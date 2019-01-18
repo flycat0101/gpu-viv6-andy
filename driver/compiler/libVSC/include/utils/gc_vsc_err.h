@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -65,10 +65,11 @@ void vscERR_ReportWarning(const char* file, gctUINT line, VSC_ErrCode status, co
 
 #if !defined(_DEBUG)
 #define VSC_ERR_DUMP     0
+#define VSC_WARNING_DUMP 0
 #else
 #define VSC_ERR_DUMP     1
+#define VSC_WARNING_DUMP 1
 #endif
-#define VSC_WARNING_DUMP 0
 
 #if VSC_ERR_DUMP
 #define ERR_REPORT(status, ...)        vscERR_ReportError(__FILE__, __LINE__, (status), __VA_ARGS__)

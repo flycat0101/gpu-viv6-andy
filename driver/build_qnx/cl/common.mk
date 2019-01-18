@@ -32,6 +32,7 @@ EXTRA_INCVPATH += $(driver_root)/hal/user
 EXTRA_INCVPATH += $(driver_root)/sdk/inc
 EXTRA_INCVPATH += $(driver_root)/compiler/libVSC/include
 EXTRA_INCVPATH += $(driver_root)/hal/os/qnx/user
+EXTRA_INCVPATH += $(driver_root)/arch/XAQ2/cmodel/inc
 
 # from libCL (trunk/driver/khronos/libCL/makefile.linux)
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl.o

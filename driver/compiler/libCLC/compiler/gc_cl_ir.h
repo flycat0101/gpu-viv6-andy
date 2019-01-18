@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -23,9 +23,7 @@
 #define cldBASIC_VECTOR_BYTE_SIZE (cldBASIC_VECTOR_SIZE * cldMachineBytesPerWord)
 #define cldMAX_ARRAY_DIMENSION  4      /*maximum number of dimension for array allowed */
 
-#ifndef _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES
-#define _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES 0
-#endif
+#define _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES (gcmOPT_oclUniformForConstant() && gcmOPT_oclInt64InVIR())
 
 #ifndef _RELAX_SYNTAX_FOR_EMBEDDED_UNNAMED_STRUCT_OR_UNION
 #define _RELAX_SYNTAX_FOR_EMBEDDED_UNNAMED_STRUCT_OR_UNION     1
@@ -95,10 +93,12 @@ typedef enum _cleBUILTIN_VARIABLE
 {
     clvBUILTIN_NONE,
     clvBUILTIN_GLOBAL_ID,
+    clvBUILTIN_PRE_SCALE_GLOBAL_ID,
     clvBUILTIN_LOCAL_ID,
     clvBUILTIN_GROUP_ID,
     clvBUILTIN_WORK_DIM,
     clvBUILTIN_GLOBAL_SIZE,
+    clvBUILTIN_GLOBAL_WORK_SCALE,
     clvBUILTIN_LOCAL_SIZE,
     clvBUILTIN_NUM_GROUPS,
     clvBUILTIN_GLOBAL_OFFSET,
@@ -108,6 +108,7 @@ typedef enum _cleBUILTIN_VARIABLE
     clvBUILTIN_ARG_LOCAL_MEM_SIZE,
     clvBUILTIN_PRINTF_ADDRESS,
     clvBUILTIN_WORKITEM_PRINTF_BUFFER_SIZE,
+    clvBUILTIN_CLUSTER_ID,
     clvBUILTIN_KERNEL_ARG,
     clvBUILTIN_LAST_ONE   /* This is a fake one to mark the last of all builtin's
                                  New builtins have to be added before this one and the
@@ -197,8 +198,11 @@ typedef enum _cleELEMENT_TYPE
     clvTYPE_IMAGE2D_T,
     clvTYPE_IMAGE2D_ARRAY_T,
     clvTYPE_IMAGE3D_T,
+    clvTYPE_VIV_GENERIC_IMAGE_T,
+    clvTYPE_VIV_GENERIC_GL_IMAGE,
     clvTYPE_SAMPLER2D,
     clvTYPE_SAMPLER3D,
+    clvTYPE_VIV_GENERIC_GL_SAMPLER,
     clvTYPE_EVENT_T,
     clvTYPE_STRUCT,
     clvTYPE_UNION,
@@ -312,11 +316,16 @@ typedef enum _cleELEMENT_TYPE
 #define clmIsElementTypeImageBuffer(EType) \
     ((EType) == clvTYPE_IMAGE1D_BUFFER_T)
 
+#define clmIsElementTypeImageGeneric(EType) \
+    ((EType) == clvTYPE_VIV_GENERIC_IMAGE_T)
+
 #define clmIsElementTypeImage(EType) \
     (clmIsElementTypeImage1D(EType) || \
      clmIsElementTypeImage2D(EType) || \
      clmIsElementTypeImage3D(EType) || \
-     clmIsElementTypeImageBuffer(EType))
+     clmIsElementTypeImageBuffer(EType) || \
+     clmIsElementTypeImageGeneric(EType) \
+    )
 
 #define clmIsElementTypeEvent(EType) \
  ((EType) == clvTYPE_EVENT_T)
@@ -440,18 +449,18 @@ typedef struct _clsMATRIX_SIZE
 
 typedef struct _clsDATA_TYPE
 {
-    slsDLINK_NODE    node;
-    gctINT        type;
-    VIR_TypeId    virPrimitiveType;
-    cltQUALIFIER    addrSpaceQualifier;
-    cltQUALIFIER    accessQualifier;
-    cltELEMENT_TYPE    elementType;
-    clsMATRIX_SIZE  matrixSize;
+    slsDLINK_NODE      node;
+    gctINT             type;
+    VIR_TypeId         virPrimitiveType;
+    cltQUALIFIER       addrSpaceQualifier : 8;
+    cltQUALIFIER       accessQualifier    : 8;
+    cltELEMENT_TYPE    elementType        : 8;
+    clsMATRIX_SIZE     matrixSize;
     union {
-       struct _clsNAME_SPACE *fieldSpace;     /* Only for struct or union*/
-       struct _clsNAME *typeDef;    /* for typedef */
-       struct _clsNAME *enumerator; /* for enum */
-       gctPOINTER generic; /* generic to all */
+       struct _clsNAME_SPACE *fieldSpace;  /* Only for struct or union*/
+       struct _clsNAME       *typeDef;     /* for typedef */
+       struct _clsNAME       *enumerator;  /* for enum */
+       gctPOINTER             generic;     /* generic to all */
     } u;
 }
 clsDATA_TYPE;
@@ -464,12 +473,12 @@ typedef struct _clsARRAY
 
 typedef struct _clsDECL
 {
-    clsDATA_TYPE *dataType;    /*data type*/
-    cltQUALIFIER storageQualifier;  /* storage qualifiers : static/extern/volatile/restrict */
+    clsDATA_TYPE *dataType;             /*data type*/
     clsARRAY  array;
-    slsSLINK_LIST *ptrDscr;    /* for pointer variables */
-    gctBOOL ptrDominant;       /* This is to indicate the declaration is a pointer
-                                  when it is an array and ptrDscr is not null */
+    slsSLINK_LIST *ptrDscr;             /* for pointer variables */
+    cltQUALIFIER storageQualifier : 8;  /* storage qualifiers : static/extern/volatile/restrict */
+    gctBOOL ptrDominant           : 2;  /* This is to indicate the declaration is a pointer
+                                            when it is an array and ptrDscr is not null */
 } clsDECL;
 
 gctUINT
@@ -554,6 +563,17 @@ gctSIZE_T
 clsDECL_GetPointedToByteSize(
 IN cloCOMPILER Compiler,
 IN clsDECL * Decl
+);
+
+void
+clGetPointedToAddrSpace(
+clsDECL *Decl,
+cltQUALIFIER *AddrSpaceQualifier
+);
+
+cltQUALIFIER
+clGetAddrSpaceQualifier(
+clsDECL *Decl
 );
 
 #define clGetVectorElementByteSize  clGetElementTypeByteSize
@@ -751,14 +771,18 @@ IN clsDECL * RDecl
     (clmDECL_IsPointerType(Decl) || \
      (clmDECL_IsArithmeticType(Decl) && \
       (Decl)->dataType->matrixSize.rowCount == 0 && \
-      !clmDECL_IsPackedGenType(Decl)))
+      !clmDECL_IsPackedGenType(Decl)) || \
+     ((Decl)->array.numDim == 0  && \
+      (clmIsElementTypeSampler((Decl)->dataType->elementType) || \
+       clmIsElementTypeEvent((Decl)->dataType->elementType))))
 
 #define clmDECL_IsElementScalar(Decl) \
-  ((clmIsElementTypeArithmetic((Decl)->dataType->elementType) && \
-   (Decl)->dataType->matrixSize.rowCount == 0 && \
-   !clmDECL_IsPackedGenType(Decl)) || \
+  ((Decl)->array.numDim == 0  && \
+   ((clmIsElementTypeArithmetic((Decl)->dataType->elementType) && \
+    (Decl)->dataType->matrixSize.rowCount == 0 && \
+    !clmDECL_IsPackedGenType(Decl)) || \
    clmIsElementTypeSampler((Decl)->dataType->elementType) || \
-   clmIsElementTypeEvent((Decl)->dataType->elementType))
+   clmIsElementTypeEvent((Decl)->dataType->elementType)))
 
 #define clmDECL_IsBool(Decl) \
     (clmIsElementTypeBoolean((Decl)->dataType->elementType) && \
@@ -936,14 +960,15 @@ clsENUMERATOR;
 /* attributes */
 typedef enum _cleATTR_FLAGS
 {
-    clvATTR_PACKED     = 0x1,
-    clvATTR_ALIGNED = 0x2,
-    clvATTR_ENDIAN = 0x4,
-    clvATTR_VEC_TYPE_HINT = 0x8,
+    clvATTR_NONE                 = 0x0,
+    clvATTR_PACKED               = 0x1,
+    clvATTR_ALIGNED              = 0x2,
+    clvATTR_ENDIAN               = 0x4,
+    clvATTR_VEC_TYPE_HINT        = 0x8,
     clvATTR_REQD_WORK_GROUP_SIZE = 0x10,
     clvATTR_WORK_GROUP_SIZE_HINT = 0x20,
-    clvATTR_ALWAYS_INLINE = 0x40,
-    clvATTR_KERNEL_SCALE_HINT = 0x80,
+    clvATTR_ALWAYS_INLINE        = 0x40,
+    clvATTR_KERNEL_SCALE_HINT    = 0x80,
 }
 cleATTR_FLAGS;
 
@@ -951,18 +976,77 @@ typedef gctUINT32 cltATTR_FLAGS;
 
 typedef struct _clsATTRIBUTE
 {
-    cltATTR_FLAGS  specifiedAttr;
-    gctUINT16 alignment;
-    gctBOOL  packed;
-    gctBOOL  alwaysInline;
-    gctBOOL  hostEndian; /*default 0: follow device's endian NOT host */
-    gctINT vecTypeHint; /*default is int*/
-    gctUINT32 reqdWorkGroupSize[3]; /*default {0,0,0} */
-    gctUINT32 workGroupSizeHint[3]; /*default {0,0,0} */
-    gctUINT32 kernelScaleHint[3];   /*default {1,1,1} */
+    cltATTR_FLAGS   specifiedAttr : 16;
+    gctUINT16       alignment     : 16;
+    gctBOOL         packed        : 2;
+    gctBOOL         alwaysInline  : 2;
+    gctBOOL         hostEndian    : 2;    /* default 0: follow device's endian NOT host */
+    gctINT          vecTypeHint   : 16;   /* default is int*/
+    gctUINT         reqdWorkGroupSize[3]; /* default {0,0,0} */
+    gctUINT         workGroupSizeHint[3]; /* default {0,0,0} */
+    gctUINT         kernelScaleHint[3];   /* default {1,1,1} */
 } clsATTRIBUTE;
 
 struct _cloIR_EXPR;
+
+typedef  struct _clsVARIABLE_INFO
+{
+    cltATTR_FLAGS  specifiedAttr;
+    union {
+       struct _cloIR_CONSTANT *constant;  /* Only for constant variables */
+       struct _clsNAME *       aliasName; /* for parameter */
+    } u;
+    struct _clsNAME *alias;          /* for optimization: alias to memory location with aliasOffset */
+    gctINT           aliasOffset;
+    gctINT           padding;        /* temporary variable for data alignment of struct*/
+    struct _clsDECL  effectiveDecl;  /* for parameter, the effective declaration with gen_type */
+    slsSLINK_LIST *  samplers;       /* for images and samplers only */
+
+    union {
+        gctUINT      value;          /* value specific to the builtin */
+        struct {
+            cleBUILTIN_VARIABLE variableType : 8;
+            gctBOOL  isConvertibleType       : 2; /* for parameter names in builtin functions, that the corresponding
+                                                     argument type can be converted to this type for matching of the
+                                                     builtin function prototype*/
+            gctBOOL  hasGenType              : 2;
+        } s;
+    } builtinSpecific;
+    gctBOOL  hostEndian              : 2; /*default 0: follow device's endian NOT host */
+    gctBOOL  isAddressed             : 2; /* has it been addressed through an '&' operator*/
+    gctBOOL  isDirty                 : 2; /* Variable is dirty, if it has been written into (location pointed by it)
+                                             or its value has been changed */
+
+    gctBOOL  allocated               : 2;  /* variable's memory has been allocated */
+    gctBOOL  inInterfaceBlock        : 2;  /* variable has put into interface block */
+    gctBOOL  isUnnamedConstant       : 2;  /* variable is an unnamed constant */
+    gctBOOL  indirectlyAddressed     : 2;  /* variable whose elements are indirectly addressed */
+    gctBOOL  isInitializedWithExtendedVectorConstant : 2;  /* variable is initialized with constant */
+}
+clsVARIABLE_INFO;
+
+typedef  struct _clsNAME_CONTEXT
+{
+    gctUINT16 alignment  : 16;
+    gctBOOL  packed      : 2;
+    union {
+      struct {
+        struct _clsLOGICAL_REG *logicalRegs;
+        gctINT  memoryOffset;
+        gctUINT  logicalRegCount : 30;
+
+        /* Only for the function/parameter names */
+        gctBOOL isKernel         : 2;  /* belong to kernel function if true */
+        union {
+          gcFUNCTION    function;
+          gcKERNEL_FUNCTION kernelFunction;
+        }u;
+      } variable;
+      clsDECL typeDef;
+      slsSLINK_LIST *enumerator;   /* for enum */
+    } u;
+}
+clsNAME_CONTEXT;
 
 typedef struct _clsNAME
 {
@@ -971,94 +1055,55 @@ typedef struct _clsNAME
     gctUINT         fileNo;
     gctUINT         lineNo;
     gctUINT         stringNo;
-    cleNAME_TYPE    type;
     struct _clsDECL decl;
     struct _clsNAME *derivedType;
     cltPOOL_STRING  symbol;
-    gctBOOL         isBuiltin;
-    cleEXTENSION    extension;
-    gctUINT16       die;
+    cleNAME_TYPE    type      : 6;
+    gctBOOL         isBuiltin : 2;
+    cleEXTENSION    extension : 8;
+    gctUINT16       die       : 16;
     union {
-      struct {
-        cltATTR_FLAGS  specifiedAttr;
-        union {
-           struct _cloIR_CONSTANT *constant; /* Only for constant variables */
-           struct _clsNAME *aliasName; /* for parameter */
-        } u;
-        struct _clsNAME *alias;  /* for optimization: alias to memory location with aliasOffset */
-        gctINT aliasOffset;
-        gctINT padding;  /* temporary variable for data alignment of struct*/
-        struct _clsDECL effectiveDecl; /* for parameter, the effective declaration with gen_type */
-        slsSLINK_LIST *samplers; /* for images and samplers only */
-        cleBUILTIN_VARIABLE variableType;
-        gctBOOL  hostEndian; /*default 0: follow device's endian NOT host */
-        gctBOOL  isAddressed; /* has it been addressed through an '&' operator*/
-        gctBOOL  isConvertibleType; /* for parameter names in builtin functions, that the corresponding
-                                          argument type can be converted to this type for matching of the
-                                          builtin function prototype*/
-        gctBOOL isDirty; /* Variable is dirty, if it has been written into (location pointed by it)
-                                or its value has been changed */
-        gctBOOL  hasGenType;
-        gctBOOL  allocated;  /* variable's memory has been allocated */
-        gctBOOL  inInterfaceBlock;  /* variable has put into interface block */
-        gctBOOL  isUnnamedConstant;  /* variable is an unnamed constant */
-        gctBOOL  isInitializedWithExtendedVectorConstant;  /* variable is initialized with constant */
-        gctBOOL  indirectlyAddressed;  /* variable whose elements are indirectly addressed */
-      } variableInfo;
+      clsVARIABLE_INFO variableInfo;
       struct { /* enum, struct, union or typedefs */
-        cltATTR_FLAGS  specifiedAttr;
-        gctUINT16 alignment;
-        gctBOOL packed;
-        gctBOOL needMemory;
-        gctINT  typeNameOffset;
-        gctBOOL hasUnnamedFields;
-        gctBOOL hasUnionFields;
+        cltATTR_FLAGS   specifiedAttr;
+        gctINT          typeNameOffset ;
+        gctUINT16       alignment;
+        gctBOOL         packed            : 2;
+        gctBOOL         needMemory        : 2;
+        gctBOOL         hasUnnamedFields  : 2;
+        gctBOOL         hasUnionFields    : 2;
       } typeInfo;
       struct {
-        struct _clsNAME_SPACE *localSpace;
-        struct _cloIR_SET *funcBody;
-        gctINT vecTypeHint;
-        gctUINT32 reqdWorkGroupSize[3];
-        gctUINT32 workGroupSizeHint[3];
-        gctUINT32 kernelScaleHint[3];
-        gctSIZE_T localMemorySize;
-        gctUINT  refCount;
-        gctBOOL  needLocalMemory;
-        gctBOOL  isIntrinsicCall;
-        gceINTRINSICS_KIND  intrinsicKind;
-        cltPOOL_STRING  mangledName;
-        gctBOOL  isFuncDef;
-        gctBOOL  isInline;
-        gctBOOL  hasWriteArg;
-        gctBOOL  passArgByRef;
-        gctBOOL  hasVarArg;
-        gctBOOL  hasGenType;
+        struct _clsNAME_SPACE * localSpace;
+        struct _cloIR_SET *     funcBody;
+
+        struct {
+            cltATTR_FLAGS       attrFlags;
+            gctINT              vecTypeHint;
+            gctINT              reqdWorkGroupSize[3];
+            gctINT              workGroupSizeHint[3];
+            gctINT              kernelScaleHint[3];
+        } attrQualifier;
+
+        gctSIZE_T               localMemorySize;
+        cltPOOL_STRING          mangledName;
+        gctUINT                 refCount      : 16;
+        gceINTRINSICS_KIND      intrinsicKind : 16;
+        gctBOOL  needLocalMemory    : 2;
+        gctBOOL  isIntrinsicCall    : 2;
+        gctBOOL  isFuncDef          : 2;
+        gctBOOL  isInline           : 2;
+        gctBOOL  hasWriteArg        : 2;
+        gctBOOL  passArgByRef       : 2;
+        gctBOOL  hasVarArg          : 2;
+        gctBOOL  hasGenType         : 2;
       } funcInfo;    /* Only for function names */
       struct {
         struct _cloIR_LABEL *label;
         gctBOOL isReferenced;
       } labelInfo;
     } u;
-    struct {
-      gctUINT16 alignment;
-      gctBOOL  packed;
-      union {
-        struct {
-          gctUINT  logicalRegCount;
-          struct _clsLOGICAL_REG *logicalRegs;
-          gctINT  memoryOffset;
-
-          /* Only for the function/parameter names */
-          gctBOOL isKernel;  /* belong to kernel function if true */
-          union {
-            gcFUNCTION    function;
-            gcKERNEL_FUNCTION kernelFunction;
-          }u;
-        } variable;
-        clsDECL typeDef;
-        slsSLINK_LIST *enumerator;   /* for enum */
-      } u;
-    } context;
+    clsNAME_CONTEXT context;
 }
 clsNAME;
 
@@ -1202,8 +1247,19 @@ IN cloCOMPILER Compiler
 );
 
 clsNAME_SPACE *
+cloCOMPILER_GetGeneralBuiltinSpace(
+IN cloCOMPILER Compiler
+);
+
+clsNAME_SPACE *
 cloCOMPILER_GetCurrentSpace(
 IN cloCOMPILER Compiler
+);
+
+void
+cloCOMPILER_SetCurrentSpace(
+IN cloCOMPILER Compiler,
+IN clsNAME_SPACE *NameSpace
 );
 
 clsNAME_SPACE *
@@ -1317,6 +1373,12 @@ IN cltPOOL_STRING Symbol,
 IN slsSLINK_LIST *PtrDscr,
 IN cleEXTENSION Extension,
 OUT clsNAME **Name
+);
+
+gceSTATUS
+clsNAME_Reset(
+    IN cloCOMPILER Compiler,
+    IN clsNAME * Name
 );
 
 gceSTATUS
@@ -1639,15 +1701,6 @@ OUT clsDECL * Decl
 );
 
 gceSTATUS
-cloCOMPILER_CloneDataType(
-IN cloCOMPILER Compiler,
-IN cltQUALIFIER AccessQualifier,
-IN cltQUALIFIER AddrSpaceQualifier,
-IN clsDATA_TYPE * Source,
-OUT clsDATA_TYPE **DataType
-);
-
-gceSTATUS
 cloCOMPILER_CloneDecl(
 IN cloCOMPILER Compiler,
 IN cltQUALIFIER AccessQualifier,
@@ -1819,6 +1872,9 @@ cloIR_VARIABLE_Construct(
 typedef union _cluCONSTANT_VALUE
 {
     gctCHAR     charValue;
+    gctUINT8    ucharValue;
+    gctINT16    shortValue;
+    gctUINT16   ushortValue;
     gctBOOL     boolValue;
     gctINT32    intValue;
     gctINT64    longValue;
@@ -1841,7 +1897,7 @@ struct _cloIR_CONSTANT
 
     union {
        gcUNIFORM *        uniformArr;
-       gcUNIFORM          uniform;
+       gcUNIFORM          uniformVector;
     } u;
 };
 
@@ -2372,7 +2428,7 @@ typedef struct _clsPARSER_STATE
 clsPARSER_STATE;
 
 void
-cloIR_InitializeVecCompSelTypes();
+cloIR_InitializeVecCompSelTypes(IN cloCOMPILER Compiler);
 
 gctCONST_STRING
 clGetIRPolynaryExprTypeName(

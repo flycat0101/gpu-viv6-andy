@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -25,7 +25,6 @@ EXPORTS
     gcoOS_AddSignalHandler
     gcoOS_Allocate
     gcoOS_AllocateMemory
-    gcoOS_AllocateNonPagedMemory
     gcoOS_AllocateSharedMemory
     gcoOS_AtomConstruct
     gcoOS_AtomDestroy
@@ -54,9 +53,7 @@ EXPORTS
     gcoOS_EnableDebugBuffer
     gcoOS_Flush
     gcoOS_Free
-    gcoOS_FreeContiguous
     gcoOS_FreeLibrary
-    gcoOS_FreeNonPagedMemory
     gcoOS_FreeSharedMemory
     gcoOS_FreeThreadData
     gcoOS_FreeMemory
@@ -84,7 +81,6 @@ EXPORTS
     gcoOS_HexStrToInt
     gcoOS_HexStrToFloat
     gcoOS_LoadLibrary
-    gcoOS_MapUserMemory
     gcoOS_MemCmp
     gcoOS_Open
     gcoOS_Print
@@ -98,6 +94,7 @@ EXPORTS
     gcoOS_Read
     gcoOS_ReadRegister
     gcoOS_ReleaseMutex
+    gcoOS_Remove
     gcoOS_Seek
     gcoOS_Send
     gcoOS_WaitForSend
@@ -130,7 +127,6 @@ EXPORTS
     gcoOS_UnLockPLS
 	gcoOS_UnLockGLFECompiler
 	gcoOS_UnLockCLFECompiler
-    gcoOS_UnmapUserMemory
     gcoOS_Verify
     gcoOS_WaitSignal
     gcoOS_Write
@@ -140,11 +136,18 @@ EXPORTS
     gcoOS_CacheClean
     gcoOS_DetectProcessByName
     gcoOS_DetectProcessByEncryptedName
-    gcoOS_MapUserMemoryEx
     gcoOS_FscanfI
+    gcoOS_LockFile
+    gcoOS_UnlockFile
 
     gcoOS_SysTraceBegin
     gcoOS_SysTraceEnd
+
+    gcsHASH_MD5Init
+    gcsHASH_MD5Update
+    gcsHASH_MD5Final
+
+    gcoOS_GetMemoryProfileInfo
 
 
 !IF "$(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_VG)" != "0_0"
@@ -225,7 +228,6 @@ EXPORTS
     gcoHAL_Construct
     gcoHAL_Destroy
     gcoHAL_DumpFrameDB
-    gcoHAL_GetDump
 	gcoHAL_InitGPUProfile
 	gcoHAL_DumpGPUProfile
 
@@ -248,6 +250,7 @@ EXPORTS
     gcoHAL_ProfileStart
     gcoHAL_QueryChipCount
     gcoHAL_Query3DCoreCount
+    gcoHAL_QueryCluster
     gcoHAL_QueryChipFeature
     gcoHAL_QueryChipIdentity
     gcoHAL_QueryChipIdentityEx
@@ -257,12 +260,9 @@ EXPORTS
     gcoHAL_QueryVideoMemory
     gcoHAL_ScheduleEvent
     gcoHAL_ScheduleUnmapMemory
-    gcoHAL_ScheduleUnmapUserMemory
     gcoHAL_SetPowerManagementState
     gcoHAL_SetTimer
     gcoHAL_UnmapMemory
-    gcoHAL_MapUserMemory
-    gcoHAL_UnmapUserMemory
     gcoHAL_QuerySeparated2D
     gcoHAL_SetTimeOut
     gcoHAL_GetOption
@@ -288,27 +288,18 @@ EXPORTS
     gcoHAL_SetCompilerFuncTable
 !ENDIF
     gcoHAL_SetHardwareType
+    gcoHAL_GetBaseAddr
 
-    ; gcoDUMP
-    gcoDUMP_AddSurface
-    gcoDUMP_Construct
-    gcoDUMP_Control
-    gcoDUMP_Delete
-    gcoDUMP_Destroy
-    gcoDUMP_DumpData
-    gcoDUMP_FrameBegin
-    gcoDUMP_FrameEnd
-    gcoDUMP_IsEnabled
-    gcoDUMP_SetDumpFlag
-    gcfDump
-    gcfDumpApi
-    gcfDumpArray
-    gcfDumpArrayToken
-    gcfDumpApiData
-    gcfDumpBuffer
-    gcfDumpFrameRate
-    gcfDump2DCommand
-    gcfDump2DSurface
+    gcoOS_SetDumpFlag
+    gcoOS_Dump
+    gcoOS_DumpApi
+    gcoOS_DumpArray
+    gcoOS_DumpArrayToken
+    gcoOS_DumpApiData
+    gcoOS_DumpBuffer
+    gcoOS_DumpFrameRate
+    gcoOS_Dump2DCommand
+    gcoOS_Dump2DSurface
     gcfAddMemoryInfo
     gcfDelMemoryInfo
 
@@ -733,8 +724,9 @@ EXPORTS
     ; gcSHADER
     gcQueryShaderCompilerHwCfg
     gcLoadShaders
-    gcLoadKernel
     gcInvokeThreadWalker
+    gcoSHADER_BindUniform
+    gcoSHADER_BindUniformCombinedMode
     gcoSHADER_ProgramUniform
     gcoSHADER_ProgramUniformEx
     gcoSHADER_BindBufferBlock
@@ -789,9 +781,11 @@ EXPORTS
     gcoCL_RestoreContext
     gcoCL_CreateHW
     gcoCL_DestroyHW
+    gcoCL_GetHWConfigGpuCount
     gcoCL_AllocateMemory
     gcoCL_FreeMemory
     gcoCL_WrapUserMemory
+	gcoCL_WrapUserPhysicalMemory
     gcoCL_FlushMemory
     gcoCL_InvalidateMemoryCache
     gcoCL_ShareMemoryWithStream
@@ -805,7 +799,6 @@ EXPORTS
     gcoCL_SetupTexture
     gcoCL_QueryDeviceInfo
     gcoCL_QueryDeviceCount
-    gcoCL_SelectDevice
     gcoCL_Commit
     gcoCL_CreateSignal
     gcoCL_DestroySignal
@@ -816,18 +809,16 @@ EXPORTS
     gcoCL_InvokeKernel
     gcoCL_InvokeThreadWalker
     gcoCL_SetSignal
-    gcoCL_MultiGPUSync
     gcoCL_MemBltCopy
     gcoCL_MemWaitAndGetFence
-    gcoCL_MemIsFenceBack
     gcoCL_ChooseBltEngine
 
     ; gcoPROFILER
     gcoPROFILER_Construct
     gcoPROFILER_Destroy
-    gcoPROFILER_Enable
+    gcoPROFILER_Initialize
     gcoPROFILER_Disable
-    gcoPROFILER_Begin
+    gcoPROFILER_EnableCounters
     gcoPROFILER_End
     gcoPROFILER_Write
     gcoPROFILER_Flush
@@ -894,10 +885,15 @@ EXPORTS
     gcoVG_SetFillRule
     gcoVG_EnableDither
     gcoVG_DrawSurfaceToImage
+    gcoVG_SetTesselationSize
+    gcoVG_DrawSurfaceToImageMasked
 !IF "$(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_2D)_$(VIVANTE_ENABLE_VG)" == "0_0_1"
     gcoVG_SetColorKey
     gcoVG_SetColorIndexTable
     gcoVG_Resolve
+    gcoVG_SetYUV2RGBStdCust
+    gcoVG_SetYUV2RGB
+    gcoVG_SetRGB2YUVParameters
 !ENDIF
 
     gcoVGHARDWARE_QueryPathStorage
@@ -952,6 +948,10 @@ EXPORTS
     gcoVGHARDWARE_SetColorKey
     gcoVGHARDWARE_SetColorIndexTable
     gcoVGHARDWARE_ResolveRect
+    gcoVGHARDWARE_SetYUV2RGBStdCust
+    gcoVGHARDWARE_SetYUV2RGB
+    gcoVGHARDWARE_SetRGB2YUVParameters
+    gcoVGHARDWARE_SetYUV2RGBParameters
 !ENDIF
 
     gcoHAL_Flush
@@ -971,6 +971,13 @@ EXPORTS
 !ENDIF
     gcoHAL_GetHardwareType
     gcoHAL_QueryCoreCount
+    gcoHAL_SelectChannel
+    gcoHAL_MCFESemaphore
+    gcoHAL_AllocateMCFESemaphore
+    gcoHAL_FreeMCFESemaphore
+    gcoHAL_QuerySRAM
+
+
 
 !IF "$(VIVANTE_ENABLE_3D)" == "1"
     gcoBUFOBJ_Construct
@@ -984,7 +991,7 @@ EXPORTS
     gcoBUFOBJ_CPUCacheOperation_Range
     gcoBUFOBJ_CPUCacheOperation
     gcoBUFOBJ_GetSize
-    gcoBUFOBJ_GPUCacheOperation
+    gcoBUFOBJ_SetCPUWrite
     gcoBUFOBJ_GetFence
     gcoBUFOBJ_WaitFence
     gcoBUFOBJ_IsFenceEnabled
@@ -1004,14 +1011,16 @@ EXPORTS
 !IF "$(VIVANTE_ENABLE_VX)" == "1"
     ; gcoVX
     gcoVX_Initialize
+    gcoVX_Construct
+    gcoVX_Destroy
     gcoVX_BindImage
+    gcoVX_SetImageInfo
     gcoVX_BindKernel
     gcoVX_BindUniform
     gcoVX_InvokeKernel
     gcoVX_Commit
     gcoVX_AllocateMemory
     gcoVX_FreeMemory
-    gcoVX_DestroyInstruction
     gcoVX_KernelConstruct
     gcoVX_LockKernel
     gcoVX_Replay
@@ -1022,28 +1031,35 @@ EXPORTS
     gcoVX_ProgrammCrossEngine
     gcoVX_SetNNImage
     gcoVX_GetNNConfig
+    gcoVX_FlushCache
     gcoVX_AllocateMemoryEx
     gcoVX_FreeMemoryEx
     gcoVX_GetMemorySize
     gcoVX_ZeroMemorySize
-    gcoVX_CreateDevices
-    gcoVX_DestroyDevices
-    gcoVX_GetCurrentDevice
-    gcoVX_SetCurrentDevice
-    gcoVX_MultiDeviceSync
-    gcoVX_SaveContext
+    gcoVX_GetHWConfigGpuCount
+    gcoVX_SwitchContext
     gcoVX_RestoreContext
     gcoVX_WaitNNEvent
+    gcoVX_SetRemapAddress
+    gcoVX_ProgrammYUV2RGBScale
+    gcoVX_CaptureState
+    gcoVX_CreateHW
+    gcoVX_DestroyHW
+    gcoVX_VerifyHardware
+    gcoVX_GetEvisNoInstFeatureCap
+    gcoVX_QueryDeviceCount
+	gcoVX_CaptureInitState
+
 
 !IF "$(VSIMULATOR_DEBUG)" == "1"
     gcoOS_UpdateSimulatorCallback
     gcoOS_SetFrameworkType
+    gcoOS_SetVSimulatorTarget
     gcoVX_addDebugShader
     gcoVX_QueryShader
     gcoVX_QueryShaderList
     gcoVX_cleanDebugShader
-	gcoVX_addNNProfileInfo
-	gcoVX_QueryNNPerf
+    gcoVX_SetDebugShaderCount
 !ENDIF
 
 !ENDIF

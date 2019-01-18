@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -47,6 +47,7 @@ _convertShaderType(
 gceSTATUS
 sloCOMPILER_Construct_General(
     IN sleSHADER_TYPE ShaderType,
+    IN gceAPI ClientApiVersion,
     OUT sloCOMPILER * Compiler
     )
 {
@@ -83,6 +84,7 @@ sloCOMPILER_Construct_General(
         /* Initialize members */
         compiler->object.type               = slvOBJ_COMPILER;
         compiler->shaderType                = (sleSHADER_TYPE)_convertShaderType(ShaderType);
+        compiler->clientApiVersion          = ClientApiVersion;
 
 #if __USE_VSC_MP__
         vscPMP_Intialize(&compiler->generalPMP, gcvNULL, __VSC_GENERAL_MP_SIZE__, sizeof(void *), __ENABLE_VSC_MP_POOL__);
@@ -97,6 +99,8 @@ sloCOMPILER_Construct_General(
         slsSLINK_LIST_Initialize(&compiler->context.layoutOffset);
         slsSLINK_LIST_Initialize(&compiler->context.sharedVariables);
         slsDLINK_LIST_Initialize(&compiler->context.dataTypeNameList);
+        slsDLINK_LIST_Initialize(&compiler->context.constantVariables);
+        compiler->context.constantBufferSize = 0;
 
         for (i = 0; i < sldMAX_VECTOR_COMPONENT; i++)
         {
@@ -226,6 +230,8 @@ sloCOMPILER_Construct(
         slsSLINK_LIST_Initialize(&compiler->context.layoutOffset);
         slsSLINK_LIST_Initialize(&compiler->context.sharedVariables);
         slsDLINK_LIST_Initialize(&compiler->context.dataTypeNameList);
+        slsDLINK_LIST_Initialize(&compiler->context.constantVariables);
+        compiler->context.constantBufferSize = 0;
 
         for(i = 0; i < sldMAX_VECTOR_COMPONENT; i++)
         {
@@ -484,6 +490,9 @@ sloCOMPILER_Destroy_General(
         gcmVERIFY_OK(sloCOMPILER_Free(Compiler, sharedVariable));
     }
 
+    /* Destroy constantVariables list */
+    gcmVERIFY_OK(sloCOMPILER_DestroyConstantVariableList(Compiler));
+
     /* Destory string pool */
     FOR_EACH_HASH_BUCKET(&Compiler->context.generalStringPool, poolStringBucket)
     {
@@ -499,6 +508,8 @@ sloCOMPILER_Destroy_General(
 #else
     gcmVERIFY_OK(sloCOMPILER_EmptyMemoryPool(Compiler, gcvTRUE));
 #endif
+
+    slCleanupKeywords();
 
     /* Free compiler struct */
     gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Compiler));
@@ -684,6 +695,9 @@ sloCOMPILER_Destroy(
         slsSLINK_LIST_DetachFirst(&Compiler->context.sharedVariables, slsSHARED_VARIABLE, &sharedVariable);
         gcmVERIFY_OK(sloCOMPILER_Free(Compiler, sharedVariable));
     }
+
+    /* Destroy constantVariables list */
+    gcmVERIFY_OK(sloCOMPILER_DestroyConstantVariableList(Compiler));
 
     /* Destory string pool */
     FOR_EACH_HASH_BUCKET(&Compiler->context.privateStringPool, poolStringBucket)
@@ -1126,19 +1140,13 @@ sloCOMPILER_GenCode(
 
     slsGEN_CODE_PARAMETERS_Initialize(&parameters, gcvFALSE, gcvFALSE);
 
-    gcmONERROR(sloIR_OBJECT_Accept(
-                                Compiler,
-                                &Compiler->context.rootSet->base,
-                                &codeGenerator->visitor,
-                                &parameters));
+    gcmONERROR(sloIR_OBJECT_Accept(Compiler,
+                                   &Compiler->context.rootSet->base,
+                                   &codeGenerator->visitor,
+                                   &parameters));
 
-    gcmONERROR(sloCOMPILER_BackPatch(Compiler, codeGenerator));
-
-    gcmONERROR(sloCOMPILER_PackUniformsWithSharedOrStd140(Compiler));
-
-    gcmONERROR(sloCOMPILER_PackSSBOWithSharedOrStd140OrStd430(Compiler));
-
-    gcmONERROR(sloCOMPILER_CheckAssignmentForGlFragData(Compiler));
+    /* Do some clean-up work after CG. */
+    gcmONERROR(sloCOMPILER_CleanUp(Compiler, codeGenerator));
 
     slsGEN_CODE_PARAMETERS_Finalize(&parameters);
 
@@ -1153,16 +1161,23 @@ sloCOMPILER_GenCode(
     /* Check if 'main' function defined */
     if (!Compiler->context.mainDefined)
     {
-        gcmVERIFY_OK(sloCOMPILER_Report(
-                                        Compiler,
-                                        0,
-                                        0,
-                                        slvREPORT_ERROR,
-                                        "'main' function undefined"));
-
-        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
-        gcmFOOTER();
-        return status;
+        /* GL allows a shader without a main function in FE, we need to do more checks in BE.*/
+        if (!sloCOMPILER_IsOGLVersion(Compiler))
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(
+                                            Compiler,
+                                            0,
+                                            0,
+                                            slvREPORT_ERROR,
+                                            "'main' function undefined"));
+            status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+            gcmFOOTER();
+            return status;
+        }
+    }
+    else
+    {
+        gcShaderSetHasDefineMainFunc(Compiler->binary);
     }
 
     gcmFOOTER_NO();
@@ -1288,6 +1303,29 @@ sloCOMPILER_Compile(
         /* save NotStagesRelatedLinkError. */
         gcSHADER_SetNotStagesRelatedLinkError(binary,
                                               Compiler->context.hasNotStagesRelatedLinkError);
+
+        /* Copy the constantVariableList into the constantBuffer. */
+        if (Compiler->context.constantBufferSize > 0)
+        {
+            gctCHAR *buffer;
+            gctPOINTER pointer;
+
+            status = sloCOMPILER_Allocate(Compiler,
+                                          gcmSIZEOF(gctCHAR) * Compiler->context.constantBufferSize,
+                                          &pointer);
+            if (gcmIS_ERROR(status)) return gcvSTATUS_OUT_OF_MEMORY;
+
+            buffer = (gctCHAR*)pointer;
+
+            /* Initialize the constant buffer with the constant variables*/
+            gcmERR_BREAK(sloCOMPILER_InitializeConstantBuffer(Compiler, buffer));
+
+            /* Copy the buffer into gcSHADER. */
+            gcmERR_BREAK(gcSHADER_SetConstantMemorySize(Compiler->binary,
+                                                        Compiler->context.constantBufferSize,
+                                                        buffer));
+            sloCOMPILER_Free(Compiler, pointer);
+        }
 
         /* Pack the binary */
         gcmERR_BREAK(gcSHADER_Pack(binary));
@@ -1901,6 +1939,7 @@ sloCOMPILER_CheckErrorLog(
 
     gcmHEADER_ARG("Compiler=0x%x LineNo=%d StringNo=%d ",
                   Compiler, LineNo, StringNo);
+
     if (Compiler->context.errorCount)
         status = gcvSTATUS_TRUE;
 
@@ -2088,6 +2127,7 @@ sloCOMPILER_Free(
     return status;
 }
 
+#if gcdUSE_WCLIP_PATCH
 gceSTATUS
 sloCOMPILER_InsertWClipList(
     IN sloCOMPILER Compiler,
@@ -2156,7 +2196,7 @@ sloCOMPILER_FindWClipForUniformList(
     gcmFOOTER();
     return status;
 }
-
+#endif
 
 gceSTATUS
 sloCOMPILER_GetUniformIndex(
@@ -2586,7 +2626,6 @@ slReport(
     gcmHEADER_ARG("LineNo=%d StringNo=%d Type=%d Message=0x%x ...",
                   LineNo, StringNo, Type, Message);
 
-    /* TODO: ... */
     gcmASSERT(CurrentCompiler);
 
     gcmARGUMENTS_START(arguments, Message);
@@ -2773,6 +2812,7 @@ sloCOMPILER_CloneDataType(
 gceSTATUS
 sloCOMPILER_DuplicateFieldSpaceForDataType(
     IN sloCOMPILER Compiler,
+    IN gctBOOL isInput,
     IN OUT slsDATA_TYPE * DataType
     )
 {
@@ -2793,9 +2833,43 @@ sloCOMPILER_DuplicateFieldSpaceForDataType(
     /* Duplicate field list. */
     FOR_EACH_DLINK_NODE(&DataType->fieldSpace->names, slsNAME, orgFieldName)
     {
+        sleSHADER_TYPE shaderType = Compiler->shaderType;
 #ifndef __clang__
         orgFieldName = orgFieldName;
 #endif
+        /* Check data type */
+        /* double/interger input must have "flat" qualifier. */
+        if (isInput &&
+            (slmIsElementTypeDouble(orgFieldName->dataType->elementType) ||
+            slmIsElementTypeInteger(orgFieldName->dataType->elementType)) &&
+            orgFieldName->dataType->qualifiers.interpolation != slvINTERPOLATION_QUALIFIER_FLAT &&
+            DataType->qualifiers.interpolation != slvINTERPOLATION_QUALIFIER_FLAT &&
+            shaderType == slvSHADER_TYPE_FRAGMENT &&
+            sloCOMPILER_IsOGLVersion(Compiler))
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            orgFieldName->lineNo,
+                                            orgFieldName->stringNo,
+                                            slvREPORT_ERROR,
+                                            "double-precision floating-point or integer typed input '%s' has to have flat interpolation qualifier",
+                                            orgFieldName->symbol));
+            status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+            gcmONERROR(status);
+        }
+
+        if (slsDATA_TYPE_IsOpaque(orgFieldName->dataType) &&
+            sloCOMPILER_IsOGLVersion(Compiler))
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            orgFieldName->lineNo,
+                                            orgFieldName->stringNo,
+                                            slvREPORT_ERROR,
+                                            "%s of opaque data type is not allowed in interface block",
+                                            orgFieldName->symbol));
+            status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+            gcmONERROR(status);
+        }
+
         /* Create a new name. */
         gcmONERROR(sloCOMPILER_CreateName(Compiler,
                                           orgFieldName->lineNo,
@@ -2817,6 +2891,7 @@ sloCOMPILER_DuplicateFieldSpaceForDataType(
         if (newDataType->elementType == slvTYPE_STRUCT)
         {
             gcmONERROR(sloCOMPILER_DuplicateFieldSpaceForDataType(Compiler,
+                                                                  isInput,
                                                                   newDataType));
         }
         newFieldName->dataType = newDataType;
@@ -2881,6 +2956,7 @@ sloCOMPILER_CreateName(
 {
     gceSTATUS status;
     gctSIZE_T length = 0;
+    gctBOOL isBuiltIn = Compiler->context.loadingBuiltIns;
 
     gcmHEADER_ARG("Compiler=0x%x LineNo=%d StringNo=%d "
                   "Type=%d DataType=0x%x Symbol=0x%x "
@@ -2899,16 +2975,36 @@ sloCOMPILER_CreateName(
         if (length >= 3 &&
             Symbol[0] == 'g' && Symbol[1] == 'l' && Symbol[2] == '_')
         {
-            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                            LineNo,
-                                            StringNo,
-                                            slvREPORT_ERROR,
-                                            "The identifier: '%s' starting with 'gl_' is reserved",
-                                            Symbol));
+            sleSHADER_TYPE shaderType;
+            shaderType = Compiler->shaderType;
+           /* The following predeclared variables can be redeclared with an interpolation qualifier:
+              Vertex and geometry languages: gl_FrontColor / gl_BackColor / gl_FrontSecondaryColor / gl_BackSecondaryColor
+              Fragment language: gl_Color / gl_SecondaryColor */
+            if (sloCOMPILER_IsOGLVersion(Compiler) &&
+               (((shaderType == slvSHADER_TYPE_VERTEX || shaderType == slvSHADER_TYPE_GS ) &&
+                 (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_FrontColor")) ||
+                  gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_BackColor")) ||
+                  gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_FrontSecondaryColor")) ||
+                  gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_BackSecondaryColor")))) ||
+                 (shaderType == slvSHADER_TYPE_FRAGMENT &&
+                 (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_Color")) ||
+                  gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_SecondaryColor"))))))
+            {
+                isBuiltIn = gcvTRUE;
+            }
+            else
+            {
+                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                LineNo,
+                                                StringNo,
+                                                slvREPORT_ERROR,
+                                                "The identifier: '%s' starting with 'gl_' is reserved",
+                                                Symbol));
 
-            status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
-            gcmFOOTER();
-            return status;
+                status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+                gcmFOOTER();
+                return status;
+            }
         }
     }
 
@@ -2919,7 +3015,7 @@ sloCOMPILER_CreateName(
                                       Type,
                                       DataType,
                                       Symbol,
-                                      Compiler->context.loadingBuiltIns,
+                                      isBuiltIn,
                                       Extension,
                                       CheckExistedName,
                                       Name);
@@ -3331,6 +3427,35 @@ sloCOMPILER_CreateAuxGlobalNameSpace(
     gcmHEADER_ARG("Compiler=0x%x NameSpace=0x%x",
                   Compiler, NameSpace);
 
+    /* check if an interface block name is reused globally as anything other than a block name. */
+    if (sloCOMPILER_IsOGLVersion(Compiler) &&
+        SpaceName && SpaceName[0] != '\0')
+    {
+        slsNAME *name;
+        status = slsNAME_SPACE_Search(Compiler,
+                                      Compiler->context.currentSpace,
+                                      SpaceName,
+                                      gcvNULL,
+                                      gcvNULL,
+                                      gcvFALSE,
+                                      gcvFALSE,
+                                      &name);
+
+        if (status == gcvSTATUS_OK && name->type != slvINTERFACE_BLOCK_NAME)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            Compiler->context.currentLineNo,
+                                            Compiler->context.currentStringNo,
+                                            slvREPORT_ERROR,
+                                            "redefined identifier: '%s'",
+                                            SpaceName));
+
+            status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+            gcmFOOTER();
+            return status;
+        }
+    }
+
     status = sloCOMPILER_CreateNameSpace(Compiler,
                                          SpaceName,
                                          NameSpaceType,
@@ -3707,7 +3832,6 @@ slNewTempRegs(
 
     slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
 
-    /* TODO: need to pass correct temp register type */
     regIndex = (gctREG_INDEX)  gcSHADER_NewTempRegs(Compiler->binary, RegCount, gcSHADER_FLOAT_X1);
     gcmFOOTER_ARG("<return>=%u", regIndex);
     return regIndex;
@@ -3773,56 +3897,126 @@ sloCOMPILER_GetOutputInvariant(
 gceSTATUS
 sloCOMPILER_SetLanguageVersion(
     IN sloCOMPILER Compiler,
-    IN gctUINT32 LangVersion
+    IN gctUINT32 LangVersion,
+    IN gctBOOL  IsGLVersion
     )
 {
-   gcmHEADER_ARG("Compiler=0x%x LangVersion=%u",
-                 Compiler, LangVersion);
+   gcmHEADER_ARG("Compiler=0x%x LangVersion=%u IsGLVersion=0x%x",
+                 Compiler, LangVersion, IsGLVersion);
 
-   switch (LangVersion)
+   if (IsGLVersion)
    {
-   case 320:
-      Compiler->langVersion = _SHADER_ES32_VERSION;
-      Compiler->context.extensions &= ~slvEXTENSION_NON_HALTI;
-      Compiler->context.extensions |= (slvEXTENSION_HALTI | slvEXTENSION_ES_31 | slvEXTENSION_ES_32);
-      Compiler->clientApiVersion = gcvAPI_OPENGL_ES32;
-      break;
+       Compiler->context.extensions = 0;
+       Compiler->context.extensions |= slvEXTENSION_SUPPORT_OGL;
 
-   case 310:
-      Compiler->langVersion = _SHADER_ES31_VERSION;
-      Compiler->context.extensions &= ~slvEXTENSION_NON_HALTI;
-      Compiler->context.extensions |= (slvEXTENSION_HALTI | slvEXTENSION_ES_31);
-      Compiler->clientApiVersion = gcvAPI_OPENGL_ES31;
-      break;
+       switch (LangVersion)
+       {
+       /* For GLSL only. */
+       /* TODO: need to review the keyword table and built-ins and refine the extensions for each GLSL version*/
+       case 100:
+       case 110:
+          Compiler->langVersion = _SHADER_GL20_VERSION;
+          Compiler->context.extensions &= ~slvEXTENSION_ES_30_AND_ABOVE;
+          Compiler->context.extensions |= slvEXTENSION_NON_HALTI;
+          break;
 
-   case 300:
-      Compiler->langVersion = _SHADER_HALTI_VERSION;
-      Compiler->context.extensions &= ~(slvEXTENSION_NON_HALTI | slvEXTENSION_ES_31);
-      Compiler->context.extensions |= slvEXTENSION_HALTI;
-      Compiler->clientApiVersion = gcvAPI_OPENGL_ES30;
-      break;
+       case 120:
+          Compiler->langVersion = _SHADER_GL21_VERSION;
+          Compiler->context.extensions &= ~slvEXTENSION_ES_30_AND_ABOVE;
+          Compiler->context.extensions |= slvEXTENSION_NON_HALTI;
+          break;
 
-   case 100:
-      Compiler->langVersion = _SHADER_ES11_VERSION;
-      Compiler->context.extensions &= ~slvEXTENSION_ES_30_AND_ABOVE;
-      Compiler->context.extensions |= slvEXTENSION_NON_HALTI;
-      Compiler->clientApiVersion = gcvAPI_OPENGL_ES20;
-      break;
+       case 130:
+          Compiler->langVersion = _SHADER_GL30_VERSION;
+          Compiler->context.extensions |= (slvEXTENSION_HALTI | slvEXTENSION_NON_HALTI | slvEXTENSION_ES_31
+                                          |slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS);
+          break;
 
-   case 110:
-   case 120:
-      Compiler->langVersion = _SHADER_ES11_VERSION;
-      Compiler->context.extensions &= ~slvEXTENSION_ES_30_AND_ABOVE;
-      Compiler->context.extensions |= slvEXTENSION_NON_HALTI;
-       break;
+       case 140:
+          Compiler->langVersion = _SHADER_GL31_VERSION;
+          Compiler->context.extensions |= (slvEXTENSION_HALTI | slvEXTENSION_NON_HALTI | slvEXTENSION_ES_31
+                                          |slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS);
+          break;
 
-   default:
-      gcmASSERT(0);
-      Compiler->langVersion = _SHADER_ES11_VERSION;
-      Compiler->context.extensions &= ~slvEXTENSION_HALTI;
-      Compiler->context.extensions |= slvEXTENSION_NON_HALTI;
-      gcmFOOTER_NO();
-      return gcvSTATUS_INVALID_DATA;
+       case 150:
+          Compiler->langVersion = _SHADER_GL32_VERSION;
+          Compiler->context.extensions |= (slvEXTENSION_HALTI | slvEXTENSION_NON_HALTI | slvEXTENSION_ES_31
+                                          |slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS | slvEXTENSION_EXT_GEOMETRY_SHADER );
+          break;
+
+       case 330:
+          Compiler->langVersion = _SHADER_GL33_VERSION;
+          Compiler->context.extensions |= (slvEXTENSION_HALTI | slvEXTENSION_NON_HALTI | slvEXTENSION_ES_31
+                                          |slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS |slvEXTENSION_EXT_GEOMETRY_SHADER );
+          break;
+
+       case 400:
+         {
+             sleSHADER_TYPE shaderType;
+             sloCOMPILER_GetShaderType(Compiler, &shaderType);
+             Compiler->langVersion = _SHADER_GL40_VERSION;
+             Compiler->context.extensions |= (slvEXTENSION_HALTI |slvEXTENSION_NON_HALTI | slvEXTENSION_DOUBLE_DATA_TYPE | slvEXTENSION_ES_31
+                                          | slvEXTENSION_EXT_GEOMETRY_SHADER | slvEXTENSION_TESSELLATION_SHADER | slvEXTENSION_TEXTURE_CUBE_MAP_ARRAY );
+             if (shaderType != slvSHADER_TYPE_LIBRARY)
+             {
+                 Compiler->context.extensions |= slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS;
+             }
+             else
+             {
+                 Compiler->context.extensions |= slvEXTENSION_INTEGER_MIX;
+             }
+          }
+          break;
+
+       default:
+          gcmASSERT(0);
+          Compiler->langVersion = _SHADER_GL11_VERSION;
+          Compiler->context.extensions &= ~slvEXTENSION_HALTI;
+          Compiler->context.extensions |= slvEXTENSION_NON_HALTI;
+          gcmFOOTER_NO();
+          return gcvSTATUS_INVALID_DATA;
+       }
+   }
+   else
+   {
+       switch (LangVersion)
+       {
+       case 320:
+          Compiler->langVersion = _SHADER_ES32_VERSION;
+          Compiler->context.extensions &= ~slvEXTENSION_NON_HALTI;
+          Compiler->context.extensions |= (slvEXTENSION_HALTI | slvEXTENSION_ES_31 | slvEXTENSION_ES_32 | slvEXTENSION_INTEGER_MIX);
+          Compiler->clientApiVersion = gcvAPI_OPENGL_ES32;
+          break;
+
+       case 310:
+          Compiler->langVersion = _SHADER_ES31_VERSION;
+          Compiler->context.extensions &= ~slvEXTENSION_NON_HALTI;
+          Compiler->context.extensions |= (slvEXTENSION_HALTI | slvEXTENSION_ES_31 | slvEXTENSION_INTEGER_MIX);
+          Compiler->clientApiVersion = gcvAPI_OPENGL_ES31;
+          break;
+
+       case 300:
+          Compiler->langVersion = _SHADER_HALTI_VERSION;
+          Compiler->context.extensions &= ~(slvEXTENSION_NON_HALTI | slvEXTENSION_ES_31);
+          Compiler->context.extensions |= slvEXTENSION_HALTI;
+          Compiler->clientApiVersion = gcvAPI_OPENGL_ES30;
+          break;
+
+       case 100:
+          Compiler->langVersion = _SHADER_ES11_VERSION;
+          Compiler->context.extensions &= ~slvEXTENSION_ES_30_AND_ABOVE;
+          Compiler->context.extensions |= slvEXTENSION_NON_HALTI;
+          Compiler->clientApiVersion = gcvAPI_OPENGL_ES20;
+          break;
+
+       default:
+          gcmASSERT(0);
+          Compiler->langVersion = _SHADER_ES11_VERSION;
+          Compiler->context.extensions &= ~slvEXTENSION_HALTI;
+          Compiler->context.extensions |= slvEXTENSION_NON_HALTI;
+          gcmFOOTER_NO();
+          return gcvSTATUS_INVALID_DATA;
+       }
    }
 
    gcmFOOTER_NO();
@@ -3848,7 +4042,14 @@ sloCOMPILER_GetVersion(
     {
         version = Compiler->langVersion;
     }
-    _slCompilerVersion[0] = _SHADER_GL_LANGUAGE_TYPE | (ShaderType << 16);
+    if (sloCOMPILER_IsOGLVersion(Compiler))
+    {
+        _slCompilerVersion[0] = _SHADER_OGL_LANGUAGE_TYPE | (ShaderType << 16);
+    }
+    else
+    {
+        _slCompilerVersion[0] = _SHADER_GL_LANGUAGE_TYPE | (ShaderType << 16);
+    }
     _slCompilerVersion[1] = version;
     return _slCompilerVersion;
 }
@@ -3866,7 +4067,7 @@ sloCOMPILER_IsHaltiVersion(
     IN sloCOMPILER Compiler
     )
 {
-    return sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_HALTI_VERSION;
+    return (sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_HALTI_VERSION || sloCOMPILER_IsOGLVersion(Compiler));
 }
 
 gctBOOL
@@ -3883,6 +4084,63 @@ sloCOMPILER_IsES31VersionOrAbove(
     )
 {
     return sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_ES31_VERSION;
+}
+
+gctBOOL
+sloCOMPILER_IsOGLVersion(
+    IN sloCOMPILER Compiler
+    )
+{
+    gctUINT32 version_sig = (sloCOMPILER_GetLanguageVersion(Compiler) >> 8) & 0xFF;
+    return (version_sig == _SHADER_GL_VERSION_SIG);
+}
+
+gctBOOL
+sloCOMPILER_IsOGL40Version(
+    IN sloCOMPILER Compiler
+    )
+{
+    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL40_VERSION;
+}
+
+gctBOOL
+sloCOMPILER_IsOGL30Version(
+    IN sloCOMPILER Compiler
+    )
+{
+    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL30_VERSION;
+}
+
+gctBOOL
+sloCOMPILER_IsOGL31Version(
+    IN sloCOMPILER Compiler
+    )
+{
+    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL31_VERSION;
+}
+
+gctBOOL
+sloCOMPILER_IsOGL32Version(
+    IN sloCOMPILER Compiler
+    )
+{
+    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL32_VERSION;
+}
+
+gctBOOL
+sloCOMPILER_IsOGL33Version(
+    IN sloCOMPILER Compiler
+    )
+{
+    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL33_VERSION;
+}
+
+gctBOOL
+sloCOMPILER_IsOGL20Version(
+    IN sloCOMPILER Compiler
+    )
+{
+    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL20_VERSION;
 }
 
 gctLABEL
@@ -3938,7 +4196,7 @@ sloCOMPILER_BackPatch(
 }
 
 gceSTATUS
-sloCOMPILER_PackUniformsWithSharedOrStd140(
+sloCOMPILER_ActiveUniformsWithSharedOrStd140(
     IN sloCOMPILER Compiler
     )
 {
@@ -4004,7 +4262,7 @@ OnError:
 }
 
 gceSTATUS
-sloCOMPILER_CheckAssignmentForGlFragData(
+sloCOMPILER_CheckAssignmentForGLFragData(
     IN sloCOMPILER Compiler
     )
 {
@@ -4115,7 +4373,43 @@ OnError:
 }
 
 gceSTATUS
-sloCOMPILER_PackSSBOWithSharedOrStd140OrStd430(
+sloCOMPILER_UpdateBuiltinDataType(
+    IN sloCOMPILER Compiler
+    )
+{
+    gceSTATUS       status = gcvSTATUS_OK;
+    gcSHADER        shader = Compiler->binary;
+    gctUINT         i;
+    gcATTRIBUTE     attr = gcvNULL;
+
+    gcmHEADER();
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    /* Update CS. */
+    if (GetShaderType(shader) == gcSHADER_TYPE_COMPUTE)
+    {
+        for (i = 0; i < shader->attributeCount; i++)
+        {
+            attr = shader->attributes[i];
+            if (attr == gcvNULL)
+            {
+                continue;
+            }
+
+            /* HW uses uint4 for localId, update it. */
+            if (GetATTRNameLength(attr) == gcSL_LOCAL_INVOCATION_ID)
+            {
+                SetATTRType(attr, gcSHADER_UINT_X4);
+            }
+        }
+    }
+
+    gcmFOOTER_NO();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_ActiveSSBOWithSharedOrStd140OrStd430(
     IN sloCOMPILER Compiler
     )
 {
@@ -4160,6 +4454,36 @@ sloCOMPILER_PackSSBOWithSharedOrStd140OrStd430(
 OnError:
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_CleanUp(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER();
+
+    /* Add some unused variables. */
+    gcmONERROR(sloCOMPILER_BackPatch(Compiler, CodeGenerator));
+
+    /* Make uniforms with shared or std140 active. */
+    gcmONERROR(sloCOMPILER_ActiveUniformsWithSharedOrStd140(Compiler));
+
+    /* Make SBOs with std430 or std140 active. */
+    gcmONERROR(sloCOMPILER_ActiveSSBOWithSharedOrStd140OrStd430(Compiler));
+
+    /* Check assignment for GL fragData. */
+    gcmONERROR(sloCOMPILER_CheckAssignmentForGLFragData(Compiler));
+
+    /* Update datatype of builtin variables to match our internal implementation. */
+    gcmONERROR(sloCOMPILER_UpdateBuiltinDataType(Compiler));
+
+OnError:
+    gcmFOOTER_NO();
+    return status;
 }
 
 gceSTATUS
@@ -4491,7 +4815,7 @@ sloCOMPILER_MergeExtLayoutId(
     /* If there are multiple layout declaration for TES input or TCS output, they must be matched. */
     if ((DefaultLayout->ext_id & slvLAYOUT_EXT_TS_PRIMITIVE_MODE)   &&
         (Layout->ext_id & slvLAYOUT_EXT_TS_PRIMITIVE_MODE)          &&
-        (DefaultLayout->ext_id & slvLAYOUT_EXT_TS_PRIMITIVE_MODE) != (Layout->ext_id & slvLAYOUT_EXT_TS_PRIMITIVE_MODE))
+        (DefaultLayout->tesPrimitiveMode != Layout->tesPrimitiveMode))
     {
         gcmVERIFY_OK(sloCOMPILER_Report(
                                         Compiler,
@@ -4503,7 +4827,7 @@ sloCOMPILER_MergeExtLayoutId(
     }
     if ((DefaultLayout->ext_id & slvlAYOUT_EXT_VERTEX_SPACING)   &&
         (Layout->ext_id & slvlAYOUT_EXT_VERTEX_SPACING)          &&
-        (DefaultLayout->ext_id & slvlAYOUT_EXT_VERTEX_SPACING) != (Layout->ext_id & slvlAYOUT_EXT_VERTEX_SPACING))
+        (DefaultLayout->tesVertexSpacing != Layout->tesVertexSpacing))
     {
         gcmVERIFY_OK(sloCOMPILER_Report(
                                         Compiler,
@@ -4515,7 +4839,7 @@ sloCOMPILER_MergeExtLayoutId(
     }
     if ((DefaultLayout->ext_id & slvlAYOUT_EXT_ORERING)   &&
         (Layout->ext_id & slvlAYOUT_EXT_ORERING)          &&
-        (DefaultLayout->ext_id & slvlAYOUT_EXT_ORERING) != (Layout->ext_id & slvlAYOUT_EXT_ORERING))
+        (DefaultLayout->tesOrdering != Layout->tesOrdering))
     {
         gcmVERIFY_OK(sloCOMPILER_Report(
                                         Compiler,
@@ -4974,6 +5298,7 @@ sloCOMPILER_GetVecConstantLists(
    switch(ElementType)
    {
    case slvTYPE_FLOAT:
+   case slvTYPE_DOUBLE:
        constantList = Compiler->context.vecConstants.typeFloat;
        break;
 
@@ -5005,7 +5330,7 @@ gceSTATUS
 sloCOMPILER_GetSharedVariableList(
     IN sloCOMPILER Compiler,
     OUT slsSLINK_LIST **SharedVariableList
-)
+    )
 {
    gcmHEADER_ARG("Compiler=0x%x", Compiler);
    gcmASSERT(SharedVariableList);
@@ -5019,7 +5344,7 @@ gceSTATUS
 sloCOMPILER_AddSharedVariable(
     IN sloCOMPILER Compiler,
     IN slsNAME *VariableName
-)
+    )
 {
     gceSTATUS status;
     slsSHARED_VARIABLE *sharedVariable;
@@ -5043,6 +5368,104 @@ sloCOMPILER_AddSharedVariable(
     sharedVariable = pointer;
     sharedVariable->name = VariableName;
     slsSLINK_LIST_InsertFirst(&Compiler->context.sharedVariables, &sharedVariable->node);
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_GetConstantVariableList(
+    IN sloCOMPILER Compiler,
+    OUT slsDLINK_LIST **ConstantVariableList
+    )
+{
+   gcmHEADER_ARG("Compiler=0x%x", Compiler);
+   gcmASSERT(ConstantVariableList);
+
+   *ConstantVariableList = &Compiler->context.constantVariables;
+   gcmFOOTER_ARG("*SharedVariableList=0x%x", *ConstantVariableList);
+   return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_AddConstantVariable(
+    IN sloCOMPILER Compiler,
+    IN sloIR_CONSTANT Constant
+    )
+{
+    gceSTATUS status;
+    slsCONSTANT_VARIABLE *constantVar;
+    gctPOINTER pointer;
+
+    gcmHEADER_ARG("Compiler=0x%x Constant=0x%x", Compiler, Constant);
+
+    /* Verify the arguments. */
+    slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    status = sloCOMPILER_Allocate(Compiler,
+                                  gcmSIZEOF(slsCONSTANT_VARIABLE),
+                                  (gctPOINTER *)&pointer);
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER_NO();
+        return gcvSTATUS_OUT_OF_MEMORY;
+    }
+
+    constantVar = (slsCONSTANT_VARIABLE*)pointer;
+    constantVar->constantVar = Constant;
+    slsDLINK_LIST_InsertLast(&Compiler->context.constantVariables, &constantVar->node);
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_DestroyConstantVariableList(
+    IN sloCOMPILER Compiler
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    while (!slsDLINK_LIST_IsEmpty(&Compiler->context.constantVariables))
+    {
+        slsCONSTANT_VARIABLE *constantVar;
+        slsDLINK_LIST_DetachFirst(&Compiler->context.constantVariables, slsCONSTANT_VARIABLE, &constantVar);
+        gcmVERIFY_OK(sloCOMPILER_Free(Compiler, constantVar));
+    }
+    Compiler->context.constantBufferSize = 0;
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_InitializeConstantBuffer(
+    IN sloCOMPILER Compiler,
+    INOUT gctCHAR* Buffer
+    )
+{
+    slsCONSTANT_VARIABLE *constantVar;
+    gctUINT bufferSize = Compiler->context.constantBufferSize;
+    gctCHAR* buffer = Buffer;
+
+    gcmHEADER_ARG("Compiler=0x%x, Buffer=0x%x", Compiler, Buffer);
+
+    FOR_EACH_DLINK_NODE(&Compiler->context.constantVariables, slsCONSTANT_VARIABLE, constantVar)
+    {
+        gctUINT i;
+
+        constantVar = constantVar;
+
+        for (i = 0; i < constantVar->constantVar->valueCount; i++)
+        {
+            gcoOS_MemCopy(buffer, &constantVar->constantVar->values[i].floatValue, gcmSIZEOF(gctFLOAT));
+            buffer += gcmSIZEOF(gctFLOAT);
+        }
+
+        bufferSize -= constantVar->constantVar->valueCount * gcmSIZEOF(gctFLOAT);
+    }
+
+    gcmASSERT(bufferSize == 0);
+
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
 }
@@ -5078,8 +5501,8 @@ sloCOMPILER_SetLayout(
         gcmVERIFY_OK(sloCOMPILER_GetDefaultLayout(Compiler, &inLayout, slvSTORAGE_QUALIFIER_IN));
         SetTesShaderLayout(Compiler->binary,
                            inLayout.tesPrimitiveMode == slvTES_PRIMITIVE_MODE_NONE ? 0 : (gcTessPrimitiveMode)inLayout.tesPrimitiveMode,
-                           inLayout.tesVertexSpacing == slvTES_VERTEX_SPACING_NONE ? (gcTessVertexSpacing)slvTES_VERTEX_SPACING_DEFAULT : (gcTessVertexSpacing)inLayout.tesVertexSpacing,
-                           inLayout.tesOrdering == slvTES_ORDERING_NONE ? (gcTessOrdering)slvTES_ORDERING_DEFAULT : (gcTessOrdering)inLayout.tesOrdering,
+                           inLayout.tesVertexSpacing == slvTES_VERTEX_SPACING_NONE ? slvTES_VERTEX_SPACING_DEFAULT : (gcTessVertexSpacing)inLayout.tesVertexSpacing,
+                           inLayout.tesOrdering == slvTES_ORDERING_NONE ? slvTES_ORDERING_DEFAULT : (gcTessOrdering)inLayout.tesOrdering,
                            inLayout.tesPointMode == slvTES_POINT_MODE_NONE ? gcvFALSE : gcvTRUE,
                            0);
     }

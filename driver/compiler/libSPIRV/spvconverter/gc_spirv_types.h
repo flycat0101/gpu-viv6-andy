@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -19,11 +19,11 @@
 #define __gc_spirv_types_h_
 
 #include "gc_hal_user_precomp.h"
-#include <SPIRV/spirv.h>
+#include "vulkan/spirv.h"
 
 /* max number of opcode define in spirv.h, it change, so anytime change spirv.h,
    make sure change this accordingly*/
-#define SPV_MAX_OPCODE_NUM                          321
+#define SPV_MAX_OPCODE_NUM                          333
 
 /* switch could have a lot of cases. */
 /*
@@ -164,6 +164,7 @@ typedef enum SpvOperandFormat SpvOperandFormat;
 
 /* we cannot get operand class directly, use this function instead */
 SpvOperandClass __SpvGetOperandClassFromOpCode(SpvOp opCode, gctUINT opndIndex);
+SpvOpcodeClass __SpvGetOpcodeClassClassFromOpCode(SpvOp opCode);
 gctUINT __SpvGetOperandNumFromOpCode(SpvOp opCode);
 gctBOOL __SpvOpCodeHasResult(SpvOp opCode);
 gctBOOL __SpvOpCodeHasType(SpvOp opCode);

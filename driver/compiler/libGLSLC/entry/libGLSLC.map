@@ -2,7 +2,9 @@
 	global:
         gcInitializeCompiler;
         gcFinalizeCompiler;
-		gcCompileShader;
+	gcCompileShader;
+	gcSetClientApiVersion;
+
 
 	local:
 		*;

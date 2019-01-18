@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -124,6 +124,11 @@ slScanIdentifier(
     OUT slsLexToken * Token
     );
 
+gceSTATUS
+slCleanupKeywords(
+    void
+    );
+
 gctINT
 slScanConvToUnsignedType(
 IN sloCOMPILER Compiler,
@@ -234,6 +239,22 @@ yyerror(
 #endif
 #ifndef YY_MAIN
 #define YY_MAIN 0
+#endif
+
+#ifndef NULL
+#define NULL ((void *)0)
+#endif
+#ifndef EOF
+#define EOF     (-1)
+#endif
+#ifndef FILE
+#define FILE    void
+#endif
+#ifndef stdin
+#define stdin   NULL
+#endif
+#ifndef stdout
+#define stdout  NULL
 #endif
 
 #endif /* __gc_glsl_scanner_h_ */

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -99,13 +99,13 @@ gcmONERROR(gcKERNEL_FUNCTION_AddKernelFunctionProperties(kernel, 1, 3, property)
 gcmONERROR(gcSHADER_EndKernelFunction(shader, kernel, 0))
 
 #define clmARGUMENT_U32(name, temp, isConst, format, isPointer) \
-gcmONERROR(gcKERNEL_FUNCTION_AddArgument(kernel, 0xffff, (gctUINT16) (tempStart + temp), gcSL_ENABLE_X, gcvTYPE_QUALIFIER_NONE)); \
+gcmONERROR(gcKERNEL_FUNCTION_AddArgument(kernel, 0xffff, (tempStart + temp), gcSL_ENABLE_X, gcvTYPE_QUALIFIER_NONE)); \
 gcmONERROR(gcKERNEL_FUNCTION_AddUniformArgument(kernel, #name, gcSHADER_INTEGER_X1, 1, &name)); \
 gcmONERROR(gcUNIFORM_SetFlags(name, isConst ? gcvUNIFORM_KIND_KERNEL_ARG_CONSTANT : gcvUNIFORM_KIND_KERNEL_ARG)); \
 gcmONERROR(gcUNIFORM_SetFormat(name, gcSL_##format, isPointer))
 
 #define clmARGUMENT_IMAGE(name, temp, isConst) \
-gcmONERROR(gcKERNEL_FUNCTION_AddArgument(kernel, 0xffff, (gctUINT16) (tempStart + temp), gcSL_ENABLE_X, gcvTYPE_QUALIFIER_NONE)); \
+gcmONERROR(gcKERNEL_FUNCTION_AddArgument(kernel, 0xffff, (tempStart + temp), gcSL_ENABLE_X, gcvTYPE_QUALIFIER_NONE)); \
 gcmONERROR(gcKERNEL_FUNCTION_AddUniformArgument(kernel, #name, gcSHADER_IMAGE_2D, 1, &name)); \
 gcmONERROR(gcUNIFORM_SetFlags(name, isConst ? gcvUNIFORM_KIND_KERNEL_ARG_CONSTANT : gcvUNIFORM_KIND_KERNEL_ARG)); \
 gcmONERROR(gcUNIFORM_SetFormat(name, gcSL_UINT32, gcvTRUE))

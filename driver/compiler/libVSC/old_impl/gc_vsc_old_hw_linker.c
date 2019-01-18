@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1538,13 +1538,15 @@ _AllocateConst(
     IN gcsCODE_GENERATOR_PTR CodeGen,
     IN gctUINT8              Usage,
     IN gcuFLOAT_UINT32       Constants[4],
+    IN gctBOOL               Restricted,
+    IN gctBOOL               Reuse,
     OUT gctINT_PTR           Index,
     OUT gctUINT8_PTR         Swizzle,
     OUT gctINT_PTR           Shift,
     OUT gcSL_TYPE            *Type
     )
 {
-    gcsSL_CONSTANT_TABLE_PTR c;
+    gcsSL_CONSTANT_TABLE_PTR c = gcvNULL;
     gceSTATUS status;
     gctINT shift = 0, index = 0, count;
     gctBOOL valid[4];
@@ -1564,75 +1566,83 @@ _AllocateConst(
 
     do
     {
-        /* Walk all costants. */
-        for (c = CodeGen->constants; c != gcvNULL; c = c->next)
+        /* Wall all constants if we can resue them. */
+        if (Reuse)
         {
-            gctBOOL match = gcvFALSE;
-
-            if (count > c->count)
+            for (c = CodeGen->constants; c != gcvNULL; c = c->next)
             {
-                continue;
-            }
+                gctBOOL match = gcvFALSE;
 
-            switch (count)
-            {
-            case 1:
-                for (index = 0; index < c->count; ++index)
+                if (count > c->count)
                 {
-                   /* if (c->constant[index] == Constants[0]) */
-                    if (*((unsigned int *) (&c->constant[index])) == Constants[0].u)
-                    {
-                        match = gcvTRUE;
-                        break;
-                    }
+                    continue;
                 }
-                break;
 
-            case 2:
-                for (index = 0; index < c->count - 1; ++index)
+                switch (count)
                 {
-                    if ((!valid[0] || (*((unsigned int *) (&c->constant[index + 0])) == Constants[0].u))
-                    &&  (!valid[1] || (*((unsigned int *) (&c->constant[index + 1])) == Constants[1].u))
+                case 1:
+                    for (index = 0; index < c->count; ++index)
+                    {
+                       /* if (c->constant[index] == Constants[0]) */
+                        if (*((unsigned int *) (&c->constant[index])) == Constants[0].u)
+                        {
+                            match = gcvTRUE;
+                            break;
+                        }
+                    }
+                    break;
+
+                case 2:
+                    for (index = 0; index < c->count - 1; ++index)
+                    {
+                        if ((!valid[0] || (*((unsigned int *) (&c->constant[index + 0])) == Constants[0].u))
+                        &&  (!valid[1] || (*((unsigned int *) (&c->constant[index + 1])) == Constants[1].u))
+                        )
+                        {
+                            match = gcvTRUE;
+                            break;
+                        }
+                    }
+                    break;
+
+                case 3:
+                    for (index = 0; index < c->count - 2; ++index)
+                    {
+                        if ((!valid[0] || (*((unsigned int *) (&c->constant[index + 0])) == Constants[0].u))
+                        &&  (!valid[1] || (*((unsigned int *) (&c->constant[index + 1])) == Constants[1].u))
+                        &&  (!valid[2] || (*((unsigned int *) (&c->constant[index + 2])) == Constants[2].u))
+                        )
+                        {
+                            match = gcvTRUE;
+                            break;
+                        }
+                    }
+                    break;
+
+                case 4:
+                    index = 0;
+
+                    if ((!valid[0] || (*((unsigned int *) (&c->constant[0])) == Constants[0].u))
+                    &&  (!valid[1] || (*((unsigned int *) (&c->constant[1])) == Constants[1].u))
+                    &&  (!valid[2] || (*((unsigned int *) (&c->constant[2])) == Constants[2].u))
+                    &&  (!valid[3] || (*((unsigned int *) (&c->constant[3])) == Constants[3].u))
                     )
                     {
                         match = gcvTRUE;
-                        break;
                     }
+                    break;
                 }
-                break;
 
-            case 3:
-                for (index = 0; index < c->count - 2; ++index)
+                if (match)
                 {
-                    if ((!valid[0] || (*((unsigned int *) (&c->constant[index + 0])) == Constants[0].u))
-                    &&  (!valid[1] || (*((unsigned int *) (&c->constant[index + 1])) == Constants[1].u))
-                    &&  (!valid[2] || (*((unsigned int *) (&c->constant[index + 2])) == Constants[2].u))
-                    )
+                    if (Restricted && gcmExtractSwizzle(c->swizzle, 0) != gcSL_SWIZZLE_X)
                     {
-                        match = gcvTRUE;
-                        break;
+                        continue;
                     }
+
+                    isConstExistBefore = gcvTRUE;
+                    break;
                 }
-                break;
-
-            case 4:
-                index = 0;
-
-                if ((!valid[0] || (*((unsigned int *) (&c->constant[0])) == Constants[0].u))
-                &&  (!valid[1] || (*((unsigned int *) (&c->constant[1])) == Constants[1].u))
-                &&  (!valid[2] || (*((unsigned int *) (&c->constant[2])) == Constants[2].u))
-                &&  (!valid[3] || (*((unsigned int *) (&c->constant[3])) == Constants[3].u))
-                )
-                {
-                    match = gcvTRUE;
-                }
-                break;
-            }
-
-            if (match)
-            {
-                isConstExistBefore = gcvTRUE;
-                break;
             }
         }
 
@@ -1653,10 +1663,10 @@ _AllocateConst(
 
             /* Allocate a new constant. */
             gcmERR_BREAK(gcoOS_Allocate(gcvNULL,
-                                        sizeof(gcsSL_CONSTANT_TABLE),
+                                        gcmSIZEOF(gcsSL_CONSTANT_TABLE),
                                         &pointer));
-
-            c = pointer;
+            gcoOS_ZeroMemory(pointer, gcmSIZEOF(gcsSL_CONSTANT_TABLE));
+            c = (gcsSL_CONSTANT_TABLE_PTR)pointer;
 
             /* Initialize the constant. */
             c->next        = CodeGen->constants;
@@ -1672,19 +1682,19 @@ _AllocateConst(
 
             /* Allocate a physical spot for the uniform. */
             status = _FindRegisterUsage(CodeGen->uniformUsage,
-                                    CodeGen->maxUniform,
-                                    (count == 1)   ? gcSHADER_FLOAT_X1
-                                    : (count == 2) ? gcSHADER_FLOAT_X2
-                                    : (count == 3) ? gcSHADER_FLOAT_X3
-                                                   : gcSHADER_FLOAT_X4,
-                                    1,
-                                    gcvSL_RESERVED,
-                                    gcvFALSE,
-                                    &c->index,
-                                    &c->swizzle,
-                                    &shift,
-                                    gcvNULL,
-                                    0);
+                                        CodeGen->maxUniform,
+                                        (count == 1)   ? gcSHADER_FLOAT_X1
+                                        : (count == 2) ? gcSHADER_FLOAT_X2
+                                        : (count == 3) ? gcSHADER_FLOAT_X3
+                                                       : gcSHADER_FLOAT_X4,
+                                        1,
+                                        gcvSL_RESERVED,
+                                        Restricted,
+                                        &c->index,
+                                        &c->swizzle,
+                                        &shift,
+                                        gcvNULL,
+                                        0);
 
             if (status != gcvSTATUS_OK)
             {
@@ -2268,6 +2278,38 @@ _FindTempRefAfterRA(
 }
 
 static gctBOOL
+_FindDestReference(
+    IN gcLINKTREE Tree,
+    IN gcsCODE_GENERATOR_PTR CodeGen,
+    IN gctINT Reference,
+    OUT gcsSL_REFERENCE_PTR * Match
+    )
+{
+    gctUINT i;
+    gcsSL_FUNCTION_CODE_PTR function = CodeGen->current;
+
+    gcmASSERT(Reference < gcSL_CG_TEMP1_XY_NO_SRC_SHIFT);
+
+    /* Look in all references. */
+    for (i = 0; i < gcmCOUNTOF(function->references); i++)
+    {
+        /* See if reference matches, check DEST reference only. */
+        if (function->references[i].sourceIndex == -1   &&
+            function->references[i].index == Reference)
+        {
+            /* Return match. */
+            *Match = &function->references[i];
+
+            /* Success. */
+            return gcvTRUE;
+        }
+    }
+
+    /* Reference not found. */
+    return gcvFALSE;
+}
+
+static gctBOOL
 _FindReference(
     IN gcLINKTREE Tree,
     IN gcsCODE_GENERATOR_PTR CodeGen,
@@ -2590,7 +2632,26 @@ _ChangeSwizzleForInstCombine(
 }
 
 static gctBOOL
-_CompareInstruction(
+_CompareDestOfInstruction(
+    IN gcSL_INSTRUCTION TargetSource,
+    IN gcSL_INSTRUCTION Source
+    )
+{
+    gctBOOL matched = gcvTRUE;
+
+    if (/* No need to check enable/format/precision/condition. */
+        /*TargetSource->temp != Source->temp              ||*/
+        TargetSource->tempIndex != Source->tempIndex    ||
+        TargetSource->tempIndexed != Source->tempIndexed)
+    {
+        matched = gcvFALSE;
+    }
+
+    return matched;
+}
+
+static gctBOOL
+_CompareSourceOfInstruction(
     IN gcSL_INSTRUCTION TargetSource,
     IN gctINT TargetSourceIndex,
     IN gcSL_INSTRUCTION Source,
@@ -2778,13 +2839,29 @@ _FindPattern(
                     }
                 }
 
-                /* Add reference for destination. */
+                /* Process destination search pattern. */
                 if (p->dest != 0)
                 {
-                    _AddReference(function,
-                                  p->dest,
-                                  Code + index,
-                                  -1);
+                    if (_FindDestReference(Tree,
+                                           CodeGen,
+                                           p->dest,
+                                           &match))
+                    {
+                        /* Compare destination reference. */
+                        if (!_CompareDestOfInstruction(match->instruction,
+                                                       Code + index))
+                        {
+                            /* Bail out if destination doesn't match. */
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        _AddReference(function,
+                                      p->dest,
+                                      Code + index,
+                                      -1);
+                    }
                 }
 
                 /* Process source 0 search pattern. */
@@ -2797,11 +2874,11 @@ _FindPattern(
                                        gcvNULL))
                     {
                         /* Compare source 0 reference. */
-                        if (!_CompareInstruction(match->instruction,
-                                                 match->sourceIndex,
-                                                 Code + index,
-                                                 0,
-                                                 &IsSourceChange))
+                        if (!_CompareSourceOfInstruction(match->instruction,
+                                                         match->sourceIndex,
+                                                         Code + index,
+                                                         0,
+                                                         &IsSourceChange))
                         {
                             /* Bail out if source 0 doesn't match. */
                             break;
@@ -2832,11 +2909,11 @@ _FindPattern(
                                        gcvNULL))
                     {
                         /* Compare source 1 reference. */
-                        if (!_CompareInstruction(match->instruction,
-                                                 match->sourceIndex,
-                                                 Code + index,
-                                                 1,
-                                                 &IsSourceChange))
+                        if (!_CompareSourceOfInstruction(match->instruction,
+                                                         match->sourceIndex,
+                                                         Code + index,
+                                                         1,
+                                                         &IsSourceChange))
                         {
                             /* Bail out if source 1 doesn't match. */
                             break;
@@ -2867,11 +2944,11 @@ _FindPattern(
                                        &match,
                                        gcvNULL))
                     {
-                        if (_CompareInstruction(match->instruction,
-                                                match->sourceIndex,
-                                                Code + index,
-                                                1,
-                                                &IsSourceChange))
+                        if (_CompareSourceOfInstruction(match->instruction,
+                                                        match->sourceIndex,
+                                                        Code + index,
+                                                        1,
+                                                        &IsSourceChange))
                         {
                             /* Bail out if the sources match. */
                             break;
@@ -3244,9 +3321,6 @@ _GetSamplerKind(gcSHADER_TYPE SamplerType)
     case gcSHADER_IMAGE_3D:                      /* 0x18 */
     case gcSHADER_IMAGE_CUBE:                    /* 0x3D */
     case gcSHADER_IMAGE_2D_ARRAY:                /* 0x40 */
-    case gcSHADER_IMAGE_1D:                      /* 0x44 */
-    case gcSHADER_IMAGE_1D_ARRAY:                /* 0x45 */
-    case gcSHADER_IMAGE_1D_BUFFER:               /* 0x46 */
         return gceTK_FLOAT;
 
     case gcSHADER_IMAGE_BUFFER:
@@ -3325,6 +3399,7 @@ _MapNonSamplerUniforms(
         case gcSHADER_VAR_CATEGORY_ENABLE_MULTISAMPLE_BUFFERS:
         case gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT:
         case gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT:
+        case gcSHADER_VAR_CATEGORY_WORK_GROUP_ID_OFFSET:
             break;
 
         case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
@@ -3422,22 +3497,55 @@ _MapNonSamplerUniforms(
                      (type == gcSHADER_FLOAT_X2) ? gcSL_ENABLE_XY   :
                      (type == gcSHADER_FLOAT_X3) ? gcSL_ENABLE_XYZ  : gcSL_ENABLE_XYZW;
 
-            gcmONERROR(_AllocateConst(Tree,
-                                      CodeGen,
-                                      Usage,
-                                      (gcuFLOAT_UINT32 *) uniform->initializer.f32_v4,
-                                      &physical,
-                                      &swizzle,
-                                      &shift,
-                                      &constType));
+            if (GetUniformOffset(uniform) >= 0)
+            {
+                gctUINT8 * data = (gctUINT8*)(GetShaderConstantMemoryBuffer(Tree->shader) + GetUniformOffset(uniform));
+                gctINT32 arrayStride = GetUniformArrayStride(uniform);
 
-            /* We should have enough uniform now. */
-            gcmASSERT(constType == gcSL_UNIFORM);
+                /* Since this uniform is an array, we can't reuse the existed constant and need to make sure it is allocated restrictly */
+                for (i = 0; i < GetUniformUsedArraySize(uniform); i++)
+                {
+                    gcmONERROR(_AllocateConst(Tree,
+                                              CodeGen,
+                                              Usage,
+                                              (gcuFLOAT_UINT32 *)(data + i * arrayStride),
+                                              gcvTRUE,
+                                              gcvFALSE,
+                                              &physical,
+                                              &swizzle,
+                                              &shift,
+                                              &constType));
 
-            uniform->swizzle  = swizzle;
-            uniform->physical = physical;
-            uniform->address  = uniformBaseAddress + uniform->physical * 16 + shift * 4;
-            uniform->RAPriority++;
+                    if (i == 0)
+                    {
+                        uniform->swizzle  = swizzle;
+                        uniform->physical = physical;
+                        uniform->address  = uniformBaseAddress + uniform->physical * 16 + shift * 4;
+                        uniform->RAPriority++;
+                    }
+                }
+            }
+            else
+            {
+                gcmONERROR(_AllocateConst(Tree,
+                                          CodeGen,
+                                          Usage,
+                                          (gcuFLOAT_UINT32 *) uniform->initializer.f32_v4,
+                                          gcvFALSE,
+                                          gcvTRUE,
+                                          &physical,
+                                          &swizzle,
+                                          &shift,
+                                          &constType));
+
+                /* We should have enough uniform now. */
+                gcmASSERT(constType == gcSL_UNIFORM);
+
+                uniform->swizzle  = swizzle;
+                uniform->physical = physical;
+                uniform->address  = uniformBaseAddress + uniform->physical * 16 + shift * 4;
+                uniform->RAPriority++;
+            }
         }
         else
         {
@@ -3470,6 +3578,7 @@ _MapNonSamplerUniforms(
                 case gcSHADER_VAR_CATEGORY_ENABLE_MULTISAMPLE_BUFFERS:
                 case gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT:
                 case gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT:
+                case gcSHADER_VAR_CATEGORY_WORK_GROUP_ID_OFFSET:
                     break;
 
                 case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
@@ -3604,6 +3713,92 @@ _VIR_MapUniforms(
     return gcvSTATUS_OK;
 }
 
+static gceSTATUS
+_CalcUniformCount(
+    IN gcSHADER             Shader,
+    IN gctBOOL              unblockUniformBlock,
+    IN gctBOOL              handleDefaultUBO,
+    IN gctUINT32*           ConstantCount,
+    IN gctUINT32*           SamplerCount
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT32 constantCount = 0, samplerCount = 0;
+    gctUINT i;
+
+    for (i = 0; i < (gctINT)Shader->uniformCount; ++i)
+    {
+        /* Get uniform. */
+        gcUNIFORM uniform = Shader->uniforms[i];
+
+        if(!uniform) continue;
+
+        if (GetUniformUsedArraySize(uniform) == 0)
+        {
+            SetUniformUsedArraySize(uniform, GetUniformArraySize(uniform));
+        }
+
+        switch (GetUniformCategory(uniform)) {
+        case gcSHADER_VAR_CATEGORY_NORMAL:
+        case gcSHADER_VAR_CATEGORY_LOD_MIN_MAX:
+        case gcSHADER_VAR_CATEGORY_LEVEL_BASE_SIZE:
+        case gcSHADER_VAR_CATEGORY_SAMPLE_LOCATION:
+        case gcSHADER_VAR_CATEGORY_ENABLE_MULTISAMPLE_BUFFERS:
+        case gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT:
+        case gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT:
+        case gcSHADER_VAR_CATEGORY_WORK_GROUP_ID_OFFSET:
+            break;
+
+        case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
+            if(isUniformStorageBlockAddress(uniform)) break;
+            if(isUniformConstantAddressSpace(uniform)) break;
+            if(handleDefaultUBO)
+            {
+                if(!isUniformUsedInShader(uniform)) continue;
+            }
+            else if(unblockUniformBlock)
+            {
+                continue;
+            }
+            break;
+
+        case gcSHADER_VAR_CATEGORY_BLOCK_MEMBER:
+            if(handleDefaultUBO)
+            {
+                if(!isUniformMovedToDUB(uniform)) continue;
+            }
+            else if(!unblockUniformBlock) continue;
+            break;
+
+        default:
+            continue;
+        }
+
+        if(gcmType_Kind(uniform->u.type) == gceTK_SAMPLER)
+        {
+            /* If this texture is not used on shader, we can skip it. */
+#if !DX_SHADER
+            if (!isUniformUsedInShader(uniform) && !isUniformSamplerCalculateTexSize(uniform) && !isUniformForceActive(uniform))
+            {
+                continue;
+            }
+#endif
+            samplerCount += GetUniformArraySize(uniform);
+        }
+    }
+
+    if (ConstantCount)
+    {
+        *ConstantCount = constantCount;
+    }
+    if (SamplerCount)
+    {
+        *SamplerCount = samplerCount;
+    }
+
+    return status;
+}
+
 gceSTATUS
 _MapUniforms(
     IN gcLINKTREE            Tree,
@@ -3618,12 +3813,19 @@ _MapUniforms(
     gceSTATUS status;
     gctINT i, j, nextUniformIndex;
     gctUINT32 vsSamplers = 0, psSamplers = 0;
-    gctINT maxSampler = 0, sampler = 0;
+    gctINT maxSampler = 0, currSampler = 0;
+    gctUINT32 samplerCount = 0;
     gctBOOL unblockUniformBlock = gcvFALSE;
     gctBOOL handleDefaultUBO = gcvFALSE;
+    /* If chip can support unified uniform, pack vs and ps. */
+    gctBOOL packSampler = gcHWCaps.hwFeatureFlags.supportUnifiedSampler;
+    gctBOOL useAllSampler = gcHWCaps.hwFeatureFlags.samplerRegFileUnified;
+    gctBOOL samplerAllocReversed = gcvFALSE;
 
     /* Extract the gcSHADER object. */
     gcSHADER shader = Tree->shader;
+
+    gcmASSERT(Hints);
 
     if (_isHWConstRegisterAllocated(Tree->shader))
     {
@@ -3639,16 +3841,57 @@ _MapUniforms(
     vsSamplers = gcHWCaps.maxVSSamplerCount;
     psSamplers = gcHWCaps.maxPSSamplerCount;
 
-    /* Determine starting sampler index. */
-    sampler = (Tree->shader->type == gcSHADER_TYPE_VERTEX)
-            ? psSamplers
-            : 0;
+    if (packSampler)
+    {
+        currSampler = Hints->unifiedStatus.samplerCount;
 
-    /* Determine maximum sampler index. */
-    /* Note that CL kernel can use all samplers if unified. */
-    maxSampler = (Tree->shader->type == gcSHADER_TYPE_FRAGMENT)
-               ? psSamplers
-               : psSamplers + vsSamplers;
+        if (Tree->shader->type == gcSHADER_TYPE_FRAGMENT)
+        {
+            maxSampler = psSamplers;
+        }
+        else if (Tree->shader->type == gcSHADER_TYPE_VERTEX)
+        {
+            maxSampler = vsSamplers;
+        }
+        else
+        {
+            maxSampler = psSamplers + vsSamplers;
+        }
+    }
+    else if (useAllSampler)
+    {
+        maxSampler = gcmMIN(gcHWCaps.maxHwNativeTotalSamplerCount, gcHWCaps.maxSamplerCountPerShader);
+
+        /* If a shader stage can use all samplers, for vertex, we need to allocate them in the bottom. */
+        if (Tree->shader->type == gcSHADER_TYPE_VERTEX)
+        {
+            _CalcUniformCount(Tree->shader,
+                              unblockUniformBlock,
+                              handleDefaultUBO,
+                              gcvNULL,
+                              &samplerCount);
+            /* We need to allocate sampler reversely so in recompiler, all original samplers have the same index. */
+            samplerAllocReversed = gcvTRUE;
+            currSampler = maxSampler - 1;
+        }
+        else
+        {
+            currSampler = 0;
+        }
+    }
+    else
+    {
+        /* Determine starting sampler index. */
+        currSampler = (Tree->shader->type == gcSHADER_TYPE_VERTEX)
+                ? psSamplers
+                : 0;
+
+        /* Determine maximum sampler index. */
+        /* Note that CL kernel can use all samplers if unified. */
+        maxSampler = (Tree->shader->type == gcSHADER_TYPE_FRAGMENT)
+                   ? psSamplers
+                   : psSamplers + vsSamplers;
+    }
 
     if (shader->uniformBlockCount) {
         if(shader->_defaultUniformBlockIndex != -1 ||
@@ -3680,6 +3923,12 @@ _MapUniforms(
             gcUNIFORM uniform = shader->uniforms[i];
 
             if(!uniform) continue;
+
+            if (GetUniformUsedArraySize(uniform) == 0)
+            {
+                SetUniformUsedArraySize(uniform, GetUniformArraySize(uniform));
+            }
+
             if(uniform->RAPriority != (gctUINT)j) continue;
 
             switch (GetUniformCategory(uniform)) {
@@ -3690,6 +3939,7 @@ _MapUniforms(
             case gcSHADER_VAR_CATEGORY_ENABLE_MULTISAMPLE_BUFFERS:
             case gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT:
             case gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT:
+            case gcSHADER_VAR_CATEGORY_WORK_GROUP_ID_OFFSET:
                 break;
 
             case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
@@ -3721,33 +3971,41 @@ _MapUniforms(
             {
                 /* If this texture is not used on shader, we can skip it. */
 #if !DX_SHADER
-                if (!isUniformUsedInShader(uniform) && !isUniformSamplerCalculateTexSize(uniform))
+                if (!isUniformUsedInShader(uniform) && !isUniformSamplerCalculateTexSize(uniform) && !isUniformForceActive(uniform))
                 {
                     SetUniformPhysical(uniform, -1);
                     SetUniformFlag(uniform, gcvUNIFORM_FLAG_IS_INACTIVE);
                     continue;
                 }
 #endif
-
-                /* Test if sampler is in range. */
-                if ((sampler >= maxSampler) &&
-                    !(Tree->flags & gcvSHADER_IMAGE_PATCHING))
+                /* Use next sampler. */
+                /* sampler physical index should be the same as
+                    the index assigned when adding sampler uniform
+                    to Shader, the sampler index is passed as argument
+                    to function for its sampler typed parameter
+                    */
+                if (samplerAllocReversed)
                 {
-                    gcmONERROR(gcvSTATUS_TOO_MANY_UNIFORMS);
+                    uniform->physical = currSampler - GetUniformArraySize(uniform) + 1;
+                    currSampler -= GetUniformArraySize(uniform);
+
+                    if (currSampler + 1 < 0)
+                    {
+                        gcmONERROR(gcvSTATUS_TOO_MANY_UNIFORMS);
+                    }
                 }
                 else
                 {
-                    /* Use next sampler. */
-                    /* sampler physical index should be the same as
-                       the index assigned when adding sampler uniform
-                       to Shader, the sampler index is passed as argument
-                       to function for its sampler typed parameter
-                     */
-                    uniform->physical = sampler;
-                    sampler += uniform->arraySize;
+                    uniform->physical = currSampler;
+                    currSampler += GetUniformArraySize(uniform);
 
-                    ResetUniformFlag(uniform, gcvUNIFORM_FLAG_IS_INACTIVE);
+                    if (currSampler > maxSampler)
+                    {
+                        gcmONERROR(gcvSTATUS_TOO_MANY_UNIFORMS);
+                    }
                 }
+
+                ResetUniformFlag(uniform, gcvUNIFORM_FLAG_IS_INACTIVE);
             }
             else
             {
@@ -3836,7 +4094,7 @@ _MapUniforms(
                 {
                     gctINT j;
 
-                    for (j = sampler - 1; j >= sampler - uniform->arraySize; --j)
+                    for (j = currSampler - 1; j >= currSampler - uniform->arraySize; --j)
                     {
                         Hints->usedSamplerMask |= (1 << j);
                     }
@@ -3876,6 +4134,30 @@ _MapUniforms(
             offset = 0;
         }
         gcoOS_Print("\n");
+    }
+
+    /* Update sampler unified mode. */
+    if (packSampler)
+    {
+        Hints->unifiedStatus.samplerUnifiedMode = gcvUNIFORM_ALLOC_PACK_FLOAT_BASE_OFFSET;
+        Hints->unifiedStatus.samplerCount += currSampler;
+    }
+    else if (useAllSampler)
+    {
+        Hints->unifiedStatus.samplerUnifiedMode = gcvUNIFORM_ALLOC_PS_TOP_GPIPE_BOTTOM_FLOAT_BASE_OFFSET;
+
+        if (Tree->shader->type == gcSHADER_TYPE_VERTEX)
+        {
+            gcmASSERT(currSampler == (gctINT)(maxSampler - samplerCount - 1));
+            Hints->unifiedStatus.samplerGPipeStart = (maxSampler - samplerCount);
+        }
+        else
+        {
+            if (currSampler != 0)
+            {
+                Hints->unifiedStatus.samplerPSEnd = currSampler - 1;
+            }
+        }
     }
 
     /* Success. */
@@ -3958,7 +4240,7 @@ _MapAttributesRAEnabled(
                     gcmASSERT(Hints != gcvNULL);
                     for (j = 0; j < 4; j++)
                     {
-                        Hints->useFragCoord[j] = _IsChannelUsedForAttribute(Tree,
+                        Hints->useFragCoord[j] = (gctCHAR)_IsChannelUsedForAttribute(Tree,
                                                                             &Tree->attributeArray[i],
                                                                             attribute->index,
                                                                             gcmComposeSwizzle(j, j, j, j));
@@ -4000,7 +4282,7 @@ _MapAttributesRAEnabled(
                     gcmASSERT(Hints != gcvNULL);
                     for (j = 0; j < 4; j++)
                     {
-                        Hints->usePointCoord[j] = _IsChannelUsedForAttribute(Tree,
+                        Hints->usePointCoord[j] = (gctCHAR)_IsChannelUsedForAttribute(Tree,
                                                                             &Tree->attributeArray[i],
                                                                             attribute->index,
                                                                             gcmComposeSwizzle(j, j, j, j));
@@ -4121,7 +4403,7 @@ _MapAttributes(
                     gcmASSERT(Hints != gcvNULL);
                     for (j = 0; j < 4; j++)
                     {
-                        Hints->useFragCoord[j] = _IsChannelUsedForAttribute(Tree,
+                        Hints->useFragCoord[j] = (gctCHAR)_IsChannelUsedForAttribute(Tree,
                                                                             &Tree->attributeArray[i],
                                                                             attribute->index,
                                                                             gcmComposeSwizzle(j, j, j, j));
@@ -4231,7 +4513,7 @@ _MapAttributes(
                         gcmASSERT(Hints != gcvNULL);
                         for (j = 0; j < 4; j++)
                         {
-                            Hints->usePointCoord[j] = _IsChannelUsedForAttribute(Tree,
+                            Hints->usePointCoord[j] = (gctCHAR)_IsChannelUsedForAttribute(Tree,
                                                                                 &Tree->attributeArray[i],
                                                                                 attribute->index,
                                                                                 gcmComposeSwizzle(j, j, j, j));
@@ -4343,7 +4625,7 @@ _MapAttributesDual16RAEnabled(
                     gcmASSERT(Hints != gcvNULL);
                     for (j = 0; j < 4; j++)
                     {
-                        Hints->useFragCoord[j] = _IsChannelUsedForAttribute(Tree,
+                        Hints->useFragCoord[j] = (gctCHAR)_IsChannelUsedForAttribute(Tree,
                                                                             &Tree->attributeArray[i],
                                                                             attribute->index,
                                                                             gcmComposeSwizzle(j, j, j, j));
@@ -4384,7 +4666,7 @@ _MapAttributesDual16RAEnabled(
                     gcmASSERT(Hints != gcvNULL);
                     for (j = 0; j < 4; j++)
                     {
-                        Hints->usePointCoord[j] = _IsChannelUsedForAttribute(Tree,
+                        Hints->usePointCoord[j] = (gctCHAR)_IsChannelUsedForAttribute(Tree,
                                                                             &Tree->attributeArray[i],
                                                                             attribute->index,
                                                                             gcmComposeSwizzle(j, j, j, j));
@@ -4640,7 +4922,7 @@ _MapAttributesDual16(
                     gcmASSERT(Hints != gcvNULL);
                     for (j = 0; j < 4; j++)
                     {
-                        Hints->useFragCoord[j] = _IsChannelUsedForAttribute(Tree,
+                        Hints->useFragCoord[j] = (gctCHAR)_IsChannelUsedForAttribute(Tree,
                                                                             &Tree->attributeArray[i],
                                                                             attribute->index,
                                                                             gcmComposeSwizzle(j, j, j, j));
@@ -4718,7 +5000,7 @@ _MapAttributesDual16(
                         gcmASSERT(Hints != gcvNULL);
                         for (j = 0; j < 4; j++)
                         {
-                            Hints->usePointCoord[j] = _IsChannelUsedForAttribute(Tree,
+                            Hints->usePointCoord[j] = (gctCHAR)_IsChannelUsedForAttribute(Tree,
                                                                                 &Tree->attributeArray[i],
                                                                                 attribute->index,
                                                                                 gcmComposeSwizzle(j, j, j, j));
@@ -4818,19 +5100,20 @@ _MapFragmentOutputs(
             {
                 index = Tree->outputArray[i].tempHolding;
                 temp = &Tree->tempArray[index];
-                if(temp->assigned == -1) { /* not yet assigned */
-                    gcmASSERT(CodeGen->registerCount <= 0xFF);
-                   temp->assigned = (gctUINT16)(CodeGen->registerCount - 1); /* use last register first,
-                                                                 * later patch to real register after
-                                                                 * allocate all other registers */
-                   temp->shift   = 0;
-                   temp->swizzle = gcSL_SWIZZLE_XYZW;
+                if (temp->assigned == -1)
+                {
+                    /* Use a special register index(-128) for subSampleDepth, replace it with the last register after RA. */
+                    temp->assigned = -128;
+                    temp->shift   = 0;
+                    temp->swizzle = gcSL_SWIZZLE_XYZW;
 
-                   CodeGen->subsampleDepthRegIncluded = gcvTRUE;
-                   CodeGen->subsampleDepthIndex       = index;
-                   CodeGen->subsampleDepthPhysical    = temp->assigned; /* temporary setting */
+                    CodeGen->subsampleDepthRegIncluded = gcvTRUE;
+                    CodeGen->subsampleDepthIndex       = index;
+                    CodeGen->subsampleDepthPhysical    = temp->assigned; /* temporary setting */
                     if (gcSHADER_DumpCodeGenVerbose(shader))
+                    {
                         dumpRegisterAllocation(temp);
+                    }
                 }
              }
          }
@@ -4869,6 +5152,8 @@ _AddConstantVec1(
                           CodeGen,
                           gcSL_ENABLE_X,
                           constants,
+                          gcvFALSE,
+                          gcvTRUE,
                           Index,
                           Swizzle,
                           gcvNULL,
@@ -4894,6 +5179,8 @@ _AddConstantVec2(
                           CodeGen,
                           gcSL_ENABLE_X | gcSL_ENABLE_Y,
                           constants,
+                          gcvFALSE,
+                          gcvTRUE,
                           Index,
                           Swizzle,
                           gcvNULL,
@@ -4921,6 +5208,8 @@ _AddConstantVec3(
                           CodeGen,
                           gcSL_ENABLE_X | gcSL_ENABLE_Y | gcSL_ENABLE_Z,
                           constants,
+                          gcvFALSE,
+                          gcvTRUE,
                           Index,
                           Swizzle,
                           gcvNULL,
@@ -4950,6 +5239,8 @@ _AddConstantVec4(
                           CodeGen,
                           gcSL_ENABLE_XYZW,
                           constants,
+                          gcvFALSE,
+                          gcvTRUE,
                           Index,
                           Swizzle,
                           gcvNULL,
@@ -4973,6 +5264,8 @@ _AddConstantIVec1(
                           CodeGen,
                           gcSL_ENABLE_X,
                           (gcuFLOAT_UINT32 *) constants,
+                          gcvFALSE,
+                          gcvTRUE,
                           Index,
                           Swizzle,
                           gcvNULL,
@@ -4998,6 +5291,8 @@ _AddConstantIVec2(
                           CodeGen,
                           gcSL_ENABLE_XY,
                           constants,
+                          gcvFALSE,
+                          gcvTRUE,
                           Index,
                           Swizzle,
                           gcvNULL,
@@ -5025,6 +5320,8 @@ _AddConstantIVec3(
                           CodeGen,
                           gcSL_ENABLE_XYZ,
                           constants,
+                          gcvFALSE,
+                          gcvTRUE,
                           Index,
                           Swizzle,
                           gcvNULL,
@@ -5054,6 +5351,8 @@ _AddConstantIVec4(
                           CodeGen,
                           gcSL_ENABLE_XYZW,
                           constants,
+                          gcvFALSE,
+                          gcvTRUE,
                           Index,
                           Swizzle,
                           gcvNULL,
@@ -5129,7 +5428,6 @@ _AllocateRegisterForTemp(
     /* Convert usage into type. */
     type = _Usage2Type(Temp->usage);
 
-    /* TODO: */
     /* We need refine it to make more flexible for RA for array or matrix that are not indexed access*/
     /* In that case, we can regard them as separated registers so to get better HW register usage*/
     if (Temp->variable != gcvNULL)
@@ -6145,6 +6443,8 @@ _SetSource(
                                             CodeGen,
                                             usage,
                                             Tree->tempArray[Index].constValue,
+                                            gcvFALSE,
+                                            gcvTRUE,
                                             (gctINT32_PTR) &index,
                                             (gctUINT8_PTR) &swizzle,
                                             gcvNULL,
@@ -6428,6 +6728,8 @@ _SetSourceWithPrecision(
                                             CodeGen,
                                             usage,
                                             Tree->tempArray[Index].constValue,
+                                            gcvFALSE,
+                                            gcvTRUE,
                                             (gctINT32_PTR) &index,
                                             (gctUINT8_PTR) &swizzle,
                                             gcvNULL,
@@ -11615,8 +11917,6 @@ _TargetConvertEmit(
             /* Output the modified original instruction. */
             gcmONERROR(_FinalEmit(Tree, CodeGen, States, 0));
 
-            /* OpenCL does not have mad_hi_sat. */
-            /* TODO - Need to implement when needed. */
             gcmASSERT(ConvertType != gcvCONVERT_HI);
         }
     }
@@ -13664,13 +13964,11 @@ _PatchSubsampleDepthRegister(
             /* Process all states. */
             for (i = 0; i < code->count; ++i)
             {
-                gctUINT targetPhysical;
                 States = &code->states[i*4];
 
                 /* Check target. */
-                targetPhysical = (((((gctUINT32) (States[0])) >> (0 ? 22:16)) & ((gctUINT32) ((((1 ? 22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ? 22:16) + 1)))))) );
                 if ((((((gctUINT32) (States[0])) >> (0 ? 12:12)) & ((gctUINT32) ((((1 ? 12:12) - (0 ? 12:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:12) - (0 ? 12:12) + 1)))))) ) &&
-                    targetPhysical == (fakeSubsampleDepthReg & 0x7f) )
+                    (((((gctUINT32) (States[0])) >> (0 ? 22:16)) & ((gctUINT32) ((((1 ? 22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ? 22:16) + 1)))))) ) == (fakeSubsampleDepthReg & 0x7f))
                 {
                     States[0] = ((((gctUINT32) (States[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:16) - (0 ?
@@ -13683,10 +13981,11 @@ _PatchSubsampleDepthRegister(
  22:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:16) - (0 ? 22:16) + 1))))))) << (0 ? 22:16)));
                 }
+
                 /* check src0 */
                 if ((((((gctUINT32) (States[1])) >> (0 ? 11:11)) & ((gctUINT32) ((((1 ? 11:11) - (0 ? 11:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:11) - (0 ? 11:11) + 1)))))) ) &&
                     (((((gctUINT32) (States[2])) >> (0 ? 5:3)) & ((gctUINT32) ((((1 ? 5:3) - (0 ? 5:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:3) - (0 ? 5:3) + 1)))))) ) == 0x0 &&
-                    (((((gctUINT32) (States[1])) >> (0 ? 20:12)) & ((gctUINT32) ((((1 ? 20:12) - (0 ? 20:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:12) - (0 ? 20:12) + 1)))))) )  == fakeSubsampleDepthReg)
+                    (((((gctUINT32) (States[1])) >> (0 ? 20:12)) & ((gctUINT32) ((((1 ? 20:12) - (0 ? 20:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:12) - (0 ? 20:12) + 1)))))) )  == (fakeSubsampleDepthReg & 0x1FF))
                 {
                     States[1] = ((((gctUINT32) (States[1])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  20:12) - (0 ?
@@ -13699,10 +13998,11 @@ _PatchSubsampleDepthRegister(
  20:12) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 20:12) - (0 ? 20:12) + 1))))))) << (0 ? 20:12)));
                 }
+
                 /* check src1 */
                 if ((((((gctUINT32) (States[2])) >> (0 ? 6:6)) & ((gctUINT32) ((((1 ? 6:6) - (0 ? 6:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1)))))) ) &&
                     (((((gctUINT32) (States[3])) >> (0 ? 2:0)) & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1)))))) ) == 0x0 &&
-                    (((((gctUINT32) (States[2])) >> (0 ? 15:7)) & ((gctUINT32) ((((1 ? 15:7) - (0 ? 15:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:7) - (0 ? 15:7) + 1)))))) )  == fakeSubsampleDepthReg)
+                    (((((gctUINT32) (States[2])) >> (0 ? 15:7)) & ((gctUINT32) ((((1 ? 15:7) - (0 ? 15:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:7) - (0 ? 15:7) + 1)))))) )  == (fakeSubsampleDepthReg & 0x1FF))
                 {
                     States[2] = ((((gctUINT32) (States[2])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:7) - (0 ?
@@ -13715,10 +14015,11 @@ _PatchSubsampleDepthRegister(
  15:7) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:7) - (0 ? 15:7) + 1))))))) << (0 ? 15:7)));
                 }
+
                 /* check src2 */
                 if ((((((gctUINT32) (States[3])) >> (0 ? 3:3)) & ((gctUINT32) ((((1 ? 3:3) - (0 ? 3:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1)))))) ) &&
                     (((((gctUINT32) (States[3])) >> (0 ? 30:28)) & ((gctUINT32) ((((1 ? 30:28) - (0 ? 30:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1)))))) ) == 0x0 &&
-                    (((((gctUINT32) (States[3])) >> (0 ? 12:4)) & ((gctUINT32) ((((1 ? 12:4) - (0 ? 12:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:4) - (0 ? 12:4) + 1)))))) )  == fakeSubsampleDepthReg)
+                    (((((gctUINT32) (States[3])) >> (0 ? 12:4)) & ((gctUINT32) ((((1 ? 12:4) - (0 ? 12:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:4) - (0 ? 12:4) + 1)))))) )  == (fakeSubsampleDepthReg & 0x1FF))
                 {
                     States[3] = ((((gctUINT32) (States[3])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:4) - (0 ?
@@ -14039,9 +14340,8 @@ _FindAddressRegChannel(
             }
 
             /* If new desired address reg channel count is 4 but other src has occupied some, we can
-               use full channel count, just use required one at this time.
+               use full channel count, just use required one at this time. */
 
-               TODO: consider more conditions because other combination may also need this code. */
             if (enabledChannelCount == 4 && addRegColoring->localAddrChannelUsageMask != 0)
             {
                 enabledChannelCount = 1;
@@ -17511,13 +17811,7 @@ _GenerateCode(
 
         if (base > max && !CodeGen->hasICache)
         {
-#if DX_SHADER
             gcoOS_Print("Shader has too many instructions: %d (maximum is %d)", base, max);
-#else
-            gcmFATAL("Shader has too many instructions: %d (maximum is %d)",
-                     base,
-                     max);
-#endif
             status = gcvSTATUS_TOO_MANY_INSTRUCTION;
             break;
         }
@@ -17586,7 +17880,7 @@ _GenerateCode(
 static gceSTATUS
 _SetState(
     IN gcsCODE_GENERATOR_PTR CodeGen,
-    IN gctUINTPTR_T Address,
+    IN gctUINT32 Address,
     IN gctUINT32 Data
     )
 {
@@ -17619,6 +17913,14 @@ _SetState(
  25:16) - (0 ?
  25:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ? 25:16)));
+        }
+
+        CodeGen->stateDeltaBufferOffset++;
+        if (CodeGen->lastStateDeltaBatchEnd && CodeGen->lastStateDeltaBatchHead)
+        {
+            *(CodeGen->lastStateDeltaBatchEnd++) = Data;
+            *(CodeGen->lastStateDeltaBatchEnd) = VSC_STATE_DELTA_END;
+            *(CodeGen->lastStateDeltaBatchHead + 1) =  *(CodeGen->lastStateDeltaBatchHead + 1) + 1;
         }
     }
     else
@@ -17676,6 +17978,17 @@ _SetState(
  ~0U : (~(~0U << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ? 25:16)));
         }
 
+        if (CodeGen->stateDeltaBuffer)
+        {
+            CodeGen->lastStateDeltaBatchHead = CodeGen->stateDeltaBuffer + CodeGen->stateDeltaBufferOffset;
+            CodeGen->lastStateDeltaBatchEnd = CodeGen->lastStateDeltaBatchHead + 3;
+            *CodeGen->lastStateDeltaBatchHead = Address;
+            *(CodeGen->lastStateDeltaBatchHead + 1) = 1;
+            *(CodeGen->lastStateDeltaBatchHead + 2) = Data;
+            *CodeGen->lastStateDeltaBatchEnd = VSC_STATE_DELTA_END;
+        }
+
+        CodeGen->stateDeltaBufferOffset += 1 + VSC_STATE_DELTA_DESC_SIZE_IN_UINT32;
         /* Increment state buffer offset. */
         CodeGen->stateBufferOffset += 4;
     }
@@ -18118,7 +18431,6 @@ static gceSTATUS _PatchShaderByReplaceWholeShaderCode(
         {
             gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, pPatchedShaderCode));
         }
-
         return gcvSTATUS_OUT_OF_MEMORY;
     }
 
@@ -18142,6 +18454,8 @@ _GenerateStates(
     IN gcsCODE_GENERATOR_PTR CodeGen,
     IN gctPOINTER StateBuffer,
     IN OUT gctSIZE_T * Size,
+    IN gctPOINTER StateDeltaBuffer,
+    IN OUT gctSIZE_T *StateDeltaBufferSize,
     OUT gcsHINT_PTR Hints
     )
 {
@@ -18149,12 +18463,13 @@ _GenerateStates(
     gctSIZE_T i, attributeCount, outputCount;
     gcsSL_CONSTANT_TABLE_PTR c;
     gctUINT32 uniformBase, instrBase;
-    gctUINTPTR_T codeAddress;
+    gctUINT32 codeAddress;
     gctUINT32 timeout;
     gctUINT32 maxNumInstrStates;
     gctUINT32 numInstrStates = 0;
     gctBOOL usePositionInVSOutput = gcvFALSE;  /* if glPositoin is used in VS output */
     gctBOOL hasPrecisionSetting = gcvFALSE;
+    gctBOOL useRegedCTC = gcvFALSE;
     gcSHADER_PRECISION precision = gcSHADER_PRECISION_MEDIUM;
     gctBOOL hasShaderMediumP = gcvFALSE;
     gctBOOL isMediumpVS = gcvFALSE;
@@ -18182,10 +18497,15 @@ _GenerateStates(
     }
 
     /* Initialize state buffer management. */
-    CodeGen->stateBuffer       = StateBuffer;
-    CodeGen->stateBufferSize   = (StateBuffer == gcvNULL) ? ~0U : *Size;
-    CodeGen->stateBufferOffset = 0;
-    CodeGen->lastStateCommand  = gcvNULL;
+    CodeGen->stateBuffer             = StateBuffer;
+    CodeGen->stateBufferSize         = (StateBuffer == gcvNULL) ? ~0U : *Size;
+    CodeGen->stateBufferOffset       = 0;
+    CodeGen->lastStateCommand        = gcvNULL;
+    CodeGen->stateDeltaBuffer        = StateDeltaBuffer;
+    CodeGen->stateDeltaSize          = (StateBuffer == gcvNULL) ? ~0U : *StateDeltaBufferSize;
+    CodeGen->stateDeltaBufferOffset  = 0;
+    CodeGen->lastStateDeltaBatchEnd  = gcvNULL;
+    CodeGen->lastStateDeltaBatchHead = gcvNULL;
 
     /*
     ** FIXME: we temporarily disabled ps medium presion optimization as GL3Tests/half_float/input.run's 3D texture test using medium presion ps,
@@ -18526,12 +18846,12 @@ _GenerateStates(
 
         if (dumpCodeGen)
         {
-            gcoOS_Print("");
+            gcoOS_Print("\n");
             gcoOS_Print("==============");
             gcoOS_Print("VS: (id:%d)", Tree->shader->_id);
             if(Tree->shader->_id % 16 - 1)
             {
-                gcoOS_Print("VS: Patched", Tree->shader->_id);
+                gcoOS_Print("VS: Patched");
             }
             gcoOS_Print("VS: EndPC=%u", CodeGen->endPC);
             gcoOS_Print("VS: InstCount=%u", CodeGen->instCount);
@@ -18949,12 +19269,6 @@ _GenerateStates(
             {
                 gctSIZE_T effectiveOutputCount;
                 gctINT min, max;
-                /* TODO: current load balance calculation degrade the
-                   performance if the outputis packed by compiler, so
-                   need to use pre-packing output counts at least no
-                   degradation. Ideally we need to have a new formular
-                   to compute loadbalance based on the shader dynamic
-                   instruction and output components */
                 gctSIZE_T prePackingOutputCount = outputCount +
                                                Tree->packedAwayOutputCount;
                 gctBOOL hasOutputCountFix = gcHWCaps.hwFeatureFlags.outputCountFix;
@@ -19144,7 +19458,7 @@ _GenerateStates(
         /* Save the vertex precision. */
         if (Hints != gcvNULL)
         {
-            if ((Hints->memoryAccessFlags[VSC_SHADER_STAGE_VS] & gceMA_FLAG_ATOMIC) &&
+            if ((Hints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][VSC_SHADER_STAGE_VS] & gceMA_FLAG_ATOMIC) &&
                 gcHWCaps.hwFeatureFlags.robustAtomic)
             {
                 shaderConfigData |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -19344,10 +19658,11 @@ _GenerateStates(
                     }
                 }
 
-                Hints->unifiedStatus.constant = gcvTRUE;
+                Hints->unifiedStatus.constantUnifiedMode = gcvUNIFORM_ALLOC_PACK_FLOAT_BASE_OFFSET;
                 Hints->unifiedStatus.constGPipeEnd = count;
                 Hints->maxConstCount = gcHWCaps.maxTotalConstRegCount;
                 Hints->vsConstCount = count;
+                Hints->unifiedStatus.constCount = Hints->vsConstCount;
             }
         }
     }
@@ -19424,7 +19739,7 @@ _GenerateStates(
 
         if (dumpCodeGen)
         {
-            gcoOS_Print("");
+            gcoOS_Print("\n");
             gcoOS_Print("==============");
             gcoOS_Print("%s: (id:%d)", shaderTypeStr, Tree->shader->_id);
             if((Tree->shader->_id % 16) - 2)
@@ -19521,7 +19836,7 @@ _GenerateStates(
         /* Walk through all outputs. */
         if (CodeGen->haltiShader == gcvTRUE) {
           gctUINT32 regPsColorOut = 0;
-          gctUINT32 regPsOutCntrl = 0;
+          gctUINT32 regPsOutCntrl[3] = {0};
 
           gctINT curLocation;
           gctUINT curIndex = 0;
@@ -19662,7 +19977,7 @@ _GenerateStates(
                          break;
 
                       case 4:
-                         regPsOutCntrl = ((((gctUINT32) (regPsOutCntrl)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                          regPsOutCntrl[0] = ((((gctUINT32) (regPsOutCntrl[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:0) - (0 ?
  5:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -19675,7 +19990,7 @@ _GenerateStates(
                          break;
 
                       case 5:
-                         regPsOutCntrl = ((((gctUINT32) (regPsOutCntrl)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                          regPsOutCntrl[0] = ((((gctUINT32) (regPsOutCntrl[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  13:8) - (0 ?
  13:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -19688,7 +20003,7 @@ _GenerateStates(
                          break;
 
                       case 6:
-                         regPsOutCntrl = ((((gctUINT32) (regPsOutCntrl)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                          regPsOutCntrl[0] = ((((gctUINT32) (regPsOutCntrl[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  21:16) - (0 ?
  21:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -19701,7 +20016,111 @@ _GenerateStates(
                          break;
 
                       case 7:
-                         regPsOutCntrl = ((((gctUINT32) (regPsOutCntrl)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                          regPsOutCntrl[0] = ((((gctUINT32) (regPsOutCntrl[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:24) - (0 ?
+ 29:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:24) - (0 ?
+ 29:24) + 1))))))) << (0 ?
+ 29:24))) | (((gctUINT32) ((gctUINT32) (reg) & ((gctUINT32) ((((1 ?
+ 29:24) - (0 ?
+ 29:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:24) - (0 ? 29:24) + 1))))))) << (0 ? 29:24)));
+                         break;
+
+                      case 8:
+                          regPsOutCntrl[1] = ((((gctUINT32) (regPsOutCntrl[1])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1))))))) << (0 ?
+ 5:0))) | (((gctUINT32) ((gctUINT32) (reg) & ((gctUINT32) ((((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0)));
+                         break;
+
+                      case 9:
+                          regPsOutCntrl[1] = ((((gctUINT32) (regPsOutCntrl[1])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 13:8) - (0 ?
+ 13:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 13:8) - (0 ?
+ 13:8) + 1))))))) << (0 ?
+ 13:8))) | (((gctUINT32) ((gctUINT32) (reg) & ((gctUINT32) ((((1 ?
+ 13:8) - (0 ?
+ 13:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 13:8) - (0 ? 13:8) + 1))))))) << (0 ? 13:8)));
+                         break;
+
+                      case 10:
+                          regPsOutCntrl[1] = ((((gctUINT32) (regPsOutCntrl[1])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 21:16) - (0 ?
+ 21:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 21:16) - (0 ?
+ 21:16) + 1))))))) << (0 ?
+ 21:16))) | (((gctUINT32) ((gctUINT32) (reg) & ((gctUINT32) ((((1 ?
+ 21:16) - (0 ?
+ 21:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 21:16) - (0 ? 21:16) + 1))))))) << (0 ? 21:16)));
+                         break;
+
+                      case 11:
+                          regPsOutCntrl[1] = ((((gctUINT32) (regPsOutCntrl[1])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:24) - (0 ?
+ 29:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:24) - (0 ?
+ 29:24) + 1))))))) << (0 ?
+ 29:24))) | (((gctUINT32) ((gctUINT32) (reg) & ((gctUINT32) ((((1 ?
+ 29:24) - (0 ?
+ 29:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:24) - (0 ? 29:24) + 1))))))) << (0 ? 29:24)));
+                         break;
+
+                      case 12:
+                          regPsOutCntrl[2] = ((((gctUINT32) (regPsOutCntrl[2])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1))))))) << (0 ?
+ 5:0))) | (((gctUINT32) ((gctUINT32) (reg) & ((gctUINT32) ((((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0)));
+                         break;
+
+                      case 13:
+                          regPsOutCntrl[2] = ((((gctUINT32) (regPsOutCntrl[2])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 13:8) - (0 ?
+ 13:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 13:8) - (0 ?
+ 13:8) + 1))))))) << (0 ?
+ 13:8))) | (((gctUINT32) ((gctUINT32) (reg) & ((gctUINT32) ((((1 ?
+ 13:8) - (0 ?
+ 13:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 13:8) - (0 ? 13:8) + 1))))))) << (0 ? 13:8)));
+                         break;
+
+                      case 14:
+                          regPsOutCntrl[2] = ((((gctUINT32) (regPsOutCntrl[2])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 21:16) - (0 ?
+ 21:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 21:16) - (0 ?
+ 21:16) + 1))))))) << (0 ?
+ 21:16))) | (((gctUINT32) ((gctUINT32) (reg) & ((gctUINT32) ((((1 ?
+ 21:16) - (0 ?
+ 21:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 21:16) - (0 ? 21:16) + 1))))))) << (0 ? 21:16)));
+                         break;
+
+                      case 15:
+                          regPsOutCntrl[2] = ((((gctUINT32) (regPsOutCntrl[2])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  29:24) - (0 ?
  29:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -19748,14 +20167,34 @@ _GenerateStates(
           {
             Hints->psOutCntl0to3 = regPsColorOut;
           }
-          if (regPsOutCntrl != 0)
+          if (regPsOutCntrl[0] != 0)
           {
               gcmONERROR(_SetState(CodeGen,
                                    0x040B,
-                                   regPsOutCntrl));
+                                   regPsOutCntrl[0]));
               if (Hints)
               {
-                Hints->psOutCntl4to7 = regPsOutCntrl;
+                  Hints->psOutCntl4to7 = regPsOutCntrl[0];
+              }
+          }
+          if (regPsOutCntrl[1] != 0)
+          {
+              gcmONERROR(_SetState(CodeGen,
+                                   0x0432,
+                                   regPsOutCntrl[1]));
+              if (Hints)
+              {
+                  Hints->psOutCntl8to11 = regPsOutCntrl[1];
+              }
+          }
+          if (regPsOutCntrl[2] != 0)
+          {
+              gcmONERROR(_SetState(CodeGen,
+                                   0x0433,
+                                   regPsOutCntrl[2]));
+              if (Hints)
+              {
+                  Hints->psOutCntl12to15 = regPsOutCntrl[2];
               }
           }
         }
@@ -20001,30 +20440,6 @@ _GenerateStates(
                 gcoOS_Print("%s: fsMaxTemp=%u", shaderTypeStr, Hints->fsMaxTemp);
             }
         }
-
-        /* 0x0403 */
-        {
-            gctUINT PSRegCount;  /* the total registers used by Pixel Shader,
-                                  * it should add subsampleDepth register if
-                                  * it is not already included in compiler
-                                  * allocated register */
-            PSRegCount = CodeGen->maxRegister +
-                         (CodeGen->subsampleDepthRegIncluded ? 0 : 1);
-            gcmONERROR(
-                _SetState(CodeGen,
-                          0x0403,
-                          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:0) - (0 ?
- 6:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 6:0) - (0 ?
- 6:0) + 1))))))) << (0 ?
- 6:0))) | (((gctUINT32) ((gctUINT32) (PSRegCount) & ((gctUINT32) ((((1 ?
- 6:0) - (0 ?
- 6:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ? 6:0)))));
-        }
-
 
         if (!gcHWCaps.hwFeatureFlags.newGPIPE)
         {
@@ -21861,7 +22276,7 @@ _GenerateStates(
 
         if (Hints != gcvNULL)
         {
-            if ((Hints->memoryAccessFlags[VSC_SHADER_STAGE_PS] & gceMA_FLAG_ATOMIC) &&
+            if ((Hints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][VSC_SHADER_STAGE_PS] & gceMA_FLAG_ATOMIC) &&
                 gcHWCaps.hwFeatureFlags.robustAtomic)
             {
                 shaderConfigData |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -22162,6 +22577,23 @@ _GenerateStates(
 
         if (CodeGen->unifiedUniform)
         {
+            gctUINT         count = 0;
+            gcsSL_USAGE_PTR usage;
+
+            /* Get constant count. */
+            for (count = 0, usage = CodeGen->uniformUsage;
+                 count < CodeGen->maxUniform;
+                 count++, usage++)
+            {
+                if (usage->lastUse[0] == gcvSL_AVAILABLE &&
+                    usage->lastUse[1] == gcvSL_AVAILABLE &&
+                    usage->lastUse[2] == gcvSL_AVAILABLE &&
+                    usage->lastUse[3] == gcvSL_AVAILABLE)
+                {
+                    break;
+                }
+            }
+
             if (CodeGen->clShader || CodeGen->computeShader)
             {
                 /* Set offset. */
@@ -22182,36 +22614,35 @@ _GenerateStates(
 
                 if (Hints != gcvNULL)
                 {
-                    Hints->unifiedStatus.constant = gcvTRUE;
+                    Hints->constRegNoBase[gcvPROGRAM_STAGE_COMPUTE] =
+                    Hints->constRegNoBase[gcvPROGRAM_STAGE_OPENCL]  = 0;
+                    Hints->fsConstCount = count;
+                    Hints->unifiedStatus.constantUnifiedMode = gcvUNIFORM_ALLOC_PACK_FLOAT_BASE_OFFSET;
                     Hints->unifiedStatus.constPSStart = 0;
+                    Hints->unifiedStatus.constCount = Hints->vsConstCount + Hints->fsConstCount;
                 }
             }
             else
             {
-                gctUINT         count = 0;
-                gctUINT         offset;
-                gcsSL_USAGE_PTR usage;
+                gctUINT         offset = 0;
                 gctBOOL         unblockUniformBlock = gcvFALSE;
                 gctBOOL         handleDefaultUBO = gcvFALSE;
                 gctINT          i, nextUniformIndex = 0;
 
-                /* Get constant count. */
-                for (count = 0, usage = CodeGen->uniformUsage;
-                     count < CodeGen->maxUniform;
-                     count++, usage++)
-                {
-                    if (usage->lastUse[0] == gcvSL_AVAILABLE &&
-                        usage->lastUse[1] == gcvSL_AVAILABLE &&
-                        usage->lastUse[2] == gcvSL_AVAILABLE &&
-                        usage->lastUse[3] == gcvSL_AVAILABLE)
-                    {
-                        break;
-                    }
-                }
-
                 /* Adjust uniform address. */
-                offset = gcHWCaps.maxHwNativeTotalConstRegCount - count;
-                uniformBase += offset * 4;
+                if (Hints)
+                {
+                    /* If chip can support unified uniform, pack vs and ps. */
+                    if (gcHWCaps.hwFeatureFlags.supportUnifiedConstant)
+                    {
+                        offset = Hints->vsConstCount;
+                    }
+                    else
+                    {
+                        offset = gcHWCaps.maxHwNativeTotalConstRegCount - count;
+                    }
+                    uniformBase += offset * 4;
+                }
 
                 /* Set offset. */
                 gcmONERROR(
@@ -22231,12 +22662,21 @@ _GenerateStates(
 
                 if (Hints != gcvNULL)
                 {
-                    Hints->unifiedStatus.constant = gcvTRUE;
-                    Hints->unifiedStatus.constPSStart = offset;
                     Hints->maxConstCount = gcHWCaps.maxTotalConstRegCount;
                     Hints->fsConstCount = count;
+                    if (gcHWCaps.hwFeatureFlags.supportUnifiedConstant)
+                    {
+                        Hints->unifiedStatus.constantUnifiedMode = gcvUNIFORM_ALLOC_PACK_FLOAT_BASE_OFFSET;
+                    }
+                    else
+                    {
+                        Hints->unifiedStatus.constantUnifiedMode = gcvUNIFORM_ALLOC_GPIPE_TOP_PS_BOTTOM_FLOAT_BASE_OFFSET;
+                    }
+                    Hints->unifiedStatus.constPSStart = offset;
+                    Hints->unifiedStatus.constCount = Hints->vsConstCount + Hints->fsConstCount;
 
                     /* Update the ps const base address. */
+                    Hints->constRegNoBase[gcvPROGRAM_STAGE_FRAGMENT] = offset;
                     Hints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] += offset * 16;
 
                     /* Remap uniforms with new uniformBase. */
@@ -22275,6 +22715,7 @@ _GenerateStates(
                         case gcSHADER_VAR_CATEGORY_ENABLE_MULTISAMPLE_BUFFERS:
                         case gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT:
                         case gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT:
+                        case gcSHADER_VAR_CATEGORY_WORK_GROUP_ID_OFFSET:
                             break;
 
                         case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
@@ -22360,6 +22801,8 @@ _GenerateStates(
                 gcmONERROR(_SetState(CodeGen,
                                      uniformBase + index,
                                      *(gctUINT32_PTR) &c->constant[u]));
+
+                useRegedCTC = gcvTRUE;
             }
         }
         /* If a constant is save on the UBO, save it. */
@@ -22379,6 +22822,24 @@ _GenerateStates(
             {
                 constAddr -= 4;
             }
+        }
+    }
+
+    if (Hints != gcvNULL)
+    {
+        if (CodeGen->shaderType == gcSHADER_TYPE_VERTEX)
+        {
+            Hints->useRegedCTC[gceSGSK_VERTEX_SHADER] = (gctCHAR)useRegedCTC;
+        }
+        else if (CodeGen->shaderType == gcSHADER_TYPE_FRAGMENT)
+        {
+            Hints->useRegedCTC[gceSGSK_FRAGMENT_SHADER] = (gctCHAR)useRegedCTC;
+        }
+        else
+        {
+            gcmASSERT(CodeGen->shaderType == gcSHADER_TYPE_COMPUTE ||
+                      CodeGen->shaderType == gcSHADER_TYPE_CL);
+            Hints->useRegedCTC[gceSGSK_COMPUTE_SHADER] = (gctCHAR)useRegedCTC;
         }
     }
 
@@ -22410,6 +22871,42 @@ _GenerateStates(
 #endif
 
     /* Process all code. */
+    /* for HW has 2-group-fast-reissue feature, old CG need to set all instruction as EndOfBB
+     * to make sure it can run correctly */
+    if (Tree->hwCfg.hwFeatureFlags.supportEndOfBBReissue)
+    {
+#if TEMP_SHADER_PATCH
+        for (i = 0; i < shaderSizeInDW; i += 4)
+        {
+            gctUINT *inst = BinaryShaderCode + i;
+            gctUINT opCode = (((((gctUINT32) (inst[0])) >> (0 ? 5:0)) & ((gctUINT32) ((((1 ? 5:0) - (0 ? 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1)))))) );
+            if (opCode == 0x31   ||
+                 opCode == 0x10   ||
+                 opCode == 0x09   ||
+                 opCode == 0x56 ||
+                 opCode == 0x0A ||
+                 opCode == 0x0B ||
+                 opCode == 0x0F)
+            {
+                /* For instructions who support condition code, this bit occupies
+                 * the bit 6 of instruction word1 */
+                inst[1] |= 0x40;
+            }
+            else if (opCode != 0x14   &&
+                     opCode != 0x15    &&
+                     opCode != 0x16 &&
+                     opCode != 0x17  )
+            {
+                /* For instructions who does not support condition code, this bit
+                 * occupies the bit 8 of instruction word0, these instructions are
+                 * all non-control-flow instructions except for above instructions. */
+                inst[0] |= 0x100;
+            }
+        }
+#else
+        gcmASSERT(gcvFALSE);
+#endif
+    }
     if (! CodeGen->useICache)
     {
 #if TEMP_SHADER_PATCH
@@ -22473,16 +22970,16 @@ _GenerateStates(
 #endif
         if (Hints != gcvNULL)
         {
-
+            gctPOINTER curInstrPtr;
             gcmONERROR(gcoOS_Allocate(gcvNULL,
                        size,
                        &pointer));
 
             instPtr = pointer;
-            codeAddress = (gctUINTPTR_T)pointer;
+            curInstrPtr = instPtr;
 
 #if TEMP_SHADER_PATCH
-            gcoOS_MemCopy((gctPOINTER) codeAddress, (gctCONST_POINTER)BinaryShaderCode, size);
+            gcoOS_MemCopy(curInstrPtr, (gctCONST_POINTER)BinaryShaderCode, size);
 #else
             for (f = 0; f <= Tree->shader->functionCount + Tree->shader->kernelFunctionCount; ++f)
             {
@@ -22490,11 +22987,12 @@ _GenerateStates(
                      code != gcvNULL;
                      code = code->next)
                 {
-                    gcoOS_MemCopy((gctPOINTER) codeAddress, code->states, code->count * 16);
-                    codeAddress += code->count * 16;
+                    gcoOS_MemCopy(curInstrPtr, code->states, code->count * 16);
+                    curInstrPtr += code->count * 16;
                 }
             }
 #endif
+
 
             gcoSHADER_AllocateVidMem(gcvNULL,
                                      gcvSURF_ICACHE,
@@ -22506,6 +23004,7 @@ _GenerateStates(
                                      &physical,
                                      instPtr,
                                      gcvFALSE);
+
             if ((gctUINT32)~0 == physical)
             {
                 gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
@@ -22807,6 +23306,52 @@ _GenerateStates(
     }
 #endif
 
+    /* Calculate the workGroupSize, use the old path that OCL driver used. */
+    if (Hints != gcvNULL &&
+        (CodeGen->clShader || CodeGen->computeShader) &&
+        !Tree->shader->shaderLayout.compute.isWorkGroupSizeFixed)
+    {
+        gctBOOL hasBarrier = gcvFALSE, hasImageWrite = gcvFALSE;
+        gctUINT j;
+        gctUINT32 maxRegCount;
+        gcSHADER kernelBinary = Tree->shader;
+        gctUINT shaderCoreCount = gcHWCaps.maxCoreCount;
+
+        maxRegCount = vscGetHWMaxFreeRegCount(&gcHWCaps);
+
+        for (j = 0; j < GetShaderCodeCount(kernelBinary); j++)
+        {
+            gcSL_INSTRUCTION inst   = GetShaderInstruction(kernelBinary, j);
+            if (gcmSL_OPCODE_GET(inst->opcode, Opcode) == gcSL_BARRIER)
+            {
+                hasBarrier = gcvTRUE;
+            }
+
+            if (gcSL_isOpcodeImageWrite(gcmSL_OPCODE_GET(inst->opcode, Opcode)))
+            {
+                hasImageWrite = gcvTRUE;
+            }
+        }
+
+        /* Calculate workGroupSize based on temp register count only when this shader uses BARRIER. */
+        if (hasBarrier)
+        {
+            gctUINT32 maxTempCount = (Hints->threadWalkerInPS) ? Hints->fsMaxTemp : Hints->vsMaxTemp;
+
+            /*
+            **  A WAR for bug13179:
+            **      relax the workGroupSize by increasing the max register count while shader uses barrier as a HW limitation.
+            */
+            if (hasImageWrite)
+            {
+                maxTempCount += 3;
+            }
+
+            kernelBinary->shaderLayout.compute.adjustedWorkGroupSize =
+                (gctUINT32)(maxRegCount / gcmMAX(2, maxTempCount)) * 4 * shaderCoreCount;
+        }
+    }
+
     /* Debug shader. */
     if (dumpCodeGen && CodeGen->lastStateCommand != gcvNULL && !CodeGen->useICache)
     {
@@ -22814,6 +23359,7 @@ _GenerateStates(
         _DumpShader(StateBuffer, CodeGen->stateBufferOffset,
                     CodeGen->hasInteger, instrBase, maxNumInstrStates, CodeGen->isDual16Shader);
     }
+
     if ((CodeGen->lastStateCommand != gcvNULL) && (numInstrStates > maxNumInstrStates) && (!CodeGen->useICache))
     {
         gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_COMPILER,
@@ -22827,6 +23373,7 @@ OnError:
 
     /* Return the required size. */
     *Size = gcmALIGN(CodeGen->stateBufferOffset, 8);
+    *StateDeltaBufferSize = CodeGen->stateDeltaBufferOffset * 4;
 #if TEMP_SHADER_PATCH
    if (BinaryShaderCode)
        gcoOS_Free(gcvNULL, BinaryShaderCode);
@@ -22960,6 +23507,7 @@ gcLINKTREE_GenerateStates(
 {
     gceSTATUS           status;
     gctSIZE_T           size;
+    gctSIZE_T           size2;
     gctPOINTER          pointer = gcvNULL;
     gctUINT32           i;
     gctUINT32           vsSamplers, psSamplers;
@@ -22970,7 +23518,9 @@ gcLINKTREE_GenerateStates(
     gcSHADER            shader = tree->shader;
     gcsHINT_PTR         hints;
     gctUINT32           stateBufferSize;
+    gctUINT32           stateDeltaSize;
     gctUINT8 *          stateBuffer = gcvNULL;
+    gctUINT32 *         stateDeltaBuffer = gcvNULL;
 
     /* The common code generator structure. */
     gcsCODE_GENERATOR   codeGen = { (gceSHADER_FLAGS) 0 };
@@ -22984,6 +23534,7 @@ gcLINKTREE_GenerateStates(
     /* old hints and stateBufferSize */
     hints = ProgramState->hints;
     stateBufferSize = ProgramState->stateBufferSize;
+    stateDeltaSize = ProgramState->stateDeltaSize;
 
     /* count the code in the shader */
     gcoOS_ZeroMemory(&codeInfo, gcmSIZEOF(codeInfo));
@@ -23159,6 +23710,7 @@ gcLINKTREE_GenerateStates(
         codeGen.maxUniform     = gcHWCaps.maxVSConstRegCount;
         codeGen.unifiedUniform = gcHWCaps.unifiedConst;
 
+        /* If this chip can support unified constant, then this shader can use all of the constant register. */
         if (codeGen.unifiedUniform)
         {
             codeGen.maxUniform = gcmMIN(512, gcHWCaps.maxTotalConstRegCount);
@@ -23174,13 +23726,11 @@ gcLINKTREE_GenerateStates(
             codeGen.unifiedUniform = gcHWCaps.unifiedConst;
         }
 #if !gcdENABLE_UNIFIED_CONSTANT
-        /* TODO - Need to enhance unified constant checking. */
         else if ((gcHWCaps.maxTotalConstRegCount== 320 &&
                   gcHWCaps.maxPSConstRegCount == 64 &&
                   gcHWCaps.maxVSConstRegCount == 256) &&
                   !codeGen.computeShader)
         {
-            /* TODO - Need to enhance for unified constant. */
             codeGen.uniformBase    = 0xC000;
             codeGen.maxUniform     = gcHWCaps.maxTotalConstRegCount;
             codeGen.unifiedUniform = gcvTRUE;
@@ -23199,6 +23749,7 @@ gcLINKTREE_GenerateStates(
         codeGen.maxUniform     = gcHWCaps.maxPSConstRegCount;
         codeGen.unifiedUniform = gcHWCaps.unifiedConst;
 
+        /* If this chip can support unified constant, then this shader can use all of the constant register. */
         if (codeGen.unifiedUniform)
         {
             codeGen.maxUniform = gcmMIN(512, gcHWCaps.maxTotalConstRegCount);
@@ -23299,17 +23850,30 @@ gcLINKTREE_GenerateStates(
         hints->unifiedStatus.constPSStart        = -1;
         hints->unifiedStatus.samplerGPipeStart   = vsSamplersBase;
         hints->unifiedStatus.samplerPSEnd        = vsSamplersBase - 1;
+        /* By default it is GPIPE_TOP_PS_BOTTOM unified. */
+        hints->unifiedStatus.constantUnifiedMode = gcvUNIFORM_ALLOC_GPIPE_TOP_PS_BOTTOM_FLOAT_BASE_OFFSET;
+        /* By default it is non-unified. */
+        hints->unifiedStatus.samplerUnifiedMode  = gcvUNIFORM_ALLOC_NONE_UNIFIED;
         hints->psOutCntl0to3                     = -1;
         hints->psOutCntl4to7                     = -1;
+        hints->psOutCntl8to11                    = -1;
+        hints->psOutCntl12to15                   = -1;
     }
 
     if (codeGen.shaderType == gcSHADER_TYPE_VERTEX)
     {
-        hints->hwConstRegBases[gcvPROGRAM_STAGE_VERTEX] = codeGen.uniformBase * 4;
+        hints->hwConstRegBases[gcvPROGRAM_STAGE_VERTEX]  = codeGen.uniformBase * 4;
+        hints->constRegNoBase[gcvPROGRAM_STAGE_VERTEX]   = 0;
     }
     else
     {
-        hints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] = codeGen.uniformBase * 4;
+        hints->hwConstRegBases[gcvPROGRAM_STAGE_COMPUTE] =
+        hints->hwConstRegBases[gcvPROGRAM_STAGE_OPENCL]  =
+        hints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT]= codeGen.uniformBase * 4;
+
+        hints->constRegNoBase[gcvPROGRAM_STAGE_COMPUTE]  =
+        hints->constRegNoBase[gcvPROGRAM_STAGE_OPENCL]   =
+        hints->constRegNoBase[gcvPROGRAM_STAGE_FRAGMENT] = 0;
     }
 
 #if gcdUSE_WCLIP_PATCH
@@ -23552,7 +24116,7 @@ gcLINKTREE_GenerateStates(
     gcmONERROR(_GenerateCode(tree, &codeGen));
 
     /* Compute the size of the state buffer. */
-    gcmONERROR(_GenerateStates(tree, &codeGen, gcvNULL, &size, gcvNULL));
+    gcmONERROR(_GenerateStates(tree, &codeGen, gcvNULL, &size, gcvNULL, &size2, gcvNULL));
 
     /* Allocate a new state buffer. */
     gcmONERROR(gcoOS_Allocate(gcvNULL,
@@ -23567,6 +24131,21 @@ gcLINKTREE_GenerateStates(
 
         gcoOS_MemCopy(stateBuffer, ProgramState->stateBuffer, stateBufferSize);
     }
+
+    /* Allocate a new state delta buffer. */
+    gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                stateDeltaSize + size2,
+                                &pointer));
+    stateDeltaBuffer = pointer;
+
+    /* Copy the old state delta buffer if there is any. */
+    if (stateDeltaSize > 0)
+    {
+        gcmASSERT(ProgramState->stateDelta != gcvNULL);
+
+        gcoOS_MemCopy(stateDeltaBuffer, ProgramState->stateDelta, stateDeltaSize);
+    }
+
 
     /* set program stage bits */
     if (codeGen.clShader)
@@ -23652,7 +24231,9 @@ gcLINKTREE_GenerateStates(
             gcmASSERT(codeGen.shaderType == gcSHADER_TYPE_CL);
             stageIndex = gcvPROGRAM_STAGE_OPENCL;
         }
-        hints->memoryAccessFlags[stageIndex] = memoryAccessFlag;
+        /* So far we won't generate any memory-access-related instruction for old CG. */
+        hints->memoryAccessFlags[gcvSHADER_HIGH_LEVEL][stageIndex] = memoryAccessFlag;
+        hints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][stageIndex] = memoryAccessFlag;
         hints->threadGroupSync = threadGroupSync;
         /* The shader invocation control function is only available in compute shaders for OGL,
             * or OCL */
@@ -23701,6 +24282,8 @@ gcLINKTREE_GenerateStates(
                                &codeGen,
                                stateBuffer + stateBufferSize,
                                &size,
+                               (gctUINT8 *)stateDeltaBuffer + stateDeltaSize,
+                               &size2,
                                hints));
 
     /* Free any old state buffer. */
@@ -23709,12 +24292,18 @@ gcLINKTREE_GenerateStates(
         gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, ProgramState->stateBuffer));
     }
 
+    if (stateDeltaSize)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, ProgramState->stateDelta));
+    }
+
     /* Set new state buffer. */
     ProgramState->stateBuffer = stateBuffer;
     ProgramState->stateBufferSize = stateBufferSize + size;
+    ProgramState->stateDelta = stateDeltaBuffer;
+    ProgramState->stateDeltaSize = stateDeltaSize + size2;
     ProgramState->hints = hints;
     stateBuffer       = gcvNULL;
-    hints             = gcvNULL;
 
 OnError:
     /* Free up uniform usage table. */
@@ -23767,12 +24356,6 @@ OnError:
     if (stateBuffer != gcvNULL)
     {
         gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, stateBuffer));
-    }
-
-    /* When in error condition, only free the hints which is newly created. */
-    if (hints && (ProgramState->hints == gcvNULL))
-    {
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, hints));
     }
 
     /* Return the status. */

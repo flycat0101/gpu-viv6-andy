@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -23,6 +23,8 @@ VX_INTERNAL_CALLBACK_API void vxoDistribution_Destructor(vx_reference ref)
 VX_API_ENTRY vx_distribution VX_API_CALL vxCreateDistribution(vx_context context, vx_size numBins, vx_int32 offset, vx_uint32 range)
 {
     vx_distribution distribution;
+
+    gcmDUMP_API("$VX vxCreateDistribution: context=%p, numBins=0x%lx, offset=0x%x, range=0x%x", context, numBins, offset, range);
 
     if (!vxoContext_IsValid(context)) return VX_NULL;
 
@@ -55,12 +57,16 @@ VX_API_ENTRY vx_distribution VX_API_CALL vxCreateDistribution(vx_context context
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseDistribution(vx_distribution *distribution)
 {
+    gcmDUMP_API("$VX vxReleaseDistribution: distribution=%p", distribution);
+
     return vxoReference_Release((vx_reference_ptr)distribution, VX_TYPE_DISTRIBUTION, VX_REF_EXTERNAL);
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryDistribution(vx_distribution distribution, vx_enum attribute, void *ptr, vx_size size)
 {
     vx_int32 dims;
+
+    gcmDUMP_API("$VX vxQueryDistribution: distribution=%p, attribute=0x%x, ptr=%p, size=0x%lx", distribution, attribute, ptr, size);
 
     if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -122,6 +128,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryDistribution(vx_distribution distribut
 
 VX_API_ENTRY vx_status VX_API_CALL vxAccessDistribution(vx_distribution distribution, void **ptr, vx_enum usage)
 {
+    gcmDUMP_API("$VX vxAccessDistribution: distribution=%p, ptr=%p, usage=0x%x", distribution, ptr, usage);
+
     if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION)) return VX_ERROR_INVALID_REFERENCE;
 
     if (!vxoMemory_Allocate(distribution->base.context, &distribution->memory)) return VX_ERROR_NO_MEMORY;
@@ -157,6 +165,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxAccessDistribution(vx_distribution distribu
 
 VX_API_ENTRY vx_status VX_API_CALL vxCommitDistribution(vx_distribution distribution, const void *ptr)
 {
+    gcmDUMP_API("$VX vxCommitDistribution: distribution=%p, ptr=%p", distribution, ptr);
+
     if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION)) return VX_ERROR_INVALID_REFERENCE;
 
     if (!vxoMemory_Allocate(distribution->base.context, &distribution->memory)) return VX_ERROR_NO_MEMORY;
@@ -186,6 +196,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyDistribution(vx_distribution distributi
 {
     vx_status status = VX_FAILURE;
     vx_size size = 0;
+
+    gcmDUMP_API("$VX vxCopyDistribution: distribution=%p, user_ptr=%p, usage=0x%x, mem_type=0x%x", distribution, user_ptr, usage, mem_type);
 
     /* bad references */
     if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION) ||
@@ -241,6 +253,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapDistribution(vx_distribution distributio
     vx_status status = VX_FAILURE;
     vx_size size = 0;
 
+    gcmDUMP_API("$VX vxMapDistribution: distribution=%p, map_id=%p, ptr=%p, usage=0x%x, mem_type=0x%x, flags=0x%x", distribution, map_id, ptr, user_ptr, usage, mem_type, flags);
+
     /* bad references */
     if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION) ||
         (vxoMemory_Allocate(distribution->base.context, &distribution->memory) != vx_true_e))
@@ -293,6 +307,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapDistribution(vx_distribution distribut
 {
     vx_status status = VX_FAILURE;
     vx_size size = 0;
+
+    gcmDUMP_API("$VX vxUnmapDistribution: vx_distribution=%p, map_id=%p", vx_distribution, map_id);
 
     /* bad references */
     if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION) ||
@@ -351,6 +367,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapDistribution(vx_distribution distributio
     vx_status status = VX_FAILURE;
     vx_size size = 0;
 
+    gcmDUMP_API("$VX vxMapDistribution: distribution=%p, map_id=%p, ptr=%p, usage=0x%x, mem_type=0x%x, flags=0x%x", distribution, map_id, ptr, usage, mem_type, flags);
+
     /* bad references */
     if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION) ||
         (vxoMemory_Allocate(distribution->base.context, &distribution->memory) != vx_true_e))
@@ -387,6 +405,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapDistribution(vx_distribution distribut
 {
     vx_status status = VX_FAILURE;
 
+    gcmDUMP_API("$VX vxUnmapDistribution: distribution=%p, map_id=%p", distribution, map_id);
+
     /* bad references */
     if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION) ||
         (vxoMemory_Allocate(distribution->base.context, &distribution->memory) != vx_true_e))
@@ -413,4 +433,24 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapDistribution(vx_distribution distribut
     return VX_SUCCESS;
 }
 #endif
+
+VX_API_ENTRY vx_distribution VX_API_CALL vxCreateVirtualDistribution(vx_graph graph, vx_size numBins, vx_int32 offset, vx_uint32 range)
+{
+    vx_distribution distribution;
+    vx_context context = vxoContext_GetFromReference((vx_reference)graph);
+
+    gcmDUMP_API("$VX vxCreateVirtualDistribution: graph=%p, numBins=0x%lx, offset=0x%x, range=0x%x", graph, numBins, offset, range);
+
+    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_NULL;
+
+    distribution = vxCreateDistribution(context, numBins, offset, range);
+
+    if (vxoReference_GetStatus((vx_reference)distribution) != VX_SUCCESS) return distribution;
+
+    distribution->base.scope        = (vx_reference)graph;
+
+    distribution->base.isVirtual    = vx_true_e;
+
+    return distribution;
+}
 

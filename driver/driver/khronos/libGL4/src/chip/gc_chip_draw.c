@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -14,6 +14,7 @@
 #include "gc_es_context.h"
 #include "gc_chip_context.h"
 #include "gc_es_object_inline.c"
+#include "gc_hal_dump.h"
 
 extern gceSTATUS loadUniforms(
     IN __GLcontext * gc,
@@ -1008,9 +1009,7 @@ OnError:
 }
 #endif
 
-/*to_do:merge the two definition after fix function refine*/
-#ifdef OPENGL40
-#define gcmGL_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, bInstance) \
+#define gcmGL_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, bInstance, fixProgram) \
     streamInfo.attribMask = instantDraw->attribMask; \
     streamInfo.u.es30.attributes = instantDraw->attributes; \
     streamInfo.first = instantDraw->first; \
@@ -1018,20 +1017,9 @@ OnError:
     streamInfo.instanced = bInstance; \
     streamInfo.instanceCount = gc->vertexArray.instanceCount; \
     streamInfo.primMode = instantDraw->primMode; \
-    streamInfo.vertexInstIndex = chipCtx->fixProgramFlag ? gcSHADER_GetVertexInstIdInputIndex(chipCtx->currProgram->vs.shader) : gcSHADER_GetVertexInstIdInputIndex(chipCtx->activePrograms[__GLSL_STAGE_VS]->masterPgInstance->binaries[__GLSL_STAGE_VS]); \
+    streamInfo.vertexInstIndex = fixProgram ? gcSHADER_GetVertexInstIdInputIndex(chipCtx->currProgram->vs.shader) : gcSHADER_GetVertexInstIdInputIndex(chipCtx->activePrograms[__GLSL_STAGE_VS]->masterPgInstance->binaries[__GLSL_STAGE_VS]); \
     streamInfo.primCount = instantDraw->primCount
-#else
-#define gcmGL_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, bInstance) \
-    streamInfo.attribMask = instantDraw->attribMask; \
-    streamInfo.u.es30.attributes = instantDraw->attributes; \
-    streamInfo.first = instantDraw->first; \
-    streamInfo.count = instantDraw->count; \
-    streamInfo.instanced = bInstance; \
-    streamInfo.instanceCount = gc->vertexArray.instanceCount; \
-    streamInfo.primMode = instantDraw->primMode; \
-    streamInfo.vertexInstIndex = gcSHADER_GetVertexInstIdInputIndex(chipCtx->activePrograms[__GLSL_STAGE_VS]->masterPgInstance->binaries[__GLSL_STAGE_VS]); \
-    streamInfo.primCount = instantDraw->primCount
-#endif
+
 
 #define gcmGL_COLLECT_INDEX_INFO(indexInfo, instantDraw) \
     indexInfo.count = instantDraw->count; \
@@ -1124,12 +1112,16 @@ gcChipSetVertexArrayBind(
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     gcsVERTEXARRAY_STREAM_INFO streamInfo;
     gcsVERTEXARRAY_INDEX_INFO  indexInfo;
+    gctBOOL fixProgram = gcvFALSE;
 
     gcmHEADER_ARG("gc=0x%x instanced=%d", gc, instanced);
 
+#ifdef OPENGL40
+    fixProgram = chipCtx->fixProgramFlag;
+#endif
     gcmONERROR(gcChipSetVertexArrayBindBegin(gc, instantDraw, fixWLimit));
     /* Collect info for hal level.*/
-    gcmGL_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, instanced);
+    gcmGL_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, instanced, fixProgram);
     gcmGL_COLLECT_INDEX_INFO(indexInfo, instantDraw);
 
     /* Bind the vertex array to the hardware. */
@@ -4406,6 +4398,33 @@ gcChipPatchConvertVertAttrib(
             AttrPtr->stride = AttrPtr->size * sizeof(GLint);
             break;
 
+
+        case gcvVERTEX_DOUBLE:
+            {
+                /* Cast pointer to buffer. */
+                gctFLOAT_PTR pDst = (gctFLOAT_PTR)baseDst + AttrPtr->size * (minIndex + first);
+
+                GL_ASSERT(AttrPtr->convertScheme == gcvATTRIB_SCHEME_DOUBLE_TO_FLOAT);
+
+                for (i = 0; i < count; ++i)
+                {
+                    gctINT j;
+                    /* Get packed data */
+                    double* pSrc = (double *)(baseSrc + (AttrPtr->stride * i));
+
+                    for (j = 0; j < AttrPtr->size; ++j)
+                    {
+                        {
+                            *pDst++ = (gctFLOAT)(*pSrc++);
+                        }
+                    }
+                }
+
+                AttrPtr->format = gcvVERTEX_FLOAT;
+                AttrPtr->stride = AttrPtr->size * sizeof(GLfloat);
+            }
+            break;
+
         default:
             gcmASSERT(GL_FALSE);
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
@@ -5368,10 +5387,12 @@ gcChipValidateStream(
         }
 
     }
-    for(i =  __GL_INPUT_ATT0_INDEX; i <= __GL_INPUT_ATT15_INDEX ; i++)
+    for(i = 0; i < __GL_MAX_VERTEX_ATTRIBUTES; i++)
     {
-        if (vertexArrayState->attribEnabled & (__GL_ONE_32 << i))
-            arrayLoc[ i - __GL_INPUT_ATT0_INDEX] =  i;
+        if ( arrayLoc[i] == 0xFFFFFFFF)
+        {
+            arrayLoc[i] = i + __GL_INPUT_ATT0_INDEX;
+        }
     }
 #endif
 
@@ -5402,9 +5423,9 @@ gcChipValidateStream(
 
             /* Check whether VS required attribute was enabled by apps */
 #ifdef OPENGL40
-           if (vertexArrayState->attribEnabled & (__GL_ONE_32 << arrayLoc[arrayIdx]))
+           if (vertexArrayState->attribEnabled & (__GL_ONE_64 << arrayLoc[arrayIdx]))
 #else
-            if (vertexArrayState->attribEnabled & (__GL_ONE_32 << arrayIdx))
+            if (vertexArrayState->attribEnabled & (__GL_ONE_64 << arrayIdx))
 #endif
             {
                 __GLbufferObject *bufObj;
@@ -5567,6 +5588,12 @@ gcChipValidateStream(
                     }
                     break;
 
+                case GL_DOUBLE:
+                    format = gcvVERTEX_DOUBLE;
+                    chipCtx->anyAttibConverted = gcvTRUE;
+                    scheme = gcvATTRIB_SCHEME_DOUBLE_TO_FLOAT;
+                    break;
+
                 default:
                     format = gcvVERTEX_BYTE;
                     gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
@@ -5620,10 +5647,10 @@ gcChipValidateStream(
                         attribPtr->stream = gcvNULL;
                         attribPtr->enable = gcvFALSE;
 #ifdef OPENGL40
-                        attribPtr->genericValue[0] = gc->state.current.attribute[arrayLoc[arrayIdx]].f.x;
-                        attribPtr->genericValue[1] = gc->state.current.attribute[arrayLoc[arrayIdx]].f.y;
-                        attribPtr->genericValue[2] = gc->state.current.attribute[arrayLoc[arrayIdx]].f.z;
-                        attribPtr->genericValue[3] = gc->state.current.attribute[arrayLoc[arrayIdx]].f.w;
+                        attribPtr->genericValue[0] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.x;
+                        attribPtr->genericValue[1] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.y;
+                        attribPtr->genericValue[2] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.z;
+                        attribPtr->genericValue[3] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.w;
 #else
                         attribPtr->genericValue[0] = gc->state.current.attribute[arrayIdx].f.x;
                         attribPtr->genericValue[1] = gc->state.current.attribute[arrayIdx].f.y;
@@ -5650,10 +5677,10 @@ gcChipValidateStream(
                 attribPtr->stream = gcvNULL;
                 attribPtr->enable = gcvFALSE;
 #ifdef OPENGL40
-                attribPtr->genericValue[0] = gc->state.current.attribute[arrayLoc[arrayIdx]].f.x;
-                attribPtr->genericValue[1] = gc->state.current.attribute[arrayLoc[arrayIdx]].f.y;
-                attribPtr->genericValue[2] = gc->state.current.attribute[arrayLoc[arrayIdx]].f.z;
-                attribPtr->genericValue[3] = gc->state.current.attribute[arrayLoc[arrayIdx]].f.w;
+                attribPtr->genericValue[0] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.x;
+                attribPtr->genericValue[1] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.y;
+                attribPtr->genericValue[2] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.z;
+                attribPtr->genericValue[3] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.w;
 #else
                 attribPtr->genericValue[0] = gc->state.current.attribute[arrayIdx].f.x;
                 attribPtr->genericValue[1] = gc->state.current.attribute[arrayIdx].f.y;
@@ -5740,7 +5767,8 @@ GLvoid configStream(__GLcontext* gc)
 
     GLuint streamIdx;
     GLuint elementIdx;
-    GLuint missingAttr, attrIndex = 0;
+    GLuint64 missingAttr;
+    GLuint attrIndex = 0;
 
     for (streamIdx = 0; streamIdx < gcmCOUNTOF(chipCtx->attributeInfo); streamIdx++) {
         chipCtx->attributeInfo[streamIdx].streamEnabled = GL_FALSE;
@@ -6806,13 +6834,13 @@ gcChipSplitDrawStipple(
 
         x1 = *((GLfloat *)(vertexPtr->pointer) + vertexPtr->size * j1);
         y1 = *((GLfloat *)(vertexPtr->pointer) + vertexPtr->size * j1 + 1);
-        z1 = vertexPtr->size > 2 ? *((GLfloat *)(vertexPtr->pointer) + vertexPtr->size * j1 + 2) : 1.0;
+        z1 = vertexPtr->size > 2 ? *((GLfloat *)(vertexPtr->pointer) + vertexPtr->size * j1 + 2) : 1.0f;
         clipX1 = x1 * gc->transform.modelView->mvp.matrix[0][0] + y1 * gc->transform.modelView->mvp.matrix[0][1] + z1 * gc->transform.modelView->mvp.matrix[0][2];
         clipY1 = x1 * gc->transform.modelView->mvp.matrix[1][0] + y1 * gc->transform.modelView->mvp.matrix[1][1] + z1 * gc->transform.modelView->mvp.matrix[1][2];
 
         x2 = *((GLfloat *)(vertexPtr->pointer) + vertexPtr->size * j2);
         y2 = *((GLfloat *)(vertexPtr->pointer) + vertexPtr->size * j2 + 1);
-        z2 = vertexPtr->size > 2 ? *((GLfloat *)(vertexPtr->pointer) + vertexPtr->size * j2 + 2) : 1.0;
+        z2 = vertexPtr->size > 2 ? *((GLfloat *)(vertexPtr->pointer) + vertexPtr->size * j2 + 2) : 1.0f;
         clipX2 = x2 * gc->transform.modelView->mvp.matrix[0][0] + y2 * gc->transform.modelView->mvp.matrix[0][1] + z2 * gc->transform.modelView->mvp.matrix[0][2];
         clipY2 = x2 * gc->transform.modelView->mvp.matrix[1][0] + y2 * gc->transform.modelView->mvp.matrix[1][1] + z2 * gc->transform.modelView->mvp.matrix[1][2];
         if ((clipY2 - clipY1) * (clipY2 - clipY1) > (clipX2 - clipX1) * (clipX2 - clipX1))
@@ -7401,14 +7429,19 @@ gcChipSplitDrawIndexFetch(
     __GLchipInstantDraw tmpInstantDraw;
     gcsVERTEXARRAY_STREAM_INFO streamInfo;
     gcsVERTEXARRAY_INDEX_INFO  indexInfo;
+    gctBOOL fixProgram = gcvFALSE;
 
     gcmHEADER();
+
+#ifdef OPENGL40
+    fixProgram = chipCtx->fixProgramFlag;
+#endif
 
     gcmONERROR(gcChipSetVertexArrayBindBegin(gc, instantDraw, gcvTRUE));
 
     /* Stream data not change, only need bind once.*/
     /* Collect info for hal level.*/
-    gcmGL_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, gcvTRUE);
+    gcmGL_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, gcvTRUE, fixProgram);
     gcmGL_COLLECT_INDEX_INFO(indexInfo, instantDraw);
 
 #if gcdUSE_WCLIP_PATCH
@@ -7534,7 +7567,7 @@ gcChipCollectSplitDrawArraysInfo(
     __GLchipSLProgram *vsProgram = chipCtx->activePrograms[__GLSL_STAGE_VS];
 
     if ((chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)
-    &&  vsProgram->xfbCount > 0
+    &&  vsProgram && vsProgram->xfbCount > 0
     /* If gcvFEATURE_FE_START_VERTEX_SUPPORT not support, VertexId after split draw is not correct. */
     && gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_FE_START_VERTEX_SUPPORT)
     &&  gc->vertexArray.instanceCount == 1
@@ -7669,8 +7702,13 @@ gcChipSplitDrawTCS(
     gcsVERTEXARRAY_STREAM_INFO streamInfo;
     gcsVERTEXARRAY_INDEX_INFO  indexInfo;
     __GLchipInstantDraw tmpInstantDraw;
+    gctBOOL fixProgram = gcvFALSE;
 
     gcmHEADER();
+
+#ifdef OPENGL40
+    fixProgram = chipCtx->fixProgramFlag;
+#endif
 
     gcmGET_INDEX_SIZE(instantDraw->indexType, indexSize);
 
@@ -7681,7 +7719,7 @@ gcChipSplitDrawTCS(
 
     /* Stream data not change, only need bind once.*/
     /* Collect info for hal level.*/
-    gcmGL_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, gcvTRUE);
+    gcmGL_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, gcvTRUE, fixProgram);
     gcmGL_COLLECT_INDEX_INFO(indexInfo, instantDraw);
     __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
 
@@ -9657,7 +9695,7 @@ __glChipDrawPattern(
 
     /* Fill into stream */
     pFastFlush->vsInputArrayMask = currentProgram->bindingInfo.vsInputArrayMask;
-    pFastFlush->vertexArrayEnable = vertexArrayState->attribEnabled;
+    pFastFlush->vertexArrayEnable = (GLuint)vertexArrayState->attribEnabled;
 
     while (vsInputArrayMask)
     {
@@ -9672,7 +9710,7 @@ __glChipDrawPattern(
         for (attribLinkage = program->attribLinkage[arrayIdx]; attribLinkage != gcvNULL; attribLinkage = attribLinkage->next)
         {
             /* Check whether VS required attribute was enabled by apps */
-            if (vertexArrayState->attribEnabled & (__GL_ONE_32 << arrayIdx))
+            if (vertexArrayState->attribEnabled & (__GL_ONE_64 << arrayIdx))
             {
                 __GLvertexAttrib *pAttrib = &vertexArrayState->attribute[arrayIdx];
                 __GLvertexAttribBinding *pAttribBinding = &vertexArrayState->attributeBinding[pAttrib->attribBinding];

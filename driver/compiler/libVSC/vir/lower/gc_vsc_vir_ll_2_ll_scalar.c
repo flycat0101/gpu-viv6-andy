@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -15,17 +15,12 @@
 #include "vir/lower/gc_vsc_vir_lower_common_func.h"
 
 static gctBOOL
-_hasNotVecMod(
+_hasNotIntVecDiv(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
     )
 {
-    /*
-    ** For INT_MOD, HW can only support component operantion, so we need to expand INT_MOD.
-    ** For FLOAT_MOD, HW can't support it directly, so we need to use DIV. But HW can only support component operation for DIV,
-    ** so we need to expand FLOAT_MOD too.
-    */
-    return gcvTRUE;
+    return !(Context->vscContext->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportFullCompIntDiv);
 }
 
 static VIR_PatternMatchInst _rcpSclPatInst0[] = {
@@ -120,28 +115,46 @@ static VIR_Pattern _cospiSclPattern[] = {
 };
 
 static VIR_PatternMatchInst _divSclPatInst0[] = {
-    { VIR_OP_DIV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_enableFullNewLinker }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_DIV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_enableFullNewLinker, _hasNotIntVecDiv, VIR_Lower_IsDstInt }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _divSclRepInst0[] = {
     { VIR_OP_DIV, 0, 0, { 1, 2, 3, 0 }, { 0 } },
 };
 
+static VIR_PatternMatchInst _divSclPatInst1[] = {
+    { VIR_OP_DIV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_enableFullNewLinker, VIR_Lower_IsDstFloat }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _divSclRepInst1[] = {
+    { VIR_OP_DIV, 0, 0, { 1, 2, 3, 0 }, { 0 } },
+};
+
 static VIR_Pattern _divSclPattern[] = {
     { VIR_PATN_FLAG_EXPAND_COMPONENT_INLINE | VIR_PATN_FLAG_EXPAND_MODE_COMPONENT_O2O, CODEPATTERN(_divScl, 0) },
+    { VIR_PATN_FLAG_EXPAND_COMPONENT_INLINE | VIR_PATN_FLAG_EXPAND_MODE_COMPONENT_O2O, CODEPATTERN(_divScl, 1) },
     { VIR_PATN_FLAG_NONE }
 };
 
 static VIR_PatternMatchInst _modSclPatInst0[] = {
-    { VIR_OP_MOD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasNotVecMod }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_MOD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasNotIntVecDiv, VIR_Lower_IsDstInt }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _modSclRepInst0[] = {
     { VIR_OP_MOD, 0, 0, { 1, 2, 3, 0 }, { 0 } },
 };
 
+static VIR_PatternMatchInst _modSclPatInst1[] = {
+    { VIR_OP_MOD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_IsDstFloat }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _modSclRepInst1[] = {
+    { VIR_OP_MOD, 0, 0, { 1, 2, 3, 0 }, { 0 } },
+};
+
 static VIR_Pattern _modSclPattern[] = {
     { VIR_PATN_FLAG_EXPAND_COMPONENT_INLINE | VIR_PATN_FLAG_EXPAND_MODE_COMPONENT_O2O, CODEPATTERN(_modScl, 0) },
+    { VIR_PATN_FLAG_EXPAND_COMPONENT_INLINE | VIR_PATN_FLAG_EXPAND_MODE_COMPONENT_O2O, CODEPATTERN(_modScl, 1) },
     { VIR_PATN_FLAG_NONE }
 };
 

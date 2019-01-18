@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -50,7 +50,7 @@ LDFLAGS := $(LFLAGS) -Wl,-z,defs
 ################################################################################
 # Supply necessary libraries.
 
-LDLIBS += -ldrm -lGAL
+LDLIBS += -ldrm -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL
 
 ifeq ($(EGL_API_WL),1)
 LDLIBS += -L$(WAYLAND_DIR)/lib \
@@ -76,11 +76,13 @@ install: all
 	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
 
 $(TARGET_MODULE): $(OBJECTS)
-	$(CC) $(LDFLAGS) -shared -Wl,-soname,$(TARGET_SONAME) -o $@ $(OBJECTS) $(LDLIBS)
+	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
+	@$(CC) $(LDFLAGS) -shared -Wl,-soname,$(TARGET_SONAME) -o $@ $(OBJECTS) $(LDLIBS)
 
 $(OBJ_DIR)/%.o: %.c
+	@echo "  COMPILE $(abspath $<)"
 	@mkdir -p $(OBJ_DIR)
-	$(CC) -c $(CFLAGS) -MMD -o $@ $<
+	@$(CC) -c $(CFLAGS) -MMD -o $@ $<
 
 # object dependencies.
 -include $(OBJECTS:.o=.d)

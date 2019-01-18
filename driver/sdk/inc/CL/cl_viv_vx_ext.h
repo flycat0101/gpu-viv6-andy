@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2018 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -58,16 +58,45 @@ typedef enum _VXC_RoundMode
     VXC_RM_ToNearestEven = 2
 } vxc_round_mode;
 
-#define VXC_CLAMP_BITMASK           0x400000     /* shift 22 */
-#define VXC_PREADJ_BITMASK          0x200000     /* shift 21 */
-#define VXC_RANGEPI_BITMASK         0x100000     /* shift 20 */
-#define VXC_FILTER_BITMASK          0x0F0000     /* shift 16 */
-#define VXC_START_BIN_BITMASK       0x00F000     /* shift 12 */
-#define VXC_END_BIN_BITMASK         0x000F00     /* shift 8 */
-#define VXC_SOURCE_BIN_BITMASK      0x0000F0     /* shift 4 */
-#define VXC_ROUNDING_MODE_BITMASK   0x00000C     /* shift 2 */
-#define VXC_ENABLEBOOL_BITMASK      0x000002     /* shift 1 */
-#define VXC_SIGNEXT_BITMASK         0x000001     /* shift 0 */
+typedef enum _VXC_ScatteredOffsetType
+{
+    VXC_OFFSET_UNSIGNED32   = 0,
+    VXC_OFFSET_SIGNED32     = 1,
+    VXC_OFFSET_UNSIGNED16   = 2,
+    VXC_OFFSET_SIGNED16     = 3,
+    VXC_OFFSET_UNSIGNED8    = 4,
+    VXC_OFFSET_SIGNED8      = 5,
+} VXC_ScatteredOffsetType;
+
+typedef enum _VXC_AtomicOp
+{
+    VXC_ATOMIC_OP_ADD       = 0,
+    VXC_ATOMIC_OP_MIN       = 1,
+    VXC_ATOMIC_OP_MAX       = 2,
+    VXC_ATOMIC_OP_OR        = 3,
+    VXC_ATOMIC_OP_AND       = 4,
+    VXC_ATOMIC_OP_XOR       = 5,
+    VXC_ATOMIC_OP_XCHG      = 6,
+}VXC_AtomicOpType;
+
+#define VXC_CLAMP_BITMASK           0x00400000     /* shift 22 */
+#define VXC_PREADJ_BITMASK          0x00200000     /* shift 21 */
+#define VXC_RANGEPI_BITMASK         0x00100000     /* shift 20 */
+#define VXC_FILTER_BITMASK          0x000F0000     /* shift 16 */
+#define VXC_START_BIN_BITMASK       0x0000F000     /* shift 12 */
+#define VXC_END_BIN_BITMASK         0x00000F00     /* shift 8 */
+#define VXC_SOURCE_BIN_BITMASK      0x000000F0     /* shift 4 */
+#define VXC_ROUNDING_MODE_BITMASK   0x0000000C     /* shift 2 */
+#define VXC_ENABLEBOOL_BITMASK      0x00000002     /* shift 1 */
+#define VXC_SIGNEXT_BITMASK         0x00000001     /* shift 0 */
+
+/* overload FILTER bits, bits in [16:18] for scattered offset type. */
+#define VXC_OFFSET_TYPE_BITMASK     0x00070000     /* shift 16 */
+#define VXC_OFFSET_TYPE_SHIFT       16             /* shift 16 */
+
+/* overload FILTER, PREADJ and RANGEPI, bits in [19:21] for scattered offset type. */
+#define VXC_ATOM_OP_BITMASK         0x00380000     /* shift 19 */
+#define VXC_ATOM_OP_SHIFT           19             /* shift 19 */
 
 #define VXC_MODIFIER(StartBin, EndBin, SourceBin, RoundingMode, Clamp)    \
          (                                                                \
@@ -119,6 +148,31 @@ typedef enum _VXC_RoundMode
           (((Clamp) << 22)&VXC_CLAMP_BITMASK)          |                  \
           (((StartBin) << 12)&VXC_START_BIN_BITMASK)   |                  \
           (((EndBin) << 8)&VXC_END_BIN_BITMASK)                           \
+         )
+
+#define VXC_MODIFIER_GATHER(StartBin, EndBin, SourceBin, OffsetType)                \
+         (                                                                          \
+          (((OffsetType) << VXC_OFFSET_TYPE_SHIFT)&VXC_OFFSET_TYPE_BITMASK)  |      \
+          (((StartBin) << 12)&VXC_START_BIN_BITMASK)     |                          \
+          (((EndBin) << 8)&VXC_END_BIN_BITMASK)          |                          \
+          (((SourceBin) << 4)&VXC_SOURCE_BIN_BITMASK)                               \
+         )
+
+#define VXC_MODIFIER_SCATTER(StartBin, EndBin, SourceBin, OffsetType)               \
+         (                                                                          \
+          (((OffsetType) << VXC_OFFSET_TYPE_SHIFT)&VXC_OFFSET_TYPE_BITMASK)  |      \
+          (((StartBin) << 12)&VXC_START_BIN_BITMASK)     |                          \
+          (((EndBin) << 8)&VXC_END_BIN_BITMASK)          |                          \
+          (((SourceBin) << 4)&VXC_SOURCE_BIN_BITMASK)                               \
+         )
+
+#define VXC_MODIFIER_ATOMIC_S(StartBin, EndBin, SourceBin, OffsetType, AtomOp)      \
+         (                                                                          \
+          (((OffsetType) << VXC_OFFSET_TYPE_SHIFT)&VXC_OFFSET_TYPE_BITMASK)  |      \
+          (((AtomOp) << VXC_ATOM_OP_SHIFT)&VXC_ATOM_OP_BITMASK)              |      \
+          (((StartBin) << 12)&VXC_START_BIN_BITMASK)     |                          \
+          (((EndBin) << 8)&VXC_END_BIN_BITMASK)          |                          \
+          (((SourceBin) << 4)&VXC_SOURCE_BIN_BITMASK)                               \
          )
 
 /*
@@ -206,8 +260,10 @@ typedef struct _vxc_half16
 } vxc_half16;
 
 typedef uint16 vxc_512bits;
+typedef uint4  vxc_128bits;
 
 typedef vxc_512bits VXC_512Bits;
+typedef vxc_128bits VXC_128Bits;
 typedef vxc_modifier VXC_Modifier_t ;
 typedef vxc_round_mode VXC_RoundMode;
 typedef vxc_filter_mode VXC_FilterMode;
@@ -271,6 +327,12 @@ enum VXC_OP {
     VXC_OP_dp8x2_b,
     VXC_OP_dp4x4_b,
     VXC_OP_dp2x8_b,
+    VXC_OP_gather,
+    VXC_OP_gather_b,
+    VXC_OP_scatter,
+    VXC_OP_scatter_b,
+    VXC_OP_atomic_s,
+    VXC_OP_atomic_s_b,
 };
 
 enum eVXC_ERROR
@@ -342,6 +404,16 @@ enum eVXC_ERROR
         _viv_asm(PARAM_CHAIN, _t3, _t2, Src3);            \
         _viv_asm(PARAM_CHAIN, _t4, _t3, Src4);            \
         _viv_asm(INTRINSIC, Dest, VXC_OP_##Op, _t4);      \
+    } while(0)
+
+#define VXC_OP5_NoDest(Op, Src0, Src1, Src2, Src3, Src4)  \
+    do {                                                  \
+        int _t1, _t2, _t3, _t4, _t5;                      \
+        _viv_asm(PARAM_CHAIN, _t1, Src0, Src1);           \
+        _viv_asm(PARAM_CHAIN, _t2, _t1, Src2);            \
+        _viv_asm(PARAM_CHAIN, _t3, _t2, Src3);            \
+        _viv_asm(PARAM_CHAIN, _t4, _t3, Src4);            \
+        _viv_asm(INTRINSIC_ST, _t5, VXC_OP_##Op, _t4);    \
     } while(0)
 
 /* make sure the immediate value offsetX and offsetY are in range of [-16, 15] */
@@ -420,6 +492,15 @@ enum eVXC_ERROR
 #define VXC_DP4x8_b(Dest, Src0, Src1, Src2, Info, U512)     VXC_OP5(dp4x8_b,  Dest, Src0, Src1, Src2, Info, U512)
 #define VXC_DP2x16_b(Dest, Src0, Src1, Src2, Info, U512)    VXC_OP5(dp2x16_b, Dest, Src0, Src1, Src2, Info, U512)
 
+#define VXC_Gather(Dest, BaseAddr, Offsets, GatherInfo)                         VXC_OP3(gather, Dest, BaseAddr, Offsets, GatherInfo)
+#define VXC_Gather_b(Dest, BaseAddr, Offsets, Offsets_b, GatherInfo)            VXC_OP4(gather_b, Dest, BaseAddr, Offsets, Offsets_b, GatherInfo)
+
+#define VXC_Scatter(BaseAddr, Offsets, Data, ScatterInfo)                       VXC_OP4_NoDest(scatter, BaseAddr, Offsets, Data, ScatterInfo)
+#define VXC_Scatter_b(BaseAddr, Offsets, Offsets_b, Data, ScatterInfo)          VXC_OP5_NoDest(scatter_b, BaseAddr, Offsets, Offsets_b, Data, ScatterInfo)
+
+#define VXC_AtomicS(Dest, BaseAddr, Offsets, Data, AtomicSInfo)                 VXC_OP4(atomic_s, Dest, BaseAddr, Offsets, Data, AtomicSInfo)
+#define VXC_AtomicS_b(Dest, BaseAddr, Offsets, Offsets_b, Data, AtomicSInfo)    VXC_OP5(atomic_s_b, Dest, BaseAddr, Offsets, Offsets_b, Data, AtomicSInfo)
+
 /* packed type image data read/write: supported types are packed 8-bit/16bit integer, 16bit float */
 /* image read/write for image1d_t/image1d_array/image2d_t,
  * offset should be composed by using VXC_5BITOFFSET_XY(x, y) */
@@ -431,25 +512,23 @@ enum eVXC_ERROR
  * Offset should be composed by using VXC_5BITOFFSET_XY(x, y)
  * Coord must be type of int4 or float4
  */
-#define VXC_ReadImage2DArray(Dest, Image, Coord, Offset, Info)       \
-    do {                                                             \
-       int8 desc;                                                    \
-       int arraySize = get_image_array_size(Image);                  \
-       _viv_asm(COPY, desc, Image, sizeof(desc));                    \
-       _viv_asm(CLAMP0MAX, Coord.w, Coord.z, desc.s4);               \
-       int baseAddr =  (int)Coord.w *desc.s5 + desc.s0;              \
-       _viv_asm(MOV, Coord.w, baseAddr);                             \
-       VXC_OP4(img_load_3d, Dest, Image, Coord.xyww, Offset, Info);  \
+#define VXC_ReadImage2DArray(Dest, Image, Coord, Offset, Info)         \
+    do {                                                               \
+       int8 desc;                                                      \
+       _viv_asm(COPY, desc, Image, sizeof(desc));                      \
+       _viv_asm(CLAMP0MAX, (Coord).w, (Coord).z, desc.s4);             \
+       int baseAddr =  (int)(Coord).w *desc.s5 + desc.s0;              \
+       _viv_asm(MOV, (Coord).w, baseAddr);                             \
+       VXC_OP4(img_load_3d, Dest, Image, (Coord).xyww, Offset, Info);  \
     } while (0)
-#define VXC_WriteImage2DArray(Image, Coord, Color, Info)             \
-    do {                                                             \
-       int8 desc;                                                    \
-       int arraySize = get_image_array_size(Image);                  \
-       _viv_asm(COPY, desc, Image, sizeof(desc));                    \
-       _viv_asm(CLAMP0MAX, Coord.w, Coord.z, desc.s4);               \
-       int baseAddr =  (int)Coord.w *desc.s5 + desc.s0;              \
-       _viv_asm(MOV, Coord.w, baseAddr);                             \
-       VXC_OP4_NoDest(img_store_3d, Image, Coord.xyww, Color, Info); \
+#define VXC_WriteImage2DArray(Image, Coord, Color, Info)               \
+    do {                                                               \
+       int8 desc;                                                      \
+       _viv_asm(COPY, desc, Image, sizeof(desc));                      \
+       _viv_asm(CLAMP0MAX, (Coord).w, (Coord).z, desc.s4);             \
+       int baseAddr =  (int)(Coord).w *(desc).s5 + desc.s0;            \
+       _viv_asm(MOV, (Coord).w, baseAddr);                             \
+       VXC_OP4_NoDest(img_store_3d, Image, (Coord).xyww, Color, Info); \
     } while (0)
 
 /* image load/store for image3d_t,
@@ -459,15 +538,15 @@ enum eVXC_ERROR
 #define VXC_ReadImage3D(Dest, Image, Coord, Offset, Info)       VXC_OP4(img_load_3d, Dest, Image, Coord, Offset, Info)
 #define VXC_WriteImage3D(Image, Coord, Color, Info)             VXC_OP4_NoDest(img_store_3d, Image, Coord, Color, Info)
 
-#define VXC_Vload2(Dest, Pointer, Offset)    do { int byteOffset = ((int)sizeof((Dest)))*Offset; VXC_OP2(vload2, Dest, Pointer, byteOffset); } while(0)
-#define VXC_Vload4(Dest, Pointer, Offset)    do { int byteOffset = ((int)sizeof((Dest)))*Offset; VXC_OP2(vload4, Dest, Pointer,  byteOffset); } while(0)
-#define VXC_Vload8(Dest, Pointer, Offset)    do { int byteOffset = ((int)sizeof((Dest)))*Offset; VXC_OP2(vload8, Dest, Pointer,  byteOffset); } while(0)
-#define VXC_Vload16(Dest, Pointer, Offset)   do { int byteOffset = ((int)sizeof((Dest)))*Offset; VXC_OP2(vload16, Dest, Pointer,  byteOffset); } while(0)
+#define VXC_Vload2(Dest, Pointer, Offset)    do { int byteOffset = ((int)sizeof((Dest)))*(Offset); VXC_OP2(vload2, Dest, Pointer, byteOffset); } while(0)
+#define VXC_Vload4(Dest, Pointer, Offset)    do { int byteOffset = ((int)sizeof((Dest)))*(Offset); VXC_OP2(vload4, Dest, Pointer,  byteOffset); } while(0)
+#define VXC_Vload8(Dest, Pointer, Offset)    do { int byteOffset = ((int)sizeof((Dest)))*(Offset); VXC_OP2(vload8, Dest, Pointer,  byteOffset); } while(0)
+#define VXC_Vload16(Dest, Pointer, Offset)   do { int byteOffset = ((int)sizeof((Dest)))*(Offset); VXC_OP2(vload16, Dest, Pointer,  byteOffset); } while(0)
 
-#define VXC_Vstore2(Pointer, Offset, Data)   do { int byteOffset = ((int)sizeof((Data)))*Offset; VXC_OP3_NoDest(vstore2, Pointer, byteOffset, Data); } while(0)
-#define VXC_Vstore4(Pointer, Offset, Data)   do { int byteOffset = ((int)sizeof((Data)))*Offset; VXC_OP3_NoDest(vstore4, Pointer, byteOffset, Data); } while(0)
-#define VXC_Vstore8(Pointer, Offset, Data)   do { int byteOffset = ((int)sizeof((Data)))*Offset; VXC_OP3_NoDest(vstore8, Pointer, byteOffset, Data); } while(0)
-#define VXC_Vstore16(Pointer, Offset, Data)  do { int byteOffset = ((int)sizeof((Data)))*Offset; VXC_OP3_NoDest(vstore16, Pointer, byteOffset, Data); } while(0)
+#define VXC_Vstore2(Pointer, Offset, Data)   do { int byteOffset = ((int)sizeof((Data)))*(Offset); VXC_OP3_NoDest(vstore2, Pointer, byteOffset, Data); } while(0)
+#define VXC_Vstore4(Pointer, Offset, Data)   do { int byteOffset = ((int)sizeof((Data)))*(Offset); VXC_OP3_NoDest(vstore4, Pointer, byteOffset, Data); } while(0)
+#define VXC_Vstore8(Pointer, Offset, Data)   do { int byteOffset = ((int)sizeof((Data)))*(Offset); VXC_OP3_NoDest(vstore8, Pointer, byteOffset, Data); } while(0)
+#define VXC_Vstore16(Pointer, Offset, Data)  do { int byteOffset = ((int)sizeof((Data)))*(Offset); VXC_OP3_NoDest(vstore16, Pointer, byteOffset, Data); } while(0)
 
 /* VX2 only instructions*/
 #define VXC_IndexAdd(Dest, Src0, Src1, Src2, Info)        VXC_OP4(index_add, Dest, Src0, Src1, Src2, Info)
@@ -481,19 +560,19 @@ enum eVXC_ERROR
 #if (VX_VERSION == 2)
 #define VXC_BiLinear(Dest, Src0, Src1, Src2, Info)                                      \
     do {                                                                                \
-        int endBin = (Info & VXC_END_BIN_BITMASK) >> 8;                                 \
-        int roundMode = (Info & VXC_ROUNDING_MODE_BITMASK) >> 2;                        \
-        int clamp = (Info & VXC_CLAMP_BITMASK) >> 22;                                   \
+        int endBin = ((Info) & VXC_END_BIN_BITMASK) >> 8;                               \
+        int roundMode = ((Info) & VXC_ROUNDING_MODE_BITMASK) >> 2;                      \
+        int clamp = ((Info) & VXC_CLAMP_BITMASK) >> 22;                                 \
         int mod1 = VXC_MODIFIER(0, endBin + 1, 0, roundMode, clamp);                    \
         int4 bitMask = { 0x00000000, 0x00000008, 0x00000010, 0x00000018};               \
-        vxc_uchar16 bi1;                                                                \
+        typeof (Dest) bi1;                                                              \
         uint4 bi2;                                                                      \
         int bi3, bi4;                                                                   \
-        VXC_Lerp(bi1, Src0, Src1, Src2.y, mod1);                                        \
+        VXC_Lerp(bi1, Src0, Src1, (Src2).y, mod1);                                      \
         _viv_asm(PARAM_CHAIN, bi3, bi1.x!<f:UINT>, bitMask);                            \
         _viv_asm(PARAM_CHAIN, bi4, bi3, 8);                                             \
         _viv_asm(INTRINSIC, bi2, OP_bit_extract, bi4);                                  \
-        VXC_Lerp(Dest, bi2!<f:UCHAR>, bi2.y!<f:UCHAR>, Src2.x, Info);                   \
+        VXC_Lerp(Dest, bi2!<f:UCHAR>, bi2.y!<f:UCHAR>, (Src2).x, Info);                 \
     }   while (0)
 
 #define VXC_BitReplace(Dest, Src0, Src1, Src2, Info)   /* BitReplace definition here */

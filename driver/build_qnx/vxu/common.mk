@@ -29,6 +29,12 @@ NAME=libOpenVXU
 include $(qnx_build_dir)/common.mk
 
 EXTRA_INCVPATH += $(driver_root)/sdk/inc
+EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/driver/include
+EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/kernels
+EXTRA_INCVPATH += $(driver_root)/hal/inc
+EXTRA_INCVPATH += $(driver_root)/hal/user
+EXTRA_INCVPATH += $(driver_root)/hal/os/linux/user
+EXTRA_INCVPATH += $(driver_root)/compiler/libVSC/include
 
 
 # from libCL (trunk/driver/khronos/libCL/makefile.linux)

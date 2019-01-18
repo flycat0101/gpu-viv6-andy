@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -23,26 +23,486 @@
 /* It will be fully removed after VIR totally replaces of gcSL */
 #include "old_impl/gc_vsc_old_drvi_interface.h"
 
-/* 0.0.1.1 add chipModel and ChipRevision, Nov. 30, 2017 */
-/* 0.0.1.2 change VIR_Operand size, April. 9, 2017 */
-/* 1.3 for 6.2.4 release */
-/* 0.0.1.4 add atomic patch library function */
-/* 0.0.1.5 implement lib function nmin, nmax and nclamp, Oct. 24, 2018 */
-/* 0.0.1.6 add imageFetch for sampler, Nov. 2, 2018 */
-/* 0.0.1.7 modify _viv_atan2_float() to comform to CL spec on 11/20/2018 */
-/* 0.0.1.8 save the UBO symbol ID for the baseAddress on 11/28/2018 */
-/* 0.0.1.9 using HALTI5 trig functions for all cases (not just conformance) on 12/3/2018 */
-#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 9)
+/******************************* VIR SHADER BINARY FILE VERSION ******************/
+/* current version */
+/* 0.0.1.4 add chipModel and ChipRevision, Nov. 30, 2017 */
+/* 0.0.1.6 add VIR_OP_CLAMPCOORD, Feb. 2, 2018 */
+/* 0.0.1.7 remove VG from shader flags, Mar. 1, 2018 */
+/* 0.0.1.8 add component for VIR_Layout, Mar. 1, 2018 */
+/* 0.0.1.9 save fixedTypeId for output variable, Mar. 5, 2018 */
+/* 0.0.1.10 save extension flags for VIR_Shader, Mar. 6, 2018 */
+/* 0.0.1.11 implement lib function nmin, nmax and nclamp, Mar. 12, 2018 */
+/* 0.0.1.12 save the funcId for separateImage/separateSampler, Mar. 13, 2018 */
+/* 0.0.1.13 save the function sym for a local symbol, Mar. 14, 2018 */
+/* 0.0.1.14 add one more flag for VIR_Function, Mar. 21, 2018 */
+/* 0.0.1.15 add the parameter "lod" for image_fetch_samplerBuffer, Mar. 30, 2018 */
+/* 0.0.1.16 add a flag in VIR_Uniform, Apr. 2, 2018 */
+/* 0.0.1.17 save more memoryAccessFlag, Apr. 19, 2018 */
+/* 0.0.1.18 change image_fetch_gsamplerBuffer prototype, Aug. 28, 2018 */
+/* 0.0.1.19 add atomic patch library function */
+/* 0.0.1.20 add imageFetch/texelBufferToImage, Nov. 2, 2018 */
+/* 0.0.1.21 save the UBO symbol ID for the baseAddress, Nov. 8, 2018 */
+/* 0.0.1.22 modify _viv_atan2_float() to comform to CL spec on 11/20/2018 */
+/* 0.0.1.23 using HALTI5 trig functions for all cases (not just conformance) on 12/3/2018 */
+/* 0.0.1.24 save the kernel function name ID on 12/24/2018 */
+/* 0.0.1.25 add image_query_size lib functions for samplerMS on 12/27/2018 */
+/* 0.0.1.26 remove some enumerations for VIR_ShaderFlags on 01/02/2019 */
+/* 0.0.1.27 Add VIR_ModifierOrder in VIR_Operand on 01/03/2019 */
+/* 0.0.1.28 Add magicNumber on shaderIOBuffer 01/08/2019 */
+#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 28)
+#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 28)
 
-#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 9)
+#if !defined(gcdTARGETHOST_BIGENDIAN)
+#define gcdTARGETHOST_BIGENDIAN 0  /* default host little endian, to change the
+                                    * host to big endian, build with -DgcdHOST_BIGENDIAN=1 */
+#endif
+#define gcdTARGETDEVICE_BIGENDIAN 0  /* device always little endian */
 
-#define gcdSUPPORT_COMPUTE_SHADER   1
-#define gcdSUPPORT_TESS_GS_SHADER   1
 #define gcdSUPPORT_OCL_1_2          1
 #define TREAT_ES20_INTEGER_AS_FLOAT 0
 #define __USE_IMAGE_LOAD_TO_ACCESS_SAMPLER_BUFFER__ 1
 
 BEGIN_EXTERN_C()
+
+/* Copy from _VIR_PRIMITIVETYPEID. */
+typedef enum _VSC_SHADER_DATA_TYPE
+{
+    VSC_SHADER_DATA_TYPE_UNKNOWN            = 0,
+    VSC_SHADER_DATA_TYPE_VOID,
+    /* scalar types */
+    /* types can be mapped to equivalent machine type directly */
+    VSC_SHADER_DATA_TYPE_FLOAT32,
+    VSC_SHADER_DATA_TYPE_FLOAT16,
+    VSC_SHADER_DATA_TYPE_INT32,
+    VSC_SHADER_DATA_TYPE_INT16,
+    VSC_SHADER_DATA_TYPE_INT8,
+    VSC_SHADER_DATA_TYPE_UINT32,
+    VSC_SHADER_DATA_TYPE_UINT16,
+    VSC_SHADER_DATA_TYPE_UINT8,
+    VSC_SHADER_DATA_TYPE_SNORM16,
+    VSC_SHADER_DATA_TYPE_SNORM8,
+    VSC_SHADER_DATA_TYPE_UNORM16,
+    VSC_SHADER_DATA_TYPE_UNORM8,
+
+    /* scalar types not supported by HW */
+    VSC_SHADER_DATA_TYPE_INT64,
+    VSC_SHADER_DATA_TYPE_UINT64,
+    VSC_SHADER_DATA_TYPE_FLOAT64,
+    VSC_SHADER_DATA_TYPE_BOOLEAN,
+
+    /* vector types */
+    /* openCL support vector 8, 16 for all scalar types: int16, int8, etc */
+    VSC_SHADER_DATA_TYPE_FLOAT_X2,
+    VSC_SHADER_DATA_TYPE_FLOAT_X3,
+    VSC_SHADER_DATA_TYPE_FLOAT_X4,
+    VSC_SHADER_DATA_TYPE_FLOAT_X8,
+    VSC_SHADER_DATA_TYPE_FLOAT_X16,
+    VSC_SHADER_DATA_TYPE_FLOAT_X32,
+
+    VSC_SHADER_DATA_TYPE_FLOAT16_X2,
+    VSC_SHADER_DATA_TYPE_FLOAT16_X3,
+    VSC_SHADER_DATA_TYPE_FLOAT16_X4,
+    VSC_SHADER_DATA_TYPE_FLOAT16_X8,
+    VSC_SHADER_DATA_TYPE_FLOAT16_X16,
+    VSC_SHADER_DATA_TYPE_FLOAT16_X32,
+
+    VSC_SHADER_DATA_TYPE_FLOAT64_X2,
+    VSC_SHADER_DATA_TYPE_FLOAT64_X3,
+    VSC_SHADER_DATA_TYPE_FLOAT64_X4,
+    VSC_SHADER_DATA_TYPE_FLOAT64_X8,
+    VSC_SHADER_DATA_TYPE_FLOAT64_X16,
+    VSC_SHADER_DATA_TYPE_FLOAT64_X32,
+
+    VSC_SHADER_DATA_TYPE_BOOLEAN_X2,
+    VSC_SHADER_DATA_TYPE_BOOLEAN_X3,
+    VSC_SHADER_DATA_TYPE_BOOLEAN_X4,
+    VSC_SHADER_DATA_TYPE_BOOLEAN_X8,
+    VSC_SHADER_DATA_TYPE_BOOLEAN_X16,
+    VSC_SHADER_DATA_TYPE_BOOLEAN_X32,
+
+    VSC_SHADER_DATA_TYPE_INTEGER_X2,
+    VSC_SHADER_DATA_TYPE_INTEGER_X3,
+    VSC_SHADER_DATA_TYPE_INTEGER_X4,
+    VSC_SHADER_DATA_TYPE_INTEGER_X8,
+    VSC_SHADER_DATA_TYPE_INTEGER_X16,
+    VSC_SHADER_DATA_TYPE_INTEGER_X32,
+
+    VSC_SHADER_DATA_TYPE_UINT_X2,
+    VSC_SHADER_DATA_TYPE_UINT_X3,
+    VSC_SHADER_DATA_TYPE_UINT_X4,
+    VSC_SHADER_DATA_TYPE_UINT_X8,
+    VSC_SHADER_DATA_TYPE_UINT_X16,
+    VSC_SHADER_DATA_TYPE_UINT_X32,
+
+    /* uchar vectors */
+    VSC_SHADER_DATA_TYPE_UINT8_X2,
+    VSC_SHADER_DATA_TYPE_UINT8_X3,
+    VSC_SHADER_DATA_TYPE_UINT8_X4,
+    VSC_SHADER_DATA_TYPE_UINT8_X8,
+    VSC_SHADER_DATA_TYPE_UINT8_X16,
+    VSC_SHADER_DATA_TYPE_UINT8_X32,
+
+    /* char vectors */
+    VSC_SHADER_DATA_TYPE_INT8_X2,
+    VSC_SHADER_DATA_TYPE_INT8_X3,
+    VSC_SHADER_DATA_TYPE_INT8_X4,
+    VSC_SHADER_DATA_TYPE_INT8_X8,
+    VSC_SHADER_DATA_TYPE_INT8_X16,
+    VSC_SHADER_DATA_TYPE_INT8_X32,
+
+    /* ushort vectors */
+    VSC_SHADER_DATA_TYPE_UINT16_X2,
+    VSC_SHADER_DATA_TYPE_UINT16_X3,
+    VSC_SHADER_DATA_TYPE_UINT16_X4,
+    VSC_SHADER_DATA_TYPE_UINT16_X8,
+    VSC_SHADER_DATA_TYPE_UINT16_X16,
+    VSC_SHADER_DATA_TYPE_UINT16_X32,
+
+    /* short vectors */
+    VSC_SHADER_DATA_TYPE_INT16_X2,
+    VSC_SHADER_DATA_TYPE_INT16_X3,
+    VSC_SHADER_DATA_TYPE_INT16_X4,
+    VSC_SHADER_DATA_TYPE_INT16_X8,
+    VSC_SHADER_DATA_TYPE_INT16_X16,
+    VSC_SHADER_DATA_TYPE_INT16_X32,
+
+    /* uint64 vectors */
+    VSC_SHADER_DATA_TYPE_UINT64_X2,
+    VSC_SHADER_DATA_TYPE_UINT64_X3,
+    VSC_SHADER_DATA_TYPE_UINT64_X4,
+    VSC_SHADER_DATA_TYPE_UINT64_X8,
+    VSC_SHADER_DATA_TYPE_UINT64_X16,
+    VSC_SHADER_DATA_TYPE_UINT64_X32,
+
+    /* int64 vectors */
+    VSC_SHADER_DATA_TYPE_INT64_X2,
+    VSC_SHADER_DATA_TYPE_INT64_X3,
+    VSC_SHADER_DATA_TYPE_INT64_X4,
+    VSC_SHADER_DATA_TYPE_INT64_X8,
+    VSC_SHADER_DATA_TYPE_INT64_X16,
+    VSC_SHADER_DATA_TYPE_INT64_X32,
+
+    /* packed data type */
+
+    /* packed float16 (2 bytes per element) */
+    VSC_SHADER_DATA_TYPE_FLOAT16_P2,
+    VSC_SHADER_DATA_TYPE_FLOAT16_P3,
+    VSC_SHADER_DATA_TYPE_FLOAT16_P4,
+    VSC_SHADER_DATA_TYPE_FLOAT16_P8,
+    VSC_SHADER_DATA_TYPE_FLOAT16_P16,
+    VSC_SHADER_DATA_TYPE_FLOAT16_P32,
+
+    /* packed boolean (1 byte per element) */
+    VSC_SHADER_DATA_TYPE_BOOLEAN_P2,
+    VSC_SHADER_DATA_TYPE_BOOLEAN_P3,
+    VSC_SHADER_DATA_TYPE_BOOLEAN_P4,
+    VSC_SHADER_DATA_TYPE_BOOLEAN_P8,
+    VSC_SHADER_DATA_TYPE_BOOLEAN_P16,
+    VSC_SHADER_DATA_TYPE_BOOLEAN_P32,
+
+    /* uchar vectors (1 byte per element) */
+    VSC_SHADER_DATA_TYPE_UINT8_P2,
+    VSC_SHADER_DATA_TYPE_UINT8_P3,
+    VSC_SHADER_DATA_TYPE_UINT8_P4,
+    VSC_SHADER_DATA_TYPE_UINT8_P8,
+    VSC_SHADER_DATA_TYPE_UINT8_P16,
+    VSC_SHADER_DATA_TYPE_UINT8_P32,
+
+    /* char vectors (1 byte per element) */
+    VSC_SHADER_DATA_TYPE_INT8_P2,
+    VSC_SHADER_DATA_TYPE_INT8_P3,
+    VSC_SHADER_DATA_TYPE_INT8_P4,
+    VSC_SHADER_DATA_TYPE_INT8_P8,
+    VSC_SHADER_DATA_TYPE_INT8_P16,
+    VSC_SHADER_DATA_TYPE_INT8_P32,
+
+    /* ushort vectors (2 bytes per element) */
+    VSC_SHADER_DATA_TYPE_UINT16_P2,
+    VSC_SHADER_DATA_TYPE_UINT16_P3,
+    VSC_SHADER_DATA_TYPE_UINT16_P4,
+    VSC_SHADER_DATA_TYPE_UINT16_P8,
+    VSC_SHADER_DATA_TYPE_UINT16_P16,
+    VSC_SHADER_DATA_TYPE_UINT16_P32,
+
+    /* short vectors (2 bytes per element) */
+    VSC_SHADER_DATA_TYPE_INT16_P2,
+    VSC_SHADER_DATA_TYPE_INT16_P3,
+    VSC_SHADER_DATA_TYPE_INT16_P4,
+    VSC_SHADER_DATA_TYPE_INT16_P8,
+    VSC_SHADER_DATA_TYPE_INT16_P16,
+    VSC_SHADER_DATA_TYPE_INT16_P32,
+
+    /* matrix type: only support float type */
+    VSC_SHADER_DATA_TYPE_FLOAT_2X2,
+    VSC_SHADER_DATA_TYPE_FLOAT_3X3,
+    VSC_SHADER_DATA_TYPE_FLOAT_4X4,
+    VSC_SHADER_DATA_TYPE_FLOAT_2X3,
+    VSC_SHADER_DATA_TYPE_FLOAT_2X4,
+    VSC_SHADER_DATA_TYPE_FLOAT_3X2,
+    VSC_SHADER_DATA_TYPE_FLOAT_3X4,
+    VSC_SHADER_DATA_TYPE_FLOAT_4X2,
+    VSC_SHADER_DATA_TYPE_FLOAT_4X3,
+
+    VSC_SHADER_DATA_TYPE_FLOAT64_2X2,
+    VSC_SHADER_DATA_TYPE_FLOAT64_3X3,
+    VSC_SHADER_DATA_TYPE_FLOAT64_4X4,
+    VSC_SHADER_DATA_TYPE_FLOAT64_2X3,
+    VSC_SHADER_DATA_TYPE_FLOAT64_2X4,
+    VSC_SHADER_DATA_TYPE_FLOAT64_3X2,
+    VSC_SHADER_DATA_TYPE_FLOAT64_3X4,
+    VSC_SHADER_DATA_TYPE_FLOAT64_4X2,
+    VSC_SHADER_DATA_TYPE_FLOAT64_4X3,
+
+    /* sampler type */
+    VSC_SHADER_DATA_TYPE_MIN_SAMPLER_TYID,
+    VSC_SHADER_DATA_TYPE_SAMPLER_1D = VSC_SHADER_DATA_TYPE_MIN_SAMPLER_TYID,
+    VSC_SHADER_DATA_TYPE_SAMPLER_2D,
+    VSC_SHADER_DATA_TYPE_SAMPLER_3D,
+    VSC_SHADER_DATA_TYPE_SAMPLER_CUBIC,
+    VSC_SHADER_DATA_TYPE_SAMPLER_CUBE_ARRAY,
+    VSC_SHADER_DATA_TYPE_SAMPLER,
+    VSC_SHADER_DATA_TYPE_ISAMPLER_1D,
+    VSC_SHADER_DATA_TYPE_ISAMPLER_2D,
+    VSC_SHADER_DATA_TYPE_ISAMPLER_3D,
+    VSC_SHADER_DATA_TYPE_ISAMPLER_CUBIC,
+    VSC_SHADER_DATA_TYPE_ISAMPLER_CUBE_ARRAY,
+    VSC_SHADER_DATA_TYPE_USAMPLER_1D,
+    VSC_SHADER_DATA_TYPE_USAMPLER_2D,
+    VSC_SHADER_DATA_TYPE_USAMPLER_3D,
+    VSC_SHADER_DATA_TYPE_USAMPLER_CUBIC,
+    VSC_SHADER_DATA_TYPE_USAMPLER_CUBE_ARRAY,
+    VSC_SHADER_DATA_TYPE_SAMPLER_EXTERNAL_OES,
+
+    VSC_SHADER_DATA_TYPE_SAMPLER_1D_SHADOW,
+    VSC_SHADER_DATA_TYPE_SAMPLER_2D_SHADOW,
+    VSC_SHADER_DATA_TYPE_SAMPLER_CUBE_SHADOW,
+    VSC_SHADER_DATA_TYPE_SAMPLER_CUBE_ARRAY_SHADOW,
+
+    VSC_SHADER_DATA_TYPE_SAMPLER_1D_ARRAY,
+    VSC_SHADER_DATA_TYPE_SAMPLER_1D_ARRAY_SHADOW,
+    VSC_SHADER_DATA_TYPE_SAMPLER_2D_ARRAY,
+    VSC_SHADER_DATA_TYPE_ISAMPLER_2D_ARRAY,
+    VSC_SHADER_DATA_TYPE_USAMPLER_2D_ARRAY,
+    VSC_SHADER_DATA_TYPE_SAMPLER_2D_ARRAY_SHADOW,
+
+    VSC_SHADER_DATA_TYPE_SAMPLER_2D_MS,
+    VSC_SHADER_DATA_TYPE_ISAMPLER_2D_MS,
+    VSC_SHADER_DATA_TYPE_USAMPLER_2D_MS,
+    VSC_SHADER_DATA_TYPE_SAMPLER_2D_MS_ARRAY,
+    VSC_SHADER_DATA_TYPE_ISAMPLER_2D_MS_ARRAY,
+    VSC_SHADER_DATA_TYPE_USAMPLER_2D_MS_ARRAY,
+    VSC_SHADER_DATA_TYPE_SAMPLER_BUFFER,
+    VSC_SHADER_DATA_TYPE_ISAMPLER_BUFFER,
+    VSC_SHADER_DATA_TYPE_USAMPLER_BUFFER,
+    VSC_SHADER_DATA_TYPE_VIV_GENERIC_GL_SAMPLER,
+    VSC_SHADER_DATA_TYPE_MAX_SAMPLER_TYID = VSC_SHADER_DATA_TYPE_VIV_GENERIC_GL_SAMPLER,
+
+    /* image type */
+    VSC_SHADER_DATA_TYPE_MIN_IMAGE_TYID,
+    /* subPass input */
+    VSC_SHADER_DATA_TYPE_SUBPASSINPUT = VSC_SHADER_DATA_TYPE_MIN_IMAGE_TYID,
+    VSC_SHADER_DATA_TYPE_SUBPASSINPUTMS,
+    VSC_SHADER_DATA_TYPE_ISUBPASSINPUT,
+    VSC_SHADER_DATA_TYPE_ISUBPASSINPUTMS,
+    VSC_SHADER_DATA_TYPE_USUBPASSINPUT,
+    VSC_SHADER_DATA_TYPE_USUBPASSINPUTMS,
+
+    VSC_SHADER_DATA_TYPE_IMAGE_1D,
+    VSC_SHADER_DATA_TYPE_IMAGE_1D_DEPTH,
+    VSC_SHADER_DATA_TYPE_IMAGE_1D_ARRAY,
+    VSC_SHADER_DATA_TYPE_IMAGE_1D_ARRAY_DEPTH,
+    VSC_SHADER_DATA_TYPE_IMAGE_1D_BUFFER,
+    VSC_SHADER_DATA_TYPE_IIMAGE_1D,
+    VSC_SHADER_DATA_TYPE_IIMAGE_1D_ARRAY,
+    VSC_SHADER_DATA_TYPE_UIMAGE_1D,
+    VSC_SHADER_DATA_TYPE_UIMAGE_1D_ARRAY,
+    VSC_SHADER_DATA_TYPE_IMAGE_2D,
+    VSC_SHADER_DATA_TYPE_IMAGE_2D_ARRAY,
+    VSC_SHADER_DATA_TYPE_IMAGE_3D,
+    VSC_SHADER_DATA_TYPE_IMAGE_2D_MSSA,
+    VSC_SHADER_DATA_TYPE_IMAGE_2D_ARRAY_MSSA,
+    VSC_SHADER_DATA_TYPE_IMAGE_2D_MSSA_DEPTH,
+    VSC_SHADER_DATA_TYPE_IMAGE_2D_ARRAY_MSSA_DEPTH,
+    VSC_SHADER_DATA_TYPE_IMAGE_2D_DEPTH,
+    VSC_SHADER_DATA_TYPE_IMAGE_2D_ARRAY_DEPTH,
+    VSC_SHADER_DATA_TYPE_IIMAGE_2D,
+    VSC_SHADER_DATA_TYPE_IIMAGE_2D_MSSA,
+    VSC_SHADER_DATA_TYPE_IIMAGE_2D_ARRAY_MSSA,
+    VSC_SHADER_DATA_TYPE_UIMAGE_2D,
+    VSC_SHADER_DATA_TYPE_UIMAGE_2D_MSSA,
+    VSC_SHADER_DATA_TYPE_UIMAGE_2D_ARRAY_MSSA,
+    VSC_SHADER_DATA_TYPE_IIMAGE_3D,
+    VSC_SHADER_DATA_TYPE_UIMAGE_3D,
+    VSC_SHADER_DATA_TYPE_IIMAGE_2D_ARRAY,
+    VSC_SHADER_DATA_TYPE_UIMAGE_2D_ARRAY,
+    VSC_SHADER_DATA_TYPE_IMAGE_CUBE,
+    VSC_SHADER_DATA_TYPE_IMAGE_CUBE_DEPTH,
+    VSC_SHADER_DATA_TYPE_IMAGE_CUBE_ARRAY,
+    VSC_SHADER_DATA_TYPE_IMAGE_CUBE_DEPTH_ARRAY,
+    VSC_SHADER_DATA_TYPE_IIMAGE_CUBE,
+    VSC_SHADER_DATA_TYPE_IIMAGE_CUBE_DEPTH,
+    VSC_SHADER_DATA_TYPE_IIMAGE_CUBE_ARRAY,
+    VSC_SHADER_DATA_TYPE_UIMAGE_CUBE,
+    VSC_SHADER_DATA_TYPE_UIMAGE_CUBE_DEPTH,
+    VSC_SHADER_DATA_TYPE_UIMAGE_CUBE_ARRAY,
+    VSC_SHADER_DATA_TYPE_IMAGE_BUFFER,
+    VSC_SHADER_DATA_TYPE_IIMAGE_BUFFER,
+    VSC_SHADER_DATA_TYPE_UIMAGE_BUFFER,
+    VSC_SHADER_DATA_TYPE_VIV_GENERIC_GL_IMAGE,
+    VSC_SHADER_DATA_TYPE_MAX_IMAGE_TYID = VSC_SHADER_DATA_TYPE_VIV_GENERIC_GL_IMAGE,
+
+    /* For OCL */
+    VSC_SHADER_DATA_TYPE_MIN_IMAGE_T_TYID,
+    VSC_SHADER_DATA_TYPE_IMAGE_1D_T = VSC_SHADER_DATA_TYPE_MIN_IMAGE_T_TYID,
+    VSC_SHADER_DATA_TYPE_IMAGE_1D_BUFFER_T,
+    VSC_SHADER_DATA_TYPE_IMAGE_1D_ARRAY_T,
+    VSC_SHADER_DATA_TYPE_IMAGE_2D_T,
+    VSC_SHADER_DATA_TYPE_IMAGE_2D_ARRAY_T,
+    VSC_SHADER_DATA_TYPE_IMAGE_3D_T,
+    VSC_SHADER_DATA_TYPE_VIV_GENERIC_IMAGE_T,
+    VSC_SHADER_DATA_TYPE_MAX_IMAGE_T_TYID = VSC_SHADER_DATA_TYPE_VIV_GENERIC_IMAGE_T,
+    VSC_SHADER_DATA_TYPE_SAMPLER_T,
+    VSC_SHADER_DATA_TYPE_EVENT_T,
+
+    /* atomic counter type */
+    VSC_SHADER_DATA_TYPE_MIN_ATOMIC_COUNTER_TYPID,
+    VSC_SHADER_DATA_TYPE_ATOMIC_UINT = VSC_SHADER_DATA_TYPE_MIN_ATOMIC_COUNTER_TYPID,
+    VSC_SHADER_DATA_TYPE_ATOMIC_UINT4,
+    VSC_SHADER_DATA_TYPE_MAX_ATOMIC_COUNTER_TYPID = VSC_SHADER_DATA_TYPE_ATOMIC_UINT4,
+
+    /* OpenGL 4.0 types */
+    VSC_SHADER_DATA_TYPE_SAMPLER_2D_RECT,
+    VSC_SHADER_DATA_TYPE_ISAMPLER_2D_RECT,
+    VSC_SHADER_DATA_TYPE_USAMPLER_2D_RECT,
+    VSC_SHADER_DATA_TYPE_SAMPLER_2D_RECT_SHADOW,
+    VSC_SHADER_DATA_TYPE_ISAMPLER_1D_ARRAY,
+    VSC_SHADER_DATA_TYPE_USAMPLER_1D_ARRAY,
+
+    VSC_SHADER_DATA_TYPE_PRIMITIVETYPE_COUNT,
+    VSC_SHADER_DATA_TYPE_LAST_PRIMITIVETYPE = VSC_SHADER_DATA_TYPE_PRIMITIVETYPE_COUNT-1,
+}
+VSC_SHADER_DATA_TYPE;
+
+typedef enum _VSC_ADDRSPACE
+{
+    VIR_AS_PRIVATE, /* private address space */
+    VIR_AS_GLOBAL, /* global address space */
+    VIR_AS_CONSTANT, /* constant address space, uniform mapped to this space */
+    VIR_AS_LOCAL            /* local address space, function scope locals mappped
+                               into this space */
+} VSC_AddrSpace;
+
+typedef enum _VSC_TYQUALIFIER
+{
+    VIR_TYQUAL_NONE         = 0x00, /* unqualified */
+    VIR_TYQUAL_CONST        = 0x01, /* const */
+    VIR_TYQUAL_VOLATILE     = 0x02, /* volatile */
+    VIR_TYQUAL_RESTRICT     = 0x04, /* restrict */
+    VIR_TYQUAL_READ_ONLY    = 0x08, /* readonly */
+    VIR_TYQUAL_WRITE_ONLY   = 0x10, /* writeonly */
+    VIR_TYQUAL_CONSTANT     = 0x20, /* constant address space */
+    VIR_TYQUAL_GLOBAL       = 0x40, /* global address space */
+    VIR_TYQUAL_LOCAL        = 0x80, /* local address space */
+    VIR_TYQUAL_PRIVATE      = 0x100, /* private address space */
+} VSC_TyQualifier;
+
+typedef VSC_AddrSpace        VIR_AddrSpace;
+typedef VSC_TyQualifier      VIR_TyQualifier;
+
+/* for different HW, we use different instruction to implement OCL image read/write
+ * to achieve best performance */
+typedef enum {
+    VSC_OCLImgLibKind_UseLoadStore       = 0, /* for v54x GC chips, use LOAD/STORE/TEXLD */
+    VSC_OCLImgLibKind_UseImgLoadTexldU   = 1, /* for v55 GC chips, use IMG_LOAD/IMG_STORE/TEXLD_U */
+    VSC_OCLImgLibKind_UseImgLoadTexldUXY = 2, /* for v60 GC and v620 GC chips */
+    VSC_OCLImgLibKind_UseImgLoadVIP      = 3, /* v60 VIP chip, use IMG_LOAD/IMG_STORE */
+    VSC_OCLImgLibKind_Counts, /* count of img libs */
+    VSC_OCLImgLibKind_BasedOnHWFeature         /* select library based on HW feature */
+} VSC_OCLImgLibKind;
+
+typedef enum
+{
+    VSC_ImageValueFloat      = 0, /* float type: read_imagef */
+    VSC_ImageValueInt        = 1, /* int type: read_imagei */
+    VSC_ImageValueUint       = 2        /* unsigned int type: read_imageui */
+} vscImageValueType;
+
+typedef union _VSC_Image_desc {
+    struct {
+        /* the first 4 32-bits are the same as HW imge_desc as of V630 */
+        gctUINT   baseAddress;          /* base address of image data */
+        gctUINT   row_stride;           /* the row stride (byte) of the image */
+        gctUINT   width          : 16;  /* the width of image (pixels) */
+        gctUINT   height         : 16;  /* the height of image (rows) */
+
+        gctUINT   shift          : 3;   /* Shift value for index. */
+        gctUINT   multiply       : 1;   /* Value to multiply index with. */
+        gctUINT   addressing     : 2;   /* Addressing mode for LOAD_IMG and STORE_IMG. */
+        gctUINT   conversion     : 4;   /* Conversion format. */
+        gctUINT   titling        : 2;   /* titling */
+        gctUINT   image1Dor2D    : 1;   /* 1D or 2D image */
+        gctUINT   imageId0       : 1;   /* ImageID bit0. */
+        gctUINT   componentCount : 2;   /* Component count. */
+        gctUINT   swizzleR       : 3;   /* swizzle for red */
+        gctUINT   imageId1       : 1;   /* ImageID bit1. */
+        gctUINT   swizzleG       : 3;   /* swizzle for green */
+        gctUINT   imageId2       : 1;   /* ImageID bit2. */
+        gctUINT   swizzleB       : 3;   /* swizzle for blue */
+        gctUINT   reserved0      : 1;
+        gctUINT   swizzleA       : 3;   /* swizzle for alpha */
+        gctUINT   reserved1      : 1;
+
+        /* following data are used by SW to calculate 3D image slice image address
+         * and image query data */
+        gctUINT   sliceSize;            /* slice size for image 3D */
+        gctUINT   depth_arraySize : 16; /* depth for image 3D, or array_size for image1D/2D array */
+        gctUINT   imageType       : 16; /* vscImageValueType: 1D: 0, 1D_buffer: 1, 1D_array: 2, 2D: 3, 2D_array: 4, 3D: 5 */
+        gctUINT   channelOrder    : 16; /* image channel order */
+        gctUINT   channelDataType : 16; /* image channel data type */
+        gctUINT   imageValueType  : 2;  /* vscImageValueType (float/int/uint), filled by compiler */
+        gctUINT   reserved2       : 30;
+    } sd;  /* structured data */
+    gctUINT rawbits[8];
+} VSC_ImageDesc;
+
+typedef enum _VSC_SAMPLER_VALUE
+{
+
+    /* First byte: addressing mode. */
+    VSC_IMG_SAMPLER_ADDRESS_NONE                = 0x00, /* (CL_ADDRESS_NONE            & 0xFF) */
+    VSC_IMG_SAMPLER_ADDRESS_CLAMP_TO_EDGE       = 0x01, /* (CL_ADDRESS_CLAMP_TO_EDGE   & 0xFF),*/
+    VSC_IMG_SAMPLER_ADDRESS_CLAMP               = 0x02, /* CL_ADDRESS_CLAMP            & 0xFF), */
+    VSC_IMG_SAMPLER_ADDRESS_REPEAT              = 0x03, /* CL_ADDRESS_REPEAT           & 0xFF), */
+    VSC_IMG_SAMPLER_ADDRESS_MIRRORED_REPEAT     = 0x04, /* CL_ADDRESS_MIRRORED_REPEAT  & 0xFF), */
+    VSC_IMG_SAMPLER_ADDRESS_COUNT               = 0x05, /* the count of address mode */
+    /* Second byte: filter mode. */
+    VSC_IMG_SAMPLER_FILTER_NEAREST              = 0x0000, /* (CL_FILTER_NEAREST  & 0xFF00) << 8), */
+    VSC_IMG_SAMPLER_FILTER_LINEAR               = 0x0100, /* (CL_FILTER_LINEAR   & 0xFF00) << 8), */
+
+    /* Third byte: normalized coords. */
+    VSC_IMG_SAMPLER_NORMALIZED_COORDS_FALSE     = 0x000000, /*0x0 << 16), */
+    VSC_IMG_SAMPLER_NORMALIZED_COORDS_TRUE      = 0x010000, /*0x1 << 16)    */
+
+    /* we treat int or float coordinate type as sampler value,
+     * so the <image, sampler> pair will carry the int coordinate info
+     * which is useful when construct image read lib function name
+     */
+    VSC_IMG_SAMPLER_INT_COORDS_FALSE            = 0x0000000, /*0x0 << 24), */
+    VSC_IMG_SAMPLER_INT_COORDS_TRUE             = 0x1000000, /*0x1 << 24)    */
+
+    VSC_IMG_SAMPLER_DEFAULT_VALUE               = VSC_IMG_SAMPLER_ADDRESS_NONE |
+                                                  VSC_IMG_SAMPLER_FILTER_NEAREST |
+                                                  VSC_IMG_SAMPLER_NORMALIZED_COORDS_FALSE |
+                                                  VSC_IMG_SAMPLER_INT_COORDS_FALSE,
+    VSC_IMG_SAMPLER_UNKNOWN_VALUE               = 0x7FFFFFFF, /* unkown sampler value marker */
+    VSC_IMG_SAMPLER_INVALID_VALUE               = 0x7FFFFFFF, /* invalid value marker */
+} VSC_SamplerValue;
+
+#define VIR_IMG_isSamplerLinearFilter(sampler)      (((sampler)&((gctUINT)VSC_IMG_SAMPLER_FILTER_LINEAR)) != 0)
+#define VIR_IMG_isSamplerNearestFilter(sampler)     (((sampler)&((gctUINT)VSC_IMG_SAMPLER_FILTER_LINEAR)) == 0)
+#define VIR_IMG_isSamplerNormalizedCoords(sampler)  (((sampler)&((gctUINT)VSC_IMG_SAMPLER_NORMALIZED_COORDS_TRUE)) != 0)
+#define VIR_IMG_isSamplerIntCoords(sampler)         (((sampler)&((gctUINT)VSC_IMG_SAMPLER_INT_COORDS_TRUE)) != 0)
+#define VIR_IMG_GetSamplerAddressMode(sampler)      ((VSC_SamplerValue)((sampler)&0xFF))
 
 typedef void* DRIVER_HANDLE;
 
@@ -76,6 +536,7 @@ typedef struct _VSC_HW_CONFIG
 {
     struct
     {
+        /* word 0 */
         gctUINT          hasHalti0              : 1;
         gctUINT          hasHalti1              : 1;
         gctUINT          hasHalti2              : 1;
@@ -84,6 +545,7 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          hasHalti5              : 1;
         gctUINT          supportGS              : 1;
         gctUINT          supportTS              : 1;
+
         gctUINT          supportInteger         : 1;
         gctUINT          hasSignFloorCeil       : 1;
         gctUINT          hasSqrtTrig            : 1;
@@ -92,6 +554,7 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          supportDual16          : 1;
         gctUINT          hasBugFix8             : 1;
         gctUINT          hasBugFix10            : 1;
+
         gctUINT          hasBugFix11            : 1;
         gctUINT          hasSelectMapSwizzleFix : 1;
         gctUINT          hasSamplePosSwizzleFix : 1;
@@ -100,14 +563,19 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          hasICacheAllocCountFix : 1;
         gctUINT          hasSHEnhance2          : 1;
         gctUINT          hasMediumPrecision     : 1;
+
         gctUINT          hasInstCache           : 1;
         gctUINT          hasInstCachePrefetch   : 1;
         gctUINT          instBufferUnified      : 1;
+        /* Every single shader stage can use all constant registers. */
         gctUINT          constRegFileUnified    : 1;
+        /* Every single shader stage can use all sampler registers. */
         gctUINT          samplerRegFileUnified  : 1;
         gctUINT          bigEndianMI            : 1;
         gctUINT          raPushPosW             : 1;
         gctUINT          vtxInstanceIdAsAttr    : 1;
+
+        /* word 1 */
         gctUINT          vtxInstanceIdAsInteger : 1;
         gctUINT          gsSupportEmit          : 1;
         gctUINT          highpVaryingShift      : 1;
@@ -116,6 +584,7 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          flatDual16Fix          : 1;
         gctUINT          supportEVIS            : 1;
         gctUINT          supportImgAtomic       : 1;
+
         gctUINT          supportAdvancedInsts   : 1;
         gctUINT          noOneConstLimit        : 1;
         gctUINT          hasUniformB0           : 1;
@@ -124,6 +593,7 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          hasUniversalTexldV2    : 1;
         gctUINT          hasTexldUFix           : 1;
         gctUINT          canSrc0OfImgLdStBeTemp : 1;
+
         gctUINT          hasPSIOInterlock       : 1;
         gctUINT          support128BppImage     : 1;
         gctUINT          supportMSAATexture     : 1;
@@ -131,14 +601,18 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          supportImgAddr         : 1;
         gctUINT          hasUscGosAddrFix       : 1;
         gctUINT          multiCluster           : 1;
+        gctUINT          smallBatch             : 1;
+
         gctUINT          hasImageOutBoundaryFix : 1;
-        gctUINT          supportTexldOffset     : 1;
+        gctUINT          supportTexldCoordOffset: 1;
         gctUINT          supportLSAtom          : 1;
         gctUINT          supportUnOrdBranch     : 1;
         gctUINT          supportPatchVerticesIn : 1;
         gctUINT          hasHalfDepFix          : 1;
         gctUINT          supportUSC             : 1;
         gctUINT          supportPartIntBranch   : 1;
+
+        /* word 2 */
         gctUINT          supportIntAttrib       : 1;
         gctUINT          hasTxBiasLodFix        : 1;
         gctUINT          supportmovai           : 1;
@@ -147,6 +621,7 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          supportAdvBlendPart0   : 1;
         gctUINT          supportStartVertexFE   : 1;
         gctUINT          supportTxGather        : 1;
+
         gctUINT          singlePipeHalti1       : 1;
         gctUINT          supportEVISVX2         : 1;
         gctUINT          computeOnly            : 1;
@@ -154,12 +629,33 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          hasExtraInst2          : 1;
         gctUINT          hasAtomic              : 1;
         gctUINT          supportFullIntBranch   : 1;
-        gctUINT          hasDynamicIdxDepFix    : 1;
-        gctUINT          hasLODQFix             : 1;
-        gctUINT          hasImageLoadEnableFix  : 1;
-        gctUINT          hasPointSizeFix        : 1;
-        gctUINT          reserved1              : 14;
+        /* All shader stages can use the same constant register at the same time. */
+        gctUINT          supportUnifiedConstant : 1;
 
+        /* All shader stages can use the same sampler register at the same time. */
+        gctUINT          supportUnifiedSampler  : 1;
+        gctUINT          support32BitIntDiv     : 1;
+        gctUINT          supportFullCompIntDiv  : 1;
+        gctUINT          supportComplex         : 1;
+        gctUINT          supportBigEndianLdSt   : 1;
+        gctUINT          supportUSCUnalloc      : 1;
+        gctUINT          supportEndOfBBReissue  : 1;
+        gctUINT          hasDynamicIdxDepFix    : 1;
+
+        gctUINT          supportPSCSThrottle    : 1;
+        gctUINT          hasLODQFix             : 1;
+        gctUINT          supportHWManagedLS     : 1;
+        gctUINT          hasScatteredMemAccess  : 1;
+        gctUINT          supportImgLDSTClamp    : 1;
+        gctUINT          useSrc0SwizzleAsSrcBin : 1;
+        gctUINT          supportSeparatedTex    : 1;
+        gctUINT          supportMultiGPU        : 1;
+
+        /* word 3 */
+        gctUINT          hasPointSizeFix        : 1;
+        gctUINT          reserved1              : 31;
+
+        /* Last word */
         /* Followings will be removed after shader programming is removed out of VSC */
         gctUINT          hasSHEnhance3          : 1;
         gctUINT          rtneRoundingEnabled    : 1;
@@ -169,18 +665,21 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          hasSamplerBaseOffset   : 1;
         gctUINT          supportStreamOut       : 1;
         gctUINT          supportZeroAttrsInFE   : 1;
+
         gctUINT          outputCountFix         : 1;
         gctUINT          varyingPackingLimited  : 1;
         gctUINT          robustAtomic           : 1;
         gctUINT          newGPIPE               : 1;
-        gctUINT          supportImgLDSTCLamp    : 1;
-        gctUINT          hasUSCAtomicFix2       : 1;
-        gctUINT          reserved               : 18;
+        gctUINT          FEDrawDirect           : 1;
 
+        gctUINT          hasUSCAtomicFix2       : 1;
+        gctUINT          reserved2              : 18;
     } hwFeatureFlags;
 
     gctUINT              chipModel;
     gctUINT              chipRevision;
+    gctUINT              productID;
+    gctUINT              customerID;
     gctUINT              maxCoreCount;
     gctUINT              maxThreadCountPerCore;
     gctUINT              maxVaryingCount;
@@ -214,8 +713,8 @@ typedef struct _VSC_HW_CONFIG
     gctUINT              maxCSSamplerCount;
     gctUINT              maxHwNativeTotalSamplerCount;
     gctUINT              maxSamplerCountPerShader;
-    gctUINT              maxUSCAttribBufInKbyte;
-    gctUINT              maxLocalMemSizeInByte;
+    gctUINT              maxUSCAttribBufInKbyte;     /* usc size for non-cache part */
+    gctUINT              maxLocalMemSizeInByte; /* local memory size */
     gctUINT              maxResultCacheWinSize;
     gctUINT              vsSamplerNoBaseInInstruction;
     gctUINT              psSamplerNoBaseInInstruction;
@@ -303,7 +802,11 @@ typedef gcsGLSLCaps VSC_GL_API_CONFIG, *PVSC_GL_API_CONFIG;
 #define VSC_COMPILER_FLAG_WAVIER_RESLAYOUT_COMPATIBLE  0x00001000   /* Vulkan only for resource layout is provided */
 #define VSC_COMPILER_FLAG_NEED_RTNE_ROUNDING           0x00002000
 #define VSC_COMPILER_FLAG_API_UNIFORM_PRECISION_CHECK  0x00004000
-#define VSC_COMPILER_FLAG_RECOMPILER                   0x00008000
+#define VSC_COMPILER_FLAG_LINK_PROGRAM_PIPELINE_OBJ    0x00008000
+#define VSC_COMPILER_FLAG_RECOMPILER                   0x00010000
+#define VSC_COMPILER_FLAG_USE_VSC_IMAGE_DESC           0x00020000
+#define VSC_COMPILER_FLAG_ENABLE_MULTI_GPU             0x00040000
+#define VSC_COMPILER_FLAG_DISABLE_IR_DUMP              0x00080000  /* used by driver to disable patch lib IR dump */
 
 #define VSC_COMPILER_FLAG_COMPILE_FULL_LEVELS          0x0000000F
 
@@ -544,6 +1047,11 @@ typedef struct _VSC_HW_PIPELINE_SHADERS_STATES
     /* It is DEPRECATED if driver directly uses EPs (PEP/KEP/SEP) as all
        the info stored in hints can be retrieved by SEP */
     struct _gcsHINT                   hints;
+
+    gcsPROGRAM_VidMemPatchOffset      patchOffsetsInDW;
+    gctUINT32                         stateDeltaSize;
+    gctUINT32*                        pStateDelta;
+
 }VSC_HW_PIPELINE_SHADERS_STATES, *PVSC_HW_PIPELINE_SHADERS_STATES;
 
 gceSTATUS vscInitializeHwPipelineShadersStates(VSC_SYS_CONTEXT* pSysCtx, VSC_HW_PIPELINE_SHADERS_STATES* pHwShdsStates);
@@ -592,7 +1100,12 @@ gceSTATUS vscLoadShaderFromBinary(void*          pBinary,
                                   SHADER_HANDLE* pShaderHandle,
                                   gctBOOL        bFreeBinary);
 
+/* Free the vir intrinsic library. */
+gceSTATUS vscFreeVirIntrinsicLib(void);
+
 gceSTATUS vscQueryShaderBinarySize(SHADER_HANDLE hShader, gctUINT* pSizeInByte);
+
+gctPOINTER vscGetDebugInfo(IN SHADER_HANDLE    Shader);
 
 /* Shader copy */
 gceSTATUS vscCopyShader(SHADER_HANDLE * hToShader, SHADER_HANDLE hFromShader);
@@ -602,6 +1115,8 @@ gceSTATUS vscCopyShader(SHADER_HANDLE * hToShader, SHADER_HANDLE hFromShader);
 gceSTATUS vscExtractSubShader(SHADER_HANDLE   hMainShader,
                               gctCONST_STRING pSubShaderEntryName,
                               SHADER_HANDLE   hSubShader);
+
+gcSHADER_KIND vscGetShaderKindFromShaderHandle(SHADER_HANDLE hShader);
 
 /* Link a lib shader to main shader. */
 gceSTATUS vscLinkLibShaderToShader(SHADER_HANDLE              hMainShader,
@@ -615,10 +1130,6 @@ gceSTATUS vscCompileShader(VSC_SHADER_COMPILER_PARAM* pCompilerParam,
                                                                  so dont use VSC MM to allocate
                                                                  inside of VSC. */
                           );
-
-gcSHADER_KIND vscGetShaderKindFromShaderHandle(SHADER_HANDLE hShader);
-
-gceSTATUS vscGetTemporaryDir(OUT gctSTRING gcTmpDir);
 
 /* GL/Vulkan driver ONLY interface, this is HL interface to match glLinkProgram
    API. It may call vscCompileShader for each shader inside. After successfully
@@ -675,7 +1186,29 @@ gceSTATUS vscProgramHwShaderStages(VSC_HW_PIPELINE_SHADERS_PARAM*   pHwPipelineS
                                                                                            we need to remove it later. */
                                   );
 
+/****************************************************************************
+   Following are for future EP, including SEP, KEP and PEP.
+*****************************************************************************/
+typedef enum _VSC_EP_KIND
+{
+    VSC_EP_KIND_NONE            = 0,
+    /* Shader executable profile. */
+    VSC_EP_KIND_SHADER          = 1,
+    /* Kernel executable profile. */
+    VSC_EP_KIND_KERNEL          = 2,
+    /* Program executable profile. */
+    VSC_EP_KIND_PROGRAM         = 3,
+}VSC_EP_KIND;
 
+/* For saver, it always returns how many bytes it saves to binary buffer, and
+              1). if ppOutBinary == NULL (szBinaryInByte will be igored), then not doing real saving, just return byte size
+              2). if ppOutBinary != NULL and *ppOutBinary == NULL (szBinaryInByte will be igored), then saver will allocate a
+                  binary for user.
+              3). *ppOutBinary != NULL, then szBinaryInByte must be the size of the binary (generally, this size got by first usage
+                  of this function).
+   For loader, szBinaryInByte must be size of binary, and return value is the real sparsed size of binary. */
+gctUINT vscSaveEPToBinary(VSC_EP_KIND epKind, void* pEP, void** ppOutBinary, gctUINT szBinaryInByte);
+gctUINT vscLoadEPFromBinary(VSC_EP_KIND epKind, void* pInBinary, gctUINT szBinaryInByte, void* pEP);
 
 /****************************************************************************
    Following are for future MC level recompiling. Right now, we are using HL
@@ -698,6 +1231,62 @@ typedef struct _VSC_SHADER_RECOMPILER_PARAM
 }VSC_SHADER_RECOMPILER_PARAM, *PVSC_SHADER_RECOMPILER_PARAM;
 
 gceSTATUS
+vscConvertGcShader2VirShader(
+    IN  SHADER_HANDLE           GcShader,
+    OUT SHADER_HANDLE*          phVirShader
+    );
+
+/* For given image descriptor and sampler value for HW cfg, do we
+ * need to do recompilation for the image read ? */
+gctBOOL
+vscImageSamplerNeedLibFuncForHWCfg(
+    void *                  pImageDesc,
+    gctUINT                 ImageSamplerValue,
+    VSC_HW_CONFIG *         pHwCfg,
+    VSC_OCLImgLibKind *     pImgLibKind, /* the image lib kind to be used */
+    gctBOOL *               UseTexld, /* set true if need to use texld for image_read */
+    gctUINT *               KeyofImgSampler         /* the key state of the image-sampler pair */
+    );
+
+/* For given image descriptorfor HW cfg, do we
+ * need to do recompilation for the image write ?  */
+gctBOOL
+vscImageWriteNeedLibFuncForHWCfg(
+    void *                  pImageDesc,
+    VSC_HW_CONFIG *         pHwCfg,
+    VSC_OCLImgLibKind *     pImgLibKind, /* the image lib kind to be used */
+    gctUINT *               KeyofImgSampler
+    );
+
+gceSTATUS
+vscConstructImageReadLibFuncName(
+    VSC_ImageDesc *         ImageDescHandle, /* VSC_ImageDesc */
+    gctUINT                 SamplerValue, /* VSC_SamplerValue */
+    VSC_HW_CONFIG *         pHwCfg,
+    gctSTRING *             pLibFuncName, /* returned lib function name if needed */
+    VSC_OCLImgLibKind *     pImgLibKind, /* the image lib kind to be used */
+    gctBOOL *               UseTexld                /* set true if need to use texld for image_read */
+    );
+
+gceSTATUS
+vscConstructImageWriteLibFuncName(
+    VSC_ImageDesc *         ImageDescHandle, /* VSC_ImageDesc */
+    VSC_HW_CONFIG *         pHwCfg,
+    gctSTRING *             pLibFuncName, /* returned lib function name if needed */
+    VSC_OCLImgLibKind *     pImgLibKind             /* the image lib kind to be used */
+);
+
+VSC_OCLImgLibKind vscGetOCLImgLibKindForHWCfg(
+    IN VSC_HW_CONFIG            *pHwCfg
+    );
+
+/* Return the max free reg count for this HW config. */
+gctUINT
+vscGetHWMaxFreeRegCount(
+    IN VSC_HW_CONFIG   *pHwCfg
+    );
+
+gceSTATUS
 gcSHADER_WriteBufferToFile(
     IN gctSTRING buffer,
     IN gctUINT32 bufferSize,
@@ -711,7 +1300,11 @@ gcSHADER_ReadBufferFromFile(
     OUT gctUINT *bufSize
     );
 
+void vscSetDriverVIRPath(gctBOOL bUseVIRPath);
+
 gceSTATUS vscGetTemporaryDir(OUT gctSTRING gcTmpDir);
+
+void vscSetIsLibraryShader(SHADER_HANDLE hShader, gctBOOL bIsLibraryShader);
 
 END_EXTERN_C();
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -22,12 +22,16 @@ VX_INTERNAL_CALLBACK_API void vxoConvolution_Destructor(vx_reference ref)
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseConvolution(vx_convolution *convolution)
 {
+    gcmDUMP_API("$VX vxReleaseConvolution: convolution=%p", convolution);
+
     return vxoReference_Release((vx_reference_ptr)convolution, VX_TYPE_CONVOLUTION, VX_REF_EXTERNAL);
 }
 
 VX_API_ENTRY vx_convolution VX_API_CALL vxCreateConvolution(vx_context context, vx_size columns, vx_size rows)
 {
     vx_convolution convolution;
+
+    gcmDUMP_API("$VX vxCreateConvolution: context=%p, columns=0x%lx rows=0x%lx", context, columns, rows);
 
     if (!vxoContext_IsValid(context)) return VX_NULL;
 
@@ -38,7 +42,12 @@ VX_API_ENTRY vx_convolution VX_API_CALL vxCreateConvolution(vx_context context, 
 
     convolution = (vx_convolution)vxoReference_Create(context, VX_TYPE_CONVOLUTION, VX_REF_EXTERNAL, &context->base);
 
-    if (vxoReference_GetStatus((vx_reference)convolution) != VX_SUCCESS) return convolution;
+    if (vxoReference_GetStatus((vx_reference)convolution) != VX_SUCCESS)
+    {
+        vxError("%s[%d]: Get reference status failed!\n", __FUNCTION__, __LINE__);
+        vxAddLogEntry(&context->base, VX_ERROR_INVALID_REFERENCE, "%s[%d]: Get reference status failed!\n", __FUNCTION__, __LINE__);
+        return convolution;
+    }
 
     convolution->matrix.dataType            = VX_TYPE_INT16;
     convolution->matrix.columns             = columns;
@@ -56,8 +65,12 @@ VX_API_ENTRY vx_convolution VX_API_CALL vxCreateConvolution(vx_context context, 
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryConvolution(vx_convolution convolution, vx_enum attribute, void *ptr, vx_size size)
 {
+
+    gcmDUMP_API("$VX vxQueryConvolution: convolution=%p, attribute=0x%x, ptr=%p, size=0x%lx", convolution, attribute, ptr, size);
+
     if (!vxoReference_IsValidAndSpecific(&convolution->matrix.base, VX_TYPE_CONVOLUTION))
     {
+        vxError("%s[%d]: Convolution reference is invalid!\n", __FUNCTION__, __LINE__);
         return VX_ERROR_INVALID_REFERENCE;
     }
 
@@ -88,7 +101,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryConvolution(vx_convolution convolution
             break;
 
         default:
-            vxError("The attribute parameter, %d, is not supported", attribute);
+            vxError("%s[%d]: The attribute parameter, %d, is not supported!\n", __FUNCTION__, __LINE__, attribute);
+            vxAddLogEntry(&convolution->matrix.base, VX_ERROR_NOT_SUPPORTED, "%s[%d]: The attribute parameter, %d, is not supported!\n", __FUNCTION__, __LINE__, attribute);
             return VX_ERROR_NOT_SUPPORTED;
     }
 
@@ -99,8 +113,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetConvolutionAttribute(vx_convolution conv
 {
     vx_uint32 scale;
 
+    gcmDUMP_API("$VX vxSetConvolutionAttribute: convolution=%p, attribute=0x%x, ptr=%p, size=0x%lx", convolution, attribute, ptr, size);
+
     if (!vxoReference_IsValidAndSpecific(&convolution->matrix.base, VX_TYPE_CONVOLUTION))
     {
+        vxError("%s[%d]: Convolution reference is invalid!\n", __FUNCTION__, __LINE__);
         return VX_ERROR_INVALID_REFERENCE;
     }
 
@@ -117,7 +134,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetConvolutionAttribute(vx_convolution conv
             break;
 
         default:
-            vxError("The attribute parameter, %d, is not supported", attribute);
+            vxError("%s[%d]: The attribute parameter, %d, is not supported", __FUNCTION__, __LINE__, attribute);
             return VX_ERROR_NOT_SUPPORTED;
     }
 
@@ -126,6 +143,9 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetConvolutionAttribute(vx_convolution conv
 
 VX_API_ENTRY vx_status VX_API_CALL vxReadConvolutionCoefficients(vx_convolution convolution, vx_int16 *array)
 {
+
+    gcmDUMP_API("$VX vxReadConvolutionCoefficients: convolution=%p, array=%p", convolution, array);
+
     if (!vxoReference_IsValidAndSpecific(&convolution->matrix.base, VX_TYPE_CONVOLUTION))
     {
         return VX_ERROR_INVALID_REFERENCE;
@@ -156,6 +176,9 @@ VX_API_ENTRY vx_status VX_API_CALL vxReadConvolutionCoefficients(vx_convolution 
 
 VX_API_ENTRY vx_status VX_API_CALL vxWriteConvolutionCoefficients(vx_convolution convolution, const vx_int16 *array)
 {
+
+    gcmDUMP_API("$VX vxWriteConvolutionCoefficients: convolution=%p, array=%p", convolution, array);
+
     if (!vxoReference_IsValidAndSpecific(&convolution->matrix.base, VX_TYPE_CONVOLUTION))
     {
         return VX_ERROR_INVALID_REFERENCE;
@@ -187,6 +210,9 @@ VX_API_ENTRY vx_status VX_API_CALL vxWriteConvolutionCoefficients(vx_convolution
 VX_API_ENTRY vx_status VX_API_CALL vxCopyConvolutionCoefficients(vx_convolution convolution, void *ptr, vx_enum usage, vx_enum mem_type)
 {
     vx_status status = VX_ERROR_INVALID_REFERENCE;
+
+    gcmDUMP_API("$VX vxCopyConvolutionCoefficients: convolution=%p, ptr=%p, usage=0x%x, mem_type=0x%x", convolution, ptr, usage, mem_type);
+
     if (vxoReference_IsValidAndSpecific(&convolution->matrix.base, VX_TYPE_CONVOLUTION) == vx_true_e)
     {
         if (vxoMemory_Allocate(convolution->matrix.base.context, &convolution->matrix.memory) == vx_true_e)
@@ -235,5 +261,25 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyConvolutionCoefficients(vx_convolution 
         vxError("Invalid reference for convolution\n");
     }
     return status;
+}
+
+VX_API_ENTRY vx_convolution VX_API_CALL vxCreateVirtualConvolution(vx_graph graph, vx_size columns, vx_size rows)
+{
+    vx_convolution convolution;
+    vx_context context = vxoContext_GetFromReference((vx_reference)graph);
+
+    gcmDUMP_API("$VX vxCreateVirtualConvolution: graph=%p, columns=0x%lx rows=0x%lx", graph, columns, rows);
+
+    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_NULL;
+
+    convolution = vxCreateConvolution(context, columns, rows);
+
+    if (vxoReference_GetStatus((vx_reference)convolution) != VX_SUCCESS) return convolution;
+
+    convolution->matrix.base.scope        = (vx_reference)graph;
+
+    convolution->matrix.base.isVirtual    = vx_true_e;
+
+    return convolution;
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2018 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -86,7 +86,7 @@ extern "C" {
 #endif
 
         /*video memory mapping*/
-        gctPHYS_ADDR g_InternalPhysical, g_ExternalPhysical, g_ContiguousPhysical;
+        gctUINT32 g_InternalPhysName, g_ExternalPhysName, g_ContiguousPhysName;
         gctSIZE_T g_InternalSize, g_ExternalSize, g_ContiguousSize;
         gctPOINTER g_Internal, g_External, g_Contiguous;
 

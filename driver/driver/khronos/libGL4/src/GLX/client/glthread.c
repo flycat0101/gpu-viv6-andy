@@ -143,10 +143,10 @@ static _glthread_TSD _gl_ContextTSD;     /**< Per-thread context pointer */
 ** or it points to GLX's __glIndirectDispatchTab table for indirect rendering.
 ** All GL contexts will share this global API dispatch table in single thread mode.
 */
-__GLesDispatchTable *_glapi_Dispatch = NULL;
+__GLdispatchTable *_glapi_Dispatch = NULL;
 GLvoid *_glapi_Context = NULL;
 
-extern __GLesDispatchTable *__glNopDispatchTab;
+extern __GLdispatchTable *__glNopDispatchTab;
 extern __GLcontext *__glxNopContext;
 
 /**
@@ -206,11 +206,11 @@ _glapi_set_dispatch(GLvoid *dispatch)
 GLvoid *
 _glapi_get_dispatch(GLvoid)
 {
-    __GLesDispatchTable *api;
+    __GLdispatchTable *api;
 
 #if defined(PTHREADS)
     api = (ThreadSafe) ?
-        (__GLesDispatchTable *) _glthread_GetTSD(&_gl_DispatchTSD) : _glapi_Dispatch;
+        (__GLdispatchTable*) _glthread_GetTSD(&_gl_DispatchTSD) : _glapi_Dispatch;
 #else
     api = _glapi_Dispatch;
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -237,6 +237,7 @@ IN gcSL_OPCODE Opcode
     case gcSL_MOV:      return "gcSL_MOV";
     case gcSL_CONV:     return "gcSL_CONV";
     case gcSL_SAT:      return "gcSL_SAT";
+    case gcSL_DP2:      return "gcSL_DP2";
     case gcSL_DP3:      return "gcSL_DP3";
     case gcSL_DP4:      return "gcSL_DP4";
     case gcSL_ABS:      return "gcSL_ABS";
@@ -335,7 +336,7 @@ IN gcSL_OPCODE Opcode
     case gcSL_TANPI:    return "gcSL_TANPI";
 
     case gcSL_POPCOUNT: return "gcSL_POPCOUNT";
-
+    case gcSL_TEXU:     return "gcSL_TEXU";
     case gcSL_ARCTRIG0:      return "gcSL_ARCTRIG0";
     case gcSL_ARCTRIG1:      return "gcSL_ARCTRIG1";
 
@@ -343,12 +344,25 @@ IN gcSL_OPCODE Opcode
     case gcSL_LONGHI:        return "gcSL_LONGHI";
     case gcSL_MOV_LONG:      return "gcSL_MOV_LONG";
     case gcSL_COPY:          return "gcSL_COPY";
+    case gcSL_TEXLD_U:       return "gcSL_TEXLD_U";
     case gcSL_PARAM_CHAIN:   return "gcSL_PARAM_CHAIN";
     case gcSL_INTRINSIC:     return "gcSL_INTRINSIC";
     case gcSL_INTRINSIC_ST:  return "gcSL_INTRINSIC_ST";
     case gcSL_CLAMP0MAX:     return "gcSL_CLAMP0MAX";
+    case gcSL_CLAMPCOORD:    return "gcSL_CLAMPCOORD";
     case gcSL_FMA_MUL:       return "gcSL_FMA_MUL";
     case gcSL_FMA_ADD:       return "gcSL_FMA_ADD";
+
+    case gcSL_CMAD:         return "gcSL_CMAD";
+    case gcSL_CONJ:         return "gcSL_CONJ";
+    case gcSL_CMUL:         return "gcSL_CMUL";
+    case gcSL_CMADCJ:       return "gcSL_CMADCJ";
+    case gcSL_CMULCJ:       return "gcSL_CMULCJ";
+    case gcSL_CADDCJ:       return "gcSL_CADDCJ";
+    case gcSL_CSUBCJ:       return "gcSL_CSUBCJ";
+
+    case gcSL_GET_IMAGE_TYPE: return "gcSL_GET_IMAGE_TYPE";
+
     case gcSL_FINDLSB:      return "gcSL_FINDLSB";
     case gcSL_FINDMSB:      return "gcSL_FINDMSB";
     case gcSL_BIT_REVERSAL: return "gcSL_BIT_REVERSAL";
@@ -1425,31 +1439,35 @@ clsGEN_CODE_DATA_TYPE DataType
         break;
 
     case clvTYPE_SAMPLER_T:
-        typeSize.type = gcSHADER_SAMPLER;
+        typeSize.type = gcSHADER_SAMPLER_T;
         break;
 
     case clvTYPE_IMAGE2D_T:
-        typeSize.type = gcSHADER_IMAGE_2D;
+        typeSize.type = gcSHADER_IMAGE_2D_T;
         break;
 
     case clvTYPE_IMAGE3D_T:
-        typeSize.type = gcSHADER_IMAGE_3D;
+        typeSize.type = gcSHADER_IMAGE_3D_T;
         break;
 
     case clvTYPE_IMAGE2D_ARRAY_T:
-        typeSize.type = gcSHADER_IMAGE_2D_ARRAY;
+        typeSize.type = gcSHADER_IMAGE_2D_ARRAY_T;
         break;
 
     case clvTYPE_IMAGE1D_T:
-        typeSize.type = gcSHADER_IMAGE_1D;
+        typeSize.type = gcSHADER_IMAGE_1D_T;
         break;
 
     case clvTYPE_IMAGE1D_ARRAY_T:
-        typeSize.type = gcSHADER_IMAGE_1D_ARRAY;
+        typeSize.type = gcSHADER_IMAGE_1D_ARRAY_T;
         break;
 
     case clvTYPE_IMAGE1D_BUFFER_T:
-        typeSize.type = gcSHADER_IMAGE_1D_BUFFER;
+        typeSize.type = gcSHADER_IMAGE_1D_BUFFER_T;
+        break;
+
+    case clvTYPE_VIV_GENERIC_IMAGE_T:
+        typeSize.type = gcSHADER_VIV_GENERIC_IMAGE_T;
         break;
 
     case clvTYPE_SAMPLER2D:
@@ -1478,129 +1496,228 @@ IN gcSHADER_TYPE Type
 )
 {
     switch (Type) {
-    case gcSHADER_FLOAT_X1:            return "gcSHADER_FLOAT_X1";
-    case gcSHADER_FLOAT_X2:            return "gcSHADER_FLOAT_X2";
-    case gcSHADER_FLOAT_X3:            return "gcSHADER_FLOAT_X3";
-    case gcSHADER_FLOAT_X4:            return "gcSHADER_FLOAT_X4";
-    case gcSHADER_FLOAT_X8:            return "gcSHADER_FLOAT_X8";
-    case gcSHADER_FLOAT_X16:           return "gcSHADER_FLOAT_X16";
-    case gcSHADER_FLOAT16_X1:          return "gcSHADER_FLOAT16_X1";
-    case gcSHADER_FLOAT16_X2:          return "gcSHADER_FLOAT16_X2";
-    case gcSHADER_FLOAT16_X3:          return "gcSHADER_FLOAT16_X3";
-    case gcSHADER_FLOAT16_X4:          return "gcSHADER_FLOAT16_X4";
-    case gcSHADER_FLOAT16_X8:          return "gcSHADER_FLOAT16_X8";
-    case gcSHADER_FLOAT16_X16:         return "gcSHADER_FLOAT16_X16";
-    case gcSHADER_FLOAT_2X2:           return "gcSHADER_FLOAT_2X2";
-    case gcSHADER_FLOAT_3X3:           return "gcSHADER_FLOAT_3X3";
-    case gcSHADER_FLOAT_4X4:           return "gcSHADER_FLOAT_4X4";
-    case gcSHADER_BOOLEAN_X1:          return "gcSHADER_BOOLEAN_X1";
-    case gcSHADER_BOOLEAN_X2:          return "gcSHADER_BOOLEAN_X2";
-    case gcSHADER_BOOLEAN_X3:          return "gcSHADER_BOOLEAN_X3";
-    case gcSHADER_BOOLEAN_X4:          return "gcSHADER_BOOLEAN_X4";
-    case gcSHADER_BOOLEAN_X8:          return "gcSHADER_BOOLEAN_X8";
-    case gcSHADER_BOOLEAN_X16:         return "gcSHADER_BOOLEAN_X16";
-    case gcSHADER_INTEGER_X1:          return "gcSHADER_INTEGER_X1";
-    case gcSHADER_INTEGER_X2:          return "gcSHADER_INTEGER_X2";
-    case gcSHADER_INTEGER_X3:          return "gcSHADER_INTEGER_X3";
-    case gcSHADER_INTEGER_X4:          return "gcSHADER_INTEGER_X4";
-    case gcSHADER_INTEGER_X8:          return "gcSHADER_INTEGER_X8";
-    case gcSHADER_INTEGER_X16:         return "gcSHADER_INTEGER_X16";
-    case gcSHADER_INT8_X1:             return "gcSHADER_INT8_X1";
-    case gcSHADER_INT8_X2:             return "gcSHADER_INT8_X2";
-    case gcSHADER_INT8_X3:             return "gcSHADER_INT8_X3";
-    case gcSHADER_INT8_X4:             return "gcSHADER_INT8_X4";
-    case gcSHADER_INT8_X8:             return "gcSHADER_INT8_X8";
-    case gcSHADER_INT8_X16:            return "gcSHADER_INT8_X16";
-    case gcSHADER_INT16_X1:            return "gcSHADER_INT16_X1";
-    case gcSHADER_INT16_X2:            return "gcSHADER_INT16_X2";
-    case gcSHADER_INT16_X3:            return "gcSHADER_INT16_X3";
-    case gcSHADER_INT16_X4:            return "gcSHADER_INT16_X4";
-    case gcSHADER_INT16_X8:            return "gcSHADER_INT16_X8";
-    case gcSHADER_INT16_X16:           return "gcSHADER_INT16_X16";
-    case gcSHADER_SAMPLER:             return "gcSHADER_SAMPLER";
-    case gcSHADER_IMAGE_2D:            return "gcSHADER_IMAGE_2D";
-    case gcSHADER_IMAGE_3D:            return "gcSHADER_IMAGE_3D";
-    case gcSHADER_IMAGE_1D:            return "gcSHADER_IMAGE_1D";
-    case gcSHADER_IMAGE_1D_ARRAY:      return "gcSHADER_IMAGE_1D_ARRAY";
-    case gcSHADER_IMAGE_1D_BUFFER:     return "gcSHADER_IMAGE_1D_BUFFER";
-    case gcSHADER_IMAGE_2D_ARRAY:      return "gcSHADER_IMAGE_2D_ARRAY";
-    case gcSHADER_FLOAT_2X3:           return "gcSHADER_FLOAT_2X3";
-    case gcSHADER_FLOAT_2X4:           return "gcSHADER_FLOAT_2X4";
-    case gcSHADER_FLOAT_3X2:           return "gcSHADER_FLOAT_3X2";
-    case gcSHADER_FLOAT_3X4:           return "gcSHADER_FLOAT_3X4";
-    case gcSHADER_FLOAT_4X2:           return "gcSHADER_FLOAT_4X2";
-    case gcSHADER_FLOAT_4X3:           return "gcSHADER_FLOAT_4X3";
-    case gcSHADER_SAMPLER_2D:          return "gcSHADER_SAMPLER_2D";
-    case gcSHADER_SAMPLER_3D:          return "gcSHADER_SAMPLER_2D";
-    case gcSHADER_UINT_X1:             return "gcSHADER_UINT_X1";
-    case gcSHADER_UINT_X2:             return "gcSHADER_UINT_X2";
-    case gcSHADER_UINT_X3:             return "gcSHADER_UINT_X3";
-    case gcSHADER_UINT_X4:             return "gcSHADER_UINT_X4";
-    case gcSHADER_UINT_X8:             return "gcSHADER_UINT_X8";
-    case gcSHADER_UINT_X16:            return "gcSHADER_UINT_X16";
-    case gcSHADER_UINT8_X1:            return "gcSHADER_UINT8_X1";
-    case gcSHADER_UINT8_X2:            return "gcSHADER_UINT8_X2";
-    case gcSHADER_UINT8_X3:            return "gcSHADER_UINT8_X3";
-    case gcSHADER_UINT8_X4:            return "gcSHADER_UINT8_X4";
-    case gcSHADER_UINT8_X8:            return "gcSHADER_UINT8_X8";
-    case gcSHADER_UINT8_X16:           return "gcSHADER_UINT8_X16";
+    case gcSHADER_FLOAT_X1:                        return "gcSHADER_FLOAT_X1";                      /* 0x00 */
+    case gcSHADER_FLOAT_X2:                        return "gcSHADER_FLOAT_X2";                      /* 0x01 */
+    case gcSHADER_FLOAT_X3:                        return "gcSHADER_FLOAT_X3";                      /* 0x02 */
+    case gcSHADER_FLOAT_X4:                        return "gcSHADER_FLOAT_X4";                      /* 0x03 */
+    case gcSHADER_FLOAT_2X2:                       return "gcSHADER_FLOAT_2X2";                     /* 0x04 */
+    case gcSHADER_FLOAT_3X3:                       return "gcSHADER_FLOAT_3X3";                     /* 0x05 */
+    case gcSHADER_FLOAT_4X4:                       return "gcSHADER_FLOAT_4X4";                     /* 0x06 */
+    case gcSHADER_BOOLEAN_X1:                      return "gcSHADER_BOOLEAN_X1";                    /* 0x07 */
+    case gcSHADER_BOOLEAN_X2:                      return "gcSHADER_BOOLEAN_X2";                    /* 0x08 */
+    case gcSHADER_BOOLEAN_X3:                      return "gcSHADER_BOOLEAN_X3";                    /* 0x09 */
+    case gcSHADER_BOOLEAN_X4:                      return "gcSHADER_BOOLEAN_X4";                    /* 0x0A */
+    case gcSHADER_INTEGER_X1:                      return "gcSHADER_INTEGER_X1";                    /* 0x0B */
+    case gcSHADER_INTEGER_X2:                      return "gcSHADER_INTEGER_X2";                    /* 0x0C */
+    case gcSHADER_INTEGER_X3:                      return "gcSHADER_INTEGER_X3";                    /* 0x0D */
+    case gcSHADER_INTEGER_X4:                      return "gcSHADER_INTEGER_X4";                    /* 0x0E */
+    case gcSHADER_SAMPLER_1D:                      return "gcSHADER_SAMPLER_1D";                    /* 0x0F */
+    case gcSHADER_SAMPLER_2D:                      return "gcSHADER_SAMPLER_2D";                    /* 0x10 */
+    case gcSHADER_SAMPLER_3D:                      return "gcSHADER_SAMPLER_3D";                    /* 0x11 */
+    case gcSHADER_SAMPLER_CUBIC:                   return "gcSHADER_SAMPLER_CUBIC";                 /* 0x12 */
+    case gcSHADER_FIXED_X1:                        return "gcSHADER_FIXED_X1";                      /* 0x13 */
+    case gcSHADER_FIXED_X2:                        return "gcSHADER_FIXED_X2";                      /* 0x14 */
+    case gcSHADER_FIXED_X3:                        return "gcSHADER_FIXED_X3";                      /* 0x15 */
+    case gcSHADER_FIXED_X4:                        return "gcSHADER_FIXED_X4";                      /* 0x16 */
 
-    case gcSHADER_UINT16_X1:           return "gcSHADER_UINT16_X1";
-    case gcSHADER_UINT16_X2:           return "gcSHADER_UINT16_X2";
-    case gcSHADER_UINT16_X3:           return "gcSHADER_UINT16_X3";
-    case gcSHADER_UINT16_X4:           return "gcSHADER_UINT16_X4";
-    case gcSHADER_UINT16_X8:           return "gcSHADER_UINT16_X8";
-    case gcSHADER_UINT16_X16:          return "gcSHADER_UINT16_X16";
+    /* For OCL. */
+    case gcSHADER_IMAGE_1D_T:                      return "gcSHADER_IMAGE_1D_T";                    /* 0x17 */
+    case gcSHADER_IMAGE_1D_BUFFER_T:               return "gcSHADER_IMAGE_1D_BUFFER_T";             /* 0x18 */
+    case gcSHADER_IMAGE_1D_ARRAY_T:                return "gcSHADER_IMAGE_1D_ARRAY_T";              /* 0x19 */
+    case gcSHADER_IMAGE_2D_T:                      return "gcSHADER_IMAGE_2D_T";                    /* 0x1A */
+    case gcSHADER_IMAGE_2D_ARRAY_T:                return "gcSHADER_IMAGE_2D_ARRAY_T";              /* 0x1B */
+    case gcSHADER_IMAGE_3D_T:                      return "gcSHADER_IMAGE_3D_T";                    /* 0x1C */
+    case gcSHADER_VIV_GENERIC_IMAGE_T:             return "gcSHADER_VIV_GENERIC_IMAGE_T";           /* 0x1D */
+    case gcSHADER_SAMPLER_T:                       return "gcSHADER_SAMPLER_T";                     /* 0x1E */
 
-    case gcSHADER_INT64_X1:            return "gcSHADER_INT64_X1";
-    case gcSHADER_INT64_X2:            return "gcSHADER_INT64_X2";
-    case gcSHADER_INT64_X3:            return "gcSHADER_INT64_X3";
-    case gcSHADER_INT64_X4:            return "gcSHADER_INT64_X4";
-    case gcSHADER_INT64_X8:            return "gcSHADER_INT64_X8";
-    case gcSHADER_INT64_X16:           return "gcSHADER_INT64_X16";
-    case gcSHADER_UINT64_X1:           return "gcSHADER_UINT64_X1";
-    case gcSHADER_UINT64_X2:           return "gcSHADER_UINT64_X2";
-    case gcSHADER_UINT64_X3:           return "gcSHADER_UINT64_X3";
-    case gcSHADER_UINT64_X4:           return "gcSHADER_UINT64_X4";
-    case gcSHADER_UINT64_X8:           return "gcSHADER_UINT64_X8";
-    case gcSHADER_UINT64_X16:          return "gcSHADER_UINT64_X16";
+    case gcSHADER_FLOAT_2X3:                       return "gcSHADER_FLOAT_2X3";                     /* 0x1F */
+    case gcSHADER_FLOAT_2X4:                       return "gcSHADER_FLOAT_2X4";                     /* 0x20 */
+    case gcSHADER_FLOAT_3X2:                       return "gcSHADER_FLOAT_3X2";                     /* 0x21 */
+    case gcSHADER_FLOAT_3X4:                       return "gcSHADER_FLOAT_3X4";                     /* 0x22 */
+    case gcSHADER_FLOAT_4X2:                       return "gcSHADER_FLOAT_4X2";                     /* 0x23 */
+    case gcSHADER_FLOAT_4X3:                       return "gcSHADER_FLOAT_4X3";                     /* 0x24 */
+    case gcSHADER_ISAMPLER_2D:                     return "gcSHADER_ISAMPLER_2D";                   /* 0x25 */
+    case gcSHADER_ISAMPLER_3D:                     return "gcSHADER_ISAMPLER_3D";                   /* 0x26 */
+    case gcSHADER_ISAMPLER_CUBIC:                  return "gcSHADER_ISAMPLER_CUBIC";                /* 0x27 */
+    case gcSHADER_USAMPLER_2D:                     return "gcSHADER_USAMPLER_2D";                   /* 0x28 */
+    case gcSHADER_USAMPLER_3D:                     return "gcSHADER_USAMPLER_3D";                   /* 0x29 */
+    case gcSHADER_USAMPLER_CUBIC:                  return "gcSHADER_USAMPLER_CUBIC";                /* 0x2A */
+    case gcSHADER_SAMPLER_EXTERNAL_OES:            return "gcSHADER_SAMPLER_EXTERNAL_OES";          /* 0x2B */
 
-    case gcSHADER_BOOLEAN_P2:          return "gcSHADER_BOOLEAN_P2";
-    case gcSHADER_BOOLEAN_P3:          return "gcSHADER_BOOLEAN_P3";
-    case gcSHADER_BOOLEAN_P4:          return "gcSHADER_BOOLEAN_P4";
-    case gcSHADER_BOOLEAN_P8:          return "gcSHADER_BOOLEAN_P8";
-    case gcSHADER_BOOLEAN_P16:         return "gcSHADER_BOOLEAN_P16";
-    case gcSHADER_BOOLEAN_P32:         return "gcSHADER_BOOLEAN_P32";
-    case gcSHADER_INT8_P2:             return "gcSHADER_INT8_P2";
-    case gcSHADER_INT8_P3:             return "gcSHADER_INT8_P3";
-    case gcSHADER_INT8_P4:             return "gcSHADER_INT8_P4";
-    case gcSHADER_INT8_P8:             return "gcSHADER_INT8_P8";
-    case gcSHADER_INT8_P16:            return "gcSHADER_INT8_P16";
-    case gcSHADER_INT8_P32:            return "gcSHADER_INT8_P32";
-    case gcSHADER_UINT8_P2:            return "gcSHADER_UINT8_P2";
-    case gcSHADER_UINT8_P3:            return "gcSHADER_UINT8_P3";
-    case gcSHADER_UINT8_P4:            return "gcSHADER_UINT8_P4";
-    case gcSHADER_UINT8_P8:            return "gcSHADER_UINT8_P8";
-    case gcSHADER_UINT8_P16:           return "gcSHADER_UINT8_P16";
-    case gcSHADER_UINT8_P32:           return "gcSHADER_UINT8_P32";
-    case gcSHADER_INT16_P2:            return "gcSHADER_INT16_P2";
-    case gcSHADER_INT16_P3:            return "gcSHADER_INT16_P3";
-    case gcSHADER_INT16_P4:            return "gcSHADER_INT16_P4";
-    case gcSHADER_INT16_P8:            return "gcSHADER_INT16_P8";
-    case gcSHADER_INT16_P16:           return "gcSHADER_INT16_P16";
-    case gcSHADER_INT16_P32:           return "gcSHADER_INT16_P32";
-    case gcSHADER_UINT16_P2:           return "gcSHADER_UINT16_P2";
-    case gcSHADER_UINT16_P3:           return "gcSHADER_UINT16_P3";
-    case gcSHADER_UINT16_P4:           return "gcSHADER_UINT16_P4";
-    case gcSHADER_UINT16_P8:           return "gcSHADER_UINT16_P8";
-    case gcSHADER_UINT16_P16:          return "gcSHADER_UINT16_P16";
-    case gcSHADER_UINT16_P32:          return "gcSHADER_UINT16_P32";
-    case gcSHADER_FLOAT16_P2:             return "gcSHADER_FLOAT16_P2";
-    case gcSHADER_FLOAT16_P3:             return "gcSHADER_FLOAT16_P3";
-    case gcSHADER_FLOAT16_P4:             return "gcSHADER_FLOAT16_P4";
-    case gcSHADER_FLOAT16_P8:             return "gcSHADER_BOOL_P8";
-    case gcSHADER_FLOAT16_P16:            return "gcSHADER_FLOAT16_P16";
-    case gcSHADER_FLOAT16_P32:            return "gcSHADER_FLOAT16_P32";
+    case gcSHADER_UINT_X1:                         return "gcSHADER_UINT_X1";                       /* 0x2C */
+    case gcSHADER_UINT_X2:                         return "gcSHADER_UINT_X2";                       /* 0x2D */
+    case gcSHADER_UINT_X3:                         return "gcSHADER_UINT_X3";                       /* 0x2E */
+    case gcSHADER_UINT_X4:                         return "gcSHADER_UINT_X4";                       /* 0x2F */
+
+    case gcSHADER_SAMPLER_2D_SHADOW:               return "gcSHADER_SAMPLER_2D_SHADOW";             /* 0x30 */
+    case gcSHADER_SAMPLER_CUBE_SHADOW:             return "gcSHADER_SAMPLER_CUBE_SHADOW";           /* 0x31 */
+
+    case gcSHADER_SAMPLER_1D_ARRAY:                return "gcSHADER_SAMPLER_1D_ARRAY";              /* 0x32 */
+    case gcSHADER_SAMPLER_1D_ARRAY_SHADOW:         return "gcSHADER_SAMPLER_1D_ARRAY_SHADOW";       /* 0x33 */
+    case gcSHADER_SAMPLER_2D_ARRAY:                return "gcSHADER_SAMPLER_2D_ARRAY";              /* 0x34 */
+    case gcSHADER_ISAMPLER_2D_ARRAY:               return "gcSHADER_ISAMPLER_2D_ARRAY";             /* 0x35 */
+    case gcSHADER_USAMPLER_2D_ARRAY:               return "gcSHADER_USAMPLER_2D_ARRAY";             /* 0x36 */
+    case gcSHADER_SAMPLER_2D_ARRAY_SHADOW:         return "gcSHADER_SAMPLER_2D_ARRAY_SHADOW";       /* 0x37 */
+
+    case gcSHADER_SAMPLER_2D_MS:                   return "gcSHADER_SAMPLER_2D_MS";                 /* 0x38 */
+    case gcSHADER_ISAMPLER_2D_MS:                  return "gcSHADER_ISAMPLER_2D_MS";                /* 0x39 */
+    case gcSHADER_USAMPLER_2D_MS:                  return "gcSHADER_USAMPLER_2D_MS";                /* 0x3A */
+    case gcSHADER_SAMPLER_2D_MS_ARRAY:             return "gcSHADER_SAMPLER_2D_MS_ARRAY";           /* 0x3B */
+    case gcSHADER_ISAMPLER_2D_MS_ARRAY:            return "gcSHADER_ISAMPLER_2D_MS_ARRAY";          /* 0x3C */
+    case gcSHADER_USAMPLER_2D_MS_ARRAY:            return "gcSHADER_USAMPLER_2D_MS_ARRAY";          /* 0x3D */
+
+    case gcSHADER_IMAGE_2D:                        return "gcSHADER_IMAGE_2D";                      /* 0x3E */
+    case gcSHADER_IIMAGE_2D:                       return "gcSHADER_IIMAGE_2D";                     /* 0x3F */
+    case gcSHADER_UIMAGE_2D:                       return "gcSHADER_UIMAGE_2D";                     /* 0x40 */
+    case gcSHADER_IMAGE_3D:                        return "gcSHADER_IMAGE_3D";                      /* 0x41 */
+    case gcSHADER_IIMAGE_3D:                       return "gcSHADER_IIMAGE_3D";                     /* 0x42 */
+    case gcSHADER_UIMAGE_3D:                       return "gcSHADER_UIMAGE_3D";                     /* 0x43 */
+    case gcSHADER_IMAGE_CUBE:                      return "gcSHADER_IMAGE_CUBE";                    /* 0x44 */
+    case gcSHADER_IIMAGE_CUBE:                     return "gcSHADER_IIMAGE_CUBE";                   /* 0x45 */
+    case gcSHADER_UIMAGE_CUBE:                     return "gcSHADER_UIMAGE_CUBE";                   /* 0x46 */
+    case gcSHADER_IMAGE_2D_ARRAY:                  return "gcSHADER_IMAGE_2D_ARRAY";                /* 0x47 */
+    case gcSHADER_IIMAGE_2D_ARRAY:                 return "gcSHADER_IIMAGE_2D_ARRAY";               /* 0x48 */
+    case gcSHADER_UIMAGE_2D_ARRAY:                 return "gcSHADER_UIMAGE_2D_ARRAY";               /* 0x49 */
+    case gcSHADER_VIV_GENERIC_GL_IMAGE:            return "gcSHADER_VIV_GENERIC_GL_IMAGE";          /* 0x4A */
+
+    case gcSHADER_ATOMIC_UINT:                     return "gcSHADER_ATOMIC_UINT";                   /* 0x4B */
+
+    /* GL_EXT_texture_cube_map_array */
+    case gcSHADER_SAMPLER_CUBEMAP_ARRAY:           return "gcSHADER_SAMPLER_CUBEMAP_ARRAY";         /* 0x4C */
+    case gcSHADER_SAMPLER_CUBEMAP_ARRAY_SHADOW:    return "gcSHADER_SAMPLER_CUBEMAP_ARRAY_SHADOW";  /* 0x4D */
+    case gcSHADER_ISAMPLER_CUBEMAP_ARRAY:          return "gcSHADER_ISAMPLER_CUBEMAP_ARRAY";        /* 0x4E */
+    case gcSHADER_USAMPLER_CUBEMAP_ARRAY:          return "gcSHADER_USAMPLER_CUBEMAP_ARRAY";        /* 0x4F */
+    case gcSHADER_IMAGE_CUBEMAP_ARRAY:             return "gcSHADER_IMAGE_CUBEMAP_ARRAY";           /* 0x50 */
+    case gcSHADER_IIMAGE_CUBEMAP_ARRAY:            return "gcSHADER_IIMAGE_CUBEMAP_ARRAY";          /* 0x51 */
+    case gcSHADER_UIMAGE_CUBEMAP_ARRAY:            return "gcSHADER_UIMAGE_CUBEMAP_ARRAY";          /* 0x52 */
+
+    case gcSHADER_INT64_X1:                        return "gcSHADER_INT64_X1";                      /* 0x53 */
+    case gcSHADER_INT64_X2:                        return "gcSHADER_INT64_X2";                      /* 0x54 */
+    case gcSHADER_INT64_X3:                        return "gcSHADER_INT64_X3";                      /* 0x55 */
+    case gcSHADER_INT64_X4:                        return "gcSHADER_INT64_X4";                      /* 0x56 */
+    case gcSHADER_UINT64_X1:                       return "gcSHADER_UINT64_X1";                     /* 0x57 */
+    case gcSHADER_UINT64_X2:                       return "gcSHADER_UINT64_X2";                     /* 0x58 */
+    case gcSHADER_UINT64_X3:                       return "gcSHADER_UINT64_X3";                     /* 0x59 */
+    case gcSHADER_UINT64_X4:                       return "gcSHADER_UINT64_X4";                     /* 0x5A */
+
+    /* texture buffer extension type. */
+    case gcSHADER_SAMPLER_BUFFER:                  return "gcSHADER_SAMPLER_BUFFER";                /* 0x5B */
+    case gcSHADER_ISAMPLER_BUFFER:                 return "gcSHADER_ISAMPLER_BUFFER";               /* 0x5C */
+    case gcSHADER_USAMPLER_BUFFER:                 return "gcSHADER_USAMPLER_BUFFER";               /* 0x5D */
+    case gcSHADER_IMAGE_BUFFER:                    return "gcSHADER_IMAGE_BUFFER";                  /* 0x5E */
+    case gcSHADER_IIMAGE_BUFFER:                   return "gcSHADER_IIMAGE_BUFFER";                 /* 0x5F */
+    case gcSHADER_UIMAGE_BUFFER:                   return "gcSHADER_UIMAGE_BUFFER";                 /* 0x60 */
+    case gcSHADER_VIV_GENERIC_GL_SAMPLER:          return "gcSHADER_VIV_GENERIC_GL_SAMPLER";        /* 0x61 */
+
+    /* float16 */
+    case gcSHADER_FLOAT16_X1:                      return "gcSHADER_FLOAT16_X1";                    /* 0x62 half2 */
+    case gcSHADER_FLOAT16_X2:                      return "gcSHADER_FLOAT16_X2";                    /* 0x63 half2 */
+    case gcSHADER_FLOAT16_X3:                      return "gcSHADER_FLOAT16_X3";                    /* 0x64 half3 */
+    case gcSHADER_FLOAT16_X4:                      return "gcSHADER_FLOAT16_X4";                    /* 0x65 half4 */
+    case gcSHADER_FLOAT16_X8:                      return "gcSHADER_FLOAT16_X8";                    /* 0x66 half8 */
+    case gcSHADER_FLOAT16_X16:                     return "gcSHADER_FLOAT16_X16";                   /* 0x67 half16 */
+    case gcSHADER_FLOAT16_X32:                     return "gcSHADER_FLOAT16_X32";                   /* 0x68 half32 */
+
+    /*  boolean  */
+    case gcSHADER_BOOLEAN_X8:                      return "gcSHADER_BOOLEAN_X8";                    /* 0x69 */
+    case gcSHADER_BOOLEAN_X16:                     return "gcSHADER_BOOLEAN_X16";                   /* 0x6A */
+    case gcSHADER_BOOLEAN_X32:                     return "gcSHADER_BOOLEAN_X32";                   /* 0x6B */
+
+    /* uchar vectors  */
+    case gcSHADER_UINT8_X1:                        return "gcSHADER_UINT8_X1";                      /* 0x6C */
+    case gcSHADER_UINT8_X2:                        return "gcSHADER_UINT8_X2";                      /* 0x6D */
+    case gcSHADER_UINT8_X3:                        return "gcSHADER_UINT8_X3";                      /* 0x6E */
+    case gcSHADER_UINT8_X4:                        return "gcSHADER_UINT8_X4";                      /* 0x6F */
+    case gcSHADER_UINT8_X8:                        return "gcSHADER_UINT8_X8";                      /* 0x70 */
+    case gcSHADER_UINT8_X16:                       return "gcSHADER_UINT8_X16";                     /* 0x71 */
+    case gcSHADER_UINT8_X32:                       return "gcSHADER_UINT8_X32";                     /* 0x72 */
+
+    /* char vectors  */
+    case gcSHADER_INT8_X1:                         return "gcSHADER_INT8_X1";                       /* 0x73 */
+    case gcSHADER_INT8_X2:                         return "gcSHADER_INT8_X2";                       /* 0x74 */
+    case gcSHADER_INT8_X3:                         return "gcSHADER_INT8_X3";                       /* 0x75 */
+    case gcSHADER_INT8_X4:                         return "gcSHADER_INT8_X4";                       /* 0x76 */
+    case gcSHADER_INT8_X8:                         return "gcSHADER_INT8_X8";                       /* 0x77 */
+    case gcSHADER_INT8_X16:                        return "gcSHADER_INT8_X16";                      /* 0x78 */
+    case gcSHADER_INT8_X32:                        return "gcSHADER_INT8_X32";                      /* 0x79 */
+
+    /* ushort vectors */
+    case gcSHADER_UINT16_X1:                       return "gcSHADER_UINT16_X1";                     /* 0x7A */
+    case gcSHADER_UINT16_X2:                       return "gcSHADER_UINT16_X2";                     /* 0x7B */
+    case gcSHADER_UINT16_X3:                       return "gcSHADER_UINT16_X3";                     /* 0x7C */
+    case gcSHADER_UINT16_X4:                       return "gcSHADER_UINT16_X4";                     /* 0x7D */
+    case gcSHADER_UINT16_X8:                       return "gcSHADER_UINT16_X8";                     /* 0x7E */
+    case gcSHADER_UINT16_X16:                      return "gcSHADER_UINT16_X16";                    /* 0x7F */
+    case gcSHADER_UINT16_X32:                      return "gcSHADER_UINT16_X32";                    /* 0x80 */
+
+    /* short vectors */
+    case gcSHADER_INT16_X1:                        return "gcSHADER_INT16_X1";                      /* 0x81 */
+    case gcSHADER_INT16_X2:                        return "gcSHADER_INT16_X2";                      /* 0x82 */
+    case gcSHADER_INT16_X3:                        return "gcSHADER_INT16_X3";                      /* 0x83 */
+    case gcSHADER_INT16_X4:                        return "gcSHADER_INT16_X4";                      /* 0x84 */
+    case gcSHADER_INT16_X8:                        return "gcSHADER_INT16_X8";                      /* 0x85 */
+    case gcSHADER_INT16_X16:                       return "gcSHADER_INT16_X16";                     /* 0x86 */
+    case gcSHADER_INT16_X32:                       return "gcSHADER_INT16_X32";                     /* 0x87 */
+
+    /* packed data type */
+    /* packed float16 (2 bytes per element) */
+    case gcSHADER_FLOAT16_P2:                      return "gcSHADER_FLOAT16_P2";                    /* 0x88 half2 */
+    case gcSHADER_FLOAT16_P3:                      return "gcSHADER_FLOAT16_P3";                    /* 0x89 half3 */
+    case gcSHADER_FLOAT16_P4:                      return "gcSHADER_FLOAT16_P4";                    /* 0x8A half4 */
+    case gcSHADER_FLOAT16_P8:                      return "gcSHADER_FLOAT16_P8";                    /* 0x8B half8 */
+    case gcSHADER_FLOAT16_P16:                     return "gcSHADER_FLOAT16_P16";                   /* 0x8C half16 */
+    case gcSHADER_FLOAT16_P32:                     return "gcSHADER_FLOAT16_P32";                   /* 0x8D half32 */
+
+    /* packed boolean (1 byte per element) */
+    case gcSHADER_BOOLEAN_P2:                      return "gcSHADER_BOOLEAN_P2";                    /* 0x8E bool2 bvec2 */
+    case gcSHADER_BOOLEAN_P3:                      return "gcSHADER_BOOLEAN_P3";                    /* 0x8F */
+    case gcSHADER_BOOLEAN_P4:                      return "gcSHADER_BOOLEAN_P4";                    /* 0x90 */
+    case gcSHADER_BOOLEAN_P8:                      return "gcSHADER_BOOLEAN_P8";                    /* 0x91 */
+    case gcSHADER_BOOLEAN_P16:                     return "gcSHADER_BOOLEAN_P16";                   /* 0x92 */
+    case gcSHADER_BOOLEAN_P32:                     return "gcSHADER_BOOLEAN_P32";                   /* 0x93 */
+
+    /* uchar vectors (1 byte per element) */
+    case gcSHADER_UINT8_P2:                        return "gcSHADER_UINT8_P2";                      /* 0x94 */
+    case gcSHADER_UINT8_P3:                        return "gcSHADER_UINT8_P3";                      /* 0x95 */
+    case gcSHADER_UINT8_P4:                        return "gcSHADER_UINT8_P4";                      /* 0x96 */
+    case gcSHADER_UINT8_P8:                        return "gcSHADER_UINT8_P8";                      /* 0x97 */
+    case gcSHADER_UINT8_P16:                       return "gcSHADER_UINT8_P16";                     /* 0x98 */
+    case gcSHADER_UINT8_P32:                       return "gcSHADER_UINT8_P32";                     /* 0x99 */
+
+    /* char vectors (1 byte per element) */
+    case gcSHADER_INT8_P2:                         return "gcSHADER_INT8_P2";                       /* 0x9A */
+    case gcSHADER_INT8_P3:                         return "gcSHADER_INT8_P3";                       /* 0x9B */
+    case gcSHADER_INT8_P4:                         return "gcSHADER_INT8_P4";                       /* 0x9C */
+    case gcSHADER_INT8_P8:                         return "gcSHADER_INT8_P8";                       /* 0x9D */
+    case gcSHADER_INT8_P16:                        return "gcSHADER_INT8_P16";                      /* 0x9E */
+    case gcSHADER_INT8_P32:                        return "gcSHADER_INT8_P32";                      /* 0x9F */
+
+    /* ushort vectors (2 bytes per element) */
+    case gcSHADER_UINT16_P2:                       return "gcSHADER_UINT16_P2";                     /* 0xA0 */
+    case gcSHADER_UINT16_P3:                       return "gcSHADER_UINT16_P3";                     /* 0xA1 */
+    case gcSHADER_UINT16_P4:                       return "gcSHADER_UINT16_P4";                     /* 0xA2 */
+    case gcSHADER_UINT16_P8:                       return "gcSHADER_UINT16_P8";                     /* 0xA3 */
+    case gcSHADER_UINT16_P16:                      return "gcSHADER_UINT16_P16";                    /* 0xA4 */
+    case gcSHADER_UINT16_P32:                      return "gcSHADER_UINT16_P32";                    /* 0xA5 */
+
+    /* short vectors (2 bytes per element) */
+    case gcSHADER_INT16_P2:                        return "gcSHADER_INT16_P2";                      /* 0xA6 */
+    case gcSHADER_INT16_P3:                        return "gcSHADER_INT16_P3";                      /* 0xA7 */
+    case gcSHADER_INT16_P4:                        return "gcSHADER_INT16_P4";                      /* 0xA8 */
+    case gcSHADER_INT16_P8:                        return "gcSHADER_INT16_P8";                      /* 0xA9 */
+    case gcSHADER_INT16_P16:                       return "gcSHADER_INT16_P16";                     /* 0xAA */
+    case gcSHADER_INT16_P32:                       return "gcSHADER_INT16_P32";                     /* 0xAB */
+
+    case gcSHADER_INTEGER_X8:                      return "gcSHADER_INTEGER_X8";                    /* 0xAC */
+    case gcSHADER_INTEGER_X16:                     return "gcSHADER_INTEGER_X16";                   /* 0xAD */
+    case gcSHADER_UINT_X8:                         return "gcSHADER_UINT_X8";                       /* 0xAE */
+    case gcSHADER_UINT_X16:                        return "gcSHADER_UINT_X16";                      /* 0xAF */
+    case gcSHADER_FLOAT_X8:                        return "gcSHADER_FLOAT_X8";                      /* 0xB0 */
+    case gcSHADER_FLOAT_X16:                       return "gcSHADER_FLOAT_X16";                     /* 0xB1 */
+    case gcSHADER_INT64_X8:                        return "gcSHADER_INT64_X8";                      /* 0xB2 */
+    case gcSHADER_INT64_X16:                       return "gcSHADER_INT64_X16";                     /* 0xB3 */
+    case gcSHADER_UINT64_X8:                       return "gcSHADER_UINT64_X8";                     /* 0xB4 */
+    case gcSHADER_UINT64_X16:                      return "gcSHADER_UINT64_X16";                    /* 0xB5 */
 
     default:
     gcmASSERT(0);
@@ -1879,37 +1996,6 @@ OUT gcATTRIBUTE * Attribute
 }
 
 static gceSTATUS
-_AddUniform(
-IN cloCOMPILER Compiler,
-IN gctCONST_STRING Name,
-IN gcSHADER_TYPE Type,
-IN gceUNIFORM_FLAGS Flags,
-IN gcSL_FORMAT Format,
-IN gctBOOL IsPointer,
-IN gctSIZE_T Length,
-OUT gcUNIFORM * Uniform
-)
-{
-    gceSTATUS status;
-    gcSHADER binary;
-
-    gcmASSERT(Uniform);
-    gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
-    gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
-                      clvDUMP_CODE_EMITTER,
-                      "gcSHADER_AddUniform(Shader, \"%s\", %s, %d);",
-                      Name,
-                      gcGetShaderDataTypeName(Type),
-                      Length));
-    status = gcSHADER_AddUniform(binary, Name, Type, Length, gcSHADER_PRECISION_DEFAULT, Uniform);
-    if(gcmIS_ERROR(status)) return status;
-
-    SetUniformFlag(*Uniform, Flags);
-
-    return gcUNIFORM_SetFormat(*Uniform, Format, IsPointer);
-}
-
-static gceSTATUS
 _AddOutput(
 IN cloCOMPILER Compiler,
 IN gctCONST_STRING Name,
@@ -1935,7 +2021,7 @@ IN gctREG_INDEX TempRegister
                                           gcSHADER_PRECISION_DEFAULT,
                                           Length > 1,
                                           Length,
-                                          (gctUINT16)TempRegister,
+                                          TempRegister,
                                           gcSHADER_SHADER_DEFAULT,
                                           gcSHADER_GetOutputDefaultLocation(binary),
                                           -1,
@@ -1964,76 +2050,7 @@ IN gctREG_INDEX TempIndex
                       Name,
                       Index,
                       TempIndex));
-    return gcSHADER_AddOutputIndexed(binary, Name, Index, (gctUINT16)TempIndex);
-}
-
-static gceSTATUS
-_AddVariable(
-IN cloCOMPILER Compiler,
-IN gctCONST_STRING Name,
-IN gctTYPE_QUALIFIER Qualifier,
-IN gcSHADER_TYPE Type,
-IN gctSIZE_T Length,
-IN gctBOOL   IsArray,
-IN gctREG_INDEX TempRegister,
-OUT gcVARIABLE *Variable
-)
-{
-    gceSTATUS    status;
-    gcSHADER     binary;
-    gctINT16     varIndex;
-    gctINT       arrayLengthCount;
-
-    gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
-    gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
-                      clvDUMP_CODE_EMITTER,
-                      "gcSHADER_AddVariableEx(Shader, \"%s\", %s, %d, %d);",
-                      Name,
-                      gcGetShaderDataTypeName(Type),
-                      Length,
-                      TempRegister));
-
-    if (IsArray || Length > 1)
-    {
-        arrayLengthCount = 1;
-    }
-    else
-    {
-        arrayLengthCount = 0;
-    }
-
-    status = gcSHADER_AddVariableEx(binary,
-                                        Name,
-                                        Type,
-                                        arrayLengthCount,
-                                        (gctINT *)(&Length),
-                                        (gctUINT16)TempRegister,
-                                        gcSHADER_VAR_CATEGORY_NORMAL,
-                                        gcSHADER_PRECISION_DEFAULT,
-                                        0,
-                                        -1,
-                                        -1,
-                                        &varIndex);
-    if (gcmIS_ERROR(status)) {
-        cloCOMPILER_Report(Compiler,
-                           0,
-                           0,
-                           clvREPORT_INTERNAL_ERROR,
-                           "failed to add variable");
-        return status;
-    }
-
-    if(Variable) {
-        status = gcSHADER_GetVariable(binary,
-                                      varIndex,
-                                      Variable);
-        if (gcmIS_ERROR(status)) return status;
-    }
-
-    return gcSHADER_UpdateVariable(binary,
-                                   varIndex,
-                                   gcvVARIABLE_UPDATE_TYPE_QUALIFIER,
-                                   Qualifier);
+    return gcSHADER_AddOutputIndexed(binary, Name, Index, TempIndex);
 }
 
 static gceSTATUS
@@ -2059,7 +2076,7 @@ _AddOpcode(
                                   _GetEnableName(Enable, buf),
                                   _GetFormatName(Format)));
 
-    return gcSHADER_AddOpcode(binary, Opcode, (gctUINT16)TempRegister, Enable, Format, gcSHADER_PRECISION_DEFAULT, SrcLoc);
+    return gcSHADER_AddOpcode(binary, Opcode, TempRegister, Enable, Format, gcSHADER_PRECISION_DEFAULT, SrcLoc);
 }
 
 static gceSTATUS
@@ -2087,7 +2104,7 @@ _AddOpcodeCondition(
                                   _GetEnableName(Enable, buf),
                                   _GetFormatName(Format)));
 
-    return gcSHADER_AddOpcode2(binary, Opcode, Condition, (gctUINT16)TempRegister, Enable, Format, gcSHADER_PRECISION_DEFAULT, SrcLoc);
+    return gcSHADER_AddOpcode2(binary, Opcode, Condition, TempRegister, Enable, Format, gcSHADER_PRECISION_DEFAULT, SrcLoc);
 }
 
 static gceSTATUS
@@ -2117,7 +2134,7 @@ _AddOpcodeIndexed(
                                  IndexRegister,
                                  _GetFormatName(Format)));
 
-    return gcSHADER_AddOpcodeIndexed(binary, Opcode, (gctUINT16)TempRegister, Enable, Mode, (gctUINT16)IndexRegister, Format, gcSHADER_PRECISION_DEFAULT, SrcLoc);
+    return gcSHADER_AddOpcodeIndexed(binary, Opcode, TempRegister, Enable, Mode, (gctUINT16)IndexRegister, Format, gcSHADER_PRECISION_DEFAULT, SrcLoc);
 }
 
 static gceSTATUS
@@ -2149,7 +2166,7 @@ _AddOpcodeConditionIndexed(
                                  IndexRegister,
                                  _GetFormatName(Format)));
 
-    return gcSHADER_AddOpcodeConditionIndexed(binary, Opcode, Condition, (gctUINT16)TempRegister, Enable, Mode,
+    return gcSHADER_AddOpcodeConditionIndexed(binary, Opcode, Condition, TempRegister, Enable, Mode,
                                               (gctUINT16)IndexRegister, Format, gcSHADER_PRECISION_DEFAULT, SrcLoc);
 }
 
@@ -2600,7 +2617,7 @@ _AddFunctionArgument(
                                 _GetEnableName(Enable, buf),
                                 _GetQualifierName((gceINPUT_OUTPUT) Qualifier)));
 
-    return gcFUNCTION_AddArgument(Function, VariableIndex, (gctUINT16)TempIndex, Enable, Qualifier, gcSHADER_PRECISION_DEFAULT, gcvFALSE);
+    return gcFUNCTION_AddArgument(Function, VariableIndex, TempIndex, Enable, Qualifier, gcSHADER_PRECISION_DEFAULT, gcvFALSE);
 }
 
 static gceSTATUS
@@ -2622,7 +2639,7 @@ _AddKernelFunctionArgument(
                       _GetEnableName(Enable, buf),
                       _GetQualifierName((gceINPUT_OUTPUT) Qualifier)));
 
-    return gcKERNEL_FUNCTION_AddArgument(Function, VariableIndex, (gctUINT16)TempIndex, Enable, Qualifier);
+    return gcKERNEL_FUNCTION_AddArgument(Function, VariableIndex, TempIndex, Enable, Qualifier);
 }
 
 gceSTATUS
@@ -2714,7 +2731,12 @@ clsGEN_CODE_DATA_TYPE DataType
     case clvTYPE_IMAGE1D_ARRAY_T:
     case clvTYPE_IMAGE1D_BUFFER_T:
     case clvTYPE_IMAGE2D_ARRAY_T:
+    case clvTYPE_VIV_GENERIC_GL_SAMPLER:
+    case clvTYPE_VIV_GENERIC_IMAGE_T:
         return gcSL_UINT32;
+
+    case clvTYPE_VIV_GENERIC_GL_IMAGE:
+        return gcSL_UINT64;
 
     case clvTYPE_SAMPLER2D:
     case clvTYPE_SAMPLER3D:
@@ -3138,6 +3160,8 @@ _EmitSource(
             gctFLOAT floatConstant[1];
             gctINT32 intConstant[1];
             gctUINT32 uintConstant[1];
+            gctINT64 longConstant[1];
+            gctUINT64 ulongConstant[1];
             gcSL_FORMAT format;
             cltELEMENT_TYPE elementType;
 
@@ -3154,12 +3178,28 @@ _EmitSource(
             }
             else if(clmIsElementTypeInteger(elementType)) {
                 if(clmIsElementTypeUnsigned(elementType)) {
-                    uintConstant[0] = Source->u.sourceConstant.uintValue;
-                    constantPtr = (void *)uintConstant;
+                    if (format == gcSL_UINT64)
+                    {
+                        ulongConstant[0] = Source->u.sourceConstant.ulongValue;
+                        constantPtr = (void *)ulongConstant;
+                    }
+                    else
+                    {
+                        uintConstant[0] = Source->u.sourceConstant.uintValue;
+                        constantPtr = (void *)uintConstant;
+                    }
                 }
                 else {
-                    intConstant[0] = Source->u.sourceConstant.intValue;
-                    constantPtr = (void *)intConstant;
+                    if (format == gcSL_INT64)
+                    {
+                        longConstant[0] = Source->u.sourceConstant.longValue;
+                        constantPtr = (void *)longConstant;
+                    }
+                    else
+                    {
+                        intConstant[0] = Source->u.sourceConstant.intValue;
+                        constantPtr = (void *)intConstant;
+                    }
                 }
             }
             else if(clmIsElementTypeEvent(elementType) ||
@@ -3271,22 +3311,26 @@ clsNAME *ParamName
 )
 {
    switch(Flags) {
-   case    clvBUILTIN_KERNEL_ARG:
+   case clvBUILTIN_KERNEL_ARG:
       if(ParamName) {
-        if(ParamName->decl.dataType->addrSpaceQualifier == clvQUALIFIER_CONSTANT) {
-           return gcvUNIFORM_KIND_KERNEL_ARG_CONSTANT;
-        }
-        else if(ParamName->decl.dataType->addrSpaceQualifier == clvQUALIFIER_LOCAL) {
-           return gcvUNIFORM_KIND_KERNEL_ARG_LOCAL;
-        }
-        else if((ParamName->decl.dataType->addrSpaceQualifier == clvQUALIFIER_NONE
-             || ParamName->decl.dataType->addrSpaceQualifier == clvQUALIFIER_PRIVATE)
-             && ParamName->u.variableInfo.isAddressed) {
-           return gcvUNIFORM_KIND_KERNEL_ARG_PRIVATE;
-        }
-        if(ParamName->decl.dataType->elementType == clvTYPE_SAMPLER_T) {
-           return gcvUNIFORM_KIND_KERNEL_ARG_SAMPLER;
-        }
+          cltQUALIFIER addrSpaceQualifier;
+
+          addrSpaceQualifier = clGetAddrSpaceQualifier(&ParamName->decl);
+
+          if(addrSpaceQualifier == clvQUALIFIER_CONSTANT) {
+             return gcvUNIFORM_KIND_KERNEL_ARG_CONSTANT;
+          }
+          else if(addrSpaceQualifier == clvQUALIFIER_LOCAL) {
+             return gcvUNIFORM_KIND_KERNEL_ARG_LOCAL;
+          }
+          else if((addrSpaceQualifier == clvQUALIFIER_NONE
+               || addrSpaceQualifier == clvQUALIFIER_PRIVATE)
+               && ParamName->u.variableInfo.isAddressed) {
+             return gcvUNIFORM_KIND_KERNEL_ARG_PRIVATE;
+          }
+          if(ParamName->decl.dataType->elementType == clvTYPE_SAMPLER_T) {
+             return gcvUNIFORM_KIND_KERNEL_ARG_SAMPLER;
+          }
       }
       return gcvUNIFORM_KIND_KERNEL_ARG;
 
@@ -3295,6 +3339,9 @@ clsNAME *ParamName
 
    case clvBUILTIN_GLOBAL_SIZE:
       return gcvUNIFORM_KIND_GLOBAL_SIZE;
+
+   case clvBUILTIN_GLOBAL_WORK_SCALE:
+       return gcvUNIFORM_KIND_GLOBAL_WORK_SCALE;
 
    case    clvBUILTIN_LOCAL_SIZE:
       return gcvUNIFORM_KIND_LOCAL_SIZE;
@@ -3323,7 +3370,7 @@ clsNAME *ParamName
    case clvBUILTIN_WORKITEM_PRINTF_BUFFER_SIZE:
        return gcvUNIFORM_KIND_WORKITEM_PRINTF_BUFFER_SIZE;
    }
-   return 0;
+   return gcvUNIFORM_KIND_NONE;
 }
 
 gceSTATUS
@@ -3337,6 +3384,7 @@ clNewUniform(
     IN gctUINT Flags,
     IN gctBOOL IsPointer,
     IN gctSIZE_T Length,
+    IN clsARRAY *Array,
     OUT gcUNIFORM * Uniform
     )
 {
@@ -3345,12 +3393,15 @@ clNewUniform(
     gcSL_FORMAT format;
     gcsTYPE_SIZE typeSize;
     gcSHADER_TYPE type;
+    gcSHADER binary;
+    gctINT length;
 
     typeSize = clConvToShaderDataType(Compiler, DataType);
     type = typeSize.type;
     format = clConvDataTypeToFormat(Format);
     flags = _GetUniformFlags(Flags, gcvNULL);
 
+    length = Length * typeSize.length;
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                       clvDUMP_CODE_EMITTER,
                       "<UNIFORM line=\"%d\" string=\"%d\" name=\"%s\""
@@ -3360,28 +3411,70 @@ clNewUniform(
                       Name,
                       gcGetShaderDataTypeName(type),
                       _GetFormatName(format),
-                      Length * typeSize.length));
+                      length));
 
-    status = _AddUniform(Compiler,
-                         Name,
-                         type,
-                         flags,
-                         format,
-                         IsPointer,
-                         Length * typeSize.length,
-                         Uniform);
+    gcmASSERT(Uniform);
+    gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
+    gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
+                      clvDUMP_CODE_EMITTER,
+                      "gcSHADER_AddUniform(Shader, \"%s\", %s, %d);",
+                      Name,
+                      gcGetShaderDataTypeName(type),
+                      length));
 
+    status = gcSHADER_AddUniform(binary,
+                                 Name,
+                                 type,
+                                 length,
+                                 gcSHADER_PRECISION_DEFAULT,
+                                 Uniform);
     if (gcmIS_ERROR(status)) {
         gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                        LineNo,
-                        StringNo,
-                        clvREPORT_INTERNAL_ERROR,
-                        "failed to add the uniform"));
-
+                                        LineNo,
+                                        StringNo,
+                                        clvREPORT_INTERNAL_ERROR,
+                                        "failed to add the uniform"));
         return status;
     }
 
+    /* update arrayLengthCount and arrayLengthList. */
+    if (Array && Array->numDim)
+    {
+        gctPOINTER pointer;
+        clsARRAY array = *Array;
+
+        /* Put the compiler-generated array length to the bottom of arrayLengthList. */
+        if (typeSize.length > 1)
+        {
+            gcmASSERT(Array->numDim < cldMAX_ARRAY_DIMENSION);
+            array.length[Array->numDim] = typeSize.length;
+            array.numDim = Array->numDim + 1;
+        }
+
+        if ((*Uniform)->arrayLengthList != gcvNULL)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, (*Uniform)->arrayLengthList);
+        }
+
+        (*Uniform)->arrayLengthCount = array.numDim;
+        status = gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctINT) * array.numDim, &pointer);
+        if(gcmIS_ERROR(status)) return status;
+
+        gcoOS_MemCopy(pointer,
+                      array.length,
+                      gcmSIZEOF(gctINT) * array.numDim);
+        (*Uniform)->arrayLengthList = (gctINT *)pointer;
+    }
+    else
+    {
+        ResetUniformFlag(*Uniform, gcvUNIFORM_FLAG_IS_ARRAY);
+    }
+
+    SetUniformFlag(*Uniform, flags);
+
     SetUniformVectorSize(*Uniform, clmGEN_CODE_vectorSize_GET(Format));
+    status = gcUNIFORM_SetFormat(*Uniform, format, IsPointer);
+    if(gcmIS_ERROR(status)) return status;
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                     clvDUMP_CODE_EMITTER,
@@ -3436,6 +3529,7 @@ clNewKernelUniformArgument(
     IN clsGEN_CODE_DATA_TYPE Format,
     IN clsNAME *ParamName,
     IN gctSIZE_T Length,
+    IN clsARRAY *Array,
     OUT gcUNIFORM * UniformArgument
     )
 {
@@ -3481,6 +3575,39 @@ clNewKernelUniformArgument(
                                         "failed to add the kernel uniform argument"));
 
         return status;
+    }
+
+    /* update arrayLengthCount and arrayLengthList. */
+    if (Array && Array->numDim)
+    {
+        gctPOINTER pointer;
+        clsARRAY array = *Array;
+
+        /* Put the compiler-generated array length to the bottom of arrayLengthList. */
+        if (typeSize.length > 1)
+        {
+            gcmASSERT(Array->numDim < cldMAX_ARRAY_DIMENSION);
+            array.length[Array->numDim] = typeSize.length;
+            array.numDim = Array->numDim + 1;
+        }
+
+        if ((*UniformArgument)->arrayLengthList != gcvNULL)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, (*UniformArgument)->arrayLengthList);
+        }
+
+        (*UniformArgument)->arrayLengthCount = array.numDim;
+        status = gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctINT) * array.numDim, &pointer);
+        if(gcmIS_ERROR(status)) return status;
+
+        gcoOS_MemCopy(pointer,
+                      array.length,
+                      gcmSIZEOF(gctINT) * array.numDim);
+        (*UniformArgument)->arrayLengthList = (gctINT *)pointer;
+    }
+    else
+    {
+        ResetUniformFlag(*UniformArgument, gcvUNIFORM_FLAG_IS_ARRAY);
     }
 
     SetUniformVectorSize(*UniformArgument, clmGEN_CODE_vectorSize_GET(Format));
@@ -3645,6 +3772,7 @@ IN cltQUALIFIER AddrSpaceQualifier,
 IN cltQUALIFIER StorageQualifier,
 IN clsGEN_CODE_DATA_TYPE DataType,
 IN gctSIZE_T Length,
+IN clsARRAY *Array,
 IN gctBOOL   IsArray,
 IN gctREG_INDEX TempRegIndex,
 OUT gcVARIABLE *Variable
@@ -3653,9 +3781,15 @@ OUT gcVARIABLE *Variable
     gceSTATUS status;
     gcsTYPE_SIZE typeSize;
     gcSHADER_TYPE type;
+    clsARRAY     array;
+    gcSHADER     binary;
+    gctUINT16     varIndex;
+    gcVARIABLE   variable;
+    gctINT       length;
 
     typeSize = clConvToShaderDataType(Compiler, DataType);
     type = typeSize.type;
+    length = Length * typeSize.length;
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                       clvDUMP_CODE_EMITTER,
                       "<VARIABLE line=\"%d\" string=\"%d\" name=\"%s\" "
@@ -3664,28 +3798,76 @@ OUT gcVARIABLE *Variable
                       StringNo,
                       Name,
                       gcGetShaderDataTypeName(type),
-                      Length * typeSize.length,
+                      length,
                       TempRegIndex));
 
-    status = _AddVariable(Compiler,
-                          Name,
-                          clConvToShaderTypeQualifier(AccessQualifier) |
-                          clConvToShaderTypeQualifier(AddrSpaceQualifier) |
-                          clConvStorageQualifierToShaderTypeQualifier(StorageQualifier),
-                          type,
-                          Length * typeSize.length,
-                          IsArray,
-                          TempRegIndex,
-                          Variable);
+    gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
+    gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
+                      clvDUMP_CODE_EMITTER,
+                      "gcSHADER_AddVariableEx(Shader, \"%s\", %s, %d, %d);",
+                      Name,
+                      gcGetShaderDataTypeName(type),
+                      length,
+                      TempRegIndex));
 
+    if (IsArray)
+    {
+        if(Array) {
+            array = *Array;
+            if(typeSize.length > 1) {
+                array.length[Array->numDim] = typeSize.length;
+                array.numDim = Array->numDim + 1;
+            }
+        }
+        else {
+            array.numDim = 1;
+            array.length[0] = length;
+        }
+    }
+    else
+    {
+        array.numDim = -1;
+        array.length[0] = length;
+    }
+
+    status = gcSHADER_AddVariableEx(binary,
+                                    Name,
+                                    type,
+                                    array.numDim,
+                                    (gctINT *)array.length,
+                                    TempRegIndex,
+                                    gcSHADER_VAR_CATEGORY_NORMAL,
+                                    gcSHADER_PRECISION_DEFAULT,
+                                    0,
+                                    -1,
+                                    -1,
+                                    (gctINT16*)&varIndex);
     if (gcmIS_ERROR(status)) {
-        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                            LineNo,
-                            StringNo,
-                            clvREPORT_INTERNAL_ERROR,
-                            "failed to add the variable"));
+        cloCOMPILER_Report(Compiler,
+                           LineNo,
+                           StringNo,
+                           clvREPORT_INTERNAL_ERROR,
+                           "failed to add variable");
         return status;
     }
+    status = gcSHADER_GetVariable(binary,
+                                  varIndex,
+                                  &variable);
+    if (gcmIS_ERROR(status)) return status;
+    if(typeSize.length > 1 && clmGEN_CODE_IsExtendedVectorType(DataType)) {
+        SetVariableFlag(variable, gceVARFLAG_IS_EXTENDED_VECTOR);
+    }
+    if(Variable) {
+        *Variable = variable;
+    }
+
+    status = gcSHADER_UpdateVariable(binary,
+                                     varIndex,
+                                     gcvVARIABLE_UPDATE_TYPE_QUALIFIER,
+                                     clConvToShaderTypeQualifier(AccessQualifier) |
+                                     clConvToShaderTypeQualifier(AddrSpaceQualifier) |
+                                     clConvStorageQualifierToShaderTypeQualifier(StorageQualifier));
+    if (gcmIS_ERROR(status)) return status;
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                       clvDUMP_CODE_EMITTER,
@@ -4018,6 +4200,17 @@ _PrepareSource(
     {
         insertAssign = (Source->type == gcvSOURCE_TEMP
                         && Target->tempRegIndex == Source->u.sourceReg.regIndex);
+        {
+            gctBOOL     useFullNewLinker = gcvFALSE;
+            gctBOOL     hasHalti2 = gcGetHWCaps()->hwFeatureFlags.hasHalti2;
+
+            useFullNewLinker = gcUseFullNewLinker(hasHalti2);
+
+            if (useFullNewLinker && insertAssign)
+            {
+                insertAssign = gcvFALSE;
+            }
+        }
     }
     else
     {
@@ -4080,7 +4273,7 @@ _PrepareAnotherSource(
         }
         {
             gctBOOL     useFullNewLinker = gcvFALSE;
-            gctBOOL     hasHalti2 = gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2));
+            gctBOOL     hasHalti2 = gcGetHWCaps()->hwFeatureFlags.hasHalti2;
 
             useFullNewLinker = gcUseFullNewLinker(hasHalti2);
 
@@ -4089,7 +4282,6 @@ _PrepareAnotherSource(
                 insertAssign = gcvFALSE;
             }
         }
-
     }
 
     if (insertAssign)
@@ -4138,6 +4330,10 @@ _ConvOpcode(
     case clvOPCODE_IDIV:             return gcSL_DIV;
     case clvOPCODE_MOD:              return gcSL_MOD;
 
+    case clvOPCODE_DP2:              return gcSL_DP2;
+    case clvOPCODE_DP3:              return gcSL_DP3;
+    case clvOPCODE_DP4:              return gcSL_DP4;
+
     case clvOPCODE_FADD:             return gcSL_ADD;
     case clvOPCODE_FSUB:             return gcSL_SUB;
     case clvOPCODE_FMUL:             return gcSL_MUL;
@@ -4167,6 +4363,8 @@ _ConvOpcode(
     case clvOPCODE_IMAGE_READ_3D:    return gcSL_IMAGE_RD_3D;
     case clvOPCODE_IMAGE_SAMPLER:    return gcSL_IMAGE_SAMPLER;
     case clvOPCODE_CLAMP0MAX:        return gcSL_CLAMP0MAX;
+    case clvOPCODE_CLAMPCOORD:       return gcSL_CLAMPCOORD;
+    case clvOPCODE_TEXU:             return gcSL_TEXU;
 
     case clvOPCODE_FLOAT_TO_INT:     return gcSL_F2I;
     case clvOPCODE_FLOAT_TO_UINT:    return gcSL_F2I;
@@ -4284,6 +4482,15 @@ _ConvOpcode(
     case clvOPCODE_FMA_MUL:          return gcSL_FMA_MUL;
     case clvOPCODE_FMA_ADD:          return gcSL_FMA_ADD;
 
+    case clvOPCODE_CMAD:             return gcSL_CMAD;
+    case clvOPCODE_CONJ:             return gcSL_CONJ;
+    case clvOPCODE_CMUL:             return gcSL_CMUL;
+    case clvOPCODE_CMADCJ:           return gcSL_CMADCJ;
+    case clvOPCODE_CMULCJ:           return gcSL_CMULCJ;
+    case clvOPCODE_CADDCJ:           return gcSL_CADDCJ;
+    case clvOPCODE_CSUBCJ:           return gcSL_CSUBCJ;
+
+    case clvOPCODE_GET_IMAGE_TYPE:   return gcSL_GET_IMAGE_TYPE;
     case clvOPCODE_FINDLSB:          return gcSL_FINDLSB;
     case clvOPCODE_FINDMSB:          return gcSL_FINDMSB;
     case clvOPCODE_BIT_REVERSAL:     return gcSL_BIT_REVERSAL;
@@ -5457,6 +5664,10 @@ _EmitFloatOrIntToBoolCode(
     gcmASSERT(Target);
     gcmASSERT(Source);
 
+    /*
+    ** We need to move FALSE to the target first, because the result of bool(-0.0) is 0,
+    ** if we don't move first, the result is 0x80000000, which is wrong.
+    */
     /* mov target, source */
     gcsSOURCE_InitializeBoolConstant(constSource, gcvFALSE);
 
@@ -5914,7 +6125,7 @@ _EmitNORM2Code(
                     Compiler,
                     LineNo,
                     StringNo,
-                    gcSL_MUL,
+                    gcSL_MUL_Z,
                     Target,
                     Source,
                     &intermSources[1]);
@@ -5979,7 +6190,7 @@ _EmitNORM4Code(
                     Compiler,
                     LineNo,
                     StringNo,
-                    gcSL_MUL,
+                    gcSL_MUL_Z,
                     Target,
                     Source,
                     &intermSources[1]);
@@ -8949,7 +9160,7 @@ IN clsNAME *FuncName
    status = gcKERNEL_FUNCTION_AddKernelFunctionProperties(FuncName->context.u.variable.u.kernelFunction,
                                                           gcvPROPERTY_REQD_WORK_GRP_SIZE,
                                                           3,
-                                                          (gctINT *)FuncName->u.funcInfo.reqdWorkGroupSize
+                                                          (gctINT *)FuncName->u.funcInfo.attrQualifier.reqdWorkGroupSize
                                                           );
    if(gcmIS_ERROR(status)) return status;
 
@@ -8957,7 +9168,7 @@ IN clsNAME *FuncName
    status = gcKERNEL_FUNCTION_AddKernelFunctionProperties(FuncName->context.u.variable.u.kernelFunction,
                                                           gcvPROPERTY_WORK_GRP_SIZE_HINT,
                                                           3,
-                                                          (gctINT *)FuncName->u.funcInfo.workGroupSizeHint
+                                                          (gctINT *)FuncName->u.funcInfo.attrQualifier.workGroupSizeHint
                                                           );
    if(gcmIS_ERROR(status)) return status;
 
@@ -8965,7 +9176,7 @@ IN clsNAME *FuncName
    status = gcKERNEL_FUNCTION_AddKernelFunctionProperties(FuncName->context.u.variable.u.kernelFunction,
                                                           gcvPROPERTY_KERNEL_SCALE_HINT,
                                                           3,
-                                                          (gctINT *)FuncName->u.funcInfo.kernelScaleHint
+                                                          (gctINT *)FuncName->u.funcInfo.attrQualifier.kernelScaleHint
                                                           );
    if(gcmIS_ERROR(status)) return status;
 

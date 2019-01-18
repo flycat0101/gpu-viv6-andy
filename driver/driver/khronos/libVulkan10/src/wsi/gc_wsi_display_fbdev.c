@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1065,7 +1065,8 @@ static VkResult __GenPresentCommand(
         sc->cmdBuf,
         &srcRes,
         &dstRes,
-        VK_FALSE
+        VK_FALSE,
+        VK_FILTER_NEAREST
         ));
 
     __VK_ONERROR(__vk_EndCommandBuffer(sc->cmdBuf));
@@ -1095,11 +1096,7 @@ static VkResult __CommitPresentCommand(
         VK_NULL_HANDLE
         ));
 
-#if __VK_NEW_DEVICE_QUEUE
     __VK_ONERROR(__vk_QueueIdle((__vkDevQueue *)queue));
-#else
-    gcoHAL_Commit(gcvNULL, gcvTRUE);
-#endif
     /* Post fb. */
     __PostFbdevDisplayPlaneImage(sc->plane, imageIndex);
 

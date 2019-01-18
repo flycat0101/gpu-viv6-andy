@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2018 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -46,8 +46,7 @@ const char * _VDK_PLATFORM = "\n\0$PLATFORM$NULLWS\n";
 
 struct _vdkPrivate
 {
-    vdkDisplay  display;
-    void *      egl;
+    void * egl;
 };
 
 static vdkPrivate _vdk = NULL;
@@ -76,12 +75,8 @@ vdkInitialize(
     vdk->egl = dlopen("libEGL.so", RTLD_LAZY);
 #endif
 
-    vdk->display = (EGLNativeDisplayType) NULL;
-
     _vdk = vdk;
     return vdk;
-
-
 }
 
 VDKAPI void VDKLANG
@@ -116,7 +111,7 @@ vdkGetDisplayByIndex(
     int DisplayIndex
     )
 {
-    return NULL;
+    return (void *)(intptr_t)(DisplayIndex + 1);
 }
 
 VDKAPI vdkDisplay VDKLANG
@@ -124,7 +119,7 @@ vdkGetDisplay(
     vdkPrivate Private
     )
 {
-    return NULL;
+    return vdkGetDisplayByIndex(Private, 0);
 }
 
 VDKAPI int VDKLANG
@@ -160,7 +155,7 @@ vdkCreateWindow(
     int Height
     )
 {
-    return (vdkWindow)(uintptr_t)NULL;
+    return NULL;
 }
 
 VDKAPI int VDKLANG

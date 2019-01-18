@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -12,7 +12,7 @@
 
 
 #
-#  Common include file for Android build
+# Common include file for Android build
 #
 
 ifeq ($(VIVANTE_ANDROID_MK_DEF),)
@@ -40,12 +40,15 @@ HAL_MODULE_VARIANT           ?=
 DEBUG                        ?= 0
 
 USE_OPENCL ?= 1
-USE_OPENVX                   ?= 0
+USE_OPENVX                   ?= 1
 USE_VULKAN                   ?= 0
 
+USE_VXC_BINARY  ?=0
+GPU_CONFIG  ?=gpu_imx8qm
 VIVANTE_ENABLE_3D            ?= 1
 VIVANTE_ENABLE_2D            ?= 1
-VIVANTE_ENABLE_VG             = 0
+VIVANTE_ENABLE_VG            ?= 0
+VIVANTE_ENABLE_VSIMULATOR    ?= 0
 
 # Specific soc platform in <vendor>-<board> format, or 'default'.
 SOC_PLATFORM                 ?= default
@@ -80,6 +83,12 @@ BUILD_OPENCL_ICD := 0
 ENABLE_CL_GL     := 0
 endif
 
+ifeq ($(VIVANTE_ENABLE_VSIMULATOR),1)
+USE_OPENVX        := 1
+VIVANTE_ENABLE_2D := 0
+ENABLE_CL_GL      := 0
+endif
+
 ifneq ($(filter vivante,$(BOARD_GPU_DRIVERS)),)
 DRM_GRALLOC      := 1
 else
@@ -97,8 +106,13 @@ CFLAGS        := -DLINUX
 
 CFLAGS        += -DgcdENABLE_3D=$(VIVANTE_ENABLE_3D)
 CFLAGS        += -DgcdENABLE_2D=$(VIVANTE_ENABLE_2D)
-CFLAGS        += -DgcdENABLE_VG=0
+CFLAGS        += -DgcdENABLE_VG=$(VIVANTE_ENABLE_VG)
 CFLAGS        += -DgcdUSE_VX=$(USE_OPENVX)
+CFLAGS        += -DgcdUSE_VXC_BINARY=$(USE_VXC_BINARY)
+
+ifeq ($(VIVANTE_ENABLE_VSIMULATOR),1)
+CFLAGS        += -DNO_VDT_PROXY -DVSIMULATOR_DEBUG -DgcdSECURITY=0 -DEMULATOR
+endif
 
 CFLAGS        += -DUSE_VDK=0
 
@@ -108,7 +122,7 @@ CFLAGS        += -DANDROID_SDK_VERSION=$(PLATFORM_SDK_VERSION)
 CFLAGS        += -fno-strict-aliasing -fno-short-enums
 CFLAGS        += -Wno-missing-field-initializers -Wno-unused-parameter
 
-ifeq ($(DEBUG), 1)
+ifeq ($(DEBUG),1)
 CFLAGS        += -DDBG=1 -DDEBUG -D_DEBUG -O0 -g
 endif
 
@@ -131,7 +145,7 @@ CFLAGS        += -Wno-typedef-redefinition
 endif
 
 # For clang.
-ifeq ($(USE_CLANG_PLATFORM_BUILD),true)
+ifeq ($(USE_CLANG_PLATFORM_BUILD),)
 CFLAGS        += -Wno-parentheses-equality -Wno-self-assign
 endif
 

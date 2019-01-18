@@ -34,3 +34,7 @@ USE_BANK_ALIGNMENT  ?= 1
 BANK_BIT_START      ?= 13
 BANK_BIT_END        ?= 15
 BANK_CHANNEL_BIT    ?= 12
+
+# ovx setting:
+#################################################################
+USE_VXC_BINARY      ?= 0

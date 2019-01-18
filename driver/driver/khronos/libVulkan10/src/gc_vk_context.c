@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -77,8 +77,6 @@ PFN_vkVoidFunction __vk_GetApiProcAddr(
     return VK_NULL_HANDLE;
 }
 
-#if __VK_NEW_DEVICE_QUEUE
-
 static void __vki_DetachDevice(
     __vkDevContext *devCtx
     )
@@ -130,7 +128,6 @@ static VkResult __vki_AttachDevice(
 
                 for (j = 0; j < gcdCONTEXT_BUFFER_COUNT; j++)
                 {
-                    devCtx->contextPhysical[j] = iface.u.Attach.physicals[j];
                     devCtx->contextLogical[j] = gcmUINT64_TO_PTR(iface.u.Attach.logicals[j]);
                 }
             }
@@ -157,7 +154,6 @@ static VkResult __vki_AttachDevice(
             devCtx->contextBytes = iface.u.Attach.bytes;
             for (i = 0; i < gcdCONTEXT_BUFFER_COUNT; i++)
             {
-                devCtx->contextPhysical[i] = iface.u.Attach.physicals[i];
                 devCtx->contextLogical[i] = gcmUINT64_TO_PTR(iface.u.Attach.logicals[i]);
             }
         }
@@ -171,8 +167,6 @@ OnError:
     return result;
 
 }
-
-#endif
 
 void __vk_AllocateVidMemoryCB(
     gctPOINTER context,
@@ -205,7 +199,7 @@ void __vk_AllocateVidMemoryCB(
     __VK_ONERROR(__vk_AllocateMemory((VkDevice)devCtx, &allocInfo, VK_NULL_HANDLE, &vkDevMem));
     __VK_ONERROR(__vk_MapMemory((VkDevice)devCtx, vkDevMem, 0, vkDevMemSize, 0, &hostPtr));
 
-    gcmDUMP(gcvNULL, "#[info: video memory allocate for VSC %s", tag);
+    gcmDUMP(gcvNULL, "#[info: video memory allocate for VSC %s]", tag);
 
     if (initialData)
     {
@@ -217,7 +211,7 @@ void __vk_AllocateVidMemoryCB(
     }
 
     devMem = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory *,vkDevMem);
-    gcmDUMP_BUFFER(gcvNULL, "memory", devMem->devAddr, hostPtr, 0, size);
+    gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_MEMORY, devMem->devAddr, hostPtr, 0, size);
 
     *physical = devMem->devAddr;
     *opaqueNode = (gctPOINTER)devMem;
@@ -305,7 +299,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
                 }
                 else
                 {
-                    return VK_ERROR_FEATURE_NOT_PRESENT;
+                    __VK_ONERROR(VK_ERROR_FEATURE_NOT_PRESENT);
                 }
             }
         }
@@ -335,9 +329,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
     __VK_ONERROR(gcoOS_AtomConstruct(gcvNULL, &devCtx->atom_id));
 #endif
 
-#if __VK_NEW_DEVICE_QUEUE
     __VK_ONERROR(__vki_AttachDevice(devCtx));
-#endif
 
     /* Initilize VSC context */
     devCtx->vscSysCtx.pCoreSysCtx = &phyDev->vscCoreSysCtx;
@@ -353,11 +345,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
     /***********************************************************************
     ** Construct the default gcHAL objects
     */
-#if !__VK_NEW_DEVICE_QUEUE
-    __VK_ONERROR(gcoHAL_Construct(gcvNULL, gcvNULL, &devCtx->hal));
-    __VK_ONERROR(gcoHAL_SetHardwareType(devCtx->hal, gcvHARDWARE_3D));
-    __VK_ONERROR(gcoHAL_GetHardware(devCtx->hal, &devCtx->hardware));
-#endif
+
     /* Create a VkBuffer for fence memory */
     __VK_MEMZERO(&buf_info, sizeof(VkBufferCreateInfo));
     buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -420,9 +408,8 @@ OnError:
 
         __vk_DestroyDeviceQueues(devCtx);
 
-#if __VK_NEW_DEVICE_QUEUE
         __vki_DetachDevice(devCtx);
-#endif
+
         __VK_FREE(devCtx);
     }
 
@@ -503,9 +490,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyDevice(
 
             __vk_DestroyDeviceQueues(devCtx);
 
-#if __VK_NEW_DEVICE_QUEUE
             __vki_DetachDevice(devCtx);
-#endif
+
             __VK_FREE(devCtx);
         }
     }

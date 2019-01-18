@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1235,8 +1235,6 @@ gc_gralloc_register_buffer(
         surface->node.pool          = (gcePOOL)   handle->nodePool;
         surface->node.size          = (gctSIZE_T) handle->nodeSize;
 
-        gcmONERROR(gcoOS_CreateMutex(gcvNULL, &surface->node.sharedMutex));
-
 #if gcdENABLE_3D
         /* Import tile status video memory node. */
         if (handle->tsNode != 0)
@@ -1247,8 +1245,6 @@ gc_gralloc_register_buffer(
         surface->tileStatusNode.u.normal.node = tsNode;
         surface->tileStatusNode.pool          = (gcePOOL  ) handle->tsNodePool;
         surface->tileStatusNode.size          = (gctSIZE_T) handle->tsNodeSize;
-
-        gcmONERROR(gcoOS_CreateMutex(gcvNULL, &surface->tileStatusNode.sharedMutex));
 #endif
 
         /* Lock once as it's done in gcoSURF_Construct with vidmem. */

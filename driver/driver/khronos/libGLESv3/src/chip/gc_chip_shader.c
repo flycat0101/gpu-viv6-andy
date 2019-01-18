@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -98,217 +98,228 @@ gcChipIsMatrixType(
 __GLchipUniformTypeInfo g_typeInfos[] =
 {
     /*halType                                glType                                              size              */
-    {gcSHADER_FLOAT_X1,                      GL_FLOAT,                                           1*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_X2,                      GL_FLOAT_VEC2,                                      2*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_X3,                      GL_FLOAT_VEC3,                                      3*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_X4,                      GL_FLOAT_VEC4,                                      4*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_2X2,                     GL_FLOAT_MAT2,                                      2*2*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_3X3,                     GL_FLOAT_MAT3,                                      3*3*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_4X4,                     GL_FLOAT_MAT4,                                      4*4*sizeof(GLfloat)},
-    {gcSHADER_BOOLEAN_X1,                    GL_BOOL,                                            1*sizeof(GLint)},
-    {gcSHADER_BOOLEAN_X2,                    GL_BOOL_VEC2,                                       2*sizeof(GLint)},
-    {gcSHADER_BOOLEAN_X3,                    GL_BOOL_VEC3,                                       3*sizeof(GLint)},
-    {gcSHADER_BOOLEAN_X4,                    GL_BOOL_VEC4,                                       4*sizeof(GLint)},
-    {gcSHADER_INTEGER_X1,                    GL_INT,                                             1*sizeof(GLint)},
-    {gcSHADER_INTEGER_X2,                    GL_INT_VEC2,                                        2*sizeof(GLint)},
-    {gcSHADER_INTEGER_X3,                    GL_INT_VEC3,                                        3*sizeof(GLint)},
-    {gcSHADER_INTEGER_X4,                    GL_INT_VEC4,                                        4*sizeof(GLint)},
-    {gcSHADER_SAMPLER_1D,                    GL_NONE,                                            0},
-    {gcSHADER_SAMPLER_2D,                    GL_SAMPLER_2D,                                      1*sizeof(GLint)},
-    {gcSHADER_SAMPLER_3D,                    GL_SAMPLER_3D,                                      1*sizeof(GLint)},
-    {gcSHADER_SAMPLER_CUBIC,                 GL_SAMPLER_CUBE,                                    1*sizeof(GLint)},
-    {gcSHADER_FIXED_X1,                      GL_NONE,                                            0},
-    {gcSHADER_FIXED_X2,                      GL_NONE,                                            0},
-    {gcSHADER_FIXED_X3,                      GL_NONE,                                            0},
-    {gcSHADER_FIXED_X4,                      GL_NONE,                                            0},
-    {gcSHADER_IMAGE_2D,                      GL_IMAGE_2D,                                        4*sizeof(GLuint)},
-    {gcSHADER_IMAGE_3D,                      GL_IMAGE_3D,                                        4*sizeof(GLuint)},
-    {gcSHADER_SAMPLER,                       GL_NONE,                                            0},
-    {gcSHADER_FLOAT_2X3,                     GL_FLOAT_MAT2x3,                                    2*3*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_2X4,                     GL_FLOAT_MAT2x4,                                    2*4*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_3X2,                     GL_FLOAT_MAT3x2,                                    3*2*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_3X4,                     GL_FLOAT_MAT3x4,                                    3*4*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_4X2,                     GL_FLOAT_MAT4x2,                                    4*2*sizeof(GLfloat)},
-    {gcSHADER_FLOAT_4X3,                     GL_FLOAT_MAT4x3,                                    4*3*sizeof(GLfloat)},
-    {gcSHADER_ISAMPLER_2D,                   GL_INT_SAMPLER_2D,                                  1*sizeof(GLint)},
-    {gcSHADER_ISAMPLER_3D,                   GL_INT_SAMPLER_3D,                                  1*sizeof(GLint)},
-    {gcSHADER_ISAMPLER_CUBIC,                GL_INT_SAMPLER_CUBE,                                1*sizeof(GLint)},
-    {gcSHADER_USAMPLER_2D,                   GL_UNSIGNED_INT_SAMPLER_2D,                         1*sizeof(GLint)},
-    {gcSHADER_USAMPLER_3D,                   GL_UNSIGNED_INT_SAMPLER_3D,                         1*sizeof(GLint)},
-    {gcSHADER_USAMPLER_CUBIC,                GL_UNSIGNED_INT_SAMPLER_CUBE,                       1*sizeof(GLint)},
-    {gcSHADER_SAMPLER_EXTERNAL_OES,          GL_SAMPLER_EXTERNAL_OES,                            1*sizeof(GLint)},
+    {gcSHADER_FLOAT_X1,                      GL_FLOAT,                                           1*sizeof(GLfloat)},                /* 0x00 */
+    {gcSHADER_FLOAT_X2,                      GL_FLOAT_VEC2,                                      2*sizeof(GLfloat)},                /* 0x01 */
+    {gcSHADER_FLOAT_X3,                      GL_FLOAT_VEC3,                                      3*sizeof(GLfloat)},                /* 0x02 */
+    {gcSHADER_FLOAT_X4,                      GL_FLOAT_VEC4,                                      4*sizeof(GLfloat)},                /* 0x03 */
+    {gcSHADER_FLOAT_2X2,                     GL_FLOAT_MAT2,                                      2*2*sizeof(GLfloat)},              /* 0x04 */
+    {gcSHADER_FLOAT_3X3,                     GL_FLOAT_MAT3,                                      3*3*sizeof(GLfloat)},              /* 0x05 */
+    {gcSHADER_FLOAT_4X4,                     GL_FLOAT_MAT4,                                      4*4*sizeof(GLfloat)},              /* 0x06 */
+    {gcSHADER_BOOLEAN_X1,                    GL_BOOL,                                            1*sizeof(GLint)},                  /* 0x07 */
+    {gcSHADER_BOOLEAN_X2,                    GL_BOOL_VEC2,                                       2*sizeof(GLint)},                  /* 0x08 */
+    {gcSHADER_BOOLEAN_X3,                    GL_BOOL_VEC3,                                       3*sizeof(GLint)},                  /* 0x09 */
+    {gcSHADER_BOOLEAN_X4,                    GL_BOOL_VEC4,                                       4*sizeof(GLint)},                  /* 0x0A */
+    {gcSHADER_INTEGER_X1,                    GL_INT,                                             1*sizeof(GLint)},                  /* 0x0B */
+    {gcSHADER_INTEGER_X2,                    GL_INT_VEC2,                                        2*sizeof(GLint)},                  /* 0x0C */
+    {gcSHADER_INTEGER_X3,                    GL_INT_VEC3,                                        3*sizeof(GLint)},                  /* 0x0D */
+    {gcSHADER_INTEGER_X4,                    GL_INT_VEC4,                                        4*sizeof(GLint)},                  /* 0x0E */
+    {gcSHADER_SAMPLER_1D,                    GL_NONE,                                            0},                                /* 0x0F */
+    {gcSHADER_SAMPLER_2D,                    GL_SAMPLER_2D,                                      1*sizeof(GLint)},                  /* 0x10 */
+    {gcSHADER_SAMPLER_3D,                    GL_SAMPLER_3D,                                      1*sizeof(GLint)},                  /* 0x11 */
+    {gcSHADER_SAMPLER_CUBIC,                 GL_SAMPLER_CUBE,                                    1*sizeof(GLint)},                  /* 0x12 */
+    {gcSHADER_FIXED_X1,                      GL_NONE,                                            0},                                /* 0x13 */
+    {gcSHADER_FIXED_X2,                      GL_NONE,                                            0},                                /* 0x14 */
+    {gcSHADER_FIXED_X3,                      GL_NONE,                                            0},                                /* 0x15 */
+    {gcSHADER_FIXED_X4,                      GL_NONE,                                            0},                                /* 0x16 */
 
-    {gcSHADER_UINT_X1,                       GL_UNSIGNED_INT,                                    1*sizeof(GLuint)},
-    {gcSHADER_UINT_X2,                       GL_UNSIGNED_INT_VEC2,                               2*sizeof(GLuint)},
-    {gcSHADER_UINT_X3,                       GL_UNSIGNED_INT_VEC3,                               3*sizeof(GLuint)},
-    {gcSHADER_UINT_X4,                       GL_UNSIGNED_INT_VEC4,                               4*sizeof(GLuint)},
+    /* For OCL. */
+    {gcSHADER_IMAGE_1D_T,                    GL_NONE,                                            0},                                /* 0x17 */
+    {gcSHADER_IMAGE_1D_BUFFER_T,             GL_NONE,                                            0},                                /* 0x18 */
+    {gcSHADER_IMAGE_1D_ARRAY_T,              GL_NONE,                                            0},                                /* 0x19 */
+    {gcSHADER_IMAGE_2D,                      GL_NONE,                                            0},                                /* 0x1A */
+    {gcSHADER_IMAGE_2D_ARRAY_T,              GL_NONE,                                            0},                                /* 0x1B */
+    {gcSHADER_IMAGE_3D,                      GL_NONE,                                            0},                                /* 0x1C */
+    {gcSHADER_VIV_GENERIC_IMAGE_T,           GL_NONE,                                            0},                                /* 0x1D */
+    {gcSHADER_SAMPLER_T,                     GL_NONE,                                            0},                                /* 0x1E */
 
-    {gcSHADER_SAMPLER_2D_SHADOW,             GL_SAMPLER_2D_SHADOW,                               1*sizeof(GLuint)},
-    {gcSHADER_SAMPLER_CUBE_SHADOW,           GL_SAMPLER_CUBE_SHADOW,                             1*sizeof(GLuint)},
+    {gcSHADER_FLOAT_2X3,                     GL_FLOAT_MAT2x3,                                    2*3*sizeof(GLfloat)},              /* 0x1F */
+    {gcSHADER_FLOAT_2X4,                     GL_FLOAT_MAT2x4,                                    2*4*sizeof(GLfloat)},              /* 0x20 */
+    {gcSHADER_FLOAT_3X2,                     GL_FLOAT_MAT3x2,                                    3*2*sizeof(GLfloat)},              /* 0x21 */
+    {gcSHADER_FLOAT_3X4,                     GL_FLOAT_MAT3x4,                                    3*4*sizeof(GLfloat)},              /* 0x22 */
+    {gcSHADER_FLOAT_4X2,                     GL_FLOAT_MAT4x2,                                    4*2*sizeof(GLfloat)},              /* 0x23 */
+    {gcSHADER_FLOAT_4X3,                     GL_FLOAT_MAT4x3,                                    4*3*sizeof(GLfloat)},              /* 0x24 */
+    {gcSHADER_ISAMPLER_2D,                   GL_INT_SAMPLER_2D,                                  1*sizeof(GLint)},                  /* 0x25 */
+    {gcSHADER_ISAMPLER_3D,                   GL_INT_SAMPLER_3D,                                  1*sizeof(GLint)},                  /* 0x26 */
+    {gcSHADER_ISAMPLER_CUBIC,                GL_INT_SAMPLER_CUBE,                                1*sizeof(GLint)},                  /* 0x27 */
+    {gcSHADER_USAMPLER_2D,                   GL_UNSIGNED_INT_SAMPLER_2D,                         1*sizeof(GLint)},                  /* 0x28 */
+    {gcSHADER_USAMPLER_3D,                   GL_UNSIGNED_INT_SAMPLER_3D,                         1*sizeof(GLint)},                  /* 0x29 */
+    {gcSHADER_USAMPLER_CUBIC,                GL_UNSIGNED_INT_SAMPLER_CUBE,                       1*sizeof(GLint)},                  /* 0x2A */
+    {gcSHADER_SAMPLER_EXTERNAL_OES,          GL_SAMPLER_EXTERNAL_OES,                            1*sizeof(GLint)},                  /* 0x2B */
 
-    {gcSHADER_SAMPLER_1D_ARRAY,              GL_NONE,                                            0},    /* 1DArray types are invalid in OES, while defined by compiler */
-    {gcSHADER_SAMPLER_1D_ARRAY_SHADOW,       GL_NONE,                                            0},
-    {gcSHADER_SAMPLER_2D_ARRAY,              GL_SAMPLER_2D_ARRAY,                                1*sizeof(GLuint)},
-    {gcSHADER_ISAMPLER_2D_ARRAY,             GL_INT_SAMPLER_2D_ARRAY,                            1*sizeof(GLuint)},
-    {gcSHADER_USAMPLER_2D_ARRAY,             GL_UNSIGNED_INT_SAMPLER_2D_ARRAY,                   1*sizeof(GLuint)},
-    {gcSHADER_SAMPLER_2D_ARRAY_SHADOW,       GL_SAMPLER_2D_ARRAY_SHADOW,                         1*sizeof(GLuint)},
+    {gcSHADER_UINT_X1,                       GL_UNSIGNED_INT,                                    1*sizeof(GLuint)},                 /* 0x2C */
+    {gcSHADER_UINT_X2,                       GL_UNSIGNED_INT_VEC2,                               2*sizeof(GLuint)},                 /* 0x2D */
+    {gcSHADER_UINT_X3,                       GL_UNSIGNED_INT_VEC3,                               3*sizeof(GLuint)},                 /* 0x2E */
+    {gcSHADER_UINT_X4,                       GL_UNSIGNED_INT_VEC4,                               4*sizeof(GLuint)},                 /* 0x2F */
 
-    {gcSHADER_SAMPLER_2D_MS,                 GL_SAMPLER_2D_MULTISAMPLE,                          1*sizeof(GLuint)},
-    {gcSHADER_ISAMPLER_2D_MS,                GL_INT_SAMPLER_2D_MULTISAMPLE,                      1*sizeof(GLuint)},
-    {gcSHADER_USAMPLER_2D_MS,                GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE,             1*sizeof(GLuint)},
-    {gcSHADER_SAMPLER_2D_MS_ARRAY,           GL_SAMPLER_2D_MULTISAMPLE_ARRAY_OES,                1*sizeof(GLuint)},
-    {gcSHADER_ISAMPLER_2D_MS_ARRAY,          GL_INT_SAMPLER_2D_MULTISAMPLE_ARRAY_OES,            1*sizeof(GLuint)},
-    {gcSHADER_USAMPLER_2D_MS_ARRAY,          GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE_ARRAY_OES,   1*sizeof(GLuint)},
+    {gcSHADER_SAMPLER_2D_SHADOW,             GL_SAMPLER_2D_SHADOW,                               1*sizeof(GLuint)},                 /* 0x30 */
+    {gcSHADER_SAMPLER_CUBE_SHADOW,           GL_SAMPLER_CUBE_SHADOW,                             1*sizeof(GLuint)},                 /* 0x31 */
 
-    {gcSHADER_IIMAGE_2D,                     GL_INT_IMAGE_2D,                                    4*sizeof(GLuint)},
-    {gcSHADER_UIMAGE_2D,                     GL_UNSIGNED_INT_IMAGE_2D,                           4*sizeof(GLuint)},
-    {gcSHADER_IIMAGE_3D,                     GL_INT_IMAGE_3D,                                    4*sizeof(GLuint)},
-    {gcSHADER_UIMAGE_3D,                     GL_UNSIGNED_INT_IMAGE_3D,                           4*sizeof(GLuint)},
-    {gcSHADER_IMAGE_CUBE,                    GL_IMAGE_CUBE,                                      4*sizeof(GLuint)},
-    {gcSHADER_IIMAGE_CUBE,                   GL_INT_IMAGE_CUBE,                                  4*sizeof(GLuint)},
-    {gcSHADER_UIMAGE_CUBE,                   GL_UNSIGNED_INT_IMAGE_CUBE,                         4*sizeof(GLuint)},
-    {gcSHADER_IMAGE_2D_ARRAY,                GL_IMAGE_2D_ARRAY,                                  4*sizeof(GLuint)},
-    {gcSHADER_IIMAGE_2D_ARRAY,               GL_INT_IMAGE_2D_ARRAY,                              4*sizeof(GLuint)},
-    {gcSHADER_UIMAGE_2D_ARRAY,               GL_UNSIGNED_INT_IMAGE_2D_ARRAY,                     4*sizeof(GLuint)},
+    {gcSHADER_SAMPLER_1D_ARRAY,              GL_NONE,                                            0},    /* 1DArray types are invalid in OES, while defined by compiler *//* 0x32 */
+    {gcSHADER_SAMPLER_1D_ARRAY_SHADOW,       GL_NONE,                                            0},                                /* 0x33 */
+    {gcSHADER_SAMPLER_2D_ARRAY,              GL_SAMPLER_2D_ARRAY,                                1*sizeof(GLuint)},                 /* 0x34 */
+    {gcSHADER_ISAMPLER_2D_ARRAY,             GL_INT_SAMPLER_2D_ARRAY,                            1*sizeof(GLuint)},                 /* 0x35 */
+    {gcSHADER_USAMPLER_2D_ARRAY,             GL_UNSIGNED_INT_SAMPLER_2D_ARRAY,                   1*sizeof(GLuint)},                 /* 0x36 */
+    {gcSHADER_SAMPLER_2D_ARRAY_SHADOW,       GL_SAMPLER_2D_ARRAY_SHADOW,                         1*sizeof(GLuint)},                 /* 0x37 */
 
-    {gcSHADER_ATOMIC_UINT,                   GL_UNSIGNED_INT_ATOMIC_COUNTER,                     1*sizeof(GLuint)},
+    {gcSHADER_SAMPLER_2D_MS,                 GL_SAMPLER_2D_MULTISAMPLE,                          1*sizeof(GLuint)},                 /* 0x38 */
+    {gcSHADER_ISAMPLER_2D_MS,                GL_INT_SAMPLER_2D_MULTISAMPLE,                      1*sizeof(GLuint)},                 /* 0x39 */
+    {gcSHADER_USAMPLER_2D_MS,                GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE,             1*sizeof(GLuint)},                 /* 0x3A */
+    {gcSHADER_SAMPLER_2D_MS_ARRAY,           GL_SAMPLER_2D_MULTISAMPLE_ARRAY_OES,                1*sizeof(GLuint)},                 /* 0x3B */
+    {gcSHADER_ISAMPLER_2D_MS_ARRAY,          GL_INT_SAMPLER_2D_MULTISAMPLE_ARRAY_OES,            1*sizeof(GLuint)},                 /* 0x3C */
+    {gcSHADER_USAMPLER_2D_MS_ARRAY,          GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE_ARRAY_OES,   1*sizeof(GLuint)},                 /* 0x3D */
 
-    {gcSHADER_IMAGE_1D,                      GL_NONE,                                            0},
-    {gcSHADER_IMAGE_1D_ARRAY,                GL_NONE,                                            0},
-    {gcSHADER_IMAGE_1D_BUFFER,               GL_NONE,                                            0},
+    {gcSHADER_IMAGE_2D,                      GL_IMAGE_2D,                                    4*sizeof(GLuint)},                     /* 0x3E */
+    {gcSHADER_IIMAGE_2D,                     GL_INT_IMAGE_2D,                                    4*sizeof(GLuint)},                 /* 0x3F */
+    {gcSHADER_UIMAGE_2D,                     GL_UNSIGNED_INT_IMAGE_2D,                           4*sizeof(GLuint)},                 /* 0x40 */
+    {gcSHADER_IMAGE_3D,                      GL_IMAGE_3D,                                    4*sizeof(GLuint)},                     /* 0x41 */
+    {gcSHADER_IIMAGE_3D,                     GL_INT_IMAGE_3D,                                    4*sizeof(GLuint)},                 /* 0x42 */
+    {gcSHADER_UIMAGE_3D,                     GL_UNSIGNED_INT_IMAGE_3D,                           4*sizeof(GLuint)},                 /* 0x43 */
+    {gcSHADER_IMAGE_CUBE,                    GL_IMAGE_CUBE,                                      4*sizeof(GLuint)},                 /* 0x44 */
+    {gcSHADER_IIMAGE_CUBE,                   GL_INT_IMAGE_CUBE,                                  4*sizeof(GLuint)},                 /* 0x45 */
+    {gcSHADER_UIMAGE_CUBE,                   GL_UNSIGNED_INT_IMAGE_CUBE,                         4*sizeof(GLuint)},                 /* 0x46 */
+    {gcSHADER_IMAGE_2D_ARRAY,                GL_IMAGE_2D_ARRAY,                                  4*sizeof(GLuint)},                 /* 0x47 */
+    {gcSHADER_IIMAGE_2D_ARRAY,               GL_INT_IMAGE_2D_ARRAY,                              4*sizeof(GLuint)},                 /* 0x48 */
+    {gcSHADER_UIMAGE_2D_ARRAY,               GL_UNSIGNED_INT_IMAGE_2D_ARRAY,                     4*sizeof(GLuint)},                 /* 0x49 */
+    {gcSHADER_VIV_GENERIC_GL_IMAGE,          GL_NONE,                                            4*sizeof(GLuint)},                 /* 0x4A */
 
-    {gcSHADER_SAMPLER_CUBEMAP_ARRAY,         GL_SAMPLER_CUBE_MAP_ARRAY_EXT,                      1*sizeof(GLuint)},
-    {gcSHADER_SAMPLER_CUBEMAP_ARRAY_SHADOW,  GL_SAMPLER_CUBE_MAP_ARRAY_SHADOW_EXT,               1*sizeof(GLuint)},
-    {gcSHADER_ISAMPLER_CUBEMAP_ARRAY,        GL_INT_SAMPLER_CUBE_MAP_ARRAY_EXT,                  1*sizeof(GLuint)},
-    {gcSHADER_USAMPLER_CUBEMAP_ARRAY,        GL_UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY_EXT,         1*sizeof(GLuint)},
-    {gcSHADER_IMAGE_CUBEMAP_ARRAY,           GL_IMAGE_CUBE_MAP_ARRAY_EXT,                        4*sizeof(GLuint)},
-    {gcSHADER_IIMAGE_CUBEMAP_ARRAY,          GL_INT_IMAGE_CUBE_MAP_ARRAY_EXT,                    4*sizeof(GLuint)},
-    {gcSHADER_UIMAGE_CUBEMAP_ARRAY,          GL_UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY_EXT,           4*sizeof(GLuint)},
+    {gcSHADER_ATOMIC_UINT,                   GL_UNSIGNED_INT_ATOMIC_COUNTER,                     1*sizeof(GLuint)},                 /* 0x4B */
 
-    {gcSHADER_INT64_X1,                      GL_NONE,                                            0},
-    {gcSHADER_INT64_X2,                      GL_NONE,                                            0},
-    {gcSHADER_INT64_X3,                      GL_NONE,                                            0},
-    {gcSHADER_INT64_X4,                      GL_NONE,                                            0},
-    {gcSHADER_UINT64_X1,                     GL_NONE,                                            0},
-    {gcSHADER_UINT64_X2,                     GL_NONE,                                            0},
-    {gcSHADER_UINT64_X3,                     GL_NONE,                                            0},
-    {gcSHADER_UINT64_X4,                     GL_NONE,                                            0},
-    {gcSHADER_SAMPLER_BUFFER,                GL_SAMPLER_BUFFER_OES,                              4*sizeof(GLint)},
-    {gcSHADER_ISAMPLER_BUFFER,               GL_INT_SAMPLER_BUFFER_OES,                          4*sizeof(GLint)},
-    {gcSHADER_USAMPLER_BUFFER,               GL_UNSIGNED_INT_SAMPLER_BUFFER_OES,                 4*sizeof(GLint)},
-    {gcSHADER_IMAGE_BUFFER,                  GL_IMAGE_BUFFER_OES,                                4*sizeof(GLint)},
-    {gcSHADER_IIMAGE_BUFFER,                 GL_INT_IMAGE_BUFFER_OES,                            4*sizeof(GLint)},
-    {gcSHADER_UIMAGE_BUFFER,                 GL_UNSIGNED_INT_IMAGE_BUFFER_OES,                   4*sizeof(GLint)},
+    /* GL_EXT_texture_cube_map_array */
+    {gcSHADER_SAMPLER_CUBEMAP_ARRAY,         GL_SAMPLER_CUBE_MAP_ARRAY_EXT,                      1*sizeof(GLuint)},                 /* 0x4C */
+    {gcSHADER_SAMPLER_CUBEMAP_ARRAY_SHADOW,  GL_SAMPLER_CUBE_MAP_ARRAY_SHADOW_EXT,               1*sizeof(GLuint)},                 /* 0x4D */
+    {gcSHADER_ISAMPLER_CUBEMAP_ARRAY,        GL_INT_SAMPLER_CUBE_MAP_ARRAY_EXT,                  1*sizeof(GLuint)},                 /* 0x4E */
+    {gcSHADER_USAMPLER_CUBEMAP_ARRAY,        GL_UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY_EXT,         1*sizeof(GLuint)},                 /* 0x4F */
+    {gcSHADER_IMAGE_CUBEMAP_ARRAY,           GL_IMAGE_CUBE_MAP_ARRAY_EXT,                        4*sizeof(GLuint)},                 /* 0x50 */
+    {gcSHADER_IIMAGE_CUBEMAP_ARRAY,          GL_INT_IMAGE_CUBE_MAP_ARRAY_EXT,                    4*sizeof(GLuint)},                 /* 0x51 */
+    {gcSHADER_UIMAGE_CUBEMAP_ARRAY,          GL_UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY_EXT,           4*sizeof(GLuint)},                 /* 0x52 */
+
+    {gcSHADER_INT64_X1,                      GL_NONE,                                            0},                                /* 0x53 */
+    {gcSHADER_INT64_X2,                      GL_NONE,                                            0},                                /* 0x54 */
+    {gcSHADER_INT64_X3,                      GL_NONE,                                            0},                                /* 0x55 */
+    {gcSHADER_INT64_X4,                      GL_NONE,                                            0},                                /* 0x56 */
+    {gcSHADER_UINT64_X1,                     GL_NONE,                                            0},                                /* 0x57 */
+    {gcSHADER_UINT64_X2,                     GL_NONE,                                            0},                                /* 0x58 */
+    {gcSHADER_UINT64_X3,                     GL_NONE,                                            0},                                /* 0x59 */
+    {gcSHADER_UINT64_X4,                     GL_NONE,                                            0},                                /* 0x5A */
+
+    /* texture buffer extension type. */
+    {gcSHADER_SAMPLER_BUFFER,                GL_SAMPLER_BUFFER_OES,                              4*sizeof(GLint)},                  /* 0x5B */
+    {gcSHADER_ISAMPLER_BUFFER,               GL_INT_SAMPLER_BUFFER_OES,                          4*sizeof(GLint)},                  /* 0x5C */
+    {gcSHADER_USAMPLER_BUFFER,               GL_UNSIGNED_INT_SAMPLER_BUFFER_OES,                 4*sizeof(GLint)},                  /* 0x5D */
+    {gcSHADER_IMAGE_BUFFER,                  GL_IMAGE_BUFFER_OES,                                4*sizeof(GLint)},                  /* 0x5E */
+    {gcSHADER_IIMAGE_BUFFER,                 GL_INT_IMAGE_BUFFER_OES,                            4*sizeof(GLint)},                  /* 0x5F */
+    {gcSHADER_UIMAGE_BUFFER,                 GL_UNSIGNED_INT_IMAGE_BUFFER_OES,                   4*sizeof(GLint)},                  /* 0x60 */
+    {gcSHADER_VIV_GENERIC_GL_SAMPLER,        GL_NONE,                                            4*sizeof(GLint)},                  /* 0x61 */
+
     /* float16 */
-    { gcSHADER_FLOAT16_X1,  GL_NONE,                       0},      /* half2 */
-    { gcSHADER_FLOAT16_X2,  GL_NONE,                       0},      /* half2 */
-    { gcSHADER_FLOAT16_X3,  GL_NONE,                       0},      /* half3 */
-    { gcSHADER_FLOAT16_X4,  GL_NONE,                       0},      /* half4 */
-    { gcSHADER_FLOAT16_X8,  GL_NONE,                       0},      /* half8 */
-    { gcSHADER_FLOAT16_X16, GL_NONE,                       0},     /* half16 */
-    { gcSHADER_FLOAT16_X32, GL_NONE,                       0},     /* half32 */
+    { gcSHADER_FLOAT16_X1,  GL_NONE,                       0},                                                                      /* 0x62 half2 */
+    { gcSHADER_FLOAT16_X2,  GL_NONE,                       0},                                                                      /* 0x63 half2 */
+    { gcSHADER_FLOAT16_X3,  GL_NONE,                       0},                                                                      /* 0x64 half3 */
+    { gcSHADER_FLOAT16_X4,  GL_NONE,                       0},                                                                      /* 0x65 half4 */
+    { gcSHADER_FLOAT16_X8,  GL_NONE,                       0},                                                                      /* 0x66 half8 */
+    { gcSHADER_FLOAT16_X16, GL_NONE,                       0},                                                                      /* 0x67 half16 */
+    { gcSHADER_FLOAT16_X32, GL_NONE,                       0},                                                                      /* 0x68 half32 */
 
     /*  boolean  */
-
-    { gcSHADER_BOOLEAN_X8,  GL_NONE,                       0},
-    { gcSHADER_BOOLEAN_X16, GL_NONE,                       0},
-    { gcSHADER_BOOLEAN_X32, GL_NONE,                       0},
+    { gcSHADER_BOOLEAN_X8,  GL_NONE,                       0},                                                                      /* 0x69 */
+    { gcSHADER_BOOLEAN_X16, GL_NONE,                       0},                                                                      /* 0x6A */
+    { gcSHADER_BOOLEAN_X32, GL_NONE,                       0},                                                                      /* 0x6B */
 
     /* uchar vectors  */
-    { gcSHADER_UINT8_X1,    GL_NONE,                       0},
-    { gcSHADER_UINT8_X2,    GL_NONE,                       0},
-    { gcSHADER_UINT8_X3,    GL_NONE,                       0},
-    { gcSHADER_UINT8_X4,    GL_NONE,                       0},
-    { gcSHADER_UINT8_X8,    GL_NONE,                       0},
-    { gcSHADER_UINT8_X16,   GL_NONE,                       0},
-    { gcSHADER_UINT8_X32,   GL_NONE,                       0},
+    { gcSHADER_UINT8_X1,    GL_NONE,                       0},                                                                      /* 0x6C */
+    { gcSHADER_UINT8_X2,    GL_NONE,                       0},                                                                      /* 0x6D */
+    { gcSHADER_UINT8_X3,    GL_NONE,                       0},                                                                      /* 0x6E */
+    { gcSHADER_UINT8_X4,    GL_NONE,                       0},                                                                      /* 0x6F */
+    { gcSHADER_UINT8_X8,    GL_NONE,                       0},                                                                      /* 0x70 */
+    { gcSHADER_UINT8_X16,   GL_NONE,                       0},                                                                      /* 0x71 */
+    { gcSHADER_UINT8_X32,   GL_NONE,                       0},                                                                      /* 0x72 */
 
     /* char vectors  */
-    { gcSHADER_INT8_X1,     GL_NONE,                       0},
-    { gcSHADER_INT8_X2,     GL_NONE,                       0},
-    { gcSHADER_INT8_X3,     GL_NONE,                       0},
-    { gcSHADER_INT8_X4,     GL_NONE,                       0},
-    { gcSHADER_INT8_X8,     GL_NONE,                       0},
-    { gcSHADER_INT8_X16,    GL_NONE,                       0},
-    { gcSHADER_INT8_X32,    GL_NONE,                       0},
+    { gcSHADER_INT8_X1,     GL_NONE,                       0},                                                                      /* 0x73 */
+    { gcSHADER_INT8_X2,     GL_NONE,                       0},                                                                      /* 0x74 */
+    { gcSHADER_INT8_X3,     GL_NONE,                       0},                                                                      /* 0x75 */
+    { gcSHADER_INT8_X4,     GL_NONE,                       0},                                                                      /* 0x76 */
+    { gcSHADER_INT8_X8,     GL_NONE,                       0},                                                                      /* 0x77 */
+    { gcSHADER_INT8_X16,    GL_NONE,                       0},                                                                      /* 0x78 */
+    { gcSHADER_INT8_X32,    GL_NONE,                       0},                                                                      /* 0x79 */
 
     /* ushort vectors */
-    { gcSHADER_UINT16_X1,   GL_NONE,                       0},
-    { gcSHADER_UINT16_X2,   GL_NONE,                       0},
-    { gcSHADER_UINT16_X3,   GL_NONE,                       0},
-    { gcSHADER_UINT16_X4,   GL_NONE,                       0},
-    { gcSHADER_UINT16_X8,   GL_NONE,                       0},
-    { gcSHADER_UINT16_X16,  GL_NONE,                       0},
-    { gcSHADER_UINT16_X32,  GL_NONE,                       0},
+    { gcSHADER_UINT16_X1,   GL_NONE,                       0},                                                                      /* 0x7A */
+    { gcSHADER_UINT16_X2,   GL_NONE,                       0},                                                                      /* 0x7B */
+    { gcSHADER_UINT16_X3,   GL_NONE,                       0},                                                                      /* 0x7C */
+    { gcSHADER_UINT16_X4,   GL_NONE,                       0},                                                                      /* 0x7D */
+    { gcSHADER_UINT16_X8,   GL_NONE,                       0},                                                                      /* 0x7E */
+    { gcSHADER_UINT16_X16,  GL_NONE,                       0},                                                                      /* 0x7F */
+    { gcSHADER_UINT16_X32,  GL_NONE,                       0},                                                                      /* 0x80 */
 
     /* short vectors */
-    { gcSHADER_INT16_X1,    GL_NONE,                       0},
-    { gcSHADER_INT16_X2,    GL_NONE,                       0},
-    { gcSHADER_INT16_X3,    GL_NONE,                       0},
-    { gcSHADER_INT16_X4,    GL_NONE,                       0},
-    { gcSHADER_INT16_X8,    GL_NONE,                       0},
-    { gcSHADER_INT16_X16,   GL_NONE,                       0},
-    { gcSHADER_INT16_X32,   GL_NONE,                       0},
+    { gcSHADER_INT16_X1,    GL_NONE,                       0},                                                                      /* 0x81 */
+    { gcSHADER_INT16_X2,    GL_NONE,                       0},                                                                      /* 0x82 */
+    { gcSHADER_INT16_X3,    GL_NONE,                       0},                                                                      /* 0x83 */
+    { gcSHADER_INT16_X4,    GL_NONE,                       0},                                                                      /* 0x84 */
+    { gcSHADER_INT16_X8,    GL_NONE,                       0},                                                                      /* 0x85 */
+    { gcSHADER_INT16_X16,   GL_NONE,                       0},                                                                      /* 0x86 */
+    { gcSHADER_INT16_X32,   GL_NONE,                       0},                                                                      /* 0x87 */
 
     /* packed data type */
     /* packed float16 (2 bytes per element) */
-    { gcSHADER_FLOAT16_P2,  GL_NONE,                       0},      /* half2 */
-    { gcSHADER_FLOAT16_P3,  GL_NONE,                       0},      /* half3 */
-    { gcSHADER_FLOAT16_P4,  GL_NONE,                       0},      /* half4 */
-    { gcSHADER_FLOAT16_P8,  GL_NONE,                       0},      /* half8 */
-    { gcSHADER_FLOAT16_P16, GL_NONE,                       0},     /* half16 */
-    { gcSHADER_FLOAT16_P32, GL_NONE,                       0},     /* half32 */
+    { gcSHADER_FLOAT16_P2,  GL_NONE,                       0},                                                                      /* 0x88 half2 */
+    { gcSHADER_FLOAT16_P3,  GL_NONE,                       0},                                                                      /* 0x89 half3 */
+    { gcSHADER_FLOAT16_P4,  GL_NONE,                       0},                                                                      /* 0x8A half4 */
+    { gcSHADER_FLOAT16_P8,  GL_NONE,                       0},                                                                      /* 0x8B half8 */
+    { gcSHADER_FLOAT16_P16, GL_NONE,                       0},                                                                      /* 0x8C half16 */
+    { gcSHADER_FLOAT16_P32, GL_NONE,                       0},                                                                      /* 0x8D half32 */
 
     /* packed boolean (1 byte per element) */
-    { gcSHADER_BOOLEAN_P2,  GL_NONE,                       0},    /* bvec2 */
-    { gcSHADER_BOOLEAN_P3,  GL_NONE,                       0},
-    { gcSHADER_BOOLEAN_P4,  GL_NONE,                       0},
-    { gcSHADER_BOOLEAN_P8,  GL_NONE,                       0},
-    { gcSHADER_BOOLEAN_P16, GL_NONE,                       0},
-    { gcSHADER_BOOLEAN_P32, GL_NONE,                       0},
+    { gcSHADER_BOOLEAN_P2,  GL_NONE,                       0},                                                                      /* 0x8E bool2 bvec2 */
+    { gcSHADER_BOOLEAN_P3,  GL_NONE,                       0},                                                                      /* 0x8F */
+    { gcSHADER_BOOLEAN_P4,  GL_NONE,                       0},                                                                      /* 0x90 */
+    { gcSHADER_BOOLEAN_P8,  GL_NONE,                       0},                                                                      /* 0x91 */
+    { gcSHADER_BOOLEAN_P16, GL_NONE,                       0},                                                                      /* 0x92 */
+    { gcSHADER_BOOLEAN_P32, GL_NONE,                       0},                                                                      /* 0x93 */
 
     /* uchar vectors (1 byte per element) */
-    { gcSHADER_UINT8_P2,    GL_NONE,                       0},
-    { gcSHADER_UINT8_P3,    GL_NONE,                       0},
-    { gcSHADER_UINT8_P4,    GL_NONE,                       0},
-    { gcSHADER_UINT8_P8,    GL_NONE,                       0},
-    { gcSHADER_UINT8_P16,   GL_NONE,                       0},
-    { gcSHADER_UINT8_P32,   GL_NONE,                       0},
+    { gcSHADER_UINT8_P2,    GL_NONE,                       0},                                                                      /* 0x94 */
+    { gcSHADER_UINT8_P3,    GL_NONE,                       0},                                                                      /* 0x95 */
+    { gcSHADER_UINT8_P4,    GL_NONE,                       0},                                                                      /* 0x96 */
+    { gcSHADER_UINT8_P8,    GL_NONE,                       0},                                                                      /* 0x97 */
+    { gcSHADER_UINT8_P16,   GL_NONE,                       0},                                                                      /* 0x98 */
+    { gcSHADER_UINT8_P32,   GL_NONE,                       0},                                                                      /* 0x99 */
 
     /* char vectors (1 byte per element) */
-    { gcSHADER_INT8_P2,     GL_NONE,                       0},
-    { gcSHADER_INT8_P3,     GL_NONE,                       0},
-    { gcSHADER_INT8_P4,     GL_NONE,                       0},
-    { gcSHADER_INT8_P8,     GL_NONE,                       0},
-    { gcSHADER_INT8_P16,    GL_NONE,                       0},
-    { gcSHADER_INT8_P32,    GL_NONE,                       0},
+    { gcSHADER_INT8_P2,     GL_NONE,                       0},                                                                      /* 0x9A */
+    { gcSHADER_INT8_P3,     GL_NONE,                       0},                                                                      /* 0x9B */
+    { gcSHADER_INT8_P4,     GL_NONE,                       0},                                                                      /* 0x9C */
+    { gcSHADER_INT8_P8,     GL_NONE,                       0},                                                                      /* 0x9D */
+    { gcSHADER_INT8_P16,    GL_NONE,                       0},                                                                      /* 0x9E */
+    { gcSHADER_INT8_P32,    GL_NONE,                       0},                                                                      /* 0x9F */
 
     /* ushort vectors (2 bytes per element) */
-    { gcSHADER_UINT16_P2,   GL_NONE,                       0},
-    { gcSHADER_UINT16_P3,   GL_NONE,                       0},
-    { gcSHADER_UINT16_P4,   GL_NONE,                       0},
-    { gcSHADER_UINT16_P8,   GL_NONE,                       0},
-    { gcSHADER_UINT16_P16,  GL_NONE,                       0},
-    { gcSHADER_UINT16_P32,  GL_NONE,                       0},
+    { gcSHADER_UINT16_P2,   GL_NONE,                       0},                                                                      /* 0xA0 */
+    { gcSHADER_UINT16_P3,   GL_NONE,                       0},                                                                      /* 0xA1 */
+    { gcSHADER_UINT16_P4,   GL_NONE,                       0},                                                                      /* 0xA2 */
+    { gcSHADER_UINT16_P8,   GL_NONE,                       0},                                                                      /* 0xA3 */
+    { gcSHADER_UINT16_P16,  GL_NONE,                       0},                                                                      /* 0xA4 */
+    { gcSHADER_UINT16_P32,  GL_NONE,                       0},                                                                      /* 0xA5 */
 
     /* short vectors (2 bytes per element) */
-    { gcSHADER_INT16_P2,    GL_NONE,                       0},
-    { gcSHADER_INT16_P3,    GL_NONE,                       0},
-    { gcSHADER_INT16_P4,    GL_NONE,                       0},
-    { gcSHADER_INT16_P8,    GL_NONE,                       0},
-    { gcSHADER_INT16_P16,   GL_NONE,                       0},
-    { gcSHADER_INT16_P32,   GL_NONE,                       0},
+    { gcSHADER_INT16_P2,    GL_NONE,                       0},                                                                      /* 0xA6 */
+    { gcSHADER_INT16_P3,    GL_NONE,                       0},                                                                      /* 0xA7 */
+    { gcSHADER_INT16_P4,    GL_NONE,                       0},                                                                      /* 0xA8 */
+    { gcSHADER_INT16_P8,    GL_NONE,                       0},                                                                      /* 0xA9 */
+    { gcSHADER_INT16_P16,   GL_NONE,                       0},                                                                      /* 0xAA */
+    { gcSHADER_INT16_P32,   GL_NONE,                       0},                                                                      /* 0xAB */
 
-    { gcSHADER_INTEGER_X8,   GL_NONE,                      0},
-    { gcSHADER_INTEGER_X16,  GL_NONE,                      0},
-    { gcSHADER_UINT_X8,      GL_NONE,                      0},
-    { gcSHADER_UINT_X16,     GL_NONE,                      0},
-    { gcSHADER_FLOAT_X8,     GL_NONE,                      0},
-    { gcSHADER_FLOAT_X16,    GL_NONE,                      0},
-    { gcSHADER_INT64_X8,     GL_NONE,                      0},
-    { gcSHADER_INT64_X16,    GL_NONE,                      0},
-    { gcSHADER_UINT64_X8,    GL_NONE,                      0},
-    { gcSHADER_UINT64_X16,   GL_NONE,                      0},
+    { gcSHADER_INTEGER_X8,   GL_NONE,                      0},                                                                      /* 0xAC */
+    { gcSHADER_INTEGER_X16,  GL_NONE,                      0},                                                                      /* 0xAD */
+    { gcSHADER_UINT_X8,      GL_NONE,                      0},                                                                      /* 0xAE */
+    { gcSHADER_UINT_X16,     GL_NONE,                      0},                                                                      /* 0xAF */
+    { gcSHADER_FLOAT_X8,     GL_NONE,                      0},                                                                      /* 0xB0 */
+    { gcSHADER_FLOAT_X16,    GL_NONE,                      0},                                                                      /* 0xB1 */
+    { gcSHADER_INT64_X8,     GL_NONE,                      0},                                                                      /* 0xB2 */
+    { gcSHADER_INT64_X16,    GL_NONE,                      0},                                                                      /* 0xB3 */
+    { gcSHADER_UINT64_X8,    GL_NONE,                      0},                                                                      /* 0xB4 */
+    { gcSHADER_UINT64_X16,   GL_NONE,                      0},                                                                      /* 0xB5 */
 
     /*halType                glType                     size    */
     {gcSHADER_FLOAT64_X1,    GL_NONE,                      0},
@@ -327,7 +338,7 @@ __GLchipUniformTypeInfo g_typeInfos[] =
     {gcSHADER_FLOAT64_X8,    GL_NONE,                      0},
     {gcSHADER_FLOAT64_X16,   GL_NONE,                      0},
 
-    /* OpenGL 4.0 types  */
+    /* OpenGL 4.0 types */
     { gcSHADER_SAMPLER_2D_RECT,         GL_NONE,           0},
     { gcSHADER_ISAMPLER_2D_RECT,        GL_NONE,           0},
     { gcSHADER_USAMPLER_2D_RECT,        GL_NONE,           0},
@@ -402,8 +413,8 @@ _FlushChannelOfPatchedUniformImm(
 
     address = psBase + hwPatchedConstRegAddr * 16 + patchedSingleChannel * 4;
 
-    gcoSHADER_ProgramUniformEx(gcvNULL, address, 1, 1, 1, gcvFALSE, 4, 4,
-                               (gctPOINTER)&channelData, gcvUNIFORMCVT_NONE, gcSHADER_TYPE_FRAGMENT);
+    gcoSHADER_BindUniform(gcvNULL, address, hwPatchedConstRegAddr, 1, 1, 1, gcvFALSE, 4, 4,
+                         (gctPOINTER)&channelData, gcvUNIFORMCVT_NONE, gcSHADER_TYPE_FRAGMENT);
 }
 
 __GL_INLINE void
@@ -616,7 +627,7 @@ gcChipUtilFindUniformUsage(
         }
         else
         {
-            gcmASSERT(isImageType(parentUniform->u.type));
+            gcmASSERT(isOGLImageType(parentUniform->u.type));
             subUsage = __GL_CHIP_UNIFORM_SUB_USAGE_IMAGE_SIZE;
         }
     }
@@ -697,7 +708,7 @@ gcChipUtilFindSsbUsage(
 
     gcmHEADER_ARG("name=%s ", name);
 
-    if (gcmIS_SUCCESS(gcoOS_StrCmp(name, "#sh_sharedVar")))
+    if (gcmIS_SUCCESS(gcoOS_StrCmp(name, _sldSharedVariableStorageBlockName)))
     {
         usage = __GL_CHIP_SSB_USAGE_SHAREDVAR;
     }
@@ -1011,6 +1022,26 @@ gcChipGetUniformArrayInfo(
     return entries;
 }
 
+static gctBOOL
+gcChipCheckUniformActive(
+    IN     __GLcontext *gc,
+    IN     __GLchipSLProgram *program,
+    IN     gcSHADER Shader,
+    IN     gcUNIFORM HalUniform
+    )
+{
+    gctBOOL isActive = gcvTRUE;
+
+    if (!HalUniform || isUniformImmediate(HalUniform) ||
+        (isUniformInactive(HalUniform) && HalUniform->location == -1))
+    {
+        isActive = gcvFALSE;
+    }
+
+
+    return isActive;
+}
+
 static GLuint
 gcChipCountUniforms(
     IN     __GLcontext *gc,
@@ -1044,8 +1075,7 @@ gcChipCountUniforms(
         gcmVERIFY_OK(gcSHADER_GetUniform(Shader, i, &uniform));
 
         /* Skip inactive and not located uniforms */
-        if (!uniform || isUniformImmediate(uniform) ||
-            (isUniformInactive(uniform) && uniform->location == -1))
+        if (!gcChipCheckUniformActive(gc, program, Shader, uniform))
         {
             continue;
         }
@@ -1330,8 +1360,7 @@ gcChipProcessUniforms(
         }
 
         /* Skip inactive and not located uniforms */
-        if (!uniform || isUniformImmediate(uniform) ||
-            (isUniformInactive(uniform) && uniform->location == -1))
+        if (!gcChipCheckUniformActive(gc, program, Shader, uniform))
         {
             continue;
         }
@@ -1987,7 +2016,8 @@ gcChipProcessUniformBlocks(
         gcmVERIFY_OK(gcSHADER_GetUniform(Shader, GetUBIndex(uniformBlock), &ubUniform));
 
         /* Skip inactive uniform blocks */
-        if (isUniformInactive(ubUniform))
+        if (isUniformInactive(ubUniform) ||
+            (GetUniformArraySize(ubUniform) > 1 && GetUBArrayIndex(uniformBlock) >= GetUniformUsedArraySize(ubUniform)))
         {
             continue;
         }
@@ -4044,7 +4074,7 @@ gcChipProgramBuildBindingInfo(
         __GLchipSLBinding *binding;
         __GLchipSLInput *input;
         gctBOOL bGLSL1_0 = (firstStage == __GLSL_STAGE_VS)
-                         ? gcShader_IsES11Compiler(pBinaries[firstStage])
+                         ? gcSHADER_IsES11Compiler(pBinaries[firstStage])
                          : gcvFALSE;
         gctUINT locationIndex = 0;
         gctUINT aliasedIndex = 0;
@@ -6765,6 +6795,7 @@ gcChipFlushSingleUniform(
 
             if (halUniform && isUniformUsedInShader(halUniform))
             {
+                gctINT32 index;
                 GL_ASSERT(GetUniformPhysical(halUniform) != -1);
 
                 arraySize = GetUniformUsedArraySize(halUniform);
@@ -6790,9 +6821,12 @@ gcChipFlushSingleUniform(
                     convert = gcvUNIFORMCVT_NONE;
                 }
 
-                gcmONERROR(gcoSHADER_ProgramUniformEx(gcvNULL, uniform->stateAddress[stageIdx] + uniform->regOffset,
-                                                      columns, rows, arraySize, gcvFALSE, matrixStride,
-                                                      arrayStride, data, convert, GetUniformShaderKind(halUniform)));
+                index = GetUniformPhysical(halUniform) + (uniform->regOffset >> 4);
+
+                gcmONERROR(gcoSHADER_BindUniform(gcvNULL, uniform->stateAddress[stageIdx] + uniform->regOffset, index,
+                                                 columns, rows, arraySize, gcvFALSE, matrixStride,
+                                                 arrayStride, data, convert, GetUniformShaderKind(halUniform)));
+
                 if (gcmOPT_DUMP_UNIFORM())
                 {
                     gcChipDumpGLUniform(uniform, uniform->dataType, 1, 0);
@@ -6969,12 +7003,24 @@ __glChipCompileShader(
         shaderObject->shaderInfo.hBinary = gcvNULL;
     }
 
+    /* Enable it for CTS in nanoUltra3. */
+    if ((chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_OESCTS || chipCtx->patchId == gcvPATCH_GTFES30) &&
+        (chipCtx->chipModel == gcv880 && chipCtx->chipRevision == 0x5124))
+    {
+        gcOPT_SetFeature(FB_TREAT_CONST_ARRAY_AS_UNIFORM);
+    }
+
     gcmONERROR((*chipCtx->pfCompile)(shaderType,
                                      shaderObject->shaderInfo.sourceSize,
                                      shaderObject->shaderInfo.source,
                                      (gcSHADER*)&shaderObject->shaderInfo.hBinary,
                                      (gctSTRING*)&shaderObject->shaderInfo.compiledLog));
 
+    if ((chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_OESCTS || chipCtx->patchId == gcvPATCH_GTFES30) &&
+        (chipCtx->chipModel == gcv880 && chipCtx->chipRevision == 0x5124))
+    {
+        gcOPT_ResetFeature(FB_TREAT_CONST_ARRAY_AS_UNIFORM);
+    }
 
     gcmFOOTER_ARG("return=%d", gcvTRUE);
     return gcvTRUE;
@@ -7462,13 +7508,46 @@ __glChipLinkProgram(
         if (patchedSrcs[stage])
         {
             __GLshaderObject *shaderObj = programObject->programInfo.attachedShader[stage];
+            gcSHADER preBinary = (gcSHADER)shaderObj->shaderInfo.hBinary;
+            gctSTRING preLog = shaderObj->shaderInfo.compiledLog;
+
+            shaderObj->shaderInfo.hBinary = gcvNULL;
+            shaderObj->shaderInfo.compiledLog = gcvNULL;
 
             /* Recompile the patched shaders. */
-            (*chipCtx->pfCompile)(shaderTypes[stage],
-                                  (gctUINT)gcoOS_StrLen(patchedSrcs[stage], gcvNULL),
-                                  patchedSrcs[stage],
-                                  (gcSHADER*)&shaderObj->shaderInfo.hBinary,
-                                  (gctSTRING*)&shaderObj->shaderInfo.compiledLog);
+            status = (*chipCtx->pfCompile)(shaderTypes[stage],
+                                           (gctUINT)gcoOS_StrLen(patchedSrcs[stage], gcvNULL),
+                                           patchedSrcs[stage],
+                                           (gcSHADER*)&shaderObj->shaderInfo.hBinary,
+                                           (gctSTRING*)&shaderObj->shaderInfo.compiledLog);
+
+            /* If patch compile failed, roll back.*/
+            if (gcmIS_ERROR(status))
+            {
+                /* Reset pre value.*/
+                /* If failed, hBinary already destory.*/
+                shaderObj->shaderInfo.hBinary = preBinary;
+
+                if (shaderObj->shaderInfo.compiledLog)
+                {
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, shaderObj->shaderInfo.compiledLog));
+                }
+                shaderObj->shaderInfo.compiledLog = preLog;
+            }
+            else
+            {
+                /* destroy preBinary.*/
+                if (preBinary)
+                {
+                    gcmVERIFY_OK(gcSHADER_Destroy(preBinary));
+                    preBinary = gcvNULL;
+                }
+
+                if (preLog)
+                {
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, preLog));
+                }
+            }
         }
 
         if (program->progFlags.disableLoopUnrolling)
@@ -7652,7 +7731,7 @@ __glChipLinkProgram(
     /* set attribute location */
     vsBinary = masterPgInstance->binaries[__GLSL_STAGE_VS];
 
-    if (vsBinary && gcShader_IsES11Compiler(vsBinary) && program->mayHasAliasedAttrib)
+    if (vsBinary && gcSHADER_IsES11Compiler(vsBinary) && program->mayHasAliasedAttrib)
     {
         __GLchipSLBinding *binding;
         for (binding = program->attribBinding; binding != gcvNULL;  binding = binding->next)
@@ -8618,8 +8697,29 @@ __glChipGetAttributeLocation(
                     gcmIS_SUCCESS(gcoOS_StrNCmp(name, program->attribLocation[attribIndex].pInput->name, nameLen))
                     )
                 {
+                    GLuint comNum = 1;
+                    switch (program->attribLocation[attribIndex].pInput->type)
+                    {
+                    case gcSHADER_FLOAT_2X2:
+                    case gcSHADER_FLOAT_2X3:
+                    case gcSHADER_FLOAT_2X4:
+                        comNum = 2;
+                        break;
+                    case gcSHADER_FLOAT_3X2:
+                    case gcSHADER_FLOAT_3X3:
+                    case gcSHADER_FLOAT_3X4:
+                        comNum = 3;
+                        break;
+                    case gcSHADER_FLOAT_4X2:
+                    case gcSHADER_FLOAT_4X3:
+                    case gcSHADER_FLOAT_4X4:
+                        comNum = 4;
+                        break;
+                    default:
+                        break;
+                    }
                     gcmFOOTER_ARG("return=%d", i);
-                    return i + (GLuint)arrayIdx;
+                    return i + (GLuint)(arrayIdx * comNum);
                 }
             }
         }
@@ -9660,6 +9760,9 @@ gcChipFlushUniformBlock(
         if (ub->mapFlags[stageIdx] & gcdUB_MAPPED_TO_MEM)
         {
             gctUINT32 physicalAddress = 0;
+            gctINT32 index;
+            gctUINT32 data;
+            gctUINT32 baseOffset;
 
             if (gc->shaderProgram.boundPPO || chipCtx->chipDirty.uDefer.sDefer.pgInsChanged)
             {
@@ -9669,18 +9772,21 @@ gcChipFlushUniformBlock(
             }
 
             physicalAddress = ub->stateAddress[stageIdx];
+            index = GetUniformPhysical(ubUniform);
 
             if (-1 != GetUBArrayIndex(ub->halUB[stageIdx]))
             {
                 physicalAddress += GetUBArrayIndex(ub->halUB[stageIdx]) * 16;
+                index += GetUBArrayIndex(ub->halUB[stageIdx]);
             }
 
-            gcmONERROR(gcoSHADER_BindBufferBlock(gcvNULL,
-                                                 physicalAddress,
-                                                 physical,
-                                                 offset,
-                                                 size,
-                                                 GetUniformShaderKind(ubUniform)));
+            gcmSAFECASTSIZET(baseOffset, offset);
+
+            data = physical + baseOffset;
+
+            gcmONERROR(gcoSHADER_BindUniform(gcvNULL, physicalAddress, index,
+                                             1, 1, 1, gcvFALSE, 1, 4,
+                                             &data, gcvFALSE, GetUniformShaderKind(ubUniform)));
 
             if (program->progFlags.robustEnabled)
             {
@@ -9694,12 +9800,13 @@ gcChipFlushUniformBlock(
                 addressLimit[0] = physical;
                 addressLimit[1] = physical + bufSize - 1;
 
-                gcmONERROR(gcoSHADER_ProgramUniformEx(
-                    gcvNULL, (physicalAddress + 4),
-                    2, 1, 1, gcvFALSE,
-                    1,
-                    4,
-                    addressLimit, gcvFALSE, GetUniformShaderKind(ubUniform)));
+                /*the base channel of the ubo must be x or y*/
+                gcmASSERT((physicalAddress & 0xF) == 0x0 || (physicalAddress & 0xF) == 0x4);
+
+                gcmONERROR(gcoSHADER_BindUniform(gcvNULL, physicalAddress + 4, index,
+                                                 2, 1, 1, gcvFALSE, 0, 0,
+                                                 addressLimit, gcvFALSE, GetUniformShaderKind(ubUniform)));
+
             }
         }
 
@@ -9760,11 +9867,11 @@ gcChipFlushUniformBlock(
                     entries = gcChipGetUniformArrayInfo(uniform, gcvNULL, gcvNULL, gcvNULL, &arraySize);
                     arraySize *= entries;   /* Expand array size for array of arrays to one dimension */
 
-                    gcmONERROR(gcoSHADER_ProgramUniformEx(gcvNULL, physicalAddress,
-                                                          numCols, numRows, arraySize, isRowMajor,
-                                                          (gctSIZE_T)GetUniformMatrixStride(uniform),
-                                                          (gctSIZE_T)GetUniformArrayStride(uniform),
-                                                          pData, convert, GetUniformShaderKind(uniform)));
+                    gcmONERROR(gcoSHADER_BindUniform(gcvNULL, physicalAddress, GetUniformPhysical(uniform),
+                                                     numCols, numRows, arraySize, isRowMajor,
+                                                     (gctSIZE_T)GetUniformMatrixStride(uniform),
+                                                     (gctSIZE_T)GetUniformArrayStride(uniform),
+                                                     pData, convert, GetUniformShaderKind(uniform)));
                 }
             }
         }
@@ -10666,17 +10773,18 @@ gcChipFlushAtomicCounterBuffers(
                     if (acb->halUniform[stageIdx])
                     {
                         gctUINT32 physicalAddr;
+                        gctINT32 index;
+                        gctUINT32 data;
 
                         gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->hwConstRegBases,
                                                                           acb->halUniform[stageIdx],
                                                                           &physicalAddr));
+                        data = physical + (gctUINT32)pBindingPoint->bufOffset;
+                        index = GetUniformPhysical(acb->halUniform[stageIdx]);
 
-                        gcmERR_BREAK(gcoSHADER_BindBufferBlock(gcvNULL,
-                                                              physicalAddr,
-                                                              physical,
-                                                              pBindingPoint->bufOffset,
-                                                              requiredSize,
-                                                              __glChipGLShaderStageToShaderKind[stageIdx]));
+                        gcmONERROR(gcoSHADER_BindUniform(gcvNULL, physicalAddr, index,
+                                                         1, 1, 1, gcvFALSE, 1, 4,
+                                                         &data, gcvFALSE, __glChipGLShaderStageToShaderKind[stageIdx]));
 
                         if (program->progFlags.robustEnabled)
                         {
@@ -10690,12 +10798,12 @@ gcChipFlushAtomicCounterBuffers(
                             addressLimit[0] = physical;
                             addressLimit[1] = physical + bufSize - 1;
 
-                            gcmONERROR(gcoSHADER_ProgramUniformEx(
-                                gcvNULL, (physicalAddr + 4),
-                                1, 1, 2, gcvFALSE,
-                                1,
-                                4,
-                                addressLimit, gcvFALSE, __glChipGLShaderStageToShaderKind[stageIdx]));
+                            /*the base channel of the ubo must be x or y*/
+                            gcmASSERT((physicalAddr & 0xF) == 0x0 || (physicalAddr & 0xF) == 0x4);
+
+                            gcmONERROR(gcoSHADER_BindUniform(gcvNULL, physicalAddr + 4, index,
+                                                             2, 1, 1, gcvFALSE, 0, 0,
+                                                             addressLimit, gcvFALSE, __glChipGLShaderStageToShaderKind[stageIdx]));
                         }
                     }
                 }
@@ -10796,6 +10904,7 @@ gcChipFlushUserDefSSBs(
             {
                 gcUNIFORM sbUniform = sb->halUniform[stageIdx];
                 gctUINT32 unsizedArrayLength = 0;
+                gctINT32 data, index;
 
                 if (!(sbUniform && isUniformUsedInShader(sbUniform)))
                 {
@@ -10822,12 +10931,12 @@ gcChipFlushUserDefSSBs(
                                                                       &sb->stateAddress[stageIdx]));
                 }
 
-                gcmONERROR(gcoSHADER_BindBufferBlock(gcvNULL,
-                                                     sb->stateAddress[stageIdx],
-                                                     physical,
-                                                     pBindingPoint->bufOffset,
-                                                     requiredSize,
-                                                     GetUniformShaderKind(sbUniform)));
+                data = physical + (gctUINT32)pBindingPoint->bufOffset;
+                index = GetUniformPhysical(sbUniform);
+
+                gcmONERROR(gcoSHADER_BindUniform(gcvNULL, sb->stateAddress[stageIdx], index,
+                                                 1, 1, 1, gcvFALSE, 1, 4,
+                                                 &data, gcvFALSE, GetUniformShaderKind(sbUniform)));
 
                 if (program->progFlags.robustEnabled)
                 {
@@ -10842,19 +10951,23 @@ gcChipFlushUserDefSSBs(
                     addressLimit[1] = physical + bufSize - 1; /* upper limit */
                     addressLimit[2] = unsizedArrayLength;     /* size */
 
-                    gcmONERROR(gcoSHADER_ProgramUniformEx(
-                        gcvNULL, (sb->stateAddress[stageIdx] + 4),
-                        3, 1, 1, gcvFALSE,
-                        1,
-                        4,
-                        addressLimit, gcvFALSE, GetUniformShaderKind(sbUniform)));
+                    /*the base channel of the ubo must be x*/
+                    gcmASSERT((sb->stateAddress[stageIdx] & 0xF) == 0x0);
+
+                    gcmONERROR(gcoSHADER_BindUniform(gcvNULL, sb->stateAddress[stageIdx] + 4, index,
+                                                     3, 1, 1, gcvFALSE, 0, 0,
+                                                     addressLimit, gcvFALSE, GetUniformShaderKind(sbUniform)));
                 }
                 else
                 {
-                    gcmONERROR(gcoSHADER_ProgramUniformEx(
-                        gcvNULL, sb->stateAddress[stageIdx] + 4,
-                        1, 1, 1, gcvFALSE, 1,
-                        1, &unsizedArrayLength, gcvFALSE, GetUniformShaderKind(sbUniform)));
+                    if ((sb->stateAddress[stageIdx] & 0xF) == 0xC)
+                    {
+                        index += 1;
+                    }
+
+                    gcmONERROR(gcoSHADER_BindUniform(gcvNULL, sb->stateAddress[stageIdx] + 4, index,
+                                                     1, 1, 1, gcvFALSE, 1, 4,
+                                                     &unsizedArrayLength, gcvFALSE, GetUniformShaderKind(sbUniform)));
                 }
             }
 
@@ -10936,6 +11049,7 @@ gcChipFlushPrivateSSBs(
             for (stageIdx = __GLSL_STAGE_VS; stageIdx < __GLSL_STAGE_LAST; ++stageIdx)
             {
                 gcUNIFORM sbUniform = sb->halUniform[stageIdx];
+                gctINT32 index;
 
                 if (!(sbUniform && isUniformUsedInShader(sbUniform)))
                 {
@@ -10950,12 +11064,12 @@ gcChipFlushPrivateSSBs(
                                                                       &sb->stateAddress[stageIdx]));
                 }
 
-                gcmONERROR(gcoSHADER_BindBufferBlock(gcvNULL,
-                                                     sb->stateAddress[stageIdx],
-                                                     physical,
-                                                     0,
-                                                     dataSize,
-                                                     GetUniformShaderKind(sbUniform)));
+                index = GetUniformPhysical(sbUniform);
+
+                gcmONERROR(gcoSHADER_BindUniform(gcvNULL, sb->stateAddress[stageIdx], index,
+                                                 1, 1, 1, gcvFALSE, 1, 4,
+                                                 &physical, gcvFALSE, GetUniformShaderKind(sbUniform)));
+
                 if (program->progFlags.robustEnabled)
                 {
                     gctUINT32 addressLimit[2];
@@ -10968,12 +11082,12 @@ gcChipFlushPrivateSSBs(
                     addressLimit[0] = physical;               /* low limit */
                     addressLimit[1] = physical + bufSize - 1; /* upper limit */
 
-                    gcmONERROR(gcoSHADER_ProgramUniformEx(
-                        gcvNULL, (sb->stateAddress[stageIdx] + 4),
-                        1, 1, 2, gcvFALSE,
-                        1,
-                        4,
-                        addressLimit, gcvFALSE, GetUniformShaderKind(sbUniform)));
+                    /*the base channel of the ubo must be x or y*/
+                    gcmASSERT((sb->stateAddress[stageIdx] & 0xF) == 0x0 || (sb->stateAddress[stageIdx] & 0xF) == 0x4);
+
+                    gcmONERROR(gcoSHADER_BindUniform(gcvNULL, sb->stateAddress[stageIdx] + 4, index,
+                                                     2, 1, 1, gcvFALSE, 0, 0,
+                                                     addressLimit, gcvFALSE, GetUniformShaderKind(sbUniform)));
                 }
 
 
@@ -11198,6 +11312,16 @@ gcChipDynamicPatchProgram(
 
         /* Rebuilding uniform tables for the newly created uniform and samplers */
         gcmONERROR(gcChipProgramBindingRecompiledInfo(gc, programObject));
+
+        if (masterPgInstance->programState.hints->unifiedStatus.samplerCount > pgInstance->programState.hints->unifiedStatus.samplerCount)
+        {
+            pgInstance->programState.hints->unifiedStatus.samplerCount =
+            gcmMAX(pgInstance->programState.hints->unifiedStatus.samplerCount, masterPgInstance->programState.hints->unifiedStatus.samplerCount);
+
+            __GLES_PRINT("ES30:The sampelrCount of current program should be maximun between current program and master program after recompile");
+        }
+
+
     }
 
 OnError:

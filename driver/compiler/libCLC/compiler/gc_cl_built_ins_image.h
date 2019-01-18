@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -37,7 +37,7 @@
 
 static clsBUILTIN_FUNCTION    ImageBuiltinFunctions[] =
 {
-#if (_USE_TEXLD_FOR_IMAGE_SAMPLER || _USE_NEW_INSTRUCTION_FOR_IMAGE_RD_SAMPLER)
+#if (_OCL_USE_INTRINSIC_FOR_IMAGE || _USE_TEXLD_FOR_IMAGE_SAMPLER || _USE_NEW_INSTRUCTION_FOR_IMAGE_RD_SAMPLER)
     {clvEXTENSION_NONE,    "read_imagef",         T_FLOAT4, 3, {T_IMAGE2D_T, T_SAMPLER_T, T_INT2}, {0, 0, 0}, {0, 0, 1}, 1},
     {clvEXTENSION_NONE,    "read_imagef",         T_FLOAT4, 2, {T_IMAGE2D_T, T_INT2}, {0, 0}, {0, 1}, 1},
     {clvEXTENSION_NONE,    "read_imagef",         T_FLOAT4, 3, {T_IMAGE2D_T, T_SAMPLER_T, T_FLOAT2}, {0, 0, 0}, {0, 0, 1}, 1},
@@ -118,7 +118,7 @@ static clsBUILTIN_FUNCTION    ImageBuiltinFunctions[] =
     {clvEXTENSION_NONE,    "read_imageui",        T_UINT4, 3, {T_IMAGE1D_ARRAY_T, T_SAMPLER_T, T_INT2}, {0, 0, 0}, {0, 0, 1}, 0},
     {clvEXTENSION_NONE,    "read_imageui",        T_UINT4, 3, {T_IMAGE1D_ARRAY_T, T_SAMPLER_T, T_FLOAT2}, {0, 0, 0}, {0, 0, 1}, 0},
 #endif
-#if _USE_NEW_INSTRUCTION_FOR_IMAGE_WR_SAMPLER
+#if (_OCL_USE_INTRINSIC_FOR_IMAGE || _USE_NEW_INSTRUCTION_FOR_IMAGE_WR_SAMPLER)
     {clvEXTENSION_NONE,    "write_imagef",        T_VOID, 3, {T_IMAGE2D_T, T_INT2, T_FLOAT4}, {0, 0, 0}, {0, 0, 1}, 1},
     {clvEXTENSION_NONE,    "write_imagei",        T_VOID, 3, {T_IMAGE2D_T, T_INT2, T_INT4}, {0, 0, 0}, {0, 0, 1}, 1},
     {clvEXTENSION_NONE,    "write_imageui",       T_VOID, 3, {T_IMAGE2D_T, T_INT2, T_UINT4}, {0, 0, 0}, {0, 0, 1}, 1},
@@ -158,27 +158,35 @@ static clsBUILTIN_FUNCTION    ImageBuiltinFunctions[] =
     {clvEXTENSION_NONE,    "get_image_width",     T_INT, 1, {T_IMAGE1D_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_width",     T_INT, 1, {T_IMAGE1D_ARRAY_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_width",     T_INT, 1, {T_IMAGE1D_BUFFER_T}, {0}, {0}, 1},
+    {clvEXTENSION_NONE,    "get_image_width",     T_INT, 1, {T_VIV_GENERIC_IMAGE_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_height",    T_INT, 1, {T_IMAGE2D_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_height",    T_INT, 1, {T_IMAGE3D_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_height",    T_INT, 1, {T_IMAGE2D_ARRAY_T}, {0}, {0}, 1},
+    {clvEXTENSION_NONE,    "get_image_height",    T_INT, 1, {T_VIV_GENERIC_IMAGE_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_depth",     T_INT, 1, {T_IMAGE3D_T}, {0}, {0}, 1},
+    {clvEXTENSION_NONE,    "get_image_depth",     T_INT, 1, {T_VIV_GENERIC_IMAGE_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_channel_data_type",   T_INT, 1, {T_IMAGE2D_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_channel_data_type",   T_INT, 1, {T_IMAGE3D_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_channel_data_type",   T_INT, 1, {T_IMAGE1D_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_channel_data_type",   T_INT, 1, {T_IMAGE1D_ARRAY_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_channel_data_type",   T_INT, 1, {T_IMAGE1D_BUFFER_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_channel_data_type",   T_INT, 1, {T_IMAGE2D_ARRAY_T}, {0}, {0}, 1},
+    {clvEXTENSION_NONE,    "get_image_channel_data_type",   T_INT, 1, {T_VIV_GENERIC_IMAGE_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_channel_order",       T_INT, 1, {T_IMAGE2D_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_channel_order",       T_INT, 1, {T_IMAGE3D_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_channel_order",       T_INT, 1, {T_IMAGE1D_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_channel_order",       T_INT, 1, {T_IMAGE1D_ARRAY_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_channel_order",       T_INT, 1, {T_IMAGE1D_BUFFER_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_channel_order",       T_INT, 1, {T_IMAGE2D_ARRAY_T}, {0}, {0}, 1},
+    {clvEXTENSION_NONE,    "get_image_channel_order",       T_INT, 1, {T_VIV_GENERIC_IMAGE_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_dim",       T_INT2, 1, {T_IMAGE2D_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_dim",       T_INT4, 1, {T_IMAGE3D_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_dim",       T_INT2, 1, {T_IMAGE2D_ARRAY_T}, {0}, {0}, 1},
+    {clvEXTENSION_NONE,    "get_image_dim",       T_INT4, 1, {T_VIV_GENERIC_IMAGE_T}, {0}, {0}, 1},
+    {clvEXTENSION_NONE,    "get_image_dim",       T_INT2, 1, {T_VIV_GENERIC_IMAGE_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_array_size",       T_INT, 1, {T_IMAGE1D_ARRAY_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_array_size",       T_INT, 1, {T_IMAGE2D_ARRAY_T}, {0}, {0}, 1},
+    {clvEXTENSION_NONE,    "get_image_array_size",       T_INT, 1, {T_VIV_GENERIC_IMAGE_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "viv_texld",           T_FLOAT4, 2, {T_UINT, T_FLOAT2}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "viv_read_imagef",     T_FLOAT4, 3, {T_IMAGE2D_T, T_SAMPLER_T, T_INT2}, {0, 0, 0}, {0, 0, 1}, 0},
     {clvEXTENSION_NONE,    "viv_read_imagef",     T_FLOAT4, 3, {T_IMAGE2D_T, T_SAMPLER_T, T_FLOAT2}, {0, 0, 0}, {0, 0, 1}, 0},
@@ -201,9 +209,8 @@ static clsBUILTIN_FUNCTION    ImageBuiltinFunctions[] =
 
 #define _cldImageBuiltinFunctionCount (sizeof(ImageBuiltinFunctions) / sizeof(clsBUILTIN_FUNCTION))
 
-#if _USE_NEW_INSTRUCTION_FOR_IMAGE_RD_SAMPLER
 static gceSTATUS
-_GenReadImageSamplerCode(
+_GenOldReadImageSamplerCode(
     IN cloCOMPILER Compiler,
     IN cloCODE_GENERATOR CodeGenerator,
     IN cloIR_POLYNARY_EXPR PolynaryExpr,
@@ -276,6 +283,131 @@ _GenReadImageSamplerCode(
     }
 
     return gcvSTATUS_OK;
+}
+
+static gceSTATUS
+_GenOldWriteImageCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters
+    )
+{
+    gceSTATUS status;
+    clsIOPERAND iOperand[1];
+    clsLOPERAND lOperand[1];
+    cleOPCODE   opcode;
+
+    if (clmIsElementTypeImage3D(clmGEN_CODE_elementType_GET(OperandsParameters[0].rOperands[0].dataType)))
+    {
+        opcode = clvOPCODE_IMAGE_WRITE_3D;
+    }
+    else
+    {
+        opcode = clvOPCODE_IMAGE_WRITE;
+    }
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+    clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 3);
+    gcmASSERT(OperandsParameters);
+
+    clsIOPERAND_New(Compiler, iOperand, OperandsParameters[2].rOperands[0].dataType);
+    clsLOPERAND_InitializeUsingIOperand(lOperand, iOperand);
+    status = clGenAssignCode(Compiler,
+                             PolynaryExpr->exprBase.base.lineNo,
+                             PolynaryExpr->exprBase.base.stringNo,
+                             lOperand,
+                             &OperandsParameters[2].rOperands[0]);
+    if (gcmIS_ERROR(status)) return status;
+
+    return clGenGenericCode2(Compiler,
+                             PolynaryExpr->exprBase.base.lineNo,
+                             PolynaryExpr->exprBase.base.stringNo,
+                             opcode,
+                             iOperand,
+                             &OperandsParameters[0].rOperands[0],
+                             &OperandsParameters[1].rOperands[0]);
+}
+
+#if _OCL_USE_INTRINSIC_FOR_IMAGE
+static gceSTATUS
+_GenReadImageSamplerCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    if(cloCOMPILER_IsGcslDriverImage(Compiler)) {
+        return _GenOldReadImageSamplerCode(Compiler,
+                                           CodeGenerator,
+                                           PolynaryExpr,
+                                           OperandCount,
+                                           OperandsParameters,
+                                           IOperand);
+    }
+    else {
+        clvVIR_IK   intrinsicKind;
+        clsLOPERAND lOperand[1];
+        clsROPERAND rOperands[3];
+
+        /* Verify the arguments. */
+        clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+        clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+        gcmASSERT(OperandCount == 3 || OperandCount == 2);
+        gcmASSERT(OperandsParameters);
+        gcmASSERT(IOperand);
+
+        if (clmIsElementTypeImage3D(clmGEN_CODE_elementType_GET(OperandsParameters[0].rOperands[0].dataType)))
+        {
+            intrinsicKind = CL_VIR_IK_image_load_3d;
+        }
+        else
+        {
+            intrinsicKind = CL_VIR_IK_image_load;
+        }
+
+        clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
+        rOperands[0] = OperandsParameters[0].rOperands[0];
+        if(OperandCount == 3) {
+            rOperands[1] = OperandsParameters[2].rOperands[0];
+            rOperands[2] = OperandsParameters[1].rOperands[0];
+        }
+        else rOperands[1] = OperandsParameters[1].rOperands[0];
+
+        return  clGenIntrinsicAsmCode(Compiler,
+                                      PolynaryExpr->exprBase.base.lineNo,
+                                      PolynaryExpr->exprBase.base.stringNo,
+                                      intrinsicKind,
+                                      lOperand,
+                                      OperandCount,
+                                      rOperands);
+    }
+}
+
+#else
+#if _USE_NEW_INSTRUCTION_FOR_IMAGE_RD_SAMPLER
+static gceSTATUS
+_GenReadImageSamplerCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    return _GenOldReadImageSamplerCode(Compiler,
+                                       CodeGenerator,
+                                       PolynaryExpr,
+                                       OperandCount,
+                                       OperandsParameters,
+                                       IOperand);
 }
 #else
 #if _USE_TEXLD_FOR_IMAGE_SAMPLER
@@ -393,7 +525,63 @@ _GenTextureCode(
 }
 #endif
 #endif
+#endif
 
+#if _OCL_USE_INTRINSIC_FOR_IMAGE
+static gceSTATUS
+_GenWriteImageCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters
+    )
+{
+    if(cloCOMPILER_IsGcslDriverImage(Compiler)) {
+        return _GenOldWriteImageCode(Compiler,
+                                     CodeGenerator,
+                                     PolynaryExpr,
+                                     OperandCount,
+                                     OperandsParameters);
+    }
+    else {
+        clvVIR_IK   intrinsicKind;
+        clsIOPERAND iOperand[1];
+        clsLOPERAND lOperand[1];
+        clsROPERAND rOperands[3];
+
+        /* Verify the arguments. */
+        clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+        clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+        gcmASSERT(OperandCount == 3);
+        gcmASSERT(OperandsParameters);
+
+        if (clmIsElementTypeImage3D(clmGEN_CODE_elementType_GET(OperandsParameters[0].rOperands[0].dataType)))
+        {
+            intrinsicKind = CL_VIR_IK_image_store_3d;
+        }
+        else
+        {
+            intrinsicKind = CL_VIR_IK_image_store;
+        }
+
+        clsIOPERAND_New(Compiler, iOperand, OperandsParameters[2].rOperands[0].dataType);
+        clsLOPERAND_InitializeUsingIOperand(lOperand, iOperand);
+        rOperands[0] = OperandsParameters[0].rOperands[0];
+        rOperands[1] = OperandsParameters[1].rOperands[0];
+        rOperands[2] = OperandsParameters[2].rOperands[0];
+
+        return  clGenIntrinsicAsmCode(Compiler,
+                                      PolynaryExpr->exprBase.base.lineNo,
+                                      PolynaryExpr->exprBase.base.stringNo,
+                                      intrinsicKind,
+                                      lOperand,
+                                      OperandCount,
+                                      rOperands);
+    }
+}
+
+#else
 #if _USE_NEW_INSTRUCTION_FOR_IMAGE_WR_SAMPLER
 static gceSTATUS
 _GenWriteImageCode(
@@ -404,43 +592,13 @@ _GenWriteImageCode(
     IN clsGEN_CODE_PARAMETERS * OperandsParameters
     )
 {
-    gceSTATUS status;
-    clsIOPERAND iOperand[1];
-    clsLOPERAND lOperand[1];
-    cleOPCODE   opcode;
-
-    if (clmIsElementTypeImage3D(clmGEN_CODE_elementType_GET(OperandsParameters[0].rOperands[0].dataType)))
-    {
-        opcode = clvOPCODE_IMAGE_WRITE_3D;
-    }
-    else
-    {
-        opcode = clvOPCODE_IMAGE_WRITE;
-    }
-
-    /* Verify the arguments. */
-    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
-    clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
-    gcmASSERT(OperandCount == 3);
-    gcmASSERT(OperandsParameters);
-
-    clsIOPERAND_New(Compiler, iOperand, OperandsParameters[2].rOperands[0].dataType);
-    clsLOPERAND_InitializeUsingIOperand(lOperand, iOperand);
-    status = clGenAssignCode(Compiler,
-                             PolynaryExpr->exprBase.base.lineNo,
-                             PolynaryExpr->exprBase.base.stringNo,
-                             lOperand,
-                             &OperandsParameters[2].rOperands[0]);
-    if (gcmIS_ERROR(status)) return status;
-
-    return clGenGenericCode2(Compiler,
-                             PolynaryExpr->exprBase.base.lineNo,
-                             PolynaryExpr->exprBase.base.stringNo,
-                             opcode,
-                             iOperand,
-                             &OperandsParameters[0].rOperands[0],
-                             &OperandsParameters[1].rOperands[0]);
+    return _GenOldWriteImageCode(Compiler,
+                                 CodeGenerator,
+                                 PolynaryExpr,
+                                 OperandCount,
+                                 OperandsParameters);
 }
+#endif
 #endif
 
 static gceSTATUS
@@ -1901,8 +2059,6 @@ _GenSoftReadImageFCode(
                             rOperandAddr,
                             &constROperand2));
 
-        /* TODO - Need to check image channel order to determine border color. */
-
         /* Clamp to edge (width - 1). */
         gcmONERROR(clGenAssignCode(Compiler,
                                    PolynaryExpr->exprBase.base.lineNo,
@@ -1926,8 +2082,6 @@ _GenSoftReadImageFCode(
                        &constROperand0);
 
         /* If CLK_ADDRESS_CLAMP, return border color. */
-
-        /* TODO - Need to check image channel order to determine border color. */
 
         /* Return border color (all 0.0). */
         gcmONERROR(clGenCompareJumpCode(Compiler,
@@ -1968,9 +2122,6 @@ _GenSoftReadImageFCode(
                        clvCONDITION_GREATER_THAN_EQUAL,
                        rOperandH);
 
-        /* If CLK_ADDRESS_CLAMP, return border color. */
-        /* TODO - Need to check image channel order to determine border color. */
-
         /* Return border color (all 0.0). */
         gcmONERROR(clGenCompareJumpCode(Compiler,
                             CodeGenerator,
@@ -2003,8 +2154,6 @@ _GenSoftReadImageFCode(
                        rOperandJ0,
                        clvCONDITION_LESS_THAN,
                        &constROperand0);
-
-        /* TODO - Need to check image channel order to determine border color. */
 
         /* Return border color (all 0.0). */
         gcmONERROR(clGenCompareJumpCode(Compiler,
@@ -2083,8 +2232,6 @@ _GenSoftReadImageFCode(
 
         /* If CLK_ADDRESS_CLAMP, return border color. */
 
-        /* TODO - Need to check image channel order to determine border color. */
-
         /* Return border color (all 0.0). */
 
         gcmONERROR(clGenCompareJumpCode(Compiler,
@@ -2120,8 +2267,6 @@ _GenSoftReadImageFCode(
                        &constROperand0);
 
         /* If CLK_ADDRESS_CLAMP, return border color. */
-
-        /* TODO - Need to check image channel order to determine border color. */
 
         /* Return border color (all 0.0). */
         gcmONERROR(clGenCompareJumpCode(Compiler,
@@ -2162,9 +2307,6 @@ _GenSoftReadImageFCode(
                        clvCONDITION_GREATER_THAN_EQUAL,
                        rOperandH);
 
-        /* If CLK_ADDRESS_CLAMP, return border color. */
-        /* TODO - Need to check image channel order to determine border color. */
-
         /* Return border color (all 0.0). */
         gcmONERROR(clGenCompareJumpCode(Compiler,
                             CodeGenerator,
@@ -2199,8 +2341,6 @@ _GenSoftReadImageFCode(
                        &constROperand0);
 
         /* If CLK_ADDRESS_CLAMP, return border color. */
-
-        /* TODO - Need to check image channel order to determine border color. */
 
         /* Return border color (all 0.0). */
         gcmONERROR(clGenCompareJumpCode(Compiler,
@@ -3609,7 +3749,7 @@ _GenReadImageFCode(
         if (gcmIS_ERROR(status)) return status;
     }
 
-#if _USE_NEW_INSTRUCTION_FOR_IMAGE_RD_SAMPLER
+#if (_OCL_USE_INTRINSIC_FOR_IMAGE || _USE_NEW_INSTRUCTION_FOR_IMAGE_RD_SAMPLER)
     return _GenReadImageSamplerCode(Compiler,
                                     CodeGenerator,
                                     PolynaryExpr,
@@ -4230,8 +4370,6 @@ _GenSoftReadImageICode(
                        clvCONDITION_EQUAL,
                        &constROperand2);
 
-        /* TODO - Need to check image channel order to determine border color. */
-
         /* Return border color (all 0.0). */
         gcmONERROR(clGenGenericCode1(Compiler,
                                      PolynaryExpr->exprBase.base.lineNo,
@@ -4281,8 +4419,6 @@ _GenSoftReadImageICode(
                        &rOperand[4],
                        clvCONDITION_EQUAL,
                        &constROperand2);
-
-        /* TODO - Need to check image channel order to determine border color. */
 
         /* Return border color (all 0.0). */
         gcmONERROR(clGenGenericCode1(Compiler,
@@ -4339,8 +4475,6 @@ _GenSoftReadImageICode(
                        clvCONDITION_EQUAL,
                        &constROperand2);
 
-        /* TODO - Need to check image channel order to determine border color. */
-
         /* Return border color (all 0.0). */
         gcmONERROR(clGenGenericCode1(Compiler,
                                      PolynaryExpr->exprBase.base.lineNo,
@@ -4390,8 +4524,6 @@ _GenSoftReadImageICode(
                        &rOperand[4],
                        clvCONDITION_EQUAL,
                        &constROperand2);
-
-        /* TODO - Need to check image channel order to determine border color. */
 
         /* Return border color (all 0.0). */
         gcmONERROR(clGenGenericCode1(Compiler,
@@ -4478,8 +4610,6 @@ _GenSoftReadImageICode(
                        clvCONDITION_EQUAL,
                        &constROperand2);
 
-        /* TODO - Need to check image channel order to determine border color. */
-
         /* Return border color (all 0.0). */
         gcmONERROR(clGenGenericCode1(Compiler,
                                      PolynaryExpr->exprBase.base.lineNo,
@@ -4529,8 +4659,6 @@ _GenSoftReadImageICode(
                        &rOperand[4],
                        clvCONDITION_EQUAL,
                        &constROperand2);
-
-        /* TODO - Need to check image channel order to determine border color. */
 
         /* Return border color (all 0.0). */
         gcmONERROR(clGenGenericCode1(Compiler,
@@ -4587,8 +4715,6 @@ _GenSoftReadImageICode(
                        clvCONDITION_EQUAL,
                        &constROperand2);
 
-        /* TODO - Need to check image channel order to determine border color. */
-
         /* Return border color (all 0.0). */
         gcmONERROR(clGenGenericCode1(Compiler,
                                      PolynaryExpr->exprBase.base.lineNo,
@@ -4638,8 +4764,6 @@ _GenSoftReadImageICode(
                        &rOperand[4],
                        clvCONDITION_EQUAL,
                        &constROperand2);
-
-        /* TODO - Need to check image channel order to determine border color. */
 
         /* Return border color (all 0.0). */
         gcmONERROR(clGenGenericCode1(Compiler,
@@ -4926,7 +5050,7 @@ _GenReadImageICode(
         if (gcmIS_ERROR(status)) return status;
     }
 
-#if _USE_NEW_INSTRUCTION_FOR_IMAGE_RD_SAMPLER
+#if (_OCL_USE_INTRINSIC_FOR_IMAGE || _USE_NEW_INSTRUCTION_FOR_IMAGE_RD_SAMPLER)
     return _GenReadImageSamplerCode(Compiler,
                                     CodeGenerator,
                                     PolynaryExpr,
@@ -5547,8 +5671,6 @@ _GenSoftReadImageUICode(
                        clvCONDITION_EQUAL,
                        &constROperand2);
 
-        /* TODO - Need to check image channel order to determine border color. */
-
         /* Return border color (all 0.0). */
         gcmONERROR(clGenGenericCode1(Compiler,
                                      PolynaryExpr->exprBase.base.lineNo,
@@ -5598,8 +5720,6 @@ _GenSoftReadImageUICode(
                        &rOperand[4],
                        clvCONDITION_EQUAL,
                        &constROperand2);
-
-        /* TODO - Need to check image channel order to determine border color. */
 
         /* Return border color (all 0.0). */
         gcmONERROR(clGenGenericCode1(Compiler,
@@ -5656,8 +5776,6 @@ _GenSoftReadImageUICode(
                        clvCONDITION_EQUAL,
                        &constROperand2);
 
-        /* TODO - Need to check image channel order to determine border color. */
-
         /* Return border color (all 0.0). */
         gcmONERROR(clGenGenericCode1(Compiler,
                                      PolynaryExpr->exprBase.base.lineNo,
@@ -5707,8 +5825,6 @@ _GenSoftReadImageUICode(
                        &rOperand[4],
                        clvCONDITION_EQUAL,
                        &constROperand2);
-
-        /* TODO - Need to check image channel order to determine border color. */
 
         /* Return border color (all 0.0). */
         gcmONERROR(clGenGenericCode1(Compiler,
@@ -5795,8 +5911,6 @@ _GenSoftReadImageUICode(
                        clvCONDITION_EQUAL,
                        &constROperand2);
 
-        /* TODO - Need to check image channel order to determine border color. */
-
         /* Return border color (all 0.0). */
         gcmONERROR(clGenGenericCode1(Compiler,
                                      PolynaryExpr->exprBase.base.lineNo,
@@ -5846,8 +5960,6 @@ _GenSoftReadImageUICode(
                        &rOperand[4],
                        clvCONDITION_EQUAL,
                        &constROperand2);
-
-        /* TODO - Need to check image channel order to determine border color. */
 
         /* Return border color (all 0.0). */
         gcmONERROR(clGenGenericCode1(Compiler,
@@ -5904,8 +6016,6 @@ _GenSoftReadImageUICode(
                        clvCONDITION_EQUAL,
                        &constROperand2);
 
-        /* TODO - Need to check image channel order to determine border color. */
-
         /* Return border color (all 0.0). */
         gcmONERROR(clGenGenericCode1(Compiler,
                                      PolynaryExpr->exprBase.base.lineNo,
@@ -5955,8 +6065,6 @@ _GenSoftReadImageUICode(
                        &rOperand[4],
                        clvCONDITION_EQUAL,
                        &constROperand2);
-
-        /* TODO - Need to check image channel order to determine border color. */
 
         /* Return border color (all 0.0). */
         gcmONERROR(clGenGenericCode1(Compiler,
@@ -6245,7 +6353,7 @@ _GenReadImageUICode(
         if (gcmIS_ERROR(status)) return status;
     }
 
-#if _USE_NEW_INSTRUCTION_FOR_IMAGE_RD_SAMPLER
+#if (_OCL_USE_INTRINSIC_FOR_IMAGE || _USE_NEW_INSTRUCTION_FOR_IMAGE_RD_SAMPLER)
     return _GenReadImageSamplerCode(Compiler,
                                     CodeGenerator,
                                     PolynaryExpr,
@@ -6891,7 +6999,7 @@ _GenWriteImageFCode(
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
-#if _USE_NEW_INSTRUCTION_FOR_IMAGE_WR_SAMPLER
+#if (_OCL_USE_INTRINSIC_FOR_IMAGE || _USE_NEW_INSTRUCTION_FOR_IMAGE_WR_SAMPLER)
 
     return _GenWriteImageCode(Compiler,
                               CodeGenerator,
@@ -7263,7 +7371,7 @@ _GenWriteImageICode(
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
-#if _USE_NEW_INSTRUCTION_FOR_IMAGE_WR_SAMPLER
+#if (_OCL_USE_INTRINSIC_FOR_IMAGE || _USE_NEW_INSTRUCTION_FOR_IMAGE_WR_SAMPLER)
     return _GenWriteImageCode(Compiler,
                               CodeGenerator,
                               PolynaryExpr,
@@ -7605,7 +7713,7 @@ _GenWriteImageUICode(
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
-#if _USE_NEW_INSTRUCTION_FOR_IMAGE_WR_SAMPLER
+#if (_OCL_USE_INTRINSIC_FOR_IMAGE || _USE_NEW_INSTRUCTION_FOR_IMAGE_WR_SAMPLER)
 
     return _GenWriteImageCode(Compiler,
                               CodeGenerator,
@@ -7853,6 +7961,7 @@ _GenQueryImageCallCode(
     IN cloCOMPILER Compiler,
     IN cloCODE_GENERATOR CodeGenerator,
     IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctCONST_STRING Query,
     IN gctUINT OperandCount,
     IN clsGEN_CODE_PARAMETERS * OperandsParameters,
     IN clsIOPERAND * IOperand
@@ -7868,7 +7977,6 @@ _GenQueryImageCallCode(
     cltELEMENT_TYPE elementType;
     clsGEN_CODE_PARAMETERS parameters[1];
 
-    gcmVERIFY_OK(cloCOMPILER_Lock(Compiler));
     elementType = clmGEN_CODE_elementType_GET(OperandsParameters[0].dataTypes[0].def);
 
     gcmASSERT(clmIsElementTypeImage(elementType));
@@ -7879,8 +7987,8 @@ _GenQueryImageCallCode(
     gcmVERIFY_OK(gcoOS_PrintStrSafe(funcNameString,
                                     64,
                                     &offset,
-                                    "_viv_%s_%s",
-                                    PolynaryExpr->funcSymbol,
+                                    "_viv_image_query_%s_%s",
+                                    Query,
                                     clGetElementTypeName(elementType)));
     funcCall = clCreateFuncCallByName(Compiler,
                                       PolynaryExpr->exprBase.base.lineNo,
@@ -7930,7 +8038,6 @@ _GenQueryImageCallCode(
     gcmONERROR(cloCOMPILER_SetHasImageQuery(Compiler));
 
 OnError:
-    gcmVERIFY_OK(cloCOMPILER_Unlock(Compiler));
     clsGEN_CODE_PARAMETERS_Finalize(parameters);
     return status;
 }
@@ -7955,12 +8062,26 @@ _GenGetImageWidthCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
+    if (_OCL_USE_INTRINSIC_FOR_IMAGE) {
+        clsLOPERAND lOperand[1];
+
+        clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
+        return  clGenIntrinsicAsmCode(Compiler,
+                                      PolynaryExpr->exprBase.base.lineNo,
+                                      PolynaryExpr->exprBase.base.stringNo,
+                                      CL_VIR_IK_image_query_width,
+                                      lOperand,
+                                      OperandCount,
+                                      &OperandsParameters[0].rOperands[0]);
+    }
+
     if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
         gcmOPT_oclUseImgIntrinsicQuery())
     {
         return _GenQueryImageCallCode(Compiler,
                                       CodeGenerator,
                                       PolynaryExpr,
+                                      "width",
                                       OperandCount,
                                       OperandsParameters,
                                       IOperand);
@@ -8004,12 +8125,25 @@ _GenGetImageHeightCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
+    if (_OCL_USE_INTRINSIC_FOR_IMAGE) {
+        clsLOPERAND lOperand[1];
+
+        clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
+        return  clGenIntrinsicAsmCode(Compiler,
+                                      PolynaryExpr->exprBase.base.lineNo,
+                                      PolynaryExpr->exprBase.base.stringNo,
+                                      CL_VIR_IK_image_query_height,
+                                      lOperand,
+                                      OperandCount,
+                                      &OperandsParameters[0].rOperands[0]);
+    }
     if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
         gcmOPT_oclUseImgIntrinsicQuery())
     {
         return _GenQueryImageCallCode(Compiler,
                                       CodeGenerator,
                                       PolynaryExpr,
+                                      "height",
                                       OperandCount,
                                       OperandsParameters,
                                       IOperand);
@@ -8053,6 +8187,18 @@ _GenGetImageDepthCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
+    if (_OCL_USE_INTRINSIC_FOR_IMAGE) {
+        clsLOPERAND lOperand[1];
+
+        clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
+        return  clGenIntrinsicAsmCode(Compiler,
+                                      PolynaryExpr->exprBase.base.lineNo,
+                                      PolynaryExpr->exprBase.base.stringNo,
+                                      CL_VIR_IK_image_query_depth,
+                                      lOperand,
+                                      OperandCount,
+                                      &OperandsParameters[0].rOperands[0]);
+    }
     clsROPERAND_InitializeIntOrIVecConstant(&constROperand,
                                             clmGenCodeDataType(T_UINT),
                                             (gctUINT) 8);
@@ -8092,12 +8238,25 @@ _GenGetImageChannelDataTypeCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
+    if (_OCL_USE_INTRINSIC_FOR_IMAGE) {
+        clsLOPERAND lOperand[1];
+
+        clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
+        return  clGenIntrinsicAsmCode(Compiler,
+                                      PolynaryExpr->exprBase.base.lineNo,
+                                      PolynaryExpr->exprBase.base.stringNo,
+                                      CL_VIR_IK_image_query_format,
+                                      lOperand,
+                                      OperandCount,
+                                      &OperandsParameters[0].rOperands[0]);
+    }
     if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
         gcmOPT_oclUseImgIntrinsicQuery())
     {
         return _GenQueryImageCallCode(Compiler,
                                       CodeGenerator,
                                       PolynaryExpr,
+                                      "format",
                                       OperandCount,
                                       OperandsParameters,
                                       IOperand);
@@ -8141,12 +8300,25 @@ _GenGetImageChannelOrderCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
+    if (_OCL_USE_INTRINSIC_FOR_IMAGE) {
+        clsLOPERAND lOperand[1];
+
+        clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
+        return  clGenIntrinsicAsmCode(Compiler,
+                                      PolynaryExpr->exprBase.base.lineNo,
+                                      PolynaryExpr->exprBase.base.stringNo,
+                                      CL_VIR_IK_image_query_order,
+                                      lOperand,
+                                      OperandCount,
+                                      &OperandsParameters[0].rOperands[0]);
+    }
     if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
         gcmOPT_oclUseImgIntrinsicQuery())
     {
         return _GenQueryImageCallCode(Compiler,
                                       CodeGenerator,
                                       PolynaryExpr,
+                                      "order",
                                       OperandCount,
                                       OperandsParameters,
                                       IOperand);
@@ -8190,12 +8362,25 @@ _GenGetImageDimCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
+    if (_OCL_USE_INTRINSIC_FOR_IMAGE) {
+        clsLOPERAND lOperand[1];
+
+        clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
+        return  clGenIntrinsicAsmCode(Compiler,
+                                      PolynaryExpr->exprBase.base.lineNo,
+                                      PolynaryExpr->exprBase.base.stringNo,
+                                      CL_VIR_IK_image_query_size,
+                                      lOperand,
+                                      OperandCount,
+                                      &OperandsParameters[0].rOperands[0]);
+    }
     if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
         gcmOPT_oclUseImgIntrinsicQuery())
     {
         return _GenQueryImageCallCode(Compiler,
                                       CodeGenerator,
                                       PolynaryExpr,
+                                      "size",
                                       OperandCount,
                                       OperandsParameters,
                                       IOperand);
@@ -8254,12 +8439,25 @@ _GenGetImageArrayCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
+    if (_OCL_USE_INTRINSIC_FOR_IMAGE) {
+        clsLOPERAND lOperand[1];
+
+        clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
+        return  clGenIntrinsicAsmCode(Compiler,
+                                      PolynaryExpr->exprBase.base.lineNo,
+                                      PolynaryExpr->exprBase.base.stringNo,
+                                      CL_VIR_IK_image_query_array_size,
+                                      lOperand,
+                                      OperandCount,
+                                      &OperandsParameters[0].rOperands[0]);
+    }
     if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
         gcmOPT_oclUseImgIntrinsicQuery())
     {
         return _GenQueryImageCallCode(Compiler,
                                       CodeGenerator,
                                       PolynaryExpr,
+                                      "array_size",
                                       OperandCount,
                                       OperandsParameters,
                                       IOperand);

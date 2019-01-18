@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -14,6 +14,67 @@
 #include <gc_vx_common.h>
 #include <gc_hal_user_precomp.h>
 #include <gc_hal_vx.h>
+
+#if gcdSTATIC_LINK
+
+gceSTATUS
+gcCompileKernel(
+    IN gcoHAL Hal,
+    IN gctUINT SourceSize,
+    IN gctCONST_STRING Source,
+    IN gctCONST_STRING Options,
+    OUT gcSHADER * Binary,
+    OUT gctSTRING * Log
+    );
+
+gceSTATUS
+gcLoadKernelCompiler(
+    IN gcsHWCaps *HWCaps,
+    IN gcePATCH_ID PatchId
+    );
+
+gceSTATUS
+gcUnloadKernelCompiler(
+void
+);
+#endif
+
+static gceSTATUS _UpdateCompileOption(gctSTRING *options)
+{
+    gctSIZE_T extraOptionLength = 0;
+    gctSIZE_T originalLengh = 0;
+    gctSIZE_T totalLength;
+    gceSTATUS status;
+    gctPOINTER pointer = gcvNULL;
+
+    extraOptionLength = gcoOS_StrLen(" -cl-viv-gcsl-driver-image", gcvNULL);
+
+    if (*options)
+    {
+        originalLengh = gcoOS_StrLen(*options, gcvNULL);
+    }
+    totalLength = originalLengh + extraOptionLength + 1;
+    gcmONERROR(gcoOS_Allocate(gcvNULL, totalLength, &pointer));
+
+    gcoOS_ZeroMemory(pointer, totalLength);
+
+    if (*options)
+    {
+        gcmVERIFY_OK(gcoOS_StrCopySafe((gctSTRING)pointer, totalLength, *options));
+        gcmOS_SAFE_FREE(gcvNULL, *options);
+    }
+
+    gcmASSERT(extraOptionLength);
+    gcmVERIFY_OK(gcoOS_StrCatSafe((gctSTRING)pointer, totalLength, " -cl-viv-gcsl-driver-image"));
+
+
+    *options = (gctSTRING)pointer;
+
+OnError:
+    return status;
+
+}
+
 
 VX_INTERNAL_CALLBACK_API void vxoProgram_Destructor(vx_reference ref)
 {
@@ -44,6 +105,7 @@ VX_API_ENTRY vx_program VX_API_CALL vxCreateProgramWithSource(
     gctSTRING   source;
     gctUINT     i;
 
+    gcmDUMP_API("$VX vxCreateProgramWithSource: context=%p, count=0x%x, strings=%p, lengths=%p", context, count, strings, lengths);
 
     if (!vxoContext_IsValid(context)) return VX_NULL;
 
@@ -124,6 +186,8 @@ VX_API_ENTRY vx_program VX_API_CALL vxCreateProgramWithBinary(
     gcSHADER    shaderBinary;
     gctUINT32   *pBinary = (gctUINT32*)binary;
 
+    gcmDUMP_API("$VX vxCreateProgramWithBinary: context=%p, binary=%p, size=0x%lx", context, binary, size);
+
     if (!vxoContext_IsValid(context)) return VX_NULL;
 
     program = (vx_program)vxoReference_Create(context, (vx_type_e)VX_TYPE_PROGRAM, VX_REF_EXTERNAL, &context->base);
@@ -162,13 +226,11 @@ OnError:
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseProgram(vx_program *program)
 {
+    gcmDUMP_API("$VX vxReleaseProgram: program=%p", program);
     return vxoReference_Release((vx_reference_ptr)program, (vx_type_e)VX_TYPE_PROGRAM, VX_REF_EXTERNAL);
 }
 
-gceSTATUS
-gcfVX_LoadCompiler(
-    vx_context context
-    )
+static gceSTATUS _LoadCompiler(vx_context context)
 {
     gceSTATUS status = gcvSTATUS_OK;
     VSC_HW_CONFIG hwCfg;
@@ -178,11 +240,14 @@ gcfVX_LoadCompiler(
     {
         if (context->compileKernel == gcvNULL)
         {
+#if !gcdSTATIC_LINK
             status = gcoOS_LoadLibrary(gcvNULL,
 #if defined(__APPLE__)
                                        "libCLC.dylib",
+#elif  defined(_WIN32) || defined(_WIN32_WCE)
+                                       "libCLC.dll",
 #else
-                                       "libCLC",
+                                       "libCLC.so",
 #endif
                                        &context->libCLC);
 
@@ -205,7 +270,11 @@ gcfVX_LoadCompiler(
                                           context->libCLC,
                                           "gcUnloadKernelCompiler",
                                           (gctPOINTER*)&context->unloadCompiler));
-
+#else
+            context->unloadCompiler = gcUnloadKernelCompiler;
+            context->loadCompiler = gcLoadKernelCompiler;
+            context->compileKernel = gcCompileKernel;
+#endif
             gcmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg));
             gcmONERROR(gcoHAL_GetPatchID(gcvNULL, &patchId));
 
@@ -227,6 +296,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxBuildProgram(vx_program program, vx_const_s
     gctUINT             binarySize;
     gceSTATUS           status = gcvSTATUS_OK;
     vx_status           vStatus = VX_FAILURE;
+
+    gcmDUMP_API("$VX vxBuildProgram: program=%p, options=%s", program, options);
 
     if (!vxoReference_IsValidAndSpecific(&program->base, (vx_type_e)VX_TYPE_PROGRAM)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -264,11 +335,15 @@ VX_API_ENTRY vx_status VX_API_CALL vxBuildProgram(vx_program program, vx_const_s
 
     if (program->binary == gcvNULL || !program->linked)
     {
-        gcmONERROR(gcfVX_LoadCompiler(program->base.context));
+        gcmONERROR(_LoadCompiler(program->base.context));
     }
 
     if (program->binary == gcvNULL)
     {
+
+        gcmONERROR(_UpdateCompileOption(&program->buildOptions));
+        vscSetDriverVIRPath(gcvFALSE);  /* change to true if vx driver changed to program with VIR shader */
+
         status = (*program->base.context->compileKernel) (
                                         gcvNULL,
                                         0,
@@ -300,7 +375,8 @@ OnError:
     }
 
 
-    if(program != gcvNULL)
+    gcmASSERT(program != gcvNULL);
+
     {
         program->buildStatus = (vStatus == VX_SUCCESS) ? VX_BUILD_SUCCESS : VX_BUILD_ERROR;
     }
@@ -310,6 +386,8 @@ OnError:
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryProgram(vx_program program, vx_enum attribute, void *ptr, vx_size size)
 {
+    gcmDUMP_API("$VX vxQueryProgram: program=%p, attribute=0x%x, ptr=%p, size=0x%lx", program, attribute, ptr, size);
+
     if (!vxoReference_IsValidAndSpecific(&program->base, (vx_type_e)VX_TYPE_PROGRAM)) return VX_ERROR_INVALID_REFERENCE;
 
     switch (attribute)

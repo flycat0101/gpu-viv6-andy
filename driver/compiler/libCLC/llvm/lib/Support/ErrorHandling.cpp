@@ -76,7 +76,7 @@ void llvm::report_fatal_error(const Twine &Reason) {
 #if !defined(UNDER_CE)
     (void)::write(2, MessageStr.data(), MessageStr.size());
 #else
-    // TODO - need to implement write for WinCE.
+    // VIV:TODO - need to implement write for WinCE.
 #endif
   }
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -27,12 +27,13 @@ GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode)
 {
     GLuint indexBuffer = gc->bufferObject.generalBindingPoint[__GL_ELEMENT_ARRAY_BUFFER_INDEX].boundBufName;
     __GLvertexArrayState *vertexArrayState = &gc->vertexArray.boundVAO->vertexArray;
-    GLuint arrayEnabled = vertexArrayState->attribEnabled & (~(__GL_VARRAY_EDGEFLAG));
+    GLuint64 arrayEnabled = vertexArrayState->attribEnabled & (~(__GL_VARRAY_EDGEFLAG));
     __GLstreamDecl *stream;
     __GLvertexElement *element;
     __GLvertexAttrib *array;
     GLubyte arrayIdx, streamIdx, numStreams;
-    GLuint mask, i;
+    GLuint64 mask;
+    GLuint  i;
     GLboolean newStream;
     __GLbufferObject *bufObj;
 
@@ -110,9 +111,6 @@ GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode)
                 for ( elementIdx = 0; elementIdx < stream->numElements; elementIdx++ )
                 {
                     arrayIdx_2 = stream->streamElement[elementIdx].inputIndex;
-//                    GL_ASSERT(stream->streamElement[elementIdx].offset == \
-//                        gc->vertexArray.boundVAO->vertexArray.attribute[arrayIdx_2].offset - \
-//                        gc->vertexArray.boundVAO->vertexArray.attribute[arrayIdx].offset);
                 }
 #endif
             }
@@ -147,7 +145,7 @@ GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode)
             /* Corner case: FarCry call SecondaryColorPointer with size 4. currentArrays will not updated.*/
             if(array->stride == 0)
             {
-                gc->vertexStreams.missingAttribs |= (1<<arrayIdx);
+                gc->vertexStreams.missingAttribs |= (__GL_ONE_64 << arrayIdx);
                 arrayIdx++;
                 mask >>= 1;
                 continue;
@@ -557,9 +555,6 @@ __GL_INLINE GLvoid __glEvaluateAttribGroup1(__GLcontext* gc, __GLattribute* cs, 
         __GL_CHECK_ATTR2(__GL_POLYGONOFFSET_BIT, polygon.factor, polygon.units);
         __GL_CHECK_ATTR1(__GL_POLYGONOFFSET_FILL_ENDISABLE_BIT, enables.polygon.polygonOffsetFill);
 #ifdef OPENGL40
-        __GL_CHECK_ATTR1(__GL_POLYGONSTIPPLE_ENDISABLE_BIT, enables.polygon.stipple);
-#endif
-#ifdef OPENGL40
         __GL_CHECK_ATTR2(__GL_POLYGONMODE_BIT, polygon.frontMode, polygon.backMode);
         __GL_CHECK_ATTR1(__GL_POLYGONOFFSET_POINT_ENDISABLE_BIT,
             enables.polygon.polygonOffsetPoint);
@@ -656,10 +651,6 @@ __GL_INLINE GLvoid __glEvaluateAttribGroup2(__GLcontext* gc, __GLattribute* cs, 
     }
 
     if (localMask & __GL_LINE_ATTR_BITS) {
-
-        __GL_CHECK_ATTR1(__GL_LINEWIDTH_BIT,
-            line.requestedWidth);
-
         __GL_CHECK_ATTR1(__GL_LINESMOOTH_ENDISABLE_BIT,
             enables.line.smooth);
 
@@ -1531,7 +1522,7 @@ GLvoid __glConfigImmedVertexStream(__GLcontext *gc, GLenum mode)
             inputIdx += 1;
         }
 
-        GL_ASSERT( ( 1 << inputIdx ) & gc->input.primInputMask );
+        GL_ASSERT( ( __GL_ONE_64 << inputIdx ) & gc->input.primInputMask );
 
         element->inputIndex = inputIdx;
         element->streamIndex = 0;
@@ -1753,18 +1744,29 @@ static GLboolean __glCheckVBOSize(__GLcontext *gc)
             GLuint index = 0;
             GLuint instanceCount = vertexArray->instanceCount;
             __GLvertexArrayState *curVertexArray = &gc->vertexArray.boundVAO->vertexArray;
-            GLuint attribEnabled = curVertexArray->attribEnabled;
+            GLuint64 attribEnabled = curVertexArray->attribEnabled;
             __GLprogramObject *vsProgObj = __glGetCurrentStageProgram(gc,__GLSL_STAGE_VS);
             GLuint vsInputArrayMask = 0;
+#ifdef OPENGL40
+            GLuint64 vsInputMask = 0;
+#endif
             if(vsProgObj)
             {
                 vsInputArrayMask = vsProgObj->bindingInfo.vsInputArrayMask;
+#ifdef OPENGL40
+                vsInputMask = vsProgObj->bindingInfo.vsInputMask;
+#endif
             }
 
-
+#ifdef OPENGL40
+            while (attribEnabled & vsInputMask)
+            {
+                if ((attribEnabled & vsInputMask) & 0x1)
+#else
             while (attribEnabled & vsInputArrayMask)
             {
                 if ((attribEnabled & vsInputArrayMask) & 0x1)
+#endif
                 {
                     GLuint remain;
                     __GLvertexAttrib *pAttrib = &curVertexArray->attribute[index];
@@ -1798,7 +1800,11 @@ static GLboolean __glCheckVBOSize(__GLcontext *gc)
                 }
 
                 index++;
+#ifdef OPENGL40
+                vsInputMask >>= 1;
+#else
                 vsInputArrayMask >>= 1;
+#endif
                 attribEnabled >>= 1;
             }
         }

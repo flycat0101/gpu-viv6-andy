@@ -32,23 +32,23 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *   Brian Paul <brian@precisioninsight.com>
  */
 
-#include "gl.h"
+#include <GL/gl.h>
 #include "indirect.h"
 #include "glxclient.h"
 #include "glcore/gc_es_dispatch.h"
 #include "gc_hal_types.h"
 
 
-__GLesDispatchTable *__glXNewIndirectAPI(GLvoid)
+__GLdispatchTable *__glXNewIndirectAPI(GLvoid)
 {
 
 /*
     __GLdispatchTable *indDispatchTab;
 */
 
-    __GLesDispatchTable *indDispatchTab = gcvNULL;
+    __GLdispatchTable *indDispatchTab = gcvNULL;
 
-    indDispatchTab = (__GLesDispatchTable *) Xmalloc(sizeof(__GLesDispatchTable));
+    indDispatchTab = (__GLdispatchTable*)Xmalloc(sizeof(__GLdispatchTable));
 
     /* Initialize the GL API entries */
     indDispatchTab->Accum = __indirect_glAccum;
@@ -398,38 +398,6 @@ __GLesDispatchTable *__glXNewIndirectAPI(GLvoid)
     /* OpenGL 1.2  GL_ARB_imaging */
     indDispatchTab->BlendColor = __indirect_glBlendColor;
     indDispatchTab->BlendEquation = __indirect_glBlendEquation;
-    indDispatchTab->ColorSubTable = __indirect_glColorSubTable;
-    indDispatchTab->ColorTable = __indirect_glColorTable;
-    indDispatchTab->ColorTableParameterfv = __indirect_glColorTableParameterfv;
-    indDispatchTab->ColorTableParameteriv = __indirect_glColorTableParameteriv;
-    indDispatchTab->ConvolutionFilter1D = __indirect_glConvolutionFilter1D;
-    indDispatchTab->ConvolutionFilter2D = __indirect_glConvolutionFilter2D;
-    indDispatchTab->ConvolutionParameterf = __indirect_glConvolutionParameterf;
-    indDispatchTab->ConvolutionParameterfv = __indirect_glConvolutionParameterfv;
-    indDispatchTab->ConvolutionParameteri = __indirect_glConvolutionParameteri;
-    indDispatchTab->ConvolutionParameteriv = __indirect_glConvolutionParameteriv;
-    indDispatchTab->CopyColorSubTable = __indirect_glCopyColorSubTable;
-    indDispatchTab->CopyColorTable = __indirect_glCopyColorTable;
-    indDispatchTab->CopyConvolutionFilter1D = __indirect_glCopyConvolutionFilter1D;
-    indDispatchTab->CopyConvolutionFilter2D = __indirect_glCopyConvolutionFilter2D;
-    indDispatchTab->GetColorTable = __indirect_glGetColorTable;
-    indDispatchTab->GetColorTableParameterfv = __indirect_glGetColorTableParameterfv;
-    indDispatchTab->GetColorTableParameteriv = __indirect_glGetColorTableParameteriv;
-    indDispatchTab->GetConvolutionFilter = __indirect_glGetConvolutionFilter;
-    indDispatchTab->GetConvolutionParameterfv = __indirect_glGetConvolutionParameterfv;
-    indDispatchTab->GetConvolutionParameteriv = __indirect_glGetConvolutionParameteriv;
-    indDispatchTab->GetHistogram = __indirect_glGetHistogram;
-    indDispatchTab->GetHistogramParameterfv = __indirect_glGetHistogramParameterfv;
-    indDispatchTab->GetHistogramParameteriv = __indirect_glGetHistogramParameteriv;
-    indDispatchTab->GetMinmax = __indirect_glGetMinmax;
-    indDispatchTab->GetMinmaxParameterfv = __indirect_glGetMinmaxParameterfv;
-    indDispatchTab->GetMinmaxParameteriv = __indirect_glGetMinmaxParameteriv;
-    indDispatchTab->GetSeparableFilter = __indirect_glGetSeparableFilter;
-    indDispatchTab->Histogram = __indirect_glHistogram;
-    indDispatchTab->Minmax = __indirect_glMinmax;
-    indDispatchTab->ResetHistogram = __indirect_glResetHistogram;
-    indDispatchTab->ResetMinmax = __indirect_glResetMinmax;
-    indDispatchTab->SeparableFilter2D = __indirect_glSeparableFilter2D;
 
     return indDispatchTab;
 }

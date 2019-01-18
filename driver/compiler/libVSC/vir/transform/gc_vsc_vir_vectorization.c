@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -16,7 +16,6 @@
 
 #define MAX_CANDIDATE_SEARCH_ITERATE_COUNT    20000
 #define MAX_VECTORIZED_VEC_IMM                700
-#define MAX_VECTORIZE_BB_INST_COUNT           1000
 
 typedef struct VIR_VECTORIZER_INFO
 {
@@ -233,14 +232,22 @@ static gctSTRING _GetVectorizedSymStrName(VIR_Shader* pShader, VIR_Symbol** ppSy
     return strNewName;
 }
 
-static VIR_Type* _GetVectorizedSymType(VIR_Shader* pShader, VIR_Symbol** ppSymArray, gctUINT symCount)
+static VIR_Type* _GetVectorizedSymType(VIR_Shader* pShader, VIR_Symbol** ppSymArray, gctUINT symCount, gctBOOL bComponentPack)
 {
     gctUINT           i, compCount = 0, rowsCount;
     VIR_TypeId        compType, newTypeId = VIR_TYPE_UNKNOWN;
 
-    for (i = 0; i < symCount; i ++)
+    if (bComponentPack)
     {
-        compCount += VIR_GetTypeComponents(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(ppSymArray[i])));
+        /* Since the component is sorted, just get the last symbol. */
+        VIR_Symbol_GetStartAndEndComponentForIO(ppSymArray[symCount - 1], gcvFALSE, gcvNULL, &compCount);
+    }
+    else
+    {
+        for (i = 0; i < symCount; i ++)
+        {
+            compCount += VIR_GetTypeComponents(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(ppSymArray[i])));
+        }
     }
 
     compType = VIR_GetTypeComponentType(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(ppSymArray[0])));
@@ -269,7 +276,7 @@ static gctSTRING _GetVectorizedIoSymStrName(VIR_Shader* pShader, VIR_IO_VECTORIZ
 
 static VIR_Type* _GetVectorizedIoSymType(VIR_Shader* pShader, VIR_IO_VECTORIZABLE_PACKET* pIoPacket)
 {
-    return _GetVectorizedSymType(pShader, pIoPacket->pSymIo, pIoPacket->realCount);
+    return _GetVectorizedSymType(pShader, pIoPacket->pSymIo, pIoPacket->realCount, pIoPacket->bComponentPack);
 }
 
 static VSC_ErrCode _CreateIoVectorizedInfoFromIoPacket(VIR_Shader* pShader,
@@ -299,6 +306,8 @@ static VSC_ErrCode _CreateIoVectorizedInfoFromIoPacket(VIR_Shader* pShader,
 
     if (!_CheckIoPacketVectorizability(pShader, pIoPacket))
     {
+        /* If it is invalid, it must not be IO component pack. */
+        gcmASSERT(!pIoPacket->bComponentPack);
         return VSC_ERR_NONE;
     }
 
@@ -418,7 +427,6 @@ static VSC_ErrCode _CreateIoVectorizedInfoFromIoPacket(VIR_Shader* pShader,
             {
                 /* Only hit here once */
                 gcmASSERT(firstMatchedXFBVaryingIdx == VIR_IdList_Count(pOrgTFBVaryingList));
-
                 firstMatchedXFBVaryingIdx = i;
             }
 
@@ -459,7 +467,6 @@ static VSC_ErrCode _CreateIoVectorizedInfoFromIoPacket(VIR_Shader* pShader,
     /* For member of IOB, need update IOB */
     if (isSymIOBlockMember(pIoPacket->pSymIo[0]))
     {
-        /* TODO */
     }
 
 OnError:
@@ -517,6 +524,10 @@ static gctBOOL _CheckSymOfOpndIsInIoVectorizedInfos(VIR_Shader* pShader,
 
                     newSymId = pVectorizedInfo->vectorizedInfo.
                                      ppVectorizedVirRegArray[pOpndSym->u1.vregIndex - var->u2.tempIndex]->index;
+                    if (pVectorizedInfo->pIoPacket->bComponentPack)
+                    {
+                        VIR_Symbol_GetStartAndEndComponentForIO(pVectorizedInfo->pIoPacket->pSymIo[j], gcvFALSE, &channelShift, gcvNULL);
+                    }
 
                     bFoundSym = gcvTRUE;
                     break;
@@ -530,12 +541,20 @@ static gctBOOL _CheckSymOfOpndIsInIoVectorizedInfos(VIR_Shader* pShader,
 
                     newSymId = pVectorizedInfo->vectorizedInfo.pVectorizedSym->index;
 
+                    if (pVectorizedInfo->pIoPacket->bComponentPack)
+                    {
+                        VIR_Symbol_GetStartAndEndComponentForIO(pVectorizedInfo->pIoPacket->pSymIo[j], gcvFALSE, &channelShift, gcvNULL);
+                    }
+
                     bFoundSym = gcvTRUE;
                     break;
                 }
             }
 
-            channelShift += VIR_GetTypeComponents(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pVectorizedInfo->pIoPacket->pSymIo[j])));
+            if (!pVectorizedInfo->pIoPacket->bComponentPack)
+            {
+                channelShift += VIR_GetTypeComponents(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pVectorizedInfo->pIoPacket->pSymIo[j])));
+            }
         }
 
         if (bFoundSym)
@@ -1174,11 +1193,11 @@ static VSC_ErrCode _RenameDstOfSeedInst(
     tempRegId = VIR_Shader_NewVirRegId(pShader, 1);
     currentFunc = VIR_Shader_GetCurrentFunction(pShader);
     errCode = VIR_Function_AddSymbol(currentFunc,
-                    VIR_SYM_VIRREG,
-                    tempRegId,
-                    VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetTypeId(destOper)),
-                    VIR_Symbol_GetStorageClass(oldSymbol),
-                    &newTempSymId);
+                                     VIR_SYM_VIRREG,
+                                     tempRegId,
+                                     VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetTypeId(destOper)),
+                                     VIR_Symbol_GetStorageClass(oldSymbol),
+                                     &newTempSymId);
     CHECK_ERROR(errCode, "VIR_Function_AddSymbol failed.");
     newSymbol = VIR_GetFuncSymFromId(currentFunc, newTempSymId);
     VIR_Symbol_SetPrecision(newSymbol, VIR_Symbol_GetPrecision(oldSymbol));
@@ -1191,7 +1210,7 @@ static VSC_ErrCode _RenameDstOfSeedInst(
     {
         VIR_Enable instDestEnable = VIR_Operand_GetEnable(destOper);
         VIR_OperandInfo instDestInfo;
-        gctUINT          firstRegNo, regNoRange;
+        gctUINT         firstRegNo, regNoRange;
 
         VIR_Operand_GetOperandInfo(pSeedInst, destOper, &instDestInfo);
 
@@ -1274,7 +1293,7 @@ static gctBOOL _CanMoveInstToSeedInst(VIR_Shader* pShader,
                 for (pUsage = vscVIR_GeneralDuIterator_First(&duIter); pUsage != gcvNULL;
                      pUsage = vscVIR_GeneralDuIterator_Next(&duIter))
                 {
-                    if (pUsage->usageKey.pUsageInst == VIR_OUTPUT_USAGE_INST)
+                    if (VIR_IS_IMPLICIT_USAGE_INST(pUsage->usageKey.pUsageInst))
                     {
                         continue;
                     }
@@ -1356,7 +1375,7 @@ static gctBOOL _CanMoveSeedInstToInst(VIR_Shader* pShader,
         for (pUsage = vscVIR_GeneralDuIterator_First(&duIter); pUsage != gcvNULL;
              pUsage = vscVIR_GeneralDuIterator_Next(&duIter))
         {
-            if (pUsage->usageKey.pUsageInst == VIR_OUTPUT_USAGE_INST)
+            if (VIR_IS_IMPLICIT_USAGE_INST(pUsage->usageKey.pUsageInst))
             {
                 continue;
             }
@@ -1478,8 +1497,9 @@ static gctBOOL _isMovaUniformBase(VIR_DEF_USAGE_INFO* pDuInfo,
             channel,
             gcvFALSE);
 
-        for (pUsage = vscVIR_GeneralDuIterator_First(&duIter); pUsage != gcvNULL;
-            pUsage = vscVIR_GeneralDuIterator_Next(&duIter))
+        for (pUsage = vscVIR_GeneralDuIterator_First(&duIter);
+             pUsage != gcvNULL;
+             pUsage = vscVIR_GeneralDuIterator_Next(&duIter))
         {
             VIR_OpCode      opcode = VIR_Inst_GetOpcode(pUsage->usageKey.pUsageInst);
             VIR_Symbol      *symbol = gcvNULL;
@@ -1495,9 +1515,16 @@ static gctBOOL _isMovaUniformBase(VIR_DEF_USAGE_INFO* pDuInfo,
                 symbol = VIR_Operand_GetUnderlyingSymbol(VIR_Inst_GetDest(pUsage->usageKey.pUsageInst));
             }
 
-            if (symbol && VIR_Symbol_isUniform(symbol))
+            if (symbol)
             {
-                return gcvTRUE;
+                if (VIR_Symbol_isUniform(symbol))
+                {
+                    return gcvTRUE;
+                }
+                else
+                {
+                    return gcvFALSE;
+                }
             }
         }
     }
@@ -1584,6 +1611,12 @@ static gctBOOL _CanInstVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectorizerInfo,
         return gcvFALSE;
     }
 
+    /* EVIS instruction cannot be vectorized */
+    if (VIR_OPCODE_isVX(VIR_Inst_GetOpcode(pSeedInst)))
+    {
+        return gcvFALSE;
+    }
+
     /* Check condOpcode */
     if (VIR_Inst_GetConditionOp(pSeedInst) != VIR_Inst_GetConditionOp(pInst))
     {
@@ -1615,10 +1648,8 @@ static gctBOOL _CanInstVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectorizerInfo,
 
     /* For fragment shader, if it is a dual16 shader, we don't need to vectorize
        more than 2 channels, since we only have a 4 channel A0, which can be used
-       for 2 HP channel.
+       for 2 HP channel. */
 
-       TODO: use dual16 flag instead of fragment shader.
-     */
     if (VIR_Shader_GetKind(pShader) == VIR_SHADER_FRAGMENT &&
         VIR_Inst_GetOpcode(pSeedInst) == VIR_OP_MOVA)
     {
@@ -1655,9 +1686,9 @@ static gctBOOL _CanInstVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectorizerInfo,
         return gcvFALSE;
     }
 
-    /* if pSeedInst and pInst use same symbol and enable bits in dest operands, like following case
+    /* if pSeedInst and pInst use same symbol in des operands, like following case
         SUB               hp temp(4121).hp.x, hp  temp(4286).hp.x, hp  temp(4287).hp.x   <- pSeedInst
-        CMP.lt            hp temp(4118).hp.x, hp  temp(4121).abs.hp.x, 0.050000[3d4ccccd], 1.000000[3f800000] <=  only usage instr
+        CMP.lt            hp temp(4118).hp.x, hp  temp(4121).abs.hp.x, 0.050000[3d4ccccd], 1.000000[3f800000] <=  usage after right and caused WAR dependence
         ...
         SUB               hp temp(4121).hp.x, hp  temp(4286).hp.y, hp  temp(4287).hp.y   <- pInst
         => create a new Symbol to the dst operand and update DU info
@@ -1672,7 +1703,6 @@ static gctBOOL _CanInstVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectorizerInfo,
         VIR_Instruction* pUsageInst = gcvNULL;
         VIR_Operand *pUsageOper = gcvNULL;
         gctBOOL bIsIndexingRegUsage;
-
         dstOfSeedInst = VIR_Inst_GetDest(pSeedInst);
         dstofpInst = VIR_Inst_GetDest(pInst);
 
@@ -1745,6 +1775,18 @@ static gctBOOL _CanInstVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectorizerInfo,
     return gcvTRUE;
 }
 
+/*adjust type of dst virreg symbol if original size is small than new type size */
+static void _UpdateSymbolTypeAfterVectorized(
+    VIR_Operand*   pDstOpnd,
+    VIR_TypeId     typeId)
+{
+    VIR_Symbol  *dstSym = VIR_Operand_GetSymbol(pDstOpnd);
+    if (dstSym && (VIR_GetTypeSize(VIR_Symbol_GetTypeId(dstSym)) <= VIR_GetTypeSize(typeId)))
+    {
+        VIR_Symbol_SetTypeId(dstSym, typeId);
+    }
+}
+
 static void _VectorizeOpndsBasedOnOrgSymOrVirreg(VIR_Shader* pShader,
                                                  VIR_BASIC_BLOCK* pBasicBlock,
                                                  VIR_DEF_USAGE_INFO* pDuInfo,
@@ -1780,6 +1822,7 @@ static void _VectorizeOpndsBasedOnOrgSymOrVirreg(VIR_Shader* pShader,
                                                  _GetVectorizedCompCount(seedEnable, enable),
                                                  1);
         VIR_Operand_SetTypeId(pSeedOpnd, typeId);
+        _UpdateSymbolTypeAfterVectorized(pSeedOpnd, typeId);
 
         vscVIR_QueryRealWriteVirRegInfo(pDuInfo->baseTsDFA.baseDFA.pOwnerCG->pOwnerShader,
                                         pOpndVectorizedInfo->instPair.pSeedInst,
@@ -2011,7 +2054,6 @@ static void _UpdateVectorizedVImmHashTable(VIR_VECTORIZER_INFO* pVectorizerInfo,
     }
 }
 
-
 static VSC_ErrCode _VectorizeSimm2SimmOpnds(VIR_VECTORIZER_INFO* pVectorizerInfo,
                                             VIR_Shader* pShader,
                                             VIR_BASIC_BLOCK* pBasicBlock,
@@ -2127,11 +2169,13 @@ static VSC_ErrCode _VectorizeSimm2VimmOpnds(VIR_VECTORIZER_INFO* pVectorizerInfo
 {
     VIR_Operand*  pSeedOpnd = pOpndVectorizedInfo->opndPair.pSeedOpnd;
     VIR_Operand*  pOpnd = pOpndVectorizedInfo->opndPair.pOpnd;
+    VIR_Swizzle   seedSwizzle = VIR_Operand_GetSwizzle(pSeedOpnd);
     VIR_TypeId    vConstType = VIR_TYPE_UNKNOWN;
     VIR_ConstVal  vConstValue;
     VIR_Const*    pOrgSeedConstValue;
     VIR_ConstId   vConstId;
     gctUINT       i, compCount = _GetVectorizedCompCount(orgSeedEnable, orgEnable);
+    gctUINT       seedChannel;
 
     gcmASSERT(!bDst);
 
@@ -2147,7 +2191,9 @@ static VSC_ErrCode _VectorizeSimm2VimmOpnds(VIR_VECTORIZER_INFO* pVectorizerInfo
 
     for (i = 0; i < VIR_CHANNEL_COUNT; i ++)
     {
-        vConstValue.vecVal.u32Value[i] = pOrgSeedConstValue->value.vecVal.u32Value[i];
+        /* save value of seedswizzle channel to new ConstValue */
+        seedChannel  = (gctUINT)VIR_Swizzle_GetChannel(seedSwizzle, i);
+        vConstValue.vecVal.u32Value[i] = pOrgSeedConstValue->value.vecVal.u32Value[seedChannel];
 
         if (orgEnable & (1 << i))
         {
@@ -2178,13 +2224,14 @@ static VSC_ErrCode _VectorizeVimm2VimmOpnds(VIR_VECTORIZER_INFO* pVectorizerInfo
     VIR_Operand*  pSeedOpnd = pOpndVectorizedInfo->opndPair.pSeedOpnd;
     VIR_Operand*  pOpnd = pOpndVectorizedInfo->opndPair.pOpnd;
     VIR_Swizzle   orgSwizzle = VIR_Operand_GetSwizzle(pOpnd);
+    VIR_Swizzle   seedSwizzle = VIR_Operand_GetSwizzle(pSeedOpnd);
     VIR_TypeId    vConstType = VIR_TYPE_UNKNOWN;
     VIR_ConstVal  vConstValue;
     VIR_Const*    pOrgConstValue;
     VIR_Const*    pOrgSeedConstValue;
     VIR_ConstId   vConstId;
     gctUINT       i, compCount = _GetVectorizedCompCount(orgSeedEnable, orgEnable);
-    gctUINT       channel;
+    gctUINT       channel, seedChannel;
 
     gcmASSERT(!bDst);
 
@@ -2201,7 +2248,9 @@ static VSC_ErrCode _VectorizeVimm2VimmOpnds(VIR_VECTORIZER_INFO* pVectorizerInfo
 
     for (i = 0; i < VIR_CHANNEL_COUNT; i ++)
     {
-        vConstValue.vecVal.u32Value[i] = pOrgSeedConstValue->value.vecVal.u32Value[i];
+        /* save value of seedswizzle channel to new ConstValue */
+        seedChannel  = (gctUINT)VIR_Swizzle_GetChannel(seedSwizzle, i);
+        vConstValue.vecVal.u32Value[i] = pOrgSeedConstValue->value.vecVal.u32Value[seedChannel];
 
         if (orgEnable & (1 << i))
         {
@@ -2360,8 +2409,7 @@ static VSC_ErrCode _VectorizeSym2SymOnDst(VIR_Shader* pShader,
     gcmASSERT(firstSeedRegNo != firstRegNo);
 
     /* Currently, don't consider the case that mapped seed-inst channel of redundant channel
-       has def other than seed-inst.
-       TODO: fully rename */
+       has def other than seed-inst. */
     for (channel = VIR_CHANNEL_X; channel < VIR_CHANNEL_NUM; channel ++)
     {
         if (!VSC_UTILS_TST_BIT(redundantEnable, channel))
@@ -2395,8 +2443,7 @@ static VSC_ErrCode _VectorizeSym2SymOnDst(VIR_Shader* pShader,
         }
 
         /* Currently, don't consider the case that one of free-channel has been def'ed by
-           other inst.
-           TODO: fully rename */
+           other inst. */
         defIdx = vscVIR_FindFirstDefIndexWithChannel(pDuInfo, firstSeedRegNo, channel);
         if (VIR_INVALID_DEF_INDEX != defIdx)
         {
@@ -2615,6 +2662,7 @@ static VSC_ErrCode _VectorizeSym2SymOnDst(VIR_Shader* pShader,
                               1);
 
             VIR_Operand_SetTypeId(pSeedDst, newTypeId);
+            _UpdateSymbolTypeAfterVectorized(pSeedDst, newTypeId);
         }
         else if (pDef->defKey.pDefInst == pInst)
         {
@@ -2624,6 +2672,7 @@ static VSC_ErrCode _VectorizeSym2SymOnDst(VIR_Shader* pShader,
                               1);
 
             VIR_Operand_SetTypeId(pDst, newTypeId);
+            _UpdateSymbolTypeAfterVectorized(pDst, newTypeId);
         }
         else
         {
@@ -2638,6 +2687,7 @@ static VSC_ErrCode _VectorizeSym2SymOnDst(VIR_Shader* pShader,
                                   1);
 
                 VIR_Operand_SetTypeId(dest, newTypeId);
+                _UpdateSymbolTypeAfterVectorized(dest, newTypeId);
             }
         }
 
@@ -2698,9 +2748,9 @@ static VSC_ErrCode _VectorizeSym2SymOnSrc(VIR_VECTORIZER_INFO* pVectorizerInfo,
     VIR_Operand_GetOperandInfo(pSeedInst, pSeedSrc, &seedOpInfo);
     VIR_Operand_GetOperandInfo(pInst, pSrc, &opInfo);
 
-    if (seedOpInfo.isUniform || seedOpInfo.isImage)
+    if (seedOpInfo.isUniform || seedOpInfo.isImage || seedOpInfo.isImageT || seedOpInfo.isSampler || seedOpInfo.isSamplerT)
     {
-        gcmASSERT(opInfo.isUniform || opInfo.isImage);
+        gcmASSERT(opInfo.isUniform || opInfo.isImage || opInfo.isImageT || opInfo.isSampler || opInfo.isSamplerT);
 
         /* Not supported yet */
         return VSC_ERR_NONE;
@@ -2709,8 +2759,6 @@ static VSC_ErrCode _VectorizeSym2SymOnSrc(VIR_VECTORIZER_INFO* pVectorizerInfo,
     {
         gcmASSERT(VIR_OpndInfo_Is_Virtual_Reg(&opInfo));
 
-        /* Currently, don't consider the case that opnd has multiple defs
-           TODO: fully rename */
         vscVIR_InitGeneralUdIterator(&udIter, pDuInfo, pInst, pSrc, gcvFALSE, gcvFALSE);
         pDef = vscVIR_GeneralUdIterator_First(&udIter);
         while ((pNextDef = vscVIR_GeneralUdIterator_Next(&udIter)) != gcvNULL)
@@ -3626,6 +3674,7 @@ static VSC_ErrCode _DoVectorizationOnBasicBlock(VIR_VECTORIZER_INFO* pVectorizer
     {
         VIR_Operand * dest = VIR_Inst_GetDest(pInst);
         if (VIR_Inst_isComponentwise(pInst) &&
+            !VIR_OPCODE_isVX(VIR_Inst_GetOpcode(pInst)) &&       /* EVIS instruction cannot be vectorized */
             (VIR_Inst_GetOpcode(pInst) != VIR_OP_MOD) &&         /* MOD may be expanded to use SW implementation which only workds for scalar */
             VIR_OPCODE_hasDest(VIR_Inst_GetOpcode(pInst)) &&
             VIR_Operand_GetEnable(dest) != VIR_ENABLE_XYZW &&  /* only look for INSTs not fully enabled */
@@ -3715,7 +3764,7 @@ static VSC_ErrCode _DoVectorizationOnFunc(VIR_VECTORIZER_INFO* pVectorizerInfo,
     pThisBlock = (VIR_BASIC_BLOCK *)CFG_ITERATOR_FIRST(&basicBlkIter);
     for (; pThisBlock != gcvNULL; pThisBlock = (VIR_BASIC_BLOCK *)CFG_ITERATOR_NEXT(&basicBlkIter))
     {
-        if (BB_GET_LENGTH(pThisBlock) && BB_GET_LENGTH(pThisBlock) < MAX_VECTORIZE_BB_INST_COUNT)
+        if (BB_GET_LENGTH(pThisBlock))
         {
             errCode = _DoVectorizationOnBasicBlock(pVectorizerInfo, pShader, pThisBlock, pDuInfo, pOvCallbacks, pMM);
             ON_ERROR(errCode, "Do vectorization on basic block");
@@ -3738,6 +3787,12 @@ gctBOOL vscVIR_CheckTwoSymsVectorizability(VIR_Shader* pShader, VIR_Symbol* pSym
 
     /* Sym kind must be same */
     if (VIR_Symbol_GetKind(pSym1) != VIR_Symbol_GetKind(pSym2))
+    {
+        return gcvFALSE;
+    }
+
+    /* if any symbol is defined by EVIS instruction, cannot vectorize them */
+    if (isSymDefinedByEVIS(pSym1) || isSymDefinedByEVIS(pSym2))
     {
         return gcvFALSE;
     }
@@ -3820,8 +3875,6 @@ gctBOOL vscVIR_CheckTwoSymsVectorizability(VIR_Shader* pShader, VIR_Symbol* pSym
             return gcvFALSE;
         }
 
-        /* For IOB's member sym, they must be in same IOB.
-           TODO: We need loose it to get better vectorizability later */
         if (isSymIOBlockMember(pSym1) != isSymIOBlockMember(pSym2) ||
             (isSymIOBlockMember(pSym1) && VIR_Symbol_GetIOBlockIndex(pSym1) != VIR_Symbol_GetIOBlockIndex(pSym2)))
         {
@@ -3888,11 +3941,68 @@ DEF_QUERY_PASS_PROP(vscVIR_DoLocalVectorization)
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
 }
 
+DEF_SH_NECESSITY_CHECK(vscVIR_DoLocalVectorization)
+{
+    VIR_Shader*                    pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VSC_OPTN_VECOptions*           pOptions = (VSC_OPTN_VECOptions*)pPassWorker->basePassWorker.pBaseOption;
+
+    if (!gcUseFullNewLinker(pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti2))
+    {
+        return gcvFALSE;
+    }
+
+    if (!VSC_OPTN_InRange(VIR_Shader_GetId(pShader), VSC_OPTN_VECOptions_GetBeforeShader(pOptions),
+                          VSC_OPTN_VECOptions_GetAfterShader(pOptions)))
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+VSC_ErrCode
+VIR_Shader_AnalyzeInst(
+    IN  VIR_Shader *  Shader
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_FuncIterator    func_iter;
+    VIR_FunctionNode   *func_node;
+    gctINT              instId   = 0;
+    VIR_Operand *       dest;
+    VIR_Symbol *        sym;
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(Shader));
+
+    for (func_node = VIR_FuncIterator_First(&func_iter);
+        func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_Function    *func       = func_node->function;
+        VIR_Instruction *inst       = gcvNULL;
+
+        inst = func->instList.pHead;
+        while (inst != gcvNULL)
+        {
+            dest = VIR_Inst_GetDest(inst);
+
+            if (VIR_OPCODE_isVX(VIR_Inst_GetOpcode(inst)) && dest && VIR_Operand_isSymbol(dest))
+            {
+                sym = VIR_Operand_GetSymbol(dest);
+                VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_DEFINED_BY_EVIS);
+            }
+
+            inst = VIR_Inst_GetNext(inst);
+        }
+
+        func->_lastInstId = instId;
+    }
+
+    return errCode;
+}
+
 VSC_ErrCode vscVIR_DoLocalVectorization(VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode                    errCode = VSC_ERR_NONE;
     VIR_Shader*                    pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
-    VSC_OPTN_VECOptions*           pOptions = (VSC_OPTN_VECOptions*)pPassWorker->basePassWorker.pBaseOption;
     VIR_DEF_USAGE_INFO*            pDuInfo = pPassWorker->pDuInfo;
     VIR_VECTORIZER_INFO            vectorizerInfo;
     VIR_FuncIterator               func_iter;
@@ -3912,17 +4022,6 @@ VSC_ErrCode vscVIR_DoLocalVectorization(VSC_SH_PASS_WORKER* pPassWorker)
         {VIR_OPND_VECTORIZE_TYPE_VIMM_2_VIMM, _Vimm2VimmOpndsVectorizabilityCheck, gcvNULL, _VectorizeVimm2VimmOpnds    },
     };
 
-    if (!gcUseFullNewLinker(pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti2))
-    {
-        return errCode;
-    }
-
-    if (!VSC_OPTN_InRange(VIR_Shader_GetId(pShader), VSC_OPTN_VECOptions_GetBeforeShader(pOptions),
-                          VSC_OPTN_VECOptions_GetAfterShader(pOptions)))
-    {
-        return errCode;
-    }
-
     vectorizerInfo.pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     vscHTBL_Initialize(&vectorizerInfo.vectorizedVImmHashTable,
                        pPassWorker->basePassWorker.pMM,
@@ -3930,6 +4029,7 @@ VSC_ErrCode vscVIR_DoLocalVectorization(VSC_SH_PASS_WORKER* pPassWorker)
                        gcvNULL, 32);
 
     VIR_Shader_RenumberInstId(pShader);
+    VIR_Shader_AnalyzeInst(pShader);
 
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {

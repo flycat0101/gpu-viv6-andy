@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -57,17 +57,11 @@ typedef va_list gctARGUMENTS;
     (gctUINT32)pthread_self()
 
 #define gcmkOUTPUT_STRING(String) \
-    printf(String); \
+    printf("%s", String); \
     fflush(stdout)
 
-#define gcmkSPRINTF(Destination, Size, Message, Value) \
-    snprintf(Destination, Size, Message, Value)
-
-#define gcmkSPRINTF2(Destination, Size, Message, Value1, Value2) \
-    snprintf(Destination, Size, Message, Value1, Value2)
-
-#define gcmkSPRINTF3(Destination, Size, Message, Value1, Value2, Value3) \
-    snprintf(Destination, Size, Message, Value1, Value2, Value3)
+#define gcmkSPRINTF(Destination, Size, ...) \
+    snprintf(Destination, Size, __VA_ARGS__)
 
 #define gcmkVSPRINTF(Destination, Size, Message, Arguments) \
     vsnprintf(Destination, Size, Message, *((va_list *)Arguments))
@@ -77,7 +71,7 @@ typedef va_list gctARGUMENTS;
 
 #if gcdUSE_FAST_MEM_COPY
 #define gcmkMEMCPY(Destination, Source, Size) \
-    fast_mem_cpy(Destination, Source, Size);
+    fast_mem_cpy(Destination, Source, Size)
 #else
 #define gcmkMEMCPY(Destination, Source, Size) \
     memcpy(Destination, Source, Size)

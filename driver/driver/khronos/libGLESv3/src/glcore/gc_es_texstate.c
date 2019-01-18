@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -97,7 +97,7 @@ GLvoid __glInitTextureObject(__GLcontext *gc, __GLtextureObject *tex, GLuint id,
     tex->params.sampler.maxLod = 1000.0;
     tex->params.baseLevel = 0;
     tex->params.maxLevel = 1000;
-    tex->params.depthStTexMode = GL_DEPTH_COMPONENT;
+    tex->params.dsTexMode = GL_DEPTH_COMPONENT;
 
     tex->params.sampler.compareMode = GL_NONE;
     tex->params.sampler.compareFunc = GL_LEQUAL;
@@ -367,7 +367,7 @@ GLboolean __glIsTextureComplete(__GLcontext *gc, __GLtextureObject *texObj, GLen
         }
 
         if(baseFmtInfo->glFormat == GL_DEPTH_STENCIL &&
-           texObj->params.depthStTexMode == GL_STENCIL_INDEX)
+            texObj->params.dsTexMode == GL_STENCIL_INDEX)
         {
             return GL_FALSE;
         }
@@ -762,10 +762,10 @@ __GL_INLINE GLvoid __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint ta
         {
         case GL_DEPTH_COMPONENT:
         case GL_STENCIL_INDEX:
-            if (tex->params.depthStTexMode != (GLenum)param)
+            if (tex->params.dsTexMode != (GLenum)param)
             {
-                tex->params.depthStTexMode = (GLenum)param;
-                dirty = __GL_TEXPARAM_D_ST_TEXMODE_BIT;
+                tex->params.dsTexMode = (GLenum)param;
+                dirty = __GL_TEXPARAM_DS_TEXMODE_BIT;
                 tex->uObjStateDirty.s.dsModeDirty = GL_TRUE;
             }
             break;
@@ -778,7 +778,7 @@ __GL_INLINE GLvoid __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint ta
         if (pv[0] >= 1.0f)
         {
             tex->params.sampler.maxAnistropy = pv[0];
-            dirty = __GL_TEXPARAM_MAX_ANISTROPY_BIT;
+            dirty = __GL_TEXPARAM_MAX_ANISOTROPY_BIT;
         }
         else
         {
@@ -1036,7 +1036,10 @@ GLvoid GL_APIENTRY __gles_TexParameteriv(__GLcontext *gc, GLenum target, GLenum 
         }
         else
         {
-            __GL_MEMCOPY(tmpf, pv, 4 * sizeof(GLfloat));
+            tmpf[0] = __GL_I_TO_FLOAT(pv[0]);
+            tmpf[1] = __GL_I_TO_FLOAT(pv[1]);
+            tmpf[2] = __GL_I_TO_FLOAT(pv[2]);
+            tmpf[3] = __GL_I_TO_FLOAT(pv[3]);
         }
     }
     else
@@ -1227,7 +1230,7 @@ __glGetTexParameterfv(__GLcontext *gc, GLenum target, GLenum pname, GLfloat *v)
         v[0] = (GLfloat)params->sampler.compareFunc;
         break;
     case GL_DEPTH_STENCIL_TEXTURE_MODE:
-        v[0] = (GLfloat)params->depthStTexMode;
+        v[0] = (GLfloat)params->dsTexMode;
         break;
     case GL_TEXTURE_MAX_ANISOTROPY_EXT:
         v[0] = (GLfloat)params->sampler.maxAnistropy;
@@ -1320,20 +1323,17 @@ GLvoid GL_APIENTRY __gles_GetTexParameteriv(__GLcontext *gc, GLenum target, GLen
 
     __glGetTexParameterfv(gc, target, pname, tmpf);
 
-    if (pname == GL_TEXTURE_BORDER_COLOR_EXT)
+    switch (pname)
     {
-        __GL_MEMCOPY(v, tmpf, 4 * sizeof(GLfloat));
-    }
-    else
-    {
-        if (tmpf[0] < 0)
-        {
-            v[0] = (GLint)(tmpf[0] - 0.5f);
-        }
-        else
-        {
-            v[0] = (GLint)(tmpf[0] + 0.5f);
-        }
+    case GL_TEXTURE_BORDER_COLOR_EXT:
+        v[0] = __GL_FLOAT_TO_I(tmpf[0]);
+        v[1] = __GL_FLOAT_TO_I(tmpf[1]);
+        v[2] = __GL_FLOAT_TO_I(tmpf[2]);
+        v[3] = __GL_FLOAT_TO_I(tmpf[3]);
+        break;
+    default:
+        v[0] = (GLint)(tmpf[0] + (tmpf[0] < 0 ? - 0.5f : 0.5f));
+        break;
     }
 
     __GL_FOOTER();
@@ -2170,7 +2170,7 @@ __GL_INLINE GLvoid __glSamplerParameterfv(__GLcontext *gc, __GLsamplerObject *sa
         if (pv[0] >= 1.0f)
         {
             samplerObj->params.maxAnistropy = pv[0];
-            dirty = __GL_TEXPARAM_MAX_ANISTROPY_BIT;
+            dirty = __GL_TEXPARAM_MAX_ANISOTROPY_BIT;
         }
         else
         {
@@ -2441,7 +2441,10 @@ GLvoid GL_APIENTRY __gles_SamplerParameteriv(__GLcontext *gc, GLuint sampler, GL
 
     if (pname == GL_TEXTURE_BORDER_COLOR_EXT)
     {
-        __GL_MEMCOPY(ftemp, param, 4 * sizeof(GLfloat));
+        ftemp[0] = __GL_I_TO_FLOAT(param[0]);
+        ftemp[1] = __GL_I_TO_FLOAT(param[1]);
+        ftemp[2] = __GL_I_TO_FLOAT(param[2]);
+        ftemp[3] = __GL_I_TO_FLOAT(param[3]);
     }
     else
     {
@@ -2496,29 +2499,26 @@ GLvoid GL_APIENTRY __gles_SamplerParameterfv(__GLcontext *gc, GLuint sampler, GL
 
 GLvoid GL_APIENTRY __gles_GetSamplerParameteriv(__GLcontext *gc, GLuint sampler, GLenum pname, GLint* params)
 {
+    GLfloat tmpf[4] = {0.0f};
     __GLsamplerObject *samplerObj = __glGetSamplerObject(gc, sampler);
-    GLfloat ftemp[4] = {0.f};
 
     __GL_HEADER();
 
-    if ((samplerObj != gcvNULL))
+    if (samplerObj != gcvNULL)
     {
-        __glGetSamplerParameterfv(gc, samplerObj, pname, ftemp);
+        __glGetSamplerParameterfv(gc, samplerObj, pname, tmpf);
 
-        if (pname == GL_TEXTURE_BORDER_COLOR_EXT)
+        switch (pname)
         {
-            __GL_MEMCOPY(params, ftemp, 4 * sizeof(GLfloat));
-        }
-        else
-        {
-            if (ftemp[0] < 0)
-            {
-                params[0] = (GLint)(ftemp[0] - 0.5f);
-            }
-            else
-            {
-                params[0] = (GLint)(ftemp[0] + 0.5f);
-            }
+        case GL_TEXTURE_BORDER_COLOR_EXT:
+            params[0] = __GL_FLOAT_TO_I(tmpf[0]);
+            params[1] = __GL_FLOAT_TO_I(tmpf[1]);
+            params[2] = __GL_FLOAT_TO_I(tmpf[2]);
+            params[3] = __GL_FLOAT_TO_I(tmpf[3]);
+            break;
+        default:
+            params[0] = (GLint)(tmpf[0] + (tmpf[0] < 0 ? - 0.5f : 0.5f));
+            break;
         }
     }
 

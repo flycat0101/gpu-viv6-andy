@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -425,6 +425,11 @@ DEF_QUERY_PASS_PROP(VSC_SCL_Scalarization_PerformOnShader)
     pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
     pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_SCALARIZE;
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+}
+
+DEF_SH_NECESSITY_CHECK(VSC_SCL_Scalarization_PerformOnShader)
+{
+    return gcvTRUE;
 }
 
 VSC_ErrCode VSC_SCL_Scalarization_PerformOnShader(

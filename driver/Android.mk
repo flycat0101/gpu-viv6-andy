@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -22,6 +22,8 @@ endif
 
 LOCAL_PATH := $(AQROOT)
 
+ifeq ($(VIVANTE_ENABLE_VSIMULATOR),0)
+
 VIVANTE_MAKEFILES := $(LOCAL_PATH)/hal/kernel/Android.mk \
                      $(LOCAL_PATH)/hal/user/Android.mk
 
@@ -31,20 +33,27 @@ else
   VIVANTE_MAKEFILES += $(LOCAL_PATH)/driver/android/gralloc/Android.mk
 endif
 
+else
+VIVANTE_MAKEFILES := \
+                     $(LOCAL_PATH)/hal/user/Android.mk \
+                     $(LOCAL_PATH)/vsimulator/os/linux/emulator/Android.mk
+
+endif
+
 ifeq ($(VIVANTE_ENABLE_2D),1)
   # Build hwcomposer for Honeycomb and later
   ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 11),1)
-    HWC_MAKEFILE += $(LOCAL_PATH)/driver/android/hwcomposer/Android.mk
+    HWC_MAKEFILE += $(LOCAL_PATH)/driver/android/hwcomposer0/Android.mk
   endif
 
-  # Build hwcomposer_v1 for Jellybean 4.2 and later
+  # Build hwcomposer1 for Jellybean 4.2 and later
   ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 17),1)
-    HWC_MAKEFILE := $(LOCAL_PATH)/driver/android/hwcomposer_v1/Android.mk
+    HWC_MAKEFILE := $(LOCAL_PATH)/driver/android/hwcomposer1/Android.mk
   endif
 
-  # Build hwcomposer_v2 Androi-N and later
+  # Build hwcomposer2 Androi-N and later
   ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 24),1)
-    # HWC_MAKEFILE := $(LOCAL_PATH)/driver/android/hwcomposer_v2/Android.mk
+    # HWC_MAKEFILE := $(LOCAL_PATH)/driver/android/hwcomposer2/Android.mk
   endif
 
   VIVANTE_MAKEFILES += $(HWC_MAKEFILE)
@@ -64,12 +73,18 @@ ifeq ($(USE_OPENVX),1)
 endif
 
 ifeq ($(VIVANTE_ENABLE_3D),1)
+
+ifeq ($(VIVANTE_ENABLE_VSIMULATOR),0)
   EGL_MAKEFILE := $(LOCAL_PATH)/driver/khronos/libEGL/Android.mk
 
   VIVANTE_MAKEFILES += $(LOCAL_PATH)/driver/khronos/libGLESv11/Android.mk \
                        $(LOCAL_PATH)/driver/khronos/libGLESv3/Android.mk \
                        $(LOCAL_PATH)/compiler/libVSC/Android.mk \
                        $(LOCAL_PATH)/compiler/libGLSLC/Android.mk
+else
+  VIVANTE_MAKEFILES += $(LOCAL_PATH)/compiler/libVSC/Android.mk
+endif
+
 endif
 
 ifeq ($(VIVANTE_ENABLE_VG),1)

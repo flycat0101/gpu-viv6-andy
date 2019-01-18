@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -20,6 +20,7 @@
 #include "utils/gc_vsc_utils_mm.h"
 #include "utils/gc_vsc_utils_hash.h"
 #include "utils/gc_vsc_utils_table.h"
+#include "utils/gc_vsc_utils_io.h"
 #include "old_impl/gc_vsc_old_gcsl.h"
 #include "vir/passmanager/gc_vsc_options.h"
 #include "vir/ir/gc_vsc_vir_ir.h"

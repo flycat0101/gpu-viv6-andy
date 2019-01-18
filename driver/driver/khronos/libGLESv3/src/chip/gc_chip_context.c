@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -146,7 +146,7 @@ gcChipConstructChipName(
     *ChipName++ = 'e';
     *ChipName++ = ' ';
 
-    gcmONERROR(gcoHAL_GetProductName(chipCtx->hal, &productName));
+    gcmONERROR(gcoHAL_GetProductName(chipCtx->hal, &productName, gcvNULL));
 
     gcoOS_StrCatSafe(chipCtx->chipName, __GL_CHIP_NAME_LEN , productName);
 
@@ -354,12 +354,6 @@ gcChipInitDevicePipeline(
 
     /* Multisample */
     gc->dp.getSampleLocation = __glChipGetSampleLocation;
-    gc->dp.drawArraysIndirect = __glChipDrawArraysIndirect;
-    gc->dp.drawElementsIndirect = __glChipDrawElementsIndirect;
-
-    /* MultiDrawIndirect */
-    gc->dp.multiDrawArraysIndirectEXT = __glChipMultiDrawArraysIndirect;
-    gc->dp.multiDrawElementsIndirectEXT = __glChipMultiDrawElementsIndirect;
 
     /* Compute shader */
     gc->dp.computeBegin = __glChipComputeBegin;
@@ -372,12 +366,12 @@ gcChipInitDevicePipeline(
     gc->dp.blendBarrier = __glChipBlendBarrier;
 
     /* profiler */
+#if VIVANTE_PROFILER
     gc->dp.profiler = __glChipProfilerSet;
+#endif
     /* Patches. */
 #if __GL_CHIP_PATCH_ENABLED
     gc->dp.patchBlend = __glChipPatchBlend;
-#else
-    gc->dp.patchBlend = NULL;
 #endif
 
     gc->dp.getError = __glChipGetError;
@@ -1116,9 +1110,6 @@ __glChipGetDeviceConstants(
     gceCHIPMODEL chipModel;
     gctUINT32 chipRevision;
     gctBOOL isEs31;
-#if defined(ANDROID)
-    gctSTRING esVersion = gcvNULL;
-#endif
 
     gcmHEADER_ARG("gc=0x%x constants=0x%x", gc, constants);
 
@@ -1156,20 +1147,12 @@ __glChipGetDeviceConstants(
     else if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI0))
     {
 #if defined(ANDROID)
-#if (ANDROID_SDK_VERSION < 19)
-        if (patchId == gcvPATCH_OESCTS)
-#else
-        if ((patchId == gcvPATCH_OESCTS) && !gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI2))
-#endif
-        {
-            gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION20);
-            constants->GLSLVersion = __GL_GLSL_VERSION20;
-            constants->majorVersion = 2;
-        }
-        else
-        if (((patchId == gcePATCH_ANDROID_CTS_GRAPHICS_GLVERSION) || (patchId == gcvPATCH_ANTUTU6X) || (patchId == gcvPATCH_ANTUTU3DBench))
+        gctSTRING esVersion = gcvNULL;
+        if ((patchId == gcvPATCH_OESCTS) ||
+            ((patchId == gcePATCH_ANDROID_CTS_GRAPHICS_GLVERSION)
             && (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.opengles.version", &esVersion)) &&
             esVersion && gcmIS_SUCCESS(gcoOS_StrCmp(esVersion, "131072"))))
+            )
         {
             gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION20);
             constants->GLSLVersion = __GL_GLSL_VERSION20;
@@ -1213,7 +1196,8 @@ __glChipGetDeviceConstants(
     constants->maxTextureDepthSize  = __GL_MAX_HW_DEPTH_SIZE;
 
     constants->lineWidthMin = 1.0f;
-    constants->lineWidthMax = gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_WIDE_LINE) ? 16.0f : 1.0f;
+    constants->lineWidthMax = (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_WIDE_LINE) &&
+                               gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_WIDELINE_HELPER_FIX)) ? 16.0f : 1.0f;
 
     constants->numberofQueryCounterBits = __GL_QUERY_COUNTER_BITS;
 
@@ -1364,7 +1348,7 @@ __glChipGetDeviceConstants(
     shaderCaps->maxWorkGroupSize[0] = 256;
     shaderCaps->maxWorkGroupSize[1] = 128;
     shaderCaps->maxWorkGroupSize[2] = 64;
-    shaderCaps->maxWorkGroupInvocation = 256;
+    shaderCaps->maxWorkGroupInvocation = 2048;
     shaderCaps->maxShareMemorySize = 32768;
 
 
@@ -1409,7 +1393,7 @@ __glChipGetDeviceConstants(
         gctUINT minTesUniforms  = tsAvailable ? 256 : 0;
         gctUINT minGsUniforms   = gsAvailable ? 256 : 0;
 
-        if (gc->apiVersion == __GL_API_VERSION_ES20 &&
+        if ((gc->apiVersion == __GL_API_VERSION_ES20 || gc->apiVersion == __GL_API_VERSION_ES30) &&
             (gcvPATCH_OES20SFT == patchId ||
              gcvPATCH_GLBM27 == patchId   ||
              gcvPATCH_GFXBENCH == patchId ||
@@ -1452,7 +1436,7 @@ __glChipGetDeviceConstants(
                                             &shaderCaps->maxDrawBuffers,
                                             &constants->maxSamples));
 
-        shaderCaps->maxDrawBuffers = __GL_MAX(shaderCaps->maxDrawBuffers / 2, 4);
+        shaderCaps->maxDrawBuffers = __GL_MAX(shaderCaps->maxDrawBuffers / 4, 4);
         if (shaderCaps->maxDrawBuffers > __GL_MAX_DRAW_BUFFERS)
         {
             __GLES_PRINT("ERROR: please define __GL_MAX_DRAW_BUFFERS no less than %d\n", shaderCaps->maxDrawBuffers);
@@ -1688,14 +1672,15 @@ __glChipDestroyContext(
         gc->constants.shaderCaps.extensions = gcvNULL;
     }
 
-
     gcmVERIFY_OK(gcChipDeinitializeSampler(gc));
     gcmVERIFY_OK(gcChipDeinitializeDraw(gc, chipCtx));
     gcmVERIFY_OK(gcChipLTCReleaseResultArray(chipCtx, gcvNULL));
     gcmVERIFY_OK(gcChipReleaseCompiler(gc));
     (*gc->imports.free)(0, gc->constants.pCompressedTexturesFormats);
 
+#if VIVANTE_PROFILER
     gcmVERIFY_OK(gcChipProfilerDestroy(gc));
+#endif
 
     if (chipCtx->rtTexture)
     {
@@ -1959,7 +1944,9 @@ __glChipCreateContext(
     gcmONERROR(gcChipInitializeSampler(gc));
     gcmONERROR(gcChipLoadCompiler(gc));
     gcmONERROR(gcChipInitDeafultObjects(gc));
+#if VIVANTE_PROFILER
     gcmONERROR(gcChipProfilerInitialize(gc));
+#endif
 
     dpGlobalInfo.numContext++;
 

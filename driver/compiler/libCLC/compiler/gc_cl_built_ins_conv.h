@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2455,6 +2455,7 @@ _GenOldConvert_Code(
                     if (gcmIS_ERROR(status)) return status;
 
                     /* r0 = r1 + 0.5 */
+                    /* Make sure that all source type is FLOAT. */
                     clsIOPERAND_Initialize(Compiler, &tempIOperand[0], clmGenCodeDataType(T_FLOAT), intermIOperands[1].tempRegIndex);
                     clsROPERAND_InitializeUsingIOperand(&tempROperand[0], &tempIOperand[0]);
 

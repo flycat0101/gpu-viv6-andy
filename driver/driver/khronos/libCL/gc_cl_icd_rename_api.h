@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -12,7 +12,7 @@
 
 
 #ifndef _RENAME_API_H_
-#define  _RENAME_API_H_
+#define _RENAME_API_H_
 
 #define clGetPlatformIDs                         ___clGetPlatformIDs
 #define clGetPlatformInfo                        ___clGetPlatformInfo

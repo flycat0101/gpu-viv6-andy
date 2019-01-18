@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -66,12 +66,6 @@ VIR_CFO_PerformUnreachableEliminationOnShader(
     );
 
 VSC_ErrCode
-VIR_CFO_PerformUnreachableEliminationOnShader(
-    VIR_CFO* cfo,
-    gctBOOL* changed
-    );
-
-VSC_ErrCode
 VIR_CFO_PerformSelectGenerationOnShader(
     VIR_CFO* cfo,
     gctBOOL* changed
@@ -82,6 +76,7 @@ VIR_CFO_PerformOnShader(
     VSC_SH_PASS_WORKER* pPassWorker
     );
 DECLARE_QUERY_PASS_PROP(VIR_CFO_PerformOnShader);
+DECLARE_SH_NECESSITY_CHECK(VIR_CFO_PerformOnShader);
 
 END_EXTERN_C()
 

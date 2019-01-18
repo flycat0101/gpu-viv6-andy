@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -29,7 +29,7 @@ typedef struct __vkUtilsHashRec         __vkUtilsHash;
 #define __VK_MAX_PDEV_COUNT             2
 #define __VK_MAX_GPU_CORE_COUNT         4
 #define __VK_MAX_FENCE_COUNT            16384
-#define __VK_MAX_QUERY_COUNT            (4096 / sizeof(uint64_t))
+#define __VK_MAX_QUERY_BUF_SIZE         4096
 #define __VK_MAX_NAME_LENGTH            256
 
 enum
@@ -93,18 +93,12 @@ struct __vkDevContextRec
     /* All VK objects created through vkCreate*() API with this devContext. */
     __vkObjectList vkObject[__VK_DEV_OBJECT_COUNT];
 
-#if !__VK_NEW_DEVICE_QUEUE
-    /* GCHAL Interfaces */
-    gcoHAL hal;
-    gcoHARDWARE hardware;       /* Should only be used for feature / cap checks */
-#endif
     /* Current error status */
     VkResult currentResult;
 
     uint32_t context[__VK_MAX_GPU_CORE_COUNT];
 
 #if gcdDUMP
-    uint32_t contextPhysical[gcdCONTEXT_BUFFER_COUNT];
     void*    contextLogical[gcdCONTEXT_BUFFER_COUNT];
     uint32_t contextBytes;
     uint32_t currentContext;
@@ -166,9 +160,7 @@ struct __vkPhysicalDeviceRec
     gctPOINTER  mutex;
 
     __vkInstance *pInst;
-#if !__VK_NEW_DEVICE_QUEUE
-    gcoHARDWARE hardware;
-#endif
+
     VkPhysicalDeviceFeatures phyDevFeatures;
     VkPhysicalDeviceProperties phyDevProp;
     VkPhysicalDeviceMemoryProperties phyDevMemProp;

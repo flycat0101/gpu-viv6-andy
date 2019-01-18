@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -107,7 +107,7 @@ typedef struct __GLdevicePipelineRec
     GLboolean (*compressedTexSubImage2D)(__GLcontext*, __GLtextureObject*, GLint, GLint, GLint, GLint, GLint, GLint, const GLvoid*, GLsizei);
     GLboolean (*compressedTexSubImage3D)(__GLcontext*, __GLtextureObject*, GLint, GLint, GLint, GLint, GLint, GLint, GLint, const GLvoid*, GLsizei);
     GLboolean (*generateMipmaps)(__GLcontext*, __GLtextureObject*, GLint, GLint*);
-    GLboolean (*getTexImage)(__GLcontext*, __GLtextureObject*, GLint, GLint, GLubyte*);
+    GLboolean (*getTexImage)(__GLcontext*, __GLtextureObject*, GLint, GLint, GLenum, GLvoid*);
 #ifdef OPENGL40
     GLboolean (*getCompressedTexImage)(__GLcontext*, __GLtextureObject*, __GLmipMapLevel *, GLint , GLvoid *);
 #endif
@@ -131,15 +131,13 @@ typedef struct __GLdevicePipelineRec
     /* Vertex buffer object */
     GLboolean (*bindBuffer)(__GLcontext*, __GLbufferObject*, GLuint);
     GLboolean (*bufferSubData)(__GLcontext*, __GLbufferObject*, GLuint, GLintptr, GLsizeiptr, const GLvoid*);
-    GLvoid * (*mapBufferRange)(__GLcontext*, __GLbufferObject*, GLuint, GLintptr, GLsizeiptr, GLbitfield);
-#ifdef OPENGL40
-    GLvoid* (*mapBuffer)(__GLcontext*, __GLbufferObject*);
-#endif
+    GLvoid *  (*mapBufferRange)(__GLcontext*, __GLbufferObject*, GLuint, GLintptr, GLsizeiptr, GLbitfield);
     GLboolean (*flushMappedBufferRange)(__GLcontext*, __GLbufferObject*, GLuint, GLintptr, GLsizeiptr);
     GLboolean (*unmapBuffer)(__GLcontext*, __GLbufferObject*, GLuint);
     GLboolean (*deleteBuffer)(__GLcontext*, __GLbufferObject*);
     GLboolean (*bufferData)(__GLcontext*, __GLbufferObject*, GLuint, const GLvoid*);
     GLboolean (*copyBufferSubData)(__GLcontext*, GLuint, __GLbufferObject*, GLuint, __GLbufferObject*, GLintptr, GLintptr, GLsizeiptr);
+    GLboolean (*getBufferSubData)(__GLcontext*, GLuint, __GLbufferObject*, GLintptr, GLsizeiptr, GLvoid *);
 
     /* Occlusion query */
     GLboolean (*beginQuery)(__GLcontext*, __GLqueryObject*);
@@ -233,7 +231,7 @@ typedef struct __GLdevicePipelineRec
 
 #if VIVANTE_PROFILER
     /* profiler */
-    GLboolean (*profiler)(void *, GLuint, gctHANDLE);
+    GLboolean (*profiler)(__GLcontext *, GLuint, gctHANDLE);
 #endif
 
     /* Patches. */

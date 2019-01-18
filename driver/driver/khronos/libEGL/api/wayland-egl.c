@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -78,7 +78,7 @@ wl_egl_window_resize(struct wl_egl_window *egl_window,
 
 WL_EGL_EXPORT struct wl_egl_window *
 wl_egl_window_create(struct wl_surface *surface,
-             int width, int height)
+            int width, int height)
 {
     struct wl_egl_window *egl_window;
 

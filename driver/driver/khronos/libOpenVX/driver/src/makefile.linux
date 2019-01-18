@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -44,6 +44,7 @@ endif
 # Core
 OBJECTS         =  \
                     $(OBJ_DIR)/gc_vx_target.o \
+                    $(OBJ_DIR)/gc_vx_json.o \
                     $(OBJ_DIR)/gc_vx_context.o \
                     $(OBJ_DIR)/gc_vx_array.o \
                     $(OBJ_DIR)/gc_vx_convolution.o \
@@ -51,6 +52,7 @@ OBJECTS         =  \
                     $(OBJ_DIR)/gc_vx_distribution.o    \
                     $(OBJ_DIR)/gc_vx_error.o   \
                     $(OBJ_DIR)/gc_vx_graph.o \
+                    $(OBJ_DIR)/gc_vx_graph_optimization.o \
                     $(OBJ_DIR)/gc_vx_image.o   \
                     $(OBJ_DIR)/gc_vx_kernel.o  \
                     $(OBJ_DIR)/gc_vx_log.o \
@@ -72,14 +74,15 @@ OBJECTS         =  \
                     $(OBJ_DIR)/gc_vx_profiler.o  \
                     $(OBJ_DIR)/gc_vx_tensor.o   \
                     $(OBJ_DIR)/gc_vx_layer.o   \
+                    $(OBJ_DIR)/gc_vx_binary.o   \
+                    $(OBJ_DIR)/gc_vx_gpu_layer.o   \
 
 # API
 OBJECTS         +=    \
                     $(OBJ_DIR)/gc_vx_interface.o \
                     $(OBJ_DIR)/gc_vx_nn_extension_interface.o \
                     $(OBJ_DIR)/gc_vx_internal_node_api.o \
-					$(OBJ_DIR)/gc_vx_nn_util.o \
-					$(OBJ_DIR)/gc_vx_nn_extension_concat.o \
+                    $(OBJ_DIR)/gc_vx_nn_util.o \
 
 # Kernels
 OBJECTS         +=  \
@@ -112,20 +115,24 @@ OBJECTS         +=  \
                     $(OBJ_DIR)/gc_vxk_statistics.o \
                     $(OBJ_DIR)/gc_vxk_threshold.o \
                     $(OBJ_DIR)/gc_vxk_warp.o \
-                    $(OBJ_DIR)/gc_vxk_rpn.o \
 
-vpath %.c ./ops
-
+vpath %.c
 
 ################################################################################
-# Add extra library path.
+
 LIBS += -L $(SDK_DIR)/drivers
 LIBS += -L $(AQROOT)/hal/user/$(OBJ_DIR)
 
-LIBS += -l VSC -l GAL
+LIBS += -lVSC -lGAL
 
 
 VPATH = ../../kernels
+
+ifeq ($(USE_VXC_BINARY),1)
+INCLUDE += -I$(AQROOT)/driver/khronos/libOpenVX/libkernel/libnnvxc
+INCLUDE += -I$(AQROOT)/driver/khronos/libOpenVX/libkernel/libovx12
+INCLUDE += -I$(AQROOT)/driver/khronos/libOpenVX/libkernel/libnngpu
+endif
 
 CFLAGS += $(INCLUDE)
 
@@ -153,3 +160,11 @@ install: $(TARGET_OUTPUT) extra_install
 extra_install: $(TARGET_OUTPUT)
 	@mkdir -p $(SDK_DIR)/include
 	@-cp -rf $(AQROOT)/sdk/inc/VX $(SDK_DIR)/include
+ifeq ($(USE_VXC_BINARY),0)
+	@mkdir -p $(SDK_DIR)/nnvxc_kernels
+	@-cp -rvf $(AQROOT)/driver/khronos/libOpenVX/libkernel/libnnvxc/nnvxc_kernels $(SDK_DIR)
+	@mkdir -p $(SDK_DIR)/ovx12_vxcKernels
+	@-cp -rvf $(AQROOT)/driver/khronos/libOpenVX/libkernel/libovx12/ovx12_vxcKernels $(SDK_DIR)
+	@mkdir -p $(SDK_DIR)/nngpu_kernels
+	@-cp -rvf $(AQROOT)/driver/khronos/libOpenVX/libkernel/libnngpu/nngpu_kernels $(SDK_DIR)
+endif

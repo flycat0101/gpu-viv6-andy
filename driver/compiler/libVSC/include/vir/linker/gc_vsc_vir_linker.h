@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -31,16 +31,17 @@ BEGIN_EXTERN_C()
 typedef VSC_SIMPLE_QUEUE  VIR_LIB_WORKLIST;
 typedef VSC_SIMPLE_QUEUE  VIR_LIB_CALLSITES;
 
-typedef struct _VIR_LinkLib_CONTEXT     VIR_LinkLibContext;
+typedef struct _VIR_LinkLib_CONTEXT                 VIR_LinkLibContext;
 
-typedef struct _VIR_LINKER_CALL_INST_NODE         VIR_LINKER_CALL_INST_NODE;
+typedef struct _VIR_LINKER_CALL_INST_NODE           VIR_LINKER_CALL_INST_NODE;
 
 struct _VIR_LINKER_CALL_INST_NODE
 {
-    VIR_Instruction             *inst;
+    VIR_Instruction             *inst;           /* the INTRINSIC/EXTCALL instruction to be converted to CALL,
+                                                  * or the CALL inst from lib func to be recursively linked in */
     union {
         VIR_IntrinsicsKind       libIntrinsicKind;  /* intrinsic kind for VIR_OP_INTRINSIC */
-        VIR_NameId               extFuncName;    /* extern function name for EXTCALL */
+        VIR_NameId               extFuncName;       /* extern function name for EXTCALL */
     } u;
 };
 
@@ -82,7 +83,8 @@ VIR_Lib_LinkFunctions(
     IN  VSC_MM                  *pMM,
     OUT VSC_HASH_TABLE          *pAddLibFuncSet,
     OUT VIR_LIB_WORKLIST        *pWorkList,
-    OUT VIR_LIB_CALLSITES       *pCallSites);
+    OUT VIR_LIB_CALLSITES       *pCallSites
+    );
 
 VSC_ErrCode
 VIR_Lib_UpdateCallSites(
@@ -92,7 +94,8 @@ VIR_Lib_UpdateCallSites(
     IN  VSC_HW_CONFIG           *pHwCfg,
     IN  VSC_MM                  *pMM,
     IN  VSC_HASH_TABLE          *pAddLibFuncSet,
-    OUT VIR_LIB_CALLSITES       *pCallSites);
+    OUT VIR_LIB_CALLSITES       *pCallSites
+    );
 
 /* Intrinsic library list. */
 typedef struct _VIR_INTRINSIC_LIBLIST
@@ -225,7 +228,6 @@ VIR_GetIntrinsicLib(
     IN gctBOOL                  forOCL,
     IN gctBOOL                  forGraphics,
     IN gctBOOL                  DumpShader,
-    IN gctBOOL                  hasExtcallAtomic,
     OUT VIR_Shader              **pOutLib
     );
 
@@ -253,10 +255,12 @@ typedef struct _VSC_EXTERNAL_LINK_PASS_DATA
 VSC_ErrCode
 VIR_LinkExternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(VIR_LinkExternalLibFunc);
+DECLARE_SH_NECESSITY_CHECK(VIR_LinkExternalLibFunc);
 
 VSC_ErrCode
 VIR_LinkInternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(VIR_LinkInternalLibFunc);
+DECLARE_SH_NECESSITY_CHECK(VIR_LinkInternalLibFunc);
 
 END_EXTERN_C()
 

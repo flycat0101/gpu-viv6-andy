@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -65,6 +65,11 @@ sltOPTIMIZATION_OPTIONS _GetOptions(sleSHADER_TYPE shaderType)
     if (shaderType == slvSHADER_TYPE_LIBRARY)
     {
         opt &= ~slvOPTIMIZATION_SHARE_VEC_CONSTANTS;
+    }
+
+    if (gcmOPT_hasFeature(FB_TREAT_CONST_ARRAY_AS_UNIFORM))
+    {
+        opt |= slvOPTIMIZATION_TREAT_CONST_ARRAY_AS_UNIFORM;
     }
 
     if (gcmOPT_hasFeature(FB_DISABLE_GL_LOOP_UNROLLING))
@@ -350,6 +355,8 @@ _UnLockCompiler(void)
     return status;
 }
 
+static gceAPI CompilerClientApiVersion = gcvAPI_OPENGL_ES20;
+
 /*******************************************************************************
 **                              gcCompileShader
 ********************************************************************************
@@ -423,13 +430,13 @@ gcCompileShader(
     }
 
     status = gco3D_Get3DEngine(&engine);
-    if (status == gcvSTATUS_OK)
+    if (status == gcvSTATUS_OK  && engine)
     {
         gcmONERROR(gco3D_GetAPI(engine, &shader_.clientApiVersion));
     }
     else
     {
-        shader_.clientApiVersion = gcvAPI_OPENGL_ES20;
+        shader_.clientApiVersion = CompilerClientApiVersion;
     }
 
     if (*Binary)
@@ -475,6 +482,7 @@ gcCompileShader(
             if (compiler == gcvNULL)
             {
                 sloCOMPILER_Construct_General((sleSHADER_TYPE)ShaderType,
+                                              shader_.clientApiVersion,
                                               gcGetCompiler(compilerIndex));
                 compiler = *gcGetCompiler(compilerIndex);
             }
@@ -492,6 +500,14 @@ gcCompileShader(
                 dumpOption = slvDUMP_ALL;
                 optOption &=~slvOPTIMIZATION_DATA_FLOW;
                 dumpOption &=~slvDUMP_CODE_GENERATOR;
+            }
+
+            if (shader_.clientApiVersion == gcvAPI_OPENGL)
+            {
+                /* set default language version as 110 */
+                gcmONERROR(sloCOMPILER_SetLanguageVersion(compiler,
+                                                          110,
+                                                          gcvTRUE));
             }
 
             gcmONERROR(sloCOMPILER_Compile(compiler,
@@ -614,13 +630,21 @@ gcInitializeCompiler(
     {
         gcmVERIFY_OK(gcInitGLSLCaps(glslCaps));
     }
-
     gcmONERROR(gcInitializeRecompilation());
 
 OnError:
     gcmFOOTER_ARG("status=%d", status);
     return status;
 
+}
+
+gceSTATUS
+gcSetClientApiVersion(
+    IN gceAPI ApiVersion
+    )
+{
+    CompilerClientApiVersion = ApiVersion;
+    return gcvSTATUS_OK;
 }
 
 /*******************************************************************************************

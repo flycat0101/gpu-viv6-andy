@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1083,6 +1083,9 @@ _SplitCurrent(
             + Buffer->bufferInfo.staticTailSize
             + Buffer->bufferInfo.eventCommandSize * EventCount;
 
+        /*One semaphore command size: between PE & END events. */
+        executionSize += 0x10;
+
         /* Determine the effective command buffer size. */
         effectiveSize
             = currentOffset
@@ -1774,12 +1777,16 @@ gcoVGBUFFER_Destroy(
     {
         gcsCMDBUFFER_PTR currentBuffer;
 
-        gcmERR_BREAK(gcoVGHARDWARE_FlushPipe(gcvNULL));
+        if ((Buffer->queueCurrent != gcvEMPTY_QUEUE) ||
+            (Buffer->taskBlockCount != 0))
+        {
+            gcmERR_BREAK(gcoVGHARDWARE_FlushPipe(gcvNULL));
 
-        /* Commit the command queue and stall. */
-        gcmERR_BREAK(gcoVGHARDWARE_Commit(
-            Buffer->hardware, gcvTRUE
-            ));
+            /* Commit the command queue and stall. */
+            gcmERR_BREAK(gcoVGHARDWARE_Commit(
+                Buffer->hardware, gcvTRUE
+                ));
+        }
 
         /* Dereference the context buffer completion. */
         gcmERR_BREAK(gcoVGBUFFER_DeassociateCompletion(
@@ -3187,9 +3194,8 @@ gcoVGBUFFER_Commit(
             /* Make sure all commands have been executed. */
             if (Stall && (Buffer->completionPrevious != gcvVACANT_BUFFER))
             {
-#if gcdDUMP_2DVG
                 gcmDUMP(gcvNULL, "@[stall]");
-#endif
+
                 /* Report current location. */
                 gcmLOG_LOCATION();
 
@@ -3332,15 +3338,18 @@ gcoVGBUFFER_Commit(
         halInterface.u.VGCommit.taskTable  = gcmPTR_TO_UINT64(&Buffer->taskTable);
 
         /* Call kernel service. */
-         gcmERR_BREAK(gcoOS_DeviceControl(
+        gcmERR_BREAK(gcoOS_DeviceControl(
             Buffer->os,
             IOCTL_GCHAL_INTERFACE,
             &halInterface, gcmSIZEOF(halInterface),
             &halInterface, gcmSIZEOF(halInterface)
             ));
+
         /* Verify the result. */
         gcmERR_BREAK(halInterface.status);
-#if gcdDUMP_2DVG
+
+
+#if gcdDUMP
         {
             gctUINT i;
             gcsVGCMDQUEUE_PTR queueTemp;
@@ -3372,7 +3381,7 @@ gcoVGBUFFER_Commit(
                 bufferDataSize = commandBuffer->dataCount * commandAlignment;
                 /* Dump it. */
                 gcmDUMP_BUFFER(gcvNULL,
-                    "command",
+                    gcvDUMP_BUFFER_COMMAND,
                     commandBuffer->address,
                     data,
                     0,
@@ -3396,9 +3405,7 @@ gcoVGBUFFER_Commit(
             /* Report current location. */
             gcmLOG_LOCATION();
 
-#if gcdDUMP_2DVG
             gcmDUMP(gcvNULL, "@[stall]");
-#endif
 
             /* Wait until the buffer is executed. */
             gcmERR_BREAK(_WaitForComplete(Buffer, Buffer->completionPrevious));

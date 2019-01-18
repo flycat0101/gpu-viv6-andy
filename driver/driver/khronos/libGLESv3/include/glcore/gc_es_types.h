@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -32,9 +32,7 @@
 #endif
 
 #include <GLES3/gl32.h>
-#include <GLES3/gl31.h>
 #include <GLES2/gl2ext.h>
-#include <GLES3/gl3ext.h>
 
 
 typedef union __GLvector2Union

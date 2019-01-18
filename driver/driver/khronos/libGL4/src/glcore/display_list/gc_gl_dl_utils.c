@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -159,35 +159,6 @@ GLint __glTexGen_size(GLenum e)
         return(4);
     default:
         return(-1);
-    }
-}
-
-/*
-*** Calculate convolution parameter size
-*/
-GLint __glConvolutionParameter_size(GLenum pname)
-{
-    switch (pname)
-    {
-    case GL_CONVOLUTION_BORDER_MODE:
-        return 1;
-    case GL_CONVOLUTION_BORDER_COLOR:
-    case GL_CONVOLUTION_FILTER_SCALE:
-    case GL_CONVOLUTION_FILTER_BIAS:
-        return 4;
-    default: /* error: bad enum value */
-        return -1;
-    }
-}
-
-GLint __glColorTableParameter_size(GLenum pname)
-{
-    switch (pname) {
-      case GL_COLOR_TABLE_SCALE:
-      case GL_COLOR_TABLE_BIAS:
-        return 4;
-      default:
-        return -1;
     }
 }
 

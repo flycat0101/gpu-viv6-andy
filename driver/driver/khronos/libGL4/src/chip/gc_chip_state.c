@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2165,6 +2165,7 @@ gcChipValidateAttribGroup3(
 
         if (localMask & __GL_MULTISAMPLE_ENDISABLE_BIT) {
             glmSETHASH_1BIT(hashMultisampleEnabled, gc->state.enables.multisample.multisampleOn, 0);
+            gco3D_SetAntiAlias(chipCtx->engine,gc->state.enables.multisample.multisampleOn);
         }
 
         if (localMask & __GL_COLORSUM_ENDISABLE_BIT) {
@@ -2211,9 +2212,9 @@ static gceSTATUS validateShader(__GLcontext *gc,
         gcsHINT_PTR psHints = program->hints;
         gctBOOL psReadZ   = psHints->useFragCoord[2];
         gctBOOL psReadW   = psHints->useFragCoord[3];
-        gctBOOL hasMemoryAccess = (psHints->memoryAccessFlags[gcvPROGRAM_STAGE_FRAGMENT] & gceMA_FLAG_READ)
+        gctBOOL hasMemoryAccess = (psHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_FRAGMENT] & gceMA_FLAG_READ)
                                   ||
-                                  (psHints->memoryAccessFlags[gcvPROGRAM_STAGE_FRAGMENT] & gceMA_FLAG_WRITE);
+                                  (psHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_FRAGMENT] & gceMA_FLAG_WRITE);
         gctUINT samples;
 
         gcmONERROR(gcoSURF_GetSamples(chipCtx->drawRT[0], &samples));
@@ -2415,7 +2416,7 @@ gcChipValidateLightSrcAttrib(
     {
         GLbitfield localMask = gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS];
         GLuint lightIndex = 0;
-        while (localMask) {
+        while (localMask & (GLbitfield)(1)) {
             GLbitfield lightAttr = gc->lightAttrState[lightIndex];
             __GLlightSourceState * src = &gc->state.light.source[lightIndex];
 
@@ -2618,9 +2619,9 @@ gcChipValidateShader(
                 gcsHINT_PTR psHints = fsProgram->curPgInstance->programState.hints;
                 gctBOOL psReadZ   = psHints->useFragCoord[2];
                 gctBOOL psReadW   = psHints->useFragCoord[3];
-                gctBOOL hasMemoryAccess = (psHints->memoryAccessFlags[gcvPROGRAM_STAGE_FRAGMENT] & gceMA_FLAG_READ)
+                gctBOOL hasMemoryAccess = (psHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_FRAGMENT] & gceMA_FLAG_READ)
                                           ||
-                                          (psHints->memoryAccessFlags[gcvPROGRAM_STAGE_FRAGMENT] & gceMA_FLAG_WRITE);
+                                          (psHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_FRAGMENT] & gceMA_FLAG_WRITE);
 
                 gcmASSERT(fsProgram->curPgInstance->binaries[__GLSL_STAGE_FS]);
 
@@ -3771,7 +3772,7 @@ gceSTATUS gcChipValidateGL4Texture(__GLcontext *gc, __GLchipContext *chipCtx)
             localMask = gc->texUnitAttrState[unit];
             tex = gc->texture.units[unit].currentTexture;
 
-            if (unit >= __GL_MIN((GLint)gc->constants.shaderCaps.maxTextureSamplers, 8)) {
+            if(unit >= __GL_MIN((GLint)gc->constants.shaderCaps.maxTextureSamplers, 8)) {
                 break;
             }
 
@@ -5097,13 +5098,17 @@ gcChipRecompileEvaluateKeyStates(
             /* There are only 5 bits for sampler index, so the max sampler count is 32. */
             gctUINT32 maxSamplerCountForOneShader = 32;
 
+            if (program->masterPgInstance->programState.hints->unifiedStatus.samplerUnifiedMode != gcvUNIFORM_ALLOC_NONE_UNIFIED)
+            {
+                useUnifiedSampler = gcvTRUE;
+            }
+
             /* Get already used sampler count */
             for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
             {
                 if (program->masterPgInstance->binaries[stage])
                 {
                     gcmONERROR(gcSHADER_GetSamplerCount(program->masterPgInstance->binaries[stage], &numSamplers[stage]));
-                    useUnifiedSampler = (GetShaderSamplerAllocStrategy(program->masterPgInstance->binaries[stage]) != gcSHADER_ALLOC_STRATEGY_FIXED_ADDR_OFFSET);
                 }
             }
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -114,10 +114,15 @@ static gctUINT16 _AllocateTemp(
     )
 {
     gctUINT16 result;
+
     gcmHEADER_ARG("ShaderControl=0x%x", ShaderControl);
     gcmASSERT(ShaderControl->rLastAllocated < 65535);
+
     result = ++ShaderControl->rLastAllocated;
-    ShaderControl->i->shader->_tempRegCount = ShaderControl->rLastAllocated + 1;
+
+    gcSHADER_NewTempRegs(ShaderControl->i->shader, 1, gcSHADER_FLOAT_X4);
+    gcmASSERT(GetShaderTempRegCount(ShaderControl->i->shader) == (gctUINT)ShaderControl->rLastAllocated + 1);
+
     gcmFOOTER_ARG("%u", result);
     return result;
 }
@@ -563,11 +568,11 @@ static gceSTATUS _Set_uTexMatrix(
         }
     }
 
-    status = gcUNIFORM_SetFracValue(
+    status = glfUtilUniformSetValue(
           Uniform,
           4 * Context->texture.pixelSamplers,
           Context->currProgram->programState.hints,
-          valueArray
+          (gctPOINTER)valueArray
           );
 
     gcmFOOTER();
@@ -733,11 +738,11 @@ static gceSTATUS _Set_uMatrixPalette(
     }
     else
     {
-        status = gcUNIFORM_SetFracValue(
+        status = glfUtilUniformSetValue(
             Uniform,
             4 * glvMAX_PALETTE_MATRICES,
             Context->currProgram->programState.hints,
-            valueArray
+            (gctPOINTER)valueArray
             );
     }
 
@@ -801,11 +806,11 @@ static gceSTATUS _Set_uMatrixPaletteInverse(
     }
     else
     {
-        status = gcUNIFORM_SetFracValue(
+        status = glfUtilUniformSetValue(
             Uniform,
             3 * glvMAX_PALETTE_MATRICES,
             Context->currProgram->programState.hints,
-            valueArray
+            (gctPOINTER)valueArray
             );
     }
 

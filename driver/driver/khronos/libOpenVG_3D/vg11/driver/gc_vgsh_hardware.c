@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -585,7 +585,7 @@ gceSTATUS _LoadIndices(_vgHARDWARE *hardware, _VGIndexBuffer *indexBuffer)
                                    &indexBuffer->index));
 
             /* for the vgmark11 flash performance */
-#if gcdDUMP || defined _DUMP_FILE
+#if gcdDUMP
             gcmERR_BREAK(
                 gcoINDEX_Upload(indexBuffer->index,
                                              indexBuffer->data.items,
@@ -650,7 +650,7 @@ gceSTATUS _LoadVertexs(_vgHARDWARE *hardware, _VGVertexBuffer *vertexBuffer)
                                     &vertexBuffer->stream));
 
             /* for the vgmark11 flash performance */
-#if gcdDUMP || defined _DUMP_FILE
+#if gcdDUMP
             gcmERR_BREAK(gcoSTREAM_Upload(
                 vertexBuffer->stream,
                 vertexBuffer->data.items,

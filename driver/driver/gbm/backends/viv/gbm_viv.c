@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -890,7 +890,7 @@ gbm_viv_create_buffers(
     surf->free_count = surf->buffer_count;
 
     surf->fence_fd = -1;
-    surf->fence_on = 0;
+    surf->sync_post = 1;
     return gcvSTATUS_OK;
 
 OnError:
@@ -959,6 +959,7 @@ gbm_viv_surface_create(
 {
     gceSTATUS status;
     gctSTRING envctrl = gcvNULL;
+    gctINT32 extraBufferCount = 0;
     uint32_t usage = GBM_BO_USE_SCANOUT;
     struct gbm_viv_surface *surf = calloc(1, sizeof(*surf));
     if (!surf)
@@ -966,7 +967,22 @@ gbm_viv_surface_create(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    surf->buffer_count = GBM_MAX_BUFFER;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_GBM_ENABLE_ASYNC", &envctrl)) && envctrl)
+    {
+        gcmPRINT("enable async");
+        surf->aSync = gcvTRUE;
+        gcmVERIFY_OK(gcoOS_StrToInt(envctrl, &extraBufferCount));
+        gcmONERROR(gcoOS_CreateMutex(gcvNULL, &surf->lock));
+    }
+
+    if (surf->aSync)
+    {
+        surf->buffer_count = gcmMIN(GBM_MAX_BUFFER, (3 + extraBufferCount));
+    }
+    else
+    {
+        surf->buffer_count = 3;
+    }
     surf->base.gbm = gbm;
     surf->base.width = width;
     surf->base.height = height;
@@ -980,18 +996,11 @@ gbm_viv_surface_create(
         surf->queue.data[i] = -1;
     }
 
-    gcmONERROR(gcoOS_CreateMutex(gcvNULL, &surf->lock));
-
     gcmONERROR(gbm_viv_create_buffers(surf, width, height,
         format, usage, modifiers, count));
 
     surf->aSync = gcvFALSE;
 
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_GBM_ENABLE_ASYNC", &envctrl)) && envctrl)
-    {
-        gcmPRINT("enable async");
-        surf->aSync = gcvTRUE;
-    }
     return &surf->base;
 
 OnError:
@@ -1017,7 +1026,31 @@ gbm_viv_surface_lock_front_buffer(
     do
     {
         unsigned int headIndex;
-        gcoOS_AcquireMutex(gcvNULL, surf->lock, gcvINFINITE);
+        int i;
+
+        if (!surf->aSync)
+        {
+            for (i = 0; i < surf->buffer_count; i++)
+            {
+                if (surf->buffers[i].status == FRONT_BUFFER)
+                {
+                    surf->buffers[i].status = LOCKED_BY_CLIENT;
+                    surf->buffers[i].lockCount = 1;
+                    bo = surf->buffers[i].bo;
+                    viv_bo = gbm_viv_bo(bo);
+
+                    if (viv_bo->modifier == DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_FC)
+                    {
+                        gcoSURF_UpdateMetadata(viv_bo->surface, viv_bo->ts_fd);
+                    }
+                }
+            }
+            break;
+        }
+
+        if (surf->lock)
+            gcoOS_AcquireMutex(gcvNULL, surf->lock, gcvINFINITE);
+
         if (surf->queue.tail != surf->queue.head)
         {
             /* not empty, dequeue the head */
@@ -1037,7 +1070,8 @@ gbm_viv_surface_lock_front_buffer(
             }
             found = gcvTRUE;
         }
-        gcoOS_ReleaseMutex(gcvNULL, surf->lock);
+        if (surf->lock)
+            gcoOS_ReleaseMutex(gcvNULL, surf->lock);
 
         if (found)
             break;
@@ -1072,38 +1106,55 @@ gbm_viv_surface_enqueue(
 {
     int i;
     gctBOOL done = gcvFALSE;
-    for (i = 0; i < surf->buffer_count; i++)
+
+    if (!surf->aSync)
     {
-       struct gbm_viv_bo *viv_bo = gbm_viv_bo(surf->buffers[i].bo);
-        if (viv_bo->surface == surface)
+        for (i = 0; i < surf->buffer_count; i++)
         {
-            break;
+            if (surf->buffers[i].status == USED_BY_EGL)
+            {
+                surf->buffers[i].status = FRONT_BUFFER;
+                break;
+            }
         }
     }
-
-    if (i == surf->buffer_count)
+    else
     {
-        gcmPRINT("FATAL error: The enqueued surface is not any of gbm buffer");
-        return;
-    }
-
-    do
-    {
-        gcoOS_AcquireMutex(gcvNULL, surf->lock, gcvINFINITE);
-        if (((surf->queue.tail + 1) % GBM_QUEUE_SIZE) != surf->queue.head)
+        for (i = 0; i < surf->buffer_count; i++)
         {
-            /* queue is not full */
-            gbm_viv_surface_print_queue(surf, "before_enqueue");
-            surf->queue.data[surf->queue.tail] = i;
-            surf->queue.tail = (surf->queue.tail + 1) % GBM_QUEUE_SIZE;
-            done = gcvTRUE;
-            gbm_viv_surface_print_queue(surf, "after_enqueue");
+            struct gbm_viv_bo *viv_bo = gbm_viv_bo(surf->buffers[i].bo);
+            if (viv_bo->surface == surface)
+            {
+                break;
+            }
         }
-        gcoOS_ReleaseMutex(gcvNULL, surf->lock);
-        if (done)
-            break;
+
+        if (i == surf->buffer_count)
+        {
+            gcmPRINT("FATAL error: The enqueued surface is not any of gbm buffer");
+            return;
+        }
+
+        do
+        {
+            if (surf->lock)
+                gcoOS_AcquireMutex(gcvNULL, surf->lock, gcvINFINITE);
+            if (((surf->queue.tail + 1) % GBM_QUEUE_SIZE) != surf->queue.head)
+            {
+                /* queue is not full */
+                gbm_viv_surface_print_queue(surf, "before_enqueue");
+                surf->queue.data[surf->queue.tail] = i;
+                surf->queue.tail = (surf->queue.tail + 1) % GBM_QUEUE_SIZE;
+                done = gcvTRUE;
+                gbm_viv_surface_print_queue(surf, "after_enqueue");
+            }
+            if (surf->lock)
+                gcoOS_ReleaseMutex(gcvNULL, surf->lock);
+            if (done)
+                break;
+        }
+        while (gcvTRUE);
     }
-    while (gcvTRUE);
 
     return;
 }
@@ -1126,7 +1177,7 @@ gbm_viv_surface_get_free_buffer(
             bo = surf->buffers[i].bo;
             surf->free_count--;
             found = gcvTRUE;
-            if (surf->free_count == 1)
+            if ((surf->free_count == 1) && surf->aSync)
             {
                 while (surf->queue.head == surf->queue.tail)
                 {
@@ -1179,7 +1230,7 @@ gbm_viv_surface_release_buffer(
         close(surf->fence_fd);
 
     surf->fence_fd = -1;
-    surf->fence_on = 0;
+    surf->sync_post = 1;
     return;
 }
 
@@ -1256,7 +1307,6 @@ static int
 gbm_viv_surface_get_in_fence_fd(struct gbm_surface *surface)
 {
     struct gbm_viv_surface *surf = (struct gbm_viv_surface*)surface;
-    surf->fence_on = 1;
     return surf->fence_fd;
 }
 
@@ -1270,11 +1320,15 @@ gbm_viv_surface_set_in_fence_fd(struct gbm_surface *surface, int fd)
     surf->fence_fd = fd;
 }
 
-static uint32_t
-gbm_viv_surface_in_fence_on(struct gbm_surface *surface)
+static void
+gbm_viv_surface_set_sync_post(
+    struct gbm_surface *surface,
+    int sync_post
+    )
 {
-    struct gbm_viv_surface *surf = (struct gbm_viv_surface*)surface;
-    return surf->fence_on;
+    struct gbm_viv_surface *surf = (struct gbm_viv_surface *) surface;
+
+    surf->sync_post = sync_post;
 }
 
 static struct gbm_device *
@@ -1311,7 +1365,7 @@ viv_device_create(int fd)
     dev->base.surface_destroy = gbm_viv_surface_destroy;
     dev->base.surface_get_in_fence_fd = gbm_viv_surface_get_in_fence_fd;
     dev->base.surface_set_in_fence_fd = gbm_viv_surface_set_in_fence_fd;
-    dev->base.surface_in_fence_on = gbm_viv_surface_in_fence_on;
+    dev->base.surface_set_sync_post = gbm_viv_surface_set_sync_post;
     dev->base.name = gbm_viv_backend.backend_name;
 
     return &dev->base;

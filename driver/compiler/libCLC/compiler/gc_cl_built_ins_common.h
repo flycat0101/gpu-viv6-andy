@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1032,24 +1032,121 @@ _GenMinCode(
 
    if(OperandsParameters[0].rOperands[0].dataType.elementType == clvTYPE_FLOAT &&
       !(CodeGenerator->fpConfig & cldFpFINITE_MATH_ONLY)) {
-      if(IOperand &&
-         clmGEN_CODE_IsVectorDataType(OperandsParameters[0].dataTypes[0].def)) { /*Floating point vector case with no finite math */
-         return clGenBuiltinVectorCode(Compiler,
-                                       CodeGenerator,
-                                       PolynaryExpr,
-                                       OperandCount,
-                                       OperandsParameters,
-                                       IOperand,
-                                       _GenScalarMinCode);
-      }
-      else {
-         return _GenScalarMinCode(Compiler,
-                                  CodeGenerator,
-                                  PolynaryExpr,
-                                  OperandCount,
-                                  OperandsParameters,
-                                  IOperand);
-      }
+       if(IOperand &&
+          clmGEN_CODE_IsVectorDataType(OperandsParameters[0].dataTypes[0].def)) { /*Floating point vector case with no finite math */
+           if (gcmOPT_DriverVIRPath() &&
+               !clmIsElementTypeHighPrecision(IOperand->dataType.elementType)) {
+               gceSTATUS   status;
+               clsIOPERAND intermIOperandX, intermIOperandY;
+               clsROPERAND intermROperandX, intermROperandY;
+               clsIOPERAND resultIOperand;
+               clsROPERAND resultROperand;
+               clsIOPERAND resultIOperand1;
+               clsIOPERAND selectorIOperand;
+               clsROPERAND selectorROperand;
+               clsROPERAND infROperand, unsignROperand;
+               clsGEN_CODE_DATA_TYPE dataType;
+
+               dataType = IOperand->dataType;
+               dataType.elementType = clvTYPE_UINT;
+               clsROPERAND_InitializeIntOrIVecConstant(&infROperand,
+                                                       dataType,
+                                                       0x7f800000);
+               clsROPERAND_InitializeIntOrIVecConstant(&unsignROperand,
+                                                       dataType,
+                                                       0x7fffffff);
+
+               clsIOPERAND_New(Compiler, &intermIOperandX, dataType);
+               clsIOPERAND_New(Compiler, &intermIOperandY, dataType);
+               clsROPERAND_InitializeUsingIOperand(&intermROperandX, &intermIOperandX);
+               clsROPERAND_InitializeUsingIOperand(&intermROperandY, &intermIOperandY);
+               status = clGenBitwiseExprCode(Compiler,
+                                             PolynaryExpr->exprBase.base.lineNo,
+                                             PolynaryExpr->exprBase.base.stringNo,
+                                             clvOPCODE_AND_BITWISE,
+                                             &intermIOperandX,
+                                             &unsignROperand,
+                                             &OperandsParameters[0].rOperands[0]);
+               if (gcmIS_ERROR(status)) return status;
+               status = clGenBitwiseExprCode(Compiler,
+                                             PolynaryExpr->exprBase.base.lineNo,
+                                             PolynaryExpr->exprBase.base.stringNo,
+                                             clvOPCODE_AND_BITWISE,
+                                             &intermIOperandY,
+                                             &unsignROperand,
+                                             &OperandsParameters[1].rOperands[0]);
+               if (gcmIS_ERROR(status)) return status;
+
+               dataType.elementType = clvTYPE_INT;
+               clsIOPERAND_New(Compiler, &selectorIOperand, dataType);
+               clsROPERAND_InitializeUsingIOperand(&selectorROperand, &selectorIOperand);
+               status = clGenGenericCode2(Compiler,
+                                          PolynaryExpr->exprBase.base.lineNo,
+                                          PolynaryExpr->exprBase.base.stringNo,
+                                          clvOPCODE_GREATER_THAN,
+                                          &selectorIOperand,
+                                          &intermROperandX,
+                                          &infROperand);
+               if (gcmIS_ERROR(status)) return status;
+
+               clsIOPERAND_New(Compiler, &resultIOperand, IOperand->dataType);
+               clsROPERAND_InitializeUsingIOperand(&resultROperand, &resultIOperand);
+               status = clGenGenericCode2(Compiler,
+                                          PolynaryExpr->exprBase.base.lineNo,
+                                          PolynaryExpr->exprBase.base.stringNo,
+                                          clvOPCODE_MIN,
+                                          &resultIOperand,
+                                          &OperandsParameters[0].rOperands[0],
+                                          &OperandsParameters[1].rOperands[0]);
+               if (gcmIS_ERROR(status)) return status;
+               clsIOPERAND_New(Compiler, &resultIOperand1, IOperand->dataType);
+               status =  clGenSelectExprCode(Compiler,
+                                             PolynaryExpr->exprBase.base.lineNo,
+                                             PolynaryExpr->exprBase.base.stringNo,
+                                             clvOPCODE_SELECT,
+                                             &resultIOperand1,
+                                             &selectorROperand,
+                                             &resultROperand,
+                                             &OperandsParameters[1].rOperands[0]);
+               if (gcmIS_ERROR(status)) return status;
+
+               status = clGenGenericCode2(Compiler,
+                                          PolynaryExpr->exprBase.base.lineNo,
+                                          PolynaryExpr->exprBase.base.stringNo,
+                                          clvOPCODE_GREATER_THAN,
+                                          &selectorIOperand,
+                                          &intermROperandY,
+                                          &infROperand);
+               if (gcmIS_ERROR(status)) return status;
+               clsROPERAND_InitializeUsingIOperand(&resultROperand, &resultIOperand1);
+               return clGenSelectExprCode(Compiler,
+                                          PolynaryExpr->exprBase.base.lineNo,
+                                          PolynaryExpr->exprBase.base.stringNo,
+                                          clvOPCODE_SELECT,
+                                          IOperand,
+                                          &selectorROperand,
+                                          &resultROperand,
+                                          &OperandsParameters[0].rOperands[0]);
+           }
+           else {
+               /* special handling for vector case */
+               return clGenBuiltinVectorCode(Compiler,
+                                             CodeGenerator,
+                                             PolynaryExpr,
+                                             OperandCount,
+                                             OperandsParameters,
+                                             IOperand,
+                                             _GenScalarMinCode);
+           }
+       }
+       else {
+           return _GenScalarMinCode(Compiler,
+                                    CodeGenerator,
+                                    PolynaryExpr,
+                                    OperandCount,
+                                    OperandsParameters,
+                                    IOperand);
+       }
    }
    else{ /* integer or floating case without INF or NAN consideration */
       return clGenGenericCode2(Compiler,
@@ -1271,35 +1368,129 @@ _GenMaxCode(
 
    if(OperandsParameters[0].rOperands[0].dataType.elementType == clvTYPE_FLOAT &&
       !(CodeGenerator->fpConfig & cldFpFINITE_MATH_ONLY)) {
-      if(IOperand &&
-         clmGEN_CODE_IsVectorDataType(OperandsParameters[0].dataTypes[0].def)) { /*Floating point vector case with no finite math */
-         /* special handling for vector case */
-         return clGenBuiltinVectorCode(Compiler,
-                                       CodeGenerator,
-                                       PolynaryExpr,
-                                       OperandCount,
-                                       OperandsParameters,
-                                       IOperand,
-                                       _GenScalarMaxCode);
-      }
-      else {
-         return _GenScalarMaxCode(Compiler,
-                                  CodeGenerator,
-                                  PolynaryExpr,
-                                  OperandCount,
-                                  OperandsParameters,
-                                  IOperand);
-      }
-   }
-   else { /* integer or floating case without INF or NAN consideration */
-      return clGenGenericCode2(Compiler,
-                               PolynaryExpr->exprBase.base.lineNo,
-                               PolynaryExpr->exprBase.base.stringNo,
-                               clvOPCODE_MAX,
-                               IOperand,
-                               &OperandsParameters[0].rOperands[0],
-                               &OperandsParameters[1].rOperands[0]);
-   }
+       if(IOperand &&
+          clmGEN_CODE_IsVectorDataType(OperandsParameters[0].dataTypes[0].def)) { /* vector type */
+           if (gcmOPT_DriverVIRPath() &&
+               !clmIsElementTypeHighPrecision(IOperand->dataType.elementType)) {
+               gceSTATUS   status;
+               clsIOPERAND intermIOperandX, intermIOperandY;
+               clsROPERAND intermROperandX, intermROperandY;
+               clsIOPERAND resultIOperand;
+               clsROPERAND resultROperand;
+               clsIOPERAND resultIOperand1;
+               clsIOPERAND selectorIOperand;
+               clsROPERAND selectorROperand;
+               clsROPERAND infROperand, unsignROperand;
+               clsGEN_CODE_DATA_TYPE dataType;
+
+               dataType = IOperand->dataType;
+               dataType.elementType = clvTYPE_UINT;
+               clsROPERAND_InitializeIntOrIVecConstant(&infROperand,
+                                                       dataType,
+                                                       0x7f800000);
+               clsROPERAND_InitializeIntOrIVecConstant(&unsignROperand,
+                                                       dataType,
+                                                       0x7fffffff);
+
+               clsIOPERAND_New(Compiler, &intermIOperandX, dataType);
+               clsIOPERAND_New(Compiler, &intermIOperandY, dataType);
+               clsROPERAND_InitializeUsingIOperand(&intermROperandX, &intermIOperandX);
+               clsROPERAND_InitializeUsingIOperand(&intermROperandY, &intermIOperandY);
+               status = clGenBitwiseExprCode(Compiler,
+                                             PolynaryExpr->exprBase.base.lineNo,
+                                             PolynaryExpr->exprBase.base.stringNo,
+                                             clvOPCODE_AND_BITWISE,
+                                             &intermIOperandX,
+                                             &unsignROperand,
+                                             &OperandsParameters[0].rOperands[0]);
+               if (gcmIS_ERROR(status)) return status;
+               status = clGenBitwiseExprCode(Compiler,
+                                             PolynaryExpr->exprBase.base.lineNo,
+                                             PolynaryExpr->exprBase.base.stringNo,
+                                             clvOPCODE_AND_BITWISE,
+                                             &intermIOperandY,
+                                             &unsignROperand,
+                                             &OperandsParameters[1].rOperands[0]);
+               if (gcmIS_ERROR(status)) return status;
+
+               dataType.elementType = clvTYPE_INT;
+               clsIOPERAND_New(Compiler, &selectorIOperand, dataType);
+               clsROPERAND_InitializeUsingIOperand(&selectorROperand, &selectorIOperand);
+               status = clGenGenericCode2(Compiler,
+                                          PolynaryExpr->exprBase.base.lineNo,
+                                          PolynaryExpr->exprBase.base.stringNo,
+                                          clvOPCODE_GREATER_THAN,
+                                          &selectorIOperand,
+                                          &intermROperandX,
+                                          &infROperand);
+               if (gcmIS_ERROR(status)) return status;
+
+               clsIOPERAND_New(Compiler, &resultIOperand, IOperand->dataType);
+               clsROPERAND_InitializeUsingIOperand(&resultROperand, &resultIOperand);
+               status = clGenGenericCode2(Compiler,
+                                          PolynaryExpr->exprBase.base.lineNo,
+                                          PolynaryExpr->exprBase.base.stringNo,
+                                          clvOPCODE_MAX,
+                                          &resultIOperand,
+                                          &OperandsParameters[0].rOperands[0],
+                                          &OperandsParameters[1].rOperands[0]);
+               if (gcmIS_ERROR(status)) return status;
+               clsIOPERAND_New(Compiler, &resultIOperand1, IOperand->dataType);
+               status =  clGenSelectExprCode(Compiler,
+                                             PolynaryExpr->exprBase.base.lineNo,
+                                             PolynaryExpr->exprBase.base.stringNo,
+                                             clvOPCODE_SELECT,
+                                             &resultIOperand1,
+                                             &selectorROperand,
+                                             &resultROperand,
+                                             &OperandsParameters[1].rOperands[0]);
+               if (gcmIS_ERROR(status)) return status;
+
+               status = clGenGenericCode2(Compiler,
+                                          PolynaryExpr->exprBase.base.lineNo,
+                                          PolynaryExpr->exprBase.base.stringNo,
+                                          clvOPCODE_GREATER_THAN,
+                                          &selectorIOperand,
+                                          &intermROperandY,
+                                          &infROperand);
+               if (gcmIS_ERROR(status)) return status;
+               clsROPERAND_InitializeUsingIOperand(&resultROperand, &resultIOperand1);
+               return clGenSelectExprCode(Compiler,
+                                          PolynaryExpr->exprBase.base.lineNo,
+                                          PolynaryExpr->exprBase.base.stringNo,
+                                          clvOPCODE_SELECT,
+                                          IOperand,
+                                          &selectorROperand,
+                                          &resultROperand,
+                                          &OperandsParameters[0].rOperands[0]);
+           }
+           else {
+               /* special handling for vector case */
+               return clGenBuiltinVectorCode(Compiler,
+                                             CodeGenerator,
+                                             PolynaryExpr,
+                                             OperandCount,
+                                             OperandsParameters,
+                                             IOperand,
+                                             _GenScalarMaxCode);
+           }
+        }
+        else return _GenScalarMaxCode(Compiler,
+                                      CodeGenerator,
+                                      PolynaryExpr,
+                                      OperandCount,
+                                      OperandsParameters,
+                                      IOperand);
+    }
+    else { /* integer or floating case without INF or NAN consideration */
+        return clGenGenericCode2(Compiler,
+                                 PolynaryExpr->exprBase.base.lineNo,
+                                 PolynaryExpr->exprBase.base.stringNo,
+                                 clvOPCODE_MAX,
+                                 IOperand,
+                                 &OperandsParameters[0].rOperands[0],
+                                 &OperandsParameters[1].rOperands[0]);
+    }
 }
 
 static gceSTATUS
@@ -4413,6 +4604,7 @@ _GenBitSelectCode(
    return status;
 }
 
+
 static gceSTATUS
 _MakeUchar16PackedSwizzle(
      IN cloCOMPILER Compiler,
@@ -5099,6 +5291,7 @@ OnError:
                                clvSTORAGE_QUALIFIER_NONE,
                                operandType,
                                vSizeMax,
+                               gcvNULL,
                                gcvTRUE,
                                tempRegIndex,
                                gcvNULL);
@@ -5435,6 +5628,7 @@ _GenShufflePtrCode(
                                    clvSTORAGE_QUALIFIER_NONE,
                                    componentDataType,
                                    vSizeMax,
+                                   gcvNULL,
                                    gcvTRUE,
                                    tempRegIndex,
                                    gcvNULL);
@@ -5618,22 +5812,25 @@ _GenShufflePtr1Code(
 
     if(clmIsElementTypeHighPrecision(srcType.elementType) &&
        (clmGEN_CODE_vectorSize_GET(srcType) == 16 ||
-        clmGEN_CODE_vectorSize_GET(srcType) == 8)) {
+        clmGEN_CODE_vectorSize_GET(srcType) == 8 ||
+        gcmOPT_oclInt64InVIR())) {
         clsIOPERAND iOperand[1], intermIOperand[1], addressOffsetIOperand[1];
         clsROPERAND intermROperand[1], constantComponentSize[1];
         gctSIZE_T byteSize;
 
         src[0] = OperandsParameters[0].rOperands[0];
         if(!clIsIntegerZero(&OperandsParameters[0].dataTypes[0].byteOffset)) {
+            clsIOPERAND addressOffset[1];
+            clsIOPERAND_New(Compiler, addressOffset, clmGenCodeDataType(T_UINT));
             status = clGenArithmeticExprCode(Compiler,
                                              PolynaryExpr->exprBase.base.lineNo,
                                              PolynaryExpr->exprBase.base.stringNo,
                                              clvOPCODE_ADD,
-                                             srcIOperand,
+                                             addressOffset,
                                              src,
                                              &OperandsParameters[0].dataTypes[0].byteOffset);
             if (gcmIS_ERROR(status)) return status;
-            clsROPERAND_InitializeUsingIOperand(src, srcIOperand);
+            clsROPERAND_InitializeUsingIOperand(src, addressOffset);
         }
 
         byteSize = clGetVectorElementByteSize(Compiler,
@@ -5725,6 +5922,7 @@ _GenShufflePtr1Code(
                                    clvSTORAGE_QUALIFIER_NONE,
                                    operandType,
                                    vSizeMax,
+                                   gcvNULL,
                                    gcvTRUE,
                                    tempRegIndex,
                                    gcvNULL);
@@ -6110,6 +6308,7 @@ OnError:
                               clvSTORAGE_QUALIFIER_NONE,
                               componentDataType,
                               2*vectorSize0,
+                              gcvNULL,
                               gcvTRUE,
                               tempRegIndex,
                               gcvNULL);
@@ -6511,6 +6710,7 @@ _GenShuffle2PtrCode(
                                    clvSTORAGE_QUALIFIER_NONE,
                                    componentDataType,
                                    2*vectorSize0,
+                                   gcvNULL,
                                    gcvTRUE,
                                    tempRegIndex,
                                    gcvNULL);
@@ -6695,7 +6895,8 @@ _GenShuffle2Ptr1Code(
 
     if(clmIsElementTypeHighPrecision(src1Type.elementType) &&
        (clmGEN_CODE_vectorSize_GET(src1Type) == 16 ||
-        clmGEN_CODE_vectorSize_GET(src1Type) == 8)) {
+        clmGEN_CODE_vectorSize_GET(src1Type) == 8 ||
+        gcmOPT_oclInt64InVIR())) {
         clsIOPERAND iOperand[1], intermIOperand[1], intermIOperand1[1], addressOffsetIOperand[1];
         clsROPERAND intermROperand[1], intermROperand1[1], constantComponentSize[1];
         clsROPERAND vectorSizeConstant[1];
@@ -6864,6 +7065,7 @@ _GenShuffle2Ptr1Code(
                                    clvSTORAGE_QUALIFIER_NONE,
                                    componentDataType,
                                    2*vectorSize0,
+                                   gcvNULL,
                                    gcvTRUE,
                                    tempRegIndex,
                                    gcvNULL);
@@ -7597,7 +7799,7 @@ _GenAsyncCopyStridedCode(
 
     elementSize = clsDECL_GetPointedToByteSize(Compiler, &memOperand->decl);
 
-    if(memOperand->decl.dataType[0].addrSpaceQualifier == clvQUALIFIER_LOCAL) {
+    if(clGetAddrSpaceQualifier(&memOperand->decl) == clvQUALIFIER_LOCAL) {
         isSrcStride = gcvTRUE;
     }
 
@@ -8151,6 +8353,10 @@ _IsConversionSpecValid(
                      vectorSize = 2;
                      break;
 
+                 case '3':
+                     vectorSize = 3;
+                     break;
+
                  case '4':
                      vectorSize = 4;
                      break;
@@ -8331,7 +8537,7 @@ _PromoteType(
     IN clsGEN_CODE_DATA_TYPE DataType
     )
 {
-    if(clmGEN_CODE_IsHighPrecisionDataType(DataType)) return DataType;
+    if(clmIsElementTypeHighPrecision(clmGEN_CODE_elementType_GET(DataType))) return DataType;
     else {
         clsGEN_CODE_DATA_TYPE baseType;
         cltELEMENT_TYPE elementType;
@@ -8632,12 +8838,13 @@ END_FIND:
         }
     }
 
-    printfBufferOffset = 8;
+    /* 8bytes for signature, and 4bytes for the byteOffset. */
+    printfBufferOffset = 12;
     for(i = 1; i < (operandsNeeded + 1); i++) {
         gctINT componentCount;
 
         componentCount = gcGetDataTypeTargetComponentCount(OperandsParameters[i].dataTypes[0].def);
-        if(clmGEN_CODE_IsHighPrecisionDataType(OperandsParameters[i].dataTypes[0].def)) {
+        if(clmIsElementTypeHighPrecision(clmGEN_CODE_elementType_GET(OperandsParameters[i].dataTypes[0].def))) {
             printfBufferOffset += componentCount * 8 + 4;
         }
         else printfBufferOffset += componentCount * 4 + 4;
@@ -8692,9 +8899,10 @@ END_FIND:
 
     printfBufferOffset = -printfBufferOffset;
 
+    /* Write signature1. */
     clsROPERAND_InitializeIntOrIVecConstant(constantROperand,
                                             clmGenCodeDataType(T_INT),
-                                            __OCL_PRINTF_WRITE_MASK__);
+                                            __OCL_PRINTF_WRITE_SIG1__);
     clsROPERAND_InitializeIntOrIVecConstant(offsetOperand,
                                             clmGenCodeDataType(T_INT),
                                             printfBufferOffset);
@@ -8706,11 +8914,25 @@ END_FIND:
                               clmGenCodeDataType(T_INT),
                               offsetOperand));
     printfBufferOffset += 4;
-
+    /* Write signature2. */
+    clsROPERAND_InitializeIntOrIVecConstant(constantROperand,
+                                            clmGenCodeDataType(T_INT),
+                                            __OCL_PRINTF_WRITE_SIG2__);
+    clsROPERAND_InitializeIntOrIVecConstant(offsetOperand,
+                                            clmGenCodeDataType(T_INT),
+                                            printfBufferOffset);
+    gcmONERROR(clGenStoreCode(Compiler,
+                              PolynaryExpr->exprBase.base.lineNo,
+                              PolynaryExpr->exprBase.base.stringNo,
+                              constantROperand,
+                              printfStart,
+                              clmGenCodeDataType(T_INT),
+                              offsetOperand));
+    printfBufferOffset += 4;
+    /* Write saveByteOffset. */
     clsROPERAND_InitializeIntOrIVecConstant(constantROperand,
                                             clmGenCodeDataType(T_INT),
                                             OperandsParameters[0].dataTypes[0].savedByteOffset);
-
     clsROPERAND_InitializeIntOrIVecConstant(offsetOperand,
                                             clmGenCodeDataType(T_INT),
                                             printfBufferOffset);
@@ -8728,7 +8950,7 @@ END_FIND:
         clsROPERAND *rOperand;
 
         highPrecisionFlag = constantZeroROperand;
-        if(clmGEN_CODE_IsHighPrecisionDataType(OperandsParameters[i].dataTypes[0].def)) {
+        if(clmIsElementTypeHighPrecision(clmGEN_CODE_elementType_GET(OperandsParameters[i].dataTypes[0].def))) {
             highPrecisionFlag = constantOneROperand;
         }
         clsROPERAND_InitializeIntOrIVecConstant(offsetOperand,

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -74,7 +74,7 @@ vxoProfiler_Initialize(
     context->profiler.enable = gcvTRUE;
     context->halProfile->profilerClient = gcvCLIENT_OPENVX;
 
-    if (gcoPROFILER_Enable(context->halProfile) != gcvSTATUS_OK)
+    if (gcoPROFILER_Initialize(context->halProfile) != gcvSTATUS_OK)
     {
         context->profiler.enable = gcvFALSE;
         goto OnError;
@@ -111,7 +111,7 @@ vxoProfiler_Initialize(
                 BCD(3), BCD(2), BCD(1), BCD(0));
         }
 
-        gcoHAL_GetProductName(gcvNULL, &productName);
+        gcoHAL_GetProductName(gcvNULL, &productName, gcvNULL);
         gcoOS_StrCatSafe(infoRenderer, 9, "Vivante ");
         gcoOS_StrCatSafe(infoRenderer, 23, productName);
         gcmOS_SAFE_FREE(gcvNULL, productName);
@@ -168,8 +168,6 @@ vxoProfiler_Begin(
     gctINT status = gcvSTATUS_OK;
     vx_context context;
 
-    gcmHEADER_ARG("reference=0x%x ", reference);
-
     context = vxoContext_GetFromReference(reference);
 
     if (!vxoContext_IsValid(context)) return VX_ERROR_INVALID_REFERENCE;
@@ -180,10 +178,9 @@ vxoProfiler_Begin(
     }
 
     gcoOS_GetTime(&context->profiler.frameStartTimeusec);
-    gcoPROFILER_Begin(context->halProfile, gcvCOUNTER_OP_FRAME);
+    gcoPROFILER_EnableCounters(context->halProfile, gcvCOUNTER_OP_FRAME);
 
     /* Return the status. */
-    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -195,8 +192,6 @@ vxoProfiler_End(
     gctINT status = gcvSTATUS_OK;
     vx_context context;
     gcoPROFILER Profiler;
-
-    gcmHEADER_ARG("reference=0x%x ", reference);
 
     context = vxoContext_GetFromReference(reference);
 
@@ -222,13 +217,12 @@ vxoProfiler_End(
 
     gcoPROFILER_Flush(context->halProfile);
 
-    gcmPRINT("VPC_ELAPSETIME: %d\n", (gctINT32) (context->profiler.frameEndTimeusec
+    vxInfo("VPC_ELAPSETIME: %d\n", (gctINT32) (context->profiler.frameEndTimeusec
                      - context->profiler.frameStartTimeusec));
-    gcmPRINT("*********\n");
+    vxInfo("*********\n");
     context->profiler.frameNumber++;
 
     /* Return the status. */
-    gcmFOOTER_ARG("%d", status);
     return status;
 }
 #endif

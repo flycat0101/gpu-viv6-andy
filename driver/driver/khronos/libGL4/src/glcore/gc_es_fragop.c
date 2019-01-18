@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -44,7 +44,7 @@ GLvoid APIENTRY __glim_AlphaFunc(__GLcontext *gc, GLenum func, GLfloat ref)
     __GL_FOOTER();
 }
 #endif
-GLvoid GL_APIENTRY __gles_StencilFunc(__GLcontext *gc, GLenum func, GLint ref, GLuint mask)
+GLvoid GL_APIENTRY __glim_StencilFunc(__GLcontext *gc, GLenum func, GLint ref, GLuint mask)
 {
     __GL_HEADER();
 
@@ -79,7 +79,7 @@ OnError:
 
 }
 
-GLvoid GL_APIENTRY __gles_StencilFuncSeparate(__GLcontext *gc, GLenum face, GLenum func, GLint ref, GLuint mask)
+GLvoid GL_APIENTRY __glim_StencilFuncSeparate(__GLcontext *gc, GLenum face, GLenum func, GLint ref, GLuint mask)
 {
     __GL_HEADER();
 
@@ -129,7 +129,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_StencilMask(__GLcontext *gc, GLuint sm)
+GLvoid GL_APIENTRY __glim_StencilMask(__GLcontext *gc, GLuint sm)
 {
     __GL_HEADER();
     /* Update stencil state */
@@ -142,7 +142,7 @@ GLvoid GL_APIENTRY __gles_StencilMask(__GLcontext *gc, GLuint sm)
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_StencilMaskSeparate(__GLcontext *gc, GLenum face, GLuint sm)
+GLvoid GL_APIENTRY __glim_StencilMaskSeparate(__GLcontext *gc, GLenum face, GLuint sm)
 {
     __GL_HEADER();
 
@@ -173,7 +173,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_StencilOp(__GLcontext *gc, GLenum fail, GLenum depthFail, GLenum depthPass)
+GLvoid GL_APIENTRY __glim_StencilOp(__GLcontext *gc, GLenum fail, GLenum depthFail, GLenum depthPass)
 {
     __GL_HEADER();
 
@@ -224,7 +224,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_StencilOpSeparate(__GLcontext *gc, GLenum face, GLenum fail,
+GLvoid GL_APIENTRY __glim_StencilOpSeparate(__GLcontext *gc, GLenum face, GLenum fail,
                                             GLenum depthFail, GLenum depthPass)
 {
     __GL_HEADER();
@@ -294,7 +294,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_DepthRangef(__GLcontext *gc, GLfloat zNear, GLfloat zFar)
+GLvoid GL_APIENTRY __glim_DepthRangef(__GLcontext *gc, GLfloat zNear, GLfloat zFar)
 {
     __GL_HEADER();
     /* Clamp depth range to legal values */
@@ -346,7 +346,7 @@ GLvoid __glUpdateScissor(__GLcontext *gc, GLint x, GLint y, GLint w, GLint h)
     __glScissor(gc, x, y, w, h);
 }
 
-GLvoid GL_APIENTRY __gles_Scissor(__GLcontext *gc, GLint x, GLint y, GLint w, GLint h)
+GLvoid GL_APIENTRY __glim_Scissor(__GLcontext *gc, GLint x, GLint y, GLint w, GLint h)
 {
     __GLscissor scissor = {x, y, w, h};
 
@@ -371,7 +371,7 @@ OnExit:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_BlendColor(__GLcontext *gc, GLfloat r, GLfloat g, GLfloat b, GLfloat a)
+GLvoid GL_APIENTRY __glim_BlendColor(__GLcontext *gc, GLfloat r, GLfloat g, GLfloat b, GLfloat a)
 {
     __GL_HEADER();
     /* Update blend state */
@@ -385,7 +385,7 @@ GLvoid GL_APIENTRY __gles_BlendColor(__GLcontext *gc, GLfloat r, GLfloat g, GLfl
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_BlendEquation(__GLcontext *gc, GLenum mode)
+GLvoid GL_APIENTRY __glim_BlendEquation(__GLcontext *gc, GLenum mode)
 {
     GLuint i;
 
@@ -441,7 +441,7 @@ OnExit:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_BlendEquationSeparate(__GLcontext *gc, GLenum modeRGB, GLenum modeAlpha)
+GLvoid GL_APIENTRY __glim_BlendEquationSeparate(__GLcontext *gc, GLenum modeRGB, GLenum modeAlpha)
 {
     GLuint i;
 
@@ -493,7 +493,7 @@ OnExit:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_BlendFunc(__GLcontext *gc, GLenum sfactor, GLenum dfactor)
+GLvoid GL_APIENTRY __glim_BlendFunc(__GLcontext *gc, GLenum sfactor, GLenum dfactor)
 {
     GLuint i;
 
@@ -573,7 +573,7 @@ OnExit:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_BlendFuncSeparate(__GLcontext *gc, GLenum sfactorRGB, GLenum dfactorRGB,
+GLvoid GL_APIENTRY __glim_BlendFuncSeparate(__GLcontext *gc, GLenum sfactorRGB, GLenum dfactorRGB,
                                             GLenum sfactorAlpha, GLenum dfactorAlpha)
 {
     GLuint i;
@@ -695,7 +695,7 @@ OnExit:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_BlendEquationi(__GLcontext * gc, GLuint buf, GLenum mode)
+GLvoid GL_APIENTRY __glim_BlendEquationi(__GLcontext * gc, GLuint buf, GLenum mode)
 {
     __GL_HEADER();
 
@@ -748,7 +748,7 @@ OnError:
 }
 
 
-GLvoid GL_APIENTRY __gles_BlendEquationSeparatei(__GLcontext * gc, GLuint buf, GLenum modeRGB, GLenum modeAlpha)
+GLvoid GL_APIENTRY __glim_BlendEquationSeparatei(__GLcontext * gc, GLuint buf, GLenum modeRGB, GLenum modeAlpha)
 {
     __GL_HEADER();
 
@@ -798,7 +798,7 @@ OnError:
 }
 
 
-GLvoid GL_APIENTRY __gles_BlendFunci(__GLcontext * gc, GLuint buf, GLenum sfactor, GLenum dfactor)
+GLvoid GL_APIENTRY __glim_BlendFunci(__GLcontext * gc, GLuint buf, GLenum sfactor, GLenum dfactor)
 {
     __GL_HEADER();
 
@@ -873,7 +873,7 @@ OnError:
 
 }
 
-GLvoid GL_APIENTRY __gles_BlendFuncSeparatei(__GLcontext * gc, GLuint buf, GLenum sfactorRGB,GLenum dfactorRGB,GLenum sfactorAlpha,GLenum dfactorAlpha)
+GLvoid GL_APIENTRY __glim_BlendFuncSeparatei(__GLcontext * gc, GLuint buf, GLenum sfactorRGB,GLenum dfactorRGB,GLenum sfactorAlpha,GLenum dfactorAlpha)
 {
     __GL_HEADER();
     if (buf >= gc->constants.shaderCaps.maxDrawBuffers)
@@ -994,7 +994,7 @@ OnError:
 }
 
 
-GLvoid GL_APIENTRY __gles_ColorMaski(__GLcontext * gc,GLuint buf, GLboolean r, GLboolean g, GLboolean b, GLboolean a)
+GLvoid GL_APIENTRY __glim_ColorMaski(__GLcontext * gc,GLuint buf, GLboolean r, GLboolean g, GLboolean b, GLboolean a)
 {
     __GL_HEADER();
 
@@ -1022,7 +1022,7 @@ OnError:
 
 }
 
-GLvoid GL_APIENTRY __gles_DepthFunc(__GLcontext *gc, GLenum zfunc)
+GLvoid GL_APIENTRY __glim_DepthFunc(__GLcontext *gc, GLenum zfunc)
 {
     __GL_HEADER();
 
@@ -1045,7 +1045,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_ClearColor(__GLcontext *gc, GLfloat r, GLfloat g, GLfloat b, GLfloat a)
+GLvoid GL_APIENTRY __glim_ClearColor(__GLcontext *gc, GLfloat r, GLfloat g, GLfloat b, GLfloat a)
 {
     __GL_HEADER();
     /* Update clear state */
@@ -1056,7 +1056,7 @@ GLvoid GL_APIENTRY __gles_ClearColor(__GLcontext *gc, GLfloat r, GLfloat g, GLfl
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ColorMask(__GLcontext *gc, GLboolean r, GLboolean g, GLboolean b, GLboolean a)
+GLvoid GL_APIENTRY __glim_ColorMask(__GLcontext *gc, GLboolean r, GLboolean g, GLboolean b, GLboolean a)
 {
     GLuint i;
 
@@ -1075,7 +1075,7 @@ GLvoid GL_APIENTRY __gles_ColorMask(__GLcontext *gc, GLboolean r, GLboolean g, G
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DepthMask(__GLcontext *gc, GLboolean flag)
+GLvoid GL_APIENTRY __glim_DepthMask(__GLcontext *gc, GLboolean flag)
 {
     __GL_HEADER();
     gc->state.depth.writeEnable = flag;
@@ -1083,7 +1083,7 @@ GLvoid GL_APIENTRY __gles_DepthMask(__GLcontext *gc, GLboolean flag)
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ClearDepthf(__GLcontext *gc, GLfloat z)
+GLvoid GL_APIENTRY __glim_ClearDepthf(__GLcontext *gc, GLfloat z)
 {
     __GL_HEADER();
     /* Update clear state */
@@ -1091,14 +1091,14 @@ GLvoid GL_APIENTRY __gles_ClearDepthf(__GLcontext *gc, GLfloat z)
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ClearStencil(__GLcontext *gc, GLint s)
+GLvoid GL_APIENTRY __glim_ClearStencil(__GLcontext *gc, GLint s)
 {
     __GL_HEADER();
     gc->state.stencil.clear = s;
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_SampleCoverage(__GLcontext *gc, GLclampf value, GLboolean invert)
+GLvoid GL_APIENTRY __glim_SampleCoverage(__GLcontext *gc, GLclampf value, GLboolean invert)
 {
     __GL_HEADER();
     if (value < __glZero)
@@ -1119,7 +1119,7 @@ GLvoid GL_APIENTRY __gles_SampleCoverage(__GLcontext *gc, GLclampf value, GLbool
 }
 
 
-GLvoid GL_APIENTRY __gles_GetMultisamplefv(__GLcontext *gc, GLenum pname, GLuint index, GLfloat *val)
+GLvoid GL_APIENTRY __glim_GetMultisamplefv(__GLcontext *gc, GLenum pname, GLuint index, GLfloat *val)
 {
     GLuint currentSamples = 0;
 
@@ -1149,7 +1149,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_SampleMaski(__GLcontext *gc, GLuint maskNumber, GLbitfield mask)
+GLvoid GL_APIENTRY __glim_SampleMaski(__GLcontext *gc, GLuint maskNumber, GLbitfield mask)
 {
     __GL_HEADER();
     if (maskNumber >= gc->constants.maxSampleMaskWords)
@@ -1165,7 +1165,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_MinSampleShading(__GLcontext *gc, GLfloat value)
+GLvoid GL_APIENTRY __glim_MinSampleShading(__GLcontext *gc, GLfloat value)
 {
     __GL_HEADER();
     /* <value> is clamped to [0,1] when specified. */

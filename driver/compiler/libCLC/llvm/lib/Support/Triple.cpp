@@ -326,7 +326,7 @@ void Triple::Parse() const {
 
   // Handle some exceptional cases where the OS / environment components are
   // stuck into the vendor field.
-  // TODO: Remove this logic and have places that need it use 'normalize'.
+  // VIV:TODO: Remove this logic and have places that need it use 'normalize'.
   if (StringRef(getTriple()).count('-') == 1) {
     StringRef VendorName = getVendorName();
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -33,13 +33,13 @@ static struct _cl_platform_id _platform =
     "cl_khr_icd",               /* Extensions. */
     "viv",                      /* ICD Extensioin suffix. */
 
-    {{0}},                       /* hwcfg */
     gcvPATCH_INVALID,           /* patchId */
     gcvNULL,                    /* Compiler mutex. */
     gcvNULL,                    /* Compiler dll. */
     gcvNULL,                    /* Compiler pointer. */
     gcvNULL,                    /* loadCompiler pointer. */
     gcvNULL,                    /* unloadCompiler pointer. */
+    gcvFALSE,                   /* virShaderPath */
 };
 
 cl_platform_id clgDefaultPlatform = gcvNULL;
@@ -78,10 +78,13 @@ cl_bool clfInitTracerDispatchTable()
             int i = 0;
 
 #if defined(_WIN32) || defined(_WIN32_WCE)
-            gcoOS_LoadLibrary(gcvNULL, "libGLES_vlogger.dll", &trlib);
+            if (gcvSTATUS_OK != gcoOS_LoadLibrary(gcvNULL, "libGLES_vlogger.dll", &trlib))
 #else
-            gcoOS_LoadLibrary(gcvNULL, "libGLES_vlogger.so", &trlib);
+            if (gcvSTATUS_OK != gcoOS_LoadLibrary(gcvNULL, "libGLES_vlogger.so", &trlib))
 #endif
+            {
+                return CL_FALSE;
+            }
 
             if (trlib  == gcvNULL)
             {
@@ -171,6 +174,69 @@ clfSetTraceMode(
     }
 }
 
+void clfAllocateVidMemoryCB(
+    gctPOINTER context,
+    gceSURF_TYPE type,
+    gctSTRING tag,
+    gctSIZE_T size,
+    gctUINT32 align,
+    gctPOINTER *opaqueNode,
+    gctPOINTER *memory,
+    gctUINT32 *physical,
+    gctPOINTER initialData,
+    gctBOOL zeroMemory
+    )
+{
+    gceSTATUS               status = gcvSTATUS_OK;
+    gctUINT                 allocatedSize;
+    gctUINT32               phy;
+    gctPOINTER              logical;
+    gcsSURF_NODE_PTR        node;
+
+    allocatedSize = gcmALIGN(size, align);
+
+    gcmONERROR(gcoCL_AllocateMemory(&allocatedSize,
+                                     &phy,
+                                     &logical,
+                                     &node,
+                                     type,
+                                     0));
+
+    gcmDUMP(gcvNULL, "#[info: video memory allocate for VSC %s]", tag);
+
+    if (initialData)
+    {
+        gcoOS_MemCopy(logical, initialData, size);
+    }
+    else if (zeroMemory)
+    {
+        gcoOS_ZeroMemory(logical, size);
+    }
+
+    *physical = phy;
+    *opaqueNode = (gctPOINTER)node;
+
+    gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_MEMORY, *physical, logical, 0, size);
+
+    if (memory)
+    {
+        *memory = logical;
+    }
+OnError:
+    return;
+}
+
+void clfFreeVidMemoryCB(
+    gctPOINTER context,
+    gceSURF_TYPE type,
+    gctSTRING tag,
+    gctPOINTER opaqueNode
+    )
+{
+    gcoCL_FreeMemory(0, gcvNULL, 0, (gcsSURF_NODE_PTR)(opaqueNode),type);
+    return;
+}
+
 void
 clfGetDefaultPlatformID(
     clsPlatformId_PTR * Platform
@@ -186,8 +252,8 @@ clfGetDefaultPlatformID(
     {
         static gctINT32  delayCount = -1;
         gctSTRING epProfile = "EMBEDDED_PROFILE";
-        gceCHIPMODEL  chipModel;
-        gctUINT32 chipRevision;
+        gceCHIPMODEL  chipModel = gcv200;
+        gctUINT32 chipRevision = 0;
         gctBOOL chipEnableEP = gcvFALSE;
         gctBOOL version11 = gcvFALSE;
 
@@ -216,7 +282,7 @@ clfGetDefaultPlatformID(
                         (chipModel == gcv3000 && chipRevision == 0x5451) ||
                         (chipModel == gcv5000));
         if((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) != gcvSTATUS_TRUE) ||
-           (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) != gcvSTATUS_TRUE)   ||
+           (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) != gcvSTATUS_TRUE) ||
            chipEnableEP)
         {
             /*if the features on the platform are not availble, still report embedded profile even if BUILD_OPENCL_FP is 1*/
@@ -238,11 +304,22 @@ clfGetDefaultPlatformID(
             clgDefaultPlatform->Cversion = clcVERSION12;
         }
 
-        clmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &clgDefaultPlatform->hwCfg), CL_INVALID_VALUE);
+        clmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &clgDefaultPlatform->vscCoreSysCtx.hwCfg), CL_INVALID_VALUE);
+        clmONERROR(vscCreatePrivateData(&clgDefaultPlatform->vscCoreSysCtx, &clgDefaultPlatform->vscCoreSysCtx.hPrivData, gcvTRUE), CL_INVALID_VALUE);
+        clgDefaultPlatform->vscSysCtx.pCoreSysCtx = &clgDefaultPlatform->vscCoreSysCtx;
+        clgDefaultPlatform->vscSysCtx.drvCBs.pfnAllocVidMemCb = (PFN_ALLOC_VIDMEM_CB)clfAllocateVidMemoryCB;
+        clgDefaultPlatform->vscSysCtx.drvCBs.pfnFreeVidMemCb = (PFN_FREE_VIDMEM_CB)clfFreeVidMemoryCB;
+        clgDefaultPlatform->vscSysCtx.hDrv = gcvNULL;
+
         clmONERROR(gcoHAL_GetPatchID(gcvNULL, &clgDefaultPlatform->patchId), CL_INVALID_VALUE);
 
         /* initialize back-end caps in case front-end is skipped for shader-binary only  */
-        *gcGetHWCaps() = clgDefaultPlatform->hwCfg;
+        *gcGetHWCaps() = clgDefaultPlatform->vscCoreSysCtx.hwCfg;
+        *gcGetPatchId() = clgDefaultPlatform->patchId;
+        clgDefaultPlatform->virShaderPath =
+            gcUseFullNewLinker(gcGetHWCaps()->hwFeatureFlags.hasHalti2)
+         && gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_VIR_SHADER);
+        vscSetDriverVIRPath(clgDefaultPlatform->virShaderPath);
 
         gcmRESTORE_HW();
     }
@@ -251,7 +328,6 @@ clfGetDefaultPlatformID(
     {
         clmONERROR(gcoOS_AtomConstruct(gcvNULL, &clgGlobalId), CL_INVALID_VALUE);
     }
-
     if (Platform)
     {
         *Platform = clgDefaultPlatform;

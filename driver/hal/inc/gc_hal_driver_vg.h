@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -93,7 +93,6 @@ typedef enum _gceTASK
     gcvTASK_UNLOCK_VIDEO_MEMORY,
     gcvTASK_FREE_VIDEO_MEMORY,
     gcvTASK_FREE_CONTIGUOUS_MEMORY,
-    gcvTASK_UNMAP_USER_MEMORY
 }
 gceTASK;
 
@@ -229,27 +228,6 @@ typedef struct _gcsTASK_FREE_CONTIGUOUS_MEMORY
     IN gctPOINTER               logical;
 }
 gcsTASK_FREE_CONTIGUOUS_MEMORY;
-
-typedef struct _gcsTASK_UNMAP_USER_MEMORY * gcsTASK_UNMAP_USER_MEMORY_PTR;
-typedef struct _gcsTASK_UNMAP_USER_MEMORY
-{
-    /* Task ID (gcvTASK_UNMAP_USER_MEMORY). */
-    IN gceTASK                  id;
-
-    /* Base address of user memory to unmap. */
-    IN gctPOINTER               memory;
-
-    /* Size of user memory in bytes to unmap. */
-    IN gctSIZE_T                size;
-
-    /* Info record returned by gcvHAL_MAP_USER_MEMORY. */
-    IN gctPOINTER               info;
-
-    /* Physical address of mapped memory as returned by
-       gcvHAL_MAP_USER_MEMORY. */
-    IN gctUINT32                address;
-}
-gcsTASK_UNMAP_USER_MEMORY;
 
 #ifdef __cplusplus
 }

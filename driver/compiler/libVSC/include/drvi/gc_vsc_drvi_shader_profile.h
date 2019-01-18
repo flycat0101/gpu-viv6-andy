@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -662,7 +662,11 @@ struct _SHADER_CONSTANT_HW_LOCATION_MAPPING
     union
     {
         /* Case to map to constant register */
-        gctUINT                                      hwRegNo;
+        struct
+        {
+            gctUINT                                  hwRegNo;
+            gctUINT                                  hwRegRange;
+        } constReg;
 
         /* Case to map to constant memory
 
@@ -794,6 +798,9 @@ typedef struct SHADER_CONSTANT_MAPPING
        SHADER_HW_ACCESS_MODE_REGISTER access mode. It is equal to (max-used-const-regNo + 1). This
        is similiar as gprCount. */
     gctUINT                                     hwConstRegCount;
+
+    /* Max HW constant register index that machine shader users, the default value is -1. */
+    gctINT                                      maxHwConstRegIndex;
 }
 SHADER_CONSTANT_MAPPING;
 
@@ -838,6 +845,9 @@ typedef struct SHADER_SAMPLER_MAPPING
 
     /* HW sampler register count that machine shader uses. */
     gctUINT                                     hwSamplerRegCount;
+
+    /* Max HW sampler register index that machine shader users, the default value is -1. */
+    gctINT                                      maxHwSamplerRegIndex;
 }
 SHADER_SAMPLER_MAPPING;
 
@@ -972,7 +982,13 @@ typedef struct SHADER_EXECUTABLE_NATIVE_HINTS
         /* For GL(ES), it can be set TRUE or FALSE, for others, it must be set to TRUE */
         gctUINT                                          bSeparatedShader : 1;
 
-        gctUINT                                          reserved         : 30;
+        /* For GL(ES), it can be set TRUE or FALSE, for others, it must be set to FALSE */
+        gctUINT                                          bLinkProgramPipeline : 1;
+
+        /* What kind of memory access operations shader native holds, see SHADER_EDH_MEM_ACCESS_HINT */
+        gctUINT                                          memoryAccessHint : 6;
+
+        gctUINT                                          reserved         : 23;
     } globalStates;
 
     union
@@ -1024,9 +1040,13 @@ typedef struct SHADER_EXECUTABLE_NATIVE_HINTS
             gctUINT                                      privMemSizePerThreadInByte;
             gctUINT                                      currWorkThreadNum;
 
+            gctUINT                                      workGroupNumPerShaderGroup;
+
             gctUINT                                      threadGrpDimX;
             gctUINT                                      threadGrpDimY;
             gctUINT                                      threadGrpDimZ;
+
+            gctUINT                                      calculatedWorkGroupSize;
         } gps;
     } prvStates;
 }
@@ -1034,6 +1054,22 @@ SHADER_EXECUTABLE_NATIVE_HINTS;
 
 typedef enum UNIFIED_RF_ALLOC_STRATEGY
 {
+    /* For current shader type, the start offset and size is fix reserved in unified register file,
+       so address offset will be set to that fixed offset. It is full same as allocating unnified
+       RF because each shader type has its own space */
+    UNIFIED_RF_ALLOC_STRATEGY_FIXED_ADDR_OFFSET                     = 0,
+
+    /* For current shader type, the start offset and size is float (which means not reserved in unified
+       register file). For all implementation, each used RF space will be packed together (that
+       means this address offset is start from end of previous stage's RF resource */
+    UNIFIED_RF_ALLOC_STRATEGY_PACK_FLOAT_ADDR_OFFSET                = 1,
+
+    /* Pack all GPIPE stages together and put them in the top of resource, and put PS in the bottom. */
+    UNIFIED_RF_ALLOC_STRATEGY_GPIPE_TOP_PS_BOTTOM_FLOAT_ADDR_OFFSET = 2,
+
+    /* Pack all GPIPE stages together and put them in the bottom of resource, and put PS in the top. */
+    UNIFIED_RF_ALLOC_STRATEGY_PS_TOP_GPIPE_BOTTOM_FLOAT_ADDR_OFFSET = 3,
+
     /* When HW provide unified register file (such as const/sampler), for non-seperated compiling
        for GL(ES), compiler may use different allocation strategy to allocate register in full scope
        of unified register file for a GL(ES) program. In this case, all shaders in this program
@@ -1044,17 +1080,7 @@ typedef enum UNIFIED_RF_ALLOC_STRATEGY
           programs to do programming. Otherwise, result is undefined!!!! */
 
     /* Allocated in full scope of unified register file, so address offset will be set to zero */
-    UNIFIED_RF_ALLOC_STRATEGY_UNIFIED           = 0,
-
-    /* For current shader type, the start offset and size is fix reserved in unified register file,
-       so address offset will be set to that fixed offset. It is full same as allocating unnified
-       RF because each shader type has its own space */
-    UNIFIED_RF_ALLOC_STRATEGY_FIXED_ADDR_OFFSET = 1,
-
-    /* For current shader type, the start offset and size is float (which means not reserved in unified
-       register file). For the most of implementation, each used RF space will be packed together (that
-       means this address offset is start from end of previous stage's RF resource */
-    UNIFIED_RF_ALLOC_STRATEGY_FLOAT_ADDR_OFFSET = 2,
+    UNIFIED_RF_ALLOC_STRATEGY_UNIFIED                               = 4,
 }
 UNIFIED_RF_ALLOC_STRATEGY;
 
@@ -1076,6 +1102,13 @@ typedef enum SHADER_EDH_MEM_ACCESS_HINT
                                                     SHADER_EDH_MEM_ACCESS_HINT_ATOMIC,
 
     SHADER_EDH_MEM_ACCESS_HINT_BARRIER            = 0x0020,
+    SHADER_EDH_MEM_ACCESS_HINT_EVIS_ATOMADD       = 0x0040, /* evis atomadd can operate on 16B data in parallel,
+                                                             * we need to tell driver to turn off workgroup packing
+                                                             * if it is used so the HW will not merge different
+                                                             * workgroup into one which can cause the different
+                                                             * address be used for the evis_atom_add */
+/* Note: 1. must sync with VIR_MemoryAccessFlag !!!
+ *       2. make sure it fits in bits in SHADER_EXECUTABLE_DERIVED_HINTS::memoryAccessHint */
 }SHADER_EDH_MEM_ACCESS_HINT;
 
 /* For these hints, we can retrieve them by analyzing machine code on the fly, but it will
@@ -1092,10 +1125,10 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
         gctUINT                   bExecuteOnDual16                : 1;
 
         /* Unified constant register file alloc strategy. For ununified RF, it has no mean */
-        gctUINT                   unifiedConstRegAllocStrategy    : 2;
+        gctUINT                   unifiedConstRegAllocStrategy    : 3;
 
         /* Unified sampler register file alloc strategy. For ununified RF, it has no mean */
-        gctUINT                   unifiedSamplerRegAllocStrategy  : 2;
+        gctUINT                   unifiedSamplerRegAllocStrategy  : 3;
 
         /* Whether the shader has GPR register spills */
         gctUINT                   bGprSpilled                     : 1;
@@ -1108,7 +1141,7 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
         /****************************************/
 
         /* What kind of memory access operations shader holds, see SHADER_EDH_MEM_ACCESS_HINT */
-        gctUINT                   memoryAccessHint                : 6;
+        gctUINT                   memoryAccessHint                : 8;
 
         /* First HW reg and its channel that will be used to store addresses
            of USC for each vertex when executing hs/ds/gs. */
@@ -1120,10 +1153,13 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
            output are all LE 4 */
         gctUINT                   bIoUSCAddrsPackedToOneReg       : 1;
 
+        /* Whether enable multi-GPU. */
+        gctUINT                   bEnableMultiGPU                 : 1;
+
         /* Whether enable robust out-of-bounds check for memory access . */
         gctUINT                   bEnableRobustCheck              : 1;
 
-        gctUINT                   reserved                        : 11;
+        gctUINT                   reserved                        : 6;
 
         gctUINT                   gprSpillSize;  /* the byte count of register spill mem to be
                                                   * allocated by driver in MultiGPU mode*/
@@ -1167,6 +1203,9 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
             /* Shader has operation to calc gradient on x/y of RT */
             gctUINT               bDerivRTx                       : 1;
             gctUINT               bDerivRTy                       : 1;
+            /* shader has dsy IR before lowering to machine code, so it
+             * wouldn't count fwidth() as using DSY for yInvert purpose */
+            gctUINT               bDsyBeforeLowering              : 1;
 
             /* Shader has operation to discard pixel (such as texkill/discard) */
             gctUINT               bPxlDiscard                     : 1;
@@ -1194,9 +1233,8 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
 
 #if gcdALPHA_KILL_IN_SHADER
             gctUINT               alphaClrKillInstsGened          : 1;
-            gctUINT               reserved                        : 1;
 #else
-            gctUINT               reserved                        : 2;
+            gctUINT               reserved                        : 1;
 #endif
         } ps;
 
@@ -1206,7 +1244,10 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
             /* Whether whole thread group needs sync */
             gctUINT               bThreadGroupSync                : 1;
 
-            gctUINT               reserved                        : 31;
+            /* Whether use Local memory. */
+            gctUINT               bUseLocalMemory                 : 1;
+
+            gctUINT               reserved                        : 30;
         } gps;
     } prvStates;
 }SHADER_EXECUTABLE_DERIVED_HINTS;
@@ -1230,6 +1271,8 @@ typedef struct SHADER_EXECUTABLE_PROFILE
     /* Target HW this executable can run on */
     gctUINT                                     chipModel;
     gctUINT                                     chipRevision;
+    gctUINT                                     productID;
+    gctUINT                                     customerID;
 
     /* From MSB to LSB, 8-bits client + 8-bits type + 8-bits majorVersion + 8-bits minorVersion */
     gctUINT                                     shVersionType;
@@ -1266,15 +1309,6 @@ typedef struct SHADER_EXECUTABLE_PROFILE
     /* All private mapping tables for dynamic (lib-link) patches. Every entry has a member pointing
        to a slot in above mapping pool */
     SHADER_DYNAMIC_PRIV_MAPPING                 dynamicPrivMapping;
-
-    /* TODO: LTC-folding gcSL insts and constants here.
-       1. Do we need convert constants used by LTC-folding gcSL insts to # based?? If so, UpdateUniform can
-          save constant values in # while set data to HW locations, and then use them when do LTC calculation.
-          But if static patch constant is not used in machine code, but for LTC, then we may need a new mode
-          in SHADER_PATCH_CONSTANT_MODE to handle it, such as SHADER_PATCH_CONSTANT_MODE_LTC_ONLY.
-       2. Can we make LTC calculation only based on dirty #?? Or
-       3. Can we directly translate LTC-folding gcSL insts to CPU code??
-    */
 
     /* Current SEI that this profile uses. This is the one used to program HW registers. Currently disable it
        due to we're using program-level recompiling */
@@ -1314,27 +1348,20 @@ void vscSortIOsByHwLoc(SHADER_IO_MAPPING_PER_EXE_OBJ* pIoMappingPerExeObj, gctUI
    SEP when flushing to hw to triage bugs */
 void vscPrintSEP(VSC_SYS_CONTEXT* pSysCtx, SHADER_EXECUTABLE_PROFILE* pSEP, SHADER_HANDLE hShader);
 
-/* For saver, it always returns how many bytes it saves to binary buffer, and
-              1). if ppOutBinary == NULL (szBinaryInByte will be igored), then not doing real saving, just return byte size
-              2). if ppOutBinary != NULL and *ppOutBinary == NULL (szBinaryInByte will be igored), then saver will allocate a
-                  binary for user.
-              3). *ppOutBinary != NULL, then szBinaryInByte must be the size of the binary (generally, this size got by first usage
-                  of this function).
-   For loader, szBinaryInByte must be size of binary, and return value is the real sparsed size of binary. */
-gctUINT vscSaveSEPToBinary(VSC_SYS_CONTEXT* pSysCtx, SHADER_EXECUTABLE_PROFILE* pSEP, void** ppOutBinary, gctUINT szBinaryInByte);
-gctUINT vscLoadSEPFromBinary(VSC_SYS_CONTEXT* pSysCtx, void* pInBinary, gctUINT szBinaryInByte, SHADER_EXECUTABLE_PROFILE* pSEP);
-
 /* Linkage info */
 typedef struct SHADER_IO_REG_LINKAGE
 {
     /* This channel have link by other stage, for linkage */
-    gctBOOL                                     bLinkedByOtherStage[CHANNEL_NUM];
+    gctBOOL                                     bLinkedByOtherStageX : 2;
+    gctBOOL                                     bLinkedByOtherStageY : 2;
+    gctBOOL                                     bLinkedByOtherStageZ : 2;
+    gctBOOL                                     bLinkedByOtherStageW : 2;
 
     /* This output is only linked to FFU SO */
-    gctBOOL                                     bOnlyLinkToSO;
+    gctBOOL                                     bOnlyLinkToSO : 2;
 
     /* This is dummy link, which means it will not be consumed by anyone. It is only used for active-mode IO */
-    gctBOOL                                     bIsDummyLink;
+    gctBOOL                                     bIsDummyLink  : 2;
 
     /* Used to link to other stage */
     gctUINT                                     linkNo;
@@ -1426,13 +1453,18 @@ typedef struct SHADER_HW_PROGRAMMING_HINTS
     gctUINT                                     maxThreadsPerHwTG             : 7;
 
     /* USC is shared by all shader stages, so we need allocate proper size for each stage
-       to get best perf of pipeline */
-    gctUINT                                     uscSizeInKbyte                : 8;
+       to get best perf of pipeline. The relation between these two members are
+       1. minUscSizeInKbyte can not be greater than maxUscSizeInKbyte.
+       2. If the minUscSizeInKbyte is equal to maxUscSizeInKbyte, HW will do static allocation
+          within shader type (client) specified maxUscSizeInKbyte USC for this shader stage.
+       3. If the minUscSizeInKbyte is less than maxUscSizeInKbyte HW will do dynamic allocation
+          on total extra-sizes (each extra size is maxUscSizeInKbyte-minUscSizeInKbyte) for each
+          shader stage by insuring the min USC size requirement, */
+    gctUINT                                     maxUscSizeInKbyte             : 8;
+    gctUINT                                     minUscSizeInKbyte             : 8;
 
     /* Iteration factor to time 'min parallel shader stage combination' when analyzing USC */
     gctUINT                                     maxParallelFactor             : 16;
-
-    gctUINT                                     reserved                      : 8;
 }SHADER_HW_PROGRAMMING_HINTS;
 
 typedef struct SHADER_HW_INFO

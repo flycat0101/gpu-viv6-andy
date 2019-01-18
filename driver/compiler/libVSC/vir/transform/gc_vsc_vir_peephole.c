@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -56,12 +56,96 @@ static void VSC_PH_Peephole_Final(
     vscHTBL_Destroy (ph->def_set1);
 }
 
+typedef gctBOOL
+(* _VSC_PH_MODIFIERTOGEN_VERIFYDEFINST)(
+    IN VIR_Instruction*         pDefInst
+    );
+
+typedef gctBOOL
+(* _VSC_PH_MODIFIERTOGEN_VERIFYUSAGEINST)(
+    IN VIR_Operand*             pDefOpnd,
+    IN VIR_Instruction*         pUsageInst
+    );
+
+static gctBOOL
+_VSC_PH_ModifierSAT_VerifyDefInst(
+    IN VIR_Instruction*         pDefInst
+    )
+{
+    gctBOOL     valid = gcvTRUE;
+    VIR_OpCode  opCode = VIR_Inst_GetOpcode(pDefInst);
+
+    /* Now only support destModifier for FLOAT32 or LOAD/STORE/IMG_STORE/I2I/CONV */
+    if (!VIR_TypeId_isFloat(VIR_Inst_GetInstType(pDefInst)) &&
+        !VIR_OPCODE_isMemLd(opCode)                         &&
+        !VIR_OPCODE_isMemSt(opCode)                         &&
+        !VIR_OPCODE_isImgSt(opCode)                         &&
+        (opCode != VIR_OP_CONVERT))
+    {
+        valid = gcvFALSE;
+    }
+
+    return valid;
+}
+
+static gctBOOL
+_VSC_PH_ModifierNEG_VerifyUsageInst(
+    IN VIR_Operand*             pDefOpnd,
+    IN VIR_Instruction*         pUsageInst
+    )
+{
+    gctBOOL                     valid = gcvTRUE;
+    VIR_TypeId                  opndBaseTypeId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(pDefOpnd));
+    VIR_TypeId                  usageDstTypeId;
+    VIR_Operand*                pUsageDstOpnd = VIR_Inst_GetDest(pUsageInst);
+
+    if (VIR_OPCODE_hasDest(VIR_Inst_GetOpcode(pUsageInst)) && pUsageDstOpnd)
+    {
+        usageDstTypeId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(pUsageDstOpnd));
+
+        /* If NEG and its usage have different type, we need to skip it. */
+        if (opndBaseTypeId != usageDstTypeId)
+        {
+            valid = gcvFALSE;
+        }
+    }
+
+    return valid;
+}
+
+static gctBOOL
+_VSC_PH_ModifierABS_VerifyUsageInst(
+    IN VIR_Operand*             pDefOpnd,
+    IN VIR_Instruction*         pUsageInst
+    )
+{
+    gctBOOL                     valid = gcvTRUE;
+    VIR_TypeId                  opndBaseTypeId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(pDefOpnd));
+    VIR_TypeId                  usageDstTypeId;
+    VIR_Operand*                pUsageDstOpnd = VIR_Inst_GetDest(pUsageInst);
+
+    if (VIR_OPCODE_hasDest(VIR_Inst_GetOpcode(pUsageInst)) && pUsageDstOpnd)
+    {
+        usageDstTypeId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(pUsageDstOpnd));
+
+        /* If ABS and its usage have different type, we need to skip it. */
+        if (opndBaseTypeId != usageDstTypeId)
+        {
+            valid = gcvFALSE;
+        }
+    }
+
+    return valid;
+}
+
 typedef struct VSC_PH_MODIFIERTOGEN
 {
-    VIR_OpCode opc : 20;
-    gctUINT lvalue : 1;
-    gctUINT modifier : 3;
-    gctSTRING name;
+    VIR_OpCode                              opc : 20;
+    gctUINT                                 lvalue : 1;
+    gctUINT                                 modifier : 4;
+    gctSTRING                               name;
+    _VSC_PH_MODIFIERTOGEN_VERIFYDEFINST     verifyDefInst;
+    _VSC_PH_MODIFIERTOGEN_VERIFYUSAGEINST   verifyUsageInst;
 } VSC_PH_ModifierToGen;
 
 #define VSC_PH_ModifierToGen_GetOPC(mtg)            ((mtg)->opc)
@@ -72,11 +156,14 @@ typedef struct VSC_PH_MODIFIERTOGEN
 #define VSC_PH_ModifierToGen_SetModifier(mtg, m)    ((mtg)->modifier = (m))
 #define VSC_PH_ModifierToGen_GetName(mtg)           ((mtg)->name)
 #define VSC_PH_ModifierToGen_SetName(mtg, n)        ((mtg)->name = (n))
+#define VSC_PH_ModifierToGen_GetDefVerifyFunc(mtg)  ((mtg)->verifyDefInst)
+#define VSC_PH_ModifierToGen_GetVerifyUsageFunc(mtg)((mtg)->verifyUsageInst)
 
-#define VSC_PH_ModifierToGen_COUNT                  3
-VSC_PH_ModifierToGen VSC_PH_ModifierToGen_SAT = {VIR_OP_SAT, 1, VIR_MOD_SAT_0_TO_1, "SAT_0_TO_1"};
-VSC_PH_ModifierToGen VSC_PH_ModifierToGen_NEG = {VIR_OP_NEG, 0, VIR_MOD_NEG, "NEG"};
-VSC_PH_ModifierToGen VSC_PH_ModifierToGen_ABS = {VIR_OP_ABS, 0, VIR_MOD_ABS, "ABS"};
+#define VSC_PH_ModifierToGen_COUNT                  4
+VSC_PH_ModifierToGen VSC_PH_ModifierToGen_SAT = {VIR_OP_SAT, 1, VIR_MOD_SAT_0_TO_1, "SAT_0_TO_1", _VSC_PH_ModifierSAT_VerifyDefInst, gcvNULL};
+VSC_PH_ModifierToGen VSC_PH_ModifierToGen_NEG = {VIR_OP_NEG, 0, VIR_MOD_NEG, "NEG", gcvNULL, _VSC_PH_ModifierNEG_VerifyUsageInst};
+VSC_PH_ModifierToGen VSC_PH_ModifierToGen_ABS = {VIR_OP_ABS, 0, VIR_MOD_ABS, "ABS", gcvNULL, _VSC_PH_ModifierABS_VerifyUsageInst};
+VSC_PH_ModifierToGen VSC_PH_ModifierToGen_CONJ = {VIR_OP_CONJ, 0, VIR_MOD_ABS, "CONJ", gcvNULL, gcvNULL};
 
 static void VSC_PH_ModifierToGen_Dump(VSC_PH_ModifierToGen* mtg, VIR_Dumper* dumper)
 {
@@ -91,7 +178,7 @@ typedef struct VSC_PH_OPNDTARGET
 
 static gctUINT _VSC_PH_OpndTarget_HFUNC(const void* ptr)
 {
-    return (gctUINT)(gctUINTPTR_T)((VSC_PH_OpndTarget*)ptr)->inst & 0xff;
+    return (gctUINT)(gctUINTPTR_T)((VSC_PH_OpndTarget*)ptr)->inst >> 2;
 }
 
 static gctBOOL _VSC_PH_OpndTarget_HKCMP(const void* pHashKey1, const void* pHashKey2)
@@ -122,8 +209,7 @@ static gctUINT _HKCMP_MergeKeyHFUNC(const void* pKey)
 {
     VSC_PH_MergeKey*     pMergeKey = (VSC_PH_MergeKey*)pKey;
 
-    gctUINT hashVal = (((((gctUINT)(gctUINTPTR_T) pMergeKey->defKey->pDefInst) & 0xFF) << 4) |
-                          (pMergeKey->src1_imm & 0xF)) & 0xFFF;
+    gctUINT hashVal = (((gctUINT)(gctUINTPTR_T) pMergeKey->defKey->pDefInst) << 4) ^ pMergeKey->src1_imm ;
 
     return hashVal;
 }
@@ -282,36 +368,7 @@ _VSC_PH_InitHashTable(
     IN gctINT                tableSize
     )
 {
-    VSC_ErrCode errCode = VSC_ERR_NONE;
-    VSC_HASH_TABLE * hTable = *ppHT;
-
-    if (hTable == gcvNULL)
-    {
-        hTable = vscHTBL_Create(VSC_PH_Peephole_GetMM(ph), pfnHashFunc, pfnKeyCmp, tableSize);
-        if (hTable == gcvNULL)
-        {
-            errCode = VSC_ERR_OUT_OF_MEMORY;
-        }
-        else
-        {
-            *ppHT = hTable;
-        }
-    }
-    else
-    {
-        if (hTable->tableSize < tableSize)
-        {
-            /* Free table list */
-            vscMM_Free(hTable->pMM, hTable->pTable);
-            vscHTBL_Initialize(hTable, hTable->pMM, pfnHashFunc, pfnKeyCmp, tableSize);
-        }
-        else
-        {
-            hTable->pfnHashFunc = pfnHashFunc;
-            hTable->pfnKeyCmp   = pfnKeyCmp ? pfnKeyCmp : vscHKCMP_Default;
-        }
-    }
-    return errCode;
+    return vscHTBL_CreateOrInitialize(VSC_PH_Peephole_GetMM(ph), ppHT, pfnHashFunc, pfnKeyCmp, tableSize);
 }
 
 void
@@ -2202,13 +2259,10 @@ static gctBOOL _VSC_PH_DoesOpcodeSupportLValueModifier(
     IN VIR_OpCode opcode
     )
 {
-    if (VIR_OPCODE_isTexLd(opcode))
-    {
-        return gcvFALSE;
-    }
-
-    if (VIR_OPCODE_isMemLd(opcode)  ||
-        VIR_OPCODE_isAttrLd(opcode))
+    if (VIR_OPCODE_isTexLd(opcode) ||
+        VIR_OPCODE_isMemLd(opcode)  ||
+        VIR_OPCODE_isAttrLd(opcode) ||
+        VIR_OPCODE_isVX(opcode))
     {
         return gcvFALSE;
     }
@@ -2352,7 +2406,9 @@ static VSC_ErrCode _VSC_PH_GenerateLValueModifier(
         }
 
         /* op should support lvalue modifier */
-        if(!_VSC_PH_DoesOpcodeSupportLValueModifier(VIR_Inst_GetOpcode(def_inst)))
+        if(!_VSC_PH_DoesOpcodeSupportLValueModifier(VIR_Inst_GetOpcode(def_inst))
+           ||
+           (VSC_PH_ModifierToGen_GetDefVerifyFunc(mtg) && !VSC_PH_ModifierToGen_GetDefVerifyFunc(mtg)(def_inst)))
         {
             if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MODIFIER))
             {
@@ -2734,6 +2790,11 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
     }
 
     /* check prerequisite and collect work set at the same time */
+    /*
+    ** VIV:TODO:
+    ** Now if any usage is invalid, we will make this instruction invalid and skip all usages.
+    ** We need to refine it so we can just skip the invalid usage.
+    */
     ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512),
              "Failed to initialize Hashtable");
     work_set = VSC_PH_Peephole_WorkSet(ph);
@@ -2762,6 +2823,41 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
             usage_opnd = usage->usageKey.pOperand;
             usage_opnd_swizzle = VIR_Operand_GetSwizzle(usage_opnd);
             usage_opnd_enable = VIR_Swizzle_2_Enable(usage_opnd_swizzle);
+
+            if (VSC_PH_ModifierToGen_GetVerifyUsageFunc(mtg) &&
+                !VSC_PH_ModifierToGen_GetVerifyUsageFunc(mtg)(inst_src0, usage_inst))
+            {
+                invalid_case = gcvTRUE;
+                break;
+            }
+
+            /* 1) no EVIS instruction support neg, abs, sat
+             * 2) except iADD which support neg
+             * 3) and except BiLinear which support neg and abs for Src2
+             */
+            if (VIR_OPCODE_isVX(opcode) &&
+                (VIR_Inst_GetOpcode(inst) == VIR_OP_ABS || VIR_Inst_GetOpcode(inst) == VIR_OP_NEG) &&
+                !(opcode == VIR_OP_VX_IADD && VIR_Inst_GetOpcode(inst) == VIR_OP_NEG) &&
+                !(opcode == VIR_OP_VX_BILINEAR && usage_opnd == VIR_Inst_GetSource(usage_inst, 2)))
+            {
+                invalid_case = gcvTRUE;
+                break;
+            }
+            /* conjugate should only be propagated to complex instructions */
+            if(VIR_Inst_GetOpcode(inst) == VIR_OP_CONJ &&
+               !VIR_OPCODE_isCmplx(VIR_Inst_GetOpcode(usage_inst)))
+            {
+                if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MODIFIER))
+                {
+                    VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+                    VIR_LOG(dumper, "not processed because use instr is not a complex instruction:\n");
+                    VIR_LOG_FLUSH(dumper);
+                    VIR_Inst_Dump(dumper, usage_inst);
+                    VIR_LOG_FLUSH(dumper);
+                }
+                invalid_case = gcvTRUE;
+                break;
+            }
 
             /* inst and its usage should be in the same bb */
             if(VIR_Inst_GetBasicBlock(inst) != VIR_Inst_GetBasicBlock(usage_inst))
@@ -2926,7 +3022,14 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
                 swizzle = VIR_Swizzle_ApplyMappingSwizzle(swizzle, mapping_swizzle);
                 work_inst_enable = VIR_Swizzle_2_Enable(swizzle);
                 VIR_Operand_ReplaceUseOperandWithUse(work_opnd, inst_src0, swizzle);
-                VIR_Operand_SetModifier(work_opnd, VSC_PH_ModifierToGen_GetModifier(mtg));
+                if (VSC_PH_ModifierToGen_GetModifier(mtg) == VIR_MOD_NEG)
+                {
+                    VIR_Operand_NegateOperand(shader, work_opnd);
+                }
+                else
+                {
+                    VIR_Operand_SetModifier(work_opnd, VSC_PH_ModifierToGen_GetModifier(mtg));
+                }
                 vscVIR_DeleteUsage(VSC_PH_Peephole_GetDUInfo(ph), VIR_ANY_DEF_INST, work_inst,
                                    work_opnd, gcvFALSE, inst_dest_info.u1.virRegInfo.virReg, 1,
                                    old_work_inst_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
@@ -5308,7 +5411,8 @@ static gctBOOL _VSC_PH_LocalVariable(
     vscHTBL_DirectSet(visitSet, (void*) pOpnd, gcvNULL);
 
     if (VIR_Symbol_isUniform(sym) &&
-        strcmp(VIR_Shader_GetSymNameString(pShader, sym), "#local_address") == 0)
+        (strcmp(VIR_Shader_GetSymNameString(pShader, sym), _sldLocalStorageAddressName) == 0 ||
+         strcmp(VIR_Shader_GetSymNameString(pShader, sym), _sldSharedVariableStorageBlockName) == 0))
     {
         return gcvTRUE;
     }
@@ -5351,8 +5455,15 @@ static VSC_ErrCode _VSC_PH_LocalInst(
     VSC_ErrCode         errCode  = VSC_ERR_NONE;
     VIR_Operand         *baseOpnd = VIR_Inst_GetSource(lsInst, 0);
     VIR_OpCode          opc = VIR_Inst_GetOpcode(lsInst);
+    VIR_Symbol          *baseSym = VIR_Operand_GetUnderlyingSymbol(baseOpnd);
 
     VSC_HASH_TABLE      *visitSet = gcvNULL;
+
+    /* if address space of baseSym is global, do not convert to local Inst */
+    if (baseSym && VIR_Symbol_GetAddrSpace(baseSym) == VIR_AS_GLOBAL)
+    {
+        return errCode;
+    }
 
     ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), vscHFUNC_Default, vscHKCMP_Default, 512),
                 "Failed to initialize Hashtable");
@@ -5520,6 +5631,10 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
         if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetModifiers(options), VSC_OPTN_PHOptions_MODIFIERS_ABS))
         {
             mtgs[count++] = &VSC_PH_ModifierToGen_ABS;
+        }
+        if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetModifiers(options), VSC_OPTN_PHOptions_MODIFIERS_CONJ))
+        {
+            mtgs[count++] = &VSC_PH_ModifierToGen_CONJ;
         }
 
         if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MODIFIER))
@@ -5722,10 +5837,9 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
                         }
                         else
                         {
-                            /*change instruction to nop*/
                             /* update du information */
                             _VSC_PH_Inst_DeleteUses(ph, inst, VIR_Inst_GetSrcNum(inst));
-                            VIR_BB_RemoveBranch(bb, gcvTRUE);
+                            VIR_Function_ChangeInstToNop(VSC_PH_Peephole_GetCurrFunc(ph), inst);
                         }
                     }
                     else
@@ -5743,17 +5857,9 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
                         else
                         {
                             /*change instruction to nop*/
-                            VIR_Inst_SetOpcode(inst, VIR_OP_NOP);
-                            VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
                             _VSC_PH_Inst_DeleteUses(ph, inst, VIR_Inst_GetSrcNum(inst));
-                            for (i = 0; i < VIR_Inst_GetSrcNum(inst); i++)
-                            {
-                                VIR_Inst_FreeSource(inst, i);
-                            }
                             _VSC_PH_Inst_DeleteDef(ph, inst);
-                            VIR_Inst_SetSrcNum(inst, 0);
-                            VIR_Inst_FreeDest(inst);
-                            VIR_Inst_SetDest(inst, gcvNULL);
+                            VIR_Function_ChangeInstToNop(VSC_PH_Peephole_GetCurrFunc(ph), inst);
                         }
                     }
 
@@ -5846,22 +5952,24 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
     /* change the load into load_L, if the number of threads can still make the
        max local group size requirement
     */
-    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetOPTS(options), VSC_OPTN_PHOptions_OPTS_LOC_MEM) &&
-       VIR_Shader_IsCL(ph->shader) &&
-       ph->hwCfg->maxLocalMemSizeInByte > 0)
+    if (VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetOPTS(options), VSC_OPTN_PHOptions_OPTS_LOC_MEM) &&
+        ph->hwCfg->maxLocalMemSizeInByte > 0)
     {
         VIR_Shader      *pShader = ph->shader;
-        VIR_Function    *mainFunc = VIR_Shader_GetCurrentKernelFunction(pShader);
-        gctUINT localMemorySize = mainFunc->kernelInfo->localMemorySize;
-        if (localMemorySize > 0)
+        gctUINT         localMemorySize = VIR_Shader_GetShareMemorySize(pShader);
+
+        if ((localMemorySize <= ph->hwCfg->maxLocalMemSizeInByte) &&
+            (localMemorySize > 0))
         {
+            gcmASSERT(VIR_Shader_IsCL(pShader) || VIR_Shader_IsGlCompute(pShader));
+
             inst = BB_GET_START_INST(bb);
-            while(inst != VIR_Inst_GetNext(BB_GET_END_INST(bb)))
+            while (inst != VIR_Inst_GetNext(BB_GET_END_INST(bb)))
             {
                 VIR_OpCode opc;
 
                 opc = VIR_Inst_GetOpcode(inst);
-                if (opc == VIR_OP_LOAD ||
+                if (opc == VIR_OP_LOAD  ||
                     opc == VIR_OP_STORE ||
                     VIR_OPCODE_isAtom(opc))
                 {
@@ -6027,6 +6135,11 @@ DEF_QUERY_PASS_PROP(VSC_PH_Peephole_PerformOnShader)
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
 
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
+}
+
+DEF_SH_NECESSITY_CHECK(VSC_PH_Peephole_PerformOnShader)
+{
+    return gcvTRUE;
 }
 
 VSC_ErrCode VSC_PH_Peephole_PerformOnShader(

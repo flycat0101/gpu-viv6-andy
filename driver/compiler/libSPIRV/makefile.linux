@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -94,19 +94,22 @@ install: all
 
 ifeq ($(gcdSTATIC_LINK),1)
 $(TARGET_MODULE): $(OBJECTS)
-	$(AR) -rc $@ $(OBJECTS)
+	@echo "  ARCHIVE \033[1m$(notdir $@)\033[0m"
+	@$(AR) -rc $@ $(OBJECTS)
 
 else
 $(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so) \
                   $(wildcard $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.so)
 
 $(TARGET_MODULE): $(OBJECTS)
-	$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LDLIBS)
+	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
+	@$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LDLIBS)
 endif
 
 $(OBJ_DIR)/%.o: %.c
+	@echo "  COMPILE $(abspath $<)"
 	@-mkdir -p $(dir $@)
-	$(CC) -c $(CFLAGS) -MMD -o $@ $<
+	@$(CC) -c $(CFLAGS) -MMD -o $@ $<
 
 -include $(OBJECTS:.o=.d)
 

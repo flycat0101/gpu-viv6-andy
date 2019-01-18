@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -443,7 +443,7 @@ void* vscBMS_Alloc(VSC_BUDDY_MEM_SYS* pBMS, gctUINT reqSize)
     gctUINT                   reqSizeWithHeader;
     gctINT                    log2Size;
 
-    reqSizeWithHeader = reqSize + BUDDY_BLOCK_HEADER_SIZE;
+    reqSizeWithHeader = min_bm_node_size(reqSize);
 
     /* For the case buddy system can maintain */
     if (reqSizeWithHeader <= MAX_BUDDY_BLOCK_SIZE)
@@ -479,7 +479,7 @@ void* vscBMS_Alloc(VSC_BUDDY_MEM_SYS* pBMS, gctUINT reqSize)
     pResBlock->blkHeader.cmnBlkHeader.userReqSize = reqSize;
 
     /* Return true memory content by shifting out of block header */
-    return (void*)((gctUINT8*)pResBlock + BUDDY_BLOCK_HEADER_SIZE);
+    return (void*)(&pResBlock->biBlockNode);
 #endif
 }
 
@@ -502,7 +502,7 @@ void* vscBMS_Realloc(VSC_BUDDY_MEM_SYS* pBMS, void* pOrgAddress, gctUINT newReqS
     }
 
     /* Retrieve block corresponding to requested memory content */
-    pOrgBlock = (VSC_BUDDY_MEM_BLOCK_NODE *)((gctUINT8*)pOrgAddress - BUDDY_BLOCK_HEADER_SIZE);
+    pOrgBlock = userDataToBmNode(pOrgAddress);
 
     /* Just return original if no resize */
     if (newReqSize <= pOrgBlock->blkHeader.cmnBlkHeader.userReqSize)
@@ -510,8 +510,8 @@ void* vscBMS_Realloc(VSC_BUDDY_MEM_SYS* pBMS, void* pOrgAddress, gctUINT newReqS
         return pOrgAddress;
     }
 
-    orgReqSizeWithHeader = pOrgBlock->blkHeader.cmnBlkHeader.userReqSize + BUDDY_BLOCK_HEADER_SIZE;
-    newReqSizeWithHeader = newReqSize + BUDDY_BLOCK_HEADER_SIZE;
+    orgReqSizeWithHeader = min_bm_node_size(pOrgBlock->blkHeader.cmnBlkHeader.userReqSize);
+    newReqSizeWithHeader = min_bm_node_size(newReqSize);
 
     if (newReqSizeWithHeader > MAX_BUDDY_BLOCK_SIZE)
     {
@@ -545,7 +545,7 @@ void* vscBMS_Realloc(VSC_BUDDY_MEM_SYS* pBMS, void* pOrgAddress, gctUINT newReqS
                 pBMS->bytesOverSized += (newReqSizeWithHeader - orgReqSizeWithHeader);
             }
 
-            pNewAddress = (void*)((gctUINT8*)pNewBlock + BUDDY_BLOCK_HEADER_SIZE);
+            pNewAddress = (void*)(&pNewBlock->biBlockNode);
             pNewBlock->blkHeader.cmnBlkHeader.userReqSize = newReqSize;
             return pNewAddress;
         }
@@ -569,7 +569,7 @@ void* vscBMS_Realloc(VSC_BUDDY_MEM_SYS* pBMS, void* pOrgAddress, gctUINT newReqS
                 pBMS->maxBytesInUse = pBMS->bytesInUse;
             }
 
-            pNewAddress = (void*)((gctUINT8*)pNewBlock + BUDDY_BLOCK_HEADER_SIZE);
+            pNewAddress = (void*)(&pNewBlock->biBlockNode);
             pNewBlock->blkHeader.cmnBlkHeader.userReqSize = newReqSize;
             return pNewAddress;
         }
@@ -595,7 +595,7 @@ void vscBMS_Free(VSC_BUDDY_MEM_SYS* pBMS, void *pData)
     if (pData != gcvNULL)
     {
         /* Retrieve block corresponding to requested memory content */
-        pBlockToDelete = (VSC_BUDDY_MEM_BLOCK_NODE *)((gctUINT8*)pData - BUDDY_BLOCK_HEADER_SIZE);
+        pBlockToDelete = userDataToBmNode(pData);
 
         log2Size = pBlockToDelete->blkHeader.log2CurSize;
 

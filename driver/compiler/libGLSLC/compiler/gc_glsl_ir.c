@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -70,6 +70,11 @@ slsDATA_TYPE_Construct(
             slmDATA_TYPE_vectorSize_SET(dataType, 0);
             break;
 
+        case T_DOUBLE:
+            dataType->elementType   = slvTYPE_DOUBLE;
+            slmDATA_TYPE_vectorSize_SET(dataType, 0);
+            break;
+
         case T_INT:
             dataType->elementType   = slvTYPE_INT;
             slmDATA_TYPE_vectorSize_SET(dataType, 0);
@@ -97,6 +102,21 @@ slsDATA_TYPE_Construct(
 
         case T_VEC4:
             dataType->elementType   = slvTYPE_FLOAT;
+            slmDATA_TYPE_vectorSize_SET(dataType, 4);
+            break;
+
+       case T_DVEC2:
+            dataType->elementType   = slvTYPE_DOUBLE;
+            slmDATA_TYPE_vectorSize_SET(dataType, 2);
+            break;
+
+        case T_DVEC3:
+            dataType->elementType   = slvTYPE_DOUBLE;
+            slmDATA_TYPE_vectorSize_SET(dataType, 3);
+            break;
+
+        case T_DVEC4:
+            dataType->elementType   = slvTYPE_DOUBLE;
             slmDATA_TYPE_vectorSize_SET(dataType, 4);
             break;
 
@@ -187,6 +207,51 @@ slsDATA_TYPE_Construct(
 
         case T_MAT4X3:
             dataType->elementType   = slvTYPE_FLOAT;
+            slmDATA_TYPE_matrixSize_SET(dataType, 3, 4);
+            break;
+
+        case T_DMAT2:
+            dataType->elementType   = slvTYPE_DOUBLE;
+            slmDATA_TYPE_matrixSize_SET(dataType, 2, 2);
+            break;
+
+        case T_DMAT2X3:
+            dataType->elementType   = slvTYPE_DOUBLE;
+            slmDATA_TYPE_matrixSize_SET(dataType, 3, 2);
+            break;
+
+        case T_DMAT2X4:
+            dataType->elementType   = slvTYPE_DOUBLE;
+            slmDATA_TYPE_matrixSize_SET(dataType, 4, 2);
+            break;
+
+        case T_DMAT3:
+            dataType->elementType   = slvTYPE_DOUBLE;
+            slmDATA_TYPE_matrixSize_SET(dataType, 3, 3);
+            break;
+
+        case T_DMAT3X2:
+            dataType->elementType   = slvTYPE_DOUBLE;
+            slmDATA_TYPE_matrixSize_SET(dataType, 2, 3);
+            break;
+
+        case T_DMAT3X4:
+            dataType->elementType   = slvTYPE_DOUBLE;
+            slmDATA_TYPE_matrixSize_SET(dataType, 4, 3);
+            break;
+
+        case T_DMAT4:
+            dataType->elementType   = slvTYPE_DOUBLE;
+            slmDATA_TYPE_matrixSize_SET(dataType, 4, 4);
+            break;
+
+        case T_DMAT4X2:
+            dataType->elementType   = slvTYPE_DOUBLE;
+            slmDATA_TYPE_matrixSize_SET(dataType, 2, 4);
+            break;
+
+        case T_DMAT4X3:
+            dataType->elementType   = slvTYPE_DOUBLE;
             slmDATA_TYPE_matrixSize_SET(dataType, 3, 4);
             break;
 
@@ -365,6 +430,56 @@ slsDATA_TYPE_Construct(
 
         case T_USAMPLERBUFFER:
             dataType->elementType   = slvTYPE_USAMPLERBUFFER;
+            slmDATA_TYPE_vectorSize_SET(dataType, 0);
+            break;
+
+        case T_SAMPLER1D:
+            dataType->elementType   = slvTYPE_SAMPLER1D;
+            slmDATA_TYPE_vectorSize_SET(dataType, 0);
+            break;
+
+        case T_ISAMPLER1D:
+            dataType->elementType   = slvTYPE_ISAMPLER1D;
+            slmDATA_TYPE_vectorSize_SET(dataType, 0);
+            break;
+
+        case T_USAMPLER1D:
+            dataType->elementType   = slvTYPE_USAMPLER1D;
+            slmDATA_TYPE_vectorSize_SET(dataType, 0);
+            break;
+
+        case T_SAMPLER1DSHADOW:
+            dataType->elementType   = slvTYPE_SAMPLER1DSHADOW;
+            slmDATA_TYPE_vectorSize_SET(dataType, 0);
+            break;
+
+        case T_SAMPLER2DRECT:
+            dataType->elementType   = slvTYPE_SAMPLER2DRECT;
+            slmDATA_TYPE_vectorSize_SET(dataType, 0);
+            break;
+
+        case T_ISAMPLER2DRECT:
+            dataType->elementType   = slvTYPE_ISAMPLER2DRECT;
+            slmDATA_TYPE_vectorSize_SET(dataType, 0);
+            break;
+
+        case T_USAMPLER2DRECT:
+            dataType->elementType   = slvTYPE_USAMPLER2DRECT;
+            slmDATA_TYPE_vectorSize_SET(dataType, 0);
+            break;
+
+        case T_SAMPLER2DRECTSHADOW:
+            dataType->elementType   = slvTYPE_SAMPLER2DRECTSHADOW;
+            slmDATA_TYPE_vectorSize_SET(dataType, 0);
+            break;
+
+        case T_ISAMPLER1DARRAY:
+            dataType->elementType   = slvTYPE_ISAMPLER1DARRAY;
+            slmDATA_TYPE_vectorSize_SET(dataType, 0);
+            break;
+
+        case T_USAMPLER1DARRAY:
+            dataType->elementType   = slvTYPE_USAMPLER1DARRAY;
             slmDATA_TYPE_vectorSize_SET(dataType, 0);
             break;
 
@@ -754,6 +869,7 @@ slsDATA_TYPE_ConstructElement(
         dataType->isPerVertexArray             = gcvFALSE;
         dataType->orgFieldSpace                = CompoundDataType->orgFieldSpace;
         dataType->fieldSpace                   = CompoundDataType->fieldSpace;
+        dataType->isImplicitlySizedArray       = CompoundDataType->isImplicitlySizedArray;
 
         *DataType = dataType;
 
@@ -874,6 +990,7 @@ _GetElementTypeName(
     case slvTYPE_INT:           return "int";
     case slvTYPE_UINT:          return "unsigned int";
     case slvTYPE_FLOAT:         return "float";
+    case slvTYPE_DOUBLE:         return "double";
 
     case slvTYPE_SAMPLER2D:     return "sampler2D";
     case slvTYPE_SAMPLERCUBE:   return "samplerCube";
@@ -912,6 +1029,19 @@ _GetElementTypeName(
     case slvTYPE_ISAMPLER2DMSARRAY:   return "isampler2DMSARRAY";
     case slvTYPE_USAMPLER2DMSARRAY:   return "usampler2DMSARRAY";
 
+    case slvTYPE_SAMPLER1D:           return "sampler1D";
+    case slvTYPE_ISAMPLER1D:          return "isampler1D";
+    case slvTYPE_USAMPLER1D:          return "usampler1D";
+    case slvTYPE_SAMPLER1DSHADOW:     return "sampler1DShadow";
+
+    case slvTYPE_SAMPLER2DRECT:       return "sampler2DRect";
+    case slvTYPE_ISAMPLER2DRECT:      return "isampler2DRect";
+    case slvTYPE_USAMPLER2DRECT:      return "usampler2DRect";
+    case slvTYPE_SAMPLER2DRECTSHADOW: return "sampler2DRectShadow";
+
+    case slvTYPE_ISAMPLER1DARRAY:     return "isampler1DArray";
+    case slvTYPE_USAMPLER1DARRAY:     return "usampler1DArray";
+
     case slvTYPE_IMAGE2D:          return "image2D";
     case slvTYPE_IIMAGE2D:         return "iimage2D";
     case slvTYPE_UIMAGE2D:         return "uimage2D";
@@ -939,6 +1069,7 @@ _GetElementTypeName(
     case slvTYPE_GEN_ISAMPLER:  return "genericISampler";
     case slvTYPE_GEN_USAMPLER:  return "genericUSampler";
     case slvTYPE_ATOMIC_UINT:   return "atmoic_uint";
+    case slvTYPE_IO_BLOCK:      return "ioBlock";
 
     default:
         gcmASSERT(0);
@@ -1135,6 +1266,7 @@ slsDATA_TYPE_GetSize(
     case slvTYPE_UINT:
     case slvTYPE_FLOAT:
     case slvTYPE_ATOMIC_UINT:
+    case slvTYPE_DOUBLE:
         size = 1;
         break;
 
@@ -1187,6 +1319,16 @@ slsDATA_TYPE_GetSize(
     case slvTYPE_IIMAGECUBEARRAY:
     case slvTYPE_UIMAGECUBE:
     case slvTYPE_UIMAGECUBEARRAY:
+    case slvTYPE_SAMPLER1D:
+    case slvTYPE_ISAMPLER1D:
+    case slvTYPE_USAMPLER1D:
+    case slvTYPE_SAMPLER1DSHADOW:
+    case slvTYPE_SAMPLER2DRECT:
+    case slvTYPE_ISAMPLER2DRECT:
+    case slvTYPE_USAMPLER2DRECT:
+    case slvTYPE_SAMPLER2DRECTSHADOW:
+    case slvTYPE_ISAMPLER1DARRAY:
+    case slvTYPE_USAMPLER1DARRAY:
         size = 4;
         break;
 
@@ -1330,6 +1472,16 @@ slsDATA_TYPE_IsAssignableAndComparable(
     case slvTYPE_SAMPLER2DMSARRAY:
     case slvTYPE_ISAMPLER2DMSARRAY:
     case slvTYPE_USAMPLER2DMSARRAY:
+    case slvTYPE_SAMPLER1D:
+    case slvTYPE_ISAMPLER1D:
+    case slvTYPE_USAMPLER1D:
+    case slvTYPE_SAMPLER1DSHADOW:
+    case slvTYPE_SAMPLER2DRECT:
+    case slvTYPE_ISAMPLER2DRECT:
+    case slvTYPE_USAMPLER2DRECT:
+    case slvTYPE_SAMPLER2DRECTSHADOW:
+    case slvTYPE_ISAMPLER1DARRAY:
+    case slvTYPE_USAMPLER1DARRAY:
     case slvTYPE_IMAGE2D:
     case slvTYPE_IIMAGE2D:
     case slvTYPE_UIMAGE2D:
@@ -1355,6 +1507,7 @@ slsDATA_TYPE_IsAssignableAndComparable(
     case slvTYPE_INT:
     case slvTYPE_UINT:
     case slvTYPE_FLOAT:
+    case slvTYPE_DOUBLE:
         gcmFOOTER_ARG("<return>=%d", gcvTRUE);
         return gcvTRUE;
 
@@ -1506,6 +1659,75 @@ slsDATA_TYPE_ConvElementDataType(
             return gcSHADER_FLOAT_4X4;
         }
 
+    case slvTYPE_DOUBLE:
+        switch (slmDATA_TYPE_matrixColumnCount_GET(DataType))
+        {
+        case 0:
+            switch (slmDATA_TYPE_vectorSize_GET(DataType))
+            {
+            case 0: return gcSHADER_FLOAT64_X1;
+            case 2: return gcSHADER_FLOAT64_X2;
+            case 3: return gcSHADER_FLOAT64_X3;
+            case 4: return gcSHADER_FLOAT64_X4;
+
+            default:
+                gcmASSERT(0);
+                return gcSHADER_FLOAT64_X4;
+            }
+
+        case 2:
+            switch (slmDATA_TYPE_matrixRowCount_GET(DataType)) {
+            case 2:
+                return gcSHADER_FLOAT64_2X2;
+
+            case 3:
+                return gcSHADER_FLOAT64_2X3;
+
+            case 4:
+                return gcSHADER_FLOAT64_2X4;
+
+            default:
+                gcmASSERT(0);
+                return gcSHADER_FLOAT64_2X2;
+            }
+
+        case 3:
+            switch (slmDATA_TYPE_matrixRowCount_GET(DataType)) {
+            case 2:
+                return gcSHADER_FLOAT64_3X2;
+
+            case 3:
+                return gcSHADER_FLOAT64_3X3;
+
+            case 4:
+                return gcSHADER_FLOAT64_3X4;
+
+            default:
+                gcmASSERT(0);
+                return gcSHADER_FLOAT64_3X3;
+            }
+
+        case 4:
+            switch (slmDATA_TYPE_matrixRowCount_GET(DataType)) {
+            case 2:
+                return gcSHADER_FLOAT64_4X2;
+
+            case 3:
+                return gcSHADER_FLOAT64_4X3;
+
+            case 4:
+                return gcSHADER_FLOAT64_4X4;
+
+            default:
+                gcmASSERT(0);
+                return gcSHADER_FLOAT64_4X4;
+            }
+
+        default:
+            gcmASSERT(0);
+            return gcSHADER_FLOAT64_4X4;
+        }
+
     case slvTYPE_SAMPLER2D:
         return gcSHADER_SAMPLER_2D;
 
@@ -1598,6 +1820,36 @@ slsDATA_TYPE_ConvElementDataType(
 
     case slvTYPE_USAMPLER2DMSARRAY:
         return gcSHADER_USAMPLER_2D_MS_ARRAY;
+
+    case slvTYPE_SAMPLER1D:
+        return gcSHADER_SAMPLER_1D;
+
+    case slvTYPE_ISAMPLER1D:
+        return gcSHADER_ISAMPLER_1D;
+
+    case slvTYPE_USAMPLER1D:
+        return gcSHADER_USAMPLER_1D;
+
+    case slvTYPE_SAMPLER1DSHADOW:
+        return gcSHADER_SAMPLER_1D_SHADOW;
+
+    case slvTYPE_SAMPLER2DRECT:
+        return gcSHADER_SAMPLER_2D_RECT;
+
+    case slvTYPE_ISAMPLER2DRECT:
+        return gcSHADER_ISAMPLER_2D_RECT;
+
+    case slvTYPE_USAMPLER2DRECT:
+        return gcSHADER_USAMPLER_2D_RECT;
+
+    case slvTYPE_SAMPLER2DRECTSHADOW:
+        return gcSHADER_SAMPLER_2D_RECT_SHADOW;
+
+    case slvTYPE_ISAMPLER1DARRAY:
+        return gcSHADER_ISAMPLER_1D_ARRAY;
+
+    case slvTYPE_USAMPLER1DARRAY:
+        return gcSHADER_ISAMPLER_1D_ARRAY;
 
     case slvTYPE_IMAGE2D:
         return gcSHADER_IMAGE_2D;
@@ -1829,6 +2081,9 @@ slsNAME_Initialize(
             Name->u.variableInfo.isLocal                    = gcvFALSE;
             Name->u.variableInfo.isReferenced               = gcvFALSE;
             Name->u.variableInfo.isCanUsedAsUnRollLoopIndex = gcvTRUE;
+            Name->u.variableInfo.declareUniformWithInit     = gcvFALSE;
+            Name->u.variableInfo.treatConstArrayAsUniform   = gcvFALSE;
+            Name->u.variableInfo.initializer                = gcvFALSE;
             break;
 
         case slvPARAMETER_NAME:
@@ -1926,6 +2181,15 @@ slsNAME_Construct(
 
         status = slsNAME_Initialize(Compiler, name, gcvTRUE);
         if (gcmIS_ERROR(status)) break;
+
+        if (!Compiler->context.loadingBuiltIns &&
+            DataType && sloCOMPILER_IsOGLVersion(Compiler) && DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_UNIFORM)
+        {
+            if (DataType->elementType != slvTYPE_STRUCT)
+            {
+                name->u.variableInfo.declareUniformWithInit = gcvTRUE;
+            }
+        }
 
         *Name = name;
 
@@ -2903,7 +3167,11 @@ _CheckMemoryAccess(
     return gcvTRUE;
 }
 
-static gctBOOL
+/* If it's an exact match, result = 0;
+   If is's an match with implicit conversion, result = 1 or greater number; (when implicit conversion is enabled)
+   Else, result = -1;
+*/
+static gctINT
 _IsCorrespondingFuncName(
     IN sloCOMPILER Compiler,
     IN slsNAME * FuncName,
@@ -2915,6 +3183,7 @@ _IsCorrespondingFuncName(
     sloIR_EXPR  argument;
     gctUINT     operandCount = 0;
     gctBOOL     hasVarArg = slsFUNC_HAS_FLAG(&(FuncName->u.funcInfo), slvFUNC_HAS_VAR_ARG);
+    gctINT      result = 0;
 
     gcmHEADER_ARG("Compiler=0x%x FuncName=0x%x PolynaryExpr=0x%x",
                    Compiler, FuncName, PolynaryExpr);
@@ -2929,8 +3198,8 @@ _IsCorrespondingFuncName(
 
     if (FuncName->symbol != PolynaryExpr->funcSymbol)
     {
-        gcmFOOTER_ARG("<return>=%d", gcvFALSE);
-        return gcvFALSE;
+        gcmFOOTER_ARG("<return>=%d", -1);
+        return -1;
     }
 
     if (PolynaryExpr->operands != gcvNULL)
@@ -2948,14 +3217,14 @@ _IsCorrespondingFuncName(
     {
         if (!hasVarArg)
         {
-            gcmFOOTER_ARG("<return>=%d", gcvFALSE);
-            return gcvFALSE;
+            gcmFOOTER_ARG("<return>=%d", -1);
+            return -1;
         }
     }
     else if (operandCount == 0)
     {
-        gcmFOOTER_ARG("<return>=%d", gcvTRUE);
-        return gcvTRUE;
+        gcmFOOTER_ARG("<return>=%d", 0);
+        return 0;
     }
 
     for (paramName = (slsNAME *)FuncName->u.funcInfo.localSpace->names.next,
@@ -2980,22 +3249,34 @@ _IsCorrespondingFuncName(
 
         effectiveType = _GetEffectiveType(paramName->dataType,
                                           argument->dataType);
-
-        if(sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS))
-        {
-            gcmVERIFY_OK(slMakeImplicitConversionForOperand(Compiler,
-                                                           argument,
-                                                           effectiveType));
-        }
-        else
-        {
-            sloIR_EXPR_SetToBeTheSameDataType(argument);
-        }
-
+        sloIR_EXPR_SetToBeTheSameDataType(argument);
         if (!slsDATA_TYPE_IsEqual(effectiveType, argument->toBeDataType))
         {
-            gcmFOOTER_ARG("<return>=%d", gcvFALSE);
-            return gcvFALSE;
+            /* For now we cannot handle double-precision floating point constants, so treat them as single-precision ones */
+            if (sloIR_OBJECT_GetType(&argument->base) == slvIR_CONSTANT
+                && argument->toBeDataType->elementType == slvTYPE_FLOAT
+                && effectiveType->elementType == slvTYPE_DOUBLE)
+            {
+                argument->toBeDataType->elementType = slvTYPE_DOUBLE;
+            }
+
+            if (sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS))
+            {
+                gcmVERIFY_OK(slMakeImplicitConversionForOperand(Compiler,
+                                                               argument,
+                                                               effectiveType));
+                if (!slsDATA_TYPE_IsEqual(effectiveType, argument->toBeDataType))
+                {
+                    gcmFOOTER_ARG("<return>=%d", -1);
+                    return -1;
+                }
+                result = 1;
+            }
+            else
+            {
+                gcmFOOTER_ARG("<return>=%d", -1);
+                return -1;
+            }
         }
 
         if (slsFUNC_HAS_FLAG(&(FuncName->u.funcInfo), slvFUNC_HAS_MEM_ACCESS) &&
@@ -3007,8 +3288,8 @@ _IsCorrespondingFuncName(
             {
                 if (!_CheckMemoryAccess(argument->dataType->qualifiers.memoryAccess, paramName->dataType->qualifiers.memoryAccess))
                 {
-                    gcmFOOTER_ARG("<return>=%d", gcvFALSE);
-                    return gcvFALSE;
+                    gcmFOOTER_ARG("<return>=%d", -1);
+                    return -1;
                 }
             }
         }
@@ -3019,12 +3300,12 @@ _IsCorrespondingFuncName(
          ((slsDLINK_NODE *)argument != &PolynaryExpr->operands->members
           && !hasVarArg))
     {
-        gcmFOOTER_ARG("<return>=%d", gcvFALSE);
-        return gcvFALSE;
+        gcmFOOTER_ARG("<return>=%d", -1);
+        return -1;
     }
 
-    gcmFOOTER_ARG("<return>=%d", gcvTRUE);
-    return gcvTRUE;
+    gcmFOOTER_ARG("<return>=%d", result);
+    return result;
 }
 
 gceSTATUS
@@ -3037,6 +3318,10 @@ slsNAME_SPACE_BindFuncName(
     gceSTATUS       status;
     slsNAME *       name;
     sltPRECISION_QUALIFIER returnPrecision = slvPRECISION_QUALIFIER_ANY;
+    gctINT          distance;
+    gctPOINTER      nameCandidates[1024];
+    gctINT          nameCandidateDistances[1024];
+    gctINT          currentCandidateIndex = 0;
 
     gcmHEADER_ARG("Compiler=0x%x NameSpace=0x%x PolynaryExpr=0x%x",
                    Compiler, NameSpace, PolynaryExpr);
@@ -3047,19 +3332,27 @@ slsNAME_SPACE_BindFuncName(
 
     FOR_EACH_DLINK_NODE(&NameSpace->names, slsNAME, name)
     {
-        if (name->type == slvFUNC_NAME
-            && _IsCorrespondingFuncName(Compiler, name, PolynaryExpr))
+        if (name->type != slvFUNC_NAME)
         {
-            if (name->extension != slvEXTENSION_NONE)
-            {
-                if (!sloCOMPILER_ExtensionEnabled(
-                                                Compiler,
-                                                name->extension))
-                {
-                    continue;
-                }
-            }
+            continue;
+        }
 
+        if (name->extension != slvEXTENSION_NONE)
+        {
+            if (!sloCOMPILER_ExtensionEnabled(Compiler, name->extension))
+            {
+                continue;
+            }
+        }
+
+        distance = _IsCorrespondingFuncName(Compiler, name, PolynaryExpr);
+        if (distance == -1)
+        {
+            continue;
+        }
+        else if (distance == 0)
+        {
+            /* find exact match */
             if (name->u.funcInfo.function != gcvNULL)
             {
                 status = (*name->u.funcInfo.function)(Compiler,
@@ -3087,6 +3380,60 @@ slsNAME_SPACE_BindFuncName(
             gcmFOOTER_ARG("PolynaryExpr=0x%x", PolynaryExpr);
             return gcvSTATUS_OK;
         }
+        else
+        {
+            if (currentCandidateIndex < 1024)
+            {
+                nameCandidates[currentCandidateIndex] = (gctPOINTER)name;
+                nameCandidateDistances[currentCandidateIndex] = distance;
+                currentCandidateIndex++;
+            }
+            else
+            {
+                /* TODO */
+            }
+        }
+    }
+
+    if (currentCandidateIndex > 0)
+    {
+        /* find the best match */
+        gctINT i = 0;
+        for (; i < currentCandidateIndex; i++)
+        {
+            name = (slsNAME *) nameCandidates[i];
+            distance = nameCandidateDistances[i];
+            if (distance == 1)
+                break;
+            /* TODO */
+        }
+
+        if (name->u.funcInfo.function != gcvNULL)
+        {
+            status = (*name->u.funcInfo.function)(Compiler,
+                                                  name,
+                                                  PolynaryExpr);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        }
+
+        sloCOMPILER_GetDefaultPrecision(Compiler, name->dataType->elementType, &returnPrecision);
+
+        status = sloCOMPILER_CloneDataType(Compiler,
+                                           slvSTORAGE_QUALIFIER_CONST,
+                                           returnPrecision,
+                                           name->dataType,
+                                           &PolynaryExpr->exprBase.dataType);
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmFOOTER();
+            return status;
+        }
+
+        PolynaryExpr->funcName = name;
+
+        gcmFOOTER_ARG("PolynaryExpr=0x%x", PolynaryExpr);
+        return gcvSTATUS_OK;
     }
 
     if (NameSpace->parent != gcvNULL)
@@ -3098,8 +3445,7 @@ slsNAME_SPACE_BindFuncName(
         return status;
     }
 
-    gcmVERIFY_OK(sloCOMPILER_Report(
-                                    Compiler,
+    gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                     PolynaryExpr->exprBase.base.lineNo,
                                     PolynaryExpr->exprBase.base.stringNo,
                                     slvREPORT_ERROR,
@@ -3199,23 +3545,54 @@ slsNAME_SPACE_CreateName(
                 sleSHADER_TYPE shaderType;
 
                 shaderType = Compiler->shaderType;
-
-                status = _SearchBuiltinVariable(Compiler,
-                                                NameSpace,
-                                                Symbol,
-                                                Extension,
-                                                &name);
-                /* some builtin names can be redefined. */
-                if (status == gcvSTATUS_OK &&
-                    (shaderType == slvSHADER_TYPE_TCS ||
-                     shaderType == slvSHADER_TYPE_TES ) &&
-                    (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_Position")) ||
-                     gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_PointSize"))))
+                if (sloCOMPILER_IsOGLVersion(Compiler))
                 {
-                    if (Name != gcvNULL) *Name = name;
+                    status = _SearchBuiltinVariable(Compiler,
+                                                    Compiler->context.builtinSpace,
+                                                    Symbol,
+                                                    Extension,
+                                                    &name);
+                    /* The following predeclared variables can be redeclared with an interpolation qualifier:
+                    Vertex and geometry languages: gl_FrontColor / gl_BackColor / gl_FrontSecondaryColor / gl_BackSecondaryColor
+                    Fragment language: gl_Color / gl_SecondaryColor */
+                    if (status == gcvSTATUS_OK)
+                    {
+                        if(((shaderType == slvSHADER_TYPE_VERTEX || shaderType == slvSHADER_TYPE_GS ) &&
+                        (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_FrontColor")) ||
+                         gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_BackColor")) ||
+                         gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_FrontSecondaryColor")) ||
+                         gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_BackSecondaryColor")))) ||
+                        (shaderType == slvSHADER_TYPE_FRAGMENT &&
+                        (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_Color")) ||
+                         gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_SecondaryColor")))))
+                        {
+                            name->dataType->qualifiers.interpolation = DataType->qualifiers.interpolation;
+                            if (Name != gcvNULL) *Name = name;
 
-                    gcmFOOTER_ARG("*Name=0x%x", gcmOPT_POINTER(Name));
-                    return gcvSTATUS_OK;
+                            gcmFOOTER_ARG("*Name=0x%x", gcmOPT_POINTER(Name));
+                            return gcvSTATUS_OK;
+                        }
+                    }
+                }
+                else
+                {
+                    status = _SearchBuiltinVariable(Compiler,
+                                                    NameSpace,
+                                                    Symbol,
+                                                    Extension,
+                                                    &name);
+                    /* some builtin names can be redefined. */
+                    if (status == gcvSTATUS_OK &&
+                        (shaderType == slvSHADER_TYPE_TCS ||
+                         shaderType == slvSHADER_TYPE_TES ) &&
+                        (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_Position")) ||
+                         gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_PointSize"))))
+                    {
+                        if (Name != gcvNULL) *Name = name;
+
+                        gcmFOOTER_ARG("*Name=0x%x", gcmOPT_POINTER(Name));
+                        return gcvSTATUS_OK;
+                    }
                 }
             }
             else
@@ -4511,10 +4888,6 @@ sloIR_CONSTANT_Initialize(
     IN OUT sloIR_CONSTANT Constant
     )
 {
-#if gcmIS_DEBUG(gcdDEBUG_ASSERT)
-    gctUINT componentCount;
-#endif
-
     gcmHEADER_ARG("Compiler=0x%x LineNo=%u StringNo=%u DataType=0x%x Values=0x%x Constant=0x%x",
                    Compiler, LineNo, StringNo, DataType, Values, Constant);
 
@@ -4524,10 +4897,7 @@ sloIR_CONSTANT_Initialize(
     gcmASSERT(Constant);
     gcmASSERT(Values);
 
-#if gcmIS_DEBUG(gcdDEBUG_ASSERT)
-    componentCount = slsDATA_TYPE_GetSize(DataType);
-#endif
-    gcmASSERT(componentCount == ValueCount);
+    gcmASSERT(slsDATA_TYPE_GetSize(DataType) == ValueCount);
 
     sloIR_EXPR_Initialize(&Constant->exprBase, &s_constantVTab, LineNo, StringNo, LineNo, DataType);
 
@@ -4791,6 +5161,7 @@ sloIR_CONSTANT_GetBoolValue(
         break;
 
     case slvTYPE_FLOAT:
+    case slvTYPE_DOUBLE:
         Value->boolValue = slmF2B(Constant->values[ValueNo].floatValue);
         break;
 
@@ -4834,6 +5205,7 @@ sloIR_CONSTANT_GetIntValue(
         break;
 
     case slvTYPE_FLOAT:
+    case slvTYPE_DOUBLE:
         Value->intValue = slmF2I(Constant->values[ValueNo].floatValue);
         break;
 
@@ -4877,6 +5249,7 @@ sloIR_CONSTANT_GetUIntValue(
         break;
 
     case slvTYPE_FLOAT:
+    case slvTYPE_DOUBLE:
         Value->uintValue = slmF2U(Constant->values[ValueNo].floatValue);
         break;
 
@@ -4920,6 +5293,7 @@ sloIR_CONSTANT_GetFloatValue(
         break;
 
     case slvTYPE_FLOAT:
+    case slvTYPE_DOUBLE:
         Value->floatValue = Constant->values[ValueNo].floatValue;
         break;
 
@@ -5022,6 +5396,7 @@ _EvaluateConstantValues(
         case slvTYPE_INT:
         case slvTYPE_UINT:
         case slvTYPE_FLOAT:
+        case slvTYPE_DOUBLE:
             status = (*Evaluate)(DataType->elementType, Values + *Offset);
 
             if (gcmIS_ERROR(status))
@@ -5398,11 +5773,33 @@ _sloIR_CONSTANT_ArithmeticOperateBySameTypes(
                 break;
 
             case slvBINARY_DIV:
-                LeftConstant->values[i].intValue /= RightConstant->values[i].intValue;
+                if (RightConstant->values[i].intValue != 0)
+                {
+                    LeftConstant->values[i].intValue /= RightConstant->values[i].intValue;
+                }
+                else
+                {
+                    gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        LeftConstant->exprBase.base.lineNo,
+                                        LeftConstant->exprBase.base.stringNo,
+                                        slvREPORT_WARN,
+                                        "The resulting value of a division operation is undefined for any component computed with a second operand that is zero"));
+                }
                 break;
 
             case slvBINARY_MOD:
-                LeftConstant->values[i].intValue %= RightConstant->values[i].intValue;
+                if (RightConstant->values[i].intValue != 0)
+                {
+                    LeftConstant->values[i].intValue %= RightConstant->values[i].intValue;
+                }
+                else
+                {
+                    gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        LeftConstant->exprBase.base.lineNo,
+                                        LeftConstant->exprBase.base.stringNo,
+                                        slvREPORT_WARN,
+                                        "The resulting value of a modulus operation is undefined for any component computed with a second operand that is zero"));
+                }
                 break;
 
             default:
@@ -5433,11 +5830,33 @@ _sloIR_CONSTANT_ArithmeticOperateBySameTypes(
                 break;
 
             case slvBINARY_DIV:
-                LeftConstant->values[i].uintValue /= RightConstant->values[i].uintValue;
+                if (RightConstant->values[i].uintValue != 0)
+                {
+                    LeftConstant->values[i].uintValue /= RightConstant->values[i].uintValue;
+                }
+                else
+                {
+                    gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        LeftConstant->exprBase.base.lineNo,
+                                        LeftConstant->exprBase.base.stringNo,
+                                        slvREPORT_WARN,
+                                        "The resulting value of a division operation is undefined for any component computed with a second operand that is zero"));
+                }
                 break;
 
             case slvBINARY_MOD:
-                LeftConstant->values[i].uintValue %= RightConstant->values[i].uintValue;
+                if (RightConstant->values[i].uintValue != 0)
+                {
+                    LeftConstant->values[i].uintValue %= RightConstant->values[i].uintValue;
+                }
+                else
+                {
+                    gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        LeftConstant->exprBase.base.lineNo,
+                                        LeftConstant->exprBase.base.stringNo,
+                                        slvREPORT_WARN,
+                                        "The resulting value of a modulus operation is undefined for any component computed with a second operand that is zero"));
+                }
                 break;
 
             default:
@@ -5451,6 +5870,7 @@ _sloIR_CONSTANT_ArithmeticOperateBySameTypes(
         break;
 
     case slvTYPE_FLOAT:
+    case slvTYPE_DOUBLE:
         for (i = 0; i < LeftConstant->valueCount; i++)
         {
             switch (ExprType)
@@ -5630,6 +6050,7 @@ _sloIR_CONSTANT_Scalar_ArithmeticOperate_VectorOrMatrix(
         break;
 
     case slvTYPE_FLOAT:
+    case slvTYPE_DOUBLE:
         for (i = 0; i < RightConstant->valueCount; i++)
         {
             switch (ExprType)
@@ -5807,6 +6228,7 @@ _sloIR_CONSTANT_VectorOrMatrix_ArithmeticOperate_Scalar(
         break;
 
     case slvTYPE_FLOAT:
+    case slvTYPE_DOUBLE:
         for (i = 0; i < LeftConstant->valueCount; i++)
         {
             switch (ExprType)
@@ -6189,9 +6611,11 @@ _sloIR_CONSTANT_RelationalOperate(
     gcmASSERT(RightConstant->exprBase.dataType);
     gcmASSERT(slsDATA_TYPE_IsInt(LeftConstant->exprBase.dataType)
             || slsDATA_TYPE_IsFloat(LeftConstant->exprBase.dataType));
-    gcmASSERT(slsDATA_TYPE_IsEqual(
-                                LeftConstant->exprBase.dataType,
-                                RightConstant->exprBase.dataType));
+    if (!sloCOMPILER_IsOGLVersion(Compiler))
+    {
+        gcmASSERT(slsDATA_TYPE_IsEqual(LeftConstant->exprBase.dataType,
+                                       RightConstant->exprBase.dataType));
+    }
 
     /* Calculate the value */
     if (slsDATA_TYPE_IsInt(LeftConstant->exprBase.dataType))
@@ -6336,9 +6760,11 @@ _sloIR_CONSTANT_EqualityOperate(
     gcmASSERT(LeftConstant->exprBase.dataType);
     gcmASSERT(RightConstant->exprBase.dataType);
     gcmASSERT(slsDATA_TYPE_IsAssignableAndComparable(Compiler, LeftConstant->exprBase.dataType));
-    gcmASSERT(slsDATA_TYPE_IsEqual(
-                                LeftConstant->exprBase.dataType,
-                                RightConstant->exprBase.dataType));
+    if (!sloCOMPILER_IsOGLVersion(Compiler))
+    {
+        gcmASSERT(slsDATA_TYPE_IsEqual(LeftConstant->exprBase.dataType,
+                                       RightConstant->exprBase.dataType));
+    }
     gcmASSERT(LeftConstant->valueCount == RightConstant->valueCount);
 
     value.boolValue = gcvTRUE;
@@ -7093,7 +7519,8 @@ _GetUnaryExprDataType(
             return status;
         }
 
-        if (slsDATA_TYPE_IsUnderlyingIOBlock(Operand->dataType))
+        if (slsDATA_TYPE_IsUnderlyingIOBlock(Operand->dataType) ||
+            ( sloCOMPILER_IsOGLVersion(Compiler) && slsDATA_TYPE_IsUnderlyingUniformBlock(Operand->dataType)))
         {
             storage = FieldName->dataType->qualifiers.storage;
         }
@@ -7273,6 +7700,7 @@ _NegConstantValue(
         break;
 
     case slvTYPE_FLOAT:
+    case slvTYPE_DOUBLE:
         Value->floatValue = -Value->floatValue;
         break;
 
@@ -8570,12 +8998,16 @@ slGetIRPolynaryExprTypeName(
     switch (PolynaryExprType)
     {
     case slvPOLYNARY_CONSTRUCT_FLOAT:   return "construct_float";
+    case slvPOLYNARY_CONSTRUCT_DOUBLE:  return "construct_double";
     case slvPOLYNARY_CONSTRUCT_INT:     return "construct_int";
-    case slvPOLYNARY_CONSTRUCT_UINT:     return "construct_unsigned_int";
+    case slvPOLYNARY_CONSTRUCT_UINT:    return "construct_unsigned_int";
     case slvPOLYNARY_CONSTRUCT_BOOL:    return "construct_bool";
     case slvPOLYNARY_CONSTRUCT_VEC2:    return "construct_vec2";
     case slvPOLYNARY_CONSTRUCT_VEC3:    return "construct_vec3";
     case slvPOLYNARY_CONSTRUCT_VEC4:    return "construct_vec4";
+    case slvPOLYNARY_CONSTRUCT_DVEC2:   return "construct_dvec2";
+    case slvPOLYNARY_CONSTRUCT_DVEC3:   return "construct_dvec3";
+    case slvPOLYNARY_CONSTRUCT_DVEC4:   return "construct_dvec4";
     case slvPOLYNARY_CONSTRUCT_BVEC2:   return "construct_bvec2";
     case slvPOLYNARY_CONSTRUCT_BVEC3:   return "construct_bvec3";
     case slvPOLYNARY_CONSTRUCT_BVEC4:   return "construct_bvec4";
@@ -8594,6 +9026,15 @@ slGetIRPolynaryExprTypeName(
     case slvPOLYNARY_CONSTRUCT_MAT4:    return "construct_mat4";
     case slvPOLYNARY_CONSTRUCT_MAT4X2:  return "construct_mat4x2";
     case slvPOLYNARY_CONSTRUCT_MAT4X3:  return "construct_mat4x3";
+    case slvPOLYNARY_CONSTRUCT_DMAT2:   return "construct_dmat2";
+    case slvPOLYNARY_CONSTRUCT_DMAT2X3: return "construct_dmat2x3";
+    case slvPOLYNARY_CONSTRUCT_DMAT2X4: return "construct_dmat2x4";
+    case slvPOLYNARY_CONSTRUCT_DMAT3:   return "construct_dmat3";
+    case slvPOLYNARY_CONSTRUCT_DMAT3X2: return "construct_dmat3x2";
+    case slvPOLYNARY_CONSTRUCT_DMAT3X4: return "construct_dmat3x4";
+    case slvPOLYNARY_CONSTRUCT_DMAT4:   return "construct_dmat4";
+    case slvPOLYNARY_CONSTRUCT_DMAT4X2: return "construct_dmat4x2";
+    case slvPOLYNARY_CONSTRUCT_DMAT4X3: return "construct_dmat4x3";
     case slvPOLYNARY_CONSTRUCT_STRUCT:  return "construct_struct";
     case slvPOLYNARY_CONSTRUCT_ARRAY:  return "construct_array";
     case slvPOLYNARY_CONSTRUCT_ARRAYS_OF_ARRAYS:  return "construct_arrays_of_arrays";
@@ -8954,6 +9395,7 @@ sloIR_POLYNARY_EXPR_ConstructScalarConstant(
             break;
 
         case slvTYPE_FLOAT:
+        case slvTYPE_DOUBLE:
             gcmVERIFY_OK(sloIR_CONSTANT_GetFloatValue(
                                                     Compiler,
                                                     operandConstant,
@@ -9088,6 +9530,7 @@ _SetVectorConstantValuesByOneScalarValue(
         break;
 
     case slvTYPE_FLOAT:
+    case slvTYPE_DOUBLE:
         for (i = 0; i < constant_rowCount; i ++)
         {
             gcmVERIFY_OK(sloIR_CONSTANT_GetFloatValue(
@@ -9187,6 +9630,7 @@ _SetMatrixConstantValuesByOneScalarValue(
         break;
 
     case slvTYPE_FLOAT:
+    case slvTYPE_DOUBLE:
         gcmVERIFY_OK(sloIR_CONSTANT_GetFloatValue(
                                                 Compiler,
                                                 OperandConstant,
@@ -9313,6 +9757,7 @@ _SetMatrixConstantValuesByOneMatrixValue(
                     break;
 
                 case slvTYPE_FLOAT:
+                case slvTYPE_DOUBLE:
                     gcmVERIFY_OK(sloIR_CONSTANT_GetFloatValue(
                                                             Compiler,
                                                             OperandConstant,
@@ -9389,7 +9834,7 @@ IN sloIR_CONSTANT Constant
     if (Constant->allValuesEqual) return gcvTRUE;
     elementType = Constant->exprBase.dataType->elementType;
 
-    if(slmIsElementTypeFloating(elementType)) {
+    if(slmIsElementTypeFloatingOrDouble(elementType)) {
         for (i = 1; i < Constant->valueCount; i++) {
             if (Constant->values[i].floatValue
                 != Constant->values[0].floatValue) {
@@ -9522,6 +9967,14 @@ _SetVectorOrMatrixConstantValues(
                 break;
 
             case slvTYPE_FLOAT:
+                gcmVERIFY_OK(sloIR_CONSTANT_GetFloatValue(
+                                                        Compiler,
+                                                        operandConstant,
+                                                        i,
+                                                        &value));
+                break;
+
+            case slvTYPE_DOUBLE:
                 gcmVERIFY_OK(sloIR_CONSTANT_GetFloatValue(
                                                         Compiler,
                                                         operandConstant,
@@ -9845,6 +10298,7 @@ sloIR_POLYNARY_EXPR_Evaluate(
     case slvPOLYNARY_CONSTRUCT_INT:
     case slvPOLYNARY_CONSTRUCT_UINT:
     case slvPOLYNARY_CONSTRUCT_BOOL:
+    case slvPOLYNARY_CONSTRUCT_DOUBLE:
         status = sloIR_POLYNARY_EXPR_ConstructScalarConstant(Compiler,
                                                              PolynaryExpr,
                                                              ResultConstant);
@@ -9873,6 +10327,9 @@ sloIR_POLYNARY_EXPR_Evaluate(
     case slvPOLYNARY_CONSTRUCT_UVEC2:
     case slvPOLYNARY_CONSTRUCT_UVEC3:
     case slvPOLYNARY_CONSTRUCT_UVEC4:
+    case slvPOLYNARY_CONSTRUCT_DVEC2:
+    case slvPOLYNARY_CONSTRUCT_DVEC3:
+    case slvPOLYNARY_CONSTRUCT_DVEC4:
         status = sloIR_POLYNARY_EXPR_ConstructVectorOrMatrixConstant(
                                                                     Compiler,
                                                                     PolynaryExpr,
@@ -9892,6 +10349,15 @@ sloIR_POLYNARY_EXPR_Evaluate(
     case slvPOLYNARY_CONSTRUCT_MAT4:
     case slvPOLYNARY_CONSTRUCT_MAT4X2:
     case slvPOLYNARY_CONSTRUCT_MAT4X3:
+    case slvPOLYNARY_CONSTRUCT_DMAT2:
+    case slvPOLYNARY_CONSTRUCT_DMAT2X3:
+    case slvPOLYNARY_CONSTRUCT_DMAT2X4:
+    case slvPOLYNARY_CONSTRUCT_DMAT3:
+    case slvPOLYNARY_CONSTRUCT_DMAT3X2:
+    case slvPOLYNARY_CONSTRUCT_DMAT3X4:
+    case slvPOLYNARY_CONSTRUCT_DMAT4:
+    case slvPOLYNARY_CONSTRUCT_DMAT4X2:
+    case slvPOLYNARY_CONSTRUCT_DMAT4X3:
         status = sloIR_POLYNARY_EXPR_ConstructVectorOrMatrixConstant(
                                                                     Compiler,
                                                                     PolynaryExpr,
@@ -9957,8 +10423,245 @@ slMakeImplicitConversionForOperand(
         return status;
     }
 
-    switch(Operand->dataType->type)
+    if (sloCOMPILER_IsOGL40Version(Compiler))
     {
+        switch(Operand->dataType->type)
+        {
+            case T_INT:
+                if(slmIsElementTypeUnsigned(DataTypeToMatch->elementType))
+                {
+                    toType = T_UINT;
+                }
+                else if(slmIsElementTypeFloating(DataTypeToMatch->elementType))
+                {
+                    toType = T_FLOAT;
+                }
+                else if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DOUBLE;
+                }
+                break;
+            case T_IVEC2:
+                if(slmIsElementTypeUnsigned(DataTypeToMatch->elementType))
+                {
+                    toType = T_UVEC2;
+                }
+                else if(slmIsElementTypeFloating(DataTypeToMatch->elementType))
+                {
+                    toType = T_VEC2;
+                }
+                else if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DVEC2;
+                }
+                break;
+            case T_IVEC3:
+                if(slmIsElementTypeUnsigned(DataTypeToMatch->elementType))
+                {
+                    toType = T_UVEC3;
+                }
+                else if(slmIsElementTypeFloating(DataTypeToMatch->elementType))
+                {
+                    toType = T_VEC3;
+                }
+                else if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DVEC3;
+                }
+                break;
+            case T_IVEC4:
+                if(slmIsElementTypeUnsigned(DataTypeToMatch->elementType))
+                {
+                    toType = T_UVEC4;
+                }
+                else if(slmIsElementTypeFloating(DataTypeToMatch->elementType))
+                {
+                    toType = T_VEC4;
+                }
+                else if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DVEC4;
+                }
+                break;
+            case T_UINT:
+                if(slmIsElementTypeFloating(DataTypeToMatch->elementType))
+                {
+                    toType = T_FLOAT;
+                }
+                else if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DOUBLE;
+                }
+                break;
+            case T_UVEC2:
+                if(slmIsElementTypeFloating(DataTypeToMatch->elementType))
+                {
+                    toType = T_VEC2;
+                }
+                else if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DVEC2;
+                }
+                break;
+            case T_UVEC3:
+                if(slmIsElementTypeFloating(DataTypeToMatch->elementType))
+                {
+                    toType = T_VEC3;
+                }
+                else if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DVEC3;
+                }
+                break;
+            case T_UVEC4:
+                if(slmIsElementTypeFloating(DataTypeToMatch->elementType))
+                {
+                    toType = T_VEC4;
+                }
+                else if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DVEC4;
+                }
+                break;
+            case T_FLOAT:
+                if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DOUBLE;
+                }
+                break;
+            case T_VEC2:
+                if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DVEC2;
+                }
+                break;
+            case T_VEC3:
+                if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DVEC3;
+                }
+                break;
+            case T_VEC4:
+                if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DVEC4;
+                }
+                break;
+            case T_MAT2:
+                if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DMAT2;
+                }
+                break;
+            case T_MAT3:
+                if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DMAT3;
+                }
+                break;
+            case T_MAT4:
+                if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DMAT4;
+                }
+                break;
+            case T_MAT2X3:
+                if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DMAT2X3;
+                }
+                break;
+            case T_MAT2X4:
+                if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DMAT2X4;
+                }
+                break;
+            case T_MAT3X2:
+                if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DMAT3X2;
+                }
+                break;
+            case T_MAT3X4:
+                if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DMAT3X4;
+                }
+                break;
+            case T_MAT4X2:
+                if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DMAT4X2;
+                }
+                break;
+            case T_MAT4X3:
+                if(slmIsElementTypeDouble(DataTypeToMatch->elementType))
+                {
+                    toType = T_DMAT4X3;
+                }
+                break;
+        }
+    }
+    else if (sloCOMPILER_IsOGLVersion(Compiler))
+    {
+        /* GLSL-1.30/1.40/1.50/3.30 */
+        switch(Operand->dataType->type)
+        {
+            case T_INT:
+                if(slmIsElementTypeFloating(DataTypeToMatch->elementType))
+                {
+                    toType = T_FLOAT;
+                }
+                break;
+            case T_IVEC2:
+                if(slmIsElementTypeFloating(DataTypeToMatch->elementType))
+                {
+                    toType = T_VEC2;
+                }
+                break;
+            case T_IVEC3:
+                if(slmIsElementTypeFloating(DataTypeToMatch->elementType))
+                {
+                    toType = T_VEC3;
+                }
+                break;
+            case T_IVEC4:
+                if(slmIsElementTypeFloating(DataTypeToMatch->elementType))
+                {
+                    toType = T_VEC4;
+                }
+                break;
+            case T_UINT:
+                if(slmIsElementTypeFloating(DataTypeToMatch->elementType))
+                {
+                    toType = T_FLOAT;
+                }
+                break;
+            case T_UVEC2:
+                if(slmIsElementTypeFloating(DataTypeToMatch->elementType))
+                {
+                    toType = T_VEC2;
+                }
+                break;
+            case T_UVEC3:
+                if(slmIsElementTypeFloating(DataTypeToMatch->elementType))
+                {
+                    toType = T_VEC3;
+                }
+                break;
+            case T_UVEC4:
+                if(slmIsElementTypeFloating(DataTypeToMatch->elementType))
+                {
+                    toType = T_VEC4;
+                }
+                break;
+        }
+    }
+    else
+    {
+        switch(Operand->dataType->type)
+        {
         case T_INT:
             if(slmIsElementTypeUnsigned(DataTypeToMatch->elementType))
             {
@@ -10023,8 +10726,8 @@ slMakeImplicitConversionForOperand(
                 toType = T_VEC4;
             }
             break;
+        }
     }
-
     if(toType)
     {
         status = sloCOMPILER_CreateDataType(Compiler,

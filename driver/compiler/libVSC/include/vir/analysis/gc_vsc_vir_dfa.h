@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -79,10 +79,12 @@ typedef struct _VIR_BASE_DFA
 
     /* What type of MM are this DFA built on? */
     VSC_MM*                      pMM;
+    /* scratch mem pool can reuse memory be freed */
+    VSC_MM*                      pScratchMemPool;
 } VIR_BASE_DFA;
 
 void vscVIR_InitializeBaseDFA(VIR_BASE_DFA* pBaseDFA, VIR_CALL_GRAPH* pCg, VIR_DFA_TYPE dfaType,
-                              gctINT flowSize, VSC_MM* pMM);
+                              gctINT flowSize, VSC_MM* pMM, VSC_MM* pScratchMemPool);
 void vscVIR_UpdateBaseDFAFlowSize(VIR_BASE_DFA* pBaseDFA, gctINT newFlowSize);
 void vscVIR_FinalizeBaseDFA(VIR_BASE_DFA* pBaseDFA);
 
@@ -308,13 +310,6 @@ VSC_ErrCode vscVIR_DoBackwardIterativeMsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_MS_DFA
                                                 (pDefInst) == VIR_INPUT_DEF_INST      || \
                                                 (pDefInst) == VIR_OUTPUT_USAGE_INST)
 
-#define VIR_CHANNEL_X                 0 /* R */
-#define VIR_CHANNEL_Y                 1 /* G */
-#define VIR_CHANNEL_Z                 2 /* B */
-#define VIR_CHANNEL_W                 3 /* A */
-#define VIR_CHANNEL_NUM               4
-#define VIR_CHANNEL_ANY               0xFF /* For def-key search only */
-
 #define VIR_HALF_CHANNEL_MASK_NONE    0x0
 #define VIR_HALF_CHANNEL_MASK_LOW     0x1 /* T0 */
 #define VIR_HALF_CHANNEL_MASK_HIGH    0x2 /* T1 */
@@ -326,7 +321,10 @@ typedef struct VIR_NATIVE_DEF_FLAGS
     gctUINT                      bIsOutput            : 1; /* Output/varyings output */
     gctUINT                      bIsPerVtxCp          : 1; /* Per vertex/control-point */
     gctUINT                      bIsPerPrim           : 1; /* Per prim */
-    gctUINT                      bHwSpecialInput      : 1; /* A hw special input */
+    gctUINT                      bHwSpecialInput      : 1; /* A hw special input,
+                                                            * so far we only have output sample-mask,
+                                                            * check needHwSpecialDef in operandInfo.
+                                                            */
 
     gctUINT                      reserved             : 27;
 }VIR_NATIVE_DEF_FLAGS;
@@ -480,12 +478,12 @@ typedef struct _VIR_USAGE
     /* Real usage channel-mask. Sometimes, swizzle of operand may be superset of
        real used channel-mask (swizzle). We mark this diff here, so client won't
        need check it anywhere */
-    gctUINT8                     realChannelMask;
+    gctUINT                      realChannelMask : 8;
 
     /* It is only used for single-t when dual16 is on. For other cases, it
        must set to VIR_HALF_CHANNEL_MASK_FULL to indicate full channel is
        touched */
-    gctUINT8                     halfChannelMask;
+    gctUINT                      halfChannelMask : 8;
 
     /* Web related info, we only record ONCE for each usage who shares several defs */
     gctUINT                      webIdx;
@@ -512,23 +510,16 @@ typedef enum _VIR_WEB_TYPE
     VIR_WEB_TYPE_PRED
 }VIR_WEB_TYPE;
 
-/* TODO!!!: We need provide several levels of web info, from fine to coarse,
-            CHANNEL_WEB, REG_WEB, RANGE_WEB!!! The best result of RA should
-            be on CHANNEL_WEB with auxiliary of other two webs. Currently,
-            only indexing-reg web is using CHANNEL_WEB, other webs are all
-            just similar as RANGE_WEB. It is too conservative!!!! */
 typedef struct _VIR_WEB
 {
-    VIR_WEB_TYPE                 webType;
-
-    gctUINT                      firstDefIdx;
-    gctUINT                      numOfDef;
-
-    gctUINT                      firstUsageIdx;
-
+    VIR_WEB_TYPE                 webType     : 4;
     /* Channel mask for this web. This channel mask is mask of
        channel of all defs belonging to this web */
-    gctUINT8                     channelMask;
+    gctINT                       channelMask : 8;
+    gctINT                       numOfDef    : 20 ;
+
+    gctUINT                      firstDefIdx;
+    gctUINT                      firstUsageIdx;
 }VIR_WEB;
 
 typedef struct _VIR_DEF_USAGE_INFO
@@ -753,7 +744,7 @@ void vscVIR_InitHomonymyDefIterator(VIR_HOMONYMY_DEF_ITERATOR* pIter,
 VIR_DEF* vscVIR_HomonymyDefIterator_First(VIR_HOMONYMY_DEF_ITERATOR* pIter);
 VIR_DEF* vscVIR_HomonymyDefIterator_Next(VIR_HOMONYMY_DEF_ITERATOR* pIter);
 
-/* Given an expected unique def (or usage inst/usage operand), check wether it is
+/* Given an expected unique def (or usage inst/usage operand), check whether it is
    really the unique one that usage (or def) has, if yes, return TRUE, otherwise,
    return FALSE. */
 gctBOOL vscVIR_IsUniqueUsageInstOfDefInst(VIR_DEF_USAGE_INFO* pDuInfo,
@@ -770,6 +761,26 @@ gctBOOL vscVIR_IsUniqueDefInstOfUsageInst(VIR_DEF_USAGE_INFO* pDuInfo,
                                           gctBOOL             bIsIndexingRegUsage,
                                           VIR_Instruction*    pExpectedUniqueDefInst, /* Expected unique def inst */
                                           VIR_Instruction**   ppFirstOtherDefInst);              /* If not unique, it returns first other def inst when searching */
+
+/* Given a register no, check whether it has a unique def instruction, if yes, return TRUE and the def instruction. */
+gctBOOL vscVIR_IsRegNoHasUniqueDefInst(VIR_DEF_USAGE_INFO*      pDuInfo,
+                                       VIR_VirRegId             regNo,
+                                       VIR_Instruction**        ppUniqueDefInst);
+
+/* Given a register no, if one of its DEF is conditional write, check whether all its def instructions have the same writeMask. */
+gctBOOL vscVIR_IsRegAllDefHaveSameWriteMask(VIR_DEF_USAGE_INFO*      pDuInfo,
+                                            VIR_VirRegId             regNo);
+
+/*
+** Check whether this instruction is a definite write.
+**      1) non-conditional write.
+**      2) conditional write, but use the fixed writeMask.
+**      3) this DEF is the unique DEF.
+*/
+gctBOOL vscVIR_IsInstDefiniteWrite(VIR_DEF_USAGE_INFO*   pDuInfo,
+                                   VIR_Instruction*      pInst,
+                                   VIR_VirRegId          regNo,
+                                   gctBOOL               bCheckDef);
 
 gctBOOL vscVIR_IsDefInstAndUsageInstSameBranch(VIR_DEF_USAGE_INFO* pDuInfo,
                                                VIR_Instruction*    pUsageInst,
@@ -808,7 +819,6 @@ gctBOOL vscVIR_RedefineBetweenInsts(IN VSC_MM                   *pMM,
                                     IN VIR_Instruction          *endInst,
                                     IN VIR_Operand              *srcOpndOfStartInst,
                                     OUT VIR_Instruction         **redefInst);
-
 /*
  *  LV analysis
  */
@@ -822,6 +832,9 @@ typedef struct _VIR_LIVENESS_INFO
 
     /* Memory pool that this LV-info is built on */
     VSC_PRIMARY_MEM_POOL         pmp;
+
+    /* scratch mem pool can reuse memory be freed */
+    VSC_MM                       scratchMemPool;
 }VIR_LIVENESS_INFO;
 
 /* Do aggressive liveness IPA.

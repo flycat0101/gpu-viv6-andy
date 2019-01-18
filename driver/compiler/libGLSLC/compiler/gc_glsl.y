@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -74,14 +74,16 @@ static int yyfprintf(FILE *file, const char * msg, ...)
 }
 
 /* tokens */
-%token<token>		T_ATTRIBUTE T_CONST T_BOOL T_FLOAT T_INT
+%token<token>		T_ATTRIBUTE T_CONST T_BOOL T_FLOAT T_INT T_DOUBLE
 					T_BREAK T_CONTINUE T_DO T_ELSE T_FOR T_IF T_DISCARD T_RETURN
 					T_BASIC_TYPE
 					T_BVEC2 T_BVEC3 T_BVEC4 T_IVEC2
 					T_IVEC3 T_IVEC4 T_VEC2 T_VEC3 T_VEC4
+					T_DVEC2 T_DVEC3 T_DVEC4
 					T_MAT2 T_MAT3 T_MAT4 T_IN T_OUT T_INOUT T_UNIFORM T_VARYING T_PATCH T_SAMPLE
 					T_UINT T_UVEC2 T_UVEC3 T_UVEC4
 					T_MAT2X3 T_MAT2X4 T_MAT3X2 T_MAT3X4 T_MAT4X2 T_MAT4X3
+					T_DMAT2 T_DMAT3 T_DMAT4 T_DMAT2X3 T_DMAT2X4 T_DMAT3X2 T_DMAT3X4 T_DMAT4X2 T_DMAT4X3
 					T_SAMPLER2D T_SAMPLERCUBE T_SAMPLERCUBEARRAY T_SAMPLERCUBESHADOW T_SAMPLERCUBEARRAYSHADOW T_SAMPLER2DSHADOW
 					T_SAMPLER3D
 					T_SAMPLER1DARRAY T_SAMPLER2DARRAY T_SAMPLER1DARRAYSHADOW T_SAMPLER2DARRAYSHADOW
@@ -91,6 +93,9 @@ static int yyfprintf(FILE *file, const char * msg, ...)
 					T_SAMPLER2DMS T_ISAMPLER2DMS T_USAMPLER2DMS
 					T_SAMPLER2DMSARRAY T_ISAMPLER2DMSARRAY T_USAMPLER2DMSARRAY
                     T_SAMPLERBUFFER T_ISAMPLERBUFFER T_USAMPLERBUFFER
+					T_SAMPLER1D T_ISAMPLER1D T_USAMPLER1D T_SAMPLER1DSHADOW
+					T_SAMPLER2DRECT T_ISAMPLER2DRECT T_USAMPLER2DRECT T_SAMPLER2DRECTSHADOW
+					T_ISAMPLER1DARRAY T_USAMPLER1DARRAY
 					T_IMAGE2D T_IIMAGE2D T_UIMAGE2D
 					T_IMAGE2DARRAY T_IIMAGE2DARRAY T_UIMAGE2DARRAY
 					T_IMAGE3D T_IIMAGE3D T_UIMAGE3D
@@ -817,6 +822,26 @@ opaque_type_specifier :
 		{ $$ = slParseNonStructType(Compiler, &$1, T_ISAMPLERCUBEARRAY); }
 	| T_USAMPLERCUBEARRAY
 		{ $$ = slParseNonStructType(Compiler, &$1, T_USAMPLERCUBEARRAY); }
+	| T_SAMPLER1D
+		{ $$ = slParseNonStructType(Compiler, &$1, T_SAMPLER1D); }
+	| T_ISAMPLER1D
+		{ $$ = slParseNonStructType(Compiler, &$1, T_ISAMPLER1D); }
+	| T_USAMPLER1D
+		{ $$ = slParseNonStructType(Compiler, &$1, T_USAMPLER1D); }
+	| T_SAMPLER1DSHADOW
+		{ $$ = slParseNonStructType(Compiler, &$1, T_SAMPLER1DSHADOW); }
+	| T_SAMPLER2DRECT
+		{ $$ = slParseNonStructType(Compiler, &$1, T_SAMPLER2DRECT); }
+	| T_ISAMPLER2DRECT
+		{ $$ = slParseNonStructType(Compiler, &$1, T_ISAMPLER2DRECT); }
+	| T_USAMPLER2DRECT
+		{ $$ = slParseNonStructType(Compiler, &$1, T_USAMPLER2DRECT); }
+	| T_SAMPLER2DRECTSHADOW
+		{ $$ = slParseNonStructType(Compiler, &$1, T_SAMPLER2DRECTSHADOW); }
+	| T_ISAMPLER1DARRAY
+		{ $$ = slParseNonStructType(Compiler, &$1, T_ISAMPLER1DARRAY); }
+	| T_USAMPLER1DARRAY
+		{ $$ = slParseNonStructType(Compiler, &$1, T_USAMPLER1DARRAY); }
 	| T_IMAGE2D
 		{ $$ = slParseNonStructType(Compiler, &$1, T_IMAGE2D); }
 	| T_IIMAGE2D
@@ -916,6 +941,32 @@ type_specifier_nonarray :
 		{ $$ = slParseNonStructType(Compiler, &$1, T_MAT4X2); }
 	| T_MAT4X3
 		{ $$ = slParseNonStructType(Compiler, &$1, T_MAT4X3); }
+    | T_DOUBLE
+		{ $$ = slParseNonStructType(Compiler, &$1, T_DOUBLE); }
+	| T_DVEC2
+		{ $$ = slParseNonStructType(Compiler, &$1, T_DVEC2); }
+	| T_DVEC3
+		{ $$ = slParseNonStructType(Compiler, &$1, T_DVEC3); }
+	| T_DVEC4
+		{ $$ = slParseNonStructType(Compiler, &$1, T_DVEC4); }
+	| T_DMAT2
+		{ $$ = slParseNonStructType(Compiler, &$1, T_DMAT2); }
+	| T_DMAT2X3
+		{ $$ = slParseNonStructType(Compiler, &$1, T_DMAT2X3); }
+	| T_DMAT2X4
+		{ $$ = slParseNonStructType(Compiler, &$1, T_DMAT2X4); }
+	| T_DMAT3
+		{ $$ = slParseNonStructType(Compiler, &$1, T_DMAT3); }
+	| T_DMAT3X2
+		{ $$ = slParseNonStructType(Compiler, &$1, T_DMAT3X2); }
+	| T_DMAT3X4
+		{ $$ = slParseNonStructType(Compiler, &$1, T_DMAT3X4); }
+	| T_DMAT4
+		{ $$ = slParseNonStructType(Compiler, &$1, T_DMAT4); }
+	| T_DMAT4X2
+		{ $$ = slParseNonStructType(Compiler, &$1, T_DMAT4X2); }
+	| T_DMAT4X3
+		{ $$ = slParseNonStructType(Compiler, &$1, T_DMAT4X3); }
 	| opaque_type_specifier
 		{ $$ = $1; }
 	;

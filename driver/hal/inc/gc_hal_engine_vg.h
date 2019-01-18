@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -739,6 +739,13 @@ gcoVG_Destroy(
 #endif
     );
 
+void
+gcoVG_SetTesselationSize(
+    IN gcoVG Vg,
+    IN gctUINT Width,
+    IN gctUINT Height
+    );
+
 gceSTATUS
 gcoVG_SetTarget(
     IN gcoVG Vg,
@@ -1115,11 +1122,30 @@ gcoVG_DrawSurfaceToImage(
 #endif
     IN gcoSURF Image,
     IN const gcsVG_RECT_PTR SrcRectangle,
-    IN const gcsVG_RECT_PTR DstRectangle,
-    IN const gctFLOAT Matrix[9],
+    IN const gctFLOAT  DstBounds[4],
+    IN const gctFLOAT DstPoints[8],
+    IN const gctFLOAT ImgMatrix[9],
+    IN const gctFLOAT RectMatrix[9],
     IN gceIMAGE_FILTER Filter,
     IN gctBOOL Mask,
     IN gctBOOL FirstTime
+#if gcdMOVG
+,
+    IN gctINT   TSWidth,
+    IN gctINT   TSHeight
+#endif
+    );
+
+gceSTATUS
+gcoVG_DrawSurfaceToImageMasked(
+    IN gcoVG Vg,
+    IN gcoSURF Image,
+    IN gcsVG_RECT_PTR SrcRect,
+    IN gctINT  X,
+    IN gctINT  Y,
+    IN gctINT  Width,
+    IN gctINT  Height,
+    IN const gctFLOAT Matrix[9]
     );
 
 gceSTATUS
@@ -1251,6 +1277,28 @@ gcoVG_SetColorIndexTable(
     IN gctINT32      Count
 );
 
+gceSTATUS
+gcoVG_SetYUV2RGBStdCust(
+    IN gcoVG            Vg,
+    IN gctBOOL          YUV2RGBStdCust
+    );
+
+gceSTATUS
+gcoVG_SetYUV2RGB(
+    IN gcoVG            Vg,
+    IN gctFLOAT         *coef,
+    IN gctFLOAT         *offset,
+    IN gctBOOL          *cfg
+);
+
+gceSTATUS
+gcoVG_SetRGB2YUVParameters(
+    IN gcoVG            Vg,
+    IN gctFLOAT         *coef,
+    IN gctFLOAT         *offset,
+    IN gctBOOL          *cfg
+);
+
 /* VG RS feature support: YUV format conversion. */
 gceSTATUS
 gcoVG_Resolve(
@@ -1267,7 +1315,8 @@ gcoVG_Resolve(
     IN gctINT       Src_standard,
     IN gctINT       Dst_uv,
     IN gctINT       Dst_standard,
-    IN gctINT       Dst_alpha
+    IN gctINT       Dst_alpha,
+    IN gctBOOL      Dst_standard_cust
 );
 #ifdef __cplusplus
 }

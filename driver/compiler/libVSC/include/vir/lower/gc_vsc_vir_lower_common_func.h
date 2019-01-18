@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -18,6 +18,49 @@
 #include "vir/lower/gc_vsc_vir_pattern.h"
 
 BEGIN_EXTERN_C()
+
+void
+VIR_Lower_Initialize(
+    IN VIR_Shader               *Shader,
+    IN VIR_PatternLowerContext  *Context,
+    IN VSC_HW_CONFIG            *HwCfg,
+    IN VSC_MM                   *pMM
+    );
+
+VSC_ErrCode
+VIR_Lower_ArraryIndexing_To_LDARR_STARR(
+    IN  VIR_Shader              *Shader,
+    IN  VSC_HW_CONFIG           *HwCfg,
+    INOUT gctBOOL               *bChanged
+    );
+
+VSC_ErrCode
+VIR_Lower_MiddleLevel_To_LowLevel_Expand(
+    IN  VIR_Shader              *Shader,
+    IN  PVSC_CONTEXT            VscContext,
+    IN  VIR_PatternLowerContext *Context
+    );
+
+VSC_ErrCode
+VIR_Lower_MiddleLevel_To_LowLevel_Scalar(
+    IN  VIR_Shader              *Shader,
+    IN  PVSC_CONTEXT            VscContext,
+    IN  VIR_PatternLowerContext *Context
+    );
+
+VSC_ErrCode
+VIR_Lower_MiddleLevel_To_LowLevel_Machine_Pre(
+    IN  VIR_Shader              *Shader,
+    IN  PVSC_CONTEXT            VscContext,
+    IN  VIR_PatternLowerContext *Context
+    );
+
+VSC_ErrCode
+VIR_Lower_MiddleLevel_To_LowLevel_Machine_Post(
+    IN  VIR_Shader              *Shader,
+    IN  PVSC_CONTEXT            VscContext,
+    IN  VIR_PatternLowerContext *Context
+    );
 
 gctBOOL
 VIR_Lower_SetOpndNeg(
@@ -55,27 +98,6 @@ VIR_Lower_SetIntZero(
     );
 
 gctBOOL
-VIR_Lower_SetIntOne(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    );
-
-gctBOOL
-VIR_Lower_SetIntTwo(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    );
-
-gctBOOL
-VIR_Lower_SetIntThree(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    );
-
-gctBOOL
 VIR_Lower_SetOne(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -91,6 +113,13 @@ VIR_Lower_SetIntHighBitOne(
 
 gctBOOL
 VIR_Lower_SetMinusOne(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetIntOne(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
     IN VIR_Operand        *Opnd
@@ -118,6 +147,13 @@ VIR_Lower_SetEnableX(
     );
 
 gctBOOL
+VIR_Lower_SetEnableXAndIntType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
 VIR_Lower_SetEnableY(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -132,7 +168,21 @@ VIR_Lower_SetEnableZ(
     );
 
 gctBOOL
+VIR_Lower_SetEnableZAndIntType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
 VIR_Lower_SetEnableW(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetEnableXYZAndInt3(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
     IN VIR_Operand        *Opnd
@@ -154,6 +204,20 @@ VIR_Lower_SetSwizzleX(
 
 gctBOOL
 VIR_Lower_AdjustCoordSwizzleForShadow(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetSwizzleXY(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetSwizzleXYZ(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
     IN VIR_Operand        *Opnd
@@ -189,13 +253,6 @@ VIR_Lower_SetSwizzleByCoord(
 
 gctBOOL
 VIR_Lower_SetSwizzleXYZW(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    );
-
-gctBOOL
-VIR_Lower_SetSwizzleXY(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
     IN VIR_Operand        *Opnd
@@ -302,6 +359,12 @@ VIR_Lower_IsDstMediumpOrLowp(
     );
 
 gctBOOL
+VIR_Lower_IsDstHighp(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
 VIR_Lower_IsDstInt16(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -332,9 +395,78 @@ VIR_Lower_IsNotCLShader(
     );
 
 gctBOOL
-VIR_Lower_HasHalt4(
+VIR_Lower_HasHalti4(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
+VIR_Lower_HasNoHalti4(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
+VIR_Lower_SetImm0xFFFF(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+);
+
+gctBOOL
+VIR_Lower_SetImm16(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+);
+
+gctBOOL
+VIR_Lower_SetImm0(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+);
+
+gctBOOL
+VIR_Lower_SetSwizzleXAndIntType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetSwizzleZAndUintType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetSwizzleZAndIntType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetSwizzleXIndex_1AndIntType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetSwizzleYIndex_1AndUintType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetSwizzleZIndex_1AndUintType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
     );
 
 gctBOOL
@@ -360,8 +492,7 @@ VIR_Lower_label_set_jmp_n(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
     IN VIR_Operand        *Opnd,
-    IN gctINT32           n
-    );
+    IN gctINT32             n);
 
 gctBOOL
 VIR_Lower_label_set_jmp_neg2(
@@ -385,34 +516,6 @@ VIR_Lower_label_set_jmp_neg3_6(
     );
 
 gctBOOL
-VIR_Lower_label_set_jmp_neg3_6_9(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    );
-
-gctBOOL
-VIR_Lower_label_set_jmp_neg4(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    );
-
-gctBOOL
-VIR_Lower_label_set_jmp_neg6(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    );
-
-gctBOOL
-VIR_Lower_label_set_jmp_neg8(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    );
-
-gctBOOL
 VIR_Lower_label_set_jmp_neg10(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -428,6 +531,20 @@ VIR_Lower_label_set_jmp_neg22(
 
 gctBOOL
 VIR_Lower_SetOpndUINT32(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetOpndUINT32HP(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetOpndHP(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
     IN VIR_Operand        *Opnd
@@ -469,7 +586,26 @@ VIR_Lower_SetEnableBaseOnSrc0(
     );
 
 gctBOOL
+VIR_Lower_SetEnableYAndSrc0Type(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
 VIR_Lower_SetEnableBaseOnSrc1(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+VIR_TexModifier_Flag
+VIR_Lower_GetTexModifierKind(
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetLongUlongInstType(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
     IN VIR_Operand        *Opnd
@@ -482,9 +618,12 @@ VIR_Lower_SetHighp(
     IN VIR_Operand        *Opnd
     );
 
-VIR_TexModifier_Flag
-VIR_Lower_GetTexModifierKind(
-    IN VIR_Operand        *Opnd
+VSC_ErrCode
+VIR_Lower_ChangeOperandByOffset(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction   *Inst,
+    IN VIR_Operand       *Opnd,
+    IN gctUINT           rowOffset
     );
 
 END_EXTERN_C()

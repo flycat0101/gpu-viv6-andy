@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -22,6 +22,7 @@ LOCAL_SRC_FILES := \
     gc_hal_user_dump.c \
     gc_hal_user.c \
     gc_hal_user_raster.c \
+    gc_hal_user_hash.c \
     gc_hal_user_heap.c \
     gc_hal_user_query.c \
     gc_hal_user_rect.c \
@@ -49,8 +50,7 @@ LOCAL_SRC_FILES += \
     gc_hal_user_mem.c \
     gc_hal_user_bufobj.c \
     gc_hal_user_statistics.c \
-    gc_hal_user_shader.c \
-    gc_hal_user_resource.c
+    gc_hal_user_shader.c
 
 ifeq ($(USE_OPENCL),1)
 LOCAL_SRC_FILES += \
@@ -106,6 +106,12 @@ LOCAL_SHARED_LIBRARIES := \
     liblog \
     libdl
 
+ifeq ($(VIVANTE_ENABLE_VSIMULATOR),1)
+LOCAL_SHARED_LIBRARIES += \
+    libEmulator
+
+endif
+
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 17),1)
 LOCAL_SHARED_LIBRARIES += \
     libsync
@@ -118,6 +124,8 @@ include $(BUILD_SHARED_LIBRARY)
 
 include $(AQROOT)/copy_installed_module.mk
 
+ifeq ($(VIVANTE_ENABLE_VSIMULATOR),0)
+
 # libhalarchuser_vg
 ifeq ($(VIVANTE_ENABLE_VG), 1)
 include $(AQROOT)/hal/user/archvg/Android.mk
@@ -128,4 +136,14 @@ include $(AQROOT)/hal/user/arch/Android.mk
 
 # libhalosuser
 include $(AQROOT)/hal/os/linux/user/Android.mk
+
+else
+
+# libhalarchuser
+include $(AQROOT)/hal/user/arch/Android.mk
+
+# libhalosuser
+include $(AQROOT)/vsimulator/os/linux/user/Android.mk
+
+endif
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -21,9 +21,9 @@
 VX_INLINE_API vx_ptr vxFormatMemoryPtr(
         vx_memory_s *memory, vx_uint32 c, vx_uint32 x, vx_uint32 y, vx_uint32 p)
 {
-    vx_int64 offset = (memory->strides[p][VX_DIM_Y] * y) +
-                      (memory->strides[p][VX_DIM_X] * x) +
-                      (memory->strides[p][VX_DIM_CHANNEL] * c);
+    vx_int64 offset = (memory->strides[p][VX_DIM_Y] * (vx_int64)y) +
+                      (memory->strides[p][VX_DIM_X] * (vx_int64)x) +
+                      (memory->strides[p][VX_DIM_CHANNEL] * (vx_int64)c);
 
     return (vx_ptr)&memory->logicals[p][offset];
 }

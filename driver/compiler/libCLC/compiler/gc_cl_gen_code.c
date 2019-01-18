@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -18,6 +18,8 @@
 #define _cldHandleULongStore 1
 
 #define _GEN_FOR_BETTER_LOOP_RECOGNITION  1
+#define _SPLIT_HIGH_PRECISION_EXTENDED_VECTOR 1
+#define HAS_MULTI_CLUSTER_SUPPORT 0
 
 #define _GROUP_ARRAY_COPY  0
 
@@ -161,9 +163,10 @@
                             (Symbol), \
                             binaryDataType, \
                             format, \
-                            (Name)->u.variableInfo.variableType, \
+                            (Name)->u.variableInfo.builtinSpecific.s.variableType, \
                             isPointer, \
                             length, \
+                            Array, \
                             &(Uniform)); \
     if (gcmIS_ERROR(Status)) break; \
     SetUniformCategory((Uniform), (VarCategory)); \
@@ -187,7 +190,7 @@
     } while (gcvFALSE)
 
 /* Array to mark each opcode on its operation begin component-wise or not */
-gctBOOL _IsOpcodeComponentWise[] =
+static gctBOOL _IsOpcodeComponentWise[] =
 {
     /* clvOPCODE_INVALID = 0 */ gcvFALSE,
     /* clvOPCODE_NOP */ gcvFALSE,
@@ -228,6 +231,11 @@ gctBOOL _IsOpcodeComponentWise[] =
     /* clvOPCODE_IMAGE_WRITE */ gcvFALSE,
     /* clvOPCODE_IMAGE_WRITE_3D */ gcvFALSE,
     /* clvOPCODE_CLAMP0MAX */ gcvFALSE,
+    /* clvOPCODE_CLAMPCOORD */ gcvFALSE,
+    /* clvOPCODE_DP2 */         gcvFALSE,
+    /* clvOPCODE_DP3 */         gcvFALSE,
+    /* clvOPCODE_DP4 */         gcvFALSE,
+    /* clvOPCODE_TEXU */ gcvFALSE,
 
     /* Conversion Operations */
     /* clvOPCODE_FLOAT_TO_INT */ gcvTRUE,
@@ -387,6 +395,16 @@ gctBOOL _IsOpcodeComponentWise[] =
 
     /* clvOPCODE_FMA_MUL */ gcvTRUE,
     /* clvOPCODE_FMA_ADD */ gcvTRUE,
+
+    /* clvOPCODE_CMAD */ gcvFALSE,
+    /* clvOPCODE_CONJ */ gcvFALSE,
+    /* clvOPCODE_CMUL */ gcvFALSE,
+    /* clvOPCODE_CMADCJ */ gcvFALSE,
+    /* clvOPCODE_CMULCJ */ gcvFALSE,
+    /* clvOPCODE_CADDCJ */ gcvFALSE,
+    /* clvOPCODE_CSUBCJ */ gcvFALSE,
+
+    /* clvOPCODE_GET_IMAGE_TYPE */ gcvFALSE,
     /* clvOPCODE_FINDLSB */  gcvTRUE,
     /* clvOPCODE_FINDMSB */  gcvTRUE,
     /* clvOPCODE_BIT_REVERSAL */  gcvTRUE,
@@ -584,6 +602,7 @@ cltELEMENT_TYPE ElementType
       case clvTYPE_IMAGE2D_ARRAY_T:
       case clvTYPE_IMAGE1D_ARRAY_T:
       case clvTYPE_IMAGE1D_BUFFER_T:
+      case clvTYPE_VIV_GENERIC_IMAGE_T:
          if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
              gcmOPT_oclUseImgIntrinsicQuery()) {
              size = 32;
@@ -829,7 +848,6 @@ OUT cloIR_POLYNARY_EXPR *FuncCall
    gcmASSERT(FuncCall);
    *FuncCall = gcvNULL;
 
-   gcmVERIFY_OK(cloCOMPILER_Lock(Compiler));
    newFuncCall = _CreateFuncCall(Compiler,
                                  Opcode,
                                  Expr);
@@ -881,7 +899,6 @@ OUT cloIR_POLYNARY_EXPR *FuncCall
    *FuncCall = newFuncCall;
 
 OnError:
-   gcmVERIFY_OK(cloCOMPILER_Unlock(Compiler));
    return status;
 }
 
@@ -1403,12 +1420,24 @@ clsROPERAND_CONSTANT_IsAllVectorComponentsEqual(
         }
     }
     else if(clmIsElementTypeInteger(elementType)) {
-        for (i = 1; i < ROperand->u.constant.valueCount; i++)
-        {
-            if (ROperand->u.constant.values[i].intValue
-                != ROperand->u.constant.values[0].intValue)
+        if (clmIsElementTypeHighPrecision(elementType)) {
+            for (i = 1; i < ROperand->u.constant.valueCount; i++)
             {
-                return gcvFALSE;
+                if (ROperand->u.constant.values[i].longValue
+                    != ROperand->u.constant.values[0].longValue)
+                {
+                    return gcvFALSE;
+                }
+            }
+        }
+        else {
+            for (i = 1; i < ROperand->u.constant.valueCount; i++)
+            {
+                if (ROperand->u.constant.values[i].intValue
+                    != ROperand->u.constant.values[0].intValue)
+                {
+                    return gcvFALSE;
+                }
             }
         }
     }
@@ -1453,6 +1482,10 @@ clGetOpcodeName(
     case clvOPCODE_SELECT:   return "viv_select";
     case clvOPCODE_FMA:      return "fma#";
 
+    case clvOPCODE_DP2:     return "dp2";
+    case clvOPCODE_DP3:     return "dp3";
+    case clvOPCODE_DP4:     return "dp4";
+
     case clvOPCODE_TEXTURE_LOAD:     return "texture_load";
     case clvOPCODE_IMAGE_SAMPLER:    return "image_sampler";
     case clvOPCODE_IMAGE_READ:       return "image_read";
@@ -1460,6 +1493,8 @@ clGetOpcodeName(
     case clvOPCODE_IMAGE_WRITE:      return "image_write";
     case clvOPCODE_IMAGE_WRITE_3D:   return "image_write_3d";
     case clvOPCODE_CLAMP0MAX:        return "clamp0max";
+    case clvOPCODE_CLAMPCOORD:       return "clampcoord";
+    case clvOPCODE_TEXU:             return "texu";
 
     case clvOPCODE_FLOAT_TO_INT:     return "float_to_int";
     case clvOPCODE_FLOAT_TO_UINT:    return "float_to_uint";
@@ -1608,11 +1643,19 @@ clGetOpcodeName(
     case clvOPCODE_FMA_MUL:             return "fma_mul";
     case clvOPCODE_FMA_ADD:             return "fma_add";
 
+    case clvOPCODE_CMAD:                return "cmad";
+    case clvOPCODE_CONJ:                return "conj";
+    case clvOPCODE_CMUL:                return "cmul";
+    case clvOPCODE_CMADCJ:              return "cmadcj";
+    case clvOPCODE_CMULCJ:              return "cmulcj";
+    case clvOPCODE_CADDCJ:              return "caddcj";
+    case clvOPCODE_CSUBCJ:              return "csubcj";
     case clvOPCODE_FINDLSB:             return "findLsb";
     case clvOPCODE_FINDMSB:             return "findMsb";
     case clvOPCODE_BIT_REVERSAL:        return "bit_reversal";
     case clvOPCODE_BYTE_REVERSAL:       return "byte_reversal";
 
+    case clvOPCODE_GET_IMAGE_TYPE:      return "get_image_type";
     default:
         gcmASSERT(0);
         return "Invalid";
@@ -1676,25 +1719,21 @@ clsROPERAND_IsFloatOrVecConstant(
     if(clmIsElementTypeFloating(clmGEN_CODE_elementType_GET(ROperand->dataType)) &&
        (gcIsScalarDataType(ROperand->dataType) || gcIsVectorDataType(ROperand->dataType))) {
 
-       switch(clmGEN_CODE_vectorSize_GET(ROperand->dataType)) {
-       case 0:
-        return (ROperand->u.constant.values[0].floatValue == FloatValue);
+       gctUINT i;
+       gctUINT length = clmGEN_CODE_vectorSize_GET(ROperand->dataType);
 
-       case 2:
-        return (ROperand->u.constant.values[0].floatValue == FloatValue
-                && ROperand->u.constant.values[1].floatValue == FloatValue);
+       length = (length == 0) ? 1 : length;
+       length = gcmMIN(length, ROperand->u.constant.valueCount);
 
-       case 3:
-        return (ROperand->u.constant.values[0].floatValue == FloatValue
-                && ROperand->u.constant.values[1].floatValue == FloatValue
-                && ROperand->u.constant.values[2].floatValue == FloatValue);
-
-       case 4:
-        return (ROperand->u.constant.values[0].floatValue == FloatValue
-                && ROperand->u.constant.values[1].floatValue == FloatValue
-                && ROperand->u.constant.values[2].floatValue == FloatValue
-                && ROperand->u.constant.values[3].floatValue == FloatValue);
+       for (i = 0; i < ROperand->u.constant.valueCount; i++)
+       {
+           if (ROperand->u.constant.values[i].floatValue != FloatValue)
+           {
+               return gcvFALSE;
+           }
        }
+
+       return gcvTRUE;
     }
     return gcvFALSE;
 }
@@ -2245,6 +2284,7 @@ _AssignStructOrUnionInMemory(
         case clvTYPE_IMAGE2D_ARRAY_T:
         case clvTYPE_IMAGE1D_ARRAY_T:
         case clvTYPE_IMAGE1D_BUFFER_T:
+        case clvTYPE_VIV_GENERIC_IMAGE_T:
             if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
                 gcmOPT_oclUseImgIntrinsicQuery()) {
                 size = 32;
@@ -2509,6 +2549,7 @@ clGetDefaultComponentSelection(
     case clvTYPE_IMAGE2D_ARRAY_T:
     case clvTYPE_IMAGE1D_ARRAY_T:
     case clvTYPE_IMAGE1D_BUFFER_T:
+    case clvTYPE_VIV_GENERIC_IMAGE_T:
         if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
             gcmOPT_oclUseImgIntrinsicQuery()) {
             return ComponentSelection_VECTOR8;
@@ -2576,10 +2617,12 @@ IN clsNAME * Name
       clmGEN_CODE_checkVariableForMemory(Name)) {
       return clmGenCodeDataType(T_UINT);
    }
+#if !_GEN_IMAGE_OR_SAMPLER_PARAMETER_VARIABLES
    else if (clmIsElementTypeImage(decl->dataType->elementType)  &&
             cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
       return clmGenCodeDataType(T_UINT8);
    }
+#endif
    else {
       clsGEN_CODE_DATA_TYPE resultType;
 
@@ -2813,6 +2856,13 @@ _SetPointerUniformQualifiers(
             case T_STATIC:
             case T_EXTERN:
                  SetUniformQualifier(Uniform, clConvStorageQualifierToShaderTypeQualifier(nextDscr->qualifier));
+                 break;
+
+            case T_CONSTANT:
+            case T_LOCAL:
+            case T_GLOBAL:
+            case T_PRIVATE:
+                 SetUniformAddrSpaceQualifier(Uniform, clConvToShaderTypeQualifier(nextDscr->qualifier));
                  break;
 
             default:
@@ -3797,6 +3847,218 @@ IN clsCOMPONENT_SELECTION *ComponentSelection
 }
 
 static gceSTATUS
+_SetVariableQualifiers(
+IN cloCOMPILER Compiler,
+IN clsNAME *Name,
+IN cltQUALIFIER AccessQualifier,
+IN cltQUALIFIER AddrSpaceQualifier,
+IN cltQUALIFIER StorageQualifier,
+IN gcVARIABLE   Variable
+)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcSHADER shader;
+    gctINT arrayStride;
+
+    cltQUALIFIER accessQualifier = AccessQualifier;
+    cltQUALIFIER addrSpaceQualifier = AddrSpaceQualifier;
+    cltQUALIFIER storageQualifier = StorageQualifier;
+
+    gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &shader));
+
+    gcmASSERT(Variable);
+    arrayStride = clsDECL_GetByteSize(Compiler, &Name->decl);
+    arrayStride /= GetVariableKnownArraySize(Variable);
+
+    SetVariableArrayStride(Variable, arrayStride);
+    if (clmNAME_VariableHasMemoryOffset(Name))
+    {
+        SetVariableOffset(Variable, clmNAME_VariableMemoryOffset_GET(Name));
+    }
+    if(storageQualifier & clvSTORAGE_QUALIFIER_EXTERN) {
+        /* set shader to have extern variables */
+        SetShaderHasExternVariable(shader, gcvTRUE);
+        SetVariableIsExtern(Variable);
+    }
+    else if(storageQualifier & clvSTORAGE_QUALIFIER_STATIC) {
+        SetVariableIsStatic(Variable);
+    }
+    if(addrSpaceQualifier == clvQUALIFIER_NONE ||
+       addrSpaceQualifier == clvQUALIFIER_PRIVATE ||
+       addrSpaceQualifier == clvQUALIFIER_LOCAL) {
+        SetVariableIsLocal(Variable);
+    }
+    if(Name->u.variableInfo.hostEndian) {
+        SetVariableIsHostEndian(Variable);
+    }
+    if(clmDECL_IsPointerType(&Name->decl)) {
+        clsTYPE_QUALIFIER *typeQualifier;
+        clsTYPE_QUALIFIER *prev;
+
+        SetVariableIsPointer(Variable);
+        FOR_EACH_SLINK_NODE(Name->decl.ptrDscr, clsTYPE_QUALIFIER, prev, typeQualifier) {
+            if(typeQualifier->type == T_EOF)break;
+            switch (typeQualifier->type) {
+            case T_CONSTANT:
+            case T_GLOBAL:
+                addrSpaceQualifier = typeQualifier->qualifier;
+                break;
+
+            case T_UNIFORM:
+                accessQualifier = typeQualifier->qualifier;
+                break;
+
+            case T_LOCAL:
+                addrSpaceQualifier = typeQualifier->qualifier;
+                break;
+
+            case T_PRIVATE:
+                addrSpaceQualifier = typeQualifier->qualifier;
+                break;
+
+            case T_CONST:
+                accessQualifier = typeQualifier->qualifier;
+                break;
+
+            case T_STATIC:
+                storageQualifier = typeQualifier->qualifier;
+                break;
+
+            case T_EXTERN:
+                storageQualifier = typeQualifier->qualifier;
+                break;
+
+            case T_RESTRICT:
+                storageQualifier = typeQualifier->qualifier;
+                break;
+
+            case T_VOLATILE:
+                storageQualifier = typeQualifier->qualifier;
+                break;
+
+            default:
+                accessQualifier = typeQualifier->qualifier;
+                break;
+            }
+        }
+        status = gcSHADER_UpdateVariable(shader,
+                                         GetVariableIndex(Variable),
+                                         gcvVARIABLE_UPDATE_TYPE_QUALIFIER,
+                                         clConvToShaderTypeQualifier(accessQualifier) |
+                                         clConvToShaderTypeQualifier(addrSpaceQualifier) |
+                                         clConvStorageQualifierToShaderTypeQualifier(storageQualifier));
+        if (gcmIS_ERROR(status)) return status;
+    }
+    return status;
+}
+
+static gceSTATUS
+_SetUniformQualifiers(
+IN cloCOMPILER Compiler,
+IN clsNAME *Name,
+IN cltQUALIFIER AccessQualifier,
+IN cltQUALIFIER AddrSpaceQualifier,
+IN cltQUALIFIER StorageQualifier,
+IN gcVARIABLE   Variable
+)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcSHADER shader;
+    gctINT arrayStride;
+
+    cltQUALIFIER accessQualifier = AccessQualifier;
+    cltQUALIFIER addrSpaceQualifier = AddrSpaceQualifier;
+    cltQUALIFIER storageQualifier = StorageQualifier;
+
+    gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &shader));
+
+    gcmASSERT(Variable);
+    arrayStride = clsDECL_GetByteSize(Compiler, &Name->decl);
+    arrayStride /= GetVariableKnownArraySize(Variable);
+
+    SetVariableArrayStride(Variable, arrayStride);
+    if (clmNAME_VariableHasMemoryOffset(Name))
+    {
+        SetVariableOffset(Variable, clmNAME_VariableMemoryOffset_GET(Name));
+    }
+    if(storageQualifier & clvSTORAGE_QUALIFIER_EXTERN) {
+        /* set shader to have extern variables */
+        SetShaderHasExternVariable(shader, gcvTRUE);
+        SetVariableIsExtern(Variable);
+    }
+    else if(storageQualifier & clvSTORAGE_QUALIFIER_STATIC) {
+        SetVariableIsStatic(Variable);
+    }
+    if(addrSpaceQualifier == clvQUALIFIER_NONE ||
+       addrSpaceQualifier == clvQUALIFIER_PRIVATE ||
+       addrSpaceQualifier == clvQUALIFIER_LOCAL) {
+        SetVariableIsLocal(Variable);
+    }
+    if(Name->u.variableInfo.hostEndian) {
+        SetVariableIsHostEndian(Variable);
+    }
+    if(clmDECL_IsPointerType(&Name->decl)) {
+        clsTYPE_QUALIFIER *typeQualifier;
+        clsTYPE_QUALIFIER *prev;
+
+        SetVariableIsPointer(Variable);
+        FOR_EACH_SLINK_NODE(Name->decl.ptrDscr, clsTYPE_QUALIFIER, prev, typeQualifier) {
+            if(typeQualifier->type == T_EOF)break;
+            switch (typeQualifier->type) {
+            case T_CONSTANT:
+            case T_GLOBAL:
+                addrSpaceQualifier = typeQualifier->qualifier;
+                break;
+
+            case T_UNIFORM:
+                accessQualifier = typeQualifier->qualifier;
+                break;
+
+            case T_LOCAL:
+                addrSpaceQualifier = typeQualifier->qualifier;
+                break;
+
+            case T_PRIVATE:
+                addrSpaceQualifier = typeQualifier->qualifier;
+                break;
+
+            case T_CONST:
+                accessQualifier = typeQualifier->qualifier;
+                break;
+
+            case T_STATIC:
+                storageQualifier = typeQualifier->qualifier;
+                break;
+
+            case T_EXTERN:
+                storageQualifier = typeQualifier->qualifier;
+                break;
+
+            case T_RESTRICT:
+                storageQualifier = typeQualifier->qualifier;
+                break;
+
+            case T_VOLATILE:
+                storageQualifier = typeQualifier->qualifier;
+                break;
+
+            default:
+                accessQualifier = typeQualifier->qualifier;
+                break;
+            }
+        }
+        status = gcSHADER_UpdateVariable(shader,
+                                         GetVariableIndex(Variable),
+                                         gcvVARIABLE_UPDATE_TYPE_QUALIFIER,
+                                         clConvToShaderTypeQualifier(accessQualifier) |
+                                         clConvToShaderTypeQualifier(addrSpaceQualifier) |
+                                         clConvStorageQualifierToShaderTypeQualifier(storageQualifier));
+        if (gcmIS_ERROR(status)) return status;
+    }
+    return status;
+}
+
+static gceSTATUS
 _AllocLogicalRegOrArray(
 IN cloCOMPILER Compiler,
 IN cloCODE_GENERATOR CodeGenerator,
@@ -3966,16 +4228,26 @@ OUT gctUINT *NumRegNeeded
 #if !_GROUP_ARRAY_COPY
                if(ParentName->type == clvPARAMETER_NAME &&
                   !IsFunctionExtern(ParentName->context.u.variable.u.kernelFunction) &&
+#if _GEN_IMAGE_OR_SAMPLER_PARAMETER_VARIABLES
+                  !(clmIsElementTypeHighPrecision(binaryDataType.elementType) ||
+                    clmIsElementTypePackedGenType(binaryDataType.elementType))) {
+#else
                   !(clmIsElementTypeImage(binaryDataType.elementType) ||
                     clmIsElementTypeHighPrecision(binaryDataType.elementType) ||
                     clmIsElementTypePackedGenType(binaryDataType.elementType) ||
                     clmIsElementTypeSampler(binaryDataType.elementType))) {
+#endif
 #else
                if(ParentName->type == clvPARAMETER_NAME &&
                   !IsFunctionExtern(ParentName->context.u.variable.u.kernelFunction) &&
+#if _GEN_IMAGE_OR_SAMPLER_PARAMETER_VARIABLES
+                  !(clmIsElementTypeHighPrecision(binaryDataType.elementType) ||
+                    clmIsElementTypePackedGenType(binaryDataType.elementType))) {
+#else
                   !(clmIsElementTypeHighPrecision(binaryDataType.elementType) ||
                     clmIsElementTypePackedGenType(binaryDataType.elementType) ||
                     clmIsElementTypeSampler(binaryDataType.elementType))) {
+#endif
 #endif
                    gctSTRING funcName;
                    gctSIZE_T length, functionLength, totalLength;
@@ -4022,11 +4294,26 @@ OUT gctUINT *NumRegNeeded
                                           storageQualifier,
                                           binaryDataType,
                                           logicalRegCount,
+                                          &Decl->array,
                                           isArray,
                                           tempRegIndex,
                                           &variable);
                    if (gcmIS_ERROR(status)) return status;
 
+                   status = _SetVariableQualifiers(Compiler,
+                                                   ParentName,
+                                                   orgAccessQualifier,
+                                                   addrSpaceQualifier,
+                                                   storageQualifier,
+                                                   variable);
+                   if (gcmIS_ERROR(status)) return status;
+                   if (symbol != gcvNULL) {
+                       gcmVERIFY_OK(cloCOMPILER_Free(Compiler, symbol));
+                   }
+               }
+
+               if (variable)
+               {
                    if (argumentQualifier == gcvFUNCTION_INPUT)
                    {
                        SetVariableCategory(variable, gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT);
@@ -4039,11 +4326,8 @@ OUT gctUINT *NumRegNeeded
                    {
                        SetVariableCategory(variable, gcSHADER_VAR_CATEGORY_FUNCTION_INOUT_ARGUMENT);
                    }
-
-                   if (symbol != gcvNULL) {
-                       gcmVERIFY_OK(cloCOMPILER_Free(Compiler, symbol));
-                   }
                }
+
                status = clNewKernelFunctionArgument(Compiler,
                                                     ParentName->context.u.variable.u.kernelFunction,
                                                     variable,
@@ -4056,10 +4340,16 @@ OUT gctUINT *NumRegNeeded
             else {
                gcmASSERT(ParentName->context.u.variable.u.function);
 
+#if _GEN_IMAGE_OR_SAMPLER_PARAMETER_VARIABLES
+               if(ParentName->type == clvPARAMETER_NAME &&
+                  !IsFunctionExtern(ParentName->context.u.variable.u.function)) {
+#else
                if(ParentName->type == clvPARAMETER_NAME &&
                   !IsFunctionExtern(ParentName->context.u.variable.u.function) &&
                   !(clmIsElementTypeImage(binaryDataType.elementType) ||
                     clmIsElementTypeSampler(binaryDataType.elementType))) {
+#endif
+
                    clsNAME *funcScope;
 
                    gcmASSERT(ParentName->context.u.variable.u.function);
@@ -4109,11 +4399,19 @@ OUT gctUINT *NumRegNeeded
                                               storageQualifier,
                                               binaryDataType,
                                               logicalRegCount,
+                                              &Decl->array,
                                               isArray,
                                               tempRegIndex,
                                               &variable);
                        if (gcmIS_ERROR(status)) return status;
 
+                       status = _SetVariableQualifiers(Compiler,
+                                                       ParentName,
+                                                       orgAccessQualifier,
+                                                       addrSpaceQualifier,
+                                                       storageQualifier,
+                                                       variable);
+                       if (gcmIS_ERROR(status)) return status;
                        if (symbol != gcvNULL) {
                            gcmVERIFY_OK(cloCOMPILER_Free(Compiler, symbol));
                        }
@@ -4131,21 +4429,20 @@ OUT gctUINT *NumRegNeeded
                                               storageQualifier,
                                               binaryDataType,
                                               logicalRegCount,
+                                              &Decl->array,
                                               isArray,
                                               tempRegIndex,
                                               &variable);
                        if (gcmIS_ERROR(status)) return status;
                    }
-                   if(storageQualifier & clvSTORAGE_QUALIFIER_EXTERN) {
-                       gcSHADER shader;
-
-                       /* set shader to have extern variables */
-                       gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &shader));
-                       SetShaderHasExternVariable(shader, gcvTRUE);
-                       SetVariableIsExtern(variable);
-                   }
-                   else if(storageQualifier & clvSTORAGE_QUALIFIER_STATIC) {
-                       SetVariableIsStatic(variable);
+                   if(variable) {
+                       status = _SetVariableQualifiers(Compiler,
+                                                       ParentName,
+                                                       orgAccessQualifier,
+                                                       addrSpaceQualifier,
+                                                       clvQUALIFIER_NONE,
+                                                       variable);
+                       if (gcmIS_ERROR(status)) return status;
                    }
                }
                else variable = gcvNULL;
@@ -4163,6 +4460,9 @@ OUT gctUINT *NumRegNeeded
                    else
                    {
                        SetVariableCategory(variable, gcSHADER_VAR_CATEGORY_FUNCTION_INOUT_ARGUMENT);
+                   }
+                   if(clmDECL_IsPointerType(&Name->decl)) {
+                       SetVariableIsPointer(variable);
                    }
                }
 
@@ -4186,35 +4486,24 @@ OUT gctUINT *NumRegNeeded
                                    storageQualifier,
                                    binaryDataType,
                                    logicalRegCount,
+                                   &Decl->array,
                                    isArray,
                                    tempRegIndex,
                                    &variable);
             if (gcmIS_ERROR(status)) return status;
-            if(storageQualifier & clvSTORAGE_QUALIFIER_EXTERN) {
-                gcSHADER shader;
 
-                /* set shader to have extern variables */
-                gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &shader));
-                SetShaderHasExternVariable(shader, gcvTRUE);
-                SetVariableIsExtern(variable);
-            }
-            else if(storageQualifier & clvSTORAGE_QUALIFIER_STATIC) {
-                SetVariableIsStatic(variable);
-            }
-            if(clmDECL_IsPointerType(&Name->decl)) {
-                SetVariableIsPointer(variable);
-            }
-            else if(addrSpaceQualifier == clvQUALIFIER_NONE ||
-                    addrSpaceQualifier == clvQUALIFIER_PRIVATE ||
-                    addrSpaceQualifier == clvQUALIFIER_LOCAL) {
-                SetVariableIsLocal(variable);
-            }
+            status = _SetVariableQualifiers(Compiler,
+                                            Name,
+                                            orgAccessQualifier,
+                                            addrSpaceQualifier,
+                                            storageQualifier,
+                                            variable);
+            if (gcmIS_ERROR(status)) return status;
         }
         break;
 
     case clvQUALIFIER_UNIFORM:
         if(isUniformForAddressSpace) {
-           gctINT arrayStride;
            gctSTRING symbol;
 
            switch(addrSpaceQualifier) {
@@ -4302,35 +4591,19 @@ OUT gctUINT *NumRegNeeded
                                   storageQualifier,
                                   binaryDataType,
                                   logicalRegCount,
+                                  &Decl->array,
                                   isArray,
                                   tempRegIndex,
                                   &variable);
            if (gcmIS_ERROR(status)) return status;
 
-           arrayStride = clsDECL_GetByteSize(Compiler, &Name->decl);
-           arrayStride /= GetVariableKnownArraySize(variable);
-
-           SetVariableArrayStride(variable, arrayStride);
-           SetVariableOffset(variable, clmNAME_VariableMemoryOffset_GET(Name));
-           if(storageQualifier & clvSTORAGE_QUALIFIER_EXTERN) {
-               gcSHADER shader;
-
-               /* set shader to have extern variables */
-               gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &shader));
-               SetShaderHasExternVariable(shader, gcvTRUE);
-               SetVariableIsExtern(variable);
-           }
-           else if(storageQualifier & clvSTORAGE_QUALIFIER_STATIC) {
-               SetVariableIsStatic(variable);
-           }
-           if(clmDECL_IsPointerType(&Name->decl)) {
-               SetVariableIsPointer(variable);
-           }
-           else if(addrSpaceQualifier == clvQUALIFIER_NONE ||
-                   addrSpaceQualifier == clvQUALIFIER_PRIVATE ||
-                   addrSpaceQualifier == clvQUALIFIER_LOCAL) {
-               SetVariableIsLocal(variable);
-           }
+           status = _SetVariableQualifiers(Compiler,
+                                           Name,
+                                           orgAccessQualifier,
+                                           addrSpaceQualifier,
+                                           storageQualifier,
+                                           variable);
+           if (gcmIS_ERROR(status)) return status;
         }
         else {
             clsGEN_CODE_DATA_TYPE format;
@@ -4348,9 +4621,10 @@ OUT gctUINT *NumRegNeeded
                                   Symbol,
                                   uniformKind,
                                   format,
-                                  Name->u.variableInfo.variableType,
+                                  Name->u.variableInfo.builtinSpecific.s.variableType,
                                   clmDECL_IsPointerType(Decl) || clmGEN_CODE_checkVariableForMemory(Name),
                                   logicalRegCount,
+                                  &Decl->array,
                                   &uniform);
             if (gcmIS_ERROR(status)) return status;
             SetUniformQualifier(uniform, clConvToShaderTypeQualifier(accessQualifier));
@@ -4534,29 +4808,18 @@ OUT gctUINT *NumRegNeeded
                                    storageQualifier,
                                    binaryDataType,
                                    logicalRegCount,
+                                   &Decl->array,
                                    isArray,
                                    tempRegIndex,
                                    &variable);
             if (gcmIS_ERROR(status)) return status;
-            if(storageQualifier & clvSTORAGE_QUALIFIER_EXTERN) {
-                gcSHADER shader;
-
-                /* set shader to have extern variables */
-                gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &shader));
-                SetShaderHasExternVariable(shader, gcvTRUE);
-                SetVariableIsExtern(variable);
-            }
-            else if(storageQualifier & clvSTORAGE_QUALIFIER_STATIC) {
-                SetVariableIsStatic(variable);
-            }
-            if(clmDECL_IsPointerType(&Name->decl)) {
-                SetVariableIsPointer(variable);
-            }
-            else if(addrSpaceQualifier == clvQUALIFIER_NONE ||
-                    addrSpaceQualifier == clvQUALIFIER_PRIVATE ||
-                    addrSpaceQualifier == clvQUALIFIER_LOCAL) {
-                SetVariableIsLocal(variable);
-            }
+            status = _SetVariableQualifiers(Compiler,
+                                            Name,
+                                            orgAccessQualifier,
+                                            addrSpaceQualifier,
+                                            storageQualifier,
+                                            variable);
+            if (gcmIS_ERROR(status)) return status;
         }
         break;
 
@@ -4580,6 +4843,7 @@ OUT gctUINT *NumRegNeeded
                                   Name->u.variableInfo.variableType,
                                   clmDECL_IsPointerType(Decl) || clmGEN_CODE_checkVariableForMemory(Name),
                                   logicalRegCount,
+                                  &Decl->array,
                                   &uniform);
            if (gcmIS_ERROR(status)) return status;
            SetUniformQualifier(uniform, clConvToShaderTypeQualifier(accessQualifier));
@@ -4982,7 +5246,7 @@ IN clsNAME * FuncName
 
         paramName->context.u.variable.isKernel = gcvTRUE;
         paramName->context.u.variable.u.kernelFunction = FuncName->context.u.variable.u.kernelFunction;
-        paramName->u.variableInfo.variableType = clvBUILTIN_KERNEL_ARG;
+        paramName->u.variableInfo.builtinSpecific.s.variableType = clvBUILTIN_KERNEL_ARG;
 
         status = clsNAME_AllocLogicalRegs(Compiler,
                           CodeGenerator,
@@ -5187,6 +5451,10 @@ IN clsLOGICAL_REG * LogicalReg
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+
+    if (!cloCOMPILER_IsDumpOn(Compiler, clvDUMP_CODE_GENERATOR))
+        return gcvSTATUS_OK;
+
     gcmASSERT(LogicalReg);
 
     switch (LogicalReg->qualifier) {
@@ -5236,6 +5504,10 @@ IN clsINDEX * Index
 {
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+
+    if (!cloCOMPILER_IsDumpOn(Compiler, clvDUMP_CODE_GENERATOR))
+        return gcvSTATUS_OK;
+
     gcmASSERT(Name);
     gcmASSERT(Index);
 
@@ -5270,8 +5542,11 @@ IN clsLOPERAND * LOperand
 {
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
-    gcmASSERT(LOperand);
 
+    if (!cloCOMPILER_IsDumpOn(Compiler, clvDUMP_CODE_GENERATOR))
+        return gcvSTATUS_OK;
+
+    gcmASSERT(LOperand);
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                       clvDUMP_CODE_GENERATOR,
                       "<LOPERAND dataType=\"%s\">",
@@ -5297,6 +5572,10 @@ IN clsROPERAND * ROperand
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+
+    if (!cloCOMPILER_IsDumpOn(Compiler, clvDUMP_CODE_GENERATOR))
+        return gcvSTATUS_OK;
+
     gcmASSERT(ROperand);
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
@@ -5346,6 +5625,10 @@ IN clsIOPERAND * IOperand
 {
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+
+    if (!cloCOMPILER_IsDumpOn(Compiler, clvDUMP_CODE_GENERATOR))
+        return gcvSTATUS_OK;
+
     gcmASSERT(IOperand);
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
@@ -8572,6 +8855,13 @@ _ConvLongConstantToSource(
 }
 
 static gceSTATUS
+_ConvROperandToSpecialVectorSourceConstant(
+    IN cloCOMPILER Compiler,
+    IN clsROPERAND * ROperand,
+    OUT gcsSOURCE * Source
+    );
+
+static gceSTATUS
 _ConvROperandToSourceConstant(
     IN cloCOMPILER Compiler,
     IN clsROPERAND * ROperand,
@@ -8585,7 +8875,8 @@ _ConvROperandToSourceConstant(
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
     gcmASSERT(ROperand);
     gcmASSERT(!ROperand->isReg);
-    gcmASSERT(gcIsScalarDataType(ROperand->dataType));
+    gcmASSERT(gcIsScalarDataType(ROperand->dataType) ||
+              ROperand->u.constant.allValuesEqual);
     gcmASSERT(Source);
 
     elementType = clmGEN_CODE_elementType_GET(ROperand->u.constant.dataType);
@@ -8624,6 +8915,11 @@ _ConvROperandToSourceConstant(
        }
     }
     else if(gcIsVectorDataType(ROperand->u.constant.dataType)) {
+       if(ROperand->u.constant.allValuesEqual) {
+           return _ConvROperandToSpecialVectorSourceConstant(Compiler,
+                                                             ROperand,
+                                                             Source);
+       }
        gcmASSERT(ROperand->vectorIndex.mode == clvINDEX_CONSTANT);
        if(clmIsElementTypeHighPrecision(elementType)) {
            return _ConvLongConstantToSource(Compiler,
@@ -8796,6 +9092,16 @@ _ConvROperandToVectorComponentSourceConstant(
     {
         gcmASSERT(gcIsVectorDataType(ROperand->u.constant.dataType));
 
+        if(clmIsElementTypeHighPrecision(elementType)) {
+            clsGEN_CODE_DATA_TYPE dataType;
+
+            _clmGetSubsetDataType(ROperand->dataType, 1, dataType);
+            return _ConvLongConstantToSource(Compiler,
+                                             &ROperand->u.constant.values[VectorIndex],
+                                             dataType,
+                                             Source);
+        }
+
         if(clmIsElementTypePacked(elementType)) {
             elementType = _ConvPackedTypeToBasicType(elementType);
         }
@@ -8906,13 +9212,34 @@ _EmitCopyCode(
         gcsTARGET newTarget[1];
         gcsSOURCE newSource[1];
         gctINT regOffset = 1;
+        gctBOOL isHighPrecision = !cldHandleHighPrecisionInFrontEnd &&
+                                  clmIsElementTypeHighPrecision(Target->dataType.elementType);
+        gctUINT vectorSize;
 
         numMov = (NumBytes + cldBASIC_VECTOR_BYTE_SIZE - 1) / cldBASIC_VECTOR_BYTE_SIZE;
+        if(isHighPrecision) {
+            regOffset <<=  1;
+            gcmASSERT(numMov > 1);
+        }
+
         newTarget[0] = *Target;
         newSource[0] = *Source;
-        if(!cldHandleHighPrecisionInFrontEnd && clmIsElementTypeHighPrecision(Target->dataType.elementType)) {
-            regOffset <<=  1;
+        if(clmGEN_CODE_IsExtendedVectorType(Target->dataType)) {
+            vectorSize = (gctUINT)clmGEN_CODE_vectorSize_GET(Target->dataType);
+            gcmASSERT(vectorSize > 1);
+
+            vectorSize /= (isHighPrecision ? numMov >> 1 : numMov);
+            newTarget[0].dataType = gcGetVectorSliceDataType(Target->dataType, (gctUINT8)vectorSize);
         }
+
+        if(clmGEN_CODE_IsExtendedVectorType(Source->dataType)) {
+            vectorSize = (gctUINT)clmGEN_CODE_vectorSize_GET(Source->dataType);
+            gcmASSERT(vectorSize > 1);
+
+            vectorSize /= (isHighPrecision ? numMov >> 1 : numMov);
+            newSource[0].dataType = gcGetVectorSliceDataType(Source->dataType, (gctUINT8)vectorSize);
+        }
+
         for(i = 0; i < numMov; i += regOffset) {
             status = clEmitAssignCode(Compiler,
                                       LineNo,
@@ -9141,10 +9468,10 @@ _SpecialGenAssignCode(
                                             reversedComponentSelection);
             if (gcmIS_ERROR(status)) return status;
 
-            if(!ROperand->isReg && ROperand->u.constant.allValuesEqual) {
-                status = _ConvROperandToSpecialVectorSourceConstant(Compiler,
-                                                                    ROperand,
-                                                                    source0);
+            if(!ROperand->isReg) {
+                status = _ConvROperandToSourceConstant(Compiler,
+                                                       ROperand,
+                                                       source0);
                 if(gcmIS_ERROR(status)) return status;
             }
             else {
@@ -9397,10 +9724,10 @@ _GenCopyArrayCode(
                                     reversedComponentSelection);
     if (gcmIS_ERROR(status)) return status;
 
-    if(!ROperand->isReg && ROperand->u.constant.allValuesEqual) {
-        status = _ConvROperandToSpecialVectorSourceConstant(Compiler,
-                                                            ROperand,
-                                                            source0);
+    if(!ROperand->isReg) {
+        status = _ConvROperandToSourceConstant(Compiler,
+                                               ROperand,
+                                               source0);
         if(gcmIS_ERROR(status)) return status;
     }
     else {
@@ -10221,8 +10548,12 @@ clGenArithmeticExprCode(
 
     gcmVERIFY_OK(clsROPERAND_Dump(Compiler, ROperand1));
 
+#if _SPLIT_HIGH_PRECISION_EXTENDED_VECTOR
+    noSplit = clmIsElementTypePacked(IOperand->dataType.elementType);
+#else
     noSplit = clmIsElementTypePacked(IOperand->dataType.elementType) ||
               (clmIsElementTypeHighPrecision(IOperand->dataType.elementType) && gcmOPT_oclInt64InVIR());
+#endif
 
     do {
       /* check for matrix multiply */
@@ -10460,6 +10791,16 @@ clGenArithmeticExprCode(
       case clvOPCODE_PARAM_CHAIN:
       case clvOPCODE_INTRINSIC:
       case clvOPCODE_INTRINSIC_ST:
+
+      case clvOPCODE_CMAD:
+      case clvOPCODE_DP2:
+      case clvOPCODE_DP3:
+      case clvOPCODE_DP4:
+      case clvOPCODE_CMUL:
+      case clvOPCODE_CMADCJ:
+      case clvOPCODE_CMULCJ:
+      case clvOPCODE_CADDCJ:
+      case clvOPCODE_CSUBCJ:
          break;
 
       default: gcmASSERT(0);
@@ -10735,8 +11076,12 @@ clGenShiftExprCode(
 
     gcmASSERT(Opcode == clvOPCODE_RSHIFT || Opcode == clvOPCODE_LSHIFT);
 
+#if _SPLIT_HIGH_PRECISION_EXTENDED_VECTOR
+    noSplit = clmIsElementTypePacked(IOperand->dataType.elementType);
+#else
     noSplit = clmIsElementTypePacked(IOperand->dataType.elementType) ||
               (clmIsElementTypeHighPrecision(IOperand->dataType.elementType) && gcmOPT_oclInt64InVIR());
+#endif
 
     if (gcIsScalarDataType(ROperand0->dataType) || gcIsVectorDataType(ROperand0->dataType))
     {
@@ -10816,8 +11161,12 @@ clGenBitwiseExprCode(
 
     gcmASSERT(Opcode == clvOPCODE_AND_BITWISE || Opcode == clvOPCODE_OR_BITWISE || Opcode == clvOPCODE_XOR_BITWISE);
 
+#if _SPLIT_HIGH_PRECISION_EXTENDED_VECTOR
+    noSplit = clmIsElementTypePacked(IOperand->dataType.elementType);
+#else
     noSplit = clmIsElementTypePacked(IOperand->dataType.elementType) ||
               (clmIsElementTypeHighPrecision(IOperand->dataType.elementType) && gcmOPT_oclInt64InVIR());
+#endif
     if (gcIsDataTypeEqual(ROperand0->dataType, ROperand1->dataType) ||
         (gcIsScalarDataType(ROperand0->dataType) && gcIsScalarDataType(ROperand1->dataType))) {
         if (gcIsScalarDataType(ROperand0->dataType) || gcIsVectorDataType(ROperand0->dataType)) {
@@ -11043,7 +11392,6 @@ clGenArithmeticExprCode(
     case clvOPCODE_SUB:
     case clvOPCODE_FSUB:
     case clvOPCODE_MUL:
-    case clvOPCODE_MUL_Z:
     case clvOPCODE_FMUL:
     case clvOPCODE_MULLO:
     case clvOPCODE_DIV:
@@ -13131,12 +13479,19 @@ clGenGenericCode1(
         break;
     }
 
+#if _SPLIT_HIGH_PRECISION_EXTENDED_VECTOR
+    if(clmIsElementTypePacked(IOperand->dataType.elementType) ||
+       clmIsElementTypePacked(ROperand->dataType.elementType)) {
+        iSize = 1;
+    }
+#else
     if(clmIsElementTypePacked(IOperand->dataType.elementType) ||
        clmIsElementTypePacked(ROperand->dataType.elementType) ||
        (clmIsElementTypeHighPrecision(IOperand->dataType.elementType) && gcmOPT_oclInt64InVIR()) ||
        (clmIsElementTypeHighPrecision(ROperand->dataType.elementType) && gcmOPT_oclInt64InVIR())) {
         iSize = 1;
     }
+#endif
     else {
         iSize = gcGetDataTypeRegSize(IOperand->dataType);
     }
@@ -14008,11 +14363,17 @@ clGenGenericCode2(
 
     gcmVERIFY_OK(clsROPERAND_Dump(Compiler, ROperand1));
 
+#if _SPLIT_HIGH_PRECISION_EXTENDED_VECTOR
+    if(IOperand && clmIsElementTypePacked(IOperand->dataType.elementType)) {
+        keepSrcTargetAsOne = gcvTRUE;
+    }
+#else
     if(IOperand &&
         (clmIsElementTypePacked(IOperand->dataType.elementType) ||
          (clmIsElementTypeHighPrecision(IOperand->dataType.elementType) && gcmOPT_oclInt64InVIR()))) {
         keepSrcTargetAsOne = gcvTRUE;
     }
+#endif
 
     switch (Opcode) {
     case clvOPCODE_LESS_THAN:
@@ -14073,6 +14434,7 @@ clGenGenericCode2(
 
     case clvOPCODE_TEXTURE_LOAD:
     case clvOPCODE_CLAMP0MAX:
+    case clvOPCODE_CLAMPCOORD:
     case clvOPCODE_ATAN2:
 
     case clvOPCODE_POW:
@@ -14127,6 +14489,17 @@ clGenGenericCode2(
 
     case clvOPCODE_MOV_LONG:
     case clvOPCODE_UNPACK:
+
+    case clvOPCODE_CMAD:
+    case clvOPCODE_CMUL:
+    case clvOPCODE_CMADCJ:
+    case clvOPCODE_CMULCJ:
+    case clvOPCODE_CADDCJ:
+    case clvOPCODE_CSUBCJ:
+
+    case clvOPCODE_DP2:
+    case clvOPCODE_DP3:
+    case clvOPCODE_DP4:
         break;
 
     case clvOPCODE_IMAGE_SAMPLER:
@@ -14403,6 +14776,7 @@ clGenGenericCode2(
     case clvOPCODE_IMAGE_WRITE:
     case clvOPCODE_IMAGE_WRITE_3D:
     case clvOPCODE_CLAMP0MAX:
+    case clvOPCODE_CLAMPCOORD:
     case clvOPCODE_LOAD:
 
     case clvOPCODE_ATAN2:
@@ -14554,7 +14928,6 @@ clGenDotCode(
       clsIOPERAND_New(Compiler, intermIOperand, IOperand->dataType);
       clsROPERAND_InitializeUsingIOperand(intermROperand, intermIOperand);
       clsROPERAND_InitializeUsingIOperand(resultROperand, IOperand);
-    }
 
         startComponent = 0;
         for(i = 0; i < rSize; i++) {
@@ -14594,6 +14967,52 @@ clGenDotCode(
            }
            startComponent += 4;
         }
+    }
+    else
+    {
+        switch (vectorComponentCount)
+        {
+         case 1:
+             status = clGenGenericCode2(Compiler,
+                                       LineNo,
+                                       StringNo,
+                                       clvOPCODE_MUL,
+                                       IOperand,
+                                       ROperand0,
+                                       ROperand1);
+            break;
+         case 2:
+             status = clGenGenericCode2(Compiler,
+                                       LineNo,
+                                       StringNo,
+                                       clvOPCODE_DP2,
+                                       IOperand,
+                                       ROperand0,
+                                       ROperand1);
+             break;
+         case 3:
+             status = clGenGenericCode2(Compiler,
+                                       LineNo,
+                                       StringNo,
+                                       clvOPCODE_DP3,
+                                       IOperand,
+                                       ROperand0,
+                                       ROperand1);
+             break;
+         case 4:
+             status = clGenGenericCode2(Compiler,
+                                       LineNo,
+                                       StringNo,
+                                       clvOPCODE_DP4,
+                                       IOperand,
+                                       ROperand0,
+                                       ROperand1);
+             break;
+         default:
+             gcmASSERT(gcvFALSE);
+             break;
+        }
+    }
 
     return gcvSTATUS_OK;
 }
@@ -14835,25 +15254,31 @@ IN OUT clsGEN_CODE_PARAMETERS *RightParameters
           }
        }
        else {
+          clsGEN_CODE_DATA_TYPE newType;
+
           if(leftElementType > rightElementType) { /* convert right */
-             gcmASSERT(gcIsScalarDataType(RightParameters->dataTypes[i].def));
+             newType = RightParameters->dataTypes[i].def;
+             newType.elementType = leftElementType;
 
              status = _ImplicitConvertOperand(Compiler,
                                               LineNo,
                                               StringNo,
-                                              LeftParameters->dataTypes[i].def,
+                                              newType,
                                               &RightParameters->rOperands[i]);
              if(gcmIS_ERROR(status)) return status;
-             RightParameters->dataTypes[i].def = LeftParameters->dataTypes[i].def;
+             RightParameters->dataTypes[i].def = newType;
          }
          else if(LeftParameters->needROperand) { /* convert left */
+             newType = LeftParameters->dataTypes[i].def;
+             newType.elementType = rightElementType;
+
              status = _ImplicitConvertOperand(Compiler,
                                               LineNo,
                                               StringNo,
-                                              RightParameters->dataTypes[i].def,
+                                              newType,
                                               &LeftParameters->rOperands[i]);
              if(gcmIS_ERROR(status)) return status;
-             LeftParameters->dataTypes[i].def = RightParameters->dataTypes[i].def;
+             LeftParameters->dataTypes[i].def = newType;
          }
       }
    }
@@ -15012,8 +15437,6 @@ IN OUT clsGEN_CODE_PARAMETERS *RightParameters
              }
          }
          else if(LeftParameters->needROperand) { /* convert left */
-             gcmASSERT(gcIsScalarDataType(LeftParameters->dataTypes[i].def));
-
              status = _ImplicitConvertOperand(Compiler,
                                               operand1->base.lineNo,
                                               operand1->base.stringNo,
@@ -17811,6 +18234,7 @@ _CreateKernelArgumentOrArray(
                                         format,
                                         ParamName,
                                         logicalRegCount,
+                                        &ParamName->decl.array,
                                         &uniform);
 #else
     status = clNewUniform(Compiler,
@@ -17823,6 +18247,7 @@ _CreateKernelArgumentOrArray(
                           clmDECL_IsPointerType(&paramName->decl) ||
                           clmGEN_CODE_checkVariableForMemory(paramName),
                           logicalRegCount,
+                          &ParamName->decl.array,
                           &uniform);
 #endif
     if (gcmIS_ERROR(status)) return status;
@@ -18012,6 +18437,7 @@ OUT clsGEN_CODE_PARAMETERS * * OperandsParameters
                                                      format,
                                                      paramName,
                                                      logicalRegCount,
+                                                     &paramName->decl.array,
                                                      &uniform);
 #else
                  status = clNewUniform(Compiler,
@@ -18024,6 +18450,7 @@ OUT clsGEN_CODE_PARAMETERS * * OperandsParameters
                                        clmDECL_IsPointerType(&paramName->decl) ||
                                        clmGEN_CODE_checkVariableForMemory(paramName),
                                        logicalRegCount,
+                                       &paramName->decl.array,
                                        &uniform);
 #endif
                  if (gcmIS_ERROR(status)) return status;
@@ -18081,7 +18508,6 @@ OUT clsGEN_CODE_PARAMETERS * * OperandsParameters
    return status;
 }
 
-
 #define clmGetFunctionLabel(Compiler, FuncName, Label) \
     ((FuncName)->type == clvKERNEL_FUNC_NAME  \
       ?  clGetKernelFunctionLabel(Compiler, \
@@ -18098,17 +18524,23 @@ IN cloCODE_GENERATOR CodeGenerator,
 IN clsNAME *KernelFuncName
 )
 {
-    gceSTATUS        status;
+    gceSTATUS        status = gcvSTATUS_OK;
     gctUINT          operandCount = 0, i, j;
     clsGEN_CODE_PARAMETERS *operandsParameters = gcvNULL;
     clsNAME *        paramName;
     clsLOPERAND      lOperand[1];
+    clsIOPERAND      iOperand[1];
     clsIOPERAND      addressOffset[1];
     clsROPERAND      rOperand1[1], rOperand2[1];
     clsROPERAND      localBaseAddr[1];
     clsLOGICAL_REG   *regs;
     gctLABEL         funcLabel;
     gctBOOL          hasArgPtrToLocal = gcvFALSE;
+    gctREG_INDEX     tempRegIndex;
+    clsROPERAND      clusterOffset[1];
+    clsROPERAND      clusterIdOperand[1];
+    clsROPERAND      groupSize[1];
+    gctBOOL          hasMultiCluster = gcGetHWCaps()->hwFeatureFlags.multiCluster && HAS_MULTI_CLUSTER_SUPPORT;
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
@@ -18128,6 +18560,58 @@ IN clsNAME *KernelFuncName
                                                &operandsParameters);
     if (gcmIS_ERROR(status)) return status;
 
+/* has multi-cluster */
+    if(hasMultiCluster) {
+        clsNAME *numGroups;
+        clsNAME *clusterId;
+        clsROPERAND numGroupsOperand[1];
+
+        numGroups = cloCOMPILER_GetBuiltinVariable(Compiler, clvBUILTIN_NUM_GROUPS);
+        gcmONERROR(clsNAME_AllocLogicalRegs(Compiler,
+                                            CodeGenerator,
+                                            numGroups));
+
+        clsROPERAND_InitializeReg(numGroupsOperand,
+                                  numGroups->context.u.variable.logicalRegs);
+
+        tempRegIndex = clNewLocalTempRegs(Compiler, 1);
+        clsIOPERAND_Initialize(Compiler, iOperand, clmGenCodeDataType(T_UINT), tempRegIndex);
+        clmROPERAND_vectorComponent_GET(rOperand1, numGroupsOperand, clvCOMPONENT_X);
+        clmROPERAND_vectorComponent_GET(rOperand2, numGroupsOperand, clvCOMPONENT_Y);
+
+        gcmONERROR(clGenArithmeticExprCode(Compiler,
+                                           KernelFuncName->lineNo,
+                                           KernelFuncName->stringNo,
+                                           clvOPCODE_MUL,
+                                           iOperand,
+                                           rOperand1,
+                                           rOperand2));
+
+        clsROPERAND_InitializeUsingIOperand(rOperand1, iOperand);
+        tempRegIndex = clNewLocalTempRegs(Compiler, 1);
+        clsIOPERAND_Initialize(Compiler, iOperand, clmGenCodeDataType(T_UINT), tempRegIndex);
+        clmROPERAND_vectorComponent_GET(rOperand2, numGroupsOperand, clvCOMPONENT_Z);
+        gcmONERROR(clGenArithmeticExprCode(Compiler,
+                                           KernelFuncName->lineNo,
+                                           KernelFuncName->stringNo,
+                                           clvOPCODE_MUL,
+                                           iOperand,
+                                           rOperand1,
+                                           rOperand2));
+
+        clsROPERAND_InitializeUsingIOperand(groupSize, iOperand);
+
+        clusterId = cloCOMPILER_GetBuiltinVariable(Compiler, clvBUILTIN_CLUSTER_ID);
+        gcmONERROR(clsNAME_AllocLogicalRegs(Compiler,
+                                            CodeGenerator,
+                                            clusterId));
+
+        clsROPERAND_InitializeReg(clusterIdOperand,
+                                  clusterId->context.u.variable.logicalRegs);
+
+
+    }
+
     /* for all arguments */
     i = 0;
     FOR_EACH_DLINK_NODE(&KernelFuncName->u.funcInfo.localSpace->names, clsNAME, paramName) {
@@ -18141,22 +18625,27 @@ IN clsNAME *KernelFuncName
        for (j = 0; j < operandsParameters[i].operandCount; j += processed) {
            processed = 1;
            if(clmDECL_IsPointerType(&paramName->decl) &&
-              paramName->decl.dataType->addrSpaceQualifier == clvQUALIFIER_LOCAL) {
+              clGetAddrSpaceQualifier(&paramName->decl) == clvQUALIFIER_LOCAL) {
                clsIOPERAND_Initialize(Compiler,
                                       addressOffset,
                                       paramName->context.u.variable.logicalRegs[j].dataType,
                                       paramName->context.u.variable.logicalRegs[j].regIndex);
                if(!hasArgPtrToLocal) {
-                   clResetLocalTempRegs(Compiler, 0);
+                   clsNAME *localMemSize;
+
                    clsROPERAND_InitializeTempReg(Compiler,
                                                  rOperand1,
                                                  clvQUALIFIER_NONE,
                                                  clmGenCodeDataType(T_UINT),
-                                                 cldLocalMemoryAddressRegIndex);
+                                                 cldParmLocalMemoryAddressRegIndex);
 /* compute base address */
-                   regs = cloCOMPILER_GetBuiltinVariable(Compiler, clvBUILTIN_ARG_LOCAL_MEM_SIZE)
-                                                                               ->context.u.variable.logicalRegs;
-                   clsROPERAND_InitializeReg(rOperand2, regs);
+                   localMemSize = cloCOMPILER_GetBuiltinVariable(Compiler, clvBUILTIN_ARG_LOCAL_MEM_SIZE);
+                   /* Allocate all logical registers */
+                   gcmONERROR(clsNAME_AllocLogicalRegs(Compiler,
+                                                       CodeGenerator,
+                                                       localMemSize));
+
+                   clsROPERAND_InitializeReg(rOperand2, localMemSize->context.u.variable.logicalRegs);
                    status = _GenScaledIndexOperand(Compiler,
                                                    KernelFuncName->lineNo,
                                                    KernelFuncName->stringNo,
@@ -18164,6 +18653,47 @@ IN clsNAME *KernelFuncName
                                                    rOperand2,
                                                    localBaseAddr);
                    if (gcmIS_ERROR(status)) return status;
+
+                   if (hasMultiCluster) {
+/* total size for each cluster */
+                       tempRegIndex = clNewLocalTempRegs(Compiler, 1);
+                       clsIOPERAND_Initialize(Compiler, iOperand, clmGenCodeDataType(T_UINT), tempRegIndex);
+                       clsROPERAND_InitializeReg(rOperand1, localMemSize->context.u.variable.logicalRegs);
+
+                       gcmONERROR(clGenArithmeticExprCode(Compiler,
+                                                          KernelFuncName->lineNo,
+                                                          KernelFuncName->stringNo,
+                                                          clvOPCODE_MUL,
+                                                          iOperand,
+                                                          rOperand1,
+                                                          groupSize));
+
+ /* offset to cluster */
+                       clsROPERAND_InitializeUsingIOperand(rOperand1, iOperand);
+                       tempRegIndex = clNewLocalTempRegs(Compiler, 1);
+                       clsIOPERAND_Initialize(Compiler, iOperand, clmGenCodeDataType(T_UINT), tempRegIndex);
+                       gcmONERROR(clGenArithmeticExprCode(Compiler,
+                                                          KernelFuncName->lineNo,
+                                                          KernelFuncName->stringNo,
+                                                          clvOPCODE_MUL,
+                                                          iOperand,
+                                                          rOperand1,
+                                                          clusterIdOperand));
+                       clsROPERAND_InitializeUsingIOperand(clusterOffset, iOperand);
+
+                       tempRegIndex = clNewLocalTempRegs(Compiler, 1);
+                       clsIOPERAND_Initialize(Compiler, iOperand, clmGenCodeDataType(T_UINT), tempRegIndex);
+                       status = clGenArithmeticExprCode(Compiler,
+                                                        KernelFuncName->lineNo,
+                                                        KernelFuncName->stringNo,
+                                                        clvOPCODE_ADD,
+                                                        iOperand,
+                                                        localBaseAddr,
+                                                        clusterOffset);
+                       if (gcmIS_ERROR(status)) return status;
+                       clsROPERAND_InitializeUsingIOperand(localBaseAddr, iOperand);
+                   }
+
                    hasArgPtrToLocal = gcvTRUE;
                }
 
@@ -18247,6 +18777,40 @@ IN clsNAME *KernelFuncName
                                         gcvFALSE,
                                         rOperand1);
        if (gcmIS_ERROR(status)) return status;
+
+       if (hasMultiCluster) {
+/* total size for each cluster */
+           status = clGenScaledIndexOperand(Compiler,
+                                            KernelFuncName->lineNo,
+                                            KernelFuncName->stringNo,
+                                            groupSize,
+                                            KernelFuncName->u.funcInfo.localMemorySize,
+                                            gcvFALSE,
+                                            groupSize);
+           if (gcmIS_ERROR(status)) return status;
+
+           /* offset to cluster */
+           tempRegIndex = clNewLocalTempRegs(Compiler, 1);
+           clsIOPERAND_Initialize(Compiler, iOperand, clmGenCodeDataType(T_UINT), tempRegIndex);
+           gcmONERROR(clGenArithmeticExprCode(Compiler,
+                                              KernelFuncName->lineNo,
+                                              KernelFuncName->stringNo,
+                                              clvOPCODE_MUL,
+                                              iOperand,
+                                              groupSize,
+                                              clusterIdOperand));
+           clsROPERAND_InitializeUsingIOperand(clusterOffset, iOperand);
+
+           status = clGenArithmeticExprCode(Compiler,
+                                            KernelFuncName->lineNo,
+                                            KernelFuncName->stringNo,
+                                            clvOPCODE_ADD,
+                                            addressOffset,
+                                            rOperand1,
+                                            clusterOffset);
+           if (gcmIS_ERROR(status)) return status;
+           clsROPERAND_InitializeUsingIOperand(rOperand1, addressOffset);
+       }
        status = clGenArithmeticExprCode(Compiler,
                                         KernelFuncName->lineNo,
                                         KernelFuncName->stringNo,
@@ -18256,6 +18820,8 @@ IN clsNAME *KernelFuncName
                                         rOperand2);
        if (gcmIS_ERROR(status)) return status;
     }
+    clResetLocalTempRegs(Compiler, 0);
+
     /* Generate the call code */
 #if cldSupportMultiKernelFunction
     status = clGetKernelFunctionLabel(Compiler,
@@ -18277,7 +18843,8 @@ IN clsNAME *KernelFuncName
     gcmVERIFY_OK(cloIR_POLYNARY_EXPR_FinalizeOperandsParameters(Compiler,
                                     operandCount,
                                     operandsParameters));
-    return gcvSTATUS_OK;
+OnError:
+    return status;
 }
 
 #if cldSupportMultiKernelFunction
@@ -19991,8 +20558,6 @@ cloIR_ITERATION_TryToGenUnrolledCode(
             break;
         }
 
-        /* TODO: Check the loop body */
-
         /* Check the iteration count */
         status = _CheckIterationCount(CodeGenerator, &iterationUnrollInfo);
 
@@ -20602,17 +21167,6 @@ cloIR_ITERATION_GenDoWhileCode(
     return gcvSTATUS_OK;
 }
 
-#define SHAER_INSTCOUNT_THROSHOLDFORUNROLL 4000
-gctBOOL
-cloIR_Shader_CheckInstCountForUnroll(
-IN cloCOMPILER Compiler
-)
-{
-    gcSHADER binary;
-    gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
-    return (binary->codeCount <= SHAER_INSTCOUNT_THROSHOLDFORUNROLL);
-}
-
 gceSTATUS
 cloIR_ITERATION_GenCode(
 IN cloCOMPILER Compiler,
@@ -20629,8 +21183,7 @@ IN OUT clsGEN_CODE_PARAMETERS * Parameters
     clmVERIFY_IR_OBJECT(Iteration, clvIR_ITERATION);
     gcmASSERT(Parameters);
 
-    if (cloCOMPILER_OptimizationEnabled(Compiler, clvOPTIMIZATION_UNROLL_ITERATION) &&
-        cloIR_Shader_CheckInstCountForUnroll(Compiler)) {
+    if (cloCOMPILER_OptimizationEnabled(Compiler, clvOPTIMIZATION_UNROLL_ITERATION)) {
         status = cloIR_ITERATION_TryToGenUnrolledCode(Compiler,
                                 CodeGenerator,
                                 Iteration,
@@ -21568,470 +22121,1071 @@ clsGEN_CODE_DATA_TYPE DataType
     gcSHADER_TYPE type;
 
     type = gcSHADER_FLOAT_X4;
-    switch (clmGEN_CODE_elementType_GET(DataType)) {
-    case clvTYPE_BOOL:
-        switch (clmGEN_CODE_vectorSize_GET(DataType))
-        {
-        case 0:
-                   type = gcSHADER_BOOLEAN_X1;
-                   break;
+    if (gcmOPT_DriverVIRPath()) {
+        switch (clmGEN_CODE_elementType_GET(DataType)) {
+        case clvTYPE_BOOL:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_BOOLEAN_X1;
+                       break;
 
-        case 2:
-                   type = gcSHADER_BOOLEAN_X2;
-                   break;
+            case 2:
+                       type = gcSHADER_BOOLEAN_X2;
+                       break;
 
-        case 3:
-                   type = gcSHADER_BOOLEAN_X3;
-                   break;
+            case 3:
+                       type = gcSHADER_BOOLEAN_X3;
+                       break;
 
-        case 4:
-                   type = gcSHADER_BOOLEAN_X4;
-                   break;
+            case 4:
+                       type = gcSHADER_BOOLEAN_X4;
+                       break;
 
-        case 8:
-                   type = gcSHADER_BOOLEAN_X8;
-                   break;
+            case 8:
+                       type = gcSHADER_BOOLEAN_X8;
+                       break;
 
-        case 16:
-                   type = gcSHADER_BOOLEAN_X16;
-                   break;
+            case 16:
+                       type = gcSHADER_BOOLEAN_X16;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_BOOL_PACKED:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_BOOLEAN_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_BOOLEAN_P2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_BOOLEAN_P3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_BOOLEAN_P4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_BOOLEAN_P8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_BOOLEAN_P16;
+                       break;
+
+            case 32:
+                       type = gcSHADER_BOOLEAN_P32;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_LONG:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_INT64_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_INT64_X2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_INT64_X3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_INT64_X4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_INT64_X8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_INT64_X16;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_CHAR:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_INT8_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_INT8_X2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_INT8_X3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_INT8_X4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_INT8_X8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_INT8_X16;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_SHORT:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_INT16_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_INT16_X2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_INT16_X3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_INT16_X4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_INT16_X8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_INT16_X16;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_INT:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_INTEGER_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_INTEGER_X2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_INTEGER_X3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_INTEGER_X4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_INTEGER_X8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_INTEGER_X16;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_CHAR_PACKED:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_INTEGER_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_INT8_P2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_INT8_P3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_INT8_P4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_INT8_P8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_INT8_P16;
+                       break;
+
+            case 32:
+                       type = gcSHADER_INT8_P32;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_UCHAR_PACKED:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_UINT_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_UINT8_P2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_UINT8_P3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_UINT8_P4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_UINT8_P8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_UINT8_P16;
+                       break;
+
+            case 32:
+                       type = gcSHADER_UINT8_P32;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_HALF_PACKED:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_FLOAT_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_FLOAT16_P2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_FLOAT16_P3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_FLOAT16_P4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_FLOAT16_P8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_FLOAT16_P16;
+                       break;
+
+            case 32:
+                       type = gcSHADER_FLOAT16_P32;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_SHORT_PACKED:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_INTEGER_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_INT16_P2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_INT16_P3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_INT16_P4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_INT16_P8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_INT16_P16;
+                       break;
+
+            case 32:
+                       type = gcSHADER_INT16_P32;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_USHORT_PACKED:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_UINT_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_UINT16_P2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_UINT16_P3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_UINT16_P4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_UINT16_P8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_UINT16_P16;
+                       break;
+
+            case 32:
+                       type = gcSHADER_UINT16_P32;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_ULONG:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_UINT64_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_UINT64_X2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_UINT64_X3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_UINT64_X4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_UINT64_X8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_UINT64_X16;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_UCHAR:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_UINT8_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_UINT8_X2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_UINT8_X3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_UINT8_X4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_UINT8_X8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_UINT8_X16;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_USHORT:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_UINT16_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_UINT16_X2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_UINT16_X3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_UINT16_X4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_UINT16_X8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_UINT16_X16;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_UINT:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_UINT_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_UINT_X2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_UINT_X3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_UINT_X4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_UINT_X8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_UINT_X16;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+
+        case clvTYPE_FLOAT:
+        case clvTYPE_HALF:
+        case clvTYPE_DOUBLE:
+            switch (clmGEN_CODE_vectorSize_GET(DataType)) {
+            case 0:
+                       type = gcSHADER_FLOAT_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_FLOAT_X2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_FLOAT_X3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_FLOAT_X4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_FLOAT_X8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_FLOAT_X16;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_EVENT_T:
+            type = gcSHADER_INTEGER_X1;
+            break;
+
+        case clvTYPE_SAMPLER_T:
+            type = gcSHADER_SAMPLER_T;
+            break;
+
+        case clvTYPE_IMAGE2D_T:
+            type = gcSHADER_IMAGE_2D_T;
+            break;
+
+        case clvTYPE_IMAGE3D_T:
+            type = gcSHADER_IMAGE_3D_T;
+            break;
+
+        case clvTYPE_IMAGE2D_ARRAY_T:
+            type = gcSHADER_IMAGE_2D_ARRAY_T;
+            break;
+
+        case clvTYPE_IMAGE1D_T:
+            type = gcSHADER_IMAGE_1D_T;
+            break;
+
+        case clvTYPE_IMAGE1D_ARRAY_T:
+            type = gcSHADER_IMAGE_1D_ARRAY_T;
+            break;
+
+        case clvTYPE_IMAGE1D_BUFFER_T:
+            type = gcSHADER_IMAGE_1D_BUFFER_T;
+            break;
+
+        case clvTYPE_VIV_GENERIC_IMAGE_T:
+            type = gcSHADER_VIV_GENERIC_IMAGE_T;
+            break;
+
+        case clvTYPE_SAMPLER2D:
+            type = gcSHADER_SAMPLER_2D;
+            break;
+
+        case clvTYPE_SAMPLER3D:
+            type = gcSHADER_SAMPLER_3D;
+            break;
+
+        case clvTYPE_STRUCT:
+        case clvTYPE_UNION:
+            type = gcSHADER_INTEGER_X4;
+            break;
 
         default:
-           gcmASSERT(0);
+            type = gcSHADER_INTEGER_X1;
+            break;
         }
-        break;
-
-    case clvTYPE_BOOL_PACKED:
-        switch (clmGEN_CODE_vectorSize_GET(DataType))
-        {
-        case 0:
-                   type = gcSHADER_BOOLEAN_X1;
-                   break;
-
-        case 2:
-                   type = gcSHADER_BOOLEAN_P2;
-                   break;
-
-        case 3:
-                   type = gcSHADER_BOOLEAN_P3;
-                   break;
-
-        case 4:
-                   type = gcSHADER_BOOLEAN_P4;
-                   break;
-
-        case 8:
-                   type = gcSHADER_BOOLEAN_P8;
-                   break;
-
-        case 16:
-                   type = gcSHADER_BOOLEAN_P16;
-                   break;
-
-        case 32:
-                   type = gcSHADER_BOOLEAN_P32;
-                   break;
-
-        default:
-           gcmASSERT(0);
-        }
-        break;
-
-    case clvTYPE_LONG:
-        switch (clmGEN_CODE_vectorSize_GET(DataType))
-        {
-        case 0:
-                   type = gcSHADER_INT64_X1;
-                   break;
-
-        case 2:
-                   type = gcSHADER_INT64_X2;
-                   break;
-
-        case 3:
-                   type = gcSHADER_INT64_X3;
-                   break;
-
-        case 4:
-                   type = gcSHADER_INT64_X4;
-                   break;
-
-        case 8:
-                   type = gcSHADER_INT64_X8;
-                   break;
-
-        case 16:
-                   type = gcSHADER_INT64_X16;
-                   break;
-
-        default:
-           gcmASSERT(0);
-        }
-        break;
-
-    case clvTYPE_INT:
-    case clvTYPE_SHORT:
-    case clvTYPE_CHAR:
-        switch (clmGEN_CODE_vectorSize_GET(DataType))
-        {
-        case 0:
-                   type = gcSHADER_INTEGER_X1;
-                   break;
-
-        case 2:
-                   type = gcSHADER_INTEGER_X2;
-                   break;
-
-        case 3:
-                   type = gcSHADER_INTEGER_X3;
-                   break;
-
-        case 4:
-                   type = gcSHADER_INTEGER_X4;
-                   break;
-
-        case 8:
-                   type = gcSHADER_INTEGER_X8;
-                   break;
-
-        case 16:
-                   type = gcSHADER_INTEGER_X16;
-                   break;
-
-        default:
-           gcmASSERT(0);
-        }
-        break;
-
-    case clvTYPE_CHAR_PACKED:
-        switch (clmGEN_CODE_vectorSize_GET(DataType))
-        {
-        case 0:
-                   type = gcSHADER_INTEGER_X1;
-                   break;
-
-        case 2:
-                   type = gcSHADER_INT8_P2;
-                   break;
-
-        case 3:
-                   type = gcSHADER_INT8_P3;
-                   break;
-
-        case 4:
-                   type = gcSHADER_INT8_P4;
-                   break;
-
-        case 8:
-                   type = gcSHADER_INT8_P8;
-                   break;
-
-        case 16:
-                   type = gcSHADER_INT8_P16;
-                   break;
-
-        case 32:
-                   type = gcSHADER_INT8_P32;
-                   break;
-
-        default:
-           gcmASSERT(0);
-        }
-        break;
-
-    case clvTYPE_UCHAR_PACKED:
-        switch (clmGEN_CODE_vectorSize_GET(DataType))
-        {
-        case 0:
-                   type = gcSHADER_UINT_X1;
-                   break;
-
-        case 2:
-                   type = gcSHADER_UINT8_P2;
-                   break;
-
-        case 3:
-                   type = gcSHADER_UINT8_P3;
-                   break;
-
-        case 4:
-                   type = gcSHADER_UINT8_P4;
-                   break;
-
-        case 8:
-                   type = gcSHADER_UINT8_P8;
-                   break;
-
-        case 16:
-                   type = gcSHADER_UINT8_P16;
-                   break;
-
-        case 32:
-                   type = gcSHADER_UINT8_P32;
-                   break;
-
-        default:
-           gcmASSERT(0);
-        }
-        break;
-
-    case clvTYPE_HALF_PACKED:
-        switch (clmGEN_CODE_vectorSize_GET(DataType))
-        {
-        case 0:
-                   type = gcSHADER_FLOAT_X1;
-                   break;
-
-        case 2:
-                   type = gcSHADER_FLOAT16_P2;
-                   break;
-
-        case 3:
-                   type = gcSHADER_FLOAT16_P3;
-                   break;
-
-        case 4:
-                   type = gcSHADER_FLOAT16_P4;
-                   break;
-
-        case 8:
-                   type = gcSHADER_FLOAT16_P8;
-                   break;
-
-        case 16:
-                   type = gcSHADER_FLOAT16_P16;
-                   break;
-
-        case 32:
-                   type = gcSHADER_FLOAT16_P32;
-                   break;
-
-        default:
-           gcmASSERT(0);
-        }
-        break;
-
-    case clvTYPE_SHORT_PACKED:
-        switch (clmGEN_CODE_vectorSize_GET(DataType))
-        {
-        case 0:
-                   type = gcSHADER_INTEGER_X1;
-                   break;
-
-        case 2:
-                   type = gcSHADER_INT16_P2;
-                   break;
-
-        case 3:
-                   type = gcSHADER_INT16_P3;
-                   break;
-
-        case 4:
-                   type = gcSHADER_INT16_P4;
-                   break;
-
-        case 8:
-                   type = gcSHADER_INT16_P8;
-                   break;
-
-        case 16:
-                   type = gcSHADER_INT16_P16;
-                   break;
-
-        case 32:
-                   type = gcSHADER_INT16_P32;
-                   break;
-
-        default:
-           gcmASSERT(0);
-        }
-        break;
-
-    case clvTYPE_USHORT_PACKED:
-        switch (clmGEN_CODE_vectorSize_GET(DataType))
-        {
-        case 0:
-                   type = gcSHADER_UINT_X1;
-                   break;
-
-        case 2:
-                   type = gcSHADER_UINT16_P2;
-                   break;
-
-        case 3:
-                   type = gcSHADER_UINT16_P3;
-                   break;
-
-        case 4:
-                   type = gcSHADER_UINT16_P4;
-                   break;
-
-        case 8:
-                   type = gcSHADER_UINT16_P8;
-                   break;
-
-        case 16:
-                   type = gcSHADER_UINT16_P16;
-                   break;
-
-        case 32:
-                   type = gcSHADER_UINT16_P32;
-                   break;
-
-        default:
-           gcmASSERT(0);
-        }
-        break;
-
-    case clvTYPE_ULONG:
-        switch (clmGEN_CODE_vectorSize_GET(DataType))
-        {
-        case 0:
-                   type = gcSHADER_UINT64_X1;
-                   break;
-
-        case 2:
-                   type = gcSHADER_UINT64_X2;
-                   break;
-
-        case 3:
-                   type = gcSHADER_UINT64_X3;
-                   break;
-
-        case 4:
-                   type = gcSHADER_UINT64_X4;
-                   break;
-
-        case 8:
-                   type = gcSHADER_UINT64_X8;
-                   break;
-
-        case 16:
-                   type = gcSHADER_UINT64_X16;
-                   break;
-
-        default:
-           gcmASSERT(0);
-        }
-        break;
-
-    case clvTYPE_UINT:
-    case clvTYPE_USHORT:
-    case clvTYPE_UCHAR:
-        switch (clmGEN_CODE_vectorSize_GET(DataType))
-        {
-        case 0:
-                   type = gcSHADER_UINT_X1;
-                   break;
-
-        case 2:
-                   type = gcSHADER_UINT_X2;
-                   break;
-
-        case 3:
-                   type = gcSHADER_UINT_X3;
-                   break;
-
-        case 4:
-                   type = gcSHADER_UINT_X4;
-                   break;
-
-        case 8:
-                   type = gcSHADER_UINT_X8;
-                   break;
-
-        case 16:
-                   type = gcSHADER_UINT_X16;
-                   break;
-
-        default:
-           gcmASSERT(0);
-        }
-        break;
-
-
-    case clvTYPE_FLOAT:
-    case clvTYPE_HALF:
-    case clvTYPE_DOUBLE:
-        switch (clmGEN_CODE_vectorSize_GET(DataType)) {
-        case 0:
-                   type = gcSHADER_FLOAT_X1;
-                   break;
-
-        case 2:
-                   type = gcSHADER_FLOAT_X2;
-                   break;
-
-        case 3:
-                   type = gcSHADER_FLOAT_X3;
-                   break;
-
-        case 4:
-                   type = gcSHADER_FLOAT_X4;
-                   break;
-
-        case 8:
-                   type = gcSHADER_FLOAT_X8;
-                   break;
-
-        case 16:
-                   type = gcSHADER_FLOAT_X16;
-                   break;
-
-        default:
-           gcmASSERT(0);
-        }
-        break;
-
-    case clvTYPE_EVENT_T:
-        type = gcSHADER_INTEGER_X1;
-        break;
-
-    case clvTYPE_SAMPLER_T:
-        type = gcSHADER_SAMPLER;
-        break;
-
-    case clvTYPE_IMAGE2D_T:
-        type = gcSHADER_IMAGE_2D;
-        break;
-
-    case clvTYPE_IMAGE3D_T:
-        type = gcSHADER_IMAGE_3D;
-        break;
-
-    case clvTYPE_IMAGE2D_ARRAY_T:
-        type = gcSHADER_IMAGE_2D_ARRAY;
-        break;
-
-    case clvTYPE_IMAGE1D_T:
-        type = gcSHADER_IMAGE_1D;
-        break;
-
-    case clvTYPE_IMAGE1D_ARRAY_T:
-        type = gcSHADER_IMAGE_1D_ARRAY;
-        break;
-
-    case clvTYPE_IMAGE1D_BUFFER_T:
-        type = gcSHADER_IMAGE_1D_BUFFER;
-        break;
-
-    case clvTYPE_SAMPLER2D:
-        type = gcSHADER_SAMPLER_2D;
-        break;
-
-    case clvTYPE_SAMPLER3D:
-        type = gcSHADER_SAMPLER_3D;
-        break;
-
-    case clvTYPE_STRUCT:
-    case clvTYPE_UNION:
-        type = gcSHADER_INTEGER_X4;
-        break;
-
-    default:
-        type = gcSHADER_INTEGER_X1;
-        break;
     }
+    else {
+        switch (clmGEN_CODE_elementType_GET(DataType)) {
+        case clvTYPE_BOOL:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_BOOLEAN_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_BOOLEAN_X2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_BOOLEAN_X3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_BOOLEAN_X4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_BOOLEAN_X8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_BOOLEAN_X16;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_BOOL_PACKED:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_BOOLEAN_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_BOOLEAN_P2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_BOOLEAN_P3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_BOOLEAN_P4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_BOOLEAN_P8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_BOOLEAN_P16;
+                       break;
+
+            case 32:
+                       type = gcSHADER_BOOLEAN_P32;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_LONG:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_INT64_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_INT64_X2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_INT64_X3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_INT64_X4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_INT64_X8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_INT64_X16;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_INT:
+        case clvTYPE_SHORT:
+        case clvTYPE_CHAR:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_INTEGER_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_INTEGER_X2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_INTEGER_X3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_INTEGER_X4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_INTEGER_X8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_INTEGER_X16;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_CHAR_PACKED:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_INTEGER_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_INT8_P2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_INT8_P3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_INT8_P4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_INT8_P8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_INT8_P16;
+                       break;
+
+            case 32:
+                       type = gcSHADER_INT8_P32;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_UCHAR_PACKED:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_UINT_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_UINT8_P2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_UINT8_P3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_UINT8_P4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_UINT8_P8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_UINT8_P16;
+                       break;
+
+            case 32:
+                       type = gcSHADER_UINT8_P32;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_HALF_PACKED:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_FLOAT_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_FLOAT16_P2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_FLOAT16_P3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_FLOAT16_P4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_FLOAT16_P8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_FLOAT16_P16;
+                       break;
+
+            case 32:
+                       type = gcSHADER_FLOAT16_P32;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_SHORT_PACKED:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_INTEGER_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_INT16_P2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_INT16_P3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_INT16_P4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_INT16_P8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_INT16_P16;
+                       break;
+
+            case 32:
+                       type = gcSHADER_INT16_P32;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_USHORT_PACKED:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_UINT_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_UINT16_P2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_UINT16_P3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_UINT16_P4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_UINT16_P8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_UINT16_P16;
+                       break;
+
+            case 32:
+                       type = gcSHADER_UINT16_P32;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_ULONG:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_UINT64_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_UINT64_X2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_UINT64_X3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_UINT64_X4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_UINT64_X8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_UINT64_X16;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_UINT:
+        case clvTYPE_USHORT:
+        case clvTYPE_UCHAR:
+            switch (clmGEN_CODE_vectorSize_GET(DataType))
+            {
+            case 0:
+                       type = gcSHADER_UINT_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_UINT_X2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_UINT_X3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_UINT_X4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_UINT_X8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_UINT_X16;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+
+        case clvTYPE_FLOAT:
+        case clvTYPE_HALF:
+        case clvTYPE_DOUBLE:
+            switch (clmGEN_CODE_vectorSize_GET(DataType)) {
+            case 0:
+                       type = gcSHADER_FLOAT_X1;
+                       break;
+
+            case 2:
+                       type = gcSHADER_FLOAT_X2;
+                       break;
+
+            case 3:
+                       type = gcSHADER_FLOAT_X3;
+                       break;
+
+            case 4:
+                       type = gcSHADER_FLOAT_X4;
+                       break;
+
+            case 8:
+                       type = gcSHADER_FLOAT_X8;
+                       break;
+
+            case 16:
+                       type = gcSHADER_FLOAT_X16;
+                       break;
+
+            default:
+               gcmASSERT(0);
+            }
+            break;
+
+        case clvTYPE_EVENT_T:
+            type = gcSHADER_INTEGER_X1;
+            break;
+
+        case clvTYPE_SAMPLER_T:
+            type = gcSHADER_SAMPLER_T;
+            break;
+
+        case clvTYPE_IMAGE2D_T:
+            type = gcSHADER_IMAGE_2D_T;
+            break;
+
+        case clvTYPE_IMAGE3D_T:
+            type = gcSHADER_IMAGE_3D_T;
+            break;
+
+        case clvTYPE_IMAGE2D_ARRAY_T:
+            type = gcSHADER_IMAGE_2D_ARRAY_T;
+            break;
+
+        case clvTYPE_IMAGE1D_T:
+            type = gcSHADER_IMAGE_1D_T;
+            break;
+
+        case clvTYPE_IMAGE1D_ARRAY_T:
+            type = gcSHADER_IMAGE_1D_ARRAY_T;
+            break;
+
+        case clvTYPE_IMAGE1D_BUFFER_T:
+            type = gcSHADER_IMAGE_1D_BUFFER_T;
+            break;
+
+            case clvTYPE_VIV_GENERIC_IMAGE_T:
+                type = gcSHADER_VIV_GENERIC_IMAGE_T;
+                break;
+
+            case clvTYPE_SAMPLER2D:
+                type = gcSHADER_SAMPLER_2D;
+                break;
+
+            case clvTYPE_SAMPLER3D:
+                type = gcSHADER_SAMPLER_3D;
+                break;
+
+            case clvTYPE_STRUCT:
+            case clvTYPE_UNION:
+                type = gcSHADER_INTEGER_X4;
+                break;
+
+            default:
+                type = gcSHADER_INTEGER_X1;
+                break;
+        }
+    }
+
     return type;
 }
 
@@ -22049,29 +23203,57 @@ cluCONSTANT_VALUE *ValueEnd
     gcmASSERT((ValueStart + ComponentCount) <= ValueEnd);
     gcoOS_ZeroMemory(Value, gcmSIZEOF(gcsValue));
 
-    if(clmIsElementTypeSigned(ElementType)) { /* signed integer */
-        for(i = 0; i < ComponentCount; i++) {
-            Value->i32_v16[i] = ValueStart[i].intValue;
-        }
-    }
-    else if(clmIsElementTypeUnsigned(ElementType)) {
-        for(i = 0; i < ComponentCount; i++) {
-            Value->u32_v16[i] = ValueStart[i].uintValue;
-        }
-    }
-    else if(clmIsElementTypeFloating(ElementType)) {
-        for(i = 0; i < ComponentCount; i++) {
-            Value->f32_v16[i] = ValueStart[i].floatValue;
+    if(clmIsElementTypePacked(ElementType)) {
+        switch(ElementType) {
+        case clvTYPE_CHAR_PACKED:
+            for(i = 0; i < ComponentCount; i++) {
+                Value->i8_v16[i] = ValueStart[i].charValue;
+            }
+            break;
+        case clvTYPE_UCHAR_PACKED:
+            for(i = 0; i < ComponentCount; i++) {
+                Value->u8_v16[i] = ValueStart[i].ucharValue;
+            }
+            break;
+        case clvTYPE_SHORT_PACKED:
+            for(i = 0; i < ComponentCount; i++) {
+                Value->i16_v16[i] = ValueStart[i].shortValue;
+            }
+            break;
+        case clvTYPE_USHORT_PACKED:
+            for(i = 0; i < ComponentCount; i++) {
+                Value->u16_v16[i] = ValueStart[i].ushortValue;
+            }
+            break;
+        default:
+            gcmASSERT(0);
+            break;
         }
     }
     else {
-        gcmASSERT(0);
-        return gcvSTATUS_INVALID_ARGUMENT;
+        if(clmIsElementTypeSigned(ElementType)) { /* signed integer */
+            for(i = 0; i < ComponentCount; i++) {
+                Value->i32_v16[i] = ValueStart[i].intValue;
+            }
+        }
+        else if(clmIsElementTypeUnsigned(ElementType)) {
+            for(i = 0; i < ComponentCount; i++) {
+                Value->u32_v16[i] = ValueStart[i].uintValue;
+            }
+        }
+        else if(clmIsElementTypeFloating(ElementType)) {
+            for(i = 0; i < ComponentCount; i++) {
+                Value->f32_v16[i] = ValueStart[i].floatValue;
+            }
+        }
+        else {
+            gcmASSERT(0);
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
     }
     return gcvSTATUS_OK;
 }
 
-#if _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES
 static gceSTATUS
 _ConvFieldConstantToGcsValue(
 gcsValue *Value,
@@ -22089,31 +23271,51 @@ gctSTRING Buffer
     if(vectorSize == 0) vectorSize = 1;
     switch(Decl->dataType->elementType) {
     case clvTYPE_CHAR:
-    case clvTYPE_CHAR_PACKED:
         for(i = 0; i < vectorSize; i++, ptr++) {
             Value->i32_v16[i] = *((gctINT8 *) ptr);
         }
         break;
 
+    case clvTYPE_CHAR_PACKED:
+        for(i = 0; i < vectorSize; i++, ptr++) {
+            Value->i8_v16[i] = *((gctINT8 *) ptr);
+        }
+        break;
+
     case clvTYPE_UCHAR:
-    case clvTYPE_UCHAR_PACKED:
-    case clvTYPE_BOOL_PACKED:
         for(i = 0; i < vectorSize; i++, ptr++) {
             Value->u32_v16[i] = *((gctUINT8 *) ptr);
         }
         break;
 
+    case clvTYPE_UCHAR_PACKED:
+    case clvTYPE_BOOL_PACKED:
+        for(i = 0; i < vectorSize; i++, ptr++) {
+            Value->u8_v16[i] = *((gctUINT8 *) ptr);
+        }
+        break;
+
     case clvTYPE_SHORT:
-    case clvTYPE_SHORT_PACKED:
         for(i = 0; i < vectorSize; i++, ptr += 2) {
             Value->i32_v16[i] = *((gctINT16 *) ptr);
         }
         break;
 
+    case clvTYPE_SHORT_PACKED:
+        for(i = 0; i < vectorSize; i++, ptr += 2) {
+            Value->i16_v16[i] = *((gctINT16 *) ptr);
+        }
+        break;
+
     case clvTYPE_USHORT:
-    case clvTYPE_USHORT_PACKED:
         for(i = 0; i < vectorSize; i++, ptr += 2) {
             Value->u32_v16[i] = *((gctUINT16 *) ptr);
+        }
+        break;
+
+    case clvTYPE_USHORT_PACKED:
+        for(i = 0; i < vectorSize; i++, ptr += 2) {
+            Value->u16_v16[i] = *((gctUINT16 *) ptr);
         }
         break;
 
@@ -22173,7 +23375,7 @@ IN OUT gctUINT * UniformOffset
 
     if(clmDECL_IsUnderlyingStructOrUnion(Decl)) {
         gctSIZE_T fieldOffset;
-        gctSIZE_T offset;
+        gctUINT offset;
         gctSIZE_T symLen;
         gcmASSERT(Decl->dataType->u.fieldSpace);
 
@@ -22188,7 +23390,7 @@ IN OUT gctUINT * UniformOffset
                                                 i));
             }
             FOR_EACH_DLINK_NODE(&Decl->dataType->u.fieldSpace->names, clsNAME, fieldName) {
-                gctSIZE_T curOffset = offset;
+                gctUINT curOffset = offset;
 
                 gcmASSERT(fieldName->decl.dataType);
                 fieldOffset = clGetFieldByteOffset(Compiler,
@@ -22230,7 +23432,10 @@ IN OUT gctUINT * UniformOffset
                                          &uniform);
             if(gcmIS_ERROR(status)) return status;
             gcmASSERT(Constant->variable);
-            SetUniformOffset(uniform, ByteOffset + clmNAME_VariableMemoryOffset_GET(Constant->variable));
+            if (clmNAME_VariableHasMemoryOffset(Constant->variable))
+            {
+                SetUniformOffset(uniform, ByteOffset + clmNAME_VariableMemoryOffset_GET(Constant->variable));
+            }
             SetUniformFlag(uniform, gcvUNIFORM_FLAG_COMPILETIME_INITIALIZED);
             SetUniformArrayStride(uniform, elementByteSize);
             gcUNIFORM_SetFormat(uniform, format, gcvFALSE);
@@ -22326,7 +23531,7 @@ IN clsDECL *Decl
 }
 
 static gceSTATUS
-_SetOperandConstants(
+_SetOperandConstantsInUniforms(
 IN cloCOMPILER Compiler,
 IN clsDECL * Decl,
 IN cloIR_CONSTANT Constant,
@@ -22362,7 +23567,7 @@ IN OUT gctUINT * Start
 
     if(Constant->variable &&
        Constant->u.uniformArr == gcvNULL &&
-       (!clmDECL_IsScalar(&Constant->exprBase.decl) ||
+       (!(clmDECL_IsScalar(&Constant->exprBase.decl) || clmDECL_IsBVecOrIVecOrVec(&Constant->exprBase.decl) || Constant->allValuesEqual) ||
         clmDATA_TYPE_IsHighPrecision(Constant->exprBase.decl.dataType))) {
         gctPOINTER pointer;
         gctSTRING nameBuffer = gcvNULL;
@@ -22394,15 +23599,13 @@ IN OUT gctUINT * Start
             namePtr = nameBuffer;
         }
         else {
-            if(Constant->variable) {
-                namePtr = Constant->variable->symbol;
-            }
-            else {
-                status = cloCOMPILER_MakeConstantName(Compiler,
-                                                      "CONSTANT",
-                                                      &namePtr);
+            if(!Constant->variable) {
+                status = clMakeConstantVariableName(Compiler,
+                                                    Constant);
                 if (gcmIS_ERROR(status)) return status;
+                gcmASSERT(Constant->variable);
             }
+            namePtr = Constant->variable->symbol;
             symLen = gcoOS_StrLen(namePtr, gcvNULL);
         }
         status = _InitializeConstantsUniforms(Compiler,
@@ -22430,7 +23633,7 @@ IN OUT gctUINT * Start
 
                 fieldOffset += ByteOffset;
 
-                status = _SetOperandConstants(Compiler,
+                status = _SetOperandConstantsInUniforms(Compiler,
                                   &fieldName->decl,
                                   Constant,
                                   Parameters,
@@ -22455,23 +23658,8 @@ IN OUT gctUINT * Start
 
         operand = Parameters->rOperands + *Start;
         operandCount = _GetLogicalOperandCount(Decl);
-        if(Constant->variable &&
-           (!clmDECL_IsScalar(Decl) ||
-            clmDATA_TYPE_IsHighPrecision(Decl->dataType))) {
-            gctREG_INDEX regSize = gcGetDataTypeRegSize(binaryDataType);
-
-            for(i = 0; i < operandCount; i++) {
-                clsLOGICAL_REG_InitializeUniform(Compiler,
-                                                 reg,
-                                                 clvQUALIFIER_UNIFORM,
-                                                 binaryDataType,
-                                                 Constant->u.uniformArr[*UniformOffset],
-                                                 i * regSize,
-                                                 gcvFALSE);
-                clsROPERAND_InitializeReg(operand + i, reg);
-            }
-        }
-        else { /* scalar type */
+        if(clmDECL_IsScalar(Decl) || Constant->allValuesEqual)
+        {
             if (clmDECL_IsUnderlyingStructOrUnion(&Constant->exprBase.decl)) {
                 cluCONSTANT_VALUE values[cldMAX_VECTOR_COMPONENT];
 
@@ -22491,12 +23679,70 @@ IN OUT gctUINT * Start
                                                Constant->values + *ValueStart);
             }
         }
+        else if(Constant->variable &&
+                (clmDECL_IsAggregateType(&Constant->exprBase.decl) ||
+                 clmDATA_TYPE_IsHighPrecision(Decl->dataType))) {
+            gctREG_INDEX regSize = gcGetDataTypeRegSize(binaryDataType);
+
+            for(i = 0; i < operandCount; i++) {
+                clsLOGICAL_REG_InitializeUniform(Compiler,
+                                                 reg,
+                                                 clvQUALIFIER_UNIFORM,
+                                                 binaryDataType,
+                                                 Constant->u.uniformArr[*UniformOffset],
+                                                 i * regSize,
+                                                 gcvFALSE);
+                clsROPERAND_InitializeReg(operand + i, reg);
+            }
+        }
+        else {  /* is vector */
+            if(Constant->u.uniformVector == gcvNULL) {
+                gcSHADER shader;
+                gcSHADER_TYPE type = _GetShaderDataType(binaryDataType);
+                gcSL_FORMAT format = clConvDataTypeToFormat(binaryDataType);
+                cltPOOL_STRING symbolInPool;
+                gcsValue value[1];
+
+                status = _ConvConstantValueToGcsValue(value,
+                                                      binaryDataType.elementType,
+                                                      componentCount,
+                                                      Constant->values + *ValueStart,
+                                                      Constant->values + Constant->valueCount);
+                if(gcmIS_ERROR(status)) return status;
+
+                gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &shader));
+                if(Constant->variable) {
+                    symbolInPool = Constant->variable->symbol;
+                }
+                else {
+                    status = cloCOMPILER_MakeConstantName(Compiler,
+                                                          "CONSTANT",
+                                                          &symbolInPool);
+                    if(gcmIS_ERROR(status)) return status;
+                }
+                status = gcSHADER_AddUniformWithInitializer(shader,
+                                                            symbolInPool,
+                                                            type,
+                                                            1,
+                                                            gcSHADER_PRECISION_DEFAULT,
+                                                            value,
+                                                            &Constant->u.uniformVector);
+                if(gcmIS_ERROR(status)) return status;
+                gcUNIFORM_SetFormat(Constant->u.uniformVector, format, gcvFALSE);
+            }
+            clsLOGICAL_REG_InitializeUniform(Compiler,
+                                             reg,
+                                             clvQUALIFIER_UNIFORM,
+                                             binaryDataType,
+                                             Constant->u.uniformVector,
+                                             0,
+                                             gcvFALSE);
+            clsROPERAND_InitializeReg(Parameters->rOperands, reg);
+        }
         *Start = *Start + operandCount;
 
         if(Parameters->hasIOperand) {
            gceSTATUS status;
-
-           gcmASSERT(Parameters->operandCount == 1 && *Start == 0);
            _clmAssignROperandToPreallocatedTempReg(Compiler,
                                                    Parameters,
                                                    &Parameters->rOperands[0],
@@ -22510,8 +23756,7 @@ IN OUT gctUINT * Start
 
     return gcvSTATUS_OK;
 }
-#else
-/*KLC : need work here */
+
 static gceSTATUS
 _SetOperandConstants(
 IN cloCOMPILER Compiler,
@@ -22524,154 +23769,165 @@ IN OUT gctUINT * ValueStart,
 IN OUT gctUINT * Start
 )
 {
-    gceSTATUS status;
-    gctUINT    count, i;
-    gctSIZE_T  elementByteSize = 0;
-    clsNAME *fieldName;
-    clsGEN_CODE_DATA_TYPE binaryDataType;
-    gctUINT    componentCount;
-    gctUINT byteOffset;
-
-    /* Verify the arguments. */
-    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
-    gcmASSERT(Decl  && Decl->dataType);
-    gcmASSERT(Constant);
-    gcmASSERT(Parameters);
-    gcmASSERT(ValueStart);
-    gcmASSERT(Start);
-
-    if (clmDECL_IsArray(Decl)) {
-       clmGetArrayElementCount(Decl->array, 0, count);
-       elementByteSize = clsDECL_GetElementByteSize(Compiler,
-                                                    Decl,
-                                                    gcvNULL,
-                                                    gcvNULL);
-    }
-    else count = 1;
-
-    binaryDataType    = _ConvElementDataType(Decl);
-    componentCount    = gcGetDataTypeComponentCount(binaryDataType);
-    byteOffset = clsDECL_GetElementByteSize(Compiler, Decl, gcvNULL, gcvNULL);
-    for (i = 0; i < count; i++) {
-        if (clmDATA_TYPE_IsStructOrUnion(Decl->dataType)) {
-
-            gcmASSERT(Decl->dataType->u.fieldSpace);
-
-            FOR_EACH_DLINK_NODE(&Decl->dataType->u.fieldSpace->names, clsNAME, fieldName)
-            {
-                gctSIZE_T fieldOffset = clGetFieldByteOffset(Compiler, Decl, fieldName, gcvNULL);
-
-                gcmASSERT(fieldName->decl.dataType);
-
-                fieldOffset += ByteOffset;
-
-                status = _SetOperandConstants(Compiler,
-                                  &fieldName->decl,
-                                  Constant,
-                                  Parameters,
-                                  fieldOffset,
-                                  UniformOffset,
-                                  ValueStart,
-                                  Start);
-                if (gcmIS_ERROR(status)) return status;
-            }
-        }
-        else
-        {
-            if(Constant->variable &&
-               (clmDECL_IsAggregateTypeOverRegLimit(&Constant->exprBase.decl) ||
-                (clmDECL_IsExtendedVectorType(&Constant->exprBase.decl) &&
-                 (clmDECL_IsPackedType(&Constant->exprBase.decl) || !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))))) {
-
-                clsIOPERAND iOperand[1];
-
-                gcmASSERT(Constant->variable);
-                clmGEN_CODE_GetParametersIOperand(Compiler, iOperand, Parameters, binaryDataType);
-                clsROPERAND_InitializeUsingIOperand(Parameters->rOperands + *Start, iOperand);
-                status = _GenLoadVariableCode(Compiler,
-                                              Constant->exprBase.base.lineNo,
-                                              Constant->exprBase.base.stringNo,
-                                              Constant->variable,
+    if(_GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES) {
+        return _SetOperandConstantsInUniforms(Compiler,
+                                              Decl,
+                                              Constant,
+                                              Parameters,
                                               ByteOffset,
-                                              iOperand);
-                if(gcmIS_ERROR(status)) return status;
-                Parameters->dataTypes[*Start].def = binaryDataType;
-                clsROPERAND_InitializeScalarConstant(&Parameters->dataTypes[*Start].byteOffset,
-                                                     clmGenCodeDataType(T_INT),
-                                                     long,
-                                                     0);
+                                              UniformOffset,
+                                              ValueStart,
+                                              Start);
+    }
+    else {
+        gceSTATUS status;
+        gctUINT    count, i;
+        gctSIZE_T  elementByteSize = 0;
+        clsNAME *fieldName;
+        clsGEN_CODE_DATA_TYPE binaryDataType;
+        gctUINT    componentCount;
+        gctUINT byteOffset;
+
+        /* Verify the arguments. */
+        clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+        gcmASSERT(Decl  && Decl->dataType);
+        gcmASSERT(Constant);
+        gcmASSERT(Parameters);
+        gcmASSERT(ValueStart);
+        gcmASSERT(Start);
+
+        if (clmDECL_IsArray(Decl)) {
+           clmGetArrayElementCount(Decl->array, 0, count);
+           elementByteSize = clsDECL_GetElementByteSize(Compiler,
+                                                        Decl,
+                                                        gcvNULL,
+                                                        gcvNULL);
+        }
+        else count = 1;
+
+        binaryDataType    = _ConvElementDataType(Decl);
+        componentCount    = gcGetDataTypeComponentCount(binaryDataType);
+        byteOffset = clsDECL_GetElementByteSize(Compiler, Decl, gcvNULL, gcvNULL);
+        for (i = 0; i < count; i++) {
+            if (clmDATA_TYPE_IsStructOrUnion(Decl->dataType)) {
+
+                gcmASSERT(Decl->dataType->u.fieldSpace);
+
+                FOR_EACH_DLINK_NODE(&Decl->dataType->u.fieldSpace->names, clsNAME, fieldName)
+                {
+                    gctSIZE_T fieldOffset = clGetFieldByteOffset(Compiler, Decl, fieldName, gcvNULL);
+
+                    gcmASSERT(fieldName->decl.dataType);
+
+                    fieldOffset += ByteOffset;
+
+                    status = _SetOperandConstants(Compiler,
+                                      &fieldName->decl,
+                                      Constant,
+                                      Parameters,
+                                      fieldOffset,
+                                      UniformOffset,
+                                      ValueStart,
+                                      Start);
+                    if (gcmIS_ERROR(status)) return status;
+                }
             }
-            else {
-                if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) &&
-                   Constant->variable &&
-                   clmDECL_IsVectorType(&Constant->exprBase.decl)) {
-                    clsLOGICAL_REG reg[1];
+            else
+            {
+                if(Constant->variable &&
+                   (clmDECL_IsAggregateTypeOverRegLimit(&Constant->exprBase.decl) ||
+                    (clmDECL_IsExtendedVectorType(&Constant->exprBase.decl) &&
+                     (clmDECL_IsPackedType(&Constant->exprBase.decl) || !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))))) {
 
-                    if(Constant->u.uniform == gcvNULL) {
-                        gcSHADER shader;
-                        gcSHADER_TYPE type = _GetShaderDataType(binaryDataType);
-                        gcSL_FORMAT format = clConvDataTypeToFormat(binaryDataType);
-                        gcsValue value[1];
+                    clsIOPERAND iOperand[1];
 
-                        status = _ConvConstantValueToGcsValue(value,
-                                                              binaryDataType.elementType,
-                                                              componentCount,
-                                                              Constant->values + *ValueStart,
-                                                              Constant->values + Constant->valueCount);
-                        if(gcmIS_ERROR(status)) return status;
-
-                        gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &shader));
-                        status = gcSHADER_AddUniformWithInitializer(shader,
-                                                                    Constant->variable->symbol,
-                                                                    type,
-                                                                    1,
-                                                                    gcSHADER_PRECISION_DEFAULT,
-                                                                    value,
-                                                                    &Constant->u.uniform);
-                        if(gcmIS_ERROR(status)) return status;
-                        gcUNIFORM_SetFormat(Constant->u.uniform, format, gcvFALSE);
-                    }
-
-                    clsLOGICAL_REG_InitializeUniform(Compiler,
-                                                     reg,
-                                                     clvQUALIFIER_UNIFORM,
-                                                     binaryDataType,
-                                                     Constant->u.uniform,
-                                                     0,
-                                                     gcvFALSE);
-                    clsROPERAND_InitializeReg(Parameters->rOperands + *Start, reg);
+                    gcmASSERT(Constant->variable);
+                    clmGEN_CODE_GetParametersIOperand(Compiler, iOperand, Parameters, binaryDataType);
+                    clsROPERAND_InitializeUsingIOperand(Parameters->rOperands + *Start, iOperand);
+                    status = _GenLoadVariableCode(Compiler,
+                                                  Constant->exprBase.base.lineNo,
+                                                  Constant->exprBase.base.stringNo,
+                                                  Constant->variable,
+                                                  ByteOffset,
+                                                  iOperand);
+                    if(gcmIS_ERROR(status)) return status;
+                    Parameters->dataTypes[*Start].def = binaryDataType;
+                    clsROPERAND_InitializeScalarConstant(&Parameters->dataTypes[*Start].byteOffset,
+                                                         clmGenCodeDataType(T_INT),
+                                                         long,
+                                                         0);
                 }
                 else {
-                    clsROPERAND_InitializeConstant(Parameters->rOperands + *Start,
-                                                   binaryDataType,
-                                                   componentCount,
-                                                   Constant->values + *ValueStart);
+                    if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) &&
+                       Constant->variable &&
+                       clmDECL_IsVectorType(&Constant->exprBase.decl)) {
+                        clsLOGICAL_REG reg[1];
+
+                        if(Constant->u.uniformVector == gcvNULL) {
+                            gcSHADER shader;
+                            gcSHADER_TYPE type = _GetShaderDataType(binaryDataType);
+                            gcSL_FORMAT format = clConvDataTypeToFormat(binaryDataType);
+                            gcsValue value[1];
+
+                            status = _ConvConstantValueToGcsValue(value,
+                                                                  binaryDataType.elementType,
+                                                                  componentCount,
+                                                                  Constant->values + *ValueStart,
+                                                                  Constant->values + Constant->valueCount);
+                            if(gcmIS_ERROR(status)) return status;
+
+                            gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &shader));
+                            status = gcSHADER_AddUniformWithInitializer(shader,
+                                                                        Constant->variable->symbol,
+                                                                        type,
+                                                                        1,
+                                                                        gcSHADER_PRECISION_DEFAULT,
+                                                                        value,
+                                                                        &Constant->u.uniformVector);
+                            if(gcmIS_ERROR(status)) return status;
+                            gcUNIFORM_SetFormat(Constant->u.uniformVector, format, gcvFALSE);
+                        }
+
+                        clsLOGICAL_REG_InitializeUniform(Compiler,
+                                                         reg,
+                                                         clvQUALIFIER_UNIFORM,
+                                                         binaryDataType,
+                                                         Constant->u.uniformVector,
+                                                         0,
+                                                         gcvFALSE);
+                        clsROPERAND_InitializeReg(Parameters->rOperands + *Start, reg);
+                    }
+                    else {
+                        clsROPERAND_InitializeConstant(Parameters->rOperands + *Start,
+                                                       binaryDataType,
+                                                       componentCount,
+                                                       Constant->values + *ValueStart);
+                    }
+
+                    if(Parameters->hasIOperand) {
+                       gceSTATUS status;
+
+                       gcmASSERT(Parameters->operandCount == 1 && *Start == 0);
+                       _clmAssignROperandToPreallocatedTempReg(Compiler,
+                                                               Parameters,
+                                                               &Parameters->rOperands[0],
+                                                               status,
+                                                               Constant->exprBase.base.lineNo,
+                                                               Constant->exprBase.base.stringNo
+                                                               );
+                       if(gcmIS_ERROR(status)) return status;
+                    }
                 }
 
-                if(Parameters->hasIOperand) {
-                   gceSTATUS status;
-
-                   gcmASSERT(Parameters->operandCount == 1 && *Start == 0);
-                   _clmAssignROperandToPreallocatedTempReg(Compiler,
-                                                           Parameters,
-                                                           &Parameters->rOperands[0],
-                                                           status,
-                                                           Constant->exprBase.base.lineNo,
-                                                           Constant->exprBase.base.stringNo
-                                                           );
-                   if(gcmIS_ERROR(status)) return status;
-                }
+                (*Start)++;
+                (*ValueStart) += componentCount;
             }
-
-            (*Start)++;
-            (*ValueStart) += componentCount;
+            ByteOffset += elementByteSize;
         }
-        ByteOffset += elementByteSize;
-    }
 
-    return gcvSTATUS_OK;
+        return gcvSTATUS_OK;
+    }
 }
-#endif
 
 gceSTATUS
 cloIR_CONSTANT_GenCode(
@@ -22705,49 +23961,61 @@ cloIR_CONSTANT_GenCode(
     }
 
     /* Allocate the operands */
-    if(Constant->variable) {
-        isMemoryRef = (gctINT)clmGEN_CODE_checkVariableForMemory(Constant->variable);
+    if(_GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES) {
+        if(Constant->variable) {
+            isMemoryRef = (gctINT)clmGEN_CODE_checkVariableForMemory(Constant->variable);
 
-        allocRegs = isMemoryRef ||
-                    (Constant->variable->decl.dataType->accessQualifier == clvQUALIFIER_CONST &&
-                     Constant->variable->u.variableInfo.indirectlyAddressed);
-        constantExpr = Constant->variable->u.variableInfo.u.constant;
-    }
+            if(Constant->variable->isBuiltin &&
+               clmDATA_TYPE_IsHighPrecision(Constant->exprBase.decl.dataType)) {
+                status = cloCOMPILER_AllocateVariableMemory(Compiler,
+                                                            Constant->variable);
+                if (gcmIS_ERROR(status)) return status;
+            }
 
-#if _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES
-    if(allocRegs) {
-       if(Constant->variable->context.u.variable.logicalRegs == gcvNULL) {
-          status = clsNAME_AllocLogicalRegs(Compiler,
-                                            CodeGenerator,
-                                            Constant->variable);
-          if(gcmIS_ERROR(status)) return status;
-       }
-
-    }
-    status = clsGEN_CODE_PARAMETERS_AllocateOperands(Compiler,
-                                      Parameters,
-                                      &Constant->exprBase.decl);
-    if (gcmIS_ERROR(status)) return status;
-#else
-    if(allocRegs) {
-       if(Constant->variable->context.u.variable.logicalRegs == gcvNULL) {
-          status = clsNAME_AllocLogicalRegs(Compiler,
+            allocRegs = isMemoryRef;
+            constantExpr = Constant->variable->u.variableInfo.u.constant;
+        }
+        if(allocRegs) {
+           if(Constant->variable->context.u.variable.logicalRegs == gcvNULL) {
+              status = clsNAME_AllocLogicalRegs(Compiler,
                                                 CodeGenerator,
                                                 Constant->variable);
-          if(gcmIS_ERROR(status)) return status;
-       }
-       status = clsGEN_CODE_PARAMETERS_AllocateOperandsByName(Compiler,
-                                      Parameters,
-                                      Constant->variable);
-       if (gcmIS_ERROR(status)) return status;
+              if(gcmIS_ERROR(status)) return status;
+           }
+        }
+        status = clsGEN_CODE_PARAMETERS_AllocateOperands(Compiler,
+                                          Parameters,
+                                          &Constant->exprBase.decl);
+        if (gcmIS_ERROR(status)) return status;
     }
     else {
-       status = clsGEN_CODE_PARAMETERS_AllocateOperands(Compiler,
-                                Parameters,
-                                &Constant->exprBase.decl);
-       if (gcmIS_ERROR(status)) return status;
+        if(Constant->variable) {
+            isMemoryRef = (gctINT)clmGEN_CODE_checkVariableForMemory(Constant->variable);
+
+            allocRegs = isMemoryRef ||
+                        (Constant->variable->decl.dataType->accessQualifier == clvQUALIFIER_CONST &&
+                         Constant->variable->u.variableInfo.indirectlyAddressed);
+            constantExpr = Constant->variable->u.variableInfo.u.constant;
+        }
+        if(allocRegs) {
+           if(Constant->variable->context.u.variable.logicalRegs == gcvNULL) {
+              status = clsNAME_AllocLogicalRegs(Compiler,
+                                                    CodeGenerator,
+                                                    Constant->variable);
+              if(gcmIS_ERROR(status)) return status;
+           }
+           status = clsGEN_CODE_PARAMETERS_AllocateOperandsByName(Compiler,
+                                          Parameters,
+                                          Constant->variable);
+           if (gcmIS_ERROR(status)) return status;
+        }
+        else {
+           status = clsGEN_CODE_PARAMETERS_AllocateOperands(Compiler,
+                                    Parameters,
+                                    &Constant->exprBase.decl);
+           if (gcmIS_ERROR(status)) return status;
+        }
     }
-#endif
 
     if(Parameters->hint & clvGEN_SUBSCRIPT_CODE) {
        gctUINT i;
@@ -22793,7 +24061,7 @@ cloIR_CONSTANT_GenCode(
                  clsLOGICAL_REG_InitializeUniform(Compiler,
                                                    reg,
                                                    clvQUALIFIER_UNIFORM,
-                                                   Parameters->rOperands[i].dataType,
+                                                   Parameters->dataTypes[i].def,
                                                    currUniform,
                                                    regIndex,
                                                    gcvFALSE);
@@ -24205,7 +25473,7 @@ cloIR_UNARY_EXPR_GenCastCode(
     if(clmDECL_IsArray(&UnaryExpr->operand->decl)) {
         operandParameters.operandCount = 1;
     }
-    gcmASSERT(operandParameters.operandCount == 1);
+    gcmASSERT(operandParameters.operandCount <= 1);
     if(clmDECL_IsPointerType(&UnaryExpr->exprBase.decl)) {
        status = clsGEN_CODE_PARAMETERS_AllocateOperands(Compiler,
                                 Parameters,
@@ -24321,7 +25589,6 @@ OUT cloIR_POLYNARY_EXPR *FuncCall
    gcmASSERT(FuncCall);
    *FuncCall = gcvNULL;
 
-   gcmVERIFY_OK(cloCOMPILER_Lock(Compiler));
    gcmASSERT(clmDECL_IsPackedType(&Expr->decl));
 
    switch(cloIR_OBJECT_GetType(&Expr->base)) {
@@ -24453,7 +25720,6 @@ OUT cloIR_POLYNARY_EXPR *FuncCall
    *FuncCall = newFuncCall;
 
 OnError:
-   gcmVERIFY_OK(cloCOMPILER_Unlock(Compiler));
    return status;
 }
 
@@ -24481,7 +25747,6 @@ OUT cloIR_POLYNARY_EXPR *FuncCall
    gcmASSERT(FuncCall);
    *FuncCall = gcvNULL;
 
-   gcmVERIFY_OK(cloCOMPILER_Lock(Compiler));
    gcmASSERT(clmDECL_IsPackedType(&Expr->decl));
 
    if(cloIR_OBJECT_GetType(&Expr->base) == clvIR_BINARY_EXPR) {
@@ -24630,7 +25895,6 @@ OUT cloIR_POLYNARY_EXPR *FuncCall
    *FuncCall = newFuncCall;
 
 OnError:
-   gcmVERIFY_OK(cloCOMPILER_Unlock(Compiler));
    return status;
 }
 #else
@@ -24714,7 +25978,6 @@ OUT cloIR_POLYNARY_EXPR *FuncCall
    gcmASSERT(FuncCall);
    *FuncCall = gcvNULL;
 
-   gcmVERIFY_OK(cloCOMPILER_Lock(Compiler));
    gcmASSERT(clmDECL_IsPackedType(&Expr->decl));
 
    switch(cloIR_OBJECT_GetType(&Expr->base)) {
@@ -24857,7 +26120,6 @@ OUT cloIR_POLYNARY_EXPR *FuncCall
    *FuncCall = newFuncCall;
 
 OnError:
-   gcmVERIFY_OK(cloCOMPILER_Unlock(Compiler));
    return status;
 }
 
@@ -24885,7 +26147,6 @@ OUT cloIR_POLYNARY_EXPR *FuncCall
    gcmASSERT(FuncCall);
    *FuncCall = gcvNULL;
 
-   gcmVERIFY_OK(cloCOMPILER_Lock(Compiler));
    gcmASSERT(clmDECL_IsPackedType(&Expr->decl));
 
    if(cloIR_OBJECT_GetType(&Expr->base) == clvIR_BINARY_EXPR) {
@@ -25051,19 +26312,10 @@ OUT cloIR_POLYNARY_EXPR *FuncCall
    *FuncCall = newFuncCall;
 
 OnError:
-   gcmVERIFY_OK(cloCOMPILER_Unlock(Compiler));
    return status;
 }
 #endif
 
-gceSTATUS
-cloIR_POLYNARY_EXPR_GenOperandsCodeForFuncCall(
-    IN cloCOMPILER Compiler,
-    IN cloCODE_GENERATOR CodeGenerator,
-    IN cloIR_POLYNARY_EXPR PolynaryExpr,
-    OUT gctUINT * OperandCount,
-    OUT clsGEN_CODE_PARAMETERS * * OperandsParameters
-    );
 
 gceSTATUS
 cloIR_UNARY_EXPR_GenIndirectionCode(
@@ -25578,7 +26830,6 @@ _GetNonConstantSubscriptCode(
     gcmASSERT(RightParameters);
     gcmASSERT(Parameters);
 
-    gcmASSERT(cloIR_OBJECT_GetType(&BinaryExpr->rightOperand->base) != clvIR_CONSTANT);
     gcmASSERT(RightParameters->operandCount == 1);
     gcmASSERT(RightParameters->rOperands != gcvNULL && RightParameters->rOperands[0].isReg);
 
@@ -27657,7 +28908,7 @@ IN clsROPERAND *Offset
   gcsSOURCE offsetSource[1];
   gcsTARGET addressTarget[1];
   gcsSOURCE addressSource[1];
-  gctSIZE_T /*rSize, */j;
+  gctSIZE_T j;
   clsROPERAND rOperand[1];
   clsROPERAND columnROperand[1];
   clsIOPERAND iOperand[1];
@@ -27665,7 +28916,7 @@ IN clsROPERAND *Offset
   clsROPERAND *newOffset;
   clsROPERAND *offset;
   gctINT incr;
-  /*clsGEN_CODE_DATA_TYPE resType;*/
+  clsGEN_CODE_DATA_TYPE resType;
 
 /* Verify the arguments. */
   clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
@@ -27692,11 +28943,11 @@ IN clsROPERAND *Offset
 
 
   if(gcIsMatrixDataType(ResType)) {
-     /*resType = gcGetMatrixColumnDataType(ResType);*/
+     resType = gcGetMatrixColumnDataType(ResType);
      numColumns = gcGetMatrixDataTypeColumnCount(ResType);
   }
   else {
-      /*resType = ResType;*/
+      resType = ResType;
       numColumns = 1;
   }
 
@@ -27706,8 +28957,7 @@ IN clsROPERAND *Offset
   else {
      *columnROperand = *ROperand;
   }
-
-  /*rSize = gcGetDataTypeRegSize(resType);*/
+  columnROperand->dataType = resType;
 
   incr= 0;
   newOffset = gcvNULL;
@@ -29192,6 +30442,7 @@ errorHandling:
                                                offsetROperand));
                      incr += clGEN_CODE_DataTypeByteSize(Compiler, rightParameters.dataTypes[i].def);
                   }
+
                }
                else {
                   gcmONERROR(_GenImplicitConvParametersToType(Compiler,
@@ -29457,7 +30708,6 @@ cloIR_BINARY_EXPR_GenArithmeticAssignCode(
                           leftParameters.lOperands,
                           intermROperand));
         }
-
         if (Parameters->needROperand) {
             Parameters->rOperands[0] = *intermROperand;
             if (Parameters->hasIOperand) {
@@ -30891,7 +32141,8 @@ cloIR_POLYNARY_EXPR_GenOperandsCodeForFuncCall(
 
             clsGEN_CODE_PARAMETERS_Initialize(&operandsParameters[i], needLOperand, needROperand);
 
-            if(clmDECL_IsAggregateTypeOverRegLimit(&paramName->decl)) {
+            if (clmDECL_IsAggregateTypeOverRegLimit(&paramName->decl) || _clmCheckVariableForMemory(paramName))
+            {
                 operandsParameters[i].hint |= clvGEN_ADDR_CODE;
             }
             status = cloIR_OBJECT_Accept(Compiler,
@@ -32313,6 +33564,12 @@ clGenBuiltInAsmCode(
       case clvOPCODE_FMUL:
       case clvOPCODE_MUL_RTZ:
       case clvOPCODE_MUL_RTNE:
+      case clvOPCODE_CMAD:
+      case clvOPCODE_CMUL:
+      case clvOPCODE_CMADCJ:
+      case clvOPCODE_CMULCJ:
+      case clvOPCODE_CADDCJ:
+      case clvOPCODE_CSUBCJ:
 
       case clvOPCODE_ADD:
       case clvOPCODE_FADD:
@@ -32433,6 +33690,9 @@ clGenBuiltInAsmCode(
 
     case clvOPCODE_LONGLO:
     case clvOPCODE_LONGHI:
+    case clvOPCODE_CONJ:
+    case clvOPCODE_GET_IMAGE_TYPE:
+    case clvOPCODE_TEXU:
         if(operandCount != 3)
         {
             status = gcvSTATUS_INVALID_ARGUMENT;
@@ -32463,6 +33723,7 @@ clGenBuiltInAsmCode(
     case clvOPCODE_IMAGE_WRITE:
     case clvOPCODE_IMAGE_WRITE_3D:
     case clvOPCODE_CLAMP0MAX:
+    case clvOPCODE_CLAMPCOORD:
     case clvOPCODE_ATAN2:
 
     case clvOPCODE_POW:
@@ -33159,8 +34420,6 @@ OUT cloCODE_GENERATOR * CodeGenerator
         codeGenerator->hasNEW_SIN_COS_LOG_DIV = gcGetHWCaps()->hwFeatureFlags.hasExtraInst2;
         codeGenerator->supportRTNE = gcGetHWCaps()->hwFeatureFlags.rtneRoundingEnabled;
         codeGenerator->supportAtomic = gcGetHWCaps()->hwFeatureFlags.hasAtomic;
-
-
         codeGenerator->fulllySupportIntegerBranch = gcGetHWCaps()->hwFeatureFlags.supportFullIntBranch;
         codeGenerator->fpConfig = cldFpCapsDefault;
         codeGenerator->fpConfig |= cloCOMPILER_GetFpConfig(Compiler);

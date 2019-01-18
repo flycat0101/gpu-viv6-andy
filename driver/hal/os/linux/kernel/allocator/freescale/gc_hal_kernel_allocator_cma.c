@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2018 Vivante Corporation
+*    Copyright (c) 2014 - 2019 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2018 Vivante Corporation
+*    Copyright (C) 2014 - 2019 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -450,11 +450,13 @@ static gceSTATUS
 _CMAMapKernel(
     IN gckALLOCATOR Allocator,
     IN PLINUX_MDL Mdl,
+    IN gctSIZE_T Offset,
+    IN gctSIZE_T Bytes,
     OUT gctPOINTER *Logical
     )
 {
     struct mdl_cma_priv *mdl_priv=(struct mdl_cma_priv *)Mdl->priv;
-    *Logical =mdl_priv->kvaddr;
+    *Logical = (uint8_t *)mdl_priv->kvaddr + Offset;
     return gcvSTATUS_OK;
 }
 
@@ -474,7 +476,7 @@ _CMACache(
     IN PLINUX_MDL Mdl,
     IN gctSIZE_T Offset,
     IN gctPOINTER Logical,
-    IN gctUINT32 Bytes,
+    IN gctSIZE_T Bytes,
     IN gceCACHEOPERATION Operation
     )
 {
@@ -574,7 +576,6 @@ _CMAFSLAlloctorInit(
                           | gcvALLOC_FLAG_4GB_ADDR
 #endif
                           ;
-
 #if defined(CONFIG_ARM64)
     Os->allocatorLimitMarker = (Os->device->baseAddress + totalram_pages * PAGE_SIZE) > 0x100000000;
 #else

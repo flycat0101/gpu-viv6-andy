@@ -307,12 +307,6 @@ esac;
 #   USE_POWER_MANAGEMENT        1      Enable GPU power managment code;                  1
 #                               0      Disable GPU power management code; Should set
 #                                      it to 0 on FPGA board;
-#
-#   PAGED_MEMORY_CACHEABLE      1      paged memory will be cacheable; only for those    0
-#                                      SOC which cann't enable writecombine without
-#                                      enabling cacheable;
-#                               0      paged memory won't be cacheable;
-#
 
 BUILD_OPTION_DEBUG=0
 BUILD_OPTION_ABI=0
@@ -338,9 +332,6 @@ if [ -z $BUILD_OPTION_EGL_API_WL ]; then
 fi
 if [ -z $BUILD_OPTION_EGL_API_NULLWS ]; then
     BUILD_OPTION_EGL_API_NULLWS=0
-fi
-if [ -z $BUILD_OPTION_EGL_API_GBM ]; then
-    BUILD_OPTION_EGL_API_GBM=0
 fi
 BUILD_OPTION_gcdSTATIC_LINK=0
 BUILD_OPTION_CUSTOM_PIXMAP=0
@@ -381,7 +372,6 @@ BUILD_OPTIONS="$BUILD_OPTIONS EGL_API_DFB=$BUILD_OPTION_EGL_API_DFB"
 BUILD_OPTIONS="$BUILD_OPTIONS EGL_API_DRI=$BUILD_OPTION_EGL_API_DRI"
 BUILD_OPTIONS="$BUILD_OPTIONS X11_DRI3=$BUILD_OPTION_X11_DRI3"
 BUILD_OPTIONS="$BUILD_OPTIONS EGL_API_WL=$BUILD_OPTION_EGL_API_WL"
-BUILD_OPTIONS="$BUILD_OPTIONS EGL_API_GBM=$BUILD_OPTION_EGL_API_GBM"
 BUILD_OPTIONS="$BUILD_OPTIONS EGL_API_NULLWS=$BUILD_OPTION_EGL_API_NULLWS"
 BUILD_OPTIONS="$BUILD_OPTIONS gcdSTATIC_LINK=$BUILD_OPTION_gcdSTATIC_LINK"
 BUILD_OPTIONS="$BUILD_OPTIONS ABI=$BUILD_OPTION_ABI"

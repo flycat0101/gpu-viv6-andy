@@ -49,6 +49,7 @@ SOURCE_OBJECTS += $(driver_root)/driver/khronos/libEGL/source/gc_egl_config.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libEGL/source/gc_egl_context.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libEGL/source/gc_egl_image.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libEGL/source/gc_egl_init.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libEGL/source/gc_egl_procaddr.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libEGL/source/gc_egl_query.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libEGL/source/gc_egl_surface.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libEGL/source/gc_egl_swap.o

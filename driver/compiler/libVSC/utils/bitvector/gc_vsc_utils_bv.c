@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -12,6 +12,8 @@
 
 
 #include "gc_vsc.h"
+
+#define VSC_DEBUG_MEM 0
 
 void vscBV_Initialize(VSC_BIT_VECTOR* pBV, VSC_MM* pMM, gctINT bvSize)
 {
@@ -43,6 +45,12 @@ void vscBV_Initialize(VSC_BIT_VECTOR* pBV, VSC_MM* pMM, gctINT bvSize)
         else
         {
             memset(pBV->pBits, CLR_VALUE, pBV->numOfUINT * sizeof(gctUINT));
+#if VSC_DEBUG_MEM
+            if (pMM->mmType != VSC_MM_TYPE_BMS)
+            {
+                gcoOS_Print("vscBV_Initialize(pBV->pBits:0x%X, pMM:0x%X, bvSize:%d)\n", pBV->pBits, pMM, bvSize);
+            }
+#endif
         }
     }
 }
@@ -146,6 +154,12 @@ void vscBV_Resize(VSC_BIT_VECTOR *pBV, gctINT newBVSize, gctBOOL bKeep)
 
 void vscBV_Finalize(VSC_BIT_VECTOR* pBV)
 {
+#if VSC_DEBUG_MEM
+    if (pBV->pMM == gcvNULL || pBV->pMM->mmType != VSC_MM_TYPE_BMS)
+    {
+        gcoOS_Print("vscBV_Finalize(pBV->pBits:0x%X, pMM:0x%X, bvSize:%d)\n", pBV->pBits, pBV->pMM, pBV->bitCount);
+    }
+#endif
     if (pBV->pMM)
     {
         vscMM_Free(pBV->pMM, pBV->pBits);
@@ -795,8 +809,6 @@ gctINT vscBV_FindClearBitInRange(VSC_BIT_VECTOR* pBV, gctINT startBitOrdinal, gc
 
     return _FindBitInRange(pBV, startBitOrdinal, szRange, gcvFALSE);
 }
-
-/* TODO: These continuous bits search needs to be perf tuned later */
 
 typedef gctINT (*PFN_SEARCH_BIT)(VSC_BIT_VECTOR*, gctINT);
 typedef gctINT (*PFN_SEARCH_BIT_RANGE)(VSC_BIT_VECTOR*, gctINT, gctINT);

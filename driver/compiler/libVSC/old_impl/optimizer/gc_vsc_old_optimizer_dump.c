@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -76,11 +76,13 @@ GetCategoryName_(
     case gcSHADER_VAR_CATEGORY_NORMAL:
     case gcSHADER_VAR_CATEGORY_LOD_MIN_MAX:
     case gcSHADER_VAR_CATEGORY_LEVEL_BASE_SIZE:
-    case gcSHADER_VAR_CATEGORY_EXTRA_FOR_TEX_GATHER:
     case gcSHADER_VAR_CATEGORY_SAMPLE_LOCATION:
     case gcSHADER_VAR_CATEGORY_ENABLE_MULTISAMPLE_BUFFERS:
+    case gcSHADER_VAR_CATEGORY_GL_SAMPLER_FOR_IMAGE_T:
+    case gcSHADER_VAR_CATEGORY_GL_IMAGE_FOR_IMAGE_T:
     case gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT:
     case gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT:
+    case gcSHADER_VAR_CATEGORY_WORK_GROUP_ID_OFFSET:
         return "";
 
     case gcSHADER_VAR_CATEGORY_STRUCT:
@@ -256,6 +258,7 @@ gcSL_GetName(
     _print_name(gcSL_IN_POINT_SIZE, "#In_PointSize");
     _print_name(gcSL_BOUNDING_BOX, "#BoundingBox");
     _print_name(gcSL_LAST_FRAG_DATA, "#LastFragData");
+    _print_name(gcSL_CLUSTER_ID, "#cluster_id");
     default:
         gcmASSERT((gctINT)Length > 0);
         break;
@@ -564,11 +567,14 @@ _DumpSource(
         {
             /* Assemble the 32-bit value. */
             gcuFLOAT_UINT32 constant;
+            gctUINT64       u64;
+            gcSL_FORMAT format = (gcSL_FORMAT)gcmSL_SOURCE_GET(Source, Format);
             constant.u = Index | ((Indexed&0xFFFF) << 16);
-
-            switch (gcmSL_SOURCE_GET(Source, Format))
+            u64 = (gctUINT64)Index | ((gctUINT64)(Indexed) << 32);
+            switch (format)
             {
             case gcSL_FLOAT:
+            case gcSL_FLOAT16:
                 /* Print the floating point constant. */
                 gcmVERIFY_OK(
                     gcoOS_PrintStrSafe(Buffer, BufferSize, &offset,
@@ -576,17 +582,38 @@ _DumpSource(
                 break;
 
             case gcSL_INTEGER:
+            case gcSL_INT16:
                 /* Print the integer constant. */
                 gcmVERIFY_OK(
                     gcoOS_PrintStrSafe(Buffer, BufferSize, &offset,
                                        "%d", (gctINT32)constant.u));
                 break;
 
+            case gcSL_INT8:
+            case gcSL_UINT8:
+                /* Print the unsigned integer constant. */
+                gcmVERIFY_OK(
+                    gcoOS_PrintStrSafe(Buffer, BufferSize, &offset,
+                                       "'%c'", constant.u));
+                break;
             case gcSL_UINT32:
+            case gcSL_UINT16:
                 /* Print the unsigned integer constant. */
                 gcmVERIFY_OK(
                     gcoOS_PrintStrSafe(Buffer, BufferSize, &offset,
                                        "%u", constant.u));
+                break;
+            case gcSL_INT64:
+                /* Print the long integer constant. */
+                gcmVERIFY_OK(
+                    gcoOS_PrintStrSafe(Buffer, BufferSize, &offset,
+                                       "%lld", (gctINT64)u64));
+                break;
+            case gcSL_UINT64:
+                /* Print the unsigned long integer constant. */
+                gcmVERIFY_OK(
+                    gcoOS_PrintStrSafe(Buffer, BufferSize, &offset,
+                                       "%ulld", u64));
                 break;
 
             case gcSL_BOOLEAN:
@@ -594,6 +621,9 @@ _DumpSource(
                 gcmVERIFY_OK(
                     gcoOS_PrintStrSafe(Buffer, BufferSize, &offset,
                                        "%s", constant.u ? "true" : "false"));
+                break;
+            default:
+                gcmASSERT(gcvFALSE);
                 break;
             }
         }
@@ -1158,6 +1188,16 @@ decode[] =
     { "PARAM_CHAIN", gcvTRUE, gcvFALSE },
     { "INTRINSIC", gcvTRUE, gcvFALSE },
     { "INTRINSIC_ST", gcvTRUE, gcvFALSE },
+    { "CMAD", gcvTRUE, gcvFALSE },
+    { "CONJ", gcvTRUE, gcvFALSE },
+    { "CMUL", gcvTRUE, gcvFALSE },
+    { "CMADCJ", gcvTRUE, gcvFALSE },
+    { "CMULCJ", gcvTRUE, gcvFALSE },
+    { "CADDCJ", gcvTRUE, gcvFALSE },
+    { "CSUBCJ", gcvTRUE, gcvFALSE },
+    { "CADD", gcvTRUE, gcvFALSE },
+    { "GET_IMAGE_TYPE", gcvTRUE,gcvFALSE },
+    { "CLAMPCOORD", gcvTRUE, gcvFALSE },
 };
 
 char _checkDecodeArray_size[sizeof(decode)/sizeof(decode[0]) == gcSL_MAXOPCODE];
@@ -1357,7 +1397,8 @@ _DumpIR(
        gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_INTRINSIC_ST)
     {
         gcSL_FORMAT fmt;
-        gctINT32 value = code->source0Index | (code->source0Indexed << 16);
+        gcuFLOAT_UINT32 constant;
+        constant.u = code->source0Index | (code->source0Indexed << 16);
 
         gcmASSERT(gcmSL_SOURCE_GET(code->source0, Type) == gcSL_CONSTANT);
         /* Assemble the 32-bit value. */
@@ -1371,7 +1412,7 @@ _DumpIR(
 
         gcmVERIFY_OK(
             gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,
-                               ", %s", VIR_Intrinsic_GetName(value)));
+                               ", %s", VIR_Intrinsic_GetName(constant.u)));
     }
     else
     {
@@ -1437,8 +1478,8 @@ void dbg_dumpCode(IN gcOPT_CODE Code)
     _DumpCodeDataFlow(gcvNULL, gcvNULL, Code);
 }
 
-gctINT gcvDumpOption =
-            0; /* gceLTC_DUMP_EVALUATION | gceLTC_DUMP_EXPESSION | gceLTC_DUMP_COLLECTING | gceLTC_DUMP_UNIFORM;*/
+gctINT gcvDumpOption = 0;
+            /* gceLTC_DUMP_EVALUATION | gceLTC_DUMP_EXPESSION | gceLTC_DUMP_COLLECTING | gceLTC_DUMP_UNIFORM;*/
 
 /* return true if the dump option Opt is set, otherwise return false */
 gctBOOL
@@ -2119,6 +2160,11 @@ gcDump_Shader(
             }
 
             /* Append name. */
+            if(isUniformPointer(uniform))
+            {
+                gcmVERIFY_OK(gcoOS_PrintStrSafe(buffer,
+                                                gcmSIZEOF(buffer), &offset, "*"));
+            }
             offset += gcSL_GetName(uniform->nameLength,
                                 uniform->name,
                                 buffer + offset,

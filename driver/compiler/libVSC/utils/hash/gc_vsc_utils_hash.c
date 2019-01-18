@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -80,7 +80,31 @@ vscHTBL_Initialize(
         HNLST_INITIALIZE(pHT->pTable + i);
     }
 
-    pHT->itemCount   = 0;
+    pHT->itemCount = 0;
+
+    if (gcmGetOptimizerOption()->dumpHashPerf)
+    {
+        pHT->searchTime = (SEARCH_TIME*)vscMM_Alloc(pMM,sizeof(SEARCH_TIME));
+        pHT->searchTime->searchFailed = 0;
+        pHT->searchTime->searchSucceed = 0;
+        pHT->searchTime->searchTotal = 0;
+        pHT->searchTime->searchMostTimes = 0;
+        pHT->searchTime->searchMostCount = 0;
+        pHT->searchTime->maxSearchTimes = gcmGetOptimizerOption()->hashMaxSearchTimes;
+        pHT->searchTime->searchTimesArray = (gctINT*)vscMM_Alloc(pMM, (HTBL_MAX_SEARCH_TIMES(pHT) + 1)*sizeof(gctINT));
+        if (pHT->searchTime->searchTimesArray == gcvNULL || pHT->searchTime == gcvNULL)
+        {
+            gcmASSERT(gcvFALSE);
+        }
+        for (i = 0; i < (HTBL_MAX_SEARCH_TIMES(pHT) + 1); i ++)
+        {
+            pHT->searchTime->searchTimesArray[i] = 0;
+        }
+    }
+    else
+    {
+        pHT->searchTime = gcvNULL;
+    }
 }
 
 VSC_HASH_TABLE *vscHTBL_Create(
@@ -102,6 +126,54 @@ VSC_HASH_TABLE *vscHTBL_Create(
     return pHT;
 }
 
+VSC_ErrCode
+vscHTBL_CreateOrInitialize(
+    IN     VSC_MM*           pMM,
+    IN OUT VSC_HASH_TABLE ** ppHT,
+    IN PFN_VSC_HASH_FUNC     pfnHashFunc,
+    IN PFN_VSC_KEY_CMP       pfnKeyCmp,
+    IN gctINT                tableSize
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_HASH_TABLE * hTable = *ppHT;
+
+    if (hTable == gcvNULL)
+    {
+        hTable = vscHTBL_Create(pMM, pfnHashFunc, pfnKeyCmp, tableSize);
+        if (hTable == gcvNULL)
+        {
+            errCode = VSC_ERR_OUT_OF_MEMORY;
+        }
+        else
+        {
+            *ppHT = hTable;
+        }
+    }
+    else
+    {
+        if (hTable->tableSize < tableSize)
+        {
+            /* Free table list */
+            vscMM_Free(hTable->pMM, hTable->pTable);
+            if (hTable->searchTime != gcvNULL)
+            {
+                vscMM_Free(hTable->pMM, hTable->searchTime->searchTimesArray);
+                hTable->searchTime->searchTimesArray = gcvNULL;
+                vscMM_Free(hTable->pMM, hTable->searchTime);
+                hTable->searchTime = gcvNULL;
+            }
+            vscHTBL_Initialize(hTable, hTable->pMM, pfnHashFunc, pfnKeyCmp, tableSize);
+        }
+        else
+        {
+            hTable->pfnHashFunc = pfnHashFunc;
+            hTable->pfnKeyCmp   = pfnKeyCmp ? pfnKeyCmp : vscHKCMP_Default;
+        }
+    }
+    return errCode;
+}
+
 void vscHTBL_Finalize(VSC_HASH_TABLE* pHT)
 {
     gctINT i;
@@ -112,6 +184,14 @@ void vscHTBL_Finalize(VSC_HASH_TABLE* pHT)
     for (i = 0; i < pHT->tableSize; i ++)
     {
         HNLST_FINALIZE(pHT->pTable + i);
+    }
+
+    if (pHT->searchTime != gcvNULL)
+    {
+        vscMM_Free(pHT->pMM, pHT->searchTime->searchTimesArray);
+        pHT->searchTime->searchTimesArray = gcvNULL;
+        vscMM_Free(pHT->pMM, pHT->searchTime);
+        pHT->searchTime = gcvNULL;
     }
 
     /* Free table list */
@@ -158,6 +238,19 @@ void vscHTBL_Reset(VSC_HASH_TABLE *pHT)
         }
     }
 
+    if (pHT->searchTime != gcvNULL)
+    {
+        for (i = 0; i < (HTBL_MAX_SEARCH_TIMES(pHT) + 1); i++)
+        {
+            pHT->searchTime->searchTimesArray[i] = 0;
+        }
+        pHT->searchTime->searchFailed = 0;
+        pHT->searchTime->searchSucceed = 0;
+        pHT->searchTime->searchTotal = 0;
+        pHT->searchTime->searchMostTimes = 0;
+        pHT->searchTime->searchMostCount = 0;
+    }
+
     pHT->itemCount = 0;
 }
 
@@ -180,6 +273,7 @@ gctBOOL vscHTBL_TestAndGet(VSC_HASH_TABLE* pHT, void* pHashKey, VSC_HASH_NODE** 
     gctINT              hashVal;
     VSC_HASH_NODE_LIST* pList;
     VSC_HASH_NODE*      pHashNode;
+    gctINT              searchTimes = 0;
 
     /* Get hash value */
     hashVal = _CalcHashValue(pHT, pHashKey);
@@ -190,12 +284,39 @@ gctBOOL vscHTBL_TestAndGet(VSC_HASH_TABLE* pHT, void* pHashKey, VSC_HASH_NODE** 
          pHashNode != NULL;
          pHashNode = HND_GET_NEXT_HASH_NODE(pHashNode))
     {
+        if (pHT->searchTime != gcvNULL)
+        {
+            searchTimes ++;
+            pHT->searchTime->searchTotal ++;
+        }
         if (pHT->pfnKeyCmp(vscHND_GetHashKey(pHashNode), pHashKey))
         {
             /* Yes, found it */
             if (ppNode)
             {
                 *ppNode = pHashNode;
+                if (pHT->searchTime != gcvNULL)
+                {
+                    pHT->searchTime->searchSucceed ++;
+                    if (searchTimes < HTBL_MAX_SEARCH_TIMES(pHT))
+                    {
+                        pHT->searchTime->searchTimesArray[searchTimes] ++ ;
+                        if (pHT->searchTime->searchTimesArray[searchTimes] > pHT->searchTime->searchMostCount)
+                        {
+                            pHT->searchTime->searchMostCount = pHT->searchTime->searchTimesArray[searchTimes];
+                            pHT->searchTime->searchMostTimes = searchTimes;
+                        }
+                    }
+                    else
+                    {
+                        pHT->searchTime->searchTimesArray[HTBL_MAX_SEARCH_TIMES(pHT)] ++ ;
+                        if (pHT->searchTime->searchTimesArray[HTBL_MAX_SEARCH_TIMES(pHT)] > pHT->searchTime->searchMostCount)
+                        {
+                            pHT->searchTime->searchMostCount = pHT->searchTime->searchTimesArray[HTBL_MAX_SEARCH_TIMES(pHT)];
+                            pHT->searchTime->searchMostTimes = searchTimes;
+                        }
+                    }
+                }
             }
 
             return gcvTRUE;
@@ -205,6 +326,32 @@ gctBOOL vscHTBL_TestAndGet(VSC_HASH_TABLE* pHT, void* pHashKey, VSC_HASH_NODE** 
     /* Not found */
     if (ppNode)
     {
+        if (pHT->searchTime != gcvNULL)
+        {
+            if (HNLST_GET_FIRST_HASH_NODE(pList) != NULL)
+            {
+                pHT->searchTime->searchFailed ++;
+            }
+
+            if (searchTimes < HTBL_MAX_SEARCH_TIMES(pHT))
+            {
+                pHT->searchTime->searchTimesArray[searchTimes] ++ ;
+                if((searchTimes > 0) && (pHT->searchTime->searchTimesArray[searchTimes] >= pHT->searchTime->searchMostCount))
+                {
+                    pHT->searchTime->searchMostCount = pHT->searchTime->searchTimesArray[searchTimes];
+                    pHT->searchTime->searchMostTimes = searchTimes;
+                }
+            }
+            else
+            {
+                pHT->searchTime->searchTimesArray[HTBL_MAX_SEARCH_TIMES(pHT)] ++ ;
+                if ((searchTimes > 0) && (pHT->searchTime->searchTimesArray[HTBL_MAX_SEARCH_TIMES(pHT)] >= pHT->searchTime->searchMostCount))
+                {
+                    pHT->searchTime->searchMostCount = pHT->searchTime->searchTimesArray[HTBL_MAX_SEARCH_TIMES(pHT)];
+                    pHT->searchTime->searchMostTimes = searchTimes;
+                }
+            }
+        }
         *ppNode = NULL;
     }
 
@@ -517,7 +664,13 @@ VSC_DIRECT_HNODE_PAIR vscHTBLIterator_DirectLast(VSC_HASH_ITERATOR * pIter)
 gctUINT
 vscHFUNC_Default(const void* ptr)
 {
-    return (gctUINT)(gctUINTPTR_T)ptr & 0xff;
+    return (gctUINT)(gctUINTPTR_T)ptr;
+}
+
+gctUINT
+vscHFUNC_DefaultPtr(const void* ptr)
+{
+    return (gctUINT)(gctUINTPTR_T)ptr >> 2;
 }
 
 gctUINT

@@ -442,6 +442,9 @@ struct __DRIscreenPrivateRec {
      *   - close the kernel device driver
      */
     int fd;
+#ifdef X11_DRI3
+    void *drm;
+#endif
 
     /**
      * SAREA pointer

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -125,7 +125,10 @@
                : 0x0;         \
         break;                                                          \
     case gcvVERTEX_INT32:                                               \
-        format = 0x8;                   \
+        if (Hardware->features[gcvFEATURE_MULTI_CLUSTER])               \
+            format = 0x10;              \
+        else                                                            \
+            format = 0x8;               \
         endian = Hardware->bigEndian                                    \
                ? 0x2       \
                : 0x0;         \
@@ -944,6 +947,12 @@ gcoHARDWARE_FlushVertex(
     {
         /* Flush L2 cache for GC700. */
         Hardware->flushL2 = gcvTRUE;
+    }
+
+    if (Hardware->features[gcvFEATURE_MULTI_CLUSTER])
+    {
+        /*Flush vertex cache when needed*/
+        Hardware->flushVtxData = gcvTRUE;
     }
 
 OnError:
@@ -2046,7 +2055,7 @@ gcoHARDWARE_SetVertexArray(
     gctUINT i, j;
     gctBOOL multiStream;
     gctBOOL halti2Support;
-    gcsVERTEXARRAY_ATTRIBUTE_PTR attribute;
+    gcsVERTEXARRAY_ATTRIBUTE_PTR attrPtr;
     gcsVERTEXARRAY_STREAM_PTR streamPtr;
     gcsVERTEXARRAY_BUFFER_PTR bufferPtr;
     gctUINT32 streamCount = 0;
@@ -2161,18 +2170,18 @@ gcoHARDWARE_SetVertexArray(
         ++streamsTotal;
 
         /* Walk all attributes in the stream. */
-        for (attribute = streamPtr->attribute;
-             attribute != gcvNULL;
-             attribute = attribute->next
+        for (attrPtr = streamPtr->attribute;
+             attrPtr != gcvNULL;
+             attrPtr = attrPtr->next
         )
         {
             /* Check if attribute falls outside the current stream. */
-            if (attribute->offset >= base + stride)
+            if (attrPtr->offset >= base + stride)
             {
                 /* Get stride and offset for this stream. */
                 stream = streamsTotal;
-                stride = attribute->vertexPtr->stride;
-                base   = attribute->offset;
+                stride = attrPtr->vertexPtr->stride;
+                base   = attrPtr->offset;
 
                 /* Make sure the streams don't overflow. */
                 if ((stream >= Hardware->config->streamCount)
@@ -2625,154 +2634,27 @@ gcoHARDWARE_SetVertexArray(
         /* Walk all attributes. */
         for (j = 0, fetchSize = 0; j < bufferPtr->numAttribs; j++)
         {
-            attribute = Attributes + bufferPtr->map[j];
+            attrPtr = Attributes + bufferPtr->map[j];
 
-            /* Dispatch on vertex format. */
-            switch (attribute->format)
-            {
-            case gcvVERTEX_BYTE:
-                format = 0x0;
-                endian = 0x0;
-                break;
-
-            case gcvVERTEX_UNSIGNED_BYTE:
-                format = 0x1;
-                endian = 0x0;
-                break;
-
-            case gcvVERTEX_SHORT:
-                format = 0x2;
-                endian = Hardware->bigEndian
-                       ? 0x1
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_UNSIGNED_SHORT:
-                format = 0x3;
-                endian = Hardware->bigEndian
-                       ? 0x1
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_INT:
-                format = 0x4;
-                endian = Hardware->bigEndian
-                       ? 0x2
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_UNSIGNED_INT:
-                format = 0x5;
-                endian = Hardware->bigEndian
-                       ? 0x2
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_FIXED:
-                format = 0xB;
-                endian = Hardware->bigEndian
-                       ? 0x2
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_HALF:
-                format = 0x9;
-                endian = Hardware->bigEndian
-                       ? 0x1
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_FLOAT:
-                format = 0x8;
-                endian = Hardware->bigEndian
-                       ? 0x2
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_UNSIGNED_INT_10_10_10_2:
-                format = 0xD;
-                endian = Hardware->bigEndian
-                       ? 0x2
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_INT_10_10_10_2:
-                format = 0xC;
-                endian = Hardware->bigEndian
-                       ? 0x2
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_UNSIGNED_INT_2_10_10_10_REV:
-                if (halti2Support)
-                {
-                    format = 0x7;
-                    endian = Hardware->bigEndian
-                           ? 0x2
-                           : 0x0;
-                }
-                else
-                {
-                    gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-                }
-                break;
-
-            case gcvVERTEX_INT_2_10_10_10_REV:
-                if (halti2Support)
-                {
-                    format = 0x6;
-                    endian = Hardware->bigEndian
-                           ? 0x2
-                           : 0x0;
-                }
-                else
-                {
-                    gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-                }
-                break;
-
-            case gcvVERTEX_INT8:
-                format = 0xE;
-                endian = Hardware->bigEndian
-                       ? 0x2
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_INT16:
-                format = 0xF;
-                endian = Hardware->bigEndian
-                       ? 0x2
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_INT32:
-                format = 0x8;
-                endian = Hardware->bigEndian
-                       ? 0x2
-                       : 0x0;
-                break;
-
-            default:
-                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-            }
+            gcmCOMPUTE_FORMAT_AND_ENDIAN();
 
             /* Get size. */
-            size = attribute->vertexPtr->enable ? (gctUINT)attribute->vertexPtr->size : attribute->bytes / 4;
-            link = attribute->vertexPtr->linkage;
+            size = attrPtr->vertexPtr->enable ? (gctUINT)attrPtr->vertexPtr->size : attrPtr->bytes / 4;
+            link = attrPtr->vertexPtr->linkage;
 
             /* Get normalized flag. */
-            normalize = (attribute->vertexPtr->normalized)
+            normalize = (attrPtr->vertexPtr->normalized)
                         ? (Hardware->currentApi == gcvAPI_OPENGL_ES30)
                           ? 0x1
                           : 0x2
                         : 0x0;
 
             /* Get vertex offset and size. */
-            offset      = attribute->offset;
-            fetchSize  += attribute->bytes;
+            offset      = attrPtr->offset;
+            fetchSize  += attrPtr->bytes;
             fetchBreak
                 = ((j + 1) == bufferPtr->numAttribs)
-                || offset + attribute->bytes != Attributes[bufferPtr->map[j+1]].offset
+                || offset + attrPtr->bytes != Attributes[bufferPtr->map[j+1]].offset
                     ? 1 : 0;
             if (Hardware->features[gcvFEATURE_NEW_GPIPE])
             {
@@ -2848,7 +2730,17 @@ gcoHARDWARE_SetVertexArray(
  31:16))) | (((gctUINT32) ((gctUINT32) (offset) & ((gctUINT32) ((((1 ?
  31:16) - (0 ?
  31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16))));
+ ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1))))))) << (0 ?
+ 7:7))) | (((gctUINT32) ((gctUINT32) (format >> 4) & ((gctUINT32) ((((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7))));
 
                  _gcmSETSTATEDATA(
                     stateDelta, feFetchCmd, feFetchState,
@@ -3150,18 +3042,18 @@ gcoHARDWARE_SetVertexArray(
         ++streamCount;
 
         /* Walk all attributes in the stream. */
-        for (attribute = streamPtr->attribute, fetchSize = 0;
-             attribute != gcvNULL;
-             attribute = attribute->next
+        for (attrPtr = streamPtr->attribute, fetchSize = 0;
+             attrPtr != gcvNULL;
+             attrPtr = attrPtr->next
         )
         {
             /* Check if attribute falls outside the current stream. */
-            if (attribute->offset >= base + stride)
+            if (attrPtr->offset >= base + stride)
             {
                 /* Get stride and offset for this stream. */
                 stream = streamCount;
-                stride = attribute->vertexPtr->stride;
-                base   = attribute->offset;
+                stride = attrPtr->vertexPtr->stride;
+                base   = attrPtr->offset;
 
                 /* Store the stream address. */
                 _gcmSETSTATEDATA(
@@ -3214,154 +3106,26 @@ gcoHARDWARE_SetVertexArray(
                 ++streamCount;
             }
 
-            /* Dispatch on vertex format. */
-            switch (attribute->format)
-            {
-            case gcvVERTEX_SHORT:
-                format = 0x2;
-                endian = Hardware->bigEndian
-                       ? 0x1
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_UNSIGNED_SHORT:
-                format = 0x3;
-                endian = Hardware->bigEndian
-                       ? 0x1
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_INT:
-                format = 0x4;
-                endian = Hardware->bigEndian
-                       ? 0x2
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_UNSIGNED_INT:
-                format = 0x5;
-                endian = Hardware->bigEndian
-                       ? 0x2
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_FIXED:
-                format = 0xB;
-                endian = Hardware->bigEndian
-                       ? 0x2
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_HALF:
-                format = 0x9;
-                endian = Hardware->bigEndian
-                       ? 0x1
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_FLOAT:
-                format = 0x8;
-                endian = Hardware->bigEndian
-                       ? 0x2
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_UNSIGNED_INT_10_10_10_2:
-                format = 0xD;
-                endian = Hardware->bigEndian
-                       ? 0x2
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_INT_10_10_10_2:
-                format = 0xC;
-                endian = Hardware->bigEndian
-                       ? 0x2
-                       : 0x0;
-                break;
-
-            case gcvVERTEX_BYTE:
-                format = 0x0;
-                endian = 0x0;
-                break;
-
-            case gcvVERTEX_UNSIGNED_BYTE:
-                format = 0x1;
-                endian = 0x0;
-                break;
-
-            case gcvVERTEX_UNSIGNED_INT_2_10_10_10_REV:
-                if (halti2Support)
-                {
-                    format = 0x7;
-                    endian = Hardware->bigEndian
-                           ? 0x2
-                           : 0x0;
-                }
-                else
-                {
-                    gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-                }
-                break;
-
-            case gcvVERTEX_INT_2_10_10_10_REV:
-                if (halti2Support)
-                {
-                    format = 0x6;
-                    endian = Hardware->bigEndian
-                           ? 0x2
-                           : 0x0;
-                }
-                else
-                {
-                    gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-                }
-                break;
-
-             case gcvVERTEX_INT8:
-                 format = 0xE;
-                 endian = Hardware->bigEndian
-                        ? 0x2
-                        : 0x0;
-                 break;
-
-             case gcvVERTEX_INT16:
-                 format = 0xF;
-                 endian = Hardware->bigEndian
-                        ? 0x2
-                        : 0x0;
-                 break;
-
-             case gcvVERTEX_INT32:
-                 format = 0x8;
-                 endian = Hardware->bigEndian
-                        ? 0x2
-                        : 0x0;
-                 break;
-
-            default:
-                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-            }
+            gcmCOMPUTE_FORMAT_AND_ENDIAN();
 
             /* Get size. */
-            size = attribute->vertexPtr->size;
-            link = attribute->vertexPtr->linkage;
+            size = attrPtr->vertexPtr->size;
+            link = attrPtr->vertexPtr->linkage;
 
             /* Get normalized flag. */
-            normalize = (attribute->vertexPtr->normalized)
+            normalize = (attrPtr->vertexPtr->normalized)
                         ? (Hardware->currentApi == gcvAPI_OPENGL_ES30)
                           ? 0x1
                           : 0x2
                         : 0x0;
 
             /* Get vertex offset and size. */
-            offset      = attribute->offset;
-            fetchSize  += attribute->bytes;
+            offset      = attrPtr->offset;
+            fetchSize  += attrPtr->bytes;
             fetchBreak
-                =
-                   (attribute->next == gcvNULL)
-                || (offset + attribute->bytes != attribute->next->offset)
-                || (attribute->next->offset >= base + stride)
+                = (attrPtr->next == gcvNULL)
+                || (offset + attrPtr->bytes != attrPtr->next->offset)
+                || (attrPtr->next->offset >= base + stride)
                     ? 1 : 0;
 
             if (Hardware->features[gcvFEATURE_NEW_GPIPE])
@@ -3438,7 +3202,17 @@ gcoHARDWARE_SetVertexArray(
  31:16))) | (((gctUINT32) ((gctUINT32) (offset - base) & ((gctUINT32) ((((1 ?
  31:16) - (0 ?
  31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16))));
+ ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1))))))) << (0 ?
+ 7:7))) | (((gctUINT32) ((gctUINT32) (format >> 4) & ((gctUINT32) ((((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7))));
 
                  _gcmSETSTATEDATA(
                     stateDelta, feFetchCmd, feFetchState,
@@ -3686,7 +3460,11 @@ gcoHARDWARE_SetVertexArrayEx(
     gctUINT attributeCount;
     gctUINT linkState = 0;
     gctUINT linkCount = 0;
+
     gctUINT32 lastPhysical = 0;
+
+    /* The flag of flush vertex cache */
+    gctBOOL bFlushVertexCache = gcvFALSE;
     gctPOINTER *outside = gcvNULL;
     gctUINT attribIndex = 0, shaderInputIndex = 0;
 
@@ -3709,16 +3487,32 @@ gcoHARDWARE_SetVertexArrayEx(
     for(streamPtr = Streams; streamPtr != gcvNULL; streamPtr = streamPtr->next)
     {
         attributeCount += streamPtr->attributeCount;
+
+        if (streamPtr->stream)
+        {
+            gcsSURF_NODE_PTR node = gcvNULL;
+
+            gcoBUFOBJ_GetNode(streamPtr->stream, &node);
+
+            if (node != gcvNULL && node->bCPUWrite)
+            {
+                bFlushVertexCache = gcvTRUE;
+                /* Reset flag.*/
+                node->bCPUWrite = gcvFALSE;
+            }
+        }
     }
 
+    if (bFlushVertexCache)
+    {
+        gcmVERIFY_OK(gcoHARDWARE_FlushVertex(gcvNULL));
+    }
     /* Reset streamCount to 0, as we flush stream everytime */
     Hardware->hwSlot->renderEngine.streamCount = 0;
     Hardware->hwSlot->renderEngine.streamMaxCount = Hardware->config->streamCount;
     gcoOS_ZeroMemory(Hardware->hwSlot->renderEngine.streams, gcmSIZEOF(gctUINT32) * gcdSTREAMS);
 
-    /* Set vertex/instance id linkage to -1 if we already have maximum number of attributes.
-     * in this case compiler will program 21:16 register */
-    if ((attributeCount == Hardware->config->attribCount) &&
+    if (attributeCount == Hardware->config->attribCount &&
         !((Hardware->config->attribCount == 16) &&
           (VertexInstanceIdLinkage == 16) &&
           Hardware->features[gcvFEATURE_NEW_GPIPE]))
@@ -3885,8 +3679,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (Hardware->streamAddressState + stream) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, Hardware->streamAddressState + stream, lastPhysical);
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
@@ -3948,8 +3741,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x51B0 + stream) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x51B0 + stream, endAddress);
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
@@ -4006,8 +3798,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (Hardware->streamStrideState + stream) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, Hardware->streamStrideState + stream, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  11:0) - (0 ?
  11:0) + 1) == 32) ?
@@ -4068,8 +3859,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x51A0 + stream) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x51A0 + stream, divisor);
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
@@ -4125,8 +3915,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (Hardware->streamStrideState + stream) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, Hardware->streamStrideState + stream, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  8:0) - (0 ?
  8:0) + 1) == 32) ?
@@ -4232,8 +4021,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x5E00 + attribIndex) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x5E00 + attribIndex, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  13:12) - (0 ?
  13:12) + 1) == 32) ?
@@ -4315,7 +4103,19 @@ gcoHARDWARE_SetVertexArrayEx(
  31:16))) | (((gctUINT32) ((gctUINT32) (offset - base) & ((gctUINT32) ((((1 ?
  31:16) - (0 ?
  31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16))));    gcmENDSTATEBATCH_NEW(reserve, memory);
+ ~0U : (~(~0U << ((1 ?
+ 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ?
+ 31:16))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1))))))) << (0 ?
+ 7:7))) | (((gctUINT32) ((gctUINT32) (format >> 4) & ((gctUINT32) ((((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7))));    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
 
@@ -4366,8 +4166,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x5EA0 + attribIndex) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x5EA0 + attribIndex, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  8:0) - (0 ?
  8:0) + 1) == 32) ?
@@ -4443,8 +4242,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0180 + attribIndex) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0180 + attribIndex, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  13:12) - (0 ?
  13:12) + 1) == 32) ?
@@ -4653,8 +4451,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (Hardware->shaderCtrlState + shaderInputIndex) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, Hardware->shaderCtrlState + shaderInputIndex, linkState);
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
@@ -4678,8 +4475,8 @@ gcoHARDWARE_SetVertexArrayEx(
                     Hardware->features[gcvFEATURE_NEW_GPIPE])
                 {
                     gctUINT32 wDefaultValue = (attrPtr->format == gcvVERTEX_INT8  ||
-                                               attrPtr->format == gcvVERTEX_INT16 ||
-                                               attrPtr->format == gcvVERTEX_INT32)
+                        attrPtr->format == gcvVERTEX_INT16 ||
+                        attrPtr->format == gcvVERTEX_INT32)
                                              ? 0x1 : 0x3F800000;
                     {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
@@ -4728,13 +4525,12 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (Hardware->genericWState + attribIndex) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, Hardware->genericWState + attribIndex, wDefaultValue);
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
-                }
+                    }
                 attribIndex++;
             }
         }
@@ -4794,8 +4590,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (Hardware->streamAddressState + i) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, Hardware->streamAddressState + i, lastPhysical);
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
@@ -4854,8 +4649,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x01F1) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x01F1, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -4942,8 +4736,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x01F1) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x01F1, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -5022,7 +4815,6 @@ gcoHARDWARE_SetVertexArrayEx(
                 }
 
             }
-
             /* Program attributes */
             {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
@@ -5071,8 +4863,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (Hardware->shaderCtrlState + shaderInputIndex) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, Hardware->shaderCtrlState + shaderInputIndex, linkState);
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
@@ -5139,8 +4930,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x01F2) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x01F2, 1);
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
@@ -5197,8 +4987,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x01F1) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x01F1, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -5285,8 +5074,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x01F1) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x01F1, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -5301,7 +5089,6 @@ gcoHARDWARE_SetVertexArrayEx(
 
                 }
             }
-
             gcmASSERT(VertexInstanceIdLinkage != -1);
             {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
@@ -5350,8 +5137,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (Hardware->shaderCtrlState) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, Hardware->shaderCtrlState, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:0) - (0 ?
  5:0) + 1) == 32) ?
@@ -5363,7 +5149,6 @@ gcoHARDWARE_SetVertexArrayEx(
  5:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0))));    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
-
 
         }
         else
@@ -5381,7 +5166,6 @@ gcoHARDWARE_SetVertexArrayEx(
             {
                 gcmGETHARDWAREADDRESS(Hardware->tempBuffer, addr);
             }
-
             /* Update the number of the elements. */
             stateDelta->elementCount = 2;
 
@@ -5432,8 +5216,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (Hardware->streamAddressState) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, Hardware->streamAddressState, addr);
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
@@ -5486,8 +5269,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0180) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0180, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  13:12) - (0 ?
  13:12) + 1) == 32) ?
@@ -5646,8 +5428,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0208) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0208, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:0) - (0 ?
  5:0) + 1) == 32) ?

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -42,13 +42,17 @@ gcOPTIMIZER_OPTION theOptimizerOption =
     gcvFALSE, /* OPTV: dump result IR in each optimization phase */
     gcvFALSE, /* CG:   dump generated machine code */
     gcvFALSE, /* CGV:  dump BE tree and optimizer detail */
+    gcvFALSE, /* HTP:  dump hash table performance */
     gcvFALSE, /* IR:   dump BE final IR */
     gcvFALSE, /* LOG:  dump FE log file in case of compiler error */
+    gcvFALSE, /* BIN2FILE: dump program binary to file when calling gcLoadProgram */
     gcvFALSE, /* UNIFORM: dump uniform value when setting uniform */
     gcvFALSE, /* SPIRV: dump VIR shader convert from SPIRV */
     gcvFALSE, /* SPIRV2FILE: dump SPIRV to tmp file for debugging */
     0, /* _dumpStart; */
     0x7fffffff, /* _dumpEnd */
+    1, /* RENUM:[0|1]: re-number instruction id when dumping IR */
+    gcvFALSE, /* LIB: dump library shader too */
 
     /* Varying Packing:
 
@@ -80,6 +84,14 @@ gcOPTIMIZER_OPTION theOptimizerOption =
     /* If need to do any power optimization, set needPowerOptimization
        to true, then set the needed sub options in below */
     gcvFALSE, /* needPowerOptimization; */
+
+    /* If need to dump hash table performance, set hash table max search times,
+        and if the fact search times is more than the max times, also add the number of max search times up,
+        if not to set this option, the max search times is 0, that means can not to statistic search times
+
+              VC_OPTION=-HMST:value
+    */
+    0, /* set hash table max search times */
 
     /* Patch TEXLD instruction by adding dummy texld
        (can be used to tune GPU power usage):
@@ -196,6 +208,7 @@ gcOPTIMIZER_OPTION theOptimizerOption =
      */
     1, /* inlineFormatConversion; */
 
+    GC_DEFAULT_TESS_LEVEL, /* testTessLevel; */
 
     /* dual 16 mode
      *
@@ -267,8 +280,8 @@ gcOPTIMIZER_OPTION theOptimizerOption =
      *
      */
 
-    VIRCG_WITH_TREECG, /* useVIRCodeGen; */
-    VIRCG_WITH_TREECG, /* origUseVIRCodeGen; */
+    VIRCG_DEFAULT, /* useVIRCodeGen; */
+    VIRCG_DEFAULT, /* origUseVIRCodeGen; */
     gcvFALSE, /* virCodeGenSpecified; */
     0, /* _vircgStart; */
     0x7fffffff, /* _vircgEnd */
@@ -317,6 +330,13 @@ gcOPTIMIZER_OPTION theOptimizerOption =
      *
      */
     gcvFALSE, /* oclInt64InVIR; */
+
+    /*  OCL uniforms for constant address space variables
+     *
+     *   VC_OPTION=-OCLUNIFORMFORCONSTANT:0|1
+     *
+     */
+    gcvFALSE, /* oclUniformForConstant; */
 
     /*  USE gcSL_NEG for -a instead of SUB(0, a)
      *
@@ -375,10 +395,23 @@ gcOPTIMIZER_OPTION theOptimizerOption =
      */
     gcvTRUE, /* CLUseVIRCodeGen; */
 
-    /* Enable write/read Shader info to/from file:
-     *   VC_OPTION=-LIBSHADERFILE:0|1
+    /* Enable register pack in old compiler:
+     *   VC_OPTION=-PACKREG:0|1
+    */
+    gcvTRUE, /*enablePackRegister; */
+
+    /* Operate shader files :
+     *
+     * VC_OPTION=-LIBSHADERFILE:0|1|2
+     *  0:  Unable to operate shader files
+     *  1:  Enable write/read Shader info to/from file
+     *  2:  Force rewrite shader info to file
      */
-    gcvTRUE, /* enableLibShaderFile; */
+    1, /*enable write/read Shader info to/from file; */
+
+    /* whether driver use new VIR path for driver programming
+     */
+    gcvFALSE, /* DriverVIRPath; */
 
 };
 
@@ -404,7 +437,7 @@ _MemPoolInit(
 {
     gceSTATUS           status = gcvSTATUS_OK;
     gcoOS               os = gcvNULL;
-
+    void *              pointer;
     gcmHEADER_ARG("Optimizer=%p", Optimizer);
 
     gcmERR_RETURN(gcfMEM_InitFSMemPool(&Optimizer->codeMemPool, os, 100, sizeof(struct _gcOPT_CODE)));
@@ -414,6 +447,12 @@ _MemPoolInit(
     gcmERR_RETURN(gcfMEM_InitAFSMemPool(&Optimizer->codeArrayMemPool, os, 300, sizeof(struct _gcOPT_CODE)));
     gcmERR_RETURN(gcfMEM_InitAFSMemPool(&Optimizer->functionArrayMemPool, os, 10, sizeof(struct _gcOPT_FUNCTION)));
     gcmERR_RETURN(gcfMEM_InitAFSMemPool(&Optimizer->tempDefineArrayMemPool, os, 500, sizeof(struct _gcOPT_TEMP_DEFINE)));
+
+    gcmERR_RETURN(gcoOS_Allocate(os,
+                    sizeof(VSC_PRIMARY_MEM_POOL),
+                    &pointer));
+    Optimizer->mp = pointer;
+    vscPMP_Intialize((VSC_PRIMARY_MEM_POOL*)Optimizer->mp, gcvNULL, 1024, sizeof(void *), gcvTRUE);
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -433,6 +472,9 @@ _MemPoolCleanup(
     gcfMEM_FreeAFSMemPool(&Optimizer->codeArrayMemPool);
     gcfMEM_FreeAFSMemPool(&Optimizer->functionArrayMemPool);
     gcfMEM_FreeAFSMemPool(&Optimizer->tempDefineArrayMemPool);
+
+    vscPMP_Finalize((VSC_PRIMARY_MEM_POOL*)Optimizer->mp);
+    gcoOS_Free(gcvNULL, Optimizer->mp);
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -768,9 +810,8 @@ gcSHADER_GoVIRPass(gcSHADER Shader)
         ** 1) OpenCL has no int64 in the shader.
         ** 2) This chip can support HALTI2.
         ** 3) Has int64 in the shader and VIR has support for int64
-        ** 4) VIRCG=2 is used
         */
-        if ((gcGetVIRCGKind(gcHWCaps.hwFeatureFlags.hasHalti2) == VIRCG_FULL) &&
+        if (gcHWCaps.hwFeatureFlags.hasHalti2 &&
             gcmOPT_CLUseVIRCodeGen() &&
             (!gcShaderHasInt64(Shader) ||
              gcmOPT_oclInt64InVIR()))
@@ -870,19 +911,6 @@ gcSHADER_DumpCodeGenVerbose(void * Shader)
         gctINT   startId = option->_dumpStart;
         gctINT   endId   = option->_dumpEnd;
         return gcDoTriageForShaderId(gcSHADER_getEffectiveShaderId(Shader), startId, endId);
-    }
-    return gcvFALSE;
-}
-
-gctBOOL VirSHADER_DumpCodeGenVerbose(gctINT ShaderId)
-{
-    gcOPTIMIZER_OPTION * option = gcmGetOptimizerOption();
-
-    if (option->dumpBEVerbose)
-    {
-        gctINT   startId = option->_dumpStart;
-        gctINT   endId   = option->_dumpEnd;
-        return gcDoTriageForShaderId(ShaderId, startId, endId);
     }
     return gcvFALSE;
 }
@@ -1775,14 +1803,25 @@ _UpdateTempRegState(
     gcSL_FORMAT         Format
     )
 {
-    gctINT              i;
+    gctINT              i, arraySize;
 #if _SUPPORT_LONG_ULONG_DATA_TYPE
     gctBOOL             is64Bit = isFormat64bit(TempReg->format) || isFormat64bit(Format);
 #else
     gctBOOL             is64Bit = gcvFALSE;
 #endif
     gctINT              stride = is64Bit ? 2 : 1;
-    gcOPT_TEMP          tempReg;
+    gcOPT_TEMP          tempReg, arrayStartTempReg;
+
+    if (TempReg->arrayVariable)
+    {
+        arraySize = TempReg->arrayVariable->arraySize * gcmType_Rows(TempReg->arrayVariable->u.type);
+        arrayStartTempReg = Optimizer->tempArray + TempReg->arrayVariable->tempIndex;
+    }
+    else
+    {
+        arraySize = stride;
+        arrayStartTempReg = TempReg;
+    }
 
 #if _SUPPORT_LONG_ULONG_DATA_TYPE
     /* Update format. */
@@ -1815,56 +1854,28 @@ _UpdateTempRegState(
         /* If this register is not used in any function before, save the current function. */
         if (!TempReg->setFunction)
         {
-            TempReg->function = Function;
-            TempReg->setFunction = gcvTRUE;
-
-            if (is64Bit)
+            for (i = 0; i < arraySize; i++)
             {
-                tempReg = TempReg + 1;
+                tempReg = arrayStartTempReg + i;
                 tempReg->function = Function;
                 tempReg->setFunction = gcvTRUE;
-                tempReg->format = Format;
-            }
-
-            if (TempReg->arrayVariable != gcvNULL && TempReg->arrayVariable->arraySize > 1)
-            {
-                for (i = 0; i < TempReg->arrayVariable->arraySize * stride; i++)
+                if (is64Bit)
                 {
-                    tempReg = TempReg + i;
-                    tempReg->function = Function;
-                    tempReg->setFunction = gcvTRUE;
-                    if (is64Bit)
-                    {
-                        tempReg->format = Format;
-                    }
+                    tempReg->format = Format;
                 }
             }
         }
         /* If this register is used in two different functions, then mark it as global. */
         else if (TempReg->function != Function)
         {
-            TempReg->isGlobal = gcvTRUE;
-            TempReg->function = gcvNULL;
-
-            if (is64Bit)
+            for (i = 0; i < arraySize; i++)
             {
-                tempReg = TempReg + 1;
+                tempReg = arrayStartTempReg + i;
                 tempReg->isGlobal = gcvTRUE;
                 tempReg->function = gcvNULL;
-                tempReg->format = Format;
-            }
-
-            if (TempReg->arrayVariable != gcvNULL && TempReg->arrayVariable->arraySize > 1)
-            {
-                for (i = 0; i < TempReg->arrayVariable->arraySize * stride; i++)
+                if (is64Bit)
                 {
-                    tempReg = TempReg + i;
-                    tempReg->isGlobal = gcvTRUE;
-                    tempReg->function = gcvNULL;
-                    if (is64Bit)
-                    {
-                        tempReg->format = Format;
-                    }
+                    tempReg->format = Format;
                 }
             }
         }
@@ -1919,27 +1930,6 @@ gcOpt_InitializeTempArray(
         temp->format = -1;
     }
 
-    if (needToCheckGlobal)
-    {
-        if (Optimizer->outputCount > 0 && tempArray == gcvNULL)
-        {
-            gcmASSERT(tempArray);
-            status = gcvSTATUS_INVALID_ARGUMENT;
-            gcmFOOTER();
-            return status;
-        }
-
-        /* Set output registers as global. */
-        for (i = 0; i < Optimizer->outputCount; i++)
-        {
-            /* output could be NULL if it is not used */
-            if (Optimizer->outputs[i] == gcvNULL)
-                continue;
-
-            tempArray[Optimizer->outputs[i]->tempIndex].isGlobal = gcvTRUE;
-        }
-    }
-
     /* Initialize arrayVariable. */
     if (Optimizer->shader->variableCount > 0)
     {
@@ -1950,7 +1940,7 @@ gcOpt_InitializeTempArray(
         {
             gcVARIABLE variable = Optimizer->shader->variables[v];
 
-            if (isVariableNormal(variable))
+            if (isVariableNormal(variable) && !IsVariableIsNotUsed(variable))
             {
                 gctUINT size = 1;
                 gctUINT j;
@@ -1969,6 +1959,47 @@ gcOpt_InitializeTempArray(
                 {
                     temp->arrayVariable = variable;
                 }
+            }
+        }
+    }
+
+    if (needToCheckGlobal)
+    {
+        if (Optimizer->outputCount > 0 && tempArray == gcvNULL)
+        {
+            gcmASSERT(tempArray);
+            status = gcvSTATUS_INVALID_ARGUMENT;
+            gcmFOOTER();
+            return status;
+        }
+
+        /* Set output registers as global. */
+        for (i = 0; i < Optimizer->outputCount; i++)
+        {
+            gcOPT_TEMP outputTemp;
+            gctUINT j, size, stride;
+
+            /* output could be NULL if it is not used */
+            if (Optimizer->outputs[i] == gcvNULL)
+                continue;
+
+            outputTemp = tempArray + Optimizer->outputs[i]->tempIndex;
+            stride = isFormat64bit(outputTemp->format) ? 2 : 1;
+            if (outputTemp->arrayVariable)
+            {
+                size = outputTemp->arrayVariable->arraySize;
+                size *= gcmType_Rows(outputTemp->arrayVariable->u.type);
+            }
+            else
+            {
+                size = stride;
+            }
+
+            for (j = 0; j < size; j++)
+            {
+                outputTemp = tempArray + Optimizer->outputs[i]->tempIndex + j;
+                outputTemp->isGlobal = gcvTRUE;
+                outputTemp->function = gcvNULL;
             }
         }
     }
@@ -2211,6 +2242,15 @@ gcOpt_BuildTempArray(
         gcsFUNCTION_ARGUMENT_PTR argument;
         gctUINT j;
 
+        /* Check if we need special WAR for CTS. */
+        if (function->shaderFunction &&
+            gcoOS_StrNCmp(function->shaderFunction->name, "compare_", 8) == 0 &&
+            Optimizer->shader->storageBlockCount == 0 &&
+            (Optimizer->patchID == gcvPATCH_GTFES30 || Optimizer->patchID == gcvPATCH_DEQP))
+        {
+            Optimizer->isCTSInline = gcvTRUE;
+        }
+
         if (function->argumentCount > 0 && tempArray == gcvNULL)
         {
             gcmASSERT(tempArray);
@@ -2401,20 +2441,11 @@ _BuildGlobalUsage(
         return status;
     }
 
-    enableDefArray = (gctUINT8*)malloc(Optimizer->tempCount * sizeof(gctUINT8));
-    if(enableDefArray == gcvNULL)
-    {
-        gcmFOOTER();
-        return gcvSTATUS_OUT_OF_MEMORY;
-    }
+    gcmONERROR(gcoOS_Allocate(gcvNULL, Optimizer->tempCount * sizeof(gctUINT8), (gctPOINTER*)&enableDefArray));
+    gcoOS_ZeroMemory(enableDefArray, Optimizer->tempCount * sizeof(gctUINT8));
 
-    enableUseArray = (gctUINT8*)malloc(Optimizer->tempCount * sizeof(gctUINT8));
-    if(enableDefArray == gcvNULL)
-    {
-        free(enableDefArray);
-        gcmFOOTER();
-        return gcvSTATUS_OUT_OF_MEMORY;
-    }
+    gcmONERROR(gcoOS_Allocate(gcvNULL, Optimizer->tempCount * sizeof(gctUINT8), (gctPOINTER*)&enableUseArray));
+    gcoOS_ZeroMemory(enableUseArray, Optimizer->tempCount * sizeof(gctUINT8));
 
     function = functionArray;
     for (i = 0; i < Optimizer->functionCount; i++, function++)
@@ -2424,9 +2455,6 @@ _BuildGlobalUsage(
         {
             tempArray[list->index].tempInt = -1;
         }
-
-        memset(enableDefArray, 0, Optimizer->tempCount * sizeof(gctUINT8));
-        memset(enableUseArray, 0, Optimizer->tempCount * sizeof(gctUINT8));
         /* Set direction in tempInt. */
         for (code = function->codeHead; code != gcvNULL && code != function->codeTail->next; code = code->next)
         {
@@ -2607,14 +2635,9 @@ _BuildGlobalUsage(
             if (temp->tempInt != -1)
             {
                 gcOPT_GLOBAL_USAGE usage = gcvNULL;
-                status = _CAllocateGlobalUsage(Optimizer->usageMemPool, &usage);
-                if(status != gcvSTATUS_OK)
-                {
-                    free(enableDefArray);
-                    free(enableUseArray);
-                    gcmFOOTER();
-                    return status;
-                }
+
+                gcmONERROR(_CAllocateGlobalUsage(Optimizer->usageMemPool, &usage));
+
                 usage->index = list->index;
                 usage->direction = (gceINPUT_OUTPUT) temp->tempInt;
                 usage->defEnable = enableDefArray[list->index];
@@ -2624,9 +2647,6 @@ _BuildGlobalUsage(
             }
         }
     }
-
-    free(enableDefArray);
-    free(enableUseArray);
 
     /* Propagate global usage for nested calling. */
     function = functionArray;
@@ -2690,7 +2710,7 @@ _BuildGlobalUsage(
                         if (callerUsage == gcvNULL)
                         {
                             /* Add global usage. */
-                            gcmERR_RETURN(_CAllocateGlobalUsage(Optimizer->usageMemPool, &callerUsage));
+                            gcmONERROR(_CAllocateGlobalUsage(Optimizer->usageMemPool, &callerUsage));
 
                             callerUsage->index = usage->index;
                             callerUsage->direction = usage->direction;
@@ -2707,6 +2727,17 @@ _BuildGlobalUsage(
         }
     }
     while (updated);
+
+OnError:
+    if (enableDefArray != gcvNULL)
+    {
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, enableDefArray));
+    }
+
+    if (enableUseArray != gcvNULL)
+    {
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, enableUseArray));
+    }
 
     gcmFOOTER();
     return status;
@@ -3269,13 +3300,17 @@ gcOpt_AddCodeBefore(
 **
 **        gcOPT_CODE DestCode
 **            Destination code.
+**
+**        gctBOOL    ReplaceJmpTarget
+**            Whether need to replace the dest caller.
 */
 gceSTATUS
 gcOpt_CopyCodeListAfter(
     IN gcOPTIMIZER      Optimizer,
     IN gcOPT_CODE       SrcCodeHead,
     IN gcOPT_CODE       SrcCodeTail,
-    IN gcOPT_CODE       DestCode
+    IN gcOPT_CODE       DestCode,
+    IN gctBOOL          ReplaceJmpTarget
     )
 {
     gceSTATUS           status = gcvSTATUS_OK;
@@ -3284,6 +3319,7 @@ gcOpt_CopyCodeListAfter(
     gcOPT_CODE          srcCodePrev = SrcCodeHead->prev;
     gcOPT_CODE          destCodeNext = DestCode->next;
     gcOPT_CODE          codePrev;
+    gcOPT_CODE          origDestCodeNext = DestCode->next;
 
     gcmHEADER_ARG("Optimizer=0x%x SrcCodeHead=0x%x SrcCodeTail=0x%x DestCode=0x%x",
                    Optimizer, SrcCodeHead, SrcCodeTail, DestCode);
@@ -3375,6 +3411,31 @@ gcOpt_CopyCodeListAfter(
     if (destCodeNext)
     {
         destCodeNext->prev = codePrev;
+    }
+
+    /* Check whether we need to replace the caller. */
+    if (ReplaceJmpTarget &&
+        origDestCodeNext &&
+        DestCode->function == origDestCodeNext->function &&
+        /* Check JMPs only, no need to check CALL. */
+        !(origDestCodeNext->function != gcvNULL &&
+          (origDestCodeNext == origDestCodeNext->function->codeHead
+           ||
+           origDestCodeNext == origDestCodeNext->function->codeTail)
+         ))
+    {
+        gcOPT_CODE newCodeStart = DestCode->next;
+        gcOPT_LIST callerList = origDestCodeNext->callers;
+
+        while(callerList)
+        {
+            gcmVERIFY_OK(gcOpt_AddCodeToList(Optimizer, &newCodeStart->callers, callerList->code));
+
+            callerList->code->callee = newCodeStart;
+            callerList = callerList->next;
+        }
+
+        gcmVERIFY_OK(gcOpt_DestroyList(Optimizer, &origDestCodeNext->callers));
     }
 
     /* Note that no housekeeping work done here. */
@@ -5123,7 +5184,7 @@ _AddUserRecusive(
             code = preDef->code;
             if (code != gcvNULL)
             {
-                if (vscHTBL_DirectTestAndGet(pCodeSet, (void*)code, gcvNULL))
+                if (vscHTBL_DirectTestAndGet(pCodeSet, (void*) code, gcvNULL))
                 {
                     break;
                 }
@@ -5161,14 +5222,15 @@ _AddUser(
     gceSTATUS           status = gcvSTATUS_OK;
     gcOPT_LIST          list;
     gcOPT_CODE          code;
-    VSC_PRIMARY_MEM_POOL mp;
-    VSC_HASH_TABLE      *pCodeSet;
+    VSC_HASH_TABLE *    pCodeSet;
+    VSC_PRIMARY_MEM_POOL * mp;
 
     gcmHEADER_ARG("Optimizer=0x%x InputList=0x%x Code=0x%x",
                    Optimizer, InputList, Code);
 
-    vscPMP_Intialize(&mp, gcvNULL, 1024, sizeof(void *), gcvTRUE);
-    pCodeSet = vscHTBL_Create(&mp.mmWrapper, vscHFUNC_Default, vscHKCMP_Default, 256);
+    mp = (VSC_PRIMARY_MEM_POOL *)Optimizer->mp;
+    vscHTBL_CreateOrInitialize(&mp->mmWrapper, (VSC_HASH_TABLE ** )&Optimizer->pCodeSet, vscHFUNC_DefaultPtr, vscHKCMP_Default, 256);
+    pCodeSet = (VSC_HASH_TABLE *)Optimizer->pCodeSet;
 
     /* Add the input list to Root. */
     for (list = InputList; list; list = list->next)
@@ -5205,10 +5267,8 @@ _AddUser(
 
     if (pCodeSet)
     {
-        vscHTBL_Destroy(pCodeSet);
+        vscHTBL_Reset(pCodeSet);
     }
-
-    vscPMP_Finalize(&mp);
 
     gcmFOOTER();
     return status;
@@ -5239,7 +5299,7 @@ _AddTempDependencyRecusive(
             index = preDef->index;
             if (code != gcvNULL)
             {
-                if (vscHTBL_DirectTestAndGet(pCodeSet, (void*)code, gcvNULL))
+                if (vscHTBL_DirectTestAndGet(pCodeSet, (void*) code, gcvNULL))
                 {
                     break;
                 }
@@ -5285,13 +5345,14 @@ _AddTempDependency(
     gceSTATUS           status = gcvSTATUS_OK;
     gcOPT_LIST          list;
     gcOPT_CODE          code;
-    VSC_PRIMARY_MEM_POOL mp;
+    VSC_PRIMARY_MEM_POOL *mp;
     VSC_HASH_TABLE      *pCodeSet;
 
     gcmHEADER_ARG("Optimizer=%p SrcList=%p Root=%p", Optimizer, SrcList, Root);
 
-    vscPMP_Intialize(&mp, gcvNULL, 1024, sizeof(void *), gcvTRUE);
-    pCodeSet = vscHTBL_Create(&mp.mmWrapper, vscHFUNC_Default, vscHKCMP_Default, 256);
+    mp = (VSC_PRIMARY_MEM_POOL *)Optimizer->mp;
+    vscHTBL_CreateOrInitialize(&mp->mmWrapper, (VSC_HASH_TABLE ** )&Optimizer->pCodeSet, vscHFUNC_DefaultPtr, vscHKCMP_Default, 256);
+    pCodeSet = (VSC_HASH_TABLE *)Optimizer->pCodeSet;
 
     for (list = SrcList; list; list = list->next)
     {
@@ -5336,10 +5397,8 @@ _AddTempDependency(
 
     if (pCodeSet)
     {
-        vscHTBL_Destroy(pCodeSet);
+        vscHTBL_Reset(pCodeSet);
     }
-
-    vscPMP_Finalize(&mp);
 
     /* Success. */
     gcmFOOTER_ARG("*Root=%p status=%d", *Root, status);
@@ -5773,7 +5832,10 @@ _InsertInitializerInstForOutput(
         }
 
         componentCount = gcmType_Comonents(output->type);
-
+        if (Optimizer->shader->type == gcSHADER_TYPE_FRAGMENT && gcmOPT_hasFeature(FB_ENABLE_FS_OUT_INIT))
+        {
+            componentCount = 4;  /* always set all channels of output register to help HW debug*/
+        }
         for (j = 0; j < output->arraySize; j++)
         {
             /* Insert a MOV. */
@@ -6388,8 +6450,9 @@ _BuildFunctionFlowGraph(
     gcmVERIFY_OK(_AddUndefined(Optimizer, tempDefineArray));
 
     /* Build data flow. */
-    code = Function->codeHead;
-    while (code && code != Function->codeTail->next)
+    for (code = Function->codeHead;
+         code && (code != Function->codeTail->next);
+         code = code->next)
     {
         if(lastBackwardCallee && code->id == lastBackwardCallee->id)
         {
@@ -6452,7 +6515,7 @@ _BuildFunctionFlowGraph(
             {
                 code->handled = gcvTRUE;
                 for (code = code->prev;
-                     code != gcvNULL && code != codeDest;
+                     code != gcvNULL && code != codeDest->prev;
                      code = code->prev)
                 {
                     /* Reset handled flag for the codes in between. */
@@ -6476,7 +6539,6 @@ _BuildFunctionFlowGraph(
                 gcmVERIFY_OK(gcOpt_ClearTempArray(Optimizer, tempDefineArray));
             }
         }
-        code = code->next;
     }
 
     /* Output dependancies are already added by RET instruction (main program has extra RET instruction). */

@@ -235,7 +235,7 @@ void PrintPPOutputPPCallbacks::FileChanged(SourceLocation Loc,
   } else if (Reason == PPCallbacks::SystemHeaderPragma) {
     MoveToLine(NewLine);
 
-    // TODO GCC emits the # directive for this directive on the line AFTER the
+    // VIV:TODO GCC emits the # directive for this directive on the line AFTER the
     // directive and emits a bunch of spaces that aren't needed.  Emulate this
     // strange behavior.
   }

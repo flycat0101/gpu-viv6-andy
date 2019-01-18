@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -132,97 +132,24 @@ _FreeRegion(
     Region->numRects = Region->maxNumRects = 0;
 }
 
-static void
-_AddDumpSurface(
-    IN VEGLThreadData Thread,
-    IN VEGLSurface Surface
-    )
-{
-    gctUINT32 address[3] = { 0 };
-    gctPOINTER memory[3] = { gcvNULL };
-    gctUINT width, height;
-    gctINT stride;
-    gceSTATUS status;
-    gcoSURF surface = gcvNULL;
-
-    if ( (Thread->dump != gcvNULL) && (Surface->renderTarget != gcvNULL) )
-    {
-        /* Lock the render target. */
-        gcmONERROR(gcoSURF_Lock(Surface->renderTarget, address, memory));
-        surface = Surface->renderTarget;
-
-        /* Get the size of the render target. */
-        gcmONERROR(gcoSURF_GetAlignedSize(Surface->renderTarget,
-                                          &width,
-                                          &height,
-                                          &stride));
-
-        /* Dump the allocation for the render target. */
-        gcmONERROR(gcoDUMP_AddSurface(Thread->dump,
-                                      width,
-                                      height,
-                                      Surface->renderTargetFormat,
-                                      address[0],
-                                      stride * height));
-
-        /* Unlock the render target. */
-        gcmONERROR(gcoSURF_Unlock(Surface->renderTarget, memory[0]));
-        surface = gcvNULL;
-    }
-
-    if ( (Thread->dump != gcvNULL) && (Surface->depthBuffer != gcvNULL) )
-    {
-        /* Lock the depth buffer. */
-        gcmONERROR(gcoSURF_Lock(Surface->depthBuffer, address, memory));
-        surface = Surface->depthBuffer;
-
-        /* Get the size of the depth buffer. */
-        gcmONERROR(gcoSURF_GetAlignedSize(Surface->depthBuffer,
-                                          &width,
-                                          &height,
-                                          &stride));
-
-        /* Dump the allocation for the depth buffer. */
-        gcmONERROR(gcoDUMP_AddSurface(Thread->dump,
-                                      width,
-                                      height,
-                                      Surface->depthFormat,
-                                      address[0],
-                                      stride * height));
-
-        /* Unlock the depth buffer. */
-        gcmONERROR(gcoSURF_Unlock(Surface->depthBuffer, memory[0]));
-        surface = gcvNULL;
-    }
-
-OnError:
-    if (surface != gcvNULL)
-    {
-        /* Unlock the failed surface. */
-        gcmVERIFY_OK(gcoSURF_Unlock(surface, memory[0]));
-    }
-
-    return;
-}
-
 static gceSTATUS
 _InitDrawable(
     IN VEGLSurface Surface
 )
 {
     /* Prepare the API drawable struct */
-    Surface->drawable.config         = &Surface->config;
-    Surface->drawable.width          = Surface->config.width;
-    Surface->drawable.height         = Surface->config.height;
-    Surface->drawable.rtHandles[0]       = (void*)Surface->renderTarget;
-    Surface->drawable.prevRtHandles[0]   = (void*)Surface->prevRenderTarget;
-    Surface->drawable.depthHandle    = (Surface->config.depthSize > 0) ?
-                                       (void*)Surface->depthBuffer: gcvNULL;
+    Surface->drawable.config            = &Surface->config;
+    Surface->drawable.width             = Surface->config.width;
+    Surface->drawable.height            = Surface->config.height;
+    Surface->drawable.rtHandles[0]      = (void*)Surface->renderTarget;
+    Surface->drawable.prevRtHandles[0]  = (void*)Surface->prevRenderTarget;
+    Surface->drawable.depthHandle       = (Surface->config.depthSize > 0) ?
+                                          (void*)Surface->depthBuffer: gcvNULL;
     /* If config requires stencil buffer, EGL chooses to combine it with depth buffer */
-    Surface->drawable.stencilHandle  = (Surface->config.stencilSize > 0) ?
-                                       (void*)Surface->depthBuffer : gcvNULL;
-    Surface->drawable.private        = gcvNULL;
-    Surface->drawable.destroyPrivate = gcvNULL;
+    Surface->drawable.stencilHandle     = (Surface->config.stencilSize > 0) ?
+                                          (void*)Surface->depthBuffer : gcvNULL;
+    Surface->drawable.private           = gcvNULL;
+    Surface->drawable.destroyPrivate    = gcvNULL;
 
     /* Set preserved flag. */
     if (Surface->renderTarget != gcvNULL)
@@ -589,6 +516,7 @@ _DestroySurfaceObjects(
             {
                 gcmOS_SAFE_FREE(gcvNULL, Surface->damage[i].rects);
                 Surface->damage[i].numRects = 0;
+                Surface->damage[i].maxNumRects = 0;
             }
         }
 
@@ -1163,6 +1091,7 @@ _InitializeSurface(
               surface->colorType |= gcvSURF_COLOR_LINEAR;
         }
 #endif
+
 #if gcdENABLE_3D
 #if gcdDEBUG_OPTION && gcdDEBUG_OPTION_FORCE_16BIT_RENDER_TARGET
         if (surface->renderTargetFormat == gcvSURF_R5G6B5 && patchId == gcvPATCH_DEBUG)
@@ -1230,6 +1159,7 @@ _InitializeSurface(
 
                 if (surface->renderTargetFormat != rtFormat)
                 {
+                    /* rtFormatChanged when the bpp of current rt format more than the bpp of previous rt*/
                     surface->rtFormatChanged = gcvTRUE;
                     surface->renderTargetFormat = rtFormat;
                 }
@@ -1403,9 +1333,6 @@ _CreateSurface(
         {
             break;
         }
-
-        /* Dump the surface. */
-        _AddDumpSurface(Thread, Surface);
 
         /* Success. */
         return EGL_SUCCESS;
@@ -1795,13 +1722,12 @@ veglCreateRenderTarget(
         gctPOINTER memory[3] = {gcvNULL};
         gctUINT8_PTR bits;
         gctINT bitsStride;
-        gctUINT alHeight;
 
         /* Get the stride of render target. */
         gcmONERROR(gcoSURF_GetAlignedSize(
             Surface->renderTarget,
             gcvNULL,
-            &alHeight,
+            gcvNULL,
             &bitsStride
             ));
 
@@ -1815,7 +1741,7 @@ veglCreateRenderTarget(
         bits = (gctUINT8_PTR) memory[0];
         gcoOS_ZeroMemory(
             bits,
-            bitsStride * alHeight
+            bitsStride * Surface->config.height
             );
 
         gcmONERROR(gcoSURF_Unlock(
@@ -1835,6 +1761,13 @@ veglCreateRenderTarget(
         Surface->renderTarget,
         gcvSURF_FLAG_CONTENT_YINVERTED,
         !(Surface->type & EGL_PBUFFER_BIT)
+        ));
+
+    /*if rt format changed, no need do dither when resolve*/
+    gcmVERIFY_OK(gcoSURF_SetFlags(
+        Surface->renderTarget,
+        gcvSURF_FLAG_DITHER_DISABLED,
+        Surface->rtFormatChanged
         ));
 
     /* Sync drawable with renderTarget. */
@@ -1998,18 +1931,6 @@ veglCreatePlatformWindowSurface(
     surface->hwnd   = native_window;
     surface->buffer = renderBuffer;
     surface->protectedContent = protectedContent;
-
-    /* For easily debug */
-    if (dpy->platform->setSwapInterval)
-    {
-        gctSTRING interval = gcvNULL;
-
-        gcoOS_GetEnv(gcvNULL, "VIV_EGL_SWAP_INTERVAL", &interval);
-        if (interval)
-        {
-            dpy->platform->setSwapInterval(surface, (EGLint)atoi(interval));
-        }
-    }
 
     /* Connect to window. */
     result = dpy->platform->connectWindow(dpy, surface, surface->hwnd);

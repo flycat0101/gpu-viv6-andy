@@ -3481,7 +3481,7 @@ void APFloat::toString(SmallVectorImpl<char> &Str,
   assert(!buffer.empty() && "no characters in buffer!");
 
   // Drop down to FormatPrecision.
-  // TODO: don't do more precise calculations above than are required.
+  // VIV:TODO: don't do more precise calculations above than are required.
   AdjustToPrecision(buffer, exp, FormatPrecision);
 
   unsigned NDigits = buffer.size();

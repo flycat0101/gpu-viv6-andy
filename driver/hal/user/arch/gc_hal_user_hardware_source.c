@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2962,26 +2962,6 @@ gceSTATUS gcoHARDWARE_SetColorSource(
     /*set gcregPEControl*/
     if(Filter)
     {
-        uvSwizzle = ((((gctUINT32) (uvSwizzle)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 8:8) - (0 ?
- 8:8) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 8:8) - (0 ?
- 8:8) + 1))))))) << (0 ?
- 8:8))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 8:8) - (0 ?
- 8:8) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ? 8:8)));
-        uvSwizzle = ((((gctUINT32) (uvSwizzle)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 11:11) - (0 ?
- 11:11) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 11:11) - (0 ?
- 11:11) + 1))))))) << (0 ?
- 11:11))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 11:11) - (0 ?
- 11:11) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 11:11) - (0 ? 11:11) + 1))))))) << (0 ? 11:11)));
         peControl[0] = uvSwizzle;
         gcmONERROR(gcoHARDWARE_Load2DState(
         Hardware,
@@ -2989,7 +2969,6 @@ gceSTATUS gcoHARDWARE_SetColorSource(
         peControl
         ));
     }
-
     gcmONERROR(gcoHARDWARE_Load2DState32(
         Hardware,
         0x012D8,
@@ -7487,7 +7466,7 @@ gcoHARDWARE_SetMultiSourceEx(
             clip.right  = gcmMAX(State->dstClipRect.right, 0);
             clip.bottom = gcmMAX(State->dstClipRect.bottom, 0);
 
-            drect = src->srcRect;
+            drect  = src->srcRect;
 
             config = ((((gctUINT32) (~0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?

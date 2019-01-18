@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -34,8 +34,7 @@
 #define R_DATABASE      "/dev/gc/database"
 #define R_VERSION       "/dev/gc/version"
 #define R_VIDMEM        "/dev/gc/vidmem"
-#define R_DUMP_TRIGGER  "/dev/gc/dump_trigger"
-#define R_CLOCK         "/dev/gc/clk"
+#define R_DUMP_TRIGGER      "/dev/gc/dump_trigger"
 
 #define ARRAY_SIZE(a)   (sizeof(a)/sizeof(a[0]))
 
@@ -47,8 +46,7 @@ enum resource_id {
     RESOURCE_DATABASE   = 4,
     RESOURCE_VERSION    = 5,
     RESOURCE_VIDMEM     = 6,
-    RESOURCE_DUMP_TRIGGER   = 7,
-    RESOURCE_CLOCK      = 8
+    RESOURCE_DUMP_TRIGGER   = 7
 };
 
 

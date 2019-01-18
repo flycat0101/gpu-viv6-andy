@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -233,6 +233,7 @@ vx_status vxMinMaxPackLocation(vx_node node, vx_image inputImage, vx_array input
         gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_ARRAY, outputArray, GC_VX_INDEX_AUTO);
 
         bin[0] = (vx_uint32)(itemSize * cap);
+        bin[1] = (vx_uint32)(itemSize * height * width);
         gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));
         kernelContext->uniforms[0].index       = 3;
         kernelContext->uniforms[0].num         = 16;
@@ -369,6 +370,7 @@ vx_status vxMinMaxGetLocation(vx_node node, vx_image img, vx_scalar minVal, vx_s
     kernelContext->params.volume           = (vx_uint32)itemSize;
     kernelContext->params.clamp            = (vx_uint32)itemSize * width;
     kernelContext->params.policy           = return_loc;
+    kernelContext->params.col              = height;
 
     kernelContext->node = node;
 
@@ -447,22 +449,42 @@ vx_status vxMinMaxLocFilter(vx_node node, vx_image input, vx_scalar filter_min, 
     }
     else
     {
-        gctUINT32 i = 0;
-        gcoVX_Index indexs[]                = {
-            /* index, num, shift0, shift1, mask0, mask1 */
-            {    3, 4 * 4, {FV4(3*8,(16+3)*8,0,0), FV4(0,0,0, 0), FV4(4*8,4*8,0,0), FV4(0,0,0,0)}  }, /*  */
-            {    4, 4 * 4, {FV4(6*8,(16+6)*8,0,0), FV4(0,0,0, 0), FV4(4*8,4*8,0,0), FV4(0,0,0,0)}  }, /*  */
-        };
-
-        kernelContext->uniform_num             = sizeof(indexs)/sizeof(indexs[0]);
-
-        for(i = 0; i < kernelContext->uniform_num; i++)
+        if (format != VX_DF_IMAGE_S16)
         {
-            gcoOS_MemCopy(&kernelContext->uniforms[i].uniform, indexs[i].bin, sizeof(indexs[i].bin));
-            kernelContext->uniforms[i].num = indexs[i].num;
-            kernelContext->uniforms[i].index = indexs[i].index;
-        }
+            gctUINT32 i = 0;
+            gcoVX_Index indexs[]                = {
+                /* index, num, shift0, shift1, mask0, mask1 */
+                {    3, 4 * 4, {FV4(3*8,(16+3)*8,0,0), FV4(0,0,0, 0), FV4(4*8,4*8,0,0), FV4(0,0,0,0)}  }, /*  */
+                {    4, 4 * 4, {FV4(6*8,(16+6)*8,0,0), FV4(0,0,0, 0), FV4(4*8,4*8,0,0), FV4(0,0,0,0)}  }, /*  */
+            };
 
+            kernelContext->uniform_num             = sizeof(indexs)/sizeof(indexs[0]);
+
+            for(i = 0; i < kernelContext->uniform_num; i++)
+            {
+                gcoOS_MemCopy(&kernelContext->uniforms[i].uniform, indexs[i].bin, sizeof(indexs[i].bin));
+                kernelContext->uniforms[i].num = indexs[i].num;
+                kernelContext->uniforms[i].index = indexs[i].index;
+            }
+        }
+        else
+        {
+            gctUINT32 i = 0;
+            gcoVX_Index indexs[]                = {
+                /* index, num, shift0, shift1, mask0, mask1 */
+                {    3, 4 * 4, {FV4(4*8,(16+4)*8,0,0), FV4(0,0,0, 0), FV4(4*8,4*8,0,0), FV4(0,0,0,0)}  }, /*  */
+                {    4, 4 * 4, {FV4(6*8,(16+6)*8,0,0), FV4(0,0,0, 0), FV4(4*8,4*8,0,0), FV4(0,0,0,0)}  }, /*  */
+            };
+
+            kernelContext->uniform_num             = sizeof(indexs)/sizeof(indexs[0]);
+
+            for(i = 0; i < kernelContext->uniform_num; i++)
+            {
+                gcoOS_MemCopy(&kernelContext->uniforms[i].uniform, indexs[i].bin, sizeof(indexs[i].bin));
+                kernelContext->uniforms[i].num = indexs[i].num;
+                kernelContext->uniforms[i].index = indexs[i].index;
+            }
+        }
         kernelContext->params.xstep            = (format == VX_DF_IMAGE_S16) ? 6 : 14;;
     }
     kernelContext->params.ystep            = height;

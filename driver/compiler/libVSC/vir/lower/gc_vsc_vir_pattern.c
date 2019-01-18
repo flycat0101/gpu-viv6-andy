@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -752,10 +752,6 @@ _Pattern_ReplaceNormal(
                     VIR_Operand_SetEnable(opnd, VIR_ENABLE_XYZW);
                     VIR_Operand_SetPrecision(opnd, VIR_Symbol_GetPrecision(sym));
 
-                    /* to-do: make the pattern more flexible to set the dst's type
-                       based on the flag. Currently, there is only a simple flag
-                       VIR_PATN_FLAG_SET_TEMP_IN_FUNC to set the type/enable in the
-                       pattern func.*/
                     if (!(Pattern->flags & VIR_PATN_FLAG_SET_TEMP_IN_FUNC))
                     {
                         VIR_Operand     *templeteOpnd = gcvNULL;

@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -54,12 +54,7 @@ CLIENT_GLX_SOURCE_FILES = \
 GCC=$(CC)
 
 LIBDIR=-L$(SDK_DIR)/drivers -L$(ROOTFS_USR)/lib
-
-ifeq ($(X11_DRI3),1)
-LLDLIBS = -lXdamage -lXfixes -lXext -lX11 -lpthread -lGAL -lglapi -lm  -ldl -ldrm -lX11-xcb -ldrm_vivante -lxcb -lxcb-shm -lxcb-dri3 -lxcb-present -lxshmfence -lxcb-sync
-else
 LLDLIBS = -lXdamage -lXfixes -lXext -lX11 -lpthread -lGAL -lglapi -lm  -ldl -ldrm
-endif
 
 ifeq ($(DEBUG),1)
 CFLAGS +=-g -O0 -DDEBUG -fPIC
@@ -88,6 +83,7 @@ INCLUDE += \
 ifeq ($(X11_DRI3),1)
 INCLUDE += -I$(AQROOT)/driver/X/libdrm-2.4.66/include/drm \
            -I$(AQROOT)/driver/X/libdrm-2.4.66/vivante
+LLDLIBS += -lX11-xcb -ldrm_vivante -lxcb -lxcb-shm -lxcb-dri3 -lxcb-present -lxshmfence -lxcb-sync
 else
 INCLUDE += -I$(ROOTFS_USR)/include/libdrm
 endif
@@ -140,7 +136,7 @@ extra_install: $(TARGET_OUTPUT)
 	@mkdir -p $(SDK_DIR)/include/GL
 	@-cp -f $(AQROOT)/sdk/inc/GL/*.h $(SDK_DIR)/include/GL
 	-cd $(OBJ_DIR); ln -sf $(TARGET_NAME) libGL.so; ln -sf $(TARGET_NAME) libGL.so.1
-	cd $(SDK_DIR)/drivers; rm -f libGL.so libGL.so.1; ln -s $(TARGET_NAME) libGL.so; ln -s $(TARGET_NAME) libGL.so.1; cd -
+	cd $(SDK_DIR)/drivers; rm -f libGL.so libGL.so.1; ln -s $(TARGET_NAME) libGL.so; ln -s $(TARGET_NAME) libGL.so.1
 
 
 
@@ -152,5 +148,6 @@ $(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so \
 
 
 $(TARGET_OUTPUT): $(OBJECTS)
-	$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LLDLIBS)
+	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
+	@$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LLDLIBS)
 

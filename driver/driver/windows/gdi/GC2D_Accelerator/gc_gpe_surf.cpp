@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -147,7 +147,7 @@ gceSTATUS GC2DSurf::Initialize(
     desc.physical = mPhysicalAddr;
     desc.size     = mSize;
 
-    status = gcoHAL_WrapUserMemory(&desc, &node);
+    status = gcoHAL_WrapUserMemory(&desc, gcvVIDMEM_TYPE_BITMAP, &node);
     if (gcmIS_ERROR(status))
     {
         GC2D_DebugTrace(GC2D_ERROR_TRACE,
@@ -303,7 +303,7 @@ gceSTATUS GC2DSurf::InitializeYUV(
     desc.physical = YPhysAddr;
     desc.size     = mSize;
 
-    status = gcoHAL_WrapUserMemory(&desc, &node);
+    status = gcoHAL_WrapUserMemory(&desc, gcvVIDMEM_TYPE_BITMAP, &node);
     if (gcmIS_ERROR(status))
     {
         GC2D_DebugTrace(GC2D_ERROR_TRACE,
@@ -373,7 +373,7 @@ gceSTATUS GC2DSurf::InitializeYUV(
         desc.physical = UPhysAddr;
         desc.size     = UVSize;
 
-        status = gcoHAL_WrapUserMemory(&desc, &node);
+        status = gcoHAL_WrapUserMemory(&desc, gcvVIDMEM_TYPE_BITMAP, &node);
         if (gcmIS_ERROR(status))
         {
             GC2D_DebugTrace(GC2D_ERROR_TRACE,
@@ -407,7 +407,7 @@ gceSTATUS GC2DSurf::InitializeYUV(
         desc.physical = VPhysAddr;
         desc.size     = UVSize;
 
-        status = gcoHAL_WrapUserMemory(&desc, &node);
+        status = gcoHAL_WrapUserMemory(&desc, gcvVIDMEM_TYPE_BITMAP, &node);
         if (gcmIS_ERROR(status))
         {
             GC2D_DebugTrace(GC2D_ERROR_TRACE,
@@ -454,19 +454,19 @@ ERROR_EXIT:
 
     if (mWrapped)
     {
-        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mWrappedNode, gcvSURF_BITMAP, gcvENGINE_RENDER));
+        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mWrappedNode, gcvVIDMEM_TYPE_BITMAP, gcvENGINE_RENDER));
         gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(mWrappedNode));
     }
 
     if (mUWrapped)
     {
-        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mUWrappedNode, gcvSURF_BITMAP, gcvENGINE_RENDER));
+        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mUWrappedNode, gcvVIDMEM_TYPE_BITMAP, gcvENGINE_RENDER));
         gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(mUWrappedNode));
     }
 
     if (mVWrapped)
     {
-        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mVWrappedNode, gcvSURF_BITMAP, gcvENGINE_RENDER));
+        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mVWrappedNode, gcvVIDMEM_TYPE_BITMAP, gcvENGINE_RENDER));
         gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(mVWrappedNode));
     }
 
@@ -556,19 +556,19 @@ gceSTATUS GC2DSurf::Denitialize(gctBOOL sync)
 
     if (mWrapped)
     {
-        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mWrappedNode, gcvSURF_BITMAP, gcvENGINE_RENDER));
+        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mWrappedNode, gcvVIDMEM_TYPE_BITMAP, gcvENGINE_RENDER));
         gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(mWrappedNode));
     }
 
     if (mUWrapped)
     {
-        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mUWrappedNode, gcvSURF_BITMAP, gcvENGINE_RENDER));
+        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mUWrappedNode, gcvVIDMEM_TYPE_BITMAP, gcvENGINE_RENDER));
         gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(mUWrappedNode));
     }
 
     if (mVWrapped)
     {
-        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mVWrappedNode, gcvSURF_BITMAP, gcvENGINE_RENDER));
+        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mVWrappedNode, gcvVIDMEM_TYPE_BITMAP, gcvENGINE_RENDER));
         gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(mVWrappedNode));
     }
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -302,25 +302,31 @@ gceSTATUS    ppoPREPROCESSOR_Eval_GetToken_FILE_LINE_VERSION_GL_ES(
     {
         token_cons_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute __FILE__";
 
-        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d\0", PP->currentSourceFileStringNumber);
+        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", PP->currentSourceFileStringNumber);
     }
     else if(Token->poolString == PP->keyword->_line_)
     {
         token_cons_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute __LINE__";
 
-        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d\0", PP->currentSourceFileLineNumber);
+        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", PP->currentSourceFileLineNumber);
     }
     else if(Token->poolString == PP->keyword->_version_)
     {
         token_cons_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute __VERSION__";
 
-        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d\0", PP->version);
+        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", PP->version);
     }
     else if(Token->poolString == PP->keyword->gl_es)
     {
         token_cons_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute GL_ES";
 
-        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d\0", 1);
+        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", 1);
+    }
+    else if(Token->poolString == PP->keyword->gl_core_profile)
+    {
+        token_cons_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute GL_core_profile";
+
+        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", 1);
     }
     else
     {
@@ -549,11 +555,20 @@ ppoPREPROCESSOR_Eval_Case_Basic_Level(
         if((!PP->skipOPError) ||
            (PP->skipOPError && Token->type != ppvTokenType_ID))
         {
-            ppoPREPROCESSOR_Report(
-                PP,
-                slvREPORT_ERROR,
-                "Integer is expected."
-                );
+            if (Token->type == ppvTokenType_ID &&
+                sloCOMPILER_GetClientApiVersion(PP->compiler) == gcvAPI_OPENGL)
+            {
+                *Result = 0;
+                return gcvSTATUS_OK;
+            }
+            else
+            {
+                ppoPREPROCESSOR_Report(
+                    PP,
+                    slvREPORT_ERROR,
+                    "Integer is expected."
+                    );
+            }
 
             return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
         }
@@ -604,9 +619,13 @@ ppoPREPROCESSOR_Eval_Case_Unary_Op(
             if (id == PP->keyword->_file_
                 ||    id == PP->keyword->_line_
                 ||    id == PP->keyword->_version_
-                ||    id == PP->keyword->gl_es)
+                ||    id == PP->keyword->gl_es
+                ||    id == PP->keyword->gl_core_profile)
             {
-                *Result = 1;
+                if (id == PP->keyword->_version_ && PP->keyword->isVersionUndefined)
+                    *Result = 0;
+                else
+                    *Result = 1;
 
                 gcmFOOTER_ARG("*Result=%d", *Result);
                 return gcvSTATUS_OK;

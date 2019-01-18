@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -97,8 +97,7 @@ _GenExtension(
     extensions[VEGL_EXTID_ANDROID_native_fence_sync].enabled = EGL_TRUE;
 
     if (Display->platform->platform == EGL_PLATFORM_FB_VIV ||
-        Display->platform->platform == EGL_PLATFORM_WAYLAND_VIV ||
-        Display->platform->platform == EGL_PLATFORM_GBM_VIV)
+        Display->platform->platform == EGL_PLATFORM_WAYLAND_VIV)
     {
         extensions[VEGL_EXTID_EXT_buffer_age].enabled          = EGL_TRUE;
         extensions[VEGL_EXTID_KHR_partial_update].enabled      = EGL_TRUE;
@@ -462,7 +461,6 @@ _FillIn(
                     gcmPRINT("EGL: enable default configs for conformance test");
                     printed = gcvTRUE;
                 }
-
                 /* Only enable RGBA8888/D24S8 and RGB565/D0S0 for ES2/ES3 context to reduce ES CTS running time */
                 if (!((Color->formatFlags & VEGL_8888) == VEGL_8888 && config->depthSize == 24 && config->stencilSize == 8) &&
                     !((Color->formatFlags & VEGL_565) == VEGL_565 && config->depthSize == 0 && config->stencilSize == 0))
@@ -470,11 +468,11 @@ _FillIn(
                     config->renderableType &= ~(EGL_OPENGL_ES2_BIT | EGL_OPENGL_ES3_BIT_KHR);
                     config->conformant     &= ~(EGL_OPENGL_ES2_BIT | EGL_OPENGL_ES3_BIT_KHR);
                 }
-            }
-            else if (!printed)
-            {
-                gcmPRINT("EGL: enable all configs for conformance test");
-                printed = gcvTRUE;
+                else if (!printed)
+                {
+                    gcmPRINT("EGL: enable all configs for conformance test");
+                    printed = gcvTRUE;
+                }
             }
             config->renderableType &= ~EGL_OPENGL_BIT;
             config->conformant &= ~EGL_OPENGL_BIT;
@@ -496,7 +494,7 @@ _FillIn(
         gcePATCH_ID patchId   = gcvPATCH_INVALID;
 
         gcoHAL_GetPatchID(gcvNULL, &patchId);
-        if (((patchId == gcePATCH_ANDROID_CTS_GRAPHICS_GLVERSION) || (patchId == gcvPATCH_ANTUTU6X) || (patchId == gcvPATCH_ANTUTU3DBench))
+        if ((patchId == gcePATCH_ANDROID_CTS_GRAPHICS_GLVERSION)
             && (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.opengles.version", &esVersion)) &&
             esVersion && gcmIS_SUCCESS(gcoOS_StrCmp(esVersion, "131072"))))
         {
@@ -553,6 +551,7 @@ _FillIn(
             config->surfaceType     |= EGL_VG_COLORSPACE_LINEAR_BIT;
         }
 #endif
+
     }
 #ifndef ANDROID
     /* No, 2D/3D implementation only. */
@@ -637,7 +636,7 @@ _SetTraceMode(
         Once = gcvTRUE;
     }
 
-     gcoOS_UnLockPLS();
+    gcoOS_UnLockPLS();
 }
 
 
@@ -727,7 +726,9 @@ _SupportedPlatforms[] =
 #if defined(__VXWORKS__)
     {"vxworks", veglGetFbdevPlatform},
 #endif
+#if defined(EGL_API_NULLWS)
     {"nullws",  veglGetNullwsPlatform},
+#endif
     /* make sure gbm is after default platform */
 #if defined(__GBM__)
     {"gbm",     veglGetGbmPlatform},
@@ -1777,6 +1778,7 @@ eglInitialize(
     VEGLDisplay dpy;
     gcmHEADER_ARG("Dpy=0x%x", Dpy);
 
+    /* Detect trace mode. */
     _SetTraceMode();
 
     gcmDUMP_API("${EGL eglInitialize 0x%08X}", Dpy);
@@ -2030,13 +2032,39 @@ eglQueryString(
                 (thread->dispatchTables[vegl_OPENGL_ES11_CL] ||
                  thread->dispatchTables[vegl_OPENGL_ES11] ||
                  thread->dispatchTables[vegl_OPENGL_ES20] ||
+                 thread->dispatchTables[vegl_OPENGL_ES30]) &&
+                 thread->dispatchTables[vegl_OPENGL])
+            {
+                ptr = "OpenGL_ES OpenGL OpenVG";
+            }
+            else if (thread->dispatchTables[vegl_OPENVG] &&
+                (thread->dispatchTables[vegl_OPENGL_ES11_CL] ||
+                 thread->dispatchTables[vegl_OPENGL_ES11] ||
+                 thread->dispatchTables[vegl_OPENGL_ES20] ||
                  thread->dispatchTables[vegl_OPENGL_ES30]))
             {
                 ptr = "OpenGL_ES OpenVG";
             }
+            else if ((thread->dispatchTables[vegl_OPENGL_ES11_CL] ||
+                thread->dispatchTables[vegl_OPENGL_ES11] ||
+                thread->dispatchTables[vegl_OPENGL_ES20] ||
+                thread->dispatchTables[vegl_OPENGL_ES30]) &&
+                thread->dispatchTables[vegl_OPENGL])
+            {
+                ptr = "OpenGL_ES OpenGL";
+            }
+            else if (thread->dispatchTables[vegl_OPENVG] &&
+                thread->dispatchTables[vegl_OPENGL])
+            {
+                ptr = "OpenGL OpenVG";
+            }
             else if (thread->dispatchTables[vegl_OPENVG])
             {
                 ptr = "OpenVG";
+            }
+            else if (thread->dispatchTables[vegl_OPENGL])
+            {
+                ptr = "OpenGL";
             }
             else
             {

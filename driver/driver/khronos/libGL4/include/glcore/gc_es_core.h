@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -22,7 +22,7 @@
 typedef struct __GLcontextRec __GLcontext;
 typedef struct __GLmipMapLevelRec __GLmipMapLevel;
 typedef struct __GLtextureObjectRec __GLtextureObject;
-typedef struct __GLesDispatchTableRec __GLesDispatchTable;
+typedef struct __GLdispatchTableRec __GLdispatchTable;
 
 typedef enum __GLdrawableTypeEnum {
     __GL_WINDOW,
@@ -582,7 +582,7 @@ struct __GLdrawablePrivateRec
             __GLdrawableBuffer drawBuffers[__GL_MAX_DRAW_BUFFERS];
         };
         struct {
-            /* Keep these varibles to avoid changing lagecy driver */
+            /* Keep these variables to avoid changing legacy driver */
             __GLdrawableBuffer frontBuffer;      /* front and front_left */
             __GLdrawableBuffer frontRightBuffer; /* front right */
             /* 0: back_left and back buffer 0, 1:back right and back buffer 1 for triple buffer mode */

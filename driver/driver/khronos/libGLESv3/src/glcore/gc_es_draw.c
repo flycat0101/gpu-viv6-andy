@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -39,7 +39,7 @@ GLvoid __glSetAttributeStatesDirty(__GLcontext *gc)
 
     for (unit = 0; unit < gc->constants.shaderCaps.maxCombinedTextureImageUnits; unit++)
     {
-        gc->texUnitAttrState[unit] = (GLbitfield)(-1);
+        gc->texUnitAttrState[unit] = (GLuint64)(-1);
     }
 
     gc->drawableDirtyMask = __GL_BUFFER_DRAW_READ_BITS;
@@ -63,7 +63,7 @@ __GL_INLINE GLvoid __glClearAttributeStates(__GLcontext *gc)
 {
     __glBitmaskSetAll(&gc->texUnitAttrDirtyMask, GL_FALSE);
     __glBitmaskSetAll(&gc->imageUnitDirtyMask, GL_FALSE);
-    __GL_MEMZERO(gc->texUnitAttrState, gc->constants.shaderCaps.maxCombinedTextureImageUnits * sizeof(GLbitfield));
+    __GL_MEMZERO(gc->texUnitAttrState, gc->constants.shaderCaps.maxCombinedTextureImageUnits * sizeof(GLuint64));
     __GL_MEMZERO(gc->globalDirtyState, __GL_DIRTY_ATTRS_END   * sizeof(GLbitfield));
 }
 
@@ -293,7 +293,7 @@ __GL_INLINE GLvoid __glEvaluateAttribGroup2(__GLcontext* gc, __GLattribute* cs, 
 __GL_INLINE GLvoid __glEvaluateTextureAttrib(__GLcontext* gc, __GLattribute* cs, __GLattribute* ds)
 {
     GLint  i = -1;
-    GLuint localMask;
+    GLuint64 localMask;
     GLuint enableDim, realEnableDim, lastRealEnableDim;
     __GLbitmask unitMask = gc->texUnitAttrDirtyMask;
     GLuint lastMaxLevelUsed = 0;
@@ -428,7 +428,6 @@ __GL_INLINE GLvoid __glEvaluateTextureAttrib(__GLcontext* gc, __GLattribute* cs,
                             if (__GL_MEMCMP(cs_params->borderColor.fv, texObj->borderColorUsed.fv, 4 * sizeof(GLfloat)))
                             {
                                 __GL_MEMCOPY(texObj->borderColorUsed.fv, cs_params->borderColor.fv, 4 * sizeof(GLfloat));
-                                texObj->uObjStateDirty.s.borderColorDirty = GL_TRUE;
                             }
                             __GL_CHECK_SAMPLER_PARAM_ARRAY(__GL_TEXPARAM_BORDER_COLOR_BIT, borderColor.fv, 4, sizeof(GLfloat));
 
@@ -450,7 +449,7 @@ __GL_INLINE GLvoid __glEvaluateTextureAttrib(__GLcontext* gc, __GLattribute* cs,
                     __GL_CHECK_TEX_PARAM1(__GL_TEXPARAM_SWIZZLE_G_BIT, swizzle[1]);
                     __GL_CHECK_TEX_PARAM1(__GL_TEXPARAM_SWIZZLE_B_BIT, swizzle[2]);
                     __GL_CHECK_TEX_PARAM1(__GL_TEXPARAM_SWIZZLE_A_BIT, swizzle[3]);
-                    __GL_CHECK_TEX_PARAM1(__GL_TEXPARAM_D_ST_TEXMODE_BIT, depthStTexMode);
+                    __GL_CHECK_TEX_PARAM1(__GL_TEXPARAM_DS_TEXMODE_BIT, dsTexMode);
                 }
             }
             else if (realEnableDim < __GL_MAX_TEXTURE_BINDINGS &&
@@ -1133,7 +1132,7 @@ __GL_INLINE GLboolean __glComputeEnd(__GLcontext *gc)
 
     __glBitmaskSetAll(&gc->texUnitAttrDirtyMask, GL_FALSE);
     __glBitmaskSetAll(&gc->imageUnitDirtyMask, GL_FALSE);
-    __GL_MEMZERO(gc->texUnitAttrState, gc->constants.shaderCaps.maxCombinedTextureImageUnits * sizeof(GLbitfield));
+    __GL_MEMZERO(gc->texUnitAttrState, gc->constants.shaderCaps.maxCombinedTextureImageUnits * sizeof(GLuint64));
     gc->globalDirtyState[__GL_PROGRAM_ATTRS] = 0;
 
     gc->globalDirtyState[__GL_ALL_ATTRS] &= ~(__GL_ONE_32 << __GL_PROGRAM_ATTRS |

@@ -36,6 +36,9 @@
 #include "llvm/System/DynamicLibrary.h"
 #include "llvm/System/Host.h"
 #include <algorithm>
+#if defined(LINUX) && !defined(ANDROID)
+#include <stdio.h>
+#endif
 using namespace clang;
 
 static FrontendAction *CreateFrontendBaseAction(CompilerInstance &CI) {
@@ -105,8 +108,7 @@ KLC    **/
   return Success;
 }
 
-#define _USE_FILE_LOCK_FOR_RD_WR   0
-
+#define _USE_FILE_LOCK_FOR_RD_WR   1
 #define RESOURCE_DIRECTORY "/driver/openGL/libCL/frontend/llvm/bin/lib/clang/2.8"
 
 static char *_IncludePaths[] = {
@@ -594,6 +596,13 @@ unsigned *pped_count)
                     std::replace(normalizedPath1.begin(), normalizedPath1.end(), '\\', '/');
                     Headersearchopts.AddPath(normalizedPath1, frontend::Angled, true, false, true);
                 }
+            }
+            else if (options.compare(lastPos, 24, "cl-viv-gcsl-driver-image") == 0) {
+                gceSTATUS status;
+                pos = lastPos + 24;
+
+                status = cloCOMPILER_SetGcslDriverImage(Compiler);
+                if(gcmIS_ERROR(status)) return status;
             }
             else if (options.compare(lastPos, 24, "cl-viv-packed-basic-type") == 0) {
                 gceSTATUS status;

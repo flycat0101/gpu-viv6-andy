@@ -40,6 +40,9 @@ endif
 # from libhalarchkernel (trunk/hal/kernel/arch/Makefile.linux)
 SOURCE_OBJECTS += $(driver_root)/hal/kernel/arch/gc_hal_kernel_context.o
 SOURCE_OBJECTS += $(driver_root)/hal/kernel/arch/gc_hal_kernel_hardware.o
+SOURCE_OBJECTS += $(driver_root)/hal/kernel/arch/gc_hal_kernel_hardware_async_fe.o
+SOURCE_OBJECTS += $(driver_root)/hal/kernel/arch/gc_hal_kernel_hardware_mc_fe.o
+SOURCE_OBJECTS += $(driver_root)/hal/kernel/arch/gc_hal_kernel_hardware_waitlink_fe.o
 
 EXTRA_SRCVPATH += $(driver_root)/hal/kernel/arch
 

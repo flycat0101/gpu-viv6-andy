@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -140,36 +140,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateRenderPass(
         desc->sampleCount = pCreateInfo->pAttachments[i].samples;
         residentFormat = g_vkFormatInfoTable[desc->format].residentImgFormat;
         desc->formatInfo = &g_vkFormatInfoTable[residentFormat];
-
-        if (desc->sampleCount == 4 && desc->formatInfo->bitsPerBlock == 64 &&
-            !devCtx->database->CACHE128B256BPERLINE)
-        {
-            switch (desc->formatInfo->residentImgFormat)
-            {
-            case VK_FORMAT_R16G16B16A16_SFLOAT:
-                residentFormat = __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT;
-                break;
-            case VK_FORMAT_R16G16B16A16_SINT:
-                residentFormat = __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT;
-                break;
-            case VK_FORMAT_R16G16B16A16_UINT:
-                residentFormat = __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT;
-                break;
-            case VK_FORMAT_R32G32_SFLOAT:
-                residentFormat = __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT;
-                break;
-            case VK_FORMAT_R32G32_SINT:
-                residentFormat = __VK_FORMAT_R32G32_SINT_2_R32_SINT;
-                break;
-            case VK_FORMAT_R32G32_UINT:
-                residentFormat = __VK_FORMAT_R32G32_UINT_2_R32_UINT;
-                break;
-            default:
-                __VK_ASSERT(!"invalid format!");
-                break;
-            }
-            desc->formatInfo = &g_vkFormatInfoTable[residentFormat];
-        }
 
         switch (desc->format)
         {

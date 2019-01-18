@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -24,7 +24,8 @@ typedef enum _VSC_CPP_FLAG
     VSC_CPP_USE_SRC_TYPE_FROM_MOVE  = 0x01,
     /*
     ** Check if we need to copy the MOVE from a output parameter,
-    ** we can't enable it if there is a inliner after this CPP pass due to the limitation in VIR_Shader_FindParmInst.
+    ** we can't enable it if there is a inliner after this CPP pass due to the limitation in VIR_Shader_FindParmInst:
+    ** we only check the output parameter once so if it have multiple usages, we can only detect the first usage.
     */
     VSC_CPP_COPY_FROM_OUTPUT_PARAM  = 0x02,
 } VSC_CPP_FLAG;
@@ -71,17 +72,20 @@ typedef struct VIR_CPP_COPYPROPAGATION
 #define VSC_CPP_SetFWOptCount(cpp, s)   ((cpp)->fwOptCount = (s))
 #define VSC_CPP_GetBWOptCount(cpp)      ((cpp)->bwOptCount)
 #define VSC_CPP_SetBWOptCount(cpp, s)   ((cpp)->bwOptCount = (s))
+#define VSC_CPP_SetMM(cpp, s)           ((cpp)->pMM = (s))
 #define VSC_CPP_GetMM(cpp)              ((cpp)->pMM)
 
 extern VSC_ErrCode VSC_CPP_PerformOnShader(
     IN VSC_SH_PASS_WORKER* pPassWorker
     );
 DECLARE_QUERY_PASS_PROP(VSC_CPP_PerformOnShader);
+DECLARE_SH_NECESSITY_CHECK(VSC_CPP_PerformOnShader);
 
 extern VSC_ErrCode VSC_SCPP_PerformOnShader(
     VSC_SH_PASS_WORKER* pPassWorker
     );
 DECLARE_QUERY_PASS_PROP(VSC_SCPP_PerformOnShader);
+DECLARE_SH_NECESSITY_CHECK(VSC_SCPP_PerformOnShader);
 
 END_EXTERN_C()
 

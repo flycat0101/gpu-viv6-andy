@@ -1,6 +1,6 @@
 ;#############################################################################
 ;#
-;#   Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+;#   Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 ;#
 ;#   The material in this file is confidential and contains trade secrets
 ;#   of Vivante Corporation. This is proprietary information owned by
@@ -22,6 +22,17 @@ EXPORTS
     dbg_dumpCode
     dbg_dumpOptimizer
     dbg_dumpShader
+    dbg_dumpVIR
+    dbg_dumpVFunc
+    dbg_dumpMCode
+    dbg_dumpVShader
+    dbg_dumpVSym
+    dbg_dumpVSymId
+    dbg_dumpVLSymId
+    dbg_dumpVNameId
+    dbg_dumpVOperand
+    dbg_dumpVTypeId
+    dbg_dumpVType
     gcDumpOption
 
     ; gcSHADER
@@ -31,17 +42,19 @@ EXPORTS
 	gcSaveCLSingleKernel
     gcLinkProgram
     gcLinkProgramPipeline
-	gcValidateProgramPipeline
+    gcValidateProgramPipeline
     gcLoadProgram
 	gcLoadCLSingleKernel
     gcLinkKernel
     gcFreeProgramState
+	gcSHADER_IsES11Compiler
     gcInitializeLibFile
     gcFinalizeLibFile
     gcSHADER_WriteShaderToFile
     gcSHADER_ReadShaderFromFile
     gcSHADER_WriteBufferToFile
     gcSHADER_ReadBufferFromFile
+    gcSHADER_IsES11Compiler
     gcSHADER_IsHaltiCompiler
     gcSHADER_IsES31Compiler
     gcSHADER_IsDual16Shader
@@ -50,7 +63,7 @@ EXPORTS
     gcSHADER_AddAttribute
     gcSHADER_AddAttributeWithLocation
     gcSHADER_AddFunction
-	gcSHADER_DeleteFunction
+    gcSHADER_DeleteFunction
     gcSHADER_AddKernelFunction
     gcSHADER_AddLabel
     gcSHADER_AddOpcode
@@ -64,7 +77,7 @@ EXPORTS
     gcSHADER_AddOpcodeConditionIndexedWithPrecision
     gcSHADER_AddOutput
     gcSHADER_AddOutputWithLocation
-	gcSHADER_GetOutputDefaultLocation
+    gcSHADER_GetOutputDefaultLocation
     gcSHADER_AddOutputIndexed
     gcSHADER_AddRoundingMode
     gcSHADER_AddSaturation
@@ -104,7 +117,7 @@ EXPORTS
     gcSHADER_AddVariableEx
     gcSHADER_AddVariableEx1
     gcSHADER_UpdateVariable
-	gcSHADER_CopyVariable
+    gcSHADER_CopyVariable
     gcSHADER_BeginFunction
     gcSHADER_BeginKernelFunction
     gcSHADER_Construct
@@ -121,9 +134,11 @@ EXPORTS
     gcSHADER_GetAttributeCount
     gcSHADER_GetAttributeAndBuiltinInputCount
     gcSHADER_GetUniform
+	gcSHADER_GetUniformByUniformIndex
     gcSHADER_GetUniformCount
     gcSHADER_GetSamplerCount
     gcSHADER_GetKernelUniformCount
+    gcSHADER_GetKernelOriginalUniformCount
     gcSHADER_GetUniformVectorCount
     gcSHADER_GetUniformVectorCountUsedInShader
     gcSHADER_GetUniformIndexingRange
@@ -140,7 +155,7 @@ EXPORTS
     gcSHADER_GetUniformByPhysicalAddress
     gcSHADER_ComputeUniformPhysicalAddress
     gcSHADER_GetIoBlock
-	gcSHADER_GetIoBlockByName
+    gcSHADER_GetIoBlockByName
     gcSHADER_GetIoBlockCount
     gcSHADER_GetIoBlockVariable
     gcSHADER_GetIoBlockVariableCount
@@ -155,24 +170,23 @@ EXPORTS
     gcSHADER_GetKernelFunctionByName
     gcSHADER_GetKernelFunctionCount
     gcSHADER_GetCompilerVersion
-    gcShader_IsESCompiler
-    gcShader_IsES11Compiler
-    gcShader_IsES30Compiler
-    gcShader_IsES31Compiler
     gcSHADER_CheckValidity
     gcSHADER_GetConstantMemorySize
     gcSHADER_GetPrivateMemorySize
     gcSHADER_GetLocalMemorySize
-	gcSHADER_GetWorkGroupSize
+    gcSHADER_GetWorkGroupSize
     gcSHADER_GetType
     gcSHADER_LinkLibFunction
+    gcSHADER_LinkBuiltinLibs
     gcSHADER_Load
     gcSHADER_LoadEx
     gcSHADER_LoadHeader
     gcSHADER_LoadKernel
     gcSHADER_MergeKernel
+	gcSHADER_MergeShader
     gcSHADER_Pack
-	gcSHADER_ExpandArraysOfArrays
+    gcSHADER_PackRegister
+    gcSHADER_ExpandArraysOfArrays
     gcSHADER_AnalyzeFunctions
     gcSHADER_FindLabel
     gcSHADER_ReallocateAttributes
@@ -197,7 +211,7 @@ EXPORTS
     gcSHADER_GetTESOrdering
     gcSHADER_GetTESPointMode
     gcSHADER_GetTESPatchInputVertices
-	gcSHADER_GetGSLayout
+    gcSHADER_GetGSLayout
     gcSHADER_GetInstructionCount
     gcSHADER_SetShaderID
     gcSHADER_GetShaderID
@@ -205,6 +219,7 @@ EXPORTS
     gcSHADER_GetDisableEZ
     gcSHADER_AddTypeNameBuffer
     gcSHADER_SetConstantMemorySize
+    gcSHADER_AddConstantMemorySize
     gcSHADER_SetPrivateMemorySize
     gcSHADER_SetLocalMemorySize
     gcSHADER_SetMaxKernelFunctionArgs
@@ -215,29 +230,29 @@ EXPORTS
     gcSHADER_GetTransformFeedbackVaryingStrideSeparate
     gcSHADER_GetOutputByName
     gcSHADER_GetOutputByTempIndex
-	gcSHADER_GetOutputIndexByOutput
+    gcSHADER_GetOutputIndexByOutput
     gcSHADER_GetOutput
     gcSHADER_GetOutputCount
     gcSHADER_CheckBugFixes10
     gcSHADER_GetVariableTempTypes
     gcSHADER_GetVertexInstIdInputIndex
     gcSHADER_InsertNOP2BeforeCode
-	gcSHADER_MoveCodeListBeforeCode
-	gcSHADER_EvaluateLTCValueWithinLinkTime
+    gcSHADER_MoveCodeListBeforeCode
+    gcSHADER_EvaluateLTCValueWithinLinkTime
     gcSHADER_InsertList
     gcSHADER_UpdateList
     gcSHADER_DeleteList
     gcSHADER_FindList
     gcSHADER_FindListByData
-	gcSHADER_FindNextUsedLabelId
-	gcSHADER_GetNotStagesRelatedLinkError
-	gcSHADER_SetNotStagesRelatedLinkError
-	gcSHADER_Has64BitOperation
-	gceLAYOUT_QUALIFIER_HasHWNotSupportingBlendMode
+    gcSHADER_FindNextUsedLabelId
+    gcSHADER_GetNotStagesRelatedLinkError
+    gcSHADER_SetNotStagesRelatedLinkError
+    gcSHADER_Has64BitOperation
+    gceLAYOUT_QUALIFIER_HasHWNotSupportingBlendMode
     gcCreateDepthComparisonDirective
     gcCreateYFlippedTextureDirective
     gcIsSameDepthComparisonDirectiveExist
-	gcIsSameInputDirectiveExist
+    gcIsSameInputDirectiveExist
     gcCreateInputConversionDirective
     gcCreateOutputConversionDirective
     gcCreateAlphaBlendingDirective
@@ -251,7 +266,7 @@ EXPORTS
     gcCreateYFlippedShaderDirective
     gcCreateSampleMaskDirective
     gcCreateTcsInputMismatch
-	gcCreateColorKillDirective
+    gcCreateColorKillDirective
     gcCreateAlphaBlendDirective
     gcCreateDepthBiasDirective
     gcDestroyPatchDirective
@@ -262,8 +277,8 @@ EXPORTS
     gcFinalizeRecompilation
     gcSetCLCompiler
     gcSetGLSLCompiler
-	gcGetPatchId
-	gcGetHWCaps
+    gcGetPatchId
+    gcGetHWCaps
     gcGetGLSLCaps
     gcInitGLSLCaps
     gcUseFullNewLinker
@@ -293,7 +308,7 @@ EXPORTS
     gcSHADER_DumpSource
     gcSHADER_DoPatch
     gcSHADER_GoVIRPass
-	gcHINTS_GetSamplerBaseOffset
+    gcHINTS_GetSamplerBaseOffset
     gcHINTS_Destroy
     gcGetSBLastVariable
     gcGetSBUnsizedArrayLength
@@ -304,7 +319,7 @@ EXPORTS
 
     ; gcATTRIBUTE
     gcATTRIBUTE_GetName
-	gcATTRIBUTE_GetNameEx
+    gcATTRIBUTE_GetNameEx
     gcATTRIBUTE_GetType
     gcATTRIBUTE_SetPrecision
     gcATTRIBUTE_IsEnabled
@@ -319,7 +334,7 @@ EXPORTS
     gcOUTPUT_GetType
     gcOUTPUT_GetIndex
     gcOUTPUT_GetName
-	gcOUTPUT_GetNameEx
+    gcOUTPUT_GetNameEx
     gcOUTPUT_GetLocation
     gcOUTPUT_GetLayoutQualifier
     gcOUTPUT_SetLayoutQualifier
@@ -360,44 +375,56 @@ EXPORTS
     gcUNIFORM_SetFlags
     gcUNIFORM_SetValue
     gcUNIFORM_SetValueF
-	gcUNIFORM_SetValue_Ex
+    gcUNIFORM_SetValue_Ex
     gcUNIFORM_SetValueF_Ex
     gcUNIFORM_BLOCK_GetName
 
-	vscCreateShader
-	vscDestroyShader
-	vscReferenceShader
-	vscCopyShader
-	vscSaveShaderToBinary
-	vscQueryShaderBinarySize
-	vscLoadShaderFromBinary
-	vscExtractSubShader
-	vscCompileShader
-	vscLinkProgram
-	vscCreateKernel
-	vscLinkKernelProgram
-	vscLinkHwShaders
-	vscProgramHwShaderStages
-	vscPrintShader
-	vscSaveSEPToBinary
-	vscLoadSEPFromBinary
-	vscInitializeSEP
-	vscFinalizeSEP
-	vscIsValidSEP
-	vscPrintSEP
-	vscInitializePEP
-	vscFinalizePEP
-	vscInitializeHwPipelineShadersStates
-	vscFinalizeHwPipelineShadersStates
-	vscCreatePrivateData
-	vscDestroyPrivateData
+    vscCreateShader
+    vscDestroyShader
+    vscReferenceShader
+    vscGetDebugInfo
+    vscCopyShader
+    vscSaveShaderToBinary
+    vscQueryShaderBinarySize
+    vscLoadShaderFromBinary
+	vscFreeVirIntrinsicLib
+    vscExtractSubShader
+    vscCompileShader
+    vscLinkProgram
+    vscCreateKernel
+    vscLinkKernelProgram
+    vscLinkHwShaders
+    vscProgramHwShaderStages
+    vscPrintShader
+    vscSaveEPToBinary
+    vscLoadEPFromBinary
+    vscInitializeSEP
+    vscFinalizeSEP
+    vscIsValidSEP
+    vscPrintSEP
+    vscInitializePEP
+    vscFinalizePEP
+    vscFinalizeKEP
+    vscInitializeHwPipelineShadersStates
+    vscFinalizeHwPipelineShadersStates
+    vscCreatePrivateData
+    vscDestroyPrivateData
     vscGetShaderKindFromShaderHandle
+    vscConvertGcShader2VirShader
+    vscImageSamplerNeedLibFuncForHWCfg
+    vscImageWriteNeedLibFuncForHWCfg
+    vscSetDriverVIRPath
     vscGetTemporaryDir
+    vscSetIsLibraryShader
 
-	vscPMP_Intialize
-	vscPMP_Finalize
-	vscMM_Alloc
-	vscMM_Free
+    vscPMP_Intialize
+    vscPMP_Finalize
+    vscMM_Alloc
+    vscMM_Free
+
+    vscBV_Initialize
+    vscBV_Finalize
+    vscBV_Resize;
 
     ;vsc debug functions
     vscDIConstructContext
@@ -422,56 +449,57 @@ EXPORTS
     vscERR_ReportError
     vscERR_ReportWarning
 
-	vscDumper_Initialize
-	vscMC_BeginCodec
-	vscMC_EndCodec
-	vscMC_DumpInst
+    vscDumper_Initialize
+    vscMC_BeginCodec
+    vscMC_EndCodec
+    vscMC_DumpInst
 	vscMC_DisassembleInst
 
-	VIR_Adjust_Imagetypesize
-	VIR_GetSymFromId
-	VIR_Shader_AddFunction
-	VIR_Shader_AddString
-	VIR_Shader_AddSymbol
-	VIR_Shader_AddConstant
-	VIR_Shader_AddStructType
-	VIR_Shader_AddArrayType
-	VIR_Shader_AddFieldSymbol
-	VIR_Shader_CompositeConstruct
-	VIR_Shader_GetBuiltInTypes
-	VIR_Shader_DecodeLangVersionToCompilerVersion
-	VIR_Shader_DecodeCompilerVersionToShVersion
-	VIR_Shader_GetCreatedSymAliasTable
-	VIR_Shader_IsNameBuiltIn
-	VIR_Shader_DuplicateVariablelFromSymId
-	VIR_SymAliasTable_Insert
-	VIR_Function_AddLabel
-	VIR_Function_AddInstruction
-	VIR_Function_NewLink
-	VIR_Function_AddInstructionAfter
-	VIR_Function_AddInstructionBefore
-	VIR_Function_AddCopiedInstructionAfter
-	VIR_Function_NewParameters
-	VIR_Function_AddParameter
-	VIR_Function_AddPhiOperandArrayForInst
-	VIR_Function_GetSymFromId
+    VIR_GetSymFromId
+    VIR_Shader_AddFunction
+    VIR_Shader_AddString
+    VIR_Shader_AddSymbol
+    VIR_Shader_AddConstant
+    VIR_Shader_AddStructType
+    VIR_Shader_AddArrayType
+    VIR_Shader_AddFieldSymbol
+    VIR_Shader_CompositeConstruct
+    VIR_Shader_GetBuiltInTypes
+    VIR_Shader_DecodeLangVersionToCompilerVersion
+    VIR_Shader_DecodeCompilerVersionToShVersion
+    VIR_Shader_GetCreatedSymAliasTable
+    VIR_Shader_IsNameBuiltIn
+    VIR_Shader_DuplicateVariablelFromSymId
+    VIR_Shader_ReplaceDeviceIndex
+    VIR_Symbol_GetUniformPointer
+    VIR_SymAliasTable_Insert
+    VIR_Function_AddLabel
+    VIR_Function_AddInstruction
+    VIR_Function_NewLink
+    VIR_Function_AddInstructionAfter
+    VIR_Function_AddInstructionBefore
+    VIR_Function_AddCopiedInstructionAfter
+    VIR_Function_NewParameters
+    VIR_Function_AddParameter
+    VIR_Function_AddPhiOperandArrayForInst
+    VIR_Function_GetSymFromId
     VIR_Function_AddSymbol
-	VIR_Operand_SetSymbol
-	VIR_Operand_SetLabel
-	VIR_Operand_SetSwizzle
-	VIR_Operand_SetEnable
-	VIR_Operand_SetPrecision
-	VIR_Operand_EvaluateOffsetByAccessChain
-	VIR_Operand_SetFunction
-	VIR_Operand_SetParameters
-	VIR_Operand_SetIntrinsic
-	VIR_Operand_SetImmediate
-	VIR_Operand_SetImmediateInt
-	VIR_Operand_SetImmediateUint
-	VIR_Operand_SetRelIndexing
-	VIR_Operand_Copy
-	VIR_Operand_ReplaceUseOperandWithDef
-	VIR_Operand_Change2Src_WShift
+    VIR_Operand_SetSymbol
+    VIR_Operand_SetLabel
+    VIR_Operand_SetSwizzle
+    VIR_Operand_SetEnable
+    VIR_Operand_SetPrecision
+    VIR_Operand_EvaluateOffsetByAccessChain
+    VIR_Operand_SetFunction
+    VIR_Operand_SetParameters
+    VIR_Operand_SetIntrinsic
+    VIR_Operand_SetImmediate
+    VIR_Operand_SetImmediateInt
+    VIR_Operand_SetImmediateUint
+    VIR_Operand_SetRelIndexing
+    VIR_Operand_Copy
+    VIR_Operand_ReplaceUseOperandWithDef
+    VIR_Operand_Change2Src_WShift
     VIR_Operand_SetTexldBias
     VIR_Operand_SetTexldLod
     VIR_Operand_SetTexldGradient
@@ -480,20 +508,21 @@ EXPORTS
     VIR_Operand_SetTexldFetchMS
     VIR_Operand_SetTexldGatherComp
     VIR_Operand_SetTexldGatherRefZ
+	VIR_Operand_Change2Src
     VIR_Function_NewOperand
-	VIR_ConditionOp_Reverse
-	VIR_IntrisicGetKind
-	VIR_Link_AddLink
-	VIR_Type_AddField
+    VIR_ConditionOp_Reverse
+    VIR_IntrisicGetKind
+    VIR_Link_AddLink
+    VIR_Type_AddField
     VIR_Type_GetVirRegCount
     VIR_Type_GetTypeByteSize
 	VIR_Type_CalcByteOffset
-	VIR_TypeId_Conv2Enable
-	VIR_TypeId_ComposeNonOpaqueType
-	VIR_Enable_2_Swizzle_WShift
-	VIR_Swizzle_SwizzleWShiftEnable
-	VIR_Swizzle_GenSwizzleByComponentCount
-	VIR_InterfaceBlock_CalcDataByteSize
-	VIR_IdList_Add
-	VIR_IdList_DeleteByValue
-	VIR_Inst_UpdateResOpType
+    VIR_TypeId_Conv2Enable
+    VIR_TypeId_ComposeNonOpaqueType
+    VIR_Enable_2_Swizzle_WShift
+    VIR_Swizzle_SwizzleWShiftEnable
+    VIR_Swizzle_GenSwizzleByComponentCount
+    VIR_InterfaceBlock_CalcDataByteSize
+    VIR_IdList_Add
+    VIR_IdList_DeleteByValue
+    VIR_Inst_UpdateResOpType

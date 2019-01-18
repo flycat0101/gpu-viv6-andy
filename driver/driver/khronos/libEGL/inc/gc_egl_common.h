@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -314,12 +314,13 @@ typedef struct EGLDrawableRec
     EGLint      width;
     EGLint      height;
 
-    void      * rtHandles[gcdMAX_DRAW_BUFFERS/2];        /* gco surface handle of render target */
-    void      * prevRtHandles[gcdMAX_DRAW_BUFFERS/2];    /* gco surface handle of previous render target */
+    void      * rtHandles[gcdMAX_DRAW_BUFFERS/4];        /* gco surface handle of render target */
+    void      * prevRtHandles[gcdMAX_DRAW_BUFFERS/4];    /* gco surface handle of previous render target */
     void      * depthHandle;     /* gco surface handle of depth */
     void      * stencilHandle;   /* gco surface handle of stencil */
 
     void      * accumHandle;
+
     void      * private;         /* private handle point to API drawable */
     void        (* destroyPrivate)(void *);
 } EGLDrawable, *VEGLDrawable;

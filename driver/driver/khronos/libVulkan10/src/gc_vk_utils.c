@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -796,11 +796,16 @@ void __vk_utils_insertDescSetRes(
     const char *op
 )
 {
-    uint32_t setIdx;
+    uint32_t dirtyMask;
+    uint32_t setIdx = 0;
     __vkCommandPool *cdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandPool*, cmdBuf->commandPool);
     __vkCmdResource cmdRes;
 
-    for (setIdx = 0; setIdx < __VK_MAX_DESCRIPTOR_SETS; ++setIdx)
+    dirtyMask = descSetInfo->dirtyMask;
+
+    while (dirtyMask)
+    {
+        if (dirtyMask & (1 << setIdx))
         {
             __vkDescriptorSet *descSet = descSetInfo->descSets[setIdx];
             uint32_t *dynamicOffsets = descSetInfo->dynamicOffsets[setIdx];
@@ -990,6 +995,9 @@ void __vk_utils_insertDescSetRes(
                     }
                 }
             }
+            dirtyMask &= ~(1 << setIdx);
+        }
+        setIdx++;
     }
 }
 
@@ -1255,9 +1263,9 @@ void __vk_utils_dumpCmdInputRes(
             /* Only dump the mapped range once */
             if (pMemory->mapped)
             {
-                gcmDUMP(gcvNULL, "#[info: update memory: %s", pResNode->res.tag);
+                gcmDUMP(gcvNULL, "#[info: update memory: %s]", pResNode->res.tag);
                 gcmDUMP_BUFFER(gcvNULL,
-                               "memory",
+                               gcvDUMP_BUFFER_MEMORY,
                                pMemory->devAddr,
                                pMemory->hostAddr,
                                (gctUINT)pMemory->mappedOffset,
@@ -1312,8 +1320,8 @@ void __vk_utils_dumpCmdOutputRes(
                                     pLevel->partSize * partIdx +
                                     pLevel->sliceSize * pSubResRange->baseArrayLayer);
 
-                gcmDUMP(gcvNULL, "#[info: verify memory: %s", pResNode->res.tag);
-                gcmDUMP_BUFFER(gcvNULL, "verify", physical, logical, offset, size);
+                gcmDUMP(gcvNULL, "#[info: verify memory: %s]", pResNode->res.tag);
+                gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_VERIFY, physical, logical, offset, size);
             }
         }
         else
@@ -1328,8 +1336,8 @@ void __vk_utils_dumpCmdOutputRes(
                  ? (gctSIZE_T)(pBuffer->createInfo.size - pResNode->res.u.buf.offset)
                  : (gctSIZE_T)pResNode->res.u.buf.range;
 
-            gcmDUMP(gcvNULL, "#[info: verify memory: %s", pResNode->res.tag);
-            gcmDUMP_BUFFER(gcvNULL, "verify", physical, logical, offset, size);
+            gcmDUMP(gcvNULL, "#[info: verify memory: %s]", pResNode->res.tag);
+            gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_VERIFY, physical, logical, offset, size);
         }
 #endif
 
@@ -1396,244 +1404,6 @@ void __vk_utils_reverseBytes(
     }
 }
 
-
-/*
- * written by Colin Plumb in 1993, no copyright is claimed.
- * This code is in the public domain; do with it what you wish.
- *
- * Equivalent code is available from RSA Data Security, Inc.
- * except that you don't need to include two pages of legalese
- * with every copy.
- */
-
-#ifndef __VK_BIG_ENDIAN
-#define __vk_utils_swapUINT(data, uints)   /* Nothing */
-#else
-static void __vk_utils_swapUINT(uint8_t *data, size_t uints)
-{
-    do
-    {
-        uint32_t swapped = ((uint32_t)data[3]) << 24
-                         | ((uint32_t)data[2]) << 16
-                         | ((uint32_t)data[1]) << 8
-                         | ((uint32_t)data[0])
-        *(uint32_t*)data = swapped;
-
-        data  += 4;
-    } while (--uints);
-}
-#endif
-
-/*
- * The core of the MD5 algorithm, this alters an existing MD5 hash to
- * reflect the addition of 16 longwords of new data.  MD5Update blocks
- * the data and converts bytes into longwords for this routine.
- */
-static void __vk_utils_MD5Transform(
-    __VkUtilsMD5Context *ctx,
-    uint32_t data[16]
-    )
-{
-    uint32_t *p = data;
-    register uint32_t a, b, c, d;
-
-    a = ctx->states[0];
-    b = ctx->states[1];
-    c = ctx->states[2];
-    d = ctx->states[3];
-
-#ifdef __VK_BIG_ENDIAN
-    /* App data need to be copied to scratch before byte swap. */
-    if (p != (uint32_t*)ctx->buffer)
-    {
-        static uint32_t scratch[16];
-        __VK_MEMCOPY(scratch, data, sizeof(uint32_t) * 16);
-        p = scratch;
-    }
-#endif
-    __vk_utils_swapUINT((uint8_t*)p, 16);
-
-#define __VK_MD5STEP(f, w, x, y, z, data, s) \
-  (w += f(x, y, z) + data, w = w << s | w >> (32 - s), w += x )
-
-#define __VK_F1(x, y, z) (z ^ (x & (y ^ z)))
-    __VK_MD5STEP(__VK_F1, a, b, c, d, p[ 0] + 0xd76aa478, 7);
-    __VK_MD5STEP(__VK_F1, d, a, b, c, p[ 1] + 0xe8c7b756, 12);
-    __VK_MD5STEP(__VK_F1, c, d, a, b, p[ 2] + 0x242070db, 17);
-    __VK_MD5STEP(__VK_F1, b, c, d, a, p[ 3] + 0xc1bdceee, 22);
-    __VK_MD5STEP(__VK_F1, a, b, c, d, p[ 4] + 0xf57c0faf, 7);
-    __VK_MD5STEP(__VK_F1, d, a, b, c, p[ 5] + 0x4787c62a, 12);
-    __VK_MD5STEP(__VK_F1, c, d, a, b, p[ 6] + 0xa8304613, 17);
-    __VK_MD5STEP(__VK_F1, b, c, d, a, p[ 7] + 0xfd469501, 22);
-    __VK_MD5STEP(__VK_F1, a, b, c, d, p[ 8] + 0x698098d8, 7);
-    __VK_MD5STEP(__VK_F1, d, a, b, c, p[ 9] + 0x8b44f7af, 12);
-    __VK_MD5STEP(__VK_F1, c, d, a, b, p[10] + 0xffff5bb1, 17);
-    __VK_MD5STEP(__VK_F1, b, c, d, a, p[11] + 0x895cd7be, 22);
-    __VK_MD5STEP(__VK_F1, a, b, c, d, p[12] + 0x6b901122, 7);
-    __VK_MD5STEP(__VK_F1, d, a, b, c, p[13] + 0xfd987193, 12);
-    __VK_MD5STEP(__VK_F1, c, d, a, b, p[14] + 0xa679438e, 17);
-    __VK_MD5STEP(__VK_F1, b, c, d, a, p[15] + 0x49b40821, 22);
-#undef __VK_F1
-
-#define __VK_F2(x, y, z) (y ^ (z & (x ^ y)))
-    __VK_MD5STEP(__VK_F2, a, b, c, d, p[ 1] + 0xf61e2562, 5);
-    __VK_MD5STEP(__VK_F2, d, a, b, c, p[ 6] + 0xc040b340, 9);
-    __VK_MD5STEP(__VK_F2, c, d, a, b, p[11] + 0x265e5a51, 14);
-    __VK_MD5STEP(__VK_F2, b, c, d, a, p[ 0] + 0xe9b6c7aa, 20);
-    __VK_MD5STEP(__VK_F2, a, b, c, d, p[ 5] + 0xd62f105d, 5);
-    __VK_MD5STEP(__VK_F2, d, a, b, c, p[10] + 0x02441453, 9);
-    __VK_MD5STEP(__VK_F2, c, d, a, b, p[15] + 0xd8a1e681, 14);
-    __VK_MD5STEP(__VK_F2, b, c, d, a, p[ 4] + 0xe7d3fbc8, 20);
-    __VK_MD5STEP(__VK_F2, a, b, c, d, p[ 9] + 0x21e1cde6, 5);
-    __VK_MD5STEP(__VK_F2, d, a, b, c, p[14] + 0xc33707d6, 9);
-    __VK_MD5STEP(__VK_F2, c, d, a, b, p[ 3] + 0xf4d50d87, 14);
-    __VK_MD5STEP(__VK_F2, b, c, d, a, p[ 8] + 0x455a14ed, 20);
-    __VK_MD5STEP(__VK_F2, a, b, c, d, p[13] + 0xa9e3e905, 5);
-    __VK_MD5STEP(__VK_F2, d, a, b, c, p[ 2] + 0xfcefa3f8, 9);
-    __VK_MD5STEP(__VK_F2, c, d, a, b, p[ 7] + 0x676f02d9, 14);
-    __VK_MD5STEP(__VK_F2, b, c, d, a, p[12] + 0x8d2a4c8a, 20);
-#undef __VK_F2
-
-#define __VK_F3(x, y, z) (x ^ y ^ z)
-    __VK_MD5STEP(__VK_F3, a, b, c, d, p[ 5] + 0xfffa3942, 4);
-    __VK_MD5STEP(__VK_F3, d, a, b, c, p[ 8] + 0x8771f681, 11);
-    __VK_MD5STEP(__VK_F3, c, d, a, b, p[11] + 0x6d9d6122, 16);
-    __VK_MD5STEP(__VK_F3, b, c, d, a, p[14] + 0xfde5380c, 23);
-    __VK_MD5STEP(__VK_F3, a, b, c, d, p[ 1] + 0xa4beea44, 4);
-    __VK_MD5STEP(__VK_F3, d, a, b, c, p[ 4] + 0x4bdecfa9, 11);
-    __VK_MD5STEP(__VK_F3, c, d, a, b, p[ 7] + 0xf6bb4b60, 16);
-    __VK_MD5STEP(__VK_F3, b, c, d, a, p[10] + 0xbebfbc70, 23);
-    __VK_MD5STEP(__VK_F3, a, b, c, d, p[13] + 0x289b7ec6, 4);
-    __VK_MD5STEP(__VK_F3, d, a, b, c, p[ 0] + 0xeaa127fa, 11);
-    __VK_MD5STEP(__VK_F3, c, d, a, b, p[ 3] + 0xd4ef3085, 16);
-    __VK_MD5STEP(__VK_F3, b, c, d, a, p[ 6] + 0x04881d05, 23);
-    __VK_MD5STEP(__VK_F3, a, b, c, d, p[ 9] + 0xd9d4d039, 4);
-    __VK_MD5STEP(__VK_F3, d, a, b, c, p[12] + 0xe6db99e5, 11);
-    __VK_MD5STEP(__VK_F3, c, d, a, b, p[15] + 0x1fa27cf8, 16);
-    __VK_MD5STEP(__VK_F3, b, c, d, a, p[ 2] + 0xc4ac5665, 23);
-#undef __VK_F3
-
-#define __VK_F4(x, y, z) (y ^ (x | ~z))
-    __VK_MD5STEP(__VK_F4, a, b, c, d, p[ 0] + 0xf4292244, 6);
-    __VK_MD5STEP(__VK_F4, d, a, b, c, p[ 7] + 0x432aff97, 10);
-    __VK_MD5STEP(__VK_F4, c, d, a, b, p[14] + 0xab9423a7, 15);
-    __VK_MD5STEP(__VK_F4, b, c, d, a, p[ 5] + 0xfc93a039, 21);
-    __VK_MD5STEP(__VK_F4, a, b, c, d, p[12] + 0x655b59c3, 6);
-    __VK_MD5STEP(__VK_F4, d, a, b, c, p[ 3] + 0x8f0ccc92, 10);
-    __VK_MD5STEP(__VK_F4, c, d, a, b, p[10] + 0xffeff47d, 15);
-    __VK_MD5STEP(__VK_F4, b, c, d, a, p[ 1] + 0x85845dd1, 21);
-    __VK_MD5STEP(__VK_F4, a, b, c, d, p[ 8] + 0x6fa87e4f, 6);
-    __VK_MD5STEP(__VK_F4, d, a, b, c, p[15] + 0xfe2ce6e0, 10);
-    __VK_MD5STEP(__VK_F4, c, d, a, b, p[ 6] + 0xa3014314, 15);
-    __VK_MD5STEP(__VK_F4, b, c, d, a, p[13] + 0x4e0811a1, 21);
-    __VK_MD5STEP(__VK_F4, a, b, c, d, p[ 4] + 0xf7537e82, 6);
-    __VK_MD5STEP(__VK_F4, d, a, b, c, p[11] + 0xbd3af235, 10);
-    __VK_MD5STEP(__VK_F4, c, d, a, b, p[ 2] + 0x2ad7d2bb, 15);
-    __VK_MD5STEP(__VK_F4, b, c, d, a, p[ 9] + 0xeb86d391, 21);
-#undef __VK_F4
-
-#undef __VK_MD5STEP
-
-    ctx->states[0] += a;
-    ctx->states[1] += b;
-    ctx->states[2] += c;
-    ctx->states[3] += d;
-}
-
-
-void __vk_uitls_MD5Init(
-    __VkUtilsMD5Context *ctx
-    )
-{
-    __VK_MEMZERO(ctx, sizeof(__VkUtilsMD5Context));
-
-    ctx->bytes = 0;
-
-    /* mysterious initial constants */
-    ctx->states[0] = 0x67452301;
-    ctx->states[1] = 0xefcdab89;
-    ctx->states[2] = 0x98badcfe;
-    ctx->states[3] = 0x10325476;
-}
-
-/* Update context to reflect the concatenation of another buffer full of bytes */
-void __vk_utils_MD5Update(
-    __VkUtilsMD5Context *ctx,
-    const void *data,
-    size_t bytes
-    )
-{
-    const uint8_t *buf = (const uint8_t*)data;
-    size_t left = ctx->bytes & 0x3F;
-    size_t fill = 64 - left;
-
-    ctx->bytes += bytes;
-
-    /* Handle any leading odd-sized chunks */
-    if (left > 0 && fill <= bytes)
-    {
-        __VK_MEMCOPY(&ctx->buffer[left], buf, fill);
-
-        __vk_utils_MD5Transform(ctx, (uint32_t*)ctx->buffer);
-
-        buf   += fill;
-        bytes -= fill;
-        left = 0;
-
-    }
-
-    /* Process data in 64-bytes chunks */
-    while (bytes >= 64)
-    {
-        __vk_utils_MD5Transform(ctx, (uint32_t*)buf);
-        buf   += 64;
-        bytes -= 64;
-    }
-
-    /* Copy any remaining bytes for next process */
-    if (bytes > 0)
-    {
-        __VK_MEMCOPY(&ctx->buffer[left], buf, bytes);
-    }
-}
-
-/*
- * Final wrapup - pad to 64-byte boundary with the bit pattern
- * 1 0* (64-bit count of bits processed, MSB-first)
- */
-void __vk_utils_MD5Final(
-    __VkUtilsMD5Context *ctx,
-    uint8_t digest[16]
-    )
-{
-    size_t left, fill;
-    uint64_t bits = 0;
-
-    left = ctx->bytes & 0x3F;
-    ctx->buffer[left++] = 0x80;     /* padding 0x80*/
-    fill = 64 - left;
-
-    if (fill > 0)
-    {
-        __VK_MEMZERO(&ctx->buffer[left], fill);
-    }
-
-    if (fill < sizeof(bits))
-    {
-        __vk_utils_MD5Transform(ctx, (uint32_t*)ctx->buffer);
-        __VK_MEMZERO(ctx->buffer, 64);
-        left = 0;
-    }
-
-    /* Append length in bits and transform */
-    bits = ctx->bytes << 3;
-    __VK_MEMCOPY(&ctx->buffer[left], &bits, sizeof(bits));
-
-    __vk_utils_MD5Transform(ctx, (uint32_t*)ctx->buffer);
-    __vk_utils_swapUINT((uint8_t*)ctx->states, 4);
-    __VK_MEMCOPY(digest, ctx->states, 16);
-}
-
 VkBool32 __vk_utils_reverseMatch(
     const char *source,
     const char *dest
@@ -1648,6 +1418,8 @@ VkBool32 __vk_utils_reverseMatch(
     return (pos ? VK_TRUE : VK_FALSE);
 
 }
+
+
 
 
 

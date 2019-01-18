@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -15,7 +15,6 @@
 #include "gc_gl_dlist.h"
 #include "g_lcomp.h"
 #include "gc_gl_image.h"
-#include "gc_im_protos.h"
 
 /*
 *** Functions in eval.c
@@ -75,7 +74,7 @@ const GLubyte *__glle_Begin(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Begin_Rec *data;
 
     data = (struct __gllc_Begin_Rec *) PC;
-    (*gc->currentImmediateTable->Begin)(gc, data->primType);
+    (*gc->immedModeDispatch.Begin)(gc, data->primType);
     return PC + sizeof(struct __gllc_Begin_Rec);
 }
 
@@ -85,7 +84,7 @@ const GLubyte *__glle_Color3fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Color3fv_Rec *data;
 
     data = (struct __gllc_Color3fv_Rec *) PC;
-    (*gc->currentImmediateTable->Color3fv)(gc, data->v);
+    (*gc->immedModeDispatch.Color3fv)(gc, data->v);
     return PC + sizeof(struct __gllc_Color3fv_Rec);
 }
 
@@ -95,7 +94,7 @@ const GLubyte *__glle_Color4fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Color4fv_Rec *data;
 
     data = (struct __gllc_Color4fv_Rec *) PC;
-    (*gc->currentImmediateTable->Color4fv)(gc, data->v);
+    (*gc->immedModeDispatch.Color4fv)(gc, data->v);
     return PC + sizeof(struct __gllc_Color4fv_Rec);
 }
 
@@ -105,7 +104,7 @@ const GLubyte *__glle_Color4ubv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Color4ubv_Rec *data;
 
     data = (struct __gllc_Color4ubv_Rec *) PC;
-    (*gc->currentImmediateTable->Color4ubv)(gc, data->v);
+    (*gc->immedModeDispatch.Color4ubv)(gc, data->v);
     return PC + sizeof(struct __gllc_Color4ubv_Rec);
 }
 
@@ -115,7 +114,7 @@ const GLubyte *__glle_EdgeFlag(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_EdgeFlag_Rec *data;
 
     data = (struct __gllc_EdgeFlag_Rec *) PC;
-    (*gc->currentImmediateTable->EdgeFlag)(gc, data->flag);
+    (*gc->immedModeDispatch.EdgeFlag)(gc, data->flag);
     return PC + sizeof(struct __gllc_EdgeFlag_Rec);
 }
 
@@ -123,7 +122,7 @@ const GLubyte *__glle_End(__GLcontext *gc, const GLubyte *PC)
 {
 
 
-    (*gc->currentImmediateTable->End)(gc);
+    (*gc->immedModeDispatch.End)(gc);
     return PC;
 }
 
@@ -142,7 +141,7 @@ const GLubyte *__glle_Normal3fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Normal3fv_Rec *data;
 
     data = (struct __gllc_Normal3fv_Rec *) PC;
-    (*gc->currentImmediateTable->Normal3fv)(gc, data->v);
+    (*gc->immedModeDispatch.Normal3fv)(gc, data->v);
     return PC + sizeof(struct __gllc_Normal3fv_Rec);
 }
 
@@ -188,7 +187,7 @@ const GLubyte *__glle_TexCoord2fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_TexCoord2fv_Rec *data;
 
     data = (struct __gllc_TexCoord2fv_Rec *) PC;
-    (*gc->currentImmediateTable->TexCoord2fv)(gc, data->v);
+    (*gc->immedModeDispatch.TexCoord2fv)(gc, data->v);
     return PC + sizeof(struct __gllc_TexCoord2fv_Rec);
 }
 
@@ -198,7 +197,7 @@ const GLubyte *__glle_TexCoord3fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_TexCoord3fv_Rec *data;
 
     data = (struct __gllc_TexCoord3fv_Rec *) PC;
-    (*gc->currentImmediateTable->TexCoord3fv)(gc, data->v);
+    (*gc->immedModeDispatch.TexCoord3fv)(gc, data->v);
     return PC + sizeof(struct __gllc_TexCoord3fv_Rec);
 }
 
@@ -208,7 +207,7 @@ const GLubyte *__glle_TexCoord4fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_TexCoord4fv_Rec *data;
 
     data = (struct __gllc_TexCoord4fv_Rec *) PC;
-    (*gc->currentImmediateTable->TexCoord4fv)(gc, data->v);
+    (*gc->immedModeDispatch.TexCoord4fv)(gc, data->v);
     return PC + sizeof(struct __gllc_TexCoord4fv_Rec);
 }
 
@@ -218,7 +217,7 @@ const GLubyte *__glle_Vertex2fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Vertex2fv_Rec *data;
 
     data = (struct __gllc_Vertex2fv_Rec *) PC;
-    (*gc->currentImmediateTable->Vertex2fv)(gc, data->v);
+    (*gc->immedModeDispatch.Vertex2fv)(gc, data->v);
     return PC + sizeof(struct __gllc_Vertex2fv_Rec);
 }
 
@@ -228,7 +227,7 @@ const GLubyte *__glle_Vertex3fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Vertex3fv_Rec *data;
 
     data = (struct __gllc_Vertex3fv_Rec *) PC;
-    (*gc->currentImmediateTable->Vertex3fv)(gc, data->v);
+    (*gc->immedModeDispatch.Vertex3fv)(gc, data->v);
     return PC + sizeof(struct __gllc_Vertex3fv_Rec);
 }
 
@@ -238,7 +237,7 @@ const GLubyte *__glle_Vertex4fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Vertex4fv_Rec *data;
 
     data = (struct __gllc_Vertex4fv_Rec *) PC;
-    (*gc->currentImmediateTable->Vertex4fv)(gc, data->v);
+    (*gc->immedModeDispatch.Vertex4fv)(gc, data->v);
     return PC + sizeof(struct __gllc_Vertex4fv_Rec);
 }
 
@@ -266,7 +265,7 @@ const GLubyte *__glle_CullFace(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_CullFace_Rec *) PC;
     /*__glim_CullFace(gc, data->mode);*/
-    __gles_CullFace(gc, data->mode);
+    gc->immedModeDispatch.CullFace(gc, data->mode);
     return PC + sizeof(struct __gllc_CullFace_Rec);
 }
 
@@ -304,7 +303,7 @@ const GLubyte *__glle_FrontFace(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_FrontFace_Rec *) PC;
     /*__glim_FrontFace(gc, data->mode);*/
-    __gles_FrontFace(gc, data->mode);
+    gc->immedModeDispatch.FrontFace(gc, data->mode);
     return PC + sizeof(struct __gllc_FrontFace_Rec);
 }
 
@@ -314,7 +313,7 @@ const GLubyte *__glle_Hint(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_Hint_Rec *) PC;
     /*__glim_Hint(gc, data->target, data->mode);*/
-    __gles_Hint(gc, data->target, data->mode);
+    gc->immedModeDispatch.Hint(gc, data->target, data->mode);
     return PC + sizeof(struct __gllc_Hint_Rec);
 }
 
@@ -444,7 +443,7 @@ const GLubyte *__glle_Scissor(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_Scissor_Rec *) PC;
     /*__glim_Scissor(gc, data->x, data->y, data->width, data->height);*/
-    __gles_Scissor(gc, data->x, data->y, data->width, data->height);
+    gc->immedModeDispatch.Scissor(gc, data->x, data->y, data->width, data->height);
     return PC + sizeof(struct __gllc_Scissor_Rec);
 }
 
@@ -466,7 +465,7 @@ const GLubyte *__glle_TexParameterfv(__GLcontext *gc, const GLubyte *PC)
     data = (struct __gllc_TexParameterfv_Rec *) PC;
     /*__glim_TexParameterfv(gc, data->target, data->pname,
             (GLfloat *) (PC + sizeof(struct __gllc_TexParameterfv_Rec)));*/
-    __gles_TexParameterfv(gc, data->target, data->pname,
+    gc->immedModeDispatch.TexParameterfv(gc, data->target, data->pname,
             (GLfloat *) (PC + sizeof(struct __gllc_TexParameterfv_Rec)));
     arraySize = __GL64PAD(__glTexParameter_size(data->pname) * 4);
     size = sizeof(struct __gllc_TexParameterfv_Rec) + arraySize;
@@ -482,7 +481,7 @@ const GLubyte *__glle_TexParameteriv(__GLcontext *gc, const GLubyte *PC)
     data = (struct __gllc_TexParameteriv_Rec *) PC;
     /*__glim_TexParameteriv(gc, data->target, data->pname,
             (GLint *) (PC + sizeof(struct __gllc_TexParameteriv_Rec)));*/
-    __gles_TexParameteriv(gc, data->target, data->pname,
+    gc->immedModeDispatch.TexParameteriv(gc, data->target, data->pname,
             (GLint *) (PC + sizeof(struct __gllc_TexParameteriv_Rec)));
     arraySize = __GL64PAD(__glTexParameter_size(data->pname) * 4);
     size = sizeof(struct __gllc_TexParameteriv_Rec) + arraySize;
@@ -614,7 +613,7 @@ const GLubyte *__glle_Clear(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_Clear_Rec *) PC;
     /*__glim_Clear(gc, data->mask);*/
-    __gles_Clear(gc, data->mask);
+    gc->immedModeDispatch.Clear(gc, data->mask);
     return PC + sizeof(struct __gllc_Clear_Rec);
 }
 
@@ -642,7 +641,7 @@ const GLubyte *__glle_ClearColor(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_ClearColor_Rec *) PC;
     /*__glim_ClearColor(gc, data->red, data->green, data->blue, data->alpha);*/
-    __gles_ClearColor(gc, data->red, data->green, data->blue, data->alpha);
+    gc->immedModeDispatch.ClearColor(gc, data->red, data->green, data->blue, data->alpha);
     return PC + sizeof(struct __gllc_ClearColor_Rec);
 }
 
@@ -652,7 +651,7 @@ const GLubyte *__glle_ClearStencil(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_ClearStencil_Rec *) PC;
     /*__glim_ClearStencil(gc, data->s);*/
-    __gles_ClearStencil(gc, data->s);
+    gc->immedModeDispatch.ClearStencil(gc, data->s);
     return PC + sizeof(struct __gllc_ClearStencil_Rec);
 }
 
@@ -662,7 +661,7 @@ const GLubyte *__glle_ClearDepth(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_ClearDepth_Rec *) PC;
     /*__glim_ClearDepth(gc, data->depth);*/
-    __gles_ClearDepthf(gc, (GLfloat)data->depth);
+    gc->immedModeDispatch.ClearDepthf(gc, (GLfloat)data->depth);
     return PC + sizeof(struct __gllc_ClearDepth_Rec);
 }
 
@@ -672,7 +671,7 @@ const GLubyte *__glle_StencilMask(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_StencilMask_Rec *) PC;
     /*__glim_StencilMask(gc, data->mask);*/
-    __gles_StencilMask(gc, data->mask);
+    gc->immedModeDispatch.StencilMask(gc, data->mask);
     return PC + sizeof(struct __gllc_StencilMask_Rec);
 }
 
@@ -682,7 +681,7 @@ const GLubyte *__glle_StencilMaskSeparate(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_StencilMaskSeparate_Rec *) PC;
     /*__glim_StencilMaskSeparate(gc, data->face, data->mask);*/
-    __gles_StencilMaskSeparate(gc, data->face, data->mask);
+    gc->immedModeDispatch.StencilMaskSeparate(gc, data->face, data->mask);
     return PC + sizeof(struct __gllc_StencilMaskSeparate_Rec);
 }
 
@@ -692,7 +691,7 @@ const GLubyte *__glle_ColorMask(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_ColorMask_Rec *) PC;
     /*__glim_ColorMask(gc, data->red, data->green, data->blue, data->alpha);*/
-    __gles_ColorMask(gc, data->red, data->green, data->blue, data->alpha);
+    gc->immedModeDispatch.ColorMask(gc, data->red, data->green, data->blue, data->alpha);
     return PC + sizeof(struct __gllc_ColorMask_Rec);
 }
 
@@ -702,7 +701,7 @@ const GLubyte *__glle_DepthMask(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_DepthMask_Rec *) PC;
     /*__glim_DepthMask(gc, data->flag);*/
-    __gles_DepthMask(gc, data->flag);
+    gc->immedModeDispatch.DepthMask(gc, data->flag);
     return PC + sizeof(struct __gllc_DepthMask_Rec);
 }
 
@@ -866,7 +865,7 @@ const GLubyte *__glle_BlendColor(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_BlendColor_Rec *) PC;
     /*__glim_BlendColor(gc, data->r, data->g, data->b, data->a);*/
-    __gles_BlendColor(gc, data->r, data->g, data->b, data->a);
+    gc->immedModeDispatch.BlendColor(gc, data->r, data->g, data->b, data->a);
     return PC + sizeof(struct __gllc_BlendColor_Rec);
 }
 
@@ -876,7 +875,7 @@ const GLubyte *__glle_BlendFunc(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_BlendFunc_Rec *) PC;
     /*__glim_BlendFunc(gc, data->sfactor, data->dfactor);*/
-    __gles_BlendFunc(gc, data->sfactor, data->dfactor);
+    gc->immedModeDispatch.BlendFunc(gc, data->sfactor, data->dfactor);
     return PC + sizeof(struct __gllc_BlendFunc_Rec);
 }
 
@@ -886,7 +885,7 @@ const GLubyte *__glle_BlendFuncSeparate(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_BlendFuncSeparate_Rec *) PC;
     /*__glim_BlendFuncSeparate(gc, data->sfactorRGB, data->dfactorRGB, data->sfactorAlpha, data->dfactorAlpha);*/
-    __gles_BlendFuncSeparate(gc, data->sfactorRGB, data->dfactorRGB, data->sfactorAlpha, data->dfactorAlpha);
+    gc->immedModeDispatch.BlendFuncSeparate(gc, data->sfactorRGB, data->dfactorRGB, data->sfactorAlpha, data->dfactorAlpha);
     return PC + sizeof(struct __gllc_BlendFuncSeparate_Rec);
 }
 
@@ -896,7 +895,7 @@ const GLubyte *__glle_BlendEquation(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_BlendEquation_Rec *) PC;
     /*__glim_BlendEquation(gc, data->mode);*/
-    __gles_BlendEquation(gc, data->mode);
+    gc->immedModeDispatch.BlendEquation(gc, data->mode);
     return PC + sizeof(struct __gllc_BlendEquation_Rec);
 }
 
@@ -906,7 +905,7 @@ const GLubyte *__glle_BlendEquationSeparate(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_BlendEquationSeparate_Rec *) PC;
     /*__glim_BlendEquationSeparate(gc, data->modeRGB, data->modeAlpha);*/
-    __gles_BlendEquationSeparate(gc, data->modeRGB, data->modeAlpha);
+    gc->immedModeDispatch.BlendEquationSeparate(gc, data->modeRGB, data->modeAlpha);
     return PC + sizeof(struct __gllc_BlendEquationSeparate_Rec);
 }
 
@@ -925,7 +924,7 @@ const GLubyte *__glle_StencilFunc(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_StencilFunc_Rec *) PC;
     /*__glim_StencilFunc(gc, data->func, data->ref, data->mask);*/
-    __gles_StencilFunc(gc, data->func, data->ref, data->mask);
+    gc->immedModeDispatch.StencilFunc(gc, data->func, data->ref, data->mask);
     return PC + sizeof(struct __gllc_StencilFunc_Rec);
 }
 
@@ -935,7 +934,7 @@ const GLubyte *__glle_StencilFuncSeparate(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_StencilFuncSeparate_Rec *) PC;
     /*__glim_StencilFuncSeparate(gc, data->face, data->func, data->ref, data->mask);*/
-    __gles_StencilFuncSeparate(gc, data->face, data->func, data->ref, data->mask);
+    gc->immedModeDispatch.StencilFuncSeparate(gc, data->face, data->func, data->ref, data->mask);
     return PC + sizeof(struct __gllc_StencilFuncSeparate_Rec);
 }
 
@@ -945,7 +944,7 @@ const GLubyte *__glle_StencilOp(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_StencilOp_Rec *) PC;
     /*__glim_StencilOp(gc, data->fail, data->zfail, data->zpass);*/
-    __gles_StencilOp(gc, data->fail, data->zfail, data->zpass);
+    gc->immedModeDispatch.StencilOp(gc, data->fail, data->zfail, data->zpass);
     return PC + sizeof(struct __gllc_StencilOp_Rec);
 }
 
@@ -955,7 +954,7 @@ const GLubyte *__glle_StencilOpSeparate(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_StencilOpSeparate_Rec *) PC;
     /*__glim_StencilOpSeparate(gc, data->face, data->fail, data->zfail, data->zpass);*/
-    __gles_StencilOpSeparate(gc, data->face, data->fail, data->zfail, data->zpass);
+    gc->immedModeDispatch.StencilOpSeparate(gc, data->face, data->fail, data->zfail, data->zpass);
     return PC + sizeof(struct __gllc_StencilOpSeparate_Rec);
 }
 
@@ -965,7 +964,7 @@ const GLubyte *__glle_DepthFunc(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_DepthFunc_Rec *) PC;
     /*__glim_DepthFunc(gc, data->func);*/
-    __gles_DepthFunc(gc, data->func);
+    gc->immedModeDispatch.DepthFunc(gc, data->func);
     return PC + sizeof(struct __gllc_DepthFunc_Rec);
 }
 
@@ -1044,7 +1043,7 @@ const GLubyte *__glle_ReadBuffer(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_ReadBuffer_Rec *) PC;
     /*__glim_ReadBuffer(gc, data->mode);*/
-    __gles_ReadBuffer(gc, data->mode);
+    gc->immedModeDispatch.ReadBuffer(gc, data->mode);
     return PC + sizeof(struct __gllc_ReadBuffer_Rec);
 }
 
@@ -1064,7 +1063,7 @@ const GLubyte *__glle_DepthRange(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_DepthRange_Rec *) PC;
     /*__glim_DepthRange(gc, data->zNear, data->zFar);*/
-    __gles_DepthRangef(gc, (GLfloat)data->zNear, (GLfloat)data->zFar);
+    gc->immedModeDispatch.DepthRangef(gc, (GLfloat)data->zNear, (GLfloat)data->zFar);
     return PC + sizeof(struct __gllc_DepthRange_Rec);
 }
 
@@ -1259,7 +1258,7 @@ const GLubyte *__glle_Viewport(__GLcontext *gc, const GLubyte *PC)
 
     data = (struct __gllc_Viewport_Rec *) PC;
     /*__glim_Viewport(gc, data->x, data->y, data->width, data->height);*/
-    __gles_Viewport(gc, data->x, data->y, data->width, data->height);
+    gc->immedModeDispatch.Viewport(gc, data->x, data->y, data->width, data->height);
     return PC + sizeof(struct __gllc_Viewport_Rec);
 }
 
@@ -1287,7 +1286,7 @@ const GLubyte *__glle_CopyTexImage2D(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_CopyTexImage2D_Rec *data;
 
     data = (struct __gllc_CopyTexImage2D_Rec *) PC;
-    __gles_CopyTexImage2D(gc, data->target, data->level, data->internalformat, data->x,
+    gc->immedModeDispatch.CopyTexImage2D(gc, data->target, data->level, data->internalformat, data->x,
             data->y, data->width, data->height, data->border);
     return PC + sizeof(struct __gllc_CopyTexImage2D_Rec);
 }
@@ -1307,7 +1306,7 @@ const GLubyte *__glle_CopyTexSubImage2D(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_CopyTexSubImage2D_Rec *data;
 
     data = (struct __gllc_CopyTexSubImage2D_Rec *) PC;
-    __gles_CopyTexSubImage2D(gc, data->target, data->level, data->xoffset, data->yoffset,
+    gc->immedModeDispatch.CopyTexSubImage2D(gc, data->target, data->level, data->xoffset, data->yoffset,
             data->x, data->y, data->width, data->height);
     return PC + sizeof(struct __gllc_CopyTexSubImage2D_Rec);
 }
@@ -1317,7 +1316,7 @@ const GLubyte *__glle_BindTexture(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_BindTexture_Rec *data;
 
     data = (struct __gllc_BindTexture_Rec *) PC;
-    __gles_BindTexture(gc, data->target, data->texture);
+    gc->immedModeDispatch.BindTexture(gc, data->target, data->texture);
     return PC + sizeof(struct __gllc_BindTexture_Rec);
 }
 
@@ -1343,7 +1342,7 @@ const GLubyte *__glle_ActiveTexture(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_ActiveTexture_Rec *data;
 
     data = (struct __gllc_ActiveTexture_Rec *) PC;
-    __gles_ActiveTexture(gc, data->texture);
+    gc->immedModeDispatch.ActiveTexture(gc, data->texture);
     return PC + sizeof( struct __gllc_ActiveTexture_Rec );
 }
 
@@ -1353,7 +1352,7 @@ const GLubyte *__glle_MultiTexCoord2fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_MultiTexCoord2fv_Rec *data;
 
     data = (struct __gllc_MultiTexCoord2fv_Rec *) PC;
-    (*gc->currentImmediateTable->MultiTexCoord2fv)(gc, data->texture, data->v);
+    (*gc->immedModeDispatch.MultiTexCoord2fv)(gc, data->texture, data->v);
     return PC + sizeof(struct __gllc_MultiTexCoord2fv_Rec);
 }
 
@@ -1363,7 +1362,7 @@ const GLubyte *__glle_MultiTexCoord3fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_MultiTexCoord3fv_Rec *data;
 
     data = (struct __gllc_MultiTexCoord3fv_Rec *) PC;
-    (*gc->currentImmediateTable->MultiTexCoord3fv)(gc, data->texture, data->v);
+    (*gc->immedModeDispatch.MultiTexCoord3fv)(gc, data->texture, data->v);
     return PC + sizeof(struct __gllc_MultiTexCoord3fv_Rec);
 }
 
@@ -1373,7 +1372,7 @@ const GLubyte *__glle_MultiTexCoord4fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_MultiTexCoord4fv_Rec *data;
 
     data = (struct __gllc_MultiTexCoord4fv_Rec *) PC;
-    (*gc->currentImmediateTable->MultiTexCoord4fv)(gc, data->texture, data->v);
+    (*gc->immedModeDispatch.MultiTexCoord4fv)(gc, data->texture, data->v);
     return PC + sizeof(struct __gllc_MultiTexCoord4fv_Rec);
 }
 
@@ -1382,65 +1381,8 @@ const GLubyte *__glle_FogCoordf(__GLcontext *gc, const GLubyte *PC)
 
     struct __gllc_FogCoordf_Rec *data;
     data = (struct __gllc_FogCoordf_Rec *)PC;
-    (*gc->currentImmediateTable->FogCoordf)(gc, data->coord);
+    (*gc->immedModeDispatch.FogCoordf)(gc, data->coord);
     return PC + sizeof(struct __gllc_FogCoordf_Rec);
-}
-
-const GLubyte * __glle_ColorTableParameteriv(__GLcontext *gc, const GLubyte *PC)
-{
-    GLuint size;
-    GLuint arraySize;
-    struct __gllc_ColorTableParameteriv_Rec *data;
-
-    data = (struct __gllc_ColorTableParameteriv_Rec *) PC;
-    __glim_ColorTableParameteriv(gc, data->target, data->pname,
-            (GLint *) (PC + sizeof(struct __gllc_ColorTableParameteriv_Rec)));
-    arraySize = __GL64PAD(__glColorTableParameter_size(data->pname) * 4);
-    size = sizeof(struct __gllc_ColorTableParameteriv_Rec) + arraySize;
-    return PC + size;
-}
-
-const GLubyte * __glle_ColorTableParameterfv(__GLcontext *gc, const GLubyte *PC)
-{
-    GLuint size;
-    GLuint arraySize;
-    struct __gllc_ColorTableParameterfv_Rec *data;
-
-    data = (struct __gllc_ColorTableParameterfv_Rec *) PC;
-    __glim_ColorTableParameterfv(gc, data->target, data->pname,
-            (GLfloat *) (PC + sizeof(struct __gllc_ColorTableParameterfv_Rec)));
-    arraySize = __GL64PAD(__glColorTableParameter_size(data->pname) * 4);
-    size = sizeof(struct __gllc_ColorTableParameterfv_Rec) + arraySize;
-    return PC + size;
-}
-
-const GLubyte *__glle_ConvolutionParameteriv(__GLcontext *gc, const GLubyte *PC)
-{
-    GLuint size;
-    GLuint arraySize;
-    struct __gllc_ConvolutionParameteriv_Rec *data;
-
-    data = (struct __gllc_ConvolutionParameteriv_Rec *) PC;
-    __glim_ConvolutionParameteriv(gc, data->target, data->pname,
-            (GLint *) (PC + sizeof(struct __gllc_ConvolutionParameteriv_Rec)));
-    arraySize = __GL64PAD(__glConvolutionParameter_size(data->pname) * 4);
-    size = sizeof(struct __gllc_ConvolutionParameteriv_Rec) + arraySize;
-    return PC + size;
-}
-
-const GLubyte *__glle_ConvolutionParameterfv(__GLcontext *gc, const GLubyte *PC)
-{
-    GLuint size;
-    GLuint arraySize;
-    struct __gllc_ConvolutionParameterfv_Rec *data;
-
-    data = (struct __gllc_ConvolutionParameterfv_Rec *) PC;
-    __glim_ConvolutionParameterfv(gc, data->target, data->pname,
-            (GLfloat *) (PC + sizeof(struct __gllc_ConvolutionParameterfv_Rec)));
-    arraySize = __GL64PAD(__glConvolutionParameter_size(data->pname) * 4);
-    size = sizeof(struct __gllc_ConvolutionParameterfv_Rec) + arraySize;
-
-    return PC + size;
 }
 
 const GLubyte *__glle_VertexAttrib4fv(__GLcontext *gc, const GLubyte *PC)
@@ -1449,7 +1391,7 @@ const GLubyte *__glle_VertexAttrib4fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_VertexAttrib4fv_Rec *data;
 
     data = (struct __gllc_VertexAttrib4fv_Rec *)PC;
-    (*gc->currentImmediateTable->VertexAttrib4fv)(gc, data->index, data->v);
+    (*gc->immedModeDispatch.VertexAttrib4fv)(gc, data->index, data->v);
 
     return PC + sizeof(struct __gllc_VertexAttrib4fv_Rec);
 }
@@ -1574,7 +1516,7 @@ const GLubyte *__glle_TexImage2D(__GLcontext *gc, const GLubyte *PC)
 
     data = (const struct __gllc_TexImage2D_Rec *) PC;
 
-    __gles_TexImage2D(gc,
+    gc->immedModeDispatch.TexImage2D(gc,
             data->target, data->level, data->components,
             data->width, data->height, data->border, data->format, data->type,
             (const GLubyte *)(PC + sizeof(struct __gllc_TexImage2D_Rec)));
@@ -1602,7 +1544,7 @@ const GLubyte *__glle_TexSubImage2D(__GLcontext *gc, const GLubyte *PC)
 
     data = (const struct __gllc_TexSubImage2D_Rec *) PC;
 
-    __gles_TexSubImage2D(gc,
+    gc->immedModeDispatch.TexSubImage2D(gc,
             data->target, data->level, data->xoffset, data->yoffset,
             data->width, data->height, data->format, data->type,
             (const GLubyte *)(PC + sizeof(struct __gllc_TexSubImage2D_Rec)));
@@ -1615,7 +1557,7 @@ const GLubyte *__glle_Disable(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Disable_Rec *data;
 
     data = (struct __gllc_Disable_Rec *) PC;
-    __gles_Disable(gc, data->cap);
+    gc->immedModeDispatch.Disable(gc, data->cap);
     return (PC + sizeof(struct __gllc_Disable_Rec));
 }
 
@@ -1624,7 +1566,7 @@ const GLubyte *__glle_Enable(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Enable_Rec *data;
 
     data = (struct __gllc_Enable_Rec *) PC;
-    __gles_Enable(gc, data->cap);
+    gc->immedModeDispatch.Enable(gc, data->cap);
     return (PC + sizeof(struct __gllc_Enable_Rec));
 }
 
@@ -1633,7 +1575,7 @@ const GLubyte *__glle_SampleCoverage(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_SampleCoverage_Rec *data;
 
     data = (struct __gllc_SampleCoverage_Rec *) PC;
-    __gles_SampleCoverage(gc, data->v, data->invert);
+    gc->immedModeDispatch.SampleCoverage(gc, data->v, data->invert);
     return PC + sizeof(struct __gllc_SampleCoverage_Rec);
 }
 
@@ -1648,7 +1590,7 @@ const GLubyte *__glle_CompressedTexImage2D(__GLcontext *gc, const GLubyte *PC)
 
     data = (const struct __gllc_CompressedTexImage2D_Rec *) PC;
 
-    __gles_CompressedTexImage2D(gc,
+    gc->immedModeDispatch.CompressedTexImage2D(gc,
             data->target, data->lod, data->components,
             data->width, data->height, data->border, data->imageSize,
             (const GLubyte *)(PC + sizeof(struct __gllc_CompressedTexImage2D_Rec)));
@@ -1672,7 +1614,7 @@ const GLubyte *__glle_CompressedTexSubImage2D(__GLcontext *gc, const GLubyte *PC
 
     data = (const struct __gllc_CompressedTexSubImage2D_Rec *) PC;
 
-    __gles_CompressedTexSubImage2D(gc,
+    gc->immedModeDispatch.CompressedTexSubImage2D(gc,
             data->target, data->lod, data->xoffset, data->yoffset,
             data->width, data->height, data->format, data->imageSize,
             (const GLubyte *)(PC + sizeof(struct __gllc_CompressedTexSubImage2D_Rec)));
@@ -1685,154 +1627,13 @@ const GLubyte *__glle_CompressedTexSubImage3D(__GLcontext *gc, const GLubyte *PC
     return (PC);
 }
 
-const GLubyte *__glle_ColorTable(__GLcontext *gc, const GLubyte *PC)
-{
-    const struct __gllc_ColorTable_Rec *data;
-
-    data = (const struct __gllc_ColorTable_Rec *) PC;
-
-    __glim_ColorTable(gc, data->target, data->internalformat, data->width, data->format, data->type,
-            (const GLvoid *) (PC + sizeof(struct __gllc_ColorTable_Rec)));
-
-    return PC + sizeof(struct __gllc_ColorTable_Rec) + __GL_PAD(data->imageSize);
-}
-
-const GLubyte *__glle_ColorSubTable(__GLcontext *gc, const GLubyte *PC)
-{
-    const struct __gllc_ColorSubTable_Rec *data;
-
-    data = (const struct __gllc_ColorSubTable_Rec *) PC;
-
-    __glim_ColorSubTable(gc, data->target, data->start, data->count, data->format, data->type,
-            (const GLvoid *) (PC + sizeof(struct __gllc_ColorSubTable_Rec)));
-
-    return PC + sizeof(struct __gllc_ColorSubTable_Rec) + __GL_PAD(data->imageSize);
-}
-
-const GLubyte *__glle_CopyColorTable(__GLcontext *gc, const GLubyte *PC)
-{
-    struct __gllc_CopyColorTable_Rec *data;
-
-    data = (struct __gllc_CopyColorTable_Rec *) PC;
-    __glim_CopyColorTable(gc, data->target, data->internalformat, data->x, data->y, data->width);
-    return PC + sizeof(struct __gllc_CopyColorTable_Rec);
-}
-
-const GLubyte *__glle_CopyColorSubTable(__GLcontext *gc, const GLubyte *PC)
-{
-    struct __gllc_CopyColorSubTable_Rec *data;
-
-    data = (struct __gllc_CopyColorSubTable_Rec *) PC;
-    __glim_CopyColorSubTable(gc, data->target, data->start, data->x, data->y, data->width);
-    return PC + sizeof(struct __gllc_CopyColorSubTable_Rec);
-}
-
-const GLubyte *__glle_ConvolutionFilter1D(__GLcontext *gc, const GLubyte *PC)
-{
-    const struct __gllc_ConvolutionFilter1D_Rec *data;
-
-    data = (const struct __gllc_ConvolutionFilter1D_Rec *) PC;
-    __glim_ConvolutionFilter1D(gc,
-            data->target, data->internalformat, data->width, data->format, data->type,
-            (const GLubyte *)(PC + sizeof(struct __gllc_ConvolutionFilter1D_Rec)));
-    return PC + sizeof(struct __gllc_ConvolutionFilter1D_Rec) + __GL_PAD(data->imageSize);
-}
-
-const GLubyte *__glle_ConvolutionFilter2D(__GLcontext *gc, const GLubyte *PC)
-{
-    const struct __gllc_ConvolutionFilter2D_Rec *data;
-
-    data = (const struct __gllc_ConvolutionFilter2D_Rec *) PC;
-    __glim_ConvolutionFilter2D(gc,
-            data->target, data->internalformat, data->width, data->height, data->format, data->type,
-            (const GLubyte *)(PC + sizeof(struct __gllc_ConvolutionFilter2D_Rec)));
-    return PC + sizeof(struct __gllc_ConvolutionFilter2D_Rec) + __GL_PAD(data->imageSize);
-}
-
-const GLubyte *__glle_SeparableFilter2D(__GLcontext *gc, const GLubyte *PC)
-{
-    const struct __gllc_SeparableFilter2D_Rec *data;
-    GLint rowSize, colSize;
-
-    data = (const struct __gllc_SeparableFilter2D_Rec *) PC;
-    rowSize = __glImageSize(data->width, 1, data->format, data->type);
-    rowSize = __GL_PAD(rowSize);
-    colSize = __glImageSize(data->height, 1, data->format, data->type);
-    colSize = __GL_PAD(colSize);
-
-    __glim_SeparableFilter2D(gc,
-        data->target, data->internalformat, data->width, data->height, data->format, data->type,
-        (const GLubyte *)(PC + sizeof(struct __gllc_SeparableFilter2D_Rec)),
-        (const GLubyte *)(PC + sizeof(struct __gllc_SeparableFilter2D_Rec)) + rowSize);
-
-    return PC + sizeof(struct __gllc_SeparableFilter2D_Rec) + rowSize + colSize;
-}
-
-const GLubyte *__glle_CopyConvolutionFilter1D(__GLcontext *gc, const GLubyte *PC)
-{
-    const struct __gllc_CopyConvolutionFilter1D_Rec *data;
-
-    data = (const struct __gllc_CopyConvolutionFilter1D_Rec *) PC;
-    __glim_CopyConvolutionFilter1D(gc, data->target, data->internalformat,
-        data->x, data->y, data->width);
-    return PC + sizeof(struct __gllc_CopyConvolutionFilter1D_Rec);
-}
-
-const GLubyte *__glle_CopyConvolutionFilter2D(__GLcontext *gc, const GLubyte *PC)
-{
-    const struct __gllc_CopyConvolutionFilter2D_Rec *data;
-
-    data = (const struct __gllc_CopyConvolutionFilter2D_Rec *) PC;
-    __glim_CopyConvolutionFilter2D(gc, data->target, data->internalformat,
-        data->x, data->y, data->width, data->height);
-
-    return PC + sizeof(struct __gllc_CopyConvolutionFilter2D_Rec);
-}
-
-const GLubyte *__glle_Histogram(__GLcontext *gc, const GLubyte *PC)
-{
-    const struct __gllc_Histogram_Rec *data;
-
-    data = (const struct __gllc_Histogram_Rec *) PC;
-    __glim_Histogram(gc, data->target, data->width,
-        data->internalformat, data->sink);
-    return PC + sizeof(struct __gllc_Histogram_Rec);
-}
-
-const GLubyte *__glle_ResetHistogram(__GLcontext *gc, const GLubyte *PC)
-{
-    const struct __gllc_ResetHistogram_Rec *data;
-
-    data = (const struct __gllc_ResetHistogram_Rec *) PC;
-    __glim_ResetHistogram(gc, data->target);
-    return PC + sizeof(struct __gllc_ResetHistogram_Rec);
-}
-
-const GLubyte *__glle_Minmax(__GLcontext *gc, const GLubyte *PC)
-{
-    const struct __gllc_Minmax_Rec *data;
-
-    data = (const struct __gllc_Minmax_Rec *) PC;
-    __glim_Minmax(gc, data->target, data->internalFormat, data->sink);
-    return PC + sizeof(struct __gllc_Minmax_Rec);
-}
-
-const GLubyte *__glle_ResetMinmax(__GLcontext *gc, const GLubyte *PC)
-{
-    const struct __gllc_ResetMinmax_Rec *data;
-
-    data = (const struct __gllc_ResetMinmax_Rec *) PC;
-    __glim_ResetMinmax(gc, data->target);
-    return PC + sizeof(struct __gllc_ResetMinmax_Rec);
-}
-
 const GLubyte *__glle_TexImage3D(__GLcontext *gc, const GLubyte *PC)
 {
     const struct __gllc_TexImage3D_Rec *data;
 
     data = (const struct __gllc_TexImage3D_Rec *) PC;
 
-    __gles_TexImage3D(gc,
+    gc->immedModeDispatch.TexImage3D(gc,
             data->target, data->lod, data->components, data->width, data->height,
             data->depth, data->border, data->format, data->type,
             (const GLubyte *)(PC + sizeof(struct __gllc_TexImage3D_Rec)));
@@ -1846,7 +1647,7 @@ const GLubyte *__glle_TexSubImage3D(__GLcontext *gc, const GLubyte *PC)
 
     data = (const struct __gllc_TexSubImage3D_Rec *) PC;
 
-    __gles_TexSubImage3D(gc,
+    gc->immedModeDispatch.TexSubImage3D(gc,
             data->target, data->lod, data->xoffset, data->yoffset, data->zoffset,
             data->width, data->height, data->depth, data->format, data->type,
             (const GLubyte *)(PC + sizeof(struct __gllc_TexSubImage3D_Rec)));
@@ -1859,7 +1660,7 @@ const GLubyte *__glle_CopyTexSubImage3D(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_CopyTexSubImage3D_Rec *data;
 
     data = (struct __gllc_CopyTexSubImage3D_Rec *) PC;
-    __gles_CopyTexSubImage3D(gc, data->target, data->level, data->xoffset, data->yoffset,
+    gc->immedModeDispatch.CopyTexSubImage3D(gc, data->target, data->level, data->xoffset, data->yoffset,
             data->zoffset, data->x, data->y, data->width, data->height);
     return (PC + sizeof(struct __gllc_CopyTexSubImage3D_Rec));
 }
@@ -1906,7 +1707,7 @@ const  GLubyte *__glle_SecondaryColor3fv(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_SecondaryColor3fv_Rec *data;
 
     data = (struct __gllc_SecondaryColor3fv_Rec *) PC;
-    (*gc->currentImmediateTable->SecondaryColor3fv)(gc, data->v);
+    (*gc->immedModeDispatch.SecondaryColor3fv)(gc, data->v);
     return (PC + sizeof(struct __gllc_SecondaryColor3fv_Rec));
 }
 
@@ -1915,7 +1716,7 @@ const GLubyte *__glle_BeginQuery(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_BeginQuery_Rec *data;
 
     data = (struct __gllc_BeginQuery_Rec *) PC;
-    __gles_BeginQuery(gc, data->target, data->id);
+    gc->immedModeDispatch.BeginQuery(gc, data->target, data->id);
     return (PC + sizeof(struct __gllc_BeginQuery_Rec));
 }
 
@@ -1924,7 +1725,7 @@ const GLubyte *__glle_EndQuery(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_EndQuery_Rec *data;
 
     data = (struct __gllc_EndQuery_Rec *) PC;
-    __gles_EndQuery(gc, data->target);
+    gc->immedModeDispatch.EndQuery(gc, data->target);
     return (PC + sizeof(struct __gllc_EndQuery_Rec));
 }
 
@@ -1949,7 +1750,7 @@ const GLubyte * __glle_Uniform4f(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Uniform4f_Rec *data;
 
     data = (struct __gllc_Uniform4f_Rec *) PC;
-    __gles_Uniform4f(gc, data->location, data->x, data->y, data->z, data->w);
+    gc->immedModeDispatch.Uniform4f(gc, data->location, data->x, data->y, data->z, data->w);
     return (PC + sizeof(struct __gllc_Uniform4f_Rec));
 }
 
@@ -1958,7 +1759,7 @@ const GLubyte * __glle_Uniform3f(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Uniform3f_Rec *data;
 
     data = (struct __gllc_Uniform3f_Rec *) PC;
-    __gles_Uniform3f(gc, data->location, data->x, data->y, data->z);
+    gc->immedModeDispatch.Uniform3f(gc, data->location, data->x, data->y, data->z);
     return (PC + sizeof(struct __gllc_Uniform3f_Rec));
 }
 
@@ -1967,7 +1768,7 @@ const GLubyte * __glle_Uniform2f(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Uniform2f_Rec *data;
 
     data = (struct __gllc_Uniform2f_Rec *) PC;
-    __gles_Uniform2f(gc, data->location, data->x, data->y);
+    gc->immedModeDispatch.Uniform2f(gc, data->location, data->x, data->y);
     return (PC + sizeof(struct __gllc_Uniform2f_Rec));
 }
 
@@ -1976,7 +1777,7 @@ const GLubyte * __glle_Uniform1f(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Uniform1f_Rec *data;
 
     data = (struct __gllc_Uniform1f_Rec *) PC;
-    __gles_Uniform1f(gc, data->location, data->x);
+    gc->immedModeDispatch.Uniform1f(gc, data->location, data->x);
     return (PC + sizeof(struct __gllc_Uniform1f_Rec));
 }
 
@@ -1985,7 +1786,7 @@ const GLubyte * __glle_Uniform4i(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Uniform4i_Rec *data;
 
     data = (struct __gllc_Uniform4i_Rec *) PC;
-    __gles_Uniform4i(gc, data->location, data->x, data->y, data->z, data->w);
+    gc->immedModeDispatch.Uniform4i(gc, data->location, data->x, data->y, data->z, data->w);
     return (PC + sizeof(struct __gllc_Uniform4i_Rec));
 }
 
@@ -1994,7 +1795,7 @@ const GLubyte * __glle_Uniform3i(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Uniform3i_Rec *data;
 
     data = (struct __gllc_Uniform3i_Rec *) PC;
-    __gles_Uniform3i(gc, data->location, data->x, data->y, data->z);
+    gc->immedModeDispatch.Uniform3i(gc, data->location, data->x, data->y, data->z);
     return (PC + sizeof(struct __gllc_Uniform3i_Rec));
 }
 
@@ -2003,7 +1804,7 @@ const GLubyte * __glle_Uniform2i(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Uniform2i_Rec *data;
 
     data = (struct __gllc_Uniform2i_Rec *) PC;
-    __gles_Uniform2i(gc, data->location, data->x, data->y);
+    gc->immedModeDispatch.Uniform2i(gc, data->location, data->x, data->y);
     return (PC + sizeof(struct __gllc_Uniform2i_Rec));
 }
 
@@ -2012,7 +1813,7 @@ const GLubyte * __glle_Uniform1i(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_Uniform1i_Rec *data;
 
     data = (struct __gllc_Uniform1i_Rec *) PC;
-    __gles_Uniform1i(gc, data->location, data->x);
+    gc->immedModeDispatch.Uniform1i(gc, data->location, data->x);
     return (PC + sizeof(struct __gllc_Uniform1i_Rec));
 }
 
@@ -2022,7 +1823,7 @@ const GLubyte * __glle_Uniform4fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_Uniform4fv_Rec *) PC;
-    __gles_Uniform4fv(gc, data->location, data->count,
+    gc->immedModeDispatch.Uniform4fv(gc, data->location, data->count,
                     (GLfloat *)(PC + sizeof(struct __gllc_Uniform4fv_Rec)));
     arraySize = __GL64PAD(data->count * 4 * sizeof(GLfloat));
     size = sizeof(struct __gllc_Uniform4fv_Rec) + arraySize;
@@ -2035,7 +1836,7 @@ const GLubyte * __glle_Uniform3fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_Uniform3fv_Rec *) PC;
-    __gles_Uniform3fv(gc, data->location, data->count,
+    gc->immedModeDispatch.Uniform3fv(gc, data->location, data->count,
                     (GLfloat *)(PC + sizeof(struct __gllc_Uniform3fv_Rec)));
     arraySize = __GL64PAD(data->count * 3 * sizeof(GLfloat));
     size = sizeof(struct __gllc_Uniform3fv_Rec) + arraySize;
@@ -2048,7 +1849,7 @@ const GLubyte * __glle_Uniform2fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_Uniform2fv_Rec *) PC;
-    __gles_Uniform2fv(gc, data->location, data->count,
+    gc->immedModeDispatch.Uniform2fv(gc, data->location, data->count,
                     (GLfloat *)(PC + sizeof(struct __gllc_Uniform2fv_Rec)));
     arraySize = __GL64PAD(data->count * 2 * sizeof(GLfloat));
     size = sizeof(struct __gllc_Uniform2fv_Rec) + arraySize;
@@ -2061,7 +1862,7 @@ const GLubyte * __glle_Uniform1fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_Uniform1fv_Rec *) PC;
-    __gles_Uniform1fv(gc, data->location, data->count,
+    gc->immedModeDispatch.Uniform1fv(gc, data->location, data->count,
                     (GLfloat *)(PC + sizeof(struct __gllc_Uniform1fv_Rec)));
     arraySize = __GL64PAD(data->count * sizeof(GLfloat));
     size = sizeof(struct __gllc_Uniform1fv_Rec) + arraySize;
@@ -2074,7 +1875,7 @@ const GLubyte * __glle_Uniform4iv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_Uniform4iv_Rec *) PC;
-    __gles_Uniform4iv(gc, data->location, data->count,
+    gc->immedModeDispatch.Uniform4iv(gc, data->location, data->count,
                     (GLint *)(PC + sizeof(struct __gllc_Uniform4iv_Rec)));
     arraySize = __GL64PAD(data->count * 4 * sizeof(GLint));
     size = sizeof(struct __gllc_Uniform4iv_Rec) + arraySize;
@@ -2087,7 +1888,7 @@ const GLubyte * __glle_Uniform3iv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_Uniform3iv_Rec *) PC;
-    __gles_Uniform3iv(gc, data->location, data->count,
+    gc->immedModeDispatch.Uniform3iv(gc, data->location, data->count,
                     (GLint *)(PC + sizeof(struct __gllc_Uniform3iv_Rec)));
     arraySize = __GL64PAD(data->count * 3 * sizeof(GLint));
     size = sizeof(struct __gllc_Uniform3iv_Rec) + arraySize;
@@ -2100,7 +1901,7 @@ const GLubyte * __glle_Uniform2iv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_Uniform2iv_Rec *) PC;
-    __gles_Uniform2iv(gc, data->location, data->count,
+    gc->immedModeDispatch.Uniform2iv(gc, data->location, data->count,
                     (GLint *)(PC + sizeof(struct __gllc_Uniform2iv_Rec)));
     arraySize = __GL64PAD(data->count * 2 * sizeof(GLint));
     size = sizeof(struct __gllc_Uniform2iv_Rec) + arraySize;
@@ -2113,7 +1914,7 @@ const GLubyte * __glle_Uniform1iv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_Uniform1iv_Rec *) PC;
-    __gles_Uniform1iv(gc, data->location, data->count,
+    gc->immedModeDispatch.Uniform1iv(gc, data->location, data->count,
                     (GLint *)(PC + sizeof(struct __gllc_Uniform1iv_Rec)));
     arraySize = __GL64PAD(data->count * sizeof(GLint));
     size = sizeof(struct __gllc_Uniform1iv_Rec) + arraySize;
@@ -2126,7 +1927,7 @@ const GLubyte * __glle_UniformMatrix4fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_UniformMatrix4fv_Rec *) PC;
-    __gles_UniformMatrix4fv(gc, data->location, data->count,
+    gc->immedModeDispatch.UniformMatrix4fv(gc, data->location, data->count,
         data->transpose, (GLfloat *)(PC + sizeof(struct __gllc_UniformMatrix4fv_Rec)));
     arraySize = __GL64PAD(data->count * 16 * sizeof(GLfloat));
     size = sizeof(struct __gllc_UniformMatrix4fv_Rec) + arraySize;
@@ -2139,7 +1940,7 @@ const GLubyte * __glle_UniformMatrix3fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_UniformMatrix3fv_Rec *) PC;
-    __gles_UniformMatrix3fv(gc, data->location, data->count,
+    gc->immedModeDispatch.UniformMatrix3fv(gc, data->location, data->count,
         data->transpose, (GLfloat *)(PC + sizeof(struct __gllc_UniformMatrix3fv_Rec)));
     arraySize = __GL64PAD(data->count * 9 * sizeof(GLfloat));
     size = sizeof(struct __gllc_UniformMatrix3fv_Rec) + arraySize;
@@ -2152,7 +1953,7 @@ const GLubyte * __glle_UniformMatrix2fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_UniformMatrix2fv_Rec *) PC;
-    __gles_UniformMatrix2fv(gc, data->location, data->count,
+    gc->immedModeDispatch.UniformMatrix2fv(gc, data->location, data->count,
         data->transpose, (GLfloat *)(PC + sizeof(struct __gllc_UniformMatrix2fv_Rec)));
     arraySize = __GL64PAD(data->count * 4 * sizeof(GLfloat));
     size = sizeof(struct __gllc_UniformMatrix2fv_Rec) + arraySize;
@@ -2165,7 +1966,7 @@ const GLubyte * __glle_UniformMatrix2x3fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_UniformMatrix2x3fv_Rec *) PC;
-    __gles_UniformMatrix2x3fv(gc, data->location, data->count,
+    gc->immedModeDispatch.UniformMatrix2x3fv(gc, data->location, data->count,
         data->transpose, (GLfloat *)(PC + sizeof(struct __gllc_UniformMatrix2x3fv_Rec)));
     arraySize = __GL64PAD(data->count * 6 * sizeof(GLfloat));
     size = sizeof(struct __gllc_UniformMatrix2x3fv_Rec) + arraySize;
@@ -2178,7 +1979,7 @@ const GLubyte * __glle_UniformMatrix2x4fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_UniformMatrix2x4fv_Rec *) PC;
-    __gles_UniformMatrix2x4fv(gc, data->location, data->count,
+    gc->immedModeDispatch.UniformMatrix2x4fv(gc, data->location, data->count,
         data->transpose, (GLfloat *)(PC + sizeof(struct __gllc_UniformMatrix2x4fv_Rec)));
     arraySize = __GL64PAD(data->count * 8 * sizeof(GLfloat));
     size = sizeof(struct __gllc_UniformMatrix2x4fv_Rec) + arraySize;
@@ -2191,7 +1992,7 @@ const GLubyte * __glle_UniformMatrix3x2fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_UniformMatrix3x2fv_Rec *) PC;
-    __gles_UniformMatrix3x2fv(gc, data->location, data->count,
+    gc->immedModeDispatch.UniformMatrix3x2fv(gc, data->location, data->count,
         data->transpose, (GLfloat *)(PC + sizeof(struct __gllc_UniformMatrix3x2fv_Rec)));
     arraySize = __GL64PAD(data->count * 6 * sizeof(GLfloat));
     size = sizeof(struct __gllc_UniformMatrix3x2fv_Rec) + arraySize;
@@ -2204,7 +2005,7 @@ const GLubyte * __glle_UniformMatrix3x4fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_UniformMatrix3x4fv_Rec *) PC;
-    __gles_UniformMatrix3x4fv(gc, data->location, data->count,
+    gc->immedModeDispatch.UniformMatrix3x4fv(gc, data->location, data->count,
         data->transpose, (GLfloat *)(PC + sizeof(struct __gllc_UniformMatrix3x4fv_Rec)));
     arraySize = __GL64PAD(data->count * 12 * sizeof(GLfloat));
     size = sizeof(struct __gllc_UniformMatrix3x4fv_Rec) + arraySize;
@@ -2217,7 +2018,7 @@ const GLubyte * __glle_UniformMatrix4x2fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_UniformMatrix4x2fv_Rec *) PC;
-    __gles_UniformMatrix4x2fv(gc, data->location, data->count,
+    gc->immedModeDispatch.UniformMatrix4x2fv(gc, data->location, data->count,
         data->transpose, (GLfloat *)(PC + sizeof(struct __gllc_UniformMatrix4x2fv_Rec)));
     arraySize = __GL64PAD(data->count * 8 * sizeof(GLfloat));
     size = sizeof(struct __gllc_UniformMatrix4x2fv_Rec) + arraySize;
@@ -2230,7 +2031,7 @@ const GLubyte * __glle_UniformMatrix4x3fv(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_UniformMatrix4x3fv_Rec *) PC;
-    __gles_UniformMatrix4x3fv(gc, data->location, data->count,
+    gc->immedModeDispatch.UniformMatrix4x3fv(gc, data->location, data->count,
         data->transpose, (GLfloat *)(PC + sizeof(struct __gllc_UniformMatrix4x3fv_Rec)));
     arraySize = __GL64PAD(data->count * 12 * sizeof(GLfloat));
     size = sizeof(struct __gllc_UniformMatrix4x3fv_Rec) + arraySize;
@@ -2243,7 +2044,7 @@ const GLubyte * __glle_DrawBuffers(__GLcontext *gc, const GLubyte *PC)
     GLuint arraySize, size;
 
     data = (struct __gllc_DrawBuffers_Rec *) PC;
-    __gles_DrawBuffers(gc, data->count,
+    gc->immedModeDispatch.DrawBuffers(gc, data->count,
             (GLenum *)(PC + sizeof(struct __gllc_DrawBuffers_Rec)));
     arraySize = __GL64PAD(data->count * sizeof(GLenum));
     size = sizeof(struct __gllc_DrawBuffers_Rec) + arraySize;
@@ -2255,7 +2056,7 @@ const GLubyte * __glle_UseProgram(__GLcontext *gc, const GLubyte *PC)
     struct __gllc_UseProgram_Rec *data;
 
     data = (struct __gllc_UseProgram_Rec *) PC;
-    __gles_UseProgram(gc, data->program);
+    gc->immedModeDispatch.UseProgram(gc, data->program);
     return (PC + sizeof(struct __gllc_UseProgram_Rec));
 }
 
@@ -2353,9 +2154,9 @@ const GLubyte *__glle_DeleteLists(__GLcontext *gc , const GLubyte *PC){ GL_ASSER
 const GLubyte *__glle_GenLists(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
 const GLubyte *__glle_DeleteObjectARB(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
 const GLubyte *__glle_GetHandleARB(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
-const GLubyte *__glle_GetInfoLogARB(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
 const GLubyte *__glle_GetObjectParameterfvARB(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
 const GLubyte *__glle_GetObjectParameterivARB(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
+const GLubyte *__glle_GetInfoLogARB(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
 const GLubyte *__glle_FeedbackBuffer(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
 const GLubyte *__glle_SelectBuffer(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
 const GLubyte *__glle_RenderMode(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
@@ -2399,9 +2200,6 @@ const GLubyte *__glle_GetTexLevelParameterfv(__GLcontext *gc , const GLubyte *PC
 const GLubyte *__glle_GetTexLevelParameteriv(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
 const GLubyte *__glle_IsEnabled(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
 const GLubyte *__glle_IsList(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
-const GLubyte *__glle_GetColorTable(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
-const GLubyte *__glle_GetColorTableParameterfv(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
-const GLubyte *__glle_GetColorTableParameteriv(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
 const GLubyte *__glle_ColorPointer(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
 const GLubyte *__glle_DisableClientState(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
 const GLubyte *__glle_EdgeFlagPointer(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
@@ -2418,293 +2216,7 @@ const GLubyte *__glle_GenTextures(__GLcontext *gc , const GLubyte *PC){ GL_ASSER
 const GLubyte *__glle_IsTexture(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
 const GLubyte *__glle_PopClientAttrib(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
 const GLubyte *__glle_PushClientAttrib(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
-const GLubyte *__glle_ConvolutionParameterf(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
-const GLubyte *__glle_ConvolutionParameteri(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
-const GLubyte *__glle_GetConvolutionFilter(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
-const GLubyte *__glle_GetConvolutionParameterfv(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
-const GLubyte *__glle_GetConvolutionParameteriv(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
-const GLubyte *__glle_GetSeparableFilter(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
-const GLubyte *__glle_GetHistogram(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
-const GLubyte *__glle_GetHistogramParameterfv(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
-const GLubyte *__glle_GetHistogramParameteriv(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
-const GLubyte *__glle_GetMinmax(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
-const GLubyte *__glle_GetMinmaxParameterfv(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
-const GLubyte *__glle_GetMinmaxParameteriv(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
 const GLubyte *__glle_ClientActiveTexture(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
 const GLubyte *__glle_GetCompressedTexImage(__GLcontext *gc , const GLubyte *PC){ GL_ASSERT(0); return NULL; }
 
 
-#if GL_ARB_vertex_program
-
-const GLubyte *__glle_BindProgramARB(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-
-    return PC + sizeof(struct __gllc_BindProgramARB_Rec);
-}
-
-const GLubyte *__glle_ProgramEnvParameter4dARB(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_ProgramEnvParameter4dARB_Rec);
-}
-
-const GLubyte *__glle_ProgramEnvParameter4dvARB(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_ProgramEnvParameter4dvARB_Rec);
-}
-
-const GLubyte *__glle_ProgramEnvParameter4fARB(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_ProgramEnvParameter4fARB_Rec);
-}
-
-const GLubyte *__glle_ProgramEnvParameter4fvARB(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_ProgramEnvParameter4fvARB_Rec);
-}
-
-const GLubyte *__glle_ProgramLocalParameter4dARB(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_ProgramEnvParameter4dARB_Rec);
-}
-
-const GLubyte *__glle_ProgramLocalParameter4dvARB(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_ProgramEnvParameter4dvARB_Rec);
-}
-
-const GLubyte *__glle_ProgramLocalParameter4fARB(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_ProgramEnvParameter4fARB_Rec);
-}
-
-const GLubyte *__glle_ProgramLocalParameter4fvARB(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_ProgramEnvParameter4fvARB_Rec);
-}
-
-#endif
-
-#if GL_ATI_element_array
-const GLubyte *__glle_DrawElementArrayATI(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_DrawElementArrayATI_Rec);
-}
-
-const GLubyte *__glle_DrawRangeElementArrayATI(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_DrawRangeElementArrayATI_Rec);
-}
-#endif
-
-#if GL_EXT_stencil_two_side
-const GLubyte *__glle_ActiveStencilFaceEXT(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_ActiveStencilFaceEXT_Rec);
-}
-#endif
-
-#if GL_EXT_texture_integer
-const GLubyte * __glle_ClearColorIiEXT(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_ClearColorIiEXT_Rec);
-}
-
-const GLubyte * __glle_ClearColorIuiEXT(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_ClearColorIuiEXT_Rec);
-
-}
-
-const GLubyte * __glle_TexParameterIivEXT(__GLcontext *gc, const GLubyte *PC)
-{
-GLuint size = 0;
-/* still not added, to do*/
-GL_ASSERT(0)
-    return PC + size;
-}
-
-const GLubyte * __glle_TexParameterIuivEXT(__GLcontext *gc, const GLubyte *PC)
-{
-    GLuint size = 0;
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + size;
-}
-#endif
-
-#if GL_EXT_gpu_shader4
-const GLubyte * __glle_Uniform1uiEXT(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_Uniform1uiEXT_Rec);
-
-}
-
-const GLubyte * __glle_Uniform2uiEXT(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_Uniform2uiEXT_Rec);
-}
-
-const GLubyte * __glle_Uniform3uiEXT(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_Uniform3uiEXT_Rec);
-}
-
-const GLubyte * __glle_Uniform4uiEXT(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_Uniform4uiEXT_Rec);
-}
-
-const GLubyte * __glle_Uniform1uivEXT(__GLcontext *gc, const GLubyte *PC)
-{
-    GLuint size = 0;
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + size;
-}
-
-const GLubyte * __glle_Uniform2uivEXT(__GLcontext *gc, const GLubyte *PC)
-{
-    GLuint size = 0;
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + size;
-}
-
-const GLubyte * __glle_Uniform3uivEXT(__GLcontext *gc, const GLubyte *PC)
-{
-    GLuint size = 0;
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + size;
-}
-
-const GLubyte * __glle_Uniform4uivEXT(__GLcontext *gc, const GLubyte *PC)
-{
-    GLuint size = 0;
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + size;
-}
-
-
-#endif
-
-#if GL_EXT_geometry_shader4
-const GLubyte * __glle_FramebufferTextureEXT(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_FramebufferTextureEXT_Rec);
-}
-
-const GLubyte * __glle_FramebufferTextureLayerEXT(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_FramebufferTextureLayerEXT_Rec);
-}
-
-const GLubyte * __glle_FramebufferTextureFaceEXT(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + sizeof(struct __gllc_FramebufferTextureFaceEXT_Rec);
-}
-#endif
-
-#if GL_EXT_draw_buffers2
-
-const GLubyte *__glle_ColorMaskIndexedEXT(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return (PC + sizeof(struct __gllc_ColorMaskIndexedEXT_Rec));
-
-}
-
-const GLubyte *__glle_EnableIndexedEXT(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return (PC + sizeof(struct __gllc_EnableIndexedEXT_Rec));
-}
-
-const GLubyte *__glle_DisableIndexedEXT(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return (PC + sizeof(struct __gllc_DisableIndexedEXT_Rec));
-}
-#endif
-
-#if GL_EXT_gpu_program_parameters
-const GLubyte * __glle_ProgramEnvParameters4fvEXT(__GLcontext *gc, const GLubyte *PC)
-{
-    GLint size = 0;
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + size;
-}
-
-const GLubyte * __glle_ProgramLocalParameters4fvEXT(__GLcontext *gc, const GLubyte *PC)
-{
-    GLint size = 0;
-/* still not added, to do*/
-GL_ASSERT(0);
-    return PC + size;
-}
-#endif
-
-#if GL_ARB_color_buffer_float
-const GLubyte *__glle_ClampColorARB(__GLcontext *gc, const GLubyte *PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return (PC + sizeof(struct __gllc_ClampColorARB_Rec));
-}
-#endif
-
-#if GL_ATI_separate_stencil
-const GLubyte* __glle_StencilFuncSeparateATI(__GLcontext *gc, const GLubyte* PC)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-    return (PC + sizeof(struct __gllc_StencilFuncSeparateATI_Rec));
-}
-#endif

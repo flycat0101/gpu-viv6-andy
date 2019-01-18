@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -15,6 +15,333 @@
 #include "vir/lower/gc_vsc_vir_ll_2_mc.h"
 #include "vir/lower/gc_vsc_vir_ml_2_ll.h"
 
+void
+VIR_Lower_Initialize(
+    IN VIR_Shader               *Shader,
+    IN VIR_PatternLowerContext  *Context,
+    IN VSC_HW_CONFIG            *HwCfg,
+    IN VSC_MM                   *pMM
+    )
+{
+    Context->hwCfg = HwCfg;
+    Context->pMM = pMM;
+
+    Context->hasNEW_TEXLD = HwCfg->hwFeatureFlags.hasHalti2;
+
+    if (HwCfg->hwFeatureFlags.hasSHEnhance2)
+    {
+        if (gcmOPT_NOIMMEDIATE())
+            Context->generateImmediate  = gcvFALSE;
+        else
+            Context->generateImmediate  = gcvTRUE;
+    }
+    else
+    {
+        Context->generateImmediate  = gcvFALSE;
+    }
+
+    Context->isCL_X  = (gctBOOL)HwCfg->hwFeatureFlags.needCLXFixes;
+
+    Context->hasCL   = Context->isCL_X || (gctBOOL)HwCfg->hwFeatureFlags.needCLXEFixes;
+
+    Context->hasHalti1 = (gctBOOL)HwCfg->hwFeatureFlags.hasHalti1;
+    Context->hasHalti2 = (gctBOOL)HwCfg->hwFeatureFlags.hasHalti2;
+    Context->hasHalti3 = (gctBOOL)HwCfg->hwFeatureFlags.hasHalti3;
+    Context->hasHalti4 = (gctBOOL)HwCfg->hwFeatureFlags.hasHalti4;
+    Context->hasSHEnhancements2 = (gctBOOL)HwCfg->hwFeatureFlags.hasSHEnhance2;
+}
+
+gctBOOL
+VIR_Lower_HasHalti4(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return ((VIR_PatternLowerContext *)Context)->hasHalti4;
+}
+
+
+gctBOOL
+VIR_Lower_HasNoHalti4(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return !VIR_Lower_HasHalti4(Context, Inst);
+}
+
+gctBOOL
+VIR_Lower_SetImm0xFFFF(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+)
+{
+    VIR_ScalarConstVal imm0;
+
+    imm0.iValue = 0xFFFF;
+
+    VIR_Operand_SetImmediate(Opnd,
+        VIR_TYPE_UINT32,
+        imm0);
+
+    VIR_Operand_SetModifier(Opnd, VIR_MOD_NONE);
+    VIR_Operand_SetRoundMode(Opnd, VIR_ROUND_DEFAULT);
+
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetImm16(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+)
+{
+    VIR_ScalarConstVal imm0;
+
+    imm0.iValue = 16;
+
+    VIR_Operand_SetImmediate(Opnd,
+        VIR_TYPE_UINT32,
+        imm0);
+
+    VIR_Operand_SetModifier(Opnd, VIR_MOD_NONE);
+    VIR_Operand_SetRoundMode(Opnd, VIR_ROUND_DEFAULT);
+
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetImm0(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+)
+{
+    VIR_ScalarConstVal imm0;
+
+    imm0.iValue = 0;
+
+    VIR_Operand_SetImmediate(Opnd,
+        VIR_TYPE_UINT32,
+        imm0);
+
+    VIR_Operand_SetModifier(Opnd, VIR_MOD_NONE);
+    VIR_Operand_SetRoundMode(Opnd, VIR_ROUND_DEFAULT);
+
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetSwizzleXAndIntType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_XXXX);
+    VIR_Operand_SetTypeId(Opnd, VIR_TYPE_INT32);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetSwizzleZAndUintType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_ZZZZ);
+    VIR_Operand_SetTypeId(Opnd, VIR_TYPE_UINT32);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetSwizzleZAndIntType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_ZZZZ);
+    VIR_Operand_SetTypeId(Opnd, VIR_TYPE_INT32);
+    return gcvTRUE;
+}
+
+static VSC_ErrCode
+VIR_Lower_SetOpndIndex1(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Shader*         pShader = Context->shader;
+    VIR_Symbol*         pSym = VIR_Operand_GetSymbol(Opnd);
+
+    gcmASSERT(VIR_Operand_isSymbol(Opnd));
+
+    /*
+    ** 1) The operand is a temp register, just use the next one.
+    ** 2) The operand is a uniform, use the constIndex.
+    */
+    if (VIR_Symbol_isVreg(pSym))
+    {
+        VIR_SymId       nextRegSymId = VIR_INVALID_ID;
+        errCode = VIR_Shader_GetVirRegSymByVirRegId(pShader,
+                                                    VIR_Symbol_GetVregIndex(pSym) + 1,
+                                                    &nextRegSymId);
+        ON_ERROR(errCode, "get vreg symbol.");
+        VIR_Operand_SetSym(Opnd, VIR_Shader_GetSymFromId(pShader, nextRegSymId));
+    }
+    else
+    {
+        VIR_Operand_SetIsConstIndexing(Opnd, gcvTRUE);
+        VIR_Operand_SetRelIndex(Opnd, 1);
+    }
+
+OnError:
+    return errCode;
+}
+
+gctBOOL
+VIR_Lower_SetSwizzleXIndex_1AndIntType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    gcmASSERT(VIR_Operand_isSymbol(Opnd));
+    VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_XXXX);
+    VIR_Operand_SetTypeId(Opnd, VIR_TYPE_INT32);
+    VIR_Lower_SetOpndIndex1(Context, Inst, Opnd);
+
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetSwizzleYIndex_1AndUintType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    gcmASSERT(VIR_Operand_isSymbol(Opnd));
+    VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_YYYY);
+    VIR_Operand_SetTypeId(Opnd, VIR_TYPE_UINT32);
+    VIR_Lower_SetOpndIndex1(Context, Inst, Opnd);
+
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetSwizzleZIndex_1AndUintType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    gcmASSERT(VIR_Operand_isSymbol(Opnd));
+    VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_ZZZZ);
+    VIR_Operand_SetTypeId(Opnd, VIR_TYPE_UINT32);
+    VIR_Lower_SetOpndIndex1(Context, Inst, Opnd);
+
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetEnableX(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_X);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetEnableXAndIntType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_X);
+    VIR_Operand_SetTypeId(Opnd, VIR_TYPE_INT32);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetEnableY(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_Y);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetEnableYAndSrc0Type(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_Y);
+    VIR_Operand_SetTypeId(Opnd, VIR_Operand_GetTypeId(VIR_Inst_GetSource(Inst, 0)));
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetEnableZ(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_Z);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetEnableZAndIntType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_Z);
+    VIR_Operand_SetTypeId(Opnd, VIR_TYPE_INT32);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetEnableW(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_W);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetEnableXYZAndInt3(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_XYZ);
+    VIR_Operand_SetTypeId(Opnd, VIR_TYPE_INTEGER_X3);
+    return gcvTRUE;
+}
+
 gctBOOL
 VIR_Lower_SetOpndNeg(
     IN VIR_PatternContext *Context,
@@ -23,7 +350,6 @@ VIR_Lower_SetOpndNeg(
     )
 {
     VIR_Operand_NegateOperand(Context->shader, Opnd);
-
     return gcvTRUE;
 }
 
@@ -66,7 +392,7 @@ VIR_Lower_SetZeroOrSamllestPositive(
     IN VIR_Operand        *Opnd
     )
 {
-    if(VIR_Lower_HasHalt4(Context, Inst) || VIR_Shader_IsCL(Context->shader))
+    if(VIR_Lower_HasHalti4(Context, Inst) || VIR_Shader_IsCL(Context->shader))
     {
         VIR_Lower_SetZero(Context, Inst, Opnd);
     }
@@ -90,54 +416,6 @@ VIR_Lower_SetIntZero(
     VIR_Operand_SetImmediate(Opnd,
         VIR_TYPE_INT32,
         imm0);
-    return gcvTRUE;
-}
-
-gctBOOL
-VIR_Lower_SetIntOne(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    VIR_ScalarConstVal imm1;
-    imm1.iValue = 1;
-
-    VIR_Operand_SetImmediate(Opnd,
-        VIR_TYPE_INT32,
-        imm1);
-    return gcvTRUE;
-}
-
-gctBOOL
-VIR_Lower_SetIntTwo(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    VIR_ScalarConstVal imm2;
-    imm2.iValue = 2;
-
-    VIR_Operand_SetImmediate(Opnd,
-        VIR_TYPE_INT32,
-        imm2);
-    return gcvTRUE;
-}
-
-gctBOOL
-VIR_Lower_SetIntThree(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    VIR_ScalarConstVal imm3;
-    imm3.iValue = 3;
-
-    VIR_Operand_SetImmediate(Opnd,
-        VIR_TYPE_INT32,
-        imm3);
     return gcvTRUE;
 }
 
@@ -166,7 +444,7 @@ VIR_Lower_SetOne(
 {
     VIR_ScalarConstVal imm0;
 
-    imm0.fValue = 1.0f;
+    imm0.fValue = 1.0f,
 
     VIR_Operand_SetImmediate(Opnd,
         VIR_TYPE_FLOAT32,
@@ -183,10 +461,27 @@ VIR_Lower_SetMinusOne(
 {
     VIR_ScalarConstVal imm0;
 
-    imm0.fValue = -1.0f;
+    imm0.fValue = -1.0f,
 
     VIR_Operand_SetImmediate(Opnd,
         VIR_TYPE_FLOAT32,
+        imm0);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetIntOne(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_ScalarConstVal imm0;
+
+    imm0.iValue = 1,
+
+    VIR_Operand_SetImmediate(Opnd,
+        VIR_TYPE_INT32,
         imm0);
     return gcvTRUE;
 }
@@ -200,7 +495,7 @@ VIR_Lower_SetUIntOne(
 {
     VIR_ScalarConstVal imm0;
 
-    imm0.iValue = 1;
+    imm0.iValue = 1,
 
     VIR_Operand_SetImmediate(Opnd,
         VIR_TYPE_UINT32,
@@ -217,55 +512,11 @@ VIR_Lower_SetIntMinusOne(
 {
     VIR_ScalarConstVal imm0;
 
-    imm0.iValue = -1;
+    imm0.iValue = -1,
 
     VIR_Operand_SetImmediate(Opnd,
         VIR_TYPE_INT32,
         imm0);
-    return gcvTRUE;
-}
-
-gctBOOL
-VIR_Lower_SetEnableX(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_X);
-    return gcvTRUE;
-}
-
-gctBOOL
-VIR_Lower_SetEnableY(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_Y);
-    return gcvTRUE;
-}
-
-gctBOOL
-VIR_Lower_SetEnableZ(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_Z);
-    return gcvTRUE;
-}
-
-gctBOOL
-VIR_Lower_SetEnableW(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_W);
     return gcvTRUE;
 }
 
@@ -331,6 +582,28 @@ VIR_Lower_AdjustCoordSwizzleForShadow(
 }
 
 gctBOOL
+VIR_Lower_SetSwizzleXY(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_XYYY);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetSwizzleXYZ(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_XYZZ);
+    return gcvTRUE;
+}
+
+gctBOOL
 VIR_Lower_SetSwizzleY(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -384,17 +657,6 @@ VIR_Lower_SetSwizzleXYZW(
     )
 {
     VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_XYZW);
-    return gcvTRUE;
-}
-
-gctBOOL
-VIR_Lower_SetSwizzleXY(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_XYYY);
     return gcvTRUE;
 }
 
@@ -678,6 +940,22 @@ VIR_Lower_IsDstMediumpOrLowp(
 }
 
 gctBOOL
+VIR_Lower_IsDstHighp(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_Precision destPrecision = VIR_Operand_GetPrecision(VIR_Inst_GetDest(Inst));
+
+    if (destPrecision == VIR_PRECISION_HIGH)
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
+gctBOOL
 VIR_Lower_IsFloatOpcode(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -726,15 +1004,6 @@ VIR_Lower_IsNotCLShader(
     )
 {
     return !VIR_Shader_IsCL(Context->shader);
-}
-
-gctBOOL
-VIR_Lower_HasHalt4(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst
-    )
-{
-    return ((VIR_PatternLowerContext *)Context)->hasHalti4;
 }
 
 gctBOOL
@@ -871,54 +1140,6 @@ VIR_Lower_label_set_jmp_neg3_6(
 }
 
 gctBOOL
-VIR_Lower_label_set_jmp_neg3_6_9(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    if (!VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -3))
-    {
-        return gcvFALSE;
-    }
-    if (!VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -6))
-    {
-        return gcvFALSE;
-    }
-    return VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -9);
-}
-
-gctBOOL
-VIR_Lower_label_set_jmp_neg4(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    return VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -4);
-}
-
-gctBOOL
-VIR_Lower_label_set_jmp_neg6(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    return VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -6);
-}
-
-gctBOOL
-VIR_Lower_label_set_jmp_neg8(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    return VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -8);
-}
-
-gctBOOL
 VIR_Lower_label_set_jmp_neg10(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -959,6 +1180,29 @@ VIR_Lower_SetOpndUINT32(
     )
 {
     _SetValueType0(Context, Opnd, VIR_TYPE_UINT32);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetOpndUINT32HP(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    _SetValueType0(Context, Opnd, VIR_TYPE_UINT32);
+    VIR_Operand_SetPrecision(Opnd, VIR_PRECISION_HIGH);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetOpndHP(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetPrecision(Opnd, VIR_PRECISION_HIGH);
     return gcvTRUE;
 }
 
@@ -1084,6 +1328,17 @@ VIR_Lower_SetHighp(
     IN VIR_Operand        *Opnd
     )
 {
+    VIR_Symbol          *pSym = gcvNULL;
+    VIR_OperandKind     opndKind = VIR_Operand_GetOpKind(Opnd);
+
+    if (opndKind == VIR_OPND_VIRREG ||
+        opndKind == VIR_OPND_SYMBOL ||
+        opndKind == VIR_OPND_SAMPLER_INDEXING)
+    {
+        pSym = VIR_Operand_GetSymbol(Opnd);
+        VIR_Symbol_SetPrecision(pSym, VIR_PRECISION_HIGH);
+    }
+
     VIR_Operand_SetPrecision(Opnd, VIR_PRECISION_HIGH);
     return gcvTRUE;
 }

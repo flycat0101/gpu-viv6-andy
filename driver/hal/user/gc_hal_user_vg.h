@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -133,6 +133,11 @@ struct _gcoVG
     gctINT                      tsMaxMemSize;
     gctINT                      tsCurMemSize;
 #endif
+
+    /* Tesselation buffer shortcut. */
+    gcsTESSELATION_PTR          curTSBuffer;
+    gctINT                      tsWidth;
+    gctINT                      tsHeight;
 };
 
 #if gcdGC355_PROFILER
@@ -484,15 +489,6 @@ gcoVGHARDWARE_ScheduleVideoMemory(
     IN gcoVGHARDWARE Hardware,
     IN gctUINT32 Node,
     IN gctBOOL Unlock
-    );
-
-gceSTATUS
-gcoVGHARDWARE_ScheduleUnmapUserMemory(
-    IN gcoVGHARDWARE Hardware,
-    IN gctPOINTER Info,
-    IN gctSIZE_T Size,
-    IN gctUINT32 Address,
-    IN gctPOINTER Memory
     );
 
 /* Allocate a temporary surface with specified parameters. */
@@ -952,6 +948,31 @@ gcoVGHARDWARE_TesselateImage(
     );
 
 gceSTATUS
+gcoVGHARDWARE_TesselateImage2(
+    IN gcoVGHARDWARE Hardware,
+    IN gctBOOL SoftwareTesselation,
+    IN gcoSURF Image,
+    IN gcsVG_RECT_PTR Rectangle,
+    IN gceIMAGE_FILTER Filter,
+    IN gctBOOL Mask,
+#if gcdMOVG
+    IN gctFLOAT *StepX,
+    IN gctFLOAT *StepY,
+    IN gctFLOAT *Const,
+    IN const gctFLOAT point0[2],
+    IN const gctFLOAT point1[2],
+    IN const gctFLOAT point2[2],
+    IN const gctFLOAT point3[2],
+    IN gctBOOL  FirstTess,
+    IN gctBOOL  FirstQuad,
+#else
+    IN gctFLOAT UserToSurface[9],
+    IN gctFLOAT SurfaceToImage[9],
+#endif
+    IN gcsTESSELATION_PTR TessellationBuffer
+    );
+
+gceSTATUS
 gcoVGHARDWARE_DrawSurfaceToImage(
     IN gcoVGHARDWARE Hardware,
     IN const gcoSURF Image,
@@ -959,8 +980,7 @@ gcoVGHARDWARE_DrawSurfaceToImage(
     IN const gcsVG_RECT_PTR DstRectangle,
     IN gceIMAGE_FILTER Filter,
     IN gctBOOL Mask,
-    IN const gctFLOAT SurfaceToImage[9],
-    IN gctBOOL FirstTime
+    IN const gctFLOAT SurfaceToImage[9]
     );
 
 gceSTATUS
@@ -1081,6 +1101,35 @@ gcoVGHARDWARE_SetColorIndexTable(
     IN gctINT32      Count
     );
 
+gceSTATUS
+gcoVGHARDWARE_SetYUV2RGBStdCust(
+    IN gcoVGHARDWARE    Hardware,
+    IN gctBOOL          YUV2RGBStdCust
+    );
+
+gceSTATUS
+gcoVGHARDWARE_SetYUV2RGB(
+    IN gcoVGHARDWARE    Hardware,
+    IN gctFLOAT         *coef,
+    IN gctFLOAT         *offset,
+    IN gctBOOL          *cfg
+);
+
+gceSTATUS
+gcoVGHARDWARE_SetYUV2RGBParameters(
+    IN gcoVGHARDWARE Hardware,
+    IN gctUINT Sampler
+);
+
+gceSTATUS
+gcoVGHARDWARE_SetRGB2YUVParameters(
+    IN gcoVGHARDWARE    Hardware,
+    IN gctFLOAT         *coef,
+    IN gctFLOAT         *offset,
+    IN gctBOOL          *cfg
+);
+
+
 /* VG RS feature. */
 gceSTATUS
 gcoVGHARDWARE_ResolveRect(
@@ -1097,7 +1146,8 @@ gcoVGHARDWARE_ResolveRect(
     IN gctINT32         Src_standard,
     IN gctINT32         Dst_uv,
     IN gctINT32         Dst_standard,
-    IN gctINT32         Dst_alpha
+    IN gctINT32         Dst_alpha,
+    IN gctINT32         Dst_standard_cust
     );
 #endif
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -15,6 +15,43 @@
 
 #define __NEXT_MSG_ID__     006030
 
+#if gcdSTATIC_LINK
+
+gceSTATUS
+gcCLCompileProgram(
+    IN gcoHAL Hal,
+    IN gctUINT SourceSize,
+    IN gctCONST_STRING Source,
+    IN gctCONST_STRING Options,
+    IN gctUINT NumInputHeaders,
+    IN gctCONST_STRING *InputHeaders,
+    IN gctCONST_STRING *HeaderIncludeNames,
+    OUT gcSHADER * Binary,
+    OUT gctSTRING * Log
+    );
+
+gceSTATUS
+gcCompileKernel(
+    IN gcoHAL Hal,
+    IN gctUINT SourceSize,
+    IN gctCONST_STRING Source,
+    IN gctCONST_STRING Options,
+    OUT gcSHADER * Binary,
+    OUT gctSTRING * Log
+    );
+
+gceSTATUS
+gcLoadKernelCompiler(
+    IN gcsHWCaps *HWCaps,
+    IN gcePATCH_ID PatchId
+    );
+
+gceSTATUS
+gcUnloadKernelCompiler(
+void
+);
+
+#endif
 /*****************************************************************************\
 |*                         Supporting functions                              *|
 \*****************************************************************************/
@@ -47,8 +84,8 @@ gctINT
     cl_program Program
     )
 {
-    gctINT              status;
-    gctINT32            oldReference;
+    gctINT    status = CL_SUCCESS;
+    gctINT32  oldReference;
 
     gcmHEADER_ARG("Program=0x%x", Program);
 
@@ -56,7 +93,7 @@ gctINT
         Program->objectType != clvOBJECT_PROGRAM)
     {
         gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-006010: (clfReleaseProgram) invalid Program.\n");
+            "OCL-006009: (clfReleaseProgram) invalid Program.\n");
         clmRETURN_ERROR(CL_INVALID_PROGRAM);
     }
 
@@ -81,9 +118,6 @@ gctINT
         gcoOS_Free(gcvNULL, Program);
     }
 
-    gcmFOOTER_ARG("%d", CL_SUCCESS);
-    return CL_SUCCESS;
-
 OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
@@ -102,14 +136,14 @@ clCreateProgramWithSource(
     cl_int *        ErrcodeRet
     )
 {
-    clsProgram_PTR      program = gcvNULL;
-    gctUINT             size = 0;
-    gctUINT             length;
-    gctUINT *           sizes = gcvNULL;
-    gctUINT             i;
-    gctSTRING           source = gcvNULL;
-    gctPOINTER          pointer = gcvNULL;
-    gctINT              status;
+    clsProgram_PTR  program = gcvNULL;
+    gctUINT         size = 0;
+    gctUINT         length;
+    gctUINT *       sizes = gcvNULL;
+    gctUINT         i;
+    gctSTRING       source = gcvNULL;
+    gctPOINTER      pointer = gcvNULL;
+    gctINT          status;
 
     gcmHEADER_ARG("Context=0x%x Count=%u Strings=0x%x Lengths=0x%x",
                   Context, Count, Strings, Lengths);
@@ -157,7 +191,7 @@ clCreateProgramWithSource(
         }
     }
 
-    /* Allocate program. */
+     /* Allocate program. */
     clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsProgram), &pointer), CL_OUT_OF_HOST_MEMORY);
     gcoOS_ZeroMemory(pointer, sizeof(clsProgram));
 
@@ -172,10 +206,9 @@ clCreateProgramWithSource(
     program->buildLog        = gcvNULL;
     program->buildStatus     = CL_BUILD_NONE;
 
-    /* Allocate source. */
+     /* Allocate source. */
     clmONERROR(gcoOS_Allocate(gcvNULL, size + 1, &pointer), CL_OUT_OF_HOST_MEMORY);
     source = (gctSTRING) pointer;
-
     program->source          = source;
 
     /* Create a reference count object and set it to 1. */
@@ -229,18 +262,18 @@ OnError:
             "OCL-006003: (clCreateProgramWithSource) cannot create program.  Maybe run out of memory.\n");
     }
 
-    if(source != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, source);
+    if(source != gcvNULL) gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, source));
 
-    if (sizes  != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, sizes);
+    if (sizes  != gcvNULL) gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, sizes));
 
     if(program != gcvNULL && program->devices != gcvNULL)
     {
         gcmOS_SAFE_FREE(gcvNULL, program->devices);
     }
 
-    if(program->referenceCount) gcoOS_AtomDestroy(gcvNULL, program->referenceCount);
+    if(program != gcvNULL && program->referenceCount) gcoOS_AtomDestroy(gcvNULL, program->referenceCount);
 
-    if(program != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, program);
+    if(program != gcvNULL) gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, program));
 
     if (ErrcodeRet)
     {
@@ -472,6 +505,8 @@ OnError:
     return status;
 }
 
+
+
 gceSTATUS
 clfLoadCompiler(
     cl_platform_id platform
@@ -487,6 +522,7 @@ clfLoadCompiler(
 
         if (platform->compiler == gcvNULL)
         {
+#if !gcdSTATIC_LINK
             status = gcoOS_LoadLibrary(gcvNULL,
 #if defined(__APPLE__)
                                        "libCLC.dylib",
@@ -520,17 +556,66 @@ clfLoadCompiler(
                                           "gcUnloadKernelCompiler",
                                           (gctPOINTER*)&platform->unloadCompiler));
 
-            gcmVERIFY_OK((*platform->loadCompiler)(&platform->hwCfg, platform->patchId));
+#else
+            platform->compiler = gcCLCompileProgram;
+            platform->compiler11 = gcCompileKernel;
+            platform->loadCompiler = gcLoadKernelCompiler;
+            platform->unloadCompiler = gcUnloadKernelCompiler;
+#endif
+            gcmVERIFY_OK((*platform->loadCompiler)(&platform->vscCoreSysCtx.hwCfg, platform->patchId));
         }
     }
 
+#if !gcdSTATIC_LINK
 OnError:
+#endif
     gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, platform->compilerMutex));
 
     gcmFOOTER_NO();
     return status;
 }
 
+
+static gceSTATUS clfUpdateCompileOption(clsPlatformId_PTR platform, gctSTRING *options)
+{
+    gctSIZE_T extraOptionLength = 0;
+    gctSIZE_T originalLengh = 0;
+    gctSIZE_T totalLength;
+    gceSTATUS status = gcvSTATUS_OK;
+    gctPOINTER pointer = gcvNULL;
+
+    if (!platform->virShaderPath)
+    {
+        extraOptionLength = gcoOS_StrLen(" -cl-viv-gcsl-driver-image", gcvNULL);
+    }
+
+    if (!extraOptionLength)
+        return status;
+
+    if (options && *options)
+    {
+        originalLengh = gcoOS_StrLen(*options, gcvNULL);
+    }
+    totalLength = originalLengh + extraOptionLength + 1;
+    gcmONERROR(gcoOS_Allocate(gcvNULL, totalLength, &pointer));
+
+    gcoOS_ZeroMemory(pointer, totalLength);
+
+    if (options && *options)
+    {
+        gcmVERIFY_OK(gcoOS_StrCopySafe((gctSTRING)pointer, totalLength, *options));
+        gcmOS_SAFE_FREE(gcvNULL, *options);
+    }
+
+    gcmASSERT(extraOptionLength);
+    gcmVERIFY_OK(gcoOS_StrCatSafe((gctSTRING)pointer, totalLength, " -cl-viv-gcsl-driver-image"));
+
+
+    *options = (gctSTRING)pointer;
+OnError:
+    return status;
+
+}
 
 CL_API_ENTRY cl_int CL_API_CALL
 clBuildProgram(
@@ -598,7 +683,7 @@ clBuildProgram(
                 "OCL-006013: (clBuildProgram) Run out of memory.\n");
             clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
         }
-        gcoOS_StrCopySafe(pointer, length, Options);
+        gcoOS_StrCopySafe((gctSTRING)pointer, length, Options);
         Program->buildOptions = (gctSTRING) pointer;
     }
     else
@@ -613,6 +698,9 @@ clBuildProgram(
     if (Program->binary == gcvNULL)
     {
         clmONERROR(clfLoadCompiler(platform), CL_BUILD_PROGRAM_FAILURE);
+
+        clmONERROR(clfUpdateCompileOption(platform, &Program->buildOptions), CL_OUT_OF_HOST_MEMORY);
+
         status = (*platform->compiler11)(gcvNULL,
                                        0,
                                        Program->source,
@@ -724,6 +812,7 @@ clCompileProgram(
     gcSHADER            binary = gcvNULL;
     gctUINT             binarySize;
     gctINT              status = CL_SUCCESS;
+    char **             headerSources = gcvNULL;
 
     gcmHEADER_ARG("Program=0x%x NumDevices=%u DeviceList=0x%x Options=%s",
                   Program, NumDevices, DeviceList, Options);
@@ -789,13 +878,10 @@ clCompileProgram(
 
     /* construct a combined source with header files */
 
-
-
     Program->buildStatus = CL_BUILD_IN_PROGRESS;
 
     if (Program->binary == gcvNULL)
     {
-        char ** headerSources = gcvNULL;
         gctUINT i;
 
         if(NumInputHeaders)
@@ -811,6 +897,8 @@ clCompileProgram(
             }
         }
 
+        clmONERROR(clfUpdateCompileOption(platform, &Program->compileOptions), CL_OUT_OF_HOST_MEMORY);
+
         status = (*platform->compiler)(gcvNULL,
                                        Program->source ?  gcoOS_StrLen(Program->source, gcvNULL) : 0,
                                        Program->source,
@@ -821,9 +909,10 @@ clCompileProgram(
                                        &binary,
                                        &Program->buildLog);
 
-        if(headerSources)
+        if (headerSources)
         {
             gcoOS_Free(gcvNULL, headerSources);
+            headerSources = gcvNULL;
         }
 
         if (gcmIS_ERROR(status))
@@ -850,24 +939,31 @@ clCompileProgram(
     return CL_SUCCESS;
 
 OnError:
-    Program->buildStatus = CL_BUILD_ERROR;
 
     if (PfnNotify)
     {
         PfnNotify(Program, UserData);
     }
-
-    /* free some resources */
-    if (Program->compileOptions)
+    if (Program != gcvNULL)
     {
-        gcmVERIFY_OK(gcoOS_Free(gcvNULL, Program->compileOptions));
-        Program->compileOptions = gcvNULL;
+        Program->buildStatus = CL_BUILD_ERROR;
+
+        /* free some resources */
+        if (Program->compileOptions)
+        {
+            gcmVERIFY_OK(gcoOS_Free(gcvNULL, Program->compileOptions));
+            Program->compileOptions = gcvNULL;
+        }
+
+        if (Program->binary)
+        {
+            gcmVERIFY_OK(gcSHADER_Destroy((gcSHADER)Program->binary));
+            Program->binary = gcvNULL;
+        }
     }
-
-    if (Program->binary)
+    if (headerSources)
     {
-        gcmVERIFY_OK(gcSHADER_Destroy((gcSHADER)Program->binary));
-        Program->binary = gcvNULL;
+        gcoOS_Free(gcvNULL, headerSources);
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -1264,7 +1360,7 @@ clGetProgramInfo(
                 for (i = 0; i < Program->numDevices; i++)
                 {
                     gctUINT binarySize = Program->binarySize;
-                    status = gcSHADER_SaveEx(retParamPtr, ((gctSTRING *)ParamValue)[i], &binarySize);
+                    status = gcSHADER_SaveEx((gcSHADER)retParamPtr, ((gctSTRING *)ParamValue)[i], &binarySize);
                     if (gcmIS_ERROR(status))
                     {
                         gcmUSER_DEBUG_ERROR_MSG(

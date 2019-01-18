@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -633,6 +633,7 @@ gal_validate_destination( GalDriverData          *vdrv,
                 };
 
                 gcmERR_BREAK(gcoHAL_WrapUserMemory(&desc,
+                                                   gcvVIDMEM_TYPE_BITMAP,
                                                    &handle));
 
                 gcmERR_BREAK(gcoHAL_LockVideoMemory(handle, gcvFALSE, gcvENGINE_RENDER, &gpu_addr, &logical));
@@ -906,6 +907,7 @@ gal_validate_source( GalDriverData          *vdrv,
                     };
 
                     gcmERR_BREAK(gcoHAL_WrapUserMemory(&desc,
+                                                       gcvVIDMEM_TYPE_BITMAP,
                                                        &handle));
 
                     gcmERR_BREAK(gcoHAL_LockVideoMemory(handle, gcvFALSE, gcvENGINE_RENDER, &gpu_addr, &logical));
@@ -1123,6 +1125,7 @@ gal_validate_source( GalDriverData          *vdrv,
                     };
 
                     gcmERR_BREAK(gcoHAL_WrapUserMemory(&desc,
+                                                       gcvVIDMEM_TYPE_BITMAP,
                                                        &handle));
 
                     gcmERR_BREAK(gcoHAL_LockVideoMemory(handle, gcvFALSE, gcvENGINE_RENDER, &gpu_addr, &logical));

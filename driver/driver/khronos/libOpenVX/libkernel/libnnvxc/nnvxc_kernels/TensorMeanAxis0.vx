@@ -1,0 +1,283 @@
+#include "cl_viv_vx_ext.h"
+
+_viv_uniform VXC_512Bits uniSumFp16toFp32_16x1;
+_viv_uniform int width_align32;
+_viv_uniform float axis_scale;
+__kernel void vxcTensorMeanAxis0_F16toF16_2D(
+    __read_only  image2d_array_t inputs,
+    __write_only image2d_array_t outputs
+    )
+{
+    int2 coord = (int2)(16, get_global_id(1));
+
+    float4 sum = {0};
+    for (coord.x = 16; coord.x < width_align32; )
+    {
+        vxc_short8 vec0, vec1, vec2, vec3;
+        vxc_half8  src0, src1, src2, src3;
+        VXC_ReadImage(vec0, inputs, coord.xy, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, src0, vec0, 16);
+        VXC_ReadImage(vec1, inputs, coord.xy, VXC_5BITOFFSET_XY(-8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, src1, vec1, 16);
+        VXC_ReadImage(vec2, inputs, coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, src2, vec2, 16);
+        VXC_ReadImage(vec3, inputs, coord.xy, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, src3, vec3, 16);
+
+        coord.x += 32;
+
+        VXC_DP16x1(sum, src0, src1, VXC_MODIFIER(1, 1, 0, VXC_RM_TowardZero, 0), uniSumFp16toFp32_16x1);
+        VXC_DP16x1(sum, src2, src3, VXC_MODIFIER(2, 2, 0, VXC_RM_TowardZero, 0), uniSumFp16toFp32_16x1);
+
+        vxc_float4 one = {1.0, 1.0, 1.0, 1.0};
+
+        sum.x = dot(sum, one);
+    }
+    sum.x *= axis_scale;
+    half tmp;
+    short dst;
+    _viv_asm(CONV, tmp, sum.x);
+    _viv_asm(COPY, dst, tmp, 2);
+    coord.x = 0;
+    VXC_WriteImage(outputs, coord, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void vxcTensorMeanAxis0_F16toF16(
+    __read_only  image2d_array_t inputs,
+    __write_only image2d_array_t outputs
+    )
+{
+    int4 coord = (int4)(16, get_global_id(1), get_global_id(2), 0);
+
+    float4 sum = {0};
+    for (coord.x = 16; coord.x < width_align32; )
+    {
+        vxc_short8 vec0, vec1, vec2, vec3;
+        vxc_half8  src0, src1, src2, src3;
+        VXC_ReadImage2DArray(vec0, inputs, coord, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, src0, vec0, 16);
+        VXC_ReadImage2DArray(vec1, inputs, coord, VXC_5BITOFFSET_XY(-8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, src1, vec1, 16);
+        VXC_ReadImage2DArray(vec2, inputs, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, src2, vec2, 16);
+        VXC_ReadImage2DArray(vec3, inputs, coord, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, src3, vec3, 16);
+
+        coord.x += 32;
+
+        VXC_DP16x1(sum, src0, src1, VXC_MODIFIER(1, 1, 0, VXC_RM_TowardZero, 0), uniSumFp16toFp32_16x1);
+        VXC_DP16x1(sum, src2, src3, VXC_MODIFIER(2, 2, 0, VXC_RM_TowardZero, 0), uniSumFp16toFp32_16x1);
+
+        vxc_float4 one = {1.0, 1.0, 1.0, 1.0};
+
+        sum.x = dot(sum, one);
+    }
+    sum.x *= axis_scale;
+    half tmp;
+    short dst;
+    _viv_asm(CONV, tmp, sum.x);
+    _viv_asm(COPY, dst, tmp, 2);
+    coord.x = 0;
+    VXC_WriteImage2DArray(outputs, coord, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+}
+
+_viv_uniform VXC_512Bits uniSumI16toFp32_16x1;
+__kernel void vxcTensorMeanAxis0_I16toI16_2D(
+    __read_only  image2d_array_t inputs,
+    __write_only image2d_array_t outputs
+    )
+{
+    int2 coord = (int2)(16, get_global_id(1));
+
+    float4 sum = {0};
+    for (coord.x = 16; coord.x < width_align32; )
+    {
+        vxc_short8  src0, src1, src2, src3;
+        VXC_ReadImage(src0, inputs, coord.xy, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(src1, inputs, coord.xy, VXC_5BITOFFSET_XY(-8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(src2, inputs, coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(src3, inputs, coord.xy, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+        coord.x += 32;
+
+        VXC_DP16x1(sum, src0, src1, VXC_MODIFIER(1, 1, 0, VXC_RM_TowardZero, 0), uniSumI16toFp32_16x1);
+        VXC_DP16x1(sum, src2, src3, VXC_MODIFIER(2, 2, 0, VXC_RM_TowardZero, 0), uniSumI16toFp32_16x1);
+
+        vxc_float4 one = {1.0, 1.0, 1.0, 1.0};
+
+        sum.x = dot(sum, one);
+    }
+
+    sum.x *= axis_scale;
+    short dst;
+    _viv_asm(CONV_SAT_RTE, dst, sum.x);
+    coord.x = 0;
+    VXC_WriteImage(outputs, coord, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void vxcTensorMeanAxis0_I16toI16(
+    __read_only  image2d_array_t inputs,
+    __write_only image2d_array_t outputs
+    )
+{
+    int4 coord = (int4)(16, get_global_id(1), get_global_id(2), 0);
+
+    float4 sum = {0};
+    for (coord.x = 16; coord.x < width_align32; )
+    {
+        vxc_short8  src0, src1, src2, src3;
+        VXC_ReadImage2DArray(src0, inputs, coord, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage2DArray(src1, inputs, coord, VXC_5BITOFFSET_XY(-8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage2DArray(src2, inputs, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage2DArray(src3, inputs, coord, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        coord.x += 32;
+
+        VXC_DP16x1(sum, src0, src1, VXC_MODIFIER(1, 1, 0, VXC_RM_TowardZero, 0), uniSumI16toFp32_16x1);
+        VXC_DP16x1(sum, src2, src3, VXC_MODIFIER(2, 2, 0, VXC_RM_TowardZero, 0), uniSumI16toFp32_16x1);
+
+        vxc_float4 one = {1.0, 1.0, 1.0, 1.0};
+
+        sum.x = dot(sum, one);
+    }
+
+    sum.x *= axis_scale;
+    short dst;
+    _viv_asm(CONV_SAT_RTE, dst, sum.x);
+    coord.x = 0;
+    VXC_WriteImage2DArray(outputs, coord, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+}
+
+_viv_uniform int width_align64;
+_viv_uniform VXC_512Bits uniSumI8toFp32_32x1;
+__kernel void vxcTensorMeanAxis0_I8toI8_2D(
+    __read_only  image2d_array_t inputs,
+    __write_only image2d_array_t outputs
+    )
+{
+    int2 coord = (int2)(16, get_global_id(1));
+
+    float4 sum = {0};
+    for (coord.x = 16; coord.x < width_align64; )
+    {
+        vxc_char16  src0, src1, src2, src3;
+        VXC_ReadImage(src0, inputs, coord.xy, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(src1, inputs, coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+        coord.x += 32;
+        VXC_ReadImage(src2, inputs, coord.xy, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(src3, inputs, coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+        coord.x += 32;
+
+        VXC_DP32x1(sum, src0, src1, VXC_MODIFIER(1, 1, 0, VXC_RM_TowardZero, 0), uniSumI8toFp32_32x1);
+        VXC_DP32x1(sum, src2, src3, VXC_MODIFIER(2, 2, 0, VXC_RM_TowardZero, 0), uniSumI8toFp32_32x1);
+
+        vxc_float4 one = {1.0, 1.0, 1.0, 1.0};
+
+        sum.x = dot(sum, one);
+    }
+
+    sum.x *= axis_scale;
+    char dst;
+    _viv_asm(CONV_SAT_RTE, dst, sum.x);
+    coord.x = 0;
+    VXC_WriteImage(outputs, coord, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void vxcTensorMeanAxis0_I8toI8(
+    __read_only  image2d_array_t inputs,
+    __write_only image2d_array_t outputs
+    )
+{
+    int4 coord = (int4)(16, get_global_id(1), get_global_id(2), 0);
+
+    float4 sum = {0};
+    for (coord.x = 16; coord.x < width_align64; )
+    {
+        vxc_char16  src0, src1, src2, src3;
+        VXC_ReadImage2DArray(src0, inputs, coord, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage2DArray(src1, inputs, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+        coord.x += 32;
+        VXC_ReadImage2DArray(src2, inputs, coord, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage2DArray(src3, inputs, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+        coord.x += 32;
+
+        VXC_DP16x1(sum, src0, src1, VXC_MODIFIER(1, 1, 0, VXC_RM_TowardZero, 0), uniSumI8toFp32_32x1);
+        VXC_DP16x1(sum, src2, src3, VXC_MODIFIER(2, 2, 0, VXC_RM_TowardZero, 0), uniSumI8toFp32_32x1);
+
+        vxc_float4 one = {1.0, 1.0, 1.0, 1.0};
+
+        sum.x = dot(sum, one);
+    }
+
+    sum.x *= axis_scale;
+    char dst;
+    _viv_asm(CONV_SAT_RTE, dst, sum.x);
+    coord.x = 0;
+    VXC_WriteImage2DArray(outputs, coord, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+}
+
+_viv_uniform float offset_asymmetric;
+__kernel void vxcTensorMeanAxis0_U8toU8_2D(
+    __read_only  image2d_array_t inputs,
+    __write_only image2d_array_t outputs
+    )
+{
+    int2 coord = (int2)(16, get_global_id(1));
+
+    float4 sum = {0};
+    for (coord.x = 16; coord.x < width_align64; )
+    {
+        vxc_uchar16  src0, src1, src2, src3;
+        VXC_ReadImage(src0, inputs, coord.xy, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(src1, inputs, coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+        coord.x += 32;
+        VXC_ReadImage(src2, inputs, coord.xy, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(src3, inputs, coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+        coord.x += 32;
+
+        VXC_DP32x1(sum, src0, src1, VXC_MODIFIER(1, 1, 0, VXC_RM_TowardZero, 0), uniSumI8toFp32_32x1);
+        VXC_DP32x1(sum, src2, src3, VXC_MODIFIER(2, 2, 0, VXC_RM_TowardZero, 0), uniSumI8toFp32_32x1);
+
+        vxc_float4 one = {1.0, 1.0, 1.0, 1.0};
+
+        sum.x = dot(sum, one);
+    }
+
+    sum.x = sum.x * axis_scale + offset_asymmetric;
+    unsigned char dst;
+    _viv_asm(CONV_SAT_RTE, dst, sum.x);
+    coord.x = 0;
+    VXC_WriteImage(outputs, coord, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void vxcTensorMeanAxis0_U8toU8(
+    __read_only  image2d_array_t inputs,
+    __write_only image2d_array_t outputs
+    )
+{
+    int4 coord = (int4)(16, get_global_id(1), get_global_id(2), 0);
+
+    float4 sum = {0};
+    for (coord.x = 16; coord.x < width_align64; )
+    {
+        vxc_char16  src0, src1, src2, src3;
+        VXC_ReadImage2DArray(src0, inputs, coord, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage2DArray(src1, inputs, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+        coord.x += 32;
+        VXC_ReadImage2DArray(src2, inputs, coord, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage2DArray(src3, inputs, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+        coord.x += 32;
+
+        VXC_DP16x1(sum, src0, src1, VXC_MODIFIER(1, 1, 0, VXC_RM_TowardZero, 0), uniSumI8toFp32_32x1);
+        VXC_DP16x1(sum, src2, src3, VXC_MODIFIER(2, 2, 0, VXC_RM_TowardZero, 0), uniSumI8toFp32_32x1);
+
+        vxc_float4 one = {1.0, 1.0, 1.0, 1.0};
+
+        sum.x = dot(sum, one);
+    }
+
+    sum.x = sum.x * axis_scale + offset_asymmetric;
+    unsigned char dst;
+    _viv_asm(CONV_SAT_RTE, dst, sum.x);
+    coord.x = 0;
+    VXC_WriteImage2DArray(outputs, coord, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+}

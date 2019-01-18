@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -41,7 +41,7 @@ extern GLuint __glDestroyContext(__GLcontext *gc);
 extern GLuint __glShareContext(__GLcontext *gc, __GLcontext *gcShare);
 extern GLvoid __glNotifyDrawableChange(__GLcontext *gc, GLuint mask);
 extern __GLformatInfo __glFormatInfoTable[];
-extern __GLesDispatchTable __glNopFuncTable;
+extern __GLdispatchTable __glNopFuncTable;
 /*
 *Later to add this if neccessary
 extern __GLdispatchState __glNopDispatchFuncTable;
@@ -660,9 +660,8 @@ vivInitDriver( __DRIscreenPrivate *sPriv )
 {
     /* Initialize the global Nop API dispatch pointer "__glNopDispatchTab".
     */
-    memset((void *)&__glNopContext, 0, sizeof(__GLesDispatchTable));
-    memcpy((void *)&(__glNopContext.apiDispatchTable), (void *)&__glNopFuncTable, sizeof(__GLesDispatchTable));
-    __glNopContext.currentImmediateTable = &__glNopFuncTable;
+    memset((void *)&__glNopContext, 0, sizeof(__GLdispatchTable));
+    __glNopContext.pEntryDispatch = &__glNopFuncTable;
 
     *sPriv->nopContext = &__glNopContext;
 
@@ -695,9 +694,8 @@ vivLoseCurrent( __DRIcontextPrivate *driContextPriv )
     retVal = __glLoseCurrent(gc, gc->drawablePrivate, gc->readablePrivate);
     if ( retVal )
     {
-        memset((void *)&__glNopContext, 0, sizeof(__GLesDispatchTable));
-        memcpy((void *)&(__glNopContext.apiDispatchTable), (void *)&__glNopFuncTable, sizeof(__GLesDispatchTable));
-        __glNopContext.currentImmediateTable = &__glNopFuncTable;
+        memset((void *)&__glNopContext, 0, sizeof(__GLdispatchTable));
+        __glNopContext.pEntryDispatch = &__glNopFuncTable;
         _glapi_set_context(&__glNopContext);
     }
     __glSetGLcontext(gcvNULL);

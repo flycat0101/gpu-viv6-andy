@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -809,11 +809,6 @@ gcChipResidentTextureLevel(
                  (__GL_IS_TEXTURE_CUBE(texObj->targetIndex) || __GL_IS_TEXTURE_ARRAY(texObj->targetIndex)))
         {
             patchCase = __GL_CHIP_FMT_PATCH_ASTC;
-        }
-        else if ((mipmap->formatInfo->drvFormat == __GL_FMT_A8) &&
-            (chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4652))
-        {
-            patchCase = __GL_CHIP_FMT_PATCH_ALPHA8;
         }
         else if ((texObj->targetIndex == __GL_TEXTURE_2D_ARRAY_INDEX) ||
                  (texObj->targetIndex == __GL_TEXTURE_3D_INDEX))
@@ -1877,13 +1872,6 @@ gcChipCopyTexImage(
         tryShader = gcvFALSE;
     }
 
-    if ((chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4652) &&
-        mipmap->formatInfo->drvFormat == __GL_FMT_A8 &&
-        srcView.surf->tiling == texView.surf->tiling)
-    {
-        tryShader = gcvTRUE;
-    }
-
     do
     {
         gctINT width  = __GL_MIN(mipmap->width,  (gctINT32)chipCtx->readRTWidth  - x);
@@ -2140,10 +2128,7 @@ gcChipTexSubImage(
             skipOffset += __GL_PTR2SIZE(buf);
             GL_ASSERT(unpackBufInfo);
             gcmONERROR(gcoBUFOBJ_Lock(unpackBufInfo->bufObj, &physicalAddress, (gctPOINTER*)&buf));
-            /* wait fence here becuase of the bufobj may comes from packbuffer obj which write in glReadPixel*/
             gcmONERROR(gcoBUFOBJ_WaitFence(unpackBufInfo->bufObj, gcvFENCE_TYPE_WRITE));
-            /* get fence here becuase of the bufobj may will be used in glMapBufferRange for read */
-            gcmONERROR(gcoBUFOBJ_GetFence(unpackBufInfo->bufObj, gcvFENCE_TYPE_READ));
 
             physicalAddress += (gctUINT32)skipOffset;
         }
@@ -2322,13 +2307,6 @@ gcChipCopyTexSubImage(
             tryResolve = gcvFALSE;
         }
         tryShader = gcvFALSE;
-    }
-
-    if ((chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4652) &&
-        mipmap->formatInfo->drvFormat == __GL_FMT_A8 &&
-        srcView.surf->tiling == texView.surf->tiling)
-    {
-        tryShader = gcvTRUE;
     }
 
     /* Just to check whether it has only 1 level of mipmap. */
@@ -2560,7 +2538,8 @@ gcChipTexNeedShadow(
     {
         need = GL_TRUE;
     }
-    else if (texInfo->direct.source)
+    else if (texInfo->direct.source &&
+            !texInfo->direct.directRender)
     {
         need = GL_TRUE;
     }
@@ -3857,7 +3836,7 @@ __glChipGetTexImage(
         packBufInfo = (__GLchipVertexBufferInfo *)(packBufObj->privateData);
         GL_ASSERT(packBufInfo);
         gcmONERROR(gcoBUFOBJ_Lock(packBufInfo->bufObj, &physicalAddress, &logicalAddress));
-        gcmONERROR(gcoBUFOBJ_GetFence(packBufInfo->bufObj, gcvFENCE_TYPE_WRITE));
+        gcmONERROR(gcoBUFOBJ_WaitFence(packBufInfo->bufObj, gcvFENCE_TYPE_WRITE));
 
         skipOffset += __GL_PTR2SIZE(buf);
         physicalAddress += (gctUINT32)skipOffset;
@@ -4281,6 +4260,9 @@ __glChipTexDirectVIV(
     gcmONERROR(gcoSURF_Construct(
         chipCtx->hal, width, height, 1, gcvSURF_BITMAP, sourceFormat, gcvPOOL_DEFAULT, &texInfo->direct.source));
 
+    texInfo->direct.directRender = texInfo->direct.source->formatInfo.format == texInfo->direct.source->formatInfo.closestRenderFormat;
+    gcmASSERT(!(texInfo->direct.directRender == gcvTRUE && texInfo->direct.directSample == gcvFALSE));
+
     /* Lock the source surface. */
     gcmONERROR(gcoSURF_Lock(texInfo->direct.source, gcvNULL, memory));
 
@@ -4576,7 +4558,7 @@ __glChipTexDirectVIVMap(
         chipCtx->hal, width, height, 1, type, sourceFormat, gcvPOOL_USER, &texInfo->direct.source));
 
     /* Set the user buffer to the surface. */
-    gcmONERROR(gcoSURF_MapUserSurface(texInfo->direct.source, 0, (GLvoid *) *logical, (gctUINT32) *physical));
+    gcmONERROR(gcoSURF_MapUserSurface(texInfo->direct.source, 0, (GLvoid *) *logical, *physical));
 
     gcmONERROR(gcoSURF_Lock(texInfo->direct.source, gcvNULL, gcvNULL));
 

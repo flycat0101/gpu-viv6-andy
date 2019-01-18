@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -474,6 +474,7 @@ VGPath  vgCreatePath(VGint pathFormat, VGPathDatatype datatype, VGfloat scale, V
         _VGint32 pathDataSize = gcmMIN(coordCapacityHint, 65536) * getBytesPerCoordinate(datatype);
         ARRAY_ALLOCATE(path->data,  pathDataSize);
     }
+
 Error:
     vgmGetApiEndTime(context);
     gcmFOOTER_ARG("return=%d", (path ? path->object.name : VG_INVALID_HANDLE));
@@ -1462,7 +1463,6 @@ void CheckContextParam(_VGContext *context, _VGPath* path, _VGMatrix3x3 *matrix,
 
     scale[0] = matrix->m[0][0] * matrix->m[0][0] + matrix->m[1][0] * matrix->m[1][0];
     scale[1] = matrix->m[0][1] * matrix->m[0][1] + matrix->m[1][1] * matrix->m[1][1];
-
     context->tessContext.strokeScale = TESS_SQRT(gcmMAX(scale[0], scale[1]));
 
     if ((paintModes & VG_FILL_PATH) &&

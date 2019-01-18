@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -72,7 +72,16 @@
     VIR_INTRINSIC_INFO(evis_dp8x2_b),
     VIR_INTRINSIC_INFO(evis_dp4x4_b),
     VIR_INTRINSIC_INFO(evis_dp2x8_b),
+
+    VIR_INTRINSIC_INFO(evis_gather), /* gather load from local memory with offsets in 128 bit temp/uniform */
+    VIR_INTRINSIC_INFO(evis_gather_b), /* gather load from local memory with offsets in 256 bit temp */
+    VIR_INTRINSIC_INFO(evis_scatter), /* scatter store to local memory with offsets in 128 bit temp/uniform */
+    VIR_INTRINSIC_INFO(evis_scatter_b), /* scatter store to local memory with offsets in 256 bit temp */
+    VIR_INTRINSIC_INFO(evis_atomic_s), /* atomically operate on scattered addresses in 128 bit temp/uniform */
+    VIR_INTRINSIC_INFO(evis_atomic_s_b),/* atomically operate on scattered addresses in 256 bit temp */
+
     VIR_INTRINSIC_INFO(evis_end), /* end of evis instrinsic */
+
     /* DO NOT add or change order of any Intrinsic before */
 
     /* common functions */
@@ -231,6 +240,9 @@
     VIR_INTRINSIC_INFO(image_store), /* image store */
     VIR_INTRINSIC_INFO(image_load), /* image load */
 
+    VIR_INTRINSIC_INFO(image_store_3d), /* 3d image store */
+    VIR_INTRINSIC_INFO(image_load_3d), /* 3d image load */
+
     /* vector dynamic indexing */
     VIR_INTRINSIC_INFO(vecGet), /* get one element from vec */
     VIR_INTRINSIC_INFO(vecSet), /* Set one element from vec */
@@ -254,13 +266,15 @@
     VIR_INTRINSIC_INFO(image_query_order),
     VIR_INTRINSIC_INFO(image_query_size_lod),
     VIR_INTRINSIC_INFO(image_query_size),
+    VIR_INTRINSIC_INFO(image_query_size_for_sampler),
     VIR_INTRINSIC_INFO(image_query_lod),
     VIR_INTRINSIC_INFO(image_query_levels),
     VIR_INTRINSIC_INFO(image_query_samples),
-    VIR_INTRINSIC_INFO(image_get_width),
-    VIR_INTRINSIC_INFO(image_get_height),
-    VIR_INTRINSIC_INFO(image_get_depth),
-    VIR_INTRINSIC_INFO(image_get_array_size),
+    VIR_INTRINSIC_INFO(image_query_width),
+    VIR_INTRINSIC_INFO(image_query_height),
+    VIR_INTRINSIC_INFO(image_query_depth),
+    VIR_INTRINSIC_INFO(image_query_array_size),
+    VIR_INTRINSIC_INFO(image_query_type),
 
     /* texture load.*/
     VIR_INTRINSIC_INFO(texld),

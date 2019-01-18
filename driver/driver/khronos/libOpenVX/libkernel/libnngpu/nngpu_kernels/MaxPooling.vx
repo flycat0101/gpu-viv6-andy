@@ -1,0 +1,144 @@
+__kernel void gpuPooling_MaxNoPadFP32(__read_only image2d_array_t   input,
+                                      int filterX,
+                                      int filterY,
+                                      int strideX,
+                                      int strideY,
+                                      __write_only image2d_array_t  output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord_in = (int4)(x*strideX, y*strideY, z, 0);
+    float4 dst = {0.0}, tmp = {0.0};
+    int i, j;
+
+    dst = read_imagef(input, coord_in);
+    for(j = 0; j < filterY; j++)
+    {
+        for(i = 0; i < filterX; i++)
+        {
+            tmp = read_imagef(input, (int4)(coord_in.x+i, coord_in.y+j, z, 0));
+            dst.x = max(dst.x, tmp.x);
+        }
+    }
+
+    write_imagef(output, (int4)(x, y, z, 0), dst);
+}
+
+__kernel void gpuPooling_MaxNoPadQuant8(__read_only image2d_array_t   input,
+                                      int   filterX,
+                                      int   filterY,
+                                      int   strideX,
+                                      int   strideY,
+                                      float scaleIn,
+                                      float scaleOut,
+                                      int   zeroPointIn,
+                                      int   zeroPointOut,
+                                      __write_only image2d_array_t  output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord_in = (int4)(x*strideX, y*strideY, z, 0);
+    float4 tmpOut = {0.0};
+    int i, j;
+    uint4 tmp;
+
+    tmp = read_imageui(input, coord_in);
+    tmpOut.x = (convert_int(tmp.x-zeroPointIn))*scaleIn;
+
+    for(j = 0; j < filterY; j++)
+    {
+        for(i = 0; i < filterX; i++)
+        {
+            tmp = read_imageui(input, (int4)(coord_in.x+i, coord_in.y+j, z, 0));
+            tmpOut.x = max(tmpOut.x, (convert_int(tmp.x-zeroPointIn))*scaleIn);
+        }
+    }
+
+    tmp.x = floor(tmpOut.x*scaleOut + zeroPointOut + 0.5);
+    write_imageui(output, (int4)(x, y, z, 0), tmp);
+}
+
+__kernel void gpuPooling_MaxPadFP32(__read_only image2d_array_t   input,
+                                      int filterX,
+                                      int filterY,
+                                      int strideX,
+                                      int strideY,
+                                      int padX,
+                                      int padY,
+                                      __write_only image2d_array_t  output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int coordinX = x*strideX - padX;
+    int coordinY = y*strideY - padY;
+    int z = get_global_id(2);
+    float4 tmpOut = {0.0}, tmp = {0.0};
+    int inWidth = get_image_width(input);
+    int inHeight = get_image_height(input);
+    int iStart, iEnd, jStart, jEnd, count = 0;
+    int w, h;
+
+    iStart = max(coordinX, 0);
+    iEnd   = min(coordinX+filterX, inWidth);
+    jStart = max(coordinY, 0);
+    jEnd   = min(coordinY+filterY, inHeight);
+
+    tmpOut = read_imagef(input, (int4)(iStart, jStart, z, 0));
+    for(h = jStart; h < jEnd; h++)
+    {
+        for(w = iStart; w < iEnd; w++)
+        {
+            tmp = read_imagef(input, (int4)(w, h, z, 0));
+            tmpOut.x = max(tmpOut.x, tmp.x);
+        }
+    }
+
+    write_imagef(output, (int4)(x, y, z, 0), tmpOut);
+}
+
+__kernel void gpuPooling_MaxPadQuant8(__read_only image2d_array_t   input,
+                                      int   filterX,
+                                      int   filterY,
+                                      int   strideX,
+                                      int   strideY,
+                                      float scaleIn,
+                                      float scaleOut,
+                                      int   zeroPointIn,
+                                      int   zeroPointOut,
+                                      int   padX,
+                                      int   padY,
+                                      __write_only image2d_array_t  output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int coordinX = x*strideX - padX;
+    int coordinY = y*strideY - padY;
+    float4 tmpOut = {0.0};
+    int inWidth = get_image_width(input);
+    int inHeight = get_image_height(input);
+    int iStart, iEnd, jStart, jEnd, count = 0;
+    int w, h;
+    uint4 tmp;
+
+    iStart = max(coordinX, 0);
+    iEnd   = min(coordinX+filterX, inWidth);
+    jStart = max(coordinY, 0);
+    jEnd   = min(coordinY+filterY, inHeight);
+
+    tmp = read_imageui(input, (int4)(iStart, jStart, z, 0));
+    tmpOut.x = (convert_int(tmp.x-zeroPointIn))*scaleIn;
+    for(h = jStart; h < jEnd; h++)
+    {
+        for(w = iStart; w < iEnd; w++)
+        {
+            tmp = read_imageui(input, (int4)(w, h, z, 0));
+            tmpOut.x = max(tmpOut.x, (convert_int(tmp.x-zeroPointIn))*scaleIn);
+        }
+    }
+
+    tmp.x = floor(tmpOut.x*scaleOut + zeroPointOut + 0.5);
+    write_imageui(output, (int4)(x, y, z, 0), tmp);
+}

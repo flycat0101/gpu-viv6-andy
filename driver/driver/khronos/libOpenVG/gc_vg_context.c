@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -66,7 +66,7 @@ static void _ConstructChipName(
     *ChipName++ = 't';
     *ChipName++ = 'e';
     *ChipName++ = ' ';
-    gcmONERROR(gcoHAL_GetProductName(Context->hal, &productName));
+    gcmONERROR(gcoHAL_GetProductName(Context->hal, &productName, gcvNULL));
 
     gcoOS_StrCatSafe(Context->chipName, vgdCHIP_NAME_LEN , productName);
 
@@ -521,6 +521,8 @@ veglCreateContext(
 
                 gcoOS_Close(gcvNULL, tf);
             }
+
+            gcoVG_SetTesselationSize(context->vg, context->tsWidth, context->tsHeight);
         }
         /* Construct the path storage manager. */
         gcmERR_BREAK(vgsPATHSTORAGE_Construct(
@@ -954,7 +956,7 @@ veglSetContext(
     gceSTATUS status;
     vgsCONTEXT_PTR context = (vgsCONTEXT_PTR) Context;
     gcoSURF Draw  = Drawable ? (gcoSURF)Drawable->rtHandles[0] : gcvNULL;
-    /*gcoSURF Read  = Readable ? (gcoSURF)Readable->rtHandle : gcvNULL;
+    /*gcoSURF Read  = Readable ? (gcoSURF)Readable->rtHandles[0] : gcvNULL;
     gcoSURF Depth = Drawable ? (gcoSURF)Drawable->depthHandle : gcvNULL;*/
 
     gcmTRACE_ZONE(
@@ -1000,6 +1002,24 @@ veglSetContext(
                     ));
 #endif
             }
+
+#if gcdGC355_PROFILER
+                /* Unset the current target. */
+                gcmERR_BREAK(gcoVG_SetTarget(
+                    thread->context->vg,
+                    thread->context->TreeDepth,
+                    thread->context->saveLayerTreeDepth,
+                    thread->context->varTreeDepth,
+                    gcvNULL,
+                    gcvORIENTATION_TOP_BOTTOM
+                    ));
+#else
+                gcmERR_BREAK(gcoVG_SetTarget(
+                    thread->context->vg,
+                    gcvNULL,
+                    gcvORIENTATION_TOP_BOTTOM
+                    ));
+#endif
 
             /* Reset the context. */
             thread->context = gcvNULL;
@@ -1054,23 +1074,6 @@ veglSetContext(
             }
             else
             {
-#if gcdGC355_PROFILER
-                /* Set target. */
-                gcmERR_BREAK(gcoVG_SetTarget(
-                    context->vg,
-                    (gcsPROFILERFUNCNODE *)context->funcDList,
-                    context->TreeDepth,
-                    context->saveLayerTreeDepth,
-                    context->varTreeDepth,
-                    gcvNULL,
-                    gcvORIENTATION_TOP_BOTTOM
-                    ));
-#else
-                /* Set target. */
-                gcmERR_BREAK(gcoVG_SetTarget(
-                    context->vg, gcvNULL, gcvORIENTATION_TOP_BOTTOM
-                    ));
-#endif
                 break;
             }
 
@@ -1516,7 +1519,11 @@ veglQueryHWVG(
     void
     )
 {
+#if defined(ANDROID)
+    return EGL_FALSE;
+#else
     return EGL_TRUE;
+#endif
 }
 
 /* VG Resolve */

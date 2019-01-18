@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -266,13 +266,7 @@ enum
     __VK_FORMAT_R32G32B32A32_SFLOAT_2_R32G32_SFLOAT = VK_FORMAT_END_RANGE + 1,
     __VK_FORMAT_R32G32B32A32_SINT_2_R32G32_SINT,
     __VK_FORMAT_R32G32B32A32_UINT_2_R32G32_UINT,
-    __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT,
-    __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT,
-    __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT,
-    __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT,
-    __VK_FORMAT_R32G32_SINT_2_R32_SINT,
-    __VK_FORMAT_R32G32_UINT_2_R32_UINT,
-    __VK_FORMAT_A4R4G4B4_UNFORM_PACK16,
+    __VK_FORMAT_A4R4G4B4_UNORM_PACK16,
     __VK_FORMAT_R8_1_X8R8G8B8,
     __VK_FORMAT_D24_UNORM_S8_UINT_PACKED32,
     __VK_FORMAT_D24_UNORM_X8_PACKED32,

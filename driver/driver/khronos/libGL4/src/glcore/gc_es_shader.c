@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -123,7 +123,9 @@ GLboolean __glInitProgramObject(__GLcontext *gc, __GLprogramObject *programObjec
 
 GLvoid __glDetachShader(__GLcontext *gc, __GLprogramObject * programObject, __GLshaderObject * shaderObject)
 {
-    __GLshaderObject **pAttachedShader = gcvNULL;
+    __GLshaderObjectList **pHead = gcvNULL;
+    __GLshaderObjectList *current = gcvNULL;
+    __GLshaderObjectList *next = gcvNULL;
     __GLSLStage  stage;
 
     GL_ASSERT(programObject);
@@ -131,14 +133,33 @@ GLvoid __glDetachShader(__GLcontext *gc, __GLprogramObject * programObject, __GL
 
     stage = __glGetShaderStage(shaderObject->shaderInfo.shaderType);
 
-    pAttachedShader = &programObject->programInfo.attachedShader[stage];
+    pHead = &programObject->programInfo.attachedShader[stage];
+    next = *pHead;
+
+
+    while (next && next->shader != shaderObject)
+    {
+        current = next;
+        next = current->next;
+    }
 
     /* The shader was not attached to the program */
-    if (*pAttachedShader != shaderObject)
+    if (gcvNULL == next)
     {
         __GL_ERROR_RET(GL_INVALID_OPERATION);
     }
-    *pAttachedShader = gcvNULL;
+    else
+    {
+        if (gcvNULL == current)
+        {
+            *pHead = next->next;
+        }
+        else
+        {
+            current->next = next->next;
+        }
+        (*gc->imports.free)(gc, next);
+    }
 
     if ((--shaderObject->objectInfo.bindCount) == 0 && shaderObject->shaderInfo.deleteStatus)
     {
@@ -207,7 +228,20 @@ GLboolean __glDeleteProgramObject(__GLcontext *gc, __GLprogramObject * programOb
     {
         if (programObject->programInfo.attachedShader[i])
         {
-            __glDetachShader(gc, programObject, programObject->programInfo.attachedShader[i]);
+            __GLshaderObjectList *current = gcvNULL;
+            __GLshaderObjectList *next = gcvNULL;
+            next = programObject->programInfo.attachedShader[i];
+            while (next)
+            {
+                current = next;
+                next = current->next;
+                if ((--current->shader->objectInfo.bindCount) == 0 && current->shader->shaderInfo.deleteStatus)
+                {
+                    __glDeleteObject(gc, gc->shaderProgram.spShared, current->shader->objectInfo.id);
+                }
+                (*gc->imports.free)(gc, current);
+            }
+            programObject->programInfo.attachedShader[i] = gcvNULL;
         }
     }
 
@@ -470,7 +504,7 @@ GLvoid __glFreeShaderProgramState(__GLcontext * gc)
 /* Section for implantation of API functions                            */
 /************************************************************************/
 
-GLuint GL_APIENTRY __gles_CreateShader(__GLcontext *gc,  GLenum type)
+GLuint GL_APIENTRY __glim_CreateShader(__GLcontext *gc,  GLenum type)
 {
     GLuint shader = 0;
     __GLshaderObject* shaderObject = gcvNULL;
@@ -519,7 +553,7 @@ OnError:
     return shader;
 }
 
-GLvoid GL_APIENTRY __gles_ShaderSource(__GLcontext *gc, GLuint shader, GLsizei count, const GLchar* const* string, const GLint* length)
+GLvoid GL_APIENTRY __glim_ShaderSource(__GLcontext *gc, GLuint shader, GLsizei count, const GLchar* const* string, const GLint* length)
 {
     __GLshaderObject * shaderObject = gcvNULL;
     GLchar *source = gcvNULL;
@@ -604,7 +638,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_ShaderBinary(__GLcontext *gc, GLsizei n, const GLuint* shaders, GLenum binaryformat, const GLvoid* binary, GLsizei length)
+GLvoid GL_APIENTRY __glim_ShaderBinary(__GLcontext *gc, GLsizei n, const GLuint* shaders, GLenum binaryformat, const GLvoid* binary, GLsizei length)
 {
     __GLshaderObject **shaderObjects = gcvNULL;
     GLboolean noerr;
@@ -683,7 +717,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_CompileShader(__GLcontext *gc, GLuint shader)
+GLvoid GL_APIENTRY __glim_CompileShader(__GLcontext *gc, GLuint shader)
 {
     __GLshaderObject * shaderObject;
 
@@ -707,7 +741,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DeleteShader(__GLcontext *gc, GLuint shader)
+GLvoid GL_APIENTRY __glim_DeleteShader(__GLcontext *gc, GLuint shader)
 {
     __GLshaderObject * shaderObject;
 
@@ -736,7 +770,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLuint GL_APIENTRY __gles_CreateProgram(__GLcontext *gc)
+GLuint GL_APIENTRY __glim_CreateProgram(__GLcontext *gc)
 {
     GLuint program;
     GLuint uniqueId;
@@ -769,11 +803,14 @@ OnError:
     return program;
 }
 
-GLvoid GL_APIENTRY __gles_AttachShader(__GLcontext *gc,  GLuint program, GLuint shader)
+GLvoid GL_APIENTRY __glim_AttachShader(__GLcontext *gc,  GLuint program, GLuint shader)
 {
     __GLshaderObject  *shaderObject    = gcvNULL;
     __GLprogramObject *programObject   = gcvNULL;
-    __GLshaderObject **pAttachedShader = gcvNULL;
+    __GLshaderObjectList *pAttachedShader = gcvNULL;
+    __GLshaderObjectList *current = gcvNULL;
+    __GLshaderObjectList *next = gcvNULL;
+    __GLshaderObjectList **pHead = gcvNULL;
     __GLSLStage stage;
 
     __GL_HEADER();
@@ -806,15 +843,36 @@ GLvoid GL_APIENTRY __gles_AttachShader(__GLcontext *gc,  GLuint program, GLuint 
 
     stage = __glGetShaderStage(shaderObject->shaderInfo.shaderType);
 
-    pAttachedShader = &programObject->programInfo.attachedShader[stage];
-
-    /* There is shader of the same type already be attached */
-    if (*pAttachedShader)
+    pAttachedShader= (__GLshaderObjectList *)(*gc->imports.calloc)(gc, 1, sizeof(__GLshaderObjectList));
+    if (gcvNULL == pAttachedShader)
     {
-        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
+    else
+    {
+        pAttachedShader->shader = shaderObject;
+        pAttachedShader->next = gcvNULL;
     }
 
-    *pAttachedShader = shaderObject;
+    pHead = &programObject->programInfo.attachedShader[stage];
+
+    if (gcvNULL == *pHead)
+    {
+        *pHead = pAttachedShader;
+    }
+    else
+    {
+#ifndef OPENGL40
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+#endif
+        next = *pHead;
+        while (gcvNULL != next)
+        {
+            current = next;
+            next = current->next;
+        }
+        current->next = pAttachedShader;
+    }
 
     /* bindCount includes bindings to programObjects both in single context and in shared contexts.
     */
@@ -824,7 +882,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DetachShader(__GLcontext *gc,  GLuint program, GLuint shader)
+GLvoid GL_APIENTRY __glim_DetachShader(__GLcontext *gc,  GLuint program, GLuint shader)
 {
     __GLshaderObject * shaderObject;
     __GLprogramObject * programObject;
@@ -863,7 +921,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_LinkProgram(__GLcontext *gc,  GLuint program)
+GLvoid GL_APIENTRY __glim_LinkProgram(__GLcontext *gc,  GLuint program)
 {
     __GLprogramObject * programObject = gcvNULL;
 
@@ -915,7 +973,7 @@ GLvoid GL_APIENTRY __gles_LinkProgram(__GLcontext *gc,  GLuint program)
         {
             if (programObject->programInfo.attachedShader[i])
             {
-               if (!programObject->programInfo.attachedShader[i]->shaderInfo.compiledStatus)
+               if (!programObject->programInfo.attachedShader[i]->shader->shaderInfo.compiledStatus)
                {
                    strncpy(programObject->programInfo.infoLog, "one attached shader in program is bad", __GLSL_LOG_INFO_SIZE);
                    programObject->programInfo.linkedStatus = GL_FALSE;
@@ -934,22 +992,43 @@ GLvoid GL_APIENTRY __gles_LinkProgram(__GLcontext *gc,  GLuint program)
     }
     else
     {
+        GLuint i;
+        for (i = 0; i < __GLSL_STAGE_LAST; i++)
+        {
+            if (programObject->programInfo.attachedShader[i])
+            {
+               if (!programObject->programInfo.attachedShader[i]->shader->shaderInfo.compiledStatus)
+               {
+                   strncpy(programObject->programInfo.infoLog, "one attached shader in program is bad", __GLSL_LOG_INFO_SIZE);
+                   programObject->programInfo.linkedStatus = GL_FALSE;
+                   __GL_EXIT();
+               }
+            }
+        }
+
+          /* Check CS shader. */
+        if ((!programObject->programInfo.attachedShader[__GLSL_STAGE_CS] ||
+             !programObject->programInfo.attachedShader[__GLSL_STAGE_CS]->shader->shaderInfo.compiledStatus) &&
+#ifdef OPENGL40
+            (!programObject->programInfo.attachedShader[__GLSL_STAGE_VS] ||
+             !programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.compiledStatus) &&
+            (!programObject->programInfo.attachedShader[__GLSL_STAGE_FS] ||
+             !programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.compiledStatus))
+#else
         /* (tbr)Check VS and PS shader. */
-        if ((!programObject->programInfo.attachedShader[__GLSL_STAGE_VS] ||
+            (!programObject->programInfo.attachedShader[__GLSL_STAGE_VS] ||
              !programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.compiledStatus ||
              !programObject->programInfo.attachedShader[__GLSL_STAGE_FS] ||
              !programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.compiledStatus)
-          /* Check CS shader. */
-          &&(!programObject->programInfo.attachedShader[__GLSL_STAGE_CS] ||
-             !programObject->programInfo.attachedShader[__GLSL_STAGE_CS]->shaderInfo.compiledStatus)
           /* Check VS, TCS and TES shader. */
-          &&(!programObject->programInfo.attachedShader[__GLSL_STAGE_VS] ||
+         &&(!programObject->programInfo.attachedShader[__GLSL_STAGE_VS] ||
              !programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.compiledStatus ||
              !programObject->programInfo.attachedShader[__GLSL_STAGE_TCS] ||
              !programObject->programInfo.attachedShader[__GLSL_STAGE_TCS]->shaderInfo.compiledStatus ||
              !programObject->programInfo.attachedShader[__GLSL_STAGE_TES] ||
              !programObject->programInfo.attachedShader[__GLSL_STAGE_TES]->shaderInfo.compiledStatus)
            )
+#endif
         {
             strncpy(programObject->programInfo.infoLog, "either vs or ps or cs in program is missed or bad", __GLSL_LOG_INFO_SIZE);
             programObject->programInfo.linkedStatus = GL_FALSE;
@@ -957,44 +1036,45 @@ GLvoid GL_APIENTRY __gles_LinkProgram(__GLcontext *gc,  GLuint program)
         }
 
  #ifdef OPENGL40
-        if (programObject->programInfo.attachedShader[__GLSL_STAGE_VS])
+        if (programObject->programInfo.attachedShader[__GLSL_STAGE_VS] &&
+            programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.hBinary)
         {
-                programObject->programInfo.vertShaderEnable = GL_TRUE;
+            programObject->programInfo.vertShaderEnable = GL_TRUE;
+            if((gc->state.light.clampVertexColor == GL_TRUE) || (gc->state.light.clampVertexColor == GL_FIXED_ONLY && !gc->modes.rgbFloatMode))
+            {
+                gcShaderSetClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.hBinary);
+            }
+            else
+            {
+                gcShaderClrClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.hBinary);
+            }
         }
-        if (programObject->programInfo.attachedShader[__GLSL_STAGE_FS])
+
+        if (programObject->programInfo.attachedShader[__GLSL_STAGE_FS] &&
+            programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.hBinary)
         {
-                programObject->programInfo.fragShaderEnable = GL_TRUE;
+            programObject->programInfo.fragShaderEnable = GL_TRUE;
+            if (gc->state.enables.program.vpTwoSize)
+            {
+                gcShaderSetVPTwoSideEnable((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.hBinary);
+            }
+            else
+            {
+                gcShaderClrVPTwoSideEnable((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.hBinary);
+            }
+            if((gc->state.raster.clampFragColor == GL_TRUE) || (gc->state.raster.clampFragColor == GL_FIXED_ONLY && !gc->modes.rgbFloatMode))
+            {
+                gcShaderSetClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.hBinary);
+            }
+            else
+            {
+                gcShaderClrClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.hBinary);
+            }
         }
+
         if (programObject->programInfo.attachedShader[__GLSL_STAGE_GS])
         {
                 programObject->programInfo.geomShaderEnable = GL_TRUE;
-        }
-
-        if (gc->state.enables.program.vpTwoSize)
-        {
-            gcShaderSetVPTwoSideEnable((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.hBinary);
-        }
-        else
-        {
-            gcShaderClrVPTwoSideEnable((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.hBinary);
-        }
-
-        if((gc->state.light.clampVertexColor == GL_TRUE) || (gc->state.light.clampVertexColor == GL_FIXED_ONLY && !gc->modes.rgbFloatMode))
-        {
-            gcShaderSetClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.hBinary);
-        }
-        else
-        {
-            gcShaderClrClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.hBinary);
-        }
-
-        if((gc->state.raster.clampFragColor == GL_TRUE) || (gc->state.raster.clampFragColor == GL_FIXED_ONLY && !gc->modes.rgbFloatMode))
-        {
-            gcShaderSetClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.hBinary);
-        }
-        else
-        {
-            gcShaderClrClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.hBinary);
         }
   #endif
 
@@ -1013,7 +1093,7 @@ GLvoid GL_APIENTRY __gles_LinkProgram(__GLcontext *gc,  GLuint program)
         for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
         {
             programObject->bindingInfo.activeShaderID[stage] = programObject->programInfo.attachedShader[stage]
-                                                             ? programObject->programInfo.attachedShader[stage]->objectInfo.id
+                                                             ? programObject->programInfo.attachedShader[stage]->shader->objectInfo.id
                                                              : 0;
         }
 
@@ -1073,7 +1153,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UseProgram(__GLcontext *gc, GLuint program)
+GLvoid GL_APIENTRY __glim_UseProgram(__GLcontext *gc, GLuint program)
 {
     __GLxfbObject *xfbObj;
     __GLprogramObject * programObject = gcvNULL;
@@ -1175,7 +1255,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ValidateProgram(__GLcontext *gc,  GLuint program)
+GLvoid GL_APIENTRY __glim_ValidateProgram(__GLcontext *gc,  GLuint program)
 {
     __GLprogramObject *programObject = gcvNULL;
 
@@ -1201,7 +1281,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DeleteProgram(__GLcontext *gc,  GLuint program)
+GLvoid GL_APIENTRY __glim_DeleteProgram(__GLcontext *gc,  GLuint program)
 {
     __GLprogramObject * programObject;
 
@@ -1230,7 +1310,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLboolean GL_APIENTRY __gles_IsShader(__GLcontext *gc,  GLuint shader)
+GLboolean GL_APIENTRY __glim_IsShader(__GLcontext *gc,  GLuint shader)
 {
     __GLshPrgObjInfo *object;
 
@@ -1252,7 +1332,7 @@ GLboolean GL_APIENTRY __gles_IsShader(__GLcontext *gc,  GLuint shader)
     }
 }
 
-GLvoid GL_APIENTRY __gles_GetShaderiv(__GLcontext *gc,  GLuint shader, GLenum pname, GLint *params)
+GLvoid GL_APIENTRY __glim_GetShaderiv(__GLcontext *gc,  GLuint shader, GLenum pname, GLint *params)
 {
     __GLshaderObject * shaderObject;
 
@@ -1308,7 +1388,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetShaderSource(__GLcontext *gc, GLuint shader, GLsizei bufSize,
+GLvoid GL_APIENTRY __glim_GetShaderSource(__GLcontext *gc, GLuint shader, GLsizei bufSize,
                                           GLsizei *length, GLchar *source)
 {
     __GLshaderObject * shaderObject = gcvNULL;
@@ -1354,7 +1434,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetShaderInfoLog(__GLcontext *gc, GLuint shader, GLsizei bufSize,
+GLvoid GL_APIENTRY __glim_GetShaderInfoLog(__GLcontext *gc, GLuint shader, GLsizei bufSize,
                                            GLsizei *length, GLchar *infoLog)
 {
     __GLshaderObject * shaderObject = gcvNULL;
@@ -1409,7 +1489,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetShaderPrecisionFormat(__GLcontext *gc, GLenum shadertype, GLenum precisiontype,
+GLvoid GL_APIENTRY __glim_GetShaderPrecisionFormat(__GLcontext *gc, GLenum shadertype, GLenum precisiontype,
                                                    GLint* range, GLint* precision)
 {
     __GLSLStage stageIndex = __GLSL_STAGE_LAST;
@@ -1453,7 +1533,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLboolean GL_APIENTRY __gles_IsProgram(__GLcontext *gc, GLuint program)
+GLboolean GL_APIENTRY __glim_IsProgram(__GLcontext *gc, GLuint program)
 {
     __GLshPrgObjInfo *object;
 
@@ -1475,7 +1555,7 @@ GLboolean GL_APIENTRY __gles_IsProgram(__GLcontext *gc, GLuint program)
     }
 }
 
-GLvoid GL_APIENTRY __gles_GetProgramiv(__GLcontext *gc, GLuint program, GLenum pname, GLint *params)
+GLvoid GL_APIENTRY __glim_GetProgramiv(__GLcontext *gc, GLuint program, GLenum pname, GLint *params)
 {
     __GLprogramObject * programObject;
 
@@ -1523,10 +1603,15 @@ GLvoid GL_APIENTRY __gles_GetProgramiv(__GLcontext *gc, GLuint program, GLenum p
         {
             GLint count = 0;
             GLuint i;
+            __GLshaderObjectList *next = gcvNULL;
+            __GLshaderObjectList *current = gcvNULL;
             for (i = 0; i < __GLSL_STAGE_LAST; i++)
             {
-                if (programObject->programInfo.attachedShader[i] != NULL)
+                next = programObject->programInfo.attachedShader[i];
+                while (next)
                 {
+                    current = next;
+                    next = current->next;
                     count++;
                 }
             }
@@ -1583,7 +1668,7 @@ GLvoid GL_APIENTRY __gles_GetProgramiv(__GLcontext *gc, GLuint program, GLenum p
         {
             GLsizei bplen = 0;
             gc->dp.getProgramBinary(gc, programObject, (GLsizei)(0x7ffffff), &bplen, gcvNULL, gcvNULL);
-            *params = *((GLint *)&bplen);
+            *params = (GLint)bplen;
         }
         else
         {
@@ -1723,7 +1808,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetProgramInfoLog(__GLcontext *gc, GLuint program, GLsizei bufSize,
+GLvoid GL_APIENTRY __glim_GetProgramInfoLog(__GLcontext *gc, GLuint program, GLsizei bufSize,
                                             GLsizei *length, GLchar *infoLog)
 {
     __GLprogramObject * programObject = gcvNULL;
@@ -1778,10 +1863,11 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetAttachedShaders(__GLcontext *gc,  GLuint program, GLsizei maxCount,
+GLvoid GL_APIENTRY __glim_GetAttachedShaders(__GLcontext *gc,  GLuint program, GLsizei maxCount,
                                              GLsizei * count, GLuint *shader)
 {
     __GLprogramObject * programObject;
+    __GLshaderObjectList  *currentShader = gcvNULL;
     GLuint i;
     GLint number = 0;
 
@@ -1813,7 +1899,12 @@ GLvoid GL_APIENTRY __gles_GetAttachedShaders(__GLcontext *gc,  GLuint program, G
     {
         if (programObject->programInfo.attachedShader[i] != NULL)
         {
-            shader[number++] = programObject->programInfo.attachedShader[i]->objectInfo.id;
+            currentShader = programObject->programInfo.attachedShader[i];
+            while (currentShader)
+            {
+                shader[number++] = currentShader->shader->objectInfo.id;
+                currentShader = currentShader->next;
+            }
         }
     }
 
@@ -1826,7 +1917,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetActiveAttrib(__GLcontext *gc,  GLuint program, GLuint index, GLsizei bufSize,
+GLvoid GL_APIENTRY __glim_GetActiveAttrib(__GLcontext *gc,  GLuint program, GLuint index, GLsizei bufSize,
                                           GLsizei *length, GLint *size, GLenum *type, GLchar *name)
 {
     __GLprogramObject * programObject;
@@ -1860,7 +1951,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLint GL_APIENTRY __gles_GetAttribLocation(__GLcontext *gc, GLuint program, const GLchar * name)
+GLint GL_APIENTRY __glim_GetAttribLocation(__GLcontext *gc, GLuint program, const GLchar * name)
 {
     __GLprogramObject * programObject;
     GLint ret = -1;
@@ -1901,7 +1992,7 @@ OnExit:
     return ret;
 }
 
-GLvoid GL_APIENTRY __gles_BindAttribLocation(__GLcontext *gc,  GLuint program, GLuint index, const GLchar * name)
+GLvoid GL_APIENTRY __glim_BindAttribLocation(__GLcontext *gc,  GLuint program, GLuint index, const GLchar * name)
 {
     __GLprogramObject * programObject;
 
@@ -1937,7 +2028,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetActiveUniform(__GLcontext *gc, GLuint program, GLuint index, GLsizei bufSize,
+GLvoid GL_APIENTRY __glim_GetActiveUniform(__GLcontext *gc, GLuint program, GLuint index, GLsizei bufSize,
                                            GLsizei* length, GLint* size, GLenum* type, GLchar* name)
 {
     __GLprogramObject* programObject;
@@ -1972,7 +2063,7 @@ OnError:
 }
 
 
-GLint GL_APIENTRY __gles_GetUniformLocation(__GLcontext *gc,  GLuint program, const GLchar *name)
+GLint GL_APIENTRY __glim_GetUniformLocation(__GLcontext *gc,  GLuint program, const GLchar *name)
 {
     __GLprogramObject * programObject;
     GLint ret = -1;
@@ -2044,7 +2135,7 @@ GLvoid __glUniform(__GLcontext *gc, GLint location, GLint type, GLsizei count,
     (*gc->dp.setUniformData)(gc, activeProgObj, location, type, count, values, transpose);
 }
 
-GLvoid GL_APIENTRY __gles_Uniform1f(__GLcontext *gc, GLint location, GLfloat x)
+GLvoid GL_APIENTRY __glim_Uniform1f(__GLcontext *gc, GLint location, GLfloat x)
 {
     __GL_HEADER();
 
@@ -2053,7 +2144,7 @@ GLvoid GL_APIENTRY __gles_Uniform1f(__GLcontext *gc, GLint location, GLfloat x)
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform2f(__GLcontext *gc, GLint location, GLfloat x, GLfloat y)
+GLvoid GL_APIENTRY __glim_Uniform2f(__GLcontext *gc, GLint location, GLfloat x, GLfloat y)
 {
     GLfloat v[2] = {x, y};
 
@@ -2064,7 +2155,7 @@ GLvoid GL_APIENTRY __gles_Uniform2f(__GLcontext *gc, GLint location, GLfloat x, 
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform3f(__GLcontext *gc, GLint location, GLfloat x, GLfloat y, GLfloat z)
+GLvoid GL_APIENTRY __glim_Uniform3f(__GLcontext *gc, GLint location, GLfloat x, GLfloat y, GLfloat z)
 {
     GLfloat v[3] = {x, y, z};
 
@@ -2075,7 +2166,7 @@ GLvoid GL_APIENTRY __gles_Uniform3f(__GLcontext *gc, GLint location, GLfloat x, 
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform4f(__GLcontext *gc, GLint location, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
+GLvoid GL_APIENTRY __glim_Uniform4f(__GLcontext *gc, GLint location, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
 {
     GLfloat v[4] = {x, y, z, w};
 
@@ -2086,7 +2177,7 @@ GLvoid GL_APIENTRY __gles_Uniform4f(__GLcontext *gc, GLint location, GLfloat x, 
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform1i(__GLcontext *gc, GLint location, GLint x)
+GLvoid GL_APIENTRY __glim_Uniform1i(__GLcontext *gc, GLint location, GLint x)
 {
     __GL_HEADER();
 
@@ -2095,7 +2186,7 @@ GLvoid GL_APIENTRY __gles_Uniform1i(__GLcontext *gc, GLint location, GLint x)
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform2i(__GLcontext *gc, GLint location, GLint x, GLint y)
+GLvoid GL_APIENTRY __glim_Uniform2i(__GLcontext *gc, GLint location, GLint x, GLint y)
 {
     GLint iv[2] = {x, y};
 
@@ -2106,7 +2197,7 @@ GLvoid GL_APIENTRY __gles_Uniform2i(__GLcontext *gc, GLint location, GLint x, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform3i(__GLcontext *gc, GLint location, GLint x, GLint y, GLint z)
+GLvoid GL_APIENTRY __glim_Uniform3i(__GLcontext *gc, GLint location, GLint x, GLint y, GLint z)
 {
     GLint iv[3]= {x, y, z};
 
@@ -2117,7 +2208,7 @@ GLvoid GL_APIENTRY __gles_Uniform3i(__GLcontext *gc, GLint location, GLint x, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform4i(__GLcontext *gc, GLint location, GLint x, GLint y, GLint z, GLint w)
+GLvoid GL_APIENTRY __glim_Uniform4i(__GLcontext *gc, GLint location, GLint x, GLint y, GLint z, GLint w)
 {
     GLint iv[4] = {x, y, z, w};
 
@@ -2128,7 +2219,7 @@ GLvoid GL_APIENTRY __gles_Uniform4i(__GLcontext *gc, GLint location, GLint x, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform1d(__GLcontext *gc, GLint location, GLdouble x)
+GLvoid GL_APIENTRY __glim_Uniform1d(__GLcontext *gc, GLint location, GLdouble x)
 {
     __GL_HEADER();
 
@@ -2137,7 +2228,7 @@ GLvoid GL_APIENTRY __gles_Uniform1d(__GLcontext *gc, GLint location, GLdouble x)
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform2d(__GLcontext *gc, GLint location, GLdouble x, GLdouble y)
+GLvoid GL_APIENTRY __glim_Uniform2d(__GLcontext *gc, GLint location, GLdouble x, GLdouble y)
 {
     GLdouble iv[2] = {x, y};
 
@@ -2148,8 +2239,7 @@ GLvoid GL_APIENTRY __gles_Uniform2d(__GLcontext *gc, GLint location, GLdouble x,
     __GL_FOOTER();
 }
 
-
-GLvoid GL_APIENTRY __gles_Uniform3d(__GLcontext *gc, GLint location, GLdouble x, GLdouble y, GLdouble z)
+GLvoid GL_APIENTRY __glim_Uniform3d(__GLcontext *gc, GLint location, GLdouble x, GLdouble y, GLdouble z)
 {
     GLdouble iv[3] = {x, y, z};
 
@@ -2160,9 +2250,7 @@ GLvoid GL_APIENTRY __gles_Uniform3d(__GLcontext *gc, GLint location, GLdouble x,
     __GL_FOOTER();
 }
 
-
-
-GLvoid GL_APIENTRY __gles_Uniform4d(__GLcontext *gc, GLint location, GLdouble x, GLdouble y, GLdouble z, GLdouble w)
+GLvoid GL_APIENTRY __glim_Uniform4d(__GLcontext *gc, GLint location, GLdouble x, GLdouble y, GLdouble z, GLdouble w)
 {
     GLdouble iv[4] = {x, y, z, w};
 
@@ -2173,8 +2261,7 @@ GLvoid GL_APIENTRY __gles_Uniform4d(__GLcontext *gc, GLint location, GLdouble x,
     __GL_FOOTER();
 }
 
-
-GLvoid GL_APIENTRY __gles_Uniform1ui(__GLcontext *gc, GLint location, GLuint x)
+GLvoid GL_APIENTRY __glim_Uniform1ui(__GLcontext *gc, GLint location, GLuint x)
 {
     __GL_HEADER();
 
@@ -2183,7 +2270,7 @@ GLvoid GL_APIENTRY __gles_Uniform1ui(__GLcontext *gc, GLint location, GLuint x)
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform2ui(__GLcontext *gc, GLint location, GLuint x, GLuint y)
+GLvoid GL_APIENTRY __glim_Uniform2ui(__GLcontext *gc, GLint location, GLuint x, GLuint y)
 {
     GLuint iv[2] = {x, y};
 
@@ -2194,7 +2281,7 @@ GLvoid GL_APIENTRY __gles_Uniform2ui(__GLcontext *gc, GLint location, GLuint x, 
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform3ui(__GLcontext *gc, GLint location, GLuint x, GLuint y, GLuint z)
+GLvoid GL_APIENTRY __glim_Uniform3ui(__GLcontext *gc, GLint location, GLuint x, GLuint y, GLuint z)
 {
     GLuint iv[3] = {x, y, z};
 
@@ -2205,7 +2292,7 @@ GLvoid GL_APIENTRY __gles_Uniform3ui(__GLcontext *gc, GLint location, GLuint x, 
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform4ui(__GLcontext *gc, GLint location, GLuint x, GLuint y, GLuint z, GLuint w)
+GLvoid GL_APIENTRY __glim_Uniform4ui(__GLcontext *gc, GLint location, GLuint x, GLuint y, GLuint z, GLuint w)
 {
     GLuint iv[4] = {x, y, z, w};
 
@@ -2216,7 +2303,7 @@ GLvoid GL_APIENTRY __gles_Uniform4ui(__GLcontext *gc, GLint location, GLuint x, 
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform1fv(__GLcontext *gc, GLint location, GLsizei count, const GLfloat * v)
+GLvoid GL_APIENTRY __glim_Uniform1fv(__GLcontext *gc, GLint location, GLsizei count, const GLfloat * v)
 {
     __GL_HEADER();
 
@@ -2225,7 +2312,7 @@ GLvoid GL_APIENTRY __gles_Uniform1fv(__GLcontext *gc, GLint location, GLsizei co
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform2fv(__GLcontext *gc, GLint location, GLsizei count, const GLfloat *v)
+GLvoid GL_APIENTRY __glim_Uniform2fv(__GLcontext *gc, GLint location, GLsizei count, const GLfloat *v)
 {
     __GL_HEADER();
 
@@ -2234,7 +2321,7 @@ GLvoid GL_APIENTRY __gles_Uniform2fv(__GLcontext *gc, GLint location, GLsizei co
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform3fv(__GLcontext *gc, GLint location, GLsizei count, const GLfloat *v)
+GLvoid GL_APIENTRY __glim_Uniform3fv(__GLcontext *gc, GLint location, GLsizei count, const GLfloat *v)
 {
     __GL_HEADER();
 
@@ -2243,7 +2330,7 @@ GLvoid GL_APIENTRY __gles_Uniform3fv(__GLcontext *gc, GLint location, GLsizei co
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform4fv(__GLcontext *gc, GLint location, GLsizei count, const GLfloat *v)
+GLvoid GL_APIENTRY __glim_Uniform4fv(__GLcontext *gc, GLint location, GLsizei count, const GLfloat *v)
 {
     __GL_HEADER();
 
@@ -2252,7 +2339,7 @@ GLvoid GL_APIENTRY __gles_Uniform4fv(__GLcontext *gc, GLint location, GLsizei co
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform1iv(__GLcontext *gc, GLint location, GLsizei count, const GLint *v)
+GLvoid GL_APIENTRY __glim_Uniform1iv(__GLcontext *gc, GLint location, GLsizei count, const GLint *v)
 {
     __GL_HEADER();
 
@@ -2261,7 +2348,7 @@ GLvoid GL_APIENTRY __gles_Uniform1iv(__GLcontext *gc, GLint location, GLsizei co
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform2iv(__GLcontext *gc, GLint location, GLsizei count, const GLint *v)
+GLvoid GL_APIENTRY __glim_Uniform2iv(__GLcontext *gc, GLint location, GLsizei count, const GLint *v)
 {
     __GL_HEADER();
 
@@ -2270,7 +2357,7 @@ GLvoid GL_APIENTRY __gles_Uniform2iv(__GLcontext *gc, GLint location, GLsizei co
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform3iv(__GLcontext *gc, GLint location, GLsizei count, const GLint *v)
+GLvoid GL_APIENTRY __glim_Uniform3iv(__GLcontext *gc, GLint location, GLsizei count, const GLint *v)
 {
     __GL_HEADER();
 
@@ -2279,7 +2366,7 @@ GLvoid GL_APIENTRY __gles_Uniform3iv(__GLcontext *gc, GLint location, GLsizei co
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform4iv(__GLcontext *gc, GLint location, GLsizei count, const GLint *v)
+GLvoid GL_APIENTRY __glim_Uniform4iv(__GLcontext *gc, GLint location, GLsizei count, const GLint *v)
 {
     __GL_HEADER();
 
@@ -2288,7 +2375,7 @@ GLvoid GL_APIENTRY __gles_Uniform4iv(__GLcontext *gc, GLint location, GLsizei co
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform1dv(__GLcontext *gc, GLint location, GLsizei count, const GLdouble *v)
+GLvoid GL_APIENTRY __glim_Uniform1dv(__GLcontext *gc, GLint location, GLsizei count, const GLdouble *v)
 {
     __GL_HEADER();
 
@@ -2297,7 +2384,7 @@ GLvoid GL_APIENTRY __gles_Uniform1dv(__GLcontext *gc, GLint location, GLsizei co
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform2dv(__GLcontext *gc, GLint location, GLsizei count, const GLdouble *v)
+GLvoid GL_APIENTRY __glim_Uniform2dv(__GLcontext *gc, GLint location, GLsizei count, const GLdouble *v)
 {
     __GL_HEADER();
 
@@ -2306,7 +2393,7 @@ GLvoid GL_APIENTRY __gles_Uniform2dv(__GLcontext *gc, GLint location, GLsizei co
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform3dv(__GLcontext *gc, GLint location, GLsizei count, const GLdouble *v)
+GLvoid GL_APIENTRY __glim_Uniform3dv(__GLcontext *gc, GLint location, GLsizei count, const GLdouble *v)
 {
     __GL_HEADER();
 
@@ -2315,7 +2402,7 @@ GLvoid GL_APIENTRY __gles_Uniform3dv(__GLcontext *gc, GLint location, GLsizei co
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform4dv(__GLcontext *gc, GLint location, GLsizei count, const GLdouble *v)
+GLvoid GL_APIENTRY __glim_Uniform4dv(__GLcontext *gc, GLint location, GLsizei count, const GLdouble *v)
 {
     __GL_HEADER();
 
@@ -2324,7 +2411,7 @@ GLvoid GL_APIENTRY __gles_Uniform4dv(__GLcontext *gc, GLint location, GLsizei co
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform1uiv(__GLcontext *gc, GLint location, GLsizei count, const GLuint *v)
+GLvoid GL_APIENTRY __glim_Uniform1uiv(__GLcontext *gc, GLint location, GLsizei count, const GLuint *v)
 {
     __GL_HEADER();
 
@@ -2333,7 +2420,7 @@ GLvoid GL_APIENTRY __gles_Uniform1uiv(__GLcontext *gc, GLint location, GLsizei c
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform2uiv(__GLcontext *gc, GLint location, GLsizei count, const GLuint *v)
+GLvoid GL_APIENTRY __glim_Uniform2uiv(__GLcontext *gc, GLint location, GLsizei count, const GLuint *v)
 {
     __GL_HEADER();
 
@@ -2342,7 +2429,7 @@ GLvoid GL_APIENTRY __gles_Uniform2uiv(__GLcontext *gc, GLint location, GLsizei c
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform3uiv(__GLcontext *gc, GLint location, GLsizei count, const GLuint *v)
+GLvoid GL_APIENTRY __glim_Uniform3uiv(__GLcontext *gc, GLint location, GLsizei count, const GLuint *v)
 {
     __GL_HEADER();
 
@@ -2351,7 +2438,7 @@ GLvoid GL_APIENTRY __gles_Uniform3uiv(__GLcontext *gc, GLint location, GLsizei c
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Uniform4uiv(__GLcontext *gc, GLint location, GLsizei count, const GLuint *v)
+GLvoid GL_APIENTRY __glim_Uniform4uiv(__GLcontext *gc, GLint location, GLsizei count, const GLuint *v)
 {
     __GL_HEADER();
 
@@ -2360,7 +2447,7 @@ GLvoid GL_APIENTRY __gles_Uniform4uiv(__GLcontext *gc, GLint location, GLsizei c
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UniformMatrix2fv(__GLcontext *gc, GLint location, GLsizei count,
+GLvoid GL_APIENTRY __glim_UniformMatrix2fv(__GLcontext *gc, GLint location, GLsizei count,
                                            GLboolean transpose, const GLfloat *v)
 {
     __GL_HEADER();
@@ -2370,7 +2457,7 @@ GLvoid GL_APIENTRY __gles_UniformMatrix2fv(__GLcontext *gc, GLint location, GLsi
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UniformMatrix3fv(__GLcontext *gc, GLint location, GLsizei count,
+GLvoid GL_APIENTRY __glim_UniformMatrix3fv(__GLcontext *gc, GLint location, GLsizei count,
                                            GLboolean transpose, const GLfloat *v)
 {
     __GL_HEADER();
@@ -2380,7 +2467,7 @@ GLvoid GL_APIENTRY __gles_UniformMatrix3fv(__GLcontext *gc, GLint location, GLsi
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UniformMatrix4fv(__GLcontext *gc, GLint location, GLsizei count,
+GLvoid GL_APIENTRY __glim_UniformMatrix4fv(__GLcontext *gc, GLint location, GLsizei count,
                                            GLboolean transpose, const GLfloat * v)
 {
     __GL_HEADER();
@@ -2390,7 +2477,7 @@ GLvoid GL_APIENTRY __gles_UniformMatrix4fv(__GLcontext *gc, GLint location, GLsi
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UniformMatrix2x3fv(__GLcontext *gc, GLint location, GLsizei count,
+GLvoid GL_APIENTRY __glim_UniformMatrix2x3fv(__GLcontext *gc, GLint location, GLsizei count,
                                              GLboolean transpose, const GLfloat *v)
 {
     __GL_HEADER();
@@ -2400,7 +2487,7 @@ GLvoid GL_APIENTRY __gles_UniformMatrix2x3fv(__GLcontext *gc, GLint location, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UniformMatrix2x4fv(__GLcontext *gc, GLint location, GLsizei count,
+GLvoid GL_APIENTRY __glim_UniformMatrix2x4fv(__GLcontext *gc, GLint location, GLsizei count,
                                              GLboolean transpose, const GLfloat *v)
 {
     __GL_HEADER();
@@ -2410,7 +2497,7 @@ GLvoid GL_APIENTRY __gles_UniformMatrix2x4fv(__GLcontext *gc, GLint location, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UniformMatrix3x2fv(__GLcontext *gc, GLint location, GLsizei count,
+GLvoid GL_APIENTRY __glim_UniformMatrix3x2fv(__GLcontext *gc, GLint location, GLsizei count,
                                              GLboolean transpose, const GLfloat *v)
 {
     __GL_HEADER();
@@ -2420,7 +2507,7 @@ GLvoid GL_APIENTRY __gles_UniformMatrix3x2fv(__GLcontext *gc, GLint location, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UniformMatrix3x4fv(__GLcontext *gc, GLint location, GLsizei count,
+GLvoid GL_APIENTRY __glim_UniformMatrix3x4fv(__GLcontext *gc, GLint location, GLsizei count,
                                              GLboolean transpose, const GLfloat *v)
 {
     __GL_HEADER();
@@ -2430,7 +2517,7 @@ GLvoid GL_APIENTRY __gles_UniformMatrix3x4fv(__GLcontext *gc, GLint location, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UniformMatrix4x2fv(__GLcontext *gc, GLint location, GLsizei count,
+GLvoid GL_APIENTRY __glim_UniformMatrix4x2fv(__GLcontext *gc, GLint location, GLsizei count,
                                              GLboolean transpose, const GLfloat * v)
 {
     __GL_HEADER();
@@ -2440,7 +2527,7 @@ GLvoid GL_APIENTRY __gles_UniformMatrix4x2fv(__GLcontext *gc, GLint location, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UniformMatrix4x3fv(__GLcontext *gc, GLint location, GLsizei count,
+GLvoid GL_APIENTRY __glim_UniformMatrix4x3fv(__GLcontext *gc, GLint location, GLsizei count,
                                              GLboolean transpose, const GLfloat * v)
 {
     __GL_HEADER();
@@ -2450,7 +2537,7 @@ GLvoid GL_APIENTRY __gles_UniformMatrix4x3fv(__GLcontext *gc, GLint location, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UniformMatrix2dv(__GLcontext *gc, GLint location, GLsizei count,
+GLvoid GL_APIENTRY __glim_UniformMatrix2dv(__GLcontext *gc, GLint location, GLsizei count,
                                            GLboolean transpose, const GLdouble *v)
 {
     __GL_HEADER();
@@ -2460,7 +2547,7 @@ GLvoid GL_APIENTRY __gles_UniformMatrix2dv(__GLcontext *gc, GLint location, GLsi
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UniformMatrix3dv(__GLcontext *gc, GLint location, GLsizei count,
+GLvoid GL_APIENTRY __glim_UniformMatrix3dv(__GLcontext *gc, GLint location, GLsizei count,
                                            GLboolean transpose, const GLdouble *v)
 {
     __GL_HEADER();
@@ -2470,7 +2557,7 @@ GLvoid GL_APIENTRY __gles_UniformMatrix3dv(__GLcontext *gc, GLint location, GLsi
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UniformMatrix4dv(__GLcontext *gc, GLint location, GLsizei count,
+GLvoid GL_APIENTRY __glim_UniformMatrix4dv(__GLcontext *gc, GLint location, GLsizei count,
                                            GLboolean transpose, const GLdouble *v)
 {
     __GL_HEADER();
@@ -2480,7 +2567,7 @@ GLvoid GL_APIENTRY __gles_UniformMatrix4dv(__GLcontext *gc, GLint location, GLsi
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UniformMatrix2x3dv(__GLcontext *gc, GLint location, GLsizei count,
+GLvoid GL_APIENTRY __glim_UniformMatrix2x3dv(__GLcontext *gc, GLint location, GLsizei count,
                                            GLboolean transpose, const GLdouble *v)
 {
     __GL_HEADER();
@@ -2490,7 +2577,7 @@ GLvoid GL_APIENTRY __gles_UniformMatrix2x3dv(__GLcontext *gc, GLint location, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UniformMatrix2x4dv(__GLcontext *gc, GLint location, GLsizei count,
+GLvoid GL_APIENTRY __glim_UniformMatrix2x4dv(__GLcontext *gc, GLint location, GLsizei count,
                                            GLboolean transpose, const GLdouble *v)
 {
     __GL_HEADER();
@@ -2500,8 +2587,7 @@ GLvoid GL_APIENTRY __gles_UniformMatrix2x4dv(__GLcontext *gc, GLint location, GL
     __GL_FOOTER();
 }
 
-
-GLvoid GL_APIENTRY __gles_UniformMatrix3x2dv(__GLcontext *gc, GLint location, GLsizei count,
+GLvoid GL_APIENTRY __glim_UniformMatrix3x2dv(__GLcontext *gc, GLint location, GLsizei count,
                                            GLboolean transpose, const GLdouble *v)
 {
     __GL_HEADER();
@@ -2511,7 +2597,7 @@ GLvoid GL_APIENTRY __gles_UniformMatrix3x2dv(__GLcontext *gc, GLint location, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UniformMatrix3x4dv(__GLcontext *gc, GLint location, GLsizei count,
+GLvoid GL_APIENTRY __glim_UniformMatrix3x4dv(__GLcontext *gc, GLint location, GLsizei count,
                                            GLboolean transpose, const GLdouble *v)
 {
     __GL_HEADER();
@@ -2521,7 +2607,7 @@ GLvoid GL_APIENTRY __gles_UniformMatrix3x4dv(__GLcontext *gc, GLint location, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UniformMatrix4x2dv(__GLcontext *gc, GLint location, GLsizei count,
+GLvoid GL_APIENTRY __glim_UniformMatrix4x2dv(__GLcontext *gc, GLint location, GLsizei count,
                                            GLboolean transpose, const GLdouble *v)
 {
     __GL_HEADER();
@@ -2531,7 +2617,7 @@ GLvoid GL_APIENTRY __gles_UniformMatrix4x2dv(__GLcontext *gc, GLint location, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UniformMatrix4x3dv(__GLcontext *gc, GLint location, GLsizei count,
+GLvoid GL_APIENTRY __glim_UniformMatrix4x3dv(__GLcontext *gc, GLint location, GLsizei count,
                                            GLboolean transpose, const GLdouble *v)
 {
     __GL_HEADER();
@@ -2540,9 +2626,6 @@ GLvoid GL_APIENTRY __gles_UniformMatrix4x3dv(__GLcontext *gc, GLint location, GL
 
     __GL_FOOTER();
 }
-
-
-
 
 GLvoid __glProgramUniform(__GLcontext *gc, GLuint program, GLint location, GLint type,
                           GLsizei count, const GLvoid * values, GLboolean transpose)
@@ -2577,7 +2660,7 @@ GLvoid __glProgramUniform(__GLcontext *gc, GLuint program, GLint location, GLint
     (*gc->dp.setUniformData)(gc, programObject, location, type, count, values, transpose);
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform1f(__GLcontext *gc, GLuint program, GLint location, GLfloat x)
+GLvoid GL_APIENTRY __glim_ProgramUniform1f(__GLcontext *gc, GLuint program, GLint location, GLfloat x)
 {
     __GL_HEADER();
 
@@ -2586,7 +2669,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform1f(__GLcontext *gc, GLuint program, GLin
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform2f(__GLcontext *gc, GLuint program, GLint location, GLfloat x, GLfloat y)
+GLvoid GL_APIENTRY __glim_ProgramUniform2f(__GLcontext *gc, GLuint program, GLint location, GLfloat x, GLfloat y)
 {
     GLfloat v[2] = {x, y};
 
@@ -2597,7 +2680,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform2f(__GLcontext *gc, GLuint program, GLin
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform3f(__GLcontext *gc, GLuint program, GLint location, GLfloat x, GLfloat y, GLfloat z)
+GLvoid GL_APIENTRY __glim_ProgramUniform3f(__GLcontext *gc, GLuint program, GLint location, GLfloat x, GLfloat y, GLfloat z)
 {
     GLfloat v[3] = {x, y, z};
 
@@ -2608,7 +2691,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform3f(__GLcontext *gc, GLuint program, GLin
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform4f(__GLcontext *gc, GLuint program, GLint location, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
+GLvoid GL_APIENTRY __glim_ProgramUniform4f(__GLcontext *gc, GLuint program, GLint location, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
 {
     GLfloat v[4] = {x, y, z, w};
 
@@ -2619,7 +2702,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform4f(__GLcontext *gc, GLuint program, GLin
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform1i(__GLcontext *gc, GLuint program, GLint location, GLint x)
+GLvoid GL_APIENTRY __glim_ProgramUniform1i(__GLcontext *gc, GLuint program, GLint location, GLint x)
 {
     __GL_HEADER();
 
@@ -2628,7 +2711,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform1i(__GLcontext *gc, GLuint program, GLin
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform2i(__GLcontext *gc, GLuint program, GLint location, GLint x, GLint y)
+GLvoid GL_APIENTRY __glim_ProgramUniform2i(__GLcontext *gc, GLuint program, GLint location, GLint x, GLint y)
 {
     GLint iv[2] = {x, y};
 
@@ -2639,7 +2722,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform2i(__GLcontext *gc, GLuint program, GLin
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform3i(__GLcontext *gc, GLuint program, GLint location, GLint x, GLint y, GLint z)
+GLvoid GL_APIENTRY __glim_ProgramUniform3i(__GLcontext *gc, GLuint program, GLint location, GLint x, GLint y, GLint z)
 {
     GLint iv[3]= {x, y, z};
 
@@ -2650,7 +2733,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform3i(__GLcontext *gc, GLuint program, GLin
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform4i(__GLcontext *gc, GLuint program, GLint location, GLint x, GLint y, GLint z, GLint w)
+GLvoid GL_APIENTRY __glim_ProgramUniform4i(__GLcontext *gc, GLuint program, GLint location, GLint x, GLint y, GLint z, GLint w)
 {
     GLint iv[4] = {x, y, z, w};
 
@@ -2661,7 +2744,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform4i(__GLcontext *gc, GLuint program, GLin
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform1ui(__GLcontext *gc, GLuint program, GLint location, GLuint x)
+GLvoid GL_APIENTRY __glim_ProgramUniform1ui(__GLcontext *gc, GLuint program, GLint location, GLuint x)
 {
     __GL_HEADER();
 
@@ -2670,7 +2753,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform1ui(__GLcontext *gc, GLuint program, GLi
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform2ui(__GLcontext *gc, GLuint program, GLint location, GLuint x, GLuint y)
+GLvoid GL_APIENTRY __glim_ProgramUniform2ui(__GLcontext *gc, GLuint program, GLint location, GLuint x, GLuint y)
 {
     GLuint iv[2] = {x, y};
 
@@ -2681,7 +2764,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform2ui(__GLcontext *gc, GLuint program, GLi
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform3ui(__GLcontext *gc, GLuint program, GLint location, GLuint x, GLuint y, GLuint z)
+GLvoid GL_APIENTRY __glim_ProgramUniform3ui(__GLcontext *gc, GLuint program, GLint location, GLuint x, GLuint y, GLuint z)
 {
     GLuint iv[3] = {x, y, z};
 
@@ -2692,7 +2775,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform3ui(__GLcontext *gc, GLuint program, GLi
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform4ui(__GLcontext *gc, GLuint program, GLint location, GLuint x, GLuint y, GLuint z, GLuint w)
+GLvoid GL_APIENTRY __glim_ProgramUniform4ui(__GLcontext *gc, GLuint program, GLint location, GLuint x, GLuint y, GLuint z, GLuint w)
 {
     GLuint iv[4] = {x, y, z, w};
 
@@ -2703,7 +2786,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform4ui(__GLcontext *gc, GLuint program, GLi
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform1fv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLfloat * v)
+GLvoid GL_APIENTRY __glim_ProgramUniform1fv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLfloat * v)
 {
     __GL_HEADER();
 
@@ -2712,7 +2795,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform1fv(__GLcontext *gc, GLuint program, GLi
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform2fv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLfloat *v)
+GLvoid GL_APIENTRY __glim_ProgramUniform2fv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLfloat *v)
 {
     __GL_HEADER();
 
@@ -2721,7 +2804,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform2fv(__GLcontext *gc, GLuint program, GLi
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform3fv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLfloat *v)
+GLvoid GL_APIENTRY __glim_ProgramUniform3fv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLfloat *v)
 {
     __GL_HEADER();
 
@@ -2730,7 +2813,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform3fv(__GLcontext *gc, GLuint program, GLi
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform4fv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLfloat *v)
+GLvoid GL_APIENTRY __glim_ProgramUniform4fv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLfloat *v)
 {
     __GL_HEADER();
 
@@ -2739,7 +2822,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform4fv(__GLcontext *gc, GLuint program, GLi
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform1iv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLint *v)
+GLvoid GL_APIENTRY __glim_ProgramUniform1iv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLint *v)
 {
     __GL_HEADER();
 
@@ -2748,7 +2831,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform1iv(__GLcontext *gc, GLuint program, GLi
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform2iv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLint *v)
+GLvoid GL_APIENTRY __glim_ProgramUniform2iv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLint *v)
 {
     __GL_HEADER();
 
@@ -2757,7 +2840,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform2iv(__GLcontext *gc, GLuint program, GLi
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform3iv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLint *v)
+GLvoid GL_APIENTRY __glim_ProgramUniform3iv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLint *v)
 {
     __GL_HEADER();
 
@@ -2766,7 +2849,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform3iv(__GLcontext *gc, GLuint program, GLi
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform4iv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLint *v)
+GLvoid GL_APIENTRY __glim_ProgramUniform4iv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLint *v)
 {
     __GL_HEADER();
 
@@ -2775,7 +2858,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform4iv(__GLcontext *gc, GLuint program, GLi
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform1uiv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLuint *v)
+GLvoid GL_APIENTRY __glim_ProgramUniform1uiv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLuint *v)
 {
     __GL_HEADER();
 
@@ -2784,7 +2867,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform1uiv(__GLcontext *gc, GLuint program, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform2uiv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLuint *v)
+GLvoid GL_APIENTRY __glim_ProgramUniform2uiv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLuint *v)
 {
     __GL_HEADER();
 
@@ -2793,7 +2876,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform2uiv(__GLcontext *gc, GLuint program, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform3uiv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLuint *v)
+GLvoid GL_APIENTRY __glim_ProgramUniform3uiv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLuint *v)
 {
     __GL_HEADER();
 
@@ -2802,7 +2885,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform3uiv(__GLcontext *gc, GLuint program, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniform4uiv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLuint *v)
+GLvoid GL_APIENTRY __glim_ProgramUniform4uiv(__GLcontext *gc, GLuint program, GLint location, GLsizei count, const GLuint *v)
 {
     __GL_HEADER();
 
@@ -2811,7 +2894,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniform4uiv(__GLcontext *gc, GLuint program, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniformMatrix2fv(__GLcontext *gc, GLuint program, GLint location,
+GLvoid GL_APIENTRY __glim_ProgramUniformMatrix2fv(__GLcontext *gc, GLuint program, GLint location,
                                                   GLsizei count, GLboolean transpose, const GLfloat *v)
 {
     __GL_HEADER();
@@ -2821,7 +2904,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniformMatrix2fv(__GLcontext *gc, GLuint progra
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniformMatrix3fv(__GLcontext *gc, GLuint program, GLint location,
+GLvoid GL_APIENTRY __glim_ProgramUniformMatrix3fv(__GLcontext *gc, GLuint program, GLint location,
                                                   GLsizei count, GLboolean transpose, const GLfloat *v)
 {
     __GL_HEADER();
@@ -2831,7 +2914,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniformMatrix3fv(__GLcontext *gc, GLuint progra
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniformMatrix4fv(__GLcontext *gc, GLuint program, GLint location,
+GLvoid GL_APIENTRY __glim_ProgramUniformMatrix4fv(__GLcontext *gc, GLuint program, GLint location,
                                                   GLsizei count, GLboolean transpose, const GLfloat * v)
 {
     __GL_HEADER();
@@ -2841,7 +2924,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniformMatrix4fv(__GLcontext *gc, GLuint progra
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniformMatrix2x3fv(__GLcontext *gc, GLuint program, GLint location,
+GLvoid GL_APIENTRY __glim_ProgramUniformMatrix2x3fv(__GLcontext *gc, GLuint program, GLint location,
                                                     GLsizei count, GLboolean transpose, const GLfloat *v)
 {
     __GL_HEADER();
@@ -2851,7 +2934,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniformMatrix2x3fv(__GLcontext *gc, GLuint prog
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniformMatrix2x4fv(__GLcontext *gc, GLuint program, GLint location,
+GLvoid GL_APIENTRY __glim_ProgramUniformMatrix2x4fv(__GLcontext *gc, GLuint program, GLint location,
                                                     GLsizei count, GLboolean transpose, const GLfloat *v)
 {
     __GL_HEADER();
@@ -2861,7 +2944,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniformMatrix2x4fv(__GLcontext *gc, GLuint prog
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniformMatrix3x2fv(__GLcontext *gc, GLuint program, GLint location,
+GLvoid GL_APIENTRY __glim_ProgramUniformMatrix3x2fv(__GLcontext *gc, GLuint program, GLint location,
                                                     GLsizei count, GLboolean transpose, const GLfloat *v)
 {
     __GL_HEADER();
@@ -2871,7 +2954,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniformMatrix3x2fv(__GLcontext *gc, GLuint prog
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniformMatrix3x4fv(__GLcontext *gc, GLuint program, GLint location,
+GLvoid GL_APIENTRY __glim_ProgramUniformMatrix3x4fv(__GLcontext *gc, GLuint program, GLint location,
                                                     GLsizei count, GLboolean transpose, const GLfloat *v)
 {
     __GL_HEADER();
@@ -2881,7 +2964,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniformMatrix3x4fv(__GLcontext *gc, GLuint prog
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniformMatrix4x2fv(__GLcontext *gc, GLuint program, GLint location,
+GLvoid GL_APIENTRY __glim_ProgramUniformMatrix4x2fv(__GLcontext *gc, GLuint program, GLint location,
                                                     GLsizei count, GLboolean transpose, const GLfloat * v)
 {
     __GL_HEADER();
@@ -2891,7 +2974,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniformMatrix4x2fv(__GLcontext *gc, GLuint prog
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramUniformMatrix4x3fv(__GLcontext *gc, GLuint program, GLint location,
+GLvoid GL_APIENTRY __glim_ProgramUniformMatrix4x3fv(__GLcontext *gc, GLuint program, GLint location,
                                                     GLsizei count, GLboolean transpose, const GLfloat * v)
 {
     __GL_HEADER();
@@ -2901,7 +2984,7 @@ GLvoid GL_APIENTRY __gles_ProgramUniformMatrix4x3fv(__GLcontext *gc, GLuint prog
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetUniformfv(__GLcontext *gc, GLuint program, GLint location, GLfloat *params)
+GLvoid GL_APIENTRY __glim_GetUniformfv(__GLcontext *gc, GLuint program, GLint location, GLfloat *params)
 {
     __GLprogramObject* programObject = gcvNULL;
 
@@ -2940,7 +3023,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetUniformiv(__GLcontext *gc,  GLuint program, GLint location, GLint *params)
+GLvoid GL_APIENTRY __glim_GetUniformiv(__GLcontext *gc,  GLuint program, GLint location, GLint *params)
 {
     __GLprogramObject* programObject = gcvNULL;
 
@@ -2980,7 +3063,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetUniformuiv(__GLcontext *gc, GLuint program, GLint location, GLuint *params)
+GLvoid GL_APIENTRY __glim_GetUniformuiv(__GLcontext *gc, GLuint program, GLint location, GLuint *params)
 {
     __GLprogramObject* programObject = gcvNULL;
 
@@ -3020,7 +3103,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetUniformdv(__GLcontext *gc, GLuint program, GLint location, GLdouble *params)
+GLvoid GL_APIENTRY __glim_GetUniformdv(__GLcontext *gc, GLuint program, GLint location, GLdouble *params)
 {
     __GLprogramObject* programObject = gcvNULL;
 
@@ -3061,7 +3144,7 @@ OnError:
 }
 
 
-GLvoid GL_APIENTRY __gles_GetnUniformfv(__GLcontext *gc, GLuint program, GLint location, GLsizei bufSize, GLfloat *params)
+GLvoid GL_APIENTRY __glim_GetnUniformfv(__GLcontext *gc, GLuint program, GLint location, GLsizei bufSize, GLfloat *params)
 {
     __GLprogramObject* programObject = gcvNULL;
     GLsizei uniformSize;
@@ -3110,7 +3193,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetnUniformiv(__GLcontext *gc, GLuint program, GLint location, GLsizei bufSize, GLint *params)
+GLvoid GL_APIENTRY __glim_GetnUniformiv(__GLcontext *gc, GLuint program, GLint location, GLsizei bufSize, GLint *params)
 {
     __GLprogramObject* programObject = gcvNULL;
     GLsizei uniformSize;
@@ -3160,7 +3243,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetnUniformuiv(__GLcontext *gc, GLuint program, GLint location, GLsizei bufSize, GLuint *params)
+GLvoid GL_APIENTRY __glim_GetnUniformuiv(__GLcontext *gc, GLuint program, GLint location, GLsizei bufSize, GLuint *params)
 {
     __GLprogramObject* programObject = gcvNULL;
     GLsizei uniformSize;
@@ -3211,11 +3294,11 @@ OnError:
 }
 
 
-GLvoid GL_APIENTRY __gles_ReleaseShaderCompiler(__GLcontext *gc)
+GLvoid GL_APIENTRY __glim_ReleaseShaderCompiler(__GLcontext *gc)
 {
 }
 
-GLvoid GL_APIENTRY __gles_ProgramBinary(__GLcontext *gc, GLuint program, GLenum binaryFormat,
+GLvoid GL_APIENTRY __glim_ProgramBinary(__GLcontext *gc, GLuint program, GLenum binaryFormat,
                                         const GLvoid* binary, GLsizei length)
 {
     __GLprogramObject * programObject = gcvNULL;
@@ -3314,7 +3397,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ProgramParameteri(__GLcontext *gc, GLuint program, GLenum pname, GLint value)
+GLvoid GL_APIENTRY __glim_ProgramParameteri(__GLcontext *gc, GLuint program, GLenum pname, GLint value)
 {
     __GLprogramObject * programObject = gcvNULL;
 
@@ -3351,7 +3434,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetProgramBinary(__GLcontext *gc, GLuint program, GLsizei bufSize,
+GLvoid GL_APIENTRY __glim_GetProgramBinary(__GLcontext *gc, GLuint program, GLsizei bufSize,
                                            GLsizei* length, GLenum* binaryFormat, GLvoid* binary)
 {
     __GLprogramObject * programObject = gcvNULL;
@@ -3390,7 +3473,7 @@ OnError:
 }
 
 
-GLint GL_APIENTRY __gles_GetFragDataLocation(__GLcontext *gc, GLuint program, const GLchar *name)
+GLint GL_APIENTRY __glim_GetFragDataLocation(__GLcontext *gc, GLuint program, const GLchar *name)
 {
     __GLprogramObject * programObject;
     GLint ret = -1;
@@ -3432,7 +3515,7 @@ OnError:
     return ret;
 }
 
-GLvoid GL_APIENTRY __gles_GetUniformIndices(__GLcontext *gc, GLuint program, GLsizei uniformCount, const GLchar* const* uniformNames, GLuint* uniformIndices)
+GLvoid GL_APIENTRY __glim_GetUniformIndices(__GLcontext *gc, GLuint program, GLsizei uniformCount, const GLchar* const* uniformNames, GLuint* uniformIndices)
 {
     __GLprogramObject* programObject = gcvNULL;
 
@@ -3482,7 +3565,7 @@ OnError:
 
 }
 
-GLvoid GL_APIENTRY __gles_GetActiveUniformsiv(__GLcontext *gc, GLuint program, GLsizei uniformCount,
+GLvoid GL_APIENTRY __glim_GetActiveUniformsiv(__GLcontext *gc, GLuint program, GLsizei uniformCount,
                                               const GLuint* uniformIndices, GLenum pname, GLint* params)
 {
     GLsizei i;
@@ -3556,7 +3639,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLuint GL_APIENTRY __gles_GetUniformBlockIndex(__GLcontext *gc, GLuint program, const GLchar* uniformBlockName)
+GLuint GL_APIENTRY __glim_GetUniformBlockIndex(__GLcontext *gc, GLuint program, const GLchar* uniformBlockName)
 {
     __GLprogramObject* programObject = gcvNULL;
     GLuint ret = GL_INVALID_INDEX;
@@ -3596,7 +3679,7 @@ OnError:
     return ret;
 }
 
-GLvoid GL_APIENTRY __gles_GetActiveUniformBlockiv(__GLcontext *gc, GLuint program, GLuint uniformBlockIndex,
+GLvoid GL_APIENTRY __glim_GetActiveUniformBlockiv(__GLcontext *gc, GLuint program, GLuint uniformBlockIndex,
                                                   GLenum pname, GLint* params)
 {
     __GLprogramObject* programObject = gcvNULL;
@@ -3637,6 +3720,9 @@ GLvoid GL_APIENTRY __gles_GetActiveUniformBlockiv(__GLcontext *gc, GLuint progra
     case GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES:
     case GL_UNIFORM_BLOCK_REFERENCED_BY_VERTEX_SHADER:
     case GL_UNIFORM_BLOCK_REFERENCED_BY_FRAGMENT_SHADER:
+    case GL_UNIFORM_BLOCK_REFERENCED_BY_TESS_CONTROL_SHADER:
+    case GL_UNIFORM_BLOCK_REFERENCED_BY_TESS_EVALUATION_SHADER:
+    case GL_UNIFORM_BLOCK_REFERENCED_BY_GEOMETRY_SHADER:
         break;
 
     default:
@@ -3656,7 +3742,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetActiveUniformBlockName(__GLcontext *gc, GLuint program, GLuint uniformBlockIndex,
+GLvoid GL_APIENTRY __glim_GetActiveUniformBlockName(__GLcontext *gc, GLuint program, GLuint uniformBlockIndex,
                                                     GLsizei bufSize, GLsizei* length, GLchar* uniformBlockName)
 {
     __GLprogramObject* programObject = gcvNULL;
@@ -3694,7 +3780,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UniformBlockBinding(__GLcontext *gc, GLuint program, GLuint uniformBlockIndex,
+GLvoid GL_APIENTRY __glim_UniformBlockBinding(__GLcontext *gc, GLuint program, GLuint uniformBlockIndex,
                                               GLuint uniformBlockBinding)
 {
     __GLprogramObject* programObject = gcvNULL;
@@ -3766,7 +3852,7 @@ GLvoid __glFreeXfbState(__GLcontext *gc)
     __glFreeSharedObjectState(gc, gc->xfb.noShare);
 }
 
-GLvoid GL_APIENTRY __gles_GenTransformFeedbacks(__GLcontext *gc, GLsizei n, GLuint* ids)
+GLvoid GL_APIENTRY __glim_GenTransformFeedbacks(__GLcontext *gc, GLsizei n, GLuint* ids)
 {
     GLint start, i;
 
@@ -3799,7 +3885,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DeleteTransformFeedbacks(__GLcontext *gc, GLsizei n, const GLuint* ids)
+GLvoid GL_APIENTRY __glim_DeleteTransformFeedbacks(__GLcontext *gc, GLsizei n, const GLuint* ids)
 {
     GLint i;
 
@@ -3819,12 +3905,12 @@ OnError:
     __GL_FOOTER();
 }
 
-GLboolean GL_APIENTRY __gles_IsTransformFeedback(__GLcontext *gc, GLuint id)
+GLboolean GL_APIENTRY __glim_IsTransformFeedback(__GLcontext *gc, GLuint id)
 {
     return (gcvNULL != __glGetObject(gc, gc->xfb.noShare, id));
 }
 
-GLvoid GL_APIENTRY __gles_BindTransformFeedback(__GLcontext *gc, GLenum target, GLuint id)
+GLvoid GL_APIENTRY __glim_BindTransformFeedback(__GLcontext *gc, GLenum target, GLuint id)
 {
     __GL_HEADER();
 
@@ -3839,7 +3925,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_BeginTransformFeedback(__GLcontext *gc, GLenum primitiveMode)
+GLvoid GL_APIENTRY __glim_BeginTransformFeedback(__GLcontext *gc, GLenum primitiveMode)
 {
     __GLxfbObject *xfbObj;
     __GLprogramObject *programObj;
@@ -3901,7 +3987,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_EndTransformFeedback(__GLcontext *gc)
+GLvoid GL_APIENTRY __glim_EndTransformFeedback(__GLcontext *gc)
 {
     __GLxfbObject *xfbObj = gc->xfb.boundXfbObj;
 
@@ -3940,7 +4026,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_PauseTransformFeedback(__GLcontext *gc)
+GLvoid GL_APIENTRY __glim_PauseTransformFeedback(__GLcontext *gc)
 {
     __GLxfbObject *xfbObj;
 
@@ -3960,7 +4046,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ResumeTransformFeedback(__GLcontext *gc)
+GLvoid GL_APIENTRY __glim_ResumeTransformFeedback(__GLcontext *gc)
 {
     __GLxfbObject *xfbObj;
     __GLprogramObject *programObj;
@@ -3982,7 +4068,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_TransformFeedbackVaryings(__GLcontext *gc, GLuint program, GLsizei count,
+GLvoid GL_APIENTRY __glim_TransformFeedbackVaryings(__GLcontext *gc, GLuint program, GLsizei count,
                                                     const GLchar* const* varyings, GLenum bufferMode)
 {
     GLuint i;
@@ -4046,7 +4132,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetTransformFeedbackVarying(__GLcontext *gc, GLuint program, GLuint index,
+GLvoid GL_APIENTRY __glim_GetTransformFeedbackVarying(__GLcontext *gc, GLuint program, GLuint index,
                                                       GLsizei bufSize, GLsizei* length, GLsizei* size,
                                                       GLenum* type, GLchar* name)
 {
@@ -4075,7 +4161,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetProgramInterfaceiv(__GLcontext *gc, GLuint program, GLenum programInterface, GLenum pname, GLint *params)
+GLvoid GL_APIENTRY __glim_GetProgramInterfaceiv(__GLcontext *gc, GLuint program, GLenum programInterface, GLenum pname, GLint *params)
 {
     __GLprogramObject * programObject;
 
@@ -4237,7 +4323,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLuint GL_APIENTRY __gles_GetProgramResourceIndex(__GLcontext *gc, GLuint program, GLenum programInterface, const GLchar *name)
+GLuint GL_APIENTRY __glim_GetProgramResourceIndex(__GLcontext *gc, GLuint program, GLenum programInterface, const GLchar *name)
 {
     GLuint resIndex = 0;
     __GLprogramObject * programObject;
@@ -4282,7 +4368,7 @@ OnError:
     return resIndex;
 }
 
-GLvoid GL_APIENTRY __gles_GetProgramResourceName(__GLcontext *gc, GLuint program, GLenum programInterface, GLuint index, GLsizei bufSize, GLsizei *length, GLchar *name)
+GLvoid GL_APIENTRY __glim_GetProgramResourceName(__GLcontext *gc, GLuint program, GLenum programInterface, GLuint index, GLsizei bufSize, GLsizei *length, GLchar *name)
 {
     __GLprogramObject * programObject;
 
@@ -4343,7 +4429,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetProgramResourceiv(__GLcontext *gc, GLuint program, GLenum programInterface,
+GLvoid GL_APIENTRY __glim_GetProgramResourceiv(__GLcontext *gc, GLuint program, GLenum programInterface,
                                                GLuint index, GLsizei propCount, const GLenum *props,
                                                GLsizei bufSize, GLsizei *length, GLint *params)
 {
@@ -4410,7 +4496,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLint GL_APIENTRY __gles_GetProgramResourceLocation(__GLcontext *gc, GLuint program, GLenum programInterface, const GLchar *name)
+GLint GL_APIENTRY __glim_GetProgramResourceLocation(__GLcontext *gc, GLuint program, GLenum programInterface, const GLchar *name)
 {
     GLint location = -1;
     __GLprogramObject * programObject;
@@ -4455,7 +4541,7 @@ OnError:
     return location;
 }
 
-GLvoid GL_APIENTRY __gles_DispatchCompute(__GLcontext *gc, GLuint num_groups_x, GLuint num_groups_y, GLuint num_groups_z)
+GLvoid GL_APIENTRY __glim_DispatchCompute(__GLcontext *gc, GLuint num_groups_x, GLuint num_groups_y, GLuint num_groups_z)
 {
     __GL_HEADER();
 
@@ -4478,7 +4564,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DispatchComputeIndirect(__GLcontext *gc, GLintptr indirect)
+GLvoid GL_APIENTRY __glim_DispatchComputeIndirect(__GLcontext *gc, GLintptr indirect)
 {
     __GLbufferObject *indirectObj = gc->bufferObject.generalBindingPoint[__GL_DISPATCH_INDIRECT_BUFFER_INDEX].boundBufObj;
 
@@ -4516,7 +4602,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLuint GL_APIENTRY __gles_CreateShaderProgramv(__GLcontext *gc, GLenum type, GLsizei count, const GLchar *const*strings)
+GLuint GL_APIENTRY __glim_CreateShaderProgramv(__GLcontext *gc, GLenum type, GLsizei count, const GLchar *const*strings)
 {
     GLsizei i = 0;
     GLuint shader = 0, program = 0;
@@ -4608,10 +4694,22 @@ GLuint GL_APIENTRY __gles_CreateShaderProgramv(__GLcontext *gc, GLenum type, GLs
     /* Compile shader */
     if ((*gc->dp.compileShader)(gc, shaderObj))
     {
+        __GLshaderObjectList *pAttachedShader;
         __GLSLStage stage = __glGetShaderStage(type);
 
+        pAttachedShader= (__GLshaderObjectList *)(*gc->imports.calloc)(gc, 1, sizeof(__GLshaderObjectList));
+        if (gcvNULL == pAttachedShader)
+        {
+            __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+        }
+        else
+        {
+            pAttachedShader->shader = shaderObj;
+            pAttachedShader->next = gcvNULL;
+        }
+
         /* Attach Shader */
-        progObj->programInfo.attachedShader[stage] = shaderObj;
+        progObj->programInfo.attachedShader[stage] = pAttachedShader;
 
         /* Set separable */
         progObj->programInfo.separable = GL_TRUE;
@@ -4626,6 +4724,7 @@ GLuint GL_APIENTRY __gles_CreateShaderProgramv(__GLcontext *gc, GLenum type, GLs
         }
 
         /* Detach Shader */
+        (*gc->imports.free)(gc, pAttachedShader);
         progObj->programInfo.attachedShader[stage] = gcvNULL;
     }
 
@@ -4824,7 +4923,7 @@ GLboolean __glDeleteProgramPipelineObj(__GLcontext *gc, __GLprogramPipelineObjec
     return GL_TRUE;
 }
 
-GLvoid GL_APIENTRY __gles_GenProgramPipelines(__GLcontext *gc, GLsizei n, GLuint *pipelines)
+GLvoid GL_APIENTRY __glim_GenProgramPipelines(__GLcontext *gc, GLsizei n, GLuint *pipelines)
 {
     GLint start, i;
 
@@ -4859,12 +4958,12 @@ OnError:
     __GL_FOOTER();
 }
 
-GLboolean GL_APIENTRY __gles_IsProgramPipeline(__GLcontext *gc, GLuint pipeline)
+GLboolean GL_APIENTRY __glim_IsProgramPipeline(__GLcontext *gc, GLuint pipeline)
 {
     return (gcvNULL != __glGetObject(gc, gc->shaderProgram.ppNoShare, pipeline));
 }
 
-GLvoid GL_APIENTRY __gles_DeleteProgramPipelines(__GLcontext *gc, GLsizei n, const GLuint *pipelines)
+GLvoid GL_APIENTRY __glim_DeleteProgramPipelines(__GLcontext *gc, GLsizei n, const GLuint *pipelines)
 {
     GLsizei i;
 
@@ -4887,7 +4986,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_BindProgramPipeline(__GLcontext *gc, GLuint pipeline)
+GLvoid GL_APIENTRY __glim_BindProgramPipeline(__GLcontext *gc, GLuint pipeline)
 {
     __GL_HEADER();
 
@@ -4896,7 +4995,7 @@ GLvoid GL_APIENTRY __gles_BindProgramPipeline(__GLcontext *gc, GLuint pipeline)
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetProgramPipelineiv(__GLcontext *gc, GLuint pipeline, GLenum pname, GLint *params)
+GLvoid GL_APIENTRY __glim_GetProgramPipelineiv(__GLcontext *gc, GLuint pipeline, GLenum pname, GLint *params)
 {
     __GLprogramPipelineObject *ppObj = __glGetProgramPipelineObject(gc, pipeline);
 
@@ -4948,7 +5047,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetProgramPipelineInfoLog(__GLcontext *gc, GLuint pipeline, GLsizei bufSize, GLsizei *length, GLchar *infoLog)
+GLvoid GL_APIENTRY __glim_GetProgramPipelineInfoLog(__GLcontext *gc, GLuint pipeline, GLsizei bufSize, GLsizei *length, GLchar *infoLog)
 {
     GLsizei len = 0;
     __GLprogramPipelineObject *ppObj;
@@ -4997,7 +5096,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ValidateProgramPipeline(__GLcontext *gc, GLuint pipeline)
+GLvoid GL_APIENTRY __glim_ValidateProgramPipeline(__GLcontext *gc, GLuint pipeline)
 {
     __GLprogramPipelineObject *ppObj = __glGetProgramPipelineObject(gc, pipeline);
 
@@ -5017,7 +5116,7 @@ OnExit:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_UseProgramStages(__GLcontext *gc, GLuint pipeline, GLbitfield stages, GLuint program)
+GLvoid GL_APIENTRY __glim_UseProgramStages(__GLcontext *gc, GLuint pipeline, GLbitfield stages, GLuint program)
 {
     __GLprogramObject * progObj;
     __GLprogramPipelineObject *ppObj;
@@ -5102,7 +5201,7 @@ OnExit:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ActiveShaderProgram(__GLcontext *gc, GLuint pipeline, GLuint program)
+GLvoid GL_APIENTRY __glim_ActiveShaderProgram(__GLcontext *gc, GLuint pipeline, GLuint program)
 {
     __GLprogramObject *progObj;
     __GLprogramPipelineObject *ppObj;
@@ -5144,7 +5243,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_PatchParameteri(__GLcontext *gc, GLenum pname, GLint value)
+GLvoid GL_APIENTRY __glim_PatchParameteri(__GLcontext *gc, GLenum pname, GLint value)
 {
     __GL_HEADER();
 
@@ -5168,7 +5267,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetObjectParameterivARB(__GLcontext *gc, UINT obj, GLenum pname, GLint *params)
+GLvoid GL_APIENTRY __glim_GetObjectParameterivARB(__GLcontext *gc, UINT obj, GLenum pname, GLint *params)
 {
     __GLshaderObject * object;
 
@@ -5186,11 +5285,11 @@ GLvoid GL_APIENTRY __gles_GetObjectParameterivARB(__GLcontext *gc, UINT obj, GLe
     }
     else if (object->objectInfo.objectType == __GL_SHADER_OBJECT_TYPE)
     {
-        __gles_GetShaderiv(gc, obj, pname, params);
+        __glim_GetShaderiv(gc, obj, pname, params);
     }
     else if (object->objectInfo.objectType == __GL_PROGRAM_OBJECT_TYPE)
     {
-        __gles_GetProgramiv(gc, obj, pname, params);
+        __glim_GetProgramiv(gc, obj, pname, params);
     }
     else
     {
@@ -5238,6 +5337,6 @@ GLvoid GL_APIENTRY __glim_BindFragDataLocation(__GLcontext *gc, GLuint program, 
 
 GLvoid GL_APIENTRY __glim_GetActiveUniformName(__GLcontext *gc, GLuint program, GLuint uniformIndex, GLsizei bufSize, GLsizei *length, GLchar *uniformName)
 {
-    __gles_GetActiveUniform(gc, program, uniformIndex, bufSize, length, NULL, NULL, uniformName);
+    __glim_GetActiveUniform(gc, program, uniformIndex, bufSize, length, NULL, NULL, uniformName);
 }
 #endif

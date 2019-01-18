@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -199,27 +199,31 @@ install: all
 ifeq ($(gcdSTATIC_LINK),1)
 
 $(GLES_CL): $(GLES_CL_OBJECTS)
-	$(AR) -r -c $@ $(GLES_CL_OBJECTS)
+	@echo "  ARCHIVE \033[1m$(notdir $@)\033[0m"
+	@$(AR) -r -c $@ $(GLES_CL_OBJECTS)
 ifneq ($(USE_ARMCC),1)
-	$(RANLIB) $@
+	@$(RANLIB) $@
 endif
 
 $(GLES_CM): $(GLES_CM_OBJECTS)
-	$(AR) -r -c $@ $(GLES_CM_OBJECTS)
+	@echo "  ARCHIVE \033[1m$(notdir $@)\033[0m"
+	@$(AR) -r -c $@ $(GLES_CM_OBJECTS)
 ifneq ($(USE_ARMCC),1)
-	$(RANLIB) $@
+	@$(RANLIB) $@
 endif
 
 $(GLES_V1_CL): $(GLES_V1_CL_OBJECTS)
-	$(AR) -r -c $@ $(GLES_V1_CL_OBJECTS)
+	@echo "  ARCHIVE \033[1m$(notdir $@)\033[0m"
+	@$(AR) -r -c $@ $(GLES_V1_CL_OBJECTS)
 ifneq ($(USE_ARMCC),1)
-	$(RANLIB) $@
+	@$(RANLIB) $@
 endif
 
 $(GLES_V1_CM): $(GLES_V1_CM_OBJECTS)
-	$(AR) -r -c $@ $(GLES_V1_CM_OBJECTS)
+	@echo "  ARCHIVE \033[1m$(notdir $@)\033[0m"
+	@$(AR) -r -c $@ $(GLES_V1_CM_OBJECTS)
 ifneq ($(USE_ARMCC),1)
-	$(RANLIB) $@
+	@$(RANLIB) $@
 endif
 
 else
@@ -229,16 +233,20 @@ $(TARGET_MODULES): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so) \
                    $(wildcard $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.so)
 
 $(GLES_CL): $(GLES_CL_OBJECTS)
-	$(CC) $(LDFLAGS) $(SONAME_OPTION)$(GLES_CL_SONAME) -o $@ $(GLES_CL_OBJECTS) $(LDLIBS)
+	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
+	@$(CC) $(LDFLAGS) $(SONAME_OPTION)$(GLES_CL_SONAME) -o $@ $(GLES_CL_OBJECTS) $(LDLIBS)
 
 $(GLES_CM): $(GLES_CM_OBJECTS)
-	$(CC) $(LDFLAGS) $(SONAME_OPTION)$(GLES_CM_SONAME) -o $@ $(GLES_CM_OBJECTS) $(LDLIBS)
+	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
+	@$(CC) $(LDFLAGS) $(SONAME_OPTION)$(GLES_CM_SONAME) -o $@ $(GLES_CM_OBJECTS) $(LDLIBS)
 
 $(GLES_V1_CL): $(GLES_V1_CL_OBJECTS)
-	$(CC) $(LDFLAGS) $(SONAME_OPTION)$(GLES_V1_CL_SONAME) -o $@ $(GLES_V1_CL_OBJECTS) $(LDLIBS)
+	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
+	@$(CC) $(LDFLAGS) $(SONAME_OPTION)$(GLES_V1_CL_SONAME) -o $@ $(GLES_V1_CL_OBJECTS) $(LDLIBS)
 
 $(GLES_V1_CM): $(GLES_V1_CM_OBJECTS)
-	$(CC) $(LDFLAGS) $(SONAME_OPTION)$(GLES_V1_CM_SONAME) -o $@ $(GLES_V1_CM_OBJECTS) $(LDLIBS)
+	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
+	@$(CC) $(LDFLAGS) $(SONAME_OPTION)$(GLES_V1_CM_SONAME) -o $@ $(GLES_V1_CM_OBJECTS) $(LDLIBS)
 
 endif
 
@@ -246,12 +254,14 @@ endif
 # Object rules.
 
 $(OBJ_DIR)/%.o: %.c
+	@echo "  COMPILE $(abspath $<)"
 	@mkdir -p $(OBJ_DIR)
-	$(CC) -c $(CFLAGS) -MMD -o $@ $<
+	@$(CC) -c $(CFLAGS) -MMD -o $@ $<
 
 $(OBJ_DIR)/%-cl.o: %.c
+	@echo "  COMPILE $(abspath $<)"
 	@mkdir -p $(OBJ_DIR)
-	$(CC) -c $(CFLAGS) -DCOMMON_LITE -MMD -o $@ $<
+	@$(CC) -c $(CFLAGS) -DCOMMON_LITE -MMD -o $@ $<
 
 # object dependencies.
 -include $(GLES_CM_OBJECTS:.o=.d)

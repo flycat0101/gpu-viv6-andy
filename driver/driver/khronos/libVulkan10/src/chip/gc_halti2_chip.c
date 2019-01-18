@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -92,7 +92,10 @@ VkResult halti2_pip_emit_vsinput(
 
             for (compositeIdx = 0; compositeIdx < shAttribTable[entryIdx].vec4BasedCount; compositeIdx++)
             {
-                uint32_t location = shAttribTable[entryIdx].pLocation[compositeIdx];
+                uint32_t location;
+                __VK_ASSERT(compositeIdx < shAttribTable[entryIdx].locationCount);
+                location = shAttribTable[entryIdx].pLocation[compositeIdx];
+
                 for (attribIdx = 0; attribIdx < vsInputInfo->vertexAttributeDescriptionCount; attribIdx++)
                 {
                     if (vsInputInfo->pVertexAttributeDescriptions[attribIdx].location == location)
@@ -118,6 +121,8 @@ VkResult halti2_pip_emit_vsinput(
             {
                 for (compositeIdx = 0; compositeIdx < shAttribTable[entryIdx].vec4BasedCount; compositeIdx++)
                 {
+                    __VK_ASSERT(compositeIdx < shAttribTable[entryIdx].locationCount);
+
                     if (shAttribTable[entryIdx].pLocation[compositeIdx] ==
                         hwVertexAttribDesc[attribIdx].sortedAttributeDescPtr->location)
                     {
@@ -498,7 +503,7 @@ static VkResult halti2_helper_convertHwRsDesc(
     }
     s_vkFormatToHwRsDescs[] =
     {
-        {__VK_FORMAT_A4R4G4B4_UNFORM_PACK16, 0x01, VK_FALSE},
+        {__VK_FORMAT_A4R4G4B4_UNORM_PACK16, 0x01, VK_FALSE},
         {__VK_FORMAT_R8_1_X8R8G8B8, 0x05, VK_FALSE},
         {VK_FORMAT_R5G6B5_UNORM_PACK16, 0x04, VK_FALSE},
         {VK_FORMAT_B5G6R5_UNORM_PACK16, 0x04, VK_TRUE},
@@ -542,6 +547,32 @@ static VkResult halti2_helper_convertHwRsDesc(
         case 32:
             format = 0x06;
             hwRsDesc->pixelSize = 32;
+            break;
+        case 64:
+            if (vkFormat >= VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK &&
+                vkFormat <= VK_FORMAT_ASTC_12x12_SRGB_BLOCK)
+            {
+                format = 0x06;
+                hwRsDesc->pixelSize = 64;
+                downsampleMode = gcvMSAA_DOWNSAMPLE_SAMPLE;
+            }
+            else
+            {
+                return VK_ERROR_FORMAT_NOT_SUPPORTED;
+            }
+            break;
+        case 128:
+            if (vkFormat >= VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK &&
+                vkFormat <= VK_FORMAT_ASTC_12x12_SRGB_BLOCK)
+            {
+                format = 0x06;
+                hwRsDesc->pixelSize = 128;
+                downsampleMode = gcvMSAA_DOWNSAMPLE_SAMPLE;
+            }
+            else
+            {
+                return VK_ERROR_FORMAT_NOT_SUPPORTED;
+            }
             break;
         default:
             return VK_ERROR_FORMAT_NOT_SUPPORTED;
@@ -603,14 +634,37 @@ VkResult halti2_clearImageWithRS(
     uint32_t hwSrcStride, hwControl;
     uint32_t hwWindowSize, hwOffset;
     uint32_t dstTileMode = 0;
+    VkRect2D realRect = *rect;
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
     __vkDevContext *devCtx = cmd->devCtx;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
 
     __VK_ASSERT(devCtx->option->affinityMode != __VK_MGPU_AFFINITY_COMBINE);
 
-    if ((rect->offset.x & 0x3)     || (rect->offset.y & 0x3) ||
-        (rect->extent.width & 0xF) || (rect->extent.height & 0x3))
+    /* Extend rect to aligned dim if possible */
+    if (rect->offset.x + (int32_t)rect->extent.width >= (int32_t)pLevel->requestW)
+    {
+        realRect.extent.width = (uint32_t)(pLevel->alignedW / img->sampleInfo.x - rect->offset.x);
+    }
+    if (rect->offset.y + (int32_t)rect->extent.height >= (int32_t)pLevel->requestH)
+    {
+        realRect.extent.height = (uint32_t)(pLevel->alignedH / img->sampleInfo.y - rect->offset.y);
+    }
+
+    /* Round negative offset */
+    if (rect->offset.x < 0)
+    {
+        realRect.offset.x = 0;
+        realRect.extent.width += rect->offset.x;
+    }
+    if (rect->offset.y < 0)
+    {
+        realRect.offset.y = 0;
+        realRect.extent.height += rect->offset.y;
+    }
+
+    if ((realRect.offset.x & 0x3)     || (realRect.offset.y & 0x3) ||
+        (realRect.extent.width & 0xF) || (realRect.extent.height & 0x3))
     {
         __vkBlitRes dstRes;
 
@@ -618,11 +672,11 @@ VkResult halti2_clearImageWithRS(
         dstRes.u.img.pImage = img;
         dstRes.u.img.subRes.aspectMask = subResource->aspectMask;
         dstRes.u.img.subRes.mipLevel = subResource->mipLevel;
-        dstRes.u.img.offset.x = rect->offset.x;
-        dstRes.u.img.offset.y = rect->offset.y;
+        dstRes.u.img.offset.x = realRect.offset.x;
+        dstRes.u.img.offset.y = realRect.offset.y;
         dstRes.u.img.offset.z = 1;
-        dstRes.u.img.extent.width = rect->extent.width;
-        dstRes.u.img.extent.height = rect->extent.height;
+        dstRes.u.img.extent.width = realRect.extent.width;
+        dstRes.u.img.extent.height = realRect.extent.height;
         dstRes.u.img.extent.depth = 1;
         dstRes.u.img.subRes.arrayLayer = subResource->arrayLayer;
 
@@ -791,7 +845,7 @@ VkResult halti2_clearImageWithRS(
  ~0U : (~(~0U << ((1 ?
  12:0) - (0 ?
  12:0) + 1))))))) << (0 ?
- 12:0))) | (((gctUINT32) ((gctUINT32) (rect->offset.x * img->sampleInfo.x) & ((gctUINT32) ((((1 ?
+ 12:0))) | (((gctUINT32) ((gctUINT32) (realRect.offset.x * img->sampleInfo.x) & ((gctUINT32) ((((1 ?
  12:0) - (0 ?
  12:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ? 12:0)))
@@ -801,7 +855,7 @@ VkResult halti2_clearImageWithRS(
  ~0U : (~(~0U << ((1 ?
  28:16) - (0 ?
  28:16) + 1))))))) << (0 ?
- 28:16))) | (((gctUINT32) ((gctUINT32) (rect->offset.y * img->sampleInfo.y) & ((gctUINT32) ((((1 ?
+ 28:16))) | (((gctUINT32) ((gctUINT32) (realRect.offset.y * img->sampleInfo.y) & ((gctUINT32) ((((1 ?
  28:16) - (0 ?
  28:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 28:16) - (0 ? 28:16) + 1))))))) << (0 ? 28:16)));
@@ -812,7 +866,7 @@ VkResult halti2_clearImageWithRS(
  ~0U : (~(~0U << ((1 ?
  15:0) - (0 ?
  15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (rect->extent.width * img->sampleInfo.x) & ((gctUINT32) ((((1 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (realRect.extent.width  * img->sampleInfo.x) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
@@ -822,7 +876,7 @@ VkResult halti2_clearImageWithRS(
  ~0U : (~(~0U << ((1 ?
  31:16) - (0 ?
  31:16) + 1))))))) << (0 ?
- 31:16))) | (((gctUINT32) ((gctUINT32) (rect->extent.height * img->sampleInfo.y) & ((gctUINT32) ((((1 ?
+ 31:16))) | (((gctUINT32) ((gctUINT32) (realRect.extent.height * img->sampleInfo.y) & ((gctUINT32) ((((1 ?
  31:16) - (0 ?
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)));
@@ -861,7 +915,6 @@ VkResult halti2_clearImageWithRS(
         __VK_ASSERT(devCtx->database->RS_NEW_BASEADDR);
 
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05B8, VK_FALSE, address);
-
         if (devCtx->database->ROBUSTNESS && devCtx->enabledFeatures.robustBufferAccess)
         {
             if (!devCtx->database->SH_ROBUSTNESS_FIX)
@@ -915,15 +968,12 @@ VkResult halti2_clearImageWithRS(
 
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0580, VK_FALSE, 0xBADABEEB);
 
-        partIndex++;
-    }
-
-    if (devCtx->enabledFeatures.robustBufferAccess &&
-        devCtx->database->ROBUSTNESS &&
-        !devCtx->database->SH_ROBUSTNESS_FIX)
-    {
-        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
-            (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        if (devCtx->enabledFeatures.robustBufferAccess &&
+            devCtx->database->ROBUSTNESS &&
+            !devCtx->database->SH_ROBUSTNESS_FIX)
+        {
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -945,6 +995,9 @@ VkResult halti2_clearImageWithRS(
  29:29) - (0 ?
  29:29) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
+        }
+
+        partIndex++;
     }
 
     if (__VK_IS_SUCCESS(result))
@@ -967,7 +1020,8 @@ VkResult halti2_copyImageWithRS(
     VkCommandBuffer commandBuffer,
     __vkBlitRes *srcRes,
     __vkBlitRes *dstRes,
-    VkBool32 rawCopy
+    VkBool32 rawCopy,
+    VkFilter filter
     )
 {
     HwRsDesc srcRsDesc = {0}, dstRsDesc = {0};
@@ -1048,7 +1102,7 @@ VkResult halti2_copyImageWithRS(
         srcFormat = dstImg->createInfo.format;
         fmtInfo = &g_vkFormatInfoTable[srcFormat];
         srcParts = fmtInfo->partCount;
-        srcWidth  = srcRes->u.buf.rowLength != 0 ? srcRes->u.buf.rowLength : dstRes->u.img.extent.width;
+        srcWidth = srcRes->u.buf.rowLength != 0 ? srcRes->u.buf.rowLength : dstRes->u.img.extent.width;
         srcStride = (srcWidth / fmtInfo->blockSize.width) * fmtInfo->bitsPerBlock / 8;
         srcSampleInfo = dstImg->sampleInfo;
     }
@@ -1143,24 +1197,32 @@ VkResult halti2_copyImageWithRS(
 
             dstTiling = 0x0;
             dstSuperTile = 0x0;
-            srcOffset.x = gcmALIGN(srcOffset.x - rect.width + 1, rect.width);
-            srcOffset.y  = gcmALIGN(srcOffset.y - rect.height + 1, rect.height);
-            dstOffset.x = gcmALIGN(dstOffset.x - rect.width + 1, rect.width);
-            dstOffset.y = gcmALIGN(dstOffset.y - rect.height + 1, rect.height);
-            srcExtent.width = gcmALIGN(srcExtent.width, rect.width) / rect.width;
-            srcExtent.height = gcmALIGN(srcExtent.height, rect.width) / rect.height;
-            dstExtent.width = gcmALIGN(dstExtent.width, rect.width) / rect.width;
-            dstExtent.height = gcmALIGN(dstExtent.height ,rect.height) / rect.height;
+            srcOffset.x = gcmALIGN_NP2(srcOffset.x - rect.width  + 1, rect.width );
+            srcOffset.y = gcmALIGN_NP2(srcOffset.y - rect.height + 1, rect.height);
+            dstOffset.x = gcmALIGN_NP2(dstOffset.x - rect.width  + 1, rect.width );
+            dstOffset.y = gcmALIGN_NP2(dstOffset.y - rect.height + 1, rect.height);
+            srcExtent.width  = gcmALIGN_NP2(srcExtent.width, rect.width ) / rect.width;
+            srcExtent.height = gcmALIGN_NP2(srcExtent.height, rect.height) / rect.height;
+            dstExtent.width  = gcmALIGN_NP2(dstExtent.width, rect.width ) / rect.width;
+            dstExtent.height = gcmALIGN_NP2(dstExtent.height, rect.height) / rect.height;
 
-            if(dstRsDesc.pixelSize == 128 )
+            if (dstRsDesc.pixelSize == 64 || dstRsDesc.pixelSize == 128)
             {
-                dstRsDesc.pixelSize = 64;
-                srcRsDesc.pixelSize = 64;
-                srcOffset.x *=2;
-                dstOffset.x *=2;
-                srcExtent.width *=2;
-                dstExtent.width *=2;
+                uint32_t scale = dstRsDesc.pixelSize / 32;
+
+                dstRsDesc.pixelSize = 32;
+                srcRsDesc.pixelSize = 32;
+                srcOffset.x *= scale;
+                dstOffset.x *= scale;
+                srcExtent.width *= scale;
+                dstExtent.width *= scale;
             }
+        }
+
+        if (srcTiling == 0x0 &&
+            g_vkFormatInfoTable[srcFormat].bitsPerBlock == 8)
+        {
+            useComputeBlit = VK_TRUE;
         }
 
         if (!useComputeBlit)
@@ -1200,7 +1262,7 @@ VkResult halti2_copyImageWithRS(
 
     if (useComputeBlit)
     {
-        return (halti5_computeBlit(commandBuffer, srcRes, dstRes, rawCopy, gcvNULL, VK_FILTER_NEAREST));
+        return (halti5_computeBlit(commandBuffer, srcRes, dstRes, rawCopy, gcvNULL, filter));
     }
 
     __VK_ASSERT(srcSampleInfo.product >= dstSampleInfo.product);
@@ -1493,7 +1555,7 @@ VkResult halti2_copyImageWithRS(
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05B0, VK_FALSE, srcAddress);
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x05B8, VK_FALSE, dstAddress);
 
-    if (devCtx->database->ROBUSTNESS && devCtx->enabledFeatures.robustBufferAccess)
+    if (devCtx->enabledFeatures.robustBufferAccess && devCtx->database->ROBUSTNESS)
     {
         if (!devCtx->database->SH_ROBUSTNESS_FIX)
         {
@@ -1548,7 +1610,7 @@ VkResult halti2_copyImageWithRS(
 
     if (devCtx->enabledFeatures.robustBufferAccess &&
         devCtx->database->ROBUSTNESS &&
-       !devCtx->database->SH_ROBUSTNESS_FIX)
+        !devCtx->database->SH_ROBUSTNESS_FIX)
     {
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
             (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -1667,7 +1729,7 @@ void halti2_helper_convertHwSampler(
     hwSamplerDesc->halti2.anisoLog = anisoLog;
 
     hwSamplerDesc->halti2.hwSamplerMode_p0 =
-          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  4:3) - (0 ?
  4:3) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2548,8 +2610,6 @@ void halti2_helper_setSamplerStates(
     uint32_t shaderConfigData
     )
 {
-    uint32_t hwSamplerMode_p0 = samplerDesc->halti2.hwSamplerMode_p0;
-
     if (!txHwRegisterIdx)
     {
         __vkCmdLoadSingleHWState(commandBuffer, 0x022D, VK_FALSE,
@@ -2579,9 +2639,8 @@ void halti2_helper_setSamplerStates(
  ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ? 16:16))));
     }
 
-
     __vkCmdLoadSingleHWState(commandBuffer, 0x4000 + hwSamplerNo, VK_FALSE,
-        hwSamplerMode_p0 | txDesc->halti2.hwSamplerMode_p1);
+        txDesc->halti2.hwSamplerMode_p1 | samplerDesc->halti2.hwSamplerMode_p0);
 
     __vkCmdLoadSingleHWState(commandBuffer, 0x40E0 + hwSamplerNo, VK_FALSE,
         txDesc->halti2.hwSamplerModeEx);
@@ -2712,6 +2771,8 @@ VkResult halti2_program_blit_src_tex(
         params->srcSize.height = srcRes->u.buf.imgHeight != 0 ? srcRes->u.buf.imgHeight : dstRes->u.img.extent.height;
         params->srcSize.depth  = dstRes->u.img.extent.depth;
 
+        params->flushTex = VK_TRUE;
+
         txFormat = pDstImg->createInfo.format;
         fmtInfo = &g_vkFormatInfoTable[txFormat];
         txStride = (params->srcSize.width / fmtInfo->blockSize.width) * fmtInfo->bitsPerBlock / 8;
@@ -2734,11 +2795,13 @@ VkResult halti2_program_blit_src_tex(
         case VK_FORMAT_EAC_R11G11_UNORM_BLOCK:
         case VK_FORMAT_EAC_R11G11_SNORM_BLOCK:
             txFormat = VK_FORMAT_R32G32_SFLOAT;
-            params->srcSize.width = gcmALIGN(params->srcSize.width, fmtInfo->blockSize.width) / fmtInfo->blockSize.width;
-            params->srcSize.height = gcmALIGN(params->srcSize.height, fmtInfo->blockSize.height) / fmtInfo->blockSize.height;
+            params->srcSize.width = gcmALIGN_NP2(params->srcSize.width, fmtInfo->blockSize.width) / fmtInfo->blockSize.width;
+            params->srcSize.height = gcmALIGN_NP2(params->srcSize.height, fmtInfo->blockSize.height) / fmtInfo->blockSize.height;
             if (fmtInfo->bitsPerBlock == 128)
             {
                 params->srcSize.width *= 2;
+                params->srcOffset.x *= 2;
+                params->srcExtent.width *= 2;
             }
             break;
         default:
@@ -2830,8 +2893,68 @@ VkResult halti2_program_blit_src_tex(
              && (txType != 0x3)
              && !txSRGB;
 
-    hwMapping = &blitProg->srcTexEntry[0]->hwMappings[VSC_SHADER_STAGE_CS].samplerMapping;
+    hwMapping = &blitProg->srcTexEntry->hwMappings[VSC_SHADER_STAGE_CS].samplerMapping;
     hwSamplerNo = hwMapping->hwSamplerSlot + pHints->samplerBaseOffset[VSC_SHADER_STAGE_CS];
+
+    if (params->flushTex)
+    {
+        uint32_t stall = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
+                       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) (0x07 & ((gctUINT32) ((((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)));
+
+        __vkCmdLoadSingleHWState(states, 0x0E03, VK_FALSE, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:2) - (0 ?
+ 2:2) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 2:2) - (0 ?
+ 2:2) + 1))))))) << (0 ?
+ 2:2))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 2:2) - (0 ?
+ 2:2) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ? 2:2))));
+        __vkCmdLoadSingleHWState(states, 0x0E03, VK_FALSE, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:4) - (0 ?
+ 4:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 4:4) - (0 ?
+ 4:4) + 1))))))) << (0 ?
+ 4:4))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 4:4) - (0 ?
+ 4:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ? 4:4))));
+
+        __VK_ASSERT(!devCtx->database->REG_BltEngine);
+        __vkCmdLoadSingleHWState(states, 0x0E02, VK_FALSE, stall);
+        *(*states)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)));*(*states)++ = (stall);
+;
+
+    }
 
     __vkCmdLoadSingleHWState(states, 0x022D + hwSamplerNo, VK_FALSE,
         ((((gctUINT32) (pHints->shaderConfigData)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?

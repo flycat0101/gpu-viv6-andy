@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -26,7 +26,7 @@ VX_INTERNAL_API vx_bool vxIsValidBorderMode(vx_enum mode);
 /*
 ** DataType APIs
 */
-VX_INTERNAL_API vx_size vxDataType_GetSize(vx_type_e type);
+VX_INTERNAL_API vx_uint32 vxDataType_GetSize(vx_type_e type);
 
 VX_INTERNAL_API vx_bool vxDataType_IsValid(vx_enum type);
 
@@ -75,6 +75,8 @@ VX_INTERNAL_API vx_bool vxoContext_FindMemoryMap(
     vx_map_id    map_id);
 
 VX_INTERNAL_API void vxoContext_MemoryUnmap(vx_context context, vx_map_id map_id);
+
+VX_INTERNAL_API vx_bool vxoContext_IsFeatureAvailable(vx_context context, vx_nn_feature_e feature);
 
 EXTERN_C_END
 

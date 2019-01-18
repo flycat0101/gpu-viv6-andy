@@ -86,8 +86,6 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <gc_hal_base.h>
 
 
-extern __GLcontext *__glxNopContext;
-extern __GLesDispatchTable *__glNopDispatchTab;
 extern Bool __glXDisplayIsClosed;
 
 #if defined(X11_DRI3) && defined(DRI_PIXMAPRENDER_GL)
@@ -528,13 +526,12 @@ static void _destroyPixmapInfo(
     if ( pixWrapSurf )
         gcoSURF_Destroy(pixWrapSurf);
 
-    if (!__glXDisplayIsClosed) {
-        if ( (gctUINT32)backPixmap && (directPix == 0) )
-            XFreePixmap(display, backPixmap);
+    if ( (gctUINT32)backPixmap && (directPix == 0) )
+        XFreePixmap(display, backPixmap);
 
-        if ( (gctUINT32)xgc )
-            XFreeGC(display, xgc);
-    }
+    if ( (gctUINT32)xgc )
+        XFreeGC(display, xgc);
+
 }
 static GLvoid _CopyToDrawable(__DRIdrawablePrivate * drawable)
 {

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -63,7 +63,7 @@ static void _ConstructChipName(
     *ChipName++ = 'e';
     *ChipName++ = ' ';
 
-    gcmONERROR(gcoHAL_GetProductName(Context->hal, &productName));
+    gcmONERROR(gcoHAL_GetProductName(Context->hal, &productName, gcvNULL));
 
     gcoOS_StrCatSafe(Context->chipName, gldCHIP_NAME_LEN , productName);
 
@@ -74,61 +74,6 @@ OnError:
     gcmFOOTER_NO();
     return;
 }
-
-
-/*******************************************************************************
-**
-**  _AddSurface
-**
-**  Add surface to be dumped.
-**
-**  INPUT:
-**
-**      Dump
-**          Pointer to the dumping object.
-**
-**      Surface
-**          Pointer to the surface to add to dumping.
-**
-**  OUTPUT:
-**
-**      Nothing.
-*/
-
-#ifdef _DUMP_FILE
-static void _AddSurface(
-    gcoDUMP Dump,
-    gcoSURF Surface
-    )
-{
-    gctUINT32 address[3] = {0};
-    gctPOINTER memory[3] = {gcvNULL};
-    gctUINT width, height;
-    gctINT stride;
-    gceSURF_FORMAT format;
-
-    /* Lock the surface. */
-    gcmVERIFY_OK(gcoSURF_Lock(Surface, address, memory));
-
-    /* Get the size of the surface. */
-    gcmVERIFY_OK(gcoSURF_GetAlignedSize(Surface, &width, &height, &stride));
-
-    /* Get the format of the surface. */
-    gcmVERIFY_OK(gcoSURF_GetFormat(Surface, gcvNULL, &format));
-
-    /* Dump the surface. */
-    gcmVERIFY_OK(gcoDUMP_AddSurface(
-        Dump,
-        width, height,
-        format,
-        address[0],
-        stride * height
-        ));
-
-    /* Unlock the surface. */
-    gcmVERIFY_OK(gcoSURF_Unlock(Surface, memory[0]));
-}
-#endif
 
 /* Clear Texture if the pointer of pixels is null if glTexImage2D is called */
 static gctBOOL _IsNeedClearTexture()
@@ -715,6 +660,11 @@ glfCreateContext(
         context->isQuadrant = (patchId == gcvPATCH_QUADRANT);
         context->varrayDirty = gcvFALSE;
         context->curFrameBufferID = 0;
+#if gcdDUMP || defined(__APPLE__) || defined(_WIN32) || defined(__QNXNTO__) || defined(EMULATOR)
+        context->useInternalMem = gcvTRUE;
+#else
+        context->useInternalMem = gcvFALSE;
+#endif
 
         /* Load compiler. */
         gcmERR_BREAK(glfLoadCompiler(context));
@@ -728,19 +678,19 @@ glfCreateContext(
         if (context->bufferList)
         {
             glfDestroyNamedObjectList(context, context->bufferList);
-            gcoOS_Free(Os,context->bufferList);
+            context->bufferList = gcvNULL;
         }
 
         if (context->renderBufferList)
         {
             glfDestroyNamedObjectList(context, context->renderBufferList);
-            gcoOS_Free(Os,context->renderBufferList);
+            context->renderBufferList = gcvNULL;
         }
 
         if (context->frameBufferList)
         {
             glfDestroyNamedObjectList(context, context->frameBufferList);
-            gcoOS_Free(Os,context->frameBufferList);
+            context->frameBufferList = gcvNULL;
         }
 #endif
         /* Free the context. */
@@ -952,31 +902,6 @@ glfSetContext(
         gceSURF_FORMAT drawFormat = gcvSURF_UNKNOWN;
         gctUINT drawWidth = 0, drawHeight = 0;
 
-#ifdef _DUMP_FILE
-        glsCONTEXT_PTR currentContext;
-        currentContext = GetCurrentContext();
-        /* Dumping. */
-        {
-            gcoDUMP dump;
-
-            if (context == gcvNULL)
-            {
-                if (currentContext != gcvNULL)
-                {
-                    gcmVERIFY_OK(gcoHAL_GetDump(currentContext->hal, &dump));
-                    gcmVERIFY_OK(gcoDUMP_Control(dump, gcvNULL));
-                }
-            }
-            else
-            {
-                gcmVERIFY_OK(gcoHAL_GetDump(context->hal, &dump));
-                gcmVERIFY_OK(gcoDUMP_Control(dump, _DUMP_FILE));
-                _AddSurface(dump, draw);
-                _AddSurface(dump, depth);
-                gcmVERIFY_OK(gcoDUMP_FrameBegin(dump));
-            }
-        }
-#endif
         gcmERR_BREAK(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
 
         gcmASSERT(context);
@@ -1496,6 +1421,7 @@ GL_API void GL_APIENTRY glFinish(
         {
             glmPROFILE(context, GL1_PROFILER_FINISH_END, 0);
         }
+
     }
     glmLEAVE();
 }

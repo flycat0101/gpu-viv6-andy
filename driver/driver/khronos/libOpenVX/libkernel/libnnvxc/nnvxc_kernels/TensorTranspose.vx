@@ -1,0 +1,662 @@
+#include "cl_viv_vx_ext.h"
+_viv_uniform VXC_512Bits uniPackDataABCD_01;
+_viv_uniform VXC_512Bits uniPackDataABCD_23;
+_viv_uniform int output_depth_sub1;
+
+__kernel void vxTensorTranspose_WHC2CHW
+    (
+    image2d_array_t input,
+    image2d_array_t output
+    )
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.zyxw;
+    vxc_ushort8 vec0, vec1, vec2, vec3, vec01, vec23;
+
+    VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec1, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec1, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+
+    coord_in.z -= 3;
+    VXC_ReadImage2DArray(vec2, input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec2, input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec3, input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec3, input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_DP2x8(vec01, vec0, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_01);
+    VXC_DP2x8(vec23, vec0, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_23);
+
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+
+    VXC_DP2x8(vec01, vec2, vec3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_01);
+    VXC_DP2x8(vec23, vec2, vec3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_23);
+
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+}
+__kernel void vxTensorTranspose_WHC2CWH
+    (
+    image2d_array_t input,
+    image2d_array_t output
+    )
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = (int4)(get_global_id(2), get_global_id(0), get_global_id(1), 0);
+
+    vxc_ushort8 vec0, vec1, vec2, vec3, vec01, vec23;
+
+    VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec1, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec1, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+
+    coord_in.z -= 3;
+    VXC_ReadImage2DArray(vec2, input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec2, input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec3, input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec3, input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_DP2x8(vec01, vec0, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_01);
+    VXC_DP2x8(vec23, vec0, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_23);
+
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.y ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.y ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.y ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.y ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+
+    VXC_DP2x8(vec01, vec2, vec3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_01);
+    VXC_DP2x8(vec23, vec2, vec3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_23);
+
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.y ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.y ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.y ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+}
+__kernel void vxTensorTranspose_WHC2HCW
+    (
+    image2d_array_t input,
+    image2d_array_t output
+    )
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = (int4)(get_global_id(1), get_global_id(2), get_global_id(0), 0);
+    vxc_ushort8 vec0, vec1, vec2, vec3, vec01, vec23;
+
+    VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec2, input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec2, input, coord_in, VXC_5BITOFFSET_XY(4, 1), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec1, input, coord_in, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec3, input, coord_in, VXC_5BITOFFSET_XY(4, 2), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec1, input, coord_in, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec3, input, coord_in, VXC_5BITOFFSET_XY(4, 3), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_DP2x8(vec01, vec0, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_01);
+    VXC_DP2x8(vec23, vec0, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_23);
+
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+
+    VXC_DP2x8(vec01, vec2, vec3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_01);
+    VXC_DP2x8(vec23, vec2, vec3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_23);
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+}
+__kernel void vxTensorTranspose_WHC2WCH
+    (
+    image2d_array_t input,
+    image2d_array_t output
+    )
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+
+    vxc_ushort8 vec0, vec1, vec2, vec3;
+
+    VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec1, input, coord_in, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec2, input, coord_in, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec3, input, coord_in, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+    int4 coord_out = coord_in.xzyw;
+
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+}
+_viv_uniform VXC_512Bits uniExchangeStride1Fp_2x8;
+_viv_uniform VXC_512Bits uniExchangeStride1EvenFp_2x8;
+_viv_uniform VXC_512Bits uniExchangeStride2FpOdd_2x8;
+_viv_uniform VXC_512Bits uniExchangeStride2FpEven_2x8;
+_viv_uniform VXC_512Bits uniExchangeStride4Odd_2x8;
+_viv_uniform VXC_512Bits uniExchangeStride4Even_2x8;
+__kernel void vxTensorTranspose_CHW2CWH
+    (
+    __read_only image2d_array_t input,
+    __write_only  image2d_array_t output
+    )
+{
+    int4 coord_in = (int4)(get_global_id(1), get_global_id(0), get_global_id(2), 0);
+    int4 coord_out = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+
+    vxc_short8 img_val0, img_val1, img_val2, img_val3, img_val4, img_val5, img_val6, img_val7;
+    vxc_short8 out_val0, out_val1, out_val2, out_val3, out_val4, out_val5, out_val6, out_val7;
+
+    VXC_ReadImage2DArray(img_val0, input,  coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(img_val1, input,  coord_in, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(img_val2, input,  coord_in, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(img_val3, input,  coord_in, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(img_val4, input,  coord_in, VXC_5BITOFFSET_XY(0, 4), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(img_val5, input,  coord_in, VXC_5BITOFFSET_XY(0, 5), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(img_val6, input,  coord_in, VXC_5BITOFFSET_XY(0, 6), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(img_val7, input,  coord_in, VXC_5BITOFFSET_XY(0, 7), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+    // exchange 1 stride
+    VXC_DP2x8(out_val0, img_val0, img_val1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1Fp_2x8);
+    VXC_DP2x8(out_val1, img_val0, img_val1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1EvenFp_2x8);
+    VXC_DP2x8(out_val2, img_val2, img_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1Fp_2x8);
+    VXC_DP2x8(out_val3, img_val2, img_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1EvenFp_2x8);
+    VXC_DP2x8(out_val4, img_val4, img_val5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1Fp_2x8);
+    VXC_DP2x8(out_val5, img_val4, img_val5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1EvenFp_2x8);
+    VXC_DP2x8(out_val6, img_val6, img_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1Fp_2x8);
+    VXC_DP2x8(out_val7, img_val6, img_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1EvenFp_2x8);
+    // exchange 2 stride
+    VXC_DP2x8(img_val0, out_val0, out_val2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpOdd_2x8);
+    VXC_DP2x8(img_val2, out_val0, out_val2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpEven_2x8);
+    VXC_DP2x8(img_val1, out_val1, out_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpOdd_2x8);
+    VXC_DP2x8(img_val3, out_val1, out_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpEven_2x8);
+    VXC_DP2x8(img_val4, out_val4, out_val6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpOdd_2x8);
+    VXC_DP2x8(img_val6, out_val4, out_val6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpEven_2x8);
+    VXC_DP2x8(img_val5, out_val5, out_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpOdd_2x8);
+    VXC_DP2x8(img_val7, out_val5, out_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpEven_2x8);
+    // exchange 4 stride
+    VXC_DP2x8(out_val0, img_val0, img_val4, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Odd_2x8);
+    VXC_DP2x8(out_val4, img_val0, img_val4, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Even_2x8);
+    VXC_DP2x8(out_val1, img_val1, img_val5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Odd_2x8);
+    VXC_DP2x8(out_val5, img_val1, img_val5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Even_2x8);
+    VXC_DP2x8(out_val2, img_val2, img_val6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Odd_2x8);
+    VXC_DP2x8(out_val6, img_val2, img_val6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Even_2x8);
+    VXC_DP2x8(out_val3, img_val3, img_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Odd_2x8);
+    VXC_DP2x8(out_val7, img_val3, img_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Even_2x8);
+
+    VXC_WriteImage2DArray(output, coord_out, out_val0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord_out.y++;
+    VXC_WriteImage2DArray(output, coord_out, out_val1, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord_out.y++;
+    VXC_WriteImage2DArray(output, coord_out, out_val2, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord_out.y++;
+    VXC_WriteImage2DArray(output, coord_out, out_val3, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord_out.y++;
+    VXC_WriteImage2DArray(output, coord_out, out_val4, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord_out.y++;
+    VXC_WriteImage2DArray(output, coord_out, out_val5, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord_out.y++;
+    VXC_WriteImage2DArray(output, coord_out, out_val6, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord_out.y++;
+    VXC_WriteImage2DArray(output, coord_out, out_val7, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord_out.y++;
+}
+__kernel void vxTensorTranspose_WHC2CHW_int8
+    (
+    image2d_array_t input,
+    image2d_array_t output
+    )
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.zyxw;
+
+    vxc_uchar16 vec0, vec1, vec2, vec3, vec01, vec23;
+
+    VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec1, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec1, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+
+    coord_in.z -= 3;
+    VXC_ReadImage2DArray(vec2, input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec2, input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec3, input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec3, input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_DP2x8(vec01, vec0, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_01);
+    VXC_DP2x8(vec23, vec0, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_23);
+
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+
+    VXC_DP2x8(vec01, vec2, vec3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_01);
+    VXC_DP2x8(vec23, vec2, vec3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_23);
+
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+}
+__kernel void vxTensorTranspose_WHC2CWH_int8
+    (
+    image2d_array_t input,
+    image2d_array_t output
+    )
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = (int4)(get_global_id(2), get_global_id(0), get_global_id(1), 0);
+
+    vxc_uchar16 vec0, vec1, vec2, vec3, vec01, vec23;
+
+    VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec1, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec1, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+
+    coord_in.z -= 3;
+    VXC_ReadImage2DArray(vec2, input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec2, input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec3, input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_in.z ++;
+    VXC_ReadImage2DArray(vec3, input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_DP2x8(vec01, vec0, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_01);
+    VXC_DP2x8(vec23, vec0, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_23);
+
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.y ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.y ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.y ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.y ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+
+    VXC_DP2x8(vec01, vec2, vec3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_01);
+    VXC_DP2x8(vec23, vec2, vec3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_23);
+
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.y ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.y ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.y ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void vxTensorTranspose_WHC2HCW_int8
+    (
+    image2d_array_t input,
+    image2d_array_t output
+    )
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = (int4)(get_global_id(1), get_global_id(2), get_global_id(0), 0);
+    vxc_uchar16 vec0, vec1, vec2, vec3, vec01, vec23;
+
+    VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec2, input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec2, input, coord_in, VXC_5BITOFFSET_XY(4, 1), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec1, input, coord_in, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec3, input, coord_in, VXC_5BITOFFSET_XY(4, 2), VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec1, input, coord_in, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec3, input, coord_in, VXC_5BITOFFSET_XY(4, 3), VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_DP2x8(vec01, vec0, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_01);
+    VXC_DP2x8(vec23, vec0, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_23);
+
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_DP2x8(vec01, vec2, vec3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_01);
+    VXC_DP2x8(vec23, vec2, vec3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), uniPackDataABCD_23);
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec01, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec23, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+}
+__kernel void vxTensorTranspose_WHC2WCH_int8
+    (
+    image2d_array_t input,
+    image2d_array_t output
+    )
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+
+    vxc_uchar16 vec0, vec1, vec2, vec3;
+
+    VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec1, input, coord_in, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec2, input, coord_in, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec3, input, coord_in, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+    int4 coord_out = coord_in.xzyw;
+
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    coord_out.z = min(output_depth_sub1, coord_out.z);
+    VXC_WriteImage2DArray(output, coord_out, vec3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+}
+__kernel void vxTensorTranspose_CHW2CWH_int8
+    (
+    __read_only image2d_array_t input,
+    __write_only  image2d_array_t output
+    )
+{
+    int4 coord_in = (int4)(get_global_id(1), get_global_id(0), get_global_id(2), 0);
+    int4 coord_out = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+
+    vxc_uchar16 img_val0, img_val1, img_val2, img_val3, img_val4, img_val5, img_val6, img_val7;
+    vxc_uchar16 out_val0, out_val1, out_val2, out_val3, out_val4, out_val5, out_val6, out_val7;
+
+    VXC_ReadImage2DArray(img_val0, input,  coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(img_val1, input,  coord_in, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(img_val2, input,  coord_in, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(img_val3, input,  coord_in, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(img_val4, input,  coord_in, VXC_5BITOFFSET_XY(0, 4), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(img_val5, input,  coord_in, VXC_5BITOFFSET_XY(0, 5), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(img_val6, input,  coord_in, VXC_5BITOFFSET_XY(0, 6), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(img_val7, input,  coord_in, VXC_5BITOFFSET_XY(0, 7), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+    // exchange 1 stride
+    VXC_DP2x8(out_val0, img_val0, img_val1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1Fp_2x8);
+    VXC_DP2x8(out_val1, img_val0, img_val1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1EvenFp_2x8);
+    VXC_DP2x8(out_val2, img_val2, img_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1Fp_2x8);
+    VXC_DP2x8(out_val3, img_val2, img_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1EvenFp_2x8);
+    VXC_DP2x8(out_val4, img_val4, img_val5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1Fp_2x8);
+    VXC_DP2x8(out_val5, img_val4, img_val5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1EvenFp_2x8);
+    VXC_DP2x8(out_val6, img_val6, img_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1Fp_2x8);
+    VXC_DP2x8(out_val7, img_val6, img_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1EvenFp_2x8);
+    // exchange 2 stride
+    VXC_DP2x8(img_val0, out_val0, out_val2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpOdd_2x8);
+    VXC_DP2x8(img_val2, out_val0, out_val2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpEven_2x8);
+    VXC_DP2x8(img_val1, out_val1, out_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpOdd_2x8);
+    VXC_DP2x8(img_val3, out_val1, out_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpEven_2x8);
+    VXC_DP2x8(img_val4, out_val4, out_val6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpOdd_2x8);
+    VXC_DP2x8(img_val6, out_val4, out_val6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpEven_2x8);
+    VXC_DP2x8(img_val5, out_val5, out_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpOdd_2x8);
+    VXC_DP2x8(img_val7, out_val5, out_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpEven_2x8);
+    // exchange 4 stride
+    VXC_DP2x8(out_val0, img_val0, img_val4, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Odd_2x8);
+    VXC_DP2x8(out_val4, img_val0, img_val4, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Even_2x8);
+    VXC_DP2x8(out_val1, img_val1, img_val5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Odd_2x8);
+    VXC_DP2x8(out_val5, img_val1, img_val5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Even_2x8);
+    VXC_DP2x8(out_val2, img_val2, img_val6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Odd_2x8);
+    VXC_DP2x8(out_val6, img_val2, img_val6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Even_2x8);
+    VXC_DP2x8(out_val3, img_val3, img_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Odd_2x8);
+    VXC_DP2x8(out_val7, img_val3, img_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Even_2x8);
+
+    VXC_WriteImage2DArray(output, coord_out, out_val0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord_out.y++;
+    VXC_WriteImage2DArray(output, coord_out, out_val1, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord_out.y++;
+    VXC_WriteImage2DArray(output, coord_out, out_val2, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord_out.y++;
+    VXC_WriteImage2DArray(output, coord_out, out_val3, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord_out.y++;
+    VXC_WriteImage2DArray(output, coord_out, out_val4, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord_out.y++;
+    VXC_WriteImage2DArray(output, coord_out, out_val5, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord_out.y++;
+    VXC_WriteImage2DArray(output, coord_out, out_val6, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord_out.y++;
+    VXC_WriteImage2DArray(output, coord_out, out_val7, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord_out.y++;
+}
+
+_viv_uniform VXC_512Bits uniExchangeStride1_part0_2x8;
+_viv_uniform VXC_512Bits uniExchangeStride1_part1_2x8;
+_viv_uniform VXC_512Bits uniExchange8Bits_part0_2x8;
+_viv_uniform VXC_512Bits uniExchange8Bits_part1_2x8;
+_viv_uniform VXC_512Bits uniExchange8Bits_part2_2x8;
+_viv_uniform VXC_512Bits uniExchange8Bits_part3_2x8;
+
+__kernel void vxTensorTranspose_8Bits_2D(
+                __read_only image2d_array_t input,
+                __write_only image2d_array_t output)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+
+    vxc_uchar8 img_val0, img_val1, img_val2, img_val3, img_val4, img_val5, img_val6, img_val7;
+    vxc_uchar16 out_val0, out_val1, out_val2, out_val3;
+
+    VXC_ReadImage(img_val0, input,  coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val1, input,  coord, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val2, input,  coord, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val3, input,  coord, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val4, input,  coord, VXC_5BITOFFSET_XY(0, 4), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val5, input,  coord, VXC_5BITOFFSET_XY(0, 5), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val6, input,  coord, VXC_5BITOFFSET_XY(0, 6), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val7, input,  coord, VXC_5BITOFFSET_XY(0, 7), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+    // exchange 1 stride
+    VXC_DP2x8(out_val0, img_val0, img_val1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1_part0_2x8);
+    VXC_DP2x8(out_val1, img_val0, img_val1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1_part1_2x8);
+    VXC_DP2x8(out_val0, img_val2, img_val3, VXC_MODIFIER(8, 15, 0, VXC_RM_TowardZero, 0), uniExchangeStride1_part0_2x8);
+    VXC_DP2x8(out_val1, img_val2, img_val3, VXC_MODIFIER(8, 15, 0, VXC_RM_TowardZero, 0), uniExchangeStride1_part1_2x8);
+    VXC_DP2x8(out_val2, img_val4, img_val5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1_part0_2x8);
+    VXC_DP2x8(out_val3, img_val4, img_val5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1_part1_2x8);
+    VXC_DP2x8(out_val2, img_val6, img_val7, VXC_MODIFIER(8, 15, 0, VXC_RM_TowardZero, 0), uniExchangeStride1_part0_2x8);
+    VXC_DP2x8(out_val3, img_val6, img_val7, VXC_MODIFIER(8, 15, 0, VXC_RM_TowardZero, 0), uniExchangeStride1_part1_2x8);
+    // exchange 2 stride
+    VXC_DP2x8(img_val0, out_val0, out_val2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchange8Bits_part0_2x8);
+    VXC_DP2x8(img_val1, out_val0, out_val2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchange8Bits_part1_2x8);
+    VXC_DP2x8(img_val2, out_val0, out_val2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchange8Bits_part2_2x8);
+    VXC_DP2x8(img_val3, out_val0, out_val2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchange8Bits_part3_2x8);
+    VXC_DP2x8(img_val4, out_val1, out_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchange8Bits_part0_2x8);
+    VXC_DP2x8(img_val5, out_val1, out_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchange8Bits_part1_2x8);
+    VXC_DP2x8(img_val6, out_val1, out_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchange8Bits_part2_2x8);
+    VXC_DP2x8(img_val7, out_val1, out_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchange8Bits_part3_2x8);
+
+    VXC_WriteImage(output, coord.yx, img_val0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.x++;
+    VXC_WriteImage(output, coord.yx, img_val1, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.x++;
+    VXC_WriteImage(output, coord.yx, img_val2, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.x++;
+    VXC_WriteImage(output, coord.yx, img_val3, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.x++;
+    VXC_WriteImage(output, coord.yx, img_val4, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.x++;
+    VXC_WriteImage(output, coord.yx, img_val5, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.x++;
+    VXC_WriteImage(output, coord.yx, img_val6, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.x++;
+    VXC_WriteImage(output, coord.yx, img_val7, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+}
+
+_viv_uniform VXC_512Bits uniExchangeStride2_part0_2x8;
+_viv_uniform VXC_512Bits uniExchangeStride2_part1_2x8;
+_viv_uniform VXC_512Bits uniExchangeStride4_part0_2x8;
+_viv_uniform VXC_512Bits uniExchangeStride4_part1_2x8;
+__kernel void vxTensorTranspose_16Bits_2D(
+                __read_only image2d_array_t input,
+                __write_only image2d_array_t output)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+
+    vxc_ushort8 img_val0, img_val1, img_val2, img_val3, img_val4, img_val5, img_val6, img_val7;
+    vxc_ushort8 out_val0, out_val1, out_val2, out_val3, out_val4, out_val5, out_val6, out_val7;
+
+    VXC_ReadImage(img_val0, input,  coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val1, input,  coord, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val2, input,  coord, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val3, input,  coord, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val4, input,  coord, VXC_5BITOFFSET_XY(0, 4), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val5, input,  coord, VXC_5BITOFFSET_XY(0, 5), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val6, input,  coord, VXC_5BITOFFSET_XY(0, 6), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val7, input,  coord, VXC_5BITOFFSET_XY(0, 7), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+    // exchange 1 stride
+    VXC_DP2x8(out_val0, img_val0, img_val1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1_part0_2x8);
+    VXC_DP2x8(out_val1, img_val0, img_val1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1_part1_2x8);
+    VXC_DP2x8(out_val2, img_val2, img_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1_part0_2x8);
+    VXC_DP2x8(out_val3, img_val2, img_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1_part1_2x8);
+    VXC_DP2x8(out_val4, img_val4, img_val5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1_part0_2x8);
+    VXC_DP2x8(out_val5, img_val4, img_val5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1_part1_2x8);
+    VXC_DP2x8(out_val6, img_val6, img_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1_part0_2x8);
+    VXC_DP2x8(out_val7, img_val6, img_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1_part1_2x8);
+    // exchange 2 stride
+    VXC_DP2x8(img_val0, out_val0, out_val2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2_part0_2x8);
+    VXC_DP2x8(img_val1, out_val0, out_val2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2_part1_2x8);
+    VXC_DP2x8(img_val2, out_val1, out_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2_part0_2x8);
+    VXC_DP2x8(img_val3, out_val1, out_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2_part1_2x8);
+    VXC_DP2x8(img_val4, out_val4, out_val6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2_part0_2x8);
+    VXC_DP2x8(img_val5, out_val4, out_val6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2_part1_2x8);
+    VXC_DP2x8(img_val6, out_val5, out_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2_part0_2x8);
+    VXC_DP2x8(img_val7, out_val5, out_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2_part1_2x8);
+    // exchange 4 stride
+    VXC_DP2x8(out_val0, img_val0, img_val4, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4_part0_2x8);
+    VXC_DP2x8(out_val1, img_val0, img_val4, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4_part1_2x8);
+    VXC_DP2x8(out_val2, img_val1, img_val5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4_part0_2x8);
+    VXC_DP2x8(out_val3, img_val1, img_val5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4_part1_2x8);
+    VXC_DP2x8(out_val4, img_val2, img_val6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4_part0_2x8);
+    VXC_DP2x8(out_val5, img_val2, img_val6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4_part1_2x8);
+    VXC_DP2x8(out_val6, img_val3, img_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4_part0_2x8);
+    VXC_DP2x8(out_val7, img_val3, img_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4_part1_2x8);
+
+    VXC_WriteImage(output, coord.yx, out_val0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.x++;
+    VXC_WriteImage(output, coord.yx, out_val1, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.x++;
+    VXC_WriteImage(output, coord.yx, out_val2, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.x++;
+    VXC_WriteImage(output, coord.yx, out_val3, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.x++;
+    VXC_WriteImage(output, coord.yx, out_val4, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.x++;
+    VXC_WriteImage(output, coord.yx, out_val5, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.x++;
+    VXC_WriteImage(output, coord.yx, out_val6, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.x++;
+    VXC_WriteImage(output, coord.yx, out_val7, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+}

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1073,7 +1073,8 @@ const EGLuint64KHR _ModiferTable[] =
     DRM_FORMAT_MOD_VIVANTE_TILED,
     DRM_FORMAT_MOD_VIVANTE_SUPER_TILED,
     DRM_FORMAT_MOD_VIVANTE_SPLIT_TILED,
-    DRM_FORMAT_MOD_VIVANTE_SPLIT_SUPER_TILED
+    DRM_FORMAT_MOD_VIVANTE_SPLIT_SUPER_TILED,
+    DRM_FORMAT_MOD_LINEAR
 };
 
 #define __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT           0
@@ -1081,11 +1082,13 @@ const EGLuint64KHR _ModiferTable[] =
 #define __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT       (1 << 1)
 #define __DRM_FORMAT_MOD_VIVANTE_SPLIT_TILED_BIT       (1 << 2)
 #define __DRM_FORMAT_MOD_VIVANTE_SPLIT_SUPER_TILED_BIT (1 << 3)
+#define __DRM_FORMAT_MOD_VIVANTE_LINEAR                (1 << 4)
 
 #define __DRM_FORMAT_MOD_VIVANTE_ALL_BIT (__DRM_FORMAT_MOD_VIVANTE_TILED_BIT | \
                                           __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT | \
                                           __DRM_FORMAT_MOD_VIVANTE_SPLIT_TILED_BIT | \
-                                          __DRM_FORMAT_MOD_VIVANTE_SPLIT_SUPER_TILED_BIT )
+                                          __DRM_FORMAT_MOD_VIVANTE_SPLIT_SUPER_TILED_BIT | \
+                                          __DRM_FORMAT_MOD_VIVANTE_LINEAR)
 static struct
 {
     int fourcc;
@@ -1154,23 +1157,23 @@ _FormatTable[] =
     /* 32 bpp 2-10-10-10 format not supported */
 
     /* packed YCbCr */
-    {DRM_FORMAT_YUYV, gcvSURF_YUY2,         __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
-    {DRM_FORMAT_YVYU, gcvSURF_YVYU,         __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
-    {DRM_FORMAT_UYVY, gcvSURF_UYVY,         __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
-    {DRM_FORMAT_VYUY, gcvSURF_VYUY,         __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
+    {DRM_FORMAT_YUYV, gcvSURF_YUY2,         __DRM_FORMAT_MOD_VIVANTE_LINEAR},
+    {DRM_FORMAT_YVYU, gcvSURF_YVYU,         __DRM_FORMAT_MOD_VIVANTE_LINEAR},
+    {DRM_FORMAT_UYVY, gcvSURF_UYVY,         __DRM_FORMAT_MOD_VIVANTE_LINEAR},
+    {DRM_FORMAT_VYUY, gcvSURF_VYUY,         __DRM_FORMAT_MOD_VIVANTE_LINEAR},
 
-    {DRM_FORMAT_AYUV, gcvSURF_AYUV,         __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
+    {DRM_FORMAT_AYUV, gcvSURF_AYUV,         __DRM_FORMAT_MOD_VIVANTE_LINEAR},
 
     /* 2 plane YCbCr */
-    {DRM_FORMAT_NV12, gcvSURF_NV12,         __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
-    {DRM_FORMAT_NV21, gcvSURF_NV21,         __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
+    {DRM_FORMAT_NV12, gcvSURF_NV12,         __DRM_FORMAT_MOD_VIVANTE_LINEAR},
+    {DRM_FORMAT_NV21, gcvSURF_NV21,         __DRM_FORMAT_MOD_VIVANTE_LINEAR},
     /* supported by SW convertor. */
-    {DRM_FORMAT_NV16, gcvSURF_NV16,         __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
-    {DRM_FORMAT_NV61, gcvSURF_NV61,         __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
+    {DRM_FORMAT_NV16, gcvSURF_NV16,         __DRM_FORMAT_MOD_VIVANTE_LINEAR},
+    {DRM_FORMAT_NV61, gcvSURF_NV61,         __DRM_FORMAT_MOD_VIVANTE_LINEAR},
 
     /* 3 plane YCbCr */
-    {DRM_FORMAT_YUV420, gcvSURF_I420,       __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
-    {DRM_FORMAT_YVU420, gcvSURF_YV12,       __DRM_FORMAT_MOD_VIVANTE_UNKNOWN_BIT},
+    {DRM_FORMAT_YUV420, gcvSURF_I420,       __DRM_FORMAT_MOD_VIVANTE_LINEAR},
+    {DRM_FORMAT_YVU420, gcvSURF_YV12,       __DRM_FORMAT_MOD_VIVANTE_LINEAR},
 
     /* Luminance */
     {DRM_FORMAT_L8,     gcvSURF_L8_RAW,     __DRM_FORMAT_MOD_VIVANTE_SUPER_TILED_BIT},

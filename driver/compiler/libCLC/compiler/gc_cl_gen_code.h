@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -16,6 +16,7 @@
 
 #include "gc_cl_ir.h"
 #define _GEN_PACKED_LOAD_STORE_AS_BUILTIN 1
+#define _GEN_IMAGE_OR_SAMPLER_PARAMETER_VARIABLES 1
 
 #define cldHandleHighPrecisionInFrontEnd gcvFALSE
 #define cldSupportMultiKernelFunction  1
@@ -28,7 +29,8 @@
 
 #define cldNumMemoryAddressRegs _gcdOCL_NumMemoryAddressRegs /*number of memory address registers */
 #define cldPrivateMemoryAddressRegIndex _gcdOCL_PrivateMemoryAddressRegIndex  /*private memory address register index */
-#define cldLocalMemoryAddressRegIndex _gcdOCL_LocalMemoryAddressRegIndex  /*local memory address register index */
+#define cldLocalMemoryAddressRegIndex _gcdOCL_LocalMemoryAddressRegIndex  /*local memory address register index for the local variables within kernel function */
+#define cldParmLocalMemoryAddressRegIndex _gcdOCL_ParmLocalMemoryAddressRegIndex  /*local memory address register index for the local parameters */
 #define cldConstantMemoryAddressRegIndex _gcdOCL_ConstantMemoryAddressRegIndex  /*constant memory address register index */
 #define cldPrintfStartMemoryAddressRegIndex _gcdOCL_PrintfStartMemoryAddressRegIndex  /*printf start memory address register index */
 #define cldPrintfEndMemoryAddressRegIndex   _gcdOCL_PrintfEndMemoryAddressRegIndex  /*printf end memory address register index */
@@ -51,7 +53,7 @@ IN clsNAME * Name
 #define _clmCheckVariableForMemory(Name) \
   (!clmDECL_IsPointerType(&((Name)->decl)) && \
    ((Name)->decl.dataType->addrSpaceQualifier == clvQUALIFIER_LOCAL || \
-    (Name)->decl.dataType->addrSpaceQualifier == clvQUALIFIER_GLOBAL || \
+    (!gcmOPT_oclPassKernelStructArgByValue() && (Name)->decl.dataType->addrSpaceQualifier == clvQUALIFIER_GLOBAL) || \
     (((Name)->type == clvVARIABLE_NAME || (Name)->type == clvPARAMETER_NAME) && \
       (Name)->u.variableInfo.isAddressed)))
 
@@ -225,7 +227,12 @@ typedef enum _cleOPCODE
     clvOPCODE_IMAGE_WRITE,
     clvOPCODE_IMAGE_WRITE_3D,
     clvOPCODE_CLAMP0MAX,
+    clvOPCODE_CLAMPCOORD,
+    clvOPCODE_DP2,
+    clvOPCODE_DP3,
+    clvOPCODE_DP4,
 
+    clvOPCODE_TEXU,
 
     /* Conversion Operations */
     clvOPCODE_FLOAT_TO_INT,
@@ -386,6 +393,15 @@ typedef enum _cleOPCODE
 
     clvOPCODE_FMA_MUL,
     clvOPCODE_FMA_ADD,
+    clvOPCODE_CMAD,
+    clvOPCODE_CONJ,
+    clvOPCODE_CMUL,
+    clvOPCODE_CMADCJ,
+    clvOPCODE_CMULCJ,
+    clvOPCODE_CADDCJ,
+    clvOPCODE_CSUBCJ,
+
+    clvOPCODE_GET_IMAGE_TYPE,
 
     clvOPCODE_FINDLSB,
     clvOPCODE_FINDMSB,
@@ -1237,17 +1253,6 @@ clGenDotCode(
 
 gceSTATUS
 clGenShiftExprCode(
-    IN cloCOMPILER Compiler,
-    IN gctUINT LineNo,
-    IN gctUINT StringNo,
-    IN cleOPCODE Opcode,
-    IN clsIOPERAND * IOperand,
-    IN clsROPERAND * ROperand0,
-    IN clsROPERAND * ROperand1
-    );
-
-gceSTATUS
-clGenBitwiseExprCode(
     IN cloCOMPILER Compiler,
     IN gctUINT LineNo,
     IN gctUINT StringNo,

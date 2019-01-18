@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -24,10 +24,24 @@
 
 #define _GC_OBJ_ZONE            gcvZONE_BUFFER
 
-#define gcmMAX_TEMPCMD_BUFFER_SIZE  0x20000
+#define gcdMAX_TEMPCMD_BUFFER_SIZE      0x20000
+
+#define gcdPATCH_LIST_SIZE              1024
+
 /******************************************************************************\
 ********************************** Structures **********************************
 \******************************************************************************/
+
+typedef struct _gcsCOMMAND_INFO * gcsCOMMAND_INFO_PTR;
+
+struct _gcsCOMMAND_INFO
+{
+    gctUINT32                   alignment;
+    gctUINT32                   reservedHead;
+    gctUINT32                   reservedTail;
+    gctUINT32                   reservedUser;
+    gceENGINE                   engine;
+};
 
 struct _gcoBUFFER
 {
@@ -55,21 +69,30 @@ struct _gcoBUFFER
     gcoCMDBUF                   commandBufferTail;
 
     /* Reserved bytes. */
-    struct _gcsCOMMAND_INFO
-    {
-        gctUINT32   alignment;
-        gctUINT32   reservedHead;
-        gctUINT32   reservedTail;
-        gctUINT32   reservedUser;
-        gceCMDBUF_SOURCE source;
-        gceENGINE   engine;
-    }                           info;
+    struct _gcsCOMMAND_INFO     info;
+
     gctUINT32                   totalReserved;
 
-    struct _gcsPATCH_LIST *     patchList;
+    /* command-location head and tail. */
+    gcsHAL_COMMAND_LOCATION     commandLocationHead;
+    gcsHAL_COMMAND_LOCATION *   commandLocationTail;
 
-    /* Cache of free patch lists. */
-    struct _gcsPATCH_LIST *     freePatchList;
+    /* sub-commit head and tail. */
+    gcsHAL_SUBCOMMIT            subCommitHead;
+    gcsHAL_SUBCOMMIT *          subCommitTail;
+
+    /* command-location and sub-commit repo. */
+    gcsHAL_COMMAND_LOCATION *   freeCommandLocations;
+    gcsHAL_SUBCOMMIT *          freeSubCommits;
+
+    /* Patch lists. */
+    gcsHAL_PATCH_LIST *         patchLists[gcvHAL_PATCH_TYPE_COUNT];
+    gcsHAL_PATCH_LIST *         tempPatchLists[gcvHAL_PATCH_TYPE_COUNT];
+    gcsHAL_PATCH_LIST *         freePatchLists[gcvHAL_PATCH_TYPE_COUNT];
+
+    /* Current MCFE channel selection. */
+    gctBOOL                     mcfePriority;
+    gctUINT32                   mcfeChannelId;
 
     struct _gcsTEMPCMDBUF       tempCMDBUF;
 
@@ -91,6 +114,14 @@ struct _gcoBUFFER
 
     gcsFENCE_LIST_PTR           fenceList;
 
+    /* capture slice of states in the command buffer */
+    gctBOOL                     captureEnabled;
+    gctBOOL                     dropCommandEnabled;
+    gctUINT8_PTR                captureBuffer;
+    gctUINT32                   captureBufferTotalSize;
+    gctINT32                    captureRemainedSize;
+    gctUINT32                   captureCommandOffset;
+
     struct
     {
         gctUINT32               hasFence                    : 1;
@@ -100,116 +131,293 @@ struct _gcoBUFFER
         gctUINT32               hasNewMMU                   : 1;
         gctUINT32               hasHWTFB                    : 1;
         gctUINT32               hasProbe                    : 1;
+        gctUINT32               hasComputeOnly              : 1;
+        gctUINT32               hasMCFE                     : 1;
 
     }hwFeature;
 };
 
+static gctUINT32 _PatchItemSize[] =
+{
+    0,
+    (gctUINT32)sizeof(gcsHAL_PATCH_VIDMEM_ADDRESS),
+    (gctUINT32)sizeof(gcsHAL_PATCH_MCFE_SEMAPHORE),
+    (gctUINT32)sizeof(gcsHAL_PATCH_VIDMEM_TIMESTAMP),
+};
+
 /******************************************************************************\
-******************************* Private Functions ******************************
+***************************** gcoCMDBUF Object Code *****************************
 \******************************************************************************/
 
-static gceSTATUS
+static void
+_DoFreeCommandBufferMemory(
+    IN gcoHARDWARE Hardware,
+    IN gcsCOMMAND_INFO_PTR Info,
+    IN gcoCMDBUF CommandBuffer
+    )
+{
+    /* Unlock command buffer video memory. */
+    gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(
+            CommandBuffer->videoMemNode,
+            gcvVIDMEM_TYPE_COMMAND,
+            Info->engine
+            ));
+
+    /* Free video memory. */
+    gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(CommandBuffer->videoMemNode));
+}
+
+static void
 _FreeCommandBuffer(
     IN gcoHARDWARE Hardware,
     IN gcsCOMMAND_INFO_PTR Info,
     IN gcoCMDBUF CommandBuffer
     )
 {
-    gceSTATUS status = gcvSTATUS_OK;
-    gcsHAL_INTERFACE iface;
-
-    gcmHEADER_ARG("CommandBuffer=0x%x", CommandBuffer);
-
-    if (gcmUINT64_TO_PTR(CommandBuffer) != gcvNULL)
+    if (CommandBuffer != gcvNULL)
     {
-        if (gcmUINT64_TO_PTR(CommandBuffer->logical) != gcvNULL)
+        if (CommandBuffer->logical != 0)
         {
-            /* Has the command buffer ever been committed? */
-            if (CommandBuffer->commitCount == 0)
-            {
-                switch (Info->source)
-                {
-                case gcvCMDBUF_VIRTUAL:
-                    iface.command = gcvHAL_FREE_VIRTUAL_COMMAND_BUFFER;
-                    iface.u.FreeVirtualCommandBuffer.bytes    = CommandBuffer->bytes;
-                    iface.u.FreeVirtualCommandBuffer.physical = CommandBuffer->physical;
-                    iface.u.FreeVirtualCommandBuffer.logical  = CommandBuffer->logical;
-                    gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
-                    break;
-                case gcvCMDBUF_CONTIGUOUS:
-                    gcmONERROR(gcoOS_FreeContiguous(
-                        gcvNULL,
-                        gcmINT2PTR(CommandBuffer->physical),
-                        gcmUINT64_TO_PTR(CommandBuffer->logical),
-                        (gctSIZE_T) CommandBuffer->bytes
-                        ));
-                    break;
-                case gcvCMDBUF_RESERVED:
-                    gcmONERROR(gcoHAL_UnlockVideoMemory(CommandBuffer->physical, gcvSURF_BITMAP, Info->engine));
-                    gcmONERROR(gcoHAL_ReleaseVideoMemory(CommandBuffer->physical));
-                    break;
-                default:
-                    break;
-                }
-            }
-            else
-            {
-                switch (Info->source)
-                {
-                case gcvCMDBUF_VIRTUAL:
-                    iface.command = gcvHAL_FREE_VIRTUAL_COMMAND_BUFFER;
-                    iface.engine = Info->engine;
-                    iface.u.FreeVirtualCommandBuffer.bytes    = CommandBuffer->bytes;
-                    iface.u.FreeVirtualCommandBuffer.physical = CommandBuffer->physical;
-                    iface.u.FreeVirtualCommandBuffer.logical  = CommandBuffer->logical;
-
-                    /* Send event. */
-                    gcmONERROR(gcoHARDWARE_CallEvent(Hardware, &iface));
-
-                    break;
-                case gcvCMDBUF_CONTIGUOUS:
-                    iface.command = gcvHAL_FREE_CONTIGUOUS_MEMORY;
-                    iface.engine = Info->engine;
-                    iface.u.FreeContiguousMemory.bytes    = CommandBuffer->bytes;
-                    iface.u.FreeContiguousMemory.physical = CommandBuffer->physical;
-                    iface.u.FreeContiguousMemory.logical  = CommandBuffer->logical;
-
-                    /* Send event. */
-                    gcmONERROR(gcoHARDWARE_CallEvent(Hardware, &iface));
-
-                    break;
-                case gcvCMDBUF_RESERVED:
-                    gcmONERROR(gcoHAL_UnlockVideoMemory(CommandBuffer->physical, gcvSURF_BITMAP, Info->engine));
-                    gcmONERROR(gcoHAL_ReleaseVideoMemory(CommandBuffer->physical));
-                    break;
-                default:
-                    break;
-                }
-            }
+            /* Can not handle error case when free. */
+            _DoFreeCommandBufferMemory(Hardware, Info, CommandBuffer);
 
             /* Reset the buffer pointer. */
             CommandBuffer->logical = 0;
         }
+    }
+}
 
-#if gcdSECURE_USER
-        if (gcmUINT64_TO_PTR(CommandBuffer->hintArray) != gcvNULL)
-        {
-            gcmONERROR(gcmOS_SAFE_FREE_SHARED_MEMORY(gcvNULL, gcmUINT64_TO_PTR(CommandBuffer->hintArray)));
-            CommandBuffer->hintArray =
-            CommandBuffer->hintArrayTail = 0;
-        }
-#endif
+/*******************************************************************************
+**
+**  _DestroyCommandBuffer
+**
+**  Destroy a gcoCMDBUF object.
+**
+**  INPUT:
+**
+**      gcoCMDBUF CommandBuffer
+**          Pointer to an gcoCMDBUF object.
+**
+**  OUTPUT:
+**
+**      None.
+*/
+static void
+_DestroyCommandBuffer(
+    IN gcoHARDWARE Hardware,
+    IN gcsCOMMAND_INFO_PTR Info,
+    IN gcoCMDBUF CommandBuffer
+    )
+{
+    gcmHEADER_ARG("CommandBuffer=0x%x", CommandBuffer);
+
+    /* Destroy command buffer allocations. */
+    _FreeCommandBuffer(Hardware, Info, CommandBuffer);
+
+    /* Destroy signal. */
+    if (CommandBuffer->signal != gcvNULL)
+    {
+        gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL, CommandBuffer->signal));
+        CommandBuffer->signal = gcvNULL;
     }
 
+    /* Free the gcoCMDBUF object. */
+    gcoOS_Free(gcvNULL, CommandBuffer);
+
     /* Success. */
-    gcmFOOTER();
+    gcmFOOTER_NO();
+}
+
+/*******************************************************************************
+**
+**  _ConstructCommandBuffer
+**
+**  Construct a new gcoCMDBUF object.
+**
+**  INPUT:
+**
+**      gcoOS Os
+**          Pointer to a gcoOS object.
+**
+**      gcoHARDWARE Hardware
+**          Pointer to a gcoHARDWARE object.
+**
+**      gctSIZE_T Bytes
+**          Number of bytes for the buffer.
+**
+**      gcsCOMMAND_BUFFER_PTR Info
+**          Alignment and head/tail information.
+**
+**  OUTPUT:
+**
+**      gcoCMDBUF * CommandBuffer
+**          Pointer to a variable that will hold the the gcoCMDBUF object
+**          pointer.
+*/
+static gceSTATUS
+_ConstructCommandBuffer(
+    IN gcoOS Os,
+    IN gcoHARDWARE Hardware,
+    IN gctSIZE_T Bytes,
+    IN gcsCOMMAND_INFO_PTR Info,
+    OUT gcoCMDBUF * CommandBuffer
+    )
+{
+    gceSTATUS status;
+    gcoCMDBUF commandBuffer = gcvNULL;
+    gctSIZE_T objectSize    = 0;
+    gctPOINTER pointer      = gcvNULL;
+
+    gcmHEADER_ARG("Bytes=%lu Info=0x%x", Bytes, Info);
+
+    /* Verify the arguments. */
+    gcmDEBUG_VERIFY_ARGUMENT(Bytes > 0);
+    gcmDEBUG_VERIFY_ARGUMENT(CommandBuffer != gcvNULL);
+
+    /* Set the size of the object. */
+    objectSize = gcmSIZEOF(struct _gcoCMDBUF);
+
+    /* Allocate the gcoCMDBUF object. */
+    gcmONERROR(gcoOS_Allocate(gcvNULL, objectSize, &pointer));
+    commandBuffer = pointer;
+
+    /* Reset the command buffer object. */
+    gcoOS_ZeroMemory(commandBuffer, objectSize);
+
+    /* Initialize the gcoCMDBUF object. */
+    commandBuffer->object.type = gcvOBJ_COMMANDBUFFER;
+
+    /* Create the signal. */
+    gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvFALSE, &commandBuffer->signal));
+
+    gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SIGNAL,
+                  "%s(%d): buffer signal created 0x%08X",
+                  __FUNCTION__, __LINE__, commandBuffer->signal);
+
+    /* Mark the buffer as available. */
+    gcmONERROR(gcoOS_Signal(gcvNULL, commandBuffer->signal, gcvTRUE));
+
+    /* Try to allocate the command buffer space. */
+    while (gcvTRUE)
+    {
+        gctUINT32 handle;
+        gcsHAL_INTERFACE iface;
+
+        iface.ignoreTLS = gcvFALSE;
+        iface.engine  = Info->engine;
+        iface.command = gcvHAL_ALLOCATE_LINEAR_VIDEO_MEMORY;
+        iface.u.AllocateLinearVideoMemory.alignment = Info->alignment;
+        iface.u.AllocateLinearVideoMemory.type = gcvVIDMEM_TYPE_COMMAND;
+        iface.u.AllocateLinearVideoMemory.pool = gcvPOOL_DEFAULT;
+        iface.u.AllocateLinearVideoMemory.flag = 0;
+        iface.u.AllocateLinearVideoMemory.bytes = (gctUINT32)Bytes;
+
+        status = gcoOS_DeviceControl(
+            gcvNULL,
+            IOCTL_GCHAL_INTERFACE,
+            &iface, gcmSIZEOF(iface),
+            &iface, gcmSIZEOF(iface)
+            );
+
+        if (status == gcvSTATUS_OUT_OF_MEMORY)
+        {
+            goto retry;
+        }
+
+        gcmONERROR(status);
+
+        handle  = iface.u.AllocateLinearVideoMemory.node;
+
+        /* Lock video memory for both CPU and GPU address. */
+        iface.ignoreTLS = gcvFALSE;
+        iface.engine  = Info->engine;
+        iface.command = gcvHAL_LOCK_VIDEO_MEMORY;
+        iface.u.LockVideoMemory.node = handle;
+        iface.u.LockVideoMemory.cacheable = gcvFALSE;
+
+        status = gcoOS_DeviceControl(
+            gcvNULL,
+            IOCTL_GCHAL_INTERFACE,
+            &iface, gcmSIZEOF(iface),
+            &iface, gcmSIZEOF(iface)
+            );
+
+        if (status == gcvSTATUS_OUT_OF_MEMORY)
+        {
+            goto retry;
+        }
+
+        gcmONERROR(status);
+
+        commandBuffer->videoMemNode = handle;
+        commandBuffer->address = iface.u.LockVideoMemory.address;
+        commandBuffer->logical = iface.u.LockVideoMemory.memory;
+        commandBuffer->bytes   = (gctUINT32)Bytes;
+
+        /* Initialize command buffer. */
+        commandBuffer->free = commandBuffer->bytes;
+
+        /* The command buffer is successfully allocated. */
+        break;
+
+retry:
+        if (Bytes <= (4 << 10))
+        {
+            gcmONERROR(status);
+        }
+
+        /* Free the command buffer objects. */
+        _FreeCommandBuffer(Hardware, Info, commandBuffer);
+
+        /* Try lower size. */
+        Bytes >>= 1;
+    }
+
+    commandBuffer->reservedTail = Info->reservedTail;
+    commandBuffer->reservedHead = Info->reservedHead;
+
+    /* Return pointer to the gcoCMDBUF object. */
+    *CommandBuffer = commandBuffer;
+
+    /* Success. */
+    gcmFOOTER_ARG("*CommandBuffer=0x%x", *CommandBuffer);
     return gcvSTATUS_OK;
 
 OnError:
+    /* Roll back. */
+    _DestroyCommandBuffer(Hardware, Info, commandBuffer);
+
     /* Return the status. */
     gcmFOOTER();
     return status;
 }
+
+static gceSTATUS
+_DuplicateCommandBuffer(
+    gcoCMDBUF Dest,
+    gcoCMDBUF Src
+    )
+{
+    gctUINT size;
+    gctUINT offset;
+
+    /* Do not copy reserved head and tail. */
+    size   = Src->offset - Src->startOffset - Src->reservedHead;
+    offset = Src->startOffset + Src->reservedHead;
+
+    Dest->startOffset = Src->startOffset;
+    Dest->offset      = Src->offset;
+
+    gcoOS_MemCopy(
+        gcmUINT64_TO_PTR(Dest->logical + offset),
+        gcmUINT64_TO_PTR(Src->logical  + offset),
+        size
+        );
+
+    return gcvSTATUS_OK;
+}
+
+/******************************************************************************/
 
 static gceSTATUS
 _ConstructMirrorCommandBuffer(
@@ -237,16 +445,17 @@ _ConstructMirrorCommandBuffer(
 
         for (i = 0; i < CommandBuffer->mirrorCount; i++)
         {
-            gcmONERROR(gcoCMDBUF_Construct(
+            gcmONERROR(_ConstructCommandBuffer(
                 gcvNULL,
                 Buffer->hardware,
                 CommandBuffer->bytes,
                 (gcsCOMMAND_INFO_PTR) &Buffer->info,
-                &CommandBuffer->mirrors[i]));
+                &CommandBuffer->mirrors[i]
+                ));
 
             if (CommandBuffer->bytes != CommandBuffer->mirrors[i]->bytes)
             {
-                gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+                gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
             }
         }
     }
@@ -255,7 +464,7 @@ _ConstructMirrorCommandBuffer(
     return gcvSTATUS_OK;
 
 OnError:
-    /* gcoCMDBUF_Construct() will handle error and release the whole gcoBUFFER. */
+    /* _ConstructCommandBuffer() will handle error and release the whole gcoBUFFER. */
     gcmFOOTER();
     return status;
 }
@@ -304,10 +513,10 @@ _GetCommandBuffer(
         if ((Buffer->maxCount == 0) || (Buffer->count < Buffer->maxCount))
         {
             gcoCMDBUF temp = gcvNULL;
-            gcmONERROR(gcoCMDBUF_Construct(gcvNULL, Buffer->hardware,
-                                           Buffer->bytes,
-                                           (gcsCOMMAND_INFO_PTR) &Buffer->info,
-                                           &temp));
+            gcmONERROR(_ConstructCommandBuffer(gcvNULL, Buffer->hardware,
+                                               Buffer->bytes,
+                                               (gcsCOMMAND_INFO_PTR) &Buffer->info,
+                                               &temp));
 
             /* Insert into the list. */
             if (commandBuffer == gcvNULL)
@@ -365,303 +574,630 @@ OnError:
     return status;
 }
 
-static gceSTATUS
-_DuplicateCommandBuffer(
-    gcoCMDBUF Dest,
-    gcoCMDBUF Src
-    )
-{
-    gctUINT commandBufferSize;
 
-    commandBufferSize = Src->offset + Src->reservedTail - Src->startOffset;
-    Dest->startOffset = Src->startOffset;
-    Dest->offset    = Src->offset;
-
-    gcoOS_MemCopy(
-        gcmUINT64_TO_PTR(Dest->logical + Dest->startOffset),
-        gcmUINT64_TO_PTR(Src->logical + Src->startOffset),
-        commandBufferSize
-        );
-
-    return gcvSTATUS_OK;
-}
-
-static gceSTATUS
+static void
 _DestroyMirrorCommandBuffer(
     IN gcoBUFFER Buffer,
     IN gcoCMDBUF CommandBuffer
     )
 {
-    gctUINT32 mirrorCount = CommandBuffer->mirrorCount;
-    gctUINT32 i;
-
-    for (i = 0; i < mirrorCount; i++)
-    {
-        if (CommandBuffer->mirrors[i])
-        {
-            gcmVERIFY_OK(gcoCMDBUF_Destroy(
-                Buffer->hardware, &Buffer->info, CommandBuffer->mirrors[i]));
-        }
-    }
-
     if (CommandBuffer->mirrors)
     {
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, CommandBuffer->mirrors));
-    }
+        gctUINT32 i;
+        gctUINT32 mirrorCount = CommandBuffer->mirrorCount;
 
-    return gcvSTATUS_OK;
-}
-
-/******************************************************************************\
-***************************** gcoCMDBUF Object Code *****************************
-\******************************************************************************/
-
-/*******************************************************************************
-**
-**  gcoCMDBUF_Construct
-**
-**  Construct a new gcoCMDBUF object.
-**
-**  INPUT:
-**
-**      gcoOS Os
-**          Pointer to a gcoOS object.
-**
-**      gcoHARDWARE Hardware
-**          Pointer to a gcoHARDWARE object.
-**
-**      gctSIZE_T Bytes
-**          Number of bytes for the buffer.
-**
-**      gcsCOMMAND_BUFFER_PTR Info
-**          Alignment and head/tail information.
-**
-**  OUTPUT:
-**
-**      gcoCMDBUF * CommandBuffer
-**          Pointer to a variable that will hold the the gcoCMDBUF object
-**          pointer.
-*/
-gceSTATUS
-gcoCMDBUF_Construct(
-    IN gcoOS Os,
-    IN gcoHARDWARE Hardware,
-    IN gctSIZE_T Bytes,
-    IN gcsCOMMAND_INFO_PTR Info,
-    OUT gcoCMDBUF * CommandBuffer
-    )
-{
-    gceSTATUS status;
-    gcoCMDBUF commandBuffer = gcvNULL;
-    gctSIZE_T objectSize    = 0;
-    gctPOINTER pointer      = gcvNULL;
-    gctPHYS_ADDR physical   = gcvNULL;
-    gctSIZE_T tmpSize       = 0;
-    gctUINT32 node          = 0;
-
-    gcmHEADER_ARG("Bytes=%lu Info=0x%x", Bytes, Info);
-
-    /* Verify the arguments. */
-    gcmDEBUG_VERIFY_ARGUMENT(Bytes > 0);
-    gcmDEBUG_VERIFY_ARGUMENT(CommandBuffer != gcvNULL);
-
-    /* Set the size of the object. */
-    objectSize = gcmSIZEOF(struct _gcoCMDBUF);
-
-    /* Allocate the gcoCMDBUF object. */
-    /* Currently in most OS we are able to access the user-side data from
-       the kernel by simple memory mapping, therefore here we allocate the
-       object from the cached user memory. */
-    gcmONERROR(gcoOS_AllocateSharedMemory(gcvNULL, objectSize, &pointer));
-    commandBuffer = pointer;
-
-    /* Reset the command buffer object. */
-    gcoOS_ZeroMemory(commandBuffer, objectSize);
-
-    /* Initialize the gcoCMDBUF object. */
-    commandBuffer->object.type = gcvOBJ_COMMANDBUFFER;
-
-    /* Create the signal. */
-    gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvFALSE, &commandBuffer->signal));
-
-    gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SIGNAL,
-                  "%s(%d): buffer signal created 0x%08X",
-                  __FUNCTION__, __LINE__, commandBuffer->signal);
-
-    /* Mark the buffer as available. */
-    gcmONERROR(gcoOS_Signal(gcvNULL, commandBuffer->signal, gcvTRUE));
-
-    /* Try to allocate the command buffer space. */
-    while (gcvTRUE)
-    {
-        gcsHAL_INTERFACE iface;
-
-        iface.ignoreTLS = gcvFALSE;
-
-        /* Set the desired size. */
-        gcmSAFECASTSIZET(commandBuffer->bytes, Bytes);
-
-        /* Allocate the buffer for the command. */
-        switch (Info->source)
+        for (i = 0; i < mirrorCount; i++)
         {
-        case gcvCMDBUF_VIRTUAL:
-            iface.command = gcvHAL_ALLOCATE_VIRTUAL_COMMAND_BUFFER;
-            iface.u.AllocateVirtualCommandBuffer.bytes = commandBuffer->bytes;
-
-            /* Call kernel service. */
-            gcmONERROR(gcoOS_DeviceControl(gcvNULL, IOCTL_GCHAL_INTERFACE,
-                                           &iface, gcmSIZEOF(iface),
-                                           &iface, gcmSIZEOF(iface)));
-            status = iface.status;
-            if (status == gcvSTATUS_OUT_OF_MEMORY)
-                goto retry;
-            gcmONERROR(status);
-
-            commandBuffer->bytes = (gctUINT32)iface.u.AllocateVirtualCommandBuffer.bytes;
-            commandBuffer->physical = iface.u.AllocateVirtualCommandBuffer.physical;
-            commandBuffer->logical = iface.u.AllocateVirtualCommandBuffer.logical;
-            break;
-
-        case gcvCMDBUF_CONTIGUOUS:
-            tmpSize = (gctSIZE_T) commandBuffer->bytes;
-            status = gcoHAL_AllocateContiguous(gcvNULL,
-                                              &tmpSize,
-                                              &physical,
-                                              &pointer);
-            if (status == gcvSTATUS_OUT_OF_MEMORY)
-                goto retry;
-            gcmONERROR(status);
-
-            gcmSAFECASTSIZET(commandBuffer->bytes, tmpSize);
-            commandBuffer->physical = gcmPTR2INT32(physical);
-            commandBuffer->logical = gcmPTR_TO_UINT64(pointer);
-            break;
-
-        case gcvCMDBUF_RESERVED:
-            tmpSize = (gctSIZE_T) commandBuffer->bytes;
-            status = gcoHAL_AllocateVideoMemory(
-                        Info->alignment,
-                        gcvSURF_BITMAP,
-                        0,
-                        gcvPOOL_SYSTEM,
-                        &tmpSize,
-                        &node);
-            if (status == gcvSTATUS_OUT_OF_MEMORY)
-                goto retry;
-            gcmONERROR(status);
-
-            gcmONERROR(gcoHAL_LockVideoMemory(
-                node, gcvFALSE, Info->engine, (gctUINT32 *)&physical, &pointer));
-            gcmSAFECASTSIZET(commandBuffer->bytes, tmpSize);
-            commandBuffer->physical = node;
-            commandBuffer->logical = gcmPTR_TO_UINT64(pointer);
-
-            break;
-
-        default:
-            break;
+            if (CommandBuffer->mirrors[i])
+            {
+                _DestroyCommandBuffer(
+                    Buffer->hardware, &Buffer->info, CommandBuffer->mirrors[i]);
+            }
         }
 
-        /* Initialize command buffer. */
-        commandBuffer->free = commandBuffer->bytes;
-
-#if gcdSECURE_USER
-        /* Determine the size of the state array. */
-        commandBuffer->hintArraySize = Bytes;
-
-        /* Allocate the state array. */
-        status = gcoOS_AllocateSharedMemory(gcvNULL,
-                                (gctSIZE_T) commandBuffer->hintArraySize,
-                                &pointer);
-        if (status == gcvSTATUS_OUT_OF_MEMORY)
-            goto retry;
-        gcmONERROR(status);
-        commandBuffer->hintArray = gcmPTR_TO_UINT64(pointer);
-
-        /* Initialize the state array tail pointer. */
-        commandBuffer->hintArrayTail = commandBuffer->hintArray;
-#endif
-
-        /* The command buffer is successfully allocated. */
-        break;
-
-retry:
-        if (Bytes <= (4 << 10))
-            goto OnError;
-
-        /* Free the command buffer objects. */
-        gcmONERROR(_FreeCommandBuffer(Hardware, Info, commandBuffer));
-
-        /* Try lower size. */
-        Bytes >>= 1;
+        gcoOS_Free(gcvNULL, CommandBuffer->mirrors);
     }
-
-    commandBuffer->reservedTail = Info->reservedTail;
-
-    /* Return pointer to the gcoCMDBUF object. */
-    *CommandBuffer = commandBuffer;
-
-    /* Success. */
-    gcmFOOTER_ARG("*CommandBuffer=0x%x", *CommandBuffer);
-    return gcvSTATUS_OK;
-
-OnError:
-    /* Roll back. */
-    gcmVERIFY_OK(gcoCMDBUF_Destroy(Hardware, Info, commandBuffer));
-
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
 }
 
-/*******************************************************************************
-**
-**  gcoCMDBUF_Destroy
-**
-**  Destroy a gcoCMDBUF object.
-**
-**  INPUT:
-**
-**      gcoCMDBUF CommandBuffer
-**          Pointer to an gcoCMDBUF object.
-**
-**  OUTPUT:
-**
-**      None.
-*/
-gceSTATUS
-gcoCMDBUF_Destroy(
-    IN gcoHARDWARE Hardware,
-    IN gcsCOMMAND_INFO_PTR Info,
-    IN gcoCMDBUF CommandBuffer
+static void
+_FinishCommandBufferRange(
+    gcoBUFFER Buffer,
+    gcoCMDBUF CommandBuffer
+    )
+{
+    gctUINT32 newOffset;
+    gctSIZE_T spaceLeft;
+
+    /* Advance the offset for next commit. */
+    newOffset = CommandBuffer->offset + Buffer->info.reservedTail;
+
+    if (Buffer->hwFeature.hasMCFE)
+    {
+        newOffset = gcmALIGN(newOffset, 16);
+    }
+
+    /* Compute the size of the space left in the buffer. */
+    spaceLeft = CommandBuffer->bytes - newOffset;
+
+    if (spaceLeft > Buffer->totalReserved)
+    {
+        /* Adjust buffer offset and size. */
+        CommandBuffer->startOffset = newOffset;
+        CommandBuffer->offset      = CommandBuffer->startOffset + Buffer->info.reservedHead;
+        CommandBuffer->free        = CommandBuffer->bytes - CommandBuffer->offset
+                                   - Buffer->info.alignment - Buffer->info.reservedTail - Buffer->info.reservedUser;
+    }
+    else
+    {
+        /* Buffer is full. */
+        CommandBuffer->startOffset = CommandBuffer->bytes;
+        CommandBuffer->offset      = CommandBuffer->bytes;
+        CommandBuffer->free        = 0;
+    }
+
+    if (Buffer->captureEnabled)
+    {
+        Buffer->captureCommandOffset = CommandBuffer->offset;
+    }
+
+    /* The exit pipe becomes the entry pipe for the next command buffer. */
+    CommandBuffer->entryPipe = CommandBuffer->exitPipe;
+
+    /* Reset usage flags. */
+    CommandBuffer->using2D   = gcvFALSE;
+    CommandBuffer->using3D   = gcvFALSE;
+}
+
+/******************************************************************************/
+
+static gcsHAL_PATCH_LIST *
+_AllocPatchList(
+    IN gcoBUFFER Buffer,
+    IN gctUINT32 PatchType,
+    IN gcsHAL_PATCH_LIST ** FreePatchList,
+    IN gctSIZE_T ItemSize
+    )
+{
+    gcsHAL_PATCH_LIST * patchList = gcvNULL;
+
+    if (*FreePatchList)
+    {
+        patchList = *FreePatchList;
+        *FreePatchList = gcmUINT64_TO_PTR(patchList->next);
+
+        patchList->count = 0;
+        patchList->next  = 0;
+    }
+
+    if (!patchList)
+    {
+        void * patchArray = gcvNULL;
+
+        /* Allocate the patchList item array. */
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                                       ItemSize * gcdPATCH_LIST_SIZE,
+                                       &patchArray)))
+        {
+            return gcvNULL;
+        }
+
+        gcoOS_ZeroMemory(patchArray, ItemSize * gcdPATCH_LIST_SIZE);
+
+        /* Allocate the patchList structure. */
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                                       sizeof(gcsHAL_PATCH_LIST),
+                                       (gctPOINTER *)&patchList)))
+        {
+            gcmOS_SAFE_FREE(gcvNULL, patchArray);
+            return gcvNULL;
+        }
+
+        /* Capacity is gcdPATCH_LIST_SIZE, and initial valid item is 0. */
+        patchList->type       = PatchType;
+        patchList->count      = 0;
+        patchList->patchArray = gcmPTR_TO_UINT64(patchArray);
+        patchList->next       = 0;
+    }
+
+    return patchList;
+}
+
+static gcsHAL_PATCH_LIST *
+_GetPatchItem(
+    IN gcoBUFFER Buffer,
+    IN gctUINT32 PatchType,
+    IN gctBOOL UseTemp
+    )
+{
+    gcsHAL_PATCH_LIST ** patchList;
+
+    patchList = UseTemp ? &Buffer->tempPatchLists[PatchType]
+              : &Buffer->patchLists[PatchType];
+
+    if (!*patchList || (* patchList)->count == gcdPATCH_LIST_SIZE)
+    {
+        /* Get new patchList list */
+        gcsHAL_PATCH_LIST * _new;
+
+        _new = _AllocPatchList(Buffer,
+                               PatchType,
+                               &Buffer->freePatchLists[PatchType],
+                               _PatchItemSize[PatchType]);
+
+        _new->next = gcmPTR_TO_UINT64(*patchList);
+
+        *patchList = _new;
+    }
+
+    return *patchList;
+}
+
+static void
+_DestroyPatchLists(
+    IN gcsHAL_PATCH_LIST * PatchLists
+    )
+{
+    gcsHAL_PATCH_LIST * patchList = PatchLists;
+
+    while (patchList)
+    {
+        gcsHAL_PATCH_LIST * node = patchList;
+        patchList = gcmUINT64_TO_PTR(patchList->next);
+
+        gcoOS_FreeMemory(gcvNULL, gcmUINT64_TO_PTR(node->patchArray));
+        gcoOS_FreeMemory(gcvNULL, node);
+    }
+}
+
+/* Recycle CommandLocation referenced patchLists, ie ->patchHead. */
+static void
+_RecyclePatchList(
+    IN gcoBUFFER Buffer,
+    IN gcsHAL_COMMAND_LOCATION * CommandLocation
+    )
+{
+    gcsHAL_PATCH_LIST * patchList;
+
+    patchList = gcmUINT64_TO_PTR(CommandLocation->patchHead);
+    CommandLocation->patchHead = 0;
+
+    while (patchList)
+    {
+        gcsHAL_PATCH_LIST ** freePatch;
+        gcsHAL_PATCH_LIST * next = gcmUINT64_TO_PTR(patchList->next);
+
+        /* Free the patchList item. */
+        patchList->count = 0;
+
+        freePatch = &Buffer->freePatchLists[patchList->type];
+
+        /* Put back the patchList to free list. */
+        patchList->next = gcmPTR_TO_UINT64(*freePatch);
+        *freePatch  = patchList;
+
+        patchList = next;
+    }
+}
+
+static gcmINLINE void
+_CorrectVidmemAddressPatch(
+    IN gcoCMDBUF CommandBuffer,
+    IN gcsHAL_PATCH_VIDMEM_ADDRESS * PatchItem,
+    IN gctUINT32 Count
+    )
+{
+    gctUINT32 i;
+
+    for (i = 0; i < Count; i++)
+    {
+        PatchItem[i].location += CommandBuffer->lastOffset;
+    }
+}
+
+static gcmINLINE void
+_CorrectMCFESemaphorePatch(
+    IN gcoCMDBUF CommandBuffer,
+    IN gcsHAL_PATCH_VIDMEM_ADDRESS * PatchItem,
+    IN gctUINT32 Count
+    )
+{
+    gctUINT32 i;
+
+    for (i = 0; i < Count; i++)
+    {
+        PatchItem[i].location += CommandBuffer->lastOffset;
+    }
+}
+
+static gceSTATUS
+_MoveTempPatchListSingle(
+    IN gcoBUFFER Buffer,
+    IN gcsHAL_PATCH_LIST * PatchList
+    )
+{
+    gcoCMDBUF commandBuffer = Buffer->commandBufferTail;
+    gcsHAL_PATCH_LIST * dstList;
+    gctPOINTER dstItem;
+    gctPOINTER srcItem;
+    gctUINT32 itemSize = _PatchItemSize[PatchList->type];
+
+    gctUINT32 index = 0;
+
+    while (index < PatchList->count)
+    {
+        gctUINT32 count;
+
+        dstList = _GetPatchItem(Buffer, PatchList->type, gcvFALSE);
+
+        /* Determine the copy batch. */
+        count = gcmMIN((gcdPATCH_LIST_SIZE - dstList->count),
+                       (PatchList->count - index));
+
+        dstItem = gcmUINT64_TO_PTR(dstList->patchArray + dstList->count * itemSize);
+
+        srcItem = gcmUINT64_TO_PTR(PatchList->patchArray + index * itemSize);
+
+        /* Copy to dest. */
+        gcoOS_MemCopy(dstItem, srcItem, itemSize * count);
+
+        /* Check if need correct patch location in gcoCMDBUF object. */
+        if (PatchList->type == gcvHAL_PATCH_VIDMEM_ADDRESS)
+        {
+            _CorrectVidmemAddressPatch(commandBuffer, dstItem, count);
+        }
+        else if (PatchList->type == gcvHAL_PATCH_MCFE_SEMAPHORE)
+        {
+            _CorrectMCFESemaphorePatch(commandBuffer, dstItem, count);
+        }
+
+        dstList->count += count;
+        index += count;
+    }
+
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS
+_MoveTempPatchLists(
+    IN gcoBUFFER Buffer
+    )
+{
+    gctUINT32 i;
+
+    for (i = gcvHAL_PATCH_VIDMEM_ADDRESS; i < gcvHAL_PATCH_TYPE_COUNT; i++)
+    {
+        gcsHAL_PATCH_LIST * patchList = Buffer->tempPatchLists[i];
+
+        while (patchList)
+        {
+            gcsHAL_PATCH_LIST * next = gcmUINT64_TO_PTR(patchList->next);
+
+            /* Move one patch list. */
+            _MoveTempPatchListSingle(Buffer, patchList);
+
+            /* Recycle it. */
+            patchList->next = gcmPTR_TO_UINT64(Buffer->freePatchLists[i]);
+            Buffer->freePatchLists[i] = patchList;
+
+            /* One patch list is recycleed, advance to next. */
+            Buffer->tempPatchLists[i] = patchList = next;
+        }
+    }
+
+    return gcvSTATUS_OK;
+}
+
+/******************************************************************************/
+
+static gcsHAL_COMMAND_LOCATION *
+_GetCommandLocation(
+    IN gcoBUFFER Buffer
+    )
+{
+    gcsHAL_COMMAND_LOCATION * cmdLoc;
+
+    if (Buffer->freeCommandLocations)
+    {
+        cmdLoc = Buffer->freeCommandLocations;
+        Buffer->freeCommandLocations = gcmUINT64_TO_PTR(cmdLoc->next);
+    }
+    else
+    {
+        /* Allocate. */
+        if (gcmIS_ERROR(gcoOS_AllocateSharedMemory(gcvNULL,
+                                                   sizeof(gcsHAL_COMMAND_LOCATION),
+                                                   (gctPOINTER *)&cmdLoc)))
+        {
+            return gcvNULL;
+        }
+    }
+
+    return cmdLoc;
+}
+
+static gcsHAL_SUBCOMMIT *
+_GetSubCommit(
+    IN gcoBUFFER Buffer
+    )
+{
+    gcsHAL_SUBCOMMIT * subCommit;
+
+    if (Buffer->freeSubCommits)
+    {
+        subCommit = Buffer->freeSubCommits;
+        Buffer->freeSubCommits = gcmUINT64_TO_PTR(subCommit->next);
+    }
+    else
+    {
+        /* Allocate. */
+        if (gcmIS_ERROR(gcoOS_AllocateSharedMemory(gcvNULL,
+                                                   sizeof(gcsHAL_SUBCOMMIT),
+                                                   (gctPOINTER *)&subCommit)))
+        {
+            return gcvNULL;
+        }
+    }
+
+    return subCommit;
+}
+
+/*
+ * Recycle SubCommit referenced CommandLocations, ie ->commandBuffer.next. */
+static void
+_RecycleCommandLocations(
+    gcoBUFFER Buffer,
+    gcsHAL_SUBCOMMIT * SubCommit
+    )
+{
+    gcsHAL_COMMAND_LOCATION * cmdLoc = gcmUINT64_TO_PTR(SubCommit->commandBuffer.next);
+    SubCommit->commandBuffer.next = 0;
+
+    /* Recycle patch list referenced by nested command-location struct. */
+    _RecyclePatchList(Buffer, &SubCommit->commandBuffer);
+
+    while (cmdLoc)
+    {
+        gcsHAL_COMMAND_LOCATION * next = gcmUINT64_TO_PTR(cmdLoc->next);
+
+        /* Recycle contained patch list. */
+        _RecyclePatchList(Buffer, cmdLoc);
+
+        /* Recycle it. */
+        cmdLoc->next = gcmPTR_TO_UINT64(Buffer->freeCommandLocations);
+        Buffer->freeCommandLocations = cmdLoc;
+
+        cmdLoc = next;
+    }
+}
+
+/* Recycle Buffer referenced subCommits, ie ->subCommitHead.next. */
+static void
+_RecycleSubCommits(
+    gcoBUFFER Buffer
+    )
+{
+    gcsHAL_SUBCOMMIT * subCommit = gcmUINT64_TO_PTR(Buffer->subCommitHead.next);
+    Buffer->subCommitHead.next = 0;
+
+    /* Recycle command-location referenced by nested sub-commit struct. */
+    _RecycleCommandLocations(Buffer, &Buffer->subCommitHead);
+
+    while (subCommit)
+    {
+        gcsHAL_SUBCOMMIT * next = gcmUINT64_TO_PTR(subCommit->next);
+
+        /* Recycle contained command buffer locations. */
+        _RecycleCommandLocations(Buffer, subCommit);
+
+        /* Recycle it. */
+        subCommit->next = gcmPTR_TO_UINT64(Buffer->freeSubCommits);
+        Buffer->freeSubCommits = subCommit;
+
+        subCommit = next;
+    }
+}
+
+static void
+_DestroyCommandLocations(
+    gcsHAL_COMMAND_LOCATION * CommandLocations
+    )
+{
+    gcsHAL_COMMAND_LOCATION * cmdLoc = CommandLocations;
+
+    while (cmdLoc)
+    {
+        gcsHAL_COMMAND_LOCATION * next = gcmUINT64_TO_PTR(cmdLoc->next);
+
+        /* Free memory. */
+        gcmOS_SAFE_FREE_SHARED_MEMORY(gcvNULL, cmdLoc);
+
+        cmdLoc = next;
+    }
+}
+
+static void
+_DestroySubCommits(
+    gcsHAL_SUBCOMMIT * SubCommits
+    )
+{
+    gcsHAL_SUBCOMMIT * subCommit = SubCommits;
+
+    while (subCommit)
+    {
+        gcsHAL_SUBCOMMIT * next = gcmUINT64_TO_PTR(subCommit->next);
+
+        /* Free memory. */
+        gcmOS_SAFE_FREE_SHARED_MEMORY(gcvNULL, subCommit);
+
+        subCommit = next;
+    }
+}
+
+
+/* Install patchLists to patchHead of command-location. */
+static void
+_InstallPatchLists(
+    gcoBUFFER Buffer,
+    gcsHAL_COMMAND_LOCATION * CommandLocation
+    )
+{
+    gctUINT i;
+
+    CommandLocation->patchHead = 0;
+
+    for (i = gcvHAL_PATCH_VIDMEM_ADDRESS; i < gcvHAL_PATCH_TYPE_COUNT; i++)
+    {
+        gcsHAL_PATCH_LIST * patchList = Buffer->patchLists[i];
+
+        if (!patchList)
+        {
+            continue;
+        }
+
+        while (patchList->next)
+        {
+            patchList = gcmUINT64_TO_PTR(patchList->next);
+        }
+
+        patchList->next = CommandLocation->patchHead;
+
+        CommandLocation->patchHead = gcmPTR_TO_UINT64(Buffer->patchLists[i]);
+        Buffer->patchLists[i] = gcvNULL;
+    }
+}
+
+/*
+ * Link cmdLoc to Buffer->commandLocationTail, with its head is
+ * Buffer->commandLocationHead.
+ */
+static gceSTATUS
+_LinkCommandLocation(
+    IN gcoBUFFER Buffer,
+    IN gcoCMDBUF CommandBuffer,
+    IN gctUINT32 ExitIndex
     )
 {
     gceSTATUS status;
+    gcsHAL_COMMAND_LOCATION * cmdLoc;
+    gcoCMDBUF cmdBuf = CommandBuffer;
 
-    gcmHEADER_ARG("CommandBuffer=0x%x", CommandBuffer);
+    gcmHEADER_ARG("Buffer=%p CommandBuffer=%p ExitIndex=%d",
+                  Buffer, CommandBuffer, ExitIndex);
 
-    /* Verify the object. */
-    gcmVERIFY_OBJECT(CommandBuffer, gcvOBJ_COMMANDBUFFER);
-
-    /* Destroy command buffer allocations. */
-    gcmONERROR(_FreeCommandBuffer(Hardware, Info, CommandBuffer));
-
-    /* Destroy signal. */
-    if (CommandBuffer->signal != gcvNULL)
+    if ((cmdBuf == gcvNULL) ||
+        (cmdBuf->offset - cmdBuf->startOffset <= cmdBuf->reservedHead))
     {
-        gcmONERROR(gcoOS_DestroySignal(gcvNULL, CommandBuffer->signal));
-        CommandBuffer->signal = gcvNULL;
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
     }
 
-    /* Free the gcoCMDBUF object. */
-    gcmONERROR(gcmOS_SAFE_FREE_SHARED_MEMORY(gcvNULL, CommandBuffer));
+    if (Buffer->commandLocationTail)
+    {
+        cmdLoc = _GetCommandLocation(Buffer);
+        Buffer->commandLocationTail->next = gcmPTR_TO_UINT64(cmdLoc);
+        Buffer->commandLocationTail = cmdLoc;
 
-    /* Success. */
+        if (!cmdLoc)
+        {
+            gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
+        }
+    }
+    else
+    {
+        cmdLoc = Buffer->commandLocationTail = &Buffer->commandLocationHead;
+    }
+
+    cmdLoc->priority     = (gctUINT16)Buffer->mcfePriority;
+    cmdLoc->channelId    = (gctUINT16)Buffer->mcfeChannelId;
+
+    cmdLoc->videoMemNode = cmdBuf->videoMemNode;
+    cmdLoc->address      = cmdBuf->address;
+    cmdLoc->logical      = cmdBuf->logical;
+
+    cmdLoc->startOffset  = cmdBuf->startOffset;
+    cmdLoc->size         = cmdBuf->offset - cmdBuf->startOffset
+                                          + cmdBuf->reservedTail;
+
+    /* Define the command range. */
+    cmdLoc->reservedHead = cmdBuf->reservedHead;
+    cmdLoc->reservedTail = cmdBuf->reservedTail;
+
+    _InstallPatchLists(Buffer, cmdLoc);
+
+    cmdLoc->entryPipe    = cmdBuf->entryPipe;
+    cmdLoc->exitPipe     = cmdBuf->exitPipe;
+    cmdLoc->exitIndex    = ExitIndex;
+
+    cmdLoc->next         = 0;
+
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
 
 OnError:
-    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+/*
+ * Link sub-commit to Buffer->subCommitTail, with its head is
+ * Buffer->subCommitHead.
+ * And also connect to commandLocations.
+ */
+static gceSTATUS
+_LinkSubCommit(
+    IN gcoBUFFER Buffer,
+    IN gctUINT32 CoreId,
+    IN gcsSTATE_DELTA_PTR StateDelta,
+    IN gctUINT32 Context,
+    IN gcoQUEUE Queue
+    )
+{
+    gceSTATUS status;
+    gcsHAL_SUBCOMMIT * subCommit;
+    gcsQUEUE_PTR queue;
+
+    gcmHEADER_ARG("Buffer=%p CoreId=%d StateDelta=%p Context=0x%x Queue=%p",
+                  Buffer, CoreId, StateDelta, Context, Queue);
+
+    if (!Buffer->commandLocationTail)
+    {
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+
+    /* Get a new sub-commit and link next to subCommitTail. */
+    if (Buffer->subCommitTail)
+    {
+        subCommit = _GetSubCommit(Buffer);
+        Buffer->subCommitTail->next = gcmPTR_TO_UINT64(subCommit);
+        Buffer->subCommitTail = subCommit;
+
+        if (!subCommit)
+        {
+            gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
+        }
+    }
+    else
+    {
+        subCommit = Buffer->subCommitTail = &Buffer->subCommitHead;
+    }
+
+    queue = Queue ? Queue->head : gcvNULL;
+
+    subCommit->coreId    = CoreId;
+    subCommit->delta     = gcmPTR_TO_UINT64(StateDelta);
+    subCommit->context   = Context;
+    subCommit->queue     = gcmPTR_TO_UINT64(queue);
+    subCommit->next      = 0;
+
+    subCommit->commandBuffer = Buffer->commandLocationHead;
+
+    Buffer->commandLocationTail = gcvNULL;
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
     gcmFOOTER();
     return status;
 }
@@ -747,17 +1283,13 @@ gcoBUFFER_Construct(
     /* Set the default maximum number of command buffers. */
     buffer->maxCount = gcdMAX_CMD_BUFFERS;
 
-    /* Reset free patch list. */
-    buffer->freePatchList = gcvNULL;
-    buffer->patchList     = gcvNULL;
-
     buffer->hardware = Hardware;
     buffer->info.engine   = Engine;
 
     /**************************************************************************
     ** Allocate temp command buffer.
     */
-    gcmONERROR(gcoOS_Allocate(gcvNULL, gcmMAX_TEMPCMD_BUFFER_SIZE, &buffer->tempCMDBUF.buffer));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, gcdMAX_TEMPCMD_BUFFER_SIZE, &buffer->tempCMDBUF.buffer));
     buffer->tempCMDBUF.currentByteSize = 0;
     buffer->tempCMDBUF.inUse = gcvFALSE;
 
@@ -771,7 +1303,6 @@ gcoBUFFER_Construct(
         &buffer->info.reservedHead,
         &buffer->info.reservedTail,
         &buffer->info.reservedUser,
-        &buffer->info.source,
         &mGpuModeSwitchBytes
         ));
 
@@ -784,7 +1315,7 @@ gcoBUFFER_Construct(
             buffer->queryResumeBytes[gcvQUERY_OCCLUSION] = gpuCount * (2 * gcmSIZEOF(gctUINT32) + gcdRESUME_OQ_LENGTH)
                                                          + 2 * gcmSIZEOF(gctUINT32);
             buffer->probeResumeBytes = gpuCount * (2 * gcmSIZEOF(gctUINT32) + gcdRESUME_PROBE_LENGH)
-                                     + 2 * gcmSIZEOF(gctUINT32);
+                                     + 2 * gcmSIZEOF(gctUINT32);;
         }
         else
         {
@@ -809,7 +1340,7 @@ gcoBUFFER_Construct(
         /* NOTE: This function only valid before gcoHARDWARE_Construct() exits. */
         gcoHARDWARE_Query3DCoreCount(Hardware, &buffer->mirrorCount);
 
-        buffer->mirrorCount -= 1;
+        buffer->mirrorCount--;
     }
 
     buffer->hwFeature.hasFence = gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_FENCE);
@@ -820,6 +1351,11 @@ gcoBUFFER_Construct(
     buffer->hwFeature.hasProbe = gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_PROBE);
     buffer->hwFeature.hasHWFence = gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_FENCE_32BIT)
                                 || gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_FENCE_64BIT);
+    buffer->hwFeature.hasComputeOnly = gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_COMPUTE_ONLY);
+    buffer->hwFeature.hasMCFE = gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_MCFE);
+    /* Initialize commits. */
+    buffer->subCommitTail       = gcvNULL;
+    buffer->commandLocationTail = gcvNULL;
 
     /***************************************************************************
     ** Initialize the command buffers.
@@ -832,10 +1368,10 @@ gcoBUFFER_Construct(
     /* Construct a command buffer. */
     for (i = 0; i < gcdCMD_BUFFERS; ++i)
     {
-        gcmONERROR(gcoCMDBUF_Construct(gcvNULL, buffer->hardware,
-                                       MaxSize,
-                                       (gcsCOMMAND_INFO_PTR) &buffer->info,
-                                       &commandBuffer));
+        gcmONERROR(_ConstructCommandBuffer(gcvNULL, buffer->hardware,
+                                           MaxSize,
+                                           (gcsCOMMAND_INFO_PTR) &buffer->info,
+                                           &commandBuffer));
 
         if (buffer->commandBufferList == gcvNULL)
         {
@@ -871,44 +1407,14 @@ gcoBUFFER_Construct(
 
 OnError:
     /* Roll back. */
-    gcmVERIFY_OK(gcoBUFFER_Destroy(buffer));
-
+    if (buffer)
+    {
+        gcmVERIFY_OK(gcoBUFFER_Destroy(buffer));
+    }
     /* Return the status. */
     gcmFOOTER();
     return status;
 }
-
-static gcsPATCH_LIST *
-_GetPatchList(
-    IN gcoBUFFER Buffer
-    )
-{
-    gcsPATCH_LIST * patchList = gcvNULL;
-
-    gcmHEADER_ARG("Buffer=0x%x", Buffer);
-
-    if (Buffer->freePatchList)
-    {
-        patchList = Buffer->freePatchList;
-        Buffer->freePatchList = patchList->next;
-        patchList->count = 0;
-        patchList->next  = gcvNULL;
-    }
-    else
-    {
-        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsPATCH_LIST), (gctPOINTER *) &patchList)))
-        {
-            return gcvNULL;
-        }
-
-        gcoOS_ZeroMemory(patchList, gcmSIZEOF(gcsPATCH_LIST));
-    }
-
-    /* Succees. */
-    gcmFOOTER_NO();
-    return patchList;
-}
-
 
 static gctUINT32
 _GetResumeCommandLength(
@@ -943,46 +1449,32 @@ _GetResumeCommandLength(
     return sizeInBytes;
 }
 
+
 gceSTATUS
-gcoBUFFER_InsertToPatchList(
+gcoBUFFER_AddTimestampPatch(
     IN gcoBUFFER Buffer,
     IN gctUINT32 Handle,
     IN gctUINT32 Flag
     )
 {
-    gcsPATCH_LIST * patchList = gcvNULL;
-    gcsPATCH_LIST * patchHead = gcvNULL;
+    gcsHAL_PATCH_LIST * patchList;
+    gcsHAL_PATCH_VIDMEM_TIMESTAMP * patchItem;
 
     gcmHEADER_ARG("Buffer=0x%x, Handle=0x%x, Flag=0x%x", Buffer, Handle, Flag);
+    gcmASSERT(Handle != 0);
 
-    if (Handle == 0)
-    {
-        gcmFOOTER_NO();
-        return gcvSTATUS_OK;
-    }
+    patchList = _GetPatchItem(Buffer,
+                              gcvHAL_PATCH_VIDMEM_TIMESTAMP,
+                              Buffer->tempCMDBUF.inUse);
 
-    patchHead = Buffer->patchList;
+    patchItem = gcmUINT64_TO_PTR(patchList->patchArray);
 
-    /* Always insert patch list from head, so, only check the first patch list */
-    if (patchHead && patchHead->count < gcdPATCH_LIST_SIZE)
-    {
-        patchList = patchHead;
-    }
+    /* Pointer to current one. */
+    patchItem += patchList->count;
 
-    if (patchList == gcvNULL ||
-        patchList->count == gcdPATCH_LIST_SIZE)
-    {
-        /* Get new patch list */
-        patchHead = _GetPatchList(Buffer);
-        patchHead->next = patchList;
-        Buffer->patchList = patchHead;
-        patchList = patchHead;
-    }
+    patchItem->handle = Handle;
+    patchItem->flag = Flag;
 
-    gcmASSERT(patchList);
-
-    patchList->patch[patchList->count].handle = Handle;
-    patchList->patch[patchList->count].flag = Flag;
     patchList->count++;
 
     /* Succees. */
@@ -990,43 +1482,106 @@ gcoBUFFER_InsertToPatchList(
     return gcvSTATUS_OK;
 }
 
-static gceSTATUS
-_FreePatchList(
-    IN gcoBUFFER Buffer,
-    IN struct _gcsPATCH_LIST *PatchList
+/* Calculate the patch location in command buffer. */
+static gcmINLINE gctUINT32
+_CalculatePatchLocation(
+    gcoBUFFER Buffer,
+    gctPOINTER Logical
     )
 {
-    gcmHEADER_ARG("Buffer=0x%x, PatchList=0x%x", Buffer, PatchList);
+    gctUINT32 location;
+    struct _gcsTEMPCMDBUF * tempCMDBUF = &Buffer->tempCMDBUF;
 
-    /* Add to the cache. */
-    PatchList->next = Buffer->freePatchList;
-    Buffer->freePatchList = PatchList;
-    PatchList->count = 0;
+    if (tempCMDBUF->inUse)
+    {
+        /* Calculate location in the gcsTEMPCMDBUF. */
+        location = (gctUINT32)((gctUINTPTR_T)Logical - (gctUINTPTR_T)tempCMDBUF->buffer);
+
+        gcmASSERT(location < gcdMAX_TEMPCMD_BUFFER_SIZE);
+    }
+    else
+    {
+        gcoCMDBUF commandBuffer = Buffer->commandBufferTail;
+
+        /* Calculate location in the gcoCMDBUF object. */
+        location = (gctUINT32)((gctUINTPTR_T)Logical - (gctUINTPTR_T)commandBuffer->logical);
+
+        gcmASSERT(location < commandBuffer->offset);
+    }
+
+    return location;
+}
+
+gceSTATUS
+gcoBUFFER_AddVidmemAddressPatch(
+    IN gcoBUFFER Buffer,
+    IN gctUINT32_PTR Logical,
+    IN gctUINT32 Handle,
+    IN gctUINT32 NodeOffset
+    )
+{
+    gcsHAL_PATCH_LIST * patchList;
+    gcsHAL_PATCH_VIDMEM_ADDRESS * patchItem;
+
+    gcmHEADER_ARG("Buffer=%p Logical=%p Handle=0x%x NodeOffset=0x%x",
+                  Buffer, Logical, Handle, NodeOffset);
+
+    /* Add to temp video memory patch list when temp buffer used. */
+    patchList = _GetPatchItem(Buffer,
+                              gcvHAL_PATCH_VIDMEM_ADDRESS,
+                              Buffer->tempCMDBUF.inUse);
+
+    patchItem = gcmUINT64_TO_PTR(patchList->patchArray);
+
+    /* Pointer to current one. */
+    patchItem += patchList->count;
+
+    patchItem->location = _CalculatePatchLocation(Buffer, Logical);
+    patchItem->node     = Handle;
+    patchItem->offset   = NodeOffset;
+
+    patchList->count++;
 
     /* Succees. */
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
 }
 
-static gceSTATUS
-_RecyclePatchList(
+gceSTATUS
+gcoBUFFER_AddMCFESemaphorePatch(
     IN gcoBUFFER Buffer,
-    IN gcoCMDBUF CommandBuffer
+    IN gctUINT32_PTR Logical,
+    IN gctBOOL SendSema,
+    IN gctUINT32 SemaHandle
     )
 {
-    struct _gcsPATCH_LIST *patchList;
+    gcsHAL_PATCH_LIST * patchList;
+    gcsHAL_PATCH_MCFE_SEMAPHORE * patchItem;
 
-    gcmHEADER_ARG("Buffer=0x%x, CommandBuffer=0x%x", Buffer, CommandBuffer);
+    gcmHEADER_ARG("Buffer=0x%x Logical=%p, SemaHandle=%u",
+                  Buffer, Logical, SemaHandle);
 
-    while (CommandBuffer->patchHead != gcmPTR_TO_UINT64(gcvNULL))
+    if (!Buffer->hwFeature.hasMCFE)
     {
-        /* Extract the head of the list. */
-        patchList = gcmUINT64_TO_PTR(CommandBuffer->patchHead);
-        CommandBuffer->patchHead = gcmPTR_TO_UINT64(patchList->next);
-
-        /* Free the patch list item. */
-        _FreePatchList(Buffer, patchList);
+        gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_REQUEST);
+        return gcvSTATUS_INVALID_REQUEST;
     }
+
+    /* Add to temp mcfe semaphore patch list when temp buffer used. */
+    patchList = _GetPatchItem(Buffer,
+                              gcvHAL_PATCH_MCFE_SEMAPHORE,
+                              Buffer->tempCMDBUF.inUse);
+
+    patchItem = gcmUINT64_TO_PTR(patchList->patchArray);
+
+    /* Pointer to current one. */
+    patchItem += patchList->count;
+
+    patchItem->location = _CalculatePatchLocation(Buffer, Logical);
+    patchItem->sendSema = SendSema;
+    patchItem->semaHandle = SemaHandle;
+
+    patchList->count++;
 
     /* Succees. */
     gcmFOOTER_NO();
@@ -1206,7 +1761,10 @@ gcoBUFFER_OnIssueFence(
             ptr = (gcsFENCE_APPEND_NODE_PTR)pointer;
             fenceList->onIssueAllocCount = count;
 
-            gcoOS_MemCopy(ptr, fenceList->onIssueList, fenceList->onIssueCount * gcmSIZEOF(gcsFENCE_APPEND_NODE));
+            if (fenceList->onIssueCount)
+            {
+                gcoOS_MemCopy(ptr, fenceList->onIssueList, fenceList->onIssueCount * gcmSIZEOF(gcsFENCE_APPEND_NODE));
+            }
             gcoOS_Free(gcvNULL, fenceList->onIssueList);
 
             fenceList->onIssueList = ptr;
@@ -1245,7 +1803,7 @@ gcoBUFFER_GetFence(
         for (i = 0; i < fenceList->onIssueCount; i++)
         {
             node = fenceList->onIssueList[i].node;
-            gcsSURF_NODE_GetFence(node, Buffer->info.engine, fenceList->onIssueList[i].type);
+            gcoHARDWARE_GetFence(gcvNULL, &node->fenceCtx, Buffer->info.engine, fenceList->onIssueList[i].type);
         }
 
         fenceList->onIssueCount = 0;
@@ -1276,9 +1834,8 @@ gcoBUFFER_Destroy(
     IN gcoBUFFER Buffer
     )
 {
-    gceSTATUS status;
     gcoCMDBUF commandBuffer;
-    struct _gcsPATCH_LIST *patchList;
+    gctUINT i;
 
     gcmHEADER_ARG("Buffer=0x%x", Buffer);
 
@@ -1290,6 +1847,11 @@ gcoBUFFER_Destroy(
     {
         /* Get the head of the list. */
         commandBuffer = Buffer->commandBufferList;
+
+        if(Buffer->commandBufferTail == commandBuffer)
+        {
+            Buffer->commandBufferTail = gcvNULL;
+        }
 
         /* Remove the head buffer from the list. */
         if (commandBuffer->next == commandBuffer)
@@ -1303,44 +1865,79 @@ gcoBUFFER_Destroy(
             commandBuffer->next->prev = commandBuffer->prev;
         }
 
-        /* Free all patch list items. */
-        gcmONERROR(_RecyclePatchList(Buffer, commandBuffer));
-
-        gcmVERIFY_OK(_DestroyMirrorCommandBuffer(Buffer, commandBuffer));
-
         /* Destroy command buffer. */
-        gcmONERROR(gcoCMDBUF_Destroy(Buffer->hardware, &Buffer->info, commandBuffer));
+        _DestroyMirrorCommandBuffer(Buffer, commandBuffer);
+        _DestroyCommandBuffer(Buffer->hardware, &Buffer->info, commandBuffer);
     }
+
 #if gcdENABLE_3D
-    gcmONERROR(_FreeFenceList(Buffer->fenceList));
+    gcmVERIFY_OK(_FreeFenceList(Buffer->fenceList));
     Buffer->fenceList = gcvNULL;
 #endif
 
-    /* Destroy the free patch list. */
-    while (Buffer->freePatchList != NULL)
+    /* Recycle sub-commits. */
+    _RecycleSubCommits(Buffer);
+
+    /* Destroy command locations. */
+    _DestroyCommandLocations(Buffer->freeCommandLocations);
+    Buffer->freeCommandLocations = gcvNULL;
+
+    /* Destroy sub-commits. */
+    _DestroySubCommits(Buffer->freeSubCommits);
+    Buffer->freeSubCommits = gcvNULL;
+
+    for (i = 0; i < gcvHAL_PATCH_TYPE_COUNT; i++)
     {
-        patchList = Buffer->freePatchList;
-        Buffer->freePatchList = patchList->next;
-        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, patchList));
+        _DestroyPatchLists(Buffer->freePatchLists[i]);
+        Buffer->freePatchLists[i] = gcvNULL;
+
+        _DestroyPatchLists(Buffer->tempPatchLists[i]);
+        Buffer->tempPatchLists[i] = gcvNULL;
     }
 
-    while (Buffer->patchList != gcvNULL)
-    {
-        patchList = Buffer->patchList;
-        Buffer->patchList = patchList->next;
-        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, patchList));
-    }
-
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Buffer->tempCMDBUF.buffer));
+    gcoOS_Free(gcvNULL, Buffer->tempCMDBUF.buffer);
 
     /* Free the object memory. */
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Buffer));
+    gcmOS_SAFE_FREE(gcvNULL, Buffer);
 
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
 }
+
+static gcmINLINE gceSTATUS _CaptureCommandBuffer(gcoBUFFER Buffer, gcoCMDBUF commandBuffer)
+{
+    if (Buffer->captureEnabled)
+    {
+        gctINT32 remainedSize = commandBuffer->offset - Buffer->captureCommandOffset;
+
+        gcmASSERT(remainedSize >= 0);
+
+        if (remainedSize)
+        {
+            if (remainedSize <= Buffer->captureRemainedSize)
+            {
+                gctUINT8 *src, *dst;
+                src = (gctUINT8_PTR)gcmUINT64_TO_PTR(commandBuffer->logical) + Buffer->captureCommandOffset;
+                dst = Buffer->captureBuffer
+                    + Buffer->captureBufferTotalSize
+                    - Buffer->captureRemainedSize;
+
+                gcoOS_MemCopy(dst, src, remainedSize);
+                Buffer->captureRemainedSize -= remainedSize;
+            }
+            else
+            {
+                /* overflowed, disable capture */
+                Buffer->captureRemainedSize =  -1;
+                Buffer->captureEnabled = gcvFALSE;
+                return gcvSTATUS_OUT_OF_MEMORY;
+            }
+        }
+    }
+
+    return gcvSTATUS_OK;
+}
+
 
 /*******************************************************************************
 **
@@ -1514,25 +2111,50 @@ gcoBUFFER_Reserve(
 
     if (alignedBytes > commandBuffer->free || notInSamePage)
     {
-        /* Sent event to signal when command buffer completes. */
-        iface.command            = gcvHAL_SIGNAL;
-        iface.engine             = Buffer->info.engine;
-        iface.u.Signal.signal    = gcmPTR_TO_UINT64(commandBuffer->signal);
-        iface.u.Signal.auxSignal = 0;
-        iface.u.Signal.process   = gcmPTR_TO_UINT64(gcoOS_GetCurrentProcessID());
-        iface.u.Signal.fromWhere = gcvKERNEL_COMMAND;
+        if (!Buffer->dropCommandEnabled)
+        {
+            /* Sent event to signal when command buffer completes. */
+            iface.command            = gcvHAL_SIGNAL;
+            iface.engine             = Buffer->info.engine;
+            iface.u.Signal.signal    = gcmPTR_TO_UINT64(commandBuffer->signal);
+            iface.u.Signal.auxSignal = 0;
+            iface.u.Signal.process   = gcmPTR_TO_UINT64(gcoOS_GetCurrentProcessID());
+            iface.u.Signal.fromWhere = gcvKERNEL_COMMAND;
 
-        /* Send event. */
-        gcmONERROR(gcoHARDWARE_CallEvent(Buffer->hardware, &iface));
+            /* Send event. */
+            gcmONERROR(gcoHARDWARE_CallEvent(Buffer->hardware, &iface));
+        }
+        else
+        {
+            /* as we already commit true for the command buffer
+             * before capture with dropCommandEnabled, we could signal this commandbuffer
+             * right away.
+             */
+            gcmONERROR(gcoOS_Signal(gcvNULL, commandBuffer->signal, gcvTRUE));
+        }
 
-        /* Commit current command buffer. */
-        gcmONERROR(gcoHARDWARE_Commit(Buffer->hardware));
+
+        if (Buffer->hwFeature.hasMCFE)
+        {
+            /* Do not commit for MCFE, but accumulates more. */
+            gcmONERROR(_LinkCommandLocation(Buffer, commandBuffer, 0));
+        }
+        else
+        {
+            /* Commit current command buffer. */
+            gcmONERROR(gcoHARDWARE_Commit(Buffer->hardware));
+        }
 
         /* Grab a new command buffer. */
         gcmONERROR(_GetCommandBuffer(Buffer));
 
         /* Get new buffer. */
         commandBuffer = Buffer->commandBufferTail;
+
+        if (Buffer->captureEnabled)
+        {
+            Buffer->captureCommandOffset = commandBuffer->offset;
+        }
 
         if (resumeBytes == 0)
         {
@@ -1676,7 +2298,9 @@ gcoBUFFER_Commit(
     gceSTATUS status;
     gcoCMDBUF commandBuffer;
     gctBOOL emptyBuffer;
-
+    gctUINT32 currentCoreId = 0;
+    gctUINT32 coreIndex = 0;
+    gctUINT32 coreCount = 1;
     gcmHEADER_ARG("Buffer=0x%x Queue=0x%x",
                   Buffer, Queue);
 
@@ -1687,6 +2311,20 @@ gcoBUFFER_Commit(
     if (Buffer->threadDefault)
     {
         gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_BUFFER, "Thread Default command buffer is comitting commands");
+    }
+
+    gcmONERROR(gcoHAL_GetCurrentCoreIndex(gcvNULL, &currentCoreId));
+    gcmONERROR(gcoHARDWARE_QueryCoreIndex(Buffer->hardware,0, &coreIndex));
+
+    gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, coreIndex));
+    /* When gcoBUFFER_EndTEMPCMDBUF, currentByteSize will set at last,
+     * so currentByteSize > 0, means we still under temp Command buffer mode,
+     * if the even is resource free and that resource is used by this tmp
+     * command, this have possible issue.
+     */
+    if (Buffer->tempCMDBUF.currentByteSize > 0 && Queue->tmpBufferRecordCount > 0)
+    {
+        gcmPRINT("warning: some event kick off during the tmp command period");
     }
 
     /* Grab the head command buffer. */
@@ -1707,21 +2345,24 @@ gcoBUFFER_Commit(
     }
 
     /* Send for execution. */
-    if (emptyBuffer)
+    if (emptyBuffer && !Buffer->subCommitTail)
     {
         gcmONERROR(gcoQUEUE_Commit(Queue, gcvFALSE));
     }
     else
     {
         gcsHAL_INTERFACE iface;
-        gctUINT32 newOffset;
-        gctSIZE_T spaceLeft;
-        gctUINT32 coreCount = 1;
+        gctUINT32 context = 0;
         gcoCMDBUF *commandBufferMirrors = commandBuffer->mirrors;
 
 #if gcdENABLE_3D
         gcoCMDBUF tailCommandBuffer = Buffer->commandBufferTail;
         gctUINT alignedBytes = gcmALIGN(tailCommandBuffer->offset, Buffer->info.alignment) - tailCommandBuffer->offset;
+
+        if (Buffer->captureEnabled)
+        {
+            _CaptureCommandBuffer(Buffer, commandBuffer);
+        }
 
         tailCommandBuffer->offset += alignedBytes;
 
@@ -1731,36 +2372,39 @@ gcoBUFFER_Commit(
 
             if (Buffer->info.engine == gcvENGINE_RENDER)
             {
-                /* need pauseQuery per commit and resumeQuery when next draw flushQuery */
-                for (type = gcvQUERY_OCCLUSION; type < gcvQUERY_MAX_NUM; type++)
+                if (!Buffer->hwFeature.hasComputeOnly)
                 {
-                    gctUINT64 pauseQueryCommand, pauseQueryCommandsaved;
-                    pauseQueryCommandsaved =
-                    pauseQueryCommand      = gcmPTR_TO_UINT64((gctUINT8_PTR) gcmUINT64_TO_PTR(tailCommandBuffer->logical)
+                    /* need pauseQuery per commit and resumeQuery when next draw flushQuery */
+                    for (type = gcvQUERY_OCCLUSION; type < gcvQUERY_MAX_NUM; type++)
+                    {
+                        gctUINT64 pauseQueryCommand, pauseQueryCommandsaved;
+                        pauseQueryCommandsaved =
+                        pauseQueryCommand      = gcmPTR_TO_UINT64((gctUINT8_PTR) gcmUINT64_TO_PTR(tailCommandBuffer->logical)
+                                                        + tailCommandBuffer->offset);
+
+                        gcoHARDWARE_SetQuery(gcvNULL, ~0U, (gceQueryType)type, gcvQUERYCMD_PAUSE, (gctPOINTER*)&pauseQueryCommand);
+                        if ((pauseQueryCommand - pauseQueryCommandsaved) > 0)
+                        {
+                            tailCommandBuffer->offset += (gctUINT32)(pauseQueryCommand - pauseQueryCommandsaved);
+                            Buffer->queryPaused[type] = gcvTRUE;
+                        }
+                    }
+
+                    /* need pauseXFB per commit and resuemeXFB when next draw flushXFB */
+                    if (Buffer->hwFeature.hasHWTFB)
+                    {
+                        gctUINT64 pauseXfbCommand, pauseXfbCommandsaved;
+
+                        pauseXfbCommandsaved =
+                        pauseXfbCommand      = gcmPTR_TO_UINT64((gctUINT8_PTR) gcmUINT64_TO_PTR(tailCommandBuffer->logical)
                                                     + tailCommandBuffer->offset);
 
-                    gcoHARDWARE_SetQuery(gcvNULL, ~0U, (gceQueryType)type, gcvQUERYCMD_PAUSE, (gctPOINTER*)&pauseQueryCommand);
-                    if ((pauseQueryCommand - pauseQueryCommandsaved) > 0)
-                    {
-                        tailCommandBuffer->offset += (gctUINT32)(pauseQueryCommand - pauseQueryCommandsaved);
-                        Buffer->queryPaused[type] = gcvTRUE;
-                    }
-                }
-
-                /* need pauseXFB per commit and resuemeXFB when next draw flushXFB */
-                if (Buffer->hwFeature.hasHWTFB)
-                {
-                    gctUINT64 pauseXfbCommand, pauseXfbCommandsaved;
-
-                    pauseXfbCommandsaved =
-                    pauseXfbCommand      = gcmPTR_TO_UINT64((gctUINT8_PTR) gcmUINT64_TO_PTR(tailCommandBuffer->logical)
-                                                + tailCommandBuffer->offset);
-
-                    gcoHARDWARE_SetXfbCmd(gcvNULL, gcvXFBCMD_PAUSE_INCOMMIT, (gctPOINTER*)&pauseXfbCommand);
-                    if (pauseXfbCommand - pauseXfbCommandsaved > 0)
-                    {
-                        tailCommandBuffer->offset += (gctUINT32)(pauseXfbCommand - pauseXfbCommandsaved);
-                        Buffer->tfbPaused = gcvTRUE;
+                        gcoHARDWARE_SetXfbCmd(gcvNULL, gcvXFBCMD_PAUSE_INCOMMIT, (gctPOINTER*)&pauseXfbCommand);
+                        if (pauseXfbCommand - pauseXfbCommandsaved > 0)
+                        {
+                            tailCommandBuffer->offset += (gctUINT32)(pauseXfbCommand - pauseXfbCommandsaved);
+                            Buffer->tfbPaused = gcvTRUE;
+                        }
                     }
                 }
 
@@ -1781,35 +2425,52 @@ gcoBUFFER_Commit(
                 }
 
                 gcoHARDWARE_Query3DCoreCount(gcvNULL, &coreCount);
+                gcoHAL_GetCurrentCoreIndex(gcvNULL, &coreIndex);
 
-                alignedBytes = gcmALIGN(tailCommandBuffer->offset, Buffer->info.alignment) - tailCommandBuffer->offset;
+                if (!Buffer->hwFeature.hasComputeOnly)
+                {
+                    alignedBytes = gcmALIGN(tailCommandBuffer->offset, Buffer->info.alignment) - tailCommandBuffer->offset;
+                    if (coreCount > 1)
+                    {
+                        gctUINT32 bytes;
+                        gctUINT32_PTR flushCacheCommandLogical;
+
+                        flushCacheCommandLogical = (gctUINT32_PTR)((gctUINT8_PTR)gcmUINT64_TO_PTR(tailCommandBuffer->logical) +
+                                                   tailCommandBuffer->offset + alignedBytes);
+
+                        gcoHARDWARE_MultiGPUCacheFlush(gcvNULL, &flushCacheCommandLogical);
+
+                        gcoHARDWARE_QueryMultiGPUCacheFlushLength(gcvNULL, &bytes);
+                        tailCommandBuffer->offset += bytes + alignedBytes;
+                    }
+                    else
+                    {
+                        gctUINT8_PTR flushCacheCommand, flushCacheCommandsaved;
+
+                        flushCacheCommandsaved =
+                        flushCacheCommand = (gctUINT8_PTR)gcmUINT64_TO_PTR(tailCommandBuffer->logical)
+                                          + tailCommandBuffer->offset + alignedBytes;
+
+                        /* need flush ccache zcache and shl1_cache per commit */
+                        gcoHARDWARE_FlushCache(gcvNULL, (gctPOINTER*)&flushCacheCommand);
+                        tailCommandBuffer->offset += (gctUINT32)(flushCacheCommand - flushCacheCommandsaved) + alignedBytes;
+                    }
+                }
+
                 if (coreCount > 1)
                 {
                     gctUINT32 bytes;
                     gctUINT32_PTR syncCommandLogical;
 
-                    syncCommandLogical = (gctUINT32_PTR)((gctUINT8_PTR)gcmUINT64_TO_PTR(tailCommandBuffer->logical) +
-                                                         tailCommandBuffer->offset + alignedBytes);
+                    alignedBytes = gcmALIGN(tailCommandBuffer->offset, Buffer->info.alignment) - tailCommandBuffer->offset;
 
-                    gcoHARDWARE_MultiGPUCacheFlush(gcvNULL, &syncCommandLogical);
+                    syncCommandLogical = (gctUINT32_PTR)((gctUINT8_PTR)gcmUINT64_TO_PTR(tailCommandBuffer->logical) +
+                                         tailCommandBuffer->offset + alignedBytes);
 
                     gcoHARDWARE_MultiGPUSync(gcvNULL, &syncCommandLogical);
+
                     gcoHARDWARE_QueryMultiGPUSyncLength(gcvNULL, &bytes);
                     tailCommandBuffer->offset += bytes + alignedBytes;
-                    gcoHARDWARE_QueryMultiGPUCacheFlushLength(gcvNULL, &bytes);
-                    tailCommandBuffer->offset += bytes;
-                }
-                else
-                {
-                    gctUINT8_PTR flushCacheCommand, flushCacheCommandsaved;
-
-                    flushCacheCommandsaved =
-                    flushCacheCommand = (gctUINT8_PTR)gcmUINT64_TO_PTR(tailCommandBuffer->logical)
-                                      + tailCommandBuffer->offset + alignedBytes;
-
-                    /* need flush ccache zcache and shl1_cache per commit */
-                    gcoHARDWARE_FlushCache(gcvNULL, (gctPOINTER *)&flushCacheCommand);
-                    tailCommandBuffer->offset += (gctUINT32)(flushCacheCommand - flushCacheCommandsaved) + alignedBytes;
                 }
             }
 
@@ -1824,8 +2485,9 @@ gcoBUFFER_Commit(
 
                 fenceCommandSaved =
                 fenceCommand = (gctUINT8_PTR)gcmUINT64_TO_PTR(tailCommandBuffer->logical)
-                                                      + tailCommandBuffer->offset + alignedBytes;
+                             + tailCommandBuffer->offset + alignedBytes;
 
+                /*no need flush cache and do multi gpu sync here*/
                 if (Buffer->info.engine == gcvENGINE_BLT)
                 {
                     /*no need flush cache and do multi gpu sync here*/
@@ -1846,160 +2508,135 @@ gcoBUFFER_Commit(
         commandBuffer->offset = gcmALIGN(commandBuffer->offset, Buffer->info.alignment);
 
 #if (gcdDUMP || (gcdUSE_VX && gcdENABLE_3D))
-        *DumpLogical = (gctUINT8_PTR) gcmUINT64_TO_PTR(commandBuffer->logical)
-                     + commandBuffer->startOffset
-                     + Buffer->info.reservedHead;
+        if (!Buffer->dropCommandEnabled)
+        {
+            *DumpLogical = (gctUINT8_PTR) gcmUINT64_TO_PTR(commandBuffer->logical)
+                         + commandBuffer->startOffset
+                         + Buffer->info.reservedHead;
 
-        *DumpBytes = commandBuffer->offset
-                   - commandBuffer->startOffset
-                   - Buffer->info.reservedHead;
+            *DumpBytes = commandBuffer->offset
+                       - commandBuffer->startOffset
+                       - Buffer->info.reservedHead;
+        }
 #endif
 
         /* The current pipe becomes the exit pipe for the current command buffer. */
         commandBuffer->exitPipe = CurrentPipe;
 
+#if gcdENABLE_3D && gcdENABLE_KERNEL_FENCE
         if (gcoHAL_GetOption(gcvNULL, gcvOPTION_KERNEL_FENCE))
         {
-#if gcdENABLE_3D && gcdENABLE_KERNEL_FENCE
-            gcmONERROR(gcoHARDWARE_BuildPatchList(Buffer->hardware, Buffer, commandBuffer, Buffer->info.engine));
-#endif
-
-            commandBuffer->patchHead = gcmPTR_TO_UINT64(Buffer->patchList);
-            Buffer->patchList = gcvNULL;
+            gcmONERROR(
+                gcoHARDWARE_BuildTimestampPatch(Buffer->hardware,
+                                                Buffer,
+                                                commandBuffer,
+                                                Buffer->info.engine));
         }
-
-        iface.u.Commit.count = coreCount;
-        iface.u.Commit.delta = gcmPTR_TO_UINT64(iface.u.Commit.deltas);
-        iface.u.Commit.context = gcmPTR_TO_UINT64(iface.u.Commit.contexts);
-        iface.u.Commit.commandBuffer = gcmPTR_TO_UINT64(iface.u.Commit.commandBuffers);
-
-        /* Send command and context buffer to hardware. */
-#if gcdENABLE_3D
-        iface.u.Commit.contexts[0] = (commandBuffer->using2D && !commandBuffer->using3D)
-                               ? 0 : Context;
-#else
-        iface.u.Commit.contexts[0] = 0;
 #endif
 
-        iface.ignoreTLS = gcvFALSE;
-        iface.command = gcvHAL_COMMIT;
-        iface.commitMutex = gcvFALSE;
-        iface.engine = Buffer->info.engine;
-        iface.u.Commit.commandBuffers[0] = gcmPTR_TO_UINT64(commandBuffer);
-        iface.u.Commit.deltas[0] = gcmPTR_TO_UINT64(StateDelta);
-        iface.u.Commit.queue = gcmPTR_TO_UINT64(Queue->head);
+#if gcdENABLE_3D
+        context = (commandBuffer->using2D && !commandBuffer->using3D) ? 0
+                : Context;
+#endif
 
-        iface.u.Commit.shared = (coreCount > 1) ? gcvTRUE : gcvFALSE;
-        iface.u.Commit.index = 0;
+        /* New command location. */
+        gcmONERROR(_LinkCommandLocation(Buffer, commandBuffer, 0));
 
-        if (Buffer->info.engine == gcvENGINE_RENDER)
+        /*
+         * New sub commit for current core, link to previous command locations.
+         * For single-core mode, current core is the core we need to use.
+         * For combine-core mode, current core should be 0.
+         */
+        /* Event queue is put to the first subCommit. */
+        gcmONERROR(gcoHARDWARE_QueryCoreIndex(gcvNULL, 0, &coreIndex));
+
+        gcmONERROR(_LinkSubCommit(Buffer, coreIndex, gcvNULL, 0, Queue));
+
+        /* Put context in the first sub commit. */
+        Buffer->subCommitHead.context = context;
+        Buffer->subCommitHead.delta   = gcmPTR_TO_UINT64(StateDelta);
+
+        if (Buffer->info.engine == gcvENGINE_RENDER && coreCount > 1)
         {
             gctUINT32 i;
-            gctUINT32 originalCoreIndex;
-
-            gcmONERROR(gcoHAL_GetCurrentCoreIndex(gcvNULL, &originalCoreIndex));
 
             for (i = 1; i < coreCount; i++)
             {
                 gctUINT32 coreIndex;
+                gctUINT32 ctx;
+                gcsSTATE_DELTA_PTR delta;
+                gcoCMDBUF cmdBuf;
 
                 /* Convert core index in this hardware to global core index. */
                 gcmONERROR(gcoHARDWARE_QueryCoreIndex(gcvNULL, i, &coreIndex));
 
-                if (StateDeltas)
-                {
-                    /* Get State Deltas of the GPU. */
-                    iface.u.Commit.deltas[i] = gcmPTR_TO_UINT64(StateDeltas[coreIndex]);
-                }
-                else
-                {
-                    iface.u.Commit.deltas[i] = iface.u.Commit.deltas[0];
-                }
-
-                if (Contexts)
-                {
-                    /* Get Context of the GPU. */
-                    iface.u.Commit.contexts[i] = Contexts[coreIndex];
-                }
-                else
-                {
-                    iface.u.Commit.contexts[i] = iface.u.Commit.contexts[0];
-                }
+                ctx = Contexts ? Contexts[coreIndex] : context;
+                delta = StateDeltas ? StateDeltas[coreIndex] : StateDelta;
 
                 if (commandBufferMirrors)
                 {
                     /* It is not needed to index commandBufferMirrors with real coreIndex,
                     *  because content in mirrors always keeps same as command buffer, no
                     *  matter what its index is. */
-                    _DuplicateCommandBuffer(commandBufferMirrors[i - 1], commandBuffer);
-                    iface.u.Commit.commandBuffers[i] = gcmPTR_TO_UINT64(commandBufferMirrors[i - 1]);
+                    cmdBuf = commandBufferMirrors[i - 1];
+
+                    _DuplicateCommandBuffer(cmdBuf, commandBuffer);
+
+                    /* Add mirrored command buffer. */
+                    gcmONERROR(_LinkCommandLocation(Buffer, cmdBuf, 0));
+
                     /* Advance commit count. */
-                    commandBufferMirrors[i - 1]->commitCount++;
+                    cmdBuf->commitCount++;
                 }
                 else
                 {
-                    iface.u.Commit.commandBuffers[i] = 0;
+                    /* Add the same command buffer. */
+                    gcmONERROR(_LinkCommandLocation(Buffer, commandBuffer, i));
                 }
+
+                /* Add sub commit for core coreIndex. */
+                gcmONERROR(_LinkSubCommit(Buffer, coreIndex, delta, ctx, gcvNULL));
 
                 /* Set it to TLS to find correct command queue. */
                 gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, coreIndex));
             }
-
-            /* Restore core index in TLS. */
-            gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, originalCoreIndex));
         }
 
-        /* Call kernel service. */
-        gcmONERROR(gcoOS_DeviceControl(gcvNULL,
-                                       IOCTL_GCHAL_INTERFACE,
-                                       &iface, gcmSIZEOF(iface),
-                                       &iface, gcmSIZEOF(iface)));
-        gcmONERROR(iface.status);
+        /* Finish link sub-commits. */
+        Buffer->subCommitTail = gcvNULL;
 
-        /* Update commit stamp. */
-        Buffer->commitStamp = iface.u.Commit.commitStamp;
+        iface.ignoreTLS = gcvFALSE;
+        iface.command = gcvHAL_COMMIT;
+        iface.engine = Buffer->info.engine;
+        iface.u.Commit.subCommit = Buffer->subCommitHead;
+        iface.u.Commit.shared  = (coreCount > 1);
+        iface.commitMutex = gcvFALSE;
 
-        /* Advance the offset for next commit. */
-        newOffset = commandBuffer->offset + Buffer->info.reservedTail;
-
-        /* Compute the size of the space left in the buffer. */
-        spaceLeft = commandBuffer->bytes - newOffset;
-
-        if (spaceLeft > Buffer->totalReserved)
+        if (!Buffer->dropCommandEnabled)
         {
-            /* Adjust buffer offset and size. */
-            commandBuffer->startOffset = newOffset;
-            commandBuffer->offset      = commandBuffer->startOffset + Buffer->info.reservedHead;
-            commandBuffer->free        = commandBuffer->bytes - commandBuffer->offset
-                                       - Buffer->info.alignment - Buffer->info.reservedTail - Buffer->info.reservedUser;
-        }
-        else
-        {
-            /* Buffer is full. */
-            commandBuffer->startOffset = commandBuffer->bytes;
-            commandBuffer->offset      = commandBuffer->bytes;
-            commandBuffer->free        = 0;
+            /* Call kernel service. */
+            gcmONERROR(gcoOS_DeviceControl(gcvNULL,
+                                           IOCTL_GCHAL_INTERFACE,
+                                           &iface, gcmSIZEOF(iface),
+                                           &iface, gcmSIZEOF(iface)));
+            gcmONERROR(iface.status);
+
+            /* Update commit stamp. */
+            Buffer->commitStamp = iface.u.Commit.commitStamp;
         }
 
-        /* The exit pipe becomes the entry pipe for the next command buffer. */
-        commandBuffer->entryPipe = commandBuffer->exitPipe;
+        /* Finish current buffer range and will use next. */
+        _FinishCommandBufferRange(Buffer, commandBuffer);
 
-#if gcdSECURE_USER
-        /* Reset the state array tail. */
-        commandBuffer->hintArrayTail = commandBuffer->hintArray;
-#endif
-
-        /* Reset usage flags. */
-        commandBuffer->using2D         = gcvFALSE;
-        commandBuffer->using3D         = gcvFALSE;
-
-        /* Kernel already set fenceID to all node of patchList */
-        gcmONERROR(_RecyclePatchList(Buffer, commandBuffer));
+        /* Recycle the sub-commits. */
+        _RecycleSubCommits(Buffer);
     }
 
     /* Empty buffer must be the tail. */
     gcmONERROR(gcoQUEUE_Free(Queue));
 
+    /* Restore core index in TLS. */
+    gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, currentCoreId));
     /* Success. */
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -2075,6 +2712,7 @@ gcoBUFFER_IsEmpty(
 gceSTATUS
 gcoBUFFER_StartTEMPCMDBUF(
     IN gcoBUFFER Buffer,
+    IN gcoQUEUE Queue,
     OUT gcsTEMPCMDBUF *tempCMDBUF
     )
 {
@@ -2090,6 +2728,8 @@ gcoBUFFER_StartTEMPCMDBUF(
     gcmASSERT((*tempCMDBUF)->inUse == gcvFALSE);
 
     (*tempCMDBUF)->inUse = gcvTRUE;
+    Queue->tmpBufferRecordCount = 0;
+
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -2127,7 +2767,7 @@ gcoBUFFER_EndTEMPCMDBUF(
 
     tempCMDBUF = &Buffer->tempCMDBUF;
 
-    if (tempCMDBUF->currentByteSize >  gcmMAX_TEMPCMD_BUFFER_SIZE)
+    if (tempCMDBUF->currentByteSize >  gcdMAX_TEMPCMD_BUFFER_SIZE)
     {
         gcmPRINT(" Temp command buffer is overflowed!");
     }
@@ -2140,6 +2780,8 @@ gcoBUFFER_EndTEMPCMDBUF(
                                  tempCMDBUF->buffer,
                                  tempCMDBUF->currentByteSize,
                                  gcvTRUE);
+
+        _MoveTempPatchLists(Buffer);
     }
 
     tempCMDBUF->currentByteSize = 0;
@@ -2147,4 +2789,199 @@ gcoBUFFER_EndTEMPCMDBUF(
     gcmFOOTER_NO();
     return status;
 }
+
+gceSTATUS
+gcoBUFFER_SelectChannel(
+    IN gcoBUFFER Buffer,
+    IN gctBOOL Priority,
+    IN gctUINT32 ChannelId
+    )
+{
+    gceSTATUS status;
+
+    gcmHEADER_ARG("Buffer=%p Priority=%d ChannelId=%d",
+                  Buffer, Priority, ChannelId);
+
+    if (Priority  == Buffer->mcfePriority &&
+        ChannelId == Buffer->mcfeChannelId)
+    {
+        /* Nothing to do. */
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+
+    /* Complete previous command location. */
+    gcmONERROR(_LinkCommandLocation(Buffer, Buffer->commandBufferTail, 0));
+
+    /* Finish buffer range. */
+    _FinishCommandBufferRange(Buffer, Buffer->commandBufferTail);
+
+    /* Switch channel. */
+    Buffer->mcfePriority  = Priority;
+    Buffer->mcfeChannelId = ChannelId;
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoBUFFER_GetChannelInfo(
+    IN gcoBUFFER Buffer,
+    OUT gctBOOL *Priority,
+    OUT gctUINT32 *ChannelId
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Buffer=%p Priority=%p ChannelId=%p",
+                  Buffer, Priority, ChannelId);
+
+    if (Priority)
+    {
+        *Priority = Buffer->mcfePriority;
+    }
+
+    if (ChannelId)
+    {
+        *ChannelId = Buffer->mcfeChannelId;
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoBUFFER_Capture(
+    IN gcoBUFFER Buffer,
+    IN OUT gctUINT8 *CaptureBuffer,
+    IN gctUINT32 InputSizeInByte,
+    IN OUT gctUINT32 *pOutputSizeInByte,
+    IN gctBOOL Enabled,
+    IN gctBOOL dropCommandEnabled
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcoCMDBUF commandBuffer;
+
+    gcmHEADER_ARG("Buffer=%p CaptureBuffer=0x%x InputSizeInByte=%d"
+                  "pOutputSizeInByte=0x%x Enabled=%d dropCommandEnabled=%d",
+                  Buffer, CaptureBuffer, InputSizeInByte, pOutputSizeInByte, Enabled, dropCommandEnabled);
+
+    commandBuffer = Buffer->commandBufferTail;
+    gcmASSERT(commandBuffer);
+
+    if (Enabled)
+    {
+        gcmASSERT(!Buffer->captureEnabled);
+        gcmASSERT(CaptureBuffer);
+        gcmASSERT(InputSizeInByte);
+        /* If we want to skip sending command to hardware during the capture,
+         * we need commit existing commands in current command buffer first
+         * and stall it. so we could make the command buffer could be used for
+         * capture only.
+         */
+        if (dropCommandEnabled)
+        {
+            gcoHAL_Commit(Buffer->hal, gcvTRUE);
+        }
+        Buffer->captureEnabled = gcvTRUE;
+        Buffer->captureBuffer = CaptureBuffer;
+        Buffer->captureBufferTotalSize = InputSizeInByte;
+        Buffer->captureRemainedSize = (gctINT)InputSizeInByte;
+        Buffer->captureCommandOffset = commandBuffer->offset;
+        Buffer->dropCommandEnabled = dropCommandEnabled;
+    }
+    else
+    {
+        gcmASSERT(!Buffer->tempCMDBUF.inUse);
+        gcmASSERT(pOutputSizeInByte);
+
+        *pOutputSizeInByte = 0;
+        /* overflowed capture buffer */
+        if (Buffer->captureRemainedSize < 0)
+        {
+            status = gcvSTATUS_OUT_OF_MEMORY;
+        }
+        else
+        {
+            status = _CaptureCommandBuffer(Buffer, commandBuffer);
+            if (gcmIS_SUCCESS(status))
+            {
+                *pOutputSizeInByte = (gctINT32)Buffer->captureBufferTotalSize
+                                   - Buffer->captureRemainedSize;
+            }
+        }
+
+        if (Buffer->dropCommandEnabled)
+        {
+            Buffer->dropCommandEnabled = gcvFALSE;
+            /* Force to set current command buffer full,
+             * so it would start with next command for
+             * resuming command submission.
+             */
+            commandBuffer->startOffset = commandBuffer->bytes;
+            commandBuffer->offset      = commandBuffer->bytes;
+            commandBuffer->free        = 0;
+
+        }
+        Buffer->captureBuffer = gcvNULL;
+        Buffer->captureEnabled = gcvFALSE;
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+
+gceSTATUS gcoBUFFER_IsCaptureEnabled(
+    gcoBUFFER Buffer
+    )
+{
+    gceSTATUS status = gcvSTATUS_FALSE;
+    gcmHEADER_ARG("Buffer=%p", Buffer);
+
+    status = Buffer && Buffer->captureEnabled && Buffer->dropCommandEnabled? gcvSTATUS_TRUE : gcvSTATUS_FALSE;
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoBUFFER_CaptureInitState(
+    IN gcoBUFFER Buffer,
+    IN OUT gctUINT8 *CaptureBuffer,
+    IN gctUINT32 InputSizeInByte,
+    IN OUT gctUINT32 *pOutputSizeInByte
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcoCMDBUF commandBuffer = gcvNULL;
+    gctUINT8 *src = gcvNULL, *dst = gcvNULL;
+    gctUINT32 commandSize = 0;
+    gctUINT32 captureCommandOffset = 0;
+
+    gcmHEADER_ARG("Buffer=%p CaptureBuffer=0x%x InputSizeInByte=%d"
+                  "pOutputSizeInByte=0x%x", Buffer, CaptureBuffer, InputSizeInByte, pOutputSizeInByte);
+
+    commandBuffer = Buffer->commandBufferTail;
+    gcmASSERT(commandBuffer);
+
+    captureCommandOffset = Buffer->info.reservedHead;
+    commandSize = commandBuffer->offset - captureCommandOffset;
+
+    src = (gctUINT8_PTR)gcmUINT64_TO_PTR(commandBuffer->logical) + captureCommandOffset;
+    dst = (gctUINT8_PTR)CaptureBuffer;
+
+    gcoOS_MemCopy(dst, src, commandSize);
+
+    *pOutputSizeInByte = commandSize;
+
+    gcmFOOTER();
+    return status;
+}
+
 #endif  /* gcdENABLE_3D */

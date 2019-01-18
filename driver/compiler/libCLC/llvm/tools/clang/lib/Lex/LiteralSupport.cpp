@@ -48,7 +48,7 @@ static unsigned ProcessCharEscape(const char *&ThisTokBuf,
 
     // These have fixed mappings.
   case 'a':
-    // TODO: K&R: the meaning of '\\a' is different in traditional C
+    // VIV:TODO: K&R: the meaning of '\\a' is different in traditional C
     ResultChar = 7;
     break;
   case 'b':
@@ -288,7 +288,6 @@ static void ProcessUCNEscape(const char *&ThisTokBuf, const char *ThisTokEnd,
 ///         ll LL
 ///
 ///       floating-constant: [C99 6.4.4.2]
-///         TODO: add rules...
 ///
 NumericLiteralParser::
 NumericLiteralParser(const char *begin, const char *end,
@@ -788,7 +787,7 @@ StringLiteralParser(const Token *StringToks, unsigned NumStringToks,
   // Include space for the null terminator.
   ++SizeBound;
 
-  // TODO: K&R warning: "traditional C rejects string constant concatenation"
+  // VIV:TODO: K&R warning: "traditional C rejects string constant concatenation"
 
   // Get the width in bytes of wchar_t.  If no wchar_t strings are used, do not
   // query the target.  As such, wchar_tByteWidth is only valid if AnyWide=true.
@@ -832,7 +831,7 @@ StringLiteralParser(const Token *StringToks, unsigned NumStringToks,
 
     const char *ThisTokEnd = ThisTokBuf+ThisTokLen-1;  // Skip end quote.
 
-    // TODO: Input character set mapping support.
+    // VIV:TODO: Input character set mapping support.
 
     // Skip L marker for wide strings.
     if (ThisTokBuf[0] == 'L')

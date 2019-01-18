@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -346,7 +346,7 @@ clfAddEventCallback(
     )
 {
     gctINT                  status;
-    clsContext_PTR          context;
+    clsContext_PTR          context = gcvNULL;
     clsEventCallback_PTR    eventCallback;
 
     gcmHEADER_ARG("EventCallback=0x%x", EventCallback);
@@ -371,7 +371,7 @@ clfAddEventCallback(
                                       clfEventCallbackWorker,
                                       context,
                                       &context->eventCallbackWorkerThread),
-                   CL_OUT_OF_HOST_MEMORY);
+                                      CL_OUT_OF_HOST_MEMORY);
     }
 
     if (context->eventCallbackList == gcvNULL)
@@ -396,8 +396,16 @@ clfAddEventCallback(
     gcmVERIFY_OK(gcoCL_SetSignal(context->eventCallbackWorkerStartSignal));
 
     status = CL_SUCCESS;
+    gcmFOOTER_ARG("%d", status);
+
+    gcmFOOTER_NO();
+
+    return status;
 
 OnError:
+    if (context)
+        gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, context->eventCallbackListMutex));
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -905,7 +913,6 @@ clfEventCallbackWorker(
     clsEventCallback_PTR    eventCallback = gcvNULL;
 
     /* Use the same hardware for event callback worker. */
-   /* gcmONERROR(gcoCL_SetHardware()); */
 
     while (gcvTRUE)
     {

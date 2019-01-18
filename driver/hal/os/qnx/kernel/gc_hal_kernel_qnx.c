@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -55,15 +55,15 @@ gckKERNEL_QueryVideoMemory(
 
     /* Get internal memory size and physical address. */
     Interface->u.QueryVideoMemory.internalSize = device->internalSize;
-    Interface->u.QueryVideoMemory.internalPhysical = gcmPTR2INT32(device->internalPhysical);
+    Interface->u.QueryVideoMemory.internalPhysName = gcmPTR2INT32(device->internalPhysical);
 
     /* Get external memory size and physical address. */
     Interface->u.QueryVideoMemory.externalSize = device->externalSize;
-    Interface->u.QueryVideoMemory.externalPhysical = gcmPTR2INT32(device->externalPhysical);
+    Interface->u.QueryVideoMemory.externalPhysName = gcmPTR2INT32(device->externalPhysical);
 
     /* Get contiguous memory size and physical address. */
     Interface->u.QueryVideoMemory.contiguousSize = device->contiguousSize;
-    Interface->u.QueryVideoMemory.contiguousPhysical = gcmPTR2INT32(device->contiguousPhysical);
+    Interface->u.QueryVideoMemory.contiguousPhysName = gcmPTR2INT32(device->contiguousPhysical);
 
     /* Success. */
     gcmkFOOTER_NO();
@@ -224,11 +224,11 @@ gckKERNEL_UnmapMemory(
 **      gctBOOL InUserSpace
 **          gcvTRUE to map the memory into the user space.
 **
-**      gctUINT32 Address
-**          Hardware specific memory address.
+**      gcePOOL Pool
+**          Specify pool type.
 **
-**      gctUINT32 Pid
-**          Process ID of the current process.
+**      gctUINT32 Offset
+**          Offset to pool start.
 **
 **      gctUINT32 Bytes
 **          Number of bytes to map.
@@ -243,38 +243,25 @@ gceSTATUS
 gckKERNEL_MapVideoMemory(
     IN gckKERNEL Kernel,
     IN gctBOOL InUserSpace,
-    IN gctUINT32 Address,
-    IN gctUINT32 Pid,
+    IN gcePOOL Pool,
+    IN gctUINT32 Offset,
     IN gctUINT32 Bytes,
     OUT gctPOINTER * Logical
     )
 {
-    gctUINT32 baseAddress = 0;
-    off64_t offset;
+    gctUINT32 pid;
 
-    gcmkHEADER_ARG("Kernel=0x%x InUserSpace=%d Address=%08x",
-                   Kernel, InUserSpace, Address);
+    gcmkHEADER_ARG("Kernel=%p InUserSpace=%d Pool=%d Offset=%X Bytes=%X",
+                   Kernel, InUserSpace, Pool, Offset, Bytes);
 
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(Kernel, gcvOBJ_KERNEL);
 
-    if (Kernel->core == gcvCORE_VG)
-    {
-        offset = (off64_t)(Address) - (off64_t)drv_mempool_get_basePAddress();
-    }
-    else
-    {
-        if (Kernel->hardware->mmuVersion == 0)
-        {
-            gcmkVERIFY_OK(gckOS_GetBaseAddress(Kernel->os, &baseAddress));
-        }
+    gckOS_GetProcessID(&pid);
 
-        offset = (off64_t)(Address + baseAddress) - (off64_t)drv_mempool_get_basePAddress();
-    }
-
-    *Logical = (gctPOINTER)mmap64_peer(Pid, gcvNULL, Bytes,
+    *Logical = (gctPOINTER)mmap64_peer(pid, gcvNULL, Bytes,
             PROT_READ | PROT_WRITE | PROT_NOCACHE, MAP_SHARED | MAP_NOINIT,
-            drv_mempool_get_fileDescriptor(), offset);
+            drv_mempool_get_fileDescriptor(), Offset);
 
     if (*Logical == MAP_FAILED)
     {
@@ -354,14 +341,12 @@ gckKERNEL_UnmapVideoMemory(
 gceSTATUS
 gckKERNEL_Notify(
     IN gckKERNEL Kernel,
-    IN gceNOTIFY Notification,
-    IN gctBOOL Data
+    IN gceNOTIFY Notification
     )
 {
     gceSTATUS status;
 
-    gcmkHEADER_ARG("Kernel=%p Notification=%d Data=%d",
-                   Kernel, Notification, Data);
+    gcmkHEADER_ARG("Kernel=%p Notification=%d", Kernel, Notification);
 
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(Kernel, gcvOBJ_KERNEL);
@@ -372,10 +357,9 @@ gckKERNEL_Notify(
     case gcvNOTIFY_INTERRUPT:
         /* Process the interrupt. */
 #if COMMAND_PROCESSOR_VERSION > 1
-        status = gckINTERRUPT_Notify(Kernel->interrupt, Data);
+        status = gckINTERRUPT_Notify(Kernel->interrupt, 0);
 #else
-        status = gckHARDWARE_Interrupt(Kernel->hardware,
-                                       Data);
+        status = gckHARDWARE_Notify(Kernel->hardware);
 #endif
         break;
 
@@ -387,29 +371,4 @@ gckKERNEL_Notify(
     /* Success. */
     gcmkFOOTER();
     return status;
-}
-
-gceSTATUS
-gckKERNEL_QuerySettings(
-    IN gckKERNEL Kernel,
-    OUT gcsKERNEL_SETTINGS * Settings
-    )
-{
-    gckGALDEVICE device;
-
-    gcmkHEADER_ARG("Kernel=%p", Kernel);
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Kernel, gcvOBJ_KERNEL);
-    gcmkVERIFY_ARGUMENT(Settings != gcvNULL);
-
-    /* Extract the pointer to the gckGALDEVICE class. */
-    device = (gckGALDEVICE) Kernel->context;
-
-    /* Fill in signal. */
-    Settings->signal = -1;
-
-    /* Success. */
-    gcmkFOOTER_ARG("Settings->signal=%d", Settings->signal);
-    return gcvSTATUS_OK;
 }

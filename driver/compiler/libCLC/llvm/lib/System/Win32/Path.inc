@@ -251,13 +251,13 @@ Path::GetBitcodeLibraryPaths(std::vector<sys::Path>& Paths) {
 
 Path
 Path::GetLLVMDefaultConfigDir() {
-  // TODO: this isn't going to fly on Windows
+  // VIV:TODO: this isn't going to fly on Windows
   return Path("/etc/llvm");
 }
 
 Path
 Path::GetUserHomeDirectory() {
-  // TODO: Typical Windows setup doesn't define HOME.
+  // VIV:TODO: Typical Windows setup doesn't define HOME.
   char* home = gcvNULL;
   gcoOS_GetEnv(gcvNULL, "HOME", &home);
   if (home) {

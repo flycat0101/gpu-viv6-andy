@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -95,6 +95,7 @@ clScanSkipToEOL(
 	#define CL_SCAN_CHARCONSTANT()		T_CHARCONSTANT
 	#define CL_SCAN_STRING_LITERAL()	T_STRING_LITERAL
 	#define CL_SCAN_OPERATOR(type)		(type)
+	#define CL_SCAN_SPECIAL_OPERATOR(extension, type)	(type)
 	#define CL_SCAN_FIELD_SELECTION()	T_FIELD_SELECTION
 
 #else
@@ -140,6 +141,9 @@ clScanSkipToEOL(
 
 	#define CL_SCAN_OPERATOR(type)		\
 		clScanOperator(Compiler, CurrentLineNo, CurrentStringNo, yytext, type, Token)
+
+	#define CL_SCAN_SPECIAL_OPERATOR(extension, type)		\
+		clScanSpecialOperator(Compiler, extension, CurrentLineNo, CurrentStringNo, yytext, type, Token)
 
 	#define CL_SCAN_FIELD_SELECTION()	\
 		clScanFieldSelection(Compiler, CurrentLineNo, CurrentStringNo, yytext, Token)
@@ -272,6 +276,7 @@ file_name                                       {string_literal}|[^ \t\n]+
 "^="						{ DUMP_SOURCE(); return CL_SCAN_OPERATOR(T_XOR_ASSIGN); }
 "|="						{ DUMP_SOURCE(); return CL_SCAN_OPERATOR(T_OR_ASSIGN); }
 "-="						{ DUMP_SOURCE(); return CL_SCAN_OPERATOR(T_SUB_ASSIGN); }
+"!<"						{ DUMP_SOURCE(); return CL_SCAN_SPECIAL_OPERATOR(clvEXTENSION_VASM, T_ASM_OPND_BRACKET); }
 
 "("						{ DUMP_SOURCE(); return CL_SCAN_OPERATOR('('); }
 ")"						{ DUMP_SOURCE(); return CL_SCAN_OPERATOR(')'); }

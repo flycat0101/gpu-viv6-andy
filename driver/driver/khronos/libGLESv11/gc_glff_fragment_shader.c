@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -195,10 +195,15 @@ static gctUINT16 _AllocateTemp(
     )
 {
     gctUINT16 result;
+
     gcmHEADER_ARG("ShaderControl=0x%x", ShaderControl);
     gcmASSERT(ShaderControl->rLastAllocated < 65535);
+
     result = ++ShaderControl->rLastAllocated;
-    ShaderControl->i->shader->_tempRegCount = ShaderControl->rLastAllocated + 1;
+
+    gcSHADER_NewTempRegs(ShaderControl->i->shader, 1, gcSHADER_FLOAT_X4);
+    gcmASSERT(GetShaderTempRegCount(ShaderControl->i->shader) == (gctUINT)ShaderControl->rLastAllocated + 1);
+
     gcmFOOTER_ARG("return=%u", result);
     return result;
 }
@@ -371,11 +376,11 @@ static gceSTATUS _Set_uTexColor(
         vector += 4;
     }
 
-    status = gcUNIFORM_SetFracValue(
+    status = glfUtilUniformSetValue(
         Uniform,
         Context->texture.pixelSamplers,
         Context->currProgram->programState.hints,
-        valueArray
+        (gctPOINTER)valueArray
         );
 
     gcmFOOTER();
@@ -404,11 +409,11 @@ static gceSTATUS _Set_uTexCombScale(
         vector += 4;
     }
 
-    status = gcUNIFORM_SetFracValue(
+    status = glfUtilUniformSetValue(
         Uniform,
         Context->texture.pixelSamplers,
         Context->currProgram->programState.hints,
-        valueArray
+        (gctPOINTER)valueArray
         );
 
     gcmFOOTER();
@@ -769,7 +774,7 @@ static gceSTATUS _Using_vColor(
         1,
         gcvFALSE,
         &glmATTRIBUTE_WRAP_INDEXED(FS, vColor0, InputIndex),
-        gcvFALSE,
+        gcvTRUE,
         shadingMode
         );
 
@@ -1117,7 +1122,7 @@ static gceSTATUS _GetInitialColor(
                 /* if (face == 1) goto lblFrontFace. */
                 glmOPCODE_BRANCH(JMP, EQUAL, lblFrontFace);
                     glmVARYING(FS, vFace, XXXX);
-                    glmCONST(1);
+                    glmCONST(1.0);
             }
 
             /* If the front face specified as counterclockwise (GL_CCW),
@@ -1127,7 +1132,7 @@ static gceSTATUS _GetInitialColor(
                 /* if (face == 1) goto lblFrontFace. */
                 glmOPCODE_BRANCH(JMP, EQUAL, lblFrontFace);
                     glmVARYING(FS, vFace, XXXX);
-                    glmCONST(0);
+                    glmCONST(0.0);
             }
 
             {

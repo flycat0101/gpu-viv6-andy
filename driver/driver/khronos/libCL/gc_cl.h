@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -74,6 +74,7 @@ typedef struct _cl_command *    clsCommand_PTR;
 typedef struct _cl_argument *   clsArgument_PTR;
 typedef struct _cl_event_callback * clsEventCallback_PTR;
 typedef struct _cl_image_header * clsImageHeader_PTR;
+typedef struct _cl_src_argument * clsSrcArgument_PTR;
 
 /* Mismatched types between OpenCL and internal gct types. */
 
@@ -210,7 +211,6 @@ extern const gctSTRING clgEmptyStr;
 #else
 #define __CL_INLINE static __inline
 #endif
-
 #ifdef __cplusplus
 }
 #endif

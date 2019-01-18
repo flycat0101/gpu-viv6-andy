@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -34,10 +34,8 @@ enum
     __GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE,
     __GL_QUERY_XFB_PRIMITIVES_WRITTEN,
     __GL_QUERY_PRIMITIVES_GENERATED,
-#ifdef OPENGL40
     __GL_QUERY_OCCLUSION,
     __GL_QUERY_TIME_ELAPSED,
-#endif
     __GL_QUERY_LAST
 };
 

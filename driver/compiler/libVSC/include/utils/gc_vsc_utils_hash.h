@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -61,6 +61,18 @@ typedef VSC_UNI_LIST VSC_HASH_NODE_LIST;
 #define HNLST_GET_FIRST_HASH_NODE(pHNList)     CAST_ULN_2_HND(vscUNILST_GetHead((pHNList)))
 #define HNLST_REMOVE_HASH_NODE(pHNList, pHnd)  vscUNILST_Remove((pHNList), CAST_HND_2_ULN((pHnd)))
 
+/* Hash search */
+typedef struct _SEARCH_TIME
+{
+    gctINT*                   searchTimesArray;
+    gctINT                    searchTotal;
+    gctINT                    searchSucceed;
+    gctINT                    searchFailed;
+    gctINT                    searchMostTimes;
+    gctINT                    searchMostCount;
+    gctINT                    maxSearchTimes;
+}SEARCH_TIME;
+
 /* Hash table */
 typedef struct _VSC_HASH_TABLE
 {
@@ -69,11 +81,13 @@ typedef struct _VSC_HASH_TABLE
     VSC_HASH_NODE_LIST*       pTable;
     gctINT                    tableSize;
     gctUINT                   itemCount;
+    SEARCH_TIME*              searchTime;
 
     /* What type of MM are this hash table built on? */
     VSC_MM*                   pMM;
 }VSC_HASH_TABLE;
 
+#define HTBL_MAX_SEARCH_TIMES(pHTAB)        (pHTAB->searchTime->maxSearchTimes)
 #define HTBL_GET_TABLE_SIZE(pHTAB)          ((pHTAB) ? (pHTAB)->tableSize : 0)
 #define HTBL_GET_ITEM_COUNT(pHTAB)          ((pHTAB) ? (pHTAB)->itemCount : 0)
 
@@ -84,6 +98,13 @@ void vscHTBL_Initialize(VSC_HASH_TABLE* pHT, VSC_MM* pMM, PFN_VSC_HASH_FUNC pfnH
                         PFN_VSC_KEY_CMP pfnKeyCmp, gctINT tableSize);
 void vscHTBL_Destroy(VSC_HASH_TABLE* pHT);
 void vscHTBL_Finalize(VSC_HASH_TABLE* pHT);
+VSC_ErrCode vscHTBL_CreateOrInitialize(
+    IN     VSC_MM*           pMM,
+    IN OUT VSC_HASH_TABLE ** ppHT,
+    IN PFN_VSC_HASH_FUNC     pfnHashFunc,
+    IN PFN_VSC_KEY_CMP       pfnKeyCmp,
+    IN gctINT                tableSize
+    );
 
 /* Make table empty */
 void vscHTBL_Reset(VSC_HASH_TABLE *pHT);
@@ -134,6 +155,7 @@ VSC_DIRECT_HNODE_PAIR vscHTBLIterator_DirectLast(VSC_HASH_ITERATOR *);
 
 /* Common hash functions are defined here */
 gctUINT vscHFUNC_Default(const void *);
+gctUINT vscHFUNC_DefaultPtr(const void *);
 gctUINT vscHFUNC_String(const void *); /* For string */
 
 /* Common hash key compare functions are defined here */

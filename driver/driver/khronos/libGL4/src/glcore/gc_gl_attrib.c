@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -117,12 +117,7 @@ GLvoid APIENTRY __glim_ClearIndex(__GLcontext *gc, GLfloat val)
 
 GLvoid APIENTRY __glim_ClearDepth(__GLcontext *gc, GLdouble z)
 {
-    __gles_ClearDepthf(gc, (GLfloat)z);
-}
-
-GLvoid APIENTRY __glim_DepthRange(__GLcontext *gc, GLdouble zNear, GLdouble zFar)
-{
-    __gles_DepthRange(gc, (GLfloat)zNear, (GLfloat)zFar);
+    __glim_ClearDepthf(gc, (GLfloat)z);
 }
 
 GLvoid APIENTRY __glim_IndexMask(__GLcontext *gc, GLuint mask)

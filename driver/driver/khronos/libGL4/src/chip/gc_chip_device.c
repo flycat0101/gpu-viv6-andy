@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -442,7 +442,7 @@ __glDpInitialize(
     deviceEntry->devSetPixelFormat = __glDpSetPixelFormat;
 #endif
 
-#if defined(OPENGL40)
+#ifdef OPENGL40
     gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
 #endif
 

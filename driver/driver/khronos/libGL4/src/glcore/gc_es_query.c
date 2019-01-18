@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -318,6 +318,9 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
     case GL_CONTEXT_FLAGS:
         *ip++ = gc->imports.contextFlags;
         break;
+    case GL_CONTEXT_PROFILE_MASK:
+        *ip++ = gc->imports.coreProfile ? GL_CONTEXT_CORE_PROFILE_BIT : GL_CONTEXT_COMPATIBILITY_PROFILE_BIT;
+        break;
     case GL_ALPHA_TEST:
     case GL_COLOR_MATERIAL:
     case GL_FOG:
@@ -416,7 +419,7 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
     case GL_POLYGON_OFFSET_FILL:
     case GL_SAMPLE_MASK:
     case GL_SAMPLE_SHADING_OES:
-        *bp++ = __gles_IsEnabled(gc, sq);
+        *bp++ = gc->immedModeDispatch.IsEnabled(gc, sq);
         break;
 
     case GL_MAX_3D_TEXTURE_SIZE:
@@ -941,30 +944,6 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
     case GL_DEPTH_BIAS:
         *fp++ = gc->state.pixel.transferMode.d_bias;
         break;
-    case GL_POST_CONVOLUTION_RED_SCALE:
-        *fp++ = gc->state.pixel.transferMode.postConvolutionScale.r;
-        break;
-    case GL_POST_CONVOLUTION_GREEN_SCALE:
-        *fp++ = gc->state.pixel.transferMode.postConvolutionScale.g;
-        break;
-    case GL_POST_CONVOLUTION_BLUE_SCALE:
-        *fp++ = gc->state.pixel.transferMode.postConvolutionScale.b;
-        break;
-    case GL_POST_CONVOLUTION_ALPHA_SCALE:
-        *fp++ = gc->state.pixel.transferMode.postConvolutionScale.a;
-        break;
-    case GL_POST_CONVOLUTION_RED_BIAS:
-        *fp++ = gc->state.pixel.transferMode.postConvolutionBias.r;
-        break;
-    case GL_POST_CONVOLUTION_GREEN_BIAS:
-        *fp++ = gc->state.pixel.transferMode.postConvolutionBias.g;
-        break;
-    case GL_POST_CONVOLUTION_BLUE_BIAS:
-        *fp++ = gc->state.pixel.transferMode.postConvolutionBias.b;
-        break;
-    case GL_POST_CONVOLUTION_ALPHA_BIAS:
-        *fp++ = gc->state.pixel.transferMode.postConvolutionBias.a;
-        break;
     case GL_ZOOM_X:
         *fp++ = gc->state.pixel.transferMode.zoomX;
         break;
@@ -1207,14 +1186,6 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
     case GL_FOG_COORDINATE_ARRAY_BUFFER_BINDING:
         *ip++ = gc->vertexArray.boundVAO->vertexArray.attributeBinding[__GL_VARRAY_FOGCOORD_INDEX].boundArrayName;
         break;
-/* lan : disable it */
-/*
-#if GL_ATI_element_array
-    case GL_ELEMENT_ARRAY_TYPE_ATI:
-        *ip++ = gc->clientState.vertexArray.elementType;
-        break;
-#endif
-*/
 #if GL_ARB_texture_rectangle
     case GL_TEXTURE_BINDING_RECTANGLE_ARB:
         index = gc->state.texture.activeTexIndex;
@@ -1255,6 +1226,8 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *ip++ = gc->state.raster.clampReadColor;
         break;
 #endif
+    case GL_SAMPLE_ALPHA_TO_ONE:
+        *bp++ = gc->state.multisample.alphaToOne;
 #endif
     case GL_PACK_ROW_LENGTH:
         *ip++ = gc->clientState.pixel.packModes.lineLength;
@@ -2110,7 +2083,7 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
 
 }
 
-GLvoid GL_APIENTRY __gles_GetFloatv(__GLcontext *gc, GLenum pname, GLfloat* params)
+GLvoid GL_APIENTRY __glim_GetFloatv(__GLcontext *gc, GLenum pname, GLfloat* params)
 {
     __GL_HEADER();
 
@@ -2119,7 +2092,7 @@ GLvoid GL_APIENTRY __gles_GetFloatv(__GLcontext *gc, GLenum pname, GLfloat* para
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetIntegerv(__GLcontext *gc, GLenum pname, GLint* params)
+GLvoid GL_APIENTRY __glim_GetIntegerv(__GLcontext *gc, GLenum pname, GLint* params)
 {
     __GL_HEADER();
 
@@ -2128,7 +2101,7 @@ GLvoid GL_APIENTRY __gles_GetIntegerv(__GLcontext *gc, GLenum pname, GLint* para
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetBooleanv(__GLcontext *gc, GLenum pname, GLboolean* params)
+GLvoid GL_APIENTRY __glim_GetBooleanv(__GLcontext *gc, GLenum pname, GLboolean* params)
 {
     __GL_HEADER();
 
@@ -2137,7 +2110,7 @@ GLvoid GL_APIENTRY __gles_GetBooleanv(__GLcontext *gc, GLenum pname, GLboolean* 
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetInteger64v(__GLcontext *gc, GLenum pname, GLint64* params)
+GLvoid GL_APIENTRY __glim_GetInteger64v(__GLcontext *gc, GLenum pname, GLint64* params)
 {
     __GL_HEADER();
 
@@ -2458,7 +2431,7 @@ __GL_INLINE GLvoid __glDoIndexedGet(__GLcontext *gc, GLenum target, GLint type, 
     }
 }
 
-GLvoid GL_APIENTRY __gles_GetIntegeri_v(__GLcontext *gc, GLenum target, GLuint index, GLint* data)
+GLvoid GL_APIENTRY __glim_GetIntegeri_v(__GLcontext *gc, GLenum target, GLuint index, GLint* data)
 {
     __GL_HEADER();
 
@@ -2467,7 +2440,7 @@ GLvoid GL_APIENTRY __gles_GetIntegeri_v(__GLcontext *gc, GLenum target, GLuint i
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetInteger64i_v(__GLcontext *gc, GLenum target, GLuint index, GLint64* data)
+GLvoid GL_APIENTRY __glim_GetInteger64i_v(__GLcontext *gc, GLenum target, GLuint index, GLint64* data)
 {
     __GL_HEADER();
 
@@ -2476,7 +2449,7 @@ GLvoid GL_APIENTRY __gles_GetInteger64i_v(__GLcontext *gc, GLenum target, GLuint
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetBooleani_v(__GLcontext *gc, GLenum target, GLuint index, GLboolean *data)
+GLvoid GL_APIENTRY __glim_GetBooleani_v(__GLcontext *gc, GLenum target, GLuint index, GLboolean *data)
 {
     __GL_HEADER();
 
@@ -2488,7 +2461,7 @@ GLvoid GL_APIENTRY __gles_GetBooleani_v(__GLcontext *gc, GLenum target, GLuint i
 /*
 ** Return the current error code.
 */
-GLenum GL_APIENTRY __gles_GetError(__GLcontext *gc)
+GLenum GL_APIENTRY __glim_GetError(__GLcontext *gc)
 {
     GLint error = gc->error;
 
@@ -2499,7 +2472,7 @@ GLenum GL_APIENTRY __gles_GetError(__GLcontext *gc)
 /*
 ** Return a pointer to the requested string
 */
-const GLubyte * GL_APIENTRY __gles_GetString(__GLcontext *gc, GLenum name)
+const GLubyte * GL_APIENTRY __glim_GetString(__GLcontext *gc, GLenum name)
 {
     switch (name)
     {
@@ -2509,8 +2482,6 @@ const GLubyte * GL_APIENTRY __gles_GetString(__GLcontext *gc, GLenum name)
         return (GLubyte*)gc->constants.renderer;
     case GL_VERSION:
         return (GLubyte*)gc->constants.version;
-    case GL_EXTENSIONS:
-        return(GLubyte*)gc->constants.extensions;
     case GL_SHADING_LANGUAGE_VERSION:
         return (GLubyte*)gc->constants.GLSLVersion;
 
@@ -2519,7 +2490,7 @@ const GLubyte * GL_APIENTRY __gles_GetString(__GLcontext *gc, GLenum name)
     }
 }
 
-const GLubyte* GL_APIENTRY __gles_GetStringi(__GLcontext *gc, GLenum name, GLuint index)
+const GLubyte* GL_APIENTRY __glim_GetStringi(__GLcontext *gc, GLenum name, GLuint index)
 {
     __GLextension *curExt;
     GLuint num = 0;
@@ -2587,7 +2558,7 @@ static GLvoid __glEndQuery(__GLcontext *gc, GLuint targetIndex)
     }
 }
 
-GLvoid GL_APIENTRY __gles_GenQueries(__GLcontext *gc, GLsizei n, GLuint *ids)
+GLvoid GL_APIENTRY __glim_GenQueries(__GLcontext *gc, GLsizei n, GLuint *ids)
 {
     GLint start, i;
 
@@ -2622,7 +2593,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DeleteQueries(__GLcontext *gc, GLsizei n, const GLuint *ids)
+GLvoid GL_APIENTRY __glim_DeleteQueries(__GLcontext *gc, GLsizei n, const GLuint *ids)
 {
     GLint i;
 
@@ -2642,12 +2613,12 @@ OnError:
     __GL_FOOTER();
 }
 
-GLboolean GL_APIENTRY __gles_IsQuery(__GLcontext *gc, GLuint id)
+GLboolean GL_APIENTRY __glim_IsQuery(__GLcontext *gc, GLuint id)
 {
     return (gcvNULL != __glGetObject(gc, gc->query.noShare, id));
 }
 
-GLvoid GL_APIENTRY __gles_BeginQuery(__GLcontext *gc, GLenum target, GLuint id)
+GLvoid GL_APIENTRY __glim_BeginQuery(__GLcontext *gc, GLenum target, GLuint id)
 {
     __GLqueryObject *queryObj;
     GLuint targetIndex, queryIdx;
@@ -2769,7 +2740,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_EndQuery(__GLcontext *gc, GLenum target)
+GLvoid GL_APIENTRY __glim_EndQuery(__GLcontext *gc, GLenum target)
 {
     GLuint targetIndex;
 
@@ -2802,7 +2773,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetQueryiv(__GLcontext *gc, GLenum target, GLenum pname, GLint *params)
+GLvoid GL_APIENTRY __glim_GetQueryiv(__GLcontext *gc, GLenum target, GLenum pname, GLint *params)
 {
     __GLqueryObject *queryObj;
     GLuint targetIndex ;
@@ -2909,7 +2880,7 @@ __GL_INLINE GLboolean __glGetQueryObjectiv(__GLcontext *gc, GLuint id, GLenum pn
     return GL_TRUE;
 }
 
-GLvoid GL_APIENTRY __gles_GetQueryObjectuiv(__GLcontext *gc, GLuint id, GLenum pname, GLuint *params)
+GLvoid GL_APIENTRY __glim_GetQueryObjectuiv(__GLcontext *gc, GLuint id, GLenum pname, GLuint *params)
 {
     GLint64 result = 0;
 
@@ -2997,7 +2968,7 @@ GLvoid __glFreeQueryState(__GLcontext *gc)
     __glFreeSharedObjectState(gc, gc->query.noShare);
 }
 
-GLenum GL_APIENTRY __gles_GetGraphicsResetStatus(__GLcontext *gc)
+GLenum GL_APIENTRY __glim_GetGraphicsResetStatus(__GLcontext *gc)
 {
     return (*gc->dp.getGraphicsResetStatus)(gc);
 }

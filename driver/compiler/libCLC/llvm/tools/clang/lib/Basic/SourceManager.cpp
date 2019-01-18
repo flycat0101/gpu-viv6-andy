@@ -824,7 +824,7 @@ static void ComputeLineNumbers(Diagnostic &Diag, ContentCache *FI,
   unsigned Offs = 0;
   while (1) {
     // Skip over the contents of the line.
-    // TODO: Vectorize this?  This is very performance sensitive for programs
+    // VIV:TODO: Vectorize this?  This is very performance sensitive for programs
     // with lots of diagnostics and in -E mode.
     const unsigned char *NextBuf = (const unsigned char *)Buf;
     while (*NextBuf != '\n' && *NextBuf != '\r' && *NextBuf != '\0')

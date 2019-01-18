@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -38,7 +38,9 @@ void vscERR_ReportError(
     /* Format the string. */
     vsprintf_s(message, VSC_MAX_ERR_WARNING_MSG_SIZE, format, arguments);
 #else
+#if !defined(__STRICT_ANSI__)
     vsnprintf(message, VSC_MAX_ERR_WARNING_MSG_SIZE, format, arguments);
+#endif
 #endif
 
     PrintMsg("%s:%d Error %d: %s\n", file, line, (gctUINT)errCode, message);
@@ -67,7 +69,9 @@ void vscERR_ReportWarning(
     /* Format the string. */
     vsprintf_s(message, VSC_MAX_ERR_WARNING_MSG_SIZE, format, arguments);
 #else
+#if !defined(__STRICT_ANSI__)
     vsnprintf(message, VSC_MAX_ERR_WARNING_MSG_SIZE, format, arguments);
+#endif
 #endif
 
     PrintMsg("%s:%d Warning %d: %s\n", file, line, (gctUINT)errCode, message);
@@ -128,7 +132,8 @@ gceSTATUS vscERR_CastErrCode2GcStatus(VSC_ErrCode errCode)
         return gcvSTATUS_INVALID_ARGUMENT;
     case VSC_ERR_LOCATION_ALIASED:
         return gcvSTATUS_LOCATION_ALIASED;
-
+    case VSC_ERR_UNSAT_LIB_SYMBOL:
+        return gcvSTATUS_LINK_LIB_ERROR;
     default:
         return (gceSTATUS)(-errCode);
     };
@@ -189,4 +194,5 @@ VSC_ErrCode vscERR_CastGcStatus2ErrCode(gceSTATUS Status)
         return VSC_ERR_INVALID_ARGUMENT;
     };
 }
+
 

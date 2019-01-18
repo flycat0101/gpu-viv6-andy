@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -50,6 +50,14 @@ typedef struct _clsBUILTIN_FUNCTION_INFO
 }
 clsBUILTIN_FUNCTION_INFO;
 
+typedef struct _clsBUILTIN_FUNCTION_INFO_NODE
+{
+    slsDLINK_NODE            node;
+    clsBUILTIN_FUNCTION_INFO builtinFuncInfo;
+    gctUINT                  crc32Value;
+}
+clsBUILTIN_FUNCTION_INFO_NODE;
+
 typedef struct _clsBUILTIN_DATATYPE_INFO
 {
     gctINT    type;
@@ -77,6 +85,12 @@ void
 
 gceSTATUS
 clLoadBuiltins(
+IN cloCOMPILER Compiler,
+IN cleSHADER_TYPE ShaderType
+);
+
+gceSTATUS
+clLoadGeneralBuiltIns(
 IN cloCOMPILER Compiler,
 IN cleSHADER_TYPE ShaderType
 );
@@ -121,6 +135,13 @@ IN gctUINT OperandCount,
 IN cloIR_CONSTANT * OperandConstants,
 OUT cloIR_CONSTANT * ResultConstant
 );
+
+clsNAME*
+clGetPreScaleGlobalIDCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN clsNAME *KernelFunc
+    );
 
 gceSTATUS
 clGenBaseMemoryAddressCode(

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -48,7 +48,7 @@ static void  tagBuiltInAttribute(IN __GLcontext * gc, IN gctINT index, IN gctCON
     }
 }
 
-static void vsInputMaskForBuiltIns(IN __GLcontext * gc, GLuint *vsInputMask)
+static void vsInputMaskForBuiltIns(IN __GLcontext * gc, GLuint64 *vsInputMask)
 {
     gctUINT i = 0;
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
@@ -62,7 +62,7 @@ static void vsInputMaskForBuiltIns(IN __GLcontext * gc, GLuint *vsInputMask)
     for( i = _GL_MULTITEX0_INDEX; i < _GL_BT_INDEX_MAX; i++ )
     {
         if ( chipCtx->builtinAttributeIndex[i] >=0 )
-            (*vsInputMask) |= (__GL_ONE_32 << (__GL_INPUT_TEX0_INDEX + i - _GL_MULTITEX0_INDEX));
+            (*vsInputMask) |= (__GL_ONE_64 << (__GL_INPUT_TEX0_INDEX + i - _GL_MULTITEX0_INDEX));
     }
 }
 #endif
@@ -172,14 +172,14 @@ __GLchipUniformTypeInfo g_typeInfos[] =
     {gcSHADER_FIXED_X4,                      GL_NONE,                                            0},                                /* 0x16 */
 
     /* For OCL. */
-//    {gcSHADER_IMAGE_1D_T,                    GL_NONE,                                            0},                                /* 0x17 */
-//    {gcSHADER_IMAGE_1D_BUFFER_T,             GL_NONE,                                            0},                                /* 0x18 */
-//    {gcSHADER_IMAGE_1D_ARRAY_T,              GL_NONE,                                            0},                                /* 0x19 */
+    {gcSHADER_IMAGE_1D_T,                    GL_NONE,                                            0},                                /* 0x17 */
+    {gcSHADER_IMAGE_1D_BUFFER_T,             GL_NONE,                                            0},                                /* 0x18 */
+    {gcSHADER_IMAGE_1D_ARRAY_T,              GL_NONE,                                            0},                                /* 0x19 */
     {gcSHADER_IMAGE_2D,                      GL_NONE,                                            0},                                /* 0x1A */
-//    {gcSHADER_IMAGE_2D_ARRAY_T,              GL_NONE,                                            0},                                /* 0x1B */
+    {gcSHADER_IMAGE_2D_ARRAY_T,              GL_NONE,                                            0},                                /* 0x1B */
     {gcSHADER_IMAGE_3D,                      GL_NONE,                                            0},                                /* 0x1C */
-//    {gcSHADER_VIV_GENERIC_IMAGE_T,           GL_NONE,                                            0},                                /* 0x1D */
-    {gcSHADER_SAMPLER,                     GL_NONE,                                            0},                                /* 0x1E */
+    {gcSHADER_VIV_GENERIC_IMAGE_T,           GL_NONE,                                            0},                                /* 0x1D */
+    {gcSHADER_SAMPLER_T,                     GL_NONE,                                            0},                                /* 0x1E */
 
     {gcSHADER_FLOAT_2X3,                     GL_FLOAT_MAT2x3,                                    2*3*sizeof(GLfloat)},              /* 0x1F */
     {gcSHADER_FLOAT_2X4,                     GL_FLOAT_MAT2x4,                                    2*4*sizeof(GLfloat)},              /* 0x20 */
@@ -217,10 +217,10 @@ __GLchipUniformTypeInfo g_typeInfos[] =
     {gcSHADER_ISAMPLER_2D_MS_ARRAY,          GL_INT_SAMPLER_2D_MULTISAMPLE_ARRAY_OES,            1*sizeof(GLuint)},                 /* 0x3C */
     {gcSHADER_USAMPLER_2D_MS_ARRAY,          GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE_ARRAY_OES,   1*sizeof(GLuint)},                 /* 0x3D */
 
-    //{gcSHADER_IMAGE_2D,                      GL_IMAGE_2D,                                    4*sizeof(GLuint)},                     /* 0x3E */
+    {gcSHADER_IMAGE_2D,                      GL_IMAGE_2D,                                    4*sizeof(GLuint)},                     /* 0x3E */
     {gcSHADER_IIMAGE_2D,                     GL_INT_IMAGE_2D,                                    4*sizeof(GLuint)},                 /* 0x3F */
     {gcSHADER_UIMAGE_2D,                     GL_UNSIGNED_INT_IMAGE_2D,                           4*sizeof(GLuint)},                 /* 0x40 */
-    //{gcSHADER_IMAGE_3D,                      GL_IMAGE_3D,                                    4*sizeof(GLuint)},                     /* 0x41 */
+    {gcSHADER_IMAGE_3D,                      GL_IMAGE_3D,                                    4*sizeof(GLuint)},                     /* 0x41 */
     {gcSHADER_IIMAGE_3D,                     GL_INT_IMAGE_3D,                                    4*sizeof(GLuint)},                 /* 0x42 */
     {gcSHADER_UIMAGE_3D,                     GL_UNSIGNED_INT_IMAGE_3D,                           4*sizeof(GLuint)},                 /* 0x43 */
     {gcSHADER_IMAGE_CUBE,                    GL_IMAGE_CUBE,                                      4*sizeof(GLuint)},                 /* 0x44 */
@@ -229,12 +229,9 @@ __GLchipUniformTypeInfo g_typeInfos[] =
     {gcSHADER_IMAGE_2D_ARRAY,                GL_IMAGE_2D_ARRAY,                                  4*sizeof(GLuint)},                 /* 0x47 */
     {gcSHADER_IIMAGE_2D_ARRAY,               GL_INT_IMAGE_2D_ARRAY,                              4*sizeof(GLuint)},                 /* 0x48 */
     {gcSHADER_UIMAGE_2D_ARRAY,               GL_UNSIGNED_INT_IMAGE_2D_ARRAY,                     4*sizeof(GLuint)},                 /* 0x49 */
-//    {gcSHADER_VIV_GENERIC_GL_IMAGE,          GL_NONE,                                            4*sizeof(GLuint)},                 /* 0x4A */
+    {gcSHADER_VIV_GENERIC_GL_IMAGE,          GL_NONE,                                            4*sizeof(GLuint)},                 /* 0x4A */
 
     {gcSHADER_ATOMIC_UINT,                   GL_UNSIGNED_INT_ATOMIC_COUNTER,                     1*sizeof(GLuint)},                 /* 0x4B */
-    {gcSHADER_IMAGE_1D,                      GL_NONE,                                            0},
-    {gcSHADER_IMAGE_1D_ARRAY,                GL_NONE,                                            0},
-    {gcSHADER_IMAGE_1D_BUFFER,               GL_NONE,                                            0},
 
     /* GL_EXT_texture_cube_map_array */
     {gcSHADER_SAMPLER_CUBEMAP_ARRAY,         GL_SAMPLER_CUBE_MAP_ARRAY_EXT,                      1*sizeof(GLuint)},                 /* 0x4C */
@@ -261,7 +258,7 @@ __GLchipUniformTypeInfo g_typeInfos[] =
     {gcSHADER_IMAGE_BUFFER,                  GL_IMAGE_BUFFER_OES,                                4*sizeof(GLint)},                  /* 0x5E */
     {gcSHADER_IIMAGE_BUFFER,                 GL_INT_IMAGE_BUFFER_OES,                            4*sizeof(GLint)},                  /* 0x5F */
     {gcSHADER_UIMAGE_BUFFER,                 GL_UNSIGNED_INT_IMAGE_BUFFER_OES,                   4*sizeof(GLint)},                  /* 0x60 */
-//    {gcSHADER_VIV_GENERIC_GL_SAMPLER,        GL_NONE,                                            4*sizeof(GLint)},                  /* 0x61 */
+    {gcSHADER_VIV_GENERIC_GL_SAMPLER,        GL_NONE,                                            4*sizeof(GLint)},                  /* 0x61 */
 
     /* float16 */
     { gcSHADER_FLOAT16_X1,  GL_NONE,                       0},                                                                      /* 0x62 half2 */
@@ -373,34 +370,34 @@ __GLchipUniformTypeInfo g_typeInfos[] =
     { gcSHADER_UINT64_X8,    GL_NONE,                      0},                                                                      /* 0xB4 */
     { gcSHADER_UINT64_X16,   GL_NONE,                      0},                                                                      /* 0xB5 */
 
-    { gcSHADER_FLOAT64_X1,   GL_DOUBLE,                    sizeof(GLdouble)},                                                                      /* 0xB6 */
-    { gcSHADER_FLOAT64_X2,   GL_DOUBLE_VEC2,               2*sizeof(GLdouble)},                                                                      /* 0xB7 */
-    { gcSHADER_FLOAT64_X3,   GL_DOUBLE_VEC3,               3*sizeof(GLdouble)},                                                                      /* 0xB8 */
-    { gcSHADER_FLOAT64_X4,   GL_DOUBLE_VEC4,               4*sizeof(GLdouble)},                                                                      /* 0xB9 */
-    { gcSHADER_FLOAT64_2X2,  GL_DOUBLE_MAT2,               2*2*sizeof(GLdouble)},                                                                      /* 0xBA */
-    { gcSHADER_FLOAT64_3X3,  GL_DOUBLE_MAT3,               3*3*sizeof(GLdouble)},                                                                      /* 0xBB */
-    { gcSHADER_FLOAT64_4X4,  GL_DOUBLE_MAT4,               4*4*sizeof(GLdouble)},                                                                      /* 0xBC */
-    { gcSHADER_FLOAT64_2X3,  GL_DOUBLE_MAT2x3,             2*3*sizeof(GLdouble)},                                                                      /* 0xBD */
-    { gcSHADER_FLOAT64_2X4,  GL_DOUBLE_MAT2x4,             2*4*sizeof(GLdouble)},                                                                      /* 0xBE */
-    { gcSHADER_FLOAT64_3X2,  GL_DOUBLE_MAT3x2,             3*2*sizeof(GLdouble)},                                                                      /* 0xBF */
-    { gcSHADER_FLOAT64_3X4,  GL_DOUBLE_MAT3x4,             3*4*sizeof(GLdouble)},                                                                      /* 0xC0 */
-    { gcSHADER_FLOAT64_4X2,  GL_DOUBLE_MAT4x2,             4*2*sizeof(GLdouble)},                                                                      /* 0xC1 */
-    { gcSHADER_FLOAT64_4X3,  GL_DOUBLE_MAT4x3,             4*3*sizeof(GLdouble)},                                                                      /* 0xC2 */
+    { gcSHADER_FLOAT64_X1,   GL_FLOAT,                    sizeof(GLfloat)},                                                                      /* 0xB6 */
+    { gcSHADER_FLOAT64_X2,   GL_FLOAT_VEC2,               2*sizeof(GLfloat)},                                                                      /* 0xB7 */
+    { gcSHADER_FLOAT64_X3,   GL_FLOAT_VEC3,               3*sizeof(GLfloat)},                                                                      /* 0xB8 */
+    { gcSHADER_FLOAT64_X4,   GL_FLOAT_VEC4,               4*sizeof(GLfloat)},                                                                      /* 0xB9 */
+    { gcSHADER_FLOAT64_2X2,  GL_FLOAT_MAT2,               2*2*sizeof(GLfloat)},                                                                      /* 0xBA */
+    { gcSHADER_FLOAT64_3X3,  GL_FLOAT_MAT3,               3*3*sizeof(GLfloat)},                                                                      /* 0xBB */
+    { gcSHADER_FLOAT64_4X4,  GL_FLOAT_MAT4,               4*4*sizeof(GLfloat)},                                                                      /* 0xBC */
+    { gcSHADER_FLOAT64_2X3,  GL_FLOAT_MAT2x3,             2*3*sizeof(GLfloat)},                                                                      /* 0xBD */
+    { gcSHADER_FLOAT64_2X4,  GL_FLOAT_MAT2x4,             2*4*sizeof(GLfloat)},                                                                      /* 0xBE */
+    { gcSHADER_FLOAT64_3X2,  GL_FLOAT_MAT3x2,             3*2*sizeof(GLfloat)},                                                                      /* 0xBF */
+    { gcSHADER_FLOAT64_3X4,  GL_FLOAT_MAT3x4,             3*4*sizeof(GLfloat)},                                                                      /* 0xC0 */
+    { gcSHADER_FLOAT64_4X2,  GL_FLOAT_MAT4x2,             4*2*sizeof(GLfloat)},                                                                      /* 0xC1 */
+    { gcSHADER_FLOAT64_4X3,  GL_FLOAT_MAT4x3,             4*3*sizeof(GLfloat)},                                                                      /* 0xC2 */
     { gcSHADER_FLOAT64_X8,   GL_NONE,                      0},                                                                      /* 0xC3 */
     { gcSHADER_FLOAT64_X16,  GL_NONE,                      0},                                                                      /* 0xC4 */
 
-    /* OpenGL 4.0 types  TODO */
-    { gcSHADER_SAMPLER_2D_RECT,         GL_NONE,           0},
-    { gcSHADER_ISAMPLER_2D_RECT,        GL_NONE,           0},
-    { gcSHADER_USAMPLER_2D_RECT,        GL_NONE,           0},
-    { gcSHADER_SAMPLER_2D_RECT_SHADOW,  GL_NONE,           0},
-    { gcSHADER_ISAMPLER_1D_ARRAY,       GL_NONE,           0},
-    { gcSHADER_USAMPLER_1D_ARRAY,       GL_NONE,           0},
-    { gcSHADER_ISAMPLER_1D,             GL_NONE,           0},
-    { gcSHADER_USAMPLER_1D,             GL_NONE,           0},
-    { gcSHADER_SAMPLER_1D_SHADOW,       GL_NONE,           0},
+    /* OpenGL 4.0 types */
+    { gcSHADER_SAMPLER_2D_RECT,         GL_SAMPLER_2D_RECT,               1*sizeof(GLuint)},
+    { gcSHADER_ISAMPLER_2D_RECT,        GL_INT_SAMPLER_2D_RECT,           1*sizeof(GLuint)},
+    { gcSHADER_USAMPLER_2D_RECT,        GL_UNSIGNED_INT_SAMPLER_2D_RECT,  1*sizeof(GLuint)},
+    { gcSHADER_SAMPLER_2D_RECT_SHADOW,  GL_SAMPLER_2D_RECT_SHADOW,        1*sizeof(GLuint)},
+    { gcSHADER_ISAMPLER_1D_ARRAY,       GL_INT_SAMPLER_1D_ARRAY,          1*sizeof(GLuint)},
+    { gcSHADER_USAMPLER_1D_ARRAY,       GL_UNSIGNED_INT_SAMPLER_1D_ARRAY, 1*sizeof(GLuint)},
+    { gcSHADER_ISAMPLER_1D,             GL_INT_SAMPLER_1D,                1*sizeof(GLuint)},
+    { gcSHADER_USAMPLER_1D,             GL_UNSIGNED_INT_SAMPLER_1D,       1*sizeof(GLuint)},
+    { gcSHADER_SAMPLER_1D_SHADOW,       GL_SAMPLER_1D_SHADOW,             1*sizeof(GLuint)},
 
-    {gcSHADER_UNKONWN_TYPE,             GL_NONE,                                            0},
+    {gcSHADER_UNKONWN_TYPE,                  GL_NONE,                                            0},
 };
 /* compile-time assertion if the g_typeInfos is not the same length as gcSHADER_TYPE_COUNT */
 const gctINT _verify_gTypeInfo[sizeof(g_typeInfos)/sizeof(__GLchipUniformTypeInfo) == gcSHADER_TYPE_COUNT] = { 0 };
@@ -746,6 +743,42 @@ gcChipUtilTransposeMatrix(
 }
 
 __GL_INLINE void
+gcChipUtilCopyDoubleToFloat(
+    GLfloat *dst,
+    const GLdouble *src,
+    gctSIZE_T count
+    )
+{
+    gctSIZE_T i;
+    for (i = 0; i < count; i++)
+    {
+        dst[i] =  (GLfloat)src[i];  /* treat double as float for now */
+    }
+}
+
+__GL_INLINE void
+gcChipUtilTransposeDoubleMatrixToFloatMatrix(
+    GLfloat *dst,
+    const GLdouble *src,
+    gctSIZE_T count,
+    gctSIZE_T rows,
+    gctSIZE_T cols
+    )
+{
+    gctSIZE_T i, x, y;
+    for (i = 0; i < count; ++i)
+    {
+        for (x = 0; x < rows; ++x)
+        {
+            for (y = 0; y < cols; ++y)
+            {
+                dst[i * (rows * cols) + x * cols + y] = (GLfloat)src[i * (rows * cols) + y * rows + x];
+            }
+        }
+    }
+}
+
+__GL_INLINE void
 gcChipUtilInt2Float(
     GLfloat *dst,
     const GLint *src,
@@ -877,7 +910,7 @@ gcChipUtilFindUniformUsage(
         }
         else
         {
-            gcmASSERT(isImageType(parentUniform->u.type));
+            gcmASSERT(isOGLImageType(parentUniform->u.type));
             subUsage = __GL_CHIP_UNIFORM_SUB_USAGE_IMAGE_SIZE;
         }
     }
@@ -1272,6 +1305,26 @@ gcChipGetUniformArrayInfo(
     return entries;
 }
 
+static gctBOOL
+gcChipCheckUniformActive(
+    IN     __GLcontext *gc,
+    IN     __GLchipSLProgram *program,
+    IN     gcSHADER Shader,
+    IN     gcUNIFORM HalUniform
+    )
+{
+    gctBOOL isActive = gcvTRUE;
+
+    if (!HalUniform || isUniformImmediate(HalUniform) ||
+        (isUniformInactive(HalUniform) && HalUniform->location == -1 && !isUniformWithInitializer(HalUniform)))
+    {
+        isActive = gcvFALSE;
+    }
+
+
+    return isActive;
+}
+
 static GLuint
 gcChipCountUniforms(
     IN     __GLcontext *gc,
@@ -1305,8 +1358,7 @@ gcChipCountUniforms(
         gcmVERIFY_OK(gcSHADER_GetUniform(Shader, i, &uniform));
 
         /* Skip inactive and not located uniforms */
-        if (!uniform || isUniformImmediate(uniform) ||
-            (isUniformInactive(uniform) && uniform->location == -1))
+        if (!gcChipCheckUniformActive(gc, program, Shader, uniform))
         {
             continue;
         }
@@ -1591,8 +1643,7 @@ gcChipProcessUniforms(
         }
 
         /* Skip inactive and not located uniforms */
-        if (!uniform || isUniformImmediate(uniform) ||
-            (isUniformInactive(uniform) && uniform->location == -1))
+        if (!gcChipCheckUniformActive(gc, program, Shader, uniform))
         {
             continue;
         }
@@ -1809,6 +1860,20 @@ gcChipProcessUniforms(
             bytes = g_typeInfos[dataType].size * arraySize;
 
             slot->halUniform[stageIdx] = uniform;
+            slot->hasInitializerInShader[stageIdx] = isUniformWithInitializer(uniform);
+            if (slot->hasInitializerInShader[stageIdx])
+            {
+                /* The data is stored in the constant buffer. */
+                if (GetUniformOffset(uniform) >= 0)
+                {
+                    slot->initializerData = (gctUINT8*)(GetShaderConstantMemoryBuffer(Shader) + GetUniformOffset(uniform));
+                }
+                else
+                {
+                    slot->initializerData = (gctUINT8*)(GetUniformInitializer(uniform).f32_v16);
+                }
+
+            }
 
             if (!duplicate)
             {
@@ -4182,7 +4247,7 @@ gcChipMapLinkError(
 
     case gcvSTATUS_UNIFORM_MISMATCH:
         gcmONERROR(gcoOS_PrintStrSafe(logBuffer,
-            __GLSL_LOG_INFO_SIZE, &logOffset, "LinkShaders: Uniform mismatch between Vertex and Fragment.\n"));
+            __GLSL_LOG_INFO_SIZE, &logOffset, "LinkShaders: Uniform mismatch among linked shaders.\n"));
         break;
 
     case gcvSTATUS_TOO_MANY_SHADERS:
@@ -4192,7 +4257,7 @@ gcChipMapLinkError(
 
     case gcvSTATUS_SHADER_VERSION_MISMATCH:
         gcmONERROR(gcoOS_PrintStrSafe(logBuffer,
-            __GLSL_LOG_INFO_SIZE, &logOffset, "LinkShaders: Shader version mismatch between Vertex and Fragment.\n"));
+            __GLSL_LOG_INFO_SIZE, &logOffset, "LinkShaders: Shader version mismatch among linked shaders.\n"));
         break;
 
     case gcvSTATUS_TOO_MANY_INSTRUCTION:
@@ -4202,7 +4267,7 @@ gcChipMapLinkError(
 
     case gcvSTATUS_SSBO_MISMATCH:
         gcmONERROR(gcoOS_PrintStrSafe(logBuffer,
-            __GLSL_LOG_INFO_SIZE, &logOffset, "LinkShaders: SSBO mismatch between Vertex and Fragment.\n"));
+            __GLSL_LOG_INFO_SIZE, &logOffset, "LinkShaders: SSBO mismatch among linked shaders.\n"));
         break;
 
     case gcvSTATUS_TOO_MANY_OUTPUT:
@@ -4500,7 +4565,7 @@ gcChipProgramBuildBindingInfo(
                             **    is possible in OpenGL ES Shading Language 1.00 vertex shaders.
                             **
                             */
-                            if (!gcShader_IsES11Compiler(*pBinaries) && program->attribLinkage[binding->index + j])
+                            if (!gcSHADER_IsES11Compiler(*pBinaries) && program->attribLinkage[binding->index + j])
                             {
                                 gcmONERROR(gcoOS_PrintStrSafe(logBuffer, __GLSL_LOG_INFO_SIZE, &logOffset, "Binding for %s occupied.", input->name));
                                 gcmTRACE(gcvLEVEL_ERROR, "Binding for %s occupied.", binding->name);
@@ -5484,10 +5549,6 @@ gcChipSetUniformData(
     case gcSHADER_UINT_X2:
     case gcSHADER_UINT_X3:
     case gcSHADER_UINT_X4:
-    case gcSHADER_FLOAT64_X1:
-    case gcSHADER_FLOAT64_X2:
-    case gcSHADER_FLOAT64_X3:
-    case gcSHADER_FLOAT64_X4:
         if (g_typeInfos[halType].glType == type)
         {
 #if __GL_CHIP_PATCH_ENABLED
@@ -5507,6 +5568,31 @@ gcChipSetUniformData(
         {
             __GL_ERROR(GL_INVALID_OPERATION);
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+        break;
+
+    case gcSHADER_FLOAT64_X1:
+    case gcSHADER_FLOAT64_X2:
+    case gcSHADER_FLOAT64_X3:
+    case gcSHADER_FLOAT64_X4:
+#if __GL_CHIP_PATCH_ENABLED
+        if (program->progFlags.CTSMaxUBOSize &&
+            (uniform == program->indexUniform))
+        {
+            program->uboIndex = *(GLint*)values;
+            gcoOS_ZeroMemory(buf, count * bytes);
+        }
+        else
+#endif
+        {
+            if (g_typeInfos[halType].glType == type)
+            {
+                gcoOS_MemCopy(buf, values, count * bytes);
+            }
+            else
+            {
+                gcChipUtilCopyDoubleToFloat(buf, values, count * bytes / 4);
+            }
         }
         break;
 
@@ -5678,6 +5764,230 @@ gcChipSetUniformData(
         {
             __GL_ERROR(GL_INVALID_OPERATION);
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+        break;
+
+    case gcSHADER_FLOAT64_2X2:
+        if (g_typeInfos[halType].glType == type)
+        {
+            if (transpose)
+            {
+                gcChipUtilTransposeMatrix(buf, values, count, 2, 2);
+            }
+            else
+            {
+                gcoOS_MemCopy(buf, values, count * bytes);
+            }
+        }
+        else
+        {
+            if (transpose)
+            {
+                gcChipUtilTransposeDoubleMatrixToFloatMatrix(buf, values, count, 2, 2);
+            }
+            else
+            {
+                gcChipUtilCopyDoubleToFloat(buf, values, count * bytes / 4);
+            }
+        }
+        break;
+
+    case gcSHADER_FLOAT64_2X3:
+        if (g_typeInfos[halType].glType == type)
+        {
+            if (transpose)
+            {
+                gcChipUtilTransposeMatrix(buf, values, count, 2, 3);
+            }
+            else
+            {
+                gcoOS_MemCopy(buf, values, count * bytes);
+            }
+        }
+        else
+        {
+            if (transpose)
+            {
+                gcChipUtilTransposeDoubleMatrixToFloatMatrix(buf, values, count, 2, 3);
+            }
+            else
+            {
+                gcChipUtilCopyDoubleToFloat(buf, values, count * bytes / 4);
+            }
+        }
+        break;
+
+    case gcSHADER_FLOAT64_2X4:
+        if (g_typeInfos[halType].glType == type)
+        {
+            if (transpose)
+            {
+                gcChipUtilTransposeMatrix(buf, values, count, 2, 4);
+            }
+            else
+            {
+                gcoOS_MemCopy(buf, values, count * bytes);
+            }
+        }
+        else
+        {
+            if (transpose)
+            {
+                gcChipUtilTransposeDoubleMatrixToFloatMatrix(buf, values, count, 2, 4);
+            }
+            else
+            {
+                gcChipUtilCopyDoubleToFloat(buf, values, count * bytes / 4);
+            }
+        }
+        break;
+
+    case gcSHADER_FLOAT64_3X2:
+        if (g_typeInfos[halType].glType == type)
+        {
+            if (transpose)
+            {
+                gcChipUtilTransposeMatrix(buf, values, count, 3, 2);
+            }
+            else
+            {
+                gcoOS_MemCopy(buf, values, count * bytes);
+            }
+        }
+        else
+        {
+            if (transpose)
+            {
+                gcChipUtilTransposeDoubleMatrixToFloatMatrix(buf, values, count, 3, 2);
+            }
+            else
+            {
+                gcChipUtilCopyDoubleToFloat(buf, values, count * bytes / 4);
+            }
+        }
+        break;
+
+    case gcSHADER_FLOAT64_3X3:
+        if (g_typeInfos[halType].glType == type)
+        {
+            if (transpose)
+            {
+                gcChipUtilTransposeMatrix(buf, values, count, 3, 3);
+            }
+            else
+            {
+                gcoOS_MemCopy(buf, values, count * bytes);
+            }
+        }
+        else
+        {
+            if (transpose)
+            {
+                gcChipUtilTransposeDoubleMatrixToFloatMatrix(buf, values, count, 3, 3);
+            }
+            else
+            {
+                gcChipUtilCopyDoubleToFloat(buf, values, count * bytes / 4);
+            }
+        }
+        break;
+
+    case gcSHADER_FLOAT64_3X4:
+        if (g_typeInfos[halType].glType == type)
+        {
+            if (transpose)
+            {
+                gcChipUtilTransposeMatrix(buf, values, count, 3, 4);
+            }
+            else
+            {
+                gcoOS_MemCopy(buf, values, count * bytes);
+            }
+        }
+        else
+        {
+            if (transpose)
+            {
+                gcChipUtilTransposeDoubleMatrixToFloatMatrix(buf, values, count, 3, 4);
+            }
+            else
+            {
+                gcChipUtilCopyDoubleToFloat(buf, values, count * bytes / 4);
+            }
+        }
+        break;
+
+    case gcSHADER_FLOAT64_4X2:
+        if (g_typeInfos[halType].glType == type)
+        {
+            if (transpose)
+            {
+                gcChipUtilTransposeMatrix(buf, values, count, 4, 2);
+            }
+            else
+            {
+                gcoOS_MemCopy(buf, values, count * bytes);
+            }
+        }
+        else
+        {
+            if (transpose)
+            {
+                gcChipUtilTransposeDoubleMatrixToFloatMatrix(buf, values, count, 4, 2);
+            }
+            else
+            {
+                gcChipUtilCopyDoubleToFloat(buf, values, count * bytes / 4);
+            }
+        }
+
+    case gcSHADER_FLOAT64_4X3:
+        if (g_typeInfos[halType].glType == type)
+        {
+            if (transpose)
+            {
+                gcChipUtilTransposeMatrix(buf, values, count, 4, 3);
+            }
+            else
+            {
+                gcoOS_MemCopy(buf, values, count * bytes);
+            }
+        }
+        else
+        {
+            if (transpose)
+            {
+                gcChipUtilTransposeDoubleMatrixToFloatMatrix(buf, values, count, 4, 3);
+            }
+            else
+            {
+                gcChipUtilCopyDoubleToFloat(buf, values, count * bytes / 4);
+            }
+        }
+        break;
+
+    case gcSHADER_FLOAT64_4X4:
+        if (g_typeInfos[halType].glType == type)
+        {
+            if (transpose)
+            {
+                gcChipUtilTransposeMatrix(buf, values, count, 4, 4);
+            }
+            else
+            {
+                gcoOS_MemCopy(buf, values, count * bytes);
+            }
+        }
+        else
+        {
+            if (transpose)
+            {
+                gcChipUtilTransposeDoubleMatrixToFloatMatrix(buf, values, count, 4, 4);
+            }
+            else
+            {
+                gcChipUtilCopyDoubleToFloat(buf, values, count * bytes / 4);
+            }
         }
         break;
 
@@ -5888,6 +6198,10 @@ gcChipSetUniformData(
         gcChipDumpGLUniform(uniform, uniform->dataType, count, index);
     }
 
+#ifdef OPENGL40
+    uniform->usrDef = GL_TRUE;
+#endif
+
 OnError:
     gcmFOOTER();
     return status;
@@ -5955,8 +6269,16 @@ gcChipUniformMapStorage(
     if (ubIndex == -1)
     {
         /* If not from named UB, they must have CPU memory allocated for storage */
-        GL_ASSERT(uniform->data);
-        data = uniform->data;
+        if (uniform->initializerData && !uniform->usrDef)
+        {
+            data = uniform->initializerData;
+        }
+        else
+        {
+            data = uniform->data;
+        }
+
+        GL_ASSERT(data);
     }
     else
     {
@@ -6606,7 +6928,7 @@ gcChipLTCStoreValueToDummyUniform(
     /* make sure the table was not broken due to definition change */
     gcmASSERT(g_typeInfos[glUniform->dataType].halType == glUniform->dataType);
 
-    if (Value->elementType == gcSL_FLOAT)
+    if (Value->elementType == gcSL_FLOAT || Value->elementType == gcSL_FLOAT64)
     {
         gctFLOAT f32[4] = {0.0};
         if (0 != (enable & gcSL_ENABLE_X))
@@ -6965,6 +7287,7 @@ gcChipFlushSingleUniform(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
+    gctUINT8* uniformData = (gctUINT8*)data;
 
     gcmHEADER_ARG("gc=0x%x program=0x%x uniform=0x%x data=0x%x", gc, program, uniform, data);
 
@@ -6990,6 +7313,15 @@ gcChipFlushSingleUniform(
         /* Uniforms of default UBO were stored closely in column major */
         matrixStride = columns * 4;
         arrayStride = matrixStride * rows;
+
+        /*
+        ** For those uniforms that haven't been set the data by user, check if they have a initializer in shader,
+        ** if so, find this initializer and use it as the data.
+        */
+        if (!uniform->usrDef && uniform->initializerData != gcvNULL)
+        {
+            uniformData = uniform->initializerData;
+        }
 
         for (stageIdx = 0; stageIdx < __GLSL_STAGE_LAST; ++stageIdx)
         {
@@ -7024,7 +7356,7 @@ gcChipFlushSingleUniform(
 
                 gcmONERROR(gcoSHADER_ProgramUniformEx(gcvNULL, uniform->stateAddress[stageIdx] + uniform->regOffset,
                                                       columns, rows, arraySize, gcvFALSE, matrixStride,
-                                                      arrayStride, data, convert, GetUniformShaderKind(halUniform)));
+                                                      arrayStride, uniformData, convert, GetUniformShaderKind(halUniform)));
                 if (gcmOPT_DUMP_UNIFORM())
                 {
                     gcChipDumpGLUniform(uniform, uniform->dataType, 1, 0);
@@ -7689,7 +8021,7 @@ __glChipLinkProgram(
 
         if (patchedSrcs[stage])
         {
-            __GLshaderObject *shaderObj = programObject->programInfo.attachedShader[stage];
+            __GLshaderObject *shaderObj = programObject->programInfo.attachedShader[stage]->shader;
 
             /* Recompile the patched shaders. */
             (*chipCtx->pfCompile)(shaderTypes[stage],
@@ -7706,8 +8038,8 @@ __glChipLinkProgram(
     if (programObject->programInfo.attachedShader[__GLSL_STAGE_VS] != gcvNULL &&
         programObject->programInfo.attachedShader[__GLSL_STAGE_FS] != gcvNULL)
     {
-        gcSHADER_CheckClipW(programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source,
-                            programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source,
+        gcSHADER_CheckClipW(programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.source,
+                            programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source,
                             &chipCtx->clipW);
     }
 #endif
@@ -7731,37 +8063,57 @@ __glChipLinkProgram(
     gcChipUtilsObjectAddRef(pgInstanceObj);
 
     /* Test if any of the shaders is dirty. */
-    for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
     {
-        __GLshaderObject *shaderObj = programObject->programInfo.attachedShader[stage];
-
-        if (shaderObj && shaderObj->shaderInfo.hBinary)
+        __GLshaderObjectList *next = gcvNULL;
+        __GLshaderObjectList *current = gcvNULL;
+        gctUINT shaderNum = 0;
+        gcSHADER binaries[__GLSL_STAGE_LAST][256];
+        for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
         {
-            if (masterPgInstance->binaries[stage] == gcvNULL)
+            gctUINT i = 0;
+            next = programObject->programInfo.attachedShader[stage];
+            if (next &&  next->shader)
             {
-                gcmONERROR(gcSHADER_Construct(shaderTypes[stage], &masterPgInstance->binaries[stage]));
+                shaderNum = 0;
+                while (next)
+                {
+                    current = next;
+                    next = current->next;
+                    gcmONERROR(gcSHADER_Construct(shaderTypes[stage], &binaries[stage][shaderNum]));
+                    gcmONERROR(gcSHADER_Copy(binaries[stage][shaderNum], (gcSHADER)current->shader->shaderInfo.hBinary));
+                    shaderNum++;
+                }
+                gcmONERROR(gcSHADER_MergeShader(shaderNum,binaries[stage],&masterPgInstance->binaries[stage]));
+                if (masterPgInstance->savedBinaries[stage] == gcvNULL)
+                {
+                    gcmONERROR(gcSHADER_Construct(shaderTypes[stage], &masterPgInstance->savedBinaries[stage]));
+                }
+                gcSHADER_Copy(masterPgInstance->savedBinaries[stage], masterPgInstance->binaries[stage]);
+                while (i < shaderNum)
+                {
+                    if(masterPgInstance->binaries[stage] != binaries[stage][i])
+                    {
+                        gcmONERROR(gcSHADER_Destroy(binaries[stage][i]));
+                    }
+                    i = i + 1;
+                }
             }
-            gcmONERROR(gcSHADER_Copy(masterPgInstance->binaries[stage], (gcSHADER)shaderObj->shaderInfo.hBinary));
-            if (masterPgInstance->savedBinaries[stage] == gcvNULL)
+            else
             {
-                gcmONERROR(gcSHADER_Construct(shaderTypes[stage], &masterPgInstance->savedBinaries[stage]));
-            }
-            gcmONERROR(gcSHADER_Copy(masterPgInstance->savedBinaries[stage], (gcSHADER)shaderObj->shaderInfo.hBinary));
-        }
-        else
-        {
-            if (masterPgInstance->binaries[stage])
-            {
-                gcmONERROR(gcSHADER_Destroy(masterPgInstance->binaries[stage]));
-                masterPgInstance->binaries[stage] = gcvNULL;
-            }
-            if (masterPgInstance->savedBinaries[stage])
-            {
-                gcmONERROR(gcSHADER_Destroy(masterPgInstance->savedBinaries[stage]));
-                masterPgInstance->savedBinaries[stage] = gcvNULL;
+                if (masterPgInstance->binaries[stage])
+                {
+                    gcmONERROR(gcSHADER_Destroy(masterPgInstance->binaries[stage]));
+                    masterPgInstance->binaries[stage] = gcvNULL;
+                }
+                if (masterPgInstance->savedBinaries[stage])
+                {
+                    gcmONERROR(gcSHADER_Destroy(masterPgInstance->savedBinaries[stage]));
+                    masterPgInstance->savedBinaries[stage] = gcvNULL;
+                }
             }
         }
     }
+
 
     if (programObject->xfbVaryingNum)
     {
@@ -7911,7 +8263,7 @@ __glChipLinkProgram(
         attribLinkage =  ((__GLchipSLProgram *)programObject->privateData)->attribLinkage[i];
         if (attribLinkage)
         {
-            programObject->bindingInfo.vsInputMask |= 1 << (i + __GL_VARRAY_ATT0_INDEX);
+            programObject->bindingInfo.vsInputMask |= __GL_ONE_64 << (i + __GL_VARRAY_ATT0_INDEX);
         }
     }
 #endif
@@ -8014,8 +8366,8 @@ __glChipUseProgram(
         programObject->programInfo.attachedShader[__GLSL_STAGE_VS] &&
         programObject->programInfo.attachedShader[__GLSL_STAGE_FS])
     {
-        gcSHADER vertShader = (gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.hBinary;
-        gcSHADER fragShader = (gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.hBinary;
+        gcSHADER vertShader = (gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.hBinary;
+        gcSHADER fragShader = (gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.hBinary;
         __glChipProfilerSet(gc, GL3_PROGRAM_IN_USE_BEGIN, programObject);
         __glChipProfilerSet(gc, GL3_PROGRAM_VERTEX_SHADER, vertShader);
         __glChipProfilerSet(gc, GL3_PROGRAM_FRAGMENT_SHADER, fragShader);
@@ -8828,8 +9180,29 @@ __glChipGetAttributeLocation(
                 gcmIS_SUCCESS(gcoOS_StrNCmp(name, program->attribLocation[attribLinkage->attribLocation].pInput->name, nameLen))
                 )
             {
+                GLuint comNum = 1;
+                switch (program->attribLocation[attribLinkage->attribLocation].pInput->type)
+                {
+                case gcSHADER_FLOAT_2X2:
+                case gcSHADER_FLOAT_2X3:
+                case gcSHADER_FLOAT_2X4:
+                    comNum = 2;
+                    break;
+                case gcSHADER_FLOAT_3X2:
+                case gcSHADER_FLOAT_3X3:
+                case gcSHADER_FLOAT_3X4:
+                    comNum = 3;
+                    break;
+                case gcSHADER_FLOAT_4X2:
+                case gcSHADER_FLOAT_4X3:
+                case gcSHADER_FLOAT_4X4:
+                    comNum = 4;
+                    break;
+                default:
+                    break;
+                }
                 gcmFOOTER_ARG("return=%d", i);
-                return i + (GLuint)arrayIdx;
+                return i + (GLuint)(arrayIdx * comNum);
             }
         }
     }
@@ -8890,7 +9263,7 @@ __glChipGetActiveAttribute(
 
     if (size)
     {
-        *size = 1;
+        *size = input->arraySize;
     }
 
     /* Convert type to GL enumeration. */
@@ -9325,6 +9698,18 @@ __glChipGetActiveUniformBlockiv(
             break;
         case GL_UNIFORM_BLOCK_REFERENCED_BY_FRAGMENT_SHADER:
             *params = ub->halUB[__GLSL_STAGE_FS] ? 1 : 0;
+            break;
+
+        case GL_UNIFORM_BLOCK_REFERENCED_BY_TESS_CONTROL_SHADER:
+            *params = ub->halUB[__GLSL_STAGE_TCS] ? 1 : 0;
+            break;
+
+        case GL_UNIFORM_BLOCK_REFERENCED_BY_TESS_EVALUATION_SHADER:
+            *params = ub->halUB[__GLSL_STAGE_TES] ? 1 : 0;
+            break;
+
+        case GL_UNIFORM_BLOCK_REFERENCED_BY_GEOMETRY_SHADER:
+            *params = ub->halUB[__GLSL_STAGE_GS] ? 1 : 0;
             break;
 
         default:
@@ -10591,149 +10976,334 @@ gcChipFlushBuiltinUniforms(
             break;
 #ifdef OPENGL40
         case __GL_CHIP_UNIFORM_USAGE_MODELVIEW:
-            for (y = 0; y < 4; y++) {
-                for (x = 0; x < 4; x++) {
-                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->matrix.matrix[y][x];
+            if (gc->globalDirtyState[__GL_DIRTY_ATTRS_3] & __GL_MODELVIEW_TRANSFORM_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                for (y = 0; y < 4; y++) {
+                    for (x = 0; x < 4; x++) {
+                        ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->matrix.matrix[y][x];
+                    }
                 }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_PROJECTION:
-            for (y = 0; y < 4; y++) {
-                for (x = 0; x < 4; x++) {
-                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.projection->matrix.matrix[y][x];
+            if (gc->globalDirtyState[__GL_DIRTY_ATTRS_3] & __GL_PROJECTION_TRANSFORM_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                for (y = 0; y < 4; y++) {
+                    for (x = 0; x < 4; x++) {
+                        ((GLfloat*)uniform->data)[4*y+x] = gc->transform.projection->matrix.matrix[y][x];
+                    }
                 }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_MVP:
-            for (y = 0; y < 4; y++) {
-                for (x = 0; x < 4; x++) {
-                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->mvp.matrix[y][x];
+            if (gc->globalDirtyState[__GL_DIRTY_ATTRS_3] & (__GL_PROJECTION_TRANSFORM_BIT | __GL_MODELVIEW_TRANSFORM_BIT))
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                for (y = 0; y < 4; y++) {
+                    for (x = 0; x < 4; x++) {
+                        ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->mvp.matrix[y][x];
+                    }
                 }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_MODELVIEW_INV:
-            for (y = 0; y < 4; y++) {
-                for (x = 0; x < 4; x++) {
-                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->inverse.matrix[y][x];
+            if (gc->globalDirtyState[__GL_DIRTY_ATTRS_3] & __GL_MODELVIEW_TRANSFORM_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                for (y = 0; y < 4; y++) {
+                    for (x = 0; x < 4; x++) {
+                        ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->inverse.matrix[y][x];
+                    }
                 }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_MODELVIEW_INVTRANS:
-            for (y = 0; y < 4; y++) {
-                for (x = 0; x < 4; x++) {
-                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->inverseTranspose.matrix[y][x];
+            if (gc->globalDirtyState[__GL_DIRTY_ATTRS_3] & __GL_MODELVIEW_TRANSFORM_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                for (y = 0; y < 4; y++) {
+                    for (x = 0; x < 4; x++) {
+                        ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->inverseTranspose.matrix[y][x];
+                    }
                 }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_NORMAL_SCALE:
+            if (gc->globalDirtyState[__GL_DIRTY_ATTRS_3] & __GL_RESCALENORMAL_ENDISABLE_BIT)
             {
-                GLfloat  scale = 0;
-                __GLtransform *tr = NULL;
-                tr = gc->transform.modelView;
-                scale = tr->matrix.matrix[1][3] * tr->matrix.matrix[1][3] +
-                    tr->matrix.matrix[2][3] * tr->matrix.matrix[2][3] +
-                    tr->matrix.matrix[3][3] * tr->matrix.matrix[3][3];
-                scale = (GLfloat)(1.0 / sqrt(scale));
-                *(GLfloat*)uniform->data = scale;
+                uniform->dirty = GL_TRUE;
             }
-            uniform->dirty = GL_TRUE;
+            if (uniform->dirty)
+            {
+                {
+                    GLfloat  scale = 0;
+                    __GLtransform *tr = NULL;
+                    tr = gc->transform.modelView;
+                    scale = tr->matrix.matrix[1][3] * tr->matrix.matrix[1][3] +
+                        tr->matrix.matrix[2][3] * tr->matrix.matrix[2][3] +
+                        tr->matrix.matrix[3][3] * tr->matrix.matrix[3][3];
+                    scale = (GLfloat)(1.0 / sqrt(scale));
+                    *(GLfloat*)uniform->data = scale;
+                }
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_POINT_SIZE:
-            *(GLfloat*)uniform->data = gc->state.point.requestedSize;
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_DIRTY_ATTRS_3] & __GL_POINTSIZE_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                *(GLfloat*)uniform->data = gc->state.point.requestedSize;
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_POINT_SIZE_MIN:
-            *(GLfloat*)uniform->data = gc->state.point.sizeMin;
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_DIRTY_ATTRS_3] & __GL_POINT_SIZE_MIN_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                *(GLfloat*)uniform->data = gc->state.point.sizeMin;
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_POINT_SIZE_MAX:
-            *(GLfloat*)uniform->data = gc->state.point.sizeMax;
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_DIRTY_ATTRS_3] & __GL_POINT_SIZE_MAX_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                *(GLfloat*)uniform->data = gc->state.point.sizeMax;
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_POINT_FADE_THRESHOLD_SIZE:
-            *(GLfloat*)uniform->data = gc->state.point.fadeThresholdSize;
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_DIRTY_ATTRS_3] & __GL_POINT_FADE_THRESHOLD_SIZE_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                *(GLfloat*)uniform->data = gc->state.point.fadeThresholdSize;
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_POINT_DISTANCE_CONST_ATTENU:
-            *(GLfloat*)uniform->data = gc->state.point.distanceAttenuation[0];
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_DIRTY_ATTRS_3] & __GL_POINT_DISTANCE_ATTENUATION_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                *(GLfloat*)uniform->data = gc->state.point.distanceAttenuation[0];
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_POINT_DISTANCE_LINEAR_ATTENU:
-            *(GLfloat*)uniform->data = gc->state.point.distanceAttenuation[1];
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_DIRTY_ATTRS_3] & __GL_POINT_DISTANCE_ATTENUATION_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                *(GLfloat*)uniform->data = gc->state.point.distanceAttenuation[1];
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_POINT_DISTANCE_QUADRATIC_ATTENU:
-            *(GLfloat*)uniform->data = gc->state.point.distanceAttenuation[2];
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_DIRTY_ATTRS_3] & __GL_POINT_DISTANCE_ATTENUATION_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                *(GLfloat*)uniform->data = gc->state.point.distanceAttenuation[2];
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_EMISSION:
-            ((GLfloat*)uniform->data)[0] = gc->state.light.front.emissive.r;
-            ((GLfloat*)uniform->data)[1] = gc->state.light.front.emissive.g;
-            ((GLfloat*)uniform->data)[2] = gc->state.light.front.emissive.b;
-            ((GLfloat*)uniform->data)[3] = gc->state.light.front.emissive.a;
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & __GL_MATERIAL_EMISSION_FRONT_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                ((GLfloat*)uniform->data)[0] = gc->state.light.front.emissive.r;
+                ((GLfloat*)uniform->data)[1] = gc->state.light.front.emissive.g;
+                ((GLfloat*)uniform->data)[2] = gc->state.light.front.emissive.b;
+                ((GLfloat*)uniform->data)[3] = gc->state.light.front.emissive.a;
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_DIFFUSE:
-            ((GLfloat*)uniform->data)[0] = gc->state.light.front.diffuse.r;
-            ((GLfloat*)uniform->data)[1] = gc->state.light.front.diffuse.g;
-            ((GLfloat*)uniform->data)[2] = gc->state.light.front.diffuse.b;
-            ((GLfloat*)uniform->data)[3] = gc->state.light.front.diffuse.a;
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & __GL_MATERIAL_DIFFUSE_FRONT_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                ((GLfloat*)uniform->data)[0] = gc->state.light.front.diffuse.r;
+                ((GLfloat*)uniform->data)[1] = gc->state.light.front.diffuse.g;
+                ((GLfloat*)uniform->data)[2] = gc->state.light.front.diffuse.b;
+                ((GLfloat*)uniform->data)[3] = gc->state.light.front.diffuse.a;
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_AMBIENT:
-            ((GLfloat*)uniform->data)[0] = gc->state.light.front.ambient.r;
-            ((GLfloat*)uniform->data)[1] = gc->state.light.front.ambient.g;
-            ((GLfloat*)uniform->data)[2] = gc->state.light.front.ambient.b;
-            ((GLfloat*)uniform->data)[3] = gc->state.light.front.ambient.a;
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & __GL_MATERIAL_AMBIENT_FRONT_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                ((GLfloat*)uniform->data)[0] = gc->state.light.front.ambient.r;
+                ((GLfloat*)uniform->data)[1] = gc->state.light.front.ambient.g;
+                ((GLfloat*)uniform->data)[2] = gc->state.light.front.ambient.b;
+                ((GLfloat*)uniform->data)[3] = gc->state.light.front.ambient.a;
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_SPECULAR:
-            ((GLfloat*)uniform->data)[0] = gc->state.light.front.specular.r;
-            ((GLfloat*)uniform->data)[1] = gc->state.light.front.specular.g;
-            ((GLfloat*)uniform->data)[2] = gc->state.light.front.specular.b;
-            ((GLfloat*)uniform->data)[3] = gc->state.light.front.specular.a;
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & __GL_MATERIAL_SPECULAR_FRONT_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                ((GLfloat*)uniform->data)[0] = gc->state.light.front.specular.r;
+                ((GLfloat*)uniform->data)[1] = gc->state.light.front.specular.g;
+                ((GLfloat*)uniform->data)[2] = gc->state.light.front.specular.b;
+                ((GLfloat*)uniform->data)[3] = gc->state.light.front.specular.a;
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_SHININESS:
-            ((GLfloat*)uniform->data)[0] = gc->state.light.front.specularExponent;
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & __GL_MATERIAL_SHININESS_FRONT_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                ((GLfloat*)uniform->data)[0] = gc->state.light.front.specularExponent;
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_EMISSION:
-            ((GLfloat*)uniform->data)[0] = gc->state.light.back.emissive.r;
-            ((GLfloat*)uniform->data)[1] = gc->state.light.back.emissive.g;
-            ((GLfloat*)uniform->data)[2] = gc->state.light.back.emissive.b;
-            ((GLfloat*)uniform->data)[3] = gc->state.light.back.emissive.a;
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & __GL_MATERIAL_EMISSION_BACK_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                ((GLfloat*)uniform->data)[0] = gc->state.light.back.emissive.r;
+                ((GLfloat*)uniform->data)[1] = gc->state.light.back.emissive.g;
+                ((GLfloat*)uniform->data)[2] = gc->state.light.back.emissive.b;
+                ((GLfloat*)uniform->data)[3] = gc->state.light.back.emissive.a;
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_DIFFUSE:
-            ((GLfloat*)uniform->data)[0] = gc->state.light.back.diffuse.r;
-            ((GLfloat*)uniform->data)[1] = gc->state.light.back.diffuse.g;
-            ((GLfloat*)uniform->data)[2] = gc->state.light.back.diffuse.b;
-            ((GLfloat*)uniform->data)[3] = gc->state.light.back.diffuse.a;
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & __GL_MATERIAL_DIFFUSE_BACK_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                ((GLfloat*)uniform->data)[0] = gc->state.light.back.diffuse.r;
+                ((GLfloat*)uniform->data)[1] = gc->state.light.back.diffuse.g;
+                ((GLfloat*)uniform->data)[2] = gc->state.light.back.diffuse.b;
+                ((GLfloat*)uniform->data)[3] = gc->state.light.back.diffuse.a;
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_AMBIENT:
-            ((GLfloat*)uniform->data)[0] = gc->state.light.back.ambient.r;
-            ((GLfloat*)uniform->data)[1] = gc->state.light.back.ambient.g;
-            ((GLfloat*)uniform->data)[2] = gc->state.light.back.ambient.b;
-            ((GLfloat*)uniform->data)[3] = gc->state.light.back.ambient.a;
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & __GL_MATERIAL_AMBIENT_BACK_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                ((GLfloat*)uniform->data)[0] = gc->state.light.back.ambient.r;
+                ((GLfloat*)uniform->data)[1] = gc->state.light.back.ambient.g;
+                ((GLfloat*)uniform->data)[2] = gc->state.light.back.ambient.b;
+                ((GLfloat*)uniform->data)[3] = gc->state.light.back.ambient.a;
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_SPECULAR:
-            ((GLfloat*)uniform->data)[0] = gc->state.light.back.specular.r;
-            ((GLfloat*)uniform->data)[1] = gc->state.light.back.specular.g;
-            ((GLfloat*)uniform->data)[2] = gc->state.light.back.specular.b;
-            ((GLfloat*)uniform->data)[3] = gc->state.light.back.specular.a;
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & __GL_MATERIAL_SPECULAR_BACK_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                ((GLfloat*)uniform->data)[0] = gc->state.light.back.specular.r;
+                ((GLfloat*)uniform->data)[1] = gc->state.light.back.specular.g;
+                ((GLfloat*)uniform->data)[2] = gc->state.light.back.specular.b;
+                ((GLfloat*)uniform->data)[3] = gc->state.light.back.specular.a;
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_SHININESS:
-            ((GLfloat*)uniform->data)[0] = gc->state.light.back.specularExponent;
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & __GL_MATERIAL_SHININESS_BACK_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                ((GLfloat*)uniform->data)[0] = gc->state.light.back.specularExponent;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_LIGHTMODEL_AMBIENT:
+            if (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & __GL_LIGHTMODEL_AMBIENT_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                ((GLfloat*)uniform->data)[0] = gc->state.light.model.ambient.r;
+                ((GLfloat*)uniform->data)[1] = gc->state.light.model.ambient.g;
+                ((GLfloat*)uniform->data)[2] = gc->state.light.model.ambient.b;
+                ((GLfloat*)uniform->data)[3] = gc->state.light.model.ambient.a;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHTMODEL_PRODUCT_SCENECOLOR:
+            if (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & (__GL_LIGHTMODEL_AMBIENT_BIT | __GL_MATERIAL_EMISSION_FRONT_BIT))
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                {
+                    __GLmaterialState *m = &gc->state.light.front;
+                    __GLcolor* ma = &(gc->state.light.model.ambient);
+                    ((GLfloat*)uniform->data)[0] = m->emissive.r + m->ambient.r * ma->r;
+                    ((GLfloat*)uniform->data)[1] = m->emissive.g + m->ambient.g * ma->g;
+                    ((GLfloat*)uniform->data)[2] = m->emissive.b + m->ambient.b * ma->b;
+                    ((GLfloat*)uniform->data)[3] = m->emissive.a + m->ambient.a * ma->a;
+                }
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHTMODEL_PRODUCT_SCENECOLOR:
+            if (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & (__GL_LIGHTMODEL_AMBIENT_BIT | __GL_MATERIAL_EMISSION_BACK_BIT))
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                {
+                    __GLmaterialState *m = &gc->state.light.back;
+                    __GLcolor* ma = &(gc->state.light.model.ambient);
+                    ((GLfloat*)uniform->data)[0] = m->emissive.r + m->ambient.r * ma->r;
+                    ((GLfloat*)uniform->data)[1] = m->emissive.g + m->ambient.g * ma->g;
+                    ((GLfloat*)uniform->data)[2] = m->emissive.b + m->ambient.b * ma->b;
+                    ((GLfloat*)uniform->data)[3] = m->emissive.a + m->ambient.a * ma->a;
+                }
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_AMBIENT:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_AMBIENT:
@@ -10745,12 +11315,19 @@ gcChipFlushBuiltinUniforms(
         case __GL_CHIP_UNIFORM_USAGE_LIGHT7_AMBIENT:
             {
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_AMBIENT;
-                ((GLfloat*)uniform->data)[0] = gc->state.light.source[index].ambient.r;
-                ((GLfloat*)uniform->data)[1] = gc->state.light.source[index].ambient.g;
-                ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].ambient.b;
-                ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].ambient.a;
+                if ((gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS] & (GLbitfield)(1 << index)) &&
+                    (gc->lightAttrState[index] & __GL_LIGHT_AMBIENT_BIT))
+                {
+                    uniform->dirty = GL_TRUE;
+                }
+                if (uniform->dirty)
+                {
+                    ((GLfloat*)uniform->data)[0] = gc->state.light.source[index].ambient.r;
+                    ((GLfloat*)uniform->data)[1] = gc->state.light.source[index].ambient.g;
+                    ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].ambient.b;
+                    ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].ambient.a;
+                }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_DIFFUSE:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_DIFFUSE:
@@ -10762,12 +11339,20 @@ gcChipFlushBuiltinUniforms(
         case __GL_CHIP_UNIFORM_USAGE_LIGHT7_DIFFUSE:
             {
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_DIFFUSE;
-                ((GLfloat*)uniform->data)[0] = gc->state.light.source[index].diffuse.r;
-                ((GLfloat*)uniform->data)[1] = gc->state.light.source[index].diffuse.g;
-                ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].diffuse.b;
-                ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].diffuse.a;
+                if ((gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS] & (GLbitfield)(1 << index)) &&
+                    (gc->lightAttrState[index] & __GL_LIGHT_DIFFUSE_BIT))
+                {
+                    uniform->dirty = GL_TRUE;
+                }
+                if (uniform->dirty)
+                {
+                    ((GLfloat*)uniform->data)[0] = gc->state.light.source[index].diffuse.r;
+                    ((GLfloat*)uniform->data)[1] = gc->state.light.source[index].diffuse.g;
+                    ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].diffuse.b;
+                    ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].diffuse.a;
+
+                }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPECULAR:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_SPECULAR:
@@ -10779,12 +11364,19 @@ gcChipFlushBuiltinUniforms(
         case __GL_CHIP_UNIFORM_USAGE_LIGHT7_SPECULAR:
             {
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPECULAR;
-                ((GLfloat*)uniform->data)[0] = gc->state.light.source[index].specular.r;
-                ((GLfloat*)uniform->data)[1] = gc->state.light.source[index].specular.g;
-                ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].specular.b;
-                ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].specular.a;
+                if ((gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS] & (GLbitfield)(1 << index)) &&
+                    (gc->lightAttrState[index] & __GL_LIGHT_SPECULAR_BIT))
+                {
+                    uniform->dirty = GL_TRUE;
+                }
+                if (uniform->dirty)
+                {
+                    ((GLfloat*)uniform->data)[0] = gc->state.light.source[index].specular.r;
+                    ((GLfloat*)uniform->data)[1] = gc->state.light.source[index].specular.g;
+                    ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].specular.b;
+                    ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].specular.a;
+                }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_POSITION:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_POSITION:
@@ -10796,12 +11388,19 @@ gcChipFlushBuiltinUniforms(
         case __GL_CHIP_UNIFORM_USAGE_LIGHT7_POSITION:
             {
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_POSITION;
-                ((GLfloat*)uniform->data)[0] = gc->state.light.source[index].position.f.x;
-                ((GLfloat*)uniform->data)[1] = gc->state.light.source[index].position.f.y;
-                ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].position.f.z;
-                ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].position.f.w;
+                if ((gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS] & (GLbitfield)(1 << index)) &&
+                    (gc->lightAttrState[index] & __GL_LIGHT_POSITION_BIT))
+                {
+                    uniform->dirty = GL_TRUE;
+                }
+                if (uniform->dirty)
+                {
+                    ((GLfloat*)uniform->data)[0] = gc->state.light.source[index].position.f.x;
+                    ((GLfloat*)uniform->data)[1] = gc->state.light.source[index].position.f.y;
+                    ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].position.f.z;
+                    ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].position.f.w;
+                }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_DIRECTION:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_SPOT_DIRECTION:
@@ -10813,12 +11412,19 @@ gcChipFlushBuiltinUniforms(
         case __GL_CHIP_UNIFORM_USAGE_LIGHT7_SPOT_DIRECTION:
             {
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_DIRECTION;
-                ((GLfloat*)uniform->data)[0] = gc->state.light.source[index].direction.f.x;
-                ((GLfloat*)uniform->data)[1] = gc->state.light.source[index].direction.f.y;
-                ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].direction.f.z;
-                ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].direction.f.w;
+                if ((gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS] & (GLbitfield)(1 << index)) &&
+                    (gc->lightAttrState[index] & __GL_LIGHT_SPOTDIRECTION_BIT))
+                {
+                    uniform->dirty = GL_TRUE;
+                }
+                if (uniform->dirty)
+                {
+                    ((GLfloat*)uniform->data)[0] = gc->state.light.source[index].direction.f.x;
+                    ((GLfloat*)uniform->data)[1] = gc->state.light.source[index].direction.f.y;
+                    ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].direction.f.z;
+                    ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].direction.f.w;
+                }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_EXPONENT:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_SPOT_EXPONENT:
@@ -10830,9 +11436,16 @@ gcChipFlushBuiltinUniforms(
         case __GL_CHIP_UNIFORM_USAGE_LIGHT7_SPOT_EXPONENT:
             {
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_EXPONENT;
-                *(GLfloat*)uniform->data = gc->state.light.source[index].spotLightExponent;
+                if ((gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS] & (GLbitfield)(1 << index)) &&
+                    (gc->lightAttrState[index] & __GL_LIGHT_SPOTEXPONENT_BIT))
+                {
+                    uniform->dirty = GL_TRUE;
+                }
+                if (uniform->dirty)
+                {
+                    *(GLfloat*)uniform->data = gc->state.light.source[index].spotLightExponent;
+                }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_CUTOFF:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_SPOT_CUTOFF:
@@ -10844,9 +11457,16 @@ gcChipFlushBuiltinUniforms(
         case __GL_CHIP_UNIFORM_USAGE_LIGHT7_SPOT_CUTOFF:
             {
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_CUTOFF;
-                *(GLfloat*)uniform->data = gc->state.light.source[index].spotLightCutOffAngle;
+                if ((gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS] & (GLbitfield)(1 << index)) &&
+                    (gc->lightAttrState[index] & __GL_LIGHT_SPOTCUTOFF_BIT))
+                {
+                    uniform->dirty = GL_TRUE;
+                }
+                if (uniform->dirty)
+                {
+                    *(GLfloat*)uniform->data = gc->state.light.source[index].spotLightCutOffAngle;
+                }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_CONST_ATTENU:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_CONST_ATTENU:
@@ -10858,9 +11478,16 @@ gcChipFlushBuiltinUniforms(
         case __GL_CHIP_UNIFORM_USAGE_LIGHT7_CONST_ATTENU:
             {
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_CONST_ATTENU;
-                *(GLfloat*)uniform->data = gc->state.light.source[index].constantAttenuation;
+                if ((gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS] & (GLbitfield)(1 << index)) &&
+                    (gc->lightAttrState[index] & __GL_LIGHT_CONSTANTATT_BIT))
+                {
+                    uniform->dirty = GL_TRUE;
+                }
+                if (uniform->dirty)
+                {
+                    *(GLfloat*)uniform->data = gc->state.light.source[index].constantAttenuation;
+                }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_LINEAR_ATTENU:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_LINEAR_ATTENU:
@@ -10872,9 +11499,16 @@ gcChipFlushBuiltinUniforms(
         case __GL_CHIP_UNIFORM_USAGE_LIGHT7_LINEAR_ATTENU:
             {
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_LINEAR_ATTENU;
-                *(GLfloat*)uniform->data = gc->state.light.source[index].linearAttenuation;
+                if ((gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS] & (GLbitfield)(1 << index)) &&
+                    (gc->lightAttrState[index] & __GL_LIGHT_LINEARATT_BIT))
+                {
+                    uniform->dirty = GL_TRUE;
+                }
+                if (uniform->dirty)
+                {
+                    *(GLfloat*)uniform->data = gc->state.light.source[index].linearAttenuation;
+                }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_LIGHT0_QUADRATIC_ATTENU:
         case __GL_CHIP_UNIFORM_USAGE_LIGHT1_QUADRATIC_ATTENU:
@@ -10886,38 +11520,16 @@ gcChipFlushBuiltinUniforms(
         case __GL_CHIP_UNIFORM_USAGE_LIGHT7_QUADRATIC_ATTENU:
             {
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_QUADRATIC_ATTENU;
-                *(GLfloat*)uniform->data = gc->state.light.source[index].quadraticAttenuation;
-            }
-            uniform->dirty = GL_TRUE;
-            break;
-        case __GL_CHIP_UNIFORM_USAGE_LIGHTMODEL_AMBIENT:
-            ((GLfloat*)uniform->data)[0] = gc->state.light.model.ambient.r;
-            ((GLfloat*)uniform->data)[1] = gc->state.light.model.ambient.g;
-            ((GLfloat*)uniform->data)[2] = gc->state.light.model.ambient.b;
-            ((GLfloat*)uniform->data)[3] = gc->state.light.model.ambient.a;
-            uniform->dirty = GL_TRUE;
-            break;
-        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHTMODEL_PRODUCT_SCENECOLOR:
-            {
-                __GLmaterialState *m = &gc->state.light.front;
-                __GLcolor* ma = &(gc->state.light.model.ambient);
-                ((GLfloat*)uniform->data)[0] = m->emissive.r + m->ambient.r * ma->r;
-                ((GLfloat*)uniform->data)[1] = m->emissive.g + m->ambient.g * ma->g;
-                ((GLfloat*)uniform->data)[2] = m->emissive.b + m->ambient.b * ma->b;
-                ((GLfloat*)uniform->data)[3] = m->emissive.a + m->ambient.a * ma->a;
-            }
-            uniform->dirty = GL_TRUE;
-            break;
-        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHTMODEL_PRODUCT_SCENECOLOR:
-            {
-                __GLmaterialState *m = &gc->state.light.back;
-                __GLcolor* ma = &(gc->state.light.model.ambient);
-                ((GLfloat*)uniform->data)[0] = m->emissive.r + m->ambient.r * ma->r;
-                ((GLfloat*)uniform->data)[1] = m->emissive.g + m->ambient.g * ma->g;
-                ((GLfloat*)uniform->data)[2] = m->emissive.b + m->ambient.b * ma->b;
-                ((GLfloat*)uniform->data)[3] = m->emissive.a + m->ambient.a * ma->a;
-            }
-            uniform->dirty = GL_TRUE;
+                if ((gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS] & (GLbitfield)(1 << index)) &&
+                    (gc->lightAttrState[index] & __GL_LIGHT_QUADRATICATT_BIT))
+                {
+                    uniform->dirty = GL_TRUE;
+                }
+                if (uniform->dirty)
+                {
+                    *(GLfloat*)uniform->data = gc->state.light.source[index].quadraticAttenuation;
+                }
+            };
             break;
         case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT0_PRODUCT_AMBIENT:
         case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT1_PRODUCT_AMBIENT:
@@ -10929,14 +11541,21 @@ gcChipFlushBuiltinUniforms(
         case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT7_PRODUCT_AMBIENT:
             {
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT0_PRODUCT_AMBIENT;
-                __GLcolor* acm  = &(gc->state.light.front.ambient);
-                __GLcolor* acli = &gc->state.light.source[index].ambient;
-                ((GLfloat*)uniform->data)[0] = acm->r * acli->r;
-                ((GLfloat*)uniform->data)[1] = acm->g * acli->g;
-                ((GLfloat*)uniform->data)[2] = acm->b * acli->b;
-                ((GLfloat*)uniform->data)[3] = acm->a * acli->a;
+                if (((gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS] & (GLbitfield)(1 << index)) && (gc->lightAttrState[index] & __GL_LIGHT_AMBIENT_BIT)) ||
+                    (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & __GL_MATERIAL_AMBIENT_FRONT_BIT))
+                {
+                    uniform->dirty = GL_TRUE;
+                }
+                if (uniform->dirty)
+                {
+                    __GLcolor* acm  = &(gc->state.light.front.ambient);
+                    __GLcolor* acli = &gc->state.light.source[index].ambient;
+                    ((GLfloat*)uniform->data)[0] = acm->r * acli->r;
+                    ((GLfloat*)uniform->data)[1] = acm->g * acli->g;
+                    ((GLfloat*)uniform->data)[2] = acm->b * acli->b;
+                    ((GLfloat*)uniform->data)[3] = acm->a * acli->a;
+                }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT0_PRODUCT_DIFFUSE:
         case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT1_PRODUCT_DIFFUSE:
@@ -10948,14 +11567,21 @@ gcChipFlushBuiltinUniforms(
         case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT7_PRODUCT_DIFFUSE:
             {
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT0_PRODUCT_DIFFUSE;
-                __GLcolor* dcm  = &(gc->state.light.front.diffuse);
-                __GLcolor* dcli = &gc->state.light.source[index].diffuse;
-                ((GLfloat*)uniform->data)[0] = dcm->r * dcli->r;
-                ((GLfloat*)uniform->data)[1] = dcm->g * dcli->g;
-                ((GLfloat*)uniform->data)[2] = dcm->b * dcli->b;
-                ((GLfloat*)uniform->data)[3] = dcm->a * dcli->a;
+                if (((gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS] & (GLbitfield)(1 << index)) && (gc->lightAttrState[index] & __GL_LIGHT_DIFFUSE_BIT)) ||
+                    (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & __GL_MATERIAL_DIFFUSE_FRONT_BIT))
+                {
+                    uniform->dirty = GL_TRUE;
+                }
+                if (uniform->dirty)
+                {
+                    __GLcolor* dcm  = &(gc->state.light.front.diffuse);
+                    __GLcolor* dcli = &gc->state.light.source[index].diffuse;
+                    ((GLfloat*)uniform->data)[0] = dcm->r * dcli->r;
+                    ((GLfloat*)uniform->data)[1] = dcm->g * dcli->g;
+                    ((GLfloat*)uniform->data)[2] = dcm->b * dcli->b;
+                    ((GLfloat*)uniform->data)[3] = dcm->a * dcli->a;
+                }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT0_PRODUCT_SPECULAR:
         case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT1_PRODUCT_SPECULAR:
@@ -10967,14 +11593,21 @@ gcChipFlushBuiltinUniforms(
         case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT7_PRODUCT_SPECULAR:
             {
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT0_PRODUCT_SPECULAR;
-                __GLcolor* scm  = &(gc->state.light.front.specular);
-                __GLcolor* scli = &gc->state.light.source[index].specular;
-                ((GLfloat*)uniform->data)[0] = scm->r * scli->r;
-                ((GLfloat*)uniform->data)[1] = scm->g * scli->g;
-                ((GLfloat*)uniform->data)[2] = scm->b * scli->b;
-                ((GLfloat*)uniform->data)[3] = scm->a * scli->a;
+                if (((gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS] & (GLbitfield)(1 << index)) && (gc->lightAttrState[index] & __GL_LIGHT_SPECULAR_BIT)) ||
+                    (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & __GL_MATERIAL_SPECULAR_FRONT_BIT))
+                {
+                    uniform->dirty = GL_TRUE;
+                }
+                if (uniform->dirty)
+                {
+                    __GLcolor* scm  = &(gc->state.light.front.specular);
+                    __GLcolor* scli = &gc->state.light.source[index].specular;
+                    ((GLfloat*)uniform->data)[0] = scm->r * scli->r;
+                    ((GLfloat*)uniform->data)[1] = scm->g * scli->g;
+                    ((GLfloat*)uniform->data)[2] = scm->b * scli->b;
+                    ((GLfloat*)uniform->data)[3] = scm->a * scli->a;
+                }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT0_PRODUCT_AMBIENT:
         case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT1_PRODUCT_AMBIENT:
@@ -10986,14 +11619,21 @@ gcChipFlushBuiltinUniforms(
         case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT7_PRODUCT_AMBIENT:
             {
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT0_PRODUCT_AMBIENT;
-                __GLcolor* acm  = &(gc->state.light.back.ambient);
-                __GLcolor* acli = &gc->state.light.source[index].ambient;
-                ((GLfloat*)uniform->data)[0] = acm->r * acli->r;
-                ((GLfloat*)uniform->data)[1] = acm->g * acli->g;
-                ((GLfloat*)uniform->data)[2] = acm->b * acli->b;
-                ((GLfloat*)uniform->data)[3] = acm->a * acli->a;
+                if (((gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS] & (GLbitfield)(1 << index)) && (gc->lightAttrState[index] & __GL_LIGHT_AMBIENT_BIT)) ||
+                    (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & __GL_MATERIAL_AMBIENT_BACK_BIT))
+                {
+                    uniform->dirty = GL_TRUE;
+                }
+                if (uniform->dirty)
+                {
+                    __GLcolor* acm  = &(gc->state.light.back.ambient);
+                    __GLcolor* acli = &gc->state.light.source[index].ambient;
+                    ((GLfloat*)uniform->data)[0] = acm->r * acli->r;
+                    ((GLfloat*)uniform->data)[1] = acm->g * acli->g;
+                    ((GLfloat*)uniform->data)[2] = acm->b * acli->b;
+                    ((GLfloat*)uniform->data)[3] = acm->a * acli->a;
+                }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT0_PRODUCT_DIFFUSE:
         case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT1_PRODUCT_DIFFUSE:
@@ -11005,14 +11645,21 @@ gcChipFlushBuiltinUniforms(
         case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT7_PRODUCT_DIFFUSE:
             {
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT0_PRODUCT_DIFFUSE;
-                __GLcolor* dcm  = &(gc->state.light.back.diffuse);
-                __GLcolor* dcli = &gc->state.light.source[index].diffuse;
-                ((GLfloat*)uniform->data)[0] = dcm->r * dcli->r;
-                ((GLfloat*)uniform->data)[1] = dcm->g * dcli->g;
-                ((GLfloat*)uniform->data)[2] = dcm->b * dcli->b;
-                ((GLfloat*)uniform->data)[3] = dcm->a * dcli->a;
+                if (((gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS] & (GLbitfield)(1 << index)) && (gc->lightAttrState[index] & __GL_LIGHT_DIFFUSE_BIT)) ||
+                    (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & __GL_MATERIAL_DIFFUSE_BACK_BIT))
+                {
+                    uniform->dirty = GL_TRUE;
+                }
+                if (uniform->dirty)
+                {
+                    __GLcolor* dcm  = &(gc->state.light.back.diffuse);
+                    __GLcolor* dcli = &gc->state.light.source[index].diffuse;
+                    ((GLfloat*)uniform->data)[0] = dcm->r * dcli->r;
+                    ((GLfloat*)uniform->data)[1] = dcm->g * dcli->g;
+                    ((GLfloat*)uniform->data)[2] = dcm->b * dcli->b;
+                    ((GLfloat*)uniform->data)[3] = dcm->a * dcli->a;
+                }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT0_PRODUCT_SPECULAR:
         case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT1_PRODUCT_SPECULAR:
@@ -11024,37 +11671,74 @@ gcChipFlushBuiltinUniforms(
         case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT7_PRODUCT_SPECULAR:
             {
                 GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT0_PRODUCT_SPECULAR;
-                __GLcolor* scm  = &(gc->state.light.back.specular);
-                __GLcolor* scli = &gc->state.light.source[index].specular;
-                ((GLfloat*)uniform->data)[0] = scm->r * scli->r;
-                ((GLfloat*)uniform->data)[1] = scm->g * scli->g;
-                ((GLfloat*)uniform->data)[2] = scm->b * scli->b;
-                ((GLfloat*)uniform->data)[3] = scm->a * scli->a;
+                if (((gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS] & (GLbitfield)(1 << index)) && (gc->lightAttrState[index] & __GL_LIGHT_SPECULAR_BIT)) ||
+                    (gc->globalDirtyState[__GL_LIGHTING_ATTRS] & __GL_MATERIAL_SPECULAR_BACK_BIT))
+                {
+                    uniform->dirty = GL_TRUE;
+                }
+                if (uniform->dirty)
+                {
+                    __GLcolor* scm  = &(gc->state.light.back.specular);
+                    __GLcolor* scli = &gc->state.light.source[index].specular;
+                    ((GLfloat*)uniform->data)[0] = scm->r * scli->r;
+                    ((GLfloat*)uniform->data)[1] = scm->g * scli->g;
+                    ((GLfloat*)uniform->data)[2] = scm->b * scli->b;
+                    ((GLfloat*)uniform->data)[3] = scm->a * scli->a;
+                }
             }
-            uniform->dirty = GL_TRUE;
             break;
         case __GL_CHIP_UNIFORM_USAGE_FOG_COLOR:
-            ((GLfloat*)uniform->data)[0] = gc->state.fog.color.r;
-            ((GLfloat*)uniform->data)[1] = gc->state.fog.color.g;
-            ((GLfloat*)uniform->data)[2] = gc->state.fog.color.b;
-            ((GLfloat*)uniform->data)[3] = gc->state.fog.color.a;
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_DIRTY_ATTRS_2] & __GL_FOGCOLOR_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                ((GLfloat*)uniform->data)[0] = gc->state.fog.color.r;
+                ((GLfloat*)uniform->data)[1] = gc->state.fog.color.g;
+                ((GLfloat*)uniform->data)[2] = gc->state.fog.color.b;
+                ((GLfloat*)uniform->data)[3] = gc->state.fog.color.a;
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_FOG_DENSITY:
-            *(GLfloat*)uniform->data = gc->state.fog.density;
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_DIRTY_ATTRS_2] & __GL_FOGDENSITY_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                *(GLfloat*)uniform->data = gc->state.fog.density;
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_FOG_START:
+            if (gc->globalDirtyState[__GL_DIRTY_ATTRS_2] & __GL_FOGSTART_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
             *(GLfloat*)uniform->data = gc->state.fog.start;
-            uniform->dirty = GL_TRUE;
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_FOG_END:
-            *(GLfloat*)uniform->data = gc->state.fog.end;
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_DIRTY_ATTRS_2] & __GL_FOGEND_BIT)
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                *(GLfloat*)uniform->data = gc->state.fog.end;
+            }
             break;
         case __GL_CHIP_UNIFORM_USAGE_FOG_SCALE:
-            *(GLfloat*)uniform->data = 1.0f / (gc->state.fog.end - gc->state.fog.start);
-            uniform->dirty = GL_TRUE;
+            if (gc->globalDirtyState[__GL_DIRTY_ATTRS_2] & (__GL_FOGSTART_BIT | __GL_FOGEND_BIT))
+            {
+                uniform->dirty = GL_TRUE;
+            }
+            if (uniform->dirty)
+            {
+                *(GLfloat*)uniform->data = 1.0f / (gc->state.fog.end - gc->state.fog.start);
+            }
             break;
 #endif
         default:
@@ -11898,7 +12582,10 @@ gcChipDynamicPatchProgram(
 
     if (gcmIS_ERROR(status))
     {
-        gcmVERIFY_OK(gcFreeProgramState(programState));
+        if (programState.stateBuffer != gcvNULL)
+        {
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, programState.stateBuffer));
+        }
         programObject->programInfo.invalidFlags |= __GL_INVALID_LINK_BIT;
         gcmFATAL("%s(%d): gcLinkProgram failed status=%d", __FUNCTION__, __LINE__, status);
     }

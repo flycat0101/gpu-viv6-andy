@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -160,7 +160,7 @@ typedef struct __GLtextureParamStateRec
     GLenum swizzle[__GL_TEX_COMPONENT_NUM];
 
     /* Depth stencil texture mode */
-    GLenum depthStTexMode;
+    GLenum dsTexMode;
 
     /* VIV private property */
     GLboolean contentProtected;
@@ -297,8 +297,7 @@ struct __GLtextureObjectRec
             GLuint swizzleDirty      : 1;
             GLuint dsModeDirty       : 1;
             GLuint baseLevelDirty    : 1;
-            GLuint borderColorDirty  : 1;
-            GLuint reserved          : 27;
+            GLuint reserved          : 28;
         } s;
         GLuint objStateDirty;
     } uObjStateDirty;

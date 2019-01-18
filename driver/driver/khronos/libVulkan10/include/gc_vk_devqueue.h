@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -23,7 +23,6 @@ typedef struct _CMDBUFinfo
     uint32_t reservedTailSize;
     uint32_t reservedUserSize;
     uint32_t totalReservedSize;
-    gceCMDBUF_SOURCE source;
     uint32_t mirrorCount;
     uint32_t curCount;
     uint32_t maxCount;
@@ -74,8 +73,6 @@ void __vk_DestroyDeviceQueues(
     );
 
 
-#if __VK_NEW_DEVICE_QUEUE
-
 VkResult __vk_QueueCommitEvents(
     __vkDevQueue *devQueue,
     VkBool32 idle
@@ -104,8 +101,6 @@ VkResult __vk_QueueAppendEvent(
     gcsHAL_INTERFACE *Interface
     );
 
-
-#endif
 
 #endif
 

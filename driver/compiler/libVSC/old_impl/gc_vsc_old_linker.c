@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2363,17 +2363,17 @@ _InitTreeHints(
     IN     gctINT              Index
     )
 {
-    Hints[Index].owner          = gcvNULL;
-    Hints[Index].isOwnerKernel  = gcvFALSE;
-    Hints[Index].isBackJump     = gcvFALSE;
-    Hints[Index].isCall         = gcvFALSE;
-    Hints[Index].isLoopHeader   = gcvFALSE;
-    Hints[Index].callers        = gcvNULL;
-    Hints[Index].callNest       = -1;
-    Hints[Index].liveTemps      = gcvNULL;
-    Hints[Index].lastUseForTemp = Index;
-    Hints[Index].lastLoadUser   = -1;
-    Hints[Index].loadDestIndex  = -1;
+    Hints[Index].owner              = gcvNULL;
+    Hints[Index].isOwnerKernel      = gcvFALSE;
+    Hints[Index].isBackJump         = gcvFALSE;
+    Hints[Index].isCall             = gcvFALSE;
+    Hints[Index].isBackJumpTarget   = gcvFALSE;
+    Hints[Index].callers            = gcvNULL;
+    Hints[Index].callNest           = -1;
+    Hints[Index].liveTemps          = gcvNULL;
+    Hints[Index].lastUseForTemp     = Index;
+    Hints[Index].lastLoadUser       = -1;
+    Hints[Index].loadDestIndex      = -1;
 }
 
 static gceSTATUS
@@ -2509,7 +2509,7 @@ gcLINKTREE_Build(
         {
             gcVARIABLE variable = Shader->variables[i];
 
-            if (isVariableNormal(variable))
+            if (isVariableNormal(variable) && !IsVariableIsNotUsed(variable))
             {
                 gctUINT size = GetVariableKnownArraySize(variable) * gcmType_Rows(variable->u.type);
                 gctUINT end = variable->tempIndex + size;
@@ -2713,7 +2713,7 @@ gcLINKTREE_Build(
                 {
                     gcVARIABLE variable = Shader->variables[i];
 
-                    if (isVariableNormal(variable))
+                    if (isVariableNormal(variable) && !IsVariableIsNotUsed(variable))
                     {
                         gctUINT startIndex, endIndex;
                         gcSHADER_GetVariableIndexingRange(Tree->shader, variable, gcvTRUE,
@@ -2909,9 +2909,9 @@ gcLINKTREE_Build(
                 {
                     gctSIZE_T inst;
 
-                    /* mark loop header and back jump */
+                    /* mark back jump */
                     Tree->hints[curInstIdx].isBackJump = gcvTRUE;
-                    Tree->hints[targetInstIdx].isLoopHeader = gcvTRUE;
+                    Tree->hints[targetInstIdx].isBackJumpTarget = gcvTRUE;
 
                     for (inst = targetInstIdx; inst < curInstIdx; inst++)
                     {
@@ -3281,7 +3281,8 @@ gcLINKTREE_Build(
             /* Add any texture attribute dependencies. */
             gcmASSERT(temp != gcvNULL);
             gcmASSERT(gcmSL_SOURCE_GET(source, Type) == gcSL_UNIFORM ||
-                      gcmSL_SOURCE_GET(source, Type) == gcSL_SAMPLER);
+                      gcmSL_SOURCE_GET(source, Type) == gcSL_SAMPLER ||
+                      gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP/* sampler index */);
 
             for (list = texAttr[code->source0Index]; list != gcvNULL; list = list->next)
             {
@@ -3985,11 +3986,15 @@ gcLINKTREE_Build(
                     }
                 }
             }
+
+            /* Update the lastUse of this temp register. */
             _updateTempLastUse(Tree, tempReg, lastUse);
         }
 
-        /* If there is another function call between a function argument assignment and its caller,
-        ** we need to add the argument register to the live list of another function.
+        /*
+        ** Check the input parameter assignment and its caller:
+        **  1) If there is another function call between them, we need to add the argument register to the live list of another function.
+        **  2) If there is a back JMP target between them, we need to update the lastUse by using the caller's lastUse.
         */
         for (i = 0; i < Tree->tempCount; i++)
         {
@@ -4010,19 +4015,45 @@ gcLINKTREE_Build(
             for (; user != gcvNULL; user = user->next)
             {
                 gctINT instIndex = user->index + 1;
+                gctBOOL bMeetOneBackJumpTarget = gcvFALSE;
 
                 /* Get the nearest call instruction index. */
-                while (instIndex < (gctINT)Tree->shader->codeCount &&
-                    Tree->shader->code[instIndex].opcode != gcSL_CALL)
+                while (instIndex < (gctINT)Tree->shader->codeCount)
                 {
-                    instIndex++;
+                    if (Tree->hints[instIndex].isBackJumpTarget)
+                    {
+                        bMeetOneBackJumpTarget = gcvTRUE;
+                    }
+
+                    if (Tree->shader->code[instIndex].opcode != gcSL_CALL)
+                    {
+                        instIndex++;
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
 
-                if (instIndex >= (gctINT)Tree->shader->codeCount ||
-                    Tree->shader->code[instIndex].tempIndex == funcHead)
+                if (instIndex >= (gctINT)Tree->shader->codeCount)
+                {
                     continue;
+                }
 
-                _addTempToFunctionLiveList(Tree, tempReg, instIndex);
+                if (Tree->shader->code[instIndex].tempIndex == funcHead)
+                {
+                    if (bMeetOneBackJumpTarget)
+                    {
+                        if (tempReg->lastUse < Tree->hints[instIndex].lastUseForTemp)
+                        {
+                            tempReg->lastUse = Tree->hints[instIndex].lastUseForTemp;
+                        }
+                    }
+                }
+                else
+                {
+                    _addTempToFunctionLiveList(Tree, tempReg, instIndex);
+                }
             }
         }
 
@@ -4754,6 +4785,7 @@ gcLINKTREE_RemoveDeadCode(
         switch (gcmSL_OPCODE_GET(code->opcode, Opcode))
         {
         case gcSL_JMP:
+        case gcSL_JMP_ANY:
             /* fall through */
         case gcSL_CALL:
             /* fall through */
@@ -5962,7 +5994,6 @@ gcLINKTREE_PackVarying(
             treeOutput->rows > 1 || treeOutput->isArray ||
             _isBuiltinOutput(VertexTree->shader->outputs[j]))
         {
-            /* TODO: handle matrix and array */
             continue;
         }
 
@@ -6595,7 +6626,7 @@ _CheckIoAliasedLocation(gcLINKTREE  Tree)
             {
                 if (vscBV_TestBit(&locationMask, j))
                 {
-                    if (gcShader_IsES11Compiler(Tree->shader))
+                    if (gcSHADER_IsES11Compiler(Tree->shader))
                     {
                         gcmATTRIBUTE_SetLocHasAlias(attribute, gcvTRUE);
                     }
@@ -8103,6 +8134,9 @@ _PreviousMOV(
     ||  (prevOpcode == gcSL_IMAGE_RD)
     ||  (prevOpcode == gcSL_IMAGE_RD_3D)
     ||  (prevOpcode == gcSL_NORM)
+    ||  (prevOpcode == gcSL_CMAD)
+    ||  (prevOpcode == gcSL_CMUL)
+    ||  (prevOpcode == gcSL_CMADCJ)
     )
     {
         return gcvFALSE;
@@ -8506,6 +8540,7 @@ gcLINKTREE_Optimize(
             {
                 continue;
             }
+
             /* there is implicit type conversion inside the code, thus bail out
                 when the type is not the same */
             diffType = gcvFALSE;
@@ -8514,7 +8549,7 @@ gcLINKTREE_Optimize(
                 gcSL_INSTRUCTION userCode = &shader->code[user->index];
                 if ((gcmSL_SOURCE_GET(userCode->source0, Type) == gcSL_TEMP) &&
                     (userCode->source0Index == code->tempIndex) &&
-                    (gcmSL_SOURCE_GET(userCode->source0, Format) != gcmSL_SOURCE_GET(code->tempIndex, Format)))
+                    (gcmSL_SOURCE_GET(userCode->source0, Format) != gcmSL_TARGET_GET(code->temp, Format)))
                 {
                     diffType = gcvTRUE;
                     break;
@@ -8522,7 +8557,7 @@ gcLINKTREE_Optimize(
 
                 if ((gcmSL_SOURCE_GET(userCode->source1, Type) == gcSL_TEMP) &&
                     (userCode->source1Index == code->tempIndex) &&
-                    (gcmSL_SOURCE_GET(userCode->source1, Format) != gcmSL_SOURCE_GET(code->tempIndex, Format)))
+                    (gcmSL_SOURCE_GET(userCode->source1, Format) != gcmSL_TARGET_GET(code->temp, Format)))
                 {
                     diffType = gcvTRUE;
                     break;
@@ -8555,8 +8590,6 @@ gcLINKTREE_Optimize(
                         break;
                     }
 
-                    /* gcSL does not allow target temp register the same as any of the source temp register. */
-                    /* TODO - Need to remove when STORE can handle uniform and swizzle, etc.*/
                     userCode = &shader->code[user->index];
                     if (user->type == gcSL_NONE)
                     {
@@ -8569,7 +8602,6 @@ gcLINKTREE_Optimize(
                         }
                     }
 
-                    /* TODO - for new chip that support immediate constant, */
                     /*        need to check if constant can be immediate constant. */
                     if (propagateUniform)
                     {
@@ -8602,6 +8634,17 @@ gcLINKTREE_Optimize(
             )
             {
                 continue;
+            }
+            else
+            {
+                sourceTemp = &Tree->tempArray[code->source0Index];
+                /* only one define stmt*/
+                if (Tree->shader->loadUsers &&
+                    sourceTemp->defined && (sourceTemp->defined->next == gcvNULL) &&
+                    Tree->shader->loadUsers[sourceTemp->defined->index] >= 0)
+                {
+                    continue;
+                }
             }
 
             /* Try a backwards optimization. */
@@ -9273,6 +9316,8 @@ _InitializeSamplerAddress(
             {
                 NewPhysical[i] = sampler + samplerBase;
                 sampler += GetUniformArraySize(uniform);
+
+                SetUniformFlag(uniform, gcvUNIFORM_FLAG_FORCE_ACTIVE);
             }
 
             if (NewPhysical[i] != GetUniformPhysical(uniform))
@@ -9654,17 +9699,21 @@ gcLINKTREE_Cleanup(
 
 gceSTATUS
 gcLINKTREE_CheckAPILevelResource(
-    IN OUT gcLINKTREE Tree
+    IN OUT gcLINKTREE Tree,
+    IN gctBOOL        IsRecompiler
     )
 {
     gceSTATUS       status = gcvSTATUS_OK;
-    gctUINT         uniformCount = 0, samplerCount = 0, imageCount = 0, atomicCount = 0;
+    gctUINT         uniformComponentCount = 0, samplerCount = 0, imageCount = 0, atomicCount = 0;
     gctUINT         maxUniformCount = 0, maxSamplerCount = 0, maxImageCount = 0, maxAtomicCount = 0;
     gctUINT         i;
     gcSHADER        shader;
+    gctBOOL         bCheckComponent = gcvFALSE;
 
-    if (!Tree)
+    if (!Tree || IsRecompiler)
+    {
         return status;
+    }
 
     shader = Tree->shader;
     /* check uniform usage: if a uniform is used in shader or LTC expression */
@@ -9682,6 +9731,9 @@ gcLINKTREE_CheckAPILevelResource(
     {
         return status;
     }
+
+    /* Check component count for CTS only. */
+    bCheckComponent = (Tree->patchID == gcvPATCH_DEQP || Tree->patchID == gcvPATCH_OESCTS || Tree->patchID == gcvPATCH_GTFES30);
 
     /* I: Check uniform resource. */
     switch (shader->type)
@@ -9734,7 +9786,6 @@ gcLINKTREE_CheckAPILevelResource(
         if (!uniform) continue;
         if (!isUniformLodMinMax(uniform) &&
             !isUniformLevelBaseSize(uniform) &&
-            !isUniformExtraForTexGather(uniform)&&
             !isUniformMLSampler(uniform))
         {
             continue;
@@ -9805,20 +9856,37 @@ gcLINKTREE_CheckAPILevelResource(
         }
         else
         {
-            gctUINT32 rows = 0;
+            gctUINT32 rows = 0, components = 0;
 
-            gcTYPE_GetTypeInfo(uniform->u.type, gcvNULL, &rows, 0);
-            if(gcmType_Kind(uniform->u.type) == gceTK_ATOMIC ||
-               isUniformMatrix(uniform) ||
-               !isUniformArray(uniform) ||
-               !isUniformNormal(uniform) ||
-               !(Tree->flags & gcvSHADER_REMOVE_UNUSED_UNIFORMS))
+            gcTYPE_GetTypeInfo(uniform->u.type, &components, &rows, 0);
+
+            if (gcmType_Kind(uniform->u.type) == gceTK_ATOMIC ||
+                isUniformMatrix(uniform) ||
+                !isUniformArray(uniform) ||
+                !isUniformNormal(uniform) ||
+                !(Tree->flags & gcvSHADER_REMOVE_UNUSED_UNIFORMS))
             {
                 SetUniformUsedArraySize(uniform, GetUniformArraySize(uniform));
             }
-            uniformCount += rows * GetUniformUsedArraySize(uniform);
-            if (uniformCount > maxUniformCount)
+
+            if (!bCheckComponent)
+            {
+                components = 4;
+            }
+            else
+            {
+                /* For a matrix, don't pack. */
+                if (rows > 1)
+                {
+                    components = 4;
+                }
+            }
+
+            uniformComponentCount += rows * GetUniformUsedArraySize(uniform) * components;
+            if (uniformComponentCount > (maxUniformCount * 4))
+            {
                 return gcvSTATUS_TOO_MANY_UNIFORMS;
+            }
         }
     }
 
@@ -10439,8 +10507,10 @@ _TraceStrictModelViewProjection(
 {
     gcLINKTREE_TEMP temp = &Tree->tempArray[Temp];
     gcsLINKTREE_LIST_PTR define = gcvNULL;
+#if gcdUSE_WCLIP_PATCH
     gcSHADER_LIST list = gcvNULL;
     gcSL_INSTRUCTION code;
+#endif
 
     if (temp == gcvNULL)
         return;
@@ -10459,317 +10529,316 @@ _TraceStrictModelViewProjection(
     if (define == gcvNULL)
         return;
 
+#if gcdUSE_WCLIP_PATCH
     code = Tree->shader->code + define->index;
 
     if (code->opcode == gcSL_ADD)
     {
         gcSHADER_FindList(Tree->shader, Tree->shader->wClipTempIndexList, Temp, &list);
-    }
-    else
-    {
-        return;
-    }
-
-    if (list != gcvNULL)
-    {
-        gcSL_TYPE type0, type1;
-        gcSL_SWIZZLE swizzle;
-        gcSL_ENABLE enable;
-        gcUNIFORM uniform = gcvNULL, uniform1 = gcvNULL;
-        gcATTRIBUTE attribute = gcvNULL;
-        gctINT index0, index1;
-        gctINT attributeIndex = -1, uniformIndex = -1, uniformIndex1 = -1;
-        gctINT i, patternCount = 0, channelCount = 0, mulCount = 0;
-        gctBOOL isMVPHoldByLTC = gcvFALSE;
-
-        type0 = list->data0 & 0xffff;
-        index0 = list->data0 >> 16;
-        type1 = list->data1 & 0xffff;
-        index1 = list->data1 >> 16;
-
-        /*---------------------------I: Find the uniform---------------------------*/
-        if (type0 == gcSL_UNIFORM)
+        if (list != gcvNULL)
         {
-            uniformIndex = index0;
-        }
-        else if (type0 == gcSL_CONSTANT)
-        {
-            gcSHADER_LIST list = gcvNULL;
+            gcSL_TYPE type0, type1;
+            gcSL_SWIZZLE swizzle;
+            gcSL_ENABLE enable;
+            gcUNIFORM uniform = gcvNULL, uniform1 = gcvNULL;
+            gcATTRIBUTE attribute = gcvNULL;
+            gctINT index0, index1;
+            gctINT attributeIndex = -1, uniformIndex = -1, uniformIndex1 = -1;
+            gctINT i, patternCount = 0, channelCount = 0, mulCount = 0;
+            gctBOOL isMVPHoldByLTC = gcvFALSE;
 
-            uniformIndex = index0 & 0xff;
-            uniformIndex1 = (index0 >> 8) & 0xff;
+            type0 = list->data0 & 0xffff;
+            index0 = list->data0 >> 16;
+            type1 = list->data1 & 0xffff;
+            index1 = list->data1 >> 16;
 
-            type0 = gcSL_UNIFORM;
-            gcSHADER_FindListByData(Tree->shader, Tree->shader->wClipUniformIndexList, uniformIndex, uniformIndex1, &list);
-            if (list != gcvNULL)
+            /*---------------------------I: Find the uniform---------------------------*/
+            if (type0 == gcSL_UNIFORM)
             {
-                index0 = list->index;
+                uniformIndex = index0;
             }
-            isMVPHoldByLTC = gcvTRUE;
-        }
-        else
-        {
-            if (index0 >= (gctINT)Tree->tempCount || Tree->tempArray[index0].defined == gcvNULL)
-                return;
-
-            /* Right now, we only check one define.*/
-            if (Tree->tempArray[index0].defined->next != gcvNULL)
+            else if (type0 == gcSL_CONSTANT)
             {
-                return;
-            }
-            code = Tree->shader->code + Tree->tempArray[index0].defined->index;
+                gcSHADER_LIST list = gcvNULL;
 
-            /* Skip non uniform assignment or indexed uniform. */
-            if (code->opcode != gcSL_MOV ||
-                gcmSL_SOURCE_GET(code->source0, Type) != gcSL_UNIFORM ||
-                gcmSL_SOURCE_GET(code->source0, Indexed) != gcSL_NOT_INDEXED)
+                uniformIndex = index0 & 0xff;
+                uniformIndex1 = (index0 >> 8) & 0xff;
+
+                type0 = gcSL_UNIFORM;
+                gcSHADER_FindListByData(Tree->shader, Tree->shader->wClipUniformIndexList, uniformIndex, uniformIndex1, &list);
+                if (list != gcvNULL)
+                {
+                    index0 = list->index;
+                }
+                isMVPHoldByLTC = gcvTRUE;
+            }
+            else
             {
-                return;
+                if (index0 >= (gctINT)Tree->tempCount || Tree->tempArray[index0].defined == gcvNULL)
+                    return;
+
+                /* Right now, we only check one define.*/
+                if (Tree->tempArray[index0].defined->next != gcvNULL)
+                {
+                    return;
+                }
+                code = Tree->shader->code + Tree->tempArray[index0].defined->index;
+
+                /* Skip non uniform assignment or indexed uniform. */
+                if (code->opcode != gcSL_MOV ||
+                    gcmSL_SOURCE_GET(code->source0, Type) != gcSL_UNIFORM ||
+                    gcmSL_SOURCE_GET(code->source0, Indexed) != gcSL_NOT_INDEXED)
+                {
+                    return;
+                }
+                uniformIndex = code->source0Index;
             }
-            uniformIndex = code->source0Index;
-        }
 
-        if (uniformIndex == -1)
-            return;
-        gcmASSERT((gctSIZE_T)uniformIndex < Tree->shader->uniformCount);
-        uniform = Tree->shader->uniforms[uniformIndex];
-
-        /* Skip uniform array, non-user defined uniform. */
-        if (uniform->arraySize != 1 || uniform->u.type != gcSHADER_FLOAT_4X4 || uniform->nameLength < 0)
-            return;
-
-        if (uniformIndex1 != -1)
-        {
-            gcmASSERT((gctSIZE_T)uniformIndex1 < Tree->shader->uniformCount);
-            uniform1 = Tree->shader->uniforms[uniformIndex1];
+            if (uniformIndex == -1)
+                return;
+            gcmASSERT((gctSIZE_T)uniformIndex < Tree->shader->uniformCount);
+            uniform = Tree->shader->uniforms[uniformIndex];
 
             /* Skip uniform array, non-user defined uniform. */
-            if (uniform1->arraySize != 1 || uniform1->u.type != gcSHADER_FLOAT_4X4 || uniform1->nameLength < 0)
+            if (uniform->arraySize != 1 || uniform->u.type != gcSHADER_FLOAT_4X4 || uniform->nameLength < 0)
                 return;
-        }
 
-        /*---------------------------II: Check the attribute---------------------------*/
-        if (type1 == gcSL_ATTRIBUTE)
-        {
-            attributeIndex = index1;
-            attribute = Tree->shader->attributes[attributeIndex];
-            for (i = define->index - 1; i >=0; i--)
+            if (uniformIndex1 != -1)
             {
-                code = Tree->shader->code + i;
+                gcmASSERT((gctSIZE_T)uniformIndex1 < Tree->shader->uniformCount);
+                uniform1 = Tree->shader->uniforms[uniformIndex1];
 
-                if (code->opcode != gcSL_MUL) continue;
-
-                if ((gcSL_TYPE)gcmSL_SOURCE_GET(code->source0, Type) != type0 ||
-                    code->source0Index != (gctUINT32)index0)
-                {
-                    continue;
-                }
-
-                patternCount = define->index - i;
-                break;
-            }
-        }
-        else
-        {
-            gcSHADER_LIST list2 = gcvNULL;
-
-            gcSHADER_FindList(Tree->shader, Tree->shader->wClipTempIndexList, index1, &list2);
-
-            if (list2 != gcvNULL)
-            {
-                gctINT startIndex = 1;
-
-                if (uniform1 != gcvNULL)
-                    startIndex = 2;
-                _TraceStrictModelViewProjection(Tree, list2->index, startIndex, MatchCount);
-
-                if (*MatchCount != 0)
-                {
-                    uniform->modelViewProjection = *MatchCount - startIndex;
-                    if (uniform1 != gcvNULL)
-                    {
-                        uniform1->modelViewProjection = uniform->modelViewProjection + 1;
-                    }
+                /* Skip uniform array, non-user defined uniform. */
+                if (uniform1->arraySize != 1 || uniform1->u.type != gcSHADER_FLOAT_4X4 || uniform1->nameLength < 0)
                     return;
-                }
             }
 
-            for (i = define->index - 1; i >=0; i--)
+            /*---------------------------II: Check the attribute---------------------------*/
+            if (type1 == gcSL_ATTRIBUTE)
             {
-                code = Tree->shader->code + i;
-
-                if (code->opcode != gcSL_MUL) continue;
-
-                if ((gcSL_TYPE)gcmSL_SOURCE_GET(code->source0, Type) != type0 ||
-                    code->source0Index != (gctUINT32)index0)
+                attributeIndex = index1;
+                attribute = Tree->shader->attributes[attributeIndex];
+                for (i = define->index - 1; i >=0; i--)
                 {
-                    continue;
-                }
+                    code = Tree->shader->code + i;
 
-                patternCount = define->index - i;
+                    if (code->opcode != gcSL_MUL) continue;
 
-                /* Right now, all channel must be seriation. */
-                if (gcmSL_SOURCE_GET(code->source1, Swizzle) != gcSL_SWIZZLE_XXXX)
-                    return;
-
-                type1 = gcmSL_SOURCE_GET(code->source1, Type);
-                if (type1 == gcSL_ATTRIBUTE)
-                {
-                    attributeIndex = code->source1Index;
-                    attribute = Tree->shader->attributes[attributeIndex];
-                }
-                else
-                {
-                    if (type1 != gcSL_TEMP)
-                        return;
-
-                    /* Right now, we only check one define.*/
-                    if (Tree->tempArray[code->source1Index].defined->next)
+                    if ((gcSL_TYPE)gcmSL_SOURCE_GET(code->source0, Type) != type0 ||
+                        code->source0Index != (gctUINT32)index0)
                     {
-                        return;
+                        continue;
                     }
 
-                    code = Tree->shader->code + Tree->tempArray[code->source1Index].defined->index;
-
-                    if (code->opcode != gcSL_MOV ||
-                        gcmSL_SOURCE_GET(code->source0, Type) != gcSL_ATTRIBUTE ||
-                        gcmSL_SOURCE_GET(code->source0, Indexed) != gcSL_NOT_INDEXED)
-                    {
-                        return;
-                    }
-                    attributeIndex = code->source0Index;
-                    attribute = Tree->shader->attributes[attributeIndex];
-                    /* All channels of this attribute must be used in order. */
-                    swizzle = gcmSL_SOURCE_GET(code->source0, Swizzle);
-                    enable = gcmSL_TARGET_GET(code->temp, Enable);
-
-                    if (attribute->type == gcSHADER_FLOAT_X1)
-                    {
-                        if (swizzle != gcSL_SWIZZLE_XXXX || enable != gcSL_ENABLE_X)
-                            return;
-                    }
-                    else if (attribute->type == gcSHADER_FLOAT_X2)
-                    {
-                        if (swizzle != gcSL_SWIZZLE_XYYY || enable != gcSL_ENABLE_XY)
-                            return;
-                    }
-                    else if (attribute->type == gcSHADER_FLOAT_X3)
-                    {
-                        if (swizzle != gcSL_SWIZZLE_XYZZ || enable != gcSL_ENABLE_XYZ)
-                            return;
-                    }
-                    else if (attribute->type == gcSHADER_FLOAT_X4)
-                    {
-                        if (swizzle != gcSL_SWIZZLE_XYZW || enable != gcSL_ENABLE_XYZW)
-                            return;
-                    }
-                }
-                break;
-            }
-        }
-
-        if (attributeIndex == -1)
-            return;
-
-        /* Find the attribute. */
-        if (attribute->nameLength < 0 || attribute->arraySize > 1 || attribute->type > gcSHADER_FLOAT_X4)
-            return;
-
-        channelCount = attribute->type - gcSHADER_FLOAT_X1 + 1;
-
-        if (channelCount == 1)
-        {
-            if (patternCount != 1)
-                return;
-        }
-        else if (channelCount == 2)
-        {
-            if (patternCount != 3)
-                return;
-        }
-        else if (channelCount == 3)
-        {
-            if (patternCount != 5)
-                return;
-        }
-        else
-        {
-            gcmASSERT(channelCount == 4);
-            if (patternCount != 6)
-                return;
-        }
-
-        /* Check the swizzle and count of MUL operation. */
-        for (i = define->index - patternCount; i < define->index; i++)
-        {
-            code = Tree->shader->code + i;
-
-            if (code->opcode != gcSL_MUL) continue;
-
-            swizzle = gcmComposeSwizzle(mulCount, mulCount, mulCount, mulCount);
-
-            if ((gcSL_SWIZZLE)gcmSL_SOURCE_GET(code->source1, Swizzle) != swizzle)
-            {
-                return;
-            }
-
-            mulCount++;
-        }
-
-        if (mulCount != channelCount)
-            return;
-
-        /* Make sure the value of w channel is 1. */
-        if (channelCount != 4)
-        {
-            code = Tree->shader->code + define->index;
-
-            if (!isMVPHoldByLTC)
-            {
-                if (gcmSL_SOURCE_GET(code->source1, Type) != gcSL_UNIFORM ||
-                    gcmSL_INDEX_GET(code->source1Index, Index) != (gctUINT32)uniformIndex ||
-                    gcmSL_INDEX_GET(code->source1Index, ConstValue) != 3)
-                {
-                    return;
+                    patternCount = define->index - i;
+                    break;
                 }
             }
             else
             {
-                if (gcmSL_SOURCE_GET(code->source1, Type) != gcSL_UNIFORM ||
-                    gcmSL_INDEX_GET(code->source1Index, Index) != (gctUINT32)(index0 + channelCount))
+                gcSHADER_LIST list2 = gcvNULL;
+
+                gcSHADER_FindList(Tree->shader, Tree->shader->wClipTempIndexList, index1, &list2);
+
+                if (list2 != gcvNULL)
+                {
+                    gctINT startIndex = 1;
+
+                    if (uniform1 != gcvNULL)
+                        startIndex = 2;
+                    _TraceStrictModelViewProjection(Tree, list2->index, startIndex, MatchCount);
+
+                    if (*MatchCount != 0)
+                    {
+                        uniform->modelViewProjection = *MatchCount - startIndex;
+                        if (uniform1 != gcvNULL)
+                        {
+                            uniform1->modelViewProjection = uniform->modelViewProjection + 1;
+                        }
+                        return;
+                    }
+                }
+
+                for (i = define->index - 1; i >=0; i--)
+                {
+                    code = Tree->shader->code + i;
+
+                    if (code->opcode != gcSL_MUL) continue;
+
+                    if ((gcSL_TYPE)gcmSL_SOURCE_GET(code->source0, Type) != type0 ||
+                        code->source0Index != (gctUINT32)index0)
+                    {
+                        continue;
+                    }
+
+                    patternCount = define->index - i;
+
+                    /* Right now, all channel must be seriation. */
+                    if (gcmSL_SOURCE_GET(code->source1, Swizzle) != gcSL_SWIZZLE_XXXX)
+                        return;
+
+                    type1 = gcmSL_SOURCE_GET(code->source1, Type);
+                    if (type1 == gcSL_ATTRIBUTE)
+                    {
+                        attributeIndex = code->source1Index;
+                        attribute = Tree->shader->attributes[attributeIndex];
+                    }
+                    else
+                    {
+                        if (type1 != gcSL_TEMP)
+                            return;
+
+                        /* Right now, we only check one define.*/
+                        if (Tree->tempArray[code->source1Index].defined->next)
+                        {
+                            return;
+                        }
+
+                        code = Tree->shader->code + Tree->tempArray[code->source1Index].defined->index;
+
+                        if (code->opcode != gcSL_MOV ||
+                            gcmSL_SOURCE_GET(code->source0, Type) != gcSL_ATTRIBUTE ||
+                            gcmSL_SOURCE_GET(code->source0, Indexed) != gcSL_NOT_INDEXED)
+                        {
+                            return;
+                        }
+                        attributeIndex = code->source0Index;
+                        attribute = Tree->shader->attributes[attributeIndex];
+                        /* All channels of this attribute must be used in order. */
+                        swizzle = gcmSL_SOURCE_GET(code->source0, Swizzle);
+                        enable = gcmSL_TARGET_GET(code->temp, Enable);
+
+                        if (attribute->type == gcSHADER_FLOAT_X1)
+                        {
+                            if (swizzle != gcSL_SWIZZLE_XXXX || enable != gcSL_ENABLE_X)
+                                return;
+                        }
+                        else if (attribute->type == gcSHADER_FLOAT_X2)
+                        {
+                            if (swizzle != gcSL_SWIZZLE_XYYY || enable != gcSL_ENABLE_XY)
+                                return;
+                        }
+                        else if (attribute->type == gcSHADER_FLOAT_X3)
+                        {
+                            if (swizzle != gcSL_SWIZZLE_XYZZ || enable != gcSL_ENABLE_XYZ)
+                                return;
+                        }
+                        else if (attribute->type == gcSHADER_FLOAT_X4)
+                        {
+                            if (swizzle != gcSL_SWIZZLE_XYZW || enable != gcSL_ENABLE_XYZW)
+                                return;
+                        }
+                    }
+                    break;
+                }
+            }
+
+            if (attributeIndex == -1)
+                return;
+
+            /* Find the attribute. */
+            if (attribute->nameLength < 0 || attribute->arraySize > 1 || attribute->type > gcSHADER_FLOAT_X4)
+                return;
+
+            channelCount = attribute->type - gcSHADER_FLOAT_X1 + 1;
+
+            if (channelCount == 1)
+            {
+                if (patternCount != 1)
+                    return;
+            }
+            else if (channelCount == 2)
+            {
+                if (patternCount != 3)
+                    return;
+            }
+            else if (channelCount == 3)
+            {
+                if (patternCount != 5)
+                    return;
+            }
+            else
+            {
+                gcmASSERT(channelCount == 4);
+                if (patternCount != 6)
+                    return;
+            }
+
+            /* Check the swizzle and count of MUL operation. */
+            for (i = define->index - patternCount; i < define->index; i++)
+            {
+                code = Tree->shader->code + i;
+
+                if (code->opcode != gcSL_MUL) continue;
+
+                swizzle = gcmComposeSwizzle(mulCount, mulCount, mulCount, mulCount);
+
+                if ((gcSL_SWIZZLE)gcmSL_SOURCE_GET(code->source1, Swizzle) != swizzle)
                 {
                     return;
                 }
-            }
-        }
 
-#if gcdUSE_WCLIP_PATCH
-        if (attributeIndex != -1 && uniformIndex != -1)
-        {
-            if (MatchCount)
-            {
-                *MatchCount = MVPStartIndex + 1;
+                mulCount++;
             }
-            Tree->shader->uniforms[uniformIndex]->modelViewProjection = MVPStartIndex + 1;
 
-            if (uniformIndex1 != -1)
+            if (mulCount != channelCount)
+                return;
+
+            /* Make sure the value of w channel is 1. */
+            if (channelCount != 4)
             {
-                Tree->shader->uniforms[uniformIndex]->modelViewProjection = MVPStartIndex + 2;
-                if (MatchCount)
+                code = Tree->shader->code + define->index;
+
+                if (!isMVPHoldByLTC)
                 {
-                    *MatchCount = MVPStartIndex + 2;
+                    if (gcmSL_SOURCE_GET(code->source1, Type) != gcSL_UNIFORM ||
+                        gcmSL_INDEX_GET(code->source1Index, Index) != (gctUINT32)uniformIndex ||
+                        gcmSL_INDEX_GET(code->source1Index, ConstValue) != 3)
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    if (gcmSL_SOURCE_GET(code->source1, Type) != gcSL_UNIFORM ||
+                        gcmSL_INDEX_GET(code->source1Index, Index) != (gctUINT32)(index0 + channelCount))
+                    {
+                        return;
+                    }
                 }
             }
 
-            gcmATTRIBUTE_SetIsPosition(Tree->shader->attributes[attributeIndex], gcvTRUE);
-            Tree->strictWClipMatch = gcvTRUE;
-
-            if (MatchCount)
+            if (attributeIndex != -1 && uniformIndex != -1)
             {
-                Tree->MVPCount = *MatchCount;
+                if (MatchCount)
+                {
+                    *MatchCount = MVPStartIndex + 1;
+                }
+                Tree->shader->uniforms[uniformIndex]->modelViewProjection = MVPStartIndex + 1;
+
+                if (uniformIndex1 != -1)
+                {
+                    Tree->shader->uniforms[uniformIndex]->modelViewProjection = MVPStartIndex + 2;
+                    if (MatchCount)
+                    {
+                        *MatchCount = MVPStartIndex + 2;
+                    }
+                }
+
+                gcmATTRIBUTE_SetIsPosition(Tree->shader->attributes[attributeIndex], gcvTRUE);
+                Tree->strictWClipMatch = gcvTRUE;
+
+                if (MatchCount)
+                {
+                    Tree->MVPCount = *MatchCount;
+                }
             }
         }
+    }
+    else
 #endif
+    {
+        return;
     }
 }
 
@@ -10798,7 +10867,9 @@ _TraceModelViewProjection(
             if (gcmSL_SOURCE_GET(code->source0, Type) == gcSL_UNIFORM)
             {
                 gctUINT uniformIndex = gcmSL_INDEX_GET(code->source0Index, Index);
+#if gcdUSE_WCLIP_PATCH
                 gcSHADER_LIST list;
+#endif
 
                 if (uniformIndex < VertexTree->shader->uniformCount)
                 {
@@ -10809,6 +10880,7 @@ _TraceModelViewProjection(
                         Counter++;
                         uniform->modelViewProjection = Counter;
                     }
+#if gcdUSE_WCLIP_PATCH
                     else if (isUniformLoadtimeConstant(uniform) &&
                         uniform->u.type == gcSHADER_FLOAT_X4 &&
                         gcSHADER_FindList(VertexTree->shader, VertexTree->shader->wClipUniformIndexList, (gctINT)uniformIndex, &list))
@@ -10818,12 +10890,15 @@ _TraceModelViewProjection(
                         Counter++;
                         VertexTree->shader->uniforms[list->data1]->modelViewProjection = Counter;
                     }
+#endif
                 }
             }
             if (gcmSL_SOURCE_GET(code->source1, Type) == gcSL_UNIFORM)
             {
                 gctUINT uniformIndex = gcmSL_INDEX_GET(code->source1Index, Index);
+#if gcdUSE_WCLIP_PATCH
                 gcSHADER_LIST list;
+#endif
 
                 if (uniformIndex < VertexTree->shader->uniformCount)
                 {
@@ -10834,6 +10909,7 @@ _TraceModelViewProjection(
                         Counter++;
                         uniform->modelViewProjection = Counter;
                     }
+#if gcdUSE_WCLIP_PATCH
                     else if (isUniformLoadtimeConstant(uniform) &&
                         uniform->u.type == gcSHADER_FLOAT_X4 &&
                         gcSHADER_FindList(VertexTree->shader, VertexTree->shader->wClipUniformIndexList, (gctINT)uniformIndex, &list))
@@ -10843,6 +10919,7 @@ _TraceModelViewProjection(
                         Counter++;
                         VertexTree->shader->uniforms[list->data1]->modelViewProjection = Counter;
                     }
+#endif
                 }
             }
         }
@@ -10894,13 +10971,16 @@ _TraceWChannelEqualToZ(
             /* Skip if there are more than one assignment for W channel. */
             if (!isWChannelAssigned)
                 isWChannelAssigned = gcvTRUE;
+#if gcdUSE_WCLIP_PATCH
             else
             {
                 Tree->WChannelEqualToZ = gcvFALSE;
                 return;
             }
+#endif
         }
 
+#if gcdUSE_WCLIP_PATCH
         if (gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_MOV &&
             gcmSL_SOURCE_GET(code->source0, Indexed) == gcSL_NOT_INDEXED &&
             gcmSL_SOURCE_GET(code->source0, SwizzleW) == gcSL_SWIZZLE_Z)
@@ -10908,6 +10988,7 @@ _TraceWChannelEqualToZ(
             Tree->WChannelEqualToZ = gcvTRUE;
         }
         else
+#endif
         {
             return;
         }
@@ -10925,7 +11006,9 @@ gcLINKTREE_FindModelViewProjection(
     gctINT matchCount = 0;
     gcOUTPUT positionOutput = gcvNULL;
     gctINT positionTempHolding = 0;
+#if gcdUSE_WCLIP_PATCH
     gcePATCH_ID patchId = gcPatchId;
+#endif
 
     /* Skip this for recompile. */
     if (VertexTree->flags & gcvSHADER_RECOMPILER)
@@ -11009,11 +11092,13 @@ gcLINKTREE_FindModelViewProjection(
     /* Check the MVP dependency. */
     _TraceStrictModelViewProjection(VertexTree, positionTempHolding, 0, &matchCount);
 
+#if gcdUSE_WCLIP_PATCH
     if (VertexTree->strictWClipMatch)
     {
         count = matchCount;
     }
     else
+#endif
     {
         count = 0;
     }
@@ -11596,8 +11681,8 @@ typedef struct _gcsSL_JUMPED_FROM   gcsSL_JUMPED_FROM,
                                     * gcsSL_JUMPED_FROM_PTR;
 struct _gcsSL_JUMPED_FROM
 {
-    gctBOOL blockBegin;
-    gctBOOL reached;
+    gctBOOL blockBegin : 2;
+    gctBOOL reached    : 2;
 };
 
 gceSTATUS
@@ -11704,13 +11789,13 @@ gcSHADER_OptimizeJumps(
 typedef struct _gcsMovConstToVector
 {
     gctUINT          tempIndex;     /* temp index for the constant vector */
-    gcSL_ENABLE      enable;
-    gcSL_FORMAT      format;        /* the format of each component */
     gctINT           assignNo;      /* number of distinct assignement */
-    gctBOOL          hasNonConstComponent;
-    gctBOOL          redefintion;   /* redefinition of some component */
-    gctBOOL          useBeforeLastDefine;
-    gctBOOL          skippedComponent;
+    gcSL_FORMAT      format  : 16;  /* the format of each component */
+    gcSL_ENABLE      enable  : 8;
+    gctBOOL          hasNonConstComponent : 2;
+    gctBOOL          redefintion          : 2;   /* redefinition of some component */
+    gctBOOL          useBeforeLastDefine  : 2;
+    gctBOOL          skippedComponent     : 2;
     gcSL_INSTRUCTION component[4];  /* instruction to assign x/y/z/w component */
     gcUNIFORM        uniform;       /* the compiler generated vector
                                        uniform for the constant */
@@ -12209,7 +12294,6 @@ gcLINKTREE_AllocateConstantUniform(
                 }
             }
 
-            /* TODO: handle user is output case or indexed */
             if (userIsOutput || userIsIndexed)
                 continue;
 
@@ -12348,6 +12432,7 @@ _splitInstructionHasSameDestAndSrcTempIndex(
             (gcmSL_SOURCE_GET(inst->source1, Type) == gcSL_TEMP && inst->tempIndex == inst->source1Index))
         {
             gctBOOL isTwoSourceSameRegister = gcvFALSE;
+            gctBOOL is64Bit = isFormat64bit(gcmSL_TARGET_GET(inst->temp, Format));
 
             /* If source0 and source1 have the same temp register and different swizzle value,
             ** we need to add two MOV instructions.
@@ -12383,7 +12468,7 @@ _splitInstructionHasSameDestAndSrcTempIndex(
                                                        (gcSL_SWIZZLE) gcmSL_SOURCE_GET(inst->source1, SwizzleW));
                 format[1] = gcmSL_SOURCE_GET(inst->source1, Format);
                 swizzle[1] = _Enable2SwizzleWShift(enable[1]);
-                precision[0] = gcmSL_SOURCE_GET(inst->source1, Precision);
+                precision[1] = gcmSL_SOURCE_GET(inst->source1, Precision);
             }
             else
             {
@@ -12421,7 +12506,7 @@ _splitInstructionHasSameDestAndSrcTempIndex(
             /* Mov the original source to a new temp register and use the new register as the source. */
             if (!isCmpPair)
             {
-                newTemp[0] = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
+                newTemp[0] = gcSHADER_NewTempRegs(Shader, is64Bit ? 2 : 1, gcSHADER_FLOAT_X4);
                 newInst[0]->opcode = gcSL_MOV;
                 newInst[0]->temp = gcmSL_TARGET_SET(0, Format, format[0])
                                           | gcmSL_TARGET_SET(0, Enable, enable[0])
@@ -12436,7 +12521,7 @@ _splitInstructionHasSameDestAndSrcTempIndex(
 
             if (isTwoSourceSameRegister)
             {
-                newTemp[1] = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
+                newTemp[1] = gcSHADER_NewTempRegs(Shader, is64Bit ? 2 : 1, gcSHADER_FLOAT_X4);
                 newInst[1]->opcode = gcSL_MOV;
                 newInst[1]->temp = gcmSL_TARGET_SET(0, Format, format[1])
                                           | gcmSL_TARGET_SET(0, Enable, enable[1])
@@ -12627,7 +12712,9 @@ _convertImageReadToTexld(
     )
 {
     gceSTATUS           status = gcvSTATUS_OK;
+#if !DEV129_469
     gctBOOL             computeOnlyGpu = gcHWCaps.hwFeatureFlags.computeOnly;
+#endif
     gcKERNEL_FUNCTION   kernelFunction = gcvNULL;
     gctSIZE_T           origUniformCount;
     gctSIZE_T           imageSamplerCount = 0;
@@ -12674,9 +12761,9 @@ _convertImageReadToTexld(
         if (Shader->uniforms[i])
         {
             gcSHADER_TYPE type = Shader->uniforms[i]->u.type;
-            if ((type == gcSHADER_IMAGE_2D) || (type == gcSHADER_IMAGE_3D) ||
-                (type == gcSHADER_IMAGE_1D) || (type == gcSHADER_IMAGE_1D_ARRAY) ||
-                (type == gcSHADER_IMAGE_1D_BUFFER) || (type == gcSHADER_IMAGE_2D_ARRAY))
+            if ((type == gcSHADER_IMAGE_2D_T) || (type == gcSHADER_IMAGE_3D_T) ||
+                (type == gcSHADER_IMAGE_1D_T) || (type == gcSHADER_IMAGE_1D_ARRAY_T) ||
+                (type == gcSHADER_IMAGE_1D_BUFFER_T) || (type == gcSHADER_IMAGE_2D_ARRAY_T))
             {
                 break;
             }
@@ -12732,7 +12819,7 @@ _convertImageReadToTexld(
                 {
                     gcSL_TYPE srcType;
 
-                    gcmASSERT(gcmSL_OPCODE_GET(prevInst->opcode, Opcode) == gcSL_MOV);
+                    gcmASSERT(gcmSL_OPCODE_GET(prevInst->opcode, Opcode) == gcSL_MOV || gcmSL_OPCODE_GET(prevInst->opcode, Opcode) == gcSL_COPY);
 
                     srcType = gcmSL_SOURCE_GET(prevInst->source0, Type);
                     if(srcType != gcSL_NONE)
@@ -12806,24 +12893,6 @@ _convertImageReadToTexld(
             return gcvSTATUS_INVALID_DATA;
         }
 
-#if gcdOCL_READ_IMAGE_OPTIMIZATION
-        /* Check if different samplers are used with the same image. */
-        if (computeOnlyGpu)
-        {
-            for (j = 0; j < imageSamplerCount; j++)
-            {
-                gcsIMAGE_SAMPLER_PTR imageSampler = &kernelFunction->imageSamplers[j];
-                if ((imageSampler->imageNum == imageNum) &&
-                    ((imageSampler->isConstantSamplerType != isConstantSamplerType) ||
-                     (imageSampler->samplerType != samplerType)))
-                {
-                    break;
-                }
-            }
-            gcmASSERT(j == imageSamplerCount);
-        }
-#endif
-
         for (j = 0; j < (gctINT)imageSamplerCount; j++)
         {
             gcsIMAGE_SAMPLER_PTR imageSampler = &kernelFunction->imageSamplers[j];
@@ -12850,7 +12919,8 @@ _convertImageReadToTexld(
                                             "sampler#%s#%d",
                                             imageUniform->name,
                                             imageSamplerCount));
-            if (imageUniform->u.type == gcSHADER_IMAGE_3D)
+
+            if (imageUniform->u.type == gcSHADER_IMAGE_3D_T)
             {
                 gcmONERROR(gcSHADER_AddUniform(Shader, symbol, gcSHADER_SAMPLER_3D, 1, imageUniform->precision, &uniform));
             }
@@ -12858,9 +12928,19 @@ _convertImageReadToTexld(
             {
                 gcmONERROR(gcSHADER_AddUniform(Shader, symbol, gcSHADER_SAMPLER_2D, 1, imageUniform->precision, &uniform));
             }
-            gcmONERROR(gcUNIFORM_SetFlags(uniform, 0 /*gcvUNIFORM_KIND_KERNEL_ARG*/));
+            gcmONERROR(gcUNIFORM_SetFlags(uniform, gcvUNIFORM_FLAG_COMPILER_GEN));
             gcmONERROR(gcUNIFORM_SetFormat(uniform, gcSL_UINT32, gcvFALSE));
             gcmASSERT(uniform->index == (origUniformCount + imageSamplerCount));
+            uniform->parent = imageNum;
+            if(isConstantSamplerType)
+            {
+                uniform->followingOffset = samplerType;
+            }
+            else
+            {
+                uniform->prevSibling = (gctINT16)samplerType;
+            }
+            SetUniformCategory(uniform, gcSHADER_VAR_CATEGORY_GL_SAMPLER_FOR_IMAGE_T);
             uniform->imageSamplerIndex = (gctUINT16) imageSamplerCount;
 
             /* Add imageSampler. */
@@ -12872,67 +12952,7 @@ _convertImageReadToTexld(
             gcmASSERT(imageSamplerCount == kernelFunction->imageSamplerCount);
         }
 
-#if gcdOCL_READ_IMAGE_OPTIMIZATION
-        if (computeOnlyGpu)
-        {
-            /* No texture unit. */
-            if (isConstantSamplerType && (coordFormat != gcSL_FLOAT))
-            {
-                /* Use img_load. */
-                /* No Action needed. */
-            }
-            else
-            {
-                /* Change IMAGE_SAMPLER to NOP. */
-                gcSL_SetInst2NOP(inst);
-
-                /* Change IMAGE_RD to TEXLD. */
-                gcmSL_OPCODE_UPDATE(instNext->opcode, Opcode, gcSL_TEXLD);
-                instNext->source0Index = (origUniformCount + j);
-                instNext->source0 = gcmSL_SOURCE_SET(instNext->source0, Swizzle, gcSL_SWIZZLE_XYZW);
-            }
-        }
-        else
-        {
-            if (gcHWCaps.hwFeatureFlags.hasUniversalTexld || /* v55 */
-                gcHWCaps.hwFeatureFlags.hasUniversalTexldV2) /* v60 and above */
-            {
-                /* Set HW sampler value. */
-                if (isConstantSamplerType)
-                {
-                    /* As the driver for texld_u/texld_u_xy is not ready, just use img_load/store for now */
-                }
-                else
-                {
-#if gcdOCL_READ_IMAGE_OPTIMIZATION > 1
-                    /* Copy src1 to src0. */
-                    inst->source0        = inst->source1;
-                    inst->source0Index   = inst->source1Index;
-                    inst->source0Indexed = inst->source1Indexed;
-#else
-                    /* Change IMAGE_SAMPLER to NOP. */
-                    gcSL_SetInst2NOP(inst);
-
-                    /* Change IMAGE_RD to TEXLD. */
-                    gcmSL_OPCODE_UPDATE(instNext->opcode, Opcode, gcSL_TEXLD);
-                    instNext->source0Index = (origUniformCount + j);
-                    instNext->source0 = gcmSL_SOURCE_SET(instNext->source0, Swizzle, gcSL_SWIZZLE_XYZW);
-#endif
-                }
-            }
-            else    /* v542 */
-            {
-                /* Change IMAGE_SAMPLER to NOP. */
-                gcSL_SetInst2NOP(inst);
-                /* Change IMAGE_RD to TEXLD. */
-                gcmSL_OPCODE_UPDATE(instNext->opcode, Opcode, gcSL_TEXLD);
-                instNext->source0Index = (origUniformCount + j);
-                instNext->source0 = gcmSL_SOURCE_SET(instNext->source0, Swizzle, gcSL_SWIZZLE_XYZW);
-            }
-
-
-        }
-#else
+#if !DEV129_469
         if ((computeOnlyGpu ||
              gcHWCaps.hwFeatureFlags.hasUniversalTexld ||
              gcHWCaps.hwFeatureFlags.hasUniversalTexldV2) &&
@@ -12945,6 +12965,7 @@ _convertImageReadToTexld(
             gcSL_SetInst2NOP(inst);
         }
         else
+#endif
         {
             /* Change IMAGE_SAMPLER to NOP. */
             gcSL_SetInst2NOP(inst);
@@ -12954,7 +12975,6 @@ _convertImageReadToTexld(
             instNext->source0Index = (origUniformCount + j);
             instNext->source0 = gcmSL_SOURCE_SET(instNext->source0, Swizzle, gcSL_SWIZZLE_XYZW);
         }
-#endif
 
         if (!isCodeChanged)
         {
@@ -13322,6 +13342,8 @@ gcLinkTree2VirShader(
                 VIR_Shader_IOBuffer buf;
                 VIR_Shader * readShader;
 
+                VIR_Shader_IOBuffer_Initialize(&buf);
+
                 VIR_Shader_Save(copiedShader, &buf);
 
                 gcmONERROR(gcoOS_Allocate(gcvNULL,
@@ -13339,6 +13361,7 @@ gcLinkTree2VirShader(
                 VIR_Shader_Destroy(copiedShader);
                 gcoOS_Free(gcvNULL, copiedShader);
                 VIR_IO_Finalize(&buf);
+                VIR_Shader_IOBuffer_Finalize(&buf);
 
                 *VirShader = readShader;
             }
@@ -13448,9 +13471,12 @@ gcLinkTreeThruVirShaders(
     VIR_Shader                  *vsVirShader = gcvNULL, *fsVirShader = gcvNULL, *csVirShader = gcvNULL,
                                 *tcsVirShader = gcvNULL, *tesVirShader = gcvNULL, *geoVirShader = gcvNULL;
     gctUINT8 *                  stateBuffer = gcvNULL;
+    gctUINT32                   *stateDelta = gcvNULL;
     gcsHINT_PTR                 hints = gcvNULL;
     VSC_CORE_SYS_CONTEXT        coreSysCtx;
-    VSC_HW_PIPELINE_SHADERS_STATES hwPgStates = {0};
+
+    coreSysCtx.hwCfg = gcHWCaps;
+    coreSysCtx.hPrivData = gcvNULL;
 
     gcmHEADER_ARG("Trees=0x%x ",Trees);
     do
@@ -13463,8 +13489,6 @@ gcLinkTreeThruVirShaders(
         gctBOOL                        dumpCGV = gcvFALSE;
         gceAPI                         clientAPI = gcvAPI_OPENGL_ES30;
 
-        coreSysCtx.hwCfg = gcHWCaps;
-        coreSysCtx.hPrivData = gcvNULL;
         sysCtx.pCoreSysCtx = &coreSysCtx;
         sysCtx.drvCBs.pfnAllocVidMemCb = (PFN_ALLOC_VIDMEM_CB)gcoSHADER_AllocateVidMem;
         sysCtx.drvCBs.pfnFreeVidMemCb = (PFN_FREE_VIDMEM_CB)gcoSHADER_FreeVidMem;
@@ -13538,12 +13562,23 @@ gcLinkTreeThruVirShaders(
                                  VSC_COMPILER_FLAG_COMPILE_CODE_GEN;
             scParam.cfg.ctx.clientAPI = clientAPI;
             scParam.cfg.optFlags = VSC_COMPILER_OPT_NONE;
+
+            /*
+            ** Enable FUNC_INLINE for OCL because we have moved the image-related code into VIR,
+            ** and we need to make sure that all those functions are inlined.
+            */
+            scParam.cfg.optFlags |= VSC_COMPILER_OPT_FUNC_INLINE;
+
             scParam.cfg.ctx.pSysCtx = &sysCtx;
             scParam.cfg.ctx.appNameId = gcPatchId;
             scParam.cfg.ctx.isPatchLib = gcvFALSE;
             if (Flags & gcvSHADER_FLUSH_DENORM_TO_ZERO)
             {
                 scParam.cfg.cFlags |= VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO;
+            }
+            if (Flags & gcvSHADER_ENABLE_MULTI_GPU)
+            {
+                scParam.cfg.cFlags |= VSC_COMPILER_FLAG_ENABLE_MULTI_GPU;
             }
         }
         else
@@ -13614,6 +13649,14 @@ gcLinkTreeThruVirShaders(
             {
                 pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_NO_FUNC_INLINE;
             }
+            if (Flags & gcvSHADER_LINK_PROGRAM_PIPELINE_OBJ)
+            {
+                pgComParam.cfg.cFlags |= VSC_COMPILER_FLAG_LINK_PROGRAM_PIPELINE_OBJ;
+            }
+            if (Flags & gcvSHADER_ENABLE_MULTI_GPU)
+            {
+                scParam.cfg.cFlags |= VSC_COMPILER_FLAG_ENABLE_MULTI_GPU;
+            }
 
             pgComParam.cfg.ctx.pSysCtx = &sysCtx;
 
@@ -13636,15 +13679,15 @@ gcLinkTreeThruVirShaders(
 
         if (ProgramState)
         {
+            VSC_HW_PIPELINE_SHADERS_STATES hwPgStates = {0};
+
             if (clKernel)
             {
                 vscCreatePrivateData(&coreSysCtx,
                                      &coreSysCtx.hPrivData,
                                      gcvTRUE);
                 gcmONERROR(vscCreateKernel(&scParam, gcvNULL, &hwPgStates));
-                vscDestroyPrivateData(&coreSysCtx,
-                                      coreSysCtx.hPrivData);
-                coreSysCtx.hPrivData = gcvNULL;
+                hwPgStates.hints.fragmentShaderId = VIR_Shader_GetId(csVirShader);
             }
             else
             {
@@ -13725,9 +13768,12 @@ gcLinkTreeThruVirShaders(
             }
 
             gcmASSERT(hwPgStates.stateBufferSize != 0 && hwPgStates.pStateBuffer != gcvNULL);
+            gcmASSERT(hwPgStates.stateDeltaSize != 0 && hwPgStates.pStateDelta != gcvNULL);
             gcmASSERT(!ProgramState->stateBufferSize);
             gcmASSERT(!ProgramState->stateBuffer);
             gcmASSERT(!ProgramState->hints);
+            gcmASSERT(!ProgramState->stateDelta);
+            gcmASSERT(!ProgramState->stateDeltaSize);
 
             /* Allocate a new state buffer. */
             gcmONERROR(gcoOS_Allocate(gcvNULL,
@@ -13739,17 +13785,32 @@ gcLinkTreeThruVirShaders(
             gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(struct _gcsHINT), (gctPOINTER*)&hints));
             gcoOS_MemCopy(hints, &hwPgStates.hints, sizeof(struct _gcsHINT));
 
+            /* Allocate a new state delta buffer. */
+            gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                      hwPgStates.stateDeltaSize,
+                                      (gctPOINTER*)&stateDelta));
+
+            gcoOS_MemCopy(stateDelta, hwPgStates.pStateDelta, hwPgStates.stateDeltaSize);
+
+
             /* Set new state buffer. */
             ProgramState->stateBuffer      = stateBuffer;
             ProgramState->stateBufferSize  = hwPgStates.stateBufferSize;
             ProgramState->hints            = hints;
+            ProgramState->stateDelta       = stateDelta;
+            ProgramState->stateDeltaSize   = hwPgStates.stateDeltaSize;
+            gcoOS_MemCopy(&ProgramState->patchOffsetsInDW, &hwPgStates.patchOffsetsInDW,
+                gcmSIZEOF(gcsPROGRAM_VidMemPatchOffset));
             stateBuffer = gcvNULL;
+            stateDelta = gcvNULL;
             hints = gcvNULL;
 
             /* Delete program states returned by compiler */
             gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, hwPgStates.pStateBuffer));
             hwPgStates.stateBufferSize = 0;
-            hwPgStates.pStateBuffer = gcvNULL;
+            gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, hwPgStates.pStateDelta));
+            hwPgStates.stateDeltaSize = 0;
+
         }
         else
         {
@@ -13838,6 +13899,11 @@ gcLinkTreeThruVirShaders(
         if (fsVirShader) {VIR_Shader_Destroy(fsVirShader); gcoOS_Free(gcvNULL, fsVirShader);}
         if (csVirShader) {VIR_Shader_Destroy(csVirShader); gcoOS_Free(gcvNULL, csVirShader);}
 
+        if (coreSysCtx.hPrivData)
+        {
+            vscDestroyPrivateData(&coreSysCtx, coreSysCtx.hPrivData);
+        }
+
     }while (gcvFALSE);
 
     /* Success. */
@@ -13854,210 +13920,15 @@ OnError:
     if (csVirShader) {VIR_Shader_Destroy(csVirShader); gcoOS_Free(gcvNULL, csVirShader);}
     if (stateBuffer) gcmOS_SAFE_FREE(gcvNULL, stateBuffer);
     if (hints)  gcmOS_SAFE_FREE(gcvNULL, hints);
-    if (hwPgStates.pStateBuffer) {gcmOS_SAFE_FREE(gcvNULL, hwPgStates.pStateBuffer); hwPgStates.stateBufferSize = 0;}
-    if (clKernel && coreSysCtx.hPrivData) {vscDestroyPrivateData(&coreSysCtx, coreSysCtx.hPrivData);}
+
+    if (coreSysCtx.hPrivData)
+    {
+        vscDestroyPrivateData(&coreSysCtx, coreSysCtx.hPrivData);
+    }
+
     /* Return the status. */
     gcmFOOTER();
 
-    return status;
-}
-
-gceSTATUS
-gcGoThroughVIRPass_Conv2VIR(
-    IN gcLINKTREE *             Tree,
-    OUT VIR_Shader **           Shader
-    )
-{
-    gceSTATUS                 status = gcvSTATUS_OK;
-    VIR_Shader *              virShader;
-    VSC_ErrCode               errCode;
-    gcLINKTREE                tree = *Tree;
-    gcSHADER                  shader = tree->shader;
-
-    VIR_ShaderKind            shaderKind = VIR_SHADER_UNKNOWN;
-
-    gctBOOL                   dumpCGV = gcSHADER_DumpCodeGenVerbose(shader);
-
-    gcmHEADER();
-
-    switch (shader->type) {
-    case gcSHADER_TYPE_VERTEX:
-        shaderKind = VIR_SHADER_VERTEX;
-        break;
-    case gcSHADER_TYPE_FRAGMENT:
-        shaderKind = VIR_SHADER_FRAGMENT;
-        break;
-    case gcSHADER_TYPE_CL:
-    case gcSHADER_TYPE_COMPUTE:
-        shaderKind = VIR_SHADER_COMPUTE;
-        break;
-    case gcSHADER_TYPE_TCS:
-        shaderKind = VIR_SHADER_TESSELLATION_CONTROL;
-        break;
-    case gcSHADER_TYPE_TES:
-        shaderKind = VIR_SHADER_TESSELLATION_EVALUATION;
-        break;
-    case gcSHADER_TYPE_GEOMETRY:
-        shaderKind = VIR_SHADER_GEOMETRY;
-        break;
-
-    default:
-        gcmASSERT(gcvFALSE);
-        break;
-    }
-
-    gcmONERROR(gcoOS_Allocate(gcvNULL,
-                              sizeof(VIR_Shader),
-                              (gctPOINTER*)&virShader));
-
-    errCode = VIR_Shader_Construct(gcvNULL,
-                                   shaderKind,
-                                   virShader);
-    if (VSC_ERR_NONE != errCode)
-    {
-        gcmASSERT(gcvFALSE);
-    }
-
-    gcmONERROR(gcSHADER_Conv2VIR(shader, gcvNULL, virShader));
-
-    if (dumpCGV)
-    {
-        VIR_Shader_Dump(gcvNULL, "Converted VIR shader IR.", virShader, gcvTRUE);
-    }
-
-    *Shader = virShader;
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-gceSTATUS
-gcGoThroughVIRPass_Compile(
-    IN OUT gcLINKTREE *     Tree,
-    IN OUT VIR_Shader *     Shader
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    VSC_CORE_SYS_CONTEXT coreSysctx;
-    VSC_SYS_CONTEXT sysctx;
-    VSC_SHADER_COMPILER_PARAM shComParam;
-
-    /* A temp VIR path for current ugent request */
-    gcQueryShaderCompilerHwCfg(gcvNULL, &coreSysctx.hwCfg);
-    coreSysctx.hPrivData = gcvNULL;
-    sysctx.pCoreSysCtx = &coreSysctx;
-    sysctx.drvCBs.pfnAllocVidMemCb = (PFN_ALLOC_VIDMEM_CB)gcoSHADER_AllocateVidMem;
-    sysctx.drvCBs.pfnFreeVidMemCb = (PFN_FREE_VIDMEM_CB)gcoSHADER_FreeVidMem;
-    sysctx.hDrv = gcvNULL;
-    shComParam.pShResourceLayout = gcvNULL;
-    shComParam.hShader = Shader;
-    shComParam.cfg.cFlags = VSC_COMPILER_FLAG_COMPILE_FULL_LEVELS|
-                            VSC_COMPILER_FLAG_COMPILE_CODE_GEN;
-    shComParam.cfg.ctx.clientAPI = Shader->clientApiVersion;
-    shComParam.cfg.optFlags = VSC_COMPILER_OPT_FULL;
-    shComParam.cfg.ctx.pSysCtx = &sysctx;
-    gcoHAL_GetPatchID(gcvNULL, &shComParam.cfg.ctx.appNameId);
-
-    if (shComParam.cfg.ctx.appNameId == gcvPATCH_AXX_SAMPLE)
-    {
-        shComParam.cfg.cFlags |= VSC_COMPILER_FLAG_API_UNIFORM_PRECISION_CHECK;
-    }
-
-    if (gcdPROC_IS_WEBGL(shComParam.cfg.ctx.appNameId) ||
-        shComParam.cfg.ctx.appNameId == gcvPATCH_DEQP  ||
-        shComParam.cfg.ctx.appNameId == gcvPATCH_OESCTS)
-    {
-        shComParam.cfg.cFlags |= VSC_COMPILER_FLAG_NEED_RTNE_ROUNDING;
-    }
-
-    status = vscCompileShader(&shComParam, gcvNULL);
-
-    return status;
-}
-
-gceSTATUS
-gcGoThroughVIRPass_NewTree(
-    IN OUT gcLINKTREE *         Tree,
-    IN VIR_Shader *             Shader
-    )
-{
-    gceSTATUS                 status = gcvSTATUS_OK;
-    gcLINKTREE                tree = *Tree;
-    gcSHADER                  shader = tree->shader;
-    gceSHADER_FLAGS           flags = tree->flags;
-    gctBOOL                   dumpCGV = gcSHADER_DumpCodeGenVerbose(shader);
-
-    gcmHEADER();
-    /* Destroy old link tree. */
-    gcLINKTREE_Destroy(tree);
-    gcmONERROR(gcSHADER_ConvFromVIR(shader, Shader, flags));
-
-    VIR_Shader_Destroy(Shader);
-    gcoOS_Free(gcvNULL, Shader);
-
-    /* Rebuild link tree by converted shader. */
-    gcmONERROR(gcLINKTREE_Construct((gcoOS)gcvNULL, Tree));
-
-    tree = *Tree;
-    gcmONERROR(gcLINKTREE_Build(tree, shader, flags));
-    if(shader->type & gcSHADER_TYPE_VERTEX)
-    {
-        gcLINKTREE_FindModelViewProjection(tree);
-    }
-
-    if ((flags & gcvSHADER_DEAD_CODE) &&
-        !gcShaderHwRegAllocated(shader))
-    {
-        gcmONERROR(gcLINKTREE_RemoveDeadCode(tree));
-    }
-    else
-    {
-        /* Mark all temps and attributes as used. */
-        gcmONERROR(gcLINKTREE_MarkAllAsUsedwithRA(tree));
-    }
-
-    if ((flags & gcvSHADER_OPTIMIZER) &&
-        !gcShaderHwRegAllocated(shader))
-    {
-        gcmONERROR(gcLINKTREE_Optimize(tree));
-    }
-
-    if (dumpCGV)
-    {
-        _DumpLinkTree("Converted gcSL shader link tree (from VIR)", tree, gcvFALSE);
-    }
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-gceSTATUS
-gcGoThroughVIRPass(
-    IN OUT gcLINKTREE *     Tree
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gcmHEADER_ARG("Tree=0x%x ",*Tree);
-    do
-    {
-        VIR_Shader *              virShader;
-
-        gcmONERROR(gcGoThroughVIRPass_Conv2VIR(Tree, &virShader));
-        gcmONERROR(gcGoThroughVIRPass_Compile(Tree, virShader));
-        gcmONERROR(gcGoThroughVIRPass_NewTree(Tree, virShader));
-
-    } while (gcvFALSE);
-    /* Success. */
-    gcmFOOTER_ARG("*Tree=0x%x", *Tree);
-    return gcvSTATUS_OK;
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
     return status;
 }
 #endif  /* !DX_SHADER */
@@ -14556,7 +14427,9 @@ _gcCreateDefaultUBO(
                 uniform->parent != -1 ||
                 (isUniformNormal(uniform) &&
                 (gcmType_Kind(uniform->u.type) == gceTK_SAMPLER ||
+                 gcmType_Kind(uniform->u.type) == gceTK_SAMPLER_T ||
                  gcmType_Kind(uniform->u.type) == gceTK_IMAGE ||
+                 gcmType_Kind(uniform->u.type) == gceTK_IMAGE_T ||
                  gcmType_Kind(uniform->u.type) == gceTK_ATOMIC)))
             {
                 continue;
@@ -14631,7 +14504,9 @@ _gcCreateDefaultUBO(
                 uniform->parent != -1 ||
                 (isUniformNormal(uniform) &&
                 (gcmType_Kind(uniform->u.type) == gceTK_SAMPLER ||
+                 gcmType_Kind(uniform->u.type) == gceTK_SAMPLER_T ||
                  gcmType_Kind(uniform->u.type) == gceTK_IMAGE ||
+                 gcmType_Kind(uniform->u.type) == gceTK_IMAGE_T ||
                  gcmType_Kind(uniform->u.type) == gceTK_ATOMIC)))
             {
                 continue;
@@ -15813,6 +15688,7 @@ _Implement32BitModulus(
     gctUINT32 int32Temp0 = 0, int32Temp1 = 0, int32Temp2 = 0;
     gctUINT endLabel, label1, label2, label3;
     gctINT constZero = 0, constOne = 1;
+    gctFLOAT constFloatOne = 1.0;
     gctUINT constFour = 0xf0000004 /* (32<<23) + 4 */;
     gcSL_FORMAT targetType = IsInt32 ? gcSL_INTEGER : gcSL_UINT32;
     /* Always use HIGHP for this conversion. */
@@ -15887,17 +15763,18 @@ _Implement32BitModulus(
         gcSHADER_AddSourceIndexedWithPrecision(Shader, gcSL_TEMP, newSource1Index, gcSL_SWIZZLE_XXXX, gcSL_NOT_INDEXED, 0, gcSL_INT32, precision);
     }
 
-    /* If Y > 1, normal step, else result X/Y = X */
-    endLabel  = gcSHADER_FindNextUsedLabelId(Shader);
-    gcSHADER_AddOpcodeConditional(Shader, gcSL_JMP, gcSL_LESS_OR_EQUAL, endLabel, srcLoc);
-    gcSHADER_AddSourceIndexedWithPrecision(Shader, gcSL_TEMP, IsInt32 ? int32Temp2 : newSource1Index, gcSL_SWIZZLE_XXXX, gcSL_NOT_INDEXED, 0, gcSL_UINT32, precision);
-    gcSHADER_AddSourceConstantFormatted(Shader, &constOne, gcSL_UINT32);
-
-    /* Normal step. */
+    /* convert Y floating point number, some chip don't support int type comparison (e.g. imx6) */
     /* Goto float, r0 = ITOF(y) */
     gcSHADER_AddOpcodeIndexedWithPrecision(Shader, gcSL_I2F, newTemp0, gcSL_ENABLE_X, gcSL_NOT_INDEXED, 0, gcSL_FLOAT, precision, srcLoc);
     gcSHADER_AddSourceIndexedWithPrecision(Shader, gcSL_TEMP, IsInt32 ? int32Temp2 : newSource1Index, gcSL_SWIZZLE_XXXX, gcSL_NOT_INDEXED, 0, gcSL_UINT32, precision);
 
+    /* If Y > 1.0, normal step, else result X/Y = X */
+    endLabel  = gcSHADER_FindNextUsedLabelId(Shader);
+    gcSHADER_AddOpcodeConditional(Shader, gcSL_JMP, gcSL_LESS_OR_EQUAL, endLabel, srcLoc);
+    gcSHADER_AddSourceIndexedWithPrecision(Shader, gcSL_TEMP, newTemp0, gcSL_SWIZZLE_XXXX, gcSL_NOT_INDEXED, 0, gcSL_FLOAT, precision);
+    gcSHADER_AddSourceConstantFormatted(Shader, &constFloatOne, gcSL_FLOAT);
+
+    /* Normal step. */
     /* r1 = 4026531844 + r0 */
     gcSHADER_AddOpcodeIndexedWithPrecision(Shader, gcSL_ADD, newTemp1, gcSL_ENABLE_X, gcSL_NOT_INDEXED, 0, gcSL_UINT32, precision, srcLoc);
     gcSHADER_AddSourceConstantFormatted(Shader, &constFour, gcSL_UINT32);
@@ -15912,9 +15789,10 @@ _Implement32BitModulus(
     gcSHADER_AddSourceIndexedWithPrecision(Shader, gcSL_TEMP, newTemp2, gcSL_SWIZZLE_XXXX, gcSL_NOT_INDEXED, 0, gcSL_FLOAT, precision);
 
     /* r4 = 0 - Y */
-    gcSHADER_AddOpcodeIndexedWithPrecision(Shader, gcSL_SUB, newTemp4, gcSL_ENABLE_X, gcSL_NOT_INDEXED, 0, gcSL_UINT32, precision, srcLoc);
-    gcSHADER_AddSourceConstantFormatted(Shader, &constZero, gcSL_UINT32);
-    gcSHADER_AddSourceIndexedWithPrecision(Shader, gcSL_TEMP, IsInt32 ? int32Temp2 : newSource1Index, gcSL_SWIZZLE_XXXX, gcSL_NOT_INDEXED, 0, gcSL_UINT32, precision);
+    /* Here we should use signed integer. */
+    gcSHADER_AddOpcodeIndexedWithPrecision(Shader, gcSL_SUB, newTemp4, gcSL_ENABLE_X, gcSL_NOT_INDEXED, 0, gcSL_INT32, precision, srcLoc);
+    gcSHADER_AddSourceConstantFormatted(Shader, &constZero, gcSL_INT32);
+    gcSHADER_AddSourceIndexedWithPrecision(Shader, gcSL_TEMP, IsInt32 ? int32Temp2 : newSource1Index, gcSL_SWIZZLE_XXXX, gcSL_NOT_INDEXED, 0, gcSL_INT32, precision);
 
     /* r5 = r4 * r3 */
     gcSHADER_AddOpcodeIndexedWithPrecision(Shader, gcSL_MUL, newTemp5, gcSL_ENABLE_X, gcSL_NOT_INDEXED, 0, gcSL_UINT32, precision, srcLoc);
@@ -16036,20 +15914,18 @@ gctBOOL isPowerOf2(gctUINT v)
     return ((v != 0) && ((v & (~v + 1)) == v));
 }
 
-/* TODO: move the implementation of 32bit modulus to library and change
- * the code to builtin intrinsic library in FE */
 static gceSTATUS
 _gcConvert32BitModulus(
     IN gcSHADER Shader,
     IN gctBOOL  Dump
     )
 {
-    gceSTATUS status = gcvSTATUS_OK;
-    gctINT i;
-    gcSL_INSTRUCTION code;
-    gctINT addCodeCount;
-    gctUINT lastInst = Shader->lastInstruction;
-    gctBOOL changed = gcvFALSE;
+    gceSTATUS         status = gcvSTATUS_OK;
+    gctINT            i;
+    gcSL_INSTRUCTION  code;
+    gctINT            addCodeCount;
+    gctUINT           lastInst = Shader->lastInstruction;
+    gctBOOL           changed = gcvFALSE;
 
     if (gcUseFullNewLinker(gcHWCaps.hwFeatureFlags.hasHalti2))
     {
@@ -16057,7 +15933,7 @@ _gcConvert32BitModulus(
         return status;
     }
 
-    if(!gcHWCaps.hwFeatureFlags.hasHalti0)
+    if (!gcHWCaps.hwFeatureFlags.hasHalti0)
     {
         return status;
     }
@@ -16105,7 +15981,6 @@ _gcConvert32BitModulus(
         Shader->lastInstruction = i;
         Shader->instrIndex = gcSHADER_OPCODE;
         gcmONERROR(_Implement32BitModulus(Shader, isInt32, isMod, &Shader->code[i + addCodeCount]));
-        gcShaderSetHas32BitModulus(Shader);
 
         lastInst +=addCodeCount;
         Shader->lastInstruction = lastInst;
@@ -16630,8 +16505,8 @@ OnError:
 }
 
 static gceSTATUS
-_gcLINKTREE_ReplaceColor2FrontBackColor(
-    IN gcSHADER FragmentShader
+_gcLINKTREE_CreateColorOutput(
+    IN gcSHADER VertexShader
     );
 
 static gceSTATUS
@@ -16640,7 +16515,8 @@ _gcLINKTREE_ClampOutputColor(
     );
 
 static gceSTATUS
-_gcLINKTREE_CreateColorOutput(
+_gcLINKTREE_ReplaceColor2FrontBackColor(
+    IN gcSHADER FragmentShader,
     IN gcSHADER VertexShader
     );
 
@@ -16854,6 +16730,32 @@ _ConvFlags2OptimizerOption(
     return opt;
 }
 
+static gceSTATUS
+_checkIfShadersCanBeLinkedTogether(
+    IN gctUINT32_PTR shaderVersion1,
+    IN gctUINT32_PTR shaderVersion2
+    )
+{
+    gceSTATUS               status = gcvSTATUS_OK;
+
+    /* check if the shaders linked together are the same versions
+     *  Note: this may not be true for some version of shaders, check with spec!
+     *  TODO: disable this check for desktop gl for now.
+     *  Per spec, GL shaders declaring version 1.40, 1.50, or 3.30 of the shading
+        language can be linked with shaders declaring version 4.00 in the same program.
+        Shaders targeting earlier versions (1.30 or earlier) of the shading language
+        cannot be linked with version 4.00 shaders.
+     */
+    if ((shaderVersion1 && shaderVersion2)
+        && (shaderVersion1[0] & 0xFFFF) != _SHADER_OGL_LANGUAGE_TYPE
+        && shaderVersion1[1] != shaderVersion2[1])
+    {
+        return gcvSTATUS_SHADER_VERSION_MISMATCH;
+    }
+
+    return status;
+}
+
 /*******************************************************************************
 **                                gcLinkShaders
 ********************************************************************************
@@ -16956,12 +16858,10 @@ gcLinkShaders(
         }
     }
 
-    /* check if the shaders linked together are the same versions
-     *  Note: this may not be true for some version of shaders, check with spec!
-     */
-    if ((vertexVersion && fragmentVersion) && vertexVersion[1] != fragmentVersion[1])
+    status = _checkIfShadersCanBeLinkedTogether(vertexVersion, fragmentVersion);
+    if (status == gcvSTATUS_SHADER_VERSION_MISMATCH)
     {
-        return gcvSTATUS_SHADER_VERSION_MISMATCH;
+        return status;
     }
 
     Shaders[gceSGSK_VERTEX_SHADER] = VertexShader;
@@ -17005,21 +16905,27 @@ gcLinkShaders(
         status = _gcLINKTREE_ClampOutputColor(VertexShader);
         if (gcmIS_ERROR(status))
         {
-            gcmFATAL("ERROR: Cannot clamp output color on shader.");
+            gcmFATAL("ERROR: Cannot clamp output color on vertex shader.");
             return status;
         }
     }
 
     if (FragmentShader)
     {
-        status = _gcLINKTREE_ReplaceColor2FrontBackColor(FragmentShader);
+        status = _gcLINKTREE_ReplaceColor2FrontBackColor(FragmentShader, VertexShader);
         if (gcmIS_ERROR(status))
         {
             gcmFATAL("ERROR: Cannot replace color 2 front/back color on fragment shader.");
             return status;
         }
-    }
 
+        status = _gcLINKTREE_ClampOutputColor(FragmentShader);
+        if (gcmIS_ERROR(status))
+        {
+            gcmFATAL("ERROR: Cannot clamp output color on fragment shader.");
+            return status;
+        }
+    }
 
     /* set the flag for optimizer and BE */
     opt = gcGetOptimizerOption()->optFlags | _ConvFlags2OptimizerOption(Flags);
@@ -17149,10 +17055,6 @@ gcLinkShaders(
         if(!gcHWCaps.hwFeatureFlags.hasHalti1 ||
            _ToUploadUBO(VertexShader, FragmentShader, &uploadUBO))
         {
-            /* TODO -
-            ** actually we should change load to mov for UBO as many as possible for all chips,
-            ** it would reduce shader instruction count and improve performance.
-            */
             for(i = 0, shader = VertexShader; i < 2; i++, shader = FragmentShader)
             {
                 if (shader)
@@ -17412,8 +17314,8 @@ gcLinkShaders(
                 }
 
                 /* API level resource check. */
-                gcmERR_BREAK(gcLINKTREE_CheckAPILevelResource(vertexTree));
-                gcmERR_BREAK(gcLINKTREE_CheckAPILevelResource(fragmentTree));
+                gcmERR_BREAK(gcLINKTREE_CheckAPILevelResource(vertexTree, isRecompiler));
+                gcmERR_BREAK(gcLINKTREE_CheckAPILevelResource(fragmentTree, isRecompiler));
 
                 /* Convert CONV. */
                 trees[gceSGSK_VERTEX_SHADER] = &vertexTree;
@@ -17465,7 +17367,7 @@ gcLinkShaders(
                     aubo_options = VSC_OPTN_Options_GetAUBOOptions(VSC_OPTN_Get_Options());
                     if (VSC_OPTN_UF_AUBOOptions_GetSwitchOn(aubo_options) && !(Flags & gcvSHADER_DISABLE_DEFAULT_UBO))
                     {
-                        VSC_UF_UtilizeAuxUBO(&all_shaders, gcvNULL, aubo_options);
+                        VSC_UF_UtilizeAuxUBO(&all_shaders, gcvNULL, aubo_options, gcvNULL);
                     }
 
                     vscPMP_Finalize(&allShadersPmp);
@@ -17672,7 +17574,7 @@ gcLinkShaders(
             }
 
             /* Check uniform limit. */
-            if (ProgramState->hints && ProgramState->hints->unifiedStatus.constant &&
+            if (ProgramState->hints && (ProgramState->hints->unifiedStatus.constantUnifiedMode != gcvUNIFORM_ALLOC_NONE_UNIFIED) &&
                 VertexShader && FragmentShader)
             {
                 if (ProgramState->hints->vsConstCount + ProgramState->hints->fsConstCount > ProgramState->hints->maxConstCount)
@@ -17718,8 +17620,9 @@ gcLinkShaders(
     /* Return the status. */
     if (gcmIS_SUCCESS(status) && ProgramState)
     {
-        gcmFOOTER_ARG("stateBufferSize=%lu stateBuffer=0x%x hints=0x%x",
-                                  ProgramState->stateBufferSize, ProgramState->stateBuffer, ProgramState->hints);
+        gcmFOOTER_ARG("stateBufferSize=%lu stateBuffer=0x%x hints=0x%x stateDelta=0x%x stateDeltaSize=%lu",
+            ProgramState->stateBufferSize, ProgramState->stateBuffer, ProgramState->hints,
+            ProgramState->stateDelta, ProgramState->stateDeltaSize);
     }
     else
     {
@@ -17801,9 +17704,10 @@ _gcLinkFullGraphicsShaders(
              */
             if (firstShot)
             {
-                if ((shVersion && thisShVersion) && shVersion[1] != thisShVersion[1])
+                status = _checkIfShadersCanBeLinkedTogether(shVersion, thisShVersion);
+                if (status == gcvSTATUS_SHADER_VERSION_MISMATCH)
                 {
-                    return gcvSTATUS_SHADER_VERSION_MISMATCH;
+                    return status;
                 }
             }
             else
@@ -17819,7 +17723,7 @@ _gcLinkFullGraphicsShaders(
 
     for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i ++)
     {
-        if (Shaders[i])
+       if (Shaders[i])
         {
             /*
             ** Ignore all references to the gl_BoundingBox in TS since we don't support it.
@@ -17849,21 +17753,28 @@ _gcLinkFullGraphicsShaders(
                 status = _gcLINKTREE_ClampOutputColor(Shaders[i]);
                 if (gcmIS_ERROR(status))
                 {
-                    gcmFATAL("ERROR: Cannot clamp output color on shader.");
+                    gcmFATAL("ERROR: Cannot clamp output color on vertex shader.");
                     return status;
                 }
             }
             else if (i == gceSGSK_FRAGMENT_SHADER)
             {
-                status = _gcLINKTREE_ReplaceColor2FrontBackColor(Shaders[i]);
+                status = _gcLINKTREE_ReplaceColor2FrontBackColor(Shaders[i], Shaders[gceSGSK_VERTEX_SHADER]);
                 if (gcmIS_ERROR(status))
                 {
                     gcmFATAL("ERROR: Cannot replace color 2 front/back color on fragment shader.");
                     return status;
                 }
+
+                status = _gcLINKTREE_ClampOutputColor(Shaders[i]);
+                if (gcmIS_ERROR(status))
+                {
+                    gcmFATAL("ERROR: Cannot clamp output color on fragment shader.");
+                    return status;
                 }
             }
         }
+    }
 
     /* set the flag for optimizer and BE */
     opt = gcGetOptimizerOption()->optFlags | _ConvFlags2OptimizerOption(Flags);
@@ -18070,7 +17981,7 @@ _gcLinkFullGraphicsShaders(
                     }
 
                     /* API level resource check. */
-                    gcmONERROR(gcLINKTREE_CheckAPILevelResource(shaderTrees[i]));
+                    gcmONERROR(gcLINKTREE_CheckAPILevelResource(shaderTrees[i], isRecompiler));
                 }
 
                 tempShaderTrees[i] = &shaderTrees[i];
@@ -18083,13 +17994,13 @@ _gcLinkFullGraphicsShaders(
         gcmONERROR(gcLinkTreeThruVirShaders(tempShaderTrees, gcvFALSE,
                                             Flags, doPreVaryingPacking,
                                             ProgramState));
-    }
 
-    for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i ++)
-    {
-        if (Shaders[i])
+        for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i ++)
         {
-            gcShaderSetAfterLink(Shaders[i]);
+            if (Shaders[i])
+            {
+                gcShaderSetAfterLink(Shaders[i]);
+            }
         }
     }
 
@@ -18106,8 +18017,9 @@ OnError:
     if (gcmIS_SUCCESS(status) && ProgramState)
     {
         /* Return the status. */
-        gcmFOOTER_ARG("stateBufferSize=%lu stateBuffer=0x%x hints=0x%x",
-            ProgramState->stateBufferSize, ProgramState->stateBuffer, ProgramState->hints);
+        gcmFOOTER_ARG("stateBufferSize=%lu stateBuffer=0x%x hints=0x%x stateDelta=0x%x stateDeltaSize=%lu",
+            ProgramState->stateBufferSize, ProgramState->stateBuffer, ProgramState->hints,
+            ProgramState->stateDelta, ProgramState->stateDeltaSize);
     }
     else
     {
@@ -18125,6 +18037,129 @@ OnError:
         gcmFOOTER();
     }
 
+    return status;
+}
+
+static gceSTATUS
+_gcCalculateWorkGroupIdForMultiGPU(
+    IN gcSHADER             Shader
+    )
+{
+    gceSTATUS               status = gcvSTATUS_OK;
+    gctUINT                 i, j, origLastInstruction = Shader->lastInstruction;
+    gcUNIFORM               uniform, workGroupIdOffsetUniform = gcvNULL;
+    gcATTRIBUTE             attr, workGroupIdAttr = gcvNULL;
+    gctINT                  mainStartIdx = 0;
+    gctUINT32               newWorkGroupIdTempIndex;
+
+    /* Find WorkGroupID, if not found, just bail out. */
+    for (i = 0; i < Shader->attributeCount; i++)
+    {
+        attr = Shader->attributes[i];
+
+        if (attr &&
+            GetATTRNameLength(attr) < 0 &&
+            GetATTRNameLength(attr) == gcSL_WORK_GROUP_ID)
+        {
+            workGroupIdAttr = attr;
+            break;
+        }
+    }
+    if (workGroupIdAttr == gcvNULL)
+    {
+        return status;
+    }
+
+    for (i = 0; i < Shader->uniformCount; i++)
+    {
+        uniform = Shader->uniforms[i];
+
+        if (uniform && isUniformWorkGroupIdOffset(uniform))
+        {
+            workGroupIdOffsetUniform = uniform;
+            break;
+        }
+    }
+    if (workGroupIdOffsetUniform)
+    {
+        return status;
+    }
+
+    /* Create workGroupIdOffset. */
+    gcmONERROR(gcSHADER_AddUniformEx1(Shader,
+                                      _sldWorkGroupIdOffsetName,
+                                      gcSHADER_UINT_X3,
+                                      gcSHADER_PRECISION_HIGH,
+                                      -1,
+                                      -1,
+                                      -1,
+                                      0,
+                                      gcvNULL,
+                                      gcSHADER_VAR_CATEGORY_WORK_GROUP_ID_OFFSET,
+                                      0,
+                                      -1,
+                                      -1,
+                                      gcIMAGE_FORMAT_DEFAULT,
+                                      gcvNULL,
+                                      &workGroupIdOffsetUniform));
+
+    /* Create a new temp register to save the workGroupId. */
+    newWorkGroupIdTempIndex = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X4);
+
+    /* Find the main function entry. */
+    gcmONERROR(gcSHADER_FindMainFunction(Shader, &mainStartIdx, gcvNULL));
+
+    /* Compute group index :
+        newWorkGroupId = workGroupIdAttr
+        newWorkGroupId.xyz = newWorkGroupId.xyz + workGroupIdOffset.xyz
+    */
+    gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, mainStartIdx, 2, gcvTRUE, gcvTRUE));
+    Shader->instrIndex = (mainStartIdx == 0) ? gcSHADER_OPCODE : gcSHADER_SOURCE1;
+    Shader->lastInstruction = (mainStartIdx == 0) ? 0 : mainStartIdx - 1;
+
+    /* MOV newWorkGroupId, workGroupIdAttr */
+    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MOV, newWorkGroupIdTempIndex, gcSL_ENABLE_XYZW, gcSL_UINT32, gcSHADER_PRECISION_HIGH, 0));
+    gcmONERROR(gcSHADER_AddSourceAttributeFormatted(Shader, workGroupIdAttr, gcSL_SWIZZLE_XYZW, 0, gcSL_UINT32));
+
+    /* ADD newWorkGroupId.xyz, workGroupIdAttr.xyz, workGroupIdOffset.xyz */
+    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_ADD, newWorkGroupIdTempIndex, gcSL_ENABLE_XYZ, gcSL_UINT32, gcSHADER_PRECISION_HIGH, 0));
+    gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, newWorkGroupIdTempIndex, gcSL_SWIZZLE_XYZZ, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+    gcmONERROR(gcSHADER_AddSourceUniformFormatted(Shader, workGroupIdOffsetUniform, gcSL_SWIZZLE_XYZZ, 0, gcSL_UINT32));
+
+    Shader->lastInstruction = origLastInstruction + 2;
+
+    /* Replace all workGroupIdAttr with newWorkGroupId. */
+    for (i = 0; i < Shader->lastInstruction; i++)
+    {
+        if ((Shader->code[i].tempIndex == newWorkGroupIdTempIndex)
+            &&
+            (gcmSL_OPCODE_GET(Shader->code[i].opcode, Opcode) == gcSL_MOV || gcmSL_OPCODE_GET(Shader->code[i].opcode, Opcode) == gcSL_ADD))
+        {
+            continue;
+        }
+
+        for (j = 0; j < 2; j++)
+        {
+            gctSOURCE_t*    pSource = (j == 0) ? &Shader->code[i].source0 : &Shader->code[i].source1;
+            gctUINT32*      pSourceIndex = (j == 0) ? &Shader->code[i].source0Index : &Shader->code[i].source1Index;
+
+            if (gcmSL_SOURCE_GET(*pSource, Type) != gcSL_ATTRIBUTE)
+            {
+                continue;
+            }
+
+            if (gcmSL_INDEX_GET(*pSourceIndex, Index) != workGroupIdAttr->index)
+            {
+                continue;
+            }
+
+            *pSource      = gcmSL_SOURCE_SET(*pSource, Type, gcSL_TEMP);
+            *pSource      = gcmSL_SOURCE_SET(*pSource, Indexed, gcSL_NOT_INDEXED);
+            *pSourceIndex = gcmSL_INDEX_SET(*pSourceIndex, Index, newWorkGroupIdTempIndex);
+        }
+    }
+
+OnError:
     return status;
 }
 
@@ -18169,6 +18204,8 @@ gcLinkKernel(
     gceSHADER_OPTIMIZATION  opt;
     gctBOOL                 dumpCGVerbose, newCGDone = gcvFALSE;
     gcSHADER                Shaders[gcMAX_SHADERS_IN_LINK_GOURP] = {0, 0, 0, 0, 0, 0};
+    gctBOOL                 isRecompiler = Flags & gcvSHADER_RECOMPILER;
+    gctBOOL                 bGoVirPass = gcSHADER_GoVIRPass(Kernel);
 
     gcmHEADER_ARG("Kernel=0x%x Flags=%x",
                   Kernel, Flags);
@@ -18252,12 +18289,21 @@ gcLinkKernel(
     /* Clear kernel functions arguments number. */
     Kernel->maxKernelFunctionArgs = 0;
 
-    if (Flags & gcSHADER_HAS_IMAGE_IN_KERNEL)
+    if ((Flags & gcSHADER_HAS_IMAGE_IN_KERNEL) && !gcmOPT_DriverVIRPath())
     {
         /* Read_image patching. */
         /* Create image-sampler pairs, */
         /*    and replace IMAGE_SAMPLER-IMAGE_RD pairs with TEXLD. */
         gcmONERROR(_convertImageReadToTexld(Kernel, Flags));
+    }
+
+    if (!bGoVirPass && (Flags & gcvSHADER_ENABLE_MULTI_GPU) && gcHWCaps.hwFeatureFlags.supportMultiGPU)
+    {
+        gcmONERROR(_gcCalculateWorkGroupIdForMultiGPU(Kernel));
+        if (gcSHADER_DumpOptimizerVerbose(Kernel))
+        {
+            gcOpt_Dump(gcvNULL, "After calculate workGroupId for multi-GPU.", gcvNULL, Kernel);
+        }
     }
 
     if (Flags & gcvSHADER_OPTIMIZER)
@@ -18304,7 +18350,7 @@ gcLinkKernel(
             /* Allocate const vector uniform for kernel tree */
             gcmONERROR(gcLINKTREE_AllocateConstantUniform(kernelTree));
             if (dumpCGVerbose)
-                _DumpLinkTree("Cleaned up the kernel tree.", kernelTree, gcvFALSE);
+                _DumpLinkTree("Allocate Constant Uniform.", kernelTree, gcvFALSE);
 
             /* Clean up the kernel shader. */
             gcmONERROR(gcLINKTREE_Cleanup(kernelTree));
@@ -18312,17 +18358,12 @@ gcLinkKernel(
                 _DumpLinkTree("Cleaned up the kernel tree.", kernelTree, gcvFALSE);
 
             /* API level resource check. */
-            gcmONERROR(gcLINKTREE_CheckAPILevelResource(kernelTree));
+            gcmONERROR(gcLINKTREE_CheckAPILevelResource(kernelTree, isRecompiler));
         }
 
         /* go through VIR pass*/
-        if (gcSHADER_GoVIRPass(Kernel))
+        if (bGoVirPass)
         {
-#if !USE_NEW_LINKER
-            gcmONERROR(gcGoThroughVIRPass(&kernelTree));
-            if (dumpCGVerbose)
-                _DumpLinkTree("After VIR kernel tree.", kernelTree, gcvFALSE);
-#else
             gcLINKTREE* trees[gcMAX_SHADERS_IN_LINK_GOURP];
             gctINT      i;
             for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i++) trees[i] = gcvNULL;
@@ -18341,7 +18382,6 @@ gcLinkKernel(
                                                     gcvFALSE, gcvNULL));
                 newCGDone = gcvFALSE;
             }
-#endif
         }
 
         if (!newCGDone)
@@ -18380,8 +18420,10 @@ gcLinkKernel(
     /* Return the status. */
     if (gcmIS_SUCCESS(status) && ProgramState)
     {
-        gcmFOOTER_ARG("stateBufferSize=%lu stateBuffer=0x%x hints=0x%x",
-                                  ProgramState->stateBufferSize, ProgramState->stateBuffer, ProgramState->hints);
+        gcmFOOTER_ARG("stateBufferSize=%lu stateBuffer=0x%x hints=0x%x stateDelta=0x%x stateDeltaSize=%lu",
+            ProgramState->stateBufferSize, ProgramState->stateBuffer, ProgramState->hints,
+            ProgramState->stateDelta, ProgramState->stateDeltaSize);
+
     }
     else
     {
@@ -18465,7 +18507,6 @@ _checkComputeShaderSanity(
         }
     }
 
-
 OnError:
     /* Return the status. */
     return status;
@@ -18483,9 +18524,9 @@ _gcConvertSharedMemoryBaseAddr(
     gcATTRIBUTE             attr, groupIdAttr = gcvNULL;
     gcSL_INSTRUCTION        code = gcvNULL;
     gctUINT16               addCodeCount = 7;
-    gctUINT16               blockAddrTempIndex;
+    gctUINT32               blockAddrTempIndex;
     gctINT16                workgroupIdIndex;
-    gctUINT32               tempIndex1, tempIndex2, tempIndex3, tempIndex4, tempIndex5, tempIndex6, tempIndex7;
+    gctUINT32               tempIndex1, tempIndex2, tempIndex3, tempIndex4, tempIndex5;
     gctUINT32               uintConstant[1];
     void*                   constantPtr;
 
@@ -18515,7 +18556,7 @@ _gcConvertSharedMemoryBaseAddr(
     gcmONERROR(gcSHADER_GetUniform(Shader,
                                    GetSBIndex(ssbo),
                                    &blockAddrUniform));
-    blockAddrTempIndex = (gctUINT16)GetSBSharedVariableBaseAddress(ssbo);
+    blockAddrTempIndex = GetSBSharedVariableBaseAddress(ssbo);
 
     /* Find the original code index. */
     for (i = 0; i < Shader->codeCount; i++)
@@ -18622,16 +18663,16 @@ _gcConvertSharedMemoryBaseAddr(
     gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, tempIndex3, gcSL_SWIZZLE_XXXX, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
     gcmONERROR(gcSHADER_AddSourceAttribute(Shader, groupIdAttr, gcSL_SWIZZLE_XXXX, 0));
 
-    /* MOD temp7.x, temp4.x, #current_num_workgroup
+    /* MOD temp5.x, temp4.x, #current_num_workgroup
        we use 100 for #current_num_workgroup here. After register allocation, we change it to
        the real value. */
-    tempIndex7 = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X1);
+    tempIndex5 = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X1);
     gcSHADER_AddVariableEx(Shader,
-        "#sh_workgroupId",
-        gcSHADER_FLOAT_X3,
+        _sldWorkGroupIdName,
+        gcSHADER_UINT_X1,
         0,
         gcvNULL,
-        tempIndex7,
+        tempIndex5,
         gcSHADER_VAR_CATEGORY_NORMAL,
         gcSHADER_PRECISION_MEDIUM,
         0,
@@ -18640,35 +18681,31 @@ _gcConvertSharedMemoryBaseAddr(
         &workgroupIdIndex);
     uintConstant[0] = 100;
     constantPtr = (void *)uintConstant;
-    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MOD, tempIndex7, gcSL_ENABLE_X, gcSL_UINT16, gcSHADER_PRECISION_MEDIUM, 0));
+    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MOD, tempIndex5, gcSL_ENABLE_X, gcSL_UINT16, gcSHADER_PRECISION_MEDIUM, 0));
     gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, tempIndex4, gcSL_SWIZZLE_XXXX, gcSL_UINT16, gcSHADER_PRECISION_MEDIUM));
     gcmONERROR(gcSHADER_AddSourceConstantFormattedWithPrecision(Shader, constantPtr, gcSL_UINT16, gcSHADER_PRECISION_MEDIUM));
 
-    /* MUL temp5.x, temp7.x, shared_memory_size */
-    tempIndex5 = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X1);
+    /* MUL blockAddrTempIndex, temp5.x, shared_memory_size */
     uintConstant[0] = GetSBBlockSize(ssbo);
     constantPtr = (void *)uintConstant;
-    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MUL, tempIndex5, gcSL_ENABLE_X, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM, 0));
-    gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, tempIndex7, gcSL_SWIZZLE_XXXX, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MUL, blockAddrTempIndex, gcSL_ENABLE_X, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM, 0));
+    gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, tempIndex5, gcSL_SWIZZLE_XXXX, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
     gcmONERROR(gcSHADER_AddSourceConstantFormattedWithPrecision(Shader, constantPtr, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
 
-    /* ADD temp6.x, base_addr, temp5.x*/
-    tempIndex6 = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X1);
-    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_ADD, tempIndex6, gcSL_ENABLE_X, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM, 0));
+    /* ADD blockAddrTempIndex, base_addr, blockAddrTempIndex*/
+    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_ADD, blockAddrTempIndex, gcSL_ENABLE_X, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM, 0));
     gcmONERROR(gcSHADER_AddSourceUniform(Shader, blockAddrUniform, gcSL_SWIZZLE_XXXX, 0));
-    gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, tempIndex5, gcSL_SWIZZLE_XXXX, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+    gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, blockAddrTempIndex, gcSL_SWIZZLE_XXXX, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
 
     /*
     ** Change
-    ** MOV temp(blockAddrTempIndex), uniform(blockAddrUniform) -->
-    ** MOV temp(blockAddrTempIndex), temp6.x
+    ** MOV temp(blockAddrTempIndex), uniform(blockAddrUniform) --> NOP
     */
     code = &Shader->code[codeIndex + addCodeCount];
-    code->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_TEMP)
-                  | gcmSL_SOURCE_SET(0, Format, gcSL_UINT32)
-                  | gcmSL_SOURCE_SET(0, Swizzle, gcSL_SWIZZLE_XXXX)
-                  | gcmSL_SOURCE_SET(0, Precision, gcSHADER_PRECISION_MEDIUM);
-    code->source0Index = tempIndex6;
+    code->opcode = gcmSL_OPCODE_SET(0, Opcode, gcSL_NOP);
+    code->temp = code->tempIndex = code->tempIndexed = 0;
+    code->source0 = code->source0Index = code->source0Indexed = 0;
+    code->source1 = code->source1Index = code->source1Indexed = 0;
 
     Shader->lastInstruction = origLastInstruction + addCodeCount;
 
@@ -18890,7 +18927,7 @@ _gcLinkComputeShader(
                 _DumpLinkTree("Remove unused attributes for the compute tree.", computeTree, gcvFALSE);
         }
 
-        gcmONERROR(gcLINKTREE_CheckAPILevelResource(computeTree));
+        gcmONERROR(gcLINKTREE_CheckAPILevelResource(computeTree, isRecompiler));
 
         /* Convert CONV. */
         trees[gceSGSK_COMPUTE_SHADER] = &computeTree;
@@ -18925,7 +18962,7 @@ _gcLinkComputeShader(
                 aubo_options = VSC_OPTN_Options_GetAUBOOptions(VSC_OPTN_Get_Options());
                 if (VSC_OPTN_UF_AUBOOptions_GetSwitchOn(aubo_options))
                 {
-                    VSC_UF_UtilizeAuxUBO(&all_shaders, gcvNULL, aubo_options);
+                    VSC_UF_UtilizeAuxUBO(&all_shaders, gcvNULL, aubo_options, gcvNULL);
                 }
 
                 vscPMP_Finalize(&allShadersPmp);
@@ -18997,8 +19034,9 @@ _gcLinkComputeShader(
     /* Return the status. */
     if (gcmIS_SUCCESS(status) && ProgramState)
     {
-        gcmFOOTER_ARG("stateBufferSize=%lu stateBuffer=0x%x hints=0x%x",
-                                  ProgramState->stateBufferSize, ProgramState->stateBuffer, ProgramState->hints);
+        gcmFOOTER_ARG("stateBufferSize=%lu stateBuffer=0x%x hints=0x%x stateDelta=0x%x stateDeltaSize=%lu",
+            ProgramState->stateBufferSize, ProgramState->stateBuffer, ProgramState->hints,
+            ProgramState->stateDelta, ProgramState->stateDeltaSize);
     }
     else
     {
@@ -19012,6 +19050,11 @@ _gcLinkComputeShader(
         if (ProgramState->hints != gcvNULL)
         {
             gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, ProgramState->hints));
+        }
+
+        if (ProgramState->stateDelta != gcvNULL)
+        {
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, ProgramState->stateDelta));
         }
         gcmFOOTER();
     }
@@ -19117,7 +19160,6 @@ _checkSetShaderGroup(
         }
         else if (ShaderArray[i]->object.type  == gcvOBJ_VIR_SHADER)
         {
-            /* TODO: handle vir shaders */
             ShaderGroup->validGroup = gcvFALSE;
             break;
         }
@@ -19396,7 +19438,8 @@ _LinkProgramPipeline(
                               gcvSHADER_USE_GL_POINT_COORD     |
                               gcvSHADER_USE_GL_POSITION        |
                               gcvSHADER_REMOVE_UNUSED_UNIFORMS |
-                              gcvSHADER_FLUSH_DENORM_TO_ZERO);
+                              gcvSHADER_FLUSH_DENORM_TO_ZERO   |
+                              gcvSHADER_LINK_PROGRAM_PIPELINE_OBJ);
 
     gcmHEADER_ARG("VertexShader=0x%x FragmentShader=0x%x",
                   VertexShader, FragmentShader);
@@ -19588,7 +19631,8 @@ _LinkFullGraphicsProgramPipeline(
                               gcvSHADER_USE_GL_POINT_COORD     |
                               gcvSHADER_USE_GL_POSITION        |
                               gcvSHADER_REMOVE_UNUSED_UNIFORMS |
-                              gcvSHADER_FLUSH_DENORM_TO_ZERO);
+                              gcvSHADER_FLUSH_DENORM_TO_ZERO   |
+                              gcvSHADER_LINK_PROGRAM_PIPELINE_OBJ);
 
     gcSHADER_KIND shaderKind[] =
     {
@@ -19609,14 +19653,12 @@ _LinkFullGraphicsProgramPipeline(
         {
             gcmONERROR(gcSHADER_GetCompilerVersion(Shaders[i], &thisShVersion));
 
-            /* check if the shaders linked together are the same versions
-             *  Note: this may not be true for some version of shaders, check with spec!
-             */
             if (firstShot)
             {
-                if ((shVersion && thisShVersion) && shVersion[1] != thisShVersion[1])
+                status = _checkIfShadersCanBeLinkedTogether(shVersion, thisShVersion);
+                if (status == gcvSTATUS_SHADER_VERSION_MISMATCH)
                 {
-                    return gcvSTATUS_SHADER_VERSION_MISMATCH;
+                    return status;
                 }
             }
             else
@@ -20136,17 +20178,43 @@ _CaculateShaderVidNodesSize(
 
     do
     {
-        /* Inst video memory. */
         for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i++)
         {
+            /* Inst video memory. */
             sizeInByte += gcmSIZEOF(gctUINT32);
-
             if (Hints->shaderVidNodes.instVidmemNode[i] != gcvNULL)
             {
                 gcsSURF_NODE_PTR surfNode = (gcsSURF_NODE_PTR)Hints->shaderVidNodes.instVidmemNode[i];
 
                 sizeInByte += surfNode->size;
             }
+
+            /* gpr spill memory. */
+            sizeInByte += gcmSIZEOF(gctUINT32);
+            if (Hints->shaderVidNodes.gprSpillVidmemNode[i] != gcvNULL)
+            {
+                gcsSURF_NODE_PTR surfNode = (gcsSURF_NODE_PTR)Hints->shaderVidNodes.gprSpillVidmemNode[i];
+
+                sizeInByte += surfNode->size;
+            }
+
+            /* cr spill memory. */
+            sizeInByte += gcmSIZEOF(gctUINT32);
+            if (Hints->shaderVidNodes.crSpillVidmemNode[i] != gcvNULL)
+            {
+                gcsSURF_NODE_PTR surfNode = (gcsSURF_NODE_PTR)Hints->shaderVidNodes.crSpillVidmemNode[i];
+
+                sizeInByte += surfNode->size;
+            }
+        }
+
+        /* shared memory. */
+        sizeInByte += gcmSIZEOF(gctUINT32);
+        if (Hints->shaderVidNodes.sharedMemVidMemNode)
+        {
+            gcsSURF_NODE_PTR surfNode = (gcsSURF_NODE_PTR)Hints->shaderVidNodes.sharedMemVidMemNode;
+
+            sizeInByte += surfNode->size;
         }
     } while (gcvFALSE);
 
@@ -20168,31 +20236,123 @@ _SaveShaderVidNodes(
 
     do
     {
-        /* Inst video memory. */
+        gctPOINTER          memory = gcvNULL;
+        gctPOINTER          data = gcvNULL;
+        gctUINT32           sizeInByte = 0;
+
         for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i++)
         {
-            gctPOINTER          instMem = Hints->shaderVidNodes.instVidmemNode[i];
-            gctPOINTER          data = gcvNULL;
-            gctUINT32           sizeInByte = 0;
+            /* Inst video memory. */
+            memory = Hints->shaderVidNodes.instVidmemNode[i];
+            data = gcvNULL;
+            sizeInByte = 0;
 
-            if (instMem != gcvNULL)
+            /* Get the size. */
+            if (memory != gcvNULL)
             {
-                sizeInByte += ((gcsSURF_NODE_PTR)instMem)->size;
-                gcmERR_BREAK(gcoSURF_LockNode((gcsSURF_NODE_PTR)instMem,
+                sizeInByte += ((gcsSURF_NODE_PTR)memory)->size;
+                gcmERR_BREAK(gcoSURF_LockNode((gcsSURF_NODE_PTR)memory,
                                               gcvNULL,
                                               &data));
 
                 gcmASSERT(sizeInByte != 0);
             }
 
+            /* Copy the size. */
             gcoOS_MemCopy(buffer, &sizeInByte, gcmSIZEOF(gctUINT32));
             buffer += gcmSIZEOF(gctUINT32);
 
+            /* Copy the data. */
             if (sizeInByte != 0)
             {
                 gcoOS_MemCopy(buffer, data, sizeInByte);
                 buffer += sizeInByte;
+                gcoSURF_UnLockNode((gcsSURF_NODE_PTR)memory, gcvSURF_ICACHE);
             }
+
+            /* gpr spill memory. */
+            memory = Hints->shaderVidNodes.gprSpillVidmemNode[i];
+            data = gcvNULL;
+            sizeInByte = 0;
+
+            /* Get the size. */
+            if (memory != gcvNULL)
+            {
+                sizeInByte += ((gcsSURF_NODE_PTR)memory)->size;
+                gcmERR_BREAK(gcoSURF_LockNode((gcsSURF_NODE_PTR)memory,
+                                              gcvNULL,
+                                              &data));
+
+                gcmASSERT(sizeInByte != 0);
+            }
+
+            /* Copy the size. */
+            gcoOS_MemCopy(buffer, &sizeInByte, gcmSIZEOF(gctUINT32));
+            buffer += gcmSIZEOF(gctUINT32);
+
+            /* Copy the data. */
+            if (sizeInByte != 0)
+            {
+                gcoOS_MemCopy(buffer, data, sizeInByte);
+                buffer += sizeInByte;
+                gcoSURF_UnLockNode((gcsSURF_NODE_PTR)memory, gcvSURF_VERTEX);
+            }
+
+            /* cr spill memory. */
+            memory = Hints->shaderVidNodes.crSpillVidmemNode[i];
+            data = gcvNULL;
+            sizeInByte = 0;
+
+            /* Get the size. */
+            if (memory != gcvNULL)
+            {
+                sizeInByte += ((gcsSURF_NODE_PTR)memory)->size;
+                gcmERR_BREAK(gcoSURF_LockNode((gcsSURF_NODE_PTR)memory,
+                                              gcvNULL,
+                                              &data));
+
+                gcmASSERT(sizeInByte != 0);
+            }
+
+            /* Copy the size. */
+            gcoOS_MemCopy(buffer, &sizeInByte, gcmSIZEOF(gctUINT32));
+            buffer += gcmSIZEOF(gctUINT32);
+
+            /* Copy the data. */
+            if (sizeInByte != 0)
+            {
+                gcoOS_MemCopy(buffer, data, sizeInByte);
+                buffer += sizeInByte;
+                gcoSURF_UnLockNode((gcsSURF_NODE_PTR)memory, gcvSURF_VERTEX);
+            }
+        }
+
+        /* shared memory. */
+        memory = Hints->shaderVidNodes.sharedMemVidMemNode;
+        data = gcvNULL;
+        sizeInByte = 0;
+
+        /* Get the size. */
+        if (memory != gcvNULL)
+        {
+            sizeInByte += ((gcsSURF_NODE_PTR)memory)->size;
+            gcmERR_BREAK(gcoSURF_LockNode((gcsSURF_NODE_PTR)memory,
+                                          gcvNULL,
+                                          &data));
+
+            gcmASSERT(sizeInByte != 0);
+        }
+
+        /* Copy the size. */
+        gcoOS_MemCopy(buffer, &sizeInByte, gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Copy the data. */
+        if (sizeInByte != 0)
+        {
+            gcoOS_MemCopy(buffer, data, sizeInByte);
+            buffer += sizeInByte;
+            gcoSURF_UnLockNode((gcsSURF_NODE_PTR)memory, gcvSURF_VERTEX);
         }
     } while (gcvFALSE);
 
@@ -20200,25 +20360,31 @@ _SaveShaderVidNodes(
 }
 
 static gceSTATUS
-_LoadShaderVidNodes(
+_LoadShaderVidNodesAndFixup(
     IN gcSHADER Shader,
-    IN gcsHINT_PTR Hints,
+    IN gcsPROGRAM_STATE *ProgramState,
     IN gctPOINTER Buffer
     )
 {
     gceSTATUS       status = gcvSTATUS_OK;
     gctUINT8_PTR    buffer = (gctUINT8_PTR)Buffer;
     gctUINT         i;
+    gcsHINT_PTR     Hints = ProgramState->hints;
 
     gcmASSERT(Hints);
 
     do
     {
-        /* Inst video memory. */
+        gctUINT32           sizeInByte = 0;
+        gctUINT32           physical = 0;
+        gctUINT32           *pPatchPoint = gcvNULL;
+
         for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i++)
         {
-            gctUINT32           sizeInByte = *(gctUINT32*)buffer;
-            gctUINT32           physical = (gctUINT32)~0;
+            /* Inst video memory. */
+            sizeInByte = *(gctUINT32*)buffer;
+            physical = (gctUINT32)~0;
+            pPatchPoint = gcvNULL;
 
             buffer += gcmSIZEOF(gctUINT32);
 
@@ -20236,12 +20402,117 @@ _LoadShaderVidNodes(
                                          gcvFALSE);
 
                 gcmASSERT((gctUINT32)~0 != physical);
+                gcmASSERT(ProgramState->patchOffsetsInDW.instVidMemInStateBuffer[i] != 0);
+                gcmASSERT(ProgramState->patchOffsetsInDW.instVidMemInStateDelta[i] != 0);
+                pPatchPoint = (gctUINT32*)ProgramState->stateBuffer
+                            + ProgramState->patchOffsetsInDW.instVidMemInStateBuffer[i];
+                *pPatchPoint = physical;
+                pPatchPoint = ProgramState->stateDelta
+                            + ProgramState->patchOffsetsInDW.instVidMemInStateDelta[i];
+                *pPatchPoint = physical;
+            }
 
-                Hints->shaderVidNodes.flushInstVidmemNode[i] = gcvTRUE;
+            buffer += sizeInByte;
+
+            /* gpr spill memory. */
+            sizeInByte = *(gctUINT32*)buffer;
+            physical = (gctUINT32)~0;
+            pPatchPoint = gcvNULL;
+
+            buffer += gcmSIZEOF(gctUINT32);
+
+            if (sizeInByte > 0)
+            {
+                gcoSHADER_AllocateVidMem(gcvNULL,
+                                         gcvSURF_VERTEX,
+                                         "temp register spill memory",
+                                         sizeInByte,
+                                         256,
+                                         (gctPOINTER *)&Hints->shaderVidNodes.gprSpillVidmemNode[i],
+                                         gcvNULL,
+                                         &physical,
+                                         buffer,
+                                         gcvFALSE);
+
+                gcmASSERT((gctUINT32)~0 != physical);
+                gcmASSERT(ProgramState->patchOffsetsInDW.gprSpillVidMemInStateBuffer[i] != 0);
+                gcmASSERT(ProgramState->patchOffsetsInDW.gprSpillVidMemInStateDelta[i] != 0);
+                pPatchPoint = (gctUINT32*)ProgramState->stateBuffer
+                            + ProgramState->patchOffsetsInDW.gprSpillVidMemInStateBuffer[i];
+                *pPatchPoint = physical;
+                pPatchPoint = ProgramState->stateDelta
+                            + ProgramState->patchOffsetsInDW.gprSpillVidMemInStateDelta[i];
+                *pPatchPoint = physical;
+            }
+
+            buffer += sizeInByte;
+
+            /* cr spill memory. */
+            sizeInByte = *(gctUINT32*)buffer;
+            physical = (gctUINT32)~0;
+            pPatchPoint = gcvNULL;
+
+            buffer += gcmSIZEOF(gctUINT32);
+
+            if (sizeInByte > 0)
+            {
+                gcoSHADER_AllocateVidMem(gcvNULL,
+                                         gcvSURF_VERTEX,
+                                         "immediate constant spill memory",
+                                         sizeInByte,
+                                         256,
+                                         (gctPOINTER *)&Hints->shaderVidNodes.crSpillVidmemNode[i],
+                                         gcvNULL,
+                                         &physical,
+                                         buffer,
+                                         gcvFALSE);
+
+                gcmASSERT((gctUINT32)~0 != physical);
+                gcmASSERT(ProgramState->patchOffsetsInDW.crSpillVidMemInStateBuffer[i] != 0);
+                gcmASSERT(ProgramState->patchOffsetsInDW.crSpillVidMemInStateDelta[i] != 0);
+                pPatchPoint = (gctUINT32*)ProgramState->stateBuffer
+                            + ProgramState->patchOffsetsInDW.crSpillVidMemInStateBuffer[i];
+                *pPatchPoint = physical;
+                pPatchPoint = ProgramState->stateDelta
+                            + ProgramState->patchOffsetsInDW.crSpillVidMemInStateDelta[i];
+                *pPatchPoint = physical;
             }
 
             buffer += sizeInByte;
         }
+
+        /* shared memory. */
+        sizeInByte = *(gctUINT32*)buffer;
+        physical = (gctUINT32)~0;
+        pPatchPoint = gcvNULL;
+
+        buffer += gcmSIZEOF(gctUINT32);
+
+        if (sizeInByte > 0)
+        {
+            gcoSHADER_AllocateVidMem(gcvNULL,
+                                     gcvSURF_VERTEX,
+                                     "shared memory",
+                                     sizeInByte,
+                                     256,
+                                     (gctPOINTER *)&Hints->shaderVidNodes.sharedMemVidMemNode,
+                                     gcvNULL,
+                                     &physical,
+                                     buffer,
+                                     gcvFALSE);
+
+            gcmASSERT((gctUINT32)~0 != physical);
+            gcmASSERT(ProgramState->patchOffsetsInDW.sharedMemVidMemInStateBuffer != 0);
+            gcmASSERT(ProgramState->patchOffsetsInDW.sharedMemVidMemInStateDelta != 0);
+            pPatchPoint = (gctUINT32*)ProgramState->stateBuffer
+                        + ProgramState->patchOffsetsInDW.sharedMemVidMemInStateBuffer;
+            *pPatchPoint = physical;
+            pPatchPoint = ProgramState->stateDelta
+                        + ProgramState->patchOffsetsInDW.sharedMemVidMemInStateDelta;
+            *pPatchPoint = physical;
+        }
+
+        buffer += sizeInByte;
     } while (gcvFALSE);
 
     return status;
@@ -20311,7 +20582,7 @@ _gcLoadProgramHeader(
     bytes = BufferSize;
     if(bytes < _gcdProgramBinaryHeaderSize) {
         /* Invalid file format */
-        gcmFATAL("_gcLoadProgramHeader: Invalid program binary file format");
+        gcoOS_Print("_gcLoadProgramHeader: Invalid program binary file format");
         gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
         return gcvSTATUS_INVALID_DATA;
     }
@@ -20320,7 +20591,7 @@ _gcLoadProgramHeader(
     signature = (gctUINT32 *) Buffer;
     if (*signature != gcmCC('P', 'R', 'G', 'M')) {
         /* Signature mismatch. */
-        gcmFATAL("_gcLoadProgramHeader: Signature does not match with 'PRGM'");
+        gcoOS_Print("_gcLoadProgramHeader: Signature does not match with 'PRGM'");
         gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
         return gcvSTATUS_INVALID_DATA;
     }
@@ -20350,7 +20621,7 @@ _gcLoadProgramHeader(
     if((bytePtr[0] == 'E' && bytePtr[1] != 'S') ||
        (bytePtr[0] == 'C' && bytePtr[1] != 'L') ||
        (bytePtr[0] != 'E' && bytePtr[0] != 'C')) {
-       gcmFATAL("_gcLoadProgramHeader: unrecognizable laguage type \"%c%c\"", bytePtr[0], bytePtr[1]);
+       gcoOS_Print("_gcLoadProgramHeader: unrecognizable laguage type \"%c%c\"", bytePtr[0], bytePtr[1]);
        gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
        return gcvSTATUS_INVALID_DATA;
     }
@@ -20366,7 +20637,7 @@ _gcLoadProgramHeader(
     size = (gctUINT32 *) (chipVersion + 1);
     if(bytes != *size) {
         /* program binary size mismatch. */
-        gcmFATAL("_gcLoadProgramHeader: program binary size %u does not match actual file size %u",
+        gcoOS_Print("_gcLoadProgramHeader: program binary size %u does not match actual file size %u",
                  bytes, *size);
         gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
         return gcvSTATUS_INVALID_DATA;
@@ -20601,193 +20872,6 @@ gcSaveProgram(
 }
 
 /*******************************************************************************
-**                                gcLoadProgram
-********************************************************************************
-**
-**    Load pre-compiled shaders and pre-linked programs from a binary file.
-**
-**    INPUT:
-**
-**        gctPOINTER Binary
-**            Pointer to the binary data loaded.
-**
-**        gctUINT32 BinarySize
-**            Number of bytes in 'Binary'.
-**
-**        gcSHADER VertexShader
-**            Pointer to a vertex shader object.
-**
-**        gcSHADER FragmentShader
-**            Pointer to a fragment shader object.
-**
-**    OUTPUT:
-**
-**        gcsPROGRAM_STATE *ProgramState
-**            Pointer to a variable receiving the program state.
-*/
-gceSTATUS
-gcLoadProgram(
-    IN gctPOINTER Binary,
-    IN gctUINT32 BinarySize,
-    OUT gcSHADER VertexShader,
-    OUT gcSHADER FragmentShader,
-    IN OUT gcsPROGRAM_STATE *ProgramState
-    )
-{
-    gcoOS os;
-    gctUINT32 bytes;
-    gctUINT8_PTR buffer;
-    gctUINT32 *bufferSize;
-    gctUINT32 alignBufferSize;
-    gceSTATUS status = gcvSTATUS_OK;
-    gctUINT8 language[4];
-    gctPOINTER pointer;
-
-    gcmHEADER_ARG("Binary=0x%x BinarySize=%lu",
-                  Binary, BinarySize);
-
-    do {
-        if (ProgramState)
-        {
-            ProgramState->stateBuffer = gcvNULL;
-            ProgramState->stateBufferSize = 0;
-            ProgramState->hints = gcvNULL;
-        }
-
-        /* Extract the gcoOS object pointer. */
-        os = gcvNULL;
-
-        gcmERR_BREAK(_gcLoadProgramHeader(Binary, BinarySize, (gctPOINTER)language));
-
-        if (language[0] != 'E' || language[1] != 'S')
-        {
-           gcmFATAL("gcLoadProgram: expect language type 'ES' instead of %c%c",
-                    language[0], language[1]);
-           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-           return gcvSTATUS_INVALID_DATA;
-        }
-
-        buffer = (gctUINT8 *)Binary + _gcdProgramBinaryHeaderSize;
-        bytes = BinarySize - _gcdProgramBinaryHeaderSize;
-
-        bufferSize = (gctUINT32 *) buffer;
-
-        if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
-        {
-           /* Invalid vertex shader size. */
-           gcmFATAL("gcLoadProgram: Invalid vertex shader size %u", bytes);
-           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-           return gcvSTATUS_INVALID_DATA;
-        }
-
-        bytes -=  sizeof(gctUINT32);
-        buffer += gcmSIZEOF(gctUINT32);
-
-        /* Load vertex shader bibary. */
-        gcmERR_BREAK(gcSHADER_Load(VertexShader,
-                                   buffer,
-                                   *bufferSize));
-
-        alignBufferSize = gcmALIGN(*bufferSize, 4);
-        buffer += alignBufferSize;
-        bytes -=  alignBufferSize;
-        bufferSize = (gctUINT32 *) buffer;
-
-        if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
-        {
-           /* Invalid fragment shader size. */
-           gcmFATAL("gcLoadProgram: Invalid fragment shader size %u", bytes);
-           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-           return gcvSTATUS_INVALID_DATA;
-        }
-
-        bytes -=  sizeof(gctUINT32);
-        buffer += gcmSIZEOF(gctUINT32);
-
-        /* Load fragment shader binary. */
-        gcmERR_BREAK(gcSHADER_Load(FragmentShader,
-                                   buffer,
-                                   *bufferSize));
-
-        alignBufferSize = gcmALIGN(*bufferSize, 4);
-        buffer += alignBufferSize;
-        bytes -=  alignBufferSize;
-        bufferSize = (gctUINT32 *) buffer;
-
-        if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
-        {
-           /* Invalid program states size. */
-           gcmFATAL("gcLoadProgram: Invalid program states size %u", bytes);
-           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-           return gcvSTATUS_INVALID_DATA;
-        }
-
-        bytes -=  gcmSIZEOF(gctUINT32);
-        buffer += gcmSIZEOF(gctUINT32);
-
-        if (ProgramState)
-        {
-            ProgramState->stateBufferSize = *bufferSize;
-        }
-
-        /* If this binary saves state buffer, then load it. */
-        if (ProgramState && *bufferSize > 0)
-        {
-            /* Allocate program states buffer. */
-            gcmERR_BREAK(gcoOS_Allocate(os, *bufferSize, &pointer));
-            ProgramState->stateBuffer= pointer;
-            gcoOS_MemCopy(ProgramState->stateBuffer, buffer, *bufferSize);
-        }
-
-        buffer += *bufferSize;
-        bytes -=  *bufferSize;
-        bufferSize = (gctUINT32 *) buffer;
-
-        if (bytes < sizeof(gctUINT32) ||
-            bytes < (*bufferSize + sizeof(gctUINT32)))
-        {
-           /* Invalid hint size. */
-           gcmFATAL("gcLoadProgram: Invalid hints size %u", bytes);
-           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-           return gcvSTATUS_INVALID_DATA;
-        }
-
-        buffer += gcmSIZEOF(gctUINT32);
-
-        /* If this binary saves hints, then load it. */
-        if (ProgramState && *bufferSize > 0)
-        {
-          /* Allocate hint structure buffer. */
-          gcmERR_BREAK(gcoOS_Allocate(os,
-                                      gcSHADER_GetHintSize(),
-                                      &pointer));
-
-          ProgramState->hints = pointer;
-
-          /* Copy the HINT structure. */
-          gcoOS_MemCopy(ProgramState->hints, buffer, *bufferSize);
-        }
-
-        buffer += *bufferSize;
-
-        /* Assert we copied the right number of bytes */
-        gcmASSERT(buffer - BinarySize == Binary);
-
-        /* Success. */
-        gcmFOOTER_ARG("*ProgramBufferSize=%lu *ProgramBuffer=0x%x *Hints=0x%x",
-                      ProgramState ? ProgramState->stateBufferSize : 0,
-                      ProgramState ? ProgramState->stateBuffer : gcvNULL,
-                      ProgramState ? ProgramState->hints : gcvNULL);
-
-        return gcvSTATUS_OK;
-    }
-    while (gcvFALSE);
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-/*******************************************************************************
 **                                gcSaveCLSingleKernel
 ********************************************************************************
 **
@@ -20847,6 +20931,8 @@ gcSaveCLSingleKernel(
                      + gcmSIZEOF(gctUINT32) + gcmALIGN(kernelShaderBytes, 4)
                      + gcmSIZEOF(gctUINT32) + ProgramState.stateBufferSize
                      + gcmSIZEOF(gctUINT32) + hintSize
+                     + gcmSIZEOF(gctUINT32) + ProgramState.stateDeltaSize
+                     + gcmSIZEOF(gctUINT32) + gcmSIZEOF(gcsPROGRAM_VidMemPatchOffset)
                      + gcmSIZEOF(gctUINT32) + vidNodesSize;
 
         if (BinarySize)
@@ -20960,6 +21046,33 @@ gcSaveCLSingleKernel(
         }
         buffer += bytes;
 
+        /* Copy the size of the state delta. */
+        bytes = ProgramState.stateDeltaSize;
+        gcoOS_MemCopy(buffer,
+                      &bytes,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+        /* Copy the state delta */
+        if (ProgramState.stateDeltaSize)
+        {
+            gcoOS_MemCopy(buffer,
+                          ProgramState.stateDelta,
+                          ProgramState.stateDeltaSize);
+        }
+        buffer += ProgramState.stateDeltaSize;
+
+        /* Copy the size of patch offset */
+        bytes = gcmSIZEOF(gcsPROGRAM_VidMemPatchOffset);
+        gcoOS_MemCopy(buffer,
+                      &bytes,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+        /* Copy the patch offsets */
+        gcoOS_MemCopy(buffer,
+                      &ProgramState.patchOffsetsInDW,
+                      gcmSIZEOF(gcsPROGRAM_VidMemPatchOffset));
+        buffer += gcmSIZEOF(gcsPROGRAM_VidMemPatchOffset);
+
         /* Copy the size of the video nodes. */
         bytes = vidNodesSize;
         gcoOS_MemCopy(buffer,
@@ -21003,6 +21116,219 @@ gcSaveCLSingleKernel(
     gcmFOOTER();
     return status;
 }
+
+
+/*******************************************************************************
+**                                gcLoadProgram
+********************************************************************************
+**
+**    Load pre-compiled shaders and pre-linked programs from a binary file.
+**
+**    INPUT:
+**
+**        gctPOINTER Binary
+**            Pointer to the binary data loaded.
+**
+**        gctUINT32 BinarySize
+**            Number of bytes in 'Binary'.
+**
+**        gcSHADER VertexShader
+**            Pointer to a vertex shader object.
+**
+**        gcSHADER FragmentShader
+**            Pointer to a fragment shader object.
+**
+**    OUTPUT:
+**
+**        gcsPROGRAM_STATE *ProgramState
+**            Pointer to a variable receiving the program state.
+*/
+gceSTATUS
+gcLoadProgram(
+    IN gctPOINTER Binary,
+    IN gctUINT32 BinarySize,
+    OUT gcSHADER VertexShader,
+    OUT gcSHADER FragmentShader,
+    IN OUT gcsPROGRAM_STATE *ProgramState
+    )
+{
+    gcoOS os;
+    gctUINT32 bytes;
+    gctUINT8_PTR buffer;
+    gctUINT32 *bufferSize;
+    gctUINT32 alignBufferSize;
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT8 language[4];
+    gctPOINTER pointer;
+
+    gcmHEADER_ARG("Binary=0x%x BinarySize=%lu",
+                  Binary, BinarySize);
+
+    do {
+        if (ProgramState)
+        {
+            ProgramState->stateBuffer = gcvNULL;
+            ProgramState->stateBufferSize = 0;
+            ProgramState->hints = gcvNULL;
+        }
+
+        /* Extract the gcoOS object pointer. */
+        os = gcvNULL;
+
+        if (gcmGetOptimizerOption()->dumpBinToFile)
+        {
+#define _FILENAMEMAX 1024
+            gctCHAR fullFileName[_FILENAMEMAX+1];
+            gctCHAR fileName[64];
+            gctUINT offset = 0;
+            gctUINT64 time;
+
+            gcmERR_BREAK(vscGetTemporaryDir(fullFileName));
+#if _WIN32
+            gcmERR_BREAK(gcoOS_StrCatSafe(fullFileName, _FILENAMEMAX, "\\"));
+#else
+            gcmERR_BREAK(gcoOS_StrCatSafe(fullFileName, _FILENAMEMAX, "/"));
+#endif
+            gcoOS_GetTime(&time);
+            gcmERR_BREAK(gcoOS_PrintStrSafe(fileName, gcmSIZEOF(fileName), &offset, "viv_program_%lld.gcPGM", (gctUINT64)time));
+            gcmERR_BREAK(gcoOS_StrCatSafe(fullFileName, _FILENAMEMAX, fileName));
+            status = gcSHADER_WriteBufferToFile((gctSTRING)Binary, BinarySize, fullFileName);
+            if (status == gcvSTATUS_OK)
+            {
+                gcoOS_Print("gcLoadProgram: save the program binary to the file %s\n", fullFileName);
+            }
+        }
+
+        gcmERR_BREAK(_gcLoadProgramHeader(Binary, BinarySize, (gctPOINTER)language));
+
+        if (language[0] != 'E' || language[1] != 'S')
+        {
+           gcoOS_Print("gcLoadProgram: expect language type 'ES' instead of %c%c",
+                    language[0], language[1]);
+           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+           return gcvSTATUS_INVALID_DATA;
+        }
+
+        buffer = (gctUINT8 *)Binary + _gcdProgramBinaryHeaderSize;
+        bytes = BinarySize - _gcdProgramBinaryHeaderSize;
+
+        bufferSize = (gctUINT32 *) buffer;
+
+        if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+           /* Invalid vertex shader size. */
+           gcoOS_Print("gcLoadProgram: Invalid vertex shader size %u", bytes);
+           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+           return gcvSTATUS_INVALID_DATA;
+        }
+
+        bytes -=  sizeof(gctUINT32);
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Load vertex shader bibary. */
+        gcmERR_BREAK(gcSHADER_Load(VertexShader,
+                                   buffer,
+                                   *bufferSize));
+
+        alignBufferSize = gcmALIGN(*bufferSize, 4);
+        buffer += alignBufferSize;
+        bytes -=  alignBufferSize;
+        bufferSize = (gctUINT32 *) buffer;
+
+        if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+           /* Invalid fragment shader size. */
+           gcoOS_Print("gcLoadProgram: Invalid fragment shader size %u", bytes);
+           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+           return gcvSTATUS_INVALID_DATA;
+        }
+
+        bytes -=  sizeof(gctUINT32);
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Load fragment shader binary. */
+        gcmERR_BREAK(gcSHADER_Load(FragmentShader,
+                                   buffer,
+                                   *bufferSize));
+
+        alignBufferSize = gcmALIGN(*bufferSize, 4);
+        buffer += alignBufferSize;
+        bytes -=  alignBufferSize;
+        bufferSize = (gctUINT32 *) buffer;
+
+        if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+           /* Invalid program states size. */
+           gcoOS_Print("gcLoadProgram: Invalid program states size %u", bytes);
+           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+           return gcvSTATUS_INVALID_DATA;
+        }
+
+        bytes -=  gcmSIZEOF(gctUINT32);
+        buffer += gcmSIZEOF(gctUINT32);
+
+        if (ProgramState)
+        {
+            ProgramState->stateBufferSize = *bufferSize;
+        }
+
+        /* If this binary saves state buffer, then load it. */
+        if (ProgramState && *bufferSize > 0)
+        {
+            /* Allocate program states buffer. */
+            gcmERR_BREAK(gcoOS_Allocate(os, *bufferSize, &pointer));
+            ProgramState->stateBuffer= pointer;
+            gcoOS_MemCopy(ProgramState->stateBuffer, buffer, *bufferSize);
+        }
+
+        buffer += *bufferSize;
+        bytes -=  *bufferSize;
+        bufferSize = (gctUINT32 *) buffer;
+
+        if (bytes < sizeof(gctUINT32) ||
+            bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+           /* Invalid hint size. */
+           gcoOS_Print("gcLoadProgram: Invalid hints size %u", bytes);
+           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+           return gcvSTATUS_INVALID_DATA;
+        }
+
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* If this binary saves hints, then load it. */
+        if (ProgramState && *bufferSize > 0)
+        {
+          /* Allocate hint structure buffer. */
+          gcmERR_BREAK(gcoOS_Allocate(os,
+                                      gcSHADER_GetHintSize(),
+                                      &pointer));
+
+          ProgramState->hints = pointer;
+
+          /* Copy the HINT structure. */
+          gcoOS_MemCopy(ProgramState->hints, buffer, *bufferSize);
+        }
+
+        buffer += *bufferSize;
+
+        /* Assert we copied the right number of bytes */
+        gcmASSERT(buffer - BinarySize == Binary);
+
+        /* Success. */
+        gcmFOOTER_ARG("*ProgramBufferSize=%lu *ProgramBuffer=0x%x *Hints=0x%x",
+                      ProgramState ? ProgramState->stateBufferSize : 0,
+                      ProgramState ? ProgramState->stateBuffer : gcvNULL,
+                      ProgramState ? ProgramState->hints : gcvNULL);
+
+        return gcvSTATUS_OK;
+    }
+    while (gcvFALSE);
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
 
 /*******************************************************************************
 **                                gcLoadCLSingleKernel
@@ -21061,7 +21387,7 @@ gcLoadCLSingleKernel(
 
         if (language[0] != 'C' || language[1] != 'L')
         {
-            gcmFATAL("gcLoadCLSingleKernel: expect language type 'CL' instead of %c%c",
+            gcoOS_Print("gcLoadCLSingleKernel: expect language type 'CL' instead of %c%c",
                     language[0], language[1]);
             gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
             return gcvSTATUS_INVALID_DATA;
@@ -21075,7 +21401,7 @@ gcLoadCLSingleKernel(
         if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
         {
             /* Invalid kernel shader size. */
-            gcmFATAL("gcLoadCLSingleKernel: Invalid kernel shader size %u", bytes);
+            gcoOS_Print("gcLoadCLSingleKernel: Invalid kernel shader size %u", bytes);
             gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
             return gcvSTATUS_INVALID_DATA;
         }
@@ -21096,7 +21422,7 @@ gcLoadCLSingleKernel(
         if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
         {
             /* Invalid program states size. */
-            gcmFATAL("gcLoadProgram: Invalid program states size %u", bytes);
+            gcoOS_Print("gcLoadProgram: Invalid program states size %u", bytes);
             gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
             return gcvSTATUS_INVALID_DATA;
         }
@@ -21126,7 +21452,7 @@ gcLoadCLSingleKernel(
             bytes < (*bufferSize + sizeof(gctUINT32)))
         {
             /* Invalid hint size. */
-            gcmFATAL("gcLoadCLSingleKernel: Invalid hints size %u", bytes);
+            gcoOS_Print("gcLoadCLSingleKernel: Invalid hints size %u", bytes);
             gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
             return gcvSTATUS_INVALID_DATA;
         }
@@ -21141,6 +21467,7 @@ gcLoadCLSingleKernel(
             gcmERR_BREAK(gcoOS_Allocate(os,
                                         gcSHADER_GetHintSize(),
                                         &pointer));
+
             gcoOS_ZeroMemory(pointer, gcSHADER_GetHintSize());
             ProgramState->hints = (gcsHINT_PTR)pointer;
 
@@ -21151,14 +21478,56 @@ gcLoadCLSingleKernel(
         buffer += *bufferSize;
         bytes -= *bufferSize;
 
+        /* Load state delta */
+        bufferSize = (gctUINT32 *) buffer;
+        if (bytes < sizeof(gctUINT32) ||
+            bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+            gcoOS_Print("gcLoadCLSingleKernel: Invalid state delta %u", bytes);
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
+        }
+        if (ProgramState)
+        {
+            ProgramState->stateDeltaSize = *bufferSize;
+        }
+        buffer += gcmSIZEOF(gctUINT32);
+        bytes -= gcmSIZEOF(gctUINT32);
+        if (ProgramState && (*bufferSize > 0))
+        {
+            /* Allocate program states delta. */
+            gcmERR_BREAK(gcoOS_Allocate(os, *bufferSize, &pointer));
+            ProgramState->stateDelta = pointer;
+            gcoOS_MemCopy(ProgramState->stateDelta, buffer, *bufferSize);
+        }
+        buffer += *bufferSize;
+        bytes -= *bufferSize;
+
+        /* Load patch offsets */
+        bufferSize = (gctUINT32 *)buffer;
+        if (bytes < sizeof(gctUINT32) ||
+            bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+            gcoOS_Print("gcLoadCLSingleKernel: Invalid patch offsets %u", bytes);
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
+        }
+        buffer += gcmSIZEOF(gctUINT32);
+        bytes -= gcmSIZEOF(gctUINT32);
+        if (ProgramState && (*bufferSize > 0))
+        {
+            gcoOS_MemCopy(&ProgramState->patchOffsetsInDW, buffer, *bufferSize);
+        }
+        buffer += *bufferSize;
+        bytes -= *bufferSize;
+
         /* Load video nodes. */
         bufferSize = (gctUINT32 *) buffer;
-
         if (bytes < sizeof(gctUINT32) ||
             bytes < (*bufferSize + sizeof(gctUINT32)))
         {
             /* Invalid video nodes. */
-            gcmFATAL("gcLoadCLSingleKernel: Invalid video nodes %u", bytes);
+            gcoOS_Print("gcLoadCLSingleKernel: Invalid video nodes %u", bytes);
             gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
             return gcvSTATUS_INVALID_DATA;
         }
@@ -21167,26 +21536,28 @@ gcLoadCLSingleKernel(
         bytes -= gcmSIZEOF(gctUINT32);
 
         /* Load vide nodes. */
-        if (*bufferSize > 0)
+        if (ProgramState && *bufferSize > 0)
         {
             gcmASSERT(ProgramState->hints);
             /* Allocate hint structure buffer. */
-            gcmERR_BREAK(_LoadShaderVidNodes(KernelShader,
-                                             ProgramState->hints,
-                                             buffer));
+            gcmERR_BREAK(_LoadShaderVidNodesAndFixup(KernelShader,
+                                                     ProgramState,
+                                                     buffer));
         }
-
         buffer += *bufferSize;
         bytes -= *bufferSize;
+
 
         /* Assert we copied the right number of bytes */
         gcmASSERT(buffer - BinarySize == Binary);
 
         /* Success. */
-        gcmFOOTER_ARG("*ProgramBufferSize=%lu *ProgramBuffer=0x%x *Hints=0x%x",
+        gcmFOOTER_ARG("*stateBufferSize=%lu *stateBuffer=0x%x *Hints=0x%x stateDeltaSize=%lu *stateDelta=0x%x",
                       ProgramState ? ProgramState->stateBufferSize : 0,
                       ProgramState ? ProgramState->stateBuffer : gcvNULL,
-                      ProgramState ? ProgramState->hints : gcvNULL);
+                      ProgramState ? ProgramState->hints : gcvNULL,
+                      ProgramState ? ProgramState->stateDeltaSize: gcvNULL,
+                      ProgramState ? ProgramState->stateDelta: gcvNULL);
 
         return gcvSTATUS_OK;
     }
@@ -21294,67 +21665,60 @@ OnError:
 
 static gceSTATUS
 _gcLINKTREE_ClampOutputColor(
-    IN gcSHADER VertexShader
+    IN gcSHADER Shader
     )
 {
     gceSTATUS   status              = gcvSTATUS_OK;
-    gcOUTPUT    frontColor          = gcvNULL;
-    gcOUTPUT    backColor           = gcvNULL;
-    gcOUTPUT    front2Color         = gcvNULL;
-    gcOUTPUT    back2Color          = gcvNULL;
-    gcOUTPUT    outputColor[4]      = {frontColor, backColor, front2Color, back2Color};
+    gcOUTPUT    outputColor[4]      = {gcvNULL, gcvNULL, gcvNULL, gcvNULL};
     gctUINT     i;
     gctINT      mainEndIdx;
-    gctBOOL     needClamp           = gcvFALSE;
-    gctUINT     origLastInstruction = VertexShader->lastInstruction;
+    gctBOOL     outputColorExist    = gcvFALSE;
+    gctBOOL     isVertex            = (GetShaderType(Shader) == gcSHADER_TYPE_VERTEX);
+    gctUINT     origLastInstruction = Shader->lastInstruction;
 
-    if (gcShaderClampOutputColor(VertexShader))
+    if (!gcShaderClampOutputColor(Shader))
     {
         return status;
     }
 
-    for (i = 0; i < VertexShader->outputCount; ++i)
+    for (i = 0; i < Shader->outputCount; ++i)
     {
-        if (VertexShader->outputs[i] == gcvNULL ||
-            GetOutputNameLength(VertexShader->outputs[i]) >= 0)
+        if (Shader->outputs[i] == gcvNULL ||
+            GetOutputNameLength(Shader->outputs[i]) >= 0)
         {
             continue;
         }
 
-        switch (GetOutputNameLength(VertexShader->outputs[i]))
+        if (isVertex &&
+            (GetOutputNameLength(Shader->outputs[i]) == gcSL_FRONT_COLOR            ||
+             GetOutputNameLength(Shader->outputs[i]) == gcSL_BACK_COLOR             ||
+             GetOutputNameLength(Shader->outputs[i]) == gcSL_FRONT_SECONDARY_COLOR  ||
+             GetOutputNameLength(Shader->outputs[i]) == gcSL_BACK_SECONDARY_COLOR))
         {
-        case gcSL_FRONT_COLOR:
-            frontColor = VertexShader->outputs[i];
-            needClamp = gcvTRUE;
-            break;
-
-        case gcSL_BACK_COLOR:
-            backColor = VertexShader->outputs[i];
-            needClamp = gcvTRUE;
-            break;
-
-        case gcSL_FRONT_SECONDARY_COLOR:
-            front2Color = VertexShader->outputs[i];
-            needClamp = gcvTRUE;
-            break;
-
-        case gcSL_BACK_SECONDARY_COLOR:
-            back2Color = VertexShader->outputs[i];
-            needClamp = gcvTRUE;
-            break;
-
-        default:
-            break;
+            outputColor[i] = Shader->outputs[i];
+            outputColorExist = gcvTRUE;
+        }
+        else if (!isVertex &&
+                 (GetOutputNameLength(Shader->outputs[i]) == gcSL_COLOR))
+        {
+            outputColor[i] = Shader->outputs[i];
+            outputColorExist = gcvTRUE;
         }
     }
 
-    if (!needClamp)
+    if (!outputColorExist)
     {
         return status;
     }
 
     /* Find the main function exit. */
-    gcmONERROR(gcSHADER_FindMainFunction(VertexShader, gcvNULL, &mainEndIdx));
+    gcmONERROR(gcSHADER_FindMainFunction(Shader, gcvNULL, &mainEndIdx));
+
+    /* The last instruction should be a RET here. */
+    if (mainEndIdx >= 1)
+    {
+        mainEndIdx--;
+    }
 
     for (i = 0; i < 4; i++)
     {
@@ -21363,11 +21727,11 @@ _gcLINKTREE_ClampOutputColor(
             continue;
         }
 
-        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(VertexShader, mainEndIdx, 1, gcvTRUE, gcvTRUE));
-        VertexShader->instrIndex = (mainEndIdx == 0) ? gcSHADER_OPCODE : gcSHADER_SOURCE1;
-        VertexShader->lastInstruction = (mainEndIdx == 0) ? 0 : (mainEndIdx - 1);
+        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, mainEndIdx, 1, gcvTRUE, gcvTRUE));
+        Shader->instrIndex = (mainEndIdx == 0) ? gcSHADER_OPCODE : gcSHADER_SOURCE1;
+        Shader->lastInstruction = (mainEndIdx == 0) ? 0 : (mainEndIdx - 1);
 
-        gcmONERROR(gcSHADER_AddOpcode(VertexShader,
+        gcmONERROR(gcSHADER_AddOpcode(Shader,
                                       gcSL_SAT,
                                       GetOutputTempIndex(outputColor[i]),
                                       gcSL_ENABLE_XYZW,
@@ -21375,7 +21739,7 @@ _gcLINKTREE_ClampOutputColor(
                                       GetOutputPrecision(outputColor[i]),
                                       0));
 
-        gcmONERROR(gcSHADER_AddSourceIndexedWithPrecision(VertexShader,
+        gcmONERROR(gcSHADER_AddSourceIndexedWithPrecision(Shader,
                                                           gcSL_TEMP,
                                                           GetOutputTempIndex(outputColor[i]),
                                                           gcSL_SWIZZLE_XYZW,
@@ -21385,7 +21749,7 @@ _gcLINKTREE_ClampOutputColor(
                                                           GetOutputPrecision(outputColor[i])));
 
         origLastInstruction++;
-        VertexShader->lastInstruction = origLastInstruction;
+        Shader->lastInstruction = origLastInstruction;
     }
 
 OnError:
@@ -21393,30 +21757,39 @@ OnError:
 }
 
 /*
-** We need to replace gl_Color/gl_SecondaryColor with gl_FrontColor/gl_FrontSecondaryColor or gl_BackColor/gl_BackSecondaryColor only if VP_TWO_SIDE is enabled.
+** We need to replace gl_Color/gl_SecondaryColor with gl_FrontColor/gl_FrontSecondaryColor or
+** gl_BackColor/gl_BackSecondaryColor only if VP_TWO_SIDE is enabled. If gl_FrontFacing is true,
+** gl_FrontColor/gl_FrontSecondaryColor is used, otherwise gl_BackColor/gl_BackSecondaryColor is used.
 ** Otherwise we always use gl_FrontColor/gl_FrontSecondaryColor to replace them.
+** Need to use the same qualifiers as verterx shader's corresponding output for created
+** attributes.
 */
 static gceSTATUS
 _gcLINKTREE_ReplaceColor2FrontBackColor(
-    IN gcSHADER FragmentShader
+    IN gcSHADER FragmentShader,
+    IN gcSHADER VertexShader
     )
 {
     gceSTATUS    status            = gcvSTATUS_OK;
     gctBOOL      enableVpTwoSide= gcShaderVPTwoSideEnable(FragmentShader);
-    gctBOOL      needClampOutputColor = gcShaderClampOutputColor(FragmentShader);
     gcATTRIBUTE  varyingColor   = gcvNULL;
     gcATTRIBUTE  varying2Color  = gcvNULL;
     gcATTRIBUTE  frontColor     = gcvNULL;
     gcATTRIBUTE  backColor      = gcvNULL;
     gcATTRIBUTE  front2Color    = gcvNULL;
     gcATTRIBUTE  back2Color     = gcvNULL;
+    gcOUTPUT     vertexFrontColor     = gcvNULL;
+    gcOUTPUT     vertexBackColor      = gcvNULL;
+    gcOUTPUT     vertexFront2Color    = gcvNULL;
+    gcOUTPUT     vertexBack2Color     = gcvNULL;
     gcATTRIBUTE  frontFacing    = gcvNULL;
     gcATTRIBUTE  fColor         = gcvNULL;
     gcATTRIBUTE  bColor         = gcvNULL;
-    gctUINT32    attrIdx, i;
-    gctINT       mainStartIdx, mainEndIdx;
+    gctUINT32    attrIdx, outputIdx, i;
+    gctINT       mainStartIdx;
     gctUINT32    realColor = 0, real2Color = 0;
     gctUINT      origLastInstruction = FragmentShader->lastInstruction;
+    gcSHADER_SHADERMODE shaderMode = gcSHADER_SHADER_DEFAULT;
 
     /* Find gl_Color/gl_SecondaryColor. */
     for (attrIdx = 0; attrIdx < FragmentShader->attributeCount; ++attrIdx)
@@ -21469,69 +21842,107 @@ _gcLINKTREE_ReplaceColor2FrontBackColor(
             frontFacing = FragmentShader->attributes[attrIdx];
         }
     }
+    /* Find vertex shader output gl_Color/gl_SecondaryColor. */
+    for (outputIdx = 0; VertexShader && outputIdx < VertexShader->outputCount; ++outputIdx)
+    {
+        gctBOOL compareName = gcvFALSE;
+
+        if (VertexShader->outputs[outputIdx] == gcvNULL)
+        {
+            continue;
+        }
+
+        if (VertexShader->outputs[outputIdx]->nameLength > 0)
+            compareName = gcvTRUE;
+
+        if (!compareName &&
+            VertexShader->outputs[outputIdx]->nameLength == gcSL_FRONT_COLOR)
+        {
+            vertexFrontColor = VertexShader->outputs[outputIdx];
+        }
+        else if (!compareName &&
+            VertexShader->outputs[outputIdx]->nameLength == gcSL_BACK_COLOR)
+        {
+            vertexBackColor = VertexShader->outputs[outputIdx];
+        }
+        else if (!compareName &&
+            VertexShader->outputs[outputIdx]->nameLength == gcSL_FRONT_SECONDARY_COLOR)
+        {
+            vertexFront2Color = VertexShader->outputs[outputIdx];
+        }
+        else if (!compareName &&
+            VertexShader->outputs[outputIdx]->nameLength == gcSL_BACK_SECONDARY_COLOR)
+        {
+            vertexBack2Color = VertexShader->outputs[outputIdx];
+        }
+    }
 
     if (!varyingColor && !varying2Color)
     {
         return status;
     }
-
+#define _SET_SHADER_MODE(v)    do { if ((v)) { shaderMode = GetOutputShaderMode((v)) ;} } while(0)
     /* Find frontColor/backColor or frontSecondaryColor/backSecondaryColor. */
     if (varyingColor)
     {
         if (frontColor == gcvNULL)
         {
+            _SET_SHADER_MODE(vertexFrontColor);
             gcmONERROR(gcSHADER_AddAttribute(FragmentShader,
                 "gl_FrontColor",
                 gcSHADER_FLOAT_X4,
                 1,
                 gcvFALSE,
-                gcSHADER_SHADER_DEFAULT,
+                shaderMode,
                 varyingColor->precision,
                 &frontColor));
         }
 
         if (enableVpTwoSide && backColor == gcvNULL)
         {
+            _SET_SHADER_MODE(vertexBackColor);
             gcmONERROR(gcSHADER_AddAttribute(FragmentShader,
                 "gl_BackColor",
                 gcSHADER_FLOAT_X4,
                 1,
                 gcvFALSE,
-                gcSHADER_SHADER_DEFAULT,
+                shaderMode,
                 varyingColor->precision,
                 &backColor));
         }
 
-        realColor = (gctUINT16)gcSHADER_NewTempRegs(FragmentShader, 1, gcSHADER_FLOAT_X4);
+        realColor = gcSHADER_NewTempRegs(FragmentShader, 1, gcSHADER_FLOAT_X4);
     }
 
     if (varying2Color)
     {
         if (front2Color == gcvNULL)
         {
+            _SET_SHADER_MODE(vertexFront2Color);
             gcmONERROR(gcSHADER_AddAttribute(FragmentShader,
                 "gl_FrontSecondaryColor",
                 gcSHADER_FLOAT_X4,
                 1,
                 gcvFALSE,
-                gcSHADER_SHADER_DEFAULT,
+                shaderMode,
                 varying2Color->precision,
                 &front2Color));
         }
 
         if (enableVpTwoSide && back2Color == gcvNULL)
         {
+            _SET_SHADER_MODE(vertexBack2Color);
             gcmONERROR(gcSHADER_AddAttribute(FragmentShader,
                 "gl_BackSecondaryColor",
                 gcSHADER_FLOAT_X4,
                 1,
                 gcvFALSE,
-                gcSHADER_SHADER_DEFAULT,
+                shaderMode,
                 varying2Color->precision,
                 &back2Color));
         }
 
-         real2Color = (gctUINT16)gcSHADER_NewTempRegs(FragmentShader, 1, gcSHADER_FLOAT_X4);
+        real2Color = gcSHADER_NewTempRegs(FragmentShader, 1, gcSHADER_FLOAT_X4);
     }
 
     if (enableVpTwoSide && frontFacing == gcvNULL)
@@ -21541,27 +21952,27 @@ _gcLINKTREE_ReplaceColor2FrontBackColor(
             gcSHADER_FLOAT_X1,
             1,
             gcvFALSE,
-            gcSHADER_SHADER_DEFAULT,
+            shaderMode,
             gcSHADER_PRECISION_MEDIUM,
             &frontFacing));
     }
 
+    /* Find the main function entry. */
+    gcmONERROR(gcSHADER_FindMainFunction(FragmentShader, &mainStartIdx, gcvNULL));
+
+    if (enableVpTwoSide)
+    {
         /*
         ** Insert:
         ** CMP.z dest, dest0, src2
         ** CMP.nz dest, dest0, src1
         */
-    gcmONERROR(gcSHADER_FindMainFunction(FragmentShader, &mainStartIdx, gcvNULL));
-
-    if (enableVpTwoSide)
-    {
         if (varyingColor != gcvNULL)
         {
             fColor  = frontColor;
             bColor  = backColor;
 
             gcmONERROR(gcSHADER_InsertNOP2BeforeCode(FragmentShader, mainStartIdx, 2, gcvTRUE, gcvTRUE));
-            gcOpt_Dump(gcvNULL, "Incoming Fragment Shader", gcvNULL, FragmentShader);
             FragmentShader->instrIndex = (mainStartIdx == 0) ? gcSHADER_OPCODE : gcSHADER_SOURCE1;
             FragmentShader->lastInstruction = (mainStartIdx == 0) ? 0 : (mainStartIdx - 1);
 
@@ -21607,12 +22018,12 @@ _gcLINKTREE_ReplaceColor2FrontBackColor(
         if (varyingColor)
         {
             gcmONERROR(gcSHADER_InsertNOP2BeforeCode(FragmentShader, mainStartIdx, 1, gcvTRUE, gcvTRUE));
-        FragmentShader->instrIndex = (mainStartIdx == 0) ? gcSHADER_OPCODE : gcSHADER_SOURCE1;
-        FragmentShader->lastInstruction = (mainStartIdx == 0) ? 0 : (mainStartIdx - 1);
+            FragmentShader->instrIndex = (mainStartIdx == 0) ? gcSHADER_OPCODE : gcSHADER_SOURCE1;
+            FragmentShader->lastInstruction = (mainStartIdx == 0) ? 0 : (mainStartIdx - 1);
 
-        /* MOV  realColor, frontColor*/
-        gcmONERROR(gcSHADER_AddOpcode(FragmentShader, gcSL_MOV, realColor, gcSL_ENABLE_XYZW, gcSL_FLOAT, frontColor->precision, 0));
-        gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, frontColor, gcSL_SWIZZLE_XYZW, 0));
+            /* MOV  realColor, frontColor*/
+            gcmONERROR(gcSHADER_AddOpcode(FragmentShader, gcSL_MOV, realColor, gcSL_ENABLE_XYZW, gcSL_FLOAT, frontColor->precision, 0));
+            gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, frontColor, gcSL_SWIZZLE_XYZW, 0));
 
             origLastInstruction++;
             FragmentShader->lastInstruction = origLastInstruction;
@@ -21624,58 +22035,9 @@ _gcLINKTREE_ReplaceColor2FrontBackColor(
             FragmentShader->instrIndex = (mainStartIdx == 0) ? gcSHADER_OPCODE : gcSHADER_SOURCE1;
             FragmentShader->lastInstruction = (mainStartIdx == 0) ? 0 : (mainStartIdx - 1);
 
-        /* MOV  real2Color, front2Color*/
-        gcmONERROR(gcSHADER_AddOpcode(FragmentShader, gcSL_MOV, real2Color, gcSL_ENABLE_XYZW, gcSL_FLOAT, front2Color->precision, 0));
-        gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, front2Color, gcSL_SWIZZLE_XYZW, 0));
-
-            origLastInstruction++;
-            FragmentShader->lastInstruction = origLastInstruction;
-        }
-    }
-
-    /* Clamp the output if needed. */
-    if (needClampOutputColor)
-    {
-        /* Find the main function exit. */
-        gcmONERROR(gcSHADER_FindMainFunction(FragmentShader, gcvNULL, &mainEndIdx));
-
-        if (varyingColor != gcvNULL)
-        {
-            gcmONERROR(gcSHADER_InsertNOP2BeforeCode(FragmentShader, mainEndIdx, 1, gcvTRUE, gcvTRUE));
-            FragmentShader->instrIndex = (mainEndIdx == 0) ? gcSHADER_OPCODE : gcSHADER_SOURCE1;
-            FragmentShader->lastInstruction = (mainEndIdx == 0) ? 0 : (mainEndIdx - 1);
-
-            /* SAT  realColor, realColor*/
-            gcmONERROR(gcSHADER_AddOpcode(FragmentShader, gcSL_SAT, realColor, gcSL_ENABLE_XYZW, gcSL_FLOAT, frontColor->precision, 0));
-            gcmONERROR(gcSHADER_AddSourceIndexedWithPrecision(FragmentShader,
-                                                              gcSL_TEMP,
-                                                              realColor,
-                                                              gcSL_SWIZZLE_XYZW,
-                                                              gcSL_NOT_INDEXED,
-                                                              0,
-                                                              gcSL_FLOAT,
-                                                              frontColor->precision));
-
-            origLastInstruction++;
-            FragmentShader->lastInstruction = origLastInstruction;
-        }
-
-        if (varying2Color != gcvNULL)
-        {
-            gcmONERROR(gcSHADER_InsertNOP2BeforeCode(FragmentShader, mainEndIdx, 1, gcvTRUE, gcvTRUE));
-            FragmentShader->instrIndex = (mainEndIdx == 0) ? gcSHADER_OPCODE : gcSHADER_SOURCE1;
-            FragmentShader->lastInstruction = (mainEndIdx == 0) ? 0 : (mainEndIdx - 1);
-
-            /* SAT  real2Color, real2Color*/
-            gcmONERROR(gcSHADER_AddOpcode(FragmentShader, gcSL_SAT, real2Color, gcSL_ENABLE_XYZW, gcSL_FLOAT, front2Color->precision, 0));
-            gcmONERROR(gcSHADER_AddSourceIndexedWithPrecision(FragmentShader,
-                                                              gcSL_TEMP,
-                                                              real2Color,
-                                                              gcSL_SWIZZLE_XYZW,
-                                                              gcSL_NOT_INDEXED,
-                                                              0,
-                                                              gcSL_FLOAT,
-                                                              frontColor->precision));
+            /* MOV  real2Color, front2Color*/
+            gcmONERROR(gcSHADER_AddOpcode(FragmentShader, gcSL_MOV, real2Color, gcSL_ENABLE_XYZW, gcSL_FLOAT, front2Color->precision, 0));
+            gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, front2Color, gcSL_SWIZZLE_XYZW, 0));
 
             origLastInstruction++;
             FragmentShader->lastInstruction = origLastInstruction;
@@ -21730,6 +22092,7 @@ _gcLINKTREE_ReplaceColor2FrontBackColor(
     {
         gcmATTRIBUTE_SetIsStaticallyUsed(varying2Color, gcvFALSE);
     }
+#undef _SET_SHADER_MODE
 
 OnError:
     return status;

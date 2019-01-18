@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -284,7 +284,6 @@ gcChipInitFormatMapInfo(
     GLuint patch8bitMsaaCount        = 0;
     GLuint patchD32FCount            = 0;
     GLuint patchAstcCount            = 0;
-    GLuint patchAlpha8Count          = 0;
     GLuint patchFmtMapInfoCount      = 0;
     static __GLApiVersion initializedVer = __GL_API_VERSION_INVALID;
 
@@ -346,11 +345,6 @@ gcChipInitFormatMapInfo(
         {gcvSURF_ASTC10x10_SRGB,    gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
         {gcvSURF_ASTC12x10_SRGB,    gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
         {gcvSURF_ASTC12x12_SRGB,    gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
-    };
-
-    __GLChipPatchFmt patchAlpha8Formats[] =
-    {
-        {gcvSURF_A8, gcvSURF_A8_1_A8R8G8B8, gcvSURF_UNKNOWN, -1},
     };
 
     GLuint halfFloatTableSize = 0;
@@ -445,16 +439,6 @@ gcChipInitFormatMapInfo(
                 patchAstcCount++;
             }
         }
-
-        for (j = 0; j < gcmCOUNTOF(patchAlpha8Formats); ++j)
-        {
-            if (patchAlpha8Formats[j].requestFormat == __glChipFmtMapInfo[i].requestFormat)
-            {
-                patchAlpha8Formats[j].entry = i;
-                patchAlpha8Count++;
-            }
-        }
-
     }
 
     /* case0 */
@@ -480,9 +464,6 @@ gcChipInitFormatMapInfo(
 
     /* case7: ASTC */
     patchFmtMapInfoCount += patchAstcCount;
-
-    /* case8 : ALPHA8*/
-    patchFmtMapInfoCount += patchAlpha8Count;
 
     GL_ASSERT(patchFmtMapInfoCount < __GL_CHIP_PATCH_FMT_MAX);
 
@@ -632,24 +613,6 @@ gcChipInitFormatMapInfo(
             index++;
         }
 
-        for (i = 0; i < gcmCOUNTOF(patchAlpha8Formats); ++i)
-        {
-            GLint entry = patchAlpha8Formats[i].entry;
-
-            GL_ASSERT(entry != -1);
-            if ((entry != -1) && (index < __GL_CHIP_PATCH_FMT_MAX))
-            {
-                __glChipFmtMapInfo_patch[index].requestFormat = patchAlpha8Formats[i].requestFormat;
-                __glChipFmtMapInfo_patch[index].readFormat = patchAlpha8Formats[i].readFormat;
-                __glChipFmtMapInfo_patch[index].writeFormat = patchAlpha8Formats[i].writeFormat;
-                __glChipFmtMapInfo_patch[index].patchCase = __GL_CHIP_FMT_PATCH_ALPHA8;
-                __glChipFmtMapInfo_patch[index].flags = 0;
-
-                gcChipSetFmtMapAttribs(gc, entry, &__glChipFmtMapInfo_patch[index], maxSamples);
-            }
-            index++;
-        }
-
         GL_ASSERT(index <= patchFmtMapInfoCount);
     }
 
@@ -689,30 +652,6 @@ gcChipGetFormatMapInfo(
     gcmFOOTER_NO();
     return formatMapInfo;
 }
-
-__GL_INLINE gceBUFOBJ_TYPE
-gcChipMapBufObjType(
-    GLuint targetIdx
-    )
-{
-    gceBUFOBJ_TYPE bufObjType = 0;
-
-    switch (targetIdx)
-    {
-    case __GL_ARRAY_BUFFER_INDEX:
-        bufObjType = gcvBUFOBJ_TYPE_ARRAY_BUFFER;
-        break;
-    case __GL_ELEMENT_ARRAY_BUFFER_INDEX:
-        bufObjType = gcvBUFOBJ_TYPE_ELEMENT_ARRAY_BUFFER;
-        break;
-    default:
-        bufObjType = gcvBUFOBJ_TYPE_GENERIC_BUFFER;
-        break;
-    }
-
-    return bufObjType;
-}
-
 
 __GL_INLINE gceBUFOBJ_USAGE
 gcChipMapBufObjUsage(
@@ -787,7 +726,7 @@ __glChipBindBufferObject(
     if (!bufInfo->bufObj)
     {
         /* Construct bufobj */
-        gcmONERROR(gcoBUFOBJ_Construct(chipCtx->hal, gcChipMapBufObjType(targetIndex), &bufInfo->bufObj));
+        gcmONERROR(gcoBUFOBJ_Construct(chipCtx->hal, gcvBUFOBJ_TYPE_GENERIC_BUFFER, &bufInfo->bufObj));
     }
 
     if (targetIndex == __GL_ELEMENT_ARRAY_BUFFER_INDEX)
@@ -890,7 +829,7 @@ __glChipMapBufferRange(
 
         if ((access & GL_MAP_UNSYNCHRONIZED_BIT) == 0)
         {
-            __glChipFlush(gc, gcvFALSE);
+            __glChipFlush(gc);
 
             if (gcvSTATUS_FALSE == gcoBUFOBJ_IsFenceEnabled(bufInfo->bufObj))
             {
@@ -909,9 +848,9 @@ __glChipMapBufferRange(
 #if gcdDUMP
             if (access & GL_MAP_READ_BIT)
             {
-                gcmDUMP(gcvNULL, "#[info: verify mapped bufobj");
+                gcmDUMP(gcvNULL, "#[info: verify mapped bufobj]");
                 gcmDUMP_BUFFER(gcvNULL,
-                               "verify",
+                               gcvDUMP_BUFFER_VERIFY,
                                physical,
                                (gctPOINTER)bufInfo->bufferMapPointer,
                                (gctUINT32)offset,
@@ -1025,7 +964,7 @@ __glChipUnMapBufferObject(
                                                              (gctSIZE_T)bufObj->mapOffset,
                                                              (gctSIZE_T)bufObj->mapLength,
                                                              gcvCACHE_FLUSH));
-                gcmONERROR(gcoBUFOBJ_GPUCacheOperation(bufInfo->bufObj));
+                gcmONERROR(gcoBUFOBJ_SetCPUWrite(bufInfo->bufObj, gcvTRUE));
 
                 gcoBUFOBJ_Dump(bufInfo->bufObj);
             }
@@ -1098,7 +1037,7 @@ __glChipBufferData(
         if (newSize > 0 && !bufInfo->bufObj)
         {
             /* Construct HAL pbo object. */
-            gcmERR_BREAK(gcoBUFOBJ_Construct(chipCtx->hal, gcChipMapBufObjType(targetIndex), &bufInfo->bufObj));
+            gcmERR_BREAK(gcoBUFOBJ_Construct(chipCtx->hal, gcvBUFOBJ_TYPE_GENERIC_BUFFER, &bufInfo->bufObj));
             if (!data)
             {
                 gcmERR_BREAK(gcoBUFOBJ_Upload(bufInfo->bufObj, gcvNULL, 0, newSize, bufInfo->usage));

@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2018 Vivante Corporation
+*    Copyright (c) 2014 - 2019 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2018 Vivante Corporation
+*    Copyright (C) 2014 - 2019 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -187,16 +187,14 @@ static int force_contiguous_lowmem_shrink(IN gckKERNEL Kernel)
 
         tasksize = 0;
         task_unlock(p);
-               rcu_read_unlock();
+
+        rcu_read_unlock();
 
         if (gckKERNEL_QueryProcessDB(Kernel, p->pid, gcvFALSE, gcvDB_VIDEO_MEMORY, &info) == gcvSTATUS_OK){
             tasksize += info.counters.bytes / PAGE_SIZE;
         }
-        if (gckKERNEL_QueryProcessDB(Kernel, p->pid, gcvFALSE, gcvDB_CONTIGUOUS, &info) == gcvSTATUS_OK){
-            tasksize += info.counters.bytes / PAGE_SIZE;
-        }
 
-               rcu_read_lock();
+        rcu_read_lock();
 
         if (tasksize <= 0)
             continue;
@@ -409,35 +407,35 @@ _AdjustParam(
 
     res = platform_get_resource_byname(pdev, IORESOURCE_IRQ, "irq_3d");
     if (res)
-        Args->irqLine = res->start;
+        Args->irqs[gcvCORE_MAJOR] = res->start;
 
     res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "iobase_3d");
     if (res)
     {
-        Args->registerMemBase = res->start;
-        Args->registerMemSize = res->end - res->start + 1;
+        Args->registerBases[gcvCORE_MAJOR] = res->start;
+        Args->registerSizes[gcvCORE_MAJOR] = res->end - res->start + 1;
     }
 
     res = platform_get_resource_byname(pdev, IORESOURCE_IRQ, "irq_2d");
     if (res)
-        Args->irqLine2D = res->start;
+        Args->irqs[gcvCORE_2D] = res->start;
 
     res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "iobase_2d");
     if (res)
     {
-        Args->registerMemBase2D = res->start;
-        Args->registerMemSize2D = res->end - res->start + 1;
+        Args->registerBases[gcvCORE_2D] = res->start;
+        Args->registerSizes[gcvCORE_2D] = res->end - res->start + 1;
     }
 
     res = platform_get_resource_byname(pdev, IORESOURCE_IRQ, "irq_vg");
     if (res)
-        Args->irqLineVG = res->start;
+        Args->irqs[gcvCORE_VG] = res->start;
 
     res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "iobase_vg");
     if (res)
     {
-        Args->registerMemBaseVG = res->start;
-        Args->registerMemSizeVG = res->end - res->start + 1;
+        Args->registerBases[gcvCORE_VG] = res->start;
+        Args->registerSizes[gcvCORE_VG] = res->end - res->start + 1;
     }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,1,0)
@@ -853,21 +851,7 @@ _Reset(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS
-_CacheFlush(
-       IN gcsPLATFORM * Platform,
-       IN gctUINT32 ProcessID,
-       IN gctPHYS_ADDR Handle,
-       IN gctUINT32 Physical,
-       IN gctPOINTER Logical,
-       IN gctSIZE_T Bytes,
-       IN gceCACHEOPERATION Operation
-       )
-{
-       return gcvSTATUS_OK;
-}
-
-static struct soc_platform_ops s32v234_ops =
+static struct _gcsPLATFORM_OPERATIONS s32v234_ops =
 {
     .adjustParam  = _AdjustParam,
     .getPower     = _GetPower,
@@ -878,17 +862,16 @@ static struct soc_platform_ops s32v234_ops =
 #ifdef CONFIG_GPU_LOW_MEMORY_KILLER
     .shrinkMemory = _ShrinkMemory,
 #endif
-    .cache        = _CacheFlush,
 };
 
-static struct soc_platform s32v234_platform =
+static struct _gcsPLATFORM s32v234_platform =
 {
     .name = __FILE__,
     .ops  = &s32v234_ops,
 };
 
-int soc_platform_init(struct platform_driver *pdrv,
-            struct soc_platform **platform)
+int gckPLATFORM_Init(struct platform_driver *pdrv,
+            struct _gcsPLATFORM **platform)
 {
     _AdjustDriver(pdrv);
     _AllocPriv(&s32v234_platform);
@@ -896,7 +879,7 @@ int soc_platform_init(struct platform_driver *pdrv,
     return 0;
 }
 
-int soc_platform_terminate(struct soc_platform *platform)
+int gckPLATFORM_Terminate(struct _gcsPLATFORM *platform)
 {
     _FreePriv(&s32v234_platform);
     return 0;

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -325,14 +325,14 @@ vx_status _gcfVX_Filter(vx_node node, gceVX_KERNEL kernel, vx_image src, vx_imag
     kernelContext->uniforms[0].num         = 4;
     kernelContext->uniform_num             = 1;
 
-    if(borders.mode == VX_BORDER_CONSTANT)
+    if(borders.mode == VX_BORDER_CONSTANT || borders.mode == VX_BORDER_UNDEFINED)
     {
         vx_uint32 bin[4];
 
         bin[0] =
         bin[1] =
         bin[2] =
-        bin[3] = FORMAT_VALUE(borders.constant_value.U32);
+        bin[3] = FORMAT_VALUE((borders.mode == VX_BORDER_UNDEFINED) ? 0xcd : borders.constant_value.U32);
 
         gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, bin, sizeof(bin));
         kernelContext->uniforms[1].num    = 4 * 4;
@@ -1139,6 +1139,7 @@ vx_status vxNonLinearFilter(vx_node node, vx_scalar function, vx_image src, vx_m
         vx_uint32 height;
         gcoVX_Kernel_Context * kernelContext = gcvNULL;
         vx_uint8 m[C_MAX_NONLINEAR_DIM * C_MAX_NONLINEAR_DIM];
+        vx_coordinates2d_t origin;
 
 #if gcdVX_OPTIMIZER
         if (node && node->kernelContext)
@@ -1336,7 +1337,9 @@ vx_status vxNonLinearFilter(vx_node node, vx_scalar function, vx_image src, vx_m
             kernelContext->uniforms[1].index = 3;
             kernelContext->uniform_num ++;
         }
-
+        status |= vxQueryMatrix(mask, VX_MATRIX_ORIGIN, &origin, sizeof(origin));
+        kernelContext->params.policy = origin.x;
+        kernelContext->params.rounding = origin.y;
         kernelContext->params.evisNoInst = node->base.context->evisNoInst;
 
         kernelContext->node = node;

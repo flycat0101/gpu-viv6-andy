@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,6 +13,14 @@
 
 #ifndef __GC_VX_KERNEL_H__
 #define __GC_VX_KERNEL_H__
+
+#define   VX_KERNEL_IMPORT_FROM_URL_BASE      0x5A
+enum vx_kernel_import_url
+{
+    VX_KERNEL_IMPORT_FROM_FILE       =    VX_KERNEL_BASE(VX_ID_DEFAULT, VX_KERNEL_IMPORT_FROM_URL_BASE) + 0x01,
+    VX_KERNEL_IMPORT_FROM_FOLDER     =    VX_KERNEL_BASE(VX_ID_DEFAULT, VX_KERNEL_IMPORT_FROM_URL_BASE) + 0x02,
+    VX_KERNEL_IMPORT_FROM_POINTER    =    VX_KERNEL_BASE(VX_ID_DEFAULT, VX_KERNEL_IMPORT_FROM_URL_BASE) + 0x03,
+};
 
 EXTERN_C_BEGIN
 
@@ -49,27 +57,29 @@ VX_INTERNAL_API vx_kernel vxoKernel_GetByEnumFromTarget(vx_context context, vx_t
 
 VX_INTERNAL_API vx_status vxoKernel_ExternalRelease(vx_kernel_ptr kernelPtr);
 
-VX_INTERNAL_API vx_status vxoKernel_ProcessKernelShaderPrint(vx_kernel kernel, vx_kernel_execution_parameters_t* shaderParameter);
+VX_INTERNAL_API vx_status vxoKernel_ProcessKernelShaderPrint(vx_shader shader, vx_kernel_execution_parameters_t* shaderParameter);
 
 
 VX_INTERNAL_API vx_status vxoKernel_CreateShaders(vx_program program, vx_char *name, vx_uint32* kernelShaderCount, vx_shader ** kernelShaders);
 
-VX_INTERNAL_API vx_status vxoShader_SetParameters(vx_shader kernelShader, vx_reference parameters[], vx_uint32 paramCount, vx_enum dataTypeTable[]);
+VX_INTERNAL_API vx_status vxoShader_SetParameters(vx_shader kernelShader, vx_reference parameters[], vx_uint32 paramCount, vx_enum dataTypeTable[], vx_bitfield paramAttributes[]);
 
 VX_INTERNAL_API vx_status vxoShader_Free(vx_shader kernel);
 
 VX_INTERNAL_API vx_status vxoShader_Execute(
+    vx_node   node,
     vx_shader kernelShader,
     vx_border_mode_t *borderMode,
     vx_kernel_execution_parameters_t *shaderParameter,
-    gctPOINTER* devices,
-    vx_uint32 deviceCount);
+    vx_uint32 batchID);
 
 VX_INTERNAL_API vx_status vxoShader_SetUniform(vx_shader shader, vx_char * name, vx_size count, void * value);
 
 VX_INTERNAL_API vx_status vxoShader_GetUniformSize(vx_shader shader, vx_char * name, vx_uint32 *size);
 
 VX_INTERNAL_CALLBACK_API void vxoKernel_Destructor(vx_reference ref);
+
+VX_INTERNAL_API vx_status vxoProgramKernel_GetCurrentShaderID(vx_node node, gctUINT *currentShaderID);
 
 VX_API_ENTRY vx_kernel VX_API_CALL vxAddKernelInProgramEx(
         vx_program program, vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration, vx_kernel_f func_ptr,

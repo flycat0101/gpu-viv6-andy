@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2018 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -214,43 +214,17 @@ install: all
 	@mkdir -p $(SDK_DIR)/include
 	@-cp -f  ../inc/gc_vdk.h $(SDK_DIR)/include
 	@-cp -f  ../inc/gc_vdk_types.h $(SDK_DIR)/include
-	@echo "/****************************************************************************" >$(SDK_DIR)/include/vdk.h
-	@echo "*" >>$(SDK_DIR)/include/vdk.h
-	@echo "*    Copyright 2012 - 2018 Vivante Corporation, Santa Clara, California." >>$(SDK_DIR)/include/vdk.h
-	@echo "*    All Rights Reserved." >>$(SDK_DIR)/include/vdk.h
-	@echo "*" >>$(SDK_DIR)/include/vdk.h
-	@echo "*    Permission is hereby granted, free of charge, to any person obtaining" >>$(SDK_DIR)/include/vdk.h
-	@echo "*    a copy of this software and associated documentation files (the" >>$(SDK_DIR)/include/vdk.h
-	@echo "*    'Software'), to deal in the Software without restriction, including" >>$(SDK_DIR)/include/vdk.h
-	@echo "*    without limitation the rights to use, copy, modify, merge, publish," >>$(SDK_DIR)/include/vdk.h
-	@echo "*    distribute, sub license, and/or sell copies of the Software, and to" >>$(SDK_DIR)/include/vdk.h
-	@echo "*    permit persons to whom the Software is furnished to do so, subject" >>$(SDK_DIR)/include/vdk.h
-	@echo "*    to the following conditions:" >>$(SDK_DIR)/include/vdk.h
-	@echo "*" >>$(SDK_DIR)/include/vdk.h
-	@echo "*    The above copyright notice and this permission notice (including the" >>$(SDK_DIR)/include/vdk.h
-	@echo "*    next paragraph) shall be included in all copies or substantial" >>$(SDK_DIR)/include/vdk.h
-	@echo "*    portions of the Software." >>$(SDK_DIR)/include/vdk.h
-	@echo "*" >>$(SDK_DIR)/include/vdk.h
-	@echo "*    THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND," >>$(SDK_DIR)/include/vdk.h
-	@echo "*    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF" >>$(SDK_DIR)/include/vdk.h
-	@echo "*    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT." >>$(SDK_DIR)/include/vdk.h
-	@echo "*    IN NO EVENT SHALL VIVANTE AND/OR ITS SUPPLIERS BE LIABLE FOR ANY" >>$(SDK_DIR)/include/vdk.h
-	@echo "*    CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT," >>$(SDK_DIR)/include/vdk.h
-	@echo "*    TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE" >>$(SDK_DIR)/include/vdk.h
-	@echo "*    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE." >>$(SDK_DIR)/include/vdk.h
-	@echo "*" >>$(SDK_DIR)/include/vdk.h
-	@echo "*****************************************************************************/" >>$(SDK_DIR)/include/vdk.h
-	@echo "" >>$(SDK_DIR)/include/vdk.h
-	@echo "#include \"gc_vdk.h\"" >>$(SDK_DIR)/include/vdk.h
+	@-cd $(SDK_DIR)/include; echo "#include \"gc_vdk.h\"" >vdk.h
 
 ################################################################################
 # Module rules.
 
 ifeq ($(STATIC),1)
 $(TARGET_MODULE): $(OBJECTS)
-	$(AR) -r -c $@ $(OBJECTS)
+	@echo "  ARCHIVE \033[1m$(notdir $@)\033[0m"
+	@$(AR) -r -c $@ $(OBJECTS)
 ifneq ($(USE_ARMCC),1)
-	$(RANLIB) $@
+	@$(RANLIB) $@
 endif
 endif
 
@@ -262,7 +236,8 @@ $(TARGET_MODULES): $(wildcard $(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)/libEGL.
 
 
 $(TARGET_MODULE): $(OBJECTS)
-	$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LDLIBS)
+	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
+	@$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LDLIBS)
 endif
 
 ################################################################################
@@ -273,8 +248,9 @@ ifeq ($(EGL_API_DRI),1)
 endif
 
 $(OBJ_DIR)/%.o: %.c
+	@echo "  COMPILE $(abspath $<)"
 	@mkdir -p $(OBJ_DIR)
-	$(CC) -c $(CFLAGS) -MMD -o $@ $<
+	@$(CC) -c $(CFLAGS) -MMD -o $@ $<
 
 # object dependencies.
 -include $(OBJECTS:.o=.d)

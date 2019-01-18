@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -64,7 +64,7 @@ GLvoid __glUpdateViewport(__GLcontext *gc, GLint x, GLint y, GLsizei w, GLsizei 
     __glViewport(gc, x, y, w, h);
 }
 
-GLvoid GL_APIENTRY GL_APIENTRY __gles_Viewport(__GLcontext *gc, GLint x, GLint y, GLsizei w, GLsizei h)
+GLvoid GL_APIENTRY GL_APIENTRY __glim_Viewport(__GLcontext *gc, GLint x, GLint y, GLsizei w, GLsizei h)
 {
     __GL_HEADER();
 
@@ -79,7 +79,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_FrontFace(__GLcontext *gc, GLenum dir)
+GLvoid GL_APIENTRY __glim_FrontFace(__GLcontext *gc, GLenum dir)
 {
     __GL_HEADER();
 
@@ -98,7 +98,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_CullFace(__GLcontext *gc, GLenum cfm)
+GLvoid GL_APIENTRY __glim_CullFace(__GLcontext *gc, GLenum cfm)
 {
     __GL_HEADER();
 
@@ -117,7 +117,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_LineWidth(__GLcontext *gc, GLfloat width)
+GLvoid GL_APIENTRY __glim_LineWidth(__GLcontext *gc, GLfloat width)
 {
     __GL_HEADER();
 
@@ -141,7 +141,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_PolygonOffset(__GLcontext *gc, GLfloat factor, GLfloat units)
+GLvoid GL_APIENTRY __glim_PolygonOffset(__GLcontext *gc, GLfloat factor, GLfloat units)
 {
     __GL_HEADER();
 

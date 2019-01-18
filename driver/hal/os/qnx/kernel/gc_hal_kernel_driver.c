@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -98,7 +98,7 @@ unsigned long   registerMemSizeVG   = gcdVG_REG_SIZE;
 static int      powerManagement     = gcdPOWER_MANAGEMENT;
 static int      gpuProfiler         = gcdGPUPROFILER;
 
-static unsigned int    physBase     = gcdMMU_PhysicalMemoryBase;
+static unsigned long   physBase     = gcdMMU_PhysicalMemoryBase;
 static unsigned int    physSize     = gcdMMU_PhysicalMemorySize;
 #endif
 
@@ -1254,11 +1254,12 @@ gckSHM_POOL drv_shmpool_create(
 
     if (rc) {
         fprintf(stderr, "%s: shm_ctl failed: %s\n", __FUNCTION__, strerror( errno ) );
-        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "[%s %d] drv_shmpool_create: couldn't allocate memory of size %d, Pid: %d [errno %s]",
-                __FUNCTION__, __LINE__, shm->poolSize, Pid, strerror( errno ) );
         close(fd);
         pthread_mutex_destroy(&shm->mutex);
         free(shm);
+
+        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "[%s %d] drv_shmpool_create: couldn't allocate memory of size %d, Pid: %d [errno %s]",
+                                                __FUNCTION__, __LINE__, shm->poolSize, Pid, strerror( errno ) );
 
         return gcvNULL;
     }
@@ -1736,7 +1737,7 @@ drv_physical_allocate_node(
 
     /* Reset the node. */
     gckOS_ZeroMemory(pNode, gcmSIZEOF(*pNode));
-    pNode->physicalAddress = gcvINVALID_ADDRESS;
+    pNode->physicalAddress = gcvINVALID_PHYSICAL_ADDRESS;
 
     /* Save pointer to the node. */
     *Node = pNode;
@@ -1838,10 +1839,11 @@ drv_physical_map_delete_node(
     pthread_mutex_unlock(&s_physicalListLock);
 }
 
-gctPOINTER
-drv_physical_map_get_kernel_logical(
+void
+drv_physical_map_get_node(
     IN gctUINT32 Pid,
-    IN gctPOINTER Logical
+    IN gctPOINTER Logical,
+    OUT gcsPHYSICAL_PTR *Node
     )
 {
     gcsPHYSICAL_PTR p;
@@ -1862,19 +1864,14 @@ drv_physical_map_get_kernel_logical(
             (logical < (userLogical + p->bytes))
            )
         {
-            logical = logical - userLogical + gcmPTR2INT32(p->kernelLogical);
-
-            /* Release the mutex. */
-            pthread_mutex_unlock(&s_physicalListLock);
-
-            return gcmINT2PTR(logical);
+            /* Found it! */
+            *Node = p;
+            break;
         }
     }
 
     /* Release the mutex. */
     pthread_mutex_unlock(&s_physicalListLock);
-
-    return gcvNULL;
 }
 
 /*----------------------------------------------------------------------------*/
@@ -2109,35 +2106,89 @@ int drv_msg(resmgr_context_t *ctp,
         else
 #endif
         {
-            userQueue = gcmUINT64_TO_PTR(drvArgs->iface.u.Commit.queue);
+            gcsHAL_SUBCOMMIT *subCommit = &drvArgs->iface.u.Commit.subCommit;
+            gctPOINTER userPtr = gcvNULL;
+            gctUINT64 next;
 
-            for (; userQueue != gcvNULL; )
+            do
             {
-                status = gckOS_MapUserPointer(
-                            gcvNULL, userQueue, gcmSIZEOF(*userQueue), &pointer);
+                status = gcvSTATUS_OK;
+
+                if (userPtr)
+                {
+                    status = gckOS_MapUserPointer(
+                        gcvNULL,
+                        userPtr,
+                        gcmSIZEOF(gcsHAL_SUBCOMMIT),
+                        (gctPOINTER *)&subCommit
+                        );
+
+                    if (gcmIS_ERROR(status))
+                    {
+                        drvArgs->iface.status = gcvSTATUS_GENERIC_IO;
+                        goto OnError;
+                    }
+                }
+
+                userQueue = gcmUINT64_TO_PTR(subCommit->queue);
+
+                while (userQueue)
+                {
+                    status = gckOS_MapUserPointer(
+                        gcvNULL,
+                        userQueue,
+                        gcmSIZEOF(gcsQUEUE_PTR),
+                        &pointer
+                        );
+
+                    if (gcmIS_ERROR(status))
+                    {
+                        drvArgs->iface.status = gcvSTATUS_GENERIC_IO;
+                        break;
+                    }
+
+                    queue = pointer;
+                    status = drv_signal_mgr_update_iface(pid, ctp->rcvid, &queue->iface);
+
+                    if (gcmIS_ERROR(status))
+                    {
+                        drvArgs->iface.status = gcvSTATUS_GENERIC_IO;
+                        break;
+                    }
+
+                    queue = gcmUINT64_TO_PTR(queue->next);
+
+                    gckOS_UnmapUserPointer(
+                        gcvNULL,
+                        userQueue,
+                        gcmSIZEOF(gcsQUEUE_PTR),
+                        pointer);
+
+                    userQueue = queue;
+                }
+
+                next = subCommit->next;
+
+                if (userPtr)
+                {
+                    gcmkVERIFY_OK(gckOS_UnmapUserPointer(
+                        gcvNULL,
+                        userPtr,
+                        gcmSIZEOF(gcsHAL_SUBCOMMIT),
+                        subCommit
+                        ));
+                }
 
                 if (gcmIS_ERROR(status))
                 {
-                    drvArgs->iface.status = gcvSTATUS_GENERIC_IO;
+                    /* Error in signal update loop. */
                     goto OnError;
                 }
 
-                queue = pointer;
-
-                status = drv_signal_mgr_update_iface(pid, ctp->rcvid, &queue->iface);
-                if (gcmIS_ERROR(status))
-                {
-                    drvArgs->iface.status = gcvSTATUS_GENERIC_IO;
-                    goto OnError;
-                }
-
-                queue = gcmUINT64_TO_PTR(queue->next);
-
-                gckOS_UnmapUserPointer(
-                    gcvNULL, userQueue, gcmSIZEOF(*userQueue), pointer);
-
-                userQueue = queue;
+                /* Advance to next sub-commit from user. */
+                userPtr = gcmUINT64_TO_PTR(next);
             }
+            while (userPtr);
         }
         break;
 
@@ -2151,7 +2202,7 @@ int drv_msg(resmgr_context_t *ctp,
     if (gcmIS_ERROR(status))
     {
         gcmkTRACE_ZONE(gcvLEVEL_WARNING, gcvZONE_DRIVER,
-                  "[galcore] gckKERNEL_Dispatch returned %d.\n",
+                  "[galcore] gckDEVICE_Dispatch returned %d.\n",
               status);
     }
     else if (gcmIS_ERROR(drvArgs->iface.status))

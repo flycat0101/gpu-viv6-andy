@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -129,6 +129,29 @@ sloCOMPILER_AddSharedVariable(
     IN struct _slsNAME *VariableName
     );
 
+gceSTATUS
+sloCOMPILER_GetConstantVariableList(
+    IN sloCOMPILER Compiler,
+    OUT slsDLINK_LIST **ConstantVariableList
+    );
+
+gceSTATUS
+sloCOMPILER_DestroyConstantVariableList(
+    IN sloCOMPILER Compiler
+    );
+
+gceSTATUS
+sloCOMPILER_InitializeConstantBuffer(
+    IN sloCOMPILER Compiler,
+    INOUT gctCHAR* Buffer
+    );
+
+gceSTATUS
+sloCOMPILER_AddConstantVariable(
+    IN sloCOMPILER Compiler,
+    IN sloIR_CONSTANT Constant
+    );
+
 typedef struct _slsBINDING_OFFSET_LIST
 {
     slsSLINK_NODE node;
@@ -184,6 +207,14 @@ typedef struct _slsSHARED_VARIABLE
     struct _slsNAME  *name;
 }
 slsSHARED_VARIABLE;
+
+struct _slsCONSTANT_VARIABLE;
+typedef struct _slsCONSTANT_VARIABLE
+{
+    slsDLINK_NODE    node;
+    sloIR_CONSTANT   constantVar;
+}
+slsCONSTANT_VARIABLE;
 
 gctBOOL
 sloCOMPILER_ExpandNorm(
@@ -363,6 +394,10 @@ struct _sloCOMPILER
         slsSLINK_LIST           sharedVariables;
         /* Use it to save the name of a type. */
         slsDLINK_LIST           dataTypeNameList;
+        /* Use it to save the constant variables, e.g., uniforms with initializer, constant array. */
+        slsDLINK_LIST           constantVariables;
+        /* The size of constant buffer. */
+        gctUINT                 constantBufferSize;
         gceSTATUS               hasNotStagesRelatedLinkError;
         sleCOMPILER_FLAGS       compilerFlags;
         VSC_DIContext *         debugInfo;

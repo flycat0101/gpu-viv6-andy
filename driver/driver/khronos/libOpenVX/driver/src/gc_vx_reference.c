@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -411,22 +411,24 @@ VX_INTERNAL_API vx_status vxoReference_Release(
 
 VX_PRIVATE_API void vxoReference_PolluteAllInputGraphs(vx_reference targetRef)
 {
-    vx_uint32 refIndex;
+    vx_reference_item current;
     vx_context context;
 
     vxmASSERT(targetRef);
 
     context = targetRef->context;
+    current = context->refListHead;
 
-    for (refIndex = 0; refIndex < context->refCount; refIndex++)
+    while (current != VX_NULL)
     {
-        vx_reference ref = context->refTable[refIndex];
+        vx_reference ref = current->ref;
 
-        if (ref == VX_NULL || ref == targetRef) continue;
+        if (ref != VX_NULL && ref != targetRef && ref->type == VX_TYPE_GRAPH)
+        {
+            vxoGraph_PolluteIfInput((vx_graph)ref, targetRef);
+        }
 
-        if (ref->type != VX_TYPE_GRAPH) continue;
-
-        vxoGraph_PolluteIfInput((vx_graph)ref, targetRef);
+        current = current->next;
     }
 }
 
@@ -456,6 +458,8 @@ VX_INTERNAL_API void vxoReference_IncrementReadCount(vx_reference ref)
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryReference(vx_reference ref, vx_enum attribute, void *ptr, vx_size size)
 {
+    gcmDUMP_API("$VX vxQueryReference: ref=%p, attribute=0x%x, ptr=%p, size=0x%lx", ref, attribute, ptr, size);
+
     if (!vxoReference_IsValidAndNoncontext(ref)
         && !vxoContext_IsValid((vx_context_s *)ref))
     {
@@ -493,6 +497,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryReference(vx_reference ref, vx_enum at
 VX_API_ENTRY vx_status VX_API_CALL vxGetStatus(vx_reference reference)
 {
     vx_status status = vxoReference_GetStatus(reference);
+
+    gcmDUMP_API("$VX vxGetStatus: reference=%p", reference);
 
     vxTrace(VX_TRACE_REF, "Got the status, %d, from the reference, %p", status, reference);
 
@@ -590,7 +596,10 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseReference(vx_reference* ref_ptr)
     vx_status status = VX_SUCCESS;
 
     vx_reference ref = (ref_ptr ? *ref_ptr : NULL);
-    if ((ref->type == VX_TYPE_CONTEXT && vxoContext_IsValid((vx_context)ref)) ||
+
+    gcmDUMP_API("$VX vxReleaseReference: reference=%p", ref_ptr);
+
+    if ((ref && ref->type == VX_TYPE_CONTEXT && vxoContext_IsValid((vx_context)ref)) ||
         (vxoReference_IsValidAndNoncontext(ref) == vx_true_e))
     {
         status = vxoReference_Release(ref_ptr, ref->type, VX_REF_EXTERNAL);
@@ -606,6 +615,9 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseReference(vx_reference* ref_ptr)
 VX_API_ENTRY vx_status VX_API_CALL vxSetReferenceName(vx_reference ref, const vx_char *name)
 {
     vx_status status = VX_ERROR_INVALID_REFERENCE;
+
+    gcmDUMP_API("$VX vxSetReferenceName: ref=%p, name=%s", ref, name);
+
     if (vxoReference_IsValidAndNoncontext(ref))
     {
         strncpy(ref->name, name, strnlen(name, VX_MAX_REFERENCE_NAME));
@@ -626,6 +638,8 @@ vx_status vxCommitSurfaceNode(vx_reference reference)
 VX_API_ENTRY vx_status VX_API_CALL vxRetainReference(vx_reference ref)
 {
     vx_status status = VX_SUCCESS;
+
+    gcmDUMP_API("$VX vxRetainReference: ref=%p", ref);
 
     if ((ref->type == VX_TYPE_CONTEXT && vxoContext_IsValid((vx_context)ref)) ||
         (vxoReference_IsValidAndNoncontext(ref) == vx_true_e))

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -19,7 +19,11 @@
 #include "debug/gc_vsc_debug.h"
 
 #define _cldFILENAME_MAX 1024
-#define _TURN_OFF_OPTIMIZATION_LOOP_UNROLL   0
+#define _TURN_OFF_OPTIMIZATION_LOOP_UNROLL   1
+
+#define __ENABLE_VSC_MP_POOL__      (gcvTRUE)
+#define __VSC_GENERAL_MP_SIZE__     (512 * 1024)
+#define __VSC_PRIVATE_SIZE__        (32 * 1024)
 
 /* cloCOMPILER object. */
 struct _cloCOMPILER
@@ -30,12 +34,20 @@ struct _cloCOMPILER
     gcSHADER         binary;
     gctSTRING        log;
     gctUINT          logBufSize;
+#if __USE_VSC_MP__
+    VSC_PRIMARY_MEM_POOL        generalPMP;
+    VSC_PRIMARY_MEM_POOL        privatePMP;
+    VSC_PRIMARY_MEM_POOL       *currentPMP;
+#else
     slsDLINK_LIST    memoryPool;
+    slsDLINK_LIST    generalMemoryPool;
+#endif
     gctCHAR          fileNameBuffer[_cldFILENAME_MAX + 1];
     struct {
         gctUINT16    errorCount;
         gctUINT16    warnCount;
         clsHASH_TABLE    stringPool;
+        clsHASH_TABLE    generalStringPool;
         cltOPTIMIZATION_OPTIONS    optimizationOptions;
         cltEXTENSIONS    extensions;
         cltDUMP_OPTIONS  dumpOptions;
@@ -55,9 +67,20 @@ struct _cloCOMPILER
         slsDLINK_LIST    dataTypes;
         clsNAME_SPACE *  unnamedSpace;
         clsNAME_SPACE *  builtinSpace;
+        clsNAME_SPACE *  generalBuiltinSpace;
         clsNAME_SPACE *  globalSpace;
         clsNAME_SPACE *  currentSpace;
         clsNAME          *unnamedVariables[cldNumBuiltinVariables];
+#if !__USE_VSC_MP__
+        slsSLINK_LIST    *namePools;
+        clsNAME_POOL     *curNamePool;
+        gctUINT          namePoolSize;
+        gctUINT          nameCount;
+        slsSLINK_LIST    *generalNamePools;
+        clsNAME_POOL     *curGeneralNamePool;
+        gctUINT          generalNamePoolSize;
+        gctUINT          generalNameCount;
+#endif
         cloIR_VARIABLE   paramChainVariables[cldMaxParamChains];
         cloIR_SET        rootSet;
         gctUINT          localTempRegCount;
@@ -72,6 +95,7 @@ struct _cloCOMPILER
         gctBOOL          inKernelFunctionEpilog;
         gctBOOL          needLocalMemory;
         gctBOOL          hasLocalMemoryKernelArg;
+        gctBOOL          loadingGeneralBuiltIns;
         gctBOOL          loadingBuiltins;
         gctBOOL          mainDefined;
         gctBOOL          kernelFuncDefined;
@@ -84,7 +108,9 @@ struct _cloCOMPILER
         gctBOOL          hasImageQuery;
         gctUINT          imageArrayMaxLevel;
         gctBOOL          basicTypePacked;
+        gctBOOL          gcslDriverImage;
         gctBOOL          longUlongPatch;
+        gctBOOL          hasCalculatePreScaleGlobalID;
         VSC_DIContext *  debugInfo;
         gctBOOL          mainFile;
     } context;
@@ -93,28 +119,31 @@ struct _cloCOMPILER
     cloCODE_GENERATOR    codeGenerator;
 };
 
+cloCOMPILER gcKernelCompiler[1] = {gcvNULL};
+
+cloCOMPILER *
+gcGetKernelCompiler(void)
+{
+    return &gcKernelCompiler[0];
+}
+
 typedef struct _clsPOOL_STRING_NODE
 {
     slsDLINK_NODE    node;
-    cltPOOL_STRING    string;
+    cltPOOL_STRING   string;
+    gctUINT          crc32Value;
 }
 clsPOOL_STRING_NODE;
 
-static gcsATOM_PTR  CompilerLockRef = gcvNULL;
-static gctINT32  CompilerLockRefCount = 0;
+struct gcsATOM CompilerLockRef = gcmATOM_INITIALIZER;
 
 gceSTATUS
 cloCOMPILER_Load(void)
 {
   gceSTATUS status = gcvSTATUS_OK;
 
-  if(CompilerLockRef) return gcvSTATUS_INVALID_REQUEST;
-  else {
-     /* Create a new reference counter. */
-     CompilerLockRefCount = 0;
-     gcmONERROR(gcoOS_AtomConstruct(gcvNULL, &CompilerLockRef));
-  }
-OnError:
+  gcmVERIFY_OK(gcoOS_AtomIncrement(gcvNULL, &CompilerLockRef, gcvNULL));
+
   return status;
 }
 
@@ -122,63 +151,73 @@ gceSTATUS
 cloCOMPILER_Unload(void)
 {
    gceSTATUS status = gcvSTATUS_OK;
+   gctINT32 reference = 0;
 
-   if(CompilerLockRef == gcvNULL) return gcvSTATUS_INVALID_REQUEST;
-   else {
-     gcmVERIFY_OK(gcoOS_AtomIncrement(gcvNULL, CompilerLockRef, &CompilerLockRefCount));
-     gcmASSERT(CompilerLockRefCount <= 1);
+   /* Decrement the reference counter */
+   gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, &CompilerLockRef, &reference));
 
-     if (CompilerLockRefCount <= 1) {
-       status = gcoOS_LockCLFECompiler();
-       if(gcmIS_ERROR(status)) return status;
-
+   if (reference == 1)
+   {
+     status = clCleanupKeywords();
+     if(gcmIS_ERROR(status)) return status;
      status = clCleanupBuiltins();
      if(gcmIS_ERROR(status)) return status;
-
-       status = gcoOS_UnLockCLFECompiler();
-       if(gcmIS_ERROR(status)) return status;
-
-       /* Destroy the reference counter */
-       gcmONERROR(gcoOS_AtomDestroy(gcvNULL, CompilerLockRef));
-
-OnError:
-       CompilerLockRef = gcvNULL;
-       CompilerLockRefCount = 0;
    }
-     else gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, CompilerLockRef, gcvNULL));
-   }
+
    return status;
 }
 
 gceSTATUS
 cloCOMPILER_Construct(
-    OUT cloCOMPILER * Compiler
+    INOUT cloCOMPILER Compiler
     )
 {
     gceSTATUS status;
-    cloCOMPILER compiler = gcvNULL;
+    cloCOMPILER compiler = Compiler;
     gcePATCH_ID patchId  = gcvPATCH_INVALID;
 
     gcmASSERT(Compiler);
 
     do {
-        /* Increment the reference counter */
-        if(CompilerLockRef) {
-           gcmERR_BREAK(gcoOS_AtomIncrement(gcvNULL, CompilerLockRef, gcvNULL));
-        }
+#if __USE_VSC_MP__
+        VSC_PRIMARY_MEM_POOL    generalPMP;
+#else
+        slsDLINK_LIST           generalMemoryPool;
+        slsSLINK_LIST *         generalNamePools;
+        clsNAME_POOL     *curGeneralNamePool;
+        gctUINT          generalNamePoolSize;
+        gctUINT          generalNameCount;
+#endif
+        clsHASH_TABLE           generalStringPool;
+        clsNAME_SPACE *         generalBuiltinSpace;
 
-        /* Allocate memory for cloCOMPILER object */
-        status = gcoOS_Allocate(gcvNULL,
-                    sizeof(struct _cloCOMPILER),
-                    (gctPOINTER *)&compiler
-                    );
-
-        if (gcmIS_ERROR(status)) {
-            compiler = gcvNULL;
-            break;
-        }
+        /* Copy the general parts into the temp variables. */
+#if __USE_VSC_MP__
+        gcoOS_MemCopy(&generalPMP, &compiler->generalPMP, gcmSIZEOF(VSC_PRIMARY_MEM_POOL));
+#else
+        gcoOS_MemCopy(&generalMemoryPool, &compiler->generalMemoryPool, gcmSIZEOF(slsDLINK_LIST));
+        generalNamePools = compiler->context.generalNamePools;
+        curGeneralNamePool = compiler->context.curGeneralNamePool;
+        generalNamePoolSize = compiler->context.generalNamePoolSize;
+        generalNameCount = compiler->context.generalNameCount;
+#endif
+        gcoOS_MemCopy(&generalStringPool, &compiler->context.generalStringPool, gcmSIZEOF(clsHASH_TABLE));
+        generalBuiltinSpace = compiler->context.generalBuiltinSpace;
 
         gcoOS_ZeroMemory(compiler, gcmSIZEOF(struct _cloCOMPILER));
+
+        /* Copy back the general parts. */
+#if __USE_VSC_MP__
+        gcoOS_MemCopy(&compiler->generalPMP, &generalPMP, gcmSIZEOF(VSC_PRIMARY_MEM_POOL));
+#else
+        gcoOS_MemCopy(&compiler->generalMemoryPool, &generalMemoryPool, gcmSIZEOF(slsDLINK_LIST));
+        compiler->context.generalNamePools = generalNamePools;
+        compiler->context.curGeneralNamePool = curGeneralNamePool;
+        compiler->context.generalNameCount = generalNameCount;
+        compiler->context.generalNamePoolSize = generalNamePoolSize;
+#endif
+        gcoOS_MemCopy(&compiler->context.generalStringPool, &generalStringPool, gcmSIZEOF(clsHASH_TABLE));
+        compiler->context.generalBuiltinSpace = generalBuiltinSpace;
 
         /* Initialize members */
         compiler->object.type   = clvOBJ_COMPILER;
@@ -189,7 +228,12 @@ cloCOMPILER_Construct(
         compiler->logBufSize    = 0;
         compiler->fileNameBuffer[0] = '\0';
 
+#if __USE_VSC_MP__
+        vscPMP_Intialize(&compiler->privatePMP, gcvNULL, __VSC_PRIVATE_SIZE__, sizeof(void *), __ENABLE_VSC_MP_POOL__);
+        compiler->currentPMP = &compiler->privatePMP;
+#else
         slsDLINK_LIST_Initialize(&compiler->memoryPool);
+#endif
 
         compiler->context.currentFileName = compiler->fileNameBuffer;
         compiler->context.fileNameBufferSize = _cldFILENAME_MAX;
@@ -212,6 +256,7 @@ cloCOMPILER_Construct(
         compiler->context.constantMemorySize = 0;
         compiler->context.privateMemorySize = 0;
         compiler->context.maxKernelFunctionArgs = 0;
+        compiler->context.hasCalculatePreScaleGlobalID = gcvFALSE;
 
         compiler->context.hasFloatOps = 0;
         compiler->context.hasFloatOpsAux = 0;
@@ -253,6 +298,11 @@ cloCOMPILER_Construct(
         slmSLINK_LIST_Initialize(compiler->context.designationScope);
         slmSLINK_LIST_Initialize(compiler->context.parserState);
         slmSLINK_LIST_Initialize(compiler->context.constantVariables);
+#if !__USE_VSC_MP__
+        slmSLINK_LIST_Initialize(compiler->context.namePools);
+        compiler->context.namePoolSize = 0;
+        compiler->context.curNamePool = gcvNULL;
+#endif
 
         /* Create unnamed space */
         status = clsNAME_SPACE_Construct(compiler,
@@ -269,12 +319,15 @@ cloCOMPILER_Construct(
 
         /* Create built-in name space */
         status = clsNAME_SPACE_Construct(compiler,
-                         gcvNULL,
+                         compiler->context.generalBuiltinSpace,
                          &compiler->context.builtinSpace);
         if (gcmIS_ERROR(status)) {
             gcmASSERT(compiler->context.builtinSpace == gcvNULL);
             break;
         }
+        cloCOMPILER_AllocatePoolString(compiler,
+                                       "$__namespace_builtin",
+                                       &compiler->context.builtinSpace->symbol);
 
         compiler->context.builtinSpace->die = compiler->context.debugInfo ?
                                               compiler->context.debugInfo->cu :
@@ -290,6 +343,10 @@ cloCOMPILER_Construct(
             gcmASSERT(compiler->context.globalSpace == gcvNULL);
             break;
         }
+
+        cloCOMPILER_AllocatePoolString(compiler,
+                                       "$__namespace_global",
+                                       &compiler->context.globalSpace->symbol);
 
         compiler->context.globalSpace->die = compiler->context.debugInfo ?
                                              compiler->context.debugInfo->cu :
@@ -317,14 +374,153 @@ cloCOMPILER_Construct(
         status = cloCODE_EMITTER_Construct(compiler, &compiler->codeEmitter);
         if (gcmIS_ERROR(status)) break;
 
-        *Compiler = compiler;
         return gcvSTATUS_OK;
     }
     while (gcvFALSE);
 
     if (compiler != gcvNULL) cloCOMPILER_Destroy(compiler);
+    return status;
+}
+
+gceSTATUS
+cloCOMPILER_Construct_General(
+    IN gctCONST_STRING Options,
+    OUT cloCOMPILER * Compiler
+    )
+{
+    gceSTATUS status;
+    cloCOMPILER compiler = gcvNULL;
+
+    gcmASSERT(Compiler);
+
+    do {
+        /* Allocate memory for cloCOMPILER object */
+        status = gcoOS_Allocate(gcvNULL,
+                    sizeof(struct _cloCOMPILER),
+                    (gctPOINTER *)&compiler
+                    );
+
+        if (gcmIS_ERROR(status)) {
+            compiler = gcvNULL;
+            break;
+        }
+
+        gcoOS_ZeroMemory(compiler, gcmSIZEOF(struct _cloCOMPILER));
+
+        /* Initialize members */
+        compiler->object.type   = clvOBJ_COMPILER;
+        compiler->shaderType    = clvSHADER_TYPE_CL;
+        compiler->langVersion   = cloGetDefaultLanguageVersion();
+
+        if (Options && gcoOS_StrStr(Options, "cl-viv-vx-extension", gcvNULL)) {
+            status = cloCOMPILER_EnableExtension(compiler,
+                                                 clvEXTENSION_VIV_VX,
+                                                 gcvTRUE);
+            if(gcmIS_ERROR(status)) return status;
+        }
+
+#if __USE_VSC_MP__
+        vscPMP_Intialize(&compiler->generalPMP, gcvNULL, __VSC_GENERAL_MP_SIZE__, sizeof(void *), __ENABLE_VSC_MP_POOL__);
+        compiler->currentPMP = &compiler->generalPMP;
+#else
+        slsDLINK_LIST_Initialize(&compiler->generalMemoryPool);
+        slmSLINK_LIST_Initialize(compiler->context.generalNamePools);
+        compiler->context.generalNamePoolSize = 0;
+        compiler->context.curGeneralNamePool = gcvNULL;
+#endif
+        clsHASH_TABLE_Initialize(&compiler->context.generalStringPool);
+
+        compiler->context.loadingGeneralBuiltIns = gcvTRUE;
+
+        /* Create built-in name space */
+        status = clsNAME_SPACE_Construct(compiler,
+                         gcvNULL,
+                         &compiler->context.generalBuiltinSpace);
+        if (gcmIS_ERROR(status)) {
+            gcmASSERT(compiler->context.generalBuiltinSpace == gcvNULL);
+            break;
+        }
+        cloCOMPILER_AllocatePoolString(compiler,
+                                       "$__namespace_builtin_general",
+                                       &compiler->context.generalBuiltinSpace->symbol);
+
+        compiler->context.generalBuiltinSpace->die = compiler->context.debugInfo ?
+                                              compiler->context.debugInfo->cu :
+                                              VSC_DI_INVALIDE_DIE;
+
+        compiler->context.currentSpace = compiler->context.generalBuiltinSpace;
+
+        /* Load the built-ins */
+        status = cloCOMPILER_LoadGeneralBuiltIns(compiler);
+        if (gcmIS_ERROR(status)) return status;
+#if __USE_VSC_MP__
+        compiler->currentPMP = gcvNULL;
+#endif
+
+        *Compiler = compiler;
+        return gcvSTATUS_OK;
+    }
+    while (gcvFALSE);
+
+    if (compiler != gcvNULL) cloCOMPILER_Destroy_General(compiler);
     *Compiler = gcvNULL;
     return status;
+}
+
+gceSTATUS
+cloCOMPILER_LoadGeneralBuiltIns(
+    IN cloCOMPILER Compiler
+    )
+{
+    gceSTATUS           status;
+    clsNAME_SPACE *     currentSpace = Compiler->context.currentSpace;
+
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+
+    Compiler->context.currentSpace = Compiler->context.generalBuiltinSpace;
+    Compiler->context.loadingGeneralBuiltIns = gcvTRUE;
+    Compiler->context.loadingBuiltins = gcvTRUE;
+
+    status = clLoadGeneralBuiltIns(Compiler, Compiler->shaderType);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER();
+        return status;
+    }
+
+    Compiler->context.currentSpace = currentSpace;
+    Compiler->context.loadingGeneralBuiltIns = gcvFALSE;
+    Compiler->context.loadingBuiltins = gcvFALSE;
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+cloCOMPILER_LoadBuiltins(
+    IN cloCOMPILER Compiler
+    )
+{
+    gceSTATUS    status;
+    cleSHADER_TYPE    shaderType;
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+
+    gcmVERIFY_OK(cloCOMPILER_LoadingBuiltins(Compiler, gcvTRUE));
+
+    /* Load all kind of built-ins */
+    gcmVERIFY_OK(cloCOMPILER_GetShaderType(Compiler, &shaderType));
+
+    status = clLoadBuiltins(Compiler, shaderType);
+    if (gcmIS_ERROR(status)) return status;
+
+    gcmVERIFY_OK(cloCOMPILER_LoadingBuiltins(Compiler, gcvFALSE));
+    return gcvSTATUS_OK;
 }
 
 gceSTATUS
@@ -334,7 +530,7 @@ cloCOMPILER_ConstructByLangVersion(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    cloCOMPILER compiler = gcvNULL;
+    cloCOMPILER compiler = *Compiler;
 
     gcmASSERT(Compiler);
     switch(LangVersion)
@@ -343,7 +539,7 @@ cloCOMPILER_ConstructByLangVersion(
         break;
 
     case _cldCL1Dot2:
-        status = cloCOMPILER_Construct(&compiler);
+        status = cloCOMPILER_Construct(compiler);
         if (gcmIS_ERROR(status)) return status;
         compiler->context.allowExternSymbols = gcvTRUE;
         break;
@@ -398,8 +594,20 @@ cloCOMPILER_Destroy(
     }
 
     /* Destroy built-in name space */
-    if (Compiler->context.builtinSpace != gcvNULL) {
+    if (Compiler->context.builtinSpace != gcvNULL)
+    {
+        clsNAME_SPACE * subSpace;
+
+        FOR_EACH_DLINK_NODE_REVERSELY(&Compiler->context.generalBuiltinSpace->subSpaces, clsNAME_SPACE, subSpace)
+        {
+            if (subSpace == Compiler->context.builtinSpace)
+            {
+                slsDLINK_NODE_Detach((slsDLINK_NODE *)subSpace);
+                break;
+            }
+        }
         gcmVERIFY_OK(clsNAME_SPACE_Destroy(Compiler, Compiler->context.builtinSpace));
+        Compiler->context.builtinSpace = gcvNULL;
     }
 
     if (Compiler->context.debugInfo != gcvNULL) {
@@ -442,6 +650,18 @@ cloCOMPILER_Destroy(
        gcmVERIFY_OK(cloCOMPILER_Free(Compiler, builtin));
     }
 
+#if !__USE_VSC_MP__
+    /* Destroy name pool list */
+    while (!slmSLINK_LIST_IsEmpty(Compiler->context.namePools)) {
+       clsNAME_POOL *namePool;
+       slmSLINK_LIST_DetachFirst(Compiler->context.namePools,
+                     clsNAME_POOL,
+                     &namePool);
+       gcmVERIFY_OK(cloCOMPILER_Free(Compiler, namePool->member));
+       gcmVERIFY_OK(cloCOMPILER_Free(Compiler, namePool));
+    }
+#endif
+
     /* Destroy constant variable list */
     while (!slmSLINK_LIST_IsEmpty(Compiler->context.constantVariables)) {
        clsCONSTANT_VARIABLE *constantVariable;
@@ -460,21 +680,91 @@ cloCOMPILER_Destroy(
         }
     }
 
+#if __USE_VSC_MP__
+    gcmASSERT(Compiler->currentPMP == &Compiler->privatePMP);
+    vscPMP_Finalize(&Compiler->privatePMP);
+#else
     /* Empty the memory pool */
     gcmVERIFY_OK(cloCOMPILER_EmptyMemoryPool(Compiler));
+#endif
 
-    /* Decrement the reference counter */
-    if(CompilerLockRef) {
-      gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, CompilerLockRef, &CompilerLockRefCount));
-      if(CompilerLockRefCount == 1) {
-        gceSTATUS currStatus;
+    /* Clean up some variables in general built-in name space. */
+    if (Compiler->context.generalBuiltinSpace != gcvNULL)
+    {
+        clsNAME *name = gcvNULL;
 
-        gcmVERIFY_OK(cloCOMPILER_Lock(Compiler));
-            currStatus = clCleanupBuiltins();
-        gcmVERIFY_OK(cloCOMPILER_Unlock(Compiler));
-        if(gcmIS_ERROR(currStatus)) return currStatus;
-      }
+        /* If a builtin function is used, we need to reset it. */
+        FOR_EACH_DLINK_NODE_REVERSELY(&Compiler->context.generalBuiltinSpace->names, clsNAME, name)
+        {
+            if (name->type == clvFUNC_NAME && name->u.funcInfo.refCount > 0)
+            {
+                clsNAME *paramName = gcvNULL;
+                clsNAME_Reset(Compiler, name);
+
+                FOR_EACH_DLINK_NODE_REVERSELY(&name->u.funcInfo.localSpace->names, clsNAME, paramName)
+                {
+                    clsNAME_Reset(Compiler, paramName);
+                }
+            }
+        }
     }
+
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+cloCOMPILER_Destroy_General(
+    IN cloCOMPILER Compiler
+    )
+{
+    slsDLINK_LIST *    poolStringBucket;
+    clsPOOL_STRING_NODE *    poolStringNode;
+#if !__USE_VSC_MP__
+    slsDLINK_NODE *    node;
+#endif
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+
+#if __USE_VSC_MP__
+    Compiler->currentPMP = &Compiler->generalPMP;
+#endif
+
+    /* Destroy general built-in name space */
+    if (Compiler->context.generalBuiltinSpace != gcvNULL) {
+        gcmVERIFY_OK(clsNAME_SPACE_Destroy(Compiler, Compiler->context.generalBuiltinSpace));
+    }
+
+#if !__USE_VSC_MP__
+    /* Destroy general name pool list */
+    while (!slmSLINK_LIST_IsEmpty(Compiler->context.generalNamePools)) {
+       clsNAME_POOL *namePool;
+
+       slmSLINK_LIST_DetachFirst(Compiler->context.generalNamePools,
+                     clsNAME_POOL,
+                     &namePool);
+       gcmVERIFY_OK(cloCOMPILER_Free(Compiler, namePool->member));
+       gcmVERIFY_OK(cloCOMPILER_Free(Compiler, namePool));
+    }
+#endif
+
+    /* Destroy string pool */
+    FOR_EACH_HASH_BUCKET(&Compiler->context.generalStringPool, poolStringBucket) {
+        while (!slsDLINK_LIST_IsEmpty(poolStringBucket)) {
+            slsDLINK_LIST_DetachFirst(poolStringBucket, clsPOOL_STRING_NODE, &poolStringNode);
+            gcmVERIFY_OK(cloCOMPILER_Free(Compiler, poolStringNode));
+        }
+    }
+
+#if __USE_VSC_MP__
+    vscPMP_Finalize(&Compiler->generalPMP);
+#else
+    /* Empty the memory pool */
+    while (!slsDLINK_LIST_IsEmpty(&Compiler->generalMemoryPool)) {
+        slsDLINK_LIST_DetachFirst(&Compiler->generalMemoryPool, slsDLINK_NODE, &node);
+        gcmVERIFY_OK(gcoOS_Free(gcvNULL, (gctPOINTER)node));
+    }
+#endif
 
     /* Free compiler struct */
     gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Compiler));
@@ -493,6 +783,17 @@ cloCOMPILER_GetShaderType(
 
     *ShaderType = Compiler->shaderType;
     return gcvSTATUS_OK;
+}
+
+gctBOOL
+cloCOMPILER_IsLoadingBuiltin(
+    IN cloCOMPILER Compiler
+    )
+{
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+
+    return Compiler->context.loadingBuiltins;
 }
 
 gceSTATUS
@@ -519,6 +820,19 @@ cloCOMPILER_LoadingBuiltins(
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
 
     Compiler->context.loadingBuiltins = LoadingBuiltins;
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+cloCOMPILER_LoadingGeneralBuiltins(
+    IN cloCOMPILER Compiler,
+    IN gctBOOL LoadingBuiltins
+    )
+{
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+
+    Compiler->context.loadingGeneralBuiltIns = LoadingBuiltins;
     return gcvSTATUS_OK;
 }
 
@@ -819,7 +1133,8 @@ gctCHAR *Buffer
       }
 
       constant = constantVarName->u.variableInfo.u.constant;
-      if(clmDECL_IsUnderlyingStructOrUnion(&constant->exprBase.decl)) {
+      if(clmDECL_IsUnderlyingStructOrUnion(&constant->exprBase.decl) ||
+         constant->buffer) {
          if((bufPtr.charPtr + constant->valueCount) > endBufPtr) {
              gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                              0,
@@ -1019,8 +1334,6 @@ cloCOMPILER_Compile(
     slmSLINK_LIST_InsertFirst(Compiler->context.parserState, &parserState->node);
 
     do {
-        gcmONERROR(cloCOMPILER_Lock(Compiler));
-
         cloCOMPILER_SetCollectDIE(Compiler, gcvTRUE);
 
         if (gcSHADER_DumpSource(0)) {
@@ -1067,7 +1380,6 @@ cloCOMPILER_Compile(
                                    StringCount,
                                    Strings,
                                    Options);
-        cloCOMPILER_Unlock(Compiler);
         if(gcmIS_ERROR(status)) {
             break;
         }
@@ -1156,6 +1468,11 @@ cloCOMPILER_Compile(
         gcShaderClrHasVivVxExtension(Compiler->binary);
         if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
            gcShaderSetHasVivVxExtension(Compiler->binary);
+        }
+
+        gcShaderClrHasVivGcslDriverImage(Compiler->binary);
+        if(cloCOMPILER_IsGcslDriverImage(Compiler)) {
+           gcShaderSetHasVivGcslDriverImage(Compiler->binary);
         }
 
         /* Pack the binary */
@@ -1253,32 +1570,6 @@ cloGetDefaultLanguageVersion()
     {
         return _cldCL1Dot2;
     }
-}
-
-gceSTATUS
-cloCOMPILER_Lock(
-IN cloCOMPILER Compiler
-)
-{
-    gceSTATUS status;
-
-    /* Verify the arguments. */
-    clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
-    status = gcoOS_LockCLFECompiler();
-    return status;
-}
-
-gceSTATUS
-cloCOMPILER_Unlock(
-IN cloCOMPILER Compiler
-)
-{
-    gceSTATUS status;
-
-    /* Verify the arguments. */
-    clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
-    status = gcoOS_UnLockCLFECompiler();
-    return status;
 }
 
 gceSTATUS
@@ -1712,6 +2003,29 @@ IN cloCOMPILER Compiler
 }
 
 gctBOOL
+cloCOMPILER_IsGcslDriverImage(
+IN cloCOMPILER Compiler
+)
+{
+    /* Verify the arguments. */
+    clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
+    return Compiler->context.gcslDriverImage;
+}
+
+/* Set image in gcsl driver mode */
+gceSTATUS
+cloCOMPILER_SetGcslDriverImage(
+IN cloCOMPILER Compiler
+)
+{
+    /* Verify the arguments. */
+    clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
+
+    Compiler->context.gcslDriverImage = gcvTRUE;
+    return gcvSTATUS_OK;
+}
+
+gctBOOL
 cloCOMPILER_IsLongUlongPatch(
 IN cloCOMPILER Compiler
 )
@@ -1731,6 +2045,29 @@ IN cloCOMPILER Compiler
     clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
 
     Compiler->context.longUlongPatch = gcvTRUE;
+    return gcvSTATUS_OK;
+}
+
+gctBOOL
+cloCOMPILER_HasCalculatePreScaleGlobalId(
+    IN cloCOMPILER Compiler
+    )
+{
+    /* Verify the arguments. */
+    clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
+    return Compiler->context.hasCalculatePreScaleGlobalID;
+}
+
+/* Set long ulong patch library */
+gceSTATUS
+cloCOMPILER_SetHasCalculatePreScaleGlobalId(
+    IN cloCOMPILER Compiler
+    )
+{
+    /* Verify the arguments. */
+    clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
+
+    Compiler->context.hasCalculatePreScaleGlobalID = gcvTRUE;
     return gcvSTATUS_OK;
 }
 
@@ -1858,21 +2195,61 @@ IN ...
 }
 
 gceSTATUS
+cloCOMPILER_SetCurrentPMP(
+IN cloCOMPILER  Compiler,
+IN VSC_PRIMARY_MEM_POOL *CurrentPMP
+)
+{
+#if __USE_VSC_MP__
+    Compiler->currentPMP = CurrentPMP;
+#endif
+    return gcvSTATUS_OK;
+}
+
+VSC_PRIMARY_MEM_POOL *
+cloCOMPILER_SetGeneralPMP(
+IN cloCOMPILER  Compiler
+)
+{
+    VSC_PRIMARY_MEM_POOL *currentPMP = gcvNULL;
+#if __USE_VSC_MP__
+    currentPMP = Compiler->currentPMP;
+    Compiler->currentPMP = &Compiler->generalPMP;
+#endif
+    return currentPMP;
+}
+
+gceSTATUS
 cloCOMPILER_Allocate(
 IN cloCOMPILER Compiler,
 IN gctSIZE_T Bytes,
 OUT gctPOINTER * Memory
 )
 {
-    gceSTATUS    status;
+    gceSTATUS    status = gcvSTATUS_OK;
+#if !__USE_VSC_MP__
     gctSIZE_T    bytes;
-    slsDLINK_NODE *node;
+    slsDLINK_NODE * node;
+#else
+    gctPOINTER      pointer = gcvNULL;
+#endif
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
 
+#if __USE_VSC_MP__
+    pointer = vscMM_Alloc(&Compiler->currentPMP->mmWrapper, (gctUINT)Bytes);
+    if (!pointer) {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                        0,
+                        0,
+                        clvREPORT_FATAL_ERROR,
+                        "not enough memory"));
+        status = gcvSTATUS_OUT_OF_MEMORY;
+        return status;
+    }
+#else
     bytes = Bytes + sizeof(slsDLINK_NODE);
-
     status = gcoOS_Allocate(gcvNULL,
                 bytes,
                 (gctPOINTER *) &node);
@@ -1885,10 +2262,26 @@ OUT gctPOINTER * Memory
                         "not enough memory"));
         return status;
     }
+#endif
 
+#if __USE_VSC_MP__
+    if (Memory)
+    {
+        *Memory = pointer;
+    }
+#else
     /* Add node into the memory pool */
-    slsDLINK_LIST_InsertLast(&Compiler->memoryPool, node);
+    if (Compiler->context.loadingGeneralBuiltIns)
+    {
+        slsDLINK_LIST_InsertLast(&Compiler->generalMemoryPool, node);
+    }
+    else
+    {
+        slsDLINK_LIST_InsertLast(&Compiler->memoryPool, node);
+    }
     *Memory = (gctPOINTER)(node + 1);
+#endif
+
     return status;
 }
 
@@ -1920,18 +2313,100 @@ IN cloCOMPILER Compiler,
 IN gctPOINTER Memory
 )
 {
-    slsDLINK_NODE *    node;
+#if !__USE_VSC_MP__
+    slsDLINK_NODE * node;
+#endif
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
 
+#if __USE_VSC_MP__
+    vscMM_Free(&Compiler->currentPMP->mmWrapper, Memory);
+    return gcvSTATUS_OK;
+#else
     node = (slsDLINK_NODE *)Memory - 1;
 
     /* Detach node from the memory pool */
     slsDLINK_NODE_Detach(node);
 
     return gcoOS_Free(gcvNULL, (gctPOINTER)node);
+#endif
 }
+
+#if !__USE_VSC_MP__
+#define _cldNAME_POOL_SIZE 2048
+
+/* Allocate name for the compiler */
+gceSTATUS
+cloCOMPILER_AllocateName(
+    IN cloCOMPILER Compiler,
+    OUT gctPOINTER * Memory
+    )
+{
+    gceSTATUS status;
+    gctSIZE_T bytes = (gctSIZE_T)sizeof(clsNAME) * _cldNAME_POOL_SIZE;
+    gctPOINTER pointer = gcvNULL;
+    clsNAME_POOL *namePool;
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+    if (Compiler->context.loadingGeneralBuiltIns)
+    {
+        if (Compiler->context.generalNamePoolSize == 0 ||
+            Compiler->context.generalNameCount >= Compiler->context.generalNamePoolSize)
+        {
+            status = cloCOMPILER_Allocate(Compiler,
+                                     (gctSIZE_T)sizeof(clsNAME_POOL),
+                                     (gctPOINTER *) &pointer);
+            if (gcmIS_ERROR(status)) return status;
+            namePool = pointer;
+
+            status = cloCOMPILER_Allocate(Compiler,
+                                          bytes,
+                                          &pointer);
+            if (gcmIS_ERROR(status)) return status;
+            gcoOS_ZeroMemory(pointer, bytes);
+
+            namePool->member = pointer;
+            slmSLINK_LIST_InsertFirst(Compiler->context.generalNamePools, &namePool->node);
+            Compiler->context.curGeneralNamePool = namePool;
+            Compiler->context.generalNamePoolSize = _cldNAME_POOL_SIZE;
+            Compiler->context.generalNameCount = 0;
+        }
+
+        *Memory = Compiler->context.curGeneralNamePool->member + Compiler->context.generalNameCount;
+        Compiler->context.generalNameCount++;
+
+        return gcvSTATUS_OK;
+    }
+
+    if (Compiler->context.namePoolSize == 0 ||
+        Compiler->context.nameCount >= Compiler->context.namePoolSize)
+    {
+        status = cloCOMPILER_Allocate(Compiler,
+                                 (gctSIZE_T)sizeof(clsNAME_POOL),
+                                 (gctPOINTER *) &pointer);
+        if (gcmIS_ERROR(status)) return status;
+        namePool = pointer;
+
+        status = cloCOMPILER_Allocate(Compiler,
+                                      bytes,
+                                      &pointer);
+        if (gcmIS_ERROR(status)) return status;
+        gcoOS_ZeroMemory(pointer, bytes);
+
+        namePool->member = pointer;
+        slmSLINK_LIST_InsertFirst(Compiler->context.namePools, &namePool->node);
+        Compiler->context.curNamePool = namePool;
+        Compiler->context.namePoolSize = _cldNAME_POOL_SIZE;
+        Compiler->context.nameCount = 0;
+    }
+
+    *Memory = Compiler->context.curNamePool->member + Compiler->context.nameCount;
+    Compiler->context.nameCount++;
+    return gcvSTATUS_OK;
+}
+#endif
 
 gceSTATUS
 cloCOMPILER_DetachFromMemoryPool(
@@ -1939,6 +2414,7 @@ IN cloCOMPILER Compiler,
 IN gctPOINTER Memory
 )
 {
+#if !__USE_VSC_MP__
     slsDLINK_NODE *    node;
 
     /* Verify the arguments. */
@@ -1948,6 +2424,7 @@ IN gctPOINTER Memory
 
     /* Detach node from the memory pool */
     slsDLINK_NODE_Detach(node);
+#endif
     return gcvSTATUS_OK;
 }
 
@@ -1956,6 +2433,7 @@ cloCOMPILER_EmptyMemoryPool(
 IN cloCOMPILER Compiler
 )
 {
+#if !__USE_VSC_MP__
     slsDLINK_NODE *    node;
 
     /* Verify the arguments. */
@@ -1966,8 +2444,65 @@ IN cloCOMPILER Compiler
         slsDLINK_LIST_DetachFirst(&Compiler->memoryPool, slsDLINK_NODE, &node);
         gcmVERIFY_OK(gcoOS_Free(gcvNULL, (gctPOINTER)node));
     }
+#endif
 
     return gcvSTATUS_OK;
+}
+
+gceSTATUS
+cloCOMPILER_FindGeneralPoolString(
+IN cloCOMPILER Compiler,
+IN gctCONST_STRING String,
+OUT cltPOOL_STRING * PoolString
+)
+{
+    slsDLINK_NODE *generalBucket = gcvNULL;
+    clsPOOL_STRING_NODE *node;
+    gctUINT      crc32Value = clEvaluateCRC32ForShaderString(String,
+                                                             (gctUINT)gcoOS_StrLen(String, gcvNULL));
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+
+    generalBucket = clsHASH_TABLE_Bucket(&Compiler->context.generalStringPool,
+                    clmBUCKET_INDEX(clHashString(String)));
+
+    FOR_EACH_DLINK_NODE(generalBucket, clsPOOL_STRING_NODE, node) {
+        if (node->crc32Value == crc32Value &&
+            gcmIS_SUCCESS(gcoOS_StrCmp(node->string, String))) {
+                *PoolString = node->string;
+                return gcvSTATUS_OK;
+        }
+    }
+    return gcvSTATUS_NOT_FOUND;
+}
+
+gceSTATUS
+cloCOMPILER_FindPrivatePoolString(
+IN cloCOMPILER Compiler,
+IN gctCONST_STRING String,
+OUT cltPOOL_STRING * PoolString
+)
+{
+    slsDLINK_NODE *privateBucket = gcvNULL;
+    clsPOOL_STRING_NODE *node;
+    gctUINT      crc32Value = clEvaluateCRC32ForShaderString(String,
+                                                             (gctUINT)gcoOS_StrLen(String, gcvNULL));
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+
+    privateBucket = clsHASH_TABLE_Bucket(&Compiler->context.stringPool,
+                    clmBUCKET_INDEX(clHashString(String)));
+    FOR_EACH_DLINK_NODE(privateBucket, clsPOOL_STRING_NODE, node) {
+        if (node->crc32Value == crc32Value &&
+            gcmIS_SUCCESS(gcoOS_StrCmp(node->string, String))) {
+                *PoolString = node->string;
+                return gcvSTATUS_OK;
+        }
+    }
+
+    return gcvSTATUS_NOT_FOUND;
 }
 
 gceSTATUS
@@ -1977,22 +2512,25 @@ IN gctCONST_STRING String,
 OUT cltPOOL_STRING * PoolString
 )
 {
-    slsDLINK_NODE *bucket;
-    clsPOOL_STRING_NODE *node;
-
+    gceSTATUS    status;
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
 
-    bucket = clsHASH_TABLE_Bucket(&Compiler->context.stringPool,
-                    clmBUCKET_INDEX(clHashString(String)));
-
-    FOR_EACH_DLINK_NODE(bucket, clsPOOL_STRING_NODE, node) {
-        if (gcmIS_SUCCESS(gcoOS_StrCmp(node->string, String))) {
-            *PoolString = node->string;
-            return gcvSTATUS_OK;
-        }
+    if (Compiler->context.loadingGeneralBuiltIns)
+    {
+        return cloCOMPILER_FindGeneralPoolString(Compiler,
+                                                 String,
+                                                 PoolString);
     }
-    return gcvSTATUS_NOT_FOUND;
+
+    status = cloCOMPILER_FindPrivatePoolString(Compiler,
+                                      String,
+                                      PoolString);
+    if (status == gcvSTATUS_NOT_FOUND)
+        status = cloCOMPILER_FindGeneralPoolString(Compiler,
+                                          String,
+                                          PoolString);
+    return status;
 }
 
 gceSTATUS
@@ -2003,21 +2541,46 @@ OUT cltPOOL_STRING * PoolString
 )
 {
     gceSTATUS    status;
+    slsDLINK_NODE *generalBucket = gcvNULL;
+    slsDLINK_NODE *privateBucket = gcvNULL;
     slsDLINK_NODE *bucket;
     gctSIZE_T    length;
     clsPOOL_STRING_NODE *node;
+    gctUINT      crc32Value = clEvaluateCRC32ForShaderString(String,
+                                                             (gctUINT)gcoOS_StrLen(String, gcvNULL));
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
-    bucket = clsHASH_TABLE_Bucket(&Compiler->context.stringPool,
-                    clmBUCKET_INDEX(clHashString(String)));
 
-
-    FOR_EACH_DLINK_NODE(bucket, clsPOOL_STRING_NODE, node) {
-        if (gcmIS_SUCCESS(gcoOS_StrCmp(node->string, String))) {
-            *PoolString = node->string;
-            return gcvSTATUS_OK;
+    if (!Compiler->context.loadingGeneralBuiltIns)
+    {
+        privateBucket = clsHASH_TABLE_Bucket(&Compiler->context.stringPool,
+                        clmBUCKET_INDEX(clHashString(String)));
+        FOR_EACH_DLINK_NODE(privateBucket, clsPOOL_STRING_NODE, node) {
+            if (node->crc32Value == crc32Value &&
+                gcmIS_SUCCESS(gcoOS_StrCmp(node->string, String))) {
+                    *PoolString = node->string;
+                    return gcvSTATUS_OK;
+            }
         }
+    }
+    generalBucket = clsHASH_TABLE_Bucket(&Compiler->context.generalStringPool,
+                                  clmBUCKET_INDEX(clHashString(String)));
+    FOR_EACH_DLINK_NODE(generalBucket, clsPOOL_STRING_NODE, node) {
+        if (node->crc32Value == crc32Value &&
+            gcmIS_SUCCESS(gcoOS_StrCmp(node->string, String))) {
+                *PoolString = node->string;
+                return gcvSTATUS_OK;
+        }
+    }
+
+    if (Compiler->context.loadingGeneralBuiltIns)
+    {
+        bucket = generalBucket;
+    }
+    else
+    {
+        bucket = privateBucket;
     }
 
     length = gcoOS_StrLen(String, gcvNULL);
@@ -2027,6 +2590,7 @@ OUT cltPOOL_STRING * PoolString
     if (gcmIS_ERROR(status)) return status;
 
     node->string = (cltPOOL_STRING)((gctINT8 *)node + sizeof(clsPOOL_STRING_NODE));
+    node->crc32Value = crc32Value;
     gcmVERIFY_OK(gcoOS_StrCopySafe(node->string, length + 1, String));
     slsDLINK_LIST_InsertFirst(bucket, &node->node);
     *PoolString = node->string;
@@ -2138,7 +2702,6 @@ cloCOMPILER_MakeCurrent(
     gcmVERIFY_OK(cloCOMPILER_SetCurrentStringNo(CurrentCompiler, 0));
     CurrentCompiler->context.currentCharNo    = 0;
 
-
     /* Load the built-ins */
     status = cloCOMPILER_LoadBuiltins(Compiler);
     if (gcmIS_ERROR(status)) return status;
@@ -2235,7 +2798,6 @@ IN ...
 )
 {
     gctARGUMENTS arguments;
-    /* TODO: ... */
     gcmASSERT(CurrentCompiler);
 
     gcmARGUMENTS_START(arguments, Message);
@@ -2310,25 +2872,33 @@ OUT clsDATA_TYPE ** DataType
         else dataType = gcvNULL;
 
         if(dataType == gcvNULL) {
-            gcmONERROR(cloCOMPILER_Allocate(Compiler,
-                                            (gctSIZE_T)sizeof(clsDATA_TYPE),
-                                            &pointer));
-            dataType = pointer;
+            if (typeInfo != gcvNULL) {
+                status = gcoOS_Allocate(gcvNULL,
+                                    (gctSIZE_T)sizeof(clsDATA_TYPE),
+                                    &pointer);
+                if (gcmIS_ERROR(status)) return status;
+                dataType = pointer;
 
-            dataType->type  = TokenType;
-            dataType->accessQualifier  = AccessQualifier;
-            dataType->addrSpaceQualifier  = AddrSpaceQualifier;
-            dataType->u.generic = Generic;
-
-            if(typeInfo != gcvNULL) {
+                dataType->type  = TokenType;
+                dataType->accessQualifier  = AccessQualifier;
+                dataType->addrSpaceQualifier  = AddrSpaceQualifier;
+                dataType->u.generic = Generic;
                 dataType->elementType = typeInfo->dataType.elementType;
                 dataType->matrixSize = typeInfo->dataType.matrixSize;
                 dataType->virPrimitiveType = typeInfo->virPrimitiveType;
-                gcmONERROR(cloCOMPILER_DetachFromMemoryPool(Compiler,
-                                                            dataType));
                 typeInfo->typePtr[AccessQualifier][AddrSpaceQualifier] = dataType;
             }
             else {
+                gcmONERROR(cloCOMPILER_Allocate(Compiler,
+                                                (gctSIZE_T)sizeof(clsDATA_TYPE),
+                                                &pointer));
+                dataType = pointer;
+
+                dataType->type  = TokenType;
+                dataType->accessQualifier  = AccessQualifier;
+                dataType->addrSpaceQualifier  = AddrSpaceQualifier;
+                dataType->u.generic = Generic;
+
                 switch(TokenType) {
                 case T_STRUCT:
                       dataType->elementType = clvTYPE_STRUCT;
@@ -2575,25 +3145,34 @@ _clGetOrConstructElement(
 
         if(dataType == gcvNULL) {
             gctPOINTER pointer;
-            gcmONERROR(cloCOMPILER_Allocate(Compiler,
-                                                (gctSIZE_T)sizeof(clsDATA_TYPE),
-                                                &pointer));
-            dataType = pointer;
 
-            dataType->type  = componentType;
-            dataType->accessQualifier  = CompoundDecl->dataType->accessQualifier;
-            dataType->addrSpaceQualifier  = CompoundDecl->dataType->addrSpaceQualifier;
-            dataType->u.generic = CompoundDecl->dataType->u.generic;
 
             if(typeInfo != gcvNULL) {
+                status = gcoOS_Allocate(gcvNULL,
+                                    (gctSIZE_T)sizeof(clsDATA_TYPE),
+                                    &pointer);
+                if (gcmIS_ERROR(status)) return status;
+                dataType = pointer;
+
+                dataType->type  = componentType;
+                dataType->accessQualifier  = CompoundDecl->dataType->accessQualifier;
+                dataType->addrSpaceQualifier  = CompoundDecl->dataType->addrSpaceQualifier;
+                dataType->u.generic = CompoundDecl->dataType->u.generic;
                 dataType->elementType = typeInfo->dataType.elementType;
                 dataType->matrixSize = typeInfo->dataType.matrixSize;
-                gcmONERROR(cloCOMPILER_DetachFromMemoryPool(Compiler,
-                                          dataType));
                 typeInfo->typePtr[CompoundDecl->dataType->accessQualifier]
-                                   [CompoundDecl->dataType->addrSpaceQualifier] = dataType;
+                                 [CompoundDecl->dataType->addrSpaceQualifier] = dataType;
             }
             else {
+                gcmONERROR(cloCOMPILER_Allocate(Compiler,
+                                                (gctSIZE_T)sizeof(clsDATA_TYPE),
+                                                &pointer));
+                dataType = pointer;
+
+                dataType->type  = componentType;
+                dataType->accessQualifier  = CompoundDecl->dataType->accessQualifier;
+                dataType->addrSpaceQualifier  = CompoundDecl->dataType->addrSpaceQualifier;
+                dataType->u.generic = CompoundDecl->dataType->u.generic;
                 dataType->elementType = CompoundDecl->dataType->elementType;
                 dataType->matrixSize = CompoundDecl->dataType->matrixSize;
                 slsDLINK_LIST_InsertLast(&Compiler->context.dataTypes, &dataType->node);
@@ -2606,6 +3185,7 @@ _clGetOrConstructElement(
         return gcvSTATUS_OK;
     }
     while (gcvFALSE);
+
 OnError:
     clmDECL_Initialize(Decl, gcvNULL, (clsARRAY *)0, gcvNULL, gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
 
@@ -2683,25 +3263,32 @@ OUT clsDATA_TYPE ** DataType
         if(dataType == gcvNULL) {
             gctPOINTER pointer;
 
-            gcmONERROR(cloCOMPILER_Allocate(Compiler,
-                                            (gctSIZE_T)sizeof(clsDATA_TYPE),
-                                            &pointer));
-            dataType = pointer;
-
-            dataType->type  = Source->type;
-            dataType->accessQualifier  = AccessQualifier;
-            dataType->addrSpaceQualifier  = AddrSpaceQualifier;
-            dataType->u.generic = gcvNULL;
-
             if(typeInfo != gcvNULL) {
+                status = gcoOS_Allocate(gcvNULL,
+                                        (gctSIZE_T)sizeof(clsDATA_TYPE),
+                                        &pointer);
+                dataType = pointer;
+
+                dataType->type  = Source->type;
+                dataType->accessQualifier  = AccessQualifier;
+                dataType->addrSpaceQualifier  = AddrSpaceQualifier;
+                dataType->u.generic = gcvNULL;
                 dataType->elementType = typeInfo->dataType.elementType;
                 dataType->matrixSize = typeInfo->dataType.matrixSize;
                 dataType->virPrimitiveType = typeInfo->virPrimitiveType;
-                gcmONERROR(cloCOMPILER_DetachFromMemoryPool(Compiler,
-                                                            dataType));
                 typeInfo->typePtr[AccessQualifier][AddrSpaceQualifier] = dataType;
             }
             else {
+                gcmONERROR(cloCOMPILER_Allocate(Compiler,
+                                                (gctSIZE_T)sizeof(clsDATA_TYPE),
+                                                &pointer));
+                dataType = pointer;
+
+                dataType->type  = Source->type;
+                dataType->accessQualifier  = AccessQualifier;
+                dataType->addrSpaceQualifier  = AddrSpaceQualifier;
+                dataType->u.generic = gcvNULL;
+
                 dataType->elementType = Source->elementType;
                 dataType->u.generic  = Source->u.generic;
                 dataType->matrixSize = Source->matrixSize;
@@ -3183,7 +3770,7 @@ IN OUT cloIR_POLYNARY_EXPR PolynaryExpr
          if(fastFunc) {
             PolynaryExpr->funcSymbol = fastFunc;
             return clsNAME_SPACE_BindFuncName(Compiler,
-                                              Compiler->context.builtinSpace,
+                                              Compiler->context.generalBuiltinSpace,
                                               PolynaryExpr);
          }
     }
@@ -3215,7 +3802,7 @@ IN OUT cloIR_POLYNARY_EXPR PolynaryExpr
     }
     /* Bind the builtin function name */
     return clsNAME_SPACE_BindFuncName(Compiler,
-                      Compiler->context.builtinSpace,
+                      Compiler->context.generalBuiltinSpace,
                       PolynaryExpr);
 }
 
@@ -3230,9 +3817,13 @@ IN cltELEMENT_TYPE ElementType
     gctUINT regCount = RegCount;
 
     clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
+#if _GEN_IMAGE_OR_SAMPLER_PARAMETER_VARIABLES
+    if(clmIsElementTypeImage(ElementType)) {
+#else
     if((cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
         gcmOPT_oclUseImgIntrinsicQuery()) &&
         clmIsElementTypeImage(ElementType)) {
+#endif
         regCount <<= 1;
     }
     if(Compiler->context.inKernelFunctionEpilog) {
@@ -3802,7 +4393,14 @@ IN cloCOMPILER Compiler
 )
 {
    return Compiler->context.builtinSpace;
+}
 
+clsNAME_SPACE *
+cloCOMPILER_GetGeneralBuiltinSpace(
+IN cloCOMPILER Compiler
+)
+{
+   return Compiler->context.generalBuiltinSpace;
 }
 
 clsNAME_SPACE *
@@ -3811,6 +4409,15 @@ IN cloCOMPILER Compiler
 )
 {
    return Compiler->context.currentSpace;
+}
+
+void
+cloCOMPILER_SetCurrentSpace(
+IN cloCOMPILER Compiler,
+IN clsNAME_SPACE *NameSpace
+)
+{
+    Compiler->context.currentSpace = NameSpace;
 }
 
 clsNAME_SPACE *
@@ -4259,4 +4866,15 @@ clsNAME_SPACE *  NameSpace
 )
 {
    return NameSpace == Compiler->context.unnamedSpace;
+}
+
+gctBOOL
+cloCOMPILER_IsDumpOn(
+IN cloCOMPILER Compiler,
+IN cleDUMP_OPTION DumpOption
+)
+{
+    if (Compiler->context.dumpOptions & DumpOption)
+        return gcvTRUE;
+    return gcvFALSE;
 }

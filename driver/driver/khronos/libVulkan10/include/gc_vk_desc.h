@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -99,8 +99,6 @@ typedef struct __vkDescriptorSetLayoutRec
     uint32_t samplerDescriptorCount; /* includes sampler, sampledImage,combinedSampledImage */
 
     uint32_t samplerBufferDescriptorCount; /* uniform texel buffer descriptor count  */
-
-    uint32_t inputAttachmentDescriptorCount; /* input attachment descriptor count */
 
     uint32_t totalEntries;
 

@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -9,6 +9,7 @@
 #    without the express written permission of Vivante Corporation.
 #
 ##############################################################################
+
 
 
 #
@@ -97,6 +98,7 @@ LIBS := -L$(SDK_DIR)/drivers -L$(GAL_DIR)/user/$(OBJ_DIR) -lGAL -lm
 OBJECTS := \
 	$(OBJ_DIR)/gc_vsc_lib_gl_builtin.o \
 	$(OBJ_DIR)/gc_vsc_lib_gl_patch.o \
+	$(OBJ_DIR)/gc_vsc_lib_common.o \
 	$(OBJ_DIR)/gc_vsc_old_hw_code_gen.o \
 	$(OBJ_DIR)/gc_vsc_old_hw_linker.o \
 	$(OBJ_DIR)/gc_vsc_old_compiler.o \
@@ -134,6 +136,7 @@ OBJECTS += \
 	$(OBJ_DIR)/gc_vsc_utils_dg.o \
 	$(OBJ_DIR)/gc_vsc_utils_udg.o \
 	$(OBJ_DIR)/gc_vsc_utils_hash.o \
+	$(OBJ_DIR)/gc_vsc_utils_io.o \
 	$(OBJ_DIR)/gc_vsc_utils_bi_list.o \
 	$(OBJ_DIR)/gc_vsc_utils_uni_list.o \
 	$(OBJ_DIR)/gc_vsc_utils_mm.o \
@@ -211,9 +214,10 @@ install: all
 
 ifeq ($(STATIC),1)
 $(TARGET_MODULE): $(OBJECTS)
-	$(AR) -r -c $@ $(OBJECTS)
+	@echo "  ARCHIVE \033[1m$(notdir $@)\033[0m"
+	@$(AR) -r -c $@ $(OBJECTS)
 ifneq ($(USE_ARMCC), 1)
-	$(RANLIB) $@
+	@$(RANLIB) $@
 endif
 endif
 
@@ -223,7 +227,8 @@ $(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so \
                              $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.a)
 
 $(TARGET_MODULE): $(OBJECTS)
-	$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LIBS)
+	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
+	@$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LIBS)
 endif
 
 ################################################################################
@@ -244,6 +249,7 @@ ifeq ($(VSC_VIR_BUILD),1)
   vpath %.c utils/bitvector
   vpath %.c utils/graph
   vpath %.c utils/hash
+  vpath %.c utils/io
   vpath %.c utils/list
   vpath %.c utils/mm
   vpath %.c utils/string
@@ -260,8 +266,9 @@ ifeq ($(VSC_VIR_BUILD),1)
 endif
 
 $(OBJ_DIR)/%.o: %.c
+	@echo "  COMPILE $(abspath $<)"
 	@mkdir -p $(OBJ_DIR)
-	$(CC) -c $(CFLAGS) -MMD -o $@ $<
+	@$(CC) -c $(CFLAGS) -MMD -o $@ $<
 
 # object dependencies.
 -include $(OBJECTS:.o=.d)

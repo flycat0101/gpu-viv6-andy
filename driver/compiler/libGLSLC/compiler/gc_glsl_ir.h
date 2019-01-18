@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -140,6 +140,7 @@ enum _sleELEMENT_TYPE
     slvTYPE_INT,
     slvTYPE_UINT,
     slvTYPE_FLOAT,
+    slvTYPE_DOUBLE,
 
     slvTYPE_SAMPLER2D,
     slvTYPE_SAMPLERCUBE,
@@ -179,6 +180,19 @@ enum _sleELEMENT_TYPE
     slvTYPE_ISAMPLER2DMSARRAY,
     slvTYPE_USAMPLER2DMSARRAY,
 
+    slvTYPE_SAMPLER1D,
+    slvTYPE_ISAMPLER1D,
+    slvTYPE_USAMPLER1D,
+    slvTYPE_SAMPLER1DSHADOW,
+
+    slvTYPE_SAMPLER2DRECT,
+    slvTYPE_ISAMPLER2DRECT,
+    slvTYPE_USAMPLER2DRECT,
+    slvTYPE_SAMPLER2DRECTSHADOW,
+
+    slvTYPE_ISAMPLER1DARRAY,
+    slvTYPE_USAMPLER1DARRAY,
+
     slvTYPE_SAMPLEREXTERNALOES,
 
     slvTYPE_IMAGE2D,
@@ -207,6 +221,7 @@ enum _sleELEMENT_TYPE
     slvTYPE_GEN_USAMPLER,
     slvTYPE_ATOMIC_UINT,
     slvTYPE_IO_BLOCK,
+
     slvTYPE_TOTAL_COUNT                /*total count of types. No new type to be defined beyond here*/
 };
 
@@ -264,28 +279,10 @@ typedef enum _sleLAYOUT_ID_EXT
 {
     /* TS layout. */
     slvLAYOUT_EXT_NONE                             = 0x0,
-    slvLAYOUT_EXT_TS_TRIANGLES                     = 0x1,
-    slvLAYOUT_EXT_TS_QUADS                         = 0x2,
-    slvLAYOUT_EXT_TS_ISOLINES                      = 0x4,
-    slvLAYOUT_EXT_TS_PRIMITIVE_MODE                = slvLAYOUT_EXT_TS_TRIANGLES |
-                                                     slvLAYOUT_EXT_TS_QUADS |
-                                                     slvLAYOUT_EXT_TS_ISOLINES,
-    slvLAYOUT_EXT_EQUAL_SPACING                    = 0x8,
-    slvLAYOUT_EXT_FRACTIONAL_EVEN_SPACING          = 0x10,
-    slvLAYOUT_EXT_FRACTIONAL_ODD_SPACING           = 0x20,
-    slvlAYOUT_EXT_VERTEX_SPACING                   = slvLAYOUT_EXT_EQUAL_SPACING |
-                                                     slvLAYOUT_EXT_FRACTIONAL_EVEN_SPACING |
-                                                     slvLAYOUT_EXT_FRACTIONAL_ODD_SPACING,
-    slvLAYOUT_EXT_CW                               = 0x40,
-    slvLAYOUT_EXT_CCW                              = 0x80,
-    slvlAYOUT_EXT_ORERING                          = slvLAYOUT_EXT_CW |
-                                                     slvLAYOUT_EXT_CCW,
+    slvLAYOUT_EXT_TS_PRIMITIVE_MODE                = 0x1,
+    slvlAYOUT_EXT_VERTEX_SPACING                   = 0x8,
+    slvlAYOUT_EXT_ORERING                          = 0x40,
     slvLAYOUT_EXT_POINT_MODE                       = 0x100,
-    slvLAYOUT_EXT_LINES_MODE                       = 0x100,
-    slvLAYOUT_EXT_TRIANGLES_MODE                   = 0x100,
-    slvLAYOUT_EXT_POINTMODE                        = slvLAYOUT_EXT_POINT_MODE |
-                                                     slvLAYOUT_EXT_LINES_MODE |
-                                                     slvLAYOUT_EXT_TRIANGLES_MODE,
 
     slvLAYOUT_EXT_VERTICES                         = 0x200,
     /* GS layout. */
@@ -377,7 +374,7 @@ typedef enum _sleTES_ORDERING
 
 typedef enum _sleTES_POINT_MODE
 {
-    slvTES_POINT_MODE_NONE                              = -1,
+    slvTES_POINT_MODE_NONE                              = 0,
     slvTES_POINT_MODE_POINT_MODE,
 } slvTES_POINT_MODE;
 
@@ -507,6 +504,7 @@ typedef enum _sleFUNC_FLAG
     slvFUNC_ATOMIC              = 0x0001,       /* atomic functions. */
     slvFUNC_HAS_MEM_ACCESS      = 0x0002,       /* has memory access. */
     slvFUNC_HAS_VAR_ARG         = 0x0004,       /* has var argument. */
+    slvFUNC_DEFINED_OUTSIDE     = 0x0008,       /* is defined in other shader. */
     slvFUNC_HAS_VOID_PARAM      = 0x0010,       /* has void param. */
     slvFUNC_IS_INTRINSIC        = 0x0020,       /* is an intrinsic function. */
     slvFUNC_DEFINED             = 0x0040,       /* is defined before. */
@@ -562,6 +560,9 @@ typedef struct _slsDATA_TYPE
 
     /* Only for struct or interface block */
     struct _slsNAME_SPACE *    fieldSpace;
+
+    /* Whether this datatype is an implicitly sized array, it is only used in OGL shader. */
+    gctBOOL           isImplicitlySizedArray;
 }
 slsDATA_TYPE;
 
@@ -703,11 +704,12 @@ slsDATA_TYPE_NAME_Destory(
 #define sldLowestRankedInteger  slvTYPE_BOOL
 #define sldHighestRankedInteger slvTYPE_UINT
 #define sldHighestRankedFloat slvTYPE_FLOAT
+#define sldHighestRankedDOUBLE slvTYPE_DOUBLE
 
-#define sldArithmeticTypeCount (sldHighestRankedFloat - sldLowestRankedInteger + 1)
+#define sldArithmeticTypeCount (sldHighestRankedDOUBLE - sldLowestRankedInteger + 1)
 
 #define slmIsElementTypeArithmetic(EType) \
- ((EType) >= sldLowestRankedInteger && (EType) <= sldHighestRankedFloat)
+ ((EType) >= sldLowestRankedInteger && (EType) <= sldHighestRankedDOUBLE)
 
 #define slmIsElementTypeBoolean(EType) \
    ((EType) == slvTYPE_BOOL)
@@ -724,8 +726,14 @@ slsDATA_TYPE_NAME_Destory(
 #define slmIsElementTypeSigned(EType) \
    ((EType) == slvTYPE_INT)
 
+#define slmIsElementTypeFloatingOrDouble(EType) \
+ ((EType) == slvTYPE_FLOAT || (EType) == slvTYPE_DOUBLE)
+
 #define slmIsElementTypeFloating(EType) \
  ((EType) == slvTYPE_FLOAT)
+
+#define slmIsElementTypeDouble(EType) \
+ ((EType) == slvTYPE_DOUBLE)
 
 #define slmDATA_TYPE_IsIntegerType(d) \
  ((d)->arrayLength == 0  && \
@@ -821,12 +829,11 @@ slsDATA_TYPE_NAME_Destory(
     ((dataType)->elementType == slvTYPE_VOID)
 
 #define slsDATA_TYPE_IsSampler(dataType) \
-    ((dataType)->elementType >= slvTYPE_SAMPLER2D && (dataType)->elementType <= slvTYPE_UIMAGECUBEARRAY && \
+    ((dataType)->elementType >= slvTYPE_SAMPLER2D && (dataType)->elementType <= slvTYPE_SAMPLEREXTERNALOES && \
         (dataType)->elementType != slvTYPE_STRUCT)
 
 #define slsDATA_TYPE_IsImage(dataType) \
-    ((dataType)->elementType >= slvTYPE_IMAGE2D && (dataType)->elementType <= slvTYPE_UIMAGECUBEARRAY && \
-        (dataType)->elementType != slvTYPE_STRUCT)
+    ((dataType)->elementType >= slvTYPE_IMAGE2D && (dataType)->elementType <= slvTYPE_UIMAGECUBEARRAY)
 
 #define slsDATA_TYPE_IsFloatImage(dataType) \
     ((dataType)->elementType == slvTYPE_IMAGE2D || (dataType)->elementType == slvTYPE_IMAGE2DARRAY || \
@@ -849,6 +856,9 @@ slsDATA_TYPE_NAME_Destory(
     ((dataType)->elementType == slvTYPE_SAMPLER2DSHADOW || \
      (dataType)->elementType == slvTYPE_SAMPLERCUBESHADOW || \
      (dataType)->elementType == slvTYPE_SAMPLER2DARRAYSHADOW || \
+     (dataType)->elementType == slvTYPE_SAMPLER1DSHADOW || \
+     (dataType)->elementType == slvTYPE_SAMPLER2DRECTSHADOW || \
+     (dataType)->elementType == slvTYPE_SAMPLER1DARRAYSHADOW || \
      (dataType)->elementType == slvTYPE_SAMPLER1DARRAYSHADOW)
 
 #define slsDATA_TYPE_IsSamplerMS(dataType) \
@@ -873,6 +883,8 @@ slsDATA_TYPE_NAME_Destory(
      (dataType)->elementType == slvTYPE_SAMPLER2DSHADOW || \
      (dataType)->elementType == slvTYPE_SAMPLER2DMS || \
      (dataType)->elementType == slvTYPE_SAMPLER2DMSARRAY || \
+     (dataType)->elementType == slvTYPE_SAMPLER1D || \
+     (dataType)->elementType == slvTYPE_SAMPLER2DRECT || \
      (dataType)->elementType == slvTYPE_SAMPLERBUFFER)
 
 #define slsDATA_TYPE_IsISampler(dataType) \
@@ -883,6 +895,9 @@ slsDATA_TYPE_NAME_Destory(
      (dataType)->elementType == slvTYPE_ISAMPLER2DARRAY || \
      (dataType)->elementType == slvTYPE_ISAMPLER2DMS || \
      (dataType)->elementType == slvTYPE_ISAMPLER2DMSARRAY || \
+     (dataType)->elementType == slvTYPE_ISAMPLER1D || \
+     (dataType)->elementType == slvTYPE_ISAMPLER1DARRAY || \
+     (dataType)->elementType == slvTYPE_ISAMPLER2DRECT || \
      (dataType)->elementType == slvTYPE_ISAMPLERBUFFER)
 
 #define slsDATA_TYPE_IsUSampler(dataType) \
@@ -893,7 +908,20 @@ slsDATA_TYPE_NAME_Destory(
      (dataType)->elementType == slvTYPE_USAMPLER2DARRAY || \
      (dataType)->elementType == slvTYPE_USAMPLER2DMS || \
      (dataType)->elementType == slvTYPE_USAMPLER2DMSARRAY || \
+     (dataType)->elementType == slvTYPE_USAMPLER1D || \
+     (dataType)->elementType == slvTYPE_USAMPLER1DARRAY || \
+     (dataType)->elementType == slvTYPE_USAMPLER2DRECT || \
      (dataType)->elementType == slvTYPE_USAMPLERBUFFER)
+
+#define slsDATA_TYPE_IsSampler1D(dataType) \
+    ((dataType)->elementType == slvTYPE_SAMPLER1D       || \
+     (dataType)->elementType == slvTYPE_ISAMPLER1D      || \
+     (dataType)->elementType == slvTYPE_USAMPLER1D)
+
+#define slsDATA_TYPE_IsSampler1DArray(dataType) \
+    ((dataType)->elementType == slvTYPE_SAMPLER1DARRAY  || \
+     (dataType)->elementType == slvTYPE_ISAMPLER1DARRAY || \
+     (dataType)->elementType == slvTYPE_USAMPLER1DARRAY)
 
 #define slsDATA_TYPE_IsSamplerBuffer(dataType) \
     ((dataType)->elementType == slvTYPE_SAMPLERBUFFER || \
@@ -939,6 +967,9 @@ slsDATA_TYPE_NAME_Destory(
 #define slsDATA_TYPE_IsArrayLengthImplicit(dataType) \
     ((dataType)->arrayLength == -1)
 
+#define slsDATA_TYPE_IsImplicitlySizedArray(dataType) \
+    ((dataType)->isImplicitlySizedArray)
+
 #define slsDATA_TYPE_IsInheritFromUnsizedDataType(dataType) \
     ((dataType)->isInheritFromUnsizedDataType)
 
@@ -958,7 +989,7 @@ slsDATA_TYPE_NAME_Destory(
    slsDATA_TYPE_IsScalar(dataType))
 
 #define slmDATA_TYPE_IsScalarFloating(dataType) \
-  (slmIsElementTypeFloating((dataType)->elementType) && \
+  (slmIsElementTypeFloatingOrDouble((dataType)->elementType) && \
    slsDATA_TYPE_IsScalar(dataType))
 
 #define slsDATA_TYPE_IsBool(dataType) \
@@ -998,7 +1029,7 @@ slsDATA_TYPE_NAME_Destory(
         && (dataType)->arrayLength == 0)
 
 #define slsDATA_TYPE_IsVec(dataType) \
-    (slmIsElementTypeFloating((dataType)->elementType) \
+    (slmIsElementTypeFloatingOrDouble((dataType)->elementType) \
          && slmDATA_TYPE_vectorSize_GET(dataType) !=0 \
         && (dataType)->arrayLength == 0)
 
@@ -1013,16 +1044,16 @@ slsDATA_TYPE_NAME_Destory(
         && (dataType)->arrayLength == 0)
 
 #define slsDATA_TYPE_IsFloatOrVec(dataType) \
-    (slmIsElementTypeFloating(dataType->elementType) \
+    (slmIsElementTypeFloatingOrDouble(dataType->elementType) \
          && slmDATA_TYPE_matrixSize_GET(dataType) == 0  \
         && (dataType)->arrayLength == 0)
 
 #define slsDATA_TYPE_IsFloatOrVecOrMat(dataType) \
     ((dataType)->arrayLength == 0 \
-        && (dataType)->elementType == slvTYPE_FLOAT)
+        && ((dataType)->elementType == slvTYPE_FLOAT || (dataType)->elementType == slvTYPE_DOUBLE))
 
 #define slsDATA_TYPE_IsVecOrMat(dataType) \
-    ((dataType)->elementType == slvTYPE_FLOAT \
+    ( ((dataType)->elementType == slvTYPE_FLOAT || (dataType)->elementType == slvTYPE_DOUBLE) \
         && ((dataType)->matrixSize.rowCount != 0 || (dataType)->matrixSize.columnCount != 0) \
         && (dataType)->arrayLength == 0)
 
@@ -1076,8 +1107,9 @@ slsDATA_TYPE_NAME_Destory(
        ((EType) == slvTYPE_SAMPLER2DARRAY) || \
        ((EType) == slvTYPE_SAMPLER2DARRAYSHADOW))
 
-#define slsDATA_TYPE_IsOpaque(dataType) \
-    (slsDATA_TYPE_IsSampler(dataType) || \
+#define slsDATA_TYPE_IsOpaque(dataType)     \
+    (slsDATA_TYPE_IsSampler(dataType)   ||  \
+     slsDATA_TYPE_IsImage(dataType)     ||  \
      slsDATA_TYPE_IsAtomic(dataType))
 
 #define slsDATA_TYPE_IsPerVertexArray(dataType) \
@@ -1134,6 +1166,7 @@ sloCOMPILER_CloneDataType(
 gceSTATUS
 sloCOMPILER_DuplicateFieldSpaceForDataType(
     IN sloCOMPILER Compiler,
+    IN gctBOOL isInput,
     IN OUT slsDATA_TYPE * DataType
     );
 
@@ -1210,6 +1243,12 @@ typedef struct _slsNAME
             gctBOOL                         isReferenced;
             /* flag to indicate if variable can be used as iteration unroll index */
             gctBOOL                         isCanUsedAsUnRollLoopIndex;
+
+            /* flag to indicate if this variable is a uniform and can be declared with a initialzier. */
+            gctBOOL                         declareUniformWithInit;
+            /* flag to indicate if this variable is a constant array but we treat it as a uniform with a initialzier. */
+            gctBOOL                         treatConstArrayAsUniform;
+            struct _sloIR_EXPR *            initializer;
         }
         variableInfo;
 
@@ -1586,7 +1625,7 @@ IN sloCOMPILER Compiler
 slsNAME_SPACE *
 sloCOMPILER_GetCurrentFunctionSpace(
     IN sloCOMPILER Compiler
-    );
+);
 
 slsNAME_SPACE *
 sloCOMPILER_GetGlobalSpace(
@@ -2387,6 +2426,7 @@ typedef enum _slePOLYNARY_EXPR_TYPE
 {
     slvPOLYNARY_CONSTRUCT_NONE,
     slvPOLYNARY_CONSTRUCT_FLOAT,
+    slvPOLYNARY_CONSTRUCT_DOUBLE,
     slvPOLYNARY_CONSTRUCT_INT,
     slvPOLYNARY_CONSTRUCT_UINT,
     slvPOLYNARY_CONSTRUCT_BOOL,
@@ -2402,6 +2442,9 @@ typedef enum _slePOLYNARY_EXPR_TYPE
     slvPOLYNARY_CONSTRUCT_UVEC2,
     slvPOLYNARY_CONSTRUCT_UVEC3,
     slvPOLYNARY_CONSTRUCT_UVEC4,
+    slvPOLYNARY_CONSTRUCT_DVEC2,
+    slvPOLYNARY_CONSTRUCT_DVEC3,
+    slvPOLYNARY_CONSTRUCT_DVEC4,
     slvPOLYNARY_CONSTRUCT_MAT2,
     slvPOLYNARY_CONSTRUCT_MAT2X3,
     slvPOLYNARY_CONSTRUCT_MAT2X4,
@@ -2411,6 +2454,15 @@ typedef enum _slePOLYNARY_EXPR_TYPE
     slvPOLYNARY_CONSTRUCT_MAT4,
     slvPOLYNARY_CONSTRUCT_MAT4X2,
     slvPOLYNARY_CONSTRUCT_MAT4X3,
+    slvPOLYNARY_CONSTRUCT_DMAT2,
+    slvPOLYNARY_CONSTRUCT_DMAT2X3,
+    slvPOLYNARY_CONSTRUCT_DMAT2X4,
+    slvPOLYNARY_CONSTRUCT_DMAT3,
+    slvPOLYNARY_CONSTRUCT_DMAT3X2,
+    slvPOLYNARY_CONSTRUCT_DMAT3X4,
+    slvPOLYNARY_CONSTRUCT_DMAT4,
+    slvPOLYNARY_CONSTRUCT_DMAT4X2,
+    slvPOLYNARY_CONSTRUCT_DMAT4X3,
     slvPOLYNARY_CONSTRUCT_STRUCT,
     slvPOLYNARY_CONSTRUCT_ARRAY,
     slvPOLYNARY_CONSTRUCT_ARRAYS_OF_ARRAYS,

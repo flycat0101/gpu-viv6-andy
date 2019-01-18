@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -352,6 +352,11 @@ struct _gcOPTIMIZER
     gcsMEM_AFS_MEM_POOL         codeArrayMemPool;
     gcsMEM_AFS_MEM_POOL         tempDefineArrayMemPool;
 
+    void *                      mp;  /* memory pool */
+
+    /* scratch hash table */
+    void *                      pCodeSet;
+
     /* hardware capabilities */
     VSC_HW_CONFIG               hwCfg;
     gctBOOL                     isHalti2;
@@ -512,7 +517,8 @@ gcOpt_CopyCodeListAfter(
     IN gcOPTIMIZER      Optimizer,
     IN gcOPT_CODE       SrcCodeFirst,
     IN gcOPT_CODE       SrcCodeLast,
-    IN gcOPT_CODE       DestCode
+    IN gcOPT_CODE       DestCode,
+    IN gctBOOL          ReplaceJmpTarget
     );
 
 gceSTATUS

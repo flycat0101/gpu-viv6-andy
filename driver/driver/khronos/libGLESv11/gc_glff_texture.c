@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1663,36 +1663,6 @@ static gceSTATUS _GenerateMipMap(
 
 #if gcdSYNC
         gcoSURF_GetFence(lod1, gcvFENCE_TYPE_ALL);
-#endif
-
-#ifdef _DUMP_FILE
-        {
-            gcoDUMP dump;
-            gctUINT width, height;
-            gctINT stride;
-            gctPOINTER memory[3] = {0};
-            gctUINT32 address[3] = {gcvNULL};
-
-            gcmVERIFY_OK(gcoSURF_Lock(
-                lod1, address, memory
-                ));
-
-            gcmVERIFY_OK(gcoSURF_GetAlignedSize(
-                lod1, &width, &height, &stride
-                ));
-
-            gcmVERIFY_OK(gcoHAL_GetDump(
-                Context->hal, &dump
-                ));
-
-            gcmVERIFY_OK(gcoDUMP_DumpData(
-                dump, gcvTAG_TEXTURE, address[0], height * stride, (char *) memory[0]
-                ));
-
-            gcmVERIFY_OK(gcoSURF_Unlock(
-                lod1, memory[0]
-                ));
-        }
 #endif
     }
     while (gcvFALSE);
@@ -9478,7 +9448,7 @@ GL_API void GL_APIENTRY glDrawTexfOES(
     glmENTER5(glmARGFLOAT, Xs, glmARGFLOAT, Ys, glmARGFLOAT, Zs,
               glmARGFLOAT, Ws, glmARGFLOAT, Hs)
     {
-        gcmDUMP_API("${ES11 glDrawTexiOES 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X}",
+        gcmDUMP_API("${ES11 glDrawTexfOES 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X}",
             *(GLuint*)&Xs, *(GLuint*)&Ys, *(GLuint*)&Zs, *(GLuint*)&Ws, *(GLuint*)&Hs);
 
         if (!_DrawTexOES(
@@ -10566,7 +10536,7 @@ GL_API void GL_APIENTRY glTexDirectVIVMap(
             texture->direct.source,
             0,
             (GLvoid*)(*Logical),
-            (gctUINT32)(*Physical)
+            *Physical
             ));
 
         gcmERR_BREAK(gcoSURF_Lock(
@@ -10873,7 +10843,7 @@ GL_API void GL_APIENTRY glTexDirectTiledMapVIV(
             texture->direct.source,
             0,
             (GLvoid*)(*Logical),
-            (gctUINT32)(*Physical)
+            *Physical
             ));
 
         if (sourceYuv)

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -72,6 +72,7 @@ void vscFinalizePassMMPool(VSC_PASS_MM_POOL* pMmPool)
 {
     vscAMS_Finalize(&pMmPool->AMS);
     vscBMS_Finalize(&pMmPool->BMS, gcvFALSE);
+    vscBMS_Finalize(&pMmPool->scratchMemPool, gcvFALSE);
     vscPMP_Finalize(&pMmPool->sharedPMP);
     vscPMP_Finalize(&pMmPool->privatePMP);
 }
@@ -115,13 +116,16 @@ void vscSPM_Initialize(VSC_SHADER_PASS_MANAGER* pShPassMnger,
     pShPassMnger->pCompilerParam = pCompilerParam;
     pShPassMnger->pMmPool = pMmPool;
 
-    if (bInitSharedPMP && !vscPMP_IsInitialized(&pShPassMnger->pMmPool->sharedPMP))
+    if (!vscPMP_IsInitialized(&pShPassMnger->pMmPool->sharedPMP))
     {
         vscPMP_Intialize(&pShPassMnger->pMmPool->sharedPMP, gcvNULL,
                          SH_PMP_LOW_LIMIT_OF_CHUNK_SIZE, sizeof(void *), gcvTRUE);
     }
+    if (!vscBMS_IsInitialized(&pShPassMnger->pMmPool->scratchMemPool))
+    {
+        vscBMS_Initialize(&pShPassMnger->pMmPool->scratchMemPool, &pShPassMnger->pMmPool->sharedPMP);
+    }
 
-    /* TODO: Will reconsider followings later */
     pShader->pCompilerCfg = &pCompilerParam->cfg;
     VIR_Shader_SetDumpOptions(pShader, VSC_OPTN_Options_GetDumpOptions(pOptions));
 
@@ -148,6 +152,7 @@ void vscSPM_Finalize(VSC_SHADER_PASS_MANAGER* pShPassMnger, gctBOOL bFinalizeSha
 
     if (bFinalizeSharedPMP)
     {
+        vscBMS_Finalize(&pShPassMnger->pMmPool->scratchMemPool, gcvFALSE);
         vscPMP_Finalize(&pShPassMnger->pMmPool->sharedPMP);
     }
 
@@ -166,6 +171,8 @@ static void _InitializeBPPM(VSC_BASE_PG_PASS_MANAGER* pBasePPM,
     /* For program pass manager, intialize shared PMP directly */
     vscPMP_Intialize(&pBasePPM->pgMmPool.sharedPMP, gcvNULL,
                      PG_PMP_LOW_LIMIT_OF_CHUNK_SIZE, sizeof(void *), gcvTRUE);
+    /* initialize scratch memory pool for program pass manager */
+    vscBMS_Initialize(&pBasePPM->pgMmPool.scratchMemPool, &pBasePPM->pgMmPool.sharedPMP);
 }
 
 static void _FinalizeBPPM(VSC_BASE_PG_PASS_MANAGER* pBasePPM)
@@ -317,7 +324,8 @@ OnError:
     return errCode;
 }
 
-static VSC_ErrCode _CreateShaderPassResources(VSC_PASS_PROPERTY* pPassProp,
+static VSC_ErrCode _CreateShaderPassResources(VSC_PASS_MM_POOL* pPassMmPool,
+                                              VSC_PASS_PROPERTY* pPassProp,
                                               VIR_Shader** ppShaderArray,
                                               VSC_SHADER_PASS_RES** ppShaderPassResArray,
                                               gctUINT shaderCount)
@@ -328,6 +336,9 @@ static VSC_ErrCode _CreateShaderPassResources(VSC_PASS_PROPERTY* pPassProp,
     gctBOOL                         bNeedBuildRdFlow, bNeedBuildDu, bNeedBuildWeb, bNeedBuildLvFlow;
     gctBOOL                         bNeedDestroyDFARes = gcvFALSE;
     VSC_PASS_RES_DESTROY_REQ_FLAG   resDestroyReq;
+    VSC_MM*                         pScratchMemPool = &pPassMmPool->scratchMemPool.mmWrapper;
+
+    gcmASSERT(pScratchMemPool != gcvNULL && pPassMmPool->scratchMemPool.flags.bInitialized);
 
     bNeedBuildCg = (pPassProp->passFlag.resCreationReq.s.bNeedCg || pPassProp->passFlag.resCreationReq.s.bNeedCfg ||
                     pPassProp->passFlag.resCreationReq.s.bNeedRdFlow || pPassProp->passFlag.resCreationReq.s.bNeedDu ||
@@ -402,16 +413,18 @@ static VSC_ErrCode _CreateShaderPassResources(VSC_PASS_PROPERTY* pPassProp,
 
         if (bNeedBuildCg && !vscVIR_IsCallGraphBuilt(&ppShaderPassResArray[i]->callGraph))
         {
-            errCode = vscVIR_BuildCallGraph(ppShaderArray[i], &ppShaderPassResArray[i]->callGraph);
+            errCode = vscVIR_BuildCallGraph(pScratchMemPool, ppShaderArray[i], &ppShaderPassResArray[i]->callGraph);
             ON_ERROR(errCode, "Build call graph");
         }
 
         if (bNeedBuildCfg && !vscVIR_IsCFGBuilt(ppShaderArray[i]))
         {
-            errCode = vscVIR_BuildCFG(ppShaderArray[i]);
+            errCode = vscVIR_BuildCFG(pScratchMemPool, ppShaderArray[i]);
             ON_ERROR(errCode, "Build CFG");
         }
 
+        /* init callGraph scratch mem pool */
+        ppShaderPassResArray[i]->callGraph.pScratchMemPool = pScratchMemPool;
         if (bNeedBuildRdFlow && !vscVIR_CheckDFAFlowBuilt(&ppShaderPassResArray[i]->duInfo.baseTsDFA.baseDFA))
         {
             errCode = vscVIR_BuildDefUsageInfo(&ppShaderPassResArray[i]->callGraph, &ppShaderPassResArray[i]->duInfo, gcvFALSE, gcvFALSE);
@@ -517,15 +530,8 @@ static VSC_ErrCode _BeginShaderPass(VSC_SHADER_PASS_MANAGER* pShPassMnger,
     VIR_Shader*          pShader = (VIR_Shader*)pShPassMnger->pCompilerParam->hShader;
     VSC_SHADER_PASS_RES* pPassRes = &pShPassMnger->passRes;
 
-    /* Firstly check gate */
-    pPassWorker->basePassWorker.pBaseOption = VSC_OPTN_Options_GetOption(pShPassMnger->basePM.pOptions, pPassProp->passOptionType, passId);
-    if (!_Gate(&pPassWorker->basePassWorker))
-    {
-        return errCode;
-    }
-
     /* Create resources */
-    errCode = _CreateShaderPassResources(pPassProp, &pShader, &pPassRes, 1);
+    errCode = _CreateShaderPassResources(pShPassMnger->pMmPool, pPassProp, &pShader, &pPassRes, 1);
     ON_ERROR(errCode, "Create Shader pass resources");
 
     /* Get resources for current pass */
@@ -570,9 +576,7 @@ static VSC_ErrCode _BeginShaderPass(VSC_SHADER_PASS_MANAGER* pShPassMnger,
         pPassWorker->basePassWorker.pMM = &pShPassMnger->pMmPool->privatePMP.mmWrapper;
     }
 
-    pPassWorker->pCompilerParam = pShPassMnger->pCompilerParam;
     pPassWorker->basePassWorker.pDumper = pShPassMnger->basePM.pDumper;
-    pPassWorker->basePassWorker.pPrvData = pPrvData;
     pPassWorker->pResDestroyReq = &pPassProp->passFlag.resDestroyReq;
 
 OnError:
@@ -588,16 +592,8 @@ static VSC_ErrCode _BeginGpgPass(VSC_GPG_PASS_MANAGER* pPgPassMnger,
     VSC_ErrCode          errCode = VSC_ERR_NONE;
     gctUINT              i;
 
-    /* Firstly check gate */
-    pPassWorker->basePassWorker.pBaseOption = VSC_OPTN_Options_GetOption(pPgPassMnger->basePgmPM.basePM.pOptions,
-                                                                         pPassProp->passOptionType, passId);
-    if (!_Gate(&pPassWorker->basePassWorker))
-    {
-        return errCode;
-    }
-
     /* Create resources */
-    errCode = _CreateShaderPassResources(pPassProp, (VIR_Shader**)pPgPassMnger->pPgmLinkerParam->hShaderArray,
+    errCode = _CreateShaderPassResources(&pPgPassMnger->basePgmPM.shMmPool, pPassProp, (VIR_Shader**)pPgPassMnger->pPgmLinkerParam->hShaderArray,
                                          pPgPassMnger->pShPassResArray, VSC_MAX_SHADER_STAGE_COUNT);
     ON_ERROR(errCode, "Create Shader pass resources");
 
@@ -639,9 +635,7 @@ static VSC_ErrCode _BeginGpgPass(VSC_GPG_PASS_MANAGER* pPgPassMnger,
         pPassWorker->basePassWorker.pMM = &pPgPassMnger->basePgmPM.pgMmPool.privatePMP.mmWrapper;
     }
 
-    pPassWorker->pPgmLinkerParam = pPgPassMnger->pPgmLinkerParam;
     pPassWorker->basePassWorker.pDumper = pPgPassMnger->basePgmPM.basePM.pDumper;
-    pPassWorker->basePassWorker.pPrvData = pPrvData;
 
 OnError:
     return errCode;
@@ -654,12 +648,6 @@ static VSC_ErrCode _EndShaderPass(VSC_SHADER_PASS_MANAGER* pShPassMnger,
     VSC_ErrCode          errCode = VSC_ERR_NONE;
     VIR_Shader*          pShader = (VIR_Shader*)pShPassMnger->pCompilerParam->hShader;
     VSC_SHADER_PASS_RES* pPassRes = &pShPassMnger->passRes;
-
-    /* Pass is not gated, just bail out */
-    if (!_Gate(&pPassWorker->basePassWorker))
-    {
-        return errCode;
-    }
 
     /* Destroy resources */
     errCode = _DestroyShaderPassResources(pPassProp, &pShader, &pPassRes,
@@ -681,12 +669,6 @@ static VSC_ErrCode _EndGpgPass(VSC_GPG_PASS_MANAGER* pPgPassMnger,
 {
     VSC_ErrCode          errCode = VSC_ERR_NONE;
 
-    /* Pass is not gated, just bail out */
-    if (!_Gate(&pPassWorker->basePassWorker))
-    {
-        return errCode;
-    }
-
     /* Destroy resources */
     errCode = _DestroyShaderPassResources(pPassProp, (VIR_Shader**)pPgPassMnger->pPgmLinkerParam->hShaderArray,
                                           pPgPassMnger->pShPassResArray, pPassWorker->resDestroyReqArray,
@@ -704,6 +686,7 @@ OnError:
 VSC_ErrCode vscSPM_CallPass(VSC_SHADER_PASS_MANAGER* pShPassMnger,
                             PFN_SH_PASS_ROUTINE pfnPassRoutine,
                             PFN_QUERY_PASS_PROP pfnQueryPassProp,
+                            PFN_SH_NECESSITY_CHECK pfnNecessityCheck,
                             gctUINT passId,
                             void* pPrvData)
 {
@@ -723,14 +706,36 @@ VSC_ErrCode vscSPM_CallPass(VSC_SHADER_PASS_MANAGER* pShPassMnger,
         WARNING_REPORT(errCode, "A pass can not run on expected pass level");
     }
 
-    /* Begin a pass to prepare resources to generate a pass-worker for the run of this pass */
+    /* Set some info for passWorker first. */
     memset(&passWorker, 0, sizeof(VSC_SH_PASS_WORKER));
-    errCode = _BeginShaderPass(pShPassMnger, &passProp, passId, pPrvData, &passWorker);
-    ON_ERROR(errCode, "Begin shader pass");
+    passWorker.basePassWorker.pBaseOption = VSC_OPTN_Options_GetOption(pShPassMnger->basePM.pOptions, passProp.passOptionType, passId);
+    passWorker.pCompilerParam = pShPassMnger->pCompilerParam;
+    passWorker.basePassWorker.pPassSpecificData = pPrvData;
 
-    /* Now run this pass if pass is gated */
-    if (_Gate(&passWorker.basePassWorker))
+    /* Pass is not gated, just bail out */
+    if (!_Gate(&passWorker.basePassWorker))
     {
+        return errCode;
+    }
+
+    /* Prepare resources before necessity check if needed. */
+    if (passProp.passFlag.resCreationReq.s.bCreateResBeforeNecessityCheck)
+    {
+        /* Begin a pass to prepare resources to generate a pass-worker for the run of this pass */
+        errCode = _BeginShaderPass(pShPassMnger, &passProp, passId, pPrvData, &passWorker);
+        ON_ERROR(errCode, "Begin shader pass");
+    }
+
+    /* Now run this pass if pass is necessary */
+    if (pfnNecessityCheck(&passWorker))
+    {
+        if (!passProp.passFlag.resCreationReq.s.bCreateResBeforeNecessityCheck)
+        {
+            /* Begin a pass to prepare resources to generate a pass-worker for the run of this pass */
+            errCode = _BeginShaderPass(pShPassMnger, &passProp, passId, pPrvData, &passWorker);
+            ON_ERROR(errCode, "Begin shader pass");
+        }
+
         errCode = pfnPassRoutine(&passWorker);
         ON_ERROR(errCode, "Run shader pass routine");
     }
@@ -746,6 +751,7 @@ OnError:
 VSC_ErrCode vscGPPM_CallPass(VSC_GPG_PASS_MANAGER* pPgPassMnger,
                              PFN_GPG_PASS_ROUTINE pfnPassRoutine,
                              PFN_QUERY_PASS_PROP pfnQueryPassProp,
+                             PFN_GPG_NECESSITY_CHECK pfnNecessityCheck,
                              gctUINT passId,
                              void* pPrvData)
 {
@@ -765,14 +771,38 @@ VSC_ErrCode vscGPPM_CallPass(VSC_GPG_PASS_MANAGER* pPgPassMnger,
         WARNING_REPORT(errCode, "A pass can not run on expected pass level");
     }
 
-    /* Begin a pass to prepare resources to generate a pass-worker for the run of this pass */
+    /* Set some info for passWorker first. */
     memset(&passWorker, 0, sizeof(VSC_GPG_PASS_WORKER));
-    errCode = _BeginGpgPass(pPgPassMnger, &passProp, passId, pPrvData, &passWorker);
-    ON_ERROR(errCode, "Begin GPG pass");
+    passWorker.basePassWorker.pBaseOption = VSC_OPTN_Options_GetOption(pPgPassMnger->basePgmPM.basePM.pOptions,
+                                                                       passProp.passOptionType,
+                                                                       passId);
+    passWorker.pPgmLinkerParam = pPgPassMnger->pPgmLinkerParam;
+    passWorker.basePassWorker.pPassSpecificData = pPrvData;
 
-    /* Now run this pass if pass is gated */
-    if (_Gate(&passWorker.basePassWorker))
+    /* Pass is not gated, just bail out */
+    if (!_Gate(&passWorker.basePassWorker))
     {
+        return errCode;
+    }
+
+    /* Prepare resources before necessity check if needed. */
+    if (passProp.passFlag.resCreationReq.s.bCreateResBeforeNecessityCheck)
+    {
+        /* Begin a pass to prepare resources to generate a pass-worker for the run of this pass */
+        errCode = _BeginGpgPass(pPgPassMnger, &passProp, passId, pPrvData, &passWorker);
+        ON_ERROR(errCode, "Begin GPG pass");
+    }
+
+    /* Now run this pass if pass is necessary */
+    if (pfnNecessityCheck(&passWorker))
+    {
+        if (!passProp.passFlag.resCreationReq.s.bCreateResBeforeNecessityCheck)
+        {
+            /* Begin a pass to prepare resources to generate a pass-worker for the run of this pass */
+            errCode = _BeginGpgPass(pPgPassMnger, &passProp, passId, pPrvData, &passWorker);
+            ON_ERROR(errCode, "Begin GPG pass");
+        }
+
         errCode = pfnPassRoutine(&passWorker);
         ON_ERROR(errCode, "Run GPG pass routine");
     }

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2018 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -780,6 +780,7 @@ vdkGetEvent(
             int buffer;
             int scancode;
             static int prefix;
+
 #if _SCREEN_VERSION_MAJOR >= 2
             screen_get_event_property_iv(screen_evt, SCREEN_PROPERTY_SCAN, &buffer);
 #else

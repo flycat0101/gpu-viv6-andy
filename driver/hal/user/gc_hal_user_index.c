@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -854,7 +854,7 @@ gcoINDEX_Upload(
 
         /* Dump the buffer. */
         gcmDUMP_BUFFER(gcvNULL,
-                       "index",
+                       gcvDUMP_BUFFER_INDEX,
                        gcsSURF_NODE_GetHWAddress(&Index->memory),
                        Index->memory.logical,
                        0,
@@ -947,7 +947,7 @@ gcoINDEX_UploadOffset(
 
         /* Dump the buffer. */
         gcmDUMP_BUFFER(gcvNULL,
-                       "index",
+                       gcvDUMP_BUFFER_INDEX,
                        gcsSURF_NODE_GetHWAddress(&Index->memory),
                        Index->memory.logical,
                        Offset,
@@ -1050,7 +1050,7 @@ gcoINDEX_Merge(
 
     /* Dump the buffer. */
     gcmDUMP_BUFFER(gcvNULL,
-                   "index",
+                   gcvDUMP_BUFFER_INDEX,
                    gcsSURF_NODE_GetHWAddress(&Index1->memory),
                    Index1->memory.logical,
                    0,
@@ -2008,7 +2008,7 @@ gcoINDEX_UploadDynamicEx(
 
     /* Dump the buffer. */
     gcmDUMP_BUFFER(gcvNULL,
-                   "index",
+                   gcvDUMP_BUFFER_INDEX,
                    dynamic->physical,
                    dynamic->logical,
                    dynamic->lastStart,
@@ -2253,7 +2253,7 @@ gcoINDEX_UploadDynamicEx2(
 
     /* Dump the buffer. */
     gcmDUMP_BUFFER(gcvNULL,
-        "index",
+        gcvDUMP_BUFFER_INDEX,
         dynamic->physical,
         dynamic->logical,
         dynamic->lastStart,

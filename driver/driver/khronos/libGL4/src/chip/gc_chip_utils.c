@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -14,6 +14,7 @@
 #include "gc_es_context.h"
 #include "gc_chip_context.h"
 #include "gc_es_object_inline.c"
+#include "gc_hal_dump.h"
 
 #define _GC_OBJ_ZONE    __GLES3_ZONE_TRACE
 
@@ -775,9 +776,9 @@ gcChipUtilsVerifyRT(
             gcmONERROR(gcoSURF_Unlock(rtView->surf, logical[0]));
             gcmONERROR(gcoSURF_GetInfo(rtView->surf, gcvSURF_INFO_SLICESIZE, &sliceSize));
 
-            gcmDUMP(gcvNULL, "#[info: verify rt%d", index);
+            gcmDUMP(gcvNULL, "#[info: verify rt%d]", index);
             gcmDUMP_BUFFER(gcvNULL,
-                           "verify",
+                           gcvDUMP_BUFFER_VERIFY,
                            physical[0] + gcChipGetSurfOffset(rtView),
                            (gctUINT8_PTR)logical[0] + gcChipGetSurfOffset(rtView),
                            0,
@@ -794,9 +795,9 @@ gcChipUtilsVerifyRT(
         gcmONERROR(gcoSURF_Unlock(chipCtx->drawDepthView.surf, logical[0]));
         gcmONERROR(gcoSURF_GetInfo(chipCtx->drawDepthView.surf, gcvSURF_INFO_SLICESIZE, &sliceSize));
 
-        gcmDUMP(gcvNULL, "#[info: verify depth");
+        gcmDUMP(gcvNULL, "#[info: verify depth]");
         gcmDUMP_BUFFER(gcvNULL,
-                       "verify",
+                       gcvDUMP_BUFFER_VERIFY,
                        physical[0] + gcChipGetSurfOffset(&chipCtx->drawDepthView),
                        (gctUINT8_PTR)logical[0] + gcChipGetSurfOffset(&chipCtx->drawDepthView),
                        0,
@@ -877,13 +878,13 @@ gcChipUtilsVerifyImagesCB(
                 for (i = 0; i < formatInfo->layers; i++)
                 {
                     GLuint j;
-                    gcmDUMP(gcvNULL, "#[info: verify image multi-layer%d", i);
+                    gcmDUMP(gcvNULL, "#[info: verify image multi-layer%d]", i);
 
                     for (j = 0; j < sliceNumbers; j++)
                     {
-                        gcmDUMP(gcvNULL, "#[info: verify image slice[%d]", j);
+                        gcmDUMP(gcvNULL, "#[info: verify image slice[%d]]", j);
                         gcmDUMP_BUFFER(gcvNULL,
-                                       "verify",
+                                       gcvDUMP_BUFFER_VERIFY,
                                        physical[0] + offset +  layerSize * i,
                                        (gctUINT8_PTR)logical[0] + offset + layerSize * i,
                                        0,

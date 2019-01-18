@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -28,6 +28,7 @@ typedef enum SPV_SPECFLAG
     SPV_SPECFLAG_NONE                   = 0x00000000,
     SPV_SPECFLAG_ENTRYPOINT             = 0x00000001,
     SPV_SPECFLAG_SPECIFIED_LOCAL_SIZE   = 0x00000002,
+    SPV_SPECFLAG_DISABLE_IR_DUMP        = 0x00000004,
 } Spv_SpecFlag;
 
 typedef enum SPV_ATTACHMENTFLAG
@@ -69,6 +70,7 @@ typedef struct SpvDecodeInfo{
     gctPOINTER funcCtx;
     SpvRenderPassInfo* renderpassInfo;
     gctUINT subPass;
+    gctBOOL isLibraryShader;
 }SpvDecodeInfo;
 
 gceSTATUS

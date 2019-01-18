@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,6 +13,7 @@
 
 #include "gc_vsc.h"
 
+/* This macro is not used anymore, we use estimateDUHashTableSize to estimate the table size. */
 #define DEF_USAGE_HASH_TABLE_SIZE   2048
 
 #define ARE_INSTS_IN_SAME_BASIC_BLOCK(pInst1, pInst2)                    \
@@ -738,7 +739,14 @@ gctBOOL vscVIR_QueryRealWriteVirRegInfo(VIR_Shader* pShader,
     {
         /* Then add each def for each reg no */
         firstRegNo = operandInfo.u1.virRegInfo.virReg;
-        regNoRange = 1;
+        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_COPY)
+        {
+            regNoRange = operandInfo.u1.virRegInfo.virRegCount;
+        }
+        else
+        {
+            regNoRange = 1;
+        }
     }
 
     /* Save the result. */
@@ -1056,7 +1064,7 @@ static void _Update_ReachDef_Local_Kill_All_Output_Defs(VIR_DEF_USAGE_INFO* pDuI
     gctUINT                  thisDefIdx, defIdx;
     VSC_BIT_VECTOR           tmpMask;
 
-    vscBV_Initialize(&tmpMask, pDuInfo->baseTsDFA.baseDFA.pMM, pDuInfo->baseTsDFA.baseDFA.flowSize);
+    vscBV_Initialize(&tmpMask, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool, pDuInfo->baseTsDFA.baseDFA.flowSize);
 
     for (thisDefIdx = 0; thisDefIdx < defCount; thisDefIdx ++)
     {
@@ -1204,7 +1212,7 @@ static void _ReachDef_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS
        VIR_HALF_CHANNEL_MASK_HIGH (2),
        VIR_HALF_CHANNEL_MASK_FULL (3)
     */
-    vscSV_Initialize(&localHalfChannelKillFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize, 4);
+    vscSV_Initialize(&localHalfChannelKillFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize, 4);
 
     /* Go through all instructions of basic block to analyze local gen and kill set */
     while (pInst)
@@ -1219,8 +1227,7 @@ static void _ReachDef_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS
                                             &bIndexing))
         {
             bCertainWrite = (!bIndexing &&
-                             !VIR_Inst_ConditionalWrite(pInst) &&
-                             !VIR_OPCODE_DestOnlyUseEnable(VIR_Inst_GetOpcode(pInst)));
+                             vscVIR_IsInstDefiniteWrite(pDuInfo, pInst, firstRegNo, gcvTRUE));
 
             _Update_ReachDef_Local_GenKill(pDuInfo,
                                            pGenFlow,
@@ -1311,7 +1318,7 @@ static gctBOOL _ReachDef_Iterate_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BL
     VSC_BIT_VECTOR         tmpFlow;
     gctBOOL                bChanged = gcvFALSE;
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
+    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
 
     /* Out = Gen U (In - Kill) */
     vscBV_Minus2(&tmpFlow, pInFlow, pKillFlow);
@@ -1344,7 +1351,7 @@ static gctBOOL _ReachDef_Combine_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BL
         return gcvFALSE;
     }
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
+    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
 
     /* In = U all-pred-Outs */
     VSC_ADJACENT_LIST_ITERATOR_INIT(&predEdgeIter, &pBasicBlock->dgNode.predList);
@@ -1379,9 +1386,9 @@ static gctBOOL _ReachDef_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA
 
     gcmASSERT(pBasicBlock->flowType == VIR_FLOW_TYPE_CALL);
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
-    vscBV_Initialize(&tmpFlow1, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
-    vscBV_Initialize(&tmpFlow2, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
+    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
+    vscBV_Initialize(&tmpFlow1, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
+    vscBV_Initialize(&tmpFlow2, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
 
     /* U flow that not flows into callee and out flow of callee excluding flows that are from other callers */
     vscBV_And2(&tmpFlow1, &pCalleeFuncFlow->inFlow, pInFlow);
@@ -1405,7 +1412,7 @@ static gctBOOL _ReachDef_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA
     return bChanged;
 }
 
-static void _And_Def_BVs_On_Same_Reg_No(VSC_MM* pMM, VSC_BLOCK_TABLE* pDefTable,
+static void _And_Def_BVs_On_Same_Reg_No(VSC_MM* pScratchMemPool, VSC_BLOCK_TABLE* pDefTable,
                                         VSC_BIT_VECTOR* pDefBV1, VSC_BIT_VECTOR* pDefBV2,
                                         gctUINT maxVirRegNo)
 {
@@ -1414,9 +1421,9 @@ static void _And_Def_BVs_On_Same_Reg_No(VSC_MM* pMM, VSC_BLOCK_TABLE* pDefTable,
     gctUINT                      defIdx, startBitOrdinal;
     VIR_DEF*                     pDef;
 
-    vscBV_Initialize(&regNoBV1, pMM, regNoBVSize);
-    vscBV_Initialize(&regNoBV2, pMM, regNoBVSize);
-    vscBV_Initialize(&andResBV, pMM, regNoBVSize);
+    vscBV_Initialize(&regNoBV1, pScratchMemPool, regNoBVSize);
+    vscBV_Initialize(&regNoBV2, pScratchMemPool, regNoBVSize);
+    vscBV_Initialize(&andResBV, pScratchMemPool, regNoBVSize);
 
     /* Convert BV on def to BV on regNo */
     startBitOrdinal = 0;
@@ -1490,8 +1497,8 @@ static gctBOOL _ReachDef_Func_Flow_Combine_From_Callers_Resolver(VIR_BASE_TS_DFA
     gctUINT                      maxVirRegNo = ((VIR_DEF_USAGE_INFO*)pBaseTsDFA)->maxVirRegNo;
     VSC_BLOCK_TABLE*             pDefTable = &((VIR_DEF_USAGE_INFO*)pBaseTsDFA)->defTable;
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
-    vscBV_Initialize(&callerInFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
+    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
+    vscBV_Initialize(&callerInFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
 
     /* U all in flow of caller at every call site */
     VSC_ADJACENT_LIST_ITERATOR_INIT(&callerIter, &pCalleeFuncBlock->dgNode.predList);
@@ -1520,7 +1527,7 @@ static gctBOOL _ReachDef_Func_Flow_Combine_From_Callers_Resolver(VIR_BASE_TS_DFA
             }
             else
             {
-                _And_Def_BVs_On_Same_Reg_No(pBaseTsDFA->baseDFA.pMM, pDefTable, &tmpFlow, &callerInFlow, maxVirRegNo);
+                _And_Def_BVs_On_Same_Reg_No(pBaseTsDFA->baseDFA.pScratchMemPool, pDefTable, &tmpFlow, &callerInFlow, maxVirRegNo);
             }
 
             vscBV_Or1(&tmpFlow, &callerInFlow);
@@ -1802,7 +1809,7 @@ static gctBOOL _AddNewUsageToTable(VIR_DEF_USAGE_INFO* pDuInfo,
                         {
                             VIR_Operand_GetOperandInfo(pUsageInst, pOperand, &operandInfo);
 
-                            if ((VIR_OPCODE_isVXOnly(VIR_Inst_GetOpcode(pUsageInst)) &&
+                            if ((VIR_OPCODE_isVX(VIR_Inst_GetOpcode(pUsageInst)) &&
                                  VIR_Inst_GetSourceIndex(pUsageInst, pOperand) == 0) ||
                                 VIR_Inst_GetOpcode(pUsageInst) == VIR_OP_SWIZZLE)
                             {
@@ -1951,10 +1958,10 @@ static gctBOOL _DeleteUsageFromTable(VIR_DEF_USAGE_INFO* pDuInfo,
             }
             else
             {
-            defKey.pDefInst = pDefInst;
-            defKey.regNo = regNo;
+                defKey.pDefInst = pDefInst;
+                defKey.regNo = regNo;
                 defKey.channel = channel;
-            defIdx = vscBT_HashSearch(pDefTable, &defKey);
+                defIdx = vscBT_HashSearch(pDefTable, &defKey);
             }
             while (VIR_INVALID_DEF_INDEX != defIdx)
             {
@@ -2144,7 +2151,7 @@ static void _AddOutputUsages(VIR_DEF_USAGE_INFO* pDuInfo,
     VIR_DU_CHAIN_USAGE_NODE* pUsageNode;
     VSC_BIT_VECTOR           tmpMask;
 
-    vscBV_Initialize(&tmpMask, pDuInfo->baseTsDFA.baseDFA.pMM, pDuInfo->baseTsDFA.baseDFA.flowSize);
+    vscBV_Initialize(&tmpMask, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool, pDuInfo->baseTsDFA.baseDFA.flowSize);
 
     for (thisDefIdx = 0; thisDefIdx < defCount; thisDefIdx ++)
     {
@@ -2393,7 +2400,7 @@ static void _BuildDUUDChainPerBB(VIR_BASIC_BLOCK* pBasicBlk, VIR_DEF_USAGE_INFO*
     gctBOOL                bIndexing, bCertainWrite;
     VSC_STATE_VECTOR       localHalfChannelKillFlow;
 
-    vscBV_Initialize(&workingDefFlow, &pDuInfo->pmp.mmWrapper, pDuInfo->baseTsDFA.baseDFA.flowSize);
+    vscBV_Initialize(&workingDefFlow, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool, pDuInfo->baseTsDFA.baseDFA.flowSize);
 
     /* Initialize working flow as input flow */
     vscBV_Copy(&workingDefFlow, &pBasicBlk->pTsWorkDataFlow->inFlow);
@@ -2404,7 +2411,7 @@ static void _BuildDUUDChainPerBB(VIR_BASIC_BLOCK* pBasicBlk, VIR_DEF_USAGE_INFO*
        VIR_HALF_CHANNEL_MASK_HIGH (2),
        VIR_HALF_CHANNEL_MASK_FULL (3)
     */
-    vscSV_Initialize(&localHalfChannelKillFlow, pDuInfo->baseTsDFA.baseDFA.pMM,
+    vscSV_Initialize(&localHalfChannelKillFlow, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool,
                      pDuInfo->baseTsDFA.baseDFA.flowSize, 4);
 
     /* Go through all instructions of basic block to create each usage and make connection between
@@ -2425,8 +2432,7 @@ static void _BuildDUUDChainPerBB(VIR_BASIC_BLOCK* pBasicBlk, VIR_DEF_USAGE_INFO*
                                             &bIndexing))
         {
             bCertainWrite = (!bIndexing &&
-                             !VIR_Inst_ConditionalWrite(pInst) &&
-                             !VIR_OPCODE_DestOnlyUseEnable(VIR_Inst_GetOpcode(pInst)));
+                             vscVIR_IsInstDefiniteWrite(pDuInfo, pInst, firstRegNo, gcvTRUE));
 
             _Update_ReachDef_Local_GenKill(pDuInfo,
                                            &workingDefFlow,
@@ -2739,7 +2745,7 @@ static void _PostProcessNewWeb(VIR_DEF_USAGE_INFO* pDuInfo, gctUINT newWebIdx)
                                                pDef->defKey.regNo);
 
         /* this temp has underlying variable */
-        if (VIR_Symbol_GetVregVariable(sym) != gcvNULL)
+        if (sym && VIR_Symbol_GetVregVariable(sym) != gcvNULL)
         {
             defIdx = vscVIR_FindFirstDefIndex(pDuInfo, pDef->defKey.regNo);
 
@@ -2798,7 +2804,7 @@ static gctBOOL _BuildNewWeb(VIR_DEF_USAGE_INFO* pDuInfo,
     if (bPartialUpdate)
     {
         vscBV_Initialize(&extendedDefFlow,
-                         pDuInfo->baseTsDFA.baseDFA.pMM,
+                         pDuInfo->baseTsDFA.baseDFA.pScratchMemPool,
                          BT_GET_MAX_VALID_ID(&pDuInfo->defTable));
 
         /* Un-indexing-reg defs who have true usages for same instruction must be in the
@@ -3104,8 +3110,8 @@ static VSC_ErrCode _BuildWebs(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuInfo)
         return errCode;
     }
 
-    vscBV_Initialize(&globalWorkingFlow, &pDuInfo->pmp.mmWrapper, defCount);
-    vscBV_Initialize(&localWorkingFlow, &pDuInfo->pmp.mmWrapper, defCount);
+    vscBV_Initialize(&globalWorkingFlow, pCg->pScratchMemPool, defCount);
+    vscBV_Initialize(&localWorkingFlow, pCg->pScratchMemPool, defCount);
 
     /* Mark all defs not processed */
     vscBV_SetAll(&globalWorkingFlow);
@@ -3342,7 +3348,7 @@ static gctBOOL _UpdateReachDefFlow(VIR_DEF_USAGE_INFO* pDuInfo,
     /* We need firstly update flow size */
     vscVIR_UpdateBaseTsDFAFlowSize(&pDuInfo->baseTsDFA, BT_GET_MAX_VALID_ID(&pDuInfo->defTable));
 
-    vscBV_Initialize(&workingDefFlow, &pDuInfo->pmp.mmWrapper, pDuInfo->baseTsDFA.baseDFA.flowSize);
+    vscBV_Initialize(&workingDefFlow, pCg->pScratchMemPool, pDuInfo->baseTsDFA.baseDFA.flowSize);
 
     /* Generate working def flow based on updated def-index-array */
     for (i = 0; i < udiArraySize; i ++)
@@ -3354,7 +3360,6 @@ static gctBOOL _UpdateReachDefFlow(VIR_DEF_USAGE_INFO* pDuInfo,
             continue;
         }
 
-        /* TODO: Remove constraint of homonymy defs */
         if (pIsUpdateDefHomonymyArray[i])
         {
             bSuccUpdated = gcvFALSE;
@@ -3483,7 +3488,8 @@ void vscVIR_AddNewDef(VIR_DEF_USAGE_INFO* pDuInfo,
                           pIsUpdateDefHomonymyArray))
     {
         /* If flow has been invalidated, no need to update it anymore */
-        if (!pDuInfo->baseTsDFA.baseDFA.cmnDfaFlags.bFlowInvalidated)
+        if (!pDuInfo->baseTsDFA.baseDFA.cmnDfaFlags.bFlowInvalidated &&
+            pDefInst != VIR_INPUT_DEF_INST)
         {
             if (!_UpdateReachDefFlow(pDuInfo,
                                      VIR_Inst_GetBasicBlock(pDefInst),
@@ -3579,6 +3585,7 @@ void vscVIR_AddNewUsageToDef(VIR_DEF_USAGE_INFO* pDuInfo,
     gctUINT8                 channel;
     VIR_DEF_KEY              defKey;
     VIR_OperandInfo          operandInfo;
+    VIR_DEF*                 pDef;
 
     if (VIR_IS_OUTPUT_USAGE_INST(pUsageInst))
     {
@@ -3605,7 +3612,7 @@ void vscVIR_AddNewUsageToDef(VIR_DEF_USAGE_INFO* pDuInfo,
     }
 
     vscBV_Initialize(&tmpWorkingDefFlow,
-                     pDuInfo->baseTsDFA.baseDFA.pMM,
+                     pDuInfo->baseTsDFA.baseDFA.pScratchMemPool,
                      BT_GET_MAX_VALID_ID(&pDuInfo->defTable));
 
     /* Check which target defs are for this new usage */
@@ -3619,13 +3626,32 @@ void vscVIR_AddNewUsageToDef(VIR_DEF_USAGE_INFO* pDuInfo,
                 continue;
             }
 
-            defKey.pDefInst = pDefInst;
-            defKey.regNo = regNo;
-            defKey.channel = channel;
-            defIdx = vscBT_HashSearch(pDefTable, &defKey);
-            if (VIR_INVALID_DEF_INDEX != defIdx)
+            /* Find all def inst. */
+            if (pDefInst == VIR_ANY_DEF_INST)
             {
-                vscBV_SetBit(&tmpWorkingDefFlow, defIdx);
+                defIdx = vscVIR_FindFirstDefIndex(pDuInfo, regNo);
+
+                while (VIR_INVALID_DEF_INDEX != defIdx)
+                {
+                    vscBV_SetBit(&tmpWorkingDefFlow, defIdx);
+
+                    /* Get next def with same regNo */
+                    pDef = GET_DEF_BY_IDX(pDefTable, defIdx);
+                    gcmASSERT(pDef);
+                    defIdx = pDef->nextDefIdxOfSameRegNo;
+                }
+            }
+            /* Find the specific def inst. */
+            else
+            {
+                defKey.pDefInst = pDefInst;
+                defKey.regNo = regNo;
+                defKey.channel = channel;
+                defIdx = vscBT_HashSearch(pDefTable, &defKey);
+                if (VIR_INVALID_DEF_INDEX != defIdx)
+                {
+                    vscBV_SetBit(&tmpWorkingDefFlow, defIdx);
+                }
             }
         }
     }
@@ -4227,6 +4253,201 @@ gctBOOL vscVIR_IsUniqueDefInstOfUsageInst(VIR_DEF_USAGE_INFO*     pDuInfo,
     return (bHasDef ? gcvTRUE : gcvFALSE);
 }
 
+/* Given a register no, check whether it has a unique def instruction, if yes, return TRUE and the def instruction. */
+gctBOOL vscVIR_IsRegNoHasUniqueDefInst(VIR_DEF_USAGE_INFO*      pDuInfo,
+                                       VIR_VirRegId             regNo,
+                                       VIR_Instruction**        ppUniqueDefInst)
+{
+    VIR_Instruction*    pDefInst = gcvNULL;
+    VIR_DEF*            pDef;
+    VIR_DEF_KEY         defKey;
+    gctUINT             tempDefIdx;
+
+    /* Find all DEFs. */
+    defKey.pDefInst = VIR_ANY_DEF_INST;
+    defKey.regNo = regNo;
+    defKey.channel = VIR_CHANNEL_ANY;
+    tempDefIdx = vscBT_HashSearch(&pDuInfo->defTable, &defKey);
+
+    while (VIR_INVALID_DEF_INDEX != tempDefIdx)
+    {
+        pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, tempDefIdx);
+
+        if (pDefInst == gcvNULL)
+        {
+            pDefInst = pDef->defKey.pDefInst;
+        }
+        else if (pDefInst != pDef->defKey.pDefInst)
+        {
+            return gcvFALSE;
+        }
+
+        tempDefIdx = pDef->nextDefIdxOfSameRegNo;
+    }
+
+    if (ppUniqueDefInst)
+    {
+        *ppUniqueDefInst = pDefInst;
+    }
+
+    return gcvTRUE;
+}
+
+/* Given a register no, if one of its DEF is conditional write, check whether all its def instructions have the same writeMask. */
+gctBOOL vscVIR_IsRegAllDefHaveSameWriteMask(VIR_DEF_USAGE_INFO*      pDuInfo,
+                                            VIR_VirRegId             regNo)
+{
+    gctBOOL             bMatched = gcvTRUE;
+    VIR_Instruction*    pDefInst = gcvNULL;
+    VIR_OpCode          defInstOpCode;
+    VIR_DEF*            pDef;
+    VIR_DEF_KEY         defKey;
+    gctUINT             tempDefIdx;
+    VIR_TypeId          instTypeId = VIR_INVALID_ID;
+    gctUINT             startBin = 0xFFFF, endBin = 0xFFFF;
+    gctUINT             i;
+
+    /* Find all DEFs. */
+    defKey.pDefInst = VIR_ANY_DEF_INST;
+    defKey.regNo = regNo;
+    defKey.channel = VIR_CHANNEL_ANY;
+    tempDefIdx = vscBT_HashSearch(&pDuInfo->defTable, &defKey);
+
+    /*
+    ** So far we only check for VX instruction:
+    **      if all its def instructions are VX instruction and have the same startBin/endBin, they have the same writeMask.
+    */
+    while (VIR_INVALID_DEF_INDEX != tempDefIdx)
+    {
+        VIR_Operand*    typeOpnd = gcvNULL;
+        VIR_TypeId      tyId;
+
+        pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, tempDefIdx);
+        pDefInst = pDef->defKey.pDefInst;
+
+        /* Implicit DEF or non-VX DEF, just return. */
+        if (VIR_IS_IMPLICIT_DEF_INST(pDefInst) || !VIR_OPCODE_isVX(VIR_Inst_GetOpcode(pDefInst)))
+        {
+            bMatched = gcvFALSE;
+            break;
+        }
+
+        /* For VX ImgLoad, HW may disable some channels(when is out of border) to be written, so the writeMask is not fixed. */
+        if (VIR_OPCODE_isVXImgLoad(VIR_Inst_GetOpcode(pDefInst)))
+        {
+            bMatched = gcvFALSE;
+            break;
+        }
+
+        defInstOpCode = VIR_Inst_GetOpcode(pDefInst);
+        if (VIR_OPCODE_hasDest(defInstOpCode))
+        {
+            typeOpnd = VIR_Inst_GetDest(pDefInst);
+        }
+        else
+        {
+            if (VIR_OPCODE_useSrc2AsInstType(defInstOpCode))
+            {
+                typeOpnd = VIR_Inst_GetSource(pDefInst, 2);
+            }
+            else if (VIR_OPCODE_useSrc3AsInstType(defInstOpCode))
+            {
+                typeOpnd = VIR_Inst_GetSource(pDefInst, 3);
+            }
+            else
+            {
+                gcmASSERT(VIR_OPCODE_useSrc0AsInstType(defInstOpCode));
+                typeOpnd = VIR_Inst_GetSource(pDefInst, 0);
+            }
+        }
+
+        tyId = VIR_Operand_GetTypeId(typeOpnd);
+        gcmASSERT(tyId < VIR_TYPE_PRIMITIVETYPE_COUNT);
+
+        for (i = 0; i < VIR_Inst_GetSrcNum(pDefInst); i++)
+        {
+            VIR_Operand *pOpnd = VIR_Inst_GetSource(pDefInst, i);
+            VIR_EVIS_Modifier evisModifier;
+
+            if (pOpnd && VIR_Operand_GetOpKind(pOpnd) == VIR_OPND_EVIS_MODIFIER)
+            {
+                evisModifier.u1 = VIR_Operand_GetEvisModifier(pOpnd);
+
+                if (startBin == 0xFFFF)
+                {
+                    startBin = evisModifier.u0.startBin;
+                    endBin = evisModifier.u0.endBin;
+                    instTypeId = tyId;
+                }
+                else if (startBin != evisModifier.u0.startBin   ||
+                         endBin != evisModifier.u0.endBin       ||
+                         instTypeId != tyId)
+                {
+                    bMatched = gcvFALSE;
+                    break;
+                }
+            }
+        }
+
+        if (!bMatched)
+        {
+            break;
+        }
+
+        /* Get the next DEF. */
+        tempDefIdx = pDef->nextDefIdxOfSameRegNo;
+    }
+
+    return bMatched;
+}
+
+/*
+** Check whether this instruction is a definite write.
+**      1) non-conditional write.
+**      2) this DEF is the unique DEF.
+**      3) conditional write, but use the fixed writeMask.
+*/
+gctBOOL vscVIR_IsInstDefiniteWrite(VIR_DEF_USAGE_INFO*   pDuInfo,
+                                   VIR_Instruction*      pInst,
+                                   VIR_VirRegId          regNo,
+                                   gctBOOL               bCheckDef)
+{
+    gctBOOL                 bDefiniteWrite = gcvFALSE;
+    VIR_OpCode              opCode = VIR_Inst_GetOpcode(pInst);
+    VIR_Instruction*        pDefInst = gcvNULL;
+    gctBOOL                 bUseConstForEvisState = gcvTRUE;
+
+    if (VIR_OPCODE_DestOnlyUseEnable(opCode))
+    {
+        return gcvFALSE;
+    }
+
+    if (!VIR_Inst_ConditionalWrite(pInst))
+    {
+        bDefiniteWrite = gcvTRUE;
+    }
+
+    if (bCheckDef)
+    {
+        /*
+        ** Although this instruction is a conditional write, if it is the unique DEF instruction for this reg,
+        ** we can still local kill this instruction.
+        */
+        if (vscVIR_IsRegNoHasUniqueDefInst(pDuInfo, regNo, &pDefInst) &&
+            pDefInst == pInst)
+        {
+            bDefiniteWrite = gcvTRUE;
+        }
+        /* For a VX instruction, if all its def instructions have the same writeMask, we can treat it as a definite write. */
+        else if (VIR_OPCODE_isVX(opCode) && bUseConstForEvisState)
+        {
+            bDefiniteWrite = vscVIR_IsRegAllDefHaveSameWriteMask(pDuInfo, regNo);
+        }
+    }
+
+    return bDefiniteWrite;
+}
+
 #define GotoResult(Value)  do { (result) = (Value); goto OnError; } while (0)
 
 static gctBOOL _CheckTwoBasicBlockSameBranch(VIR_DEF_USAGE_INFO* pDuInfo,
@@ -4341,7 +4562,7 @@ gctBOOL vscVIR_IsDefInstAndUsageInstSameBranch(VIR_DEF_USAGE_INFO* pDuInfo,
     }
 
     bbCount = CG_GET_HIST_GLOBAL_BB_COUNT(VIR_Function_GetFuncBlock(pUsageFunc)->pOwnerCG);
-    vscBV_Initialize(&bbMask, &pDuInfo->pmp.mmWrapper, bbCount);
+    vscBV_Initialize(&bbMask, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool, bbCount);
 
     bSameBranch = _CheckTwoBasicBlockSameBranch(pDuInfo, pDefBB, pUsageBB, &bbMask);
 
@@ -4415,6 +4636,12 @@ gctBOOL vscVIR_DoesDefInstHaveUniqueUsageInst(VIR_DEF_USAGE_INFO* pDuInfo,
                     }
                 }
             }
+        }
+
+        /* No usage found. */
+        if (pFirstUsageInst == gcvNULL)
+        {
+            return gcvFALSE;
         }
 
         if (ppUniqueUsageInst)
@@ -4754,6 +4981,11 @@ static gctBOOL _vscVIR_DefBBInBetween(
                                                  pCheckStatusMask,
                                                  pCheckValueMask,
                                                  &meetReDefBB);
+        }
+
+        if (result[idx])
+        {
+            break;
         }
     }
 

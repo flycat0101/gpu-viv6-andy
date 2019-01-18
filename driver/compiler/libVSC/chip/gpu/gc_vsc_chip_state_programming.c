@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -34,6 +34,8 @@
 #define DMA_BATCH_SIZE_LIMIT               256
 
 #define SHADER_STATE_PADDING               0xdeadbeef
+
+#define ENABLE_USC_DYNAMICALLY_ALLOC       0
 
 typedef enum GPGPU_THD_GRP_ID_ORDER
 {
@@ -74,6 +76,11 @@ VSC_ErrCode vscInitializeChipStatesProgrammer(VSC_CHIP_STATES_PROGRAMMER* pState
 
     pStatesPgmer->pHints = pHints;
 
+    pStatesPgmer->pStateDelta = (gctUINT32*)vscMM_Alloc(&pStatesPgmer->pmp.mmWrapper,
+        VSC_CHIP_STATES_ALLOC_GRANULARITY * sizeof(gctUINT));
+    pStatesPgmer->stateDeltaAllocSize  = VSC_CHIP_STATES_ALLOC_GRANULARITY;
+    pStatesPgmer->nextStateDeltaAddr = 0;
+
     return (pStatesPgmer->pStartStateBuffer) ? VSC_ERR_NONE : VSC_ERR_OUT_OF_MEMORY;
 }
 
@@ -85,6 +92,50 @@ VSC_ErrCode vscFinalizeChipStatesProgrammer(VSC_CHIP_STATES_PROGRAMMER* pStatesP
     pStatesPgmer->nextStateAddr = 0;
     pStatesPgmer->pHints = gcvNULL;
 
+    pStatesPgmer->pStateDelta = gcvNULL;
+    pStatesPgmer->stateDeltaAllocSize = 0;
+    pStatesPgmer->nextStateDeltaAddr = 0;
+
+    gcoOS_ZeroMemory(&pStatesPgmer->patchOffsetsInDW, sizeof(gcsPROGRAM_VidMemPatchOffset));
+
+    return VSC_ERR_NONE;
+}
+
+enum
+{
+    _VSC_PATCH_OFFSET_INSTR    = 1,
+    _VSC_PATCH_OFFSET_GPRSPILL = 2,
+    _VSC_PATCH_OFFSET_CRSPILL  = 3,
+    _VSC_PATCH_OFFSET_SHAREMEM = 4,
+};
+
+/*
+** !!!PLEASE be sure this function is called RIGHT before the VSC_LOAD_HW_STATE for buffer address.
+*/
+static VSC_ErrCode _SetPatchOffsets(VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer,
+                                    gctUINT patchOffsetType,
+                                    gcsSHADER_GROUP_SHADER_KIND shaderType
+                                    )
+{
+    switch (patchOffsetType)
+    {
+    case _VSC_PATCH_OFFSET_INSTR:
+        pStatesPgmer->patchOffsetsInDW.instVidMemInStateBuffer[shaderType] = pStatesPgmer->nextStateAddr + 1;
+        pStatesPgmer->patchOffsetsInDW.instVidMemInStateDelta[shaderType] = pStatesPgmer->nextStateDeltaAddr + 2;
+        break;
+    case _VSC_PATCH_OFFSET_GPRSPILL:
+        pStatesPgmer->patchOffsetsInDW.gprSpillVidMemInStateBuffer[shaderType] = pStatesPgmer->nextStateAddr + 1;
+        pStatesPgmer->patchOffsetsInDW.gprSpillVidMemInStateDelta[shaderType] = pStatesPgmer->nextStateDeltaAddr + 2;
+        break;
+    case _VSC_PATCH_OFFSET_CRSPILL:
+        pStatesPgmer->patchOffsetsInDW.crSpillVidMemInStateBuffer[shaderType] = pStatesPgmer->nextStateAddr + 1;
+        pStatesPgmer->patchOffsetsInDW.crSpillVidMemInStateDelta[shaderType] = pStatesPgmer->nextStateDeltaAddr + 2;
+        break;
+    case _VSC_PATCH_OFFSET_SHAREMEM:
+        pStatesPgmer->patchOffsetsInDW.sharedMemVidMemInStateBuffer = pStatesPgmer->nextStateAddr + 1;
+        pStatesPgmer->patchOffsetsInDW.sharedMemVidMemInStateDelta = pStatesPgmer->nextStateDeltaAddr + 2;
+        break;
+    }
     return VSC_ERR_NONE;
 }
 
@@ -95,9 +146,13 @@ static VSC_ErrCode _LoadContinuousAddressStates(VSC_CHIP_STATES_PROGRAMMER* pSta
 {
     gctUINT      requestSize, i;
     gctUINT*     pStateBuffer;
+    gctUINT*     pStateDelta;
+    gctUINT      requestStateDelta;
 
     /* Align States request to a multiple of 2 dwords for command alignment. */
     requestSize = ((dataCountInDW + 2) / 2) * 2;
+
+    requestStateDelta = dataCountInDW + VSC_STATE_DELTA_DESC_SIZE_IN_UINT32;
 
     /* Get where to load states */
     if (pStatesPgmer->nextStateAddr + requestSize > pStatesPgmer->allocSize)
@@ -116,7 +171,6 @@ static VSC_ErrCode _LoadContinuousAddressStates(VSC_CHIP_STATES_PROGRAMMER* pSta
     }
 
     pStateBuffer = pStatesPgmer->pStartStateBuffer + pStatesPgmer->nextStateAddr;
-
     /* Begin to load */
         *(pStateBuffer) ++ =  ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -178,6 +232,33 @@ static VSC_ErrCode _LoadContinuousAddressStates(VSC_CHIP_STATES_PROGRAMMER* pSta
     /* Move on to next available state buffer address */
     pStatesPgmer->nextStateAddr += requestSize;
 
+    /* Get where to load states */
+    if (pStatesPgmer->nextStateDeltaAddr + requestStateDelta > pStatesPgmer->stateDeltaAllocSize)
+    {
+        pStatesPgmer->stateDeltaAllocSize = VSC_UTILS_ALIGN(pStatesPgmer->nextStateDeltaAddr + requestStateDelta,
+                VSC_CHIP_STATES_ALLOC_GRANULARITY);
+
+        pStatesPgmer->pStateDelta = (gctUINT32 *)vscMM_Realloc(&pStatesPgmer->pmp.mmWrapper,
+                                                                  pStatesPgmer->pStateDelta,
+                                                                  pStatesPgmer->stateDeltaAllocSize*sizeof(gctUINT32));
+
+        if (pStatesPgmer->pStateDelta == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
+    }
+
+    pStateDelta = pStatesPgmer->pStateDelta + pStatesPgmer->nextStateDeltaAddr;
+
+    *pStateDelta++ = startAddress;
+    *pStateDelta++ = dataCountInDW;
+    gcoOS_MemCopy(pStateDelta, pStateData, sizeof(gctUINT)*dataCountInDW);
+    pStateDelta += dataCountInDW;
+    *pStateDelta = VSC_STATE_DELTA_END;
+
+    pStatesPgmer->nextStateDeltaAddr += requestStateDelta;
+
+
     return VSC_ERR_NONE;
 }
 
@@ -194,6 +275,7 @@ VSC_ErrCode vscVerifyShaderStates(VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
 {
     gctUINT  offset, statesCount;
     gctUINT* statesBuffer = pStatesPgmer->pStartStateBuffer;
+    gctUINT* stateDeltaBuffer = pStatesPgmer->pStateDelta;
 
     gcmASSERT(statesBuffer && pStatesPgmer->nextStateAddr);
 
@@ -222,6 +304,16 @@ VSC_ErrCode vscVerifyShaderStates(VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
     }
 
     gcmASSERT(offset == pStatesPgmer->nextStateAddr);
+
+    for (offset = 0; offset < pStatesPgmer->nextStateDeltaAddr;)
+    {
+        statesCount = *(stateDeltaBuffer + 1);
+        gcmASSERT(*(stateDeltaBuffer + 2 + statesCount) == VSC_STATE_DELTA_END);
+        stateDeltaBuffer += statesCount + VSC_STATE_DELTA_DESC_SIZE_IN_UINT32;
+        offset += statesCount + VSC_STATE_DELTA_DESC_SIZE_IN_UINT32;
+    }
+
+    gcmASSERT(offset == pStatesPgmer->nextStateDeltaAddr);
 
     return VSC_ERR_NONE;
 }
@@ -276,12 +368,82 @@ extern gctUINT _GetValidHwRegChannelCount(SHADER_IO_REG_MAPPING* pIoRegMapping, 
     }
 }
 
+static void _ProgramConstCountInfo(SHADER_HW_INFO* pShHwInfo,
+                                   VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer,
+                                   gctBOOL bGPipe)
+{
+    if (pShHwInfo->pSEP->exeHints.derivedHints.globalStates.unifiedConstRegAllocStrategy == UNIFIED_RF_ALLOC_STRATEGY_UNIFIED)
+    {
+        pStatesPgmer->pHints->unifiedStatus.constCount = vscMAX(pShHwInfo->pSEP->constantMapping.maxHwConstRegIndex + 1,
+                                                                pStatesPgmer->pHints->unifiedStatus.constCount);
+    }
+    else if (pShHwInfo->pSEP->exeHints.derivedHints.globalStates.unifiedConstRegAllocStrategy == UNIFIED_RF_ALLOC_STRATEGY_PACK_FLOAT_ADDR_OFFSET)
+    {
+        if (pStatesPgmer->pHints->unifiedStatus.constCount >= 0)
+        {
+            pStatesPgmer->pHints->unifiedStatus.constCount += pShHwInfo->pSEP->constantMapping.maxHwConstRegIndex + 1;
+        }
+        else
+        {
+            pStatesPgmer->pHints->unifiedStatus.constCount = pShHwInfo->pSEP->constantMapping.maxHwConstRegIndex + 1;
+        }
+    }
+    else if (pShHwInfo->pSEP->exeHints.derivedHints.globalStates.unifiedConstRegAllocStrategy == UNIFIED_RF_ALLOC_STRATEGY_GPIPE_TOP_PS_BOTTOM_FLOAT_ADDR_OFFSET)
+    {
+        if (bGPipe)
+        {
+            pStatesPgmer->pHints->unifiedStatus.constGPipeEnd += pShHwInfo->pSEP->constantMapping.hwConstRegCount;
+        }
+        else
+        {
+            pStatesPgmer->pHints->unifiedStatus.constPSStart = pShHwInfo->hwProgrammingHints.hwConstantRegAddrOffset;
+        }
+    }
+}
+
+static void _ProgramSamplerCountInfo(SHADER_HW_INFO* pShHwInfo,
+                                     VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer,
+                                     gctBOOL bGPipe)
+{
+    if (pShHwInfo->pSEP->exeHints.derivedHints.globalStates.unifiedSamplerRegAllocStrategy == UNIFIED_RF_ALLOC_STRATEGY_UNIFIED)
+    {
+        pStatesPgmer->pHints->unifiedStatus.samplerCount = vscMAX(pShHwInfo->pSEP->samplerMapping.maxHwSamplerRegIndex + 1,
+                                                                    pStatesPgmer->pHints->unifiedStatus.samplerCount);
+    }
+    else if (pShHwInfo->pSEP->exeHints.derivedHints.globalStates.unifiedSamplerRegAllocStrategy == UNIFIED_RF_ALLOC_STRATEGY_PACK_FLOAT_ADDR_OFFSET)
+    {
+        if (pStatesPgmer->pHints->unifiedStatus.samplerCount >= 0)
+        {
+            pStatesPgmer->pHints->unifiedStatus.samplerCount += pShHwInfo->pSEP->samplerMapping.maxHwSamplerRegIndex + 1;
+        }
+        else
+        {
+            pStatesPgmer->pHints->unifiedStatus.samplerCount = pShHwInfo->pSEP->samplerMapping.maxHwSamplerRegIndex + 1;
+        }
+    }
+    else if (pShHwInfo->pSEP->exeHints.derivedHints.globalStates.unifiedSamplerRegAllocStrategy == UNIFIED_RF_ALLOC_STRATEGY_PS_TOP_GPIPE_BOTTOM_FLOAT_ADDR_OFFSET)
+    {
+        if (bGPipe)
+        {
+            pStatesPgmer->pHints->unifiedStatus.samplerGPipeStart -= pShHwInfo->pSEP->samplerMapping.hwSamplerRegCount;
+        }
+        else
+        {
+            if (pShHwInfo->pSEP->samplerMapping.hwSamplerRegCount != 0)
+            {
+                pStatesPgmer->pHints->unifiedStatus.samplerPSEnd = pShHwInfo->pSEP->samplerMapping.hwSamplerRegCount - 1;
+            }
+        }
+    }
+}
+
 static VSC_ErrCode _ProgramRegedCTC(SHADER_HW_INFO* pShHwInfo,
                                     gctUINT startConstRegAddr,
                                     VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     gctUINT                    ctcIdx, channel, ctcAddr;
+    gctBOOL                    useRegedCTC = gcvFALSE;
 
     for (ctcIdx = 0; ctcIdx < pShHwInfo->pSEP->constantMapping.countOfCompileTimeConstant; ctcIdx ++)
     {
@@ -292,9 +454,11 @@ static VSC_ErrCode _ProgramRegedCTC(SHADER_HW_INFO* pShHwInfo,
             continue;
         }
 
+        useRegedCTC = gcvTRUE;
+
         if (pCTC->hwConstantLocation.validHWChannelMask == WRITEMASK_ALL)
         {
-            ctcAddr = startConstRegAddr + (pCTC->hwConstantLocation.hwLoc.hwRegNo * CHANNEL_NUM);
+            ctcAddr = startConstRegAddr + (pCTC->hwConstantLocation.hwLoc.constReg.hwRegNo * CHANNEL_NUM);
             VSC_LOAD_HW_STATES(ctcAddr, pCTC->constantValue, CHANNEL_NUM);
         }
         else
@@ -303,11 +467,42 @@ static VSC_ErrCode _ProgramRegedCTC(SHADER_HW_INFO* pShHwInfo,
             {
                 if (pCTC->hwConstantLocation.validHWChannelMask & (1 << channel))
                 {
-                    ctcAddr = startConstRegAddr + (pCTC->hwConstantLocation.hwLoc.hwRegNo * CHANNEL_NUM) + channel;
+                    ctcAddr = startConstRegAddr + (pCTC->hwConstantLocation.hwLoc.constReg.hwRegNo * CHANNEL_NUM) + channel;
                     VSC_LOAD_HW_STATE(ctcAddr, pCTC->constantValue[channel]);
                 }
             }
         }
+    }
+
+    switch ((SHADER_TYPE)DECODE_SHADER_TYPE(pShHwInfo->pSEP->shVersionType))
+    {
+    case SHADER_TYPE_VERTEX:
+        pStatesPgmer->pHints->useRegedCTC[gceSGSK_VERTEX_SHADER] = (gctCHAR)useRegedCTC;
+        break;
+
+    case SHADER_TYPE_HULL:
+        pStatesPgmer->pHints->useRegedCTC[gceSGSK_TC_SHADER] = (gctCHAR)useRegedCTC;
+        break;
+
+    case SHADER_TYPE_DOMAIN:
+        pStatesPgmer->pHints->useRegedCTC[gceSGSK_TE_SHADER] = (gctCHAR)useRegedCTC;
+        break;
+
+    case SHADER_TYPE_GEOMETRY:
+        pStatesPgmer->pHints->useRegedCTC[gceSGSK_GEOMETRY_SHADER] = (gctCHAR)useRegedCTC;
+        break;
+
+    case SHADER_TYPE_PIXEL:
+        pStatesPgmer->pHints->useRegedCTC[gceSGSK_FRAGMENT_SHADER] = (gctCHAR)useRegedCTC;
+        break;
+
+    case SHADER_TYPE_GENERAL:
+        pStatesPgmer->pHints->useRegedCTC[gceSGSK_CL_SHADER] = (gctCHAR)useRegedCTC;
+        break;
+
+    default:
+        gcmASSERT(gcvFALSE);
+        break;
     }
 
 OnError:
@@ -497,7 +692,7 @@ static VSC_ErrCode _AllocVidMemForGprSpill(VSC_CHIP_STATES_PROGRAMMER* pStatesPg
 
     for (i = 0; i < pSEP->staticPrivMapping.privUavMapping.countOfEntries; i ++)
     {
-        if (pSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].commonPrivm.privmFlag == SHS_PRIV_MEM_FLAG_GPR_SPILLED_MEMORY)
+        if (pSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].commonPrivm.privmKind == SHS_PRIV_MEM_KIND_GPR_SPILLED_MEMORY)
         {
             gcmASSERT(pSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].memData.ppCnstSubArray == gcvNULL);
             gcmASSERT(pSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].memData.ppCTC == gcvNULL);
@@ -545,7 +740,7 @@ static VSC_ErrCode _ProgramGprSpillMemAddr(SHADER_EXECUTABLE_PROFILE* pSEP,
 
     for (i = 0; i < pSEP->staticPrivMapping.privUavMapping.countOfEntries; i ++)
     {
-        if (pSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].commonPrivm.privmFlag == SHS_PRIV_MEM_FLAG_GPR_SPILLED_MEMORY)
+        if (pSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].commonPrivm.privmKind == SHS_PRIV_MEM_KIND_GPR_SPILLED_MEMORY)
         {
             gcmASSERT(pSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].memData.ppCnstSubArray == gcvNULL);
             gcmASSERT(pSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].memData.ppCTC == gcvNULL);
@@ -566,7 +761,7 @@ static VSC_ErrCode _ProgramGprSpillMemAddr(SHADER_EXECUTABLE_PROFILE* pSEP,
         gctUINT upperLimit;
         /* must at start with x and at least .x.y.z channels are allocated */
         gcmASSERT((pConstHwLocMapping->validHWChannelMask & 0x07) == 0x07);
-        regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.hwRegNo * CHANNEL_NUM);
+        regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.constReg.hwRegNo * CHANNEL_NUM);
         VSC_LOAD_HW_STATE(regAddr, spillMemAddr);
 
         regAddr += 1;  /* .y lower limit */
@@ -582,7 +777,7 @@ static VSC_ErrCode _ProgramGprSpillMemAddr(SHADER_EXECUTABLE_PROFILE* pSEP,
         {
             if (pConstHwLocMapping->validHWChannelMask & (1 << channel))
             {
-                regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.hwRegNo * CHANNEL_NUM) + channel;
+                regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.constReg.hwRegNo * CHANNEL_NUM) + channel;
                 VSC_LOAD_HW_STATE(regAddr, spillMemAddr);
             }
         }
@@ -609,7 +804,7 @@ static VSC_ErrCode _AllocVidMemForCrSpill(VSC_CHIP_STATES_PROGRAMMER* pStatesPgm
     {
         pPrivUavEntry = &pSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i];
 
-        if (pPrivUavEntry->commonPrivm.privmFlag == SHS_PRIV_MEM_FLAG_CONSTANT_SPILLED_MEMORY)
+        if (pPrivUavEntry->commonPrivm.privmKind == SHS_PRIV_MEM_KIND_CONSTANT_SPILLED_MEMORY)
         {
             /* Only all data of memory can be determined by vsc, we can go on */
             if (pPrivUavEntry->memData.ppCnstSubArray == gcvNULL && pPrivUavEntry->memData.ppCTC)
@@ -694,7 +889,7 @@ static VSC_ErrCode _ProgramCrSpillMemAddr(SHADER_EXECUTABLE_PROFILE* pSEP,
 
     for (i = 0; i < pSEP->staticPrivMapping.privUavMapping.countOfEntries; i ++)
     {
-        if (pSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].commonPrivm.privmFlag == SHS_PRIV_MEM_FLAG_CONSTANT_SPILLED_MEMORY)
+        if (pSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].commonPrivm.privmKind == SHS_PRIV_MEM_KIND_CONSTANT_SPILLED_MEMORY)
         {
             gcmASSERT(pSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].memData.ppCnstSubArray == gcvNULL);
             gcmASSERT(pSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].memData.ppCTC != gcvNULL);
@@ -716,7 +911,7 @@ static VSC_ErrCode _ProgramCrSpillMemAddr(SHADER_EXECUTABLE_PROFILE* pSEP,
         gctUINT upperLimit;
         /* must at start with x and at least .x.y.z channels are allocated */
         gcmASSERT((pConstHwLocMapping->validHWChannelMask & 0x07) == 0x07);
-        regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.hwRegNo * CHANNEL_NUM);
+        regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.constReg.hwRegNo * CHANNEL_NUM);
         VSC_LOAD_HW_STATE(regAddr, spillMemAddr);
 
         regAddr += 1;  /* .y lower limit */
@@ -732,7 +927,7 @@ static VSC_ErrCode _ProgramCrSpillMemAddr(SHADER_EXECUTABLE_PROFILE* pSEP,
         {
             if (pConstHwLocMapping->validHWChannelMask & (1 << channel))
             {
-                regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.hwRegNo * CHANNEL_NUM) + channel;
+                regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.constReg.hwRegNo * CHANNEL_NUM) + channel;
                 VSC_LOAD_HW_STATE(regAddr, spillMemAddr);
             }
         }
@@ -870,6 +1065,9 @@ static VSC_ErrCode _ProgramVsInsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PR
             endPC = pVsSEP->endPCOfMainRoutine;
             VSC_LOAD_HW_STATE(0x021E, endPC);
         }
+
+        /* !!! Must be RIGHT before instruction state programming */
+        _SetPatchOffsets(pStatesPgmer, _VSC_PATCH_OFFSET_INSTR, gceSGSK_VERTEX_SHADER);
 
         /* Program where to fetch from vid-mem */
         VSC_LOAD_HW_STATE(0x021B, vidMemAddrOfCode);
@@ -1159,7 +1357,8 @@ static VSC_ErrCode _ProgramVsCompileTimeConsts(SHADER_HW_INFO* pShHwInfo, VSC_CH
 
     startConstRegAddr = _GetVsStartConstRegAddr(pShHwInfo, pStatesPgmer);
 
-    pStatesPgmer->pHints->unifiedStatus.constGPipeEnd += pShHwInfo->pSEP->constantMapping.hwConstRegCount;
+    _ProgramConstCountInfo(pShHwInfo, pStatesPgmer, gcvTRUE);
+
     pStatesPgmer->pHints->hwConstRegBases[gcvPROGRAM_STAGE_VERTEX] = startConstRegAddr * 4;
     pStatesPgmer->pHints->constRegNoBase[gcvPROGRAM_STAGE_VERTEX] = pShHwInfo->hwProgrammingHints.hwConstantRegAddrOffset;
 
@@ -1184,6 +1383,8 @@ static VSC_ErrCode _ProgramVsGprSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES
     ON_ERROR(errCode, "Alloc vid-mem for gpr spill");
 
     pStatesPgmer->pHints->shaderVidNodes.gprSpillVidmemNode[gceSGSK_VERTEX_SHADER] = gprSpillVidmemNode;
+
+    _SetPatchOffsets(pStatesPgmer, _VSC_PATCH_OFFSET_GPRSPILL, gceSGSK_VERTEX_SHADER);
 
     errCode = _ProgramGprSpillMemAddr(pVsSEP,
                                       _GetVsStartConstRegAddr(pShHwInfo, pStatesPgmer),
@@ -1211,6 +1412,8 @@ static VSC_ErrCode _ProgramVsCrSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_
     {
         pStatesPgmer->pHints->shaderVidNodes.crSpillVidmemNode[gceSGSK_VERTEX_SHADER] = crSpillVidmemNode;
 
+        _SetPatchOffsets(pStatesPgmer, _VSC_PATCH_OFFSET_CRSPILL, gceSGSK_VERTEX_SHADER);
+
         errCode = _ProgramCrSpillMemAddr(pVsSEP,
                                          _GetVsStartConstRegAddr(pShHwInfo, pStatesPgmer),
                                          vidMemAddrOfSpillMem,
@@ -1236,6 +1439,39 @@ static gctUINT _GetCalibratedGprCount(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES
     return calibratedGprCount;
 }
 
+static void _GetMinMaxUscSize(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer,
+                              gctUINT* pMinUscSize, gctUINT* pMaxUscSize, gctUINT* pExtraUscSize)
+{
+    gcmASSERT(pShHwInfo->hwProgrammingHints.minUscSizeInKbyte <= pShHwInfo->hwProgrammingHints.maxUscSizeInKbyte);
+
+    if (pMinUscSize)
+    {
+#if ENABLE_USC_DYNAMICALLY_ALLOC
+        *pMinUscSize = pShHwInfo->hwProgrammingHints.minUscSizeInKbyte + 1;
+#else
+        *pMinUscSize = pShHwInfo->hwProgrammingHints.maxUscSizeInKbyte + 1;
+#endif
+    }
+
+    if (pMaxUscSize)
+    {
+#if ENABLE_USC_DYNAMICALLY_ALLOC
+        *pMaxUscSize = pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.maxUSCAttribBufInKbyte;
+#else
+        *pMaxUscSize = pShHwInfo->hwProgrammingHints.maxUscSizeInKbyte + 1;
+#endif
+    }
+
+    if (pExtraUscSize)
+    {
+#if ENABLE_USC_DYNAMICALLY_ALLOC
+        *pExtraUscSize = pShHwInfo->hwProgrammingHints.maxUscSizeInKbyte - pShHwInfo->hwProgrammingHints.minUscSizeInKbyte;
+#else
+        *pExtraUscSize = 0;
+#endif
+    }
+}
+
 static VSC_ErrCode _ProgramVS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
@@ -1252,6 +1488,7 @@ static VSC_ErrCode _ProgramVS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     gctUINT                    firstValidIoChannel, hwThreadGroupSize, resultCacheWinSize;
     gctUINT                    calibratedGprCount = _GetCalibratedGprCount(pShHwInfo, pStatesPgmer);
     gctBOOL                    bHasStreamOutedOutput = gcvFALSE;
+    gctUINT                    minUscSize, maxUscSize, extraUscSize;
 
     gcmASSERT(pVsSEP->inputMapping.ioVtxPxl.ioMode == SHADER_IO_MODE_PASSIVE);
     gcmASSERT(pVsSEP->outputMapping.ioVtxPxl.ioMode == SHADER_IO_MODE_PASSIVE);
@@ -1432,6 +1669,8 @@ static VSC_ErrCode _ProgramVS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
         vsOutputCount ++;
     }
 
+    _GetMinMaxUscSize(pShHwInfo, pStatesPgmer, &minUscSize, &maxUscSize, &extraUscSize);
+
     /* Fill hints */
     pStatesPgmer->pHints->vsHasPointSize = (pVsSEP->outputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_POINTSIZE].ioIndexMask != 0);
     pStatesPgmer->pHints->isPtSizeStreamedOut = (pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportStreamOut &&
@@ -1441,16 +1680,16 @@ static VSC_ErrCode _ProgramVS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     pStatesPgmer->pHints->vsPtSizeAtLastLinkLoc = (ptSzLinkNo == (pVSOutputLinkageInfo->vtxPxlLinkage.totalLinkNoCount - 1));
     pStatesPgmer->pHints->vsInstCount = pVsSEP->countOfMCInst;
     pStatesPgmer->pHints->vsOutputCount  = vsOutputCount;
+#if gcdUSE_WCLIP_PATCH
     pStatesPgmer->pHints->vsPositionZDependsOnW = pVsSEP->exeHints.derivedHints.prePaStates.bOutPosZDepW;
+#endif
     pStatesPgmer->pHints->vsMaxTemp = calibratedGprCount;
-    pStatesPgmer->pHints->memoryAccessFlags[gcvPROGRAM_STAGE_VERTEX] = (gceMEMORY_ACCESS_FLAG)pVsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
+    pStatesPgmer->pHints->extraUscPages += extraUscSize;
+    pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_VERTEX] = (gceMEMORY_ACCESS_FLAG)pVsSEP->exeHints.nativeHints.globalStates.memoryAccessHint;
+    pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_VERTEX] = (gceMEMORY_ACCESS_FLAG)pVsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
     pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_VERTEX] = pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
-    pStatesPgmer->pHints->unifiedStatus.samplerGPipeStart -= pVsSEP->samplerMapping.hwSamplerRegCount;
 
-    if (pShHwInfo->hwProgrammingHints.hwSamplerFetchMode == HW_SAMPLER_FETCH_MODE_UNIFIED_REG_FILE)
-    {
-        pStatesPgmer->pHints->unifiedStatus.sampler = gcvTRUE;
-    }
+    _ProgramSamplerCountInfo(pShHwInfo, pStatesPgmer, gcvTRUE);
 
     pStatesPgmer->pHints->vsUseStoreAttr = (pVsSEP->outputMapping.ioVtxPxl.ioMode == SHADER_IO_MODE_ACTIVE);
     pStatesPgmer->pHints->prePaShaderHasPointSize = pStatesPgmer->pHints->vsHasPointSize;
@@ -1544,7 +1783,6 @@ static VSC_ErrCode _ProgramVS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
  21:16) - (0 ?
  21:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 21:16) - (0 ? 21:16) + 1))))))) << (0 ? 21:16)));
-    pStatesPgmer->pHints->vsInputState = state;
     VSC_LOAD_HW_STATE(0x0202, state);
 
     if (pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.newGPIPE)
@@ -1584,7 +1822,7 @@ static VSC_ErrCode _ProgramVS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
  ~0U : (~(~0U << ((1 ?
  5:0) - (0 ?
  5:0) + 1))))))) << (0 ?
- 5:0))) | (((gctUINT32) ((gctUINT32) (pShHwInfo->hwProgrammingHints.uscSizeInKbyte + 1) & ((gctUINT32) ((((1 ?
+ 5:0))) | (((gctUINT32) ((gctUINT32) (maxUscSize) & ((gctUINT32) ((((1 ?
  5:0) - (0 ?
  5:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0))) |
@@ -1609,6 +1847,21 @@ static VSC_ErrCode _ProgramVS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
  28:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 28:20) - (0 ? 28:20) + 1))))))) << (0 ? 28:20)));
         VSC_LOAD_HW_STATE(0x0228, state);
+
+        if (pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.multiCluster)
+        {
+            state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1))))))) << (0 ?
+ 5:0))) | (((gctUINT32) ((gctUINT32) (minUscSize) & ((gctUINT32) ((((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0)));
+            VSC_LOAD_HW_STATE(0x5582, state);
+        }
     }
     else
     {
@@ -1720,6 +1973,9 @@ static VSC_ErrCode _ProgramHsInsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PR
     VSC_LOAD_HW_STATE(0x5280, startPC);
     VSC_LOAD_HW_STATE(0x5281, endPC);
 
+    /* !!! Must be RIGHT before instruction state programming */
+    _SetPatchOffsets(pStatesPgmer, _VSC_PATCH_OFFSET_INSTR, gceSGSK_TC_SHADER);
+
     /* Program where to fetch from vid-mem */
     VSC_LOAD_HW_STATE(0x5282, vidMemAddrOfCode);
 
@@ -1759,8 +2015,20 @@ OnError:
 
 static gctUINT _GetHsStartConstRegAddr(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
 {
-    return pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.tcsConstRegAddrBase +
-           pShHwInfo->hwProgrammingHints.hwConstantRegAddrOffset * CHANNEL_NUM;
+    gctUINT constRegBaseAddr;
+
+    if (pShHwInfo->pSEP->exeHints.derivedHints.globalStates.unifiedConstRegAllocStrategy == UNIFIED_RF_ALLOC_STRATEGY_UNIFIED)
+    {
+        constRegBaseAddr = pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.vsConstRegAddrBase;
+    }
+    else
+    {
+        constRegBaseAddr = pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.tcsConstRegAddrBase;
+    }
+
+    constRegBaseAddr += pShHwInfo->hwProgrammingHints.hwConstantRegAddrOffset * CHANNEL_NUM;
+
+    return constRegBaseAddr;
 }
 
 static VSC_ErrCode _ProgramHsCompileTimeConsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
@@ -1779,7 +2047,8 @@ static VSC_ErrCode _ProgramHsCompileTimeConsts(SHADER_HW_INFO* pShHwInfo, VSC_CH
 
     startConstRegAddr = _GetHsStartConstRegAddr(pShHwInfo, pStatesPgmer);
 
-    pStatesPgmer->pHints->unifiedStatus.constGPipeEnd += pShHwInfo->pSEP->constantMapping.hwConstRegCount;
+    _ProgramConstCountInfo(pShHwInfo, pStatesPgmer, gcvTRUE);
+
     pStatesPgmer->pHints->hwConstRegBases[gcvPROGRAM_STAGE_TCS] = startConstRegAddr * 4;
     pStatesPgmer->pHints->constRegNoBase[gcvPROGRAM_STAGE_TCS] = pShHwInfo->hwProgrammingHints.hwConstantRegAddrOffset;
 
@@ -1804,6 +2073,8 @@ static VSC_ErrCode _ProgramHsGprSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES
     ON_ERROR(errCode, "Alloc vid-mem for gpr spill");
 
     pStatesPgmer->pHints->shaderVidNodes.gprSpillVidmemNode[gceSGSK_TC_SHADER] = gprSpillVidmemNode;
+
+    _SetPatchOffsets(pStatesPgmer, _VSC_PATCH_OFFSET_GPRSPILL, gceSGSK_TC_SHADER);
 
     errCode = _ProgramGprSpillMemAddr(pHsSEP,
                                       _GetHsStartConstRegAddr(pShHwInfo, pStatesPgmer),
@@ -1830,6 +2101,8 @@ static VSC_ErrCode _ProgramHsCrSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_
     if (vidMemAddrOfSpillMem != NOT_ASSIGNED)
     {
         pStatesPgmer->pHints->shaderVidNodes.crSpillVidmemNode[gceSGSK_TC_SHADER] = crSpillVidmemNode;
+
+        _SetPatchOffsets(pStatesPgmer, _VSC_PATCH_OFFSET_CRSPILL, gceSGSK_TC_SHADER);
 
         errCode = _ProgramCrSpillMemAddr(pHsSEP,
                                          _GetHsStartConstRegAddr(pShHwInfo, pStatesPgmer),
@@ -2044,6 +2317,7 @@ static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     gctUINT                    firstValidIoChannel, totalCPOutputCount, hsPerCPOutputAttrCount;
     gctUINT                    remapMode, maxPatchesPerHwTG, totalOutputCountPerhwTG;
     gctINT                     maxPerPatchOutputLinkNo = -1;
+    gctUINT                    minUscSize, maxUscSize, extraUscSize;
 
     gcmASSERT(pHsSEP->inputMapping.ioVtxPxl.ioMode == SHADER_IO_MODE_ACTIVE ||
               pHsSEP->inputMapping.ioVtxPxl.countOfIoRegMapping == 0);
@@ -2123,15 +2397,15 @@ static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
         }
     }
 
-    pStatesPgmer->pHints->memoryAccessFlags[gcvPROGRAM_STAGE_TCS] = (gceMEMORY_ACCESS_FLAG)pHsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
-    pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_TCS] = pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
-    pStatesPgmer->pHints->unifiedStatus.samplerGPipeStart -= pHsSEP->samplerMapping.hwSamplerRegCount;
-    pStatesPgmer->pHints->tcsPerVertexAttributeCount = hsPerCPInputCount;
+    _GetMinMaxUscSize(pShHwInfo, pStatesPgmer, &minUscSize, &maxUscSize, &extraUscSize);
 
-    if (pShHwInfo->hwProgrammingHints.hwSamplerFetchMode == HW_SAMPLER_FETCH_MODE_UNIFIED_REG_FILE)
-    {
-        pStatesPgmer->pHints->unifiedStatus.sampler = gcvTRUE;
-    }
+    pStatesPgmer->pHints->tcsPerVertexAttributeCount = hsPerCPInputCount;
+    pStatesPgmer->pHints->extraUscPages += extraUscSize;
+    pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_TCS] = (gceMEMORY_ACCESS_FLAG)pHsSEP->exeHints.nativeHints.globalStates.memoryAccessHint;
+    pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_TCS] = (gceMEMORY_ACCESS_FLAG)pHsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
+    pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_TCS] = pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
+
+    _ProgramSamplerCountInfo(pShHwInfo, pStatesPgmer, gcvTRUE);
 
     /* Need consider output link count is different with IO count because currently we only
        support IOs without usages mixed */
@@ -2315,10 +2589,20 @@ static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
  ~0U : (~(~0U << ((1 ?
  5:0) - (0 ?
  5:0) + 1))))))) << (0 ?
- 5:0))) | (((gctUINT32) ((gctUINT32) (pShHwInfo->hwProgrammingHints.uscSizeInKbyte + 1) & ((gctUINT32) ((((1 ?
+ 5:0))) | (((gctUINT32) ((gctUINT32) (maxUscSize) & ((gctUINT32) ((((1 ?
  5:0) - (0 ?
  5:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0))) |
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:20) - (0 ?
+ 25:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 25:20) - (0 ?
+ 25:20) + 1))))))) << (0 ?
+ 25:20))) | (((gctUINT32) ((gctUINT32) (minUscSize) & ((gctUINT32) ((((1 ?
+ 25:20) - (0 ?
+ 25:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 25:20) - (0 ? 25:20) + 1))))))) << (0 ? 25:20))) |
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  19:12) - (0 ?
  19:12) + 1) == 32) ?
@@ -2413,6 +2697,9 @@ static VSC_ErrCode _ProgramDsInsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PR
     VSC_LOAD_HW_STATE(0x52C1, startPC);
     VSC_LOAD_HW_STATE(0x52C2, endPC);
 
+    /* !!! Must be RIGHT before instruction state programming */
+    _SetPatchOffsets(pStatesPgmer, _VSC_PATCH_OFFSET_INSTR, gceSGSK_TE_SHADER);
+
     /* Program where to fetch from vid-mem */
     VSC_LOAD_HW_STATE(0x52C3, vidMemAddrOfCode);
 
@@ -2451,8 +2738,20 @@ OnError:
 
 static gctUINT _GetDsStartConstRegAddr(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
 {
-    return pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.tesConstRegAddrBase +
-           pShHwInfo->hwProgrammingHints.hwConstantRegAddrOffset * CHANNEL_NUM;
+    gctUINT constRegBaseAddr;
+
+    if (pShHwInfo->pSEP->exeHints.derivedHints.globalStates.unifiedConstRegAllocStrategy == UNIFIED_RF_ALLOC_STRATEGY_UNIFIED)
+    {
+        constRegBaseAddr = pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.vsConstRegAddrBase;
+    }
+    else
+    {
+        constRegBaseAddr = pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.tesConstRegAddrBase;
+    }
+
+    constRegBaseAddr += pShHwInfo->hwProgrammingHints.hwConstantRegAddrOffset * CHANNEL_NUM;
+
+    return constRegBaseAddr;
 }
 
 static VSC_ErrCode _ProgramDsCompileTimeConsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
@@ -2471,7 +2770,8 @@ static VSC_ErrCode _ProgramDsCompileTimeConsts(SHADER_HW_INFO* pShHwInfo, VSC_CH
 
     startConstRegAddr = _GetDsStartConstRegAddr(pShHwInfo, pStatesPgmer);
 
-    pStatesPgmer->pHints->unifiedStatus.constGPipeEnd += pShHwInfo->pSEP->constantMapping.hwConstRegCount;
+    _ProgramConstCountInfo(pShHwInfo, pStatesPgmer, gcvTRUE);
+
     pStatesPgmer->pHints->hwConstRegBases[gcvPROGRAM_STAGE_TES] = startConstRegAddr * 4;
     pStatesPgmer->pHints->constRegNoBase[gcvPROGRAM_STAGE_TES] = pShHwInfo->hwProgrammingHints.hwConstantRegAddrOffset;
 
@@ -2496,6 +2796,8 @@ static VSC_ErrCode _ProgramDsGprSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES
     ON_ERROR(errCode, "Alloc vid-mem for gpr spill");
 
     pStatesPgmer->pHints->shaderVidNodes.gprSpillVidmemNode[gceSGSK_TE_SHADER] = gprSpillVidmemNode;
+
+    _SetPatchOffsets(pStatesPgmer, _VSC_PATCH_OFFSET_GPRSPILL, gceSGSK_TE_SHADER);
 
     errCode = _ProgramGprSpillMemAddr(pDsSEP,
                                       _GetDsStartConstRegAddr(pShHwInfo, pStatesPgmer),
@@ -2523,6 +2825,8 @@ static VSC_ErrCode _ProgramDsCrSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_
     {
         pStatesPgmer->pHints->shaderVidNodes.crSpillVidmemNode[gceSGSK_TE_SHADER] = crSpillVidmemNode;
 
+        _SetPatchOffsets(pStatesPgmer, _VSC_PATCH_OFFSET_CRSPILL, gceSGSK_TE_SHADER);
+
         errCode = _ProgramCrSpillMemAddr(pDsSEP,
                                          _GetDsStartConstRegAddr(pShHwInfo, pStatesPgmer),
                                          vidMemAddrOfSpillMem,
@@ -2545,6 +2849,7 @@ static VSC_ErrCode _ProgramDS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     gctUINT                    soOnlyOutputCount = 0, dummyOutputCount = 0;
     gctUINT                    outputRegMapping[MAX_HW_IO_COUNT];
     gctUINT                    firstValidIoChannel, hwThreadGroupSize, resultCacheWinSize;
+    gctUINT                    minUscSize, maxUscSize, extraUscSize;
 
     gcmASSERT(pDsSEP->inputMapping.ioVtxPxl.ioMode == SHADER_IO_MODE_ACTIVE ||
               pDsSEP->inputMapping.ioVtxPxl.countOfIoRegMapping == 0);
@@ -2632,17 +2937,17 @@ static VSC_ErrCode _ProgramDS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
         dsOutputCount ++;
     }
 
+    _GetMinMaxUscSize(pShHwInfo, pStatesPgmer, &minUscSize, &maxUscSize, &extraUscSize);
+
+    pStatesPgmer->pHints->extraUscPages += extraUscSize;
     pStatesPgmer->pHints->prePaShaderHasPointSize = (pDsSEP->outputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_POINTSIZE].ioIndexMask != 0);
     pStatesPgmer->pHints->prePaShaderHasPrimitiveId = (pDsSEP->outputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_PRIMITIVEID].ioIndexMask != 0);
     pStatesPgmer->pHints->shader2PaOutputCount = dsOutputCount - soOnlyOutputCount - dummyOutputCount;
-    pStatesPgmer->pHints->memoryAccessFlags[gcvPROGRAM_STAGE_TES] = (gceMEMORY_ACCESS_FLAG)pDsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
+    pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_TES] = (gceMEMORY_ACCESS_FLAG)pDsSEP->exeHints.nativeHints.globalStates.memoryAccessHint;
+    pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_TES] = (gceMEMORY_ACCESS_FLAG)pDsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
     pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_TES] = pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
-    pStatesPgmer->pHints->unifiedStatus.samplerGPipeStart -= pDsSEP->samplerMapping.hwSamplerRegCount;
 
-    if (pShHwInfo->hwProgrammingHints.hwSamplerFetchMode == HW_SAMPLER_FETCH_MODE_UNIFIED_REG_FILE)
-    {
-        pStatesPgmer->pHints->unifiedStatus.sampler = gcvTRUE;
-    }
+    _ProgramSamplerCountInfo(pShHwInfo, pStatesPgmer, gcvTRUE);
 
     if (pStatesPgmer->pHints->prePaShaderHasPointSize)
     {
@@ -2771,7 +3076,7 @@ static VSC_ErrCode _ProgramDS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
  ~0U : (~(~0U << ((1 ?
  5:0) - (0 ?
  5:0) + 1))))))) << (0 ?
- 5:0))) | (((gctUINT32) ((gctUINT32) (pShHwInfo->hwProgrammingHints.uscSizeInKbyte + 1) & ((gctUINT32) ((((1 ?
+ 5:0))) | (((gctUINT32) ((gctUINT32) (maxUscSize) & ((gctUINT32) ((((1 ?
  5:0) - (0 ?
  5:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0))) |
@@ -2799,6 +3104,16 @@ static VSC_ErrCode _ProgramDS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
 
     /* Program USC extra registers */
     state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 13:8) - (0 ?
+ 13:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 13:8) - (0 ?
+ 13:8) + 1))))))) << (0 ?
+ 13:8))) | (((gctUINT32) ((gctUINT32) (minUscSize) & ((gctUINT32) ((((1 ?
+ 13:8) - (0 ?
+ 13:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 13:8) - (0 ? 13:8) + 1))))))) << (0 ? 13:8))) |
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  7:0) - (0 ?
  7:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2900,6 +3215,9 @@ static VSC_ErrCode _ProgramGsInsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PR
     VSC_LOAD_HW_STATE(0x0443, startPC);
     VSC_LOAD_HW_STATE(0x0444, endPC);
 
+    /*!!! Must be RIGHT before instruction state programming */
+    _SetPatchOffsets(pStatesPgmer, _VSC_PATCH_OFFSET_INSTR, gceSGSK_GEOMETRY_SHADER);
+
     /* Program where to fetch from vid-mem */
     VSC_LOAD_HW_STATE(0x0445, vidMemAddrOfCode);
 
@@ -2938,8 +3256,20 @@ OnError:
 
 static gctUINT _GetGsStartConstRegAddr(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
 {
-    return pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.gsConstRegAddrBase +
-           pShHwInfo->hwProgrammingHints.hwConstantRegAddrOffset * CHANNEL_NUM;
+    gctUINT constRegBaseAddr;
+
+    if (pShHwInfo->pSEP->exeHints.derivedHints.globalStates.unifiedConstRegAllocStrategy == UNIFIED_RF_ALLOC_STRATEGY_UNIFIED)
+    {
+        constRegBaseAddr = pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.vsConstRegAddrBase;
+    }
+    else
+    {
+        constRegBaseAddr = pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.gsConstRegAddrBase;
+    }
+
+    constRegBaseAddr += pShHwInfo->hwProgrammingHints.hwConstantRegAddrOffset * CHANNEL_NUM;
+
+    return constRegBaseAddr;
 }
 
 static VSC_ErrCode _ProgramGsCompileTimeConsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
@@ -2958,7 +3288,8 @@ static VSC_ErrCode _ProgramGsCompileTimeConsts(SHADER_HW_INFO* pShHwInfo, VSC_CH
 
     startConstRegAddr = _GetGsStartConstRegAddr(pShHwInfo, pStatesPgmer);
 
-    pStatesPgmer->pHints->unifiedStatus.constGPipeEnd += pShHwInfo->pSEP->constantMapping.hwConstRegCount;
+    _ProgramConstCountInfo(pShHwInfo, pStatesPgmer, gcvTRUE);
+
     pStatesPgmer->pHints->hwConstRegBases[gcvPROGRAM_STAGE_GEOMETRY] = startConstRegAddr * 4;
     pStatesPgmer->pHints->constRegNoBase[gcvPROGRAM_STAGE_GEOMETRY] = pShHwInfo->hwProgrammingHints.hwConstantRegAddrOffset;
 
@@ -2983,6 +3314,8 @@ static VSC_ErrCode _ProgramGsGprSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES
     ON_ERROR(errCode, "Alloc vid-mem for gpr spill");
 
     pStatesPgmer->pHints->shaderVidNodes.gprSpillVidmemNode[gceSGSK_GEOMETRY_SHADER] = gprSpillVidmemNode;
+
+    _SetPatchOffsets(pStatesPgmer, _VSC_PATCH_OFFSET_GPRSPILL, gceSGSK_GEOMETRY_SHADER);
 
     errCode = _ProgramGprSpillMemAddr(pGsSEP,
                                       _GetGsStartConstRegAddr(pShHwInfo, pStatesPgmer),
@@ -3009,6 +3342,8 @@ static VSC_ErrCode _ProgramGsCrSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_
     if (vidMemAddrOfSpillMem != NOT_ASSIGNED)
     {
         pStatesPgmer->pHints->shaderVidNodes.crSpillVidmemNode[gceSGSK_GEOMETRY_SHADER] = crSpillVidmemNode;
+
+        _SetPatchOffsets(pStatesPgmer, _VSC_PATCH_OFFSET_CRSPILL, gceSGSK_GEOMETRY_SHADER);
 
         errCode = _ProgramCrSpillMemAddr(pGsSEP,
                                          _GetGsStartConstRegAddr(pShHwInfo, pStatesPgmer),
@@ -3078,6 +3413,7 @@ static VSC_ErrCode _ProgramGS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     gctBOOL                    bNeedMetaDataForSO = gcvFALSE;
     gctUINT                    startRemapHwReg, gsOutputSizePerThread;
     gctUINT                    maxThreadsPerHwTG, hwTGSize, gsOutputAttrCount;
+    gctUINT                    minUscSize, maxUscSize, extraUscSize;
 #if PROGRAMING_OUTPUTS_ON_COMPONENT_GRANULARITY
     gctUINT                    gsOutputCompCount = 0;
 #endif
@@ -3220,17 +3556,17 @@ static VSC_ErrCode _ProgramGS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     hwTGSize = maxThreadsPerHwTG * gsOutputSizePerThread + pShHwInfo->hwProgrammingHints.gsMetaDataSizePerHwTGInBtye;
     hwTGSize = VSC_UTILS_ALIGN(hwTGSize, 16);
 
+    _GetMinMaxUscSize(pShHwInfo, pStatesPgmer, &minUscSize, &maxUscSize, &extraUscSize);
+
+    pStatesPgmer->pHints->extraUscPages += extraUscSize;
     pStatesPgmer->pHints->prePaShaderHasPointSize = (pGsSEP->outputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_POINTSIZE].ioIndexMask != 0);
     pStatesPgmer->pHints->prePaShaderHasPrimitiveId = (pGsSEP->outputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_PRIMITIVEID].ioIndexMask != 0);
     pStatesPgmer->pHints->shader2PaOutputCount = gsOutputCount - soOnlyOutputCount - dummyOutputCount;
-    pStatesPgmer->pHints->memoryAccessFlags[gcvPROGRAM_STAGE_GEOMETRY] = (gceMEMORY_ACCESS_FLAG)pGsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
+    pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_GEOMETRY] = (gceMEMORY_ACCESS_FLAG)pGsSEP->exeHints.nativeHints.globalStates.memoryAccessHint;
+    pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_GEOMETRY] = (gceMEMORY_ACCESS_FLAG)pGsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
     pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_GEOMETRY] = pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
-    pStatesPgmer->pHints->unifiedStatus.samplerGPipeStart -= pGsSEP->samplerMapping.hwSamplerRegCount;
 
-    if (pShHwInfo->hwProgrammingHints.hwSamplerFetchMode == HW_SAMPLER_FETCH_MODE_UNIFIED_REG_FILE)
-    {
-        pStatesPgmer->pHints->unifiedStatus.sampler = gcvTRUE;
-    }
+    _ProgramSamplerCountInfo(pShHwInfo, pStatesPgmer, gcvTRUE);
 
     if (pStatesPgmer->pHints->prePaShaderHasPointSize)
     {
@@ -3484,10 +3820,20 @@ static VSC_ErrCode _ProgramGS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
  ~0U : (~(~0U << ((1 ?
  5:0) - (0 ?
  5:0) + 1))))))) << (0 ?
- 5:0))) | (((gctUINT32) ((gctUINT32) (pShHwInfo->hwProgrammingHints.uscSizeInKbyte + 1) & ((gctUINT32) ((((1 ?
+ 5:0))) | (((gctUINT32) ((gctUINT32) (maxUscSize) & ((gctUINT32) ((((1 ?
  5:0) - (0 ?
  5:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0))) |
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:21) - (0 ?
+ 26:21) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 26:21) - (0 ?
+ 26:21) + 1))))))) << (0 ?
+ 26:21))) | (((gctUINT32) ((gctUINT32) (minUscSize) & ((gctUINT32) ((((1 ?
+ 26:21) - (0 ?
+ 26:21) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 26:21) - (0 ? 26:21) + 1))))))) << (0 ? 26:21))) |
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:8) - (0 ?
  15:8) + 1) == 32) ?
@@ -3709,6 +4055,8 @@ static VSC_ErrCode _ProgramPsInsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PR
             endPC = pPsSEP->endPCOfMainRoutine;
             VSC_LOAD_HW_STATE(0x0220, endPC);
         }
+        /* !!! Must be RIGHT before instruction state programming */
+        _SetPatchOffsets(pStatesPgmer, _VSC_PATCH_OFFSET_INSTR, gceSGSK_FRAGMENT_SHADER);
 
         /* Program where to fetch from vid-mem */
         VSC_LOAD_HW_STATE(0x040A, vidMemAddrOfCode);
@@ -4100,8 +4448,20 @@ OnError:
 
 static gctUINT _GetPsStartConstRegAddr(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
 {
-    return pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.psConstRegAddrBase +
-           pShHwInfo->hwProgrammingHints.hwConstantRegAddrOffset * CHANNEL_NUM;
+    gctUINT constRegBaseAddr;
+
+    if (pShHwInfo->pSEP->exeHints.derivedHints.globalStates.unifiedConstRegAllocStrategy == UNIFIED_RF_ALLOC_STRATEGY_UNIFIED)
+    {
+        constRegBaseAddr = pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.vsConstRegAddrBase;
+    }
+    else
+    {
+        constRegBaseAddr = pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.psConstRegAddrBase;
+    }
+
+    constRegBaseAddr += pShHwInfo->hwProgrammingHints.hwConstantRegAddrOffset * CHANNEL_NUM;
+
+    return constRegBaseAddr;
 }
 
 static VSC_ErrCode _ProgramPsCompileTimeConsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
@@ -4112,8 +4472,16 @@ static VSC_ErrCode _ProgramPsCompileTimeConsts(SHADER_HW_INFO* pShHwInfo, VSC_CH
     if (pShHwInfo->hwProgrammingHints.hwConstantFetchMode == HW_CONSTANT_FETCH_MODE_UNIFIED_REG_FILE)
     {
         gcmASSERT(pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.maxHwNativeTotalConstRegCount > 256);
+
+        if (pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.smallBatch)
+        {
+            gcmASSERT(pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.psConstRegAddrBase == 0xD000);
+        }
+        else
+        {
         gcmASSERT((pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.psConstRegAddrBase == 0xC000) ||
                   (pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.psConstRegAddrBase == 0xD800));
+        }
 
         state = pShHwInfo->hwProgrammingHints.hwConstantRegAddrOffset;
         VSC_LOAD_HW_STATE(0x0409, state);
@@ -4136,8 +4504,10 @@ static VSC_ErrCode _ProgramPsCompileTimeConsts(SHADER_HW_INFO* pShHwInfo, VSC_CH
 
     startConstRegAddr = _GetPsStartConstRegAddr(pShHwInfo, pStatesPgmer);
 
-    pStatesPgmer->pHints->unifiedStatus.constPSStart = pShHwInfo->hwProgrammingHints.hwConstantRegAddrOffset;
+    _ProgramConstCountInfo(pShHwInfo, pStatesPgmer, gcvFALSE);
+
     pStatesPgmer->pHints->hwConstRegBases[gcvPROGRAM_STAGE_COMPUTE] =
+    pStatesPgmer->pHints->hwConstRegBases[gcvPROGRAM_STAGE_OPENCL] =
     pStatesPgmer->pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] = startConstRegAddr * 4;
     pStatesPgmer->pHints->constRegNoBase[gcvPROGRAM_STAGE_FRAGMENT] = pShHwInfo->hwProgrammingHints.hwConstantRegAddrOffset;
 
@@ -4162,6 +4532,8 @@ static VSC_ErrCode _ProgramPsGprSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES
     ON_ERROR(errCode, "Alloc vid-mem for gpr spill");
 
     pStatesPgmer->pHints->shaderVidNodes.gprSpillVidmemNode[gceSGSK_FRAGMENT_SHADER] = gprSpillVidmemNode;
+
+    _SetPatchOffsets(pStatesPgmer, _VSC_PATCH_OFFSET_GPRSPILL, gceSGSK_FRAGMENT_SHADER);
 
     errCode = _ProgramGprSpillMemAddr(pPsSEP,
                                       _GetPsStartConstRegAddr(pShHwInfo, pStatesPgmer),
@@ -4188,6 +4560,8 @@ static VSC_ErrCode _ProgramPsCrSpill(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_
     if (vidMemAddrOfSpillMem != NOT_ASSIGNED)
     {
         pStatesPgmer->pHints->shaderVidNodes.crSpillVidmemNode[gceSGSK_FRAGMENT_SHADER] = crSpillVidmemNode;
+
+        _SetPatchOffsets(pStatesPgmer, _VSC_PATCH_OFFSET_CRSPILL, gceSGSK_FRAGMENT_SHADER);
 
         errCode = _ProgramCrSpillMemAddr(pPsSEP,
                                          _GetPsStartConstRegAddr(pShHwInfo, pStatesPgmer),
@@ -4273,10 +4647,10 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     gctUINT                    psColorOutputState = 0, psColorOutputCtrlState = 0;
     gctUINT                    psColorOutputPrecisionState = 0, psExtColorOutputPrecisionState = 0;
     gctUINT                    validChannelCount, psInputComponnentCount = 0;
-    gctUINT                    componentType[MAX_HW_IO_COUNT * CHANNEL_NUM];
-    gctUINT                    psInputType[MAX_HW_IO_COUNT * CHANNEL_NUM];
-    gctUINT                    interpolationType[MAX_HW_IO_COUNT * CHANNEL_NUM];
-    gctUINT                    interpolationLoc[MAX_HW_IO_COUNT * CHANNEL_NUM];
+    gctCHAR                    componentType[MAX_HW_IO_COUNT * CHANNEL_NUM];
+    gctCHAR                    psInputType[MAX_HW_IO_COUNT * CHANNEL_NUM];
+    gctCHAR                    interpolationType[MAX_HW_IO_COUNT * CHANNEL_NUM];
+    gctCHAR                    interpolationLoc[MAX_HW_IO_COUNT * CHANNEL_NUM];
     gctUINT                    varyingPacking[MAX_HW_IO_COUNT];
     gctUINT                    lastValidInputIndex = NOT_ASSIGNED;
     gctBOOL                    bHalfAttribute = gcvFALSE, bForceSampleFreq = gcvFALSE;
@@ -4299,14 +4673,14 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
 #endif
 
     memset(&componentType[0], 0 /*0x0*/,
-           sizeof(gctUINT)*MAX_HW_IO_COUNT * CHANNEL_NUM);
+           sizeof(gctCHAR)*MAX_HW_IO_COUNT * CHANNEL_NUM);
     memset(&interpolationLoc[0], 0 /*0x0*/,
-           sizeof(gctUINT)*MAX_HW_IO_COUNT * CHANNEL_NUM);
+           sizeof(gctCHAR)*MAX_HW_IO_COUNT * CHANNEL_NUM);
     memset(&interpolationType[0], 0 /*0x0*/,
-           sizeof(gctUINT)*MAX_HW_IO_COUNT * CHANNEL_NUM);
+           sizeof(gctCHAR)*MAX_HW_IO_COUNT * CHANNEL_NUM);
     memset(&varyingPacking[0], 0, sizeof(gctUINT)*MAX_HW_IO_COUNT);
     memset(&psInputType[0], 0 /*0x0*/,
-           sizeof(gctUINT)*MAX_HW_IO_COUNT * CHANNEL_NUM);
+           sizeof(gctCHAR)*MAX_HW_IO_COUNT * CHANNEL_NUM);
 
     for (i = 0; i < MAX_HW_PS_COLOR_OUTPUTS; ++i)
     {
@@ -4314,6 +4688,15 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     }
 
     bForceSampleFreq = pPsSEP->exeHints.derivedHints.prvStates.ps.bExecuteOnSampleFreq;
+
+#if gcdDUMP
+    if (!pPsSEP->inputMapping.ioVtxPxl.countOfIoRegMapping &&
+        !pPsSEP->outputMapping.ioVtxPxl.countOfIoRegMapping)
+    {
+        pPsSEP->exeHints.derivedHints.globalStates.bExecuteOnDual16 = 0;
+    }
+
+#endif
 
     /* Input */
     for (ioIdx = 0; ioIdx < pPsSEP->inputMapping.ioVtxPxl.countOfIoRegMapping; ioIdx ++)
@@ -4465,8 +4848,8 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
                     }
                 }
 
-                interpolationType[psInputComponnentCount] = _GetPSInputChannelInterpolationType(pPsSEP, pThisIoChannelMapping);
-                interpolationLoc[psInputComponnentCount] = _GetPSInputChannelInterpolationLoc(pPsSEP, pThisIoChannelMapping,
+                interpolationType[psInputComponnentCount] = (gctCHAR)_GetPSInputChannelInterpolationType(pPsSEP, pThisIoChannelMapping);
+                interpolationLoc[psInputComponnentCount] = (gctCHAR)_GetPSInputChannelInterpolationLoc(pPsSEP, pThisIoChannelMapping,
                                                                                               bForceSampleFreq);
                 bHasCentroidInput = pThisIoChannelMapping->flag.bCentroidInterpolate;
 
@@ -4533,6 +4916,20 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
             /* Ok, increase count */
             psInputCount ++;
         }
+    }
+
+    if (!pPsSEP->outputMapping.ioVtxPxl.countOfIoRegMapping)
+    {
+        psColorOutputPrecisionState = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 6:6) - (0 ?
+ 6:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 6:6) - (0 ?
+ 6:6) + 1))))))) << (0 ?
+ 6:6))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 6:6) - (0 ?
+ 6:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ? 6:6)));
     }
 
     /* Output */
@@ -4844,18 +5241,11 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     }
 
     pStatesPgmer->pHints->psHasDiscard = pStatesPgmer->pHints->hasKill = pPsSEP->exeHints.derivedHints.prvStates.ps.bPxlDiscard;
-    pStatesPgmer->pHints->memoryAccessFlags[gcvPROGRAM_STAGE_FRAGMENT] = (gceMEMORY_ACCESS_FLAG)pPsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
+    pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_FRAGMENT] = (gceMEMORY_ACCESS_FLAG)pPsSEP->exeHints.nativeHints.globalStates.memoryAccessHint;
+    pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_FRAGMENT] = (gceMEMORY_ACCESS_FLAG)pPsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
     pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_FRAGMENT] = pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
 
-    if (pShHwInfo->hwProgrammingHints.hwSamplerFetchMode == HW_SAMPLER_FETCH_MODE_UNIFIED_REG_FILE)
-    {
-        pStatesPgmer->pHints->unifiedStatus.sampler = gcvTRUE;
-    }
-
-    if (pShHwInfo->pSEP->samplerMapping.hwSamplerRegCount != 0)
-    {
-        pStatesPgmer->pHints->unifiedStatus.samplerPSEnd = pShHwInfo->pSEP->samplerMapping.hwSamplerRegCount - 1;
-    }
+    _ProgramSamplerCountInfo(pShHwInfo, pStatesPgmer, gcvFALSE);
 
     pStatesPgmer->pHints->elementCount = psInputCount;
     pStatesPgmer->pHints->componentCount = gcmALIGN(psInputComponnentCount, 2);
@@ -4870,7 +5260,7 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
                                           (pPsSEP->inputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_SAMPLE_POSITION].ioIndexMask != 0) ||
                                           (pPsSEP->exeHints.derivedHints.prvStates.ps.inputPosChannelValid & (1 << CHANNEL_Y)) ||
                                           (pPsSEP->exeHints.derivedHints.prvStates.ps.inputPntCoordChannelValid & (1 << CHANNEL_Y)) ||
-                                          pPsSEP->exeHints.derivedHints.prvStates.ps.bDerivRTy);
+                                          (pPsSEP->exeHints.derivedHints.prvStates.ps.bDsyBeforeLowering));
 
     pStatesPgmer->pHints->hasCentroidInput = bHasCentroidInput;
     pStatesPgmer->pHints->useEarlyFragmentTest = pPsSEP->exeHints.nativeHints.prvStates.ps.bEarlyPixelTestInRa;
@@ -4968,7 +5358,17 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
  1:1))) | (((gctUINT32) ((gctUINT32) (bHalfAttribute) & ((gctUINT32) ((((1 ?
  1:1) - (0 ?
  1:1) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1)));
+ ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1))) |
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 9:4) - (0 ?
+ 9:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 9:4) - (0 ?
+ 9:4) + 1))))))) << (0 ?
+ 9:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 9:4) - (0 ?
+ 9:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 9:4) - (0 ? 9:4) + 1))))))) << (0 ? 9:4)));
     VSC_LOAD_HW_STATE(0x0380, state);
 
     /* Program color output */
@@ -6721,19 +7121,6 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
         }
     }
 
-    /* Program used GPR count */
-    state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:0) - (0 ?
- 6:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 6:0) - (0 ?
- 6:0) + 1))))))) << (0 ?
- 6:0))) | (((gctUINT32) ((gctUINT32) (calibratedGprCount) & ((gctUINT32) ((((1 ?
- 6:0) - (0 ?
- 6:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ? 6:0)));
-    VSC_LOAD_HW_STATE(0x0403, state);
-
     /* Program sampler-related. */
     if (pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasSamplerBaseOffset)
     {
@@ -6792,7 +7179,7 @@ static VSC_ErrCode _AllocVidMemForSharedMemory(VSC_CHIP_STATES_PROGRAMMER* pStat
 
     for (i = 0; i < pGpsSEP->staticPrivMapping.privUavMapping.countOfEntries; i ++)
     {
-        if (pGpsSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].commonPrivm.privmFlag == SHS_PRIV_MEM_FLAG_SHARED_MEMORY)
+        if (pGpsSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].commonPrivm.privmKind == SHS_PRIV_MEM_KIND_SHARED_MEMORY)
         {
             gcmASSERT(pGpsSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].memData.ppCnstSubArray == gcvNULL);
             gcmASSERT(pGpsSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].memData.ppCTC == gcvNULL);
@@ -6846,7 +7233,7 @@ static VSC_ErrCode _ProgramSharedMemAddr(SHADER_EXECUTABLE_PROFILE* pGpsSEP,
 
     for (i = 0; i < pGpsSEP->staticPrivMapping.privUavMapping.countOfEntries; i ++)
     {
-        if (pGpsSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].commonPrivm.privmFlag == SHS_PRIV_MEM_FLAG_SHARED_MEMORY)
+        if (pGpsSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].commonPrivm.privmKind == SHS_PRIV_MEM_KIND_SHARED_MEMORY)
         {
             gcmASSERT(pGpsSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].memData.ppCnstSubArray == gcvNULL);
             gcmASSERT(pGpsSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].memData.ppCTC == gcvNULL);
@@ -6868,7 +7255,7 @@ static VSC_ErrCode _ProgramSharedMemAddr(SHADER_EXECUTABLE_PROFILE* pGpsSEP,
         gctUINT upperLimit;
         /* must at start with x and at least .x.y.z channels are allocated */
         gcmASSERT((pConstHwLocMapping->validHWChannelMask & 0x07) == 0x07);
-        regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.hwRegNo * CHANNEL_NUM);
+        regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.constReg.hwRegNo * CHANNEL_NUM);
         VSC_LOAD_HW_STATE(regAddr, sharedMemAddr);
 
         regAddr += 1;  /* .y lower limit */
@@ -6884,7 +7271,7 @@ static VSC_ErrCode _ProgramSharedMemAddr(SHADER_EXECUTABLE_PROFILE* pGpsSEP,
         {
             if (pConstHwLocMapping->validHWChannelMask & (1 << channel))
             {
-                regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.hwRegNo * CHANNEL_NUM) + channel;
+                regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.constReg.hwRegNo * CHANNEL_NUM) + channel;
                 VSC_LOAD_HW_STATE(regAddr, sharedMemAddr);
             }
         }
@@ -6906,6 +7293,8 @@ static VSC_ErrCode _ProgramGpsSharedMemory(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_S
     ON_ERROR(errCode, "Alloc vid-mem for shared memory");
 
     pStatesPgmer->pHints->shaderVidNodes.sharedMemVidMemNode = sharedVidmemNode;
+
+    _SetPatchOffsets(pStatesPgmer, _VSC_PATCH_OFFSET_SHAREMEM, 0);
 
     errCode = _ProgramSharedMemAddr(pGpsSEP,
                                     threadWalkInPs ?
@@ -7028,33 +7417,26 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
     pStatesPgmer->pHints->workGrpSize.z = pGpsSEP->exeHints.nativeHints.prvStates.gps.threadGrpDimZ;
     pStatesPgmer->pHints->threadGroupSync = pGpsSEP->exeHints.derivedHints.prvStates.gps.bThreadGroupSync;
 
-    if (pShHwInfo->hwProgrammingHints.hwSamplerFetchMode == HW_SAMPLER_FETCH_MODE_UNIFIED_REG_FILE)
-    {
-        pStatesPgmer->pHints->unifiedStatus.sampler = gcvTRUE;
-    }
-
-    if (pShHwInfo->pSEP->samplerMapping.hwSamplerRegCount != 0)
-    {
-        pStatesPgmer->pHints->unifiedStatus.samplerPSEnd = pShHwInfo->pSEP->samplerMapping.hwSamplerRegCount - 1;
-    }
+    _ProgramSamplerCountInfo(pShHwInfo, pStatesPgmer, gcvFALSE);
 
     if (DECODE_SHADER_CLIENT(pGpsSEP->shVersionType) == SHADER_CLIENT_CL)
     {
-        pStatesPgmer->pHints->memoryAccessFlags[gcvPROGRAM_STAGE_OPENCL] =
+        pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_OPENCL] =
+                               (gceMEMORY_ACCESS_FLAG)pGpsSEP->exeHints.nativeHints.globalStates.memoryAccessHint;
+        pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_OPENCL] =
                                (gceMEMORY_ACCESS_FLAG)pGpsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
         pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_OPENCL] =
                                pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
     }
     else
     {
-        pStatesPgmer->pHints->memoryAccessFlags[gcvPROGRAM_STAGE_COMPUTE] =
+        pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_COMPUTE] =
+                               (gceMEMORY_ACCESS_FLAG)pGpsSEP->exeHints.nativeHints.globalStates.memoryAccessHint;
+        pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_COMPUTE] =
                                (gceMEMORY_ACCESS_FLAG)pGpsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
         pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_COMPUTE] =
                                pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
     }
-
-    /* Save local memory size. */
-    pStatesPgmer->pHints->localMemSizeInByte = pGpsSEP->exeHints.nativeHints.prvStates.gps.shareMemSizePerThreadGrpInByte;
 
     /* Save the concurrent workThreadCount. */
     pStatesPgmer->pHints->workThreadCount = (gctUINT16)pGpsSEP->exeHints.nativeHints.prvStates.gps.currWorkThreadNum;
@@ -7110,18 +7492,35 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
             VSC_LOAD_HW_STATE(0x0E0D, state);
         }
 
-        /* Program used GPR count */
-        state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        /* Program PSCS_THROTTLE reg. */
+        if (pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportPSCSThrottle)
+        {
+            state = 0;
+            state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  6:0) - (0 ?
  6:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
  6:0) - (0 ?
  6:0) + 1))))))) << (0 ?
- 6:0))) | (((gctUINT32) ((gctUINT32) (calibratedGprCount) & ((gctUINT32) ((((1 ?
+ 6:0))) | (((gctUINT32) ((gctUINT32) ((pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.maxLocalMemSizeInByte >> 10)) & ((gctUINT32) ((((1 ?
  6:0) - (0 ?
  6:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ? 6:0)));
-        VSC_LOAD_HW_STATE(0x0403, state);
+            if (pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportHWManagedLS)
+            {
+                state |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:8) - (0 ?
+ 15:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:8) - (0 ?
+ 15:8) + 1))))))) << (0 ?
+ 15:8))) | (((gctUINT32) ((gctUINT32) (pGpsSEP->exeHints.nativeHints.prvStates.gps.workGroupNumPerShaderGroup) & ((gctUINT32) ((((1 ?
+ 15:8) - (0 ?
+ 15:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:8) - (0 ? 15:8) + 1))))))) << (0 ? 15:8)));
+            }
+            VSC_LOAD_HW_STATE(0x0427, state);
+        }
 
         /* Program sampler-related. */
         if (pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasSamplerBaseOffset)
@@ -7150,20 +7549,24 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
         /* Program gpr spill */
         if (pGpsSEP->exeHints.derivedHints.globalStates.bGprSpilled)
         {
-            errCode = _ProgramPsGprSpill(pShHwInfo, pStatesPgmer);
-            ON_ERROR(errCode, "Program GP grp spill");
+            /* Do not program the reg spill memory when multi-GPU is enabled, let driver programs it. */
+            if (!pGpsSEP->exeHints.derivedHints.globalStates.bEnableMultiGPU)
+            {
+                errCode = _ProgramPsGprSpill(pShHwInfo, pStatesPgmer);
+                ON_ERROR(errCode, "Program GP grp spill");
+            }
         }
 
         /* Program cr spill */
         if (pGpsSEP->exeHints.derivedHints.globalStates.bCrSpilled)
         {
-            if (DECODE_SHADER_CLIENT(pGpsSEP->shVersionType) == SHADER_CLIENT_VK)
+            if (DECODE_SHADER_CLIENT(pGpsSEP->shVersionType) == SHADER_CLIENT_VK ||
+                DECODE_SHADER_CLIENT(pGpsSEP->shVersionType) == SHADER_CLIENT_CL)
             {
                 errCode = _ProgramPsCrSpill(pShHwInfo, pStatesPgmer);
                 ON_ERROR(errCode, "Program GP cr spill");
             }
         }
-
     }
     else
     {
@@ -7217,18 +7620,38 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
         /* Program gpr spill */
         if (pGpsSEP->exeHints.derivedHints.globalStates.bGprSpilled)
         {
-            errCode = _ProgramVsGprSpill(pShHwInfo, pStatesPgmer);
-            ON_ERROR(errCode, "Program GP grp spill");
+            /* Do not program the reg spill memory when multi-GPU is enabled, let driver programs it. */
+            if (!pGpsSEP->exeHints.derivedHints.globalStates.bEnableMultiGPU)
+            {
+                errCode = _ProgramVsGprSpill(pShHwInfo, pStatesPgmer);
+                ON_ERROR(errCode, "Program GP grp spill");
+            }
         }
     }
 
-    /* Program simulated shared (local) memory */
-    if (pGpsSEP->exeHints.nativeHints.prvStates.gps.shareMemSizePerThreadGrpInByte > 0)
+    if (pGpsSEP->exeHints.derivedHints.prvStates.gps.bUseLocalMemory)
     {
-        if (DECODE_SHADER_CLIENT(pGpsSEP->shVersionType) == SHADER_CLIENT_VK)
+        /* Save local memory size. */
+        pStatesPgmer->pHints->localMemSizeInByte = pGpsSEP->exeHints.nativeHints.prvStates.gps.shareMemSizePerThreadGrpInByte;
+    }
+    /* Program simulated shared (local) memory */
+    else if (pGpsSEP->exeHints.nativeHints.prvStates.gps.shareMemSizePerThreadGrpInByte > 0)
+    {
+        if (DECODE_SHADER_CLIENT(pGpsSEP->shVersionType) == SHADER_CLIENT_VK ||
+            DECODE_SHADER_CLIENT(pGpsSEP->shVersionType) == SHADER_CLIENT_CL)
         {
-            errCode = _ProgramGpsSharedMemory(pShHwInfo, pStatesPgmer);
-            ON_ERROR(errCode, "Program GP shared memory");
+             /* Do not program the shared memory when multi-GPU is enabled, let driver programs it. */
+            if (pGpsSEP->exeHints.derivedHints.globalStates.bEnableMultiGPU)
+            {
+                gcmASSERT(DECODE_SHADER_CLIENT(pGpsSEP->shVersionType) == SHADER_CLIENT_CL);
+            }
+            else
+            {
+                errCode = _ProgramGpsSharedMemory(pShHwInfo, pStatesPgmer);
+                ON_ERROR(errCode, "Program GP shared memory");
+
+                pStatesPgmer->pHints->sharedMemAllocByCompiler = gcvTRUE;
+            }
         }
     }
 
@@ -7294,6 +7717,7 @@ VSC_ErrCode vscProgramShaderStates(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PR
         break;
     }
 
+    /* Set instruction fetch mode. */
     if (pShHwInfo->hwProgrammingHints.hwInstFetchMode == HW_INST_FETCH_MODE_UNIFIED_BUFFER_0 ||
         pShHwInfo->hwProgrammingHints.hwInstFetchMode == HW_INST_FETCH_MODE_UNIFIED_BUFFER_1)
     {
@@ -7305,11 +7729,13 @@ VSC_ErrCode vscProgramShaderStates(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PR
         pStatesPgmer->pHints->unifiedStatus.useIcache = gcvTRUE;
     }
 
-    if (pShHwInfo->hwProgrammingHints.hwConstantFetchMode == HW_CONSTANT_FETCH_MODE_UNIFIED_REG_FILE)
-    {
-        pStatesPgmer->pHints->unifiedStatus.constant = gcvTRUE;
-        pStatesPgmer->pHints->maxConstCount = pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.maxHwNativeTotalConstRegCount;
-    }
+    /* Set constant reg fetch mode. */
+    pStatesPgmer->pHints->unifiedStatus.constantUnifiedMode = (gceUNIFOEM_ALLOC_MODE)
+        pShHwInfo->pSEP->exeHints.derivedHints.globalStates.unifiedConstRegAllocStrategy;
+
+    /* Set sampler fetch mode. */
+    pStatesPgmer->pHints->unifiedStatus.samplerUnifiedMode = (gceUNIFOEM_ALLOC_MODE)
+        pShHwInfo->pSEP->exeHints.derivedHints.globalStates.unifiedSamplerRegAllocStrategy;
 
 OnError:
     return errCode;

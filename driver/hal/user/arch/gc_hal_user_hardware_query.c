@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -65,13 +65,6 @@ static const gceTEXTURE_SWIZZLE baseComponents_rg00[] =
     gcvTEXTURE_SWIZZLE_0
 };
 
-static const gceTEXTURE_SWIZZLE baseComponents_000a[] =
-{
-    gcvTEXTURE_SWIZZLE_0,
-    gcvTEXTURE_SWIZZLE_0,
-    gcvTEXTURE_SWIZZLE_0,
-    gcvTEXTURE_SWIZZLE_A
-};
 
 static const gceTEXTURE_SWIZZLE baseComponents_000r[] =
 {
@@ -1032,6 +1025,24 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_ANV16, 0x25 << 12, baseComponents_rgba, gcvTRUE
     },
+
+    {
+        gcmNameFormat(AUYVY), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 32, 1, 1, 32,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
+        {{{ 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}, {0}}},
+        {{{ 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_AUYVY, 0x25 << 12, baseComponents_rgba, gcvTRUE
+    },
+
+    {
+        gcmNameFormat(YV16), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 16, 2, 1, 32,
+        1, 0, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
+        {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
+        {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvINVALID_TEXTURE_FORMAT, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
 #endif
 };
 
@@ -1219,15 +1230,6 @@ static struct _gcsSURF_FORMAT_INFO formatAlpha[] =
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8, gcmINVALID_TEXTURE_FORMAT_ENTRY
-    },
-
-    {
-        gcmNameFormat(A8_1_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
-        1, 1, 0, gcvFALSE, gcvENDIAN_NO_SWAP,
-        {{{ 24, 8 }, { 16, 8 | gcvCOMPONENT_DONTCARE }, { 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 | gcvCOMPONENT_DONTCARE }, {0}, {0}}},
-        {{{ 24, 8 }, { 16, 8 | gcvCOMPONENT_DONTCARE }, { 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 | gcvCOMPONENT_DONTCARE }, {0}, {0}}},
-        gcvSURF_A8_1_A8R8G8B8, 0x06, baseComponents_rgba,
-        gcvSURF_A8_1_A8R8G8B8, 0x07, baseComponents_000a, gcvTRUE
     },
 };
 
@@ -3392,7 +3394,7 @@ gcoHARDWARE_InitializeFormatArrayTable(
     }
 
     /* SNORM TEXTURE formats. */
-    if (Hardware->features[gcvFEATURE_HALTI1])
+    if (Hardware->features[gcvFEATURE_TX_SNORM_SUPPORT])
     {
         info = gcmGET_SURF_FORMAT_INFO(gcvSURF_R8_SNORM);
         info->closestTXFormat     = gcvSURF_R8_SNORM;
@@ -3609,8 +3611,6 @@ gcoHARDWARE_InitializeFormatArrayTable(
 
         /* Multi-layer formats. */
         /* Don't support gcvSURF_X32G32R32F. Doesn't map to GL formats. */
-        info = gcmGET_SURF_FORMAT_INFO(gcvSURF_X32G32R32F);
-
         info = gcmGET_SURF_FORMAT_INFO(gcvSURF_B32G32R32F);
         info->closestRenderFormat =
         info->closestTXFormat     = gcvSURF_X32B32G32R32F_2_G32R32F;
@@ -5051,7 +5051,6 @@ gcoHARDWARE_QueryCommandBuffer(
     OUT gctUINT32 * ReservedHead,
     OUT gctUINT32 * ReservedTail,
     OUT gctUINT32 * ReservedUser,
-    OUT gceCMDBUF_SOURCE * Source,
     OUT gctUINT32 * MGPUModeSwitchBytes
     )
 {
@@ -5096,23 +5095,19 @@ gcoHARDWARE_QueryCommandBuffer(
             }
             else
             {
-                gctUINT i;
-
-                *ReservedTail = 0;
-
-                for (i = 0; i < Hardware->config->gpuCoreCount; i++)
-                {
-                    /* Reserve space for ChipEnable(). */
-                    *ReservedTail += 8;
-
-                    /* Reserve space for Link(). */
-                    *ReservedTail += 8;
-                }
+                /* Reserve space for ChipEnable, Link for each core. */
+                *ReservedTail = (8 + 8) * Hardware->config->gpuCoreCount;
             }
 
             if (Hardware->features[gcvFEATURE_FENCE_64BIT])
             {
                 *ReservedTail += gcdRENDER_FENCE_LENGTH;
+            }
+
+            if (Hardware->features[gcvFEATURE_MCFE])
+            {
+                /* 16 byte alignment for MCFE. */
+                *ReservedTail = gcmALIGN(*ReservedTail, 16);
             }
         }
         else
@@ -5121,17 +5116,14 @@ gcoHARDWARE_QueryCommandBuffer(
         }
     }
 
-    if (Hardware->config->gpuCoreCount > 1)
-    {
-        mGpuModeSwitchBytes = 4 * gcmSIZEOF(gctUINT32);
-
-        gcoHARDWARE_QueryMultiGPUSyncLength(Hardware, &mGpuSyncBytes);
-        gcoHARDWARE_QueryMultiGPUCacheFlushLength(Hardware, &gpuFlushBytes);
-    }
+    mGpuModeSwitchBytes = Hardware->config->gpuCoreCount > 1 ?
+                          4 * gcmSIZEOF(gctUINT32) : 0;
 
     if (ReservedUser != gcvNULL)
     {
-         if (Engine == gcvENGINE_BLT)
+        *ReservedUser = 0;
+
+        if (Engine == gcvENGINE_BLT)
         {
             /* BLT engine will flush within command, so, don't need flush here
                All other semphore/stall/flush/sync command is unknown to Async 3DBLT pipe
@@ -5147,24 +5139,28 @@ gcoHARDWARE_QueryCommandBuffer(
         }
         else
         {
-            *ReservedUser  = (gpuFlushBytes + mGpuSyncBytes);
-
-            if (Hardware->features[gcvFEATURE_FENCE_64BIT])
+            if (Hardware->config->gpuCoreCount > 1)
             {
-                *ReservedUser += (gcdRESERVED_HW_FENCE_64BIT + mGpuModeSwitchBytes);
-            }
-            else if (Hardware->features[gcvFEATURE_FENCE_32BIT])
-            {
-                *ReservedUser += (gcdRESERVED_HW_FENCE_32BIT + mGpuModeSwitchBytes);
+                gcoHARDWARE_QueryMultiGPUSyncLength(Hardware, &mGpuSyncBytes);
+                *ReservedUser += mGpuSyncBytes;
             }
 
-            *ReservedUser += gcdRESERVED_PAUSE_OQ_LENGTH;
-
-            if (Hardware->features[gcvFEATURE_HW_TFB])
+            if (!gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_COMPUTE_ONLY))
             {
-                *ReservedUser += (gcdRESERVED_PAUSE_XFBWRITTEN_QUERY_LENGTH + mGpuModeSwitchBytes);
-                *ReservedUser += (gcdRESERVED_PAUSE_PRIMGEN_QUERY_LENGTH    + mGpuModeSwitchBytes);
-                *ReservedUser += (gcdRESERVED_PAUSE_XFB_LENGTH              + mGpuModeSwitchBytes);
+                if (Hardware->config->gpuCoreCount > 1)
+                {
+                    gcoHARDWARE_QueryMultiGPUCacheFlushLength(Hardware, &gpuFlushBytes);
+                }
+
+                *ReservedUser += gpuFlushBytes;
+                *ReservedUser += gcdRESERVED_PAUSE_OQ_LENGTH;
+
+                if (Hardware->features[gcvFEATURE_HW_TFB])
+                {
+                    *ReservedUser += (gcdRESERVED_PAUSE_XFBWRITTEN_QUERY_LENGTH + mGpuModeSwitchBytes);
+                    *ReservedUser += (gcdRESERVED_PAUSE_PRIMGEN_QUERY_LENGTH    + mGpuModeSwitchBytes);
+                    *ReservedUser += (gcdRESERVED_PAUSE_XFB_LENGTH              + mGpuModeSwitchBytes);
+                }
             }
 
             if (Hardware->features[gcvFEATURE_PROBE])
@@ -5194,18 +5190,16 @@ gcoHARDWARE_QueryCommandBuffer(
                     }
                 }
             }
-        }
-    }
 
-    if (Source != gcvNULL)
-    {
-#if gcdALLOC_CMD_FROM_RESERVE
-        *Source = gcvCMDBUF_RESERVED;
-#elif gcdSECURITY || gcdDISABLE_GPU_VIRTUAL_ADDRESS || !USE_KERNEL_VIRTUAL_BUFFERS || defined(VSIMULATOR_DEBUG)
-        *Source = gcvCMDBUF_CONTIGUOUS;
-#else
-        *Source = gcvCMDBUF_VIRTUAL;
-#endif
+            if (Hardware->features[gcvFEATURE_FENCE_64BIT])
+            {
+                *ReservedUser += (gcdRESERVED_HW_FENCE_64BIT + mGpuModeSwitchBytes);
+            }
+            else if (Hardware->features[gcvFEATURE_FENCE_32BIT])
+            {
+                *ReservedUser += (gcdRESERVED_HW_FENCE_32BIT + mGpuModeSwitchBytes);
+            }
+        }
     }
 
     if (MGPUModeSwitchBytes)
@@ -6889,7 +6883,7 @@ gcoHARDWARE_QuerySamplerBase(
         samplerBase[gcvPROGRAM_STAGE_COMPUTE] =
         samplerBase[gcvPROGRAM_STAGE_OPENCL] = 0;
     }
-    else if (Hardware->features[gcvFEATURE_HALTI1])
+    else if (Hardware->features[gcvFEATURE_HALTI1] || Hardware->config->customerID == 0x103)
     {
         samplerCount[gcvPROGRAM_STAGE_VERTEX] = 16;
         samplerCount[gcvPROGRAM_STAGE_FRAGMENT] = 16;
@@ -7029,39 +7023,6 @@ OnError:
     return status;
 }
 
-
-gceSTATUS
-gcoHARDWARE_IsSwwaNeeded(
-    IN gcoHARDWARE Hardware,
-    IN gceSWWA Swwa
-    )
-{
-    gceSTATUS status;
-
-    gcmHEADER_ARG("Hardware=0x%x Swwa=%d", Hardware, Swwa);
-
-    gcmGETHARDWARE(Hardware);
-
-    /* Verify the arguments. */
-    gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
-
-    if (Swwa < gcvSWWA_COUNT)
-    {
-        status = Hardware->swwas[Swwa]
-            ? gcvSTATUS_TRUE
-            : gcvSTATUS_FALSE;
-    }
-    else
-    {
-        status = gcvSTATUS_INVALID_ARGUMENT;
-    }
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
 /*******************************************************************************
 **
 **  gcoHARDWARE_Is2DAvailable
@@ -7180,6 +7141,47 @@ OnError:
 }
 
 gceSTATUS
+gcoHARDWARE_QueryCluster(
+    IN gcoHARDWARE Hardware,
+    OUT gctINT32  *ClusterMinID,
+    OUT gctINT32  *ClusterMaxID,
+    OUT gctUINT32  *ClusterCount,
+    OUT gctUINT32  *ClusterIDWidth
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Hardware=0x%x ClusterMinID=0x%x ClusterMaxID=0x%x ClusterCount = 0x%x",
+                  Hardware, ClusterMinID, ClusterMaxID, ClusterCount);
+
+    gcmGETHARDWARE(Hardware);
+
+    if (ClusterMinID)
+    {
+        *ClusterMinID = Hardware->config->clusterMinID;
+    }
+
+    if (ClusterMaxID)
+    {
+        *ClusterMaxID = Hardware->config->clusterMaxID;
+    }
+
+    if (ClusterCount)
+    {
+        *ClusterCount = Hardware->config->clusterCount;
+    }
+
+    if (ClusterIDWidth)
+    {
+        *ClusterIDWidth = Hardware->config->clusterIDWidth;
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
 gcoHARDWARE_IsFlatMapped(
     IN gcoHARDWARE Hardware,
     IN gctPHYS_ADDR_T Address
@@ -7196,7 +7198,8 @@ gcoHARDWARE_IsFlatMapped(
     {
         if ((Address >= Hardware->flatMappingRanges[i].start) &&
             (Address < Hardware->flatMappingRanges[i].end) &&
-            (Address != ~0U))
+            (Hardware->flatMappingRanges[i].flag == gcvFLATMAP_DIRECT) &&
+            (Address != ~0ULL))
         {
             status = gcvSTATUS_TRUE;
             break;
@@ -7226,7 +7229,7 @@ gcoHARDWARE_DrawOnOneCore(
 
     for (i = 0; i < gcvPROGRAM_STAGE_LAST; i++)
     {
-        if (hints && (hints->memoryAccessFlags[i] & gceMA_FLAG_WRITE))
+        if (hints && (hints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][i] & gceMA_FLAG_WRITE))
         {
             status = gcvSTATUS_TRUE;
             break;
@@ -7300,9 +7303,7 @@ gcoHARDWARE_QueryMultiGPUSyncLength(
     coreCount = Hardware->config->gpuCoreCount;
     if (Hardware->features[gcvFEATURE_MULTIGPU_SYNC_V3])
     {
-        /* make compiler happy */
-        coreCount = coreCount + 1;
-        *Bytes = (24 + 4) * gcmSIZEOF(gctUINT32);
+        *Bytes =  (4 + (coreCount - 2) * 8 + 4 * 2 ) * gcmSIZEOF(gctUINT32);
     }
     else if (Hardware->features[gcvFEATURE_MULTIGPU_SYNC_V2])
     {
@@ -7318,6 +7319,12 @@ gcoHARDWARE_QueryMultiGPUSyncLength(
     {
         /* Lock/Unlock command for blt engine.*/
         *Bytes += 4 * gcmSIZEOF(gctUINT32);
+
+        if (Hardware->features[gcvFEATURE_MULTI_CLUSTER])
+        {
+            /*add multi cluster control command*/
+            *Bytes += 2 * gcmSIZEOF(gctUINT32);
+        }
 
         if (Hardware->features[gcvFEATURE_VMSAA] && !Hardware->features[gcvFEATURE_PE_VMSAA_COVERAGE_CACHE_FIX])
         {
@@ -7370,6 +7377,37 @@ OnError:
     return status;
 }
 
+gceSTATUS
+gcoHARDWARE_QuerySRAM(
+    IN gcoHARDWARE Hardware,
+    IN gceSRAM  Type,
+    OUT gctUINT32 *Base,
+    OUT gctUINT32 *Size
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("Hardware=%p Type=%d Base=%p Size=%p", Hardware, Type, Base, Size);
+
+    gcmGETHARDWARE(Hardware);
+
+    if ((Type >= gcvSRAM_INTERNAL) && (Type < gcvSRAM_COUNT))
+    {
+        if (Base)
+            *Base = Hardware->options.sRAMBaseAddress[Type];
+
+        if (Size)
+            *Size = Hardware->config->sRAMSizes[Type];
+    }
+    else
+    {
+        status = gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
 #if gcdENABLE_3D && gcdUSE_VX
 gceSTATUS
 gcoHARDWARE_QueryNNConfig(
@@ -7386,16 +7424,7 @@ gcoHARDWARE_QueryNNConfig(
 
     if (NNConfig != gcvNULL)
     {
-        NNConfig->nnMadPerCore = Hardware->config->nnConfig.nnMadPerCore;
-        NNConfig->nnCoreCount   = Hardware->config->nnConfig.nnCoreCount;
-        NNConfig->nnInputBufferDepth = Hardware->config->nnConfig.nnInputBufferDepth;
-        NNConfig->nnAccumBufferDepth = Hardware->config->nnConfig.nnAccumBufferDepth;
-        NNConfig->nnDPAmount = Hardware->config->nnConfig.nnDPAmount;
-        NNConfig->nnL2CacheSize = Hardware->config->nnConfig.nnL2CacheSize;
-        NNConfig->vipSRAMSize = Hardware->config->nnConfig.vipSRAMSize;
-        NNConfig->tpCoreCount = Hardware->config->nnConfig.tpCoreCount;
-        NNConfig->tpPwlLUTCount = Hardware->config->nnConfig.tpPwlLUTCount;
-        NNConfig->tpPwlLUTSize = Hardware->config->nnConfig.tpPwlLUTSize;
+        gcoOS_MemCopy(NNConfig, &Hardware->config->nnConfig, sizeof(vx_nn_config));
         NNConfig->isSet = gcvTRUE;
     }
 

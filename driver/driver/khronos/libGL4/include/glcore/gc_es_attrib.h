@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -146,17 +146,15 @@ typedef struct __GLcurrentStateRec
                 GLubyte   padding2[15];
                 __GLcoord filler;
                 __GLcoord texture[__GL_MAX_TEXTURE_COORDS];
-                __GLcoord attribute[__GL_MAX_PROGRAM_VERTEX_ATTRIBUTES];
+                __GLcoord attribute[__GL_MAX_VERTEX_ATTRIBUTES];
             };
 
             __GLcoord currentState[__GL_TOTAL_VERTEX_ATTRIBUTES];
         };
-#else
-        __GLcoord attribute[__GL_MAX_VERTEX_ATTRIBUTES];
-#endif
-#ifdef OPENGL40
     };
     GLfloat colorIndex;
+#else
+    __GLcoord attribute[__GL_MAX_VERTEX_ATTRIBUTES];
 #endif
 } __GLcurrentState;
 
@@ -179,18 +177,18 @@ typedef struct __GLlineStateRec
 */
 typedef struct __GLpolygonStateRec
 {
-#ifdef OPENGL40
-    GLenum frontMode;
-    GLenum backMode;
-    GLuint bothFaceFill;
-    GLfloat bias;
-#endif
     GLenum cullFace;
     GLenum frontFace;
 
     /* Polygon offset */
     GLfloat factor;
     GLfloat units;
+#ifdef OPENGL40
+    GLenum frontMode;
+    GLenum backMode;
+    GLuint bothFaceFill;
+    GLfloat bias;
+#endif
 } __GLpolygonState;
 
 /*
@@ -231,7 +229,6 @@ typedef struct __GLstencilFaceStateRec
     GLenum fail;
     GLenum depthFail;
     GLenum depthPass;
-
     GLint writeMask;
 } __GLstencilFaceState;
 
@@ -240,7 +237,6 @@ typedef struct __GLstencilStateRec
 {
     __GLstencilFaceState front;
     __GLstencilFaceState back;
-
     GLint clear;
 #ifdef OPENGL40
     __GLstencilFaceState StencilArbFront; /* For ARB spec 2.0 */
@@ -266,7 +262,6 @@ typedef struct __GLviewportRec
     ** Depthrange parameters from user.
     */
     GLfloat zNear, zFar;
-
     GLfloat farMinusNear, pack;
 #endif
 } __GLviewport;
@@ -276,17 +271,6 @@ typedef struct __GLviewportRec
 */
 typedef struct __GLrasterStateRec
 {
-#ifdef OPENGL40
-     /*
-    ** Alpha function.  The alpha function is applied to the alpha color
-    ** value and the reference value.  If it fails then the pixel is
-    ** not rendered.
-    */
-    GLenum alphaFunction;
-    GLfloat alphaReference;
-    GLenum logicOp;
-#endif
-
     /* Alpha blending source and destination factors, blend op,
     ** and blend color.
     */
@@ -311,23 +295,6 @@ typedef struct __GLrasterStateRec
         __GLcolorIi  clearIi;
     } clearColor;
 
-#ifdef OPENGL40
-    GLfloat clearIndex;
-    /*
-    ** Color index write mask.  The color values are masked with this
-    ** value when writing to the frame buffer so that only the bits set
-    ** in the mask are changed in the frame buffer.
-    */
-    GLint writeMask;
-
-    /*
-    ** Color buffer clamp color control
-    ** GL_CLAMP_FRAGMENT_COLOR_ARB
-    ** GL_CLAMP_READ_COLOR_ARB
-    */
-    GLenum clampFragColor;
-    GLenum clampReadColor;
-#endif
     /*
     ** RGB write masks.  These booleans enable or disable writing of
     ** the r, g, b, and a components.
@@ -345,6 +312,32 @@ typedef struct __GLrasterStateRec
     GLboolean mrtEnable;
 
     GLenum    readBuffer;
+#ifdef OPENGL40
+     /*
+    ** Alpha function.  The alpha function is applied to the alpha color
+    ** value and the reference value.  If it fails then the pixel is
+    ** not rendered.
+    */
+    GLenum alphaFunction;
+    GLfloat alphaReference;
+    GLenum logicOp;
+
+    GLfloat clearIndex;
+    /*
+    ** Color index write mask.  The color values are masked with this
+    ** value when writing to the frame buffer so that only the bits set
+    ** in the mask are changed in the frame buffer.
+    */
+    GLint writeMask;
+
+    /*
+    ** Color buffer clamp color control
+    ** GL_CLAMP_FRAGMENT_COLOR_ARB
+    ** GL_CLAMP_READ_COLOR_ARB
+    */
+    GLenum clampFragColor;
+    GLenum clampReadColor;
+#endif
 } __GLrasterState;
 
 /*
@@ -358,7 +351,6 @@ typedef struct __GLpixelPackModeRec
     GLuint skipPixels;
     GLuint skipImages;
     GLuint imageHeight;
-
 #ifdef OPENGL40
     GLuint swapEndian;
     GLuint lsbFirst;
@@ -369,7 +361,6 @@ typedef struct __GLclientPixelStateRec
 {
     __GLpixelPackMode packModes;
     __GLpixelPackMode unpackModes;
-
 #ifdef OPENGL40
     /* Buffer object binding points for PIXEL_PACK_BUFFER and PIXEL_UNPACK_BUFFER */
     GLuint  packBufBinding;
@@ -382,6 +373,8 @@ typedef struct __GLclientPixelStateRec
 */
 typedef struct __GLhitStateRec
 {
+    GLenum generateMipmap;
+    GLenum fsDerivative;
 #ifdef OPENGL40
     GLenum perspectiveCorrection;
     GLenum pointSmooth;
@@ -390,10 +383,7 @@ typedef struct __GLhitStateRec
     GLenum fog;
     GLenum textureCompressionHint;
 #endif
-    GLenum generateMipmap;
-    GLenum fsDerivative;
 } __GLhintState;
-
 
 /*
 ** Scissor state from user.
@@ -410,110 +400,55 @@ typedef struct __GLscissorRec
 ** Multisample state from user.
 */
 typedef struct __GLmultisampleStateRec {
-#ifdef OPENGL40
-    GLboolean alphaToCoverage;
-    GLboolean alphaToOne;
-    GLboolean coverage;
-#endif
     GLboolean coverageInvert;
     GLfloat   coverageValue;
 
     GLbitfield sampleMaskValue;
     GLfloat   minSampleShadingValue;
+
+#ifdef OPENGL40
+    GLboolean alphaToCoverage;
+    GLboolean alphaToOne;
+    GLboolean coverage;
+#endif
 } __GLmultisampleState;
 
 typedef struct __GLcolorBufferStateRec
-
 {
-
     GLboolean dither;
-
     GLboolean blend[__GL_MAX_DRAW_BUFFERS];
-
 #ifdef OPENGL40
-
     GLboolean alphaTest;
-
     GLboolean logicOp;
-
     GLboolean colorLogicOp, indexLogicOp;
-
 #endif
-
 } __GLColorBufferEnableState;
 
-
-
 typedef struct __GLpolygonEnableStateRec
-
 {
-
     GLboolean cullFace;
-
     GLboolean polygonOffsetFill;
-
 #ifdef OPENGL40
-
     GLboolean smooth;
-
     GLboolean stipple;
-
     GLboolean polygonOffsetPoint, polygonOffsetLine;
-
 #endif
-
 } __GLPolygonEnableState;
 
-
-
 typedef struct __GLmultisampleEnableStateRec
-
 {
-
     GLboolean alphaToCoverage;
-
     GLboolean coverage;
-
-#ifdef OPENGL40
-
-    GLboolean multisampleOn;
-
-    GLboolean alphaToOne;
-
-#endif
-
     GLboolean sampleMask;
-
     GLboolean sampleShading;
-
+#ifdef OPENGL40
+    GLboolean multisampleOn;
+    GLboolean alphaToOne;
+#endif
 } __GLMultisampleEnableState;
-
-
 
 typedef struct __GLenableStateRec
 {
-#ifdef OPENGL40
-    __GLTransformEnableState   transform;
-    __GLLightingEnableState    lighting;
-    __GLEvalEnableState        eval;
-    __GLTextureEnableState     texUnits[__GL_MAX_TEXTURE_UNITS];
-    __GLDepthEnableState       depthBuffer;
-    __GLLineEnableState        line;
-    __GLConvolutionEnableState convolution;
-    __GLProgramEnableState     program;
-    GLboolean                  pointSmooth;
-    GLboolean                  fog;
-    GLboolean                  scissor; //adopt the same name as OPENGLES
-    GLboolean                  stencilTestTwoSideExt;
-    GLboolean                  colorSum;
-    GLboolean                  colorTable;
-    GLboolean                  postConvColorTable;
-    GLboolean                  postColorMatrixColorTable;
-    GLboolean                  histogram;
-    GLboolean                  minmax;
-    GLboolean                  depthBoundTest; //adopt the same name as OPENGLES
-    GLboolean                  pointSprite;
-#endif
     __GLColorBufferEnableState colorBuffer;
     __GLPolygonEnableState     polygon;
     __GLMultisampleEnableState multisample;
@@ -522,6 +457,22 @@ typedef struct __GLenableStateRec
     GLboolean                  stencilTest;
     GLboolean                  primitiveRestart;
     GLboolean                  rasterizerDiscard;
+#ifdef OPENGL40
+    __GLTransformEnableState   transform;
+    __GLLightingEnableState    lighting;
+    __GLEvalEnableState        eval;
+    __GLTextureEnableState     texUnits[__GL_MAX_TEXTURE_UNITS];
+    __GLDepthEnableState       depthBuffer;
+    __GLLineEnableState        line;
+    __GLProgramEnableState     program;
+    GLboolean                  pointSmooth;
+    GLboolean                  fog;
+    GLboolean                  scissor; //adopt the same name as OPENGLES
+    GLboolean                  stencilTestTwoSideExt;
+    GLboolean                  colorSum;
+    GLboolean                  depthBoundTest; //adopt the same name as OPENGLES
+    GLboolean                  pointSprite;
+#endif
 } __GLenableState;
 
 typedef struct __GLprimBoundStateRec
@@ -536,7 +487,6 @@ typedef struct __GLprimBoundStateRec
     GLfloat maxW;
 } __GLprimBoundState;
 
-
 /* Record the last samper2TexUnit mapping */
 typedef struct __GLprogramStateRec
 {
@@ -547,19 +497,6 @@ typedef struct __GLprogramStateRec
 ***********************************************************************
 */
 typedef struct __GLattributeRec {
-#ifdef OPENGL40
-    __GLRasterPosState rasterPos;
-    __GLpointState point;
-    __GLpolygonStippleState polygonStipple;
-    __GLpixelState pixel;
-    __GLlightState light;
-    __GLfogState fog;
-    __GLdepthBoundTestState depthBoundTest;
-    __GLaccumState accum;
-    __GLtransformState transform;
-    __GLevaluatorState evaluator;
-    __GLdlistState list;
-#endif
     __GLcurrentState current;
     __GLlineState line;
     __GLpolygonState polygon;
@@ -575,8 +512,20 @@ typedef struct __GLattributeRec {
     __GLprogramState program;
     __GLimageState image;
     __GLprimBoundState primBound;
+#ifdef OPENGL40
+    __GLRasterPosState rasterPos;
+    __GLpointState point;
+    __GLpolygonStippleState polygonStipple;
+    __GLpixelState pixel;
+    __GLlightState light;
+    __GLfogState fog;
+    __GLdepthBoundTestState depthBoundTest;
+    __GLaccumState accum;
+    __GLtransformState transform;
+    __GLevaluatorState evaluator;
+    __GLdlistState list;
+#endif
 } __GLattribute;
-
 
 typedef struct __GLclientAttributeRec
 {

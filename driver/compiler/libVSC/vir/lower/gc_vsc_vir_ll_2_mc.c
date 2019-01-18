@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -16,19 +16,6 @@
 #include "vir/lower/gc_vsc_vir_ml_2_ll.h"
 #include "vir/lower/gc_vsc_vir_lower_common_func.h"
 
-typedef struct _VIR_PATTERN_MC_LOWER_CONTEXT
-{
-    VIR_PatternContext          header;
-    VSC_HW_CONFIG*              hwCfg;
-    VSC_MM*                     pMM;
-    gctBOOL                     generateImmediate;
-    gctBOOL                     hasNEW_TEXLD;
-    gctBOOL                     isCL_X;
-    gctBOOL                     hasCL;
-    gctBOOL                     hasHalti4;
-    gctBOOL                     hasSHEnhancements2;
-} VIR_PatternMCLowerContext;
-
 static gctBOOL
 _CmpInstuction(
     IN VIR_PatternContext   *Context,
@@ -39,28 +26,9 @@ _CmpInstuction(
     return Inst0->opcode == Inst1->_opcode;
 }
 
-static gctBOOL
-_hasHalti4(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst
-    )
-{
-    return ((VIR_PatternMCLowerContext *)Context)->hasHalti4;
-}
-
-static gctBOOL
-_hasNotHalti4(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst
-    )
-{
-    return !_hasHalti4(Context, Inst);
-}
-
 /* because of hw cmov restriction (one instruction type for control
    comparison and implicit converstion), we have to change cmov to
-   cmp/select pair
-   TODO: only changing to cmp/select pair for dual16 shader */
+   cmp/select pair */
 static gctBOOL
 _dual16Req(
     IN VIR_PatternContext *Context,
@@ -108,7 +76,7 @@ _isCL_X(
     IN VIR_Instruction    *Inst
     )
 {
-    return ((VIR_PatternMCLowerContext *)Context)->isCL_X;
+    return ((VIR_PatternLowerContext *)Context)->isCL_X;
 }
 
 static gctBOOL
@@ -117,24 +85,12 @@ _isHWNotSupportJmpAny(
     IN VIR_Instruction    *Inst
     )
 {
-    if (((VIR_PatternMCLowerContext *)Context)->hwCfg->hwFeatureFlags.hasHalti5)
+    if (((VIR_PatternLowerContext *)Context)->hwCfg->hwFeatureFlags.hasHalti5)
     {
         return gcvFALSE;
     }
 
     return gcvTRUE;
-}
-
-static gctBOOL
-_isTypeEqualTo(
-    IN VIR_Operand *Opnd,
-    IN VIR_TyFlag   TyFlag
-    )
-{
-    VIR_TypeId   ty   = VIR_Operand_GetTypeId(Opnd);
-    gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
-
-    return (VIR_GetTypeFlag(ty) & TyFlag);
 }
 
 static gctBOOL
@@ -170,6 +126,18 @@ _notSameSizeType(
 }
 
 static gctBOOL
+_isTypeEqualTo(
+    IN VIR_Operand *Opnd,
+    IN VIR_TyFlag   TyFlag
+    )
+{
+    VIR_TypeId   ty   = VIR_Operand_GetTypeId(Opnd);
+    gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
+
+    return (VIR_GetTypeFlag(ty) & TyFlag);
+}
+
+static gctBOOL
 _isF2I(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -192,12 +160,34 @@ _isI2F(
 }
 
 static gctBOOL
+_hasNoResultSat(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_Operand*    pDstOpnd = VIR_Inst_GetDest(Inst);
+
+    if (pDstOpnd)
+    {
+        if (VIR_Operand_GetOpKind(pDstOpnd) == VIR_OPND_SYMBOL)
+        {
+            if (VIR_Operand_GetModifier(pDstOpnd) == VIR_MOD_SAT_0_TO_1)
+            {
+                return gcvFALSE;
+            }
+        }
+    }
+
+    return gcvTRUE;
+}
+
+static gctBOOL
 _hasSHEnhancements2(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
     )
 {
-    if (((VIR_PatternMCLowerContext *)Context)->hasSHEnhancements2)
+    if (((VIR_PatternLowerContext *)Context)->hasSHEnhancements2)
     {
         return gcvTRUE;
     }
@@ -226,31 +216,7 @@ _isF2IRnd(
         VIR_Operand_GetRoundMode(VIR_Inst_GetDest(Inst)) != VIR_ROUND_DEFAULT;
 }
 
-static gctBOOL
-_isActOn3DImg(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst
-    )
-{
-    VIR_Operand         *opndSrc0 = VIR_Inst_GetSource(Inst, 0);
-    VIR_Symbol          *sym = VIR_Operand_GetSymbol(opndSrc0);
-    VIR_PrimitiveTypeId primTypeId;
-
-    if (VIR_Operand_GetOpKind(opndSrc0) == VIR_OPND_SYMBOL &&
-        VIR_Symbol_GetKind(sym) == VIR_SYM_IMAGE)
-    {
-        primTypeId = VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(sym));
-
-        if (VIR_TypeId_isImage3D(primTypeId))
-        {
-            return gcvTRUE;
-        }
-    }
-
-    return gcvFALSE;
-}
-
-static gctINT
+gctINT
 _ConvType(
     IN VIR_TypeId Ty
     )
@@ -299,9 +265,46 @@ _setAbs(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
     IN VIR_Operand        *Opnd
-)
+    )
 {
-    VIR_Operand_SetModifier(Opnd, VIR_MOD_ABS);
+    VIR_Operand_SetModifier(Opnd, VIR_MOD_ABS | VIR_Operand_GetModifier(Opnd));
+    if (VIR_Operand_GetModifier(Opnd) & VIR_MOD_NEG)
+    {
+        VIR_Operand_SetModOrder(Opnd, VIR_MODORDER_NEG_ABS);
+    }
+    return gcvTRUE;
+}
+
+static gctBOOL
+_setConj(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    gcmASSERT(VIR_OPCODE_isCmplx(VIR_Inst_GetOpcode(Inst)));
+    VIR_Operand_SetModifier(Opnd, VIR_MOD_ABS | VIR_Operand_GetModifier(Opnd));
+    if (VIR_Operand_GetModifier(Opnd) & VIR_MOD_NEG)
+    {
+        VIR_Operand_SetModOrder(Opnd, VIR_MODORDER_NEG_ABS);
+    }
+    return gcvTRUE;
+}
+
+static gctBOOL
+_setConjNeg(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    gcmASSERT(VIR_OPCODE_isCmplx(VIR_Inst_GetOpcode(Inst)));
+    VIR_Operand_NegateOperand(Context->shader, Opnd);
+    VIR_Operand_SetModifier(Opnd, VIR_MOD_ABS | VIR_Operand_GetModifier(Opnd));
+    if (VIR_Operand_GetModifier(Opnd) & VIR_MOD_NEG)
+    {
+        VIR_Operand_SetModOrder(Opnd, VIR_MODORDER_NEG_ABS);
+    }
     return gcvTRUE;
 }
 
@@ -402,7 +405,7 @@ _shouldSetHelper(
     /* cmp.cond         dst0, src0, src1*/
     /* select.selmsb    dst, dst0, src1, src2  */
 static VIR_PatternMatchInst _cmovPatInst0[] = {
-    { VIR_OP_CMOV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { _hasNotHalti4, _dual16Req }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_CMOV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_HasNoHalti4, _dual16Req }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 /* CMP, if dest.type is not float,
@@ -420,21 +423,9 @@ static VIR_Pattern _cmovPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
-static VIR_PatternMatchInst _imgaddrPatInst0[] = {
-    { VIR_OP_IMG_ADDR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3 }, { _hasHalti4, _isActOn3DImg }, VIR_PATN_MATCH_FLAG_AND },
-};
-
-static VIR_PatternReplaceInst _imgaddrRepInst0[] = {
-    { VIR_OP_IMG_ADDR_3D, -1, 0, { 1, 2, 3, 0 }, { 0 } }
-};
-
-static VIR_Pattern _imgaddrPattern[] = {
-    { VIR_PATN_FLAG_NONE, CODEPATTERN(_imgaddr, 0) },
-    { VIR_PATN_FLAG_NONE }
-};
-
 static VIR_PatternMatchInst _madPatInst0[] = {
-    { VIR_OP_MAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsIntOpcode, VIR_Lower_IsDstInt16, _hasNotHalti4 }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_MAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsIntOpcode, VIR_Lower_IsDstInt16, VIR_Lower_HasNoHalti4 }, VIR_PATN_MATCH_FLAG_AND },
+
 };
 
 static VIR_PatternReplaceInst _madRepInst0[] = {
@@ -516,7 +507,7 @@ static VIR_PatternReplaceInst _convRepInst2[] = {
 };
 
 static VIR_PatternMatchInst _convPatInst3[] = {
-    { VIR_OP_CONVERT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isI2F }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_CONVERT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isI2F, _hasNoResultSat }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _convRepInst3[] = {
@@ -1352,6 +1343,172 @@ static VIR_Pattern _jmpanySclPattern[] = {
 };
 
 static gctBOOL
+_isXYEnabled(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    if (VIR_Operand_GetEnable(VIR_Inst_GetDest(Inst)) == VIR_ENABLE_XY &&
+        VIR_Operand_GetSwizzle(VIR_Inst_GetSource(Inst, 0)) == VIR_SWIZZLE_XYYY)
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
+static gctBOOL
+_isXYZWEnabled(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    if (VIR_Operand_GetEnable(VIR_Inst_GetDest(Inst)) == VIR_ENABLE_XYZW &&
+        VIR_Operand_GetSwizzle(VIR_Inst_GetSource(Inst, 0)) == VIR_SWIZZLE_XYZW)
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
+static gctBOOL
+_setNegModifierSwizzleY(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_NegateOperand(Context->shader, Opnd);
+    VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_YYYY);
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_setNegModifierSwizzleYW(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_NegateOperand(Context->shader, Opnd);
+    VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_YYWW);
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_setEnableXZ(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_XZ);
+    return gcvTRUE;
+}
+
+static gctBOOL
+_setSwizzleXZ(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_XZZZ);
+    return gcvTRUE;
+}
+
+static gctBOOL
+_setEnableYW(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_YW);
+    return gcvTRUE;
+}
+
+static VIR_PatternMatchInst _conjPatInst0[] = {
+    { VIR_OP_CONJ, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isXYEnabled }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _conjRepInst0[] = {
+    { VIR_OP_MOV, -1, 0, { 1, 2, 0, 0 }, { VIR_Lower_SetEnableX, VIR_Lower_SetSwizzleX } },
+    { VIR_OP_MOV, -1, 0, { 1, 2, 0, 0 }, { VIR_Lower_SetEnableY, _setNegModifierSwizzleY } },
+};
+
+static VIR_PatternMatchInst _conjPatInst1[] = {
+    { VIR_OP_CONJ, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isXYZWEnabled }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _conjRepInst1[] = {
+    { VIR_OP_MOV, -1, 0, { 1, 2, 0, 0 }, { _setEnableXZ, _setSwizzleXZ } },
+    { VIR_OP_MOV, -1, 0, { 1, 2, 0, 0 }, { _setEnableYW, _setNegModifierSwizzleYW } },
+};
+
+static VIR_Pattern _conjPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_conj, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_conj, 1) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+static VIR_PatternMatchInst _cmadcjPatInst0[] = {
+    { VIR_OP_CMADCJ, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _cmadcjRepInst0[] = {
+    { VIR_OP_CMAD, -1, 0, { 1, 2, 3, 4 }, { 0, 0, _setConj, 0 } },
+};
+
+static VIR_Pattern _cmadcjPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_cmadcj, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+static VIR_PatternMatchInst _cmulcjPatInst0[] = {
+    { VIR_OP_CMULCJ, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _cmulcjRepInst0[] = {
+    { VIR_OP_CMUL, -1, 0, { 1, 2, 3, 0 }, { 0, 0, _setConj, 0 } },
+};
+
+static VIR_Pattern _cmulcjPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_cmulcj, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+
+static VIR_PatternMatchInst _caddcjPatInst0[] = {
+    { VIR_OP_CADDCJ, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _caddcjRepInst0[] = {
+    { VIR_OP_CADD, -1, 0, { 1, 2, 3, 0 }, { 0, 0, _setConj } },
+};
+
+static VIR_Pattern _caddcjPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_caddcj, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+static VIR_PatternMatchInst _csubcjPatInst0[] = {
+    { VIR_OP_CSUBCJ, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _csubcjRepInst0[] = {
+    { VIR_OP_CADD, -1, 0, { 1, 2, 3, 0 }, { 0, 0, _setConjNeg } },
+};
+
+static VIR_Pattern _csubcjPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_csubcj, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+static gctBOOL
 _HasDual16Support(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -1563,6 +1720,738 @@ static VIR_Pattern _normPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
+static
+gctBOOL _needSetConstBorderValue(
+    IN VIR_PatternContext   *Context,
+    IN VIR_Instruction      *Inst
+    )
+{
+    return gcmOPT_hasFeature(FB_ENABLE_CONST_BORDER);
+}
+
+gctBOOL _needSetConstBorderValueFullWrite(
+    IN VIR_PatternContext   *Context,
+    IN VIR_Instruction      *Inst
+    )
+{
+    gctBOOL       fullyCovered = gcvFALSE;
+    if (gcmOPT_hasFeature(FB_ENABLE_CONST_BORDER))
+    {
+        VIR_TypeId    tyId = VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst));
+        VIR_TypeId    compTyId;
+        VIR_Operand * evisModifierOpnd = VIR_Inst_GetEvisModiferOpnd(Inst);
+
+        if (evisModifierOpnd)
+        {
+            VIR_EVIS_Modifier evisModifier;
+            gctUINT binsCovered;
+            evisModifier.u1 = VIR_Operand_GetEvisModifier(evisModifierOpnd);
+            binsCovered = evisModifier.u0.endBin - evisModifier.u0.startBin + 1;
+            compTyId = VIR_GetTypeComponentType(tyId);
+            switch(compTyId) {
+            case VIR_TYPE_UINT8:
+            case VIR_TYPE_INT8:
+                fullyCovered = (binsCovered == 16);
+                break;
+            case VIR_TYPE_UINT16:
+            case VIR_TYPE_INT16:
+            case VIR_TYPE_FLOAT16:
+                fullyCovered = (binsCovered == 8);
+                break;
+            case VIR_TYPE_UINT32:
+            case VIR_TYPE_INT32:
+            case VIR_TYPE_FLOAT32:
+                fullyCovered = (binsCovered == 4);
+                break;
+            default:
+                break;
+            }
+        }
+    }
+    return fullyCovered;
+}
+
+static
+gctBOOL _needSetConstBorderValueAndSrc1FloatType(
+    IN VIR_PatternContext   *Context,
+    IN VIR_Instruction      *Inst
+    )
+{
+    return gcmOPT_hasFeature(FB_ENABLE_CONST_BORDER) &&
+           _isTypeEqualTo(VIR_Inst_GetSource(Inst, 1), VIR_TYFLAG_ISFLOAT);
+}
+
+static
+gctBOOL _needSetConstBorderValueAndSrc1FloatTypeFullWrite(
+    IN VIR_PatternContext   *Context,
+    IN VIR_Instruction      *Inst
+    )
+{
+    gctBOOL       fullyCovered = gcvFALSE;
+    if (gcmOPT_hasFeature(FB_ENABLE_CONST_BORDER) &&
+        _isTypeEqualTo(VIR_Inst_GetSource(Inst, 1), VIR_TYFLAG_ISFLOAT))
+    {
+        return _needSetConstBorderValueFullWrite(Context, Inst);
+    }
+    return fullyCovered;
+}
+
+static gctBOOL
+_setConstBorderValue(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Shader *  shader = Context->shader;
+    VIR_Uniform * uniform = VIR_Shader_GetConstBorderValueUniform(shader);
+    VIR_TypeId    tyId = VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst));
+    VIR_TypeId    compTyId;
+    VIR_Swizzle   swizzle = VIR_SWIZZLE_XXXX;
+    VIR_Operand * src0 = VIR_Inst_GetSource(Inst, 0);
+
+    VIR_Operand_SetLvalue(src0, 0);
+    VIR_Operand_SetUniform(src0, uniform, shader);
+    /* set swizzle by dest's type: U8 => .x, U16 => .y, U32 => .z, F32 => .w */
+    compTyId = VIR_GetTypeComponentType(tyId);
+    switch(compTyId) {
+    case VIR_TYPE_UINT8:
+    case VIR_TYPE_INT8:
+        swizzle = VIR_SWIZZLE_XXXX;
+        break;
+    case VIR_TYPE_UINT16:
+    case VIR_TYPE_INT16:
+        swizzle = VIR_SWIZZLE_YYYY;
+        break;
+    case VIR_TYPE_UINT32:
+    case VIR_TYPE_INT32:
+        swizzle = VIR_SWIZZLE_ZZZZ;
+        break;
+    case VIR_TYPE_FLOAT32:
+        swizzle = VIR_SWIZZLE_WWWW;
+        break;
+    default:
+        break;
+    }
+
+    VIR_Operand_SetSwizzle(src0, swizzle);
+    VIR_Operand_SetTypeId(src0, tyId);
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_setEvisConstBorderValue(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Shader *  shader = Context->shader;
+    VIR_Uniform * uniform = VIR_Shader_GetConstBorderValueUniform(shader);
+    VIR_TypeId    tyId = VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst));
+    VIR_TypeId    compTyId;
+    VIR_Swizzle   swizzle = VIR_SWIZZLE_XXXX;
+    VIR_Operand   *src;
+
+    if (VIR_Inst_GetOpcode(Inst) != VIR_OP_MOV)
+    {
+        gcmASSERT(0);
+    }
+
+    /* set swizzle by dest's type: U8 => .x, U16 => .y, U32 => .z, F32 => .w */
+    compTyId = VIR_GetTypeComponentType(tyId);
+    switch(compTyId)
+    {
+    case VIR_TYPE_UINT8:
+    case VIR_TYPE_INT8:
+        swizzle = VIR_SWIZZLE_XXXX;
+        break;
+    case VIR_TYPE_UINT16:
+    case VIR_TYPE_INT16:
+        swizzle = VIR_SWIZZLE_YYYY;
+        break;
+    case VIR_TYPE_UINT32:
+    case VIR_TYPE_INT32:
+        swizzle = VIR_SWIZZLE_ZZZZ;
+        break;
+    case VIR_TYPE_FLOAT32:
+        swizzle = VIR_SWIZZLE_WWWW;
+        break;
+    default:
+        break;
+    }
+
+    src = VIR_Inst_GetSource(Inst, 0);
+    VIR_Operand_SetLvalue(src, 0);
+    VIR_Operand_SetUniform(src, uniform, shader);
+    VIR_Operand_SetSwizzle(src, swizzle);
+    VIR_Operand_SetTypeId(src, tyId);
+
+    return gcvTRUE;
+}
+
+
+static gctBOOL
+_setEvisConstBorderValueModifier(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_OpCode    opCode = VIR_Inst_GetOpcode(Inst);
+
+    /* clear boolean bit in modifier */
+    {
+        gctINT            evisSrcNo;
+        VIR_Operand *     modifier;
+        gctUINT           val, newVal;
+        gctUINT           startBin;
+        gctUINT           endBin;
+
+        evisSrcNo = VIR_OPCODE_EVISModifier_SrcNo(opCode);
+        modifier = VIR_Inst_GetSource(Inst, evisSrcNo);
+        gcmASSERT(VIR_Operand_isEvisModifier(modifier));
+        val = VIR_Operand_GetImmediateUint(modifier);
+        startBin =  VXC_GET_START_BIN(val);
+        endBin   =  VXC_GET_END_BIN(val);
+        newVal = VXC_MODIFIER_BIN(startBin, endBin, 0);
+        VIR_Operand_SetEvisModifier(modifier, newVal);
+    }
+    return gcvTRUE;
+}
+
+static gctBOOL
+_setIntegerType_EnableXY(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetTypeId(Opnd, VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_INT32,
+        VIR_GetTypeComponents(VIR_Lower_GetBaseType(Context->shader, Opnd)), 1));
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_XY);
+    return gcvTRUE;
+}
+
+static gctBOOL
+_setIntegerType_EnableXYZ(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetTypeId(Opnd, VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_INT32,
+        VIR_GetTypeComponents(VIR_Lower_GetBaseType(Context->shader, Opnd)), 1));
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_XYZ);
+    return gcvTRUE;
+}
+
+static gctBOOL
+_isSrc1FloatType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return _isTypeEqualTo(VIR_Inst_GetSource(Inst, 1), VIR_TYFLAG_ISFLOAT);
+}
+
+static gctBOOL
+_isSrc0Image1DNotArray(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_Operand*    pSrc0Opnd = VIR_Inst_GetSource(Inst, 0);
+    VIR_Symbol*     pSrc0Sym;
+    VIR_Type*       pSrc0Type;
+
+    gcmASSERT(VIR_Operand_isSymbol(pSrc0Opnd));
+    pSrc0Sym = VIR_Operand_GetSymbol(pSrc0Opnd);
+    pSrc0Type = VIR_Symbol_GetType(pSrc0Sym);
+
+    while (VIR_Type_isArray(pSrc0Type))
+    {
+        pSrc0Type = VIR_Shader_GetTypeFromId(Context->shader, VIR_Type_GetBaseTypeId(pSrc0Type));
+    }
+
+    if (VIR_TypeId_isImage1D(VIR_Type_GetBaseTypeId(pSrc0Type)) &&
+        !VIR_TypeId_isImageArray(VIR_Type_GetBaseTypeId(pSrc0Type)))
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
+/* IMG_READ dest, image, coord, sample
+ *     IMG_LOAD   dest, image, coord
+ */
+static VIR_PatternMatchInst _imgReadPatInst0[] = {
+    { VIR_OP_IMG_READ, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { _isSrc0Image1DNotArray }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _imgReadRepInst0[] = {
+    { VIR_OP_MOV, -1, 0, { -1, 3, 0 ,0 }, { VIR_Lower_SetEnableBaseOnSrc0 } },
+    { VIR_OP_MOV, -1, 0, { -1, 0, 0 ,0 }, { VIR_Lower_SetEnableYAndSrc0Type, VIR_Lower_SetImm0 } },
+    { VIR_OP_IMG_LOAD, -1, 0, { 1, 2, -1, 0, 4 }, { 0, 0, VIR_Lower_SetSwizzleXY, VIR_Lower_SetImm0 } }
+};
+
+static VIR_PatternMatchInst _imgReadPatInst1[] = {
+    { VIR_OP_IMG_READ, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _imgReadRepInst1[] = {
+    { VIR_OP_IMG_LOAD, -1, 0, { 1, 2, 3, 0, 4 }, { 0, 0, 0, VIR_Lower_SetImm0 } }
+};
+
+static VIR_Pattern _imgReadPattern[] = {
+    { VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST, CODEPATTERN(_imgRead, 0) },
+    { VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST, CODEPATTERN(_imgRead, 1) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+/* IMG_READ_3D dest, image, coord, sample
+ *     MAD           coord.z, image.sliceStride (.s4), coord.z, image.addr(.x)
+ *     IMG_LOAD_3D   dest, image, coord, sample
+ */
+static VIR_PatternMatchInst _imgRead3dPatInst0[] = {
+    { VIR_OP_IMG_READ_3D, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _imgRead3dRepInst0[] = {
+    { VIR_OP_MOV, -1, 0, { -1, 3, 0 ,0 }, { VIR_Lower_SetEnableXYZAndInt3 } },
+    { VIR_OP_MAD, -1, 0, { -1, 2, -1, 2 }, { VIR_Lower_SetEnableZAndIntType, VIR_Lower_SetSwizzleXIndex_1AndIntType, VIR_Lower_SetSwizzleZAndIntType, VIR_Lower_SetSwizzleXAndIntType } },
+    { VIR_OP_IMG_LOAD_3D, -1, 0, { 1, 2, -1, 0, 4 }, { 0, 0, VIR_Lower_SetSwizzleXYZ, VIR_Lower_SetImm0 } }
+};
+
+static VIR_Pattern _imgRead3dPattern[] = {
+    { VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST, CODEPATTERN(_imgRead3d, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+/* VX_IMG_READ dest, image, coord, sample
+ *     VX_IMG_LOAD   dest, image, coord
+ */
+static VIR_PatternMatchInst _vxImgReadPatInst0[] = {
+    { VIR_OP_VX_IMG_READ, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { _isSrc0Image1DNotArray }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _vxImgReadRepInst0[] = {
+    { VIR_OP_MOV, -1, 0, { -1, 3, 0 ,0 }, { VIR_Lower_SetEnableBaseOnSrc0 } },
+    { VIR_OP_MOV, -1, 0, { -1, 0, 0 ,0 }, { VIR_Lower_SetEnableYAndSrc0Type, VIR_Lower_SetImm0 } },
+    { VIR_OP_VX_IMG_LOAD, -1, 0, { 1, 2, -1, 0, 4 }, { 0, 0, VIR_Lower_SetSwizzleXY, VIR_Lower_SetImm0 } }
+};
+
+static VIR_PatternMatchInst _vxImgReadPatInst1[] = {
+    { VIR_OP_VX_IMG_READ, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _vxImgReadRepInst1[] = {
+    { VIR_OP_VX_IMG_LOAD, -1, 0, { 1, 2, 3, 0, 4 }, { 0, 0, 0, VIR_Lower_SetImm0 } }
+};
+
+static VIR_Pattern _vxImgReadPattern[] = {
+    { VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST, CODEPATTERN(_vxImgRead, 0) },
+    { VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST, CODEPATTERN(_vxImgRead, 1) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+/* VX_IMG_READ_3D dest, image, coord, sample
+ *     MAD           coord.z, image.sliceStride (.s4), coord.z, image.addr(.x)
+ *     VX_IMG_LOAD_3D   dest, image, coord, sample
+ */
+static VIR_PatternMatchInst _vxImgRead3dPatInst0[] = {
+    { VIR_OP_VX_IMG_READ_3D, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _vxImgRead3dRepInst0[] = {
+    { VIR_OP_MOV, -1, 0, { -1, 3, 0 ,0 }, { VIR_Lower_SetEnableXYZAndInt3 } },
+    { VIR_OP_MAD, -1, 0, { -1, 2, -1, 2 }, { VIR_Lower_SetEnableZAndIntType, VIR_Lower_SetSwizzleXIndex_1AndIntType, VIR_Lower_SetSwizzleZAndIntType, VIR_Lower_SetSwizzleXAndIntType } },
+    { VIR_OP_VX_IMG_LOAD_3D, -1, 0, { 1, 2, -1, 0, 4 }, { 0, 0, VIR_Lower_SetSwizzleXYZ, VIR_Lower_SetImm0 } }
+};
+
+static VIR_Pattern _vxImgRead3dPattern[] = {
+    { VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST, CODEPATTERN(_vxImgRead3d, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+/* High-level write_image. */
+/* IMG_WRITE dest, image, coord, color
+ *     IMG_STORE   dest, image, coord, color
+ */
+static VIR_PatternMatchInst _imgWritePatInst0[] = {
+    { VIR_OP_IMG_WRITE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { _isSrc0Image1DNotArray }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _imgWriteRepInst0[] = {
+    { VIR_OP_MOV, -1, 0, { -1, 3, 0 ,0 }, { VIR_Lower_SetEnableBaseOnSrc0 } },
+    { VIR_OP_MOV, -1, 0, { -1, 0, 0 ,0 }, { VIR_Lower_SetEnableYAndSrc0Type, VIR_Lower_SetImm0 } },
+    { VIR_OP_IMG_STORE, -1, 0, { 1, 2, -1, 4, 0 }, { 0, 0, VIR_Lower_SetSwizzleXY, } }
+};
+
+static VIR_PatternMatchInst _imgWritePatInst1[] = {
+    { VIR_OP_IMG_WRITE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _imgWriteRepInst1[] = {
+    { VIR_OP_IMG_STORE, -1, 0, { 1, 2, 3, 4, 0 }, { 0 } }
+};
+
+static VIR_Pattern _imgWritePattern[] = {
+    { VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST, CODEPATTERN(_imgWrite, 0) },
+    { VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST, CODEPATTERN(_imgWrite, 1) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+/* IMG_WRITE_3D dest, image, coord, color
+ *     MAD           coord.z, image.sliceStride (.s4), coord.z, image.addr(.x)
+ *     IMG_STORE_3D   dest, image, coord, color
+ */
+static VIR_PatternMatchInst _imgWrite3dPatInst0[] = {
+    { VIR_OP_IMG_WRITE_3D, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _imgWrite3dRepInst0[] = {
+    { VIR_OP_MOV, -1, 0, { -1, 3, 0, 0 }, { VIR_Lower_SetEnableXYZAndInt3 } },
+    { VIR_OP_AND_BITWISE, -1, 0, { -2, 2, 0, }, { VIR_Lower_SetEnableXAndIntType, VIR_Lower_SetSwizzleYIndex_1AndUintType, VIR_Lower_SetImm0xFFFF } },
+    { VIR_OP_SUB, -1, 0, { -2, -2, 0, 0}, { VIR_Lower_SetEnableXAndIntType, VIR_Lower_SetSwizzleXAndIntType, VIR_Lower_SetIntOne } },
+    { VIR_OP_CLAMP0MAX, -1, 0, { -1, -1, -2, 0}, { VIR_Lower_SetEnableZAndIntType, VIR_Lower_SetSwizzleZAndIntType, VIR_Lower_SetSwizzleXAndIntType, VIR_Lower_SetIntZero } },
+    { VIR_OP_MAD, -1, 0, { -1, 2, -1, 2 }, { VIR_Lower_SetEnableZAndIntType, VIR_Lower_SetSwizzleXIndex_1AndIntType, VIR_Lower_SetSwizzleZAndIntType, VIR_Lower_SetSwizzleXAndIntType } },
+    { VIR_OP_IMG_STORE_3D, -1, 0, { 1, 2, -1, 4, 0 }, { 0, 0, VIR_Lower_SetSwizzleXYZ, } }
+};
+
+static VIR_Pattern _imgWrite3dPattern[] = {
+    { VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST, CODEPATTERN(_imgWrite3d, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+/* VX_IMG_WRITE dest, image, coord, color
+ *     IMG_STORE   dest, image, coord, color
+ */
+static VIR_PatternMatchInst _vxImgWritePatInst0[] = {
+    { VIR_OP_VX_IMG_WRITE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { _isSrc0Image1DNotArray }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _vxImgWriteRepInst0[] = {
+    { VIR_OP_MOV, -1, 0, { -1, 3, 0 ,0 }, { VIR_Lower_SetEnableBaseOnSrc0 } },
+    { VIR_OP_MOV, -1, 0, { -1, 0, 0 ,0 }, { VIR_Lower_SetEnableYAndSrc0Type, VIR_Lower_SetImm0 } },
+    { VIR_OP_IMG_STORE, -1, 0, { 1, 2, -1, 4, 0 }, { 0, 0, VIR_Lower_SetSwizzleXY, } }
+};
+
+static VIR_PatternMatchInst _vxImgWritePatInst1[] = {
+    { VIR_OP_IMG_WRITE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _vxImgWriteRepInst1[] = {
+    { VIR_OP_IMG_STORE, -1, 0, { 1, 2, 3, 4, 0 }, { 0 } }
+};
+
+static VIR_Pattern _vxImgWritePattern[] = {
+    { VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST, CODEPATTERN(_vxImgWrite, 0) },
+    { VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST, CODEPATTERN(_vxImgWrite, 1) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+/* VX_IMG_WRITE_3D dest, image, coord, color
+ *     MAD           coord.z, image.sliceStride (.s4), coord.z, image.addr(.x)
+ *     IMG_STORE_3D   dest, image, coord, color
+ */
+static VIR_PatternMatchInst _vxImgWrite3dPatInst0[] = {
+    { VIR_OP_VX_IMG_WRITE_3D, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _vxImgWrite3dRepInst0[] = {
+    { VIR_OP_MOV, -1, 0, { -1, 3, 0 ,0 }, { VIR_Lower_SetEnableXYZAndInt3 } },
+    { VIR_OP_AND_BITWISE, -1, 0, { -2, 2, 0, }, { VIR_Lower_SetEnableXAndIntType, VIR_Lower_SetSwizzleYIndex_1AndUintType, VIR_Lower_SetImm0xFFFF } },
+    { VIR_OP_SUB, -1, 0, { -2, -2, 0, 0}, { VIR_Lower_SetEnableXAndIntType, VIR_Lower_SetSwizzleXAndIntType, VIR_Lower_SetIntOne } },
+    { VIR_OP_CLAMP0MAX, -1, 0, { -1, -1, -2, 0}, { VIR_Lower_SetEnableZAndIntType, VIR_Lower_SetSwizzleZAndIntType, VIR_Lower_SetSwizzleXAndIntType, VIR_Lower_SetIntZero } },
+    { VIR_OP_MAD, -1, 0, { -1, 2, -1, 2 }, { VIR_Lower_SetEnableZAndIntType, VIR_Lower_SetSwizzleXIndex_1AndIntType, VIR_Lower_SetSwizzleZAndIntType, VIR_Lower_SetSwizzleXAndIntType } },
+    { VIR_OP_IMG_STORE_3D, -1, 0, { 1, 2, -1, 4, 0 }, { 0, 0, VIR_Lower_SetSwizzleXYZ, } }
+};
+
+static VIR_Pattern _vxImgWrite3dPattern[] = {
+    { VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST, CODEPATTERN(_vxImgWrite3d, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+/*
+        MAX 1, 2, 3  <-integer
+            select.lt 1, 2, 3, 2, 0
+*/
+static VIR_PatternMatchInst _maxPatInst0[] = {
+    { VIR_OP_MAX, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_IsNotCLShader, VIR_Lower_IsIntOpcode }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _maxRepInst0[] = {
+    { VIR_OP_SELECT, VIR_COP_LESS, 0, {  1, 2, 3, 2 }, { 0 } },
+};
+
+
+/*
+        MAX 1, 2, 3  <- float type
+            select.lt -1, 2, 3, 2, 0
+            add       1, -1, zero
+
+        new chip's select doesn't flush denorm to zero, add zero to flush to zero
+*/
+static VIR_PatternMatchInst _maxPatInst1[] = {
+    { VIR_OP_MAX, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _maxRepInst1[] = {
+    { VIR_OP_SELECT, VIR_COP_LESS, 0, {  -1, 2, 3, 2 }, { 0 } },
+    { VIR_OP_ADD, 0, 0, {  1, -1, 0, 0 }, { 0, 0, VIR_Lower_SetZero } },
+};
+
+static VIR_Pattern _maxPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_max, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_max, 1) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+/*
+        MIN 1, 2, 3  <-integer
+            select.lt 1, 2, 3, 2, 0
+*/
+static VIR_PatternMatchInst _minPatInst0[] = {
+    { VIR_OP_MIN, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_IsNotCLShader, VIR_Lower_IsIntOpcode }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _minRepInst0[] = {
+    { VIR_OP_SELECT, VIR_COP_GREATER, 0, {  1, 2, 3, 2 }, { 0 } },
+};
+
+/*
+        MIN 1, 2, 3  <- float
+            select.lt -1, 2, 3, 2, 0
+            add       1, -1, zero
+
+        new chip's select doesn't flush denorm to zero, add zero to flush to zero
+*/
+static VIR_PatternMatchInst _minPatInst1[] = {
+    { VIR_OP_MIN, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _minRepInst1[] = {
+    { VIR_OP_SELECT, VIR_COP_GREATER, 0, { -1, 2, 3, 2 }, { 0 } },
+    { VIR_OP_ADD, 0, 0, {  1, -1, 0, 0 }, { 0, 0, VIR_Lower_SetZero } },
+};
+
+static VIR_Pattern _minPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_min, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_min, 1) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+static VIR_PatternMatchInst _vxImgLoadPatInst0[] = {
+    { VIR_OP_VX_IMG_LOAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, { _needSetConstBorderValueAndSrc1FloatTypeFullWrite }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _vxImgLoadRepInst0[] = {
+    { VIR_OP_F2I, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXY } },
+    { VIR_OP_MOV, 0, 0, {  1, 0, 0, 0 }, {_setEvisConstBorderValue } },
+    { VIR_OP_VX_IMG_LOAD, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _vxImgLoadPatInst1[] = {
+    { VIR_OP_VX_IMG_LOAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, { _needSetConstBorderValueAndSrc1FloatType }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _vxImgLoadRepInst1[] = {
+    { VIR_OP_F2I, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXY } },
+    { VIR_OP_MOV, 0, 0, {  -2, 1, 0, 0 }, {_setEvisConstBorderValue } },
+    { VIR_OP_VX_CLAMP, 0, 0, {  1, -2, -2, -2, 5 }, {_setEvisConstBorderValueModifier } },
+    { VIR_OP_VX_IMG_LOAD, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _vxImgLoadPatInst2[] = {
+    { VIR_OP_VX_IMG_LOAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, { _needSetConstBorderValueFullWrite }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _vxImgLoadRepInst2[] = {
+    { VIR_OP_MOV, 0, 0, {  1, 0, 0, 0 }, {_setEvisConstBorderValue } },
+    { VIR_OP_VX_IMG_LOAD, 0, 0, {  1, 2, 3, 4, 5 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _vxImgLoadPatInst3[] = {
+    { VIR_OP_VX_IMG_LOAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, { _needSetConstBorderValue }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _vxImgLoadRepInst3[] = {
+    { VIR_OP_MOV, 0, 0, {  -1, 1, 0, 0 }, {_setEvisConstBorderValue } },
+    { VIR_OP_VX_CLAMP, 0, 0, {  1, -1, -1, -1, 5 }, {_setEvisConstBorderValueModifier } },
+    { VIR_OP_VX_IMG_LOAD, 0, 0, {  1, 2, 3, 4, 5 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _vxImgLoadPatInst4[] = {
+    { VIR_OP_VX_IMG_LOAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, {_isSrc1FloatType }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _vxImgLoadRepInst4[] = {
+    { VIR_OP_F2I, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXY } },
+    { VIR_OP_VX_IMG_LOAD, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
+};
+
+
+static VIR_Pattern _vxImgLoadPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_vxImgLoad, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_vxImgLoad, 1) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_vxImgLoad, 2) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_vxImgLoad, 3) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_vxImgLoad, 4) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+static VIR_PatternMatchInst _vxImgLoad3DPatInst0[] = {
+    { VIR_OP_VX_IMG_LOAD_3D, VIR_PATTERN_ANYCOND, 0, {  1, 2, 3, 4, 5}, { _needSetConstBorderValueAndSrc1FloatTypeFullWrite }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _vxImgLoad3DRepInst0[] = {
+    { VIR_OP_F2I, 0, 0, { -1, 3, 0 ,0 }, {_setIntegerType_EnableXYZ } },
+    { VIR_OP_MOV, 0, 0, {  1, 0, 0, 0 }, {_setEvisConstBorderValue } },
+    { VIR_OP_VX_IMG_LOAD_3D, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _vxImgLoad3DPatInst1[] = {
+    { VIR_OP_VX_IMG_LOAD_3D, VIR_PATTERN_ANYCOND, 0, {  1, 2, 3, 4, 5}, { _needSetConstBorderValueAndSrc1FloatType }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _vxImgLoad3DRepInst1[] = {
+    { VIR_OP_F2I, 0, 0, { -1, 3, 0 ,0 }, {_setIntegerType_EnableXYZ } },
+    { VIR_OP_MOV, 0, 0, {  -2, 1, 0, 0 }, {_setEvisConstBorderValue } },
+    { VIR_OP_VX_CLAMP, 0, 0, {  1, -2, -2, -2, 5 }, {_setEvisConstBorderValueModifier } },
+    { VIR_OP_VX_IMG_LOAD_3D, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _vxImgLoad3DPatInst2[] = {
+    { VIR_OP_VX_IMG_LOAD_3D, VIR_PATTERN_ANYCOND, 0, {  1, 2, 3, 4, 5}, { _needSetConstBorderValueFullWrite }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _vxImgLoad3DRepInst2[] = {
+    { VIR_OP_MOV, 0, 0, { 1, 0, 0, 0 }, {_setEvisConstBorderValue } },
+    { VIR_OP_VX_IMG_LOAD_3D, 0, 0, { 1, 2, 3, 4, 5 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _vxImgLoad3DPatInst3[] = {
+    { VIR_OP_VX_IMG_LOAD_3D, VIR_PATTERN_ANYCOND, 0, {  1, 2, 3, 4, 5}, { _needSetConstBorderValue }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _vxImgLoad3DRepInst3[] = {
+    { VIR_OP_MOV, 0, 0, {  -1, 1, 0, 0 }, {_setEvisConstBorderValue } },
+    { VIR_OP_VX_CLAMP, 0, 0, {  1, -1, -1, -1, 5 }, {_setEvisConstBorderValueModifier } },
+    { VIR_OP_VX_IMG_LOAD_3D, 0, 0, { 1, 2, 3, 4, 5 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _vxImgLoad3DPatInst4[] = {
+    { VIR_OP_VX_IMG_LOAD_3D, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, {_isSrc1FloatType }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _vxImgLoad3DRepInst4[] = {
+    { VIR_OP_F2I, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXYZ } },
+    { VIR_OP_VX_IMG_LOAD_3D, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
+};
+
+static VIR_Pattern _vxImgLoad3DPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_vxImgLoad3D, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_vxImgLoad3D, 1) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_vxImgLoad3D, 2) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_vxImgLoad3D, 3) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_vxImgLoad3D, 4) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+static VIR_PatternMatchInst _imgLoadPatInst0[] = {
+    { VIR_OP_IMG_LOAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, { _needSetConstBorderValueAndSrc1FloatType }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _imgLoadRepInst0[] = {
+    { VIR_OP_F2I, 0, 0, { -1, 3, 0 ,0 }, {_setIntegerType_EnableXY } },
+    { VIR_OP_MOV, 0, 0, {  1, 0, 0 ,0 }, {_setConstBorderValue } },
+    { VIR_OP_IMG_LOAD, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _imgLoadPatInst1[] = {
+    { VIR_OP_IMG_LOAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, { _needSetConstBorderValue }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _imgLoadRepInst1[] = {
+    { VIR_OP_MOV, 0, 0, {  1, 0, 0 ,0 }, {_setConstBorderValue } },
+    { VIR_OP_IMG_LOAD, 0, 0, {  1, 2, 3, 4, 5 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _imgLoadPatInst2[] = {
+    { VIR_OP_IMG_LOAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, {_isSrc1FloatType }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _imgLoadRepInst2[] = {
+    { VIR_OP_F2I, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXY } },
+    { VIR_OP_IMG_LOAD, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
+};
+
+static VIR_Pattern _imgLoadPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_imgLoad, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_imgLoad, 1) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_imgLoad, 2) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+static VIR_PatternMatchInst _imgLoad3DPatInst0[] = {
+    { VIR_OP_IMG_LOAD_3D, VIR_PATTERN_ANYCOND, 0, {  1, 2, 3, 4, 5}, { _needSetConstBorderValueAndSrc1FloatType }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _imgLoad3DRepInst0[] = {
+    { VIR_OP_F2I, 0, 0, { -1, 3, 0 ,0 }, {_setIntegerType_EnableXYZ } },
+    { VIR_OP_MOV, 0, 0, { 1, 0, 0 ,0 }, {_setConstBorderValue } },
+    { VIR_OP_IMG_LOAD_3D, 0, 0, { 1, 2, -1, 4, 5 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _imgLoad3DPatInst1[] = {
+    { VIR_OP_IMG_LOAD_3D, VIR_PATTERN_ANYCOND, 0, {  1, 2, 3, 4, 5}, { _needSetConstBorderValue }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _imgLoad3DRepInst1[] = {
+    { VIR_OP_MOV, 0, 0, { 1, 0, 0 ,0 }, {_setConstBorderValue } },
+    { VIR_OP_IMG_LOAD_3D, 0, 0, { 1, 2, 3, 4, 5 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _imgLoad3DPatInst2[] = {
+    { VIR_OP_IMG_LOAD_3D, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, {_isSrc1FloatType }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _imgLoad3DRepInst2[] = {
+    { VIR_OP_F2I, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXYZ } },
+    { VIR_OP_IMG_LOAD_3D, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
+};
+
+static VIR_Pattern _imgLoad3DPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_imgLoad3D, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_imgLoad3D, 1) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_imgLoad3D, 2) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+    /*
+        FWIDTH 1, 2
+            dsx TEMP1, 2
+            dsy TEMP2, 2
+            add 1, |TEMP1|, |TEMP2|, 0
+    */
+static VIR_PatternMatchInst _fwidthPatInst0[] = {
+    { VIR_OP_FWIDTH, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _fwidthRepInst0[] = {
+    { VIR_OP_DSX, 0, 0, { -1, 2, 0, 0 }, { 0 } },
+    { VIR_OP_DSY, 0, 0, { -2, 2, 0, 0 }, { 0 } },
+    { VIR_OP_ADD, 0, 0, {  1, -1, -2, 0 }, { 0, _setAbs, _setAbs } },
+};
+
+static VIR_Pattern _fwidthPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_fwidth, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
 static VIR_Pattern*
 _GetPattern0(
     IN VIR_PatternContext      *Context,
@@ -1576,10 +2465,32 @@ _GetPattern0(
         return _cmovPattern;
     case VIR_OP_MAD:
         return _madPattern;
-    case VIR_OP_IMG_ADDR:
-        return _imgaddrPattern;
     case VIR_OP_NORM:
         return _normPattern;
+
+    /* High-level read_image. */
+    case  VIR_OP_IMG_READ:
+        return _imgReadPattern;
+    case  VIR_OP_IMG_READ_3D:
+        return _imgRead3dPattern;
+    case  VIR_OP_VX_IMG_READ:
+        return _vxImgReadPattern;
+    case  VIR_OP_VX_IMG_READ_3D:
+        return _vxImgRead3dPattern;
+
+    /* High-level write_image. */
+    case VIR_OP_IMG_WRITE:
+        return _imgWritePattern;
+    case VIR_OP_IMG_WRITE_3D:
+        return _imgWrite3dPattern;
+    case VIR_OP_VX_IMG_WRITE:
+        return _vxImgWritePattern;
+    case VIR_OP_VX_IMG_WRITE_3D:
+        return _vxImgWrite3dPattern;
+    case VIR_OP_MAX:
+        return _maxPattern;
+    case VIR_OP_MIN:
+        return _minPattern;
     default:
         break;
     }
@@ -1615,6 +2526,16 @@ _GetPattern1(
         return _negPattern;
     case VIR_OP_ABS:
         return _absPattern;
+    case VIR_OP_VX_IMG_LOAD:
+        return _vxImgLoadPattern;
+    case VIR_OP_VX_IMG_LOAD_3D:
+        return _vxImgLoad3DPattern;
+    case VIR_OP_IMG_LOAD:
+        return _imgLoadPattern;
+    case VIR_OP_IMG_LOAD_3D:
+        return _imgLoad3DPattern;
+    case VIR_OP_FWIDTH:
+        return _fwidthPattern;
     default:
         break;
     }
@@ -1674,44 +2595,20 @@ _GetPatternScalar(
         return _rshiftSclPattern;
     case VIR_OP_JMP_ANY:
         return _jmpanySclPattern;
+    case VIR_OP_CONJ:
+        return _conjPattern;
+    case VIR_OP_CMADCJ:
+        return _cmadcjPattern;
+    case VIR_OP_CMULCJ:
+        return _cmulcjPattern;
+    case VIR_OP_CADDCJ:
+        return _caddcjPattern;
+    case VIR_OP_CSUBCJ:
+        return _csubcjPattern;
     default:
         break;
     }
     return gcvNULL;
-}
-
-static void
-_Lower_Initialize(
-    IN VIR_Shader                *Shader,
-    IN VIR_PatternMCLowerContext *Context,
-    IN VSC_HW_CONFIG             *HwCfg,
-    IN VSC_MM                    *pMM
-    )
-{
-    Context->hwCfg = HwCfg;
-    Context->pMM = pMM;
-
-    Context->hasNEW_TEXLD = HwCfg->hwFeatureFlags.hasHalti2;
-
-    if (HwCfg->hwFeatureFlags.hasSHEnhance2)
-    {
-        if (gcmOPT_NOIMMEDIATE())
-            Context->generateImmediate  = gcvFALSE;
-        else
-            Context->generateImmediate  = gcvTRUE;
-    }
-    else
-    {
-        Context->generateImmediate  = gcvFALSE;
-    }
-
-    Context->isCL_X  = (gctBOOL)HwCfg->hwFeatureFlags.needCLXFixes;
-
-    Context->hasCL   = Context->isCL_X || (gctBOOL)HwCfg->hwFeatureFlags.needCLXEFixes;
-
-    Context->hasHalti4 = (gctBOOL)HwCfg->hwFeatureFlags.hasHalti4;
-
-    Context->hasSHEnhancements2 = (gctBOOL)HwCfg->hwFeatureFlags.hasSHEnhance2;
 }
 
 DEF_QUERY_PASS_PROP(VIR_Lower_LowLevel_To_MachineCodeLevel)
@@ -1728,6 +2625,25 @@ DEF_QUERY_PASS_PROP(VIR_Lower_LowLevel_To_MachineCodeLevel)
     pPassProp->passFlag.resDestroyReq.s.bInvalidateLvFlow = gcvTRUE;
 }
 
+DEF_SH_NECESSITY_CHECK(VIR_Lower_LowLevel_To_MachineCodeLevel)
+{
+    VIR_Shader * Shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VSC_HW_CONFIG* HwCfg = &(&pPassWorker->pCompilerParam->cfg.ctx)->pSysCtx->pCoreSysCtx->hwCfg;
+
+    if (VIR_Shader_GetLevel(Shader) != VIR_SHLEVEL_Post_Low)
+    {
+        return gcvFALSE;
+    }
+
+    if (!gcUseFullNewLinker(HwCfg->hwFeatureFlags.hasHalti2))
+    {
+        VIR_Shader_SetLevel(Shader, VIR_SHLEVEL_Pre_Machine);
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
 VSC_ErrCode
 VIR_Lower_LowLevel_To_MachineCodeLevel(
     IN VSC_SH_PASS_WORKER* pPassWorker
@@ -1737,20 +2653,17 @@ VIR_Lower_LowLevel_To_MachineCodeLevel(
     VIR_Shader * Shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     PVSC_CONTEXT VscContext = &pPassWorker->pCompilerParam->cfg.ctx;
     VSC_HW_CONFIG* HwCfg = &VscContext->pSysCtx->pCoreSysCtx->hwCfg;
-    VIR_PatternMCLowerContext context;
+    VIR_PatternLowerContext context;
+    gctUINT codeCounter[VIR_OP_MAXOPCODE];
 
-    if (VIR_Shader_GetLevel(Shader) != VIR_SHLEVEL_Post_Low)
+    VIR_Lower_Initialize(Shader, &context, HwCfg, pPassWorker->basePassWorker.pMM);
+    /* count code to check */
+    gcoOS_ZeroMemory(&codeCounter, gcmSIZEOF(codeCounter));
+    VIR_Shader_CountCode(Shader, codeCounter);
+    if (codeCounter[VIR_OP_DSY] !=0)
     {
-        return errCode;
+        VIR_Shader_SetFlagExt1(Shader, VIR_SHFLAG_EXT1_HAS_DSY_BEFORE_LOWERING);
     }
-
-    if (!gcUseFullNewLinker(HwCfg->hwFeatureFlags.hasHalti2))
-    {
-        VIR_Shader_SetLevel(Shader, VIR_SHLEVEL_Pre_Machine);
-        return errCode;
-    }
-
-    _Lower_Initialize(Shader, &context, HwCfg, pPassWorker->basePassWorker.pMM);
 
     {
         VIR_PatternContext_Initialize(&context.header, VscContext, Shader, context.pMM, VIR_PATN_CONTEXT_FLAG_NONE,

@@ -223,7 +223,7 @@ __GLXcontext *__glXcurrentContext = &dummyContext;
 /*
 ** Point to glcore's global __glNopDispatchFuncTable.dispatch table.
 */
-__GLesDispatchTable *__glNopDispatchTab = NULL;
+__GLdispatchTable *__glNopDispatchTab = NULL;
 __GLcontext *__glxNopContext = NULL;
 
 /*
@@ -1096,7 +1096,6 @@ CallCreateNewScreen_dri1(Display *dpy, int scrn, __DRIscreen *psc,
 #include <xcb/dri3.h>
 #include <xcb/present.h>
 
-
 static int
 dri3_open(Display *dpy,
           Window root,
@@ -1193,7 +1192,6 @@ CallCreateNewScreen(Display *dpy, int scrn, __DRIscreen *psc,
 
     return CallCreateNewScreen_dri1(dpy, scrn, psc, driDpy, createNewScreen);
 }
-
 
 /*
 ** Allocate the memory for the per screen configs for each screen.

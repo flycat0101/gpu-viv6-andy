@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -23,6 +23,7 @@
 
 
 #include "gc_hal_user.h"
+#include "gc_hal_dump.h"
 
 /* Zone used for header/footer. */
 #define _GC_OBJ_ZONE    gcdZONE_EGL_SWAP
@@ -592,6 +593,42 @@ _DumpFrameTag(
     do {} while (0)
 #endif
 
+#if gcdDUMP && gcdENABLE_VG
+static void
+_DumpVGSwapTag(
+    gcoSURF Surface
+    )
+{
+    gctUINT32 physical[3] = {0};
+    gctPOINTER logical[3] = {gcvNULL};
+    gctINT stride;
+    gctUINT width,height;
+
+    gcoSURF_Lock(Surface, physical, logical);
+    gcoSURF_GetAlignedSize(Surface, &width, &height, &stride);
+
+    gcoHAL_Commit(gcvNULL,gcvTRUE);
+
+    gcmDUMP_BUFFER(gcvNULL,
+        gcvDUMP_BUFFER_MEMORY,
+        physical[0],
+        logical[0],
+        0,
+        stride * height);
+
+    gcoSURF_Unlock(Surface, logical[0]);
+}
+
+#  define VEGL_DUMP_VG_SWAP_TAG(sur) \
+    _DumpVGSwapTag(sur)
+
+#else
+
+#  define VEGL_DUMP_VG_SWAP_TAG(sur) \
+    do {} while (0)
+
+#endif
+
 /* Realloc region with give capacity. */
 static gcmINLINE EGLBoolean
 _ReallocRegion(
@@ -1076,7 +1113,9 @@ veglSwapWorker(
             /* The current worker is the one to be displayed. */
             displayWorker = currWorker;
 
+#if gcdDUMP_FRAMERATE
             gcmDUMP_FRAMERATE();
+#endif
 
             /* Post window back buffer. */
             display->platform->postWindowBackBuffer(display,
@@ -1333,31 +1372,9 @@ _eglSwapBuffersRegionDRI(
         height = draw->config.height;
 
         VEGL_DUMP_SWAP_TAG(draw, resolveTarget);
-#if gcdDUMP_2DVG
-        {
-            gctUINT32 physical[3] = {0};
-            gctPOINTER logical[3] = {gcvNULL};
-            gctINT stride;
-            gctUINT width, height;
 
-            gcoHAL_Flush(gcvNULL);
-            gcoSURF_Lock(draw->renderTarget, physical, logical);
-            gcoSURF_GetAlignedSize(draw->renderTarget, &width, &height, &stride);
+        VEGL_DUMP_VG_SWAP_TAG(draw->renderTarget);
 
-            gcoHAL_Commit(gcvNULL,gcvTRUE);
-            gcmDUMP(gcvNULL,
-                "@[swap 0x%08X %dx%d +%u]",
-                physical[0],
-                width, height,
-                stride);
-            gcmDUMP_BUFFER(gcvNULL,
-                "framebuffer",
-                physical[0],logical[0],
-                0,
-                stride*height);
-            gcoSURF_Unlock(draw->renderTarget, logical[0]);
-        }
-#endif
 #if gcdENABLE_VG
         if ( thread->openVGpipe && (thread->api == EGL_OPENVG_API) )
         {
@@ -1388,8 +1405,8 @@ _eglSwapBuffersRegionDRI(
         VEGL_DUMP_TGA(thread, draw);
 
         /* Check for window resize. */
-        if ((draw->config.width != (EGLint)width) ||
-            (draw->config.height != (EGLint)height))
+        if ((draw->config.width != (gctINT)width) ||
+            (draw->config.height != (gctINT)height))
         {
             if (gcmIS_ERROR(veglResizeSurface(dpy, draw, width, height)))
             {
@@ -1439,7 +1456,6 @@ _eglSwapBuffersRegionDRI(
 
     return result;
 }
-
 
 /*
  * Compute valid swap region.
@@ -1610,8 +1626,8 @@ _ClipDamageRegion(
                 }
             }
 
-            index = (index == 0) ? (EGL_WORKER_COUNT - 1)
-                  : (index - 1);
+            index = (Draw->curDamage == 0) ? (EGL_WORKER_COUNT - 1)
+                  : (Draw->curDamage - 1);
         }
 
         if (!boundingValid)
@@ -1955,31 +1971,8 @@ _SwapBuffersRegion(
             }
 
             VEGL_DUMP_SWAP_TAG(draw, backBuffer.surface);
-#if gcdDUMP_2DVG
-            {
-                gctUINT32 physical[3] = {0};
-                gctPOINTER logical[3] = {gcvNULL};
-                gctINT stride;
-                gctUINT width, height;
 
-                gcoSURF_Lock(backBuffer.surface, physical, logical);
-                gcoSURF_GetAlignedSize(backBuffer.surface, &width, &height, &stride);
-
-                gcoHAL_Flush(gcvNULL);
-                gcoHAL_Commit(gcvNULL,gcvTRUE);
-                gcmDUMP(gcvNULL,
-                    "@[swap 0x%08X %dx%d +%u]",
-                    physical[0],
-                    width, height,
-                    stride);
-                gcmDUMP_BUFFER(gcvNULL,
-                    "framebuffer",
-                    physical[0],logical[0],
-                    0,
-                    stride*height);
-                gcoSURF_Unlock(backBuffer.surface, logical[0]);
-            }
-#endif
+            VEGL_DUMP_VG_SWAP_TAG(backBuffer.surface);
 #endif
         }
 
@@ -2186,7 +2179,7 @@ _SwapBuffersRegion(
                 }
 
                 /* Sync drawable with renderTarget. */
-                draw->drawable.rtHandles[0] = draw->renderTarget;
+                draw->drawable.rtHandles[0]     = draw->renderTarget;
                 draw->drawable.prevRtHandles[0] = draw->prevRenderTarget;
 
                 /* Update drawable to api. */
@@ -2477,9 +2470,7 @@ veglSwapBuffers(
     )
 {
     EGLBoolean result = EGL_FALSE;
-
     VEGLDisplay dpy = veglGetDisplay(Dpy);
-
 
 
 #if gcdDEBUG_OPTION && gcdDEBUG_OPTION_SKIP_SWAP && gcdDEBUG_OPTION_SKIP_FRAMES
@@ -2508,6 +2499,7 @@ veglSwapBuffers(
     {
         result = _eglSwapBuffersRegion(Dpy, Draw, SwapRegion, DamageHint);
     }
+
 
 
 #if gcdGC355_PROFILER

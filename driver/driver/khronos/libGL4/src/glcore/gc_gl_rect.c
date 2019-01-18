@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -22,12 +22,12 @@
 __GL_INLINE GLvoid __glRect(__GLcontext *gc, GLfloat x0, GLfloat y0, GLfloat x1, GLfloat y1)
 {
 
-    (*gc->currentImmediateTable->Begin)(gc, GL_QUADS);
-    (*gc->currentImmediateTable->Vertex2f)(gc, x0, y0);
-    (*gc->currentImmediateTable->Vertex2f)(gc, x1, y0);
-    (*gc->currentImmediateTable->Vertex2f)(gc, x1, y1);
-    (*gc->currentImmediateTable->Vertex2f)(gc, x0, y1);
-    (*gc->currentImmediateTable->End)(gc);
+    (*gc->immedModeDispatch.Begin)(gc, GL_QUADS);
+    (*gc->immedModeDispatch.Vertex2f)(gc, x0, y0);
+    (*gc->immedModeDispatch.Vertex2f)(gc, x1, y0);
+    (*gc->immedModeDispatch.Vertex2f)(gc, x1, y1);
+    (*gc->immedModeDispatch.Vertex2f)(gc, x0, y1);
+    (*gc->immedModeDispatch.End)(gc);
 
 }
 

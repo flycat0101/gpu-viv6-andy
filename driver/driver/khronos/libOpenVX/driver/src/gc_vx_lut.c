@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -54,7 +54,7 @@ VX_PRIVATE_API vx_status gcoLUT_CopyArrayRangeInt(vx_array arr, vx_size start, v
     vx_size offset = start * arr->itemSize;
     if (usage == VX_READ_ONLY)
     {
-        vxError("CopyArrayRange from "VX_FMT_REF" to ptr %p from %u to %u\n", arr, ptr, start, end);
+        vxInfo("CopyArrayRange from "VX_FMT_REF" to ptr %p from %u to %u\n", arr, ptr, start, end);
         {
             vx_uint8 *pSrc = (vx_uint8 *)&arr->memory.logicals[0][offset];
         vx_uint8 *pDst = (vx_uint8 *)ptr;
@@ -81,7 +81,7 @@ VX_PRIVATE_API vx_status gcoLUT_CopyArrayRangeInt(vx_array arr, vx_size start, v
     }
     else
     {
-        vxError("CopyArrayRange from ptr %p to "VX_FMT_REF" from %u to %u\n", arr, ptr, start, end);
+        vxInfo("CopyArrayRange from ptr %p to "VX_FMT_REF" from %u to %u\n", arr, ptr, start, end);
 
         if (vxAcquireMutex(arr->memory.writeLocks[0]) == vx_true_e)
         {
@@ -150,7 +150,7 @@ VX_PRIVATE_API vx_status gcoLUT_MapArrayRangeInt(vx_array arr, vx_size start, vx
         return VX_ERROR_NO_MEMORY;
     }
 
-    vxError("MapArrayRange from "VX_FMT_REF" to ptr %p from %u to %u\n", arr, *ptr, start, end);
+    vxInfo("MapArrayRange from "VX_FMT_REF" to ptr %p from %u to %u\n", arr, *ptr, start, end);
     {
     vx_memory_map_extra_s extra;
     vx_uint8 *buf = NULL;
@@ -221,7 +221,7 @@ VX_PRIVATE_API vx_status gcoLUT_UnmapArrayRangeInt(vx_array arr, vx_map_id map_i
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
-    vxError("UnmapArrayRange from "VX_FMT_REF"\n", arr);
+    vxInfo("UnmapArrayRange from "VX_FMT_REF"\n", arr);
     {
     vx_context context = arr->base.context;
     vx_memory_map_s* map = &context->memoryMaps[map_id];
@@ -299,7 +299,7 @@ VX_PRIVATE_API vx_status gcoLUT_MapArrayRangeInt(vx_array arr, vx_size start, vx
         return VX_ERROR_NO_MEMORY;
     }
 
-    vxError("MapArrayRange from "VX_FMT_REF" to ptr %p from %u to %u\n", arr, *ptr, start, end);
+    vxInfo("MapArrayRange from "VX_FMT_REF" to ptr %p from %u to %u\n", arr, *ptr, start, end);
     {
         vx_memory_map_extra_s extra;
         vx_uint8 *buf = NULL;
@@ -345,7 +345,7 @@ VX_PRIVATE_API vx_status gcoLUT_UnmapArrayRangeInt(vx_array arr, vx_map_id map_i
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
-    vxError("UnmapArrayRange from "VX_FMT_REF"\n", arr);
+    vxInfo("UnmapArrayRange from "VX_FMT_REF"\n", arr);
     {
         vx_context context = arr->base.context;
         vx_memory_map_s* map = &context->memoryMaps[map_id];
@@ -369,10 +369,9 @@ VX_API_ENTRY vx_lut VX_API_CALL vxCreateLUT(vx_context context, vx_enum data_typ
 {
     vx_array lut;
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
+    gcmDUMP_API("$VX vxCreateLUT: context=%p, data_type=0x%x, count=0x%lx", context, data_type, count);
 
-    if((data_type == VX_TYPE_INT16) && (count <= 65536))
-        lut = (vx_array)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
+    if (!vxoContext_IsValid(context)) return VX_NULL;
 
     switch (data_type)
     {
@@ -385,7 +384,7 @@ VX_API_ENTRY vx_lut VX_API_CALL vxCreateLUT(vx_context context, vx_enum data_typ
             return (vx_lut)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_TYPE);
     }
 
-    lut = vxoArray_Create(context, data_type, count, vx_false_e, VX_TYPE_LUT);
+    lut = vxoArray_Create(context, data_type, count, vx_false_e, VX_TYPE_LUT, vx_false_e);
 
     if (vxoReference_GetStatus((vx_reference)lut) != VX_SUCCESS) return (vx_lut)lut;
 
@@ -398,12 +397,16 @@ VX_API_ENTRY vx_lut VX_API_CALL vxCreateLUT(vx_context context, vx_enum data_typ
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseLUT(vx_lut *lut)
 {
+    gcmDUMP_API("$VX vxReleaseLUT: lut=%p", lut);
+
     return vxoReference_Release((vx_reference_ptr)lut, VX_TYPE_LUT, VX_REF_EXTERNAL);
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryLUT(vx_lut lut, vx_enum attribute, void *ptr, vx_size size)
 {
     vx_array lutArray = (vx_array)lut;
+
+    gcmDUMP_API("$VX vxQueryLUT: lut=%p, attribute=0x%x, ptr=%p, size=0x%lx", lut, attribute, ptr, size);
 
     if (!vxoReference_IsValidAndSpecific(&lutArray->base, VX_TYPE_LUT)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -445,6 +448,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxAccessLUT(vx_lut lut, void **ptr, vx_enum u
 {
     vx_array lutArray = (vx_array)lut;
 
+    gcmDUMP_API("$VX vxAccessLUT: lut=%p, ptr=%p, usage=0x%x", lut, ptr, usage);
+
     if (!vxoReference_IsValidAndSpecific(&lutArray->base, VX_TYPE_LUT)) return VX_ERROR_INVALID_REFERENCE;
 
     return vxoArray_AccessRange(lutArray, 0, lutArray->itemCount, VX_NULL, ptr, usage);
@@ -453,6 +458,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxAccessLUT(vx_lut lut, void **ptr, vx_enum u
 VX_API_ENTRY vx_status VX_API_CALL vxCommitLUT(vx_lut lut, const void *ptr)
 {
     vx_array lutArray = (vx_array)lut;
+
+    gcmDUMP_API("$VX vxCommitLUT: lut=%p, ptr=%p", lut, ptr);
 
     if (!vxoReference_IsValidAndSpecific(&lutArray->base, VX_TYPE_LUT)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -463,6 +470,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyLUT(vx_lut l, void *user_ptr, vx_enum u
 {
     vx_status status = VX_FAILURE;
     vx_lut_s *lut = (vx_lut_s *)l;
+
+    gcmDUMP_API("$VX vxCopyLUT: l=%p, user_ptr=%p, usage=0x%x, user_mem_type=0x%x", l, user_ptr, usage, user_mem_type);
     if (vxoReference_IsValidAndSpecific(&lut->base, VX_TYPE_LUT))
     {
         vx_size stride = lut->itemSize;
@@ -479,6 +488,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapLUT(vx_lut l, vx_map_id *map_id, void **
 {
     vx_status status = VX_FAILURE;
     vx_lut_s *lut = (vx_lut_s *)l;
+
+    gcmDUMP_API("$VX vxMapLUT: l=%p, map_id=%p, ptr=%p, usage=0x%x, mem_type=0x%x, flags=0x%x", l, map_id, ptr, usage, mem_type, flags);
     if (vxoReference_IsValidAndSpecific(&lut->base, VX_TYPE_LUT))
     {
         vx_size stride = lut->itemSize;
@@ -495,6 +506,9 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapLUT(vx_lut l, vx_map_id map_id)
 {
     vx_status status = VX_FAILURE;
     vx_lut_s *lut = (vx_lut_s *)l;
+
+    gcmDUMP_API("$VX vxUnmapLUT: l=%p, map_id=0x%x", l, map_id);
+
     if (vxoReference_IsValidAndSpecific(&lut->base, VX_TYPE_LUT))
     {
         status = gcoLUT_UnmapArrayRangeInt((vx_array_s *)l, map_id);
@@ -506,4 +520,23 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapLUT(vx_lut l, vx_map_id map_id)
     return status;
 }
 
+VX_API_ENTRY vx_lut VX_API_CALL vxCreateVirtualLUT(vx_graph graph, vx_enum data_type, vx_size count)
+{
+    vx_array lut;
+    vx_context context = vxoContext_GetFromReference((vx_reference)graph);
+
+    gcmDUMP_API("$VX vxCreateVirtualLUT: graph=%p, data_type=0x%x, count=0x%lx", graph, data_type, count);
+
+    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_NULL;
+
+    lut = (vx_array)vxCreateLUT(context, data_type, count);
+
+    if (vxoReference_GetStatus((vx_reference)lut) != VX_SUCCESS) return (vx_lut)lut;
+
+    lut->base.scope        = (vx_reference)graph;
+
+    lut->base.isVirtual    = vx_true_e;
+
+    return (vx_lut)lut;
+}
 

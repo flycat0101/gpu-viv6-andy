@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -14,6 +14,7 @@
 #include "gc_es_context.h"
 #include "gc_chip_context.h"
 #include "gc_es_object_inline.c"
+#include "gc_hal_dump.h"
 
 #define _GC_OBJ_ZONE    __GLES3_ZONE_DRAW
 
@@ -1028,26 +1029,28 @@ gcChipSetVertexArrayBindBegin(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
 
     gcmHEADER();
 
 #if gcdUSE_WCLIP_PATCH
-    /* WClipping Patch. */
-    if (fixWLimit && chipCtx->wLimitPatch
-#if __GL_CHIP_PATCH_ENABLED
-        && (chipCtx->patchInfo.patchFlags.clipW < 2)
-#endif
-        )
     {
-        gcmONERROR(gcChipComputeWlimitArg(gc, instantDraw));
-
-        if (chipCtx->computeWlimitByVertex &&
-            !chipCtx->wLimitSettled &&
-            instantDraw->count <= chipCtx->wLimitComputeLimit &&
-            instantDraw->positionIndex != -1)
+        __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+        /* WClipping Patch. */
+        if (fixWLimit && chipCtx->wLimitPatch
+#if __GL_CHIP_PATCH_ENABLED
+            && (chipCtx->patchInfo.patchFlags.clipW < 2)
+#endif
+            )
         {
-            gcmONERROR(gcChipComputeWlimitByVertex(gc, instantDraw));
+            gcmONERROR(gcChipComputeWlimitArg(gc, instantDraw));
+
+            if (chipCtx->computeWlimitByVertex &&
+                !chipCtx->wLimitSettled &&
+                instantDraw->count <= chipCtx->wLimitComputeLimit &&
+                instantDraw->positionIndex != -1)
+            {
+                gcmONERROR(gcChipComputeWlimitByVertex(gc, instantDraw));
+            }
         }
     }
 #endif
@@ -1057,6 +1060,7 @@ gcChipSetVertexArrayBindBegin(
     {
         /*for line loop the last line is automatic added in hw implementation*/
         instantDraw->primCount = instantDraw->primCount - 1;
+        gcmONERROR(gcvSTATUS_OK);
     }
 
 OnError:
@@ -1072,23 +1076,24 @@ gcChipSetVertexArrayBindEnd(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
 
     gcmHEADER();
 
 #if gcdUSE_WCLIP_PATCH
-    /* WClipping Patch. */
-    if (fixWLimit && chipCtx->wLimitPatch  && !chipCtx->wLimitSettled
-#if __GL_CHIP_PATCH_ENABLED
-        && (chipCtx->patchInfo.patchFlags.clipW < 2)
-#endif
-        )
     {
-        gcmONERROR(gcChipFixWlimit(gc));
-    }
+        __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+        /* WClipping Patch. */
+        if (fixWLimit && chipCtx->wLimitPatch  && !chipCtx->wLimitSettled
+#if __GL_CHIP_PATCH_ENABLED
+            && (chipCtx->patchInfo.patchFlags.clipW < 2)
 #endif
-
+            )
+        {
+            gcmONERROR(gcChipFixWlimit(gc));
+        }
+    }
 OnError:
+#endif
     gcmFOOTER();
     return status;
 }
@@ -3594,11 +3599,13 @@ gcChipValidateDrawPath(
                 break;
             }
 
+#if VIVANTE_PROFILER
             if (gc->profiler.enable)
             {
                 __glChipProfilerSet(gc, GL3_PROFILER_PRIMITIVE_TYPE, (gctHANDLE)(gctUINTPTR_T)defaultInstant->primMode);
                 __glChipProfilerSet(gc, GL3_PROFILER_PRIMITIVE_COUNT, (gctHANDLE)(gctUINTPTR_T)(defaultInstant->primCount * gc->vertexArray.instanceCount));
             }
+#endif
 
             /* Is any of the attrib need SW converted? */
             if (chipCtx->anyAttibConverted)
@@ -4964,7 +4971,14 @@ gcChipValidateChipDirty(
         }
 #endif
 
-        if(chipCtx->chipDirty.uDefer.sDefer.polygonOffset)
+        #if gcdALPHA_KILL_IN_SHADER
+        if (chipCtx->chipDirty.uDefer.sDefer.blend || chipCtx->chipDirty.uDefer.sDefer.fsReload)
+        {
+            gcmONERROR(gcChipSetAlphaKill(gc));
+        }
+#endif
+
+        if (chipCtx->chipDirty.uDefer.sDefer.polygonOffset)
         {
             gcmONERROR(gcChipSetPolygonOffset(gc));
         }
@@ -5251,15 +5265,15 @@ __GLchipInstantDraw* instantDraw
                 vector[j] = vertexPtr[j];
             }
         }
+#if gcdUSE_WCLIP_PATCH
         else
         {
             for (j = 0; j < attrib->size; j++)
             {
-
-                readDataForWLimit(vertexPtr + j, vector[j])
+                readDataForWLimit(vertexPtr + j, vector[j]);
             }
-
         }
+#endif
 
         /*MVP matrix is identiy */
         vertexs[i][0] = vector[0];
@@ -6090,7 +6104,7 @@ gcChipCollectSplitDrawArraysInfo(
         instantDraw->primMode == gcvPRIMITIVE_LINE_LIST ||
         instantDraw->primMode == gcvPRIMITIVE_TRIANGLE_LIST
         )
-       )
+    )
     {
         splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_XFB;
         splitDrawInfo->splitDrawFunc = gcChipSplitDrawXFB;
@@ -7032,11 +7046,19 @@ __glChipDrawNothing(
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     gceSTATUS status;
+    __GLchipInstantDraw *instantDraw = &chipCtx->instantDraw[__GL_DEFAULT_LOOP];
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-    status = gco3D_DrawNullPrimitives(chipCtx->engine);
+    if (instantDraw->count)
+    {
+        /* Bind the vertex array to the hardware. */
+        gcmONERROR(gcChipSetVertexArrayBind(gc, instantDraw, gcvTRUE, gcvFALSE));
+    }
 
+    gcmONERROR(gco3D_DrawNullPrimitives(chipCtx->engine));
+
+OnError:
     gcmFOOTER();
 
     return (gcmIS_ERROR(status) ? GL_FALSE : GL_TRUE);
@@ -7044,8 +7066,7 @@ __glChipDrawNothing(
 
 GLboolean
 __glChipFlush(
-    __GLcontext *gc,
-    GLboolean bInternal
+    __GLcontext *gc
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
@@ -7078,7 +7099,7 @@ __glChipFinish(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-    /* Sychronization between CPU and GPU, then drain all commands */
+    /*Synchronization between CPU and GPU, then drain all commands */
     gcmONERROR(gcChipFboSyncFromShadow(gc, gc->frameBuffer.drawFramebufObj));
 
     gcmONERROR(gcoSURF_Flush(gcvNULL));
@@ -7249,10 +7270,12 @@ __glChipDrawBegin(
         }
 #endif
 
+#if VIVANTE_PROFILER
         if (gc->profiler.enable  && gc->profiler.perDrawMode)
         {
             __glChipProfilerSet(gc, GL3_PROFILER_DRAW_BEGIN, 0);
         }
+#endif
 
         /* Special patch for fishnoodle.*/
         if (chipCtx->patchId == gcvPATCH_FISHNOODLE &&
@@ -7667,10 +7690,13 @@ __glChipDrawBegin(
         ret = GL_TRUE;
     } while (0);
 
+#if VIVANTE_PROFILER
     if (ret == GL_FALSE && gc->profiler.enable &&  gc->profiler.perDrawMode)
     {
         __glChipProfilerSet(gc, GL3_PROFILER_DRAW_END, 0);
     }
+#endif
+
     gcmFOOTER_ARG("return=%d", ret);
     return ret;
 }
@@ -7783,10 +7809,12 @@ __glChipDrawEnd(
         }
     }
 
+#if VIVANTE_PROFILER
     if (gc->profiler.enable && gc->profiler.perDrawMode)
     {
         __glChipProfilerSet(gc, GL3_PROFILER_DRAW_END, 0);
     }
+#endif
 
 #if gcdFRAMEINFO_STATISTIC
     {
@@ -8260,6 +8288,7 @@ __glChipComputeValidateState(
             chipCtx->activeProgState = gcvNULL;
         }
     }
+
     /* Flush shader resource after program is loaded to under layer */
     gcmONERROR(gcChipTraverseProgramStages(gc, chipCtx, gcChipFlushGLSLResourcesCB));
 
@@ -8516,6 +8545,7 @@ __glChipDispatchCompute(
             }
         }
         info.barrierUsed = program->curPgInstance->programState.hints->threadGroupSync;
+        info.bDual16 = program->curPgInstance->programState.hints->fsIsDual16;
         gcmERR_BREAK(gco3D_InvokeThreadWalker(chipCtx->engine, &info));
     } while (GL_FALSE);
 

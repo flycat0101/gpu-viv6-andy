@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -42,7 +42,7 @@ typedef struct _gcsPLATFORM_OPERATIONS
     gceSTATUS
     (*getCPUPhysical)(
         IN gcoPLATFORM Platform,
-        IN gctUINT32 GPUPhysical,
+        IN gctPHYS_ADDR_T GPUPhysical,
         OUT gctPHYS_ADDR_T * CPUPhysical
         );
 }

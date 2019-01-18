@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -277,7 +277,7 @@ void _PrintConstantMapping(SHADER_CONSTANT_MAPPING* pConstantMapping, VIR_Shader
 
         if (pCTC->hwConstantLocation.hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER)
         {
-            vscDumper_PrintStrSafe(pDumper, "c%d = {", pCTC->hwConstantLocation.hwLoc.hwRegNo);
+            vscDumper_PrintStrSafe(pDumper, "c%d = {", pCTC->hwConstantLocation.hwLoc.constReg.hwRegNo);
         }
         else
         {
@@ -311,10 +311,6 @@ void _PrintMappingTables(SHADER_EXECUTABLE_PROFILE* pSEP, VIR_Shader* pShader, V
     vscDumper_PrintStrSafe(pDumper, "[mapping tables]");
     vscDumper_DumpBuffer(pDumper);
 
-    /* TODO:
-            If pShader is not NULL, we need dump vir-symbol->#->hw resource, not only #->hw resource.
-    */
-
     /* Print inputs */
     _PrintIoMapping(&pSEP->inputMapping, gcvTRUE, pShader, pDumper);
 
@@ -340,6 +336,8 @@ void _PrintSEPMisc(SHADER_EXECUTABLE_PROFILE* pSEP, VSC_DUMPER* pDumper)
     /* Print chip version */
     vscDumper_PrintStrSafe(pDumper, "chip = 0x%x\n", pSEP->chipModel);
     vscDumper_PrintStrSafe(pDumper, "chipRevision = 0x%x\n", pSEP->chipRevision);
+    vscDumper_PrintStrSafe(pDumper, "productID = 0x%x\n", pSEP->productID);
+    vscDumper_PrintStrSafe(pDumper, "customerID = 0x%x\n", pSEP->customerID);
 
     /* Print total inst count */
     vscDumper_PrintStrSafe(pDumper, "instCount = %d\n", pSEP->countOfMCInst);
@@ -349,6 +347,12 @@ void _PrintSEPMisc(SHADER_EXECUTABLE_PROFILE* pSEP, VSC_DUMPER* pDumper)
 
     /* Print GPR count */
     vscDumper_PrintStrSafe(pDumper, "tempRegCount = %d\n", pSEP->gprCount);
+
+    /* Print workGroupSize */
+    if ((SHADER_TYPE)DECODE_SHADER_TYPE(pSEP->shVersionType) == SHADER_TYPE_GENERAL)
+    {
+        vscDumper_PrintStrSafe(pDumper, "workGroupSize = %d\n", pSEP->exeHints.nativeHints.prvStates.gps.calculatedWorkGroupSize);
+    }
 
     /* Flush now */
     vscDumper_DumpBuffer(pDumper);
@@ -374,7 +378,9 @@ void _PrintExeHints(SHADER_EXECUTABLE_PROFILE* pSEP, VSC_DUMPER* pDumper)
     {
         "unified",
         "fixed",
-        "float"
+        "pack float",
+        "gpipe top, ps bot",
+        "gpipe bot, ps top"
     };
 
     gctCONST_STRING strGsInputPrimName[] =
@@ -541,6 +547,14 @@ void vscPrintSEP(VSC_SYS_CONTEXT* pSysCtx, SHADER_EXECUTABLE_PROFILE* pSEP, SHAD
     vscDumper_PrintStrSafe(&sepDumper, "SEP_%d_%d\n", DECODE_SEP_MAJOR_VER(pSEP->profileVersion),
                                                       DECODE_SEP_MINOR_VER(pSEP->profileVersion));
     vscDumper_DumpBuffer(&sepDumper);
+
+    /* Print kernel function name. */
+    if (pShader && VIR_Shader_IsCL(pShader))
+    {
+        gcmASSERT(VIR_Shader_GetKernelNameId(pShader) != VIR_INVALID_ID);
+        vscDumper_PrintStrSafe(&sepDumper, "KernelFunction: %s", VIR_Shader_GetStringFromId(pShader, VIR_Shader_GetKernelNameId(pShader)));
+        vscDumper_DumpBuffer(&sepDumper);
+    }
 
     /* Print misc info */
     _PrintSEPMisc(pSEP, &sepDumper);

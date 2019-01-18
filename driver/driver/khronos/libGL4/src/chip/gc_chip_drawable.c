@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -103,7 +103,6 @@ gcChipPickDrawBuffersForDrawable(
 
             case GL_LEFT:
                 rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[__GL_DRAWBUFFER_FRONTLEFT_INDEX];
-                gc->state.raster.drawBuffers[0] = GL_FRONT_LEFT;
                 if (gc->modes.doubleBufferMode)
                 {
                     rtViews[rtNum++].surf = (gcoSURF)drawable->rtHandles[__GL_DRAWBUFFER_BACKLEFT_INDEX];
@@ -731,10 +730,8 @@ GLvoid notifyChangeBufferSizeDrawable(__GLcontext * gc)
     glsCHIPDRAWABLE* chipDraw = (glsCHIPDRAWABLE*)(draw->dp.privateData);
     glsCHIPBUFFERCREATE chipCreateInfo;
     __GLformatInfo *pformatInfo = gcvNULL;
-    GLint i;
     GLboolean retValue = GL_TRUE;
 
-    gcoSURF rtSurf[__GL_MAX_DRAW_BUFFERS] = {gcvNULL};
     gcoSURF stencilSurf = gcvNULL;
     gcoSURF accumSurf = gcvNULL;
     gcoSURF nullSurf = gcvNULL;
@@ -1040,14 +1037,10 @@ GLvoid resolveBuffer(__GLcontext * gc,  GLboolean swapFront)
 
 GLvoid resolveRenderTargetToScreen(__GLcontext * gc)
 {
-    __GLchipContext     *chipCtx = CHIP_CTXINFO(gc);
     __GLdrawablePrivate *draw = gc->drawablePrivate;
-    glsCHIPDRAWABLE_PTR  chipDraw = (glsCHIPDRAWABLE_PTR)(draw->dp.privateData);
 
     vivDriMirror *pDriMirror = (vivDriMirror *)gc->imports.other;
     __DRIdrawablePrivate *dPriv = pDriMirror->drawable;
-
-    gcoSURF displaySurf;
 
     LINUX_LOCK_FRAMEBUFFER(gc);
 
@@ -1088,7 +1081,6 @@ GLvoid __glChipFreeDrawableBuffers(__GLdrawablePrivate *draw, GLboolean bWaitDra
     glsCHIPREADABLE * chipDrawable;
     glCHIPBUFFERDESSTROY chipDestroyInfo;
     GLuint i;
-    gceSTATUS status;
 
     gcmHEADER_ARG("draw=0x%x", draw);
 

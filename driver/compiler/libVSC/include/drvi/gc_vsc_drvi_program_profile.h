@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -75,6 +75,13 @@ typedef enum GL_FRAGOUT_USAGE
 }
 GL_FRAGOUT_USAGE;
 
+typedef enum GL_UNIFORM_HW_SUB_MAPPING_MODE
+{
+    GL_UNIFORM_HW_SUB_MAPPING_MODE_CONSTANT     = 0,
+    GL_UNIFORM_HW_SUB_MAPPING_MODE_SAMPLER      = 1,
+}
+GL_UNIFORM_HW_SUB_MAPPING_MODE;
+
 typedef enum GL_UNIFORM_USAGE
 {
     /* All user defined uniforms will get this type */
@@ -88,10 +95,25 @@ typedef enum GL_UNIFORM_USAGE
 }
 GL_UNIFORM_USAGE;
 
+typedef enum VK_UNIFORM_TEXEL_BUFFER_HW_MAPPING_MODE
+{
+    VK_UNIFORM_TEXEL_BUFFER_HW_MAPPING_MODE_NATIVELY_SUPPORT        = 0,
+    VK_UNIFORM_TEXEL_BUFFER_HW_MAPPING_MODE_NOT_NATIVELY_SUPPORT    = 1,
+}
+VK_UNIFORM_TEXEL_BUFFER_HW_MAPPING_MODE;
+
 
 /**********************************************************************************************************************
  **********************************     Common program mapping table definitions     **********************************
  **********************************************************************************************************************/
+
+typedef enum _VSC_RES_ENTRY_BIT
+{
+    VSC_RES_ENTRY_BIT_NONE      = 0x0000,
+    VSC_RES_ENTRY_BIT_8BIT      = 0x0001,
+    VSC_RES_ENTRY_BIT_16BIT     = 0x0002,
+    VSC_RES_ENTRY_BIT_32BIT     = 0x0004,
+}VSC_RES_ENTRY_BIT;
 
 /* Attribute table definition
 
@@ -106,7 +128,9 @@ GL_UNIFORM_USAGE;
 typedef struct PROG_ATTRIBUTE_TABLE_ENTRY
 {
     VSC_SHADER_DATA_TYPE                        type;
+    VSC_RES_ENTRY_BIT                           resEntryBit;
     gctCONST_STRING                             name;
+    gctUINT                                     nameLength;
 
     /* Decl'ed array size by GLSL, at this time, it must be 1 */
     gctSIZE_T                                   arraySize;
@@ -128,6 +152,7 @@ typedef struct PROG_ATTRIBUTE_TABLE_ENTRY
        If user didn't assign it, we should allocate it then. Each ioRegMapping has a
        corresponding location. */
     gctUINT*                                    pLocation;
+    gctUINT                                     locationCount;
 
     /* How many vec4 'type' can group? For component count of type LT vec4, regarding it as vec4 */
     gctUINT                                     vec4BasedCount;
@@ -159,7 +184,9 @@ PROG_ATTRIBUTE_TABLE;
 typedef struct PROG_FRAGOUT_TABLE_ENTRY
 {
     VSC_SHADER_DATA_TYPE                        type;
+    VSC_RES_ENTRY_BIT                           resEntryBit;
     gctCONST_STRING                             name;
+    gctUINT                                     nameLength;
 
     /* Specially for built-in ones */
     GL_FRAGOUT_USAGE                            usage;
@@ -175,6 +202,7 @@ typedef struct PROG_FRAGOUT_TABLE_ENTRY
     /* Shader can have 'layout(location = ?)' qualifier, if so, just use it. Otherwise, we should allocate
        it then. Each ioRegMapping has a corresponding location. */
     gctUINT*                                    pLocation;
+    gctUINT                                     locationCount;
 
     /* How many vec4 'type' can group? For component count of type LT vec4, regarding it as vec4. Since
        frag output variable can only be scalar or vector, so it actually is the array size GLSL decl'ed */
@@ -235,6 +263,8 @@ typedef struct PROG_GL_UNIFORM_HW_SUB_MAPPING
        (further validHWChannelMask) to determine where data goes. For sampler, it must be 0x01 */
     gctUINT                                     validChannelMask;
 
+    GL_UNIFORM_HW_SUB_MAPPING_MODE              hwSubMappingMode;
+
     /* Points to HW constant/sampler mapping that SEPs maintains. Compiler assure this active sub range is
        mapped to successive HW register/memory. */
     union
@@ -267,6 +297,7 @@ typedef struct PROG_GL_UNIFORM_COMMON_ENTRY
 {
     VSC_SHADER_DATA_TYPE                        type;
     gctCONST_STRING                             name;
+    gctUINT                                     nameLength;
     GL_DATA_PRECISION                           precision;
 
     /* Decl'ed array size by GLSL */
@@ -373,6 +404,7 @@ typedef struct PROG_GL_XFB_OUT_TABLE_ENTRY
 {
     VSC_SHADER_DATA_TYPE                        type;
     gctCONST_STRING                             name;
+    gctUINT                                     nameLength;
 
     /* Decl'ed array size by GLSL */
     gctSIZE_T                                   arraySize;
@@ -623,10 +655,26 @@ PROG_VK_SEPARATED_SAMPLER_TABLE;
 typedef union PROG_VK_SEPARATED_TEXTURE_HW_MAPPING
 {
     /* For HW natively supports separated texture */
-    SHADER_RESOURCE_SLOT_MAPPING                texMapping;
+    SHADER_RESOURCE_SLOT_MAPPING                    texMapping;
 
     /* For HW does not natively supports separated texture */
-    PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING_LIST  texHwMappingList;
+    struct
+    {
+        /* For a separated image, it might need a image-size attached. As each image in
+           storageBinding::arraySize array has image-size, so this is the first entry
+           of image-size array. */
+        SHADER_PRIV_CONSTANT_ENTRY*                 pImageSize;
+
+        /* Extra layer HW mapping. As currently, for images in in texBinding::arraySize
+           array, if one image has extra image, all other images must have extra image, so
+           this is the first entry of extra-image */
+        SHADER_PRIV_UAV_ENTRY*                      pExtraLayer;
+
+        /* We still need to allocate a constant image for this separated texture for the imageFetch operation.*/
+        SHADER_UAV_SLOT_MAPPING                     hwMapping;
+
+        PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING_LIST  texHwMappingList;
+    } s;
 }
 PROG_VK_SEPARATED_TEXTURE_HW_MAPPING;
 
@@ -670,26 +718,31 @@ PROG_VK_SEPARATED_TEXTURE_TABLE;
    VSC_SHADER_RESOURCE_TYPE_UNIFORM_TEXEL_BUFFER
 */
 
-typedef union PROG_VK_UNIFORM_TEXEL_BUFFER_HW_MAPPING
+typedef struct PROG_VK_UNIFORM_TEXEL_BUFFER_HW_MAPPING
 {
-    /* For HW natively supports separated texture */
-    SHADER_RESOURCE_SLOT_MAPPING                texMapping;
+    VK_UNIFORM_TEXEL_BUFFER_HW_MAPPING_MODE     hwMappingMode;
 
-    /* For HW does not natively supports separated texture */
-    struct
+    union
     {
-        SHADER_HW_MEM_ACCESS_MODE               hwMemAccessMode;
+        /* For HW natively supports separated texture */
+        SHADER_RESOURCE_SLOT_MAPPING            texMapping;
 
-        union
+        /* For HW does not natively supports separated texture */
+        struct
         {
-            SHADER_SAMPLER_SLOT_MAPPING         samplerMapping;
+            SHADER_HW_MEM_ACCESS_MODE               hwMemAccessMode;
 
-            SHADER_CONSTANT_HW_LOCATION_MAPPING*pHwDirectAddrBase;
-        } hwLoc;
+            union
+            {
+                SHADER_SAMPLER_SLOT_MAPPING         samplerMapping;
 
-        /* The array size is utbBinding::arraySize */
-        SHADER_PRIV_SAMPLER_ENTRY**             ppExtraSamplerArray;
-    } s;
+                SHADER_CONSTANT_HW_LOCATION_MAPPING*pHwDirectAddrBase;
+            } hwLoc;
+
+            /* The array size is utbBinding::arraySize */
+            SHADER_PRIV_SAMPLER_ENTRY**         ppExtraSamplerArray;
+        } s;
+    } u;
 }
 PROG_VK_UNIFORM_TEXEL_BUFFER_HW_MAPPING;
 

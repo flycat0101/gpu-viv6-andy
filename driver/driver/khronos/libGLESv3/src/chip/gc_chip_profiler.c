@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -188,7 +188,7 @@ gcChipProfilerInitialize(
 
     chipCtx->profiler->profilerClient = gcvCLIENT_OPENGLES;
 
-    if (gcoPROFILER_Enable(chipCtx->profiler) != gcvSTATUS_OK)
+    if (gcoPROFILER_Initialize(chipCtx->profiler) != gcvSTATUS_OK)
     {
         profiler->enable = gcvFALSE;
         gcmFOOTER();
@@ -268,17 +268,29 @@ gcChipProfilerWrite(
 #define BCD(digit)      ((rev >> (digit * 4)) & 0xF)
         gcoOS_MemFill(infoRevision, 0, gcmSIZEOF(infoRevision));
         if (BCD(3) == 0)
+
         {
+
             /* Old format. */
+
             gcmONERROR(gcoOS_PrintStrSafe(infoRevision, gcmSIZEOF(infoRevision),
+
                 &offset, "revision=\"%d.%d\" ", BCD(1), BCD(0)));
+
         }
+
         else
+
         {
+
             /* New format. */
+
             gcmONERROR(gcoOS_PrintStrSafe(infoRevision, gcmSIZEOF(infoRevision),
+
                 &offset, "revision=\"%d.%d.%d_rc%d\" ",
+
                 BCD(3), BCD(2), BCD(1), BCD(0)));
+
         }
 
         gcmWRITE_CONST(VPG_INFO);
@@ -309,6 +321,7 @@ gcChipProfilerWrite(
             gctCHAR  infoScreen[255] = { '\0' };
             gcoOS_MemFill(infoScreen, 0, gcmSIZEOF(infoScreen));
             gcmONERROR(gcoOS_PrintStrSafe(infoScreen, gcmSIZEOF(infoScreen),
+
                                           &offset, "%d x %d", gc->drawablePrivate->width, gc->drawablePrivate->height));
             gcmWRITE_CONST(VPC_INFOSCREENSIZE);
             gcmWRITE_STRING(infoScreen);
@@ -317,11 +330,17 @@ gcChipProfilerWrite(
             gc->profiler.writeDrawable = gcvTRUE;
         }
         if (!gc->profiler.frameBegun && gc->profiler.need_dump)
+
         {
+
             gcmWRITE_COUNTER(VPG_FRAME, gc->profiler.frameNumber);
+
             gc->profiler.frameBegun = gcvTRUE;
+
         }
+
         break;
+
 
     case GL3_PROFILER_WRITE_FRAME_END:
 
@@ -518,7 +537,9 @@ gcChipProfilerWrite(
         gc->profiler.drawCount = 0;
         gc->profiler.totalDriverTime = 0;
 
+
         gcmONERROR(gcoOS_GetTime(&gc->profiler.frameStartTimeusec));
+
 
         break;
     default:
@@ -598,13 +619,22 @@ __glChipProfilerSet(
     {
     case GL3_PROFILER_FRAME_END:
 
+
+
         gcmONERROR(gcoOS_GetTime(&profiler->frameEndTimeusec));
+
         profiler->drawCount = 0;
+
         profiler->curFrameNumber++;
+
         gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_BEGIN));
 
+
+
         gcmONERROR(gcoPROFILER_End(Profiler, gcvCOUNTER_OP_FRAME, profiler->frameNumber));
+
         gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_END));
+
         gcmONERROR(gcoPROFILER_Flush(Profiler));
 
         gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_RESET));
@@ -618,17 +648,30 @@ __glChipProfilerSet(
 
     case GL3_PROFILER_FINISH_BEGIN:
 
+
+
         gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_BEGIN));
-        gcmONERROR(gcoPROFILER_Begin(chipCtx->profiler, gcvCOUNTER_OP_FINISH));
+
+        gcmONERROR(gcoPROFILER_EnableCounters(chipCtx->profiler, gcvCOUNTER_OP_FINISH));
+
         profiler->drawCount = 0;
+
+
 
         break;
 
+
+
     case GL3_PROFILER_FINISH_END:
 
+
+
         gcmONERROR(gcoOS_GetTime(&profiler->frameEndTimeusec));
+
         gcmONERROR(gcoPROFILER_End(Profiler, gcvCOUNTER_OP_FINISH, profiler->finishNumber));
+
         gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_END));
+
         gcmONERROR(gcoPROFILER_Flush(Profiler));
 
         gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_RESET));
@@ -670,7 +713,7 @@ __glChipProfilerSet(
     case GL3_PROFILER_DRAW_BEGIN:
 
         gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_BEGIN));
-        gcmONERROR(gcoPROFILER_Begin(chipCtx->profiler, gcvCOUNTER_OP_DRAW));
+        gcmONERROR(gcoPROFILER_EnableCounters(chipCtx->profiler, gcvCOUNTER_OP_DRAW));
         break;
 
     case GL3_PROFILER_DRAW_END:
@@ -687,7 +730,7 @@ __glChipProfilerSet(
         gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_BEGIN));
         if (!profiler->perDrawMode)
         {
-            gcmONERROR(gcoPROFILER_Begin(chipCtx->profiler, gcvCOUNTER_OP_FRAME));
+            gcmONERROR(gcoPROFILER_EnableCounters(chipCtx->profiler, gcvCOUNTER_OP_FRAME));
         }
         gcmWRITE_CONST(VPG_PROG);
         gcmWRITE_COUNTER(VPC_PROGRAMHANDLE, gcmPTR2INT32(Value));
@@ -895,21 +938,20 @@ __glChipProfile_DrawEnd(
 
 GLboolean
 __glChipProfile_Flush(
-    __GLcontext *gc,
-    GLboolean bInternal
+    __GLcontext *gc
     )
 {
     GLboolean ret;
     __GLCHIP_PROFILER_HEADER();
 
-    if (gc->profiler.enable && gc->profiler.useGlfinish && !bInternal)
+    if (gc->profiler.enable && gc->profiler.useGlfinish)
     {
         __glChipProfilerSet(gc, GL3_PROFILER_FINISH_BEGIN, 0);
     }
 
-    ret = __glChipFlush(gc, gcvFALSE);
+    ret = __glChipFlush(gc);
 
-    if (gc->profiler.enable && gc->profiler.useGlfinish && !bInternal)
+    if (gc->profiler.enable && gc->profiler.useGlfinish)
     {
         __glChipProfilerSet(gc, GL3_PROFILER_FINISH_END, 0);
     }
@@ -2758,31 +2800,6 @@ __glChipProfile_BlendBarrier(
 }
 
 
-GLboolean
-__glChipProfile_MultiDrawElementsIndirect(
-    __GLcontext *gc
-    )
-{
-    GLboolean ret;
-    __GLCHIP_PROFILER_HEADER();
-    ret = __glChipMultiDrawElementsIndirect(gc);
-    __GLCHIP_PROFILER_FOOTER();
-    return ret;
-}
-
-
-GLboolean
-__glChipProfile_MultiDrawArraysIndirect(
-    __GLcontext *gc
-    )
-{
-    GLboolean ret;
-    __GLCHIP_PROFILER_HEADER();
-    ret = __glChipMultiDrawArraysIndirect(gc);
-    __GLCHIP_PROFILER_FOOTER();
-    return ret;
-}
-
 /* Init DP interface to chip specific function */
 GLvoid
 gcChipInitProfileDevicePipeline(
@@ -2975,10 +2992,6 @@ gcChipInitProfileDevicePipeline(
     gc->dp.dispatchCompute = __glChipProfile_DispatchCompute;
 
     gc->dp.memoryBarrier = __glChipProfile_MemoryBarrier;
-
-    gc->dp.multiDrawArraysIndirectEXT = __glChipProfile_MultiDrawArraysIndirect;
-
-    gc->dp.multiDrawElementsIndirectEXT = __glChipProfile_MultiDrawElementsIndirect;;
 
     gc->dp.blendBarrier = __glChipProfile_BlendBarrier;
 

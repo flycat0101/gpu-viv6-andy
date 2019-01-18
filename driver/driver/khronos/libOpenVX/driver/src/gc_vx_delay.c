@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -54,7 +54,7 @@ VX_INTERNAL_API vx_delay vxoDelay_Create(vx_context context, vx_reference exempl
                 {
                     vx_array array = (vx_array)exemplar;
                     ref = (vx_reference)vxoArray_Create(
-                                context, array->itemType, array->capacity, vx_false_e, VX_TYPE_ARRAY);
+                        context, array->itemType, array->capacity, vx_false_e, VX_TYPE_ARRAY, vx_false_e);
                 }
                 break;
 
@@ -294,6 +294,8 @@ VX_INTERNAL_API vx_bool vxoParameterValue_UnbindFromDelay(vx_reference value, vx
 
 VX_API_ENTRY vx_delay VX_API_CALL vxCreateDelay(vx_context context, vx_reference exemplar, vx_size count)
 {
+    gcmDUMP_API("$VX vxCreateDelay: context=%p, exemplar=%p, count=0x%lx", context, exemplar, count);
+
     if (!vxoContext_IsValid(context)) return VX_NULL;
 
     if (!vxoReference_IsValidAndNoncontext(exemplar))
@@ -338,6 +340,8 @@ VX_API_ENTRY vx_delay VX_API_CALL vxCreateDelay(vx_context context, vx_reference
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseDelay(vx_delay *d)
 {
+    gcmDUMP_API("$VX vxReleaseDelay: d=%p", d);
+
     if (vxoReference_IsValidAndSpecific((vx_reference)(*d), VX_TYPE_DELAY) && ((*d)->type == VX_TYPE_PYRAMID) && ((*d)->pyramidTable != NULL))
     {
         vx_delay delay = *d;
@@ -354,6 +358,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseDelay(vx_delay *d)
 
 VX_API_ENTRY vx_reference VX_API_CALL vxGetReferenceFromDelay(vx_delay delay, vx_int32 index)
 {
+    gcmDUMP_API("$VX vxGetReferenceFromDelay: delay=%p, index=0x%x", delay, index);
+
     if (!vxoReference_IsValidAndSpecific((vx_reference)delay, VX_TYPE_DELAY)) return VX_NULL;
 
     if ((vx_uint32)abs(index) >= delay->count) return VX_NULL;
@@ -363,6 +369,8 @@ VX_API_ENTRY vx_reference VX_API_CALL vxGetReferenceFromDelay(vx_delay delay, vx
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryDelay(vx_delay delay, vx_enum attribute, void *ptr, vx_size size)
 {
+    gcmDUMP_API("$VX vxQueryDelay: delay=%p, attribute=0x%x, ptr=%p, size=0x%lx", delay, attribute, ptr, size);
+
     if (!vxoReference_IsValidAndSpecific((vx_reference)delay, VX_TYPE_DELAY)) return VX_ERROR_INVALID_REFERENCE;
 
     switch (attribute)
@@ -390,6 +398,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryDelay(vx_delay delay, vx_enum attribut
 VX_API_ENTRY vx_status VX_API_CALL vxAgeDelay(vx_delay delay)
 {
     vx_uint32 index, refIndex;
+
+    gcmDUMP_API("$VX vxAgeDelay: delay=%p", delay);
 
     if (!vxoReference_IsValidAndSpecific((vx_reference)delay, VX_TYPE_DELAY)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -445,6 +455,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxRegisterAutoAging(vx_graph graph, vx_delay 
     vx_bool isAlreadyRegistered = vx_false_e;
     vx_bool isRegisteredDelaysListFull = vx_true_e;
 
+    gcmDUMP_API("$VX vxRegisterAutoAging: graph=%p, delay=%p", graph, delay);
+
     if (vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH) == vx_false_e)
         return VX_ERROR_INVALID_REFERENCE;
 
@@ -454,7 +466,6 @@ VX_API_ENTRY vx_status VX_API_CALL vxRegisterAutoAging(vx_graph graph, vx_delay 
     /* check if this particular delay is already registered in the graph */
     for (i = 0; i < VX_MAX_REF_COUNT; i++)
     {
-
         if (vxoReference_IsValidAndSpecific((vx_reference)(graph->delays[i]), VX_TYPE_DELAY) && graph->delays[i] == delay)
         {
             isAlreadyRegistered = vx_true_e;
@@ -471,6 +482,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxRegisterAutoAging(vx_graph graph, vx_delay 
             {
                 isRegisteredDelaysListFull = vx_false_e;
                 graph->delays[i] = delay;
+                graph->hasAutoAgingDelay = vx_true_e;
 
                 if (graph->dirty)
                     graph->dirty = vx_false_e;

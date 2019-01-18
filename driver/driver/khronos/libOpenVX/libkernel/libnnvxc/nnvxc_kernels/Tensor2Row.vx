@@ -1,0 +1,427 @@
+#include "cl_viv_vx_ext.h"
+_viv_uniform int outputWidth;
+_viv_uniform int2 padding_xy;
+_viv_uniform int kernelSizeXY;
+_viv_uniform int kernelSizeX;
+_viv_uniform int kernelSizeY;
+_viv_uniform int2 strideXY;
+_viv_uniform int dilate_x;
+_viv_uniform int dilate_y;
+#define tensor2row_integer16_1_8(kernelsize_x, endBinX)                                            \
+    __kernel void tensor2row_Integer16_##kernelsize_x                                            \
+    (                                                                                            \
+    __read_only  image2d_array_t src,                                                            \
+    __write_only image2d_array_t dst                                                            \
+    )                                                                                            \
+{                                                                                            \
+    int x = get_global_id(0);                                                                \
+    int y = get_global_id(1);                                                                \
+    int z = get_global_id(2);                                                                \
+    int yy = 0;                                                                                \
+    \
+    int2 coord = (int2)(kernelSizeXY * z, y * outputWidth + x);                                \
+    int4 coord_in = (int4)(x * strideXY.x - padding_xy.x, y * strideXY.y - padding_xy.y, z, 0); \
+    int4 coord_in0 = coord_in;                                                                \
+    do                                                                                        \
+{                                                                                        \
+    vxc_short8 pixel;                                                                        \
+    VXC_ReadImage2DArray(pixel, src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+    coord_in0.y ++;                                                                            \
+    VXC_WriteImage(dst, coord, pixel, VXC_MODIFIER(0, endBinX, 0, VXC_RM_TowardZero, 0));    \
+    coord.x += kernelSizeX;                                                                    \
+    yy ++;                                                                                    \
+} while (yy < kernelSizeY);                                                                \
+}
+
+#define tensor2row_integer16_9_16(kernelsize_x, endBinX)                                            \
+    __kernel void tensor2row_Integer16_##kernelsize_x                                                \
+    (                                                                                                \
+    __read_only  image2d_array_t src,                                                                \
+    __write_only image2d_array_t dst                                                                \
+    )                                                                                                \
+{                                                                                                \
+    int x = get_global_id(0);                                                                    \
+    int y = get_global_id(1);                                                                    \
+    int z = get_global_id(2);                                                                    \
+    int yy = 0;                                                                                    \
+    \
+    int2 coord = (int2)(kernelSizeXY * z, y * outputWidth + x);                                    \
+    int4 coord_in = (int4)(x * strideXY.x - padding_xy.x, y * strideXY.y - padding_xy.y, z, 0); \
+    int4 coord_in0 = coord_in;                                                                    \
+    do                                                                                            \
+{                                                                                            \
+    vxc_short8 pixel0, pixel1;                                                                    \
+    VXC_ReadImage2DArray(pixel0, src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+    VXC_ReadImage2DArray(pixel1, src, coord_in0, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+    coord_in0.y ++;                                                                                \
+    VXC_WriteImage(dst, coord, pixel0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));            \
+    coord.x += 8;                                                                                \
+    VXC_WriteImage(dst, coord, pixel1, VXC_MODIFIER(0, endBinX, 0, VXC_RM_TowardZero, 0));        \
+    coord.x += kernelSizeX - 8;                                                                    \
+    yy ++;                                                                                        \
+} while (yy < kernelSizeY);                                                                    \
+}
+
+tensor2row_integer16_1_8(1, 1 - 1)
+    tensor2row_integer16_1_8(2, 2 - 1)
+    tensor2row_integer16_1_8(3, 3 - 1)
+    tensor2row_integer16_1_8(4, 4 - 1)
+    tensor2row_integer16_1_8(5, 5 - 1)
+    tensor2row_integer16_1_8(6, 6 - 1)
+    tensor2row_integer16_1_8(7, 7 - 1)
+    tensor2row_integer16_1_8(8, 8 - 1)
+    tensor2row_integer16_9_16(9,  9  - 9)
+    tensor2row_integer16_9_16(10, 10 - 9)
+    tensor2row_integer16_9_16(11, 11 - 9)
+    tensor2row_integer16_9_16(12, 12 - 9)
+    tensor2row_integer16_9_16(13, 13 - 9)
+    tensor2row_integer16_9_16(14, 14 - 9)
+    tensor2row_integer16_9_16(15, 15 - 9)
+    tensor2row_integer16_9_16(16, 16 - 9)
+
+    __kernel void tensor2row_Integer16_Generic
+    (
+    image2d_array_t src,
+    image2d_array_t dst
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int xx = 0, yy = 0;
+
+    int2 coord = (int2)(kernelSizeXY * z, y * outputWidth + x);
+    int4 coord_in = (int4)(x * strideXY.x - padding_xy.x, y * strideXY.y - padding_xy.y, z, 0);
+    int4 coord_in0 = coord_in;
+    do
+    {
+        do
+        {
+            coord_in0.xy = coord_in.xy + (int2)(xx, yy);
+            vxc_short8 pixel;
+            VXC_ReadImage2DArray(pixel, src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+            VXC_WriteImage(dst, coord, pixel, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+            coord.x ++;
+            xx ++;
+        } while (xx < kernelSizeX);
+        yy ++;
+        xx = 0;
+    } while (yy < kernelSizeY);
+}
+#define tensor2row_integer8_1_16(kernelsize_x, endBinX)                                        \
+    __kernel void tensor2row_Integer8_##kernelsize_x                                        \
+    (                                                                                        \
+    __read_only  image2d_array_t src,                                                        \
+    __write_only image2d_array_t dst                                                        \
+    )                                                                                        \
+{                                                                                            \
+    int x = get_global_id(0);                                                                \
+    int y = get_global_id(1);                                                                \
+    int z = get_global_id(2);                                                                \
+    int yy = 0;                                                                                \
+    \
+    int2 coord = (int2)(kernelSizeXY * z, y * outputWidth + x);                                \
+    int4 coord_in = (int4)(x * strideXY.x - padding_xy.x, y * strideXY.y - padding_xy.y, z, 0); \
+    int4 coord_in0 = coord_in;                                                                \
+    do                                                                                        \
+{                                                                                        \
+    vxc_char16 pixel;                                                                    \
+    VXC_ReadImage2DArray(pixel, src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0)); \
+    coord_in0.y ++;                                                                            \
+    VXC_WriteImage(dst, coord, pixel, VXC_MODIFIER(0, endBinX, 0, VXC_RM_TowardZero, 0));    \
+    coord.x += kernelSizeX;                                                                    \
+    yy ++;                                                                                    \
+} while (yy < kernelSizeY);                                                                    \
+}
+
+tensor2row_integer8_1_16(1,  1 - 1)
+    tensor2row_integer8_1_16(2,  2 - 1)
+    tensor2row_integer8_1_16(3,  3 - 1)
+    tensor2row_integer8_1_16(4,  4 - 1)
+    tensor2row_integer8_1_16(5,  5 - 1)
+    tensor2row_integer8_1_16(6,  6 - 1)
+    tensor2row_integer8_1_16(7,  7 - 1)
+    tensor2row_integer8_1_16(8,  8 - 1)
+    tensor2row_integer8_1_16(9,  9  - 1)
+    tensor2row_integer8_1_16(10, 10 - 1)
+    tensor2row_integer8_1_16(11, 11 - 1)
+    tensor2row_integer8_1_16(12, 12 - 1)
+    tensor2row_integer8_1_16(13, 13 - 1)
+    tensor2row_integer8_1_16(14, 14 - 1)
+    tensor2row_integer8_1_16(15, 15 - 1)
+    tensor2row_integer8_1_16(16, 16 - 1)
+
+    __kernel void tensor2row_Integer8_Generic
+    (
+    image2d_array_t src,
+    image2d_array_t dst
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int xx = 0, yy = 0;
+
+    int2 coord = (int2)(kernelSizeXY * z, y * outputWidth + x);
+    int4 coord_in = (int4)(x * strideXY.x - padding_xy.x, y * strideXY.y - padding_xy.y, z, 0);
+    int4 coord_in0 = coord_in;
+    do
+    {
+        do
+        {
+            coord_in0.xy = coord_in.xy + (int2)(xx, yy);
+            vxc_char16 pixel;
+            VXC_ReadImage2DArray(pixel, src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+            VXC_WriteImage(dst, coord, pixel, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+            coord.x ++;
+            xx ++;
+        } while (xx < kernelSizeX);
+        yy ++;
+        xx = 0;
+    } while (yy < kernelSizeY);
+}
+#define tensor2row_Tensor_integer16_1_8(kernelsize_x, endBinX)                                            \
+    __kernel void tensor2row_Tensor_Integer16_##kernelsize_x                                            \
+    (                                                                                            \
+    __read_only  image2d_array_t src,                                                            \
+    __write_only image2d_array_t dst                                                            \
+    )                                                                                            \
+{                                                                                            \
+    int x = get_global_id(0);                                                                \
+    int y = get_global_id(1);                                                                \
+    int z = get_global_id(2);                                                                \
+    int yy = 0;                                                                                \
+    \
+    int4 coord = (int4)(kernelSizeXY * z, x, y, 0);                                \
+    int4 coord_in = (int4)(x * strideXY.x - padding_xy.x, y * strideXY.y - padding_xy.y, z, 0); \
+    int4 coord_in0 = coord_in;                                                                \
+    do                                                                                        \
+{                                                                                        \
+    vxc_short8 pixel;                                                                        \
+    VXC_ReadImage2DArray(pixel, src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+    coord_in0.y ++;                                                                            \
+    VXC_WriteImage2DArray(dst, coord, pixel, VXC_MODIFIER(0, endBinX, 0, VXC_RM_TowardZero, 0));    \
+    coord.x += kernelSizeX;                                                                    \
+    yy ++;                                                                                    \
+} while (yy < kernelSizeY);                                                                \
+}
+
+#define tensor2row_Tensor_integer16_9_16(kernelsize_x, endBinX)                                            \
+    __kernel void tensor2row_Tensor_Integer16_##kernelsize_x                                                \
+    (                                                                                                \
+    __read_only  image2d_array_t src,                                                                \
+    __write_only image2d_array_t dst                                                                \
+    )                                                                                                \
+{                                                                                                \
+    int x = get_global_id(0);                                                                    \
+    int y = get_global_id(1);                                                                    \
+    int z = get_global_id(2);                                                                    \
+    int yy = 0;                                                                                    \
+    \
+    int4 coord = (int4)(kernelSizeXY * z, x, y, 0);                                    \
+    int4 coord_in = (int4)(x * strideXY.x - padding_xy.x, y * strideXY.y - padding_xy.y, z, 0); \
+    int4 coord_in0 = coord_in;                                                                    \
+    do                                                                                            \
+{                                                                                            \
+    vxc_short8 pixel0, pixel1;                                                                    \
+    VXC_ReadImage2DArray(pixel0, src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+    VXC_ReadImage2DArray(pixel1, src, coord_in0, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+    coord_in0.y ++;                                                                                \
+    VXC_WriteImage2DArray(dst, coord, pixel0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));            \
+    coord.x += 8;                                                                                \
+    VXC_WriteImage2DArray(dst, coord, pixel1, VXC_MODIFIER(0, endBinX, 0, VXC_RM_TowardZero, 0));        \
+    coord.x += kernelSizeX - 8;                                                                    \
+    yy ++;                                                                                        \
+} while (yy < kernelSizeY);                                                                    \
+}
+
+tensor2row_Tensor_integer16_1_8(1, 1 - 1)
+    tensor2row_Tensor_integer16_1_8(2, 2 - 1)
+    tensor2row_Tensor_integer16_1_8(3, 3 - 1)
+    tensor2row_Tensor_integer16_1_8(4, 4 - 1)
+    tensor2row_Tensor_integer16_1_8(5, 5 - 1)
+    tensor2row_Tensor_integer16_1_8(6, 6 - 1)
+    tensor2row_Tensor_integer16_1_8(7, 7 - 1)
+    tensor2row_Tensor_integer16_1_8(8, 8 - 1)
+    tensor2row_Tensor_integer16_9_16(9,  9  - 9)
+    tensor2row_Tensor_integer16_9_16(10, 10 - 9)
+    tensor2row_Tensor_integer16_9_16(11, 11 - 9)
+    tensor2row_Tensor_integer16_9_16(12, 12 - 9)
+    tensor2row_Tensor_integer16_9_16(13, 13 - 9)
+    tensor2row_Tensor_integer16_9_16(14, 14 - 9)
+    tensor2row_Tensor_integer16_9_16(15, 15 - 9)
+    tensor2row_Tensor_integer16_9_16(16, 16 - 9)
+
+    __kernel void tensor2row_Tensor_Integer16_Generic
+    (
+    image2d_array_t src,
+    image2d_array_t dst
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int xx = 0, yy = 0;
+
+    int4 coord = (int4)(kernelSizeXY * z, x, y, 0);
+    int4 coord_in = (int4)(x * strideXY.x - padding_xy.x, y * strideXY.y - padding_xy.y, z, 0);
+    int4 coord_in0 = coord_in;
+    do
+    {
+        do
+        {
+            coord_in0.xy = coord_in.xy + (int2)(xx, yy);
+            vxc_short8 pixel;
+            VXC_ReadImage2DArray(pixel, src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+            VXC_WriteImage2DArray(dst, coord, pixel, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+            coord.x ++;
+            xx += dilate_x;
+        } while (xx < kernelSizeX * dilate_x);
+        yy += dilate_y;
+        xx = 0;
+    } while (yy < kernelSizeY * dilate_y);
+}
+#define tensor2row_Tensor_integer8_1_16(kernelsize_x, endBinX)                                        \
+    __kernel void tensor2row_Tensor_Integer8_##kernelsize_x                                        \
+    (                                                                                        \
+    __read_only  image2d_array_t src,                                                        \
+    __write_only image2d_array_t dst                                                        \
+    )                                                                                        \
+{                                                                                            \
+    int x = get_global_id(0);                                                                \
+    int y = get_global_id(1);                                                                \
+    int z = get_global_id(2);                                                                \
+    int yy = 0;                                                                                \
+    \
+    int4 coord = (int4)(kernelSizeXY * z, x, y, 0);                                \
+    int4 coord_in = (int4)(x * strideXY.x - padding_xy.x, y * strideXY.y - padding_xy.y, z, 0); \
+    int4 coord_in0 = coord_in;                                                                \
+    do                                                                                        \
+{                                                                                        \
+    vxc_char16 pixel;                                                                    \
+    VXC_ReadImage2DArray(pixel, src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0)); \
+    coord_in0.y ++;                                                                            \
+    VXC_WriteImage2DArray(dst, coord, pixel, VXC_MODIFIER(0, endBinX, 0, VXC_RM_TowardZero, 0));    \
+    coord.x += kernelSizeX;                                                                    \
+    yy ++;                                                                                    \
+} while (yy < kernelSizeY);                                                                    \
+}
+
+tensor2row_Tensor_integer8_1_16(1,  1 - 1)
+    tensor2row_Tensor_integer8_1_16(2,  2 - 1)
+    tensor2row_Tensor_integer8_1_16(3,  3 - 1)
+    tensor2row_Tensor_integer8_1_16(4,  4 - 1)
+    tensor2row_Tensor_integer8_1_16(5,  5 - 1)
+    tensor2row_Tensor_integer8_1_16(6,  6 - 1)
+    tensor2row_Tensor_integer8_1_16(7,  7 - 1)
+    tensor2row_Tensor_integer8_1_16(8,  8 - 1)
+    tensor2row_Tensor_integer8_1_16(9,  9  - 1)
+    tensor2row_Tensor_integer8_1_16(10, 10 - 1)
+    tensor2row_Tensor_integer8_1_16(11, 11 - 1)
+    tensor2row_Tensor_integer8_1_16(12, 12 - 1)
+    tensor2row_Tensor_integer8_1_16(13, 13 - 1)
+    tensor2row_Tensor_integer8_1_16(14, 14 - 1)
+    tensor2row_Tensor_integer8_1_16(15, 15 - 1)
+    tensor2row_Tensor_integer8_1_16(16, 16 - 1)
+
+    __kernel void tensor2row_Tensor_Integer8_Generic
+    (
+    image2d_array_t src,
+    image2d_array_t dst
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int xx = 0, yy = 0;
+
+    int4 coord = (int4)(kernelSizeXY * z, x, y, 0);
+    int4 coord_in = (int4)(x * strideXY.x - padding_xy.x, y * strideXY.y - padding_xy.y, z, 0);
+    int4 coord_in0 = coord_in;
+    do
+    {
+        do
+        {
+            coord_in0.xy = coord_in.xy + (int2)(xx, yy);
+            vxc_char16 pixel;
+            VXC_ReadImage2DArray(pixel, src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+            VXC_WriteImage2DArray(dst, coord, pixel, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+            coord.x ++;
+            xx += dilate_x;
+        } while (xx < kernelSizeX * dilate_x);
+        yy += dilate_y;
+        xx = 0;
+    } while (yy < kernelSizeY * dilate_y);
+}
+
+_viv_uniform VXC_512Bits uniExchangeStride1Fp_2x8;
+_viv_uniform VXC_512Bits uniExchangeStride1EvenFp_2x8;
+_viv_uniform VXC_512Bits uniExchangeStride2FpOdd_2x8;
+_viv_uniform VXC_512Bits uniExchangeStride2FpEven_2x8;
+_viv_uniform VXC_512Bits uniExchangeStride4Odd_2x8;
+_viv_uniform VXC_512Bits uniExchangeStride4Even_2x8;
+__kernel void tensor2row_8Bits_K1S1
+    (
+    __read_only  image2d_array_t input,
+    __write_only image2d_array_t output
+    )
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+
+    vxc_uchar16 img_val0, img_val1, img_val2, img_val3, img_val4, img_val5, img_val6, img_val7;
+    vxc_uchar16 out_val0, out_val1, out_val2, out_val3, out_val4, out_val5, out_val6, out_val7;
+
+    VXC_ReadImage(img_val0, input, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val1, input, coord, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val2, input, coord, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val3, input, coord, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val4, input, coord, VXC_5BITOFFSET_XY(0, 4), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val5, input, coord, VXC_5BITOFFSET_XY(0, 5), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val6, input, coord, VXC_5BITOFFSET_XY(0, 6), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(img_val7, input, coord, VXC_5BITOFFSET_XY(0, 7), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+    coord = coord.yx;
+    // exchange 1 stride
+    VXC_DP2x8(out_val0, img_val0, img_val1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1Fp_2x8);
+    VXC_DP2x8(out_val1, img_val0, img_val1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1EvenFp_2x8);
+    VXC_DP2x8(out_val2, img_val2, img_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1Fp_2x8);
+    VXC_DP2x8(out_val3, img_val2, img_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1EvenFp_2x8);
+    VXC_DP2x8(out_val4, img_val4, img_val5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1Fp_2x8);
+    VXC_DP2x8(out_val5, img_val4, img_val5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1EvenFp_2x8);
+    VXC_DP2x8(out_val6, img_val6, img_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1Fp_2x8);
+    VXC_DP2x8(out_val7, img_val6, img_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride1EvenFp_2x8);
+    // exchange 2 stride
+    VXC_DP2x8(img_val0, out_val0, out_val2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpOdd_2x8);
+    VXC_DP2x8(img_val2, out_val0, out_val2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpEven_2x8);
+    VXC_DP2x8(img_val1, out_val1, out_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpOdd_2x8);
+    VXC_DP2x8(img_val3, out_val1, out_val3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpEven_2x8);
+    VXC_DP2x8(img_val4, out_val4, out_val6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpOdd_2x8);
+    VXC_DP2x8(img_val6, out_val4, out_val6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpEven_2x8);
+    VXC_DP2x8(img_val5, out_val5, out_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpOdd_2x8);
+    VXC_DP2x8(img_val7, out_val5, out_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride2FpEven_2x8);
+    // exchange 4 stride
+    VXC_DP2x8(out_val0, img_val0, img_val4, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Odd_2x8);
+    VXC_DP2x8(out_val4, img_val0, img_val4, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Even_2x8);
+    VXC_DP2x8(out_val1, img_val1, img_val5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Odd_2x8);
+    VXC_DP2x8(out_val5, img_val1, img_val5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Even_2x8);
+    VXC_DP2x8(out_val2, img_val2, img_val6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Odd_2x8);
+    VXC_DP2x8(out_val6, img_val2, img_val6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Even_2x8);
+    VXC_DP2x8(out_val3, img_val3, img_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Odd_2x8);
+    VXC_DP2x8(out_val7, img_val3, img_val7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExchangeStride4Even_2x8);
+
+    VXC_WriteImage(output, coord, out_val0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.y++;
+    VXC_WriteImage(output, coord, out_val1, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.y++;
+    VXC_WriteImage(output, coord, out_val2, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.y++;
+    VXC_WriteImage(output, coord, out_val3, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.y++;
+    VXC_WriteImage(output, coord, out_val4, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.y++;
+    VXC_WriteImage(output, coord, out_val5, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.y++;
+    VXC_WriteImage(output, coord, out_val6, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    coord.y++;
+    VXC_WriteImage(output, coord, out_val7, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+}

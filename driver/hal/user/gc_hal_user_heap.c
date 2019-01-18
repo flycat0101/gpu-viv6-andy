@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -155,7 +155,7 @@ struct _gcoHEAP
     gctUINT                     snodeOverhead;
 #endif
 
-#if VIVANTE_PROFILER || gcmIS_DEBUG(gcdDEBUG_CODE)
+#if VIVANTE_PROFILER_SYSTEM_MEMORY || gcmIS_DEBUG(gcdDEBUG_CODE)
     /* Profile information. */
     gctUINT32                   allocCount;
     gctUINT64                   allocBytes;
@@ -360,7 +360,7 @@ _CompactHeap(
                 heap->next->prev = heap->prev;
             }
 
-#if VIVANTE_PROFILER || gcmIS_DEBUG(gcdDEBUG_CODE)
+#if VIVANTE_PROFILER_SYSTEM_MEMORY || gcmIS_DEBUG(gcdDEBUG_CODE)
             /* Update profiling. */
             Heap->heapCount  -= 1;
             Heap->heapMemory -= heap->size + gcmSIZEOF(gcsHEAP);
@@ -758,7 +758,7 @@ gcoHEAP_Allocate(
     /* No previous free. */
     prevFree = gcvNULL;
 
-#if VIVANTE_PROFILER || gcmIS_DEBUG(gcdDEBUG_CODE)
+#if VIVANTE_PROFILER_SYSTEM_MEMORY || gcmIS_DEBUG(gcdDEBUG_CODE)
     /* Update profiling. */
     Heap->heapCount  += 1;
     Heap->heapMemory += Heap->allocationSize;
@@ -842,7 +842,7 @@ UseNode:
     gcoOS_MemCopy((gctUINT8_PTR) (used + 1) + Bytes, _Signature, 8);
 #endif
 
-#if VIVANTE_PROFILER || gcmIS_DEBUG(gcdDEBUG_CODE)
+#if VIVANTE_PROFILER_SYSTEM_MEMORY || gcmIS_DEBUG(gcdDEBUG_CODE)
     /* Update profile counters. */
     Heap->allocCount      += 1;
     Heap->allocBytes      += bytes;
@@ -1025,7 +1025,7 @@ gcoHEAP_Free(
     gcoOS_MemFill(Memory, gcdDEBUG_FILLER, node->bytes - gcmSIZEOF(*node));
 #endif
 
-#if VIVANTE_PROFILER || gcmIS_DEBUG(gcdDEBUG_CODE)
+#if VIVANTE_PROFILER_SYSTEM_MEMORY || gcmIS_DEBUG(gcdDEBUG_CODE)
     /* Update profile counters. */
     Heap->allocBytes -= node->bytes;
 #endif
@@ -1044,7 +1044,7 @@ OnError:
     return status;
 }
 
-#if VIVANTE_PROFILER || gcmIS_DEBUG(gcdDEBUG_CODE)
+#if VIVANTE_PROFILER_SYSTEM_MEMORY || gcmIS_DEBUG(gcdDEBUG_CODE)
 gceSTATUS
 gcoHEAP_ProfileStart(
     IN gcoHEAP Heap
@@ -1115,9 +1115,5 @@ gcoHEAP_ProfileEnd(
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
 }
-#endif /* VIVANTE_PROFILER */
-
-/*******************************************************************************
-***** Test Code ****************************************************************
-*******************************************************************************/
+#endif /* VIVANTE_PROFILER_SYSTEM_MEMORY */
 

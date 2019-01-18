@@ -1,0 +1,183 @@
+#include "cl_viv_vx_ext.h"
+
+#define gcVX_BILATERAL_FILTER_U8  0
+#define gcVX_BILATERAL_FILTER_S16 1
+
+void ComputeGlobalPositionsFromIndex(int index, uint * dimensions,
+         uint * stride, uint number_of_dimensions, uint * pos)
+{
+    *pos = 0;
+    uint index_leftover = index;
+    int divisor = 1;
+    for (int i = 0; i < number_of_dimensions; i++)
+    {
+        divisor = dimensions[i];
+        uint curr_dim_index = index_leftover % divisor;
+        *pos += stride[i] * curr_dim_index ;
+        index_leftover = index_leftover /divisor;
+    }
+}
+
+void vxBilateralFilter_u8
+(
+    global unsigned char*   src,
+    global unsigned int*    src_strides_ptr,
+    global unsigned int*    dims_ptr,
+           unsigned int     num_dims,
+                    int     diameter,
+                    float   sigma_space,
+                    float   sigma_color,
+    global unsigned int*    dst_strides_ptr,
+                    uint    out_size,
+    global unsigned char*   dst)
+{
+    const int pX = get_global_id(0);
+
+    float gauss_color_coeff = -0.5/(sigma_color*sigma_color);
+    float gauss_space_coeff = -0.5/(sigma_space*sigma_space);
+    uint src_pos = 0, dst_pos = 0, nei_pos = 0;
+    unsigned char *src_ptr = 0, *dst_ptr = 0, *nei_ptr = 0;
+    float sum = 0, wsum = 0, w = 0;
+    int radius = diameter/2;
+    int j;
+
+    if(radius < 1)
+    {
+        radius = 1;
+    }
+
+    if(radius > out_size)
+    {
+        radius = out_size;
+    }
+
+    ComputeGlobalPositionsFromIndex(pX, dims_ptr, src_strides_ptr, num_dims, &src_pos);
+    ComputeGlobalPositionsFromIndex(pX, dims_ptr, dst_strides_ptr, num_dims, &dst_pos);
+
+    src_ptr = src + src_pos;
+    dst_ptr = dst + dst_pos;
+
+    for(j = -radius; j <= radius; j++)
+    {
+        float color_weight;
+        float space_weight;
+
+        ComputeGlobalPositionsFromIndex(pX + j, dims_ptr, src_strides_ptr, num_dims, &nei_pos);
+        nei_ptr = src + nei_pos;
+
+        int color_diff = *nei_ptr - *src_ptr;
+        color_weight = (float)exp(gauss_color_coeff * abs(color_diff) * abs(color_diff));
+
+        space_weight = (float)exp(gauss_space_coeff * j * j);
+
+        w = space_weight * color_weight;
+        sum += (*nei_ptr)*w;
+        wsum += w;
+    }
+
+    *dst_ptr = round(sum/wsum);
+}
+
+void vxBilateralFilter_s16
+(
+    global unsigned char*   src,
+    global unsigned int*    src_strides_ptr,
+    global unsigned int*    dims_ptr,
+           unsigned int     num_dims,
+                    int     diameter,
+                    float   sigma_space,
+                    float   sigma_color,
+    global unsigned int*    dst_strides_ptr,
+                    uint    out_size,
+    global unsigned char*   dst)
+{
+    const int pX = get_global_id(0);
+
+    float gauss_color_coeff = -0.5/(sigma_color*sigma_color);
+    float gauss_space_coeff = -0.5/(sigma_space*sigma_space);
+    uint src_pos = 0, dst_pos = 0, nei_pos = 0;
+    unsigned char *src_ptr = 0, *dst_ptr = 0, *nei_ptr = 0;
+    float sum = 0, wsum = 0, w = 0;
+    int radius = diameter/2;
+    int j;
+    short *dst_s16_ptr = 0;
+
+    if(radius < 1)
+    {
+        radius = 1;
+    }
+
+    if(radius > out_size)
+    {
+        radius = out_size;
+    }
+
+    ComputeGlobalPositionsFromIndex(pX, dims_ptr, src_strides_ptr, num_dims, &src_pos);
+    ComputeGlobalPositionsFromIndex(pX, dims_ptr, dst_strides_ptr, num_dims, &dst_pos);
+
+    src_ptr = src + src_pos;
+    dst_ptr = dst + dst_pos;
+
+    for(j = -radius; j <= radius; j++)
+    {
+        float color_weight;
+        float space_weight;
+        short *nei_s16_ptr = 0, *src_s16_ptr = 0;
+
+        ComputeGlobalPositionsFromIndex(pX + j, dims_ptr, src_strides_ptr, num_dims, &nei_pos);
+        nei_ptr = src + nei_pos;
+
+        src_s16_ptr = (short *)src_ptr;
+        nei_s16_ptr = (short *)nei_ptr;
+
+        int color_diff = *nei_s16_ptr - *src_s16_ptr;
+        color_weight = (float)exp(gauss_color_coeff * abs(color_diff) * abs(color_diff));
+
+        space_weight = (float)exp(gauss_space_coeff * j * j);
+
+        w = space_weight * color_weight;
+        sum += (*nei_s16_ptr)*w;
+        wsum += w;
+    }
+
+    dst_s16_ptr = (short *)dst_ptr;
+    *dst_s16_ptr = round(sum/wsum);
+}
+
+__kernel void bilateral_filter
+(
+    global unsigned char*   src,
+    global unsigned int*    src_strides_ptr,
+    global unsigned int*    dims_ptr,
+           unsigned int     num_dims,
+                    int     diameter,
+                    float   sigma_space,
+                    float   sigma_values,
+    global unsigned int*    dst_strides_ptr,
+                    int     data_type,
+                    uint    out_size,
+    global unsigned char*   dst)
+{
+    if(data_type == gcVX_BILATERAL_FILTER_U8)
+        vxBilateralFilter_u8(src,
+                             src_strides_ptr,
+                             dims_ptr,
+                             num_dims,
+                             diameter,
+                             sigma_space,
+                             sigma_values,
+                             dst_strides_ptr,
+                             out_size,
+                             dst);
+    else
+        vxBilateralFilter_s16(src,
+                             src_strides_ptr,
+                             dims_ptr,
+                             num_dims,
+                             diameter,
+                             sigma_space,
+                             sigma_values,
+                             dst_strides_ptr,
+                             out_size,
+                             dst);
+}

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -14,6 +14,7 @@
 #include "gc_es_context.h"
 #include "gc_chip_context.h"
 #include "gc_chip_misc.h"
+#include "gc_hal_dump.h"
 
 #if defined(ANDROID)
 #if ANDROID_SDK_VERSION >= 16
@@ -256,6 +257,10 @@ gcChipGetFramebufferAttachedSurfaceAndImage(
             {
                 surfView.surf = shadow->surface;
             }
+            else if (texInfo->direct.directRender)
+            {
+                surfView.surf = texInfo->direct.source;
+            }
             else
             {
                 surfView = gcChipGetTextureSurface(chipCtx, tex, attachPoint->layered, attachPoint->level, attachPoint->slice);
@@ -472,7 +477,7 @@ gcChipFboSyncFromShadow(
                 __GLchipFmtMapInfo *fmtMapInfo = texInfo->mipLevels[attachPoint->level].formatMapInfo;
 
                 if ((texInfo->eglImage.image) ||
-                    (texInfo->direct.source)  ||
+                    (texInfo->direct.source && !texInfo->direct.directRender)  ||
                     (gc->texture.shared->refcount > 1 &&
                      fmtMapInfo &&
                      (fmtMapInfo->flags & (__GL_CHIP_FMTFLAGS_FMT_DIFF_READ_WRITE | __GL_CHIP_FMTFLAGS_LAYOUT_DIFF_READ_WRITE))
@@ -2055,7 +2060,8 @@ __glChipRenderbufferStorage(
     if ((rbo->formatInfo->drvFormat == __GL_FMT_SRGB8_ALPHA8) &&
         (chipCtx->patchId == gcvPATCH_GTFES30) &&
         ((rbo->width == 0x1f4 && rbo->height == 0x1f4) ||
-         (rbo->width == 2 && rbo->height == 2)
+         (rbo->width == 2 && rbo->height == 2) ||
+         (rbo->width == 128 && rbo->height == 64)
         )
        )
     {
@@ -2432,6 +2438,12 @@ __glChipEglImageTargetRenderbufferStorageOES(
                                                                              __GL_CHIP_FMT_PATCH_NONE;
 
         chipRBO->formatMapInfo = gcChipGetFormatMapInfo(gc, rbo->formatInfo->drvFormat, patchCase);
+
+        if (chipRBO->surface != gcvNULL)
+        {
+            gcmONERROR(gcoSURF_Destroy(chipRBO->surface));
+            chipRBO->surface = gcvNULL;
+        }
 
         if (image->type == KHR_IMAGE_TEXTURE_CUBE && (image->u.texture.face > 0 ))
         {

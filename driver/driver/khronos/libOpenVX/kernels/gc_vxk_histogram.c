@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -203,6 +203,7 @@ vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_refer
         vx_uint32 width = 0, height = 0;
 
         vx_uint32 index = 0, position = 0;
+
         vxQueryImage(src, VX_IMAGE_WIDTH, &width, sizeof(width));
 
         vxQueryImage(src, VX_IMAGE_HEIGHT, &height, sizeof(height));

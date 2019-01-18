@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -241,6 +241,22 @@ struct _VIR_PATTERN_CONTEXT
 
     VSC_MM                      *pMM;
 };
+
+typedef struct _VIR_PATTERN_LOWER_CONTEXT
+{
+    VIR_PatternContext          header;
+    VSC_HW_CONFIG*              hwCfg;
+    VSC_MM*                     pMM;
+    gctBOOL                     generateImmediate;
+    gctBOOL                     hasNEW_TEXLD;
+    gctBOOL                     isCL_X;
+    gctBOOL                     hasCL;
+    gctBOOL                     hasHalti1;
+    gctBOOL                     hasHalti2;
+    gctBOOL                     hasHalti3;
+    gctBOOL                     hasHalti4;
+    gctBOOL                     hasSHEnhancements2;
+} VIR_PatternLowerContext;
 
 VSC_ErrCode
 VIR_Pattern_Transform(

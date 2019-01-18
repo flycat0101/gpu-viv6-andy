@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1775,6 +1775,211 @@ vgmGETARRAYSIZE_FUNCTION(VG_EXT_COLOR_INDEX)
 {
     return 256;
 }
+
+/*--------------------- Extension: YUV2RGB          ------------------------*/
+vgmVALID_VALUE_ARRAY(VG_EXT_YUV2RGB_STANDARD_CUST)
+{
+    VG_FALSE,
+    VG_TRUE
+};
+
+vgmSETSTATE_FUNCTION(VG_EXT_YUV2RGB_STANDARD_CUST)
+{
+    Context->yuv2rgbStdCust
+        = (gctBOOL) * (VGint *) Values;
+}
+
+vgmSETSTATE_FUNCTION(VG_EXT_YUV2RGB_COEF)
+{
+    if (Count == 0)
+    {
+        vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+    }
+    else
+    {
+        ValueConverter(
+            Context->yuv2rgbCoef, Values, 9, VG_FALSE, VG_FALSE
+            );
+
+        /* Invalidate YUV2RGB coeff values. */
+        Context->yuv2rgbDirty = gcvTRUE;
+    }
+}
+
+vgmSETSTATE_FUNCTION(VG_EXT_YUV2RGB_OFFSET)
+{
+    if (Count == 0)
+    {
+        vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+    }
+    else
+    {
+        ValueConverter(
+            Context->yuv2rgbOffset, Values, 2, VG_FALSE, VG_FALSE
+            );
+
+        /* Invalidate YUV2RGB coeff values. */
+        Context->yuv2rgbDirty = gcvTRUE;
+    }
+}
+
+vgmSETSTATE_FUNCTION(VG_EXT_YUV2RGB_ELEMENT_CFG)
+{
+        Context->yuv2rgbCfg =* (VGint *) Values;
+
+        /* Invalidate YUV2RGB coeff values. */
+        Context->yuv2rgbDirty = gcvTRUE;
+}
+
+vgmGETSTATE_FUNCTION(VG_EXT_YUV2RGB_STANDARD_CUST)
+{
+    ValueConverter(
+        Values, &Context->yuv2rgbStdCust, 1, VG_FALSE, VG_TRUE
+        );
+}
+
+vgmGETSTATE_FUNCTION(VG_EXT_YUV2RGB_COEF)
+{
+    ValueConverter(
+        Values, &Context->yuv2rgbCoef, 9, VG_FALSE, VG_TRUE
+        );
+}
+
+vgmGETARRAYSIZE_FUNCTION(VG_EXT_YUV2RGB_COEF)
+{
+    return 9;
+}
+
+vgmGETSTATE_FUNCTION(VG_EXT_YUV2RGB_OFFSET)
+{
+    ValueConverter(
+        Values, &Context->yuv2rgbCoef, 2, VG_FALSE, VG_TRUE
+        );
+}
+
+vgmGETARRAYSIZE_FUNCTION(VG_EXT_YUV2RGB_OFFSET)
+{
+    return 2;
+}
+
+vgmGETSTATE_FUNCTION(VG_EXT_YUV2RGB_ELEMENT_CFG)
+{
+    ValueConverter(
+        Values, &Context->yuv2rgbCfg, 1, VG_FALSE, VG_TRUE
+        );
+}
+
+vgmGETARRAYSIZE_FUNCTION(VG_EXT_YUV2RGB_ELEMENT_CFG)
+{
+    return 1;
+}
+
+/*--------------------- Extension: RGB2YUV          ------------------------*/
+vgmVALID_VALUE_ARRAY(VG_EXT_RGB2YUV_STANDARD_CUST)
+{
+    VG_FALSE,
+    VG_TRUE
+};
+
+vgmSETSTATE_FUNCTION(VG_EXT_RGB2YUV_STANDARD_CUST)
+{
+    Context->rgb2yuvStdCust
+        = (VGboolean) * (VGint *) Values;
+}
+
+vgmSETSTATE_FUNCTION(VG_EXT_RGB2YUV_COEF)
+{
+    if (Count == 0)
+    {
+        vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+    }
+    else
+    {
+        ValueConverter(
+            Context->rgb2yuvCoef, Values, 9, VG_FALSE, VG_FALSE
+            );
+
+        /* Invalidate YUV2RGB coeff values. */
+        Context->rgb2yuvDirty = gcvTRUE;
+    }
+}
+
+vgmSETSTATE_FUNCTION(VG_EXT_RGB2YUV_OFFSET)
+{
+    if (Count == 0)
+    {
+        vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+    }
+    else
+    {
+        ValueConverter(
+            Context->rgb2yuvOffset, Values, 2, VG_FALSE, VG_FALSE
+            );
+
+        /* Invalidate YUV2RGB coeff values. */
+        Context->rgb2yuvDirty = gcvTRUE;
+    }
+}
+
+vgmSETSTATE_FUNCTION(VG_EXT_RGB2YUV_ELEMENT_CFG)
+{
+    if (Count == 0)
+    {
+        vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+    }
+    else
+    {
+        ValueConverter(
+            Context->rgb2yuvCfg, Values, 2, VG_FALSE, VG_FALSE
+            );
+
+        /* Invalidate RGB2YUV coeff values. */
+        Context->rgb2yuvDirty = gcvTRUE;
+    }
+}
+
+vgmGETSTATE_FUNCTION(VG_EXT_RGB2YUV_STANDARD_CUST)
+{
+    ValueConverter(
+        Values, &Context->rgb2yuvStdCust, 1, VG_FALSE, VG_TRUE
+        );
+}
+
+vgmGETSTATE_FUNCTION(VG_EXT_RGB2YUV_COEF)
+{
+    ValueConverter(
+        Values, &Context->rgb2yuvCoef, 9, VG_FALSE, VG_TRUE
+        );
+}
+
+vgmGETARRAYSIZE_FUNCTION(VG_EXT_RGB2YUV_COEF)
+{
+    return 9;
+}
+
+vgmGETSTATE_FUNCTION(VG_EXT_RGB2YUV_OFFSET)
+{
+    ValueConverter(
+        Values, &Context->rgb2yuvCoef, 2, VG_FALSE, VG_TRUE
+        );
+}
+
+vgmGETARRAYSIZE_FUNCTION(VG_EXT_RGB2YUV_OFFSET)
+{
+    return 2;
+}
+
+vgmGETSTATE_FUNCTION(VG_EXT_RGB2YUV_ELEMENT_CFG)
+{
+    ValueConverter(
+        Values, &Context->rgb2yuvCfg, 2, VG_FALSE, VG_TRUE
+        );
+}
+
+vgmGETARRAYSIZE_FUNCTION(VG_EXT_RGB2YUV_ELEMENT_CFG)
+{
+    return 2;
+}
 #endif
 
 /******************************************************************************\
@@ -1852,6 +2057,18 @@ static vgsSTATEENTRY _stateArray[] =
     /* Color Index States. */
     vgmDEFINE_ARRAY_ENTRY(VG_EXT_COLOR_INDEX, INT, 1, 256),
     vgmDEFINE_SCALAR_ENTRY(VG_EXT_COLOR_INDEX_COUNT, INT),
+
+    /* RGB2YUV states. */
+    vgmDEFINE_ENUMERATED_ENTRY(VG_EXT_RGB2YUV_STANDARD_CUST),
+    vgmDEFINE_ARRAY_ENTRY(VG_EXT_RGB2YUV_COEF, FLOAT, 9, 1),
+    vgmDEFINE_ARRAY_ENTRY(VG_EXT_RGB2YUV_OFFSET, FLOAT, 2, 1),
+    vgmDEFINE_ARRAY_ENTRY(VG_EXT_RGB2YUV_ELEMENT_CFG, INT, 2, 1),
+
+    /*YUV2RGB states. */
+    vgmDEFINE_ENUMERATED_ENTRY(VG_EXT_YUV2RGB_STANDARD_CUST),
+    vgmDEFINE_ARRAY_ENTRY(VG_EXT_YUV2RGB_COEF, FLOAT, 9, 1),
+    vgmDEFINE_ARRAY_ENTRY(VG_EXT_YUV2RGB_OFFSET, FLOAT, 2, 1),
+    vgmDEFINE_ARRAY_ENTRY(VG_EXT_YUV2RGB_ELEMENT_CFG, INT, 1, 1)
 #endif
 };
 
@@ -1966,7 +2183,10 @@ void vgfSetDefaultStates(
     Context->maxSeparableKernelSize = vgvMAX_SEPARABLE_KERNEL_SIZE;
     Context->maxColorRampStops      = vgvMAX_COLOR_RAMP_STOPS;
 
-    Context->maxImageWidth          = gcoHAL_IsFeatureAvailable(Context->hal, gcvFEATURE_VG_RESOLUTION_8K) ? 8192 : 2048;
+
+    Context->maxImageWidth          = gcoHAL_IsFeatureAvailable(Context->hal, gcvFEATURE_VG_IMAGE_16K)  \
+                                      ? 16384 : (gcoHAL_IsFeatureAvailable(Context->hal, gcvFEATURE_VG_RESOLUTION_8K) ? 8192 : 2048);
+
     Context->maxImageHeight         = Context->maxImageWidth;
     Context->maxImagePixels         = Context->maxImageWidth * Context->maxImageHeight;
     Context->maxImageBytes          = Context->maxImagePixels * 4;
@@ -1985,6 +2205,16 @@ void vgfSetDefaultStates(
     /* Initialize the Index Color states. */
     Context->colorIndexEntryCount = 0;
     Context->colorIndexDirty      = gcvFALSE;
+
+    Context->yuv2rgbDirty         = gcvFALSE;
+    gcoOS_MemFill(Context->yuv2rgbCoef, 0 , sizeof(Context->yuv2rgbCoef));
+    gcoOS_MemFill(Context->yuv2rgbOffset, 0 , sizeof(Context->yuv2rgbOffset));
+    Context->yuv2rgbCfg           = 0;
+
+    Context->rgb2yuvDirty         = gcvFALSE;
+    gcoOS_MemFill(Context->rgb2yuvCoef, 0 , sizeof(Context->rgb2yuvCoef));
+    gcoOS_MemFill(Context->rgb2yuvOffset, 0 , sizeof(Context->rgb2yuvOffset));
+    gcoOS_MemFill(Context->rgb2yuvCfg, 0 , sizeof(Context->rgb2yuvCfg));
 #endif
     }
     vgmLEAVESUBAPI(vgfSetDefaultStates);
@@ -2240,6 +2470,14 @@ gceSTATUS vgfUpdateStates(
             Context->colorIndexDirty = gcvFALSE;
             gcoVG_SetColorIndexTable(Context->vg, Context->colorIndexEntries, Context->colorIndexEntryCount);
         }
+
+        gcoVG_SetYUV2RGBStdCust(Context->vg, Context->yuv2rgbStdCust);
+        if (Context->yuv2rgbDirty && Context->yuv2rgbStdCust)
+        {
+            Context->yuv2rgbDirty = gcvFALSE;
+            gcoVG_SetYUV2RGB(Context->vg, Context->yuv2rgbCoef, Context->yuv2rgbOffset, (gctBOOL *)&Context->yuv2rgbCfg);
+        }
+
 #endif
     }
     while (gcvFALSE);

@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -17,7 +17,7 @@ include $(LOCAL_PATH)/../../../Android.mk.def
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-	gc_cl.c  \
+	gc_cl.c \
     gc_cl_log.c  \
 	gc_cl_command.c \
 	gc_cl_context.c \
@@ -34,8 +34,8 @@ LOCAL_SRC_FILES := \
 	gc_cl_sampler.c \
 
 ifeq ($(ENABLE_CL_GL), 1)
-    LOCAL_SRC_FILES += \
-                    gc_cl_gl.c
+LOCAL_SRC_FILES += \
+	gc_cl_gl.c
 endif
 
 LOCAL_CFLAGS := \
@@ -52,6 +52,7 @@ LOCAL_C_INCLUDES := \
 	$(AQROOT)/hal/os/linux/user \
 	$(AQROOT)/compiler/libVSC/include \
     $(AQROOT)/hal/user \
+	$(AQARCH)/cmodel/inc \
 	$(LOCAL_PATH)
 
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 26),1)

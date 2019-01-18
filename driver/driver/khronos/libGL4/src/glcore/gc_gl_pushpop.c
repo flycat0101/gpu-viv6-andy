@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -97,18 +97,6 @@ GLvoid APIENTRY __glim_PushAttrib(__GLcontext *gc, GLuint mask)
             sp->state.pixel.readBuffer = gc->state.pixel.readBuffer;
             sp->state.pixel.readBufferReturn = gc->state.pixel.readBufferReturn;
             sp->state.pixel.transferMode = gc->state.pixel.transferMode;
-            sp->state.pixel.colorTable[__GL_COLOR_TABLE_INDEX].state =
-                gc->state.pixel.colorTable[__GL_COLOR_TABLE_INDEX].state;
-            sp->state.pixel.colorTable[__GL_POST_CONVOLUTION_COLOR_TABLE_INDEX].state =
-                gc->state.pixel.colorTable[__GL_POST_CONVOLUTION_COLOR_TABLE_INDEX].state;
-            sp->state.pixel.colorTable[__GL_POST_COLOR_MATRIX_COLOR_TABLE_INDEX].state =
-                gc->state.pixel.colorTable[__GL_POST_COLOR_MATRIX_COLOR_TABLE_INDEX].state;
-            sp->state.pixel.convolutionFilter[__GL_CONVOLUTION_1D_INDEX].state =
-                gc->state.pixel.convolutionFilter[__GL_CONVOLUTION_1D_INDEX].state;
-            sp->state.pixel.convolutionFilter[__GL_CONVOLUTION_2D_INDEX].state =
-                gc->state.pixel.convolutionFilter[__GL_CONVOLUTION_2D_INDEX].state;
-            sp->state.pixel.convolutionFilter[__GL_SEPARABLE_2D_INDEX].state =
-                gc->state.pixel.convolutionFilter[__GL_SEPARABLE_2D_INDEX].state;
         }
         if (mask & GL_POINT_BIT)
         {
@@ -341,18 +329,6 @@ GLvoid APIENTRY __glim_PopAttrib(__GLcontext *gc)
             gc->state.pixel.transferMode = sp->state.pixel.transferMode;
             gc->state.pixel.readBufferReturn = sp->state.pixel.readBufferReturn;
             gc->state.pixel.readBuffer = sp->state.pixel.readBuffer;
-            gc->state.pixel.colorTable[__GL_COLOR_TABLE_INDEX].state =
-                sp->state.pixel.colorTable[__GL_COLOR_TABLE_INDEX].state;
-            gc->state.pixel.colorTable[__GL_POST_CONVOLUTION_COLOR_TABLE_INDEX].state =
-                sp->state.pixel.colorTable[__GL_POST_CONVOLUTION_COLOR_TABLE_INDEX].state;
-            gc->state.pixel.colorTable[__GL_POST_COLOR_MATRIX_COLOR_TABLE_INDEX].state =
-                sp->state.pixel.colorTable[__GL_POST_COLOR_MATRIX_COLOR_TABLE_INDEX].state;
-            gc->state.pixel.convolutionFilter[__GL_CONVOLUTION_1D_INDEX].state =
-                sp->state.pixel.convolutionFilter[__GL_CONVOLUTION_1D_INDEX].state;
-            gc->state.pixel.convolutionFilter[__GL_CONVOLUTION_2D_INDEX].state =
-                sp->state.pixel.convolutionFilter[__GL_CONVOLUTION_2D_INDEX].state;
-            gc->state.pixel.convolutionFilter[__GL_SEPARABLE_2D_INDEX].state =
-                sp->state.pixel.convolutionFilter[__GL_SEPARABLE_2D_INDEX].state;
 
             /* Notify attribute changes to SWP.
             */
@@ -682,18 +658,6 @@ GLuint __glCopyContext(__GLcontext *dst, __GLcontext *src, GLuint mask)
         dst->state.pixel.transferMode = src->state.pixel.transferMode;
         dst->state.pixel.readBufferReturn = src->state.pixel.readBufferReturn;
         dst->state.pixel.readBuffer = src->state.pixel.readBuffer;
-        dst->state.pixel.colorTable[__GL_COLOR_TABLE_INDEX].state =
-            src->state.pixel.colorTable[__GL_COLOR_TABLE_INDEX].state;
-        dst->state.pixel.colorTable[__GL_POST_CONVOLUTION_COLOR_TABLE_INDEX].state =
-            src->state.pixel.colorTable[__GL_POST_CONVOLUTION_COLOR_TABLE_INDEX].state;
-        dst->state.pixel.colorTable[__GL_POST_COLOR_MATRIX_COLOR_TABLE_INDEX].state =
-            src->state.pixel.colorTable[__GL_POST_COLOR_MATRIX_COLOR_TABLE_INDEX].state;
-        dst->state.pixel.convolutionFilter[__GL_CONVOLUTION_1D_INDEX].state =
-            src->state.pixel.convolutionFilter[__GL_CONVOLUTION_1D_INDEX].state;
-        dst->state.pixel.convolutionFilter[__GL_CONVOLUTION_2D_INDEX].state =
-            src->state.pixel.convolutionFilter[__GL_CONVOLUTION_2D_INDEX].state;
-        dst->state.pixel.convolutionFilter[__GL_SEPARABLE_2D_INDEX].state =
-            src->state.pixel.convolutionFilter[__GL_SEPARABLE_2D_INDEX].state;
 
         /* Notify attribute changes to SWP.
         */
@@ -703,7 +667,7 @@ GLuint __glCopyContext(__GLcontext *dst, __GLcontext *src, GLuint mask)
 
         /* Immediately notify attribute changes to DP.
         */
-        /*lan: wait till pixel code is ready
+        /*
         (*dst->dp.pixelTransfer)(dst);
         (*dst->dp.pixelZoom)(dst);
         */

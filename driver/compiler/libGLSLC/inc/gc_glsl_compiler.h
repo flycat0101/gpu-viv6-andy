@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -23,7 +23,7 @@
 #include "gc_glsl_common.h"
 
 #define slmIsLanguageVersion3_1(Compiler) \
-    (sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_ES31_VERSION)
+    (sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_ES31_VERSION && !sloCOMPILER_IsOGLVersion(Compiler))
 
 #if gcmIS_DEBUG(gcdDEBUG_ASSERT)
 
@@ -59,15 +59,17 @@
 /* Optimization options. */
 typedef enum _sleOPTIMIZATION_OPTION
 {
-    slvOPTIMIZATION_NONE                    = 0x0000,
-    slvOPTIMIZATION_CALCULATION             = 0x0001,
-    slvOPTIMIZATION_UNROLL_ITERATION        = 0x0002,
-    slvOPTIMIZATION_DATA_FLOW               = 0x0004,
-    slvOPTIMIZATION_SPECIAL                 = 0x0008,
-    slvOPTIMIZATION_SHARE_VEC_CONSTANTS     = 0x0010,
-    slvOPTIMIZATION_ALL                     = 0xFFFF,
+    slvOPTIMIZATION_NONE                            = 0x0000,
+    slvOPTIMIZATION_CALCULATION                     = 0x0001,
+    slvOPTIMIZATION_UNROLL_ITERATION                = 0x0002,
+    slvOPTIMIZATION_DATA_FLOW                       = 0x0004,
+    slvOPTIMIZATION_SPECIAL                         = 0x0008,
+    slvOPTIMIZATION_SHARE_VEC_CONSTANTS             = 0x0010,
+    slvOPTIMIZATION_ALL                             = 0xFFFF,
     /* Extra options */
-    slvOPTIMIZATION_EXPAND_NORM             = 0x10000
+    slvOPTIMIZATION_EXPAND_NORM                     = 0x10000,
+    slvOPTIMIZATION_TREAT_CONST_ARRAY_AS_UNIFORM    = 0x20000,
+
 }
 sleOPTIMIZATION_OPTION;
 
@@ -186,7 +188,8 @@ sloCOMPILER_GetClientApiVersion(
 gceSTATUS
 sloCOMPILER_SetLanguageVersion(
     IN sloCOMPILER Compiler,
-    IN gctUINT32 LangVersion
+    IN gctUINT32 LangVersion,
+    IN gctBOOL  IsGLVersion
     );
 
 gctUINT32
@@ -206,6 +209,41 @@ sloCOMPILER_IsES30Version(
 
 gctBOOL
 sloCOMPILER_IsES31VersionOrAbove(
+    IN sloCOMPILER Compiler
+);
+
+gctBOOL
+sloCOMPILER_IsOGLVersion(
+    IN sloCOMPILER Compiler
+);
+
+gctBOOL
+sloCOMPILER_IsOGL40Version(
+    IN sloCOMPILER Compiler
+);
+
+gctBOOL
+sloCOMPILER_IsOGL30Version(
+    IN sloCOMPILER Compiler
+);
+
+gctBOOL
+sloCOMPILER_IsOGL31Version(
+    IN sloCOMPILER Compiler
+);
+
+gctBOOL
+sloCOMPILER_IsOGL32Version(
+    IN sloCOMPILER Compiler
+);
+
+gctBOOL
+sloCOMPILER_IsOGL33Version(
+    IN sloCOMPILER Compiler
+);
+
+gctBOOL
+sloCOMPILER_IsOGL20Version(
     IN sloCOMPILER Compiler
 );
 
@@ -235,6 +273,7 @@ sloCOMPILER_GetOutputInvariant(
 gceSTATUS
 sloCOMPILER_Construct_General(
     IN sleSHADER_TYPE ShaderType,
+    IN gceAPI ClientApiVersion,
     OUT sloCOMPILER * Compiler
     );
 
@@ -346,6 +385,7 @@ sloCOMPILER_Free(
     IN gctPOINTER Memory
     );
 
+#if gcdUSE_WCLIP_PATCH
 gceSTATUS
 sloCOMPILER_InsertWClipList(
     IN sloCOMPILER Compiler,
@@ -369,6 +409,7 @@ sloCOMPILER_FindWClipForUniformList(
     IN gctINT * UniformIndex1,
     IN gctINT * UniformIndex2
     );
+#endif
 
 gceSTATUS
 sloCOMPILER_GetUniformIndex(
@@ -483,6 +524,7 @@ typedef enum _sleEXTENSION
 
     slvEXTENSION_ES_32                                      = 0x02000000 | slvEXTENSION_TEXTURE_CUBE_MAP_ARRAY
                                                                          | slvEXTENSION_EXT_GEOMETRY_SHADER
+                                                                         | slvEXTENSION_TESSELLATION_SHADER
                                                                          | slvEXTENSION_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY
                                                                          | slvEXTENSION_SHADOW_SAMPLER
                                                                          | slvEXTENSION_GPU_SHADER5
@@ -496,9 +538,8 @@ typedef enum _sleEXTENSION
     slvEXTENSION_SHADER_FRAMEBUFFER_FETCH                   = 0x04000000,
     slvEXTENSION_DOUBLE_DATA_TYPE                           = 0x08000000,
 
-    slvEXTENSION_SUPPORT_SAMPLER1D                          = 0x10000000,
+    slvEXTENSION_SUPPORT_OGL                                = 0x10000000,
     slvEXTENSION_INTEGER_MIX                                = 0x20000000,
-
     slvEXTENSION_EGL_IMAGE_EXTERNAL_ESSL3                   = 0x40000000,
 
     slvEXTENSION_ANDROID_EXTENSION_PACK_ES31A               = slvEXTENSION_BLEND_EQUATION_ADVANCED              |
@@ -550,18 +591,29 @@ sloCOMPILER_BackPatch(
     );
 
 gceSTATUS
-sloCOMPILER_PackUniformsWithSharedOrStd140(
+sloCOMPILER_ActiveUniformsWithSharedOrStd140(
     IN sloCOMPILER Compiler
     );
 
 gceSTATUS
-sloCOMPILER_PackSSBOWithSharedOrStd140OrStd430(
+sloCOMPILER_ActiveSSBOWithSharedOrStd140OrStd430(
     IN sloCOMPILER Compiler
     );
 
 gceSTATUS
-sloCOMPILER_CheckAssignmentForGlFragData(
+sloCOMPILER_CheckAssignmentForGLFragData(
     IN sloCOMPILER Compiler
+    );
+
+gceSTATUS
+sloCOMPILER_UpdateBuiltinDataType(
+    IN sloCOMPILER Compiler
+    );
+
+gceSTATUS
+sloCOMPILER_CleanUp(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator
     );
 
 gceSTATUS

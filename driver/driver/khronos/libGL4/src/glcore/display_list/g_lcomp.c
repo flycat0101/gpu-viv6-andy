@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -140,7 +140,7 @@ GLvoid APIENTRY __gllc_End(__GLcontext *gc)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-         if(gc->currentImmediateTable->End == __glim_End_Material)
+         if(gc->immedModeDispatch.End == __glim_End_Material)
             __glim_End_Material(gc);
         else
             __glim_End(gc);
@@ -177,7 +177,7 @@ GLvoid APIENTRY __gllc_EdgeFlagv(__GLcontext *gc, const GLboolean *flag)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->EdgeFlagv)(gc, flag);
+        (*gc->immedModeDispatch.EdgeFlagv)(gc, flag);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_EdgeFlag_Rec));
@@ -194,7 +194,7 @@ GLvoid APIENTRY __gllc_EdgeFlag(__GLcontext *gc, GLboolean flag)
     struct __gllc_EdgeFlag_Rec *data;
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->EdgeFlag)(gc, flag);
+        (*gc->immedModeDispatch.EdgeFlag)(gc, flag);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_EdgeFlag_Rec));
@@ -3429,148 +3429,6 @@ GLvoid APIENTRY __gllc_BlendEquationSeparate(__GLcontext *gc, GLenum modeRGB, GL
     __glDlistAppendOp(gc, dlop);
 }
 
-GLvoid APIENTRY __gllc_ColorTableParameteriv(__GLcontext *gc, GLenum target, GLenum pname, const GLint *params)
-{
-    __GLdlistOp *dlop;
-    GLuint size;
-    GLint arraySize;
-    struct __gllc_ColorTableParameteriv_Rec *data;
-
-
-    if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        __glim_ColorTableParameteriv(gc, target, pname, params);
-    }
-
-    arraySize = __GL64PAD(__glColorTableParameter_size(pname) * 4);
-    if (arraySize < 0) {
-        __gllc_InvalidEnum(gc);
-        return;
-    }
-    size = (GLuint)sizeof(struct __gllc_ColorTableParameteriv_Rec) + arraySize;
-    dlop = __glDlistAllocOp(gc, size);
-    if (dlop == NULL) return;
-    dlop->opcode = __glop_ColorTableParameteriv;
-    data = (struct __gllc_ColorTableParameteriv_Rec *)(dlop + 1);
-    data->target = target;
-    data->pname = pname;
-    __GL_MEMCOPY((GLubyte *)(data + 1), params, arraySize);
-    __glDlistAppendOp(gc, dlop);
-}
-
-GLvoid APIENTRY __gllc_ColorTableParameterfv(__GLcontext *gc, GLenum target, GLenum pname, const GLfloat *params)
-{
-    __GLdlistOp *dlop;
-    GLuint size;
-    GLint arraySize;
-    struct __gllc_ColorTableParameterfv_Rec *data;
-
-
-    if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        __glim_ColorTableParameterfv(gc, target, pname, params);
-    }
-
-    arraySize = __GL64PAD(__glColorTableParameter_size(pname) * 4);
-    if (arraySize < 0) {
-        __gllc_InvalidEnum(gc);
-        return;
-    }
-    size = (GLuint)sizeof(struct __gllc_ColorTableParameterfv_Rec) + arraySize;
-    dlop = __glDlistAllocOp(gc, size);
-    if (dlop == NULL) return;
-    dlop->opcode = __glop_ColorTableParameterfv;
-    data = (struct __gllc_ColorTableParameterfv_Rec *)(dlop + 1);
-    data->target = target;
-    data->pname = pname;
-    __GL_MEMCOPY((GLubyte *)(data + 1), params, arraySize);
-    __glDlistAppendOp(gc, dlop);
-}
-
-GLvoid APIENTRY __gllc_ConvolutionParameteri(__GLcontext *gc, GLenum target, GLenum pname, GLint param)
-{
-
-
-    if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        __glim_ConvolutionParameteri(gc, target, pname, param);
-    }
-
-    if (__glConvolutionParameter_size(pname) != 1) {
-        __gllc_InvalidEnum(gc);
-        return;
-    }
-    __gllc_ConvolutionParameteriv(gc, target, pname, &param);
-}
-
-GLvoid APIENTRY __gllc_ConvolutionParameteriv(__GLcontext *gc, GLenum target, GLenum pname, const GLint* params)
-{
-    __GLdlistOp *dlop;
-    GLuint size;
-    GLint arraySize;
-    struct __gllc_ConvolutionParameteriv_Rec *data;
-
-
-    if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        __glim_ConvolutionParameteriv(gc, target, pname, params);
-    }
-
-    arraySize = __GL64PAD(__glConvolutionParameter_size(pname) * 4);
-    if (arraySize < 0) {
-        __gllc_InvalidEnum(gc);
-        return;
-    }
-    size = (GLuint)sizeof(struct __gllc_ConvolutionParameteriv_Rec) + arraySize;
-    dlop = __glDlistAllocOp(gc, size);
-    if (dlop == NULL) return;
-    dlop->opcode = __glop_ConvolutionParameteriv;
-    data = (struct __gllc_ConvolutionParameteriv_Rec *)(dlop + 1);
-    data->target = target;
-    data->pname = pname;
-    __GL_MEMCOPY((GLubyte *)(data + 1), params, arraySize);
-    __glDlistAppendOp(gc, dlop);
-}
-
-GLvoid APIENTRY __gllc_ConvolutionParameterfv(__GLcontext *gc, GLenum target, GLenum pname, const GLfloat* params)
-{
-    __GLdlistOp *dlop;
-    GLuint size;
-    GLint arraySize;
-    struct __gllc_ConvolutionParameterfv_Rec *data;
-
-
-    if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        __glim_ConvolutionParameterfv(gc, target, pname, params);
-    }
-
-    arraySize = __GL64PAD(__glConvolutionParameter_size(pname) * 4);
-    if (arraySize < 0) {
-        __gllc_InvalidEnum(gc);
-        return;
-    }
-    size = (GLuint)sizeof(struct __gllc_ConvolutionParameterfv_Rec) + arraySize;
-    dlop = __glDlistAllocOp(gc, size);
-    if (dlop == NULL) return;
-    dlop->opcode = __glop_ConvolutionParameterfv;
-    data = (struct __gllc_ConvolutionParameterfv_Rec *)(dlop + 1);
-    data->target = target;
-    data->pname = pname;
-    __GL_MEMCOPY((GLubyte *)(data + 1), params, arraySize);
-    __glDlistAppendOp(gc, dlop);
-}
-
-GLvoid APIENTRY __gllc_ConvolutionParameterf(__GLcontext *gc, GLenum target, GLenum pname, GLfloat param)
-{
-
-
-    if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        __glim_ConvolutionParameterf(gc, target, pname, param);
-    }
-
-    if (__glConvolutionParameter_size(pname) != 1) {
-        __gllc_InvalidEnum(gc);
-        return;
-    }
-    __gllc_ConvolutionParameterfv(gc, target, pname, &param);
-}
-
 GLvoid APIENTRY __gllc_Color3b(__GLcontext *gc, GLbyte red, GLbyte green, GLbyte blue)
 {
     __GLdlistOp *dlop;
@@ -3578,7 +3436,7 @@ GLvoid APIENTRY __gllc_Color3b(__GLcontext *gc, GLbyte red, GLbyte green, GLbyte
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color3b)(gc, red, green, blue);
+        (*gc->immedModeDispatch.Color3b)(gc, red, green, blue);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4ubv_Rec));
@@ -3599,7 +3457,7 @@ GLvoid APIENTRY __gllc_Color3bv(__GLcontext *gc, const GLbyte *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color3bv)(gc, v);
+        (*gc->immedModeDispatch.Color3bv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4ubv_Rec));
@@ -3620,7 +3478,7 @@ GLvoid APIENTRY __gllc_Color3d(__GLcontext *gc, GLdouble red, GLdouble green, GL
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color3d)(gc, red, green, blue);
+        (*gc->immedModeDispatch.Color3d)(gc, red, green, blue);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color3fv_Rec));
@@ -3640,7 +3498,7 @@ GLvoid APIENTRY __gllc_Color3dv(__GLcontext *gc, const GLdouble *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color3dv)(gc, v);
+        (*gc->immedModeDispatch.Color3dv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color3fv_Rec));
@@ -3660,7 +3518,7 @@ GLvoid APIENTRY __gllc_Color3f(__GLcontext *gc, GLfloat red, GLfloat green, GLfl
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color3f)(gc, red, green, blue);
+        (*gc->immedModeDispatch.Color3f)(gc, red, green, blue);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color3fv_Rec));
@@ -3680,7 +3538,7 @@ GLvoid APIENTRY __gllc_Color3fv(__GLcontext *gc, const GLfloat *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color3fv)(gc, v);
+        (*gc->immedModeDispatch.Color3fv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color3fv_Rec));
@@ -3700,7 +3558,7 @@ GLvoid APIENTRY __gllc_Color3i(__GLcontext *gc, GLint red, GLint green, GLint bl
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color3i)(gc, red, green, blue);
+        (*gc->immedModeDispatch.Color3i)(gc, red, green, blue);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color3fv_Rec));
@@ -3720,7 +3578,7 @@ GLvoid APIENTRY __gllc_Color3iv(__GLcontext *gc, const GLint *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color3iv)(gc, v);
+        (*gc->immedModeDispatch.Color3iv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color3fv_Rec));
@@ -3740,7 +3598,7 @@ GLvoid APIENTRY __gllc_Color3s(__GLcontext *gc, GLshort red, GLshort green, GLsh
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color3s)(gc, red, green, blue);
+        (*gc->immedModeDispatch.Color3s)(gc, red, green, blue);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color3fv_Rec));
@@ -3760,7 +3618,7 @@ GLvoid APIENTRY __gllc_Color3sv(__GLcontext *gc, const GLshort *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color3sv)(gc, v);
+        (*gc->immedModeDispatch.Color3sv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color3fv_Rec));
@@ -3780,7 +3638,7 @@ GLvoid APIENTRY __gllc_Color3ub(__GLcontext *gc, GLubyte red, GLubyte green, GLu
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color3ub)(gc, red, green, blue);
+        (*gc->immedModeDispatch.Color3ub)(gc, red, green, blue);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4ubv_Rec));
@@ -3801,7 +3659,7 @@ GLvoid APIENTRY __gllc_Color3ubv(__GLcontext *gc, const GLubyte *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color3ubv)(gc, v);
+        (*gc->immedModeDispatch.Color3ubv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4ubv_Rec));
@@ -3822,7 +3680,7 @@ GLvoid APIENTRY __gllc_Color3ui(__GLcontext *gc, GLuint red, GLuint green, GLuin
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color3ui)(gc, red, green, blue);
+        (*gc->immedModeDispatch.Color3ui)(gc, red, green, blue);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color3fv_Rec));
@@ -3842,7 +3700,7 @@ GLvoid APIENTRY __gllc_Color3uiv(__GLcontext *gc, const GLuint *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color3uiv)(gc, v);
+        (*gc->immedModeDispatch.Color3uiv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color3fv_Rec));
@@ -3862,7 +3720,7 @@ GLvoid APIENTRY __gllc_Color3us(__GLcontext *gc, GLushort red, GLushort green, G
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color3us)(gc, red, green, blue);
+        (*gc->immedModeDispatch.Color3us)(gc, red, green, blue);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color3fv_Rec));
@@ -3882,7 +3740,7 @@ GLvoid APIENTRY __gllc_Color3usv(__GLcontext *gc, const GLushort *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color3usv)(gc, v);
+        (*gc->immedModeDispatch.Color3usv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color3fv_Rec));
@@ -3902,7 +3760,7 @@ GLvoid APIENTRY __gllc_Color4b(__GLcontext *gc, GLbyte red, GLbyte green, GLbyte
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color4b)(gc, red, green, blue, alpha);
+        (*gc->immedModeDispatch.Color4b)(gc, red, green, blue, alpha);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4ubv_Rec));
@@ -3923,7 +3781,7 @@ GLvoid APIENTRY __gllc_Color4bv(__GLcontext *gc, const GLbyte *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color4bv)(gc, v);
+        (*gc->immedModeDispatch.Color4bv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4ubv_Rec));
@@ -3944,7 +3802,7 @@ GLvoid APIENTRY __gllc_Color4d(__GLcontext *gc, GLdouble red, GLdouble green, GL
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color4d)(gc, red, green, blue, alpha);
+        (*gc->immedModeDispatch.Color4d)(gc, red, green, blue, alpha);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4fv_Rec));
@@ -3965,7 +3823,7 @@ GLvoid APIENTRY __gllc_Color4dv(__GLcontext *gc, const GLdouble *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color4dv)(gc, v);
+        (*gc->immedModeDispatch.Color4dv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4fv_Rec));
@@ -3986,7 +3844,7 @@ GLvoid APIENTRY __gllc_Color4f(__GLcontext *gc, GLfloat red, GLfloat green, GLfl
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color4f)(gc, red, green, blue, alpha);
+        (*gc->immedModeDispatch.Color4f)(gc, red, green, blue, alpha);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4fv_Rec));
@@ -4007,7 +3865,7 @@ GLvoid APIENTRY __gllc_Color4fv(__GLcontext *gc, const GLfloat *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color4fv)(gc, v);
+        (*gc->immedModeDispatch.Color4fv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4fv_Rec));
@@ -4028,7 +3886,7 @@ GLvoid APIENTRY __gllc_Color4i(__GLcontext *gc, GLint red, GLint green, GLint bl
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color4i)(gc, red, green, blue, alpha);
+        (*gc->immedModeDispatch.Color4i)(gc, red, green, blue, alpha);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4fv_Rec));
@@ -4049,7 +3907,7 @@ GLvoid APIENTRY __gllc_Color4iv(__GLcontext *gc, const GLint *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color4iv)(gc, v);
+        (*gc->immedModeDispatch.Color4iv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4fv_Rec));
@@ -4070,7 +3928,7 @@ GLvoid APIENTRY __gllc_Color4s(__GLcontext *gc, GLshort red, GLshort green, GLsh
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color4s)(gc, red, green, blue, alpha);
+        (*gc->immedModeDispatch.Color4s)(gc, red, green, blue, alpha);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4fv_Rec));
@@ -4091,7 +3949,7 @@ GLvoid APIENTRY __gllc_Color4sv(__GLcontext *gc, const GLshort *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color4sv)(gc, v);
+        (*gc->immedModeDispatch.Color4sv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4fv_Rec));
@@ -4112,7 +3970,7 @@ GLvoid APIENTRY __gllc_Color4ub(__GLcontext *gc, GLubyte red, GLubyte green, GLu
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color4ub)(gc, red, green, blue, alpha);
+        (*gc->immedModeDispatch.Color4ub)(gc, red, green, blue, alpha);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4ubv_Rec));
@@ -4133,7 +3991,7 @@ GLvoid APIENTRY __gllc_Color4ubv(__GLcontext *gc, const GLubyte *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color4ubv)(gc, v);
+        (*gc->immedModeDispatch.Color4ubv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4ubv_Rec));
@@ -4154,7 +4012,7 @@ GLvoid APIENTRY __gllc_Color4ui(__GLcontext *gc, GLuint red, GLuint green, GLuin
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color4ui)(gc, red, green, blue, alpha);
+        (*gc->immedModeDispatch.Color4ui)(gc, red, green, blue, alpha);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4fv_Rec));
@@ -4175,7 +4033,7 @@ GLvoid APIENTRY __gllc_Color4uiv(__GLcontext *gc, const GLuint *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color4uiv)(gc, v);
+        (*gc->immedModeDispatch.Color4uiv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4fv_Rec));
@@ -4196,7 +4054,7 @@ GLvoid APIENTRY __gllc_Color4us(__GLcontext *gc, GLushort red, GLushort green, G
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color4us)(gc, red, green, blue, alpha);
+        (*gc->immedModeDispatch.Color4us)(gc, red, green, blue, alpha);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4fv_Rec));
@@ -4217,7 +4075,7 @@ GLvoid APIENTRY __gllc_Color4usv(__GLcontext *gc, const GLushort *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Color4usv)(gc, v);
+        (*gc->immedModeDispatch.Color4usv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Color4fv_Rec));
@@ -4238,7 +4096,7 @@ GLvoid APIENTRY __gllc_Normal3b(__GLcontext *gc, GLbyte nx, GLbyte ny, GLbyte nz
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Normal3b)(gc, nx, ny, nz);
+        (*gc->immedModeDispatch.Normal3b)(gc, nx, ny, nz);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Normal3fv_Rec));
@@ -4258,7 +4116,7 @@ GLvoid APIENTRY __gllc_Normal3bv(__GLcontext *gc, const GLbyte *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Normal3bv)(gc, v);
+        (*gc->immedModeDispatch.Normal3bv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Normal3fv_Rec));
@@ -4278,7 +4136,7 @@ GLvoid APIENTRY __gllc_Normal3d(__GLcontext *gc, GLdouble nx, GLdouble ny, GLdou
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Normal3d)(gc, nx, ny, nz);
+        (*gc->immedModeDispatch.Normal3d)(gc, nx, ny, nz);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Normal3fv_Rec));
@@ -4298,7 +4156,7 @@ GLvoid APIENTRY __gllc_Normal3dv(__GLcontext *gc, const GLdouble *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Normal3dv)(gc, v);
+        (*gc->immedModeDispatch.Normal3dv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Normal3fv_Rec));
@@ -4318,7 +4176,7 @@ GLvoid APIENTRY __gllc_Normal3f(__GLcontext *gc, GLfloat nx, GLfloat ny, GLfloat
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Normal3f)(gc, nx, ny, nz);
+        (*gc->immedModeDispatch.Normal3f)(gc, nx, ny, nz);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Normal3fv_Rec));
@@ -4338,7 +4196,7 @@ GLvoid APIENTRY __gllc_Normal3fv(__GLcontext *gc, const GLfloat *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Normal3fv)(gc, v);
+        (*gc->immedModeDispatch.Normal3fv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Normal3fv_Rec));
@@ -4358,7 +4216,7 @@ GLvoid APIENTRY __gllc_Normal3i(__GLcontext *gc, GLint nx, GLint ny, GLint nz)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Normal3i)(gc, nx, ny, nz);
+        (*gc->immedModeDispatch.Normal3i)(gc, nx, ny, nz);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Normal3fv_Rec));
@@ -4378,7 +4236,7 @@ GLvoid APIENTRY __gllc_Normal3iv(__GLcontext *gc, const GLint *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Normal3iv)(gc, v);
+        (*gc->immedModeDispatch.Normal3iv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Normal3fv_Rec));
@@ -4398,7 +4256,7 @@ GLvoid APIENTRY __gllc_Normal3s(__GLcontext *gc, GLshort nx, GLshort ny, GLshort
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Normal3s)(gc, nx, ny, nz);
+        (*gc->immedModeDispatch.Normal3s)(gc, nx, ny, nz);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Normal3fv_Rec));
@@ -4418,7 +4276,7 @@ GLvoid APIENTRY __gllc_Normal3sv(__GLcontext *gc, const GLshort *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Normal3sv)(gc, v);
+        (*gc->immedModeDispatch.Normal3sv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Normal3fv_Rec));
@@ -4438,7 +4296,7 @@ GLvoid APIENTRY __gllc_TexCoord1d(__GLcontext *gc, GLdouble s)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord1d)(gc, s);
+        (*gc->immedModeDispatch.TexCoord1d)(gc, s);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord2fv_Rec));
@@ -4457,7 +4315,7 @@ GLvoid APIENTRY __gllc_TexCoord1dv(__GLcontext *gc, const GLdouble *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord1dv)(gc, v);
+        (*gc->immedModeDispatch.TexCoord1dv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord2fv_Rec));
@@ -4476,7 +4334,7 @@ GLvoid APIENTRY __gllc_TexCoord1f(__GLcontext *gc, GLfloat s)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord1f)(gc, s);
+        (*gc->immedModeDispatch.TexCoord1f)(gc, s);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord2fv_Rec));
@@ -4495,7 +4353,7 @@ GLvoid APIENTRY __gllc_TexCoord1fv(__GLcontext *gc, const GLfloat *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord1fv)(gc, v);
+        (*gc->immedModeDispatch.TexCoord1fv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord2fv_Rec));
@@ -4514,7 +4372,7 @@ GLvoid APIENTRY __gllc_TexCoord1i(__GLcontext *gc, GLint s)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord1i)(gc, s);
+        (*gc->immedModeDispatch.TexCoord1i)(gc, s);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord2fv_Rec));
@@ -4533,7 +4391,7 @@ GLvoid APIENTRY __gllc_TexCoord1iv(__GLcontext *gc, const GLint *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord1iv)(gc, v);
+        (*gc->immedModeDispatch.TexCoord1iv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord2fv_Rec));
@@ -4552,7 +4410,7 @@ GLvoid APIENTRY __gllc_TexCoord1s(__GLcontext *gc, GLshort s)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord1s)(gc, s);
+        (*gc->immedModeDispatch.TexCoord1s)(gc, s);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord2fv_Rec));
@@ -4571,7 +4429,7 @@ GLvoid APIENTRY __gllc_TexCoord1sv(__GLcontext *gc, const GLshort *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord1sv)(gc, v);
+        (*gc->immedModeDispatch.TexCoord1sv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord2fv_Rec));
@@ -4590,7 +4448,7 @@ GLvoid APIENTRY __gllc_TexCoord2d(__GLcontext *gc, GLdouble s, GLdouble t)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord2d)(gc, s, t);
+        (*gc->immedModeDispatch.TexCoord2d)(gc, s, t);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord2fv_Rec));
@@ -4609,7 +4467,7 @@ GLvoid APIENTRY __gllc_TexCoord2dv(__GLcontext *gc, const GLdouble *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord2dv)(gc, v);
+        (*gc->immedModeDispatch.TexCoord2dv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord2fv_Rec));
@@ -4628,7 +4486,7 @@ GLvoid APIENTRY __gllc_TexCoord2f(__GLcontext *gc, GLfloat s, GLfloat t)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord2f)(gc, s, t);
+        (*gc->immedModeDispatch.TexCoord2f)(gc, s, t);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord2fv_Rec));
@@ -4647,7 +4505,7 @@ GLvoid APIENTRY __gllc_TexCoord2fv(__GLcontext *gc, const GLfloat *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord2fv)(gc, v);
+        (*gc->immedModeDispatch.TexCoord2fv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord2fv_Rec));
@@ -4666,7 +4524,7 @@ GLvoid APIENTRY __gllc_TexCoord2i(__GLcontext *gc, GLint s, GLint t)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord2i)(gc, s, t);
+        (*gc->immedModeDispatch.TexCoord2i)(gc, s, t);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord2fv_Rec));
@@ -4685,7 +4543,7 @@ GLvoid APIENTRY __gllc_TexCoord2iv(__GLcontext *gc, const GLint *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord2iv)(gc, v);
+        (*gc->immedModeDispatch.TexCoord2iv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord2fv_Rec));
@@ -4704,7 +4562,7 @@ GLvoid APIENTRY __gllc_TexCoord2s(__GLcontext *gc, GLshort s, GLshort t)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord2s)(gc, s, t);
+        (*gc->immedModeDispatch.TexCoord2s)(gc, s, t);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord2fv_Rec));
@@ -4723,7 +4581,7 @@ GLvoid APIENTRY __gllc_TexCoord2sv(__GLcontext *gc, const GLshort *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord2sv)(gc, v);
+        (*gc->immedModeDispatch.TexCoord2sv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord2fv_Rec));
@@ -4742,7 +4600,7 @@ GLvoid APIENTRY __gllc_TexCoord3d(__GLcontext *gc, GLdouble s, GLdouble t, GLdou
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord3d)(gc, s, t, r);
+        (*gc->immedModeDispatch.TexCoord3d)(gc, s, t, r);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord3fv_Rec));
@@ -4762,7 +4620,7 @@ GLvoid APIENTRY __gllc_TexCoord3dv(__GLcontext *gc, const GLdouble *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord3dv)(gc, v);
+        (*gc->immedModeDispatch.TexCoord3dv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord3fv_Rec));
@@ -4782,7 +4640,7 @@ GLvoid APIENTRY __gllc_TexCoord3f(__GLcontext *gc, GLfloat s, GLfloat t, GLfloat
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord3f)(gc, s, t, r);
+        (*gc->immedModeDispatch.TexCoord3f)(gc, s, t, r);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord3fv_Rec));
@@ -4802,7 +4660,7 @@ GLvoid APIENTRY __gllc_TexCoord3fv(__GLcontext *gc, const GLfloat *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord3fv)(gc, v);
+        (*gc->immedModeDispatch.TexCoord3fv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord3fv_Rec));
@@ -4822,7 +4680,7 @@ GLvoid APIENTRY __gllc_TexCoord3i(__GLcontext *gc, GLint s, GLint t, GLint r)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord3i)(gc, s, t, r);
+        (*gc->immedModeDispatch.TexCoord3i)(gc, s, t, r);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord3fv_Rec));
@@ -4842,7 +4700,7 @@ GLvoid APIENTRY __gllc_TexCoord3iv(__GLcontext *gc, const GLint *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord3iv)(gc, v);
+        (*gc->immedModeDispatch.TexCoord3iv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord3fv_Rec));
@@ -4862,7 +4720,7 @@ GLvoid APIENTRY __gllc_TexCoord3s(__GLcontext *gc, GLshort s, GLshort t, GLshort
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord3s)(gc, s, t, r);
+        (*gc->immedModeDispatch.TexCoord3s)(gc, s, t, r);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord3fv_Rec));
@@ -4882,7 +4740,7 @@ GLvoid APIENTRY __gllc_TexCoord3sv(__GLcontext *gc, const GLshort *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord3sv)(gc, v);
+        (*gc->immedModeDispatch.TexCoord3sv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord3fv_Rec));
@@ -4902,7 +4760,7 @@ GLvoid APIENTRY __gllc_TexCoord4d(__GLcontext *gc, GLdouble s, GLdouble t, GLdou
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord4d)(gc, s, t, r, q);
+        (*gc->immedModeDispatch.TexCoord4d)(gc, s, t, r, q);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord4fv_Rec));
@@ -4923,7 +4781,7 @@ GLvoid APIENTRY __gllc_TexCoord4dv(__GLcontext *gc, const GLdouble *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord4dv)(gc, v);
+        (*gc->immedModeDispatch.TexCoord4dv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord4fv_Rec));
@@ -4944,7 +4802,7 @@ GLvoid APIENTRY __gllc_TexCoord4f(__GLcontext *gc, GLfloat s, GLfloat t, GLfloat
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord4f)(gc, s, t, r, q);
+        (*gc->immedModeDispatch.TexCoord4f)(gc, s, t, r, q);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord4fv_Rec));
@@ -4965,7 +4823,7 @@ GLvoid APIENTRY __gllc_TexCoord4fv(__GLcontext *gc, const GLfloat *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord4fv)(gc, v);
+        (*gc->immedModeDispatch.TexCoord4fv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord4fv_Rec));
@@ -4986,7 +4844,7 @@ GLvoid APIENTRY __gllc_TexCoord4i(__GLcontext *gc, GLint s, GLint t, GLint r, GL
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord4i)(gc, s, t, r, q);
+        (*gc->immedModeDispatch.TexCoord4i)(gc, s, t, r, q);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord4fv_Rec));
@@ -5007,7 +4865,7 @@ GLvoid APIENTRY __gllc_TexCoord4iv(__GLcontext *gc, const GLint *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord4iv)(gc, v);
+        (*gc->immedModeDispatch.TexCoord4iv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord4fv_Rec));
@@ -5028,7 +4886,7 @@ GLvoid APIENTRY __gllc_TexCoord4s(__GLcontext *gc, GLshort s, GLshort t, GLshort
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord4s)(gc, s, t, r, q);
+        (*gc->immedModeDispatch.TexCoord4s)(gc, s, t, r, q);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord4fv_Rec));
@@ -5049,7 +4907,7 @@ GLvoid APIENTRY __gllc_TexCoord4sv(__GLcontext *gc, const GLshort *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->TexCoord4sv)(gc, v);
+        (*gc->immedModeDispatch.TexCoord4sv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_TexCoord4fv_Rec));
@@ -5070,7 +4928,7 @@ GLvoid APIENTRY __gllc_Vertex2d(__GLcontext *gc, GLdouble x, GLdouble y)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex2d)(gc, x, y);
+        (*gc->immedModeDispatch.Vertex2d)(gc, x, y);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex2fv_Rec));
@@ -5089,7 +4947,7 @@ GLvoid APIENTRY __gllc_Vertex2dv(__GLcontext *gc, const GLdouble *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex2dv)(gc, v);
+        (*gc->immedModeDispatch.Vertex2dv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex2fv_Rec));
@@ -5108,7 +4966,7 @@ GLvoid APIENTRY __gllc_Vertex2f(__GLcontext *gc, GLfloat x, GLfloat y)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex2f)(gc, x, y);
+        (*gc->immedModeDispatch.Vertex2f)(gc, x, y);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex2fv_Rec));
@@ -5127,7 +4985,7 @@ GLvoid APIENTRY __gllc_Vertex2fv(__GLcontext *gc, const GLfloat *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex2fv)(gc, v);
+        (*gc->immedModeDispatch.Vertex2fv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex2fv_Rec));
@@ -5146,7 +5004,7 @@ GLvoid APIENTRY __gllc_Vertex2i(__GLcontext *gc, GLint x, GLint y)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex2i)(gc, x, y);
+        (*gc->immedModeDispatch.Vertex2i)(gc, x, y);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex2fv_Rec));
@@ -5165,7 +5023,7 @@ GLvoid APIENTRY __gllc_Vertex2iv(__GLcontext *gc, const GLint *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex2iv)(gc, v);
+        (*gc->immedModeDispatch.Vertex2iv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex2fv_Rec));
@@ -5184,7 +5042,7 @@ GLvoid APIENTRY __gllc_Vertex2s(__GLcontext *gc, GLshort x, GLshort y)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex2s)(gc, x, y);
+        (*gc->immedModeDispatch.Vertex2s)(gc, x, y);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex2fv_Rec));
@@ -5203,7 +5061,7 @@ GLvoid APIENTRY __gllc_Vertex2sv(__GLcontext *gc, const GLshort *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex2sv)(gc, v);
+        (*gc->immedModeDispatch.Vertex2sv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex2fv_Rec));
@@ -5222,7 +5080,7 @@ GLvoid APIENTRY __gllc_Vertex3d(__GLcontext *gc, GLdouble x, GLdouble y, GLdoubl
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex3d)(gc, x, y, z);
+        (*gc->immedModeDispatch.Vertex3d)(gc, x, y, z);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex3fv_Rec));
@@ -5242,7 +5100,7 @@ GLvoid APIENTRY __gllc_Vertex3dv(__GLcontext *gc, const GLdouble *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex3dv)(gc, v);
+        (*gc->immedModeDispatch.Vertex3dv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex3fv_Rec));
@@ -5262,7 +5120,7 @@ GLvoid APIENTRY __gllc_Vertex3f(__GLcontext *gc, GLfloat x, GLfloat y, GLfloat z
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex3f)(gc, x, y, z);
+        (*gc->immedModeDispatch.Vertex3f)(gc, x, y, z);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex3fv_Rec));
@@ -5282,7 +5140,7 @@ GLvoid APIENTRY __gllc_Vertex3fv(__GLcontext *gc, const GLfloat *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex3fv)(gc, v);
+        (*gc->immedModeDispatch.Vertex3fv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex3fv_Rec));
@@ -5302,7 +5160,7 @@ GLvoid APIENTRY __gllc_Vertex3i(__GLcontext *gc, GLint x, GLint y, GLint z)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex3i)(gc, x, y, z);
+        (*gc->immedModeDispatch.Vertex3i)(gc, x, y, z);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex3fv_Rec));
@@ -5322,7 +5180,7 @@ GLvoid APIENTRY __gllc_Vertex3iv(__GLcontext *gc, const GLint *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex3iv)(gc, v);
+        (*gc->immedModeDispatch.Vertex3iv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex3fv_Rec));
@@ -5342,7 +5200,7 @@ GLvoid APIENTRY __gllc_Vertex3s(__GLcontext *gc, GLshort x, GLshort y, GLshort z
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex3s)(gc, x, y, z);
+        (*gc->immedModeDispatch.Vertex3s)(gc, x, y, z);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex3fv_Rec));
@@ -5362,7 +5220,7 @@ GLvoid APIENTRY __gllc_Vertex3sv(__GLcontext *gc, const GLshort *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex3sv)(gc, v);
+        (*gc->immedModeDispatch.Vertex3sv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex3fv_Rec));
@@ -5382,7 +5240,7 @@ GLvoid APIENTRY __gllc_Vertex4d(__GLcontext *gc, GLdouble x, GLdouble y, GLdoubl
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex4d)(gc, x, y, z, w);
+        (*gc->immedModeDispatch.Vertex4d)(gc, x, y, z, w);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex4fv_Rec));
@@ -5403,7 +5261,7 @@ GLvoid APIENTRY __gllc_Vertex4dv(__GLcontext *gc, const GLdouble *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex4dv)(gc, v);
+        (*gc->immedModeDispatch.Vertex4dv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex4fv_Rec));
@@ -5424,7 +5282,7 @@ GLvoid APIENTRY __gllc_Vertex4f(__GLcontext *gc, GLfloat x, GLfloat y, GLfloat z
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex4f)(gc, x, y, z, w);
+        (*gc->immedModeDispatch.Vertex4f)(gc, x, y, z, w);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex4fv_Rec));
@@ -5445,7 +5303,7 @@ GLvoid APIENTRY __gllc_Vertex4fv(__GLcontext *gc, const GLfloat *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex4fv)(gc, v);
+        (*gc->immedModeDispatch.Vertex4fv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex4fv_Rec));
@@ -5466,7 +5324,7 @@ GLvoid APIENTRY __gllc_Vertex4i(__GLcontext *gc, GLint x, GLint y, GLint z, GLin
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex4i)(gc, x, y, z, w);
+        (*gc->immedModeDispatch.Vertex4i)(gc, x, y, z, w);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex4fv_Rec));
@@ -5487,7 +5345,7 @@ GLvoid APIENTRY __gllc_Vertex4iv(__GLcontext *gc, const GLint *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex4iv)(gc, v);
+        (*gc->immedModeDispatch.Vertex4iv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex4fv_Rec));
@@ -5508,7 +5366,7 @@ GLvoid APIENTRY __gllc_Vertex4s(__GLcontext *gc, GLshort x, GLshort y, GLshort z
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex4s)(gc, x, y, z, w);
+        (*gc->immedModeDispatch.Vertex4s)(gc, x, y, z, w);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex4fv_Rec));
@@ -5529,7 +5387,7 @@ GLvoid APIENTRY __gllc_Vertex4sv(__GLcontext *gc, const GLshort *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->Vertex4sv)(gc, v);
+        (*gc->immedModeDispatch.Vertex4sv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Vertex4fv_Rec));
@@ -5550,7 +5408,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord1d(__GLcontext *gc, GLenum texture, GLdouble
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord1d)(gc, texture, s);
+        (*gc->immedModeDispatch.MultiTexCoord1d)(gc, texture, s);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord2fv_Rec));
@@ -5570,7 +5428,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord1dv(__GLcontext *gc, GLenum texture, const G
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord1dv)(gc, texture, v);
+        (*gc->immedModeDispatch.MultiTexCoord1dv)(gc, texture, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord2fv_Rec));
@@ -5590,7 +5448,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord1f(__GLcontext *gc, GLenum texture, GLfloat 
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord1f)(gc, texture, s);
+        (*gc->immedModeDispatch.MultiTexCoord1f)(gc, texture, s);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord2fv_Rec));
@@ -5610,7 +5468,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord1fv(__GLcontext *gc, GLenum texture, const G
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord1fv)(gc, texture, v);
+        (*gc->immedModeDispatch.MultiTexCoord1fv)(gc, texture, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord2fv_Rec));
@@ -5630,7 +5488,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord1i(__GLcontext *gc, GLenum texture, GLint s)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord1i)(gc, texture, s);
+        (*gc->immedModeDispatch.MultiTexCoord1i)(gc, texture, s);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord2fv_Rec));
@@ -5650,7 +5508,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord1iv(__GLcontext *gc, GLenum texture, const G
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord1iv)(gc, texture, v);
+        (*gc->immedModeDispatch.MultiTexCoord1iv)(gc, texture, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord2fv_Rec));
@@ -5670,7 +5528,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord1s(__GLcontext *gc, GLenum texture, GLshort 
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord1s)(gc, texture, s);
+        (*gc->immedModeDispatch.MultiTexCoord1s)(gc, texture, s);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord2fv_Rec));
@@ -5690,7 +5548,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord1sv(__GLcontext *gc, GLenum texture, const G
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord1sv)(gc, texture, v);
+        (*gc->immedModeDispatch.MultiTexCoord1sv)(gc, texture, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord2fv_Rec));
@@ -5711,7 +5569,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord2d(__GLcontext *gc, GLenum texture, GLdouble
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord2d)(gc, texture, s, t);
+        (*gc->immedModeDispatch.MultiTexCoord2d)(gc, texture, s, t);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord2fv_Rec));
@@ -5731,7 +5589,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord2dv(__GLcontext *gc, GLenum texture, const G
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord2dv)(gc, texture, v);
+        (*gc->immedModeDispatch.MultiTexCoord2dv)(gc, texture, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord2fv_Rec));
@@ -5751,7 +5609,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord2f(__GLcontext *gc, GLenum texture, GLfloat 
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord2f)(gc, texture, s, t);
+        (*gc->immedModeDispatch.MultiTexCoord2f)(gc, texture, s, t);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord2fv_Rec));
@@ -5771,7 +5629,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord2fv(__GLcontext *gc, GLenum texture, const G
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord2fv)(gc, texture, v);
+        (*gc->immedModeDispatch.MultiTexCoord2fv)(gc, texture, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord2fv_Rec));
@@ -5791,7 +5649,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord2i(__GLcontext *gc, GLenum texture, GLint s,
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord2i)(gc, texture, s, t);
+        (*gc->immedModeDispatch.MultiTexCoord2i)(gc, texture, s, t);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord2fv_Rec));
@@ -5811,7 +5669,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord2iv(__GLcontext *gc, GLenum texture, const G
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord2iv)(gc, texture, v);
+        (*gc->immedModeDispatch.MultiTexCoord2iv)(gc, texture, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord2fv_Rec));
@@ -5830,7 +5688,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord2s(__GLcontext *gc, GLenum texture, GLshort 
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord2s)(gc, texture, s, t);
+        (*gc->immedModeDispatch.MultiTexCoord2s)(gc, texture, s, t);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord2fv_Rec));
@@ -5850,7 +5708,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord2sv(__GLcontext *gc, GLenum texture, const G
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord2sv)(gc, texture, v);
+        (*gc->immedModeDispatch.MultiTexCoord2sv)(gc, texture, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord2fv_Rec));
@@ -5870,7 +5728,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord3d(__GLcontext *gc, GLenum texture, GLdouble
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord3d)(gc, texture, s, t, r);
+        (*gc->immedModeDispatch.MultiTexCoord3d)(gc, texture, s, t, r);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord3fv_Rec));
@@ -5891,7 +5749,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord3dv(__GLcontext *gc, GLenum texture, const G
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord3dv)(gc, texture, v);
+        (*gc->immedModeDispatch.MultiTexCoord3dv)(gc, texture, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord3fv_Rec));
@@ -5912,7 +5770,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord3f(__GLcontext *gc, GLenum texture, GLfloat 
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord3f)(gc, texture, s, t, r);
+        (*gc->immedModeDispatch.MultiTexCoord3f)(gc, texture, s, t, r);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord3fv_Rec));
@@ -5933,7 +5791,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord3fv(__GLcontext *gc, GLenum texture, const G
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord3fv)(gc, texture, v);
+        (*gc->immedModeDispatch.MultiTexCoord3fv)(gc, texture, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord3fv_Rec));
@@ -5954,7 +5812,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord3i(__GLcontext *gc, GLenum texture, GLint s,
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord3i)(gc, texture, s, t, r);
+        (*gc->immedModeDispatch.MultiTexCoord3i)(gc, texture, s, t, r);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord3fv_Rec));
@@ -5975,7 +5833,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord3iv(__GLcontext *gc, GLenum texture, const G
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord3iv)(gc, texture, v);
+        (*gc->immedModeDispatch.MultiTexCoord3iv)(gc, texture, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord3fv_Rec));
@@ -5996,7 +5854,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord3s(__GLcontext *gc, GLenum texture, GLshort 
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord3s)(gc, texture, s, t, r);
+        (*gc->immedModeDispatch.MultiTexCoord3s)(gc, texture, s, t, r);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord3fv_Rec));
@@ -6017,7 +5875,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord3sv(__GLcontext *gc, GLenum texture, const G
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord3sv)(gc, texture, v);
+        (*gc->immedModeDispatch.MultiTexCoord3sv)(gc, texture, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord3fv_Rec));
@@ -6038,7 +5896,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord4d(__GLcontext *gc, GLenum texture, GLdouble
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord4d)(gc, texture, s, t, r, q);
+        (*gc->immedModeDispatch.MultiTexCoord4d)(gc, texture, s, t, r, q);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord4fv_Rec));
@@ -6060,7 +5918,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord4dv(__GLcontext *gc, GLenum texture, const G
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord4dv)(gc, texture, v);
+        (*gc->immedModeDispatch.MultiTexCoord4dv)(gc, texture, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord4fv_Rec));
@@ -6082,7 +5940,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord4f(__GLcontext *gc, GLenum texture, GLfloat 
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord4f)(gc, texture, s, t, r, q);
+        (*gc->immedModeDispatch.MultiTexCoord4f)(gc, texture, s, t, r, q);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord4fv_Rec));
@@ -6104,7 +5962,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord4fv(__GLcontext *gc, GLenum texture, const G
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord4fv)(gc, texture, v);
+        (*gc->immedModeDispatch.MultiTexCoord4fv)(gc, texture, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord4fv_Rec));
@@ -6126,7 +5984,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord4i(__GLcontext *gc, GLenum texture, GLint s,
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord4i)(gc, texture, s, t, r, q);
+        (*gc->immedModeDispatch.MultiTexCoord4i)(gc, texture, s, t, r, q);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord4fv_Rec));
@@ -6148,7 +6006,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord4iv(__GLcontext *gc, GLenum texture, const G
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord4iv)(gc, texture, v);
+        (*gc->immedModeDispatch.MultiTexCoord4iv)(gc, texture, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord4fv_Rec));
@@ -6170,7 +6028,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord4s(__GLcontext *gc, GLenum texture, GLshort 
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord4s)(gc, texture, s, t, r, q);
+        (*gc->immedModeDispatch.MultiTexCoord4s)(gc, texture, s, t, r, q);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord4fv_Rec));
@@ -6192,7 +6050,7 @@ GLvoid APIENTRY __gllc_MultiTexCoord4sv(__GLcontext *gc, GLenum texture, const G
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->MultiTexCoord4sv)(gc, texture, v);
+        (*gc->immedModeDispatch.MultiTexCoord4sv)(gc, texture, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_MultiTexCoord4fv_Rec));
@@ -6214,7 +6072,7 @@ GLvoid APIENTRY __gllc_FogCoordf(__GLcontext *gc, GLfloat coord)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->FogCoordf)(gc, coord);
+        (*gc->immedModeDispatch.FogCoordf)(gc, coord);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_FogCoordf_Rec));
@@ -6232,7 +6090,7 @@ GLvoid APIENTRY __gllc_FogCoordd(__GLcontext *gc, GLdouble coord)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->FogCoordd)(gc, coord);
+        (*gc->immedModeDispatch.FogCoordd)(gc, coord);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_FogCoordf_Rec));
@@ -6250,7 +6108,7 @@ GLvoid APIENTRY __gllc_FogCoordfv(__GLcontext *gc, const GLfloat coord[])
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->FogCoordfv)(gc, coord);
+        (*gc->immedModeDispatch.FogCoordfv)(gc, coord);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_FogCoordf_Rec));
@@ -6268,7 +6126,7 @@ GLvoid APIENTRY __gllc_FogCoorddv(__GLcontext *gc, const GLdouble coord[])
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->FogCoorddv)(gc, coord);
+        (*gc->immedModeDispatch.FogCoorddv)(gc, coord);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_FogCoordf_Rec));
@@ -6289,7 +6147,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib1s)(gc, index, x);
+        (*gc->immedModeDispatch.VertexAttrib1s)(gc, index, x);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6312,7 +6170,7 @@ GLvoid APIENTRY __gllc_VertexAttrib1f(__GLcontext *gc, GLuint index, GLfloat x)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib1f)(gc, index, x);
+        (*gc->immedModeDispatch.VertexAttrib1f)(gc, index, x);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6337,7 +6195,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib1d)(gc, index, x);
+        (*gc->immedModeDispatch.VertexAttrib1d)(gc, index, x);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6363,7 +6221,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib2s)(gc, index, x, y);
+        (*gc->immedModeDispatch.VertexAttrib2s)(gc, index, x, y);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6386,7 +6244,7 @@ GLvoid APIENTRY __gllc_VertexAttrib2f(__GLcontext *gc, GLuint index, GLfloat x, 
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib2f)(gc, index, x, y);
+        (*gc->immedModeDispatch.VertexAttrib2f)(gc, index, x, y);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6411,7 +6269,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib2d)(gc, index, x, y);
+        (*gc->immedModeDispatch.VertexAttrib2d)(gc, index, x, y);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6437,7 +6295,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib3s)(gc, index, x, y, z);
+        (*gc->immedModeDispatch.VertexAttrib3s)(gc, index, x, y, z);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6460,7 +6318,7 @@ GLvoid APIENTRY __gllc_VertexAttrib3f(__GLcontext *gc, GLuint index, GLfloat x, 
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib3f)(gc, index, x, y, z);
+        (*gc->immedModeDispatch.VertexAttrib3f)(gc, index, x, y, z);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6485,7 +6343,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib3d)(gc, index, x, y, z);
+        (*gc->immedModeDispatch.VertexAttrib3d)(gc, index, x, y, z);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6511,7 +6369,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib4s)(gc, index, x, y, z, w);
+        (*gc->immedModeDispatch.VertexAttrib4s)(gc, index, x, y, z, w);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6534,7 +6392,7 @@ GLvoid APIENTRY __gllc_VertexAttrib4f(__GLcontext *gc, GLuint index, GLfloat x, 
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib4f)(gc, index, x, y, z, w);
+        (*gc->immedModeDispatch.VertexAttrib4f)(gc, index, x, y, z, w);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6559,7 +6417,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib4d)(gc, index, x, y, z, w);
+        (*gc->immedModeDispatch.VertexAttrib4d)(gc, index, x, y, z, w);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6585,7 +6443,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib4Nub)(gc, index, x, y, z, w);
+        (*gc->immedModeDispatch.VertexAttrib4Nub)(gc, index, x, y, z, w);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6611,7 +6469,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib1sv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib1sv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6634,7 +6492,7 @@ GLvoid APIENTRY __gllc_VertexAttrib1fv(__GLcontext *gc, GLuint index, const GLfl
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib1fv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib1fv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6659,7 +6517,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib1dv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib1dv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6685,7 +6543,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib2sv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib2sv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6708,7 +6566,7 @@ GLvoid APIENTRY __gllc_VertexAttrib2fv(__GLcontext *gc, GLuint index, const GLfl
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib2fv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib2fv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6733,7 +6591,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib2dv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib2dv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6759,7 +6617,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib3sv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib3sv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6782,7 +6640,7 @@ GLvoid APIENTRY __gllc_VertexAttrib3fv(__GLcontext *gc, GLuint index, const GLfl
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib3fv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib3fv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6807,7 +6665,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib3dv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib3dv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6833,7 +6691,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib4bv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib4bv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6859,7 +6717,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib4sv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib4sv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6885,7 +6743,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib4iv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib4iv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6911,7 +6769,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib4ubv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib4ubv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6937,7 +6795,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib4usv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib4usv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6963,7 +6821,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib4uiv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib4uiv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -6986,7 +6844,7 @@ GLvoid APIENTRY __gllc_VertexAttrib4fv(__GLcontext *gc, GLuint index, const GLfl
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib4fv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib4fv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -7011,7 +6869,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib4dv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib4dv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -7035,7 +6893,7 @@ GLvoid APIENTRY __gllc_VertexAttrib4Nbv(__GLcontext *gc, GLuint index, const GLb
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib4Nbv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib4Nbv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -7061,7 +6919,7 @@ GL_ASSERT(0);
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib4Nsv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib4Nsv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -7085,7 +6943,7 @@ GLvoid APIENTRY __gllc_VertexAttrib4Niv(__GLcontext *gc, GLuint index, const GLi
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib4Niv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib4Niv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -7109,7 +6967,7 @@ GLvoid APIENTRY __gllc_VertexAttrib4Nubv(__GLcontext *gc, GLuint index, const GL
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib4Nubv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib4Nubv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -7133,7 +6991,7 @@ GLvoid APIENTRY __gllc_VertexAttrib4Nusv(__GLcontext *gc, GLuint index, const GL
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib4Nusv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib4Nusv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -7157,7 +7015,7 @@ GLvoid APIENTRY __gllc_VertexAttrib4Nuiv(__GLcontext *gc, GLuint index, const GL
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->VertexAttrib4Nuiv)(gc, index, v);
+        (*gc->immedModeDispatch.VertexAttrib4Nuiv)(gc, index, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_VertexAttrib4fv_Rec));
@@ -7688,15 +7546,13 @@ GLvoid APIENTRY __gllc_TexImage2D(__GLcontext *gc, GLenum target, GLint lod,
     GLint imageSize;
     GLuint activeUnit;
     __GLtextureObject *tex;
-    GLuint face = 0;
-
-    __GL_TEXIMAGE2D_GET_OBJECT();
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
         __glim_TexImage2D(gc, target, lod, internalFormat, width, height, border, format, type, pixels);
     }
     else
     {
         GLenum oldError = gc->error;
+        activeUnit = gc->state.texture.activeTexIndex;
         /*proxy textures are executed immediately*/
         switch (target)
         {
@@ -7705,6 +7561,8 @@ GLvoid APIENTRY __gllc_TexImage2D(__GLcontext *gc, GLenum target, GLint lod,
                 __glim_TexImage2D(gc, target,lod, internalFormat, width, height, border, format, type, pixels);
                 return;
             case GL_TEXTURE_2D:
+                tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_2D_INDEX];
+                tex->arrays = 1;
                 break;
             case GL_TEXTURE_CUBE_MAP_POSITIVE_X:
             case GL_TEXTURE_CUBE_MAP_NEGATIVE_X:
@@ -7717,6 +7575,8 @@ GLvoid APIENTRY __gllc_TexImage2D(__GLcontext *gc, GLenum target, GLint lod,
                     __gllc_InvalidEnum(gc);
                     return;
                 }
+                tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_INDEX];
+                tex->arrays = 6;
                 break;
             default:
                 __gllc_InvalidEnum(gc);
@@ -7886,7 +7746,6 @@ GLvoid APIENTRY __gllc_CopyTexImage1D(__GLcontext *gc, GLenum target, GLint leve
 {
     __GLdlistOp *dlop;
     struct __gllc_CopyTexImage1D_Rec *data;
-    GLenum format;
     GLuint activeUnit;
     __GLtextureObject *tex;
 
@@ -7914,7 +7773,6 @@ GLvoid APIENTRY __gllc_CopyTexImage1D(__GLcontext *gc, GLenum target, GLint leve
             case GL_DEPTH_COMPONENT16:
             case GL_DEPTH_COMPONENT24:
             case GL_DEPTH_COMPONENT32:
-                format = GL_DEPTH_COMPONENT;
                 if(!gc->modes.haveDepthBuffer)
                 {
                     __gllc_InvalidOperation(gc);
@@ -7922,7 +7780,6 @@ GLvoid APIENTRY __gllc_CopyTexImage1D(__GLcontext *gc, GLenum target, GLint leve
                 }
                 break;
             default:
-                format = GL_RGBA;
                 break;
         }
 
@@ -7950,21 +7807,21 @@ GLvoid APIENTRY __gllc_CopyTexImage2D(__GLcontext *gc, GLenum target, GLint leve
 {
     __GLdlistOp *dlop;
     struct __gllc_CopyTexImage2D_Rec *data;
-    GLenum format;
     GLuint activeUnit;
     __GLtextureObject *tex;
-    GLuint face = 0;
     /* Get the texture object and face */
-    __GL_TEXIMAGE2D_GET_OBJECT();
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
         __glim_CopyTexImage2D(gc, target, level, internalformat, x, y, width, height, border);
     }
     else
     {
         GLenum oldError = gc->error;
+        activeUnit = gc->state.texture.activeTexIndex;
         switch (target)
         {
             case GL_TEXTURE_2D:
+                tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_2D_INDEX];
+                tex->arrays = 1;
                 break;
             case GL_TEXTURE_CUBE_MAP_POSITIVE_X:
             case GL_TEXTURE_CUBE_MAP_NEGATIVE_X:
@@ -7977,6 +7834,8 @@ GLvoid APIENTRY __gllc_CopyTexImage2D(__GLcontext *gc, GLenum target, GLint leve
                     __gllc_InvalidEnum(gc);
                     return;
                 }
+                tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_INDEX];
+                tex->arrays = 6;
                 break;
             default:
                 __gllc_InvalidEnum(gc);
@@ -7989,7 +7848,6 @@ GLvoid APIENTRY __gllc_CopyTexImage2D(__GLcontext *gc, GLenum target, GLint leve
             case GL_DEPTH_COMPONENT16:
             case GL_DEPTH_COMPONENT24:
             case GL_DEPTH_COMPONENT32:
-                format = GL_DEPTH_COMPONENT;
                 if(!gc->modes.haveDepthBuffer)
                 {
                     __gllc_InvalidOperation(gc);
@@ -7997,7 +7855,6 @@ GLvoid APIENTRY __gllc_CopyTexImage2D(__GLcontext *gc, GLenum target, GLint leve
                 }
                 break;
             default:
-                format = GL_RGBA;
                 break;
         }
 
@@ -8136,7 +7993,7 @@ GLvoid APIENTRY __gllc_TexSubImage2D(__GLcontext *gc, GLenum target, GLint level
         }
 
         /* Check arguments */
-        __glCheckTexSubImgArgs(gc, tex, 0, level, xoffset, yoffset, 0, width, height, 1);
+        __glCheckTexSubImgArgs(gc, tex, face, level, xoffset, yoffset, 0, width, height, 1);
 
         __glCheckTexImgTypeArg(gc, tex, type);
 
@@ -8281,7 +8138,6 @@ GLvoid APIENTRY __gllc_CopyTexSubImage1D(__GLcontext *gc, GLenum target, GLint l
     else
     {
         GLenum oldError = gc->error;
-        GLenum format;
         __GLtextureObject *tex;
         __GLmipMapLevel *mipmap;
         GLuint activeUnit = gc->state.texture.activeTexIndex;
@@ -8302,15 +8158,13 @@ GLvoid APIENTRY __gllc_CopyTexSubImage1D(__GLcontext *gc, GLenum target, GLint l
             case GL_DEPTH_COMPONENT16:
             case GL_DEPTH_COMPONENT24:
             case GL_DEPTH_COMPONENT32:
-                format = GL_DEPTH_COMPONENT;
                 if(!gc->modes.haveDepthBuffer)
                 {
                     __gllc_InvalidOperation(gc);
                     return;
                 }
                 break;
-            default:
-                format = GL_RGBA;
+            default:;
                 break;
         }
 
@@ -8360,7 +8214,6 @@ GLvoid APIENTRY __gllc_CopyTexSubImage2D(__GLcontext *gc, GLenum target, GLint l
     else
     {
         GLenum oldError = gc->error;
-        GLenum format;
         __GLtextureObject *tex;
         __GLmipMapLevel *mipmap;
         GLuint activeUnit = gc->state.texture.activeTexIndex;
@@ -8397,7 +8250,6 @@ GLvoid APIENTRY __gllc_CopyTexSubImage2D(__GLcontext *gc, GLenum target, GLint l
             case GL_DEPTH_COMPONENT16:
             case GL_DEPTH_COMPONENT24:
             case GL_DEPTH_COMPONENT32:
-                format = GL_DEPTH_COMPONENT;
                 if(!gc->modes.haveDepthBuffer)
                 {
                     __gllc_InvalidOperation(gc);
@@ -8405,7 +8257,6 @@ GLvoid APIENTRY __gllc_CopyTexSubImage2D(__GLcontext *gc, GLenum target, GLint l
                 }
                 break;
             default:
-                format = GL_RGBA;
                 break;
         }
 
@@ -8467,7 +8318,6 @@ GLvoid APIENTRY __gllc_CopyTexSubImage3D(__GLcontext *gc, GLenum target,
     else
     {
         GLenum oldError = gc->error;
-        GLenum format;
         __GLtextureObject *tex;
         __GLmipMapLevel *mipmap;
         GLuint activeUnit = gc->state.texture.activeTexIndex;
@@ -8488,7 +8338,6 @@ GLvoid APIENTRY __gllc_CopyTexSubImage3D(__GLcontext *gc, GLenum target,
             case GL_DEPTH_COMPONENT16:
             case GL_DEPTH_COMPONENT24:
             case GL_DEPTH_COMPONENT32:
-                format = GL_DEPTH_COMPONENT;
                 if(!gc->modes.haveDepthBuffer)
                 {
                     __gllc_InvalidOperation(gc);
@@ -8496,7 +8345,6 @@ GLvoid APIENTRY __gllc_CopyTexSubImage3D(__GLcontext *gc, GLenum target,
                 }
                 break;
             default:
-                format = GL_RGBA;
                 break;
         }
 
@@ -8548,16 +8396,15 @@ GLvoid APIENTRY __gllc_CompressedTexImage2D(__GLcontext *gc, GLenum target, GLin
     GLint blockSize;
     GLuint activeUnit;
     __GLtextureObject *tex;
-    GLuint face = 0;
     /* Get the texture object and face */
-    __GL_TEXIMAGE2D_GET_OBJECT();
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
         __glim_CompressedTexImage2D(gc, target, lod, components, width, height, border, imageSize, data);
     }
     else
     {
-         GLenum oldError = gc->error;
+        GLenum oldError = gc->error;
+        activeUnit = gc->state.texture.activeTexIndex;
         /*proxy textures are executed immediately*/
         switch (target)
         {
@@ -8569,6 +8416,8 @@ GLvoid APIENTRY __gllc_CompressedTexImage2D(__GLcontext *gc, GLenum target, GLin
                                     imageSize, data);
                 return;
             case GL_TEXTURE_2D:
+                tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_2D_INDEX];
+                tex->arrays = 1;
                 break;
             case GL_TEXTURE_CUBE_MAP_POSITIVE_X:
             case GL_TEXTURE_CUBE_MAP_NEGATIVE_X:
@@ -8581,6 +8430,8 @@ GLvoid APIENTRY __gllc_CompressedTexImage2D(__GLcontext *gc, GLenum target, GLin
                     __gllc_InvalidEnum(gc);
                     return;
                 }
+                tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_INDEX];
+                tex->arrays = 6;
                 break;
             default:
                 __gllc_InvalidEnum(gc);
@@ -8834,588 +8685,6 @@ GLvoid APIENTRY __gllc_Enable(__GLcontext *gc, GLenum cap)
     dlop->opcode = __glop_Enable;
     data = (struct __gllc_Enable_Rec *)(dlop + 1);
     data->cap = cap;
-    __glDlistAppendOp(gc, dlop);
-}
-GLvoid APIENTRY __gllc_ColorTable(__GLcontext *gc, GLenum target, GLenum internalformat,
-                GLsizei width, GLenum format, GLenum type, const GLvoid *table)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_ColorSubTable(__GLcontext *gc, GLenum target, GLsizei start,
-            GLsizei count, GLenum format, GLenum type, const GLvoid *table)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_CopyColorTable(__GLcontext *gc, GLenum target, GLenum internalFormat, GLint x, GLint y, GLsizei width)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_CopyColorSubTable(__GLcontext *gc, GLenum target, GLsizei start, GLint x, GLint y, GLsizei width)
-{
-    __GLdlistOp *dlop;
-    struct __gllc_CopyColorSubTable_Rec *data;
-
-
-    if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        __glim_CopyColorSubTable(gc, target, start, x, y, width);
-    }
-
-    dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_CopyColorSubTable_Rec));
-    if (dlop == NULL) return;
-    dlop->opcode = __glop_CopyColorSubTable;
-    data = (struct __gllc_CopyColorSubTable_Rec *)(dlop + 1);
-    data->target = target;
-    data->start = start;
-    data->x = x;
-    data->y = y;
-    data->width = width;
-    __glDlistAppendOp(gc, dlop);
-}
-
-GLvoid APIENTRY __gllc_ConvolutionFilter1D(__GLcontext *gc, GLenum target, GLenum internalformat, GLsizei width, GLenum format, GLenum type, const GLvoid *image)
-{
-    GLenum adjustFormat= format;
-    GLenum adjustType= type;
-    __GLdlistOp *dlop;
-    struct __gllc_ConvolutionFilter1D_Rec *data;
-    GLint imageSize;
-    GLboolean index;
-
-
-    if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        __glim_ConvolutionFilter1D(gc, target, internalformat, width, format, type, image);
-    }
-
-    if (width < 0)
-    {
-        __gllc_InvalidValue(gc);
-        return;
-    }
-    switch (format)
-    {
-    case GL_COLOR_INDEX:
-        index = GL_TRUE;
-        break;
-    case GL_RED:
-    case GL_GREEN:
-    case GL_BLUE:
-    case GL_ALPHA:
-    case GL_RGB:
-    case GL_RGBA:
-    case GL_LUMINANCE:
-    case GL_LUMINANCE_ALPHA:
-    case GL_ABGR_EXT:
-    case GL_BGR_EXT:
-    case GL_BGRA_EXT:
-        index = GL_FALSE;
-        break;
-    default:
-        __gllc_InvalidEnum(gc);
-        return;
-    }
-    switch (type)
-    {
-    case GL_BITMAP:
-        if (!index)
-        {
-            __gllc_InvalidEnum(gc);
-            return;
-        }
-        break;
-    case GL_BYTE:
-    case GL_UNSIGNED_BYTE:
-    case GL_SHORT:
-    case GL_UNSIGNED_SHORT:
-    case GL_INT:
-    case GL_UNSIGNED_INT:
-    case GL_FLOAT:
-        break;
-    case GL_UNSIGNED_BYTE_3_3_2:
-    case GL_UNSIGNED_SHORT_5_6_5:
-    case GL_UNSIGNED_BYTE_2_3_3_REV:
-    case GL_UNSIGNED_SHORT_5_6_5_REV:
-        switch (format)
-        {
-        case GL_RGB:
-        case GL_BGR_EXT:
-            adjustFormat= GL_LUMINANCE; /* or anything that's 1 component */
-            adjustType= GL_UNSIGNED_BYTE;
-            break;
-        default:
-            __glSetError(gc, GL_INVALID_OPERATION);
-            return;
-        }
-        break;
-    case GL_UNSIGNED_SHORT_4_4_4_4:
-    case GL_UNSIGNED_SHORT_5_5_5_1:
-    case GL_UNSIGNED_INT_8_8_8_8:
-    case GL_UNSIGNED_INT_10_10_10_2:
-    case GL_UNSIGNED_SHORT_4_4_4_4_REV:
-    case GL_UNSIGNED_SHORT_1_5_5_5_REV:
-    case GL_UNSIGNED_INT_8_8_8_8_REV:
-    case GL_UNSIGNED_INT_2_10_10_10_REV:
-        switch (format)
-        {
-        case GL_RGBA:
-        case GL_ABGR_EXT:
-        case GL_BGRA_EXT:
-            adjustFormat= GL_LUMINANCE; /* or anything that's 1 component */
-            adjustType= GL_UNSIGNED_SHORT;
-            if (type == GL_UNSIGNED_INT_8_8_8_8 ||
-                type == GL_UNSIGNED_INT_10_10_10_2 ||
-                type == GL_UNSIGNED_INT_8_8_8_8_REV ||
-                type == GL_UNSIGNED_INT_2_10_10_10_REV)
-                adjustType= GL_UNSIGNED_INT;
-            break;
-        default:
-            __glSetError(gc, GL_INVALID_OPERATION);
-            return;
-        }
-        break;
-    default:
-        __gllc_InvalidEnum(gc);
-        return;
-    }
-
-    imageSize = __glImageSize(width, 1, format, type);
-    imageSize = __GL_PAD(imageSize);
-
-    dlop = __glDlistAllocOp(gc, (sizeof(struct __gllc_ConvolutionFilter1D_Rec) + imageSize));
-    if (dlop == NULL) return;
-    dlop->opcode = __glop_TexImage1D;
-
-    data = (struct __gllc_ConvolutionFilter1D_Rec *)(dlop + 1);
-    data->target = target;
-    data->internalformat = internalformat;
-    data->width = width;
-    data->format = format;
-    data->type = type;
-    data->imageSize = imageSize;
-
-    if (imageSize > 0 && image != NULL)
-    {
-        __glFillImage(gc, width, 1, adjustFormat, adjustType, image, (GLubyte*)(data + 1));
-    }
-
-    __glDlistAppendOp(gc, dlop);
-}
-
-GLvoid APIENTRY __gllc_ConvolutionFilter2D(__GLcontext *gc, GLenum target, GLenum internalformat, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *image)
-{
-    GLenum adjustFormat= format;
-    GLenum adjustType= type;
-    __GLdlistOp *dlop;
-    struct __gllc_ConvolutionFilter2D_Rec  *data;
-    GLint imageSize;
-    GLboolean index;
-
-
-    if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        __glim_ConvolutionFilter2D(gc, target, internalformat, width, height, format, type, image);
-    }
-
-    if ((width < 0) || (height < 0))
-    {
-        __gllc_InvalidValue(gc);
-        return;
-    }
-    switch (format)
-    {
-    case GL_COLOR_INDEX:
-        index = GL_TRUE;
-        break;
-    case GL_RED:
-    case GL_GREEN:
-    case GL_BLUE:
-    case GL_ALPHA:
-    case GL_RGB:
-    case GL_RGBA:
-    case GL_LUMINANCE:
-    case GL_LUMINANCE_ALPHA:
-    case GL_ABGR_EXT:
-    case GL_BGR_EXT:
-    case GL_BGRA_EXT:
-        index = GL_FALSE;
-        break;
-    default:
-        __gllc_InvalidEnum(gc);
-        return;
-    }
-    switch (type)
-    {
-    case GL_BITMAP:
-        if (!index)
-        {
-            __gllc_InvalidEnum(gc);
-            return;
-        }
-        break;
-    case GL_BYTE:
-    case GL_UNSIGNED_BYTE:
-    case GL_SHORT:
-    case GL_UNSIGNED_SHORT:
-    case GL_INT:
-    case GL_UNSIGNED_INT:
-    case GL_FLOAT:
-        break;
-    case GL_UNSIGNED_BYTE_3_3_2:
-    case GL_UNSIGNED_SHORT_5_6_5:
-    case GL_UNSIGNED_BYTE_2_3_3_REV:
-    case GL_UNSIGNED_SHORT_5_6_5_REV:
-        switch (format)
-        {
-        case GL_RGB:
-        case GL_BGR_EXT:
-            adjustFormat= GL_LUMINANCE; /* or anything that's 1 component */
-            adjustType= GL_UNSIGNED_BYTE;
-            break;
-        default:
-            __glSetError(gc, GL_INVALID_OPERATION);
-            return;
-        }
-        break;
-    case GL_UNSIGNED_SHORT_4_4_4_4:
-    case GL_UNSIGNED_SHORT_5_5_5_1:
-    case GL_UNSIGNED_INT_8_8_8_8:
-    case GL_UNSIGNED_INT_10_10_10_2:
-    case GL_UNSIGNED_SHORT_4_4_4_4_REV:
-    case GL_UNSIGNED_SHORT_1_5_5_5_REV:
-    case GL_UNSIGNED_INT_8_8_8_8_REV:
-    case GL_UNSIGNED_INT_2_10_10_10_REV:
-        switch (format)
-        {
-        case GL_RGBA:
-        case GL_ABGR_EXT:
-        case GL_BGRA_EXT:
-            adjustFormat= GL_LUMINANCE; /* or anything that's 1 component */
-            adjustType= GL_UNSIGNED_SHORT;
-            if (type == GL_UNSIGNED_INT_8_8_8_8 ||
-                type == GL_UNSIGNED_INT_10_10_10_2 ||
-                type == GL_UNSIGNED_INT_8_8_8_8_REV ||
-                type == GL_UNSIGNED_INT_2_10_10_10_REV)
-                adjustType= GL_UNSIGNED_INT;
-            break;
-        default:
-            __glSetError(gc, GL_INVALID_OPERATION);
-            return;
-        }
-        break;
-    default:
-        __gllc_InvalidEnum(gc);
-        return;
-    }
-
-    imageSize = __glImageSize(width, height, format, type);
-    imageSize = __GL_PAD(imageSize);
-
-    dlop = __glDlistAllocOp(gc, (sizeof(struct __gllc_ConvolutionFilter2D_Rec) + imageSize));
-    if (dlop == NULL) return;
-    dlop->opcode = __glop_ConvolutionFilter2D;
-
-    data = (struct __gllc_ConvolutionFilter2D_Rec *)(dlop + 1);
-    data->target = target;
-    data->internalformat = internalformat;
-    data->width = width;
-    data->height = height;
-    data->format = format;
-    data->type = type;
-    data->imageSize = imageSize;
-
-    if (imageSize > 0 && image != NULL)
-    {
-        __glFillImage(gc, width, height, adjustFormat, adjustType, image, (GLubyte*)(data + 1));
-    }
-
-    __glDlistAppendOp(gc, dlop);
-}
-
-GLvoid APIENTRY __gllc_SeparableFilter2D(__GLcontext *gc, GLenum target, GLenum internalformat, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *row, const GLvoid *col)
-{
-    GLenum adjustFormat= format;
-    GLenum adjustType= type;
-    __GLdlistOp *dlop;
-    struct __gllc_SeparableFilter2D_Rec  *data;
-    GLint rowSize, colSize, imageSize;
-    GLboolean index;
-
-
-    if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        __glim_SeparableFilter2D(gc, target, internalformat, width, height, format, type, row, col);
-    }
-
-    if ((width < 0) || (height < 0))
-    {
-        __gllc_InvalidValue(gc);
-        return;
-    }
-    switch (format)
-    {
-    case GL_COLOR_INDEX:
-        index = GL_TRUE;
-        break;
-    case GL_RED:
-    case GL_GREEN:
-    case GL_BLUE:
-    case GL_ALPHA:
-    case GL_RGB:
-    case GL_RGBA:
-    case GL_LUMINANCE:
-    case GL_LUMINANCE_ALPHA:
-    case GL_ABGR_EXT:
-    case GL_BGR_EXT:
-    case GL_BGRA_EXT:
-        index = GL_FALSE;
-        break;
-    default:
-        __gllc_InvalidEnum(gc);
-        return;
-    }
-    switch (type)
-    {
-    case GL_BITMAP:
-        if (!index)
-        {
-            __gllc_InvalidEnum(gc);
-            return;
-        }
-        break;
-    case GL_BYTE:
-    case GL_UNSIGNED_BYTE:
-    case GL_SHORT:
-    case GL_UNSIGNED_SHORT:
-    case GL_INT:
-    case GL_UNSIGNED_INT:
-    case GL_FLOAT:
-        break;
-    case GL_UNSIGNED_BYTE_3_3_2:
-    case GL_UNSIGNED_SHORT_5_6_5:
-    case GL_UNSIGNED_BYTE_2_3_3_REV:
-    case GL_UNSIGNED_SHORT_5_6_5_REV:
-        switch (format)
-        {
-        case GL_RGB:
-        case GL_BGR_EXT:
-            adjustFormat= GL_LUMINANCE; /* or anything that's 1 component */
-            adjustType= GL_UNSIGNED_BYTE;
-            break;
-        default:
-            __glSetError(gc, GL_INVALID_OPERATION);
-            return;
-        }
-        break;
-    case GL_UNSIGNED_SHORT_4_4_4_4:
-    case GL_UNSIGNED_SHORT_5_5_5_1:
-    case GL_UNSIGNED_INT_8_8_8_8:
-    case GL_UNSIGNED_INT_10_10_10_2:
-    case GL_UNSIGNED_SHORT_4_4_4_4_REV:
-    case GL_UNSIGNED_SHORT_1_5_5_5_REV:
-    case GL_UNSIGNED_INT_8_8_8_8_REV:
-    case GL_UNSIGNED_INT_2_10_10_10_REV:
-        switch (format)
-        {
-        case GL_RGBA:
-        case GL_ABGR_EXT:
-        case GL_BGRA_EXT:
-            adjustFormat= GL_LUMINANCE; /* or anything that's 1 component */
-            adjustType= GL_UNSIGNED_SHORT;
-            if (type == GL_UNSIGNED_INT_8_8_8_8 ||
-                type == GL_UNSIGNED_INT_10_10_10_2 ||
-                type == GL_UNSIGNED_INT_8_8_8_8_REV ||
-                type == GL_UNSIGNED_INT_2_10_10_10_REV)
-                adjustType= GL_UNSIGNED_INT;
-            break;
-        default:
-            __glSetError(gc, GL_INVALID_OPERATION);
-            return;
-        }
-        break;
-    default:
-        __gllc_InvalidEnum(gc);
-        return;
-    }
-
-    rowSize = __glImageSize(width, 1, format, type);
-    rowSize = __GL_PAD(rowSize);
-
-    colSize = __glImageSize(1, height, format, type);
-    colSize = __GL_PAD(colSize);
-
-    imageSize = rowSize+colSize;
-
-    dlop = __glDlistAllocOp(gc, (sizeof(struct __gllc_SeparableFilter2D_Rec) + imageSize));
-    if (dlop == NULL) return;
-    dlop->opcode = __glop_SeparableFilter2D;
-
-    data = (struct __gllc_SeparableFilter2D_Rec *)(dlop + 1);
-    data->target = target;
-    data->internalformat = internalformat;
-    data->width = width;
-    data->height = height;
-    data->format = format;
-    data->type = type;
-
-    if (rowSize > 0 && row != NULL)
-    {
-        __glFillImage(gc, width, 1, adjustFormat, adjustType, row,
-                        (GLubyte*)(data + 1));
-    }
-
-    if (colSize > 0 && col != NULL)
-    {
-        __glFillImage(gc, 1, height, adjustFormat, adjustType, col,
-                        ((GLubyte *)(data + 1) + rowSize));
-    }
-
-    __glDlistAppendOp(gc, dlop);
-}
-
-GLvoid APIENTRY __gllc_CopyConvolutionFilter1D(__GLcontext *gc, GLenum target, GLenum internalformat, GLint x, GLint y, GLsizei width)
-{
-    __GLdlistOp *dlop;
-    struct __gllc_CopyConvolutionFilter1D_Rec *data;
-
-
-    if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        __glim_CopyConvolutionFilter1D(gc, target, internalformat, x, y, width);
-    }
-
-    dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_CopyConvolutionFilter1D_Rec));
-    if (dlop == NULL) return;
-    dlop->opcode = __glop_CopyConvolutionFilter1D;
-    data = (struct __gllc_CopyConvolutionFilter1D_Rec *)(dlop + 1);
-    data->target = target;
-    data->internalformat = internalformat;
-    data->x = x;
-    data->y = y;
-    data->width = width;
-    __glDlistAppendOp(gc, dlop);
-}
-
-GLvoid APIENTRY __gllc_CopyConvolutionFilter2D(__GLcontext *gc, GLenum target, GLenum internalformat, GLint x, GLint y, GLsizei width, GLsizei height)
-{
-    __GLdlistOp *dlop;
-    struct __gllc_CopyConvolutionFilter2D_Rec *data;
-
-
-    if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        __glim_CopyConvolutionFilter2D(gc, target, internalformat, x, y, width, height);
-    }
-
-    dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_CopyConvolutionFilter2D_Rec));
-    if (dlop == NULL) return;
-    dlop->opcode = __glop_CopyConvolutionFilter2D;
-    data = (struct __gllc_CopyConvolutionFilter2D_Rec *)(dlop + 1);
-    data->target = target;
-    data->internalformat = internalformat;
-    data->x = x;
-    data->y = y;
-    data->width = width;
-    data->height = height;
-    __glDlistAppendOp(gc, dlop);
-}
-
-GLvoid APIENTRY __gllc_Histogram(__GLcontext *gc, GLenum target, GLsizei width, GLenum internalformat, GLboolean sink)
-{
-    __GLdlistOp *dlop;
-    struct __gllc_Histogram_Rec *data;
-
-
-    if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        __glim_Histogram(gc, target, width, internalformat, sink);
-    }
-
-    switch (target)
-    {
-    case GL_PROXY_HISTOGRAM:
-        __glim_Histogram(gc, target, width, internalformat, sink);
-        return;
-    }
-
-    dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Histogram_Rec));
-    if (dlop == NULL) return;
-    dlop->opcode = __glop_Histogram;
-    data = (struct __gllc_Histogram_Rec *)(dlop + 1);
-    data->target = target;
-    data->width = width;
-    data->internalformat = internalformat;
-    data->sink = sink;
-    __glDlistAppendOp(gc, dlop);
-}
-
-GLvoid APIENTRY __gllc_ResetHistogram(__GLcontext *gc, GLenum target)
-{
-    __GLdlistOp *dlop;
-    struct __gllc_ResetHistogram_Rec *data;
-
-
-    if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        __glim_ResetHistogram(gc, target);
-    }
-
-    if(target != GL_HISTOGRAM) {
-        __gllc_InvalidEnum(gc);
-          return;
-    }
-
-    dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_ResetHistogram_Rec));
-    if (dlop == NULL) return;
-    dlop->opcode = __glop_ResetHistogram;
-    data = (struct __gllc_ResetHistogram_Rec *)(dlop + 1);
-    data->target = target;
-    __glDlistAppendOp(gc, dlop);
-}
-
-GLvoid APIENTRY __gllc_Minmax(__GLcontext *gc, GLenum target, GLenum internalFormat, GLboolean sink)
-{
-    __GLdlistOp *dlop;
-    struct __gllc_Minmax_Rec *data;
-
-
-    if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        __glim_Minmax(gc, target, internalFormat, sink);
-    }
-
-    if(target != GL_MINMAX) {
-        __gllc_InvalidEnum(gc);
-          return;
-    }
-
-    dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_Minmax_Rec));
-    if (dlop == NULL) return;
-    dlop->opcode = __glop_Minmax;
-    data = (struct __gllc_Minmax_Rec *)(dlop + 1);
-    data->target = target;
-    data->internalFormat = internalFormat;
-    data->sink = sink;
-    __glDlistAppendOp(gc, dlop);
-}
-
-GLvoid APIENTRY __gllc_ResetMinmax(__GLcontext *gc, GLenum target)
-{
-    __GLdlistOp *dlop;
-    struct __gllc_ResetMinmax_Rec *data;
-
-
-    if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        __glim_ResetMinmax(gc, target);
-    }
-
-    if(target != GL_MINMAX) {
-        __gllc_InvalidEnum(gc);
-          return;
-    }
-
-    dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_ResetMinmax_Rec));
-    if (dlop == NULL) return;
-    dlop->opcode = __glop_ResetMinmax;
-    data = (struct __gllc_ResetMinmax_Rec *)(dlop + 1);
-    data->target = target;
     __glDlistAppendOp(gc, dlop);
 }
 
@@ -9888,7 +9157,7 @@ GLvoid APIENTRY __gllc_SecondaryColor3bv(__GLcontext *gc, const GLbyte *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->SecondaryColor3bv)(gc, v);
+        (*gc->immedModeDispatch.SecondaryColor3bv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_SecondaryColor3fv_Rec));
@@ -9908,7 +9177,7 @@ GLvoid APIENTRY __gllc_SecondaryColor3b(__GLcontext *gc, GLbyte red, GLbyte gree
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->SecondaryColor3b)(gc, red, green, blue);
+        (*gc->immedModeDispatch.SecondaryColor3b)(gc, red, green, blue);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_SecondaryColor3fv_Rec));
@@ -9928,7 +9197,7 @@ GLvoid APIENTRY __gllc_SecondaryColor3dv(__GLcontext *gc, const GLdouble *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->SecondaryColor3dv)(gc, v);
+        (*gc->immedModeDispatch.SecondaryColor3dv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_SecondaryColor3fv_Rec));
@@ -9948,7 +9217,7 @@ GLvoid APIENTRY __gllc_SecondaryColor3d(__GLcontext *gc, GLdouble red, GLdouble 
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->SecondaryColor3d)(gc, red, green, blue);
+        (*gc->immedModeDispatch.SecondaryColor3d)(gc, red, green, blue);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_SecondaryColor3fv_Rec));
@@ -9968,7 +9237,7 @@ GLvoid APIENTRY __gllc_SecondaryColor3fv(__GLcontext *gc, const GLfloat *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->SecondaryColor3fv)(gc, v);
+        (*gc->immedModeDispatch.SecondaryColor3fv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_SecondaryColor3fv_Rec));
@@ -9988,7 +9257,7 @@ GLvoid APIENTRY __gllc_SecondaryColor3f(__GLcontext *gc, GLfloat red, GLfloat gr
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->SecondaryColor3f)(gc, red, green, blue);
+        (*gc->immedModeDispatch.SecondaryColor3f)(gc, red, green, blue);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_SecondaryColor3fv_Rec));
@@ -10008,7 +9277,7 @@ GLvoid APIENTRY __gllc_SecondaryColor3iv(__GLcontext *gc, const GLint *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->SecondaryColor3iv)(gc, v);
+        (*gc->immedModeDispatch.SecondaryColor3iv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_SecondaryColor3fv_Rec));
@@ -10028,7 +9297,7 @@ GLvoid APIENTRY __gllc_SecondaryColor3i(__GLcontext *gc, GLint red, GLint green,
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->SecondaryColor3i)(gc, red, green, blue);
+        (*gc->immedModeDispatch.SecondaryColor3i)(gc, red, green, blue);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_SecondaryColor3fv_Rec));
@@ -10048,7 +9317,7 @@ GLvoid APIENTRY __gllc_SecondaryColor3sv(__GLcontext *gc, const GLshort *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->SecondaryColor3sv)(gc, v);
+        (*gc->immedModeDispatch.SecondaryColor3sv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_SecondaryColor3fv_Rec));
@@ -10068,7 +9337,7 @@ GLvoid APIENTRY __gllc_SecondaryColor3s(__GLcontext *gc, GLshort red, GLshort gr
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->SecondaryColor3s)(gc, red, green, blue);
+        (*gc->immedModeDispatch.SecondaryColor3s)(gc, red, green, blue);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_SecondaryColor3fv_Rec));
@@ -10088,7 +9357,7 @@ GLvoid APIENTRY __gllc_SecondaryColor3ubv(__GLcontext *gc, const GLubyte *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->SecondaryColor3ubv)(gc, v);
+        (*gc->immedModeDispatch.SecondaryColor3ubv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_SecondaryColor3fv_Rec));
@@ -10108,7 +9377,7 @@ GLvoid APIENTRY __gllc_SecondaryColor3ub(__GLcontext *gc, GLubyte red, GLubyte g
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->SecondaryColor3ub)(gc, red, green, blue);
+        (*gc->immedModeDispatch.SecondaryColor3ub)(gc, red, green, blue);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_SecondaryColor3fv_Rec));
@@ -10128,7 +9397,7 @@ GLvoid APIENTRY __gllc_SecondaryColor3uiv(__GLcontext *gc, const GLuint *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->SecondaryColor3uiv)(gc, v);
+        (*gc->immedModeDispatch.SecondaryColor3uiv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_SecondaryColor3fv_Rec));
@@ -10148,7 +9417,7 @@ GLvoid APIENTRY __gllc_SecondaryColor3ui(__GLcontext *gc, GLuint red, GLuint gre
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->SecondaryColor3ui)(gc, red, green, blue);
+        (*gc->immedModeDispatch.SecondaryColor3ui)(gc, red, green, blue);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_SecondaryColor3fv_Rec));
@@ -10168,7 +9437,7 @@ GLvoid APIENTRY __gllc_SecondaryColor3usv(__GLcontext *gc, const GLushort *v)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->SecondaryColor3usv)(gc, v);
+        (*gc->immedModeDispatch.SecondaryColor3usv)(gc, v);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_SecondaryColor3fv_Rec));
@@ -10188,7 +9457,7 @@ GLvoid APIENTRY __gllc_SecondaryColor3us(__GLcontext *gc, GLushort red, GLushort
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->currentImmediateTable->SecondaryColor3us)(gc, red, green, blue);
+        (*gc->immedModeDispatch.SecondaryColor3us)(gc, red, green, blue);
     }
 
     dlop = __glDlistAllocOp(gc, sizeof(struct __gllc_SecondaryColor3fv_Rec));
@@ -10855,7 +10124,6 @@ GLvoid APIENTRY __gllc_UseProgram(__GLcontext *gc, GLuint program)
     __GLdlistOp *dlop;
     struct __gllc_UseProgram_Rec *data;
 
-
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
         __glim_UseProgram(gc, program);
     }
@@ -10868,359 +10136,6 @@ GLvoid APIENTRY __gllc_UseProgram(__GLcontext *gc, GLuint program)
     __glDlistAppendOp(gc, dlop);
 }
 
-
-#if GL_ARB_vertex_program
-
-GLvoid APIENTRY __gllc_BindProgramARB(__GLcontext *gc, GLenum target, GLuint program)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_ProgramEnvParameter4dARB(__GLcontext *gc, GLenum target, GLuint index, GLdouble x, GLdouble y, GLdouble z, GLdouble w)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_ProgramEnvParameter4dvARB(__GLcontext *gc, GLenum target, GLuint index, const GLdouble *params)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_ProgramEnvParameter4fARB(__GLcontext *gc, GLenum target, GLuint index, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_ProgramEnvParameter4fvARB(__GLcontext *gc, GLenum target, GLuint index, const GLfloat *params)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_ProgramLocalParameter4dARB(__GLcontext *gc, GLenum target, GLuint index, GLdouble x, GLdouble y, GLdouble z, GLdouble w)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_ProgramLocalParameter4dvARB(__GLcontext *gc, GLenum target, GLuint index, const GLdouble *params)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_ProgramLocalParameter4fARB(__GLcontext *gc, GLenum target, GLuint index, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_ProgramLocalParameter4fvARB(__GLcontext *gc, GLenum target, GLuint index, const GLfloat *params)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-#endif
-
-#if GL_ATI_element_array
-GLvoid  APIENTRY __gllc_DrawElementArrayATI(__GLcontext *gc, GLenum mode, GLsizei count)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid  APIENTRY __gllc_DrawRangeElementArrayATI(__GLcontext *gc, GLenum mode, GLuint start,
-                                  GLuint end, GLsizei count)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-#endif
-
-#if GL_EXT_stencil_two_side
-GLvoid APIENTRY __gllc_ActiveStencilFaceEXT(__GLcontext *gc, GLenum face)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-#endif
-
-#if GL_EXT_texture_integer
-GLvoid APIENTRY __gllc_ClearColorIiEXT(__GLcontext *gc, GLint r, GLint g, GLint b, GLint a)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-
-GLvoid APIENTRY __gllc_ClearColorIuiEXT(__GLcontext *gc, GLuint r, GLuint g, GLuint b, GLuint a)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_TexParameterIivEXT(__GLcontext *gc, GLenum target, GLenum pname, GLint *params)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_TexParameterIuivEXT(__GLcontext *gc, GLenum target, GLenum pname, GLuint *params)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-#endif
-
-#if GL_EXT_gpu_shader4
-GLvoid APIENTRY __gllc_VertexAttribI1iEXT(__GLcontext *gc, GLuint index, GLint x)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_VertexAttribI2iEXT(__GLcontext *gc, GLuint index, GLint x, GLint y)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_VertexAttribI3iEXT(__GLcontext *gc, GLuint index, GLint x, GLint y, GLint z)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_VertexAttribI4iEXT(__GLcontext *gc, GLuint index, GLint x, GLint y, GLint z, GLint w)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_VertexAttribI1uiEXT(__GLcontext *gc, GLuint index, GLuint x)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_VertexAttribI2uiEXT(__GLcontext *gc, GLuint index, GLuint x, GLuint y)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_VertexAttribI3uiEXT(__GLcontext *gc, GLuint index, GLuint x, GLuint y, GLuint z)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_VertexAttribI4uiEXT(__GLcontext *gc, GLuint index, GLuint x, GLuint y, GLuint z,
-                            GLuint w)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_VertexAttribI1ivEXT(__GLcontext *gc, GLuint index, const GLint *v)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_VertexAttribI2ivEXT(__GLcontext *gc, GLuint index, const GLint *v)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_VertexAttribI3ivEXT(__GLcontext *gc, GLuint index, const GLint *v)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_VertexAttribI4ivEXT(__GLcontext *gc, GLuint index, const GLint *v)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_VertexAttribI1uivEXT(__GLcontext *gc, GLuint index, const GLuint *v)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_VertexAttribI2uivEXT(__GLcontext *gc, GLuint index, const GLuint *v)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_VertexAttribI3uivEXT(__GLcontext *gc, GLuint index, const GLuint *v)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_VertexAttribI4uivEXT(__GLcontext *gc, GLuint index, const GLuint *v)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_VertexAttribI4bvEXT(__GLcontext *gc, GLuint index, const GLbyte *v)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_VertexAttribI4svEXT(__GLcontext *gc, GLuint index, const GLshort *v)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_VertexAttribI4ubvEXT(__GLcontext *gc, GLuint index, const GLubyte *v)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-GLvoid APIENTRY __gllc_VertexAttribI4usvEXT(__GLcontext *gc, GLuint index, const GLushort *v)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-
-GLvoid APIENTRY __gllc_Uniform1uiEXT(__GLcontext *gc, GLint location, GLuint v0)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_Uniform2uiEXT(__GLcontext *gc, GLint location, GLuint v0, GLuint v1)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_Uniform3uiEXT(__GLcontext *gc, GLint location, GLuint v0, GLuint v1, GLuint v2)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_Uniform4uiEXT(__GLcontext *gc, GLint location, GLuint v0, GLuint v1, GLuint v2, GLuint v3)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_Uniform1uivEXT(__GLcontext *gc, GLint location, GLsizei count, const GLuint *value)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_Uniform2uivEXT(__GLcontext *gc, GLint location, GLsizei count, const GLuint *value)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_Uniform3uivEXT(__GLcontext *gc, GLint location, GLsizei count, const GLuint *value)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_Uniform4uivEXT(__GLcontext *gc, GLint location, GLsizei count, const GLuint *value)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-#endif
-
-#if GL_EXT_geometry_shader4
-GLvoid APIENTRY __gllc_FramebufferTextureEXT(__GLcontext *gc, GLenum target, GLenum attachment, GLuint texture, GLint level)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-GLvoid APIENTRY __gllc_FramebufferTextureLayerEXT(__GLcontext *gc, GLenum target, GLenum attachment, GLuint texture, GLint level, GLint layer)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_FramebufferTextureFaceEXT(__GLcontext *gc, GLenum target, GLenum attachment, GLuint texture, GLint level, GLenum face)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-#endif
-
-#if GL_EXT_draw_buffers2
-
-GLvoid APIENTRY __gllc_ColorMaskIndexedEXT(__GLcontext *gc, GLuint buf, GLboolean r, GLboolean g, GLboolean b, GLboolean a)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_EnableIndexedEXT(__GLcontext *gc, GLenum target, GLuint index)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_DisableIndexedEXT(__GLcontext *gc, GLenum target, GLuint index)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-#endif
-
-#if GL_EXT_gpu_program_parameters
-
-GLvoid APIENTRY __gllc_ProgramEnvParameters4fvEXT(__GLcontext *gc, GLenum target, GLuint index, GLsizei count, const GLfloat *params)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-GLvoid APIENTRY __gllc_ProgramLocalParameters4fvEXT(__GLcontext *gc, GLenum target, GLuint index, GLsizei count, const GLfloat *params)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-
-#endif
-
-#if GL_ARB_color_buffer_float
-GLvoid APIENTRY __gllc_ClampColorARB(__GLcontext *gc, GLenum target, GLenum clamp)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-#endif
-
-#if GL_ATI_separate_stencil
-GLvoid APIENTRY __gllc_StencilFuncSeparateATI(__GLcontext *gc, GLenum frontfunc, GLenum backfunc, GLint ref, GLuint mask)
-{
-/* still not added, to do*/
-GL_ASSERT(0);
-}
-#endif
 
 #if defined(_WIN32)
 #pragma warning(default: 4244)

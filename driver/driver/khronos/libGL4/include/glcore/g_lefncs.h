@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,6 +13,7 @@
 
 #ifndef __g_lefncs_h_
 #define __g_lefncs_h_
+
 
 extern const GLubyte *__glle_Skip(__GLcontext * , const GLubyte *PC);
 extern const GLubyte *__glle_InvalidValue(__GLcontext * , const GLubyte *);
@@ -186,12 +187,6 @@ extern const GLubyte *__glle_Scalef(__GLcontext * , const GLubyte *);
 extern const GLubyte *__glle_Translated(__GLcontext * , const GLubyte *);
 extern const GLubyte *__glle_Translatef(__GLcontext * , const GLubyte *);
 extern const GLubyte *__glle_Viewport(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ColorSubTable(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ColorTable(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_CopyColorTable(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetColorTable(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetColorTableParameterfv(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetColorTableParameteriv(__GLcontext * , const GLubyte *);
 extern const GLubyte *__glle_ColorPointer(__GLcontext * , const GLubyte *);
 extern const GLubyte *__glle_DisableClientState(__GLcontext * , const GLubyte *);
 extern const GLubyte *__glle_EdgeFlagPointer(__GLcontext * , const GLubyte *);
@@ -219,40 +214,6 @@ extern const GLubyte *__glle_PopClientAttrib(__GLcontext * , const GLubyte *);
 extern const GLubyte *__glle_PushClientAttrib(__GLcontext * , const GLubyte *);
 
 #if GL_VERSION_1_2
-extern const GLubyte *__glle_BlendColor(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_BlendEquation(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ColorTable(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ColorTableParameterfv(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ColorTableParameteriv(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_CopyColorTable(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetColorTable(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetColorTableParameterfv(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetColorTableParameteriv(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ColorSubTable(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_CopyColorSubTable(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ConvolutionFilter1D(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ConvolutionFilter2D(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ConvolutionParameterf(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ConvolutionParameterfv(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ConvolutionParameteri(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ConvolutionParameteriv(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_CopyConvolutionFilter1D(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_CopyConvolutionFilter2D(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetConvolutionFilter(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetConvolutionParameterfv(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetConvolutionParameteriv(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetSeparableFilter(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_SeparableFilter2D(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetHistogram(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetHistogramParameterfv(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetHistogramParameteriv(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetMinmax(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetMinmaxParameterfv(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetMinmaxParameteriv(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_Histogram(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_Minmax(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ResetHistogram(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ResetMinmax(__GLcontext * , const GLubyte *);
 extern const GLubyte *__glle_TexImage3D(__GLcontext * , const GLubyte *);
 extern const GLubyte *__glle_TexSubImage3D(__GLcontext * , const GLubyte *);
 extern const GLubyte *__glle_CopyTexSubImage3D(__GLcontext * , const GLubyte *);
@@ -291,6 +252,8 @@ extern const GLubyte *__glle_SecondaryColor3fv(__GLcontext * , const GLubyte *);
 extern const GLubyte *__glle_SecondaryColorPointer(__GLcontext * , const GLubyte *);
 extern const GLubyte *__glle_WindowPos2fv(__GLcontext * , const GLubyte *);
 extern const GLubyte *__glle_WindowPos3fv(__GLcontext * , const GLubyte *);
+extern const GLubyte *__glle_BlendColor(__GLcontext * , const GLubyte *);
+extern const GLubyte *__glle_BlendEquation(__GLcontext * , const GLubyte *);
 #endif
 #if GL_VERSION_1_5
 extern const GLubyte *__glle_GenQueries(__GLcontext * , const GLubyte *);
@@ -383,98 +346,5 @@ extern const GLubyte *__glle_UniformMatrix4x2fv(__GLcontext * , const GLubyte *)
 extern const GLubyte *__glle_UniformMatrix4x3fv(__GLcontext * , const GLubyte *);
 #endif
 
-
-#if GL_ARB_vertex_program
-extern const GLubyte *__glle_ProgramStringARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_BindProgramARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_DeleteProgramsARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GenProgramsARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ProgramEnvParameter4dARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ProgramEnvParameter4dvARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ProgramEnvParameter4fARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ProgramEnvParameter4fvARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ProgramLocalParameter4dARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ProgramLocalParameter4dvARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ProgramLocalParameter4fARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ProgramLocalParameter4fvARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetProgramEnvParameterdvARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetProgramEnvParameterfvARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetProgramLocalParameterdvARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetProgramLocalParameterfvARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetProgramivARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetProgramStringARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_IsProgramARB(__GLcontext * , const GLubyte *);
-#endif
-
-#if GL_ARB_shader_objects
-extern const GLubyte *__glle_DeleteObjectARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetHandleARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetInfoLogARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetObjectParameterfvARB(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_GetObjectParameterivARB(__GLcontext * , const GLubyte *);
-#endif
-
-#if GL_ATI_element_array
-extern const GLubyte *__glle_DrawElementArrayATI(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_DrawRangeElementArrayATI(__GLcontext * , const GLubyte *);
-#endif
-
-#if GL_EXT_stencil_two_side
-extern const GLubyte *__glle_ActiveStencilFaceEXT(__GLcontext * , const GLubyte *);
-#endif
-
-#if GL_EXT_depth_bounds_test
-extern const GLubyte * __glle_DepthBoundsEXT(__GLcontext * , const GLubyte *PC);
-#endif
-
-#if GL_NV_occlusion_query
-extern const GLubyte *__glle_BeginQueryNV(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_EndQueryNV(__GLcontext * , const GLubyte *);
-#endif
-
-#if GL_EXT_texture_integer
-extern const GLubyte *__glle_ClearColorIiEXT(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ClearColorIuiEXT(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_TexParameterIivEXT(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_TexParameterIuivEXT(__GLcontext * , const GLubyte *);
-#endif
-
-#if GL_EXT_gpu_shader4
-extern const GLubyte *__glle_Uniform1uiEXT(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_Uniform2uiEXT(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_Uniform3uiEXT(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_Uniform4uiEXT(__GLcontext * , const GLubyte *);
-
-extern const GLubyte *__glle_Uniform1uivEXT(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_Uniform2uivEXT(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_Uniform3uivEXT(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_Uniform4uivEXT(__GLcontext * , const GLubyte *);
-
-#endif
-
-#if GL_EXT_geometry_shader4
-extern const GLubyte *__glle_FramebufferTextureEXT(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_FramebufferTextureLayerEXT(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_FramebufferTextureFaceEXT(__GLcontext * , const GLubyte *);
-#endif
-
-#if GL_EXT_draw_buffers2
-extern const GLubyte *__glle_ColorMaskIndexedEXT(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_EnableIndexedEXT(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_DisableIndexedEXT(__GLcontext * , const GLubyte *);
-#endif
-
-#if GL_EXT_gpu_program_parameters
-extern const GLubyte *__glle_ProgramEnvParameters4fvEXT(__GLcontext * , const GLubyte *);
-extern const GLubyte *__glle_ProgramLocalParameters4fvEXT(__GLcontext * , const GLubyte *);
-#endif
-
-#if GL_ARB_color_buffer_float
-extern const GLubyte *__glle_ClampColorARB(__GLcontext * , const GLubyte*);
-#endif
-
-#if GL_ATI_separate_stencil
-extern const GLubyte *__glle_StencilFuncSeparateATI(__GLcontext * , const GLubyte*);
-#endif
 
 #endif /* __g_lefncs_h_ */

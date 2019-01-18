@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -47,6 +47,25 @@ typedef gceSTATUS
     );
 
 /*******************************evaluate/gen function pointer*******************************/
+gceSTATUS
+_ConvertCoordForSampler1D(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * NewCoordIOperand
+    );
+
+gceSTATUS
+_GenTexture1DLodCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    );
+
 gceSTATUS
 _GenTexture2DLodCode(
     IN sloCOMPILER Compiler,
@@ -1842,16 +1861,31 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_NONE,     "sqrt", _EvaluateSqrt, _GenSqrtCode, T_VEC3,     1, {T_VEC3}, {0}, {0}},
     {slvEXTENSION_NONE,     "sqrt", _EvaluateSqrt, _GenSqrtCode, T_VEC4,     1, {T_VEC4}, {0}, {0}},
 
+    {slvEXTENSION_DOUBLE_DATA_TYPE, "sqrt", _EvaluateSqrt, _GenSqrtCode, T_DOUBLE,    1, {T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE, "sqrt", _EvaluateSqrt, _GenSqrtCode, T_DVEC2,     1, {T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE, "sqrt", _EvaluateSqrt, _GenSqrtCode, T_DVEC3,     1, {T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE, "sqrt", _EvaluateSqrt, _GenSqrtCode, T_DVEC4,     1, {T_DVEC4}, {0}, {0}},
+
     {slvEXTENSION_NONE,     "inversesqrt", _EvaluateInverseSqrt, _GenInverseSqrtCode, T_FLOAT,    1, {T_FLOAT}, {0}, {0}},
     {slvEXTENSION_NONE,     "inversesqrt", _EvaluateInverseSqrt, _GenInverseSqrtCode, T_VEC2,     1, {T_VEC2}, {0}, {0}},
     {slvEXTENSION_NONE,     "inversesqrt", _EvaluateInverseSqrt, _GenInverseSqrtCode, T_VEC3,     1, {T_VEC3}, {0}, {0}},
     {slvEXTENSION_NONE,     "inversesqrt", _EvaluateInverseSqrt, _GenInverseSqrtCode, T_VEC4,     1, {T_VEC4}, {0}, {0}},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE, "inversesqrt", _EvaluateInverseSqrt, _GenInverseSqrtCode, T_DOUBLE,    1, {T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE, "inversesqrt", _EvaluateInverseSqrt, _GenInverseSqrtCode, T_DVEC2,     1, {T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE, "inversesqrt", _EvaluateInverseSqrt, _GenInverseSqrtCode, T_DVEC3,     1, {T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE, "inversesqrt", _EvaluateInverseSqrt, _GenInverseSqrtCode, T_DVEC4,     1, {T_DVEC4}, {0}, {0}},
 
     /* Common Functions */
     {slvEXTENSION_NONE,     "abs", _EvaluateAbs, _GenAbsCode, T_FLOAT,    1, {T_FLOAT}, {0}, {0}},
     {slvEXTENSION_NONE,     "abs", _EvaluateAbs, _GenAbsCode, T_VEC2,     1, {T_VEC2}, {0}, {0}},
     {slvEXTENSION_NONE,     "abs", _EvaluateAbs, _GenAbsCode, T_VEC3,     1, {T_VEC3}, {0}, {0}},
     {slvEXTENSION_NONE,     "abs", _EvaluateAbs, _GenAbsCode, T_VEC4,     1, {T_VEC4}, {0}, {0}},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE,  "abs", _EvaluateAbs, _GenAbsCode, T_DOUBLE,    1, {T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,  "abs", _EvaluateAbs, _GenAbsCode, T_DVEC2,     1, {T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,  "abs", _EvaluateAbs, _GenAbsCode, T_DVEC3,     1, {T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,  "abs", _EvaluateAbs, _GenAbsCode, T_DVEC4,     1, {T_DVEC4}, {0}, {0}},
 
     {slvEXTENSION_HALTI,    "abs", _EvaluateAbs, _GenAbsCode, T_INT,      1, {T_INT}, {0}, {0}},
     {slvEXTENSION_HALTI,    "abs", _EvaluateAbs, _GenAbsCode, T_IVEC2,    1, {T_IVEC2}, {0}, {0}},
@@ -1868,25 +1902,50 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_HALTI,    "sign", _EvaluateSign, _GenSignCode, T_IVEC3,    1, {T_IVEC3}, {0}, {0}, TREAT_F_AS_I},
     {slvEXTENSION_HALTI,    "sign", _EvaluateSign, _GenSignCode, T_IVEC4,    1, {T_IVEC4}, {0}, {0}, TREAT_F_AS_I},
 
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "sign", _EvaluateSign, _GenSignCode, T_DOUBLE,   1, {T_DOUBLE}, {0}, {0}, TREAT_F_AS_I},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "sign", _EvaluateSign, _GenSignCode, T_DVEC2,    1, {T_DVEC2}, {0}, {0}, TREAT_F_AS_I},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "sign", _EvaluateSign, _GenSignCode, T_DVEC3,    1, {T_DVEC3}, {0}, {0}, TREAT_F_AS_I},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "sign", _EvaluateSign, _GenSignCode, T_DVEC4,    1, {T_DVEC4}, {0}, {0}, TREAT_F_AS_I},
+
     {slvEXTENSION_NONE,     "floor", _EvaluateFloor, _GenFloorCode, T_FLOAT,    1, {T_FLOAT}, {0}, {0}, TREAT_F_AS_I},
     {slvEXTENSION_NONE,     "floor", _EvaluateFloor, _GenFloorCode, T_VEC2,     1, {T_VEC2}, {0}, {0}, TREAT_F_AS_I},
     {slvEXTENSION_NONE,     "floor", _EvaluateFloor, _GenFloorCode, T_VEC3,     1, {T_VEC3}, {0}, {0}, TREAT_F_AS_I},
     {slvEXTENSION_NONE,     "floor", _EvaluateFloor, _GenFloorCode, T_VEC4,     1, {T_VEC4}, {0}, {0}, TREAT_F_AS_I},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "floor", _EvaluateFloor, _GenFloorCode, T_DOUBLE,    1, {T_DOUBLE}, {0}, {0}, TREAT_F_AS_I},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "floor", _EvaluateFloor, _GenFloorCode, T_DVEC2,     1, {T_DVEC2}, {0}, {0}, TREAT_F_AS_I},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "floor", _EvaluateFloor, _GenFloorCode, T_DVEC3,     1, {T_DVEC3}, {0}, {0}, TREAT_F_AS_I},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "floor", _EvaluateFloor, _GenFloorCode, T_DVEC4,     1, {T_DVEC4}, {0}, {0}, TREAT_F_AS_I},
 
     {slvEXTENSION_HALTI,    "trunc", _EvaluateTrunc, _GenTruncCode, T_FLOAT,    1, {T_FLOAT}, {0}, {0}},
     {slvEXTENSION_HALTI,    "trunc", _EvaluateTrunc, _GenTruncCode, T_VEC2,     1, {T_VEC2}, {0}, {0}},
     {slvEXTENSION_HALTI,    "trunc", _EvaluateTrunc, _GenTruncCode, T_VEC3,     1, {T_VEC3}, {0}, {0}},
     {slvEXTENSION_HALTI,    "trunc", _EvaluateTrunc, _GenTruncCode, T_VEC4,     1, {T_VEC4}, {0}, {0}},
 
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "trunc", _EvaluateTrunc, _GenTruncCode, T_DOUBLE,    1, {T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "trunc", _EvaluateTrunc, _GenTruncCode, T_DVEC2,     1, {T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "trunc", _EvaluateTrunc, _GenTruncCode, T_DVEC3,     1, {T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "trunc", _EvaluateTrunc, _GenTruncCode, T_DVEC4,     1, {T_DVEC4}, {0}, {0}},
+
     {slvEXTENSION_NONE,     "ceil", _EvaluateCeil, _GenCeilCode, T_FLOAT,    1, {T_FLOAT}, {0}, {0}, TREAT_F_AS_I},
     {slvEXTENSION_NONE,     "ceil", _EvaluateCeil, _GenCeilCode, T_VEC2,     1, {T_VEC2}, {0}, {0}, TREAT_F_AS_I},
     {slvEXTENSION_NONE,     "ceil", _EvaluateCeil, _GenCeilCode, T_VEC3,     1, {T_VEC3}, {0}, {0}, TREAT_F_AS_I},
     {slvEXTENSION_NONE,     "ceil", _EvaluateCeil, _GenCeilCode, T_VEC4,     1, {T_VEC4}, {0}, {0}, TREAT_F_AS_I},
 
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "ceil", _EvaluateCeil, _GenCeilCode, T_DOUBLE,    1, {T_DOUBLE}, {0}, {0}, TREAT_F_AS_I},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "ceil", _EvaluateCeil, _GenCeilCode, T_DVEC2,     1, {T_DVEC2}, {0}, {0}, TREAT_F_AS_I},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "ceil", _EvaluateCeil, _GenCeilCode, T_DVEC3,     1, {T_DVEC3}, {0}, {0}, TREAT_F_AS_I},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "ceil", _EvaluateCeil, _GenCeilCode, T_DVEC4,     1, {T_DVEC4}, {0}, {0}, TREAT_F_AS_I},
+
     {slvEXTENSION_NONE,     "fract", _EvaluateFract, _GenFractCode, T_FLOAT,    1, {T_FLOAT}, {0}, {0}},
     {slvEXTENSION_NONE,     "fract", _EvaluateFract, _GenFractCode, T_VEC2,     1, {T_VEC2}, {0}, {0}},
     {slvEXTENSION_NONE,     "fract", _EvaluateFract, _GenFractCode, T_VEC3,     1, {T_VEC3}, {0}, {0}},
     {slvEXTENSION_NONE,     "fract", _EvaluateFract, _GenFractCode, T_VEC4,     1, {T_VEC4}, {0}, {0}},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "fract", _EvaluateFract, _GenFractCode, T_DOUBLE,    1, {T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "fract", _EvaluateFract, _GenFractCode, T_DVEC2,     1, {T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "fract", _EvaluateFract, _GenFractCode, T_DVEC3,     1, {T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "fract", _EvaluateFract, _GenFractCode, T_DVEC4,     1, {T_DVEC4}, {0}, {0}},
 
     {slvEXTENSION_NONE,     "mod", _EvaluateMod, _GenModCode, T_FLOAT,    2, {T_FLOAT,        T_FLOAT}, {0}, {0}},
     {slvEXTENSION_NONE,     "mod", _EvaluateMod, _GenModCode, T_VEC2,     2, {T_VEC2,         T_FLOAT}, {0}, {0}},
@@ -1895,6 +1954,14 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_NONE,     "mod", _EvaluateMod, _GenModCode, T_VEC2,     2, {T_VEC2,         T_VEC2}, {0}, {0}},
     {slvEXTENSION_NONE,     "mod", _EvaluateMod, _GenModCode, T_VEC3,     2, {T_VEC3,         T_VEC3}, {0}, {0}},
     {slvEXTENSION_NONE,     "mod", _EvaluateMod, _GenModCode, T_VEC4,     2, {T_VEC4,         T_VEC4}, {0}, {0}},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "mod", _EvaluateMod, _GenModCode, T_DOUBLE,    2, {T_DOUBLE,        T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "mod", _EvaluateMod, _GenModCode, T_DVEC2,     2, {T_DVEC2,         T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "mod", _EvaluateMod, _GenModCode, T_DVEC3,     2, {T_DVEC3,         T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "mod", _EvaluateMod, _GenModCode, T_DVEC4,     2, {T_DVEC4,         T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "mod", _EvaluateMod, _GenModCode, T_DVEC2,     2, {T_DVEC2,         T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "mod", _EvaluateMod, _GenModCode, T_DVEC3,     2, {T_DVEC3,         T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "mod", _EvaluateMod, _GenModCode, T_DVEC4,     2, {T_DVEC4,         T_DVEC4}, {0}, {0}},
 
     {slvEXTENSION_NONE,     "min", _EvaluateMin, _GenMinCode, T_FLOAT,    2, {T_FLOAT,        T_FLOAT}, {0}, {0}},
     {slvEXTENSION_NONE,     "min", _EvaluateMin, _GenMinCode, T_VEC2,     2, {T_VEC2,         T_FLOAT}, {0}, {0}},
@@ -1917,6 +1984,13 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_HALTI,    "min", _EvaluateMin, _GenMinCode, T_UVEC2,    2, {T_UVEC2,        T_UVEC2}, {0}, {0}},
     {slvEXTENSION_HALTI,    "min", _EvaluateMin, _GenMinCode, T_UVEC3,    2, {T_UVEC3,        T_UVEC3}, {0}, {0}},
     {slvEXTENSION_HALTI,    "min", _EvaluateMin, _GenMinCode, T_UVEC4,    2, {T_UVEC4,        T_UVEC4}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "min", _EvaluateMin, _GenMinCode, T_DOUBLE,    2, {T_DOUBLE,        T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "min", _EvaluateMin, _GenMinCode, T_DVEC2,     2, {T_DVEC2,         T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "min", _EvaluateMin, _GenMinCode, T_DVEC3,     2, {T_DVEC3,         T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "min", _EvaluateMin, _GenMinCode, T_DVEC4,     2, {T_DVEC4,         T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "min", _EvaluateMin, _GenMinCode, T_DVEC2,     2, {T_DVEC2,         T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "min", _EvaluateMin, _GenMinCode, T_DVEC3,     2, {T_DVEC3,         T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "min", _EvaluateMin, _GenMinCode, T_DVEC4,     2, {T_DVEC4,         T_DVEC4}, {0}, {0}},
 
     {slvEXTENSION_NONE,     "max", _EvaluateMax, _GenMaxCode, T_FLOAT,    2, {T_FLOAT,        T_FLOAT}, {0}, {0}},
     {slvEXTENSION_NONE,     "max", _EvaluateMax, _GenMaxCode, T_VEC2,     2, {T_VEC2,         T_FLOAT}, {0}, {0}},
@@ -1939,6 +2013,13 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_HALTI,    "max", _EvaluateMax, _GenMaxCode, T_UVEC2,    2, {T_UVEC2,        T_UVEC2}, {0}, {0}},
     {slvEXTENSION_HALTI,    "max", _EvaluateMax, _GenMaxCode, T_UVEC3,    2, {T_UVEC3,        T_UVEC3}, {0}, {0}},
     {slvEXTENSION_HALTI,    "max", _EvaluateMax, _GenMaxCode, T_UVEC4,    2, {T_UVEC4,        T_UVEC4}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "max", _EvaluateMax, _GenMaxCode, T_DOUBLE,    2, {T_DOUBLE,        T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "max", _EvaluateMax, _GenMaxCode, T_DVEC2,     2, {T_DVEC2,         T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "max", _EvaluateMax, _GenMaxCode, T_DVEC3,     2, {T_DVEC3,         T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "max", _EvaluateMax, _GenMaxCode, T_DVEC4,     2, {T_DVEC4,         T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "max", _EvaluateMax, _GenMaxCode, T_DVEC2,     2, {T_DVEC2,         T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "max", _EvaluateMax, _GenMaxCode, T_DVEC3,     2, {T_DVEC3,         T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "max", _EvaluateMax, _GenMaxCode, T_DVEC4,     2, {T_DVEC4,         T_DVEC4}, {0}, {0}},
 
     {slvEXTENSION_NONE,     "clamp", _EvaluateClamp, _GenClampCode, T_FLOAT,    3, {T_FLOAT,        T_FLOAT,    T_FLOAT}, {0}, {0}},
     {slvEXTENSION_NONE,     "clamp", _EvaluateClamp, _GenClampCode, T_VEC2,     3, {T_VEC2,         T_FLOAT,    T_FLOAT}, {0}, {0}},
@@ -1961,6 +2042,14 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_HALTI,    "clamp", _EvaluateClamp, _GenClampCode, T_UVEC2,     3, {T_UVEC2,       T_UVEC2,    T_UVEC2}, {0}, {0}},
     {slvEXTENSION_HALTI,    "clamp", _EvaluateClamp, _GenClampCode, T_UVEC3,     3, {T_UVEC3,       T_UVEC3,    T_UVEC3}, {0}, {0}},
     {slvEXTENSION_HALTI,    "clamp", _EvaluateClamp, _GenClampCode, T_UVEC4,     3, {T_UVEC4,       T_UVEC4,    T_UVEC4}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "clamp", _EvaluateClamp, _GenClampCode, T_DOUBLE,    3, {T_DOUBLE,        T_DOUBLE,    T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "clamp", _EvaluateClamp, _GenClampCode, T_DVEC2,     3, {T_DVEC2,         T_DOUBLE,    T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "clamp", _EvaluateClamp, _GenClampCode, T_DVEC3,     3, {T_DVEC3,         T_DOUBLE,    T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "clamp", _EvaluateClamp, _GenClampCode, T_DVEC4,     3, {T_DVEC4,         T_DOUBLE,    T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "clamp", _EvaluateClamp, _GenClampCode, T_DVEC2,     3, {T_DVEC2,         T_DVEC2,     T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "clamp", _EvaluateClamp, _GenClampCode, T_DVEC3,     3, {T_DVEC3,         T_DVEC3,     T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "clamp", _EvaluateClamp, _GenClampCode, T_DVEC4,     3, {T_DVEC4,         T_DVEC4,     T_DVEC4}, {0}, {0}},
+
 #if !MIX_AS_INTRINCIS
     {slvEXTENSION_NONE,     "mix", _EvaluateMix, _GenMixCode, T_FLOAT,    3, {T_FLOAT,        T_FLOAT,    T_FLOAT}, {0}},
     {slvEXTENSION_NONE,     "mix", _EvaluateMix, _GenMixCode, T_VEC2,     3, {T_VEC2,         T_VEC2,     T_FLOAT}, {0}},
@@ -1969,26 +2058,37 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_NONE,     "mix", _EvaluateMix, _GenMixCode, T_VEC2,     3, {T_VEC2,         T_VEC2,     T_VEC2}, {0}},
     {slvEXTENSION_NONE,     "mix", _EvaluateMix, _GenMixCode, T_VEC3,     3, {T_VEC3,         T_VEC3,     T_VEC3}, {0}},
     {slvEXTENSION_NONE,     "mix", _EvaluateMix, _GenMixCode, T_VEC4,     3, {T_VEC4,         T_VEC4,     T_VEC4}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "mix", _EvaluateMix, _GenMixCode, T_DOUBLE,    3, {T_DOUBLE,        T_DOUBLE,    T_DOUBLE}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "mix", _EvaluateMix, _GenMixCode, T_DVEC2,     3, {T_DVEC2,         T_DVEC2,     T_DOUBLE}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "mix", _EvaluateMix, _GenMixCode, T_DVEC3,     3, {T_DVEC3,         T_DVEC3,     T_DOUBLE}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "mix", _EvaluateMix, _GenMixCode, T_DVEC4,     3, {T_DVEC4,         T_DVEC4,     T_DOUBLE}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "mix", _EvaluateMix, _GenMixCode, T_DVEC2,     3, {T_DVEC2,         T_DVEC2,     T_DVEC2}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "mix", _EvaluateMix, _GenMixCode, T_DVEC3,     3, {T_DVEC3,         T_DVEC3,     T_DVEC3}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "mix", _EvaluateMix, _GenMixCode, T_DVEC4,     3, {T_DVEC4,         T_DVEC4,     T_DVEC4}, {0}},
 #endif
 
     {slvEXTENSION_HALTI,    "mix", _EvaluateMix, _GenMixCode, T_FLOAT,    3, {T_FLOAT,        T_FLOAT,    T_BOOL}, {0}, {0}},
     {slvEXTENSION_HALTI,    "mix", _EvaluateMix, _GenMixCode, T_VEC2,     3, {T_VEC2,         T_VEC2,     T_BVEC2}, {0}, {0}},
     {slvEXTENSION_HALTI,    "mix", _EvaluateMix, _GenMixCode, T_VEC3,     3, {T_VEC3,         T_VEC3,     T_BVEC3}, {0}, {0}},
     {slvEXTENSION_HALTI,    "mix", _EvaluateMix, _GenMixCode, T_VEC4,     3, {T_VEC4,         T_VEC4,     T_BVEC4}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "mix", _EvaluateMix, _GenMixCode, T_DOUBLE,    3, {T_DOUBLE,        T_DOUBLE,    T_BOOL}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "mix", _EvaluateMix, _GenMixCode, T_DVEC2,     3, {T_DVEC2,         T_DVEC2,     T_BVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "mix", _EvaluateMix, _GenMixCode, T_DVEC3,     3, {T_DVEC3,         T_DVEC3,     T_BVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "mix", _EvaluateMix, _GenMixCode, T_DVEC4,     3, {T_DVEC4,         T_DVEC4,     T_BVEC4}, {0}, {0}},
 
     /*ES31 integer mix */
-    {slvEXTENSION_ES_31,     "mix", _EvaluateMix, _GenMixCode, T_INT,       3, {T_INT,         T_INT,      T_BOOL}, {0}, {0}},
-    {slvEXTENSION_ES_31,     "mix", _EvaluateMix, _GenMixCode, T_IVEC2,     3, {T_IVEC2,       T_IVEC2,    T_BVEC2}, {0}, {0}},
-    {slvEXTENSION_ES_31,     "mix", _EvaluateMix, _GenMixCode, T_IVEC3,     3, {T_IVEC3,       T_IVEC3,    T_BVEC3}, {0}, {0}},
-    {slvEXTENSION_ES_31,     "mix", _EvaluateMix, _GenMixCode, T_IVEC4,     3, {T_IVEC4,       T_IVEC4,    T_BVEC4}, {0}, {0}},
-    {slvEXTENSION_ES_31,     "mix", _EvaluateMix, _GenMixCode, T_UINT,      3, {T_UINT,        T_UINT,     T_BOOL}, {0}, {0}},
-    {slvEXTENSION_ES_31,     "mix", _EvaluateMix, _GenMixCode, T_UVEC2,     3, {T_UVEC2,       T_UVEC2,    T_BVEC2}, {0}, {0}},
-    {slvEXTENSION_ES_31,     "mix", _EvaluateMix, _GenMixCode, T_UVEC3,     3, {T_UVEC3,       T_UVEC3,    T_BVEC3}, {0}, {0}},
-    {slvEXTENSION_ES_31,     "mix", _EvaluateMix, _GenMixCode, T_UVEC4,     3, {T_UVEC4,       T_UVEC4,    T_BVEC4}, {0}, {0}},
-    {slvEXTENSION_ES_31,     "mix", _EvaluateMix, _GenMixCode, T_BOOL,      3, {T_BOOL,        T_BOOL,     T_BOOL}, {0}, {0}},
-    {slvEXTENSION_ES_31,     "mix", _EvaluateMix, _GenMixCode, T_BVEC2,     3, {T_BVEC2,       T_BVEC2,    T_BVEC2}, {0}, {0}},
-    {slvEXTENSION_ES_31,     "mix", _EvaluateMix, _GenMixCode, T_BVEC3,     3, {T_BVEC3,       T_BVEC3,    T_BVEC3}, {0}, {0}},
-    {slvEXTENSION_ES_31,     "mix", _EvaluateMix, _GenMixCode, T_BVEC4,     3, {T_BVEC4,       T_BVEC4,    T_BVEC4}, {0}, {0}},
+    {slvEXTENSION_INTEGER_MIX,     "mix", _EvaluateMix, _GenMixCode, T_INT,       3, {T_INT,         T_INT,      T_BOOL}, {0}, {0}},
+    {slvEXTENSION_INTEGER_MIX,     "mix", _EvaluateMix, _GenMixCode, T_IVEC2,     3, {T_IVEC2,       T_IVEC2,    T_BVEC2}, {0}, {0}},
+    {slvEXTENSION_INTEGER_MIX,     "mix", _EvaluateMix, _GenMixCode, T_IVEC3,     3, {T_IVEC3,       T_IVEC3,    T_BVEC3}, {0}, {0}},
+    {slvEXTENSION_INTEGER_MIX,     "mix", _EvaluateMix, _GenMixCode, T_IVEC4,     3, {T_IVEC4,       T_IVEC4,    T_BVEC4}, {0}, {0}},
+    {slvEXTENSION_INTEGER_MIX,     "mix", _EvaluateMix, _GenMixCode, T_UINT,      3, {T_UINT,        T_UINT,     T_BOOL}, {0}, {0}},
+    {slvEXTENSION_INTEGER_MIX,     "mix", _EvaluateMix, _GenMixCode, T_UVEC2,     3, {T_UVEC2,       T_UVEC2,    T_BVEC2}, {0}, {0}},
+    {slvEXTENSION_INTEGER_MIX,     "mix", _EvaluateMix, _GenMixCode, T_UVEC3,     3, {T_UVEC3,       T_UVEC3,    T_BVEC3}, {0}, {0}},
+    {slvEXTENSION_INTEGER_MIX,     "mix", _EvaluateMix, _GenMixCode, T_UVEC4,     3, {T_UVEC4,       T_UVEC4,    T_BVEC4}, {0}, {0}},
+    {slvEXTENSION_INTEGER_MIX,     "mix", _EvaluateMix, _GenMixCode, T_BOOL,      3, {T_BOOL,        T_BOOL,     T_BOOL}, {0}, {0}},
+    {slvEXTENSION_INTEGER_MIX,     "mix", _EvaluateMix, _GenMixCode, T_BVEC2,     3, {T_BVEC2,       T_BVEC2,    T_BVEC2}, {0}, {0}},
+    {slvEXTENSION_INTEGER_MIX,     "mix", _EvaluateMix, _GenMixCode, T_BVEC3,     3, {T_BVEC3,       T_BVEC3,    T_BVEC3}, {0}, {0}},
+    {slvEXTENSION_INTEGER_MIX,     "mix", _EvaluateMix, _GenMixCode, T_BVEC4,     3, {T_BVEC4,       T_BVEC4,    T_BVEC4}, {0}, {0}},
 
     {slvEXTENSION_NONE,     "step", _EvaluateStep, _GenStepCode, T_FLOAT,    2, {T_FLOAT,        T_FLOAT}, {0}, {0}, TREAT_F_AS_I},
     {slvEXTENSION_NONE,     "step", _EvaluateStep, _GenStepCode, T_VEC2,     2, {T_VEC2,         T_VEC2}, {0}, {0}, TREAT_F_AS_I},
@@ -1997,6 +2097,13 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_NONE,     "step", _EvaluateStep, _GenStepCode, T_VEC2,     2, {T_FLOAT,        T_VEC2}, {0}, {0}, TREAT_F_AS_I},
     {slvEXTENSION_NONE,     "step", _EvaluateStep, _GenStepCode, T_VEC3,     2, {T_FLOAT,        T_VEC3}, {0}, {0}, TREAT_F_AS_I},
     {slvEXTENSION_NONE,     "step", _EvaluateStep, _GenStepCode, T_VEC4,     2, {T_FLOAT,        T_VEC4}, {0}, {0}, TREAT_F_AS_I},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "step", _EvaluateStep, _GenStepCode, T_DOUBLE,    2, {T_DOUBLE,        T_DOUBLE}, {0}, {0}, TREAT_F_AS_I},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "step", _EvaluateStep, _GenStepCode, T_DVEC2,     2, {T_DVEC2,         T_DVEC2}, {0}, {0}, TREAT_F_AS_I},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "step", _EvaluateStep, _GenStepCode, T_DVEC3,     2, {T_DVEC3,         T_DVEC3}, {0}, {0}, TREAT_F_AS_I},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "step", _EvaluateStep, _GenStepCode, T_DVEC4,     2, {T_DVEC4,         T_DVEC4}, {0}, {0}, TREAT_F_AS_I},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "step", _EvaluateStep, _GenStepCode, T_DVEC2,     2, {T_DOUBLE,        T_DVEC2}, {0}, {0}, TREAT_F_AS_I},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "step", _EvaluateStep, _GenStepCode, T_DVEC3,     2, {T_DOUBLE,        T_DVEC3}, {0}, {0}, TREAT_F_AS_I},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "step", _EvaluateStep, _GenStepCode, T_DVEC4,     2, {T_DOUBLE,        T_DVEC4}, {0}, {0}, TREAT_F_AS_I},
 
     {slvEXTENSION_NONE,     "smoothstep", _EvaluateSmoothStep, _GenSmoothStepCode, T_FLOAT,    3, {T_FLOAT,        T_FLOAT,    T_FLOAT}, {0}, {0}},
     {slvEXTENSION_NONE,     "smoothstep", _EvaluateSmoothStep, _GenSmoothStepCode, T_VEC2,     3, {T_VEC2,         T_VEC2,     T_VEC2}, {0}, {0}},
@@ -2005,16 +2112,31 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_NONE,     "smoothstep", _EvaluateSmoothStep, _GenSmoothStepCode, T_VEC2,     3, {T_FLOAT,        T_FLOAT,    T_VEC2}, {0}, {0}},
     {slvEXTENSION_NONE,     "smoothstep", _EvaluateSmoothStep, _GenSmoothStepCode, T_VEC3,     3, {T_FLOAT,        T_FLOAT,    T_VEC3}, {0}, {0}},
     {slvEXTENSION_NONE,     "smoothstep", _EvaluateSmoothStep, _GenSmoothStepCode, T_VEC4,     3, {T_FLOAT,        T_FLOAT,    T_VEC4}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "smoothstep", _EvaluateSmoothStep, _GenSmoothStepCode, T_DOUBLE,    3, {T_DOUBLE,        T_DOUBLE,    T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "smoothstep", _EvaluateSmoothStep, _GenSmoothStepCode, T_DVEC2,     3, {T_DVEC2,         T_DVEC2,     T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "smoothstep", _EvaluateSmoothStep, _GenSmoothStepCode, T_DVEC3,     3, {T_DVEC3,         T_DVEC3,     T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "smoothstep", _EvaluateSmoothStep, _GenSmoothStepCode, T_DVEC4,     3, {T_DVEC4,         T_DVEC4,     T_DVEC4}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "smoothstep", _EvaluateSmoothStep, _GenSmoothStepCode, T_DVEC2,     3, {T_DOUBLE,        T_DOUBLE,    T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "smoothstep", _EvaluateSmoothStep, _GenSmoothStepCode, T_DVEC3,     3, {T_DOUBLE,        T_DOUBLE,    T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "smoothstep", _EvaluateSmoothStep, _GenSmoothStepCode, T_DVEC4,     3, {T_DOUBLE,        T_DOUBLE,    T_DVEC4}, {0}, {0}},
 
     {slvEXTENSION_HALTI,     "isnan", _EvaluateIsNan, _GenIsNanCode, T_BOOL,    1, {T_FLOAT}, {0}, {0}},
     {slvEXTENSION_HALTI,     "isnan", _EvaluateIsNan, _GenIsNanCode, T_BVEC2,     1, {T_VEC2}, {0}, {0}},
     {slvEXTENSION_HALTI,     "isnan", _EvaluateIsNan, _GenIsNanCode, T_BVEC3,     1, {T_VEC3}, {0}, {0}},
     {slvEXTENSION_HALTI,     "isnan", _EvaluateIsNan, _GenIsNanCode, T_BVEC4,     1, {T_VEC4}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "isnan", _EvaluateIsNan, _GenIsNanCode, T_BOOL,    1, {T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "isnan", _EvaluateIsNan, _GenIsNanCode, T_BVEC2,     1, {T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "isnan", _EvaluateIsNan, _GenIsNanCode, T_BVEC3,     1, {T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "isnan", _EvaluateIsNan, _GenIsNanCode, T_BVEC4,     1, {T_DVEC4}, {0}, {0}},
 
     {slvEXTENSION_HALTI,     "isinf", _EvaluateIsInf, _GenIsInfCode, T_BOOL,    1, {T_FLOAT}, {0}, {0}},
     {slvEXTENSION_HALTI,     "isinf", _EvaluateIsInf, _GenIsInfCode, T_BVEC2,     1, {T_VEC2}, {0}, {0}},
     {slvEXTENSION_HALTI,     "isinf", _EvaluateIsInf, _GenIsInfCode, T_BVEC3,     1, {T_VEC3}, {0}, {0}},
     {slvEXTENSION_HALTI,     "isinf", _EvaluateIsInf, _GenIsInfCode, T_BVEC4,     1, {T_VEC4}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "isinf", _EvaluateIsInf, _GenIsInfCode, T_BOOL,    1, {T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "isinf", _EvaluateIsInf, _GenIsInfCode, T_BVEC2,     1, {T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "isinf", _EvaluateIsInf, _GenIsInfCode, T_BVEC3,     1, {T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "isinf", _EvaluateIsInf, _GenIsInfCode, T_BVEC4,     1, {T_DVEC4}, {0}, {0}},
 
     {slvEXTENSION_HALTI,     "floatBitsToInt", _EvaluateFloatBitsToInteger, _GenFloatBitsToIntCode, T_INT,      1, {T_FLOAT}, {0}, {0}},
     {slvEXTENSION_HALTI,     "floatBitsToInt", _EvaluateFloatBitsToInteger, _GenFloatBitsToIntCode, T_IVEC2,    1, {T_VEC2}, {0}, {0}},
@@ -2041,33 +2163,59 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_NONE,     "length", _EvaluateLength, _GenLengthCode, T_FLOAT,    1, {T_VEC2}, {0}, {0}},
     {slvEXTENSION_NONE,     "length", _EvaluateLength, _GenLengthCode, T_FLOAT,    1, {T_VEC3}, {0}, {0}},
     {slvEXTENSION_NONE,     "length", _EvaluateLength, _GenLengthCode, T_FLOAT,    1, {T_VEC4}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "length", _EvaluateLength, _GenLengthCode, T_DOUBLE,    1, {T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "length", _EvaluateLength, _GenLengthCode, T_DOUBLE,    1, {T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "length", _EvaluateLength, _GenLengthCode, T_DOUBLE,    1, {T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "length", _EvaluateLength, _GenLengthCode, T_DOUBLE,    1, {T_DVEC4}, {0}, {0}},
 
     {slvEXTENSION_NONE,     "distance", _EvaluateDistance, _GenDistanceCode, T_FLOAT,    2, {T_FLOAT,        T_FLOAT}, {0}, {0}},
     {slvEXTENSION_NONE,     "distance", _EvaluateDistance, _GenDistanceCode, T_FLOAT,    2, {T_VEC2,         T_VEC2}, {0}, {0}},
     {slvEXTENSION_NONE,     "distance", _EvaluateDistance, _GenDistanceCode, T_FLOAT,    2, {T_VEC3,         T_VEC3}, {0}, {0}},
     {slvEXTENSION_NONE,     "distance", _EvaluateDistance, _GenDistanceCode, T_FLOAT,    2, {T_VEC4,         T_VEC4}, {0}, {0}},
 
+    {slvEXTENSION_DOUBLE_DATA_TYPE, "distance", _EvaluateDistance, _GenDistanceCode, T_DOUBLE,    2, {T_DOUBLE,    T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE, "distance", _EvaluateDistance, _GenDistanceCode, T_DOUBLE,    2, {T_DVEC2,     T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE, "distance", _EvaluateDistance, _GenDistanceCode, T_DOUBLE,    2, {T_DVEC3,     T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE, "distance", _EvaluateDistance, _GenDistanceCode, T_DOUBLE,    2, {T_DVEC4,     T_DVEC4}, {0}, {0}},
+
     {slvEXTENSION_NONE,     "dot", _EvaluateDot, _GenDotCode, T_FLOAT,    2, {T_FLOAT,        T_FLOAT}, {0}, {0}},
     {slvEXTENSION_NONE,     "dot", _EvaluateDot, _GenDotCode, T_FLOAT,    2, {T_VEC2,         T_VEC2}, {0}, {0}},
     {slvEXTENSION_NONE,     "dot", _EvaluateDot, _GenDotCode, T_FLOAT,    2, {T_VEC3,         T_VEC3}, {0}, {0}},
     {slvEXTENSION_NONE,     "dot", _EvaluateDot, _GenDotCode, T_FLOAT,    2, {T_VEC4,         T_VEC4}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "dot", _EvaluateDot, _GenDotCode, T_DOUBLE,    2, {T_DOUBLE,        T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "dot", _EvaluateDot, _GenDotCode, T_DOUBLE,    2, {T_DVEC2,         T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "dot", _EvaluateDot, _GenDotCode, T_DOUBLE,    2, {T_DVEC3,         T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "dot", _EvaluateDot, _GenDotCode, T_DOUBLE,    2, {T_DVEC4,         T_DVEC4}, {0}, {0}},
 
     {slvEXTENSION_NONE,     "cross", _EvaluateCross, _GenCrossCode, T_VEC3,     2, {T_VEC3,         T_VEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "cross", _EvaluateCross, _GenCrossCode, T_DVEC3,     2, {T_DVEC3,         T_DVEC3}, {0}, {0}},
 
     {slvEXTENSION_NONE,     "normalize", _EvaluateNormalize, _GenNormalizeCode, T_FLOAT,    1, {T_FLOAT}, {0}, {0}},
     {slvEXTENSION_NONE,     "normalize", _EvaluateNormalize, _GenNormalizeCode, T_VEC2,     1, {T_VEC2}, {0}, {0}},
     {slvEXTENSION_NONE,     "normalize", _EvaluateNormalize, _GenNormalizeCode, T_VEC3,     1, {T_VEC3}, {0}, {0}},
     {slvEXTENSION_NONE,     "normalize", _EvaluateNormalize, _GenNormalizeCode, T_VEC4,     1, {T_VEC4}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "normalize", _EvaluateNormalize, _GenNormalizeCode, T_DOUBLE,    1, {T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "normalize", _EvaluateNormalize, _GenNormalizeCode, T_DVEC2,     1, {T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "normalize", _EvaluateNormalize, _GenNormalizeCode, T_DVEC3,     1, {T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "normalize", _EvaluateNormalize, _GenNormalizeCode, T_DVEC4,     1, {T_DVEC4}, {0}, {0}},
 
     {slvEXTENSION_NONE,     "faceforward", _EvaluateFaceForward, _GenFaceForwardCode, T_FLOAT,    3, {T_FLOAT,        T_FLOAT,    T_FLOAT}, {0}, {0}},
     {slvEXTENSION_NONE,     "faceforward", _EvaluateFaceForward, _GenFaceForwardCode, T_VEC2,     3, {T_VEC2,         T_VEC2,     T_VEC2}, {0}, {0}},
     {slvEXTENSION_NONE,     "faceforward", _EvaluateFaceForward, _GenFaceForwardCode, T_VEC3,     3, {T_VEC3,         T_VEC3,     T_VEC3}, {0}, {0}},
     {slvEXTENSION_NONE,     "faceforward", _EvaluateFaceForward, _GenFaceForwardCode, T_VEC4,     3, {T_VEC4,         T_VEC4,     T_VEC4}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "faceforward", _EvaluateFaceForward, _GenFaceForwardCode, T_DOUBLE,    3, {T_DOUBLE,        T_DOUBLE,    T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "faceforward", _EvaluateFaceForward, _GenFaceForwardCode, T_DVEC2,     3, {T_DVEC2,         T_DVEC2,     T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "faceforward", _EvaluateFaceForward, _GenFaceForwardCode, T_DVEC3,     3, {T_DVEC3,         T_DVEC3,     T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "faceforward", _EvaluateFaceForward, _GenFaceForwardCode, T_DVEC4,     3, {T_DVEC4,         T_DVEC4,     T_DVEC4}, {0}, {0}},
 
     {slvEXTENSION_NONE,     "refract", _EvaluateRefract, _GenRefractCode, T_FLOAT,    3, {T_FLOAT,        T_FLOAT,    T_FLOAT}, {0}, {0}},
     {slvEXTENSION_NONE,     "refract", _EvaluateRefract, _GenRefractCode, T_VEC2,     3, {T_VEC2,         T_VEC2,     T_FLOAT}, {0}, {0}},
     {slvEXTENSION_NONE,     "refract", _EvaluateRefract, _GenRefractCode, T_VEC3,     3, {T_VEC3,         T_VEC3,     T_FLOAT}, {0}, {0}},
     {slvEXTENSION_NONE,     "refract", _EvaluateRefract, _GenRefractCode, T_VEC4,     3, {T_VEC4,         T_VEC4,     T_FLOAT}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "refract", _EvaluateRefract, _GenRefractCode, T_DOUBLE,    3, {T_DOUBLE,        T_DOUBLE,    T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "refract", _EvaluateRefract, _GenRefractCode, T_DVEC2,     3, {T_DVEC2,         T_DVEC2,     T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "refract", _EvaluateRefract, _GenRefractCode, T_DVEC3,     3, {T_DVEC3,         T_DVEC3,     T_DOUBLE}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "refract", _EvaluateRefract, _GenRefractCode, T_DVEC4,     3, {T_DVEC4,         T_DVEC4,     T_DOUBLE}, {0}, {0}},
 
     /* Matrix Functions */
     {slvEXTENSION_NONE,     "matrixCompMult", _EvaluateMatrixCompMult, _GenMatrixCompMultCode, T_MAT2,     2, {T_MAT2,         T_MAT2}, {0}, {0}},
@@ -2083,6 +2231,19 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_NONE,     "matrixCompMult", _EvaluateMatrixCompMult, _GenMatrixCompMultCode, T_MAT3X4,   2, {T_MAT3X4,       T_MAT3X4}, {0}, {0}},
     {slvEXTENSION_NONE,     "matrixCompMult", _EvaluateMatrixCompMult, _GenMatrixCompMultCode, T_MAT4X3,   2, {T_MAT4X3,       T_MAT4X3}, {0}, {0}},
 
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "matrixCompMult", _EvaluateMatrixCompMult, _GenMatrixCompMultCode, T_DMAT2,     2, {T_DMAT2,         T_DMAT2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "matrixCompMult", _EvaluateMatrixCompMult, _GenMatrixCompMultCode, T_DMAT3,     2, {T_DMAT3,         T_DMAT3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "matrixCompMult", _EvaluateMatrixCompMult, _GenMatrixCompMultCode, T_DMAT4,     2, {T_DMAT4,         T_DMAT4}, {0}, {0}},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "matrixCompMult", _EvaluateMatrixCompMult, _GenMatrixCompMultCode, T_DMAT2X3,   2, {T_DMAT2X3,       T_DMAT2X3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "matrixCompMult", _EvaluateMatrixCompMult, _GenMatrixCompMultCode, T_DMAT3X2,   2, {T_DMAT3X2,       T_DMAT3X2}, {0}, {0}},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "matrixCompMult", _EvaluateMatrixCompMult, _GenMatrixCompMultCode, T_DMAT2X4,   2, {T_DMAT2X4,       T_DMAT2X4}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "matrixCompMult", _EvaluateMatrixCompMult, _GenMatrixCompMultCode, T_DMAT4X2,   2, {T_DMAT4X2,       T_DMAT4X2}, {0}, {0}},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "matrixCompMult", _EvaluateMatrixCompMult, _GenMatrixCompMultCode, T_DMAT3X4,   2, {T_DMAT3X4,       T_DMAT3X4}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "matrixCompMult", _EvaluateMatrixCompMult, _GenMatrixCompMultCode, T_DMAT4X3,   2, {T_DMAT4X3,       T_DMAT4X3}, {0}, {0}},
+
     {slvEXTENSION_HALTI,    "outerProduct", _EvaluateOuterProduct, _GenOuterProductCode, T_MAT2,     2, {T_VEC2,         T_VEC2}, {0}, {0}},
     {slvEXTENSION_HALTI,    "outerProduct", _EvaluateOuterProduct, _GenOuterProductCode, T_MAT3,     2, {T_VEC3,         T_VEC3}, {0}, {0}},
     {slvEXTENSION_HALTI,    "outerProduct", _EvaluateOuterProduct, _GenOuterProductCode, T_MAT4,     2, {T_VEC4,         T_VEC4}, {0}, {0}},
@@ -2095,6 +2256,19 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
 
     {slvEXTENSION_HALTI,    "outerProduct", _EvaluateOuterProduct, _GenOuterProductCode, T_MAT3X4,   2, {T_VEC4,         T_VEC3}, {0}, {0}},
     {slvEXTENSION_HALTI,    "outerProduct", _EvaluateOuterProduct, _GenOuterProductCode, T_MAT4X3,   2, {T_VEC3,         T_VEC4}, {0}, {0}},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "outerProduct", _EvaluateOuterProduct, _GenOuterProductCode, T_DMAT2,     2, {T_DVEC2,         T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "outerProduct", _EvaluateOuterProduct, _GenOuterProductCode, T_DMAT3,     2, {T_DVEC3,         T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "outerProduct", _EvaluateOuterProduct, _GenOuterProductCode, T_DMAT4,     2, {T_DVEC4,         T_DVEC4}, {0}, {0}},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "outerProduct", _EvaluateOuterProduct, _GenOuterProductCode, T_DMAT2X3,   2, {T_DVEC3,         T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "outerProduct", _EvaluateOuterProduct, _GenOuterProductCode, T_DMAT3X2,   2, {T_DVEC2,         T_DVEC3}, {0}, {0}},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "outerProduct", _EvaluateOuterProduct, _GenOuterProductCode, T_DMAT2X4,   2, {T_DVEC4,         T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "outerProduct", _EvaluateOuterProduct, _GenOuterProductCode, T_DMAT4X2,   2, {T_DVEC2,         T_DVEC4}, {0}, {0}},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "outerProduct", _EvaluateOuterProduct, _GenOuterProductCode, T_DMAT3X4,   2, {T_DVEC4,         T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "outerProduct", _EvaluateOuterProduct, _GenOuterProductCode, T_DMAT4X3,   2, {T_DVEC3,         T_DVEC4}, {0}, {0}},
 
     {slvEXTENSION_HALTI,    "transpose", _EvaluateTranspose, _GenTransposeCode, T_MAT2,     1, {T_MAT2}, {0}, {0}},
     {slvEXTENSION_HALTI,    "transpose", _EvaluateTranspose, _GenTransposeCode, T_MAT3,     1, {T_MAT3}, {0}, {0}},
@@ -2109,13 +2283,34 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_HALTI,    "transpose", _EvaluateTranspose, _GenTransposeCode, T_MAT3X4,   1, {T_MAT4X3}, {0}, {0}},
     {slvEXTENSION_HALTI,    "transpose", _EvaluateTranspose, _GenTransposeCode, T_MAT4X3,   1, {T_MAT3X4}, {0}, {0}},
 
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "transpose", _EvaluateTranspose, _GenTransposeCode, T_DMAT2,     1, {T_DMAT2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "transpose", _EvaluateTranspose, _GenTransposeCode, T_DMAT3,     1, {T_DMAT3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "transpose", _EvaluateTranspose, _GenTransposeCode, T_DMAT4,     1, {T_DMAT4}, {0}, {0}},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "transpose", _EvaluateTranspose, _GenTransposeCode, T_DMAT2X3,   1, {T_DMAT3X2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "transpose", _EvaluateTranspose, _GenTransposeCode, T_DMAT3X2,   1, {T_DMAT2X3}, {0}, {0}},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "transpose", _EvaluateTranspose, _GenTransposeCode, T_DMAT2X4,   1, {T_DMAT4X2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "transpose", _EvaluateTranspose, _GenTransposeCode, T_DMAT4X2,   1, {T_DMAT2X4}, {0}, {0}},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "transpose", _EvaluateTranspose, _GenTransposeCode, T_DMAT3X4,   1, {T_DMAT4X3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "transpose", _EvaluateTranspose, _GenTransposeCode, T_DMAT4X3,   1, {T_DMAT3X4}, {0}, {0}},
+
     {slvEXTENSION_HALTI,    "determinant", _EvaluateDeterminant, _GenDeterminantCode, T_FLOAT,    1, {T_MAT2}, {0}, {0}},
     {slvEXTENSION_HALTI,    "determinant", _EvaluateDeterminant, _GenDeterminantCode, T_FLOAT,    1, {T_MAT3}, {0}, {0}},
     {slvEXTENSION_HALTI,    "determinant", _EvaluateDeterminant, _GenDeterminantCode, T_FLOAT,    1, {T_MAT4}, {0}, {0}},
 
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "determinant", _EvaluateDeterminant, _GenDeterminantCode, T_DOUBLE,    1, {T_DMAT2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "determinant", _EvaluateDeterminant, _GenDeterminantCode, T_DOUBLE,    1, {T_DMAT3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "determinant", _EvaluateDeterminant, _GenDeterminantCode, T_DOUBLE,    1, {T_DMAT4}, {0}, {0}},
+
     {slvEXTENSION_HALTI,    "inverse", _EvaluateInverse, _GenInverseCode, T_MAT2,     1, {T_MAT2}, {0}, {0}},
     {slvEXTENSION_HALTI,    "inverse", _EvaluateInverse, _GenInverseCode, T_MAT3,     1, {T_MAT3}, {0}, {0}},
     {slvEXTENSION_HALTI,    "inverse", _EvaluateInverse, _GenInverseCode, T_MAT4,     1, {T_MAT4}, {0}, {0}},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "inverse", _EvaluateInverse, _GenInverseCode, T_DMAT2,     1, {T_DMAT2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "inverse", _EvaluateInverse, _GenInverseCode, T_DMAT3,     1, {T_DMAT3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "inverse", _EvaluateInverse, _GenInverseCode, T_DMAT4,     1, {T_DMAT4}, {0}, {0}},
 
     /* Vector Relational Functions */
     {slvEXTENSION_NONE,     "lessThan", _EvaluateLessThan, _GenLessThanCode, T_BVEC2,    2, {T_VEC2,         T_VEC2}, {0}, {0}},
@@ -2130,6 +2325,10 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_HALTI,    "lessThan", _EvaluateLessThan, _GenLessThanCode, T_BVEC3,    2, {T_UVEC3,        T_UVEC3}, {0}, {0}},
     {slvEXTENSION_HALTI,    "lessThan", _EvaluateLessThan, _GenLessThanCode, T_BVEC4,    2, {T_UVEC4,        T_UVEC4}, {0}, {0}},
 
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "lessThan", _EvaluateLessThan, _GenLessThanCode, T_BVEC2,    2, {T_DVEC2,         T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "lessThan", _EvaluateLessThan, _GenLessThanCode, T_BVEC3,    2, {T_DVEC3,         T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "lessThan", _EvaluateLessThan, _GenLessThanCode, T_BVEC4,    2, {T_DVEC4,         T_DVEC4}, {0}, {0}},
+
     {slvEXTENSION_NONE,     "lessThanEqual", _EvaluateLessThanEqual, _GenLessThanEqualCode, T_BVEC2,    2, {T_VEC2,         T_VEC2}, {0}, {0}},
     {slvEXTENSION_NONE,     "lessThanEqual", _EvaluateLessThanEqual, _GenLessThanEqualCode, T_BVEC3,    2, {T_VEC3,         T_VEC3}, {0}, {0}},
     {slvEXTENSION_NONE,     "lessThanEqual", _EvaluateLessThanEqual, _GenLessThanEqualCode, T_BVEC4,    2, {T_VEC4,         T_VEC4}, {0}, {0}},
@@ -2141,6 +2340,10 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_HALTI,    "lessThanEqual", _EvaluateLessThanEqual, _GenLessThanEqualCode, T_BVEC2,    2, {T_UVEC2,        T_UVEC2}, {0}, {0}},
     {slvEXTENSION_HALTI,    "lessThanEqual", _EvaluateLessThanEqual, _GenLessThanEqualCode, T_BVEC3,    2, {T_UVEC3,        T_UVEC3}, {0}, {0}},
     {slvEXTENSION_HALTI,    "lessThanEqual", _EvaluateLessThanEqual, _GenLessThanEqualCode, T_BVEC4,    2, {T_UVEC4,        T_UVEC4}, {0}, {0}},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "lessThanEqual", _EvaluateLessThanEqual, _GenLessThanEqualCode, T_BVEC2,    2, {T_DVEC2,         T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "lessThanEqual", _EvaluateLessThanEqual, _GenLessThanEqualCode, T_BVEC3,    2, {T_DVEC3,         T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "lessThanEqual", _EvaluateLessThanEqual, _GenLessThanEqualCode, T_BVEC4,    2, {T_DVEC4,         T_DVEC4}, {0}, {0}},
 
     {slvEXTENSION_NONE,     "greaterThan", _EvaluateGreaterThan, _GenGreaterThanCode, T_BVEC2,    2, {T_VEC2,         T_VEC2}, {0}, {0}},
     {slvEXTENSION_NONE,     "greaterThan", _EvaluateGreaterThan, _GenGreaterThanCode, T_BVEC3,    2, {T_VEC3,         T_VEC3}, {0}, {0}},
@@ -2154,6 +2357,10 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_HALTI,    "greaterThan", _EvaluateGreaterThan, _GenGreaterThanCode, T_BVEC3,    2, {T_UVEC3,        T_UVEC3}, {0}, {0}},
     {slvEXTENSION_HALTI,    "greaterThan", _EvaluateGreaterThan, _GenGreaterThanCode, T_BVEC4,    2, {T_UVEC4,        T_UVEC4}, {0}, {0}},
 
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "greaterThan", _EvaluateGreaterThan, _GenGreaterThanCode, T_BVEC2,    2, {T_DVEC2,         T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "greaterThan", _EvaluateGreaterThan, _GenGreaterThanCode, T_BVEC3,    2, {T_DVEC3,         T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "greaterThan", _EvaluateGreaterThan, _GenGreaterThanCode, T_BVEC4,    2, {T_DVEC4,         T_DVEC4}, {0}, {0}},
+
     {slvEXTENSION_NONE,     "greaterThanEqual", _EvaluateGreaterThanEqual, _GenGreaterThanEqualCode, T_BVEC2,    2, {T_VEC2,         T_VEC2}, {0}, {0}},
     {slvEXTENSION_NONE,     "greaterThanEqual", _EvaluateGreaterThanEqual, _GenGreaterThanEqualCode, T_BVEC3,    2, {T_VEC3,         T_VEC3}, {0}, {0}},
     {slvEXTENSION_NONE,     "greaterThanEqual", _EvaluateGreaterThanEqual, _GenGreaterThanEqualCode, T_BVEC4,    2, {T_VEC4,         T_VEC4}, {0}, {0}},
@@ -2165,6 +2372,10 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_HALTI,    "greaterThanEqual", _EvaluateGreaterThanEqual, _GenGreaterThanEqualCode, T_BVEC2,    2, {T_UVEC2,        T_UVEC2}, {0}, {0}},
     {slvEXTENSION_HALTI,    "greaterThanEqual", _EvaluateGreaterThanEqual, _GenGreaterThanEqualCode, T_BVEC3,    2, {T_UVEC3,        T_UVEC3}, {0}, {0}},
     {slvEXTENSION_HALTI,    "greaterThanEqual", _EvaluateGreaterThanEqual, _GenGreaterThanEqualCode, T_BVEC4,    2, {T_UVEC4,        T_UVEC4}, {0}, {0}},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "greaterThanEqual", _EvaluateGreaterThanEqual, _GenGreaterThanEqualCode, T_BVEC2,    2, {T_DVEC2,         T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "greaterThanEqual", _EvaluateGreaterThanEqual, _GenGreaterThanEqualCode, T_BVEC3,    2, {T_DVEC3,         T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "greaterThanEqual", _EvaluateGreaterThanEqual, _GenGreaterThanEqualCode, T_BVEC4,    2, {T_DVEC4,         T_DVEC4}, {0}, {0}},
 
     {slvEXTENSION_NONE,     "equal", _EvaluateEqual, _GenEqualCode, T_BVEC2,    2, {T_VEC2,         T_VEC2}, {0}, {0}},
     {slvEXTENSION_NONE,     "equal", _EvaluateEqual, _GenEqualCode, T_BVEC3,    2, {T_VEC3,         T_VEC3}, {0}, {0}},
@@ -2182,6 +2393,10 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_NONE,     "equal", _EvaluateEqual, _GenEqualCode, T_BVEC3,    2, {T_BVEC3,        T_BVEC3}, {0}, {0}},
     {slvEXTENSION_NONE,     "equal", _EvaluateEqual, _GenEqualCode, T_BVEC4,    2, {T_BVEC4,        T_BVEC4}, {0}, {0}},
 
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "equal", _EvaluateEqual, _GenEqualCode, T_BVEC2,    2, {T_DVEC2,         T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "equal", _EvaluateEqual, _GenEqualCode, T_BVEC3,    2, {T_DVEC3,         T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "equal", _EvaluateEqual, _GenEqualCode, T_BVEC4,    2, {T_DVEC4,         T_DVEC4}, {0}, {0}},
+
     {slvEXTENSION_NONE,     "notEqual", _EvaluateNotEqual, _GenNotEqualCode, T_BVEC2,    2, {T_VEC2,         T_VEC2}, {0}, {0}},
     {slvEXTENSION_NONE,     "notEqual", _EvaluateNotEqual, _GenNotEqualCode, T_BVEC3,    2, {T_VEC3,         T_VEC3}, {0}, {0}},
     {slvEXTENSION_NONE,     "notEqual", _EvaluateNotEqual, _GenNotEqualCode, T_BVEC4,    2, {T_VEC4,         T_VEC4}, {0}, {0}},
@@ -2197,6 +2412,10 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_NONE,     "notEqual", _EvaluateNotEqual, _GenNotEqualCode, T_BVEC2,    2, {T_BVEC2,        T_BVEC2}, {0}, {0}},
     {slvEXTENSION_NONE,     "notEqual", _EvaluateNotEqual, _GenNotEqualCode, T_BVEC3,    2, {T_BVEC3,        T_BVEC3}, {0}, {0}},
     {slvEXTENSION_NONE,     "notEqual", _EvaluateNotEqual, _GenNotEqualCode, T_BVEC4,    2, {T_BVEC4,        T_BVEC4}, {0}, {0}},
+
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "notEqual", _EvaluateNotEqual, _GenNotEqualCode, T_BVEC2,    2, {T_DVEC2,         T_DVEC2}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "notEqual", _EvaluateNotEqual, _GenNotEqualCode, T_BVEC3,    2, {T_DVEC3,         T_DVEC3}, {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "notEqual", _EvaluateNotEqual, _GenNotEqualCode, T_BVEC4,    2, {T_DVEC4,         T_DVEC4}, {0}, {0}},
 
     {slvEXTENSION_NONE,     "any", _EvaluateAny, _GenAnyCode, T_BOOL,     1, {T_BVEC2}, {0}, {0}},
     {slvEXTENSION_NONE,     "any", _EvaluateAny, _GenAnyCode, T_BOOL,     1, {T_BVEC3}, {0}, {0}},
@@ -2427,6 +2646,14 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_EXT_TEXTURE_BUFFER,     "texelFetch", gcvNULL, _GenTexelFetchCode,          T_IVEC4,    2, {T_ISAMPLERBUFFER,     T_INT}, {0}, {0}},
     {slvEXTENSION_EXT_TEXTURE_BUFFER,     "texelFetch", gcvNULL, _GenTexelFetchCode,          T_UVEC4,    2, {T_USAMPLERBUFFER,     T_INT}, {0}, {0}},
 
+    /* OGL texelFetch functions with more sampler types */
+    {slvEXTENSION_HALTI | slvEXTENSION_SUPPORT_OGL,     "texelFetch", gcvNULL, _GenTexelFetchCode,          T_VEC4 ,    3, {T_SAMPLER1D,        T_INT,     T_INT}, {0}, {0}},
+    {slvEXTENSION_HALTI | slvEXTENSION_SUPPORT_OGL,     "texelFetch", gcvNULL, _GenTexelFetchCode,          T_IVEC4,    3, {T_ISAMPLER1D,       T_INT,     T_INT}, {0}, {0}},
+    {slvEXTENSION_HALTI | slvEXTENSION_SUPPORT_OGL,     "texelFetch", gcvNULL, _GenTexelFetchCode,          T_UVEC4,    3, {T_USAMPLER1D,       T_INT,     T_INT}, {0}, {0}},
+    {slvEXTENSION_HALTI | slvEXTENSION_SUPPORT_OGL,     "texelFetch", gcvNULL, _GenTexelFetchCode,          T_VEC4 ,    3, {T_SAMPLER1DARRAY,        T_IVEC2,     T_INT}, {0}, {0}},
+    {slvEXTENSION_HALTI | slvEXTENSION_SUPPORT_OGL,     "texelFetch", gcvNULL, _GenTexelFetchCode,          T_IVEC4,    3, {T_ISAMPLER1DARRAY,       T_IVEC2,     T_INT}, {0}, {0}},
+    {slvEXTENSION_HALTI | slvEXTENSION_SUPPORT_OGL,     "texelFetch", gcvNULL, _GenTexelFetchCode,          T_UVEC4,    3, {T_USAMPLER1DARRAY,       T_IVEC2,     T_INT}, {0}, {0}},
+
     {slvEXTENSION_HALTI,     "texelFetchOffset", gcvNULL, _GenTexelFetchOffsetCode,    T_VEC4,     4, {T_SAMPLER2D,       T_IVEC2,     T_INT, T_IVEC2}, {0}, {0}},
     {slvEXTENSION_HALTI,     "texelFetchOffset", gcvNULL, _GenTexelFetchOffsetCode,    T_VEC4,     4, {T_SAMPLER3D,       T_IVEC3,     T_INT, T_IVEC3}, {0}, {0}},
     {slvEXTENSION_HALTI,     "texelFetchOffset", gcvNULL, _GenTexelFetchOffsetCode,    T_VEC4,     4, {T_SAMPLER2DARRAY,  T_IVEC3,     T_INT, T_IVEC2}, {0}, {0}},
@@ -2436,6 +2663,14 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_HALTI,     "texelFetchOffset", gcvNULL, _GenTexelFetchOffsetCode,    T_UVEC4,    4, {T_USAMPLER2D,       T_IVEC2,     T_INT, T_IVEC2}, {0}, {0}},
     {slvEXTENSION_HALTI,     "texelFetchOffset", gcvNULL, _GenTexelFetchOffsetCode,    T_UVEC4,    4, {T_USAMPLER3D,       T_IVEC3,     T_INT, T_IVEC3}, {0}, {0}},
     {slvEXTENSION_HALTI,     "texelFetchOffset", gcvNULL, _GenTexelFetchOffsetCode,    T_UVEC4,    4, {T_USAMPLER2DARRAY,  T_IVEC3,     T_INT, T_IVEC2}, {0}, {0}},
+
+    /* OGL texelFetchOffset functions with more sampler types */
+    {slvEXTENSION_HALTI | slvEXTENSION_SUPPORT_OGL,     "texelFetchOffset", gcvNULL, _GenTexelFetchOffsetCode,          T_VEC4 ,    4, {T_SAMPLER1D,  T_INT,       T_INT, T_INT},{0}, {0}},
+    {slvEXTENSION_HALTI | slvEXTENSION_SUPPORT_OGL,     "texelFetchOffset", gcvNULL, _GenTexelFetchOffsetCode,          T_IVEC4,    4, {T_ISAMPLER1D, T_INT,       T_INT, T_INT}, {0}, {0}},
+    {slvEXTENSION_HALTI | slvEXTENSION_SUPPORT_OGL,     "texelFetchOffset", gcvNULL, _GenTexelFetchOffsetCode,          T_UVEC4,    4, {T_USAMPLER1D, T_INT,       T_INT, T_INT}, {0}, {0}},
+    {slvEXTENSION_HALTI | slvEXTENSION_SUPPORT_OGL,     "texelFetchOffset", gcvNULL, _GenTexelFetchOffsetCode,          T_VEC4 ,    4, {T_SAMPLER1DARRAY,  T_IVEC2,       T_INT, T_INT},{0}, {0}},
+    {slvEXTENSION_HALTI | slvEXTENSION_SUPPORT_OGL,     "texelFetchOffset", gcvNULL, _GenTexelFetchOffsetCode,          T_IVEC4,    4, {T_ISAMPLER1DARRAY, T_IVEC2,       T_INT, T_INT}, {0}, {0}},
+    {slvEXTENSION_HALTI | slvEXTENSION_SUPPORT_OGL,     "texelFetchOffset", gcvNULL, _GenTexelFetchOffsetCode,          T_UVEC4,    4, {T_USAMPLER1DARRAY, T_IVEC2,       T_INT, T_INT}, {0}, {0}},
 
     {slvEXTENSION_HALTI,     "textureLodOffset", gcvNULL, _GenTextureLodOffsetCode,    T_VEC4,     4, {T_SAMPLER2D,       T_VEC2, T_FLOAT, T_IVEC2}, {0}, {0}},
     {slvEXTENSION_HALTI,     "textureLodOffset", gcvNULL, _GenTextureLodOffsetCode,    T_VEC4,     4, {T_SAMPLER3D,       T_VEC3, T_FLOAT, T_IVEC3}, {0}, {0}},
@@ -2636,11 +2871,19 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
     {slvEXTENSION_HALTI,    "round", _EvaluateRound, gcvNULL,                 T_VEC2,   ANY,   1, {T_VEC2},  {_IN}, {ANY},gceINTRIN_source, "_viv_round_vec2", {0}, {0}},
     {slvEXTENSION_HALTI,    "round", _EvaluateRound, gcvNULL,                 T_VEC3,   ANY,   1, {T_VEC3},  {_IN}, {ANY},gceINTRIN_source, "_viv_round_vec3", {0}, {0}},
     {slvEXTENSION_HALTI,    "round", _EvaluateRound, gcvNULL,                 T_VEC4,   ANY,   1, {T_VEC4},  {_IN}, {ANY},gceINTRIN_source, "_viv_round_vec4", {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "round", _EvaluateRound, gcvNULL,                 T_DOUBLE,  ANY,   1, {T_DOUBLE}, {_IN}, {ANY},gceINTRIN_source, "_viv_round_float", {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "round", _EvaluateRound, gcvNULL,                 T_DVEC2,   ANY,   1, {T_DVEC2},  {_IN}, {ANY},gceINTRIN_source, "_viv_round_vec2", {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "round", _EvaluateRound, gcvNULL,                 T_DVEC3,   ANY,   1, {T_DVEC3},  {_IN}, {ANY},gceINTRIN_source, "_viv_round_vec3", {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "round", _EvaluateRound, gcvNULL,                 T_DVEC4,   ANY,   1, {T_DVEC4},  {_IN}, {ANY},gceINTRIN_source, "_viv_round_vec4", {0}, {0}},
 
     {slvEXTENSION_HALTI,    "roundEven", _EvaluateRoundEven, gcvNULL,             T_FLOAT, ANY,   1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_roundEven_float", {0}, {0}},
     {slvEXTENSION_HALTI,    "roundEven", _EvaluateRoundEven, gcvNULL,             T_VEC2,  ANY,   1, {T_VEC2},  {_IN}, {ANY},gceINTRIN_source, "_viv_roundEven_vec2", {0}, {0}},
     {slvEXTENSION_HALTI,    "roundEven", _EvaluateRoundEven, gcvNULL,             T_VEC3,  ANY,   1, {T_VEC3},  {_IN}, {ANY},gceINTRIN_source, "_viv_roundEven_vec3", {0}, {0}},
     {slvEXTENSION_HALTI,    "roundEven", _EvaluateRoundEven, gcvNULL,             T_VEC4,  ANY,   1, {T_VEC4},  {_IN}, {ANY},gceINTRIN_source, "_viv_roundEven_vec4", {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "roundEven", _EvaluateRoundEven, gcvNULL,             T_DOUBLE, ANY,   1, {T_DOUBLE}, {_IN}, {ANY},gceINTRIN_source, "_viv_roundEven_float", {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "roundEven", _EvaluateRoundEven, gcvNULL,             T_DVEC2,  ANY,   1, {T_DVEC2},  {_IN}, {ANY},gceINTRIN_source, "_viv_roundEven_vec2", {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "roundEven", _EvaluateRoundEven, gcvNULL,             T_DVEC3,  ANY,   1, {T_DVEC3},  {_IN}, {ANY},gceINTRIN_source, "_viv_roundEven_vec3", {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "roundEven", _EvaluateRoundEven, gcvNULL,             T_DVEC4,  ANY,   1, {T_DVEC4},  {_IN}, {ANY},gceINTRIN_source, "_viv_roundEven_vec4", {0}, {0}},
     {slvEXTENSION_ES_31,    "findLSB", gcvNULL, gcvNULL,                T_INT,  _LP,    1, {T_INT}, {_IN}, {ANY},gceINTRIN_source, "_viv_findLSB_1", {0}, {0}},
     {slvEXTENSION_ES_31,    "findLSB", gcvNULL, gcvNULL,                T_IVEC2,_LP,    1, {T_IVEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_findLSB_2", {0}, {0}},
     {slvEXTENSION_ES_31,    "findLSB", gcvNULL, gcvNULL,                T_IVEC3,_LP,    1, {T_IVEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_findLSB_3", {0}, {0}},
@@ -2734,6 +2977,10 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
     {slvEXTENSION_HALTI,    "modf", gcvNULL, gcvNULL,                   T_VEC2, ANY,     2, {T_VEC2,  T_VEC2},   {_IN,  _OT}, {ANY, ANY},gceINTRIN_source, "_viv_modf_vec2", {0}, {0}},
     {slvEXTENSION_HALTI,    "modf", gcvNULL, gcvNULL,                   T_VEC3, ANY,     2, {T_VEC3,  T_VEC3},   {_IN,  _OT}, {ANY, ANY},gceINTRIN_source, "_viv_modf_vec3", {0}, {0}},
     {slvEXTENSION_HALTI,    "modf", gcvNULL, gcvNULL,                   T_VEC4, ANY,     2, {T_VEC4,  T_VEC4},   {_IN,  _OT}, {ANY, ANY},gceINTRIN_source, "_viv_modf_vec4", {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "modf", gcvNULL, gcvNULL,        T_DOUBLE,ANY,    2, {T_DOUBLE, T_DOUBLE},  {_IN,  _OT}, {ANY, ANY},gceINTRIN_source, "_viv_modf_float", {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "modf", gcvNULL, gcvNULL,        T_DVEC2, ANY,    2, {T_DVEC2,  T_DVEC2},   {_IN,  _OT}, {ANY, ANY},gceINTRIN_source, "_viv_modf_vec2", {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "modf", gcvNULL, gcvNULL,        T_DVEC3, ANY,    2, {T_DVEC3,  T_DVEC3},   {_IN,  _OT}, {ANY, ANY},gceINTRIN_source, "_viv_modf_vec3", {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,    "modf", gcvNULL, gcvNULL,        T_DVEC4, ANY,    2, {T_DVEC4,  T_DVEC4},   {_IN,  _OT}, {ANY, ANY},gceINTRIN_source, "_viv_modf_vec4", {0}, {0}},
 
     {slvEXTENSION_GPU_SHADER5,  "fma", gcvNULL, gcvNULL,                 T_FLOAT,ANY,     3, {T_FLOAT, T_FLOAT, T_FLOAT},  {_IN,  _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_fma_float", {0}, {0}},
     {slvEXTENSION_GPU_SHADER5,  "fma", gcvNULL, gcvNULL,                 T_VEC2, ANY,     3, {T_VEC2,  T_VEC2,  T_VEC2},   {_IN,  _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_fma_vec2", {0}, {0}},
@@ -2744,6 +2991,10 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
     {slvEXTENSION_NONE,     "reflect", _EvaluateReflect, gcvNULL,                T_VEC2, ANY,     2, {T_VEC2,  T_VEC2},   {_IN,  _IN}, {ANY, ANY},gceINTRIN_source, "_viv_reflect_vec2", {0}, {0}},
     {slvEXTENSION_NONE,     "reflect", _EvaluateReflect, gcvNULL,                T_VEC3, ANY,     2, {T_VEC3,  T_VEC3},   {_IN,  _IN}, {ANY, ANY},gceINTRIN_source, "_viv_reflect_vec3", {0}, {0}},
     {slvEXTENSION_NONE,     "reflect", _EvaluateReflect, gcvNULL,                T_VEC4, ANY,     2, {T_VEC4,  T_VEC4},   {_IN,  _IN}, {ANY, ANY},gceINTRIN_source, "_viv_reflect_vec4", {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "reflect", _EvaluateReflect, gcvNULL,    T_DOUBLE,ANY,    2, {T_DOUBLE, T_DOUBLE},  {_IN,  _IN}, {ANY, ANY},gceINTRIN_source, "_viv_reflect_float", {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "reflect", _EvaluateReflect, gcvNULL,    T_DVEC2, ANY,    2, {T_DVEC2,  T_DVEC2},   {_IN,  _IN}, {ANY, ANY},gceINTRIN_source, "_viv_reflect_vec2", {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "reflect", _EvaluateReflect, gcvNULL,    T_DVEC3, ANY,    2, {T_DVEC3,  T_DVEC3},   {_IN,  _IN}, {ANY, ANY},gceINTRIN_source, "_viv_reflect_vec3", {0}, {0}},
+    {slvEXTENSION_DOUBLE_DATA_TYPE,     "reflect", _EvaluateReflect, gcvNULL,    T_DVEC4, ANY,    2, {T_DVEC4,  T_DVEC4},   {_IN,  _IN}, {ANY, ANY},gceINTRIN_source, "_viv_reflect_vec4", {0}, {0}},
 
     /* texture size function. */
     {slvEXTENSION_HALTI,    "textureSize", gcvNULL, gcvNULL,            T_IVEC2,_HP,     2, {T_SAMPLER2D,    T_INT},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_2D", {0}, {0}},
@@ -2779,7 +3030,18 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
     {slvEXTENSION_EXT_TEXTURE_BUFFER,   "textureSize", gcvNULL, gcvNULL,            T_INT, _HP,    1, {T_SAMPLERBUFFER},                    {_IN}, {ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_buffer", {0}, {0}},
     {slvEXTENSION_EXT_TEXTURE_BUFFER,   "textureSize", gcvNULL, gcvNULL,            T_INT, _HP,    1, {T_ISAMPLERBUFFER},                   {_IN}, {ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_int_buffer", {0}, {0}},
     {slvEXTENSION_EXT_TEXTURE_BUFFER,   "textureSize", gcvNULL, gcvNULL,            T_INT, _HP,    1, {T_USAMPLERBUFFER},                   {_IN}, {ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_uint_buffer", {0}, {0}},
+
+    {slvEXTENSION_HALTI,    "textureSize", gcvNULL, gcvNULL,            T_INT, _HP,     2, {T_SAMPLER1D,       T_INT},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_1D", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureSize", gcvNULL, gcvNULL,            T_INT, _HP,     2, {T_ISAMPLER1D,      T_INT},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_1D", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureSize", gcvNULL, gcvNULL,            T_INT, _HP,     2, {T_USAMPLER1D,      T_INT},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_1D", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureSize", gcvNULL, gcvNULL,            T_INT, _HP,     2, {T_SAMPLER1DSHADOW, T_INT},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_1D", {0}, {0}},
+
+    {slvEXTENSION_HALTI,    "textureSize", gcvNULL, gcvNULL,            T_IVEC2,_HP,     2, {T_SAMPLER2DRECT,  T_INT},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_2D", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureSize", gcvNULL, gcvNULL,            T_IVEC2,_HP,     2, {T_ISAMPLER2DRECT, T_INT},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_2D", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureSize", gcvNULL, gcvNULL,            T_IVEC2,_HP,     2, {T_USAMPLER2DRECT, T_INT},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_2D", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureSize", gcvNULL, gcvNULL,            T_IVEC2,_HP,     2, {T_SAMPLER2DRECTSHADOW, T_INT},                {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_2D", {0}, {0}},
     {slvEXTENSION_EGL_IMAGE_EXTERNAL_ESSL3,     "textureSize", gcvNULL,  gcvNULL,    T_IVEC2,_HP,2, {T_SAMPLEREXTERNALOES,    T_INT},      {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_2D", {0}, {0}},
+
     /* texture gather functions. */
     {slvEXTENSION_ES_31,    "textureGather", gcvNULL, gcvNULL,          T_VEC4,  ANY,   2, {T_SAMPLER2D,         T_VEC2},                {_IN, _IN}, {ANY, ANY},gceINTRIN_texture_gather, "_viv_textureGather_float_2D_NoComp", {0}, {0}},
     {slvEXTENSION_ES_31,    "textureGather", gcvNULL, gcvNULL,          T_VEC4,  ANY,   2, {T_SAMPLER2DARRAY,    T_VEC3},                {_IN, _IN}, {ANY, ANY},gceINTRIN_texture_gather, "_viv_textureGather_float_2DArray_NoComp", {0}, {0}},
@@ -3087,6 +3349,35 @@ static slsINTRINSIC_BUILTIN_FUNCTION FSIntrinsicBuiltInFunctions[] =
     {slvEXTENSION_SHADER_MULTISAMPLE_INTERPOLATION,     "interpolateAtOffset", gcvNULL, gcvNULL,      T_VEC2,  ANY,    2, {T_VEC2, T_VEC2},  {_IN, _IN}, {ANY, ANY},gceINTRIN_MS_interpolate_at_offset, "_viv_interpolateAtOffset_vec2", {0}, {0}, slFuncCheckForInterpolate},
     {slvEXTENSION_SHADER_MULTISAMPLE_INTERPOLATION,     "interpolateAtOffset", gcvNULL, gcvNULL,      T_VEC3,  ANY,    2, {T_VEC3, T_VEC2},  {_IN, _IN}, {ANY, ANY},gceINTRIN_MS_interpolate_at_offset, "_viv_interpolateAtOffset_vec3", {0}, {0}, slFuncCheckForInterpolate},
     {slvEXTENSION_SHADER_MULTISAMPLE_INTERPOLATION,     "interpolateAtOffset", gcvNULL, gcvNULL,      T_VEC4,  ANY,    2, {T_VEC4, T_VEC2},  {_IN, _IN}, {ANY, ANY},gceINTRIN_MS_interpolate_at_offset, "_viv_interpolateAtOffset_vec4", {0}, {0}, slFuncCheckForInterpolate},
+
+    /* texture query lod function. */
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_SAMPLER1D,    T_FLOAT},                    {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_1d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_ISAMPLER1D,   T_FLOAT},                    {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_1d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_USAMPLER1D,   T_FLOAT},                    {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_1d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_SAMPLER2D,    T_VEC2},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_2d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_ISAMPLER2D,   T_VEC2},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_2d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_USAMPLER2D,   T_VEC2},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_2d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_SAMPLER3D,    T_VEC3},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_3d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_ISAMPLER3D,   T_VEC3},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_3d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_USAMPLER3D,   T_VEC3},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_3d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_SAMPLERCUBE,  T_VEC3},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_cube", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_ISAMPLERCUBE, T_VEC3},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_cube", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_USAMPLERCUBE, T_VEC3},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_cube", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_SAMPLER1DARRAY,    T_FLOAT},               {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_1d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_ISAMPLER1DARRAY,   T_FLOAT},               {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_1d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_USAMPLER1DARRAY,   T_FLOAT},               {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_1d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_SAMPLER2DARRAY,    T_VEC2},                {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_2d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_ISAMPLER2DARRAY,   T_VEC2},                {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_2d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_USAMPLER2DARRAY,   T_VEC2},                {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_2d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_SAMPLERCUBEARRAY,  T_VEC3},                {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_cube", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_ISAMPLERCUBEARRAY, T_VEC3},                {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_cube", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_USAMPLERCUBEARRAY, T_VEC3},                {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_cube", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_SAMPLER1DSHADOW,   T_FLOAT},               {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_1d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_SAMPLER2DSHADOW,   T_VEC2},                {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_2d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_SAMPLERCUBESHADOW, T_VEC3},                {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_cube", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_SAMPLER1DARRAYSHADOW,   T_FLOAT},          {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_1d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_SAMPLER2DARRAYSHADOW,   T_VEC2},           {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_2d", {0}, {0}},
+    {slvEXTENSION_HALTI,    "textureQueryLod", gcvNULL, gcvNULL,            T_VEC2,_HP,     2, {T_SAMPLERCUBEARRAYSHADOW, T_VEC3},           {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_image_query_lod_cube", {0}, {0}},
 };
 
 static gctUINT FSIntrinsicBuiltInFunctionCount =
@@ -3307,6 +3598,11 @@ static slsBUILT_IN_VARIABLE GSBuiltInVariables[] =
     {slvEXTENSION_NONE,  "gl_PointSize",             "#PointSize",          slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NONE,  "gl_PrimitiveID",           "#PrimitiveID",        slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_INT,      0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NONE,  "gl_Layer",                 "#Layer",              slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_INT,      0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
+    /* uniform state */
+    {slvEXTENSION_NONE,  "gl_DepthRange.near",       "#DepthRange.near",  slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM,      T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {slvEXTENSION_NONE,  "gl_DepthRange.far",        "#DepthRange.far",   slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM,      T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {slvEXTENSION_NONE,  "gl_DepthRange.diff",       "#DepthRange.diff",  slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM,      T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {slvEXTENSION_NONE,  "gl_DepthRange",            "#DepthRange",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM,      T_STRUCT,   (gctUINT)-1,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
 };
 
 static gctUINT GSBuiltInVariableCount =

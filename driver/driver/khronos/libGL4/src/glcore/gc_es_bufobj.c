@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -644,7 +644,7 @@ GLvoid __glFreeBufferObjectState(__GLcontext *gc)
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_BindBuffer(__GLcontext *gc, GLenum target, GLuint buffer)
+GLvoid GL_APIENTRY __glim_BindBuffer(__GLcontext *gc, GLenum target, GLuint buffer)
 {
     GLuint targetIndex;
 
@@ -671,7 +671,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_BindBufferBase(__GLcontext *gc, GLenum target, GLuint index, GLuint buffer)
+GLvoid GL_APIENTRY __glim_BindBufferBase(__GLcontext *gc, GLenum target, GLuint index, GLuint buffer)
 {
     GLuint targetIndex;
 
@@ -735,7 +735,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_BindBufferRange(__GLcontext *gc, GLenum target, GLuint index,
+GLvoid GL_APIENTRY __glim_BindBufferRange(__GLcontext *gc, GLenum target, GLuint index,
                                           GLuint buffer, GLintptr offset, GLsizeiptr size)
 {
     GLuint targetIndex;
@@ -824,7 +824,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_DeleteBuffers(__GLcontext *gc, GLsizei n, const GLuint *buffers)
+GLvoid GL_APIENTRY __glim_DeleteBuffers(__GLcontext *gc, GLsizei n, const GLuint *buffers)
 {
     GLint i;
 
@@ -847,7 +847,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_GenBuffers(__GLcontext *gc, GLsizei n, GLuint * buffers)
+GLvoid GL_APIENTRY __glim_GenBuffers(__GLcontext *gc, GLsizei n, GLuint * buffers)
 {
     GLint start, i;
 
@@ -883,12 +883,12 @@ OnExit:
     return;
 }
 
-GLboolean GL_APIENTRY __gles_IsBuffer(__GLcontext *gc, GLuint buffer)
+GLboolean GL_APIENTRY __glim_IsBuffer(__GLcontext *gc, GLuint buffer)
 {
     return (gcvNULL != __glGetObject(gc, gc->bufferObject.shared, buffer));
 }
 
-GLvoid GL_APIENTRY __gles_BufferData(__GLcontext *gc, GLenum target, GLsizeiptr size,
+GLvoid GL_APIENTRY __glim_BufferData(__GLcontext *gc, GLenum target, GLsizeiptr size,
                                      const GLvoid *data, GLenum usage)
 {
     GLuint targetIndex;
@@ -962,7 +962,7 @@ OnError:
 
 }
 
-GLvoid GL_APIENTRY __gles_BufferSubData(__GLcontext *gc, GLenum target, GLintptr offset,
+GLvoid GL_APIENTRY __glim_BufferSubData(__GLcontext *gc, GLenum target, GLintptr offset,
                                         GLsizeiptr size, const GLvoid *data)
 {
     GLuint targetIndex;
@@ -1005,7 +1005,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_CopyBufferSubData(__GLcontext *gc, GLenum readTarget, GLenum writeTarget,
+GLvoid GL_APIENTRY __glim_CopyBufferSubData(__GLcontext *gc, GLenum readTarget, GLenum writeTarget,
                                             GLintptr readOffset, GLintptr writeOffset, GLsizeiptr size)
 {
     GLuint readTargetIndex;
@@ -1049,7 +1049,39 @@ OnError:
     return;
 }
 
-GLvoid* GL_APIENTRY __gles_MapBufferRange(__GLcontext *gc, GLenum target, GLintptr offset,
+GLvoid GL_APIENTRY __glim_GetBufferSubData(__GLcontext *gc, GLenum target, GLintptr offset, GLsizeiptr size, GLvoid *data)
+{
+    GLuint targetIndex;
+    __GLbufferObject *readBufObj;
+
+    __GL_HEADER();
+    __GL_GET_BUFFER_TARGET_INDEX(target, targetIndex);
+
+    readBufObj  = __glGetBoundBufObj(gc, targetIndex);
+
+    if (!readBufObj )
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
+
+    if (size < 0 || (size + offset) > readBufObj->size)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+
+    if (readBufObj->bufferMapped)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
+
+    (*gc->dp.getBufferSubData)(gc, targetIndex, readBufObj, offset, size, data);
+
+    OnError:
+    __GL_FOOTER();
+    return;
+}
+
+GLvoid* GL_APIENTRY __glim_MapBufferRange(__GLcontext *gc, GLenum target, GLintptr offset,
                                           GLsizeiptr length, GLbitfield access)
 {
     GLuint targetIndex;
@@ -1112,76 +1144,62 @@ OnError:
     return result;
 }
 
-#ifdef OPENGL40
-GLvoid* APIENTRY __glim_MapBuffer(__GLcontext *gc, GLenum target, GLenum access)
+GLvoid* GL_APIENTRY __glim_MapBuffer(__GLcontext *gc, GLenum target, GLenum access)
 {
     GLuint targetIndex;
-    __GLbufferObject * bufObj;
+    __GLbufferObject *bufObj;
+    GLbitfield accessFlag = (GLbitfield)access;
+    void *result = gcvNULL;
 
+    __GL_HEADER();
 
-    switch( target )
-    {
-    case GL_ARRAY_BUFFER :
-        targetIndex = __GL_ARRAY_BUFFER_INDEX;
-        break;
-    case GL_ELEMENT_ARRAY_BUFFER :
-        targetIndex = __GL_ELEMENT_ARRAY_BUFFER_INDEX;
-        break;
-    case GL_PIXEL_PACK_BUFFER_ARB:
-        targetIndex = __GL_PIXEL_PACK_BUFFER_INDEX;
-        break;
-    case GL_PIXEL_UNPACK_BUFFER_ARB:
-        targetIndex = __GL_PIXEL_UNPACK_BUFFER_INDEX;
-        break;
-    case GL_UNIFORM_BUFFER_EXT:
-        targetIndex = __GL_UNIFORM_BUFFER_INDEX;
-        break;
-    case GL_TEXTURE_BUFFER_EXT:
-        targetIndex = __GL_TEXTURE_BUFFER_BINDING_EXT;
-        break;
-    default:
-        __glSetError(gc, GL_INVALID_ENUM);
-        return NULL;
-    }
-
-    if(gc->bufferObject.generalBindingPoint[targetIndex].boundBufName == 0 )
-    {
-        __glSetError(gc, GL_INVALID_OPERATION);
-        return NULL;
-    }
-
-    bufObj = __glGetBoundBufObj(gc, targetIndex);
-    GL_ASSERT(bufObj);
-
-    if( bufObj->bufferMapped )
-    {
-        __glSetError(gc, GL_INVALID_OPERATION);
-        return NULL;
-    }
-
-    __GL_VERTEX_BUFFER_FLUSH(gc);
+    __GL_GET_BUFFER_TARGET_INDEX(target, targetIndex);
 
     switch( access )
     {
-    case GL_READ_ONLY :
-    case GL_WRITE_ONLY :
-    case GL_READ_WRITE :
-        bufObj->accessFlags = access;
+    case GL_WRITE_ONLY:
+        accessFlag = GL_MAP_WRITE_BIT;
         break;
+#ifdef OPENGL40
+    case GL_READ_ONLY:
+        accessFlag = GL_MAP_READ_BIT;
+        break;
+    case GL_READ_WRITE:
+        accessFlag = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT;
+        break;
+#else
+    case GL_MAP_BUFFER_OBJ_VIV:
+        break;
+#endif
     default:
-        __glSetError(gc, GL_INVALID_ENUM);
-        return NULL;
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
-    /*call the dp function to get the mapPointer*/
-    bufObj->mapPointer = (*gc->dp.mapBuffer)(gc, bufObj);
-    bufObj->bufferMapped = GL_TRUE;
+    bufObj = __glGetBoundBufObj(gc, targetIndex);
+    if (!bufObj)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
 
-    return bufObj->mapPointer;
+    if (bufObj->bufferMapped)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
+
+    __GL_VERTEX_BUFFER_FLUSH(gc);
+    result = (*gc->dp.mapBufferRange)(gc, bufObj, targetIndex, 0, bufObj->size, accessFlag);
+    if (gcvNULL == result)
+    {
+        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
+    }
+    bufObj->accessOES = access;
+
+OnError:
+    __GL_FOOTER();
+    return result;
 }
-#endif
 
-GLvoid GL_APIENTRY __gles_FlushMappedBufferRange(__GLcontext *gc, GLenum target, GLintptr offset, GLsizeiptr length)
+GLvoid GL_APIENTRY __glim_FlushMappedBufferRange(__GLcontext *gc, GLenum target, GLintptr offset, GLsizeiptr length)
 {
     GLuint targetIndex;
     __GLbufferObject *bufObj;
@@ -1214,7 +1232,7 @@ OnError:
     return;
 }
 
-GLboolean GL_APIENTRY __gles_UnmapBuffer(__GLcontext *gc, GLenum target)
+GLboolean GL_APIENTRY __glim_UnmapBuffer(__GLcontext *gc, GLenum target)
 {
     GLuint targetIndex;
     __GLbufferObject *bufObj;
@@ -1243,12 +1261,12 @@ OnError:
     return retVal;
 }
 
-GLvoid GL_APIENTRY __gles_GetBufferParameteri64v(__GLcontext *gc, GLenum target, GLenum pname, GLint64* params)
+GLvoid GL_APIENTRY __glim_GetBufferParameteri64v(__GLcontext *gc, GLenum target, GLenum pname, GLint64* params)
 {
     __glGetBufferParameteri64v(gc, target, pname, params);
 }
 
-GLvoid GL_APIENTRY __gles_GetBufferParameteriv(__GLcontext *gc, GLenum target, GLenum pname, GLint *params)
+GLvoid GL_APIENTRY __glim_GetBufferParameteriv(__GLcontext *gc, GLenum target, GLenum pname, GLint *params)
 {
     __GL_HEADER();
     if (params)
@@ -1266,7 +1284,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_GetBufferPointerv(__GLcontext *gc, GLenum target, GLenum pname, GLvoid **params)
+GLvoid GL_APIENTRY __glim_GetBufferPointerv(__GLcontext *gc, GLenum target, GLenum pname, GLvoid **params)
 {
     GLuint targetIndex;
     __GLbufferObject *bufObj;
@@ -1296,60 +1314,3 @@ OnError:
     return;
 }
 
-#if GL_OES_mapbuffer
-GLvoid GL_APIENTRY __gles_GetBufferPointervOES(__GLcontext *gc, GLenum target, GLenum pname, GLvoid** params)
-{
-    __gles_GetBufferPointerv(gc, target, pname, params);
-}
-
-GLvoid* GL_APIENTRY __gles_MapBufferOES(__GLcontext *gc, GLenum target, GLenum access)
-{
-    GLuint targetIndex;
-    __GLbufferObject *bufObj;
-    GLbitfield accessFlag = (GLbitfield)access;
-    void *result = gcvNULL;
-
-    __GL_HEADER();
-
-    __GL_GET_BUFFER_TARGET_INDEX(target, targetIndex);
-
-    if ((access != GL_WRITE_ONLY_OES) && (access != GL_MAP_BUFFER_OBJ_VIV))
-    {
-        /* Bitfield not defined */
-        __GL_ERROR_EXIT(GL_INVALID_VALUE);
-    }
-
-    /* map the enum GL_WRITE_ONLY_OES to es30 enum.*/
-    if(access == GL_WRITE_ONLY_OES)
-    {
-        accessFlag = GL_MAP_WRITE_BIT;
-    }
-
-    bufObj = __glGetBoundBufObj(gc, targetIndex);
-    if (!bufObj)
-    {
-        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-    }
-
-    if (bufObj->bufferMapped)
-    {
-        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-    }
-
-    result = (*gc->dp.mapBufferRange)(gc, bufObj, targetIndex, 0, bufObj->size, accessFlag);
-    if (gcvNULL == result)
-    {
-        __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
-    }
-    bufObj->accessOES = access;
-
-OnError:
-    __GL_FOOTER();
-    return result;
-}
-
-GLboolean GL_APIENTRY __gles_UnmapBufferOES(__GLcontext *gc, GLenum target)
-{
-    return __gles_UnmapBuffer(gc, target);
-}
-#endif

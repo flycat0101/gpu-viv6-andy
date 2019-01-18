@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -53,7 +53,6 @@ int GC2DParms::UpdateBusyStatus(gctBOOL clear)
 
         gcsHAL_INTERFACE halInterface;
         halInterface.command = gcvHAL_WRITE_DATA;
-        halInterface.engine  = gcvENGINE_RENDER;
         halInterface.u.WriteData.address = mFinishFlagPhys;
         halInterface.u.WriteData.data = mCommitCounter;
 
@@ -163,7 +162,6 @@ gceSTATUS GC2DParms::WaitForHW()
     /* Create a signal event. */
     gcsHAL_INTERFACE iface;
     iface.command            = gcvHAL_SIGNAL;
-    iface.engine             = gcvENGINE_RENDER;
     iface.u.Signal.signal    = gcmPTR_TO_UINT64(mStallSignal);
     iface.u.Signal.auxSignal = 0;
     iface.u.Signal.process   = gcmPTR_TO_UINT64(gcoOS_GetCurrentProcessID());

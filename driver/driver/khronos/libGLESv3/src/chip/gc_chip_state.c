@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1107,7 +1107,7 @@ gcChipSetTextureParameters(
     __GLcontext *gc,
     __GLtextureObject *tex,
     GLuint unit,
-    GLuint localMask
+    GLuint64 localMask
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
@@ -1125,7 +1125,7 @@ gcChipSetTextureParameters(
         GL_LINEAR,          /* gcvTEXTURE_LINEAR */
     };
 
-    gcmHEADER_ARG("gc=0x%x tex=0x%x unit=%u localMask=%u", gc, tex, unit, localMask);
+    gcmHEADER_ARG("gc=0x%x tex=0x%x unit=%u localMask=0x%llx", gc, tex, unit, localMask);
 
     if (tex == gcvNULL)
     {
@@ -1184,9 +1184,9 @@ gcChipSetTextureParameters(
         halTexture->swizzle[gcvTEXTURE_COMPONENT_A] = gcChipUtilConvertTexSwizzle(tex->params.swizzle[__GL_TEX_COMPONENT_A]);
     }
 
-    if (localMask & __GL_TEXPARAM_D_ST_TEXMODE_BIT)
+    if (localMask & __GL_TEXPARAM_DS_TEXMODE_BIT)
     {
-        halTexture->dsMode = gcChipUtilConvertDSMode(tex->params.depthStTexMode);
+        halTexture->dsMode = gcChipUtilConvertDSMode(tex->params.dsTexMode);
 
     }
 
@@ -1302,14 +1302,19 @@ gcChipSetTextureParameters(
         halTexture->compareFunc = gcChipUtilConvertCompareFunc(samplerStates->compareFunc);
     }
 
-    if (localMask & __GL_TEXPARAM_MAX_ANISTROPY_BIT)
+    if (localMask & __GL_TEXPARAM_MAX_ANISOTROPY_BIT)
     {
         halTexture->anisoFilter = __GL_MIN(gc->constants.maxAnistropic, gcoMATH_Float2UInt(samplerStates->maxAnistropy));
     }
 
     if (localMask & __GL_TEXPARAM_BORDER_COLOR_BIT)
     {
-        __GL_MEMCOPY(halTexture->borderColor, samplerStates->borderColor.fv, 4 * gcmSIZEOF(GLfloat));
+        if (__GL_MEMCMP(halTexture->borderColor, samplerStates->borderColor.fv, 4 * sizeof(GLfloat)))
+        {
+            __GL_MEMCOPY(halTexture->borderColor, samplerStates->borderColor.fv, 4 * gcmSIZEOF(GLfloat));
+            /* Border color change will cause desc node dirty.*/
+            halTexture->descDirty = gcvTRUE;
+        }
     }
 
     if (chipCtx->chipFeature.hwFeature.hasTxDescriptor)
@@ -1534,9 +1539,9 @@ gcChipValidateShader(
                 gcsHINT_PTR psHints = fsProgram->curPgInstance->programState.hints;
                 gctBOOL psReadZ   = psHints->useFragCoord[2];
                 gctBOOL psReadW   = psHints->useFragCoord[3];
-                gctBOOL hasMemoryAccess = (psHints->memoryAccessFlags[gcvPROGRAM_STAGE_FRAGMENT] & gceMA_FLAG_READ)
+                gctBOOL hasMemoryAccess = (psHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_FRAGMENT] & gceMA_FLAG_READ)
                                           ||
-                                          (psHints->memoryAccessFlags[gcvPROGRAM_STAGE_FRAGMENT] & gceMA_FLAG_WRITE);
+                                          (psHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_FRAGMENT] & gceMA_FLAG_WRITE);
 
                 gcmASSERT(fsProgram->curPgInstance->binaries[__GLSL_STAGE_FS]);
 
@@ -1671,7 +1676,6 @@ gcChipValidateProgramSamplersCB(
         if ((program->samplerMap[sampler].stage == __GLSL_STAGE_LAST) &&
             (pgInstance->extraSamplerMap[sampler].stage == __GLSL_STAGE_LAST))
         {
-            gcmONERROR(gcoTEXTURE_Disable(chipCtx->hal, sampler, gcvFALSE));
             continue;
         }
 
@@ -2075,8 +2079,8 @@ gcChipValidateTexture(
     {
         __GLtextureObject *tex;
         __GLbitmask unitMask = gc->texUnitAttrDirtyMask;
-        GLuint localMask;
-        GLint  unit = -1;
+        GLuint64 localMask;
+        GLint unit = -1;
 
         while (!__glBitmaskIsAllZero(&unitMask))
         {
@@ -2757,7 +2761,7 @@ gcChipSetDrawBuffers(
         chipCtx->drawDepthView.surf = dView->surf;
         chipCtx->drawDepthView.numSlices = dView->numSlices;
         chipDirty->uBuffer.sBuffer.zSurfDirty = GL_TRUE;
-        chipDirty->uDefer.sDefer.polygonOffset = GL_TRUE;
+        chipCtx->chipDirty.uDefer.sDefer.polygonOffset = GL_TRUE;
     }
 
     if ((chipCtx->drawStencilView.surf != sView->surf) ||
@@ -2938,7 +2942,7 @@ gcChipRecompileShader(
 
                 gcmONERROR(gcChipTexGetFormatInfo(gc, texObj, &txFormatInfo));
 
-                depthStencilMode = (texObj->params.depthStTexMode == GL_DEPTH_COMPONENT) ? gcvTRUE : gcvFALSE;
+                depthStencilMode = (texObj->params.dsTexMode == GL_DEPTH_COMPONENT) ? gcvTRUE : gcvFALSE;
 
                 if (!gcIsSameInputDirectiveExist(program->samplerMap[sampler].uniform,
                                                  (gctINT)program->samplerMap[sampler].arrayIndex,
@@ -3361,13 +3365,17 @@ gcChipRecompileEvaluateKeyStates(
             /* There are only 5 bits for sampler index, so the max sampler count is 32. */
             gctUINT32 maxSamplerCountForOneShader = 32;
 
+            if (program->masterPgInstance->programState.hints->unifiedStatus.samplerUnifiedMode != gcvUNIFORM_ALLOC_NONE_UNIFIED)
+            {
+                useUnifiedSampler = gcvTRUE;
+            }
+
             /* Get already used sampler count */
             for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
             {
                 if (program->masterPgInstance->binaries[stage])
                 {
                     gcmONERROR(gcSHADER_GetSamplerCount(program->masterPgInstance->binaries[stage], &numSamplers[stage]));
-                    useUnifiedSampler = (GetShaderSamplerAllocStrategy(program->masterPgInstance->binaries[stage]) != gcSHADER_ALLOC_STRATEGY_FIXED_ADDR_OFFSET);
                 }
             }
 
@@ -3452,7 +3460,7 @@ gcChipRecompileEvaluateKeyStates(
                     ) ||
                     (!(__glBitmaskTest(&shadowSamplerMask, sampler)) &&
                     (texFmt == gcvSURF_S8D32F_1_G32R32F) &&
-                    (texObj->params.depthStTexMode == GL_STENCIL_INDEX)
+                    (texObj->params.dsTexMode == GL_STENCIL_INDEX)
                     ) ||
                     (!chipCtx->chipFeature.hwFeature.extendIntSign &&
                     ((texFmt == gcvSURF_R8I) || (texFmt == gcvSURF_R16I)||
@@ -3470,7 +3478,7 @@ gcChipRecompileEvaluateKeyStates(
                     (texFmt == gcvSURF_D24S8) &&
                     !chipCtx->chipFeature.hwFeature.hasD24S8SampleStencil&&
                     (chipCtx->chipFeature.haltiLevel < __GL_CHIP_HALTI_LEVEL_3) &&
-                    (texObj->params.depthStTexMode == GL_STENCIL_INDEX)
+                    (texObj->params.dsTexMode == GL_STENCIL_INDEX)
                     ))
                 {
                     __GLSLStage stage = program->samplerMap[sampler].stage;
@@ -3790,7 +3798,7 @@ gcChipRecompileEvaluateKeyStates(
             gctBOOL drawYInverted = program->masterPgInstance->programState.hints->yInvertAware &&
                                     chipCtx->drawYInverted;
 
-            if ((drawYInverted != pgKeyState->staticKey->drawYInverted ) && (!gcoHAL_GetOption(gcvNULL, gcvOPTION_NO_Y_INVERT)))
+            if (drawYInverted != pgKeyState->staticKey->drawYInverted)
             {
                 pgKeyState->staticKey->drawYInverted = drawYInverted;
                 pgKeyDirty = GL_TRUE;

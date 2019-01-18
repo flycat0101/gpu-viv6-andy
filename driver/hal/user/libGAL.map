@@ -3,6 +3,7 @@
         gcoOS_*;
         gcoMATH_*;
         gcoHAL_*;
+        gcsHASH_*;
 
         gcoSURF_*;
         depr_gcoSURF_*;
@@ -37,8 +38,6 @@
         gcoPROFILER_*;
         gcfSTATISTICS_*;
 
-        gcoDUMP_*;
-        gcfDump*;
         gcfAddMemoryInfo*;
         gcfDelMemoryInfo*;
 

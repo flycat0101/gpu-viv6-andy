@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1023,7 +1023,7 @@ _GenVstoreCode(
                                 PolynaryExpr->exprBase.base.stringNo,
                                 &OperandsParameters[0].rOperands[0],
                                 lOperand,
-                                OperandsParameters[2].rOperands[0].dataType,
+                                OperandsParameters[0].rOperands[0].dataType,
                                 scaledIndex);
     if (gcmIS_ERROR(status)) return status;
 

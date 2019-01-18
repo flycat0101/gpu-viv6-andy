@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -82,16 +82,6 @@ label_set_jmp_n(
 }
 
 static gctBOOL
-label_set_jmp_neg2(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    return label_set_jmp_n(Context, Inst, Opnd, -2);
-}
-
-static gctBOOL
 label_set_jmp_neg5(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -99,16 +89,6 @@ label_set_jmp_neg5(
     )
 {
     return label_set_jmp_n(Context, Inst, Opnd, -5);
-}
-
-static gctBOOL
-label_set_jmp_neg7(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    return label_set_jmp_n(Context, Inst, Opnd, -7);
 }
 
 /* set current operand as constant 0.5. */
@@ -328,59 +308,9 @@ _dup1stParmAsNeg(
     IN VIR_Operand        *Opnd
     )
 {
-    VIR_Modifier modifer;
-
     _dup1stParm(Context, Inst, Opnd);
-    modifer = VIR_Operand_GetModifier(Opnd);
-    modifer |= VIR_MOD_NEG;
-    VIR_Operand_SetModifier(Opnd, modifer);
+    VIR_Operand_NegateOperand(Context->shader, Opnd);
 
-    return gcvTRUE;
-}
-
-static gctBOOL
-_dup1stParmSwizzleX(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd)
-{
-    _dup1stParm(Context, Inst, Opnd);
-    VIR_Operand_SetSwizzle(Opnd, VIR_Swizzle_Extract_Single_Channel_Swizzle(VIR_Operand_GetSwizzle(Opnd), VIR_CHANNEL_X));
-
-    return gcvTRUE;
-}
-
-static gctBOOL
-_dup1stParmSwizzleY(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd)
-{
-    _dup1stParm(Context, Inst, Opnd);
-    VIR_Operand_SetSwizzle(Opnd, VIR_Swizzle_Extract_Single_Channel_Swizzle(VIR_Operand_GetSwizzle(Opnd), VIR_CHANNEL_Y));
-
-    return gcvTRUE;
-}
-
-static gctBOOL
-_dup1stParmSwizzleZ(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd)
-{
-    _dup1stParm(Context, Inst, Opnd);
-    VIR_Operand_SetSwizzle(Opnd, VIR_Swizzle_Extract_Single_Channel_Swizzle(VIR_Operand_GetSwizzle(Opnd), VIR_CHANNEL_Z));
-    return gcvTRUE;
-}
-
-static gctBOOL
-_dup1stParmSwizzleW(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd)
-{
-    _dup1stParm(Context, Inst, Opnd);
-    VIR_Operand_SetSwizzle(Opnd, VIR_Swizzle_Extract_Single_Channel_Swizzle(VIR_Operand_GetSwizzle(Opnd), VIR_CHANNEL_W));
     return gcvTRUE;
 }
 
@@ -489,15 +419,11 @@ _setSourceNeg(
 {
     gctUINT srcIdx = VIR_Inst_GetSourceIndex(Inst, Opnd);
     VIR_Operand *src = gcvNULL;
-    VIR_Modifier modifer;
 
     gcmASSERT(srcIdx < VIR_MAX_SRC_NUM);
 
     src = VIR_Inst_GetSource(Inst, srcIdx);
-
-    modifer = VIR_Operand_GetModifier(src);
-    modifer |= VIR_MOD_NEG;
-    VIR_Operand_SetModifier(src, modifer);
+    VIR_Operand_NegateOperand(Context->shader, src);
 
     return gcvTRUE;
 }
@@ -1683,77 +1609,6 @@ _dupTexldModifierFrom3rdParm(
     return gcvTRUE;
 }
 
-static gctBOOL
-_isIntrinParam0Vec4(
-    IN VIR_PatternContext   *Context,
-    IN VIR_Instruction      *Inst)
-{
-    VIR_Operand             *pOpnd = VIR_Inst_GetSource(Inst, 1);
-    VIR_Operand             *vecOpnd;
-    VIR_ParmPassing         *parm;
-    VIR_TypeId               vecTypeId;
-    gcmASSERT(VIR_Operand_isParameters(pOpnd));
-
-    parm = VIR_Operand_GetParameters(pOpnd);
-    vecOpnd = parm->args[0];
-    vecTypeId = VIR_Operand_GetTypeId(vecOpnd);
-    if (!VIR_TypeId_isPacked(vecTypeId) && /* not support packed mode yet*/
-        VIR_GetTypeComponents(vecTypeId) == 4)
-    {
-        return gcvTRUE;
-    }
-
-    return gcvFALSE;
-}
-
-static gctBOOL
-_isIntrinParam0Vec3(
-    IN VIR_PatternContext   *Context,
-    IN VIR_Instruction      *Inst)
-{
-    VIR_Operand             *pOpnd = VIR_Inst_GetSource(Inst, 1);
-    VIR_Operand             *vecOpnd;
-    VIR_ParmPassing         *parm;
-    VIR_TypeId               vecTypeId;
-    gcmASSERT(VIR_Operand_isParameters(pOpnd));
-
-    parm = VIR_Operand_GetParameters(pOpnd);
-    vecOpnd = parm->args[0];
-    vecTypeId = VIR_Operand_GetTypeId(vecOpnd);
-
-    if (!VIR_TypeId_isPacked(vecTypeId) && /* not support packed mode yet*/
-        VIR_GetTypeComponents(vecTypeId) == 3)
-    {
-        return gcvTRUE;
-    }
-
-    return gcvFALSE;
-}
-
-static gctBOOL
-_isIntrinParam0Vec2(
-    IN VIR_PatternContext   *Context,
-    IN VIR_Instruction      *Inst)
-{
-    VIR_Operand             *pOpnd = VIR_Inst_GetSource(Inst, 1);
-    VIR_Operand             *vecOpnd;
-    VIR_ParmPassing         *parm;
-    VIR_TypeId               vecTypeId;
-    gcmASSERT(VIR_Operand_isParameters(pOpnd));
-
-    parm = VIR_Operand_GetParameters(pOpnd);
-    vecOpnd = parm->args[0];
-    vecTypeId = VIR_Operand_GetTypeId(vecOpnd);
-
-    if (!VIR_TypeId_isPacked(vecTypeId) && /* not support packed mode yet*/
-        VIR_GetTypeComponents(vecTypeId) == 2)
-    {
-        return gcvTRUE;
-    }
-
-    return gcvFALSE;
-}
-
 /* Construct the coord for 1DArray first, then calculate the coord. */
 static VIR_PatternMatchInst _intrinTexldPatInst0[] = {
     { VIR_OP_INTRINSIC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isIntrinSampler1DArray, _isCoordFloat }, VIR_PATN_MATCH_FLAG_AND },
@@ -1823,108 +1678,6 @@ static VIR_Pattern _intrinTexldpcfPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
-/* vecget instrinsic function param0 is vec4
-    vecget d1, vec4 src0, src1
-=>
-    t0 = src1->secondparameter
-    d1 = src0.x
-    jmpc label2, t0 == 1
-    jmpc label3, t0 == 2
-    jmpc lable4, t0 == 3
-label1:
-    d1 = src0.y
-    jmp label4
-label2:
-    d1 = src0.z
-    jmp label4
-label3:
-    d1 = src0.w
-label4:
-*/
-static VIR_PatternMatchInst _intrinVecGetPatInst0[] = {
-    { VIR_OP_INTRINSIC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isIntrinParam0Vec4 }, VIR_PATN_MATCH_FLAG_AND },
-};
-
-static VIR_PatternReplaceInst _intrinVecGetRepInst0[] = {
-    { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { 0, _dup2ndParm } },
-    { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleX } },
-    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntOne, 0 } },
-    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntTwo, 0 } },
-    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntThree, 0 } },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3 } }, /*label1*/
-    { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleY } },
-    { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg5 } }, /*label2*/
-    { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleZ } },
-    { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg7 } }, /*label3*/
-    { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleW } },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3_6_9 } }, /*label4*/
-};
-
-/* vecget instrinsic function param0 is vec3
-    vecget d1, vec3 src0, src1
-=>
-    t0 = src1->secondparameter
-    d1 = src0.x
-    jmpc label1, t0 == 1
-    jmpc label2, t0 == 2
-label1:
-    d1 = src0.y
-    jmp label3
-label2:
-    d1 = src0.z
-label3:
-*/
-static VIR_PatternMatchInst _intrinVecGetPatInst1[] = {
-    { VIR_OP_INTRINSIC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isIntrinParam0Vec3 }, VIR_PATN_MATCH_FLAG_AND },
-};
-
-static VIR_PatternReplaceInst _intrinVecGetRepInst1[] = {
-    { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { 0, _dup2ndParm } },
-    { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleX } },
-    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntOne, 0 } },
-    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntTwo, 0 } },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { label_set_jmp_neg2 } }, /*label1*/
-    { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleY } },
-    { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg4 } }, /*label2*/
-    { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleZ } },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3 } }, /*label3*/
-};
-
-/* vecget instrinsic function param0 is vec2
-    vecget d1, vec2 src0, src1
-=>
-    t0 = src1->secondparameter
-    jmpc label1, t0 == 1
-    d1 = src0.x
-    jmp label2;
-label1:
-    d1 = src0.y
-label2:
-*/
-static VIR_PatternMatchInst _intrinVecGetPatInst2[] = {
-    { VIR_OP_INTRINSIC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isIntrinParam0Vec2 }, VIR_PATN_MATCH_FLAG_AND },
-};
-
-static VIR_PatternReplaceInst _intrinVecGetRepInst2[] = {
-    { VIR_OP_MOV, 0, 0, { -1, 3, 0, 0 }, { 0, _dup2ndParm } },
-    { VIR_OP_JMPC, VIR_COP_EQUAL, 0, { 0, -1, 0, 0 }, { 0, VIR_Lower_SetOpndINT32, VIR_Lower_SetIntOne, 0 } },
-    { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleX } },
-    { VIR_OP_JMP, VIR_COP_ALWAYS, 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3 } }, /*label1*/
-    { VIR_OP_MOV, 0, 0, { 1, 3, 0, 0 }, { 0, _dup1stParmSwizzleY } },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3 } }, /*label2*/
-};
-
-static VIR_Pattern _intrinVecGetPattern[] = {
-    { VIR_PATN_FLAG_NONE, CODEPATTERN(_intrinVecGet, 0) },
-    { VIR_PATN_FLAG_NONE, CODEPATTERN(_intrinVecGet, 1) },
-    { VIR_PATN_FLAG_NONE, CODEPATTERN(_intrinVecGet, 2) },
-    { VIR_PATN_FLAG_NONE }
-};
-
 /* should synchronize with gc_vsc_vir_intrisic_kind.def.h */
 static VIR_Pattern* _intrisicPatterns[] = {
     gcvNULL, /* (NONE), */
@@ -1980,11 +1733,17 @@ static VIR_Pattern* _intrisicPatterns[] = {
     gcvNULL, /* evis_horz_max3 */
     gcvNULL, /* evis_horz_med3 */
     gcvNULL, /* evis_error */
-    gcvNULL, /* evis_bit_extract */
+    gcvNULL, /* bit_extract */
     gcvNULL, /* evis_dp16x1_b */
     gcvNULL, /* evis_dp8x2_b */
     gcvNULL, /* evis_dp4x4_b */
     gcvNULL, /* evis_dp2x8_b */
+    gcvNULL, /* evis_gather */
+    gcvNULL, /* evis_gather_b */
+    gcvNULL, /* evis_scatter */
+    gcvNULL, /* evis_scatter_b */
+    gcvNULL, /* evis_atomic_s */
+    gcvNULL, /* evis_atomic_s_b */
     gcvNULL, /* evis_end */
 
     /* common functions */
@@ -2140,8 +1899,10 @@ static VIR_Pattern* _intrisicPatterns[] = {
     /* Image-related functions. */
     gcvNULL, /* (imageStore) */
     gcvNULL, /* (imageLoad) */
+    gcvNULL, /* imageStore_3d */
+    gcvNULL, /* imageLoad_3d */
 
-    _intrinVecGetPattern, /* vecGet (get a componet from a vec), link from lib */
+    gcvNULL, /* vecGet (get a componet from a vec), link from lib */
     gcvNULL, /* vecSet (set a componet to a vec), link from lib */
 
     gcvNULL, /* add carry */
@@ -2152,13 +1913,14 @@ static VIR_Pattern* _intrisicPatterns[] = {
     gcvNULL, /* F32ToF16 */
     gcvNULL, /* quantizeToF16 */
 
-    gcvNULL, /* image fetch */
-    gcvNULL, /* image fetch for sampler */
-    gcvNULL, /* image address */
+    gcvNULL, /* image_fetch */
+    gcvNULL, /* image_fetch for sampler */
+    gcvNULL, /* image_address */
     gcvNULL, /* image_query_format */
     gcvNULL, /* image_query_order */
     gcvNULL, /* image_query_size_lod */
     gcvNULL, /* image_query_size */
+    gcvNULL, /* image_query_size_for_sampler */
     _intrinQueryLodPattern, /* image_query_lod */
     _intrinQueryLevelsPattern, /* image_query_levels */
     _intrinQuerySamplesPattern, /* image_query_samples */
@@ -2166,6 +1928,7 @@ static VIR_Pattern* _intrisicPatterns[] = {
     gcvNULL, /* image_get_height */
     gcvNULL, /* image_get_depth */
     gcvNULL, /* image_get_array_size */
+    gcvNULL, /* image_get_type */
 
     _intrinTexldPattern, /* texld */
     _intrinTexldpcfPattern, /* texldpcf */
@@ -2468,7 +2231,7 @@ _processEvisIntrinsic(
     VIR_Operand  *    src0 = VIR_Inst_GetSource(pInst, 0);
     VIR_Operand  *    src1 = VIR_Inst_GetSource(pInst, 1);
     VIR_OpCode        opCode = VIR_OP_NOP;
-    gctBOOL           isVX2 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_EVIS_VX2);
+    gctBOOL           isVX2 = gcHWCaps.hwFeatureFlags.supportEVISVX2;
     gctUINT           i;
     VIR_ParmPassing * argList;
     gctINT            evisSrcNo;
@@ -2578,6 +2341,24 @@ _processEvisIntrinsic(
     case VIR_IK_evis_dp2x16_b:
         opCode = VIR_OP_VX_DP2X16_B;
         break;
+    case VIR_IK_evis_gather:
+        opCode = VIR_OP_VX_GATHER;
+        break;
+    case VIR_IK_evis_gather_b:
+        opCode = VIR_OP_VX_GATHER_B;
+        break;
+    case VIR_IK_evis_scatter:
+        opCode = VIR_OP_VX_SCATTER;
+        break;
+    case VIR_IK_evis_scatter_b:
+        opCode = VIR_OP_VX_SCATTER_B;
+        break;
+    case VIR_IK_evis_atomic_s:
+        opCode = VIR_OP_VX_ATOMIC_S;
+        break;
+    case VIR_IK_evis_atomic_s_b:
+        opCode = VIR_OP_VX_ATOMIC_S_B;
+        break;
     case VIR_IK_evis_img_load:
         opCode = VIR_OP_VX_IMG_LOAD;
         break;
@@ -2641,6 +2422,10 @@ _processEvisIntrinsic(
     case VIR_IK_evis_error:
         opCode = VIR_OP_ERROR;
         break;
+
+    case VIR_IK_bit_extract:
+        opCode = VIR_OP_BITEXTRACT;
+        break;
     default:
         gcmASSERT(gcvFALSE);
         break;
@@ -2658,28 +2443,63 @@ _processEvisIntrinsic(
         VIR_Operand * arg = argList->args[i];
         VIR_Inst_SetSource(pInst, i, arg);
         /* change the immediate to EvisModifier for EVIS inst if it is modifier operand */
-        if (VIR_OPCODE_isVXOnly(opCode))
+        if (VIR_OPCODE_isVX(opCode))
         {
             int evisSrcNo = VIR_OPCODE_EVISModifier_SrcNo(opCode);
             /* VIR_OP_VX_IADD can have two sources and three sources, if the src2 is 0
              * make sure it is supported type  */
-            if (opCode == VIR_OP_VX_IADD && i == 2 && VIR_Operand_isValueZero(pShader, VIR_Inst_GetSource(pInst, i)))
+            if (opCode == VIR_OP_VX_IADD && i == 2 && VIR_Operand_isValueZero(pShader, arg))
             {
-                VIR_Operand_SetTypeId(VIR_Inst_GetSource(pInst, i),
-                                    VIR_Operand_GetTypeId(VIR_Inst_GetSource(pInst, 0)));
+                VIR_Operand_SetTypeId(arg, VIR_Operand_GetTypeId(VIR_Inst_GetSource(pInst, 0)));
             }
             gcmASSERT(evisSrcNo >= 0 && (gctUINT)evisSrcNo < VIR_Inst_GetSrcNum(pInst));
 
             if (evisSrcNo == (int)i)
             {
                 /* set newSrc to EVISModifier operand */
-                VIR_Operand_SetOpKind(VIR_Inst_GetSource(pInst, i), VIR_OPND_EVIS_MODIFIER);
+                gctUINT evisModifier;
+                if (VIR_Operand_GetOpKind(arg) !=  VIR_OPND_IMMEDIATE)
+                {
+                    fprintf(stderr, "Error: EVIS Modifier must be an immediate number.\n");
+                    return VSC_ERR_INVALID_ARGUMENT;
+                }
+                evisModifier = VIR_Operand_GetImmediateUint(arg);
+                VIR_Operand_SetEvisModifier(arg, evisModifier);
+                VIR_Operand_SetOpKind(arg, VIR_OPND_EVIS_MODIFIER);
             }
             else if ((opCode == VIR_OP_VX_IMG_LOAD || opCode == VIR_OP_VX_IMG_LOAD_3D) && i == 2)
             {
                 /* check img_load offset operand */
-                VIR_Operand * opnd = VIR_Inst_GetSource(pInst, i);
-                VIR_IMG_LOAD_SetImmOffset(pShader, pInst,opnd, gcvTRUE /* encoded */);
+                VIR_IMG_LOAD_SetImmOffset(pShader, pInst, arg, gcvTRUE /* encoded */);
+            }
+            else if (i == 0 && (opCode == VIR_OP_VX_IMG_LOAD || opCode == VIR_OP_VX_IMG_LOAD_3D ||
+                                opCode == VIR_OP_VX_IMG_STORE || opCode == VIR_OP_VX_IMG_STORE_3D))
+            {
+                VIR_Operand * opnd = arg;
+                VIR_Symbol    *sym;
+
+                sym = VIR_Operand_GetSymbol(opnd);
+                /* Change source type to associated image variable */
+                if (sym && VIR_Symbol_GetKind(sym) == VIR_SYM_VIRREG && VIR_Symbol_GetVregVariable(sym))
+                {
+                    VIR_TypeId typeId;
+
+                    sym = VIR_Symbol_GetVregVariable(sym); /* sym corresponding to variable */
+
+                    typeId = VIR_Symbol_GetTypeId(sym);
+                    if(VIR_TypeId_isImage(typeId) || VIR_TypeId_isImageT(typeId))
+                    {
+                        gctUINT typeSize = VIR_GetTypeSize(typeId);
+                        VIR_PrimitiveTypeId  format;
+                        gctUINT components;
+                        format = VIR_GetTypeComponentType(typeId);
+                        components = typeSize / VIR_GetTypeSize(format),
+                        typeId = VIR_TypeId_ComposeNonOpaqueType(format,
+                                                                 components,
+                                                                 1);
+                        VIR_Operand_SetTypeId(opnd, typeId);
+                    }
+                }
             }
         }
     }
@@ -2724,19 +2544,19 @@ _processEvisIntrinsic(
             val = VIR_Operand_GetImmediateUint(modifier);
             switch (val) {
             case ERROR_DP2x16_NOT_SUPPORTED:
-                fprintf(stderr, "Error: VXC_DP2x16() is not supported");
+                fprintf(stderr, "Error: VXC_DP2x16() is not supported.\n");
                 break;
             case ERROR_IADD_NOT_SUPPORTED:
-                fprintf(stderr, "Error: VXC_IAdd() is not supported");
+                fprintf(stderr, "Error: VXC_IAdd() is not supported.\n");
                 break;
             case ERROR_SELECTADD_NOT_SUPPORTED:
-                fprintf(stderr, "Error: VXC_SelectAdd() is not supported");
+                fprintf(stderr, "Error: VXC_SelectAdd() is not supported.\n");
                 break;
             case ERROR_BITREPLACE_NOT_SUPPORTED:
-                fprintf(stderr, "Error: VXC_BitReplace() is not supported");
+                fprintf(stderr, "Error: VXC_BitReplace() is not supported.\n");
                 break;
             default:
-                fprintf(stderr, "Error: unknown VXC operator is not supported");
+                fprintf(stderr, "Error: unknown VXC operator is not supported.\n");
                 break;
             }
         }
@@ -2749,7 +2569,7 @@ _processEvisIntrinsic(
         endBin   =  VXC_GET_END_BIN(val);
         if (endBin - startBin >= 7)
         {
-            fprintf(stderr, "Error: %s [StartBin:%d, EndBin:%d] using more than 7 bins is not supported",
+            fprintf(stderr, "Error: %s [StartBin:%d, EndBin:%d] using more than 7 bins is not supported.\n",
                             VIR_OPCODE_GetName(VIR_Inst_GetOpcode(pInst)), startBin, endBin);
             return VSC_ERR_NOT_SUPPORTED;
         }
@@ -2762,7 +2582,7 @@ _processEvisIntrinsic(
         endBin   =  VXC_GET_END_BIN(val);
         if (endBin - startBin >= 8)
         {
-            fprintf(stderr, "Error: %s [StartBin:%d, EndBin:%d] using more than 8 bins is not supported",
+            fprintf(stderr, "Error: %s [StartBin:%d, EndBin:%d] using more than 8 bins is not supported.\n",
                             VIR_OPCODE_GetName(VIR_Inst_GetOpcode(pInst)), startBin, endBin);
             return VSC_ERR_NOT_SUPPORTED;
         }
@@ -2775,7 +2595,7 @@ _processEvisIntrinsic(
         switch (opCode) {
         case VIR_OP_VX_SELECTADD:
         case VIR_OP_VX_DP2X16:
-            fprintf(stderr, "Error: opcode %s is not supported in VX2", VIR_OPCODE_GetName(opCode));
+            fprintf(stderr, "Error: opcode %s is not supported in VX2.\n", VIR_OPCODE_GetName(opCode));
             return VSC_ERR_NOT_SUPPORTED;
         case VIR_OP_VX_IACCSQ:
             /* IAccSQ will only support up to 8 outputs*/
@@ -2785,7 +2605,7 @@ _processEvisIntrinsic(
             endBin   =  VXC_GET_END_BIN(val);
             if (endBin - startBin >= 8)
             {
-                fprintf(stderr, "Error: %s [StartBin:%d, EndBin:%d] using more than 8 bins is not supported in VX2",
+                fprintf(stderr, "Error: %s [StartBin:%d, EndBin:%d] using more than 8 bins is not supported in VX2.\n",
                                 VIR_OPCODE_GetName(VIR_Inst_GetOpcode(pInst)), startBin, endBin);
                 return VSC_ERR_NOT_SUPPORTED;
             }
@@ -2798,7 +2618,7 @@ _processEvisIntrinsic(
             endBin   =  VXC_GET_END_BIN(val);
             if (endBin - startBin >= 7)
             {
-                fprintf(stderr, "Error: %s [StartBin:%d, EndBin:%d] using more than 7 bins is not supported in VX2",
+                fprintf(stderr, "Error: %s [StartBin:%d, EndBin:%d] using more than 7 bins is not supported in VX2.\n",
                                 VIR_OPCODE_GetName(VIR_Inst_GetOpcode(pInst)), startBin, endBin);
                 return VSC_ERR_NOT_SUPPORTED;
             }
@@ -2818,7 +2638,7 @@ _processEvisIntrinsic(
             endBin   =  VXC_GET_END_BIN(val);
             if (endBin - startBin >= 8)
             {
-                fprintf(stderr, "Error: %s [StartBin:%d, EndBin:%d] using more than 8 bins is not supported",
+                fprintf(stderr, "Error: %s [StartBin:%d, EndBin:%d] using more than 8 bins is not supported.\n",
                                 VIR_OPCODE_GetName(VIR_Inst_GetOpcode(pInst)), startBin, endBin);
                 return VSC_ERR_NOT_SUPPORTED;
             }
@@ -2830,27 +2650,27 @@ _processEvisIntrinsic(
         case VIR_OP_VX_HORZMIN3:
         case VIR_OP_VX_HORZMAX3:
         case VIR_OP_VX_HORZMED3:
-            fprintf(stderr, "Error: VX2 opcode %s is not supported in non-VX2 chip", VIR_OPCODE_GetName(opCode));
+            fprintf(stderr, "Error: VX2 opcode %s is not supported in non-VX2 chip.\n", VIR_OPCODE_GetName(opCode));
             return VSC_ERR_NOT_SUPPORTED;
         default:
             break;
         }
     }
 
-    if (opCode == VIR_OP_VX_DP16X1_B ||
-        opCode == VIR_OP_VX_DP8X2_B  ||
-        opCode == VIR_OP_VX_DP4X4_B  ||
-        opCode == VIR_OP_VX_DP2X8_B  ||
-        opCode == VIR_OP_VX_DP32X1_B ||
-        opCode == VIR_OP_VX_DP16X2_B ||
-        opCode == VIR_OP_VX_DP8X4_B  ||
-        opCode == VIR_OP_VX_DP4X8_B  ||
-        opCode == VIR_OP_VX_DP2X16_B)
+    /* Check temp 256 register pair. */
+    if (VIR_OPCODE_Src0Src1Temp256(opCode))
     {
         /* set the src0 to be higher part of temp 256 register pair */
         VIR_Operand_SetFlag(VIR_Inst_GetSource(pInst, 0), VIR_OPNDFLAG_TEMP256_HIGH);
         /* set the src1 to be lower part of temp 256 register pair */
         VIR_Operand_SetFlag(VIR_Inst_GetSource(pInst, 1), VIR_OPNDFLAG_TEMP256_LOW);
+    }
+    else if (VIR_OPCODE_Src1Src2Temp256(opCode))
+    {
+        /* set the src0 to be higher part of temp 256 register pair */
+        VIR_Operand_SetFlag(VIR_Inst_GetSource(pInst, 1), VIR_OPNDFLAG_TEMP256_HIGH);
+        /* set the src1 to be lower part of temp 256 register pair */
+        VIR_Operand_SetFlag(VIR_Inst_GetSource(pInst, 2), VIR_OPNDFLAG_TEMP256_LOW);
     }
 
 OnError:
@@ -2910,6 +2730,178 @@ OnError:
 }
 
 /*********** At Middle Level Process intrinsics *************/
+static VIR_Instruction *
+_handleParamChain(
+    IN VIR_Shader         *Shader,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VSC_ErrCode     errCode = VSC_ERR_NONE;
+    VIR_Function    *curFunction = VIR_Inst_GetFunction(Inst);
+    VIR_Instruction *curParamChianHead = Inst;
+    VIR_Instruction *nextInst = VIR_Inst_GetNext(Inst);
+    VIR_Operand * src0;
+    VIR_Operand * src1;
+    VIR_Operand * opnd = gcvNULL;
+    VIR_ParmPassing *parm;
+    VIR_Instruction * newInst =gcvNULL;
+    gctUINT allocSize;
+
+    gcmASSERT(VIR_Inst_GetOpcode(Inst) == VIR_OP_PARAM_CHAIN );
+
+    for (curParamChianHead = Inst, nextInst = VIR_Inst_GetNext(Inst);
+         nextInst != gcvNULL; nextInst = VIR_Inst_GetNext(nextInst))
+    {
+        VIR_Operand * dest = VIR_Inst_GetDest(curParamChianHead);
+        gctUINT i;
+        gcmASSERT(VIR_Operand_isSymbol(dest));
+        /* find next parameter chain or the user of the chain, now it's only VIR_OP_INTRINSIC */
+        if (!(VIR_Inst_GetOpcode(nextInst) == VIR_OP_PARAM_CHAIN ||
+              VIR_Inst_GetOpcode(nextInst) == VIR_OP_INTRINSIC))
+        {
+            continue;
+        }
+
+        /* find if there is a user of curParamChianHead's dest */
+        for (opnd = gcvNULL, i = 0; i < VIR_Inst_GetSrcNum(nextInst); i++)
+        {
+            VIR_Operand * src;
+            /* check if source[i] using curParamChianHead's dest */
+            src = VIR_Inst_GetSource(nextInst, i);
+            if (VIR_Operand_isSymbol(src) &&
+                VIR_Operand_GetSymbol(dest) == VIR_Operand_GetSymbol(src))
+            {
+                opnd = src;
+                break;
+            }
+        }
+        if (opnd == gcvNULL)
+        {
+            /* user not found */
+            if (VIR_Inst_GetOpcode(nextInst) == VIR_OP_PARAM_CHAIN)
+            {
+                nextInst = _handleParamChain(Shader, nextInst);
+
+                if (newInst == gcvNULL)
+                {
+                    newInst = nextInst;
+                }
+            }
+            continue;
+        }
+
+        gcmASSERT(VIR_Operand_isSymbol(opnd) && VIR_Operand_isSymbol(VIR_Inst_GetDest(curParamChianHead)));
+        src0 = VIR_Inst_GetSource(curParamChianHead, 0);
+        src1 = VIR_Inst_GetSource(curParamChianHead, 1);
+        /* check if curParamChianHead has parameter list in its source */
+        if (VIR_Operand_isParameters(src0) || VIR_Operand_isParameters(src1))
+        {
+            VIR_Operand * src;
+            /* merge the new parameter to the parameter list */
+            parm = VIR_Operand_isParameters(src0) ? VIR_Operand_GetParameters(src0)
+                                                  : VIR_Operand_GetParameters(src1);
+            errCode = VIR_Function_DupOperand(curFunction,
+                                              VIR_Operand_isParameters(src0) ? src1 : src0,
+                                              &src);
+            if (errCode != VSC_ERR_NONE)
+            {
+                return gcvNULL;
+            }
+            gcmASSERT(!VIR_Operand_isParameters(src));
+
+            /* reallocate to parm->argNum+1 */
+            allocSize = sizeof(VIR_ParmPassing) + parm->argNum * sizeof (VIR_Operand *);
+            parm = (VIR_ParmPassing *)vscMM_Realloc(&Shader->pmp.mmWrapper, parm, allocSize);
+
+            if (parm == gcvNULL)
+            {
+                return gcvNULL;
+            }
+            else
+            {
+                /* merge the last parameter to parameter list */
+                parm->args[parm->argNum] = src;
+                parm->argNum++;
+            }
+            /* reset parameters in original operand */
+            if (VIR_Operand_isParameters(src0))
+            {
+                VIR_Operand_SetParameters(src0, gcvNULL);
+            }
+            else
+            {
+                VIR_Operand_SetParameters(src1, gcvNULL);
+            }
+        }
+        else
+        {
+            /* create a new VIR_ParmPassing */
+
+            /* VIR_ParmPassing size: init to 5 parameters */
+            allocSize = sizeof(VIR_ParmPassing) + 4 * sizeof (VIR_Operand *);
+            parm = (VIR_ParmPassing *)vscMM_Alloc(&Shader->pmp.mmWrapper, allocSize);
+
+            if (parm == gcvNULL)
+            {
+                return gcvNULL;
+            }
+            else
+            {
+                parm->argNum = 2;
+                VIR_Function_DupOperand(curFunction, src0, &parm->args[0]);
+                VIR_Function_DupOperand(curFunction, src1, &parm->args[1]);
+            }
+        }
+        /* set parameters to new operand */
+        VIR_Operand_SetParameters(opnd, parm);
+
+        /* delete the curParamChianHead */
+        VIR_Function_RemoveInstruction(curFunction, curParamChianHead);
+        curParamChianHead = nextInst;
+        if (VIR_Inst_GetOpcode(nextInst) == VIR_OP_INTRINSIC)
+        {
+            if (newInst == gcvNULL)
+            {
+                newInst = nextInst;
+                break;
+            }
+        }
+    }
+    return newInst;
+}
+
+static VSC_ErrCode
+_makeParamChain(
+    IN VIR_Shader         *Shader,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_Operand * src1;
+    VIR_ParmPassing *parm;
+    gctUINT allocSize;
+
+    src1 = VIR_Inst_GetSource(Inst, 1);
+    gcmASSERT(!VIR_Operand_isParameters(src1));
+
+    /* create a new VIR_ParmPassing */
+    /* VIR_ParmPassing size: init to 5 parameters */
+    allocSize = sizeof(VIR_ParmPassing) + 4 * sizeof (VIR_Operand *);
+    parm = (VIR_ParmPassing *)vscMM_Alloc(&Shader->pmp.mmWrapper, allocSize);
+
+    if (parm == gcvNULL)
+    {
+        return VSC_ERR_INVALID_DATA;
+    }
+    else
+    {
+        parm->argNum = 1;
+        VIR_Function_DupOperand(VIR_Inst_GetFunction(Inst), src1, &parm->args[0]);
+    }
+    /* set parameters to new operand */
+    VIR_Operand_SetParameters(src1, parm);
+
+    return VSC_ERR_NONE;
+}
 
 VSC_ErrCode
 VIR_Lower_MiddleLevel_Process_Intrinsics(
@@ -2927,16 +2919,48 @@ VIR_Lower_MiddleLevel_Process_Intrinsics(
          func_node != gcvNULL;
          func_node = VIR_FuncIterator_Next(&func_iter))
     {
-        VIR_InstIterator            inst_iter;
         VIR_Instruction             *inst;
 
         func = func_node->function;
 
-        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
-        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+        for (inst = VIR_Function_GetInstStart(func);
              inst != gcvNULL;
-             inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+             inst = VIR_Inst_GetNext(inst))
+        {
+            /* process parameter chain:
+             *   1. find all instructions in the parameter chain
+             *   2. find the intrinsic instruction and put all the
+             *       parameters in the chain into instrinsic instruction
+             * Note:
+             *   there should exactly one use of each VIR_OP_PARAM_CHAIN's
+             *   dest, and tail of parameter chain should consumed by known
+             *   parameter chain consumers. Currenly the consumers are:
+             *     1. VIR_OP_INTRINSIC
+             */
+            if (VIR_Inst_GetOpcode(inst) == VIR_OP_PARAM_CHAIN)
+            {
+                inst = _handleParamChain(Shader, inst);
+
+                if (!(inst && VIR_Inst_GetOpcode(inst) == VIR_OP_INTRINSIC))
                 {
+                    ON_ERROR0(VSC_ERR_INVALID_DATA);
+                }
+            }
+            /* Sometimes the source1 of INTRINSIC instruction is not a parameter chain(if there is only one parameter, then the source1 may not be a chain),
+            ** in this case, we need to make one.
+            ** TODO: maybe we can fix this in FE to generate the paramter chain even for a one parameter,
+            */
+            else if (VIR_Inst_GetOpcode(inst) == VIR_OP_INTRINSIC)
+            {
+                VIR_Operand * src1 = VIR_Inst_GetSource(inst, 1);
+
+                if (!VIR_Operand_isParameters(src1))
+                {
+                    ON_ERROR0(_makeParamChain(Shader, inst));
+                }
+            }
+
+
             if (VIR_Inst_GetOpcode(inst) == VIR_OP_INTRINSIC)
             {
                 VIR_Operand *   src0 = VIR_Inst_GetSource(inst, 0);
@@ -2988,6 +3012,54 @@ VIR_Lower_MiddleLevel_Process_Intrinsics(
 
                     case VIR_IK_bitinsert:
                         opCode = VIR_OP_BITINSERT;
+                        break;
+
+                    case VIR_IK_image_load:
+                        opCode = VIR_OP_IMG_READ;
+                        break;
+
+                    case VIR_IK_image_load_3d:
+                        opCode = VIR_OP_IMG_READ_3D;
+                        break;
+
+                    case VIR_IK_image_store:
+                        opCode = VIR_OP_IMG_WRITE;
+                        break;
+
+                    case VIR_IK_image_store_3d:
+                        opCode = VIR_OP_IMG_WRITE_3D;
+                        break;
+
+                    case VIR_IK_image_query_format:
+                        opCode = VIR_OP_IMG_FORMAT;
+                        break;
+
+                    case VIR_IK_image_query_order:
+                        opCode = VIR_OP_IMG_ORDER;
+                        break;
+
+                    case VIR_IK_image_query_width:
+                        opCode = VIR_OP_IMG_WIDTH;
+                        break;
+
+                    case VIR_IK_image_query_height:
+                        opCode = VIR_OP_IMG_HEIGHT;
+                        break;
+
+                    case VIR_IK_image_query_depth:
+                        opCode = VIR_OP_IMG_DEPTH;
+                        break;
+
+                    case VIR_IK_image_query_array_size:
+                        opCode = VIR_OP_IMG_ARRAY_SIZE;
+                        break;
+
+                    case VIR_IK_image_query_type:
+                        opCode = VIR_OP_IMG_TYPE;
+                        break;
+
+                    case VIR_IK_image_query_size:
+                        opCode = VIR_OP_IMG_DIM;
                         break;
 
                     default:

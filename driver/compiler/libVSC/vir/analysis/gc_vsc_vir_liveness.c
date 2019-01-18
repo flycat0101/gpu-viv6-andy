@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -221,9 +221,6 @@ static void _Update_Liveness_Local_Gen(VIR_DEF_USAGE_INFO* pDuInfo,
         }
     }
 
-    /* A WAR to fix an issue introduced by mova + ldarr seq.
-       !!!TODO: We should support mova + Rb[Ro.single_channel] in MC level, and remove mova + ldarr
-                and mova + starr seq */
     if (pUsage)
     {
         VIR_DEF*         pDef = gcvNULL;
@@ -454,7 +451,6 @@ static void _Liveness_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS
     gctUINT8               halfChannelMask;
     gctBOOL                bIndexing;
     VSC_STATE_VECTOR       localHalfChannelKillFlow;
-    VIR_OpCode             opcode;
 
     /* 4 states we are using:
        VIR_HALF_CHANNEL_MASK_NONE (0),
@@ -477,14 +473,10 @@ static void _Liveness_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS
                                             gcvNULL,
                                             &bIndexing))
         {
-            opcode = VIR_Inst_GetOpcode(pInst);
-
-            /* Since almost all indexings are located inside of loop, and for loop, we can
-               not kill indexing dsts because they are potentially killed, not definitely
-               killed. So to be easy, we dont kill all indexings now! */
-            if (!bIndexing &&
-                !VIR_Inst_ConditionalWrite(pInst) &&
-                !VIR_OPCODE_DestOnlyUseEnable(opcode))
+            if (
+                /* For dynamic indexing, add all to killSet to avoid the usage in the inflow set of Function */
+                /*!bIndexing &&*/
+                vscVIR_IsInstDefiniteWrite(pDuInfo, pInst, firstRegNo, gcvTRUE))
             {
                 _Update_Liveness_Local_Kill(pDuInfo,
                                             pGenFlow,
@@ -588,7 +580,7 @@ static gctBOOL _Liveness_Iterate_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BL
     VSC_BIT_VECTOR         tmpFlow;
     gctBOOL                bChanged = gcvFALSE;
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
+    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
 
     /* In = Gen U (Out - Kill) */
     vscBV_Minus2(&tmpFlow, pOutFlow, pKillFlow);
@@ -621,7 +613,7 @@ static gctBOOL _Liveness_Combine_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BL
         return gcvFALSE;
     }
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
+    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
 
     /* Out = U all-succ-Ins */
     VSC_ADJACENT_LIST_ITERATOR_INIT(&succEdgeIter, &pBasicBlock->dgNode.succList);
@@ -658,7 +650,7 @@ static gctBOOL _Liveness_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA
 
     gcmASSERT(pBasicBlock->flowType == VIR_FLOW_TYPE_CALL);
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
+    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
 
 #if ENABLE_AGGRESSIVE_IPA_LIVENESS
     /* U flow that not flows into callee and in flow of callee */
@@ -691,7 +683,7 @@ static gctBOOL _Liveness_Func_Flow_Combine_From_Callers_Resolver(VIR_BASE_TS_DFA
     VSC_BIT_VECTOR               tmpFlow;
     gctBOOL                      bChanged = gcvFALSE;
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
+    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
 
 #if ENABLE_AGGRESSIVE_IPA_LIVENESS
     vscBV_SetAll(&tmpFlow);

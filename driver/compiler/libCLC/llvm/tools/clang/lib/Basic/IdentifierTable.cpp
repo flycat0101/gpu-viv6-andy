@@ -206,7 +206,7 @@ void IdentifierTable::PrintStats() const {
   unsigned AverageIdentifierSize = 0;
   unsigned MaxIdentifierLength = 0;
 
-  // TODO: Figure out maximum times an identifier had to probe for -stats.
+  // VIV:TODO: Figure out maximum times an identifier had to probe for -stats.
   for (llvm::StringMap<IdentifierInfo*, llvm::BumpPtrAllocator>::const_iterator
        I = HashTable.begin(), E = HashTable.end(); I != E; ++I) {
     unsigned IdLen = I->getKeyLength();

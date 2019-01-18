@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2018 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -350,6 +350,7 @@ vdkGetAddress(
 #define VDK_CONFIG_RGB565_AA        ((const EGLint *) 21)
 #define VDK_CONFIG_RGB888_AA        ((const EGLint *) 23)
 #define VDK_CONFIG_RGB888_D16_GL    ((const EGLint *) 24)
+
 
 /* OpenVG Configurations. */
 #define VDK_CONFIG_RGB565_VG        ((const EGLint *) 500)

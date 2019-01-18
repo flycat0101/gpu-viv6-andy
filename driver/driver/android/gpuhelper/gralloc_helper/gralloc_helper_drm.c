@@ -249,19 +249,12 @@ static int create_vivante_drm_buffer_surface(buffer_handle_t handle,
     surface->node.pool          = pool;
     surface->node.size          = size; /* ??? */
 
-    /* shared mutex, for what? */
-    gcmONERROR(gcoOS_CreateMutex(gcvNULL,
-                                 &surface->node.sharedMutex));
-
 #if gcdENABLE_3D
     if (tsNode != 0)
     {
         surface->tileStatusNode.u.normal.node = tsNode;
         surface->tileStatusNode.pool          = pool; /* ??? */
         surface->tileStatusNode.size          = size >> 8; /* ??? */
-
-        gcmONERROR(gcoOS_CreateMutex(gcvNULL,
-                                     &surface->tileStatusNode.sharedMutex));
     }
 #endif
 
@@ -452,16 +445,12 @@ static int pop_vivante_drm_buffer_status(
 static int pop_generic_drm_buffer_status(buffer_handle_t handle,
                 gcoSURF surface, uint64_t *pTimeStamp)
 {
-    uint64_t timeStamp = 0;
-
     (void)handle;
     (void)surface;
 
     if (pTimeStamp)
-    {
-        timeStamp = *pTimeStamp;
-        *pTimeStamp = timeStamp++;
-    }
+        (*pTimeStamp)++;
+
     return 0;
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -682,8 +682,7 @@ GLvoid __glLoadPackModes(__GLcontext *gc, __GLpixelSpanInfo *spanInfo)
 ** Internal image processing routine.  Used by GetTexImage to transfer from
 ** internal texture image to the user.  Used by TexImage[12]D to transfer
 ** from the user to internal texture.  Used for display list optimization of
-** textures and DrawPixels. Used by GetColorTable, GetConvolutionFilter,
-** GetSeparableFilter, GetHistogram, GetMinmax, GetPolygonStipple,
+** textures and DrawPixels.
 **
 ** This routine also supports the pixel format mode __GL_RED_ALPHA which is
 ** basically a 2 component texture.

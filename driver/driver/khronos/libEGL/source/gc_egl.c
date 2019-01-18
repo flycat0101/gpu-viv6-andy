@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -32,8 +32,8 @@ static gctCONST_STRING _dispatchNames[] =
     "GLES_CM_DISPATCH_TABLE",           /* OpenGL ES 1.1 Common */
     "GLESv2_DISPATCH_TABLE",            /* OpenGL ES 2.0 */
     "GLESv2_DISPATCH_TABLE",            /* OpenGL ES 3.0 */
-    "OpenVG_DISPATCH_TABLE",            /* OpenVG 1.0 */
     "GL_DISPATCH_TABLE",                /* OpenGL */
+    "OpenVG_DISPATCH_TABLE",            /* OpenVG 1.0 */
 };
 #endif
 #endif
@@ -304,11 +304,6 @@ veglGetThreadData(
 
 #if gcdGC355_MEM_PRINT
         thread->fbMemSize         = 0;
-#endif
-
-#if veglUSE_HAL_DUMP
-        /* Get the gcoDUMP object. */
-        gcmONERROR(gcoHAL_GetDump(thread->hal, &thread->dump));
 #endif
 
         /* Initialize client dispatch tables. */
@@ -1077,7 +1072,23 @@ EGLBoolean LOG_eglSignalSyncKHR(EGLDisplay dpy, EGLSyncKHR sync, EGLenum mode)
                 gcoOS_GetCurrentThreadID(), dpy, sync, mode);
 
     return EGL_TRUE;
+}
 
+/* EGL_ANDROID_native_fence_sync. */
+EGLint LOG_eglDupNativeFenceFDANDROID_pre(EGLDisplay dpy, EGLSyncKHR sync)
+{
+    EGL_LOG_API("EGL(tid=%p): eglDupNativeFenceFDANDROID_pre %p %p\n",
+                gcoOS_GetCurrentThreadID(), dpy, sync);
+
+    return -1;
+}
+
+EGLint LOG_eglDupNativeFenceFDANDROID_post(EGLDisplay dpy, EGLSyncKHR sync, EGLint ret_fd)
+{
+    EGL_LOG_API("EGL(tid=%p): eglDupNativeFenceFDANDROID_post %p %p => %d\n",
+                gcoOS_GetCurrentThreadID(), dpy, sync, ret_fd);
+
+    return ret_fd;
 }
 
 /* EGL_EXT_platform_base. */
@@ -1234,6 +1245,8 @@ eglTracerDispatchTableStruct veglLogFunctionTable = {
     LOG_eglWaitSyncKHR,
     /* EGL_KHR_reusable_sync. */
     LOG_eglSignalSyncKHR,
+    /* EGL_ANDROID_native_fence_sync. */
+    LOG_eglDupNativeFenceFDANDROID_post,
     /* EGL_EXT_platform_base. */
     LOG_eglGetPlatformDisplayEXT_post,
     LOG_eglCreatePlatformWindowSurfaceEXT_post,
@@ -1279,6 +1292,8 @@ eglTracerDispatchTableStruct veglLogFunctionTable = {
     /* EGL_KHR_fence_sync. */
     LOG_eglCreateSyncKHR_pre,
     LOG_eglGetSyncAttribKHR_post,
+    /* EGL_ANDROID_native_fence_sync. */
+    LOG_eglDupNativeFenceFDANDROID_pre,
     /* EGL_EXT_platform_base. */
     LOG_eglGetPlatformDisplayEXT_pre,
     LOG_eglCreatePlatformWindowSurfaceEXT_pre,
@@ -1347,6 +1362,8 @@ char *veglTraceFuncNames[] = {
     "eglWaitSyncKHR",
     /* EGL_KHR_resuable_sync. */
     "eglSignalSyncKHR",
+    /* EGL_ANDROID_native_fence_sync. */
+    "eglDupNativeFenceFDANDROID",
     /* EGL_EXT_platform_base. */
     "eglGetPlatformDisplayEXT",
     "eglCreatePlatformWindowSurfaceEXT",

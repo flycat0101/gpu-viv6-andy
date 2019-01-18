@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,6 +13,10 @@
 
 #ifndef __gc_vsc_utils_mm_h_
 #define __gc_vsc_utils_mm_h_
+
+#if defined(UNDER_CE)
+#include <stddef.h>
+#endif
 
 BEGIN_EXTERN_C()
 
@@ -43,7 +47,7 @@ typedef struct _VSC_MEMORY_MANAGEMENT_PARAM
 typedef struct _VSC_COMMON_BLOCK_HEADER
 {
     /* User requested allocation size */
-    gctUINT                   userReqSize;
+    gctUINT                userReqSize;
 }VSC_COMMON_BLOCK_HEADER;
 
 /* sizeof(VSC_COMMON_BLOCK_HEADER) */
@@ -211,7 +215,13 @@ typedef struct _VSC_BUDDY_MEM_BLOCK_NODE
 }VSC_BUDDY_MEM_BLOCK_NODE;
 
 /* sizeof(BUDDY_BLOCK_HEADER) */
-#define BUDDY_BLOCK_HEADER_SIZE           sizeof(struct BUDDY_BLOCK_HEADER)
+#define BUDDY_BLOCK_HEADER_SIZE           (gctUINT)(offsetof(VSC_BUDDY_MEM_BLOCK_NODE, biBlockNode))
+
+#define min_bm_node_size(reqSz) ((((reqSz)+BUDDY_BLOCK_HEADER_SIZE) < (gctUINT)(sizeof(VSC_BUDDY_MEM_BLOCK_NODE))) ? \
+                                  (gctUINT)(sizeof(VSC_BUDDY_MEM_BLOCK_NODE)) : ((reqSz)+BUDDY_BLOCK_HEADER_SIZE))
+#define bmNode_userData(ptr) ((void*) &((VSC_BUDDY_MEM_BLOCK_NODE*)(ptr))->biBlockNode)
+#define userDataToBmNode(ptr) ((VSC_BUDDY_MEM_BLOCK_NODE*)((gctCHAR *)(ptr) - (gctUINT)(offsetof(VSC_BUDDY_MEM_BLOCK_NODE, biBlockNode))))
+
 
 typedef struct _VSC_BUDDY_MEM_HUGE_ALLOC_IN_PMP
 {

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -179,7 +179,7 @@ _FreeArrayListInfo(
 
 #define slmNewUniform(Compiler, LineNo, StringNo, Symbol, DataType, Precision, Location, Binding, Offset,\
           ArrayCount, ArrayLengthList, VarCategory, NumStructElement, Parent, PrevSibling, ImageFormat, \
-          ThisVarIndex, Uniform, Status)  \
+          ThisVarIndex, Uniform, Status, CompilerGen, Initializer)  \
   do { \
    gcsSHADER_VAR_INFO uniformInfo[1]; \
    uniformInfo->varCategory = (VarCategory); \
@@ -199,6 +199,8 @@ _FreeArrayListInfo(
                            (StringNo), \
                            (Symbol), \
                            uniformInfo, \
+                           (CompilerGen), \
+                           (Initializer), \
                            (ThisVarIndex), \
                            (Uniform)); \
     _FreeArrayListInfo(Compiler, &uniformInfo[0]); \
@@ -263,6 +265,7 @@ slsOPERAND_CONSTANT_ChangeFloatFamilyDataType(
     switch (gcGetComponentDataType(NewDataType))
     {
     case gcSHADER_FLOAT_X1:
+    case gcSHADER_FLOAT64_X1:
         break;
 
     case gcSHADER_BOOLEAN_X1:
@@ -306,6 +309,7 @@ slsOPERAND_CONSTANT_ChangeIntegerFamilyDataType(
     switch (gcGetComponentDataType(NewDataType))
     {
     case gcSHADER_FLOAT_X1:
+    case gcSHADER_FLOAT64_X1:
         for (i = 0; i < OperandConstant->valueCount; i++)
         {
             OperandConstant->values[i].floatValue = slmI2F(OperandConstant->values[i].intValue);
@@ -349,6 +353,7 @@ slsOPERAND_CONSTANT_ChangeUintFamilyDataType(
     switch (gcGetComponentDataType(NewDataType))
     {
     case gcSHADER_FLOAT_X1:
+    case gcSHADER_FLOAT64_X1:
         for (i = 0; i < OperandConstant->valueCount; i++)
         {
             OperandConstant->values[i].floatValue = slmU2F(OperandConstant->values[i].uintValue);
@@ -392,6 +397,7 @@ slsOPERAND_CONSTANT_ChangeBooleanFamilyDataType(
     switch (gcGetComponentDataType(NewDataType))
     {
     case gcSHADER_FLOAT_X1:
+    case gcSHADER_FLOAT64_X1:
         for (i = 0; i < OperandConstant->valueCount; i++)
         {
             OperandConstant->values[i].floatValue = slmB2F(OperandConstant->values[i].boolValue);
@@ -452,6 +458,7 @@ slsROPERAND_ChangeDataTypeFamily(
             switch (gcGetComponentDataType(ROperand->dataType))
             {
             case gcSHADER_FLOAT_X1:     opcode = slvOPCODE_FLOAT_TO_BOOL;   break;
+            case gcSHADER_FLOAT64_X1:   opcode = slvOPCODE_FLOAT_TO_BOOL;   break;
             case gcSHADER_INTEGER_X1:   opcode = slvOPCODE_INT_TO_BOOL;     break;
             case gcSHADER_UINT_X1:   opcode = slvOPCODE_UINT_TO_BOOL;     break;
             default: break;
@@ -462,6 +469,7 @@ slsROPERAND_ChangeDataTypeFamily(
             switch (gcGetComponentDataType(ROperand->dataType))
             {
             case gcSHADER_FLOAT_X1:
+            case gcSHADER_FLOAT64_X1:
                 if (!TreatFloatAsInt) opcode = slvOPCODE_FLOAT_TO_INT;
                 break;
             case gcSHADER_UINT_X1:
@@ -475,6 +483,7 @@ slsROPERAND_ChangeDataTypeFamily(
             switch (gcGetComponentDataType(ROperand->dataType))
             {
             case gcSHADER_FLOAT_X1:
+            case gcSHADER_FLOAT64_X1:
                 if (!TreatFloatAsInt) opcode = slvOPCODE_FLOAT_TO_UINT;
                 break;
             case gcSHADER_INTEGER_X1:
@@ -485,6 +494,7 @@ slsROPERAND_ChangeDataTypeFamily(
             break;
 
         case gcSHADER_FLOAT_X1:
+        case gcSHADER_FLOAT64_X1:
 #if TREAT_ES20_INTEGER_AS_FLOAT
             if (sloCOMPILER_IsHaltiVersion(Compiler))
             {
@@ -540,6 +550,7 @@ slsROPERAND_ChangeDataTypeFamily(
         switch (gcGetComponentDataType(ROperand->dataType))
         {
         case gcSHADER_FLOAT_X1:
+        case gcSHADER_FLOAT64_X1:
             slsOPERAND_CONSTANT_ChangeFloatFamilyDataType(NewDataType, &ROperand->u.constant);
             break;
 
@@ -589,6 +600,7 @@ slsROPERAND_CONSTANT_ConvScalarToVector(
     switch (ROperand->dataType)
     {
     case gcSHADER_FLOAT_X1:
+    case gcSHADER_FLOAT64_X1:
         for (i = 1; i < vectorComponentCount; i++)
         {
             ROperand->u.constant.values[i].floatValue = ROperand->u.constant.values[0].floatValue;
@@ -657,6 +669,7 @@ slsROPERAND_CONSTANT_IsAllVectorComponentsEqual(
     switch (gcGetVectorComponentDataType(ROperand->dataType))
     {
     case gcSHADER_FLOAT_X1:
+    case gcSHADER_FLOAT64_X1:
         for (i = 1; i < ROperand->u.constant.valueCount; i++)
         {
             if (ROperand->u.constant.values[i].floatValue
@@ -788,6 +801,7 @@ slGetOpcodeName(
     case slvOPCODE_INVERSE_SQRT:        return "inverse_sqrt";
 
     case slvOPCODE_ABS:                 return "abs";
+    case slvOPCODE_NEG:                 return "neg";
     case slvOPCODE_SIGN:                return "sign";
     case slvOPCODE_FLOOR:               return "floor";
     case slvOPCODE_CEIL:                return "ceil";
@@ -853,6 +867,7 @@ slGetOpcodeName(
     case slvOPCODE_IMAGE_READ_3D:       return "imageLoad_3D";
     case slvOPCODE_IMAGE_WRITE_3D:      return "imageStore_3D";
     case slvOPCODE_CLAMP0MAX:           return "clamp0max";
+    case slvOPCODE_CLAMPCOORD:          return "clampcoord";
     case slvOPCODE_EMIT_VERTEX:         return "emitVertex";
     case slvOPCODE_END_PRIMITIVE:       return "endPrimitive";
 
@@ -923,32 +938,23 @@ slsROPERAND_IsFloatOrVecConstant(
     IN gctFLOAT FloatValue
     )
 {
+    gctUINT i, length;
     gcmASSERT(ROperand);
 
     if (ROperand->isReg) return gcvFALSE;
 
-    switch (ROperand->dataType)
+    length = gcGetDataTypeComponentCount(ROperand->dataType);
+    length = gcmMIN(length, ROperand->u.constant.valueCount);
+
+    for (i = 0; i < length; i++)
     {
-    case gcSHADER_FLOAT_X1:
-        return (ROperand->u.constant.values[0].floatValue == FloatValue);
-
-    case gcSHADER_FLOAT_X2:
-        return (ROperand->u.constant.values[0].floatValue == FloatValue
-                && ROperand->u.constant.values[1].floatValue == FloatValue);
-
-    case gcSHADER_FLOAT_X3:
-        return (ROperand->u.constant.values[0].floatValue == FloatValue
-                && ROperand->u.constant.values[1].floatValue == FloatValue
-                && ROperand->u.constant.values[2].floatValue == FloatValue);
-
-    case gcSHADER_FLOAT_X4:
-        return (ROperand->u.constant.values[0].floatValue == FloatValue
-                && ROperand->u.constant.values[1].floatValue == FloatValue
-                && ROperand->u.constant.values[2].floatValue == FloatValue
-                && ROperand->u.constant.values[3].floatValue == FloatValue);
-
-    default: return gcvFALSE;
+        if (ROperand->u.constant.values[i].floatValue != FloatValue)
+        {
+            return gcvFALSE;
+        }
     }
+
+    return gcvTRUE;
 }
 
 static gceSTATUS
@@ -1021,6 +1027,7 @@ slGetDefaultComponentSelection(
     switch (DataType)
     {
     case gcSHADER_FLOAT_X1:
+    case gcSHADER_FLOAT64_X1:
     case gcSHADER_BOOLEAN_X1:
     case gcSHADER_INTEGER_X1:
     case gcSHADER_UINT_X1:
@@ -1030,6 +1037,10 @@ slGetDefaultComponentSelection(
     case gcSHADER_FLOAT_2X2:
     case gcSHADER_FLOAT_3X2:
     case gcSHADER_FLOAT_4X2:
+    case gcSHADER_FLOAT64_X2:
+    case gcSHADER_FLOAT64_2X2:
+    case gcSHADER_FLOAT64_3X2:
+    case gcSHADER_FLOAT64_4X2:
     case gcSHADER_BOOLEAN_X2:
     case gcSHADER_INTEGER_X2:
     case gcSHADER_UINT_X2:
@@ -1039,6 +1050,10 @@ slGetDefaultComponentSelection(
     case gcSHADER_FLOAT_2X3:
     case gcSHADER_FLOAT_3X3:
     case gcSHADER_FLOAT_4X3:
+    case gcSHADER_FLOAT64_X3:
+    case gcSHADER_FLOAT64_2X3:
+    case gcSHADER_FLOAT64_3X3:
+    case gcSHADER_FLOAT64_4X3:
     case gcSHADER_BOOLEAN_X3:
     case gcSHADER_INTEGER_X3:
     case gcSHADER_UINT_X3:
@@ -1048,6 +1063,10 @@ slGetDefaultComponentSelection(
     case gcSHADER_FLOAT_2X4:
     case gcSHADER_FLOAT_3X4:
     case gcSHADER_FLOAT_4X4:
+    case gcSHADER_FLOAT64_X4:
+    case gcSHADER_FLOAT64_2X4:
+    case gcSHADER_FLOAT64_3X4:
+    case gcSHADER_FLOAT64_4X4:
     case gcSHADER_BOOLEAN_X4:
     case gcSHADER_INTEGER_X4:
     case gcSHADER_UINT_X4:
@@ -1087,6 +1106,16 @@ slGetDefaultComponentSelection(
     case gcSHADER_SAMPLER_2D_MS_ARRAY:
     case gcSHADER_ISAMPLER_2D_MS_ARRAY:
     case gcSHADER_USAMPLER_2D_MS_ARRAY:
+
+    case gcSHADER_ISAMPLER_1D:
+    case gcSHADER_USAMPLER_1D:
+    case gcSHADER_SAMPLER_1D_SHADOW:
+    case gcSHADER_SAMPLER_2D_RECT:
+    case gcSHADER_ISAMPLER_2D_RECT:
+    case gcSHADER_USAMPLER_2D_RECT:
+    case gcSHADER_SAMPLER_2D_RECT_SHADOW:
+    case gcSHADER_ISAMPLER_1D_ARRAY:
+    case gcSHADER_USAMPLER_1D_ARRAY:
 
     case gcSHADER_IMAGE_2D:
     case gcSHADER_IIMAGE_2D:
@@ -1680,25 +1709,54 @@ _AllocLogicalRegOrArray(
     case slvSTORAGE_QUALIFIER_UNIFORM:
         if(!sloCOMPILER_IsES31VersionOrAbove(Compiler))
         {
+            if (Name->u.variableInfo.initializer)
+            {
+                slsGEN_CODE_PARAMETERS  initParameters;
+
+                /* Try to evaluate the initializer operand */
+                slsGEN_CODE_PARAMETERS_Initialize(&initParameters,
+                                                  gcvFALSE,
+                                                  gcvTRUE);
+
+                initParameters.hint = slvEVALUATE_ONLY;
+
+                status = sloIR_OBJECT_Accept(Compiler,
+                                             &Name->u.variableInfo.initializer->base,
+                                             &CodeGenerator->visitor,
+                                             &initParameters);
+
+                if (gcmIS_ERROR(status)) {
+                     slsGEN_CODE_PARAMETERS_Finalize(&initParameters);
+                     gcmFOOTER();
+                     return status;
+                }
+
+                Name->u.variableInfo.constant = initParameters.constant;
+                initParameters.constant       = gcvNULL;
+
+                slsGEN_CODE_PARAMETERS_Finalize(&initParameters);
+            }
             slmNewUniform(Compiler,
-                              Name->lineNo,
-                              Name->stringNo,
-                              Symbol,
-                              binaryDataType,
-                              binaryPrecision,
-                              -1,
-                              -1,
-                              -1,
-                              DataType->arrayLengthCount,
-                              DataType->arrayLengthList,
-                              gcSHADER_VAR_CATEGORY_NORMAL,
-                              0,
-                              parent,
-                              prevSibling,
-                              gcIMAGE_FORMAT_DEFAULT,
-                              ThisVarIndex,
-                              &uniform,
-                              status);
+                          Name->lineNo,
+                          Name->stringNo,
+                          Symbol,
+                          binaryDataType,
+                          binaryPrecision,
+                          -1,
+                          -1,
+                          -1,
+                          DataType->arrayLengthCount,
+                          DataType->arrayLengthList,
+                          gcSHADER_VAR_CATEGORY_NORMAL,
+                          0,
+                          parent,
+                          prevSibling,
+                          gcIMAGE_FORMAT_DEFAULT,
+                          ThisVarIndex,
+                          &uniform,
+                          status,
+                          Name->u.variableInfo.treatConstArrayAsUniform,
+                          Name->u.variableInfo.constant);
         }
         else if(sloCOMPILER_IsES31VersionOrAbove(Compiler))
         {
@@ -1748,7 +1806,9 @@ _AllocLogicalRegOrArray(
                           imageFormat,
                           ThisVarIndex,
                           &uniform,
-                          status);
+                          status,
+                          gcvFALSE,
+                          gcvNULL);
 
             /* Update the uniform location. */
             if (slsDATA_TYPE_IsUnderlyingStruct(Name->dataType) &&
@@ -1970,12 +2030,29 @@ _AllocLogicalRegOrArray(
 
         tempRegIndex = slNewTempRegs(Compiler, logicalRegCount * binaryDataTypeSize);
 
-        if (sloCOMPILER_IsHaltiVersion(Compiler))
+        if (sloCOMPILER_IsHaltiVersion(Compiler) &&
+            !sloCOMPILER_IsOGL20Version(Compiler))
         {
            gctUINT layoutId;
            gctINT layoutLocation = CodeGenerator->layoutLocation;
            gctUINT arraySize = logicalRegCount;
            gctUINT arrayCount = DataType->arrayLengthCount;
+
+           if (sloCOMPILER_IsOGLVersion(Compiler))
+           {
+               if (_IsOutputColorAddBefore(Compiler))
+               {
+                   gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                   Name->lineNo,
+                                                   Name->stringNo,
+                                                   slvREPORT_ERROR,
+                                                   "Can not assgin values to gl_FragColor or gl_FragData if user declared output variables are in use"));
+
+                   gcmFOOTER_ARG("status=%d", gcvSTATUS_COMPILER_FE_PARSER_ERROR);
+
+                   return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+               }
+           }
 
            if (slsDATA_TYPE_IsPerVertexArray(DataType))
            {
@@ -2297,7 +2374,9 @@ slAllocSamplerLevelBaseSize(
                   gcIMAGE_FORMAT_DEFAULT,
                   thisVarIndex,
                   &levelBaseSizeUniform,
-                  status);
+                  status,
+                  gcvFALSE,
+                  gcvNULL);
 
     if (gcmIS_ERROR(status))
     {
@@ -2379,7 +2458,9 @@ slAllocImageSizeUniform(
                   gcIMAGE_FORMAT_DEFAULT,
                   thisVarIndex,
                   &imageSizeUniform,
-                  status);
+                  status,
+                  gcvFALSE,
+                  gcvNULL);
 
     if (gcmIS_ERROR(status))
     {
@@ -2484,7 +2565,9 @@ slAllocSamplerLodMinMax(
                   gcIMAGE_FORMAT_DEFAULT,
                   thisVarIndex,
                   &lodMinMaxUniform,
-                  status);
+                  status,
+                  gcvFALSE,
+                  gcvNULL);
 
     if (gcmIS_ERROR(status))
     {
@@ -2627,24 +2710,26 @@ _NewStructIntermediateElementSymbol(
         gcUNIFORM uniform;
 
         slmNewUniform(Compiler,
-                              Name->lineNo,
-                              Name->stringNo,
-                              Symbol,
-                              DataType,
-                              _ConvElementDataPrecision(Name->dataType),
-                              -1,
-                              -1,
-                              -1,
-                              ArrayLengthCount,
-                              ArrayLengthList,
-                              varCategory,
-                              numStructureElement,
-                              parent,
-                              prevSibling,
-                              gcIMAGE_FORMAT_DEFAULT,
-                              ThisVarIndex,
-                              &uniform,
-                              status);
+                      Name->lineNo,
+                      Name->stringNo,
+                      Symbol,
+                      DataType,
+                      _ConvElementDataPrecision(Name->dataType),
+                      -1,
+                      -1,
+                      -1,
+                      ArrayLengthCount,
+                      ArrayLengthList,
+                      varCategory,
+                      numStructureElement,
+                      parent,
+                      prevSibling,
+                      gcIMAGE_FORMAT_DEFAULT,
+                      ThisVarIndex,
+                      &uniform,
+                      status,
+                      gcvFALSE,
+                      gcvNULL);
     }
     else
     {
@@ -2726,6 +2811,7 @@ _AllocMemoryOffsets(
     IN slsNAME *BlockName,
     IN gctBOOL IsBlockMemberActive,
     IN gctPOINTER StructParent,
+    IN gctBOOL IsTopLevel,
     IN OUT gctBOOL *NeedAllocateRegs,
     IN OUT gctINT16 *PrevSibling,
     IN OUT slsLOGICAL_REG **LogicalRegs,
@@ -2924,7 +3010,6 @@ _AllocLogicalRegsForStruct1(
                                            Start,
                                            FieldIndex);
                 if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
             }
             else
             {
@@ -3334,14 +3419,16 @@ _NewBlockIntermediateElementSymbol(
                       -1,
                       ArrayLengthCount,
                       ArrayLengthList,
-                      VarCategory,
+                      gcSHADER_VAR_CATEGORY_STRUCT,
                       NumStructureElement,
                       Parent,
                       PrevSibling,
                       gcIMAGE_FORMAT_DEFAULT,
                       ThisVarIndex,
                       &uniform,
-                      status);
+                      status,
+                      gcvFALSE,
+                      gcvNULL);
 
         if (gcmIS_ERROR(status))
         {
@@ -3450,6 +3537,7 @@ _GetDataTypeByteOffset(
     {
     case gcSHADER_BOOLEAN_X1:
     case gcSHADER_FLOAT_X1:
+    case gcSHADER_FLOAT64_X1:
     case gcSHADER_INTEGER_X1:
     case gcSHADER_UINT_X1:
     case gcSHADER_ATOMIC_UINT:
@@ -3467,6 +3555,7 @@ _GetDataTypeByteOffset(
 
     case gcSHADER_BOOLEAN_X2:
     case gcSHADER_FLOAT_X2:
+    case gcSHADER_FLOAT64_X2:
     case gcSHADER_INTEGER_X2:
     case gcSHADER_UINT_X2:
        if(IsArray &&  (MemoryLayout & gcvINTERFACE_BLOCK_STD140))
@@ -3483,6 +3572,7 @@ _GetDataTypeByteOffset(
 
     case gcSHADER_BOOLEAN_X3:
     case gcSHADER_FLOAT_X3:
+    case gcSHADER_FLOAT64_X3:
     case gcSHADER_INTEGER_X3:
     case gcSHADER_UINT_X3:
        alignment = 16;
@@ -3494,6 +3584,7 @@ _GetDataTypeByteOffset(
 
     case gcSHADER_BOOLEAN_X4:
     case gcSHADER_FLOAT_X4:
+    case gcSHADER_FLOAT64_X4:
     case gcSHADER_INTEGER_X4:
     case gcSHADER_UINT_X4:
        alignment = 16;
@@ -3501,6 +3592,7 @@ _GetDataTypeByteOffset(
        break;
 
    case gcSHADER_FLOAT_2X2:
+   case gcSHADER_FLOAT64_2X2:
        if(MemoryLayout & gcvINTERFACE_BLOCK_STD140)
        {
           alignment = 16;
@@ -3515,6 +3607,7 @@ _GetDataTypeByteOffset(
        break;
 
    case gcSHADER_FLOAT_2X3:
+   case gcSHADER_FLOAT64_2X3:
        if(MemoryLayout & gcvINTERFACE_BLOCK_STD140)
        {
           alignment = 16;
@@ -3554,6 +3647,7 @@ _GetDataTypeByteOffset(
        break;
 
    case gcSHADER_FLOAT_2X4:
+   case gcSHADER_FLOAT64_2X4:
        if(MemoryLayout & gcvINTERFACE_BLOCK_STD140)
        {
           alignment = 16;
@@ -3585,6 +3679,7 @@ _GetDataTypeByteOffset(
        break;
 
    case gcSHADER_FLOAT_3X2:
+   case gcSHADER_FLOAT64_3X2:
        if(MemoryLayout & gcvINTERFACE_BLOCK_STD140)
        {
           alignment = 16;
@@ -3624,6 +3719,7 @@ _GetDataTypeByteOffset(
        break;
 
    case gcSHADER_FLOAT_3X3:
+   case gcSHADER_FLOAT64_3X3:
        if(MemoryLayout & gcvINTERFACE_BLOCK_STD140)
        {
           alignment = 16;
@@ -3646,6 +3742,7 @@ _GetDataTypeByteOffset(
        break;
 
    case gcSHADER_FLOAT_3X4:
+   case gcSHADER_FLOAT64_3X4:
        if(MemoryLayout & gcvINTERFACE_BLOCK_STD140)
        {
           alignment = 16;
@@ -3685,6 +3782,7 @@ _GetDataTypeByteOffset(
        break;
 
    case gcSHADER_FLOAT_4X2:
+   case gcSHADER_FLOAT64_4X2:
        if(MemoryLayout & gcvINTERFACE_BLOCK_STD140)
        {
           alignment = 16;
@@ -3715,6 +3813,7 @@ _GetDataTypeByteOffset(
        break;
 
    case gcSHADER_FLOAT_4X3:
+   case gcSHADER_FLOAT64_4X3:
        if(MemoryLayout & gcvINTERFACE_BLOCK_STD140)
        {
           alignment = 16;
@@ -3754,6 +3853,7 @@ _GetDataTypeByteOffset(
        break;
 
    case gcSHADER_FLOAT_4X4:
+   case gcSHADER_FLOAT64_4X4:
        alignment = 16;
        size = 16 * 4;
        matrixStride = alignment;
@@ -3871,7 +3971,9 @@ _AllocMemoryOffsetOrArray(
                       gcIMAGE_FORMAT_DEFAULT,
                       &thisVarIndex,
                       &member.uniform,
-                      status);
+                      status,
+                      gcvFALSE,
+                      gcvNULL);
         break;
 
     case slvTYPE_STORAGE_BLOCK:
@@ -4404,6 +4506,7 @@ _AllocMemoryOffsetsForNormalStruct(
                                          BlockName,
                                          IsBlockMemberActive,
                                          structParent.pointer,
+                                         gcvFALSE,
                                          NeedAllocateRegs,
                                          &structElePrevSibling,
                                          LogicalRegs,
@@ -4663,6 +4766,7 @@ _AllocMemoryOffsets(
     IN slsNAME *BlockName,
     IN gctBOOL IsBlockMemberActive,
     IN gctPOINTER StructParent,
+    IN gctBOOL IsTopLevel,
     IN OUT gctBOOL *NeedAllocateRegs,
     IN OUT gctINT16 *PrevSibling,
     IN OUT slsLOGICAL_REG **LogicalRegs,
@@ -4710,7 +4814,7 @@ _AllocMemoryOffsets(
                                               BlockName,
                                               IsBlockMemberActive,
                                               structParentIndex,
-                                              slsDATA_TYPE_IsUnderlyingStorageBlock(BlockName->dataType) ? gcvTRUE : gcvFALSE,
+                                              IsTopLevel,
                                               NeedAllocateRegs,
                                               PrevSibling,
                                               LogicalRegs,
@@ -5612,6 +5716,7 @@ _AllocLogicalRegForInterfaceBlock(
                                         blockName,
                                         blockMember->isActive,
                                         gcvNULL,
+                                        gcvTRUE,
                                         &needAllocateRegs,
                                         &blockPrevSibling,
                                         &logicalRegs,
@@ -6124,12 +6229,9 @@ _AllocateFuncResources(
     /* Allocate registers for all parameters */
     FOR_EACH_DLINK_NODE(&FuncName->u.funcInfo.localSpace->names, slsNAME, paramName)
     {
-        sltPRECISION_QUALIFIER origParamPrecision;
-
         if (paramName->type != slvPARAMETER_NAME) break;
-        paramName->context.function = FuncName->context.function;
 
-        origParamPrecision = paramName->dataType->qualifiers.precision;
+        paramName->context.function = FuncName->context.function;
 
         gcmASSERT(!intrinsicCall || paramName->dataType->qualifiers.precision != slvPRECISION_QUALIFIER_DEFAULT);
 
@@ -6137,8 +6239,6 @@ _AllocateFuncResources(
                                           CodeGenerator,
                                           paramName);
         if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-        paramName->dataType->qualifiers.precision = origParamPrecision;
     }
 
     /* Allocate registers for return value */
@@ -7859,24 +7959,24 @@ _LoadInterfaceBlockMember(
                 }
                 else
                 {
-                    gcVARIABLE parentVariable, structVariable;
+                    gcVARIABLE structVariable = gcvNULL;
 
                     gcmASSERT(ROperand->u.reg.qualifier == slvSTORAGE_QUALIFIER_STORAGE_BLOCK_MEMBER);
                     gcmASSERT(ROperand->u.reg.u.variable->parent != -1);
 
                     status = gcSHADER_GetVariable(binary,
                                                   ROperand->u.reg.u.variable->parent,
-                                                  &parentVariable);
-                    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-                    gcmASSERT(isVariableStruct(parentVariable));
-
-                    gcmASSERT(parentVariable->parent != -1);
-                    status = gcSHADER_GetVariable(binary,
-                                                  parentVariable->parent,
                                                   &structVariable);
                     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
+                    while (!isVariableTopLevelStruct(structVariable) &&
+                           structVariable->parent)
+                    {
+                        status = gcSHADER_GetVariable(binary,
+                                                      structVariable->parent,
+                                                      &structVariable);
+                        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+                    }
                     gcmASSERT(isVariableArray(structVariable) &&
                               structVariable->arrayStride > 0);
                     if (!(isVariableArray(structVariable) &&
@@ -8856,7 +8956,11 @@ _LoadPerVertexMember(
         if (vertexSource->type == gcvSOURCE_CONSTANT)
         {
             gcmVERIFY_OK(sloCOMPILER_GetDefaultLayout(Compiler, &inLayout, slvSTORAGE_QUALIFIER_IN));
-            if (vertexSource->u.sourceConstant.u.intConstant > _GetInputArraySizeByPrimitiveType(inLayout.gsPrimitive))
+            if (inLayout.gsPrimitive == slvGS_PRIMITIVE_NONE && sloCOMPILER_IsOGLVersion(Compiler))
+            {
+                /* TODO: OGL allows unsized array */
+            }
+            else if (vertexSource->u.sourceConstant.u.intConstant > _GetInputArraySizeByPrimitiveType(inLayout.gsPrimitive))
             {
                 gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                 Compiler->context.currentLineNo,
@@ -10428,6 +10532,7 @@ _ConvROperandToSourceConstant(
     switch (ROperand->u.constant.dataType)
     {
     case gcSHADER_FLOAT_X1:
+    case gcSHADER_FLOAT64_X1:
         sourceConstant.u.floatConstant  = ROperand->u.constant.values[0].floatValue;
         break;
 
@@ -10446,6 +10551,9 @@ _ConvROperandToSourceConstant(
     case gcSHADER_FLOAT_X2:
     case gcSHADER_FLOAT_X3:
     case gcSHADER_FLOAT_X4:
+    case gcSHADER_FLOAT64_X2:
+    case gcSHADER_FLOAT64_X3:
+    case gcSHADER_FLOAT64_X4:
         gcmASSERT(ROperand->vectorIndex.mode == slvINDEX_CONSTANT);
         sourceConstant.u.floatConstant  =
                 ROperand->u.constant.values[ROperand->vectorIndex.u.constant].floatValue;
@@ -10484,6 +10592,15 @@ _ConvROperandToSourceConstant(
     case gcSHADER_FLOAT_4X2:
     case gcSHADER_FLOAT_4X3:
     case gcSHADER_FLOAT_4X4:
+    case gcSHADER_FLOAT64_2X2:
+    case gcSHADER_FLOAT64_2X3:
+    case gcSHADER_FLOAT64_2X4:
+    case gcSHADER_FLOAT64_3X2:
+    case gcSHADER_FLOAT64_3X3:
+    case gcSHADER_FLOAT64_3X4:
+    case gcSHADER_FLOAT64_4X2:
+    case gcSHADER_FLOAT64_4X3:
+    case gcSHADER_FLOAT64_4X4:
         gcmASSERT(ROperand->matrixIndex.mode == slvINDEX_CONSTANT);
         gcmASSERT(ROperand->vectorIndex.mode == slvINDEX_CONSTANT);
         sourceConstant.u.floatConstant  =
@@ -10527,6 +10644,7 @@ _ConvROperandToSpecialVectorSourceConstant(
     switch (gcGetVectorComponentDataType(ROperand->dataType))
     {
     case gcSHADER_FLOAT_X1:
+    case gcSHADER_FLOAT64_X1:
         sourceConstant.u.floatConstant  = ROperand->u.constant.values[0].floatValue;
         break;
 
@@ -10592,6 +10710,7 @@ _ConvROperandToVectorComponentSourceConstant(
         switch (dataType)
         {
         case gcSHADER_FLOAT_X1:
+        case gcSHADER_FLOAT64_X1:
             sourceConstant.u.floatConstant  = ROperand->u.constant.values[
                                                     ROperand->matrixIndex.u.constant * rowCount
                                                         + VectorIndex].floatValue;
@@ -10632,6 +10751,7 @@ _ConvROperandToVectorComponentSourceConstant(
         switch (dataType)
         {
         case gcSHADER_FLOAT_X1:
+        case gcSHADER_FLOAT64_X1:
             sourceConstant.u.floatConstant  = ROperand->u.constant.values[VectorIndex].floatValue;
             break;
 
@@ -10692,6 +10812,7 @@ _ConvROperandToMatrixComponentSourceConstant(
     switch (dataType)
     {
     case gcSHADER_FLOAT_X1:
+    case gcSHADER_FLOAT64_X1:
         sourceConstant.u.floatConstant  = ROperand->u.constant.values[index].floatValue;
         break;
 
@@ -10756,6 +10877,7 @@ _ConvROperandToMatrixColumnROperandConstant(
         switch (componentType)
         {
         case gcSHADER_FLOAT_X1:
+        case gcSHADER_FLOAT64_X1:
             values[i].floatValue  = ROperand->u.constant.values[index].floatValue;
             break;
 
@@ -12223,12 +12345,14 @@ slGenArithmeticExprCode(
                 gctINT uniformIndex1, uniformIndex2;
 
                 index0 = ROperand0->u.reg.regIndex;
+#if gcdUSE_WCLIP_PATCH
                 if (sloCOMPILER_FindWClipForUniformList(Compiler, index0, &uniformIndex1, &uniformIndex2) == gcvSTATUS_TRUE)
                 {
                     type0 = gcSL_CONSTANT;
                     index0 = uniformIndex2;
                     index0 = (index0 << 8) | uniformIndex1;
                 }
+#endif
             }
             index0 = (index0 << 16) | type0;
 
@@ -12245,8 +12369,10 @@ slGenArithmeticExprCode(
             }
             index1 = (index1 << 16) | type1;
 
+#if gcdUSE_WCLIP_PATCH
             status = sloCOMPILER_InsertWClipList(Compiler, IOperand->tempRegIndex, index0, index1);
             if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+#endif
         }
 #endif
     }
@@ -12292,8 +12418,10 @@ slGenArithmeticExprCode(
             uniform = ROperand1->u.reg.u.uniform;
             sloCOMPILER_GetUniformIndex(Compiler, uniform, &index1);
 
+#if gcdUSE_WCLIP_PATCH
             status = sloCOMPILER_InsertWClipForUniformList(Compiler, IOperand->tempRegIndex, index0, index1);
             if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+#endif
         }
 #endif
     }
@@ -12976,6 +13104,7 @@ slGenGenericCode1(
     case slvOPCODE_INVERSE_SQRT:
 
     case slvOPCODE_ABS:
+    case slvOPCODE_NEG:
     case slvOPCODE_SIGN:
     case slvOPCODE_FLOOR:
     case slvOPCODE_CEIL:
@@ -13007,30 +13136,55 @@ slGenGenericCode1(
     default: gcmASSERT(0);
     }
 
-    status = _ConvIOperandToTarget(
-                                    Compiler,
-                                    IOperand,
-                                    &target);
-    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+    if (gcIsMatrixDataType(ROperand->dataType))
+    {
+        gctUINT     i;
 
-    status = _ConvNormalROperandToSource(
-                                        Compiler,
-                                        LineNo,
-                                        StringNo,
-                                        ROperand,
-                                        &source);
+        gcmASSERT(ROperand->dataType == IOperand->dataType);
 
-    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        for (i = 0; i < gcGetMatrixDataTypeColumnCount(ROperand->dataType); i++)
+        {
+            gcmVERIFY_OK(_ConvIOperandToMatrixColumnTarget(Compiler, IOperand, i, &target));
 
-    status = slEmitCode1(
-                        Compiler,
-                        LineNo,
-                        StringNo,
-                        Opcode,
-                        &target,
-                        &source);
+            status = _ConvNormalROperandToMatrixColumnSource(Compiler,
+                                                             LineNo,
+                                                             StringNo,
+                                                             ROperand,
+                                                             i,
+                                                             &source);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
-    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+            status = slEmitCode1(Compiler,
+                                 LineNo,
+                                 StringNo,
+                                 Opcode,
+                                 &target,
+                                 &source);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        }
+    }
+    else
+    {
+        status = _ConvIOperandToTarget(Compiler,
+                                       IOperand,
+                                       &target);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        status = _ConvNormalROperandToSource(Compiler,
+                                             LineNo,
+                                             StringNo,
+                                             ROperand,
+                                             &source);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        status = slEmitCode1(Compiler,
+                             LineNo,
+                             StringNo,
+                             Opcode,
+                             &target,
+                             &source);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+    }
 
     if (dump) { sloCOMPILER_DecrDumpOffset(Compiler); }
 
@@ -13348,6 +13502,7 @@ slGenGenericCode3(
     case slvOPCODE_INVERSE_SQRT:
 
     case slvOPCODE_ABS:
+    case slvOPCODE_NEG:
     case slvOPCODE_SIGN:
     case slvOPCODE_FLOOR:
     case slvOPCODE_CEIL:
@@ -13859,6 +14014,7 @@ slGenGenericCode2WithFormat(
     case slvOPCODE_IMAGE_READ_3D:
     case slvOPCODE_IMAGE_WRITE_3D:
     case slvOPCODE_CLAMP0MAX:
+    case slvOPCODE_CLAMPCOORD:
 
     case slvOPCODE_LOAD_L:
     case slvOPCODE_STORE_L:
@@ -16883,6 +17039,8 @@ _GenInitSpecialVariables(
         slsROPERAND addressROperand[1];
         slsLOGICAL_REG reg[1];
         gcSHADER_TYPE ty;
+        gctREG_INDEX regIndex = slNewTempRegs(Compiler, 1);
+        gctINT16 varIndex = 0;
 
         gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
 
@@ -16896,7 +17054,27 @@ _GenInitSpecialVariables(
         gcmASSERT(sharedVariableStorageBlock->u.interfaceBlockContent.u.storageBlock);
         SetSBFlag(sharedVariableStorageBlock->u.interfaceBlockContent.u.storageBlock, gceIB_FLAG_FOR_SHARED_VARIABLE);
         SetSBSharedVariableBaseAddress(sharedVariableStorageBlock->u.interfaceBlockContent.u.storageBlock,
-                                       slNewTempRegs(Compiler, 1));
+                                       regIndex);
+
+        slmNewVariable(Compiler,
+                       0,
+                       0,
+                       _sldLocalMemoryAddressName,
+                       gcSHADER_UINT_X1,
+                       gcSHADER_PRECISION_HIGH,
+                       0,
+                       gcvNULL,
+                       gcvFALSE,
+                       gcvFALSE,
+                       gcvFALSE,
+                       gcvFALSE,
+                       regIndex,
+                       gcSHADER_VAR_CATEGORY_NORMAL,
+                       0,
+                       -1,
+                       -1,
+                       &varIndex,
+                       status);
 
         gcmONERROR(gcSHADER_GetUniform(binary,
                                        GetSBIndex(sharedVariableStorageBlock->u.interfaceBlockContent.u.storageBlock),
@@ -17064,9 +17242,10 @@ _CheckLayout(
     }
     else if (shaderType == slvSHADER_TYPE_GS)
     {
+        /* in OGL GS, the input and output layout may be declared in other GS. We'll check this in link time. */
         /* Check input layout. */
         gcmVERIFY_OK(sloCOMPILER_GetDefaultLayout(Compiler, &layout, slvSTORAGE_QUALIFIER_IN));
-        if (layout.gsPrimitive == slvGS_PRIMITIVE_NONE)
+        if (layout.gsPrimitive == slvGS_PRIMITIVE_NONE && !sloCOMPILER_IsOGLVersion(Compiler))
         {
             gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                             0,
@@ -17078,7 +17257,7 @@ _CheckLayout(
         }
         /* Check output layout. */
         gcmVERIFY_OK(sloCOMPILER_GetDefaultLayout(Compiler, &layout, slvSTORAGE_QUALIFIER_OUT));
-        if (layout.gsPrimitive == slvGS_PRIMITIVE_NONE)
+        if (layout.gsPrimitive == slvGS_PRIMITIVE_NONE  && !sloCOMPILER_IsOGLVersion(Compiler))
         {
             gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                             0,
@@ -17088,7 +17267,7 @@ _CheckLayout(
                                             "the output primitive layout."));
             Compiler->context.hasNotStagesRelatedLinkError = gcvSTATUS_MISSING_PRIMITIVE_TYPE;
         }
-        if (layout.maxGSVerticesNumber == -1)
+        if (layout.maxGSVerticesNumber == -1 && !sloCOMPILER_IsOGLVersion(Compiler))
         {
             gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                             0,
@@ -17912,6 +18091,11 @@ _GenUniformAndUBO(
             {
                 generated = gcvTRUE;
             }
+        }
+        /* If a uniform has a initializer, always generate it. */
+        else if (name->u.variableInfo.initializer || name->u.variableInfo.declareUniformWithInit)
+        {
+            generated = gcvTRUE;
         }
 
         if (generated)
@@ -21729,6 +21913,7 @@ sloIR_UNARY_EXPR_GenIncOrDecCode(
     switch (componentDataType)
     {
     case gcSHADER_FLOAT_X1:     constantValue.floatValue    = (gctFLOAT)1.0;    break;
+    case gcSHADER_FLOAT64_X1:   constantValue.floatValue    = (gctFLOAT)1.0;    break;
     case gcSHADER_INTEGER_X1:   constantValue.intValue      = 1;                break;
     case gcSHADER_UINT_X1:   constantValue.uintValue      = 1;                break;
 
@@ -21828,57 +22013,81 @@ sloIR_UNARY_EXPR_GenNegCode(
     {
         gcmASSERT(operandParameters.operandCount == 1);
 
-        /* sub t0, 0, operand */
-        slsIOPERAND_New(Compiler,
-                        &intermIOperand,
-                        operandParameters.dataTypes[0],
-                        operandParameters.rOperands[0].u.reg.precision);
-
-        componentDataType = gcGetComponentDataType(operandParameters.dataTypes[0]);
-
-        switch (componentDataType)
+        if (gcvTRUE)
         {
-        case gcSHADER_FLOAT_X1:     constantValue.floatValue    = (gctFLOAT)0.0;    break;
-        case gcSHADER_INTEGER_X1:   constantValue.intValue      = 0;                break;
+            /* Return t0 */
+            status = slsGEN_CODE_PARAMETERS_AllocateOperands(Compiler,
+                                                             Parameters,
+                                                             UnaryExpr->exprBase.dataType);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
-        case gcSHADER_UINT_X1:
-            if (sloCOMPILER_IsHaltiVersion(Compiler))
-            {
-               constantValue.uintValue      = 0;
-               break;
-            }
-            /*fall through */
+            /* not t0, operand */
+            slsIOPERAND_New(Compiler,
+                            &intermIOperand,
+                            Parameters->dataTypes[0],
+                            Parameters->rOperands[0].u.reg.precision);
 
-        default: gcmASSERT(0);
-            constantValue.floatValue    = (gctFLOAT)0.0;
+            status = slGenGenericCode1(Compiler,
+                                       UnaryExpr->exprBase.base.lineNo,
+                                       UnaryExpr->exprBase.base.stringNo,
+                                       slvOPCODE_NEG,
+                                       &intermIOperand,
+                                       &operandParameters.rOperands[0]);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+            slsROPERAND_InitializeUsingIOperand(&Parameters->rOperands[0], &intermIOperand);
         }
+        else
+        {
+            /* sub t0, 0, operand */
+            slsIOPERAND_New(Compiler,
+                            &intermIOperand,
+                            operandParameters.dataTypes[0],
+                            operandParameters.rOperands[0].u.reg.precision);
 
-        slsROPERAND_InitializeConstant(&constantROperand,
-                                       componentDataType,
-                                       gcSHADER_PRECISION_MEDIUM,
-                                       1,
-                                       &constantValue);
+            componentDataType = gcGetComponentDataType(operandParameters.dataTypes[0]);
 
-        status = slGenArithmeticExprCode(
-                                        Compiler,
-                                        UnaryExpr->exprBase.base.lineNo,
-                                        UnaryExpr->exprBase.base.stringNo,
-                                        slvOPCODE_SUB,
-                                        &intermIOperand,
-                                        &constantROperand,
-                                        &operandParameters.rOperands[0]);
+            switch (componentDataType)
+            {
+            case gcSHADER_FLOAT_X1:     constantValue.floatValue    = (gctFLOAT)0.0;    break;
+            case gcSHADER_FLOAT64_X1:   constantValue.floatValue    = (gctFLOAT)0.0;    break;
+            case gcSHADER_INTEGER_X1:   constantValue.intValue      = 0;                break;
 
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+            case gcSHADER_UINT_X1:
+                if (sloCOMPILER_IsHaltiVersion(Compiler))
+                {
+                   constantValue.uintValue      = 0;
+                   break;
+                }
+                /*fall through */
 
-        /* Return t0 */
-        status = slsGEN_CODE_PARAMETERS_AllocateOperands(
-                                                        Compiler,
-                                                        Parameters,
-                                                        UnaryExpr->exprBase.dataType);
+            default: gcmASSERT(0);
+                constantValue.floatValue    = (gctFLOAT)0.0;
+            }
 
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+            slsROPERAND_InitializeConstant(&constantROperand,
+                                           componentDataType,
+                                           gcSHADER_PRECISION_MEDIUM,
+                                           1,
+                                           &constantValue);
 
-        slsROPERAND_InitializeUsingIOperand(&Parameters->rOperands[0], &intermIOperand);
+            status = slGenArithmeticExprCode(Compiler,
+                                             UnaryExpr->exprBase.base.lineNo,
+                                             UnaryExpr->exprBase.base.stringNo,
+                                             slvOPCODE_SUB,
+                                             &intermIOperand,
+                                             &constantROperand,
+                                             &operandParameters.rOperands[0]);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+            /* Return t0 */
+            status = slsGEN_CODE_PARAMETERS_AllocateOperands(Compiler,
+                                                             Parameters,
+                                                             UnaryExpr->exprBase.dataType);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+            slsROPERAND_InitializeUsingIOperand(&Parameters->rOperands[0], &intermIOperand);
+        }
     }
 
     slsGEN_CODE_PARAMETERS_Finalize(&operandParameters);
@@ -26533,7 +26742,7 @@ slGetVectorROperandSlice(
 
     if (SliceComponentCount == 1)
     {
-        gcmASSERT(ROperandSlice->vectorIndex.mode == slvINDEX_NONE);
+        gcmASSERT(ROperandSlice->vectorIndex.mode == slvINDEX_NONE || ROperandSlice->vectorIndex.mode == slvINDEX_CONSTANT);
 
         ROperandSlice->vectorIndex.mode         = slvINDEX_CONSTANT;
         ROperandSlice->vectorIndex.u.constant   = (gctREG_INDEX)StartComponent;
@@ -26674,7 +26883,6 @@ slGetVectorLOperandSlice(
 
     /* Verify the arguments. */
     gcmASSERT(LOperand);
-    gcmASSERT(gcIsVectorDataType(LOperand->dataType));
     gcmASSERT(SliceComponentCount > 0);
     gcmASSERT(LOperandSlice);
 
@@ -27078,13 +27286,13 @@ sloIR_POLYNARY_EXPR_GenConstructVectorCode(
                                                 &operandCount,
                                                 &operandsParameters);
 
-    gcmASSERT(operandCount > 0);
-
     if (gcmIS_ERROR(status))
     {
         gcmFOOTER();
         return status;
     }
+
+    gcmASSERT(operandCount > 0);
 
     gcmASSERT(operandsParameters);
     if (operandsParameters == gcvNULL)
@@ -27264,6 +27472,7 @@ _GenMatrixToMatrixAssignCode(
     slsLOPERAND     matrixLOperand, columnLOperand, columnSliceLOperand, componentLOperand;
     slsROPERAND     columnROperand, columnSliceROperand, oneROperand, zeroROperand;
     gctUINT8        sliceComponentCount;
+    gcSHADER_TYPE   dataType = gcSHADER_FLOAT_X1;
 
     gcmHEADER();
 
@@ -27277,13 +27486,18 @@ _GenMatrixToMatrixAssignCode(
     targetMatrixColumnCount = gcGetMatrixDataTypeColumnCount(MatrixIOperand->dataType);
     targetMatrixRowCount = gcGetMatrixDataTypeRowCount(MatrixIOperand->dataType);
 
+    if (gcIsDoubleDataType(MatrixIOperand->dataType))
+    {
+        dataType = gcSHADER_FLOAT64_X1;
+    }
+
     slsLOPERAND_InitializeUsingIOperand(&matrixLOperand, MatrixIOperand);
     slsROPERAND_InitializeFloatOrVecOrMatConstant(&oneROperand,
-                                                  gcSHADER_FLOAT_X1,
+                                                  dataType,
                                                   gcSHADER_PRECISION_MEDIUM,
                                                   (gctFLOAT)1.0);
     slsROPERAND_InitializeFloatOrVecOrMatConstant(&zeroROperand,
-                                                  gcSHADER_FLOAT_X1,
+                                                  dataType,
                                                   gcSHADER_PRECISION_MEDIUM,
                                                   (gctFLOAT)0.0);
 
@@ -27394,6 +27608,7 @@ sloIR_POLYNARY_EXPR_GenConstructMatrixCode(
     gctUINT                         operandCount;
     slsGEN_CODE_PARAMETERS *        operandsParameters;
     slsIOPERAND                     iOperand;
+    gctBOOL                         treatFloatAsInt;
 
     gcmHEADER();
 
@@ -27446,6 +27661,21 @@ sloIR_POLYNARY_EXPR_GenConstructMatrixCode(
                         Parameters->rOperands[0].u.reg.precision);
 
         slsROPERAND_InitializeUsingIOperand(&Parameters->rOperands[0], &iOperand);
+
+        /* when enabling implicit conversion, mat type needs to changed to dmat in some case */
+        if (sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS) &&
+            gcGetDataTypeComponentCount(operandsParameters[0].rOperands[0].dataType)
+            == gcGetDataTypeComponentCount(Parameters->dataTypes[0]))
+        {
+            treatFloatAsInt = operandsParameters[0].treatFloatAsInt;
+            status = slsROPERAND_ChangeDataTypeFamily(
+                                                    Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
+                                                    treatFloatAsInt,
+                                                    Parameters->dataTypes[0],
+                                                    &operandsParameters[0].rOperands[0]);
+        }
 
         /* Generate the assignment(s) */
         if (operandCount == 1 && operandsParameters[0].operandCount == 1
@@ -27689,6 +27919,7 @@ sloIR_POLYNARY_EXPR_GenFuncCallCode(
     slsLOPERAND                 intermLOperand;
     slsROPERAND                 intermROperand;
     gctLABEL                    funcLabel;
+    gctBOOL                     isFuncUndefined = intrinsicCall;
 
     gcmHEADER();
 
@@ -27699,8 +27930,17 @@ sloIR_POLYNARY_EXPR_GenFuncCallCode(
     gcmASSERT(Parameters);
     gcmASSERT(!Parameters->needLOperand);
 
-    if (!PolynaryExpr->funcName->isBuiltIn && !intrinsicCall &&
-        !slsFUNC_HAS_FLAG(&(PolynaryExpr->funcName->u.funcInfo), slvFUNC_DEFINED))
+    if (sloCOMPILER_IsOGLVersion(Compiler) &&
+        !slsFUNC_HAS_FLAG(&(PolynaryExpr->funcName->u.funcInfo), slvFUNC_DEFINED) &&
+        !slsFUNC_HAS_FLAG(&(PolynaryExpr->funcName->u.funcInfo), slvFUNC_IS_INTRINSIC))
+    {
+        slsFUNC_SET_FLAG(&(PolynaryExpr->funcName->u.funcInfo), slvFUNC_DEFINED_OUTSIDE);
+        isFuncUndefined = gcvTRUE;
+    }
+
+    if (!PolynaryExpr->funcName->isBuiltIn && !isFuncUndefined &&
+        !slsFUNC_HAS_FLAG(&(PolynaryExpr->funcName->u.funcInfo), slvFUNC_DEFINED) &&
+        !slsFUNC_HAS_FLAG(&(PolynaryExpr->funcName->u.funcInfo), slvFUNC_DEFINED_OUTSIDE))
     {
         gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                         PolynaryExpr->exprBase.base.lineNo,
@@ -27907,7 +28147,30 @@ sloIR_POLYNARY_EXPR_GenFuncCallCode(
         PolynaryExpr->funcName->context.function->intrinsicsKind = PolynaryExpr->funcName->u.funcInfo.intrinsicKind;
 
         /* set intrinsic function label's function, these labels
-           needs to be patched later after compiling the library*/
+           needs to be patched later after compiling the library */
+        if (gcSHADER_FindLabel(shader, funcLabel, &shaderLabel))
+        {
+            shaderLabel->function = PolynaryExpr->funcName->context.function;
+        }
+        else
+        {
+            gcmASSERT(gcvFALSE);
+        }
+    }
+    else if (isFuncUndefined )
+    {
+        gcSHADER    shader;
+        gcSHADER_LABEL  shaderLabel;
+
+        gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &shader));
+
+        /* set shader has the extern function */
+        SetShaderHasExternFunction(shader, gcvTRUE);
+
+        /* set function call extern */
+        SetKFunctionFlags(PolynaryExpr->funcName->context.function, gcvFUNC_EXTERN);
+
+        /* set extern function label's function */
         if (gcSHADER_FindLabel(shader, funcLabel, &shaderLabel))
         {
             shaderLabel->function = PolynaryExpr->funcName->context.function;
@@ -28087,6 +28350,7 @@ sloIR_POLYNARY_EXPR_GenCode(
     case slvPOLYNARY_CONSTRUCT_INT:
     case slvPOLYNARY_CONSTRUCT_BOOL:
     case slvPOLYNARY_CONSTRUCT_UINT:
+    case slvPOLYNARY_CONSTRUCT_DOUBLE:
         status = sloIR_POLYNARY_EXPR_GenConstructScalarCode(
                                                         Compiler,
                                                         CodeGenerator,
@@ -28117,6 +28381,9 @@ sloIR_POLYNARY_EXPR_GenCode(
     case slvPOLYNARY_CONSTRUCT_UVEC2:
     case slvPOLYNARY_CONSTRUCT_UVEC3:
     case slvPOLYNARY_CONSTRUCT_UVEC4:
+    case slvPOLYNARY_CONSTRUCT_DVEC2:
+    case slvPOLYNARY_CONSTRUCT_DVEC3:
+    case slvPOLYNARY_CONSTRUCT_DVEC4:
         status = sloIR_POLYNARY_EXPR_GenConstructVectorCode(
                                                         Compiler,
                                                         CodeGenerator,
@@ -28135,6 +28402,15 @@ sloIR_POLYNARY_EXPR_GenCode(
     case slvPOLYNARY_CONSTRUCT_MAT4:
     case slvPOLYNARY_CONSTRUCT_MAT4X2:
     case slvPOLYNARY_CONSTRUCT_MAT4X3:
+    case slvPOLYNARY_CONSTRUCT_DMAT2:
+    case slvPOLYNARY_CONSTRUCT_DMAT2X3:
+    case slvPOLYNARY_CONSTRUCT_DMAT2X4:
+    case slvPOLYNARY_CONSTRUCT_DMAT3:
+    case slvPOLYNARY_CONSTRUCT_DMAT3X2:
+    case slvPOLYNARY_CONSTRUCT_DMAT3X4:
+    case slvPOLYNARY_CONSTRUCT_DMAT4:
+    case slvPOLYNARY_CONSTRUCT_DMAT4X2:
+    case slvPOLYNARY_CONSTRUCT_DMAT4X3:
         status = sloIR_POLYNARY_EXPR_GenConstructMatrixCode(
                                                         Compiler,
                                                         CodeGenerator,

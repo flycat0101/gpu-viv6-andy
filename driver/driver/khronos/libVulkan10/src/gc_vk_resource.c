@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -28,10 +28,10 @@ __vkFormatInfo g_vkFormatInfoTable[] =
     {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 8, 1, VK_FORMAT_UNDEFINED,
     {0, 0, 0}},
     /*      VK_FORMAT_R4G4B4A4_UNORM_PACK16     */
-    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 16, 1, __VK_FORMAT_A4R4G4B4_UNFORM_PACK16,
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 16, 1, __VK_FORMAT_A4R4G4B4_UNORM_PACK16,
     {0, 0, 0}},
     /*      VK_FORMAT_B4G4R4A4_UNORM_PACK16     */
-    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 16, 1, __VK_FORMAT_A4R4G4B4_UNFORM_PACK16,
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 16, 1, __VK_FORMAT_A4R4G4B4_UNORM_PACK16,
     {0,
      __VK_FORMAT_SAMPLE_IMAGE_FILTERABLE_FEATURES,
      0}},
@@ -44,10 +44,8 @@ __vkFormatInfo g_vkFormatInfoTable[] =
     {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 16, 1, VK_FORMAT_R5G6B5_UNORM_PACK16,
     {0, 0, 0}},
     /*      VK_FORMAT_R5G5B5A1_UNORM_PACK16, */
-    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 16, 1, VK_FORMAT_A1R5G5B5_UNORM_PACK16,
-    {0,
-     __VK_FORMAT_SAMPLE_IMAGE_FILTERABLE_FEATURES,
-     0}},
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 16, 1, VK_FORMAT_UNDEFINED,
+    {0, 0, 0}},
      /*     VK_FORMAT_B5G5R5A1_UNORM_PACK16, */
     {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 16, 1, VK_FORMAT_A1R5G5B5_UNORM_PACK16,
     {0, 0, 0}},
@@ -244,10 +242,8 @@ __vkFormatInfo g_vkFormatInfoTable[] =
      __VK_FORMAT_SAMPLE_IMAGE_FILTERABLE_FEATURES | __VK_FORMAT_COLOR_BLEND_FEATURES,
      0}},
      /*    VK_FORMAT_A2R10G10B10_UNORM_PACK32, */
-    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 32, 1, VK_FORMAT_A2B10G10R10_UNORM_PACK32,
-    {0,
-     __VK_FORMAT_SAMPLE_IMAGE_FILTERABLE_FEATURES | __VK_FORMAT_COLOR_BLEND_FEATURES,
-     __VK_FORMAT_SAMPLE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_VERTEX_FEATURES}},
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 32, 1, VK_FORMAT_UNDEFINED,
+    {0, 0, 0}},
     /*    VK_FORMAT_A2R10G10B10_SNORM_PACK32, */
     {__VK_FMT_CATEGORY_SNORM, VK_FALSE, { 1, 1}, 32, 1, VK_FORMAT_UNDEFINED,
     {0, 0, 0}},
@@ -801,38 +797,8 @@ __vkFormatInfo g_vkFormatInfoTable[] =
     {0,
     __VK_FORMAT_SAMPLE_IMAGE_FEATURES | __VK_FORMAT_COLOR_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
     __VK_FORMAT_SAMPLE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_STORAGE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_VERTEX_FEATURES}},
-    /*    __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT, */
-    {__VK_FMT_CATEGORY_SFLOAT, VK_FALSE, { 1, 1}, 64, 2, __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT,
-    {__VK_FORMAT_SAMPLE_IMAGE_FILTERABLE_FEATURES | __VK_FORMAT_COLOR_BLEND_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
-     __VK_FORMAT_SAMPLE_IMAGE_FILTERABLE_FEATURES | __VK_FORMAT_COLOR_BLEND_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
-     __VK_FORMAT_SAMPLE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_STORAGE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_VERTEX_FEATURES}},
-    /*    __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT, */
-    {__VK_FMT_CATEGORY_SINT, VK_FALSE, { 1, 1}, 64, 2, __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT,
-    {__VK_FORMAT_SAMPLE_IMAGE_FEATURES | __VK_FORMAT_COLOR_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
-     __VK_FORMAT_SAMPLE_IMAGE_FEATURES | __VK_FORMAT_COLOR_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
-     __VK_FORMAT_SAMPLE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_STORAGE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_VERTEX_FEATURES}},
-    /*    __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT, */
-    {__VK_FMT_CATEGORY_UINT, VK_FALSE, { 1, 1}, 64, 2, __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT,
-    {__VK_FORMAT_SAMPLE_IMAGE_FEATURES | __VK_FORMAT_COLOR_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
-     __VK_FORMAT_SAMPLE_IMAGE_FEATURES | __VK_FORMAT_COLOR_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
-     __VK_FORMAT_SAMPLE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_STORAGE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_VERTEX_FEATURES}},
-    /*    __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT, */
-    {__VK_FMT_CATEGORY_SFLOAT, VK_FALSE, { 1, 1}, 64, 2, __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT,
-    {__VK_FORMAT_SAMPLE_IMAGE_FEATURES | __VK_FORMAT_COLOR_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
-     __VK_FORMAT_SAMPLE_IMAGE_FEATURES | __VK_FORMAT_COLOR_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
-     __VK_FORMAT_SAMPLE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_STORAGE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_VERTEX_FEATURES}},
-    /*    __VK_FORMAT_R32G32_SINT_2_R32_SINT, */
-    {__VK_FMT_CATEGORY_SINT, VK_FALSE, { 1, 1}, 64, 2, __VK_FORMAT_R32G32_SINT_2_R32_SINT,
-    {__VK_FORMAT_SAMPLE_IMAGE_FEATURES | __VK_FORMAT_COLOR_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
-     __VK_FORMAT_SAMPLE_IMAGE_FEATURES | __VK_FORMAT_COLOR_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
-     __VK_FORMAT_SAMPLE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_STORAGE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_VERTEX_FEATURES}},
-    /*    __VK_FORMAT_R32G32_UINT_2_R32_UINT, */
-    {__VK_FMT_CATEGORY_UINT, VK_FALSE, { 1, 1}, 64, 2, __VK_FORMAT_R32G32_UINT_2_R32_UINT,
-    {__VK_FORMAT_SAMPLE_IMAGE_FEATURES | __VK_FORMAT_COLOR_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
-     __VK_FORMAT_SAMPLE_IMAGE_FEATURES | __VK_FORMAT_COLOR_FEATURES | __VK_FORMAT_STORAGE_IMAGE_FEATURES,
-     __VK_FORMAT_SAMPLE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_STORAGE_TEXEL_BUFFER_FEATURES | __VK_FORMAT_VERTEX_FEATURES}},
-    /*  __VK_FORMAT_A4R4G4B4_UNFORM_PACK16, */
-    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 16, 1, __VK_FORMAT_A4R4G4B4_UNFORM_PACK16,
+    /*  __VK_FORMAT_A4R4G4B4_UNORM_PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, { 1, 1}, 16, 1, __VK_FORMAT_A4R4G4B4_UNORM_PACK16,
     {0,
     __VK_FORMAT_SAMPLE_IMAGE_FILTERABLE_FEATURES,
     0}},
@@ -853,7 +819,6 @@ __vkFormatInfo g_vkFormatInfoTable[] =
     0}},
 };
 
-#if __VK_NEW_DEVICE_QUEUE
 static VkResult __vki_CreateSurfNode(
     __vkDevContext *devCtx,
     gcsSURF_NODE_PTR node,
@@ -875,13 +840,13 @@ static VkResult __vki_CreateSurfNode(
     iface.u.AllocateLinearVideoMemory.alignment = alignment;
     iface.u.AllocateLinearVideoMemory.flag = flag;
     iface.u.AllocateLinearVideoMemory.pool = pool;
-    iface.u.AllocateLinearVideoMemory.type = surfType;
+    iface.u.AllocateLinearVideoMemory.type = (gctUINT32)surfType & 0xFF;
 
     __VK_ONERROR(__vk_DeviceControl(&iface, 0));
 
     node->u.normal.node = iface.u.AllocateLinearVideoMemory.node;
     node->pool          = iface.u.AllocateLinearVideoMemory.pool;
-    node->size          = iface.u.AllocateLinearVideoMemory.bytes;
+    node->size          = (gctSIZE_T)iface.u.AllocateLinearVideoMemory.bytes;
 
     node->physical2     = ~0U;
     node->physical3     = ~0U;
@@ -926,7 +891,7 @@ OnError:
 static VkBool32
 __vki_IsResourceFlatMapped(
     __vkDevContext *devCtx,
-    uint32_t physical
+    gctPHYS_ADDR_T physical
     )
 {
     uint32_t i;
@@ -934,6 +899,7 @@ __vki_IsResourceFlatMapped(
     {
         if ((physical >= devCtx->chipInfo->flatMappingRanges[i].start) &&
             (physical < devCtx->chipInfo->flatMappingRanges[i].end) &&
+            (devCtx->chipInfo->flatMappingRanges[i].flag == gcvFLATMAP_DIRECT) &&
             (physical != ~0U))
         {
             return VK_TRUE;
@@ -963,15 +929,15 @@ VkResult __vki_LockSurfNode(
 
         if (node->pool == gcvPOOL_USER)
         {
-            gctUINT32 physical;
+            gctPHYS_ADDR_T physical;
 
-            gcmSAFECASTPHYSADDRT(physical, node->u.wrapped.physical);
+            physical = node->u.wrapped.physical;
 
             if (physical != gcvINVALID_ADDRESS)
             {
                 gctUINT32 baseAddress;
 
-                gcmVERIFY_OK(gcoOS_GetBaseAddress(gcvNULL, &baseAddress));
+                gcmVERIFY_OK(gcoHAL_GetBaseAddr(gcvNULL, &baseAddress));
                 physical -= baseAddress;
                 gcoOS_CPUPhysicalToGPUPhysical(physical, &physical);
             }
@@ -987,7 +953,7 @@ VkResult __vki_LockSurfNode(
                 ** Since 'physical' is only for one hardware, it can't be used by other hardware type.
                 */
                 gcmASSERT(node->logical != gcvNULL);
-                node->hardwareAddresses[type] = physical + (gctUINT32)node->bufferOffset;
+                node->hardwareAddresses[type] = (gctUINT32)physical + (gctUINT32)node->bufferOffset;
             }
             else if (__vki_IsResourceFlatMapped(devCtx, physical))
             {
@@ -995,7 +961,7 @@ VkResult __vki_LockSurfNode(
                 ** If physical address is in flat mapping range of current hardware,
                 ** use physical address as hardware address instead of lock in kernel.
                 */
-                node->hardwareAddresses[type] = physical + (gctUINT32) node->bufferOffset;
+                node->hardwareAddresses[type] = (gctUINT32)physical + (gctUINT32) node->bufferOffset;
 
                 handle = 0;
 
@@ -1064,7 +1030,7 @@ VkResult __vki_UnlockSurfNode(
     /* Verify whether the node is valid. */
     if (node->lockCounts[type][engine] <= 0)
     {
-        __VK_PRINT("__vki_UnlockSurfNode: node=0x%x; unlock called on an unlocked surface.", node);
+        __VK_PRINT("__vki_UnlockSurfNode: node=%p unlock called on an unlocked surface.", node);
     }
     /* Locked more then once? */
     else
@@ -1093,13 +1059,13 @@ VkResult __vki_UnlockSurfNode(
                 iface.engine = engine;
                 iface.command = gcvHAL_UNLOCK_VIDEO_MEMORY;
                 iface.u.UnlockVideoMemory.node = handle;
-                iface.u.UnlockVideoMemory.type = surfType & ~gcvSURF_NO_VIDMEM;
+                iface.u.UnlockVideoMemory.type = (gctUINT32)surfType & 0xFF;
                 /* Call the kernel. */
                 __VK_ONERROR(__vk_DeviceControl(&iface, 0));
 
                 iface.command = gcvHAL_BOTTOM_HALF_UNLOCK_VIDEO_MEMORY;
                 iface.u.BottomHalfUnlockVideoMemory.node = handle;
-                iface.u.BottomHalfUnlockVideoMemory.type = surfType & ~gcvSURF_NO_VIDMEM;
+                iface.u.BottomHalfUnlockVideoMemory.type = (gctUINT32)surfType & 0xFF;
                 /* Call the kernel. */
                 __VK_ONERROR(__vk_DeviceControl(&iface, 0));
             }
@@ -1112,9 +1078,6 @@ OnError:
 
     return result;
 }
-
-
-#endif
 
 static VkResult __vki_ImportDmabuf(
     __vkDevContext *devCtx,
@@ -1215,7 +1178,7 @@ static VkResult __vki_ImportUserMemory(
     __VK_ONERROR(__vk_DeviceControl(&iface, 0));
 
     node->u.normal.node = iface.u.WrapUserMemory.node;
-    node->pool          = gcvPOOL_VIRTUAL;
+    node->pool          = gcvPOOL_USER;
     node->size          = size;
 
     node->physical2     = ~0U;
@@ -1262,7 +1225,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
         dvm->size   = (gctSIZE_T)pAllocateInfo->allocationSize;
         gcoOS_MemCopy(&dvm->allocInfo, pAllocateInfo, gcmSIZEOF(VkMemoryAllocateInfo));
 
-#if __VK_NEW_DEVICE_QUEUE
         __VK_ERR_BREAK(__vki_CreateSurfNode(devCtx, &dvm->node, (uint32_t)dvm->size, dvm->align, gcvSURF_TYPE_UNKNOWN,
                                             gcvALLOC_FLAG_NONE, gcvPOOL_DEFAULT));
 
@@ -1274,18 +1236,13 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
         {
             __VK_MEMZERO(dvm->hostAddr, dvm->size);
         }
-#else
-        gcmERR_BREAK(gcsSURF_NODE_Construct(&dvm->node, dvm->size, dvm->align, gcvSURF_TYPE_UNKNOWN,
-                                            gcvALLOC_FLAG_NONE, gcvPOOL_DEFAULT));
 
-        gcmERR_BREAK(gcsSURF_NODE_Lock(&dvm->node, gcvENGINE_RENDER, &dvm->devAddr, &dvm->hostAddr));
-#endif
 #if gcdDUMP
         __VK_MEMZERO(dvm->hostAddr, dvm->size);
 
-        gcmDUMP(gcvNULL, "#[info: initialize device memory=%d", dvm->obj.id);
+        gcmDUMP(gcvNULL, "#[info: initialize device memory=%d]", dvm->obj.id);
         gcmDUMP_BUFFER(gcvNULL,
-                       "memory",
+                       gcvDUMP_BUFFER_MEMORY,
                        dvm->devAddr,
                        dvm->hostAddr,
                        0,
@@ -1297,7 +1254,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
 
     if (gcmIS_ERROR(status) && dvm)
     {
-#if __VK_NEW_DEVICE_QUEUE
         if (dvm->hostAddr)
         {
             __VK_VERIFY_OK(__vki_UnlockSurfNode(devCtx, &dvm->node));
@@ -1307,17 +1263,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
         {
             __VK_VERIFY_OK(__vki_DestroySurfNode(devCtx, &dvm->node));
         }
-#else
-        if (dvm->hostAddr)
-        {
-            gcmVERIFY_OK(gcsSURF_NODE_Unlock(&dvm->node, gcvENGINE_RENDER));
-        }
-
-        if (dvm->node.pool != gcvPOOL_UNKNOWN)
-        {
-            gcmVERIFY_OK(gcsSURF_NODE_Destroy(&dvm->node));
-        }
-#endif
         __vk_DestroyObject(devCtx, __VK_OBJECT_DEVICE_MEMORY, (__vkObject *)dvm);
     }
 
@@ -1389,22 +1334,14 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_ImportMemory(
         if (result != VK_SUCCESS)
             break;
 
-#if __VK_NEW_DEVICE_QUEUE
         __VK_ERR_BREAK(__vki_LockSurfNode(devCtx, &dvm->node, &dvm->devAddr, &dvm->hostAddr));
-
-#else
-        if (gcmIS_ERROR(gcsSURF_NODE_Lock(&dvm->node, gcvENGINE_RENDER, &dvm->devAddr, &dvm->hostAddr)))
-        {
-            break;
-        }
-#endif
 
 #if gcdDUMP
         __VK_MEMZERO(dvm->hostAddr, dvm->size);
 
-        gcmDUMP(gcvNULL, "#[info: initialize device memory=%d", dvm->obj.id);
+        gcmDUMP(gcvNULL, "#[info: initialize device memory=%d]", dvm->obj.id);
         gcmDUMP_BUFFER(gcvNULL,
-                       "memory",
+                       gcvDUMP_BUFFER_MEMORY,
                        dvm->devAddr,
                        dvm->hostAddr,
                        0,
@@ -1419,7 +1356,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_ImportMemory(
     /* Error rollback. */
     if (dvm)
     {
-#if __VK_NEW_DEVICE_QUEUE
         if (dvm->hostAddr)
         {
             __VK_VERIFY_OK(__vki_UnlockSurfNode(devCtx, &dvm->node));
@@ -1429,17 +1365,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_ImportMemory(
         {
             __VK_VERIFY_OK(__vki_DestroySurfNode(devCtx, &dvm->node));
         }
-#else
-        if (dvm->hostAddr)
-        {
-            gcmVERIFY_OK(gcsSURF_NODE_Unlock(&dvm->node, gcvENGINE_RENDER));
-        }
-
-        if (dvm->node.pool != gcvPOOL_UNKNOWN)
-        {
-            gcmVERIFY_OK(gcsSURF_NODE_Destroy(&dvm->node));
-        }
-#endif
         __vk_DestroyObject(devCtx, __VK_OBJECT_DEVICE_MEMORY, (__vkObject *)dvm);
     }
 
@@ -1460,7 +1385,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_FreeMemory(
         /* Set the allocator to the parent allocator or API defined allocator if valid */
         __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
 #endif
-#if __VK_NEW_DEVICE_QUEUE
         __VK_VERIFY_OK(__vki_UnlockSurfNode(devCtx, &dvm->node));
         __VK_VERIFY_OK(__vki_DestroySurfNode(devCtx, &dvm->node));
 #if __VK_ENABLETS
@@ -1482,29 +1406,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_FreeMemory(
             __VK_FREE(dvm->ts);
         }
 #endif
-#else
-        gcmVERIFY_OK(gcsSURF_NODE_Unlock(&dvm->node, gcvENGINE_RENDER));
-        gcmVERIFY_OK(gcsSURF_NODE_Destroy(&dvm->node));
-#if __VK_ENABLETS
-        /* Free TS related information. */
-        if (dvm->ts)
-        {
-            uint32_t i = 0;
-            gcmVERIFY_OK(gcsSURF_NODE_Unlock(&dvm->ts->tsNode, gcvENGINE_RENDER));
-            gcmVERIFY_OK(gcsSURF_NODE_Destroy(&dvm->ts->tsNode));
-            for (i = 0; i < dvm->ts->mipLevels; i++)
-            {
-                __VK_FREE(dvm->ts->tileStatusDisable[i]);
-                __VK_FREE(dvm->ts->fcValue[i]);
-                __VK_FREE(dvm->ts->fcValueUpper[i]);
-            }
-            __VK_FREE(dvm->ts->tileStatusDisable);
-            __VK_FREE(dvm->ts->fcValue);
-            __VK_FREE(dvm->ts->fcValueUpper);
-            __VK_FREE(dvm->ts);
-        }
-#endif
-#endif
+
         __vk_DestroyObject(devCtx, __VK_OBJECT_DEVICE_MEMORY, (__vkObject *)dvm);
     }
 }
@@ -1535,15 +1437,13 @@ VKAPI_ATTR void VKAPI_CALL __vk_UnmapMemory(
 {
     __vkDeviceMemory *dvm = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory *, mem);
 
-#if gcdDUMP
-    gcmDUMP(gcvNULL, "#[info: update device memory=%d", dvm->obj.id);
+    gcmDUMP(gcvNULL, "#[info: update device memory=%d]", dvm->obj.id);
     gcmDUMP_BUFFER(gcvNULL,
-                   "memory",
+                   gcvDUMP_BUFFER_MEMORY,
                    dvm->devAddr,
                    dvm->hostAddr,
                    (gctUINT)dvm->mappedOffset,
                    (gctUINT)dvm->mappedSize);
-#endif
 
     dvm->mappedOffset = 0;
     dvm->mappedSize = 0;
@@ -1713,19 +1613,11 @@ VkResult __vki_AllocateTileStatus(
                 break;
             }
 
-#if __VK_NEW_DEVICE_QUEUE
             __VK_ERR_BREAK(__vki_CreateSurfNode(devCtx, &tsResource->tsNode, totalBytes, 1, gcvSURF_TYPE_UNKNOWN,
                 gcvALLOC_FLAG_NONE, gcvPOOL_DEFAULT));
 
             __VK_ERR_BREAK(__vki_LockSurfNode(devCtx, &tsResource->tsNode, &tsResource->devAddr, &tsResource->hostAddr));
 
-#else
-            /* Allocate the tile status buffer. */
-            __VK_ERR_BREAK(gcsSURF_NODE_Construct(&tsResource->tsNode, totalBytes, 1, gcvSURF_TILE_STATUS,
-                gcvALLOC_FLAG_NONE, gcvPOOL_DEFAULT));
-
-            __VK_ERR_BREAK(gcsSURF_NODE_Lock(&tsResource->tsNode, gcvENGINE_RENDER, VK_NULL_HANDLE, VK_NULL_HANDLE));
-#endif
             /* Fill the tile status memory with the invalid filler.
                APP may give memory with context, we set TS to be invalid, and make it enable
             */
@@ -1739,7 +1631,7 @@ VkResult __vki_AllocateTileStatus(
                 /* Determine color compression format. */
                 switch (img->formatInfo.residentImgFormat)
                 {
-                case __VK_FORMAT_A4R4G4B4_UNFORM_PACK16:
+                case __VK_FORMAT_A4R4G4B4_UNORM_PACK16:
                     if (!devCtx->database->CACHE128B256BPERLINE)
                     {
                         compressedFormat = 0x0;
@@ -1911,13 +1803,8 @@ void __vkGetAlign(
     gctUINT32 alignX, alignY, alignH;
     gctUINT32 resolveAlignX, resolveAlignY;
 
-#if __VK_NEW_DEVICE_QUEUE
     resolveAlignX = (devCtx->database->REG_BltEngine) ? 1 : 16;
     resolveAlignY = (devCtx->database->REG_BltEngine) ? 1 : 4;
-#else
-    resolveAlignX = devCtx->hardware->resolveAlignmentX;
-    resolveAlignY = devCtx->hardware->resolveAlignmentY;
-#endif
 
     if ((formatInfo->residentImgFormat >= VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK &&
          formatInfo->residentImgFormat <= VK_FORMAT_ASTC_12x12_SRGB_BLOCK))
@@ -2259,7 +2146,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
         uint32_t level;
         gctUINT width, height, depth;
         VkBool32 enableCC;
-        uint32_t residentFormat;
         __VK_ONERROR(__vk_CreateObject(devCtx, __VK_OBJECT_IMAGE, sizeof(__vkImage), (__vkObject**)&img));
 
         img->devCtx = devCtx;
@@ -2276,7 +2162,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
         }
         else
         {
-            residentFormat = g_vkFormatInfoTable[pCreateInfo->format].residentImgFormat;
+            uint32_t residentFormat = g_vkFormatInfoTable[pCreateInfo->format].residentImgFormat;
             img->formatInfo = g_vkFormatInfoTable[residentFormat];
         }
 
@@ -2285,36 +2171,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
             /* Shouldn't happen if app pays attention to format queries */
             __VK_ASSERT(0);
             __VK_ONERROR(VK_ERROR_FORMAT_NOT_SUPPORTED);
-        }
-        else if (img->formatInfo.bitsPerBlock == 64 && (img->createInfo.samples & VK_SAMPLE_COUNT_4_BIT) &&
-                 !devCtx->database->CACHE128B256BPERLINE)
-        {
-            uint32_t fakedFormat = VK_FORMAT_UNDEFINED;
-            switch (img->formatInfo.residentImgFormat)
-            {
-            case VK_FORMAT_R16G16B16A16_SFLOAT:
-                fakedFormat = __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT;
-                break;
-            case VK_FORMAT_R16G16B16A16_SINT:
-                fakedFormat = __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT;
-                break;
-            case VK_FORMAT_R16G16B16A16_UINT:
-                fakedFormat = __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT;
-                break;
-            case VK_FORMAT_R32G32_SFLOAT:
-                fakedFormat = __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT;
-                break;
-            case VK_FORMAT_R32G32_SINT:
-                fakedFormat = __VK_FORMAT_R32G32_SINT_2_R32_SINT;
-                break;
-            case VK_FORMAT_R32G32_UINT:
-                fakedFormat = __VK_FORMAT_R32G32_UINT_2_R32_UINT;
-                break;
-            default:
-                __VK_ASSERT(!"invalid format!");
-                break;
-            }
-            img->formatInfo = g_vkFormatInfoTable[fakedFormat];
         }
 
         __vkGetAlign(devCtx, &img->formatInfo, pCreateInfo->tiling, &alignX, &alignY, &img->hAlignment, &img->halTiling);

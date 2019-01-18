@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -240,6 +240,7 @@ _VSC_DCE_MarkAndQueueOutput(
     gctUINT8            channel = 0;
     VIR_Enable          enable;
     VIR_Symbol*         sym;
+    gctUINT             componentCount = VIR_CHANNEL_NUM;
 
     if(!dest)
     {
@@ -276,8 +277,16 @@ _VSC_DCE_MarkAndQueueOutput(
         return;
     }
 
+    /* If it has a fixed type, use its componentCount. */
+    if (VIR_Symbol_GetFixedTypeId(sym) != VIR_INVALID_ID)
+    {
+        componentCount = VIR_GetTypeComponents(VIR_Symbol_GetFixedTypeId(sym));
+    }
+
+    gcmASSERT(componentCount <= VIR_CHANNEL_NUM);
+
     /* Check if it's a real output. */
-    for(channel = 0; channel < VIR_CHANNEL_NUM; channel ++)
+    for(channel = 0; channel < componentCount; channel ++)
     {
         VIR_GENERAL_DU_ITERATOR  du_iter;
         VIR_USAGE               *use        = gcvNULL;
@@ -329,7 +338,7 @@ _VSC_DCE_MarkInstAll(
     VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
 
     if(VIR_OPCODE_hasDest(opcode) &&
-       !VIR_OPCODE_isVXOnly(opcode))
+       !VIR_OPCODE_isVX(opcode))
     {
         VIR_Operand        *dest  = VIR_Inst_GetDest(inst);
         if(VIR_OpndInfo_Is_Virtual_Reg(dest_info))
@@ -366,7 +375,7 @@ _VSC_DCE_InitDCEOnFunction(
     {
         VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
 
-        if (VIR_OPCODE_isVXOnly(opcode))
+        if (VIR_OPCODE_isVX(opcode))
         {
             _VSC_DCE_MarkInstAll(dce, inst, gcvNULL);
         }
@@ -655,6 +664,24 @@ _VSC_DCE_DeleteUsage(
     return errCode;
 }
 
+static void
+_VSC_DCE_RemoveInstruction(
+    IN VSC_DCE          *dce,
+    IN VIR_Function     *func,
+    IN VIR_Instruction  *inst
+    )
+{
+    VIR_BASIC_BLOCK     *BB = VIR_Inst_GetBasicBlock(inst);
+
+    VIR_Function_RemoveInstruction(func, inst);
+
+    /* If there is no instruction within one BB, we need to rebuild CFG, otherwise CFG is wrong after DCE. */
+    if (BB && BB_GET_LENGTH(BB) == 0)
+    {
+        dce->rebuildCFG = gcvTRUE;
+    }
+}
+
 static VIR_Instruction*
 _VSC_DCE_GetNextInst(
     IN VSC_DCE          *dce,
@@ -680,7 +707,7 @@ _VSC_DCE_GetNextInst(
             _VSC_DCE_DumpWorkListNode(dce, inst);
         }
 
-        VIR_Function_RemoveInstruction(func, inst);
+        _VSC_DCE_RemoveInstruction(dce, func, inst);
         inst = nxtInst;
     }
     else
@@ -728,13 +755,20 @@ _VSC_DCE_RemoveDeadCodeOnFunction(
 
         /* HW has restrictions on NORM_DPx and NORM_MUL that src component for pre-normalize
            must be same and enable of NORM_MUL must be xy/xyz/xyzw, so let's keep it as original. */
-        if (VIR_Inst_GetOpcode(inst) == VIR_OP_NORM     ||
-            VIR_Inst_GetOpcode(inst) == VIR_OP_NORM_DP2 ||
-            VIR_Inst_GetOpcode(inst) == VIR_OP_NORM_DP3 ||
-            VIR_Inst_GetOpcode(inst) == VIR_OP_NORM_DP4 ||
-            VIR_Inst_GetOpcode(inst) == VIR_OP_NORM_MUL ||
-            VIR_OPCODE_isVXOnly(VIR_Inst_GetOpcode(inst)) ||
-            (VIR_OPCODE_LoadsOrStores(VIR_Inst_GetOpcode(inst)) && VIR_OPCODE_LoadsOnly(VIR_Inst_GetOpcode(inst))))
+        if (opcode == VIR_OP_NORM     ||
+            opcode == VIR_OP_NORM_DP2 ||
+            opcode == VIR_OP_NORM_DP3 ||
+            opcode == VIR_OP_NORM_DP4 ||
+            opcode == VIR_OP_NORM_MUL ||
+            opcode == VIR_OP_CMAD     ||
+            opcode == VIR_OP_CMUL     ||
+            opcode == VIR_OP_CADD     ||
+            opcode == VIR_OP_CMADCJ     ||
+            opcode == VIR_OP_CMULCJ     ||
+            opcode == VIR_OP_CADDCJ     ||
+            opcode == VIR_OP_CSUBCJ     ||
+            VIR_OPCODE_isVX(opcode) ||
+            (VIR_OPCODE_LoadsOrStores(opcode) && VIR_OPCODE_LoadsOnly(opcode)))
         {
             if (VSC_DCE_GetMarkByInst(dce, inst).isAlive != 0)
             {
@@ -837,7 +871,7 @@ _VSC_DCE_RemoveDeadCodeOnFunction(
                 VIR_Instruction* lastInst = VIR_Function_GetInstEnd(func);
                 if(lastInst == inst)
                 {
-                    VIR_Function_RemoveInstruction(func, inst);
+                    _VSC_DCE_RemoveInstruction(dce, func, inst);
                     break;
                 }
                 else if(VIR_Inst_GetOpcode(lastInst) != VIR_OP_LABEL)
@@ -1056,6 +1090,11 @@ DEF_QUERY_PASS_PROP(VSC_DCE_Perform)
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
 
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
+}
+
+DEF_SH_NECESSITY_CHECK(VSC_DCE_Perform)
+{
+    return gcvTRUE;
 }
 
 VSC_ErrCode

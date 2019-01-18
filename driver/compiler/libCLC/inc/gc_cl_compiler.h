@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -196,6 +196,12 @@ cloCOMPILER_Unload(
 
 gceSTATUS
 cloCOMPILER_Construct(
+    INOUT cloCOMPILER Compiler
+    );
+
+gceSTATUS
+cloCOMPILER_Construct_General(
+    IN gctCONST_STRING Options,
     OUT cloCOMPILER * Compiler
     );
 
@@ -208,6 +214,12 @@ cloCOMPILER_ConstructByLangVersion(
 /* Destroy an cloCOMPILER object. */
 gceSTATUS
 cloCOMPILER_Destroy(
+    IN cloCOMPILER Compiler
+    );
+
+/* Destroy an cloCOMPILER object. */
+gceSTATUS
+cloCOMPILER_Destroy_General(
     IN cloCOMPILER Compiler
     );
 
@@ -311,6 +323,13 @@ cloCOMPILER_Free(
     IN gctPOINTER Memory
     );
 
+/* Allocate name for the compiler */
+gceSTATUS
+cloCOMPILER_AllocateName(
+    IN cloCOMPILER Compiler,
+    OUT gctPOINTER * Memory
+    );
+
 /* Report info */
 typedef enum _cleREPORT_TYPE
 {
@@ -380,6 +399,31 @@ cloCOMPILER_AllocatePoolString(
     );
 
 gceSTATUS
+cloCOMPILER_SetCurrentPMP(
+IN cloCOMPILER  Compiler,
+IN VSC_PRIMARY_MEM_POOL *CurrentPMP
+);
+
+VSC_PRIMARY_MEM_POOL *
+cloCOMPILER_SetGeneralPMP(
+IN cloCOMPILER  Compiler
+);
+
+gceSTATUS
+cloCOMPILER_FindPrivatePoolString(
+    IN cloCOMPILER Compiler,
+    IN gctCONST_STRING String,
+    OUT cltPOOL_STRING * PoolString
+    );
+
+gceSTATUS
+cloCOMPILER_FindGeneralPoolString(
+    IN cloCOMPILER Compiler,
+    IN gctCONST_STRING String,
+    OUT cltPOOL_STRING * PoolString
+    );
+
+gceSTATUS
 cloCOMPILER_FindPoolString(
     IN cloCOMPILER Compiler,
     IN gctCONST_STRING String,
@@ -424,6 +468,24 @@ gceSTATUS
 cloCOMPILER_SetLongUlongPatch(
 IN cloCOMPILER Compiler
 );
+
+gceSTATUS
+cloCOMPILER_SetHasCalculatePreScaleGlobalId(
+    IN cloCOMPILER Compiler
+    );
+
+gceSTATUS
+cloCOMPILER_SetGcslDriverImage(
+IN cloCOMPILER Compiler
+);
+
+gctBOOL
+cloCOMPILER_IsLoadingBuiltin(
+    IN cloCOMPILER Compiler
+    );
+
+cloCOMPILER *
+gcGetKernelCompiler(void);
 
 #ifdef __cplusplus
 }

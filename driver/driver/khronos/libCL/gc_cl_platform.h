@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -41,7 +41,6 @@ typedef struct _cl_platform_id
     gctSTRING               profile;
     gctSTRING               extensions;
     gctSTRING               suffix;
-    VSC_HW_CONFIG           hwCfg;
     gcePATCH_ID             patchId;
 
     gctPOINTER              compilerMutex;
@@ -65,6 +64,10 @@ typedef struct _cl_platform_id
 
     gceSTATUS   (*loadCompiler)(IN gcsHWCaps *HWCaps, IN gcePATCH_ID PatchId);
     gceSTATUS   (*unloadCompiler)(void);
+    gctBOOL     virShaderPath;
+
+    VSC_CORE_SYS_CONTEXT vscCoreSysCtx;
+    VSC_SYS_CONTEXT vscSysCtx;
 }
 clsPlatformId;
 
@@ -73,7 +76,7 @@ clfGetDefaultPlatformID(
     clsPlatformId_PTR * Platform
     );
 
-
+extern cl_platform_id clgDefaultPlatform;
 #ifdef __cplusplus
 }
 #endif

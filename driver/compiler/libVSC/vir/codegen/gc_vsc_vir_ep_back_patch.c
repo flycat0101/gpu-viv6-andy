@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -81,7 +81,8 @@ static VSC_ErrCode _AddAlphaKillPatch(VIR_Shader* pShader, VSC_HW_CONFIG* pHwCfg
         /* Add 2 imms to CTC */
         pCTC = _EnlargeCTCRoom(&pOutSEP->constantMapping, 1, gcvNULL);
         vscInitializeCTC(pCTC);
-        pCTC->hwConstantLocation.hwLoc.hwRegNo = hwCnstRegNoFor1fDiv256f;
+        pCTC->hwConstantLocation.hwLoc.constReg.hwRegNo = hwCnstRegNoFor1fDiv256f;
+        pCTC->hwConstantLocation.hwLoc.constReg.hwRegRange = 1;
         pCTC->hwConstantLocation.hwAccessMode = SHADER_HW_ACCESS_MODE_REGISTER;
         _SetValidChannelForHwConstantLoc(&pCTC->hwConstantLocation, hwCnstRegChannelFor1f);
         pCTC->constantValue[hwCnstRegChannelFor1f] = *(gctUINT*)&imm1f;
@@ -202,6 +203,18 @@ DEF_QUERY_PASS_PROP(vscVIR_PerformSEPBackPatch)
     pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_SEP_GEN;
 }
 
+DEF_SH_NECESSITY_CHECK(vscVIR_PerformSEPBackPatch)
+{
+    SHADER_EXECUTABLE_PROFILE* pOutSEP = (SHADER_EXECUTABLE_PROFILE*)pPassWorker->basePassWorker.pPassSpecificData;
+
+    if (!(pOutSEP && vscIsValidSEP(pOutSEP)))
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
 VSC_ErrCode
 vscVIR_PerformSEPBackPatch(
     VSC_SH_PASS_WORKER* pPassWorker
@@ -210,19 +223,13 @@ vscVIR_PerformSEPBackPatch(
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     VIR_Shader*                pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VSC_HW_CONFIG*             pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
-    SHADER_EXECUTABLE_PROFILE* pOutSEP = (SHADER_EXECUTABLE_PROFILE*)pPassWorker->basePassWorker.pPrvData;
+    SHADER_EXECUTABLE_PROFILE* pOutSEP = (SHADER_EXECUTABLE_PROFILE*)pPassWorker->basePassWorker.pPassSpecificData;
     VSC_OPTN_SEPGenOptions*    sepgen_options = (VSC_OPTN_SEPGenOptions*)pPassWorker->basePassWorker.pBaseOption;
-
-    if (!(pOutSEP && vscIsValidSEP(pOutSEP)))
-    {
-        return errCode;
-    }
 
     /* This code is temp put here because such patch is actually a dynamic (recompile)
        patch, and if we put it to general static patch framework, it will complex other
        stages unless we can design multiple-version SEP (which means we can prepare more
-       than one SEP for driver's selection to flush) later.
-       TODO: It will be fully removed after alphakill is moved to recompile framework!!! */
+       than one SEP for driver's selection to flush) later. */
 #if gcdALPHA_KILL_IN_SHADER
     errCode = _AddAlphaKillPatch(pShader, pHwCfg, pOutSEP);
     ON_ERROR(errCode, "Add alphakill patch to SEP");
@@ -243,10 +250,8 @@ vscVIR_PerformSEPBackPatch(
     }
 
     /* check shader instruction in dual16 mode, same check as AQSHADER30::Execute */
-    if (VIR_Shader_isDual16Mode(pShader) && (pOutSEP->endPCOfMainRoutine >= 1024))
-    {
-        gcmASSERT(0);
-    }
+    gcmASSERT(!VIR_Shader_isDual16Mode(pShader) || (pOutSEP->endPCOfMainRoutine < 1024));
+
 OnError:
     return errCode;
 }

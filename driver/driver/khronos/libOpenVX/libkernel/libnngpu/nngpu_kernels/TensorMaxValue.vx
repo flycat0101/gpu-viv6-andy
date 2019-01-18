@@ -1,0 +1,117 @@
+__kernel void gpuTensorMaxValue_FP32
+    (
+    __read_only     image2d_array_t input,
+    __global float *                output
+    )
+{
+    int width = get_image_width(input);
+    int height = get_image_height(input);
+    int depth = get_image_array_size(input);
+    float4 src;
+    int4 coord_in = (int4)(0, 0, 0, 0);
+    float tmpOut = ((float) -3.4028235e+038);
+
+    for(int k = 0; k < depth; k++)
+    {
+        for(int j = 0; j < height; j++)
+        {
+            for(int i = 0; i < width; i++)
+            {
+                src = read_imagef(input, coord_in);
+                tmpOut = fmax(src.x, tmpOut);
+                coord_in.x++;
+            }
+            coord_in.x = 0;
+            coord_in.y++;
+        }
+        coord_in.x = 0;
+        coord_in.y = 0;
+        coord_in.z++;
+    }
+    output[0] = tmpOut;
+}
+
+__kernel void gpuTensorMaxValue_Quant8
+    (
+    __read_only     image2d_array_t input,
+    float                           scaleIn,
+    float                           scaleOut,
+    int                             zpIn,
+    __global uint *                 output
+    )
+{
+    int width = get_image_width(input);
+    int height = get_image_height(input);
+    int depth = get_image_array_size(input);
+    uint4 src;
+    int4 coord_in = (int4)(0, 0, 0, 0);
+    uint tmpOut = 0;
+    float inPxel, maxValue = (convert_int(-zpIn))*scaleIn;
+
+    for(int k = 0; k < depth; k++)
+    {
+        for(int j = 0; j < height; j++)
+        {
+            for(int i = 0; i < width; i++)
+            {
+                src = read_imageui(input, coord_in);
+                inPxel = (convert_int(src.x)-zpIn)*scaleIn;
+                maxValue = fmax(inPxel, maxValue);
+                coord_in.x++;
+            }
+            coord_in.x = 0;
+            coord_in.y++;
+        }
+        coord_in.x = 0;
+        coord_in.y = 0;
+        coord_in.z++;
+    }
+    output[0] = floor(maxValue*scaleOut + zpIn + 0.5);;
+}
+
+__kernel void gpuTensorMaxValue_Dim2FP32
+    (
+    __read_only     image2d_array_t input,
+    __global float *                output
+    )
+{
+    int width = get_image_width(input);
+    float4 src;
+    int4 coord_in = (int4)(0, 0, 0, 0);
+    float tmpOut = ((float) -3.4028235e+038);
+
+    for(int i = 0; i < width; i++)
+    {
+        src = read_imagef(input, coord_in);
+        tmpOut = fmax(src.x, tmpOut);
+        coord_in.x++;
+    }
+
+    output[0] = tmpOut;
+}
+
+__kernel void gpuTensorMaxValue_Dim2Quant8
+    (
+    __read_only     image2d_array_t input,
+    float                           scaleIn,
+    float                           scaleOut,
+    int                             zpIn,
+    __global uint *                 output
+    )
+{
+    int width = get_image_width(input);
+    uint4 src;
+    int4 coord_in = (int4)(0, 0, 0, 0);
+    uint tmpOut = 0;
+    float inPxel, maxValue = (convert_int(-zpIn))*scaleIn;
+
+    for(int i = 0; i < width; i++)
+    {
+        src = read_imageui(input, coord_in);
+        inPxel = (convert_int(src.x)-zpIn)*scaleIn;
+        maxValue = fmax(inPxel, maxValue);
+        coord_in.x++;
+    }
+
+    output[0] = floor(maxValue*scaleOut + zpIn + 0.5);;
+}

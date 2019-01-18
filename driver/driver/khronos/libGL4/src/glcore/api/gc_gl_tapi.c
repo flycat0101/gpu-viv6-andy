@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -44,7 +44,7 @@ __GL_INLINE GLvoid __glTexCoord2fv(__GLcontext *gc, GLuint unit, GLfloat *v)
         GLuint64 tc3fMask = (__GL_ONE_64 << (__GL_TC3F_INDEX + unit));
         GLuint64 tc4fMask = (__GL_ONE_64 << (__GL_TC4F_INDEX + unit));
 
-        if (((gc->input.currentInputMask & (__GL_ONE_32 << (__GL_INPUT_TEX0_INDEX + unit))) == 0) ||
+        if (((gc->input.currentInputMask & (__GL_ONE_64 << (__GL_INPUT_TEX0_INDEX + unit))) == 0) ||
             (gc->input.beginMode != __GL_IN_BEGIN))
         {
             /* If glTexCoord is not needed in glBegin/glEnd */
@@ -164,7 +164,7 @@ __GL_INLINE GLvoid __glTexCoord3fv(__GLcontext *gc, GLuint unit, GLfloat *v)
         GLuint64 tc2fMask = (__GL_ONE_64 << (__GL_TC2F_INDEX + unit));
         GLuint64 tc4fMask = (__GL_ONE_64 << (__GL_TC4F_INDEX + unit));
 
-        if ((gc->input.currentInputMask & (__GL_ONE_32 << (__GL_INPUT_TEX0_INDEX + unit))) == 0)
+        if ((gc->input.currentInputMask & (__GL_ONE_64 << (__GL_INPUT_TEX0_INDEX + unit))) == 0)
         {
             /* If glTexCoord is not needed in glBegin/glEnd */
             gc->state.current.texture[unit].fTex.s = v[0];
@@ -283,7 +283,7 @@ __GL_INLINE GLvoid __glTexCoord4fv(__GLcontext *gc, GLuint unit, GLfloat *v)
         GLuint64 tc2fMask = (__GL_ONE_64 << (__GL_TC2F_INDEX + unit));
         GLuint64 tc3fMask = (__GL_ONE_64 << (__GL_TC3F_INDEX + unit));
 
-        if ((gc->input.currentInputMask & (__GL_ONE_32 << (__GL_INPUT_TEX0_INDEX + unit))) == 0)
+        if ((gc->input.currentInputMask & (__GL_ONE_64 << (__GL_INPUT_TEX0_INDEX + unit))) == 0)
         {
             /* If glTexCoord is not needed in glBegin/glEnd */
             gc->state.current.texture[unit].fTex.s = v[0];

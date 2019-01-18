@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -118,6 +118,13 @@ VIR_BasicBlock_Name_Dump(
     IN VIR_BB         *Bb
     );
 
+VSC_ErrCode
+VIR_Dump_OCLTypeName(
+    IN VIR_Shader *        pShader,
+    IN VIR_TypeId          TypeId,
+    IN OUT gctSTRING       Buffer,
+    IN gctUINT             Length
+    );
 #endif
 
 

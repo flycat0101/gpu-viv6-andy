@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -917,6 +917,8 @@ bool galStretchBlit( void         *drv,
                 src_rect.bottom = src_rect.top + srect->h;
             }
             else if (vdrv->src_rotation == gcvSURF_90_DEGREE) {
+
+                D_DEBUG_AT( Gal_2D, "vdrv->src_aligned_width=%d,width=%d,aligned_height=%d height=%d\n",vdrv->src_aligned_width,vdrv->src_width,vdrv->src_aligned_height,vdrv->src_height);
                 src_rect.left   = srect->y;
                 src_rect.top    = vdrv->src_aligned_width - srect->x - srect->w;
                 src_rect.right  = src_rect.left + srect->h;

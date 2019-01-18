@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -23,13 +23,15 @@ VX_INTERNAL_API void vxoNode_Dump(vx_node node);
 
 VX_INTERNAL_CALLBACK_API void vxoNode_Destructor(vx_reference ref);
 
+VX_INTERNAL_API vx_bool vxoNode_Adapter(vx_graph graph, vx_node node, vx_uint32 index);
+
 VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx_reference value);
 
 VX_INTERNAL_API vx_parameter vxoNode_GetParameter(vx_node node, vx_uint32 index);
 
 typedef enum vx_node_attribute_internal_e
 {
-    VX_NODE_TILE_MEMORY_PTR = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0xD,
+    VX_NODE_TILE_MEMORY_PTR = VX_ATTRIBUTE_BASE(VX_ID_VIVANTE, VX_TYPE_NODE) + 0x0,
 }
 vx_node_attribute_internal_e;
 
@@ -55,6 +57,27 @@ VX_INTERNAL_API vx_status vxoNode_SetWaitCNNEventID0(vx_node node, vx_uint32 eve
 
 VX_INTERNAL_API vx_status vxoNode_SetWaitCNNEventID1(vx_node node, vx_uint32 eventID);
 
+VX_INTERNAL_API vx_bool vxoNode_IsGPUNode(vx_node node);
+
+VX_INTERNAL_API vx_bool vxoNode_HasCPUfunction(vx_node node);
+
+VX_INTERNAL_API vx_bool vxoNode_IsConvNode(vx_node node);
+
+VX_INTERNAL_API vx_bool vxoNode_IsFCNode(vx_node node);
+
+VX_INTERNAL_API vx_bool vxoNode_IsLeakyReluNode(vx_node node);
+
+VX_INTERNAL_API vx_bool vxoNode_IsMaxPoolingNode(vx_node node);
+
+VX_INTERNAL_API vx_node vxoNode_TransferFC2FCRelu(vx_node FCnode);
+
+VX_INTERNAL_API void vxoNode_getInfoFromFCNode(vx_node FCnode, vx_uint32 *pad, vx_uint8 *acc,
+                                               vx_uint32 *rounding, vx_uint32 *overflow, vx_uint32 *down_scale_round);
+
+
+VX_INTERNAL_API vx_status vxoNode_setTensorVxcOptimize(vx_node node);
+
+VX_INTERNAL_API vx_status vxoNode_resetTensorVxcOptimize(vx_node node);
 
 EXTERN_C_END
 

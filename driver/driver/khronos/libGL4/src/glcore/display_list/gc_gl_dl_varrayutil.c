@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1045,7 +1045,8 @@ GLenum __glArrayElement_Generic(__GLcontext *gc, GLuint index, GLfloat **bufptr,
             if (vbo->bufferMapped) {
                 return GL_INVALID_OPERATION;
             }
-            pArray = (GLubyte *)(*gc->dp.mapBuffer)(gc, vbo) + pV->normal.offset;
+            pArray = (GLubyte*)(*gc->dp.mapBufferRange)(gc, vbo, __GL_ARRAY_BUFFER_INDEX, 0, vbo->size, GL_MAP_READ_BIT)
+                   + pV->normal.offset;
         }
 
         switch (pV->normal.size) {
@@ -1070,7 +1071,8 @@ GLenum __glArrayElement_Generic(__GLcontext *gc, GLuint index, GLfloat **bufptr,
             if (vbo->bufferMapped) {
                 return GL_INVALID_OPERATION;
             }
-            pArray = (GLubyte *)(*gc->dp.mapBuffer)(gc, vbo)+ pV->color.offset;
+            pArray = (GLubyte*)(*gc->dp.mapBufferRange)(gc, vbo, __GL_ARRAY_BUFFER_INDEX, 0, vbo->size, GL_MAP_READ_BIT)
+                   + pV->color.offset;
         }
 
         switch (pV->color.size) {
@@ -1117,7 +1119,8 @@ GLenum __glArrayElement_Generic(__GLcontext *gc, GLuint index, GLfloat **bufptr,
             if (vbo->bufferMapped) {
                 return GL_INVALID_OPERATION;
             }
-            pArray = (GLubyte *)(*gc->dp.mapBuffer)(gc, vbo) + pV->color2.offset;
+            pArray = (GLubyte*)(*gc->dp.mapBufferRange)(gc, vbo, __GL_ARRAY_BUFFER_INDEX, 0, vbo->size, GL_MAP_READ_BIT)
+                   + pV->color2.offset;
         }
 
         switch (pV->color2.size) {
@@ -1142,7 +1145,8 @@ GLenum __glArrayElement_Generic(__GLcontext *gc, GLuint index, GLfloat **bufptr,
             if (vbo->bufferMapped) {
                 return GL_INVALID_OPERATION;
             }
-            pArray = (GLubyte *)(*gc->dp.mapBuffer)(gc, vbo)+ pV->fogcoord.offset;
+            pArray = (GLubyte*)(*gc->dp.mapBufferRange)(gc, vbo, __GL_ARRAY_BUFFER_INDEX, 0, vbo->size, GL_MAP_READ_BIT)
+                   + pV->fogcoord.offset;
         }
 
         switch (pV->fogcoord.size) {
@@ -1171,7 +1175,8 @@ GLenum __glArrayElement_Generic(__GLcontext *gc, GLuint index, GLfloat **bufptr,
                     if (vbo->bufferMapped) {
                         return GL_INVALID_OPERATION;
                     }
-                    pArray = (GLubyte *)(*gc->dp.mapBuffer)(gc, vbo) + pV->texture[i].offset;
+                    pArray = (GLubyte*)(*gc->dp.mapBufferRange)(gc, vbo, __GL_ARRAY_BUFFER_INDEX, 0, vbo->size, GL_MAP_READ_BIT)
+                           + pV->texture[i].offset;
                 }
 
                 switch (pV->texture[i].size) {
@@ -1218,7 +1223,8 @@ GLenum __glArrayElement_Generic(__GLcontext *gc, GLuint index, GLfloat **bufptr,
             if (vbo->bufferMapped) {
                 return GL_INVALID_OPERATION;
             }
-            pArray = (GLubyte *)(*gc->dp.mapBuffer)(gc, vbo) + pV->edgeflag.offset;
+            pArray = (GLubyte*)(*gc->dp.mapBufferRange)(gc, vbo, __GL_ARRAY_BUFFER_INDEX, 0, vbo->size, GL_MAP_READ_BIT)
+                   + pV->edgeflag.offset;
         }
 
         flag = (GLboolean *)((GLubyte *)pArray + index * pV->edgeflag.stride);
@@ -1241,7 +1247,8 @@ GLenum __glArrayElement_Generic(__GLcontext *gc, GLuint index, GLfloat **bufptr,
                     if (vbo->bufferMapped) {
                         return GL_INVALID_OPERATION;
                     }
-                    pArray = (GLubyte *)(*gc->dp.mapBuffer)(gc, vbo) + pV->attribute[i].offset;
+                    pArray = (GLubyte*)(*gc->dp.mapBufferRange)(gc, vbo, __GL_ARRAY_BUFFER_INDEX, 0, vbo->size, GL_MAP_READ_BIT)
+                           + pV->attribute[i].offset;
                 }
 
                 switch (pV->attribute[i].size) {
@@ -1282,7 +1289,8 @@ GLenum __glArrayElement_Generic(__GLcontext *gc, GLuint index, GLfloat **bufptr,
             if (vbo->bufferMapped) {
                 return GL_INVALID_OPERATION;
             }
-            pArray = (GLubyte *)(*gc->dp.mapBuffer)(gc, vbo) + pV->attribute[0].offset;
+            pArray = (GLubyte*)(*gc->dp.mapBufferRange)(gc, vbo, __GL_ARRAY_BUFFER_INDEX, 0, vbo->size, GL_MAP_READ_BIT)
+                   + pV->attribute[0].offset;
         }
 
         switch (pV->attribute[0].size) {
@@ -1329,7 +1337,8 @@ GLenum __glArrayElement_Generic(__GLcontext *gc, GLuint index, GLfloat **bufptr,
             if (vbo->bufferMapped) {
                 return GL_INVALID_OPERATION;
             }
-            pArray = (GLubyte *)(*gc->dp.mapBuffer)(gc, vbo) + pV->vertex.offset;
+            pArray = (GLubyte*)(*gc->dp.mapBufferRange)(gc, vbo, __GL_ARRAY_BUFFER_INDEX, 0, vbo->size, GL_MAP_READ_BIT)
+                   + pV->vertex.offset;
         }
 
         switch (pV->vertex.size) {

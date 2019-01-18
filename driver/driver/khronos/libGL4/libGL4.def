@@ -1,6 +1,6 @@
 ;#############################################################################
 ;#
-;#   Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+;#   Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 ;#
 ;#   The material in this file is confidential and contains trade secrets
 ;#   of Vivante Corporation. This is proprietary information owned by
@@ -19,7 +19,7 @@ VERSION 1.100
 
 EXPORTS
 		GL_DISPATCH_TABLE
-        DrvDeleteContext
+		DrvDeleteContext
         DrvSetContext
         DrvReleaseContext
         DrvShareLists
@@ -39,6 +39,7 @@ EXPORTS
         DrvSwapLayerBuffers
         DrvPresentBuffers
         DrvSetCallbackProcs
+
 
         glIsList
         glDeleteLists
@@ -323,38 +324,6 @@ EXPORTS
         glTexSubImage1D
         glPushClientAttrib
         glPopClientAttrib
-        glColorTable
-        glColorTableParameteriv
-        glColorTableParameterfv
-        glCopyColorTable
-        glGetColorTable
-        glGetColorTableParameterfv
-        glGetColorTableParameteriv
-        glColorSubTable
-        glCopyColorSubTable
-        glConvolutionFilter1D
-        glConvolutionFilter2D
-        glConvolutionParameterf
-        glConvolutionParameterfv
-        glConvolutionParameteri
-        glConvolutionParameteriv
-        glCopyConvolutionFilter1D
-        glCopyConvolutionFilter2D
-        glGetConvolutionFilter
-        glGetConvolutionParameterfv
-        glGetConvolutionParameteriv
-        glSeparableFilter2D
-        glGetSeparableFilter
-        glHistogram
-        glResetHistogram
-        glGetHistogram
-        glGetHistogramParameterfv
-        glGetHistogramParameteriv
-        glMinmax
-        glResetMinmax
-        glGetMinmax
-        glGetMinmaxParameterfv
-        glGetMinmaxParameteriv
         glClientActiveTexture
         glMultiTexCoord1d
         glMultiTexCoord1dv
@@ -835,4 +804,4 @@ EXPORTS
         glGetInfoLogARB
         glGetObjectParameterivARB
 
-        
+

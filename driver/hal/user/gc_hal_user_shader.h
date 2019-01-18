@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -47,35 +47,6 @@ gcLoadShaders(
     IN gcsPROGRAM_STATE ProgramState
     );
 
-/*******************************************************************************
-**                                gcLoadKernel
-********************************************************************************
-**
-**  Load a pre-compiled and pre-linked kernel program into the hardware.
-**
-**  INPUT:
-**
-**      gcoHARDWARE Hardware
-**          Pointer to an gcoHARDWARE object.
-**
-**      gctSIZE_T StateBufferSize
-**          The number of bytes in the 'StateBuffer'.
-**
-**      gctPOINTER StateBuffer
-**          Pointer to the states that make up the shader program.
-**
-**      gcsHINT_PTR Hints
-**          Pointer to a gcsHINT structure that contains information required
-**          when loading the shader states.
-*/
-gceSTATUS
-gcLoadKernel(
-    IN gcoHARDWARE Hardware,
-    IN gctSIZE_T StateBufferSize,
-    IN gctPOINTER StateBuffer,
-    IN gcsHINT_PTR Hints
-    );
-
 gceSTATUS
 gcInvokeThreadWalker(
     IN gcoHARDWARE Hardware,
@@ -105,6 +76,39 @@ gcoSHADER_ProgramUniformEx(
     IN gctSIZE_T MatrixStride,
     IN gctSIZE_T ArrayStride,
     IN gctCONST_POINTER Values,
+    IN gceUNIFORMCVT Convert,
+    IN gcSHADER_KIND Type
+    );
+
+gceSTATUS
+gcoSHADER_BindUniform(
+    IN gcoHAL Hal,
+    IN gctUINT32 Address,
+    IN gctINT32 Physical,
+    IN gctSIZE_T Columns,
+    IN gctSIZE_T Rows,
+    IN gctSIZE_T Arrays,
+    IN gctBOOL   IsRowMajor,
+    IN gctSIZE_T MatrixStride,
+    IN gctSIZE_T ArrayStride,
+    IN gctCONST_POINTER Values,
+    IN gceUNIFORMCVT Convert,
+    IN gcSHADER_KIND Type
+    );
+
+gceSTATUS
+gcoSHADER_BindUniformCombinedMode(
+    IN gcoHAL Hal,
+    IN gctUINT32 Address,
+    IN gctINT32 Physical,
+    IN gctSIZE_T Columns,
+    IN gctSIZE_T Rows,
+    IN gctSIZE_T Arrays,
+    IN gctBOOL   IsRowMajor,
+    IN gctSIZE_T MatrixStride,
+    IN gctSIZE_T ArrayStride,
+    IN gctCONST_POINTER Values[],
+    IN gctUINT32 ValuesCount,
     IN gceUNIFORMCVT Convert,
     IN gcSHADER_KIND Type
     );

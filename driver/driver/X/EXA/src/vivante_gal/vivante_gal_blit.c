@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2018 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -371,11 +371,6 @@ Bool EnableAlphaBlending(GALINFOPTR galInfo) {
     srcfactor = (gceSURF_BLEND_FACTOR_MODE)galInfo->mBlitInfo.mBlendOp.mSrcBlendingFactor;
     dstfactor = (gceSURF_BLEND_FACTOR_MODE)galInfo->mBlitInfo.mBlendOp.mDstBlendingFactor;
 
-    if (!pBlt->mSrcSurfInfo.alpha)
-            dstfactor = gcvSURF_BLEND_ONE;
-
-    if (!pBlt->mDstSurfInfo.alpha)
-            srcfactor = gcvSURF_BLEND_ONE;
 
      status = gco2D_EnableAlphaBlendAdvanced
      (

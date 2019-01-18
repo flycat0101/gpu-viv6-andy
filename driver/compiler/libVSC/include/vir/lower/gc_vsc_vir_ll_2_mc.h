@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -23,6 +23,7 @@ VIR_Lower_LowLevel_To_MachineCodeLevel(
     IN VSC_SH_PASS_WORKER* pPassWorker
     );
 DECLARE_QUERY_PASS_PROP(VIR_Lower_LowLevel_To_MachineCodeLevel);
+DECLARE_SH_NECESSITY_CHECK(VIR_Lower_LowLevel_To_MachineCodeLevel);
 
 END_EXTERN_C()
 #endif

@@ -1,0 +1,44 @@
+__kernel void gpuSoftMax_FP32
+    (
+    __read_only     image2d_array_t input,
+    __global float *                maxValue,
+    float                           scale,
+    __write_only     image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord = (int4)(x, y, z, 0);
+    float4 src, dst = {0.0};
+
+    src = read_imagef(input, coord);
+    dst.x = exp2((src.x-maxValue[0])*scale);
+    write_imagef(output, coord, dst);
+}
+
+__kernel void gpuSoftMax_Quant8
+    (
+    __read_only     image2d_array_t input,
+    __global uint *                 maxValue,
+    float                           scale,
+    float                           scaleIn,
+    int                             zpIn,
+    __write_only     image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord = (int4)(x, y, z, 0);
+    uint4 src, dst = {0};
+    uint inMax = maxValue[0];
+    float tmpOut, max, outPixel;
+
+    src = read_imageui(input, coord);
+    tmpOut = (convert_int(src.x)-zpIn)*scaleIn;
+    max = (convert_int(inMax)-zpIn)*scaleIn;
+    outPixel = exp2((tmpOut-max)*scale);
+    dst.x = floor(outPixel*256.0 + 0.5);
+    write_imageui(output, coord, dst);
+}

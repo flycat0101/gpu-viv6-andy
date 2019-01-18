@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -76,8 +76,7 @@ extern GLvoid __glInitDebugState(__GLcontext *gc);
 extern GLvoid __glFreeDebugState(__GLcontext *gc);
 
 extern GLboolean __glInitTracerDispatchTable(GLint trmode, __GLApiVersion apiVersion);
-extern __GLesDispatchTable __glesNopDispatchFuncTable;
-extern __GLesDispatchTable __glesApiProfileDispatchTable;
+extern __GLdispatchTable __glProfileFuncTable;
 extern GLvoid __glSetDrawable(__GLcontext* gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable);
 #ifdef OPENGL40
 extern GLuint __glInitVertexInputState(__GLcontext *gc);
@@ -89,11 +88,12 @@ extern GLvoid __glFreeAttribStackState(__GLcontext *gc);
 extern GLvoid __glInitEvaluatorState(__GLcontext *gc);
 extern GLfloat __glClampWidth(GLfloat width, __GLdeviceConstants *constants);
 extern GLvoid __glComputeClipBox(__GLcontext *gc);
+extern GLvoid __glOverWriteListCompileTable();
 #endif
 
 extern __GLformatInfo __glFormatInfoTable[];
 
-gceTRACEMODE __glesApiTraceMode = gcvTRACEMODE_NONE;
+gceTRACEMODE __glApiTraceMode = gcvTRACEMODE_NONE;
 
 
 #define __GL_NOOP(fp)      *(GLvoid (**)())&(fp) = __glNoop;
@@ -103,50 +103,50 @@ gceTRACEMODE __glesApiTraceMode = gcvTRACEMODE_NONE;
 #if gcdPATTERN_FAST_PATH
 __GLapiPattern gfxPattern0 = {
     {
-        { __glesApiEnum(Uniform2f) , {0, 0, 0, 0}},
-        { __glesApiEnum(Uniform2f) , {0, 0, 0, 0}},
-        { __glesApiEnum(Uniform1f) , {0, 0, 0, 0}},
-        { __glesApiEnum(Uniform2f) , {0, 0, 0, 0}},
-        { __glesApiEnum(Uniform2f) , {0, 0, 0, 0}},
-        { __glesApiEnum(Uniform4f) , {0, 0, 0, 0}},
-        { __glesApiEnum(Uniform4f) , {0, 0, 0, 0}},
-        { __glesApiEnum(Uniform4f) , {0, 0, 0, 0}},
-        { __glesApiEnum(Uniform4f) , {0, 0, 0, 0}},
-        { __glesApiEnum(BlendColor) , {0, 0, 0, 0}},
-        { __glesApiEnum(Disable) , {0x0B71, 0, 0, 0}},
-        { __glesApiEnum(DepthFunc) , {0, 0, 0, 0}},
-        { __glesApiEnum(BlendFunc) , {0, 0, 0, 0}},
-        { __glesApiEnum(Enable) , {0x0BE2, 0, 0, 0}},
-        { __glesApiEnum(BindBuffer) , {0, 0, 0, 0}},
-        { __glesApiEnum(BindBuffer) , {0, 0, 0, 0}},
-        { __glesApiEnum(VertexAttribPointer) , {0x1406, 0, 0, 0}},
-        { __glesApiEnum(VertexAttribPointer) , {0x1406, 0, 0, 0}},
-        { __glesApiEnum(DrawElements) , {0x4, 0x1403, 0, 0}},
+        { __glApiEnum(Uniform2f) , {0, 0, 0, 0}},
+        { __glApiEnum(Uniform2f) , {0, 0, 0, 0}},
+        { __glApiEnum(Uniform1f) , {0, 0, 0, 0}},
+        { __glApiEnum(Uniform2f) , {0, 0, 0, 0}},
+        { __glApiEnum(Uniform2f) , {0, 0, 0, 0}},
+        { __glApiEnum(Uniform4f) , {0, 0, 0, 0}},
+        { __glApiEnum(Uniform4f) , {0, 0, 0, 0}},
+        { __glApiEnum(Uniform4f) , {0, 0, 0, 0}},
+        { __glApiEnum(Uniform4f) , {0, 0, 0, 0}},
+        { __glApiEnum(BlendColor) , {0, 0, 0, 0}},
+        { __glApiEnum(Disable) , {0x0B71, 0, 0, 0}},
+        { __glApiEnum(DepthFunc) , {0, 0, 0, 0}},
+        { __glApiEnum(BlendFunc) , {0, 0, 0, 0}},
+        { __glApiEnum(Enable) , {0x0BE2, 0, 0, 0}},
+        { __glApiEnum(BindBuffer) , {0, 0, 0, 0}},
+        { __glApiEnum(BindBuffer) , {0, 0, 0, 0}},
+        { __glApiEnum(VertexAttribPointer) , {0x1406, 0, 0, 0}},
+        { __glApiEnum(VertexAttribPointer) , {0x1406, 0, 0, 0}},
+        { __glApiEnum(DrawElements) , {0x4, 0x1403, 0, 0}},
     },
     19
 };
 
 __GLapiPattern gfxPattern1 = {
     {
-        { __glesApiEnum(Uniform2f) , {0, 0, 0, 0}},
-        { __glesApiEnum(Uniform2f) , {0, 0, 0, 0}},
-        { __glesApiEnum(Uniform1f) , {0, 0, 0, 0}},
-        { __glesApiEnum(Uniform2f) , {0, 0, 0, 0}},
-        { __glesApiEnum(Uniform2f) , {0, 0, 0, 0}},
-        { __glesApiEnum(Uniform4f) , {0, 0, 0, 0}},
-        { __glesApiEnum(Uniform4f) , {0, 0, 0, 0}},
-        { __glesApiEnum(Uniform4f) , {0, 0, 0, 0}},
-        { __glesApiEnum(Uniform4f) , {0, 0, 0, 0}},
-        { __glesApiEnum(BlendColor) , {0, 0, 0, 0}},
-        { __glesApiEnum(Enable) , {0x0B71, 0, 0, 0}},
-        { __glesApiEnum(DepthFunc) , {0, 0, 0, 0}},
-        { __glesApiEnum(BlendFunc) , {0, 0, 0, 0}},
-        { __glesApiEnum(Enable) , {0x0BE2, 0, 0, 0}},
-        { __glesApiEnum(BindBuffer) , {0, 0, 0, 0}},
-        { __glesApiEnum(BindBuffer) , {0, 0, 0, 0}},
-        { __glesApiEnum(VertexAttribPointer) , {0x1406, 0, 0, 0}},
-        { __glesApiEnum(VertexAttribPointer) , {0x1406, 0, 0, 0}},
-        { __glesApiEnum(DrawElements) , {0x4, 0x1403, 0, 0}},
+        { __glApiEnum(Uniform2f) , {0, 0, 0, 0}},
+        { __glApiEnum(Uniform2f) , {0, 0, 0, 0}},
+        { __glApiEnum(Uniform1f) , {0, 0, 0, 0}},
+        { __glApiEnum(Uniform2f) , {0, 0, 0, 0}},
+        { __glApiEnum(Uniform2f) , {0, 0, 0, 0}},
+        { __glApiEnum(Uniform4f) , {0, 0, 0, 0}},
+        { __glApiEnum(Uniform4f) , {0, 0, 0, 0}},
+        { __glApiEnum(Uniform4f) , {0, 0, 0, 0}},
+        { __glApiEnum(Uniform4f) , {0, 0, 0, 0}},
+        { __glApiEnum(BlendColor) , {0, 0, 0, 0}},
+        { __glApiEnum(Enable) , {0x0B71, 0, 0, 0}},
+        { __glApiEnum(DepthFunc) , {0, 0, 0, 0}},
+        { __glApiEnum(BlendFunc) , {0, 0, 0, 0}},
+        { __glApiEnum(Enable) , {0x0BE2, 0, 0, 0}},
+        { __glApiEnum(BindBuffer) , {0, 0, 0, 0}},
+        { __glApiEnum(BindBuffer) , {0, 0, 0, 0}},
+        { __glApiEnum(VertexAttribPointer) , {0x1406, 0, 0, 0}},
+        { __glApiEnum(VertexAttribPointer) , {0x1406, 0, 0, 0}},
+        { __glApiEnum(DrawElements) , {0x4, 0x1403, 0, 0}},
     },
     19
 };
@@ -455,6 +455,7 @@ GLvoid __glInitRasterState(__GLcontext *gc)
     {
         gc->flags |= __GL_CONTEXT_DRAW_TO_FRONT;
         fs->drawBuffers[0] = GL_FRONT;
+        fs->readBuffer = GL_FRONT;
     }
     else
 #endif
@@ -1329,33 +1330,33 @@ GLvoid __glInitGlobals(__GLApiVersion apiVersion)
     {
         if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "0")))
         {
-            __glesApiTraceMode = gcvTRACEMODE_NONE;
+            __glApiTraceMode = gcvTRACEMODE_NONE;
         }
         else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "1")))
         {
-            __glesApiTraceMode = gcvTRACEMODE_FULL;
+            __glApiTraceMode = gcvTRACEMODE_FULL;
         }
         else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "2")))
         {
-            __glesApiTraceMode = gcvTRACEMODE_LOGGER;
+            __glApiTraceMode = gcvTRACEMODE_LOGGER;
         }
         else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "3")))
         {
-            __glesApiTraceMode = gcvTRACEMODE_PRE;
+            __glApiTraceMode = gcvTRACEMODE_PRE;
         }
         else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "4")))
         {
-            __glesApiTraceMode = gcvTRACEMODE_POST;
+            __glApiTraceMode = gcvTRACEMODE_POST;
         }
         else
         {
             gcmPRINT("ES: Unsupported trace mode");
         }
 
-        if (!__glInitTracerDispatchTable(__glesApiTraceMode, apiVersion))
+        if (!__glInitTracerDispatchTable(__glApiTraceMode, apiVersion))
         {
             /* Reset to regular API entry functions if tracer dispatch table initialization failed */
-            __glesApiTraceMode = gcvTRACEMODE_NONE;
+            __glApiTraceMode = gcvTRACEMODE_NONE;
         }
     }
 
@@ -1365,22 +1366,24 @@ GLvoid __glInitGlobals(__GLApiVersion apiVersion)
     {
         if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "0")))
         {
-            __glesApiProfileMode = 0;
+            __glApiProfileMode = 0;
         }
         else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "1")))
         {
-            __glesApiProfileMode = 1;
+            __glApiProfileMode = 1;
         }
         else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "2")))
         {
-            __glesApiProfileMode = 2;
+            __glApiProfileMode = 2;
         }
         else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "3")))
         {
-            __glesApiProfileMode = 3;
+            __glApiProfileMode = 3;
         }
     }
 #endif
+
+    __glOverWriteListCompileTable();
 }
 
 GLboolean __glLoseCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable)
@@ -1675,32 +1678,33 @@ GLvoid *__glCreateContext(GLint clientVersion,
     }
 
 #if gcdPATTERN_FAST_PATH
-    /* Init Pattern
-    */
+    /* Init Pattern */
     __glInitPattern(gc);
 #endif
 
     /* Initialize API dispatch tables. */
+    if (__glApiTraceMode > gcvTRACEMODE_NONE
 #if VIVANTE_PROFILER
-    if (__glesApiTraceMode == gcvTRACEMODE_NONE && __glesApiProfileMode < 1)
-        gc->apiDispatchTable = __glesApiFuncDispatchTable;
+     || __glApiProfileMode > 0
+#endif
+       )
+    {
+        gc->apiProfile = GL_TRUE;
+    }
     else
-        gc->apiDispatchTable = __glesApiProfileDispatchTable;
-#else
-    gc->apiDispatchTable = (__glesApiTraceMode != gcvTRACEMODE_NONE) ?
-                                __glesApiProfileDispatchTable : __glesApiFuncDispatchTable;
-#endif
+    {
+        gc->apiProfile = GL_FALSE;
+    }
 
+    /* Initialize API dispatch tables. */
 #ifdef OPENGL40
-    gc->immediateDispatchTable = __glImmediateFuncTable;
-    gc->listCompileDispatchTable = __glListCompileFuncTable;
-
-    /* Set current immediate mode dispatch table.
-    */
-    gc->currentImmediateTable = &gc->immediateDispatchTable;
+    gc->dlCompileDispatch = __glListCompileFuncTable;
 #endif
-    gc->magic = ES3X_MAGIC;
+    gc->immedModeDispatch = __glImmediateFuncTable;
+    gc->pModeDispatch = &gc->immedModeDispatch; /* immediate mode by default. */
+    gc->pEntryDispatch = gc->apiProfile ? &__glProfileFuncTable : gc->pModeDispatch;
 
+    gc->magic = ES3X_MAGIC;
 
     /* Do not destructor. */
     gc->base.destructor = gcvNULL;

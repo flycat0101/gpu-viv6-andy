@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -62,4 +62,11 @@ IN gctSIZE_T num,
 IN gctSIZE_T size,
 IN int ( * comparator ) ( const void *, const void * )
 );
+
+gctUINT
+clEvaluateCRC32ForShaderString(
+    IN const void *pData,
+    IN gctUINT32 dataSizeInByte
+    );
+
 #endif /* __gc_cl_common_h_ */

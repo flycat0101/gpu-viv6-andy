@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -30,10 +30,6 @@ extern GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist
 extern GLvoid __glExecuteDisplayList(__GLcontext *gc, __GLdlist *dlist);
 extern GLvoid __glConcatenateDlistPrims(__GLcontext *gc, __GLdlist *dlist);
 extern GLvoid __glDeleteDlist(__GLcontext *gc, GLvoid *obj);
-
-extern GLvoid __gIMDispatch(__GLcontext *gc);
-
-extern GLvoid __gDLDispatch(__GLcontext *gc);
 
 GLvoid __glAddNameToNameList(__GLcontext *gc, __GLdlistNameNode **nameListHead, GLuint name)
 {
@@ -350,14 +346,12 @@ GLvoid APIENTRY __glim_NewList(__GLcontext *gc, GLuint list, GLenum mode)
         }
     }
 
-    /* Save the current table offset and switch to display list compile dispatch table.
-    */
-    /*
-    gc->savedDispatchOffset = gc->currentDispatchOffset;
-    __GL_SET_API_DISPATCH(__GL_LISTCOMPILE_TABLE_OFFSET);
-    */
+    gc->pModeDispatch = &gc->dlCompileDispatch;
+    if (!gc->apiProfile)
+    {
+        gc->pEntryDispatch = gc->pModeDispatch;
+    }
 
-    __gDLDispatch(gc);
     gc->dlist.currentList = list;
     gc->dlist.mode = mode;
     gc->dlist.listData.dlist = NULL;
@@ -405,10 +399,11 @@ GLvoid APIENTRY __glim_EndList(__GLcontext *gc)
 
     __GL_DLIST_SEMAPHORE_UNLOCK();
 
-    /* Switch back to the saved immediate mode dispatch table.
-    __GL_SET_API_DISPATCH(gc->savedDispatchOffset);
-    */
-    __gIMDispatch(gc);
+    gc->pModeDispatch = &gc->immedModeDispatch;
+    if (!gc->apiProfile)
+    {
+        gc->pEntryDispatch = gc->pModeDispatch;
+    }
 
     gc->dlist.currentList = 0;
     gc->dlist.mode = 0;

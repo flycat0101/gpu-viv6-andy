@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -45,6 +45,38 @@ DllMain(
             gcoOS_AtomDestroy(gcvNULL, clgGlobalId);
         }
 
+        if(clgDefaultPlatform)
+        {
+            if(clgDefaultPlatform->unloadCompiler)
+            {
+                /* Destroy CL patch library. Move it at Process exit */
+                gcmVERIFY_OK(gcFreeCLPatchLibrary());
+
+                /* Destroy vir intrinsic library. */
+                gcmVERIFY_OK(vscFreeVirIntrinsicLib());
+
+                (*clgDefaultPlatform->unloadCompiler)();
+
+                gcoOS_FreeLibrary(gcvNULL, clgDefaultPlatform->dll);
+
+                clgDefaultPlatform->dll = gcvNULL;
+                clgDefaultPlatform->compiler = gcvNULL;
+                clgDefaultPlatform->compiler11 = gcvNULL;
+                clgDefaultPlatform->loadCompiler = gcvNULL;
+                clgDefaultPlatform->unloadCompiler = gcvNULL;
+            }
+
+            if(clgDefaultPlatform->compilerMutex)
+            {
+                gcoOS_DeleteMutex(gcvNULL, clgDefaultPlatform->compilerMutex);
+            }
+
+            if(clgDefaultPlatform->vscCoreSysCtx.hPrivData)
+            {
+                vscDestroyPrivateData(&clgDefaultPlatform->vscCoreSysCtx, clgDefaultPlatform->vscCoreSysCtx.hPrivData);
+            }
+        }
+
         break;
 
     case DLL_THREAD_DETACH:
@@ -63,11 +95,42 @@ static void _ModuleDestructor(void)
         clgDispatchTable = NULL;
     }
 
-    if(clgDevices) gcmOS_SAFE_FREE(gcvNULL, clgDevices);
+    if(clgDevices) gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, clgDevices));
 
     if(clgGlobalId)
     {
         gcoOS_AtomDestroy(gcvNULL, clgGlobalId);
+    }
+    if(clgDefaultPlatform)
+    {
+        if(clgDefaultPlatform->unloadCompiler)
+        {
+            /* Destroy CL patch library. */
+            gcmVERIFY_OK(gcFreeCLPatchLibrary());
+
+            /* Destroy vir intrinsic library. */
+            gcmVERIFY_OK(vscFreeVirIntrinsicLib());
+
+            (*clgDefaultPlatform->unloadCompiler)();
+
+            gcoOS_FreeLibrary(gcvNULL, clgDefaultPlatform->dll);
+
+            clgDefaultPlatform->dll = gcvNULL;
+            clgDefaultPlatform->compiler = gcvNULL;
+            clgDefaultPlatform->compiler11 = gcvNULL;
+            clgDefaultPlatform->loadCompiler = gcvNULL;
+            clgDefaultPlatform->unloadCompiler = gcvNULL;
+        }
+
+        if(clgDefaultPlatform->compilerMutex)
+        {
+            gcoOS_DeleteMutex(gcvNULL, clgDefaultPlatform->compilerMutex);
+        }
+
+        if(clgDefaultPlatform->vscCoreSysCtx.hPrivData)
+        {
+            vscDestroyPrivateData(&clgDefaultPlatform->vscCoreSysCtx, clgDefaultPlatform->vscCoreSysCtx.hPrivData);
+        }
     }
 }
 #endif

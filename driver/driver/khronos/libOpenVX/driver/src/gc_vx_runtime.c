@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -11,7 +11,7 @@
 *****************************************************************************/
 
 
-#if (defined(__QNXNTO__) || defined(LINUX))
+#if defined __QNXNTO__ || defined ANDROID
 #include <ctype.h>
 #endif
 #include <gc_vx_common.h>
@@ -60,7 +60,7 @@ VX_INTERNAL_API void vxTrace(vx_trace_target_e target, char *message, ...)
         outputBuffer[VX_TRACE_BUFFER_COUNT - 1] = 0;
 
         //gcmTRACE(gcvLEVEL_INFO, outputBuffer);
-        gcmPRINT(outputBuffer);
+        vxInfo(outputBuffer);
 
         va_end(argList);
     }

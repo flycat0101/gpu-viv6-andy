@@ -398,8 +398,8 @@ gbm_surface_get_in_fence_fd(struct gbm_surface *surface);
 void
 gbm_surface_set_in_fence_fd(struct gbm_surface *surface, int fd);
 
-uint32_t
-gbm_surface_in_fence_on(struct gbm_surface *surface);
+void
+gbm_surface_set_sync_post(struct gbm_surface *surface, int sync_post);
 
 
 void

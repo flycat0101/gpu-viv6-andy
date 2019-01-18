@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -17,14 +17,14 @@
 
 #if defined(ANDROID)
 #if ANDROID_SDK_VERSION >= 16
-#      include <ui/ANativeObjectBase.h>
-#   else
-#      include <private/ui/android_natives_priv.h>
-#   endif
+#    include <ui/ANativeObjectBase.h>
+#  else
+#    include <private/ui/android_natives_priv.h>
+#  endif
 
 #if gcdANDROID_IMPLICIT_NATIVE_BUFFER_SYNC
-#      include <gc_gralloc_priv.h>
-#   endif
+#    include <gc_gralloc_priv.h>
+#  endif
 #endif
 
 
@@ -803,6 +803,15 @@ gcChipUtilGetImageFormat(
             bpp = 32;
             imageFormat = gcvSURF_A8B8G8R8UI;
             break;
+        case GL_UNSIGNED_INT:
+            bpp = 128;
+            imageFormat = gcvSURF_A32B32G32R32UI;
+            break;
+        case GL_INT:
+            bpp = 128;
+            imageFormat = gcvSURF_A32B32G32R32I;
+            break;
+
 #endif
         }
         break;
@@ -2468,7 +2477,14 @@ gcChipCopyTexImage(
     ** meaning (format) with master surface, such as SRGB encoding.
     ** Even for the same format between shadow and master, then we only sync once.
     */
-    srcView = gcChipFboSyncFromShadowSurface(gc, &chipCtx->readRtView, GL_TRUE);
+    if (!((mipmap->formatInfo->baseFormat == GL_DEPTH_STENCIL) || (mipmap->formatInfo->baseFormat == GL_STENCIL) || (mipmap->formatInfo->baseFormat == GL_DEPTH_COMPONENT)))
+    {
+        srcView = gcChipFboSyncFromShadowSurface(gc, &chipCtx->readRtView, GL_TRUE);
+    }
+    else
+    {
+        srcView = gcChipFboSyncFromShadowSurface(gc, &chipCtx->readDepthView, GL_TRUE);
+    }
 
     if (srcView.surf && srcView.surf->isMsaa)
     {
@@ -3261,7 +3277,9 @@ gcChipGetTextureSurface(
 
     switch (texObj->targetIndex)
     {
+    case __GL_TEXTURE_1D_INDEX:
     case __GL_TEXTURE_2D_INDEX:
+    case __GL_TEXTURE_RECTANGLE_INDEX:
     case __GL_TEXTURE_2D_MS_INDEX:
         if (slice != 0)
         {
@@ -3895,7 +3913,6 @@ OnError:
     gcChipSetError(chipCtx, status);
     gcmFOOTER_ARG("return=%d", GL_FALSE);
     return GL_FALSE;
-
 }
 
 GLboolean __glChipCopyTexSubImage1D(
@@ -4045,7 +4062,6 @@ OnError:
     gcmFOOTER_ARG("return=%d", GL_FALSE);
     return GL_FALSE;
 }
-
 #endif
 
 GLboolean
@@ -4168,7 +4184,6 @@ OnError:
     gcChipSetError(chipCtx, status);
     gcmFOOTER_ARG("return=%d", GL_FALSE);
     return GL_FALSE;
-
 }
 
 GLboolean
@@ -4196,7 +4211,6 @@ OnError:
     gcChipSetError(chipCtx, status);
     gcmFOOTER_ARG("return=%d", GL_FALSE);
     return GL_FALSE;
-
 }
 
 GLboolean
@@ -4227,7 +4241,6 @@ OnError:
     gcChipSetError(chipCtx, status);
     gcmFOOTER_ARG("return=%d", GL_FALSE);
     return GL_FALSE;
-
 }
 
 GLboolean
@@ -4260,7 +4273,6 @@ OnError:
     gcChipSetError(chipCtx, status);
     gcmFOOTER_ARG("return=%d", GL_FALSE);
     return GL_FALSE;
-
 }
 
 GLboolean
@@ -4586,13 +4598,62 @@ OnError:
     return GL_FALSE;
 }
 
+typedef struct sD32F_S8
+{
+    GLfloat depth;
+    GLuint stencil;
+} D32F_S8;
+
+typedef struct
+{
+    GLfloat depth;
+    GLfloat stencil;
+} D32F_S8_1_G32R32F;
+
+
+#define GET_SOURCE(s) \
+    ((*s >> (srcShift)) & srcMax) \
+
+#define CONVERT_FIXED_TO_FIXED(dstDataType, srcDataType) \
+    *d = (dstDataType)__GL_FLOORF((( GET_SOURCE(s) / (gctFLOAT)(srcMax)) * (dstMax)) + 0.5) \
+
+#define CONVERT_FIXED_TO_FLOAT(dstDataType, srcDataType) \
+    *d = (dstDataType)(GET_SOURCE(s) / (gctFLOAT)(srcMax)) \
+
+#define CONVERT_NONE(dstDataType, srcDataType) \
+    *d = (dstDataType) GET_SOURCE(s) \
+
+#define CONVERT_DEPTH(D32F_S8, D32F_S8_1_G32R32F) \
+    d->stencil = (GLuint)(s->stencil) & 0xff; \
+    d->depth = s->depth \
+
+#define CONVERT_DEPTH_ONLY(dstDataType, D32F_S8_1_G32R32F) \
+    *d = (dstDataType)(s->depth) \
+
+#define CONVERT_DEPTH_PIXELS(dstDataType, srcDataType, convertFunc) \
+    do \
+        { \
+        srcDataType* s;\
+        dstDataType* d;\
+        for (j = 0; j < h; j++) \
+                {\
+            for (i = 0; i < w; i++) \
+                        {\
+                s = ((srcDataType*)((gctUINT8*)srcData[0] + (j + sy) * srcStride)) + (i + sx);\
+                d = ((dstDataType*)((gctUINT8*)dstData + (j + dy) * dstStride)) + (i + dx);\
+                convertFunc(dstDataType, srcDataType);\
+                        }\
+                }\
+        } while(gcvFALSE) \
+
 GLboolean
 __glChipGetTexImage(
     __GLcontext* gc,
     __GLtextureObject *texObj,
     GLint face,
     GLint level,
-    GLubyte *buf
+    GLenum type,
+    GLvoid *buf
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
@@ -4610,9 +4671,10 @@ __glChipGetTexImage(
     gctSIZE_T skipImgs = (__GL_IS_TEXTURE_ARRAY(texObj->targetIndex) ||
         texObj->targetIndex == __GL_TEXTURE_3D_INDEX) ?
         (gctSIZE_T)gc->clientState.pixel.packModes.skipImages : 0;
-    GLuint i;
+    GLuint i,j;
     GLenum format = mipmap->format;
     gceSURF_FORMAT wrapformat = gcvSURF_UNKNOWN;
+    gceSURF_FORMAT srcFormat = gcvSURF_UNKNOWN;
     __GLformatInfo *formatInfo = mipmap->formatInfo;
     gctUINT w, h;
     gctUINT dstWidth, dstHeight;
@@ -4620,6 +4682,13 @@ __glChipGetTexImage(
     GLuint lineLength = ps->packModes.lineLength ? ps->packModes.lineLength : (GLuint)mipmap->width;
     GLuint imageHeight = ps->packModes.imageHeight ? ps->packModes.imageHeight : (GLuint)mipmap->height;
     gceSTATUS status = gcvSTATUS_OK;
+    GLboolean bDepth = GL_FALSE;
+    gctPOINTER srcData[3] = { gcvNULL };
+    gctPOINTER dstData;
+    gctINT srcStride, dstStride;
+    gctUINT32 srcShift, srcMax, dstMax;
+    GLint dx, dy, sx, sy;
+    GLuint width;
 
 
     gcmHEADER_ARG("gc=0x%x, texObj=0x%x, face=%d, level=%d, buf=0x%x",
@@ -4682,6 +4751,11 @@ __glChipGetTexImage(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+    if (formatInfo->baseFormat == GL_DEPTH_COMPONENT || formatInfo->baseFormat == GL_DEPTH_STENCIL || formatInfo->baseFormat == GL_STENCIL)
+    {
+        bDepth = GL_TRUE;
+    }
+
     if (gcvSURF_UNKNOWN == wrapformat)
     {
         __GLchipFmtMapInfo *formatMapInfo = gcChipGetFormatMapInfo(gc, formatInfo->drvFormat, __GL_CHIP_FMT_PATCH_NONE);
@@ -4738,12 +4812,27 @@ __glChipGetTexImage(
         dstLogicalAddress = (gctPOINTER)((GLbyte*)logicalAddress + rowStride * imgHeight * i);
         physicalAddress = (physicalAddress == gcvINVALID_ADDRESS) ? gcvINVALID_ADDRESS : physicalAddress + (gctUINT32)(rowStride * imgHeight * i);
 
+        if (bDepth)
+        {
+            gcmONERROR(gcoSURF_GetFormat(srcView.surf, gcvNULL, &srcFormat));
+            /* Allocate a new surface. */
+            gcmONERROR(gcoSURF_Construct(
+                chipCtx->hal,
+                mipmap->width, mipmap->height, 1,
+                gcvSURF_BITMAP, srcFormat,
+                gcvPOOL_DEFAULT,
+                &dstView.surf
+                ));
+        }
+        else
+        {
         /* Create the wrapper surface. */
-        gcmONERROR(gcoSURF_Construct(gcvNULL, mipmap->width, mipmap->height, 1, gcvSURF_BITMAP,
-            wrapformat, gcvPOOL_USER, &dstView.surf));
-        gcmONERROR(gcoSURF_ResetSurWH(dstView.surf, mipmap->width, mipmap->height, lineLength, imageHeight, wrapformat));
+            gcmONERROR(gcoSURF_Construct(gcvNULL, mipmap->width, mipmap->height, 1, gcvSURF_BITMAP,
+                wrapformat, gcvPOOL_USER, &dstView.surf));
+            gcmONERROR(gcoSURF_ResetSurWH(dstView.surf, mipmap->width, mipmap->height, lineLength, imageHeight, wrapformat));
 
-        gcmONERROR(gcoSURF_WrapSurface(dstView.surf, ps->packModes.alignment, dstLogicalAddress, physicalAddress));
+            gcmONERROR(gcoSURF_WrapSurface(dstView.surf, ps->packModes.alignment, dstLogicalAddress, physicalAddress));
+        }
         gcmONERROR(gcoSURF_GetSize(srcView.surf, &w, &h, gcvNULL));
         gcmONERROR(gcoSURF_GetSize(dstView.surf, &dstWidth, &dstHeight, gcvNULL));
 
@@ -4776,6 +4865,153 @@ __glChipGetTexImage(
             }
             gcmERR_BREAK(gcoSURF_CopyPixels(&srcView, &dstView, &rlvArgs));
         } while (gcvFALSE);
+
+        if (bDepth)
+        {
+            gcmONERROR(gcoSURF_GetAlignedSize(
+                dstView.surf,
+                gcvNULL,
+                gcvNULL,
+                &srcStride));
+
+            gcmONERROR(gcoSURF_Lock(dstView.surf, gcvNULL, srcData));
+
+            dstData = (GLubyte*)buf + rowStride * imgHeight * i; sx = 0; sy = 0; dx = 0; dy = 0;
+            w = gcmMIN(mipmap->width, (gctINT)w);
+            h = gcmMIN(mipmap->height, (gctINT)h);
+            width = mipmap->width;
+
+            switch (srcFormat)
+            {
+            case gcvSURF_D16:
+                srcShift = 0;
+                srcMax = (1 << 16) - 1;
+
+                switch (type)
+                {
+                case GL_FLOAT:
+                    dstMax = 0;
+                    dstStride = width * 4;
+                    CONVERT_DEPTH_PIXELS(gctFLOAT, gctUINT16, CONVERT_FIXED_TO_FLOAT);
+                    break;
+                case GL_UNSIGNED_SHORT:
+                    dstMax = 0;
+                    dstStride = width * 2;
+                    CONVERT_DEPTH_PIXELS(gctUINT16, gctUINT16, CONVERT_NONE);
+                    break;
+                case GL_UNSIGNED_BYTE:
+                    dstMax = (1 << 8) - 1;
+                    dstStride = width;
+                    CONVERT_DEPTH_PIXELS(gctUINT8, gctUINT16, CONVERT_FIXED_TO_FIXED);
+                    break;
+                default:
+                    break;
+                }
+                break;
+
+            case gcvSURF_D24X8:
+                srcShift = 8;
+                srcMax = (1 << 24) - 1;
+
+                switch (type)
+                {
+                case GL_FLOAT:
+                    dstMax = 0;
+                    dstStride = width * 4;
+                    CONVERT_DEPTH_PIXELS(gctFLOAT, gctUINT32, CONVERT_FIXED_TO_FLOAT);
+                    break;
+                case GL_UNSIGNED_SHORT:
+                    dstMax = (1 << 16) - 1;
+                    dstStride = width * 2;
+                    CONVERT_DEPTH_PIXELS(gctUINT16, gctUINT32, CONVERT_FIXED_TO_FIXED);
+                    break;
+                case GL_UNSIGNED_INT:
+                    dstStride = width * 4;
+                    CONVERT_DEPTH_PIXELS(gctUINT32, gctUINT32, CONVERT_NONE);
+                    break;
+                case GL_UNSIGNED_INT_24_8_EXT:
+                    srcShift = 0;
+                    srcMax = 0xFFFFFFFF;
+                    dstStride = width * 4;
+                    CONVERT_DEPTH_PIXELS(gctUINT32, gctUINT32, CONVERT_NONE);
+                    break;
+                case GL_UNSIGNED_BYTE:
+                    dstStride = width;
+                    dstMax = (1 << 8) - 1;
+                    CONVERT_DEPTH_PIXELS(gctUINT8, gctUINT32, CONVERT_FIXED_TO_FIXED);
+                    break;
+                default:
+                    break;
+                }
+                break;
+
+
+            case gcvSURF_D24S8:
+                srcShift = (format == GL_DEPTH_COMPONENT) ? 8 : 0;
+                srcMax = (format == GL_DEPTH_COMPONENT) ? ((1 << 24) - 1) : ((1 << 8) - 1);
+
+                switch (type)
+                {
+                case GL_FLOAT:
+                    dstMax = 0;
+                    dstStride = width * 4;
+                    CONVERT_DEPTH_PIXELS(gctFLOAT, gctUINT32, CONVERT_FIXED_TO_FLOAT);
+                    break;
+                case GL_UNSIGNED_SHORT:
+                    dstMax = (1 << 16) - 1;
+                    dstStride = width * 2;
+                    CONVERT_DEPTH_PIXELS(gctUINT16, gctUINT32, CONVERT_FIXED_TO_FIXED);
+                    break;
+                case GL_UNSIGNED_INT:
+                    dstStride = width * 4;
+                    CONVERT_DEPTH_PIXELS(gctUINT32, gctUINT32, CONVERT_NONE);
+                    break;
+                case GL_UNSIGNED_INT_24_8_EXT:
+                    srcShift = 0;
+                    srcMax = 0xFFFFFFFF;
+                    dstStride = width * 4;
+                    CONVERT_DEPTH_PIXELS(gctUINT32, gctUINT32, CONVERT_NONE);
+                    break;
+                case GL_UNSIGNED_BYTE:
+                    dstStride = width;
+                    if (format == GL_STENCIL_INDEX)
+                    {
+                        dstMax = 0;
+                        CONVERT_DEPTH_PIXELS(gctUINT8, gctUINT32, CONVERT_NONE);
+                    }
+                    else
+                    {
+                        dstMax = (1 << 8) - 1;
+                        CONVERT_DEPTH_PIXELS(gctUINT8, gctUINT32, CONVERT_FIXED_TO_FIXED);
+                    }
+                    break;
+                default:
+                    break;
+                }
+                break;
+
+            case gcvSURF_S8D32F_1_G32R32F:
+                switch (type)
+                {
+                case GL_FLOAT_32_UNSIGNED_INT_24_8_REV:
+                    dstStride = width * 8;
+                    CONVERT_DEPTH_PIXELS(D32F_S8, D32F_S8_1_G32R32F, CONVERT_DEPTH);
+                    break;
+                case GL_FLOAT:
+                    dstStride = width * 4;
+                    CONVERT_DEPTH_PIXELS(gctFLOAT, D32F_S8_1_G32R32F, CONVERT_DEPTH_ONLY);
+                    break;
+                default:
+                    break;
+                }
+                break;
+
+            default:
+                break;
+            }
+
+            gcoSURF_Unlock(dstView.surf, gcvNULL);
+        }
 
         if (dstView.surf)
         {
@@ -5415,7 +5651,7 @@ __glChipTexDirectVIVMap(
         chipCtx->hal, width, height, 1, type, sourceFormat, gcvPOOL_USER, &texInfo->direct.source));
 
     /* Set the user buffer to the surface. */
-    gcmONERROR(gcoSURF_MapUserSurface(texInfo->direct.source, 0, (GLvoid *) *logical, (gctUINT32) *physical));
+    gcmONERROR(gcoSURF_MapUserSurface(texInfo->direct.source, 0, (GLvoid *) *logical, *physical));
 
     gcmONERROR(gcoSURF_Lock(texInfo->direct.source, gcvNULL, gcvNULL));
 
@@ -6001,6 +6237,7 @@ gcChipTexSyncEGLImage(
                         gcsHAL_INTERFACE iface;
 
                         iface.command            = gcvHAL_SIGNAL;
+                        iface.engine             = gcvENGINE_RENDER;
                         iface.u.Signal.signal    = handle->hwDoneSignal;
                         iface.u.Signal.auxSignal = 0;
                         /* Stuff the client's PID. */

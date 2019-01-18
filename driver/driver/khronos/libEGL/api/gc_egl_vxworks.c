@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -259,7 +259,6 @@ vxworks_GetDisplayByIndex(
     IN gctPOINTER Context
     )
 {
-    char *dev, *p;
     int i;
     char fbDevName[256];
     struct _FBDisplay* display = NULL;
@@ -1129,7 +1128,6 @@ vxworks_CreateWindow(
 {
     gceSTATUS           status = gcvSTATUS_OK;
     struct _FBDisplay * display;
-    gctCHAR *           p;
 
     gcmHEADER_ARG("Display=%p X=%d Y=%d Width=%d Height=%d",
                   Display, X, Y, Width, Height);
@@ -2209,7 +2207,7 @@ struct eglWindowInfo
 
     /* Information obtained by vxworks_GetDisplayInfoEx2. */
     gctPOINTER          logical;
-    unsigned long       physical;
+    gctPHYS_ADDR_T      physical;
     gctINT              stride;
     gctUINT             width;
     gctUINT             height;
@@ -2260,7 +2258,7 @@ _CreateWindowBuffers(
             {
                 gctUINT    offset;
                 gctPOINTER logical;
-                gctUINT    physical;
+                gctPHYS_ADDR_T physical;
 
                 /* Allocate native buffer object. */
                 gcmONERROR(gcoOS_Allocate(gcvNULL,
@@ -2571,7 +2569,7 @@ _QueryWindowInfo(
     {
         Info->fbDirect     = EGL_FALSE;
         Info->logical      = gcvNULL;
-        Info->physical     = gcvINVALID_ADDRESS;
+        Info->physical     = gcvINVALID_PHYSICAL_ADDRESS;
         Info->stride       = 0;
         Info->wrapFB       = gcvFALSE;
         Info->multiBuffer  = 1;
@@ -3830,7 +3828,7 @@ _ConnectPixmap(
     gceSURF_FORMAT pixmapFormat;
     gctINT pixmapBpp;
     gctPOINTER pixmapBits = gcvNULL;
-    gctUINT32 pixmapPhysical = gcvINVALID_ADDRESS;
+    gctPHYS_ADDR_T pixmapPhysical = gcvINVALID_PHYSICAL_ADDRESS;
     gcoSURF wrapper = gcvNULL;
     gcoSURF shadow = gcvNULL;
     gctPOINTER pointer;

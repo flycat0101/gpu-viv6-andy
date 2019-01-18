@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -289,6 +289,20 @@ typedef struct _vgsCONTEXT
     gctUINT32   colorIndexEntryCount;
     gctUINT32   colorIndexEntries[256];
     gctBOOL     colorIndexDirty;
+
+    /* yuv2rgb states */
+    gctBOOL     yuv2rgbStdCust;
+    gctFLOAT    yuv2rgbCoef[9];
+    gctFLOAT    yuv2rgbOffset[2];
+    gctUINT8    yuv2rgbCfg;
+    gctBOOL     yuv2rgbDirty;
+
+    /* rgb2yuv states */
+    gctBOOL     rgb2yuvStdCust;
+    gctFLOAT    rgb2yuvCoef[9];
+    gctFLOAT    rgb2yuvOffset[2];
+    gctUINT8    rgb2yuvCfg[2];
+    gctBOOL     rgb2yuvDirty;
 #endif
 
     /* Debug counters. */

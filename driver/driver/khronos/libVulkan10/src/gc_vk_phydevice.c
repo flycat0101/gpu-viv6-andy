@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -32,7 +32,6 @@ const VkExtensionProperties g_DeviceExtensions[] =
 const uint32_t g_DeviceExtensionsCount =
     sizeof(g_DeviceExtensions) / sizeof(g_DeviceExtensions[0]);
 
-#if __VK_NEW_DEVICE_QUEUE
 static void __vki_InitializeHWcapsForVSC(
     __vkPhysicalDevice *phyDev
     )
@@ -43,6 +42,7 @@ static void __vki_InitializeHWcapsForVSC(
     gctUINT32 totalCount = 0;
     gctUINT32 fragmentSizeInKbyte = 0;
     gctUINT32 attribBufSizeInKbyte = 0;
+    gctUINT32 localStorageSizeInKbyte = 0;
     VSC_HW_CONFIG *pVscHwCfg = &phyDev->vscCoreSysCtx.hwCfg;
     const gcsFEATURE_DATABASE *database = phyDev->phyDevConfig.database;
     uint32_t chipModel = phyDev->phyDevConfig.chipModel;
@@ -118,7 +118,9 @@ static void __vki_InitializeHWcapsForVSC(
     maxAttribs = database->PIPELINE_32_ATTRIBUTES ? 32 : 16;
     /* Determine constant parameters. */
     {if (database->NumberOfConstants > 256){    unifiedConst = gcvTRUE;
-if (database->REG_Halti5){    vsConstBase  = 0xD000;
+if ((database->SMALLBATCH && phyDev->phyDevConfig.options.smallBatch)){    vsConstBase  = 0xD000;
+    psConstBase  = 0xD000;
+}else if (database->REG_Halti5){    vsConstBase  = 0xD000;
     psConstBase  = 0xD800;
 }else{    vsConstBase  = 0xC000;
     psConstBase  = 0xC000;
@@ -233,36 +235,52 @@ if (database->REG_Halti5){    vsConstBase  = 0xD000;
     }
     if (database->REG_Halti5)
     {
-
-        static const gctFLOAT s_uscCacheRatio[] =
+        if (database->SEPARATE_LS)
         {
-            1.0f,
-            0.5f,
-            0.25f,
-            0.125f,
-            0.0625f,
-            0.03125f,
-            0.75f,
-            0.0f,
-        };
+            localStorageSizeInKbyte  = database->LocalStorageSize;
+            attribBufSizeInKbyte = database->USC_MAX_PAGES - fragmentSizeInKbyte;
+        }
+        else
+        {
+            static const gctFLOAT s_uscCacheRatio[] =
+            {
+                1.0f,
+                0.5f,
+                0.25f,
+                0.125f,
+                0.0625f,
+                0.03125f,
+                0.75f,
+                0.0f,
+            };
 
-        attribBufSizeInKbyte = (uint32_t)
-           (database->USC_MAX_PAGES - (database->L1CacheSize * s_uscCacheRatio[phyDev->phyDevConfig.options.uscL1CacheRatio]));
-        attribBufSizeInKbyte -= fragmentSizeInKbyte;
+            attribBufSizeInKbyte = (uint32_t)
+               (database->USC_MAX_PAGES
+              - (database->L1CacheSize * s_uscCacheRatio[phyDev->phyDevConfig.options.uscL1CacheRatio]));
+
+            /* attribute cache size for multi cluster arch */
+            if (database->MULTI_CLUSTER)
+            {
+                attribBufSizeInKbyte -= (uint32_t)
+                    ((database->L1CacheSize * s_uscCacheRatio[phyDev->phyDevConfig.options.uscAttribCacheRatio]));
+            }
+            attribBufSizeInKbyte -= fragmentSizeInKbyte;
+        }
+    }
+    else
+    {
+        localStorageSizeInKbyte  = database->LocalStorageSize;
     }
 
     pVscHwCfg->maxUSCAttribBufInKbyte = database->REG_Halti5 ? attribBufSizeInKbyte : 0;
-    pVscHwCfg->maxLocalMemSizeInByte = attribBufSizeInKbyte * 1024;
+    pVscHwCfg->maxLocalMemSizeInByte = localStorageSizeInKbyte * 1024;
     pVscHwCfg->maxResultCacheWinSize = database->RESULT_WINDOW_MAX_SIZE;
+    pVscHwCfg->unifiedConst = unifiedConst;
 
     pVscHwCfg->minPointSize = 0.5f;
     pVscHwCfg->maxPointSize = 128.0f;
 
-    /*
-    ** 1) Use the DEVICE_MAX_WORK_GROUP_SIZE as the default workGroupSize for a shader.
-    ** 2) When we need to use the workGroupSize to calculate the maxRegCount(e.g., use BARRIER in shader),
-    **    use initWorkGroupSizeToCalcRegCount as the workGroupSize. And we may also reduce it to use more HW registers.
-    */
+    /* Set the maxWorkGroupSize. */
     if (pVscHwCfg->maxCoreCount >= 4)
     {
         maxWorkGroupSize = 256;
@@ -280,6 +298,8 @@ if (database->REG_Halti5){    vsConstBase  = 0xD000;
     pVscHwCfg->initWorkGroupSizeToCalcRegCount       = 128;
     pVscHwCfg->maxWorkGroupSize                      = maxWorkGroupSize;
     pVscHwCfg->minWorkGroupSize                      = 1;
+
+    gcmASSERT(pVscHwCfg->maxWorkGroupSize >= pVscHwCfg->initWorkGroupSizeToCalcRegCount);
 
     pVscHwCfg->hwFeatureFlags.hasHalti0 = database->REG_Halti0;
     pVscHwCfg->hwFeatureFlags.hasHalti1 = database->REG_Halti1;
@@ -348,15 +368,31 @@ if (database->REG_Halti5){    vsConstBase  = 0xD000;
     pVscHwCfg->hwFeatureFlags.supportImgAddr = database->REG_Halti3;
     pVscHwCfg->hwFeatureFlags.hasUscGosAddrFix = database->USC_GOS_ADDR_FIX;
     pVscHwCfg->hwFeatureFlags.multiCluster = database->MULTI_CLUSTER;
+    pVscHwCfg->hwFeatureFlags.smallBatch = (database->SMALLBATCH && phyDev->phyDevConfig.options.smallBatch);
+    pVscHwCfg->hwFeatureFlags.supportUnifiedConstant = (database->SMALLBATCH && phyDev->phyDevConfig.options.smallBatch);
+    pVscHwCfg->hwFeatureFlags.supportUnifiedSampler  = (database->SMALLBATCH && phyDev->phyDevConfig.options.smallBatch);
+    pVscHwCfg->hwFeatureFlags.support32BitIntDiv     = gcvFALSE;
+    pVscHwCfg->hwFeatureFlags.supportFullCompIntDiv  = gcvFALSE;
+    pVscHwCfg->hwFeatureFlags.supportComplex         = database->SH_CMPLX;
+    pVscHwCfg->hwFeatureFlags.supportBigEndianLdSt   = database->SH_GM_ENDIAN;
+    pVscHwCfg->hwFeatureFlags.supportUSCUnalloc      = database->SH_GM_USC_UNALLOC;
+    pVscHwCfg->hwFeatureFlags.supportEndOfBBReissue  = database->SH_END_OF_BB;
+    pVscHwCfg->hwFeatureFlags.hasDynamicIdxDepFix    = database->REG_Halti5;
+    pVscHwCfg->hwFeatureFlags.supportPSCSThrottle    = database->PSCS_THROTTLE;
     /* Now LODQ can't return the correct raw LOD value as spec require. */
-    pVscHwCfg->hwFeatureFlags.hasLODQFix = gcvFALSE;
-    pVscHwCfg->hwFeatureFlags.hasImageLoadEnableFix = database->SH_IMAGE_ENABLE_FIX;
-    pVscHwCfg->hwFeatureFlags.hasPointSizeFix = gcvTRUE;
+    pVscHwCfg->hwFeatureFlags.hasLODQFix             = gcvFALSE;
+    pVscHwCfg->hwFeatureFlags.supportHWManagedLS     = database->HWMANAGED_LS;
+    pVscHwCfg->hwFeatureFlags.hasScatteredMemAccess  = database->SH_SCATTER_GATHER;
+    pVscHwCfg->hwFeatureFlags.supportImgLDSTClamp    = database->SH_IMG_LDST_ON_TEMP;
+    /* Use SRC0's swizzle as the sourceBin. */
+    pVscHwCfg->hwFeatureFlags.useSrc0SwizzleAsSrcBin = gcvTRUE;
+    pVscHwCfg->hwFeatureFlags.supportSeparatedTex    = gcvFALSE;
+    pVscHwCfg->hwFeatureFlags.supportMultiGPU        = gcvFALSE;
+    pVscHwCfg->hwFeatureFlags.hasPointSizeFix        = gcvTRUE;
+    pVscHwCfg->hwFeatureFlags.FEDrawDirect           = database->FE_DRAW_DIRECT;
 
     return;
 }
-
-#endif
 
 static void __vki_InitializeShaderCaps(
     __vkPhysicalDevice *phyDev
@@ -366,6 +402,7 @@ static void __vki_InitializeShaderCaps(
     VkPhysicalDeviceProperties *phyDevProp = &phyDev->phyDevProp;
     const gcsFEATURE_DATABASE *database = phyDev->phyDevConfig.database;
     uint32_t i;
+
 
     /* GLSL extension string. */
     shaderCaps->extensions = gcvNULL;
@@ -518,21 +555,10 @@ static void __vki_InitializeShaderCaps(
     shaderCaps->provokingVertex = gcvPROVOKING_VERTEX_UNDEFINE;
     shaderCaps->maxGsInvocationCount = phyDevProp->limits.maxGeometryShaderInvocations;
 
+    __vki_InitializeHWcapsForVSC(phyDev);
+
     gcInitializeCompiler(gcvPATCH_INVALID, &phyDev->vscCoreSysCtx.hwCfg, &phyDev->shaderCaps);
 
-#if __VK_NEW_DEVICE_QUEUE
-    __vki_InitializeHWcapsForVSC(phyDev);
-#else
-    __VK_VERIFY_OK(gcQueryShaderCompilerHwCfg(gcvNULL, &phyDev->vscCoreSysCtx.hwCfg));
-
-    /* Vulkan needs constant reg count for each shader are meanly divided, which means
-       constant reg space for each shader can be fixed */
-    phyDev->vscCoreSysCtx.hwCfg.maxVSConstRegCount =
-    phyDev->vscCoreSysCtx.hwCfg.maxTCSConstRegCount =
-    phyDev->vscCoreSysCtx.hwCfg.maxTESConstRegCount =
-    phyDev->vscCoreSysCtx.hwCfg.maxGSConstRegCount =
-    phyDev->vscCoreSysCtx.hwCfg.maxPSConstRegCount = phyDev->vscCoreSysCtx.hwCfg.maxTotalConstRegCount/5;
-#endif
     /* VSC private data */
     vscCreatePrivateData(&phyDev->vscCoreSysCtx, &phyDev->vscCoreSysCtx.hPrivData, gcvFALSE);
     return;
@@ -578,6 +604,7 @@ static void __vki_InitializePhysicalDeviceFeatures(
     phyDev->phyDevFeatures.dualSrcBlend                            = VK_FALSE;
     phyDev->phyDevFeatures.logicOp                                 = VK_FALSE;
     phyDev->phyDevFeatures.multiDrawIndirect                       = VK_FALSE;
+    phyDev->phyDevFeatures.drawIndirectFirstInstance               = phyDevConfig->database->FE_DRAW_DIRECT;
     phyDev->phyDevFeatures.depthClamp                              = VK_FALSE;
     phyDev->phyDevFeatures.depthBiasClamp                          = VK_FALSE;
     phyDev->phyDevFeatures.fillModeNonSolid                        = VK_FALSE;
@@ -594,7 +621,7 @@ static void __vki_InitializePhysicalDeviceFeatures(
     phyDev->phyDevFeatures.textureCompressionBC                    = VK_FALSE;
     phyDev->phyDevFeatures.occlusionQueryPrecise                   = VK_TRUE;
     phyDev->phyDevFeatures.pipelineStatisticsQuery                 = VK_FALSE;
-    phyDev->phyDevFeatures.vertexPipelineStoresAndAtomics          = VK_FALSE;
+    phyDev->phyDevFeatures.vertexPipelineStoresAndAtomics          = phyDevConfig->database->REG_Halti2;
     phyDev->phyDevFeatures.fragmentStoresAndAtomics                = phyDevConfig->database->REG_Halti2;
     phyDev->phyDevFeatures.shaderTessellationAndGeometryPointSize  = phyDevConfig->database->REG_TessellationShaders;
     phyDev->phyDevFeatures.shaderImageGatherExtended               = VK_FALSE;
@@ -949,8 +976,7 @@ static void __vki_InitializePhysicalDevicePorperties(
     phyDev->phyDevProp.limits.maxComputeWorkGroupCount[0]                     = 65535;
     phyDev->phyDevProp.limits.maxComputeWorkGroupCount[1]                     = 65535;
     phyDev->phyDevProp.limits.maxComputeWorkGroupCount[2]                     = 65535;
-    /*modify the max WorkGroupInvocation from 128 to 256 when do barrier in cs, the max value should be 128*/
-    phyDev->phyDevProp.limits.maxComputeWorkGroupInvocations                  = 256;
+    phyDev->phyDevProp.limits.maxComputeWorkGroupInvocations                  = 128;
     phyDev->phyDevProp.limits.maxComputeWorkGroupSize[0]                      = 128;
     phyDev->phyDevProp.limits.maxComputeWorkGroupSize[1]                      = 128;
     phyDev->phyDevProp.limits.maxComputeWorkGroupSize[2]                      = 64;
@@ -1055,15 +1081,6 @@ static VkResult __vki_InitializePhysicalDevice(
     __vkPhysicalDevice *    phyDev = (__vkPhysicalDevice *)physicalDevice;
     gceSTATUS               status;
 
-#if !__VK_NEW_DEVICE_QUEUE
-    status = gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
-    status = gcoHAL_GetHardware(gcvNULL, &phyDev->hardware);
-    if (gcmIS_ERROR(status))
-    {
-        return VK_ERROR_INITIALIZATION_FAILED;
-    }
-#endif
-
     status = gcoOS_CreateMutex(gcvNULL, &phyDev->mutex);
     if (gcmIS_ERROR(status))
     {
@@ -1102,7 +1119,15 @@ static VkResult __vki_InitializePhysicalDevice(
 
     if (!phyDev->phyDevConfig.database->REG_Halti5 && phyDev->phyDevConfig.database->REG_Halti3)
     {
-       g_vkFormatInfoTable[VK_FORMAT_R8_UNORM].residentImgFormat = __VK_FORMAT_R8_1_X8R8G8B8;
+        g_vkFormatInfoTable[VK_FORMAT_R8_UNORM].residentImgFormat = __VK_FORMAT_R8_1_X8R8G8B8;
+    }
+
+    if (phyDev->phyDevConfig.database->PE_A8B8G8R8)
+    {
+        g_vkFormatInfoTable[VK_FORMAT_R8G8B8A8_UNORM].residentImgFormat = VK_FORMAT_R8G8B8A8_UNORM;
+        g_vkFormatInfoTable[VK_FORMAT_R8G8B8A8_SRGB].residentImgFormat = VK_FORMAT_R8G8B8A8_SRGB;
+        g_vkFormatInfoTable[VK_FORMAT_A8B8G8R8_UNORM_PACK32].residentImgFormat = VK_FORMAT_A8B8G8R8_UNORM_PACK32;
+        g_vkFormatInfoTable[VK_FORMAT_A8B8G8R8_SRGB_PACK32].residentImgFormat = VK_FORMAT_A8B8G8R8_SRGB_PACK32;
     }
 
     /* Initialize VkPhysicalDeviceMemoryProperties here */

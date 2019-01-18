@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -449,6 +449,13 @@ _InitializeContextBuffer(
     index += StateInitFunction(Hardware, InitInfo, index, 0x0295C >> 2, 0x00000000, 1);
     index += StateInitFunction(Hardware, InitInfo, index, 0x02960 >> 2, 0x00000000, 1);
     index += StateInitFunction(Hardware, InitInfo, index, 0x02980 >> 2, 0x00000000, 25);
+    index += StateInitFunction(Hardware, InitInfo, index, 0x02AD0 >> 2, 0x00000000, 2);
+    index += StateInitFunction(Hardware, InitInfo, index, 0x02AD8 >> 2, 0x00000000, 2);
+    index += StateInitFunction(Hardware, InitInfo, index, 0x02AE0 >> 2, 0x00000000, 2);
+    index += StateInitFunction(Hardware, InitInfo, index, 0x02AE8 >> 2, 0x00000000, 2);
+    index += StateInitFunction(Hardware, InitInfo, index, 0x02AF0 >> 2, 0x00000000, 2);
+    index += StateInitFunction(Hardware, InitInfo, index, 0x02AF8 >> 2, 0x00000000, 2);
+    index += StateInitFunction(Hardware, InitInfo, index, 0x02B00 >> 2, 0x00000000, 2);
 
     /* Align the buffer. */
     _ALIGN_BUFFER();

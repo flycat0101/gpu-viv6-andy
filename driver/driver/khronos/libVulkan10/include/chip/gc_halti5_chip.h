@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -253,13 +253,6 @@ typedef struct
 typedef struct
 {
     uint32_t imageInfo[4];
-
-    /* Needed if texelFetch need to be implemented using texelLoad
-    for 128 bpp texelbuffer use img to do*/
-    uint32_t baseWidth;
-    uint32_t baseHeight;
-    uint32_t baseDepth;
-    uint32_t baseSlice;
 } HwImgDesc;
 
 
@@ -268,6 +261,7 @@ typedef union
     struct
     {
         uint32_t hwSamplerCtrl0;
+        uint32_t hwSamplerCtrl1;
         uint32_t hwSamplerLodMinMax;
         uint32_t hwSamplerLodBias;
         uint32_t hwSamplerAnisVal;
@@ -321,18 +315,22 @@ typedef struct
     HwResourceViewUsage usedUsageMask;
 } halti5_bufferView;
 
+typedef struct
+{
+    /* clusterAliveMask is an enabled physical mask, may not all clusters are enabled by user.*/
+    uint32_t clusterAliveMask;
+    uint32_t clusterAliveCount;
+    uint32_t clusterMinID;
+    uint32_t clusterMaxID;
+}halti5_clusterInfo;
+
 enum
 {
     HALTI5_BLIT_2D_UNORM_FLOAT = 0,
-    HALTI5_BLIT_2D_UNORM_FLOAT_HWDOUBLEROUNDING,
     HALTI5_BLIT_2D_UNORM_TO_PACK16,
     HALTI5_BLIT_2D_SINT,
     HALTI5_BLIT_2D_UINT,
     HALTI5_BLIT_2D_UINT_TO_A2B10G10R10_PACK,
-
-    HALTI5_BLIT_2D_SFLOAT_DOWNSAMPLE,
-    HALTI5_BLIT_2D_SINT_DOWNSAMPLE,
-    HALTI5_BLIT_2D_UINT_DOWNSAMPLE,
 
     HALTI5_BLIT_3D_UNORM_FLOAT,
     HALTI5_BLIT_3D_UNORM_TO_PACK16,
@@ -343,6 +341,7 @@ enum
     HALTI5_BLIT_2LAYERS_IMG_TO_BUF,
     HALTI5_BLIT_BUF_TO_2LAYERS_IMG,
     HALTI5_BLIT_COPY_2D_UNORM_FLOAT,
+    HALTI5_BLIT_COPY_OQ_QUERY_POOL,
 
     HALTI3_CLEAR_2D_UINT,
     HALTI3_CLEAR_TO_2LAYERS_IMG,
@@ -364,16 +363,12 @@ enum
 
 enum
 {
-    __PACK_FORMAT_INVALID      = 0,
-    __PACK_FORMAT_A4R4G4B4     = 1,
-    __PACK_FORMAT_B4G4R4A4     = 2,
-    __PACK_FORMAT_R5G6B5       = 3,
-    __PACK_FORMAT_A1R5G5B5     = 4,
-    __PACK_FORMAT_A2B10G10R10  = 5,
-    __PACK_FORMAT_R32G32B32A32 = 6,
-    __PACK_FORMAT_R16G16B16A16 = 7,
-    __PACK_FORMAT_R32G32       = 8,
-
+    __PACK_FORMAT_INVALID     = 0,
+    __PACK_FORMAT_A4R4G4B4    = 1,
+    __PACK_FORMAT_B4G4R4A4    = 2,
+    __PACK_FORMAT_R5G6B5      = 3,
+    __PACK_FORMAT_A1R5G5B5    = 4,
+    __PACK_FORMAT_A2B10G10R10 = 5,
 };
 
 #define HALTI5_INSTANCE_CMD_BUFSIZE 10
@@ -396,9 +391,9 @@ typedef struct __vkComputeBlitParams
     VkBool32   dstSRGB;
     uint32_t   srcFormat;   /* tex format finally used to program compute blit */
     uint32_t   dstFormat;   /* img format finally used to program compute blit */
-    uint32_t   srcParts;
-    uint32_t   dstParts;
     const VkComponentMapping *txSwizzles;
+    uint32_t   partIndex;
+    uint32_t   partCount;
     VkBool32   flushTex;
 
     VkOffset3D srcOffset;
@@ -420,7 +415,7 @@ typedef struct halti5_vscprogram_blit
     PROGRAM_EXECUTABLE_PROFILE      pep;
     VSC_HW_PIPELINE_SHADERS_STATES  hwStates;
 
-    PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY    *srcTexEntry[2];
+    PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY    *srcTexEntry;
     PROG_VK_STORAGE_TABLE_ENTRY                 *srcImgEntry[2];
     PROG_VK_STORAGE_TABLE_ENTRY                 *dstImgEntry[2];
     PROG_VK_UNIFORM_BUFFER_TABLE_ENTRY          *constEntry;
@@ -487,13 +482,6 @@ typedef struct halti5_tweak_handler
         struct halti5_tweak_handler *handler
         );
 
-    VkResult (* copy)(
-        __vkDevContext *devCtx,
-        __vkPipeline *pip,
-        __vkBuffer *dstBuf,
-        struct halti5_tweak_handler *handler
-        );
-
     void *privateData;
 } halti5_tweak_handler;
 
@@ -521,6 +509,7 @@ typedef struct
 
     halti5_tweak_handler **ppTweakHandlers;
     uint32_t tweakHandleCount;
+    halti5_clusterInfo clusterInfo;
 
     struct
     {
@@ -723,9 +712,7 @@ typedef struct
     enum HwCacheMode hwCacheMode;
 
     uint32_t regDepthConfig;
-    uint32_t vsAllInputCount;
-
-    uint32_t psOutCntl4to7;
+    uint32_t regRAControl;
 
 } halti5_graphicsPipeline;
 
@@ -799,7 +786,8 @@ VkResult halti5_copyImage(
     VkCommandBuffer cmdBuf,
     __vkBlitRes *srcRes,
     __vkBlitRes *dstRes,
-    VkBool32 rawCopy
+    VkBool32 rawCopy,
+    VkFilter filter
     );
 
 VkResult halti5_fillBuffer(
@@ -834,6 +822,12 @@ VkResult halti5_computeBlit(
     VkFilter filter
     );
 
+VkResult halti5_computeCopyOQQueryPool(
+    VkCommandBuffer cmdBuf,
+    __vkBlitRes *srcRes,
+    __vkBlitRes *dstRes
+    );
+
 VkResult halti5_draw(
     VkCommandBuffer commandBuffer,
     uint32_t vertexCount,
@@ -843,6 +837,23 @@ VkResult halti5_draw(
     );
 
 VkResult halti5_drawIndexed(
+    VkCommandBuffer commandBuffer,
+    uint32_t indexCount,
+    uint32_t instanceCount,
+    uint32_t firstIndex,
+    int32_t vertexOffset,
+    uint32_t firstInstance
+    );
+
+VkResult halti5_drawDirect(
+    VkCommandBuffer commandBuffer,
+    uint32_t vertexCount,
+    uint32_t instanceCount,
+    uint32_t firstVertex,
+    uint32_t firstInstance
+    );
+
+VkResult halti5_drawIndexedDirect(
     VkCommandBuffer commandBuffer,
     uint32_t indexCount,
     uint32_t instanceCount,
@@ -958,11 +969,6 @@ VkResult halti5_setLineWidth(
     __vkCommandBuffer *cmdBuf
     );
 
-VkResult halti5_setPsOutputMode(
-    __vkCommandBuffer *cmdBuf,
-    __vkPipeline *pip
-    );
-
 VkResult halti5_setRenderTargets(
     __vkCommandBuffer *cmdBuf
     );
@@ -1029,14 +1035,9 @@ VkResult halti5_helper_set_linewidth(
     float lineWidth
     );
 
-VkResult halti5_helper_set_psOutputMode(
-    __vkDevContext *devCtx,
-    uint32_t **commandBuffer,
-    uint32_t oldPsOutCntl4to7,
-    uint32_t newPsOutCntl4to7
-    );
 
 VkResult halti5_helper_convertHwPEDesc(
+    __vkDevContext *devCtx,
     uint32_t vkFormat,
     HwPEDesc *hwPEDesc
     );
@@ -1328,7 +1329,8 @@ VkResult halti2_copyImageWithRS(
     VkCommandBuffer commandBuffer,
     __vkBlitRes *srcRes,
     __vkBlitRes *dstRes,
-    VkBool32 rawCopy
+    VkBool32 rawCopy,
+    VkFilter filter
     );
 
 void halti2_helper_convertHwSampler(
@@ -1375,9 +1377,21 @@ VkResult halti5_flushCache(
     int32_t cacheMask
     );
 
-VkBool32 halti5_tweakCopy(
-    VkCommandBuffer cmdBuf,
-    VkBuffer destBuffer
+VkResult halti5_getQueryResult(
+    VkDevice device,
+    VkQueryPool queryPool,
+    uint32_t queryIndex,
+    uint64_t *retValue
+    );
+
+VkResult halti5_copyQueryResult(
+    VkCommandBuffer commandBuffer,
+    VkQueryPool queryPool,
+    VkBuffer dstBuffer,
+    uint32_t queryIndex,
+    VkDeviceSize dstOffset,
+    VkDeviceSize dstStride,
+    VkQueryResultFlags flags
     );
 
 uint32_t halti5_computeTileStatusAddr(

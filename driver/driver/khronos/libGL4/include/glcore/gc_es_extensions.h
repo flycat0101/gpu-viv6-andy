@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -116,27 +116,34 @@ typedef enum
 
     /* Vendor extensions */
     __GL_EXTID_VIV_tex_direct,
-    __GL_EXTID_ARB_vertex_program,
-    __GL_EXTID_ARB_vertex_buffer_object,
-    __GL_EXTID_ARB_shading_language_100,
-    __GL_EXTID_ARB_shader_objects,
+
 
 #ifdef OPENGL40
-    __GL_EXTID_texture_compression_s3tc,
-    __GL_EXTID_ARB_depth_texture,
-    __GL_EXTID_texture_shared_exponent,
-    __GL_EXTID_ARB_half_float_pixel,
-    __GL_EXTID_packed_float,
-    __GL_EXTID_texture_compression_latc,
-    __GL_EXTID_texture_compression_rgtc,
-    __GL_EXTID_texture_integer,
-    __GL_EXTID_texture_sRGB,
-    __GL_EXTID_ARB_texture_float,
-    __GL_EXTID_ARB_texture_array,
+    __GL_EXTID_EXT_framebuffer_blit,
     __GL_EXTID_EXT_framebuffer_object,
-    __GL_EXTID_ARB_framebuffer_object,
+    __GL_EXTID_EXT_packed_float,
+    __GL_EXTID_EXT_texture_compression_latc,
+    __GL_EXTID_EXT_texture_compression_rgtc,
+    __GL_EXTID_EXT_texture_integer,
+    __GL_EXTID_EXT_texture_shared_exponent,
+    __GL_EXTID_EXT_texture_sRGB,
     __GL_EXTID_EXT_timer_query,
+
+    __GL_EXTID_ARB_color_buffer_float,
+    __GL_EXTID_ARB_depth_texture,
+    __GL_EXTID_ARB_framebuffer_object,
+    __GL_EXTID_ARB_half_float_pixel,
+    __GL_EXTID_ARB_shader_objects,
+    __GL_EXTID_ARB_shading_language_100,
+    __GL_EXTID_ARB_texture_array,
+    __GL_EXTID_ARB_texture_float,
+    __GL_EXTID_ARB_vertex_buffer_object,
+    __GL_EXTID_ARB_vertex_program,
+    __GL_EXTID_ARB_window_pos,
+    __GL_EXTID_ARB_texture_compression,
+    __GL_EXTID_ARB_multitexture,
 #endif
+
     __GL_EXTID_EXT_LAST,
 
 } __GLextID;
@@ -271,6 +278,25 @@ static __GLextFuncAlias __glExtFuncAlias[] =
     {__GL_EXTID_EXT_draw_elements_base_vertex, "DrawRangeElementsBaseVertexEXT", "DrawRangeElementsBaseVertex"},
     {__GL_EXTID_EXT_draw_elements_base_vertex, "DrawElementsInstancedBaseVertexEXT", "DrawElementsInstancedBaseVertex"},
 
+    /* Extension API alias for GL_EXT_framebuffer_object */
+    {__GL_EXTID_EXT_framebuffer_object, "IsRenderbufferEXT", "IsRenderbuffer"},
+    {__GL_EXTID_EXT_framebuffer_object, "BindRenderbufferEXT", "BindRenderbuffer"},
+    {__GL_EXTID_EXT_framebuffer_object, "DeleteRenderbuffersEXT", "DeleteRenderbuffers"},
+    {__GL_EXTID_EXT_framebuffer_object, "GenRenderbuffersEXT", "GenRenderbuffers"},
+    {__GL_EXTID_EXT_framebuffer_object, "RenderbufferStorageEXT", "RenderbufferStorage"},
+    {__GL_EXTID_EXT_framebuffer_object, "GetRenderbufferParameterivEXT", "GetRenderbufferParameteriv"},
+    {__GL_EXTID_EXT_framebuffer_object, "IsFramebufferEXT", "IsFramebuffer"},
+    {__GL_EXTID_EXT_framebuffer_object, "BindFramebufferEXT", "BindFramebuffer"},
+    {__GL_EXTID_EXT_framebuffer_object, "DeleteFramebuffersEXT", "DeleteFramebuffers"},
+    {__GL_EXTID_EXT_framebuffer_object, "GenFramebuffersEXT", "GenFramebuffers"},
+    {__GL_EXTID_EXT_framebuffer_object, "CheckFramebufferStatusEXT", "CheckFramebufferStatus"},
+    {__GL_EXTID_EXT_framebuffer_object, "FramebufferTexture1DEXT", "FramebufferTexture1D"},
+    {__GL_EXTID_EXT_framebuffer_object, "FramebufferTexture2DEXT", "FramebufferTexture2D"},
+    {__GL_EXTID_EXT_framebuffer_object, "FramebufferTexture3DEXT", "FramebufferTexture3D"},
+    {__GL_EXTID_EXT_framebuffer_object, "FramebufferRenderbufferEXT", "FramebufferRenderbuffer"},
+    {__GL_EXTID_EXT_framebuffer_object, "GetFramebufferAttachmentParameterivEXT", "GetFramebufferAttachmentParameteriv"},
+    {__GL_EXTID_EXT_framebuffer_object, "GenerateMipmapEXT", "GenerateMipmap"},
+
     /* Extension API alias for GL_OES_primitive_bounding_box */
     {__GL_EXTID_OES_primitive_bounding_box, "PrimitiveBoundingBoxOES", "PrimitiveBoundingBox"},
 
@@ -319,8 +345,8 @@ static __GLextFuncAlias __glExtFuncAlias[] =
     {__GL_EXTID_ARB_vertex_buffer_object, "DeleteBuffersARB", "DeleteBuffers"},
     {__GL_EXTID_ARB_vertex_buffer_object, "IsBufferARB", "IsBuffer"},
 
-    {__GL_EXTID_ARB_vertex_program, "EnableVertexAttribArray", "EnableVertexAttribArray"},
-    {__GL_EXTID_ARB_vertex_program, "VertexAttribPointer", "VertexAttribPointer"},
+    {__GL_EXTID_ARB_vertex_program, "EnableVertexAttribArrayARB", "EnableVertexAttribArray"},
+    {__GL_EXTID_ARB_vertex_program, "VertexAttribPointerARB", "VertexAttribPointer"},
 
     {__GL_EXTID_ARB_shader_objects, "CreateProgramObjectARB", "CreateProgram"},
     {__GL_EXTID_ARB_shader_objects, "DeleteObjectARB", "DeleteObjectARB"},
@@ -336,6 +362,60 @@ static __GLextFuncAlias __glExtFuncAlias[] =
     {__GL_EXTID_ARB_shader_objects, "Uniform4fARB", "Uniform4f"},
     {__GL_EXTID_ARB_shader_objects, "Uniform1iARB", "Uniform1i"},
 
+    /* Extension API alias for GL_ARB_window_pos */
+    {__GL_EXTID_ARB_window_pos, "WindowPos2dARB", "WindowPos2d"},
+    {__GL_EXTID_ARB_window_pos, "WindowPos2dvARB", "WindowPos2dv"},
+    {__GL_EXTID_ARB_window_pos, "WindowPos2fARB", "WindowPos2f"},
+    {__GL_EXTID_ARB_window_pos, "WindowPos2fvARB", "WindowPos2fv"},
+    {__GL_EXTID_ARB_window_pos, "WindowPos2iARB", "WindowPos2d"},
+    {__GL_EXTID_ARB_window_pos, "WindowPos2ivARB", "WindowPos2dv"},
+    {__GL_EXTID_ARB_window_pos, "WindowPos2sARB", "WindowPos2s"},
+    {__GL_EXTID_ARB_window_pos, "WindowPos2svARB", "WindowPos2sv"},
+    {__GL_EXTID_ARB_window_pos, "WindowPos3dARB", "WindowPos3d"},
+    {__GL_EXTID_ARB_window_pos, "WindowPos3dvARB", "WindowPos3dv"},
+    {__GL_EXTID_ARB_window_pos, "WindowPos3fARB", "WindowPos3f"},
+    {__GL_EXTID_ARB_window_pos, "WindowPos3fvARB", "WindowPos3fv"},
+    {__GL_EXTID_ARB_window_pos, "WindowPos3iARB", "WindowPos3d"},
+    {__GL_EXTID_ARB_window_pos, "WindowPos3ivARB", "WindowPos3dv"},
+    {__GL_EXTID_ARB_window_pos, "WindowPos3sARB", "WindowPos3s"},
+    {__GL_EXTID_ARB_window_pos, "WindowPos3svARB", "WindowPos3sv"},
+
+    {__GL_EXTID_ARB_texture_compression, "GetCompressedTexImageARB", "GetCompressedTexImage"},
+
+    {__GL_EXTID_ARB_multitexture, "ActiveTextureARB", "ActiveTexture"},
+    {__GL_EXTID_ARB_multitexture, "ClientActiveTextureARB", "ClientActiveTexture"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord1dARB", "MultiTexCoord1d"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord1dvARB", "MultiTexCoord1dv"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord1fARB", "MultiTexCoord1f"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord1fvARB", "MultiTexCoord1fv"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord1iARB", "MultiTexCoord1i"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord1ivARB", "MultiTexCoord1iv"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord1sARB", "MultiTexCoord1s"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord1svARB", "MultiTexCoord1sv"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord2dARB", "MultiTexCoord2d"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord2dvARB", "MultiTexCoord2dv"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord2fARB", "MultiTexCoord2f"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord2fvARB", "MultiTexCoord2fv"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord2iARB", "MultiTexCoord2i"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord2ivARB", "MultiTexCoord2iv"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord2sARB", "MultiTexCoord2s"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord2svARB", "MultiTexCoord2sv"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord3dARB", "MultiTexCoord3d"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord3dvARB", "MultiTexCoord3dv"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord3fARB", "MultiTexCoord3f"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord3fvARB", "MultiTexCoord3fv"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord3iARB", "MultiTexCoord3i"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord3ivARB", "MultiTexCoord3iv"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord3sARB", "MultiTexCoord3s"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord3svARB", "MultiTexCoord3sv"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord4dARB", "MultiTexCoord4d"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord4dvARB", "MultiTexCoord4dv"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord4fARB", "MultiTexCoord4f"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord4fvARB", "MultiTexCoord4fv"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord4iARB", "MultiTexCoord4i"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord4ivARB", "MultiTexCoord4iv"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord4sARB", "MultiTexCoord4s"},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord4svARB", "MultiTexCoord4sv"},
 
     {__GL_EXTID_EXT_LAST, gcvNULL, gcvNULL}
 };

@@ -38,7 +38,6 @@ EXTRA_INCVPATH += $(driver_root)/hal/kernel/archvg
 endif
 
 # from libhalkernel (trunk/hal/kernel/Makefile.linux)
-SOURCE_OBJECTS += $(driver_root)/hal/kernel/gc_hal_kernel_async_command.o
 SOURCE_OBJECTS += $(driver_root)/hal/kernel/gc_hal_kernel_command.o
 SOURCE_OBJECTS += $(driver_root)/hal/kernel/gc_hal_kernel_db.o
 SOURCE_OBJECTS += $(driver_root)/hal/kernel/gc_hal_kernel_debug.o

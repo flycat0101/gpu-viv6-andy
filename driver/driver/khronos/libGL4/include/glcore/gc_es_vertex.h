@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -55,38 +55,38 @@ enum {
         __GL_INPUT_ATT15_INDEX,
 };
 
-#define __GL_INPUT_VERTEX                 (__GL_ONE_32 << __GL_INPUT_VERTEX_INDEX)
-#define __GL_INPUT_WEIGHT                 (__GL_ONE_32 << __GL_INPUT_WEIGHT_INDEX)
-#define __GL_INPUT_NORMAL                 (__GL_ONE_32 << __GL_INPUT_NORMAL_INDEX)
-#define __GL_INPUT_DIFFUSE                (__GL_ONE_32 << __GL_INPUT_DIFFUSE_INDEX)
-#define __GL_INPUT_SPECULAR               (__GL_ONE_32 << __GL_INPUT_SPECULAR_INDEX)
-#define __GL_INPUT_FOGCOORD               (__GL_ONE_32 << __GL_INPUT_FOGCOORD_INDEX)
-#define __GL_INPUT_EDGEFLAG               (__GL_ONE_32 << __GL_INPUT_EDGEFLAG_INDEX)
-#define __GL_INPUT_V7                     (__GL_ONE_32 << __GL_INPUT_V7_INDEX)
-#define __GL_INPUT_TEX0                   (__GL_ONE_32 << __GL_INPUT_TEX0_INDEX)
-#define __GL_INPUT_TEX1                   (__GL_ONE_32 << __GL_INPUT_TEX1_INDEX)
-#define __GL_INPUT_TEX2                   (__GL_ONE_32 << __GL_INPUT_TEX2_INDEX)
-#define __GL_INPUT_TEX3                   (__GL_ONE_32 << __GL_INPUT_TEX3_INDEX)
-#define __GL_INPUT_TEX4                   (__GL_ONE_32 << __GL_INPUT_TEX4_INDEX)
-#define __GL_INPUT_TEX5                   (__GL_ONE_32 << __GL_INPUT_TEX5_INDEX)
-#define __GL_INPUT_TEX6                   (__GL_ONE_32 << __GL_INPUT_TEX6_INDEX)
-#define __GL_INPUT_TEX7                   (__GL_ONE_32 << __GL_INPUT_TEX7_INDEX)
-#define __GL_INPUT_ATT0                   (__GL_ONE_32 << __GL_INPUT_ATT0_INDEX)
-#define __GL_INPUT_ATT1                   (__GL_ONE_32 << __GL_INPUT_ATT1_INDEX)
-#define __GL_INPUT_ATT2                   (__GL_ONE_32 << __GL_INPUT_ATT2_INDEX)
-#define __GL_INPUT_ATT3                   (__GL_ONE_32 << __GL_INPUT_ATT3_INDEX)
-#define __GL_INPUT_ATT4                   (__GL_ONE_32 << __GL_INPUT_ATT4_INDEX)
-#define __GL_INPUT_ATT5                   (__GL_ONE_32 << __GL_INPUT_ATT5_INDEX)
-#define __GL_INPUT_ATT6                   (__GL_ONE_32 << __GL_INPUT_ATT6_INDEX)
-#define __GL_INPUT_ATT7                   (__GL_ONE_32 << __GL_INPUT_ATT7_INDEX)
-#define __GL_INPUT_ATT8                   (__GL_ONE_32 << __GL_INPUT_ATT8_INDEX)
-#define __GL_INPUT_ATT9                   (__GL_ONE_32 << __GL_INPUT_ATT9_INDEX)
-#define __GL_INPUT_ATT10                  (__GL_ONE_32 << __GL_INPUT_ATT10_INDEX)
-#define __GL_INPUT_ATT11                  (__GL_ONE_32 << __GL_INPUT_ATT11_INDEX)
-#define __GL_INPUT_ATT12                  (__GL_ONE_32 << __GL_INPUT_ATT12_INDEX)
-#define __GL_INPUT_ATT13                  (__GL_ONE_32 << __GL_INPUT_ATT13_INDEX)
-#define __GL_INPUT_ATT14                  (__GL_ONE_32 << __GL_INPUT_ATT14_INDEX)
-#define __GL_INPUT_ATT15                  (__GL_ONE_32 << __GL_INPUT_ATT15_INDEX)
+#define __GL_INPUT_VERTEX                 (__GL_ONE_64 << __GL_INPUT_VERTEX_INDEX)
+#define __GL_INPUT_WEIGHT                 (__GL_ONE_64 << __GL_INPUT_WEIGHT_INDEX)
+#define __GL_INPUT_NORMAL                 (__GL_ONE_64 << __GL_INPUT_NORMAL_INDEX)
+#define __GL_INPUT_DIFFUSE                (__GL_ONE_64 << __GL_INPUT_DIFFUSE_INDEX)
+#define __GL_INPUT_SPECULAR               (__GL_ONE_64 << __GL_INPUT_SPECULAR_INDEX)
+#define __GL_INPUT_FOGCOORD               (__GL_ONE_64 << __GL_INPUT_FOGCOORD_INDEX)
+#define __GL_INPUT_EDGEFLAG               (__GL_ONE_64 << __GL_INPUT_EDGEFLAG_INDEX)
+#define __GL_INPUT_V7                     (__GL_ONE_64 << __GL_INPUT_V7_INDEX)
+#define __GL_INPUT_TEX0                   (__GL_ONE_64 << __GL_INPUT_TEX0_INDEX)
+#define __GL_INPUT_TEX1                   (__GL_ONE_64 << __GL_INPUT_TEX1_INDEX)
+#define __GL_INPUT_TEX2                   (__GL_ONE_64 << __GL_INPUT_TEX2_INDEX)
+#define __GL_INPUT_TEX3                   (__GL_ONE_64 << __GL_INPUT_TEX3_INDEX)
+#define __GL_INPUT_TEX4                   (__GL_ONE_64 << __GL_INPUT_TEX4_INDEX)
+#define __GL_INPUT_TEX5                   (__GL_ONE_64 << __GL_INPUT_TEX5_INDEX)
+#define __GL_INPUT_TEX6                   (__GL_ONE_64 << __GL_INPUT_TEX6_INDEX)
+#define __GL_INPUT_TEX7                   (__GL_ONE_64 << __GL_INPUT_TEX7_INDEX)
+#define __GL_INPUT_ATT0                   (__GL_ONE_64 << __GL_INPUT_ATT0_INDEX)
+#define __GL_INPUT_ATT1                   (__GL_ONE_64 << __GL_INPUT_ATT1_INDEX)
+#define __GL_INPUT_ATT2                   (__GL_ONE_64 << __GL_INPUT_ATT2_INDEX)
+#define __GL_INPUT_ATT3                   (__GL_ONE_64 << __GL_INPUT_ATT3_INDEX)
+#define __GL_INPUT_ATT4                   (__GL_ONE_64 << __GL_INPUT_ATT4_INDEX)
+#define __GL_INPUT_ATT5                   (__GL_ONE_64 << __GL_INPUT_ATT5_INDEX)
+#define __GL_INPUT_ATT6                   (__GL_ONE_64 << __GL_INPUT_ATT6_INDEX)
+#define __GL_INPUT_ATT7                   (__GL_ONE_64 << __GL_INPUT_ATT7_INDEX)
+#define __GL_INPUT_ATT8                   (__GL_ONE_64 << __GL_INPUT_ATT8_INDEX)
+#define __GL_INPUT_ATT9                   (__GL_ONE_64 << __GL_INPUT_ATT9_INDEX)
+#define __GL_INPUT_ATT10                  (__GL_ONE_64 << __GL_INPUT_ATT10_INDEX)
+#define __GL_INPUT_ATT11                  (__GL_ONE_64 << __GL_INPUT_ATT11_INDEX)
+#define __GL_INPUT_ATT12                  (__GL_ONE_64 << __GL_INPUT_ATT12_INDEX)
+#define __GL_INPUT_ATT13                  (__GL_ONE_64 << __GL_INPUT_ATT13_INDEX)
+#define __GL_INPUT_ATT14                  (__GL_ONE_64 << __GL_INPUT_ATT14_INDEX)
+#define __GL_INPUT_ATT15                  (__GL_ONE_64 << __GL_INPUT_ATT15_INDEX)
 
 #define __GL_MISSING_ATT_MASK             (__GL_INPUT_NORMAL   | \
                                            __GL_INPUT_DIFFUSE  | \
@@ -224,13 +224,11 @@ extern GLsizei minVertexNumber[];
 #define __GL_DIRTY_VARRAY_FORMAT_BIT        (1 << __GL_DIRTY_VARRAY_FORMAT)
 #define __GL_DIRTY_VARRAY_BINDING_BIT       (1 << __GL_DIRTY_VARRAY_BINDING)
 #define __GL_DIRTY_VARRAY_OFFSET_BIT        (1 << __GL_DIRTY_VARRAY_OFFSET)
-#define __GL_DIRTY_VARRAY_STOP_CACHE_BIT    (1 << __GL_DIRTY_VARRAY_STOP_CACHE)
 
 
 enum {
     __GL_DRAWARRAYS_NEW_BEGIN   = 0,
     __GL_DRAWARRAYS_CONT_BEGIN  = 1,
-    __GL_DRAWARRAYS_CACHE       = 2,
 };
 
 GLvoid __glArrayElement_V2F(__GLcontext *, GLuint, GLfloat **);
@@ -308,16 +306,16 @@ typedef struct __GLvertexArrayStateRec
             __GLvertexAttrib edgeflag;
             __GLvertexAttrib colorindex;
             __GLvertexAttrib texture[__GL_MAX_TEXTURE_COORDS];
-            __GLvertexAttrib usrattribute[__GL_MAX_PROGRAM_VERTEX_ATTRIBUTES];
+            __GLvertexAttrib usrattribute[__GL_MAX_VERTEX_ATTRIBUTES];
         };
 #endif
-        __GLvertexAttrib attribute[__GL_MAX_VERTEX_ATTRIBUTES];
+        __GLvertexAttrib attribute[__GL_MAX_VERTEX_ATTRIBUTES + 16];
 #ifdef OPENGL40
     };
 #endif
-    __GLvertexAttribBinding attributeBinding[__GL_MAX_VERTEX_ATTRIBUTE_BINDINGS];
+    __GLvertexAttribBinding attributeBinding[__GL_MAX_VERTEX_ATTRIBUTE_BINDINGS + 16];
 
-    GLuint            attribEnabled;  /* bitvector of the enabled attributes */
+    GLuint64            attribEnabled;  /* bitvector of the enabled attributes */
 
     GLuint            boundIdxName;
     __GLbufferObject *boundIdxObj;
@@ -356,18 +354,14 @@ typedef struct __GLvertexArrayStateRec
  */
 enum
 {
-    __GL_DIRTY_VARRAY_MODE          = 0,
-    __GL_DIRTY_VARRAY_ENABLE        = 1,
-    __GL_DIRTY_VARRAY_FORMAT        = 2,
-    __GL_DIRTY_VARRAY_BINDING       = 3,
-    __GL_DIRTY_VARRAY_OFFSET        = 4,
-    __GL_DIRTY_VARRAY_DIVISOR       = 5,
-#ifdef OPENGL40
-    __GL_DIRTY_VARRAY_STOP_CACHE    =6,
-    __GL_DIRTY_VARRAY_END           = 7
-#else
-    __GL_DIRTY_VARRAY_END           = 6
-#endif
+    __GL_DIRTY_VARRAY_MODE = 0,
+    __GL_DIRTY_VARRAY_ENABLE,
+    __GL_DIRTY_VARRAY_FORMAT,
+    __GL_DIRTY_VARRAY_BINDING,
+    __GL_DIRTY_VARRAY_OFFSET,
+    __GL_DIRTY_VARRAY_DIVISOR,
+
+    __GL_DIRTY_VARRAY_END,
 };
 
 #define __GL_DIRTY_VARRAY_MODE_BIT          (1 << __GL_DIRTY_VARRAY_MODE)
@@ -397,9 +391,6 @@ enum
 
 #define __GL_SET_VARRAY_DIVISOR_BIT(gc) \
     (gc)->vertexArray.varrayDirty |= __GL_DIRTY_VARRAY_DIVISOR_BIT
-
-#define __GL_SET_VARRAY_STOP_CACHE_BIT(gc) \
-    (gc)->vertexArray.varrayDirty |= __GL_DIRTY_VARRAY_STOP_CACHE_BIT
 
 /*
 ** Vertex array object
@@ -564,7 +555,11 @@ __GL_INLINE GLsizei __glUtilCalculateStride(GLint size, GLenum type)
 
             return (sizeof(GLhalf) * size);
 
+#ifdef OPENGL40
+        case GL_DOUBLE:
 
+            return (sizeof(GLdouble) * size);
+#endif
 
         default:
 

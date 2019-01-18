@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -83,6 +83,11 @@ gcIsVectorDataType(
 
 gctBOOL
 gcIsFloatDataType(
+    IN gcSHADER_TYPE DataType
+    );
+
+gctBOOL
+gcIsDoubleDataType(
     IN gcSHADER_TYPE DataType
     );
 
@@ -448,6 +453,8 @@ slNewUniform(
     IN gctUINT StringNo,
     IN gctCONST_STRING Name,
     IN gcsSHADER_VAR_INFO *UniformInfo,
+    IN gctBOOL CompilerGen,
+    IN sloIR_CONSTANT Initializer,
     OUT gctINT16* ThisUniformIndex,
     OUT gcUNIFORM * Uniform
     );

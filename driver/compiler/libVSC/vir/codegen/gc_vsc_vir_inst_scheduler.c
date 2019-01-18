@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -106,125 +106,331 @@ static gctUINT32 _VSC_IS_DepDagNode_DepandsOnBubbleSet(
     );
 
 /* enum for instruction conflict types */
-/* TL           texture load instruction */
-/* ML           memory load instruction */
-/* MS           memory store instruction */
-/* RU           register use*/
-/* RS           register set*/
-/* COND         conditional dependence */
-typedef enum VSC_IS_CONFLICTTYPE
+typedef enum
 {
-    VSC_IS_ConflictType_NONE                = 0,
+    VSC_IS_RegConflictType_NONE                 = 0x0,
+    VSC_IS_RegConflictType_SET_USE0_CH0         = 0x1,
+    VSC_IS_RegConflictType_SET_USE0_CH1         = 0x2,
+    VSC_IS_RegConflictType_SET_USE0_CH2         = 0x4,
+    VSC_IS_RegConflictType_SET_USE0_CH3         = 0x8,
+    VSC_IS_RegConflictType_SET_USE1_CH0         = 0x10,
+    VSC_IS_RegConflictType_SET_USE1_CH1         = 0x20,
+    VSC_IS_RegConflictType_SET_USE1_CH2         = 0x40,
+    VSC_IS_RegConflictType_SET_USE1_CH3         = 0x80,
+    VSC_IS_RegConflictType_SET_USE2_CH0         = 0x100,
+    VSC_IS_RegConflictType_SET_USE2_CH1         = 0x200,
+    VSC_IS_RegConflictType_SET_USE2_CH2         = 0x400,
+    VSC_IS_RegConflictType_SET_USE2_CH3         = 0x800,
+    VSC_IS_RegConflictType_SET_USE3_CH0         = 0x1000,
+    VSC_IS_RegConflictType_SET_USE3_CH1         = 0x2000,
+    VSC_IS_RegConflictType_SET_USE3_CH2         = 0x4000,
+    VSC_IS_RegConflictType_SET_USE3_CH3         = 0x8000,
+    VSC_IS_RegConflictType_SET_USE4_CH0         = 0x10000,
+    VSC_IS_RegConflictType_SET_USE4_CH1         = 0x20000,
+    VSC_IS_RegConflictType_SET_USE4_CH2         = 0x40000,
+    VSC_IS_RegConflictType_SET_USE4_CH3         = 0x80000,
+    VSC_IS_RegConflictType_SET_USE_MASK         = 0xfffff,
 
-    VSC_IS_ConflictType_TLRS_RU             = 0x1, /* register save from texture load, to, register use */
-    VSC_IS_ConflictType_TLRS_RS             = 0x2, /* register save from texture load, to, register save */
+    VSC_IS_RegConflictType_SET_SET_BIT_SHIFT    = 20,
+    VSC_IS_RegConflictType_SET_SET_CH0          = 0x1 << VSC_IS_RegConflictType_SET_SET_BIT_SHIFT,
+    VSC_IS_RegConflictType_SET_SET_CH1          = 0x2 << VSC_IS_RegConflictType_SET_SET_BIT_SHIFT,
+    VSC_IS_RegConflictType_SET_SET_CH2          = 0x4 << VSC_IS_RegConflictType_SET_SET_BIT_SHIFT,
+    VSC_IS_RegConflictType_SET_SET_CH3          = 0x8 << VSC_IS_RegConflictType_SET_SET_BIT_SHIFT,
+    VSC_IS_RegConflictType_SET_SET_MASK         = 0xf << VSC_IS_RegConflictType_SET_SET_BIT_SHIFT,
+    VSC_IS_RegConflictType_FROM_SET_MASK        = 0xffffff,
 
-    VSC_IS_ConflictType_MLRS_RU             = 0x4, /* register save from memory load, to, register use */
-    VSC_IS_ConflictType_MLRS_RS             = 0x8, /* register save from memory load, to, register save */
+    VSC_IS_RegConflictType_USE_SET_BIT_SHIFT    = 24,
+    VSC_IS_RegConflictType_USE_SET_CH0          = 0x1 << VSC_IS_RegConflictType_USE_SET_BIT_SHIFT,
+    VSC_IS_RegConflictType_USE_SET_CH1          = 0x2 << VSC_IS_RegConflictType_USE_SET_BIT_SHIFT,
+    VSC_IS_RegConflictType_USE_SET_CH2          = 0x4 << VSC_IS_RegConflictType_USE_SET_BIT_SHIFT,
+    VSC_IS_RegConflictType_USE_SET_CH3          = 0x8 << VSC_IS_RegConflictType_USE_SET_BIT_SHIFT,
+    VSC_IS_RegConflictType_USE_SET_MASK         = 0xf << VSC_IS_RegConflictType_USE_SET_BIT_SHIFT,
 
-    VSC_IS_ConflictType_ML_MS               = 0x10, /* memory load, to, memory store */
-    VSC_IS_ConflictType_MS_ML               = 0x20, /* memory store, to, memory load */
-    VSC_IS_ConflictType_MS_MS               = 0x40, /* memory store, to, memory store */
+    VSC_IS_RegConflictType_REAL_DEP_MASK        = 0xfffffff,
 
-    VSC_IS_ConflictType_CLRS_RU             = 0x80, /* register save from cache load, to, register use */
-    VSC_IS_ConflictType_CLRS_RS             = 0x100, /* register save from cache load, to, register save */
+    VSC_IS_RegConflictType_SET_FROM_BIT_SHIFT   = 28,
+    VSC_IS_RegConflictType_SET_FROM_REG         = 0x1 << VSC_IS_RegConflictType_SET_FROM_BIT_SHIFT,
+    VSC_IS_RegConflictType_SET_FROM_TEX         = 0x2 << VSC_IS_RegConflictType_SET_FROM_BIT_SHIFT,
+    VSC_IS_RegConflictType_SET_FROM_MEM         = 0x3 << VSC_IS_RegConflictType_SET_FROM_BIT_SHIFT,
+    VSC_IS_RegConflictType_SET_FROM_IMAGE       = 0x4 << VSC_IS_RegConflictType_SET_FROM_BIT_SHIFT,
+    VSC_IS_RegConflictType_SET_FROM_CACHE       = 0x5 << VSC_IS_RegConflictType_SET_FROM_BIT_SHIFT,
+    VSC_IS_RegConflictType_SET_FROM_MASK        = 0x7 << VSC_IS_RegConflictType_SET_FROM_BIT_SHIFT,
+} VSC_IS_RegConflictType;
 
-    VSC_IS_ConflictType_CL_CS               = 0x200, /* cache load, to, cache store */
-    VSC_IS_ConflictType_CS_CL               = 0x400, /* cache store, to, cache load */
-    VSC_IS_ConflictType_CS_CS               = 0x800, /* cache store, to, cache store */
+#define VSC_IS_RegConflictType_Reset(rct)                                       ((rct) = VSC_IS_RegConflictType_NONE)
+#define VSC_IS_RegConflictType_GetSetUse(rct, srcId)                            (VIR_Enable)(((rct) & (0xf << ((srcId) * VIR_CHANNEL_NUM))) >> ((srcId) * VIR_CHANNEL_NUM))
+#define VSC_IS_RegConflictType_AddSetUse(rct, srcId, en)                        ((rct) = (gctUINT)(rct) | ((gctUINT)(en) << ((srcId) * VIR_CHANNEL_NUM)))
+#define VSC_IS_RegConflictType_ExclusivelyAddSetUse(rct, exc, srcId, en)        ((rct) = (gctUINT)(rct) | (((en) << ((srcId) * VIR_CHANNEL_NUM)) & ~((gctUINT)(exc))))
+#define VSC_IS_RegConflictType_HasSetUse(rct)                                   ((rct) & VSC_IS_RegConflictType_SET_USE_MASK)
+#define VSC_IS_RegConflictType_GetSetSet(rct)                                   (VIR_Enable)(((rct) & VSC_IS_RegConflictType_SET_SET_MASK) >> VSC_IS_RegConflictType_SET_SET_BIT_SHIFT)
+#define VSC_IS_RegConflictType_AddSetSet(rct, en)                               ((rct) = (gctUINT)(rct) | ((en) << VSC_IS_RegConflictType_SET_SET_BIT_SHIFT))
+#define VSC_IS_RegConflictType_ExclusivelyAddSetSet(rct, exc, en)               ((rct) = (gctUINT)(rct) | (((en) << VSC_IS_RegConflictType_SET_SET_BIT_SHIFT) & ~(gctUINT)(exc)))
+#define VSC_IS_RegConflictType_HasFromSet(rct)                                  ((rct) & VSC_IS_RegConflictType_FROM_SET_MASK)
+#define VSC_IS_RegConflictType_GetUseSet(rct)                                   (VIR_Enable)(((rct) & VSC_IS_RegConflictType_USE_SET_MASK) >> VSC_IS_RegConflictType_USE_SET_BIT_SHIFT)
+#define VSC_IS_RegConflictType_AddUseSet(rct, en)                               ((rct) = (gctUINT)(rct) | ((en) << VSC_IS_RegConflictType_USE_SET_BIT_SHIFT))
+#define VSC_IS_RegConflictType_ExclusivelyAddUseSet(rct, exc, en)               ((rct) = (gctUINT)(rct) | ((en << VSC_IS_RegConflictType_USE_SET_BIT_SHIFT) & ~(gctUINT)(exc)))
+#define VSC_IS_RegConflictType_HasUseSet(rct)                                   ((rct) & VSC_IS_RegConflictType_USE_SET_MASK)
+#define VSC_IS_RegConflictType_HasRealDep(rct)                                  ((rct) & VSC_IS_RegConflictType_REAL_DEP_MASK)
+#define VSC_IS_RegConflictType_GetSetFrom(rct)                                  ((rct) & VSC_IS_RegConflictType_SET_FROM_MASK)
+#define VSC_IS_RegConflictType_IsSetFromReg(rct)                                (VSC_IS_RegConflictType_HasFromSet(rct) && VSC_IS_RegConflictType_GetSetFrom(rct) == VSC_IS_RegConflictType_SET_FROM_REG)
+#define VSC_IS_RegConflictType_IsSetFromTex(rct)                                (VSC_IS_RegConflictType_HasFromSet(rct) && VSC_IS_RegConflictType_GetSetFrom(rct) == VSC_IS_RegConflictType_SET_FROM_TEX)
+#define VSC_IS_RegConflictType_IsSetFromMem(rct)                                (VSC_IS_RegConflictType_HasFromSet(rct) && VSC_IS_RegConflictType_GetSetFrom(rct) == VSC_IS_RegConflictType_SET_FROM_MEM)
+#define VSC_IS_RegConflictType_IsSetFromImage(rct)                              (VSC_IS_RegConflictType_HasFromSet(rct) && VSC_IS_RegConflictType_GetSetFrom(rct) == VSC_IS_RegConflictType_SET_FROM_IMAGE)
+#define VSC_IS_RegConflictType_IsSetFromCache(rct)                              (VSC_IS_RegConflictType_HasFromSet(rct) && VSC_IS_RegConflictType_GetSetFrom(rct) == VSC_IS_RegConflictType_SET_FROM_CACHE)
+#define VSC_IS_RegConflictType_SetSetFromReg(rct)                               ((rct) = ((gctUINT)(rct) & ~VSC_IS_RegConflictType_SET_FROM_MASK) | VSC_IS_RegConflictType_SET_FROM_REG)
+#define VSC_IS_RegConflictType_SetSetFromTex(rct)                               ((rct) = ((gctUINT)(rct) & ~VSC_IS_RegConflictType_SET_FROM_MASK) | VSC_IS_RegConflictType_SET_FROM_TEX)
+#define VSC_IS_RegConflictType_SetSetFromMem(rct)                               ((rct) = ((gctUINT)(rct) & ~VSC_IS_RegConflictType_SET_FROM_MASK) | VSC_IS_RegConflictType_SET_FROM_MEM)
+#define VSC_IS_RegConflictType_SetSetFromImage(rct)                             ((rct) = ((gctUINT)(rct) & ~VSC_IS_RegConflictType_SET_FROM_MASK) | VSC_IS_RegConflictType_SET_FROM_IMAGE)
+#define VSC_IS_RegConflictType_SetSetFromCache(rct)                             ((rct) = ((gctUINT)(rct) & ~VSC_IS_RegConflictType_SET_FROM_MASK) | VSC_IS_RegConflictType_SET_FROM_CACHE)
 
-    VSC_IS_ConflictType_RS_RU               = 0x1000, /* register save, to, register use */
-    VSC_IS_ConflictType_RU_RS               = 0x2000, /* register use, to, register save */
-    VSC_IS_ConflictType_RS_RS               = 0x4000, /* register save, to, register save */
+static void
+_VSC_IS_RegConflictType_Dump(VSC_IS_RegConflictType rct, VIR_Dumper* dumper)
+{
+    gctUINT i;
 
-    VSC_IS_ConflictType_COND                = 0x8000, /* conditional */
-    VSC_IS_ConflictType_LOOP_CARRIED        = 0x10000, /* to flag loop carried dependency */
-    VSC_IS_ConflictType_CONTINUOUS_BINDING  = 0x20000, /* if A depends on B, after B is scheduled, A must be scheduled immediately */
+    if(!VSC_IS_RegConflictType_HasRealDep(rct))
+    {
+        return;
+    }
 
-                                                           /* loose binding means, if A depends on B, some instructions can be scheduled in between but some cannot */
-    VSC_IS_ConflictType_LOOSE_BINDING_LDARR = 0x40000, /* between LDARR and its RSRU dependency. LDARR's RURS dependency should dodge */
-    VSC_IS_ConflictType_LOOSE_BINDING_MOVA  = 0x80000, /* between MOVA and its RSRU dependency. other MOVAs should dodge */
-    VSC_IS_ConflictType_DODGING             = 0x100000, /* if A has loose binding dependency with B, C is up to schedule but cannot be scheduled
-                                                            * in between A and B, then set C have DODGING dependency with A OR B */
-    VSC_IS_ConflictType_USE_RETURNVALUE     = 0x200000, /* the instruction uses return value of previous call,
-                                                            * cannot move across TEXLD, otherwise it will break return
-                                                            * value rename after inline when the texld be convert to call */
-    VSC_IS_ConflictType_BARRIER             = 0x400000, /* Barrier instruction has dependency with all other instructions
-                                                            * in the same bb */
-    VSC_IS_ConflictType_EMIT                = 0x800000, /* Emit instruction has dependency with all previous instructions
-                                                            * which stores output */
-    VSC_IS_ConflictType_ATOMIC              = 0x1000000    /* atomic instruction has dependency with all previous atomic instructions */
-} VSC_IS_ConflictType;
+    if(VSC_IS_RegConflictType_GetSetFrom(rct))
+    {
+        if(VSC_IS_RegConflictType_IsSetFromReg(rct))
+        {
+            VIR_LOG(dumper, " REG_SET_TO");
+        }
+        if(VSC_IS_RegConflictType_IsSetFromTex(rct))
+        {
+            VIR_LOG(dumper, " TEX_SET_TO");
+        }
+        if(VSC_IS_RegConflictType_IsSetFromMem(rct))
+        {
+            VIR_LOG(dumper, " MEM_SET_TO");
+        }
+        if(VSC_IS_RegConflictType_IsSetFromImage(rct))
+        {
+            VIR_LOG(dumper, " IMAGE_SET_TO");
+        }
+        if(VSC_IS_RegConflictType_IsSetFromCache(rct))
+        {
+            VIR_LOG(dumper, " CACHE_SET_TO");
+        }
 
-#define VSC_IS_ConflictType_ExclusivelySet(ct_var, ct_exclude, ct_value)       ((ct_var) |= ((~(ct_exclude)) & (ct_value)))
-#define VSC_IS_ConflictType_Set(ct_var, ct_value)       ((ct_var) |= (ct_value))
-#define VSC_IS_ConflictType_RESET(ct_var, ct_value)     ((ct_var) ^= (ct_var) & (ct_value))
-#define VSC_IS_ConflictType_HasTLRS_RU(ct)              ((ct) & VSC_IS_ConflictType_TLRS_RU)
-#define VSC_IS_ConflictType_HasTLRS_RS(ct)              ((ct) & VSC_IS_ConflictType_TLRS_RS)
-#define VSC_IS_ConflictType_HasCLRS_RU(ct)              ((ct) & VSC_IS_ConflictType_CLRS_RU)
-#define VSC_IS_ConflictType_HasCLRS_RS(ct)              ((ct) & VSC_IS_ConflictType_CLRS_RS)
-#define VSC_IS_ConflictType_HasCL_CS(ct)                ((ct) & VSC_IS_ConflictType_CL_CS)
-#define VSC_IS_ConflictType_HasCS_CL(ct)                ((ct) & VSC_IS_ConflictType_CS_CL)
-#define VSC_IS_ConflictType_HasCS_CS(ct)                ((ct) & VSC_IS_ConflictType_CS_CS)
-#define VSC_IS_ConflictType_HasMLRS_RU(ct)              ((ct) & VSC_IS_ConflictType_MLRS_RU)
-#define VSC_IS_ConflictType_HasMLRS_RS(ct)              ((ct) & VSC_IS_ConflictType_MLRS_RS)
-#define VSC_IS_ConflictType_HasML_MS(ct)                ((ct) & VSC_IS_ConflictType_ML_MS)
-#define VSC_IS_ConflictType_HasMS_ML(ct)                ((ct) & VSC_IS_ConflictType_MS_ML)
-#define VSC_IS_ConflictType_HasMS_MS(ct)                ((ct) & VSC_IS_ConflictType_MS_MS)
-#define VSC_IS_ConflictType_HasRS_RU(ct)                ((ct) & VSC_IS_ConflictType_RS_RU)
-#define VSC_IS_ConflictType_HasRU_RS(ct)                ((ct) & VSC_IS_ConflictType_RU_RS)
-#define VSC_IS_ConflictType_HasRS_RS(ct)                ((ct) & VSC_IS_ConflictType_RS_RS)
-#define VSC_IS_ConflictType_HasCOND(ct)                 ((ct) & VSC_IS_ConflictType_COND)
-#define VSC_IS_ConflictType_IsLOOPCARRIED(ct)           ((ct) & VSC_IS_ConflictType_LOOP_CARRIED)
-#define VSC_IS_ConflictType_HasContinuousBinding(ct)    ((ct) & VSC_IS_ConflictType_CONTINUOUS_BINDING)
-#define VSC_IS_ConflictType_HasLooseBindingLDARR(ct)    ((ct) & VSC_IS_ConflictType_LOOSE_BINDING_LDARR)
-#define VSC_IS_ConflictType_HasLooseBindingMOVA(ct)     ((ct) & VSC_IS_ConflictType_LOOSE_BINDING_MOVA)
-#define VSC_IS_ConflictType_HasDodging(ct)              ((ct) & VSC_IS_ConflictType_DODGING)
-#define VSC_IS_ConflictType_UseReturnValue(ct)          ((ct) & VSC_IS_ConflictType_USE_RETURNVALUE)
-#define VSC_IS_ConflictType_HasBarrier(ct)              ((ct) & VSC_IS_ConflictType_BARRIER)
-#define VSC_IS_ConflictType_HasAtomic(ct)               ((ct) & VSC_IS_ConflictType_ATOMIC)
+        if(VSC_IS_RegConflictType_GetSetSet(rct))
+        {
+            VIR_LOG(dumper, "_DEST_%s", VIR_Enable_2_String(VSC_IS_RegConflictType_GetSetSet(rct), gcvTRUE));
+        }
+
+        for(i = 0; i < VIR_CHANNEL_NUM; i++)
+        {
+            if(VSC_IS_RegConflictType_GetSetUse(rct, i))
+            {
+                VIR_LOG(dumper, "_SRC%d_%s", i, VIR_Enable_2_String(VSC_IS_RegConflictType_GetSetUse(rct, i), gcvTRUE));
+            }
+        }
+    }
+
+    if(VSC_IS_RegConflictType_GetUseSet(rct))
+    {
+        VIR_LOG(dumper, " USE_TO_DEST_%s", VIR_Enable_2_String(VSC_IS_RegConflictType_GetUseSet(rct), gcvTRUE));
+    }
+}
+
+typedef enum
+{
+    VSC_IS_OtherConflictType_NONE                       = 0x0,
+    VSC_IS_OtherConflictType_FROM_STORE                 = 0x1,
+    VSC_IS_OtherConflictType_TO_STORE                   = 0x2,
+    VSC_IS_OtherConflictType_LOAD_STORE_MASK            = 0x3,
+
+    VSC_IS_OtherConflictType_ON_MEM                     = 0x4,
+    VSC_IS_OtherConflictType_ON_IMAGE                   = 0x8,
+    VSC_IS_OtherConflictType_ON_CACHE                   = 0xc,
+    VSC_IS_OtherConflictType_ON_ATOM                    = 0x10,
+    VSC_IS_OtherConflictType_ON_MASK                    = 0x1c,
+
+    /* gap here */
+
+    VSC_IS_OtherConflictType_COND                       = 0x100, /* conditional */
+    VSC_IS_OtherConflictType_LOOP_CARRIED               = 0x200, /* to flag loop carried dependency */
+    VSC_IS_OtherConflictType_CONTINUOUS_BINDING         = 0x400, /* if A depends on B, after B is scheduled, A must be scheduled immediately */
+
+                                                                        /* loose binding means, if A depends on B, some instructions can be scheduled in between but some cannot */
+    VSC_IS_OtherConflictType_LOOSE_BINDING_LDARR        = 0x800, /* between LDARR and its RSRU dependency. LDARR's RURS dependency should dodge */
+    VSC_IS_OtherConflictType_LOOSE_BINDING_MOVA         = 0x1000, /* between MOVA and its RSRU dependency. other MOVAs should dodge */
+    VSC_IS_OtherConflictType_DODGING                    = 0x2000, /* if A has loose binding dependency with B, C is up to schedule but cannot be scheduled
+                                                                         * in between A and B, then set C have DODGING dependency with A OR B */
+    VSC_IS_OtherConflictType_USE_RETURNVALUE            = 0x4000, /* the instruction uses return value of previous call,
+                                                                         * cannot move across TEXLD, otherwise it will break return
+                                                                         * value rename after inline when the texld be convert to call */
+    VSC_IS_OtherConflictType_BARRIER                    = 0x8000, /* Barrier instruction has dependency with all other instructions
+                                                                         * in the same bb */
+    VSC_IS_OtherConflictType_EMIT                       = 0x10000, /* Emit instruction has dependency with all previous instructions
+                                                                         * which stores output */
+    VSC_IS_OtherConflictType_REAL_DEP_MASK              = 0x1ff03,
+} VSC_IS_OtherConflictType;
+
+#define VSC_IS_OtherConflictType_Set(oct, c)                                        ((oct) = (gctUINT)(oct) | (c))
+#define VSC_IS_OtherConflictType_ExclusivelySet(oct, exc, c)                        ((oct) = (gctUINT)(oct) | ((c) & ~(exc)))
+#define VSC_IS_OtherConflictType_Reset(oct)                                         ((oct) = VSC_IS_OtherConflictType_NONE)
+#define VSC_IS_OtherConflictType_GetFromOrToStore(oct)                              ((oct) & VSC_IS_OtherConflictType_LOAD_STORE_MASK)
+#define VSC_IS_OtherConflictType_IsFromStore(oct)                                   ((oct) & VSC_IS_OtherConflictType_FROM_STORE)
+#define VSC_IS_OtherConflictType_SetFromStore(oct)                                  ((oct) = (gctUINT)(oct) |  VSC_IS_OtherConflictType_FROM_STORE)
+#define VSC_IS_OtherConflictType_IsToStore(oct)                                     ((oct) & VSC_IS_OtherConflictType_TO_STORE)
+#define VSC_IS_OtherConflictType_SetToStore(oct)                                    ((oct) = (gctUINT)(oct) | VSC_IS_OtherConflictType_TO_STORE)
+#define VSC_IS_OtherConflictType_GetOnSpace(oct)                                    ((oct) & VSC_IS_OtherConflictType_ON_MASK)
+#define VSC_IS_OtherConflictType_IsOnMem(oct)                                       (VSC_IS_OtherConflictType_GetOnSpace(oct) == VSC_IS_OtherConflictType_ON_MEM)
+#define VSC_IS_OtherConflictType_SetOnMem(oct)                                      ((oct) = (gctUINT)(oct) | VSC_IS_OtherConflictType_ON_MEM)
+#define VSC_IS_OtherConflictType_IsOnImage(oct)                                     (VSC_IS_OtherConflictType_GetFromOrToStore(oct) && VSC_IS_OtherConflictType_GetOnSpace(oct) == VSC_IS_OtherConflictType_ON_IMAGE)
+#define VSC_IS_OtherConflictType_SetOnImage(oct)                                    ((oct) = (gctUINT)(oct) | VSC_IS_OtherConflictType_ON_IMAGE)
+#define VSC_IS_OtherConflictType_IsOnCache(oct)                                     (VSC_IS_OtherConflictType_GetFromOrToStore(oct) && VSC_IS_OtherConflictType_GetOnSpace(oct) == VSC_IS_OtherConflictType_ON_CACHE)
+#define VSC_IS_OtherConflictType_SetOnCache(oct)                                    ((oct) = (gctUINT)(oct) | VSC_IS_OtherConflictType_ON_CACHE)
+#define VSC_IS_OtherConflictType_IsOnAtom(oct)                                      (VSC_IS_OtherConflictType_GetFromOrToStore(oct) && VSC_IS_OtherConflictType_GetOnSpace(oct) == VSC_IS_OtherConflictType_ON_ATOM)
+#define VSC_IS_OtherConflictType_SetOnAtom(oct)                                     ((oct) = (gctUINT)(oct) | VSC_IS_OtherConflictType_ON_ATOM)
+#define VSC_IS_OtherConflictType_HasCond(oct)                                       ((oct) & VSC_IS_OtherConflictType_COND)
+#define VSC_IS_OtherConflictType_SetCond(oct)                                       ((oct) = (gctUINT)(oct) | VSC_IS_OtherConflictType_COND)
+#define VSC_IS_OtherConflictType_HasLoopCarried(oct)                                ((oct) & VSC_IS_OtherConflictType_LOOP_CARRIED)
+#define VSC_IS_OtherConflictType_SetLoopCarried(oct)                                ((oct) = (gctUINT)(oct) | VSC_IS_OtherConflictType_LOOP_CARRIED)
+#define VSC_IS_OtherConflictType_HasContinuousBinding(oct)                          ((oct) & VSC_IS_OtherConflictType_CONTINUOUS_BINDING)
+#define VSC_IS_OtherConflictType_SetContinuousBinding(oct)                          ((oct) = (gctUINT)(oct) | VSC_IS_OtherConflictType_CONTINUOUS_BINDING)
+#define VSC_IS_OtherConflictType_HasLooseBindingLDARR(oct)                          ((oct) & VSC_IS_OtherConflictType_LOOSE_BINDING_LDARR)
+#define VSC_IS_OtherConflictType_SetLooseBindingLDARR(oct)                          ((oct) = (gctUINT)(oct) | VSC_IS_OtherConflictType_LOOSE_BINDING_LDARR)
+#define VSC_IS_OtherConflictType_HasLooseBindingMOVA(oct)                           ((oct) & VSC_IS_OtherConflictType_LOOSE_BINDING_MOVA)
+#define VSC_IS_OtherConflictType_SetLooseBindingMOVA(oct)                           ((oct) = (gctUINT)(oct) | VSC_IS_OtherConflictType_LOOSE_BINDING_MOVA)
+#define VSC_IS_OtherConflictType_HasDodging(oct)                                    ((oct) & VSC_IS_OtherConflictType_DODGING)
+#define VSC_IS_OtherConflictType_SetDodging(oct)                                    ((oct) = (gctUINT)(oct) | VSC_IS_OtherConflictType_DODGING)
+#define VSC_IS_OtherConflictType_HasUseReturnValue(oct)                             ((oct) & VSC_IS_OtherConflictType_USE_RETURNVALUE)
+#define VSC_IS_OtherConflictType_SetUseReturnValue(oct)                             ((oct) = (gctUINT)(oct) | VSC_IS_OtherConflictType_USE_RETURNVALUE)
+#define VSC_IS_OtherConflictType_HasBarrier(oct)                                    ((oct) & VSC_IS_OtherConflictType_BARRIER)
+#define VSC_IS_OtherConflictType_SetBarrier(oct)                                    ((oct) = (gctUINT)(oct) | VSC_IS_OtherConflictType_BARRIER)
+#define VSC_IS_OtherConflictType_HasEmit(oct)                                       ((oct) & VSC_IS_OtherConflictType_EMIT)
+#define VSC_IS_OtherConflictType_SetEmit(oct)                                       ((oct) = (gctUINT)(oct) | VSC_IS_OtherConflictType_EMIT)
+#define VSC_IS_OtherConflictType_HasRealDep(oct)                                    ((oct) & VSC_IS_OtherConflictType_REAL_DEP_MASK)
+
+static void
+_VSC_IS_OtherConflictType_Dump(VSC_IS_OtherConflictType oct, VIR_Dumper* dumper)
+{
+    if(VSC_IS_OtherConflictType_GetFromOrToStore(oct))
+    {
+        switch(VSC_IS_OtherConflictType_GetOnSpace(oct))
+        {
+            case VSC_IS_OtherConflictType_ON_MEM:
+            {
+                VIR_LOG(dumper, " MEM");
+                break;
+            }
+            case VSC_IS_OtherConflictType_ON_IMAGE:
+            {
+                VIR_LOG(dumper, " IMAGE");
+                break;
+            }
+            case VSC_IS_OtherConflictType_ON_CACHE:
+            {
+                VIR_LOG(dumper, " CACHE");
+                break;
+            }
+            case VSC_IS_OtherConflictType_ON_ATOM:
+            {
+                VIR_LOG(dumper, " ATOM");
+                break;
+            }
+            default:
+                gcmASSERT(0);
+        }
+
+        if(VSC_IS_OtherConflictType_IsFromStore(oct))
+        {
+            VIR_LOG(dumper, "_FROM_STORE");
+        }
+        if(VSC_IS_OtherConflictType_IsToStore(oct))
+        {
+            VIR_LOG(dumper, "_TO_STORE");
+        }
+    }
+    VIR_LOG(dumper, " ");
+    if(VSC_IS_OtherConflictType_HasCond(oct))
+    {
+        VIR_LOG(dumper, " COND");
+    }
+    if(VSC_IS_OtherConflictType_HasLoopCarried(oct))
+    {
+        VIR_LOG(dumper, " LOOP_CARRIED");
+    }
+    if(VSC_IS_OtherConflictType_HasContinuousBinding(oct))
+    {
+        VIR_LOG(dumper, " CONTINUOUS_BINDING");
+    }
+    if(VSC_IS_OtherConflictType_HasLooseBindingLDARR(oct))
+    {
+        VIR_LOG(dumper, " LOOSE_BINDING_LDARR");
+    }
+    if(VSC_IS_OtherConflictType_HasLooseBindingMOVA(oct))
+    {
+        VIR_LOG(dumper, " LOOSE_BINDING_MOVA");
+    }
+    if(VSC_IS_OtherConflictType_HasDodging(oct))
+    {
+        VIR_LOG(dumper, " DODGING");
+    }
+    if(VSC_IS_OtherConflictType_HasUseReturnValue(oct))
+    {
+        VIR_LOG(dumper, " UseReturnValue");
+    }
+    if(VSC_IS_OtherConflictType_HasBarrier(oct))
+    {
+        VIR_LOG(dumper, " Barrier");
+    }
+    if(VSC_IS_OtherConflictType_HasEmit(oct))
+    {
+        VIR_LOG(dumper, " Emit");
+    }
+}
 
 static gctUINT32 _VSC_IS_ConflictType_GetBubble(
-    IN VSC_IS_ConflictType conflict_types,
+    IN VSC_IS_RegConflictType rct,
     IN VSC_IS_InstSched* is
     )
 {
     gctUINT32 max_bubble = 0;
     gctUINT32 bubble;
-    if(conflict_types & VSC_IS_ConflictType_CLRS_RU ||
-       conflict_types & VSC_IS_ConflictType_CLRS_RS)
+
+    if(VSC_OPTN_ISOptions_GetReissue(VSC_IS_InstSched_GetOptions(is)))
     {
-        bubble = VSC_IS_InstSched_GetCacheldDepBubble(is);
-        if(bubble > max_bubble)
+        if(VSC_IS_RegConflictType_HasSetUse(rct))
         {
-            max_bubble = bubble;
+            max_bubble = 1;
         }
     }
-    if(conflict_types & VSC_IS_ConflictType_TLRS_RU ||
-       conflict_types & VSC_IS_ConflictType_TLRS_RS)
+    else
     {
-        bubble = VSC_IS_InstSched_GetTexldDepBubble(is);
-        if(bubble > max_bubble)
+        if(VSC_IS_RegConflictType_IsSetFromCache(rct))
         {
-            max_bubble = bubble;
+            bubble = VSC_IS_InstSched_GetCacheldDepBubble(is);
+            if(bubble > max_bubble)
+            {
+                max_bubble = bubble;
+            }
         }
-    }
-    if(conflict_types & VSC_IS_ConflictType_MLRS_RU ||
-       conflict_types & VSC_IS_ConflictType_MLRS_RS)
-    {
-        bubble = VSC_IS_InstSched_GetMemldDepBubble(is);
-        if(bubble > max_bubble)
+        if(VSC_IS_RegConflictType_IsSetFromTex(rct))
         {
-            max_bubble = bubble;
+            bubble = VSC_IS_InstSched_GetTexldDepBubble(is);
+            if(bubble > max_bubble)
+            {
+                max_bubble = bubble;
+            }
+        }
+        if(VSC_IS_RegConflictType_IsSetFromMem(rct) ||
+           VSC_IS_RegConflictType_IsSetFromImage(rct))
+        {
+            bubble = VSC_IS_InstSched_GetMemldDepBubble(is);
+            if(bubble > max_bubble)
+            {
+                max_bubble = bubble;
+            }
         }
     }
     return max_bubble;
 }
-
-static void _VSC_IS_ConflictType_Dump(
-    IN gctUINT32 conflict_types,
-    IN VIR_Dumper* dumper
-    );
 
 typedef enum VSC_IS_DEPDAGEDGE_FLAG
 {
@@ -238,38 +444,44 @@ typedef enum VSC_IS_DEPDAGEDGE_FLAG
 struct VSC_IS_DEPDAGEDGE
 {
     VSC_DG_EDGE edge;
-    gctUINT32 conflict_type;
+    VSC_IS_RegConflictType rct;
+    VSC_IS_OtherConflictType oct;
     VSC_IS_DepDagEdge_Flag flags;
     gctUINT32 bubble;
 };
 
-#define VSC_IS_DepDagEdge_GetEdge(eg)               (&((eg)->edge))
-#define VSC_IS_DepDagEdge_GetID(eg)                 (VSC_IS_DepDagEdge_GetEdge(eg)->id)
-#define VSC_IS_DepDagEdge_Verify(eg)                gcmASSERT((eg)->edge.pFromNode == ((eg) + 1)->edge.pToNode)
-#define VSC_IS_DepDagEdge_GetConflictType(eg)       ((eg)->conflict_type)
-#define VSC_IS_DepDagEdge_SetConflictType(eg, c)    VSC_IS_DepDagEdge_Verify(eg); (eg)->conflict_type = (c); (eg+1)->conflict_type = (c)
-#define VSC_IS_DepDagEdge_ResetConflictType(eg, c)  VSC_IS_DepDagEdge_Verify(eg); (eg)->conflict_type = VSC_IS_ConflictType_NONE; (eg+1)->conflict_type = VSC_IS_ConflictType_NONE
-#define VSC_IS_DepDagEdge_AddConflictType(eg, c)    VSC_IS_DepDagEdge_Verify(eg); (eg)->conflict_type |= (c); (eg+1)->conflict_type |= (c)
-#define VSC_IS_DepDagEdge_RemoveConflictType(eg, c) VSC_IS_DepDagEdge_Verify(eg); (eg)->conflict_type &= ~(c); (eg+1)->conflict_type &= ~(c)
-#define VSC_IS_DepDagEdge_HasConflictType(eg, c)    ((eg)->conflict_type & (c))
-#define VSC_IS_DepDagEdge_GetFlags(eg)              ((eg)->flags)
-#define VSC_IS_DepDagEdge_SetFlags(eg, f)           VSC_IS_DepDagEdge_Verify(eg); (eg)->flags = (f); (eg+1)->flags = (f)
-#define VSC_IS_DepDagEdge_ResetFlags(eg)            VSC_IS_DepDagEdge_Verify(eg); (eg)->flags = VSC_IS_DEPDAGEDGE_FLAG_NONE; (eg+1)->flags = VSC_IS_DEPDAGEDGE_FLAG_NONE
-#define VSC_IS_DepDagEdge_AddFlag(eg, f)            VSC_IS_DepDagEdge_Verify(eg); (eg)->flags |= (f); (eg+1)->flags |= (f)
-#define VSC_IS_DepDagEdge_RemoveFlag(eg, f)         VSC_IS_DepDagEdge_Verify(eg); (eg)->flags &= ~(f); (eg+1)->flags &= ~(f)
-#define VSC_IS_DepDagEdge_HasFlag(eg, f)            ((eg)->flags & (f))
-#define VSC_IS_DepDagEdge_GetBubble(eg)             ((eg)->bubble)
-#define VSC_IS_DepDagEdge_SetBubble(eg, b)          VSC_IS_DepDagEdge_Verify(eg); (eg)->bubble = (b); (eg + 1)->bubble = (b)
-#define VSC_IS_DepDagEdge_IncBubble(eg, b)          VSC_IS_DepDagEdge_Verify(eg); (eg)->bubble += (b); (eg + 1)->bubble += (b)
-#define VSC_IS_DepDagEdge_DecBubble(eg, b)          VSC_IS_DepDagEdge_Verify(eg); (eg)->bubble -= (b); (eg + 1)->bubble -= (b)
-#define VSC_IS_DepDagEdge_GetFromNode(eg)           ((VSC_IS_DepDagNode*)(eg)->edge.pFromNode)
-#define VSC_IS_DepDagEdge_GetToNode(eg)             ((VSC_IS_DepDagNode*)(eg)->edge.pToNode)
+#define VSC_IS_DepDagEdge_GetEdge(eg)                   (&((eg)->edge))
+#define VSC_IS_DepDagEdge_GetID(eg)                     (VSC_IS_DepDagEdge_GetEdge(eg)->id)
+#define VSC_IS_DepDagEdge_Verify(eg)                    gcmASSERT((eg)->edge.pFromNode == ((eg) + 1)->edge.pToNode)
+#define VSC_IS_DepDagEdge_GetRCT(eg)                    ((eg)->rct)
+#define VSC_IS_DepDagEdge_SetRCT(eg, c)                 VSC_IS_DepDagEdge_Verify(eg); (eg)->rct = (c); (eg+1)->rct = (c)
+#define VSC_IS_DepDagEdge_ResetRCT(eg)                  VSC_IS_DepDagEdge_SetRCT(eg, VSC_IS_RegConflictType_NONE)
+#define VSC_IS_DepDagEdge_AddRCT(eg, c)                 VSC_IS_DepDagEdge_Verify(eg); (eg)->rct |= (c); (eg+1)->rct |= (c)
+#define VSC_IS_DepDagEdge_HasRCT(eg, c)                 ((eg)->rct & (c))
+#define VSC_IS_DepDagEdge_GetOCT(eg)                    ((eg)->oct)
+#define VSC_IS_DepDagEdge_SetOCT(eg, c)                 VSC_IS_DepDagEdge_Verify(eg); (eg)->oct = (c); (eg+1)->oct = (c)
+#define VSC_IS_DepDagEdge_ResetOCT(eg)                  VSC_IS_DepDagEdge_SetOCT(eg, VSC_IS_OtherConflictType_NONE)
+#define VSC_IS_DepDagEdge_AddOCT(eg, c)                 VSC_IS_DepDagEdge_Verify(eg); (eg)->oct |= (c); (eg+1)->oct |= (c)
+#define VSC_IS_DepDagEdge_HasOCT(eg, c)                 ((eg)->oct & (c))
+#define VSC_IS_DepDagEdge_GetFlags(eg)                  ((eg)->flags)
+#define VSC_IS_DepDagEdge_SetFlags(eg, f)               VSC_IS_DepDagEdge_Verify(eg); (eg)->flags = (f); (eg+1)->flags = (f)
+#define VSC_IS_DepDagEdge_ResetFlags(eg)                VSC_IS_DepDagEdge_Verify(eg); (eg)->flags = VSC_IS_DEPDAGEDGE_FLAG_NONE; (eg+1)->flags = VSC_IS_DEPDAGEDGE_FLAG_NONE
+#define VSC_IS_DepDagEdge_AddFlag(eg, f)                VSC_IS_DepDagEdge_Verify(eg); (eg)->flags |= (f); (eg+1)->flags |= (f)
+#define VSC_IS_DepDagEdge_RemoveFlag(eg, f)             VSC_IS_DepDagEdge_Verify(eg); (eg)->flags &= ~(f); (eg+1)->flags &= ~(f)
+#define VSC_IS_DepDagEdge_HasFlag(eg, f)                ((eg)->flags & (f))
+#define VSC_IS_DepDagEdge_GetBubble(eg)                 ((eg)->bubble)
+#define VSC_IS_DepDagEdge_SetBubble(eg, b)              VSC_IS_DepDagEdge_Verify(eg); (eg)->bubble = (b); (eg + 1)->bubble = (b)
+#define VSC_IS_DepDagEdge_IncBubble(eg, b)              VSC_IS_DepDagEdge_Verify(eg); (eg)->bubble += (b); (eg + 1)->bubble += (b)
+#define VSC_IS_DepDagEdge_DecBubble(eg, b)              VSC_IS_DepDagEdge_Verify(eg); (eg)->bubble -= (b); (eg + 1)->bubble -= (b)
+#define VSC_IS_DepDagEdge_GetFromNode(eg)               ((VSC_IS_DepDagNode*)(eg)->edge.pFromNode)
+#define VSC_IS_DepDagEdge_GetToNode(eg)                 ((VSC_IS_DepDagNode*)(eg)->edge.pToNode)
 
 static void _VSC_IS_DepDagEdge_Init(
     IN OUT VSC_IS_DepDagEdge* dde
     )
 {
-    VSC_IS_DepDagEdge_SetConflictType(dde, VSC_IS_ConflictType_NONE);
+    VSC_IS_DepDagEdge_ResetRCT(dde);
+    VSC_IS_DepDagEdge_ResetOCT(dde);
     VSC_IS_DepDagEdge_ResetFlags(dde);
     VSC_IS_DepDagEdge_SetBubble(dde, 0);
 }
@@ -683,8 +895,15 @@ static gctUINT32 _VSC_IS_EstimateRegisterUsage(
         reg_count += 2;
     }
 
-    if (reg_count == 0)
+    if(reg_count == 0)
+    {
         reg_count = 1;
+    }
+    if(reg_count > 14)
+    {
+        reg_count = 14;
+    }
+
 
     return reg_count;
 }
@@ -776,7 +995,6 @@ static void _VSC_IS_InstSched_InitBubble(
                    (texld_latency % (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) ? 0 : 1);
     memld_bubble = memld_latency / (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) -
                    (memld_latency % (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) ? 0 : 1);
-
     memst_bubble = memst_latency / (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) -
                    (memst_latency % (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) ? 0 : 1);
     cache_ld_bubble = cacheld_latency / (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) -
@@ -914,7 +1132,7 @@ static void _VSC_IS_DumpInstSet(
     IN VIR_Dumper* dumper
     );
 
-static gctBOOL _VSC_IS_OperandsOverlapping(
+static VIR_Enable _VSC_IS_OperandsOverlapping(
     IN VIR_Instruction *    Inst1,
     IN VIR_Operand*         opr1,
     IN VIR_Instruction *    Inst2,
@@ -932,12 +1150,12 @@ static gctBOOL _VSC_IS_OperandsOverlapping(
         VIR_Operand_GetOperandInfo(Inst1, opr1, &opr1_info);
         if(VIR_Id_isInvalid(opr1_info.u1.virRegInfo.virReg))
         {
-            return gcvFALSE;
+            return VIR_ENABLE_NONE;
         }
         VIR_Operand_GetOperandInfo(Inst2, opr2, &opr2_info);
         if(VIR_Id_isInvalid(opr2_info.u1.virRegInfo.virReg))
         {
-            return gcvFALSE;
+            return VIR_ENABLE_NONE;
         }
         if(VIR_Operand_isLvalue(opr1))
         {
@@ -960,7 +1178,7 @@ static gctBOOL _VSC_IS_OperandsOverlapping(
                 (opr2_info.u1.virRegInfo.virReg >= opr1_info.u1.virRegInfo.startVirReg && opr2_info.u1.virRegInfo.virReg < opr1_info.u1.virRegInfo.startVirReg + opr1_info.u1.virRegInfo.virRegCount)) &&
                (opr1_enable & opr2_enable))
         {
-            return gcvTRUE;
+            return (VIR_Enable)(opr1_enable & opr2_enable);
         }
         if(VIR_Operand_isLvalue(opr1) && !VIR_Operand_GetIsConstIndexing(opr2) && VIR_Operand_GetRelAddrMode(opr2))
         {
@@ -970,7 +1188,7 @@ static gctBOOL _VSC_IS_OperandsOverlapping(
             if((relAddrIndex >= opr1_info.u1.virRegInfo.startVirReg && relAddrIndex < opr1_info.u1.virRegInfo.startVirReg + opr1_info.u1.virRegInfo.virRegCount) &&
                (opr1_enable & enable))
             {
-                return gcvTRUE;
+                return enable;
             }
         }
         if(VIR_Operand_isLvalue(opr2) && !VIR_Operand_GetIsConstIndexing(opr1) && VIR_Operand_GetRelAddrMode(opr1))
@@ -981,63 +1199,60 @@ static gctBOOL _VSC_IS_OperandsOverlapping(
             if((relAddrIndex >= opr2_info.u1.virRegInfo.startVirReg && relAddrIndex < opr2_info.u1.virRegInfo.startVirReg + opr2_info.u1.virRegInfo.virRegCount) &&
                (opr2_enable & enable))
             {
-                return gcvTRUE;
+                return enable;
             }
         }
     }
     /*else if(VIR_Operand_GetOpKind(opr1) == VIR_OPND_SYMBOL &&
         VIR_Operand_GetOpKind(opr2) == VIR_OPND_SYMBOL)*/
-    return gcvFALSE;
+    return VIR_ENABLE_NONE;
 }
 
 /* return the conflict types of two instruction */
-static gctUINT32 _VSC_IS_InstConflict(
+static void _VSC_IS_InstConflict(
     IN VIR_Shader* shader,
     IN VIR_Instruction* inst0,
     IN VIR_Instruction* inst1,
-    IN gctUINT32* excludeCTs)
+    IN OUT VSC_IS_RegConflictType* rct,
+    IN OUT VSC_IS_OtherConflictType* oct,
+    IN VSC_IS_RegConflictType* excludeRCT,
+    IN VSC_IS_OtherConflictType* excludeOCT)
 {
-    gctUINT32 conflict_types = 0;
     VIR_OpCode opc0, opc1;
     VIR_Operand *dest0, *dest1;
     gctUINT32 i, j;
+    VIR_Enable overlappingEnable;
 
     if(VIR_Inst_GetOpcode(inst1) == VIR_OP_BARRIER)
     {
-        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_BARRIER);
+        VSC_IS_OtherConflictType_ExclusivelySet(*oct, *excludeOCT, VSC_IS_OtherConflictType_BARRIER);
         if(VIR_Inst_GetOpcode(inst0) == VIR_OP_BARRIER)
         {
-            VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_BARRIER);
+            VSC_IS_OtherConflictType_Set(*excludeOCT, VSC_IS_OtherConflictType_BARRIER);
         }
-        return conflict_types;
+        return;
     }
     if(VIR_Inst_GetOpcode(inst0) == VIR_OP_BARRIER)
     {
-        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_BARRIER);
-        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_BARRIER);
-        return conflict_types;
+        VSC_IS_OtherConflictType_ExclusivelySet(*oct, *excludeOCT, VSC_IS_OtherConflictType_BARRIER);
+        VSC_IS_OtherConflictType_Set(*excludeOCT, VSC_IS_OtherConflictType_BARRIER);
+        return;
     }
 
     if(VIR_Inst_GetOpcode(inst1) == VIR_OP_EMIT0)
     {
-        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_EMIT);
+        VSC_IS_OtherConflictType_ExclusivelySet(*oct, *excludeOCT, VSC_IS_OtherConflictType_EMIT);
         if(VIR_Inst_GetOpcode(inst0) == VIR_OP_EMIT0)
         {
-            VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_EMIT);
+            VSC_IS_OtherConflictType_Set(*excludeOCT, VSC_IS_OtherConflictType_EMIT);
         }
-        return conflict_types;
+        return;
     }
     if(VIR_Inst_GetOpcode(inst0) == VIR_OP_EMIT0)
     {
-        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_EMIT);
-        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_EMIT);
-        return conflict_types;
-    }
-
-    if(VIR_OPCODE_isAtom(VIR_Inst_GetOpcode(inst0)) && VIR_OPCODE_isAtom(VIR_Inst_GetOpcode(inst1)))
-    {
-        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_ATOMIC);
-        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_ATOMIC);
+        VSC_IS_OtherConflictType_ExclusivelySet(*oct, *excludeOCT, VSC_IS_OtherConflictType_EMIT);
+        VSC_IS_OtherConflictType_Set(*excludeOCT, VSC_IS_OtherConflictType_EMIT);
+        return;
     }
 
     opc0 = VIR_Inst_GetOpcode(inst0);
@@ -1059,74 +1274,110 @@ static gctUINT32 _VSC_IS_InstConflict(
                     if (VIR_Operand_GetTexldModifier(src1, j) != gcvNULL)
                     {
                         VIR_Operand* srcTexMod = VIR_Operand_GetTexldModifier(src1, j);
+                        overlappingEnable = _VSC_IS_OperandsOverlapping(inst0, dest0, inst1, srcTexMod);
 
-                        if (_VSC_IS_OperandsOverlapping(inst0, dest0, inst1, srcTexMod))
+                        if (overlappingEnable)
                         {
+                            VSC_IS_RegConflictType_AddSetUse(*rct, i, overlappingEnable);
                             if (VIR_OPCODE_isTexLd(opc0))
                             {
-                                VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_TLRS_RU);
+                                VSC_IS_RegConflictType_SetSetFromTex(*rct);
                             }
-                            else if (VIR_OPCODE_isMemLd(opc0) || VIR_OPCODE_isImgLd(opc0))
+                            else if (VIR_OPCODE_isMemLd(opc0))
                             {
-                                VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_MLRS_RU);
+                                VSC_IS_RegConflictType_SetSetFromMem(*rct);
+                            }
+                            else if (VIR_OPCODE_isImgLd(opc0))
+                            {
+                                VSC_IS_RegConflictType_SetSetFromImage(*rct);
                             }
                             else if (VIR_OPCODE_isAttrLd(opc0))
                             {
-                                VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_CLRS_RU);
+                                VSC_IS_RegConflictType_SetSetFromCache(*rct);
                             }
                             else
                             {
-                                VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_RS_RU);
+                                VSC_IS_RegConflictType_SetSetFromReg(*rct);
                                 if(VIR_Inst_GetOpcode(inst0) == VIR_OP_MOVA)
                                 {
-                                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_LOOSE_BINDING_MOVA);
+                                    VSC_IS_OtherConflictType_Set(*oct, VSC_IS_OtherConflictType_LOOSE_BINDING_MOVA);
                                 }
                             }
                         }
                     }
                 }
             }
-            else if(_VSC_IS_OperandsOverlapping(inst0, dest0, inst1, src1))
+            else
             {
-                if(VIR_OPCODE_isTexLd(opc0))
+                overlappingEnable = _VSC_IS_OperandsOverlapping(inst0, dest0, inst1, src1);
+
+                if(overlappingEnable)
                 {
-                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_TLRS_RU);
-                }
-                else if(VIR_OPCODE_isMemLd(opc0) || VIR_OPCODE_isImgLd(opc0))
-                {
-                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_MLRS_RU);
-                }
-                else if(VIR_OPCODE_isAttrLd(opc0))
-                {
-                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_CLRS_RU);
-                }
-                else
-                {
-                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_RS_RU);
-                    if(VIR_Inst_GetOpcode(inst0) == VIR_OP_MOVA)
+                    VSC_IS_RegConflictType_ExclusivelyAddSetUse(*rct, *excludeRCT, i, overlappingEnable);
+                    if (opc0 == VIR_OP_STARR || (opc1 != VIR_OP_LDARR && opc1 != VIR_OP_ATTR_LD) || i != 0)
                     {
-                        VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_LOOSE_BINDING_MOVA);
+                        VSC_IS_RegConflictType_AddSetUse(*excludeRCT, i, overlappingEnable);
+                    }
+                    if(VIR_OPCODE_isTexLd(opc0))
+                    {
+                        VSC_IS_RegConflictType_SetSetFromTex(*rct);
+                    }
+                    else if (VIR_OPCODE_isMemLd(opc0))
+                    {
+                        VSC_IS_RegConflictType_SetSetFromMem(*rct);
+                    }
+                    else if (VIR_OPCODE_isImgLd(opc0))
+                    {
+                        VSC_IS_RegConflictType_SetSetFromImage(*rct);
+                    }
+                    else if (VIR_OPCODE_isAttrLd(opc0))
+                    {
+                        VSC_IS_RegConflictType_SetSetFromCache(*rct);
+                    }
+                    else
+                    {
+                        VSC_IS_RegConflictType_SetSetFromReg(*rct);
+                        if(VIR_Inst_GetOpcode(inst0) == VIR_OP_MOVA)
+                        {
+                            VSC_IS_OtherConflictType_Set(*oct, VSC_IS_OtherConflictType_LOOSE_BINDING_MOVA);
+                        }
                     }
                 }
             }
         }
-        if(dest1 && _VSC_IS_OperandsOverlapping(inst0, dest0, inst1, dest1))
+
+
+        if(dest1 && !VIR_OPCODE_isMemSt(opc0) && !VIR_OPCODE_isMemSt(opc1))
         {
-            if(VIR_OPCODE_isTexLd(opc0))
+            overlappingEnable = _VSC_IS_OperandsOverlapping(inst0, dest0, inst1, dest1);
+
+            if(overlappingEnable)
             {
-                VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_TLRS_RS);
-            }
-            else if(VIR_OPCODE_isMemLd(opc0) || VIR_OPCODE_isImgLd(opc0))
-            {
-                VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_MLRS_RS);
-            }
-            else if(VIR_OPCODE_isAttrLd(opc0))
-            {
-                VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_CLRS_RS);
-            }
-            else
-            {
-                VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_RS_RS);
+                VSC_IS_RegConflictType_ExclusivelyAddSetSet(*rct, *excludeRCT, overlappingEnable);
+                if(opc1 != VIR_OP_STARR)
+                {
+                    VSC_IS_RegConflictType_AddSetSet(*excludeRCT, overlappingEnable);
+                }
+                if(VIR_OPCODE_isTexLd(opc0))
+                {
+                    VSC_IS_RegConflictType_SetSetFromTex(*rct);
+                }
+                else if (VIR_OPCODE_isMemLd(opc0))
+                {
+                    VSC_IS_RegConflictType_SetSetFromMem(*rct);
+                }
+                else if (VIR_OPCODE_isImgLd(opc0))
+                {
+                    VSC_IS_RegConflictType_SetSetFromImage(*rct);
+                }
+                else if (VIR_OPCODE_isAttrLd(opc0))
+                {
+                    VSC_IS_RegConflictType_SetSetFromCache(*rct);
+                }
+                else
+                {
+                    VSC_IS_RegConflictType_SetSetFromReg(*rct);
+                }
             }
         }
     }
@@ -1141,8 +1392,7 @@ static gctUINT32 _VSC_IS_InstConflict(
                 VIR_Symbol *sym = VIR_Operand_GetUnderlyingSymbol(src0);
                 if (sym && VIR_Symbol_isOutParam(sym))
                 {
-                    VSC_IS_ConflictType_Set(conflict_types,
-                                            VSC_IS_ConflictType_USE_RETURNVALUE);
+                    VSC_IS_OtherConflictType_Set(*oct, VSC_IS_OtherConflictType_USE_RETURNVALUE);
                 }
             }
 
@@ -1153,45 +1403,48 @@ static gctUINT32 _VSC_IS_InstConflict(
                     if (VIR_Operand_GetTexldModifier(src0, j) != gcvNULL)
                     {
                         VIR_Operand* srcTexMod = VIR_Operand_GetTexldModifier(src0, j);
+                        overlappingEnable = _VSC_IS_OperandsOverlapping(inst0, srcTexMod, inst1, dest1);
 
-                        if (_VSC_IS_OperandsOverlapping(inst0, srcTexMod, inst1, dest1))
+                        if (overlappingEnable)
                         {
-                            VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_RU_RS);
+                            VSC_IS_RegConflictType_AddUseSet(*rct, overlappingEnable);
                         }
                     }
                 }
             }
-            else if(_VSC_IS_OperandsOverlapping(inst0, src0, inst1, dest1))
+            else
             {
-                VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_RU_RS);
+                overlappingEnable = _VSC_IS_OperandsOverlapping(inst0, src0, inst1, dest1);
+
+                if(overlappingEnable)
+                {
+                    VSC_IS_RegConflictType_AddUseSet(*rct, overlappingEnable);
+                }
             }
         }
     }
 
     /* without alias, have to assume memory/cache dependence */
-    if(VIR_OPCODE_isAtom(opc0) && VIR_OPCODE_isImgSt(opc1))
+    if((VIR_OPCODE_isAtom(opc0) && VIR_OPCODE_isAtom(opc1)) ||
+       (VIR_OPCODE_isAtom(opc0) && VIR_OPCODE_isImgSt(opc1)) ||
+       (VIR_OPCODE_isImgSt(opc0) && VIR_OPCODE_isAtom(opc1)))
     {
-        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_ML_MS);
-        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_MS_MS);
-        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_MS_MS);
-        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_ML_MS);
+        VSC_IS_OtherConflictType_ExclusivelySet(*oct, *excludeOCT, VSC_IS_OtherConflictType_FROM_STORE);
+        VSC_IS_OtherConflictType_ExclusivelySet(*oct, *excludeOCT, VSC_IS_OtherConflictType_TO_STORE);
+        VSC_IS_OtherConflictType_SetOnAtom(*oct);
+        VSC_IS_OtherConflictType_Set(*excludeOCT, VSC_IS_OtherConflictType_FROM_STORE);
+        VSC_IS_OtherConflictType_Set(*excludeOCT, VSC_IS_OtherConflictType_TO_STORE);
     }
     else if(VIR_OPCODE_isAtom(opc0) && VIR_OPCODE_isImgLd(opc1))
     {
-        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_MS_ML);
-        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_MS_ML);
-    }
-    else if(VIR_OPCODE_isImgSt(opc0) && VIR_OPCODE_isAtom(opc1))
-    {
-        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_MS_ML);
-        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_MS_MS);
-        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_MS_ML);
-        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_MS_MS);
-        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_ML_MS);
+        VSC_IS_OtherConflictType_ExclusivelySet(*oct, *excludeOCT, VSC_IS_OtherConflictType_FROM_STORE);
+        VSC_IS_OtherConflictType_SetOnImage(*oct);
+        VSC_IS_OtherConflictType_Set(*excludeOCT, VSC_IS_OtherConflictType_FROM_STORE);
     }
     else if(VIR_OPCODE_isImgLd(opc0) && VIR_OPCODE_isAtom(opc1))
     {
-        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_ML_MS);
+        VSC_IS_OtherConflictType_ExclusivelySet(*oct, *excludeOCT, VSC_IS_OtherConflictType_TO_STORE);
+        VSC_IS_OtherConflictType_SetOnImage(*oct);
     }
     else if((VIR_OPCODE_isLocalMemLd(opc0) && VIR_OPCODE_isLocalMemSt(opc1)) ||
        (VIR_OPCODE_isSpecialMemLd(opc0) && VIR_OPCODE_isSpecialMemSt(opc1)) ||
@@ -1201,7 +1454,8 @@ static gctUINT32 _VSC_IS_InstConflict(
        (opc0 == VIR_OP_VX_IMG_LOAD && opc1 == VIR_OP_VX_IMG_STORE) ||
        (opc0 == VIR_OP_VX_IMG_LOAD_3D && opc1 == VIR_OP_VX_IMG_STORE_3D))
     {
-        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_ML_MS);
+        VSC_IS_OtherConflictType_ExclusivelySet(*oct, *excludeOCT, VSC_IS_OtherConflictType_TO_STORE);
+        VSC_IS_OtherConflictType_SetOnMem(*oct);
     }
     else if((VIR_OPCODE_isLocalMemSt(opc0) && VIR_OPCODE_isLocalMemLd(opc1)) ||
             (VIR_OPCODE_isSpecialMemSt(opc0) && VIR_OPCODE_isSpecialMemLd(opc1)) ||
@@ -1213,8 +1467,9 @@ static gctUINT32 _VSC_IS_InstConflict(
             /* kill should not be scheduled before inst with store flag */
             (VIR_OPCODE_Stores(opc0) && opc1 == VIR_OP_KILL))
     {
-        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_MS_ML);
-        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_MS_ML);
+        VSC_IS_OtherConflictType_ExclusivelySet(*oct, *excludeOCT, VSC_IS_OtherConflictType_FROM_STORE);
+        VSC_IS_OtherConflictType_SetOnMem(*oct);
+        VSC_IS_OtherConflictType_Set(*excludeOCT, VSC_IS_OtherConflictType_FROM_STORE);
     }
     else if((VIR_OPCODE_isLocalMemSt(opc0) && VIR_OPCODE_isLocalMemSt(opc1)) ||
             (VIR_OPCODE_isSpecialMemSt(opc0) && VIR_OPCODE_isSpecialMemSt(opc1)) ||
@@ -1224,26 +1479,32 @@ static gctUINT32 _VSC_IS_InstConflict(
             (opc0 == VIR_OP_VX_IMG_STORE && opc1 == VIR_OP_VX_IMG_STORE) ||
             (opc0 == VIR_OP_VX_IMG_STORE_3D && opc1 == VIR_OP_VX_IMG_STORE_3D))
     {
-        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_MS_MS);
-        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_MS_MS);
-        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_ML_MS);
+        VSC_IS_OtherConflictType_ExclusivelySet(*oct, *excludeOCT, VSC_IS_OtherConflictType_FROM_STORE);
+        VSC_IS_OtherConflictType_ExclusivelySet(*oct, *excludeOCT, VSC_IS_OtherConflictType_TO_STORE);
+        VSC_IS_OtherConflictType_SetOnMem(*oct);
+        VSC_IS_OtherConflictType_Set(*excludeOCT, VSC_IS_OtherConflictType_FROM_STORE);
+        VSC_IS_OtherConflictType_Set(*excludeOCT, VSC_IS_OtherConflictType_TO_STORE);
     }
     if(VIR_OPCODE_isAttrLd(opc0) && VIR_OPCODE_isAttrSt(opc1))
     {
-        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_CL_CS);
+        VSC_IS_OtherConflictType_ExclusivelySet(*oct, *excludeOCT, VSC_IS_OtherConflictType_TO_STORE);
+        VSC_IS_OtherConflictType_SetOnCache(*oct);
     }
     else if(VIR_OPCODE_isAttrSt(opc0) && VIR_OPCODE_isAttrLd(opc1))
     {
-        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_CS_CL);
-        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_CS_CL);
+        VSC_IS_OtherConflictType_ExclusivelySet(*oct, *excludeOCT, VSC_IS_OtherConflictType_FROM_STORE);
+        VSC_IS_OtherConflictType_SetOnCache(*oct);
+        VSC_IS_OtherConflictType_Set(*excludeOCT, VSC_IS_OtherConflictType_FROM_STORE);
     }
     else if(VIR_OPCODE_isAttrSt(opc0) && VIR_OPCODE_isAttrSt(opc1))
     {
-        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_CS_CS);
-        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_CS_CS);
-        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_CL_CS);
+        VSC_IS_OtherConflictType_ExclusivelySet(*oct, *excludeOCT, VSC_IS_OtherConflictType_FROM_STORE);
+        VSC_IS_OtherConflictType_ExclusivelySet(*oct, *excludeOCT, VSC_IS_OtherConflictType_TO_STORE);
+        VSC_IS_OtherConflictType_SetOnCache(*oct);
+        VSC_IS_OtherConflictType_Set(*excludeOCT, VSC_IS_OtherConflictType_FROM_STORE);
+        VSC_IS_OtherConflictType_Set(*excludeOCT, VSC_IS_OtherConflictType_TO_STORE);
     }
-    return conflict_types;
+    return;
 }
 
 static void _VSC_IS_BindContinuousNodes(
@@ -1274,7 +1535,7 @@ static void _VSC_IS_BindContinuousNodes(
         VSC_IS_DepDagNode_AddFlag(next_node, VSC_IS_DEPDAGNODE_FLAG_HAS_BINDING_SUCC);
         edge = _VSC_IS_DepDag_GetEdge(dag, iter_node, next_node);
         gcmASSERT(edge);
-        VSC_IS_DepDagEdge_AddConflictType(edge, VSC_IS_ConflictType_CONTINUOUS_BINDING);
+        VSC_IS_DepDagEdge_AddOCT(edge, VSC_IS_OtherConflictType_CONTINUOUS_BINDING);
 
         iter_inst = VIR_Inst_GetNext(iter_inst);
         iter_node = next_node;
@@ -1303,12 +1564,12 @@ static gctBOOL _VSC_IS_LooselyBindLdarr(
     for(succ_edge0 = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_FIRST(&iter0);
         succ_edge0 != gcvNULL; succ_edge0 = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_NEXT(&iter0))
     {
-        if(VSC_IS_DepDagEdge_HasConflictType(succ_edge0, VSC_IS_ConflictType_RS_RU))
+        if(VSC_IS_RegConflictType_HasSetUse(VSC_IS_DepDagEdge_GetRCT(succ_edge0)))
         {
-            VSC_IS_DepDagEdge_AddConflictType(succ_edge0, VSC_IS_ConflictType_LOOSE_BINDING_LDARR);
+            VSC_IS_DepDagEdge_AddOCT(succ_edge0, VSC_IS_OtherConflictType_LOOSE_BINDING_LDARR);
         }
 
-        if(VSC_IS_DepDagEdge_HasConflictType(succ_edge0, VSC_IS_ConflictType_RU_RS))
+        if(VSC_IS_RegConflictType_HasUseSet(VSC_IS_DepDagEdge_GetRCT(succ_edge0)))
         {
             VSC_IS_DepDagNode* dep_node0 = VSC_IS_DepDagEdge_GetToNode(succ_edge0);
             VSC_UL_ITERATOR iter1;
@@ -1322,14 +1583,14 @@ static gctBOOL _VSC_IS_LooselyBindLdarr(
                     continue;
                 }
 
-                if(VSC_IS_DepDagEdge_HasConflictType(succ_edge1, VSC_IS_ConflictType_RS_RU))
+                if(VSC_IS_RegConflictType_HasSetUse(VSC_IS_DepDagEdge_GetRCT(succ_edge1)))
                 {
                     VSC_IS_DepDagNode* dep_node1 = VSC_IS_DepDagEdge_GetToNode(succ_edge1);
 
                     if(VSC_IS_DepDagNode_GetID(dep_node1) < VSC_IS_DepDagNode_GetID(dep_node0))
                     {
                         VSC_IS_DepDagEdge* edge = _VSC_IS_DepDag_AddEdge(dag, dep_node1, dep_node0);
-                        VSC_IS_DepDagEdge_AddConflictType(edge, VSC_IS_ConflictType_DODGING);
+                        VSC_IS_DepDagEdge_AddOCT(edge, VSC_IS_OtherConflictType_DODGING);
                         set_dodging = gcvTRUE;
                     }
                 }
@@ -1426,7 +1687,7 @@ static void _VSC_IS_BindNodesOnCurrentBB(
     }
 }
 
-static VSC_ErrCode _VSC_IS_BuildDAGForBB_Gross(
+static VSC_ErrCode _VSC_IS_BuildDAGForBB_Basic(
     IN OUT VSC_IS_InstSched* is
     )
 {
@@ -1447,152 +1708,48 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB_Gross(
         VIR_Instruction* prev;
         gctINT32 j;
         VSC_IS_DepDagNode* node = _VSC_IS_DepDag_NewNode(dag, inst);
-        gctUINT32 excludeCTs = VSC_IS_ConflictType_NONE;
+        VSC_IS_RegConflictType excludeRCT;
+        VSC_IS_OtherConflictType excludeOCT;
+
+        VSC_IS_RegConflictType_Reset(excludeRCT);
+        VSC_IS_OtherConflictType_Reset(excludeOCT);
 
         vscHTBL_DirectSet(inst2node, inst, node);
         _VSC_IS_DepDag_AddNode(dag, node);
         for(j = i - 1, prev = VIR_Inst_GetPrev(inst); j >= 0; j--, prev = VIR_Inst_GetPrev(prev))
         {
-            gctUINT32 ct = _VSC_IS_InstConflict(shader, prev, inst, &excludeCTs);
             VSC_IS_DepDagNode* prev_node = gcvNULL;
+            VSC_IS_RegConflictType rct;
+            VSC_IS_OtherConflictType oct;
 
+            VSC_IS_RegConflictType_Reset(rct);
+            VSC_IS_OtherConflictType_Reset(oct);
+            _VSC_IS_InstConflict(shader, prev, inst, &rct, &oct, &excludeRCT, &excludeOCT);
             vscHTBL_DirectTestAndGet(inst2node, prev, (void**)&prev_node);
             gcmASSERT(prev_node);
             if(VSC_IS_DepDagNode_HasFlag(prev_node, VSC_IS_DEPDAGNODE_FLAG_DEPENDING_MOVA) &&
                 VIR_Inst_GetOpcode(inst) == VIR_OP_MOVA)
             {
-                VSC_IS_ConflictType_Set(ct, VSC_IS_ConflictType_DODGING);
+                VSC_IS_OtherConflictType_Set(oct, VSC_IS_OtherConflictType_DODGING);
             }
 
             /* add dependence edge */
-            if(ct)
+            if(VSC_IS_RegConflictType_HasRealDep(rct) || VSC_IS_OtherConflictType_HasRealDep(oct))
             {
                 VSC_IS_DepDagEdge* edge;
-                gctUINT32 bubble = _VSC_IS_ConflictType_GetBubble(ct, is);
+                gctUINT32 bubble = _VSC_IS_ConflictType_GetBubble(rct, is);
 
                 edge = _VSC_IS_DepDag_AddEdge(dag, prev_node, node);
-                VSC_IS_DepDagEdge_SetConflictType(edge, ct);
+                VSC_IS_DepDagEdge_SetRCT(edge, rct);
+                VSC_IS_DepDagEdge_SetOCT(edge, oct);
                 VSC_IS_DepDagEdge_SetBubble(edge, bubble);
-                if(VSC_IS_ConflictType_HasLooseBindingMOVA(ct))
+                if(VSC_IS_OtherConflictType_HasLooseBindingMOVA(oct))
                 {
                     VSC_IS_DepDagNode_AddFlag(node, VSC_IS_DEPDAGNODE_FLAG_DEPENDING_MOVA);
                 }
             }
         }
     }
-
-    return err_code;
-}
-
-static VSC_ErrCode _VSC_IS_BuildDAGForBB_DUPerChannel(
-    IN OUT VSC_IS_InstSched* is
-    )
-{
-    VSC_ErrCode err_code  = VSC_ERR_NONE;
-    VIR_BASIC_BLOCK* bb = VSC_IS_InstSched_GetCurrBB(is);
-    VSC_IS_DepDag* dag = VSC_IS_InstSched_GetCurrDepDag(is);
-    gctUINT32 len;
-    VIR_Instruction *start_inst, *end_inst;
-    VIR_Instruction* def_inst;
-    VSC_HASH_TABLE* inst2node = VSC_IS_DepDag_GetInst2Node(dag);
-    gctUINT32 i;
-
-    gcmASSERT(VSC_IS_InstSched_GetDUInfo(is));
-
-    len = _VSC_IS_GetBBEssence(bb, &start_inst, &end_inst);
-    /* compute for each instruction in BB */
-    for(i = 0, def_inst = start_inst; i < len; i++, def_inst = VIR_Inst_GetNext(def_inst))
-    {
-        VSC_IS_DepDagNode* def_node = gcvNULL;
-        gctUINT32 conflict_types = 0;
-        VIR_Operand *def_dest;
-        VIR_OpCode def_instopc;
-        gctUINT8 channel;
-
-        VIR_Enable def_enable = 0;
-        VIR_VirRegId def_regid = 1000;
-        VIR_GENERAL_DU_ITERATOR du_iter;
-
-        def_dest = VIR_Inst_GetDest(def_inst);
-
-        if(!def_dest)
-        {
-            continue;
-        }
-
-        vscHTBL_DirectTestAndGet(inst2node, def_inst, (void**)&def_node);
-        gcmASSERT(def_node);
-        def_instopc = VIR_Inst_GetOpcode(def_inst);
-        if(VIR_Operand_GetOpKind(def_dest) == VIR_OPND_SYMBOL)
-        {
-            VIR_Symbol* def_sym = VIR_Operand_GetSymbol(def_dest);
-            if(VIR_Symbol_isVreg(def_sym))
-            {
-                def_regid = VIR_Symbol_GetVregIndex(def_sym);
-                def_enable = VIR_Operand_GetEnable(def_dest);
-            }
-        }
-
-        /* compute per channel */
-        for(channel = 0; channel < VIR_CHANNEL_NUM; channel ++)
-        {
-            VSC_IS_DepDagEdge* edge;
-            VIR_USAGE* def_usage;
-            if(!(def_enable & (1 << channel)))
-            {
-                continue;
-            }
-
-            /* get RAW depandence */
-            vscVIR_InitGeneralDuIterator(&du_iter, VSC_IS_InstSched_GetDUInfo(is), def_inst, def_regid, channel, gcvTRUE);
-            for(def_usage = vscVIR_GeneralDuIterator_First(&du_iter); def_usage != gcvNULL;
-                def_usage = vscVIR_GeneralDuIterator_Next(&du_iter))
-            {
-                VSC_IS_DepDagNode* use_node = gcvNULL;
-                VIR_Instruction* use_inst = def_usage->usageKey.pUsageInst;
-
-                /* no need to add edge for BB ending branch inst */
-                if(VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(use_inst)))
-                {
-                    continue;
-                }
-                vscHTBL_DirectTestAndGet(inst2node, use_inst, (void**)&use_node);
-                gcmASSERT(use_node);
-                /* do not add edge for loop DU over inst itself */
-                if(VSC_IS_DepDagNode_GetID(use_node) == VSC_IS_DepDagNode_GetID(def_node))
-                {
-                    continue;
-                }
-                /* do not add edge for loop DU to prevent cycle in DAG */
-                if(VSC_IS_DepDagNode_GetID(use_node) < VSC_IS_DepDagNode_GetID(def_node))
-                {
-                    edge = _VSC_IS_DepDag_AddEdge(dag, use_node, def_node);
-                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_LOOP_CARRIED);
-                }
-                else
-                {
-                    edge = _VSC_IS_DepDag_AddEdge(dag, def_node, use_node);
-                }
-                if(VIR_OPCODE_isTexLd(def_instopc))
-                {
-                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_TLRS_RU);
-                }
-                else if(VIR_OPCODE_isMemLd(def_instopc))
-                {
-                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_MLRS_RU);
-                }
-                else if(VIR_OPCODE_isAttrLd(def_instopc))
-                {
-                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_CLRS_RU);
-                }
-                else
-                {
-                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_RS_RU);
-                }
-                VSC_IS_DepDagEdge_SetConflictType(edge, conflict_types);
-            }
-        }   /* end compute per channel */
-    }   /* end compute for each instruction in BB */
 
     return err_code;
 }
@@ -1657,9 +1814,8 @@ static VSC_ErrCode _VSC_IS_DepDag_UpdateMemLdBubble(
                         for(ldedge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_FIRST(&lddepiter);
                             ldedge != gcvNULL; ldedge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_NEXT(&lddepiter))
                         {
-                            gctUINT32 conflict_type = VSC_IS_DepDagEdge_GetConflictType(ldedge);
-                            if (VSC_IS_ConflictType_HasMLRS_RU(conflict_type) ||
-                                VSC_IS_ConflictType_HasMLRS_RS(conflict_type))
+                            VSC_IS_RegConflictType rct = VSC_IS_DepDagEdge_GetRCT(ldedge);
+                            if (VSC_IS_RegConflictType_IsSetFromMem(rct))
                             {
                                 gctUINT newbubbleValue = VSC_IS_DepDagEdge_GetBubble(ldedge) > 6 ? 6 : VSC_IS_DepDagEdge_GetBubble(ldedge);
                                 VSC_IS_DepDagEdge_SetBubble(ldedge, newbubbleValue);
@@ -1685,17 +1841,8 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB(
     VSC_IS_DepDag* dag = VSC_IS_InstSched_GetCurrDepDag(is);
     VSC_OPTN_ISOptions* options = VSC_IS_InstSched_GetOptions(is);
 
-    switch(VSC_OPTN_ISOptions_GetDepGran(options))
-    {
-        case VSC_OPTN_ISOptions_DEPGRAN_GROSS:
-            _VSC_IS_BuildDAGForBB_Gross(is);
-            break;
-        case VSC_OPTN_ISOptions_DEPGRAN_DU_PER_CHANNAL:
-            _VSC_IS_BuildDAGForBB_DUPerChannel(is);
-            break;
-        default:
-            gcmASSERT(gcvFALSE);
-    }
+    /* build DAG */
+    _VSC_IS_BuildDAGForBB_Basic(is);
 
     /* sometimes we need to bind instructions in case other instructions be scheduled in between*/
     _VSC_IS_BindNodesOnCurrentBB(bb, dag);
@@ -1712,7 +1859,7 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB(
         tail_count = vscSRARR_GetElementCount(tail_array);
 
         /* because tail_array changes during node adding, we need to copy them at first here */
-        tail_nodes = (VSC_IS_DepDagNode**)malloc(sizeof(VSC_IS_DepDagNode*) * tail_count);
+        gcoOS_Allocate(gcvNULL, sizeof(VSC_IS_DepDagNode*) * tail_count, (gctPOINTER*)&tail_nodes);
         for(i = 0; i < tail_count; i++)
         {
             tail_nodes[i] = *(VSC_IS_DepDagNode**)vscSRARR_GetElement(tail_array, i);
@@ -1724,7 +1871,7 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB(
         {
             _VSC_IS_DepDag_AddEdge(dag, tail_nodes[i], pseudo_end);
         }
-        free(tail_nodes);
+        gcoOS_Free(gcvNULL, (gctPOINTER)tail_nodes);
 
         _VSC_IS_DepDag_SetKillPriority(dag);
 
@@ -1956,7 +2103,7 @@ static VSC_ErrCode _VSC_IS_FW_Heuristic_PreferBinding(
     for(succ_edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_FIRST(&succ_edge_iter);
         succ_edge != gcvNULL; succ_edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_NEXT(&succ_edge_iter))
     {
-        if(VSC_IS_DepDagEdge_HasConflictType(succ_edge, VSC_IS_ConflictType_CONTINUOUS_BINDING))
+        if(VSC_IS_DepDagEdge_HasOCT(succ_edge, VSC_IS_OtherConflictType_CONTINUOUS_BINDING))
         {
             VSC_HASH_TABLE* out_set;
 
@@ -4264,9 +4411,6 @@ static VSC_ErrCode _VSC_IS_MergeDetour(
         }
     }
 
-    /* update bubble value after merge */
-   /* _VSC_IS_DepDagNode_UpdateBubbleValueIfNeeded(top_node, bottom_node, detour_edges_bv);*/
-
     if(VSC_UTILS_MASK(VSC_OPTN_ISOptions_GetTrace(options), VSC_OPTN_ISOptions_TRACE_BUBBLESCHED) &&
        (VSC_UTILS_MASK(VSC_OPTN_ISOptions_GetTrace(options), VSC_OPTN_ISOptions_TRACE_BUBBLESCHED_INCLUDE_RECUR) || !recursive_call))
     {
@@ -5349,6 +5493,11 @@ DEF_QUERY_PASS_PROP(VSC_IS_InstSched_PerformOnShader)
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
 }
 
+DEF_SH_NECESSITY_CHECK(VSC_IS_InstSched_PerformOnShader)
+{
+    return gcvTRUE;
+}
+
 VSC_ErrCode VSC_IS_InstSched_PerformOnShader(
     IN VSC_SH_PASS_WORKER* pPassWorker
     )
@@ -5401,6 +5550,9 @@ VSC_ErrCode VSC_IS_InstSched_PerformOnShader(
             }
         }
 
+        /* Renumber instruction ID. */
+        VIR_Shader_RenumberInstId(shader);
+
         _VSC_IS_InstSched_Final(&is);
     }
 
@@ -5416,36 +5568,6 @@ VSC_ErrCode VSC_IS_InstSched_PerformOnShader(
 
     return errcode;
 }
-/*
-void _VSC_IS_DepDagNode_UpdateBubbleValueIfNeeded(
-    IN VSC_IS_DepDagNode* start,
-    IN VSC_IS_DepDagNode* end,
-    IN VSC_BIT_VECTOR* edges_bv
-    )
-{
-    VSC_IS_DepDagNode* iter = start;
-    gctBOOL prevIsMemLd = iter && (VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(iter->inst))) ? gcvTRUE : gcvFALSE;
-    VSC_IS_DepDagEdge* edge = gcvNULL;
-    gctUINT  continusMemLd = 0;
-    if (!start)
-    {
-        return;
-    }
-    do
-    {
-        iter = _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(iter, gcvTRUE, edges_bv, &edge);
-        if (!edge)
-        {
-           break;
-        }
-        if (prevIsMemLd
-    } while(iter && iter != end);
-
-    if(end)
-    {
-
-    }
-}*/
 
 /* dump functions */
 void _VSC_IS_DepDagNode_Dump(
@@ -5631,116 +5753,14 @@ gctUINT32 _VSC_IS_DepDagNode_DepandsOnBubbleSet(
     return max_bubble;
 }
 
-static void _VSC_IS_ConflictType_Dump(
-    IN gctUINT32 conflict_type,
-    IN VIR_Dumper* dumper
-    )
-{
-    if(VSC_IS_ConflictType_IsLOOPCARRIED(conflict_type))
-    {
-        VIR_LOG(dumper, "LOOP_CARRIED ");
-    }
-    if(VSC_IS_ConflictType_HasTLRS_RU(conflict_type))
-    {
-        VIR_LOG(dumper, "TLRS_RU ");
-    }
-    if(VSC_IS_ConflictType_HasTLRS_RS(conflict_type))
-    {
-        VIR_LOG(dumper, "TLRS_RS ");
-    }
-    if(VSC_IS_ConflictType_HasMLRS_RU(conflict_type))
-    {
-        VIR_LOG(dumper, "MLRS_RU ");
-    }
-    if(VSC_IS_ConflictType_HasMLRS_RS(conflict_type))
-    {
-        VIR_LOG(dumper, "MLRS_RS ");
-    }
-    if(VSC_IS_ConflictType_HasML_MS(conflict_type))
-    {
-        VIR_LOG(dumper, "ML_MS ");
-    }
-    if(VSC_IS_ConflictType_HasMS_ML(conflict_type))
-    {
-        VIR_LOG(dumper, "MS_ML ");
-    }
-    if(VSC_IS_ConflictType_HasMS_MS(conflict_type))
-    {
-        VIR_LOG(dumper, "MS_MS ");
-    }
-    if(VSC_IS_ConflictType_HasCLRS_RU(conflict_type))
-    {
-        VIR_LOG(dumper, "CLRS_RU ");
-    }
-    if(VSC_IS_ConflictType_HasCLRS_RS(conflict_type))
-    {
-        VIR_LOG(dumper, "CLRS_RS ");
-    }
-    if(VSC_IS_ConflictType_HasCL_CS(conflict_type))
-    {
-        VIR_LOG(dumper, "CL_CS ");
-    }
-    if(VSC_IS_ConflictType_HasCS_CL(conflict_type))
-    {
-        VIR_LOG(dumper, "CS_CL ");
-    }
-    if(VSC_IS_ConflictType_HasCS_CS(conflict_type))
-    {
-        VIR_LOG(dumper, "CS_CS ");
-    }
-    if(VSC_IS_ConflictType_HasRS_RU(conflict_type))
-    {
-        VIR_LOG(dumper, "RS_RU ");
-    }
-    if(VSC_IS_ConflictType_HasRU_RS(conflict_type))
-    {
-        VIR_LOG(dumper, "RU_RS ");
-    }
-    if(VSC_IS_ConflictType_HasRS_RS(conflict_type))
-    {
-        VIR_LOG(dumper, "RS_RS ");
-    }
-    if(VSC_IS_ConflictType_HasCOND(conflict_type))
-    {
-        VIR_LOG(dumper, "COND ");
-    }
-    if(VSC_IS_ConflictType_HasContinuousBinding(conflict_type))
-    {
-        VIR_LOG(dumper, "CONTINUOUS_BINDING ");
-    }
-    if(VSC_IS_ConflictType_HasLooseBindingLDARR(conflict_type))
-    {
-        VIR_LOG(dumper, "LOOSE_BINDING_LDARR");
-    }
-    if(VSC_IS_ConflictType_HasLooseBindingMOVA(conflict_type))
-    {
-        VIR_LOG(dumper, "LOOSE_BINDING_MOVA");
-    }
-    if(VSC_IS_ConflictType_HasDodging(conflict_type))
-    {
-        VIR_LOG(dumper, "DODGING ");
-    }
-    if(VSC_IS_ConflictType_UseReturnValue(conflict_type))
-    {
-        VIR_LOG(dumper, "UseReturnValue ");
-    }
-    if(VSC_IS_ConflictType_HasBarrier(conflict_type))
-    {
-        VIR_LOG(dumper, "Barrier ");
-    }
-    if(VSC_IS_ConflictType_HasAtomic(conflict_type))
-    {
-        VIR_LOG(dumper, "Atomic ");
-    }
-}
-
 static void _VSC_IS_DepDagEgde_Dump(
     IN VSC_IS_DepDagEdge* edge,
     IN VIR_Dumper* dumper
     )
 {
     VIR_LOG(dumper, "conflict type: ");
-    _VSC_IS_ConflictType_Dump(VSC_IS_DepDagEdge_GetConflictType(edge), dumper);
+    _VSC_IS_RegConflictType_Dump(VSC_IS_DepDagEdge_GetRCT(edge), dumper);
+    _VSC_IS_OtherConflictType_Dump(VSC_IS_DepDagEdge_GetOCT(edge), dumper);
     VIR_LOG(dumper, " bubble: %d ", VSC_IS_DepDagEdge_GetBubble(edge));
     VIR_LOG_FLUSH(dumper);
 }

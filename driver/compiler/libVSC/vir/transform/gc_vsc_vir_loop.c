@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,6 +13,7 @@
 
 #include "gc_vsc.h"
 #include "vir/transform/gc_vsc_vir_loop.h"
+#include "vir/transform/gc_vsc_vir_cpf.h"
 
 /* Only support VSC_UNI_LIST_NODE_EXT node */
 static void _CommonFreeList(VSC_UNI_LIST* pList, VSC_MM* pMM)
@@ -79,20 +80,6 @@ _VIR_DefInLoop_Init(
     VIR_DefInLoop_SetInst(def, inst);
     VIR_DefInLoop_SetDefEnable(def, enable);
 }
-
-typedef struct VIR_LoopDU
-{
-    VSC_HASH_TABLE symToDefListTable;
-    gctBOOL isValid;
-    VSC_MM* mm;
-} VIR_LoopDU;
-
-#define VIR_LoopDU_GetSymToDefListTable(du)     (&(du)->symToDefListTable)
-#define VIR_LoopDU_IsValid(du)                  ((du)->isValid)
-#define VIR_LoopDU_SetValid(du)                 ((du)->isValid = gcvTRUE)
-#define VIR_LoopDU_SetInValid(du)               ((du)->isValid = gcvFALSE)
-#define VIR_LoopDU_GetMM(du)                    ((du)->mm)
-#define VIR_LoopDU_SetMM(du, m)                 ((du)->mm = (m))
 
 static void
 _VIR_LoopDU_Init(
@@ -275,47 +262,6 @@ _VIR_LoopDU_SymDefCountInLoop(
     return result;
 }
 
-
-typedef enum VIR_IV_FLAGS
-{
-    VIR_IV_Flags_None        = 0x0,
-    VIR_IV_Flags_Invalid     = 0x1,
-    VIR_IV_Flags_Basic       = 0x2,
-    VIR_IV_Flags_LoopIndex   = 0x4
-} VIR_IV_Flags;
-
-typedef struct VIR_INDUCTIONVARIABLE
-{
-    VSC_UNI_LIST_NODE               node;
-    VIR_Symbol*                     sym;
-    gctUINT                         channel;
-    VIR_Instruction*                updateInst;
-    VIR_Const                       factor;
-    struct VIR_INDUCTIONVARIABLE*   basis;
-    VIR_Const                       constFactor;
-    VIR_IV_Flags                    flags;
-} VIR_InductionVariable;
-
-typedef VIR_InductionVariable VIR_IV;
-
-#define VIR_IV_GetSym(iv)                           ((iv)->sym)
-#define VIR_IV_SetSym(iv, s)                        ((iv)->sym = (s))
-#define VIR_IV_GetChannel(iv)                       ((iv)->channel)
-#define VIR_IV_SetChannel(iv, c)                    ((iv)->channel = (c))
-#define VIR_IV_GetUpdateInst(iv)                    ((iv)->updateInst)
-#define VIR_IV_SetUpdateInst(iv, i)                 ((iv)->updateInst = (i))
-#define VIR_IV_GetUpdateOpcode(iv)                  (VIR_Inst_GetOpcode((iv)->updateInst))
-#define VIR_IV_GetFactor(iv)                        (&(iv)->factor)
-#define VIR_IV_SetFactor(iv, f)                     ((iv)->factor = (f))
-#define VIR_IV_GetBasis(iv)                         ((iv)->basis)
-#define VIR_IV_SetBasis(iv, b)                      ((iv)->basis = (b))
-#define VIR_IV_GetConstFactor(iv)                   (&(iv)->constFactor)
-#define VIR_IV_SetConstFactor(iv, c)                ((iv)->constFactor = (c))
-#define VIR_IV_GetFlags(iv)                         ((iv)->flags)
-#define VIR_IV_SetFlags(iv, f)                      ((iv)->flags = (f))
-#define VIR_IV_AddFlag(iv, f)                       ((iv)->flags |= (f))
-#define VIR_IV_HasFlag(iv, f)                       ((iv)->flags & (f))
-
 static void
 _VIR_IV_Init(
     VIR_IV* iv,
@@ -386,20 +332,6 @@ _VIR_IV_Dump(
     VIR_LOG(dumper, "\n");
     VIR_LOG_FLUSH(dumper);
 }
-
-typedef struct VIR_IVMGR
-{
-    VSC_UNI_LIST                ivList;
-    VSC_MM*                     mm;
-    gctBOOL                     basicIdentified;
-} VIR_IVMgr;
-
-#define VIR_IVMgr_GetIVList(i)                  (&(i)->ivList)
-#define VIR_IVMgr_GetIVCount(i)                 vscUNILST_GetNodeCount(VIR_IVMgr_GetIVList(i))
-#define VIR_IVMgr_GetBasicIdentified(i)         ((i)->basicIdentified)
-#define VIR_IVMgr_SetBasicIdentified(i, b)      ((i)->basicIdentified = (b))
-#define VIR_IVMgr_GetMM(i)                      ((i)->mm)
-#define VIR_IVMgr_SetMM(i, m)                   ((i)->mm = (m))
 
 static void
 _VIR_IVMgr_Init(
@@ -481,27 +413,6 @@ _VIR_IVMgr_Dump(
     }
 }
 
-typedef struct VIR_LOOPUPBOUND
-{
-    VIR_IV*                 iv;
-    VIR_Instruction*        cmpInst;
-    VIR_Symbol*             upboundSym;
-    gctUINT                 upboundSymChannel;
-    VIR_Const               upboundConst;
-} VIR_LoopUpbound;
-
-#define VIR_LoopUpbound_GetIV(lu)                           ((lu)->iv)
-#define VIR_LoopUpbound_SetIV(lu, i)                        ((lu)->iv = (i))
-#define VIR_LoopUpbound_GetCmpInst(lu)                      ((lu)->cmpInst)
-#define VIR_LoopUpbound_SetCmpInst(lu, c)                   ((lu)->cmpInst = (c))
-#define VIR_LoopUpbound_GetCOP(lu)                          VIR_Inst_GetConditionOp((lu)->cmpInst)
-#define VIR_LoopUpbound_GetUpboundSym(lu)                   ((lu)->upboundSym)
-#define VIR_LoopUpbound_SetUpboundSym(lu, u)                ((lu)->upboundSym = (u))
-#define VIR_LoopUpbound_GetUpboundSymChannel(lu)            ((lu)->upboundSymChannel)
-#define VIR_LoopUpbound_SetUpboundSymChannel(lu, u)         ((lu)->upboundSymChannel = (u))
-#define VIR_LoopUpbound_GetUpboundConst(lu)                 (&(lu)->upboundConst)
-#define VIR_LoopUpbound_IsConst(lu)                         ((lu)->upboundSym == gcvNULL)
-
 static VIR_TypeId
 _VIR_LoopUpbound_GetTypeId(
     VIR_LoopUpbound* upbound
@@ -557,23 +468,6 @@ _VIR_LoopUpbound_Dump(
     VIR_LOG_FLUSH(dumper);
 }
 
-typedef struct VIR_LOOPLOWBOUND
-{
-    VIR_IV*                 iv;
-    VIR_Symbol*             lowboundSym;
-    gctUINT                 lowboundSymChannel;
-    VIR_Const               lowboundConst;
-} VIR_LoopLowbound;
-
-#define VIR_LoopLowbound_GetIV(ll)                          ((ll)->iv)
-#define VIR_LoopLowbound_SetIV(ll, i)                       ((ll)->iv = (i))
-#define VIR_LoopLowbound_GetLowboundSym(ll)                 ((ll)->lowboundSym)
-#define VIR_LoopLowbound_SetLowboundSym(ll, l)              ((ll)->lowboundSym = (l))
-#define VIR_LoopLowbound_GetLowboundSymChannel(ll)          ((ll)->lowboundSymChannel)
-#define VIR_LoopLowbound_SetLowboundSymChannel(ll, l)       ((ll)->lowboundSymChannel = (l))
-#define VIR_LoopLowbound_GetLowboundConst(ll)               (&(ll)->lowboundConst)
-#define VIR_LoopLowbound_IsConst(ll)                        ((ll)->lowboundSym == gcvNULL)
-
 static void
 _VIR_LoopLowbound_Dump(
     VIR_LoopLowbound* lowbound,
@@ -605,83 +499,6 @@ _VIR_LoopLowbound_Dump(
     VIR_LOG_FLUSH(dumper);
 }
 
-/*
-For the loops we are talking about here, they have the following attributes:
-    1. break bbs are those whose successors are not all in loop
-    2. continue bbs are those whose successors contain loop head
-    3. loop body bbs do not have to be continuours in IR. spir-v assembly can generate this kind of loop(dEQP-VK.glsl.functions.control_flow.return_in_nested_loop_vertex).
-*/
-
-typedef enum
-{
-    VIR_LoopInfo_Flags_None             = 0,
-    VIR_LoopInfo_Flags_HasEmit          = 1,
-    VIR_LoopInfo_Flags_HasStore         = 2,
-} VIR_LoopInfo_Flags;
-
-typedef struct VIR_LOOPINFO
-{
-    VSC_UNI_LIST_NODE       node;
-    gctUINT                 id;
-    VIR_LoopInfoMgr*        loopinfoMgr;
-    VIR_BASIC_BLOCK*        loopHead;
-    VIR_BASIC_BLOCK*        loopEnd;
-    struct VIR_LOOPINFO*    parentLoop;
-    VSC_UNI_LIST            childLoopSet;
-    VSC_UNI_LIST            bbSet;
-    VSC_UNI_LIST            breakBBSet;
-    VSC_UNI_LIST            continueBBSet;
-    VSC_UNI_LIST            backBoneSet;
-    VSC_UNI_LIST            loopEndDominatorSet;
-    VIR_LoopDU*             du;
-    VIR_LoopInfo_Flags      flags;
-    VIR_IVMgr*              ivMgr;
-    VIR_LoopUpbound*        upbound;
-    VIR_LoopLowbound*       lowbound;
-} VIR_LoopInfo;
-
-#define VIR_LoopInfo_GetId(l)                       ((l)->id)
-#define VIR_LoopInfo_SetId(l, i)                    ((l)->id = (i))
-#define VIR_LoopInfo_GetLoopInfoMgr(l)              ((l)->loopinfoMgr)
-#define VIR_LoopInfo_SetLoopInfoMgr(l, lim)         ((l)->loopinfoMgr = (lim))
-#define VIR_LoopInfo_GetShader(l)                   VIR_LoopInfoMgr_GetShader(VIR_LoopInfo_GetLoopInfoMgr(l))
-#define VIR_LoopInfo_GetFunc(l)                     VIR_LoopInfoMgr_GetFunc(VIR_LoopInfo_GetLoopInfoMgr(l))
-#define VIR_LoopInfo_GetCFG(l)                      (VIR_Function_GetCFG(VIR_LoopInfo_GetFunc(l)))
-#define VIR_LoopInfo_GetLoopHead(l)                 ((l)->loopHead)
-#define VIR_LoopInfo_SetLoopHead(l, lh)             ((l)->loopHead = (lh))
-#define VIR_LoopInfo_GetLoopEnd(l)                  ((l)->loopEnd)
-#define VIR_LoopInfo_SetLoopEnd(l, le)              ((l)->loopEnd = (le))
-#define VIR_LoopInfo_GetParentLoop(l)               ((l)->parentLoop)
-#define VIR_LoopInfo_SetParentLoop(l, p)            ((l)->parentLoop = (p))
-#define VIR_LoopInfo_GetChildLoopSet(l)             (&(l)->childLoopSet)
-#define VIR_LoopInfo_GetChildLoopCount(l)           (vscUNILST_GetNodeCount(&(l)->childLoopSet))
-#define VIR_LoopInfo_GetBBSet(l)                    (&(l)->bbSet)
-#define VIR_LoopInfo_GetBBCount(l)                  (vscUNILST_GetNodeCount(&(l)->bbSet))
-#define VIR_LoopInfo_GetBreakBBSet(l)               (&(l)->breakBBSet)
-#define VIR_LoopInfo_GetBreakBBCount(l)             (vscUNILST_GetNodeCount(&(l)->breakBBSet))
-#define VIR_LoopInfo_GetContinueBBSet(l)            (&(l)->continueBBSet)
-#define VIR_LoopInfo_GetContinueBBCount(l)          (vscUNILST_GetNodeCount(&(l)->continueBBSet))
-#define VIR_LoopInfo_GetBackBoneBBSet(l)            (&(l)->backBoneSet)
-#define VIR_LoopInfo_GetBackBoneBBCount(l)          (vscUNILST_GetNodeCount(&(l)->backBoneSet))
-#define VIR_LoopInfo_GetLoopEndDominatorSet(l)      (&(l)->loopEndDominatorSet)
-#define VIR_LoopInfo_GetLoopEndDominatorCount(l)    (vscUNILST_GetNodeCount(&(l)->loopEndDominatorSet))
-#define VIR_LoopInfo_GetDU(l)                       ((l)->du)
-#define VIR_LoopInfo_SetDU(l, d)                    ((l)->du = (d))
-#define VIR_LoopInfo_GetFlags(l)                    ((l)->flags)
-#define VIR_LoopInfo_SetFlags(l, f)                 ((l)->flags = (f))
-#define VIR_LoopInfo_HasFlag(l, f)                  ((l)->flags & (f))
-#define VIR_LoopInfo_AddFlag(l, f)                  ((l)->flags |= (f))
-#define VIR_LoopInfo_GetIVMGR(l)                    ((l)->ivMgr)
-#define VIR_LoopInfo_SetIVMGR(l, i)                 ((l)->ivMgr = (i))
-#define VIR_LoopInfo_GetIVCount(l)                  (VIR_LoopInfo_GetIVMGR(l) ? VIR_IVMgr_GetIVCount(VIR_LoopInfo_GetIVMGR(l)) : 0)
-#define VIR_LoopInfo_GetUpbound(l)                  ((l)->upbound)
-#define VIR_LoopInfo_SetUpbound(l, u)               ((l)->upbound = (u))
-#define VIR_LoopInfo_GetLowbound(l)                 ((l)->lowbound)
-#define VIR_LoopInfo_SetLowbound(l, u)              ((l)->lowbound = (u))
-#define VIR_LoopInfo_GetOptions(l)                  VIR_LoopInfoMgr_GetOptions(VIR_LoopInfo_GetLoopInfoMgr(l))
-#define VIR_LoopInfo_GetDumper(l)                   VIR_LoopInfoMgr_GetDumper(VIR_LoopInfo_GetLoopInfoMgr(l))
-#define VIR_LoopInfo_GetMM(l)                       VIR_LoopInfoMgr_GetMM(VIR_LoopInfo_GetLoopInfoMgr(l))
-
 static void
 _VIR_LoopInfo_Init(
     VIR_LoopInfo* loopInfo,
@@ -702,6 +519,7 @@ _VIR_LoopInfo_Init(
     VIR_LoopInfo_SetId(loopInfo, id);
     VIR_LoopInfo_SetLoopHead(loopInfo, loopHead);
     VIR_LoopInfo_SetLoopEnd(loopInfo, loopEnd);
+    VIR_LoopInfo_SetParentIterationCount(loopInfo, -1);
 }
 
 static void
@@ -1875,6 +1693,7 @@ _VIR_LoopInfo_CollectDefs(
                 {
                     destSym = VIR_Symbol_GetVregVariable(destSym);
                 }
+
                 errCode = _VIR_LoopDU_AddDef(du, destSym, enable, inst);
                 if(errCode)
                 {
@@ -1892,6 +1711,7 @@ _VIR_LoopInfo_CollectDefs(
                 {
                     src0Sym = VIR_Symbol_GetVregVariable(src0Sym);
                 }
+
                 errCode = _VIR_LoopDU_AddDef(du, src0Sym, enable, inst);
                 if(errCode)
                 {
@@ -1913,6 +1733,7 @@ _VIR_LoopInfo_CollectDefs(
                 {
                     destSym = VIR_Symbol_GetVregVariable(destSym);
                 }
+
                 errCode = _VIR_LoopDU_AddDef(du, destSym, enable, inst);
                 if(errCode)
                 {
@@ -1925,10 +1746,6 @@ _VIR_LoopInfo_CollectDefs(
                 VIR_Function *calleeFunc = VIR_Inst_GetCallee(inst);
                 gctUINT i;
 
-                if(gcoOS_StrNCmp("_atom", VIR_Function_GetNameString(calleeFunc), 5) == gcvSTATUS_OK)
-                {
-                    VIR_LoopInfo_AddFlag(loopInfo, VIR_LoopInfo_Flags_HasStore);
-                }
                 for(i = 0; i < VIR_IdList_Count(&calleeFunc->paramters); ++i)
                 {
                     VIR_Id id = VIR_IdList_GetId(&calleeFunc->paramters, i);
@@ -1947,10 +1764,11 @@ _VIR_LoopInfo_CollectDefs(
                     }
                 }
             }
-            if(opcode == VIR_OP_EMIT)
+            if(opcode == VIR_OP_EMIT0)
             {
                 VIR_LoopInfo_AddFlag(loopInfo, VIR_LoopInfo_Flags_HasEmit);
             }
+
             if(inst == BB_GET_END_INST(bb))
             {
                 break;
@@ -1967,6 +1785,115 @@ _VIR_LoopInfo_CollectDefs(
     return errCode;
 }
 
+
+/* Check if all usages of this instruction are within this LOOP. */
+static gctBOOL
+_VIR_LoopInfo_IsInstAllUsagesWithinLoop(
+    VIR_LoopInfo*           pLoopInfo,
+    VIR_Instruction*        pInst
+    )
+{
+    VIR_DEF_USAGE_INFO*     pDuInfo = VIR_LoopOpts_GetDuInfo(VIR_LoopInfoMgr_GetLoopOpts(VIR_LoopInfo_GetLoopInfoMgr(pLoopInfo)));
+    gctBOOL                 bAllUsagesWithinLoop = gcvTRUE;
+    VIR_LoopInfo_BBIterator bbIter = {gcvNULL, 0, gcvNULL, 0, gcvNULL};
+    VIR_BB*                 pBB;
+    VIR_OpCode              opCode = VIR_Inst_GetOpcode(pInst);
+    VIR_Operand*            pDestOpnd = VIR_Inst_GetDest(pInst);
+    VIR_OperandInfo         destOpndInfo;
+    VIR_Enable              enable;
+    gctUINT8                channel;
+    VIR_GENERAL_DU_ITERATOR du_iter;
+    VIR_USAGE*              pUsage = gcvNULL;
+    gctUINT                 firstDefIdx;
+
+    gcmASSERT(pDuInfo);
+
+    /* Check if DEST valid. */
+    if (!VIR_OPCODE_hasDest(opCode) || !pDestOpnd)
+    {
+        return gcvFALSE;
+    }
+
+    enable = VIR_Operand_GetEnable(pDestOpnd);
+    VIR_Operand_GetOperandInfo(pInst, pDestOpnd, &destOpndInfo);
+
+    if (!destOpndInfo.isVreg)
+    {
+        return gcvFALSE;
+    }
+
+    for (channel = 0; channel < VIR_CHANNEL_COUNT; ++channel)
+    {
+        if (!(enable & (1 << channel)))
+        {
+            continue;
+        }
+
+        /* DU is not completed here, so we check if it have any usage first. */
+        {
+            du_iter.bSameBBOnly = gcvFALSE;
+            du_iter.defKey.pDefInst = pInst;
+            du_iter.defKey.regNo = destOpndInfo.u1.virRegInfo.virReg;
+            du_iter.defKey.channel = channel;
+            du_iter.pDuInfo = pDuInfo;
+
+            firstDefIdx = vscBT_HashSearch(&pDuInfo->defTable, &du_iter.defKey);
+            if (firstDefIdx == VIR_INVALID_DEF_INDEX)
+            {
+                continue;
+            }
+        }
+
+        vscVIR_InitGeneralDuIterator(&du_iter,
+                                     pDuInfo,
+                                     pInst,
+                                     destOpndInfo.u1.virRegInfo.virReg,
+                                     channel,
+                                     gcvFALSE);
+
+        for (pUsage = vscVIR_GeneralDuIterator_First(&du_iter);
+             pUsage != gcvNULL;
+             pUsage = vscVIR_GeneralDuIterator_Next(&du_iter))
+        {
+            VIR_Instruction* pUsageInst = pUsage->usageKey.pUsageInst;
+            VIR_BB*          pUsageBB = VIR_Inst_GetBasicBlock(pUsageInst);
+            gctBOOL          bUsageBBFound = gcvFALSE;
+
+            if (!pUsageBB)
+            {
+                continue;
+            }
+
+            /* A rough check first. */
+            if (VIR_Inst_GetId(pUsageInst) > VIR_Inst_GetId(BB_GET_END_INST(VIR_LoopInfo_GetLoopEnd(pLoopInfo))))
+            {
+                bAllUsagesWithinLoop = gcvFALSE;
+                break;
+            }
+
+            _VIR_LoopInfo_BBIterator_Init(&bbIter, pLoopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
+            for (pBB = _VIR_LoopInfo_BBIterator_First(&bbIter);
+                 pBB != gcvNULL;
+                 pBB = _VIR_LoopInfo_BBIterator_Next(&bbIter))
+            {
+                if (pUsageBB == pBB)
+                {
+                    bUsageBBFound = gcvTRUE;
+                    break;
+                }
+            }
+
+            /* One usage is not found within the loop. */
+            if (!bUsageBBFound)
+            {
+                bAllUsagesWithinLoop = gcvFALSE;
+                break;
+            }
+        }
+    }
+
+    return bAllUsagesWithinLoop;
+}
 
 static VIR_IVMgr*
 _VIR_LoopInfo_NewIVMgr(
@@ -2433,11 +2360,12 @@ VIR_LoopInfoMgr_RemoveLoopInfo(
     VIR_LoopInfo*           loopInfo
     )
 {
-    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_LoopInfo*           pParentLoopInfo = VIR_LoopInfo_GetParentLoop(loopInfo);
 
-    if(VIR_LoopInfo_GetParentLoop(loopInfo))
+    if(pParentLoopInfo)
     {
-        _VIR_LoopInfo_RemoveChildLoop(VIR_LoopInfo_GetParentLoop(loopInfo), loopInfo);
+        _VIR_LoopInfo_RemoveChildLoop(pParentLoopInfo, loopInfo);
     }
 
     if(VIR_LoopInfo_GetChildLoopCount(loopInfo))
@@ -2451,7 +2379,13 @@ VIR_LoopInfoMgr_RemoveLoopInfo(
             node = CAST_ULN_2_ULEN(vscULIterator_Next(&iter)))
         {
             VIR_LoopInfo* childLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(node);
-            VIR_LoopInfo_SetParentLoop(childLoopInfo, VIR_LoopInfo_GetParentLoop(loopInfo));
+
+            VIR_LoopInfo_SetParentLoop(childLoopInfo, pParentLoopInfo);
+
+            if (pParentLoopInfo)
+            {
+                _VIR_LoopInfo_AddChildLoop(pParentLoopInfo, childLoopInfo);
+            }
         }
     }
 
@@ -2581,21 +2515,26 @@ VIR_LoopInfoMgr_Dump(
 void
 VIR_LoopOpts_Init(
     VIR_LoopOpts* loopOpts,
+    VIR_DEF_USAGE_INFO* pDuInfo,
     VIR_Shader* shader,
     VIR_Function* func,
     VSC_OPTN_LoopOptsOptions* options,
     VIR_Dumper* dumper,
     VSC_MM* mm,
-    gctBOOL hwSuppertCompDepForLS
+    VSC_HW_CONFIG* pHwCfg
     )
 {
+    memset(loopOpts, 0, sizeof(VIR_LoopOpts));
+
     VIR_LoopOpts_SetShader(loopOpts, shader);
+    VIR_LoopOpts_SetDuInfo(loopOpts, pDuInfo);
     VIR_LoopOpts_SetFunc(loopOpts, func);
     VIR_LoopOpts_SetLoopInfoMgr(loopOpts, gcvNULL);
     VIR_LoopOpts_SetOptions(loopOpts, options);
     VIR_LoopOpts_SetDumper(loopOpts, dumper);
     VIR_LoopOpts_SetMM(loopOpts, mm);
-    VIR_LoopOpts_SetHWsupportPerCompDepForLS(loopOpts, hwSuppertCompDepForLS);
+    VIR_LoopOpts_SetHwCfg(loopOpts, pHwCfg);
+    VIR_LoopOpts_SetHWsupportPerCompDepForLS(loopOpts, pHwCfg->hwFeatureFlags.supportPerCompDepForLS);
 }
 
 void
@@ -2609,8 +2548,8 @@ VIR_LoopOpts_Final(
     }
 }
 
-static VIR_LoopInfoMgr*
-_VIR_LoopOpts_NewLoopInfoMgr(
+VIR_LoopInfoMgr*
+VIR_LoopOpts_NewLoopInfoMgr(
     VIR_LoopOpts* loopOpts
     )
 {
@@ -2624,8 +2563,8 @@ _VIR_LoopOpts_NewLoopInfoMgr(
     return loopInfoMgr;
 }
 
-static void
-_VIR_LoopOpts_DeleteLoopInfoMgr(
+void
+VIR_LoopOpts_DeleteLoopInfoMgr(
     VIR_LoopOpts* loopOpts
     )
 {
@@ -2638,6 +2577,9 @@ _VIR_LoopOpts_DeleteLoopInfoMgr(
     }
 
     vscMM_Free(VIR_LoopOpts_GetMM(loopOpts), loopInfoMgr);
+
+    /* We need to clean the visit order index so next time we can build it again correctly. */
+    vscVIR_CleanDfsVisitOrderIdxOnFunc(VIR_LoopOpts_GetFunc(loopOpts));
 }
 
 /* Parameter passing into traversal callbacks of CFG */
@@ -2681,8 +2623,8 @@ static void _EdgeHandlerDFSOnRevisit(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_CFG_EDGE*
     }
 }
 
-static gctBOOL
-_VIR_LoopOpts_DetectNatrualLoops(
+gctBOOL
+VIR_LoopOpts_DetectNaturalLoops(
     VIR_LoopOpts* loopOpts
     )
 {
@@ -2751,6 +2693,46 @@ _VIR_LoopOpts_DetectNatrualLoops(
         VIR_LoopInfoMgr_Dump(loopInfoMgr, gcvFALSE);
     }
     return bLoopDetected;
+}
+
+gctBOOL
+VIR_LoopOpts_IsBBHeadBlockOfOneLoop(
+    VIR_LoopOpts*       pLoopOpts,
+    VIR_BASIC_BLOCK*    pBB,
+    VIR_LoopInfo**      ppLoopInfo
+    )
+{
+    gctBOOL             bFound = gcvFALSE;
+    VIR_LoopInfoMgr*    pLoopInfoMgr = VIR_LoopOpts_GetLoopInfoMgr(pLoopOpts);
+    VIR_LoopInfo*       pLoopInfo;
+    VSC_UL_ITERATOR     iter;
+
+    if (pLoopInfoMgr == gcvNULL)
+    {
+        return bFound;
+    }
+
+    vscULIterator_Init(&iter, VIR_LoopInfoMgr_GetLoopInfos(pLoopInfoMgr));
+    for (pLoopInfo = (VIR_LoopInfo*)vscULIterator_First(&iter);
+         pLoopInfo != gcvNULL;
+         pLoopInfo = (VIR_LoopInfo*)vscULIterator_Next(&iter))
+    {
+        if (VIR_LoopInfo_GetLoopHead(pLoopInfo) == pBB)
+        {
+            bFound = gcvTRUE;
+            break;
+        }
+    }
+
+    if (bFound)
+    {
+        if (ppLoopInfo != gcvNULL)
+        {
+            *ppLoopInfo = pLoopInfo;
+        }
+    }
+
+    return bFound;
 }
 
 static void
@@ -3080,6 +3062,7 @@ _VIR_LoopOpts_IdentifyBreakContinues(VIR_LoopOpts* loopOpts)
 VSC_ErrCode
 _VIR_LoopInfo_PerformLoopInversionOnLoop(
     VIR_LoopInfo* loopInfo,
+    void * privateData,
     gctBOOL* changed
     )
 {
@@ -3099,7 +3082,7 @@ _VIR_LoopInfo_PerformLoopInversionOnLoop(
         {
             VIR_LoopInfo* childLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(node);
 
-            _VIR_LoopInfo_PerformLoopInversionOnLoop(childLoopInfo, changed);
+            _VIR_LoopInfo_PerformLoopInversionOnLoop(childLoopInfo, privateData, changed);
         }
     }
 
@@ -3305,11 +3288,9 @@ _VIR_LoopInfo_BuildBackBoneSet(
             node = CAST_ULN_2_ULEN(vscULIterator_Next(&breakBBIter)))
         {
             VIR_BB* breakBB = (VIR_BB*)vscULNDEXT_GetContainedUserData(node);
-
             /* if bb is new created by inner loop invariable code motion,
-             * we skip the dominator check since the dominator tree is not updated
-             * new created BB is always backbone bb for outer loop
-             */
+               we skip the dominator check since the dominator tree is not updated
+               new created BB is always backbone bb for outer loop */
             if((bb->domSet.bitCount != 0) && !BB_IS_DOM(bb, breakBB))
             {
                 isBackBone = gcvFALSE;
@@ -3318,9 +3299,8 @@ _VIR_LoopInfo_BuildBackBoneSet(
         }
 
         /* if bb is new created by inner loop invariable code motion
-         * we skip the dominator check since the dominator tree is not updated
-         * new created BB is always backbone bb for outer loop
-         */
+           we skip the dominator check since the dominator tree is not updated
+           new created BB is always backbone bb for outer loop */
         if(isBackBone && (bb->domSet.bitCount != 0) && !BB_IS_DOM(bb, VIR_LoopInfo_GetLoopEnd(loopInfo)))
         {
             isBackBone = gcvFALSE;
@@ -3336,6 +3316,8 @@ _VIR_LoopInfo_BuildBackBoneSet(
         }
     }
 
+    _VIR_LoopInfo_BBIterator_Final(&bbIter);
+
     if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(VIR_LoopInfo_GetOptions(loopInfo)), VSC_OPTN_LoopOptsOptions_TRACE_INVARIANT))
     {
         VIR_LOG(VIR_LoopInfo_GetDumper(loopInfo), "after building back bone bb set:\n");
@@ -3348,6 +3330,7 @@ _VIR_LoopInfo_BuildBackBoneSet(
 VSC_ErrCode
 _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
     VIR_LoopInfo* loopInfo,
+    void * privateData,
     gctBOOL* changed
     )
 {
@@ -3357,7 +3340,7 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
     VIR_LoopDU* du;
     gctBOOL repeat;
     VSC_UNI_LIST invariantInsts;
-    gctBOOL invariantInstsHasLoad = gcvFALSE;
+    gctBOOL bLocalChanged = gcvFALSE;
 
     if(VIR_LoopInfo_GetChildLoopCount(loopInfo))
     {
@@ -3371,7 +3354,7 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
         {
             VIR_LoopInfo* childLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(node);
 
-            _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(childLoopInfo, changed);
+            _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(childLoopInfo, privateData, changed);
         }
     }
 
@@ -3463,8 +3446,10 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
 
                     if(defIsOK)
                     {
-                        /* check whether operands have def in loop */
                         gctUINT j;
+                        gctBOOL bValidCase = gcvTRUE;
+
+                        /* Check if any operand has def in loop, if it has, it is a invalid case and it is not invariant. */
                         for(j = 0; j < VIR_Inst_GetSrcNum(inst); j++)
                         {
                             VIR_Operand* src = VIR_Inst_GetSource(inst, j);
@@ -3478,6 +3463,7 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
                                VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(inst)) &&
                                VIR_LoopInfo_HasFlag(loopInfo, VIR_LoopInfo_Flags_HasStore))
                             {
+                                bValidCase = gcvFALSE;
                                 break;
                             }
 
@@ -3494,11 +3480,31 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
 
                                 if(_VIR_LoopDU_SymDefCountInLoop(du, srcSym, enable, VIR_LoopDU_SymDefCountInLoop_SUM))
                                 {
-                                        break;
+                                    bValidCase = gcvFALSE;
+                                    break;
                                 }
                             }
                         }
-                        if(j >= VIR_Inst_GetSrcNum(inst))  /* all operands have no def in loop */
+
+                        /*
+                        ** When move a invariant instruction out of this loop, it may increase the live range of this instruction,
+                        ** now we use a simple rule to check if we need to move this instruction:
+                        **  1) All usages of this instruction is within this loop, then don't move it.
+                        **  2) One usage is not in this loop, but it is in front of this loop, we can treat it
+                        */
+                        if (bValidCase)
+                        {
+                            VIR_LoopOpts*  loopOpts = VIR_LoopInfoMgr_GetLoopOpts(VIR_LoopInfo_GetLoopInfoMgr(loopInfo));
+                            if ((!VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(inst))) &&
+                                (!VIR_LoopOpts_HWsupportPerCompDepForLS(loopOpts)) &&
+                                _VIR_LoopInfo_IsInstAllUsagesWithinLoop(loopInfo, inst))
+                            {
+                                bValidCase = gcvFALSE;
+                            }
+                        }
+
+                        /* This is invariant instruction, put it into the list. */
+                        if(bValidCase)
                         {
                             VSC_UNI_LIST_NODE_EXT* node = (VSC_UNI_LIST_NODE_EXT*)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VSC_UNI_LIST_NODE_EXT));
                             VIR_Symbol* defSym = VIR_Operand_GetSymbol(VIR_Inst_GetDest(inst));
@@ -3514,10 +3520,6 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
                             _VIR_LoopDU_RemoveDef(du, defSym, inst);
                             repeat = gcvTRUE;
 
-                            if (VIR_OPCODE_LoadsOnly(VIR_Inst_GetOpcode(inst)))
-                            {
-                                invariantInstsHasLoad = gcvTRUE;
-                            }
                             if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(VIR_LoopInfo_GetOptions(loopInfo)), VSC_OPTN_LoopOptsOptions_TRACE_INVARIANT))
                             {
                                 VIR_LOG(VIR_LoopInfo_GetDumper(loopInfo), "the following instruction is loop invariant:\n");
@@ -3539,10 +3541,8 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
         }
     } while(repeat);
 
-    /* move loop invariant instructions out if has load
-     * TODO : only promote load related insts
-     */
-    if(invariantInstsHasLoad && vscUNILST_GetNodeCount(&invariantInsts))
+    /* move loop invariant instructions out */
+    if(vscUNILST_GetNodeCount(&invariantInsts))
     {
         VIR_BB* preHead = gcvNULL;
         VSC_UL_ITERATOR iter;
@@ -3572,6 +3572,8 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
             VIR_LOG(VIR_LoopInfo_GetDumper(loopInfo), "new generated preHead:\n");
             VIR_BasicBlock_Dump(VIR_LoopInfo_GetDumper(loopInfo), preHead, gcvTRUE);
         }
+
+        bLocalChanged = gcvTRUE;
     }
     _CommonFreeList(&invariantInsts, VIR_LoopInfo_GetMM(loopInfo));
     vscUNILST_Finalize(&invariantInsts);
@@ -3580,6 +3582,11 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
     {
         VIR_LOG(VIR_LoopInfo_GetDumper(loopInfo), "loop invariant code motion output loop:\n");
         _VIR_LoopInfo_Dump(loopInfo, gcvTRUE);
+    }
+
+    if (changed)
+    {
+        *changed |= bLocalChanged;
     }
 
     return errCode;
@@ -3596,9 +3603,9 @@ _VIR_LoopInfo_DetectLoopUpbound(
     if(VIR_Inst_GetOpcode(lastInst) == VIR_OP_JMPC)
     {
         if(VIR_Inst_GetPrev(lastInst) &&
-           VIR_Inst_GetOpcode(VIR_Inst_GetPrev(lastInst)) == VIR_OP_SELECT &&
+           VIR_Inst_GetOpcode(VIR_Inst_GetPrev(lastInst)) == VIR_OP_CSELECT &&
            VIR_Inst_GetPrev(VIR_Inst_GetPrev(lastInst)) &&
-           VIR_Inst_GetOpcode(VIR_Inst_GetPrev(VIR_Inst_GetPrev(lastInst))) == VIR_OP_CMP)
+           VIR_Inst_GetOpcode(VIR_Inst_GetPrev(VIR_Inst_GetPrev(lastInst))) == VIR_OP_COMPARE)
         {
             VIR_Instruction* selectInst = VIR_Inst_GetPrev(lastInst);
             VIR_Instruction* cmpInst = VIR_Inst_GetPrev(selectInst);
@@ -3993,7 +4000,7 @@ _VIR_LoopInfo_ComputeConstLoopIterations(
                   lowConst->type == upConst->type);
 
         if(VIR_TypeId_isFloat(ivSymTypeId))
-         {
+        {
             gctFLOAT gap;
 
             gcmASSERT(constFactor->type == VIR_TYPE_FLOAT32);
@@ -4241,34 +4248,194 @@ _VIR_LoopInfo_ComputeConstLoopIterations(
     return -1;
 }
 
+static gctBOOL
+_VIR_LoopInfo_IsBBEntireChildLoop(
+    VIR_LoopInfo* pLoopInfo,
+    VIR_BB*       pBB
+    )
+{
+    VSC_UL_ITERATOR iter;
+    VSC_UNI_LIST_NODE_EXT* node;
+
+    if (VIR_LoopInfo_GetChildLoopCount(pLoopInfo) == 0)
+    {
+        return gcvFALSE;
+    }
+
+    vscULIterator_Init(&iter, VIR_LoopInfo_GetChildLoopSet(pLoopInfo));
+    for(node = CAST_ULN_2_ULEN(vscULIterator_First(&iter));
+        node != gcvNULL;
+        node = CAST_ULN_2_ULEN(vscULIterator_Next(&iter)))
+    {
+        VIR_LoopInfo* pChildLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(node);
+
+        if (VIR_LoopInfo_GetLoopHead(pChildLoopInfo) == VIR_LoopInfo_GetLoopEnd(pChildLoopInfo)
+            &&
+            VIR_LoopInfo_GetLoopHead(pChildLoopInfo) == pBB)
+        {
+            return gcvTRUE;
+        }
+    }
+
+    return gcvFALSE;
+}
+
+static gctBOOL
+_VIR_LoopInfo_IsBBChildLoop(
+    VIR_LoopInfo*   pLoopInfo,
+    VIR_BB*         pBB,
+    gctBOOL         bIsHead,
+    VIR_LoopInfo**  ppChildLoopInfo
+    )
+{
+    VSC_UL_ITERATOR iter;
+    VSC_UNI_LIST_NODE_EXT* node;
+
+    if (VIR_LoopInfo_GetChildLoopCount(pLoopInfo) == 0)
+    {
+        return gcvFALSE;
+    }
+
+    vscULIterator_Init(&iter, VIR_LoopInfo_GetChildLoopSet(pLoopInfo));
+    for(node = CAST_ULN_2_ULEN(vscULIterator_First(&iter));
+        node != gcvNULL;
+        node = CAST_ULN_2_ULEN(vscULIterator_Next(&iter)))
+    {
+        VIR_LoopInfo* pChildLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(node);
+
+        if (bIsHead)
+        {
+            if (VIR_LoopInfo_GetLoopHead(pChildLoopInfo) == pBB)
+            {
+                if (ppChildLoopInfo)
+                {
+                    *ppChildLoopInfo = pChildLoopInfo;
+                }
+                return gcvTRUE;
+            }
+        }
+        else
+        {
+            if (VIR_LoopInfo_GetLoopEnd(pChildLoopInfo) == pBB)
+            {
+                if (ppChildLoopInfo)
+                {
+                    *ppChildLoopInfo = pChildLoopInfo;
+                }
+                return gcvTRUE;
+            }
+        }
+    }
+
+    return gcvFALSE;
+}
+
 static VSC_ErrCode
 _VIR_LoopInfo_CopyLoop(
     VIR_LoopInfo* loopInfo,
+    VIR_LoopInfo_BBIterator* pBbIter,
     VIR_BB* beforeBB,
     VSC_HASH_TABLE* bbToNewBBMap
     )
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_Function* func = VIR_LoopInfo_GetFunc(loopInfo);
-    VIR_LoopInfo_BBIterator bbIter = {0};
     VIR_BB* bb;
     VIR_BB* newBB;
     VIR_CFG* cfg = VIR_LoopInfo_GetCFG(loopInfo);
     VSC_HASH_TABLE* labelToNewLabelMap = vscHTBL_Create(VIR_LoopInfo_GetMM(loopInfo), vscHFUNC_Default, vscHKCMP_Default, 256);
+    VSC_HASH_TABLE* childLoopInfoMap = vscHTBL_Create(VIR_LoopInfo_GetMM(loopInfo), vscHFUNC_Default, vscHKCMP_Default, 16);
 
     /* insert BBs */
-    _VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_CoveringIRSequence);
-    for(bb = _VIR_LoopInfo_BBIterator_First(&bbIter); bb != gcvNULL; bb = _VIR_LoopInfo_BBIterator_Next(&bbIter))
+    for(bb = _VIR_LoopInfo_BBIterator_First(pBbIter); bb != gcvNULL; bb = _VIR_LoopInfo_BBIterator_Next(pBbIter))
     {
-        VIR_Instruction* bbInst;
-        VIR_Instruction* newBBInst;
+        VIR_Instruction*    bbInst;
+        VIR_Instruction*    newBBInst;
+        VIR_LoopInfo*       pChildLoopInfo = gcvNULL;
+        VIR_BASIC_BLOCK*    pNewChildLoopHead = gcvNULL;
+        VIR_BASIC_BLOCK*    pNewChildLoopEnd = gcvNULL;
+        gctBOOL             bInsertNewLoopInfo = gcvFALSE;
 
         errCode = VIR_BB_CopyBBBefore(bb, beforeBB, &newBB);
         if(errCode)
         {
             return errCode;
         }
+
         vscHTBL_DirectSet(bbToNewBBMap, (void*)bb, (void*)newBB);
+
+        /* The child loop has only one BB, just insert it. */
+        if (_VIR_LoopInfo_IsBBEntireChildLoop(loopInfo, bb))
+        {
+            bInsertNewLoopInfo = gcvTRUE;
+            pNewChildLoopHead = newBB;
+            pNewChildLoopEnd = newBB;
+        }
+        /* Detect a head of a child loop, record it. */
+        else if (_VIR_LoopInfo_IsBBChildLoop(loopInfo, bb, gcvTRUE, &pChildLoopInfo))
+        {
+            vscHTBL_DirectSet(childLoopInfoMap, (void *)bb, (void *)pChildLoopInfo);
+        }
+        /* Detect a tail of a child loop, and if the head is already been detected, add it to the loop manager. */
+        else if (_VIR_LoopInfo_IsBBChildLoop(loopInfo, bb, gcvFALSE, &pChildLoopInfo))
+        {
+            VIR_BASIC_BLOCK*    pChildLoopHead = VIR_LoopInfo_GetLoopHead(pChildLoopInfo);
+            VIR_LoopInfo*       pChildHeadLoopInfo = gcvNULL;
+
+            if (vscHTBL_DirectTestAndGet(childLoopInfoMap, (void *)pChildLoopHead, (void **)&pChildHeadLoopInfo))
+            {
+                gcmASSERT(pChildLoopInfo == pChildHeadLoopInfo);
+                vscHTBL_DirectTestAndGet(bbToNewBBMap, (void *)pChildLoopHead, (void **)&pNewChildLoopHead);
+                gcmASSERT(pNewChildLoopHead != gcvNULL);
+                pNewChildLoopEnd = newBB;
+                bInsertNewLoopInfo = gcvTRUE;
+            }
+        }
+
+        /* If we find a child looop, add the copy to the loop manager. */
+        if (bInsertNewLoopInfo)
+        {
+            VIR_LoopInfo*   pNewLoopInfo = gcvNULL;
+            VIR_LoopInfoMgr_NewLoopInfo(VIR_LoopInfo_GetLoopInfoMgr(loopInfo), pNewChildLoopHead, pNewChildLoopEnd, &pNewLoopInfo);
+            gcmASSERT(pNewLoopInfo != gcvNULL);
+
+            /* Set the parent/child loop. */
+            VIR_LoopInfo_SetParentLoop(pNewLoopInfo, loopInfo);
+            _VIR_LoopInfo_AddChildLoop(loopInfo, pNewLoopInfo);
+
+            _VIR_LoopInfo_ComputeLoopBody(pNewLoopInfo);
+
+            /* Copy all the BBs. */
+            if (pChildLoopInfo != gcvNULL)
+            {
+                VSC_UL_ITERATOR iter;
+                VSC_UNI_LIST_NODE_EXT* node;
+
+                vscULIterator_Init(&iter, VIR_LoopInfo_GetBBSet(pChildLoopInfo));
+                for (node = (VSC_UNI_LIST_NODE_EXT*)vscULIterator_First(&iter);
+                     node != gcvNULL;
+                     node = (VSC_UNI_LIST_NODE_EXT*)vscULIterator_Next(&iter))
+                {
+                    VIR_BASIC_BLOCK* pBB = (VIR_BASIC_BLOCK*)vscULNDEXT_GetContainedUserData(node);
+                    VIR_BASIC_BLOCK* pNewBB = gcvNULL;
+
+                    if (vscHTBL_DirectTestAndGet(bbToNewBBMap, (void *)pBB, (void **)&pNewBB))
+                    {
+                        _VIR_LoopInfo_AddBB(pNewLoopInfo, pNewBB, gcvNULL);
+                    }
+                    else
+                    {
+                        gcmASSERT(gcvFALSE);
+
+                    }
+                }
+
+                gcmASSERT(VIR_LoopInfo_GetBBCount(pChildLoopInfo) == VIR_LoopInfo_GetBBCount(pNewLoopInfo));
+            }
+
+            _VIR_LoopInfo_IdentifyBreakContinues(pNewLoopInfo);
+        }
+
         if(VIR_LoopInfo_GetParentLoop(loopInfo))
         {
             errCode = _VIR_LoopInfo_AddBB(VIR_LoopInfo_GetParentLoop(loopInfo), newBB, gcvNULL);
@@ -4328,7 +4495,7 @@ _VIR_LoopInfo_CopyLoop(
                 VIR_Label* newLabel = (VIR_Label*)vscHTBL_DirectGet(labelToNewLabelMap, label);
 
                 /* Update the label only if there is a matched new label. */
-                if(newLabel != gcvNULL)
+                if (newLabel != gcvNULL)
                 {
                     VIR_Link* link = VIR_Link_RemoveLink(VIR_Label_GetReferenceAddr(label), (gctUINTPTR_T)newBBEnd);
 
@@ -4349,7 +4516,7 @@ _VIR_LoopInfo_CopyLoop(
             }
         }
 
-        if(bb == _VIR_LoopInfo_BBIterator_Last(&bbIter))
+        if(bb == _VIR_LoopInfo_BBIterator_Last(pBbIter))
         {
             break;
         }
@@ -4359,12 +4526,38 @@ _VIR_LoopInfo_CopyLoop(
             newBB = VIR_BB_GetFollowingBB(newBB);
         }
     }
+
+    /* Destroy hash tables. */
     vscHTBL_Destroy(labelToNewLabelMap);
+    vscHTBL_Destroy(childLoopInfoMap);
 
     return errCode;
 }
 
-/* return false if loop has barrier instruction */
+static gctBOOL
+_VIR_LoopInfo_MatchIterationFactor(
+    VIR_LoopInfo* loopInfo,
+    gctINT  iterations
+    )
+{
+    VSC_OPTN_LoopOptsOptions* options = VIR_LoopInfo_GetOptions(loopInfo);
+
+    if (iterations < 0 || iterations > VSC_OPTN_LoopOptsOptions_GetFullUnrollingFactor(options))
+    {
+        return gcvFALSE;
+    }
+
+    if (VIR_LoopInfo_GetParentIterationCount(loopInfo) != -1
+        &&
+        VIR_LoopInfo_GetParentIterationCount(loopInfo) * iterations > VSC_OPTN_LoopOptsOptions_GetTotalUnrollingFactor(options))
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+/* return false if loop has memory instruction and hwSupportPerCompDepForLS is false */
 static gctBOOL
 _VIR_LoopInfo_CanDoStaticllyUnroll(
     VIR_LoopInfo* loopInfo
@@ -4373,19 +4566,23 @@ _VIR_LoopInfo_CanDoStaticllyUnroll(
     VIR_BB* loopHead = VIR_LoopInfo_GetLoopHead(loopInfo);
     VIR_BB* loopEnd = VIR_LoopInfo_GetLoopEnd(loopInfo);
     VIR_Instruction* instIter = BB_GET_START_INST(loopHead);
+    gctUINT instCounts, memInstCount = 0;
 
     if (VIR_LoopOpts_HWsupportPerCompDepForLS(VIR_LoopInfoMgr_GetLoopOpts(VIR_LoopInfo_GetLoopInfoMgr(loopInfo))))
     {
         return gcvTRUE;
     }
+
+    instCounts = BB_GET_LENGTH(loopHead);
     while(gcvTRUE)
     {
         VIR_OpCode opcode = VIR_Inst_GetOpcode(instIter);
 
-        if (opcode == VIR_OP_BARRIER)
+        if (VIR_OPCODE_isMemLd(opcode))
         {
-            return gcvFALSE;
+            memInstCount++;
         }
+
         if(instIter == BB_GET_END_INST(loopHead))
         {
             break;
@@ -4398,15 +4595,17 @@ _VIR_LoopInfo_CanDoStaticllyUnroll(
 
     if(loopEnd != loopHead)
     {
+        instCounts += BB_GET_LENGTH(loopEnd);
         instIter = BB_GET_START_INST(loopEnd);
 
         while(gcvTRUE)
         {
             VIR_OpCode opcode = VIR_Inst_GetOpcode(instIter);
-            if (opcode == VIR_OP_BARRIER)
+            if (VIR_OPCODE_isMemLd(opcode) || VIR_OPCODE_isMemSt(opcode))
             {
-                return gcvFALSE;
+                 memInstCount++;
             }
+
             if(instIter == BB_GET_END_INST(loopEnd))
             {
                 break;
@@ -4418,7 +4617,8 @@ _VIR_LoopInfo_CanDoStaticllyUnroll(
         }
     }
 
-    return gcvTRUE;
+    /* if HWsupportPerCompDepForLS is false, the register used for ld/st need 8 instructions to reuse again */
+    return (instCounts >= (memInstCount << 3));
 }
 
 static VSC_ErrCode
@@ -4433,15 +4633,35 @@ _VIR_LoopInfo_StaticallyUnroll(
     VIR_BB* loopHead = VIR_LoopInfo_GetLoopHead(loopInfo);
     VIR_BB* loopEnd = VIR_LoopInfo_GetLoopEnd(loopInfo);
     VIR_BB* lowerNeighbour = _VIR_LoopInfo_GetLowerNeighbour(loopInfo);
+    VIR_LoopInfo_BBIterator bbIter = {0};
     gctUINT i;
 
     gcmASSERT(copyCount > 0);
 
+    _VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_CoveringIRSequence);
+
     for(i = 0; i < copyCount; i++)
     {
         bbToNewBBMaps[i] = vscHTBL_Create(VIR_LoopInfo_GetMM(loopInfo), vscHFUNC_Default, vscHKCMP_Default, 256);
-        _VIR_LoopInfo_CopyLoop(loopInfo, lowerNeighbour, bbToNewBBMaps[i]);
+        _VIR_LoopInfo_CopyLoop(loopInfo, &bbIter, lowerNeighbour, bbToNewBBMaps[i]);
     }   /* now loop order is loopInfo, newBB0, newBB1, newBB2, newBB3.... */
+
+    /* Copy the parent statically iteration count. */
+    if(VIR_LoopInfo_GetChildLoopCount(loopInfo))
+    {
+        VSC_UL_ITERATOR iter;
+        VSC_UNI_LIST_NODE_EXT* node;
+
+        vscULIterator_Init(&iter, VIR_LoopInfo_GetChildLoopSet(loopInfo));
+        for(node = CAST_ULN_2_ULEN(vscULIterator_First(&iter));
+            node != gcvNULL;
+            node = CAST_ULN_2_ULEN(vscULIterator_Next(&iter)))
+        {
+            VIR_LoopInfo* childLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(node);
+
+            VIR_LoopInfo_SetParentIterationCount(childLoopInfo, (gctINT)(copyCount + 1));
+        }
+    }
 
     /* orgnize unrolled loop */
     {
@@ -4467,7 +4687,7 @@ _VIR_LoopInfo_StaticallyUnroll(
                 }
 
                 /* update the last copied loop */
-                 VIR_BB_ChangeSuccBBs((VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[copyCount - 1], bb), lowerNeighbour, gcvNULL);
+                VIR_BB_ChangeSuccBBs((VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[copyCount - 1], bb), lowerNeighbour, gcvNULL);
             }
             else if(bb == loopEnd)
             {
@@ -4481,6 +4701,7 @@ _VIR_LoopInfo_StaticallyUnroll(
                         VIR_BB_RemoveBranch((VIR_BB*)vscHTBL_DirectGet(bbToNewBBMaps[i], bb), gcvTRUE);
                     }
                 }
+
                 break;
             }
 
@@ -4489,9 +4710,9 @@ _VIR_LoopInfo_StaticallyUnroll(
     }
 
     for(i = 0; i < copyCount; i++)
-        {
-            vscHTBL_Destroy(bbToNewBBMaps[i]);
-        }
+    {
+        vscHTBL_Destroy(bbToNewBBMaps[i]);
+    }
     vscMM_Free(VIR_LoopInfo_GetMM(loopInfo), bbToNewBBMaps);
 
     VIR_LoopInfoMgr_RemoveLoopInfo(VIR_LoopInfo_GetLoopInfoMgr(loopInfo), loopInfo);
@@ -4506,7 +4727,6 @@ _VIR_LoopInfo_CanDoDynamicallyUnroll(
 {
     VIR_BB* loopHead = VIR_LoopInfo_GetLoopHead(loopInfo);
     VIR_BB* loopEnd = VIR_LoopInfo_GetLoopEnd(loopInfo);
-
     VSC_OPTN_LoopOptsOptions* options = VIR_LoopInfo_GetOptions(loopInfo);
 
     {
@@ -4521,6 +4741,7 @@ _VIR_LoopInfo_CanDoDynamicallyUnroll(
             return gcvFALSE;
         }
     }
+
     /* skip dynamic unroll to avoid register pressure if HWsupportPerCompDepForLS is false */
     if (!VIR_LoopOpts_HWsupportPerCompDepForLS(VIR_LoopInfoMgr_GetLoopOpts(VIR_LoopInfo_GetLoopInfoMgr(loopInfo))))
     {
@@ -4529,7 +4750,7 @@ _VIR_LoopInfo_CanDoDynamicallyUnroll(
 
     /* check load ratio */
     {
-        gctUINT ldCount = 0, instCount = BB_GET_LENGTH(loopHead);
+        gctUINT ldCount = 0, condDefCount = 0, instCount = BB_GET_LENGTH(loopHead);
         VIR_Instruction* instIter = BB_GET_START_INST(loopHead);
 
         while(gcvTRUE)
@@ -4550,6 +4771,12 @@ _VIR_LoopInfo_CanDoDynamicallyUnroll(
                opcode != VIR_OP_VX_DP2X16)
             {
                 return gcvFALSE;
+            }
+
+            /* conditional def will increase the live range of dest after unroll */
+            if (VIR_Inst_ConditionalWrite(instIter))
+            {
+                condDefCount++;
             }
 
             if(VIR_OPCODE_isMemLd(opcode) ||
@@ -4595,7 +4822,7 @@ _VIR_LoopInfo_CanDoDynamicallyUnroll(
             instCount += BB_GET_LENGTH(loopEnd);
         }
 
-        if(ldCount == 0 || instCount / ldCount >= 10000)
+        if(ldCount == 0 || instCount / ldCount >= 10000 || condDefCount >= 4)
         {
             return gcvFALSE;
         }
@@ -4793,14 +5020,17 @@ _VIR_LoopInfo_DynamicallyUnroll(
 
     {
         VSC_HASH_TABLE** bbToNewBBMaps = (VSC_HASH_TABLE**)vscMM_Alloc(VIR_LoopInfo_GetMM(loopInfo), sizeof(VSC_HASH_TABLE*) * factor);
+        VIR_LoopInfo_BBIterator bbIter = {0};
         gctUINT i;
 
         gcmASSERT(factor >= 2);
 
+        _VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_CoveringIRSequence);
+
         for(i = 0; i < factor; i++)
         {
             bbToNewBBMaps[i] = vscHTBL_Create(VIR_LoopInfo_GetMM(loopInfo), vscHFUNC_Default, vscHKCMP_Default, 256);
-            _VIR_LoopInfo_CopyLoop(loopInfo, lowerNeighbour, bbToNewBBMaps[i]);
+            _VIR_LoopInfo_CopyLoop(loopInfo, &bbIter, lowerNeighbour, bbToNewBBMaps[i]);
         }
 
         /* orgnize unrolled loop */
@@ -4875,6 +5105,7 @@ _VIR_LoopInfo_DynamicallyUnroll(
 VSC_ErrCode
 _VIR_LoopInfo_PerformLoopUnrollingOnLoop(
     VIR_LoopInfo* loopInfo,
+    void * privateData,
     gctBOOL* changed
     )
 {
@@ -4885,27 +5116,32 @@ _VIR_LoopInfo_PerformLoopUnrollingOnLoop(
     VSC_OPTN_LoopOptsOptions* options = VIR_LoopInfo_GetOptions(loopInfo);
     VIR_Dumper* dumper = VIR_LoopInfo_GetDumper(loopInfo);
     VIR_LoopOpts*  loopOpts = VIR_LoopInfoMgr_GetLoopOpts(VIR_LoopInfo_GetLoopInfoMgr(loopInfo));
+    VIR_Shader*     pShader = VIR_LoopInfo_GetShader(loopInfo);
+    gctBOOL bHasChildLoop = (VIR_LoopInfo_GetChildLoopCount(loopInfo) != 0);
+    VSC_HASH_TABLE* loopInfoTable = (VSC_HASH_TABLE *)privateData;
 
     /* check shader instrs number, early quit if shader program is too large */
-    if (VIR_Shader_GetTotalInstructionCount(VIR_LoopInfo_GetShader(loopInfo)) > VIR_LoopOpts_GetAllowedInstNumAfterUnroll(loopOpts))
+    if (VIR_Shader_GetTotalInstructionCount(pShader) > VIR_LoopOpts_GetAllowedInstNumAfterUnroll(loopOpts))
     {
          return errCode;
     }
 
-    if(VIR_LoopInfo_GetChildLoopCount(loopInfo))
+    if (vscHTBL_DirectTestAndGet(loopInfoTable, (void *)loopInfo, gcvNULL))
     {
-        VSC_UL_ITERATOR iter;
-        VSC_UNI_LIST_NODE_EXT* node;
+        return errCode;
+    }
+    else
+    {
+        vscHTBL_DirectSet(loopInfoTable, (void *)loopInfo, gcvNULL);
+    }
 
-        vscULIterator_Init(&iter, VIR_LoopInfo_GetChildLoopSet(loopInfo));
-        for(node = CAST_ULN_2_ULEN(vscULIterator_First(&iter));
-            node != gcvNULL;
-            node = CAST_ULN_2_ULEN(vscULIterator_Next(&iter)))
-        {
-            VIR_LoopInfo* childLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(node);
-
-            _VIR_LoopInfo_PerformLoopUnrollingOnLoop(childLoopInfo, &localChanged);
-        }
+    /*
+    ** If a loop have a parent loop, handle the parent loop first because the IV of the parent loop may be used as
+    ** the bound check of the child loop, after do a CPF for the parent loop, the IV could be changed to a imm constant.
+    */
+    if (VIR_LoopInfo_GetParentLoop(loopInfo))
+    {
+        _VIR_LoopInfo_PerformLoopUnrollingOnLoop(VIR_LoopInfo_GetParentLoop(loopInfo), privateData, &localChanged);
     }
 
     if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(VIR_LoopInfo_GetOptions(loopInfo)), VSC_OPTN_LoopOptsOptions_TRACE_UNROLL))
@@ -4926,17 +5162,17 @@ _VIR_LoopInfo_PerformLoopUnrollingOnLoop(
     {
         gctINT iterations = _VIR_LoopInfo_ComputeConstLoopIterations(loopInfo);
 
-        if(iterations >= 0 && iterations <= VSC_OPTN_LoopOptsOptions_GetFullUnrollingFactor(options))
+        if(_VIR_LoopInfo_MatchIterationFactor(loopInfo, iterations))
         {
             if(iterations <= 1)
             {
-                 VIR_BB_RemoveBranch(VIR_LoopInfo_GetLoopEnd(loopInfo), gcvTRUE);
+                VIR_BB_RemoveBranch(VIR_LoopInfo_GetLoopEnd(loopInfo), gcvTRUE);
             }
             else
             {
                 gctUINT loopLength = _VIR_LoopInfo_GetInstCount(loopInfo);
                 gctUINT addedLength = loopLength * (gctUINT)(iterations - 1);
-                gctUINT shaderLength = VIR_Shader_GetTotalInstructionCount(VIR_LoopInfo_GetShader(loopInfo));
+                gctUINT shaderLength = VIR_Shader_GetTotalInstructionCount(pShader);
 
                 if((addedLength < 2048) &&
                    (addedLength + shaderLength < VIR_LoopOpts_GetAllowedInstNumAfterUnroll(loopOpts)) &&
@@ -4945,6 +5181,15 @@ _VIR_LoopInfo_PerformLoopUnrollingOnLoop(
                     errCode = _VIR_LoopInfo_StaticallyUnroll(loopInfo, (gctUINT)(iterations - 1));
 
                     localChanged = gcvTRUE;
+
+                    if (bHasChildLoop)
+                    {
+                        errCode = VSC_CPF_PerformOnFunction(pShader,
+                                                            VIR_LoopOpts_GetHwCfg(loopOpts),
+                                                            VIR_LoopOpts_GetMM(loopOpts),
+                                                            BB_GET_FUNC(loopHead));
+                        ON_ERROR(errCode, "CPF fail on function.");
+                    }
                 }
             }
 
@@ -4976,15 +5221,18 @@ _VIR_LoopInfo_PerformLoopUnrollingOnLoop(
         *changed = localChanged;
     }
 
+OnError:
     return errCode;
 }
 
-typedef VSC_ErrCode (*_VIR_LoopInfo_OptFuncP)(VIR_LoopInfo* loopInfo, gctBOOL* changed);
+typedef VSC_ErrCode (*_VIR_LoopInfo_OptFuncP)(VIR_LoopInfo* loopInfo, void * privateData, gctBOOL* changed);
 
 VSC_ErrCode
 _VIR_LoopOpts_PerformSpecOptOnLoops(
     VIR_LoopOpts* loopOpts,
     _VIR_LoopInfo_OptFuncP optFunc,
+    gctBOOL bInnerLoopFirst,
+    void * privateData,
     gctBOOL* changed
     )
 {
@@ -5002,12 +5250,26 @@ _VIR_LoopOpts_PerformSpecOptOnLoops(
         loopInfo != gcvNULL;
         loopInfo = (VIR_LoopInfo*)vscULIterator_Next(&iter))
     {
-        if(VIR_LoopInfo_GetParentLoop(loopInfo))
+        /*
+        ** 1. When innerLoopFirst, all child loops are handled in OptFunc.
+        ** 2. When outerLoopFirst, all parent loops are handled in OptFunc.
+        */
+        if (bInnerLoopFirst)
         {
-            continue;
+            if (VIR_LoopInfo_GetParentLoop(loopInfo))
+            {
+                continue;
+            }
+        }
+        else
+        {
+            if (VIR_LoopInfo_GetChildLoopCount(loopInfo) != 0)
+            {
+                continue;
+            }
         }
 
-        errCode = (*optFunc)(loopInfo, changed);
+        errCode = (*optFunc)(loopInfo, privateData, changed);
 
         if(errCode)
         {
@@ -5040,37 +5302,16 @@ VIR_LoopOpts_PerformOnFunction(
         VIR_Function_Dump(dumper, func);
     }
 
-    _VIR_LoopOpts_NewLoopInfoMgr(loopOpts);
-    if(_VIR_LoopOpts_DetectNatrualLoops(loopOpts))
+    VIR_LoopOpts_NewLoopInfoMgr(loopOpts);
+    if(VIR_LoopOpts_DetectNaturalLoops(loopOpts))
     {
+        /* Compute the loop body and some other information, we need to call these after add a new loopInfo. */
         _VIR_LoopOpts_ComputeLoopBodies(loopOpts);
         _VIR_LoopOpts_ComputeLoopTree(loopOpts);
         _VIR_LoopOpts_IdentifyBreakContinues(loopOpts);
 
-        if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetOpts(options), VSC_OPTN_LoopOptsOptions_OPTS_LOOP_INVERSION))
-        {
-            gctBOOL localChanged = gcvFALSE;
-
-            if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(options), VSC_OPTN_LoopOptsOptions_TRACE_INVERSION_FUNC_INPUT))
-            {
-                VIR_Dumper* dumper = VIR_LoopOpts_GetDumper(loopOpts);
-                VIR_LOG(dumper, "Loop inversion starts for function\n");
-                VIR_LOG_FLUSH(dumper);
-                VIR_Function_Dump(dumper, func);
-            }
-            _VIR_LoopOpts_PerformSpecOptOnLoops(loopOpts, _VIR_LoopInfo_PerformLoopInversionOnLoop, &localChanged);
-            if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(options), VSC_OPTN_LoopOptsOptions_TRACE_INVERSION_FUNC_OUTPUT))
-            {
-                VIR_Dumper* dumper = VIR_LoopOpts_GetDumper(loopOpts);
-                VIR_LOG(dumper, "Loop inversion ends for function\n");
-                VIR_LOG_FLUSH(dumper);
-                VIR_Function_Dump(dumper, func);
-            }
-        }
-
-        /* if hwsuppoertPerCompDepForLS is false, register is shorten in RA pass, skip licm */
-        if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetOpts(options), VSC_OPTN_LoopOptsOptions_OPTS_LOOP_INVARIANT) &&
-           VIR_LoopOpts_HWsupportPerCompDepForLS(loopOpts))
+         /* if hwsuppoertPerCompDepForLS is false, register is shorten in RA pass, skip licm */
+        if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetOpts(options), VSC_OPTN_LoopOptsOptions_OPTS_LOOP_INVARIANT))
         {
             gctBOOL localChanged = gcvFALSE;
 
@@ -5081,7 +5322,6 @@ VIR_LoopOpts_PerformOnFunction(
                 VIR_LOG_FLUSH(dumper);
                 VIR_Function_Dump(dumper, func);
             }
-
             /* build dominator tree for whole cfg, the domintor tree is used for find backbone set of each loop.
              * for nested loop, new bb may be created to store li instr from inner loop and the cfg of outer loop is changed.
              * For this case, new create bb is always in the backbone set of outer loop without dominator check.
@@ -5091,8 +5331,7 @@ VIR_LoopOpts_PerformOnFunction(
             {
                 return errCode;
             }
-
-            _VIR_LoopOpts_PerformSpecOptOnLoops(loopOpts, _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop, &localChanged);
+            _VIR_LoopOpts_PerformSpecOptOnLoops(loopOpts, _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop, gcvTRUE, gcvNULL, &localChanged);
 
             errCode = vscVIR_DestroyDOMTreePerCFG(VIR_Function_GetCFG(func));
             if (errCode)
@@ -5109,9 +5348,31 @@ VIR_LoopOpts_PerformOnFunction(
             }
         }
 
+        if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetOpts(options), VSC_OPTN_LoopOptsOptions_OPTS_LOOP_INVERSION))
+        {
+            gctBOOL localChanged = gcvFALSE;
+
+            if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(options), VSC_OPTN_LoopOptsOptions_TRACE_INVERSION_FUNC_INPUT))
+            {
+                VIR_Dumper* dumper = VIR_LoopOpts_GetDumper(loopOpts);
+                VIR_LOG(dumper, "Loop inversion starts for function\n");
+                VIR_LOG_FLUSH(dumper);
+                VIR_Function_Dump(dumper, func);
+            }
+            _VIR_LoopOpts_PerformSpecOptOnLoops(loopOpts, _VIR_LoopInfo_PerformLoopInversionOnLoop, gcvTRUE, gcvNULL, &localChanged);
+            if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(options), VSC_OPTN_LoopOptsOptions_TRACE_INVERSION_FUNC_OUTPUT))
+            {
+                VIR_Dumper* dumper = VIR_LoopOpts_GetDumper(loopOpts);
+                VIR_LOG(dumper, "Loop inversion ends for function\n");
+                VIR_LOG_FLUSH(dumper);
+                VIR_Function_Dump(dumper, func);
+            }
+        }
+
         if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetOpts(options), VSC_OPTN_LoopOptsOptions_OPTS_LOOP_UNROLLING))
         {
             gctBOOL localChanged = gcvFALSE;
+            VSC_HASH_TABLE* loopInfoTable = gcvNULL;
 
             if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(options), VSC_OPTN_LoopOptsOptions_TRACE_UNROLL_FUNC_INPUT))
             {
@@ -5120,7 +5381,6 @@ VIR_LoopOpts_PerformOnFunction(
                 VIR_LOG_FLUSH(dumper);
                 VIR_Function_Dump(dumper, func);
             }
-
             /* build dominator tree for whole cfg, the domintor tree is used for find loopEnd dominator set to find BIV.
              * for nested loop, new bb may be created by unrolling inner loop.
              * Now the original inner loop body bb is in the set of outer loop's loopExitDominator set and make the clone bb in the set too.
@@ -5131,7 +5391,9 @@ VIR_LoopOpts_PerformOnFunction(
                 return errCode;
             }
 
-            _VIR_LoopOpts_PerformSpecOptOnLoops(loopOpts, _VIR_LoopInfo_PerformLoopUnrollingOnLoop, &localChanged);
+            loopInfoTable = vscHTBL_Create(VIR_LoopOpts_GetMM(loopOpts), vscHFUNC_Default, vscHKCMP_Default, 16);
+            _VIR_LoopOpts_PerformSpecOptOnLoops(loopOpts, _VIR_LoopInfo_PerformLoopUnrollingOnLoop, gcvFALSE, (void *)loopInfoTable, &localChanged);
+            vscHTBL_Destroy(loopInfoTable);
 
             errCode = vscVIR_DestroyDOMTreePerCFG(VIR_Function_GetCFG(func));
             if (errCode)
@@ -5148,7 +5410,7 @@ VIR_LoopOpts_PerformOnFunction(
             }
         }
     }
-    _VIR_LoopOpts_DeleteLoopInfoMgr(loopOpts);
+    VIR_LoopOpts_DeleteLoopInfoMgr(loopOpts);
 
     if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(options), VSC_OPTN_LoopOptsOptions_TRACE_FUNC_OUTPUT))
     {
@@ -5199,7 +5461,14 @@ DEF_QUERY_PASS_PROP(VIR_LoopOpts_PerformOnShader)
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
 
     pPassProp->passFlag.resCreationReq.s.bNeedCfg = gcvTRUE;
+    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
     pPassProp->passFlag.resDestroyReq.s.bInvalidateCg = gcvTRUE;
+}
+
+
+DEF_SH_NECESSITY_CHECK(VIR_LoopOpts_PerformOnShader)
+{
+    return gcvTRUE;
 }
 
 VSC_ErrCode
@@ -5213,8 +5482,7 @@ VIR_LoopOpts_PerformOnShader(
     VIR_FunctionNode* func_node;
     VSC_OPTN_LoopOptsOptions* options = (VSC_OPTN_LoopOptsOptions*)pPassWorker->basePassWorker.pBaseOption;
     /* set the max instrunction numbers after unroll */
-    gctUINT     allowedInstNumsAfterUnroll = _VIR_AllowedInstNumAfterUnroll(pPassWorker);
-    gctBOOL     hwSuppertCompDepForLS = pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportPerCompDepForLS;
+    gctUINT allowedInstNumsAfterUnroll =  _VIR_AllowedInstNumAfterUnroll(pPassWorker);
 
     if(!VSC_OPTN_InRange(VIR_Shader_GetId(shader), VSC_OPTN_LoopOptsOptions_GetBeforeShader(options), VSC_OPTN_LoopOptsOptions_GetAfterShader(options)))
     {
@@ -5236,6 +5504,8 @@ VIR_LoopOpts_PerformOnShader(
         }
     }
 
+    VIR_Shader_RenumberInstId(shader);
+
     if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(options), VSC_OPTN_LoopOptsOptions_TRACE_SHADER_INPUT))
     {
         VIR_Shader_Dump(gcvNULL, "Before Loop optimizations.", shader, gcvTRUE);
@@ -5248,8 +5518,14 @@ VIR_LoopOpts_PerformOnShader(
         VIR_LoopOpts loopOpts;
         VIR_Function* func = func_node->function;
 
-        VIR_LoopOpts_Init(&loopOpts, shader, func, options, pPassWorker->basePassWorker.pDumper, pPassWorker->basePassWorker.pMM,
-                          hwSuppertCompDepForLS);
+        VIR_LoopOpts_Init(&loopOpts,
+                          pPassWorker->pDuInfo,
+                          shader,
+                          func,
+                          options,
+                          pPassWorker->basePassWorker.pDumper,
+                          pPassWorker->basePassWorker.pMM,
+                          &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg);
         VIR_LoopOpts_SetAllowedInstNumAfterUnroll(&loopOpts, allowedInstNumsAfterUnroll);
         errcode = VIR_LoopOpts_PerformOnFunction(&loopOpts);
         VIR_LoopOpts_Final(&loopOpts);

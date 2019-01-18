@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -380,10 +380,17 @@ struct __GLchipSLUniformRec
     gctBOOL             isRowMajor;
     GLvoid             *data;
 
+    /* Whether this uniform has the initializer in the shader. */
+    gctBOOL             hasInitializerInShader[__GLSL_STAGE_LAST];
+    gctUINT8           *initializerData;
+
     /* The reg offset from a[0]...[0] */
     gctUINT32           regOffset;
 
     GLboolean           dirty;
+#ifdef OPENGL40
+    GLboolean           usrDef;
+#endif
 };
 
 #define gcdUB_MAPPED_TO_MEM 0x1
@@ -1048,7 +1055,7 @@ typedef struct _glsPROGRAMINFO
 }
 glsPROGRAMINFO;
 
-typedef struct _glsFSCONTROL * glsFSCONTROL_PTR;
+//typedef struct _glsFSCONTROL * glsFSCONTROL_PTR;
 
 
 /******************************************************************************\
@@ -1157,6 +1164,13 @@ typedef struct _glsFSCONTROL * glsFSCONTROL_PTR;
     gcmERR_BREAK(gcSHADER_AddSourceConstant( \
         ShaderControl->i->shader, \
         (gctFLOAT) (Value) \
+        ))
+
+#define glmINT_CONST(Value) \
+    gcmERR_BREAK(gcSHADER_AddSourceConstantFormatted( \
+        ShaderControl->i->shader, \
+        (gctINT*) (Value), \
+        gcSL_INT32 \
         ))
 
 #define glmUNIFORM_WRAP(Shader, Name) \

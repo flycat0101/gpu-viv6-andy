@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -256,7 +256,6 @@ _FillInOptions(
     gcOptions[gcvOPTION_PREFER_GUARDBAND] = gcvFALSE;
     gcOptions[gcvOPTION_PREFER_TILED_DISPLAY_BUFFER] = gcvFALSE;
     gcOptions[gcvOPTION_PREFER_TPG_TRIVIALMODEL] = gcvFALSE;
-    gcOptions[gcvOPTION_PREFER_RA_DEPTH_WRITE] = gcvTRUE;
     gcOptions[gcvOPTION_PREFER_USC_RECONFIG] = gcvFALSE;
     gcOptions[gcvOPTION_PREFER_DISALBE_HZ] = gcvFALSE;
 
@@ -264,14 +263,24 @@ _FillInOptions(
     gcOptions[gcvOPTION_ASYNC_PIPE] = gcvFALSE;
     gcOptions[gcvOPTION_GPU_TEX_UPLOAD] = gcvTRUE;
     gcOptions[gcvOPTION_GPU_BUFOBJ_UPLOAD] = gcvTRUE;
+    gcOptions[gcvOPTION_OCL_ASYNC_BLT] = gcvTRUE;
     gcOptions[gcvOPTION_OCL_IN_THREAD] = gcvTRUE;
-    gcOptions[gcvOPTION_OCL_ASYNC_BLT] = gcvFALSE;
-    gcOptions[gcvOPTION_FBO_PREFER_MEM] = gcvFALSE;
     gcOptions[gcvOPTION_COMPRESSION_DEC400] = gcvTRUE;
-    gcOptions[gcvOPTION_NO_Y_INVERT] = gcvFALSE;
+    gcOptions[gcvOPTION_OCL_VIR_SHADER] = gcvTRUE;
+    gcOptions[gcvOPTION_OCL_USE_MULTI_DEVICES] = gcvFALSE;
 
 
-    /* overwrite option with environment settings here. */
+    envctrl = gcvNULL;
+    gcOptions[gcvOPTION_PREFER_RA_DEPTH_WRITE] = gcvTRUE;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_DISABLE_RA_DEPTH_WRITE", &envctrl)) && envctrl)
+    {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "1")))
+        {
+            gcOptions[gcvOPTION_PREFER_RA_DEPTH_WRITE] = gcvFALSE;
+        }
+    }
+
+    gcOptions[gcvOPTION_FBO_PREFER_MEM] = gcvFALSE;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_FBO_PREFER_MEM", &envctrl)) && envctrl)
     {
         if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "1")))
@@ -280,6 +289,7 @@ _FillInOptions(
         }
     }
 
+    envctrl = gcvNULL;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_FBO_PREFER_TILED", &envctrl)) && envctrl)
     {
         if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "1")))
@@ -288,14 +298,7 @@ _FillInOptions(
         }
     }
 
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_DISABLE_HZ", &envctrl)) && envctrl)
-    {
-        if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "1")))
-        {
-            gcOptions[gcvOPTION_PREFER_DISALBE_HZ] = gcvTRUE;
-        }
-    }
-
+    envctrl = gcvNULL;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_DISABLE_DEC400", &envctrl)) && envctrl)
     {
         if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "1")))
@@ -304,13 +307,105 @@ _FillInOptions(
         }
     }
 
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_NO_Y_INVERT", &envctrl)) && envctrl)
+    envctrl = gcvNULL;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_DISABLE_HZ", &envctrl)) && envctrl)
     {
         if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "1")))
         {
-            gcOptions[gcvOPTION_NO_Y_INVERT] = gcvTRUE;
+            gcOptions[gcvOPTION_PREFER_DISALBE_HZ] = gcvTRUE;
         }
     }
+
+    envctrl = gcvNULL;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_OCL_VIR_SHADER", &envctrl)) && envctrl)
+    {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "0")))
+        {
+            gcOptions[gcvOPTION_OCL_VIR_SHADER] = gcvFALSE;
+        }
+    }
+
+    envctrl = gcvNULL;
+    gcOptions[gcvOPTION_PREFER_RA_DEPTH_WRITE] = gcvTRUE;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_DISABLE_RA_DEPTH_WRITE", &envctrl)) && envctrl)
+    {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "1")))
+        {
+            gcOptions[gcvOPTION_FBO_PREFER_MEM] = gcvFALSE;
+        }
+    }
+
+
+    /* if VIV_MGPU_AFFINITY is COMBINED , VIV_OCL_USE_MULTI_DEVICE is ignore
+        if VIV_MGPU_AFFINITY is INDEPENENT, single device if VIV_OCL_USE_MULTI_DEVICE is false else get mulit-device .
+    */
+
+    envctrl = gcvNULL;
+    gcoOS_GetEnv(gcvNULL,"VIV_OCL_USE_MULTI_DEVICE", &envctrl);
+    if(envctrl == gcvNULL || envctrl[0] == '0')
+    {
+
+        gcOptions[gcvOPTION_OCL_USE_MULTI_DEVICES] = gcvFALSE;
+
+    }
+    else  if((gcoOS_StrCmp(envctrl, "1") == gcvSTATUS_OK  )
+             || (gcoOS_StrCmp(envctrl, "1:1") == gcvSTATUS_OK)
+             || (gcoOS_StrCmp(envctrl, "1:2") == gcvSTATUS_OK)
+             || (gcoOS_StrCmp(envctrl, "1:4") == gcvSTATUS_OK)
+             )/* mulit-device mode validation  in gcoCL_QueryDeviceCount */
+    {
+        gcOptions[gcvOPTION_OCL_USE_MULTI_DEVICES] = gcvTRUE;
+    }
+
+#if gcdUSE_VX
+    envctrl = gcvNULL;
+    gcOptions[gcvOPTION_OVX_ENABLE_NN_ZDP3] = gcvTRUE;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_NN_ZDP3", &envctrl)) && envctrl)
+    {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "0")))
+        {
+            gcOptions[gcvOPTION_OVX_ENABLE_NN_ZDP3] = gcvFALSE;
+        }
+    }
+
+    envctrl = gcvNULL;
+    gcOptions[gcvOPTION_OVX_ENABLE_NN_ZDP6] = gcvTRUE;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_NN_ZDP6", &envctrl)) && envctrl)
+    {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "0")))
+        {
+            gcOptions[gcvOPTION_OVX_ENABLE_NN_ZDP6] = gcvFALSE;
+        }
+    }
+
+    envctrl = gcvNULL;
+    gcOptions[gcvOPTION_OVX_ENABLE_NN_STRIDE] = gcvTRUE;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_NN_STRIDE", &envctrl)) && envctrl)
+    {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "0")))
+        {
+            gcOptions[gcvOPTION_OVX_ENABLE_NN_STRIDE] = gcvFALSE;
+        }
+    }
+
+    envctrl = gcvNULL;
+    gcoOS_GetEnv(gcvNULL,"VIV_OVX_USE_MULTI_DEVICE", &envctrl); /*mulit-device mode validation  in gcoVX_QueryDeviceCount*/
+    if(envctrl == gcvNULL || envctrl[0] == '0')
+    {
+
+         gcOptions[gcvOPTION_OVX_USE_MULTI_DEVICES] = gcvFALSE;
+
+    }
+    else  if( (gcoOS_StrCmp(envctrl, "1") == gcvSTATUS_OK)
+              || (gcoOS_StrCmp(envctrl, "1:1") == gcvSTATUS_OK)
+              || (gcoOS_StrCmp(envctrl, "1:2") == gcvSTATUS_OK)
+              || (gcoOS_StrCmp(envctrl, "1:4") == gcvSTATUS_OK)
+            )/* VIV_MGPU_AFFINITY is INDEPENENT */
+    {
+         gcOptions[gcvOPTION_OVX_USE_MULTI_DEVICES] = gcvTRUE;
+    }
+
+#endif
 
     return gcvSTATUS_OK;
 }
@@ -468,11 +563,12 @@ gcoHAL_ConstructEx(
         /* Initialize the object. */
         hal->object.type = gcvOBJ_HAL;
 
-        /* Zero the gco2D, gco3D, and gcoDUMP objects. */
-        hal->dump      = gcvNULL;
-
-        /* Query the kernel version number. */
+#if defined(_WIN32) && defined(EMULATOR)
+        iface.ignoreTLS = gcvFALSE;
+#else
         iface.ignoreTLS = gcvTRUE;
+#endif
+
         iface.command = gcvHAL_VERSION;
         gcmONERROR(gcoOS_DeviceControl(gcvNULL,
                                        IOCTL_GCHAL_INTERFACE,
@@ -600,13 +696,6 @@ gcoHAL_DestroyEx(
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hal, gcvOBJ_HAL);
-
-    /* Destroy the gcoDUMP object if any. */
-    if (Hal->dump != gcvNULL)
-    {
-        gcmONERROR(gcoDUMP_Destroy(Hal->dump));
-        Hal->dump = gcvNULL;
-    }
 
     /* Free the gcoHAL object. */
     gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hal));
@@ -780,8 +869,8 @@ OnError:
 **      gcoHAL Hal
 **          Pointer to an gcoHAL object.
 **
-**      gctPHYS_ADDR Physical
-**          Physical address of video memory to map.
+**      gctUINT32 PhysName
+**          Physical memory name of video memory to map.
 **
 **      gctSIZE_T NumberOfBytes
 **          Number of bytes to map.
@@ -795,7 +884,7 @@ OnError:
 gceSTATUS
 gcoHAL_MapMemory(
     IN gcoHAL Hal,
-    IN gctPHYS_ADDR Physical,
+    IN gctUINT32 PhysName,
     IN gctSIZE_T NumberOfBytes,
     OUT gctPOINTER * Logical
     )
@@ -803,15 +892,15 @@ gcoHAL_MapMemory(
     gcsHAL_INTERFACE iface;
     gceSTATUS status;
 
-    gcmHEADER_ARG("Physical=0x%x NumberOfBytes=%lu",
-                  Physical, NumberOfBytes);
+    gcmHEADER_ARG("PhysName=0x%x NumberOfBytes=%lu",
+                  PhysName, NumberOfBytes);
 
     /* Verify the arguments. */
     gcmVERIFY_ARGUMENT(Logical != gcvNULL);
 
     /* Call kernel API to map the memory. */
     iface.command              = gcvHAL_MAP_MEMORY;
-    iface.u.MapMemory.physical = gcmPTR2INT32(Physical);
+    iface.u.MapMemory.physName = PhysName;
     iface.u.MapMemory.bytes    = NumberOfBytes;
     gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
 
@@ -839,8 +928,8 @@ OnError:
 **      gcoHAL Hal
 **          Pointer to an gcoHAL object.
 **
-**      gctPHYS_ADDR Physical
-**          Physical address of video memory to unmap.
+**      gctUINT32 PhysName
+**          Physical memory name of video memory to unmap.
 **
 **      gctSIZE_T NumberOfBytes
 **          Number of bytes to unmap.
@@ -855,7 +944,7 @@ OnError:
 gceSTATUS
 gcoHAL_UnmapMemory(
     IN gcoHAL Hal,
-    IN gctPHYS_ADDR Physical,
+    IN gctUINT32 PhysName,
     IN gctSIZE_T NumberOfBytes,
     IN gctPOINTER Logical
     )
@@ -863,15 +952,15 @@ gcoHAL_UnmapMemory(
     gcsHAL_INTERFACE iface;
     gceSTATUS status;
 
-    gcmHEADER_ARG("Physical=0x%x NumberOfBytes=%lu Logical=0x%x",
-                  Physical, NumberOfBytes, Logical);
+    gcmHEADER_ARG("PhysName=0x%x NumberOfBytes=%lu Logical=0x%x",
+                  PhysName, NumberOfBytes, Logical);
 
     /* Verify the arguments. */
     gcmVERIFY_ARGUMENT(Logical != gcvNULL);
 
     /* Call kernel API to unmap the memory. */
     iface.command                = gcvHAL_UNMAP_MEMORY;
-    iface.u.UnmapMemory.physical = gcmPTR2INT32(Physical);
+    iface.u.UnmapMemory.physName = PhysName;
     iface.u.UnmapMemory.bytes    = NumberOfBytes;
     iface.u.UnmapMemory.logical  = gcmPTR_TO_UINT64(Logical);
     status = gcoHAL_Call(gcvNULL, &iface);
@@ -892,8 +981,8 @@ gcoHAL_UnmapMemory(
 **      gcoHAL Hal
 **          Pointer to an gcoHAL object.
 **
-**      gctPHYS_ADDR Physical
-**          Physical address of video memory to unmap.
+**      gctUINT32 PhysName
+**          Physical memory name of video memory to unmap.
 **
 **      gctSIZE_T NumberOfBytes
 **          Number of bytes to unmap.
@@ -908,7 +997,7 @@ gcoHAL_UnmapMemory(
 gceSTATUS
 gcoHAL_ScheduleUnmapMemory(
     IN gcoHAL Hal,
-    IN gctPHYS_ADDR Physical,
+    IN gctUINT32 PhysName,
     IN gctSIZE_T NumberOfBytes,
     IN gctPOINTER Logical
     )
@@ -916,8 +1005,8 @@ gcoHAL_ScheduleUnmapMemory(
     gceSTATUS status;
     gcsHAL_INTERFACE iface;
 
-    gcmHEADER_ARG("Physical=0x%x NumberOfBytes=%lu Logical=0x%x",
-                  Physical, NumberOfBytes, Logical);
+    gcmHEADER_ARG("PhysName=0x%x NumberOfBytes=%lu Logical=0x%x",
+                  PhysName, NumberOfBytes, Logical);
 
     /* Verify the arguments. */
     gcmVERIFY_ARGUMENT(NumberOfBytes > 0);
@@ -927,7 +1016,7 @@ gcoHAL_ScheduleUnmapMemory(
     iface.command                = gcvHAL_UNMAP_MEMORY;
     iface.engine                 = gcvENGINE_RENDER;
     iface.u.UnmapMemory.bytes    = NumberOfBytes;
-    iface.u.UnmapMemory.physical = gcmPTR2INT32(Physical);
+    iface.u.UnmapMemory.physName = PhysName;
     iface.u.UnmapMemory.logical  = gcmPTR_TO_UINT64(Logical);
     status = gcoHAL_ScheduleEvent(gcvNULL, &iface);
 
@@ -936,258 +1025,21 @@ gcoHAL_ScheduleUnmapMemory(
     return status;
 }
 
-/*******************************************************************************
-**
-**  gcoHAL_MapUserMemory
-**
-**  Map a contiguous memory to GPU address space.
-**
-**  INPUT:
-**
-**      gctPOINTER Logical
-**          Logical address of this memory.
-**
-**      gctUINT32 Physical
-**          Physical address of this memory.
-**
-**      gctSIZE_T Size
-**          Size in bytes of the memory to map.
-**
-**  OUTPUT:
-**
-**      gctPOINTER Info
-**          Information record returned by gcoHAL_MapUserMemory.
-**
-**      gctUINT32_PTR GPUAddress
-**          The GPU address returned by gcoHAL_MapUserMemory.
-*/
 gceSTATUS
-gcoHAL_MapUserMemory(
-    IN gctPOINTER Logical,
-    IN gctUINT32 Physical,
-    IN gctSIZE_T Size,
-    OUT gctPOINTER * Info,
-    OUT gctUINT32_PTR GPUAddress
-    )
-{
-    gceSTATUS status;
-    gctUINT32 baseAddress = 0;
-    gctUINT32 gpuPhysical = Physical;
-    gctUINT32 size;
-
-    gcmHEADER_ARG("Logical=0x%08x Physical=0x%08x Size=0x%08zx",
-                   Logical, Physical, Size);
-
-    gcmVERIFY_ARGUMENT(Logical != gcvNULL || Physical != gcvINVALID_ADDRESS);
-    gcmVERIFY_ARGUMENT(Info != gcvNULL);
-    gcmVERIFY_ARGUMENT(GPUAddress != gcvNULL);
-    gcmVERIFY_ARGUMENT(Size != 0);
-
-    gcmSAFECASTSIZET(size, Size);
-
-    gcmONERROR(gcoOS_GetBaseAddress(gcvNULL, &baseAddress));
-
-    /* Only valid physical address can be converted to GPU's view */
-    if (Physical != gcvINVALID_ADDRESS)
-    {
-        /* Convert physical to GPU's view. */
-        Physical -= baseAddress;
-
-        gcoOS_CPUPhysicalToGPUPhysical(Physical, &gpuPhysical);
-    }
-
-#if gcdENABLE_VG
-    {
-        gceHARDWARE_TYPE currentHW = gcvHARDWARE_INVALID;
-        gcmGETCURRENTHARDWARE(currentHW);
-
-        /* 2D VG can access the whole 4G memory */
-        if (currentHW == gcvHARDWARE_VG)
-        {
-            /* CPU physical address can be used as GPU address. */
-            *GPUAddress = Physical;
-            *Info = gcvNULL;
-
-            /* Add the memory info. */
-            gcmDUMP_ADD_MEMORY_INFO(*GPUAddress, Logical, Physical + baseAddress, size);
-
-            gcmFOOTER_NO();
-            return gcvSTATUS_OK;
-        }
-    }
-#endif
-
-#if !gcdPROCESS_ADDRESS_SPACE
-    /* Is memory flat mapped? */
-    if (gcoHARDWARE_IsFlatMapped(gcvNULL, gpuPhysical)
-     && gcoHARDWARE_IsFlatMapped(gcvNULL, gpuPhysical + size - 1)
-    )
-    {
-        /* CPU physical address can be used as GPU address. */
-        *GPUAddress = gpuPhysical;
-        *Info = gcvNULL;
-    }
-    else
-#endif
-    {
-        /* Physical pointer has to be mapped before use. */
-        gcmONERROR(gcoOS_MapUserMemoryEx(
-                   gcvNULL,
-                   Logical,
-                   Physical,
-                   size,
-                   Info,
-                   GPUAddress
-                   ));
-    }
-
-    /* Add the memory info. */
-    gcmDUMP_ADD_MEMORY_INFO(*GPUAddress, Logical, Physical + baseAddress, size);
-
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
-
-OnError:
-    gcmFOOTER();
-    return status;
-}
-
-/*******************************************************************************
-**
-**  gcoHAL_UnmapUserMemory
-**
-**  Unmap a contiguous memory from GPU address space.
-**
-**  INPUT:
-**
-**      gctPOINTER Logical
-**          Pointer to memory to unmap.
-**
-**      gctSIZE_T Size
-**          Size in bytes of the memory to unmap.
-**
-**      gctPOINTER Info
-**          Information record returned by gcoHAL_MapUserMemory.
-**
-**      gctUINT32_PTR GPUAddress
-**          The address returned by gcoHAL_MapUserMemory.
-**
-**  OUTPUT:
-**
-**      Nothing.
-*/
-gceSTATUS
-gcoHAL_UnmapUserMemory(
-    IN gctPOINTER Logical,
-    IN gctSIZE_T Size,
-    IN gctPOINTER Info,
-    IN gctUINT32 GPUAddress
+gcoHAL_GetBaseAddr(
+    IN  gcoHAL Hal,
+    OUT gctUINT32 *BaseAddr
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gcmHEADER_ARG("Info=0x%x Size=%lu GPUAddress=0x%08x Logical=0x%x",
-                  Info, Size, GPUAddress, Logical);
 
-    if (Info != gcvNULL)
-    {
-        /* Delete the memory info. */
-        gcmDUMP_DEL_MEMORY_INFO(GPUAddress);
+    gcmHEADER();
+    gcmVERIFY_ARGUMENT(BaseAddr);
 
-        gcmONERROR(gcoHAL_ScheduleUnmapUserMemory(
-                   gcvNULL,
-                   Info,
-                   Size,
-                   GPUAddress,
-                   Logical
-                   ));
-    }
-
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
+    gcmONERROR(gcoHARDWARE_GetBaseAddr(gcvNULL, BaseAddr));
 
 OnError:
-    gcmFOOTER();
-    return status;
-}
-
-/*******************************************************************************
-**
-**  gcoHAL_ScheduleUnmapUserMemory
-**
-**  Schedule an unmap of a user buffer using event mechanism.
-**
-**  INPUT:
-**
-**      gcoHAL Hal
-**          Pointer to an gcoHAL object.
-**
-**      gctPOINTER Info
-**          Information record returned by gcoOS_MapUserMemory.
-**
-**      gctSIZE_T Size
-**          Size in bytes of the memory to unlock.
-**
-**      gctUINT32_PTR Address
-**          The address returned by gcoOS_MapUserMemory.
-**
-**      gctPOINTER Memory
-**          Pointer to memory to unlock.
-**
-**  OUTPUT:
-**
-**      Nothing.
-*/
-gceSTATUS
-gcoHAL_ScheduleUnmapUserMemory(
-    IN gcoHAL Hal,
-    IN gctPOINTER Info,
-    IN gctSIZE_T Size,
-    IN gctUINT32 Address,
-    IN gctPOINTER Memory
-    )
-{
-    gceSTATUS status;
-    gcsHAL_INTERFACE iface;
-
-    gcmHEADER_ARG("Info=0x%x Size=%lu Address=0x%08x Memory=0x%x",
-                  Info, Size, Address, Memory);
-
-    /* Verify the arguments. */
-    gcmVERIFY_ARGUMENT(Size > 0);
-    gcmVERIFY_ARGUMENT(Memory != gcvNULL);
-
-#if gcdENABLE_VG
-    {
-        gceHARDWARE_TYPE currentHW = gcvHARDWARE_INVALID;
-        gcmGETCURRENTHARDWARE(currentHW);
-
-        if (currentHW == gcvHARDWARE_VG)
-        {
-            status = gcoVGHARDWARE_ScheduleUnmapUserMemory(
-                       gcvNULL,
-                       Info,
-                       Size,
-                       Address,
-                       Memory
-                       );
-            /* Return the status. */
-            gcmFOOTER();
-            return status;
-        }
-    }
-#endif
-
-    /* Schedule an event to unmap the user memory. */
-    iface.command = gcvHAL_UNMAP_USER_MEMORY;
-    iface.engine             = gcvENGINE_RENDER;
-    iface.u.UnmapUserMemory.info    = gcmPTR2INT32(Info);
-    iface.u.UnmapUserMemory.size    = Size;
-    iface.u.UnmapUserMemory.address = Address;
-    iface.u.UnmapUserMemory.memory  = gcmPTR_TO_UINT64(Memory);
-    status = gcoHAL_ScheduleEvent(gcvNULL, &iface);
-
-    /* Return the status. */
-    gcmFOOTER();
+    gcmFOOTER_ARG("BaseAddr=0x%X, status=%d", gcmOPT_VALUE(BaseAddr), status);
     return status;
 }
 
@@ -1611,54 +1463,6 @@ gcoHAL_SetBltNP2Texture(
 
 /*******************************************************************************
 **
-**  gcoHAL_GetDump
-**
-**  Get the pointer to the gcoDUMP object.
-**
-**  INPUT:
-**
-**      gcoHAL Hal
-**          Pointer to an gcoHAL object.
-**
-**  OUTPUT:
-**
-**      gcoDUMP * Dump
-**          Pointer to a variable receiving the gcoDUMP object pointer.
-*/
-gceSTATUS
-gcoHAL_GetDump(
-    IN gcoHAL Hal,
-    OUT gcoDUMP * Dump
-    )
-{
-    gceSTATUS status;
-
-    gcmHEADER();
-
-    /* Verify the arguments. */
-    gcmVERIFY_ARGUMENT(Dump != gcvNULL);
-
-    if (gcPLS.hal->dump == gcvNULL)
-    {
-        /* Construct the gcoDUMP object. */
-        gcmONERROR(gcoDUMP_Construct(gcvNULL, gcvNULL, &gcPLS.hal->dump));
-    }
-
-    /* Return pointer to the gcoDUMP object. */
-    *Dump = gcPLS.hal->dump;
-
-    /* Success. */
-    gcmFOOTER_ARG("*Dump=0x%x", *Dump);
-    return gcvSTATUS_OK;
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-/*******************************************************************************
-**
 **  gcoHAL_GetPatchID
 **
 **  Get the patch ID according to current process name.
@@ -1913,7 +1717,7 @@ gcoHAL_Compact(
     return status;
 }
 
-#if VIVANTE_PROFILER
+#if VIVANTE_PROFILER_SYSTEM_MEMORY
 gceSTATUS
 gcoHAL_ProfileStart(
     IN gcoHAL Hal
@@ -2508,7 +2312,8 @@ OnError:
 gceSTATUS
 gcoHAL_GetProductName(
     IN gcoHAL Hal,
-    OUT gctSTRING *ProductName
+    OUT gctSTRING *ProductName,
+    OUT gctUINT *PID
     )
 {
     gceSTATUS status= gcvSTATUS_OK;
@@ -2531,7 +2336,7 @@ gcoHAL_GetProductName(
     {
         gcmGETHARDWARE(hardware);
 
-        status = gcoHARDWARE_GetProductName(hardware, ProductName);
+        status = gcoHARDWARE_GetProductName(hardware, ProductName, PID);
     }
 
 OnError:
@@ -2805,6 +2610,58 @@ OnError:
     return status;
 }
 
+gceSTATUS
+gcoHAL_SelectChannel(
+    IN gcoHAL Hal,
+    IN gctBOOL Priority,
+    IN gctUINT32 ChannelId
+    )
+{
+#if gcdENABLE_3D
+    return gcoHARDWARE_SelectChannel(gcvNULL, Priority, ChannelId);
+#else
+    return gcvSTATUS_NOT_SUPPORTED;
+#endif
+}
+
+gceSTATUS
+gcoHAL_MCFESemaphore(
+    IN gctUINT32        SemaHandle,
+    IN gctBOOL          SendSema
+    )
+{
+#if gcdENABLE_3D
+    return gcoHARDWARE_McfeSemapore(gcvNULL, SemaHandle, SendSema, gcvNULL);
+#else
+    return gcvSTATUS_NOT_SUPPORTED;
+#endif
+}
+
+gceSTATUS
+gcoHAL_AllocateMCFESemaphore(
+    OUT gctUINT32 *     SemaHandle
+    )
+{
+#if gcdENABLE_3D
+    return gcoHARDWARE_AllocateMcfeSemaphore(gcvNULL, SemaHandle);
+#else
+    return gcvSTATUS_NOT_SUPPORTED;
+#endif
+}
+
+gceSTATUS
+gcoHAL_FreeMCFESemaphore(
+    IN gctUINT32        SemaHandle
+    )
+{
+#if gcdENABLE_3D
+    return gcoHARDWARE_FreeMcfeSemaphore(gcvNULL, SemaHandle);
+#else
+    return gcvSTATUS_NOT_SUPPORTED;
+#endif
+}
+
+
 /*******************************************************************************
 **
 **  gcoHAL_ConfigPowerManagement
@@ -2842,7 +2699,7 @@ OnError:
 gceSTATUS
 gcoHAL_AllocateVideoMemory(
     IN gctUINT Alignment,
-    IN gceSURF_TYPE Type,
+    IN gceVIDMEM_TYPE Type,
     IN gctUINT32 Flag,
     IN gcePOOL Pool,
     IN OUT gctSIZE_T * Bytes,
@@ -2859,17 +2716,17 @@ gcoHAL_AllocateVideoMemory(
 
     iface.command   = gcvHAL_ALLOCATE_LINEAR_VIDEO_MEMORY;
 
-    gcmSAFECASTSIZET(alvm->bytes, *Bytes);
+    alvm->bytes = *Bytes;
 
     alvm->alignment = Alignment;
-    alvm->type      = Type;
+    alvm->type      = (gctUINT32)Type;
     alvm->pool      = Pool;
     alvm->flag      = Flag;
 
     gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
 
     *Node  = alvm->node;
-    *Bytes = alvm->bytes;
+    *Bytes = (gctSIZE_T)alvm->bytes;
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -2884,7 +2741,7 @@ gcoHAL_LockVideoMemory(
     IN gctUINT32 Node,
     IN gctBOOL Cacheable,
     IN gceENGINE engine,
-    OUT gctUINT32 * Physical,
+    OUT gctUINT32 * Address,
     OUT gctPOINTER * Logical
     )
 {
@@ -2909,11 +2766,6 @@ gcoHAL_LockVideoMemory(
     }
     else if (engine == gcvENGINE_BLT)
     {
-        if (gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_ASYNC_BLIT))
-        {
-            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-        }
-
         /* Fill in the kernel call structure. */
         iface.engine = gcvENGINE_BLT;
         iface.command = gcvHAL_LOCK_VIDEO_MEMORY;
@@ -2930,10 +2782,10 @@ gcoHAL_LockVideoMemory(
         return status;
     }
 
-    if (Physical)
+    if (Address)
     {
         /* Return physical address. */
-        *Physical = iface.u.LockVideoMemory.address;
+        *Address = iface.u.LockVideoMemory.address;
     }
 
     if (Logical)
@@ -2943,7 +2795,7 @@ gcoHAL_LockVideoMemory(
     }
 
     /* Success. */
-    gcmFOOTER_ARG("*Physical=0x%x *Logical=0x%x", gcmOPT_VALUE(Physical), gcmOPT_VALUE(Logical));
+    gcmFOOTER_ARG("*Address=0x%x *Logical=0x%x", gcmOPT_VALUE(Address), gcmOPT_VALUE(Logical));
     return gcvSTATUS_OK;
 
 OnError:
@@ -2955,7 +2807,7 @@ OnError:
 gceSTATUS
 gcoHAL_UnlockVideoMemory(
     IN gctUINT32 Node,
-    IN gceSURF_TYPE Type,
+    IN gceVIDMEM_TYPE Type,
     IN gceENGINE engine
     )
 {
@@ -2969,7 +2821,7 @@ gcoHAL_UnlockVideoMemory(
         iface.engine = gcvENGINE_RENDER;
         iface.command = gcvHAL_UNLOCK_VIDEO_MEMORY;
         iface.u.UnlockVideoMemory.node = Node;
-        iface.u.UnlockVideoMemory.type = Type;
+        iface.u.UnlockVideoMemory.type = (gctUINT32)Type;
 
         gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
 
@@ -2986,7 +2838,7 @@ gcoHAL_UnlockVideoMemory(
         iface.engine = gcvENGINE_BLT;
         iface.command = gcvHAL_UNLOCK_VIDEO_MEMORY;
         iface.u.UnlockVideoMemory.node = Node;
-        iface.u.UnlockVideoMemory.type = Type;
+        iface.u.UnlockVideoMemory.type = (gctUINT32)Type;
 
         gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
 
@@ -3029,88 +2881,6 @@ OnError:
 
 /*******************************************************************************
 **
-**  gcoHAL_AllocateContiguous
-**
-**  Allocate contiguous memory from the kernel.
-**
-**  INPUT:
-**
-**      gcoOS Os
-**          Pointer to an gcoOS object.
-**
-**      gctBOOL InUserSpace
-**          gcvTRUE to map the memory into the user space.
-**
-**      gctSIZE_T * Bytes
-**          Pointer to the number of bytes to allocate.
-**
-**  OUTPUT:
-**
-**      gctSIZE_T * Bytes
-**          Pointer to a variable that will receive the aligned number of bytes
-**          allocated.
-**
-**      gctPHYS_ADDR * Physical
-**          Pointer to a variable that will receive the physical addresses of
-**          the allocated memory.
-**
-**      gctPOINTER * Logical
-**          Pointer to a variable that will receive the logical address of the
-**          allocation.
-*/
-gceSTATUS
-gcoHAL_AllocateContiguous(
-    IN gcoOS Os,
-    IN OUT gctSIZE_T * Bytes,
-    OUT gctPHYS_ADDR * Physical,
-    OUT gctPOINTER * Logical
-    )
-{
-    gceSTATUS status;
-    gcsHAL_INTERFACE iface;
-
-    gcmHEADER_ARG("*Bytes=%lu", gcmOPT_VALUE(Bytes));
-
-    /* Verify the arguments. */
-    gcmVERIFY_ARGUMENT(Bytes != gcvNULL);
-    gcmVERIFY_ARGUMENT(Physical != gcvNULL);
-    gcmVERIFY_ARGUMENT(Logical != gcvNULL);
-
-    /* Initialize the gcsHAL_INTERFACE structure. */
-    iface.command = gcvHAL_ALLOCATE_CONTIGUOUS_MEMORY;
-    iface.u.AllocateContiguousMemory.bytes = *Bytes;
-
-    /* Call kernel driver. */
-    gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
-
-    /* Return allocated number of bytes. */
-    *Bytes = (gctSIZE_T)iface.u.AllocateContiguousMemory.bytes;
-
-    /* Return physical address. */
-    *Physical = gcmINT2PTR(iface.u.AllocateContiguousMemory.physical);
-
-    /* Return logical address. */
-    *Logical = gcmUINT64_TO_PTR(iface.u.AllocateContiguousMemory.logical);
-
-    /* Success. */
-    gcmFOOTER_ARG("*Bytes=%lu *Physical=0x%x *Logical=0x%x",
-                  *Bytes, *Physical, *Logical);
-    return gcvSTATUS_OK;
-
-OnError:
-    gcmTRACE(
-        gcvLEVEL_ERROR,
-        "%s(%d): failed to allocate %lu bytes",
-        __FUNCTION__, __LINE__, *Bytes
-        );
-
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-/*******************************************************************************
-**
 **  gcoHAL_WrapUserMemory
 **
 **  Wrap a memory from other allocator to a vidmem node.
@@ -3131,6 +2901,7 @@ OnError:
 gceSTATUS
 gcoHAL_WrapUserMemory(
     IN gcsUSER_MEMORY_DESC_PTR UserMemoryDesc,
+    IN gceVIDMEM_TYPE Type,
     OUT gctUINT32_PTR Node
     )
 {
@@ -3144,6 +2915,7 @@ gcoHAL_WrapUserMemory(
     gcmHEADER_ARG("UserMemoryDesc=%d", UserMemoryDesc);
 
     iface.command = gcvHAL_WRAP_USER_MEMORY;
+    iface.u.WrapUserMemory.type = (gctUINT32)Type;
 
 #if defined(__QNXNTO__)
     mlock(lock_addr, lock_size);
@@ -3340,8 +3112,7 @@ gcoHAL_AttachExternalMemory(
 
     gcoOS_MemCopy(&desc.externalMemoryInfo, External, gcmSIZEOF(gcsEXTERNAL_MEMORY_INFO));
 
-    /* Wrap to a node. */
-    gcmONERROR(gcoHAL_WrapUserMemory(&desc, &info->node));
+    gcmONERROR(gcoHAL_WrapUserMemory(&desc, gcvVIDMEM_TYPE_BITMAP, &info->node));
 
     /* Lock and get hardware address. */
     gcmONERROR(gcoHAL_LockVideoMemory(info->node, gcvFALSE, gcvENGINE_RENDER, GPU2DAddress, gcvNULL));
@@ -3375,7 +3146,7 @@ gcoHAL_DetachExternalMemory(
 
     if (info->node)
     {
-        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(info->node, gcvSURF_BITMAP, gcvENGINE_RENDER));
+        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(info->node, gcvVIDMEM_TYPE_BITMAP, gcvENGINE_RENDER));
 
         gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(info->node));
     }

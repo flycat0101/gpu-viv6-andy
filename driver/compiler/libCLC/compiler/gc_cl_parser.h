@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -97,6 +97,13 @@ clParseSimpleAttribute(
     IN cltATTR_FLAGS AttrType,
     IN clsATTRIBUTE *Attr
     );
+
+clsATTRIBUTE *
+clParseMergeAttributeSpecifier(
+    IN cloCOMPILER Compiler,
+    IN clsATTRIBUTE *Attr,
+    IN clsATTRIBUTE *ToAttr
+);
 
 cloIR_EXPR
 clParseSubscriptExpr(
@@ -436,14 +443,6 @@ IN cloIR_EXPR InitExpr
 clsDeclOrDeclList *
 clParseFinishDeclListInit(
 IN cloCOMPILER Compiler,
-IN clsDeclOrDeclList *Designation,
-IN cloIR_EXPR InitExpr
-);
-
-cloIR_EXPR
-clParseInitializerList(
-IN cloCOMPILER Compiler,
-IN cloIR_EXPR InitializerList,
 IN clsDeclOrDeclList *Designation,
 IN cloIR_EXPR InitExpr
 );
@@ -789,7 +788,8 @@ clsNAME    *
 clParseParameterDecl(
     IN cloCOMPILER Compiler,
     IN clsDECL * Decl,
-    IN clsLexToken * Identifier
+    IN clsLexToken * Identifier,
+    IN clsATTRIBUTE *Attr
     );
 
 clsNAME    *
@@ -797,7 +797,8 @@ clParseArrayParameterDecl(
     IN cloCOMPILER Compiler,
     IN clsDECL * Decl,
     IN clsLexToken * Identifier,
-    IN cloIR_EXPR ArrayLengthExpr
+    IN cloIR_EXPR ArrayLengthExpr,
+    IN clsATTRIBUTE *Attr
     );
 
 clsNAME    *
@@ -895,4 +896,32 @@ IN cloCOMPILER Compiler,
 IN cloIR_EXPR ArrayOperand,
 IN OUT cloIR_EXPR *ArrayPointerExpr
 );
+
+gceSTATUS
+clMakeConstantVariableName(
+IN cloCOMPILER Compiler,
+cloIR_CONSTANT ConstantOperand
+);
+
+cloIR_EXPR
+clParseAsmAppendOperandModifiers(
+IN cloCOMPILER Compiler,
+IN cloIR_EXPR  Expr,
+IN clsASM_MODIFIERS *Modifiers
+);
+
+clsASM_MODIFIERS
+clParseAsmAppendModifier(
+IN cloCOMPILER Compiler,
+IN clsASM_MODIFIERS *Modifiers,
+IN clsASM_MODIFIER  *Modifier
+);
+
+clsASM_MODIFIER
+clParseAsmModifier(
+IN cloCOMPILER Compiler,
+IN clsLexToken * Type,
+IN clsLexToken * Value
+);
+
 #endif /* __gc_cl_parser_h_ */

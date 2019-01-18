@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -148,7 +148,7 @@ vx_status vxCnnLayer(vx_node node, vx_uint32 layerIndex, vx_uint32 bacthLevelInd
 
         if (node->base.context->options.enableCNNPerf)
         {
-            printf("layer %3d non-zero input:%10d/%10d (%9.6f%%)\n", layerIndex,
+            gcmPRINT("layer %3d non-zero input:%10d/%10d (%9.6f%%)\n", layerIndex,
                    nonZeroInputCount, inputKernelInfo->orgWeightDepth,
                    (float)nonZeroInputCount * 100.0f / inputKernelInfo->orgWeightDepth);
         }
@@ -314,51 +314,43 @@ vx_status vxCnnLayer(vx_node node, vx_uint32 layerIndex, vx_uint32 bacthLevelInd
     }
 #endif
 
-#if gcdDUMP
     gcmDUMP_BUFFER(gcvNULL,
-                    "memory",
-                    nnCmdBuffer->memory.physicals[0],
-                    (gctPOINTER)nnCmdBuffer->memory.logicals[0],
-                    0,
-                    nnCmdBuffer->itemCount * nnCmdBuffer->itemSize);
+                   gcvDUMP_BUFFER_MEMORY,
+                   nnCmdBuffer->memory.physicals[0],
+                   (gctPOINTER)nnCmdBuffer->memory.logicals[0],
+                   0,
+                   nnCmdBuffer->itemCount * nnCmdBuffer->itemSize);
 
     gcmDUMP_BUFFER(gcvNULL,
-                    "memory",
-                    inputBuffer->memory.physicals[0],
-                    (gctPOINTER)inputBuffer->memory.logicals[0],
-                    0,
-                    inputBuffer->itemCount * inputBuffer->itemSize);
+                   gcvDUMP_BUFFER_MEMORY,
+                   inputBuffer->memory.physicals[0],
+                   (gctPOINTER)inputBuffer->memory.logicals[0],
+                   0,
+                   inputBuffer->itemCount * inputBuffer->itemSize);
 
     gcmDUMP_BUFFER(gcvNULL,
-                    "memory",
-                    inputKernelBuffer->memory.physicals[0],
-                    (gctPOINTER)inputKernelBuffer->memory.logicals[0],
-                    0,
-                    inputKernelBuffer->itemCount * inputKernelBuffer->itemSize);
-#endif
+                   gcvDUMP_BUFFER_MEMORY,
+                   inputKernelBuffer->memory.physicals[0],
+                   (gctPOINTER)inputKernelBuffer->memory.logicals[0],
+                   0,
+                   inputKernelBuffer->itemCount * inputKernelBuffer->itemSize);
 
     {
-#if defined(__linux__)
-    struct timeval start = gcfVX_PerfStart((vx_reference)node);
-#endif
-    status = gcfVX_Accel((gctUINT32)nnCmdBufferAddress, gcvVX_ACCELERATOR_NN, node->cnnTriggerEventID, node->forceWaitForEvent);
-    outputBuffer->itemCount = outputBuffer->capacity;
+        gctUINT64 start = gcfVX_PerfStart((vx_reference)node);
+        status = gcfVX_Accel((gctUINT32)nnCmdBufferAddress, gcvVX_ACCELERATOR_NN, node->cnnTriggerEventID, node->forceWaitForEvent, 0);
+        outputBuffer->itemCount = outputBuffer->capacity;
 
-#if defined(__linux__)
-    if (node->base.context->options.enableCNNPerf)
-        printf("layer %3d execution time:%10d us\n", layerIndex, gcfVX_PerfEnd((vx_reference)node, start));
-#endif
+        if (node->base.context->options.enableCNNPerf)
+            gcmPRINT("layer %3d execution time:%10d us\n", layerIndex, gcfVX_PerfEnd((vx_reference)node, start));
     }
 
-#if gcdDUMP
     gcmDUMP_BUFFER(gcvNULL,
-                    "verify",
-                    outputBuffer->memory.physicals[0],
-                    (gctPOINTER)outputBuffer->memory.logicals[0],
-                    0,
-                    node->kernel->cnnAttributes.cnnkernelStreamInfo[layerIndex].outItemCount * outputBuffer->itemSize > 16 ?
-                    node->kernel->cnnAttributes.cnnkernelStreamInfo[layerIndex].outItemCount * outputBuffer->itemSize : 16);
-#endif
+                   gcvDUMP_BUFFER_VERIFY,
+                   outputBuffer->memory.physicals[0],
+                   (gctPOINTER)outputBuffer->memory.logicals[0],
+                   0,
+                   node->kernel->cnnAttributes.cnnkernelStreamInfo[layerIndex].outItemCount * outputBuffer->itemSize > 16 ?
+                   node->kernel->cnnAttributes.cnnkernelStreamInfo[layerIndex].outItemCount * outputBuffer->itemSize : 16);
 
 #if VX_NN_FC_ACCEL
     if (layerIndex >= bacthLevelIndex)
@@ -542,7 +534,7 @@ vx_status vxCnnLayer(vx_node node, vx_uint32 layerIndex, vx_uint32 bacthLevelInd
             }
 
             fPortion_BigDelta = (float)count_big_delta/(float)node->kernel->cnnAttributes.cnnkernelStreamInfo[layerIndex].outItemCount;
-            printf("Layer %d: Portion_BigDelta = %10.7f, Max delta = %10.6f, count_big_delta= %10d \n", layerIndex, fPortion_BigDelta, fMax_delta, count_big_delta);
+            gcmPRINT("Layer %d: Portion_BigDelta = %10.7f, Max delta = %10.6f, count_big_delta= %10d \n", layerIndex, fPortion_BigDelta, fMax_delta, count_big_delta);
             free(pfRef_out);
             free(pfNN_out);
          }
@@ -593,7 +585,7 @@ vx_status vxCnnLayer(vx_node node, vx_uint32 layerIndex, vx_uint32 bacthLevelInd
             *(nnCmdBufferPtr + 7) =   outputBufferAddress + batchIndex * node->kernel->cnnAttributes.cnnkernelStreamInfo[layerIndex].outItemCount * dataTypeSize;
         }
 
-        status = gcfVX_Accel((gctUINT32)nnCmdBufferAddress, gcvVX_ACCELERATOR_NN, 0, gcvFALSE);
+        status = gcfVX_Accel((gctUINT32)nnCmdBufferAddress, gcvVX_ACCELERATOR_NN, 0, gcvFALSE, 0);
 #ifdef COMPARE_TO_REF
             if (doCompare)
             {
@@ -648,7 +640,7 @@ vx_status vxCnnLayer(vx_node node, vx_uint32 layerIndex, vx_uint32 bacthLevelInd
                 }
 
                 fPortion_BigDelta = (float)count_big_delta/(float)node->kernel->cnnAttributes.cnnkernelStreamInfo[layerIndex].outItemCount;
-                printf("Portion_BigDelta = %10.7f, Max delta = %10.6f, count_big_delta= %10d \n", fPortion_BigDelta, fMax_delta, count_big_delta);
+                gcmPRINT("Portion_BigDelta = %10.7f, Max delta = %10.6f, count_big_delta= %10d \n", fPortion_BigDelta, fMax_delta, count_big_delta);
                 free(pfRef_out);
                 free(pfNN_out);
              }

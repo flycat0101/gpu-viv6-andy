@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -97,6 +97,7 @@ extern void VSC_PARAM_optimization_Final(
 extern VSC_ErrCode VSC_PARAM_Optimization_PerformOnShader(
     VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(VSC_PARAM_Optimization_PerformOnShader);
+DECLARE_SH_NECESSITY_CHECK(VSC_PARAM_Optimization_PerformOnShader);
 
 END_EXTERN_C()
 

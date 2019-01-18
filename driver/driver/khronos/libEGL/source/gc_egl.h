@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -97,8 +97,6 @@ typedef struct eglPixmapInfo      * VEGLPixmapInfo;
 #define EGL_IMAGE_SIGNATURE         gcmCC('E','G','L','I')
 #define EGL_SYNC_SIGNATURE          gcmCC('E','G','L','Y')
 
-#define veglUSE_HAL_DUMP            0
-
 #define  __EGL_INVALID_CONFIG__     0
 
 #define MAJOR_API_VER(x)            ((x) >> 4)
@@ -169,8 +167,8 @@ typedef enum _veglAPIINDEX
     vegl_OPENGL_ES11,
     vegl_OPENGL_ES20,
     vegl_OPENGL_ES30,
-    vegl_OPENVG,
     vegl_OPENGL,
+    vegl_OPENVG,
 
     vegl_API_LAST,
 }
@@ -181,9 +179,6 @@ struct eglThreadData
 {
     /* Extends from gcsDRIVER_TLS structure, must be first field. */
     gcsDRIVER_TLS               base;
-
-    /* gcoDUMP object. */
-    gcoDUMP                     dump;
 
     /* Last known error code. */
     EGLenum                     error;
@@ -612,6 +607,8 @@ struct eglContext
 
     /* Context protection, EGL_EXT_protected_content. */
     EGLBoolean                  protectedContent;
+
+    EGLBoolean                  coreProfile;
 
 #if gcdGC355_PROFILER
     gctUINT64                   appStartTime;
@@ -1187,6 +1184,9 @@ typedef struct
     /* EGL_KHR_reusable_sync. */
     EGLBoolean (* SignalSyncKHR)(EGLDisplay dpy, EGLSyncKHR sync, EGLenum mode);
 
+    /* EGL_ANDROID_native_fence_sync */
+    EGLint     (* DupNativeFenceFDANDROID_post)(EGLDisplay dpy, EGLSyncKHR sync, EGLint ret_fd);
+
     /* EGL_EXT_platform_base. */
     EGLDisplay (* GetPlatformDisplayEXT_post)(EGLenum platform, void *native_display, const EGLint *attrib_list, EGLDisplay ret_dpy);
     EGLSurface (* CreatePlatformWindowSurfaceEXT_post)(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLint *attrib_list, EGLSurface ret_surface);
@@ -1239,6 +1239,9 @@ typedef struct
     /* EGL_KHR_fence_sync*/
     EGLSyncKHR (* CreateSyncKHR_pre)(EGLDisplay dpy, EGLenum type, const EGLint *attrib_list);
     EGLBoolean (* GetSyncAttribKHR_post)(EGLDisplay dpy, EGLSyncKHR sync, EGLint attribute, EGLint *value, EGLint ret_value);
+
+    /* EGL_ANDROID_native_fence_sync */
+    EGLint     (* DupNativeFenceFDANDROID_pre)(EGLDisplay dpy, EGLSyncKHR sync);
 
     /* EGL_EXT_platform_base. */
     EGLDisplay (* GetPlatformDisplayEXT_pre)(EGLenum platform, void *native_display, const EGLint *attrib_list);

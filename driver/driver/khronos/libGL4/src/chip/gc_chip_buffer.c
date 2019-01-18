@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -22,6 +22,7 @@ static GLint MSAASamples[4] = {0};
 #define __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(b)      {b,             gcvSURF_UNKNOWN,   gcvSURF_UNKNOWN,    0,         0,          0,        &MSAASample0 }
 #define __GL_INITIALIZE_FORMAT_MAP_INFO_WITH_FLAGS(b,f) {b,             gcvSURF_UNKNOWN,   gcvSURF_UNKNOWN,    f,         0,          0,        &MSAASample0 }
 
+extern __GLformatInfo* __glGetFormatInfo(GLenum internalFormat);
 
 /* OGL format naming rules:
 ** 1, Non packed-format, from LSB to MSB. e.g RGBA8, R is LSB, A is MSB.
@@ -909,9 +910,9 @@ __glChipMapBufferRange(
 #if gcdDUMP
             if (access & GL_MAP_READ_BIT)
             {
-                gcmDUMP(gcvNULL, "#[info: verify mapped bufobj");
+                gcmDUMP(gcvNULL, "#[info: verify mapped bufobj]");
                 gcmDUMP_BUFFER(gcvNULL,
-                               "verify",
+                               gcvDUMP_BUFFER_VERIFY,
                                physical,
                                (gctPOINTER)bufInfo->bufferMapPointer,
                                (gctUINT32)offset,
@@ -944,13 +945,6 @@ OnError:
     gcmFOOTER_ARG("return=0x%x", retPtr);
     return retPtr;
 }
-
-#ifdef OPENGL40
-GLvoid*__glChiptMapBufferObject(__GLcontext* gc, __GLbufferObject* bufObj)
-{
-    return __glChipMapBufferRange(gc, bufObj, 0, 0, bufObj->size, GL_MAP_READ_BIT||GL_MAP_WRITE_BIT);
-}
-#endif
 
 GLboolean
 __glChipFlushMappedBufferRange(
@@ -1032,8 +1026,7 @@ __glChipUnMapBufferObject(
                                                              (gctSIZE_T)bufObj->mapOffset,
                                                              (gctSIZE_T)bufObj->mapLength,
                                                              gcvCACHE_FLUSH));
- //               gcmONERROR(gcoBUFOBJ_SetCPUWrite(bufInfo->bufObj, gcvTRUE));
-                 gcmONERROR(gcoBUFOBJ_GPUCacheOperation(bufInfo->bufObj));
+                gcmONERROR(gcoBUFOBJ_SetCPUWrite(bufInfo->bufObj, gcvTRUE));
 
                 gcoBUFOBJ_Dump(bufInfo->bufObj);
             }
@@ -1308,6 +1301,54 @@ OnError:
     gcmFOOTER_ARG("return=%d", GL_FALSE);
     return GL_FALSE;
 }
+
+GLboolean
+__glChipGetBufferSubData(
+    __GLcontext* gc,
+    GLuint targetIndex,
+    __GLbufferObject* bufObj,
+    GLintptr offset,
+    GLsizeiptr size,
+    GLvoid* data
+    )
+{
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    __GLchipVertexBufferInfo *bufInfo = (__GLchipVertexBufferInfo*)(bufObj->privateData);
+    gctPOINTER logical = gcvNULL;
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("gc=0x%x targetIndex=%u bufObj=0x%x offset=%ld size=%ld data=0x%x",
+                   gc, targetIndex, bufObj, offset, size, data);
+
+    /* Lock Buffer */
+    GL_ASSERT(bufInfo->bufObj);
+
+    gcoBUFOBJ_WaitFence(bufInfo->bufObj, gcvFENCE_TYPE_WRITE);
+
+    gcmONERROR(gcoBUFOBJ_Lock(bufInfo->bufObj, gcvNULL, &logical));
+    /* Invalidate CPU cache for the buf may be written by GPU previously. */
+    gcmONERROR(gcoBUFOBJ_CPUCacheOperation_Range(bufInfo->bufObj, (gctSIZE_T)offset,
+                                                 (gctSIZE_T)size, gcvCACHE_INVALIDATE));
+
+    if (logical)
+    {
+        /* Adjust source offset */
+        logical =(gctPOINTER)((GLubyte*)logical + offset);
+        memcpy(data, logical, size);
+    }
+
+    /* Unlock */
+    gcoBUFOBJ_Unlock(bufInfo->bufObj);
+
+    gcmFOOTER_ARG("return=%d", GL_TRUE);
+    return GL_TRUE;
+
+OnError:
+    gcChipSetError(chipCtx, status);
+    gcmFOOTER_ARG("return=%d", GL_FALSE);
+    return GL_FALSE;
+}
+
 
 #if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
 

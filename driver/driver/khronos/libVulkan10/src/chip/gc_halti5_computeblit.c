@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -136,6 +136,7 @@ static PROG_VK_UNIFORM_BUFFER_TABLE_ENTRY* halti5_getUboEntry(
     return uboEntry;
 }
 
+
 static VkResult halti5_program_blit_src_tex(
     IN  __vkCommandBuffer *cmdBuf,
     IN  halti5_vscprogram_blit *blitProg,
@@ -148,9 +149,8 @@ static VkResult halti5_program_blit_src_tex(
 {
     __vkDevContext *devCtx = cmdBuf->devCtx;
     const __vkFormatInfo *fmtInfo = gcvNULL;
+    __vkScratchMem *pScratchMem = gcvNULL;
     gcsHINT_PTR pHints = &blitProg->hwStates.hints;
-    uint32_t partIdx, partCount = 1;
-    uint32_t partSize = 0;
     VkResult result = VK_SUCCESS;
 
     /*
@@ -193,9 +193,9 @@ static VkResult halti5_program_blit_src_tex(
             0x5780, 0x5312
         },
     };
-    uint32_t txHwRegisterIdx = 1;
-    __vkScratchMem *pScratchMem[2] = {gcvNULL, gcvNULL};
-    gcsTEXTUREDESCRIPTORREGS *pDesc[2] = {gcvNULL, gcvNULL};
+    uint32_t txHwRegisterIdx = (devCtx->database->SMALLBATCH
+                             && devCtx->pPhyDevice->phyDevConfig.options.smallBatch) ? 0 : 1;
+    gcsTEXTUREDESCRIPTORREGS *pDesc = gcvNULL;
     uint32_t txStride, txSliceSize, txHAlign, txMsaa;
     uint32_t txType, txSRGB, txSignExt, txAddressing, txIntCtrl;
     uint32_t swizzle_r, swizzle_g, swizzle_b, swizzle_a;
@@ -212,8 +212,8 @@ static VkResult halti5_program_blit_src_tex(
 
         params->srcOffset = srcRes->u.img.offset;
         params->srcExtent = srcRes->u.img.extent;
-        params->srcSize.width  = pSrcLevel->requestW * pSrcImg->sampleInfo.x;
-        params->srcSize.height = pSrcLevel->requestH * pSrcImg->sampleInfo.y;
+        params->srcSize.width  = pSrcLevel->requestW;
+        params->srcSize.height = pSrcLevel->requestH;
         params->srcSize.depth  = pSrcLevel->requestD;
 
         fmtInfo = &g_vkFormatInfoTable[pSrcImg->formatInfo.residentImgFormat];
@@ -225,19 +225,18 @@ static VkResult halti5_program_blit_src_tex(
         txHAlign = pSrcImg->hAlignment;
         txMsaa = (pSrcImg->sampleInfo.product > 1) ? 1 : 0;
 
+        __VK_ASSERT(params->partIndex < pSrcLevel->partCount);
         address = pSrcImg->memory->devAddr;
         address += (uint32_t)(pSrcImg->memOffset + pSrcLevel->offset +
-                              srcRes->u.img.subRes.arrayLayer * pSrcLevel->sliceSize);
-
-        partCount = pSrcImg->formatInfo.partCount;
-        partSize = (uint32_t)pSrcLevel->partSize;
+                              srcRes->u.img.subRes.arrayLayer * pSrcLevel->sliceSize +
+                              params->partIndex * pSrcLevel->partSize);
     }
     else
     {
+        uint32_t alignment;
         uint32_t txFormat = VK_FORMAT_UNDEFINED;
         __vkBuffer *pSrcBuf = srcRes->u.buf.pBuffer;
         __vkImage  *pDstImg = dstRes->u.img.pImage;
-        uint32_t alignWidth;
 
         params->srcOffset.x = params->srcOffset.y = params->srcOffset.z = 0;
         params->srcExtent = dstRes->u.img.extent;
@@ -253,8 +252,7 @@ static VkResult halti5_program_blit_src_tex(
                  : pDstImg->createInfo.format;
 
         fmtInfo = &g_vkFormatInfoTable[txFormat];
-        alignWidth = gcmALIGN_NP2(params->srcSize.width, fmtInfo->blockSize.width);
-        txStride = (alignWidth / fmtInfo->blockSize.width) * fmtInfo->bitsPerBlock / 8;
+        txStride = (params->srcSize.width / fmtInfo->blockSize.width) * fmtInfo->bitsPerBlock / 8;
         txSliceSize = (params->srcSize.height / fmtInfo->blockSize.height) * txStride;
 
         txType = (pDstImg->createInfo.imageType == VK_IMAGE_TYPE_3D) ? 0x3 : 0x2;
@@ -262,19 +260,29 @@ static VkResult halti5_program_blit_src_tex(
         txHAlign = 0x1;
         txMsaa = 0;
 
+        __VK_ASSERT(params->partIndex == 0);
         address = pSrcBuf->memory->devAddr;
         address += (uint32_t)(pSrcBuf->memOffset + srcRes->u.buf.offset);
-    }
 
-    if (dstRes->isImage)
-    {
-        __vkImage *pDstImg = dstRes->u.img.pImage;
-        params->dstSRGB = pDstImg->formatInfo.category == __VK_FMT_CATEGORY_SRGB;
-    }
-    else
-    {
-        __vkImage *pSrcImg = srcRes->u.img.pImage;
-        params->dstSRGB = g_vkFormatInfoTable[pSrcImg->createInfo.format].category == __VK_FMT_CATEGORY_SRGB;
+        if (fmtInfo->compressed && devCtx->database->CACHE128B256BPERLINE)
+        {
+            alignment = 256;
+        }
+        else if (!fmtInfo->compressed && devCtx->database->CACHE128B256BPERLINE)
+        {
+            alignment = 256;
+        }
+        else
+        {
+            /* alignment should be 16(pixels) * byte per pixels for tiled surface */
+            alignment = (fmtInfo->bitsPerBlock >= 64) ? (4 * 4 * fmtInfo->bitsPerBlock / 8) : 64;
+        }
+
+        if (address & (alignment - 1))
+        {
+            __VK_PRINT("ERROR: buffer address=0x%08x is NOT %d-bytes aligned, cannot simulated as texture!\n", address, alignment);
+            __VK_ONERROR(VK_INCOMPLETE);
+        }
     }
 
     if (params->rawCopy)
@@ -311,7 +319,6 @@ static VkResult halti5_program_blit_src_tex(
     case VK_FORMAT_R16_SINT:
     case VK_FORMAT_R16G16_SINT:
     case VK_FORMAT_R16G16B16A16_SINT:
-    case __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT:
         txSignExt = 0x2;
         break;
     case VK_FORMAT_R8_SINT:
@@ -339,6 +346,11 @@ static VkResult halti5_program_blit_src_tex(
     hwTxFmtInfo = halti5_helper_convertHwTxInfo(devCtx, tmpFormat);
     txSRGB = (hwTxFmtInfo->hwFormat >> TX_FORMAT_SRGB_SHIFT) & 0x1;
     params->srcSRGB = txSRGB ? VK_TRUE : VK_FALSE;
+    /* Disable src texture SRGB if dst also require SRGB */
+    if (params->dstSRGB && txSRGB)
+    {
+        txSRGB = 0;
+    }
 
     if (params->txSwizzles)
     {
@@ -358,6 +370,232 @@ static VkResult halti5_program_blit_src_tex(
     txIntCtrl = ((hwTxFmtInfo->hwFormat >> TX_FORMAT_FAST_FILTER_SHIFT) & 0x1)
              && (txType != 0x3)
              && !txSRGB;
+
+    pScratchMem = __vkGetScratchMem(cmdBuf, TX_HW_DESCRIPTOR_MEM_SIZE);
+    __VK_ONERROR(__vk_MapMemory((VkDevice)devCtx, (VkDeviceMemory)(uintptr_t)pScratchMem->memory,
+                                0, TX_HW_DESCRIPTOR_MEM_SIZE, 0, (void**)&pDesc));
+    __VK_MEMZERO(pDesc, TX_HW_DESCRIPTOR_MEM_SIZE);
+    pDesc->gcregTXAddress[0] = address;
+
+    pDesc->gcregTXConfig =
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) ((gctUINT32) (txType) & ((gctUINT32) ((((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 17:13) - (0 ?
+ 17:13) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 17:13) - (0 ?
+ 17:13) + 1))))))) << (0 ?
+ 17:13))) | (((gctUINT32) ((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_OLD_SHIFT)) & ((gctUINT32) ((((1 ?
+ 17:13) - (0 ?
+ 17:13) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 17:13) - (0 ? 17:13) + 1))))))) << (0 ? 17:13)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 21:20) - (0 ?
+ 21:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 21:20) - (0 ?
+ 21:20) + 1))))))) << (0 ?
+ 21:20))) | (((gctUINT32) ((gctUINT32) (txAddressing) & ((gctUINT32) ((((1 ?
+ 21:20) - (0 ?
+ 21:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ? 21:20)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:22) - (0 ?
+ 23:22) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 23:22) - (0 ?
+ 23:22) + 1))))))) << (0 ?
+ 23:22))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 23:22) - (0 ?
+ 23:22) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 23:22) - (0 ? 23:22) + 1))))))) << (0 ? 23:22)));
+
+    pDesc->gcregTXSize =
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 14:0) - (0 ?
+ 14:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 14:0) - (0 ?
+ 14:0) + 1))))))) << (0 ?
+ 14:0))) | (((gctUINT32) ((gctUINT32) (params->srcSize.width) & ((gctUINT32) ((((1 ?
+ 14:0) - (0 ?
+ 14:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 14:0) - (0 ? 14:0) + 1))))))) << (0 ? 14:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 30:16) - (0 ?
+ 30:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 30:16) - (0 ?
+ 30:16) + 1))))))) << (0 ?
+ 30:16))) | (((gctUINT32) ((gctUINT32) (params->srcSize.height) & ((gctUINT32) ((((1 ?
+ 30:16) - (0 ?
+ 30:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 30:16) - (0 ? 30:16) + 1))))))) << (0 ? 30:16)));
+
+    pDesc->gcregTX3D = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 13:0) - (0 ?
+ 13:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 13:0) - (0 ?
+ 13:0) + 1))))))) << (0 ?
+ 13:0))) | (((gctUINT32) ((gctUINT32) (params->srcSize.depth) & ((gctUINT32) ((((1 ?
+ 13:0) - (0 ?
+ 13:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ? 13:0)));
+
+    pDesc->gcregTXLinearStride =
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 17:0) - (0 ?
+ 17:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 17:0) - (0 ?
+ 17:0) + 1))))))) << (0 ?
+ 17:0))) | (((gctUINT32) ((gctUINT32) (txStride) & ((gctUINT32) ((((1 ?
+ 17:0) - (0 ?
+ 17:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 17:0) - (0 ? 17:0) + 1))))))) << (0 ? 17:0)));
+
+    pDesc->gcregTXExtConfig =
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1))))))) << (0 ?
+ 5:0))) | (((gctUINT32) ((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_NEW_SHIFT)) & ((gctUINT32) ((((1 ?
+ 5:0) - (0 ?
+ 5:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1))))))) << (0 ?
+ 7:7))) | (((gctUINT32) ((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_COLOR_SWIZZLE_SHIFT)) & ((gctUINT32) ((((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:8) - (0 ?
+ 10:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 10:8) - (0 ?
+ 10:8) + 1))))))) << (0 ?
+ 10:8))) | (((gctUINT32) ((gctUINT32) (swizzle_r) & ((gctUINT32) ((((1 ?
+ 10:8) - (0 ?
+ 10:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 10:8) - (0 ? 10:8) + 1))))))) << (0 ? 10:8)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 14:12) - (0 ?
+ 14:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 14:12) - (0 ?
+ 14:12) + 1))))))) << (0 ?
+ 14:12))) | (((gctUINT32) ((gctUINT32) (swizzle_g) & ((gctUINT32) ((((1 ?
+ 14:12) - (0 ?
+ 14:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 14:12) - (0 ? 14:12) + 1))))))) << (0 ? 14:12)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ?
+ 18:16))) | (((gctUINT32) ((gctUINT32) (swizzle_b) & ((gctUINT32) ((((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 22:20) - (0 ?
+ 22:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ?
+ 22:20))) | (((gctUINT32) ((gctUINT32) (swizzle_a) & ((gctUINT32) ((((1 ?
+ 22:20) - (0 ?
+ 22:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:26) - (0 ?
+ 28:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:26) - (0 ?
+ 28:26) + 1))))))) << (0 ?
+ 28:26))) | (((gctUINT32) ((gctUINT32) (txHAlign) & ((gctUINT32) ((((1 ?
+ 28:26) - (0 ?
+ 28:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 28:26) - (0 ? 28:26) + 1))))))) << (0 ? 28:26)))
+        ;
+
+    pDesc->gcregTXConfig2 = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1))))))) << (0 ?
+ 19:18))) | (((gctUINT32) ((gctUINT32) (txSignExt) & ((gctUINT32) ((((1 ?
+ 19:18) - (0 ?
+ 19:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:18) - (0 ? 19:18) + 1))))))) << (0 ? 19:18)));
+    pDesc->gcregTXConfig3 = ((((gctUINT32) (0x00000000)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 3:3) - (0 ?
+ 3:3) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 3:3) - (0 ?
+ 3:3) + 1))))))) << (0 ?
+ 3:3))) | (((gctUINT32) ((gctUINT32) (txMsaa) & ((gctUINT32) ((((1 ?
+ 3:3) - (0 ?
+ 3:3) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ? 3:3)));
+
+    pDesc->gcregTXSizeExt =
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (__vk_UtilLog2inXdot8(params->srcSize.width)) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:16) - (0 ?
+ 31:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ?
+ 31:16))) | (((gctUINT32) ((gctUINT32) (__vk_UtilLog2inXdot8(params->srcSize.height)) & ((gctUINT32) ((((1 ?
+ 31:16) - (0 ?
+ 31:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)));
+
+    pDesc->gcregTXVolumeExt =
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (__vk_UtilLog2inXdot8(params->srcSize.depth)) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));
+
+    pDesc->gcregTXSlice = txSliceSize;
+
+    hwMapping = &blitProg->srcTexEntry->hwMappings[VSC_SHADER_STAGE_CS].samplerMapping;
+    hwSamplerNo = hwMapping->hwSamplerSlot + pHints->samplerBaseOffset[VSC_SHADER_STAGE_CS];
 
     if (params->flushTex)
     {
@@ -383,241 +621,11 @@ static VkResult halti5_program_blit_src_tex(
  ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ? 4:4))));
     }
 
-    for (partIdx = 0; partIdx < partCount; partIdx++)
-    {
-        uint32_t descAddress;
-        pScratchMem[partIdx] = __vkGetScratchMem(cmdBuf, TX_HW_DESCRIPTOR_MEM_SIZE);
-        __VK_ONERROR(__vk_MapMemory((VkDevice)devCtx, (VkDeviceMemory)(uintptr_t)pScratchMem[partIdx]->memory,
-                                    0, TX_HW_DESCRIPTOR_MEM_SIZE, 0, (void**)&pDesc[partIdx]));
-        __VK_MEMZERO(pDesc[partIdx], TX_HW_DESCRIPTOR_MEM_SIZE);
+    address = pScratchMem->memory->devAddr;
+    __vkCmdLoadSingleHWState(states, s_TxHwRegisters[txHwRegisterIdx].texDescAddrReg + hwSamplerNo, VK_FALSE, address);
 
-        pDesc[partIdx]->gcregTXAddress[0] = address + partIdx * partSize;
-
-        pDesc[partIdx]->gcregTXConfig =
-              ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 2:0) - (0 ?
- 2:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 2:0) - (0 ?
- 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) ((gctUINT32) (txType) & ((gctUINT32) ((((1 ?
- 2:0) - (0 ?
- 2:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 17:13) - (0 ?
- 17:13) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 17:13) - (0 ?
- 17:13) + 1))))))) << (0 ?
- 17:13))) | (((gctUINT32) ((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_OLD_SHIFT)) & ((gctUINT32) ((((1 ?
- 17:13) - (0 ?
- 17:13) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 17:13) - (0 ? 17:13) + 1))))))) << (0 ? 17:13)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 21:20) - (0 ?
- 21:20) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 21:20) - (0 ?
- 21:20) + 1))))))) << (0 ?
- 21:20))) | (((gctUINT32) ((gctUINT32) (txAddressing) & ((gctUINT32) ((((1 ?
- 21:20) - (0 ?
- 21:20) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ? 21:20)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 23:22) - (0 ?
- 23:22) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 23:22) - (0 ?
- 23:22) + 1))))))) << (0 ?
- 23:22))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 23:22) - (0 ?
- 23:22) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 23:22) - (0 ? 23:22) + 1))))))) << (0 ? 23:22)));
-
-        pDesc[partIdx]->gcregTXSize =
-              ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 14:0) - (0 ?
- 14:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 14:0) - (0 ?
- 14:0) + 1))))))) << (0 ?
- 14:0))) | (((gctUINT32) ((gctUINT32) (params->srcSize.width) & ((gctUINT32) ((((1 ?
- 14:0) - (0 ?
- 14:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 14:0) - (0 ? 14:0) + 1))))))) << (0 ? 14:0)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 30:16) - (0 ?
- 30:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 30:16) - (0 ?
- 30:16) + 1))))))) << (0 ?
- 30:16))) | (((gctUINT32) ((gctUINT32) (params->srcSize.height) & ((gctUINT32) ((((1 ?
- 30:16) - (0 ?
- 30:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 30:16) - (0 ? 30:16) + 1))))))) << (0 ? 30:16)));
-
-        pDesc[partIdx]->gcregTX3D = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 13:0) - (0 ?
- 13:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 13:0) - (0 ?
- 13:0) + 1))))))) << (0 ?
- 13:0))) | (((gctUINT32) ((gctUINT32) (params->srcSize.depth) & ((gctUINT32) ((((1 ?
- 13:0) - (0 ?
- 13:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ? 13:0)));
-
-        pDesc[partIdx]->gcregTXLinearStride =
+    __vkCmdLoadSingleHWState(states, s_TxHwRegisters[txHwRegisterIdx].samplerCtrl0Reg + hwSamplerNo, VK_FALSE,
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 17:0) - (0 ?
- 17:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 17:0) - (0 ?
- 17:0) + 1))))))) << (0 ?
- 17:0))) | (((gctUINT32) ((gctUINT32) (txStride) & ((gctUINT32) ((((1 ?
- 17:0) - (0 ?
- 17:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 17:0) - (0 ? 17:0) + 1))))))) << (0 ? 17:0)));
-
-        pDesc[partIdx]->gcregTXExtConfig =
-              ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 5:0) - (0 ?
- 5:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 5:0) - (0 ?
- 5:0) + 1))))))) << (0 ?
- 5:0))) | (((gctUINT32) ((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_NEW_SHIFT)) & ((gctUINT32) ((((1 ?
- 5:0) - (0 ?
- 5:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 7:7) - (0 ?
- 7:7) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 7:7) - (0 ?
- 7:7) + 1))))))) << (0 ?
- 7:7))) | (((gctUINT32) ((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_COLOR_SWIZZLE_SHIFT)) & ((gctUINT32) ((((1 ?
- 7:7) - (0 ?
- 7:7) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 10:8) - (0 ?
- 10:8) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 10:8) - (0 ?
- 10:8) + 1))))))) << (0 ?
- 10:8))) | (((gctUINT32) ((gctUINT32) (swizzle_r) & ((gctUINT32) ((((1 ?
- 10:8) - (0 ?
- 10:8) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 10:8) - (0 ? 10:8) + 1))))))) << (0 ? 10:8)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 14:12) - (0 ?
- 14:12) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 14:12) - (0 ?
- 14:12) + 1))))))) << (0 ?
- 14:12))) | (((gctUINT32) ((gctUINT32) (swizzle_g) & ((gctUINT32) ((((1 ?
- 14:12) - (0 ?
- 14:12) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 14:12) - (0 ? 14:12) + 1))))))) << (0 ? 14:12)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 18:16) - (0 ?
- 18:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 18:16) - (0 ?
- 18:16) + 1))))))) << (0 ?
- 18:16))) | (((gctUINT32) ((gctUINT32) (swizzle_b) & ((gctUINT32) ((((1 ?
- 18:16) - (0 ?
- 18:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 22:20) - (0 ?
- 22:20) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 22:20) - (0 ?
- 22:20) + 1))))))) << (0 ?
- 22:20))) | (((gctUINT32) ((gctUINT32) (swizzle_a) & ((gctUINT32) ((((1 ?
- 22:20) - (0 ?
- 22:20) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 28:26) - (0 ?
- 28:26) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 28:26) - (0 ?
- 28:26) + 1))))))) << (0 ?
- 28:26))) | (((gctUINT32) ((gctUINT32) (txHAlign) & ((gctUINT32) ((((1 ?
- 28:26) - (0 ?
- 28:26) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 28:26) - (0 ? 28:26) + 1))))))) << (0 ? 28:26)))
-            ;
-
-        pDesc[partIdx]->gcregTXConfig2 = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 19:18) - (0 ?
- 19:18) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 19:18) - (0 ?
- 19:18) + 1))))))) << (0 ?
- 19:18))) | (((gctUINT32) ((gctUINT32) (txSignExt) & ((gctUINT32) ((((1 ?
- 19:18) - (0 ?
- 19:18) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 19:18) - (0 ? 19:18) + 1))))))) << (0 ? 19:18)));
-        pDesc[partIdx]->gcregTXConfig3 = ((((gctUINT32) (0x00000000)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 3:3) - (0 ?
- 3:3) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 3:3) - (0 ?
- 3:3) + 1))))))) << (0 ?
- 3:3))) | (((gctUINT32) ((gctUINT32) (txMsaa) & ((gctUINT32) ((((1 ?
- 3:3) - (0 ?
- 3:3) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ? 3:3)));
-
-        pDesc[partIdx]->gcregTXSizeExt =
-              ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 15:0) - (0 ?
- 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (__vk_UtilLog2inXdot8(params->srcSize.width)) & ((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:16) - (0 ?
- 31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 31:16) - (0 ?
- 31:16) + 1))))))) << (0 ?
- 31:16))) | (((gctUINT32) ((gctUINT32) (__vk_UtilLog2inXdot8(params->srcSize.height)) & ((gctUINT32) ((((1 ?
- 31:16) - (0 ?
- 31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)));
-
-        pDesc[partIdx]->gcregTXVolumeExt =
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 15:0) - (0 ?
- 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (__vk_UtilLog2inXdot8(params->srcSize.depth)) & ((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));
-
-        pDesc[partIdx]->gcregTXSlice = txSliceSize;
-
-        hwMapping = &blitProg->srcTexEntry[partIdx]->hwMappings[VSC_SHADER_STAGE_CS].samplerMapping;
-        hwSamplerNo = hwMapping->hwSamplerSlot + pHints->samplerBaseOffset[VSC_SHADER_STAGE_CS];
-
-        descAddress = pScratchMem[partIdx]->memory->devAddr;
-        __vkCmdLoadSingleHWState(states, s_TxHwRegisters[txHwRegisterIdx].texDescAddrReg + hwSamplerNo, VK_FALSE, descAddress);
-
-        __vkCmdLoadSingleHWState(states, s_TxHwRegisters[txHwRegisterIdx].samplerCtrl0Reg + hwSamplerNo, VK_FALSE,
-                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -627,7 +635,7 @@ static VkResult halti5_program_blit_src_tex(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:3) - (0 ?
  5:3) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -637,7 +645,7 @@ static VkResult halti5_program_blit_src_tex(
  5:3) - (0 ?
  5:3) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:3) - (0 ? 5:3) + 1))))))) << (0 ? 5:3)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  8:6) - (0 ?
  8:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -647,7 +655,7 @@ static VkResult halti5_program_blit_src_tex(
  8:6) - (0 ?
  8:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 8:6) - (0 ? 8:6) + 1))))))) << (0 ? 8:6)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:9) - (0 ?
  10:9) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -657,7 +665,7 @@ static VkResult halti5_program_blit_src_tex(
  10:9) - (0 ?
  10:9) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ? 10:9)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  14:13) - (0 ?
  14:13) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -667,7 +675,7 @@ static VkResult halti5_program_blit_src_tex(
  14:13) - (0 ?
  14:13) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 14:13) - (0 ? 14:13) + 1))))))) << (0 ? 14:13)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:11) - (0 ?
  12:11) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -677,7 +685,7 @@ static VkResult halti5_program_blit_src_tex(
  12:11) - (0 ?
  12:11) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 12:11) - (0 ? 12:11) + 1))))))) << (0 ? 12:11)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:15) - (0 ?
  15:15) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -687,7 +695,7 @@ static VkResult halti5_program_blit_src_tex(
  15:15) - (0 ?
  15:15) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:15) - (0 ? 15:15) + 1))))))) << (0 ? 15:15)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  16:16) - (0 ?
  16:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -697,7 +705,7 @@ static VkResult halti5_program_blit_src_tex(
  16:16) - (0 ?
  16:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ? 16:16)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  17:17) - (0 ?
  17:17) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -707,7 +715,7 @@ static VkResult halti5_program_blit_src_tex(
  17:17) - (0 ?
  17:17) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 17:17) - (0 ? 17:17) + 1))))))) << (0 ? 17:17)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:21) - (0 ?
  22:21) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -717,7 +725,7 @@ static VkResult halti5_program_blit_src_tex(
  22:21) - (0 ?
  22:21) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:21) - (0 ? 22:21) + 1))))))) << (0 ? 22:21)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  23:23) - (0 ?
  23:23) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -727,10 +735,10 @@ static VkResult halti5_program_blit_src_tex(
  23:23) - (0 ?
  23:23) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 23:23) - (0 ? 23:23) + 1))))))) << (0 ? 23:23)))
-            );
+        );
 
-        __vkCmdLoadSingleHWState(states, s_TxHwRegisters[txHwRegisterIdx].samplerCtrl1Reg + hwSamplerNo, VK_FALSE,
-                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    __vkCmdLoadSingleHWState(states, s_TxHwRegisters[txHwRegisterIdx].samplerCtrl1Reg + hwSamplerNo, VK_FALSE,
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -740,7 +748,7 @@ static VkResult halti5_program_blit_src_tex(
  1:0) - (0 ?
  1:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ? 1:0)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:2) - (0 ?
  2:2) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -750,7 +758,7 @@ static VkResult halti5_program_blit_src_tex(
  2:2) - (0 ?
  2:2) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ? 2:2)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  3:3) - (0 ?
  3:3) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -760,7 +768,7 @@ static VkResult halti5_program_blit_src_tex(
  3:3) - (0 ?
  3:3) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ? 3:3)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -770,7 +778,7 @@ static VkResult halti5_program_blit_src_tex(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  6:6) - (0 ?
  6:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -780,10 +788,10 @@ static VkResult halti5_program_blit_src_tex(
  6:6) - (0 ?
  6:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ? 6:6)))
-            );
+        );
 
-        __vkCmdLoadSingleHWState(states, s_TxHwRegisters[txHwRegisterIdx].samplerLodMaxMinReg + hwSamplerNo, VK_FALSE,
-                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    __vkCmdLoadSingleHWState(states, s_TxHwRegisters[txHwRegisterIdx].samplerLodMaxMinReg + hwSamplerNo, VK_FALSE,
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:0) - (0 ?
  12:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -793,7 +801,7 @@ static VkResult halti5_program_blit_src_tex(
  12:0) - (0 ?
  12:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ? 12:0)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:16) - (0 ?
  28:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -803,10 +811,10 @@ static VkResult halti5_program_blit_src_tex(
  28:16) - (0 ?
  28:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 28:16) - (0 ? 28:16) + 1))))))) << (0 ? 28:16)))
-            );
+        );
 
-        __vkCmdLoadSingleHWState(states, s_TxHwRegisters[txHwRegisterIdx].samplerLodBiasReg + hwSamplerNo, VK_FALSE,
-                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    __vkCmdLoadSingleHWState(states, s_TxHwRegisters[txHwRegisterIdx].samplerLodBiasReg + hwSamplerNo, VK_FALSE,
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -816,10 +824,10 @@ static VkResult halti5_program_blit_src_tex(
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-            );
+        );
 
-        __vkCmdLoadSingleHWState(states, s_TxHwRegisters[txHwRegisterIdx].samplerAnisCtrlReg + hwSamplerNo, VK_FALSE,
-                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    __vkCmdLoadSingleHWState(states, s_TxHwRegisters[txHwRegisterIdx].samplerAnisCtrlReg + hwSamplerNo, VK_FALSE,
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:0) - (0 ?
  10:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -829,10 +837,10 @@ static VkResult halti5_program_blit_src_tex(
  10:0) - (0 ?
  10:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 10:0) - (0 ? 10:0) + 1))))))) << (0 ? 10:0)))
-            );
+        );
 
-        __vkCmdLoadSingleHWState(states, s_TxHwRegisters[txHwRegisterIdx].textureControlAddrReg + hwSamplerNo, VK_FALSE,
-                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    __vkCmdLoadSingleHWState(states, s_TxHwRegisters[txHwRegisterIdx].textureControlAddrReg + hwSamplerNo, VK_FALSE,
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -842,7 +850,7 @@ static VkResult halti5_program_blit_src_tex(
  0:0) - (0 ?
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:1) - (0 ?
  1:1) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -852,7 +860,7 @@ static VkResult halti5_program_blit_src_tex(
  1:1) - (0 ?
  1:1) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:5) - (0 ?
  5:5) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -862,10 +870,10 @@ static VkResult halti5_program_blit_src_tex(
  5:5) - (0 ?
  5:5) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ? 5:5)))
-            );
+        );
 
-        __vkCmdLoadSingleHWState(states, s_TxHwRegisters[txHwRegisterIdx].txCommandReg, VK_FALSE,
-              ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    __vkCmdLoadSingleHWState(states, s_TxHwRegisters[txHwRegisterIdx].txCommandReg, VK_FALSE,
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:28) - (0 ?
  31:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -875,7 +883,7 @@ static VkResult halti5_program_blit_src_tex(
  31:28) - (0 ?
  31:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:28) - (0 ? 31:28) + 1))))))) << (0 ? 31:28)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  6:0) - (0 ?
  6:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -885,16 +893,12 @@ static VkResult halti5_program_blit_src_tex(
  6:0) - (0 ?
  6:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ? 6:0)))
-            );
-    }
+        );
 
 OnError:
-    for (partIdx = 0; partIdx < partCount; partIdx++)
+    if (pDesc)
     {
-        if (pDesc[partIdx])
-        {
-            __vk_UnmapMemory((VkDevice)devCtx, (VkDeviceMemory)(uintptr_t)pScratchMem[partIdx]->memory);
-        }
+        __vk_UnmapMemory((VkDevice)devCtx, (VkDeviceMemory)(uintptr_t)pScratchMem->memory);
     }
 
     return result;
@@ -915,7 +919,6 @@ static VkResult halti5_program_blit_dst_img(
     SHADER_UAV_SLOT_MAPPING *hwMapping = gcvNULL;
     HwImgDesc hwImgDesc[__VK_MAX_PARTS];
     uint32_t hwConstRegAddr;
-    uint32_t partCount = 1;
     VkExtent3D *pUserSize = gcvNULL;
     gcsHINT_PTR pHints = &blitProg->hwStates.hints;
     VkResult result = VK_SUCCESS;
@@ -976,8 +979,6 @@ static VkResult halti5_program_blit_dst_img(
         tmpImgView.formatInfo = &tmpFormatInfo;
         imgView = &tmpImgView;
 
-        partCount = tmpImgView.formatInfo->partCount;
-
         params->dstOffset = dstRes->u.img.offset;
         params->dstExtent = dstRes->u.img.extent;
     }
@@ -1006,6 +1007,7 @@ static VkResult halti5_program_blit_dst_img(
             {
                 tmpBufView.formatInfo.residentImgFormat = VK_FORMAT_B8G8R8A8_UNORM;
             }
+            break;
         default:
             break;
         }
@@ -1038,6 +1040,7 @@ static VkResult halti5_program_blit_dst_img(
         }
 
         pUserSize = &dstSize;
+        __VK_ASSERT(params->partIndex == 0);
     }
     __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, imgView, bufView, pUserSize, hwImgDesc));
 
@@ -1068,20 +1071,9 @@ static VkResult halti5_program_blit_dst_img(
     __VK_ASSERT(hwMapping->hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR);
     __VK_ASSERT(hwMapping->hwLoc.pHwDirectAddrBase->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
     hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
-                   + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo * 4)
+                   + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                    + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
-    __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[0].imageInfo);
-
-    if (partCount == 2)
-    {
-        hwMapping = &blitProg->dstImgEntry[1]->hwMappings[VSC_SHADER_STAGE_CS];
-        __VK_ASSERT(hwMapping->hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR);
-        __VK_ASSERT(hwMapping->hwLoc.pHwDirectAddrBase->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
-        hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
-                       + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo * 4)
-                       + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
-        __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[1].imageInfo);
-    }
+    __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[params->partIndex].imageInfo);
 
 OnError:
     return result;
@@ -1189,7 +1181,7 @@ VkResult halti5_program_clear_dst_img(
     __VK_ASSERT(hwMapping->hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR);
     __VK_ASSERT(hwMapping->hwLoc.pHwDirectAddrBase->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
     hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
-                   + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo * 4)
+                   + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                    + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
     __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[0].imageInfo);
 
@@ -1200,10 +1192,139 @@ VkResult halti5_program_clear_dst_img(
         __VK_ASSERT(hwMapping->hwLoc.pHwDirectAddrBase->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
 
         hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
-            + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo * 4)
+            + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
             + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
         __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[1].imageInfo);
     }
+
+OnError:
+    return result;
+}
+
+VkResult halti5_program_copy_src_oq_query_pool(
+    IN  __vkCommandBuffer *cmdBuf,
+    IN  halti5_vscprogram_blit *blitProg,
+    IN  uint32_t **states,
+    IN  __vkBlitRes *srcRes,
+    IN  __vkBlitRes *dstRes,
+    IN  VkFilter filter,
+    OUT __vkComputeBlitParams *params
+    )
+{
+    __vkDevContext *devCtx = cmdBuf->devCtx;
+    __vkImageView  *imgView = gcvNULL;
+    __vkBufferView *bufView = gcvNULL;
+    SHADER_UAV_SLOT_MAPPING *hwMapping = gcvNULL;
+    HwImgDesc hwImgDesc[__VK_MAX_PARTS];
+    uint32_t hwConstRegAddr;
+    VkExtent3D *pUserSize = gcvNULL;
+    gcsHINT_PTR pHints = &blitProg->hwStates.hints;
+    VkResult result = VK_SUCCESS;
+
+    __VK_MEMZERO(&hwImgDesc, sizeof(hwImgDesc));
+
+    __VK_ASSERT(!srcRes->isImage);
+
+    /* program buffer.*/
+    {
+        static __vkBufferView tmpBufView;
+        static VkExtent3D srcSize;
+        params->srcOffset.x = params->srcOffset.y = params->srcOffset.z = 0;
+
+        __VK_MEMZERO(&tmpBufView, sizeof(tmpBufView));
+        tmpBufView.obj.sType = __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_IMAGE_VIEW);
+        tmpBufView.obj.pDevContext = devCtx;
+        tmpBufView.devCtx = devCtx;
+        tmpBufView.createInfo.buffer = (VkBuffer)(uintptr_t)srcRes->u.buf.pBuffer;
+        tmpBufView.createInfo.flags = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        tmpBufView.createInfo.format = VK_FORMAT_R32_UINT;
+        tmpBufView.createInfo.offset = srcRes->u.buf.offset;
+        tmpBufView.createInfo.range = VK_WHOLE_SIZE;
+
+        tmpBufView.formatInfo = g_vkFormatInfoTable[VK_FORMAT_R32_UINT];
+        tmpBufView.formatInfo.residentImgFormat = VK_FORMAT_R32_UINT;
+        bufView = &tmpBufView;
+
+        srcSize.width  = srcRes->u.buf.rowLength;
+        srcSize.height = srcRes->u.buf.imgHeight;
+        srcSize.depth  = 1;
+        params->srcExtent = srcSize;
+        pUserSize = &srcSize;
+    }
+
+    __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, imgView, bufView, pUserSize, hwImgDesc));
+
+    hwMapping = &blitProg->srcImgEntry[0]->hwMappings[VSC_SHADER_STAGE_CS];
+    __VK_ASSERT(hwMapping->hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR);
+    __VK_ASSERT(hwMapping->hwLoc.pHwDirectAddrBase->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
+    hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
+                   + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
+                   + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
+    __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[0].imageInfo);
+
+OnError:
+    return result;
+}
+
+VkResult halti5_program_copy_dst_oq_query_pool(
+    IN  __vkCommandBuffer *cmdBuf,
+    IN  halti5_vscprogram_blit *blitProg,
+    IN  uint32_t **states,
+    IN  __vkBlitRes *srcRes,
+    IN  __vkBlitRes *dstRes,
+    OUT __vkComputeBlitParams *params
+    )
+{
+    __vkDevContext *devCtx = cmdBuf->devCtx;
+    __vkImageView  *imgView = gcvNULL;
+    __vkBufferView *bufView = gcvNULL;
+    SHADER_UAV_SLOT_MAPPING *hwMapping = gcvNULL;
+    HwImgDesc hwImgDesc[__VK_MAX_PARTS];
+    uint32_t hwConstRegAddr;
+    VkExtent3D *pUserSize = gcvNULL;
+    gcsHINT_PTR pHints = &blitProg->hwStates.hints;
+    VkResult result = VK_SUCCESS;
+
+    __VK_MEMZERO(&hwImgDesc, sizeof(hwImgDesc));
+
+    __VK_ASSERT(!dstRes->isImage);
+
+    /* program buffer.*/
+    {
+        static __vkBufferView tmpBufView;
+        static VkExtent3D dstSize;
+        params->dstOffset.x = params->dstOffset.y = params->dstOffset.z = 0;
+
+        __VK_MEMZERO(&tmpBufView, sizeof(tmpBufView));
+        tmpBufView.obj.sType = __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_IMAGE_VIEW);
+        tmpBufView.obj.pDevContext = devCtx;
+        tmpBufView.devCtx = devCtx;
+        tmpBufView.createInfo.buffer = (VkBuffer)(uintptr_t)dstRes->u.buf.pBuffer;
+        tmpBufView.createInfo.flags = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        tmpBufView.createInfo.format = VK_FORMAT_R32_UINT;
+        tmpBufView.createInfo.offset = dstRes->u.buf.offset;
+        tmpBufView.createInfo.range = VK_WHOLE_SIZE;
+
+        tmpBufView.formatInfo = g_vkFormatInfoTable[VK_FORMAT_R32_UINT];
+        tmpBufView.formatInfo.residentImgFormat = VK_FORMAT_R32_UINT;
+        bufView = &tmpBufView;
+
+        dstSize.width  = dstRes->u.buf.rowLength;
+        dstSize.height = dstRes->u.buf.imgHeight;
+        dstSize.depth  = 1;
+        params->dstExtent = dstSize;
+        pUserSize = &dstSize;
+    }
+
+    __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, imgView, bufView, pUserSize, hwImgDesc));
+
+    hwMapping = &blitProg->dstImgEntry[0]->hwMappings[VSC_SHADER_STAGE_CS];
+    __VK_ASSERT(hwMapping->hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR);
+    __VK_ASSERT(hwMapping->hwLoc.pHwDirectAddrBase->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
+    hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
+                   + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
+                   + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
+    __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[0].imageInfo);
 
 OnError:
     return result;
@@ -1220,7 +1341,6 @@ static VkResult halti5_program_blit_const(
     gctINT_PTR   pI = gcvNULL;
     gctUINT_PTR  pU = gcvNULL;
     gctFLOAT_PTR pF = gcvNULL;
-    gctBOOL_PTR  pB = gcvNULL;
     uint32_t addresses[3];
     uint32_t addrCount = 0;
     uint32_t hwConstRegAddr;
@@ -1256,26 +1376,21 @@ static VkResult halti5_program_blit_const(
 
     /* dstOffset */
     pI += 4;
-    pU += 4;
     pI[0] = params->dstOffset.x;
     pI[1] = params->dstOffset.y;
     pI[2] = params->dstOffset.z;
-    pU[3] = params->srcParts;
 
     /* dstExtent */
     pU = (gctUINT_PTR)(pI + 4);
     pU[0] = params->dstExtent.width;
     pU[1] = params->dstExtent.height;
     pU[2] = params->dstExtent.depth;
-    pU[3] = params->dstParts;
 
     /* srcOffset */
     pF = (gctFLOAT_PTR)(pU + 4);
-    pB = (gctBOOL_PTR)pF;
     pF[0] = (gctFLOAT)params->srcOffset.x;
     pF[1] = (gctFLOAT)params->srcOffset.y;
     pF[2] = (gctFLOAT)params->srcOffset.z;
-    pB[3] = (gctBOOL)params->dstSRGB;
 
     /* srcExtent */
     pF += 4;
@@ -1294,7 +1409,7 @@ static VkResult halti5_program_blit_const(
     pU[0] = params->uClearValue0[0];
     pU[1] = params->uClearValue0[1];
     pU[2] = params->uClearValue0[2];
-    pU[2] = params->uClearValue0[3];
+    pU[3] = params->uClearValue0[3];
 
     pU += 4;
     pU[0] = params->uClearValue1[0];
@@ -1308,7 +1423,7 @@ static VkResult halti5_program_blit_const(
     __VK_ASSERT(hwMapping->hwLoc.memAddr.memBase.pHwDirectAddrBase->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
 
     hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
-                   + (hwMapping->hwLoc.memAddr.memBase.pHwDirectAddrBase->hwLoc.hwRegNo * 4)
+                   + (hwMapping->hwLoc.memAddr.memBase.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                    +  hwMapping->hwLoc.memAddr.memBase.pHwDirectAddrBase->firstValidHwChannel;
 
     addresses[addrCount++] = pScratchMem->memory->devAddr;
@@ -1376,10 +1491,6 @@ static VkResult halti5_program_copy_src_img(
         {
         case 128:
             __VK_MEMCOPY(&tmpFormatInfo, &g_vkFormatInfoTable[VK_FORMAT_R16G16B16A16_UINT], sizeof(tmpFormatInfo));
-            break;
-        case 64:
-            if (pSrcImg->formatInfo.partCount == 2)
-                __VK_MEMCOPY(&tmpFormatInfo, &g_vkFormatInfoTable[VK_FORMAT_R8G8B8A8_UINT], sizeof(tmpFormatInfo));
             break;
         default:
             /* Not support other bpp currently */
@@ -1453,7 +1564,7 @@ static VkResult halti5_program_copy_src_img(
     __VK_ASSERT(hwMapping->hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR);
     __VK_ASSERT(hwMapping->hwLoc.pHwDirectAddrBase->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
     hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
-                   + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo * 4)
+                   + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                    + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
     __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[0].imageInfo);
 
@@ -1463,7 +1574,7 @@ static VkResult halti5_program_copy_src_img(
         __VK_ASSERT(hwMapping->hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR);
         __VK_ASSERT(hwMapping->hwLoc.pHwDirectAddrBase->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
         hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
-                       + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo * 4)
+                       + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                        + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
         __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[1].imageInfo);
     }
@@ -1488,7 +1599,6 @@ static VkResult halti5_program_copy_dst_img(
     HwImgDesc hwImgDesc[__VK_MAX_PARTS];
     uint32_t hwConstRegAddr;
     VkExtent3D *pUserSize = gcvNULL;
-    __vkImage *pSrcImg = srcRes->u.img.pImage;
     gcsHINT_PTR pHints = &blitProg->hwStates.hints;
     VkResult result = VK_SUCCESS;
 
@@ -1521,12 +1631,6 @@ static VkResult halti5_program_copy_dst_img(
         case 128:
             __VK_MEMCOPY(&tmpFormatInfo, &g_vkFormatInfoTable[VK_FORMAT_R16G16B16A16_UINT], sizeof(tmpFormatInfo));
             break;
-        case 64:
-            if (pSrcImg->formatInfo.partCount == 2)
-            {
-                __VK_MEMCOPY(&tmpFormatInfo, &g_vkFormatInfoTable[VK_FORMAT_R8G8B8A8_UINT], sizeof(tmpFormatInfo));
-            }
-            break;
         default:
             /* Not support other bpp currently */
             __VK_ASSERT(0);
@@ -1538,6 +1642,7 @@ static VkResult halti5_program_copy_dst_img(
         if (pDstImg->formatInfo.partCount == 1)
         {
             static VkExtent3D userSize;
+            __vkImage *pSrcImg = srcRes->u.img.pImage;
             __vkImageLevel *pImgLevel = &pDstImg->pImgLevels[dstRes->u.img.subRes.mipLevel];
 
             userSize.width  = pImgLevel->requestW * pSrcImg->formatInfo.partCount;
@@ -1556,6 +1661,7 @@ static VkResult halti5_program_copy_dst_img(
     {
         static __vkBufferView tmpBufView;
         static VkExtent3D dstSize;
+        __vkImage *pSrcImg = srcRes->u.img.pImage;
 
         params->dstOffset.x = params->dstOffset.y = params->dstOffset.z = 0;
 
@@ -1576,13 +1682,6 @@ static VkResult halti5_program_copy_dst_img(
             if (pSrcImg->formatInfo.partCount == 2)
             {
                 tmpBufView.formatInfo = g_vkFormatInfoTable[VK_FORMAT_R16G16B16A16_UINT];
-            }
-            break;
-        case 64:
-            /* Dst must be 2 part faked format here. */
-            if (pSrcImg->formatInfo.partCount == 2)
-            {
-                tmpBufView.formatInfo = g_vkFormatInfoTable[VK_FORMAT_R8G8B8A8_UINT];
             }
             break;
         default:
@@ -1608,7 +1707,7 @@ static VkResult halti5_program_copy_dst_img(
     __VK_ASSERT(hwMapping->hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR);
     __VK_ASSERT(hwMapping->hwLoc.pHwDirectAddrBase->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
     hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
-                   + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo * 4)
+                   + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                    + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
     __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[0].imageInfo);
 
@@ -1619,7 +1718,7 @@ static VkResult halti5_program_copy_dst_img(
         __VK_ASSERT(hwMapping->hwLoc.pHwDirectAddrBase->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
 
         hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
-                       + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo * 4)
+                       + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                        + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
         __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[1].imageInfo);
     }
@@ -1649,36 +1748,30 @@ static halti5_vscprogram_blit* halti5_GetComputeBlitProg(
     {
         static VSC_PROGRAM_RESOURCE_BINDING vscResBinding[] =
         {
-            {{VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER, 0, 0, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcTex2D_F0 */
-            {{VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER, 0, 1, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcTex2D_F1 */
-            {{VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER, 0, 2, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcTex2D_I0 */
-            {{VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER, 0, 3, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcTex2D_I1 */
-            {{VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER, 0, 4, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcTex2D_U0 */
-            {{VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER, 0, 5, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcTex2D_U1 */
+            {{VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER, 0, 0, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcTex2D_F */
+            {{VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER, 0, 1, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcTex2D_I */
+            {{VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER, 0, 2, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcTex2D_U */
+            {{VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER, 0, 3, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcTex3D_F */
+            {{VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER, 0, 4, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcTex3D_I */
+            {{VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER, 0, 5, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcTex3D_U */
 
-            {{VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER, 0, 6, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcTex3D_F */
-            {{VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER, 0, 7, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcTex3D_I */
-            {{VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER, 0, 8, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcTex3D_U */
+            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 6, 1}, VSC_SHADER_STAGE_BIT_CS}, /* dstImg2D_F */
+            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 7, 1}, VSC_SHADER_STAGE_BIT_CS}, /* dstImg2D_I */
+            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 8, 1}, VSC_SHADER_STAGE_BIT_CS}, /* dstImg2D_U */
+            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 9, 1}, VSC_SHADER_STAGE_BIT_CS}, /* dstImg3D_F */
+            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 10, 1}, VSC_SHADER_STAGE_BIT_CS}, /* dstImg3D_I */
+            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 11, 1}, VSC_SHADER_STAGE_BIT_CS}, /* dstImg3D_U */
 
-            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 9, 1}, VSC_SHADER_STAGE_BIT_CS}, /* dstImg2D_F0 */
-            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 10, 1}, VSC_SHADER_STAGE_BIT_CS}, /* dstImg2D_F1 */
-            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 11, 1}, VSC_SHADER_STAGE_BIT_CS}, /* dstImg2D_I0 */
-            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 12, 1}, VSC_SHADER_STAGE_BIT_CS}, /* dstImg2D_I1 */
-            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 13, 1}, VSC_SHADER_STAGE_BIT_CS}, /* dstImg2D_U0 */
-            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 14, 1}, VSC_SHADER_STAGE_BIT_CS}, /* dstImg2D_U1 */
+            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 12, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcImg2D_U0 */
+            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 13, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcImg2D_U1 */
+            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 14, 1}, VSC_SHADER_STAGE_BIT_CS}, /* dstImg3D_U0 */
+            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 15, 1}, VSC_SHADER_STAGE_BIT_CS}, /* dstImg3D_U1 */
 
-            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 15, 1}, VSC_SHADER_STAGE_BIT_CS}, /* dstImg3D_F */
-            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 16, 1}, VSC_SHADER_STAGE_BIT_CS}, /* dstImg3D_I */
-            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 17, 1}, VSC_SHADER_STAGE_BIT_CS}, /* dstImg3D_U */
+            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 16, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcImg2D_F  */
+            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 17, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcImg2D_I  */
+            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 18, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcImg2D_U  */
 
-            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 18, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcImg2D_U0 */
-            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 19, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcImg2D_U1 */
-
-            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 20, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcImg2D_F  */
-            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 21, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcImg2D_I  */
-            {{VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE, 0, 22, 1}, VSC_SHADER_STAGE_BIT_CS}, /* srcImg2D_U  */
-
-            {{VSC_SHADER_RESOURCE_TYPE_UNIFORM_BUFFER, 0, 24, 1}, VSC_SHADER_STAGE_BIT_CS}, /* uniform PARAMS */
+            {{VSC_SHADER_RESOURCE_TYPE_UNIFORM_BUFFER, 0, 20, 1}, VSC_SHADER_STAGE_BIT_CS}, /* uniform PARAMS */
         };
         VSC_PROGRAM_LINKER_PARAM vscLinkParams;
         VSC_PROGRAM_RESOURCE_LAYOUT vscResLayout;
@@ -1702,33 +1795,28 @@ static halti5_vscprogram_blit* halti5_GetComputeBlitProg(
             uint32_t    dstBindings[__VK_MAX_PARTS];
             uint32_t    uboBinding;
         }
-
         entryInfos[] =
         {
-            {"blit2D_unorm_float", { 0, 1}, { 9, 10}, 24},
-            {"blit2D_unorm_float_hwdoublerounding", { 0, 1}, { 9, 10}, 24},
-            {"blit2D_unorm_to_pack", { 0, 1}, {13, ~0u}, 24},
-            {"blit2D_sint", { 2, 3}, {11, 12}, 24},
-            {"blit2D_uint", { 4, 5}, {13, 14}, 24},
-            {"blit2D_uint_to_a2b10g10r10_pack", { 4, 5}, {13, ~0u}, 24},
+            {"blit2D_unorm_float", { 0, ~0u}, { 6, ~0u}, 20},
+            {"blit2D_unorm_to_pack", { 0, ~0u}, { 8, ~0u}, 20},
+            {"blit2D_sint", { 1, ~0u}, { 7, ~0u}, 20},
+            {"blit2D_uint", { 2, ~0u}, { 8, ~0u}, 20},
+            {"blit2D_uint_to_a2b10g10r10_pack", { 2, ~0u}, { 8, ~0u}, 20},
 
-            {"blit2D_sfloat_downsample", { 0, 1}, { 9, 10}, 24},
-            {"blit2D_sint_downsample", { 2, 3}, {11, 12}, 24},
-            {"blit2D_uint_downsample", { 4, 5}, {13, 14}, 24},
+            {"blit3D_unorm_float", { 3, ~0u}, { 9, ~0u}, 20},
+            {"blit3D_unorm_to_pack", { 3, ~0u}, {11, ~0u}, 20},
+            {"blit3D_sint", { 4, ~0u}, {10, ~0u}, 20},
+            {"blit3D_uint", { 5, ~0u}, {11, ~0u}, 20},
+            {"blit3D_uint_to_a2b10g10r10_pack", { 5, ~0u}, {11, ~0u}, 20},
 
-            {"blit3D_unorm_float", { 6, ~0u}, {15, ~0u}, 24},
-            {"blit3D_unorm_to_pack", { 6, ~0u}, {17, ~0u}, 24},
-            {"blit3D_sint", { 7, ~0u}, {16, ~0u}, 24},
-            {"blit3D_uint", { 8, ~0u}, {17, ~0u}, 24},
-            {"blit3D_uint_to_a2b10g10r10_pack", { 8, ~0u}, {17, ~0u}, 24},
+            {"copy_2layers_img_to_buf", {12, 13}, {14, 15}, 20},
+            {"copy_buf_to_2layers_img", {12, 13}, {14, 15}, 20},
+            {"copy_2D_unorm_float", {16, ~0u}, {6, ~0u}, 20},
+            {"copy_oq_query_pool", {18, ~0u}, { 8, ~0u}, 20},
 
-            {"copy_2layers_img_to_buf", {18, 19}, {13, 14}, 24},
-            {"copy_buf_to_2layers_img", {18, 19}, {13, 14}, 24},
-            {"copy_2D_unorm_float", {20, ~0u}, {9, ~0u}, 24},
-
-            {"clear_2D_uint", {~0u,~0u}, {13, ~0u}, 24},
-            {"clear_to_2layers_img", {~0u,~0u}, {13, 14}, 24},
-            {"blit_2D_buffer", {21, ~0u}, {11, ~0u}, 24},
+            {"clear_2D_uint", {~0u,~0u}, { 8, ~0u}, 20},
+            {"clear_to_2layers_img", {~0u,~0u}, {14, 15}, 20},
+            {"blit_2D_buffer", {17, ~0u}, {7, ~0u}, 20},
         };
 
         PROG_VK_RESOURCE_SET *progResSet = gcvNULL;
@@ -1797,6 +1885,15 @@ static halti5_vscprogram_blit* halti5_GetComputeBlitProg(
             blitProg->program_const = halti5_program_blit_const;
             break;
 
+        case HALTI5_BLIT_COPY_OQ_QUERY_POOL:
+            blitProg->srcImgEntry[0] = halti5_getImageEntry(progResSet, entryInfos[blitKind].srcBindings[0]);
+            blitProg->dstImgEntry[0] = halti5_getImageEntry(progResSet, entryInfos[blitKind].dstBindings[0]);
+
+            blitProg->program_src   = halti5_program_copy_src_oq_query_pool;
+            blitProg->program_dst   = halti5_program_copy_dst_oq_query_pool;
+            blitProg->program_const = halti5_program_blit_const;
+            break;
+
         case HALTI3_CLEAR_2D_UINT:
             blitProg->dstImgEntry[0] = halti5_getImageEntry(progResSet, entryInfos[blitKind].dstBindings[0]);
 
@@ -1821,17 +1918,8 @@ static halti5_vscprogram_blit* halti5_GetComputeBlitProg(
             break;
 
         default:
-            blitProg->srcTexEntry[0] = halti5_getCombinedTexSamplerEntry(progResSet, entryInfos[blitKind].srcBindings[0]);
-            if (entryInfos[blitKind].srcBindings[1] != ~0u)
-            {
-                blitProg->srcTexEntry[1] = halti5_getCombinedTexSamplerEntry(progResSet, entryInfos[blitKind].srcBindings[1]);
-            }
-
+            blitProg->srcTexEntry    = halti5_getCombinedTexSamplerEntry(progResSet, entryInfos[blitKind].srcBindings[0]);
             blitProg->dstImgEntry[0] = halti5_getImageEntry(progResSet, entryInfos[blitKind].dstBindings[0]);
-            if (entryInfos[blitKind].dstBindings[1] != ~0u)
-            {
-                blitProg->dstImgEntry[1] = halti5_getImageEntry(progResSet, entryInfos[blitKind].dstBindings[1]);
-            }
 
             blitProg->program_src   = (devCtx->database->REG_Halti5)
                                     ? halti5_program_blit_src_tex
@@ -1857,7 +1945,6 @@ OnError:
 }
 
 static uint32_t halti5_detect_blit_kind(
-    __vkCommandBuffer *cmdBuf,
     __vkBlitRes *srcRes,
     __vkBlitRes *dstRes,
     __vkComputeBlitParams *params,
@@ -1884,13 +1971,11 @@ static uint32_t halti5_detect_blit_kind(
     uint32_t srcParts, dstParts;
     uint32_t srcFormat, dstFormat;
     uint32_t srcCategory, dstCategory;
-    uint32_t srcBitsPerPixel = 0, dstBitsPerPixel = 0;
     VkBool32 srcMsaa, dstMsaa;
     VkImageType srcType, dstType;
     VkImageAspectFlags srcAspect = VK_IMAGE_ASPECT_FLAG_BITS_MAX_ENUM;
     __vkImage *pSrcImg, *pDstImg;
     const __vkFormatInfo *fmtInfo = gcvNULL;
-    __vkDevContext *devCtx = cmdBuf->devCtx;
 
     if (!srcRes->isImage && !dstRes->isImage)
     {
@@ -1904,9 +1989,8 @@ static uint32_t halti5_detect_blit_kind(
         srcFormat = pSrcImg->formatInfo.residentImgFormat;
         srcParts = pSrcImg->formatInfo.partCount;
         srcCategory = pSrcImg->formatInfo.category;
-        srcType = pSrcImg->createInfo.imageType;
-        srcBitsPerPixel = pSrcImg->formatInfo.bitsPerBlock;
         srcMsaa = (pSrcImg->sampleInfo.product > 1);
+        srcType = pSrcImg->createInfo.imageType;
         srcAspect = srcRes->u.img.subRes.aspectMask;
 
         if ((pSrcImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
@@ -1924,8 +2008,8 @@ static uint32_t halti5_detect_blit_kind(
         fmtInfo = &g_vkFormatInfoTable[srcFormat];
         srcParts = fmtInfo->partCount;
         srcCategory = fmtInfo->category;
-        srcType = pDstImg->createInfo.imageType;
         srcMsaa = VK_FALSE;
+        srcType = pDstImg->createInfo.imageType;
         srcAspect = dstRes->u.img.subRes.aspectMask;
     }
 
@@ -1949,7 +2033,6 @@ static uint32_t halti5_detect_blit_kind(
         dstFormat = pDstImg->formatInfo.residentImgFormat;
         dstParts = pDstImg->formatInfo.partCount;
         dstCategory = pDstImg->formatInfo.category;
-        dstBitsPerPixel = pDstImg->formatInfo.bitsPerBlock;
         dstMsaa = (pDstImg->sampleInfo.product > 1);
         dstType = pDstImg->createInfo.imageType;
 
@@ -2241,8 +2324,7 @@ static uint32_t halti5_detect_blit_kind(
 
     params->srcFormat = srcFormat;
     params->dstFormat = dstFormat;
-    params->srcParts = srcParts;
-    params->dstParts = dstParts;
+    params->partCount = 1;
 
     if (srcCategory != dstCategory)
     {
@@ -2250,69 +2332,15 @@ static uint32_t halti5_detect_blit_kind(
                          srcCategory, dstCategory);
         __VK_ASSERT(VK_FALSE);
     }
-    else if (srcRes->isImage && dstRes->isImage &&
-             srcBitsPerPixel >= 64 &&
-             srcMsaa != dstMsaa)
-    {
-        __VK_ASSERT(srcBitsPerPixel == dstBitsPerPixel);
-
-        switch (dstCategory)
-        {
-        case __VK_FMT_CATEGORY_SINT:
-            kind = HALTI5_BLIT_2D_SINT_DOWNSAMPLE;
-            break;
-        case __VK_FMT_CATEGORY_UINT:
-            kind = HALTI5_BLIT_2D_UINT_DOWNSAMPLE;
-            break;
-        default:
-            kind = HALTI5_BLIT_2D_SFLOAT_DOWNSAMPLE;
-            break;
-        }
-
-        if (srcParts == 2)
-        {
-            switch (srcFormat)
-            {
-                case __VK_FORMAT_R32G32B32A32_SFLOAT_2_R32G32_SFLOAT:
-                case __VK_FORMAT_R32G32B32A32_SINT_2_R32G32_SINT:
-                case __VK_FORMAT_R32G32B32A32_UINT_2_R32G32_UINT:
-                    params->packFormat = __PACK_FORMAT_R32G32B32A32;
-                    break;
-                case __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT:
-                case __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT:
-                case __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT:
-                    params->packFormat = __PACK_FORMAT_R16G16B16A16;
-                    break;
-                case __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT:
-                case __VK_FORMAT_R32G32_SINT_2_R32_SINT:
-                case __VK_FORMAT_R32G32_UINT_2_R32_UINT:
-                    params->packFormat = __PACK_FORMAT_R32G32;
-                    break;
-                default:
-                    __VK_ASSERT(!"invalid downsample format!");
-                    break;
-            }
-        }
-    }
     else if (srcParts != dstParts)
     {
         if (srcParts == 2 && dstParts == 1)
         {
-            /*if dst resource is buffer or image with 128 bpp native format which is a temp image created in __vk_CmdCopyImage,
-            then go blit buffer to 2layer iamge path*/
-            if (!dstRes->isImage || (srcBitsPerPixel == dstBitsPerPixel))
-            {
-                kind = HALTI5_BLIT_2LAYERS_IMG_TO_BUF;
-            }
+            kind = HALTI5_BLIT_2LAYERS_IMG_TO_BUF;
         }
         else if (srcParts == 1 && dstParts == 2)
         {
-            /*if src resource is buffer or image with 128 bpp native format which is a temp image created in __vk_CmdCopyImage,
-            then go blit buffer to 2layer iamge path*/
-            if ((srcBitsPerPixel == dstBitsPerPixel) || !srcRes->isImage)
-            {
-                kind = HALTI5_BLIT_BUF_TO_2LAYERS_IMG;
-            }
+            kind = HALTI5_BLIT_BUF_TO_2LAYERS_IMG;
         }
         else
         {
@@ -2326,12 +2354,13 @@ static uint32_t halti5_detect_blit_kind(
     {
         kind = HALTI5_BLIT_COPY_2D_UNORM_FLOAT;
     }
-
-    if (kind == HALTI5_BLIT_NUM)
+    else
     {
+        params->partCount = srcParts;
+
         switch (dstFormat)
         {
-        case __VK_FORMAT_A4R4G4B4_UNFORM_PACK16:
+        case __VK_FORMAT_A4R4G4B4_UNORM_PACK16:
             kind = HALTI5_BLIT_2D_UNORM_TO_PACK16;
             params->dstFormat = VK_FORMAT_R16_UINT;
             params->packFormat = __PACK_FORMAT_A4R4G4B4;
@@ -2370,18 +2399,7 @@ static uint32_t halti5_detect_blit_kind(
                 kind = HALTI5_BLIT_2D_UINT;
                 break;
             default:
-                {
-                    if (devCtx->pPhyDevice->phyDevConfig.chipModel == gcv7000 &&
-                        devCtx->pPhyDevice->phyDevConfig.chipRevision == 0x6214)
-                    {
-                        /* Tune textureCoord for 8mscale. In this chip, will triger HW double rounding issue. */
-                        kind = HALTI5_BLIT_2D_UNORM_FLOAT_HWDOUBLEROUNDING;
-                    }
-                    else
-                    {
-                        kind = HALTI5_BLIT_2D_UNORM_FLOAT;
-                    }
-                }
+                kind = HALTI5_BLIT_2D_UNORM_FLOAT;
                 break;
             }
             break;
@@ -2393,6 +2411,7 @@ static uint32_t halti5_detect_blit_kind(
             kind += (HALTI5_BLIT_3D_UNORM_FLOAT - HALTI5_BLIT_2D_UNORM_FLOAT);
         }
     }
+
     return kind;
 }
 
@@ -2751,8 +2770,11 @@ __VK_INLINE VkResult halti5_triggerComputeShader(
     ** Program the compute dispatch
     */
     {
+        halti5_module *chipModule = (halti5_module *)devCtx->chipPriv;
         uint32_t threadAllocation = gcmCEIL((gctFLOAT)(pHints->workGrpSize.x * pHints->workGrpSize.y * pHints->workGrpSize.z)
                                   / (devCtx->database->NumShaderCores * 4));
+        uint32_t localMemSizeInByte = 0;
+        uint32_t groupNumberPerCluster = 0;
         uint32_t workGroupCountX, workGroupCountY, workGroupCountZ;
 
         workGroupCountX = gcmCEIL((float)params->dstExtent.width  / VIV_LOCAL_X);
@@ -2780,6 +2802,54 @@ __VK_INLINE VkResult halti5_triggerComputeShader(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24))));
+
+        if (devCtx->database->PSCS_THROTTLE)
+        {
+            localMemSizeInByte = gcmCEIL((gctFLOAT)pHints->localMemSizeInByte  / 16.0);
+        }
+        if (chipModule->clusterInfo.clusterAliveMask > 0)
+        {
+            uint32_t allocationSize = pHints->workGrpSize.x * pHints->workGrpSize.y * pHints->workGrpSize.z;
+
+            groupNumberPerCluster = (devCtx->database->NumShaderCores * 4
+                * (pHints->fsIsDual16 ? 2 : 1)) / allocationSize;
+            groupNumberPerCluster = groupNumberPerCluster > 1 ? groupNumberPerCluster -1 : 0;
+            groupNumberPerCluster = __VK_MIN(groupNumberPerCluster, 63);
+        }
+
+        __vkCmdLoadSingleHWState(states, 0x0249, VK_FALSE,
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (localMemSizeInByte) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
+             | (devCtx->database->SH_MULTI_WG_PACK ?
+                 ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1))))))) << (0 ?
+ 16:16))) | (((gctUINT32) ((gctUINT32) ((pHints->threadGroupSync ?
+ 0x0 : 0x1)) & ((gctUINT32) ((((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ? 16:16))) : 0)
+             | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:20) - (0 ?
+ 25:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 25:20) - (0 ?
+ 25:20) + 1))))))) << (0 ?
+ 25:20))) | (((gctUINT32) ((gctUINT32) (groupNumberPerCluster) & ((gctUINT32) ((((1 ?
+ 25:20) - (0 ?
+ 25:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 25:20) - (0 ? 25:20) + 1))))))) << (0 ? 25:20))));
 
         __vkCmdLoadSingleHWState(states, 0x0247, VK_FALSE, threadAllocation);
 
@@ -2844,6 +2914,93 @@ __VK_INLINE VkResult halti5_triggerComputeShader(
     return VK_SUCCESS;
 }
 
+static VkResult halti5_addAllocationForCompute(
+    uint32_t **states,
+    halti5_vscprogram_blit *blitProg
+    )
+{
+    VkResult result = VK_SUCCESS;
+    gcsHINT_PTR pHints = &blitProg->hwStates.hints;
+
+    if (pHints->unifiedStatus.constCount)
+    {
+        /* now, always copy.*/
+        __vkCmdLoadSingleHWState(states, 0x042B, VK_FALSE,
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 8:0) - (0 ?
+ 8:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 8:0) - (0 ?
+ 8:0) + 1))))))) << (0 ?
+ 8:0))) | (((gctUINT32) ((gctUINT32) (pHints->unifiedStatus.constCount) & ((gctUINT32) ((((1 ?
+ 8:0) - (0 ?
+ 8:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 8:0) - (0 ? 8:0) + 1))))))) << (0 ? 8:0)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ?
+ 31:31))) | (((gctUINT32) ((gctUINT32) (gcvTRUE) & ((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ? 31:31)))
+            );
+    }
+
+    if (pHints->unifiedStatus.samplerCount)
+    {
+        __vkCmdLoadSingleHWState(states, 0x042C, VK_FALSE,
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 6:0) - (0 ?
+ 6:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 6:0) - (0 ?
+ 6:0) + 1))))))) << (0 ?
+ 6:0))) | (((gctUINT32) ((gctUINT32) (pHints->unifiedStatus.samplerCount) & ((gctUINT32) ((((1 ?
+ 6:0) - (0 ?
+ 6:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ? 6:0)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ?
+ 31:31))) | (((gctUINT32) ((gctUINT32) (gcvTRUE) & ((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ? 31:31)))
+            );
+
+        __vkCmdLoadSingleHWState(states, 0x042D, VK_FALSE,
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 6:0) - (0 ?
+ 6:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 6:0) - (0 ?
+ 6:0) + 1))))))) << (0 ?
+ 6:0))) | (((gctUINT32) ((gctUINT32) (pHints->unifiedStatus.samplerCount) & ((gctUINT32) ((((1 ?
+ 6:0) - (0 ?
+ 6:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ? 6:0)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ?
+ 31:31))) | (((gctUINT32) ((gctUINT32) (gcvTRUE) & ((gctUINT32) ((((1 ?
+ 31:31) - (0 ?
+ 31:31) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ? 31:31)))
+            );
+    }
+
+    return result;
+}
+
 VkResult halti5_computeBlit(
     VkCommandBuffer cmdBuf,
     __vkBlitRes *srcRes,
@@ -2859,7 +3016,6 @@ VkResult halti5_computeBlit(
     VkResult result = VK_SUCCESS;
     __vkComputeBlitParams params;
     halti5_vscprogram_blit *blitProg = gcvNULL;
-
     uint32_t blitKind = HALTI5_BLIT_NUM;
 
     __VK_MEMZERO(&params, sizeof(params));
@@ -2870,10 +3026,11 @@ VkResult halti5_computeBlit(
         params.reverse = *reverse;
     }
     params.txSwizzles = gcvNULL;
+    params.partCount = 1;
     params.packFormat = __PACK_FORMAT_INVALID;
     params.channelWriteMask = __CHANNEL_MASK_RGBA;
 
-    blitKind = halti5_detect_blit_kind(pCmdBuf, srcRes, dstRes, &params, filter);
+    blitKind = halti5_detect_blit_kind(srcRes, dstRes, &params, filter);
     if (blitKind >= HALTI5_BLIT_NUM)
     {
         __VK_ONERROR(VK_NOT_READY);
@@ -2882,45 +3039,6 @@ VkResult halti5_computeBlit(
     blitProg = halti5_GetComputeBlitProg(devCtx, blitKind);
 
     scatch = scatchBegin = &pCmdBuf->scratchCmdBuffer[pCmdBuf->curScrachBufIndex];
-
-    if (blitKind >= HALTI5_BLIT_2D_SFLOAT_DOWNSAMPLE &&
-        blitKind <= HALTI5_BLIT_2D_UINT_DOWNSAMPLE)
-    {
-        uint32_t stall = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 4:0) - (0 ?
- 4:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 4:0) - (0 ?
- 4:0) + 1))))))) << (0 ?
- 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
- 4:0) - (0 ?
- 4:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
-                       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 12:8) - (0 ?
- 12:8) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 12:8) - (0 ?
- 12:8) + 1))))))) << (0 ?
- 12:8))) | (((gctUINT32) (0x07 & ((gctUINT32) ((((1 ?
- 12:8) - (0 ?
- 12:8) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)));
-
-        __vkCmdLoadSingleHWState(&scatch, 0x0E02, VK_FALSE, stall);
-        *(*&scatch)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ?
- 31:27) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 31:27) - (0 ?
- 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ?
- 31:27) - (0 ?
- 31:27) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)));*(*&scatch)++ = (stall);
-;
-
-    }
 
     if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
     {
@@ -2941,12 +3059,20 @@ VkResult halti5_computeBlit(
 
     }
 
-    __VK_ONERROR(blitProg->program_src(pCmdBuf, blitProg, &scatch, srcRes, dstRes, filter, &params));
-    __VK_ONERROR(blitProg->program_dst(pCmdBuf, blitProg, &scatch, srcRes, dstRes, &params));
-    __VK_ONERROR(blitProg->program_const(pCmdBuf, blitProg, &scatch, &params));
+    if (devCtx->database->SMALLBATCH && devCtx->pPhyDevice->phyDevConfig.options.smallBatch)
+    {
+        __VK_ONERROR(halti5_addAllocationForCompute(&scatch, blitProg));
+    }
 
-    /* program compute shader.*/
-    __VK_ONERROR(halti5_triggerComputeShader(devCtx, &scatch, blitProg, &params));
+    for (params.partIndex = 0; params.partIndex < params.partCount; ++params.partIndex)
+    {
+        __VK_ONERROR(blitProg->program_src(pCmdBuf, blitProg, &scatch, srcRes, dstRes, filter, &params));
+        __VK_ONERROR(blitProg->program_dst(pCmdBuf, blitProg, &scatch, srcRes, dstRes, &params));
+        __VK_ONERROR(blitProg->program_const(pCmdBuf, blitProg, &scatch, &params));
+
+        /* program compute shader.*/
+        __VK_ONERROR(halti5_triggerComputeShader(devCtx, &scatch, blitProg, &params));
+    }
 
     if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
     {
@@ -3054,14 +3180,13 @@ VkResult halti5_computeClear(
     VkResult result = VK_SUCCESS;
     __vkComputeBlitParams params;
     halti5_vscprogram_blit *blitProg = gcvNULL;
-    gcsHINT_PTR pHints = gcvNULL;
     uint32_t partIndex = 0;
     uint32_t blitKind = HALTI5_BLIT_NUM;
     __vkImage *pDstImg;
     uint32_t bitsPerPixel;
     uint32_t tmpClearValue[4];
 
-    if(dstRes->isImage)
+    if (dstRes->isImage)
     {
         if (dstRes->u.img.pImage->formatInfo.partCount == 2)
         {
@@ -3084,7 +3209,6 @@ VkResult halti5_computeClear(
     }
 
     blitProg = halti5_GetComputeBlitProg(devCtx, blitKind);
-    pHints = &blitProg->hwStates.hints;
 
     scatch = scatchBegin = &pCmdBuf->scratchCmdBuffer[pCmdBuf->curScrachBufIndex];
 
@@ -3109,7 +3233,7 @@ VkResult halti5_computeClear(
 
      __VK_MEMZERO(&params, sizeof(params));
 
-    if(dstRes->isImage)
+    if (dstRes->isImage)
     {
         pDstImg = dstRes->u.img.pImage;
 
@@ -3129,39 +3253,125 @@ VkResult halti5_computeClear(
          switch (bitsPerPixel)
          {
          case 64:
-             {
-                 params.uClearValue0[0] =  tmpClearValue[0] & 0x0000FFFF;
-                 params.uClearValue0[1] = (tmpClearValue[0] & 0xFFFF0000) >> 16;
-                 params.uClearValue0[2] =  tmpClearValue[1] & 0x0000FFFF;
-                 params.uClearValue0[3] = (tmpClearValue[1] & 0xFFFF0000) >> 16;
-             }break;
-         case 128:
-             {
-                 params.uClearValue0[0] =  tmpClearValue[0] & 0x0000FFFF;
-                 params.uClearValue0[1] = (tmpClearValue[0] & 0xFFFF0000) >> 16;
-                 params.uClearValue0[2] =  tmpClearValue[1] & 0x0000FFFF;
-                 params.uClearValue0[3] = (tmpClearValue[1] & 0xFFFF0000) >> 16;
+             params.uClearValue0[0] =  tmpClearValue[0] & 0x0000FFFF;
+             params.uClearValue0[1] = (tmpClearValue[0] & 0xFFFF0000) >> 16;
+             params.uClearValue0[2] =  tmpClearValue[1] & 0x0000FFFF;
+             params.uClearValue0[3] = (tmpClearValue[1] & 0xFFFF0000) >> 16;
+             break;
 
-                 params.uClearValue1[0] =  tmpClearValue[2] & 0x0000FFFF;
-                 params.uClearValue1[1] = (tmpClearValue[2] & 0xFFFF0000) >> 16;
-                 params.uClearValue1[2] =  tmpClearValue[3] & 0x0000FFFF;
-                 params.uClearValue1[3] = (tmpClearValue[3] & 0xFFFF0000) >> 16;
-             }break;
+         case 128:
+             params.uClearValue0[0] =  tmpClearValue[0] & 0x0000FFFF;
+             params.uClearValue0[1] = (tmpClearValue[0] & 0xFFFF0000) >> 16;
+             params.uClearValue0[2] =  tmpClearValue[1] & 0x0000FFFF;
+             params.uClearValue0[3] = (tmpClearValue[1] & 0xFFFF0000) >> 16;
+
+             params.uClearValue1[0] =  tmpClearValue[2] & 0x0000FFFF;
+             params.uClearValue1[1] = (tmpClearValue[2] & 0xFFFF0000) >> 16;
+             params.uClearValue1[2] =  tmpClearValue[3] & 0x0000FFFF;
+             params.uClearValue1[3] = (tmpClearValue[3] & 0xFFFF0000) >> 16;
+             break;
+
          default:
-             {
-                 params.uClearValue0[0] =  tmpClearValue[0] & 0x000000FF;
-                 params.uClearValue0[1] = (tmpClearValue[0] & 0x0000FF00) >> 8;
-                 params.uClearValue0[2] = (tmpClearValue[0] & 0x00FF0000) >> 16;
-                 params.uClearValue0[3] = (tmpClearValue[0] & 0xFF000000) >> 24;
-             }break;
+             params.uClearValue0[0] =  tmpClearValue[0] & 0x000000FF;
+             params.uClearValue0[1] = (tmpClearValue[0] & 0x0000FF00) >> 8;
+             params.uClearValue0[2] = (tmpClearValue[0] & 0x00FF0000) >> 16;
+             params.uClearValue0[3] = (tmpClearValue[0] & 0xFF000000) >> 24;
+             break;
          }
     }
     else
     {
-
         params.uClearValue0[0] = clearValue->color.int32[0];
     }
 
+    if (devCtx->database->SMALLBATCH && devCtx->pPhyDevice->phyDevConfig.options.smallBatch)
+    {
+        __VK_ONERROR(halti5_addAllocationForCompute(&scatch, blitProg));
+    }
+    __VK_ONERROR(blitProg->program_dst(pCmdBuf, blitProg, &scatch, VK_NULL_HANDLE, dstRes, &params));
+    __VK_ONERROR(blitProg->program_const(pCmdBuf, blitProg, &scatch, &params));
+
+    /* program compute shader.*/
+    __VK_ONERROR(halti5_triggerComputeShader(devCtx, &scatch, blitProg, &params));
+
+    if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+    {
+        *(*&scatch)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_ALL_MASK);*(*&scatch)++ = 0;
+;
+
+
+        halti5_setMultiGpuSync((VkDevice)devCtx, &scatch, VK_NULL_HANDLE);
+    }
+
+    pCmdBuf->curScrachBufIndex += (uint32_t)(scatch - scatchBegin);
+    __VK_ASSERT(pCmdBuf->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);
+
+    __vk_CmdAquireBuffer(cmdBuf, pCmdBuf->curScrachBufIndex, &states);
+    __VK_MEMCOPY(states, pCmdBuf->scratchCmdBuffer, pCmdBuf->curScrachBufIndex * sizeof(uint32_t));
+    __vk_CmdReleaseBuffer(cmdBuf, pCmdBuf->curScrachBufIndex);
+
+OnError:
+    pCmdBuf->curScrachBufIndex = 0;
+    return result;
+}
+
+VkResult halti5_computeCopyOQQueryPool(
+    VkCommandBuffer cmdBuf,
+    __vkBlitRes *srcRes,
+    __vkBlitRes *dstRes
+    )
+{
+    __vkCommandBuffer *pCmdBuf = (__vkCommandBuffer*)cmdBuf;
+    __vkDevContext *devCtx = pCmdBuf->devCtx;
+    uint32_t *scatch, *scatchBegin, *states;
+    VkResult result = VK_SUCCESS;
+    __vkComputeBlitParams params;
+    halti5_vscprogram_blit *blitProg = gcvNULL;
+    uint32_t blitKind = HALTI5_BLIT_NUM;
+
+    /* set kind.*/
+    blitKind = HALTI5_BLIT_COPY_OQ_QUERY_POOL;
+
+    blitProg = halti5_GetComputeBlitProg(devCtx, blitKind);
+
+    scatch = scatchBegin = &pCmdBuf->scratchCmdBuffer[pCmdBuf->curScrachBufIndex];
+
+    if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+    {
+        halti5_setMultiGpuSync((VkDevice)devCtx, &scatch, VK_NULL_HANDLE);
+
+        *(*&scatch)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_0_MASK << (0));*(*&scatch)++ = 0;
+;
+
+    }
+
+    __VK_MEMZERO(&params, sizeof(params));
+
+    if (devCtx->database->SMALLBATCH && devCtx->pPhyDevice->phyDevConfig.options.smallBatch)
+    {
+        __VK_ONERROR(halti5_addAllocationForCompute(&scatch, blitProg));
+    }
+    __VK_ONERROR(blitProg->program_src(pCmdBuf, blitProg, &scatch, srcRes, VK_NULL_HANDLE, VK_FILTER_NEAREST, &params));
     __VK_ONERROR(blitProg->program_dst(pCmdBuf, blitProg, &scatch, VK_NULL_HANDLE, dstRes, &params));
     __VK_ONERROR(blitProg->program_const(pCmdBuf, blitProg, &scatch, &params));
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -838,134 +838,6 @@ struct __gllc_CompressedTexSubImage2D_Rec {
     GLsizei imageSize;
 };
 
-struct __gllc_ColorTable_Rec {
-    GLenum target;
-    GLenum internalformat;
-    GLsizei width;
-    GLenum format;
-    GLenum type;
-    GLsizei imageSize;
-    const GLvoid *table;
-};
-
-struct __gllc_ColorSubTable_Rec {
-    GLenum target;
-    GLsizei start;
-    GLsizei count;
-    GLenum format;
-    GLenum type;
-    GLsizei imageSize;
-    const GLvoid *table;
-};
-
-struct __gllc_CopyColorTable_Rec {
-    GLenum target;
-    GLenum internalformat;
-    GLint x;
-    GLint y;
-    GLsizei width;
-};
-
-struct __gllc_CopyColorSubTable_Rec {
-    GLenum target;
-    GLsizei start;
-    GLint x;
-    GLint y;
-    GLsizei width;
-};
-
-struct __gllc_ColorTableParameteriv_Rec {
-    GLenum target;
-    GLenum pname;
-};
-
-struct __gllc_ColorTableParameterfv_Rec {
-    GLenum target;
-    GLenum pname;
-};
-
-struct __gllc_ConvolutionFilter1D_Rec {
-    GLenum target;
-    GLenum internalformat;
-    GLsizei width;
-    GLenum format;
-    GLenum type;
-    GLsizei imageSize;
-    const GLvoid *image;
-};
-
-struct __gllc_ConvolutionFilter2D_Rec {
-    GLenum target;
-    GLenum internalformat;
-    GLsizei width;
-    GLsizei height;
-    GLenum format;
-    GLenum type;
-    const GLvoid *image;
-    GLsizei imageSize;
-};
-
-struct __gllc_SeparableFilter2D_Rec {
-    GLenum target;
-    GLenum internalformat;
-    GLsizei width;
-    GLsizei height;
-    GLenum format;
-    GLenum type;
-    const GLvoid *row;
-    const GLvoid *col;
-    GLsizei rowSize;
-    GLsizei colSize;
-};
-
-struct __gllc_CopyConvolutionFilter1D_Rec {
-    GLenum target;
-    GLenum internalformat;
-    GLint x;
-    GLint y;
-    GLsizei width;
-};
-
-struct __gllc_CopyConvolutionFilter2D_Rec {
-    GLenum target;
-    GLenum internalformat;
-    GLint x;
-    GLint y;
-    GLsizei width;
-    GLsizei height;
-};
-
-struct __gllc_ConvolutionParameteriv_Rec {
-    GLenum target;
-    GLenum pname;
-};
-
-struct __gllc_ConvolutionParameterfv_Rec {
-    GLenum target;
-    GLenum pname;
-};
-
-struct __gllc_Histogram_Rec {
-    GLenum target;
-    GLsizei width;
-    GLenum internalformat;
-    GLboolean sink;
-};
-
-struct __gllc_ResetHistogram_Rec {
-    GLenum target;
-};
-
-struct __gllc_Minmax_Rec {
-    GLenum target;
-    GLenum internalFormat;
-    GLboolean sink;
-};
-
-struct __gllc_ResetMinmax_Rec {
-    GLenum target;
-};
-
 struct __gllc_TexImage3D_Rec {
     GLenum target;
     GLint lod;
@@ -1430,12 +1302,10 @@ struct __gllc_ProgramLocalParameters4fvEXT_Rec {
 };
 #endif
 
-#if GL_ARB_color_buffer_float
-struct __gllc_ClampColorARB_Rec {
+struct __gllc_ClampColor_Rec {
     GLenum target;
     GLenum clamp;
 };
-#endif
 
 #if GL_ATI_separate_stencil
 struct __gllc_StencilFuncSeparateATI_Rec {
@@ -1457,8 +1327,6 @@ extern GLint __glMaterial_size(GLenum pname);
 extern GLint __glTexParameter_size(GLenum e);
 extern GLint __glTexEnv_size(GLenum e);
 extern GLint __glTexGen_size(GLenum e);
-extern GLint __glConvolutionParameter_size(GLenum pname);
-extern GLint __glColorTableParameter_size(GLenum pname);
 extern GLint __glPointParameter_size(GLenum pname);
 extern GLenum __glErrorCheckMaterial(GLenum face, GLenum p, GLfloat pv0);
 

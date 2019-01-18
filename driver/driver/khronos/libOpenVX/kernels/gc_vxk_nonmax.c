@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -14,8 +14,7 @@
 #include <gc_vxk_common.h>
 
 #if VIV_NONMAX_SUPPRESSION
-
-vx_status vxNonMaxSuppression(vx_node node, vx_image i_mag, vx_image i_ang, vx_image i_edge, vx_border_t *borders)
+vx_status vxNonMaxSuppressionCanny(vx_node node, vx_image i_mag, vx_image i_ang, vx_image i_edge, vx_border_t *borders)
 {
     vx_status status = VX_SUCCESS;
     vx_uint32 constantData[2] = {0, 16};
@@ -58,7 +57,7 @@ vx_status vxNonMaxSuppression(vx_node node, vx_image i_mag, vx_image i_ang, vx_i
     kernelContext->uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
     kernelContext->uniform_num = 1;
 
-    kernelContext->params.kernel   = gcvVX_KERNEL_NONMAXSUPPRESSION;
+    kernelContext->params.kernel   = gcvVX_KERNEL_NONMAXSUPPRESSION_CANNY;
 
 #if gcdVX_OPTIMIZER
     kernelContext->borders         = borders->mode;
@@ -215,10 +214,7 @@ vx_status vxEuclideanNonMax_Sort(vx_node node, vx_scalar point_count, vx_image p
 
     status |= gcfVX_Kernel(kernelContext);
 
-    if (kernelContext)
-    {
-        vxFree(kernelContext);
-    }
+    vxFree(kernelContext);
 
     return status;
 }
@@ -274,10 +270,7 @@ vx_status vxEuclideanNonMaxSuppression_NonMax(vx_node node, vx_image arrays, vx_
 
     status |= gcfVX_Kernel(kernelContext);
 
-    if (kernelContext)
-    {
-        vxFree(kernelContext);
-    }
+    vxFree(kernelContext);
 
     return status;
 }
@@ -294,8 +287,8 @@ vx_status vxEuclideanNonMaxSuppression(vx_node node, vx_image src, vx_scalar thr
         vx_image point_array_s = vxCreateImage(context, 6, size, VX_DF_IMAGE_S16);
         vx_image sort_array_s = vxCreateImage(context, 6, size, VX_DF_IMAGE_S16);
 
-        vxoImage_AllocateMemory(point_array_s);
-        vxoImage_AllocateMemory(sort_array_s);
+        vxmONERROR_FALSE(vxoImage_AllocateMemory(point_array_s));
+        vxmONERROR_FALSE(vxoImage_AllocateMemory(sort_array_s));
 
         vxZeroMemory(dst->memory.logicals[0], sizeof(vx_float32) * dst->width * dst->height);
 
@@ -379,6 +372,8 @@ vx_status vxEuclideanNonMaxSuppression(vx_node node, vx_image src, vx_scalar thr
 #endif
         }
     }
+
+OnError:
     return status;
 }
 #endif

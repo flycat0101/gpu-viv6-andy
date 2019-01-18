@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -36,6 +36,14 @@ typedef struct _VSC_CHIP_STATES_PROGRAMMER
     gctUINT               nextStateAddr;
 
     struct _gcsHINT*      pHints;
+
+    gctUINT32*            pStateDelta;
+
+    /* Followings are at UINT size granularity */
+    gctUINT32             stateDeltaAllocSize;
+    gctUINT32             nextStateDeltaAddr;
+
+    gcsPROGRAM_VidMemPatchOffset patchOffsetsInDW;
 }VSC_CHIP_STATES_PROGRAMMER;
 
 VSC_ErrCode vscInitializeChipStatesProgrammer(VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer,

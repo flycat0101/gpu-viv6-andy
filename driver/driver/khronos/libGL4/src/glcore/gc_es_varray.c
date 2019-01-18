@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -31,9 +31,6 @@ __GL_INLINE GLvoid __glVertexAttrib4f(__GLcontext *gc, GLuint index, GLfloat x, 
         __GL_ERROR_RET(GL_INVALID_VALUE);
     }
 
-#ifdef OPENGL40
-    index = index + __GL_VARRAY_ATT0_INDEX;
-#endif
 
     gc->state.current.attribute[index].f.x = x;
     gc->state.current.attribute[index].f.y = y;
@@ -49,10 +46,6 @@ __GL_INLINE GLvoid __glVertexAttribI4ui(__GLcontext *gc, GLuint index, GLuint ix
         __GL_ERROR_RET(GL_INVALID_VALUE);
     }
 
-#ifdef OPENGL40
-    index = index + __GL_VARRAY_ATT0_INDEX;
-#endif
-
     gc->state.current.attribute[index].i.ix = ix;
     gc->state.current.attribute[index].i.iy = iy;
     gc->state.current.attribute[index].i.iz = iz;
@@ -60,7 +53,7 @@ __GL_INLINE GLvoid __glVertexAttribI4ui(__GLcontext *gc, GLuint index, GLuint ix
 
 }
 
-GLvoid GL_APIENTRY __gles_VertexAttrib1f(__GLcontext *gc, GLuint index, GLfloat x)
+GLvoid GL_APIENTRY __glim_VertexAttrib1f(__GLcontext *gc, GLuint index, GLfloat x)
 {
     __GL_HEADER();
 
@@ -69,7 +62,7 @@ GLvoid GL_APIENTRY __gles_VertexAttrib1f(__GLcontext *gc, GLuint index, GLfloat 
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_VertexAttrib1fv(__GLcontext *gc, GLuint index, const GLfloat *v)
+GLvoid GL_APIENTRY __glim_VertexAttrib1fv(__GLcontext *gc, GLuint index, const GLfloat *v)
 {
     __GL_HEADER();
 
@@ -78,7 +71,7 @@ GLvoid GL_APIENTRY __gles_VertexAttrib1fv(__GLcontext *gc, GLuint index, const G
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_VertexAttrib2f(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y)
+GLvoid GL_APIENTRY __glim_VertexAttrib2f(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y)
 {
     __GL_HEADER();
 
@@ -87,7 +80,7 @@ GLvoid GL_APIENTRY __gles_VertexAttrib2f(__GLcontext *gc, GLuint index, GLfloat 
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_VertexAttrib2fv(__GLcontext *gc, GLuint index, const GLfloat *v)
+GLvoid GL_APIENTRY __glim_VertexAttrib2fv(__GLcontext *gc, GLuint index, const GLfloat *v)
 {
     __GL_HEADER();
 
@@ -96,7 +89,7 @@ GLvoid GL_APIENTRY __gles_VertexAttrib2fv(__GLcontext *gc, GLuint index, const G
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_VertexAttrib3f(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y, GLfloat z)
+GLvoid GL_APIENTRY __glim_VertexAttrib3f(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y, GLfloat z)
 {
     __GL_HEADER();
 
@@ -105,7 +98,7 @@ GLvoid GL_APIENTRY __gles_VertexAttrib3f(__GLcontext *gc, GLuint index, GLfloat 
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_VertexAttrib3fv(__GLcontext *gc, GLuint index, const GLfloat *v)
+GLvoid GL_APIENTRY __glim_VertexAttrib3fv(__GLcontext *gc, GLuint index, const GLfloat *v)
 {
     __GL_HEADER();
 
@@ -114,7 +107,7 @@ GLvoid GL_APIENTRY __gles_VertexAttrib3fv(__GLcontext *gc, GLuint index, const G
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_VertexAttrib4f(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
+GLvoid GL_APIENTRY __glim_VertexAttrib4f(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
 {
     __GL_HEADER();
 
@@ -123,7 +116,7 @@ GLvoid GL_APIENTRY __gles_VertexAttrib4f(__GLcontext *gc, GLuint index, GLfloat 
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_VertexAttrib4fv(__GLcontext *gc, GLuint index, const GLfloat *v)
+GLvoid GL_APIENTRY __glim_VertexAttrib4fv(__GLcontext *gc, GLuint index, const GLfloat *v)
 {
     __GL_HEADER();
 
@@ -132,7 +125,7 @@ GLvoid GL_APIENTRY __gles_VertexAttrib4fv(__GLcontext *gc, GLuint index, const G
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_VertexAttribI4i(__GLcontext *gc, GLuint index, GLint x, GLint y, GLint z, GLint w)
+GLvoid GL_APIENTRY __glim_VertexAttribI4i(__GLcontext *gc, GLuint index, GLint x, GLint y, GLint z, GLint w)
 {
     __GL_HEADER();
 
@@ -141,7 +134,7 @@ GLvoid GL_APIENTRY __gles_VertexAttribI4i(__GLcontext *gc, GLuint index, GLint x
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_VertexAttribI4ui(__GLcontext *gc, GLuint index, GLuint x, GLuint y, GLuint z, GLuint w)
+GLvoid GL_APIENTRY __glim_VertexAttribI4ui(__GLcontext *gc, GLuint index, GLuint x, GLuint y, GLuint z, GLuint w)
 {
     __GL_HEADER();
 
@@ -150,7 +143,7 @@ GLvoid GL_APIENTRY __gles_VertexAttribI4ui(__GLcontext *gc, GLuint index, GLuint
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_VertexAttribI4iv(__GLcontext *gc, GLuint index, const GLint *v)
+GLvoid GL_APIENTRY __glim_VertexAttribI4iv(__GLcontext *gc, GLuint index, const GLint *v)
 {
     __GL_HEADER();
 
@@ -159,7 +152,7 @@ GLvoid GL_APIENTRY __gles_VertexAttribI4iv(__GLcontext *gc, GLuint index, const 
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_VertexAttribI4uiv(__GLcontext *gc, GLuint index, const GLuint *v)
+GLvoid GL_APIENTRY __glim_VertexAttribI4uiv(__GLcontext *gc, GLuint index, const GLuint *v)
 {
     __GL_HEADER();
 
@@ -500,10 +493,17 @@ GLvoid APIENTRY __glim_GetVertexAttribdv(__GLcontext *gc,  GLuint index, GLenum 
     case GL_CURRENT_VERTEX_ATTRIB:
         if(index > 0)
         {
+#ifdef OPENGL40
+            *params++ = gc->state.current.currentState[index].f.x;
+            *params++ = gc->state.current.currentState[index].f.y;
+            *params++ = gc->state.current.currentState[index].f.z;
+            *params++ = gc->state.current.currentState[index].f.w;
+#else
             *params++ = gc->state.current.attribute[index].f.x;
             *params++ = gc->state.current.attribute[index].f.y;
             *params++ = gc->state.current.attribute[index].f.z;
             *params++ = gc->state.current.attribute[index].f.w;
+#endif
         }
         else
             __glSetError(gc, GL_INVALID_OPERATION);
@@ -561,7 +561,7 @@ GLsizei g_minVertexNumber[] =
 static GLboolean __glCheckVAOState(__GLcontext *gc, GLboolean attribMustFromVBO, GLboolean IdxMustFromVBO)
 {
     GLuint index = 0;
-    GLuint attribEnabled;
+    GLuint64 attribEnabled;
     __GLbufferObject *boundIdxObj = __glGetBoundBufObj(gc, __GL_ELEMENT_ARRAY_BUFFER_INDEX);
     __GLvertexArrayState *curVertexArray = &gc->vertexArray.boundVAO->vertexArray;
 
@@ -795,7 +795,7 @@ __GL_INLINE GLvoid __glDrawRangeElements(__GLcontext *gc, GLenum mode, GLsizei c
     __glDrawPrimitive(gc, mode);
 }
 
-GLvoid GL_APIENTRY __gles_VertexAttribPointer(__GLcontext *gc, GLuint index, GLint size, GLenum type,
+GLvoid GL_APIENTRY __glim_VertexAttribPointer(__GLcontext *gc, GLuint index, GLint size, GLenum type,
                                               GLboolean normalized, GLsizei stride, const GLvoid *pointer)
 {
     __GL_HEADER();
@@ -823,6 +823,9 @@ GLvoid GL_APIENTRY __gles_VertexAttribPointer(__GLcontext *gc, GLuint index, GLi
     case GL_FIXED:
     case GL_FLOAT:
     case GL_HALF_FLOAT_OES:
+#ifdef OPENGL40
+    case GL_DOUBLE:
+#endif
         break;
 
     /* GL_OES_vertex_type_10_10_10_2 requires INVALID value error */
@@ -864,7 +867,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_VertexAttribIPointer(__GLcontext *gc, GLuint index, GLint size, GLenum type,
+GLvoid GL_APIENTRY __glim_VertexAttribIPointer(__GLcontext *gc, GLuint index, GLint size, GLenum type,
                                                GLsizei stride, const GLvoid *pointer)
 {
     __GL_HEADER();
@@ -909,7 +912,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_EnableVertexAttribArray(__GLcontext *gc, GLuint index)
+GLvoid GL_APIENTRY __glim_EnableVertexAttribArray(__GLcontext *gc, GLuint index)
 {
     __GLvertexArrayState * pVertexArrayState = &gc->vertexArray.boundVAO->vertexArray;
 
@@ -924,9 +927,9 @@ GLvoid GL_APIENTRY __gles_EnableVertexAttribArray(__GLcontext *gc, GLuint index)
     index = index + __GL_VARRAY_ATT0_INDEX;
 #endif
 
-    if ((pVertexArrayState->attribEnabled & (__GL_ONE_32 << index)) == 0)
+    if ((pVertexArrayState->attribEnabled & (__GL_ONE_64 << index)) == 0)
     {
-        pVertexArrayState->attribEnabled |= (__GL_ONE_32 << index);
+        pVertexArrayState->attribEnabled |= (__GL_ONE_64 << index);
         __GL_SET_VARRAY_ENABLE_BIT(gc);
     }
 
@@ -934,7 +937,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DisableVertexAttribArray(__GLcontext *gc, GLuint index)
+GLvoid GL_APIENTRY __glim_DisableVertexAttribArray(__GLcontext *gc, GLuint index)
 {
     __GLvertexArrayState * pVertexArrayState = &gc->vertexArray.boundVAO->vertexArray;
 
@@ -949,9 +952,9 @@ GLvoid GL_APIENTRY __gles_DisableVertexAttribArray(__GLcontext *gc, GLuint index
     index = index + __GL_VARRAY_ATT0_INDEX;
 #endif
 
-    if (pVertexArrayState->attribEnabled & (__GL_ONE_32 << index))
+    if (pVertexArrayState->attribEnabled & (__GL_ONE_64 << index))
     {
-        pVertexArrayState->attribEnabled &= ~(__GL_ONE_32 << index);
+        pVertexArrayState->attribEnabled &= ~(__GL_ONE_64 << index);
         __GL_SET_VARRAY_ENABLE_BIT(gc);
     }
 
@@ -959,7 +962,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DrawElements(__GLcontext *gc, GLenum mode, GLsizei count, GLenum type,
+GLvoid GL_APIENTRY __glim_DrawElements(__GLcontext *gc, GLenum mode, GLsizei count, GLenum type,
                                        const GLvoid *indices)
 {
     __GL_HEADER();
@@ -1020,7 +1023,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_VertexAttribDivisor(__GLcontext *gc, GLuint index, GLuint divisor)
+GLvoid GL_APIENTRY __glim_VertexAttribDivisor(__GLcontext *gc, GLuint index, GLuint divisor)
 {
     __GLvertexArrayState *vertexArrayState = &gc->vertexArray.boundVAO->vertexArray;
     __GLvertexAttrib *pAttrib;
@@ -1100,7 +1103,7 @@ __GL_INLINE GLvoid __glDrawArraysInstanced(__GLcontext *gc, GLenum mode, GLint f
 }
 
 
-GLvoid GL_APIENTRY __gles_DrawArraysInstanced(__GLcontext *gc, GLenum mode, GLint first, GLsizei count,
+GLvoid GL_APIENTRY __glim_DrawArraysInstanced(__GLcontext *gc, GLenum mode, GLint first, GLsizei count,
                                               GLsizei instanceCount)
 {
     __GL_HEADER();
@@ -1110,7 +1113,7 @@ GLvoid GL_APIENTRY __gles_DrawArraysInstanced(__GLcontext *gc, GLenum mode, GLin
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DrawArrays(__GLcontext *gc, GLenum mode, GLint first, GLsizei count)
+GLvoid GL_APIENTRY __glim_DrawArrays(__GLcontext *gc, GLenum mode, GLint first, GLsizei count)
 {
     __GL_HEADER();
 
@@ -1119,7 +1122,7 @@ GLvoid GL_APIENTRY __gles_DrawArrays(__GLcontext *gc, GLenum mode, GLint first, 
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DrawElementsInstanced(__GLcontext *gc, GLenum mode, GLsizei count, GLenum type,
+GLvoid GL_APIENTRY __glim_DrawElementsInstanced(__GLcontext *gc, GLenum mode, GLsizei count, GLenum type,
                                                 const GLvoid *indices, GLsizei instanceCount)
 {
     __GL_HEADER();
@@ -1175,7 +1178,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DrawRangeElements(__GLcontext *gc, GLenum mode, GLuint start, GLuint end,
+GLvoid GL_APIENTRY __glim_DrawRangeElements(__GLcontext *gc, GLenum mode, GLuint start, GLuint end,
                                             GLsizei count, GLenum type, const GLvoid *indices)
 {
     __GL_HEADER();
@@ -1228,7 +1231,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DrawArraysIndirect(__GLcontext *gc, GLenum mode, const void *indirect)
+GLvoid GL_APIENTRY __glim_DrawArraysIndirect(__GLcontext *gc, GLenum mode, const void *indirect)
 {
     GLsizeiptr offset = (GLsizeiptr)indirect;
     __GLbufferObject *indirectObj;
@@ -1295,7 +1298,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DrawElementsIndirect(__GLcontext *gc, GLenum mode, GLenum type, const void *indirect)
+GLvoid GL_APIENTRY __glim_DrawElementsIndirect(__GLcontext *gc, GLenum mode, GLenum type, const void *indirect)
 {
     GLsizeiptr offset = (GLsizeiptr)indirect;
     __GLbufferObject *indirectObj;
@@ -1373,8 +1376,8 @@ OnError:
 }
 
 #if GL_EXT_multi_draw_indirect
-GLvoid GL_APIENTRY __gles_MultiDrawArraysIndirectEXT(__GLcontext *gc, GLenum mode, const void *indirect,
-                                                     GLsizei drawcount, GLsizei stride)
+GLvoid GL_APIENTRY __glim_MultiDrawArraysIndirect(__GLcontext *gc, GLenum mode, const void *indirect,
+                                                  GLsizei drawcount, GLsizei stride)
 {
     GLsizeiptr offset = (GLsizeiptr)indirect;
     __GLbufferObject *indirectObj;
@@ -1457,8 +1460,8 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_MultiDrawElementsIndirectEXT(__GLcontext *gc, GLenum mode, GLenum type, const void *indirect,
-                                               GLsizei drawcount, GLsizei stride)
+GLvoid GL_APIENTRY __glim_MultiDrawElementsIndirect(__GLcontext *gc, GLenum mode, GLenum type, const void *indirect,
+                                                    GLsizei drawcount, GLsizei stride)
 {
     GLsizeiptr offset = (GLsizeiptr)indirect;
     __GLbufferObject *indirectObj;
@@ -1552,7 +1555,7 @@ OnError:
 }
 #endif
 
-GLvoid GL_APIENTRY __gles_DrawElementsBaseVertex(__GLcontext *gc, GLenum mode, GLsizei count, GLenum type, const void *indices, GLint basevertex)
+GLvoid GL_APIENTRY __glim_DrawElementsBaseVertex(__GLcontext *gc, GLenum mode, GLsizei count, GLenum type, const void *indices, GLint basevertex)
 {
     __GL_HEADER();
 
@@ -1605,7 +1608,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DrawRangeElementsBaseVertex(__GLcontext *gc, GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const void *indices, GLint basevertex)
+GLvoid GL_APIENTRY __glim_DrawRangeElementsBaseVertex(__GLcontext *gc, GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const void *indices, GLint basevertex)
 {
     __GL_HEADER();
 
@@ -1656,7 +1659,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DrawElementsInstancedBaseVertex(__GLcontext *gc, GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei instanceCount, GLint basevertex)
+GLvoid GL_APIENTRY __glim_DrawElementsInstancedBaseVertex(__GLcontext *gc, GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei instanceCount, GLint basevertex)
 {
     __GL_HEADER();
 
@@ -1710,9 +1713,7 @@ OnError:
     __GL_FOOTER();
 }
 
-
-#if GL_EXT_multi_draw_arrays && GL_EXT_draw_elements_base_vertex
-GLvoid GL_APIENTRY __gles_MultiDrawElementsBaseVertexEXT(__GLcontext *gc, GLenum mode, const GLsizei * count, GLenum type, const void *const *indices, GLsizei drawCount, const GLint * baseVertex)
+GLvoid GL_APIENTRY __glim_MultiDrawElementsBaseVertex(__GLcontext *gc, GLenum mode, const GLsizei * count, GLenum type, const void *const *indices, GLsizei drawCount, const GLint * baseVertex)
 {
     GLsizei i;
 
@@ -1725,15 +1726,14 @@ GLvoid GL_APIENTRY __gles_MultiDrawElementsBaseVertexEXT(__GLcontext *gc, GLenum
 
     for (i = 0; i < drawCount; ++i)
     {
-        __gles_DrawElementsBaseVertex(gc, mode, count[i], type, indices[i], baseVertex ? baseVertex[i] : 0);
+        __glim_DrawElementsBaseVertex(gc, mode, count[i], type, indices[i], baseVertex ? baseVertex[i] : 0);
     }
 
 OnError:
     __GL_FOOTER();
 }
-#endif
 
-GLvoid GL_APIENTRY __gles_GetVertexAttribfv(__GLcontext *gc,  GLuint index, GLenum pname, GLfloat *params)
+GLvoid GL_APIENTRY __glim_GetVertexAttribfv(__GLcontext *gc,  GLuint index, GLenum pname, GLfloat *params)
 {
     __GLvertexAttrib *pAttrib;
     __GLvertexAttribBinding *pAttribBinding;
@@ -1760,7 +1760,7 @@ GLvoid GL_APIENTRY __gles_GetVertexAttribfv(__GLcontext *gc,  GLuint index, GLen
         break;
 
     case GL_VERTEX_ATTRIB_ARRAY_ENABLED:
-        *params = (GLfloat)((pVertexArrayState->attribEnabled & (__GL_ONE_32 << index)) ? 1 : 0);
+        *params = (GLfloat)((pVertexArrayState->attribEnabled & (__GL_ONE_64 << index)) ? 1 : 0);
         break;
 
     case GL_VERTEX_ATTRIB_ARRAY_SIZE:
@@ -1784,10 +1784,17 @@ GLvoid GL_APIENTRY __gles_GetVertexAttribfv(__GLcontext *gc,  GLuint index, GLen
         break;
 
     case GL_CURRENT_VERTEX_ATTRIB:
+#ifdef OPENGL40
+        *params++ = gc->state.current.currentState[index].f.x;
+        *params++ = gc->state.current.currentState[index].f.y;
+        *params++ = gc->state.current.currentState[index].f.z;
+        *params++ = gc->state.current.currentState[index].f.w;
+#else
         *params++ = gc->state.current.attribute[index].f.x;
         *params++ = gc->state.current.attribute[index].f.y;
         *params++ = gc->state.current.attribute[index].f.z;
         *params++ = gc->state.current.attribute[index].f.w;
+#endif
         break;
 
     case GL_VERTEX_ATTRIB_ARRAY_DIVISOR:
@@ -1810,7 +1817,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetVertexAttribiv(__GLcontext *gc,  GLuint index, GLenum pname, GLint *params)
+GLvoid GL_APIENTRY __glim_GetVertexAttribiv(__GLcontext *gc,  GLuint index, GLenum pname, GLint *params)
 {
     __GLvertexAttrib *pAttrib;
     __GLvertexAttribBinding *pAttribBinding;
@@ -1837,7 +1844,7 @@ GLvoid GL_APIENTRY __gles_GetVertexAttribiv(__GLcontext *gc,  GLuint index, GLen
         break;
 
     case GL_VERTEX_ATTRIB_ARRAY_ENABLED:
-        *params = (pVertexArrayState->attribEnabled & (__GL_ONE_32 << index)) ? 1 : 0;
+        *params = (pVertexArrayState->attribEnabled & (__GL_ONE_64 << index)) ? 1 : 0;
         break;
 
     case GL_VERTEX_ATTRIB_ARRAY_SIZE:
@@ -1861,10 +1868,17 @@ GLvoid GL_APIENTRY __gles_GetVertexAttribiv(__GLcontext *gc,  GLuint index, GLen
         break;
 
     case GL_CURRENT_VERTEX_ATTRIB:
+#ifdef OPENGL40
+        *params++ = (GLint) gc->state.current.currentState[index].f.x;
+        *params++ = (GLint) gc->state.current.currentState[index].f.y;
+        *params++ = (GLint) gc->state.current.currentState[index].f.z;
+        *params++ = (GLint) gc->state.current.currentState[index].f.w;
+#else
         *params++ = (GLint) gc->state.current.attribute[index].f.x;
         *params++ = (GLint) gc->state.current.attribute[index].f.y;
         *params++ = (GLint) gc->state.current.attribute[index].f.z;
         *params++ = (GLint) gc->state.current.attribute[index].f.w;
+#endif
         break;
 
     case GL_VERTEX_ATTRIB_ARRAY_DIVISOR:
@@ -1887,7 +1901,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetVertexAttribPointerv(__GLcontext *gc, GLuint index, GLenum pname, GLvoid**pointer)
+GLvoid GL_APIENTRY __glim_GetVertexAttribPointerv(__GLcontext *gc, GLuint index, GLenum pname, GLvoid**pointer)
 {
     __GLvertexAttrib *pAttrib;
 
@@ -1917,7 +1931,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetVertexAttribIiv(__GLcontext *gc, GLuint index, GLenum pname, GLint *params)
+GLvoid GL_APIENTRY __glim_GetVertexAttribIiv(__GLcontext *gc, GLuint index, GLenum pname, GLint *params)
 {
     __GLvertexArrayState * pVertexArrayState = &gc->vertexArray.boundVAO->vertexArray;
     __GLvertexAttrib *pAttrib;
@@ -1941,7 +1955,7 @@ GLvoid GL_APIENTRY __gles_GetVertexAttribIiv(__GLcontext *gc, GLuint index, GLen
     switch (pname)
     {
     case GL_VERTEX_ATTRIB_ARRAY_ENABLED:
-        *params = (pVertexArrayState->attribEnabled & (__GL_ONE_32 << index)) ? 1 : 0;
+        *params = (pVertexArrayState->attribEnabled & (__GL_ONE_64 << index)) ? 1 : 0;
         break;
 
     case GL_VERTEX_ATTRIB_ARRAY_SIZE:
@@ -1965,10 +1979,17 @@ GLvoid GL_APIENTRY __gles_GetVertexAttribIiv(__GLcontext *gc, GLuint index, GLen
         break;
 
     case GL_CURRENT_VERTEX_ATTRIB:
+#ifdef OPENGL40
+            *uparams++ = gc->state.current.currentState[index].i.ix;
+            *uparams++ = gc->state.current.currentState[index].i.iy;
+            *uparams++ = gc->state.current.currentState[index].i.iz;
+            *uparams++ = gc->state.current.currentState[index].i.iw;
+#else
             *uparams++ = gc->state.current.attribute[index].i.ix;
             *uparams++ = gc->state.current.attribute[index].i.iy;
             *uparams++ = gc->state.current.attribute[index].i.iz;
             *uparams++ = gc->state.current.attribute[index].i.iw;
+#endif
         break;
 
     case GL_VERTEX_ATTRIB_ARRAY_DIVISOR:
@@ -1996,7 +2017,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetVertexAttribIuiv(__GLcontext *gc, GLuint index, GLenum pname, GLuint *params)
+GLvoid GL_APIENTRY __glim_GetVertexAttribIuiv(__GLcontext *gc, GLuint index, GLenum pname, GLuint *params)
 {
     __GLvertexAttrib *pAttrib;
     __GLvertexAttribBinding *pAttribBinding;
@@ -2019,7 +2040,7 @@ GLvoid GL_APIENTRY __gles_GetVertexAttribIuiv(__GLcontext *gc, GLuint index, GLe
     switch (pname)
     {
     case GL_VERTEX_ATTRIB_ARRAY_ENABLED:
-        *params = (pVertexArrayState->attribEnabled & (__GL_ONE_32 << index)) ? 1 : 0;
+        *params = (pVertexArrayState->attribEnabled & (__GL_ONE_64 << index)) ? 1 : 0;
         break;
 
     case GL_VERTEX_ATTRIB_ARRAY_SIZE:
@@ -2043,10 +2064,17 @@ GLvoid GL_APIENTRY __gles_GetVertexAttribIuiv(__GLcontext *gc, GLuint index, GLe
         break;
 
     case GL_CURRENT_VERTEX_ATTRIB:
+#ifdef OPENGL40
+            *params++ = gc->state.current.currentState[index].i.ix;
+            *params++ = gc->state.current.currentState[index].i.iy;
+            *params++ = gc->state.current.currentState[index].i.iz;
+            *params++ = gc->state.current.currentState[index].i.iw;
+#else
             *params++ = gc->state.current.attribute[index].i.ix;
             *params++ = gc->state.current.attribute[index].i.iy;
             *params++ = gc->state.current.attribute[index].i.iz;
             *params++ = gc->state.current.attribute[index].i.iw;
+#endif
         break;
 
     case GL_VERTEX_ATTRIB_ARRAY_DIVISOR:
@@ -2271,7 +2299,7 @@ void __glFreeVertexArrayState(__GLcontext *gc)
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_BindVertexArray(__GLcontext *gc, GLuint array)
+GLvoid GL_APIENTRY __glim_BindVertexArray(__GLcontext *gc, GLuint array)
 {
     __GL_HEADER();
 
@@ -2280,7 +2308,7 @@ GLvoid GL_APIENTRY __gles_BindVertexArray(__GLcontext *gc, GLuint array)
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DeleteVertexArrays(__GLcontext *gc, GLsizei n, const GLuint* arrays)
+GLvoid GL_APIENTRY __glim_DeleteVertexArrays(__GLcontext *gc, GLsizei n, const GLuint* arrays)
 {
     GLint i;
 
@@ -2300,7 +2328,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GenVertexArrays(__GLcontext *gc, GLsizei n, GLuint* arrays)
+GLvoid GL_APIENTRY __glim_GenVertexArrays(__GLcontext *gc, GLsizei n, GLuint* arrays)
 {
     GLint start, i;
 
@@ -2335,14 +2363,13 @@ OnExit:
     __GL_FOOTER();
 }
 
-GLboolean GL_APIENTRY __gles_IsVertexArray(__GLcontext *gc, GLuint array)
+GLboolean GL_APIENTRY __glim_IsVertexArray(__GLcontext *gc, GLuint array)
 {
     return (gcvNULL != __glGetObject(gc, gc->vertexArray.noShare, array));
 }
 
 
-#if GL_EXT_multi_draw_arrays
-GLvoid GL_APIENTRY __gles_MultiDrawArraysEXT(__GLcontext *gc, GLenum mode, const GLint *first,
+GLvoid GL_APIENTRY __glim_MultiDrawArrays(__GLcontext *gc, GLenum mode, const GLint *first,
                                              const GLsizei *count, GLsizei primcount)
 {
     GLsizei i;
@@ -2356,15 +2383,15 @@ GLvoid GL_APIENTRY __gles_MultiDrawArraysEXT(__GLcontext *gc, GLenum mode, const
 
     for (i = 0; i < primcount; ++i)
     {
-        __gles_DrawArrays(gc, mode, first[i], count[i]);
+        __glim_DrawArrays(gc, mode, first[i], count[i]);
     }
 
 OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_MultiDrawElementsEXT(__GLcontext *gc, GLenum mode, const GLsizei *count,
-                                               GLenum type, const GLvoid*const*indices, GLsizei primcount)
+GLvoid GL_APIENTRY __glim_MultiDrawElements(__GLcontext *gc, GLenum mode, const GLsizei *count,
+                                            GLenum type, const GLvoid*const*indices, GLsizei primcount)
 {
     GLsizei i;
 
@@ -2377,17 +2404,14 @@ GLvoid GL_APIENTRY __gles_MultiDrawElementsEXT(__GLcontext *gc, GLenum mode, con
 
     for (i = 0; i < primcount; ++i)
     {
-        __gles_DrawElements(gc, mode, count[i], type, indices[i]);
+        __glim_DrawElements(gc, mode, count[i], type, indices[i]);
     }
 
 OnError:
     __GL_FOOTER();
 }
-#endif
 
-
-
-GLvoid GL_APIENTRY __gles_BindVertexBuffer(__GLcontext *gc, GLuint bindingindex, GLuint buffer,
+GLvoid GL_APIENTRY __glim_BindVertexBuffer(__GLcontext *gc, GLuint bindingindex, GLuint buffer,
                                            GLintptr offset, GLsizei stride)
 {
     __GLbufferObject *bufObj;
@@ -2484,7 +2508,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_VertexAttribFormat(__GLcontext *gc, GLuint attribindex, GLint size,
+GLvoid GL_APIENTRY __glim_VertexAttribFormat(__GLcontext *gc, GLuint attribindex, GLint size,
                                              GLenum type, GLboolean normalized, GLuint relativeoffset)
 {
     __GLvertexAttrib *pAttrib;
@@ -2558,7 +2582,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_VertexAttribIFormat(__GLcontext *gc, GLuint attribindex, GLint size,
+GLvoid GL_APIENTRY __glim_VertexAttribIFormat(__GLcontext *gc, GLuint attribindex, GLint size,
                                               GLenum type, GLuint relativeoffset)
 {
     __GLvertexAttrib *pAttrib;
@@ -2616,7 +2640,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_VertexAttribBinding(__GLcontext *gc, GLuint attribindex, GLuint bindingindex)
+GLvoid GL_APIENTRY __glim_VertexAttribBinding(__GLcontext *gc, GLuint attribindex, GLuint bindingindex)
 {
     __GLvertexAttrib *pAttrib;
 
@@ -2646,7 +2670,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_VertexBindingDivisor(__GLcontext *gc, GLuint bindingindex, GLuint divisor)
+GLvoid GL_APIENTRY __glim_VertexBindingDivisor(__GLcontext *gc, GLuint bindingindex, GLuint divisor)
 {
     __GLvertexAttribBinding *pAttribBinding;
 
@@ -2848,7 +2872,7 @@ GLvoid APIENTRY __glim_FogCoordPointer(__GLcontext *gc, GLenum type, GLsizei str
 }
 
 
-GLvoid APIENTRY __glim_EdgeFlagPointer(__GLcontext *gc,  GLsizei stride, const GLvoid *ptr )
+GLvoid APIENTRY __glim_EdgeFlagPointer(__GLcontext *gc,  GLsizei stride, const GLvoid *ptr)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
@@ -2942,7 +2966,7 @@ GLvoid APIENTRY __glim_TexCoordPointer(__GLcontext *gc, GLint size, GLenum type,
 */
 __GL_INLINE GLvoid __glValidateVertexArrays(__GLcontext *gc)
 {
-    GLuint currentEnabled;
+    GLuint64 currentEnabled;
 
     /* Filter out the vertex arrays that are not really needed */
     currentEnabled = ( gc->vertexArray.boundVAO->vertexArray.attribEnabled & gc->input.requiredInputMask);
@@ -2963,21 +2987,16 @@ __GL_INLINE GLvoid __glValidateVertexArrays(__GLcontext *gc)
         gc->vertexArray.varrayDirty &= (~__GL_DIRTY_VARRAY_ENABLE_BIT);
     }
 
-    if (gc->vertexArray.varrayDirty & (__GL_DIRTY_VARRAY_FORMAT_BIT |
-        __GL_DIRTY_VARRAY_ENABLE_BIT |
-        __GL_DIRTY_VARRAY_STOP_CACHE_BIT))
+    if (gc->vertexArray.varrayDirty & (__GL_DIRTY_VARRAY_FORMAT_BIT | __GL_DIRTY_VARRAY_ENABLE_BIT))
     {
         /* Validate DrawArrays/ArrayElement function */
-        gc->vertexArray.drawArraysFunc = __gles_DrawArrays;
-        gc->vertexArray.drawElementsFunc = __gles_DrawElements;
+        gc->vertexArray.drawArraysFunc = __glim_DrawArrays;
+        gc->vertexArray.drawElementsFunc = __glim_DrawElements;
         gc->vertexArray.arrayElementFunc = __glim_ArrayElement;
-
-        gc->vertexArray.varrayDirty &= (~__GL_DIRTY_VARRAY_STOP_CACHE_BIT);
     }
 
-    /* Finally, Clear the vertex array dirty bits except __GL_DIRTY_VARRAY_STOP_CACHE_BIT */
+    /* Finally, Clear the vertex array dirty bits */
     gc->vertexArray.globalDirtyBackup = gc->vertexArray.varrayDirty;
-    gc->vertexArray.varrayDirty &= __GL_DIRTY_VARRAY_STOP_CACHE_BIT;
 }
 
 #define __GL_SIZE_F \
@@ -3193,9 +3212,11 @@ GLvoid APIENTRY __glim_DrawArrays_Validate(__GLcontext *gc, GLenum mode, GLint f
 
     __glValidateVertexArrays(gc);
 
-    gc->immediateDispatchTable.DrawArrays = gc->vertexArray.drawArraysFunc;
+    gc->immedModeDispatch.ArrayElement = gc->vertexArray.arrayElementFunc;
+    gc->immedModeDispatch.DrawArrays   = gc->vertexArray.drawArraysFunc;
+    gc->immedModeDispatch.DrawElements = gc->vertexArray.drawElementsFunc;
 
-    (*gc->immediateDispatchTable.DrawArrays)(gc, mode, first, count);
+    (*gc->immedModeDispatch.DrawArrays)(gc, mode, first, count);
 }
 
 GLvoid APIENTRY __glim_DrawElements_Validate(__GLcontext *gc, GLenum mode, GLsizei count, GLenum type, const GLvoid *indices)
@@ -3210,9 +3231,11 @@ GLvoid APIENTRY __glim_DrawElements_Validate(__GLcontext *gc, GLenum mode, GLsiz
 
     __glValidateVertexArrays(gc);
 
-    gc->immediateDispatchTable.DrawElements = gc->vertexArray.drawElementsFunc;
+    gc->immedModeDispatch.ArrayElement = gc->vertexArray.arrayElementFunc;
+    gc->immedModeDispatch.DrawArrays   = gc->vertexArray.drawArraysFunc;
+    gc->immedModeDispatch.DrawElements = gc->vertexArray.drawElementsFunc;
 
-    (*gc->immediateDispatchTable.DrawElements)(gc, mode, count, type, indices);
+    (*gc->immedModeDispatch.DrawElements)(gc, mode, count, type, indices);
 }
 
 GLvoid APIENTRY __glim_ArrayElement_Validate(__GLcontext *gc, GLint element)
@@ -3227,9 +3250,11 @@ GLvoid APIENTRY __glim_ArrayElement_Validate(__GLcontext *gc, GLint element)
 
     __glValidateVertexArrays(gc);
 
-    gc->currentImmediateTable->ArrayElement = gc->vertexArray.arrayElementFunc;
+    gc->immedModeDispatch.ArrayElement = gc->vertexArray.arrayElementFunc;
+    gc->immedModeDispatch.DrawArrays   = gc->vertexArray.drawArraysFunc;
+    gc->immedModeDispatch.DrawElements = gc->vertexArray.drawElementsFunc;
 
-    (*gc->currentImmediateTable->ArrayElement)(gc, element);
+    (*gc->immedModeDispatch.ArrayElement)(gc, element);
 }
 
 GLvoid APIENTRY __glim_ArrayElement(__GLcontext *gc, GLint element)
@@ -3261,38 +3286,38 @@ GLvoid APIENTRY __glim_ArrayElement(__GLcontext *gc, GLint element)
         switch (tagBuf[i])
         {
         case __GL_V2F_TAG:
-            (*gc->currentImmediateTable->Vertex2fv)(gc, bufptr);
+            (*gc->immedModeDispatch.Vertex2fv)(gc, bufptr);
             bufptr += 2;
             loop = GL_FALSE;
             break;
         case __GL_V3F_TAG:
-            (*gc->currentImmediateTable->Vertex3fv)(gc, bufptr);
+            (*gc->immedModeDispatch.Vertex3fv)(gc, bufptr);
             bufptr += 3;
             loop = GL_FALSE;
             break;
         case __GL_V4F_TAG:
-            (*gc->currentImmediateTable->Vertex4fv)(gc, bufptr);
+            (*gc->immedModeDispatch.Vertex4fv)(gc, bufptr);
             bufptr += 4;
             loop = GL_FALSE;
             break;
         case __GL_C3F_TAG:
-            (*gc->currentImmediateTable->Color3fv)(gc, bufptr);
+            (*gc->immedModeDispatch.Color3fv)(gc, bufptr);
             bufptr += 3;
             break;
         case __GL_C4F_TAG:
-            (*gc->currentImmediateTable->Color4fv)(gc, bufptr);
+            (*gc->immedModeDispatch.Color4fv)(gc, bufptr);
             bufptr += 4;
             break;
         case __GL_C4UB_TAG:
-            (*gc->currentImmediateTable->Color4ubv)(gc, (GLubyte *)bufptr);
+            (*gc->immedModeDispatch.Color4ubv)(gc, (GLubyte *)bufptr);
             bufptr += 1;
             break;
         case __GL_N3F_TAG:
-            (*gc->currentImmediateTable->Normal3fv)(gc, bufptr);
+            (*gc->immedModeDispatch.Normal3fv)(gc, bufptr);
             bufptr += 3;
             break;
         case __GL_TC2F_TAG:
-            (*gc->currentImmediateTable->TexCoord2fv)(gc, bufptr);
+            (*gc->immedModeDispatch.TexCoord2fv)(gc, bufptr);
             bufptr += 2;
             break;
         case __GL_TC2F_U1_TAG:
@@ -3303,11 +3328,11 @@ GLvoid APIENTRY __glim_ArrayElement(__GLcontext *gc, GLint element)
         case __GL_TC2F_U6_TAG:
         case __GL_TC2F_U7_TAG:
             index = GL_TEXTURE0 + (tagBuf[i] - __GL_TC2F_TAG);
-            (*gc->currentImmediateTable->MultiTexCoord2fv)(gc, index, bufptr);
+            (*gc->immedModeDispatch.MultiTexCoord2fv)(gc, index, bufptr);
             bufptr += 2;
             break;
         case __GL_TC3F_TAG:
-            (*gc->currentImmediateTable->TexCoord3fv)(gc, bufptr);
+            (*gc->immedModeDispatch.TexCoord3fv)(gc, bufptr);
             bufptr += 3;
             break;
         case __GL_TC3F_U1_TAG:
@@ -3318,11 +3343,11 @@ GLvoid APIENTRY __glim_ArrayElement(__GLcontext *gc, GLint element)
         case __GL_TC3F_U6_TAG:
         case __GL_TC3F_U7_TAG:
             index = GL_TEXTURE0 + (tagBuf[i] - __GL_TC3F_TAG);
-            (*gc->currentImmediateTable->MultiTexCoord3fv)(gc, index, bufptr);
+            (*gc->immedModeDispatch.MultiTexCoord3fv)(gc, index, bufptr);
             bufptr += 3;
             break;
         case __GL_TC4F_TAG:
-            (*gc->currentImmediateTable->TexCoord4fv)(gc, bufptr);
+            (*gc->immedModeDispatch.TexCoord4fv)(gc, bufptr);
             bufptr += 4;
             break;
         case __GL_TC4F_U1_TAG:
@@ -3333,18 +3358,18 @@ GLvoid APIENTRY __glim_ArrayElement(__GLcontext *gc, GLint element)
         case __GL_TC4F_U6_TAG:
         case __GL_TC4F_U7_TAG:
             index = GL_TEXTURE0 + (tagBuf[i] - __GL_TC4F_TAG);
-            (*gc->currentImmediateTable->MultiTexCoord4fv)(gc, index, bufptr);
+            (*gc->immedModeDispatch.MultiTexCoord4fv)(gc, index, bufptr);
             bufptr += 4;
             break;
         case __GL_EDGEFLAG_TAG:
-            (*gc->currentImmediateTable->EdgeFlag)(gc, edgeflag);
+            (*gc->immedModeDispatch.EdgeFlag)(gc, edgeflag);
             break;
         case __GL_SC3F_TAG:
-            (*gc->currentImmediateTable->SecondaryColor3fv)(gc, bufptr);
+            (*gc->immedModeDispatch.SecondaryColor3fv)(gc, bufptr);
             bufptr += 3;
             break;
         case __GL_FOG1F_TAG:
-            (*gc->currentImmediateTable->FogCoordfv)(gc, bufptr);
+            (*gc->immedModeDispatch.FogCoordfv)(gc, bufptr);
             bufptr += 1;
             break;
         case __GL_AT4F_I0_TAG:
@@ -3364,7 +3389,7 @@ GLvoid APIENTRY __glim_ArrayElement(__GLcontext *gc, GLint element)
         case __GL_AT4F_I14_TAG:
         case __GL_AT4F_I15_TAG:
             index = (tagBuf[i] - __GL_AT4F_I0_TAG);
-            (*gc->currentImmediateTable->VertexAttrib4fv)(gc, index, bufptr);
+            (*gc->immedModeDispatch.VertexAttrib4fv)(gc, index, bufptr);
             bufptr += 4;
             break;
 
@@ -3374,46 +3399,5 @@ GLvoid APIENTRY __glim_ArrayElement(__GLcontext *gc, GLint element)
         }
         i++;
     }
-}
-GLvoid GL_APIENTRY __glim_MultiDrawArrays(__GLcontext *gc, GLenum mode, const GLint *first,
-                                             const GLsizei *count, GLsizei primcount)
-{
-    GLsizei i;
-
-    __GL_HEADER();
-
-    if (primcount < 0 || !first || !count)
-    {
-        __GL_ERROR_EXIT(GL_INVALID_VALUE);
-    }
-
-    for (i = 0; i < primcount; ++i)
-    {
-        __gles_DrawArrays(gc, mode, first[i], count[i]);
-    }
-
-OnError:
-    __GL_FOOTER();
-}
-
-GLvoid GL_APIENTRY __glim_MultiDrawElements(__GLcontext *gc, GLenum mode, const GLsizei *count,
-                                               GLenum type, const GLvoid*const*indices, GLsizei primcount)
-{
-    GLsizei i;
-
-    __GL_HEADER();
-
-    if (primcount < 0 || !count || !indices)
-    {
-        __GL_ERROR_EXIT(GL_INVALID_VALUE);
-    }
-
-    for (i = 0; i < primcount; ++i)
-    {
-        __gles_DrawElements(gc, mode, count[i], type, indices[i]);
-    }
-
-OnError:
-    __GL_FOOTER();
 }
 #endif

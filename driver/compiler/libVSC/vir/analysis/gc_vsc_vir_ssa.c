@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -200,7 +200,6 @@ VSC_ErrCode vscVIR_TransformFromSpvSSA(VIR_Shader* pShader)
                         if(!vscHTBL_DirectTestAndGet(movToDupMap, (void*)VIR_PhiOperand_GetLabel(phiOperand), (void**)&prevMovToDupInst))
                         {
                             VIR_Instruction* labelEnd = (VIR_Instruction*)vscHTBL_DirectGet(labelEndMap, (void*)VIR_PhiOperand_GetLabel(phiOperand));
-
 
                             while(VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(labelEnd)))
                             {

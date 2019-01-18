@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -39,6 +39,7 @@ vscDumper_PrintStrSafe(
     gctARGUMENTS arguments;
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT   offset;
+
     /* Verify the arguments. */
     gcmASSERT(pDumper->pBuffer != gcvNULL);
     gcmASSERT(pDumper->pOffset != gcvNULL);
@@ -48,17 +49,27 @@ vscDumper_PrintStrSafe(
     /* Route through gcoOS_PrintStrVSafe. */
     gcmARGUMENTS_START(arguments, pFormat);
     offset = (gctUINT)*pDumper->pOffset;
-    gcmONERROR(gcoOS_PrintStrVSafe(pDumper->pBuffer, pDumper->bufferSize,
+
+    status = gcoOS_PrintStrVSafe(pDumper->pBuffer, pDumper->bufferSize,
                                    &offset,
-                                   pFormat, arguments));
-    *pDumper->pOffset = (gctSIZE_T)offset;
+                                   pFormat, arguments);
+    if (status < 0)
+    {
+        gcoOS_Print("Warning: Print status is not OK !!\n");
+
+        gcoOS_ZeroMemory(pDumper->pBuffer, sizeof(pDumper->pBuffer));
+        *pDumper->pOffset = 0;
+        goto OnError;
+    }
+    else
+        *pDumper->pOffset = (gctSIZE_T)offset;
 
 OnError:
     /* Delete the pointer to the variable arguments. */
     gcmARGUMENTS_END(arguments);
 
     /* Success. */
-    return status == gcvSTATUS_OK ? VSC_ERR_NONE : VSC_ERR_INVALID_ARGUMENT;
+    return VSC_ERR_NONE;
 }
 
 void

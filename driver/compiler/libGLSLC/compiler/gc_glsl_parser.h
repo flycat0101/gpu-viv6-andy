@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -762,5 +762,12 @@ slParseFuncDefinitionEnd(
     IN sloCOMPILER Compiler,
     IN slsNAME * FuncName
     );
+
+#ifndef FILE
+#define FILE        void
+#endif
+#ifndef stderr
+#define stderr      gcvNULL
+#endif
 
 #endif /* __gc_glsl_parser_h_ */

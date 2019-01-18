@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1415,6 +1415,8 @@ static gceSTATUS getInitialColor(
         if (gc->state.enables.lighting.lighting &&
             chipCtx->lightingStates.doTwoSidedlighting)
         {
+            const gctINT constOne = 1, constZero = 0;
+
             /* Allocate a label. */
             glmALLOCATE_LOCAL_LABEL(lblFrontFace);
 
@@ -1442,7 +1444,7 @@ static gceSTATUS getInitialColor(
                 /* if (face == 1) goto lblFrontFace. */
                 glmOPCODE_BRANCH(JMP, EQUAL, lblFrontFace);
                     glmVARYING(FS, vFace, XXXX);
-                    glmCONST(1);
+                    glmINT_CONST(&constOne);
             }
 
             /* If the front face specified as counterclockwise (GL_CCW),
@@ -1452,7 +1454,7 @@ static gceSTATUS getInitialColor(
                 /* if (face == 1) goto lblFrontFace. */
                 glmOPCODE_BRANCH(JMP, EQUAL, lblFrontFace);
                     glmVARYING(FS, vFace, XXXX);
-                    glmCONST(0);
+                    glmINT_CONST(&constZero);
             }
 
             {

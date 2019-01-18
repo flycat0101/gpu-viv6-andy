@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -34,7 +34,7 @@ void VSC_OPTN_SCPPOptions_SetDefault(
 {
     if(optLevel >= 2)
     {
-        VSC_OPTN_SCPPOptions_SetSwitchOn(options, gcvFALSE);
+        VSC_OPTN_SCPPOptions_SetSwitchOn(options, gcvTRUE);
     }
     else
     {
@@ -207,7 +207,7 @@ void VSC_OPTN_ParamOptOptions_Dump(
     IN VIR_Dumper* dumper
     )
 {
-    VIR_LOG(dumper, "PAOPT options:\n");
+    VIR_LOG(dumper, "PARAMOPT options:\n");
     VIR_LOG(dumper, "    on: %s\n", VSC_OPTN_ParamOptOptions_GetSwitchOn(options) ? "true" : "false");
     VIR_LOG(dumper, "    trace: %x\n", VSC_OPTN_ParamOptOptions_GetTrace(options));
     VIR_LOG_FLUSH(dumper);
@@ -218,7 +218,7 @@ void VSC_OPTN_ParamOptOptions_Usage(
     )
 {
     gctSTRING usage =
-        "-PAOPT:\n"
+        "-PARAMOPT:\n"
         "    on                         turn on Long Parameter Optimizer\n"
         "    off                        turn off Long Parameter Optimizer\n"
         "    threshold:                0x1    \n"
@@ -249,8 +249,8 @@ void VSC_OPTN_LoopOptsOptions_SetDefault(
                                      VSC_OPTN_LoopOptsOptions_OPTS_LOOP_INVARIANT |
                                      VSC_OPTN_LoopOptsOptions_OPTS_LOOP_UNROLLING);
     VSC_OPTN_LoopOptsOptions_SetFullUnrollingFactor(options, 16);
-   /* TODO:: disable partial unroll and enable it after tuning its performance */
-    VSC_OPTN_LoopOptsOptions_SetPartialUnrollingFactor(options, 0);
+    VSC_OPTN_LoopOptsOptions_SetTotalUnrollingFactor(options, 32);
+    VSC_OPTN_LoopOptsOptions_SetPartialUnrollingFactor(options, 4);
     VSC_OPTN_LoopOptsOptions_SetTrace(options, 0);
 
     VSC_OPTN_LoopOptsOptions_SetBeforeShader(options, gcvMAXUINT32);
@@ -284,6 +284,17 @@ void VSC_OPTN_LoopOptsOptions_GetOptionFromString(
             len = _VSC_OPTN_GetSubOptionLength(str);
             opts = vscSTR_StrToUint32(str, len);
             VSC_OPTN_LoopOptsOptions_SetOpts(options, opts);
+            str += len;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "tof:", sizeof("tof:") - 1))
+        {
+            gctINT32 fuf;
+            gctUINT32 len;
+
+            str += sizeof("fuf:") - 1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            fuf = (gctINT32)vscSTR_StrToUint32(str, len);
+            VSC_OPTN_LoopOptsOptions_SetTotalUnrollingFactor(options, fuf);
             str += len;
         }
         else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "fuf:", sizeof("fuf:") - 1))
@@ -378,22 +389,27 @@ void VSC_OPTN_CFOOptions_SetDefault(
     IN gctUINT optLevel
     )
 {
-    if(optLevel >=2)
-    {
-        VSC_OPTN_CFOOptions_SetSwitchOn(options, gcvTRUE);
-    }
-    else
-    {
-        VSC_OPTN_CFOOptions_SetSwitchOn(options, gcvFALSE);
-    }
-    VSC_OPTN_CFOOptions_SetOpts(options,
-                                     VSC_OPTN_CFOOptions_OPTS_NONE |
-                                     VSC_OPTN_CFOOptions_OPTS_PATTERN /*|
-                                     VSC_OPTN_CFOOptions_OPTS_GEN_SELECT*/);
-    VSC_OPTN_CFOOptions_SetTrace(options, 0);
+    gctUINT i;
 
-    VSC_OPTN_CFOOptions_SetBeforeShader(options, gcvMAXUINT32);
-    VSC_OPTN_CFOOptions_SetAfterShader(options, gcvMAXUINT32);
+    for(i = 0; i < VSC_OPTN_CFO_COUNT; i++)
+    {
+        if(optLevel >=2)
+        {
+            VSC_OPTN_CFOOptions_SetSwitchOn(options + i, gcvTRUE);
+        }
+        else
+        {
+            VSC_OPTN_CFOOptions_SetSwitchOn(options + i, gcvFALSE);
+        }
+        VSC_OPTN_CFOOptions_SetOpts(options + i,
+                                         VSC_OPTN_CFOOptions_OPTS_NONE |
+                                         VSC_OPTN_CFOOptions_OPTS_PATTERN /*|
+                                         VSC_OPTN_CFOOptions_OPTS_GEN_SELECT*/);
+        VSC_OPTN_CFOOptions_SetTrace(options + i, 0);
+
+        VSC_OPTN_CFOOptions_SetBeforeShader(options + i, gcvMAXUINT32);
+        VSC_OPTN_CFOOptions_SetAfterShader(options + i, gcvMAXUINT32);
+    }
 }
 
 void VSC_OPTN_CFOOptions_GetOptionFromString(
@@ -648,7 +664,7 @@ void VSC_OPTN_ILOptions_SetDefault(
     }
     VSC_OPTN_ILOptions_SetHeuristics(options, 0xffffffff);
     VSC_OPTN_ILOptions_SetTrace(options, 0);
-    VSC_OPTN_ILOptions_SetInlineLevel(options, VSC_OPTN_ILOptions_LEVEL2);
+    VSC_OPTN_ILOptions_SetInlineLevel(options, VSC_OPTN_ILOptions_LEVEL3);
 }
 
 void VSC_OPTN_ILOptions_GetOptionFromString(
@@ -690,12 +706,14 @@ void VSC_OPTN_ILOptions_GetOptionFromString(
             level = vscSTR_StrToUint32(str, len);
             /* inline level:
                 0: disable inline
-                1: minimal inline
-                2: default inline
-                3: maximal inline */
-            if (level >= VSC_OPTN_ILOptions_LEVEL3)
+                1: inline ALWAYSINLINE function only
+                2: minimal inline
+                3: default inline
+                4: maximal inline
+            */
+            if (level >= VSC_OPTN_ILOptions_LEVEL4)
             {
-                VSC_OPTN_ILOptions_SetInlineLevel(options, VSC_OPTN_ILOptions_LEVEL3);
+                VSC_OPTN_ILOptions_SetInlineLevel(options, VSC_OPTN_ILOptions_LEVEL4);
             }
             else
             {
@@ -715,6 +733,11 @@ void VSC_OPTN_ILOptions_GetOptionFromString(
             VSC_OPTN_ILOptions_SetTrace(options, trace);
             str += len;
         }
+    }
+
+    if ((VSC_OPTN_ILOptions_GetInlineLevel(options) == VSC_OPTN_ILOptions_LEVEL1))
+    {
+        VSC_OPTN_ILOptions_SetSwitchOn(options, gcvTRUE);
     }
 }
 
@@ -1343,13 +1366,14 @@ void VSC_OPTN_ISOptions_SetDefault(
         VSC_OPTN_ISOptions_SetIsForward(options + i, gcvTRUE);
         VSC_OPTN_ISOptions_SetLLIOnly(options + i, gcvTRUE);
         VSC_OPTN_ISOptions_SetBandwidthOnly(options + i, gcvFALSE);
+        VSC_OPTN_ISOptions_SetVXOn(options + i, gcvFALSE);
+        VSC_OPTN_ISOptions_SetReissue(options + i, gcvFALSE);
         VSC_OPTN_ISOptions_SetRegCount(options + i, 0);             /* 0 is invalid number here */
         VSC_OPTN_ISOptions_SetTexldCycles(options + i, 0);          /* 0 is invalid number here */
         VSC_OPTN_ISOptions_SetMemldCycles(options + i, 0);          /* 0 is invalid number here */
         VSC_OPTN_ISOptions_SetMemstCycles(options + i, 0);          /* 0 is invalid number here */
         VSC_OPTN_ISOptions_SetCacheldCycles(options + i, 0);        /* 0 is invalid number here */
         VSC_OPTN_ISOptions_SetCachestCycles(options + i, 0);        /* 0 is invalid number here */
-        VSC_OPTN_ISOptions_SetDepGran(options + i, VSC_OPTN_ISOptions_DEPGRAN_GROSS);
         VSC_OPTN_ISOptions_SetBBCeiling(options + i, 512);
         VSC_OPTN_ISOptions_SetAlgorithm(options + i, /*VSC_OPTN_ISOptions_ALGORITHM_LISTSCHEDULING
                                                ,*/ VSC_OPTN_ISOptions_ALGORITHM_BUBBLESCHEDULING);
@@ -1434,6 +1458,26 @@ void VSC_OPTN_ISOptions_GetOptionFromString(
             VSC_OPTN_ISOptions_SetBandwidthOnly(options, gcvFALSE);
             str += sizeof("bandwidth_only:off") - 1;
         }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "vx_on:on", sizeof("vx_on:on") - 1))
+        {
+            VSC_OPTN_ISOptions_SetVXOn(options, gcvTRUE);
+            str += sizeof("vx_on:on") - 1;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "vx_on:off", sizeof("vx_on:off") - 1))
+        {
+            VSC_OPTN_ISOptions_SetVXOn(options, gcvFALSE);
+            str += sizeof("vx_on:off") - 1;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "re_issue:on", sizeof("re_issue:on") - 1))
+        {
+            VSC_OPTN_ISOptions_SetReissue(options, gcvTRUE);
+            str += sizeof("re_issue:on") - 1;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "re_issue:off", sizeof("re_issue:off") - 1))
+        {
+            VSC_OPTN_ISOptions_SetReissue(options, gcvFALSE);
+            str += sizeof("re_issue:off") - 1;
+        }
         else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "reg_count:", sizeof("reg_count:") - 1))
         {
             gctUINT32 reg_count;
@@ -1498,17 +1542,6 @@ void VSC_OPTN_ISOptions_GetOptionFromString(
             len = _VSC_OPTN_GetSubOptionLength(str);
             cachest_cycles = vscSTR_StrToUint32(str, len);
             VSC_OPTN_ISOptions_SetCachestCycles(options, cachest_cycles);
-            str += len;
-        }
-        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "dep_gran:", sizeof("dep_gran:") - 1))
-        {
-            gctUINT32 dep_gran;
-            gctUINT32 len;
-
-            str += sizeof("dep_gran:") - 1;
-            len = _VSC_OPTN_GetSubOptionLength(str);
-            dep_gran = vscSTR_StrToUint32(str, len);
-            VSC_OPTN_ISOptions_SetDepGran(options, dep_gran);
             str += len;
         }
         else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "bb_ceiling:", sizeof("bb_ceiling:") - 1))
@@ -1755,7 +1788,6 @@ void VSC_OPTN_ISOptions_Dump(
     VIR_LOG(dumper, "    lli_only: %s\n", VSC_OPTN_ISOptions_GetLLIOnly(options) ? "true" : "false");
     VIR_LOG(dumper, "    bandwidth_only: %s\n", VSC_OPTN_ISOptions_GetBandwidthOnly(options) ? "true" : "false");
     VIR_LOG(dumper, "    reg_count: %d\n", VSC_OPTN_ISOptions_GetRegCount(options));
-    VIR_LOG(dumper, "    depandency granularity: %d\n", VSC_OPTN_ISOptions_GetDepGran(options));
     VIR_LOG(dumper, "    bb ceiling: %d\n", VSC_OPTN_ISOptions_GetBBCeiling(options));
     VIR_LOG(dumper, "    fw_heuristics: 0x%x\n", VSC_OPTN_ISOptions_GetFwHeuristics(options));
     VIR_LOG(dumper, "    bw_heuristics: 0x%x\n", VSC_OPTN_ISOptions_GetBwHeuristics(options));
@@ -2096,8 +2128,6 @@ void VSC_OPTN_CPFOptions_SetDefault(
     VSC_OPTN_CPFOptions_SetBeforeFunc(options, gcvMAXUINT32);
     VSC_OPTN_CPFOptions_SetAfterFunc(options, gcvMAXUINT32);
     VSC_OPTN_CPFOptions_SetTrace(options, 0);
-    VSC_OPTN_CPFOptions_SetMaxTempCount(options, 3072);
-    VSC_OPTN_CPFOptions_SetMaxInstCount(options, 3400);
 }
 
 void VSC_OPTN_CPFOptions_GetOptionFromString(
@@ -2171,30 +2201,6 @@ void VSC_OPTN_CPFOptions_GetOptionFromString(
             len = _VSC_OPTN_GetSubOptionLength(str);
             trace = vscSTR_StrToUint32(str, len);
             VSC_OPTN_CPFOptions_SetTrace(options, trace);
-            str += len;
-        }
-        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "maxic:", sizeof("maxic:")-1))
-        {
-            /* if instructoin count of each function > value of maxic, skip cpf */
-            gctUINT32 maxinst;
-            gctUINT32 len;
-
-            str += sizeof("maxic:") -1;
-            len = _VSC_OPTN_GetSubOptionLength(str);
-            maxinst = vscSTR_StrToUint32(str, len);
-            VSC_OPTN_CPFOptions_SetMaxInstCount(options, maxinst);
-            str += len;
-        }
-        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "maxtc:", sizeof("maxtc:")-1))
-        {
-            /* if temp variable count of each shader > value of maxtc, skip cpf */
-            gctUINT32 maxtemp;
-            gctUINT32 len;
-
-            str += sizeof("maxtc:") -1;
-            len = _VSC_OPTN_GetSubOptionLength(str);
-            maxtemp = vscSTR_StrToUint32(str, len);
-            VSC_OPTN_CPFOptions_SetMaxTempCount(options, maxtemp);
             str += len;
         }
     }
@@ -2974,27 +2980,26 @@ void VSC_OPTN_DumpOptions_GetOptionFromString(
         if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "SHADER", sizeof("SHADER") - 1))
         {
             opt |= VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE;
-            str += sizeof("on") - 1;
+            str += sizeof("SHADER") - 1;
         }
         else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "OPTION", sizeof("OPTION") - 1))
         {
             opt |= VSC_OPTN_DumpOptions_DUMP_OPTION;
-            str += sizeof("on") - 1;
+            str += sizeof("OPTION") - 1;
         }
         else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "CG", sizeof("CG") - 1))
         {
             opt |= VSC_OPTN_DumpOptions_DUMP_CG;
-            str += sizeof("on") - 1;
+            str += sizeof("CG") - 1;
         }
         else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "ALLV", sizeof("ALLV") - 1))
         {
             opt |= VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE| VSC_OPTN_DumpOptions_DUMP_CG;
-            str += sizeof("on") - 1;
+            str += sizeof("ALLV") - 1;
         }
     }
     VSC_OPTN_DumpOptions_SetOPTS(options, opt);
 }
-
 
 void VSC_OPTN_DumpOptions_Dump(
     IN VSC_OPTN_DumpOptions  *options,
@@ -3014,6 +3019,43 @@ void VSC_OPTN_ILFLinkOptions_SetDefault(
     VSC_OPTN_ILFLinkOptions_SetSwitchOn(options, gcvTRUE);
 }
 
+void VSC_OPTN_UnifiedUniformOptions_SetDefault(
+    IN OUT VSC_OPTN_UnifiedUniformOptions* options
+    )
+{
+    VSC_OPTN_UnifiedUniformOptions_SetSwitchOn(options, gcvFALSE);
+}
+
+void VSC_OPTN_UnifiedUniformOptions_GetOptionFromString(
+    IN gctSTRING str,
+    IN OUT VSC_OPTN_UnifiedUniformOptions* options
+    )
+{
+    while (str[0] == ':')
+    {
+        ++str;
+        if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "on", sizeof("on") - 1))
+        {
+            VSC_OPTN_UnifiedUniformOptions_SetSwitchOn(options, gcvTRUE);
+            str += sizeof("on") - 1;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "off", sizeof("off") - 1))
+        {
+            VSC_OPTN_UnifiedUniformOptions_SetSwitchOn(options, gcvFALSE);
+            str += sizeof("off") - 1;
+        }
+    }
+}
+
+void VSC_OPTN_UnifiedUniformOptions_Dump(
+    IN VSC_OPTN_UnifiedUniformOptions  *options,
+    IN VIR_Dumper           *dumper
+    )
+{
+    VIR_LOG(dumper, "unified uniform options:\n");
+    VIR_LOG(dumper, "    on: %s\n", VSC_OPTN_UnifiedUniformOptions_GetSwitchOn(options) ? "true" : "false");
+}
+
 void VSC_OPTN_ATOMPatchOptions_SetDefault(
     IN OUT VSC_OPTN_ATOMPatchOptions* options
     )
@@ -3021,6 +3063,7 @@ void VSC_OPTN_ATOMPatchOptions_SetDefault(
     /* set default value as VSC_OPTN_ILFLinkOptions_SetDefault */
     VSC_OPTN_ATOMPatchOptions_SetSwitchOn(options, gcvTRUE);
 }
+
 
 static gctBOOL
 _IsTriageForShaderId(
@@ -3155,6 +3198,8 @@ VSC_OPTN_BASE* VSC_OPTN_Options_GetOption(VSC_OPTN_Options* pOptions, VSC_PASS_O
         return &pOptions->dump_options.optnBase;
     case VSC_PASS_OPTN_TYPE_ILF_LINK:
         return &pOptions->ilflink_options.optnBase;
+    case VSC_PASS_OPTN_TYPE_UNIFIED_UNIFORM:
+        return &pOptions->unifiedUniform_options.optnBase;
     case VSC_PASS_OPTN_TYPE_ATOM_PATCH:
         return &pOptions->atompatch_options.optnBase;
     default:
@@ -3198,8 +3243,25 @@ void VSC_OPTN_Options_GetOptionFromString(
     gcoOS_StrStr(str, "-CFO", &pos);
     if (pos)
     {
+        gctUINT i;
+
         pos += sizeof("-CFO") - 1;
+        for(i = 0; i < VSC_OPTN_CFO_COUNT; i++)
+        {
+            VSC_OPTN_CFOOptions_GetOptionFromString(pos, VSC_OPTN_Options_GetCFOOptions(options, i));
+        }
+    }
+    gcoOS_StrStr(str, "-CFO0", &pos);
+    if (pos)
+    {
+        pos += sizeof("-CFO0") - 1;
         VSC_OPTN_CFOOptions_GetOptionFromString(pos, VSC_OPTN_Options_GetCFOOptions(options, 0));
+    }
+    gcoOS_StrStr(str, "-CFO1", &pos);
+    if (pos)
+    {
+        pos += sizeof("-CFO1") - 1;
+        VSC_OPTN_CFOOptions_GetOptionFromString(pos, VSC_OPTN_Options_GetCFOOptions(options, 1));
     }
 
     /* default UBO options */
@@ -3381,13 +3443,6 @@ void VSC_OPTN_Options_GetOptionFromString(
         VSC_OPTN_FCPOptions_GetOptionFromString(pos, VSC_OPTN_Options_GetFCPOptions(options, 0));
     }
 
-    gcoOS_StrStr(str, "-ATOMPATCH", &pos);
-    if (pos)
-    {
-        pos += sizeof("-ATOMPATCH") - 1;
-        VSC_OPTN_ATOMPatchOptions_GetOptionFromString(pos, VSC_OPTN_Options_GetATOMPatchOptions(options));
-    }
-
     /* machine code generator: */
     gcoOS_StrStr(str, "-GEN", &pos);
     if (pos)
@@ -3402,6 +3457,21 @@ void VSC_OPTN_Options_GetOptionFromString(
     {
         pos += sizeof("-DUMP_OPTIONS") - 1;
         VSC_OPTN_DumpOptions_GetOptionFromString(pos, VSC_OPTN_Options_GetDumpOptions(options));
+    }
+
+    /* unified uniform options */
+    gcoOS_StrStr(str, "-UNIFIEDUNIFORM", &pos);
+    if (pos)
+    {
+        pos += sizeof("-UNIFIEDUNIFORM") - 1;
+        VSC_OPTN_UnifiedUniformOptions_GetOptionFromString(pos, VSC_OPTN_Options_GetUnifiedUniformOptions(options));
+    }
+
+    gcoOS_StrStr(str, "-ATOMPATCH", &pos);
+    if (pos)
+    {
+        pos += sizeof("-ATOMPATCH") - 1;
+        VSC_OPTN_ATOMPatchOptions_GetOptionFromString(pos, VSC_OPTN_Options_GetATOMPatchOptions(options));
     }
 
     /* print options usage*/
@@ -3439,6 +3509,7 @@ void VSC_OPTN_Options_Dump(
     VSC_OPTN_DUAL16Options_Dump(VSC_OPTN_Options_GetDUAL16Options(options, 0), dumper);
     VSC_OPTN_FCPOptions_Dump(VSC_OPTN_Options_GetFCPOptions(options, 0), dumper);
     VSC_OPTN_DumpOptions_Dump(VSC_OPTN_Options_GetDumpOptions(options), dumper);
+    VSC_OPTN_UnifiedUniformOptions_Dump(VSC_OPTN_Options_GetUnifiedUniformOptions(options), dumper);
     VIR_LOG(dumper, "options usage: %s\n", VSC_OPTN_Options_GetOptionsUsage(options) ? "true" : "false");
     VIR_LOG_FLUSH(dumper);
 }
@@ -3476,6 +3547,7 @@ void VSC_OPTN_Options_SetOptionsByCompileFlags(
     IN  gctUINT CompileFlags
     )
 {
+    Options->cFlags = CompileFlags;
 }
 
 void VSC_OPTN_Options_SetOptionsByOptFlags(
@@ -3612,6 +3684,7 @@ void VSC_OPTN_Options_SetOptionsByOptFlags(
 
     if(OptFlags & VSC_COMPILER_OPT_ALGE_SIMP)
     {
+        gcmASSERT(!(OptFlags & VSC_COMPILER_OPT_NO_ALGE_SIMP));
         VSC_OPTN_SIMPOptions_SetSwitchOn(VSC_OPTN_Options_GetSIMPOptions(Options, 0), gcvTRUE);
     }
     else if(OptFlags & VSC_COMPILER_OPT_NO_ALGE_SIMP)
@@ -3636,7 +3709,9 @@ void VSC_OPTN_Options_SetSpecialOptions(
     IN VSC_HW_CONFIG* pHwCfg
     )
 {
-    if (gcUseFullNewLinker(pHwCfg->hwFeatureFlags.hasHalti2))
+    gctBOOL useNewCG = gcUseFullNewLinker(pHwCfg->hwFeatureFlags.hasHalti2);
+
+    if (useNewCG)
     {
         VSC_OPTN_RAOptions* ra_options = VSC_OPTN_Options_GetRAOptions(options, 0);
         VSC_OPTN_MCGenOptions* mc_options = VSC_OPTN_Options_GetMCGenOptions(options, 0);
@@ -3657,11 +3732,35 @@ void VSC_OPTN_Options_SetSpecialOptions(
         VSC_OPTN_ILOptions_SetSwitchOn(il_options, gcvFALSE);
     }
 
+    if (pHwCfg->hwFeatureFlags.supportUnifiedConstant && pHwCfg->hwFeatureFlags.supportUnifiedSampler)
+    {
+        VSC_OPTN_UnifiedUniformOptions* unifiedUniform_options = VSC_OPTN_Options_GetUnifiedUniformOptions(options);
+
+        VSC_OPTN_UnifiedUniformOptions_SetSwitchOn(unifiedUniform_options, gcvTRUE);
+    }
+
     {
         if(gcPatchId == gcvPATCH_OCLCTS)
         {
             VSC_OPTN_ISOptions_SetSwitchOn(VSC_OPTN_Options_GetISOptions(options, 0), gcvFALSE);
         }
+    }
+
+    if (pHwCfg->hwFeatureFlags.supportPSCSThrottle || pHwCfg->hwFeatureFlags.supportHWManagedLS)
+    {
+        VSC_OPTN_PHOptions* ph_options = VSC_OPTN_Options_GetPHOptions(options, 0);
+        gctUINT ph_option = VSC_OPTN_PHOptions_GetOPTS(ph_options);
+
+        VSC_OPTN_PHOptions_SetOPTS(ph_options, (ph_option | VSC_OPTN_PHOptions_OPTS_LOC_MEM));
+    }
+
+    /* Enable HW local memory for new CG only. */
+    if (!useNewCG)
+    {
+        VSC_OPTN_PHOptions* ph_options = VSC_OPTN_Options_GetPHOptions(options, 0);
+        gctUINT ph_option = VSC_OPTN_PHOptions_GetOPTS(ph_options);
+
+        VSC_OPTN_PHOptions_SetOPTS(ph_options, (ph_option & (~VSC_OPTN_PHOptions_OPTS_LOC_MEM)));
     }
 
     /* temperarily switch off Post RA IS */
@@ -3731,17 +3830,20 @@ void VSC_OPTN_Options_MergeVCEnvOption(
     {
         VSC_OPTN_DumpOptions* dump_options = VSC_OPTN_Options_GetDumpOptions(options);
         gctUINT opt = VSC_OPTN_DumpOptions_DUMP_NONE;
-        if (gcmOPT_DUMP_OPTIMIZER_VERBOSE())
+        if (!(options->cFlags & VSC_COMPILER_FLAG_DISABLE_IR_DUMP))
         {
-            opt |= VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE;
-        }
-        if (gcmOPT_DUMP_CODEGEN())
-        {
-            opt |= VSC_OPTN_DumpOptions_DUMP_CG;
-        }
-        if (gcmOPT_DUMP_FINAL_IR())
-        {
-            opt |= VSC_OPTN_DumpOptions_DUMP_FINALIR;
+            if (gcmOPT_DUMP_OPTIMIZER_VERBOSE())
+            {
+                opt |= VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE;
+            }
+            if (gcmOPT_DUMP_CODEGEN())
+            {
+                opt |= VSC_OPTN_DumpOptions_DUMP_CG;
+            }
+            if (gcmOPT_DUMP_FINAL_IR())
+            {
+                opt |= VSC_OPTN_DumpOptions_DUMP_FINALIR;
+            }
         }
         VSC_OPTN_DumpOptions_SetDumpStart(dump_options, gcmOPT_DUMP_Start());
         VSC_OPTN_DumpOptions_SetDumpEnd(dump_options, gcmOPT_DUMP_End());

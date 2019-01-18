@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include "gc_hal_kernel_qnx.h"
 #include "gc_hal_driver.h"
+#include "gc_hal_base.h"
 
 #include "gc_hal_kernel_resource_manager.h"
 #include "gc_hal_kernel_resource_manager_buf.h"
@@ -186,7 +187,6 @@ gc_meminfo_show(void *data)
 
     gctUINT32 free = 0, used = 0, total = 0, minFree = 0, maxUsed = 0;
 
-    gcsDATABASE_COUNTERS contiguousCounter = {0, 0, 0};
     gcsDATABASE_COUNTERS virtualCounter = {0, 0, 0};
     gcsDATABASE_COUNTERS nonPagedCounter = {0, 0, 0};
 
@@ -224,8 +224,7 @@ gc_meminfo_show(void *data)
                 database != gcvNULL;
                 database = database->next)
         {
-            gcsDATABASE_COUNTERS * counter = &database->vidMemPool[gcvPOOL_CONTIGUOUS];
-            _CounterAdd(&contiguousCounter, counter);
+            gcsDATABASE_COUNTERS * counter;
 
             counter = &database->vidMemPool[gcvPOOL_VIRTUAL];
             _CounterAdd(&virtualCounter, counter);
@@ -239,7 +238,6 @@ gc_meminfo_show(void *data)
     /* Release the database mutex. */
     gcmkVERIFY_OK(gckOS_ReleaseMutex(kernel->os, kernel->db->dbMutex));
 
-    _CounterPrint(&contiguousCounter, "gcvPOOL_CONTIGUOUS", m);
     _CounterPrint(&virtualCounter, "gcvPOOL_VIRTUAL", m);
 
     msg_buf_add_msg(m, "\n");
@@ -259,15 +257,12 @@ _ShowRecord(
     static const char * recordTypes[gcvDB_NUM_TYPES] = {
         "Unknown",
         "VideoMemory",
-        "CommandBuffer",
         "NonPaged",
-        "Contiguous",
         "Signal",
         "VidMemLock",
         "Context",
         "Idel",
         "MapMemory",
-        "MapUserMemory",
         "ShBuf",
     };
 
@@ -346,20 +341,15 @@ _ShowCounters(
         "System",
         "Virtual",
         "User",
-        "Contiguous",
     };
 
     static const char * otherCounterNames[] = {
         "AllocNonPaged",
-        "AllocContiguous",
-        "MapUserMemory",
         "MapMemory",
     };
 
     gcsDATABASE_COUNTERS * otherCounters[] = {
         &Database->nonPaged,
-        &Database->contiguous,
-        &Database->mapUserMemory,
         &Database->mapMemory,
     };
 
@@ -517,18 +507,14 @@ gc_idle_show(void *data)
     struct buf_msg *m = (struct buf_msg *) data;
     gckKERNEL kernel = _GetValidKernel(m->thread->device);
 
-    gctUINT64 start;
-    gctUINT64 end;
     gctUINT64 on;
     gctUINT64 off;
     gctUINT64 idle;
     gctUINT64 suspend;
 
-    gckHARDWARE_QueryStateTimer(kernel->hardware, &start, &end, &on, &off, &idle, &suspend);
+    gckHARDWARE_QueryStateTimer(kernel->hardware, &on, &off, &idle, &suspend);
 
     /* Idle time since last call */
-    msg_buf_add_msg(m, "Start:   %llu ns\n",  start);
-    msg_buf_add_msg(m, "End:     %llu ns\n",  end);
     msg_buf_add_msg(m, "On:      %llu ns\n",  on);
     msg_buf_add_msg(m, "Off:     %llu ns\n",  off);
     msg_buf_add_msg(m, "Idle:    %llu ns\n",  idle);
@@ -632,46 +618,3 @@ gc_dump_trigger_write(void *data)
     dumpCore = strtoul(wmsg->buf, NULL, 10);
     return 0;
 }
-
-int gc_clk_show(void *data)
-{
-    struct buf_msg *m = (struct buf_msg *) data;
-    gckGALDEVICE device = m->thread->device;
-    gctUINT i;
-    gceSTATUS status;
-
-    for (i = gcvCORE_MAJOR; i < gcvCORE_COUNT; i++)
-    {
-        if (device->kernels[i])
-        {
-            gckHARDWARE hardware = device->kernels[i]->hardware;
-
-#if gcdENABLE_VG
-            if (i == gcvCORE_VG)
-            {
-                continue;
-            }
-#endif
-
-            status = gckHARDWARE_QueryFrequency(hardware);
-            if (gcmIS_ERROR(status))
-            {
-                msg_buf_add_msg(m, "query gpu%d clock fail.\n", i);
-                continue;
-            }
-
-            if (hardware->mcClk)
-            {
-                msg_buf_add_msg(m, "gpu%d mc clock: %d HZ.\n", i, hardware->mcClk);
-            }
-
-            if (hardware->shClk)
-            {
-                msg_buf_add_msg(m, "gpu%d sh clock: %d HZ.\n", i, hardware->shClk);
-            }
-        }
-    }
-
-    return 0;
-}
-

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1127,6 +1127,7 @@ eglDupNativeFenceFDANDROID(
     gceSTATUS status;
 
     gcmHEADER_ARG("Display=0x%x Sync=0x%x", Display, Sync);
+    VEGL_TRACE_API_PRE(DupNativeFenceFDANDROID)(Display, Sync);
 
     /* Get thread data. */
     thread = veglGetThreadData();
@@ -1188,10 +1189,13 @@ eglDupNativeFenceFDANDROID(
     gcmDUMP_API("${EGL eglDupNativeFenceFDANDROID 0x%08X 0x%08X := 0x%08X",
                 Display, Sync, fenceFD);
     gcmFOOTER_ARG("%d", fenceFD);
+    VEGL_TRACE_API_POST(DupNativeFenceFDANDROID)(Display, Sync, fenceFD);
     return fenceFD;
 
 OnError:
     gcmFOOTER_ARG("%d", EGL_NO_NATIVE_FENCE_FD_ANDROID);
+    VEGL_TRACE_API_POST(DupNativeFenceFDANDROID)(
+                        Display, Sync, EGL_NO_NATIVE_FENCE_FD_ANDROID);
     return EGL_NO_NATIVE_FENCE_FD_ANDROID;
 
 }

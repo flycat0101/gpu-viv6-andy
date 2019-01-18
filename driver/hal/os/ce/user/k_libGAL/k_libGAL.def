@@ -1,6 +1,6 @@
 ;#############################################################################
 ;#
-;#   Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+;#   Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 ;#
 ;#   The material in this file is confidential and contains trade secrets
 ;#   of Vivante Corporation. This is proprietary information owned by
@@ -30,9 +30,6 @@ EXPORTS
 	gcoOS_Free
 	gcoOS_AllocateSharedMemory
 	gcoOS_FreeSharedMemory
-	gcoOS_AllocateNonPagedMemory
-	gcoOS_FreeNonPagedMemory
-	gcoOS_FreeContiguous
 	gcoOS_CreateMutex
 	gcoOS_DeleteMutex
 	gcoOS_AcquireMutex
@@ -44,6 +41,7 @@ EXPORTS
 	gcoOS_DeviceControl
 	gcoOS_Open
 	gcoOS_Close
+	gcoOS_Remove
 	gcoOS_Read
 	gcoOS_Write
 	gcoOS_Seek
@@ -63,8 +61,6 @@ EXPORTS
 	gcoOS_MemCmp
 	gcoOS_PrintStrSafe
 	gcoOS_PrintStrVSafe
-	gcoOS_MapUserMemory
-	gcoOS_UnmapUserMemory
 	gcoOS_StrDup
 	gcoOS_LoadLibrary
 	gcoOS_FreeLibrary
@@ -94,7 +90,6 @@ EXPORTS
 	gcoHAL_MapMemory
 	gcoHAL_UnmapMemory
 	gcoHAL_ScheduleUnmapMemory
-	gcoHAL_ScheduleUnmapUserMemory
 	gcoHAL_Commit
 	gcoHAL_QueryTiled
 	gcoHAL_Get2DEngine
@@ -106,15 +101,13 @@ EXPORTS
 	gcoHAL_SetPowerManagementState
 	gcoHAL_QueryPowerManagementState
 
-	gcoHAL_MapUserMemory
-	gcoHAL_UnmapUserMemory
-
 	gcoHAL_QueryResetTimeStamp
 
 	gcoHAL_WrapUserMemory
 	gcoHAL_LockVideoMemory
 	gcoHAL_UnlockVideoMemory
 	gcoHAL_ReleaseVideoMemory
+	gcoHAL_GetBaseAddr
 
 	; gcoSURF
 	gcoSURF_Construct

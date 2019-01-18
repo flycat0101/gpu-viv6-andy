@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -17,8 +17,7 @@
 BEGIN_EXTERN_C()
 
 #define INDENT_GAP      4
-#define VSC_GET_DUMPER_FILE()   gcvNULL     /* TODO: get dumper file if set */
-
+#define VSC_GET_DUMPER_FILE()   gcvNULL
 typedef struct _VSC_DUMPER
 {
     gcoOS           pOs;

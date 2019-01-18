@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -69,7 +69,10 @@ void clfSortHaarRects(gctPOINTER Destination, gctPOINTER Source, gctSIZE_T Size)
         src += x - hSize;
     }
 
-    gcoOS_MemCopy(Source, Destination, Size);
+    if((Source != Destination) && (Size > 0))
+    {
+        gcoOS_MemCopy(Source, Destination, Size);
+    }
 }
 #endif
 
@@ -145,7 +148,10 @@ clfSyncHostMemory(
 
         for (j = 0; j < Area[1]; j++)
         {
-            gcoOS_MemCopy(toWrite, toRead, lineSize);
+            if(toWrite != toRead)
+            {
+                gcoOS_MemCopy(toWrite, toRead, lineSize);
+            }
 
             toRead = gcmINT2PTR(gcmPTR2SIZE(toRead) + readStride);
             toWrite = gcmINT2PTR(gcmPTR2SIZE(toWrite) + writeStride);
@@ -198,7 +204,7 @@ clfReleaseMemObject(
         MemObj->objectType != clvOBJECT_MEM)
     {
         gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-004026: (clfReleaseMemObject) invalid MemObj.\n");
+            "OCL-004025: (clfReleaseMemObject) invalid MemObj.\n");
         clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
     }
 
@@ -210,7 +216,8 @@ clfReleaseMemObject(
 
         if (MemObj->type == CL_MEM_OBJECT_BUFFER)
         {
-            if (MemObj->u.buffer.createType == CL_BUFFER_CREATE_TYPE_REGION) {
+            if (MemObj->u.buffer.createType == CL_BUFFER_CREATE_TYPE_REGION)
+            {
                 clsMem_PTR parentBuffer = MemObj->u.buffer.parentBuffer;
 
                 /* Release parent buffer. */
@@ -222,11 +229,12 @@ clfReleaseMemObject(
                 gctUINT32 physical = 0;
 
                 gcsSURF_NODE_GetHardwareAddress(MemObj->tmpNode,&physical,gcvNULL, gcvNULL, gcvNULL);
-                gcoCL_FreeMemory((gctPHYS_ADDR)(gctUINTPTR_T) physical,
-                    (gctPOINTER)MemObj->tmpNode->logical,
-                    MemObj->u.buffer.allocatedSize,
-                    MemObj->tmpNode);
 
+                gcoCL_FreeMemory(physical,
+                                (gctPOINTER)MemObj->tmpNode->logical,
+                                MemObj->u.buffer.allocatedSize,
+                                MemObj->tmpNode,
+                                gcvSURF_INDEX);
             }
 
             if (MemObj->mapCount == 0)
@@ -241,7 +249,8 @@ clfReleaseMemObject(
                     gcoCL_FreeMemory(MemObj->u.buffer.physical,
                                      MemObj->u.buffer.logical,
                                      MemObj->u.buffer.allocatedSize,
-                                     MemObj->u.buffer.node);
+                                     MemObj->u.buffer.node,
+                                     gcvSURF_INDEX);
                 }
 
                 /* Invoke and free callbacks */
@@ -277,10 +286,11 @@ clfReleaseMemObject(
             if (MemObj->mapCount == 0)
             {
                 /* Release image object */
-                gcoCL_FreeMemory(MemObj->u.image.physical,
-                                 MemObj->u.image.logical,
-                                 MemObj->u.image.allocatedSize,
-                                 MemObj->u.image.node);
+                gcoCL_FreeMemory(MemObj->u.image.headerPhysical,
+                                 MemObj->u.image.headerLogical,
+                                 MemObj->u.image.headerSize,
+                                 MemObj->u.image.headerNode,
+                                 gcvSURF_INDEX);
 
                 gcoCL_DestroyTexture(MemObj->u.image.texture,
                                      MemObj->u.image.surface);
@@ -314,12 +324,11 @@ clfReleaseMemObject(
         }
     }
 
-
 OnError:
     if (status == CL_INVALID_MEM_OBJECT)
     {
         gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-004027: (clfReleaseMemObject) internal error.\n");
+            "OCL-004027: (clReleaseMemObject) internal error.\n");
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -349,6 +358,7 @@ clfExecuteHWCopy(
         case clvCOMMAND_READ_BUFFER:
             {
                 clsCommandReadBuffer_PTR readBuffer = gcvNULL;
+                gctUINT32 physical;
 
                 readBuffer  = &Command->u.readBuffer;
                 srcBuffer = readBuffer->buffer;
@@ -362,7 +372,9 @@ clfExecuteHWCopy(
                 /* flush and invalid user ptr cache */
                 gcoCL_FlushMemory(gcvNULL, readBuffer->ptr, size);
 
-                gcmONERROR(gcoCL_WrapUserMemory(readBuffer->ptr, size, gcvFALSE, &dstPhysical, &node));
+                gcmONERROR(gcoCL_WrapUserMemory(readBuffer->ptr, size, gcvFALSE, &physical, &node));
+
+                dstPhysical = physical;
 
                 EVENT_SET_GPU_RUNNING(Command, engine);
                 gcoCL_MemWaitAndGetFence(srcBuffer->u.buffer.node, engine, gcvFENCE_TYPE_READ, gcvFENCE_TYPE_WRITE);
@@ -380,18 +392,17 @@ clfExecuteHWCopy(
                 /*src address */
                 if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE) == gcvSTATUS_FALSE)
                 {
-                    gctPHYS_ADDR physical = 0;
+                    gctUINT32 physical = 0;
                     gctUINT   bytes = dstBuffer->u.buffer.allocatedSize;
 
                     if(dstBuffer->tmpNode)
                     {
-                        gctUINT32 physical;
-
                         gcsSURF_NODE_GetHardwareAddress(dstBuffer->tmpNode,&physical,gcvNULL, gcvNULL, gcvNULL);
-                        gcoCL_FreeMemory((gctPHYS_ADDR)(gctUINTPTR_T) physical,
+                        gcoCL_FreeMemory( physical,
                                          (gctPOINTER)dstBuffer->tmpNode->logical,
                                          dstBuffer->u.buffer.allocatedSize,
-                                         dstBuffer->tmpNode
+                                         dstBuffer->tmpNode,
+                                         gcvSURF_INDEX
                                          );
 
                         dstBuffer->tmpNode = gcvNULL;
@@ -401,6 +412,7 @@ clfExecuteHWCopy(
                                                     &physical,
                                                     &logical,
                                                     &dstBuffer->tmpNode,
+                                                    gcvSURF_INDEX,
                                                     0));
                 }
                 else
@@ -408,12 +420,13 @@ clfExecuteHWCopy(
                     if(dstBuffer->tmpNode == gcvNULL)
                     {
                         gctUINT         bytes = dstBuffer->u.buffer.allocatedSize;
-                        gctPHYS_ADDR    physical = 0;
+                        gctUINT32    physical = 0;
 
                         gcmONERROR(gcoCL_AllocateMemory(&bytes,
                                                         &physical,
                                                         &logical,
                                                         &dstBuffer->tmpNode,
+                                                        gcvSURF_INDEX,
                                                         0));
                     }
 
@@ -423,10 +436,13 @@ clfExecuteHWCopy(
                 /*Src address */
                 gcsSURF_NODE_GetHardwareAddress(dstBuffer->tmpNode,&srcPhysical,gcvNULL, gcvNULL, gcvNULL);
                 logical = dstBuffer->tmpNode->logical;
-                gcoOS_MemCopy(logical,writeBuffer->ptr,writeBuffer->cb);
+                if(logical != writeBuffer->ptr)
+                {
+                    gcoOS_MemCopy(logical,writeBuffer->ptr,writeBuffer->cb);
+                }
 
                 gcmDUMP_BUFFER(gcvNULL,
-                               "memory",
+                               gcvDUMP_BUFFER_MEMORY,
                                gcmPTR2SIZE(srcPhysical),
                                (gctPOINTER)writeBuffer->ptr,
                                0,
@@ -478,7 +494,7 @@ clfExecuteHWCopy(
 OnError:
     if (node)
     {
-        gcoCL_FreeMemory(gcvNULL, gcvNULL, 0, node);
+        gcoCL_FreeMemory(0, gcvNULL, 0, node, gcvSURF_INDEX);
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -535,15 +551,20 @@ clfExecuteCommandReadBuffer(
         }
         gcoCL_InvalidateMemoryCache(buffer->u.buffer.node, src, readBuffer->cb);
 
-        gcoOS_MemCopy(readBuffer->ptr, src, readBuffer->cb);
+        if(readBuffer->ptr != src)
+        {
+            gcoOS_MemCopy(readBuffer->ptr, src, readBuffer->cb);
+        }
 
         gcmDUMP(gcvNULL,
                 "@[memory.read 0x%08X 0x%08X]",
                 gcmPTR2SIZE(buffer->u.buffer.physical) + readBuffer->offset,
                 readBuffer->cb);
 
+        gcmDUMP(gcvNULL, "#[info: verify when read buffer");
+
         gcmDUMP_BUFFER(gcvNULL,
-                       "verify",
+                       gcvDUMP_BUFFER_VERIFY,
                        gcmPTR2SIZE(buffer->u.buffer.physical) + readBuffer->offset,
                        src,
                        0,
@@ -552,7 +573,6 @@ clfExecuteCommandReadBuffer(
 
     status = CL_SUCCESS;
 
-    /* Decrease reference count of memory object */
     clfReleaseMemObject(buffer);
 
 OnError:
@@ -629,12 +649,25 @@ clfExecuteCommandReadBufferRect(
         {
             src = srcFirstByte + row*bufferRowPitch + slice*bufferSlicePitch;
             dst = dstFirstByte + row*hostRowPitch + slice*hostSlicePitch;
-            gcoOS_MemCopy((gctPOINTER)dst, (gctPOINTER)src, region[0]);
+            if(src != dst)
+            {
+                gcoOS_MemCopy((gctPOINTER)dst, (gctPOINTER)src, region[0]);
+            }
 
             gcmDUMP(gcvNULL,
                     "@[memory.read 0x%08X 0x%08X]",
-                    gcmPTR2SIZE( buffer->u.buffer.physical) + (src - gcmPTR2SIZE( buffer->u.buffer.logical)),
+                     gcmPTR2SIZE(buffer->u.buffer.physical) + (src - gcmPTR2SIZE( buffer->u.buffer.logical)),
                     region[0]);
+
+            gcmDUMP(gcvNULL, "#[info: verify when read buffer rect");
+
+            gcmDUMP_BUFFER(gcvNULL,
+                           gcvDUMP_BUFFER_VERIFY,
+                           buffer->u.buffer.physical + (src - gcmPTR2SIZE( buffer->u.buffer.logical)),
+                           (gctPOINTER)src,
+                           0,
+                           region[0]);
+
         }
     }
 
@@ -661,7 +694,6 @@ clfExecuteCommandWriteBuffer(
     gctINT          status = CL_SUCCESS;
     gctPOINTER      logicalAddress;
     gctBOOL         hwCopy = gcvFALSE;
-    gctBOOL          fenceBack = gcvFALSE;
     gcmHEADER_ARG("Command=0x%x", Command);
 
     clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
@@ -672,26 +704,21 @@ clfExecuteCommandWriteBuffer(
     buffer      = writeBuffer->buffer;
     hwCopy   = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_ENGINE);
 
-
-    fenceBack = gcoCL_MemIsFenceBack(buffer->u.buffer.node, gcvENGINE_RENDER, gcvFENCE_TYPE_ALL)  &&
-                    gcoCL_MemIsFenceBack(buffer->u.buffer.node, gcvENGINE_BLT, gcvFENCE_TYPE_ALL);
-
-   /* HwCopy will first copy to a tmpNode and do blit ,
-     If dest Mem 's fence is back, we choose cpu copy to  reduce the bandwidth
-   */
-    if(fenceBack)
+    if(buffer->flags & CL_MEM_USE_HOST_PTR)
     {
-        hwCopy = gcvFALSE;
+        hwCopy = hwCopy && (!(gcmPTR2SIZE(buffer->u.buffer.logical) & 0xFF));
     }
 
-     /*Try Hardware Copy*/
+    /*Try Hardware Copy*/
     if (hwCopy)
     {
         if (gcmIS_ERROR(clfExecuteHWCopy(Command)))
         {
             hwCopy = gcvFALSE;
         }
+
     }
+
 
     if(!hwCopy)
     {
@@ -712,20 +739,24 @@ clfExecuteCommandWriteBuffer(
         offset      = writeBuffer->offset;
         logicalAddress = (gctPOINTER) (gcmPTR2SIZE(buffer->u.buffer.logical) + offset);
 
-        gcoOS_MemCopy(logicalAddress, ptr, cb);
+        if(logicalAddress != ptr)
+        {
+            gcoOS_MemCopy(logicalAddress, ptr, cb);
+        }
 
         gcoCL_FlushMemory(buffer->u.buffer.node, buffer->u.buffer.logical, buffer->u.buffer.allocatedSize);
 
+        gcmDUMP(gcvNULL, "#[info: write buffer by cpu");
+
         gcmDUMP_BUFFER(gcvNULL,
-                       "memory",
-                       gcmPTR2SIZE( buffer->u.buffer.physical),
-                       buffer->u.buffer.logical,
+                       gcvDUMP_BUFFER_MEMORY,
+                       gcmPTR2SIZE( buffer->u.buffer.physical) + offset,
+                       (gctPOINTER) (gcmPTR2SIZE(buffer->u.buffer.logical) + offset) ,
                        0,
                        cb);
     }
     status = CL_SUCCESS;
 
-    /* Decrease reference count of memory object */
     clfReleaseMemObject(buffer);
 
 OnError:
@@ -780,14 +811,19 @@ clfExecuteCommandFillBuffer(
 
     for ( i = 0; i < size; i+=pattern_size )
     {
-        gcoOS_MemCopy((gctPOINTER) operAddress, pattern, pattern_size);
+        if(((gctPOINTER)operAddress) != pattern)
+        {
+            gcoOS_MemCopy((gctPOINTER) operAddress, pattern, pattern_size);
+        }
         operAddress += (size_t)pattern_size;
     }
 
     gcoCL_FlushMemory(buffer->u.buffer.node, buffer->u.buffer.logical, buffer->u.buffer.allocatedSize);
 
+    gcmDUMP(gcvNULL, "#[info: fill buffer by cpu");
+
     gcmDUMP_BUFFER(gcvNULL,
-                   "memory",
+                   gcvDUMP_BUFFER_MEMORY,
                    gcmPTR2SIZE( buffer->u.buffer.physical),
                    buffer->u.buffer.logical,
                    0,
@@ -820,13 +856,13 @@ clfExecuteCommandWriteBufferRect(
     gctCONST_POINTER ptr;
     size_t          src, dst, srcFirstByte, dstFirstByte;
     size_t          row, slice;
-    gctINT          status;
+    gceSTATUS       status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("Command=0x%x", Command);
 
-    clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
+    gcmASSERT(Command && Command->objectType == clvOBJECT_COMMAND);
 
-    clmASSERT(Command->type == clvCOMMAND_WRITE_BUFFER_RECT, CL_INVALID_VALUE);
+    gcmASSERT(Command->type == clvCOMMAND_WRITE_BUFFER_RECT);
 
     /* Flush GPU cache and wait for GPU finish before CPU operations */
     gcmONERROR(gcoCL_Flush(gcvTRUE));
@@ -861,10 +897,15 @@ clfExecuteCommandWriteBufferRect(
         {
             src = srcFirstByte + row*hostRowPitch + slice*hostSlicePitch;
             dst = dstFirstByte + row*bufferRowPitch + slice*bufferSlicePitch;
-            gcoOS_MemCopy((gctPOINTER)dst, (gctPOINTER)src, region[0]);
+            if(src != dst)
+            {
+                gcoOS_MemCopy((gctPOINTER)dst, (gctPOINTER)src, region[0]);
+            }
+
+            gcmDUMP(gcvNULL, "#[info: write buffer rect by cpu");
 
             gcmDUMP_BUFFER(gcvNULL,
-                           "memory",
+                           gcvDUMP_BUFFER_MEMORY,
                            gcmPTR2SIZE( buffer->u.buffer.physical),
                            buffer->u.buffer.logical,
                            dst - gcmPTR2SIZE(buffer->u.buffer.logical),
@@ -874,14 +915,14 @@ clfExecuteCommandWriteBufferRect(
 
     gcoCL_FlushMemory(buffer->u.buffer.node, buffer->u.buffer.logical, buffer->u.buffer.allocatedSize);
 
-    status = CL_SUCCESS;
-
     /* Decrease reference count of memory object */
     clfReleaseMemObject(buffer);
 
+    return CL_SUCCESS;
+
 OnError:
     gcmFOOTER_ARG("%d", status);
-    return status;
+    return ((gctINT)status);
 }
 
 gctINT
@@ -907,6 +948,16 @@ clfExecuteCommandCopyBuffer(
     copyBuffer  = &Command->u.copyBuffer;
     srcBuffer   = copyBuffer->srcBuffer;
     dstBuffer   = copyBuffer->dstBuffer;
+
+    if(srcBuffer->flags & CL_MEM_USE_HOST_PTR)
+    {
+        hwCopy = hwCopy && (!(gcmPTR2SIZE(srcBuffer->u.buffer.logical) & 0xFF));
+    }
+
+    if(dstBuffer->flags & CL_MEM_USE_HOST_PTR)
+    {
+        hwCopy = hwCopy && (!(gcmPTR2SIZE(dstBuffer->u.buffer.logical) & 0xFF));
+    }
 
     if (hwCopy)
     {
@@ -940,14 +991,19 @@ clfExecuteCommandCopyBuffer(
 
         gcoCL_InvalidateMemoryCache(srcBuffer->u.buffer.node, srcBuffer->u.buffer.logical, srcBuffer->u.buffer.allocatedSize);
 
-        gcoOS_MemCopy((gctPOINTER)dst, (gctPOINTER)src, cb);
+        if(src != dst)
+        {
+            gcoOS_MemCopy((gctPOINTER)dst, (gctPOINTER)src, cb);
+        }
 
         gcoCL_FlushMemory(dstBuffer->u.buffer.node, dstBuffer->u.buffer.logical, dstBuffer->u.buffer.allocatedSize);
 
+        gcmDUMP(gcvNULL, "#[info: copy buffer by cpu");
+
         gcmDUMP_BUFFER(gcvNULL,
-                       "memory",
-                       gcmPTR2SIZE( dstBuffer->u.buffer.physical),
-                       dstBuffer->u.buffer.logical,
+                       gcvDUMP_BUFFER_MEMORY,
+                       gcmPTR2SIZE( dstBuffer->u.buffer.physical)+ dstOffset,
+                       (gctPOINTER)dst,
                        0,
                        cb);
     }
@@ -1002,7 +1058,6 @@ clfExecuteCommandCopyBufferRect(
     }
 
     EVENT_SET_CPU_RUNNING(Command);
-
     srcOrigin       = copyBufferRect->srcOrigin;
     dstOrigin       = copyBufferRect->dstOrigin;
     region          = copyBufferRect->region;
@@ -1030,10 +1085,15 @@ clfExecuteCommandCopyBufferRect(
         {
             src = srcFirstByte + row*srcRowPitch + slice*srcSlicePitch;
             dst = dstFirstByte + row*dstRowPitch + slice*dstSlicePitch;
-            gcoOS_MemCopy((gctPOINTER)dst, (gctPOINTER)src, region[0]);
+            if(src != dst)
+            {
+                gcoOS_MemCopy((gctPOINTER)dst, (gctPOINTER)src, region[0]);
+            }
+
+            gcmDUMP(gcvNULL, "#[info: copy buffer rect by cpu");
 
             gcmDUMP_BUFFER(gcvNULL,
-                           "memory",
+                           gcvDUMP_BUFFER_MEMORY,
                            gcmPTR2SIZE( dstBuffer->u.buffer.physical),
                            dstBuffer->u.buffer.logical,
                            dst - gcmPTR2SIZE(dstBuffer->u.buffer.logical),
@@ -1045,6 +1105,7 @@ clfExecuteCommandCopyBufferRect(
 
     status = CL_SUCCESS;
 
+    /* Decrease reference count of memory object */
     clfReleaseMemObject(srcBuffer);
     clfReleaseMemObject(dstBuffer);
 
@@ -1059,7 +1120,7 @@ clfReadImage(
     )
 {
     clsCommandReadImage_PTR readImage;
-    gctINT          status;
+    gceSTATUS       status = gcvSTATUS_OK;
     clsMem_PTR      image;
     gctUINT         elementSize;
     gctUINT         lineSize;
@@ -1075,9 +1136,9 @@ clfReadImage(
 
     gcmHEADER_ARG("Command=0x%x", Command);
 
-    clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
+    gcmASSERT(Command && Command->objectType == clvOBJECT_COMMAND);
 
-    clmASSERT(Command->type == clvCOMMAND_READ_IMAGE, CL_INVALID_VALUE);
+    gcmASSERT(Command->type == clvCOMMAND_READ_IMAGE);
 
     /* Flush GPU cache and wait for GPU finish before CPU operations */
     gcmONERROR(gcoCL_Flush(gcvTRUE));
@@ -1098,8 +1159,16 @@ clfReadImage(
     elementSize = image->u.image.elementSize;
     lineSize = width * elementSize;
 
-
     gcoCL_FlushSurface(image->u.image.surface);
+
+    gcmDUMP(gcvNULL, "#[info: verify image before reading image]");
+    gcmDUMP_BUFFER(gcvNULL,
+        gcvDUMP_BUFFER_VERIFY,
+        image->u.image.texturePhysical,
+        image->u.image.textureLogical,
+        0,
+        image->u.image.surface->size
+        );
 
     /* set to the slice begin */
     srcLine = (gctUINT8_PTR) image->u.image.textureLogical + (srcSlicePitch * zoff);
@@ -1114,7 +1183,10 @@ clfReadImage(
         for (y = 0; y < height; y++)
         {
             /* set to the pixel begin */
-            gcoOS_MemCopy(dstLine, srcLine, lineSize);
+            if(srcLine != dstLine)
+            {
+                gcoOS_MemCopy(dstLine, srcLine, lineSize);
+            }
             /* set to next line begin */
             srcLine += srcRowPitch;
             dstLine += dstRowPitch;
@@ -1124,12 +1196,15 @@ clfReadImage(
         dstSliceBegin += dstSlicePitch;
     }
 
+    /* Decrease reference count of memory object */
     clfReleaseMemObject(image);
-    status = CL_SUCCESS;
+
+    gcmFOOTER_ARG("%d", status);
+    return CL_SUCCESS;
 
 OnError:
     gcmFOOTER_ARG("%d", status);
-    return status;
+    return ((gctINT)status);
 }
 
 gctINT
@@ -1152,7 +1227,7 @@ clfWriteImage(
     )
 {
     clsCommandWriteImage_PTR writeImage;
-    gctINT           status;
+    gceSTATUS        status = gcvSTATUS_OK;
     clsMem_PTR       image;
     gctUINT          elementSize;
     gctUINT          lineSize;
@@ -1167,9 +1242,9 @@ clfWriteImage(
 
     gcmHEADER_ARG("Command=0x%x", Command);
 
-    clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
+    gcmASSERT(Command && Command->objectType == clvOBJECT_COMMAND);
 
-    clmASSERT(Command->type == clvCOMMAND_WRITE_IMAGE, CL_INVALID_VALUE);
+    gcmASSERT(Command->type == clvCOMMAND_WRITE_IMAGE);
 
     /* Flush GPU cache and wait for GPU finish before CPU operations */
     gcmONERROR(gcoCL_Flush(gcvTRUE));
@@ -1202,8 +1277,10 @@ clfWriteImage(
         {
             /* set to the pixel begin */
             gcoOS_MemCopy(dstLine, srcLine, lineSize);
+
+            gcmDUMP(gcvNULL, "#[info: write image by cpu");
             gcmDUMP_BUFFER(gcvNULL,
-                            "texture",
+                            gcvDUMP_BUFFER_TEXTURE,
                             gcmPTR2SIZE(image->u.image.texturePhysical),
                             image->u.image.textureLogical,
                             gcmPTR2SIZE(dstLine) - gcmPTR2SIZE(image->u.image.textureLogical),
@@ -1218,12 +1295,14 @@ clfWriteImage(
 
     gcoCL_FlushSurface(image->u.image.surface);
 
+    /* Decrease reference count of memory object */
     clfReleaseMemObject(image);
-    status = CL_SUCCESS;
+
+    return CL_SUCCESS;
 
 OnError:
     gcmFOOTER_ARG("%d", status);
-    return status;
+    return ((gctINT)status);
 }
 
 gctINT
@@ -1273,11 +1352,12 @@ clfExecuteCommandFillImage(
     }
     else
     {
-        /* Flush GPU cache and wait for GPU finish before CPU operations */
-        gcoCL_MemWaitAndGetFence(image->u.image.node, gcvENGINE_CPU, gcvFENCE_TYPE_WRITE, gcvFENCE_TYPE_ALL);
-    }
-    EVENT_SET_CPU_RUNNING(Command);
+         /* Flush GPU cache and wait for GPU finish before CPU operations */
+        gcoCL_MemWaitAndGetFence(image->u.image.headerNode, gcvENGINE_CPU, gcvFENCE_TYPE_WRITE, gcvFENCE_TYPE_ALL);
 
+    }
+
+    EVENT_SET_CPU_RUNNING(Command);
     ptr            = fillImage->fillColorPtr;
     stride         = image->u.image.textureStride;
     slice          = image->u.image.textureSlicePitch;
@@ -1302,10 +1382,14 @@ clfExecuteCommandFillImage(
             line = srcLineBegin;
             for (x = 0; x < width; x++)
             {
-                gcoOS_MemCopy(line, ptr, elementSize);
+                if(line != ptr)
+                {
+                    gcoOS_MemCopy(line, ptr, elementSize);
+                }
+                gcmDUMP(gcvNULL, "#[info: fill image by cpu");
 
                 gcmDUMP_BUFFER(gcvNULL,
-                               "texture",
+                               gcvDUMP_BUFFER_TEXTURE,
                                gcmPTR2SIZE( image->u.image.texturePhysical),
                                image->u.image.textureLogical,
                                gcmPTR2SIZE(line) - gcmPTR2SIZE(image->u.image.textureLogical),
@@ -1370,9 +1454,11 @@ clfExecuteCommandCopyImage(
     else
     {
         /* Flush GPU cache and wait for GPU finish before CPU operations */
-        gcoCL_MemWaitAndGetFence(srcImage->u.image.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_WRITE);
-        gcoCL_MemWaitAndGetFence(dstImage->u.image.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_ALL);
+        gcoCL_MemWaitAndGetFence(srcImage->u.image.headerNode, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_WRITE);
+        gcoCL_MemWaitAndGetFence(dstImage->u.image.headerNode, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_ALL);
     }
+
+
     EVENT_SET_CPU_RUNNING(Command);
 
     sxoff       = copyImage->srcOrigin[0];
@@ -1408,7 +1494,10 @@ clfExecuteCommandCopyImage(
         dstLine = dstSliceBegin;
         for (y = 0; y < height; y++)
         {
-            gcoOS_MemCopy(dstLine, srcLine, lineSize);
+            if(srcLine != dstLine)
+            {
+                gcoOS_MemCopy(dstLine, srcLine, lineSize);
+            }
             srcLine += srcRowPitch;
             dstLine += dstRowPitch;
         }
@@ -1427,7 +1516,6 @@ OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
-
 gctINT
 clfExecuteCommandCopyImageToBuffer(
     clsCommand_PTR  Command
@@ -1467,9 +1555,11 @@ clfExecuteCommandCopyImageToBuffer(
     else
     {
         /* Flush GPU cache and wait for GPU finish before CPU operations */
-        gcoCL_MemWaitAndGetFence(srcImage->u.image.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_WRITE);
+        gcoCL_MemWaitAndGetFence(srcImage->u.image.headerNode, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_WRITE);
         gcoCL_MemWaitAndGetFence(dstBuffer->u.buffer.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_ALL);
     }
+
+
 
     EVENT_SET_CPU_RUNNING(Command);
 
@@ -1503,10 +1593,15 @@ clfExecuteCommandCopyImageToBuffer(
         srcLine = imgSlice;
         for (y = 0; y < height; y++)
         {
-            gcoOS_MemCopy(dstLine, srcLine, lineSize);
+            if(srcLine != dstLine)
+            {
+                gcoOS_MemCopy(dstLine, srcLine, lineSize);
+            }
+
+            gcmDUMP(gcvNULL, "#[info: copy image to buffer by cpu");
 
             gcmDUMP_BUFFER(gcvNULL,
-                           "memory",
+                           gcvDUMP_BUFFER_MEMORY,
                            gcmPTR2SIZE(dstBuffer->u.buffer.physical),
                            dstBuffer->u.buffer.logical,
                            gcmPTR2SIZE(dstLine) - gcmPTR2SIZE(dstBuffer->u.buffer.logical),
@@ -1572,8 +1667,9 @@ clfExecuteCommandCopyBufferToImage(
     {
         /* Flush GPU cache and wait for GPU finish before CPU operations */
         gcoCL_MemWaitAndGetFence(srcBuffer->u.buffer.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_WRITE);
-        gcoCL_MemWaitAndGetFence(dstImage->u.image.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_ALL);
+        gcoCL_MemWaitAndGetFence(dstImage->u.image.headerNode, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID, gcvFENCE_TYPE_ALL);
     }
+
     EVENT_SET_CPU_RUNNING(Command);
 
     width             = copyBufferToImage->region[0];
@@ -1604,10 +1700,14 @@ clfExecuteCommandCopyBufferToImage(
         dstLine = dstSlice;
         for (y = 0; y < height; y++)
         {
-            gcoOS_MemCopy(dstLine, srcLine, lineSize);
+            if(srcLine != dstLine)
+            {
+                gcoOS_MemCopy(dstLine, srcLine, lineSize);
+            }
+            gcmDUMP(gcvNULL, "#[info: copy buffer to image by cpu");
 
             gcmDUMP_BUFFER(gcvNULL,
-                           "texture",
+                           gcvDUMP_BUFFER_TEXTURE,
                            gcmPTR2SIZE( dstImage->u.image.texturePhysical),
                            dstImage->u.image.textureLogical,
                            gcmPTR2SIZE(dstLine) - gcmPTR2SIZE(dstImage->u.image.textureLogical),
@@ -1623,7 +1723,7 @@ clfExecuteCommandCopyBufferToImage(
 
     status = CL_SUCCESS;
 
-     /* Decrease reference count of memory object */
+    /* Decrease reference count of memory object */
     clfReleaseMemObject(dstImage);
     clfReleaseMemObject(srcBuffer);
 
@@ -1646,7 +1746,6 @@ clfExecuteCommandMigrateMemObjects(
     clmASSERT(Command->type == clvCOMMAND_MIGRATE_MEM_OBJECTS, CL_INVALID_VALUE);
 
     EVENT_SET_CPU_RUNNING(Command);
-
     status = CL_SUCCESS;
 
 OnError:
@@ -1686,7 +1785,6 @@ clfExecuteCommandMapBuffer(
     }
 
     EVENT_SET_CPU_RUNNING(Command);
-
     mapFlags    = mapBuffer->mapFlags;
     cb          = mapBuffer->cb;
     mappedPtr   = mapBuffer->mappedPtr;
@@ -1760,8 +1858,10 @@ clfExecuteCommandMapBuffer(
 
         src = (gctPOINTER) (gcmPTR2SIZE(buffer->u.buffer.logical) + mapBuffer->offset);
 
+        gcmDUMP(gcvNULL, "#[info: verify buffer with map buffer");
+
         gcmDUMP_BUFFER(gcvNULL,
-                        "verify",
+                        gcvDUMP_BUFFER_VERIFY,
                         gcmPTR2SIZE(buffer->u.buffer.physical) + mapBuffer->offset,
                         src,
                         0,
@@ -1782,15 +1882,15 @@ clfExecuteCommandMapImage(
     )
 {
     clsCommandMapImage_PTR mapImage;
-    gctINT          status;
-    clsMem_PTR      image;
+    gceSTATUS       status = gcvSTATUS_OK;
+    clsMem_PTR      image = gcvNULL;
     cl_map_flags    mapFlags;
 
     gcmHEADER_ARG("Command=0x%x", Command);
 
-    clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
+    gcmASSERT(Command && Command->objectType == clvOBJECT_COMMAND);
 
-    clmASSERT(Command->type == clvCOMMAND_MAP_IMAGE, CL_INVALID_VALUE);
+    gcmASSERT(Command->type == clvCOMMAND_MAP_IMAGE);
 
     mapImage    = &Command->u.mapImage;
     image       = mapImage->image;
@@ -1802,11 +1902,10 @@ clfExecuteCommandMapImage(
     else
     {
         /* Flush GPU cache and wait for GPU finish before CPU operations */
-        gcoCL_MemWaitAndGetFence(image->u.image.node, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID,  gcvFENCE_TYPE_ALL);
+        gcoCL_MemWaitAndGetFence(image->u.image.headerNode, gcvENGINE_CPU, gcvFNECE_TYPE_INVALID,  gcvFENCE_TYPE_ALL);
     }
 
     EVENT_SET_CPU_RUNNING(Command);
-
     mapFlags    = mapImage->mapFlags;
     image->mapFlag = mapFlags;
     clfRetainMemObject(image);
@@ -1834,6 +1933,14 @@ clfExecuteCommandMapImage(
     if (mapFlags & CL_MAP_READ)
     {
         /* TODO - Need to invalidate surface node. */
+        gcmDUMP(gcvNULL, "#[info: verify image before map image]");
+        gcmDUMP_BUFFER(gcvNULL,
+            gcvDUMP_BUFFER_VERIFY,
+            image->u.image.texturePhysical,
+            image->u.image.textureLogical,
+            0,
+            image->u.image.surface->size
+            );
     }
 
     /* Anyway, we need to sync the content of the memory when mapping is called. */
@@ -1842,18 +1949,18 @@ clfExecuteCommandMapImage(
     {
         gctSIZE_T   orig[3], area[3];
         orig[0] = orig[1] = orig[2] = 0;
-        area[0] = image->u.image.width;
+        area[0] = image->u.image.imageDesc.image_width;
         area[1] = image->type == CL_MEM_OBJECT_IMAGE1D_ARRAY ?
-                    image->u.image.arraySize :
-                    image->u.image.height;
+                                  image->u.image.imageDesc.image_array_size :
+                                  image->u.image.imageDesc.image_height;
         area[2] = image->type == CL_MEM_OBJECT_IMAGE2D_ARRAY ?
-                    image->u.image.arraySize :
-                    image->u.image.depth;
+                                 image->u.image.imageDesc.image_array_size :
+                                 image->u.image.imageDesc.image_depth;
 
         clfSyncHostMemory(gcvFALSE,
             image->host,
-            image->u.image.rowPitch,
-            image->u.image.slicePitch,
+            image->u.image.imageDesc.image_row_pitch,
+            image->u.image.imageDesc.image_slice_pitch,
             orig,
             image->u.image.textureLogical,
             image->u.image.textureStride,
@@ -1864,11 +1971,14 @@ clfExecuteCommandMapImage(
             );
     }
 
-    status = CL_SUCCESS;
+    gcmFOOTER_ARG("%d", status);
+    return CL_SUCCESS;
 
 OnError:
+    if (image)
+        gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, image->mutex));
     gcmFOOTER_ARG("%d", status);
-    return status;
+    return ((gctINT)status);
 }
 
 gctINT
@@ -1879,20 +1989,19 @@ clfExecuteCommandUnmapMemObject(
     clsCommandUnmapMemObject_PTR unmapMemObject;
     clsMem_PTR          memObj = gcvNULL;
     /*gctPOINTER **       mappedPtr;*/
-    gctINT              status;
+    gceSTATUS           status = gcvSTATUS_OK;
     gctBOOL             acquired = gcvFALSE;
 
     gcmHEADER_ARG("Command=0x%x", Command);
 
-    clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
+    gcmASSERT(Command && Command->objectType == clvOBJECT_COMMAND);
 
-    clmASSERT(Command->type == clvCOMMAND_UNMAP_MEM_OBJECT, CL_INVALID_VALUE);
+    gcmASSERT(Command->type == clvCOMMAND_UNMAP_MEM_OBJECT);
 
     /* Flush GPU cache and wait for GPU finish before CPU operations */
     gcmONERROR(gcoCL_Flush(gcvTRUE));
 
     EVENT_SET_CPU_RUNNING(Command);
-
     unmapMemObject  = &Command->u.unmapMemObject;
     memObj          = unmapMemObject->memObj;
     /*mappedPtr     = unmapMemObject->mappedPtr;*/
@@ -1956,14 +2065,14 @@ clfExecuteCommandUnmapMemObject(
             }
            /* TODO - if mapped for write, need to flush memory. */
             /*gcoCL_FlushMemory(memObj->u.buffer.node, memObj->u.buffer.logical, cb);*/
-#if gcdDUMP
-            gcmDUMP_BUFFER(gcvNULL,
-                            "memory",
+           gcmDUMP(gcvNULL, "#[info: update buffer when unmap memory object");
+
+           gcmDUMP_BUFFER(gcvNULL,
+                            gcvDUMP_BUFFER_MEMORY,
                             gcmPTR2SIZE( memObj->u.buffer.physical),
                             memObj->u.buffer.logical,
                             0,
                             memObj->u.buffer.size);
-#endif
         }
         else if (memObj->type == CL_MEM_OBJECT_IMAGE2D ||
                  memObj->type == CL_MEM_OBJECT_IMAGE3D ||
@@ -1980,18 +2089,18 @@ clfExecuteCommandUnmapMemObject(
                 /* Host writting done, Sync host to device. */
                 gctSIZE_T   orig[3], area[3];
                 orig[0] = orig[1] = orig[2] = 0;
-                area[0] = memObj->u.image.width;
+                area[0] = memObj->u.image.imageDesc.image_width;
                 area[1] = memObj->type == CL_MEM_OBJECT_IMAGE1D_ARRAY ?
-                            memObj->u.image.arraySize :
-                            memObj->u.image.height;
+                                          memObj->u.image.imageDesc.image_array_size :
+                                          memObj->u.image.imageDesc.image_height;
                 area[2] = memObj->type == CL_MEM_OBJECT_IMAGE2D_ARRAY ?
-                            memObj->u.image.arraySize :
-                            memObj->u.image.depth;
+                                          memObj->u.image.imageDesc.image_array_size :
+                                          memObj->u.image.imageDesc.image_depth;
 
                 clfSyncHostMemory(gcvTRUE,
                     memObj->host,
-                    memObj->u.image.rowPitch,
-                    memObj->u.image.slicePitch,
+                    memObj->u.image.imageDesc.image_row_pitch,
+                    memObj->u.image.imageDesc.image_slice_pitch,
                     orig,
                     memObj->u.image.textureLogical,
                     memObj->u.image.textureStride,
@@ -2005,6 +2114,7 @@ clfExecuteCommandUnmapMemObject(
             /* Unlock memory */
             gcmONERROR(gcoCL_UnlockSurface(memObj->u.image.surface, memObj->u.image.textureLogical));
         }
+
     }
 
     gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, memObj->mutex));
@@ -2012,7 +2122,8 @@ clfExecuteCommandUnmapMemObject(
 
     clfReleaseMemObject(memObj);
 
-    status = CL_SUCCESS;
+    gcmFOOTER_ARG("%d", status);
+    return CL_SUCCESS;
 
 OnError:
     if (acquired)
@@ -2021,7 +2132,7 @@ OnError:
     }
 
     gcmFOOTER_ARG("%d", status);
-    return status;
+    return ((gctINT)status);
 }
 
 gctINT
@@ -2930,19 +3041,13 @@ clfNewImage(
     image->fromGL          = gcvFALSE;
 
     /* Image specific info. */
-    image->u.image.width        = 0;
-    image->u.image.height       = 0;
-    image->u.image.depth        = 0;
-    image->u.image.rowPitch     = 0;
-    image->u.image.slicePitch   = 0;
     image->u.image.elementSize  = 4;
     image->u.image.size         = 0;
     image->u.image.texture      = gcvNULL;
-    image->u.image.node         = gcvNULL;
+    image->u.image.headerNode   = gcvNULL;
     image->u.image.internalFormat = gcvSURF_UNKNOWN;
     image->u.image.texturePhysical = 0;
     image->u.image.textureLogical = 0;
-    image->u.image.buffer = gcvNULL;
     /* Create a reference count object and set it to 1. */
     clmONERROR(gcoOS_AtomConstruct(gcvNULL, &image->referenceCount),
                CL_OUT_OF_HOST_MEMORY);
@@ -3072,13 +3177,34 @@ clCreateBuffer(
         if (clmNO_ERROR(status))
         {
             buffer->u.buffer.allocatedSize  = Size;
-            buffer->u.buffer.physical       = (gctPHYS_ADDR)gcmINT2PTR(physical);
+            buffer->u.buffer.physical       = physical;
             buffer->u.buffer.logical        = HostPtr;
             buffer->u.buffer.wrapped        = gcvTRUE;
 
             gcoCL_FlushMemory(buffer->u.buffer.node, HostPtr, Size);
             bwrap  = gcvTRUE;
         }
+    }
+    else if(Flags & CL_MEM_USE_HOST_PHYSICAL_ADDR_VIV)
+    {
+        gctPOINTER logical = gcvNULL;
+
+        if (Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV)
+        {
+            clmONERROR(gcoCL_WrapUserPhysicalMemory((gctUINT32_PTR)HostPtr, Size, gcvTRUE, &logical, &buffer->u.buffer.node), CL_MAP_FAILURE);
+        }
+        else
+        {
+            clmONERROR(gcoCL_WrapUserPhysicalMemory((gctUINT32_PTR)HostPtr, Size, gcvFALSE, &logical, &buffer->u.buffer.node), CL_MAP_FAILURE);
+        }
+
+        buffer->u.buffer.allocatedSize  = Size;
+        buffer->u.buffer.physical       = gcmALL_TO_UINT32(HostPtr);
+        buffer->u.buffer.logical        = logical;
+        buffer->u.buffer.wrapped        = gcvTRUE;
+
+        gcoCL_FlushMemory(buffer->u.buffer.node, logical, Size);
+
     }
 
     if (!bwrap)
@@ -3095,6 +3221,7 @@ clCreateBuffer(
                                         &buffer->u.buffer.physical,
                                         &buffer->u.buffer.logical,
                                         &buffer->u.buffer.node,
+                                        gcvSURF_INDEX,
                                         memFlag),
                    CL_MEM_OBJECT_ALLOCATION_FAILURE);
 
@@ -3110,13 +3237,18 @@ clCreateBuffer(
             else
 #endif
             {
-                gcoOS_MemCopy(buffer->u.buffer.logical, HostPtr, Size);
+                if(HostPtr != buffer->u.buffer.logical)
+                {
+                    gcoOS_MemCopy(buffer->u.buffer.logical, HostPtr, Size);
+                }
             }
 
             gcoCL_FlushMemory(buffer->u.buffer.node, buffer->u.buffer.logical, buffer->u.buffer.allocatedSize);
 
+            gcmDUMP(gcvNULL, "#[info: initialize buffer at clCreateBufer");
+
             gcmDUMP_BUFFER(gcvNULL,
-                           "memory",
+                           gcvDUMP_BUFFER_MEMORY,
                            gcmPTR2SIZE(buffer->u.buffer.physical),
                            buffer->u.buffer.logical,
                            0,
@@ -3248,7 +3380,7 @@ clCreateSubBuffer(
     buffer->u.buffer.logical       = Buffer->u.buffer.logical ?
         (gctPOINTER)(gcmPTR2SIZE(Buffer->u.buffer.logical) + origin) : gcvNULL;
     buffer->u.buffer.physical      = Buffer->u.buffer.physical ?
-        (gctPOINTER)(gcmPTR2SIZE(Buffer->u.buffer.physical) + origin) : gcvNULL;
+        (Buffer->u.buffer.physical + origin) : 0;
 
     buffer->u.buffer.bufferCreateInfo.origin    = origin;
     buffer->u.buffer.bufferCreateInfo.size      = size;
@@ -3280,6 +3412,215 @@ OnError:
     return gcvNULL;
 }
 
+static void
+clfInitImageDescriptor(clsMem_PTR image)
+{
+    VSC_ImageDesc * tmpData = &image->u.image.imageDescriptor;
+    gctUINT addressMode = 0, format, tiling, type=0, componentCount=0,
+            swizzleR=0, swizzleG=0, swizzleB=0, swizzleA=0;
+    gctUINT sliceSize = 0, depth = 0;
+    gctUINT shift = (unsigned int)(gcoMATH_Log((gctFLOAT)image->u.image.elementSize)/gcoMATH_Log(2.0));
+
+    tmpData->rawbits[0]= (gctUINT32 ) image->u.image.texturePhysical;
+    tmpData->rawbits[1] = image->u.image.textureStride;
+
+    switch(image->type)
+    {
+    case CL_MEM_OBJECT_IMAGE1D:
+        tmpData->sd.imageType = CL_MEM_OBJECT_IMAGE1D;
+    case CL_MEM_OBJECT_IMAGE1D_BUFFER:
+        tmpData->rawbits[2] = (image->u.image.imageDesc.image_width) | (image->u.image.imageDesc.image_width<<16);
+        sliceSize = image->u.image.imageDesc.image_width;
+        depth = 1;
+        type = 0;
+        tmpData->sd.imageType = CL_MEM_OBJECT_IMAGE1D_BUFFER;
+        break;
+    case CL_MEM_OBJECT_IMAGE2D:
+        tmpData->rawbits[2] = (image->u.image.imageDesc.image_width) | (image->u.image.imageDesc.image_height<<16);
+        sliceSize = image->u.image.imageDesc.image_width * image->u.image.imageDesc.image_height;
+        depth = 1;
+        type = 1;
+        tmpData->sd.imageType = CL_MEM_OBJECT_IMAGE2D;
+        break;
+    case CL_MEM_OBJECT_IMAGE3D:
+        tmpData->rawbits[2] = (image->u.image.imageDesc.image_width) | (image->u.image.imageDesc.image_height<<16);
+        sliceSize = image->u.image.textureSlicePitch;
+        depth = image->u.image.imageDesc.image_depth;
+        type = 1;
+        tmpData->sd.imageType = CL_MEM_OBJECT_IMAGE3D;
+        break;
+    case CL_MEM_OBJECT_IMAGE1D_ARRAY:
+        tmpData->rawbits[2] = (image->u.image.imageDesc.image_width) | (image->u.image.imageDesc.image_array_size<<16);
+        sliceSize = image->u.image.imageDesc.image_width;
+        depth = image->u.image.imageDesc.image_array_size;
+        type = 1;
+        tmpData->sd.imageType = CL_MEM_OBJECT_IMAGE1D_ARRAY;
+        break;
+    case CL_MEM_OBJECT_IMAGE2D_ARRAY:
+        tmpData->rawbits[2] = (image->u.image.imageDesc.image_width) | (image->u.image.imageDesc.image_height<<16);
+        sliceSize = image->u.image.textureSlicePitch;
+        depth = image->u.image.imageDesc.image_array_size;
+        type = 1;
+        tmpData->sd.imageType = CL_MEM_OBJECT_IMAGE2D_ARRAY;
+        break;
+    default:
+        break;
+    }
+
+    switch(image->u.image.imageFormat.image_channel_data_type)
+    {
+    case CL_UNORM_INT8:
+        format = 0xF;
+        break;
+    case CL_UNORM_INT16:
+        format = 0xE;
+        break;
+    case CL_SNORM_INT8:
+        format = 0xC;
+        break;
+    case CL_SNORM_INT16:
+        format = 0xB;
+        break;
+    case CL_UNORM_SHORT_565:
+        format = 9;
+        break;
+    case CL_UNORM_SHORT_555:
+        format = 8;
+        break;
+    case CL_UNORM_INT_101010:
+        format = 0xA;
+        break;
+    case CL_SIGNED_INT8:
+        format = 4;
+        break;
+    case CL_SIGNED_INT16:
+        format = 3;
+        break;
+    case CL_SIGNED_INT32:
+        format = 2;
+        break;
+    case CL_UNSIGNED_INT8:
+        format = 7;
+        break;
+    case CL_UNSIGNED_INT16:
+        format = 6;
+        break;
+    case CL_UNSIGNED_INT32:
+        format = 5;
+        break;
+    case CL_HALF_FLOAT:
+        format = 1;
+        break;
+    case CL_FLOAT:
+    default:
+        format = 0;
+        break;
+    }
+
+    tiling = (image->u.image.tiling == gcvLINEAR ? 0 : image->u.image.tiling == gcvTILED ?
+        1 : image->u.image.tiling == gcvSUPERTILED ? 2 : 3);
+
+    switch(image->u.image.imageFormat.image_channel_order)
+    {
+    case CL_R:
+    case CL_Rx:
+        componentCount = 1;
+        swizzleR = 0;
+        swizzleG = 4;
+        swizzleB = 4;
+        swizzleA = 5;
+        break;
+    case CL_A:
+        componentCount = 1;
+        swizzleR = 4;
+        swizzleG = 4;
+        swizzleB = 4;
+        swizzleA = 3;
+        break;
+    case CL_RG:
+    case CL_RGx:
+        componentCount = 2;
+        swizzleR = 0;
+        swizzleG = 1;
+        swizzleB = 4;
+        swizzleA = 5;
+        break;
+    case CL_RA:
+        componentCount = 2;
+        swizzleR = 0;
+        swizzleG = 4;
+        swizzleB = 4;
+        swizzleA = 3;
+        break;
+    case CL_RGB:
+        componentCount = 3;
+        swizzleR = 0;
+        swizzleG = 1;
+        swizzleB = 2;
+        swizzleA = 5;
+        break;
+    case CL_RGBA:
+        componentCount = 0;
+        swizzleR = 0;
+        swizzleG = 1;
+        swizzleB = 2;
+        swizzleA = 3;
+        break;
+    case CL_BGRA:
+        componentCount = 0;
+        swizzleR = 2;
+        swizzleG = 1;
+        swizzleB = 0;
+        swizzleA = 3;
+        break;
+    case CL_ARGB:
+        componentCount = 0;
+        swizzleR = 1;
+        swizzleG = 2;
+        swizzleB = 3;
+        swizzleA = 0;
+        break;
+    case CL_INTENSITY:
+        componentCount = 0;
+        swizzleR = 0;
+        swizzleG = 0;
+        swizzleB = 0;
+        swizzleA = 0;
+        break;
+    case CL_LUMINANCE:
+        componentCount = 1;
+        swizzleR = 0;
+        swizzleG = 0;
+        swizzleB = 0;
+        swizzleA = 5;
+        break;
+    default:
+        componentCount = 0;
+        break;
+    }
+
+    addressMode = 0;
+
+    tmpData->rawbits[3] =  shift | (addressMode<<4) | (format<<6) | (tiling<<10) | (type<<12)
+        | (componentCount<<14) | (swizzleR<<16) | (swizzleG<<20) | (swizzleB<<24) | (swizzleA<<28);
+    /*gcmSETFIELD(0, GCREG_SH_IMAGE, SHIFT, shift)
+    | gcmSETFIELDVALUE(0, GCREG_SH_IMAGE, MULTIPLY, ONE)
+    | gcmSETFIELD(0, GCREG_SH_IMAGE, ADDRESSING, addressMode)
+    | gcmSETFIELD(0, GCREG_SH_IMAGE, CONVERSION, format)
+    | gcmSETFIELD(0, GCREG_SH_IMAGE, TILING, tiling)
+    | gcmSETFIELD(0, GCREG_SH_IMAGE, TYPE, type)
+    | gcmSETFIELD(0, GCREG_SH_IMAGE, COMPONENT_COUNT, componentCount)
+    | gcmSETFIELD(0, GCREG_SH_IMAGE, SWIZZLE_R, swizzleR)
+    | gcmSETFIELD(0, GCREG_SH_IMAGE, SWIZZLE_G, swizzleG)
+    | gcmSETFIELD(0, GCREG_SH_IMAGE, SWIZZLE_B, swizzleB)
+    | gcmSETFIELD(0, GCREG_SH_IMAGE, SWIZZLE_A, swizzleA);*/
+
+    tmpData->rawbits[4] = sliceSize;
+    tmpData->sd.depth_arraySize = depth;
+    tmpData->rawbits[6] = ((gctUINT)((image->u.image.imageFormat.image_channel_data_type & 0xffff) << 16) |
+        (gctUINT)(image->u.image.imageFormat.image_channel_order & 0xffff));
+}
+
 CL_API_ENTRY cl_mem CL_API_CALL
 clCreateImage(
     cl_context               Context ,
@@ -3293,14 +3634,11 @@ clCreateImage(
     clsMem_PTR              image = gcvNULL;
     clsImageHeader_PTR      imageHeader;
     gctINT                  status;
-    gctSIZE_T               rowPitch;
-    gctSIZE_T               slicePitch = 0;
     gctSIZE_T               elementSize;
     gceSURF_FORMAT          internalFormat;
     gctSIZE_T               size;
     gctSIZE_T               ImageWidth, ImageHeight, ImageDepth, ImageRowPitch, ImageSlicePitch, ImageArraySize;
     gctSIZE_T               dim1Size, dim2Size, dim3Size;
-
 
     gcmHEADER_ARG("Context=0x%x Flags=%u ImageFormat=0x%x ImageDesc=%u HostPtr=0x%x",
                    Context, Flags, ImageFormat, ImageDesc, HostPtr);
@@ -3367,10 +3705,12 @@ clCreateImage(
      }
 
     /* Get row pitch. */
-    rowPitch = (ImageRowPitch ? ImageRowPitch
+    ImageRowPitch = (ImageRowPitch ? ImageRowPitch
                               : ImageWidth * elementSize);
     dim1Size = ImageWidth;
-    switch (ImageDesc->image_type) {
+
+    switch (ImageDesc->image_type)
+    {
     case CL_MEM_OBJECT_IMAGE2D:
         if (ImageWidth == 0 || ImageWidth > Context->devices[0]->deviceInfo.image2DMaxWidth)
         {
@@ -3399,7 +3739,7 @@ clCreateImage(
         dim2Size = ImageHeight;
         dim3Size = ImageDepth;
         /* Calculate the size of the image. */
-        size = rowPitch * ImageHeight;
+        size = ImageRowPitch * ImageHeight;
         break;
 
     case CL_MEM_OBJECT_IMAGE1D:
@@ -3415,7 +3755,7 @@ clCreateImage(
         dim2Size = ImageHeight;
         dim3Size = ImageDepth;
         /* Calculate the size of the image. */
-        size = rowPitch * ImageHeight;
+        size = ImageRowPitch * ImageHeight;
         break;
 
     case CL_MEM_OBJECT_IMAGE2D_ARRAY:
@@ -3444,7 +3784,7 @@ clCreateImage(
         }
 
         if (ImageSlicePitch != 0 && HostPtr != gcvNULL &&
-            (ImageSlicePitch < rowPitch * ImageHeight))
+            (ImageSlicePitch < ImageRowPitch * ImageHeight))
         {
             gcmUSER_DEBUG_ERROR_MSG(
             "OCL-004054: (clCreateImage) invalid ImageSlicePitch (%d).\n",ImageSlicePitch);
@@ -3453,11 +3793,11 @@ clCreateImage(
         dim2Size = ImageHeight;
         dim3Size = ImageArraySize;
         /* Get slice pitch. */
-        slicePitch = (ImageSlicePitch ? ImageSlicePitch
-                                      : rowPitch * ImageHeight);
+        ImageSlicePitch = (ImageSlicePitch ? ImageSlicePitch
+                                      : ImageRowPitch * ImageHeight);
         ImageDepth = 1;
         /* Calculate the size of the image. */
-        size = slicePitch * ImageArraySize;
+        size = ImageSlicePitch * ImageArraySize;
         break;
     case CL_MEM_OBJECT_IMAGE1D_ARRAY:
         if (ImageWidth == 0 || ImageWidth > Context->devices[0]->deviceInfo.image2DMaxWidth)
@@ -3469,18 +3809,18 @@ clCreateImage(
         }
         ImageHeight = 1;
         if (ImageSlicePitch != 0 && HostPtr != gcvNULL &&
-            (ImageSlicePitch < rowPitch * ImageHeight))
+            (ImageSlicePitch < ImageRowPitch * ImageHeight))
         {
             gcmUSER_DEBUG_ERROR_MSG(
             "OCL-004056: (clCreateImage) invalid ImageSlicePitch (%d).\n",ImageSlicePitch);
             clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
         }
         /* Get slice pitch. */
-        slicePitch = (ImageSlicePitch ? ImageSlicePitch
-                                      : rowPitch * ImageHeight);
+        ImageSlicePitch = (ImageSlicePitch ? ImageSlicePitch
+                                      : ImageRowPitch * ImageHeight);
         ImageDepth = 1;
         /* Calculate the size of the image. */
-        size = slicePitch * ImageArraySize;
+        size = ImageSlicePitch * ImageArraySize;
         dim2Size = ImageArraySize;
         dim3Size = ImageDepth;
         break;
@@ -3497,7 +3837,7 @@ clCreateImage(
         dim2Size = ImageHeight;
         dim3Size = ImageDepth;
         /* Calculate the size of the image. */
-        size = rowPitch * ImageHeight;
+        size = ImageRowPitch * ImageHeight;
         break;
     case CL_MEM_OBJECT_IMAGE3D:
         if (ImageWidth == 0 || ImageWidth > Context->devices[0]->deviceInfo.image2DMaxWidth)
@@ -3532,17 +3872,17 @@ clCreateImage(
         }
 
         if (ImageSlicePitch != 0 && HostPtr != gcvNULL &&
-            (ImageSlicePitch < rowPitch * ImageHeight))
+            (ImageSlicePitch < ImageRowPitch * ImageHeight))
         {
             gcmUSER_DEBUG_ERROR_MSG(
             "OCL-004062: (clCreateImage) invalid ImageSlicePitch (%d).\n",ImageSlicePitch);
             clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
         }
         /* Get slice pitch. */
-        slicePitch = (ImageSlicePitch ? ImageSlicePitch
-                                      : rowPitch * ImageHeight);
+        ImageSlicePitch = (ImageSlicePitch ? ImageSlicePitch
+                                      : ImageRowPitch * ImageHeight);
         /* Calculate the size of the image. */
-        size = slicePitch * ImageDepth;
+        size = ImageSlicePitch * ImageDepth;
         dim2Size = ImageHeight;
         dim3Size = ImageDepth;
         break;
@@ -3570,9 +3910,6 @@ clCreateImage(
         clmRETURN_ERROR(CL_INVALID_HOST_PTR);
     }
     gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
-
-    /* TODO - Set endian hint. */
-
 
     /* New image object. */
     clmONERROR(clfNewImage(Context, &image),
@@ -3610,36 +3947,40 @@ clCreateImage(
     }
 
     /* Image specific info. */
-    image->u.image.format           = *ImageFormat;
-    image->u.image.width            = ImageWidth;
-    image->u.image.height           = ImageHeight;
-    image->u.image.depth            = ImageDepth;
-    image->u.image.rowPitch         = rowPitch;
-    image->u.image.slicePitch       = slicePitch;
+    image->u.image.imageDesc.image_type = ImageDesc->image_type;
+    image->u.image.imageDesc.image_width = ImageWidth;
+    image->u.image.imageDesc.image_height = ImageHeight;
+    image->u.image.imageDesc.image_depth = ImageDepth;
+    image->u.image.imageDesc.image_row_pitch = ImageRowPitch;
+    image->u.image.imageDesc.image_slice_pitch = ImageSlicePitch;
+    image->u.image.imageDesc.image_array_size = ImageArraySize;
+    image->u.image.imageDesc.num_mip_levels = ImageDesc->num_mip_levels;
+    image->u.image.imageDesc.num_samples = ImageDesc->num_samples;
+    image->u.image.imageDesc.buffer = ImageDesc->buffer;
+
+    image->u.image.imageFormat      = *ImageFormat;
     image->u.image.elementSize      = elementSize;
     image->u.image.size             = size;
-    image->u.image.arraySize        = ImageArraySize;
     image->u.image.texture          = gcvNULL;
-    image->u.image.node             = gcvNULL;
+    image->u.image.headerNode       = gcvNULL;
     image->u.image.internalFormat   = internalFormat;
     image->u.image.texturePhysical  = 0;
     image->u.image.textureLogical   = 0;
     image->u.image.surfaceMapped    = gcvIMAGE_MEM_DEFAULT;
     image->u.image.tiling           = gcvLINEAR;
-    /* TODO: need to handle 1d buffer */
-    image->u.image.buffer           = ImageDesc->buffer;
     image->mapFlag                  = 0;
 
     /* Allocate physical buffer for image header. */
-    image->u.image.allocatedSize = sizeof(clsImageHeader);
-    clmONERROR(gcoCL_AllocateMemory(&image->u.image.allocatedSize,
-                                    &image->u.image.physical,
-                                    &image->u.image.logical,
-                                    &image->u.image.node,
+    image->u.image.headerSize = sizeof(clsImageHeader);
+    clmONERROR(gcoCL_AllocateMemory(&image->u.image.headerSize,
+                                    &image->u.image.headerPhysical,
+                                    &image->u.image.headerLogical,
+                                    &image->u.image.headerNode,
+                                    gcvSURF_INDEX,
                                     0),
                CL_MEM_OBJECT_ALLOCATION_FAILURE);
 
-    imageHeader = (clsImageHeader_PTR) image->u.image.logical;
+    imageHeader = (clsImageHeader_PTR) image->u.image.headerLogical;
 
     /* Get endian hint */
     /*endianHint = clfEndianHint(internalformat, type);*/
@@ -3656,14 +3997,25 @@ clCreateImage(
             image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR;
         }
     }
+    else if(Flags & CL_MEM_USE_HOST_PHYSICAL_ADDR_VIV)
+    {
+        if(Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV)
+        {
+            image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PHY_PTR_UNCACHED;
+        }
+        else
+        {
+            image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PHY_PTR;
+        }
+    }
 #endif
     clmONERROR(gcoCL_CreateTexture(&image->u.image.surfaceMapped,
                                    dim1Size,
                                    dim2Size,
                                    dim3Size,
                                    HostPtr,
-                                   rowPitch,
-                                   slicePitch,
+                                   ImageRowPitch,
+                                   ImageSlicePitch,
                                    internalFormat,
                                    gcvENDIAN_NO_SWAP,
                                    &image->u.image.texture,
@@ -3674,7 +4026,8 @@ clCreateImage(
                                    &image->u.image.textureSlicePitch),
                CL_MEM_OBJECT_ALLOCATION_FAILURE);
 
-    switch (image->type) {
+    switch (image->type)
+    {
     case CL_MEM_OBJECT_IMAGE1D:
     case CL_MEM_OBJECT_IMAGE1D_BUFFER:
     case CL_MEM_OBJECT_IMAGE2D:
@@ -3688,10 +4041,26 @@ clCreateImage(
     /* For 1D buffer, associate the buffer with the image and sync the data. */
     if (image->type == CL_MEM_OBJECT_IMAGE1D_BUFFER)
     {
-        gcmASSERT((image->u.image.buffer != gcvNULL)
-                    && (image->u.image.buffer->u.buffer.logical != gcvNULL));
-        image->u.image.buffer->u.buffer.image = image;
-        gcoOS_MemCopy(image->u.image.textureLogical, image->u.image.buffer->u.buffer.logical, size);
+        gcmASSERT((image->u.image.imageDesc.buffer != gcvNULL)
+                    && (image->u.image.imageDesc.buffer->u.buffer.logical != gcvNULL));
+        image->u.image.imageDesc.buffer->u.buffer.image = image;
+        if(image->u.image.textureLogical != image->u.image.imageDesc.buffer->u.buffer.logical)
+        {
+            gcoOS_MemCopy(image->u.image.textureLogical, image->u.image.imageDesc.buffer->u.buffer.logical, size);
+        }
+    }
+
+    /* In below cases, image content is initialized */
+    if ((Flags & (CL_MEM_USE_HOST_PTR | CL_MEM_COPY_HOST_PTR)) ||
+        (image->type == CL_MEM_OBJECT_IMAGE1D_BUFFER))
+    {
+        gcmDUMP(gcvNULL, "#[info: initialized image content at clCreateImage");
+        gcmDUMP_BUFFER(gcvNULL,
+                       gcvDUMP_BUFFER_MEMORY,
+                       image->u.image.texturePhysical,
+                       image->u.image.textureLogical,
+                       0,
+                       image->u.image.surface->size);
     }
 
     gcoCL_FlushSurface(image->u.image.surface);
@@ -3708,7 +4077,19 @@ clCreateImage(
     imageHeader->tiling             = image->u.image.tiling;
     imageHeader->physical           = gcmPTR2INT32(image->u.image.texturePhysical);
     imageHeader->imageType          = ImageDesc->image_type;
-    imageHeader->elementSize        = image->u.image.elementSize;
+
+    gcoCL_FlushMemory(image->u.image.headerNode, image->u.image.headerLogical, image->u.image.headerSize);
+
+    gcmDUMP(gcvNULL, "#[info: set image head buffer");
+    gcmDUMP_BUFFER(gcvNULL,
+                   gcvDUMP_BUFFER_MEMORY,
+                   image->u.image.headerPhysical,
+                   image->u.image.headerLogical,
+                   0,
+                   image->u.image.headerSize);
+
+    /* prepare at start, in theory we rarely change image attribute after create. */
+    clfInitImageDescriptor(image);
 
     if (ErrcodeRet)
     {
@@ -3855,32 +4236,33 @@ clCreateImage2D(
     image->flags           = Flags ? Flags : CL_MEM_READ_WRITE /* default */;
 
     /* Image specific info. */
-    image->u.image.format           = *ImageFormat;
-    image->u.image.width            = ImageWidth;
-    image->u.image.height           = ImageHeight;
-    image->u.image.depth            = 1;
-    image->u.image.rowPitch         = rowPitch;
-    image->u.image.slicePitch       = 0;
+    image->u.image.imageFormat                       = *ImageFormat;
+    image->u.image.imageDesc.image_width             = ImageWidth;
+    image->u.image.imageDesc.image_height            = ImageHeight;
+    image->u.image.imageDesc.image_depth             = 1;
+    image->u.image.imageDesc.image_row_pitch         = rowPitch;
+    image->u.image.imageDesc.image_slice_pitch       = 0;
     image->u.image.elementSize      = elementSize;
     image->u.image.size             = size;
     image->u.image.texture          = gcvNULL;
-    image->u.image.node             = gcvNULL;
+    image->u.image.headerNode       = gcvNULL;
     image->u.image.internalFormat   = internalFormat;
     image->u.image.texturePhysical  = 0;
     image->u.image.textureLogical   = 0;
-    image->u.image.surfaceMapped    =  gcvIMAGE_MEM_DEFAULT;
+    image->u.image.surfaceMapped    = gcvIMAGE_MEM_DEFAULT;
     image->u.image.tiling           = gcvLINEAR;
 
     /* Allocate physical buffer for image header. */
-    image->u.image.allocatedSize = sizeof(clsImageHeader);
-    clmONERROR(gcoCL_AllocateMemory(&image->u.image.allocatedSize,
-                                    &image->u.image.physical,
-                                    &image->u.image.logical,
-                                    &image->u.image.node,
+    image->u.image.headerSize = sizeof(clsImageHeader);
+    clmONERROR(gcoCL_AllocateMemory(&image->u.image.headerSize,
+                                    &image->u.image.headerPhysical,
+                                    &image->u.image.headerLogical,
+                                    &image->u.image.headerNode,
+                                    gcvSURF_INDEX,
                                     0),
                CL_MEM_OBJECT_ALLOCATION_FAILURE);
 
-    imageHeader = (clsImageHeader_PTR) image->u.image.logical;
+    imageHeader = (clsImageHeader_PTR) image->u.image.headerLogical;
 
     /* Get endian hint */
     /*endianHint = clfEndianHint(internalformat, type);*/
@@ -3900,6 +4282,17 @@ clCreateImage2D(
         else if (!(size & 0x3F))
         {
             image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR;
+        }
+    }
+    else if(Flags & CL_MEM_USE_HOST_PHYSICAL_ADDR_VIV)
+    {
+        if(Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV)
+        {
+            image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PHY_PTR_UNCACHED;
+        }
+        else
+        {
+            image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PHY_PTR;
         }
     }
 #endif
@@ -3933,6 +4326,8 @@ clCreateImage2D(
     imageHeader->slicePitch         = 0;
     imageHeader->physical           = gcmPTR2INT32(image->u.image.texturePhysical);
     imageHeader->imageType          = CL_MEM_OBJECT_IMAGE2D;
+
+    clfInitImageDescriptor(image);
 
     if (ErrcodeRet)
     {
@@ -4122,16 +4517,16 @@ clCreateImage3D(
     image->flags           = Flags ? Flags : CL_MEM_READ_WRITE /* default */;
 
     /* Image specific info. */
-    image->u.image.format           = *ImageFormat;
-    image->u.image.width            = ImageWidth;
-    image->u.image.height           = ImageHeight;
-    image->u.image.depth            = ImageDepth;
-    image->u.image.rowPitch         = rowPitch;
-    image->u.image.slicePitch       = slicePitch;
+    image->u.image.imageFormat                       = *ImageFormat;
+    image->u.image.imageDesc.image_width             = ImageWidth;
+    image->u.image.imageDesc.image_height            = ImageHeight;
+    image->u.image.imageDesc.image_depth             = ImageDepth;
+    image->u.image.imageDesc.image_row_pitch         = rowPitch;
+    image->u.image.imageDesc.image_slice_pitch       = slicePitch;
     image->u.image.elementSize      = elementSize;
     image->u.image.size             = size;
     image->u.image.texture          = gcvNULL;
-    image->u.image.node             = gcvNULL;
+    image->u.image.headerNode       = gcvNULL;
     image->u.image.internalFormat   = internalFormat;
     image->u.image.texturePhysical  = 0;
     image->u.image.textureLogical   = 0;
@@ -4139,15 +4534,16 @@ clCreateImage3D(
     image->u.image.tiling           = gcvLINEAR;
 
     /* Allocate physical buffer for image header. */
-    image->u.image.allocatedSize = sizeof(clsImageHeader);
-    clmONERROR(gcoCL_AllocateMemory(&image->u.image.allocatedSize,
-                                    &image->u.image.physical,
-                                    &image->u.image.logical,
-                                    &image->u.image.node,
+    image->u.image.headerSize = sizeof(clsImageHeader);
+    clmONERROR(gcoCL_AllocateMemory(&image->u.image.headerSize,
+                                    &image->u.image.headerPhysical,
+                                    &image->u.image.headerLogical,
+                                    &image->u.image.headerNode,
+                                    gcvSURF_INDEX,
                                     0),
                CL_MEM_OBJECT_ALLOCATION_FAILURE);
 
-    imageHeader = (clsImageHeader_PTR) image->u.image.logical;
+    imageHeader = (clsImageHeader_PTR) image->u.image.headerLogical;
 
 #if MAP_TO_DEVICE
     if((Flags & CL_MEM_USE_HOST_PTR) && !(gcmPTR2SIZE(HostPtr) & 0x3F))
@@ -4159,6 +4555,17 @@ clCreateImage3D(
         else if (!(size & 0x3F))
         {
             image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PTR;
+        }
+    }
+    else if(Flags & CL_MEM_USE_HOST_PHYSICAL_ADDR_VIV)
+    {
+        if(Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV)
+        {
+            image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PHY_PTR_UNCACHED;
+        }
+        else
+        {
+            image->u.image.surfaceMapped = gcvIMAGE_MEM_HOST_PHY_PTR;
         }
     }
 #endif
@@ -4192,6 +4599,8 @@ clCreateImage3D(
     imageHeader->slicePitch         = image->u.image.textureSlicePitch;
     imageHeader->physical           = gcmPTR2INT32(image->u.image.texturePhysical);
     imageHeader->imageType          = CL_MEM_OBJECT_IMAGE3D;
+
+    clfInitImageDescriptor(image);
 
     if (ErrcodeRet)
     {
@@ -4283,7 +4692,6 @@ OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
-
 
 CL_API_ENTRY cl_int CL_API_CALL
 clGetSupportedImageFormats(
@@ -4578,8 +4986,8 @@ clGetImageInfo(
 
     switch (ParamName) {
         case CL_IMAGE_FORMAT:
-            retParamSize = gcmSIZEOF(Image->u.image.format);
-            retParamPtr = &(Image->u.image.format);
+            retParamSize = gcmSIZEOF(Image->u.image.imageFormat);
+            retParamPtr = &(Image->u.image.imageFormat);
             break;
 
         case CL_IMAGE_ELEMENT_SIZE:
@@ -4593,7 +5001,7 @@ clGetImageInfo(
         case CL_IMAGE_ROW_PITCH:
             /*retParamSize = gcmSIZEOF(Image->u.image.rowPitch);
             retParamPtr = &(Image->u.image.rowPitch);*/
-            retValue_size_t = Image->u.image.rowPitch;
+            retValue_size_t = Image->u.image.imageDesc.image_row_pitch;
             retParamSize = gcmSIZEOF(retValue_size_t);
             retParamPtr = &retValue_size_t;
             break;
@@ -4601,7 +5009,7 @@ clGetImageInfo(
         case CL_IMAGE_SLICE_PITCH:
             /*retParamSize = gcmSIZEOF(Image->u.image.slicePitch);
             retParamPtr = &(Image->u.image.slicePitch);*/
-            retValue_size_t = Image->u.image.slicePitch;
+            retValue_size_t = Image->u.image.imageDesc.image_slice_pitch;
             if(Image->type == CL_MEM_OBJECT_IMAGE1D || Image->type == CL_MEM_OBJECT_IMAGE2D
                 || Image->type == CL_MEM_OBJECT_IMAGE1D_BUFFER)
                 retValue_size_t = 0;
@@ -4612,7 +5020,7 @@ clGetImageInfo(
         case CL_IMAGE_WIDTH:
             /*retParamSize = gcmSIZEOF(Image->u.image.width);
             retParamPtr = &(Image->u.image.width);*/
-            retValue_size_t = Image->u.image.width;
+            retValue_size_t = Image->u.image.imageDesc.image_width;
             retParamSize = gcmSIZEOF(retValue_size_t);
             retParamPtr = &retValue_size_t;
             break;
@@ -4620,7 +5028,7 @@ clGetImageInfo(
         case CL_IMAGE_HEIGHT:
             /*retParamSize = gcmSIZEOF(Image->u.image.height);
             retParamPtr = &(Image->u.image.height);*/
-            retValue_size_t = Image->u.image.height;
+            retValue_size_t = Image->u.image.imageDesc.image_height;
             if(Image->type == CL_MEM_OBJECT_IMAGE1D || Image->type == CL_MEM_OBJECT_IMAGE1D_ARRAY
                 || Image->type == CL_MEM_OBJECT_IMAGE1D_BUFFER)
                 retValue_size_t = 0;
@@ -4631,7 +5039,7 @@ clGetImageInfo(
         case CL_IMAGE_DEPTH:
             /*retParamSize = gcmSIZEOF(Image->u.image.depth);
             retParamPtr = &(Image->u.image.depth);*/
-            retValue_size_t = Image->u.image.depth;
+            retValue_size_t = Image->u.image.imageDesc.image_depth;
             if(Image->type == CL_MEM_OBJECT_IMAGE1D || Image->type == CL_MEM_OBJECT_IMAGE1D_ARRAY
                 || Image->type == CL_MEM_OBJECT_IMAGE1D_BUFFER || Image->type == CL_MEM_OBJECT_IMAGE2D
                 || Image->type == CL_MEM_OBJECT_IMAGE2D_ARRAY)
@@ -4641,7 +5049,7 @@ clGetImageInfo(
             break;
 
         case CL_IMAGE_ARRAY_SIZE:
-            retValue_size_t = Image->u.image.arraySize;
+            retValue_size_t = Image->u.image.imageDesc.image_array_size;
             if (Image->type != CL_MEM_OBJECT_IMAGE1D_ARRAY && Image->type != CL_MEM_OBJECT_IMAGE2D_ARRAY)
                 retValue_size_t = 0;
             retParamSize = gcmSIZEOF(retValue_size_t);
@@ -4656,8 +5064,8 @@ clGetImageInfo(
             break;
 
         case CL_IMAGE_BUFFER:
-            retParamSize = gcmSIZEOF(Image->u.image.buffer);
-            retParamPtr = &(Image->u.image.buffer);
+            retParamSize = gcmSIZEOF(Image->u.image.imageDesc.buffer);
+            retParamPtr = &(Image->u.image.imageDesc.buffer);
             break;
 
         default:

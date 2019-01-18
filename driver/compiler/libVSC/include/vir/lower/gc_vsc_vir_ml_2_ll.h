@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -23,26 +23,19 @@ BEGIN_EXTERN_C()
 #   define M_PI 3.14159265358979323846f
 #endif
 
-typedef struct _VIR_PATTERN_LOWER_CONTEXT
-{
-    VIR_PatternContext          header;
-    VSC_HW_CONFIG*              hwCfg;
-    VSC_MM*                     pMM;
-    gctBOOL                     generateImmediate;
-    gctBOOL                     hasNEW_TEXLD;
-    gctBOOL                     isCL_X;
-    gctBOOL                     hasCL;
-    gctBOOL                     hasHalti1;
-    gctBOOL                     hasHalti2;
-    gctBOOL                     hasHalti3;
-    gctBOOL                     hasHalti4;
-} VIR_PatternLowerContext;
-
 VSC_ErrCode
-VIR_Lower_MiddleLevel_To_LowLevel(
+VIR_Lower_MiddleLevel_To_LowLevel_Pre(
     IN VSC_SH_PASS_WORKER* pPassWorker
     );
-DECLARE_QUERY_PASS_PROP(VIR_Lower_MiddleLevel_To_LowLevel);
+DECLARE_QUERY_PASS_PROP(VIR_Lower_MiddleLevel_To_LowLevel_Pre);
+DECLARE_SH_NECESSITY_CHECK(VIR_Lower_MiddleLevel_To_LowLevel_Pre);
+
+VSC_ErrCode
+VIR_Lower_MiddleLevel_To_LowLevel_Post(
+    IN VSC_SH_PASS_WORKER* pPassWorker
+    );
+DECLARE_QUERY_PASS_PROP(VIR_Lower_MiddleLevel_To_LowLevel_Post);
+DECLARE_SH_NECESSITY_CHECK(VIR_Lower_MiddleLevel_To_LowLevel_Post);
 
 END_EXTERN_C()
 #endif

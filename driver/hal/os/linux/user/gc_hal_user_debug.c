@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -301,8 +301,7 @@ static pthread_mutex_t _dumpFileMutex = PTHREAD_MUTEX_INITIALIZER;
     getpid()
 
 #ifdef ANDROID
-#   define gcmGETTHREADID() \
-        (gctUINT32) gettid()
+#   define gcmGETTHREADID() (gctUINT32)gettid()
 
 #   define gcmOUTPUT_STRING(File, String) \
         do \
@@ -319,20 +318,26 @@ static pthread_mutex_t _dumpFileMutex = PTHREAD_MUTEX_INITIALIZER;
         } \
         while (0)
 #else
-    extern long int syscall (long int __sysno, ...);
-#   define gcmGETTHREADID() \
-        syscall(SYS_gettid)
+#   define gcmGETTHREADID() (gctUINT32)pthread_self()
 
 #   define gcmOUTPUT_STRING(File, String) \
         fprintf((File == gcvNULL) ? stderr : File, "%s", String); \
         FFLUSH((File == gcvNULL) ? stderr : File)
 #endif
 
-#define gcmSPRINTF(Destination, Size, Message, Value) \
-    snprintf(Destination, Size, Message, Value)
+#ifdef __STRICT_ANSI__
+#   define gcmSPRINTF(Destination, Size, Message, Value) \
+        sprintf(Destination, Message, Value)
 
-#define gcmVSPRINTF(Destination, Size, Message, Arguments) \
-    vsnprintf(Destination, Size, Message, Arguments)
+#   define gcmVSPRINTF(Destination, Size, Message, Arguments) \
+        vsprintf(Destination, Message, Arguments)
+#else
+#   define gcmSPRINTF(Destination, Size, Message, Value) \
+        snprintf(Destination, Size, Message, Value)
+
+#   define gcmVSPRINTF(Destination, Size, Message, Arguments) \
+        vsnprintf(Destination, Size, Message, Arguments)
+#endif
 
 #define gcmSTRCAT(Destination, Size, String) \
     strncat(Destination, String, Size)
@@ -513,22 +518,18 @@ _Print(
 {
     /* Output to file or debugger. */
 #if gcdDEBUG_IN_KERNEL
+    char buffer[256];
+    gctUINT n;
     gcsHAL_INTERFACE iface;
 
-    iface.ignoreTLS      = gcvFALSE;
-    iface.command        = gcvHAL_DEBUG;
-    iface.u.Debug.set    = gcvTRUE;
-    iface.u.Debug.level  = _debugLevel;
-    iface.u.Debug.type   = gcvMESSAGE_TEXT;
-    iface.u.Debug.zones  = _debugZones[gcmZONE_GET_API(gcvZONE_API_HAL)];
-    iface.u.Debug.enable = gcvTRUE;
+    n = gcmVSPRINTF(buffer, sizeof(buffer) - 1, Message, Arguments);
 
-    gcmVSPRINTF(
-        iface.u.Debug.message,
-        sizeof(iface.u.Debug.message) - 1,
-        Message,
-        Arguments
-        );
+    iface.ignoreTLS = gcvFALSE;
+    iface.command   = gcvHAL_DEBUG_DUMP;
+    iface.u.DebugDump.type    = gcvDUMP_BUFFER_USER_STRING;
+    iface.u.DebugDump.ptr     = gcmPTR_TO_UINT64(buffer);
+    iface.u.DebugDump.address = ~0U; /* ignored. */
+    iface.u.DebugDump.size    = n + 1; /* include tailing \0'. */
 
     gcoOS_DeviceControl(
         gcvNULL, IOCTL_GCHAL_INTERFACE,
@@ -1631,7 +1632,7 @@ typedef struct _gcsSTACK_FRAME
     gctCONST_STRING     function;
     gctINT              line;
     gctCONST_STRING     text;
-    gctARGUMENTS        arguments;
+    gctPOINTER          arguments[12];
 }
 gcsSTACK_FRAME;
 
@@ -1678,7 +1679,7 @@ _AllocStackTLSKey(
 */
 static gcsTRACE_STACK * _FindStack(void)
 {
-    static pthread_once_t onceControl = PTHREAD_ONCE_INIT;
+    static pthread_once_t onceControl = {PTHREAD_ONCE_INIT};
     gcsTRACE_STACK * traceStack;
 
     /* Allocate stack trace tls key. */
@@ -1756,7 +1757,12 @@ gcoOS_StackPush(
         if (Text != gcvNULL)
         {
             /* Copy the arguments. */
-            va_start(frame->arguments, Text);
+            gctSIZE_T i;
+            gctPOINTER * arguments = ((gctPOINTER *) &Text) + 1;
+            for (i = 0; i < gcmCOUNTOF(frame->arguments); ++i)
+            {
+                frame->arguments[i] = arguments[i];
+            }
         }
     }
 }
@@ -1787,10 +1793,8 @@ gcoOS_StackPop(
     if (traceStack->level > 0)
     {
         /* Pop arguments from the stack. */
-        gcsSTACK_FRAME* prevFrame = &traceStack->frames[traceStack->level];
         gcsSTACK_FRAME* frame = &traceStack->frames[--traceStack->level];
 
-        va_end(prevFrame->arguments);
 
         /* Check for function mismatch. */
         if (frame->identity != Identity)
@@ -1860,9 +1864,10 @@ gcoOS_StackDump(
             {
                 char buffer[192] = "";
                 gctUINT offset = 0;
+                gctPOINTER pointer = (gctPOINTER) frame->arguments;
 
                 gcoOS_PrintStrVSafe(buffer, gcmSIZEOF(buffer),
-                                    &offset, frame->text, frame->arguments);
+                                    &offset, frame->text, *(gctARGUMENTS *) &pointer);
 
                 gcmPRINT("    (%s)", buffer);
             }
@@ -1925,10 +1930,10 @@ _DumpAPI(
         {
             char buffer[192] = "";
             gctUINT offset = 0;
+            gctPOINTER pointer = (gctPOINTER) frame->arguments;
 
-            gcoOS_PrintStrVSafe(buffer, gcmSIZEOF(buffer),
-                &offset, frame->text, frame->arguments);
-
+                gcoOS_PrintStrVSafe(buffer, gcmSIZEOF(buffer),
+                                    &offset, frame->text, *(gctARGUMENTS *) &pointer);
             gcmPRINT("    (%s)", buffer);
         }
     }
@@ -1998,7 +2003,7 @@ _VerifyMessage(
 
     if (numArguments)
     {
-        vsnprintf(arguments, 150, format, *(gctARGUMENTS *) &args);
+        gcmVSPRINTF(arguments, 150, format, *(gctARGUMENTS *) &args);
     }
 
     gcmPRINT("[%d](%d): %s(%d) %s",
@@ -2233,5 +2238,4 @@ gcoOS_SysTraceEnd(
     _ATraceEnd();
 #endif
 }
-
 

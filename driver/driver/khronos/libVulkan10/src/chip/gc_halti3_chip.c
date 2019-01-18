@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -159,8 +159,8 @@ VkResult halti3_helper_convertHwTxDesc(
     logDepth  = __vk_UtilLog2inXdot8(baseLevel->requestD);
 
     addressing = (tiling == gcvLINEAR) ? 0x3 : 0x0;
-    astcImage = ((((((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_NEW_SHIFT))) >> (0 ? 5:0)) & ((gctUINT32) ((((1 ? 5:0) - (0 ? 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1)))))) ) == 0x14) ?
-VK_TRUE : VK_FALSE;
+    astcImage = ((((((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_NEW_SHIFT))) >> (0 ? 5:0)) & ((gctUINT32) ((((1 ? 5:0) - (0 ? 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1)))))) ) == 0x14)
+              ? VK_TRUE : VK_FALSE;
 
     switch (createFormat)
     {
@@ -244,7 +244,7 @@ VK_TRUE : VK_FALSE;
         hwTxDesc[partIdx].baseSlice  = (uint32_t) (baseLevel->sliceSize) / (residentFormatInfo->bitsPerBlock >> 3);
 
         hwTxDesc[partIdx].halti2.hwSamplerMode_p1 =
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+              ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -286,7 +286,7 @@ VK_TRUE : VK_FALSE;
  ~0U : (~(~0U << ((1 ? 23:22) - (0 ? 23:22) + 1))))))) << (0 ? 23:22)));
 
         hwTxDesc[partIdx].halti2.hwSamplerModeEx =
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+              ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:0) - (0 ?
  5:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -802,7 +802,7 @@ void halti3_helper_convertHwSampler(
     hwSamplerDesc->halti3.anisoLog = anisoLog;
 
     hwSamplerDesc->halti3.hwSamplerMode_p0 =
-          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  4:3) - (0 ?
  4:3) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -874,7 +874,7 @@ void halti3_helper_convertHwSampler(
  ~0U : (~(~0U << ((1 ? 19:19) - (0 ? 19:19) + 1))))))) << (0 ? 19:19)));
 
     hwSamplerDesc->halti3.hwSamplerLOD  =
-          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:0) - (0 ?
  12:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -896,7 +896,7 @@ void halti3_helper_convertHwSampler(
  ~0U : (~(~0U << ((1 ? 28:16) - (0 ? 28:16) + 1))))))) << (0 ? 28:16)));
 
     hwSamplerDesc->halti3.hwSamplerLODBias  =
-          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  16:16) - (0 ?
  16:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -919,7 +919,7 @@ void halti3_helper_convertHwSampler(
  ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));
 
     hwSamplerDesc->halti3.hwBaseLOD_p0 =
-          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  16:16) - (0 ?
  16:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -978,8 +978,6 @@ void halti3_helper_setSamplerStates(
     uint32_t shaderConfigData
     )
 {
-    uint32_t hwSamplerMode_p0 = samplerDesc->halti3.hwSamplerMode_p0;
-
     if (!txHwRegisterIdx)
     {
         __vkCmdLoadSingleHWState(commandBuffer, 0x022D, VK_FALSE,
@@ -1009,9 +1007,8 @@ void halti3_helper_setSamplerStates(
  ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ? 16:16))));
     }
 
-
     __vkCmdLoadSingleHWState(commandBuffer, 0x4000 + hwSamplerNo, VK_FALSE,
-        hwSamplerMode_p0 | txDesc->halti2.hwSamplerMode_p1);
+        txDesc->halti2.hwSamplerMode_p1 | samplerDesc->halti3.hwSamplerMode_p0);
 
     __vkCmdLoadSingleHWState(commandBuffer, 0x40E0 + hwSamplerNo, VK_FALSE,
         txDesc->halti2.hwSamplerModeEx);
@@ -1166,7 +1163,7 @@ VkResult halti3_program_copy_src_img(
     __VK_ASSERT(hwMapping->hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR);
     __VK_ASSERT(hwMapping->hwLoc.pHwDirectAddrBase->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
     hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
-                   + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo * 4)
+                   + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                    + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
     __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[0].imageInfo);
 
@@ -1260,7 +1257,7 @@ VkResult halti3_program_copy_dst_img(
     __VK_ASSERT(hwMapping->hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR);
     __VK_ASSERT(hwMapping->hwLoc.pHwDirectAddrBase->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
     hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
-                   + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo * 4)
+                   + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                    + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
     __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[0].imageInfo);
 
@@ -1325,7 +1322,7 @@ VkResult halti3_program_blit_buffer_src(
     __VK_ASSERT(hwMapping->hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR);
     __VK_ASSERT(hwMapping->hwLoc.pHwDirectAddrBase->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
     hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
-                   + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo * 4)
+                   + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                    + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
     __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[0].imageInfo);
 
@@ -1389,7 +1386,7 @@ VkResult halti3_program_blit_buffer_dst(
     __VK_ASSERT(hwMapping->hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR);
     __VK_ASSERT(hwMapping->hwLoc.pHwDirectAddrBase->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
     hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
-                   + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo * 4)
+                   + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo * 4)
                    + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
     __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[0].imageInfo);
 
@@ -1467,7 +1464,7 @@ VkResult halti3_copyBuffer(
     if (copySize < maxTexSize)
     {
          /* use rowLength and imgHeight to fake a 2d image*/
-        if(copySize > 0)
+        if (copySize > 0)
         {
             srcRes->u.buf.rowLength =(uint32_t)  copySize;
             srcRes->u.buf.imgHeight = 1;
@@ -1475,17 +1472,20 @@ VkResult halti3_copyBuffer(
             dstRes->u.buf.rowLength = (uint32_t) copySize;
             dstRes->u.buf.imgHeight = 1;
 
-            halti5_computeBlit(cmdBuf, srcRes, dstRes, gcvFALSE, gcvNULL, VK_FILTER_NEAREST);
+            halti5_computeBlit(cmdBuf, srcRes, dstRes, VK_FALSE, gcvNULL,VK_FILTER_NEAREST);
         }
     }
     else
     {
         uint32_t height =(uint32_t)  copySize / maxTexSize;
+
         srcRes->u.buf.rowLength = maxTexSize;
         srcRes->u.buf.imgHeight = height;
         dstRes->u.buf.rowLength = maxTexSize;
         dstRes->u.buf.imgHeight = height;
-        halti5_computeBlit(cmdBuf, srcRes, dstRes, gcvFALSE, gcvNULL, VK_FILTER_NEAREST);
+
+        halti5_computeBlit(cmdBuf, srcRes, dstRes, VK_FALSE, gcvNULL, VK_FILTER_NEAREST);
+
         if (copySize % maxTexSize)
         {
             VkDeviceSize addOffset = maxTexSize * height;
@@ -1494,7 +1494,7 @@ VkResult halti3_copyBuffer(
             srcRes->u.buf.offset += addOffset;
             dstRes->u.buf.offset += addOffset;
 
-            halti5_computeBlit(cmdBuf, srcRes, dstRes, gcvFALSE, gcvNULL, VK_FILTER_NEAREST);
+            halti5_computeBlit(cmdBuf, srcRes, dstRes, VK_FALSE, gcvNULL, VK_FILTER_NEAREST);
 
             /*restore to orignal offset*/
             srcRes->u.buf.offset -= addOffset;

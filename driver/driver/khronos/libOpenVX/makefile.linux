@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -22,15 +22,23 @@ include ./makefile.linux.def
 
 VX_VXU                 := utility
 VX_ENTRY               := driver/src
+ifeq ($(USE_VXC_BINARY),1)
+VX_NNVXC_BINARY        := libkernel/libnnvxc
+VX_OVX12_VXC_BINARY    := libkernel/libovx12
+VX_NNGPU_BINARY        := libkernel/libnngpu
+endif
 
-
+ifeq ($(USE_VXC_BINARY),1)
+LIB_VX := $(VX_NNVXC_BINARY) $(VX_ENTRY) $(VX_VXU)  $(VX_OVX12_VXC_BINARY) $(VX_NNGPU_BINARY)
+else
 LIB_VX := $(VX_ENTRY) $(VX_VXU)
+endif
 
 ######################################################
 # Define the macros used in the common file.
 
 MODULES     := $(LIB_VX)
-MAIN_MODULE := $(VX_ENTRY) $(VX_VXU)
+MAIN_MODULE := $(LIB_VX)
 
 ######################################################
 # Include the common makefile.
@@ -39,7 +47,9 @@ include $(AQROOT)/common.node
 
 ######################################################
 # Define the denpendencies.
-
+ifeq ($(USE_VXC_BINARY),1)
+$(VX_ENTRY) : $(VX_NNVXC_BINARY)
+$(VX_ENTRY) : $(VX_OVX12_VXC_BINARY)
+$(VX_ENTRY) : $(VX_NNGPU_BINARY)
+endif
 $(VX_VXU): $(VX_ENTRY)
-
-

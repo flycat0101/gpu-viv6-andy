@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -26,6 +26,7 @@ LOCAL_SRC_FILES := \
 	source/gc_egl_context.c \
 	source/gc_egl_image.c \
 	source/gc_egl_init.c \
+    source/gc_egl_procaddr.c \
 	source/gc_egl_query.c \
 	source/gc_egl_surface.c \
 	source/gc_egl_swap.c \

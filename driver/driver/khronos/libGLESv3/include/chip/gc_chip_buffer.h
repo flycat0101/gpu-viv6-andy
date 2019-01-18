@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -125,9 +125,6 @@ typedef enum {
 
     /* Force ASTC to RGBA8 when gcvFEATURE_TX_ASTC_MULTISLICE_FIX is false */
     __GL_CHIP_FMT_PATCH_ASTC,
-
-    /* Force ALPHA8 to RGBA8 */
-    __GL_CHIP_FMT_PATCH_ALPHA8,
 
 } __GLchipFmtPatch;
 

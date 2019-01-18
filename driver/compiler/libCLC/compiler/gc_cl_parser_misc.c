@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -61,27 +61,6 @@ cloCOMPILER_Lex(YYSTYPE * pyylval, cloCOMPILER Compiler)
     }
 
     return tokenType;
-}
-
-gceSTATUS
-cloCOMPILER_LoadBuiltins(IN cloCOMPILER Compiler)
-{
-    gceSTATUS    status;
-    cleSHADER_TYPE    shaderType;
-
-    /* Verify the arguments. */
-    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
-
-    gcmVERIFY_OK(cloCOMPILER_LoadingBuiltins(Compiler, gcvTRUE));
-
-    /* Load all kind of built-ins */
-    gcmVERIFY_OK(cloCOMPILER_GetShaderType(Compiler, &shaderType));
-
-    status = clLoadBuiltins(Compiler, shaderType);
-    if (gcmIS_ERROR(status)) return status;
-
-    gcmVERIFY_OK(cloCOMPILER_LoadingBuiltins(Compiler, gcvFALSE));
-    return gcvSTATUS_OK;
 }
 
 static gctCONST_STRING *_IndexKeywordStrings = gcvNULL;
@@ -1206,6 +1185,147 @@ IN clsATTRIBUTE *Attr
    }
    attr->specifiedAttr |= AttrType;
    return attr;
+}
+
+clsATTRIBUTE *
+clParseMergeAttributeSpecifier(
+IN cloCOMPILER Compiler,
+IN clsATTRIBUTE *Attr,
+IN clsATTRIBUTE *ToAttr
+)
+{
+   gctUINT lineNo = cloCOMPILER_GetCurrentLineNo(Compiler);
+   gctUINT stringNo = cloCOMPILER_GetCurrentStringNo(Compiler);
+
+   gcmASSERT(ToAttr);
+
+/* check for PACKED attributes */
+   if(Attr->specifiedAttr & clvATTR_PACKED) {
+       if(ToAttr->specifiedAttr & clvATTR_PACKED) {
+           gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                           lineNo,
+                                           stringNo,
+                                           clvREPORT_ERROR,
+                                           "packed attribute already defined"));
+       }
+       else {
+           ToAttr->packed = gcvTRUE;
+           ToAttr->specifiedAttr |= clvATTR_PACKED;
+       }
+   }
+
+/* check for ALWAYS_INLINE attributes */
+   if(Attr->specifiedAttr & clvATTR_ALWAYS_INLINE) {
+       if(ToAttr->specifiedAttr & clvATTR_ALWAYS_INLINE) {
+           gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                           lineNo,
+                                           stringNo,
+                                           clvREPORT_ERROR,
+                                           "always_inline attribute already defined"));
+       }
+       else {
+           ToAttr->alwaysInline = gcvTRUE;
+           ToAttr->specifiedAttr |= clvATTR_ALWAYS_INLINE;
+       }
+   }
+
+/* check for ENDIAN TYPE attributes */
+   if(Attr->specifiedAttr & clvATTR_ENDIAN) {
+       if(ToAttr->specifiedAttr & clvATTR_ENDIAN) {
+           gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                           lineNo,
+                                           stringNo,
+                                           clvREPORT_ERROR,
+                                           "endian attribute already defined"));
+       }
+       else {
+           ToAttr->hostEndian = Attr->hostEndian;
+           ToAttr->specifiedAttr |= clvATTR_ENDIAN;
+       }
+   }
+
+/* check for VEC_TYPE_HINT attributes */
+   if(Attr->specifiedAttr & clvATTR_VEC_TYPE_HINT) {
+       if(ToAttr->specifiedAttr & clvATTR_VEC_TYPE_HINT) {
+           gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                           lineNo,
+                                           stringNo,
+                                           clvREPORT_ERROR,
+                                           "vec_type_hint attribute already defined"));
+       }
+       else {
+           ToAttr->vecTypeHint = Attr->vecTypeHint;
+           ToAttr->specifiedAttr |= clvATTR_VEC_TYPE_HINT;
+       }
+   }
+
+/* check for REQ_WORK_GROUP_SIZE attributes */
+   if(Attr->specifiedAttr & clvATTR_REQD_WORK_GROUP_SIZE) {
+       if(ToAttr->specifiedAttr & clvATTR_REQD_WORK_GROUP_SIZE) {
+           gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                           lineNo,
+                                           stringNo,
+                                           clvREPORT_ERROR,
+                                           "reqd_work_group_size attribute already defined"));
+       }
+       else {
+           ToAttr->reqdWorkGroupSize[0] = Attr->reqdWorkGroupSize[0];
+           ToAttr->reqdWorkGroupSize[1] = Attr->reqdWorkGroupSize[1];
+           ToAttr->reqdWorkGroupSize[2] = Attr->reqdWorkGroupSize[2];
+           ToAttr->specifiedAttr |= clvATTR_REQD_WORK_GROUP_SIZE;
+       }
+   }
+
+/* check for WORK_GROUP_SIZE_HINT attributes */
+   if(Attr->specifiedAttr & clvATTR_WORK_GROUP_SIZE_HINT) {
+       if(ToAttr->specifiedAttr & clvATTR_WORK_GROUP_SIZE_HINT) {
+           gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                           lineNo,
+                                           stringNo,
+                                           clvREPORT_ERROR,
+                                           "work_group_size_hint attribute already defined"));
+       }
+       else {
+           ToAttr->workGroupSizeHint[0] = Attr->workGroupSizeHint[0];
+           ToAttr->workGroupSizeHint[1] = Attr->workGroupSizeHint[1];
+           ToAttr->workGroupSizeHint[2] = Attr->workGroupSizeHint[2];
+           ToAttr->specifiedAttr |= clvATTR_WORK_GROUP_SIZE_HINT;
+       }
+   }
+
+/* check for KERNEL_SCALE_HINT attributes */
+   if(Attr->specifiedAttr & clvATTR_KERNEL_SCALE_HINT) {
+       if(ToAttr->specifiedAttr & clvATTR_KERNEL_SCALE_HINT) {
+           gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                           lineNo,
+                                           stringNo,
+                                           clvREPORT_ERROR,
+                                           "kernel_scale_hint attribute already defined"));
+       }
+       else {
+           ToAttr->kernelScaleHint[0] = Attr->kernelScaleHint[0];
+           ToAttr->kernelScaleHint[1] = Attr->kernelScaleHint[1];
+           ToAttr->kernelScaleHint[2] = Attr->kernelScaleHint[2];
+           ToAttr->specifiedAttr |= clvATTR_KERNEL_SCALE_HINT;
+       }
+   }
+
+/* check for ALIGNED attributes */
+   if(Attr->specifiedAttr & clvATTR_ALIGNED) {
+       if(ToAttr->specifiedAttr & clvATTR_ALIGNED) {
+           gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                           lineNo,
+                                           stringNo,
+                                           clvREPORT_ERROR,
+                                           "aligned attribute already defined"));
+       }
+       else {
+           ToAttr->alignment = Attr->alignment;
+           ToAttr->specifiedAttr |= clvATTR_ALIGNED;
+       }
+   }
+
+   return ToAttr;
 }
 
 gceSTATUS
@@ -2608,8 +2728,32 @@ IN clsLexToken * FieldSelection
                         fieldName,
                         &componentSelection,
                         &unaryExpr);
-
     if (gcmIS_ERROR(status)) return gcvNULL;
+
+    if(fieldName && clmDECL_IsArray(&fieldName->decl)) {
+       if(clScanLookAheadWithSkip(Compiler, '[', ')') == gcvSTATUS_NOT_FOUND) { /* the next token is not '[' */
+          cloIR_EXPR expr;
+
+          /* Create the expression &A[0] for A being an array*/
+          expr =  _EvaluateIndirectionExpr(Compiler,
+                                           &unaryExpr->exprBase);
+          gcmASSERT(expr);
+          status = cloIR_UNARY_EXPR_Construct(Compiler,
+                                              Operand->base.lineNo,
+                                              Operand->base.stringNo,
+                                              clvUNARY_ADDR,
+                                              expr,
+                                              gcvNULL,
+                                              gcvNULL,
+                                              &unaryExpr);
+          if (gcmIS_ERROR(status)) return gcvNULL;
+          unaryExpr->u.generated = fieldName;
+          status = clParseSetOperandAddressed(Compiler,
+                                              &unaryExpr->exprBase);
+          if (gcmIS_ERROR(status)) return gcvNULL;
+       }
+    }
+
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                       clvDUMP_PARSER,
                       "<UNARY_EXPR type=\"%s\" line=\"%d\" string=\"%d\""
@@ -3799,7 +3943,7 @@ slsSLINK_LIST *SourceList
    return newList;
 }
 
-static gctSIZE_T
+static gctINT
 _ParseReplicateLocationMap(
 cloCOMPILER Compiler,
 clsDATA_LOCATION_MAP *Location,
@@ -3829,7 +3973,7 @@ gctSIZE_T MaxOperandCount
 
    if(MaxOperandCount < operandCount) {
       /* issue error */
-      return 0;
+      return -1;
    }
 
    currLocation = Location + maxOperandCount;
@@ -3855,7 +3999,7 @@ gctSIZE_T MaxOperandCount
    if (gcmIS_ERROR(status)) return 0;
 
    *ByteOffset += byteOffset;
-   return operandCount;
+   return (gctINT)operandCount;
 }
 
 static gctSIZE_T
@@ -3868,7 +4012,7 @@ gctSIZE_T *ByteOffset,
 gctSIZE_T MaxOperandCount
 )
 {
-   gctSIZE_T numFilled;
+   gctINT numFilled;
    gctSIZE_T byteOffset;
    gctSIZE_T maxOperandCount;
    gctSIZE_T operandCount = RowCount * ColumnCount - 1;
@@ -3880,11 +4024,11 @@ gctSIZE_T MaxOperandCount
 
    maxOperandCount = MaxOperandCount;
    byteOffset = *ByteOffset;
-   numFilled = _ParseFormVectorLocationMap(Compiler,
-                       Location,
-                       RowCount,
-                       &byteOffset,
-                       maxOperandCount);
+   numFilled = (gctINT)_ParseFormVectorLocationMap(Compiler,
+                                                   Location,
+                                                   RowCount,
+                                                   &byteOffset,
+                                                   maxOperandCount);
    if(numFilled == 0) {
       return 0;
    }
@@ -3893,11 +4037,11 @@ gctSIZE_T MaxOperandCount
    }
 
    numFilled = _ParseReplicateLocationMap(Compiler,
-                      Location,
+                                          Location,
                                           ColumnCount,
-                      &byteOffset,
-                      maxOperandCount);
-   if(numFilled == 0) {
+                                          &byteOffset,
+                                          maxOperandCount);
+   if(numFilled == -1) {
       return 0;
    }
    else {
@@ -3908,7 +4052,7 @@ gctSIZE_T MaxOperandCount
    return MaxOperandCount - maxOperandCount;
 }
 
-static gctSIZE_T
+static gctINT
 _ParseFormArrayLocationMap(
 cloCOMPILER Compiler,
 clsDATA_LOCATION_MAP *Location,
@@ -3918,7 +4062,7 @@ gctSIZE_T MaxOperandCount
 )
 {
    gctINT i;
-   gctSIZE_T numFilled;
+   gctINT numFilled;
    gctSIZE_T byteOffset;
    gctSIZE_T operandCount;
    gctSIZE_T maxOperandCount;
@@ -3934,7 +4078,7 @@ gctSIZE_T MaxOperandCount
 
    if(MaxOperandCount < operandCount) {
       /* issue error */
-      return 0;
+      return -1;
    }
 
    maxOperandCount = MaxOperandCount;
@@ -3946,8 +4090,8 @@ gctSIZE_T MaxOperandCount
                                              Array->length[i],
                                              &byteOffset,
                                              maxOperandCount);
-      if(numFilled == 0) {
-         return 0;
+      if(numFilled == -1) {
+         return -1;
       }
       else {
          maxOperandCount -= numFilled;
@@ -3958,7 +4102,7 @@ gctSIZE_T MaxOperandCount
    return MaxOperandCount - maxOperandCount;
 }
 
-static gctSIZE_T
+static gctINT
 _ParseFillLocationMapData(
 cloCOMPILER Compiler,
 clsDECL *Decl,
@@ -3970,7 +4114,7 @@ gctSIZE_T MaxOperandCount
    gctSIZE_T byteOffset;
    gctSIZE_T operandCount = 1;
    gctSIZE_T maxOperandCount;
-   gctSIZE_T numFilled;
+   gctINT numFilled;
 
    gcmASSERT(Decl && Decl->dataType);
    gcmASSERT(CurrLocation);
@@ -4048,8 +4192,8 @@ gctSIZE_T MaxOperandCount
                                                           currLocation,
                                                           &byteOffset,
                                                           maxOperandCount);
-                    if(numFilled == 0) {
-                       return 0;
+                    if(numFilled == -1) {
+                       return -1;
                     }
                     else maxOperandCount -= numFilled;
 
@@ -4063,8 +4207,8 @@ gctSIZE_T MaxOperandCount
                                                        currLocation,
                                                        &byteOffset,
                                                        maxOperandCount);
-                 if(numFilled == 0) {
-                    return 0;
+                 if(numFilled == -1) {
+                    return -1;
                  }
                  else {
                     maxOperandCount -= numFilled;
@@ -4077,7 +4221,7 @@ gctSIZE_T MaxOperandCount
 
            numFilled = MaxOperandCount - maxOperandCount;
            operandCount = clsDECL_GetElementSize(Decl);
-           gcmASSERT(numFilled <= operandCount);
+           gcmASSERT(numFilled <= (gctINT)operandCount);
 
            status = _ParsePushNestingLevel(Compiler,
                                            CurrLocation,
@@ -4150,13 +4294,13 @@ gctSIZE_T MaxOperandCount
 
          vectorSize = clmDATA_TYPE_vectorSize_GET(Decl->dataType);
          if (vectorSize > 0) {
-            numFilled = _ParseFormVectorLocationMap(Compiler,
-                                                    CurrLocation,
-                                                    vectorSize,
-                                                    &byteOffset,
-                                                    maxOperandCount);
+            numFilled = (gctINT)_ParseFormVectorLocationMap(Compiler,
+                                                            CurrLocation,
+                                                            vectorSize,
+                                                            &byteOffset,
+                                                            maxOperandCount);
             if(numFilled == 0) {
-               return 0;
+               return -1;
             }
             else {
                maxOperandCount -= numFilled;
@@ -4189,8 +4333,8 @@ gctSIZE_T MaxOperandCount
                                              &Decl->array,
                                              &byteOffset,
                                              maxOperandCount);
-      if(numFilled == 0) {
-         return 0;
+      if(numFilled == -1) {
+         return -1;
       }
       else {
          maxOperandCount -= numFilled;
@@ -4236,7 +4380,8 @@ OUT clsDATA_LOCATION_MAP **LocationMap
 )
 {
     gceSTATUS status;
-    gctSIZE_T size, numFilled;
+    gctSIZE_T size;
+    gctINT numFilled;
     gctSIZE_T byteOffset = 0;
     gctPOINTER pointer;
     clsDATA_LOCATION_MAP *locationMap;
@@ -4255,18 +4400,18 @@ OUT clsDATA_LOCATION_MAP **LocationMap
     locationMap = pointer;
 
     numFilled = _ParseFillLocationMapData(Compiler,
-                                              Decl,
-                                              locationMap,
-                                              &byteOffset,
-                                              size);
-    if(numFilled == 0) {
-           _clmParseFreeLocationMap(Compiler,
-                                    locationMap,
-                                    size);
-           size = 0;
+                                          Decl,
+                                          locationMap,
+                                          &byteOffset,
+                                          size);
+    if(numFilled == -1) {
+       _clmParseFreeLocationMap(Compiler,
+                                locationMap,
+                                size);
+       size = 0;
     }
     else {
-           gcmASSERT(numFilled == size);
+       gcmASSERT(numFilled == (gctINT)size);
        *LocationMap = locationMap;
     }
 
@@ -4681,7 +4826,11 @@ cloIR_EXPR Designation
       retVal = _ParseGetArrayOffset(&subscript->leftOperand->decl.array,
                                     subscript->rightOperand,
                                     &offset);
-      gcmASSERT(retVal >= 0);
+      if(retVal < 0) {
+          gcmASSERT(0);
+          offset = -1;
+          break;
+      }
 
       offset = leftOffset + offset * elementSize;
       break;
@@ -4918,7 +5067,7 @@ IN gctSIZE_T MaxOperandCount
 )
 {
    gceSTATUS status;
-   gctSIZE_T numEdited;
+   gctINT numEdited;
 
    (void)gcoOS_ZeroMemory((gctPOINTER)Location,
                           sizeof(clsDATA_LOCATION_MAP) * MaxOperandCount);
@@ -4929,10 +5078,10 @@ IN gctSIZE_T MaxOperandCount
                                          Location,
                                          ByteOffset,
                                          MaxOperandCount);
-   if(numEdited == 0) {
+   if(numEdited == -1) {
       return 0;
    }
-   gcmASSERT(numEdited <= MaxOperandCount);
+   gcmASSERT(numEdited <= (gctINT)MaxOperandCount);
 
    status = _ParsePushNestingLevel(Compiler,
                                    Location,
@@ -5156,66 +5305,36 @@ OUT cloIR_EXPR *ConstantExpr
 )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    clsDECL decl[1];
-    clsNAME *unnamedConstant;
     cloIR_VARIABLE constantVariable;
-    clsNAME_SPACE *nameSpace;
-    cltPOOL_STRING symbolInPool;
 
     gcmASSERT (ConstantExpr);
     if (clmDECL_IsScalar(Decl) ||
-        (!clmDATA_TYPE_IsHighPrecision(Decl->dataType) &&
-         _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES) ||
         Constant->variable || Constant->allValuesEqual) {
        *ConstantExpr = &Constant->exprBase;
        return gcvSTATUS_OK;
     }
 
-    status = cloCOMPILER_PushUnnamedSpace(Compiler, &nameSpace);
+    status = clMakeConstantVariableName(Compiler,
+                                        Constant);
     if (gcmIS_ERROR(status)) return status;
-
-    gcmONERROR(cloCOMPILER_CloneDecl(Compiler,
-                                     clvQUALIFIER_CONST,
-                                     clvQUALIFIER_CONSTANT,
-                                     Decl,
-                                     decl));
-    gcmONERROR(cloCOMPILER_MakeConstantName(Compiler,
-                                            "CONSTANT",
-                                            &symbolInPool));
-
-    gcmONERROR(cloCOMPILER_CreateName(Compiler,
-                                      Constant->exprBase.base.lineNo,
-                                      Constant->exprBase.base.stringNo,
-                                      clvVARIABLE_NAME,
-                                      decl,
-                                      symbolInPool,
-                                      gcvNULL,
-                                      clvEXTENSION_NONE,
-                                      &unnamedConstant));
-
-    unnamedConstant->u.variableInfo.variableType = clvBUILTIN_NONE;
-    unnamedConstant->u.variableInfo.u.constant = Constant;
-    unnamedConstant->u.variableInfo.isUnnamedConstant = gcvTRUE;
-    unnamedConstant->u.variableInfo.u.constant->variable = unnamedConstant;
     if(_GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES) {
         *ConstantExpr = &Constant->exprBase;
 
         status = cloCOMPILER_AllocateVariableMemory(Compiler,
-                                                    unnamedConstant);
+                                                    Constant->variable);
         if (gcmIS_ERROR(status)) return status;
     }
     else {
         gcmONERROR(clsNAME_SetVariableAddressed(Compiler,
-                                                unnamedConstant));
+                                                Constant->variable));
         gcmONERROR(cloIR_VARIABLE_Construct(Compiler,
                                             Constant->exprBase.base.lineNo,
                                             Constant->exprBase.base.stringNo,
-                                            unnamedConstant,
+                                            Constant->variable,
                                             &constantVariable));
         *ConstantExpr = &constantVariable->exprBase;
     }
 OnError:
-    cloCOMPILER_PopCurrentNameSpace(Compiler, &nameSpace);
     return status;
 }
 #endif
@@ -6064,6 +6183,295 @@ IN OUT cloIR_EXPR *ArrayPointerExpr
 
     *ArrayPointerExpr = &unaryExpr->exprBase;
     return status;
+}
+
+cloIR_EXPR
+clParseAsmAppendOperandModifiers(
+IN cloCOMPILER Compiler,
+IN cloIR_EXPR  Expr,
+IN clsASM_MODIFIERS *Modifiers
+)
+{
+    gcmHEADER_ARG("Modifiers=0x%x", Modifiers);
+    gcmASSERT(Modifiers);
+
+    if (Modifiers)
+    {
+        gctPOINTER pointer = gcvNULL;
+        clsASM_MODIFIERS *modifierCopy;
+
+        cloCOMPILER_Allocate(
+                        Compiler,
+                        (gctSIZE_T)sizeof(clsASM_MODIFIERS),
+                        &pointer);
+
+        modifierCopy = (clsASM_MODIFIERS *) pointer;
+
+        *modifierCopy = *Modifiers;
+
+        Modifiers = modifierCopy;
+    }
+
+    if (Expr)
+    {
+        Expr->asmMods = Modifiers;
+    }
+
+    gcmFOOTER_ARG("<return>=0x%x", Expr);
+    return  Expr;
+}
+
+clsASM_MODIFIERS
+clParseAsmAppendModifier(
+IN cloCOMPILER Compiler,
+IN clsASM_MODIFIERS *Modifiers,
+IN clsASM_MODIFIER  *Modifier
+)
+{
+    clsASM_MODIFIERS modifiers;
+
+    gcmHEADER_ARG("Modifier=0x%x", Modifier);
+    gcmASSERT(Modifier);
+
+    if (!Modifiers)
+    {
+        gcoOS_MemFill((gctPOINTER)&modifiers, (gctUINT8)-1, sizeof(clsASM_MODIFIERS));
+
+        Modifiers = (clsASM_MODIFIERS *) &modifiers;
+    }
+
+    Modifiers->modifiers[Modifier->type] = *Modifier;
+
+    gcmFOOTER_ARG("<return>=0x%x", Modifiers);
+    return  *Modifiers;
+}
+
+clsASM_MODIFIER
+clParseAsmModifier(
+IN cloCOMPILER Compiler,
+IN clsLexToken * Type,
+IN clsLexToken * Value
+)
+{
+    clsASM_MODIFIER asmMod;
+
+    gcmHEADER_ARG("Opcode=0x%x, Opcode=0x%x", Type, Value);
+    gcmASSERT(Type && Value);
+
+    gcoOS_ZeroMemory((gctPOINTER)&asmMod, sizeof(clsASM_MODIFIER));
+
+    asmMod.type = cleASM_MODIFIER_COUNT; /* to indicate as invalid type */
+
+    /* DATATYPE */
+    if(gcmIS_SUCCESS(gcoOS_StrCmp(Type->u.identifier.name, "f")))
+    {
+#define STRING_MATCH_FORMAT(STR) \
+    if(gcmIS_SUCCESS(gcoOS_StrCmp(Value->u.identifier.name, #STR))) { \
+    asmMod.type = cleASM_MODIFIER_OPND_FORMAT;   \
+    asmMod.value = clvTYPE_##STR;   \
+    }
+
+        STRING_MATCH_FORMAT(BOOL)
+        else STRING_MATCH_FORMAT(CHAR)
+        else STRING_MATCH_FORMAT(UCHAR)
+        else STRING_MATCH_FORMAT(SHORT)
+        else STRING_MATCH_FORMAT(USHORT)
+        else STRING_MATCH_FORMAT(INT)
+        else STRING_MATCH_FORMAT(UINT)
+        else STRING_MATCH_FORMAT(LONG)
+        else STRING_MATCH_FORMAT(ULONG)
+        else STRING_MATCH_FORMAT(HALF)
+        else STRING_MATCH_FORMAT(FLOAT)
+        else STRING_MATCH_FORMAT(DOUBLE)
+        else STRING_MATCH_FORMAT(QUAD)
+        else {
+            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                Value->lineNo,
+                Value->stringNo,
+                clvREPORT_ERROR,
+                "unknown token: '%s'",
+                Value->u.identifier.name));
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return asmMod;
+        }
+
+    }
+    /* PRECISION */
+    else if(gcmIS_SUCCESS(gcoOS_StrCmp(Type->u.identifier.name, "p")))
+    {
+#define STRING_MATCH_PRECISION(STR) \
+    if(gcmIS_SUCCESS(gcoOS_StrCmp(Value->u.identifier.name, #STR))) { \
+    asmMod.type  = cleASM_MODIFIER_OPND_PRECISION;   \
+    asmMod.value = gcSHADER_PRECISION_##STR;   \
+    }
+
+        STRING_MATCH_PRECISION(DEFAULT)
+        else STRING_MATCH_PRECISION(HIGH)
+        else STRING_MATCH_PRECISION(MEDIUM)
+        else STRING_MATCH_PRECISION(LOW)
+        else {
+            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                Value->lineNo,
+                Value->stringNo,
+                clvREPORT_ERROR,
+                "unknown token: '%s'",
+                Value->u.identifier.name));
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return asmMod;
+        }
+
+#undef STRING_MATCH_PRECISION
+    }
+    else if(gcmIS_SUCCESS(gcoOS_StrCmp(Type->u.identifier.name, "c")))
+    {
+#define STRING_MATCH_CONDITION(STR) \
+    if(gcmIS_SUCCESS(gcoOS_StrCmp(Value->u.identifier.name, #STR))) { \
+    asmMod.type = cleASM_MODIFIER_OPCODE_CONDITION;   \
+    asmMod.value = gcSL_##STR;   \
+    }
+        /*
+        Regular expression:
+        Find:    ^[ ]+gcSL_([a-zA-Z0-9_]+),.*
+        Replace: else STRING_MATCH_CONDITION(\1)
+        */
+        STRING_MATCH_CONDITION(ALWAYS)
+        else STRING_MATCH_CONDITION(NOT_EQUAL)
+        else STRING_MATCH_CONDITION(LESS_OR_EQUAL)
+        else STRING_MATCH_CONDITION(LESS)
+        else STRING_MATCH_CONDITION(EQUAL)
+        else STRING_MATCH_CONDITION(GREATER)
+        else STRING_MATCH_CONDITION(GREATER_OR_EQUAL)
+        else STRING_MATCH_CONDITION(AND)
+        else STRING_MATCH_CONDITION(OR)
+        else STRING_MATCH_CONDITION(XOR)
+        else STRING_MATCH_CONDITION(NOT_ZERO)
+        else STRING_MATCH_CONDITION(ZERO)
+        else STRING_MATCH_CONDITION(GREATER_OR_EQUAL_ZERO)
+        else STRING_MATCH_CONDITION(GREATER_ZERO)
+        else STRING_MATCH_CONDITION(LESS_OREQUAL_ZERO)
+        else STRING_MATCH_CONDITION(LESS_ZERO)
+        else {
+            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                Value->lineNo,
+                Value->stringNo,
+                clvREPORT_ERROR,
+                "unknown token: '%s'",
+                Value->u.identifier.name));
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return asmMod;
+        }
+#undef STRING_MATCH_CONDITION
+    }
+    else if(gcmIS_SUCCESS(gcoOS_StrCmp(Type->u.identifier.name, "t")))
+    {
+#define STRING_MATCH_THREAD(STR) \
+    if(gcmIS_SUCCESS(gcoOS_StrCmp(Value->u.identifier.name, #STR))) { \
+    asmMod.type = cleASM_MODIFIER_THREAD_OPCODE_MODE;   \
+    asmMod.value = gcSL_##STR;   \
+    }
+
+
+#undef STRING_MATCH_THREAD
+    }
+    else if(gcmIS_SUCCESS(gcoOS_StrCmp(Type->u.identifier.name, "rnd")))
+    {
+#define STRING_MATCH_ROUND(STR) \
+    if(gcmIS_SUCCESS(gcoOS_StrCmp(Value->u.identifier.name, #STR))) { \
+    asmMod.type = cleASM_MODIFIER_OPCODE_ROUND;   \
+    asmMod.value = gcSL_ROUND_##STR;   \
+    }
+        STRING_MATCH_ROUND(DEFAULT)
+        else STRING_MATCH_ROUND(RTZ)
+        else STRING_MATCH_ROUND(RTNE)
+        else STRING_MATCH_ROUND(RTP)
+        else STRING_MATCH_ROUND(RTN)
+        else {
+            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                Value->lineNo,
+                Value->stringNo,
+                clvREPORT_ERROR,
+                "unknown token: '%s'",
+                Value->u.identifier.name));
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return asmMod;
+        }
+
+#undef STRING_MATCH_ROUND
+    }
+    else if(gcmIS_SUCCESS(gcoOS_StrCmp(Type->u.identifier.name, "sat")))
+    {
+#define STRING_MATCH_SATURATE(STR) \
+    if(gcmIS_SUCCESS(gcoOS_StrCmp(Value->u.identifier.name, #STR))) { \
+    asmMod.type = cleASM_MODIFIER_OPCODE_SAT;   \
+    asmMod.value = gcSL_##STR;   \
+    }
+        STRING_MATCH_SATURATE(NO_SATURATE)
+        else STRING_MATCH_SATURATE(SATURATE)
+        else {
+            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                Value->lineNo,
+                Value->stringNo,
+                clvREPORT_ERROR,
+                "unknown token: '%s'",
+                Value->u.identifier.name));
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return asmMod;
+        }
+#undef STRING_MATCH_SATURATE
+    }
+    else if(gcmIS_SUCCESS(gcoOS_StrCmp(Type->u.identifier.name, "abs")))
+    {
+#define STRING_MATCH_ABS(STR) \
+    if(gcmIS_SUCCESS(gcoOS_StrCmp(Value->u.identifier.name, #STR))) { \
+    asmMod.type = cleASM_MODIFIER_OPND_ABS;   \
+    asmMod.value = 1;   \
+    }
+        STRING_MATCH_ABS(1)
+        else {
+            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                Value->lineNo,
+                Value->stringNo,
+                clvREPORT_ERROR,
+                "unknown token: '%s'",
+                Value->u.identifier.name));
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return asmMod;
+        }
+#undef STRING_MATCH_ABS
+    }
+    else if(gcmIS_SUCCESS(gcoOS_StrCmp(Type->u.identifier.name, "neg")))
+    {
+#define STRING_MATCH_NEG(STR) \
+    if(gcmIS_SUCCESS(gcoOS_StrCmp(Value->u.identifier.name, #STR))) { \
+    asmMod.type = cleASM_MODIFIER_OPND_NEG;   \
+    asmMod.value = 1;   \
+    }
+        STRING_MATCH_NEG(1)
+        else {
+            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                Value->lineNo,
+                Value->stringNo,
+                clvREPORT_ERROR,
+                "unknown token: '%s'",
+                Value->u.identifier.name));
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return asmMod;
+        }
+#undef STRING_MATCH_NEG
+    }
+    else {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+            Type->lineNo,
+            Type->stringNo,
+            clvREPORT_ERROR,
+            "unknown type: '%s'",
+            Type->u.identifier.name));
+        gcmFOOTER_ARG("<return>=%s", "<nil>");
+        return asmMod;
+    }
+
+    gcmFOOTER_ARG("<return>=0x%x", &asmMod);
+    return  asmMod;
 }
 
 cloIR_EXPR
@@ -7061,6 +7469,53 @@ IN cloIR_EXPR RightOperand
   return gcvSTATUS_OK;
 }
 
+gceSTATUS
+clMakeConstantVariableName(
+IN cloCOMPILER Compiler,
+cloIR_CONSTANT ConstantOperand
+)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    if(ConstantOperand->variable == gcvNULL) {
+        clsNAME *constantVarName;
+        clsNAME_SPACE *nameSpace = gcvNULL;
+        clsDECL decl[1];
+        cltPOOL_STRING symbolInPool;
+
+        status = cloCOMPILER_PushUnnamedSpace(Compiler, &nameSpace);
+        if (gcmIS_ERROR(status)) return status;
+
+        gcmONERROR(cloCOMPILER_CloneDecl(Compiler,
+                                         clvQUALIFIER_CONST,
+                                         clvQUALIFIER_CONSTANT,
+                                         &ConstantOperand->exprBase.decl,
+                                         decl));
+
+        gcmONERROR(cloCOMPILER_MakeConstantName(Compiler,
+                                                "CONSTANT",
+                                                &symbolInPool));
+
+        gcmONERROR(cloCOMPILER_CreateName(Compiler,
+                                          ConstantOperand->exprBase.base.lineNo,
+                                          ConstantOperand->exprBase.base.stringNo,
+                                          clvVARIABLE_NAME,
+                                          decl,
+                                          symbolInPool,
+                                          gcvNULL,
+                                          clvEXTENSION_NONE,
+                                          &constantVarName));
+
+        constantVarName->u.variableInfo.builtinSpecific.s.variableType = clvBUILTIN_NONE;
+        constantVarName->u.variableInfo.u.constant = ConstantOperand;
+        constantVarName->u.variableInfo.isUnnamedConstant = gcvTRUE;
+        constantVarName->u.variableInfo.u.constant->variable = constantVarName;
+
+OnError:
+        if(nameSpace) cloCOMPILER_PopCurrentNameSpace(Compiler, &nameSpace);
+    }
+    return status;
+}
 
 static gceSTATUS
 _MakeConstantVariableExpr(
@@ -7778,6 +8233,8 @@ IN clsNAME *Var
 static gceSTATUS
 _ParseFillVariableAttr(
 IN cloCOMPILER Compiler,
+IN gctINT LineNo,
+IN gctINT StringNo,
 IN clsDECL *Decl,
 IN clsNAME *Var,
 IN clsATTRIBUTE *Attr
@@ -7828,7 +8285,18 @@ IN clsATTRIBUTE *Attr
      Var->context.alignment = attrPtr->alignment;
    }
    if(attrPtr->specifiedAttr & clvATTR_ENDIAN) {
-     Var->u.variableInfo.hostEndian = attrPtr->hostEndian;
+     if(!clmDECL_IsPointerType(&Var->decl)) {
+         gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                         LineNo,
+                                         StringNo,
+                                         clvREPORT_ERROR,
+                                         "the endian attribute cannot be used for variables that are not a pointer type"));
+         return gcvSTATUS_INVALID_ARGUMENT;
+     }
+     else {
+         Var->u.variableInfo.specifiedAttr |= clvATTR_ENDIAN;
+         Var->u.variableInfo.hostEndian = attrPtr->hostEndian;
+     }
    }
    if(Attr) {
      gcmVERIFY_OK(cloCOMPILER_Free(Compiler, Attr));
@@ -8348,7 +8816,10 @@ IN clsATTRIBUTE *Attr
                     Identifier);
     if (gcmIS_ERROR(status))  return declOrDeclListPtr;
 
-    _ParseFillVariableAttr(Compiler, Decl, declOrDeclListPtr->name, Attr);
+    _ParseFillVariableAttr(Compiler,
+                           Identifier->lineNo,
+                           Identifier->stringNo,
+                           Decl, declOrDeclListPtr->name, Attr);
     return declOrDeclListPtr;
 }
 
@@ -8401,7 +8872,10 @@ IN clsATTRIBUTE *Attr
         return declOrDeclListPtr;
     }
 
-    _ParseFillVariableAttr(Compiler, Decl, declOrDeclListPtr->name, Attr);
+    _ParseFillVariableAttr(Compiler,
+                           Identifier->lineNo,
+                           Identifier->stringNo,
+                           Decl, declOrDeclListPtr->name, Attr);
     return declOrDeclListPtr;
 }
 
@@ -8443,7 +8917,10 @@ IN clsATTRIBUTE *Attr
        }
     }
 
-    _ParseFillVariableAttr(Compiler, &declOrDeclListPtr->decl, declOrDeclListPtr->name, Attr);
+    _ParseFillVariableAttr(Compiler,
+                           Identifier->lineNo,
+                           Identifier->stringNo,
+                           &declOrDeclListPtr->decl, declOrDeclListPtr->name, Attr);
     return declOrDeclListPtr;
 }
 
@@ -8487,7 +8964,10 @@ IN clsATTRIBUTE *Attr
        }
     }
 
-    _ParseFillVariableAttr(Compiler, &declOrDeclListPtr->decl, declOrDeclListPtr->name, Attr);
+    _ParseFillVariableAttr(Compiler,
+                           Identifier->lineNo,
+                           Identifier->stringNo,
+                           &declOrDeclListPtr->decl, declOrDeclListPtr->name, Attr);
     return declOrDeclListPtr;
 }
 
@@ -9449,14 +9929,12 @@ IN cloIR_EXPR InitExpr
                                          &constant);
         if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
 
-#if _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES
-        if (clmDECL_IsAggregateType(&name->decl) ||
-            clmDATA_TYPE_IsHighPrecision(name->decl.dataType)) {
-#else
-        if (clmDECL_IsUnderlyingStructOrUnion(&name->decl) &&
-            ((clGetOperandCountForRegAlloc(&name->decl) > _clmMaxOperandCountToUseMemory(&constant->exprBase.decl)) ||
-             name->u.variableInfo.isAddressed)) {
-#endif
+        if((_GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES &&
+            (clmDECL_IsAggregateType(&name->decl) ||
+             clmDATA_TYPE_IsHighPrecision(name->decl.dataType))) ||
+            (clmDECL_IsUnderlyingStructOrUnion(&name->decl) &&
+             ((clGetOperandCountForRegAlloc(&name->decl) > _clmMaxOperandCountToUseMemory(&constant->exprBase.decl)) ||
+             name->u.variableInfo.isAddressed))) {
            gctSIZE_T written;
            clsVARIABLE_NESTING *nesting = gcvNULL;
 
@@ -9945,7 +10423,10 @@ IN clsATTRIBUTE *Attr
         return declOrDeclListPtr;
     }
 
-    status = _ParseFillVariableAttr(Compiler, Decl, declOrDeclListPtr->name, Attr);
+    status = _ParseFillVariableAttr(Compiler,
+                                    Identifier->lineNo,
+                                    Identifier->stringNo,
+                                    Decl, declOrDeclListPtr->name, Attr);
     if (gcmIS_ERROR(status)) {
         return declOrDeclListPtr;
     }
@@ -10011,7 +10492,10 @@ IN clsATTRIBUTE *Attr
         return declOrDeclListPtr;
     }
 
-    status = _ParseFillVariableAttr(Compiler, &declOrDeclListPtr->decl, declOrDeclListPtr->name, Attr);
+    status = _ParseFillVariableAttr(Compiler,
+                                    Identifier->lineNo,
+                                    Identifier->stringNo,
+                                    &declOrDeclListPtr->decl, declOrDeclListPtr->name, Attr);
     if (gcmIS_ERROR(status)) {
         return declOrDeclListPtr;
     }
@@ -10062,7 +10546,10 @@ IN clsATTRIBUTE *Attr
         return declOrDeclListPtr;
     }
 
-    status = _ParseFillVariableAttr(Compiler, Decl, declOrDeclListPtr->name, Attr);
+    status = _ParseFillVariableAttr(Compiler,
+                                    Identifier->lineNo,
+                                    Identifier->stringNo,
+                                    Decl, declOrDeclListPtr->name, Attr);
     if (gcmIS_ERROR(status)) {
         return declOrDeclListPtr;
     }
@@ -10130,7 +10617,10 @@ IN clsATTRIBUTE *Attr
         return declOrDeclListPtr;
     }
 
-    status = _ParseFillVariableAttr(Compiler, &declOrDeclListPtr->decl, declOrDeclListPtr->name, Attr);
+    status = _ParseFillVariableAttr(Compiler,
+                                    Identifier->lineNo,
+                                    Identifier->stringNo,
+                                    &declOrDeclListPtr->decl, declOrDeclListPtr->name, Attr);
     if (gcmIS_ERROR(status)) {
         return declOrDeclListPtr;
     }
@@ -10191,7 +10681,10 @@ IN clsLexToken *Identifier
     if (gcmIS_ERROR(status)) return gcvNULL;
 
     name->derivedType = derivedType;
-    _ParseFillVariableAttr(Compiler, declPtr, name, gcvNULL);
+    _ParseFillVariableAttr(Compiler,
+                           Identifier->lineNo,
+                           Identifier->stringNo,
+                           declPtr, name, gcvNULL);
 
     status = cloCOMPILER_CreateNameSpace(Compiler, &name->u.funcInfo.localSpace);
     if (gcmIS_ERROR(status)) return gcvNULL;
@@ -10280,26 +10773,27 @@ IN clsLexToken *Identifier
    if (gcmIS_ERROR(status)) return gcvNULL;
    name->u.funcInfo.localSpace->scopeName = name;
    if(Attr) {
+     name->u.funcInfo.attrQualifier.attrFlags = Attr->specifiedAttr;
      if(Attr->specifiedAttr & clvATTR_REQD_WORK_GROUP_SIZE)  {
-        name->u.funcInfo.reqdWorkGroupSize[0] = Attr->reqdWorkGroupSize[0];
-        name->u.funcInfo.reqdWorkGroupSize[1] = Attr->reqdWorkGroupSize[1];
-        name->u.funcInfo.reqdWorkGroupSize[2] = Attr->reqdWorkGroupSize[2];
+        name->u.funcInfo.attrQualifier.reqdWorkGroupSize[0] = Attr->reqdWorkGroupSize[0];
+        name->u.funcInfo.attrQualifier.reqdWorkGroupSize[1] = Attr->reqdWorkGroupSize[1];
+        name->u.funcInfo.attrQualifier.reqdWorkGroupSize[2] = Attr->reqdWorkGroupSize[2];
      }
 
      if(Attr->specifiedAttr & clvATTR_WORK_GROUP_SIZE_HINT)  {
-        name->u.funcInfo.workGroupSizeHint[0] = Attr->workGroupSizeHint[0];
-        name->u.funcInfo.workGroupSizeHint[1] = Attr->workGroupSizeHint[1];
-        name->u.funcInfo.workGroupSizeHint[2] = Attr->workGroupSizeHint[2];
+        name->u.funcInfo.attrQualifier.workGroupSizeHint[0] = Attr->workGroupSizeHint[0];
+        name->u.funcInfo.attrQualifier.workGroupSizeHint[1] = Attr->workGroupSizeHint[1];
+        name->u.funcInfo.attrQualifier.workGroupSizeHint[2] = Attr->workGroupSizeHint[2];
      }
 
      if(Attr->specifiedAttr & clvATTR_KERNEL_SCALE_HINT)  {
-        name->u.funcInfo.kernelScaleHint[0] = Attr->kernelScaleHint[0];
-        name->u.funcInfo.kernelScaleHint[1] = Attr->kernelScaleHint[1];
-        name->u.funcInfo.kernelScaleHint[2] = Attr->kernelScaleHint[2];
+        name->u.funcInfo.attrQualifier.kernelScaleHint[0] = Attr->kernelScaleHint[0];
+        name->u.funcInfo.attrQualifier.kernelScaleHint[1] = Attr->kernelScaleHint[1];
+        name->u.funcInfo.attrQualifier.kernelScaleHint[2] = Attr->kernelScaleHint[2];
      }
 
      if(Attr->specifiedAttr & clvATTR_VEC_TYPE_HINT)  {
-        name->u.funcInfo.vecTypeHint = Attr->vecTypeHint;
+        name->u.funcInfo.attrQualifier.vecTypeHint = Attr->vecTypeHint;
      }
      gcmVERIFY_OK(cloCOMPILER_Free(Compiler, Attr));
    }
@@ -11842,12 +12336,13 @@ IN cloIR_SET Statements
         FOR_EACH_DLINK_NODE(&firstFuncName->u.funcInfo.localSpace->names, clsNAME, paramName) {
             if (paramName->type != clvPARAMETER_NAME) break;
             if(clmDECL_IsPointerType(&paramName->decl) &&
-               paramName->decl.dataType->addrSpaceQualifier == clvQUALIFIER_LOCAL) {
+               clGetAddrSpaceQualifier(&paramName->decl) == clvQUALIFIER_LOCAL) {
                cloCOMPILER_SetHasLocalMemoryKernelArg(Compiler);
             }
             argCount += clGetOperandCountForRegAllocByName(paramName);
         }
 
+        /* There is a hypothesis that no uniform is added before all kernel function arguments are added. */
         cloCOMPILER_SetMaxKernelFunctionArgs(Compiler, argCount);
     }
 
@@ -11896,7 +12391,8 @@ clsNAME    *
 clParseParameterDecl(
 IN cloCOMPILER Compiler,
 IN clsDECL * Decl,
-IN clsLexToken * Identifier
+IN clsLexToken * Identifier,
+IN clsATTRIBUTE *Attr
 )
 {
     gceSTATUS  status;
@@ -12013,7 +12509,10 @@ IN clsLexToken * Identifier
     if (gcmIS_ERROR(status)) return gcvNULL;
 
     name->derivedType = derivedType;
-    _ParseFillVariableAttr(Compiler, declPtr, name, gcvNULL);
+    _ParseFillVariableAttr(Compiler,
+                           lineNo,
+                           stringNo,
+                           declPtr, name, Attr);
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                     clvDUMP_PARSER,
                     "<PARAMETER_DECL decl=\"0x%x\" name=\"%s\" />",
@@ -12027,7 +12526,8 @@ clParseArrayParameterDecl(
 IN cloCOMPILER Compiler,
 IN clsDECL * Decl,
 IN clsLexToken * Identifier,
-IN cloIR_EXPR ArrayLengthExpr
+IN cloIR_EXPR ArrayLengthExpr,
+IN clsATTRIBUTE *Attr
 )
 {
     gceSTATUS status;
@@ -12052,7 +12552,8 @@ IN cloIR_EXPR ArrayLengthExpr
 
     return clParseParameterDecl(Compiler,
                                 &arrayDecl,
-                                Identifier);
+                                Identifier,
+                                Attr);
 }
 
 #define _clmMakeIdentifierToken(Token, Symbol)  \
@@ -12081,81 +12582,6 @@ IN clsNAME * ParameterDecl
                                   &ParameterDecl->decl);
       dataType = decl.dataType;
       if(dataType) {
-        switch(dataType->addrSpaceQualifier) {
-        case clvQUALIFIER_GLOBAL:
-           if(!clmDECL_IsPointerType(&ParameterDecl->decl) &&
-              !clmDECL_IsArray(&ParameterDecl->decl)) {
-              gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                              ParameterDecl->lineNo,
-                                              ParameterDecl->stringNo,
-                                              clvREPORT_ERROR,
-                                              "invalid global address space qualifier specified for parameter type"));
-               return gcvNULL;
-           }
-           break;
-
-        case clvQUALIFIER_CONSTANT:
-           if(!clmDECL_IsPointerType(&ParameterDecl->decl) &&
-              !clmDECL_IsArray(&ParameterDecl->decl)) {
-              gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                              ParameterDecl->lineNo,
-                                              ParameterDecl->stringNo,
-                                              clvREPORT_ERROR,
-                                              "invalid constant address space qualifier specified for parameter type"));
-               return gcvNULL;
-           }
-           break;
-
-        case clvQUALIFIER_LOCAL:
-           if(clmDATA_TYPE_IsImage(dataType)) {
-              gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                              ParameterDecl->lineNo,
-                                              ParameterDecl->stringNo,
-                                              clvREPORT_ERROR,
-                                              "image type cannot have local address space qualifier"));
-               return gcvNULL;
-           }
-           if(!clmDECL_IsPointerType(&ParameterDecl->decl) &&
-              !clmDECL_IsArray(&ParameterDecl->decl)) {
-              gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                              ParameterDecl->lineNo,
-                                              ParameterDecl->stringNo,
-                                              clvREPORT_ERROR,
-                                              "invalid local address space qualifier specified for parameter type"));
-               return gcvNULL;
-           }
-           break;
-
-        case clvQUALIFIER_NONE:
-        case clvQUALIFIER_PRIVATE:
-           {
-              clsNAME_SPACE *nameSpace;
-
-              nameSpace = cloCOMPILER_GetCurrentSpace(Compiler);
-              if(nameSpace->scopeName && (nameSpace->scopeName->type == clvKERNEL_FUNC_NAME)) {
-                  if(clmDECL_IsPointerType(&ParameterDecl->decl)) {
-                       gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                                       ParameterDecl->lineNo,
-                                                       ParameterDecl->stringNo,
-                                                       clvREPORT_ERROR,
-                                                       "kernel pointer parameters must point to"
-                                                       " global, local, or constant address space"));
-                        return gcvNULL;
-                    }
-                    else if(clmDECL_IsArray(&ParameterDecl->decl)) {
-                        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                                        ParameterDecl->lineNo,
-                                                        ParameterDecl->stringNo,
-                                                        clvREPORT_ERROR,
-                                                        "array parameter to kernel function must be in"
-                                                        " global, local, or constant address space"));
-                       return gcvNULL;
-                   }
-               }
-            }
-            break;
-        }
-
         ParameterDecl->decl.dataType = dataType;
         ParameterDecl->decl.storageQualifier = decl.storageQualifier;
         if(dataType->accessQualifier == clvQUALIFIER_NONE &&
@@ -12169,6 +12595,18 @@ IN clsNAME * ParameterDecl
                                                &ParameterDecl->decl.dataType);
             if (gcmIS_ERROR(status)) {
                return gcvNULL;
+            }
+        }
+        if(ParameterDecl->u.variableInfo.specifiedAttr & clvATTR_ENDIAN) {
+            cltQUALIFIER addrSpaceQualifier = clGetAddrSpaceQualifier(&ParameterDecl->decl);
+
+            if(addrSpaceQualifier != clvQUALIFIER_CONSTANT &&
+               addrSpaceQualifier != clvQUALIFIER_GLOBAL) {
+                gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                                ParameterDecl->lineNo,
+                                                ParameterDecl->stringNo,
+                                                clvREPORT_ERROR,
+                                                "Endian attribute can only be applied to pointer types that are in the global or constant address space"));
             }
         }
     }
@@ -12366,11 +12804,113 @@ IN clsDECL * Decl
        dataType.accessQualifier = clvQUALIFIER_CONST;
     }
 
-    if(Decl->dataType->accessQualifier != dataType.accessQualifier ||
-       Decl->dataType->addrSpaceQualifier != dataType.addrSpaceQualifier) {
+    if(ForParamDecl) {
+        gctUINT stringNo = cloCOMPILER_GetCurrentStringNo(Compiler);
+        gctUINT lineNo = cloCOMPILER_GetCurrentLineNo(Compiler);
+
+        if(!clmDECL_IsPointerType(&decl) &&
+           !clmDECL_IsArray(&decl)) {
+            switch(clGetAddrSpaceQualifier(&decl)) {
+            case clvQUALIFIER_GLOBAL:
+                gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                                lineNo,
+                                                stringNo,
+                                                clvREPORT_ERROR,
+                                                "invalid global address space qualifier specified for parameter type"));
+                return decl;
+
+            case clvQUALIFIER_CONSTANT:
+                gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                                lineNo,
+                                                stringNo,
+                                                clvREPORT_ERROR,
+                                                "invalid constant address space qualifier specified for parameter type"));
+                return decl;
+
+           case clvQUALIFIER_LOCAL:
+               gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                               lineNo,
+                                               stringNo,
+                                               clvREPORT_ERROR,
+                                               "invalid local address space qualifier specified for parameter type"));
+               return decl;
+
+           default:
+               break;
+           }
+        }
+        else {
+           clsNAME_SPACE *nameSpace;
+           cltQUALIFIER addrSpaceQualifier = clvQUALIFIER_NONE;
+
+           switch(dataType.addrSpaceQualifier) {
+           case clvQUALIFIER_NONE:
+           case clvQUALIFIER_PRIVATE:
+              nameSpace = cloCOMPILER_GetCurrentSpace(Compiler);
+              if(nameSpace->scopeName && (nameSpace->scopeName->type == clvKERNEL_FUNC_NAME)) {
+                  switch(clGetAddrSpaceQualifier(&decl))
+                  {
+                  case clvQUALIFIER_NONE:
+                  case clvQUALIFIER_PRIVATE:
+                      if(clmDECL_IsPointerType(&decl)) {
+                          gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                                          lineNo,
+                                                          stringNo,
+                                                          clvREPORT_ERROR,
+                                                          "kernel pointer parameters must point to"
+                                                          " global, local, or constant address space"));
+                           return decl;
+                      }
+                      else if(clmDECL_IsArray(&decl)) {
+                           gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                                           lineNo,
+                                                           stringNo,
+                                                           clvREPORT_ERROR,
+                                                           "array parameter to kernel function must be in"
+                                                           " global, local, or constant address space"));
+                          return decl;
+                      }
+                      break;
+
+                  default:
+                      break;
+                  }
+               }
+               break;
+
+           default:
+               clGetPointedToAddrSpace(&decl, &addrSpaceQualifier);
+               if(addrSpaceQualifier != clvQUALIFIER_NONE) {
+                   gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                                   lineNo,
+                                                   stringNo,
+                                                   clvREPORT_ERROR,
+                                                   "address space qualifier inappropriately specified"));
+                   return decl;
+               }
+           }
+        }
+    }
+
+    if(clmDECL_IsPointerType(&decl)) {
+        slsSLINK_LIST *ptrDscr = decl.ptrDscr;
+
+        decl.ptrDscr = gcvNULL;
+        status = clMergePtrDscrToDecl(Compiler,
+                                      ptrDscr,
+                                      &decl,
+                                      gcvTRUE);
+        if (gcmIS_ERROR(status)) {
+            gcmASSERT(0);
+            return *Decl;
+        }
+    }
+
+    if(Decl->dataType->accessQualifier != decl.dataType->accessQualifier ||
+       Decl->dataType->addrSpaceQualifier != decl.dataType->addrSpaceQualifier) {
        status = cloCOMPILER_CloneDataType(Compiler,
-                                          dataType.accessQualifier,
-                                          dataType.addrSpaceQualifier,
+                                          decl.dataType->accessQualifier,
+                                          decl.dataType->addrSpaceQualifier,
                                           Decl->dataType,
                                           &decl.dataType);
        if(gcmIS_ERROR(status)) return *Decl;
@@ -13387,7 +13927,10 @@ IN clsATTRIBUTE *Attr
                       lineNo,
                       stringNo,
                       symbol));
-    _ParseFillVariableAttr(Compiler, gcvNULL, field, Attr);
+    _ParseFillVariableAttr(Compiler,
+                           Identifier->lineNo,
+                           Identifier->stringNo,
+                           gcvNULL, field, Attr);
     return fieldDecl;
 }
 
@@ -13507,7 +14050,7 @@ IN clsNAME *TopKernelFunc
                                       &token,
                                       gcvNULL);
         if(varDecl == gcvNULL) return gcvNULL;
-        varDecl->name->u.variableInfo.variableType = clvBUILTIN_KERNEL_ARG;
+        varDecl->name->u.variableInfo.builtinSpecific.s.variableType = clvBUILTIN_KERNEL_ARG;
         currStatement = clParseDeclaration(Compiler,
                                            varDecl);
       }

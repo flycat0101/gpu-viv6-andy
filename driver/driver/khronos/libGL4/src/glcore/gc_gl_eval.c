@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -368,7 +368,7 @@ GLvoid DoEvalCoord1(__GLcontext *gc, GLfloat u)
 
             DoDomain1(&em, u, &eval[__GL_C4], &gc->state.current.color.r,
                 evalData[__GL_C4]);
-            (*gc->currentImmediateTable->Color4fv)(gc ,&gc->state.current.color.r);
+            (*gc->immedModeDispatch.Color4fv)(gc ,&gc->state.current.color.r);
         }
     }
 
@@ -376,32 +376,32 @@ GLvoid DoEvalCoord1(__GLcontext *gc, GLfloat u)
     {
         DoDomain1(&em, u, &eval[__GL_T4], &__GL_ACTIVE_TEXCOORD(gc).f.x,
             evalData[__GL_T4]);
-        (*gc->currentImmediateTable->TexCoord4fv)(gc ,&__GL_ACTIVE_TEXCOORD(gc).f.x);
+        (*gc->immedModeDispatch.TexCoord4fv)(gc ,&__GL_ACTIVE_TEXCOORD(gc).f.x);
     }
     else if (gc->state.enables.eval.map1[__GL_T3])
     {
         DoDomain1(&em, u, &eval[__GL_T3], &__GL_ACTIVE_TEXCOORD(gc).f.x,
             evalData[__GL_T3]);
-        (*gc->currentImmediateTable->TexCoord3fv)(gc ,&__GL_ACTIVE_TEXCOORD(gc).f.x);
+        (*gc->immedModeDispatch.TexCoord3fv)(gc ,&__GL_ACTIVE_TEXCOORD(gc).f.x);
     }
     else if (gc->state.enables.eval.map1[__GL_T2])
     {
         DoDomain1(&em, u, &eval[__GL_T2], &__GL_ACTIVE_TEXCOORD(gc).f.x,
             evalData[__GL_T2]);
-        (*gc->currentImmediateTable->TexCoord2fv)(gc ,&__GL_ACTIVE_TEXCOORD(gc).f.x);
+        (*gc->immedModeDispatch.TexCoord2fv)(gc ,&__GL_ACTIVE_TEXCOORD(gc).f.x);
     }
     else if (gc->state.enables.eval.map1[__GL_T1])
     {
         DoDomain1(&em, u, &eval[__GL_T1], &__GL_ACTIVE_TEXCOORD(gc).f.x,
             evalData[__GL_T1]);
-        (*gc->currentImmediateTable->TexCoord1fv)(gc ,&__GL_ACTIVE_TEXCOORD(gc).f.x);
+        (*gc->immedModeDispatch.TexCoord1fv)(gc ,&__GL_ACTIVE_TEXCOORD(gc).f.x);
     }
 
     if (gc->state.enables.eval.map1[__GL_N3])
     {
         DoDomain1(&em, u, &eval[__GL_N3], &gc->state.current.normal.f.x,
             evalData[__GL_N3]);
-        (*gc->currentImmediateTable->Normal3fv)(gc ,&gc->state.current.normal.f.x);
+        (*gc->immedModeDispatch.Normal3fv)(gc ,&gc->state.current.normal.f.x);
     }
 
     if (gc->state.enables.eval.map1[__GL_V4])
@@ -409,14 +409,14 @@ GLvoid DoEvalCoord1(__GLcontext *gc, GLfloat u)
         __GLcoord vvec;
 
         DoDomain1(&em, u, &eval[__GL_V4], &vvec.f.x, evalData[__GL_V4]);
-        (*gc->currentImmediateTable->Vertex4fv)(gc ,&vvec.f.x);
+        (*gc->immedModeDispatch.Vertex4fv)(gc ,&vvec.f.x);
     }
     else if (gc->state.enables.eval.map1[__GL_V3])
     {
         __GLcoord vvec;
 
         DoDomain1(&em, u, &eval[__GL_V3], &vvec.f.x, evalData[__GL_V3]);
-        (*gc->currentImmediateTable->Vertex3fv)(gc ,&vvec.f.x);
+        (*gc->immedModeDispatch.Vertex3fv)(gc ,&vvec.f.x);
     }
     if (restorecolor0)
     {
@@ -600,7 +600,7 @@ GLvoid DoEvalCoord2(__GLcontext *gc, GLfloat u, GLfloat v,
                 evalData[__GL_V4]);
             ComputeFirstPartials(&vvec.f.x, du, dv);
             ComputeNormal2(gc, &vnormal.f.x, du, dv);
-            (*gc->currentImmediateTable->Normal3fv)(gc ,&vnormal.f.x);
+            (*gc->immedModeDispatch.Normal3fv)(gc ,&vnormal.f.x);
             if (changes)
             {
                 changes->changed |= CHANGE_NORMAL | CHANGE_VERTEX4;
@@ -616,7 +616,7 @@ GLvoid DoEvalCoord2(__GLcontext *gc, GLfloat u, GLfloat v,
             DoDomain2WithDerivs(&em, u, v, &eval[__GL_V3], &vvec.f.x, du, dv,
                 evalData[__GL_V3]);
             ComputeNormal2(gc, &vnormal.f.x, du, dv);
-            (*gc->currentImmediateTable->Normal3fv)(gc ,&vnormal.f.x);
+            (*gc->immedModeDispatch.Normal3fv)(gc ,&vnormal.f.x);
             if (changes)
             {
                 changes->changed |= CHANGE_NORMAL | CHANGE_VERTEX3;
@@ -632,7 +632,7 @@ GLvoid DoEvalCoord2(__GLcontext *gc, GLfloat u, GLfloat v,
         {
             DoDomain2(&em, u, v, &eval[__GL_N3], &vnormal.f.x,
                 evalData[__GL_N3]);
-            (*gc->currentImmediateTable->Normal3fv)(gc ,&vnormal.f.x);
+            (*gc->immedModeDispatch.Normal3fv)(gc ,&vnormal.f.x);
             if (changes)
             {
                 changes->changed |= CHANGE_NORMAL;
@@ -670,7 +670,7 @@ GLvoid DoEvalCoord2(__GLcontext *gc, GLfloat u, GLfloat v,
             __GLcolor color = gc->state.current.color;
 
             DoDomain2(&em, u, v, &eval[__GL_C4], &color.r, evalData[__GL_C4]);
-            (*gc->currentImmediateTable->Color4fv)(gc, &color.r);
+            (*gc->immedModeDispatch.Color4fv)(gc, &color.r);
             if (changes)
             {
                 changes->changed |= CHANGE_COLOR;
@@ -684,7 +684,7 @@ GLvoid DoEvalCoord2(__GLcontext *gc, GLfloat u, GLfloat v,
     {
         DoDomain2(&em, u, v, &eval[__GL_T4], &__GL_ACTIVE_TEXCOORD(gc).f.x,
             evalData[__GL_T4]);
-        (*gc->currentImmediateTable->TexCoord4fv)(gc ,&texcoord.f.x);
+        (*gc->immedModeDispatch.TexCoord4fv)(gc ,&texcoord.f.x);
         if (changes)
         {
             changes->changed |= CHANGE_TEXTURE;
@@ -695,7 +695,7 @@ GLvoid DoEvalCoord2(__GLcontext *gc, GLfloat u, GLfloat v,
     {
         DoDomain2(&em, u, v, &eval[__GL_T3], &texcoord.f.x,
             evalData[__GL_T3]);
-        (*gc->currentImmediateTable->TexCoord3fv)(gc ,&texcoord.f.x);
+        (*gc->immedModeDispatch.TexCoord3fv)(gc ,&texcoord.f.x);
         if (changes)
         {
             changes->changed |= CHANGE_TEXTURE;
@@ -706,7 +706,7 @@ GLvoid DoEvalCoord2(__GLcontext *gc, GLfloat u, GLfloat v,
     {
         DoDomain2(&em, u, v, &eval[__GL_T2], &texcoord.f.x,
             evalData[__GL_T2]);
-                (*gc->currentImmediateTable->TexCoord2fv)(gc ,&texcoord.f.x);
+                (*gc->immedModeDispatch.TexCoord2fv)(gc ,&texcoord.f.x);
         if (changes)
         {
             changes->changed |= CHANGE_TEXTURE;
@@ -717,7 +717,7 @@ GLvoid DoEvalCoord2(__GLcontext *gc, GLfloat u, GLfloat v,
     {
         DoDomain2(&em, u, v, &eval[__GL_T1], &texcoord.f.x,
             evalData[__GL_T1]);
-        (*gc->currentImmediateTable->TexCoord1fv)(gc ,&texcoord.f.x);
+        (*gc->immedModeDispatch.TexCoord1fv)(gc ,&texcoord.f.x);
         if (changes)
         {
             changes->changed |= CHANGE_TEXTURE;
@@ -727,11 +727,11 @@ GLvoid DoEvalCoord2(__GLcontext *gc, GLfloat u, GLfloat v,
 
     if (vertexType == 3)
     {
-        (*gc->currentImmediateTable->Vertex3fv)(gc ,&vvec.f.x);
+        (*gc->immedModeDispatch.Vertex3fv)(gc ,&vvec.f.x);
     }
     else if (vertexType == 4)
     {
-        (*gc->currentImmediateTable->Vertex4fv)(gc ,&vvec.f.x);
+        (*gc->immedModeDispatch.Vertex4fv)(gc ,&vvec.f.x);
     }
 }
 
@@ -787,12 +787,12 @@ GLvoid __glEvalMesh1Line(__GLcontext *gc, GLint low, GLint high)
     ** multiplication instead of iterative adding done to prevent
     ** accumulation of error.
     */
-    (*gc->currentImmediateTable->Begin)(gc ,GL_LINE_STRIP);
+    (*gc->immedModeDispatch.Begin)(gc ,GL_LINE_STRIP);
     for (i = low; i <= high ; i++)
     {
         DoEvalCoord1(gc, (i == u->n) ? u->finish : (u->start + i * du));
     }
-    (*gc->currentImmediateTable->End)(gc);
+    (*gc->immedModeDispatch.End)(gc);
 
     gc->state.current.color = currentColor;
     gc->state.current.normal = currentNormal;
@@ -819,12 +819,12 @@ GLvoid __glEvalMesh1Point(__GLcontext *gc, GLint low, GLint high)
     ** multiplication instead of iterative adding done to prevent
     ** accumulation of error.
     */
-    (*gc->currentImmediateTable->Begin)(gc ,GL_POINTS);
+    (*gc->immedModeDispatch.Begin)(gc ,GL_POINTS);
     for (i = low; i <= high ; i++)
     {
         DoEvalCoord1(gc, (i == u->n) ? u->finish : (u->start + i * du));
     }
-    (*gc->currentImmediateTable->End)(gc);
+    (*gc->immedModeDispatch.End)(gc);
 
     gc->state.current.color = currentColor;
     gc->state.current.normal = currentNormal;
@@ -836,25 +836,25 @@ GLvoid sendChange(__GLcontext *gc, StateChange *change)
     if (change->changed & CHANGE_COLOR)
     {
         gc->state.current.color = change->color;
-        (*gc->currentImmediateTable->Color4fv)(gc, &change->color.r);
+        (*gc->immedModeDispatch.Color4fv)(gc, &change->color.r);
     }
     if (change->changed & CHANGE_TEXTURE)
     {
         __GL_ACTIVE_TEXCOORD(gc) = change->texture;
-        (*gc->currentImmediateTable->TexCoord4fv)(gc, &change->texture.f.x);
+        (*gc->immedModeDispatch.TexCoord4fv)(gc, &change->texture.f.x);
     }
     if (change->changed & CHANGE_NORMAL)
     {
         gc->state.current.normal = change->normal;
-        (*gc->currentImmediateTable->Normal3fv)(gc, &change->normal.f.x);
+        (*gc->immedModeDispatch.Normal3fv)(gc, &change->normal.f.x);
     }
     if (change->changed & CHANGE_VERTEX3)
     {
-        (*gc->currentImmediateTable->Vertex3fv)(gc, &change->vertex.f.x);
+        (*gc->immedModeDispatch.Vertex3fv)(gc, &change->vertex.f.x);
     }
     else if (change->changed & CHANGE_VERTEX4)
     {
-        (*gc->currentImmediateTable->Vertex4fv)(gc, &change->vertex.f.x);
+        (*gc->immedModeDispatch.Vertex4fv)(gc, &change->vertex.f.x);
     }
 
 
@@ -892,7 +892,7 @@ GLvoid __glEvalMesh2Fill(__GLcontext *gc, GLint lowU, GLint lowV,
     {
         GLfloat u1 = (i == u->n) ? u->finish : (u->start + i * du);
         GLfloat u2 = ((i+1) == u->n) ? u->finish : (u->start + (i+1) * du);
-        (*gc->currentImmediateTable->Begin)(gc, GL_QUAD_STRIP);
+        (*gc->immedModeDispatch.Begin)(gc, GL_QUAD_STRIP);
         row=0;
         for (j = highV; j >= lowV; j--)
         {
@@ -921,7 +921,7 @@ GLvoid __glEvalMesh2Fill(__GLcontext *gc, GLint lowU, GLint lowV,
             row++;
 
         }
-        (*gc->currentImmediateTable->End)(gc);
+        (*gc->immedModeDispatch.End)(gc);
     }
 
     gc->state.current.color = currentColor;
@@ -948,7 +948,7 @@ GLvoid __glEvalMesh2Point(__GLcontext *gc, GLint lowU, GLint lowV,
     currentNormal = gc->state.current.normal;
     currentTexture = __GL_ACTIVE_TEXCOORD(gc);
 
-    (*gc->currentImmediateTable->Begin)(gc, GL_POINTS);
+    (*gc->immedModeDispatch.Begin)(gc, GL_POINTS);
     for (i = lowU; i <= highU; i++)
     {
         GLfloat u1 = (i == u->n) ? u->finish : (u->start + i * du);
@@ -959,7 +959,7 @@ GLvoid __glEvalMesh2Point(__GLcontext *gc, GLint lowU, GLint lowV,
             DoEvalCoord2(gc, u1, v1, NULL);
         }
     }
-    (*gc->currentImmediateTable->End)(gc);
+    (*gc->immedModeDispatch.End)(gc);
 
     gc->state.current.color = currentColor;
     gc->state.current.normal = currentNormal;
@@ -999,7 +999,7 @@ GLvoid __glEvalMesh2Line(__GLcontext *gc, GLint lowU, GLint lowV,
             GLfloat v1 = (j == v->n) ? v->finish : (v->start + j * dv);
             GLfloat v2 = ((j+1) == v->n) ? v->finish : (v->start + (j+1)*dv);
 
-            (*gc->currentImmediateTable->Begin)(gc, GL_LINE_STRIP);
+            (*gc->immedModeDispatch.Begin)(gc, GL_LINE_STRIP);
             if (j != highV)
             {
                 if (row < MAX_WIDTH-1)
@@ -1035,7 +1035,7 @@ GLvoid __glEvalMesh2Line(__GLcontext *gc, GLint lowU, GLint lowV,
                 DoEvalCoord2(gc, u1, v1, NULL);
                 DoEvalCoord2(gc, u2, v1, NULL);
             }
-            (*gc->currentImmediateTable->End)(gc);
+            (*gc->immedModeDispatch.End)(gc);
             row++;
         }
     }
@@ -1045,7 +1045,7 @@ GLvoid __glEvalMesh2Line(__GLcontext *gc, GLint lowU, GLint lowV,
     */
     row--;
     u1 = (i == u->n) ? u->finish : (u->start + i * du);
-    (*gc->currentImmediateTable->Begin)(gc, GL_LINE_STRIP);
+    (*gc->immedModeDispatch.Begin)(gc, GL_LINE_STRIP);
     for (j = highV; j >= lowV; j--)
     {
         GLfloat v1 = (j == v->n) ? v->finish : (v->start + j * dv);
@@ -1061,7 +1061,7 @@ GLvoid __glEvalMesh2Line(__GLcontext *gc, GLint lowU, GLint lowV,
 
         row--;
     }
-    (*gc->currentImmediateTable->End)(gc);
+    (*gc->immedModeDispatch.End)(gc);
 
     gc->state.current.color = currentColor;
     gc->state.current.normal = currentNormal;

@@ -1,0 +1,139 @@
+__kernel void gpuL2Pooling_NoPadFP32
+    (
+    __read_only     image2d_array_t input,
+    int             kernelX,
+    int             kernelY,
+    int             strideX,
+    int             strideY,
+    __write_only    image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    float sum = 0.0;
+    float4 tmp = {0.0}, dst = {0.0};
+    int i, j, count = 0;
+
+    for (j = 0; j < kernelY; j++)
+    {
+        for (i = 0; i < kernelX; i++)
+        {
+            tmp = read_imagef(input, (int4)(x*strideX+i, y*strideY+j, z, 0));
+            sum += tmp.x * tmp.x;
+            count++;
+        }
+    }
+
+    dst.x = sqrt(sum/count);
+    write_imagef(output, (int4)(x, y, z, 0), dst);
+}
+
+__kernel void gpuL2Pooling_NoPadQuant8
+    (
+    __read_only     image2d_array_t input,
+    int             kernelX,
+    int             kernelY,
+    int             strideX,
+    int             strideY,
+    float           scaleIn,
+    float           scaleOut,
+    int             zpIn,
+    int             zpOut,
+    __write_only    image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    float sum = 0.0, tmpOut = 0.0;
+    uint4 tmp = {0.0}, dst = {0.0};
+    int i, j, count = 0;
+
+    for (j = 0; j < kernelY; j++)
+    {
+        for (i = 0; i < kernelX; i++)
+        {
+            tmp = read_imageui(input, (int4)(x*strideX+i, y*strideY+j, z, 0));
+            tmpOut = (convert_int(tmp.x-zpIn))*scaleIn;
+            sum += tmpOut * tmpOut;
+            count++;
+        }
+    }
+
+    sum = sqrt(sum/count);
+    dst.x = floor(sum*scaleOut + zpOut + 0.5);
+    write_imageui(output, (int4)(x, y, z, 0), dst);
+}
+
+__kernel void gpuL2Pooling_FP32
+    (
+    __read_only     image2d_array_t input,
+    int             kernelX,
+    int             kernelY,
+    int             strideX,
+    int             strideY,
+    int             padX,
+    int             padY,
+    __write_only    image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    float sum = 0.0;
+    float4 tmp = {0.0}, dst = {0.0};
+    int i, j, count = 0;
+
+    for (j = 0; j < kernelY; j++)
+    {
+        for (i = 0; i < kernelX; i++)
+        {
+            tmp = read_imagef(input, (int4)(x*strideX+i-padX, y*strideY+j-padY, z, 0));
+            sum += tmp.x * tmp.x;
+            count++;
+        }
+    }
+
+    dst.x = sqrt(sum/count);
+    write_imagef(output, (int4)(x, y, z, 0), dst);
+}
+
+__kernel void gpuL2Pooling_NoPadQuant8
+    (
+    __read_only     image2d_array_t input,
+    int             kernelX,
+    int             kernelY,
+    int             strideX,
+    int             strideY,
+    int             padX,
+    int             padY,
+    float           scaleIn,
+    float           scaleOut,
+    int             zpIn,
+    int             zpOut,
+    __write_only    image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    float sum = 0.0, tmpOut = 0.0;
+    uint4 tmp = {0.0}, dst = {0.0};
+    int i, j, count = 0;
+
+    for (j = 0; j < kernelY; j++)
+    {
+        for (i = 0; i < kernelX; i++)
+        {
+            tmp =read_imageui(input, (int4)(x*strideX+i-padX, y*strideY+j-padY, z, 0));
+            tmpOut = (convert_int(tmp.x-zpIn))*scaleIn;
+            sum += tmpOut * tmpOut;
+            count++;
+        }
+    }
+
+    sum = sqrt(sum/count);
+    dst.x = floor(sum*scaleOut + zpOut + 0.5);
+    write_imageui(output, (int4)(x, y, z, 0), dst);
+}

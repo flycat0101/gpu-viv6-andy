@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -218,7 +218,7 @@ VkResult __vki_DisplayWin32SwapChainImage(
         mask[2] = 0x000000FF;
         break;
 
-    case __VK_FORMAT_A4R4G4B4_UNFORM_PACK16:
+    case __VK_FORMAT_A4R4G4B4_UNORM_PACK16:
         mask[0] = 0x00000F00;
         mask[1] = 0x000000F0;
         mask[2] = 0x0000000F;
@@ -366,7 +366,8 @@ static VkResult __vki_PresentSwapChainImage(
             sc->cmdBuf,
             &srcRes,
             &dstRes,
-            VK_FALSE
+            VK_FALSE,
+            VK_FILTER_NEAREST
             ));
 
         srcRes.u.img.subRes.arrayLayer++;
@@ -387,7 +388,6 @@ static VkResult __vki_PresentSwapChainImage(
         VK_NULL_HANDLE
         ));
 
-#if __VK_NEW_DEVICE_QUEUE
     {
         gcsHAL_INTERFACE iface;
 
@@ -407,25 +407,6 @@ static VkResult __vki_PresentSwapChainImage(
 
         __VK_ONERROR(__vk_QueueCommitEvents((__vkDevQueue *)queue, VK_FALSE));
     }
-#else
-    /* Signal buffer swap complete */
-    __VK_ONERROR(gcoHAL_ScheduleSignal(
-        sc->imageBuffers[imageIndex].signal,
-        gcvNULL,
-        gcmPTR2INT32(gcoOS_GetCurrentProcessID()),
-        gcvKERNEL_PIXEL
-        ));
-
-    /* Signal to wake up thread */
-    __VK_ONERROR(gcoHAL_ScheduleSignal(
-        sc->presentQueue.threadStart,
-        gcvNULL,
-        gcmPTR2INT32(gcoOS_GetCurrentProcessID()),
-        gcvKERNEL_PIXEL
-        ));
-
-    __VK_ONERROR(gcoHAL_Commit(gcvNULL, gcvFALSE));
-#endif
 
      gcmDUMP(gcvNULL,
             "@[swap 0x%08X %dx%d +%u]",

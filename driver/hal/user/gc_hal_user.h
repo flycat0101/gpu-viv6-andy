@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -436,6 +436,13 @@ gco3D_ClearHzTileStatus(
 
 #endif /* gcdENABLE_3D */
 
+#if gcdUSE_VX && gcdENABLE_3D
+
+gceSTATUS gcoVX_Construct(OUT gcoVX *VXObj);
+
+gceSTATUS gcoVX_Destroy(IN gcoVX VXObj);
+#endif
+
 /******************************************************************************\
 ******************************* gcoHARDWARE Object ******************************
 \******************************************************************************/
@@ -451,6 +458,18 @@ gcoHARDWARE_Construct(
     IN gctBOOL Robust,
     OUT gcoHARDWARE * Hardware
     );
+
+gceSTATUS
+gcoHARDWARE_ConstructEx(
+    IN gcoHAL Hal,
+    IN gctBOOL ThreadDefault,
+    IN gctBOOL Robust,
+    IN gceHARDWARE_TYPE Type,
+    IN gctUINT32    AttachGpuCount,
+    IN gctUINT32    CoreIndexs[],
+    OUT gcoHARDWARE * Hardware
+    );
+
 
 /* Destroy an gcoHARDWARE object. */
 gceSTATUS
@@ -481,12 +500,6 @@ gcoHARDWARE_IsFeatureAvailable(
     IN gceFEATURE Feature
     );
 
-gceSTATUS
-gcoHARDWARE_IsSwwaNeeded(
-    IN gcoHARDWARE Hardware,
-    IN gceSWWA Swwa
-    );
-
 /* Query command buffer requirements. */
 gceSTATUS
 gcoHARDWARE_QueryCommandBuffer(
@@ -496,7 +509,6 @@ gcoHARDWARE_QueryCommandBuffer(
     OUT gctUINT32 * ReservedHead,
     OUT gctUINT32 * ReservedTail,
     OUT gctUINT32 * ReservedUser,
-    OUT gceCMDBUF_SOURCE * Source,
     OUT gctUINT32 * MGPUModeSwitchBytes
     );
 
@@ -577,6 +589,14 @@ gcoHARDWARE_LoadCtrlStateNEW_GPU0(
     INOUT gctPOINTER *Memory
     );
 
+gceSTATUS
+gcoHARDWARE_McfeSemapore(
+    IN gcoHARDWARE Hardware,
+    IN gctUINT32 SemaHandle,
+    IN gctBOOL SendSema,
+    INOUT gctPOINTER *Memory
+    );
+
 /* Load a number of load states in fixed-point (3D pipe). */
 gceSTATUS
 gcoHARDWARE_LoadStateX(
@@ -584,6 +604,12 @@ gcoHARDWARE_LoadStateX(
     IN gctUINT32 Address,
     IN gctUINT32 Count,
     IN gctPOINTER States
+    );
+
+gceSTATUS
+gcoHARDWARE_McfeSubmitJob(
+    IN gcoHARDWARE Hardware,
+    IN gctPOINTER *Memory
     );
 #endif
 
@@ -640,29 +666,9 @@ gcoHARDWARE_MultiGPUSync(
 );
 
 gceSTATUS
-gcoHARDWARE_MultiGPUSyncEx(
-    IN gcoHARDWARE Hardware,
-    OUT gctUINT32_PTR *Memory
-);
-
-gceSTATUS gcoHARDWARE_MultiGPUSyncV2(
-    IN gcoHARDWARE Hardware,
-    IN gctUINT32 GPUCount,
-    IN gctUINT_PTR ChipIDs,
-    OUT gctUINT32_PTR *Memory
-);
-
-gceSTATUS gcoHARDWARE_MultiGPUSyncV3(
-    IN gcoHARDWARE Hardware,
-    IN gctUINT32 GPUCount,
-    IN gctUINT_PTR ChipIDs,
-    OUT gctUINT32_PTR *Memory
-);
-
-gceSTATUS
 gcoHARDWARE_MultiGPUCacheFlush(
     IN gcoHARDWARE Hardware,
-    OUT gctUINT32_PTR *Memory
+    INOUT gctUINT32_PTR *Memory
     );
 
 gceSTATUS
@@ -677,15 +683,6 @@ gcoHARDWARE_LoadProgram(
     IN gcoHARDWARE Hardware,
     IN gcePROGRAM_STAGE_BIT StageBits,
     IN gctPOINTER ProgramState
-    );
-
-
-gceSTATUS
-gcoHARDWARE_LoadKernel(
-    IN gcoHARDWARE Hardware,
-    IN gctSIZE_T StateBufferSize,
-    IN gctPOINTER StateBuffer,
-    IN gcsHINT_PTR Hints
     );
 
 /* Resolve. */
@@ -724,6 +721,33 @@ gcoHARDWARE_PreserveRects(
     IN gcsRECT Rects[],
     IN gctUINT RectCount
     );
+
+gceSTATUS
+gcoHARDWARE_SelectChannel(
+    IN gcoHARDWARE Hardware,
+    IN gctBOOL Priority,
+    IN gctUINT32 ChannelId
+    );
+
+gceSTATUS
+gcoHARDWARE_GetChannelInfo(
+    IN gcoHARDWARE Hardware,
+    OUT gctBOOL *Priority,
+    OUT gctUINT32 *ChannelId
+    );
+
+gceSTATUS
+gcoHARDWARE_AllocateMcfeSemaphore(
+    IN gcoHARDWARE Hardware,
+    OUT gctUINT32 * SemaHandle
+    );
+
+gceSTATUS
+gcoHARDWARE_FreeMcfeSemaphore(
+    IN gcoHARDWARE Hardware,
+    IN gctUINT32 SemaHandle
+    );
+
 #endif /* gcdENABLE_3D */
 
 /* Query tile sizes. */
@@ -1070,6 +1094,15 @@ gcoHARDWARE_QueryCoreIndex(
     IN gcoHARDWARE Hardware,
     IN gctUINT32 CoreID,
     OUT gctUINT32 *CoreIndex
+    );
+
+gceSTATUS
+gcoHARDWARE_QueryCluster(
+    IN gcoHARDWARE Hardware,
+    OUT gctINT32   *ClusterMinID,
+    OUT gctINT32   *ClusterMaxID,
+    OUT gctUINT32  *ClusterCount,
+    OUT gctUINT32  *ClusterIDWidth
     );
 
 gceSTATUS
@@ -2581,10 +2614,8 @@ gcoHARDWARE_WaitFence(
     );
 
 gceSTATUS
-gcoHARDWARE_OnIssueFence(
-    IN gcoHARDWARE Hardware,
-    IN gceENGINE engine
-    );
+gcoHARDWARE_OnIssueFence( IN gcoHARDWARE Hardware,
+                          IN gceENGINE engine);
 
 gceSTATUS
 gcoHARDWARE_SendFence(
@@ -2602,18 +2633,18 @@ gcoHARDWARE_GetFence(
     IN gceFENCE_TYPE Type
     );
 
+gceSTATUS
+gcoHARDWARE_GetFenceEnabled(
+    IN gcoHARDWARE Hardware,
+    OUT gctBOOL_PTR Enabled
+    );
+
 gctBOOL
 gcoHARDWARE_IsFenceBack(
     IN gcoHARDWARE Hardware,
     IN gcsSYNC_CONTEXT_PTR Ctx,
     IN gceENGINE Engine,
     IN gceFENCE_TYPE Type
-    );
-
-gceSTATUS
-gcoHARDWARE_GetFenceEnabled(
-    IN gcoHARDWARE Hardware,
-    OUT gctBOOL_PTR Enabled
     );
 
 gceSTATUS
@@ -2629,7 +2660,6 @@ gcoHARDWARE_AppendFence(
     IN gceENGINE Engine,
     IN gceFENCE_TYPE Type
     );
-
 #endif
 
 gceSTATUS
@@ -2760,7 +2790,7 @@ typedef enum _gceVX_KERNEL
 
     gcvVX_KERNEL_SCHARR_3x3,
     gcvVX_KERNEL_ELEMENTWISE_NORM,
-    gcvVX_KERNEL_NONMAXSUPPRESSION,
+    gcvVX_KERNEL_NONMAXSUPPRESSION_CANNY,
     gcvVX_KERNEL_EUCLIDEAN_NONMAXSUPPRESSION,
     gcvVX_KERNEL_EDGE_TRACE,
     gcvVX_KERNEL_IMAGE_LISTER,
@@ -2875,52 +2905,102 @@ typedef struct _vx_evis_no_inst_struct
     gctBOOL accsq8Output;
     gctBOOL noBilinear;
     gctBOOL isVX2;
+    gctBOOL supportEVIS;
 }
 vx_evis_no_inst_s;
 
 typedef struct _vx_nn_config
 {
-    gctBOOL isSet;
-    gctUINT nnMadPerCore;
-    gctUINT nnCoreCount;
-    gctUINT nnInputBufferDepth;
-    gctUINT nnAccumBufferDepth;
-    gctUINT nnDPAmount;
-    gctUINT nnL2CacheSize;
-    gctUINT nnUSCCacheSize;
-    gctUINT vipSRAMSize;
-    gctUINT vipSRAMRemapAddress;
-    gctUINT tpCoreCount;
-    gctUINT tpPwlLUTCount;
-    gctUINT tpPwlLUTSize;
+    gctBOOL  isSet;
+    gcsNN_FIXED_FEATURE      fixedFeature;
+    gcsNN_CUSTOMIZED_FEATURE customizedFeature;
+    gcsNN_UNIFIED_FEATURE    unifiedFeature;
+    gcsNN_DERIVED_FEATURE    derivedFeature;
 }
 vx_nn_config;
 
 typedef struct _vx_drv_option
 {
-#define TP_FUNC_MAX 16
     gctUINT enableTP;
     gctUINT enableMultiTP;
-    gctUINT flagTPFunc[TP_FUNC_MAX];
-    gctUINT typeTPFunc[TP_FUNC_MAX];
-    gctUINT enableIdealPerf;
+    gctUINT8_PTR flagTPFunc;
+    gctUINT_PTR  typeTPFunc;
     gctUINT enableSRAM;
     gctUINT enableSramStreamMode;
     gctUINT enableCNNPerf;
     gctUINT enableBrickMode;
+    gctUINT enableNonZeroBalance;
     gctUINT enableBorderMode;
+    gctUINT enableTPReorder;
+    gctUINT enableTPInterleave8;
+    gctUINT enableTPRTNE;
+    gctUINT enableShader;
+    gctUINT enableNNXYDP9;
+    gctUINT enableNNXYDP6;
+    gctUINT enableSwtilingPhase1;
+    gctUINT enableSwtilingPhase2;
+    gctUINT enableSwtilingPhase3;
+    gctUINT enableHandleBranch; /*merge more branches to use AB Buffer for SWTiling for arch model*/
+    gctUINT enableNNFirstPixelPooling;
+    gctUINT enableNNDepthWiseSupport;
+    gctUINT enablePrintOperaTarget;
+    gctUINT enableSaveBinary;
+    gctUINT enableGraphCommandBuffer;
     gctUINT nnFormulaOpt;
-    gctFLOAT sustainedBandwidth;
+    gctFLOAT ddrLatency;
+    gctFLOAT ddrReadBWLimit;
+    gctFLOAT ddrWriteBWLimit;
+    gctFLOAT ddrTotalBWLimit;
+    gctFLOAT axiSramReadBWLimit;
+    gctFLOAT axiSramWriteBWLimit;
+    gctFLOAT axiSramTotalBWLimit;
+    gctFLOAT axiBusReadBWLimit;
+    gctFLOAT axiBusWriteBWLimit;
+    gctFLOAT axiBusTotalBWLimit;
+    gctUINT vipSRAMSizeInKB;
+    gctUINT axiSRAMSizeInKB;
     gctSTRING graphPerfLogFile;
     gctUINT nnZeroRunLen;
     gctINT  tpZeroRunLen;
-    gctUINT enableNNFCAccel;
-    gctUINT nnFCAccelThreshold;
     gctUINT enableNNArchPerfPrint;
     gctUINT enableNNLayerDump;
+    gctUINT enableInterleave8;
     gctSTRING nnRoundingMode;
     gctSTRING vxcShaderSourcePath;
     gctUINT fcZMax;
+    gctUINT enableMemPool;
+    gctUINT memPoolSize;
+#define COLLECT_PERF_RUN       0
+#define COLLECT_PERF_ESTIMATE  1
+    gctUINT collectPerfType;
+    gctUINT enableGraphAdapter;
+    gctUINT enableZdpOpt;
+    gctUINT do1xnAfterSwtiling;
+    gctUINT nn1x1To1xN;
+    gctUINT enableGraphTranform;
+    gctUINT enableGraphWAR7;
+    gctUINT enableGraphMerge;
+    gctUINT enableGraphDump;
+    gctUINT enableTransformNMConv;
+    gctUINT enableGraphConvertAvgPool2Conv;
+    gctUINT enableGraphUnrollDWConv;
+    gctUINT enableGraphOptimizationToTest;
+    gctUINT enableGraphConvertBatchFC2NNConv;
+    gctUINT enableGraphConvertTensorAdd;
+    gctUINT enableGraphConvertConv2Fc;
+    gctUINT enableGraphSwaplayer;
+    gctUINT enableGraphReshapelayer;
+    gctUINT enableGraphConcalayer;
+    gctUINT freqInMHZ;
+    gctUINT axiClockFreqInMHZ;
+    gctUINT maxSocOTNumber;
+    gctUINT enableHuffmanEnhancement;
+    gctUINT enableTPHuffman;
+    gctUINT enableMultiVIPCombined;
+    gctUINT enableVectorPrune;
+    gctUINT enableYUV2RGBScaler;
+    gctUINT enableVIPDEC400;
+    gctUINT enableCacheGraphBinary;
 }
 vx_drv_option;
 
@@ -2928,6 +3008,7 @@ typedef union _vx_nn_cmd_info_union
 {
     struct _vx_nn_general_cmd_info
     {
+        gctUINT32 kernelAddress;
         gctUINT32 kernelXSize;
         gctUINT32 kernelYSize;
         gctUINT32 kernelZSize;
@@ -2938,21 +3019,38 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32 inImageYSize;
         gctINT32  inImageXOffset;
         gctINT32  inImageYOffset;
+        gctUINT32 inImageAddress;
+        gctUINT32 inImageXstride;
+        gctUINT32 inImageYstride;
+        gctUINT32 inImageCircularBufSize;
+        gctUINT32 inImageCircularBufEndAddrPlus1;
+
         gctUINT32 outImageXSize;
         gctUINT32 outImageYSize;
         gctUINT32 outImageZSize;
         gctUINT32 outImageTileXSize;
         gctUINT32 outImageTileYSize;
+        gctUINT32 outImageAddress;
+        gctUINT32 outImageXstride;
+        gctUINT32 outImageYstride;
+        gctUINT32 outImageCircularBufSize;
+        gctUINT32 outImageCircularBufEndAddrPlus1;
 
         gctUINT32  roundingMode;
         gctUINT32  relu;
         gctINT32   nn_layer_flush;
         gctUINT32  postMultiplier;
+        gctUINT32  postMultiplierBit6to1;
+        gctUINT32  postMultiplierBit14to7;
         gctINT32   postShift;
+        gctUINT32  postShiftBit6to5;
         gctUINT32  wSize;
         gctUINT8   kernelDataType;
         gctUINT8   inImageDataType;
         gctUINT8   outImageDataType;
+
+        gctUINT32  coefZP;
+        gctUINT32  outputZP;
 
         gctUINT8   brickMode;
         gctUINT32  brickDistance;
@@ -2965,11 +3063,25 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32 kernelPatternHigh32Bits;
         gctUINT32 kernelCacheStartAddress;
         gctUINT32 kernelCacheEndAddress;
+        gctUINT32 kernelDirectStreamFromVipSram;
         gctUINT32 imageStartAddress;
         gctUINT32 imageEndAddress;
 
+
+
+
         gctUINT32 inImageBorderMode;
-        gctINT32  imImageBorderConst;
+        gctINT32  inImageBorderConst;
+
+        gctUINT8  kernelDataTypeMsb;
+        gctUINT8  inImageDataTypeMsb;
+        gctUINT8  outImageDataTypeMsb;
+        gctUINT8  outImageCacheEvictPolicy;
+        gctUINT32 noFlush;
+        gctUINT8  hwDepthWise;
+        gctUINT8  noZOffset;
+        gctUINT8  perChannelPostMul;
+        gctUINT8  pRelu;
     }
     vx_nn_general_cmd_info;
 
@@ -3015,8 +3127,8 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32 outLoop3Reset;
         gctUINT32 outBrickMode;
         gctUINT32 aluZFilterMode;
-        gctUINT32 aluZFilterStartOverfetch;
-        gctUINT32 aluZFilterEndOverfetch;
+        gctUINT32 inWindowZStartOverfetch;
+        gctUINT32 inWindowZEndOverfetch;
         gctUINT32 aluSquarePreshift;
         gctUINT32 last;
         gctUINT32 outBaseAddress;
@@ -3041,8 +3153,27 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32 aluReluEnable;
         gctUINT32 floatRoundingMode;
         gctUINT32 integeroundingMode;
+        gctUINT32 aluReorderBitsUsed;
+        gctUINT32 aluReorderLoop2Mode;
+        gctUINT32 inImageBorderMode;
+        gctINT32  inImageBorderConst;
         gctINT32  aluInputPreshift;
         gctINT32  aluOutputPostshift;
+        gctINT32  aluOutputPostshiftBit6to5;
+        gctUINT32 inAddressOffset;
+        gctUINT32 inAddressExOffset;
+        gctUINT32 outAddressOffset;
+        gctINT32  noFlush;
+
+        gctUINT32 coefZP;
+        gctUINT32 inputZP;
+        gctUINT32 outputZP;
+        gctUINT32 aluOutputPostMultiplier;
+
+        gctUINT32 inImageCircularBufSize;
+        gctUINT32 inImageCircularBufEndAddrPlus1;
+        gctUINT32 outImageCircularBufSize;
+        gctUINT32 outImageCircularBufEndAddrPlus1;
     }
     vx_nn_tp_cmd_info;
 
@@ -3054,6 +3185,44 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32 physical;
     }
     vx_nn_image_cmd_info;
+
+    struct _vx_yuv2rgb_scaler_cmd_info
+    {
+        gctUINT32 inImageBaseY;
+        gctUINT32 inImageBaseU;
+        gctUINT32 inImageBaseV;
+        gctUINT16 inRectX;
+        gctUINT16 inRectY;
+        gctUINT16 inRectWidth;
+        gctUINT16 inRectHeight;
+        gctUINT16 inImageWidth;
+        gctUINT16 inImageHeight;
+        gctUINT16 inImageStrideY;
+        gctUINT32 outImageBaseR;
+        gctUINT32 outImageBaseG;
+        gctUINT32 outImageBaseB;
+        gctUINT16 outImageWidth;
+        gctUINT16 outImageHeight;
+        gctUINT16 outImageStride;
+        gctUINT16 outImageBitsSize;
+        gctUINT32 scaleX;
+        gctUINT32 scaleY;
+        gctUINT16 inImageInitErrX;
+        gctUINT16 inImageInitErrY;
+        gctUINT8  yOnly;
+        gctUINT8  outSigned;
+        gctUINT8  postShift;
+        gctUINT16 c0;
+        gctUINT16 c1;
+        gctUINT16 c2;
+        gctUINT16 c3;
+        gctUINT16 c4;
+        gctINT32  c5;
+        gctINT32  c6;
+        gctINT32  c7;
+        gctUINT32 outRequestCount;
+    }
+    vx_yuv2rgb_scaler_cmd_info;
 }
 vx_nn_cmd_info_u;
 
@@ -3143,6 +3312,8 @@ typedef struct _gcoVX_Hardware_Context
     gctPOINTER              *devices;
 #endif
 
+    gctBOOL             hasBarrier;
+    gctBOOL             hasAtomic;
 }
 gcoVX_Hardware_Context;
 
@@ -3165,30 +3336,46 @@ typedef enum
 }
 gceVX_ACCELERATOR_TYPE;
 
+typedef enum
+{
+   /* AXI SRAM REMAP */
+    gcvVX_OCB_REMAP           = 0,
+    /* VIP SRAM REMAP */
+    gcvVX_SRAM_REMAP          = 1,
+}
+gceVX_REMAP_TYPE;
 
 gceSTATUS
-gcoHARDWARE_CommitCmdVX(
+gcoHARDWAREVX_CommitCmd(
     IN gcoHARDWARE          Hardware,
     OUT gctPOINTER*         pCmdLogical,
     OUT gctUINT32*          pCmdBytes
     );
 
 gceSTATUS
-gcoHARDWARE_ReplayCmdVX(
+gcoHARDWAREVX_ReplayCmd(
     IN gcoHARDWARE          Hardware,
     OUT gctPOINTER          CmdLogical,
     OUT gctUINT32           CmdBytes
     );
 
 gceSTATUS
-gcoHARDWARE_BindImageVX(
+gcoHARDWAREVX_SetImageInfo(
+    IN gcoHARDWARE          Hardware,
+    IN gctUINT32            RegAddress,
+    IN gctUINT32            Physical,
+    IN gcsVX_IMAGE_INFO_PTR Info
+    );
+
+gceSTATUS
+gcoHARDWAREVX_BindImage(
     IN gcoHARDWARE          Hardware,
     IN gctUINT32            Index,
     IN gcsVX_IMAGE_INFO_PTR Info
     );
 
 gceSTATUS
-gcoHARDWARE_BindUniform(
+gcoHARDWAREVX_BindUniform(
     IN gcoHARDWARE          Hardware,
     IN gctUINT32            RegAddress,
     IN gctUINT32            Index,
@@ -3197,13 +3384,13 @@ gcoHARDWARE_BindUniform(
     );
 
 gceSTATUS
-gcoHARDWARE_InvokeThreadWalkerVX(
+gcoHARDWAREVX_InvokeThreadWalker(
     IN gcoHARDWARE                          Hardware,
     IN gcsVX_THREAD_WALKER_PARAMETERS_PTR   Parameters
     );
 
 gceSTATUS
-gcoHARDWARE_LoadKernelVX(
+gcoHARDWAREVX_LoadKernel(
     IN gcoHARDWARE          Hardware,
     IN gctUINT32            Address,
     IN gctUINT32            Size,
@@ -3227,7 +3414,9 @@ gcoHARDWAREVX_TriggerAccelerator(
     IN gctUINT32                CmdAddress,
     IN gceVX_ACCELERATOR_TYPE   Type,
     IN gctUINT32                EventId,
-    IN gctBOOL                  waitEvent
+    IN gctBOOL                  waitEvent,
+    IN gctUINT32                gpuId,
+    IN gctBOOL                  sync
 );
 
 gceSTATUS
@@ -3258,6 +3447,22 @@ gcoHARDWAREVX_WaitNNEvent(
     IN gctUINT32   EventId
 );
 
+gceSTATUS
+gcoHARDWAREVX_SetRemapAddress(
+    IN gcoHARDWARE Hardware,
+    IN gctUINT32 remapStart,
+    IN gctUINT32 remapEnd,
+    IN gceVX_REMAP_TYPE remapType
+);
+
+gceSTATUS
+gcoHARDWAREVX_YUV2RGBScale(
+    IN gcoHARDWARE Hardware,
+    IN gctPOINTER Info,
+    IN gctUINT32  gpuId,
+    IN gctBOOL    mGpuSync
+    );
+
 #if GC_VX_ASM
 gceSTATUS
 gcoHARDWAREVX_GenerateMC(
@@ -3266,13 +3471,33 @@ gcoHARDWAREVX_GenerateMC(
 #endif
 
 gceSTATUS
-gcoHARDWARE_FlushCacheVX(
+gcoHARDWAREVX_FlushCache(
     IN gcoHARDWARE          Hardware,
     IN gctBOOL              InvalidateICache,
     IN gctBOOL              FlushPSSHL1Cache,
     IN gctBOOL              FlushNNL1Cache,
     IN gctBOOL              FlushTPL1Cache
     );
+
+
+gceSTATUS
+gcoHARDWAREVX_CaptureState(
+    IN gcoHARDWARE  Hardware,
+    IN OUT gctUINT8 *CaptureBuffer,
+    IN gctUINT32 InputSizeInByte,
+    IN OUT gctUINT32 *pOutputSizeInByte,
+    IN gctBOOL Enabled,
+    IN gctBOOL dropCommandEnabled
+    );
+
+gceSTATUS
+gcoHARDWAREVX_CaptureInitState(
+    IN gcoHARDWARE Hardware,
+    IN OUT gctPOINTER CaptureBuffer,
+    IN gctUINT32 InputSizeInByte,
+    IN OUT gctUINT32 *OutputSizeInByte
+    );
+
 #endif
 
 gceSTATUS
@@ -3352,6 +3577,7 @@ typedef struct _gcsTEMPCMDBUF       * gcsTEMPCMDBUF;
 gceSTATUS
 gcoBUFFER_StartTEMPCMDBUF(
     IN gcoBUFFER Buffer,
+    IN gcoQUEUE Queue,
     OUT gcsTEMPCMDBUF *tempCMDBUF
     );
 
@@ -3424,14 +3650,66 @@ gcoBUFFER_IsEmpty(
     IN gcoBUFFER Buffer
     );
 
-#if gcdENABLE_3D
 gceSTATUS
-gcoBUFFER_InsertToPatchList(
+gcoBUFFER_SelectChannel(
     IN gcoBUFFER Buffer,
-    IN gctUINT32 handle,
-    IN gctUINT32 flag
-);
-#endif
+    IN gctBOOL Priority,
+    IN gctUINT32 ChannelId
+    );
+
+gceSTATUS
+gcoBUFFER_GetChannelInfo(
+    IN gcoBUFFER Buffer,
+    OUT gctBOOL *Priority,
+    OUT gctUINT32 *ChannelId
+    );
+
+gceSTATUS
+gcoBUFFER_AddTimestampPatch(
+    IN gcoBUFFER Buffer,
+    IN gctUINT32 Handle,
+    IN gctUINT32 Flag
+    );
+
+gceSTATUS
+gcoBUFFER_AddVidmemAddressPatch(
+    IN gcoBUFFER Buffer,
+    IN gctUINT32_PTR Logical,
+    IN gctUINT32 Handle,
+    IN gctUINT32 NodeOffset
+    );
+
+gceSTATUS
+gcoBUFFER_AddMCFESemaphorePatch(
+    IN gcoBUFFER Buffer,
+    IN gctUINT32_PTR Logica,
+    IN gctBOOL SendSema,
+    IN gctUINT32 SemaHandle
+    );
+
+gceSTATUS
+gcoBUFFER_Capture(
+    IN gcoBUFFER Buffer,
+    IN OUT gctUINT8 *CaptureBuffer,
+    IN gctUINT32 InputSizeInByte,
+    IN OUT gctUINT32 *pOutputSizeInByte,
+    IN gctBOOL Enabled,
+    IN gctBOOL dropCommandEnabled
+    );
+
+gceSTATUS
+gcoBUFFER_CaptureInitState(
+    IN gcoBUFFER Buffer,
+    IN OUT gctUINT8 *CaptureBuffer,
+    IN gctUINT32 InputSizeInByte,
+    IN OUT gctUINT32 *pOutputSizeInByte
+    );
+
+gceSTATUS
+gcoBUFFER_IsCaptureEnabled(
+    IN gcoBUFFER Buffer
+    );
+
 
 #if gcdSYNC
 typedef enum _gceFENCE_STATUS
@@ -3444,42 +3722,12 @@ gceFENCE_STATUS;
 #endif
 
 /******************************************************************************\
-******************************** gcoCMDBUF Object *******************************
-\******************************************************************************/
-
-typedef struct _gcsCOMMAND_INFO * gcsCOMMAND_INFO_PTR;
-
-/* Construct a new gcoCMDBUF object. */
-gceSTATUS
-gcoCMDBUF_Construct(
-    IN gcoOS Os,
-    IN gcoHARDWARE Hardware,
-    IN gctSIZE_T Bytes,
-    IN gcsCOMMAND_INFO_PTR Info,
-    OUT gcoCMDBUF * Buffer
-    );
-
-/* Destroy an gcoCMDBUF object. */
-gceSTATUS
-gcoCMDBUF_Destroy(
-    IN gcoHARDWARE Hardware,
-    IN gcsCOMMAND_INFO_PTR Info,
-    IN gcoCMDBUF Buffer
-    );
-
-#ifdef LINUX
-#define PENDING_FREED_MEMORY_SIZE_LIMIT     (4 * 1024 * 1024)
-#endif
-
-/******************************************************************************\
 ********************************* gcoHAL object *********************************
 \******************************************************************************/
 
 struct _gcoHAL
 {
     gcsOBJECT               object;
-
-    gcoDUMP                 dump;
 
 #if gcdFRAME_DB
     gctINT                  frameDBIndex;
@@ -3571,6 +3819,9 @@ typedef struct _gcsSURF_NODE
     /* Linear size for tile status. */
     gctSIZE_T               size;
 
+    /* CPU write to the video memory.*/
+    gctBOOL                 bCPUWrite;
+
     union _gcuSURF_NODE_LIST
     {
         /* Allocated through HAL. */
@@ -3595,7 +3846,6 @@ typedef struct _gcsSURF_NODE
 #if gcdSYNC
     gceFENCE_STATUS             fenceStatus;
     gcsSYNC_CONTEXT_PTR         fenceCtx;
-    gctPOINTER                  sharedMutex;
 #endif
 
 }
@@ -3783,7 +4033,7 @@ struct _gcoSURF
 
     /* User pointers for the surface wrapper. */
     gctPOINTER                  userLogical;
-    gctUINT32                   userPhysical;
+    gctPHYS_ADDR_T              userPhysical;
 
     /* Timestamp, indicate when surface is changed. */
     gctUINT64                   timeStamp;
@@ -4453,6 +4703,23 @@ gcoHARDWARE_ProgramUniformEx(
     );
 
 gceSTATUS
+gcoHARDWARE_BindUniformEx(
+    IN gcoHARDWARE Hardware,
+    IN gctUINT32 Address,
+    IN gctINT32 Physical,
+    IN gctUINT Columns,
+    IN gctUINT Rows,
+    IN gctUINT Arrays,
+    IN gctBOOL IsRowMajor,
+    IN gctUINT MatrixStride,
+    IN gctUINT ArrayStride,
+    IN gctCONST_POINTER Values[],
+    IN gceUNIFORMCVT Convert,
+    IN gcSHADER_KIND Type,
+    IN gctBOOL CombinedMode /* every GPU has his own uniform value*/
+    );
+
+gceSTATUS
 gcoHARDWARE_BindBufferBlock(
     IN gcoHARDWARE Hardware,
     IN gctUINT32 Address,
@@ -4575,14 +4842,30 @@ gcsSURF_NODE_IsFenceEnabled(
 gceSTATUS
 gcoHARDWARE_GetProductName(
     IN gcoHARDWARE Hardware,
-    IN OUT gctSTRING *ProductName
+    OUT gctSTRING *ProductName,
+    OUT gctUINT *PID
+    );
+
+gceSTATUS
+gcoHARDWARE_GetBaseAddr(
+    IN  gcoHARDWARE Hardware,
+    OUT gctUINT32 *BaseAddr
+    );
+
+gceSTATUS
+gcoHARDWARE_QuerySRAM(
+    IN gcoHARDWARE Hardware,
+    IN gceSRAM  Type,
+    OUT gctUINT32 *Base,
+    OUT gctUINT32 *Size
     );
 
 /******************************************************************************
 *******************************HW slot*****************************************
 *******************************************************************************/
 #if gcdENABLE_3D && gcdENABLE_KERNEL_FENCE
-typedef enum {
+typedef enum
+{
     gcvHWSLOT_INDEX,
     gcvHWSLOT_STREAM,
     gcvHWSLOT_TEXTURE,
@@ -4590,7 +4873,8 @@ typedef enum {
     gcvHWSLOT_DEPTH_STENCIL,
     gcvHWSLOT_BLT_SRC,
     gcvHWSLOT_BLT_DST,
-}gceHWSLOT_TYPE;
+}
+gceHWSLOT_TYPE;
 
 gceSTATUS
 gcoHARDWARE_SetHWSlot(
@@ -4599,20 +4883,20 @@ gcoHARDWARE_SetHWSlot(
     IN gctUINT type,
     IN gctUINT32 node,
     IN gctUINT32 slot
-);
+    );
 
 gceSTATUS
-gcoHARDWARE_BuildPatchList(
+gcoHARDWARE_BuildTimestampPatch(
     IN gcoHARDWARE Hardware,
     IN gcoBUFFER Buffer,
     IN gcoCMDBUF CommandBuffer,
     IN gceENGINE Engine
-);
+    );
 
 gceSTATUS
 gcoHARDWARE_ResetHWSlot(
     IN gcoHARDWARE Hardware
-);
+    );
 #endif
 
 /******************************************************************************
@@ -4874,6 +5158,7 @@ extern const gcsSAMPLES g_sampleInfos[];
 extern gctPOINTER dumpMemInfoListMutex;
 extern gctBOOL    dump2DFlag;
 #endif
+
 
 #ifdef __cplusplus
 }

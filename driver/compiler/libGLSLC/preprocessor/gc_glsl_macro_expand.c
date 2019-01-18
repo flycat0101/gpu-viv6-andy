@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -140,7 +140,7 @@ ppoPREPROCESSOR_MacroExpand(
 
     status = sloCOMPILER_Allocate(
         PP->compiler,
-        sizeof(ppoTOKEN)*2*(ms->argc),
+        sizeof(ppoTOKEN)*ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG*(ms->argc),
         &pointer
         );
 
@@ -149,14 +149,14 @@ ppoPREPROCESSOR_MacroExpand(
 
     headtail = pointer;
 
-    gcoOS_MemFill((gctPOINTER)headtail, 0, sizeof(ppoTOKEN) * 2 * (ms->argc));
+    gcoOS_MemFill((gctPOINTER)headtail, 0, sizeof(ppoTOKEN) * ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG * (ms->argc));
 
     gcmONERROR(sloCOMPILER_Allocate(
         PP->compiler,
-        sizeof(ppoTOKEN)*2*(ms->argc),
+        sizeof(ppoTOKEN)*ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG*(ms->argc),
         (void*)&expanded_headtail));
 
-    gcoOS_MemFill((gctPOINTER)expanded_headtail, 0, sizeof(ppoTOKEN) * 2 * (ms->argc));
+    gcoOS_MemFill((gctPOINTER)expanded_headtail, 0, sizeof(ppoTOKEN) * ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG * (ms->argc));
 
     gcmONERROR(
         ppoPREPROCESSOR_MacroExpand_5_BufferRealArgs(PP, IS, headtail, id, ms)
@@ -172,14 +172,14 @@ ppoPREPROCESSOR_MacroExpand(
 
     for (i = 0; i < ms->argc; i++)
     {
-        if (headtail[i *2] == headtail[i *2 + 1])
+        if (headtail[i * ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG] == headtail[i *ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG + 1])
         {
-            gcmONERROR(ppoTOKEN_Destroy(PP, headtail[i *2 + 1]));
+            gcmONERROR(ppoTOKEN_Destroy(PP, headtail[i *ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG + 1]));
         }
         else
         {
-            ppoTOKEN ntoken = (ppoTOKEN)(headtail[i *2 + 1]->inputStream.base.node.next);
-            ppoTOKEN nhead = headtail[i *2 + 1];
+            ppoTOKEN ntoken = (ppoTOKEN)(headtail[i *ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG + 1]->inputStream.base.node.next);
+            ppoTOKEN nhead = headtail[i *ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG + 1];
 
             while(nhead)
             {
@@ -940,6 +940,11 @@ ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList(
     gctBOOL pasting = gcvFALSE;
 
     gctBOOL supportPasting = gcvFALSE;
+
+    if (sloCOMPILER_GetClientApiVersion(PP->compiler) == gcvAPI_OPENGL)
+    {
+        supportPasting = gcvTRUE;
+    }
 
     gcmTRACE(gcvLEVEL_VERBOSE, "ME : begin to expand replacement-list.");
 

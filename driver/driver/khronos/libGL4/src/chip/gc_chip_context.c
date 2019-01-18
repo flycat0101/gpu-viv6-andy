@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -160,7 +160,7 @@ gcChipConstructChipName(
     *ChipName++ = 'e';
     *ChipName++ = ' ';
 
-    gcmONERROR(gcoHAL_GetProductName(chipCtx->hal, &productName));
+    gcmONERROR(gcoHAL_GetProductName(chipCtx->hal, &productName, gcvNULL));
 
     gcoOS_StrCatSafe(chipCtx->chipName, __GL_CHIP_NAME_LEN , productName);
 
@@ -316,6 +316,8 @@ gcChipInitDevicePipeline(
     gc->dp.bufferData = __glChipBufferData;
     gc->dp.bufferSubData = __glChipBufferSubData;
     gc->dp.copyBufferSubData = __glChipCopyBufferSubData;
+    gc->dp.getBufferSubData = __glChipGetBufferSubData;
+
 
     /* FBO */
     gc->dp.bindDrawFramebuffer = __glChipBindDrawFramebuffer;
@@ -409,7 +411,6 @@ gcChipInitDevicePipeline(
     gc->dp.copyPixels = __glChipCopyPixels;
     gc->dp.createAccumBufferInfo = __glChipCreateAccumBufferInfo;
     gc->dp.bindFragDataLocation = __glChipBindFragDataLocation;
-    gc->dp.mapBuffer = __glChiptMapBufferObject;
     gc->dp.accum = __glChipAccum;
     gc->dp.getCompressedTexImage = __glChipGetCompressedTexImage;
 #if defined(DRI_PIXMAPRENDER_GL)
@@ -519,8 +520,7 @@ gcChipInitExtension(
     }
 
     /* extension enabled only for context 3.0 and later */
-    if (constants->majorVersion == 3 && constants->minorVersion >= 0 ||
-        constants->majorVersion > 3)
+    if (constants->majorVersion >= 3)
     {
         __glExtension[__GL_EXTID_OES_texture_half_float].bEnabled = GL_TRUE;
         __glExtension[__GL_EXTID_OES_texture_float].bEnabled = GL_TRUE;
@@ -581,7 +581,7 @@ gcChipInitExtension(
     }
 
     /* extension enabled only for context 3.1 and later */
-    if (constants->majorVersion == 3 && constants->minorVersion >= 1 ||
+    if ((constants->majorVersion == 3 && constants->minorVersion >= 1) ||
         constants->majorVersion > 3)
     {
         __glExtension[__GL_EXTID_KHR_blend_equation_advanced].bEnabled = GL_TRUE;
@@ -670,6 +670,7 @@ gcChipInitExtension(
     {
         __glFormatInfoTable[__GL_FMT_R32F].renderable =
         __glFormatInfoTable[__GL_FMT_RG32F].renderable =
+        __glFormatInfoTable[__GL_FMT_RGB32F].renderable =
         __glFormatInfoTable[__GL_FMT_RGBA32F].renderable = GL_TRUE;
 
         if (chipCtx->chipFeature.haltiLevel > __GL_CHIP_HALTI_LEVEL_2)
@@ -1195,10 +1196,10 @@ __glChipGetDeviceConstants(
     }
     gcoOS_StrCatSafe(constants->version, __GL_MAX_VERSION_LEN, gcvVERSION_STRING);
 
-#if defined(OPENGL40)
-    gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __OGL_VERSION31);
+#ifdef OPENGL40
+    gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __OGL_VERSION40);
     gcoOS_StrCatSafe(constants->version, __GL_MAX_VERSION_LEN, gcvVERSION_STRING);
-    constants->GLSLVersion = __OGL_GLSL_VERSION30;
+    constants->GLSLVersion = __OGL_GLSL_VERSION40;
 #endif
 
     isEs31 = (constants->majorVersion >= 3) && (constants->minorVersion >= 1);
@@ -1250,25 +1251,25 @@ __glChipGetDeviceConstants(
     /* In basic machine unit */
     shaderCaps->maxUniformBlockSize = 65536;
 
-    shaderCaps->maxVertAtomicCounters = 16;
-    shaderCaps->maxFragAtomicCounters = 16;
-    shaderCaps->maxCmptAtomicCounters = 16;
-    /*spec implicilty requied one atomic counter buffer has at least 8 atomic counters */
+    shaderCaps->maxVertAtomicCounterBuffers = 16;
+    shaderCaps->maxFragAtomicCounterBuffers = 16;
+    shaderCaps->maxCmptAtomicCounterBuffers = 16;
+    /*glsl spec implicilty requied one atomic counter buffer has at least 8 atomic counters */
     shaderCaps->maxVertAtomicCounters = shaderCaps->maxVertAtomicCounterBuffers * 8;
     shaderCaps->maxVertAtomicCounters = shaderCaps->maxFragAtomicCounterBuffers * 8;
     shaderCaps->maxCmptAtomicCounters = shaderCaps->maxCmptAtomicCounterBuffers * 8;
     if (tsAvailable)
     {
         /* minimal is 0 in spec */
-        shaderCaps->maxTcsAtomicCounters = 16;
-        shaderCaps->maxTesAtomicCounters = 16;
+        shaderCaps->maxTcsAtomicCounterBuffers = 16;
+        shaderCaps->maxTesAtomicCounterBuffers = 16;
         shaderCaps->maxTcsAtomicCounters = shaderCaps->maxTcsAtomicCounterBuffers * 8;
         shaderCaps->maxTesAtomicCounters = shaderCaps->maxTesAtomicCounterBuffers * 8;
     }
     if (gsAvailable)
     {
         /* minimal is 0 in spec */
-        shaderCaps->maxGsAtomicCounters = 16;
+        shaderCaps->maxGsAtomicCounterBuffers = 16;
         shaderCaps->maxGsAtomicCounters = shaderCaps->maxGsAtomicCounterBuffers * 8;
     }
     shaderCaps->maxCombinedAtomicCounterBuffers = __GL_MAX(shaderCaps->maxVertAtomicCounterBuffers +
@@ -1357,7 +1358,7 @@ __glChipGetDeviceConstants(
     shaderCaps->maxWorkGroupSize[0] = 256;
     shaderCaps->maxWorkGroupSize[1] = 128;
     shaderCaps->maxWorkGroupSize[2] = 64;
-    shaderCaps->maxWorkGroupInvocation = 256;
+    shaderCaps->maxWorkGroupInvocation = 2048;
     shaderCaps->maxShareMemorySize = 32768;
 
 
@@ -1608,22 +1609,21 @@ __glChipGetDeviceConstants(
 
         /* Should meet spec minimum 1024 requirements */
         shaderCaps->maxUniformLocations = __GL_MAX(shaderCaps->maxUniformLocations, 1024);
-/*
+
         shaderCaps->maxFragmentUniformComponents = shaderCaps->maxFragUniformVectors * 4;
         shaderCaps->maxVertexUniformComponents = shaderCaps->maxVertUniformVectors * 4;
         shaderCaps->maxVaryingComponents = shaderCaps->maxVaryingFloats = shaderCaps->maxVaryingVectors * 4;
         shaderCaps->maxVertexOutputComponents = shaderCaps->maxVertOutVectors * 4;
         shaderCaps->maxFragmentInputComponents = shaderCaps->maxFragInVectors * 4;
-        */
+
     } while (GL_FALSE);
 
     constants->maxNumTextureLevels = __glFloorLog2(constants->maxTextureSize) + 1;
-  /*
     shaderCaps->maxClipPlanes = glvMAX_CLIP_PLANES;
     shaderCaps->maxClipDistances = 8;
     shaderCaps->maxTextureUnits = shaderCaps->maxVertTextureImageUnits;
     shaderCaps->maxTextureCoords = shaderCaps->maxVertTextureImageUnits;
-    */
+
     /* Assert reported caps are less than macro */
     GL_ASSERT(shaderCaps->maxUserVertAttributes <= __GL_MAX_VERTEX_ATTRIBUTES);
     GL_ASSERT(constants->maxVertexAttribBindings <= __GL_MAX_VERTEX_ATTRIBUTE_BINDINGS);
@@ -1642,7 +1642,7 @@ __glChipGetDeviceConstants(
         shaderCaps->maxGsOutTotalVectors = 256;
         shaderCaps->maxGsOutVertices = 256;
         shaderCaps->maxGsInvocationCount = 32;
- //       shaderCaps->maxGSVaryingComponents = 64;
+        shaderCaps->maxGSVaryingComponents = 64;
         shaderCaps->provokingVertex = gcvPROVOKING_VERTEX_UNDEFINE;
         constants->gsLayerProvokingVertex = GL_UNDEFINED_VERTEX_EXT;
     }
@@ -1834,7 +1834,7 @@ __glChipCreateContext(
                               chipCtx->patchId == gcvPATCH_ANTUTUGL3;
 
 #if VIVANTE_PROFILER
-    if (__glesApiProfileMode >= 1)
+    if (__glApiProfileMode >= 1)
     {
         gcChipInitProfileDevicePipeline(gc, chipCtx);
     }

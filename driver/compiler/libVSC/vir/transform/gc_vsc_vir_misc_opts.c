@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -16,6 +16,11 @@
 DEF_QUERY_PASS_PROP(vscVIR_RemoveNop)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_PRE;
+}
+
+DEF_SH_NECESSITY_CHECK(vscVIR_RemoveNop)
+{
+    return gcvTRUE;
 }
 
 VSC_ErrCode vscVIR_RemoveNop(VSC_SH_PASS_WORKER* pPassWorker)
@@ -52,6 +57,83 @@ VSC_ErrCode vscVIR_RemoveNop(VSC_SH_PASS_WORKER* pPassWorker)
     return errCode;
 }
 
+DEF_QUERY_PASS_PROP(vscVIR_RecordInstructionStatus)
+{
+    /* We can call this pass in any level. */
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_ALL;
+}
+
+DEF_SH_NECESSITY_CHECK(vscVIR_RecordInstructionStatus)
+{
+    return gcvTRUE;
+}
+
+VSC_ErrCode vscVIR_RecordInstructionStatus(VSC_SH_PASS_WORKER* pPassWorker)
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_Shader*             pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_ShLevel             curShLevel = VIR_Shader_GetLevel(pShader);
+    VIR_FuncIterator        func_iter;
+    VIR_FunctionNode*       pFunc_node;
+    VIR_MemoryAccessFlag    memoryAccessFlag = VIR_MA_FLAG_NONE;
+
+    /* Now we only record them at these two levels. */
+    gcmASSERT(curShLevel == VIR_SHLEVEL_Pre_Low || curShLevel == VIR_SHLEVEL_Post_Machine);
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for (pFunc_node = VIR_FuncIterator_First(&func_iter);
+         pFunc_node != gcvNULL;
+         pFunc_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_Function*    pFunc = pFunc_node->function;
+        VIR_InstIterator inst_iter;
+        VIR_Instruction* pInst;
+        VIR_OpCode       opCode;
+
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(pFunc));
+        for (pInst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             pInst != gcvNULL;
+             pInst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            opCode = VIR_Inst_GetOpcode(pInst);
+
+            if (VIR_OPCODE_isMemLd(opCode))
+            {
+                memoryAccessFlag |= VIR_MA_FLAG_LOAD;
+            }
+            else if (VIR_OPCODE_isMemSt(opCode))
+            {
+                memoryAccessFlag |= VIR_MA_FLAG_STORE;
+            }
+            else if (VIR_OPCODE_isImgLd(opCode))
+            {
+                memoryAccessFlag |= VIR_MA_FLAG_IMG_READ;
+            }
+            else if (VIR_OPCODE_isImgSt(opCode))
+            {
+                memoryAccessFlag |= VIR_MA_FLAG_IMG_WRITE;
+            }
+            else if (VIR_OPCODE_isAtom(opCode))
+            {
+                memoryAccessFlag |= VIR_MA_FLAG_ATOMIC;
+            }
+            else if (VIR_OPCODE_isBarrier(opCode))
+            {
+                memoryAccessFlag |= VIR_MA_FLAG_BARRIER;
+            }
+            else if (opCode == VIR_OP_VX_ATOMICADD)
+            {
+                memoryAccessFlag |= VIR_MA_FLAG_EVIS_ATOMADD;
+            }
+        }
+    }
+
+    /* Save the result. */
+    pShader->memoryAccessFlag[curShLevel] = memoryAccessFlag;
+
+    return errCode;
+}
+
 /* To implement the partial def of VX instruction (e.g., select_add),
    we need to make select_add to be conditional def.
    But this conditional def is only valid for its real variable def, not the temp.
@@ -68,6 +150,12 @@ DEF_QUERY_PASS_PROP(vscVIR_VX_ReplaceDest)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_PRE;
 }
+
+DEF_SH_NECESSITY_CHECK(vscVIR_VX_ReplaceDest)
+{
+    return gcvTRUE;
+}
+
 VSC_ErrCode vscVIR_VX_ReplaceDest(VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode       errCode = VSC_ERR_NONE;
@@ -87,7 +175,7 @@ VSC_ErrCode vscVIR_VX_ReplaceDest(VSC_SH_PASS_WORKER* pPassWorker)
         for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
              inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
-            if (VIR_OPCODE_isVXOnly(VIR_Inst_GetOpcode(inst)))
+            if (VIR_OPCODE_isVX(VIR_Inst_GetOpcode(inst)))
             {
                 if (VIR_Inst_GetDest(inst))
                 {
@@ -151,10 +239,63 @@ VSC_ErrCode vscVIR_VX_ReplaceDest(VSC_SH_PASS_WORKER* pPassWorker)
     return errCode;
 }
 
+static gctBOOL _ChangePackedConstValue(VIR_Shader* pShader,
+                                       VIR_Operand* pOpnd)
+{
+    gctBOOL         bChanged = gcvFALSE;
+    VIR_TypeId      opndTypeId = VIR_Operand_GetTypeId(pOpnd);
+    VIR_TypeId      elementTypeId = VIR_TYPE_UNKNOWN;
+    gctUINT32       elementSizePerByte;
+    gctUINT32       elementCountPerChannel;
+    gctUINT32       componentSizePerByte = 4;
+    gctUINT32       minElementBitCount = 8;
+
+    /* Skip non-packed type. */
+    if (!(VIR_TypeId_isPrimitive(opndTypeId) && VIR_TypeId_isPacked(opndTypeId)))
+    {
+        return bChanged;
+    }
+
+    elementTypeId = VIR_GetTypeComponentType(opndTypeId);
+    elementSizePerByte = VIR_GetTypeSize(elementTypeId);
+    elementCountPerChannel = componentSizePerByte / elementSizePerByte;
+
+    if (VIR_Operand_isImm(pOpnd))
+    {
+        gctUINT32   newValue = 0, uValue = VIR_Operand_GetImmediateUint(pOpnd);
+        gctUINT32   i;
+
+        for (i = 0; i < elementCountPerChannel; i++)
+        {
+            switch (elementSizePerByte)
+            {
+            case 2:
+                newValue |= ((uValue & 0xFFFF) << (elementSizePerByte * minElementBitCount * i));
+                break;
+
+            case 1:
+                newValue |= ((uValue & 0xFF) << (elementSizePerByte * minElementBitCount * i));
+                break;
+
+            default:
+                gcmASSERT(gcvFALSE);
+                newValue = uValue;
+                break;
+            }
+        }
+
+        VIR_Operand_SetImmUint(pOpnd, newValue);
+        bChanged = gcvTRUE;
+    }
+
+    return bChanged;
+}
+
 static gctBOOL _NeedPutImmValue2Uniform(VIR_Shader* pShader,
                                         VIR_Operand *Opnd,
                                         VSC_HW_CONFIG* pHwCfg,
                                         gctBOOL bIsInDual16Check,
+                                        gctBOOL bPackedChanged,
                                         VIR_ConstVal* ImmValues,
                                         VIR_TypeId* ImmTypeId)
 {
@@ -162,7 +303,7 @@ static gctBOOL _NeedPutImmValue2Uniform(VIR_Shader* pShader,
 
     memset(ImmValues, 0, sizeof(VIR_ConstVal));
 
-    if (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_IMMEDIATE)
+    if (VIR_Operand_isImm(Opnd))
     {
         ImmValues->scalarVal.uValue = VIR_Operand_GetImmediateUint(Opnd);
         gcmASSERT(VIR_TypeId_isPrimitive(VIR_Operand_GetTypeId(Opnd)));
@@ -208,10 +349,14 @@ static gctBOOL _NeedPutImmValue2Uniform(VIR_Shader* pShader,
                 return !CAN_EXACTLY_CVT_U32_2_U20(VIR_Operand_GetImmediateUint(Opnd));
             }
         default:
+            if (bPackedChanged)
+            {
+                return !CAN_EXACTLY_CVT_U32_2_U20(VIR_Operand_GetImmediateUint(Opnd));
+            }
             return gcvFALSE;
         }
     }
-    else if (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_CONST)
+    else if (VIR_Operand_isConst(Opnd))
     {
         constValue = (VIR_Const*)VIR_GetSymFromId(&pShader->constTable, VIR_Operand_GetConstId(Opnd));
         *ImmValues = constValue->value;
@@ -238,34 +383,24 @@ static gctBOOL _IsConstScalar(VIR_Shader* pShader,
         VIR_Symbol* uniformSym = VIR_Operand_GetSymbol(pOpnd);
         VIR_Uniform* uniform = VIR_Symbol_GetUniform(uniformSym);
 
-        if (uniform && isSymUniformCompiletimeInitialized(uniformSym))
+        if (uniform && isSymUniformCompiletimeInitialized(uniformSym) && VIR_Operand_GetRelAddrMode(pOpnd) == VIR_INDEXED_NONE)
         {
-            if(VIR_Operand_GetRelAddrMode(pOpnd) == VIR_INDEXED_NONE) {
                 VIR_ConstId constId;
-                VIR_Type *symType;
+            VIR_Type*   pConstType;
 
-                symType = VIR_Symbol_GetType(uniformSym);
-                if(VIR_Type_isArray(symType)) {
-                    VIR_TypeId  baseTypeId = VIR_Type_GetBaseTypeId(symType);
-                    gctUINT rows = VIR_GetTypeRows(baseTypeId);
-                    gctINT arrayIndex;
-
-                    arrayIndex = (VIR_Operand_GetConstIndexingImmed(pOpnd) +
-                                  VIR_Operand_GetMatrixConstIndex(pOpnd)) / rows;
-                    constId = *(VIR_Uniform_GetInitializerPtr(uniform) + arrayIndex);
-                }
-                else {
-                    constId = VIR_Uniform_GetInitializer(uniform);
-                }
+            constId = VIR_Operand_GetConstValForUniform(pShader,
+                                                        pOpnd,
+                                                        uniformSym,
+                                                        uniform);
             pConst = VIR_Shader_GetConstFromId(pShader, constId);
-                symType = VIR_Shader_GetTypeFromId(pShader, pConst->type);
-                if (VIR_Type_isVector(symType) || VIR_Type_isScalar(symType))
+            pConstType = VIR_Shader_GetTypeFromId(pShader, pConst->type);
+
+            if (VIR_Type_isVector(pConstType) || VIR_Type_isScalar(pConstType))
                 {
                     isConstScalar = gcvTRUE;
                 }
             }
         }
-    }
     else if (srcInfo.isVecConst)
     {
         pConst = VIR_Shader_GetConstFromId(pShader, VIR_Operand_GetConstId(pOpnd));
@@ -284,9 +419,61 @@ static gctBOOL _IsConstScalar(VIR_Shader* pShader,
     return isConstScalar;
 }
 
+static gctBOOL _IsNeedToPropagate(VIR_Instruction*  pInst,
+                                  gctUINT           SrcIdx)
+{
+    VIR_OpCode      opCode = VIR_Inst_GetOpcode(pInst);
+
+    if (opCode == VIR_OP_SUBSAT && SrcIdx == 1)
+    {
+        return gcvFALSE;
+    }
+    /* Don't do propagte for LDARR. */
+    else if (opCode == VIR_OP_LDARR && SrcIdx == 0)
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+static gctUINT _GetCompCountFromEnable(gctUINT8 enable)
+{
+    if (enable & VIR_ENABLE_W)
+    {
+        return VIR_CHANNEL_COUNT;
+    }
+    else if (enable & VIR_ENABLE_Z)
+    {
+        return VIR_CHANNEL_COUNT - 1;
+    }
+    else if (enable & VIR_ENABLE_Y)
+    {
+        return VIR_CHANNEL_COUNT - 2;
+    }
+    else if (enable & VIR_ENABLE_X)
+    {
+        return VIR_CHANNEL_COUNT - 3;
+    }
+
+    return VIR_CHANNEL_COUNT;
+}
+
 DEF_QUERY_PASS_PROP(vscVIR_PutScalarConstToImm)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_MC;
+}
+
+DEF_SH_NECESSITY_CHECK(vscVIR_PutScalarConstToImm)
+{
+    VSC_HW_CONFIG*    pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+
+    if (!pHwCfg->hwFeatureFlags.hasSHEnhance2)
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
 }
 
 VSC_ErrCode vscVIR_PutScalarConstToImm(VSC_SH_PASS_WORKER* pPassWorker)
@@ -295,14 +482,9 @@ VSC_ErrCode vscVIR_PutScalarConstToImm(VSC_SH_PASS_WORKER* pPassWorker)
     VIR_Shader*       pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VIR_FuncIterator  func_iter;
     VIR_FunctionNode* func_node;
+    gctBOOL           bChanged = gcvFALSE;
     gctUINT           srcInx;
     gctUINT           i, j;
-    VSC_HW_CONFIG*    pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
-
-    if (!pHwCfg->hwFeatureFlags.hasSHEnhance2)
-    {
-        return errCode;
-    }
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
@@ -331,13 +513,13 @@ VSC_ErrCode vscVIR_PutScalarConstToImm(VSC_SH_PASS_WORKER* pPassWorker)
                 gctUINT             immedValue = 0;
                 gctBOOL             hasSameValue = gcvTRUE;
 
-                if (!_IsConstScalar(pShader, inst, srcOpnd, &constValue) ||
-                    VIR_TypeId_isPacked(srcType))
+                if (!_IsNeedToPropagate(inst, srcInx))
                 {
                     continue;
                 }
-                if (VIR_Inst_GetOpcode(inst) == VIR_OP_SUBSAT &&
-                    srcInx == 1)
+
+                if (!_IsConstScalar(pShader, inst, srcOpnd, &constValue) ||
+                    VIR_TypeId_isPacked(srcType))
                 {
                     continue;
                 }
@@ -461,13 +643,17 @@ VSC_ErrCode vscVIR_PutScalarConstToImm(VSC_SH_PASS_WORKER* pPassWorker)
                 VIR_Operand_SetTypeId(srcOpnd, srcType);
                 VIR_Operand_SetSwizzle(srcOpnd, VIR_SWIZZLE_XXXX);
                 VIR_Operand_SetModifier(srcOpnd, VIR_MOD_NONE);
+
+                /* Mark change happen. */
+                bChanged = gcvTRUE;
             }
         }
     }
 
-    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    if (bChanged &&
+        VirSHADER_DumpCodeGenVerbose(pShader))
     {
-        VIR_Shader_Dump(gcvNULL, "After put scalar const to imm.", pShader, gcvTRUE);
+        VIR_Shader_Dump(gcvNULL, "After put scalar const to imm", pShader, gcvTRUE);
     }
 
     return errCode;
@@ -478,11 +664,17 @@ DEF_QUERY_PASS_PROP(vscVIR_PutImmValueToUniform)
     pPassProp->supportedLevels = VSC_PASS_LEVEL_MC;
 }
 
+DEF_SH_NECESSITY_CHECK(vscVIR_PutImmValueToUniform)
+{
+    return gcvTRUE;
+}
+
 VSC_ErrCode vscVIR_PutImmValueToUniform(VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode       errCode = VSC_ERR_NONE;
     VIR_Shader*       pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VSC_HW_CONFIG*    pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    gctBOOL           bChanged = gcvFALSE;
     VIR_FuncIterator  func_iter;
     VIR_FunctionNode* func_node;
     VIR_Operand*      opnd;
@@ -492,6 +684,7 @@ VSC_ErrCode vscVIR_PutImmValueToUniform(VSC_SH_PASS_WORKER* pPassWorker)
     VIR_TypeId        immTypeId[VIR_MAX_SRC_NUM];
     gctBOOL           needChange[VIR_MAX_SRC_NUM];
     gctBOOL           hasChanged[VIR_MAX_SRC_NUM];
+    gctBOOL           bPackedChanged = gcvFALSE;
     VIR_Uniform*      pImmUniform;
     VIR_Symbol*       sym;
     VIR_Swizzle       swizzle = VIR_SWIZZLE_XXXX;
@@ -521,10 +714,25 @@ VSC_ErrCode vscVIR_PutImmValueToUniform(VSC_SH_PASS_WORKER* pPassWorker)
             {
                 needChange[i] = gcvFALSE;
                 hasChanged[i] = gcvFALSE;
+                bPackedChanged = gcvFALSE;
                 opnd = VIR_Inst_GetSource(inst, i);
 
+                if (opnd == gcvNULL)
+                {
+                    continue;
+                }
+
+                /*
+                ** If the source is a packed type, we need to fill a single-full-channel(right now it is 32bit) data with this constant.
+                ** For example, we need to do the following change:
+                **      006: MOV.pack           half8P temp(28){r4.<0}, short8P 0xFBFF
+                **      -->
+                **      006: MOV.pack           half8P temp(28){r4.<0}, short8P 0xFBFFFBFF
+                */
+                bPackedChanged = _ChangePackedConstValue(pShader, opnd);
+
                 /* check whether we need put imm value to uniform */
-                if (opnd && _NeedPutImmValue2Uniform(pShader, opnd, pHwCfg, gcvFALSE, &ImmValues[i], &immTypeId[i]))
+                if (_NeedPutImmValue2Uniform(pShader, opnd, pHwCfg, gcvFALSE, bPackedChanged, &ImmValues[i], &immTypeId[i]))
                 {
                     needChange[i] = gcvTRUE;
 
@@ -541,13 +749,14 @@ VSC_ErrCode vscVIR_PutImmValueToUniform(VSC_SH_PASS_WORKER* pPassWorker)
             /* to improve performance, we put the (same type) immediate into one uniform (const vector) */
             if (gcUseFullNewLinker(pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti2) &&
                 numChange > 1 &&
-                !VIR_OPCODE_isVXOnly(VIR_Inst_GetOpcode(inst)))
+                numChange <= VIR_CHANNEL_COUNT &&
+                !VIR_OPCODE_isVX(VIR_Inst_GetOpcode(inst)))
             {
                 /* generate a const vector */
                 VIR_ConstVal    new_const_val;
                 VIR_ConstId     new_const_id;
                 VIR_Const       *new_const;
-                VIR_Swizzle     new_swizzle;
+                VIR_Swizzle     new_swizzle, swizzle = VIR_SWIZZLE_XXXX;
                 gctUINT8        constChannel = 0;
 
                 memset(&new_const_val, 0, sizeof(VIR_ConstVal));
@@ -589,7 +798,7 @@ VSC_ErrCode vscVIR_PutImmValueToUniform(VSC_SH_PASS_WORKER* pPassWorker)
                 VIR_Shader_AddConstant(pShader, dstType, &new_const_val, &new_const_id);
                 new_const = VIR_Shader_GetConstFromId(pShader, new_const_id);
                 new_const->type = dstType;
-                VIR_Shader_AddInitializedConstUniform(pShader, new_const, &pImmUniform);
+                VIR_Shader_AddInitializedUniform(pShader, new_const, &pImmUniform, &swizzle);
                 sym = VIR_Shader_GetSymFromId(pShader, pImmUniform->sym);
 
                 constChannel = 0;
@@ -599,28 +808,16 @@ VSC_ErrCode vscVIR_PutImmValueToUniform(VSC_SH_PASS_WORKER* pPassWorker)
 
                     if (needChange[i] && immTypeId[i] == dstElemType)
                     {
-                        if (constChannel == 0)
-                        {
-                            new_swizzle = VIR_SWIZZLE_XXXX;
-                        }
-                        else if (constChannel == 1)
-                        {
-                            new_swizzle = VIR_SWIZZLE_YYYY;
-                        }
-                        else if (constChannel == 2)
-                        {
-                            new_swizzle = VIR_SWIZZLE_ZZZZ;
-                        }
-                        else
-                        {
-                            new_swizzle = VIR_SWIZZLE_WWWW;
-                        }
+                        new_swizzle = VIR_Swizzle_Extract_Single_Channel_Swizzle(swizzle, constChannel);
                         VIR_Operand_SetOpKind(opnd, VIR_OPND_SYMBOL);
                         VIR_Operand_SetSym(opnd, sym);
                         VIR_Operand_SetTypeId(opnd, dstType);
                         VIR_Operand_SetSwizzle(opnd, new_swizzle);
                         constChannel++;
                         hasChanged[i] = gcvTRUE;
+
+                        /* Mark change happen. */
+                        bChanged = gcvTRUE;
                     }
                 }
             }
@@ -652,20 +849,426 @@ VSC_ErrCode vscVIR_PutImmValueToUniform(VSC_SH_PASS_WORKER* pPassWorker)
                     VIR_Operand_SetOpKind(opnd, VIR_OPND_SYMBOL);
                     VIR_Operand_SetSym(opnd, sym);
                     VIR_Operand_SetSwizzle(opnd, swizzle);
+
+                    /* Mark change happen. */
+                    bChanged = gcvTRUE;
                 }
             }
         }
     }
 
-    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    if (bChanged &&
+        VirSHADER_DumpCodeGenVerbose(pShader))
     {
-        VIR_Shader_Dump(gcvNULL, "After put imm value to uniform.", pShader, gcvTRUE);
+        VIR_Shader_Dump(gcvNULL, "After put imm value to uniform", pShader, gcvTRUE);
     }
 
     return errCode;
 }
 
 DEF_QUERY_PASS_PROP(vscVIR_CheckCstRegFileReadPortLimitation)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
+
+    /* Only constant allocation is enable, we can check constant reg file read port limitation */
+    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_RA;
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+
+    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
+    pPassProp->passFlag.resCreationReq.s.bNeedCfg = gcvTRUE;
+
+    /* Temp invaliate rd flow here (before IS/RA) as dubo pass does not update du */
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateRdFlow = gcvTRUE;
+}
+
+DEF_SH_NECESSITY_CHECK(vscVIR_CheckCstRegFileReadPortLimitation)
+{
+    VSC_HW_CONFIG*             pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    VIR_Shader*                pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+
+    /*
+    ** When a chip has no const reg read port limitation, it only means that it can support 4*128 constant read bandwidth.
+    ** So for a evis instruction that uses a uniform512 source, it can't use any more constant for the other source, we also need to check this.
+    */
+    if (pHwCfg->hwFeatureFlags.noOneConstLimit)
+    {
+        if (!VIR_Shader_HasVivVxExtension(pShader))
+        {
+            return gcvFALSE;
+        }
+    }
+
+    return gcvTRUE;
+}
+
+VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWorker)
+{
+    VSC_ErrCode                errCode = VSC_ERR_NONE;
+    VSC_HW_CONFIG*             pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    VIR_Shader*                pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_DEF_USAGE_INFO*        pDuInfo = pPassWorker->pDuInfo;
+    VIR_FuncIterator           func_iter;
+    VIR_FunctionNode*          func_node;
+    VIR_Operand*               firstOpnd = gcvNULL;
+    VIR_Operand*               opnd;
+    gctUINT                    i, j, firstConstRegNo, thisConstRegNo, newDstRegNo;
+    VIR_SymId                  newDstSymId;
+    VIR_Symbol*                pSym = gcvNULL, *pNewSym = gcvNULL, *firstSym = gcvNULL;
+    VIR_Uniform*               pUniform;
+    VIR_Instruction*           pNewInsertedInst;
+    gctBOOL                    bFirstConstRegIndexing, bHitReadPortLimitation;
+    VIR_Operand *              newOpnd;
+    gctBOOL                    bHasOneConstFix = pHwCfg->hwFeatureFlags.noOneConstLimit;
+    gctBOOL                    bChanged = gcvFALSE;
+    VIR_BASIC_BLOCK            *pBB        = gcvNULL;
+    CFG_ITERATOR               cfgIter;
+    VSC_HASH_TABLE*            replacedUniformSet = gcvNULL; /* record the map <Sym, defInst> */
+
+    gcmASSERT(VIR_Shader_isConstRegAllocated(pShader));
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    replacedUniformSet = vscHTBL_Create(pPassWorker->basePassWorker.pMM, vscHFUNC_Default, vscHKCMP_Default, 256);
+
+    for (func_node = VIR_FuncIterator_First(&func_iter);
+         func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_Function*    func = func_node->function;
+        VIR_InstIterator inst_iter;
+        VIR_Instruction* inst;
+        VIR_OpCode       opCode;
+        CFG_ITERATOR_INIT(&cfgIter, &func->pFuncBlock->cfg);
+        for (pBB = CFG_ITERATOR_FIRST(&cfgIter); pBB != gcvNULL;
+             pBB = CFG_ITERATOR_NEXT(&cfgIter))
+        {
+            if(BB_GET_LENGTH(pBB) == 0)
+            {
+                continue;
+            }
+
+            VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+            for (inst = BB_GET_START_INST(pBB); inst != VIR_Inst_GetNext(BB_GET_END_INST(pBB));
+                inst = VIR_Inst_GetNext(inst))
+            {
+                /* Only have one or zero source, just bail out. */
+                if (VIR_Inst_GetSrcNum(inst) < 2)
+                {
+                    continue;
+                }
+
+                opCode = VIR_Inst_GetOpcode(inst);
+
+                /* This instruction has not a uniform512 source, just bail out. */
+                if (bHasOneConstFix && VIR_OPCODE_U512_SrcNo(opCode) == 0)
+                {
+                    continue;
+                }
+
+                for (i = 0; i < VIR_Inst_GetSrcNum(inst) - 1; ++i)
+                {
+                    firstConstRegNo = NOT_ASSIGNED;
+                    bFirstConstRegIndexing = gcvFALSE;
+
+                    for (j = 0; j < VIR_Inst_GetSrcNum(inst); ++j)
+                    {
+                        opnd = VIR_Inst_GetSource(inst, j);
+
+                        pUniform = gcvNULL;
+                        if (VIR_Operand_GetOpKind(opnd) == VIR_OPND_SYMBOL)
+                        {
+                            pSym = VIR_Operand_GetSymbol(opnd);
+                            pUniform = VIR_Symbol_GetUniformPointer(pShader, pSym);
+                        }
+
+                        if (pUniform)
+                        {
+                            bHitReadPortLimitation = gcvFALSE;
+
+                            thisConstRegNo = pUniform->physical +
+                                             VIR_Operand_GetMatrixConstIndex(opnd) +
+                                             ((VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE) ?
+                                              VIR_Operand_GetRelIndexing(opnd) : 0);
+
+                            /* Check whether shader hits the limitation that HW does not support two read port on reg file. */
+                            if (firstConstRegNo == NOT_ASSIGNED)
+                            {
+                                firstOpnd = opnd;
+                                firstSym  = pSym;
+                                firstConstRegNo = thisConstRegNo;
+                                bFirstConstRegIndexing = (VIR_Operand_GetRelAddrMode(opnd) != VIR_INDEXED_NONE);
+                            }
+                            else
+                            {
+                                if (!bFirstConstRegIndexing && VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE)
+                                {
+                                    if (firstConstRegNo != thisConstRegNo)
+                                    {
+                                        bHitReadPortLimitation = gcvTRUE;
+                                    }
+                                }
+                                else if (bFirstConstRegIndexing || VIR_Operand_GetRelAddrMode(opnd) != VIR_INDEXED_NONE)
+                                {
+                                    bHitReadPortLimitation = gcvTRUE;
+                                }
+                            }
+
+                            if (bHitReadPortLimitation)
+                            {
+                                VIR_Precision precision;
+                                VIR_TypeId newTempRegTypeId;
+
+                                /* decide which operand to replace, do not replace image uniform, 512 bit uniform */
+                                if (VIR_Symbol_GetKind(pSym) == VIR_SYM_IMAGE ||
+                                    VIR_Symbol_GetKind(pSym) == VIR_SYM_IMAGE_T ||
+                                    (VIR_OPCODE_U512_SrcNo(VIR_Inst_GetOpcode(inst)) > 0 &&
+                                    VIR_OPCODE_U512_SrcNo(VIR_Inst_GetOpcode(inst)) == (gctINT)j) )
+                                {
+                                    VIR_Operand * tmpOpnd = opnd;
+                                    VIR_Symbol *  tmpSym  = pSym;
+
+                                    /* swap current opnd/sym with firstOpnd/firstSym */
+                                    gcmASSERT(firstOpnd != gcvNULL);
+                                    opnd = firstOpnd;
+                                    pSym = firstSym;
+                                    firstOpnd = tmpOpnd;
+                                    firstSym = tmpSym;
+                                }
+                                gcmASSERT(pSym);
+                                pNewInsertedInst = gcvNULL;
+                                newDstSymId = 0;
+                                newDstRegNo = 0;
+                                precision = VIR_Operand_GetPrecision(opnd);
+                                /* if the symbol has the corresponding defInst and the operand has no indexing and relmode,
+                                 * use the dest symbol of the defInst in opnd to reduce a MOV instruction
+                                 */
+                                if (vscHTBL_DirectTestAndGet(replacedUniformSet, (void*)pSym, (void**)&pNewInsertedInst))
+                                {
+                                    VIR_Operand *dest = VIR_Inst_GetDest(pNewInsertedInst);
+                                    pNewSym = VIR_Operand_GetSymbol(dest);
+                                    gcmASSERT(pNewSym && VIR_Symbol_GetKind(pNewSym) == VIR_SYM_VIRREG);
+                                    if (VIR_Operand_GetPrecision(opnd) == VIR_Symbol_GetPrecision(pNewSym) &&
+                                        (!VIR_Operand_GetIsConstIndexing(opnd)) &&
+                                        (!VIR_Operand_GetMatrixConstIndex(opnd)) &&
+                                        (VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE))
+                                    {
+                                        newDstSymId = VIR_Symbol_GetIndex(pNewSym);
+                                        newDstRegNo = VIR_Symbol_GetVregIndex(pNewSym);
+                                    }
+                                    else
+                                    {
+                                        pNewInsertedInst = gcvNULL;
+                                    }
+                                }
+                                if (pNewInsertedInst == gcvNULL)
+                                {
+                                    newTempRegTypeId = VIR_TypeId_isPrimitive(VIR_Symbol_GetTypeId(pSym)) ?
+                                                       VIR_Symbol_GetTypeId(pSym) : VIR_Operand_GetTypeId(opnd);
+                                    /* make new created symbol type consistent with src's swizzle channel
+                                     * if newTempRegTypeId is float32 computed by operand type while .w is used like following inst
+                                     * MUL                hp temp(3).hp.w, hp  uColor.hp.w, hp  uTexCombScale[2].hp.w
+                                     * extend newTempRegTypeId to be float32_x3
+                                     */
+                                    if (VIR_GetTypeComponents(newTempRegTypeId) < _GetCompCountFromEnable(VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(opnd))))
+                                    {
+                                        VIR_TypeId componentTypeId = VIR_GetTypeComponentType(newTempRegTypeId);
+                                        newTempRegTypeId = VIR_TypeId_ComposeNonOpaqueType(componentTypeId,
+                                                                                           _GetCompCountFromEnable(VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(opnd))),
+                                                                                           1);
+                                    }
+                                    precision = VIR_Operand_GetPrecision(opnd);
+
+                                    /* Add a new-temp-reg number */
+                                    newDstRegNo = VIR_Shader_NewVirRegId(pShader, 1);
+
+                                    errCode = VIR_Shader_AddSymbol(pShader,
+                                                                   VIR_SYM_VIRREG,
+                                                                   newDstRegNo,
+                                                                   VIR_Shader_GetTypeFromId(pShader, newTempRegTypeId),
+                                                                   VIR_STORAGE_UNKNOWN,
+                                                                   &newDstSymId);
+                                    ON_ERROR(errCode, "Add symbol");
+                                    pNewSym = VIR_Shader_GetSymFromId(pShader, newDstSymId);
+
+                                    /* Add following inst just before current inst:
+
+                                        mov new-temp-reg, uniform
+                                    */
+                                    errCode = VIR_Function_AddInstructionBefore(func, VIR_OP_MOV, newTempRegTypeId, inst, gcvTRUE, &pNewInsertedInst);
+                                    ON_ERROR(errCode, "Add instruction before");
+
+                                    /* dst */
+                                    newOpnd = VIR_Inst_GetDest(pNewInsertedInst);
+                                    VIR_Operand_SetSymbol(newOpnd, func, newDstSymId);
+                                    VIR_Operand_SetEnable(newOpnd, VIR_TypeId_Conv2Enable(newTempRegTypeId));
+                                    VIR_Symbol_SetPrecision(pNewSym, precision);
+                                    VIR_Operand_SetPrecision(newOpnd, precision);
+                                    if(precision == VIR_PRECISION_HIGH)
+                                    {
+                                        VIR_Inst_SetThreadMode(pNewInsertedInst, VIR_THREAD_D16_DUAL_32);
+                                    }
+
+                                    /* src */
+                                    newOpnd = VIR_Inst_GetSource(pNewInsertedInst, VIR_Operand_Src0);
+                                    VIR_Operand_SetSymbol(newOpnd, func, pSym->index);
+                                    VIR_Operand_SetSwizzle(newOpnd, VIR_TypeId_Conv2Swizzle(newTempRegTypeId));
+                                    VIR_Operand_SetTypeId(newOpnd, newTempRegTypeId);
+                                    VIR_Operand_SetPrecision(newOpnd, VIR_Operand_GetPrecision(opnd));
+                                    VIR_Operand_SetMatrixConstIndex(newOpnd, VIR_Operand_GetMatrixConstIndex(opnd));
+                                    VIR_Operand_SetIsConstIndexing(newOpnd, VIR_Operand_GetIsConstIndexing(opnd));
+                                    VIR_Operand_SetRelAddrMode(newOpnd, VIR_Operand_GetRelAddrMode(opnd));
+                                    if (VIR_Operand_GetIsConstIndexing(opnd))
+                                    {
+                                        VIR_Operand_SetRelIndexingImmed(newOpnd, VIR_Operand_GetRelIndexing(opnd));
+                                    }
+                                    else
+                                    {
+                                        VIR_Operand_SetRelIndexing(newOpnd, VIR_Operand_GetRelIndexing(opnd));
+                                    }
+                                    if ((!VIR_Operand_GetIsConstIndexing(opnd)) &&
+                                        (!VIR_Operand_GetMatrixConstIndex(opnd)) &&
+                                        (VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE))
+                                    {
+                                        vscHTBL_DirectSet(replacedUniformSet, (void*)pSym, (void*)pNewInsertedInst);
+                                    }
+                                }
+                                /* Change operand of current inst to new-temp-reg */
+                                VIR_Operand_SetMatrixConstIndex(opnd, 0);
+                                VIR_Operand_SetRelAddrMode(opnd, VIR_INDEXED_NONE);
+                                VIR_Operand_SetRelIndexing(opnd, 0);
+                                VIR_Operand_SetTempRegister(opnd, func, newDstSymId, VIR_Operand_GetTypeId(opnd));
+                                if (precision == VIR_PRECISION_HIGH)
+                                {
+                                    VIR_Inst_SetThreadMode(inst, VIR_THREAD_D16_DUAL_32);
+                                }
+
+                                vscVIR_AddNewDef(pDuInfo, pNewInsertedInst, newDstRegNo, 1, VIR_ENABLE_XYZW, VIR_HALF_CHANNEL_MASK_FULL,
+                                                 gcvNULL, gcvNULL);
+
+                                vscVIR_AddNewUsageToDef(pDuInfo, pNewInsertedInst, inst, opnd,
+                                                        gcvFALSE, newDstRegNo, 1, VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(opnd)),
+                                                        VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+
+                                /* Change happens. */
+                                bChanged = gcvTRUE;
+
+                            }
+                        }
+                    }
+                }
+            }
+            vscHTBL_Reset(replacedUniformSet);
+        }
+    }
+
+    if (bChanged && VirSHADER_DumpCodeGenVerbose(pShader))
+    {
+        VIR_Shader_Dump(gcvNULL, "After fix const reg read port limitation", pShader, gcvTRUE);
+    }
+
+OnError:
+    vscHTBL_Destroy(replacedUniformSet);
+    return errCode;
+}
+
+static VSC_ErrCode
+_FixSwizzleRestrictForLocalStorageAddr(
+    VIR_Shader*         pShader,
+    VIR_DEF_USAGE_INFO* pDuInfo,
+    VIR_Function*       pFunc,
+    VIR_Instruction*    pInst
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Operand*        pOrigSrc = VIR_Inst_GetSource(pInst, 0);
+    VIR_Symbol*         pLocalStorageAddr = VIR_Operand_GetSymbol(pOrigSrc);
+    VIR_Instruction*    pNewInst = gcvNULL;
+    VIR_Operand*        pNewOpnd = gcvNULL;
+    VIR_VirRegId        destRegId = VIR_INVALID_ID;
+    VIR_SymId           destSymId = VIR_INVALID_ID;
+    VIR_TypeId          typeId = VIR_Operand_GetTypeId(pOrigSrc);
+    VIR_Enable          enable = VIR_TypeId_Conv2Enable(typeId);
+
+    /* Delete usage first. */
+    vscVIR_DeleteUsage(pDuInfo,
+                       VIR_INPUT_DEF_INST,
+                       pInst,
+                       pOrigSrc,
+                       gcvFALSE,
+                       VIR_Symbol_GetVariableVregIndex(pLocalStorageAddr),
+                       1,
+                       VIR_ENABLE_W,
+                       VIR_HALF_CHANNEL_MASK_FULL,
+                       gcvNULL);
+
+    errCode = VIR_Function_AddInstructionBefore(pFunc,
+                                                VIR_OP_MOV,
+                                                typeId,
+                                                pInst,
+                                                gcvTRUE,
+                                                &pNewInst);
+    ON_ERROR(errCode, "Add MOV instruction failed.");
+
+    /* Add a new vreg. */
+    destRegId = VIR_Shader_NewVirRegId(pShader, 1);
+    errCode = VIR_Shader_AddSymbol(pShader,
+                                   VIR_SYM_VIRREG,
+                                   destRegId,
+                                   VIR_Shader_GetTypeFromId(pShader, typeId),
+                                   VIR_STORAGE_UNKNOWN,
+                                   &destSymId);
+    ON_ERROR(errCode, "Add vreg failed.");
+
+    /* Set DEST. */
+    pNewOpnd = VIR_Inst_GetDest(pNewInst);
+    VIR_Operand_SetTempRegister(pNewOpnd,
+                                pFunc,
+                                destSymId,
+                                typeId);
+    VIR_Operand_SetEnable(pNewOpnd, enable);
+
+    /* Set SRC0. */
+    pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
+    VIR_Operand_Copy(pNewOpnd, pOrigSrc);
+
+    /* Change the original source to the new virReg. */
+    VIR_Operand_Copy(pOrigSrc, VIR_Inst_GetDest(pNewInst));
+    VIR_Operand_Change2Src_WShift(pOrigSrc);
+
+    /* Update DU info. */
+    vscVIR_AddNewDef(pDuInfo,
+                     pNewInst,
+                     destRegId,
+                     1,
+                     enable,
+                     VIR_HALF_CHANNEL_MASK_FULL,
+                     gcvNULL,
+                     gcvNULL);
+
+    vscVIR_AddNewUsageToDef(pDuInfo,
+                            VIR_INPUT_DEF_INST,
+                            pNewInst,
+                            pNewOpnd,
+                            gcvFALSE,
+                            VIR_Symbol_GetVariableVregIndex(pLocalStorageAddr),
+                            1,
+                            VIR_ENABLE_W,
+                            VIR_HALF_CHANNEL_MASK_FULL,
+                            gcvNULL);
+
+    vscVIR_AddNewUsageToDef(pDuInfo,
+                            pNewInst,
+                            pInst,
+                            pOrigSrc,
+                            gcvFALSE,
+                            destRegId,
+                            1,
+                            enable,
+                            VIR_HALF_CHANNEL_MASK_FULL,
+                            gcvNULL);
+OnError:
+    return errCode;
+}
+
+DEF_QUERY_PASS_PROP(vscVIR_CheckEvisInstSwizzleRestriction)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
 
@@ -678,240 +1281,30 @@ DEF_QUERY_PASS_PROP(vscVIR_CheckCstRegFileReadPortLimitation)
     pPassProp->passFlag.resDestroyReq.s.bInvalidateRdFlow = gcvTRUE;
 }
 
-VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWorker)
+DEF_SH_NECESSITY_CHECK(vscVIR_CheckEvisInstSwizzleRestriction)
 {
-    VSC_ErrCode                errCode = VSC_ERR_NONE;
     VIR_Shader*                pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
-    VIR_DEF_USAGE_INFO*        pDuInfo = pPassWorker->pDuInfo;
-    VSC_HW_CONFIG*             pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
-    VIR_FuncIterator           func_iter;
-    VIR_FunctionNode*          func_node;
-    VIR_Operand*               firstOpnd = gcvNULL;
-    VIR_Operand*               opnd;
-    gctUINT                    i, j, firstConstRegNo, thisConstRegNo, newDstRegNo;
-    VIR_SymId                  newDstSymId;
-    VIR_Symbol*                pSym = gcvNULL, *pNewSym = gcvNULL, *firstSym = gcvNULL;
-    VIR_Uniform*               pUniform;
-    VIR_Instruction*           pNewInsertedInst;
-    gctBOOL                    bFirstConstRegIndexing, bHitReadPortLimitation;
-    VIR_Operand *              newOpnd;
 
-    gcmASSERT(VIR_Shader_isConstRegAllocated(pShader));
-
-    /* If has no const reg read port limitation, just bail out */
-    if (pHwCfg->hwFeatureFlags.noOneConstLimit)
+    /* If it is not OCL, just bail out */
+    if (!VIR_Shader_IsCL(pShader))
     {
-        return errCode;
+        return gcvFALSE;
     }
 
-    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
-    for (func_node = VIR_FuncIterator_First(&func_iter);
-         func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
-    {
-        VIR_Function*    func = func_node->function;
-        VIR_InstIterator inst_iter;
-        VIR_Instruction* inst;
-
-        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
-        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
-             inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
-        {
-            if (VIR_Inst_GetSrcNum(inst) < 2)
-            {
-                continue;
-            }
-
-            for (i = 0; i < VIR_Inst_GetSrcNum(inst) - 1; ++i)
-            {
-                firstConstRegNo = NOT_ASSIGNED;
-                bFirstConstRegIndexing = gcvFALSE;
-
-                for (j = 0; j < VIR_Inst_GetSrcNum(inst); ++j)
-                {
-                    opnd = VIR_Inst_GetSource(inst, j);
-
-                    pUniform = gcvNULL;
-                    if (VIR_Operand_GetOpKind(opnd) == VIR_OPND_SYMBOL)
-                    {
-                        pSym = VIR_Operand_GetSymbol(opnd);
-
-                        if (VIR_Symbol_GetKind(pSym) == VIR_SYM_UNIFORM)
-                        {
-                            pUniform = VIR_Symbol_GetUniform(pSym);
-                        }
-                        else if (VIR_Symbol_GetKind(pSym) == VIR_SYM_IMAGE)
-                        {
-                            pUniform = VIR_Symbol_GetImage(pSym);
-                        }
-                        /* We need to check a sampler if it is treated as a constant register. */
-                        else if (VIR_Symbol_GetKind(pSym) == VIR_SYM_SAMPLER &&
-                                 isSymUniformTreatSamplerAsConst(pSym))
-                        {
-                            pUniform = VIR_Symbol_GetSampler(pSym);
-                        }
-                        else
-                        {
-                            continue;
-                        }
-                    }
-
-                    if (pUniform)
-                    {
-                        bHitReadPortLimitation = gcvFALSE;
-
-                        thisConstRegNo = pUniform->physical +
-                                         VIR_Operand_GetMatrixConstIndex(opnd) +
-                                         ((VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE) ?
-                                          VIR_Operand_GetRelIndexing(opnd) : 0);
-
-                        /* Check whether shader hits the limitation that HW does not support two read port on reg file. */
-                        if (firstConstRegNo == NOT_ASSIGNED)
-                        {
-                            firstOpnd = opnd;
-                            firstSym  = pSym;
-                            firstConstRegNo = thisConstRegNo;
-                            bFirstConstRegIndexing = (VIR_Operand_GetRelAddrMode(opnd) != VIR_INDEXED_NONE);
-                        }
-                        else
-                        {
-                            if (!bFirstConstRegIndexing && VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE)
-                            {
-                                if (firstConstRegNo != thisConstRegNo)
-                                {
-                                    bHitReadPortLimitation = gcvTRUE;
-                                }
-                            }
-                            else if (bFirstConstRegIndexing || VIR_Operand_GetRelAddrMode(opnd) != VIR_INDEXED_NONE)
-                            {
-                                bHitReadPortLimitation = gcvTRUE;
-                            }
-                        }
-
-                        if (bHitReadPortLimitation)
-                        {
-                            VIR_Precision precision;
-
-                            /* decide which operand to replace, do not replace image uniform, 512 bit uniform */
-                            if (VIR_Symbol_GetKind(pSym) == VIR_SYM_IMAGE ||
-                                (VIR_OPCODE_U512_SrcNo(VIR_Inst_GetOpcode(inst)) > 0 &&
-                                 VIR_OPCODE_U512_SrcNo(VIR_Inst_GetOpcode(inst)) == (gctINT)j) )
-                            {
-                                VIR_Operand * tmpOpnd = opnd;
-                                VIR_Symbol *  tmpSym  = pSym;
-
-                                /* swap current opnd/sym with firstOpnd/firstSym */
-                                gcmASSERT(firstOpnd != gcvNULL);
-                                opnd = firstOpnd;
-                                pSym = firstSym;
-                                firstOpnd = tmpOpnd;
-                                firstSym = tmpSym;
-                            }
-
-                            precision = VIR_Operand_GetPrecision(opnd);
-
-                            /* Add a new-temp-reg number */
-                            newDstRegNo = VIR_Shader_NewVirRegId(pShader, 1);
-                            errCode = VIR_Shader_AddSymbol(pShader,
-                                                            VIR_SYM_VIRREG,
-                                                            newDstRegNo,
-                                                            VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetTypeId(opnd)),
-                                                            VIR_STORAGE_UNKNOWN,
-                                                            &newDstSymId);
-                            ON_ERROR(errCode, "Add symbol");
-                            pNewSym = VIR_Shader_GetSymFromId(pShader, newDstSymId);
-
-                            /* Add following inst just before current inst:
-
-                                mov new-temp-reg, uniform
-                            */
-                            errCode = VIR_Function_AddInstructionBefore(func, VIR_OP_MOV, VIR_Operand_GetTypeId(opnd), inst, gcvTRUE, &pNewInsertedInst);
-                            ON_ERROR(errCode, "Add instruction before");
-
-                            /* dst */
-                            newOpnd = VIR_Inst_GetDest(pNewInsertedInst);
-                            VIR_Operand_SetSymbol(newOpnd, func, newDstSymId);
-                            VIR_Operand_SetEnable(newOpnd, VIR_ENABLE_XYZW);
-                            VIR_Symbol_SetPrecision(pNewSym, precision);
-                            VIR_Operand_SetPrecision(newOpnd, precision);
-                            if(precision == VIR_PRECISION_HIGH)
-                            {
-                                VIR_Inst_SetThreadMode(pNewInsertedInst, VIR_THREAD_D16_DUAL_32);
-                            }
-
-                            /* src */
-                            newOpnd = VIR_Inst_GetSource(pNewInsertedInst, VIR_Operand_Src0);
-                            VIR_Operand_SetSymbol(newOpnd, func, pSym->index);
-                            VIR_Operand_SetSwizzle(newOpnd, VIR_SWIZZLE_XYZW);
-                            VIR_Operand_SetTypeId(newOpnd, VIR_Operand_GetTypeId(opnd));
-                            VIR_Operand_SetPrecision(newOpnd, VIR_Operand_GetPrecision(opnd));
-                            VIR_Operand_SetMatrixConstIndex(newOpnd, VIR_Operand_GetMatrixConstIndex(opnd));
-                            VIR_Operand_SetIsConstIndexing(newOpnd, VIR_Operand_GetIsConstIndexing(opnd));
-                            VIR_Operand_SetRelAddrMode(newOpnd, VIR_Operand_GetRelAddrMode(opnd));
-                            if (VIR_Operand_GetIsConstIndexing(opnd))
-                            {
-                                VIR_Operand_SetRelIndexingImmed(newOpnd, VIR_Operand_GetRelIndexing(opnd));
-                            }
-                            else
-                            {
-                                VIR_Operand_SetRelIndexing(newOpnd, VIR_Operand_GetRelIndexing(opnd));
-                            }
-
-                            /* Change operand of current inst to new-temp-reg */
-                            VIR_Operand_SetMatrixConstIndex(opnd, 0);
-                            VIR_Operand_SetRelAddrMode(opnd, VIR_INDEXED_NONE);
-                            VIR_Operand_SetRelIndexing(opnd, 0);
-                            VIR_Operand_SetTempRegister(opnd, func, newDstSymId, VIR_Operand_GetTypeId(opnd));
-                            if (precision == VIR_PRECISION_HIGH)
-                            {
-                                VIR_Inst_SetThreadMode(inst, VIR_THREAD_D16_DUAL_32);
-                            }
-
-                            vscVIR_AddNewDef(pDuInfo, pNewInsertedInst, newDstRegNo, 1, VIR_ENABLE_XYZW, VIR_HALF_CHANNEL_MASK_FULL,
-                                             gcvNULL, gcvNULL);
-
-                            vscVIR_AddNewUsageToDef(pDuInfo, pNewInsertedInst, inst, opnd,
-                                                    gcvFALSE, newDstRegNo, 1, VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(opnd)),
-                                                    VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-OnError:
-    return errCode;
-}
-
-DEF_QUERY_PASS_PROP(vscVIR_CheckEvisInstSwizzleRestriction)
-{
-    pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
-
-    /* Only constant allocation is enable, we can check constant reg file read port limitation */
-    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_RA;
-
-    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvFALSE;
-
-    /* Temp invaliate rd flow here (before IS/RA) as dubo pass does not update du */
-    pPassProp->passFlag.resDestroyReq.s.bInvalidateRdFlow = gcvTRUE;
+    return gcvTRUE;
 }
 
 VSC_ErrCode vscVIR_CheckEvisInstSwizzleRestriction(VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
+    VSC_HW_CONFIG*             pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     VIR_Shader*                pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_DEF_USAGE_INFO*        pDuInfo = pPassWorker->pDuInfo;
     VIR_FuncIterator           func_iter;
     VIR_FunctionNode*          func_node;
     VIR_Operand*               opnd;
     gctUINT                    j;
     VIR_Symbol*                pSym = gcvNULL;
-
-
-    /* If it is not OCL, just bail out */
-    if (!VIR_Shader_IsCL(pShader))
-    {
-        return errCode;
-    }
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
@@ -933,6 +1326,23 @@ VSC_ErrCode vscVIR_CheckEvisInstSwizzleRestriction(VSC_SH_PASS_WORKER* pPassWork
             for (j = 0; j < VIR_Inst_GetSrcNum(inst); ++j)
             {
                 opnd = VIR_Inst_GetSource(inst, j);
+
+                /* For a VX instruction, the swizzle of source0 is used for sourceBin, we can't shift it. */
+                if (pHwCfg->hwFeatureFlags.useSrc0SwizzleAsSrcBin &&
+                    j == 0 &&
+                    (VIR_Operand_GetOpKind(opnd) == VIR_OPND_SYMBOL ||
+                     VIR_Operand_GetOpKind(opnd) == VIR_OPND_VIRREG))
+                {
+                    pSym = VIR_Operand_GetSymbol(opnd);
+                    /* If the source is local storage addr, HW saves it to the w channel, so we need to insert a MOV to replace it. */
+                    if (VIR_Symbol_GetName(pSym) == VIR_NAME_LOCAL_INVOCATION_ID && VIR_Operand_GetSwizzle(opnd) == VIR_SWIZZLE_WWWW)
+                    {
+                        _FixSwizzleRestrictForLocalStorageAddr(pShader, pDuInfo, func, inst);
+                        opnd = VIR_Inst_GetSource(inst, j);
+                        pSym = VIR_Operand_GetSymbol(opnd);
+                    }
+                    VIR_Symbol_SetCannotShift(pSym, gcvTRUE);
+                }
 
                 if (VIR_Operand_GetOpKind(opnd) == VIR_OPND_SYMBOL)
                 {
@@ -1000,8 +1410,8 @@ static gctBOOL _IsPosAndDepthConflicted(VIR_Shader* pShader,
         return gcvTRUE;
     }
 
-    vscBV_Initialize(&tempMask, pMM, pDuInfo->baseTsDFA.baseDFA.flowSize);
-    vscBV_Initialize(&depDefIdxMask, pMM, pDuInfo->baseTsDFA.baseDFA.flowSize);
+    vscBV_Initialize(&tempMask, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool, pDuInfo->baseTsDFA.baseDFA.flowSize);
+    vscBV_Initialize(&depDefIdxMask, pDuInfo->baseTsDFA.baseDFA.pScratchMemPool, pDuInfo->baseTsDFA.baseDFA.flowSize);
 
     /* Collect all depth defs and mask them */
     depDefIdx = vscVIR_FindFirstDefIndex(pDuInfo, pDepthSym->u2.tempIndex);
@@ -1124,6 +1534,18 @@ DEF_QUERY_PASS_PROP(vscVIR_CheckPosAndDepthConflict)
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
 }
 
+DEF_SH_NECESSITY_CHECK(vscVIR_CheckPosAndDepthConflict)
+{
+    VIR_Shader*                pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+
+    if (pShader->shaderKind != VIR_SHADER_FRAGMENT)
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
 /* Pos and depth might be overlapped (conflicted). As HW needs postion is put into r0 and
    depth is put into r0.z, so if such overlapp is on Z, then we will encounter error. If
    such overlap happens, we need break it by inserting an extra MOV at the end of shader
@@ -1146,11 +1568,6 @@ VSC_ErrCode vscVIR_CheckPosAndDepthConflict(VSC_SH_PASS_WORKER* pPassWorker)
     VIR_TypeId                 depthTypeId;
     VIR_NATIVE_DEF_FLAGS       nativeDefFlags;
     VIR_Operand *              opnd;
-
-    if (pShader->shaderKind != VIR_SHADER_FRAGMENT)
-    {
-        return VSC_ERR_NONE;
-    }
 
     /* Does shader have pos? */
     for (ioIdx = 0; ioIdx < VIR_IdList_Count(pAttrIdLsts); ioIdx ++)
@@ -1301,32 +1718,663 @@ OnError:
     return errCode;
 }
 
-static VIR_Uniform* _FindMemBaseUniform(VIR_DEF_USAGE_INFO* pDuInfo,
-                                        VIR_Instruction* pMemInst,
-                                        VIR_Operand* pOpnd)
+DEF_QUERY_PASS_PROP(vscVIR_ConvFrontFacing)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_MC;
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+
+    pPassProp->passFlag.resCreationReq.s.bNeedRdFlow = gcvTRUE;
+    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
+}
+
+DEF_SH_NECESSITY_CHECK(vscVIR_ConvFrontFacing)
+{
+    VIR_Shader*                pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_Symbol*                pFrontFacingSym = gcvNULL;
+
+    if (pShader->shaderKind != VIR_SHADER_FRAGMENT)
     {
+        return gcvFALSE;
+    }
+
+    /* There is no integer support for ES11, so we always treat FrontFacing as a floating variable. */
+    if (VIR_Shader_IsES11Compiler(pShader))
+    {
+        return gcvFALSE;
+    }
+
+    /* Check if frontFacing is used. */
+    pFrontFacingSym = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_FRONT_FACING);
+    if (pFrontFacingSym == gcvNULL || isSymUnused(pFrontFacingSym))
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+/* HW always use a floating variable to save the FrontFacing, so we need to convert it to a boolean variable to match the spec. */
+VSC_ErrCode vscVIR_ConvFrontFacing(VSC_SH_PASS_WORKER* pPassWorker)
+{
+    VSC_ErrCode                errCode = VSC_ERR_NONE;
+    VIR_Shader*                pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_DEF_USAGE_INFO*        pDuInfo = pPassWorker->pDuInfo;
+    gctUINT                    symId = VIR_INVALID_ID, newRegNo, newRegSymId = VIR_INVALID_ID;
+    VIR_NameId                 nameId = VIR_INVALID_ID;
+    VIR_Symbol*                pRegSym = gcvNULL;
+    VIR_Symbol*                pVarSym = gcvNULL;
+    VIR_Symbol*                pFrontFacingSym = gcvNULL;
+    VIR_FuncIterator           func_iter;
+    VIR_FunctionNode*          pFunc_node;
+    VIR_Function*              pFunc;
+    VIR_Instruction*           pConvInst = gcvNULL;
+    VIR_Operand*               pOpnd = gcvNULL;
+
+    gcmASSERT(pShader->shaderKind == VIR_SHADER_FRAGMENT);
+
+    /* Check if frontFacing is used. */
+    pFrontFacingSym = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_FRONT_FACING);
+    if (pFrontFacingSym == gcvNULL || isSymUnused(pFrontFacingSym))
+    {
+        gcmASSERT(gcvFALSE);
+        return VSC_ERR_NONE;
+    }
+
+    /* Create a temp register to hold the integer value of FrontFacing. */
+    errCode = VIR_Shader_AddString(pShader,
+                                   "#int_frontFacing",
+                                   &nameId);
+    ON_ERROR(errCode, "Add nameString");
+
+    errCode = VIR_Shader_AddSymbol(pShader,
+                                   VIR_SYM_VARIABLE,
+                                   nameId,
+                                   VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_BOOLEAN),
+                                   VIR_STORAGE_UNKNOWN,
+                                   &symId);
+    pVarSym = VIR_Shader_GetSymFromId(pShader, symId);
+
+    if (errCode == VSC_ERR_REDEFINITION)
+    {
+        newRegNo = VIR_Symbol_GetVariableVregIndex(pVarSym);
+        errCode = VIR_Shader_GetVirRegSymByVirRegId(pShader,
+                                                    newRegNo,
+                                                    &newRegSymId);
+        pRegSym = VIR_Shader_GetSymFromId(pShader, newRegSymId);
+    }
+    else
+    {
+        newRegNo = VIR_Shader_NewVirRegId(pShader, 1);
+        VIR_Symbol_SetVariableVregIndex(pVarSym, newRegNo);
+
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                       VIR_SYM_VIRREG,
+                                       newRegNo,
+                                       VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_BOOLEAN),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &newRegSymId);
+        ON_ERROR(errCode, "Add symbol");
+        pRegSym = VIR_Shader_GetSymFromId(pShader, newRegSymId);
+        VIR_Symbol_SetVregVarSymId(pRegSym, symId);
+
+        /* Insert a CONVERT instruction for FrontFacing. */
+        errCode = VIR_Function_PrependInstruction(pShader->mainFunction,
+                                                  VIR_OP_F2I,
+                                                  VIR_TYPE_BOOLEAN,
+                                                  &pConvInst);
+        ON_ERROR(errCode, "add instruction");
+
+        /* Set dst. */
+        pOpnd = VIR_Inst_GetDest(pConvInst);
+        VIR_Operand_SetSymbol(pOpnd, VIR_Shader_GetMainFunction(pShader), newRegSymId);
+        VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
+
+        /* Set src0. */
+        pOpnd = VIR_Inst_GetSource(pConvInst, VIR_Operand_Src0);
+        VIR_Operand_SetSymbol(pOpnd, VIR_Shader_GetMainFunction(pShader), VIR_Symbol_GetIndex(pFrontFacingSym));
+        VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
+        VIR_Operand_SetTypeId(pOpnd, VIR_TYPE_FLOAT32);
+
+        /* Update DU. */
+        vscVIR_AddNewDef(pDuInfo, pConvInst, newRegNo, 1, VIR_ENABLE_X, VIR_HALF_CHANNEL_MASK_FULL,
+                         gcvNULL, gcvNULL);
+
+        vscVIR_AddNewUsageToDef(pDuInfo, VIR_INPUT_DEF_INST, pConvInst,
+                                pOpnd,
+                                gcvFALSE, VIR_Symbol_GetVariableVregIndex(pFrontFacingSym), 1, VIR_ENABLE_X,
+                                VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+    }
+
+    /* Find if any operand using gl_FrontFace and use the new temp register to replace it. */
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for (pFunc_node = VIR_FuncIterator_First(&func_iter);
+         pFunc_node != gcvNULL; pFunc_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_InstIterator       inst_iter;
+        VIR_Instruction*       pInst = gcvNULL;
+
+        pFunc = pFunc_node->function;
+
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(pFunc));
+        for (pInst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             pInst != gcvNULL;
+             pInst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            VIR_SrcOperand_Iterator srcOpndIter;
+            gctBOOL                 convertInst = gcvFALSE;
+
+            pOpnd = VIR_Inst_GetDest(pInst);
+            if (pOpnd && VIR_Operand_GetOpKind(pOpnd) == VIR_OPND_SYMBOL && VIR_Operand_GetSymbol(pOpnd) == pRegSym)
+            {
+                convertInst = gcvTRUE;
+                pConvInst = pInst;
+            }
+
+            VIR_SrcOperand_Iterator_Init(pInst, &srcOpndIter);
+            pOpnd = VIR_SrcOperand_Iterator_First(&srcOpndIter);
+
+            for (; pOpnd != gcvNULL; pOpnd = VIR_SrcOperand_Iterator_Next(&srcOpndIter))
+            {
+                if (VIR_Operand_GetOpKind(pOpnd) == VIR_OPND_SYMBOL &&
+                    VIR_Symbol_GetName(VIR_Operand_GetSymbol(pOpnd)) == VIR_NAME_FRONT_FACING)
+                {
+                    if (convertInst)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        /* Delete usage. */
+                        vscVIR_DeleteUsage(pDuInfo,
+                                           VIR_INPUT_DEF_INST,
+                                           pInst,
+                                           pOpnd,
+                                           gcvFALSE,
+                                           VIR_Symbol_GetVariableVregIndex(pFrontFacingSym),
+                                           1,
+                                           VIR_ENABLE_X,
+                                           VIR_HALF_CHANNEL_MASK_FULL,
+                                           gcvNULL);
+
+                        VIR_Operand_SetTempRegister(pOpnd, pFunc, newRegSymId, VIR_TYPE_BOOLEAN);
+
+                        /* Add the new usage. */
+                        vscVIR_AddNewUsageToDef(pDuInfo,
+                                                pConvInst,
+                                                pInst,
+                                                pOpnd,
+                                                gcvFALSE,
+                                                newRegNo,
+                                                1,
+                                                VIR_ENABLE_X,
+                                                VIR_HALF_CHANNEL_MASK_FULL,
+                                                gcvNULL);
+                    }
+                }
+            }
+        }
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode _ChangeUniformTypeToUvec3(VIR_Shader* pShader,
+                                             VIR_Symbol* pUniformSym)
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_Uniform*                pUniform = gcvNULL;
+    VIR_Symbol*                 pUnderlyingSym = gcvNULL;
+    VIR_Type*                   pUniformSymType = gcvNULL;
+    VIR_Type*                   pNewSymType = gcvNULL;
+    VIR_TypeId                  newSymTypeId;
+
+    /* Change uniform type to vec4 to hold lower/upper bounds in x/y and mem-size in W channel. */
+    if (VIR_Symbol_HasFlag(pUniformSym, VIR_SYMUNIFORMFLAG_ATOMIC_COUNTER))
+    {
+        pUniform = VIR_Symbol_GetUniform(pUniformSym);
+        pUnderlyingSym = VIR_Shader_GetSymFromId(pShader, pUniform->baseBindingUniform);
+
+        pUniformSymType = VIR_Symbol_GetType(pUnderlyingSym);
+        gcmASSERT((VIR_GetTypeFlag(VIR_Type_GetBaseTypeId(pUniformSymType)) & VIR_TYFLAG_ISINTEGER));
+        if (VIR_Type_isArray(pUniformSymType))
+        {
+            errCode = VIR_Shader_AddArrayType(pShader, VIR_TYPE_ATOMIC_UINT4,
+                                                VIR_Type_GetArrayLength(pUniformSymType), 0, &newSymTypeId);
+            ON_ERROR(errCode, "Add array type");
+            pNewSymType = VIR_Shader_GetTypeFromId(pShader, newSymTypeId);
+            VIR_Symbol_SetType(pUnderlyingSym, pNewSymType);
+        }
+        else
+        {
+            VIR_Symbol_SetType(pUnderlyingSym, VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_ATOMIC_UINT4));
+        }
+    }
+    else
+    {
+        pUniformSymType = VIR_Symbol_GetType(pUniformSym);
+        gcmASSERT((VIR_GetTypeFlag(VIR_Type_GetBaseTypeId(pUniformSymType)) & VIR_TYFLAG_ISINTEGER));
+
+        if (VIR_Type_isArray(pUniformSymType))
+        {
+            errCode = VIR_Shader_AddArrayType(pShader, VIR_TYPE_UINT_X4,
+                                                VIR_Type_GetArrayLength(pUniformSymType), 0, &newSymTypeId);
+            ON_ERROR(errCode, "Add array type");
+            pNewSymType = VIR_Shader_GetTypeFromId(pShader, newSymTypeId);
+            VIR_Symbol_SetType(pUniformSym, pNewSymType);
+        }
+        else
+        {
+            VIR_Symbol_SetType(pUniformSym, VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X4));
+        }
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode _InitializeUniformCopy(VIR_DEF_USAGE_INFO* pDuInfo,
+                                          VIR_Shader* pShader,
+                                          VIR_SymId* pResultSymId,
+                                          VIR_Operand* pUniformOpnd,
+                                          VIR_Symbol* pUniformSym)
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_Function*               pMainFunc = VIR_Shader_GetMainFunction(pShader);
+    VIR_VirRegId                virRegId = VIR_Shader_NewVirRegId(pShader, 1);
+    VIR_SymId                   resultSymId;
+    VIR_Instruction*            pNewInst;
+    VIR_Operand*                pOpnd;
+    VIR_OperandInfo             operandInfo;
+    gctBOOL                     bIsImage = gcvFALSE;
+
+    /*
+    ** If the base uniform is an image, then the address of LOAD/STORE/ATOMIC have already been calculated
+    ** and valided, so we just set the YZ to the full range.
+    */
+    if (VIR_Symbol_isImage(pUniformSym) || VIR_Symbol_isImageT(pUniformSym))
+    {
+        bIsImage = gcvTRUE;
+    }
+
+    errCode = VIR_Shader_AddSymbol(pShader,
+                                   VIR_SYM_VIRREG,
+                                   virRegId,
+                                   VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT32),
+                                   VIR_STORAGE_UNKNOWN,
+                                   &resultSymId);
+    ON_ERROR(errCode, "Add result symbol");
+
+    if (bIsImage)
+    {
+        /* Insert the MOV-X instruction. */
+        errCode = VIR_Function_PrependInstruction(pMainFunc,
+                                                  VIR_OP_MOV,
+                                                  VIR_TYPE_UINT32,
+                                                  &pNewInst);
+        ON_ERROR(errCode, "Prepend instruction");
+
+        /* Set DEST. */
+        pOpnd = VIR_Inst_GetDest(pNewInst);
+        VIR_Operand_SetSymbol(pOpnd, pMainFunc, resultSymId);
+        VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
+        VIR_Operand_GetOperandInfo(pNewInst, pOpnd, &operandInfo);
+
+        /* Update def. */
+        vscVIR_AddNewDef(pDuInfo,
+                         pNewInst,
+                         operandInfo.u1.virRegInfo.virReg,
+                         1,
+                         VIR_ENABLE_X,
+                         VIR_HALF_CHANNEL_MASK_FULL,
+                         gcvNULL,
+                         gcvNULL);
+
+        /* Set SOURCE. */
+        pOpnd = VIR_Inst_GetSource(pNewInst, 0);
+
+        /*
+        ** HW has underflow bug which can not use 0 as lower bound: it used (lowerB - sz + 1) to check OOB access.
+        ** so we just set it to the base start address.
+        */
+        VIR_Operand_Copy(pOpnd, pUniformOpnd);
+        VIR_Operand_SetTypeId(pOpnd, VIR_TYPE_UINT32);
+        VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
+
+        /* Insert the MOV-Y instruction. */
+        errCode = VIR_Function_PrependInstruction(pMainFunc,
+                                                  VIR_OP_MOV,
+                                                  VIR_TYPE_UINT32,
+                                                  &pNewInst);
+        ON_ERROR(errCode, "Prepend instruction");
+
+        /* Set DEST. */
+        pOpnd = VIR_Inst_GetDest(pNewInst);
+        VIR_Operand_SetSymbol(pOpnd, pMainFunc, resultSymId);
+        VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_Y);
+        VIR_Operand_GetOperandInfo(pNewInst, pOpnd, &operandInfo);
+
+        /* Update def. */
+        vscVIR_AddNewDef(pDuInfo,
+                         pNewInst,
+                         operandInfo.u1.virRegInfo.virReg,
+                         1,
+                         VIR_ENABLE_Y,
+                         VIR_HALF_CHANNEL_MASK_FULL,
+                         gcvNULL,
+                         gcvNULL);
+
+        /* Set SOURCE. */
+        pOpnd = VIR_Inst_GetSource(pNewInst, 0);
+        VIR_Operand_SetImmediateUint(pOpnd, 0xFFFFFFFF);
+    }
+    else
+    {
+        /* Change the type first. */
+        errCode = _ChangeUniformTypeToUvec3(pShader, pUniformSym);
+        ON_ERROR(errCode, "Change the uniform type.");
+
+        /* Insert the MOV-XY instruction. */
+        errCode = VIR_Function_PrependInstruction(pMainFunc,
+                                                  VIR_OP_MOV,
+                                                  VIR_TYPE_UINT_X2,
+                                                  &pNewInst);
+        ON_ERROR(errCode, "Prepend instruction");
+
+        /* Set DEST. */
+        pOpnd = VIR_Inst_GetDest(pNewInst);
+        VIR_Operand_SetSymbol(pOpnd, pMainFunc, resultSymId);
+        VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_XY);
+        VIR_Operand_GetOperandInfo(pNewInst, pOpnd, &operandInfo);
+
+        /* Update def. */
+        vscVIR_AddNewDef(pDuInfo,
+                         pNewInst,
+                         operandInfo.u1.virRegInfo.virReg,
+                         1,
+                         VIR_ENABLE_XY,
+                         VIR_HALF_CHANNEL_MASK_FULL,
+                         gcvNULL,
+                         gcvNULL);
+
+        /* Set SOURCE. */
+        pOpnd = VIR_Inst_GetSource(pNewInst, 0);
+        VIR_Operand_Copy(pOpnd, pUniformOpnd);
+        VIR_Operand_SetTypeId(pOpnd, VIR_TYPE_UINT_X2);
+        VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_YZZZ);
+    }
+
+    if (pResultSymId)
+    {
+        *pResultSymId = resultSymId;
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode _InsertAddressCopy(VIR_DEF_USAGE_INFO* pDuInfo,
+                                      VIR_Shader* pShader,
+                                      VIR_Instruction* pInstPosition,
+                                      VIR_SymId* pResultSymId,
+                                      VIR_SymId sourceSymId)
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_SymId                   resultSymId;
+    VIR_Instruction*            pNewInst;
+    VIR_Operand*                pOpnd;
+    VIR_Function*               pFunc = VIR_Inst_GetFunction(pInstPosition);
+    VIR_OperandInfo             operandInfo;
+
+    gcmASSERT(pResultSymId);
+    resultSymId = *pResultSymId;
+
+    /* Allocate the result reg symbol for this working instruction if no exist. */
+    if (resultSymId == VIR_INVALID_ID)
+    {
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                       VIR_SYM_VIRREG,
+                                       VIR_Shader_NewVirRegId(pShader, 1),
+                                       VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X2),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &resultSymId);
+        ON_ERROR(errCode, "Add result symbol");
+
+        *pResultSymId = resultSymId;
+    }
+
+    errCode = VIR_Function_AddInstructionAfter(pFunc,
+                                               VIR_OP_MOV,
+                                               VIR_TYPE_UINT_X2,
+                                               pInstPosition,
+                                               gcvTRUE,
+                                               &pNewInst);
+    ON_ERROR(errCode, "Add instruction after");
+
+    /* Set DEST. */
+    pOpnd = VIR_Inst_GetDest(pNewInst);
+    VIR_Operand_SetSymbol(pOpnd, pFunc, resultSymId);
+    VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_XY);
+    VIR_Operand_GetOperandInfo(pNewInst, pOpnd, &operandInfo);
+
+    /* Update def. */
+    vscVIR_AddNewDef(pDuInfo,
+                     pNewInst,
+                     operandInfo.u1.virRegInfo.virReg,
+                     1,
+                     VIR_ENABLE_XY,
+                     VIR_HALF_CHANNEL_MASK_FULL,
+                     gcvNULL,
+                     gcvNULL);
+
+    /* Set SOURCE. */
+    pOpnd = VIR_Inst_GetSource(pNewInst, 0);
+    VIR_Operand_SetSymbol(pOpnd, pFunc, sourceSymId);
+    VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XYYY);
+    VIR_Operand_GetOperandInfo(pNewInst, pOpnd, &operandInfo);
+
+    /* Update usage. */
+    vscVIR_AddNewUsageToDef(pDuInfo,
+                            VIR_ANY_DEF_INST,
+                            pNewInst,
+                            pOpnd,
+                            gcvFALSE,
+                            operandInfo.u1.virRegInfo.virReg,
+                            1,
+                            VIR_ENABLE_XY,
+                            VIR_HALF_CHANNEL_MASK_FULL,
+                            gcvNULL);
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode _InsertCompareAddressCopy(VIR_DEF_USAGE_INFO* pDuInfo,
+                                             VIR_Shader* pShader,
+                                             VIR_Instruction* pCompInst,
+                                             VIR_SymId* pResultSymId,
+                                             VIR_SymId sourceSymIds[2])
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_SymId                   resultSymId;
+    VIR_Instruction*            pNewInst;
+    VIR_Operand*                pOpnd;
+    VIR_Function*               pFunc = VIR_Inst_GetFunction(pCompInst);
+    VIR_OperandInfo             operandInfo;
+    gctUINT                     i;
+
+    errCode = VIR_Shader_AddSymbol(pShader,
+                                   VIR_SYM_VIRREG,
+                                   VIR_Shader_NewVirRegId(pShader, 1),
+                                   VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X2),
+                                   VIR_STORAGE_UNKNOWN,
+                                   &resultSymId);
+    ON_ERROR(errCode, "Add result symbol");
+
+    errCode = VIR_Function_AddInstructionAfter(pFunc,
+                                               VIR_Inst_GetOpcode(pCompInst),
+                                               VIR_TYPE_UINT_X2,
+                                               pCompInst,
+                                               gcvTRUE,
+                                               &pNewInst);
+    ON_ERROR(errCode, "Add instruction after");
+
+    VIR_Inst_SetConditionOp(pNewInst, VIR_Inst_GetConditionOp(pCompInst));
+
+    /* Set DEST. */
+    pOpnd = VIR_Inst_GetDest(pNewInst);
+    VIR_Operand_SetSymbol(pOpnd, pFunc, resultSymId);
+    VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_XY);
+    VIR_Operand_GetOperandInfo(pNewInst, pOpnd, &operandInfo);
+
+    /* Update def. */
+    vscVIR_AddNewDef(pDuInfo,
+                     pNewInst,
+                     operandInfo.u1.virRegInfo.virReg,
+                     1,
+                     VIR_ENABLE_XY,
+                     VIR_HALF_CHANNEL_MASK_FULL,
+                     gcvNULL,
+                     gcvNULL);
+
+    /* Copy the condition operand. */
+    pOpnd = VIR_Inst_GetSource(pNewInst, 0);
+    VIR_Operand_Copy(pOpnd, VIR_Inst_GetSource(pCompInst, 0));
+    VIR_Operand_GetOperandInfo(pNewInst, pOpnd, &operandInfo);
+
+    /* Update usage. */
+    if (operandInfo.isVreg)
+    {
+        vscVIR_AddNewUsageToDef(pDuInfo,
+                                VIR_ANY_DEF_INST,
+                                pNewInst,
+                                pOpnd,
+                                gcvFALSE,
+                                operandInfo.u1.virRegInfo.virReg,
+                                1,
+                                VIR_ENABLE_XY,
+                                VIR_HALF_CHANNEL_MASK_FULL,
+                                gcvNULL);
+    }
+    /* Set SOURCEs. */
+    for (i = 0; i < 2; i++)
+    {
+        pOpnd = VIR_Inst_GetSource(pNewInst, i + 1);
+        VIR_Operand_SetSymbol(pOpnd, pFunc, sourceSymIds[i]);
+        VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XYYY);
+        VIR_Operand_GetOperandInfo(pNewInst, pOpnd, &operandInfo);
+
+        /* Update usage. */
+        vscVIR_AddNewUsageToDef(pDuInfo,
+                                VIR_ANY_DEF_INST,
+                                pNewInst,
+                                pOpnd,
+                                gcvFALSE,
+                                operandInfo.u1.virRegInfo.virReg,
+                                1,
+                                VIR_ENABLE_XY,
+                                VIR_HALF_CHANNEL_MASK_FULL,
+                                gcvNULL);
+    }
+
+    if (pResultSymId)
+    {
+        *pResultSymId = resultSymId;
+    }
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode _GetLowerUpperVirRegSymId(VSC_MM* pMM,
+                                             VIR_Shader* pShader,
+                                             VIR_DEF_USAGE_INFO* pDuInfo,
+                                             VSC_HASH_TABLE* pWorkingSet,
+                                             VIR_Instruction* pWorkingInst,
+                                             VIR_Operand* pOpnd,
+                                             VIR_SymId* pVirRegSymId)
+    {
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
     VIR_DEF*                    pDef;
     VIR_GENERAL_UD_ITERATOR     udIter;
     gctUINT                     i;
-    VIR_Operand*              pThisOpnd;
-    VIR_Symbol*               pSym = gcvNULL;
-    VIR_OperandInfo           operandInfo;
-    VIR_Uniform*              pUniform;
+    VIR_Symbol*                 pResultRegSym = gcvNULL;
+    VIR_SymId                   resultRegSymId = VIR_INVALID_ID, firstRegSymId = VIR_INVALID_ID;
+    VIR_Instruction*            pFirstDefInst = gcvNULL;
+    gctBOOL                     bFound = gcvFALSE, bHasOnlyOneDef = gcvTRUE;
 
-    vscVIR_InitGeneralUdIterator(&udIter, pDuInfo, pMemInst, pOpnd, gcvFALSE, gcvFALSE);
+    /* We already generate a symbol for this instruction. */
+    if (vscHTBL_DirectTestAndGet(pWorkingSet, (void *)pWorkingInst, (void **)&pResultRegSym))
+    {
+        resultRegSymId = VIR_Symbol_GetIndex(pResultRegSym);
+        if (pVirRegSymId)
+        {
+            *pVirRegSymId = resultRegSymId;
+        }
+        return errCode;
+    }
 
+    /* Find all the defs. */
+    vscVIR_InitGeneralUdIterator(&udIter, pDuInfo, pWorkingInst, pOpnd, gcvFALSE, gcvFALSE);
     for (pDef = vscVIR_GeneralUdIterator_First(&udIter);
          pDef != gcvNULL;
          pDef = vscVIR_GeneralUdIterator_Next(&udIter))
     {
+        VIR_Instruction*        pDefInst = pDef->defKey.pDefInst;
+        VIR_Operand*            pSrcOpnd;
+        VIR_Symbol*             pSrcSym = gcvNULL;
+        VIR_OperandInfo         operandInfo;
         VIR_OpCode              opCode;
-        if (VIR_IS_SPECIAL_INST(pDef->defKey.pDefInst))
+        gctBOOL                 bCompareInst = gcvFALSE, bCompareInstAlsoFirstDef = gcvFALSE;
+        gctBOOL                 bFoundForThisDefSrc = gcvFALSE;
+        VIR_SymId               workingRegSymId = VIR_INVALID_ID;
+        VIR_SymId               compareSymIds[2] = { VIR_INVALID_ID, VIR_INVALID_ID };
+
+        if (VIR_IS_SPECIAL_INST(pDefInst))
         {
             continue;
         }
-        opCode = VIR_Inst_GetOpcode(pDef->defKey.pDefInst);
-        for (i = 0; i < VIR_Inst_GetSrcNum(pDef->defKey.pDefInst); ++i)
+        opCode = VIR_Inst_GetOpcode(pDefInst);
+
+        /* So far only check CSELECT for the compare instruction. */
+        if (opCode == VIR_OP_CSELECT)
         {
+            bCompareInst = gcvTRUE;
+        }
+
+        /* We already generate a symbol for this def instruction. */
+        if (vscHTBL_DirectTestAndGet(pWorkingSet, (void *)pDefInst, (void **)&pResultRegSym))
+        {
+            workingRegSymId = VIR_Symbol_GetIndex(pResultRegSym);
+            if (!bFound)
+            {
+                bFound = gcvTRUE;
+                pFirstDefInst = pDefInst;
+                firstRegSymId = workingRegSymId;
+            }
+            else
+        {
+                /* It has multi-def, so we need to allocate a new result reg for this working instruction. */
+                bHasOnlyOneDef = gcvFALSE;
+
+                /* Copy the address. */
+                errCode = _InsertAddressCopy(pDuInfo,
+                                             pShader,
+                                             pDefInst,
+                                             &resultRegSymId,
+                                             workingRegSymId);
+                ON_ERROR(errCode, "Insert address assign.");
+            }
+
+            continue;
+        }
+
+        /* Check all sources. */
+        opCode = VIR_Inst_GetOpcode(pDefInst);
+        for (i = 0; i < VIR_Inst_GetSrcNum(pDefInst); ++i)
+        {
+            workingRegSymId = VIR_INVALID_ID;
+            bFoundForThisDefSrc = gcvFALSE;
+
             if (opCode == VIR_OP_MAD ||
                 opCode == VIR_OP_IMADLO0 ||
                 opCode == VIR_OP_IMADLO1)
@@ -1334,46 +2382,191 @@ static VIR_Uniform* _FindMemBaseUniform(VIR_DEF_USAGE_INFO* pDuInfo,
                 /* only check src2 if it is MAD operation */
                 i = 2;
             }
-
-            pThisOpnd = VIR_Inst_GetSource(pDef->defKey.pDefInst, i);
-            pSym = VIR_Operand_GetSymbol(pThisOpnd);
-
-            if (VIR_Operand_GetOpKind(pThisOpnd) == VIR_OPND_SYMBOL &&
-                (VIR_Symbol_isUniform(pSym)   ||
-                 VIR_Symbol_isImage(pSym)       )  )
+            else if (bCompareInst)
             {
-                return VIR_Symbol_isUniform(pSym) ? VIR_Symbol_GetUniform(pSym)
-                                                  : VIR_Symbol_GetImage(pSym);
+                i = (i == 0) ? 1 : i;
+            }
+
+            pSrcOpnd = VIR_Inst_GetSource(pDefInst, i);
+            pSrcSym = VIR_Operand_GetSymbol(pSrcOpnd);
+
+            if (VIR_Operand_GetOpKind(pSrcOpnd) == VIR_OPND_SYMBOL &&
+                (VIR_Symbol_isUniform(pSrcSym)   ||
+                 VIR_Symbol_isImage(pSrcSym)     ||
+                 VIR_Symbol_isImageT(pSrcSym)))
+            {
+                /* Check if we already generate a symbol for this uniform. */
+                if (!vscHTBL_DirectTestAndGet(pWorkingSet, (void *)pSrcSym, (void **)&pResultRegSym))
+                {
+                    /* Copy the .yz channel of this uniform. */
+                    errCode = _InitializeUniformCopy(pDuInfo,
+                                                     pShader,
+                                                     &workingRegSymId,
+                                                     pSrcOpnd,
+                                                     pSrcSym);
+                    ON_ERROR(errCode, "Initialize uniform copy.");
+
+                    /* Update the hash. */
+                    pResultRegSym = VIR_Shader_GetSymFromId(pShader, workingRegSymId);
+                    vscHTBL_DirectSet(pWorkingSet, (void *)pSrcSym, (void *)pResultRegSym);
+                }
+                else
+            {
+                    workingRegSymId = VIR_Symbol_GetIndex(pResultRegSym);
+                }
+                gcmASSERT(workingRegSymId != VIR_INVALID_ID);
+                bFoundForThisDefSrc = gcvTRUE;
                 }
                 else
                 {
-                VIR_Operand_GetOperandInfo(pDef->defKey.pDefInst, pThisOpnd, &operandInfo);
+                VIR_Operand_GetOperandInfo(pDefInst, pSrcOpnd, &operandInfo);
 
                 if (VIR_OpndInfo_Is_Virtual_Reg(&operandInfo))
                 {
-                    pUniform = _FindMemBaseUniform(pDuInfo, pDef->defKey.pDefInst, pThisOpnd);
-                    if (pUniform)
+                    errCode = _GetLowerUpperVirRegSymId(pMM,
+                                                        pShader,
+                                                        pDuInfo,
+                                                        pWorkingSet,
+                                                        pDefInst,
+                                                        pSrcOpnd,
+                                                        &workingRegSymId);
+                    ON_ERROR(errCode, "Get lower upper virRegSymId.");
+
+                    if (workingRegSymId != VIR_INVALID_ID)
                     {
-                        return pUniform;
+                        bFoundForThisDefSrc = gcvTRUE;
+                    }
                 }
             }
+
+            /* Find one matched reg sym id. */
+            if (bFoundForThisDefSrc)
+            {
+                gcmASSERT(workingRegSymId != VIR_INVALID_ID);
+                if (!bFound)
+                {
+                    bFound = gcvTRUE;
+                    if (!bCompareInst)
+                    {
+                        pFirstDefInst = pDefInst;
+                        firstRegSymId = workingRegSymId;
                     }
+                    else
+                    {
+                        compareSymIds[i - 1] = workingRegSymId;
+                        bCompareInstAlsoFirstDef = gcvTRUE;
+                    }
+                }
+                else
+                {
+                    /* It has multi-def, so we need to allocate a new result reg for this working instruction. */
+                    bHasOnlyOneDef = gcvFALSE;
+
+                    if (!bCompareInst)
+                    {
+                        /* Copy the address. */
+                        errCode = _InsertAddressCopy(pDuInfo,
+                                                     pShader,
+                                                     pDefInst,
+                                                     &resultRegSymId,
+                                                     workingRegSymId);
+                        ON_ERROR(errCode, "Insert address assign.");
+                    }
+                    else
+                    {
+                        compareSymIds[i - 1] = workingRegSymId;
                     }
                 }
 
-    return gcvNULL;
+                /* Only check one source for a non-compare instruction. */
+                if (!bCompareInst)
+                {
+                    break;
+                }
+            }
+        }
+
+        if (bFoundForThisDefSrc)
+        {
+            /* If this match-def is a compare instruction, we need to insert a compare instruction too. */
+            if (bCompareInst)
+            {
+                gcmASSERT(compareSymIds[0] != VIR_INVALID_ID && compareSymIds[1] != VIR_INVALID_ID);
+
+                errCode = _InsertCompareAddressCopy(pDuInfo,
+                                                    pShader,
+                                                    pDefInst,
+                                                    &workingRegSymId,
+                                                    compareSymIds);
+                ON_ERROR(errCode, "Insert compare address assign.");
+
+                if (bCompareInstAlsoFirstDef)
+                    {
+                    pFirstDefInst = VIR_Inst_GetNext(pDefInst);
+                    firstRegSymId = workingRegSymId;
+                }
+            }
+
+            pResultRegSym = VIR_Shader_GetSymFromId(pShader, workingRegSymId);
+            vscHTBL_DirectSet(pWorkingSet, (void *)pDefInst, (void *)pResultRegSym);
+                }
+            }
+
+    gcmASSERT(bFound);
+
+    /* Copy the first def if there are multi-defs, otherwise just use the first def. */
+    if (!bHasOnlyOneDef)
+    {
+        gcmASSERT(firstRegSymId != VIR_INVALID_ID);
+
+        /* Copy the address. */
+        errCode = _InsertAddressCopy(pDuInfo,
+                                     pShader,
+                                     pFirstDefInst,
+                                     &resultRegSymId,
+                                     firstRegSymId);
+        ON_ERROR(errCode, "Insert address assign. ");
+                    }
+    else
+    {
+        resultRegSymId = firstRegSymId;
+                    }
+
+    gcmASSERT(resultRegSymId != VIR_INVALID_ID);
+    pResultRegSym = VIR_Shader_GetSymFromId(pShader, resultRegSymId);
+
+    if (pVirRegSymId)
+    {
+        *pVirRegSymId = resultRegSymId;
+                }
+
+OnError:
+    return errCode;
             }
 
 DEF_QUERY_PASS_PROP(vscVIR_AddOutOfBoundCheckSupport)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
 
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
+}
+
+DEF_SH_NECESSITY_CHECK(vscVIR_AddOutOfBoundCheckSupport)
+{
+    if (!(pPassWorker->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_NEED_OOB_CHECK))
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
 }
 
 VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode               errCode = VSC_ERR_NONE;
+    VSC_MM*                   pMM = pPassWorker->basePassWorker.pMM;
+    VSC_HASH_TABLE*           pWorkingSet = gcvNULL;
     VIR_Shader*               pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VIR_DEF_USAGE_INFO*       pDuInfo = pPassWorker->pDuInfo;
     VIR_FuncIterator          func_iter;
@@ -1382,29 +2575,25 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
     VIR_InstIterator          inst_iter;
     VIR_Instruction*          inst;
     VIR_Operand*              pOpnd;
-    VIR_Uniform*              pMemBaseUniform;
-    VIR_Symbol*               pSym = gcvNULL, *pNewSym = gcvNULL, *pSymForMemBaseUniform;
-    VIR_Symbol*               pUnderlyingSym = gcvNULL;
+    VIR_Symbol*               pSym = gcvNULL, *pNewSym = gcvNULL;
     gctBOOL                   bNeedInsertMov;
     VIR_OperandInfo           operandInfo;
     gctUINT                   newDstRegNo, i;
     VIR_SymId                 newDstSymId;
     VIR_Instruction*          pNewInsertedInstX;
-    VIR_Instruction*          pNewInsertedInstY;
-    VIR_Instruction*          pNewInsertedInstZ;
+    VIR_Instruction*          pNewInsertedInstYZ;
     VIR_OperandInfo           srcInfo;
     VIR_GENERAL_UD_ITERATOR   udIter;
     VIR_DEF*                  pDef;
     VIR_Operand *             opnd;
-    VIR_Type *                symType;
-    VIR_TypeId                newSymTypeId;
-    VIR_Type *                newSymType;
+    gctBOOL                   bChanged = gcvFALSE;
 
-    if (!(pPassWorker->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_NEED_OOB_CHECK))
+    if (VirSHADER_DumpCodeGenVerbose(pShader))
     {
-        return VSC_ERR_NONE;
+        VIR_Shader_Dump(gcvNULL, "Before out of bound check", pShader, gcvTRUE);
     }
 
+    /* Change the data type of the base address uniform. */
     for(i = 0; i < VIR_IdList_Count(&pShader->uniforms); ++i)
     {
         VIR_Id      id  = VIR_IdList_GetId(&pShader->uniforms, i);
@@ -1413,6 +2602,9 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
         errCode = VIR_Shader_ChangeAddressUniformTypeToFatPointer(pShader, sym);
         ON_ERROR0(errCode);
     }
+
+    /* Initialize the working set. */
+    pWorkingSet = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 256);
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
@@ -1424,7 +2616,11 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
         for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
              inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
-            gctBOOL bFullRange = gcvFALSE;  /* set bounds to <0x00, 0xFFFFFFFF> */
+            VIR_SymId virRegSymId = VIR_INVALID_ID;
+            VIR_Symbol* pVirRegSym = gcvNULL;
+
+            bNeedInsertMov = gcvFALSE;
+
             /* Uniform for SSBO base-addr has Y channel to store size of SSBO, now with OOB enable,
                we need move it to W channel because XYZ will be use as base/low-limit/upper-limit */
             for (i = 0; i < VIR_Inst_GetSrcNum(inst); ++ i)
@@ -1454,96 +2650,64 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
             }
 
             pOpnd = VIR_Inst_GetSource(inst, 0);
-
-            /* Try to find corresponding mem-base-addr uniform */
-            pMemBaseUniform = gcvNULL;
             pSym = VIR_Operand_GetSymbol(pOpnd);
-            bNeedInsertMov = gcvFALSE;
+
+            /* Try to find corresponding mem-base-addr uniform virreg */
             if (VIR_Operand_GetOpKind(pOpnd) == VIR_OPND_SYMBOL && VIR_Symbol_GetKind(pSym) == VIR_SYM_UNIFORM)
             {
-                /* the uniform has the pointer bound in its .y/.z channel,
-                 * so there is no need to insert a bounds info to the pointer */
-                pMemBaseUniform = VIR_Symbol_GetUniform(pSym);
-            }
-            else if (VIR_Symbol_isInput(pSym) || VIR_Symbol_isOutput(pSym))
+                if (VIR_Symbol_isImage(pSym) || VIR_Symbol_isImageT(pSym))
             {
+                    bNeedInsertMov = gcvTRUE;
+
+                    /* Check if we already generate a symbol for this uniform. */
+                    if (vscHTBL_DirectTestAndGet(pWorkingSet, (void*)&pSym, (void**)&pVirRegSym))
+                {
+                        virRegSymId = VIR_Symbol_GetIndex(pVirRegSym);
+                }
+                else
+                {
+                        /* Copy the .yz channel of this uniform. */
+                        errCode = _InitializeUniformCopy(pDuInfo,
+                                                         pShader,
+                                                         &virRegSymId,
+                                                         pOpnd,
+                                                         pSym);
+                        ON_ERROR(errCode, "Initialize uniform copy.");
+
+                        /* Update the hash. */
+                        pVirRegSym = VIR_Shader_GetSymFromId(pShader, virRegSymId);
+                        vscHTBL_DirectSet(pWorkingSet, (void*)&pSym, (void**)&pVirRegSym);
+                    }
+                    }
+                    else
+                    {
+                    _ChangeUniformTypeToUvec3(pShader, pSym);
+                    }
+                }
+            else if (VIR_Symbol_isInput(pSym) || VIR_Symbol_isOutput(pSym))
+                {
                 continue;
             }
             else
             {
-                VIR_Operand_GetOperandInfo(inst, pOpnd, &operandInfo);
-
-                if (VIR_OpndInfo_Is_Virtual_Reg(&operandInfo))
-                {
-                    pMemBaseUniform = _FindMemBaseUniform(pDuInfo, inst, pOpnd);
-                    bNeedInsertMov = gcvTRUE;
-                }
-                else
-                {
-                    gcmASSERT(gcvFALSE);
-                }
-            }
-
-            gcmASSERT(pMemBaseUniform);
-
-            pSymForMemBaseUniform = VIR_Shader_GetSymFromId(pShader, pMemBaseUniform->sym);
-
-            if (VIR_Symbol_isImage(pSymForMemBaseUniform))
-                    {
-                /* assume the image atomic address calculation is done bounds check,
-                    * so the bounds can be extended to full range, we can set the instruction not
-                    * to do bounds check if HW support per-inst bound check flag in future */
+                _GetLowerUpperVirRegSymId(pMM,
+                                          pShader,
+                                          pDuInfo,
+                                          pWorkingSet,
+                                          inst,
+                                          pOpnd,
+                                          &virRegSymId);
                 bNeedInsertMov = gcvTRUE;
-                bFullRange = gcvTRUE;
                     }
-                    else
-                    {
-                /* Change uniform type to vec4 to hold lower/upper bounds in x/y and mem-size in W channel. */
-                if (VIR_Symbol_HasFlag(pSymForMemBaseUniform, VIR_SYMUNIFORMFLAG_ATOMIC_COUNTER))
-                {
-                    pUnderlyingSym = VIR_Shader_GetSymFromId(pShader, pMemBaseUniform->baseBindingUniform);
 
-                    symType = VIR_Symbol_GetType(pUnderlyingSym);
-                    gcmASSERT((VIR_GetTypeFlag(VIR_Type_GetBaseTypeId(symType)) & VIR_TYFLAG_ISINTEGER));
-                    if (VIR_Type_isArray(symType))
-                    {
-                        errCode = VIR_Shader_AddArrayType(pShader, VIR_TYPE_ATOMIC_UINT4,
-                                                          VIR_Type_GetArrayLength(symType), 0, &newSymTypeId);
-                        ON_ERROR(errCode, "Add array type");
-                        newSymType = VIR_Shader_GetTypeFromId(pShader, newSymTypeId);
-                        VIR_Symbol_SetType(pUnderlyingSym, newSymType);
-                    }
-                    else
-                    {
-                        VIR_Symbol_SetType(pUnderlyingSym, VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_ATOMIC_UINT4));
-                    }
-                }
-                else
-                {
-                    symType = VIR_Symbol_GetType(pSymForMemBaseUniform);
-                    gcmASSERT((VIR_GetTypeFlag(VIR_Type_GetBaseTypeId(symType)) & VIR_TYFLAG_ISINTEGER));
-
-                    if (VIR_Type_isArray(symType))
-                    {
-                        errCode = VIR_Shader_AddArrayType(pShader, VIR_TYPE_UINT_X4,
-                                                          VIR_Type_GetArrayLength(symType), 0, &newSymTypeId);
-                        ON_ERROR(errCode, "Add array type");
-                        newSymType = VIR_Shader_GetTypeFromId(pShader, newSymTypeId);
-                        VIR_Symbol_SetType(pSymForMemBaseUniform, newSymType);
-            }
-            else
-            {
-                        VIR_Symbol_SetType(pSymForMemBaseUniform,
-                                            VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X4));
-                    }
-                }
-            }
             /* If src0 is not mem-base uniform, insert following 3 movs, and cast src0 to new dst-of-mov
                1. mov from src0.x,
                2. mov from Y channel of mem-base-addr uniform (low-limit)
                2. mov from Z channel of mem-base-addr uniform (upper-limit) */
             if (bNeedInsertMov)
             {
+                gcmASSERT(virRegSymId != VIR_INVALID_ID);
+
                 /* Add a new-temp-reg number */
                 newDstRegNo = VIR_Shader_NewVirRegId(pShader, 1);
                 errCode = VIR_Shader_AddSymbol(pShader,
@@ -1607,67 +2771,41 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
 
                 /* Add following inst just before current inst:
 
-                   mov new-temp-reg.y, pMemBaseUniform.y
+                   mov new-temp-reg.yz, pMemBaseUniformReg.xxy
                 */
-                errCode = VIR_Function_AddInstructionBefore(func, VIR_OP_MOV, VIR_TYPE_UINT32, inst, gcvTRUE, &pNewInsertedInstY);
+                errCode = VIR_Function_AddInstructionBefore(func, VIR_OP_MOV, VIR_TYPE_UINT_X2, inst, gcvTRUE, &pNewInsertedInstYZ);
                 ON_ERROR(errCode, "Add instruction before");
 
                 /* dst */
-                opnd = VIR_Inst_GetDest(pNewInsertedInstY);
+                opnd = VIR_Inst_GetDest(pNewInsertedInstYZ);
                 VIR_Operand_SetSymbol(opnd, func, newDstSymId);
-                VIR_Operand_SetEnable(opnd, VIR_ENABLE_Y);
+                VIR_Operand_SetEnable(opnd, VIR_ENABLE_YZ);
                 VIR_Operand_SetPrecision(opnd, VIR_Operand_GetPrecision(pOpnd));
 
                 /* src */
-                opnd = VIR_Inst_GetSource(pNewInsertedInstY, VIR_Operand_Src0);
-                {
-                    VIR_Operand_SetSymbol(opnd, func, pMemBaseUniform->sym);
-                    VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_YYYY);
-                    VIR_Operand_SetTypeId(opnd, VIR_TYPE_UINT32);
-                    VIR_Operand_SetPrecision(opnd, VIR_Operand_GetPrecision(pOpnd));
-                }
+                opnd = VIR_Inst_GetSource(pNewInsertedInstYZ, VIR_Operand_Src0);
+                VIR_Operand_SetSymbol(opnd, func, virRegSymId);
+                VIR_Operand_SetSwizzle(opnd, virmSWIZZLE(X, X, Y, Y));
+
                 vscVIR_AddNewDef(pDuInfo,
-                                 pNewInsertedInstY,
+                                 pNewInsertedInstYZ,
                                  newDstRegNo,
                                  1,
-                                 VIR_ENABLE_Y,
+                                 VIR_ENABLE_YZ,
                                  VIR_HALF_CHANNEL_MASK_FULL,
                                  gcvNULL,
                                  gcvNULL);
 
-                /* Add following inst just before current inst:
-
-                   mov new-temp-reg.z, pMemBaseUniform.z
-                */
-                errCode = VIR_Function_AddInstructionBefore(func, VIR_OP_MOV, VIR_TYPE_UINT32, inst, gcvTRUE, &pNewInsertedInstZ);
-                ON_ERROR(errCode, "Add instruction before");
-
-                /* dst */
-                opnd = VIR_Inst_GetDest(pNewInsertedInstZ);
-                VIR_Operand_SetSymbol(opnd, func, newDstSymId);
-                VIR_Operand_SetEnable(opnd, VIR_ENABLE_Z);
-                VIR_Operand_SetPrecision(opnd, VIR_Operand_GetPrecision(pOpnd));
-
-                /* src */
-                opnd = VIR_Inst_GetSource(pNewInsertedInstZ, VIR_Operand_Src0);
-                if (bFullRange)
-                {
-                    VIR_Operand_SetImmediateUint(opnd, 0xFFFFFFFF);
-                }
-                else
-                {
-                    VIR_Operand_SetSymbol(opnd, func, pMemBaseUniform->sym);
-                    VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_ZZZZ);
-                    VIR_Operand_SetTypeId(opnd, VIR_TYPE_UINT32);
-                    VIR_Operand_SetPrecision(opnd, VIR_Operand_GetPrecision(pOpnd));
-                }
-                vscVIR_AddNewDef(pDuInfo,
-                                 pNewInsertedInstZ,
-                                 newDstRegNo,
+                VIR_Operand_GetOperandInfo(pNewInsertedInstYZ, opnd, &operandInfo);
+                vscVIR_AddNewUsageToDef(pDuInfo,
+                                        VIR_ANY_DEF_INST,
+                                        pNewInsertedInstYZ,
+                                        opnd,
+                                        gcvFALSE,
+                                        operandInfo.u1.virRegInfo.virReg,
                                         1,
-                                 VIR_ENABLE_Z,
+                                        VIR_ENABLE_YZ,
                                         VIR_HALF_CHANNEL_MASK_FULL,
-                                 gcvNULL,
                                         gcvNULL);
 
                 /* Change operand of current inst to new-temp-reg */
@@ -1688,33 +2826,37 @@ VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker)
                                         gcvNULL);
 
                 vscVIR_AddNewUsageToDef(pDuInfo,
-                                        pNewInsertedInstY,
+                                        pNewInsertedInstYZ,
                                         inst,
                                         pOpnd,
                                         gcvFALSE,
                                         newDstRegNo,
                                         1,
-                                        VIR_ENABLE_Y,
-                                        VIR_HALF_CHANNEL_MASK_FULL,
-                                        gcvNULL);
-
-                vscVIR_AddNewUsageToDef(pDuInfo,
-                                        pNewInsertedInstZ,
-                                        inst,
-                                        pOpnd,
-                                        gcvFALSE,
-                                        newDstRegNo,
-                                        1,
-                                        VIR_ENABLE_Z,
+                                        VIR_ENABLE_YZ,
                                         VIR_HALF_CHANNEL_MASK_FULL,
                                         gcvNULL);
             }
+
             /* Change the swizzle of src0 to XYZ */
             VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XYZZ);
+
+            bChanged = gcvTRUE;
         }
     }
 
+    /* Dump the shader if changed. */
+    if (bChanged && VirSHADER_DumpCodeGenVerbose(pShader))
+    {
+        VIR_Shader_Dump(gcvNULL, "After out of bound check", pShader, gcvTRUE);
+    }
+
 OnError:
+    /* Finalize the working set. */
+    if (pWorkingSet)
+    {
+        vscHTBL_Reset(pWorkingSet);
+    }
+
     return errCode;
 }
 
@@ -1738,7 +2880,6 @@ _Inst_ChangeOpnd2HP(
     VIR_OperandInfo     operandInfo;
     VSC_DU_ITERATOR     duIter;
     VIR_DU_CHAIN_USAGE_NODE *pUsageNode;
-
 
     if (!(opndKind == VIR_OPND_VIRREG || opndKind == VIR_OPND_SYMBOL))
     {
@@ -1810,7 +2951,7 @@ _Inst_ChangeOpnd2HP(
                     for (; pUsageNode != gcvNULL; pUsageNode = VSC_DU_ITERATOR_NEXT(&duIter))
                     {
                         pUsage = GET_USAGE_BY_IDX(&pDuInfo->usageTable, pUsageNode->usageIdx);
-                        if (pUsage->usageKey.pUsageInst != VIR_OUTPUT_USAGE_INST)
+                        if (!VIR_IS_OUTPUT_USAGE_INST(pUsage->usageKey.pUsageInst))
                         {
                             VIR_Operand_SetPrecision(pUsage->usageKey.pOperand, VIR_PRECISION_HIGH);
                         }
@@ -1836,7 +2977,7 @@ _Inst_ChangeOpnd2HP(
                 for (; pUsageNode != gcvNULL; pUsageNode = VSC_DU_ITERATOR_NEXT(&duIter))
                 {
                     pUsage = GET_USAGE_BY_IDX(&pDuInfo->usageTable, pUsageNode->usageIdx);
-                    if (pUsage->usageKey.pUsageInst != VIR_OUTPUT_USAGE_INST)
+                    if (!VIR_IS_OUTPUT_USAGE_INST(pUsage->usageKey.pUsageInst))
                     {
                         VIR_Operand_SetPrecision(pUsage->usageKey.pOperand, VIR_PRECISION_HIGH);
                     }
@@ -1864,6 +3005,7 @@ _Inst_RequireHPDest(
             opcode == VIR_OP_IMG_STORE_3D ||
             opcode == VIR_OP_MOVA ||
             (VIR_OPCODE_isTexLd(opcode) && forceChange) ||
+            (VIR_OPCODE_isImgLd(opcode) && forceChange) ||
             (VIR_OPCODE_BITWISE(opcode) && forceChange))
         {
             return gcvTRUE;
@@ -1972,16 +3114,7 @@ _Inst_RequireHPSrc(
         if (VIR_OPCODE_isMemSt(opcode)       ||
             VIR_OPCODE_isMemLd(opcode)       ||
             VIR_OPCODE_isAttrLd(opcode)       ||
-            opcode == VIR_OP_IMG_LOAD        ||
-            opcode == VIR_OP_VX_IMG_LOAD     ||
-            opcode == VIR_OP_IMG_LOAD_3D     ||
-            opcode == VIR_OP_VX_IMG_LOAD_3D  ||
-            opcode == VIR_OP_IMG_STORE       ||
-            opcode == VIR_OP_VX_IMG_STORE    ||
-            opcode == VIR_OP_IMG_STORE_3D    ||
-            opcode == VIR_OP_VX_IMG_STORE_3D ||
-            opcode == VIR_OP_IMG_ADDR        ||
-            opcode == VIR_OP_IMG_ADDR_3D     ||
+            VIR_OPCODE_isImgRelated(opcode)  ||
             VIR_OPCODE_isAtom(opcode)
             )
         {
@@ -2139,6 +3272,21 @@ DEF_QUERY_PASS_PROP(vscVIR_AdjustPrecision)
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
 }
 
+DEF_SH_NECESSITY_CHECK(vscVIR_AdjustPrecision)
+{
+    VIR_Shader*                    pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+
+    /* currently only PS is dual16-able */
+    if (VIR_Shader_GetKind(pShader) == VIR_SHADER_FRAGMENT &&
+        !VIR_Shader_IsVulkan(pShader) &&
+        !VIR_Shader_IsDesktopGL(pShader))
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
 /* Based on HW dual16 restriction, adjust operand/symbol's precision */
 VSC_ErrCode vscVIR_AdjustPrecision(VSC_SH_PASS_WORKER* pPassWorker)
 {
@@ -2150,240 +3298,245 @@ VSC_ErrCode vscVIR_AdjustPrecision(VSC_SH_PASS_WORKER* pPassWorker)
     VIR_FunctionNode*              func_node;
     gctUINT                        dual16PrecisionRule = gcmOPT_DualFP16PrecisionRule();
 
-
-    /* currently only PS is dual16-able */
-    if (VIR_Shader_GetKind(pShader) == VIR_SHADER_FRAGMENT && !VIR_Shader_IsVulkan(pShader))
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for (func_node = VIR_FuncIterator_First(&func_iter);
+         func_node != gcvNULL;
+         func_node = VIR_FuncIterator_Next(&func_iter))
     {
-        VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
-        for (func_node = VIR_FuncIterator_First(&func_iter);
-                func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
+        VIR_Function    *func = func_node->function;
+        VIR_InstIterator inst_iter;
+        VIR_Instruction *inst;
+        gctUINT         i;
+        gctBOOL         forceChange = gcvFALSE, skipLowp = gcvTRUE;
+
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             inst != gcvNULL;
+             inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
-            VIR_Function    *func = func_node->function;
-            VIR_InstIterator inst_iter;
-            VIR_Instruction *inst;
-            gctUINT         i;
-            gctBOOL         forceChange = gcvFALSE, skipLowp = gcvTRUE;
+            VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
 
-            VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
-            for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
-                    inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+            /* bitwise operation: if any src is highp, the other src and dest has to be highp */
+            if (VIR_OPCODE_BITWISE(opcode))
             {
-                VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
-
-                /* bitwise operation: if any src is highp, the other src and dest has to be highp */
-                if (VIR_OPCODE_BITWISE(opcode))
+                for (i = 0; i < VIR_Inst_GetSrcNum(inst); ++i)
                 {
-                    for (i = 0; i < VIR_Inst_GetSrcNum(inst); ++i)
+                    if ((VIR_Operand_GetOpKind(VIR_Inst_GetSource(inst, i)) == VIR_OPND_IMMEDIATE &&
+                        !VIR_Opnd_ValueFit16Bits(VIR_Inst_GetSource(inst, i))) ||
+                        VIR_Operand_GetPrecision(VIR_Inst_GetSource(inst, i)) == VIR_PRECISION_HIGH)
                     {
-                        if ((VIR_Operand_GetOpKind(VIR_Inst_GetSource(inst, i)) == VIR_OPND_IMMEDIATE &&
-                            !VIR_Opnd_ValueFit16Bits(VIR_Inst_GetSource(inst, i))) ||
-                            VIR_Operand_GetPrecision(VIR_Inst_GetSource(inst, i)) == VIR_PRECISION_HIGH)
-                        {
-                            forceChange = gcvTRUE;
-                            break;
-                        }
+                        forceChange = gcvTRUE;
+                        break;
                     }
                 }
+            }
 
-                /* HW has restriction on select instruction - only one instruction type for comparison and type conversion
-                    we may have problem when dest and src0 type is different. For example,
-                    select fp32, int32, fp16, fp16,
-                    we need to set it instruction type to int32, thus it will use integer conversion
-                    to convert fp16 to fp32, which is wrong. Thus, we make dest and all src to be highp if
-                    there is one highp source or dest */
-                if (opcode == VIR_OP_CSELECT)
+            if (VIR_OPCODE_isTexLd(opcode) || VIR_OPCODE_isImgLd(opcode))
+            {
+                VIR_Operand*    pSrc0Opnd = VIR_Inst_GetSource(inst, 0);
+
+                if (VIR_Operand_GetPrecision(pSrc0Opnd) == VIR_PRECISION_HIGH)
                 {
-                    /* cmp.uint16 t1, t2, t3
-                        select.selmsb.fp32, t1.uint16, fp16, fp16 has problem
-                        since t1 will be -1 in uint16 (0xFFFF), while select.selmsb
-                        the instruction is fp32, which will check bit31 to be one or not*/
-                    if (VIR_Inst_GetConditionOp(inst) == VIR_COP_SELMSB ||
-                        VIR_Inst_GetConditionOp(inst) == VIR_COP_ALLMSB ||
-                        VIR_Inst_GetConditionOp(inst) == VIR_COP_ANYMSB)
+                    forceChange = gcvTRUE;
+                }
+            }
+
+            /* HW has restriction on select instruction - only one instruction type for comparison and type conversion
+                we may have problem when dest and src0 type is different. For example,
+                select fp32, int32, fp16, fp16,
+                we need to set it instruction type to int32, thus it will use integer conversion
+                to convert fp16 to fp32, which is wrong. Thus, we make dest and all src to be highp if
+                there is one highp source or dest */
+            if (opcode == VIR_OP_CSELECT)
+            {
+                /* cmp.uint16 t1, t2, t3
+                    select.selmsb.fp32, t1.uint16, fp16, fp16 has problem
+                    since t1 will be -1 in uint16 (0xFFFF), while select.selmsb
+                    the instruction is fp32, which will check bit31 to be one or not*/
+                if (VIR_Inst_GetConditionOp(inst) == VIR_COP_SELMSB ||
+                    VIR_Inst_GetConditionOp(inst) == VIR_COP_ALLMSB ||
+                    VIR_Inst_GetConditionOp(inst) == VIR_COP_ANYMSB)
+                {
+                    if (VIR_Operand_GetPrecision(VIR_Inst_GetDest(inst)) == VIR_PRECISION_HIGH &&
+                        VIR_Operand_GetPrecision(VIR_Inst_GetSource(inst, 0)) != VIR_PRECISION_HIGH)
                     {
-                        if (VIR_Operand_GetPrecision(VIR_Inst_GetDest(inst)) == VIR_PRECISION_HIGH &&
-                            VIR_Operand_GetPrecision(VIR_Inst_GetSource(inst, 0)) != VIR_PRECISION_HIGH)
-                        {
-                            forceChange = gcvTRUE;
-                        }
+                        forceChange = gcvTRUE;
                     }
-                    else
+                }
+                else
+                {
+                    VIR_Symbol  *destSym = VIR_Operand_GetSymbol(VIR_Inst_GetDest(inst));
+                    gctBOOL     needHighp = gcvFALSE;
+                    if (destSym)
                     {
-                        VIR_Symbol  *destSym = VIR_Operand_GetSymbol(VIR_Inst_GetDest(inst));
-                        gctBOOL     needHighp = gcvFALSE;
-                        if (destSym)
+                        VIR_TypeId ty0 = VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(destSym));
+                        VIR_TypeId ty1 = VIR_Operand_GetTypeId(VIR_Inst_GetSource(inst, 0));
+
+                        if(!(((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISFLOAT) &&
+                            (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISFLOAT)) ||
+                            ((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISINTEGER) &&
+                            (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISINTEGER))))
                         {
-                            VIR_TypeId ty0 = VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(destSym));
-                            VIR_TypeId ty1 = VIR_Operand_GetTypeId(VIR_Inst_GetSource(inst, 0));
+                            needHighp = gcvTRUE;
+                        }
 
-                            if(!(((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISFLOAT) &&
-                                (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISFLOAT)) ||
-                                ((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISINTEGER) &&
-                                (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISINTEGER))))
+                        /* it is possible that destSym is used as a different type */
+                        if (!needHighp)
+                        {
+                            VIR_DEF_KEY   defKey;
+                            gctUINT       defIdx;
+                            VIR_USAGE     *pUsage = gcvNULL;
+                            VIR_DEF       *pDef = gcvNULL;
+                            VIR_OperandInfo     operandInfo;
+                            VSC_DU_ITERATOR     duIter;
+                            VIR_DU_CHAIN_USAGE_NODE *pUsageNode;
+
+                            VIR_Operand_GetOperandInfo(inst, VIR_Inst_GetDest(inst), &operandInfo);
+
+                            defKey.pDefInst = inst;
+                            defKey.regNo = operandInfo.u1.virRegInfo.virReg;
+                            defKey.channel = VIR_CHANNEL_ANY;
+                            defIdx = vscBT_HashSearch(&pDuInfo->defTable, &defKey);
+
+                            while (VIR_INVALID_DEF_INDEX != defIdx)
                             {
-                                needHighp = gcvTRUE;
-                            }
+                                pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, defIdx);
 
-                            /* it is possible that destSym is used as a different type */
-                            if (!needHighp)
-                            {
-                                VIR_DEF_KEY   defKey;
-                                gctUINT       defIdx;
-                                VIR_USAGE     *pUsage = gcvNULL;
-                                VIR_DEF       *pDef = gcvNULL;
-                                VIR_OperandInfo     operandInfo;
-                                VSC_DU_ITERATOR     duIter;
-                                VIR_DU_CHAIN_USAGE_NODE *pUsageNode;
-
-                                VIR_Operand_GetOperandInfo(
-                                    inst,
-                                    VIR_Inst_GetDest(inst),
-                                    &operandInfo);
-
-                                defKey.pDefInst = inst;
-                                defKey.regNo = operandInfo.u1.virRegInfo.virReg;
-                                defKey.channel = VIR_CHANNEL_ANY;
-                                defIdx = vscBT_HashSearch(&pDuInfo->defTable, &defKey);
-
-                                while (VIR_INVALID_DEF_INDEX != defIdx)
+                                /* go through all the uses */
+                                VSC_DU_ITERATOR_INIT(&duIter, &pDef->duChain);
+                                pUsageNode = VSC_DU_ITERATOR_FIRST(&duIter);
+                                for (; pUsageNode != gcvNULL; pUsageNode = VSC_DU_ITERATOR_NEXT(&duIter))
                                 {
-                                    pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, defIdx);
+                                    pUsage = GET_USAGE_BY_IDX(&pDuInfo->usageTable, pUsageNode->usageIdx);
 
-                                    /* go through all the uses */
-                                    VSC_DU_ITERATOR_INIT(&duIter, &pDef->duChain);
-                                    pUsageNode = VSC_DU_ITERATOR_FIRST(&duIter);
-                                    for (; pUsageNode != gcvNULL; pUsageNode = VSC_DU_ITERATOR_NEXT(&duIter))
+                                    if (!VIR_IS_OUTPUT_USAGE_INST(pUsage->usageKey.pUsageInst))
                                     {
-                                        pUsage = GET_USAGE_BY_IDX(&pDuInfo->usageTable, pUsageNode->usageIdx);
-                                            if (pUsage->usageKey.pUsageInst != VIR_OUTPUT_USAGE_INST)
+                                        ty0 = VIR_Operand_GetTypeId(pUsage->usageKey.pOperand);
+                                        if(!(((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISFLOAT) &&
+                                            (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISFLOAT)) ||
+                                            ((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISINTEGER) &&
+                                            (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISINTEGER))))
                                         {
-                                            ty0 = VIR_Operand_GetTypeId(pUsage->usageKey.pOperand);
-                                            if(!(((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISFLOAT) &&
-                                                (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISFLOAT)) ||
-                                                ((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISINTEGER) &&
-                                                (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISINTEGER))))
-                                            {
-                                                needHighp = gcvTRUE;
-                                                break;
-                                            }
-                                        }
-                                    }
-
-                                    defIdx = pDef->nextDefIdxOfSameRegNo;
-                                    if (needHighp)
-                                    {
-                                        break;
-                                    }
-                                }
-                            }
-                            if (needHighp)
-                            {
-                                if (VIR_Operand_GetPrecision(VIR_Inst_GetDest(inst)) == VIR_PRECISION_HIGH)
-                                {
-                                    forceChange = gcvTRUE;
-                                }
-                                else
-                                {
-                                    for (i = 0; i < VIR_Inst_GetSrcNum(inst); ++i)
-                                    {
-                                        if (VIR_Operand_GetPrecision(VIR_Inst_GetSource(inst, i)) == VIR_PRECISION_HIGH)
-                                        {
-                                            forceChange = gcvTRUE;
+                                            needHighp = gcvTRUE;
                                             break;
                                         }
                                     }
                                 }
-                            }
-                        }
-                    }
-                }
 
-                if (VIR_OPCODE_isTexLd(opcode) &&
-                    (VIR_GetTypeFlag(VIR_Operand_GetTypeId(VIR_Inst_GetDest(inst))) & VIR_TYFLAG_ISINTEGER) &&
-                    VIR_Operand_GetPrecision(VIR_Inst_GetDest(inst)) != VIR_PRECISION_HIGH &&
-                    !pHwCfg->hwFeatureFlags.hasHalti5)
-                {
-                    forceChange = gcvTRUE;
-                    skipLowp = gcvFALSE;
-                }
-
-                for (i = 0; i < VIR_Inst_GetSrcNum(inst); ++i)
-                {
-                    if (_Inst_RequireHPSrc(inst, i, pDuInfo, &forceChange, &skipLowp))
-                    {
-                        gctBOOL setDefRecursively = (opcode == VIR_OP_MOD);
-                        _Inst_ChangeOpnd2HP(inst, VIR_Inst_GetSource(inst, i), gcvFALSE, skipLowp, setDefRecursively, pDuInfo);
-                    }
-                }
-
-                if (_Inst_RequireHPDest(inst, forceChange))
-                {
-                    _Inst_ChangeOpnd2HP(inst, VIR_Inst_GetDest(inst), gcvTRUE, skipLowp, gcvFALSE, pDuInfo);
-                }
-
-                /* HW Cvt2OutColFmt has issue with 0x2,
-                    output should be high-precision, */
-                {
-                    VIR_Operand* dest = VIR_Inst_GetDest(inst);
-                    if(dest)
-                    {
-                        if(VIR_Operand_isVirReg(dest) || VIR_Operand_isSymbol(dest))
-                        {
-                            VIR_Symbol* sym = VIR_Operand_GetSymbol(dest);
-                            if(VIR_Symbol_isVreg(sym))
-                            {
-                                VIR_Symbol* varSym = VIR_Symbol_GetVregVariable(sym);
-                                if(VIR_Symbol_isOutput(varSym))
+                                defIdx = pDef->nextDefIdxOfSameRegNo;
+                                if (needHighp)
                                 {
-                                    if(VIR_Type_isInteger(VIR_Symbol_GetType(varSym)) ||
-                                        (dual16PrecisionRule & Dual16_PrecisionRule_OUTPUT_HP))
-                                    {
-                                        VIR_Symbol_SetPrecision(varSym, VIR_PRECISION_HIGH);
-                                        VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
-                                        VIR_Operand_SetPrecision(dest, VIR_PRECISION_HIGH);
-                                    }
+                                    break;
                                 }
                             }
-                            else if(VIR_Symbol_isVariable(sym))
+                        }
+                        if (needHighp)
+                        {
+                            if (VIR_Operand_GetPrecision(VIR_Inst_GetDest(inst)) == VIR_PRECISION_HIGH)
                             {
-                                if(VIR_Symbol_isOutput(sym))
+                                forceChange = gcvTRUE;
+                            }
+                            else
+                            {
+                                for (i = 0; i < VIR_Inst_GetSrcNum(inst); ++i)
                                 {
-                                    if(VIR_Type_isInteger(VIR_Symbol_GetType(sym)) ||
-                                        (dual16PrecisionRule & Dual16_PrecisionRule_OUTPUT_HP))
+                                    if (VIR_Operand_GetPrecision(VIR_Inst_GetSource(inst, i)) == VIR_PRECISION_HIGH)
                                     {
-                                        VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
-                                        VIR_Operand_SetPrecision(dest, VIR_PRECISION_HIGH);
+                                        forceChange = gcvTRUE;
+                                        break;
                                     }
                                 }
                             }
                         }
                     }
                 }
-                /* HW has bug on conversion for flat varying, thus promote it to highp */
+            }
+
+            if (VIR_OPCODE_isTexLd(opcode) &&
+                (VIR_GetTypeFlag(VIR_Operand_GetTypeId(VIR_Inst_GetDest(inst))) & VIR_TYFLAG_ISINTEGER) &&
+                VIR_Operand_GetPrecision(VIR_Inst_GetDest(inst)) != VIR_PRECISION_HIGH &&
+                !pHwCfg->hwFeatureFlags.hasHalti5)
+            {
+                forceChange = gcvTRUE;
+                skipLowp = gcvFALSE;
+            }
+
+            for (i = 0; i < VIR_Inst_GetSrcNum(inst); ++i)
+            {
+                if (_Inst_RequireHPSrc(inst, i, pDuInfo, &forceChange, &skipLowp))
                 {
-                    gctUINT i;
-                    for(i = 0; i < VIR_Inst_GetSrcNum(inst); i++)
+                    gctBOOL setDefRecursively = (opcode == VIR_OP_MOD);
+                    _Inst_ChangeOpnd2HP(inst, VIR_Inst_GetSource(inst, i), gcvFALSE, skipLowp, setDefRecursively, pDuInfo);
+                }
+            }
+
+            if (_Inst_RequireHPDest(inst, forceChange))
+            {
+                _Inst_ChangeOpnd2HP(inst, VIR_Inst_GetDest(inst), gcvTRUE, skipLowp, gcvFALSE, pDuInfo);
+            }
+
+            /* HW Cvt2OutColFmt has issue with 0x2,
+                output should be high-precision, */
+            {
+                VIR_Operand* dest = VIR_Inst_GetDest(inst);
+                if(dest)
+                {
+                    if(VIR_Operand_isVirReg(dest) || VIR_Operand_isSymbol(dest))
                     {
-                        VIR_Operand* src = VIR_Inst_GetSource(inst, i);
-                        if (VIR_Operand_GetOpKind(src) == VIR_OPND_SYMBOL)
+                        VIR_Symbol* sym = VIR_Operand_GetSymbol(dest);
+                        if(VIR_Symbol_isVreg(sym))
                         {
-                            VIR_Symbol * sym = VIR_Operand_GetSymbol(src);
-                            if(VIR_Symbol_isInput(sym) && isSymFlat(sym))
+                            VIR_Symbol* varSym = VIR_Symbol_GetVregVariable(sym);
+                            if(VIR_Symbol_isOutput(varSym))
                             {
-                                VIR_Operand_SetPrecision(src, VIR_PRECISION_HIGH);
-                                VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
+                                if(VIR_Type_isInteger(VIR_Symbol_GetType(varSym)) ||
+                                    (dual16PrecisionRule & Dual16_PrecisionRule_OUTPUT_HP))
+                                {
+                                    VIR_Symbol_SetPrecision(varSym, VIR_PRECISION_HIGH);
+                                    VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
+                                    VIR_Operand_SetPrecision(dest, VIR_PRECISION_HIGH);
+                                }
                             }
                         }
-                        else if (VIR_Operand_GetOpKind(src) == VIR_OPND_VIRREG)
+                        else if(VIR_Symbol_isVariable(sym))
                         {
-                            VIR_Symbol * sym = VIR_Operand_GetSymbol(src);
-                            VIR_Symbol * varSym = VIR_Symbol_GetVregVariable(sym);
-                            if(VIR_Symbol_isInput(varSym) && isSymFlat(varSym))
+                            if(VIR_Symbol_isOutput(sym))
                             {
-                                VIR_Operand_SetPrecision(src, VIR_PRECISION_HIGH);
-                                VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
-                                VIR_Symbol_SetPrecision(varSym, VIR_PRECISION_HIGH);
+                                if(VIR_Type_isInteger(VIR_Symbol_GetType(sym)) ||
+                                    (dual16PrecisionRule & Dual16_PrecisionRule_OUTPUT_HP))
+                                {
+                                    VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
+                                    VIR_Operand_SetPrecision(dest, VIR_PRECISION_HIGH);
+                                }
                             }
+                        }
+                    }
+                }
+            }
+            /* HW has bug on conversion for flat varying, thus promote it to highp */
+            {
+                gctUINT i;
+                for(i = 0; i < VIR_Inst_GetSrcNum(inst); i++)
+                {
+                    VIR_Operand* src = VIR_Inst_GetSource(inst, i);
+                    if (VIR_Operand_GetOpKind(src) == VIR_OPND_SYMBOL)
+                    {
+                        VIR_Symbol * sym = VIR_Operand_GetSymbol(src);
+                        if(VIR_Symbol_isInput(sym) && isSymFlat(sym))
+                        {
+                            VIR_Operand_SetPrecision(src, VIR_PRECISION_HIGH);
+                            VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
+                        }
+                    }
+                    else if (VIR_Operand_GetOpKind(src) == VIR_OPND_VIRREG)
+                    {
+                        VIR_Symbol * sym = VIR_Operand_GetSymbol(src);
+                        VIR_Symbol * varSym = VIR_Symbol_GetVregVariable(sym);
+                        if(VIR_Symbol_isInput(varSym) && isSymFlat(varSym))
+                        {
+                            VIR_Operand_SetPrecision(src, VIR_PRECISION_HIGH);
+                            VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
+                            VIR_Symbol_SetPrecision(varSym, VIR_PRECISION_HIGH);
                         }
                     }
                 }
@@ -2391,7 +3544,7 @@ VSC_ErrCode vscVIR_AdjustPrecision(VSC_SH_PASS_WORKER* pPassWorker)
         }
     }
 
-    if (VirSHADER_DumpCodeGenVerbose(pShader->_id))
+    if (VirSHADER_DumpCodeGenVerbose(pShader))
     {
         VIR_Shader_Dump(gcvNULL, "After Adjust Precision", pShader, gcvTRUE);
     }
@@ -2400,7 +3553,8 @@ VSC_ErrCode vscVIR_AdjustPrecision(VSC_SH_PASS_WORKER* pPassWorker)
 }
 
 
-VIR_Operand * _vscVIR_FindParentOperandFromIndex(VIR_Instruction* inst, VIR_Operand* index, gctUINT channel)
+static
+VIR_Operand * _vscVIR_FindParentImgOperandFromIndex(VIR_Instruction* inst, VIR_Operand* index, gctUINT channel)
 {
     VIR_Instruction* prev;
 
@@ -2409,7 +3563,8 @@ VIR_Operand * _vscVIR_FindParentOperandFromIndex(VIR_Instruction* inst, VIR_Oper
         VIR_Operand* dest;
 
         dest = VIR_Inst_GetDest(prev);
-        if(VIR_Operand_GetSymbol(dest)->u1.vregIndex == VIR_Operand_GetSymbol(index)->u1.vregIndex &&
+        if(dest &&
+           VIR_Operand_GetSymbol(dest)->u1.vregIndex == VIR_Operand_GetSymbol(index)->u1.vregIndex &&
            VIR_Enable_Covers(VIR_Operand_GetEnable(dest), 1 << channel))
         {
             VIR_OpCode op = VIR_Inst_GetOpcode(prev);
@@ -2417,12 +3572,12 @@ VIR_Operand * _vscVIR_FindParentOperandFromIndex(VIR_Instruction* inst, VIR_Oper
             if(op == VIR_OP_LDARR)
             {
                 index = VIR_Inst_GetSource(prev, 1);
-                return _vscVIR_FindParentOperandFromIndex(prev, index, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(index), 0));
+                return _vscVIR_FindParentImgOperandFromIndex(prev, index, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(index), 0));
             }
             else if(op == VIR_OP_MOVA)
             {
                 index = VIR_Inst_GetSource(prev, 0);
-                return _vscVIR_FindParentOperandFromIndex(prev, index, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(index), channel));
+                return _vscVIR_FindParentImgOperandFromIndex(prev, index, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(index), channel));
             }
             else if(op == VIR_OP_GET_SAMPLER_IDX)
             {
@@ -2431,15 +3586,18 @@ VIR_Operand * _vscVIR_FindParentOperandFromIndex(VIR_Instruction* inst, VIR_Oper
             else if (op == VIR_OP_MOV)
             {
                 index = VIR_Inst_GetSource(prev, 0);
-                gcmASSERT(VIR_Operand_isSymbol(index));
 
-                if (VIR_Symbol_isImage(VIR_Operand_GetSymbol(index)))
+                if (VIR_Operand_isSymbol(index) && !VIR_Symbol_isVreg(VIR_Operand_GetSymbol(index)))
+                {
+                    return index;
+                }
+                else if(VIR_Operand_isImm(index))
                 {
                     return index;
                 }
                 else
                 {
-                    return _vscVIR_FindParentOperandFromIndex(prev, index, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(index), channel));
+                    return _vscVIR_FindParentImgOperandFromIndex(prev, index, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(index), channel));
                 }
             }
         }
@@ -2523,7 +3681,6 @@ _ConvGetSamplerIdx(
         {
             return errCode;
         }
-
         src = VIR_Inst_GetSource(pNextInst, srcIdx);
         if (src == gcvNULL || !VIR_Operand_isSymbol(src))
         {
@@ -2587,9 +3744,1060 @@ _ConvGetSamplerIdx(
     return errCode;
 }
 
+static VIR_Symbol*
+_getImageSymPairedWithSamplerValue(
+    IN VIR_Shader *pShader,
+    IN VIR_Symbol*          imageSym,
+    IN VIR_Symbol*          samplerSym,
+    IN VSC_SamplerValue     samplerValue
+    )
+{
+    VIR_Uniform *   imageUniform;
+    VIR_Type *      imageType = VIR_Symbol_GetType(imageSym);
+    VIR_TypeId      imageTypeId = VIR_Type_GetIndex(imageType);
+    VIR_Symbol*     origImageSym = imageSym;
+
+    if (VIR_TypeId_isImage(imageTypeId))
+    {
+        gcmASSERT(VIR_TypeId_isImage(imageTypeId) && samplerValue != VSC_IMG_SAMPLER_INVALID_VALUE);
+    }
+
+    /* loop through the image tandem chain to find if the pair existed or not
+     * if not, create a image symbol paired with sampler value */
+    for (; imageSym != gcvNULL; )
+    {
+        VIR_SymId nextTandemSymId;
+        imageUniform = VIR_Symbol_GetImage(imageSym);
+        /* check if the uniform has the same sampler value assigned, or if value is unknown they
+         * are using the same sampler symbol */
+        if (VIR_Uniform_GetImageSamplerValue(imageUniform) == samplerValue &&
+            ((samplerValue != VSC_IMG_SAMPLER_UNKNOWN_VALUE) ||
+             (samplerSym && VIR_Symbol_GetIndex(samplerSym) == VIR_Uniform_GetImageSamplerSymId(imageUniform))))
+        {
+            return imageSym;
+        }
+        else if (VIR_Uniform_GetImageSamplerValue(imageUniform) == VSC_IMG_SAMPLER_INVALID_VALUE)
+        {
+            /* the image uniform is first time been paired with sampler */
+            VIR_Uniform_SetImageSamplerValue(imageUniform, samplerValue);
+            VIR_Uniform_SetImageSamplerSymId(imageUniform, samplerSym ? VIR_Symbol_GetIndex(samplerSym)
+                                                                      : VIR_INVALID_ID);
+            VIR_Uniform_SetImageNextTandemSymId(imageUniform, VIR_INVALID_ID);
+            VIR_Uniform_SetImageSymId(imageUniform, VIR_Symbol_GetIndex(origImageSym));
+            return imageSym;
+        }
+        /* check the next tandem symbol for the image */
+        nextTandemSymId = VIR_Uniform_GetImageNextTandemSymId(imageUniform);
+        if (VIR_Id_isInvalid(nextTandemSymId))
+            {
+            /* no same value sampler for this image found, create a new image symbol and
+             * corresponding image uniform which has the new sampler value paired to it
+             *  <imageSym, samplerValue>, and tandem it to previous image uniform
+             */
+            VIR_Symbol*     newImageSym;
+            VIR_Uniform*    newImageUniform;
+            VIR_NameId      nameId;
+            VIR_SymId       newImageSymId = VIR_INVALID_ID;
+            gctCHAR         name[256] = "#";
+
+            /* create a new name */
+            gcoOS_StrCatSafe(name, gcmSIZEOF(name), VIR_Shader_GetSymNameString(pShader, origImageSym));
+            gcoOS_StrCatSafe(name, gcmSIZEOF(name), "$");
+            if(samplerSym)
+                {
+                gcoOS_StrCatSafe(name, gcmSIZEOF(name), VIR_Shader_GetSymNameString(pShader, samplerSym));
+            }
+            else
+            {
+                gcoOS_PrintStrSafe(name+strlen(name), 127 - strlen(name), gcvNULL, "%x", samplerValue);
+                }
+            gcoOS_StrCatSafe(name, gcmSIZEOF(name), "$glImage");
+            ON_ERROR(VIR_Shader_AddString(pShader, name, &nameId), "Failed to add name %s", name);
+
+            /* add image symbol with the new name and proper type etc. info */
+           ON_ERROR(VIR_Shader_AddSymbol(pShader,
+                                         VIR_SYM_IMAGE_T,
+                                         nameId,
+                                         imageType,
+                                         VIR_Symbol_GetStorageClass(imageSym),
+                                         &newImageSymId), "Failed to add new image symbol");
+            newImageSym = VIR_Shader_GetSymFromId(pShader, newImageSymId);
+            VIR_Symbol_SetFlag(newImageSym, VIR_SYMFLAG_COMPILER_GEN);
+            VIR_Symbol_SetPrecision(newImageSym, VIR_Symbol_GetPrecision(imageSym));
+            newImageUniform = VIR_Symbol_GetImage(newImageSym);
+            VIR_Symbol_SetUniformKind(newImageSym, VIR_UNIFORM_GL_IMAGE_FOR_IMAGE_T);
+            VIR_Symbol_SetAddrSpace(newImageSym, VIR_AS_CONSTANT);
+            VIR_Symbol_SetTyQualifier(newImageSym, VIR_TYQUAL_CONST);
+
+            /* <image, sampler> pair info */
+            VIR_Uniform_SetImageSymId(newImageUniform, VIR_Symbol_GetIndex(origImageSym));
+            VIR_Uniform_SetImageSamplerValue(newImageUniform, samplerValue);
+            VIR_Uniform_SetImageSamplerSymId(newImageUniform, samplerSym ? VIR_Symbol_GetIndex(samplerSym)
+                                                                         : VIR_INVALID_ID);
+            VIR_Uniform_SetImageLibFuncName(newImageUniform, gcvNULL);
+
+            /* chain newImageSym to the previous imageSym */
+            VIR_Uniform_SetImageNextTandemSymId(imageUniform, newImageSymId);
+            VIR_Uniform_SetImageNextTandemSymId(newImageUniform, VIR_INVALID_ID);
+            return newImageSym;
+            }
+        else
+        {
+            imageSym = VIR_Shader_GetSymFromId(pShader, nextTandemSymId);
+        }
+    }
+OnError:
+
+    return gcvNULL;
+}
+
+/* check if the sampler value used by the image read instruciton is using
+ * the same sampler value as assigned in the image uniform it accessed,
+ * if it is, no action is needed
+ * otherwise, check the next tandem image uniform,
+ *     if the same sampler value is used,
+ *        change the instruction to use that image uniform
+ *     otherwise continue the search untill found one or to the end
+ *    if non image uniform with the same sampler value is found
+ *    then create a new image uniform with that sampler value
+ */
+void
+_vscGenerateNewImageUniformIfNeeded(
+    VSC_SH_PASS_WORKER  *pPassWorker,
+    VIR_Instruction     *pInst
+    )
+{
+    VIR_Operand*    imageSrc;
+    VIR_Operand*    samplerSrc;
+    VIR_Operand*    parentSrc = gcvNULL;
+    VIR_Symbol*     imageSym;
+    VIR_Symbol*     samplerSym = gcvNULL;
+    VSC_SamplerValue  samplerTValue = VSC_IMG_SAMPLER_INVALID_VALUE;  /* default value if the sampler is set by kernel arg */
+    VIR_Symbol*     newImageSym;
+    VIR_Shader *    pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_OpCode      opcode = VIR_Inst_GetOpcode(pInst);
+    gctBOOL         coordIntType = VIR_TypeId_isInteger(VIR_Operand_GetTypeId(VIR_Inst_GetSource(pInst, 1)));
+
+    gcmASSERT(VIR_OPCODE_isImgLd(opcode));
+
+    /* get image uniform and sampler info used by the inst */
+    imageSrc = VIR_Inst_GetSource(pInst, 0);  /* image always the fisrt operand*/
+    gcmASSERT(VIR_Operand_isSymbol(imageSrc));
+
+    imageSym = VIR_Operand_GetSymbol(imageSrc);
+
+    if (!(VIR_Symbol_isImageT(imageSym) || VIR_Symbol_isImage(imageSym)))
+    {
+        parentSrc = _vscVIR_FindParentImgOperandFromIndex(pInst, imageSrc, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(imageSrc), 0));
+        imageSym = VIR_Operand_GetSymbol(parentSrc);
+    }
+    gcmASSERT(imageSym && (VIR_Symbol_isImageT(imageSym)|| VIR_Symbol_isImage(imageSym)));
+
+    /* sampler info */
+    samplerSrc = VIR_OPCODE_isImgRead(opcode) ? VIR_Inst_GetSource(pInst, 2)  /* source 2 for IMG_READ */
+                                               : VIR_Inst_GetSource(pInst, 3) ; /* source 3 for IMG_LOAD*/
+    /* VX_IMG_xxx instructions only support samplerless image read*/
+    if (VIR_OPCODE_isVX(opcode))
+    {
+            samplerSym = gcvNULL;
+            samplerTValue = VSC_IMG_SAMPLER_DEFAULT_VALUE;
+    }
+    else if (samplerSrc && !VIR_Operand_isUndef(samplerSrc))
+    {
+        if(VIR_Operand_isSymbol(samplerSrc))
+        {
+            VIR_Uniform * sampler = gcvNULL;
+            samplerSym = VIR_Operand_GetSymbol(samplerSrc);
+            if(VIR_Symbol_isSamplerT(samplerSym))
+            {
+                sampler = VIR_Symbol_GetSampler(samplerSym);
+            }
+            else
+            {
+                parentSrc = _vscVIR_FindParentImgOperandFromIndex(pInst, samplerSrc, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(samplerSrc), 0));
+                if(VIR_Operand_isImm(parentSrc))
+                {
+                    samplerSym = gcvNULL;
+                    samplerTValue = VIR_Operand_GetImmediateUint(parentSrc);
+                }
+                else
+                {
+                    samplerSym = VIR_Operand_GetSymbol(parentSrc);
+                    sampler = VIR_Symbol_GetSampler(samplerSym);
+                }
+            }
+            if (sampler)
+            {
+                /* get the sampler value stored in the sampler uniform */
+                samplerTValue = VIR_Uniform_GetSamplerValue(sampler);
+            }
+        }
+        else
+        {
+            gcmASSERT(VIR_Operand_isImm(samplerSrc));
+            samplerSym = gcvNULL;
+            samplerTValue = VIR_Operand_GetImmediateUint(samplerSrc);
+        }
+    }
+
+    if (samplerTValue == VSC_IMG_SAMPLER_INVALID_VALUE)
+    {
+        /* samplerless or unknown sampler value, use default sampler value*/
+        samplerTValue = VSC_IMG_SAMPLER_DEFAULT_VALUE;
+    }
+
+    /* add int coorinate info to the sampler value */
+    if (coordIntType)
+    {
+        samplerTValue |= VSC_IMG_SAMPLER_INT_COORDS_TRUE;
+    }
+
+    newImageSym = _getImageSymPairedWithSamplerValue(pShader, imageSym, samplerSym, samplerTValue);
+
+    /* update the inst to use new image sym if it is different with the one used in src0 */
+    if (imageSym != newImageSym)
+    {
+        VIR_Operand_SetSym(imageSrc, newImageSym);
+    }
+    return;
+}
+
+typedef union __ImgSampler_KeyState{
+    struct {
+       gctUINT baseLib : 2;         /* 2 = ceil(log(VSC_OCLImgLibKind_Counts)/log(2))*/
+       gctUINT imgType : 3;         /* 3 = ceil(log(VIR_IMG_TY_COUNT)/log(2))*/
+       gctUINT channelDataType : 4; /* 4 = ceil(log(VIR_IMG_CT_COUNT)/log(2))*/
+       gctUINT channelOrder : 4;    /* 4 = ceil(log(VIR_IMG_CO_COUNT)/log(2))*/
+       gctUINT normalizedCoord : 1; /* 0: NORMALIZED_COORDS_FALSE, 1: NORMALIZED_COORDS_TRUE */
+       gctUINT filterMode : 1;      /* 0: FILTER_NEAREST, 1: FILTER_LINEAR */
+       gctUINT addressMode : 3;     /* 3 = ceil(log(VSC_IMG_SAMPLER_ADDRESS_COUNT)/log(2))*/
+       gctUINT coordType : 1;       /*0: float coord, 1 integer coord*/
+       gctUINT imgDataType : 2;     /* 2 = ceil(log(3)/log(2))*/
+       gctUINT imgAccessType : 1;   /* 0: image for write; 1:image for read */
+    }u;
+    gctUINT data;
+}ImgSamplerKeyState;
+
+/* struct ImgSamplerKeyTable and struct ImgReadNameStr should have the same index value and should match with each other for the corresponding field */
+struct ImgSamplerKeyTable{
+    gctUINT imgType[VIR_IMG_TY_COUNT];
+    gctUINT imgChannelDataType[VIR_IMG_CT_COUNT];
+    gctUINT imgChannelOrder[VIR_IMG_CO_COUNT];
+    gctUINT normalizedCoord[2];
+    gctUINT filterMode[2];
+    gctUINT addressMode[VSC_IMG_SAMPLER_ADDRESS_COUNT];
+    gctUINT coordType[2];
+    gctUINT imgDataType[3];
+}imgSamplerKeyWordsTable[VSC_OCLImgLibKind_Counts] =
+{
+    /* VSC_OCLImgLibKind_UseLoadStore */
+    {
+        {VIR_IMG_TY_BUFFER, VIR_IMG_TY_2D, VIR_IMG_TY_3D, VIR_IMG_TY_2D_ARRAY, VIR_IMG_TY_1D, VIR_IMG_TY_1D_ARRAY, VIR_IMG_TY_1D_BUFFER},
+        {VIR_IMG_CT_SNORM_INT8, VIR_IMG_CT_SNORM_INT16, VIR_IMG_CT_UNORM_INT8, VIR_IMG_CT_UNORM_INT16, VIR_IMG_CT_UNORM_SHORT_565, VIR_IMG_CT_UNORM_SHORT_555, VIR_IMG_CT_UNORM_INT_101010,
+         VIR_IMG_CT_SIGNED_INT8, VIR_IMG_CT_SIGNED_INT16, VIR_IMG_CT_SIGNED_INT32, VIR_IMG_CT_UNSIGNED_INT8, VIR_IMG_CT_UNSIGNED_INT16, VIR_IMG_CT_UNSIGNED_INT32, VIR_IMG_CT_HALF_FLOAT, VIR_IMG_CT_FLOAT},
+        {VIR_IMG_CO_R, VIR_IMG_CO_A, VIR_IMG_CO_RG, VIR_IMG_CO_RA, VIR_IMG_CO_RGB, VIR_IMG_CO_RGBA, VIR_IMG_CO_BGRA, VIR_IMG_CO_ARGB,
+         VIR_IMG_CO_INTENSITY, VIR_IMG_CO_LUMINANCE, VIR_IMG_CO_Rx, VIR_IMG_CO_RGx, VIR_IMG_CO_RGBx},
+        {0, 1},
+        {0, 1},
+        {VSC_IMG_SAMPLER_ADDRESS_NONE, VSC_IMG_SAMPLER_ADDRESS_CLAMP_TO_EDGE, VSC_IMG_SAMPLER_ADDRESS_CLAMP, VSC_IMG_SAMPLER_ADDRESS_REPEAT, VSC_IMG_SAMPLER_ADDRESS_MIRRORED_REPEAT},
+        {0, 1},
+        {VSC_ImageValueFloat, VSC_ImageValueInt, VSC_ImageValueUint},
+    },
+    /* VSC_OCLImgLibKind_UseImgLoadTexldU */
+    {
+        {VIR_IMG_TY_2D, VIR_IMG_TY_2D, VIR_IMG_TY_3D, VIR_IMG_TY_3D, VIR_IMG_TY_2D, VIR_IMG_TY_2D, VIR_IMG_TY_2D},
+        {VIR_IMG_CT_SNORM_INT8, VIR_IMG_CT_SNORM_INT16, VIR_IMG_CT_UNORM_INT8, VIR_IMG_CT_UNORM_INT16, VIR_IMG_CT_UNORM_SHORT_565, VIR_IMG_CT_UNORM_SHORT_555, VIR_IMG_CT_UNORM_INT_101010,
+         VIR_IMG_CT_SIGNED_INT8, VIR_IMG_CT_SIGNED_INT16, VIR_IMG_CT_SIGNED_INT32, VIR_IMG_CT_UNSIGNED_INT8, VIR_IMG_CT_UNSIGNED_INT16, VIR_IMG_CT_UNSIGNED_INT32, VIR_IMG_CT_HALF_FLOAT, VIR_IMG_CT_FLOAT},
+        {VIR_IMG_CO_R, VIR_IMG_CO_A, VIR_IMG_CO_RG, VIR_IMG_CO_RA, VIR_IMG_CO_RGB, VIR_IMG_CO_RGBA, VIR_IMG_CO_BGRA, VIR_IMG_CO_ARGB,
+         VIR_IMG_CO_INTENSITY, VIR_IMG_CO_LUMINANCE, VIR_IMG_CO_Rx, VIR_IMG_CO_RGx, VIR_IMG_CO_RGBx},
+        {0, 1},
+        {0, 1},
+        {VSC_IMG_SAMPLER_ADDRESS_NONE, VSC_IMG_SAMPLER_ADDRESS_CLAMP_TO_EDGE, VSC_IMG_SAMPLER_ADDRESS_CLAMP, VSC_IMG_SAMPLER_ADDRESS_REPEAT, VSC_IMG_SAMPLER_ADDRESS_MIRRORED_REPEAT},
+        {0, 1},
+        {VSC_ImageValueFloat, VSC_ImageValueInt, VSC_ImageValueUint},
+    },
+    /* VSC_OCLImgLibKind_UseImgLoadTexldUXY */
+    {
+        {VIR_IMG_TY_2D, VIR_IMG_TY_2D, VIR_IMG_TY_3D, VIR_IMG_TY_3D, VIR_IMG_TY_2D, VIR_IMG_TY_2D, VIR_IMG_TY_2D},
+        {VIR_IMG_CT_SNORM_INT8, VIR_IMG_CT_SNORM_INT16, VIR_IMG_CT_UNORM_INT8, VIR_IMG_CT_UNORM_INT16, VIR_IMG_CT_UNORM_SHORT_565, VIR_IMG_CT_UNORM_SHORT_555, VIR_IMG_CT_UNORM_INT_101010,
+         VIR_IMG_CT_SIGNED_INT8, VIR_IMG_CT_SIGNED_INT16, VIR_IMG_CT_SIGNED_INT32, VIR_IMG_CT_UNSIGNED_INT8, VIR_IMG_CT_UNSIGNED_INT16, VIR_IMG_CT_UNSIGNED_INT32, VIR_IMG_CT_HALF_FLOAT, VIR_IMG_CT_FLOAT},
+        {VIR_IMG_CO_R, VIR_IMG_CO_A, VIR_IMG_CO_RG, VIR_IMG_CO_RA, VIR_IMG_CO_RGB, VIR_IMG_CO_RGBA, VIR_IMG_CO_BGRA, VIR_IMG_CO_ARGB,
+         VIR_IMG_CO_INTENSITY, VIR_IMG_CO_LUMINANCE, VIR_IMG_CO_Rx, VIR_IMG_CO_RGx, VIR_IMG_CO_RGBx},
+        {0, 1},
+        {0, 1},
+        {VSC_IMG_SAMPLER_ADDRESS_NONE, VSC_IMG_SAMPLER_ADDRESS_CLAMP_TO_EDGE, VSC_IMG_SAMPLER_ADDRESS_CLAMP, VSC_IMG_SAMPLER_ADDRESS_REPEAT, VSC_IMG_SAMPLER_ADDRESS_MIRRORED_REPEAT},
+        {0, 1},
+        {VSC_ImageValueFloat, VSC_ImageValueInt, VSC_ImageValueUint},
+    },
+    /* VSC_OCLImgLibKind_UseImgLoadVIP */
+    {
+        {VIR_IMG_TY_2D, VIR_IMG_TY_2D, VIR_IMG_TY_3D, VIR_IMG_TY_2D_ARRAY, VIR_IMG_TY_1D, VIR_IMG_TY_1D_ARRAY, VIR_IMG_TY_1D},
+        {VIR_IMG_CT_FLOAT, VIR_IMG_CT_FLOAT, VIR_IMG_CT_FLOAT, VIR_IMG_CT_FLOAT, VIR_IMG_CT_FLOAT, VIR_IMG_CT_FLOAT, VIR_IMG_CT_FLOAT,
+         VIR_IMG_CT_SIGNED_INT32, VIR_IMG_CT_SIGNED_INT32, VIR_IMG_CT_SIGNED_INT32, VIR_IMG_CT_UNSIGNED_INT32, VIR_IMG_CT_UNSIGNED_INT32, VIR_IMG_CT_UNSIGNED_INT32, VIR_IMG_CT_HALF_FLOAT, VIR_IMG_CT_FLOAT},
+        {VIR_IMG_CO_COUNT, VIR_IMG_CO_A, VIR_IMG_CO_RG, VIR_IMG_CO_RA, VIR_IMG_CO_RGB, VIR_IMG_CO_COUNT, VIR_IMG_CO_COUNT, VIR_IMG_CO_ARGB,
+         VIR_IMG_CO_INTENSITY, VIR_IMG_CO_LUMINANCE, VIR_IMG_CO_Rx, VIR_IMG_CO_RGx, VIR_IMG_CO_RGBx},
+        {0, 1},
+        {0, 1},
+        {VSC_IMG_SAMPLER_ADDRESS_NONE, VSC_IMG_SAMPLER_ADDRESS_CLAMP_TO_EDGE, VSC_IMG_SAMPLER_ADDRESS_CLAMP, VSC_IMG_SAMPLER_ADDRESS_REPEAT, VSC_IMG_SAMPLER_ADDRESS_MIRRORED_REPEAT},
+        {0, 1},
+        {VSC_ImageValueUint, VSC_ImageValueUint, VSC_ImageValueUint},
+    },
+};
+
+struct ImgReadNameStr {
+    gctSTRING baseName;
+    gctSTRING imgTypeStr[VIR_IMG_TY_COUNT];                         /* 0: buffer, 1: 2d, 2: 3d, 3: 2darray, 4: 1d, 5: 1darray, 6:1dbuffer */
+    gctSTRING imgChannelTypeStr[VIR_IMG_CT_COUNT];
+    gctSTRING imgChannelOrderStr[VIR_IMG_CO_COUNT];
+    gctSTRING samplerNormalizedCoordStr[2];                         /* 0: NORMALIZED_COORDS_FALSE, 1: NORMALIZED_COORDS_TRUE */
+    gctSTRING samplerFilterStr[2];                                  /* 0: FILTER_NEAREST, 1: FILTER_LINEAR */
+    gctSTRING samplerAddressModeStr[VSC_IMG_SAMPLER_ADDRESS_COUNT]; /* 0: NODE, 1: EDGE, 2: CLAMP, 3: REPEAT, 4: MIRROR */
+    gctSTRING coordType[2];                                         /*0: float coord, 1 integer coord*/
+    gctSTRING imageValueType[3];                                    /* match imageValueType in VSC_ImageDesc */
+} imgReadNamesInfo[VSC_OCLImgLibKind_Counts] =
+{
+    /* VSC_OCLImgLibKind_UseLoadStore */
+    {
+        "_read_image_with_load",
+        {"_buffer", "_2d", "_3d", "_2darray", "_1d", "_1darray", "_1dbuffer"},
+        {"_snorm8", "_snorm16", "_unorm8", "_unorm16", "_unorm565", "_unorm555", "_unorm101010",
+         "_int8", "_int16", "_int32", "_uint8", "_uint16", "_uint32", "_half", "_float"},
+        {"_R", "_A", "_RG", "_RA", "_RGB", "_RGBA", "_BGRA", "_ARGB",
+         "_INTENSITY", "_LUMINANCE", "_Rx", "_RGx", "_RGBx"},
+        {"_unnormCoord", "_normCoord"},
+        {"_nearest", "_linear"},
+        {"_none", "_clamp", "_border", "_wrap", "_mirror"},
+        {"_floatcoord", "_intcoord"},
+        {"_retf", "_reti", "_retui"},
+    },
+    /* VSC_OCLImgLibKind_UseImgLoadTexldU */
+    {
+        "_read_image_with_texldu",
+        {"", "", "_3d", "_3d", "", "", ""},
+        {"_snorm8", "_snorm16", "_unorm8", "_unorm16", "_unorm565", "_unorm555", "_unorm101010",
+         "_int8", "_int16", "_int32", "_uint8", "_uint16", "_uint32", "_half", "_float"},
+        {"_R", "_A", "_RG", "_RA", "_RGB", "_RGBA", "_BGRA", "_ARGB",
+         "_INTENSITY", "_LUMINANCE", "_Rx", "_RGx", "_RGBx"},
+        {"", "_normCoord"},
+        {"_nearest", "_linear"},
+        {"", "_clamp", "_border", "_wrap", "_mirror"},
+        {"", ""},
+        {"", "", ""},
+    },
+    /* VSC_OCLImgLibKind_UseImgLoadTexldUXY */
+    {
+        "_read_image_with_texlduxy",
+        {"", "", "_3d", "_3d", "", "", ""},
+        {"_snorm8", "_snorm16", "_unorm8", "_unorm16", "_unorm565", "_unorm555", "_unorm101010",
+         "_int8", "_int16", "_int32", "_uint8", "_uint16", "_uint32", "_half", "_float"},
+        {"_R", "_A", "_RG", "_RA", "_RGB", "_RGBA", "_BGRA", "_ARGB",
+         "_INTENSITY", "_LUMINANCE", "_Rx", "_RGx", "_RGBx"},
+        {"", "_normCoord"},
+        {"_nearest", "_linear"},
+        {"", "_clamp", "_border", "_wrap", "_mirror"},
+        {"", ""},
+        {"", "", ""},
+    },
+    /* VSC_OCLImgLibKind_UseImgLoadVIP */
+    {
+        "_read_image_width_imgread",
+        {"", "_2d", "_3d", "_2darray", "_1d", "_1darray", "_1d"},
+        {"_float", "_float", "_float", "_float", "_float", "_float", "_float",
+         "_int", "_int", "_int", "_uint", "_uint", "_uint", "_float", "_float"},
+        {"", "_A", "_RG", "_RA", "_RGB", "", "", "",
+         "_INTENSITY", "_LUMINANCE", "_Rx", "_RGx", "_RGBx"},
+        {"_unnormCoord", "_normCoord"},
+        {"_nearest", "_linear"},
+        {"_none", "_clamp", "_border", "_wrap", "_mirror"},
+        {"_floatcoord", "_intcoord"},
+        {"", "", ""},
+    },
+};
+
+struct ImgWriteNameStr {
+    gctSTRING baseName;
+    gctSTRING imgTypeStr[VIR_IMG_TY_COUNT];                         /* 0: buffer, 1: 2d, 2: 3d, 3: 2darray, 4: 1d, 5: 1darray, 6:1dbuffer */
+    gctSTRING imgChannelTypeStr[VIR_IMG_CT_COUNT];
+    gctSTRING imgChannelOrderStr[VIR_IMG_CO_COUNT];
+    gctSTRING imageValueType[3];                                    /* match imageValueType in VSC_ImageDesc */
+} imgWriteNamesInfo[VSC_OCLImgLibKind_Counts] =
+{
+    /* VSC_OCLImgLibKind_UseLoadStore */
+    {
+        "_write_image_with_store",
+        {"_buffer", "_2d", "_3d", "_2darray", "_1d", "_1darray", "_1dbuffer"},
+        {"_snorm8", "_snorm16", "_unorm8", "_unorm16", "_unorm565", "_unorm555", "_unorm101010",
+         "_int8", "_int16", "_int32", "_uint8", "_uint16", "_uint32", "_half", "_float"},
+        {"_R", "_A", "_RG", "_RA", "_RGB", "_RGBA", "_BGRA", "_ARGB",
+         "_INTENSITY", "_LUMINANCE", "_Rx", "_RGx", "_RGBx"},
+        {"_retf", "_reti", "_retui"},
+    },
+    /* VSC_OCLImgLibKind_UseImgLoadTexldU */
+    {
+        "_write_image_with_img_store",
+        {"", "", "_3d", "_3d", "", "", ""},
+        {"_snorm8", "_snorm16", "_unorm8", "_unorm16", "_unorm565", "_unorm555", "_unorm101010",
+         "_int8", "_int16", "_int32", "_uint8", "_uint16", "_uint32", "_half", "_float"},
+        {"_R", "_A", "_RG", "_RA", "_RGB", "_RGBA", "_BGRA", "_ARGB",
+         "_INTENSITY", "_LUMINANCE", "_Rx", "_RGx", "_RGBx"},
+        {"", "", ""},
+    },
+    /* VSC_OCLImgLibKind_UseImgLoadTexldUXY */
+    {
+        "_write_image_with_img_store",
+        {"", "", "_3d", "_3d", "", "", ""},
+        {"_snorm8", "_snorm16", "_unorm8", "_unorm16", "_unorm565", "_unorm555", "_unorm101010",
+         "_int8", "_int16", "_int32", "_uint8", "_uint16", "_uint32", "_half", "_float"},
+        {"_R", "_A", "_RG", "_RA", "_RGB", "_RGBA", "_BGRA", "_ARGB",
+         "_INTENSITY", "_LUMINANCE", "_Rx", "_RGx", "_RGBx"},
+        {"", "", ""},
+    },
+    /* VSC_OCLImgLibKind_UseImgLoadVIP */
+    {
+        "_write_image_with_imgwrite",
+        {"", "_2d", "_3d", "_3d", "_1d", "_2d", "_1d"},
+        {"_float", "_float", "_float", "_float", "_float", "_float", "_float",
+         "_int", "_int", "_int", "_uint", "_uint", "_uint", "_float", "_float"},
+        {"", "_A", "_RG", "_RA", "_RGB", "", "", "",
+         "_INTENSITY", "_LUMINANCE", "_Rx", "_RGx", "_RGBx"},
+        {"", "", ""},
+    },
+};
+
+/* For given image descriptorfor HW cfg, do we
+ * need to do recompilation for the image write ?  */
+gctBOOL
+vscImageWriteNeedLibFuncForHWCfg(
+    void *                  pImageDesc,
+    VSC_HW_CONFIG *         pHwCfg,
+    VSC_OCLImgLibKind *     pImgLibKind, /* the image lib kind to be used */
+    gctUINT *               KeyofImgSampler
+    )
+{
+    gctBOOL doRecompile = gcvFALSE;
+    ImgSamplerKeyState keyState;
+    VSC_ImageDesc * ImageDescHandle = (VSC_ImageDesc *)pImageDesc;
+    struct ImgSamplerKeyTable * tmpImgSamplerKeyTable;
+
+    /* initialize the value of key state to 0 */
+    keyState.data = 0;
+
+    if (ImageDescHandle->sd.imageType != 0)
+    {
+        /* check which base lib to use: if the HW supports Image write, use HW instruction,
+         * otherwise to store for image write*/
+        if (!pHwCfg->hwFeatureFlags.supportImgAddr)
+        {
+            keyState.u.baseLib = VSC_OCLImgLibKind_UseLoadStore;
+            if (pImgLibKind)
+            {
+                *pImgLibKind = VSC_OCLImgLibKind_UseLoadStore;
+            }
+            doRecompile = gcvTRUE;
+        }
+
+        tmpImgSamplerKeyTable = &imgSamplerKeyWordsTable[keyState.u.baseLib];
+        /* check the state of image-sampler base on the base lib used for the pair */
+        keyState.u.imgType = tmpImgSamplerKeyTable->imgType[VSC_CLImageType_To_VIRImageType(ImageDescHandle->sd.imageType)];
+        keyState.u.imgDataType = tmpImgSamplerKeyTable->imgDataType[ImageDescHandle->sd.imageValueType];
+        keyState.u.channelDataType = tmpImgSamplerKeyTable->imgChannelDataType[VSC_CLChannelDataType_To_VIRChannelDataType(ImageDescHandle->sd.channelDataType)];
+        keyState.u.channelOrder = tmpImgSamplerKeyTable->imgChannelOrder[VSC_CLChannelOrder_To_VIRChannelOrder(ImageDescHandle->sd.channelOrder)];
+        keyState.u.imgAccessType = 0; /* for kernel write*/
+    }
+
+    if(KeyofImgSampler)
+    {
+        *KeyofImgSampler = keyState.data;
+    }
+    return doRecompile;
+}
+
+/* For given image descriptor and sampler value for HW cfg, do we
+ * need to do recompilation for the image read ?*/
+gctBOOL
+vscImageSamplerNeedLibFuncForHWCfg(
+    void *                  pImageDesc,
+    gctUINT                 imageSamplerValue,
+    VSC_HW_CONFIG *         pHwCfg,
+    VSC_OCLImgLibKind *     pImgLibKind, /* the image lib kind to be used */
+    gctBOOL *               UseTexld, /* set true if need to use texld for image_read */
+    gctUINT *               KeyofImgSampler
+    )
+{
+    gctBOOL             supportedByHWInst = gcvFALSE;
+    ImgSamplerKeyState  keyState;
+    VSC_ImageDesc *     ImageDescHandle = (VSC_ImageDesc *)pImageDesc;
+    struct ImgSamplerKeyTable * tmpImgSamplerKeyTable;
+    VIR_IMG_Type        imageType = VSC_CLImageType_To_VIRImageType(ImageDescHandle->sd.imageType);
+    vscImageValueType   imageValueType = (vscImageValueType)ImageDescHandle->sd.imageValueType;
+    VIR_IMG_ChannelDataType channelType = VSC_CLChannelDataType_To_VIRChannelDataType(ImageDescHandle->sd.channelDataType);
+    VIR_IMG_ChannelOrder channelOrder = VSC_CLChannelOrder_To_VIRChannelOrder(ImageDescHandle->sd.channelOrder);
+    gctBOOL             isCoordsIntType = VIR_IMG_isSamplerIntCoords(imageSamplerValue);
+    gctBOOL             isLinearFilterMode = VIR_IMG_isSamplerLinearFilter(imageSamplerValue);
+    gctBOOL             isNormalizedCoords = VIR_IMG_isSamplerNormalizedCoords(imageSamplerValue);
+    VSC_SamplerValue    addressMode = VIR_IMG_GetSamplerAddressMode(imageSamplerValue);
+    VSC_OCLImgLibKind   libKind = VSC_OCLImgLibKind_UseLoadStore;
+
+    /* initialize the value of key state to 0 */
+    keyState.data = 0;
+
+    if(ImageDescHandle->sd.imageType != 0)
+    {
+        /* check which base lib to use */
+        libKind = vscGetOCLImgLibKindForHWCfg(pHwCfg);
+        keyState.u.baseLib = libKind;
+        tmpImgSamplerKeyTable = &imgSamplerKeyWordsTable[keyState.u.baseLib];
+        /* check the state of image-sampler base on the base lib used for the pair */
+        keyState.u.imgType = tmpImgSamplerKeyTable->imgType[imageType];
+        keyState.u.imgDataType = tmpImgSamplerKeyTable->imgDataType[imageValueType];
+        keyState.u.channelDataType = tmpImgSamplerKeyTable->imgChannelDataType[channelType];
+        keyState.u.channelOrder = tmpImgSamplerKeyTable->imgChannelOrder[channelOrder];
+        keyState.u.filterMode = tmpImgSamplerKeyTable->filterMode[isLinearFilterMode];
+        keyState.u.normalizedCoord = tmpImgSamplerKeyTable->normalizedCoord[isNormalizedCoords];
+        keyState.u.coordType = tmpImgSamplerKeyTable->coordType[isCoordsIntType];
+        keyState.u.addressMode = tmpImgSamplerKeyTable->addressMode[addressMode];
+        keyState.u.imgAccessType = 1; /* for kernel read*/
+    }
+    switch (libKind) {
+    case VSC_OCLImgLibKind_UseImgLoadVIP:       /* only use img_load/img_load_3d inst. */
+        if (!isLinearFilterMode &&
+            imageType == VIR_IMG_TY_2D &&      /* ?? other image type supported?? */
+            (addressMode == VSC_IMG_SAMPLER_ADDRESS_NONE ||
+             addressMode == VSC_IMG_SAMPLER_ADDRESS_CLAMP ||
+             addressMode == VSC_IMG_SAMPLER_ADDRESS_CLAMP_TO_EDGE) &&
+            !isNormalizedCoords &&
+            isCoordsIntType &&
+            pHwCfg->hwFeatureFlags.supportImgLDSTClamp)
+        {
+            supportedByHWInst = gcvTRUE;  /* use img_load or f2i(coord) + img_load for float type coordinate */
+        }
+        break;
+    case VSC_OCLImgLibKind_UseImgLoadTexldUXY:  /* use texld_u_x_y */
+        if ((channelType == VIR_IMG_CT_SNORM_INT8 ||
+             channelType == VIR_IMG_CT_UNORM_INT8 ||
+             channelType == VIR_IMG_CT_SIGNED_INT8 ||
+             channelType == VIR_IMG_CT_SIGNED_INT16 ||
+             channelType == VIR_IMG_CT_UNSIGNED_INT8 ||
+             channelType == VIR_IMG_CT_UNSIGNED_INT16 ||
+             channelType == VIR_IMG_CT_HALF_FLOAT)      )
+        {
+            supportedByHWInst = gcvTRUE;  /* use texld_u_x_y for 16 bit channel data type,
+                                           * SNORM16 and UNORM16 are not supported */
+        }
+        break;
+    case VSC_OCLImgLibKind_UseImgLoadTexldU:    /* use load for now  */
+#if _SUPPORT_TEDLX_U_IMG_LIB
+        if ((channelType == VIR_IMG_CT_SNORM_INT8 ||
+             channelType == VIR_IMG_CT_UNORM_INT8 ||
+             channelType == VIR_IMG_CT_SIGNED_INT8 ||
+             channelType == VIR_IMG_CT_SIGNED_INT16 ||
+             channelType == VIR_IMG_CT_UNSIGNED_INT8 ||
+             channelType == VIR_IMG_CT_UNSIGNED_INT16 ||
+             channelType == VIR_IMG_CT_HALF_FLOAT)      )
+        {
+            supportedByHWInst = gcvTRUE;  /* use texld_u_x_y for 16 bit channel data type,
+                                           * SNORM16 and UNORM16 are not supported */
+        }
+        break;
+#else
+        /* fall through */
+#endif
+    case VSC_OCLImgLibKind_UseLoadStore:        /* no HW inst support, need to use load */
+        break;
+    default:
+        gcmASSERT(gcvFALSE);
+        break;
+    }
+
+    if(KeyofImgSampler)
+    {
+        *KeyofImgSampler = keyState.data;
+    }
+    if (pImgLibKind)
+    {
+        *pImgLibKind = libKind;
+    }
+    return !supportedByHWInst;
+}
+
+gceSTATUS
+vscConstructImageReadLibFuncName(
+    VSC_ImageDesc *         ImageDescHandle, /* VSC_ImageDesc */
+    gctUINT                 SamplerValue, /* VSC_SamplerValue */
+    VSC_HW_CONFIG *         pHwCfg,
+    gctSTRING *             pLibFuncName, /* returned lib function name if needed */
+    VSC_OCLImgLibKind *     pImgLibKind, /* the image lib kind to be used */
+    gctBOOL *               UseTexld                /* set true if need to use texld for image_read */
+)
+{
+    VSC_ErrCode                 errCode  = VSC_ERR_NONE;
+    VSC_ImageDesc *             pImageDesc = (VSC_ImageDesc *)ImageDescHandle;
+    VSC_SamplerValue            imageSamplerValue = (VSC_SamplerValue)SamplerValue;
+    VIR_IMG_ChannelDataType     channelDataType = VIR_IMG_CT_SNORM_INT8; /* default value, assuemd */
+    VIR_IMG_ChannelOrder        channelOrder = VIR_IMG_CO_RGBA;           /* default value, assuemd */
+    gctUINT                     addressMode;
+    gctUINT                     filterMode;         /* 1: linear filter mode; 0: nearest filter mode */
+    gctUINT                     normalizedCoord ;   /* 1: normalized coordinate; 0: unnormalized coordinate */
+    VIR_IMG_Type                imageType = pImageDesc ? VSC_CLImageType_To_VIRImageType(pImageDesc->sd.imageType)
+                                                       : VIR_IMG_TY_2D;
+    VSC_OCLImgLibKind           imgLibKind;
+    gceSTATUS                   status = gcvSTATUS_OK;
+    gctBOOL                     coordIntType = VIR_IMG_isSamplerIntCoords(imageSamplerValue);
+
+    if (pImageDesc != gcvNULL && pImageDesc->sd.width != 0) /* valid desc */
+    {
+        /* get the image info from image desciptor */
+        channelDataType = VSC_CLChannelDataType_To_VIRChannelDataType(pImageDesc->sd.channelDataType);
+        channelOrder    = VSC_CLChannelOrder_To_VIRChannelOrder(pImageDesc->sd.channelOrder);
+        imageType       = VSC_CLImageType_To_VIRImageType(pImageDesc->sd.imageType);
+    }
+    else
+    {
+        gcmASSERT(pImageDesc != gcvNULL);
+        /* assume channel data type bu image value type */
+        switch (pImageDesc->sd.imageValueType)
+        {
+            case VSC_ImageValueFloat:
+                channelDataType = VIR_IMG_CT_UNORM_INT8;
+                break;
+
+            case VSC_ImageValueInt:
+                channelDataType = VIR_IMG_CT_SIGNED_INT8;
+                break;
+
+            case VSC_ImageValueUint:
+                channelDataType = VIR_IMG_CT_UNSIGNED_INT8;
+                break;
+
+            default:
+                gcmASSERT(0);
+                break;
+        }
+
+        /* set assumed default value to ImageDescHandle so driver can know what value is
+         * used for default */
+        gcmASSERT(pImageDesc != gcvNULL);
+        pImageDesc->sd.channelDataType = VSC_VIRChannelDataType_To_CLChannelDataType(channelDataType);
+        pImageDesc->sd.channelOrder    = VSC_VIRChannelOrder_To_CLChannelOrder(channelOrder);
+        pImageDesc->sd.imageType       = VSC_VIRImageType_To_CLImageType(imageType);
+    }
+
+    if (imageSamplerValue == VSC_IMG_SAMPLER_UNKNOWN_VALUE || imageSamplerValue == VSC_IMG_SAMPLER_INVALID_VALUE)
+    {
+        /* treat unknown and invalid value as default value */
+        imageSamplerValue = VSC_IMG_SAMPLER_DEFAULT_VALUE;
+    }
+
+    if (vscImageSamplerNeedLibFuncForHWCfg(pImageDesc, imageSamplerValue, pHwCfg, pImgLibKind, UseTexld, gcvNULL))
+    {
+        gctCHAR                 name[256] = "";
+        struct ImgReadNameStr * imgReadNameInfo;
+
+        imgLibKind = *pImgLibKind;
+        gcmASSERT(imgLibKind < VSC_OCLImgLibKind_Counts);
+
+        addressMode = imageSamplerValue & 0x0F;
+        filterMode = (imageSamplerValue & VSC_IMG_SAMPLER_FILTER_LINEAR) ? 1 : 0;
+        normalizedCoord = (imageSamplerValue & VSC_IMG_SAMPLER_NORMALIZED_COORDS_TRUE) ? 1 : 0;
+        gcmASSERT(addressMode < VSC_IMG_SAMPLER_ADDRESS_COUNT);
+
+        imgReadNameInfo = &imgReadNamesInfo[imgLibKind];
+        gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), imgReadNameInfo->baseName));
+        gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), imgReadNameInfo->samplerFilterStr[filterMode]));
+        gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), imgReadNameInfo->samplerNormalizedCoordStr[normalizedCoord]));
+        gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), imgReadNameInfo->samplerAddressModeStr[addressMode]));
+        gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), imgReadNameInfo->coordType[coordIntType]));
+        gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), imgReadNameInfo->imageValueType[pImageDesc->sd.imageValueType]));
+        gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), imgReadNameInfo->imgChannelTypeStr[channelDataType]));
+        gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), imgReadNameInfo->imgTypeStr[imageType]));
+        gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), imgReadNameInfo->imgChannelOrderStr[channelOrder]));
+
+        /* dup the name to pLibFuncName */
+        gcmONERROR(gcoOS_StrDup(gcvNULL, name, pLibFuncName));
+    }
+    else
+    {
+        /* no lib func needed */
+        *pLibFuncName = gcvNULL;
+    }
+
+OnError:
+    if (errCode != VSC_ERR_NONE)
+    {
+        status = vscERR_CastErrCode2GcStatus(errCode);
+    }
+    return status;
+}
+
+gceSTATUS
+vscConstructImageWriteLibFuncName(
+    VSC_ImageDesc *         ImageDescHandle, /* VSC_ImageDesc */
+    VSC_HW_CONFIG *         pHwCfg,
+    gctSTRING *             pLibFuncName, /* returned lib function name if needed */
+    VSC_OCLImgLibKind *     pImgLibKind             /* the image lib kind to be used */
+)
+{
+    VSC_ErrCode                 errCode  = VSC_ERR_NONE;
+    VSC_ImageDesc *             pImageDesc = (VSC_ImageDesc *)ImageDescHandle;
+    VIR_IMG_ChannelDataType     channelDataType = VIR_IMG_CT_SNORM_INT8; /* default value, assuemd */
+    VIR_IMG_ChannelOrder        channelOrder = VIR_IMG_CO_RGBA;           /* default value, assuemd */
+    VIR_IMG_Type                imageType = pImageDesc ? VSC_CLImageType_To_VIRImageType(pImageDesc->sd.imageType)
+                                                       : VIR_IMG_TY_2D;
+    VSC_OCLImgLibKind           imgLibKind;
+    gceSTATUS                   status = gcvSTATUS_OK;
+
+    if (pImageDesc != gcvNULL && pImageDesc->sd.width != 0) /* valid desc */
+    {
+        /* get the image info from image desciptor */
+        channelDataType = VSC_CLChannelDataType_To_VIRChannelDataType(pImageDesc->sd.channelDataType);
+        channelOrder    = VSC_CLChannelOrder_To_VIRChannelOrder(pImageDesc->sd.channelOrder);
+        imageType       = VSC_CLImageType_To_VIRImageType(pImageDesc->sd.imageType);
+    }
+    else
+    {
+        gcmASSERT(pImageDesc != gcvNULL);
+        /* assume channel data type bu image value type */
+        switch (pImageDesc->sd.imageValueType)
+        {
+            case VSC_ImageValueFloat:
+                channelDataType = VIR_IMG_CT_UNORM_INT8;
+                break;
+
+            case VSC_ImageValueInt:
+                channelDataType = VIR_IMG_CT_SIGNED_INT8;
+                break;
+
+            case VSC_ImageValueUint:
+                channelDataType = VIR_IMG_CT_UNSIGNED_INT8;
+                break;
+
+            default:
+                gcmASSERT(0);
+                break;
+        }
+
+        /* set assumed default value to ImageDescHandle so driver can know what value is
+         * used for default */
+        gcmASSERT(pImageDesc != gcvNULL);
+        pImageDesc->sd.channelDataType = VSC_VIRChannelDataType_To_CLChannelDataType(channelDataType);
+        pImageDesc->sd.channelOrder    = VSC_VIRChannelOrder_To_CLChannelOrder(channelOrder);
+        pImageDesc->sd.imageType       = VSC_VIRImageType_To_CLImageType(imageType);
+    }
+
+    if (vscImageWriteNeedLibFuncForHWCfg(pImageDesc,pHwCfg, pImgLibKind, gcvNULL))
+    {
+        gctCHAR                 name[256] = "";
+        struct ImgWriteNameStr * imgWriteNameInfo;
+        imgLibKind = *pImgLibKind;
+        gcmASSERT(imgLibKind < VSC_OCLImgLibKind_Counts);
+        imgWriteNameInfo = &imgWriteNamesInfo[imgLibKind];
+        gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), imgWriteNameInfo->baseName));
+        gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), imgWriteNameInfo->imageValueType[pImageDesc->sd.imageValueType]));
+        gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), imgWriteNameInfo->imgChannelTypeStr[channelDataType]));
+        gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), imgWriteNameInfo->imgTypeStr[imageType]));
+        gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), imgWriteNameInfo->imgChannelOrderStr[channelOrder]));
+
+        /* dup the name to pLibFuncName */
+        gcmONERROR(gcoOS_StrDup(gcvNULL, name, pLibFuncName));
+    }
+    else
+    {
+        /* no lib func needed */
+        *pLibFuncName = gcvNULL;
+    }
+
+OnError:
+    if (errCode != VSC_ERR_NONE)
+    {
+        status = vscERR_CastErrCode2GcStatus(errCode);
+    }
+    return status;
+}
+
+vscImageValueType
+_virType2ImageValueType(VIR_TypeId ty)
+{
+    gcmASSERT(VIR_TypeId_isPrimitive(ty));
+    return VIR_TypeId_isFloat(ty) ? VSC_ImageValueFloat :
+           VIR_TypeId_isUnSignedInteger(ty) ? VSC_ImageValueUint : VSC_ImageValueInt;
+}
+
+/* check if we need to  the image read instruction to lib function call:
+ * 1. if the sampler value and image data are unknown, we assume they are using default
+ *    value, so there is no lib function needed for the image read if the HW can handle
+ *    default image read
+ * 2. if at run-time it turns out the assumption is not correct, the driver will
+ *    fill the image and sampler with correct value and the re-compilation
+ * 3. we know for each HW arch, which sampler and image format can be natively
+ *    handled, for these image read, we do not transform it to lib func call
+ * 4. if the image read cannot be handled natively, we construct a name which
+ *    uniquely identify the corresponding lib function which can perform the image
+ *    read with the sampler and image format
+ * 5. do the conversion:
+ *       IMG_READ  dest, image, coord, sampler
+ *    ==>
+ *       EXTCALL  dest, libFuncName, PARAMETERS<image, coord, sampler>
+ * 6. return TRUE if IMG_READ is transformed, otherwise return FALSE
+ */
+gctBOOL
+_vscTransformImgReadToLibFuncCall(
+    VSC_SH_PASS_WORKER  *pPassWorker,
+    VIR_Instruction     *pInst
+    )
+{
+    VIR_Operand*        imageSrc;
+    VIR_Operand*        parentSrc = gcvNULL;
+    VIR_Symbol*         imageSym;
+    VIR_Shader *        pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_OpCode          opcode = VIR_Inst_GetOpcode(pInst);
+    gctSTRING           libFuncName = gcvNULL;
+    VIR_Uniform *       imageUniform;
+    VSC_HW_CONFIG *     pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    VSC_OCLImgLibKind   imgLibKind;
+    gctBOOL             useTexld = gcvFALSE;
+    gceSTATUS           status = gcvSTATUS_OK;
+    VIR_TypeId          valueType = VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst));
+    vscImageValueType   imgValTy  = _virType2ImageValueType(valueType) ;
+    VSC_ImageDesc *     imgDesc;
+    VIR_IMG_Type        imageType;
+    if (!VIR_OPCODE_isImgLd(opcode))
+    {
+        gcmASSERT(gcvFALSE);
+    }
+
+    if (VIR_OPCODE_isVX(opcode))
+    {
+        /* VX_IMG_LOAD/VX_IMG_LOAD_3D is sampleless image read, no need to use lib function */
+        return gcvFALSE;
+    }
+
+    /* get image uniform and sampler info used by the inst */
+    imageSrc = VIR_Inst_GetSource(pInst, 0);  /* image always the fisrt operand*/
+    gcmASSERT(VIR_Operand_isSymbol(imageSrc));
+
+    imageSym = VIR_Operand_GetSymbol(imageSrc);
+    if (!(VIR_Symbol_isImageT(imageSym) || VIR_Symbol_isImage(imageSym)))
+    {
+        parentSrc = _vscVIR_FindParentImgOperandFromIndex(pInst, imageSrc, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(imageSrc), 0));
+        imageSym = VIR_Operand_GetSymbol(parentSrc);
+    }
+    gcmASSERT(imageSym && (VIR_Symbol_isImageT(imageSym)|| VIR_Symbol_isImage(imageSym)));
+    imageUniform = VIR_Symbol_GetImage(imageSym);
+    imgDesc = &VIR_Uniform_GetImageDesc(imageUniform);
+    /* set the image value type by instruction's dest type */
+    imgDesc->sd.imageValueType = imgValTy;
+
+    /* set the image type by imageSym's type */
+    switch (VIR_Symbol_GetTypeId(imageSym)) {
+    case VIR_TYPE_IMAGE_1D_T:
+        imageType = VIR_IMG_TY_1D;
+        break;
+    case VIR_TYPE_IMAGE_1D_BUFFER_T:
+        imageType = VIR_IMG_TY_1D_BUFFER;
+        break;
+    case VIR_TYPE_IMAGE_1D_ARRAY_T:
+        imageType = VIR_IMG_TY_1D_ARRAY;
+        break;
+    case VIR_TYPE_IMAGE_2D_ARRAY_T:
+        imageType = VIR_IMG_TY_2D_ARRAY;
+        break;
+    case VIR_TYPE_IMAGE_3D_T:
+        imageType = VIR_IMG_TY_3D;
+        break;
+    case VIR_TYPE_IMAGE_2D_T:
+    default:
+        imageType = VIR_IMG_TY_2D;
+        break;
+    }
+    imgDesc->sd.imageType = VSC_VIRImageType_To_CLImageType(imageType);
+
+    gcmONERROR(vscConstructImageReadLibFuncName(imgDesc,
+                                              VIR_Uniform_GetImageSamplerValue(imageUniform),
+                                              pHwCfg,
+                                              &libFuncName,
+                                              &imgLibKind,
+                                              &useTexld));
+    if (libFuncName != gcvNULL)
+    {
+        /* a lib function should be called */
+        VIR_Function * func = VIR_Inst_GetFunction(pInst);
+        VIR_Operand *  funcName;
+        VIR_NameId     funcNameId;
+        VIR_Operand *  parameters;
+        VIR_ParmPassing *parm;
+        gctUINT i, argCount = VIR_OPCODE_GetSrcOperandNum(opcode);
+
+        /* set the lib func name to image uniform */
+        VIR_Uniform_SetImageLibFuncName(imageUniform, libFuncName);
+
+        ON_ERROR(VIR_Function_NewOperand(func, &funcName), "Failed to new operand");
+        ON_ERROR(VIR_Shader_AddString(pShader, libFuncName, &funcNameId), "");
+        VIR_Operand_SetName(funcName, funcNameId);
+        ON_ERROR(VIR_Function_NewOperand(func, &parameters), "Failed to new operand");
+
+        /* create a new VIR_ParmPassing */
+        ON_ERROR(VIR_Function_NewParameters(func, argCount, &parm), "Failed to copy operand");
+        for (i = 0; i < argCount; i++)
+        {
+            VIR_Operand_Copy(parm->args[i], VIR_Inst_GetSource(pInst, i));
+        }
+
+        /* set parameters to new operand */
+        VIR_Operand_SetParameters(parameters, parm);
+
+        VIR_Inst_SetSource(pInst, 0, funcName);
+        VIR_Inst_SetSource(pInst, 1, parameters);
+        VIR_Inst_SetOpcode(pInst, VIR_OP_EXTCALL);
+        VIR_Inst_SetSrcNum(pInst, 2);
+
+        gcoOS_Free(gcvNULL, libFuncName);
+
+        return gcvTRUE;
+    }
+    else if (useTexld)
+    {
+    }
+OnError:
+    return gcvFALSE;
+}
+
+/* check if we need to  the image write instruction to lib function call:
+ * 1. if the image data are unknown, we assume they are using default
+ *    value, so there is no lib function needed for the image write if the HW can handle
+ *    default image write
+ * 2. if at run-time it turns out the assumption is not correct, the driver will
+ *    fill the image with correct value and the re-compilation
+ * 3. we know for each HW arch, which image format can be natively
+ *    handled, for these image write, we do not transform it to lib func call
+ * 4. if the image write cannot be handled natively, we construct a name which
+ *    uniquely identify the corresponding lib function which can perform the image
+ *    write with the image format
+ * 5. do the conversion:
+ *       IMG_STORE[_3D]  dest, image, coord, color
+ *    ==>
+ *       EXTCALL  dest, libFuncName, PARAMETERS<image, coord, color>
+ * 6. return TRUE if IMG_STORE[_3D] is transformed, otherwise return FALSE
+ */
+gctBOOL
+_vscTransformImgWriteToLibFuncCall(
+    VSC_SH_PASS_WORKER  *pPassWorker,
+    VIR_Instruction     *pInst
+    )
+{
+    VIR_Operand*        imageSrc;
+    VIR_Operand*        parentSrc = gcvNULL;
+    VIR_Symbol*         imageSym;
+    VIR_Shader *        pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_OpCode          opcode = VIR_Inst_GetOpcode(pInst);
+    gctSTRING           libFuncName = gcvNULL;
+    VIR_Uniform *       imageUniform;
+    VSC_HW_CONFIG *     pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    VSC_OCLImgLibKind   imgLibKind;
+    gceSTATUS           status = gcvSTATUS_OK;
+    VIR_TypeId          valueType = VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst));
+    vscImageValueType   imgValTy  = _virType2ImageValueType(valueType) ;
+    VSC_ImageDesc *     imgDesc;
+    VIR_IMG_Type        imageType;
+
+    if (!VIR_OPCODE_isImgSt(opcode))
+    {
+        gcmASSERT(gcvFALSE);
+    }
+
+    /* get image uniform and sampler info used by the inst */
+    imageSrc = VIR_Inst_GetSource(pInst, 0);  /* image always the fisrt operand*/
+    gcmASSERT(VIR_Operand_isSymbol(imageSrc));
+
+    imageSym = VIR_Operand_GetSymbol(imageSrc);
+    if (!(VIR_Symbol_isImageT(imageSym) || VIR_Symbol_isImage(imageSym)))
+    {
+        parentSrc = _vscVIR_FindParentImgOperandFromIndex(pInst, imageSrc, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(imageSrc), 0));
+        imageSym = VIR_Operand_GetSymbol(parentSrc);
+    }
+    gcmASSERT(imageSym && (VIR_Symbol_isImageT(imageSym)|| VIR_Symbol_isImage(imageSym)));
+    imageUniform = VIR_Symbol_GetImage(imageSym);
+    imgDesc = &VIR_Uniform_GetImageDesc(imageUniform);
+    /* set the image value type by instruction's dest type */
+    imgDesc->sd.imageValueType = imgValTy;
+
+    /* set the image type by imageSym's type */
+    switch (VIR_Symbol_GetTypeId(imageSym)) {
+    case VIR_TYPE_IMAGE_1D_T:
+        imageType = VIR_IMG_TY_1D;
+        break;
+    case VIR_TYPE_IMAGE_1D_BUFFER_T:
+        imageType = VIR_IMG_TY_1D_BUFFER;
+        break;
+    case VIR_TYPE_IMAGE_1D_ARRAY_T:
+        imageType = VIR_IMG_TY_1D_ARRAY;
+        break;
+    case VIR_TYPE_IMAGE_2D_ARRAY_T:
+        imageType = VIR_IMG_TY_2D_ARRAY;
+        break;
+    case VIR_TYPE_IMAGE_3D_T:
+        imageType = VIR_IMG_TY_3D;
+        break;
+    case VIR_TYPE_IMAGE_2D_T:
+    default:
+        imageType = VIR_IMG_TY_2D;
+        break;
+    }
+    imgDesc->sd.imageType = VSC_VIRImageType_To_CLImageType(imageType);
+
+    gcmONERROR(vscConstructImageWriteLibFuncName(imgDesc,
+                                              pHwCfg,
+                                              &libFuncName,
+                                              &imgLibKind));
+    if (libFuncName != gcvNULL)
+    {
+        /* a lib function should be called */
+        VIR_Function * func = VIR_Inst_GetFunction(pInst);
+        VIR_Operand *  funcName;
+        VIR_NameId     funcNameId;
+        VIR_Operand *  parameters;
+        VIR_ParmPassing *parm;
+        gctUINT i, argCount = VIR_OPCODE_GetSrcOperandNum(opcode);
+
+        /* set the lib func name to image uniform */
+        VIR_Uniform_SetImageLibFuncName(imageUniform, libFuncName);
+
+        ON_ERROR(VIR_Function_NewOperand(func, &funcName), "Failed to new operand");
+        ON_ERROR(VIR_Shader_AddString(pShader, libFuncName, &funcNameId), "");
+        VIR_Operand_SetName(funcName, funcNameId);
+        ON_ERROR(VIR_Function_NewOperand(func, &parameters), "Failed to new operand");
+
+        /* create a new VIR_ParmPassing */
+        ON_ERROR(VIR_Function_NewParameters(func, argCount, &parm), "Failed to copy operand");
+        for (i = 0; i < argCount; i++)
+        {
+            VIR_Operand_Copy(parm->args[i], VIR_Inst_GetSource(pInst, i));
+        }
+
+        /* set parameters to new operand */
+        VIR_Operand_SetParameters(parameters, parm);
+
+        VIR_Inst_SetSource(pInst, 0, funcName);
+        VIR_Inst_SetSource(pInst, 1, parameters);
+        VIR_Inst_SetOpcode(pInst, VIR_OP_EXTCALL);
+        VIR_Inst_SetSrcNum(pInst, 2);
+
+        gcoOS_Free(gcvNULL, libFuncName);
+
+        return gcvTRUE;
+    }
+
+OnError:
+    return gcvFALSE;
+}
+
 DEF_QUERY_PASS_PROP(vscVIR_ConvertVirtualInstructions)
 {
    pPassProp->supportedLevels = VSC_PASS_LEVEL_ML | VSC_PASS_LEVEL_LL;
+}
+
+DEF_SH_NECESSITY_CHECK(vscVIR_ConvertVirtualInstructions)
+{
+    return gcvTRUE;
 }
 
 VSC_ErrCode
@@ -2654,7 +4862,7 @@ vscVIR_ConvertVirtualInstructions(
                     samplerSym = VIR_Operand_GetSymbol(samplerSrc);
                     if(!VIR_Symbol_isSampler(samplerSym))
                     {
-                        parentSrc = _vscVIR_FindParentOperandFromIndex(inst, samplerSrc, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(samplerSrc), 0));
+                        parentSrc = _vscVIR_FindParentImgOperandFromIndex(inst, samplerSrc, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(samplerSrc), 0));
                         samplerSym = VIR_Operand_GetSymbol(parentSrc);
                     }
                     gcmASSERT(samplerSym && VIR_Symbol_isSampler(samplerSym));
@@ -2736,7 +4944,7 @@ vscVIR_ConvertVirtualInstructions(
                     samplerOrImageSym = VIR_Operand_GetSymbol(samplerOrImageSrc);
                     if(!VIR_Symbol_isSampler(samplerOrImageSym) && !VIR_Symbol_isImage(samplerOrImageSym))
                     {
-                        parentSrc = _vscVIR_FindParentOperandFromIndex(inst, samplerOrImageSrc, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(samplerOrImageSrc), 0));
+                        parentSrc = _vscVIR_FindParentImgOperandFromIndex(inst, samplerOrImageSrc, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(samplerOrImageSrc), 0));
                         samplerOrImageSym = VIR_Operand_GetSymbol(parentSrc);
                     }
                     gcmASSERT(samplerOrImageSym &&
@@ -2803,6 +5011,12 @@ vscVIR_ConvertVirtualInstructions(
                     }
                     else if (parentSrc)
                     {
+                        VIR_Operand_SetIsConstIndexing(samplerOrImageSrc, VIR_Operand_GetIsConstIndexing(parentSrc));
+                        VIR_Operand_SetRelAddrMode(samplerOrImageSrc, VIR_Operand_GetRelAddrMode(parentSrc));
+                        VIR_Operand_SetMatrixConstIndex(samplerOrImageSrc, VIR_Operand_GetMatrixConstIndex(parentSrc));
+                        VIR_Operand_SetRelIndex(samplerOrImageSrc, VIR_Operand_GetRelIndexing(parentSrc));
+                        VIR_Operand_SetIsSymLocal(samplerOrImageSrc, VIR_Operand_isSymLocal(parentSrc));
+                        VIR_Operand_SetRelAddrLevel(samplerOrImageSrc, VIR_Operand_GetRelAddrLevel(parentSrc));
                     }
                     break;
                 }
@@ -2821,7 +5035,7 @@ vscVIR_ConvertVirtualInstructions(
                     samplerOrImageSym = VIR_Operand_GetSymbol(samplerOrImageSrc);
                     if(!VIR_Symbol_isSampler(samplerOrImageSym) && !VIR_Symbol_isImage(samplerOrImageSym))
                     {
-                        parentSrc = _vscVIR_FindParentOperandFromIndex(inst, samplerOrImageSrc, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(samplerOrImageSrc), 0));
+                        parentSrc = _vscVIR_FindParentImgOperandFromIndex(inst, samplerOrImageSrc, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(samplerOrImageSrc), 0));
                         samplerOrImageSym = VIR_Operand_GetSymbol(parentSrc);
                     }
                     gcmASSERT(samplerOrImageSym &&
@@ -2897,7 +5111,6 @@ vscVIR_ConvertVirtualInstructions(
                     }
                     break;
                 }
-
                 default:
                     break;
             }
@@ -2918,6 +5131,10 @@ static VSC_ErrCode vscVIR_PrecisionUpdateSrc(VIR_Shader* shader, VIR_Operand* op
 
     gcmASSERT(operand);
 
+    if (VIR_Shader_IsDesktopGL(shader))
+    {
+        return errCode;
+    }
     switch(VIR_Operand_GetOpKind(operand))
     {
         case VIR_OPND_SYMBOL:
@@ -2983,6 +5200,7 @@ static VSC_ErrCode vscVIR_PrecisionUpdateSrc(VIR_Shader* shader, VIR_Operand* op
         case VIR_OPND_ADDRESS_OF:
             gcmASSERT(VIR_Operand_GetPrecision(operand) == VIR_PRECISION_HIGH);
             break;
+        case VIR_OPND_NAME:
         case VIR_OPND_INTRINSIC:
         case VIR_OPND_UNUSED:
         case VIR_OPND_EVIS_MODIFIER:
@@ -3036,7 +5254,9 @@ static VSC_ErrCode _PrecisionUpdate(VIR_Shader* pShader, VIR_Dumper* dumper)
     VIR_FuncIterator func_iter;
     VIR_FunctionNode* func_node;
 
-    if(!VIR_Shader_IsFS(pShader) || VIR_Shader_IsVulkan(pShader))
+    if(!VIR_Shader_IsFS(pShader) ||
+        VIR_Shader_IsVulkan(pShader) ||
+        VIR_Shader_IsDesktopGL(pShader))
     {
         return errCode;
     }
@@ -3909,6 +6129,7 @@ gctBOOL _CheckAlwaysInlineFunction(
                 pOpndSym = VIR_Operand_GetSymbol(pOperand);
 
                 if (!VIR_Symbol_isImage(pOpndSym) &&
+                    !VIR_Symbol_isImageT(pOpndSym) &&
                     !VIR_Symbol_isUniform(pOpndSym))
                 {
                     isSrc0Temp = gcvTRUE;
@@ -4188,6 +6409,11 @@ DEF_QUERY_PASS_PROP(vscVIR_PreprocessLLShader)
     pPassProp->passFlag.resDestroyReq.s.bInvalidateCg = gcvTRUE;
 }
 
+DEF_SH_NECESSITY_CHECK(vscVIR_PreprocessLLShader)
+{
+    return gcvTRUE;
+}
+
 VSC_ErrCode vscVIR_PreprocessLLShader(VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
@@ -4230,7 +6456,7 @@ VSC_ErrCode vscVIR_PreprocessLLShader(VSC_SH_PASS_WORKER* pPassWorker)
        ldarr t2, (t3 + c), a0
        ...
        add t4, t0, t5 ==> t0 is changed !!!
-       TO-DO: since vulkan needs this, we enable it for vulkan only for now.
+       VIV:TODO: since vulkan needs this, we enable it for vulkan only for now.
        Need better solution.
     */
     if (VIR_Shader_IsVulkan(pShader))
@@ -4263,6 +6489,11 @@ DEF_QUERY_PASS_PROP(vscVIR_CheckMustInlineFuncForML)
     pPassProp->passFlag.resDestroyReq.s.bInvalidateCg = gcvTRUE;
 }
 
+DEF_SH_NECESSITY_CHECK(vscVIR_CheckMustInlineFuncForML)
+{
+    return gcvTRUE;
+}
+
 VSC_ErrCode vscVIR_CheckMustInlineFuncForML(VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
@@ -4271,136 +6502,6 @@ VSC_ErrCode vscVIR_CheckMustInlineFuncForML(VSC_SH_PASS_WORKER* pPassWorker)
     /* Check if a function is ALWAYSINLINE, no need to check a patch lib. */
     errCode = _CheckMLLevelAlwaysInlineFunctions(pShader);
     ON_ERROR(errCode, "Check ML level always inline functions");
-
-OnError:
-    return errCode;
-}
-
-static VSC_ErrCode
-_ConvBaseSamplerIndexOnInst(
-    IN VIR_Shader                 *pShader,
-    INOUT VIR_Instruction         *pInst,
-    IN VIR_VirRegId               virRegId,
-    INOUT gctBOOL                 *pChanged
-    )
-{
-    VSC_ErrCode                   errCode = VSC_ERR_NONE;
-    VIR_Instruction               *pInstIter = gcvNULL;
-    VIR_Operand                   *pDest = gcvNULL, *pIndexOpnd = gcvNULL;
-    VIR_Operand                   *pSamplerOpnd = VIR_Inst_GetSource(pInst, 0);
-    VIR_OpCode                    opCode;
-    gctBOOL                       bChanged = gcvFALSE;
-
-    for (pInstIter = VIR_Inst_GetPrev(pInst);
-         pInstIter && (VIR_Inst_GetFunction(pInstIter) == VIR_Inst_GetFunction(pInst));
-         pInstIter = VIR_Inst_GetPrev(pInstIter))
-    {
-        opCode = VIR_Inst_GetOpcode(pInstIter);
-        if (VIR_OPCODE_hasDest(opCode))
-        {
-            pDest = VIR_Inst_GetDest(pInstIter);
-
-            if (VIR_Operand_isSymbol(pDest) &&
-                VIR_Symbol_GetVregIndex(VIR_Operand_GetSymbol(pDest)) == virRegId)
-            {
-                gcmASSERT(opCode == VIR_OP_GET_SAMPLER_IDX);
-
-                VIR_Operand_Copy(pSamplerOpnd, VIR_Inst_GetSource(pInstIter, 0));
-
-                pIndexOpnd = VIR_Inst_GetSource(pInstIter, 1);
-
-                if (VIR_Operand_isImm(pIndexOpnd))
-                {
-                    VIR_Operand_SetIsConstIndexing(pSamplerOpnd, VIR_Operand_GetImmediateUint(pIndexOpnd));
-                }
-                else
-                {
-                    gcmASSERT(gcvFALSE);
-                }
-
-                bChanged = gcvTRUE;
-                break;
-            }
-        }
-    }
-
-    if (pChanged)
-    {
-        *pChanged = bChanged;
-    }
-
-    return errCode;
-}
-
-static VSC_ErrCode
-_ConvBaseSamplerIndexOnShader(
-    IN VIR_Shader                 *pShader,
-    INOUT gctBOOL                 *pChanged
-    )
-{
-    VSC_ErrCode         errCode = VSC_ERR_NONE;
-    VIR_Function        *pMainFunc = VIR_Shader_GetMainFunction(pShader);
-    gctBOOL             bChanged = gcvFALSE;
-    VIR_InstIterator    pInstIter;
-    VIR_Instruction     *pInst;
-    VIR_Operand         *pSrcOpnd;
-    VIR_Symbol          *pSrcSym, *pIdxSym;
-
-    VIR_InstIterator_Init(&pInstIter, VIR_Function_GetInstList(pMainFunc));
-    for (pInst = (VIR_Instruction*)VIR_InstIterator_First(&pInstIter);
-         pInst != gcvNULL;
-         pInst = (VIR_Instruction*)VIR_InstIterator_Next(&pInstIter))
-    {
-        /* find the texld to patch */
-        if (VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(pInst)))
-        {
-            pSrcOpnd = VIR_Inst_GetSource(pInst, 0);
-
-            if (VIR_Operand_isSymbol(pSrcOpnd))
-            {
-                pSrcSym = VIR_Operand_GetSymbol(pSrcOpnd);
-
-                if (VIR_Symbol_GetIndex(pSrcSym) == VIR_Shader_GetBaseSamplerId(pShader) &&
-                    VIR_Operand_GetRelAddrMode(pSrcOpnd) != VIR_INDEXED_NONE)
-                {
-                    pIdxSym = VIR_Shader_GetSymFromId(pShader, VIR_Operand_GetRelIndexing(pSrcOpnd));
-
-                    errCode = _ConvBaseSamplerIndexOnInst(pShader, pInst, VIR_Symbol_GetVregIndex(pIdxSym), &bChanged);
-                    ON_ERROR(errCode, "Convert base sampler index on instruction.");
-                }
-            }
-        }
-    }
-
-    if (pChanged)
-    {
-        *pChanged = bChanged;
-    }
-
-OnError:
-    return errCode;
-}
-
-DEF_QUERY_PASS_PROP(vscVIR_PostprocessMLPostShader)
-{
-    pPassProp->supportedLevels = VSC_PASS_LEVEL_ML;
-}
-
-VSC_ErrCode vscVIR_PostprocessMLPostShader(VSC_SH_PASS_WORKER* pPassWorker)
-{
-    VSC_ErrCode errCode = VSC_ERR_NONE;
-    VIR_Shader* pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
-    gctBOOL     bChanged = gcvFALSE;
-
-    /* Convert BaseSampleIndex. */
-    errCode = _ConvBaseSamplerIndexOnShader(pShader, &bChanged);
-    ON_ERROR(errCode, "Convert base sampler index.");
-
-    if (bChanged &&
-        VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
-    {
-        VIR_Shader_Dump(gcvNULL, "After convert base sampler index.", pShader, gcvTRUE);
-    }
 
 OnError:
     return errCode;
@@ -4502,6 +6603,32 @@ DEF_QUERY_PASS_PROP(VIR_Shader_CheckDual16able)
     pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_DUAL16;
 }
 
+DEF_SH_NECESSITY_CHECK(VIR_Shader_CheckDual16able)
+{
+    VSC_COMPILER_CONFIG     *compCfg = &pPassWorker->pCompilerParam->cfg;
+    VIR_Shader              *Shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+
+    VIR_Shader_SetDual16Mode(Shader, gcvFALSE);
+
+    /* only fragment shader can be dual16 shader,
+    ** and exclude OpenVG shader due to precision issue
+    */
+    if (!compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportDual16 ||
+        (VIR_Shader_GetKind(Shader) != VIR_SHADER_FRAGMENT)       ||
+        VIR_Shader_IsDesktopGL(Shader)                            ||
+        VIR_Shader_IsVulkan(Shader)                               ||
+        VIR_Shader_IsOpenVG(Shader)                               ||
+        VIR_Shader_HasOutputArrayHighp(Shader)                    || /* currently, we disable dual16 if the output array is highp */
+        !VirSHADER_DoDual16(VIR_Shader_GetId(Shader))             ||
+        gcmOPT_EnableDebug()                                         /* we disable dual16 for debugging mode */
+        )
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
 static gctINT
 _CheckCstRegFileReadPortLimitation(VIR_Shader* pShader, VIR_Instruction* pInst, gctBOOL bHasOneConstFix)
 {
@@ -4539,26 +6666,8 @@ _CheckCstRegFileReadPortLimitation(VIR_Shader* pShader, VIR_Instruction* pInst, 
             if (VIR_Operand_GetOpKind(opnd) == VIR_OPND_SYMBOL)
             {
                 pSym = VIR_Operand_GetSymbol(opnd);
-
-                if (VIR_Symbol_GetKind(pSym) == VIR_SYM_UNIFORM)
-                {
-                    pUniform = VIR_Symbol_GetUniform(pSym);
+                pUniform = VIR_Symbol_GetUniformPointer(pShader, pSym);
                 }
-                else if (VIR_Symbol_GetKind(pSym) == VIR_SYM_IMAGE)
-                {
-                    pUniform = VIR_Symbol_GetImage(pSym);
-                }
-                /* We need to check a sampler if it is treated as a constant register. */
-                else if (VIR_Symbol_GetKind(pSym) == VIR_SYM_SAMPLER &&
-                            isSymUniformTreatSamplerAsConst(pSym))
-                {
-                    pUniform = VIR_Symbol_GetSampler(pSym);
-                }
-                else
-                {
-                    continue;
-                }
-            }
 
             if (pUniform)
             {
@@ -4619,26 +6728,6 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
     VSC_HW_CONFIG*          pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     gctBOOL                 bHasOneConstFix = pHwCfg->hwFeatureFlags.noOneConstLimit;
 
-    VIR_Shader_SetDual16Mode(Shader, gcvFALSE);
-
-    /* only fragment shader can be dual16 shader,
-    ** and exclude OpenVG shader due to precision issue
-    */
-    if (!compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportDual16 ||
-        (VIR_Shader_GetKind(Shader) != VIR_SHADER_FRAGMENT)       ||
-        VIR_Shader_IsVulkan(Shader)                               ||
-        VIR_Shader_IsOpenVG(Shader)                               ||
-        VIR_Shader_Has32BitModulus(Shader)                        || /* gcsl expand the integer mod and div using 32bit way
-                                                                        (_gcConvert32BitModulus) */
-        VIR_Shader_HasOutputArrayHighp(Shader)                    || /* currently, we disable dual16 if the output array is highp */
-        !VirSHADER_DoDual16(VIR_Shader_GetId(Shader))             ||
-        gcmOPT_EnableDebug()                                         /* we disable dual16 for debugging mode */
-        )
-    {
-        return errCode;
-    }
-
-    /* TODO: Need move this option to driver side */
     if (dual16Mode == DUAL16_AUTO_BENCH)
     {
         /* Enable dual16 auto-on mode for following games. */
@@ -4728,7 +6817,7 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
             {
                 VIR_OpCode  opcode  =  VIR_Inst_GetOpcode(pInst);
                 gctBOOL     needRunSingleT = gcvFALSE;
-
+                gctBOOL     isDual16Highpvec2 = gcvFALSE;
                 if(VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_DETAIL))
                 {
                     VIR_Inst_Dump(dumper, pInst);
@@ -4751,8 +6840,7 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
                     break;
                 }
 
-                VIR_Inst_Check4Dual16(pInst, &needRunSingleT, &dual16NotSupported, options, dumper,
-                    gcdPROC_IS_WEBGL(compCfg->ctx.appNameId));
+                VIR_Inst_Check4Dual16(pInst, &needRunSingleT, &dual16NotSupported, &isDual16Highpvec2, options, dumper, HWSUPPORTDUAL16HIGHVEC2);
                 if(dual16NotSupported && VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_DETAIL))
                 {
                     VIR_LOG(dumper, "inst not supported by dual16.\n", i);
@@ -4782,8 +6870,7 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
                         for (j = 0; j < VIR_Inst_GetSrcNum(pInst); ++j)
                         {
                             opnd = VIR_Inst_GetSource(pInst, i);
-                            if (opnd && _NeedPutImmValue2Uniform(Shader, opnd, pHwCfg, gcvTRUE, &immValues[i], &immTypeId[i]))
-
+                            if (opnd && _NeedPutImmValue2Uniform(Shader, opnd, pHwCfg, gcvTRUE, gcvFALSE, &immValues[i], &immTypeId[i]))
                             {
                                 runSignleTInstCount = runSignleTInstCount + 2;
                                 break;
@@ -4796,7 +6883,7 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
                     }
                     VIR_Inst_SetThreadMode(pInst, VIR_THREAD_D16_DUAL_32);
 
-                    /* VIV when hw has no half-dep fix, there is false depedence among
+                    /* VIV when hw has no half-dep fix, there is force depedence among
                        texld.t0, r2, s0, r0.hp
                        texld.t1, r2, s0, r1.hp,
                        the performance will be bad */
@@ -4809,8 +6896,12 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
                         halfDepInst++;
                     }
                 }
+                else if (isDual16Highpvec2)
+                {
+                    VIR_Inst_SetThreadMode(pInst, VIR_THREAD_D16_DUAL_HIGHPVEC2);
                 }
             }
+        }
 
         codeInfo.hasUnsupportDual16Inst = dual16NotSupported;
         codeInfo.runSignleTInstCount    = runSignleTInstCount;
@@ -4846,7 +6937,6 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
     {
         VIR_Shader_Dump(gcvNULL, "After dual16 shader transform.", Shader, gcvTRUE);
     }
-
 
     return errCode;
 }
@@ -4957,23 +7047,23 @@ DEF_QUERY_PASS_PROP(vscVIR_CheckVariableUsage)
     pPassProp->supportedLevels = VSC_PASS_LEVEL_ML;
 }
 
+DEF_SH_NECESSITY_CHECK(vscVIR_CheckVariableUsage)
+{
+    return gcvTRUE;
+}
+
 VSC_ErrCode vscVIR_CheckVariableUsage(VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode                 errCode = VSC_ERR_NONE;
     VIR_Shader                 *pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
-    VIR_CHECK_VAR_USAGE        *checkVarUsage = (VIR_CHECK_VAR_USAGE *)pPassWorker->basePassWorker.pPrvData;
+    VIR_CHECK_VAR_USAGE        *checkVarUsage = (VIR_CHECK_VAR_USAGE *)pPassWorker->basePassWorker.pPassSpecificData;
     VIR_FuncIterator            func_iter;
     VIR_FunctionNode           *func_node;
 
-    /* Clean up the flag first. */
-    /* to-do: we have issue with IO block with struct. Since all the accesses
-       is based on first symbol, after this phase, all other fields will be marked as unused.
-       thus disable the check for some phase. */
     if (checkVarUsage->checkInput)
     {
         /* we check per-vertex attribute for TCS, since VS shader output is always checked */
         if (VIR_Shader_GetKind(pShader) == VIR_SHADER_TESSELLATION_CONTROL ||
-            VIR_Shader_GetKind(pShader) == VIR_SHADER_TESSELLATION_EVALUATION ||
             VIR_Shader_GetKind(pShader) == VIR_SHADER_GEOMETRY)
         {
             _InitUsageFlag(pShader, VIR_Shader_GetAttributes(pShader), VIR_SYMFLAG_UNUSED, gcvTRUE, gcvTRUE);
@@ -5076,7 +7166,7 @@ static VSC_ErrCode _InsertInitializeInst(
     {
         VIR_Operand_SetImmediateFloat(opnd, (gctFLOAT)initValue);
     }
-    VIR_Operand_SetPrecision(opnd, VIR_Symbol_GetPrecision(pSym));
+    VIR_Operand_SetPrecision(opnd, VIR_PRECISION_HIGH);
 
     vscVIR_AddNewDef(pDuInfo, pNewMovInst, firstRegNo, regNoRange,
                      defEnableMask, halfChannelMask, gcvNULL, gcvNULL);
@@ -5117,6 +7207,11 @@ DEF_QUERY_PASS_PROP(vscVIR_InitializeVariables)
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
 }
 
+DEF_SH_NECESSITY_CHECK(vscVIR_InitializeVariables)
+{
+    return gcvTRUE;
+}
+
 VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode                 errCode = VSC_ERR_NONE;
@@ -5124,6 +7219,8 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
     VIR_DEF_USAGE_INFO*         pDuInfo = pPassWorker->pDuInfo;
     VSC_BLOCK_TABLE*            pUsageTable = &pDuInfo->usageTable;
     VIR_USAGE*                  pUsage;
+    VIR_Operand*                pUsageOpnd = gcvNULL;
+    VIR_Instruction*            pUsageInst = gcvNULL;
     VIR_DEF*                    pDef;
     gctUINT                     i, j, usageCount, usageIdx, defIdx;
     VIR_OperandInfo             operandInfo, operandInfo1;
@@ -5132,6 +7229,7 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
     gctUINT8                    halfChannelMask = 0;
     VIR_Symbol*                 pSym = gcvNULL;
     gctBOOL                     bNeedInitialization;
+    gctBOOL                     bNeedToCheckDef;
     gctBOOL                     bChanged = gcvFALSE;
     gctUINT                     initValue = 0;
 
@@ -5146,17 +7244,34 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
         {
             gctBOOL bChannelInitialized[VIR_CHANNEL_COUNT] = {gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE};
 
+            pUsageInst = pUsage->usageKey.pUsageInst;
+            pUsageOpnd = pUsage->usageKey.pOperand;
+
             /* If the usage has no def, we must initialize it */
             bNeedInitialization = (UD_CHAIN_GET_DEF_COUNT(&pUsage->udChain) == 0);
+            bNeedToCheckDef = gcvTRUE;
+
+            /* Don't need to a combined sampler. */
+            if (bNeedInitialization &&
+                !VIR_IS_IMPLICIT_USAGE_INST(pUsageInst) &&
+                pUsageOpnd &&
+                VIR_Operand_isSymbol(pUsageOpnd))
+            {
+                VIR_Symbol*     pOpndSym = VIR_Operand_GetSymbol(pUsageOpnd);
+
+                if (isSymCombinedSampler(pOpndSym))
+                {
+                    bNeedInitialization = gcvFALSE;
+                    bNeedToCheckDef = gcvFALSE;
+                }
+            }
 
             /* Even usage has defs, however, some of pathes might have no definition. So far,
-               only loop is checked.
+               only loop is checked. */
 
-               TODO: need more complicated solution to check all pathes
-            */
-            if (!bNeedInitialization)
+            if (!bNeedInitialization && bNeedToCheckDef)
             {
-                if (pUsage->usageKey.pUsageInst < VIR_OUTPUT_USAGE_INST)
+                if (pUsageInst < VIR_OUTPUT_USAGE_INST)
                 {
                     gctBOOL bSkipCheck = gcvFALSE;
 
@@ -5186,7 +7301,7 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
                             break;
                         }
 
-                        if (VIR_Inst_GetFunction(pDef->defKey.pDefInst) != VIR_Inst_GetFunction(pUsage->usageKey.pUsageInst))
+                        if (VIR_Inst_GetFunction(pDef->defKey.pDefInst) != VIR_Inst_GetFunction(pUsageInst))
                         {
                             bNeedInitialization = gcvFALSE;
                             bSkipCheck = gcvTRUE;
@@ -5195,7 +7310,7 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
 
                         if (pDef->defKey.pDefInst < VIR_OUTPUT_USAGE_INST)
                         {
-                            if (VIR_Inst_GetId(pDef->defKey.pDefInst) < VIR_Inst_GetId(pUsage->usageKey.pUsageInst))
+                            if (VIR_Inst_GetId(pDef->defKey.pDefInst) < VIR_Inst_GetId(pUsageInst))
                             {
                                 bNeedInitialization = gcvFALSE;
                             }
@@ -5227,8 +7342,10 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
 
             if (bNeedInitialization)
             {
-                VIR_Operand_GetOperandInfo(pUsage->usageKey.pUsageInst,
-                                           pUsage->usageKey.pOperand,
+                bChanged = gcvTRUE;
+
+                VIR_Operand_GetOperandInfo(pUsageInst,
+                                           pUsageOpnd,
                                            &operandInfo);
 
                 if (pUsage->usageKey.bIsIndexingRegUsage)
@@ -5242,12 +7359,12 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
                 }
                 else
                 {
-                    if (VIR_Inst_GetOpcode(pUsage->usageKey.pUsageInst) == VIR_OP_LDARR)
+                    if (VIR_Inst_GetOpcode(pUsageInst) == VIR_OP_LDARR)
                     {
-                        if (pUsage->usageKey.pOperand == VIR_Inst_GetSource(pUsage->usageKey.pUsageInst, VIR_Operand_Src0))
+                        if (pUsageOpnd == VIR_Inst_GetSource(pUsageInst, VIR_Operand_Src0))
                         {
-                            VIR_Operand_GetOperandInfo(pUsage->usageKey.pUsageInst,
-                                                       VIR_Inst_GetSource(pUsage->usageKey.pUsageInst, VIR_Operand_Src1),
+                            VIR_Operand_GetOperandInfo(pUsageInst,
+                                                       VIR_Inst_GetSource(pUsageInst, VIR_Operand_Src1),
                                                        &operandInfo1);
 
                             if (operandInfo1.isImmVal)
@@ -5261,17 +7378,17 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
                                 regNoRange = operandInfo.u1.virRegInfo.virRegCount;
                             }
 
-                            defEnableMask = VIR_Operand_GetRealUsedChannels(pUsage->usageKey.pOperand,
-                                                                            pUsage->usageKey.pUsageInst,
+                            defEnableMask = VIR_Operand_GetRealUsedChannels(pUsageOpnd,
+                                                                            pUsageInst,
                                                                             gcvNULL);
                             halfChannelMask = (gctUINT8)operandInfo.halfChannelMask;
                         }
-                        else if (pUsage->usageKey.pOperand == VIR_Inst_GetSource(pUsage->usageKey.pUsageInst, VIR_Operand_Src1))
+                        else if (pUsageOpnd == VIR_Inst_GetSource(pUsageInst, VIR_Operand_Src1))
                         {
                             firstRegNo = operandInfo.u1.virRegInfo.virReg;
                             regNoRange = 1;
-                            defEnableMask = VIR_Operand_GetRealUsedChannels(pUsage->usageKey.pOperand,
-                                                                            pUsage->usageKey.pUsageInst,
+                            defEnableMask = VIR_Operand_GetRealUsedChannels(pUsageOpnd,
+                                                                            pUsageInst,
                                                                             gcvNULL);
                             halfChannelMask = (gctUINT8)operandInfo.halfChannelMask;
                         }
@@ -5293,22 +7410,22 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
                             regNoRange = 1;
                         }
 
-                        defEnableMask = VIR_Operand_GetRealUsedChannels(pUsage->usageKey.pOperand,
-                                                                        pUsage->usageKey.pUsageInst,
+                        defEnableMask = VIR_Operand_GetRealUsedChannels(pUsageOpnd,
+                                                                        pUsageInst,
                                                                         gcvNULL);
                         halfChannelMask = (gctUINT8)operandInfo.halfChannelMask;
                     }
 
-                    pSym = VIR_Operand_GetSymbol(pUsage->usageKey.pOperand);
+                    pSym = VIR_Operand_GetSymbol(pUsageOpnd);
                 }
 
                 /* Insert 'MOV reg, 0' at the begin of function */
                 errCode = _InsertInitializeInst(pDuInfo,
                                                 pShader,
-                                                VIR_Inst_GetFunction(pUsage->usageKey.pUsageInst),
+                                                VIR_Inst_GetFunction(pUsageInst),
                                                 pSym,
                                                 pUsage,
-                                                VIR_Operand_GetTypeId(pUsage->usageKey.pOperand),
+                                                VIR_Operand_GetTypeId(pUsageOpnd),
                                                 firstRegNo,
                                                 regNoRange,
                                                 defEnableMask,
@@ -5373,6 +7490,12 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
                 bChanged = gcvTRUE;
             }
         }
+    }
+
+    /* Basicly if we meet a uninitialized variable, there must be something wrong with the optimization. */
+    if (bChanged)
+    {
+        WARNING_REPORT(VSC_ERR_INVALID_DATA, "Get some uninitialized variables, please double check!!!");
     }
 
     if (bChanged &&
@@ -6977,6 +9100,19 @@ DEF_QUERY_PASS_PROP(vscVIR_FixTexldOffset)
     pPassProp->supportedLevels = VSC_PASS_LEVEL_ML;
 }
 
+DEF_SH_NECESSITY_CHECK(vscVIR_FixTexldOffset)
+{
+    VSC_HW_CONFIG              *pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+
+    /* Calcuate the new coordinate with offset, if hardware doesn't support it directly. */
+    if (pHwCfg->hwFeatureFlags.supportTexldCoordOffset)
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
 VSC_ErrCode vscVIR_FixTexldOffset(VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode                 errCode = VSC_ERR_NONE;
@@ -6985,13 +9121,737 @@ VSC_ErrCode vscVIR_FixTexldOffset(VSC_SH_PASS_WORKER* pPassWorker)
     VIR_FuncIterator            func_iter;
     VIR_FunctionNode           *func_node;
 
-    /* Calcuate the new coordinate with offset, if hardware doesn't support it directly. */
-    if (pHwCfg->hwFeatureFlags.supportTexldOffset)
+    /* Process all instructions. */
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for (func_node = VIR_FuncIterator_First(&func_iter);
+        func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_Function           *func = func_node->function;
+        VIR_InstIterator        inst_iter;
+        VIR_Instruction        *inst;
+
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+            inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
+            if (VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(inst)))
+            {
+                _CalculateCoordWithOffset(pShader, pHwCfg, func, inst);
+            }
+        }
+    }
+
     return errCode;
 }
 
-    /* Process all instructions. */
+static VSC_ErrCode _CalculateIndexForPrivateMemory(
+    VIR_DEF_USAGE_INFO  *pDuInfo,
+    VIR_Shader          *pShader,
+    VIR_Function        *pFunc,
+    VIR_Instruction     *pInst
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_OpCode          opCode = VIR_Inst_GetOpcode(pInst);
+    VIR_Instruction     *newInst = gcvNULL;
+    VIR_Operand         *dstOpnd = gcvNULL;
+    VIR_Operand         *srcOpnd = gcvNULL;
+    VIR_OperandInfo     srcOpndInfo;
+    VIR_NameId          nameId;
+    VIR_SymId           workThreadCountSymId = VIR_INVALID_ID;
+    VIR_Symbol          *workThreadCountSym = gcvNULL;
+    VIR_Symbol          *privateMemSym = gcvNULL;
+    VIR_VirRegId        newVirRegIdx = VIR_INVALID_ID;
+    VIR_SymId           newVirRegSymId = VIR_INVALID_ID;
+
+    if (opCode == VIR_OP_ADD && VIR_Operand_isSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src1)))
+    {
+        privateMemSym = VIR_Operand_GetSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src1));
+    }
+    else if (opCode == VIR_OP_IMADLO0 && VIR_Operand_isSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src2)))
+    {
+        privateMemSym = VIR_Operand_GetSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src2));
+    }
+
+    if (privateMemSym &&
+        VIR_Symbol_isUniform(privateMemSym) &&
+        strcmp(VIR_Shader_GetSymNameString(pShader, privateMemSym), "#private_address") == 0)
+    {
+        /* Add a new uniform to save the workThreadCount. */
+        errCode = VIR_Shader_AddString(pShader,
+                                       "#WorkThreadCount",
+                                       &nameId);
+
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                       VIR_SYM_UNIFORM,
+                                       nameId,
+                                       VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT16),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &workThreadCountSymId);
+        ON_ERROR(errCode, "Add workThreadCount uniform. ");
+
+        workThreadCountSym = VIR_Shader_GetSymFromId(pShader, workThreadCountSymId);
+        VIR_Symbol_SetFlag(workThreadCountSym, VIR_SYMFLAG_COMPILER_GEN);
+        VIR_Symbol_SetPrecision(workThreadCountSym, VIR_PRECISION_MEDIUM);
+        VIR_Symbol_SetUniformKind(workThreadCountSym, VIR_UNIFORM_WORK_THREAD_COUNT);
+        VIR_Symbol_SetAddrSpace(workThreadCountSym, VIR_AS_CONSTANT);
+        VIR_Symbol_SetTyQualifier(workThreadCountSym, VIR_TYQUAL_CONST);
+
+        VIR_Shader_SetFlag(pShader, VIR_SHFLAG_USE_PRIVATE_MEM);
+
+        newVirRegIdx = VIR_Shader_NewVirRegId(pShader, 1);
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                        VIR_SYM_VIRREG,
+                                        newVirRegIdx,
+                                        VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT16),
+                                        VIR_STORAGE_UNKNOWN,
+                                        &newVirRegSymId);
+        ON_ERROR(errCode, "Add symbol");
+
+        if (opCode == VIR_OP_ADD)
+        {
+            /*
+            ** 004: LSHIFT             uint temp(9).x{r0.<3}, uint temp(8).x{r0.<3}, int 8
+            ** 005: ADD                uint temp(1).x{r0.<3}, uint temp(9).x{r0.<3}, uint #private_address.x
+            ** -->
+            ** 004: IMOD               ushort temp(10).x{r0.<0}, ushort temp(8).x{r0.<3}, ushort #WorkThreadCount.x
+            ** 005: LSHIFT             uint temp(9).x{r0.<3}, uint temp(10).x{r0.<0}, int 8
+            ** 006: ADD                uint temp(1).x{r0.<3}, uint temp(9).x{r0.<3}, uint #private_address.x
+            **
+            ** Or
+            **
+            ** 004: MUL                uint temp(9).x{r0.<3}, uint temp(8).x{r0.<3}, int 8
+            ** 005: ADD                uint temp(1).x{r0.<3}, uint temp(9).x{r0.<3}, uint #private_address.x
+            ** -->
+            ** 004: IMOD               ushort temp(10).x{r0.<0}, ushort temp(8).x{r0.<3}, ushort #WorkThreadCount.x
+            ** 005: MUL                uint temp(9).x{r0.<3}, uint temp(10).x{r0.<0}, uint 300
+            ** 006: ADD                uint temp(1).x{r0.<3}, uint temp(9).x{r0.<3}, uint #private_address.x
+            */
+            VIR_Instruction     *shiftOrMulInst = gcvNULL;
+
+            /* Insert a MOD before LSHIFT/MUL. */
+            shiftOrMulInst = VIR_Inst_GetPrev(pInst);
+            gcmASSERT(VIR_Inst_GetOpcode(shiftOrMulInst) == VIR_OP_LSHIFT || VIR_Inst_GetOpcode(shiftOrMulInst) == VIR_OP_MUL);
+
+            VIR_Function_AddCopiedInstructionBefore(pFunc,
+                                                    shiftOrMulInst,
+                                                    shiftOrMulInst,
+                                                    gcvTRUE,
+                                                    &newInst);
+            VIR_Inst_SetOpcode(newInst, VIR_OP_IMOD);
+
+            /*
+            ** Change the instType to UINT16.
+            ** VIV:TODO: is UINT16 enough for globalIndex?
+            */
+            VIR_Inst_SetInstType(newInst, VIR_TYPE_UINT16);
+
+            dstOpnd = VIR_Inst_GetDest(newInst);
+            VIR_Operand_SetSymbol(dstOpnd, pFunc, newVirRegSymId);
+            VIR_Operand_SetEnable(dstOpnd, VIR_ENABLE_X);
+
+            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src0);
+            VIR_Operand_SetTypeId(srcOpnd, VIR_TYPE_UINT16);
+
+            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src1);
+            VIR_Operand_SetSymbol(srcOpnd, pFunc, workThreadCountSymId);
+            VIR_Operand_SetSwizzle(srcOpnd, VIR_SWIZZLE_XXXX);
+
+            /* Update the DU for IMOD. */
+            VIR_Operand_GetOperandInfo(newInst, VIR_Inst_GetSource(newInst, VIR_Operand_Src0), &srcOpndInfo);
+            vscVIR_AddNewDef(pDuInfo,
+                             newInst,
+                             newVirRegIdx,
+                             1,
+                             VIR_Operand_GetEnable(dstOpnd),
+                             VIR_HALF_CHANNEL_MASK_FULL,
+                             gcvNULL,
+                             gcvNULL);
+
+            vscVIR_AddNewUsageToDef(pDuInfo,
+                                    VIR_ANY_DEF_INST,
+                                    newInst,
+                                    VIR_Inst_GetSource(newInst, VIR_Operand_Src0),
+                                    gcvFALSE,
+                                    srcOpndInfo.u1.virRegInfo.virReg,
+                                    1,
+                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(newInst, VIR_Operand_Src0))),
+                                    VIR_HALF_CHANNEL_MASK_FULL,
+                                    gcvNULL);
+
+            /* Change the SRC0 of LSHIFT/MUL. */
+            srcOpnd = VIR_Inst_GetSource(shiftOrMulInst, VIR_Operand_Src0);
+            VIR_Operand_GetOperandInfo(shiftOrMulInst, srcOpnd, &srcOpndInfo);
+
+            /* Update the DU for LSHIFT/MUL. */
+            vscVIR_DeleteUsage(pDuInfo,
+                               VIR_ANY_DEF_INST,
+                               shiftOrMulInst,
+                               srcOpnd,
+                               gcvFALSE,
+                               srcOpndInfo.u1.virRegInfo.virReg,
+                               1,
+                               VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpnd)),
+                               VIR_HALF_CHANNEL_MASK_FULL,
+                               gcvNULL);
+
+            VIR_Operand_Copy(srcOpnd, dstOpnd);
+            VIR_Operand_SetLvalue(srcOpnd, gcvFALSE);
+            VIR_Operand_SetSwizzle(srcOpnd, VIR_Enable_2_Swizzle_WShift(VIR_Operand_GetEnable(dstOpnd)));
+            VIR_Operand_GetOperandInfo(shiftOrMulInst, srcOpnd, &srcOpndInfo);
+
+            vscVIR_AddNewUsageToDef(pDuInfo,
+                                    VIR_ANY_DEF_INST,
+                                    shiftOrMulInst,
+                                    srcOpnd,
+                                    gcvFALSE,
+                                    srcOpndInfo.u1.virRegInfo.virReg,
+                                    1,
+                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpnd)),
+                                    VIR_HALF_CHANNEL_MASK_FULL,
+                                    gcvNULL);
+        }
+        else
+        {
+            /*
+            ** 004: IMADLO0            uint temp(1).x{r0.<3}, uint temp(8).x{r0.<3}, int 340, uint #private_address.x
+            ** -->
+            ** 003: IMOD               ushort temp(10).x{r0.<0}, ushort temp(8).x{r0.<3}, ushort #WorkThreadCount.x
+            ** 004: IMADLO0            uint temp(1).x{r0.<3}, uint temp(10).x{r0.<0}, int 340, uint #private_address.x
+            */
+            /* Insert a MOD before MAD. */
+            VIR_Function_AddInstructionBefore(pFunc,
+                                              VIR_OP_IMOD,
+                                              VIR_TYPE_UINT16,
+                                              pInst,
+                                              gcvTRUE,
+                                              &newInst);
+            dstOpnd = VIR_Inst_GetDest(newInst);
+            VIR_Operand_SetSymbol(dstOpnd, pFunc, newVirRegSymId);
+            VIR_Operand_SetEnable(dstOpnd, VIR_ENABLE_X);
+
+            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src0);
+            VIR_Operand_Copy(srcOpnd, VIR_Inst_GetSource(pInst, VIR_Operand_Src0));
+            VIR_Operand_SetTypeId(srcOpnd, VIR_TYPE_UINT16);
+
+            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src1);
+            VIR_Operand_SetSymbol(srcOpnd, pFunc, workThreadCountSymId);
+            VIR_Operand_SetSwizzle(srcOpnd, VIR_SWIZZLE_XXXX);
+
+            /* Update the DU for IMOD. */
+            VIR_Operand_GetOperandInfo(newInst, VIR_Inst_GetSource(newInst, VIR_Operand_Src0), &srcOpndInfo);
+            vscVIR_AddNewDef(pDuInfo,
+                             newInst,
+                             newVirRegIdx,
+                             1,
+                             VIR_Operand_GetEnable(dstOpnd),
+                             VIR_HALF_CHANNEL_MASK_FULL,
+                             gcvNULL,
+                             gcvNULL);
+
+            vscVIR_AddNewUsageToDef(pDuInfo,
+                                    VIR_ANY_DEF_INST,
+                                    newInst,
+                                    VIR_Inst_GetSource(newInst, VIR_Operand_Src0),
+                                    gcvFALSE,
+                                    srcOpndInfo.u1.virRegInfo.virReg,
+                                    1,
+                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(newInst, VIR_Operand_Src0))),
+                                    VIR_HALF_CHANNEL_MASK_FULL,
+                                    gcvNULL);
+
+            /* Change the SRC0 of MAD. */
+            srcOpnd = VIR_Inst_GetSource(pInst, VIR_Operand_Src0);
+            VIR_Operand_GetOperandInfo(pInst, srcOpnd, &srcOpndInfo);
+
+            /* Update the DU for MAD. */
+            vscVIR_DeleteUsage(pDuInfo,
+                               VIR_ANY_DEF_INST,
+                               pInst,
+                               srcOpnd,
+                               gcvFALSE,
+                               srcOpndInfo.u1.virRegInfo.virReg,
+                               1,
+                               VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpnd)),
+                               VIR_HALF_CHANNEL_MASK_FULL,
+                               gcvNULL);
+
+            VIR_Operand_Copy(srcOpnd, dstOpnd);
+            VIR_Operand_SetLvalue(srcOpnd, gcvFALSE);
+            VIR_Operand_SetSwizzle(srcOpnd, VIR_Enable_2_Swizzle_WShift(VIR_Operand_GetEnable(dstOpnd)));
+            VIR_Operand_GetOperandInfo(pInst, srcOpnd, &srcOpndInfo);
+
+            vscVIR_AddNewUsageToDef(pDuInfo,
+                                    VIR_ANY_DEF_INST,
+                                    pInst,
+                                    srcOpnd,
+                                    gcvFALSE,
+                                    srcOpndInfo.u1.virRegInfo.virReg,
+                                    1,
+                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpnd)),
+                                    VIR_HALF_CHANNEL_MASK_FULL,
+                                    gcvNULL);
+        }
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode _CalculateIndexForLocalMemory(
+    VIR_DEF_USAGE_INFO  *pDuInfo,
+    VIR_Shader          *pShader,
+    VIR_Function        *pFunc,
+    VIR_Instruction     *pInst
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_OpCode          opCode = VIR_Inst_GetOpcode(pInst);
+    VIR_Instruction     *newInst = gcvNULL;
+    VIR_Operand         *dstOpnd = gcvNULL;
+    VIR_Operand         *srcOpnd = gcvNULL;
+    VIR_OperandInfo     srcOpndInfo;
+    VIR_NameId          nameId;
+    VIR_SymId           workGroupCountSymId = VIR_INVALID_ID;
+    VIR_Symbol          *workGroupCountSym = gcvNULL;
+    VIR_Symbol          *localMemSym = gcvNULL;
+    VIR_VirRegId        newVirRegIdx = VIR_INVALID_ID;
+    VIR_SymId           newVirRegSymId = VIR_INVALID_ID;
+
+    if (opCode == VIR_OP_ADD && VIR_Operand_isSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src1)))
+    {
+        localMemSym = VIR_Operand_GetSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src1));
+    }
+    else if (opCode == VIR_OP_IMADLO0 && VIR_Operand_isSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src2)))
+    {
+        localMemSym = VIR_Operand_GetSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src2));
+    }
+
+    if (localMemSym &&
+        VIR_Symbol_isUniform(localMemSym) &&
+        strcmp(VIR_Shader_GetSymNameString(pShader, localMemSym), _sldLocalStorageAddressName) == 0)
+    {
+        /* Add a new uniform to save the workGroupCount. */
+        errCode = VIR_Shader_AddString(pShader,
+                                       _sldWorkGroupCountName,
+                                       &nameId);
+
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                       VIR_SYM_UNIFORM,
+                                       nameId,
+                                       VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT16),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &workGroupCountSymId);
+        ON_ERROR(errCode, "Add workGroupCount uniform. ");
+
+        workGroupCountSym = VIR_Shader_GetSymFromId(pShader, workGroupCountSymId);
+        VIR_Symbol_SetFlag(workGroupCountSym, VIR_SYMFLAG_COMPILER_GEN);
+        VIR_Symbol_SetPrecision(workGroupCountSym, VIR_PRECISION_MEDIUM);
+        VIR_Symbol_SetUniformKind(workGroupCountSym, VIR_UNIFORM_WORK_GROUP_COUNT);
+        VIR_Symbol_SetAddrSpace(workGroupCountSym, VIR_AS_CONSTANT);
+        VIR_Symbol_SetTyQualifier(workGroupCountSym, VIR_TYQUAL_CONST);
+
+        newVirRegIdx = VIR_Shader_NewVirRegId(pShader, 1);
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                        VIR_SYM_VIRREG,
+                                        newVirRegIdx,
+                                        VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT16),
+                                        VIR_STORAGE_UNKNOWN,
+                                        &newVirRegSymId);
+        ON_ERROR(errCode, "Add symbol");
+
+        if (opCode == VIR_OP_ADD)
+        {
+            /*
+            ** 004: LSHIFT             uint temp(9).x{r0.<3}, uint temp(8).x{r0.<3}, int 8
+            ** 005: ADD                uint temp(1).x{r0.<3}, uint temp(9).x{r0.<3}, uint #local_address.x
+            ** -->
+            ** 004: IMOD               ushort temp(10).x{r0.<0}, ushort temp(8).x{r0.<3}, ushort #workGroupCount.x
+            ** 005: LSHIFT             uint temp(9).x{r0.<3}, uint temp(10).x{r0.<0}, int 8
+            ** 006: ADD                uint temp(1).x{r0.<3}, uint temp(9).x{r0.<3}, uint #local_address.x
+            **
+            ** Or
+            **
+            ** 004: MUL                uint temp(9).x{r0.<3}, uint temp(8).x{r0.<3}, int 8
+            ** 005: ADD                uint temp(1).x{r0.<3}, uint temp(9).x{r0.<3}, uint #local_address.x
+            ** -->
+            ** 004: IMOD               ushort temp(10).x{r0.<0}, ushort temp(8).x{r0.<3}, ushort #workGroupCount.x
+            ** 005: MUL                uint temp(9).x{r0.<3}, uint temp(10).x{r0.<0}, uint 300
+            ** 006: ADD                uint temp(1).x{r0.<3}, uint temp(9).x{r0.<3}, uint #local_address.x
+            */
+            VIR_Instruction     *shiftOrMulInst = gcvNULL;
+
+            /* Insert a MOD before LSHIFT/MUL. */
+            shiftOrMulInst = VIR_Inst_GetPrev(pInst);
+            gcmASSERT(VIR_Inst_GetOpcode(shiftOrMulInst) == VIR_OP_LSHIFT || VIR_Inst_GetOpcode(shiftOrMulInst) == VIR_OP_MUL);
+
+            VIR_Function_AddCopiedInstructionBefore(pFunc,
+                                                    shiftOrMulInst,
+                                                    shiftOrMulInst,
+                                                    gcvTRUE,
+                                                    &newInst);
+            VIR_Inst_SetOpcode(newInst, VIR_OP_IMOD);
+
+            /*
+            ** Change the instType to UINT16.
+            ** VIV:TODO: is UINT16 enough for globalIndex?
+            */
+            VIR_Inst_SetInstType(newInst, VIR_TYPE_UINT16);
+
+            dstOpnd = VIR_Inst_GetDest(newInst);
+            VIR_Operand_SetSymbol(dstOpnd, pFunc, newVirRegSymId);
+            VIR_Operand_SetEnable(dstOpnd, VIR_ENABLE_X);
+
+            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src0);
+            VIR_Operand_SetTypeId(srcOpnd, VIR_TYPE_UINT16);
+
+            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src1);
+            VIR_Operand_SetSymbol(srcOpnd, pFunc, workGroupCountSymId);
+            VIR_Operand_SetSwizzle(srcOpnd, VIR_SWIZZLE_XXXX);
+
+            /* Update the DU for IMOD. */
+            VIR_Operand_GetOperandInfo(newInst, VIR_Inst_GetSource(newInst, VIR_Operand_Src0), &srcOpndInfo);
+            vscVIR_AddNewDef(pDuInfo,
+                             newInst,
+                             newVirRegIdx,
+                             1,
+                             VIR_Operand_GetEnable(dstOpnd),
+                             VIR_HALF_CHANNEL_MASK_FULL,
+                             gcvNULL,
+                             gcvNULL);
+
+            vscVIR_AddNewUsageToDef(pDuInfo,
+                                    VIR_ANY_DEF_INST,
+                                    newInst,
+                                    VIR_Inst_GetSource(newInst, VIR_Operand_Src0),
+                                    gcvFALSE,
+                                    srcOpndInfo.u1.virRegInfo.virReg,
+                                    1,
+                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(newInst, VIR_Operand_Src0))),
+                                    VIR_HALF_CHANNEL_MASK_FULL,
+                                    gcvNULL);
+
+            /* Change the SRC0 of LSHIFT/MUL. */
+            srcOpnd = VIR_Inst_GetSource(shiftOrMulInst, VIR_Operand_Src0);
+            VIR_Operand_GetOperandInfo(shiftOrMulInst, srcOpnd, &srcOpndInfo);
+
+            /* Update the DU for LSHIFT/MUL. */
+            vscVIR_DeleteUsage(pDuInfo,
+                               VIR_ANY_DEF_INST,
+                               shiftOrMulInst,
+                               srcOpnd,
+                               gcvFALSE,
+                               srcOpndInfo.u1.virRegInfo.virReg,
+                               1,
+                               VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpnd)),
+                               VIR_HALF_CHANNEL_MASK_FULL,
+                               gcvNULL);
+
+            VIR_Operand_Copy(srcOpnd, dstOpnd);
+            VIR_Operand_SetLvalue(srcOpnd, gcvFALSE);
+            VIR_Operand_SetSwizzle(srcOpnd, VIR_Enable_2_Swizzle_WShift(VIR_Operand_GetEnable(dstOpnd)));
+            VIR_Operand_GetOperandInfo(shiftOrMulInst, srcOpnd, &srcOpndInfo);
+
+            vscVIR_AddNewUsageToDef(pDuInfo,
+                                    VIR_ANY_DEF_INST,
+                                    shiftOrMulInst,
+                                    srcOpnd,
+                                    gcvFALSE,
+                                    srcOpndInfo.u1.virRegInfo.virReg,
+                                    1,
+                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpnd)),
+                                    VIR_HALF_CHANNEL_MASK_FULL,
+                                    gcvNULL);
+        }
+        else
+        {
+            /*
+            ** 004: IMADLO0            uint temp(1).x{r0.<3}, uint temp(8).x{r0.<3}, int 340, uint #local_address.x
+            ** -->
+            ** 003: IMOD               ushort temp(10).x{r0.<0}, ushort temp(8).x{r0.<3}, ushort #WorkGroupCount.x
+            ** 004: IMADLO0            uint temp(1).x{r0.<3}, uint temp(10).x{r0.<0}, int 340, uint #local_address.x
+            */
+            /* Insert a MOD before MAD. */
+            VIR_Function_AddInstructionBefore(pFunc,
+                                              VIR_OP_IMOD,
+                                              VIR_TYPE_UINT16,
+                                              pInst,
+                                              gcvTRUE,
+                                              &newInst);
+            dstOpnd = VIR_Inst_GetDest(newInst);
+            VIR_Operand_SetSymbol(dstOpnd, pFunc, newVirRegSymId);
+            VIR_Operand_SetEnable(dstOpnd, VIR_ENABLE_X);
+
+            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src0);
+            VIR_Operand_Copy(srcOpnd, VIR_Inst_GetSource(pInst, VIR_Operand_Src0));
+            VIR_Operand_SetTypeId(srcOpnd, VIR_TYPE_UINT16);
+
+            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src1);
+            VIR_Operand_SetSymbol(srcOpnd, pFunc, workGroupCountSymId);
+            VIR_Operand_SetSwizzle(srcOpnd, VIR_SWIZZLE_XXXX);
+
+            /* Update the DU for IMOD. */
+            VIR_Operand_GetOperandInfo(newInst, VIR_Inst_GetSource(newInst, VIR_Operand_Src0), &srcOpndInfo);
+            vscVIR_AddNewDef(pDuInfo,
+                             newInst,
+                             newVirRegIdx,
+                             1,
+                             VIR_Operand_GetEnable(dstOpnd),
+                             VIR_HALF_CHANNEL_MASK_FULL,
+                             gcvNULL,
+                             gcvNULL);
+
+            vscVIR_AddNewUsageToDef(pDuInfo,
+                                    VIR_ANY_DEF_INST,
+                                    newInst,
+                                    VIR_Inst_GetSource(newInst, VIR_Operand_Src0),
+                                    gcvFALSE,
+                                    srcOpndInfo.u1.virRegInfo.virReg,
+                                    1,
+                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(newInst, VIR_Operand_Src0))),
+                                    VIR_HALF_CHANNEL_MASK_FULL,
+                                    gcvNULL);
+
+            /* Change the SRC0 of MAD. */
+            srcOpnd = VIR_Inst_GetSource(pInst, VIR_Operand_Src0);
+            VIR_Operand_GetOperandInfo(pInst, srcOpnd, &srcOpndInfo);
+
+            /* Update the DU for MAD. */
+            vscVIR_DeleteUsage(pDuInfo,
+                               VIR_ANY_DEF_INST,
+                               pInst,
+                               srcOpnd,
+                               gcvFALSE,
+                               srcOpndInfo.u1.virRegInfo.virReg,
+                               1,
+                               VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpnd)),
+                               VIR_HALF_CHANNEL_MASK_FULL,
+                               gcvNULL);
+
+            VIR_Operand_Copy(srcOpnd, dstOpnd);
+            VIR_Operand_SetLvalue(srcOpnd, gcvFALSE);
+            VIR_Operand_SetSwizzle(srcOpnd, VIR_Enable_2_Swizzle_WShift(VIR_Operand_GetEnable(dstOpnd)));
+            VIR_Operand_GetOperandInfo(pInst, srcOpnd, &srcOpndInfo);
+
+            vscVIR_AddNewUsageToDef(pDuInfo,
+                                    VIR_ANY_DEF_INST,
+                                    pInst,
+                                    srcOpnd,
+                                    gcvFALSE,
+                                    srcOpndInfo.u1.virRegInfo.virReg,
+                                    1,
+                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(srcOpnd)),
+                                    VIR_HALF_CHANNEL_MASK_FULL,
+                                    gcvNULL);
+        }
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode _ReplaceLocalMemoryAddress(
+    VIR_DEF_USAGE_INFO  *pDuInfo,
+    VIR_Shader          *pShader,
+    VIR_Function        *pFunc,
+    VIR_Instruction     *pInst
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_OpCode          opCode = VIR_Inst_GetOpcode(pInst);
+    VIR_Symbol          *localMemAddrSym = gcvNULL;
+    VIR_Operand         *pOpnd = gcvNULL;
+    VIR_Symbol          *localMemSym = gcvNULL;
+    gctBOOL             isOCL = VIR_Shader_IsCL(pShader);
+
+    if (opCode == VIR_OP_ADD && VIR_Operand_isSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src1)))
+    {
+        localMemSym = VIR_Operand_GetSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src1));
+    }
+    else if (opCode == VIR_OP_IMADLO0 && VIR_Operand_isSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src2)))
+    {
+        localMemSym = VIR_Operand_GetSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src2));
+    }
+
+    if (localMemSym &&
+        VIR_Symbol_isUniform(localMemSym) &&
+        ((isOCL && strcmp(VIR_Shader_GetSymNameString(pShader, localMemSym), _sldLocalStorageAddressName) == 0)
+         ||
+         (!isOCL && strcmp(VIR_Shader_GetSymNameString(pShader, localMemSym), _sldSharedVariableStorageBlockName) == 0)))
+    {
+        localMemAddrSym = VIR_Operand_GetSymbol(VIR_Inst_GetDest(pInst));
+        if (localMemAddrSym && VIR_Symbol_isVreg(localMemAddrSym))
+        {
+            localMemAddrSym = VIR_Symbol_GetVregVariable(localMemAddrSym);
+        }
+    }
+
+    if (localMemAddrSym &&
+        strcmp(VIR_Shader_GetSymNameString(pShader, localMemAddrSym), _sldLocalMemoryAddressName) == 0)
+    {
+        VIR_Symbol          *pLocIdSym = gcvNULL;
+        VIR_SymId           outRegId, outRegSymId;
+        VIR_AttributeIdList *pAttrIdLsts = VIR_Shader_GetAttributes(pShader);
+        gctUINT             attrCount = VIR_IdList_Count(pAttrIdLsts);
+        gctUINT             attrIdx;
+        gctUINT             nextAttrLlSlot = 0;
+        gctUINT             i;
+        VIR_NATIVE_DEF_FLAGS nativeDefFlags;
+
+        pLocIdSym = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_LOCAL_INVOCATION_ID);
+
+        if (pLocIdSym == gcvNULL)
+        {
+            for (attrIdx = 0; attrIdx < attrCount; attrIdx ++)
+            {
+                VIR_SymId       attrSymId = VIR_IdList_GetId(pAttrIdLsts, attrIdx);
+                VIR_Symbol      *pAttrSym = VIR_Shader_GetSymFromId(pShader, attrSymId);
+                gctUINT         thisOutputRegCount;
+
+                if (!isSymUnused(pAttrSym) && !isSymVectorizedOut(pAttrSym))
+                {
+                    gcmASSERT(VIR_Symbol_GetFirstSlot(pAttrSym) != NOT_ASSIGNED);
+
+                    thisOutputRegCount = VIR_Symbol_GetVirIoRegCount(pShader, pAttrSym);
+                    if (nextAttrLlSlot < (VIR_Symbol_GetFirstSlot(pAttrSym) + thisOutputRegCount))
+                    {
+                        nextAttrLlSlot = VIR_Symbol_GetFirstSlot(pAttrSym) + thisOutputRegCount;
+                    }
+                }
+            }
+
+            pLocIdSym = VIR_Shader_AddBuiltinAttribute(pShader, VIR_TYPE_UINT_X4, gcvFALSE, VIR_NAME_LOCAL_INVOCATION_ID);
+            outRegId = VIR_Shader_NewVirRegId(pShader, 1);
+            VIR_Shader_AddSymbol(pShader,
+                                 VIR_SYM_VIRREG,
+                                 outRegId,
+                                 VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X4),
+                                 VIR_STORAGE_UNKNOWN,
+                                 &outRegSymId);
+            VIR_Symbol_SetVariableVregIndex(pLocIdSym, outRegId);
+            VIR_Symbol_SetVregVariable(VIR_Shader_GetSymFromId(pShader, outRegSymId), pLocIdSym);
+            VIR_Symbol_SetIndexRange(pLocIdSym, outRegId + 1);
+            VIR_Symbol_SetIndexRange(VIR_Shader_GetSymFromId(pShader, outRegSymId), outRegId + 1);
+            VIR_Symbol_SetFirstSlot(pLocIdSym, nextAttrLlSlot);
+        }
+        else
+        {
+            outRegId = VIR_Symbol_GetVregIndex(pLocIdSym);
+        }
+
+        /* Delete the usage first. */
+        for (i = 0; i < VIR_Inst_GetSrcNum(pInst); i++)
+        {
+            VIR_Operand     *pOpnd;
+            VIR_OperandInfo  opndInfo;
+
+            pOpnd = VIR_Inst_GetSource(pInst, i);
+            VIR_Operand_GetOperandInfo(pInst, pOpnd, &opndInfo);
+
+            if (opndInfo.isVreg)
+            {
+                vscVIR_DeleteUsage(pDuInfo,
+                                   VIR_ANY_DEF_INST,
+                                   pInst,
+                                   pOpnd,
+                                   gcvFALSE,
+                                   opndInfo.u1.virRegInfo.virReg,
+                                   1,
+                                   VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pOpnd)),
+                                   VIR_HALF_CHANNEL_MASK_FULL,
+                                   gcvNULL);
+            }
+        }
+
+        /* Change this instruction to MOV. */
+        VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
+        VIR_Inst_SetSrcNum(pInst, 1);
+
+        pOpnd = VIR_Inst_GetSource(pInst, 0);
+        VIR_Operand_SetSymbol(pOpnd, pFunc, VIR_Symbol_GetIndex(pLocIdSym));
+        VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_WWWW);
+
+        /* Add def. */
+        memset(&nativeDefFlags, 0, sizeof(nativeDefFlags));
+        nativeDefFlags.bIsInput = gcvTRUE;
+        vscVIR_AddNewDef(pDuInfo,
+                         VIR_INPUT_DEF_INST,
+                         outRegId,
+                         1,
+                         VIR_ENABLE_W,
+                         VIR_HALF_CHANNEL_MASK_FULL,
+                         &nativeDefFlags,
+                         gcvNULL);
+
+        /* Add usage. */
+        vscVIR_AddNewUsageToDef(pDuInfo,
+                                VIR_INPUT_DEF_INST,
+                                pInst,
+                                pOpnd,
+                                gcvFALSE,
+                                outRegId,
+                                1,
+                                VIR_ENABLE_W,
+                                VIR_HALF_CHANNEL_MASK_FULL,
+                                gcvNULL);
+
+        /* Set the flag. */
+        VIR_Shader_SetUseHwManagedLS(pShader, gcvTRUE);
+
+        /* Change the uniform to unused. */
+        VIR_Symbol_ClrFlag(localMemSym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
+        VIR_Symbol_SetFlag(localMemSym, VIR_SYMFLAG_INACTIVE);
+    }
+
+    return errCode;
+}
+
+static VSC_ErrCode _UpdateLocalMemoryCalc(
+    VIR_DEF_USAGE_INFO  *pDuInfo,
+    VSC_HW_CONFIG       *pHwCfg,
+    VIR_Shader          *pShader,
+    VIR_Function        *pFunc,
+    VIR_Instruction     *pInst
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+
+    /* If HW can suport managed_ls, it means we need to use a reserved register for #sh_localMemoryAddress, and remove all its defined. */
+    if (pHwCfg->hwFeatureFlags.supportHWManagedLS   &&
+        VIR_Shader_UseLocalMem(pShader)             &&
+        !VIR_Shader_IsUseHwManagedLS(pShader))
+    {
+        errCode = _ReplaceLocalMemoryAddress(pDuInfo, pShader, pFunc, pInst);
+        ON_ERROR(errCode, "Replace local memory address.");
+    }
+    else
+    {
+        /* Generate a uniform to save the workGroupCount, we need to do this for OCL only because the totalNumGroups of CS is fixed. */
+        if (VIR_Shader_IsCL(pShader) &&
+            !VIR_Shader_IsVulkan(pShader) &&
+            VIR_Shader_GetShareMemorySize(pShader) > 0)
+        {
+            errCode = _CalculateIndexForLocalMemory(pDuInfo, pShader, pFunc, pInst);
+            ON_ERROR(errCode, "Create concurrent workGroupCount.");
+        }
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_UpdateLocMemAndPrivMem(
+    VSC_SH_PASS_WORKER* pPassWorker
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Shader          *pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_FuncIterator    func_iter;
+    VIR_FunctionNode*   func_node;
+    VSC_HW_CONFIG       *pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    VIR_DEF_USAGE_INFO  *pDuInfo = pPassWorker->pDuInfo;
+
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
          func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
@@ -7004,12 +9864,320 @@ VSC_ErrCode vscVIR_FixTexldOffset(VSC_SH_PASS_WORKER* pPassWorker)
         for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
                 inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
-            if (VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(inst)))
+            /* Only support OCL now. */
+            if (VIR_Shader_IsCL(pShader) &&
+                !VIR_Shader_IsVulkan(pShader) &&
+                VIR_Shader_GetPrivateMemorySize(pShader) > 0)
             {
-                _CalculateCoordWithOffset(pShader, pHwCfg, func, inst);
+                errCode = _CalculateIndexForPrivateMemory(pDuInfo, pShader, func, inst);
+                ON_ERROR(errCode, "Create concurrent workThreadCount.");
             }
+
+            /* Convert local memory if local memory is used. */
+            if ((VIR_Shader_IsCL(pShader) || VIR_Shader_IsGlCompute(pShader))
+                &&
+                VIR_Shader_GetShareMemorySize(pShader) > 0)
+            {
+                errCode = _UpdateLocalMemoryCalc(pDuInfo, pHwCfg, pShader, func, inst);
+                ON_ERROR(errCode, "Update local memory calculation.");
             }
         }
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_UpdateWorkGroupIdForMultiGPU(
+    VSC_SH_PASS_WORKER* pPassWorker,
+    gctBOOL*            bChanged
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_Shader*             pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_DEF_USAGE_INFO*     pDuInfo = pPassWorker->pDuInfo;
+    VIR_GENERAL_DU_ITERATOR duIter;
+    VIR_USAGE*              pUsage = gcvNULL;
+    VIR_Instruction*        pUsageInst = gcvNULL;
+    VIR_Operand*            pUsageOpnd = gcvNULL;
+    VIR_AttributeIdList*    pAttrIdLists = VIR_Shader_GetAttributes(pShader);
+    VIR_UniformIdList*      pUniformIdList = VIR_Shader_GetUniforms(pShader);
+    VIR_SymId               symId = VIR_INVALID_ID;
+    VIR_SymId               workGroupIdOffsetSymId = VIR_INVALID_ID;
+    VIR_Symbol*             pSym = gcvNULL;
+    VIR_Symbol*             pWorkGroupIdSym = gcvNULL;
+    VIR_Symbol*             pWorkGroupIdOffsetSym = gcvNULL;
+    VIR_Function*           pMainFunc = VIR_Shader_GetMainFunction(pShader);
+    VIR_NameId              nameId = VIR_INVALID_ID;
+    VIR_Instruction*        pNewAddInst = gcvNULL;
+    VIR_Operand*            pNewOpnd = gcvNULL;
+    gctUINT                 i, defIdx = 0;
+    VIR_DEF*                pDef;
+
+    /* Find the workGroupId. */
+    for (i = 0; i < VIR_IdList_Count(pAttrIdLists); i++)
+    {
+        symId = VIR_IdList_GetId(pAttrIdLists, i);
+        pSym = VIR_Shader_GetSymFromId(pShader, symId);
+
+        if (isSymUnused(pSym))
+        {
+            continue;
+        }
+
+        if (VIR_Symbol_GetName(pSym) == VIR_NAME_WORK_GROUP_ID)
+        {
+            pWorkGroupIdSym = pSym;
+            break;
+        }
+    }
+    if (!pWorkGroupIdSym)
+    {
+        return errCode;
+    }
+
+    for (i = 0; i < VIR_IdList_Count(pUniformIdList); i++)
+    {
+        symId = VIR_IdList_GetId(pUniformIdList, i);
+        pSym = VIR_Shader_GetSymFromId(pShader, symId);
+
+        if (pSym && VIR_Symbol_GetUniformKind(pSym) == VIR_UNIFORM_WORK_GROUP_ID_OFFSET)
+        {
+            pWorkGroupIdOffsetSym = pSym;
+            workGroupIdOffsetSymId = VIR_Symbol_GetIndex(pWorkGroupIdOffsetSym);
+            break;
+        }
+    }
+    if (pWorkGroupIdOffsetSym)
+    {
+        return errCode;
+    }
+
+    errCode = VIR_Shader_AddString(pShader,
+                                    _sldWorkGroupIdOffsetName,
+                                    &nameId);
+
+    errCode = VIR_Shader_AddSymbol(pShader,
+                                    VIR_SYM_UNIFORM,
+                                    nameId,
+                                    VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X3),
+                                    VIR_STORAGE_UNKNOWN,
+                                    &workGroupIdOffsetSymId);
+    ON_ERROR(errCode, "Add workGroupIdOffset uniform. ");
+
+    pWorkGroupIdOffsetSym = VIR_Shader_GetSymFromId(pShader, workGroupIdOffsetSymId);
+    VIR_Symbol_SetFlag(pWorkGroupIdOffsetSym, VIR_SYMFLAG_COMPILER_GEN);
+    VIR_Symbol_SetPrecision(pWorkGroupIdOffsetSym, VIR_PRECISION_HIGH);
+    VIR_Symbol_SetUniformKind(pWorkGroupIdOffsetSym, VIR_UNIFORM_WORK_GROUP_ID_OFFSET);
+    VIR_Symbol_SetAddrSpace(pWorkGroupIdOffsetSym, VIR_AS_CONSTANT);
+    VIR_Symbol_SetTyQualifier(pWorkGroupIdOffsetSym, VIR_TYQUAL_CONST);
+
+    /* Insert a ADD instruction: workGroupId = workGroupId + workGroupOffset. */
+    errCode = VIR_Function_PrependInstruction(pMainFunc,
+                                              VIR_OP_ADD,
+                                              VIR_TYPE_UINT_X3,
+                                              &pNewAddInst);
+    ON_ERROR(errCode, "Insert a ADD instruction.");
+
+    /* Set DEST. */
+    pNewOpnd = VIR_Inst_GetDest(pNewAddInst);
+    VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, VIR_Symbol_GetIndex(pWorkGroupIdSym));
+    VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_XYZ);
+
+    /* Set SRC0. */
+    pNewOpnd = VIR_Inst_GetSource(pNewAddInst, 0);
+    VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, VIR_Symbol_GetIndex(pWorkGroupIdSym));
+    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XYZZ);
+
+    /* Set SRC1. */
+    pNewOpnd = VIR_Inst_GetSource(pNewAddInst, 1);
+    VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, workGroupIdOffsetSymId);
+    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XYZZ);
+
+    /* Add a new def. */
+    vscVIR_AddNewDef(pDuInfo,
+                     pNewAddInst,
+                     VIR_Symbol_GetVregIndex(pWorkGroupIdSym),
+                     1,
+                     VIR_ENABLE_XYZ,
+                     VIR_HALF_CHANNEL_MASK_FULL,
+                     gcvNULL,
+                     gcvNULL);
+
+    /* Add source0 usage. */
+    vscVIR_AddNewUsageToDef(pDuInfo,
+                            VIR_INPUT_DEF_INST,
+                            pNewAddInst,
+                            VIR_Inst_GetSource(pNewAddInst, VIR_Operand_Src0),
+                            gcvFALSE,
+                            VIR_Symbol_GetVregIndex(pWorkGroupIdSym),
+                            1,
+                            VIR_ENABLE_XYZ,
+                            VIR_HALF_CHANNEL_MASK_FULL,
+                            gcvNULL);
+
+    /* Add a new def for all its usages(channel XYZ). */
+    defIdx = vscVIR_FindFirstDefIndex(pDuInfo, VIR_Symbol_GetVregIndex(pWorkGroupIdSym));
+    while (VIR_INVALID_DEF_INDEX != defIdx)
+    {
+        pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, defIdx);
+        gcmASSERT(pDef);
+
+        if (pDef->defKey.channel < VIR_CHANNEL_W && pDef->defKey.pDefInst == VIR_INPUT_DEF_INST)
+        {
+            duIter.pDuInfo = pDuInfo;
+            duIter.bSameBBOnly = gcvFALSE;
+            duIter.defKey.pDefInst = pDef->defKey.pDefInst;
+            duIter.defKey.regNo = VIR_Symbol_GetVregIndex(pWorkGroupIdSym);
+            duIter.defKey.channel = pDef->defKey.channel;
+            VSC_DU_ITERATOR_INIT(&(duIter.duIter), &pDef->duChain);
+
+            for (pUsage = vscVIR_GeneralDuIterator_First(&duIter);
+                 pUsage != gcvNULL;
+                 pUsage = vscVIR_GeneralDuIterator_Next(&duIter))
+            {
+                pUsageInst = pUsage->usageKey.pUsageInst;
+                pUsageOpnd = pUsage->usageKey.pOperand;
+
+                vscVIR_AddNewUsageToDef(pDuInfo,
+                                        pNewAddInst,
+                                        pUsageInst,
+                                        pUsageOpnd,
+                                        gcvFALSE,
+                                        VIR_Symbol_GetVregIndex(pWorkGroupIdSym),
+                                        1,
+                                        (VIR_Enable)(VIR_ENABLE_X << pDef->defKey.channel),
+                                        VIR_HALF_CHANNEL_MASK_FULL,
+                                        gcvNULL);
+            }
+        }
+
+        /* Get next def with same regNo */
+        defIdx = pDef->nextDefIdxOfSameRegNo;
+    }
+
+    /* Set the flag. */
+    VIR_Shader_SetFlagExt1(pShader, VIR_SHFLAG_EXT1_ENABLE_MULTI_GPU);
+
+    if (bChanged)
+    {
+        *bChanged = gcvTRUE;
+    }
+
+OnError:
+    return errCode;
+}
+
+DEF_QUERY_PASS_PROP(vscVIR_PreprocessMCShader)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_MC;
+    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
+}
+
+DEF_SH_NECESSITY_CHECK(vscVIR_PreprocessMCShader)
+{
+    return gcvTRUE;
+}
+
+VSC_ErrCode vscVIR_PreprocessMCShader(VSC_SH_PASS_WORKER* pPassWorker)
+{
+    VSC_ErrCode     errCode = VSC_ERR_NONE;
+    VIR_Uniform*    spillMemUniform;
+    VIR_Shader*     pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    gctBOOL         bChanged = gcvFALSE;
+    gctBOOL         needBoundsCheck =
+                      (pPassWorker->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_NEED_OOB_CHECK) != 0;
+
+    /* add temp register spill addr uniform (should be done before dubo) */
+    spillMemUniform = VIR_Shader_GetTempRegSpillAddrUniform(pShader, needBoundsCheck);
+    if (spillMemUniform == gcvNULL)
+            {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+            }
+
+    /* Update the local memory and the private memory */
+    _UpdateLocMemAndPrivMem(pPassWorker);
+
+    /* If enable the multi-GPU, we need to re-calculate the workGroupID. */
+    if (pPassWorker->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_ENABLE_MULTI_GPU
+        &&
+        pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportMultiGPU
+        &&
+        VIR_Shader_IsCL(pShader))
+    {
+        _UpdateWorkGroupIdForMultiGPU(pPassWorker, &bChanged);
+            }
+
+    if (bChanged &&
+        VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    {
+        VIR_Shader_Dump(gcvNULL, "After preprocess MC shader.", pShader, gcvTRUE);
+        }
+
+    return errCode;
+}
+
+DEF_QUERY_PASS_PROP(vscVIR_PreprocessCGShader)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
+}
+
+DEF_SH_NECESSITY_CHECK(vscVIR_PreprocessCGShader)
+{
+    return gcvTRUE;
+}
+
+VSC_ErrCode vscVIR_PreprocessCGShader(VSC_SH_PASS_WORKER* pPassWorker)
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Shader          *pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_Dumper          *pDumper = pPassWorker->basePassWorker.pDumper;
+    VIR_FuncIterator    func_iter;
+    VIR_FunctionNode*   func_node;
+    gctBOOL             bChanged = gcvFALSE;
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for (func_node = VIR_FuncIterator_First(&func_iter);
+         func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_Function*    func = func_node->function;
+        VIR_InstIterator inst_iter;
+        VIR_Instruction* inst;
+
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             inst != gcvNULL;
+             inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            if (VIR_Shader_isDual16Mode(pShader))
+            {
+                gctBOOL bNeedRunSingleT = gcvFALSE;
+                gctBOOL bDual16NotSupported = gcvFALSE;
+
+                VIR_Inst_Check4Dual16(inst,
+                                      &bNeedRunSingleT,
+                                      &bDual16NotSupported,
+                                      gcvNULL,
+                                      gcvNULL,
+                                      gcvNULL,
+                                      HWSUPPORTDUAL16HIGHVEC2);
+
+                /* We need to set this status before RA because RA uses this to set LR live range. */
+                if (bNeedRunSingleT)
+                {
+                    VIR_Inst_SetThreadMode(inst, VIR_THREAD_D16_DUAL_32);
+                    bChanged = gcvTRUE;
+                }
+            }
+        }
+    }
+
+    if (bChanged && VirSHADER_DumpCodeGenVerbose(pShader))
+    {
+        VIR_Shader_Dump(gcvNULL, "Shader after preprocess CG", pShader, gcvTRUE);
+        VIR_LOG_FLUSH(pDumper);
+    }
 
     return errCode;
 }
@@ -7028,10 +10196,10 @@ static gctUINT _VSC_DynamicIdx_Usage_HFUNC(const void *ptr)
 
     if (pDynamicIdxUsage->pBB)
     {
-        hashKey = pDynamicIdxUsage->pBB->globalBbId & 0xFFFF;
+        hashKey = (pDynamicIdxUsage->pBB->globalBbId & 0xFFFF) << 16;
     }
 
-    hashKey |= ((pDynamicIdxUsage->symId & 0xFFFF) << 16);
+    hashKey |= (pDynamicIdxUsage->symId & 0xFFFF);
 
     return hashKey;
 }
@@ -7086,30 +10254,30 @@ DEF_QUERY_PASS_PROP(vscVIR_FixDynamicIdxDep)
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
 }
 
+DEF_SH_NECESSITY_CHECK(vscVIR_FixDynamicIdxDep)
+{
+    VSC_HW_CONFIG*              pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+
+    if (pHwCfg->hwFeatureFlags.hasDynamicIdxDepFix)
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
 VSC_ErrCode vscVIR_FixDynamicIdxDep(VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode                 errCode = VSC_ERR_NONE;
     VSC_MM*                     pMM = pPassWorker->basePassWorker.pMM;
     VIR_DEF_USAGE_INFO*         pDuInfo = pPassWorker->pDuInfo;
     VIR_Shader*                 pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
-    VSC_HW_CONFIG*              pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     VIR_FuncIterator            func_iter;
     VIR_FunctionNode*           func_node;
     VSC_HASH_TABLE*             usageInstHT = gcvNULL;
     VSC_HASH_ITERATOR           iter;
     VSC_DIRECT_HNODE_PAIR       pair;
     gctBOOL                     bChanged = gcvFALSE;
-
-    if (pHwCfg->hwFeatureFlags.hasDynamicIdxDepFix)
-    {
-        return errCode;
-    }
-
-    /* For OCL only now. */
-    if (!VIR_Shader_IsCL(pShader))
-    {
-        return errCode;
-    }
 
     /* Renumber instruction ID. */
     VIR_Shader_RenumberInstId(pShader);
@@ -7331,6 +10499,102 @@ OnError:
     return errCode;
 }
 
+static VIR_Symbol *
+_FindSampledImageSym(
+    IN VIR_Shader*      pShader,
+    IN VIR_Instruction* pInst,
+    IN VIR_Symbol*      pSym,
+    IN gctBOOL          bIsImage
+    )
+{
+    VIR_VirRegId        virRegId = VIR_Symbol_GetVregIndex(pSym);
+    VIR_Instruction*    pInstIter = gcvNULL;
+
+    for (pInstIter = VIR_Inst_GetPrev(pInst);
+         pInstIter && (VIR_Inst_GetFunction(pInstIter) == VIR_Inst_GetFunction(pInst));
+         pInstIter = VIR_Inst_GetPrev(pInstIter))
+    {
+        VIR_Operand*    pDest = VIR_Inst_GetDest(pInstIter);
+        VIR_OpCode      opCode = VIR_Inst_GetOpcode(pInstIter);
+        VIR_Operand*    pOpnd = gcvNULL;
+        VIR_Symbol*     pOpndSym = gcvNULL;
+
+        if (pDest && VIR_Symbol_GetVregIndex(VIR_Operand_GetSymbol(pDest)) == virRegId)
+        {
+            if (opCode == VIR_OP_GET_SAMPLER_IDX)
+            {
+                gcmASSERT(!bIsImage);
+                return VIR_Operand_GetSymbol(VIR_Inst_GetSource(pInstIter, 0));
+            }
+            else if (opCode == VIR_OP_MOV)
+            {
+                pOpnd = VIR_Inst_GetSource(pInstIter, 0);
+                if (VIR_Operand_isSymbol(pOpnd))
+                {
+                    pOpndSym = VIR_Operand_GetSymbol(pOpnd);
+
+                    if (bIsImage && VIR_Symbol_isImage(pOpndSym))
+                    {
+                        return pOpndSym;
+                    }
+                    else if (VIR_Symbol_isSampler(pOpndSym))
+                    {
+                        return pOpndSym;
+                    }
+                    else
+                    {
+                        return _FindSampledImageSym(pShader, pInstIter, pOpndSym, bIsImage);
+                    }
+                }
+            }
+        }
+    }
+
+    return gcvNULL;
+}
+
+static VSC_ErrCode
+_UpdateSampledImageAssignment(
+    IN VIR_Shader*      pShader,
+    IN VIR_Instruction* pInst,
+    IN VIR_Symbol*      pSym,
+    IN gctBOOL          bIsImage
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Symbol*         pSampledImageSym = bIsImage ? VIR_Symbol_GetSeparateImage(pShader, pSym) : VIR_Symbol_GetSeparateSampler(pShader, pSym);
+    VIR_Symbol*         pUpdatedSym = gcvNULL;
+    gctBOOL             bNeedToUpdate = gcvFALSE;
+
+    if (bIsImage)
+    {
+        bNeedToUpdate = !VIR_Symbol_isImage(pSampledImageSym);
+    }
+    else
+    {
+        bNeedToUpdate = !VIR_Symbol_isSampler(pSampledImageSym);
+    }
+
+    if (bNeedToUpdate)
+    {
+        pUpdatedSym = _FindSampledImageSym(pShader, pInst, pSampledImageSym, bIsImage);
+        gcmASSERT(pUpdatedSym);
+
+        if (bIsImage)
+        {
+            gcmASSERT(VIR_Symbol_isImage(pUpdatedSym));
+            VIR_Symbol_SetSeparateImageId(pSym, VIR_Symbol_GetIndex(pUpdatedSym), VIR_INVALID_ID);
+        }
+        else
+        {
+            gcmASSERT(VIR_Symbol_isSampler(pUpdatedSym));
+            VIR_Symbol_SetSeparateSamplerId(pSym, VIR_Symbol_GetIndex(pUpdatedSym), VIR_INVALID_ID);
+        }
+    }
+
+    return errCode;
+}
+
 static VSC_ErrCode
 _GenCombinedSamplerOpnd(
     IN VIR_Shader       *pShader,
@@ -7339,17 +10603,31 @@ _GenCombinedSamplerOpnd(
     )
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    VIR_Symbol  *pSymbol = VIR_Operand_GetSymbol(pOpnd);
+    VIR_Symbol  *pSymbol = gcvNULL;
     VIR_Uniform *pUniform = gcvNULL;
     VIR_Id      id ;
     VIR_Symbol  *uniformSym = gcvNULL, *origSym = gcvNULL;
     gctUINT i;
 
-    if (VIR_Operand_GetOpKind(pOpnd) != VIR_OPND_SYMBOL ||
-        !isSymCombinedSampler(pSymbol))
+    if (!VIR_Operand_isSymbol(pOpnd) && !VIR_Operand_isVirReg(pOpnd))
     {
         return errCode;
     }
+
+    pSymbol = VIR_Operand_GetSymbol(pOpnd);
+    if (VIR_Symbol_isVreg(pSymbol))
+    {
+        pSymbol = VIR_Symbol_GetVregVariable(pSymbol);
+    }
+
+    if (pSymbol == gcvNULL || !isSymCombinedSampler(pSymbol))
+    {
+        return errCode;
+    }
+
+    /* Check if we need to find the real sampledImage. */
+    _UpdateSampledImageAssignment(pShader, pInst, pSymbol, gcvTRUE);
+    _UpdateSampledImageAssignment(pShader, pInst, pSymbol, gcvFALSE);
 
     for (i = 0; i < (gctINT) VIR_IdList_Count(&pShader->uniforms); i ++)
     {
@@ -7358,9 +10636,11 @@ _GenCombinedSamplerOpnd(
 
         if (VIR_Symbol_GetUniformKind(uniformSym) == VIR_UNIFORM_SAMPLED_IMAGE)
         {
-            if (VIR_Symbol_GetSeparateImage(uniformSym) == VIR_Symbol_GetSeparateImage(pSymbol) &&
+            if (VIR_Symbol_GetSeparateImageId(uniformSym) == VIR_Symbol_GetSeparateImageId(pSymbol) &&
+                VIR_Symbol_GetSeparateImageFuncId(uniformSym) == VIR_Symbol_GetSeparateImageFuncId(pSymbol) &&
                 VIR_Symbol_GetImgIdxRange(uniformSym) == VIR_Symbol_GetImgIdxRange(pSymbol) &&
-                VIR_Symbol_GetSeparateSampler(uniformSym) == VIR_Symbol_GetSeparateSampler(pSymbol) &&
+                VIR_Symbol_GetSeparateSamplerId(uniformSym) == VIR_Symbol_GetSeparateSamplerId(pSymbol) &&
+                VIR_Symbol_GetSeparateSamplerFuncId(uniformSym) == VIR_Symbol_GetSeparateSamplerFuncId(pSymbol) &&
                 VIR_Symbol_GetSamplerIdxRange(uniformSym) == VIR_Symbol_GetSamplerIdxRange(pSymbol))
             {
                 pUniform = VIR_Symbol_GetSampler(uniformSym);
@@ -7384,16 +10664,16 @@ _GenCombinedSamplerOpnd(
                                        VIR_SYMFLAG_COMPILER_GEN);
         VIR_Symbol_SetLocation(uniformSym, -1);
 
-        VIR_Symbol_SetSeparateSamplerId(uniformSym, VIR_Symbol_GetSeparateSampler(pSymbol));
+        VIR_Symbol_SetSeparateSamplerId(uniformSym, VIR_Symbol_GetSeparateSamplerId(pSymbol), VIR_Symbol_GetSeparateSamplerFuncId(pSymbol));
         VIR_Symbol_SetSamplerIdxRange(uniformSym, VIR_Symbol_GetSamplerIdxRange(pSymbol));
-        VIR_Symbol_SetSeparateImageId(uniformSym, VIR_Symbol_GetSeparateImage(pSymbol));
+        VIR_Symbol_SetSeparateImageId(uniformSym, VIR_Symbol_GetSeparateImageId(pSymbol), VIR_Symbol_GetSeparateImageFuncId(pSymbol));
         VIR_Symbol_SetImgIdxRange(uniformSym, VIR_Symbol_GetImgIdxRange(pSymbol));
         VIR_Symbol_SetUniformKind(uniformSym, VIR_UNIFORM_SAMPLED_IMAGE);
 
         /* clear the flag */
-        origSym = VIR_Shader_GetSymFromId(pShader, VIR_Symbol_GetSeparateSampler(pSymbol));
+        origSym = VIR_Symbol_GetSeparateSampler(pShader, pSymbol);
         VIR_Symbol_ClrFlag(origSym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
-        origSym = VIR_Shader_GetSymFromId(pShader, VIR_Symbol_GetSeparateImage(pSymbol));
+        origSym = VIR_Symbol_GetSeparateImage(pShader, pSymbol);
         VIR_Symbol_ClrFlag(origSym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
 
         pUniform = VIR_Symbol_GetSampler(uniformSym);
@@ -7408,6 +10688,11 @@ _GenCombinedSamplerOpnd(
 DEF_QUERY_PASS_PROP(vscVIR_GenCombinedSampler)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_ML;
+}
+
+DEF_SH_NECESSITY_CHECK(vscVIR_GenCombinedSampler)
+{
+    return gcvTRUE;
 }
 
 VSC_ErrCode vscVIR_GenCombinedSampler(VSC_SH_PASS_WORKER* pPassWorker)
@@ -7431,29 +10716,40 @@ VSC_ErrCode vscVIR_GenCombinedSampler(VSC_SH_PASS_WORKER* pPassWorker)
         {
             VIR_SrcOperand_Iterator srcOpndIter;
             VIR_Operand*            srcOpnd;
+            VIR_OpCode              opcode = VIR_Inst_GetOpcode(inst);
 
+            /* for OpenCL image read/load, generate combined <image, sampler> */
+            if (VIR_OPCODE_isImgLd(opcode))
+            {
+                _vscGenerateNewImageUniformIfNeeded(pPassWorker, inst);
+                /* check if the combined <image, sampler> need to transform to lib function call */
+                if (_vscTransformImgReadToLibFuncCall(pPassWorker, inst))
+                {
+                    continue;
+                }
+            }
+            else if (VIR_OPCODE_isImgSt(opcode) )
+            {
+                /* check if the img_store need to transform to lib function call */
+                if (_vscTransformImgWriteToLibFuncCall(pPassWorker, inst))
+                {
+                    continue;
+                }
+            }
+
+            /* Now find the combinedSampler for vulkan. */
+            if (!VIR_Shader_IsVulkan(pShader))
+            {
+                continue;
+                }
             VIR_SrcOperand_Iterator_Init(inst, &srcOpndIter);
             srcOpnd = VIR_SrcOperand_Iterator_First(&srcOpndIter);
 
             for (; srcOpnd != gcvNULL; srcOpnd = VIR_SrcOperand_Iterator_Next(&srcOpndIter))
             {
-                if (VIR_Operand_isParameters(srcOpnd))
-                {
-                    VIR_ParmPassing *parm = VIR_Operand_GetParameters(srcOpnd);
-                    gctUINT i;
-
-                    for (i = 0; i < parm->argNum; i++)
-            {
-                        _GenCombinedSamplerOpnd(pShader, inst, parm->args[i]);
-                }
-
-            }
-                else
-            {
                 _GenCombinedSamplerOpnd(pShader, inst, srcOpnd);
             }
         }
-    }
     }
 
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
@@ -7466,7 +10762,7 @@ VSC_ErrCode vscVIR_GenCombinedSampler(VSC_SH_PASS_WORKER* pPassWorker)
 
 /* dfs recursive to check src0 of ATOM* instruction is same address for all threads in a shader group.
  * if src0 is defined by const/uniform/attribute-VIR_NAME_WORK_GROUP_ID, it would be fine
- * others return false now
+ * otherwise return false
  */
 static gctBOOL _vscVIR_CheckAtomSrcIsSameAddrForAllthreads(
     VIR_Instruction *inst,
@@ -7534,8 +10830,7 @@ static gctBOOL _vscVIR_CheckAtomSrcIsSameAddrForAllthreads(
                     gctUINT i;
                     for (i = 0; i < VIR_Inst_GetSrcNum(pDefInst); i++)
                     {
-                        VIR_Operand *src = VIR_Inst_GetSource(pDefInst, i);
-                        if(src && !_vscVIR_CheckAtomSrcIsSameAddrForAllthreads(pDefInst, src, pDuInfo))
+                        if(!_vscVIR_CheckAtomSrcIsSameAddrForAllthreads(pDefInst, VIR_Inst_GetSource(pDefInst, i), pDuInfo))
                         {
                             earlyExit = gcvTRUE;
                             break;
@@ -7562,12 +10857,14 @@ static gctBOOL _vscVIR_CheckAtomSrcIsSameAddrForAllthreads(
 static void _vscVIR_ConstructAtomFuncName(
     VIR_Instruction *pInst,
     gctUINT         maxcore,
+    gctBOOL         ocl,
     OUT gctSTRING   *pLibFuncName          /* returned lib function name if needed */
     )
 {
     gctUINT srcNum = VIR_Inst_GetSrcNum(pInst);
     gctUINT i;
     gctCHAR name[256] = "";
+    gctBOOL destTypeIsInt = gcvFALSE;
 
     switch (VIR_Inst_GetOpcode(pInst))
     {
@@ -7584,16 +10881,12 @@ static void _vscVIR_ConstructAtomFuncName(
     }
 
     /* get dest type */
-    gcmASSERT(VIR_Inst_GetDest(pInst) != gcvNULL);
-    if (VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst)) == VIR_TYPE_UINT32) {
+    if (VIR_Inst_GetDest(pInst) && (VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst)) == VIR_TYPE_UINT32)) {
         gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_uint");
-    }
-    else if (VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst)) == VIR_TYPE_FLOAT32)
-    {
-        gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_float");
     }
     else
     {
+        destTypeIsInt = gcvTRUE;
         gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_int");
     }
     /* skip last _undef src in ML*/
@@ -7603,25 +10896,53 @@ static void _vscVIR_ConstructAtomFuncName(
         VIR_TypeId srcTypeId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(src));;
         if (srcTypeId == VIR_TYPE_UINT32)
         {
+            if (i == srcNum-2)
+            {
                 /* special deal to atomcmpxchg, src2 store two values */
-            if ((i == srcNum-2) && VIR_Inst_GetOpcode(pInst) == VIR_OP_ATOMCMPXCHG)
+                if (VIR_Inst_GetOpcode(pInst) == VIR_OP_ATOMCMPXCHG)
+                {
+                    if (ocl)
                     {
                         gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_uint2");
                     }
                     else
                     {
+                        gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_uvec2");
+                    }
+                }
+                else if (destTypeIsInt)
+                {
+                    /* convert "atom*_int_uint_uint" to "atom*_int_uint_int" case
+                     * to reduce library function implementation
+                     */
+                    gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_int");
+                }
+                else
+                {
                     gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_uint");
                 }
             }
+            else
+            {
+                gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_uint");
+            }
+        }
         else if (srcTypeId == VIR_TYPE_INT32)
         {
             /* special deal to atomcmpxchg, src2 store two values */
             if ((i == srcNum-2) && VIR_Inst_GetOpcode(pInst) == VIR_OP_ATOMCMPXCHG)
             {
+                if (ocl)
+                {
                     gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_int2");
                 }
                 else
                 {
+                    gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_vec2");
+                }
+            }
+            else
+            {
                 gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_int");
             }
         }
@@ -7630,10 +10951,17 @@ static void _vscVIR_ConstructAtomFuncName(
             /* special deal to atomcmpxchg, src2 store two values */
             if ((i == srcNum-2) && VIR_Inst_GetOpcode(pInst) == VIR_OP_ATOMCMPXCHG)
             {
+                if (ocl)
+                {
                     gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_float2");
                 }
                 else
                 {
+                    gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_vec2");
+                }
+            }
+            else
+            {
                 gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_float");
             }
         }
@@ -7675,10 +11003,10 @@ static void _vscVIR_ConstructAtomFuncName(
 
 static VSC_ErrCode _vscVIR_ReplaceAtomWithExtCall(
     VIR_Instruction *pInst,
-    gctUINT         maxcoreCount)
+    gctUINT         maxcoreCount,
+    gctBOOL         ocl)
 {
     VSC_ErrCode   errCode = VSC_ERR_NONE;
-    /**/
     gctSTRING     libFuncName = gcvNULL;
     VIR_Function *func = VIR_Inst_GetFunction(pInst);
     VIR_Operand  *funcName;
@@ -7687,8 +11015,11 @@ static VSC_ErrCode _vscVIR_ReplaceAtomWithExtCall(
     VIR_ParmPassing *parm;
     gctINT argCount = VIR_OPCODE_GetSrcOperandNum(VIR_Inst_GetOpcode(pInst)) - 1; /* last argument is undef in ML IR */
     gctINT   i;
+
+    gcmASSERT(func != gcvNULL);
+
     {
-        _vscVIR_ConstructAtomFuncName(pInst, maxcoreCount, &libFuncName);
+        _vscVIR_ConstructAtomFuncName(pInst, maxcoreCount, ocl, &libFuncName);
         /* create FuncOperand*/
         ON_ERROR(VIR_Function_NewOperand(func, &funcName), "Failed to new operand");
         ON_ERROR(VIR_Shader_AddString(func->hostShader, libFuncName, &funcNameId), "");
@@ -7715,9 +11046,24 @@ static VSC_ErrCode _vscVIR_ReplaceAtomWithExtCall(
         return errCode;
     }
 OnError:
-    if (libFuncName != gcvNULL) {gcoOS_Free(gcvNULL, libFuncName);}
-
     return errCode;
+}
+
+DEF_SH_NECESSITY_CHECK(vscVIR_GenExternalAtomicCall)
+{
+    VSC_HW_CONFIG*   pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    /* now only apply patch to identified appNameId */
+    if (pPassWorker->pCompilerParam->cfg.ctx.appNameId != gcvPATCH_OPENCV_ATOMIC)
+    {
+        return gcvFALSE;
+    }
+
+    if ((pHwCfg->hwFeatureFlags.supportUSC) && (!pHwCfg->hwFeatureFlags.hasUSCAtomicFix2))
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
 }
 
 DEF_QUERY_PASS_PROP(vscVIR_GenExternalAtomicCall)
@@ -7737,19 +11083,7 @@ VSC_ErrCode vscVIR_GenExternalAtomicCall(VSC_SH_PASS_WORKER* pPassWorker)
     VIR_DEF_USAGE_INFO*        pDuInfo = pPassWorker->pDuInfo;
     VIR_FuncIterator func_iter;
     VIR_FunctionNode* func_node;
-    VSC_HW_CONFIG*   pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
-
-    /* skip this pass according to hwcfg */
-    if ((!pHwCfg->hwFeatureFlags.supportUSC) || pHwCfg->hwFeatureFlags.hasUSCAtomicFix2)
-    {
-        return errCode;
-    }
-
-    /* now only apply patch to identified appNameId */
-    if (pPassWorker->pCompilerParam->cfg.ctx.appNameId != gcvPATCH_OPENCV_ATOMIC)
-    {
-        return errCode;
-    }
+    gctBOOL           extcallgenerated = gcvFALSE;
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for(func_node = VIR_FuncIterator_First(&func_iter);
@@ -7765,20 +11099,21 @@ VSC_ErrCode vscVIR_GenExternalAtomicCall(VSC_SH_PASS_WORKER* pPassWorker)
         {
             if (VIR_Inst_GetOpcode(inst) >= VIR_OP_ATOMADD && VIR_Inst_GetOpcode(inst) <= VIR_OP_ATOMXOR)
             {
-                /*check src0 of atom* */
+                /* check operand */
                 if (!_vscVIR_CheckAtomSrcIsSameAddrForAllthreads(inst, VIR_Inst_GetSource(inst, 0), pDuInfo))
                 {
-                    _vscVIR_ReplaceAtomWithExtCall(inst, maxcoreCount);
-                    VIR_Shader_SetFlags(pShader, VIR_SHFLAG_HAS_EXTCALL_ATOM);
+                    _vscVIR_ReplaceAtomWithExtCall(inst, maxcoreCount, (pPassWorker->pCompilerParam->cfg.ctx.clientAPI == gcvAPI_OPENCL));
+                    extcallgenerated = gcvTRUE;
                 }
             }
         }
     }
-    /* invalid callgraph resource if EXTCALL generated*/
-    if (VIR_Shader_HasExtcallAtomic(pShader))
+    /* invalid callgraph if extcall is generated */
+    if (extcallgenerated)
     {
         pPassWorker->pResDestroyReq->s.bInvalidateDu = gcvTRUE;
     }
+
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
         VIR_Shader_Dump(gcvNULL, "After Generating Atom EXTCALL", pShader, gcvTRUE);
@@ -8035,6 +11370,21 @@ static VSC_ErrCode _vscVIR_GenerateStoreBoundCheck(
     return errCode;
 }
 
+DEF_SH_NECESSITY_CHECK(vscVIR_GenRobustBoundCheck)
+{
+    VSC_HW_CONFIG*   pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    /* if vscVIR_AddOutOfBoundCheckSupport is not called, or HW support OOB-check
+     * skip generating bound check
+     */
+    if ((!(pPassWorker->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_NEED_OOB_CHECK)) ||
+        pHwCfg->hwFeatureFlags.supportOOBCheck)
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
 DEF_QUERY_PASS_PROP(vscVIR_GenRobustBoundCheck)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
@@ -8047,16 +11397,6 @@ VSC_ErrCode vscVIR_GenRobustBoundCheck(VSC_SH_PASS_WORKER* pPassWorker)
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_FuncIterator func_iter;
     VIR_FunctionNode* func_node;
-    VSC_HW_CONFIG*   pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
-
-    /* if vscVIR_AddOutOfBoundCheckSupport is not called, or HW support OOB-check
-     * skip generating bound check
-     */
-    if ((!(pPassWorker->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_NEED_OOB_CHECK)) ||
-        pHwCfg->hwFeatureFlags.supportOOBCheck)
-    {
-        return VSC_ERR_NONE;
-    }
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for(func_node = VIR_FuncIterator_First(&func_iter);
@@ -8096,7 +11436,7 @@ VSC_ErrCode vscVIR_GenRobustBoundCheck(VSC_SH_PASS_WORKER* pPassWorker)
             }
         }
     }
-    /* invalid cfg */
+
     pPassWorker->pResDestroyReq->s.bInvalidateCfg = gcvTRUE;
 
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
@@ -8107,52 +11447,62 @@ VSC_ErrCode vscVIR_GenRobustBoundCheck(VSC_SH_PASS_WORKER* pPassWorker)
     return errCode;
 }
 
-DEF_QUERY_PASS_PROP(vscVIR_ClampPointSize)
-{
-    pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
-}
-
-VSC_ErrCode vscVIR_ClampPointSize(VSC_SH_PASS_WORKER* pPassWorker)
+DEF_SH_NECESSITY_CHECK(vscVIR_ClampPointSize)
 {
     VSC_HW_CONFIG*      pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     VIR_Shader*         pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
-    VSC_ErrCode         errCode = VSC_ERR_NONE;
-    VIR_OutputIdList*   pOutputList = VIR_Shader_GetOutputs(pShader);
-    gctUINT             i, outputCount = VIR_IdList_Count(pOutputList);
     VIR_Symbol*         pPointSizeSym = gcvNULL;
-    VIR_Symbol*         pSym = gcvNULL;
-    VIR_Instruction*    pNewInst = gcvNULL;
-    VIR_Operand*        pOpnd = gcvNULL;
-    VIR_Function*       pMainFunc = VIR_Shader_GetMainFunction(pShader);
-    VIR_SymId           vregSymId = VIR_INVALID_ID;
 
     /* Check for VS only. */
     if (!VIR_Shader_IsVS(pShader))
     {
-        return errCode;
+        return gcvFALSE;
     }
 
     /* Have HW fix, skip it. */
     if (pHwCfg->hwFeatureFlags.hasPointSizeFix)
     {
-        return errCode;
+        return gcvFALSE;
     }
 
     /* Find gl_PointSize. */
-    for (i = 0; i < outputCount; i++)
+    pPointSizeSym = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_POINT_SIZE);
+    if (pPointSizeSym)
     {
-        pSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pOutputList, i));
-
-        if (VIR_Symbol_GetName(pSym) == VIR_NAME_POINT_SIZE)
-        {
-            pPointSizeSym = pSym;
-            break;
-        }
+        return gcvTRUE;
     }
+
+    return gcvFALSE;
+}
+
+DEF_QUERY_PASS_PROP(vscVIR_ClampPointSize)
+{
+    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
+
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
+}
+
+VSC_ErrCode vscVIR_ClampPointSize(VSC_SH_PASS_WORKER* pPassWorker)
+{
+    VIR_DEF_USAGE_INFO* pDuInfo = pPassWorker->pDuInfo;
+    VSC_HW_CONFIG*      pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    VIR_Shader*         pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Symbol*         pPointSizeSym = gcvNULL;
+    VIR_Instruction*    pNewInst = gcvNULL;
+    VIR_Operand*        pOpnd = gcvNULL;
+    VIR_Function*       pMainFunc = VIR_Shader_GetMainFunction(pShader);
+    VIR_SymId           vregSymId = VIR_INVALID_ID;
+    gctUINT             defIdx;
+    gctBOOL             bHasDef = gcvTRUE;
+
+    /* Find gl_PointSize. */
+    pPointSizeSym = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_POINT_SIZE);
 
     /* Not found, just return. */
     if (pPointSizeSym == gcvNULL)
     {
+        gcmASSERT(gcvFALSE);
         return errCode;
     }
 
@@ -8161,41 +11511,68 @@ VSC_ErrCode vscVIR_ClampPointSize(VSC_SH_PASS_WORKER* pPassWorker)
                                                 &vregSymId);
     ON_ERROR(errCode, "Get vreg symbol.");
 
+    /* Check if PointSize have any assignment. */
+    defIdx = vscVIR_FindFirstDefIndex(pDuInfo, VIR_Symbol_GetVregIndex(pPointSizeSym));
+    if (VIR_INVALID_DEF_INDEX == defIdx)
+    {
+        bHasDef = gcvFALSE;
+    }
+
     /*
-    ** Insert the clamp instructions:
-    **      PointSize = min(max(PointSize, minPointSize), maxPointSize)
+    ** If it have any assignment, clamp it; otherwise just assign it with 1.0f.
     */
-    errCode = VIR_Function_AddInstruction(pMainFunc,
-                                          VIR_OP_MAX,
-                                          VIR_TYPE_FLOAT32,
-                                          &pNewInst);
-    ON_ERROR(errCode, "Insert MAX instruction.");
-    pOpnd = VIR_Inst_GetDest(pNewInst);
-    VIR_Operand_SetSymbol(pOpnd, pMainFunc, vregSymId);
-    VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
+    if (bHasDef)
+    {
+        /*
+        ** Insert the clamp instructions:
+        **      PointSize = min(max(PointSize, minPointSize), maxPointSize)
+        */
+        errCode = VIR_Function_AddInstruction(pMainFunc,
+                                              VIR_OP_MAX,
+                                              VIR_TYPE_FLOAT32,
+                                              &pNewInst);
+        ON_ERROR(errCode, "Insert MAX instruction.");
+        pOpnd = VIR_Inst_GetDest(pNewInst);
+        VIR_Operand_SetSymbol(pOpnd, pMainFunc, vregSymId);
+        VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
 
-    pOpnd = VIR_Inst_GetSource(pNewInst, 0);
-    VIR_Operand_SetSymbol(pOpnd, pMainFunc, vregSymId);
-    VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
+        pOpnd = VIR_Inst_GetSource(pNewInst, 0);
+        VIR_Operand_SetSymbol(pOpnd, pMainFunc, vregSymId);
+        VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
 
-    pOpnd = VIR_Inst_GetSource(pNewInst, 1);
-    VIR_Operand_SetImmediateFloat(pOpnd, pHwCfg->minPointSize);
+        pOpnd = VIR_Inst_GetSource(pNewInst, 1);
+        VIR_Operand_SetImmediateFloat(pOpnd, pHwCfg->minPointSize);
 
-    errCode = VIR_Function_AddInstruction(pMainFunc,
-                                          VIR_OP_MIN,
-                                          VIR_TYPE_FLOAT32,
-                                          &pNewInst);
-    ON_ERROR(errCode, "Insert MIN instruction.");
-    pOpnd = VIR_Inst_GetDest(pNewInst);
-    VIR_Operand_SetSymbol(pOpnd, pMainFunc, vregSymId);
-    VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
+        errCode = VIR_Function_AddInstruction(pMainFunc,
+                                              VIR_OP_MIN,
+                                              VIR_TYPE_FLOAT32,
+                                              &pNewInst);
+        ON_ERROR(errCode, "Insert MIN instruction.");
+        pOpnd = VIR_Inst_GetDest(pNewInst);
+        VIR_Operand_SetSymbol(pOpnd, pMainFunc, vregSymId);
+        VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
 
-    pOpnd = VIR_Inst_GetSource(pNewInst, 0);
-    VIR_Operand_SetSymbol(pOpnd, pMainFunc, vregSymId);
-    VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
+        pOpnd = VIR_Inst_GetSource(pNewInst, 0);
+        VIR_Operand_SetSymbol(pOpnd, pMainFunc, vregSymId);
+        VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
 
-    pOpnd = VIR_Inst_GetSource(pNewInst, 1);
-    VIR_Operand_SetImmediateFloat(pOpnd, pHwCfg->maxPointSize);
+        pOpnd = VIR_Inst_GetSource(pNewInst, 1);
+        VIR_Operand_SetImmediateFloat(pOpnd, pHwCfg->maxPointSize);
+    }
+    else
+    {
+        errCode = VIR_Function_AddInstruction(pMainFunc,
+                                              VIR_OP_MOV,
+                                              VIR_TYPE_FLOAT32,
+                                              &pNewInst);
+        ON_ERROR(errCode, "Insert MOV instruction.");
+        pOpnd = VIR_Inst_GetDest(pNewInst);
+        VIR_Operand_SetSymbol(pOpnd, pMainFunc, vregSymId);
+        VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
+
+        pOpnd = VIR_Inst_GetSource(pNewInst, 0);
+        VIR_Operand_SetImmediateFloat(pOpnd, 1.0f);
+    }
 
 OnError:
     return errCode;

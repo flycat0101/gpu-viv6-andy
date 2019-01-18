@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -79,12 +79,11 @@ typedef struct _clsRecompileDirective
 }
 clsPatchDirective;
 
-typedef struct _cl_kernel_states * clsKernelStates_PTR;
+typedef struct _cl_kernel_instance * clsKernelInstance_PTR;
 
-typedef struct _cl_kernel_states
+typedef struct _cl_kernel_instance
 {
     gctUINT8_PTR            binary;
-    gctUINT                 numArgs;
 
     /* States info. */
     gcsPROGRAM_STATE        programState;
@@ -92,60 +91,96 @@ typedef struct _cl_kernel_states
     /* Need to add key for reusage. */
     clsPatchDirective_PTR   patchDirective;
 
-    clsKernelStates_PTR     next;
+    clsKernelInstance_PTR     next;
 }
-clsKernelStates;
+clsKernelInstance;
+
+typedef struct
+{
+    clsPlatformId_PTR              platform;
+    KERNEL_EXECUTABLE_PROFILE      kep;
+    VSC_HW_PIPELINE_SHADERS_STATES hwStates;
+    gctUINT                        hashKey;
+}clsKernelVIRInstance;
+
+typedef struct __clsVIRInstanceHashRec * clsVIRInstanceHashRec_PTR;
+typedef struct _cls_VIRInstance_KeyState_ * clsVIRInstanceKey_PTR;
+
+typedef struct _cls_VIRInstance_KeyState_
+{
+    gctUINT                      key;
+    gctUINT                      year;
+    clsKernelVIRInstance         * virInstance;
+    clsVIRInstanceKey_PTR        nextInstanceKey;
+}clsVIRInstanceKey;
+
+/* Hash definition */
+typedef struct __clsVIRInstanceHashRec
+{
+    clsVIRInstanceKey           **ppHashTable;
+    /* How many objects of each entry */
+    gctUINT                     *pEntryCounts;
+    /* Hash table entry number must be power of 2 (32, 64, etc.), so that
+       we can use a simple bitmask (entryNum-1) to get the hash entry */
+    gctUINT                     tbEntryNum;
+    /* Max objects count that each hash table entry can hold. For memory
+       footprint consideration, we don't hope too many objects are hold in
+       each entry. */
+    gctUINT                      maxEntryObjs;
+    gctUINT                      year;
+}clsVIRInstanceHashRec;
 
 typedef struct _cl_kernel
 {
     clsIcdDispatch_PTR      dispatch;
     cleOBJECT_TYPE          objectType;
     gctUINT                 id;
-    gcsATOM_PTR             referenceCount;
 
-    clsProgram_PTR          program;
-    clsContext_PTR          context;
-
+    /* clGetKernelInfo */
+    gctUINT                 kernelNumArgs;
     gctSTRING               name;
+    gcsATOM_PTR             referenceCount;
+    clsContext_PTR          context;
+    clsProgram_PTR          program;
+    /*!TO_DO, kernel attribute */
+
+    /* clGetKernelWorkGroupInfo */
+    /*!TO_DO, CL_KERNEL_GLOBAL_WORK_SIZE*/
     size_t                  maxWorkGroupSize;
     size_t                  compileWorkGroupSize[3];
-    size_t                  preferredWorkGroupSizeMultiple;
     cl_ulong                localMemSize;
+    size_t                  preferredWorkGroupSizeMultiple;
     cl_ulong                privateMemSize;
+
+    /* clGetKernelArgInfo, currently, not only the source arg here,
+    all other argument are here. */
+    clsArgument_PTR         args;
+    gctUINT                 numArgs;
+    gctPOINTER              argMutex;
+
     gctSIZE_T               constantMemSize;
     gctCHAR *               constantMemBuffer;
 
-    gctUINT                 numArgs;
-    clsArgument_PTR         args;
-
-    clsKernelStates         states;
-    clsKernelStates_PTR     patchedStates;
+    clsKernelInstance       masterInstance;
+    clsKernelInstance_PTR   recompileInstance;
     gctBOOL                 patchNeeded;
 
-    gctUINT                 attributeCount;
-    gctUINT                 tempCount;
-
-    gctBOOL                 useLocalRegisters;
-    gctBOOL                 alreadyUsedLocalSource;
-    gctINT                  localRegLoadedLastCycle;
-
-    gctPOINTER              argMutex;
-
-    /* Constant range that define constants starting from 0. */
-    gctINT                  constRegUsedAsSrc;
-    gctINT                  firstProgression;
-    gctINT                  lastProgression;
-
-    /* Constant range that define LOAD/STORE base addresses. */
-    gctINT                  firstBase;
-    gctINT                  lastBase;
-
-    gctINT                  idivImodMov;
     /* indicate if OCL patch is pathed already */
     gctBOOL                 isPatched;
     gctBOOL                 hasPrintf;
+
+    /* srcArgs size must match kernelNumArgs */
+    clsSrcArgument_PTR      srcArgs;
+    clsKernelVIRInstance     * virMasterInstance;
+    clsKernelVIRInstance     * virCurrentInstance;
+    clsVIRInstanceHashRec_PTR virCacheTable;
+    gctPOINTER              cacheMutex;
+
+    SHADER_HANDLE           shaderHandle;
 }
 clsKernel;
+
+#define ARG_TYPE_NAME_LENTH 128
 
 typedef struct _cl_argument
 {
@@ -161,13 +196,37 @@ typedef struct _cl_argument
     gctUINT                 samplerValue;
     gctUINT                 printThreadNum;
     gctUINT                 printBufferSizePerThread;
+    gctCHAR                 typeName[ARG_TYPE_NAME_LENTH];
+    cl_kernel_arg_address_qualifier addressQualifier;
+    cl_kernel_arg_type_qualifier    typeQualifier;
+    cl_kernel_arg_access_qualifier  accessQualifier;
 }
 clsArgument;
+
+typedef struct _cl_src_argument
+{
+    size_t                  size;
+    gctPOINTER              data;
+    gctUINT                 argIndex;
+    gctBOOL                 set;
+    gctCHAR *               name;
+    gctCHAR                 typeName[ARG_TYPE_NAME_LENTH];
+    gctUINT                 type;
+    gctBOOL                 isPointer;
+    gctBOOL                 isSampler;
+    gctBOOL                 isImage;
+    gctBOOL                 isDuplicate;
+    gctBOOL                 isLocal;
+    gctBOOL                 isMemAlloc;
+    cl_kernel_arg_address_qualifier addressQualifier;
+    cl_kernel_arg_type_qualifier    typeQualifier;
+    cl_kernel_arg_access_qualifier  accessQualifier;
+}clsSrcArgument;
 
 typedef struct _cl_mem_alloc_info
 {
     gctUINT                 allocatedSize;
-    gctPHYS_ADDR            physical;
+    gctUINT32               physical; /* GPU virutal address */
     gctPOINTER              logical;
     gcsSURF_NODE_PTR        node;
     gctPOINTER              data;
@@ -187,6 +246,11 @@ clfExecuteCommandNDRangeKernel(
     );
 
 gctINT
+clfExecuteCommandNDRangeVIRKernel(
+    clsCommand_PTR      Command
+    );
+
+gctINT
 clfExecuteCommandTask(
     clsCommand_PTR      Command
     );
@@ -197,8 +261,14 @@ clfExecuteCommandNativeKernel(
     );
 
 gctINT
-clfAllocateKernelArgs(
+clfBuildKernelArgs(
     clsKernel_PTR       Kernel
+    );
+
+gctINT
+clfDuplicateVIRKernelArgs(
+    clsKernel_PTR       Kernel,
+    clsSrcArgument_PTR *   Arguments
     );
 
 gctINT
@@ -221,6 +291,14 @@ clfFreeKernelArgs(
     gctBOOL             FreeAllocData
     );
 
+gctINT
+clfFreeVIRKernelArgs(
+    gctUINT            NumArgs,
+    clsSrcArgument_PTR Args,
+    gctUINT            localKernelArgSize, /* local kernel arg should be related with each NDRange only */
+    gctBOOL            FreePrivateKernelArg
+    );
+
 clsArgument_PTR
 clfGetKernelArg(
     clsKernel_PTR       Kernel,
@@ -235,6 +313,7 @@ clfDestroyPatchDirective(
     IN OUT clsPatchDirective ** PatchDirectivePtr
     );
 
+
 gctINT
 clfReleaseKernel(
     cl_kernel   Kernel
@@ -243,6 +322,18 @@ clfReleaseKernel(
 gctINT
 clfRetainKernel(
     cl_kernel    Kernel
+    );
+
+gceSTATUS
+clfRecompileVIRKernel(
+    cl_kernel Kernel
+    );
+
+clsVIRInstanceKey *
+clfAddInstanceKeyToHashTable(
+    clsVIRInstanceHashRec_PTR pHash,
+    clsKernelVIRInstance * pVIRInstance,
+    gctUINT key
     );
 
 #ifdef __cplusplus

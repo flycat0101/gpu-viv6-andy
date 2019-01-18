@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -18,31 +18,41 @@
 #define ENTERFUNC(name)
 #define LEAVEFUNC(name)
 
-#define __GL_SETUP_NOT_IN_BEGIN(gc)                                                                      \
+#ifdef OPENGL40
+
+#define __GL_SETUP_NOT_IN_BEGIN(gc)                         \
     if (gc->input.beginMode == __GL_IN_BEGIN) {             \
-        __glSetError(gc, GL_INVALID_OPERATION);                 \
+        __glSetError(gc, GL_INVALID_OPERATION);             \
         return;                                             \
     }                                                       \
 
-#define __GL_SETUP_NOT_IN_BEGIN_RET(gc,val)                                                               \
+#define __GL_SETUP_NOT_IN_BEGIN_RET(gc,val)                 \
     if (gc->input.beginMode == __GL_IN_BEGIN) {             \
-        __glSetError(gc, GL_INVALID_OPERATION);                 \
+        __glSetError(gc, GL_INVALID_OPERATION);             \
         return (val);                                       \
     }                                                       \
 
 #define __GL_VERTEX_BUFFER_FLUSH(gc)                        \
     switch (gc->input.beginMode) {                          \
       case __GL_SMALL_LIST_BATCH:                           \
-        __glDisplayListBatchEnd(gc);                   \
+        __glDisplayListBatchEnd(gc);                        \
         break;                                              \
-        default: ;                        \
+        default: ;                                          \
     }                                                       \
 
 #define __GL_DLIST_BUFFER_FLUSH(gc)                         \
     if (gc->input.beginMode == __GL_SMALL_LIST_BATCH) {     \
-       __glDisplayListBatchEnd(gc);              \
+       __glDisplayListBatchEnd(gc);                         \
     }                                                       \
 
+#else
+
+#define __GL_SETUP_NOT_IN_BEGIN(gc)
+#define __GL_SETUP_NOT_IN_BEGIN_RET(gc,val)
+#define __GL_VERTEX_BUFFER_FLUSH(gc)
+#define __GL_DLIST_BUFFER_FLUSH(gc)
+
+#endif
 
 #define __GL_PACK_COLOR4UB(r, g, b, a)  (((a) << 24) | ((b) << 16) | ((g) << 8) | (r))
 
@@ -290,8 +300,8 @@ typedef struct __GLvertexStreamMachineRec {
     __GLindexStream indexStream;/*index stream*/
     GLubyte *edgeflagStream;/*edgeflag stream*/
     GLuint64 primElemSequence;
-    GLuint missingAttribs;/*missing flag*/
-    GLuint primElementMask;/*bitmask for all primitive elements*/
+    GLuint64 missingAttribs;/*missing flag*/
+    GLuint64 primElementMask;/*bitmask for all primitive elements*/
     GLuint indexCount; /* 0: Draw Primitive; Not 0: Draw Index Primitive */
     /*the start (inclusive) and end (exclusive) vertex*/
     /*the actual vertex count to be used is always denoted by (endVertex-startVertex)*/

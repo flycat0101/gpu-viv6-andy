@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -66,6 +66,19 @@ GLboolean __glDeleteRenderbufferObject(__GLcontext *gc, __GLrenderbufferObject *
 
 #define _GC_OBJ_ZONE __GLES3_ZONE_CORE
 
+__GL_INLINE GLvoid __glFramebufferResetAttachPoint(__GLcontext *gc, __GLfboAttachPoint *attachPoint)
+{
+    attachPoint->objType    = GL_NONE;
+    attachPoint->objName    = 0;
+    attachPoint->object     = gcvNULL;
+    attachPoint->level      = 0;
+    attachPoint->face       = 0;
+    attachPoint->layer      = 0;
+    attachPoint->slice      = 0;
+    attachPoint->layered    = GL_FALSE;
+    attachPoint->cube       = GL_FALSE;
+    attachPoint->isExtMode  = GL_FALSE;
+}
 
 __GL_INLINE GLvoid __glRemoveFramebufferAsImageUser(__GLcontext *gc, __GLframebufferObject *framebuffer, __GLfboAttachPoint* attachPoint)
 {
@@ -92,6 +105,7 @@ __GL_INLINE GLvoid __glRemoveFramebufferAsImageUser(__GLcontext *gc, __GLframebu
                 if (!rbo->bindCount && !rbo->fboList && (rbo->flag & __GL_OBJECT_IS_DELETED))
                 {
                     __glDeleteRenderbufferObject(gc, rbo);
+                    __glFramebufferResetAttachPoint(gc, attachPoint);
                 }
             }
         }
@@ -113,6 +127,7 @@ __GL_INLINE GLvoid __glRemoveFramebufferAsImageUser(__GLcontext *gc, __GLframebu
                 if (!tex->bindCount && !tex->fboList && !tex->imageList && (tex->flag & __GL_OBJECT_IS_DELETED))
                 {
                     __glDeleteTextureObject(gc, tex);
+                    __glFramebufferResetAttachPoint(gc, attachPoint);
                 }
             }
         }
@@ -121,25 +136,12 @@ __GL_INLINE GLvoid __glRemoveFramebufferAsImageUser(__GLcontext *gc, __GLframebu
     }
 }
 
-GLvoid __glFramebufferResetAttachpoint(__GLcontext *gc,
+GLvoid __glFramebufferResetAttachIndex(__GLcontext *gc,
                                        __GLframebufferObject *fbo,
                                        GLint attachIndex,
                                        GLboolean drawFbo)
 {
-    /* Set all state of "attachment" point to default state. */
-
-    __GLfboAttachPoint *attachState = &fbo->attachPoint[attachIndex];
-
-    attachState->objType    = GL_NONE;
-    attachState->objName    = 0;
-    attachState->object     = gcvNULL;
-    attachState->level      = 0;
-    attachState->face       = 0;
-    attachState->layer      = 0;
-    attachState->slice      = 0;
-    attachState->layered    = GL_FALSE;
-    attachState->cube       = GL_FALSE;
-    attachState->isExtMode  = GL_FALSE;
+    __glFramebufferResetAttachPoint(gc, &fbo->attachPoint[attachIndex]);
 }
 
 GLvoid __glInitRenderbufferObject(__GLcontext *gc, __GLrenderbufferObject *renderbuffer, GLuint name)
@@ -313,7 +315,7 @@ GLboolean __glDeleteFramebufferObject(__GLcontext *gc, __GLframebufferObject *fr
         }
 
         __glRemoveFramebufferAsImageUser(gc, framebuffer, attachPoint);
-        __glFramebufferResetAttachpoint(gc, framebuffer, i, GL_TRUE);
+        __glFramebufferResetAttachIndex(gc, framebuffer, i, GL_TRUE);
     }
 
     (*gc->imports.free)(gc, framebuffer);
@@ -574,12 +576,15 @@ GLvoid __glRenderbufferStorage(__GLcontext* gc,
     case GL_DEPTH_COMPONENT16:
     case GL_DEPTH_COMPONENT24:
     case GL_DEPTH_COMPONENT32:
+    case GL_DEPTH_COMPONENT32F:
         /* stencil-renderable */
     case GL_STENCIL_INDEX:
     case GL_STENCIL_INDEX1_EXT:
     case GL_STENCIL_INDEX4_EXT:
     case GL_STENCIL_INDEX8_EXT:
     case GL_STENCIL_INDEX16_EXT:
+    case GL_DEPTH24_STENCIL8:
+    case GL_DEPTH32F_STENCIL8:
         break;
         /*GL_EXT_texture_integer*/
     case GL_RGBA32UI_EXT:
@@ -594,19 +599,19 @@ GLvoid __glRenderbufferStorage(__GLcontext* gc,
     case GL_RGB16I_EXT:
     case GL_RGBA8I_EXT:
     case GL_RGB8I_EXT:
-        if (!__glExtension[__GL_EXTID_texture_integer].bEnabled)
+        if (!__glExtension[__GL_EXTID_EXT_texture_integer].bEnabled)
         {
             __GL_ERROR_EXIT(GL_INVALID_ENUM);
         }
         break;
     case GL_RGB9_E5_EXT:
-        if(!__glExtension[__GL_EXTID_texture_shared_exponent].bEnabled)
+        if(!__glExtension[__GL_EXTID_EXT_texture_shared_exponent].bEnabled)
         {
             __GL_ERROR_EXIT(GL_INVALID_ENUM);
         }
         break;
     case GL_R11F_G11F_B10F_EXT:
-        if(!__glExtension[__GL_EXTID_packed_float].bEnabled)
+        if(!__glExtension[__GL_EXTID_EXT_packed_float].bEnabled)
         {
             __GL_ERROR_EXIT(GL_INVALID_ENUM);
         }
@@ -921,7 +926,7 @@ GLvoid __glFramebufferTexture(__GLcontext *gc,
     else
     {
         /* Detach image */
-        __glFramebufferResetAttachpoint(gc, framebufferObj, attachIndex, GL_TRUE);
+        __glFramebufferResetAttachIndex(gc, framebufferObj, attachIndex, GL_TRUE);
     }
 
     if (!gc->dp.frameBufferTexture(gc,
@@ -1008,7 +1013,7 @@ GLvoid __glFramebufferRenderbuffer(__GLcontext *gc,
     else
     {
         /* Detach image */
-        __glFramebufferResetAttachpoint(gc, framebufferObj, attachIndex, GL_TRUE);
+        __glFramebufferResetAttachIndex(gc, framebufferObj, attachIndex, GL_TRUE);
     }
 
     gc->dp.framebufferRenderbuffer(gc, framebufferObj, attachIndex, renderbufferObj, &preAttach);
@@ -1233,12 +1238,12 @@ GLvoid __glFreeFramebufferStates(__GLcontext *gc)
 /*
 ** OpenGL Frame buffer object APIs
 */
-GLboolean GL_APIENTRY __gles_IsRenderbuffer(__GLcontext *gc, GLuint renderbuffer)
+GLboolean GL_APIENTRY __glim_IsRenderbuffer(__GLcontext *gc, GLuint renderbuffer)
 {
     return (gcvNULL != __glGetObject(gc, gc->frameBuffer.rboShared, renderbuffer));
 }
 
-GLvoid GL_APIENTRY __gles_BindRenderbuffer(__GLcontext *gc, GLenum target, GLuint renderbuffer)
+GLvoid GL_APIENTRY __glim_BindRenderbuffer(__GLcontext *gc, GLenum target, GLuint renderbuffer)
 {
     if (target != GL_RENDERBUFFER)
     {
@@ -1246,7 +1251,7 @@ GLvoid GL_APIENTRY __gles_BindRenderbuffer(__GLcontext *gc, GLenum target, GLuin
     }
 
 #ifdef OPENGL40
-    if (renderbuffer && !__glIsNameDefined(gc, gc->frameBuffer.rboShared, renderbuffer))
+    if ((gc->apiVersion > __GL_API_VERSION_OGL21) && renderbuffer && !__glIsNameDefined(gc, gc->frameBuffer.rboShared, renderbuffer))
     {
         __GL_ERROR_RET(GL_INVALID_OPERATION);
     }
@@ -1255,7 +1260,7 @@ GLvoid GL_APIENTRY __gles_BindRenderbuffer(__GLcontext *gc, GLenum target, GLuin
     __glBindRenderbuffer(gc, target, renderbuffer);
 }
 
-GLvoid GL_APIENTRY __gles_DeleteRenderbuffers(__GLcontext *gc, GLsizei n, const GLuint *renderbuffers)
+GLvoid GL_APIENTRY __glim_DeleteRenderbuffers(__GLcontext *gc, GLsizei n, const GLuint *renderbuffers)
 {
     GLint i;
 
@@ -1283,7 +1288,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_GenRenderbuffers(__GLcontext *gc, GLsizei n, GLuint *renderbuffers)
+GLvoid GL_APIENTRY __glim_GenRenderbuffers(__GLcontext *gc, GLsizei n, GLuint *renderbuffers)
 {
     GLint start, i;
 
@@ -1322,13 +1327,13 @@ OnExit:
 /*
 ** Establish the data storage format and dimensions of a renderbuffer object's image
 */
-GLvoid GL_APIENTRY __gles_RenderbufferStorage(__GLcontext *gc, GLenum target, GLenum internalformat,
+GLvoid GL_APIENTRY __glim_RenderbufferStorage(__GLcontext *gc, GLenum target, GLenum internalformat,
                                               GLsizei width, GLsizei height)
 {
     __glRenderbufferStorage(gc, target, 0, internalformat, width, height, GL_FALSE);
 }
 
-GLvoid GL_APIENTRY __gles_GetRenderbufferParameteriv(__GLcontext *gc, GLenum target, GLenum pname, GLint* params)
+GLvoid GL_APIENTRY __glim_GetRenderbufferParameteriv(__GLcontext *gc, GLenum target, GLenum pname, GLint* params)
 {
     __GL_HEADER();
     /* Error check */
@@ -1425,12 +1430,12 @@ OnError:
     return;
 }
 
-GLboolean GL_APIENTRY __gles_IsFramebuffer(__GLcontext *gc, GLuint framebuffer)
+GLboolean GL_APIENTRY __glim_IsFramebuffer(__GLcontext *gc, GLuint framebuffer)
 {
     return (gcvNULL != __glGetObject(gc, gc->frameBuffer.fboManager, framebuffer));
 }
 
-GLvoid GL_APIENTRY __gles_BindFramebuffer(__GLcontext *gc, GLenum target, GLuint framebuffer)
+GLvoid GL_APIENTRY __glim_BindFramebuffer(__GLcontext *gc, GLenum target, GLuint framebuffer)
 {
     __GL_HEADER();
 
@@ -1440,7 +1445,7 @@ GLvoid GL_APIENTRY __gles_BindFramebuffer(__GLcontext *gc, GLenum target, GLuint
     }
 
 #ifdef OPENGL40
-    if (framebuffer && !__glIsNameDefined(gc, gc->frameBuffer.fboManager, framebuffer))
+    if ((gc->apiVersion > __GL_API_VERSION_OGL21) && framebuffer && !__glIsNameDefined(gc, gc->frameBuffer.fboManager, framebuffer))
     {
         __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }
@@ -1453,7 +1458,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_DeleteFramebuffers(__GLcontext *gc, GLsizei n, const GLuint *framebuffers)
+GLvoid GL_APIENTRY __glim_DeleteFramebuffers(__GLcontext *gc, GLsizei n, const GLuint *framebuffers)
 {
     GLint i;
 
@@ -1477,7 +1482,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_GenFramebuffers(__GLcontext *gc, GLsizei n, GLuint *framebuffers)
+GLvoid GL_APIENTRY __glim_GenFramebuffers(__GLcontext *gc, GLsizei n, GLuint *framebuffers)
 {
     GLint start, i;
 
@@ -1513,7 +1518,7 @@ OnExit:
     return;
 }
 
-GLenum GL_APIENTRY __gles_CheckFramebufferStatus(__GLcontext *gc, GLenum target)
+GLenum GL_APIENTRY __glim_CheckFramebufferStatus(__GLcontext *gc, GLenum target)
 {
     __GLframebufferObject *fbo = gcvNULL;
 
@@ -1541,7 +1546,7 @@ OnError:
     return fbo ? fbo->checkCode : 0;
 }
 
-GLvoid GL_APIENTRY __gles_FramebufferTexture2D(__GLcontext *gc, GLenum target, GLenum attachment,
+GLvoid GL_APIENTRY __glim_FramebufferTexture2D(__GLcontext *gc, GLenum target, GLenum attachment,
                                                GLenum textarget, GLuint texture, GLint level)
 {
     __GLtextureObject *texObj;
@@ -1644,7 +1649,7 @@ OnError:
 /*
 ** Functions to attach renderbuffer to current framebuffer object
 */
-GLvoid GL_APIENTRY __gles_FramebufferRenderbuffer(__GLcontext *gc, GLenum target, GLenum attachment,
+GLvoid GL_APIENTRY __glim_FramebufferRenderbuffer(__GLcontext *gc, GLenum target, GLenum attachment,
                                                   GLenum renderbuffertarget, GLuint renderbuffer)
 {
     GLuint i;
@@ -1708,7 +1713,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_GetFramebufferAttachmentParameteriv(__GLcontext *gc, GLenum target, GLenum attachment,
+GLvoid GL_APIENTRY __glim_GetFramebufferAttachmentParameteriv(__GLcontext *gc, GLenum target, GLenum attachment,
                                                               GLenum pname, GLint *params)
 {
     __GLframebufferObject *framebufferObj;
@@ -1985,7 +1990,7 @@ __GL_INLINE GLvoid __glBlitFramebufferEnd(__GLcontext *gc)
 
 
 
-GLvoid GL_APIENTRY __gles_BlitFramebuffer(__GLcontext *gc,
+GLvoid GL_APIENTRY __glim_BlitFramebuffer(__GLcontext *gc,
                                           GLint srcX0,
                                           GLint srcY0,
                                           GLint srcX1,
@@ -2202,12 +2207,6 @@ GLvoid GL_APIENTRY __gles_BlitFramebuffer(__GLcontext *gc,
                     if (drawHandle)
                     {
                         bHaveDrawbuffer = GL_TRUE;
-                    }
-
-                    /* Surface of default drawFBO must be different than named readFBO */
-                    if ((0 == readFBO->name) && (readHandle == drawHandle))
-                    {
-                        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
                     }
                 }
 #else
@@ -2511,7 +2510,7 @@ OnExit:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_FramebufferTextureLayer(__GLcontext *gc, GLenum target, GLenum attachment,
+GLvoid GL_APIENTRY __glim_FramebufferTextureLayer(__GLcontext *gc, GLenum target, GLenum attachment,
                                                   GLuint texture, GLint level, GLint layer)
 {
     GLuint i;
@@ -2569,7 +2568,7 @@ GLvoid GL_APIENTRY __gles_FramebufferTextureLayer(__GLcontext *gc, GLenum target
                 __GL_ERROR_EXIT(GL_INVALID_VALUE);
             }
             break;
-        case  __GL_TEXTURE_1D_ARRAY_INDEX:
+        case __GL_TEXTURE_1D_ARRAY_INDEX:
             if (layer >= (GLint)gc->constants.maxTextureArraySize)
             {
                 __GL_ERROR_EXIT(GL_INVALID_VALUE);
@@ -2617,7 +2616,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_RenderbufferStorageMultisample(__GLcontext *gc,
+GLvoid GL_APIENTRY __glim_RenderbufferStorageMultisample(__GLcontext *gc,
                                                          GLenum target,
                                                          GLsizei samples,
                                                          GLenum internalformat,
@@ -2735,13 +2734,13 @@ OnExit:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_InvalidateFramebuffer(__GLcontext *gc, GLenum target, GLsizei numAttachments, const GLenum* attachments)
+GLvoid GL_APIENTRY __glim_InvalidateFramebuffer(__GLcontext *gc, GLenum target, GLsizei numAttachments, const GLenum* attachments)
 {
     /* Inconvenient to get FBO size in GLcore layer, set -1 and let chip layer do it */
     __glInvalidateFramebuffer(gc, target, numAttachments, attachments, 0, 0, (GLsizei)(-1), (GLsizei)(-1));
 }
 
-GLvoid GL_APIENTRY __gles_InvalidateSubFramebuffer(__GLcontext *gc,
+GLvoid GL_APIENTRY __glim_InvalidateSubFramebuffer(__GLcontext *gc,
                                                    GLenum target,
                                                    GLsizei numAttachments,
                                                    const GLenum* attachments,
@@ -2753,7 +2752,7 @@ GLvoid GL_APIENTRY __gles_InvalidateSubFramebuffer(__GLcontext *gc,
     __glInvalidateFramebuffer(gc, target, numAttachments, attachments, x, y, width, height);
 }
 
-GLvoid GL_APIENTRY __gles_GetInternalformativ(__GLcontext *gc, GLenum target, GLenum internalformat, GLenum pname, GLsizei bufSize, GLint* params)
+GLvoid GL_APIENTRY __glim_GetInternalformativ(__GLcontext *gc, GLenum target, GLenum internalformat, GLenum pname, GLsizei bufSize, GLint* params)
 {
     __GLformatInfo *formatInfo = gcvNULL;
 
@@ -2809,7 +2808,7 @@ OnExit:
 }
 
 #if GL_EXT_discard_framebuffer
-GLvoid GL_APIENTRY __gles_DiscardFramebufferEXT(__GLcontext *gc, GLenum target, GLsizei numAttachments, const GLenum *attachments)
+GLvoid GL_APIENTRY __glim_DiscardFramebufferEXT(__GLcontext *gc, GLenum target, GLsizei numAttachments, const GLenum *attachments)
 {
     /* Inconvenient to get FBO size in GLcore layer, set -1 and let chip layer do it */
     __glInvalidateFramebuffer(gc, target, numAttachments, attachments, 0, 0, (GLsizei)(-1), (GLsizei)(-1));
@@ -2817,18 +2816,7 @@ GLvoid GL_APIENTRY __gles_DiscardFramebufferEXT(__GLcontext *gc, GLenum target, 
 #endif
 
 #if GL_EXT_multisampled_render_to_texture
-GLvoid GL_APIENTRY __gles_RenderbufferStorageMultisampleEXT(
-    __GLcontext *gc,
-    GLenum target,
-    GLsizei samples,
-    GLenum internalformat,
-    GLsizei width,
-    GLsizei height)
-{
-    __glRenderbufferStorage(gc, target, samples, internalformat, width, height, GL_TRUE);
-}
-
-GLvoid GL_APIENTRY __gles_FramebufferTexture2DMultisampleEXT(
+GLvoid GL_APIENTRY __glim_FramebufferTexture2DMultisampleEXT(
     __GLcontext *gc,
     GLenum target,
     GLenum attachment,
@@ -2927,7 +2915,7 @@ OnError:
 }
 #endif
 
-GLvoid GL_APIENTRY __gles_FramebufferParameteri(__GLcontext *gc, GLenum target, GLenum pname, GLint param)
+GLvoid GL_APIENTRY __glim_FramebufferParameteri(__GLcontext *gc, GLenum target, GLenum pname, GLint param)
 {
     __GLframebufferObject *framebufferObj = gcvNULL;
 
@@ -3004,7 +2992,7 @@ OnError:
 
 }
 
-GLvoid GL_APIENTRY __gles_GetFramebufferParameteriv(__GLcontext *gc, GLenum target, GLenum pname, GLint *params)
+GLvoid GL_APIENTRY __glim_GetFramebufferParameteriv(__GLcontext *gc, GLenum target, GLenum pname, GLint *params)
 {
     __GLframebufferObject *framebufferObj = gcvNULL;
 
@@ -3065,7 +3053,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_FramebufferTexture(__GLcontext *gc, GLenum target, GLenum attachment, GLuint texture, GLint level)
+GLvoid GL_APIENTRY __glim_FramebufferTexture(__GLcontext *gc, GLenum target, GLenum attachment, GLuint texture, GLint level)
 {
     GLuint i;
     __GLtextureObject *texObj;
@@ -3151,79 +3139,165 @@ OnError:
 #ifdef OPENGL40
 GLvoid GLAPIENTRY __glim_FramebufferTexture1D(__GLcontext *gc,  GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level)
 {
-/* to do */
+   GLuint i;
+    __GLtextureObject *texObj;
+    GLuint numAttachments = 0;
+    GLenum attachIndices[2];
+    GLuint targetIdx = __GL_MAX_TEXTURE_BINDINGS;
+
+    __GL_HEADER();
+
+    /* Parameter error check */
+    FRAMEBUFFER_CHECK_TARGET_ATTACHMENT();
+
+    if (texture != 0)
+    {
+        /* Tex object must exist */
+        texObj = (__GLtextureObject *)__glGetObject(gc, gc->texture.shared, texture);
+        if (!texObj)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+        }
+        if ((level >= (GLint)gc->constants.maxNumTextureLevels) ||(level < 0))
+        {
+            __GL_ERROR_EXIT(GL_INVALID_VALUE);
+        }
+
+        switch (textarget)
+        {
+        case GL_TEXTURE_1D:
+            targetIdx = __GL_TEXTURE_1D_INDEX;
+            break;
+        default:
+            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+        }
+
+        if (texObj->targetIndex != targetIdx)
+        {
+            __GL_ERROR_RET(GL_INVALID_OPERATION);
+        }
+
+    }
+    else
+    {
+        texObj = gcvNULL;
+    }
+
+    if (GL_DEPTH_STENCIL_ATTACHMENT == attachment)
+    {
+        numAttachments = 2;
+        attachIndices[0] = __GL_DEPTH_ATTACHMENT_POINT_INDEX;
+        attachIndices[1] = __GL_STENCIL_ATTACHMENT_POINT_INDEX;
+    }
+    else
+    {
+        numAttachments = 1;
+        attachIndices[0] = __glMapAttachmentToIndex(attachment);
+    }
+
+    for (i = 0; i < numAttachments; ++i)
+    {
+        switch (target)
+        {
+        case GL_FRAMEBUFFER:
+        case GL_DRAW_FRAMEBUFFER:
+            __glFramebufferTexture(gc, gc->frameBuffer.drawFramebufObj, attachIndices[i],
+                                   texObj, level, 0, 0, 0, GL_FALSE, GL_FALSE);
+            break;
+        case GL_READ_FRAMEBUFFER:
+            __glFramebufferTexture(gc, gc->frameBuffer.readFramebufObj, attachIndices[i],
+                                   texObj, level, 0, 0, 0, GL_FALSE, GL_FALSE);
+            break;
+        }
+    }
+
+OnError:
+    __GL_FOOTER();
+    return;
 }
 GLvoid GLAPIENTRY __glim_FramebufferTexture3D(__GLcontext *gc,  GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint zoffset)
 {
-/* to do */
-}
-GLboolean GLAPIENTRY __glim_IsRenderbufferEXT( __GLcontext *gc,  GLuint renderbuffer)
-{
-    return __gles_IsRenderbuffer(gc, renderbuffer);
-}
-GLvoid GLAPIENTRY __glim_BindRenderbufferEXT(__GLcontext *gc,  GLenum target, GLuint renderbuffer)
-{
-    __gles_BindRenderbuffer(gc, target, renderbuffer);
-}
-GLvoid GLAPIENTRY __glim_DeleteRenderbuffersEXT(__GLcontext *gc,  GLsizei n, const GLuint *renderbuffers)
-{
-    __gles_DeleteRenderbuffers(gc, n, renderbuffers);
-}
-GLvoid GLAPIENTRY __glim_GenRenderbuffersEXT(__GLcontext *gc,  GLsizei n, GLuint *renderbuffers)
-{
-    __gles_GenRenderbuffers(gc, n, renderbuffers);
-}
-GLvoid GLAPIENTRY __glim_RenderbufferStorageEXT(__GLcontext *gc,  GLenum target, GLenum internalformat, GLsizei width, GLsizei height)
-{
-    __gles_RenderbufferStorage(gc, target, internalformat, width, height);
-}
-GLvoid GLAPIENTRY __glim_GetRenderbufferParameterivEXT(__GLcontext *gc,  GLenum target, GLenum pname, GLint* params)
-{
-    __gles_GetRenderbufferParameteriv(gc, target, pname, params);
-}
-GLboolean GLAPIENTRY __glim_IsFramebufferEXT(__GLcontext *gc,  GLuint framebuffer)
-{
-    return __gles_IsFramebuffer(gc, framebuffer);
-}
-GLvoid GLAPIENTRY __glim_BindFramebufferEXT(__GLcontext *gc,  GLenum target, GLuint framebuffer)
-{
-    __gles_BindFramebuffer(gc, target, framebuffer);
-}
-GLvoid GLAPIENTRY __glim_DeleteFramebuffersEXT(__GLcontext *gc,  GLsizei n, const GLuint *framebuffers)
-{
-    __gles_DeleteFramebuffers(gc, n, framebuffers);
-}
-GLvoid GLAPIENTRY __glim_GenFramebuffersEXT(__GLcontext *gc,  GLsizei n, GLuint *framebuffers)
-{
-    __gles_GenFramebuffers(gc, n, framebuffers);
-}
-GLvoid GLAPIENTRY __glim_FramebufferRenderbufferEXT(__GLcontext *gc,  GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer)
-{
-    __gles_FramebufferRenderbuffer(gc, target, attachment, renderbuffertarget, renderbuffer);
-}
-GLenum GLAPIENTRY __glim_CheckFramebufferStatusEXT(__GLcontext *gc, GLenum target)
-{
-    return __gles_CheckFramebufferStatus(gc, target);
-}
-GLvoid GLAPIENTRY __glim_FramebufferTexture1DEXT(__GLcontext *gc,  GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level)
-{
-/* to do */
-}
-GLvoid GLAPIENTRY __glim_FramebufferTexture2DEXT(__GLcontext *gc,  GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level)
-{
-    __gles_FramebufferTexture2D(gc, target, attachment, textarget, texture, level);
-}
-GLvoid GLAPIENTRY __glim_FramebufferTexture3DEXT(__GLcontext *gc,  GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint zoffset)
-{
-/* to do */
-}
-GLvoid GLAPIENTRY __glim_GetFramebufferAttachmentParameterivEXT(__GLcontext *gc,  GLenum target, GLenum attachment, GLenum pname, GLint *params)
-{
-    __gles_GetFramebufferAttachmentParameteriv(gc, target, attachment, pname, params);
-}
+   GLuint i;
+    __GLtextureObject *texObj;
+    GLuint numAttachments = 0;
+    GLenum attachIndices[2];
+    GLuint targetIdx = __GL_MAX_TEXTURE_BINDINGS;
 
-GLvoid GLAPIENTRY __glim_BlitFramebufferEXT(__GLcontext *gc,  GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1,GLbitfield mask, GLenum filter)
-{
-    __gles_BlitFramebuffer(gc, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+    __GL_HEADER();
+
+    /* Parameter error check */
+    FRAMEBUFFER_CHECK_TARGET_ATTACHMENT();
+
+    if (texture != 0)
+    {
+        /* Tex object must exist */
+        texObj = (__GLtextureObject *)__glGetObject(gc, gc->texture.shared, texture);
+        if (!texObj)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+        }
+        if ((level >= (GLint)gc->constants.maxNumTextureLevels) ||(level < 0))
+        {
+            __GL_ERROR_EXIT(GL_INVALID_VALUE);
+        }
+
+        if ((zoffset < 0) || (zoffset > (GLint)gc->constants.maxTextureSize))
+        {
+            __GL_ERROR_EXIT(GL_INVALID_VALUE);
+        }
+
+        switch (textarget)
+        {
+        case GL_TEXTURE_3D:
+            if (zoffset >= (GLint)gc->constants.maxTextureSize)
+            {
+                __GL_ERROR_EXIT(GL_INVALID_VALUE);
+            }
+            targetIdx = __GL_TEXTURE_3D_INDEX;
+            break;
+        default:
+            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+        }
+        if (texObj->targetIndex != targetIdx)
+        {
+            __GL_ERROR_RET(GL_INVALID_OPERATION);
+        }
+    }
+    else
+    {
+        texObj = gcvNULL;
+    }
+
+    if (GL_DEPTH_STENCIL_ATTACHMENT == attachment)
+    {
+        numAttachments = 2;
+        attachIndices[0] = __GL_DEPTH_ATTACHMENT_POINT_INDEX;
+        attachIndices[1] = __GL_STENCIL_ATTACHMENT_POINT_INDEX;
+    }
+    else
+    {
+        numAttachments = 1;
+        attachIndices[0] = __glMapAttachmentToIndex(attachment);
+    }
+
+    for (i = 0; i < numAttachments; ++i)
+    {
+        switch (target)
+        {
+        case GL_FRAMEBUFFER:
+        case GL_DRAW_FRAMEBUFFER:
+            __glFramebufferTexture(gc, gc->frameBuffer.drawFramebufObj, attachIndices[i],
+                                   texObj, level, 0, zoffset, 0, GL_FALSE, GL_FALSE);
+            break;
+        case GL_READ_FRAMEBUFFER:
+            __glFramebufferTexture(gc, gc->frameBuffer.readFramebufObj, attachIndices[i],
+                                   texObj, level, 0, zoffset, 0, GL_FALSE, GL_FALSE);
+            break;
+        }
+    }
+
+OnError:
+    __GL_FOOTER();
+    return;
 }
 #endif

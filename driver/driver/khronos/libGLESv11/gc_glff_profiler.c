@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -129,14 +129,13 @@ _glffProfilerInitialize(
 
     Context->profilerObj->profilerClient = gcvCLIENT_OPENGLES11;
 
-    if (gcoPROFILER_Enable(Context->profilerObj) != gcvSTATUS_OK)
+    if (gcoPROFILER_Initialize(Context->profilerObj) != gcvSTATUS_OK)
     {
         profiler->enable = gcvFALSE;
         gcmFOOTER_NO();
         return;
     }
     profiler->enable = gcvTRUE;
-
     profiler->curFrameNumber = 0;
     profiler->frameNumber = 0;
     profiler->frameBegun = gcvFALSE;
@@ -246,7 +245,7 @@ _glffProfilerWrite(
             gcoOS_MemFill(infoScreen, 0, gcmSIZEOF(infoScreen));
             gcmONERROR(gcoSURF_GetSize(Context->draw, &width, &height, gcvNULL));
             gcmONERROR(gcoOS_PrintStrSafe(infoScreen, gcmSIZEOF(infoScreen),
-                       &offset, "%d x %d", width, height));
+                &offset, "%d x %d", width, height));
             gcmWRITE_CONST(VPC_INFOSCREENSIZE);
             gcmWRITE_STRING(infoScreen);
 
@@ -529,7 +528,7 @@ _glffProfilerSet(
     case GL1_PROFILER_FINISH_BEGIN:
 
         gcmONERROR(_glffProfilerWrite(Context, GL1_PROFILER_WRITE_FRAME_BEGIN));
-        gcmONERROR(gcoPROFILER_Begin(Context->profilerObj, gcvCOUNTER_OP_FINISH));
+        gcmONERROR(gcoPROFILER_EnableCounters(Context->profilerObj, gcvCOUNTER_OP_FINISH));
         profiler->drawCount = 0;
 
         break;
@@ -580,7 +579,7 @@ _glffProfilerSet(
     case GL1_PROFILER_DRAW_BEGIN:
 
         gcmONERROR(_glffProfilerWrite(Context, GL1_PROFILER_WRITE_FRAME_BEGIN));
-        gcmONERROR(gcoPROFILER_Begin(Context->profilerObj, gcvCOUNTER_OP_DRAW));
+        gcmONERROR(gcoPROFILER_EnableCounters(Context->profilerObj, gcvCOUNTER_OP_DRAW));
 
         break;
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -12,7 +12,7 @@
 
 
 #include "gc_vk_precomp.h"
-#include <SPIRV/spirv.h>
+#include <vulkan/spirv.h>
 
 /******************************************************************************
 ** default func
@@ -47,16 +47,6 @@ static VkResult default_collect(
 
 static VkResult default_cleanup(
     __vkDevContext *devCtx,
-    halti5_tweak_handler *handler
-    )
-{
-    return VK_SUCCESS;
-}
-
-static VkResult default_copy(
-    __vkDevContext *devCtx,
-    __vkPipeline *pip,
-    __vkBuffer *dstBuf,
     halti5_tweak_handler *handler
     )
 {
@@ -182,7 +172,6 @@ static VkBool32 cube_useLOD_shaderDetect(__vkShaderModule * module)
 
    return VK_TRUE;
 }
-
 
 static VkBool32 cube_useLOD_match(
     __vkDevContext *devCtx,
@@ -559,7 +548,7 @@ static VkResult deqp_vk_48_timeout_tweak(
     return VK_SUCCESS;
 }
 
-static VkBool32 msaa_128bpp_01_shaderDetect(__vkShaderModule * module)
+static VkBool32 msaa_128bpp_shaderDetect(__vkShaderModule * module)
 {
     static uint32_t opArray[] =
     {
@@ -653,7 +642,7 @@ static VkBool32 msaa_128bpp_01_shaderDetect(__vkShaderModule * module)
    return VK_TRUE;
 }
 
-static VkBool32 deqp_vk_msaa_128bpp_01_match(
+static VkBool32 deqp_vk_msaa_128bpp_match(
     __vkDevContext *devCtx,
     __vkPipeline *pip,
     void *createInfo
@@ -702,7 +691,7 @@ static VkBool32 deqp_vk_msaa_128bpp_01_match(
                 return VK_FALSE;
             }
 
-            ret = ret & msaa_128bpp_01_shaderDetect(pPsShaderModule);
+            ret = ret & msaa_128bpp_shaderDetect(pPsShaderModule);
 
             if(!ret)
                 return VK_FALSE;
@@ -714,7 +703,7 @@ static VkBool32 deqp_vk_msaa_128bpp_01_match(
     return VK_FALSE;
 }
 
-static VkResult deqp_vk_msaa_128bpp_01_tweak(
+static VkResult deqp_vk_msaa_128bpp_tweak(
     __vkDevContext *devCtx,
     __vkPipeline *pip,
     void *createInfo,
@@ -776,396 +765,6 @@ static VkResult deqp_vk_msaa_128bpp_01_tweak(
     return VK_SUCCESS;
 }
 
-static VkBool32 deqp_vk_msaa_128bpp_02_match(
-    __vkDevContext *devCtx,
-    __vkPipeline *pip,
-    void *createInfo
-    )
-{
-    if (devCtx->database->CACHE128B256BPERLINE)
-    {
-        return VK_FALSE;
-    }
-
-    if(pip->type == __VK_PIPELINE_TYPE_GRAPHICS)
-    {
-        VkGraphicsPipelineCreateInfo * graphicCreateInfo = (VkGraphicsPipelineCreateInfo *) createInfo;
-        float x,y,width,height;
-        VkBool32 ret = VK_TRUE;
-        /* Check state match */
-        if(graphicCreateInfo->pViewportState && graphicCreateInfo->pViewportState->pViewports)
-        {
-            x = graphicCreateInfo->pViewportState->pViewports->x;
-            y = graphicCreateInfo->pViewportState->pViewports->y;
-            width = graphicCreateInfo->pViewportState->pViewports->width;
-            height = graphicCreateInfo->pViewportState->pViewports->height;
-
-            ret = ret & (x == 0.0 && y == 0.0 && width == 32.0 && height == 32.0);
-            if(!ret)
-                return VK_FALSE;
-        }
-
-        if (pip->renderPass->attachments)
-        {
-            ret = ret & (pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SFLOAT ||
-                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SINT ||
-                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_UINT);
-
-            if(!ret)
-                return VK_FALSE;
-        }
-
-        if (graphicCreateInfo->pMultisampleState)
-        {
-            ret = ret & (graphicCreateInfo->pMultisampleState->rasterizationSamples == VK_SAMPLE_COUNT_4_BIT);
-
-            if (!ret)
-                return VK_FALSE;
-        }
-
-        /*Check shader Match*/
-        if(graphicCreateInfo->stageCount == 2)
-        {
-            const VkPipelineShaderStageCreateInfo *pVsStage = &(graphicCreateInfo->pStages[0]);
-            const VkPipelineShaderStageCreateInfo *pFsStage = &(graphicCreateInfo->pStages[1]);
-            __vkShaderModule *pVsShaderModule = gcvNULL, *pPsShaderModule = gcvNULL;
-
-            pVsShaderModule = (__vkShaderModule * )(uintptr_t)pVsStage->module;
-            pPsShaderModule = (__vkShaderModule * )(uintptr_t)pFsStage->module;
-
-            ret = ret & (pVsShaderModule->codeSize == 752 &&
-                         (pPsShaderModule->codeSize == 1300 || pPsShaderModule->codeSize == 1312));
-
-            if (!ret)
-                return VK_FALSE;
-        }
-
-        return ret;
-    }
-
-    return VK_FALSE;
-}
-
-static VkResult deqp_vk_msaa_128bpp_02_copy(
-    __vkDevContext *devCtx,
-    __vkPipeline *pip,
-    __vkBuffer *dstBuf,
-    halti5_tweak_handler *handler
-    )
-{
-    VkFormat dstFormat = pip->renderPass->attachments[0].format;
-    gctPOINTER dstAddress = dstBuf->memory->hostAddr;
-    static uint32_t sampleNdx = 0;
-
-    switch (dstFormat)
-    {
-    case VK_FORMAT_R32G32B32A32_UINT:
-        {
-            uint32_t x, y, compNdx;
-            uint32_t range = (uint32_t)(1 << 31);
-            uint32_t *dstPtr = (uint32_t *)dstAddress;
-
-            for (y = 0; y < 32; y++)
-            {
-                for (x = 0; x < 32; x++)
-                {
-                    const uint32_t x1 = x ^ sampleNdx;
-                    const uint32_t y1 = y ^ sampleNdx;
-                    uint32_t color[4] = {0u, 0u, 0u, 0u};
-                    uint32_t dstBitsUsed[4] = { 0u, 0u, 0u, 0u };
-                    uint32_t nextSrcBit = 0;
-                    uint32_t divider = 2;
-
-                    while (nextSrcBit < 0x10)
-                    {
-                        for (compNdx = 0; compNdx < 4; compNdx++)
-                        {
-                            if (dstBitsUsed[compNdx] > 32)
-                                continue;
-
-                            color[compNdx] += (range / divider)
-                                            * (((nextSrcBit % 2 == 0 ? x1 : y1) & (0x1u << (nextSrcBit / 2u))) == 0u ? 0u : 1u);
-
-                            nextSrcBit++;
-                            dstBitsUsed[compNdx]++;
-                        }
-                        divider *= 2;
-                    }
-                    dstPtr[0] = color[0];
-                    dstPtr[1] = color[1];
-                    dstPtr[2] = color[2];
-                    dstPtr[3] = color[3];
-                    dstPtr += 4;
-                }
-            }
-        }
-        break;
-    case VK_FORMAT_R32G32B32A32_SINT:
-        {
-            uint32_t x, y, compNdx;
-            int32_t range = 1 << 30;
-            int32_t *dstPtr = (int32_t *)dstAddress;
-
-            for (y = 0; y < 32; y++)
-            {
-                for (x = 0; x < 32; x++)
-                {
-                    const uint32_t x1 = x ^ sampleNdx;
-                    const uint32_t y1 = y ^ sampleNdx;
-                    uint32_t color[4] = {0u, 0u, 0u, 0u};
-                    uint32_t dstBitsUsed[4] = { 0u, 0u, 0u, 0u };
-                    uint32_t nextSrcBit = 0;
-                    uint32_t divider = 2;
-
-                    while (nextSrcBit < 0x10)
-                    {
-                        for (compNdx = 0; compNdx < 4; compNdx++)
-                        {
-                            if (dstBitsUsed[compNdx] > 32)
-                                continue;
-
-                            color[compNdx] += (range / divider)
-                                            * (((nextSrcBit % 2 == 0 ? x1 : y1) & (0x1u << (nextSrcBit / 2u))) == 0u ? 0u : 1u);
-
-                            nextSrcBit++;
-                            dstBitsUsed[compNdx]++;
-                        }
-                        divider *= 2;
-                    }
-                    dstPtr[0] = color[0];
-                    dstPtr[1] = color[1];
-                    dstPtr[2] = color[2];
-                    dstPtr[3] = color[3];
-                    dstPtr += 4;
-                }
-            }
-        }
-        break;
-    case VK_FORMAT_R32G32B32A32_SFLOAT:
-        {
-            uint32_t x, y, compNdx;
-            float range = 131072.0;
-            float *dstPtr = (float *)dstAddress;
-
-            for (y = 0; y < 32; y++)
-            {
-                for (x = 0; x < 32; x++)
-                {
-                    const uint32_t x1 = x ^ sampleNdx;
-                    const uint32_t y1 = y ^ sampleNdx;
-                    float color[4] = {-65536.0, -65536.0, -65536.0, -65536.0};
-                    uint32_t dstBitsUsed[4] = { 0u, 0u, 0u, 0u };
-                    uint32_t nextSrcBit = 0;
-                    uint32_t divider = 2;
-
-                    while (nextSrcBit < 0x10)
-                    {
-                        for (compNdx = 0; compNdx < 4; compNdx++)
-                        {
-                            if (dstBitsUsed[compNdx] > 32)
-                                continue;
-
-                            color[compNdx] += (range / divider)
-                                            * (((nextSrcBit % 2 == 0 ? x1 : y1) & (0x1u << (nextSrcBit / 2u))) == 0u ? 0u : 1u);
-
-                            nextSrcBit++;
-                            dstBitsUsed[compNdx]++;
-                        }
-                        divider *= 2;
-                    }
-                    dstPtr[0] = color[0];
-                    dstPtr[1] = color[1];
-                    dstPtr[2] = color[2];
-                    dstPtr[3] = color[3];
-                    dstPtr += 4;
-                }
-            }
-        }
-        break;
-    default:
-        break;
-    }
-
-    sampleNdx++;
-
-    if (sampleNdx == 4)
-        sampleNdx = 0;
-
-    return VK_SUCCESS;
-}
-
-static VkBool32 deqp_vk_msaa_128bpp_03_match(
-    __vkDevContext *devCtx,
-    __vkPipeline *pip,
-    void *createInfo
-    )
-{
-    if (devCtx->database->CACHE128B256BPERLINE)
-    {
-        return VK_FALSE;
-    }
-
-    if(pip->type == __VK_PIPELINE_TYPE_GRAPHICS)
-    {
-        VkGraphicsPipelineCreateInfo * graphicCreateInfo = (VkGraphicsPipelineCreateInfo *) createInfo;
-        float x,y,width,height;
-        VkBool32 ret = VK_TRUE;
-        /* Check state match */
-        if(graphicCreateInfo->pViewportState && graphicCreateInfo->pViewportState->pViewports)
-        {
-            x = graphicCreateInfo->pViewportState->pViewports->x;
-            y = graphicCreateInfo->pViewportState->pViewports->y;
-            width = graphicCreateInfo->pViewportState->pViewports->width;
-            height = graphicCreateInfo->pViewportState->pViewports->height;
-
-            ret = ret & (x == 0.0 && y == 0.0 && width == 32.0 && height == 32.0);
-            if(!ret)
-                return VK_FALSE;
-        }
-
-        if (pip->renderPass->attachments)
-        {
-            ret = ret & (pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SFLOAT ||
-                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SINT ||
-                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_UINT);
-
-            if(!ret)
-                return VK_FALSE;
-        }
-
-        if (graphicCreateInfo->pMultisampleState)
-        {
-            ret = ret & (graphicCreateInfo->pMultisampleState->rasterizationSamples == VK_SAMPLE_COUNT_4_BIT);
-
-            if (!ret)
-                return VK_FALSE;
-        }
-
-        /*Check shader Match*/
-        if(graphicCreateInfo->stageCount == 2)
-        {
-            const VkPipelineShaderStageCreateInfo *pVsStage = &(graphicCreateInfo->pStages[0]);
-            const VkPipelineShaderStageCreateInfo *pFsStage = &(graphicCreateInfo->pStages[1]);
-            __vkShaderModule *pVsShaderModule = gcvNULL, *pPsShaderModule = gcvNULL;
-
-            pVsShaderModule = (__vkShaderModule * )(uintptr_t)pVsStage->module;
-            pPsShaderModule = (__vkShaderModule * )(uintptr_t)pFsStage->module;
-
-            ret = ret & (pVsShaderModule->codeSize == 752 &&
-                         (pPsShaderModule->codeSize == 744 || pPsShaderModule->codeSize == 756));
-
-            if (!ret)
-                return VK_FALSE;
-        }
-
-        return ret;
-    }
-
-    return VK_FALSE;
-}
-
-static VkResult deqp_vk_msaa_128bpp_03_copy(
-    __vkDevContext *devCtx,
-    __vkPipeline *pip,
-    __vkBuffer *dstBuf,
-    halti5_tweak_handler *handler
-    )
-{
-    VkFormat dstFormat = pip->renderPass->attachments[0].format;
-    gctPOINTER dstAddress = dstBuf->memory->hostAddr;
-    static uint32_t sampleNdx = 0, sampleMask = 0;
-
-    switch (dstFormat)
-    {
-    case VK_FORMAT_R32G32B32A32_UINT:
-        {
-            uint32_t clearValue[4] = { 0, 0, 0, 0 };
-            uint32_t renderValue[4] = { 255, 255, 255, 255 };
-            uint32_t copyValue[4];
-            uint32_t *dstPtr = (uint32_t *)dstAddress;
-            uint32_t x;
-
-            copyValue[0] = sampleMask > 7 ? renderValue[0] : clearValue[0];
-            copyValue[1] = sampleMask > 7 ? renderValue[1] : clearValue[1];
-            copyValue[2] = sampleMask > 7 ? renderValue[2] : clearValue[2];
-            copyValue[3] = sampleMask > 7 ? renderValue[3] : clearValue[3];
-
-            for (x = 0; x < 32 * 32; x++)
-            {
-                dstPtr[0] = copyValue[0];
-                dstPtr[1] = copyValue[1];
-                dstPtr[2] = copyValue[2];
-                dstPtr[3] = copyValue[3];
-                dstPtr += 4;
-            }
-        }
-        break;
-    case VK_FORMAT_R32G32B32A32_SINT:
-        {
-            int32_t clearValue[4] = { -128, -128, -128, -128 };
-            int32_t renderValue[4] = { 127, 127, 127, 127 };
-            int32_t copyValue[4];
-            int32_t *dstPtr = (int32_t *)dstAddress;
-            uint32_t x;
-
-            copyValue[0] = sampleMask > 7 ? renderValue[0] : clearValue[0];
-            copyValue[1] = sampleMask > 7 ? renderValue[1] : clearValue[1];
-            copyValue[2] = sampleMask > 7 ? renderValue[2] : clearValue[2];
-            copyValue[3] = sampleMask > 7 ? renderValue[3] : clearValue[3];
-
-            for (x = 0; x < 32 * 32; x++)
-            {
-                dstPtr[0] = copyValue[0];
-                dstPtr[1] = copyValue[1];
-                dstPtr[2] = copyValue[2];
-                dstPtr[3] = copyValue[3];
-                dstPtr += 4;
-            }
-        }
-        break;
-    case VK_FORMAT_R32G32B32A32_SFLOAT:
-        {
-            float clearValue[4] = { -1.0, -1.0, -1.0, -1.0 };
-            float renderValue[4] = { 1.0, 1.0, 1.0, 1.0 };
-            float copyValue[4];
-            float *dstPtr = (float *)dstAddress;
-            uint32_t x;
-
-            copyValue[0] = sampleMask > 7 ? renderValue[0] : clearValue[0];
-            copyValue[1] = sampleMask > 7 ? renderValue[1] : clearValue[1];
-            copyValue[2] = sampleMask > 7 ? renderValue[2] : clearValue[2];
-            copyValue[3] = sampleMask > 7 ? renderValue[3] : clearValue[3];
-
-            for (x = 0; x < 32 * 32; x++)
-            {
-                dstPtr[0] = copyValue[0];
-                dstPtr[1] = copyValue[1];
-                dstPtr[2] = copyValue[2];
-                dstPtr[3] = copyValue[3];
-                dstPtr += 4;
-            }
-        }
-        break;
-    default:
-        break;
-    }
-
-    sampleNdx++;
-
-    if (sampleNdx == 4)
-    {
-        sampleNdx = 0;
-        sampleMask++;
-    }
-
-    if (sampleMask == 16)
-    {
-        sampleMask = 0;
-    }
-
-    return VK_SUCCESS;
-}
-
 /******************************************************************************
 ** tweak info in cmd buf
 *******************************************************************************/
@@ -1178,7 +777,6 @@ static const halti5_tweak_handler g_tweakArray[] =
      default_collect,
      cube_useLOD_set,
      default_cleanup,
-     default_copy,
      0
      },
     {
@@ -1188,39 +786,17 @@ static const halti5_tweak_handler g_tweakArray[] =
      default_collect,
      default_set,
      default_cleanup,
-     default_copy,
      0
     },
     {
      "\x9b\x9a\x8e\x8f",
-     deqp_vk_msaa_128bpp_01_match,
-     deqp_vk_msaa_128bpp_01_tweak,
+     deqp_vk_msaa_128bpp_match,
+     deqp_vk_msaa_128bpp_tweak,
      default_collect,
      default_set,
      default_cleanup,
-     default_copy,
      0
     },
-    {
-     "\x9b\x9a\x8e\x8f",
-     deqp_vk_msaa_128bpp_02_match,
-     default_tweak,
-     default_collect,
-     default_set,
-     default_cleanup,
-     deqp_vk_msaa_128bpp_02_copy,
-     0
-     },
-    {
-     "\x9b\x9a\x8e\x8f",
-     deqp_vk_msaa_128bpp_03_match,
-     default_tweak,
-     default_collect,
-     default_set,
-     default_cleanup,
-     deqp_vk_msaa_128bpp_03_copy,
-     0
-     },
 };
 
 
@@ -1261,42 +837,13 @@ VkResult halti5_tweak_detect(
         chipModule->tweakHandleCount = handleIdx;
     }
 
+
 OnError:
     if (tempArray)
     {
         __VK_FREE(tempArray);
     }
     return result;
-}
-
-VkBool32 halti5_tweakCopy(
-    VkCommandBuffer cmdBuf,
-    VkBuffer destBuffer
-    )
-{
-    __vkCommandBuffer *cmd = (__vkCommandBuffer *)cmdBuf;
-    __vkDevContext *devCtx = cmd->devCtx;
-    __vkPipeline *pip = cmd->bindInfo.pipeline.graphics;
-    __vkBuffer *dstBuf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer*, destBuffer);
-
-    if (!pip)
-    {
-        return VK_FALSE;
-    }
-    else
-    {
-        halti5_pipeline *chipPipeline = (halti5_pipeline *)pip->chipPriv;
-
-        if (chipPipeline->tweakHandler)
-        {
-            chipPipeline->tweakHandler->copy(devCtx, pip, dstBuf, chipPipeline->tweakHandler);
-            return VK_TRUE;
-        }
-        else
-        {
-            return VK_FALSE;
-        }
-    }
 }
 
 

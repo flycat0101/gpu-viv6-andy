@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -734,6 +734,13 @@ ppoPREPROCESSOR_Construct_InitKeyword(
                                        "",
                                        &((*PP)->keyword->nul_str)));
 
+    /*59    gl_core_profile     */
+    gcmONERROR(
+        sloCOMPILER_AllocatePoolString((*PP)->compiler,
+                                       "GL_core_profile",
+                                       &((*PP)->keyword->gl_core_profile)));
+
+    (*PP)->keyword->isVersionUndefined = gcvFALSE;
     gcmFOOTER_ARG("*PP=%d", *PP);
     return gcvSTATUS_OK;
 
@@ -1369,7 +1376,6 @@ ppoPREPROCESSOR_Reset(
     gcmONERROR(sloCOMPILER_SetOutputInvariant(PP->compiler, gcvFALSE));
 
     /*reset compiler version*/
-    gcmONERROR(sloCOMPILER_SetLanguageVersion(PP->compiler, 100));
     PP->version = 100;
 
     /*reset states for version parsing.*/

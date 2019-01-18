@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -71,7 +71,7 @@
     /* @ conditional move: dst = cond_op(s0, s1) ? s2 : dst; */
     VIR_OPINFO(CMOV, 3, HasDest|Componentwise|Expr|EPFromS2|UseCondCode, 1, AL),
     /* @ MOVAR, MOVAF, MOVAI, mov dynamic indexing value to a0 */
-    VIR_OPINFO(MOVA, 1, HasDest|Componentwise|Expr|VIR_OPFLAG_ExpdPrecHP, 1, LM),
+    VIR_OPINFO(MOVA, 1, HasDest|Componentwise|Expr|VIR_OPFLAG_ExpdPrecHP|UseCondCode, 1, LM),
     /* Mov address to b0 with address calculation, b0 is used for uniform dynamic indexing
      *  addr[9:0]= base + (index<<shift) *(mul3?3:1)
      *  write the addr[9:0] to B0, where B0 is similar to A0, but one per shader group.
@@ -92,7 +92,7 @@
     /* @ Shuffle components from register pair */
     VIR_OPINFO(SHUFFLE2, 3, HasDest|Expr|EPFromS0, 1, NU),
     /* @ set predicator */
-    VIR_OPINFO(SETP, 2, HasDest|Componentwise|Expr|EPFromHighest, 1, NU),
+    VIR_OPINFO(SETP, 2, HasDest|Componentwise|Expr|EPFromHighest|UseCondCode, 1, NU),
     /* compare each component
         dest = is_float(dest.type) ? ((cond_op(src0, src1) ? 1.0 : 0.0)
                                    : ((cond_op(src0, src1) ? 0xFFFFFFFF: 0) ;*/
@@ -114,14 +114,14 @@
     /* convert source to dest type   */
     VIR_OPINFO(CONVERT, 1, HasDest|Componentwise|Expr|EPHP, 1, NM),
     /* convert source to dest type, only used in converter to match gcSL_CONV */
-    VIR_OPINFO(CONV0, 2, HasDest|Componentwise|Expr|EPHP, 1, HM),
+    VIR_OPINFO(CONV0, 2, HasDest|Src0Componentwise|Expr|EPHP, 1, HM),
     /* Machine instruction: convert source to dest type, source type is encoded in src1   */
-    VIR_OPINFO(CONV, 2, HasDest|Componentwise|Expr|EPHP, 1, MC),
+    VIR_OPINFO(CONV, 2, HasDest|Src0Componentwise|Expr|EPHP, 1, MC),
     /* Machine instruciton: convert source to dest type,
        Destination data type is determined by source_1.x[7:4].
        With dual-16 mode the Destination data type for I2I instructions
        (provided as source_1.x[6:4]) must be an immediate.*/
-    VIR_OPINFO(I2I, 2, HasDest|Componentwise|Expr|EPFromS0, 1, MC),
+    VIR_OPINFO(I2I, 2, HasDest|Src0Componentwise|Expr|EPFromS0, 1, MC),
     /* Machine instruction: Integer to float convert, */
     VIR_OPINFO(I2F, 1, HasDest|Componentwise|Expr|EPFromS0, 1, MC),
     /* Machine instruction: Float to integer convert,
@@ -521,20 +521,44 @@
     VIR_OPINFO(LOAD_L, 2, HasDest|Loads|Expr, 1, AL),
     VIR_OPINFO(STORE_L, 3, HasDest|Stores|Src2Componentwise|EPFromS2, 1, AL),
 
-    VIR_OPINFO(ATOMADD_L, 3, HasDest | Loads | Stores| Expr, 1, AL),
-    VIR_OPINFO(ATOMSUB_L, 3, HasDest | Loads | Stores| Expr, 1, AL),
-    VIR_OPINFO(ATOMXCHG_L, 3, HasDest | Loads | Stores| Expr, 1, AL),
+    VIR_OPINFO(ATOMADD_L, 3, HasDest | Loads | Stores|Expr, 1, AL),
+    VIR_OPINFO(ATOMSUB_L, 3, HasDest | Loads | Stores|Expr, 1, AL),
+    VIR_OPINFO(ATOMXCHG_L, 3, HasDest | Loads | Stores|Expr, 1, AL),
     /* For ATOMCMPXCHG, the Value is saved in the x channel of src2, the Comparator is saved in the y channel of src2. */
-    VIR_OPINFO(ATOMCMPXCHG_L, 3, HasDest | Loads | Stores| Expr, 1, AL),
-    VIR_OPINFO(ATOMMIN_L, 3, HasDest | Loads | Stores| Expr, 1, AL),
-    VIR_OPINFO(ATOMMAX_L, 3, HasDest | Loads | Stores| Expr, 1, AL),
-    VIR_OPINFO(ATOMOR_L, 3, HasDest | Loads | Stores| Expr, 1, AL),
-    VIR_OPINFO(ATOMAND_L, 3, HasDest | Loads | Stores| Expr, 1, AL),
-    VIR_OPINFO(ATOMXOR_L, 3, HasDest | Loads | Stores| Expr, 1, AL),
+    VIR_OPINFO(ATOMCMPXCHG_L, 3, HasDest | Loads | Stores|Expr, 1, AL),
+    VIR_OPINFO(ATOMMIN_L, 3, HasDest | Loads | Stores|Expr, 1, AL),
+    VIR_OPINFO(ATOMMAX_L, 3, HasDest | Loads | Stores|Expr, 1, AL),
+    VIR_OPINFO(ATOMOR_L, 3, HasDest | Loads | Stores|Expr, 1, AL),
+    VIR_OPINFO(ATOMAND_L, 3, HasDest | Loads | Stores|Expr, 1, AL),
+    VIR_OPINFO(ATOMXOR_L, 3, HasDest | Loads | Stores|Expr, 1, AL),
 
     VIR_OPINFO(IMG_SAMPLER, 2, HasDest|Loads|Expr, 1, HL),
 
-    /* IMG_LOAD instructions.
+    /* IMG_READ instructions.
+    ** corresponding to OCL read_image[f|i|u](image_[1|2]d_t, sampler, coord)
+    ** The source0 holds the vector 4 image descriptor:
+    **      x: base address
+    **      y: stride in bytes (should be set to 0 for 1D images).
+    **      z: [height(31:16), width(15:0)]
+    **      w: image defines (see GCREG_SH_IMAGE offset).
+    ** The source1.xyz holds the <x, y> coordinates.
+    ** The source2 is image sampler if presents (not undef)
+    */
+    VIR_OPINFO(IMG_READ, 3, HasDest|Loads|Expr|EPFromS0, 1, NM),
+
+    /* IMG_READ_3D instructions.
+    ** corresponding to OCL read_image[f|i|u](image_3d_t, sampler, coord)
+    ** The source0 holds the vector 4 image descriptor:
+    **      x: base address (not used in 3d instruction)
+    **      y: stride in bytes (should be set to 0 for 1D images).
+    **      z: [height(31:16), width(15:0)]
+    **      w: image defines (see GCREG_SH_IMAGE offset).
+    ** The source1.xyz holds the <x, y, z> coordinates (integer).
+    ** The source2 is image sampler if presents (not undef)
+    */
+    VIR_OPINFO(IMG_READ_3D, 3, HasDest|Loads|Expr|EPFromS0, 1, NM),
+
+    /* HW IMG_LOAD instructions.
     ** The source0 holds the vector 4 image descriptor:
     **      x: base address
     **      y: stride in bytes (should be set to 0 for 1D images).
@@ -546,9 +570,9 @@
     **      src2.x[ 9: 5] S05 relative y offset
     ** The source3 is image sampler if presents (not undef)
     */
-    VIR_OPINFO(IMG_LOAD, 4, HasDest|Expr|EPFromS0, 1, AL),
+    VIR_OPINFO(IMG_LOAD, 4, HasDest|Loads|Expr|EPFromS0, 1, AL),
 
-    /* IMG_LOAD_3D instructions.
+    /* HW IMG_LOAD_3D instructions.
     ** The source0 holds the vector 4 image descriptor:
     **      x: base address (not used in 3d instruction)
     **      y: stride in bytes (should be set to 0 for 1D images).
@@ -564,6 +588,30 @@
     ** The source3 is image sampler if presents (not undef)
     */
     VIR_OPINFO(IMG_LOAD_3D, 4, HasDest|Loads|Expr|EPFromS0, 1, AL),
+
+    /* IMG_WRITE instructions.
+    ** corresponding to OCL write_image[f|i|u](image_[1|2]d_t, coord, color)
+    ** The source0 holds the vector 4 image descriptor:
+    **      x: base address
+    **      y: stride in bytes (should be set to 0 for 1D images).
+    **      z: [height(31:16), width(15:0)]
+    **      w: image defines (see GCREG_SH_IMAGE offset).
+    ** The source1.xy holds the <x, y> coordinates.
+    ** The source2 holds the color value
+    */
+    VIR_OPINFO(IMG_WRITE, 3, HasDest|Stores|EPFromS0, 1, NM),
+
+    /* IMG_WRITE_3D instructions.
+    ** corresponding to OCL write_image[f|i|u](image_3d_t, coord, color)
+    ** The source0 holds the vector 4 image descriptor:
+    **      x: base address
+    **      y: stride in bytes
+    **      z: [height(31:16), width(15:0)]
+    **      w: image defines (see GCREG_SH_IMAGE offset).
+    ** The source1.xyz holds the <x, y, z> coordinates.
+    ** The source2 holds the color value
+    */
+    VIR_OPINFO(IMG_WRITE_3D, 3, HasDest|Stores|EPFromS0, 1, NM),
 
     /* IMG_STORE instructions.
     ** The source0 holds the vector 4 image descriptor (same as IMG_LOAD):
@@ -600,9 +648,61 @@
     */
     VIR_OPINFO(IMG_QUERY, 3, HasDest|Expr|EPFromHighest, 1, NM),
 
+    /* IMG_WIDTH: get 1d/2d/3d image width
+    **  dest: int, image width
+    **  src0: image descriptor
+    */
+    VIR_OPINFO(IMG_WIDTH, 1, HasDest|Expr|EPFromHighest, 1, NM),
+
+    /* IMG_HEIGHT: get 2d/3d image height
+    **  dest: int, image height
+    **  src0: image descriptor
+    */
+    VIR_OPINFO(IMG_HEIGHT, 1, HasDest|Expr|EPFromHighest, 1, NM),
+
+    /* IMG_DEPTH: get 3d image depth
+    **  dest: int, image depth
+    **  src0: image descriptor
+    */
+    VIR_OPINFO(IMG_DEPTH, 1, HasDest|Expr|EPFromHighest, 1, NM),
+
+    /* IMG_DIM: get image dimension
+    **  dest: int2, image 2d/2d array: <width, height>, int4, image 3d: <width, height, width, 0>
+    **  src0: image descriptor
+    */
+    VIR_OPINFO(IMG_DIM, 1, HasDest|Expr|EPFromHighest, 1, NM),
+
+    /* IMG_FORMAT: get image channel data type
+    **  src0: image descriptor
+    */
+    VIR_OPINFO(IMG_FORMAT, 1, HasDest|Expr|EPFromHighest, 1, NM),
+
+    /* IMG_ORDER: get image channel order
+    **  src0: image descriptor
+    */
+    VIR_OPINFO(IMG_ORDER, 1, HasDest|Expr|EPFromHighest, 1, NM),
+
+    /* IMG_ARRAY_SIZE: get image array size
+    **  dest: int, image 1d/2d array
+    **  src0: image descriptor
+    */
+    VIR_OPINFO(IMG_ARRAY_SIZE, 1, HasDest|Expr|EPFromHighest, 1, NM),
+
+    /* IMG_TYPE: get image type
+    **  dest: int, 1D: 0, 1D_buffer: 1, 1D_array: 2, 2D: 3, 2D_array: 4, 3D: 5
+    **  src0: image descriptor
+    */
+    VIR_OPINFO(IMG_TYPE, 1, HasDest|Expr|EPFromHighest, 1, NM),
+
     /* src0: value, src1: max, src2: delta
        DST = MIN(MAX(SRC0 + delta(SRC2), 0), SRC1) */
     VIR_OPINFO(CLAMP0MAX, 3, HasDest|Expr, 1, AL),
+
+    /* clamp image 2d cooridate to its width and height
+       src0: coordinate,
+       src1: image desc
+       DST = CLAMP0MAX(src0, (image.width, image.height), 0) */
+    VIR_OPINFO(CLAMPCOORD, 2, HasDest|Componentwise|Expr, 1, NM),
 
     /* register array access */
     /* indexed array load:  LDARR dest, src0, src1 ==> dest = src0[src1] */
@@ -670,6 +770,9 @@
     VIR_OPINFO(TEXQUERY, 2, HasDest|Expr, 1, NU),
 
     /* LODQ instructions:
+    ** The dest has two channels
+    **     x: integer portion lod.
+    **     y: floating lod.
     ** The source0 holds the sampler.
     ** The source1 holds the coord.
     ** The source2 holds the BIAS.
@@ -683,11 +786,14 @@
     ** The source1 holds the offset.
     */
     VIR_OPINFO(GET_SAMPLER_IDX, 2, HasDest|Expr|EPFromS0, 1, AL),
-    VIR_OPINFO(GET_SAMPLER_LMM, 2, HasDest|Expr, 1, AL),
-    VIR_OPINFO(GET_SAMPLER_LBS, 2, HasDest|Expr, 1, AL),
+    VIR_OPINFO(GET_SAMPLER_LMM, 2, HasDest|Expr, 1, AL), /* Get sampler's lodminmax:
+                                                            * for a sampler with LODmin, LODmax:
+                                                            * uniform is a vec2 where the x component is LODmin
+                                                            * and the y component is LODmax */
+    VIR_OPINFO(GET_SAMPLER_LBS, 2, HasDest|Expr, 1, AL), /* Get sampler's levelbasesize (base level of
+                                                            * sampler containing the width and height)*/
     /* Get the levels and samples of a sampler. */
     VIR_OPINFO(GET_SAMPLER_LS, 2, HasDest|Expr, 1, AL),
-
     /* combining separate samplers and textures:
      *    uniform sampler s[4];    // a handle to filtering information
      *    uniform texture2D t[4];  // a handle to a texture (an image in SPIR-V)
@@ -701,15 +807,18 @@
      ** surface instructions
      **/
     /* surface load */
-    VIR_OPINFO(SURLD, 2, HasDest|Expr, 1, NU),
+    VIR_OPINFO(SURLD, 2, HasDest|Loads|Expr, 1, NU),
     /* surface store */
-    VIR_OPINFO(SURSTORE, 2, HasDest, 0, NU),
+    VIR_OPINFO(SURSTORE, 2, HasDest|Stores, 0, NU),
     /* surface reduction */
-    VIR_OPINFO(SURRED, 2, HasDest, 1, NU),
+    VIR_OPINFO(SURRED, 2, HasDest|Loads|Stores, 1, NU),
     /* surface query */
     VIR_OPINFO(SURQUERY, 2, HasDest|Expr, 1, NU),
 
     /* synchronization and atomic operations */
+    /*
+    ** Barrier instructions, source0 is a integer constant, save the barrier type(VIR_BARRIER_TYPE).
+    */
     VIR_OPINFO(BARRIER, 1, NoDest, 0, AL), /*   */
     VIR_OPINFO(MEM_BARRIER, 1, NoDest, 0, AL), /*   */
     VIR_OPINFO(FENCE, 0, NoDest, 0, NU), /* memory fence */
@@ -768,6 +877,30 @@
     /* implicit cast for vx_inst dest */
     VIR_OPINFO(VX_ICASTD, 1, HasDest|EPFromS0|Expr|VX1, 1, NM),
 
+    /* VX_IMG_READ instructions.
+    ** corresponding to OCL read_image[f|i|u](image_[1|2]d_t, sampler, coord)
+    ** The source0 holds the vector 4 image descriptor:
+    **      x: base address
+    **      y: stride in bytes (should be set to 0 for 1D images).
+    **      z: [height(31:16), width(15:0)]
+    **      w: image defines (see GCREG_SH_IMAGE offset).
+    ** The source1.xyz holds the <x, y> coordinates.
+    ** The source2 holds EVIS_modifer
+    */
+    VIR_OPINFO(VX_IMG_READ, 3, HasDest|Loads|Expr|EPFromS0|VX1_2|EVISModifier(2), 1, NM),
+
+    /* VX_IMG_READ_3D instructions.
+    ** corresponding to OCL read_image[f|i|u](image_3d_t, sampler, coord)
+    ** The source0 holds the vector 4 image descriptor:
+    **      x: base address (not used in 3d instruction)
+    **      y: stride in bytes (should be set to 0 for 1D images).
+    **      z: [height(31:16), width(15:0)]
+    **      w: image defines (see GCREG_SH_IMAGE offset).
+    ** The source1.xyz holds the <x, y, z> coordinates (integer).
+    ** The source2 holds EVIS_modifer
+    */
+    VIR_OPINFO(VX_IMG_READ_3D, 3, HasDest|Loads|Expr|EPFromS0|VX1_2|EVISModifier(2), 1, NM),
+
     /* VX_IMG_LOAD instructions.
     ** The source0 holds the vector 4 image descriptor:
     **      x: base address
@@ -780,7 +913,7 @@
     **      src2.x[ 9: 5] S05 relative y offset
     ** The source3 holds EVIS_modifer
     */
-    VIR_OPINFO(VX_IMG_LOAD, 4, HasDest|EPFromS0|Expr|VX1_2|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_IMG_LOAD, 4, HasDest|Loads|EPFromS0|Expr|VX1_2|EVISModifier(3), 1, AL),
 
     /* VX_IMG_LOAD_3D instructions.
     ** The source0 holds the vector 4 image descriptor:
@@ -797,7 +930,31 @@
     **      src2.x[14:10] S05 relative z offset
     ** The source3 holds EVIS_modifer
     */
-    VIR_OPINFO(VX_IMG_LOAD_3D, 4, HasDest|EPFromS0|Expr|VX1_2|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_IMG_LOAD_3D, 4, HasDest|Loads|EPFromS0|Expr|VX1_2|EVISModifier(3), 1, AL),
+
+    /* VX_IMG_WRITE instructions.
+    ** corresponding to OCL write_image[f|i|u](image_[1|2]d_t, coord, color)
+    ** The source0 holds the vector 4 image descriptor:
+    **      x: base address
+    **      y: stride in bytes (should be set to 0 for 1D images).
+    **      z: [height(31:16), width(15:0)]
+    **      w: image defines (see GCREG_SH_IMAGE offset).
+    ** The source1.xyz holds the <x, y> coordinates.
+    ** The source2 holds EVIS_modifer
+    */
+    VIR_OPINFO(VX_IMG_WRITE, 4, HasDest|Stores|EPFromS0|VX1_2|EVISModifier(3), 1, NM),
+
+    /* VX_IMG_WRITE_3D instructions.
+    ** corresponding to OCL write_image[f|i|u](image_3d_t, coord, color)
+    ** The source0 holds the vector 4 image descriptor:
+    **      x: base address (not used in 3d instruction)
+    **      y: stride in bytes (should be set to 0 for 1D images).
+    **      z: [height(31:16), width(15:0)]
+    **      w: image defines (see GCREG_SH_IMAGE offset).
+    ** The source1.xyz holds the <x, y, z> coordinates (integer).
+    ** The source2 holds EVIS_modifer
+    */
+    VIR_OPINFO(VX_IMG_WRITE_3D, 4, HasDest|Stores|EPFromS0|VX1_2|EVISModifier(3), 1, NM),
 
     /* IMG_STORE instructions.
     ** The source0 holds the vector 4 image descriptor (same as IMG_LOAD):
@@ -1020,7 +1177,7 @@
      * bin. Src2 holds a 512-bit uniform that contains the min value for the entire
      * instruction as well as the range for each bin.
      */
-    VIR_OPINFO(VX_SELECTADD, 4, HasDest|Componentwise|Expr|VX1Use512BitUniform(2)|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_SELECTADD, 4, HasDest|Componentwise|Expr|VX1Use512BitUniform(2)|EVISModifier(3)|UseCondCode, 1, AL),
 
     /* The AtomicAdd instruction adds a valid atomically to a given address. It is in
      * fact a read/modify/write instruction that executes atomically. It works on 8-
@@ -1029,19 +1186,19 @@
      * Src0 holds the base address and src1 holds the offset. Src2 holds the values
      * that need to be added to the memory locations pointed to by src0 and src1.
      */
-    VIR_OPINFO(VX_ATOMICADD, 4, HasDest|Expr|VX1_2|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_ATOMICADD, 4, HasDest|Loads|Stores|Expr|VX1_2|EVISModifier(3), 1, AL),
 
     /* The BitExtract instruction extracts up to 8 bitfields from a packed data stream.
      * The input is is a 256-bit blob of data. Valid output formats are U8, U16, and
      * U32.
      */
-    VIR_OPINFO(VX_BITEXTRACT, 4, HasDest|Componentwise|Expr|VX1_2|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_BITEXTRACT, 4, HasDest|Expr|VX1_2|EVISModifier(3), 1, AL),
 
     /* The BitReplace instruction replaces up to 8 bitfields inside a packed data stream.
      * Valid output formats are U8, U16, and U32. This instruction doesn’t use the
      * SourceBin field.
      */
-    VIR_OPINFO(VX_BITREPLACE, 4, HasDest|Componentwise|Expr|VX1|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_BITREPLACE, 4, HasDest|Expr|VX1|EVISModifier(3), 1, AL),
 
     /* VX2
      *  The IndexAdd instruction either adds the pixel value or increments a counter inside
@@ -1109,6 +1266,56 @@
      */
     VIR_OPINFO(VX_HORZMED3, 2, HasDest|Expr|VX2|EVISModifier(1), 1, AL),
 
+    /* GATHER dest, BaseAddr, Offsets, Modifier(StartBin, EndBin, SoureBin, OffsetType)
+     * Load multiple bins of data from different memory offsets (source_1) with same base
+     * address (source_0.x) without conversion, and then gather them to a 128-bit
+     * destination result. No sign extension and rounding are performed. Currently, this
+     * instruction can work only on local-storage, no global memory support.
+     */
+    VIR_OPINFO(VX_GATHER, 3, HasDest|Expr|VX2|EVISModifier(2), 1, AL),
+
+    /* GATHER_B dest, BaseAddr, Offsets, Offsets_b, Modifier(StartBin, EndBin, SoureBin, OffsetType)
+     * Load multiple bins of data from different memory offsets (source_1) with same base
+     * address (source_0.x) without conversion, and then gather them to a 128-bit
+     * destination result. No sign extension and rounding are performed. Currently, this
+     * instruction can work only on local-storage, no global memory support.
+     * It take stemp256 as two offsets source, src1 is the tmp256.hi, src2 is the tmp256.lo
+     */
+    VIR_OPINFO(VX_GATHER_B, 4, HasDest|Expr|VX2|EVISModifier(3), 1, AL),
+
+    /* SCATTER  BaseAddr, Offsets, Data, Modifier(StartBin, EndBin, SoureBin, OffsetType)
+     * Store multiple bins of data (source_2) to different memory offsets (source_1) with
+     * same base address (source_0.x) without conversion. No sign extension and rounding
+     * are performed. Currently, this instruction can work only on local-storage, no
+     * global memory support.
+     */
+    VIR_OPINFO(VX_SCATTER, 4, NoDest|Expr|VX2|EVISModifier(3), 0, AL),
+
+    /* SCATTER_B dest, BaseAddr, Offsets, Offsets_b, Data, Modifier(StartBin, EndBin, SoureBin, OffsetType)
+     * Store multiple bins of data (source_2) to different memory offsets (source_1) with
+     * same base address (source_0.x) without conversion. No sign extension and rounding
+     * are performed. Currently, this instruction can work only on local-storage, no
+     * global memory support.
+     * It take stemp256 as two offsets source, src1 is the tmp256.hi, src2 is the tmp256.lo
+     */
+    VIR_OPINFO(VX_SCATTER_B, 5, NoDest|Expr|VX2|EVISModifier(4), 0, AL),
+
+    /* ATOMIC_S dest, BaseAddr, Offsets, AtomicData, Modifier(StartBin, EndBin, SoureBin, OffsetType)
+     * Load multiple bins of data from different memory offsets (source_1) with same base
+     * address (source_0.x) without conversion, and then perform atomic operation to a 128-bit
+     * destination result. Currently, this
+     * instruction can work only on local-storage, no global memory support.
+     */
+    VIR_OPINFO(VX_ATOMIC_S, 4, HasDest|Expr|VX2|EVISModifier(3), 1, AL),
+    /* ATOMIC_S dest, BaseAddr, Offsets, Offsets_b, AtomicData, Modifier(StartBin, EndBin, SoureBin, OffsetType)
+     * Load multiple bins of data from different memory offsets (source_1) with same base
+     * address (source_0.x) without conversion, and then perform atomic operation to a 128-bit
+     * destination result. Currently, this
+     * instruction can work only on local-storage, no global memory support.
+     * It take stemp256 as two offsets source, src1 is the tmp256.hi, src2 is the tmp256.lo.
+     */
+    VIR_OPINFO(VX_ATOMIC_S_B, 5, HasDest|Componentwise|Expr|VX2|EVISModifier(4), 1, AL),
+
     /* float point number attributes */
     VIR_OPINFO(COPYSIGN, 1, HasDest|Componentwise|Expr|EPFromS0, 1, LM), /* Very Low Level */
     VIR_OPINFO(NAN, 1, HasDest|Componentwise|Expr|EPFromS0, 1, LM), /* Very Low Level */
@@ -1128,7 +1335,7 @@
     /* control flow */
     VIR_OPINFO(JMP, 0, HasDest|ControlFlow, 0, AL), /* unconditional direct branch */
     VIR_OPINFO(JMPC, 2, HasDest|ControlFlow|UseCondCode, 0, AL), /* conditional direct branch */
-    VIR_OPINFO(JMP_ANY, 2, HasDest|ControlFlow, 0, AL), /* conditional direct branch on any component is true */
+    VIR_OPINFO(JMP_ANY, 2, HasDest|ControlFlow|UseCondCode, 0, AL), /* conditional direct branch on any component is true */
     VIR_OPINFO(IJMP, 0, HasDest|ControlFlow, 0, NU), /* unconditional indirect branch, not supported in Dual16*/
     VIR_OPINFO(CALL, 0, HasDest|ControlFlow, 0, AL), /* function call, destination is FuncId */
     VIR_OPINFO(EXTCALL, 2, HasDest|ControlFlow|EPHP, 0, HM), /* Extern function call, src0 is extern func's nameId, src1 is parameters */
@@ -1166,7 +1373,7 @@
     VIR_OPINFO(LOAD_ATTR, 3, HasDest|Loads|Expr, 1, LM), /* LOAD_ATTR  dest, Remap.xyzw, RemapIndex, AttributeIndex */
     VIR_OPINFO(LOAD_ATTR_O, 3, HasDest|Loads|Expr, 1, LM), /* LOAD_ATTR_O  dest, Remap.xyzw, RemapIndex, AttributeIndex
                                                                       Only for TCS to load attribute from output */
-    VIR_OPINFO(ATTR_ST, 3, HasDest|Stores, 1, HM), /* ATTR_ST  Output, InvocationIndex, offset, value */
+    VIR_OPINFO(ATTR_ST, 3, HasDest|Src2Componentwise|Stores, 1, HM), /* ATTR_ST  Output, InvocationIndex, offset, value */
     VIR_OPINFO(ATTR_LD, 3, HasDest|Src0Componentwise|Loads|Expr, 1, HM), /* ATTR_LD  dest, Attribute, InvocationIndex, offset */
 
     VIR_OPINFO(SELECT_MAP, 4, HasDest, 1, LM), /* SELECT_MAP dest, RangeSourceComponent, src1, src2, samperSwizzle */
@@ -1182,12 +1389,45 @@
     VIR_OPINFO(CVTA, 2, HasDest, 1, NU), /* convert between address space */
 
     /* performance */
-    VIR_OPINFO(PREFETCH, 2, NoDest, 0, NU), /* prefetch memory */
+    VIR_OPINFO(PREFETCH, 2, NoDest|Loads, 0, NU), /* prefetch memory */
 
     /* misc */
     VIR_OPINFO(PRAGMA, 1, HasDest, 0, NU), /* pragma directive to optimizer */
     VIR_OPINFO(RGB2YUV, 2, HasDest, 1, AL), /* Convert RGB into YUV */
     VIR_OPINFO(PARAM_CHAIN, 2, HasDest, 1, HL), /* chain two sources to one dest, used by gcSL to pass multiple sources to one inst */
+
+    /* Complex number instructions. */
+    VIR_OPINFO(CMAD, 3, HasDest|Expr|EPFromHighest, 1, AL), /* CMAD dest.xy, src0.xy, src1.xy, src2.xy:
+                                                               *   <dest.x, I(dest.y)> = <src0.x, I(src0.y)> *
+                                                               *      <src1.x, I(src1.y)> + <src2.x, I(src2.y)>
+                                                               */
+    VIR_OPINFO(CONJ, 1, HasDest|Expr|EPFromHighest, 1, AL), /* CONJ dest.xy, src0.xy :
+                                                               *   <dest.x, I(dest.y)> = <src0.x, -I(src0.y)>
+                                                               */
+    VIR_OPINFO(CMUL, 2, HasDest|Expr|EPFromHighest, 1, AL), /* CMUL dest.xy, src0.xy, src1.xy, src2.xy:
+                                                               *   <dest.x, I(dest.y)> = <src0.x, I(src0.y)> *
+                                                               *                         <src1.x, I(src1.y)>
+                                                               */
+    VIR_OPINFO(CADD, 2, HasDest|Expr|EPFromHighest, 1, AL), /* CADD dest.xy, src0.xy, src1.xy, src2.xy:
+                                                               *   <dest.x, I(dest.y)> = <src0.x, I(src0.y)> +
+                                                               *                         <src1.x, I(src1.y)>
+                                                               */
+    VIR_OPINFO(CMADCJ, 3, HasDest|Expr|EPFromHighest, 1, AL), /* CMADCJ dest.xy, src0.xy, src1.xy, src2.xy:
+                                                               *   <dest.x, I(dest.y)> = <src0.x, I(src0.y)> *
+                                                               *      <src1.x, -I(src1.y)> + <src2.x, I(src2.y)>
+                                                               */
+    VIR_OPINFO(CMULCJ, 2, HasDest|Expr|EPFromHighest, 1, AL), /* CMULCJ dest.xy, src0.xy, src1.xy, src2.xy:
+                                                               *   <dest.x, I(dest.y)> = <src0.x, I(src0.y)> *
+                                                               *                         <src1.x, -I(src1.y)>
+                                                               */
+    VIR_OPINFO(CADDCJ, 2, HasDest|Expr|EPFromHighest, 1, AL), /* CADDCJ dest.xy, src0.xy, src1.xy, src2.xy:
+                                                               *   <dest.x, I(dest.y)> = <src0.x, I(src0.y)> +
+                                                               *                         <src1.x, -I(src1.y)>
+                                                               */
+    VIR_OPINFO(CSUBCJ, 2, HasDest|Expr|EPFromHighest, 1, AL), /* CSUBCJ dest.xy, src0.xy, src1.xy, src2.xy:
+                                                               *   <dest.x, I(dest.y)> = <src0.x, I(src0.y)> -
+                                                               *                         <src1.x, -I(src1.y)>
+                                                               */
 
     VIR_OPINFO(MAXOPCODE, 0, NoDest, 0, NU),
 

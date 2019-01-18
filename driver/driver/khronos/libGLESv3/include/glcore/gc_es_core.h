@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -282,7 +282,7 @@ typedef struct __GLformatInfoRec
 /*
 ** Index for Back buffers, must be no less than GL reported caps
 */
-#define __GL_MAX_DRAW_BUFFERS               4
+#define __GL_MAX_DRAW_BUFFERS               (gcdMAX_DRAW_BUFFERS / 4)
 
 /* Drawable flags */
 #define __GL_DRAWABLE_FLAG_ZERO_WH          0x00001
@@ -295,8 +295,8 @@ typedef struct __GLdrawablePrivateRec
     GLint width;
     GLint height;
 
-    void * rtHandle;
-    void * prevRtHandle;
+    void * rtHandles[__GL_MAX_DRAW_BUFFERS];
+    void * prevRtHandles[__GL_MAX_DRAW_BUFFERS];
     void * depthHandle;
     void * stencilHandle;
 

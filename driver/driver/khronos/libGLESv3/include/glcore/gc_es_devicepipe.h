@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -97,7 +97,7 @@ typedef struct __GLdevicePipelineRec
     GLvoid (*deleteQuery)(__GLcontext*, __GLqueryObject*);
 
     /* Flush, Finish */
-    GLboolean (*flush)(__GLcontext*, GLboolean);
+    GLboolean (*flush)(__GLcontext*);
     GLboolean (*finish)(__GLcontext*);
     GLboolean (*clear)(__GLcontext*, GLbitfield);
     GLboolean (*clearBuffer)(__GLcontext*, GLenum, GLint, GLvoid*, GLenum);
@@ -173,23 +173,13 @@ typedef struct __GLdevicePipelineRec
     GLvoid (*getXfbVarying)(__GLcontext*, __GLprogramObject*, GLuint, GLsizei, GLsizei*, GLsizei*, GLenum*, GLchar*);
     GLboolean (*checkXFBBufSizes)(__GLcontext *, __GLxfbObject *, GLuint64);
 
-    GLboolean (*drawArraysIndirect)(__GLcontext *);
-    GLboolean (*drawElementsIndirect)(__GLcontext *);
-
-    GLboolean (*multiDrawArraysIndirectEXT)(__GLcontext *);
-    GLboolean (*multiDrawElementsIndirectEXT)(__GLcontext *);
-
-    GLvoid (*DrawElementsBaseVertexEXT)(__GLcontext *);
-    GLvoid (*DrawRangeElementsBaseVertexEXT)(__GLcontext *);
-    GLvoid (*DrawElementsInstancedBaseVertexEXT)(__GLcontext *);
-    GLvoid (*MultiDrawElementsBaseVertexEXT)(__GLcontext *);
-
-
     /* GL_EXT_robustness */
     GLenum (*getGraphicsResetStatus)(__GLcontext *);
 
+#if VIVANTE_PROFILER
     /* profiler */
     GLboolean(*profiler)(__GLcontext *, GLuint, gctHANDLE);
+#endif
 
     /* Patches. */
     GLvoid  (*patchBlend)(__GLcontext *, gctBOOL);

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -121,14 +121,12 @@ __glChipBeginQuery(
     gcoOS_ZeroMemory(queryHeader->headerLocked, queryHeader->headerSize);
     gcmGETHARDWAREADDRESS(queryHeader->headerNode, physical);
 
-#if gcdDUMP
     gcmDUMP_BUFFER(gcvNULL,
-                   "memory",
+                   gcvDUMP_BUFFER_MEMORY,
                    physical,
                    queryHeader->headerLocked,
                    0,
                    queryHeader->headerSize);
-#endif
 
     gcmONERROR(gco3D_SetQuery(chipCtx->engine, physical, chipQuery->type, gcvTRUE));
 
@@ -177,6 +175,7 @@ __glChipEndQuery(
 
     /* Send an event to signal that the data is in the buffer. */
     iface.command            = gcvHAL_SIGNAL;
+    iface.engine             = gcvENGINE_RENDER;
     iface.u.Signal.signal    = gcmPTR_TO_UINT64(chipQuery->querySignal);
     iface.u.Signal.auxSignal = 0;
     iface.u.Signal.process   = gcmPTR_TO_UINT64(gcoOS_GetCurrentProcessID());
@@ -297,9 +296,9 @@ __glChipGetQueryObject(
         {
             gctUINT32 physical = 0;
             gcmGETHARDWAREADDRESS(queryHeader->headerNode, physical);
-            gcmDUMP(gcvNULL, "#[info: verify occlusion/xfb/prim query");
+            gcmDUMP(gcvNULL, "#[info: verify occlusion/xfb/prim query]");
             gcmDUMP_BUFFER(gcvNULL,
-                           "verify",
+                           gcvDUMP_BUFFER_VERIFY,
                            physical,
                            queryHeader->headerLocked,
                            0,
@@ -447,6 +446,7 @@ __glChipCreateSync(
     __glChipSyncImage(gc);
 
     iface.command            = gcvHAL_SIGNAL;
+    iface.engine             = gcvENGINE_RENDER;
     iface.u.Signal.signal    = gcmPTR_TO_UINT64(syncObject->privateData);
     iface.u.Signal.auxSignal = 0;
     iface.u.Signal.process   = gcmPTR_TO_UINT64(gcoOS_GetCurrentProcessID());
@@ -695,17 +695,17 @@ __glChipEndXFB(
                                         &buffer));
             gcmVERIFY_OK(gcoBUFOBJ_GetSize(chipBufInfo->bufObj, &size));
 
-            gcmDUMP(gcvNULL, "#[info: verify xfb buffer when endxfb");
+            gcmDUMP(gcvNULL, "#[info: verify xfb buffer when endxfb]");
             gcmDUMP_BUFFER(gcvNULL,
-                           "verify",
+                           gcvDUMP_BUFFER_VERIFY,
                            physical,
                            buffer,
                            0,
                            size);
 
-            gcmDUMP(gcvNULL, "#[info: upload stream with xfb out in case 2nd pass rendering");
+            gcmDUMP(gcvNULL, "#[info: upload stream with xfb out in case 2nd pass rendering]");
             gcmDUMP_BUFFER(gcvNULL,
-                           "stream",
+                           gcvDUMP_BUFFER_STREAM,
                            physical,
                            buffer,
                            0,
@@ -728,17 +728,17 @@ __glChipEndXFB(
                                             &buffer));
                 gcmVERIFY_OK(gcoBUFOBJ_GetSize(chipBufInfo->bufObj, &size));
 
-                gcmDUMP(gcvNULL, "#[info: verify xfb buffer when endxfb");
+                gcmDUMP(gcvNULL, "#[info: verify xfb buffer when endxfb]");
                 gcmDUMP_BUFFER(gcvNULL,
-                               "verify",
+                               gcvDUMP_BUFFER_VERIFY,
                                physical,
                                buffer,
                                0,
                                size);
 
-                gcmDUMP(gcvNULL, "#[info: upload stream with xfb out in case 2nd pass rendering");
+                gcmDUMP(gcvNULL, "#[info: upload stream with xfb out in case 2nd pass rendering]");
                 gcmDUMP_BUFFER(gcvNULL,
-                               "stream",
+                               gcvDUMP_BUFFER_STREAM,
                                physical,
                                buffer,
                                0,

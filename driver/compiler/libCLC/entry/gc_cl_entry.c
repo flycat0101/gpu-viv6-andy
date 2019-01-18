@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -16,7 +16,7 @@
 static gctINT _clDebugCompiler = 0;  /* debug !!! */
 #define cldDumpOptions (_clDebugCompiler == 1 ? clvDUMP_IR :\
                         _clDebugCompiler == 2 ? clvDUMP_COMPILER : \
-                        _clDebugCompiler == 3 ? clvDUMP_SCANNER : clvDUMP_NONE)
+                        _clDebugCompiler == 3 ? clvDUMP_ALL : clvDUMP_NONE)
 
 #define cldVivanteBuiltinLibraryInclude "#include \"VIV_BUILTIN_LIB.cl\"\n"
 #define cldVivanteBuiltinLibraryIncludeLength 36
@@ -57,6 +57,22 @@ static void __clChipUtilsDecrypt( IN OUT gctSTRING Source)
 
 }
 #endif
+
+static gceSTATUS _LockCompiler()
+{
+    gceSTATUS status;
+    /* Verify the arguments. */
+    status = gcoOS_LockCLFECompiler();
+    return status;
+}
+
+static gceSTATUS _UnlockCompiler()
+{
+    gceSTATUS status;
+    /* Verify the arguments. */
+    status = gcoOS_UnLockCLFECompiler();
+    return status;
+}
 
 /*******************************************************************************
 **                              gcLoadKernelCompiler
@@ -279,8 +295,19 @@ gcCompileKernel(
 {
     gceSTATUS status;
     cloCOMPILER compiler = gcvNULL;
+    gctBOOL locked = gcvFALSE;
 
-    gcmONERROR(cloCOMPILER_Construct(&compiler));
+    gcmONERROR(_LockCompiler());
+    locked = gcvTRUE;
+
+    compiler = *gcGetKernelCompiler();
+    if (compiler == gcvNULL)
+    {
+        cloCOMPILER_Construct_General(Options, gcGetKernelCompiler());
+        compiler = *gcGetKernelCompiler();
+    }
+
+    gcmONERROR(cloCOMPILER_Construct(compiler));
 
     gcmONERROR(_CompileKernel(compiler,
                               SourceSize,
@@ -288,9 +315,13 @@ gcCompileKernel(
                               Options,
                               Binary,
                               Log));
-
 OnError:
     if (compiler != gcvNULL) gcmVERIFY_OK(cloCOMPILER_Destroy(compiler));
+
+    if (locked)
+    {
+        gcmVERIFY_OK(_UnlockCompiler());
+    }
 
     return status;
 }
@@ -352,7 +383,14 @@ gcCLCompileProgram(
     gctCONST_STRING newSourceString = gcvNULL;
     gctUINT sourceSize;
     gctCONST_STRING sourceString;
+    gctBOOL locked = gcvFALSE;
 
+    compiler = *gcGetKernelCompiler();
+    if (compiler == gcvNULL)
+    {
+        cloCOMPILER_Construct_General(Options, gcGetKernelCompiler());
+        compiler = *gcGetKernelCompiler();
+    }
     gcmONERROR(cloCOMPILER_ConstructByLangVersion(_cldCL1Dot2, &compiler));
 
     sourceString = Source;
@@ -603,20 +641,26 @@ gcCLCompileProgram(
         }
     }
 
+    gcmONERROR(_LockCompiler());
+    locked = gcvTRUE;
+
     gcmONERROR(_CompileKernel(compiler,
                               sourceSize,
                               sourceString,
                               Options,
                               Binary,
                               Log));
-
 OnError:
-
     if(newSourceString) {
         cloCOMPILER_Free(compiler, (gctSTRING)newSourceString);
     }
 
     if (compiler != gcvNULL) gcmVERIFY_OK(cloCOMPILER_Destroy(compiler));
+
+    if (locked)
+    {
+        gcmVERIFY_OK(_UnlockCompiler());
+    }
 
     return status;
 }

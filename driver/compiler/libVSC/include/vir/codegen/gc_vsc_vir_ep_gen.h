@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -16,6 +16,19 @@
 
 BEGIN_EXTERN_C()
 
+typedef struct _VSC_SEP_GEN_PRIV_DATA
+{
+    SHADER_EXECUTABLE_PROFILE*   pOutSEP;
+    gctBOOL                      bSkipPepGen;
+}VSC_SEP_GEN_PRIV_DATA;
+
+VSC_ErrCode
+vscVIR_GenerateSEP(
+    VSC_SH_PASS_WORKER* pPassWorker
+    );
+DECLARE_QUERY_PASS_PROP(vscVIR_GenerateSEP);
+DECLARE_SH_NECESSITY_CHECK(vscVIR_GenerateSEP);
+
 typedef struct _VSC_PEP_GEN_PRIV_DATA
 {
     PROGRAM_EXECUTABLE_PROFILE*  pOutPEP;
@@ -23,16 +36,18 @@ typedef struct _VSC_PEP_GEN_PRIV_DATA
 }VSC_PEP_GEN_PRIV_DATA;
 
 VSC_ErrCode
-vscVIR_GenerateSEP(
-    VSC_SH_PASS_WORKER* pPassWorker
-    );
-DECLARE_QUERY_PASS_PROP(vscVIR_GenerateSEP);
-
-VSC_ErrCode
 vscVIR_GeneratePEP(
     VSC_GPG_PASS_WORKER* pPassWorker
     );
 DECLARE_QUERY_PASS_PROP(vscVIR_GeneratePEP);
+DECLARE_GPG_NECESSITY_CHECK(vscVIR_GeneratePEP);
+
+VSC_ErrCode
+vscVIR_GenerateKEP(
+    VSC_SH_PASS_WORKER* pPassWorker
+    );
+DECLARE_QUERY_PASS_PROP(vscVIR_GenerateKEP);
+DECLARE_SH_NECESSITY_CHECK(vscVIR_GenerateKEP);
 
 END_EXTERN_C()
 

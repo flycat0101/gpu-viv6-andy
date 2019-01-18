@@ -1,0 +1,134 @@
+#include "cl_viv_vx_ext.h"
+_viv_uniform VXC_512Bits UniReshuffle_dual_0_2x8;
+_viv_uniform VXC_512Bits UniReshuffle_dual_1_2x8;
+_viv_uniform VXC_512Bits UniReshuffle_quad_0_4x4;
+_viv_uniform VXC_512Bits UniReshuffle_quad_1_4x4;
+_viv_uniform VXC_512Bits UniReshuffle_quad_2_4x4;
+_viv_uniform VXC_512Bits UniReshuffle_quad_3_4x4;
+__kernel void vxcReshuffle_Fp16Stride4
+    (
+    __read_only image2d_array_t    input,
+    int    padXLeft,
+    int    padYTop,
+    __write_only image2d_array_t   output
+    )
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out;
+    coord_out.xy = coord_in.xy >> 2;
+    coord_out.z  = coord_in.z << 4;
+
+    coord_in.xy -= (int2)(padXLeft, padYTop);
+    vxc_ushort8 vec0, vec1, vec2, vec3, vec4, vec5, vec6, vec7, vec;
+    VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec2, input, coord_in, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec1, input, coord_in, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec3, input, coord_in, VXC_5BITOFFSET_XY(8, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec4, input, coord_in, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec6, input, coord_in, VXC_5BITOFFSET_XY(8, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec5, input, coord_in, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec7, input, coord_in, VXC_5BITOFFSET_XY(8, 3), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+    VXC_DP4x4(vec, vec0, vec2, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniReshuffle_quad_0_4x4);
+    VXC_DP4x4(vec, vec0, vec2, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardInf, 0), UniReshuffle_quad_1_4x4);
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    VXC_DP4x4(vec, vec0, vec2, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniReshuffle_quad_2_4x4);
+    VXC_DP4x4(vec, vec0, vec2, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardInf, 0), UniReshuffle_quad_3_4x4);
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+
+    VXC_DP4x4(vec, vec1, vec3, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniReshuffle_quad_0_4x4);
+    VXC_DP4x4(vec, vec1, vec3, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardInf, 0), UniReshuffle_quad_1_4x4);
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    VXC_DP4x4(vec, vec1, vec3, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniReshuffle_quad_2_4x4);
+    VXC_DP4x4(vec, vec1, vec3, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardInf, 0), UniReshuffle_quad_3_4x4);
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+
+    VXC_DP4x4(vec, vec4, vec6, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniReshuffle_quad_0_4x4);
+    VXC_DP4x4(vec, vec4, vec6, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardInf, 0), UniReshuffle_quad_1_4x4);
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    VXC_DP4x4(vec, vec4, vec6, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniReshuffle_quad_2_4x4);
+    VXC_DP4x4(vec, vec4, vec6, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardInf, 0), UniReshuffle_quad_3_4x4);
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+
+    VXC_DP4x4(vec, vec5, vec7, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniReshuffle_quad_0_4x4);
+    VXC_DP4x4(vec, vec5, vec7, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardInf, 0), UniReshuffle_quad_1_4x4);
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    VXC_DP4x4(vec, vec5, vec7, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniReshuffle_quad_2_4x4);
+    VXC_DP4x4(vec, vec5, vec7, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardInf, 0), UniReshuffle_quad_3_4x4);
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
+}
+__kernel void vxcReshuffle_Fp16Stride2
+    (
+    __read_only image2d_array_t    input,
+    int    padXLeft,
+    int    padYTop,
+    __write_only image2d_array_t   output
+    )
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out;
+
+    coord_out.xy = coord_in.xy >> 1;
+    coord_out.z  = coord_in.z << 2;
+
+    coord_in.xy -= (int2)(padXLeft, padYTop);
+    vxc_ushort8 vec0, vec1, vec2, vec3, vec4, vec5, vec6, vec7, vec;
+    VXC_ReadImage2DArray(vec0, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec2, input, coord_in, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec4, input, coord_in, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec6, input, coord_in, VXC_5BITOFFSET_XY(8, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec1, input, coord_in, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec3, input, coord_in, VXC_5BITOFFSET_XY(8, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec5, input, coord_in, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(vec7, input, coord_in, VXC_5BITOFFSET_XY(8, 3), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+    VXC_DP2x8(vec, vec0, vec2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), UniReshuffle_dual_0_2x8);
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    VXC_DP2x8(vec, vec0, vec2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), UniReshuffle_dual_1_2x8);
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+    coord_out.yz += (int2)(1, -1);
+    VXC_DP2x8(vec, vec4, vec6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), UniReshuffle_dual_0_2x8);
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    VXC_DP2x8(vec, vec4, vec6, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), UniReshuffle_dual_1_2x8);
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+    coord_out.yz += (int2)(-1, 1);
+    VXC_DP2x8(vec, vec1, vec3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), UniReshuffle_dual_0_2x8);
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    VXC_DP2x8(vec, vec1, vec3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), UniReshuffle_dual_1_2x8);
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+    coord_out.yz += (int2)(1, -1);
+    VXC_DP2x8(vec, vec5, vec7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), UniReshuffle_dual_0_2x8);
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    coord_out.z ++;
+    VXC_DP2x8(vec, vec5, vec7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardInf, 0), UniReshuffle_dual_1_2x8);
+    VXC_WriteImage2DArray(output, coord_out, vec, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+}

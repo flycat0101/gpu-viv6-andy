@@ -200,7 +200,7 @@ static LONG WINAPI LLVMUnhandledExceptionFilter(LPEXCEPTION_POINTERS ep) {
     Cleanup();
 
 #ifdef _WIN64
-  // TODO: provide a x64 friendly version of the following
+  // VIV:TODO: provide a x64 friendly version of the following
 #else
 
     // Initialize the STACKFRAME structure.

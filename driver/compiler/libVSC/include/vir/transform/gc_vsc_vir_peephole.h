@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -42,6 +42,7 @@ typedef struct VIR_PH_PEEPHOLE
 
 #define VSC_PH_Peephole_GetShader(ph)          ((ph)->shader)
 #define VSC_PH_Peephole_SetShader(ph, s)       ((ph)->shader = (s))
+#define VSC_PH_Peephole_GetCurrFunc(ph)        (VIR_Shader_GetCurrentFunction((ph)->shader))
 #define VSC_PH_Peephole_GetCurrBB(ph)          ((ph)->curr_bb)
 #define VSC_PH_Peephole_SetCurrBB(ph, b)       ((ph)->curr_bb = (b))
 #define VSC_PH_Peephole_GetDUInfo(ph)          ((ph)->du_info)
@@ -67,6 +68,7 @@ extern VSC_ErrCode VSC_PH_Peephole_PerformOnShader(
     IN VSC_SH_PASS_WORKER* pPassWorker
     );
 DECLARE_QUERY_PASS_PROP(VSC_PH_Peephole_PerformOnShader);
+DECLARE_SH_NECESSITY_CHECK(VSC_PH_Peephole_PerformOnShader);
 
 VSC_ErrCode
 _VSC_PH_InitHashTable(

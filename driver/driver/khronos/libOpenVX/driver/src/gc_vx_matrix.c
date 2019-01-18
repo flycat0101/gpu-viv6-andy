@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -22,6 +22,7 @@ VX_INTERNAL_CALLBACK_API void vxoMatrix_Destructor(vx_reference ref)
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseMatrix(vx_matrix *mat)
 {
+    gcmDUMP_API("$VX vxReleaseMatrix: mat=%p", mat);
     return vxoReference_Release((vx_reference_ptr)mat, VX_TYPE_MATRIX, VX_REF_EXTERNAL);
 }
 
@@ -29,6 +30,8 @@ VX_API_ENTRY vx_matrix VX_API_CALL vxCreateMatrix(vx_context context, vx_enum da
 {
     vx_matrix   matrix;
     vx_size     dataSize;
+
+    gcmDUMP_API("$VX vxCreateMatrix: context=%p, data_type=0x%x, columns=0x%lx, rows=0x%lx", context, data_type, columns, rows);
 
     if (!vxoContext_IsValid(context)) return VX_NULL;
 
@@ -110,6 +113,9 @@ VX_API_ENTRY vx_matrix VX_API_CALL vxCreateMatrix(vx_context context, vx_enum da
 VX_API_ENTRY vx_matrix VX_API_CALL vxCreateMatrixFromPattern(vx_context context, vx_enum pattern, vx_size columns, vx_size rows)
 {
     vx_matrix matrix;
+
+    gcmDUMP_API("$VX vxCreateMatrixFromPattern: context=%p, pattern=0x%x, columns=0x%lx, rows=0x%lx", context, pattern, columns, rows);
+
     if (!vxoContext_IsValid(context))
         return 0;
 
@@ -166,6 +172,9 @@ VX_API_ENTRY vx_matrix VX_API_CALL vxCreateMatrixFromPattern(vx_context context,
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryMatrix(vx_matrix matrix, vx_enum attribute, void *ptr, vx_size size)
 {
+
+    gcmDUMP_API("$VX vxQueryMatrix: matrix=%p, attribute=0x%x, ptr=%p, size=0x%lx", matrix, attribute, ptr, size);
+
     if (!vxoReference_IsValidAndSpecific(&matrix->base, VX_TYPE_MATRIX)) return VX_ERROR_INVALID_REFERENCE;
 
     switch (attribute)
@@ -216,6 +225,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryMatrix(vx_matrix matrix, vx_enum attri
 
 VX_API_ENTRY vx_status VX_API_CALL vxReadMatrix(vx_matrix matrix, void *array)
 {
+    gcmDUMP_API("$VX vxReadMatrix: matrix=%p, array=%p", matrix, array);
+
     if (!vxoReference_IsValidAndSpecific(&matrix->base, VX_TYPE_MATRIX)) return VX_ERROR_INVALID_REFERENCE;
 
     if (!vxoMemory_Allocate(matrix->base.context, &matrix->memory)) return VX_ERROR_NO_MEMORY;
@@ -241,6 +252,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxReadMatrix(vx_matrix matrix, void *array)
 
 VX_API_ENTRY vx_status VX_API_CALL vxWriteMatrix(vx_matrix matrix, const void *array)
 {
+    gcmDUMP_API("$VX vxWriteMatrix: matrix=%p, array=%p", matrix, array);
+
     if (!vxoReference_IsValidAndSpecific(&matrix->base, VX_TYPE_MATRIX)) return VX_ERROR_INVALID_REFERENCE;
 
     if (!vxoMemory_Allocate(matrix->base.context, &matrix->memory)) return VX_ERROR_NO_MEMORY;
@@ -267,6 +280,9 @@ VX_API_ENTRY vx_status VX_API_CALL vxWriteMatrix(vx_matrix matrix, const void *a
 VX_API_ENTRY vx_status VX_API_CALL vxCopyMatrix(vx_matrix matrix, void *ptr, vx_enum usage, vx_enum mem_type)
 {
     vx_status status = VX_ERROR_INVALID_REFERENCE;
+
+    gcmDUMP_API("$VX vxCopyMatrix: matrix=%p, ptr=%p, usage=0x%x, mem_type=0x%x", matrix, ptr, usage, mem_type);
+
     if (vxoReference_IsValidAndSpecific(&matrix->base, VX_TYPE_MATRIX))
     {
         if (vxoMemory_Allocate(matrix->base.context, &matrix->memory) == vx_true_e)
@@ -315,5 +331,54 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyMatrix(vx_matrix matrix, void *ptr, vx_
     }
 
     return status;
+}
+
+VX_API_ENTRY vx_matrix VX_API_CALL vxCreateVirtualMatrix(vx_graph graph, vx_enum data_type, vx_size columns, vx_size rows)
+{
+    vx_matrix matrix;
+    vx_context context = vxoContext_GetFromReference((vx_reference)graph);
+
+    gcmDUMP_API("$VX vxCreateVirtualMatrix: graph=%p, data_type=0x%x, columns=0x%lx, rows=0x%lx", graph, data_type, columns, rows);
+
+    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_NULL;
+
+    matrix = vxCreateMatrix(context, data_type, columns, rows);
+
+    if (vxoReference_GetStatus((vx_reference)matrix) != VX_SUCCESS) return matrix;
+
+    matrix->base.scope        = (vx_reference)graph;
+
+    matrix->base.isVirtual    = vx_true_e;
+
+    return matrix;
+}
+
+VX_API_ENTRY vx_matrix VX_API_CALL vxCreateMatrixFromPatternAndOrigin(
+    vx_context context,
+    vx_enum pattern,
+    vx_size columns,
+    vx_size rows,
+    vx_size origin_col,
+    vx_size origin_row)
+{
+    vx_matrix matrix = vxCreateMatrixFromPattern(context, pattern, columns, rows);
+
+    gcmDUMP_API("$VX vxCreateMatrixFromPatternAndOrigin: context=%p, pattern=0x%x, columns=0x%lx, rows=0x%lx, origin_col=0x%lx, origin_row=0x%lx", context, pattern, columns, rows, origin_col, origin_row);
+
+    if (vxoReference_GetStatus((vx_reference)matrix) != VX_SUCCESS) return matrix;
+
+    if(origin_col < columns && origin_row < rows)
+    {
+        matrix->origin.x = (vx_uint32)origin_col;
+        matrix->origin.y = (vx_uint32)origin_row;
+    }
+    else
+    {
+        vxReleaseMatrix(&matrix);
+        vxError("Invalid parameters to vxCreateMatrixFromPatternAndOrigin\n");
+        matrix = (vx_matrix)vxoError_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
+    }
+
+    return matrix;
 }
 

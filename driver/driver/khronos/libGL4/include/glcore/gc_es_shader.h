@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -106,6 +106,12 @@ typedef struct __GLshaderObjectRec
 
 } __GLshaderObject;
 
+typedef struct __GLshaderObjectListRec
+{
+    __GLshaderObject *shader;
+    struct __GLshaderObjectListRec *next;
+}__GLshaderObjectList;
+
 
 #define __GL_INVALID_TEX_BIT    (1 << 0)
 #define __GL_INVALID_LINK_BIT   (1 << 1)
@@ -119,7 +125,7 @@ typedef struct __GLprogramInfoRec
     GLuint    invalidFlags;
     GLchar  * infoLog;
 
-    __GLshaderObject *attachedShader[__GLSL_STAGE_LAST];
+    __GLshaderObjectList *attachedShader[__GLSL_STAGE_LAST];
 #ifdef OPENGL40
     GLboolean vertShaderEnable;     /* current enable */
     GLboolean geomShaderEnable;
@@ -148,7 +154,7 @@ typedef struct __GLbindingInfoRec
     GLuint vsInputArrayMask;
 #ifdef OPENGL40
     GLuint psInputMask;
-    GLuint vsInputMask;
+    GLuint64 vsInputMask;
 #endif
     /* Output */
     GLuint numActiveOutput;

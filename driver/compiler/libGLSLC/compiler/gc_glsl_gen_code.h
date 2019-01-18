@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -114,6 +114,7 @@ typedef enum _sleOPCODE
     slvOPCODE_INVERSE_SQRT,
 
     slvOPCODE_ABS,
+    slvOPCODE_NEG,
     slvOPCODE_SIGN,
     slvOPCODE_FLOOR,
     slvOPCODE_CEIL,
@@ -177,6 +178,7 @@ typedef enum _sleOPCODE
     slvOPCODE_IMAGE_READ_3D,
     slvOPCODE_IMAGE_WRITE_3D,
     slvOPCODE_CLAMP0MAX,
+    slvOPCODE_CLAMPCOORD,
     /* attr ld/st. */
     slvOPCODE_ATTR_LD,
     slvOPCODE_ATTR_ST,

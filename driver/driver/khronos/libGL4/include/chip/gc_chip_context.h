@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -54,7 +54,6 @@ extern "C" {
 /* Fix me for the next defines */
 #define __OGL_VERSION21      "2.1 V"
 #define __OGL_VERSION30      "3.0 V"
-#define __OGL_VERSION31      "3.1 V"
 #define __OGL_VERSION40      "4.0 V"
 
 #define __OGL_GLSL_VERSION21 "2.1.0 "
@@ -237,7 +236,7 @@ typedef struct __GLchipDirtyRec
 
 #define __GL_DEFAULT_LOOP 0
 
-#define __GL_CHIP_NAME_LEN 23
+#define __GL_CHIP_NAME_LEN 32
 
 
 #ifdef OPENGL40

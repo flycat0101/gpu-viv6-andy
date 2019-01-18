@@ -29,7 +29,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #ifndef __VIV_LOCK_H__
 #define __VIV_LOCK_H__
 
-#ifdef _LINUX_
+#if defined(_LINUX_) && !defined(__VXWORKS__)
 
 #include "dri_util.h"
 extern GLvoid vivGetLock( __GLcontext *gc, GLuint flags );

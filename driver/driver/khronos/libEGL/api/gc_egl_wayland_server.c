@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -16,6 +16,7 @@
 #endif
 
 #include <stdio.h>
+
 
 #include <wayland-viv-server-protocol.h>
 #include <wayland-server.h>
@@ -133,8 +134,6 @@ viv_handle_create_buffer(struct wl_client *client,
     surface->node.pool          = (gcePOOL) pool;
     surface->node.size          = (gctSIZE_T) size;
 
-    gcmONERROR(gcoOS_CreateMutex(gcvNULL, &surface->node.sharedMutex));
-
 #if gcdENABLE_3D
     /* Import tile status video memory node. */
     if (tsNode != 0)
@@ -145,8 +144,6 @@ viv_handle_create_buffer(struct wl_client *client,
     surface->tileStatusNode.u.normal.node = tsNode;
     surface->tileStatusNode.pool          = (gcePOOL  ) tsPool;
     surface->tileStatusNode.size          = (gctSIZE_T) tsSize;
-
-    gcmONERROR(gcoOS_CreateMutex(gcvNULL, &surface->tileStatusNode.sharedMutex));
 
     /* Set tile status disabled by default for compositor. */
     surface->tileStatusDisabled[0] = gcvTRUE;
@@ -159,6 +156,7 @@ viv_handle_create_buffer(struct wl_client *client,
 
     gcmONERROR(gcoHAL_ImportVideoMemory(
         (gctUINT32)node, (gctUINT32 *)&surface->node.u.normal.node));
+
 
     /* Lock once as it's done in gcoSURF_Construct with vidmem. */
     gcmONERROR(gcoSURF_Lock(surface, gcvNULL, gcvNULL));
@@ -281,6 +279,7 @@ veglBindWaylandDisplay(
 
         Display->wl_global = wl_global;
     }
+
     /* If not fbdev backend, ignore this */
     /* Tag backend fbdev which is used at wayland server side*/
     fbdev_SetServerTag(Display);
@@ -350,4 +349,3 @@ veglQueryWaylandBuffer(
 
     return EGL_TRUE;
 }
-

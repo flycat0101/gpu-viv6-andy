@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -15,13 +15,6 @@
 #define __gc_vsc_drvi_lib_link_h_
 
 BEGIN_EXTERN_C()
-
-typedef enum _VSC_SHADER_DATA_TYPE
-{
-    VSC_SHADER_DATA_TYPE_UNKONW              = 0,
-    VSC_SHADER_DATA_TYPE_IVEC4               = 1,
-}
-VSC_SHADER_DATA_TYPE;
 
 typedef union _SPECIALIZATION_CONSTANT_VALUE
 {
@@ -61,6 +54,10 @@ typedef enum _VSC_LIB_LINK_TYPE
     ** but for some cases HW can't meet this requirement, so compiler forces change it to TRUE.
     */
     VSC_LIB_LINK_TYPE_FRONTFACING_ALWAY_FRONT       = 4,
+    /* image read/write need to use library function to implement
+     * the function for given <image, sampler> pair for read,
+     * image for write */
+    VSC_LIB_LINK_TYPE_IMAGE_READ_WRITE              = 5,
 }VSC_LIB_LINK_TYPE;
 
 typedef enum _VSC_RES_OP_BIT
@@ -117,9 +114,33 @@ typedef struct _VSC_LIB_LINK_POINT_RESOURCE
     VSC_LINK_POINT_RESOURCE_SUBTYPE   subType;
 } VSC_LIB_LINK_POINT_RESOURCE;
 
+typedef struct _VSC_IMAGE_DESC_INFO
+{
+    gctINT                          kernelArgNo;    /* kernel arg number for the image */
+    VSC_ImageDesc                   imageDesc;      /* image descriptor value */
+    gctCONST_STRING                 name;           /* image variable name */
+} VSC_IMAGE_DESC_INFO;
+
+typedef struct _VSC_SAMPLER_INFO
+{
+    gctINT                          kernelArgNo;    /* kernel arg number for the sampler */
+    VSC_SamplerValue                sampleValue;    /* sampler descriptor value */
+    gctCONST_STRING                 name;           /* sampler variable name */
+} VSC_SAMPLER_INFO;
+
+
+typedef struct _VSC_LIB_LINK_IMAGE_READ_WRITE
+{
+    gctUINT                         imageCount;
+    VSC_IMAGE_DESC_INFO *           imageInfo;
+    gctUINT                         samplerCount;
+    VSC_SAMPLER_INFO *              samplerInfo;
+} VSC_LIB_LINK_IMAGE_READ_WRITE;
+
 typedef struct _VSC_LIB_LINK_POINT
 {
     VSC_LIB_LINK_TYPE                 libLinkType;
+    gctBOOL                           linkImageIntrinsic;    /* do not link image lib functions if false */
 
     /* The interested function maitained by lib shader. NOTE only the interested function
        will be truely linked into main shader at each link point. If this function is NULL,
@@ -132,6 +153,7 @@ typedef struct _VSC_LIB_LINK_POINT
         VSC_LIB_LINK_POINT_FUNC_NAME  funcName;
         VSC_LIB_LINK_POINT_CLR_OUTPUT clrOutput;
         VSC_LIB_LINK_POINT_RESOURCE   resource;
+        VSC_LIB_LINK_IMAGE_READ_WRITE imageReadWrite;
     } u;
 }VSC_LIB_LINK_POINT;
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -35,9 +35,9 @@ struct _gckSHM_POOL
     gctUINT32 pageSize;                 /* Size of each page. */
     gctUINT32 poolSize;                 /* Size of this pool. */
     pthread_mutex_t mutex;              /* Mutex. */
-    gctPOINTER UserLogical;              /* Logical base address in user process. */
-    gctPOINTER KernelLogical;            /* logical base address in galcore process. */
-    gctUINT32 Physical;                 /* Physical base address. */
+    gctPOINTER UserLogical;             /* Logical base address in user process. */
+    gctPOINTER KernelLogical;           /* logical base address in galcore process. */
+    gctPHYS_ADDR_T Physical;            /* Physical base address. */
     gctUINT32 cacheFlag;                /* Flag with which the shmPool was created. */
     struct _gckPAGE_USAGE* pageUsage;   /* List of pageUsage arrays. */
     struct _gckSHM_POOL* nextPool;      /* Pointer to next pool. */
@@ -68,13 +68,14 @@ typedef struct _gcsPHYSICAL
 
     gctUINT32                   pid;
 
-    gctUINT32                   physicalAddress;
+    gctPHYS_ADDR_T              physicalAddress;
     gctPOINTER                  userLogical;
     gctPOINTER                  kernelLogical;
     gctUINT32                   pageCount;
     gctUINT32                   extraPage;
 
-    gctINT32                    kernelMapCount;
+    /* Vitual pool physical array. */
+    gctPHYS_ADDR_T              *physicals;
 
     LIST_ENTRY(_gcsPHYSICAL)    node;
 }
@@ -254,10 +255,11 @@ drv_physical_map_delete_node(
     IN gcsPHYSICAL_PTR Node
     );
 
-gctPOINTER
-drv_physical_map_get_kernel_logical(
+void
+drv_physical_map_get_node(
     IN gctUINT32 Pid,
-    IN gctPOINTER Logical
+    IN gctPOINTER Logical,
+    OUT gcsPHYSICAL_PTR *Node
     );
 
 gctUINT32

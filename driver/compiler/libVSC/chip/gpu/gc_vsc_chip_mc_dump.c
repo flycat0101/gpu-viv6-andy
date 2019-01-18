@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -140,7 +140,7 @@ static void _DumpOpcode(gctUINT baseOpcode, gctUINT extOpcode, VSC_DUMPER* pDump
         "not", /* 0x5f */
         "bit_extract", /* 0x60 */
         "popcount", /* 0x61 */
-        "_reserved", /* 0x62 */
+        "_cmplx", /* 0x62 */
         "arc_trig", /* 0x63 */
         "div", /* 0x64 */
         "atom_add", /* 0x65 */
@@ -229,6 +229,9 @@ static void _DumpOpcode(gctUINT baseOpcode, gctUINT extOpcode, VSC_DUMPER* pDump
         "vx_horz_min3",
         "vx_horz_max3",
         "vx_horz_med3",
+        "vx_gather",
+        "vx_scatter",
+        "vx_atomic_s",
     };
 
     static const char * _strAuxOpcode[] =
@@ -272,6 +275,13 @@ static void _DumpOpcode(gctUINT baseOpcode, gctUINT extOpcode, VSC_DUMPER* pDump
         "storep",
     };
 
+    static const char * _strCmplxSubOpcode[] =
+    {
+        "cmul", /* 0x00 */
+        "cmad", /* 0x01 */
+        "cadd"               /* 0x02 */
+    };
+
     if (baseOpcode == 0x7F)
     {
         vscDumper_PrintStrSafe(pDumper, "%s", _strNonVisionExtOpcode[extOpcode]);
@@ -283,6 +293,10 @@ static void _DumpOpcode(gctUINT baseOpcode, gctUINT extOpcode, VSC_DUMPER* pDump
     else if (baseOpcode >= MC_AUXILIARY_OP_CODE_OFFSET)
     {
         vscDumper_PrintStrSafe(pDumper, "%s", _strAuxOpcode[baseOpcode - MC_AUXILIARY_OP_CODE_OFFSET]);
+    }
+    else if (baseOpcode == 0x62)
+    {
+        vscDumper_PrintStrSafe(pDumper, "%s", _strCmplxSubOpcode[extOpcode]);
     }
     else
     {
@@ -355,14 +369,22 @@ static void _DumpInstCtrl(VSC_MC_CODEC_INST_CTRL* pInstCtrl,
 
     static const char * _strInstType[] =
     {
-        ".f32",
-        ".f16",
-        ".s32",
-        ".s16",
-        ".s8",
-        ".u32",
-        ".u16",
-        ".u8"
+        ".f32", /* 0x0    0x0 */
+        ".f16", /* 0x1    0x1 */
+        ".s32", /* 0x2   0x2 */
+        ".s16", /* 0x3   0x3 */
+        ".s8", /* 0x4    0x4 */
+        ".u32", /* 0x5 0x5 */
+        ".u16", /* 0x6 0x6 */
+        ".u8", /* 0x7  0x7 */
+        "", /* 0x8 */
+        "", /* 0x9 */
+        ".s64", /* 0xA   0xA */
+        ".snorm16", /* 0xB    0xB */
+        ".snorm8", /* 0xC     0xC */
+        ".u64", /* 0xD 0xD */
+        ".unorm16", /* 0xE    0xE */
+        ".unorm8", /* 0xF     0xF */
     };
 
     static const char * _strLsAttrClient[] =
@@ -403,6 +425,24 @@ static void _DumpInstCtrl(VSC_MC_CODEC_INST_CTRL* pInstCtrl,
         vscDumper_PrintStrSafe(pDumper, ".denorm");
     }
 
+    if (pInstCtrl->bEndOfBB)
+    {
+        vscDumper_PrintStrSafe(pDumper, ".ebb");
+    }
+
+    /* set USC Unallocate Bit For Global Memory Load/Store Instructions */
+    if (IS_MEM_ACCESS_MC_OPCODE(baseOpcode) &&
+        pInstCtrl->u.maCtrl.bUnallocate  )
+    {
+        vscDumper_PrintStrSafe(pDumper, ".UA");
+    }
+
+    /* set Endian Control Bit For Global Memory Access Instructions */
+    if ((IS_MEM_ACCESS_MC_OPCODE(baseOpcode) ||IS_ATOMIC_MC_OPCODE(baseOpcode)) &&
+        pInstCtrl->u.maCtrl.bBigEndian )
+    {
+        vscDumper_PrintStrSafe(pDumper, ".BE");
+    }
     if (IS_MEM_ACCESS_MC_OPCODE(baseOpcode) ||
         (baseOpcode == 0x7F && extOpcode == 0x13))
     {
@@ -451,11 +491,6 @@ static void _DumpInstCtrl(VSC_MC_CODEC_INST_CTRL* pInstCtrl,
     else if (baseOpcode == 0x78 ||
              baseOpcode == 0x42)
     {
-        if (pInstCtrl->u.lsAttrCtrl.bNeedUscSync)
-        {
-            vscDumper_PrintStrSafe(pDumper, ".uscSync");
-        }
-
         if (pInstCtrl->u.lsAttrCtrl.shStageClient)
         {
             vscDumper_PrintStrSafe(pDumper, "%s", _strLsAttrClient[pInstCtrl->u.lsAttrCtrl.shStageClient]);
@@ -480,7 +515,7 @@ static void _DumpInstCtrl(VSC_MC_CODEC_INST_CTRL* pInstCtrl,
             vscDumper_PrintStrSafe(pDumper, ".restart");
         }
 
-        if (pInstCtrl->u.emitCtrl.bJmpToEndOnMaxVtxCnt)
+        if (!pInstCtrl->u.emitCtrl.bNoJmpToEndOnMaxVtxCnt)
         {
             vscDumper_PrintStrSafe(pDumper, ".JmpToEnd");
         }

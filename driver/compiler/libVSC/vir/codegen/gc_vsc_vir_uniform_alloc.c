@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -80,7 +80,6 @@ static void _VIR_CG_ConfigSamplers(
     gctUINT32           vsSamplers = 0, psSamplers = 0;
     gctINT              samplerCount = 0, samplerRegNoBase = 0;
 
-
      /* Config sampler setting. */
     if (VIR_Shader_isPackUnifiedSampler(pShader))
     {
@@ -89,31 +88,46 @@ static void _VIR_CG_ConfigSamplers(
 
         gcmASSERT(samplerRegNoBase != -1);
 
-        /*
-        ** Set the max sampler count and the start index.
-        ** If this chip can support sampler base offset, all sampler index begin with 0,
-        ** and we need to program samplerRegNoBase, otherwise, we set samplerRegNoBase to 0.
-        */
-        if (VIR_Shader_IsGPipe(pShader))
+        if (pHwConfig->hwFeatureFlags.supportUnifiedSampler)
         {
-            *allocateSamplerReverse = gcvTRUE;
-
             if (pHwConfig->hwFeatureFlags.hasSamplerBaseOffset)
             {
-                *maxSampler = 0;
-                *sampler = samplerCount - 1;
+                *maxSampler = samplerCount;
+                *sampler = 0;
             }
             else
             {
-                *maxSampler = samplerRegNoBase;
-                *sampler = samplerRegNoBase + samplerCount - 1;
-                samplerRegNoBase = 0;
+                *maxSampler = samplerRegNoBase + samplerCount;
+                *sampler = samplerRegNoBase;
             }
         }
         else
         {
-            *maxSampler = samplerCount;
-            *sampler = 0;
+            /*
+            ** Set the max sampler count and the start index.
+            ** If this chip can support sampler base offset, all sampler index begin with 0,
+            ** and we need to program samplerRegNoBase, otherwise, we set samplerRegNoBase to 0.
+            */
+            if (VIR_Shader_IsGPipe(pShader))
+            {
+                *allocateSamplerReverse = gcvTRUE;
+
+                if (pHwConfig->hwFeatureFlags.hasSamplerBaseOffset)
+                {
+                    *maxSampler = 0;
+                    *sampler = samplerCount - 1;
+                }
+                else
+                {
+                    *maxSampler = samplerRegNoBase;
+                    *sampler = samplerRegNoBase + samplerCount - 1;
+                }
+            }
+            else
+            {
+                *maxSampler = samplerCount;
+                *sampler = 0;
+            }
         }
     }
     else if (pHwConfig->hwFeatureFlags.hasSamplerBaseOffset)
@@ -123,38 +137,31 @@ static void _VIR_CG_ConfigSamplers(
         {
         case VIR_SHADER_FRAGMENT:
             *maxSampler = pHwConfig->maxPSSamplerCount;
-            samplerRegNoBase = pHwConfig->psSamplerRegNoBase;
             break;
 
         case VIR_SHADER_COMPUTE:
             *maxSampler = pHwConfig->maxCSSamplerCount;
-            samplerRegNoBase = pHwConfig->csSamplerRegNoBase;
             break;
 
         case VIR_SHADER_VERTEX:
             *maxSampler = pHwConfig->maxVSSamplerCount;
-            samplerRegNoBase = pHwConfig->vsSamplerRegNoBase;
             break;
 
         case VIR_SHADER_TESSELLATION_CONTROL:
             *maxSampler = pHwConfig->maxTCSSamplerCount;
-            samplerRegNoBase = pHwConfig->tcsSamplerRegNoBase;
             break;
 
         case VIR_SHADER_TESSELLATION_EVALUATION:
             *maxSampler = pHwConfig->maxTESSamplerCount;
-            samplerRegNoBase = pHwConfig->tesSamplerRegNoBase;
             break;
 
         case VIR_SHADER_GEOMETRY:
             *maxSampler = pHwConfig->maxGSSamplerCount;
-            samplerRegNoBase = pHwConfig->gsSamplerRegNoBase;
             break;
 
         default:
             gcmASSERT(0);
             *maxSampler = pHwConfig->maxPSSamplerCount;
-            samplerRegNoBase = pHwConfig->psSamplerRegNoBase;
             break;
         }
     }
@@ -174,12 +181,7 @@ static void _VIR_CG_ConfigSamplers(
         *maxSampler = (shaderKind == VIR_SHADER_FRAGMENT)
                         ? psSamplers
                         : psSamplers + vsSamplers;
-
-        samplerRegNoBase = 0;
     }
-
-    /* Update the sampler base offset. */
-    VIR_Shader_SetSamplerBaseOffset(pShader, samplerRegNoBase);
 }
 
 static void _VIR_CG_isUBOSupported(
@@ -716,8 +718,8 @@ gctBOOL VIR_CG_UniformAvailablePacked(
     )
 {
     VSC_BIT_VECTOR  *usedColor = &uniformColorMap->usedColor;
-    gctUINT         count = 0;
     gctUINT         curIdx = origStartIdx;
+    gctUINT         count = 0;
 
     while (rows-- > 0)
     {
@@ -918,6 +920,17 @@ VIR_CG_FindUniformUsePacked(
     return VSC_ERR_OUT_OF_RESOURCE;
 }
 
+static gctBOOL
+_isTypeIdLongUlong(
+    IN VIR_TypeId   TypeId
+)
+{
+    VIR_PrimitiveTypeId format;
+
+    format = VIR_GetTypeComponentType(TypeId);
+    return format == VIR_TYPE_INT64 || format == VIR_TYPE_UINT64;
+}
+
 /* whether we could find an existing const */
 gctBOOL VIR_CG_ConstUniformExistBefore(
     IN VIR_Shader       *pShader,
@@ -933,6 +946,7 @@ gctBOOL VIR_CG_ConstUniformExistBefore(
 
     VIR_Const *pConstVal;
     VIR_Type *symType;
+    gctBOOL isLongUlong = gcvFALSE;
 
     /* skip check for initialized uniform array */
     symType = VIR_Symbol_GetType(pSym);
@@ -946,12 +960,36 @@ gctBOOL VIR_CG_ConstUniformExistBefore(
     case VIR_TYPE_FLOAT_X32:
     case VIR_TYPE_FLOAT_X16:
     case VIR_TYPE_FLOAT_X8:
+    case VIR_TYPE_INT8_X32:
+    case VIR_TYPE_INT8_X16:
+    case VIR_TYPE_INT8_X8:
+    case VIR_TYPE_INT16_X32:
+    case VIR_TYPE_INT16_X16:
+    case VIR_TYPE_INT16_X8:
     case VIR_TYPE_INTEGER_X32:
     case VIR_TYPE_INTEGER_X16:
     case VIR_TYPE_INTEGER_X8:
+    case VIR_TYPE_UINT8_X32:
+    case VIR_TYPE_UINT8_X16:
+    case VIR_TYPE_UINT8_X8:
+    case VIR_TYPE_UINT16_X32:
+    case VIR_TYPE_UINT16_X16:
+    case VIR_TYPE_UINT16_X8:
     case VIR_TYPE_UINT_X32:
     case VIR_TYPE_UINT_X16:
     case VIR_TYPE_UINT_X8:
+    case VIR_TYPE_INT16_P32:
+    case VIR_TYPE_INT16_P16:
+    case VIR_TYPE_UINT16_P32:
+    case VIR_TYPE_UINT16_P16:
+    case VIR_TYPE_INT8_P32:
+    case VIR_TYPE_UINT8_P32:
+    case VIR_TYPE_INT64_X32:
+    case VIR_TYPE_INT64_X16:
+    case VIR_TYPE_INT64_X8:
+    case VIR_TYPE_UINT64_X32:
+    case VIR_TYPE_UINT64_X16:
+    case VIR_TYPE_UINT64_X8:
         return gcvFALSE;
     case VIR_TYPE_FLOAT_X4:
         valid[3] = gcvTRUE;
@@ -989,28 +1027,61 @@ gctBOOL VIR_CG_ConstUniformExistBefore(
     case VIR_TYPE_INT32:
         valid[0] = gcvTRUE;
         break;
+    case VIR_TYPE_UINT64_X4:
+        valid[3] = gcvTRUE;
+        /* fall through */
+    case VIR_TYPE_UINT64_X3:
+        valid[2] = gcvTRUE;
+        /* fall through */
+    case VIR_TYPE_UINT64_X2:
+        valid[1] = gcvTRUE;
+        /* fall through */
+    case VIR_TYPE_UINT64:
+        valid[0] = gcvTRUE;
+        isLongUlong = gcvTRUE;
+        break;
+    case VIR_TYPE_INT64_X4:
+        valid[3] = gcvTRUE;
+        /* fall through */
+    case VIR_TYPE_INT64_X3:
+        valid[2] = gcvTRUE;
+        /* fall through */
+    case VIR_TYPE_INT64_X2:
+        valid[1] = gcvTRUE;
+        /* fall through */
+    case VIR_TYPE_INT64:
+        valid[0] = gcvTRUE;
+        isLongUlong = gcvTRUE;
+        break;
+    case VIR_TYPE_INT16_X4:
     case VIR_TYPE_UINT16_X4:
         valid[3] = gcvTRUE;
         /* fall through */
+    case VIR_TYPE_INT16_X3:
     case VIR_TYPE_UINT16_X3:
         valid[2] = gcvTRUE;
         /* fall through */
+    case VIR_TYPE_INT16_X2:
     case VIR_TYPE_UINT16_X2:
         valid[1] = gcvTRUE;
         /* fall through */
+    case VIR_TYPE_INT16:
     case VIR_TYPE_UINT16:
         valid[0] = gcvTRUE;
         break;
-    case VIR_TYPE_INT16_X4:
+    case VIR_TYPE_INT16_P8:
+    case VIR_TYPE_UINT16_P8:
         valid[3] = gcvTRUE;
-        /* fall through */
-    case VIR_TYPE_INT16_X3:
         valid[2] = gcvTRUE;
         /* fall through */
-    case VIR_TYPE_INT16_X2:
+    case VIR_TYPE_INT16_P4:
+    case VIR_TYPE_UINT16_P4:
+    case VIR_TYPE_INT16_P3:
+    case VIR_TYPE_UINT16_P3:
         valid[1] = gcvTRUE;
         /* fall through */
-    case VIR_TYPE_INT16:
+    case VIR_TYPE_INT16_P2:
+    case VIR_TYPE_UINT16_P2:
         valid[0] = gcvTRUE;
         break;
     case VIR_TYPE_UINT8_X4:
@@ -1037,6 +1108,23 @@ gctBOOL VIR_CG_ConstUniformExistBefore(
     case VIR_TYPE_INT8:
         valid[0] = gcvTRUE;
         break;
+    case VIR_TYPE_INT8_P16:
+    case VIR_TYPE_UINT8_P16:
+        valid[3] = gcvTRUE;
+        valid[2] = gcvTRUE;
+        /* fall through */
+    case VIR_TYPE_INT8_P8:
+    case VIR_TYPE_UINT8_P8:
+        valid[1] = gcvTRUE;
+        /* fall through */
+    case VIR_TYPE_INT8_P4:
+    case VIR_TYPE_UINT8_P4:
+    case VIR_TYPE_INT8_P3:
+    case VIR_TYPE_UINT8_P3:
+    case VIR_TYPE_INT8_P2:
+    case VIR_TYPE_UINT8_P2:
+        valid[0] = gcvTRUE;
+        break;
     case VIR_TYPE_BOOLEAN_X4:
         valid[3] = gcvTRUE;
         /* fall through */
@@ -1049,6 +1137,7 @@ gctBOOL VIR_CG_ConstUniformExistBefore(
     case VIR_TYPE_BOOLEAN:
         valid[0] = gcvTRUE;
         break;
+
 
     case VIR_TYPE_FLOAT16_X4:
         return gcvFALSE;
@@ -1084,59 +1173,119 @@ gctBOOL VIR_CG_ConstUniformExistBefore(
 
             gcmASSERT(constCount > 0);
 
-            switch (count)
+            if(isLongUlong && _isTypeIdLongUlong(constVal->type))
             {
-            case 1:
-                for (index = 0; index < constCount; ++index)
+                switch (count)
                 {
-                    if (pConstVal->value.vecVal.u32Value[0] == constVal->value.vecVal.u32Value[index])
+                case 1:
+                    for (index = 0; index < constCount; ++index)
                     {
-                        match = gcvTRUE;
-                        break;
+                        if (pConstVal->value.vecVal.u64Value[0] == constVal->value.vecVal.u64Value[index])
+                        {
+                            match = gcvTRUE;
+                            break;
+                        }
                     }
-                }
-                break;
+                    break;
 
-            case 2:
-                for (index = 0; index < constCount - 1; ++index)
-                {
-                    if ((!valid[0] || pConstVal->value.vecVal.u32Value[0] == constVal->value.vecVal.u32Value[index])
-                    &&  (!valid[1] || pConstVal->value.vecVal.u32Value[1] == constVal->value.vecVal.u32Value[index + 1])
+                case 2:
+                    for (index = 0; index < constCount - 1; ++index)
+                    {
+                        if ((!valid[0] || pConstVal->value.vecVal.u64Value[0] == constVal->value.vecVal.u64Value[index])
+                        &&  (!valid[1] || pConstVal->value.vecVal.u64Value[1] == constVal->value.vecVal.u64Value[index + 1])
+                        )
+                        {
+                            match = gcvTRUE;
+                            break;
+                        }
+                    }
+                    break;
+
+                case 3:
+                    for (index = 0; index < constCount - 2; ++index)
+                    {
+                        if ((!valid[0] || pConstVal->value.vecVal.u64Value[0] == constVal->value.vecVal.u64Value[index])
+                        &&  (!valid[1] || pConstVal->value.vecVal.u64Value[1] == constVal->value.vecVal.u64Value[index + 1])
+                        &&  (!valid[2] || pConstVal->value.vecVal.u64Value[2] == constVal->value.vecVal.u64Value[index + 2])
+                        )
+                        {
+                            match = gcvTRUE;
+                            break;
+                        }
+                    }
+                    break;
+
+                case 4:
+                    index = 0;
+
+                    if (constCount == count
+                    &&  (!valid[0] || pConstVal->value.vecVal.u64Value[0] == constVal->value.vecVal.u64Value[index])
+                    &&  (!valid[1] || pConstVal->value.vecVal.u64Value[1] == constVal->value.vecVal.u64Value[index + 1])
+                    &&  (!valid[2] || pConstVal->value.vecVal.u64Value[2] == constVal->value.vecVal.u64Value[index + 2])
+                    &&  (!valid[3] || pConstVal->value.vecVal.u64Value[3] == constVal->value.vecVal.u64Value[index + 3])
                     )
                     {
                         match = gcvTRUE;
-                        break;
                     }
+                    break;
                 }
-                break;
-
-            case 3:
-                for (index = 0; index < constCount - 2; ++index)
+            }
+            else
+            {
+                switch (count)
                 {
-                    if ((!valid[0] || pConstVal->value.vecVal.u32Value[0] == constVal->value.vecVal.u32Value[index])
+                case 1:
+                    for (index = 0; index < constCount; ++index)
+                    {
+                        if (pConstVal->value.vecVal.u32Value[0] == constVal->value.vecVal.u32Value[index])
+                        {
+                            match = gcvTRUE;
+                            break;
+                        }
+                    }
+                    break;
+
+                case 2:
+                    for (index = 0; index < constCount - 1; ++index)
+                    {
+                        if ((!valid[0] || pConstVal->value.vecVal.u32Value[0] == constVal->value.vecVal.u32Value[index])
+                        &&  (!valid[1] || pConstVal->value.vecVal.u32Value[1] == constVal->value.vecVal.u32Value[index + 1])
+                        )
+                        {
+                            match = gcvTRUE;
+                            break;
+                        }
+                    }
+                    break;
+
+                case 3:
+                    for (index = 0; index < constCount - 2; ++index)
+                    {
+                        if ((!valid[0] || pConstVal->value.vecVal.u32Value[0] == constVal->value.vecVal.u32Value[index])
+                        &&  (!valid[1] || pConstVal->value.vecVal.u32Value[1] == constVal->value.vecVal.u32Value[index + 1])
+                        &&  (!valid[2] || pConstVal->value.vecVal.u32Value[2] == constVal->value.vecVal.u32Value[index + 2])
+                        )
+                        {
+                            match = gcvTRUE;
+                            break;
+                        }
+                    }
+                    break;
+
+                case 4:
+                    index = 0;
+
+                    if (constCount == count
+                    &&  (!valid[0] || pConstVal->value.vecVal.u32Value[0] == constVal->value.vecVal.u32Value[index])
                     &&  (!valid[1] || pConstVal->value.vecVal.u32Value[1] == constVal->value.vecVal.u32Value[index + 1])
                     &&  (!valid[2] || pConstVal->value.vecVal.u32Value[2] == constVal->value.vecVal.u32Value[index + 2])
+                    &&  (!valid[3] || pConstVal->value.vecVal.u32Value[3] == constVal->value.vecVal.u32Value[index + 3])
                     )
                     {
                         match = gcvTRUE;
-                        break;
                     }
+                    break;
                 }
-                break;
-
-            case 4:
-                index = 0;
-
-                if (constCount == count
-                &&  (!valid[0] || pConstVal->value.vecVal.u32Value[0] == constVal->value.vecVal.u32Value[index])
-                &&  (!valid[1] || pConstVal->value.vecVal.u32Value[1] == constVal->value.vecVal.u32Value[index + 1])
-                &&  (!valid[2] || pConstVal->value.vecVal.u32Value[2] == constVal->value.vecVal.u32Value[index + 2])
-                &&  (!valid[3] || pConstVal->value.vecVal.u32Value[3] == constVal->value.vecVal.u32Value[index + 3])
-                )
-                {
-                    match = gcvTRUE;
-                }
-                break;
             }
 
             if (match)
@@ -1181,20 +1330,7 @@ static gctBOOL _VIR_CG_isUniformAllocable(
     VIR_Uniform **symUniform)
 {
     gctBOOL     retValue = gcvTRUE;
-    VIR_Uniform *pUniform = gcvNULL;
-
-    if (VIR_Symbol_isUniform(pSym))
-    {
-        pUniform = VIR_Symbol_GetUniform(pSym);
-    }
-    else if (VIR_Symbol_isImage(pSym))
-    {
-        pUniform = VIR_Symbol_GetImage(pSym);
-    }
-    else if (VIR_Symbol_isSampler(pSym))
-    {
-        pUniform = VIR_Symbol_GetSampler(pSym);
-    }
+    VIR_Uniform *pUniform = VIR_Symbol_GetUniformPointer(VIR_Symbol_GetShader(pSym), pSym);
 
     if (pUniform == gcvNULL)
     {
@@ -1214,22 +1350,36 @@ static gctBOOL _VIR_CG_isUniformAllocable(
         case VIR_UNIFORM_NUM_GROUPS:
         case VIR_UNIFORM_GLOBAL_OFFSET:
         case VIR_UNIFORM_WORK_DIM:
+        case VIR_UNIFORM_KERNEL_ARG:
+        case VIR_UNIFORM_KERNEL_ARG_LOCAL:
+        case VIR_UNIFORM_KERNEL_ARG_SAMPLER:
         case VIR_UNIFORM_KERNEL_ARG_CONSTANT:
         case VIR_UNIFORM_KERNEL_ARG_LOCAL_MEM_SIZE:
         case VIR_UNIFORM_KERNEL_ARG_PRIVATE:
         case VIR_UNIFORM_SAMPLE_LOCATION:
         case VIR_UNIFORM_ENABLE_MULTISAMPLE_BUFFERS:
-        case VIR_UNIFORM_WORK_THREAD_COUNT:
-        case VIR_UNIFORM_WORK_GROUP_COUNT:
         case VIR_UNIFORM_TEMP_REG_SPILL_MEM_ADDRESS:
+        case VIR_UNIFORM_LOCAL_ADDRESS_SPACE:
+        case VIR_UNIFORM_PRIVATE_ADDRESS_SPACE:
+        case VIR_UNIFORM_CONSTANT_ADDRESS_SPACE:
         case VIR_UNIFORM_CONST_BORDER_VALUE:
         case VIR_UNIFORM_SAMPLED_IMAGE:
         case VIR_UNIFORM_EXTRA_LAYER:
-        case VIR_UNIFORM_TEXELBUFFER_TO_IMAGE:
         case VIR_UNIFORM_PUSH_CONSTANT:
         case VIR_UNIFORM_BASE_INSTANCE:
+        case VIR_UNIFORM_GL_IMAGE_FOR_IMAGE_T:
+        case VIR_UNIFORM_GL_SAMPLER_FOR_IMAGE_T:
+        case VIR_UNIFORM_WORK_THREAD_COUNT:
+        case VIR_UNIFORM_WORK_GROUP_COUNT:
+        case VIR_UNIFORM_WORK_GROUP_ID_OFFSET:
+        case VIR_UNIFORM_PRINTF_ADDRESS:
+        case VIR_UNIFORM_WORKITEM_PRINTF_BUFFER_SIZE:
+        case VIR_UNIFORM_GENERAL_PATCH:
         case VIR_UNIFORM_TRANSFORM_FEEDBACK_BUFFER:
         case VIR_UNIFORM_TRANSFORM_FEEDBACK_STATE:
+        case VIR_UNIFORM_TEXELBUFFER_TO_IMAGE:
+        case VIR_UNIFORM_GLOBAL_WORK_SCALE:
+
             if (isSymUniformMovedToAUBO(pSym))
             {
                 retValue = gcvFALSE;
@@ -1289,7 +1439,6 @@ static gctBOOL _VIR_CG_isSamplerType(
 
     switch(baseType)
     {
-    case VIR_TYPE_SAMPLER_GENERIC:
     case VIR_TYPE_SAMPLER:
     case VIR_TYPE_SAMPLER_1D:
     case VIR_TYPE_SAMPLER_2D:
@@ -1323,6 +1472,7 @@ static gctBOOL _VIR_CG_isSamplerType(
     case VIR_TYPE_SAMPLER_BUFFER:
     case VIR_TYPE_ISAMPLER_BUFFER:
     case VIR_TYPE_USAMPLER_BUFFER:
+    case VIR_TYPE_VIV_GENERIC_GL_SAMPLER:
     case VIR_TYPE_SAMPLER_2D_RECT:
     case VIR_TYPE_ISAMPLER_2D_RECT:
     case VIR_TYPE_USAMPLER_2D_RECT:
@@ -1369,6 +1519,30 @@ _VIR_CG_UniformListDequeue(
     vscMM_Free(pMM, worklistNode);
 }
 
+static gctBOOL
+_VIR_CG_IsUniformRestricted(
+    IN VIR_Symbol       *pSymbol
+    )
+{
+    gctBOOL restricted = gcvFALSE;
+
+    /*
+    ** 1) for #num_group, it must be c.xyz
+    ** 2) for #base_instance, it must be c.x
+    */
+    if (VIR_Symbol_GetUniformKind(pSymbol) == VIR_UNIFORM_NUM_GROUPS    ||
+        VIR_Symbol_GetUniformKind(pSymbol) == VIR_UNIFORM_BASE_INSTANCE)
+    {
+        restricted = gcvTRUE;
+    }
+    else if (VIR_Symbol_GetCannotShift(pSymbol))
+    {
+        restricted = gcvTRUE;
+    }
+
+    return restricted;
+}
+
 VSC_ErrCode _VIR_CG_MapNonSamplerUniforms(
     IN VIR_Shader       *pShader,
     IN VSC_HW_CONFIG    *pHwConfig,
@@ -1382,6 +1556,7 @@ VSC_ErrCode _VIR_CG_MapNonSamplerUniforms(
     IN gctBOOL          singleUniform,
     IN gctBOOL          alwaysAllocate,
     IN VSC_MM           *pMM,
+    OUT gctUINT         *pUniformSize,
     OUT gctINT          *NextUniformIndex
     )
 {
@@ -1417,6 +1592,7 @@ VSC_ErrCode _VIR_CG_MapNonSamplerUniforms(
         VIR_Id      id  = VIR_IdList_GetId(&pShader->uniforms, i);
         VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, id);
         VIR_Type    *symType = VIR_Symbol_GetType(sym);
+        VIR_Type    *baseType = gcvNULL;
         VIR_Uniform *symUniform = gcvNULL;
         gctUINT32 components = 0, rows = 0;
 
@@ -1428,19 +1604,12 @@ VSC_ErrCode _VIR_CG_MapNonSamplerUniforms(
         if (!alwaysAllocate &&
             !isSymUniformUsedInShader(sym) &&
             !isSymUniformImplicitlyUsed(sym) &&
-            VIR_Symbol_GetUniformKind(sym) != VIR_UNIFORM_NUM_GROUPS)
+            !VIR_Uniform_AlwaysAlloc(pShader, sym))
         {
             continue;
         }
 
-        /*
-        ** When allocate constant register for #num_group, we should always allocate XYZ for it
-        ** because HW always use XYZ for this uniform, so is base instance.
-        */
-        if (VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_NUM_GROUPS    ||
-            VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_BASE_INSTANCE ||
-            VIR_Symbol_GetCannotShift(sym))
-            restricted = gcvTRUE;
+        restricted = _VIR_CG_IsUniformRestricted(sym);
 
         /* skip samplers */
         if(VIR_Symbol_isSampler(sym) && !TreatSamplerAsConst)
@@ -1448,27 +1617,9 @@ VSC_ErrCode _VIR_CG_MapNonSamplerUniforms(
             continue;
         }
 
+        baseType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(symType));
         components = VIR_Symbol_GetComponents(sym);
-
-        if (VIR_Uniform_GetRealUseArraySize(symUniform) == -1)
-        {
-            rows = VIR_Type_GetVirRegCount(pShader, symType, -1);
-
-            if (VIR_Type_GetKind(symType) == VIR_TY_ARRAY)
-            {
-                VIR_Uniform_SetRealUseArraySize(symUniform, VIR_Type_GetArrayLength(symType));
-            }
-            else
-            {
-                VIR_Uniform_SetRealUseArraySize(symUniform, 1);
-            }
-        }
-        else
-        {
-            VIR_Type * baseType = VIR_Shader_GetTypeFromId(pShader,
-                                                            VIR_Type_GetBaseTypeId(symType));
-            rows = VIR_Uniform_GetRealUseArraySize(symUniform) * VIR_Type_GetVirRegCount(pShader, baseType, -1);
-        }
+        rows = VIR_Uniform_GetRealUseArraySize(symUniform) * VIR_Type_GetVirRegCount(pShader, baseType, -1);
 
         if (maxComp < components)
             maxComp = components;
@@ -1571,14 +1722,7 @@ VSC_ErrCode _VIR_CG_MapNonSamplerUniforms(
                         baseUniform->physical = physical;
                         baseUniform->address  = uniformBaseAddress + baseUniform->physical * 16 + shift * 4;
 
-                        if (VIR_Uniform_GetRealUseArraySize(baseUniform) == -1)
-                        {
-                            rows = VIR_Type_GetVirRegCount(pShader, symType, -1);
-                        }
-                        else
-                        {
-                            rows = VIR_Uniform_GetRealUseArraySize(baseUniform) * VIR_Type_GetVirRegCount(pShader, baseType, -1);
-                        }
+                        rows = VIR_Uniform_GetRealUseArraySize(baseUniform) * VIR_Type_GetVirRegCount(pShader, baseType, -1);
                         physical += rows;
                     }
 
@@ -1600,14 +1744,7 @@ VSC_ErrCode _VIR_CG_MapNonSamplerUniforms(
                     symUniform->physical = physical;
                     symUniform->address = uniformBaseAddress + symUniform->physical * 16 + shift * 4;
 
-                    if (VIR_Uniform_GetRealUseArraySize(symUniform) == -1)
-                    {
-                        rows = VIR_Type_GetVirRegCount(pShader, symType, -1);
-                    }
-                    else
-                    {
-                        rows = VIR_Uniform_GetRealUseArraySize(symUniform) * VIR_Type_GetVirRegCount(pShader, baseType, -1);
-                    }
+                    rows = VIR_Uniform_GetRealUseArraySize(symUniform) * VIR_Type_GetVirRegCount(pShader, baseType, -1);
                     physical += rows;
                 }
             }
@@ -1619,6 +1756,11 @@ OnError:
 
     if (NextUniformIndex)
         *NextUniformIndex = lastUniformIndex + 1;
+
+    if (pUniformSize)
+    {
+        *pUniformSize = (gctUINT)arraySize;
+    }
 
     return retValue;
 }
@@ -1635,20 +1777,21 @@ VSC_ErrCode _VIR_CG_MapSamplerUniforms(
     IN gctBOOL          alwaysAllocate,
     IN gctINT           maxSampler,
     IN VSC_MM           *pMM,
+    OUT gctUINT         *pSamplerSize,
     OUT gctINT          *sampler
     )
 {
     VSC_ErrCode retValue = VSC_ERR_NONE;
-
+    gctINT arrayLength = 1;
     VIR_Symbol  *pSym = VIR_Shader_GetSymFromId(pShader, VIR_Uniform_GetSymID(pUniform));
-    gctBOOL   allocateSamplerPhysical = gcvFALSE;
+    gctBOOL   treatSamplerAsConst = gcvFALSE;
 
     if (isSymUniformTreatSamplerAsConst(pSym) &&
         isSymUniformUsedInShader(pSym))
     {
-        allocateSamplerPhysical = gcvTRUE;
+        treatSamplerAsConst = gcvTRUE;
 
-        _VIR_CG_MapNonSamplerUniforms(pShader,
+        retValue = _VIR_CG_MapNonSamplerUniforms(pShader,
             pHwConfig,
             pUniform,
             gcvFALSE,
@@ -1660,23 +1803,17 @@ VSC_ErrCode _VIR_CG_MapSamplerUniforms(
             gcvFALSE,
             alwaysAllocate,
             pMM,
+            pSamplerSize,
             gcvNULL);
+        ON_ERROR(retValue, "Failed to Allocate Uniform");
     }
     else
     {
         VIR_Type    *symType = VIR_Symbol_GetType(pSym);
 
-        /* Allocate sampler for a const-texture because driver need this. */
-        if (VIR_Uniform_GetRealUseArraySize(pUniform) == -1)
+        if (VIR_Type_GetKind(symType) == VIR_TY_ARRAY)
         {
-            if (VIR_Type_GetKind(symType) == VIR_TY_ARRAY)
-            {
-                VIR_Uniform_SetRealUseArraySize(pUniform, VIR_Type_GetArrayLength(symType));
-            }
-            else
-            {
-                VIR_Uniform_SetRealUseArraySize(pUniform, 1);
-            }
+            arrayLength = (gctINT)VIR_Type_GetArrayLength(symType);
         }
 
         /* Test if sampler is in range */
@@ -1685,18 +1822,11 @@ VSC_ErrCode _VIR_CG_MapSamplerUniforms(
             if (*sampler < maxSampler)
             {
                 retValue = VSC_ERR_OUT_OF_SAMPLER;
-                goto OnRet;
+                goto OnError;
             }
             else
             {
-                gctINT arrayLength = 1;
-
-                if (VIR_Type_GetKind(symType) == VIR_TY_ARRAY)
-                {
-                    arrayLength = (gctINT)VIR_Type_GetArrayLength(symType);
-                }
-
-                if (allocateSamplerPhysical)
+                if (treatSamplerAsConst)
                 {
                     VIR_Uniform_SetSamplerPhysical(pUniform, *sampler + 1 - arrayLength);
                 }
@@ -1712,11 +1842,11 @@ VSC_ErrCode _VIR_CG_MapSamplerUniforms(
             if (*sampler >= maxSampler)
             {
                 retValue = VSC_ERR_OUT_OF_SAMPLER;
-                goto OnRet;
+                goto OnError;
             }
             else
             {
-                if (allocateSamplerPhysical)
+                if (treatSamplerAsConst)
                 {
                     VIR_Uniform_SetSamplerPhysical(pUniform, *sampler);
                 }
@@ -1727,7 +1857,7 @@ VSC_ErrCode _VIR_CG_MapSamplerUniforms(
 
                 if (VIR_Type_GetKind(symType) == VIR_TY_ARRAY)
                 {
-                    *sampler += VIR_Type_GetArrayLength(symType);
+                    *sampler += arrayLength;
                 }
                 else
                 {
@@ -1736,7 +1866,7 @@ VSC_ErrCode _VIR_CG_MapSamplerUniforms(
             }
         }
 
-        if (allocateSamplerPhysical)
+        if (treatSamplerAsConst)
         {
             if (VIR_Uniform_GetSamplerPhysical(pUniform) != VIR_Uniform_GetOrigPhysical(pUniform))
             {
@@ -1750,9 +1880,15 @@ VSC_ErrCode _VIR_CG_MapSamplerUniforms(
                 VIR_Shader_SetNeedToAjustSamplerPhysical(pShader, gcvTRUE);
             }
         }
+
+
+        if (pSamplerSize)
+        {
+            *pSamplerSize = (gctUINT)arrayLength;
+        }
     }
 
-OnRet:
+OnError:
     return retValue;
 }
 
@@ -1834,6 +1970,7 @@ VSC_ErrCode VIR_CG_MapUniforms(
                     gcvFALSE, /* always allocate */
                     maxSampler,
                     pMM,
+                    gcvNULL,
                     &sampler);
             ON_ERROR(retValue, "Failed to Allocate Uniform");
         }
@@ -1849,7 +1986,7 @@ VSC_ErrCode VIR_CG_MapUniforms(
             /* skip the uniform not used in the shader */
             if (!isSymUniformUsedInShader(sym) &&
                 !isSymUniformImplicitlyUsed(sym) &&
-                VIR_Symbol_GetUniformKind(sym) != VIR_UNIFORM_NUM_GROUPS)
+                !VIR_Uniform_AlwaysAlloc(pShader, sym))
             {
                 if (!isSymUniformForcedToActive(sym) &&
                     !isSymUniformUsedInLTC(sym))
@@ -1872,6 +2009,7 @@ VSC_ErrCode VIR_CG_MapUniforms(
                 gcvFALSE, /* single uniform */
                 gcvFALSE, /* always allocate */
                 pMM,
+                gcvNULL,
                 &nextUniformIndex);
             ON_ERROR(retValue, "Failed to Allocate Uniform");
 
@@ -1907,18 +2045,7 @@ VIR_Uniform* _VIR_CG_FindResUniform(
             continue;
         }
 
-        if (VIR_Symbol_isUniform(sym))
-        {
-           symUniform = VIR_Symbol_GetUniform(sym);
-        }
-        else if (VIR_Symbol_isSampler(sym))
-        {
-            symUniform = VIR_Symbol_GetSampler(sym);
-        }
-        else if (VIR_Symbol_isImage(sym))
-        {
-            symUniform = VIR_Symbol_GetImage(sym);
-        }
+        symUniform = VIR_Symbol_GetUniformPointer(pShader, sym);
 
         if (symUniform == gcvNULL ||
             VIR_Symbol_GetUniformKind(sym) != uniformKind)
@@ -2233,6 +2360,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
         VIR_Uniform     *pUniform = gcvNULL;
         VIR_UniformKind uniformKind = _VIR_CG_ResType2UniformKind(resBinding.type);
         VIR_Symbol      *pSym = gcvNULL;
+        gctUINT         uniformSize = 0;
 
         memcpy(&pResAllocLayout->pResAllocEntries[i].resBinding, &resBinding, sizeof(VSC_SHADER_RESOURCE_BINDING));
 
@@ -2262,6 +2390,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                         gcvTRUE, /* single uniform */
                         gcvTRUE, /* always allocate */
                         pMM,
+                        &uniformSize,
                         gcvNULL);
 
                     pResAllocLayout->pResAllocEntries[i].resFlag |= VIR_SRE_FLAG_TREAT_TEXELBUFFER_AS_IMAGE;
@@ -2280,13 +2409,15 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                         gcvTRUE, /* always allocate */
                         maxSampler,
                         pMM,
+                        &uniformSize,
                         &sampler);
                     ON_ERROR(retValue, "Failed to Allocate Uniform");
                 }
-
+                gcmASSERT(uniformSize <= resBinding.arraySize);
 
                 pResAllocLayout->pResAllocEntries[i].bUse = gcvTRUE;
                 pResAllocLayout->pResAllocEntries[i].hwRegNo = pUniform->physical;
+                pResAllocLayout->pResAllocEntries[i].hwRegRange = uniformSize;
                 pResAllocLayout->pResAllocEntries[i].swizzle = pUniform->swizzle;
 
                 break;
@@ -2314,6 +2445,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                         gcvTRUE, /* always allocate */
                         maxSampler,
                         pMM,
+                        &uniformSize,
                         &sampler);
                 }
                 else
@@ -2330,12 +2462,16 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                         gcvTRUE, /* single uniform */
                         gcvTRUE, /* always allocate */
                         pMM,
+                        &uniformSize,
                         gcvNULL);
                 }
                 ON_ERROR(retValue, "Failed to Allocate Uniform");
 
+                gcmASSERT(uniformSize <= resBinding.arraySize);
+
                 pResAllocLayout->pResAllocEntries[i].bUse = gcvTRUE;
                 pResAllocLayout->pResAllocEntries[i].hwRegNo = pUniform->physical;
+                pResAllocLayout->pResAllocEntries[i].hwRegRange = uniformSize;
                 pResAllocLayout->pResAllocEntries[i].swizzle = pUniform->swizzle;
 
                 if (isSymUniformTreatImageAsSampler(pSym))
@@ -2381,9 +2517,43 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
             }
 
             case VSC_SHADER_RESOURCE_TYPE_SAMPLER:
-            case VSC_SHADER_RESOURCE_TYPE_SAMPLED_IMAGE:
                 /* no need to assign hw reg */
                 pResAllocLayout->pResAllocEntries[i].hwRegNo = NOT_ASSIGNED;
+                break;
+
+            case VSC_SHADER_RESOURCE_TYPE_SAMPLED_IMAGE:
+                /* For a sampled image, we need to allocate a image uniform for it, and we may also need to allocate a sampler for it. */
+                gcmASSERT(VIR_Uniform_IsImageCanBeSampled(pUniform));
+
+                if (!pHwConfig->hwFeatureFlags.supportSeparatedTex)
+                {
+                    retValue = _VIR_CG_MapNonSamplerUniforms(pShader,
+                        pHwConfig,
+                        pUniform,
+                        gcvFALSE,
+                        &uniformColorMap,
+                        codeGenUniformBase,
+                        handleDefaultUBO,
+                        unblockUniformBlock,
+                        gcvFALSE, /* treat sampler as const */
+                        gcvTRUE, /* single uniform */
+                        gcvTRUE, /* always allocate */
+                        pMM,
+                        &uniformSize,
+                        gcvNULL);
+                    ON_ERROR(retValue, "Failed to Allocate Uniform");
+
+                    gcmASSERT(uniformSize <= resBinding.arraySize);
+
+                    pResAllocLayout->pResAllocEntries[i].bUse = gcvTRUE;
+                    pResAllocLayout->pResAllocEntries[i].hwRegNo = pUniform->physical;
+                    pResAllocLayout->pResAllocEntries[i].hwRegRange = uniformSize;
+                    pResAllocLayout->pResAllocEntries[i].swizzle = pUniform->swizzle;
+                }
+                else
+                {
+                    gcmASSERT(gcvFALSE);
+                }
                 break;
 
             default:
@@ -2408,6 +2578,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
 
             pResAllocLayout->pResAllocEntries[i].bUse = gcvFALSE;
             pResAllocLayout->pResAllocEntries[i].hwRegNo = physical;
+            pResAllocLayout->pResAllocEntries[i].hwRegRange = resBinding.arraySize;
             pResAllocLayout->pResAllocEntries[i].swizzle = swizzle;
         }
     }
@@ -2422,16 +2593,21 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
         gctBOOL        bPushConstUBO = gcvFALSE;
 
         VSC_SIMPLE_QUEUE    pushConstList;
+        gctUINT             pushConstCount = 0;
 
         QUEUE_INITIALIZE(&pushConstList);
 
         memcpy(&pResAllocLayout->pPushCnstAllocEntries[i].pushCnstRange, &pushConst, sizeof(VSC_SHADER_PUSH_CONSTANT_RANGE));
 
         _VIR_CG_FindPushConstUniform(pShader, pMM, &pushConst, &maxAlignment, &pushConstList, &bPushConstUBO);
+        pushConstCount = vscUNILST_GetNodeCount(&pushConstList);
 
         if (bPushConstUBO)
         {
             VIR_Uniform*    pUniform;
+            gctUINT         uniformSize = 0;
+
+            gcmASSERT(pushConstCount == 1);
 
             _VIR_CG_UniformListDequeue(pMM, &pushConstList, &pUniform);
             retValue = _VIR_CG_MapNonSamplerUniforms(pShader,
@@ -2446,12 +2622,14 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                                                      gcvTRUE, /* single uniform */
                                                      gcvTRUE, /* always allocate */
                                                      pMM,
+                                                     &uniformSize,
                                                      gcvNULL);
             if (retValue != VSC_ERR_NONE)
             {
                 QUEUE_FINALIZE(&pushConstList);
                 goto OnError;
             }
+            gcmASSERT(uniformSize == 1);
 
             pResAllocLayout->pPushCnstAllocEntries[i].bUse = gcvTRUE;
             pResAllocLayout->pPushCnstAllocEntries[i].bBaseAddr = gcvTRUE;
@@ -2460,20 +2638,39 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
         }
         else
         {
-            retValue = _VIR_CG_AllocatePushConst(&uniformColorMap, maxAlignment, pushConst.size, &firstPhysical, &firstSwizzle);
-            if (retValue != VSC_ERR_NONE)
+            if (pushConstCount != 0)
             {
-                QUEUE_FINALIZE(&pushConstList);
-                goto OnError;
+                retValue = _VIR_CG_AllocatePushConst(&uniformColorMap,
+                                                     maxAlignment,
+                                                     pushConst.size,
+                                                     &firstPhysical,
+                                                     &firstSwizzle);
+                if (retValue != VSC_ERR_NONE)
+                {
+                    QUEUE_FINALIZE(&pushConstList);
+                    goto OnError;
+                }
+
+                gcmASSERT(firstPhysical != NOT_ASSIGNED);
+
+                pResAllocLayout->pPushCnstAllocEntries[i].bUse = gcvTRUE;
+                pResAllocLayout->pPushCnstAllocEntries[i].hwRegNo = firstPhysical;
+                pResAllocLayout->pPushCnstAllocEntries[i].swizzle = firstSwizzle;
+
+                _VIR_CG_AssignPushConstUniform(pShader,
+                                               pMM,
+                                               &pushConst,
+                                               maxAlignment,
+                                               &pushConstList,
+                                               firstPhysical,
+                                               firstSwizzle);
             }
-
-            gcmASSERT(firstPhysical != NOT_ASSIGNED);
-
-            pResAllocLayout->pPushCnstAllocEntries[i].bUse = gcvTRUE;
-            pResAllocLayout->pPushCnstAllocEntries[i].hwRegNo = firstPhysical;
-            pResAllocLayout->pPushCnstAllocEntries[i].swizzle = firstSwizzle;
-
-            _VIR_CG_AssignPushConstUniform(pShader, pMM, &pushConst, maxAlignment, &pushConstList, firstPhysical, firstSwizzle);
+            else
+            {
+                pResAllocLayout->pPushCnstAllocEntries[i].bUse = gcvFALSE;
+                pResAllocLayout->pPushCnstAllocEntries[i].hwRegNo = firstPhysical;
+                pResAllocLayout->pPushCnstAllocEntries[i].swizzle = firstSwizzle;
+            }
         }
 
         QUEUE_FINALIZE(&pushConstList);
@@ -2486,6 +2683,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
         VIR_Id      id  = VIR_IdList_GetId(&pShader->uniforms, i);
         VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, id);
         VIR_Uniform *symUniform = gcvNULL;
+        gctUINT     uniformSize = 0;
 
         if (!_VIR_CG_isUniformAllocable(sym, handleDefaultUBO, unblockUniformBlock, &symUniform))
         {
@@ -2495,7 +2693,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
         if (!isSymUniformUsedInShader(sym) &&
             !isSymUniformUsedInLTC(sym) &&
             !isSymUniformImplicitlyUsed(sym) &&
-            VIR_Symbol_GetUniformKind(sym) != VIR_UNIFORM_NUM_GROUPS)
+            !VIR_Uniform_AlwaysAlloc(pShader, sym))
         {
             VIR_Uniform_SetPhysical(symUniform, -1);
             VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_INACTIVE);
@@ -2544,6 +2742,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                     gcvTRUE, /* always allocate */
                     maxSampler,
                     pMM,
+                    &uniformSize,
                     &sampler);
                 ON_ERROR(retValue, "Failed to Allocate Uniform");
             }
@@ -2561,6 +2760,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                     gcvTRUE, /* single uniform */
                     gcvFALSE, /* always allocate */
                     pMM,
+                    &uniformSize,
                     gcvNULL);
                 ON_ERROR(retValue, "Failed to Allocate Uniform");
             }
@@ -2573,43 +2773,16 @@ OnError:
     return retValue;
 }
 
-static VSC_ErrCode _AppendTempRegSpillMemAddrUniform(VIR_Shader *pShader)
-{
-    VSC_ErrCode  virErrCode;
-    VIR_NameId   spillMemName;
-    VIR_SymId    spillMemSymId;
-    VIR_Symbol*  spillMemSym;
-    VIR_Uniform *virUniform = gcvNULL;
-
-    virErrCode = VIR_Shader_AddString(pShader, "#TempRegSpillMemAddr", &spillMemName);
-    ON_ERROR(virErrCode, "Failed to VIR_Shader_AddString");
-
-    /* default ubo symbol */
-    virErrCode = VIR_Shader_AddSymbol(pShader,
-                                      VIR_SYM_UNIFORM,
-                                      spillMemName,
-                                      VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT32),
-                                      VIR_STORAGE_UNKNOWN,
-                                      &spillMemSymId);
-
-    spillMemSym = VIR_Shader_GetSymFromId(pShader, spillMemSymId);
-    VIR_Symbol_SetUniformKind(spillMemSym, VIR_UNIFORM_TEMP_REG_SPILL_MEM_ADDRESS);
-    VIR_Symbol_SetFlag(spillMemSym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
-    VIR_Symbol_SetFlag(spillMemSym, VIR_SYMFLAG_COMPILER_GEN);
-    VIR_Symbol_SetLocation(spillMemSym, -1);
-
-    virUniform = VIR_Symbol_GetUniform(spillMemSym);
-    virUniform->index = VIR_IdList_Count(VIR_Shader_GetUniforms(pShader)) - 1;
-
-OnError:
-    return virErrCode;
-}
-
 DEF_QUERY_PASS_PROP(VIR_RA_PerformUniformAlloc)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
     pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_RA;
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+}
+
+DEF_SH_NECESSITY_CHECK(VIR_RA_PerformUniformAlloc)
+{
+    return gcvTRUE;
 }
 
 VSC_ErrCode VIR_RA_PerformUniformAlloc(
@@ -2621,35 +2794,434 @@ VSC_ErrCode VIR_RA_PerformUniformAlloc(
     VSC_OPTN_RAOptions                *pOption = (VSC_OPTN_RAOptions*)pPassWorker->basePassWorker.pBaseOption;
     VSC_MM                            *pMM = pPassWorker->basePassWorker.pMM;
     VSC_SHADER_RESOURCE_LAYOUT        *pShResourceLayout = pPassWorker->pCompilerParam->pShResourceLayout;
-
-    /* Append an uniform (one channel) for temp register spill mem address.
-       This code should be moved to an phase that determine whether we need
-       do temp register spill before uniform allocation */
-    retValue = _AppendTempRegSpillMemAddrUniform(pShader);
-    CHECK_ERROR(retValue, "Append temp-reg spill mem address uniform");
+    gctBOOL                           allocUniform = gcvFALSE;
 
     if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetOPTS(pOption),
         VSC_OPTN_RAOptions_ALLOC_UNIFORM))
     {
-        if (pShResourceLayout)
+        if (!VIR_Shader_isConstRegAllocated(pShader))
         {
-            retValue = VIR_CG_MapUniformsWithLayout(pShader, pHwCfg, pShResourceLayout, pMM);
-            CHECK_ERROR(retValue, "VIR_CG_MapUniformsWithLayout");
-        }
-        else
-        {
-            retValue = VIR_CG_MapUniforms(pShader, pHwCfg, pMM);
-            CHECK_ERROR(retValue, "VIR_CG_MapUniforms");
-        }
+            allocUniform = gcvTRUE;
 
-        /* set const register allocated to shader */
-        VIR_Shader_SetConstRegAllocated(pShader, gcvTRUE);
+            if (pShResourceLayout)
+            {
+                retValue = VIR_CG_MapUniformsWithLayout(pShader, pHwCfg, pShResourceLayout, pMM);
+                CHECK_ERROR(retValue, "VIR_CG_MapUniformsWithLayout");
+            }
+            else
+            {
+                retValue = VIR_CG_MapUniforms(pShader, pHwCfg, pMM);
+                CHECK_ERROR(retValue, "VIR_CG_MapUniforms");
+            }
+
+            /* set const register allocated to shader */
+            VIR_Shader_SetConstRegAllocated(pShader, gcvTRUE);
+        }
     }
 
-    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    if (allocUniform)
     {
-        VIR_Shader_Dump(gcvNULL, "After Uniform allocation", pShader, gcvTRUE);
+        if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+        {
+            VIR_Shader_Dump(gcvNULL, "After Uniform allocation", pShader, gcvTRUE);
+        }
     }
+
+    return retValue;
+}
+
+void _VIR_CG_Unified_UniformColorMap_Init(
+    IN VSC_HW_CONFIG        *pHwConfig,
+    IN VSC_MM               *pMM,
+    IN OUT VIR_RA_ColorMap  *uniformCM,
+    OUT gctUINT             *CodeGenUniformBase
+    )
+{
+    uniformCM->maxAllocReg = 0;
+    uniformCM->availReg = 0;
+    *CodeGenUniformBase = pHwConfig->vsConstRegAddrBase;
+
+    uniformCM->maxReg = pHwConfig->maxTotalConstRegCount;
+
+    /* each const registers needs 4 channels (w, z, y, x) */
+    vscBV_Initialize(&uniformCM->usedColor,
+        pMM,
+        uniformCM->maxReg * VIR_CHANNEL_NUM);
+}
+
+static void _VIR_CG_Unified_ConfigSamplers(
+    IN VSC_AllShaders   *all_shaders,
+    IN VSC_HW_CONFIG    *pHwConfig,
+    IN gctINT           *samplerBaseOffset,
+    OUT gctINT          *maxSampler,
+    OUT gctINT          *sampler,
+    OUT gctBOOL         *allocateSamplerReverse
+    )
+{
+    gctUINT i;
+
+    /* Determine starting sampler index. */
+    if (sampler)
+    {
+        *sampler = 0;
+    }
+
+    if (maxSampler)
+    {
+        *maxSampler = vscMIN(pHwConfig->maxSamplerCountPerShader,
+                             pHwConfig->maxHwNativeTotalSamplerCount);
+    }
+
+    for (i = 0; i < VSC_MAX_LINKABLE_SHADER_STAGE_COUNT; i++)
+    {
+        VIR_Shader* pShader = VSC_AllShaders_GetShader(all_shaders, i);
+
+        if (pShader)
+        {
+            /*
+            ** If it is a recompiler link, the sampler base offset may be set before,
+            ** so we need to save the original value in case unified allocation fail.
+            */
+            samplerBaseOffset[i] = VIR_Shader_GetSamplerBaseOffset(pShader);
+            VIR_Shader_SetSamplerBaseOffset(pShader, 0);
+        }
+    }
+}
+
+static void _VIR_CG_RollBack_MapUniforms(
+    IN OUT VSC_AllShaders   *all_shaders,
+    IN gctBOOL              handleDefaultUBO,
+    IN gctBOOL              unblockUniformBlock,
+    IN gctINT               *samplerBaseOffset
+    )
+{
+    gctINT              i, j;
+
+    for (i = 0; i < VSC_MAX_LINKABLE_SHADER_STAGE_COUNT; i++)
+    {
+        VIR_Shader* pShader = all_shaders->shaders[i];
+
+        if (pShader == gcvNULL)
+        {
+            continue;
+        }
+
+        VIR_Shader_SetSamplerBaseOffset(pShader, samplerBaseOffset[i]);
+        VIR_Shader_SetNeedToAjustSamplerPhysical(pShader, gcvFALSE);
+
+        for (j = 0; j < (gctINT) VIR_IdList_Count(&pShader->uniforms); ++j)
+        {
+            VIR_Id      id  = VIR_IdList_GetId(&pShader->uniforms, j);
+            VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, id);
+            VIR_Uniform *symUniform = gcvNULL;
+
+            if (!_VIR_CG_isUniformAllocable(sym, handleDefaultUBO, unblockUniformBlock, &symUniform))
+            {
+                continue;
+            }
+
+            VIR_Uniform_SetPhysical(symUniform, -1);
+            VIR_Uniform_SetSamplerPhysical(symUniform, -1);
+            symUniform->address = (gctUINT32)-1;
+            symUniform->swizzle = 0;
+        }
+    }
+}
+
+VSC_ErrCode VIR_CG_Unified_MapUniforms(
+    IN OUT VSC_AllShaders   *all_shaders,
+    IN VSC_HW_CONFIG        *pHwConfig
+    )
+{
+    VSC_ErrCode         retValue = VSC_ERR_NONE;
+    VSC_GlobalUniformTable   *pGlobalUniformTable = &all_shaders->global_uniform_table;
+    VSC_MM              *pMM = &all_shaders->mem_pool;
+    gctINT              i, j;
+    gctBOOL             unblockUniformBlock = gcvFALSE;
+    gctBOOL             handleDefaultUBO = gcvFALSE;
+    gctBOOL             allocateSamplerReverse = gcvFALSE;
+    gctINT              samplerBaseOffset[VSC_MAX_LINKABLE_SHADER_STAGE_COUNT] = {0};
+    gctINT              maxSampler = 0, sampler = 0;
+    VIR_RA_ColorMap     uniformColorMap;
+    gctUINT             codeGenUniformBase;
+
+    VSC_GlobalUniformTable_Iterator iter;
+    VSC_GlobalUniformItem* item;
+
+    /* initialize the colorMap */
+    _VIR_CG_Unified_UniformColorMap_Init(
+        pHwConfig,
+        pMM,
+        &uniformColorMap,
+        &codeGenUniformBase);
+
+    /* Config sampler setting. */
+    _VIR_CG_Unified_ConfigSamplers(all_shaders,
+        pHwConfig, samplerBaseOffset, &maxSampler, &sampler, &allocateSamplerReverse);
+
+    /* set the handleDefaultUBO flag */
+    handleDefaultUBO = gcvTRUE;
+    unblockUniformBlock = gcvFALSE;
+
+    /* Map all uniforms. */
+    VSC_GlobalUniformTable_Iterator_Init(&iter, pGlobalUniformTable);
+    for (item = VSC_GlobalUniformTable_Iterator_First(&iter), i = 0; item != gcvNULL;
+         item = VSC_GlobalUniformTable_Iterator_Next(&iter), i++)
+    {
+        gctBOOL     vAllocated = gcvFALSE;
+        VIR_Uniform *preSymUnifom = gcvNULL;
+
+        for (i = 0; i < VSC_MAX_LINKABLE_SHADER_STAGE_COUNT; i++)
+        {
+            VIR_SymId uniform_symid = item->uniforms[i];
+            if (VIR_Id_isValid(uniform_symid))
+            {
+                VIR_Shader* pShader = item->all_shaders->shaders[i];
+                VIR_Symbol* sym = VIR_Shader_GetSymFromId(pShader, uniform_symid);
+                VIR_Uniform* symUniform = gcvNULL;
+
+                if (!_VIR_CG_isUniformAllocable(sym, handleDefaultUBO, unblockUniformBlock, &symUniform))
+                {
+                    continue;
+                }
+
+                if (_VIR_CG_isSamplerType(sym))
+                {
+                    /* This physical address of base sampler symbol is always 0. */
+                    if (VIR_Symbol_GetIndex(sym) == VIR_Shader_GetBaseSamplerId(pShader))
+                    {
+                        VIR_Uniform_SetPhysical(symUniform, 0);
+                        continue;
+                    }
+
+                    /* If this texture is not used on shader, we can skip it. */
+                    if (!isSymUniformUsedInShader(sym) &&
+                        !isSymUniformUsedInTextureSize(sym) &&
+                        /* If this texture is treated as a const, it can be used in LTC. */
+                        !isSymUniformUsedInLTC(sym))
+                    {
+                        VIR_Uniform_SetPhysical(symUniform, -1);
+                        VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_INACTIVE);
+                        continue;
+                    }
+
+                    VIR_Symbol_ClrFlag(sym, VIR_SYMFLAG_INACTIVE);
+
+                    if (vAllocated)
+                    {
+                        symUniform->physical = preSymUnifom->physical;
+
+                        VIR_Uniform_SetRealUseArraySize(symUniform,
+                            VIR_Uniform_GetRealUseArraySize(preSymUnifom));
+                    }
+                    else
+                    {
+                        retValue = _VIR_CG_MapSamplerUniforms(pShader,
+                            pHwConfig,
+                            symUniform,
+                            &uniformColorMap,
+                            codeGenUniformBase,
+                            handleDefaultUBO,
+                            unblockUniformBlock,
+                            allocateSamplerReverse,
+                            gcvFALSE, /* always allocate */
+                            maxSampler,
+                            pMM,
+                            gcvNULL,
+                            &sampler);
+                        ON_ERROR(retValue, "Failed to Allocate Uniform");
+
+                        preSymUnifom = symUniform;
+                        vAllocated = gcvTRUE;
+                    }
+                }
+                else
+                {
+                    if (symUniform->physical != -1)
+                    {
+                        continue;
+                    }
+
+                    VIR_Symbol_ClrFlag(sym, VIR_SYMFLAG_INACTIVE);
+
+                    /* skip the uniform not used in the shader */
+                    if (!isSymUniformUsedInShader(sym) &&
+                        !isSymUniformImplicitlyUsed(sym) &&
+                        !VIR_Uniform_AlwaysAlloc(pShader, sym))
+                    {
+                        if (!isSymUniformForcedToActive(sym) &&
+                            !isSymUniformUsedInLTC(sym))
+                        {
+                            VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_INACTIVE);
+                        }
+
+                        continue;
+                    }
+
+                    if (vAllocated)
+                    {
+                        symUniform->address = preSymUnifom->address;
+                        symUniform->swizzle = preSymUnifom->swizzle;
+                        symUniform->physical = preSymUnifom->physical;
+
+                        /* set the array length */
+                        VIR_Uniform_SetRealUseArraySize(symUniform,
+                            VIR_Uniform_GetRealUseArraySize(preSymUnifom));
+                    }
+                    else
+                    {
+                        retValue = _VIR_CG_MapNonSamplerUniforms(pShader,
+                            pHwConfig,
+                            symUniform,
+                            isSymUniformCompiletimeInitialized(sym),
+                            &uniformColorMap,
+                            codeGenUniformBase,
+                            handleDefaultUBO,
+                            unblockUniformBlock,
+                            gcvFALSE, /* treat sampler as const */
+                            gcvFALSE, /* single uniform */
+                            gcvFALSE, /* always allocate */
+                            pMM,
+                            gcvNULL,
+                            gcvNULL);
+                        ON_ERROR(retValue, "Failed to Allocate Uniform");
+
+                        preSymUnifom = symUniform;
+                        vAllocated = gcvTRUE;
+                    }
+                }
+            }
+        }
+    }
+
+    /* Allocate the private uniforms. */
+    for (i = 0; i < VSC_MAX_LINKABLE_SHADER_STAGE_COUNT; i++)
+    {
+        VIR_Shader* pShader = all_shaders->shaders[i];
+
+        if (pShader == gcvNULL)
+        {
+            continue;
+        }
+
+        /* check uniform usage: if a uniform is used in shader or LTC expression */
+        VSC_CheckUniformUsage(pShader);
+
+        /* Map all the other uniforms. */
+        for (j = 0; j < (gctINT) VIR_IdList_Count(&pShader->uniforms); ++j)
+        {
+            VIR_Id      id  = VIR_IdList_GetId(&pShader->uniforms, j);
+            VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, id);
+            VIR_Uniform *symUniform = gcvNULL;
+
+            if (!_VIR_CG_isUniformAllocable(sym, handleDefaultUBO, unblockUniformBlock, &symUniform))
+            {
+                continue;
+            }
+
+            /* Skip those uniforms that been allocated. */
+            if (VIR_Uniform_GetPhysical(symUniform) != -1)
+            {
+                continue;
+            }
+
+            if (_VIR_CG_isSamplerType(sym))
+            {
+                /* This physical address of base sampler symbol is always 0. */
+                if (VIR_Symbol_GetIndex(sym) == VIR_Shader_GetBaseSamplerId(pShader))
+                {
+                    VIR_Uniform_SetPhysical(symUniform, 0);
+                    continue;
+                }
+
+                /* If this texture is not used on shader, we can skip it. */
+                if (!isSymUniformUsedInShader(sym) &&
+                    !isSymUniformUsedInTextureSize(sym) &&
+                    /* If this texture is treated as a const, it can be used in LTC. */
+                    !isSymUniformUsedInLTC(sym))
+                {
+                    VIR_Uniform_SetPhysical(symUniform, -1);
+                    VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_INACTIVE);
+                    continue;
+                }
+
+                VIR_Symbol_ClrFlag(sym, VIR_SYMFLAG_INACTIVE);
+
+                retValue = _VIR_CG_MapSamplerUniforms(pShader,
+                        pHwConfig,
+                        symUniform,
+                        &uniformColorMap,
+                        codeGenUniformBase,
+                        handleDefaultUBO,
+                        unblockUniformBlock,
+                        allocateSamplerReverse,
+                        gcvFALSE, /* always allocate */
+                        maxSampler,
+                        pMM,
+                        gcvNULL,
+                        &sampler);
+                ON_ERROR(retValue, "Failed to Allocate Uniform");
+            }
+            else
+            {
+                VIR_Symbol_ClrFlag(sym, VIR_SYMFLAG_INACTIVE);
+
+                /* skip the uniform not used in the shader */
+                if (!isSymUniformUsedInShader(sym) &&
+                    !isSymUniformImplicitlyUsed(sym) &&
+                    !VIR_Uniform_AlwaysAlloc(pShader, sym))
+                {
+                    if (!isSymUniformForcedToActive(sym) &&
+                        !isSymUniformUsedInLTC(sym))
+                    {
+                        VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_INACTIVE);
+                    }
+
+                    continue;
+                }
+
+                retValue = _VIR_CG_MapNonSamplerUniforms(pShader,
+                    pHwConfig,
+                    symUniform,
+                    isSymUniformCompiletimeInitialized(sym),
+                    &uniformColorMap,
+                    codeGenUniformBase,
+                    handleDefaultUBO,
+                    unblockUniformBlock,
+                    gcvFALSE, /* treat sampler as const */
+                    gcvFALSE, /* single uniform */
+                    gcvFALSE, /* always allocate */
+                    pMM,
+                    gcvNULL,
+                    gcvNULL);
+                ON_ERROR(retValue, "Failed to Allocate Uniform");
+            }
+        }
+    }
+
+    /* Allocate unified uniforms successfully, now we can save the states.*/
+    for (i = 0; i < VSC_MAX_LINKABLE_SHADER_STAGE_COUNT; i++)
+    {
+        VIR_Shader* pShader = all_shaders->shaders[i];
+
+        if (pShader)
+        {
+            VIR_Shader_SetConstRegAllocated(pShader, gcvTRUE);
+            VIR_Shader_SetFullUnifiedUniforms(pShader, gcvTRUE);
+        }
+    }
+
+OnError:
+    /* Meet any error, roll back all changes. */
+    if (retValue != VSC_ERR_NONE)
+    {
+        _VIR_CG_RollBack_MapUniforms(all_shaders,
+                                     handleDefaultUBO,
+                                     unblockUniformBlock,
+                                     samplerBaseOffset);
+    }
+
+    vscBV_Finalize(&uniformColorMap.usedColor);
 
     return retValue;
 }

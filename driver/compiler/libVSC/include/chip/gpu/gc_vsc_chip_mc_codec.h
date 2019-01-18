@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -111,6 +111,8 @@ typedef struct _VSC_MC_CODEC_DST
     gctUINT     regNo;
     gctUINT     regType;
 
+    gctBOOL     bEvisInfoOnly;
+
     union
     {
         /* For normal dst */
@@ -148,6 +150,7 @@ typedef struct _VSC_MC_CODEC_SRC
             gctUINT      indexingAddr;
             gctBOOL      bNegative;
             gctBOOL      bAbs;
+            gctBOOL      bConstReg;
         } reg;
 
         /* Any immediate value including branch-target */
@@ -166,12 +169,13 @@ typedef struct _VSC_MC_CODEC_INST_CTRL
     gctUINT     condOpCode;
     gctUINT     instType;
     gctUINT     roundingMode;
-    gctUINT     packMode;
-    gctBOOL     bDenorm;
-    gctUINT     threadType;
-    gctBOOL     bSkipForHelperKickoff;
-    gctBOOL     bResultSat;
-    gctBOOL     bForceGen;
+    gctBOOL     packMode                : 2;
+    gctBOOL     bDenorm                 : 2;
+    gctUINT     threadType              : 2;
+    gctBOOL     bSkipForHelperKickoff   : 2;
+    gctBOOL     bResultSat              : 2;
+    gctBOOL     bEndOfBB                : 2;     /* non-control end of BB instruction */
+    gctBOOL     bForceGen               : 2;
 
     union
     {
@@ -180,8 +184,10 @@ typedef struct _VSC_MC_CODEC_INST_CTRL
                  so following ctrl will also control this inst */
         struct
         {
-            gctBOOL     bAccessLocalStorage;
-            gctBOOL     bUnderEvisMode;
+            gctBOOL     bAccessLocalStorage : 2;
+            gctBOOL     bUnderEvisMode      : 2;
+            gctBOOL     bBigEndian          : 2;     /* access to big endian data in memory */
+            gctBOOL     bUnallocate         : 2;     /* USC Unallocate Bit for global memory Load/Store */
 
             union
             {
@@ -211,12 +217,12 @@ typedef struct _VSC_MC_CODEC_INST_CTRL
         struct
         {   gctUINT     evisState;
             gctUINT     startSrcCompIdx; /* Source bin */
+            gctBOOL     bUseUniform512;
         } visionCtrl;
 
         /* For load_attr/store_attr */
         struct
         {
-            gctBOOL     bNeedUscSync;
             gctUINT     shStageClient;
             gctUINT     attrLayout;
         } lsAttrCtrl;
@@ -225,8 +231,16 @@ typedef struct _VSC_MC_CODEC_INST_CTRL
         struct
         {
             gctBOOL     bNeedRestartPrim;
-            gctBOOL     bJmpToEndOnMaxVtxCnt;
+            gctBOOL     bNoJmpToEndOnMaxVtxCnt;
         } emitCtrl;
+
+        /* For conv inst */
+        struct
+        {
+            gctBOOL     bEvisMode;
+            gctBOOL     bDstPack;
+            gctBOOL     bSrcPack;
+        } convCtrl;
 
         /* For pack inst */
         gctUINT     srcSelect;
@@ -312,7 +326,8 @@ gctBOOL vscMC_EncodeSrc(VSC_MC_CODEC*                 pMcCodec,
                         gctUINT                       mcSrcIdx,
                         VSC_MC_RAW_INST*              pOutMCInst);
 
-gctBOOL vscMC_DecodeSrc(VSC_MC_CODEC*                 pMcCodec,
+gctBOOL vscMC_DecodeSrc(VSC_MC_CODEC_INST*            pOutCodecHelperInst,
+                        VSC_MC_CODEC*                 pMcCodec,
                         VSC_MC_RAW_INST*              pInMCInst,
                         gctBOOL                       bEvisMode,
                         gctUINT                       mcSrcIdx,

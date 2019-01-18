@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -18,7 +18,7 @@
 #if gcdNULL_DRIVER < 2
 
 #define _GC_OBJ_ZONE            gcvZONE_BUFOBJ
-#define BUFFER_OBJECT_ALIGNMENT 8 /* max alignmet for all buffer object types */
+#define BUFFER_OBJECT_ALIGNMENT 16 /* max alignmet for all buffer object types */
 #define BUFFER_INDEX_ALIGNMENT  16 /* max alignmet for index buffer object types */
 #define BUFFER_OBJECT_SURFTYPE  gcvSURF_VERTEX
 #define DYNAMIC_BUFFER_MAX_COUNT    0x1000 /* max dynamic buffer size.*/
@@ -63,8 +63,7 @@ struct _gcoBUFOBJ
     gctSIZE_T                   dynamicEnd;
 
     /* gcdDUMP descriptor of the buffer */
-    gctSTRING                   dumpDescriptor;
-    gceDUMP_TAG                 dumpTag;
+    gceDUMP_BUFFER_TYPE         dumpDescriptor;
 };
 
 /******************************************************************************\
@@ -184,25 +183,21 @@ gcoBUFOBJ_Construct(
     {
     case gcvBUFOBJ_TYPE_ARRAY_BUFFER:
         bufobj->surfType = gcvSURF_VERTEX;
-        bufobj->dumpDescriptor = "stream";
-        bufobj->dumpTag = gcvTAG_STREAM;
+        bufobj->dumpDescriptor = gcvDUMP_BUFFER_STREAM;
         break;
     case gcvBUFOBJ_TYPE_ELEMENT_ARRAY_BUFFER:
         bufobj->surfType = gcvSURF_INDEX;
-        bufobj->dumpDescriptor = "index";
-        bufobj->dumpTag = gcvTAG_INDEX;
+        bufobj->dumpDescriptor = gcvDUMP_BUFFER_INDEX;
         break;
     case gcvBUFOBJ_TYPE_GENERIC_BUFFER:
         /* We need to create a new surf type for other buffers */
         bufobj->surfType = BUFFER_OBJECT_SURFTYPE;
-        bufobj->dumpDescriptor = "bufobj";
-        bufobj->dumpTag = gcvTAG_BUFOBJ;
+        bufobj->dumpDescriptor = gcvDUMP_BUFFER_BUFOBJ;
         break;
     default:
         gcmASSERT(0);
         bufobj->surfType = BUFFER_OBJECT_SURFTYPE;
-        bufobj->dumpDescriptor = "bufobj";
-        bufobj->dumpTag = gcvTAG_BUFOBJ;
+        bufobj->dumpDescriptor = gcvDUMP_BUFFER_BUFOBJ;
         break;
     }
 
@@ -561,6 +556,7 @@ static gceSTATUS _gpuUpload(
         &physicAddress,
         gcvNULL));
 
+
     srcLocked = gcvTRUE;
 
     srcAddress = physicAddress;
@@ -875,12 +871,24 @@ gcoBUFOBJ_Upload (
             gcvALLOC_FLAG_NONE,
             memoryPool
             ));
-
         /* Lock the bufobj buffer. */
         gcmONERROR(gcoHARDWARE_Lock(&memory,
             gcvNULL,
             gcvNULL));
 
+#if gcdDUMP
+        {
+            gctUINT32 address;
+            gcmDUMP(gcvNULL, "#[info initialize bufobj node memory at create time]");
+            gcmGETHARDWAREADDRESS(memory, address);
+            gcmDUMP_BUFFER(gcvNULL,
+                           gcvDUMP_BUFFER_MEMORY,
+                           address,
+                           memory.logical,
+                           0,
+                           memory.size);
+        }
+#endif
         /* If we need to duplicate old data */
         if (duplicate)
         {
@@ -890,6 +898,8 @@ gcoBUFOBJ_Upload (
                 0,
                 BufObj->memory.logical,
                 BufObj->bytes));
+
+            gcmONERROR(gcoBUFOBJ_SetCPUWrite(BufObj, gcvTRUE));
 
             /* Dump buffer.*/
             gcmDUMP_BUFFER(gcvNULL,
@@ -913,6 +923,8 @@ gcoBUFOBJ_Upload (
         if (bGPUupload)
         {
             gcmONERROR(_gpuUpload(BufObj, Offset, Buffer, Bytes));
+
+            gcmONERROR(gcoBUFOBJ_SetCPUWrite(BufObj, gcvTRUE));
         }
         else
         {
@@ -922,8 +934,7 @@ gcoBUFOBJ_Upload (
                 Buffer,
                 Bytes));
 
-            /* Flush GPU cache */
-            gcmONERROR(gcoBUFOBJ_GPUCacheOperation(BufObj));
+            gcmONERROR(gcoBUFOBJ_SetCPUWrite(BufObj, gcvTRUE));
 
             /* Dump the buffer. */
             gcmDUMP_BUFFER(gcvNULL,
@@ -1542,42 +1553,18 @@ OnError:
     return status;
 }
 
-/*******************************************************************************
-**
-**  gcoBUFOBJ_GPUCacheOperation
-**
-**  Handles GPU cache operations.
-**
-**  INPUT:
-**
-**      gcoBUFOBJ BufObj
-**          Pointer to an gcoBUFOBJ object
-**
-**  OUTPUT:
-**
-**      NONE
-*/
 gceSTATUS
-gcoBUFOBJ_GPUCacheOperation(
-    gcoBUFOBJ BufObj
+gcoBUFOBJ_SetCPUWrite(
+    gcoBUFOBJ BufObj,
+    gctBOOL Value
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("BufObj=0x%x", BufObj);
-
     gcmVERIFY_OBJECT(BufObj, gcvOBJ_BUFOBJ);
 
-    switch(BufObj->type)
-    {
-    case gcvBUFOBJ_TYPE_ARRAY_BUFFER:
-        status = gcoHARDWARE_FlushVertex(gcvNULL);
-        break;
-    case gcvBUFOBJ_TYPE_ELEMENT_ARRAY_BUFFER:
-    case gcvBUFOBJ_TYPE_GENERIC_BUFFER:
-    default:
-        break;
-    }
+    BufObj->memory.bCPUWrite = Value;
 
     gcmFOOTER();
     return status;
@@ -1725,7 +1712,7 @@ gcoBUFOBJ_CPUCacheOperation_Range(
 }
 
 gceSTATUS
-gcoBUFOBJ_GPUCacheOperation(
+gcoBUFOBJ_SetCPUWrite(
     gcoBUFOBJ BufObj
     )
 {

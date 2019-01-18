@@ -144,7 +144,7 @@ MemoryBuffer *MemoryBuffer::getNewUninitMemBuffer(size_t Size,
   // that MemoryBuffer and data are aligned so PointerIntPair works with them.
   size_t AlignedStringLen =
     RoundUpToAlignment(sizeof(MemoryBufferMem) + BufferName.size() + 1,
-                       sizeof(void*)); // TODO: Is sizeof(void*) enough?
+                       sizeof(void*)); // VIV:TODO: Is sizeof(void*) enough?
   size_t RealLen = AlignedStringLen + Size + 1;
   char *Mem = static_cast<char*>(operator new(RealLen, std::nothrow));
   if (!Mem) return 0;
@@ -254,7 +254,7 @@ MemoryBuffer *MemoryBuffer::getFile(const char *Filename, std::string *ErrStr,
     struct stat MyFileInfo;
     struct stat *FileInfoPtr = FileInfo? (struct stat*)FileInfo : &MyFileInfo;
 
-    // TODO: This should use fstat64 when available.
+    // VIV:TODO: This should use fstat64 when available.
     if (fstat(FD, FileInfoPtr) == -1) {
       if (ErrStr) *ErrStr = sys::StrError();
       return 0;

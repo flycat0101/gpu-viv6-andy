@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -15,59 +15,6 @@
 #define __gc_es_consts_h__
 
 #include "gc_es_bindtable.h"
-
-#ifdef OPENGL40
-#define __GL_MAX_TEXTURE_COORDS                  8
-#define __GL_MAX_LIGHT_NUMBER                    32
-#define __GL_MAX_CLIPPLANE_NUMBER                8
-
-#define __GL_MAX_VERTEX_ELEMENTS                 16
-#define __GL_MAX_WEIGHT_SUPPORT                  4
-#define __GL_MAX_VERTEX_BUFFER_BINDINGS          6
-
-#define __GL_MAX_PROGRAM_STACK_DEPTH             8
-#define __GL_MAX_PROGRAM_VERTEX_ATTRIBUTES       16
-#define __GL_MAX_PROGRAM_MATRICES                16
-#define __GL_MAX_PROGRAM_LOCAL_PARAMETERS        256
-#define __GL_MAX_PROGRAM_PARAMETERS              480
-#define __GL_MAX_PROGRAM_ENV_PARAMETERS          256
-#define __GL_MAX_PROGRAM_INSTRUCTIONS            128
-#define __GL_PROGRAM_NATIVE_INSTRUCTIONS         128
-#define __GL_MAX_PROGRAM_ADDRESS_REGISTERS       1
-#define __GL_NUMBER_OF_PROGRAM_TARGET            2
-#define __GL_MAX_PROGRAM_ERRORSTR_LENGTH         2048
-#define __GL_PROGRAM_TABLE_STEP                  20
-
-#define __GL_TOTAL_VERTEX_ATTRIBUTES (__GL_MAX_PROGRAM_VERTEX_ATTRIBUTES + __GL_MAX_TEXTURE_COORDS + 8)
-
-#define __GL_MAX_COLORS                  2
-
-/* Indicies for color[] array in vertex */
-#define __GL_FRONTFACE                   0
-#define __GL_BACKFACE                    1
-#define __GL_MAX_COLORS                  2
-#define __GL_PRIMARY_COLOR               0
-#define __GL_SECONDARY_COLOR             1
-
-
-/*
-** Vertex structure.  Each vertex contains enough state to properly
-** render the active primitive.
-*/
-typedef struct __GLvertexRec {
-    __GLcoord    winPos;
-    GLfloat      clipW;
-    __GLcolor   *color[__GL_MAX_COLORS];         /* Pointer to current primary and secondary colors*/
-    __GLcolor    colors[__GL_MAX_COLORS];        /* 0: front face primary,   1: back face primary */
-    __GLcolor    colors2[__GL_MAX_COLORS];       /* 0: front face secondary, 1: back face secondary */
-    __GLcoord    texture[__GL_MAX_TEXTURE_COORDS];
-    GLfloat      eyeDistance;
-    GLfloat      pointSize;
-    GLfloat      colorIndex;
-    GLuint       boundaryEdge;
-} __GLvertex;
-
-#endif
 
 #define __glZero        (0.0f)
 #define __glOne         (1.0f)
@@ -126,6 +73,59 @@ typedef struct __GLvertexRec {
 #define __GL_INT64      4       /* api 64 bit GLint */
 #define __GL_BOOLEAN    5       /* api 8 bit boolean */
 #define __GL_COLOR      6       /* unscaled color in __GLfloat */
+
+#ifdef OPENGL40
+#define __GL_MAX_TEXTURE_COORDS                  8
+#define __GL_MAX_LIGHT_NUMBER                    32
+#define __GL_MAX_CLIPPLANE_NUMBER                8
+
+#define __GL_MAX_VERTEX_ELEMENTS                 16
+#define __GL_MAX_WEIGHT_SUPPORT                  4
+#define __GL_MAX_VERTEX_BUFFER_BINDINGS          6
+
+#define __GL_MAX_PROGRAM_STACK_DEPTH             8
+#define __GL_MAX_PROGRAM_VERTEX_ATTRIBUTES       16
+#define __GL_MAX_PROGRAM_MATRICES                16
+#define __GL_MAX_PROGRAM_LOCAL_PARAMETERS        256
+#define __GL_MAX_PROGRAM_PARAMETERS              480
+#define __GL_MAX_PROGRAM_ENV_PARAMETERS          256
+#define __GL_MAX_PROGRAM_INSTRUCTIONS            128
+#define __GL_PROGRAM_NATIVE_INSTRUCTIONS         128
+#define __GL_MAX_PROGRAM_ADDRESS_REGISTERS       1
+#define __GL_NUMBER_OF_PROGRAM_TARGET            2
+#define __GL_MAX_PROGRAM_ERRORSTR_LENGTH         2048
+#define __GL_PROGRAM_TABLE_STEP                  20
+
+#define __GL_TOTAL_VERTEX_ATTRIBUTES (__GL_MAX_VERTEX_ATTRIBUTES + __GL_MAX_TEXTURE_COORDS + 8)
+
+#define __GL_MAX_COLORS                  2
+
+/* Indicies for color[] array in vertex */
+#define __GL_FRONTFACE                   0
+#define __GL_BACKFACE                    1
+#define __GL_MAX_COLORS                  2
+#define __GL_PRIMARY_COLOR               0
+#define __GL_SECONDARY_COLOR             1
+
+
+/*
+** Vertex structure.  Each vertex contains enough state to properly
+** render the active primitive.
+*/
+typedef struct __GLvertexRec {
+    __GLcoord    winPos;
+    GLfloat      clipW;
+    __GLcolor   *color[__GL_MAX_COLORS];         /* Pointer to current primary and secondary colors*/
+    __GLcolor    colors[__GL_MAX_COLORS];        /* 0: front face primary,   1: back face primary */
+    __GLcolor    colors2[__GL_MAX_COLORS];       /* 0: front face secondary, 1: back face secondary */
+    __GLcoord    texture[__GL_MAX_TEXTURE_COORDS];
+    GLfloat      eyeDistance;
+    GLfloat      pointSize;
+    GLfloat      colorIndex;
+    GLuint       boundaryEdge;
+} __GLvertex;
+
+#endif
 
 
 /*internal data formats which aren't defined by spec, but supported by Vivante internal

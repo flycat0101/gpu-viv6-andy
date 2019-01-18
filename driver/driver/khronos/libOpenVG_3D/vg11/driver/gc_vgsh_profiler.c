@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -138,7 +138,7 @@ _vgshProfilerInitialize(
 
     Context->profilerObj->profilerClient = gcvCLIENT_OPENVG;
 
-    if (gcoPROFILER_Enable(Context->profilerObj) != gcvSTATUS_OK)
+    if (gcoPROFILER_Initialize(Context->profilerObj) != gcvSTATUS_OK)
     {
         profiler->enable = gcvFALSE;
         gcmFOOTER_NO();
@@ -502,7 +502,7 @@ _vgshProfilerSet(
     case VG_PROFILER_DRAW_BEGIN:
 
         gcmONERROR(_vgshProfilerWrite(Context, VG_PROFILER_WRITE_FRAME_BEGIN));
-        gcmONERROR(gcoPROFILER_Begin(Context->profilerObj, gcvCOUNTER_OP_DRAW));
+        gcmONERROR(gcoPROFILER_EnableCounters(Context->profilerObj, gcvCOUNTER_OP_DRAW));
 
         break;
 

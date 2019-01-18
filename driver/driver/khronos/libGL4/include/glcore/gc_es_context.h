@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -36,8 +36,6 @@
 #include "gc_es_fbo.h"
 #include "gc_es_vertex.h"
 #ifdef OPENGL40
-#include "gc_im_protos.h"
-#include "gc_gl_ctable.h"
 #include "gc_gl_pixel.h"
 #include "gc_gl_lighting.h"
 #include "gc_gl_eval.h"
@@ -50,7 +48,6 @@
 #include "gc_gl_image.h"
 #endif
 #include "gc_es_attrib.h"
-#include "gc_es_protos.h"
 #include "gc_es_devicepipe.h"
 #include "gc_es_profiler.h"
 #include "gc_egl.h"
@@ -62,47 +59,26 @@
 
 #ifdef OPENGL40
 enum {
-
     __GL_SHADEMODEL_BIT                         = (1 << 0),
-
     __GL_LIGHTING_ENDISABLE_BIT                 = (1 << 1),
-
     __GL_LIGHTMODEL_AMBIENT_BIT                 = (1 << 2),
-
     __GL_LIGHTMODEL_LOCALVIEWER_BIT             = (1 << 3),
-
     __GL_LIGHTMODEL_TWOSIDE_BIT                 = (1 << 4),
-
     __GL_LIGHTMODEL_COLORCONTROL_BIT            = (1 << 5),
-
     __GL_MATERIAL_COLORINDEX_FRONT_BIT          = (1 << 6),
-
     __GL_MATERIAL_EMISSION_FRONT_BIT            = (1 << 7),
-
     __GL_MATERIAL_SPECULAR_FRONT_BIT            = (1 << 8),
-
     __GL_MATERIAL_SHININESS_FRONT_BIT           = (1 << 9),
-
     __GL_MATERIAL_AMBIENT_FRONT_BIT             = (1 << 10),
-
     __GL_MATERIAL_DIFFUSE_FRONT_BIT             = (1 << 11),
-
     __GL_MATERIAL_COLORINDEX_BACK_BIT           = (1 << 12),
-
     __GL_MATERIAL_EMISSION_BACK_BIT             = (1 << 13),
-
     __GL_MATERIAL_SPECULAR_BACK_BIT             = (1 << 14),
-
     __GL_MATERIAL_SHININESS_BACK_BIT            = (1 << 15),
-
     __GL_MATERIAL_AMBIENT_BACK_BIT              = (1 << 16),
-
     __GL_MATERIAL_DIFFUSE_BACK_BIT              = (1 << 17),
-
     __GL_COLORMATERIAL_BIT                      = (1 << 18),
-
     __GL_COLORMATERIAL_ENDISABLE_BIT            = (1 << 19)
-
 };
 
 #define __GL_LIGHTING_ATTR_BITS    ( \
@@ -256,10 +232,10 @@ typedef struct __GLvertexInputRec {
 typedef struct __GLvertexMachineRec {
     GLuint indexCount;
     GLuint lastVertexIndex;
-    GLuint currentInputMask;
+    GLuint64 currentInputMask;
     GLuint inputMaskChanged;
-    GLuint requiredInputMask;
-    GLuint primInputMask;
+    GLuint64 requiredInputMask;
+    GLuint64 primInputMask;
     GLuint numberOfElements;
     __GLbeginMode beginMode;
     GLuint64 primElemSequence;
@@ -1089,17 +1065,17 @@ typedef enum __GLApiVersionRec
 } __GLApiVersion;
 
 
-#define __glesApiEnum(apiname)  enum_gl##apiname
+#define __glApiEnum(apiname)  enum_gl##apiname
 
 typedef enum
 {
-    __GLES_API_ENTRIES(__glesApiEnum)
-} __glesApiEnum;
+    __GL_API_ENTRIES(__glApiEnum)
+} __glApiEnum;
 
 #if gcdPATTERN_FAST_PATH
 typedef struct __GLapiInfoRec
 {
-    __glesApiEnum apiEnum;
+    __glApiEnum apiEnum;
     GLuint param[4];
 } __GLapiInfo;
 
@@ -1175,17 +1151,22 @@ struct __GLcontextRec
     /* Implementation dependent constants. */
     __GLdeviceConstants constants;
 
-    /* Current dispatch table. */
-    __GLesDispatchTable apiDispatchTable;
+
 #ifdef OPENGL40
     __GLevaluatorMachine eval;
     __GLdlistMachine dlist;
-    __GLesDispatchTable apiSaveDispatchTable;
-    __GLesDispatchTable immediateDispatchTable;
-    __GLesDispatchTable listCompileDispatchTable;
-    __GLesDispatchTable *currentImmediateTable;
     __GLattributeMachine attribute;
+    __GLdispatchTable dlCompileDispatch;
 #endif
+    __GLdispatchTable immedModeDispatch;
+
+    /* Enabled API level profiling? */
+    GLboolean apiProfile;
+    /* Current mode dispatch table:  can point to immediate or dlist-compile dispatch table */
+    __GLdispatchTable *pModeDispatch;
+    /* Current entry dispatch table: can point to mode, profiler or nop dispatch table. */
+    __GLdispatchTable *pEntryDispatch;
+
 
     /*
     ** All of the current user controllable GL server states are in "state".
@@ -1267,6 +1248,7 @@ struct __GLcontextRec
 #if gcdPATTERN_FAST_PATH
     __GLapiPatternMatchine      pattern;
 #endif
+
 #ifdef OPENGL40
     /* The drawable change mask: resize, move, and etc*/
     GLuint changeMask;
@@ -1278,10 +1260,10 @@ extern GLvoid __glSetError(__GLcontext *gc, GLenum code);
 
 #ifdef OPENGL40
 #define __GL_VALIDATE_VERTEX_ARRAYS(gc) \
-    (gc)->immediateDispatchTable.ArrayElement = __glim_ArrayElement_Validate; \
-    (gc)->apiDispatchTable.DrawArrays = __glim_DrawArrays_Validate; \
-    (gc)->apiDispatchTable.DrawElements = __glim_DrawElements_Validate; \
-    (gc)->vertexArray.formatChanged = GL_TRUE;
+    (gc)->vertexArray.formatChanged = GL_TRUE; \
+    (gc)->immedModeDispatch.ArrayElement = __glim_ArrayElement_Validate; \
+    (gc)->immedModeDispatch.DrawArrays = __glim_DrawArrays_Validate; \
+    (gc)->immedModeDispatch.DrawElements = __glim_DrawElements_Validate; \
 
 
 /* Macro to set inputMaskChanged */
@@ -1289,9 +1271,9 @@ extern GLvoid __glSetError(__GLcontext *gc, GLenum code);
     if (GL_FALSE == (gc)->input.inputMaskChanged) \
     { \
         (gc)->input.inputMaskChanged = GL_TRUE; \
-        (gc)->immediateDispatchTable.ArrayElement = __glim_ArrayElement_Validate; \
-        (gc)->immediateDispatchTable.DrawArrays = __glim_DrawArrays_Validate; \
-        (gc)->immediateDispatchTable.DrawElements = __glim_DrawElements_Validate; \
+        (gc)->immedModeDispatch.ArrayElement = __glim_ArrayElement_Validate; \
+        (gc)->immedModeDispatch.DrawArrays = __glim_DrawArrays_Validate; \
+        (gc)->immedModeDispatch.DrawElements = __glim_DrawElements_Validate; \
     } \
 
 #endif
@@ -1556,7 +1538,7 @@ __GL_INLINE GLvoid __glEvaluateAttribDrawableChange(__GLcontext *gc)
 
 
 #if VIVANTE_PROFILER
-extern GLint __glesApiProfileMode;
+extern GLint __glApiProfileMode;
 #endif
 
 #endif /* __gc_gl_context_h__ */

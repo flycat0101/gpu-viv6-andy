@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -28,7 +28,14 @@ typedef struct _slsKEYWORD
 }
 slsKEYWORD;
 
-static slsKEYWORD KeywordTable[] =
+typedef struct _clsKEYWORD_NODE
+{
+    slsDLINK_NODE    node;
+    slsKEYWORD       keyword;
+}
+slsKEYWORD_NODE;
+
+static slsKEYWORD KeywordTable_ES[] =
 {
     {"_viv_asm",               T_NOT_KEYWORD, T_NOT_KEYWORD, T_VIV_ASM, slvEXTENSION_VASM },
     {"active",                 T_NOT_KEYWORD, T_NOT_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
@@ -102,8 +109,8 @@ static slsKEYWORD KeywordTable[] =
     {"int",                    T_INT, T_INT, T_INT, slvEXTENSION_HALTI},
     {"interface",              T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
     {"invariant",              T_INVARIANT, T_INVARIANT, T_INVARIANT, slvEXTENSION_HALTI},
-    {"isampler1D",             T_NOT_KEYWORD, T_NOT_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
-    {"isampler1DArray",        T_NOT_KEYWORD, T_NOT_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"isampler1D",             T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_ISAMPLER1D, slvEXTENSION_VASM},
+    {"isampler1DArray",        T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_ISAMPLER1DARRAY, slvEXTENSION_VASM},
     {"isampler2D",             T_NOT_KEYWORD, T_NOT_KEYWORD, T_ISAMPLER2D, slvEXTENSION_HALTI},
     {"isampler2DArray",        T_NOT_KEYWORD, T_NOT_KEYWORD, T_ISAMPLER2DARRAY, slvEXTENSION_HALTI},
     {"isampler2DMS",           T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_ISAMPLER2DMS, slvEXTENSION_ES_31},
@@ -148,10 +155,10 @@ static slsKEYWORD KeywordTable[] =
     {"restrict",               T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_RESTRICT, slvEXTENSION_ES_31},
     {"return",                 T_RETURN, T_RETURN, T_RETURN, slvEXTENSION_HALTI},
     {"sample",                 T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_SAMPLE, slvEXTENSION_TESSELLATION_SHADER | slvEXTENSION_EXT_GEOMETRY_SHADER | slvEXTENSION_SHADER_MULTISAMPLE_INTERPOLATION},
-    {"sampler1D",              T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
-    {"sampler1DArray",         T_NOT_KEYWORD, T_NOT_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
-    {"sampler1DArrayShadow",   T_NOT_KEYWORD, T_NOT_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
-    {"sampler1DShadow",        T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"sampler1D",              T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_SAMPLER1D, slvEXTENSION_VASM},
+    {"sampler1DArray",         T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_SAMPLER1DARRAY, slvEXTENSION_VASM},
+    {"sampler1DArrayShadow",   T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_SAMPLER1DARRAYSHADOW, slvEXTENSION_VASM},
+    {"sampler1DShadow",        T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_SAMPLER1DSHADOW, slvEXTENSION_VASM},
     {"sampler2D",              T_SAMPLER2D, T_SAMPLER2D, T_SAMPLER2D, slvEXTENSION_HALTI},
     {"sampler2DArray",         T_NOT_KEYWORD, T_NOT_KEYWORD, T_SAMPLER2DARRAY, slvEXTENSION_HALTI},
     {"sampler2DArrayShadow",   T_NOT_KEYWORD, T_NOT_KEYWORD, T_SAMPLER2DARRAYSHADOW, slvEXTENSION_HALTI},
@@ -192,8 +199,8 @@ static slsKEYWORD KeywordTable[] =
     {"uniform",                T_UNIFORM, T_UNIFORM, T_UNIFORM, slvEXTENSION_HALTI},
     {"union",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
     {"unsigned",               T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
-    {"usampler1D",             T_NOT_KEYWORD, T_NOT_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
-    {"usampler1DArray",        T_NOT_KEYWORD, T_NOT_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"usampler1D",             T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_USAMPLER1D, slvEXTENSION_VASM},
+    {"usampler1DArray",        T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_USAMPLER1DARRAY, slvEXTENSION_VASM},
     {"usampler2D",             T_NOT_KEYWORD, T_NOT_KEYWORD, T_USAMPLER2D, slvEXTENSION_HALTI},
     {"usampler2DArray",        T_NOT_KEYWORD, T_NOT_KEYWORD, T_USAMPLER2DARRAY, slvEXTENSION_HALTI},
     {"usampler2DMS",           T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_USAMPLER2DMS, slvEXTENSION_ES_31},
@@ -217,35 +224,214 @@ static slsKEYWORD KeywordTable[] =
     {"writeonly",              T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_WRITEONLY, slvEXTENSION_ES_31},
 };
 
-const gctUINT KeywordCount = sizeof(KeywordTable) / sizeof(slsKEYWORD);
-
-#define _CHECK_KEYWORD_TABLE_SORTED  1
-static gctBOOL _keywordTableChecked = gcvFALSE;
-static void
-_IsKeywordTableSorted(
-    IN sloCOMPILER Compiler
-)
+static slsKEYWORD KeywordTable_GL[] =
 {
-    gctUINT i;
-    int result;
+    {"_viv_asm",               T_NOT_KEYWORD, T_NOT_KEYWORD, T_VIV_ASM, slvEXTENSION_VASM },
+    {"active",                 T_NOT_KEYWORD, T_NOT_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"asm",                    T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"atomic_uint",            T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_ATOMIC_UINT, slvEXTENSION_ES_31},
+    {"attribute",              T_ATTRIBUTE, T_ATTRIBUTE, T_ATTRIBUTE, slvEXTENSION_HALTI},
+    {"bool",                   T_BOOL, T_BOOL, T_BOOL, slvEXTENSION_HALTI},
+    {"break",                  T_BREAK, T_BREAK, T_BREAK, slvEXTENSION_HALTI},
+    {"buffer",                 T_NOT_KEYWORD, T_NOT_KEYWORD, T_BUFFER, slvEXTENSION_ES_31},
+    {"bvec2",                  T_BVEC2, T_BVEC2, T_BVEC2, slvEXTENSION_HALTI},
+    {"bvec3",                  T_BVEC3, T_BVEC3, T_BVEC3, slvEXTENSION_HALTI},
+    {"bvec4",                  T_BVEC4, T_BVEC4, T_BVEC4, slvEXTENSION_HALTI},
+    {"case",                   T_NOT_KEYWORD, T_NOT_KEYWORD, T_CASE, slvEXTENSION_HALTI},
+    {"cast",                   T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"centroid",               T_NOT_KEYWORD, T_NOT_KEYWORD, T_CENTROID, slvEXTENSION_HALTI},
+    {"class",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"coherent",               T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_COHERENT, slvEXTENSION_ES_31},
+    {"common",                 T_NOT_KEYWORD, T_NOT_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"const",                  T_CONST, T_CONST, T_CONST, slvEXTENSION_HALTI},
+    {"continue",               T_CONTINUE, T_CONTINUE, T_CONTINUE, slvEXTENSION_HALTI},
+    {"default",                T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_DEFAULT, slvEXTENSION_HALTI},
+    {"discard",                T_DISCARD, T_DISCARD, T_DISCARD, slvEXTENSION_HALTI},
+    {"dmat2",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_DMAT2, slvEXTENSION_DOUBLE_DATA_TYPE},
+    {"dmat2x2",                T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_DMAT2, slvEXTENSION_DOUBLE_DATA_TYPE},
+    {"dmat2x3",                T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_DMAT2X3, slvEXTENSION_DOUBLE_DATA_TYPE},
+    {"dmat2x4",                T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_DMAT2X4, slvEXTENSION_DOUBLE_DATA_TYPE},
+    {"dmat3",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_DMAT3, slvEXTENSION_DOUBLE_DATA_TYPE},
+    {"dmat3x2",                T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_DMAT3X2, slvEXTENSION_DOUBLE_DATA_TYPE},
+    {"dmat3x3",                T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_DMAT3, slvEXTENSION_DOUBLE_DATA_TYPE},
+    {"dmat3x4",                T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_DMAT3X4, slvEXTENSION_DOUBLE_DATA_TYPE},
+    {"dmat4",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_DMAT4, slvEXTENSION_DOUBLE_DATA_TYPE},
+    {"dmat4x2",                T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_DMAT4X2, slvEXTENSION_DOUBLE_DATA_TYPE},
+    {"dmat4x3",                T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_DMAT4X3, slvEXTENSION_DOUBLE_DATA_TYPE},
+    {"dmat4x4",                T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_DMAT4, slvEXTENSION_DOUBLE_DATA_TYPE},
+    {"do",                     T_DO, T_DO, T_DO, slvEXTENSION_HALTI},
+    {"double",                 T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_DOUBLE, slvEXTENSION_DOUBLE_DATA_TYPE},
+    {"dvec2",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_DVEC2, slvEXTENSION_DOUBLE_DATA_TYPE},
+    {"dvec3",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_DVEC3, slvEXTENSION_DOUBLE_DATA_TYPE},
+    {"dvec4",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_DVEC4, slvEXTENSION_DOUBLE_DATA_TYPE},
+    {"else",                   T_ELSE, T_ELSE, T_ELSE, slvEXTENSION_HALTI},
+    {"enum",                   T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"extern",                 T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"external",               T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"filter",                 T_NOT_KEYWORD, T_NOT_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"fixed",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"flat",                   T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_FLAT, slvEXTENSION_HALTI},
+    {"float",                  T_FLOAT, T_FLOAT, T_FLOAT, slvEXTENSION_HALTI},
+    {"for",                    T_FOR, T_FOR, T_FOR, slvEXTENSION_HALTI},
+    {"fvec2",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"fvec3",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"fvec4",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"goto",                   T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"half",                   T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"highp",                  T_HIGH_PRECISION, T_HIGH_PRECISION, T_HIGH_PRECISION, slvEXTENSION_HALTI},
+    {"hvec2",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"hvec3",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"hvec4",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"if",                     T_IF, T_IF, T_IF, slvEXTENSION_HALTI},
+    {"iimage1D",               T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"iimage1DArray",          T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"iimage2D",               T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_IIMAGE2D, slvEXTENSION_ES_31},
+    {"iimage2DArray",          T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_IIMAGE2DARRAY, slvEXTENSION_ES_31},
+    {"iimage3D",               T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_IIMAGE3D, slvEXTENSION_ES_31},
+    {"iimageBuffer",           T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"iimageCube",             T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_IIMAGECUBE, slvEXTENSION_ES_31},
+    {"iimageCubeArray",        T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_IIMAGECUBEARRAY, slvEXTENSION_TEXTURE_CUBE_MAP_ARRAY},
+    {"image1D",                T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"image1DArray",           T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"image1DArrayShadow",     T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"image1DShadow",          T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"image2D",                T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_IMAGE2D, slvEXTENSION_ES_31},
+    {"image2DArray",           T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_IMAGE2DARRAY, slvEXTENSION_ES_31},
+    {"image2DArrayShadow",     T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"image2DShadow",          T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"image3D",                T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_IMAGE3D, slvEXTENSION_ES_31},
+    {"imageBuffer",            T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"imageCube",              T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_IMAGECUBE, slvEXTENSION_ES_31},
+    {"imageCubeArray",         T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_IMAGECUBEARRAY, slvEXTENSION_TEXTURE_CUBE_MAP_ARRAY},
+    {"in",                     T_IN, T_IN, T_IN, slvEXTENSION_HALTI},
+    {"inline",                 T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"inout",                  T_INOUT, T_INOUT, T_INOUT, slvEXTENSION_HALTI},
+    {"input",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"int",                    T_INT, T_INT, T_INT, slvEXTENSION_HALTI},
+    {"interface",              T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"invariant",              T_INVARIANT, T_INVARIANT, T_INVARIANT, slvEXTENSION_HALTI},
+    {"isampler1D",             T_ISAMPLER1D, T_ISAMPLER1D, T_ISAMPLER1D, slvEXTENSION_HALTI},
+    {"isampler1DArray",        T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_ISAMPLER1DARRAY, slvEXTENSION_HALTI},
+    {"isampler2D",             T_NOT_KEYWORD, T_NOT_KEYWORD, T_ISAMPLER2D, slvEXTENSION_HALTI},
+    {"isampler2DArray",        T_NOT_KEYWORD, T_NOT_KEYWORD, T_ISAMPLER2DARRAY, slvEXTENSION_HALTI},
+    {"isampler2DMS",           T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_ISAMPLER2DMS, slvEXTENSION_ES_31},
+    {"isampler2DMSArray",      T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_ISAMPLER2DMSARRAY, slvEXTENSION_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY},
+    {"isampler2DRect",         T_ISAMPLER2DRECT, T_ISAMPLER2DRECT, T_ISAMPLER2DRECT, slvEXTENSION_HALTI},
+    {"isampler3D",             T_NOT_KEYWORD, T_NOT_KEYWORD, T_ISAMPLER3D, slvEXTENSION_HALTI},
+    {"isamplerBuffer",         T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_ISAMPLERBUFFER, slvEXTENSION_EXT_TEXTURE_BUFFER},
+    {"isamplerCube",           T_NOT_KEYWORD, T_NOT_KEYWORD, T_ISAMPLERCUBE, slvEXTENSION_HALTI},
+    {"isamplerCubeArray",      T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_ISAMPLERCUBEARRAY, slvEXTENSION_TEXTURE_CUBE_MAP_ARRAY},
+    {"ivec2",                  T_IVEC2, T_IVEC2, T_IVEC2, slvEXTENSION_HALTI},
+    {"ivec3",                  T_IVEC3, T_IVEC3, T_IVEC3, slvEXTENSION_HALTI},
+    {"ivec4",                  T_IVEC4, T_IVEC4, T_IVEC4, slvEXTENSION_HALTI},
+    {"layout",                 T_NOT_KEYWORD, T_NOT_KEYWORD, T_LAYOUT, slvEXTENSION_HALTI},
+    {"long",                   T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"lowp",                   T_LOW_PRECISION, T_LOW_PRECISION, T_LOW_PRECISION, slvEXTENSION_HALTI},
+    {"mat2",                   T_MAT2, T_MAT2, T_MAT2, slvEXTENSION_HALTI},
+    {"mat2x2",                 T_NOT_KEYWORD, T_NOT_KEYWORD, T_MAT2, slvEXTENSION_HALTI},
+    {"mat2x3",                 T_NOT_KEYWORD, T_NOT_KEYWORD, T_MAT2X3, slvEXTENSION_HALTI},
+    {"mat2x4",                 T_NOT_KEYWORD, T_NOT_KEYWORD, T_MAT2X4, slvEXTENSION_HALTI},
+    {"mat3",                   T_MAT3, T_MAT3, T_MAT3, slvEXTENSION_HALTI},
+    {"mat3x2",                 T_NOT_KEYWORD, T_NOT_KEYWORD, T_MAT3X2, slvEXTENSION_HALTI},
+    {"mat3x3",                 T_NOT_KEYWORD, T_NOT_KEYWORD, T_MAT3, slvEXTENSION_HALTI},
+    {"mat3x4",                 T_NOT_KEYWORD, T_NOT_KEYWORD, T_MAT3X4, slvEXTENSION_HALTI},
+    {"mat4",                   T_MAT4, T_MAT4, T_MAT4, slvEXTENSION_HALTI},
+    {"mat4x2",                 T_NOT_KEYWORD, T_NOT_KEYWORD, T_MAT4X2, slvEXTENSION_HALTI},
+    {"mat4x3",                 T_NOT_KEYWORD, T_NOT_KEYWORD, T_MAT4X3, slvEXTENSION_HALTI},
+    {"mat4x4",                 T_NOT_KEYWORD, T_NOT_KEYWORD, T_MAT4, slvEXTENSION_HALTI},
+    {"mediump",                T_MEDIUM_PRECISION, T_MEDIUM_PRECISION, T_MEDIUM_PRECISION, slvEXTENSION_HALTI},
+    {"namespace",              T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"noinline",               T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"noperspective",          T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_SMOOTH, slvEXTENSION_HALTI},
+    {"out",                    T_OUT, T_OUT, T_OUT, slvEXTENSION_HALTI},
+    {"output",                 T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"packed",                 T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"partition",              T_NOT_KEYWORD, T_NOT_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"patch",                  T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_PATCH, slvEXTENSION_TESSELLATION_SHADER},
+    {"precise",                T_NOT_KEYWORD, T_NOT_KEYWORD, T_PRECISE, slvEXTENSION_GPU_SHADER5},
+    {"precision",              T_PRECISION, T_PRECISION, T_PRECISION, slvEXTENSION_HALTI},
+    {"public",                 T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"readonly",               T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_READONLY, slvEXTENSION_ES_31},
+    {"resource",               T_NOT_KEYWORD, T_NOT_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"restrict",               T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_RESTRICT, slvEXTENSION_ES_31},
+    {"return",                 T_RETURN, T_RETURN, T_RETURN, slvEXTENSION_HALTI},
+    {"row_major",              T_NOT_KEYWORD, T_NOT_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"sample",                 T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_SAMPLE, slvEXTENSION_TESSELLATION_SHADER | slvEXTENSION_EXT_GEOMETRY_SHADER | slvEXTENSION_SHADER_MULTISAMPLE_INTERPOLATION},
+    {"sampler1D",              T_SAMPLER1D, T_SAMPLER1D, T_SAMPLER1D, slvEXTENSION_HALTI},
+    {"sampler1DArray",         T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_SAMPLER1DARRAY, slvEXTENSION_HALTI},
+    {"sampler1DArrayShadow",   T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_SAMPLER1DARRAYSHADOW, slvEXTENSION_HALTI},
+    {"sampler1DShadow",        T_SAMPLER1DSHADOW, T_SAMPLER1DSHADOW, T_SAMPLER1DSHADOW, slvEXTENSION_HALTI},
+    {"sampler2D",              T_SAMPLER2D, T_SAMPLER2D, T_SAMPLER2D, slvEXTENSION_HALTI},
+    {"sampler2DArray",         T_NOT_KEYWORD, T_NOT_KEYWORD, T_SAMPLER2DARRAY, slvEXTENSION_HALTI},
+    {"sampler2DArrayShadow",   T_NOT_KEYWORD, T_NOT_KEYWORD, T_SAMPLER2DARRAYSHADOW, slvEXTENSION_HALTI},
+    {"sampler2DMS",            T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_SAMPLER2DMS, slvEXTENSION_ES_31},
+    {"sampler2DMSArray",       T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_SAMPLER2DMSARRAY, slvEXTENSION_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY},
+    {"sampler2DRect",          T_SAMPLER2DRECT, T_SAMPLER2DRECT, T_SAMPLER2DRECT, slvEXTENSION_HALTI},
+    {"sampler2DRectShadow",    T_SAMPLER2DRECTSHADOW, T_SAMPLER2DRECTSHADOW, T_SAMPLER2DRECTSHADOW, slvEXTENSION_HALTI},
+    {"sampler2DShadow",        T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_SAMPLER2DSHADOW, slvEXTENSION_SHADOW_SAMPLER | slvEXTENSION_HALTI},
+    {"sampler3D",              T_SAMPLER3D, T_SAMPLER3D, T_SAMPLER3D, slvEXTENSION_HALTI},
+    {"sampler3DRect",          T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"samplerBuffer",          T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_SAMPLERBUFFER, slvEXTENSION_EXT_TEXTURE_BUFFER},
+    {"samplerCube",            T_SAMPLERCUBE, T_SAMPLERCUBE, T_SAMPLERCUBE, slvEXTENSION_HALTI},
+    {"samplerCubeArray",       T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_SAMPLERCUBEARRAY, slvEXTENSION_TEXTURE_CUBE_MAP_ARRAY},
+    {"samplerCubeArrayShadow", T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_SAMPLERCUBEARRAYSHADOW, slvEXTENSION_TEXTURE_CUBE_MAP_ARRAY},
+    {"samplerCubeShadow",      T_NOT_KEYWORD, T_NOT_KEYWORD, T_SAMPLERCUBESHADOW, slvEXTENSION_HALTI},
+    {"samplerExternalOES",     T_NOT_KEYWORD, T_NOT_KEYWORD, T_SAMPLEREXTERNALOES, slvEXTENSION_EGL_IMAGE_EXTERNAL | slvEXTENSION_EGL_IMAGE_EXTERNAL_ESSL3 },
+    {"shared",                 T_NOT_KEYWORD, T_NOT_KEYWORD, T_SHARED, slvEXTENSION_ES_31},
+    {"short",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"sizeof",                 T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"smooth",                 T_NOT_KEYWORD, T_NOT_KEYWORD, T_SMOOTH, slvEXTENSION_HALTI},
+    {"static",                 T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"struct",                 T_STRUCT, T_STRUCT, T_STRUCT, slvEXTENSION_HALTI},
+    {"subroutine",             T_NOT_KEYWORD, T_NOT_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"superp",                 T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"switch",                 T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_SWITCH, slvEXTENSION_HALTI},
+    {"template",               T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"this",                   T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"typedef",                T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"uimage1D",               T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"uimage1DArray",          T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"uimage2D",               T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_UIMAGE2D, slvEXTENSION_ES_31},
+    {"uimage2DArray",          T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_UIMAGE2DARRAY, slvEXTENSION_ES_31},
+    {"uimage3D",               T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_UIMAGE3D, slvEXTENSION_ES_31},
+    {"uimageBuffer",           T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"uimageCube",             T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_UIMAGECUBE, slvEXTENSION_ES_31},
+    {"uimageCubeArray",        T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_UIMAGECUBEARRAY, slvEXTENSION_TEXTURE_CUBE_MAP_ARRAY},
+    {"uint",                   T_NOT_KEYWORD, T_NOT_KEYWORD, T_UINT, slvEXTENSION_HALTI},
+    {"uniform",                T_UNIFORM, T_UNIFORM, T_UNIFORM, slvEXTENSION_HALTI},
+    {"union",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"unsigned",               T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"usampler1D",             T_USAMPLER1D, T_USAMPLER1D, T_USAMPLER1D, slvEXTENSION_HALTI},
+    {"usampler1DArray",        T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_USAMPLER1DARRAY, slvEXTENSION_HALTI},
+    {"usampler2D",             T_NOT_KEYWORD, T_NOT_KEYWORD, T_USAMPLER2D, slvEXTENSION_HALTI},
+    {"usampler2DArray",        T_NOT_KEYWORD, T_NOT_KEYWORD, T_USAMPLER2DARRAY, slvEXTENSION_HALTI},
+    {"usampler2DMS",           T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_USAMPLER2DMS, slvEXTENSION_ES_31},
+    {"usampler2DMSArray",      T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_USAMPLER2DMSARRAY, slvEXTENSION_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY},
+    {"usampler2DRect",         T_USAMPLER2DRECT, T_USAMPLER2DRECT, T_USAMPLER2DRECT, slvEXTENSION_HALTI},
+    {"usampler3D",             T_NOT_KEYWORD, T_NOT_KEYWORD, T_USAMPLER3D, slvEXTENSION_HALTI},
+    {"usamplerBuffer",         T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_USAMPLERBUFFER, slvEXTENSION_EXT_TEXTURE_BUFFER},
+    {"usamplerCube",           T_NOT_KEYWORD, T_NOT_KEYWORD, T_USAMPLERCUBE, slvEXTENSION_HALTI},
+    {"usamplerCubeArray",      T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_USAMPLERCUBEARRAY, slvEXTENSION_TEXTURE_CUBE_MAP_ARRAY},
+    {"using",                  T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
+    {"uvec2",                  T_NOT_KEYWORD, T_NOT_KEYWORD, T_UVEC2, slvEXTENSION_HALTI},
+    {"uvec3",                  T_NOT_KEYWORD, T_NOT_KEYWORD, T_UVEC3, slvEXTENSION_HALTI},
+    {"uvec4",                  T_NOT_KEYWORD, T_NOT_KEYWORD, T_UVEC4, slvEXTENSION_HALTI},
+    {"varying",                T_VARYING, T_VARYING, T_VARYING, slvEXTENSION_HALTI},
+    {"vec2",                   T_VEC2, T_VEC2, T_VEC2, slvEXTENSION_HALTI},
+    {"vec3",                   T_VEC3, T_VEC3, T_VEC3, slvEXTENSION_HALTI},
+    {"vec4",                   T_VEC4, T_VEC4, T_VEC4, slvEXTENSION_HALTI},
+    {"void",                   T_VOID, T_VOID, T_VOID, slvEXTENSION_HALTI},
+    {"volatile",               T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_VOLATILE, slvEXTENSION_ES_31},
+    {"while",                  T_WHILE, T_WHILE, T_WHILE, slvEXTENSION_HALTI},
+    {"writeonly",              T_NOT_KEYWORD, T_RESERVED_KEYWORD, T_WRITEONLY, slvEXTENSION_ES_31},
+};
 
-    if(_keywordTableChecked) return;
-    _keywordTableChecked = gcvTRUE;
-    for(i=0; i < KeywordCount - 1; i++) {
-        result = gcoOS_StrCmp(KeywordTable[i].symbol, KeywordTable[i + 1].symbol);
-        if (result != gcvSTATUS_SMALLER) {
-            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                            0,
-                            0,
-                            slvREPORT_ERROR,
-                            "keyword table not sorted at: '%s' and '%s'",
-                            KeywordTable[i].symbol,
-                            KeywordTable[i + 1].symbol));
-            return;
+const gctUINT KeywordCount_ES = sizeof(KeywordTable_ES) / sizeof(slsKEYWORD);
+const gctUINT KeywordCount_GL = sizeof(KeywordTable_GL) / sizeof(slsKEYWORD);
 
-        }
-    }
-}
+static slsHASH_TABLE  _keywordHash;
+
+static gctBOOL _IskeywordTableGenerated = gcvFALSE;
 
 static gctINT
 _SearchKeyword(
@@ -253,9 +439,12 @@ _SearchKeyword(
     IN gctCONST_STRING Symbol
     )
 {
-    gctINT    low, mid, high;
-    gceSTATUS result;
     gctSIZE_T length = 0, i;
+    gctUINT KeywordCount;
+    slsKEYWORD *KeywordTable;
+    slsKEYWORD_NODE *node;
+    slsDLINK_NODE *bucket;
+    gceSTATUS    status;
 
     length = gcoOS_StrLen(Symbol, gcvNULL);
 
@@ -273,46 +462,82 @@ _SearchKeyword(
         }
     }
 
-#ifdef _CHECK_KEYWORD_TABLE_SORTED
-    _IsKeywordTableSorted(Compiler);
-#endif
-    low = 0;
-    high = KeywordCount - 1;
-
-    while (low <= high)
+    if (!_IskeywordTableGenerated)
     {
-        mid = (low + high) / 2;
-
-        result = gcoOS_StrCmp(Symbol, KeywordTable[mid].symbol);
-
-        if (result == gcvSTATUS_SMALLER)
+        if (sloCOMPILER_IsOGLVersion(Compiler))
         {
-            high    = mid - 1;
-        }
-        else if (result == gcvSTATUS_LARGER)
-        {
-            low        = mid + 1;
+            KeywordCount = KeywordCount_GL;
+            KeywordTable = KeywordTable_GL;
         }
         else
         {
-            gcmASSERT(gcmIS_SUCCESS(result));
+            KeywordCount = KeywordCount_ES;
+            KeywordTable = KeywordTable_ES;
+        }
+        /* init the keyword hash */
+        slsHASH_TABLE_Initialize(&_keywordHash);
 
-            if (sloCOMPILER_ExtensionEnabled(Compiler, KeywordTable[mid].extension))
+        for(i=0; i< KeywordCount; i++) {
+            bucket = slsHASH_TABLE_Bucket(&_keywordHash,
+                                          slmBUCKET_INDEX(slHashString(KeywordTable[i].symbol)));
+
+            status = gcoOS_Allocate(gcvNULL,
+                                    sizeof(slsKEYWORD_NODE),
+                                    (gctPOINTER *) &node);
+            if (gcmIS_ERROR(status))
+                break;
+            node->keyword = KeywordTable[i];
+            slsDLINK_LIST_InsertFirst(bucket, &node->node);
+        }
+
+        _IskeywordTableGenerated = gcvTRUE;
+    }
+
+    bucket = slsHASH_TABLE_Bucket(&_keywordHash,
+                                  slmBUCKET_INDEX(slHashString(Symbol)));
+
+    FOR_EACH_DLINK_NODE(bucket, slsKEYWORD_NODE, node) {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(node->keyword.symbol, Symbol))) {
+            if (sloCOMPILER_ExtensionEnabled(Compiler, node->keyword.extension))
             {
-                return KeywordTable[mid].enabled;
+                return node->keyword.enabled;
             }
             else if (sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_NON_HALTI))
             {
-                return KeywordTable[mid].token;
+                return node->keyword.token;
             }
             else
             {
-                return KeywordTable[mid].disabled;
+                return node->keyword.disabled;
             }
         }
     }
 
     return T_NOT_KEYWORD;
+}
+
+gceSTATUS
+slCleanupKeywords(
+void
+)
+{
+   slsKEYWORD_NODE *node;
+   slsDLINK_NODE *bucket;
+   gceSTATUS status = gcvSTATUS_OK;
+
+   /* Destroy keyword hash table */
+   if (_IskeywordTableGenerated)
+   {
+       FOR_EACH_HASH_BUCKET(&_keywordHash, bucket) {
+          while (!slsDLINK_LIST_IsEmpty(bucket)) {
+             slsDLINK_LIST_DetachFirst(bucket, slsKEYWORD_NODE, &node);
+             gcmONERROR(gcoOS_Free(gcvNULL, (gctPOINTER)node));
+          }
+       }
+       _IskeywordTableGenerated = gcvFALSE;
+   }
+OnError:
+   return status;
 }
 
 gctINT
@@ -672,6 +897,7 @@ slScanBoolConstant(
 }
 
 #define SL_INT_MAX      2147483647
+#define SL_UINT_MAX     0xffffffff
 #define _sldUnsignedSuffix  "uU"
 #define _sldFloatingSuffix  "fF"
 
@@ -761,6 +987,8 @@ StringToIntConstant(
     IN OUT gctINT * Index
     )
 {
+    gctINT orgIndex = *Index;
+    gctBOOL error = gcvFALSE;
     gctINT32 result = 0, digit = 0;
     gctCHAR ch;
 
@@ -800,7 +1028,27 @@ StringToIntConstant(
             result = result * Base + digit;
         }
         else {
-            result = result * Base + digit;
+            if (error) continue;
+
+            /* here we use unsigned int max to do error checking,
+            because a 32-bit integer literal (whether it has a 'u' suffix or not) is valid */
+            if ((gctUINT32)result > ((SL_UINT_MAX - digit) / Base))
+            {
+                error = gcvTRUE;
+
+                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                             LineNo,
+                             StringNo,
+                             slvREPORT_ERROR,
+                             "too large %s integer: %s",
+                             (Base == 8)?
+                             "octal" : ((Base == 10)? "decimal" : "hexadecimal"),
+                             String + orgIndex));
+            }
+            else
+            {
+                result = result * Base + digit;
+            }
         }
     }
 
@@ -810,6 +1058,9 @@ EXIT:
 
 static gctSTRING
 _ConvStringToUintConstant(
+    IN sloCOMPILER Compiler,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
     IN gctSTRING String,
     IN gctINT Base,
     OUT gctUINT32 *UintConstant
@@ -818,6 +1069,8 @@ _ConvStringToUintConstant(
     gctUINT32 result = 0, digit = 0;
     gctCHAR ch;
     gctSTRING strEnd;
+    gctBOOL error = gcvFALSE;
+    gctSTRING strOrg = String;
 
     gcmASSERT(String);
     gcmASSERT((Base == 8) || (Base == 10) || (Base == 16));
@@ -861,7 +1114,31 @@ _ConvStringToUintConstant(
             goto EXIT;
         }
 
+        if(!sloCOMPILER_IsHaltiVersion(Compiler)) {
+            /* no need bound checking */
+            result = result * Base + digit;
+        }
+        else {
+            if (error) continue;
+
+            if (result > ((SL_UINT_MAX - digit) / Base))
+            {
+                error = gcvTRUE;
+
+                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                             LineNo,
+                             StringNo,
+                             slvREPORT_ERROR,
+                             "too large %s integer: %s",
+                             (Base == 8)?
+                             "octal" : ((Base == 10)? "decimal" : "hexadecimal"),
+                             strOrg));
+            }
+            else
+            {
                 result = result * Base + digit;
+            }
+        }
     }
 
 EXIT:  /*error invalid string */
@@ -883,7 +1160,7 @@ StringToUintConstant(
     gctUINT32 result = 0;
     gctSTRING strEnd;
 
-    strEnd = _ConvStringToUintConstant(String + orgIndex, Base, &result);
+    strEnd = _ConvStringToUintConstant(Compiler, LineNo, StringNo, String + orgIndex, Base, &result);
     if (strEnd == String + orgIndex)
     {
         /* Ignore octal-constant 0u, it is legal. */

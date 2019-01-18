@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -142,6 +142,8 @@ static VSC_ErrCode _VSC_LCSE_ReplaceUses(
 
                 if (VIR_Operand_Identical(srcOpnd, newDstOpnd, VSC_LCSE_GetShader(lcse)))
                 {
+                    VIR_TypeId srcOpndTypeId = VIR_Operand_GetTypeId(srcOpnd);
+
                     if(VSC_UTILS_MASK(VSC_OPTN_LCSEOptions_GetTrace(options), VSC_OPTN_LCSEOptions_TRACE_REPLACING))
                     {
                         VIR_LOG(dumper, "change the use instruction:\n");
@@ -160,6 +162,7 @@ static VSC_ErrCode _VSC_LCSE_ReplaceUses(
                         gcvNULL);
 
                     VIR_Operand_Copy(srcOpnd, VIR_Inst_GetSource(replacedInst, 0));
+                    VIR_Operand_SetTypeId(srcOpnd, srcOpndTypeId);
 
                     VIR_Operand_GetOperandInfo(instIter, srcOpnd, &srcInfo);
 
@@ -348,7 +351,6 @@ static VSC_LCSE_Key* _VSC_LCSE_ExpMap_FindSameExpKey(
                the two loads are loading the same data to xy and yz */
             if (VIR_OPCODE_isMemLd(keyOpcode))
             {
-                /* TO-DO: relax here - same channels just different shifts */
                 if ((VIR_Enable_Channel_Count(VIR_Inst_GetEnable(keyInst)) == 1 &&
                      VIR_Enable_Channel_Count(VIR_Inst_GetEnable(inst))    == 1) ||
                     VIR_Inst_GetEnable(keyInst) == VIR_Inst_GetEnable(inst))
@@ -503,7 +505,12 @@ static void _VSC_LCSE_ExpMap_MultiKill(
         {
             if (VIR_OPCODE_isMemSt(killOpcode) && VIR_OPCODE_isMemLd(keyOpcode))
             {
-                if(!VIR_Operand_Identical(VIR_Inst_GetSource(killingInst, 0), VIR_Inst_GetSource(keyInst, 0), VSC_LCSE_ExpMap_GetShader(expMap)))
+                if((VIR_Operand_isSymbol(VIR_Inst_GetSource(killingInst, 0)) && !VIR_Symbol_isUniform(VIR_Operand_GetSymbol(VIR_Inst_GetSource(killingInst, 0)))) ||
+                   (VIR_Operand_isSymbol(VIR_Inst_GetSource(keyInst, 0)) && !VIR_Symbol_isUniform(VIR_Operand_GetSymbol(VIR_Inst_GetSource(keyInst, 0)))))
+                {
+                    kills = gcvTRUE;
+                }
+                else if(!VIR_Operand_Identical(VIR_Inst_GetSource(killingInst, 0), VIR_Inst_GetSource(keyInst, 0), VSC_LCSE_ExpMap_GetShader(expMap)))
                 {
                     /* different base means no overlap */
                     kills = gcvFALSE;
@@ -630,6 +637,8 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBB(
             case VIR_OP_LOAD_L:
             case VIR_OP_LOAD_S:
             case VIR_OP_LOAD:
+            case VIR_OP_IMG_LOAD:
+            case VIR_OP_IMG_LOAD_3D:
                 if (VSC_UTILS_MASK(VSC_OPTN_LCSEOptions_GetOpts(options), VSC_OPTN_LCSEOptions_OPT_LOAD))
                 {
                     handledOp = gcvTRUE;
@@ -641,6 +650,7 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBB(
                     handledOp = gcvTRUE;
                 }
                 break;
+            case VIR_OP_MOVA:
             case VIR_OP_MUL:
             case VIR_OP_MUL_Z:
             case VIR_OP_NORM_MUL:
@@ -805,7 +815,11 @@ DEF_QUERY_PASS_PROP(VSC_LCSE_PerformOnShader)
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
 
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
+}
 
+DEF_SH_NECESSITY_CHECK(VSC_LCSE_PerformOnShader)
+{
+    return gcvTRUE;
 }
 
 /* local common expression elimination entry function */

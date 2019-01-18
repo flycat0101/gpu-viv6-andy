@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -284,7 +284,7 @@ VX_INTERNAL_CALLBACK_API void vxoOA_DestructObjectArray(vx_reference ref)
 {
     vx_object_array arr = (vx_object_array)ref;
     vx_uint32 i = 0u;
-    vxError("Releasing object array "VX_FMT_REF"\n", (void *)ref);
+    vxInfo("Releasing object array "VX_FMT_REF"\n", (void *)ref);
     for (i = 0u; i < arr->itemCount; i++)
     {
         /* NULL means standard destructor */
@@ -335,6 +335,7 @@ VX_INTERNAL_CALLBACK_API vx_object_array vxoOA_CreateObjectArrayEmpty(vx_referen
             case VX_TYPE_REMAP:
             case VX_TYPE_LUT:
             case VX_TYPE_THRESHOLD:
+            case VX_TYPE_TENSOR:
                 arr->itemType = item_type;
                 break;
             default:
@@ -364,6 +365,7 @@ VX_INTERNAL_CALLBACK_API vx_bool vxoOA_SetObjectArrayItem(vx_object_array arr, v
         case VX_TYPE_REMAP:
         case VX_TYPE_LUT:
         case VX_TYPE_THRESHOLD:
+        case VX_TYPE_TENSOR:
             if (arr->itemType != item_type) return vx_false_e;
             else break;
         default:
@@ -389,6 +391,8 @@ VX_INTERNAL_CALLBACK_API vx_bool vxoOA_SetObjectArrayItem(vx_object_array arr, v
 VX_API_ENTRY vx_object_array VX_API_CALL vxCreateObjectArray(vx_context context, vx_reference exemplar, vx_size count)
 {
     vx_object_array arr = NULL;
+
+    gcmDUMP_API("$VX vxCreateObjectArray: context=%p, exemplar=%p, count=0x%lx", context, exemplar, count);
 
     if (vxoContext_IsValid(context) == vx_true_e)
     {
@@ -416,6 +420,8 @@ VX_API_ENTRY vx_object_array VX_API_CALL vxCreateVirtualObjectArray(vx_graph gra
 {
     vx_object_array arr = NULL;
 
+    gcmDUMP_API("$VX vxCreateVirtualObjectArray: graph=%p, exemplar=%p, count=0x%lx", graph, exemplar, count);
+
     if (vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH) == vx_true_e)
     {
         if (vxoReference_IsValidAndNoncontext(exemplar) &&
@@ -440,6 +446,8 @@ VX_API_ENTRY vx_object_array VX_API_CALL vxCreateVirtualObjectArray(vx_graph gra
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseObjectArray(vx_object_array *arr)
 {
+    gcmDUMP_API("$VX vxReleaseObjectArray: arr=%p", arr);
+
     /* NULL means standard destructor */
     return vxoReference_Release((vx_reference_s **)arr, VX_TYPE_OBJECT_ARRAY, VX_REF_EXTERNAL);
 }
@@ -447,6 +455,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseObjectArray(vx_object_array *arr)
 VX_API_ENTRY vx_status VX_API_CALL vxQueryObjectArray(vx_object_array arr, vx_enum attribute, void *ptr, vx_size size)
 {
     vx_status status = VX_ERROR_INVALID_REFERENCE;
+
+    gcmDUMP_API("$VX vxQueryObjectArray: arr=%p, attribute=0x%x, ptr=%p, size=0x%lx", arr, attribute, ptr, size);
 
     if (vxoOA_IsValidObjectArray(arr) == vx_true_e)
     {
@@ -477,6 +487,8 @@ VX_API_ENTRY vx_reference VX_API_CALL vxGetObjectArrayItem(vx_object_array arr, 
 {
     vx_reference item = NULL;
 
+    gcmDUMP_API("$VX vxGetObjectArrayItem: arr=%p, index=0x%x", arr, index);
+
     if (vxoOA_IsValidObjectArray(arr) == vx_true_e)
     {
         if (index < arr->itemCount)
@@ -491,5 +503,31 @@ VX_API_ENTRY vx_reference VX_API_CALL vxGetObjectArrayItem(vx_object_array arr, 
     }
 
     return item;
+}
+
+VX_API_ENTRY vx_object_array VX_API_CALL vxCreateTensorObjectArray(vx_context context, vx_uint32 count, vx_tensor* tensor)
+{
+    vx_object_array arr = VX_NULL;
+
+    gcmDUMP_API("$VX vxCreateTensorObjectArray: context=%p, count=0x%x, tensor=%p", context, count, tensor);
+
+    if (vxoContext_IsValid(context) == vx_true_e)
+    {
+        vx_uint32 i = 0;
+        arr = vxoOA_CreateObjectArrayEmpty((vx_reference)tensor[0], VX_TYPE_TENSOR, count);
+        arr->itemCount = count;
+
+        for(i = 0; i < count; i++)
+        {
+            arr->itemsTable[i] = (vx_reference)tensor[i];
+            ((vx_reference)tensor[i])->scope = (vx_reference)arr;
+
+            vxoReference_Increment((vx_reference)tensor[i], VX_REF_EXTERNAL);
+        }
+    }
+    else
+        vxError("vxCreateTensorObjectArray: Invalid context");
+
+    return arr;
 }
 

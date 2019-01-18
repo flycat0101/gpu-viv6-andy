@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -20,6 +20,7 @@ ColorType
 2.0 s_pre
 3.0 l_pre
 */
+
 
 void _VGProgramCtor(gcoOS os, _VGProgram *program)
 {

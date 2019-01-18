@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -20,6 +20,10 @@
 ******************************************************************************/
 
 #include "gc_vsc.h"
+#include "gc_vsc_vir_loop.h"
+
+#define     VSC_CPF_MAX_TEMP        3072
+#define     VSC_CPF_MAX_INST_COUNT  3400
 
 BEGIN_EXTERN_C()
 
@@ -31,8 +35,6 @@ typedef enum _VSC_CPF_LATTICE
     VSC_CPF_NOT_CONSTANT = 3, /* not constant */
 } VSC_CPF_LATTICE;
 
-/* const value for each channel */
-/* to-do: four channel has the same type, is it better to have const value for each vec4 */
 typedef struct _VSC_CPF_CONST
 {
     gctUINT                 value;      /* use unsigned int to store the bit value */
@@ -61,6 +63,8 @@ typedef struct _VSC_CPF
     VSC_HASH_TABLE              constTable;    /* hash table to save the const information
                                                   key: (tempIdx*4 + channel) and bbIdx
                                                   value: VSC_CPF_Const */
+    /* We need a loop to check that in/out flow. */
+    VIR_LoopOpts                loopOpts;
 } VSC_CPF;
 
 #define VSC_CPF_GetShader(cpf)                  ((cpf)->pShader)
@@ -72,15 +76,27 @@ typedef struct _VSC_CPF
 #define VSC_CPF_GetDumper(cpf)                  ((cpf)->pDumper)
 #define VSC_CPF_SetDumper(cpf, d)               ((cpf)->pDumper = (d))
 #define VSC_CPF_GetMM(cpf)                      ((cpf)->pMM)
+#define VSC_CPF_GetFlowSize(cpf)                ((cpf)->flowSize)
+#define VSC_CPF_SetFlowSize(cpf, d)             ((cpf)->flowSize = (d))
 
 #define VSC_CPF_GetWorkList(cpf)                (&(cpf)->workList)
 #define VSC_CPF_GetBlkFlowArray(cpf)            (&(cpf)->blkFlowArray)
 #define VSC_CPF_GetConstTable(cpf)              (&(cpf)->constTable)
+#define VSC_CPF_GetLoopOpts(cpf)                ((cpf)->loopOpts)
+#define VSC_CPF_SetLoopOpts(cpf, l)             ((cpf)->loopOpts = (l))
 
 extern VSC_ErrCode VSC_CPF_PerformOnShader(
     IN VSC_SH_PASS_WORKER* pPassWorker
     );
 DECLARE_QUERY_PASS_PROP(VSC_CPF_PerformOnShader);
+DECLARE_SH_NECESSITY_CHECK(VSC_CPF_PerformOnShader);
+
+VSC_ErrCode VSC_CPF_PerformOnFunction(
+    IN  VIR_Shader*         pShader,
+    IN  VSC_HW_CONFIG*      pHwCfg,
+    IN  VSC_MM*             pMM,
+    IN  VIR_Function*       pFunc
+    );
 
 END_EXTERN_C()
 

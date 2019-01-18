@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -34,22 +34,30 @@ typedef enum _VSC_PASS_LEVEL
     VSC_PASS_LEVEL_LL   = 0x08,
     VSC_PASS_LEVEL_MC   = 0x10,
     VSC_PASS_LEVEL_CG   = 0x20,
-    VSC_PASS_LEVEL_PST  = 0x40
+    VSC_PASS_LEVEL_PST  = 0x40,
+    VSC_PASS_LEVEL_ALL  = VSC_PASS_LEVEL_PRE
+                        | VSC_PASS_LEVEL_HL
+                        | VSC_PASS_LEVEL_ML
+                        | VSC_PASS_LEVEL_LL
+                        | VSC_PASS_LEVEL_MC
+                        | VSC_PASS_LEVEL_CG
+                        | VSC_PASS_LEVEL_PST,
 }VSC_PASS_LEVEL;
 
 typedef union _VSC_PASS_RES_CREATION_REQ_FLAG
 {
     struct
     {
-        gctUINT                           bNeedCg           : 1;
-        gctUINT                           bNeedCfg          : 1;
-        gctUINT                           bNeedRdFlow       : 1;
-        gctUINT                           bNeedDu           : 1;
-        gctUINT                           bNeedWeb          : 1;
-        gctUINT                           bNeedLvFlow       : 1;
-        gctUINT                           bNeedSSAForm      : 1;
+        gctUINT                           bCreateResBeforeNecessityCheck    : 1;
+        gctUINT                           bNeedCg                           : 1;
+        gctUINT                           bNeedCfg                          : 1;
+        gctUINT                           bNeedRdFlow                       : 1;
+        gctUINT                           bNeedDu                           : 1;
+        gctUINT                           bNeedWeb                          : 1;
+        gctUINT                           bNeedLvFlow                       : 1;
+        gctUINT                           bNeedSSAForm                      : 1;
 
-        gctUINT                           reserved          : 25;
+        gctUINT                           reserved                          : 24;
     } s;
 
     gctUINT                               data;
@@ -116,7 +124,7 @@ typedef struct _VSC_BASE_PASS_WORKER
     VSC_OPTN_BASE*                    pBaseOption;
 
     /* Pass specific privated data */
-    void*                             pPrvData;
+    void*                             pPassSpecificData;
 
     /* Real used mem pool based on VSC_PASS_MEMPOOL_SEL */
     VSC_MM*                           pMM;
@@ -163,8 +171,23 @@ typedef struct _VSC_GPG_PASS_WORKER
    has made sure that pPassProp has been initialized into zero. */
 typedef VSC_ErrCode (*PFN_SH_PASS_ROUTINE)(VSC_SH_PASS_WORKER* pPassWorker);
 typedef VSC_ErrCode (*PFN_GPG_PASS_ROUTINE)(VSC_GPG_PASS_WORKER* pPassWorker);
-typedef void (*PFN_QUERY_PASS_PROP)(VSC_PASS_PROPERTY* pPassProp, void* pPrvData);
 
+/* Necessity check functions. */
+typedef gctBOOL (*PFN_SH_NECESSITY_CHECK)(VSC_SH_PASS_WORKER* pPassWorker);
+typedef gctBOOL (*PFN_GPG_NECESSITY_CHECK)(VSC_GPG_PASS_WORKER* pPassWorker);
+
+#define NECESSITY_CHECK_NAME(nameOfPassRoutine) nameOfPassRoutine##_NecessityCheck
+
+#define DECLARE_SH_NECESSITY_CHECK(nameOfPassRoutine) \
+                     gctBOOL NECESSITY_CHECK_NAME(nameOfPassRoutine)(VSC_SH_PASS_WORKER* pPassWorker)
+#define DEF_SH_NECESSITY_CHECK(nameOfPassRoutine) DECLARE_SH_NECESSITY_CHECK(nameOfPassRoutine)
+
+#define DECLARE_GPG_NECESSITY_CHECK(nameOfPassRoutine) \
+                     gctBOOL NECESSITY_CHECK_NAME(nameOfPassRoutine)(VSC_GPG_PASS_WORKER* pPassWorker)
+#define DEF_GPG_NECESSITY_CHECK(nameOfPassRoutine) DECLARE_GPG_NECESSITY_CHECK(nameOfPassRoutine)
+
+/* Query pass prop functions. */
+typedef void (*PFN_QUERY_PASS_PROP)(VSC_PASS_PROPERTY* pPassProp, void* pPrvData);
 #define QUERY_PASS_PROP_NAME(nameOfPassRoutine) nameOfPassRoutine##_QueryPassProp
 #define DECLARE_QUERY_PASS_PROP(nameOfPassRoutine) \
                      void QUERY_PASS_PROP_NAME(nameOfPassRoutine)(VSC_PASS_PROPERTY* pPassProp, void* pPrvData)
@@ -217,6 +240,7 @@ typedef struct _VSC_PASS_MM_POOL
     VSC_PRIMARY_MEM_POOL              sharedPMP;
     VSC_BUDDY_MEM_SYS                 BMS;
     VSC_ARENA_MEM_SYS                 AMS;
+    VSC_BUDDY_MEM_SYS                 scratchMemPool;
 }VSC_PASS_MM_POOL;
 
 typedef struct _VSC_SHADER_PASS_MANAGER
@@ -308,6 +332,7 @@ void vscKPPM_Finalize(VSC_KPG_PASS_MANAGER* pPgPassMnger);
 VSC_ErrCode vscSPM_CallPass(VSC_SHADER_PASS_MANAGER* pShPassMnger,
                             PFN_SH_PASS_ROUTINE pfnPassRoutine,
                             PFN_QUERY_PASS_PROP pfnQueryPassProp,
+                            PFN_SH_NECESSITY_CHECK pfnNecessityCheck,
                             gctUINT passId,
                             void* pPrvData);
 
@@ -322,11 +347,12 @@ VSC_ErrCode vscSPM_RunPasses(VSC_SHADER_PASS_MANAGER* pShPassMnger);
 VSC_ErrCode vscGPPM_CallPass(VSC_GPG_PASS_MANAGER* pPgPassMnger,
                              PFN_GPG_PASS_ROUTINE pfnPassRoutine,
                              PFN_QUERY_PASS_PROP pfnQueryPassProp,
+                             PFN_GPG_NECESSITY_CHECK pfnNecessityCheck,
                              gctUINT passId,
                              void* pPrvData);
 
 #define CALL_SH_PASS(pfnPassRoutine, passId, pPrvData) \
-          errCode = vscSPM_CallPass(pShPassMnger, (pfnPassRoutine), QUERY_PASS_PROP_NAME(pfnPassRoutine), (passId), (pPrvData)); \
+          errCode = vscSPM_CallPass(pShPassMnger, (pfnPassRoutine), QUERY_PASS_PROP_NAME(pfnPassRoutine), NECESSITY_CHECK_NAME(pfnPassRoutine), (passId), (pPrvData)); \
           ON_ERROR(errCode, #pfnPassRoutine);
 
 #define REGISTER_SH_PASS(pfnPassRoutine, pPrvData) \
@@ -335,7 +361,7 @@ VSC_ErrCode vscGPPM_CallPass(VSC_GPG_PASS_MANAGER* pPgPassMnger,
 #define RUN_SH_PASSES() errCode = vscSPM_RunPasses(pShPassMnger); ON_ERROR(errCode, "run shader passes");
 
 #define CALL_GPG_PASS(pfnPassRoutine, passId, pPrvData) \
-          errCode = vscGPPM_CallPass(pPgPassMnger, (pfnPassRoutine), QUERY_PASS_PROP_NAME(pfnPassRoutine), (passId), (pPrvData)); \
+          errCode = vscGPPM_CallPass(pPgPassMnger, (pfnPassRoutine), QUERY_PASS_PROP_NAME(pfnPassRoutine), NECESSITY_CHECK_NAME(pfnPassRoutine), (passId), (pPrvData)); \
           ON_ERROR(errCode, #pfnPassRoutine);
 
 END_EXTERN_C()

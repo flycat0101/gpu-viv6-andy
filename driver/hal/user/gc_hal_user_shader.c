@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -65,47 +65,6 @@ gcLoadShaders(
 
     /* Call down to the hardware object. */
     status = gcoHARDWARE_LoadProgram(gcvNULL, ProgramState.hints->stageBits, &ProgramState);
-
-    gcmFOOTER();
-    return status;
-}
-
-/*******************************************************************************
-**                                gcLoadKernel
-********************************************************************************
-**
-**  Load a pre-compiled and pre-linked kernel program into the hardware.
-**
-**  INPUT:
-**
-**      gcoHARDWARE Hardware
-**          Pointer to an gcoHARDWARE object.
-**
-**      gctSIZE_T StateBufferSize
-**          The number of bytes in the 'StateBuffer'.
-**
-**      gctPOINTER StateBuffer
-**          Pointer to the states that make up the shader program.
-**
-**      gcsHINT_PTR Hints
-**          Pointer to a gcsHINT structure that contains information required
-**          when loading the shader states.
-*/
-gceSTATUS
-gcLoadKernel(
-    IN gcoHARDWARE Hardware,
-    IN gctSIZE_T StateBufferSize,
-    IN gctPOINTER StateBuffer,
-    IN gcsHINT_PTR Hints
-    )
-{
-    gceSTATUS status;
-
-    gcmHEADER_ARG("Hardware=0x%x StateBufferSize=%zu StateBuffer=0x%x Hints=0x%x",
-        Hardware, StateBufferSize, StateBuffer, Hints);
-
-    /* Call down to the hardware object. */
-    status = gcoHARDWARE_LoadKernel(Hardware, StateBufferSize, StateBuffer, Hints);
 
     gcmFOOTER();
     return status;
@@ -188,6 +147,84 @@ gcoSHADER_ProgramUniformEx(
 }
 
 gceSTATUS
+gcoSHADER_BindUniform(
+    IN gcoHAL Hal,
+    IN gctUINT32 Address,
+    IN gctINT32 Physical,
+    IN gctSIZE_T Columns,
+    IN gctSIZE_T Rows,
+    IN gctSIZE_T Arrays,
+    IN gctBOOL   IsRowMajor,
+    IN gctSIZE_T MatrixStride,
+    IN gctSIZE_T ArrayStride,
+    IN gctCONST_POINTER Values,
+    IN gceUNIFORMCVT Convert,
+    IN gcSHADER_KIND Type
+    )
+{
+    gceSTATUS status;
+    gctUINT32 columns, rows, arrays, matrixStride, arrayStride;
+
+    gcmHEADER_ARG("Hal=0x%x, Address=%u Physical=%d Columns=%zu Rows=%zu Arrays=%zu "
+                  "IsRowMajor=%d MatrixStride=%zu ArrayStride=%zu Values=%p Convert=%d Type=%d",
+                  Hal, Address, Physical, Columns, Rows, Arrays, IsRowMajor,
+                  MatrixStride, ArrayStride, Values, Convert, Type);
+
+    gcmSAFECASTSIZET(columns, Columns);
+    gcmSAFECASTSIZET(rows, Rows);
+    gcmSAFECASTSIZET(arrays, Arrays);
+    gcmSAFECASTSIZET(matrixStride, MatrixStride);
+    gcmSAFECASTSIZET(arrayStride, ArrayStride);
+
+    status = gcoHARDWARE_BindUniformEx(gcvNULL, Address, Physical, columns, rows, arrays, IsRowMajor,
+                                       matrixStride, arrayStride, &Values, Convert, Type, gcvFALSE);
+
+    gcmFOOTER();
+    return status;
+}
+
+
+gceSTATUS
+gcoSHADER_BindUniformCombinedMode(
+    IN gcoHAL Hal,
+    IN gctUINT32 Address,
+    IN gctINT32 Physical,
+    IN gctSIZE_T Columns,
+    IN gctSIZE_T Rows,
+    IN gctSIZE_T Arrays,
+    IN gctBOOL   IsRowMajor,
+    IN gctSIZE_T MatrixStride,
+    IN gctSIZE_T ArrayStride,
+    IN gctCONST_POINTER Values[],
+    IN gctUINT32 ValuesCount,
+    IN gceUNIFORMCVT Convert,
+    IN gcSHADER_KIND Type
+    )
+{
+    gceSTATUS status;
+    gctUINT32 columns, rows, arrays, matrixStride, arrayStride;
+    gctUINT32 gpuCount = 1;
+    gcmHEADER_ARG("Hal=0x%x, Address=%u Physical=%d Columns=%zu Rows=%zu Arrays=%zu "
+                  "IsRowMajor=%d MatrixStride=%zu ArrayStride=%zu Values=%p Convert=%d Type=%d",
+                  Hal, Address, Physical, Columns, Rows, Arrays, IsRowMajor,
+                  MatrixStride, ArrayStride, Values, Convert, Type);
+
+    gcmSAFECASTSIZET(columns, Columns);
+    gcmSAFECASTSIZET(rows, Rows);
+    gcmSAFECASTSIZET(arrays, Arrays);
+    gcmSAFECASTSIZET(matrixStride, MatrixStride);
+    gcmSAFECASTSIZET(arrayStride, ArrayStride);
+
+    gcoHARDWARE_Query3DCoreCount(gcvNULL, &gpuCount);
+    gcmASSERT(ValuesCount == gpuCount);   /*Combined mode need send all gpus unform data */
+    status = gcoHARDWARE_BindUniformEx(gcvNULL, Address, Physical, columns, rows, arrays, IsRowMajor,
+                                       matrixStride, arrayStride, Values, Convert, Type, gcvTRUE);
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
 gcoSHADER_BindBufferBlock(
     IN gcoHAL Hal,
     IN gctUINT32 Address,
@@ -256,7 +293,7 @@ gcoSHADER_AllocateVidMem(
         gcmONERROR(gcoSURF_LockNode(node,
                                     physical,
                                     &logical));
-        gcmDUMP(gcvNULL, "#[info: video memory allocate for VSC %s", tag);
+        gcmDUMP(gcvNULL, "#[info: video memory allocate for VSC %s]", tag);
 
         if (initialData)
         {
@@ -281,7 +318,7 @@ gcoSHADER_AllocateVidMem(
             gcoOS_ZeroMemory(logical, size);
         }
 
-        gcmDUMP_BUFFER(gcvNULL, "memory", *physical, logical, 0, size);
+        gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_MEMORY, *physical, logical, 0, size);
 
         if (node->pool == gcvPOOL_VIRTUAL)
         {

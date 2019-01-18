@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -887,7 +887,7 @@ gceSTATUS vgfInitializeWrapper(
             Wrapper->surfArgValid = gcvTRUE;
 
             Wrapper->imageAllocated   = gcvFALSE;
-            Wrapper->surfaceAllocated = gcvTRUE;
+            Wrapper->surfaceAllocated = gcvFALSE;
             Wrapper->surfaceLocked    = gcvFALSE;
 
             /* Set default orientation. */
@@ -2346,6 +2346,15 @@ gceSTATUS vgfTesselateImage(
         /* Update surface-to-image matrix. */
         Context->drawImageSurfaceToImage->update(Context);
 
+        /*As spec, When a projective transformation is used(i.e., the bottom row of the image-user-tosurface
+        transformation contains values [ w0 w1 w2 ] different from [ 0 0 1 ]), the value of the VG_IMAGE_MODE parameter
+        is ignored and the behavior of VG_DRAW_IMAGE_NORMAL is substituted. This avoids
+        the need to generate paint pixels in perspective. */
+        if (!vgfIsAffine(Context, &Context->drawImageSurfaceToImage->matrix))
+        {
+            Context->halImageMode = gcvVG_IMAGE_NORMAL;
+        }
+
         /* Update states. */
         gcmERR_BREAK(vgfUpdateStates(
             Context,
@@ -2978,7 +2987,7 @@ VG_API_CALL VGImage VG_API_ENTRY vgCreateImage(
         else
 #endif
         {
-            byteCount  = pixelCount * surfaceFormat->bitsPerPixel / 8;
+            byteCount  = pixelCount * (surfaceFormat->bitsPerPixel / 8);
         }
 
         /* Make sure we are within range. */
@@ -4656,24 +4665,28 @@ VG_API_CALL void VG_API_ENTRY vgDrawWarpedImageVIV(
     VGImage Image,
     VGuint RectangleCount,
     const VGRectangle* SrcRectangles,
-    const VGRectangle* DstRectangles,
-    const VGMatrix* Matrices
+    const VGfloat DstBounds[][4],
+    const VGfloat DstPoints[][8],
+    const VGfloat Matrices[][9],
+    const VGfloat InvMatrices[][9]
     )
 {
     vgmENTERAPI(vgDrawWarpedImageVIV)
     {
-        VGImage PaddedImage;
         vgsIMAGE_PTR image;
         VGuint i;
         gceSTATUS status;
         VGImageQuality imageQuality;
         gceIMAGE_FILTER halImageQuality;
-
+        VGuint quality;
         gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_PARAMETERS,
-                      "%s(%p, %u, %p, %p, %p);\n",
+                      "%s(%p, %u, %p, %p);\n",
                       __FUNCTION__,
-                      Image, RectangleCount, SrcRectangles, DstRectangles, Matrices
+                      Image, RectangleCount, SrcRectangles, Matrices
                       );
+
+        /* Save the original rendering quality. */
+        quality = vgGeti(VG_RENDERING_QUALITY);
 
         if (RectangleCount == 0)
         {
@@ -4687,9 +4700,7 @@ VG_API_CALL void VG_API_ENTRY vgDrawWarpedImageVIV(
             break;
         }
 
-        PaddedImage = vgCreateImage((VGImageFormat)vgGetParameteri(Image, VG_IMAGE_FORMAT), vgGetParameteri(Image, VG_IMAGE_WIDTH) + 10, vgGetParameteri(Image, VG_IMAGE_HEIGHT) + 10, vgGeti(VG_IMAGE_QUALITY));
-        vgCopyImage(PaddedImage, 1, 1, Image, 0, 0, vgGetParameteri(Image, VG_IMAGE_WIDTH), vgGetParameteri(Image, VG_IMAGE_HEIGHT), VG_FALSE);
-        image = (vgsIMAGE_PTR) PaddedImage;
+        image = (vgsIMAGE_PTR) Image;
 
         if (vgfIsImageRenderTarget(Context, image))
         {
@@ -4700,6 +4711,8 @@ VG_API_CALL void VG_API_ENTRY vgDrawWarpedImageVIV(
         Context->drawImageSurfaceToPaint = &Context->imageFillSurfaceToPaint;
         Context->drawImageSurfaceToImage = &Context->imageSurfaceToImage;
 
+        /* Force non-antialiasing to remove blurred artifacts. */
+        vgSeti(VG_RENDERING_QUALITY, VG_RENDERING_QUALITY_NONANTIALIASED);
         gcmERR_BREAK(vgfFlushImage(Context, image, gcvFALSE));
 
 #if gcdGC355_PROFILER
@@ -4726,12 +4739,6 @@ VG_API_CALL void VG_API_ENTRY vgDrawWarpedImageVIV(
             Context->targetImage.surOrientation
             ));
 
-        gcmERR_BREAK(gcoVG_SetFillRule(
-            Context->vg,
-            gcvVG_NON_ZERO
-            ));
-#endif
-
         gcmERR_BREAK(vgfUpdateStates(
             Context,
             Context->halImageMode,
@@ -4741,6 +4748,12 @@ VG_API_CALL void VG_API_ENTRY vgDrawWarpedImageVIV(
             Context->maskingEnable,
             gcvFALSE
             ));
+
+        gcmERR_BREAK(gcoVG_SetFillRule(
+            Context->vg,
+            gcvVG_NON_ZERO
+            ));
+#endif
 
         gcmERR_BREAK(vgfUpdatePaint(
             Context,
@@ -4775,32 +4788,175 @@ VG_API_CALL void VG_API_ENTRY vgDrawWarpedImageVIV(
                 Context->varTreeDepth,
                 image->surface,
                 (gcsVG_RECT_PTR) &SrcRectangles[i],
-                (gcsVG_RECT_PTR) &DstRectangles[i],
                 (gctFLOAT *) Matrices[i].m,
                 halImageQuality,
                 Context->maskingEnable,
                 (i == 0) ? gcvTRUE : gcvFALSE
                 ));
 #else
+#if gcdMOVG
             gcmERR_BREAK(gcoVG_DrawSurfaceToImage(
                 Context->vg,
                 image->surface,
                 (gcsVG_RECT_PTR) &SrcRectangles[i],
-                (gcsVG_RECT_PTR) &DstRectangles[i],
-                (gctFLOAT *) Matrices[i].m,
+                DstBounds[i],
+                DstPoints[i],
+                (gctFLOAT *) InvMatrices[i],
+                (gctFLOAT *) Matrices[i],
+                halImageQuality,
+                Context->maskingEnable,
+                (i == 0) ? gcvTRUE : gcvFALSE,
+                Context->tsWidth, Context->tsHeight
+                ));
+#else
+            gcmERR_BREAK(gcoVG_DrawSurfaceToImage(
+                Context->vg,
+                image->surface,
+                (gcsVG_RECT_PTR) &SrcRectangles[i],
+                DstBounds[i],
+                DstPoints[i],
+                (gctFLOAT *) InvMatrices[i],
+                (gctFLOAT *) Matrices[i],
                 halImageQuality,
                 Context->maskingEnable,
                 (i == 0) ? gcvTRUE : gcvFALSE
                 ));
 #endif
+#endif
+        }
+
+        vgSeti(VG_RENDERING_QUALITY, quality);
+        *image->imageDirtyPtr = vgvIMAGE_NOT_FINISHED;
+        *Context->targetImage.imageDirtyPtr = vgvIMAGE_NOT_READY;
+        Context->imageDirty = vgvIMAGE_NOT_READY;
+    }
+    vgmLEAVEAPI(vgDrawWarpedImageVIV);
+}
+
+VG_API_CALL void VG_API_ENTRY vgDrawWarpedImageMaskVIV(
+    VGImage Image,
+    VGuint RectangleCount,
+    const VGRectangle* SrcRectangles,
+    VGint DestOrig[][2],
+    VGMaskLayer Masks[],
+    const VGfloat InvMatrices[][9])
+{
+    vgmENTERAPI(vgDrawWarpedImagMaskVIV)
+    {
+        gceSTATUS status = gcvSTATUS_OK;
+        vgsIMAGE_PTR image;
+        gctINT i;
+        vgsMASK_PTR mask;
+        vgsIMAGE_PTR maskImage;
+
+        if (RectangleCount == 0)
+        {
+            vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+            break;
+        }
+
+        if (!vgfVerifyUserObject(Context, Image, vgvOBJECTTYPE_IMAGE))
+        {
+            vgmERROR(VG_BAD_HANDLE_ERROR);
+            break;
+        }
+
+        image = (vgsIMAGE_PTR) Image;
+
+        if (vgfIsImageRenderTarget(Context, image))
+        {
+            vgmERROR(VG_IMAGE_IN_USE_ERROR);
+            break;
+        }
+
+        gcmERR_BREAK(vgfGetMaskImage(Context));
+        gcmERR_BREAK(vgfFlushImage(Context, image, gcvFALSE));
+
+        /* Enable masking. */
+        gcoVG_EnableMask(Context->vg, gcvTRUE);
+        gcoVG_SetMask(Context->vg, Context->maskImage->surface);
+
+        for (i = 0; i < (VGint)RectangleCount; i++)
+        {
+            if (Masks[i] == VG_INVALID_HANDLE)
+                continue;
+
+            /* Get the mask info. */
+            mask = (vgsMASK_PTR)Masks[i];
+            maskImage = &mask->image;
+
+            if ((i == 0) ||
+                (Masks[i - 1] == VG_INVALID_HANDLE))
+            {
+                /* Clearn the full mask with 0. */
+                gcmERR_BREAK(vgfFillColor(
+                    Context,
+                    Context->maskImage,
+                    0, 0,
+                    Context->maskImage->size.width,
+                    Context->maskImage->size.height,
+                    vgvFLOATCOLOR0000,
+                    vgvBYTECOLOR0000,
+                    gcvFALSE
+                    ));
+            }
+            else
+            {
+                /* Clearn the partial mask with 0. */
+                gcmERR_BREAK(vgfFillColor(
+                    Context,
+                    Context->maskImage,
+                    0, 0,
+                    ((vgsMASK_PTR)Masks[i - 1])->image.size.width,
+                    ((vgsMASK_PTR)Masks[i - 1])->image.size.height,
+                    vgvFLOATCOLOR0000,
+                    vgvBYTECOLOR0000,
+                    gcvFALSE
+                    ));
+            }
+
+            /* Copy the mask layer to driver's mask surface. */
+            vgfDrawImage(
+                Context,
+                maskImage,
+                Context->maskImage,
+                0, 0,
+                DestOrig[i][0], DestOrig[i][1],
+                maskImage->size.width, maskImage->size.height,
+                gcvVG_BLEND_SRC,
+                gcvFALSE,
+                gcvFALSE,
+                gcvFALSE,
+                gcvFALSE,
+                gcvTRUE,
+                gcvFALSE);
+
+            /* Flush to ensure the mask is set OK. */
+            vgfFlushPipe(Context, gcvFALSE);
+
+            gcmERR_BREAK(gcoVG_SetTarget(
+                Context->vg,
+                Context->targetImage.surface,
+                Context->targetImage.surOrientation
+                ));
+
+            gcmERR_BREAK(gcoVG_DrawSurfaceToImageMasked(
+                Context->vg,
+                image->surface,
+                (gcsVG_RECT_PTR) &SrcRectangles[i],
+                DestOrig[i][0],
+                DestOrig[i][1],
+                maskImage->size.width,
+                maskImage->size.height,
+                InvMatrices[i]
+                ));
         }
 
         *image->imageDirtyPtr = vgvIMAGE_NOT_FINISHED;
         *Context->targetImage.imageDirtyPtr = vgvIMAGE_NOT_READY;
         Context->imageDirty = vgvIMAGE_NOT_READY;
-        vgDestroyImage(PaddedImage);
     }
-    vgmLEAVEAPI(vgDrawWarpedImageVIV);
+    vgmLEAVEAPI(vgDrawWarpedImagMaskVIV);
 }
 
 VG_API_CALL VGImage VG_API_ENTRY vgCreateImageConstVIV(
@@ -4980,6 +5136,22 @@ static gceSTATUS _CreateYUVImage(
             surfFormat = gcvSURF_ANV12;
             break;
 
+        case VG_EXT_UYVY:
+            surfFormat = gcvSURF_UYVY;
+            break;
+
+        case VG_EXT_YV16:
+            surfFormat = gcvSURF_YV16;
+            break;
+
+        case VG_EXT_YV12:
+            surfFormat = gcvSURF_YV12;
+            break;
+
+        case VG_EXT_AUYVY:
+            surfFormat = gcvSURF_AUYVY;
+            break;
+
         default:
             vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
             return gcvSTATUS_INVALID_ARGUMENT;
@@ -5106,7 +5278,11 @@ VG_API_CALL VGImage VG_API_ENTRY vgCreateImageDirectVIV(
             (Format != VG_EXT_NV16) &&
             (Format != VG_EXT_AYUY2) &&
             (Format != VG_EXT_ANV12) &&
-            (Format != VG_EXT_ANV16)
+            (Format != VG_EXT_ANV16) &&
+            (Format != VG_EXT_UYVY) &&
+            (Format != VG_EXT_AUYVY) &&
+            (Format != VG_EXT_YV16) &&
+            (Format != VG_EXT_YV12)
             )
         {
             vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
@@ -5124,15 +5300,19 @@ VG_API_CALL VGImage VG_API_ENTRY vgCreateImageDirectVIV(
         {
         case VG_EXT_YUY2:
         case VG_EXT_NV16:
+        case VG_EXT_UYVY:
+        case VG_EXT_YV16:
             byteCount = 16;
             break;
 
         case VG_EXT_NV12:
+        case VG_EXT_YV12:
             byteCount = 12;
             break;
 
         case VG_EXT_AYUY2:
         case VG_EXT_ANV16:
+        case VG_EXT_AUYVY:
             byteCount = 24;
             break;
 
@@ -5167,16 +5347,20 @@ VG_API_CALL VGImage VG_API_ENTRY vgCreateImageDirectVIV(
             switch (Format)
             {
             case VG_EXT_YUY2:
+            case VG_EXT_UYVY:
                 *Count = 1;
                 break;
             case VG_EXT_NV12:
             case VG_EXT_NV16:
             case VG_EXT_AYUY2:
+            case VG_EXT_AUYVY:
                 *Count = 2;
                 break;
 
             case VG_EXT_ANV12:
             case VG_EXT_ANV16:
+            case VG_EXT_YV16:
+            case VG_EXT_YV12:
             default:
                 *Count = 3;
                 break;
@@ -5221,6 +5405,13 @@ VG_API_CALL void VG_API_ENTRY vgResolveImageVIV(
 
         image_src = (vgsIMAGE_PTR) Src;
         image_dst = (vgsIMAGE_PTR) Dst;
+
+        if (Context->rgb2yuvDirty & Context->rgb2yuvStdCust)
+        {
+            Context->rgb2yuvDirty = gcvFALSE;
+            gcoVG_SetRGB2YUVParameters(Context->vg, Context->rgb2yuvCoef, Context->rgb2yuvOffset, (gctBOOL *)(Context->rgb2yuvCfg));
+        }
+
         gcmERR_BREAK(gcoVG_Resolve(
             Context->vg,
             image_src->surface,
@@ -5229,7 +5420,8 @@ VG_API_CALL void VG_API_ENTRY vgResolveImageVIV(
             Dst_x, Dst_y,
             Width, Height,
             Src_uv, Src_standard,
-            Dst_uv, Dst_standard, Dst_alpha
+            Dst_uv, Dst_standard,
+            Dst_alpha, Context->rgb2yuvStdCust
             ));
 
         *image_src->imageDirtyPtr  = vgvIMAGE_NOT_FINISHED;

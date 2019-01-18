@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -21,6 +21,8 @@
 /*#define CL_SCAN_ONLY*/
 /*#define CL_SCAN_NO_ACTION*/
 /*#define CL_SCAN_NO_PREPROCESSOR*/
+
+#define __USE_VSC_MP__              0
 
 typedef    gctUINT            gctLABEL;
 
@@ -50,16 +52,6 @@ cloGetDefaultLanguageVersion(
 /* Prefix for a struct name */
 #define cldSTRUCT_NAME_PREFIX  "struct$"
 #define cldUNION_NAME_PREFIX  "union$"
-
-gceSTATUS
-cloCOMPILER_Lock(
-    IN cloCOMPILER Compiler
-    );
-
-gceSTATUS
-cloCOMPILER_Unlock(
-    IN cloCOMPILER Compiler
-    );
 
 gceSTATUS
 cloCOMPILER_EmptyMemoryPool(
@@ -112,6 +104,14 @@ typedef struct _clsCONSTANT_VARIABLE
     struct _clsNAME *member;
 }
 clsCONSTANT_VARIABLE;
+
+struct _clsNAME_POOL;
+typedef struct _clsNAME_POOL
+{
+    slsSLINK_NODE node;
+    struct _clsNAME *member;
+}
+clsNAME_POOL;
 
 gceSTATUS
 cloCOMPILER_AddConstantVariable(
@@ -218,6 +218,16 @@ IN cloCOMPILER Compiler
 );
 
 gctBOOL
+cloCOMPILER_HasCalculatePreScaleGlobalId(
+    IN cloCOMPILER Compiler
+    );
+
+gctBOOL
+cloCOMPILER_IsGcslDriverImage(
+IN cloCOMPILER Compiler
+);
+
+gctBOOL
 cloCOMPILER_ExtensionEnabled(
     IN cloCOMPILER Compiler,
     IN cleEXTENSION Extension
@@ -286,6 +296,12 @@ cloCOMPILER_LoadingBuiltins(
     );
 
 gceSTATUS
+cloCOMPILER_LoadingGeneralBuiltins(
+    IN cloCOMPILER Compiler,
+    IN gctBOOL LoadingBuiltins
+    );
+
+gceSTATUS
 cloCOMPILER_InKernelFunctionEpilog(
     IN cloCOMPILER Compiler,
     IN gctBOOL InKernelFunctionEpilog
@@ -303,6 +319,11 @@ cloCOMPILER_KernelFuncDefined(
 
 gceSTATUS
 cloCOMPILER_LoadBuiltins(
+    IN cloCOMPILER Compiler
+    );
+
+gceSTATUS
+cloCOMPILER_LoadGeneralBuiltIns(
     IN cloCOMPILER Compiler
     );
 
@@ -413,6 +434,12 @@ gctBOOL
 cloCOMPILER_IsNameSpaceGlobal(
 IN cloCOMPILER Compiler,
 IN struct _clsNAME_SPACE *  NameSpace
+);
+
+gctBOOL
+cloCOMPILER_IsDumpOn(
+IN cloCOMPILER Compiler,
+IN cleDUMP_OPTION DumpOption
 );
 
 gceSTATUS

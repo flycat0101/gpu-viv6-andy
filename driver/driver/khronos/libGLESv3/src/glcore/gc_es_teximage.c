@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -210,8 +210,6 @@ static const __GLformatCombine canonicalformats[] = {
     { GL_RG_EXT, GL_RG_EXT, GL_FLOAT, 4, GL_TRUE },
     { GL_RG_EXT, GL_RG_EXT, GL_HALF_FLOAT_OES, 2, GL_TRUE },
     { GL_RG_EXT, GL_RG_EXT, GL_UNSIGNED_BYTE, 1, GL_TRUE },
-
-    { GL_BGRA_EXT, GL_BGRA_EXT, GL_UNSIGNED_BYTE, 4, GL_TRUE },
 
     /* required by EXT_color_buffer_half_float extension */
     { GL_RGBA, GL_RGBA, GL_HALF_FLOAT_OES, 8, GL_TRUE },
@@ -659,7 +657,7 @@ GLboolean __glCheckTexImgFmtArg(__GLcontext *gc,
         case GL_BGRA_EXT:
             break;
         case GL_STENCIL_INDEX:
-            if(!__glExtension[__GL_EXTID_OES_texture_stencil8].bEnabled && gc->apiVersion < __GL_API_VERSION_ES30 )
+            if(!__glExtension[__GL_EXTID_OES_texture_stencil8].bEnabled && gc->apiVersion < __GL_API_VERSION_ES31 )
             {
                 invalid = GL_TRUE;
             }
@@ -745,7 +743,7 @@ GLboolean __glCheckTexImgFmt(__GLcontext *gc,
         {
         case GL_UNSIGNED_BYTE:
             invalid = (GL_RGB8 != internalFormat && GL_RGB565 != internalFormat &&
-                       GL_SRGB8 != internalFormat && GL_RGB != internalFormat);
+                       GL_SRGB8 != internalFormat && GL_RGB != internalFormat && __GL_RGBX8 != internalFormat);
             break;
         case GL_BYTE:
             invalid = (GL_RGB8_SNORM != internalFormat);
@@ -970,7 +968,8 @@ GLboolean __glCheckTexImgFmt(__GLcontext *gc,
         break;
 
     case GL_STENCIL_INDEX:
-        if (GL_STENCIL_INDEX8 != internalFormat ||
+        if ((!__glExtension[__GL_EXTID_OES_texture_stencil8].bEnabled && gc->apiVersion < __GL_API_VERSION_ES31) ||
+            GL_STENCIL_INDEX8 != internalFormat ||
             GL_UNSIGNED_BYTE != type)
         {
             invalid = GL_TRUE;
@@ -3460,22 +3459,13 @@ GLvoid GL_APIENTRY __gles_GenerateMipmap(__GLcontext *gc, GLenum target)
     }
     else
     {
-        /* remove the MIP_HINT_FORCE_ON which against spec required, the app will use mipmap only when
-        minFilter use mipmap related filter */
-        tex->params.mipHint = __GL_TEX_MIP_HINT_AUTO_MIP;
-
         if (tex->fboList == gcvNULL)
         {
-            gcePATCH_ID patchId = gcvPATCH_INVALID;
-
-            gcoHAL_GetPatchID(gcvNULL, &patchId);
-
-            if (patchId == gcvPATCH_GLBM21 ||
-                patchId == gcvPATCH_GLBM25 ||
-                patchId == gcvPATCH_ANTUTU6X)
-            {
-                tex->params.mipHint = __GL_TEX_MIP_HINT_FORCE_ON;
-            }
+            tex->params.mipHint = __GL_TEX_MIP_HINT_FORCE_ON;
+        }
+        else
+        {
+            tex->params.mipHint = __GL_TEX_MIP_HINT_AUTO_MIP;
         }
     }
     tex->mipBaseLevel = baseLevel;
@@ -5350,10 +5340,11 @@ GLvoid __glSetFBOAttachedTexDirty(__GLcontext *gc, GLbitfield mask, GLint drawbu
         else
         {
             GLint attachIndex = __glMapAttachmentToIndex(fbo->drawBuffers[drawbuffer]);
+            __GLfboAttachPoint *attachPoint = gcvNULL;
 
             if (attachIndex != -1)
             {
-                __GLfboAttachPoint *attachPoint = &fbo->attachPoint[attachIndex];
+                attachPoint = &fbo->attachPoint[attachIndex];
 
                 if (attachPoint->objType == GL_TEXTURE)
                 {

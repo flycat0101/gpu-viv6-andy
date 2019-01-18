@@ -11,7 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// TODO: This should index all interesting directories with dirent calls.
+// VIV:TODO: This should index all interesting directories with dirent calls.
 //  getdirentries ?
 //  opendir/readdir_r/closedir ?
 //
@@ -49,7 +49,7 @@ namespace {
 #if !defined(UNDER_CE)
     char *absPathStrPtr = _fullpath(NULL, relPath, 0);
 #else
-    // TODO - Need to implement _fullpath.
+    // VIV:TODO - Need to implement _fullpath.
     assert(relPath[0] == '\\' || relPath[0] == '/');
     const char *absPathStrPtr = relPath;
 #endif

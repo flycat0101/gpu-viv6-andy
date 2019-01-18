@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -58,17 +58,15 @@
 
    6. Since we use 3-srcs ALU inst layout to codec load_attr, but load_attr has several special bits
       for following:
-          a. bNeedUscSync (bit-30 of word0) to indicate whether needs USC level data sync,
-          b. shStageClient (bit[3-4] of word1) to indicate from which upstreaming shader stage
+          a. shStageClient (bit[3-4] of word1) to indicate from which upstreaming shader stage
              load_attr loads attrs,
-          c. attrLayout (bit 6 of word1) to indicate attributes layout (interleaved or linear)
+          b. attrLayout (bit 6 of word1) to indicate attributes layout (interleaved or linear)
       so we need cast 3-srcs ALU inst to store_attr inst layout to do codec for this bit.
 
    7. MSB5 of word0 (samplerSlot as usual in normal layouts) has special meaning for mul/norm_mul/
       mad/mullo/dst/dp/norm_dp. If that 5bits are zero, result of these insts will generate INF for
       (0 * INF), otherwise, 0 is generated for (0 * INF). Note that, that MSB5 are reserved in these
-      insts' layout, so we will cast to VSC_MC_SAMPLE_INST when codecing (that means relative reserved
-      one might be written with non-zero value).
+      insts' layout.
 
    8. Since we use 3-srcs ALU inst layout to codec atomic operations, but atomic operations have a
       special bAccessLocalStorage bit (bit-8 of word1) to indicate whether the operation will act on
@@ -87,32 +85,36 @@ typedef union _VSC_MC_NO_OPERAND_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
-        gctUINT        reserved0             : 26;/* Must be zero'ed */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1;
+        gctUINT        reserved1             : 23;/* Must be zero'ed */
 #else
-        gctUINT        reserved0             : 26;/* Must be zero'ed */
+        gctUINT        reserved1             : 23;/* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1;
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
 #endif
 
-        gctUINT        reserved1             : 32;/* Must be zero'ed */
+        gctUINT        reserved2             : 32;/* Must be zero'ed */
 
 #if !gcdENDIAN_BIG
-        gctUINT        reserved2             : 16;/* Must be zero'ed */
+        gctUINT        reserved3             : 16;/* Must be zero'ed */
         gctUINT        baseOpcodeBit6        : 1;
-        gctUINT        reserved3             : 15;/* Must be zero'ed */
+        gctUINT        reserved4             : 15;/* Must be zero'ed */
 #else
-        gctUINT        reserved3             : 15;/* Must be zero'ed */
+        gctUINT        reserved4             : 15;/* Must be zero'ed */
         gctUINT        baseOpcodeBit6        : 1;
-        gctUINT        reserved2             : 16;/* Must be zero'ed */
+        gctUINT        reserved3             : 16;/* Must be zero'ed */
 #endif
 
 #if !gcdENDIAN_BIG
-        gctUINT        reserved4             : 4; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved5             : 4; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        extOpcode             : 8;
-        gctUINT        reserved5             : 20;/* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved6             : 20;/* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
 #else
-        gctUINT        reserved5             : 20;/* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved6             : 20;/* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        extOpcode             : 8;
-        gctUINT        reserved4             : 4; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved5             : 4; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
 #endif
     } inst;
 
@@ -127,30 +129,38 @@ typedef union _VSC_MC_ALU_3_SRCS_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
-        gctUINT        condOpCode            : 5;
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
+        gctUINT        reserved0             : 1; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
-        gctUINT        reserved0             : 5; /* For load_attr, see NOTE 6; For mad, see NOTE 7; For others, must be zero'ed */
+        gctUINT        bInfX0ToZero          : 1;
+        gctUINT        reserved2             : 4; /* Must be zero'ed */
 #else
-        gctUINT        reserved0             : 5; /* For load_attr, see NOTE 6; For mad, see NOTE 7; For others, must be zero'ed */
+        gctUINT        reserved2             : 4; /* Must be zero'ed */
+        gctUINT        bInfX0ToZero          : 1;
         gctUINT        writeMask             : 4;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        dstRelAddr            : 3;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        bResultSat            : 1;
-        gctUINT        condOpCode            : 5;
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 1; /* Must be zero'ed */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
 #endif
 
 #if !gcdENDIAN_BIG
         gctUINT        roundMode             : 2;
         gctUINT        packMode              : 1;
-        gctUINT        reserved1             : 4; /* For load_attr, see NOTE 6; For others, must be zero'ed */
+        gctUINT        reserved3             : 4; /* For load_attr, see NOTE 6; For others, must be zero'ed */
         gctUINT        bSkipForHelperKickoff : 1;
-        gctUINT        reserved2             : 2; /* Must be zero'ed for non-atomics. For atomics, see NOTE 8 */
+        gctUINT        reserved4             : 2; /* Must be zero'ed for non-atomics. For atomics, see NOTE 8 */
         gctUINT        bDenorm               : 1;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
         gctUINT        src0RegNo             : 9;
@@ -166,9 +176,9 @@ typedef union _VSC_MC_ALU_3_SRCS_INST
         gctUINT        src0RegNo             : 9;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
         gctUINT        bDenorm               : 1;
-        gctUINT        reserved2             : 2; /* Must be zero'ed for non-atomics. For atomics, see NOTE 8 */
+        gctUINT        reserved4             : 2; /* Must be zero'ed for non-atomics. For atomics, see NOTE 8 */
         gctUINT        bSkipForHelperKickoff : 1;
-        gctUINT        reserved1             : 4; /* For load_attr, see NOTE 6; For others, must be zero'ed */
+        gctUINT        reserved3             : 4; /* For load_attr, see NOTE 6; For others, must be zero'ed */
         gctUINT        packMode              : 1;
         gctUINT        roundMode             : 2;
 #endif
@@ -228,8 +238,8 @@ typedef union _VSC_MC_ALU_3_SRCS_INST
 }
 VSC_MC_ALU_3_SRCS_INST;
 
-/* 2-srcs (src0 + src1) alu inst case */
-typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC1_INST
+/* 3-srcs alu with condition code inst case */
+typedef union _VSC_MC_ALU_3_SRCS_CC_INST
 {
     struct
     {
@@ -237,17 +247,19 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC1_INST
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        condOpCode            : 5;
         gctUINT        bResultSat            : 1;
-        gctUINT        bDstValid             : 1;
+        gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
-        gctUINT        reserved0             : 5; /* Must be zero'ed for non NORM_MUL/MUL/MULLO/DST/DP, otherwise, see NOTE 7 */
+        gctUINT        bInfX0ToZero          : 1;
+        gctUINT        reserved0             : 4; /* Must be zero'ed */
 #else
-        gctUINT        reserved0             : 5; /* Must be zero'ed for non NORM_MUL/MUL/MULLO/DST/DP, otherwise, see NOTE 7 */
+        gctUINT        reserved0             : 4; /* Must be zero'ed */
+        gctUINT        bInfX0ToZero          : 1;
         gctUINT        writeMask             : 4;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        dstRelAddr            : 3;
-        gctUINT        bDstValid             : 1;
+        gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        bResultSat            : 1;
         gctUINT        condOpCode            : 5;
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
@@ -256,7 +268,11 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC1_INST
 #if !gcdENDIAN_BIG
         gctUINT        roundMode             : 2;
         gctUINT        packMode              : 1;
-        gctUINT        reserved1             : 8; /* Must be zero'ed */
+        gctUINT        reserved1             : 3; /* For load_attr, see NOTE 6; For others, must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        bSkipForHelperKickoff : 1;
+        gctUINT        reserved2             : 2; /* Must be zero'ed for non-atomics. For atomics, see NOTE 8 */
+        gctUINT        bDenorm               : 1;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
         gctUINT        src0RegNo             : 9;
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
@@ -270,7 +286,11 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC1_INST
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
         gctUINT        src0RegNo             : 9;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
-        gctUINT        reserved1             : 8; /* Must be zero'ed */
+        gctUINT        bDenorm               : 1;
+        gctUINT        reserved2             : 2; /* Must be zero'ed for non-atomics. For atomics, see NOTE 8 */
+        gctUINT        bSkipForHelperKickoff : 1;
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved1             : 3; /* For load_attr, see NOTE 6; For others, must be zero'ed */
         gctUINT        packMode              : 1;
         gctUINT        roundMode             : 2;
 #endif
@@ -301,23 +321,133 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC1_INST
 
 #if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
-        gctUINT        reserved2             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
-        gctUINT        extOpcode             : 8;
-        gctUINT        reserved3             : 1; /* Must be zero'ed */
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        src2RegNo             : 9;
         gctUINT        dstRegNoBit7          : 1;
-        gctUINT        reserved4             : 10;/* Must be zero'ed */
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        bSrc2ModAbs           : 1;
         gctUINT        dstRegNoBit8          : 1;
-        gctUINT        reserved5             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        src2Type              : 3;
         gctUINT        dstType               : 1;
 #else
         gctUINT        dstType               : 1;
-        gctUINT        reserved5             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        src2Type              : 3;
+        gctUINT        src2RelAddr           : 3;
         gctUINT        dstRegNoBit8          : 1;
-        gctUINT        reserved4             : 10;/* Must be zero'ed */
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        src2Swizzle           : 8;
         gctUINT        dstRegNoBit7          : 1;
-        gctUINT        reserved3             : 1; /* Must be zero'ed */
+        gctUINT        src2RegNo             : 9;
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        src1Type              : 3;
+#endif
+    } inst;
+
+    gctUINT            data[4];
+}
+VSC_MC_ALU_3_SRCS_CC_INST;
+
+/* 2-srcs (src0 + src1) alu inst case */
+typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC1_INST
+{
+    struct
+    {
+#if !gcdENDIAN_BIG
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
+        gctUINT        reserved0             : 1; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+        gctUINT        bResultSat            : 1;
+        gctUINT        bDstValid             : 1;
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        writeMask             : 4;
+        gctUINT        bInfX0ToZero          : 1;
+        gctUINT        reserved2             : 4; /* Must be zero'ed */
+#else
+        gctUINT        reserved2             : 4; /* Must be zero'ed */
+        gctUINT        bInfX0ToZero          : 1;
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1;
+        gctUINT        bResultSat            : 1;
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 1; /* Must be zero'ed */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
+
+#if !gcdENDIAN_BIG
+        gctUINT        roundMode             : 2;
+        gctUINT        packMode              : 1;
+        gctUINT        reserved3             : 8; /* For load_attr, see NOTE 6; For others, must be zero'ed */
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        reserved3             : 8; /* For load_attr, see NOTE 6; For others, must be zero'ed */
+        gctUINT        packMode              : 1;
+        gctUINT        roundMode             : 2;
+#endif
+
+#if !gcdENDIAN_BIG
+        gctUINT        src0RelAddr           : 3;
+        gctUINT        src0Type              : 3;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        src1RegNo             : 9;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
+
+#if !gcdENDIAN_BIG
+        gctUINT        src1Type              : 3;
+        gctUINT        reserved4             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        extOpcode             : 8;
-        gctUINT        reserved2             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved5             : 1; /* Must be zero'ed */
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        reserved6             : 10;/* Must be zero'ed */
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        reserved7             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        reserved7             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        reserved6             : 10;/* Must be zero'ed */
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        reserved5             : 1; /* Must be zero'ed */
+        gctUINT        extOpcode             : 8;
+        gctUINT        reserved4             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        src1Type              : 3;
 #endif
     } inst;
@@ -326,6 +456,110 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC1_INST
 }
 VSC_MC_ALU_2_SRCS_SRC0_SRC1_INST;
 
+/* 2-srcs (src0 + src1) alu inst case */
+typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC1_CC_INST
+{
+    struct
+    {
+#if !gcdENDIAN_BIG
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+        gctUINT        condOpCode            : 5;
+        gctUINT        bResultSat            : 1;
+        gctUINT        bDstValid             : 1;
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        writeMask             : 4;
+        gctUINT        bInfX0ToZero          : 1;
+        gctUINT        reserved0             : 4; /* Must be zero'ed */
+#else
+        gctUINT        reserved0             : 4; /* Must be zero'ed */
+        gctUINT        bInfX0ToZero          : 1;
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1;
+        gctUINT        bResultSat            : 1;
+        gctUINT        condOpCode            : 5;
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
+
+#if !gcdENDIAN_BIG
+        gctUINT        roundMode             : 2;
+        gctUINT        packMode              : 1;
+        gctUINT        reserved1             : 3; /* For load_attr, see NOTE 6; For others, must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved2             : 4; /* Must be zero'ed */
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        reserved2             : 4; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved1             : 3; /* For load_attr, see NOTE 6; For others, must be zero'ed */
+        gctUINT        packMode              : 1;
+        gctUINT        roundMode             : 2;
+#endif
+
+#if !gcdENDIAN_BIG
+        gctUINT        src0RelAddr           : 3;
+        gctUINT        src0Type              : 3;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        src1RegNo             : 9;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
+
+#if !gcdENDIAN_BIG
+        gctUINT        src1Type              : 3;
+        gctUINT        reserved3             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        extOpcode             : 8;
+        gctUINT        reserved4             : 1; /* Must be zero'ed */
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        reserved5             : 10;/* Must be zero'ed */
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        reserved6             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        reserved6             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        reserved5             : 10;/* Must be zero'ed */
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        reserved4             : 1; /* Must be zero'ed */
+        gctUINT        extOpcode             : 8;
+        gctUINT        reserved3             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        src1Type              : 3;
+#endif
+    } inst;
+
+    gctUINT            data[4];
+}
+VSC_MC_ALU_2_SRCS_SRC0_SRC1_CC_INST;
+
 /* 2-srcs (src0 + src2) alu inst case */
 typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC2_INST
 {
@@ -333,28 +567,34 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC2_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
+        gctUINT        reserved0             : 1; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
-        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        reserved2             : 5; /* Must be zero'ed */
 #else
-        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        reserved2             : 5; /* Must be zero'ed */
         gctUINT        writeMask             : 4;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        dstRelAddr            : 3;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        bResultSat            : 1;
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 1; /* Must be zero'ed */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
 #endif
 
 #if !gcdENDIAN_BIG
         gctUINT        roundMode             : 2;
         gctUINT        packMode              : 1;
-        gctUINT        reserved2             : 8; /* Must be zero'ed */
+        gctUINT        reserved3             : 8; /* Must be zero'ed */
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
         gctUINT        src0RegNo             : 9;
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
@@ -368,7 +608,7 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC2_INST
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
         gctUINT        src0RegNo             : 9;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
-        gctUINT        reserved2             : 8; /* Must be zero'ed */
+        gctUINT        reserved3             : 8; /* Must be zero'ed */
         gctUINT        packMode              : 1;
         gctUINT        roundMode             : 2;
 #endif
@@ -376,21 +616,21 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC2_INST
 #if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
-        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        reserved4             : 10;/* Must be zero'ed */
         gctUINT        baseOpcodeBit6        : 1;
-        gctUINT        reserved4             : 13;/* Must be zero'ed */
+        gctUINT        reserved5             : 13;/* Must be zero'ed */
         gctUINT        instTypeBit1_2        : 2;
 #else
         gctUINT        instTypeBit1_2        : 2;
-        gctUINT        reserved4             : 13;/* Must be zero'ed */
+        gctUINT        reserved5             : 13;/* Must be zero'ed */
         gctUINT        baseOpcodeBit6        : 1;
-        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        reserved4             : 10;/* Must be zero'ed */
         gctUINT        src0Type              : 3;
         gctUINT        src0RelAddr           : 3;
 #endif
 
 #if !gcdENDIAN_BIG
-        gctUINT        reserved5             : 3; /* Must be zero'ed */
+        gctUINT        reserved6             : 3; /* Must be zero'ed */
         gctUINT        bSrc2Valid            : 1; /* Must be valid */
         gctUINT        src2RegNo             : 9;
         gctUINT        dstRegNoBit7          : 1;
@@ -412,7 +652,7 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC2_INST
         gctUINT        dstRegNoBit7          : 1;
         gctUINT        src2RegNo             : 9;
         gctUINT        bSrc2Valid            : 1; /* Must be valid */
-        gctUINT        reserved5             : 3; /* Must be zero'ed */
+        gctUINT        reserved6             : 3; /* Must be zero'ed */
 #endif
     } inst;
 
@@ -427,40 +667,46 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC1_SRC2_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
+        gctUINT        reserved0             : 1; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
-        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        reserved2             : 5; /* Must be zero'ed */
 #else
-        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        reserved2             : 5; /* Must be zero'ed */
         gctUINT        writeMask             : 4;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        dstRelAddr            : 3;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        bResultSat            : 1;
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 1; /* Must be zero'ed */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
 #endif
 
 #if !gcdENDIAN_BIG
         gctUINT        roundMode             : 2;
         gctUINT        packMode              : 1;
-        gctUINT        reserved2             : 18;/* Must be zero'ed */
+        gctUINT        reserved3             : 18;/* Must be zero'ed */
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
-        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        reserved4             : 10;/* Must be zero'ed */
 #else
-        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        reserved4             : 10;/* Must be zero'ed */
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
-        gctUINT        reserved2             : 18;/* Must be zero'ed */
+        gctUINT        reserved3             : 18;/* Must be zero'ed */
         gctUINT        packMode              : 1;
         gctUINT        roundMode             : 2;
 #endif
 
 #if !gcdENDIAN_BIG
-        gctUINT        reserved4             : 6; /* Must be zero'ed */
+        gctUINT        reserved5             : 6; /* Must be zero'ed */
         gctUINT        bSrc1Valid            : 1; /* Must be valid */
         gctUINT        src1RegNo             : 9;
         gctUINT        baseOpcodeBit6        : 1;
@@ -478,7 +724,7 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC1_SRC2_INST
         gctUINT        baseOpcodeBit6        : 1;
         gctUINT        src1RegNo             : 9;
         gctUINT        bSrc1Valid            : 1; /* Must be valid */
-        gctUINT        reserved4             : 6; /* Must be zero'ed */
+        gctUINT        reserved5             : 6; /* Must be zero'ed */
 #endif
 
 #if !gcdENDIAN_BIG
@@ -519,28 +765,36 @@ typedef union _VSC_MC_ALU_1_SRC_SRC0_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
+        gctUINT        reserved0             : 1; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
-        gctUINT        reserved1             : 5; /* Must be zero'ed for non NORM_DP, otherwise, see NOTE 7 */
+        gctUINT        bInfX0ToZero          : 1;
+        gctUINT        reserved2             : 4; /* Must be zero'ed */
 #else
-        gctUINT        reserved1             : 5; /* Must be zero'ed for non NORM_DP, otherwise, see NOTE 7 */
+        gctUINT        reserved2             : 4; /* Must be zero'ed */
+        gctUINT        bInfX0ToZero          : 1;
         gctUINT        writeMask             : 4;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        dstRelAddr            : 3;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        bResultSat            : 1;
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 1; /* Must be zero'ed */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
 #endif
 
 #if !gcdENDIAN_BIG
         gctUINT        roundMode             : 2;
         gctUINT        packMode              : 1;
-        gctUINT        reserved2             : 8; /* Must be zero'ed */
+        gctUINT        reserved3             : 8; /* Must be zero'ed */
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
         gctUINT        src0RegNo             : 9;
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
@@ -554,7 +808,7 @@ typedef union _VSC_MC_ALU_1_SRC_SRC0_INST
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
         gctUINT        src0RegNo             : 9;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
-        gctUINT        reserved2             : 8; /* Must be zero'ed */
+        gctUINT        reserved3             : 8; /* Must be zero'ed */
         gctUINT        packMode              : 1;
         gctUINT        roundMode             : 2;
 #endif
@@ -562,37 +816,37 @@ typedef union _VSC_MC_ALU_1_SRC_SRC0_INST
 #if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
-        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        reserved4             : 10;/* Must be zero'ed */
         gctUINT        baseOpcodeBit6        : 1;
-        gctUINT        reserved4             : 13;/* Must be zero'ed */
+        gctUINT        reserved5             : 13;/* Must be zero'ed */
         gctUINT        instTypeBit1_2        : 2;
 #else
         gctUINT        instTypeBit1_2        : 2;
-        gctUINT        reserved4             : 13;/* Must be zero'ed */
+        gctUINT        reserved5             : 13;/* Must be zero'ed */
         gctUINT        baseOpcodeBit6        : 1;
-        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        reserved4             : 10;/* Must be zero'ed */
         gctUINT        src0Type              : 3;
         gctUINT        src0RelAddr           : 3;
 #endif
 
 #if !gcdENDIAN_BIG
-        gctUINT        reserved5             : 4; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved6             : 4; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        extOpcode             : 8;
-        gctUINT        reserved6             : 1; /* Must be zero'ed */
+        gctUINT        reserved7             : 1; /* Must be zero'ed */
         gctUINT        dstRegNoBit7          : 1;
-        gctUINT        reserved7             : 10;/* Must be zero'ed */
+        gctUINT        reserved8             : 10;/* Must be zero'ed */
         gctUINT        dstRegNoBit8          : 1;
-        gctUINT        reserved8             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved9             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        dstType               : 1;
 #else
         gctUINT        dstType               : 1;
-        gctUINT        reserved8             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved9             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        dstRegNoBit8          : 1;
-        gctUINT        reserved7             : 10;/* Must be zero'ed */
+        gctUINT        reserved8             : 10;/* Must be zero'ed */
         gctUINT        dstRegNoBit7          : 1;
-        gctUINT        reserved6             : 1; /* Must be zero'ed */
+        gctUINT        reserved7             : 1; /* Must be zero'ed */
         gctUINT        extOpcode             : 8;
-        gctUINT        reserved5             : 4; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved6             : 4; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
 #endif
     } inst;
 
@@ -607,40 +861,46 @@ typedef union _VSC_MC_ALU_1_SRC_SRC1_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
+        gctUINT        reserved0             : 1; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
-        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        reserved2             : 5; /* Must be zero'ed */
 #else
-        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        reserved2             : 5; /* Must be zero'ed */
         gctUINT        writeMask             : 4;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        dstRelAddr            : 3;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        bResultSat            : 1;
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 1; /* Must be zero'ed */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
 #endif
 
 #if !gcdENDIAN_BIG
         gctUINT        roundMode             : 2;
         gctUINT        packMode              : 1;
-        gctUINT        reserved2             : 18;/* Must be zero'ed */
+        gctUINT        reserved3             : 18;/* Must be zero'ed */
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
-        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        reserved4             : 10;/* Must be zero'ed */
 #else
-        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        reserved4             : 10;/* Must be zero'ed */
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
-        gctUINT        reserved2             : 18;/* Must be zero'ed */
+        gctUINT        reserved3             : 18;/* Must be zero'ed */
         gctUINT        packMode              : 1;
         gctUINT        roundMode             : 2;
 #endif
 
 #if !gcdENDIAN_BIG
-        gctUINT        reserved4             : 6; /* Must be zero'ed */
+        gctUINT        reserved5             : 6; /* Must be zero'ed */
         gctUINT        bSrc1Valid            : 1; /* Must be valid */
         gctUINT        src1RegNo             : 9;
         gctUINT        baseOpcodeBit6        : 1;
@@ -658,28 +918,28 @@ typedef union _VSC_MC_ALU_1_SRC_SRC1_INST
         gctUINT        baseOpcodeBit6        : 1;
         gctUINT        src1RegNo             : 9;
         gctUINT        bSrc1Valid            : 1; /* Must be valid */
-        gctUINT        reserved4             : 6; /* Must be zero'ed */
+        gctUINT        reserved5             : 6; /* Must be zero'ed */
 #endif
 
 #if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
-        gctUINT        reserved5             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved6             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        extOpcode             : 8;
-        gctUINT        reserved6             : 1; /* Must be zero'ed */
+        gctUINT        reserved7             : 1; /* Must be zero'ed */
         gctUINT        dstRegNoBit7          : 1;
-        gctUINT        reserved7             : 10;/* Must be zero'ed */
+        gctUINT        reserved8             : 10;/* Must be zero'ed */
         gctUINT        dstRegNoBit8          : 1;
-        gctUINT        reserved8             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved9             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        dstType               : 1;
 #else
         gctUINT        dstType               : 1;
-        gctUINT        reserved8             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved9             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        dstRegNoBit8          : 1;
-        gctUINT        reserved7             : 10;/* Must be zero'ed */
+        gctUINT        reserved8             : 10;/* Must be zero'ed */
         gctUINT        dstRegNoBit7          : 1;
-        gctUINT        reserved6             : 1; /* Must be zero'ed */
+        gctUINT        reserved7             : 1; /* Must be zero'ed */
         gctUINT        extOpcode             : 8;
-        gctUINT        reserved5             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved6             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        src1Type              : 3;
 #endif
     } inst;
@@ -695,52 +955,58 @@ typedef union _VSC_MC_ALU_1_SRC_SRC2_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
+        gctUINT        reserved0             : 1; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
-        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        reserved2             : 5; /* Must be zero'ed */
 #else
-        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        reserved2             : 5; /* Must be zero'ed */
         gctUINT        writeMask             : 4;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        dstRelAddr            : 3;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        bResultSat            : 1;
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 1; /* Must be zero'ed */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
 #endif
 
 #if !gcdENDIAN_BIG
         gctUINT        roundMode             : 2;
         gctUINT        packMode              : 1;
-        gctUINT        reserved2             : 18;/* Must be zero'ed */
+        gctUINT        reserved3             : 18;/* Must be zero'ed */
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
-        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        reserved4             : 10;/* Must be zero'ed */
 #else
-        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        reserved4             : 10;/* Must be zero'ed */
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
-        gctUINT        reserved2             : 18;/* Must be zero'ed */
+        gctUINT        reserved3             : 18;/* Must be zero'ed */
         gctUINT        packMode              : 1;
         gctUINT        roundMode             : 2;
 #endif
 
 #if !gcdENDIAN_BIG
-        gctUINT        reserved4             : 16;/* Must be zero'ed */
+        gctUINT        reserved5             : 16;/* Must be zero'ed */
         gctUINT        baseOpcodeBit6        : 1;
-        gctUINT        reserved5             : 13;/* Must be zero'ed */
+        gctUINT        reserved6             : 13;/* Must be zero'ed */
         gctUINT        instTypeBit1_2        : 2;
 #else
         gctUINT        instTypeBit1_2        : 2;
-        gctUINT        reserved5             : 13;/* Must be zero'ed */
+        gctUINT        reserved6             : 13;/* Must be zero'ed */
         gctUINT        baseOpcodeBit6        : 1;
-        gctUINT        reserved4             : 16;/* Must be zero'ed */
+        gctUINT        reserved5             : 16;/* Must be zero'ed */
 #endif
 
 #if !gcdENDIAN_BIG
-        gctUINT        reserved6             : 3; /* Must be zero'ed */
+        gctUINT        reserved7             : 3; /* Must be zero'ed */
         gctUINT        bSrc2Valid            : 1; /* Must be valid */
         gctUINT        src2RegNo             : 9;
         gctUINT        dstRegNoBit7          : 1;
@@ -762,7 +1028,7 @@ typedef union _VSC_MC_ALU_1_SRC_SRC2_INST
         gctUINT        dstRegNoBit7          : 1;
         gctUINT        src2RegNo             : 9;
         gctUINT        bSrc2Valid            : 1; /* Must be valid */
-        gctUINT        reserved6             : 3; /* Must be zero'ed */
+        gctUINT        reserved7             : 3; /* Must be zero'ed */
 #endif
     } inst;
 
@@ -777,26 +1043,30 @@ typedef union _VSC_MC_PACK_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
-        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        reserved2             : 5; /* Must be zero'ed */
 #else
-        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        reserved2             : 5; /* Must be zero'ed */
         gctUINT        writeMask             : 4;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        dstRelAddr            : 3;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        bResultSat            : 1;
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
 #endif
 
 #if !gcdENDIAN_BIG
-        gctUINT        reserved2             : 3; /* Must be zero'ed */
+        gctUINT        reserved3             : 3; /* Must be zero'ed */
         gctUINT        srcSelect             : 8;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
         gctUINT        src0RegNo             : 9;
@@ -812,7 +1082,7 @@ typedef union _VSC_MC_PACK_INST
         gctUINT        src0RegNo             : 9;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
         gctUINT        srcSelect             : 8;
-        gctUINT        reserved2             : 3; /* Must be zero'ed */
+        gctUINT        reserved3             : 3; /* Must be zero'ed */
 #endif
 
 #if !gcdENDIAN_BIG
@@ -877,7 +1147,9 @@ typedef union _VSC_MC_SAMPLE_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
@@ -891,7 +1163,9 @@ typedef union _VSC_MC_SAMPLE_INST
         gctUINT        dstRelAddr            : 3;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        bResultSat            : 1;
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
 #endif
 
@@ -977,7 +1251,9 @@ typedef union _VSC_MC_SAMPLE_EXT_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
@@ -991,7 +1267,9 @@ typedef union _VSC_MC_SAMPLE_EXT_INST
         gctUINT        dstRelAddr            : 3;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        bResultSat            : 1;
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
 #endif
 
@@ -1041,23 +1319,23 @@ typedef union _VSC_MC_SAMPLE_EXT_INST
 
 #if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
-        gctUINT        reserved1             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved2             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        extOpcode             : 8;
-        gctUINT        reserved2             : 1; /* Must be zero'ed */
+        gctUINT        reserved3             : 1; /* Must be zero'ed */
         gctUINT        dstRegNoBit7          : 1;
-        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        reserved4             : 10;/* Must be zero'ed */
         gctUINT        dstRegNoBit8          : 1;
-        gctUINT        reserved4             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved5             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        dstType               : 1;
 #else
         gctUINT        dstType               : 1;
-        gctUINT        reserved4             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved5             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        dstRegNoBit8          : 1;
-        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        reserved4             : 10;/* Must be zero'ed */
         gctUINT        dstRegNoBit7          : 1;
-        gctUINT        reserved2             : 1; /* Must be zero'ed */
+        gctUINT        reserved3             : 1; /* Must be zero'ed */
         gctUINT        extOpcode             : 8;
-        gctUINT        reserved1             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved2             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        src1Type              : 3;
 #endif
     } inst;
@@ -1073,7 +1351,10 @@ typedef union _VSC_MC_LD_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
+        gctUINT        bUnallocate           : 1; /* USC Unallocate Bit for global memory Load/Store  */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
@@ -1087,7 +1368,10 @@ typedef union _VSC_MC_LD_INST
         gctUINT        dstRelAddr            : 3;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        bResultSat            : 1;
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        bUnallocate           : 1; /* USC Unallocate Bit for global memory Load/Store  */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
 #endif
 
@@ -1181,7 +1465,10 @@ typedef union _VSC_MC_IMG_LD_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
+        gctUINT        bUnallocate           : 1; /* USC Unallocate Bit for global memory Load/Store  */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
@@ -1195,7 +1482,10 @@ typedef union _VSC_MC_IMG_LD_INST
         gctUINT        dstRelAddr            : 3;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        bResultSat            : 1;
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        bUnallocate           : 1; /* USC Unallocate Bit for global memory Load/Store  */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
 #endif
 
@@ -1287,13 +1577,19 @@ typedef union _VSC_MC_ST_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
-        gctUINT        reserved0             : 17;/* Must be zero'ed */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
+        gctUINT        bUnallocate           : 1; /* USC Unallocate Bit for global memory Load/Store  */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 14; /* Must be zero'ed */
         gctUINT        writeMask             : 4;
         gctUINT        reserved1             : 5; /* Must be zero'ed */
 #else
         gctUINT        reserved1             : 5; /* Must be zero'ed */
         gctUINT        writeMask             : 4;
-        gctUINT        reserved0             : 17;/* Must be zero'ed */
+        gctUINT        reserved0             : 14; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        bUnallocate           : 1; /* USC Unallocate Bit for global memory Load/Store  */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
 #endif
 
@@ -1391,13 +1687,19 @@ typedef union _VSC_MC_IMG_ST_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
-        gctUINT        reserved0             : 17;/* Must be zero'ed */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
+        gctUINT        bUnallocate           : 1; /* USC Unallocate Bit for global memory Load/Store  */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 14; /* Must be zero'ed */
         gctUINT        writeMask             : 4; /* For evis-mode, see Note 9 */
         gctUINT        reserved1             : 5; /* For non-evis-mode, must be zero'ed; otherwise, see NOTE 9 */
 #else
         gctUINT        reserved1             : 5; /* For non-evis-mode, must be zero'ed; otherwise, see NOTE 9 */
         gctUINT        writeMask             : 4; /* For evis-mode, see Note 9 */
-        gctUINT        reserved0             : 17;/* Must be zero'ed */
+        gctUINT        reserved0             : 14; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        bUnallocate           : 1; /* USC Unallocate Bit for global memory Load/Store  */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
 #endif
 
@@ -1489,7 +1791,10 @@ typedef union _VSC_MC_IMG_ATOM_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
+        gctUINT        bUnallocate           : 1; /* USC Unallocate Bit for global memory Load/Store  */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
@@ -1503,7 +1808,10 @@ typedef union _VSC_MC_IMG_ATOM_INST
         gctUINT        dstRelAddr            : 3;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        bResultSat            : 1;
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        bUnallocate           : 1; /* USC Unallocate Bit for global memory Load/Store  */
+        gctUINT        bBigEndian            : 1; /* need to swap big endian data to little endian if true */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
 #endif
 
@@ -1597,26 +1905,28 @@ typedef union _VSC_MC_STORE_ATTR_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
-        gctUINT        reserved0             : 17;/* Must be zero'ed */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved1             : 14; /* Must be zero'ed */
         gctUINT        writeMask             : 4;
-        gctUINT        reserved1             : 3; /* Must be zero'ed */
-        gctUINT        bNeedUscSync          : 1;
-        gctUINT        reserved2             : 1; /* Must be zero'ed */
+        gctUINT        reserved2             : 3; /* Must be zero'ed */
+        gctUINT        reserved3             : 2; /* Must be zero'ed */
 #else
-        gctUINT        reserved2             : 1; /* Must be zero'ed */
-        gctUINT        bNeedUscSync          : 1;
-        gctUINT        reserved1             : 3; /* Must be zero'ed */
+        gctUINT        reserved3             : 2; /* Must be zero'ed */
+        gctUINT        reserved2             : 3; /* Must be zero'ed */
         gctUINT        writeMask             : 4;
-        gctUINT        reserved0             : 17;/* Must be zero'ed */
+        gctUINT        reserved1             : 14; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
 #endif
 
 #if !gcdENDIAN_BIG
-        gctUINT        reserved3             : 3; /* Must be zero'ed */
+        gctUINT        reserved4             : 3; /* Must be zero'ed */
         gctUINT        shStageClient         : 2;
-        gctUINT        reserved4             : 1; /* Must be zero'ed */
+        gctUINT        reserved5             : 1; /* Must be zero'ed */
         gctUINT        attrLayout            : 1;
-        gctUINT        reserved5             : 4; /* Must be zero'ed */
+        gctUINT        reserved6             : 4; /* Must be zero'ed */
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
         gctUINT        src0RegNo             : 9;
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
@@ -1630,11 +1940,11 @@ typedef union _VSC_MC_STORE_ATTR_INST
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
         gctUINT        src0RegNo             : 9;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
-        gctUINT        reserved5             : 4; /* Must be zero'ed */
+        gctUINT        reserved6             : 4; /* Must be zero'ed */
         gctUINT        attrLayout            : 1;
-        gctUINT        reserved4             : 1; /* Must be zero'ed */
+        gctUINT        reserved5             : 1; /* Must be zero'ed */
         gctUINT        shStageClient         : 2;
-        gctUINT        reserved3             : 3; /* Must be zero'ed */
+        gctUINT        reserved4             : 3; /* Must be zero'ed */
 #endif
 
 #if !gcdENDIAN_BIG
@@ -1672,9 +1982,9 @@ typedef union _VSC_MC_STORE_ATTR_INST
         gctUINT        threadTypeBit1        : 1;
         gctUINT        src2RelAddr           : 3;
         gctUINT        src2Type              : 3;
-        gctUINT        reserved6             : 1; /* Must be zero'ed */
+        gctUINT        reserved7             : 1; /* Must be zero'ed */
 #else
-        gctUINT        reserved6             : 1; /* Must be zero'ed */
+        gctUINT        reserved7             : 1; /* Must be zero'ed */
         gctUINT        src2Type              : 3;
         gctUINT        src2RelAddr           : 3;
         gctUINT        threadTypeBit1        : 1;
@@ -1699,28 +2009,32 @@ typedef union _VSC_MC_SELECT_MAP_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid, see rangeToMatch for more info */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
-        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        reserved2             : 5; /* Must be zero'ed */
 #else
-        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        reserved2             : 5; /* Must be zero'ed */
         gctUINT        writeMask             : 4;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        dstRelAddr            : 3;
         gctUINT        bDstValid             : 1; /* Must be valid, see rangeToMatch for more info */
         gctUINT        bResultSat            : 1;
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
 #endif
 
 #if !gcdENDIAN_BIG
-        gctUINT        reserved2             : 3; /* Must be zero'ed */
-        gctUINT        rangeToMatch          : 4; /* Only the range is matched, the dst will be written */
         gctUINT        reserved3             : 3; /* Must be zero'ed */
+        gctUINT        rangeToMatch          : 4; /* Only the range is matched, the dst will be written */
+        gctUINT        reserved4             : 3; /* Must be zero'ed */
         gctUINT        bCompSel              : 1; /* If TRUE, component select, otherwise, src select */
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
         gctUINT        src0RegNo             : 9;
@@ -1736,9 +2050,9 @@ typedef union _VSC_MC_SELECT_MAP_INST
         gctUINT        src0RegNo             : 9;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
         gctUINT        bCompSel              : 1; /* If TRUE, component select, otherwise, src select */
-        gctUINT        reserved3             : 3; /* Must be zero'ed */
+        gctUINT        reserved4             : 3; /* Must be zero'ed */
         gctUINT        rangeToMatch          : 4; /* Only the range is matched, the dst will be written */
-        gctUINT        reserved2             : 3; /* Must be zero'ed */
+        gctUINT        reserved3             : 3; /* Must be zero'ed */
 #endif
 
 #if !gcdENDIAN_BIG
@@ -2215,29 +2529,33 @@ typedef union _VSC_MC_EMIT_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
-        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        reserved2             : 5; /* Must be zero'ed */
 #else
-        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        reserved2             : 5; /* Must be zero'ed */
         gctUINT        writeMask             : 4;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        dstRelAddr            : 3;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        bResultSat            : 1;
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
 #endif
 
 #if !gcdENDIAN_BIG
-        gctUINT        reserved2             : 3; /* Must be zero'ed */
+        gctUINT        reserved3             : 3; /* Must be zero'ed */
         gctUINT        bNeedRestartPrim      : 1;
-        gctUINT        bJmpToEndOnMaxVtxCnt  : 1;
-        gctUINT        reserved3             : 6; /* Must be zero'ed */
+        gctUINT        bNoJmpToEndOnMaxVtxCnt: 1;
+        gctUINT        reserved4             : 6; /* Must be zero'ed */
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
         gctUINT        src0RegNo             : 9;
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
@@ -2251,10 +2569,10 @@ typedef union _VSC_MC_EMIT_INST
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
         gctUINT        src0RegNo             : 9;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
-        gctUINT        reserved3             : 6; /* Must be zero'ed */
-        gctUINT        bJmpToEndOnMaxVtxCnt  : 1;
+        gctUINT        reserved4             : 6; /* Must be zero'ed */
+        gctUINT        bNoJmpToEndOnMaxVtxCnt: 1;
         gctUINT        bNeedRestartPrim      : 1;
-        gctUINT        reserved2             : 3; /* Must be zero'ed */
+        gctUINT        reserved3             : 3; /* Must be zero'ed */
 #endif
 
 #if !gcdENDIAN_BIG
@@ -2283,23 +2601,23 @@ typedef union _VSC_MC_EMIT_INST
 
 #if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
-        gctUINT        reserved4             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved5             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        extOpcode             : 8;
-        gctUINT        reserved5             : 1; /* Must be zero'ed */
+        gctUINT        reserved6             : 1; /* Must be zero'ed */
         gctUINT        dstRegNoBit7          : 1;
-        gctUINT        reserved6             : 10;/* Must be zero'ed */
+        gctUINT        reserved7             : 10;/* Must be zero'ed */
         gctUINT        dstRegNoBit8          : 1;
-        gctUINT        reserved7             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved8             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        dstType               : 1;
 #else
         gctUINT        dstType               : 1;
-        gctUINT        reserved7             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved8             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        dstRegNoBit8          : 1;
-        gctUINT        reserved6             : 10;/* Must be zero'ed */
+        gctUINT        reserved7             : 10;/* Must be zero'ed */
         gctUINT        dstRegNoBit7          : 1;
-        gctUINT        reserved5             : 1; /* Must be zero'ed */
+        gctUINT        reserved6             : 1; /* Must be zero'ed */
         gctUINT        extOpcode             : 8;
-        gctUINT        reserved4             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        reserved5             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        src1Type              : 3;
 #endif
     } inst;
@@ -2315,7 +2633,9 @@ typedef union _VSC_MC_EVIS_INST
     {
 #if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode, and base-opcode must be 0x45 */
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        extEvisOpCodeBit0_2   : 3; /* Together with extEvisOpCodeBit3 and extEvisOpCodeBit4_5 to extEvisOpCode */
@@ -2331,7 +2651,9 @@ typedef union _VSC_MC_EVIS_INST
         gctUINT        extEvisOpCodeBit0_2   : 3; /* Together with extEvisOpCodeBit3 and extEvisOpCodeBit4_5 to extEvisOpCode */
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        bResultSat            : 1;
-        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode, and base-opcode must be 0x45 */
 #endif
 
@@ -2342,9 +2664,9 @@ typedef union _VSC_MC_EVIS_INST
         gctUINT        src0RegNo             : 9;
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
         gctUINT        startSrcCompIdx       : 4; /* AKA sourceBin */
-        gctUINT        reserved1             : 6; /* Must be zero'ed */
+        gctUINT        reserved2             : 6; /* Must be zero'ed */
 #else
-        gctUINT        reserved1             : 6; /* Must be zero'ed */
+        gctUINT        reserved2             : 6; /* Must be zero'ed */
         gctUINT        startSrcCompIdx       : 4; /* AKA sourceBin */
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
         gctUINT        src0RegNo             : 9;
@@ -2360,13 +2682,13 @@ typedef union _VSC_MC_EVIS_INST
         gctUINT        src1RegNo             : 9;
         gctUINT        baseOpcodeBit6        : 1;
         gctUINT        src1Swizzle           : 8;
-        gctUINT        reserved2             : 2; /* Must be zero'ed */
+        gctUINT        reserved3             : 2; /* Must be zero'ed */
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
 #else
         gctUINT        instTypeBit1_2        : 2;
         gctUINT        src1RelAddr           : 3;
-        gctUINT        reserved2             : 2; /* Must be zero'ed */
+        gctUINT        reserved3             : 2; /* Must be zero'ed */
         gctUINT        src1Swizzle           : 8;
         gctUINT        baseOpcodeBit6        : 1;
         gctUINT        src1RegNo             : 9;
@@ -2381,7 +2703,7 @@ typedef union _VSC_MC_EVIS_INST
         gctUINT        src2RegNo             : 9;
         gctUINT        dstRegNoBit7          : 1;
         gctUINT        src2Swizzle           : 8;
-        gctUINT        reserved3             : 2; /* Must be zero'ed */
+        gctUINT        reserved4             : 2; /* Must be zero'ed */
         gctUINT        dstRegNoBit8          : 1;
         gctUINT        src2RelAddr           : 3;
         gctUINT        src2Type              : 3;
@@ -2391,7 +2713,7 @@ typedef union _VSC_MC_EVIS_INST
         gctUINT        src2Type              : 3;
         gctUINT        src2RelAddr           : 3;
         gctUINT        dstRegNoBit8          : 1;
-        gctUINT        reserved3             : 2; /* Must be zero'ed */
+        gctUINT        reserved4             : 2; /* Must be zero'ed */
         gctUINT        src2Swizzle           : 8;
         gctUINT        dstRegNoBit7          : 1;
         gctUINT        src2RegNo             : 9;
@@ -2404,43 +2726,267 @@ typedef union _VSC_MC_EVIS_INST
 }
 VSC_MC_EVIS_INST;
 
+/* CONV inst case */
+typedef union _VSC_MC_CONV_INST
+{
+    struct
+    {
+#if !gcdENDIAN_BIG
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+        gctUINT        bResultSat            : 1;
+        gctUINT        bDstValid             : 1; /* Must be valid */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        writeMask             : 4;
+        gctUINT        reserved2             : 5; /* Must be zero'ed */
+#else
+        gctUINT        reserved2             : 5; /* Must be zero'ed */
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1; /* Must be valid */
+        gctUINT        bResultSat            : 1;
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
+
+#if !gcdENDIAN_BIG
+        gctUINT        roundMode             : 2;
+        gctUINT        bEvisMode             : 1;
+        gctUINT        reserved3             : 4;
+        gctUINT        bDstPack              : 1;
+        gctUINT        bSrcPack              : 1;
+        gctUINT        reserved4             : 2; /* Must be zero'ed */
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        reserved4             : 2; /* Must be zero'ed */
+        gctUINT        bSrcPack              : 1;
+        gctUINT        bDstPack              : 1;
+        gctUINT        reserved3             : 4;
+        gctUINT        bEvisMode             : 1;
+        gctUINT        roundMode             : 2;
+#endif
+
+#if !gcdENDIAN_BIG
+        gctUINT        src0RelAddr           : 3;
+        gctUINT        src0Type              : 3;
+        gctUINT        reserved5             : 10;/* Must be zero'ed */
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        reserved6             : 13;/* Must be zero'ed */
+        gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        reserved6             : 13;/* Must be zero'ed */
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        reserved5             : 10;/* Must be zero'ed */
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
+
+#if !gcdENDIAN_BIG
+        gctUINT        reserved7             : 3; /* Must be zero'ed */
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        src2RegNo             : 9;
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        src2Type              : 3;
+        gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        src2Type              : 3;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        src2RegNo             : 9;
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        reserved7             : 3; /* Must be zero'ed */
+#endif
+    } inst;
+
+    gctUINT            data[4];
+}
+VSC_MC_CONV_INST;
+
+/* complex inst case */
+typedef union _VSC_MC_CMPLX_INST
+{
+    struct
+    {
+#if !gcdENDIAN_BIG
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+        gctUINT        bResultSat            : 1;
+        gctUINT        bDstValid             : 1; /* Must be valid */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        writeMask             : 4;
+        gctUINT        multInf               : 1;
+        gctUINT        reserved2             : 4; /* For load_attr, see NOTE 6; For mad, see NOTE 7; For others, must be zero'ed */
+#else
+        gctUINT        reserved2             : 4; /* For load_attr, see NOTE 6; For mad, see NOTE 7; For others, must be zero'ed */
+        gctUINT        multInf               : 1;
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1; /* Must be valid */
+        gctUINT        bResultSat            : 1;
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+        gctUINT        bEndOfBB              : 1; /* End Of Basic Block bit for non-control-clow instructions */
+        gctUINT        reserved0             : 2; /* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
+
+#if !gcdENDIAN_BIG
+        gctUINT        roundMode             : 2; /* For atom, bit 0 is used for endian_swap. */
+        gctUINT        packMode              : 1;
+        gctUINT        subOpcode             : 4; /* For complex, bit 3-6 is subOpcode */
+        gctUINT        bSkipForHelperKickoff : 1;
+        gctUINT        reserved3             : 2; /* Must be zero'ed for non-atomics. For atomics, see NOTE 8 */
+        gctUINT        bDenorm               : 1;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        bDenorm               : 1;
+        gctUINT        reserved3             : 2; /* Must be zero'ed for non-atomics. For atomics, see NOTE 8 */
+        gctUINT        bSkipForHelperKickoff : 1;
+        gctUINT        subOpcode             : 4; /* For complex, bit 3-6 is subOpcode */
+        gctUINT        packMode              : 1;
+        gctUINT        roundMode             : 2; /* For atom, bit 0 is used for endian_swap. */
+#endif
+
+#if !gcdENDIAN_BIG
+        gctUINT        src0RelAddr           : 3;
+        gctUINT        src0Type              : 3;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        src1RegNo             : 9;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
+
+#if !gcdENDIAN_BIG
+        gctUINT        src1Type              : 3;
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        src2RegNo             : 9;
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        src2Type              : 3;
+        gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        src2Type              : 3;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        src2RegNo             : 9;
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        src1Type              : 3;
+#endif
+    } inst;
+
+    gctUINT            data[4];
+}
+VSC_MC_CMPLX_INST;
+
+
 typedef union _VSC_MC_INST
 {
-    VSC_MC_RAW_INST                    raw_inst;
-    VSC_MC_NO_OPERAND_INST             no_opnd_inst;
-    VSC_MC_ALU_3_SRCS_INST             tri_srcs_alu_inst;
-    VSC_MC_ALU_2_SRCS_SRC0_SRC1_INST   bin_srcs_src0_src1_alu_inst;
-    VSC_MC_ALU_2_SRCS_SRC0_SRC2_INST   bin_srcs_src0_src2_alu_inst;
-    VSC_MC_ALU_2_SRCS_SRC1_SRC2_INST   bin_srcs_src1_src2_alu_inst;
-    VSC_MC_ALU_1_SRC_SRC0_INST         una_src_src0_alu_inst;
-    VSC_MC_ALU_1_SRC_SRC1_INST         una_src_src1_alu_inst;
-    VSC_MC_ALU_1_SRC_SRC2_INST         una_src_src2_alu_inst;
-    VSC_MC_PACK_INST                   pack_inst;
-    VSC_MC_SAMPLE_INST                 sample_inst;
-    VSC_MC_SAMPLE_EXT_INST             sample_ext_inst;
-    VSC_MC_LD_INST                     load_inst;
-    VSC_MC_IMG_LD_INST                 img_load_inst;
-    VSC_MC_ST_INST                     store_inst;
-    VSC_MC_IMG_ST_INST                 img_store_inst;
-    VSC_MC_IMG_ATOM_INST               img_atom_inst;
-    VSC_MC_STORE_ATTR_INST             store_attr_inst;
-    VSC_MC_SELECT_MAP_INST             select_map_inst;
-    VSC_MC_DIRECT_BRANCH_0_INST        direct_branch0_inst;
-    VSC_MC_DIRECT_BRANCH_1_INST        direct_branch1_inst;
-    VSC_MC_INDIRECT_BRANCH_INST        indirect_branch_inst;
-    VSC_MC_DIRECT_CALL_INST            direct_call_inst;
-    VSC_MC_INDIRECT_CALL_INST          indirect_call_inst;
-    VSC_MC_LOOP_INST                   loop_inst;
-    VSC_MC_EMIT_INST                   emit_inst;
-    VSC_MC_EVIS_INST                   evis_inst;
-}VSC_MC_INST;
+    VSC_MC_RAW_INST                     raw_inst;
+    VSC_MC_NO_OPERAND_INST              no_opnd_inst;
+    VSC_MC_ALU_3_SRCS_INST              tri_srcs_alu_inst;
+    VSC_MC_ALU_3_SRCS_CC_INST           tri_srcs_cc_alu_inst;
+    VSC_MC_ALU_2_SRCS_SRC0_SRC1_INST    bin_srcs_src0_src1_alu_inst;
+    VSC_MC_ALU_2_SRCS_SRC0_SRC1_CC_INST bin_srcs_src0_src1_alu_cc_inst;
+    VSC_MC_ALU_2_SRCS_SRC0_SRC2_INST    bin_srcs_src0_src2_alu_inst;
+    VSC_MC_ALU_1_SRC_SRC0_INST          una_src_src0_alu_inst;
+    VSC_MC_ALU_1_SRC_SRC1_INST          una_src_src1_alu_inst;
+    VSC_MC_ALU_1_SRC_SRC2_INST          una_src_src2_alu_inst;
+    VSC_MC_PACK_INST                    pack_inst;
+    VSC_MC_SAMPLE_INST                  sample_inst;
+    VSC_MC_SAMPLE_EXT_INST              sample_ext_inst;
+    VSC_MC_LD_INST                      load_inst;
+    VSC_MC_IMG_LD_INST                  img_load_inst;
+    VSC_MC_ST_INST                      store_inst;
+    VSC_MC_IMG_ST_INST                  img_store_inst;
+    VSC_MC_IMG_ATOM_INST                img_atom_inst;
+    VSC_MC_STORE_ATTR_INST              store_attr_inst;
+    VSC_MC_SELECT_MAP_INST              select_map_inst;
+    VSC_MC_DIRECT_BRANCH_0_INST         direct_branch0_inst;
+    VSC_MC_DIRECT_BRANCH_1_INST         direct_branch1_inst;
+    VSC_MC_INDIRECT_BRANCH_INST         indirect_branch_inst;
+    VSC_MC_DIRECT_CALL_INST             direct_call_inst;
+    VSC_MC_INDIRECT_CALL_INST           indirect_call_inst;
+    VSC_MC_LOOP_INST                    loop_inst;
+    VSC_MC_EMIT_INST                    emit_inst;
+    VSC_MC_EVIS_INST                    evis_inst;
+    VSC_MC_CONV_INST                    conv_inst;
+    VSC_MC_CMPLX_INST                   cmplx_inst;
+} VSC_MC_INST;
 
 typedef enum _VSC_MC_CODEC_TYPE
 {
     VSC_MC_CODEC_TYPE_UNKNOWN                = 0,
     VSC_MC_CODEC_TYPE_NO_OPND,
     VSC_MC_CODEC_TYPE_3_SRCS_ALU,
+    VSC_MC_CODEC_TYPE_3_SRCS_CC_ALU,
     VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_ALU,
+    VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_CC_ALU,
     VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC2_ALU,
     VSC_MC_CODEC_TYPE_2_SRCS_SRC1_SRC2_ALU,
     VSC_MC_CODEC_TYPE_1_SRC_SRC0_ALU,
@@ -2463,7 +3009,11 @@ typedef enum _VSC_MC_CODEC_TYPE
     VSC_MC_CODEC_TYPE_INDIRECT_CALL,
     VSC_MC_CODEC_TYPE_LOOP,
     VSC_MC_CODEC_TYPE_EMIT,
-    VSC_MC_CODEC_TYPE_EVIS
+    VSC_MC_CODEC_TYPE_CONV,
+    VSC_MC_CODEC_TYPE_SCATTER,
+    /* Not used now. */
+    VSC_MC_CODEC_TYPE_EVIS,
+    VSC_MC_CODEC_TYPE_CMPLX,
 }VSC_MC_CODEC_TYPE;
 
 #define MC_SRC0_BIT   1
@@ -2649,6 +3199,12 @@ static VSC_MC_CODEC_TYPE _GetExtendedOpcodeCodecType(VSC_MC_CODEC* pMcCodec,
         case 0x1C:
         case 0x1D:
             return VSC_MC_CODEC_TYPE_1_SRC_SRC0_ALU;
+        case 0x1E:
+            return VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_ALU;
+        case 0x1F:
+            return VSC_MC_CODEC_TYPE_SCATTER;
+        case 0x20:
+            return VSC_MC_CODEC_TYPE_3_SRCS_ALU;
         }
     }
 
@@ -2674,6 +3230,7 @@ static VSC_MC_CODEC_TYPE _GetMcCodecType(VSC_MC_CODEC* pMcCodec,
     case 0x0B:
     case 0x0F:
     case 0x31:
+        return VSC_MC_CODEC_TYPE_3_SRCS_CC_ALU;
     case 0x02:
     case 0x0E:
     case 0x30:
@@ -2702,14 +3259,23 @@ static VSC_MC_CODEC_TYPE _GetMcCodecType(VSC_MC_CODEC* pMcCodec,
         return VSC_MC_CODEC_TYPE_3_SRCS_ALU;
     case 0x36:
         {
-            /* src2 of CLAMP0_MAX is optional */
-            VSC_MC_CODEC_INST* pInstHelper = (VSC_MC_CODEC_INST *)pRefInInst;
-            return pInstHelper->srcCount == 3 ? VSC_MC_CODEC_TYPE_3_SRCS_ALU
-                                              : VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_ALU;
+            if (codecMode == VSC_MC_CODEC_MODE_ENCODE)
+            {
+                /* src2 of CLAMP0_MAX is optional */
+                VSC_MC_CODEC_INST* pInstHelper = (VSC_MC_CODEC_INST *)pRefInInst;
+                return pInstHelper->srcCount == 3 ? VSC_MC_CODEC_TYPE_3_SRCS_ALU
+                                                  : VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_ALU;
+            }
+            else
+            {
+                VSC_MC_INST* pMcInst = (VSC_MC_INST*)pRefInInst;
+                return (pMcInst->tri_srcs_alu_inst.inst.bSrc2Valid) ? VSC_MC_CODEC_TYPE_3_SRCS_ALU
+                                                                    : VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_ALU;
+            }
         }
     case 0x10:
     case 0x17:  /* A special one that has no dst valid bit */
-    case 0x72:
+        return VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_CC_ALU;
     case 0x2C:
     case 0x77:
     case 0x03:
@@ -2850,6 +3416,12 @@ static VSC_MC_CODEC_TYPE _GetMcCodecType(VSC_MC_CODEC* pMcCodec,
     case 0x7F:
     case 0x45:
         return _GetExtendedOpcodeCodecType(pMcCodec, baseOpcode, extOpcode);
+
+    case 0x72:
+        return VSC_MC_CODEC_TYPE_CONV;
+
+    case 0x62:
+        return VSC_MC_CODEC_TYPE_CMPLX;
     }
 
     return VSC_MC_CODEC_TYPE_UNKNOWN;
@@ -3433,7 +4005,8 @@ static void _EncodeSrc(VSC_MC_CODEC* pMcCodec,
     }
 }
 
-static gctBOOL _DecodeSrc(VSC_MC_CODEC* pMcCodec,
+static gctBOOL _DecodeSrc(VSC_MC_CODEC_INST* pOutCodecHelperInst,
+                          VSC_MC_CODEC* pMcCodec,
                           gctUINT srcIdx,
                           VSC_MC_INST* pMcInst,
                           gctBOOL bEvisMode,
@@ -3503,6 +4076,20 @@ static gctBOOL _DecodeSrc(VSC_MC_CODEC* pMcCodec,
                 pMcCodecSrc->u.reg.bAbs = pMcInst->tri_srcs_alu_inst.inst.bSrc2ModAbs;
                 pMcCodecSrc->u.reg.bNegative = pMcInst->tri_srcs_alu_inst.inst.bSrc2ModNeg;
             }
+
+            if (pOutCodecHelperInst->extOpcode == 0x08     ||
+                pOutCodecHelperInst->extOpcode == 0x09      ||
+                pOutCodecHelperInst->extOpcode == 0x0A      ||
+                pOutCodecHelperInst->extOpcode == 0x0B      ||
+                pOutCodecHelperInst->extOpcode == 0x12     ||
+                pOutCodecHelperInst->extOpcode == 0x13     ||
+                pOutCodecHelperInst->extOpcode == 0x14      ||
+                pOutCodecHelperInst->extOpcode == 0x15      ||
+                pOutCodecHelperInst->extOpcode == 0x16)
+            {
+                gcmASSERT(pMcCodecSrc->regType == 0x4);
+                pMcCodecSrc->u.reg.bConstReg = gcvTRUE;
+            }
         }
     }
 
@@ -3510,11 +4097,16 @@ static gctBOOL _DecodeSrc(VSC_MC_CODEC* pMcCodec,
     {
         pMcCodecSrc->u.imm.immData = _DecodeImmData(pMcInst, srcIdx, &pMcCodecSrc->u.imm.immType);
     }
+    else if (pMcCodecSrc->regType == 0x2)
+    {
+        pMcCodecSrc->u.reg.bConstReg = gcvTRUE;
+    }
 
     return gcvTRUE;
 }
 
-static gctBOOL _DecodeSrcWrapper(VSC_MC_CODEC* pMcCodec,
+static gctBOOL _DecodeSrcWrapper(VSC_MC_CODEC_INST* pOutCodecHelperInst,
+                                 VSC_MC_CODEC* pMcCodec,
                                  gctUINT* pSrcIdx,
                                  gctUINT  expectedSrcIdxMask,
                                  VSC_MC_INST* pMcInst,
@@ -3547,7 +4139,7 @@ static gctBOOL _DecodeSrcWrapper(VSC_MC_CODEC* pMcCodec,
     }
 
     /* Decode now */
-    if (!_DecodeSrc(pMcCodec, *pSrcIdx, pMcInst, bEvisMode, pMcCodecSrc))
+    if (!_DecodeSrc(pOutCodecHelperInst, pMcCodec, *pSrcIdx, pMcInst, bEvisMode, pMcCodecSrc))
     {
         return gcvFALSE;
     }
@@ -3699,6 +4291,24 @@ static gctBOOL _Common_Encode_Mc_Alu_Inst(VSC_MC_CODEC* pMcCodec,
         }
     }
 
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportEndOfBBReissue)
+    {
+        /* set End Of Basic Block Bit For non-control-flow instructions */
+        if (mcCodecType == VSC_MC_CODEC_TYPE_3_SRCS_CC_ALU)
+        {
+            pOutMcInst->tri_srcs_cc_alu_inst.inst.bEndOfBB = pInCodecHelperInst->instCtrl.bEndOfBB;
+        }
+        else if (mcCodecType == VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_CC_ALU)
+        {
+            pOutMcInst->bin_srcs_src0_src1_alu_cc_inst.inst.bEndOfBB = pInCodecHelperInst->instCtrl.bEndOfBB;
+        }
+        else
+        {
+            /* use bit 8 of word0 for all other inst kind */
+            pOutMcInst->tri_srcs_alu_inst.inst.bEndOfBB = pInCodecHelperInst->instCtrl.bEndOfBB;
+        }
+    }
+
     return gcvTRUE;
 }
 
@@ -3722,13 +4332,18 @@ static gctBOOL _Common_Decode_Mc_Alu_Inst(VSC_MC_CODEC* pMcCodec,
     /* Src */
     for (srcIdxOfHelperInst = 0; ; srcIdxOfHelperInst ++)
     {
-        if (!_DecodeSrcWrapper(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, pInMcInst,
+        if (!_DecodeSrcWrapper(pOutCodecHelperInst, pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, pInMcInst,
                                bEvisMode, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
         {
             break;
         }
 
         pOutCodecHelperInst->srcCount = srcIdxOfHelperInst + 1;
+
+        if (pOutCodecHelperInst->src[srcIdxOfHelperInst].regType == 0x4)
+        {
+            pOutCodecHelperInst->instCtrl.u.visionCtrl.bUseUniform512 = gcvTRUE;
+        }
     }
 
     /* Inst ctrl */
@@ -3745,7 +4360,36 @@ static gctBOOL _Common_Decode_Mc_Alu_Inst(VSC_MC_CODEC* pMcCodec,
     else
     {
         pOutCodecHelperInst->instCtrl.roundingMode = pInMcInst->tri_srcs_alu_inst.inst.roundMode;
-        pOutCodecHelperInst->instCtrl.packMode = pInMcInst->tri_srcs_alu_inst.inst.packMode;
+
+        /*
+        ** For CONV instruction, bit:2 of word1 is saved the evis mode, not packMode, and we use data type to check if it is packMode.
+        */
+        if (pOutCodecHelperInst->baseOpcode == 0x72)
+        {
+            pOutCodecHelperInst->instCtrl.u.visionCtrl.evisState = pInMcInst->evis_inst.inst.evisState;
+        }
+        else
+        {
+            pOutCodecHelperInst->instCtrl.packMode = pInMcInst->tri_srcs_alu_inst.inst.packMode;
+        }
+    }
+
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportEndOfBBReissue)
+    {
+        /* set End Of Basic Block Bit For non-control-flow instructions */
+        if (mcCodecType == VSC_MC_CODEC_TYPE_3_SRCS_CC_ALU)
+        {
+            pOutCodecHelperInst->instCtrl.bEndOfBB = pInMcInst->tri_srcs_cc_alu_inst.inst.bEndOfBB;
+        }
+        else if (mcCodecType == VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_CC_ALU)
+        {
+            pOutCodecHelperInst->instCtrl.bEndOfBB = pInMcInst->bin_srcs_src0_src1_alu_cc_inst.inst.bEndOfBB;
+        }
+        else
+        {
+            /* use bit 8 of word0 for all other inst kind */
+            pOutCodecHelperInst->instCtrl.bEndOfBB = pInMcInst->tri_srcs_alu_inst.inst.bEndOfBB;
+        }
     }
 
     return gcvTRUE;
@@ -3815,6 +4459,10 @@ static gctBOOL _Common_Encode_Mc_Sample_Inst(VSC_MC_CODEC* pMcCodec,
     _EncodeInstType(pMcCodec, mcCodecType, pOutMcInst, pInCodecHelperInst->instCtrl.instType);
     _EncodeThreadType(pMcCodec, mcCodecType, pOutMcInst, pInCodecHelperInst->instCtrl.threadType);
     pOutMcInst->sample_inst.inst.bResultSat = pInCodecHelperInst->instCtrl.bResultSat;
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportEndOfBBReissue)
+    {
+        pOutMcInst->sample_inst.inst.bEndOfBB = pInCodecHelperInst->instCtrl.bEndOfBB;
+    }
 
     return gcvTRUE;
 }
@@ -3843,12 +4491,12 @@ static gctBOOL _Common_Decode_Mc_Sample_Inst(VSC_MC_CODEC* pMcCodec,
     pOutCodecHelperInst->src[0].u.reg.indexingAddr = pInMcInst->sample_inst.inst.samplerRelAddr;
     pOutCodecHelperInst->srcCount = 1;
 
-    _DecodeSrcWrapper(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, pInMcInst, gcvFALSE, &pOutCodecHelperInst->src[1]);
+    _DecodeSrcWrapper(pOutCodecHelperInst, pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, pInMcInst, gcvFALSE, &pOutCodecHelperInst->src[1]);
     pOutCodecHelperInst->srcCount ++;
 
     for (srcIdxOfHelperInst = 2; ; srcIdxOfHelperInst ++)
     {
-        if (!_DecodeSrcWrapper(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, pInMcInst,
+        if (!_DecodeSrcWrapper(pOutCodecHelperInst, pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, pInMcInst,
                                gcvFALSE, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
         {
             break;
@@ -3869,6 +4517,10 @@ static gctBOOL _Common_Decode_Mc_Sample_Inst(VSC_MC_CODEC* pMcCodec,
     pOutCodecHelperInst->instCtrl.instType = _DecodeInstType(pMcCodec, mcCodecType, pInMcInst);
     pOutCodecHelperInst->instCtrl.threadType = _DecodeThreadType(pMcCodec, mcCodecType, pInMcInst);
     pOutCodecHelperInst->instCtrl.bResultSat = pInMcInst->sample_inst.inst.bResultSat;
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportEndOfBBReissue)
+    {
+        pOutCodecHelperInst->instCtrl.bEndOfBB = pInMcInst->sample_inst.inst.bEndOfBB;
+    }
 
     /* Map sample hw-opcode to sample aux-opcode based on different src-idx */
     pOutCodecHelperInst->baseOpcode = _MapSampleHwOpcodeToAuxOpcode(pMcCodec, baseOpcode, srcIdx1And2MaskOfMc, texldUModeReg);
@@ -3880,6 +4532,7 @@ static gctBOOL _Common_Encode_Mc_Load_Store_Inst(VSC_MC_CODEC* pMcCodec,
                                                  VSC_MC_CODEC_TYPE mcCodecType,
                                                  VSC_MC_CODEC_INST* pInCodecHelperInst,
                                                  gctBOOL bForImgLS,
+                                                 gctBOOL bIsImgAtom,
                                                  VSC_MC_INST* pOutMcInst)
 {
     gctUINT           srcIdx, baseOpcode = _MapLdStAuxOpcodeToHwOpcode(pInCodecHelperInst->baseOpcode);
@@ -3903,7 +4556,12 @@ static gctBOOL _Common_Encode_Mc_Load_Store_Inst(VSC_MC_CODEC* pMcCodec,
     /* Inst ctrl */
     pOutMcInst->load_inst.inst.bSkipForHelperKickoff = pInCodecHelperInst->instCtrl.bSkipForHelperKickoff;
     pOutMcInst->load_inst.inst.bAccessLocalStorage = pInCodecHelperInst->instCtrl.u.maCtrl.bAccessLocalStorage;
-    pOutMcInst->load_inst.inst.bDenorm = pInCodecHelperInst->instCtrl.bDenorm;
+
+    if (!bIsImgAtom)
+    {
+        pOutMcInst->load_inst.inst.bDenorm = pInCodecHelperInst->instCtrl.bDenorm;
+    }
+
     if (!bForImgLS)
     {
         gcmASSERT(!bEvisMode);
@@ -3918,7 +4576,7 @@ static gctBOOL _Common_Encode_Mc_Load_Store_Inst(VSC_MC_CODEC* pMcCodec,
         ((VSC_MC_INST*)pOutMcInst)->evis_inst.inst.evisState = 0x01;
     }
 
-    if (pInCodecHelperInst->baseOpcode == 0x46)
+    if (bIsImgAtom)
     {
         ((VSC_MC_INST*)pOutMcInst)->img_atom_inst.inst.atomicMode = pInCodecHelperInst->instCtrl.u.maCtrl.u.imgAtomCtrl.atomicMode;
         ((VSC_MC_INST*)pOutMcInst)->img_atom_inst.inst.b3dImgMode = pInCodecHelperInst->instCtrl.u.maCtrl.u.imgAtomCtrl.b3dImgMode;
@@ -3932,6 +4590,37 @@ static gctBOOL _Common_Encode_Mc_Load_Store_Inst(VSC_MC_CODEC* pMcCodec,
         pOutMcInst->load_inst.inst.bResultSat = pInCodecHelperInst->instCtrl.bResultSat;
     }
 
+    /* set USC Unallocate Bit For Global Memory Load/Store Instructions */
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportUSCUnalloc &&
+        pInCodecHelperInst->instCtrl.u.maCtrl.bUnallocate &&
+        (mcCodecType == VSC_MC_CODEC_TYPE_STORE ||
+         mcCodecType == VSC_MC_CODEC_TYPE_IMG_STORE ||
+         mcCodecType == VSC_MC_CODEC_TYPE_LOAD ||
+         mcCodecType == VSC_MC_CODEC_TYPE_IMG_LOAD ||
+         mcCodecType == VSC_MC_CODEC_TYPE_IMG_ATOM) )
+    {
+        pOutMcInst->load_inst.inst.bUnallocate = pInCodecHelperInst->instCtrl.u.maCtrl.bUnallocate;
+    }
+
+    /* set Endian Control Bit For Global Memory Access Instructions */
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportBigEndianLdSt &&
+        pInCodecHelperInst->instCtrl.u.maCtrl.bBigEndian &&
+        (mcCodecType == VSC_MC_CODEC_TYPE_STORE ||
+         mcCodecType == VSC_MC_CODEC_TYPE_IMG_STORE ||
+         mcCodecType == VSC_MC_CODEC_TYPE_LOAD ||
+         mcCodecType == VSC_MC_CODEC_TYPE_IMG_LOAD ||
+         mcCodecType == VSC_MC_CODEC_TYPE_IMG_ATOM ||
+         IS_ATOMIC_MC_OPCODE(pInCodecHelperInst->baseOpcode)) )
+    {
+        pOutMcInst->load_inst.inst.bBigEndian = pInCodecHelperInst->instCtrl.u.maCtrl.bBigEndian;
+    }
+
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportEndOfBBReissue)
+    {
+        /* load and store use the same bit forendOfBB */
+        pOutMcInst->load_inst.inst.bEndOfBB = pInCodecHelperInst->instCtrl.bEndOfBB;
+    }
+
     return gcvTRUE;
 }
 
@@ -3940,6 +4629,7 @@ static gctBOOL _Common_Decode_Mc_Load_Store_Inst(VSC_MC_CODEC* pMcCodec,
                                                  VSC_MC_INST* pInMcInst,
                                                  gctUINT expectedMcSrcIdxMask,
                                                  gctBOOL bForImgLS,
+                                                 gctBOOL bIsImgAtom,
                                                  VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
     gctUINT           baseOpcode;
@@ -3955,7 +4645,7 @@ static gctBOOL _Common_Decode_Mc_Load_Store_Inst(VSC_MC_CODEC* pMcCodec,
     /* Src */
     for (srcIdxOfHelperInst = 0; ; srcIdxOfHelperInst ++)
     {
-        if (!_DecodeSrcWrapper(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, pInMcInst,
+        if (!_DecodeSrcWrapper(pOutCodecHelperInst, pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, pInMcInst,
                                gcvFALSE, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
         {
             break;
@@ -3967,7 +4657,12 @@ static gctBOOL _Common_Decode_Mc_Load_Store_Inst(VSC_MC_CODEC* pMcCodec,
     /* Inst ctrl */
     pOutCodecHelperInst->instCtrl.bSkipForHelperKickoff = pInMcInst->load_inst.inst.bSkipForHelperKickoff;
     pOutCodecHelperInst->instCtrl.u.maCtrl.bAccessLocalStorage = pInMcInst->load_inst.inst.bAccessLocalStorage;
-    pOutCodecHelperInst->instCtrl.bDenorm = pInMcInst->load_inst.inst.bDenorm;
+
+    if (!bIsImgAtom)
+    {
+        pOutCodecHelperInst->instCtrl.bDenorm = pInMcInst->load_inst.inst.bDenorm;
+    }
+
     if (!bForImgLS)
     {
         pOutCodecHelperInst->instCtrl.packMode = pInMcInst->load_inst.inst.packMode;
@@ -3979,7 +4674,7 @@ static gctBOOL _Common_Decode_Mc_Load_Store_Inst(VSC_MC_CODEC* pMcCodec,
         pOutCodecHelperInst->instCtrl.u.maCtrl.bUnderEvisMode = bEvisMode;
     }
 
-    if (baseOpcode == 0x46)
+    if (bIsImgAtom)
     {
         pOutCodecHelperInst->instCtrl.u.maCtrl.u.imgAtomCtrl.atomicMode = pInMcInst->img_atom_inst.inst.atomicMode;
         pOutCodecHelperInst->instCtrl.u.maCtrl.u.imgAtomCtrl.b3dImgMode = pInMcInst->img_atom_inst.inst.b3dImgMode;
@@ -3991,6 +4686,35 @@ static gctBOOL _Common_Decode_Mc_Load_Store_Inst(VSC_MC_CODEC* pMcCodec,
     if (pOutCodecHelperInst->bDstValid || bForImgLS)
     {
         pOutCodecHelperInst->instCtrl.bResultSat = pInMcInst->load_inst.inst.bResultSat;
+    }
+
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportUSCUnalloc &&
+        pInMcInst->load_inst.inst.bUnallocate &&
+        (mcCodecType == VSC_MC_CODEC_TYPE_STORE ||
+        mcCodecType == VSC_MC_CODEC_TYPE_IMG_STORE ||
+        mcCodecType == VSC_MC_CODEC_TYPE_LOAD ||
+        mcCodecType == VSC_MC_CODEC_TYPE_IMG_LOAD ||
+        mcCodecType == VSC_MC_CODEC_TYPE_IMG_ATOM))
+    {
+        pOutCodecHelperInst->instCtrl.u.maCtrl.bUnallocate = pInMcInst->load_inst.inst.bUnallocate;
+    }
+
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportBigEndianLdSt &&
+        pInMcInst->load_inst.inst.bBigEndian &&
+        (mcCodecType == VSC_MC_CODEC_TYPE_STORE ||
+                  mcCodecType == VSC_MC_CODEC_TYPE_IMG_STORE ||
+                  mcCodecType == VSC_MC_CODEC_TYPE_LOAD ||
+                  mcCodecType == VSC_MC_CODEC_TYPE_IMG_LOAD ||
+                  mcCodecType == VSC_MC_CODEC_TYPE_IMG_ATOM ||
+                  IS_ATOMIC_MC_OPCODE(pOutCodecHelperInst->baseOpcode) ))
+    {
+        pOutCodecHelperInst->instCtrl.u.maCtrl.bBigEndian = pInMcInst->load_inst.inst.bBigEndian;
+    }
+
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportEndOfBBReissue)
+    {
+        /* load and store use the same bit forendOfBB */
+        pOutCodecHelperInst->instCtrl.bEndOfBB = pInMcInst->load_inst.inst.bEndOfBB;
     }
 
     /* Map ld/st hw-opcode to ld/st aux-opcode based on whether dst is enabled */
@@ -4012,6 +4736,10 @@ static gctBOOL _Encode_Mc_No_Opnd_Inst(VSC_MC_CODEC* pMcCodec,
     ENCODE_BASE_OPCODE((VSC_MC_INST*)pOutMcInst, pInCodecHelperInst->baseOpcode);
     ENCODE_EXT_OPCODE(pOutMcInst, pInCodecHelperInst->baseOpcode, pInCodecHelperInst->extOpcode);
 
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportEndOfBBReissue)
+    {
+        pOutMcInst->inst.bEndOfBB = pInCodecHelperInst->instCtrl.bEndOfBB;
+    }
     return gcvTRUE;
 }
 
@@ -4023,7 +4751,7 @@ static gctBOOL _Encode_Mc_3_Srcs_Alu_Inst(VSC_MC_CODEC* pMcCodec,
     gctUINT srcMap[3];
 
     gcmASSERT(IS_ATOMIC_MC_OPCODE(pInCodecHelperInst->baseOpcode) || pInCodecHelperInst->bDstValid);
-    gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_3_SRCS_ALU);
+    gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_3_SRCS_ALU || mcCodecType == VSC_MC_CODEC_TYPE_3_SRCS_CC_ALU);
 
     if (_IsSupportCondOp(pInCodecHelperInst->baseOpcode, pInCodecHelperInst->extOpcode))
     {
@@ -4077,7 +4805,10 @@ static gctBOOL _Encode_Mc_3_Srcs_Alu_Inst(VSC_MC_CODEC* pMcCodec,
     }
 
     ENCODE_EXT_OPCODE(pOutMcInst, pInCodecHelperInst->baseOpcode, pInCodecHelperInst->extOpcode);
-    pOutMcInst->inst.condOpCode = pInCodecHelperInst->instCtrl.condOpCode;
+    if (mcCodecType == VSC_MC_CODEC_TYPE_3_SRCS_CC_ALU)
+    {
+        ((VSC_MC_ALU_3_SRCS_CC_INST*)pOutMcInst)->inst.condOpCode = pInCodecHelperInst->instCtrl.condOpCode;
+    }
 
     /* Atomic operations may
        1. skip for helper pixel,
@@ -4089,12 +4820,9 @@ static gctBOOL _Encode_Mc_3_Srcs_Alu_Inst(VSC_MC_CODEC* pMcCodec,
         ((VSC_MC_INST*)pOutMcInst)->load_inst.inst.bAccessLocalStorage = pInCodecHelperInst->instCtrl.u.maCtrl.bAccessLocalStorage;
     }
 
-    /* Load_attr needs a sync bit */
+    /* Load_attr needs stage client and layout */
     if (pInCodecHelperInst->baseOpcode == 0x78)
     {
-        ((VSC_MC_INST*)pOutMcInst)->store_attr_inst.inst.bNeedUscSync =
-                                         pInCodecHelperInst->instCtrl.u.lsAttrCtrl.bNeedUscSync ? 1 : 0;
-
         ((VSC_MC_INST*)pOutMcInst)->store_attr_inst.inst.shStageClient =
                                          pInCodecHelperInst->instCtrl.u.lsAttrCtrl.shStageClient;
 
@@ -4105,10 +4833,7 @@ static gctBOOL _Encode_Mc_3_Srcs_Alu_Inst(VSC_MC_CODEC* pMcCodec,
     /* MAD uses MSB5 of word0 as control bit to control result of (0 * INF) */
     if (pInCodecHelperInst->baseOpcode == 0x02)
     {
-        if (pInCodecHelperInst->instCtrl.u.bInfX0ToZero)
-        {
-            ((VSC_MC_INST*)pOutMcInst)->sample_inst.inst.samplerSlot = 1;
-        }
+        pOutMcInst->inst.bInfX0ToZero = pInCodecHelperInst->instCtrl.u.bInfX0ToZero;
     }
 
     pOutMcInst->inst.bDenorm = pInCodecHelperInst->instCtrl.bDenorm;
@@ -4123,7 +4848,8 @@ static gctBOOL _Encode_Mc_2_Srcs_Src0_Src1_Alu_Inst(VSC_MC_CODEC* pMcCodec,
 {
     gctUINT srcMap[2] = {0, 1};
 
-    gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_ALU);
+    gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_ALU ||
+              mcCodecType == VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_CC_ALU);
     gcmASSERT(pInCodecHelperInst->bDstValid || pInCodecHelperInst->baseOpcode == 0x17);
 
     if (_IsSupportCondOp(pInCodecHelperInst->baseOpcode, pInCodecHelperInst->extOpcode))
@@ -4141,7 +4867,10 @@ static gctBOOL _Encode_Mc_2_Srcs_Src0_Src1_Alu_Inst(VSC_MC_CODEC* pMcCodec,
     }
 
     ENCODE_EXT_OPCODE(pOutMcInst, pInCodecHelperInst->baseOpcode, pInCodecHelperInst->extOpcode);
-    pOutMcInst->inst.condOpCode = pInCodecHelperInst->instCtrl.condOpCode;
+    if (mcCodecType == VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_CC_ALU)
+    {
+        ((VSC_MC_ALU_2_SRCS_SRC0_SRC1_CC_INST *)pOutMcInst)->inst.condOpCode = pInCodecHelperInst->instCtrl.condOpCode;
+    }
 
     if (pInCodecHelperInst->baseOpcode == 0x03 ||
         pInCodecHelperInst->baseOpcode == 0x77 ||
@@ -4152,10 +4881,7 @@ static gctBOOL _Encode_Mc_2_Srcs_Src0_Src1_Alu_Inst(VSC_MC_CODEC* pMcCodec,
         pInCodecHelperInst->baseOpcode == 0x06)
     {
         /* NORM_MUL/MUL/MULLO/DST/DP use MSB5 of word0 as control bit to control result of (0 * INF) */
-        if (pInCodecHelperInst->instCtrl.u.bInfX0ToZero)
-        {
-            ((VSC_MC_INST*)pOutMcInst)->sample_inst.inst.samplerSlot = 1;
-        }
+        pOutMcInst->inst.bInfX0ToZero = pInCodecHelperInst->instCtrl.u.bInfX0ToZero;
     }
 
     if (pInCodecHelperInst->baseOpcode == 0x29)
@@ -4230,10 +4956,7 @@ static gctBOOL _Encode_Mc_1_Src_Src0_Alu_Inst(VSC_MC_CODEC* pMcCodec,
         pInCodecHelperInst->baseOpcode == 0x75 ||
         pInCodecHelperInst->baseOpcode == 0x76)
     {
-        if (pInCodecHelperInst->instCtrl.u.bInfX0ToZero)
-        {
-            ((VSC_MC_INST*)pOutMcInst)->sample_inst.inst.samplerSlot = 1;
-        }
+        pOutMcInst->inst.bInfX0ToZero = pInCodecHelperInst->instCtrl.u.bInfX0ToZero;
     }
 
     return _Common_Encode_Mc_Alu_Inst(pMcCodec, mcCodecType, pInCodecHelperInst, &srcMap[0], (VSC_MC_INST*)pOutMcInst);
@@ -4313,6 +5036,10 @@ static gctBOOL _Encode_Mc_Pack_Inst(VSC_MC_CODEC* pMcCodec,
     _EncodeThreadType(pMcCodec, VSC_MC_CODEC_TYPE_PACK, (VSC_MC_INST*)pOutMcInst,
                       pInCodecHelperInst->instCtrl.threadType);
     pOutMcInst->inst.bResultSat = pInCodecHelperInst->instCtrl.bResultSat;
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportEndOfBBReissue)
+    {
+        pOutMcInst->inst.bEndOfBB = pInCodecHelperInst->instCtrl.bEndOfBB;
+    }
 
     return gcvTRUE;
 }
@@ -4352,7 +5079,7 @@ static gctBOOL _Encode_Mc_Load_Inst(VSC_MC_CODEC* pMcCodec,
     gcmASSERT(pInCodecHelperInst->srcCount == 2);
 
     ENCODE_EXT_OPCODE(pOutMcInst, pInCodecHelperInst->baseOpcode, pInCodecHelperInst->extOpcode);
-    return _Common_Encode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, pInCodecHelperInst, gcvFALSE, (VSC_MC_INST*)pOutMcInst);
+    return _Common_Encode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, pInCodecHelperInst, gcvFALSE, gcvFALSE, (VSC_MC_INST*)pOutMcInst);
 }
 
 static gctBOOL _Encode_Mc_Img_Load_Inst(VSC_MC_CODEC* pMcCodec,
@@ -4364,7 +5091,7 @@ static gctBOOL _Encode_Mc_Img_Load_Inst(VSC_MC_CODEC* pMcCodec,
     gcmASSERT(pInCodecHelperInst->bDstValid);
     gcmASSERT(pInCodecHelperInst->srcCount >= 2);
 
-    return _Common_Encode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, pInCodecHelperInst, gcvTRUE, (VSC_MC_INST*)pOutMcInst);
+    return _Common_Encode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, pInCodecHelperInst, gcvTRUE, gcvFALSE, (VSC_MC_INST*)pOutMcInst);
 }
 
 static gctBOOL _Encode_Mc_Store_Inst(VSC_MC_CODEC* pMcCodec,
@@ -4383,7 +5110,7 @@ static gctBOOL _Encode_Mc_Store_Inst(VSC_MC_CODEC* pMcCodec,
         pOutMcInst->inst.writeMask = pInCodecHelperInst->dst.u.nmlDst.writeMask;
     }
 
-    return _Common_Encode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, pInCodecHelperInst, gcvFALSE, (VSC_MC_INST*)pOutMcInst);
+    return _Common_Encode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, pInCodecHelperInst, gcvFALSE, gcvFALSE, (VSC_MC_INST*)pOutMcInst);
 }
 
 static gctBOOL _Encode_Mc_Img_Store_Inst(VSC_MC_CODEC* pMcCodec,
@@ -4417,7 +5144,7 @@ static gctBOOL _Encode_Mc_Img_Store_Inst(VSC_MC_CODEC* pMcCodec,
         }
     }
 
-    return _Common_Encode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, pInCodecHelperInst, gcvTRUE, (VSC_MC_INST*)pOutMcInst);
+    return _Common_Encode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, pInCodecHelperInst, gcvTRUE, gcvFALSE, (VSC_MC_INST*)pOutMcInst);
 }
 
 static gctBOOL _Encode_Mc_Img_Atom_Inst(VSC_MC_CODEC* pMcCodec,
@@ -4429,7 +5156,7 @@ static gctBOOL _Encode_Mc_Img_Atom_Inst(VSC_MC_CODEC* pMcCodec,
     gcmASSERT(pInCodecHelperInst->bDstValid);
     gcmASSERT(pInCodecHelperInst->srcCount == 3);
 
-    return _Common_Encode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, pInCodecHelperInst, gcvTRUE, (VSC_MC_INST*)pOutMcInst);
+    return _Common_Encode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, pInCodecHelperInst, gcvTRUE, gcvTRUE, (VSC_MC_INST*)pOutMcInst);
 }
 
 static gctBOOL _Encode_Mc_Store_Attr_Inst(VSC_MC_CODEC* pMcCodec,
@@ -4457,8 +5184,7 @@ static gctBOOL _Encode_Mc_Store_Attr_Inst(VSC_MC_CODEC* pMcCodec,
         pOutMcInst->inst.writeMask = pInCodecHelperInst->dst.u.nmlDst.writeMask;
     }
 
-    /* Usc sync bit */
-    pOutMcInst->inst.bNeedUscSync = pInCodecHelperInst->instCtrl.u.lsAttrCtrl.bNeedUscSync ? 1 : 0;
+    /* Usc stage client and layout */
     pOutMcInst->inst.shStageClient = pInCodecHelperInst->instCtrl.u.lsAttrCtrl.shStageClient;
     pOutMcInst->inst.attrLayout = pInCodecHelperInst->instCtrl.u.lsAttrCtrl.attrLayout;
 
@@ -4471,6 +5197,10 @@ static gctBOOL _Encode_Mc_Store_Attr_Inst(VSC_MC_CODEC* pMcCodec,
     _EncodeInstType(pMcCodec, mcCodecType, (VSC_MC_INST*)pOutMcInst, pInCodecHelperInst->instCtrl.instType);
     _EncodeThreadType(pMcCodec, mcCodecType, (VSC_MC_INST*)pOutMcInst, pInCodecHelperInst->instCtrl.threadType);
 
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportEndOfBBReissue)
+    {
+        pOutMcInst->inst.bEndOfBB = pInCodecHelperInst->instCtrl.bEndOfBB;
+    }
     return gcvTRUE;
 }
 
@@ -4720,18 +5450,147 @@ static gctBOOL _Encode_Mc_Emit_Inst(VSC_MC_CODEC* pMcCodec,
     _EncodeInstType(pMcCodec, VSC_MC_CODEC_TYPE_EMIT, (VSC_MC_INST*)pOutMcInst,
                     pInCodecHelperInst->instCtrl.instType);
     pOutMcInst->inst.bNeedRestartPrim = pInCodecHelperInst->instCtrl.u.emitCtrl.bNeedRestartPrim;
-    pOutMcInst->inst.bJmpToEndOnMaxVtxCnt = pInCodecHelperInst->instCtrl.u.emitCtrl.bJmpToEndOnMaxVtxCnt;
+    pOutMcInst->inst.bNoJmpToEndOnMaxVtxCnt = pInCodecHelperInst->instCtrl.u.emitCtrl.bNoJmpToEndOnMaxVtxCnt;
     pOutMcInst->inst.bResultSat = pInCodecHelperInst->instCtrl.bResultSat;
+
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportEndOfBBReissue)
+    {
+        pOutMcInst->inst.bEndOfBB = pInCodecHelperInst->instCtrl.bEndOfBB;
+    }
+    return gcvTRUE;
+}
+
+static gctBOOL _Encode_Mc_Conv_Inst(VSC_MC_CODEC* pMcCodec,
+                                    VSC_MC_CODEC_TYPE mcCodecType,
+                                    VSC_MC_CODEC_INST* pInCodecHelperInst,
+                                    VSC_MC_CONV_INST* pOutMcInst)
+{
+    gctUINT           srcIdx;
+
+    gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_CONV);
+    gcmASSERT(pInCodecHelperInst->bDstValid);
+    gcmASSERT(pInCodecHelperInst->srcCount == 2);
+
+    /* Opcode */
+    ENCODE_BASE_OPCODE((VSC_MC_INST*)pOutMcInst, pInCodecHelperInst->baseOpcode);
+    ENCODE_EXT_OPCODE(pOutMcInst, pInCodecHelperInst->baseOpcode, pInCodecHelperInst->extOpcode);
+
+    /* Dst */
+    _EncodeDst(pMcCodec, &pInCodecHelperInst->dst, gcvFALSE, (VSC_MC_INST*)pOutMcInst);
+
+    /* Src */
+    for (srcIdx = 0; srcIdx < pInCodecHelperInst->srcCount; srcIdx ++)
+    {
+        _EncodeSrc(pMcCodec, srcIdx, &pInCodecHelperInst->src[srcIdx], gcvFALSE, (VSC_MC_INST*)pOutMcInst);
+    }
+
+    /* Inst ctrl */
+    _EncodeInstType(pMcCodec, mcCodecType, (VSC_MC_INST*)pOutMcInst, pInCodecHelperInst->instCtrl.instType);
+    _EncodeThreadType(pMcCodec, mcCodecType, (VSC_MC_INST*)pOutMcInst, pInCodecHelperInst->instCtrl.threadType);
+    ((VSC_MC_INST*)pOutMcInst)->tri_srcs_alu_inst.inst.bResultSat = pInCodecHelperInst->instCtrl.bResultSat;
+
+    pOutMcInst->inst.roundMode = pInCodecHelperInst->instCtrl.roundingMode;
+    pOutMcInst->inst.bEvisMode = pInCodecHelperInst->instCtrl.u.convCtrl.bEvisMode;
+    pOutMcInst->inst.bDstPack = pInCodecHelperInst->instCtrl.u.convCtrl.bDstPack;
+    pOutMcInst->inst.bSrcPack = pInCodecHelperInst->instCtrl.u.convCtrl.bSrcPack;
+
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportEndOfBBReissue)
+    {
+        pOutMcInst->inst.bEndOfBB = pInCodecHelperInst->instCtrl.bEndOfBB;
+    }
+    return gcvTRUE;
+}
+
+static gctBOOL _Encode_Mc_Scatter_Inst(VSC_MC_CODEC* pMcCodec,
+                                       VSC_MC_CODEC_TYPE mcCodecType,
+                                       VSC_MC_CODEC_INST* pInCodecHelperInst,
+                                       VSC_MC_INST* pOutMcInst)
+{
+    gctUINT           srcIdx;
+
+    gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_SCATTER);
+    gcmASSERT(!pInCodecHelperInst->bDstValid);
+    gcmASSERT(pInCodecHelperInst->srcCount == 3);
+
+    /* Opcode */
+    ENCODE_BASE_OPCODE(pOutMcInst, 0x45);
+    ENCODE_EXT_OPCODE(pOutMcInst, 0x45, 0x1F);
+
+    /*  Why dst is valid, but has no channel to be written? */
+    gcmASSERT(pInCodecHelperInst->dst.u.evisDst.compIdxRange > 0);
+
+    /* Get the startBin/endBin first. */
+    pOutMcInst->evis_inst.inst.startDstCompIdx = pInCodecHelperInst->dst.u.evisDst.startCompIdx;
+    pOutMcInst->evis_inst.inst.endDstCompIdx = pInCodecHelperInst->dst.u.evisDst.startCompIdx + pInCodecHelperInst->dst.u.evisDst.compIdxRange - 1;
+
+    /* Src */
+    for (srcIdx = 0; srcIdx < pInCodecHelperInst->srcCount; srcIdx ++)
+    {
+        _EncodeSrc(pMcCodec, srcIdx, &pInCodecHelperInst->src[srcIdx], gcvTRUE, pOutMcInst);
+    }
+
+    /* Inst ctrl */
+    pOutMcInst->load_inst.inst.bSkipForHelperKickoff = pInCodecHelperInst->instCtrl.bSkipForHelperKickoff;
+    pOutMcInst->load_inst.inst.bAccessLocalStorage = pInCodecHelperInst->instCtrl.u.maCtrl.bAccessLocalStorage;
+
+    /* EVIS insts have evis-state and sourceBin */
+    pOutMcInst->evis_inst.inst.evisState = pInCodecHelperInst->instCtrl.u.visionCtrl.evisState;
+    pOutMcInst->evis_inst.inst.startSrcCompIdx = pInCodecHelperInst->instCtrl.u.visionCtrl.startSrcCompIdx;
+
+    _EncodeInstType(pMcCodec, mcCodecType, pOutMcInst, pInCodecHelperInst->instCtrl.instType);
+    _EncodeThreadType(pMcCodec, mcCodecType, pOutMcInst, pInCodecHelperInst->instCtrl.threadType);
 
     return gcvTRUE;
 }
+
+static gctBOOL _Encode_Mc_Cmplx_Inst(VSC_MC_CODEC* pMcCodec,
+                                     VSC_MC_CODEC_TYPE mcCodecType,
+                                     VSC_MC_CODEC_INST* pInCodecHelperInst,
+                                     VSC_MC_CMPLX_INST* pOutMcInst)
+{
+    gctUINT srcMap[3];
+
+    gcmASSERT(IS_ATOMIC_MC_OPCODE(pInCodecHelperInst->baseOpcode) || pInCodecHelperInst->bDstValid);
+    gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_CMPLX);
+
+    if (pInCodecHelperInst->extOpcode == 0x1)
+    {
+        gcmASSERT(pInCodecHelperInst->srcCount == 3);
+
+        srcMap[0] = 0;
+        srcMap[1] = 1;
+        srcMap[2] = 2;
+    }
+    else if (pInCodecHelperInst->extOpcode == 0x0)
+    {
+        gcmASSERT(pInCodecHelperInst->srcCount == 2);
+
+        srcMap[0] = 0;
+        srcMap[1] = 1;
+    }
+    else
+    {
+        srcMap[0] = 0;
+        srcMap[1] = 1;
+        srcMap[2] = 2;
+    }
+
+    pOutMcInst->inst.bDenorm = pInCodecHelperInst->instCtrl.bDenorm;
+
+    pOutMcInst->inst.subOpcode = pInCodecHelperInst->extOpcode;
+
+    return _Common_Encode_Mc_Alu_Inst(pMcCodec, mcCodecType, pInCodecHelperInst, &srcMap[0], (VSC_MC_INST*)pOutMcInst);
+}
+
 
 static PFN_MC_ENCODER _pfn_mc_encoder[] =
 {
     gcvNULL,
     (PFN_MC_ENCODER)_Encode_Mc_No_Opnd_Inst,
     (PFN_MC_ENCODER)_Encode_Mc_3_Srcs_Alu_Inst,
+    (PFN_MC_ENCODER)_Encode_Mc_3_Srcs_Alu_Inst, /* VSC_MC_CODEC_TYPE_3_SRCS_CC_ALU */
     (PFN_MC_ENCODER)_Encode_Mc_2_Srcs_Src0_Src1_Alu_Inst,
+    (PFN_MC_ENCODER)_Encode_Mc_2_Srcs_Src0_Src1_Alu_Inst, /* VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_CC_ALU */
     (PFN_MC_ENCODER)_Encode_Mc_2_Srcs_Src0_Src2_Alu_Inst,
     (PFN_MC_ENCODER)_Encode_Mc_2_Srcs_Src1_Src2_Alu_Inst,
     (PFN_MC_ENCODER)_Encode_Mc_1_Src_Src0_Alu_Inst,
@@ -4754,7 +5613,10 @@ static PFN_MC_ENCODER _pfn_mc_encoder[] =
     (PFN_MC_ENCODER)_Encode_Mc_Indirect_Call_Inst,
     (PFN_MC_ENCODER)_Encode_Mc_Loop_Inst,
     (PFN_MC_ENCODER)_Encode_Mc_Emit_Inst,
-    gcvNULL
+    (PFN_MC_ENCODER)_Encode_Mc_Conv_Inst,
+    (PFN_MC_ENCODER)_Encode_Mc_Scatter_Inst,
+    (PFN_MC_ENCODER)_Encode_Mc_3_Srcs_Alu_Inst,
+    (PFN_MC_ENCODER)_Encode_Mc_Cmplx_Inst,
 };
 
 /* Decode routines */
@@ -4769,6 +5631,10 @@ static gctBOOL _Decode_Mc_No_Opnd_Inst(VSC_MC_CODEC* pMcCodec,
     pOutCodecHelperInst->baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
     pOutCodecHelperInst->extOpcode = DECODE_EXT_OPCODE((VSC_MC_INST*)pInMcInst, pOutCodecHelperInst->baseOpcode);
 
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportEndOfBBReissue)
+    {
+        pOutCodecHelperInst->instCtrl.bEndOfBB = pInMcInst->inst.bEndOfBB;
+    }
     return gcvTRUE;
 }
 
@@ -4780,10 +5646,14 @@ static gctBOOL _Decode_Mc_3_Srcs_Alu_Inst(VSC_MC_CODEC* pMcCodec,
     gctUINT  baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
     gctUINT  expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT | MC_SRC2_BIT;
 
-    gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_3_SRCS_ALU);
+    gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_3_SRCS_ALU ||
+              mcCodecType == VSC_MC_CODEC_TYPE_3_SRCS_CC_ALU );
 
     pOutCodecHelperInst->extOpcode = DECODE_EXT_OPCODE((VSC_MC_INST*)pInMcInst, baseOpcode);
-    pOutCodecHelperInst->instCtrl.condOpCode = pInMcInst->inst.condOpCode;
+    if (mcCodecType == VSC_MC_CODEC_TYPE_3_SRCS_CC_ALU)
+    {
+        pOutCodecHelperInst->instCtrl.condOpCode = ((VSC_MC_ALU_3_SRCS_CC_INST *)pInMcInst)->inst.condOpCode;
+    }
 
     /* Atomic operations may skip for helper pixel, also atomics might access local memory, not always global memory */
     if (IS_ATOMIC_MC_OPCODE(baseOpcode))
@@ -4792,20 +5662,16 @@ static gctBOOL _Decode_Mc_3_Srcs_Alu_Inst(VSC_MC_CODEC* pMcCodec,
         pOutCodecHelperInst->instCtrl.u.maCtrl.bAccessLocalStorage = ((VSC_MC_INST*)pInMcInst)->load_inst.inst.bAccessLocalStorage;
     }
 
-    /* Load_attr needs a sync bit */
+    /* Load_attr needs stage client and layout */
     if (baseOpcode == 0x78)
     {
-        pOutCodecHelperInst->instCtrl.u.lsAttrCtrl.bNeedUscSync = ((VSC_MC_INST*)pInMcInst)->store_attr_inst.inst.bNeedUscSync;
         pOutCodecHelperInst->instCtrl.u.lsAttrCtrl.shStageClient = ((VSC_MC_INST*)pInMcInst)->store_attr_inst.inst.shStageClient;
         pOutCodecHelperInst->instCtrl.u.lsAttrCtrl.attrLayout = ((VSC_MC_INST*)pInMcInst)->store_attr_inst.inst.attrLayout;
     }
 
     if (baseOpcode == 0x02)
     {
-        if (((VSC_MC_INST*)pInMcInst)->sample_inst.inst.samplerSlot)
-        {
-            pOutCodecHelperInst->instCtrl.u.bInfX0ToZero = gcvTRUE;
-        }
+        pOutCodecHelperInst->instCtrl.u.bInfX0ToZero = pInMcInst->inst.bInfX0ToZero;
     }
 
     pOutCodecHelperInst->instCtrl.bDenorm = pInMcInst->inst.bDenorm;
@@ -4821,10 +5687,14 @@ static gctBOOL _Decode_Mc_2_Srcs_Src0_Src1_Alu_Inst(VSC_MC_CODEC* pMcCodec,
     gctUINT  baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
     gctUINT  expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT;
 
-    gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_ALU);
+    gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_ALU ||
+              mcCodecType == VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_CC_ALU);
 
     pOutCodecHelperInst->extOpcode = DECODE_EXT_OPCODE((VSC_MC_INST*)pInMcInst, baseOpcode);
-    pOutCodecHelperInst->instCtrl.condOpCode = pInMcInst->inst.condOpCode;
+    if (mcCodecType == VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_CC_ALU)
+    {
+        pOutCodecHelperInst->instCtrl.condOpCode = ((VSC_MC_ALU_2_SRCS_SRC0_SRC1_CC_INST *)pInMcInst)->inst.condOpCode;
+    }
 
     if (baseOpcode == 0x03 ||
         baseOpcode == 0x77 ||
@@ -4834,10 +5704,7 @@ static gctBOOL _Decode_Mc_2_Srcs_Src0_Src1_Alu_Inst(VSC_MC_CODEC* pMcCodec,
         baseOpcode == 0x05 ||
         baseOpcode == 0x06)
     {
-        if (((VSC_MC_INST*)pInMcInst)->sample_inst.inst.samplerSlot)
-        {
-            pOutCodecHelperInst->instCtrl.u.bInfX0ToZero = gcvTRUE;
-        }
+        pOutCodecHelperInst->instCtrl.u.bInfX0ToZero = pInMcInst->inst.bInfX0ToZero;
     }
 
     return _Common_Decode_Mc_Alu_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst, expectedMcSrcIdxMask, pOutCodecHelperInst);
@@ -4886,10 +5753,7 @@ static gctBOOL _Decode_Mc_1_Src_Src0_Alu_Inst(VSC_MC_CODEC* pMcCodec,
         baseOpcode == 0x75 ||
         baseOpcode == 0x76)
     {
-        if (((VSC_MC_INST*)pInMcInst)->sample_inst.inst.samplerSlot)
-        {
-            pOutCodecHelperInst->instCtrl.u.bInfX0ToZero = gcvTRUE;
-        }
+        pOutCodecHelperInst->instCtrl.u.bInfX0ToZero = pInMcInst->inst.bInfX0ToZero;
     }
 
     return _Common_Decode_Mc_Alu_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst, expectedMcSrcIdxMask, pOutCodecHelperInst);
@@ -4941,7 +5805,7 @@ static gctBOOL _Decode_Mc_Pack_Inst(VSC_MC_CODEC* pMcCodec,
     /* Src */
     for (srcIdxOfHelperInst = 0; ; srcIdxOfHelperInst ++)
     {
-        if (!_DecodeSrcWrapper(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
+        if (!_DecodeSrcWrapper(pOutCodecHelperInst, pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
                                gcvFALSE, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
         {
             break;
@@ -4955,6 +5819,10 @@ static gctBOOL _Decode_Mc_Pack_Inst(VSC_MC_CODEC* pMcCodec,
     pOutCodecHelperInst->instCtrl.instType = _DecodeInstType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
     pOutCodecHelperInst->instCtrl.threadType = _DecodeThreadType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
     pOutCodecHelperInst->instCtrl.bResultSat = pInMcInst->inst.bResultSat;
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportEndOfBBReissue)
+    {
+        pOutCodecHelperInst->instCtrl.bEndOfBB = pInMcInst->inst.bEndOfBB;
+    }
 
     return gcvTRUE;
 }
@@ -4999,7 +5867,7 @@ static gctBOOL _Decode_Mc_Load_Inst(VSC_MC_CODEC* pMcCodec,
     pOutCodecHelperInst->extOpcode = DECODE_EXT_OPCODE((VSC_MC_INST*)pInMcInst, baseOpcode);
 
     return _Common_Decode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst,
-                                             expectedMcSrcIdxMask, gcvFALSE, pOutCodecHelperInst);
+                                             expectedMcSrcIdxMask, gcvFALSE, gcvFALSE, pOutCodecHelperInst);
 }
 
 static gctBOOL _Decode_Mc_Img_Load_Inst(VSC_MC_CODEC* pMcCodec,
@@ -5012,7 +5880,7 @@ static gctBOOL _Decode_Mc_Img_Load_Inst(VSC_MC_CODEC* pMcCodec,
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_IMG_LOAD);
 
     return _Common_Decode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst,
-                                             expectedMcSrcIdxMask, gcvTRUE, pOutCodecHelperInst);
+                                             expectedMcSrcIdxMask, gcvTRUE, gcvFALSE, pOutCodecHelperInst);
 }
 
 static gctBOOL _Decode_Mc_Store_Inst(VSC_MC_CODEC* pMcCodec,
@@ -5026,7 +5894,7 @@ static gctBOOL _Decode_Mc_Store_Inst(VSC_MC_CODEC* pMcCodec,
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_STORE);
 
     bRet = _Common_Decode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst,
-                                             expectedMcSrcIdxMask, gcvFALSE, pOutCodecHelperInst);
+                                             expectedMcSrcIdxMask, gcvFALSE, gcvFALSE, pOutCodecHelperInst);
 
     if (pOutCodecHelperInst->baseOpcode != MC_AUXILIARY_OP_CODE_USC_STORE)
     {
@@ -5048,7 +5916,7 @@ static gctBOOL _Decode_Mc_Img_Store_Inst(VSC_MC_CODEC* pMcCodec,
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_IMG_STORE);
 
     bRet = _Common_Decode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst,
-                                             expectedMcSrcIdxMask, gcvTRUE, pOutCodecHelperInst);
+                                             expectedMcSrcIdxMask, gcvTRUE, gcvFALSE, pOutCodecHelperInst);
 
     if (pOutCodecHelperInst->baseOpcode != MC_AUXILIARY_OP_CODE_USC_IMG_STORE &&
         pOutCodecHelperInst->baseOpcode != MC_AUXILIARY_OP_CODE_USC_IMG_STORE_3D)
@@ -5074,7 +5942,7 @@ static gctBOOL _Decode_Mc_Img_Atom_Inst(VSC_MC_CODEC* pMcCodec,
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_IMG_ATOM);
 
     return _Common_Decode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst,
-                                             expectedMcSrcIdxMask, gcvTRUE, pOutCodecHelperInst);
+                                             expectedMcSrcIdxMask, gcvTRUE, gcvTRUE, pOutCodecHelperInst);
 }
 
 static gctBOOL _Decode_Mc_Store_Attr_Inst(VSC_MC_CODEC* pMcCodec,
@@ -5099,15 +5967,14 @@ static gctBOOL _Decode_Mc_Store_Attr_Inst(VSC_MC_CODEC* pMcCodec,
         pOutCodecHelperInst->dst.u.nmlDst.writeMask = pInMcInst->inst.writeMask;
     }
 
-    /* Usc sync bit */
-    pOutCodecHelperInst->instCtrl.u.lsAttrCtrl.bNeedUscSync = pInMcInst->inst.bNeedUscSync;
+    /* Usc stage client and layout */
     pOutCodecHelperInst->instCtrl.u.lsAttrCtrl.shStageClient = pInMcInst->inst.shStageClient;
     pOutCodecHelperInst->instCtrl.u.lsAttrCtrl.attrLayout = pInMcInst->inst.attrLayout;
 
     /* Src */
     for (srcIdxOfHelperInst = 0; ; srcIdxOfHelperInst ++)
     {
-        if (!_DecodeSrcWrapper(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
+        if (!_DecodeSrcWrapper(pOutCodecHelperInst, pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
                                gcvFALSE, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
         {
             break;
@@ -5121,6 +5988,10 @@ static gctBOOL _Decode_Mc_Store_Attr_Inst(VSC_MC_CODEC* pMcCodec,
 
     /* Map st-att hw-opcode to st-att aux-opcode based on whether dst is enabled */
     pOutCodecHelperInst->baseOpcode = _MapLdStHwOpcodeToAuxOpcode(baseOpcode, pOutCodecHelperInst->bDstValid);
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportEndOfBBReissue)
+    {
+        pOutCodecHelperInst->instCtrl.bEndOfBB = pInMcInst->inst.bEndOfBB;
+    }
 
     return gcvTRUE;
 }
@@ -5144,7 +6015,7 @@ static gctBOOL _Decode_Mc_Select_Map_Inst(VSC_MC_CODEC* pMcCodec,
     /* Src */
     for (srcIdxOfHelperInst = 0; ; srcIdxOfHelperInst ++)
     {
-        if (!_DecodeSrcWrapper(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
+        if (!_DecodeSrcWrapper(pOutCodecHelperInst, pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
                                gcvFALSE, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
         {
             break;
@@ -5179,7 +6050,7 @@ static gctBOOL _Decode_Mc_Direct_Branch_0_Inst(VSC_MC_CODEC* pMcCodec,
     /* Src */
     for (srcIdxOfHelperInst = 0; ; srcIdxOfHelperInst ++)
     {
-        if (!_DecodeSrcWrapper(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
+        if (!_DecodeSrcWrapper(pOutCodecHelperInst, pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
                                gcvFALSE, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
         {
             break;
@@ -5229,7 +6100,7 @@ static gctBOOL _Decode_Mc_Direct_Branch_1_Inst(VSC_MC_CODEC* pMcCodec,
             break;
         }
 
-        if (!_DecodeSrcWrapper(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
+        if (!_DecodeSrcWrapper(pOutCodecHelperInst, pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
                                gcvFALSE, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
         {
             break;
@@ -5271,7 +6142,7 @@ static gctBOOL _Decode_Mc_Indirect_Branch_Inst(VSC_MC_CODEC* pMcCodec,
     pOutCodecHelperInst->baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
 
     /* Branch target */
-    _DecodeSrcWrapper(pMcCodec, &srcIdxOfBranchTarget, expectedMcSrcIdxMask,
+    _DecodeSrcWrapper(pOutCodecHelperInst, pMcCodec, &srcIdxOfBranchTarget, expectedMcSrcIdxMask,
                       (VSC_MC_INST*)pInMcInst, gcvFALSE, &pOutCodecHelperInst->src[0]);
     pOutCodecHelperInst->srcCount = 1;
 
@@ -5317,7 +6188,7 @@ static gctBOOL _Decode_Mc_Indirect_Call_Inst(VSC_MC_CODEC* pMcCodec,
     pOutCodecHelperInst->baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
 
     /* Call target */
-    _DecodeSrcWrapper(pMcCodec, &srcIdxOfCallTarget, expectedMcSrcIdxMask,
+    _DecodeSrcWrapper(pOutCodecHelperInst, pMcCodec, &srcIdxOfCallTarget, expectedMcSrcIdxMask,
                       (VSC_MC_INST*)pInMcInst, gcvFALSE, &pOutCodecHelperInst->src[0]);
     pOutCodecHelperInst->srcCount = 1;
 
@@ -5342,7 +6213,7 @@ static gctBOOL _Decode_Mc_Loop_Inst(VSC_MC_CODEC* pMcCodec,
     pOutCodecHelperInst->baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
 
     /* Src */
-    _DecodeSrcWrapper(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask,
+    _DecodeSrcWrapper(pOutCodecHelperInst, pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask,
                       (VSC_MC_INST*)pInMcInst, gcvFALSE, &pOutCodecHelperInst->src[0]);
     pOutCodecHelperInst->srcCount = 1;
 
@@ -5378,7 +6249,7 @@ static gctBOOL _Decode_Mc_Emit_Inst(VSC_MC_CODEC* pMcCodec,
     /* Src */
     for (srcIdxOfHelperInst = 0; ; srcIdxOfHelperInst ++)
     {
-        if (!_DecodeSrcWrapper(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
+        if (!_DecodeSrcWrapper(pOutCodecHelperInst, pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
                                gcvFALSE, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
         {
             break;
@@ -5390,10 +6261,131 @@ static gctBOOL _Decode_Mc_Emit_Inst(VSC_MC_CODEC* pMcCodec,
     /* Inst ctrl */
     pOutCodecHelperInst->instCtrl.instType = _DecodeInstType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
     pOutCodecHelperInst->instCtrl.u.emitCtrl.bNeedRestartPrim = pInMcInst->inst.bNeedRestartPrim;
-    pOutCodecHelperInst->instCtrl.u.emitCtrl.bJmpToEndOnMaxVtxCnt = pInMcInst->inst.bJmpToEndOnMaxVtxCnt;
+    pOutCodecHelperInst->instCtrl.u.emitCtrl.bNoJmpToEndOnMaxVtxCnt = pInMcInst->inst.bNoJmpToEndOnMaxVtxCnt;
     pOutCodecHelperInst->instCtrl.bResultSat = pInMcInst->inst.bResultSat;
 
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportEndOfBBReissue)
+    {
+        pOutCodecHelperInst->instCtrl.bEndOfBB = pInMcInst->inst.bEndOfBB;
+    }
+
     return gcvTRUE;
+}
+
+static gctBOOL _Decode_Mc_Conv_Inst(VSC_MC_CODEC* pMcCodec,
+                                    VSC_MC_CODEC_TYPE mcCodecType,
+                                    VSC_MC_CONV_INST* pInMcInst,
+                                    VSC_MC_CODEC_INST* pOutCodecHelperInst)
+{
+    gctUINT           srcIdxOfHelperInst, srcIdxOfMc = 0;
+    gctUINT           expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT;
+
+    /* Opcode */
+    pOutCodecHelperInst->baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
+
+    /* Dst */
+    pOutCodecHelperInst->bDstValid = _DecodeDst(pMcCodec, (VSC_MC_INST*)pInMcInst, gcvFALSE, &pOutCodecHelperInst->dst);
+
+    /* Src */
+    for (srcIdxOfHelperInst = 0; ; srcIdxOfHelperInst ++)
+    {
+        if (!_DecodeSrcWrapper(pOutCodecHelperInst, pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
+                               gcvFALSE, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
+        {
+            break;
+        }
+
+        pOutCodecHelperInst->srcCount = srcIdxOfHelperInst + 1;
+    }
+
+    /* Inst ctrl */
+    pOutCodecHelperInst->instCtrl.instType = _DecodeInstType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
+    pOutCodecHelperInst->instCtrl.threadType = _DecodeThreadType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
+    pOutCodecHelperInst->instCtrl.bResultSat = ((VSC_MC_INST*)pInMcInst)->tri_srcs_alu_inst.inst.bResultSat;
+    pOutCodecHelperInst->instCtrl.roundingMode = ((VSC_MC_INST*)pInMcInst)->tri_srcs_alu_inst.inst.roundMode;
+
+    pOutCodecHelperInst->instCtrl.u.convCtrl.bEvisMode = pInMcInst->inst.bEvisMode;
+    pOutCodecHelperInst->instCtrl.u.convCtrl.bDstPack = pInMcInst->inst.bDstPack;
+    pOutCodecHelperInst->instCtrl.u.convCtrl.bSrcPack = pInMcInst->inst.bSrcPack;
+
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportEndOfBBReissue)
+    {
+        pOutCodecHelperInst->instCtrl.bEndOfBB = pInMcInst->inst.bEndOfBB;
+    }
+
+    return gcvTRUE;
+}
+
+static gctBOOL _Decode_Mc_Scatter_Inst(VSC_MC_CODEC* pMcCodec,
+                                       VSC_MC_CODEC_TYPE mcCodecType,
+                                       VSC_MC_INST* pInMcInst,
+                                       VSC_MC_CODEC_INST* pOutCodecHelperInst)
+{
+    gctUINT  expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT | MC_SRC2_BIT;
+    gctUINT  srcIdxOfHelperInst, srcIdxOfMc = 0;
+
+    gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_SCATTER);
+
+    pOutCodecHelperInst->baseOpcode = 0x45;
+    pOutCodecHelperInst->extOpcode = 0x1F;
+
+    /* Dst, get the startBin/endBin. */
+    pOutCodecHelperInst->bDstValid = gcvFALSE;
+    pOutCodecHelperInst->dst.u.evisDst.startCompIdx = pInMcInst->evis_inst.inst.startDstCompIdx;
+    pOutCodecHelperInst->dst.u.evisDst.compIdxRange = pInMcInst->evis_inst.inst.endDstCompIdx - pInMcInst->evis_inst.inst.startDstCompIdx + 1;
+
+    /* Src */
+    for (srcIdxOfHelperInst = 0; ; srcIdxOfHelperInst ++)
+    {
+        if (!_DecodeSrcWrapper(pOutCodecHelperInst, pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, pInMcInst,
+                               gcvTRUE, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
+        {
+            break;
+        }
+
+        pOutCodecHelperInst->srcCount = srcIdxOfHelperInst + 1;
+    }
+
+    /* Inst ctrl */
+    pOutCodecHelperInst->instCtrl.bSkipForHelperKickoff = pInMcInst->load_inst.inst.bSkipForHelperKickoff;
+    pOutCodecHelperInst->instCtrl.u.maCtrl.bAccessLocalStorage = pInMcInst->load_inst.inst.bAccessLocalStorage;
+
+    /* EVIS insts have evis-state and sourceBin */
+    pOutCodecHelperInst->instCtrl.u.visionCtrl.evisState = pInMcInst->evis_inst.inst.evisState;
+    pOutCodecHelperInst->instCtrl.u.visionCtrl.startSrcCompIdx = pInMcInst->evis_inst.inst.startSrcCompIdx;
+
+    pOutCodecHelperInst->instCtrl.instType = _DecodeInstType(pMcCodec, mcCodecType, pInMcInst);
+    pOutCodecHelperInst->instCtrl.threadType = _DecodeThreadType(pMcCodec, mcCodecType, pInMcInst);
+
+    return gcvTRUE;
+}
+
+static gctBOOL _Decode_Mc_Cmplx_Inst(VSC_MC_CODEC* pMcCodec,
+                                     VSC_MC_CODEC_TYPE mcCodecType,
+                                     VSC_MC_CMPLX_INST* pInMcInst,
+                                     VSC_MC_CODEC_INST* pOutCodecHelperInst)
+{
+    gctUINT  expectedMcSrcIdxMask;
+
+    if (pInMcInst->inst.subOpcode == 0x1)
+    {
+        expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT | MC_SRC2_BIT;
+    }
+    else if (pInMcInst->inst.subOpcode == 0x0)
+    {
+        expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT;
+    }
+    else
+    {
+        expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT | MC_SRC2_BIT;
+    }
+
+    gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_CMPLX);
+
+    pOutCodecHelperInst->instCtrl.bDenorm = pInMcInst->inst.bDenorm;
+    pOutCodecHelperInst->extOpcode = pInMcInst->inst.subOpcode;
+
+    return _Common_Decode_Mc_Alu_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst, expectedMcSrcIdxMask, pOutCodecHelperInst);
 }
 
 static PFN_MC_DECODER _pfn_mc_decoder[] =
@@ -5401,7 +6393,9 @@ static PFN_MC_DECODER _pfn_mc_decoder[] =
     gcvNULL,
     (PFN_MC_DECODER)_Decode_Mc_No_Opnd_Inst,
     (PFN_MC_DECODER)_Decode_Mc_3_Srcs_Alu_Inst,
+    (PFN_MC_DECODER)_Decode_Mc_3_Srcs_Alu_Inst, /* VSC_MC_CODEC_TYPE_3_SRCS_CC_ALU */
     (PFN_MC_DECODER)_Decode_Mc_2_Srcs_Src0_Src1_Alu_Inst,
+    (PFN_MC_DECODER)_Decode_Mc_2_Srcs_Src0_Src1_Alu_Inst, /* VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_CC_ALU */
     (PFN_MC_DECODER)_Decode_Mc_2_Srcs_Src0_Src2_Alu_Inst,
     (PFN_MC_DECODER)_Decode_Mc_2_Srcs_Src1_Src2_Alu_Inst,
     (PFN_MC_DECODER)_Decode_Mc_1_Src_Src0_Alu_Inst,
@@ -5424,7 +6418,10 @@ static PFN_MC_DECODER _pfn_mc_decoder[] =
     (PFN_MC_DECODER)_Decode_Mc_Indirect_Call_Inst,
     (PFN_MC_DECODER)_Decode_Mc_Loop_Inst,
     (PFN_MC_DECODER)_Decode_Mc_Emit_Inst,
-    gcvNULL
+    (PFN_MC_DECODER)_Decode_Mc_Conv_Inst,
+    (PFN_MC_DECODER)_Decode_Mc_Scatter_Inst,
+    (PFN_MC_DECODER)_Decode_Mc_3_Srcs_Alu_Inst,
+    (PFN_MC_DECODER)_Decode_Mc_Cmplx_Inst,
 };
 
 static void _dbgStopHere(void)
@@ -5434,58 +6431,33 @@ static void _dbgStopHere(void)
 
 #define GotoError()  do { _dbgStopHere(); goto OnError; } while (0)
 
-static gctUINT _getSrcType(VSC_MC_CODEC_INST* pCodecHelperInst)
-{
-    gctUINT srcType = pCodecHelperInst->instCtrl.instType;
-
-    switch (pCodecHelperInst->baseOpcode)
-    {
-    case 0x72:
-        srcType = pCodecHelperInst->src[1].u.imm.immData.ui;
-        if (srcType == 0xB ||
-            srcType == 0xC ||
-            srcType == 0xE ||
-            srcType == 0xF)
-        {
-            if (pCodecHelperInst->instCtrl.threadType == 0x0)
-            {
-                srcType = 0x1;
-            }
-            else
-            {
-                srcType = 0x0;
-            }
-        }
-        break;
-    case 0x2E:
-    case 0x2F:
-        if (pCodecHelperInst->instCtrl.threadType == 0x0)
-        {
-            srcType = 0x1;
-        }
-        else
-        {
-            srcType = 0x0;
-        }
-        break;
-    case 0x2C:
-    case 0x2D:
-        /* to be clear: I2I/I2F instruction type is src0 type */
-        srcType = pCodecHelperInst->instCtrl.instType;
-        break;
-    default:
-        break;
-    }
-
-    return srcType;
-}
-
 static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCodecHelperInst)
 {
     gctUINT  srcIdx, i, firstCstRegNo;
     gctBOOL  bFirstCstRegIndexing;
     gctUINT8 src2Format;
     gctBOOL  isVX2 = gcHWCaps.hwFeatureFlags.supportEVISVX2;
+    gctBOOL  bEvisMode = (pCodecHelperInst->baseOpcode == 0x45);
+
+    if (pCodecHelperInst->instCtrl.bResultSat)
+    {
+        /* Now only support destModifier for FLOAT32 or LOAD/STORE/IMG_STORE/I2I/CONV */
+        if (pCodecHelperInst->instCtrl.instType != 0x0    &&
+            pCodecHelperInst->baseOpcode != 0x32                        &&
+            pCodecHelperInst->baseOpcode != 0x33                       &&
+            pCodecHelperInst->baseOpcode != 0x39                       &&
+            pCodecHelperInst->baseOpcode != 0x3A                      &&
+            pCodecHelperInst->baseOpcode != 0x7A                   &&
+            pCodecHelperInst->baseOpcode != 0x35                &&
+            pCodecHelperInst->baseOpcode != 0x2C                         &&
+            pCodecHelperInst->baseOpcode != 0x72                        &&
+            pCodecHelperInst->baseOpcode != 0x45                        &&
+            pCodecHelperInst->baseOpcode != MC_AUXILIARY_OP_CODE_USC_IMG_STORE          &&
+            pCodecHelperInst->baseOpcode != MC_AUXILIARY_OP_CODE_USC_IMG_STORE_3D)
+        {
+            GotoError();
+        }
+    }
 
     if (pCodecHelperInst->instCtrl.instType == 0x1)
     {
@@ -5655,9 +6627,8 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
         if (pCodecHelperInst->src[srcIdx].u.reg.bAbs &&
             pCodecHelperInst->src[srcIdx].regType != 0x7)
         {
-            gctUINT srcType = _getSrcType(pCodecHelperInst);
-            if (srcType != 0x0 &&
-                srcType != 0x1)
+            if (pCodecHelperInst->instCtrl.instType != 0x0 &&
+                pCodecHelperInst->instCtrl.instType != 0x1)
             {
                 GotoError();
             }
@@ -5665,7 +6636,11 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
     }
 
     /* Check constant reg file read port limitation */
-    if (pCodecHelperInst->srcCount >= 2 && !pMcCodec->pHwCfg->hwFeatureFlags.noOneConstLimit)
+    if (pCodecHelperInst->srcCount >= 2 &&
+        ((!pMcCodec->pHwCfg->hwFeatureFlags.noOneConstLimit)
+         ||
+         (bEvisMode && pCodecHelperInst->instCtrl.u.visionCtrl.bUseUniform512))
+       )
     {
         for (i = 0; i < pCodecHelperInst->srcCount - 1; i ++)
         {
@@ -5674,7 +6649,7 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
 
             for (srcIdx = 0; srcIdx < pCodecHelperInst->srcCount; srcIdx ++)
             {
-                if (pCodecHelperInst->src[srcIdx].regType == 0x2)
+                if (pCodecHelperInst->src[srcIdx].u.reg.bConstReg)
                 {
                     if (firstCstRegNo == NOT_ASSIGNED)
                     {
@@ -5703,15 +6678,45 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
         }
     }
 
+    /* Atom related inst, check the source2 swizzle if dest is valid.  */
+    if (pMcCodec->pHwCfg->hwFeatureFlags.supportUSC &&
+        pCodecHelperInst->bDstValid &&
+        pCodecHelperInst->srcCount >= 2 &&
+        IS_ATOMIC_MC_OPCODE(pCodecHelperInst->baseOpcode) &&
+        pCodecHelperInst->src[2].regType != 0x7)
+    {
+        gctUINT swizzle[4];
+
+        for (i = 0; i < 4; i++)
+        {
+            swizzle[i] = (((pCodecHelperInst->src[2].u.reg.swizzle) >> ((i) << 1)) & 0x3);
+        }
+
+        if (pCodecHelperInst->baseOpcode == 0x67)
+        {
+            if (!((swizzle[0] == swizzle[2]) && (swizzle[1] == swizzle[3])))
+            {
+                GotoError();
+            }
+        }
+        else
+        {
+            if (!((swizzle[0] == swizzle[1]) && (swizzle[0] == swizzle[2]) && (swizzle[0] == swizzle[3])))
+            {
+                GotoError();
+            }
+        }
+    }
+
     /* Image related inst, for elder chips, src0 must be constant reg */
-     if (pCodecHelperInst->baseOpcode == 0x79 ||
-         pCodecHelperInst->baseOpcode == 0x34 ||
-         pCodecHelperInst->baseOpcode == 0x7A ||
-         pCodecHelperInst->baseOpcode == 0x35 ||
-         pCodecHelperInst->baseOpcode == 0x37 ||
-         pCodecHelperInst->baseOpcode == 0x38 ||
-         pCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_USC_IMG_STORE_3D ||
-         pCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_USC_IMG_STORE)
+    if (pCodecHelperInst->baseOpcode == 0x79 ||
+        pCodecHelperInst->baseOpcode == 0x34 ||
+        pCodecHelperInst->baseOpcode == 0x7A ||
+        pCodecHelperInst->baseOpcode == 0x35 ||
+        pCodecHelperInst->baseOpcode == 0x37 ||
+        pCodecHelperInst->baseOpcode == 0x38 ||
+        pCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_USC_IMG_STORE_3D ||
+        pCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_USC_IMG_STORE)
     {
         if (!pMcCodec->pHwCfg->hwFeatureFlags.canSrc0OfImgLdStBeTemp)
         {
@@ -5755,21 +6760,24 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
             GotoError();
         }
 
-        /* Src0 can not be imm */
-        if (pCodecHelperInst->src[0].regType == 0x7)
+        if (pMcCodec->pHwCfg->hwFeatureFlags.useSrc0SwizzleAsSrcBin)
         {
-            GotoError();
-        }
-        else if (pCodecHelperInst->src[0].u.reg.swizzle != VIR_SWIZZLE_XXXX &&
-                 pCodecHelperInst->src[0].u.reg.swizzle != VIR_SWIZZLE_XYYY &&
-                 pCodecHelperInst->src[0].u.reg.swizzle != VIR_SWIZZLE_XYZZ &&
-                 pCodecHelperInst->src[0].u.reg.swizzle != VIR_SWIZZLE_XYZW
-                 )
-        {
-            /* the EVIS inst src0's swizzle bits are used for EVIS info like startBin,
-             * make sure the src0 operand does NOT use them
-             */
-            GotoError();
+            /* Src0 can not be imm */
+            if (pCodecHelperInst->src[0].regType == 0x7)
+            {
+                GotoError();
+            }
+            else if (pCodecHelperInst->src[0].u.reg.swizzle != VIR_SWIZZLE_XXXX &&
+                     pCodecHelperInst->src[0].u.reg.swizzle != VIR_SWIZZLE_XYYY &&
+                     pCodecHelperInst->src[0].u.reg.swizzle != VIR_SWIZZLE_XYZZ &&
+                     pCodecHelperInst->src[0].u.reg.swizzle != VIR_SWIZZLE_XYZW
+                     )
+            {
+                /* the EVIS inst src0's swizzle bits are used for EVIS info like startBin,
+                 * make sure the src0 operand does NOT use them
+                 */
+                GotoError();
+            }
         }
 
         /* When src0 is temp256, src1’s swizzle has to be XYZW */
@@ -6003,7 +7011,8 @@ gctBOOL vscMC_EncodeInstDirect(VSC_MC_CODEC*          pMcCodec,
             baseOpcode != 0x3A &&
             baseOpcode != 0x7A &&
             baseOpcode != 0x35 &&
-            baseOpcode != 0x42)
+            baseOpcode != 0x42 &&
+            !(baseOpcode == 0x45 && extOpcode == 0x1F))
         {
             mcCodecHelperInst.bDstValid = gcvTRUE;
         }
@@ -6124,7 +7133,8 @@ gctBOOL vscMC_EncodeSrc(VSC_MC_CODEC*     pMcCodec,
     return gcvTRUE;
 }
 
-gctBOOL vscMC_DecodeSrc(VSC_MC_CODEC*                 pMcCodec,
+gctBOOL vscMC_DecodeSrc(VSC_MC_CODEC_INST*            pOutCodecHelperInst,
+                        VSC_MC_CODEC*                 pMcCodec,
                         VSC_MC_RAW_INST*              pInMCInst,
                         gctBOOL                       bEvisMode,
                         gctUINT                       mcSrcIdx,
@@ -6135,7 +7145,7 @@ gctBOOL vscMC_DecodeSrc(VSC_MC_CODEC*                 pMcCodec,
         return gcvFALSE;
     }
 
-    return _DecodeSrc(pMcCodec, mcSrcIdx, (VSC_MC_INST*)pInMCInst, bEvisMode, pOutSrc);
+    return _DecodeSrc(pOutCodecHelperInst, pMcCodec, mcSrcIdx, (VSC_MC_INST*)pInMCInst, bEvisMode, pOutSrc);
 }
 
 gctUINT vscMC_GetFreeSrcCount(VSC_MC_CODEC*    pMcCodec,

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -436,7 +436,7 @@ GCHAL::GCHAL(
         gckDEVICE_AddCore(m_Device, gcvCORE_MAJOR, gcvCHIP_ID_DEFAULT, this, &m_Kernels[gcvCORE_MAJOR]);
 
         // Set the power management
-        gcmkONERROR(gckHARDWARE_SetPowerManagement(
+        gcmkONERROR(gckHARDWARE_EnablePowerManagement(
             m_Kernels[gcvCORE_MAJOR]->hardware, m_PowerManagement
             ));
 
@@ -469,7 +469,7 @@ GCHAL::GCHAL(
         }
 
         // Set the power management
-        gcmkONERROR(gckHARDWARE_SetPowerManagement(
+        gcmkONERROR(gckHARDWARE_EnablePowerManagement(
             m_Kernels[gcvCORE_2D]->hardware, m_PowerManagement
             ));
     }
@@ -484,7 +484,7 @@ GCHAL::GCHAL(
         gckDEVICE_AddCore(m_Device, gcvCORE_VG, gcvCHIP_ID_DEFAULT, this, &m_Kernels[gcvCORE_VG]);
 
         // Set the power management
-        gcmkONERROR(gckVGHARDWARE_SetPowerManagement(
+        gcmkONERROR(gckVGHARDWARE_EnablePowerManagement(
             m_Kernels[gcvCORE_VG]->vg->hardware,
             m_PowerManagement
             ));
@@ -678,8 +678,8 @@ GCHAL::~GCHAL(
             {
                 /* Switch to ON power state. */
                 gcmkVERIFY_OK(
-                    gckHARDWARE_SetPowerManagementState(m_Kernels[i]->hardware,
-                                                        gcvPOWER_ON));
+                    gckHARDWARE_SetPowerState(m_Kernels[i]->hardware,
+                                              gcvPOWER_ON));
             }
 
 #ifndef EMULATOR
@@ -1011,7 +1011,7 @@ GPU_PowerDown(
             if (i != gcvCORE_VG)
 #endif
             {
-                if (gcmIS_ERROR(gckHARDWARE_SetPowerManagementState(
+                if (gcmIS_ERROR(gckHARDWARE_SetPowerState(
                         GCHAL::GetObject()->GetKernel((gceCORE)i)->hardware,
                         gcvPOWER_OFF)))
                 {
@@ -1035,7 +1035,7 @@ GPU_PowerUp(
             if (i != gcvCORE_VG)
 #endif
             {
-                if (gcmIS_ERROR(gckHARDWARE_SetPowerManagementState(
+                if (gcmIS_ERROR(gckHARDWARE_SetPowerState(
                         GCHAL::GetObject()->GetKernel((gceCORE)i)->hardware,
                         gcvPOWER_ON)))
                 {
@@ -1140,14 +1140,14 @@ GCHAL::InterruptLoop(
     {
         gcmkVERIFY_OK(gckOS_SuspendInterruptEx(gchal->m_Os, gcvCORE_MAJOR));
 
-        status = gckKERNEL_Notify(gchal->m_Kernels[gcvCORE_MAJOR], gcvNOTIFY_INTERRUPT, gcvTRUE);
+        status = gckHARDWARE_Interrupt(gchal->m_Kernels[gcvCORE_MAJOR]->hardware);
 
         gcmkVERIFY_OK(gckOS_ResumeInterruptEx(gchal->m_Os, gcvCORE_MAJOR));
 
         // Notify HAL of interrupt.
         if (gcmIS_SUCCESS(status))
         {
-            gckKERNEL_Notify(gchal->m_Kernels[gcvCORE_MAJOR], gcvNOTIFY_INTERRUPT, gcvFALSE);
+            gckKERNEL_Notify(gchal->m_Kernels[gcvCORE_MAJOR], gcvNOTIFY_INTERRUPT);
         }
 
 #ifndef EMULATOR
@@ -1174,14 +1174,14 @@ GCHAL::InterruptLoop2D(
     {
         gcmkVERIFY_OK(gckOS_SuspendInterruptEx(gchal->m_Os, gcvCORE_2D));
 
-        status = gckKERNEL_Notify(gchal->m_Kernels[gcvCORE_2D], gcvNOTIFY_INTERRUPT, gcvTRUE);
+        status = gckHARDWARE_Interrupt(gchal->m_Kernels[gcvCORE_2D]->hardware);
 
         gcmkVERIFY_OK(gckOS_ResumeInterruptEx(gchal->m_Os, gcvCORE_2D));
 
         // Notify HAL of interrupt.
         if (gcmIS_SUCCESS(status))
         {
-            gckKERNEL_Notify(gchal->m_Kernels[gcvCORE_2D], gcvNOTIFY_INTERRUPT, gcvFALSE);
+            gckKERNEL_Notify(gchal->m_Kernels[gcvCORE_2D], gcvNOTIFY_INTERRUPT);
         }
 
 #ifndef EMULATOR

@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -43,6 +43,7 @@ LOCAL_SRC_FILES := \
 	chip/gpu/gc_vsc_chip_mc_dump.c \
 	asm/gc_vsc_asm_al_codec.c \
 	lib/gc_vsc_lib_gl_builtin.c \
+	lib/gc_vsc_lib_common.c \
 	lib/gc_vsc_lib_gl_patch.c \
 	utils/array/gc_vsc_utils_array.c \
 	utils/base/gc_vsc_utils_base_node.c \
@@ -57,6 +58,7 @@ LOCAL_SRC_FILES := \
 	utils/graph/gc_vsc_utils_dg.c \
 	utils/graph/gc_vsc_utils_udg.c \
 	utils/hash/gc_vsc_utils_hash.c \
+	utils/io/gc_vsc_utils_io.c \
 	utils/list/gc_vsc_utils_bi_list.c \
 	utils/list/gc_vsc_utils_uni_list.c \
 	utils/mm/gc_vsc_utils_mm.c \

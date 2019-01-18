@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -136,18 +136,16 @@ typedef enum _gcePATCH_ID
     gcvPATCH_SILICONSTUDIOGPUMARK,
     gcvPATCH_LEANBACKSCROLLING,
     gcvPATCH_ANTUTU6X, /* Antutu 6.x */
-    gcvPATCH_ANTUTU3DBench,
     gcvPATCH_CAR_CHASE,
     gcvPATCH_ANDROID_BROWSER,
     gcvPATCH_COMPUTBENCH_CL, /* ComputBench 1.5 */
+    gcvPATCH_ANDROID_CTS_UIRENDERING,
     gcvPATCH_GLU3, /* gfx3.0 glu.*/
     gcvPATCH_GLU4, /* gfx4.0 glu.*/
     gcvPATCH_MRVELBM20,
-    gcvPATCH_OGLES3OQ,
-    gcvPATCH_ANDROID_CTS_UIRENDERING,
     gcvPATCH_OPENCV_ATOMIC,
-    gcvPATCH_SKIA_SKQP,
     gcvPATCH_WESTON,
+    gcvPATCH_SKIA_SKQP,
 
     gcvPATCH_COUNT
 } gcePATCH_ID;
@@ -188,17 +186,17 @@ typedef struct _gcsPLS
 
     /* Internal memory pool. */
     gctSIZE_T                   internalSize;
-    gctPHYS_ADDR                internalPhysical;
+    gctUINT32                   internalPhysName;
     gctPOINTER                  internalLogical;
 
     /* External memory pool. */
     gctSIZE_T                   externalSize;
-    gctPHYS_ADDR                externalPhysical;
+    gctUINT32                   externalPhysName;
     gctPOINTER                  externalLogical;
 
     /* Contiguous memory pool. */
     gctSIZE_T                   contiguousSize;
-    gctPHYS_ADDR                contiguousPhysical;
+    gctUINT32                   contiguousPhysName;
     gctPOINTER                  contiguousLogical;
 
     /* EGL-specific process-wide objects. */
@@ -236,11 +234,24 @@ typedef struct _gcsPLS
     gcePATCH_ID                 patchID;
 
     /* Global fenceID to record each fence object */
-#if gcdENABLE_3D
-#if gcdSYNC
     gcsATOM_PTR                 globalFenceID;
-#endif
-#endif
+
+    /* flag for memory profile */
+    gctBOOL                 bMemoryProfile;
+    gctPOINTER              profileLock;
+    gctUINT32               allocCount;
+    gctUINT64               allocSize;
+    gctUINT64               maxAllocSize;
+    gctUINT32               freeCount;
+    gctUINT64               freeSize;
+    gctUINT64               currentSize;
+
+    gctUINT32               video_allocCount;
+    gctUINT64               video_allocSize;
+    gctUINT64               video_maxAllocSize;
+    gctUINT32               video_freeCount;
+    gctUINT64               video_freeSize;
+    gctUINT64               video_currentSize;
 }
 gcsPLS;
 

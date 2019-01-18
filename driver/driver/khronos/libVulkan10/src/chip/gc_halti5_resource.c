@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -29,7 +29,14 @@
     } \
     __vkCmdLoadSingleHWState(&(pCmdBuffer), 0x502E, VK_FALSE, \
         gcmSETFIELDVALUE(0, GCREG_BLT_GENERAL_CONTROL, STREAM_CONTROL, LOCK) \
-        );
+        ); \
+    if ((devCtx)->database->MULTI_CLUSTER) \
+    { \
+        halti5_module *chipModule = (halti5_module *)((devCtx)->chipPriv); \
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CE, VK_FALSE, \
+            gcmSETFIELD(0, GCREG_BLT_CLUSTER_CONTROL, CLUSTER_ENABLE, forceSGPU ? (1u << chipModule->clusterInfo.clusterMinID): chipModule->clusterInfo.clusterAliveMask) \
+            ); \
+    }
 
 #define __VK_3DBLIT_UNLOCK(devCtx, pCmdBuffer, forceSGPU) \
     __vkCmdLoadSingleHWState(&(pCmdBuffer), 0x502E, VK_FALSE, \
@@ -54,7 +61,7 @@ const __vkFormatToHwTxFmtInfo* halti5_helper_convertHwTxInfo(
 
     static const __vkFormatToHwTxFmtInfo s_vkFormatToHwTxInfos[] =
     {
-        {__VK_FORMAT_A4R4G4B4_UNFORM_PACK16, TX_FORMAT(0x05, 0, VK_FALSE, VK_FALSE, VK_TRUE),
+        {__VK_FORMAT_A4R4G4B4_UNORM_PACK16, TX_FORMAT(0x05, 0, VK_FALSE, VK_FALSE, VK_TRUE),
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
         {__VK_FORMAT_R8_1_X8R8G8B8, TX_FORMAT(0x08, 0, VK_FALSE, VK_FALSE, VK_TRUE),
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_ZERO, SWZL_USE_ZERO, SWZL_USE_ONE)},
@@ -63,12 +70,6 @@ const __vkFormatToHwTxFmtInfo* halti5_helper_convertHwTxInfo(
         {__VK_FORMAT_R32G32B32A32_SINT_2_R32G32_SINT, TX_FORMAT(0, 0x24, VK_FALSE, VK_FALSE, VK_FALSE),
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
         {__VK_FORMAT_R32G32B32A32_SFLOAT_2_R32G32_SFLOAT, TX_FORMAT(0, 0x0B, VK_FALSE, VK_FALSE, VK_FALSE),
-            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
-        {__VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT, TX_FORMAT(0, 0x19, VK_FALSE, VK_FALSE, VK_FALSE),
-            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
-        {__VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT, TX_FORMAT(0, 0x19, VK_FALSE, VK_FALSE, VK_FALSE),
-            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
-        {__VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT, TX_FORMAT(0, 0x08, VK_FALSE, VK_FALSE, VK_FALSE),
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
         {VK_FORMAT_S8_UINT, TX_FORMAT(0, 0x15, VK_FALSE, VK_FALSE, VK_FALSE),
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_ZERO, SWZL_USE_ZERO, SWZL_USE_ONE)},
@@ -89,7 +90,7 @@ const __vkFormatToHwTxFmtInfo* halti5_helper_convertHwTxInfo(
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
         {VK_FORMAT_R8_SNORM, TX_FORMAT(0, 0x0E, VK_FALSE, VK_FALSE, VK_FALSE),
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
-        {VK_FORMAT_R8_UINT,TX_FORMAT(0, 0x15, VK_FALSE, VK_FALSE, VK_FALSE),
+        {VK_FORMAT_R8_UINT, TX_FORMAT(0, 0x15, VK_FALSE, VK_FALSE, VK_FALSE),
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
         {VK_FORMAT_R8_SINT, TX_FORMAT(0, 0x15, VK_FALSE, VK_FALSE, VK_FALSE),
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
@@ -163,12 +164,6 @@ const __vkFormatToHwTxFmtInfo* halti5_helper_convertHwTxInfo(
         {VK_FORMAT_R32G32_SINT, TX_FORMAT(0, 0x24, VK_FALSE, VK_FALSE, VK_FALSE),
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
         {VK_FORMAT_R32G32_SFLOAT, TX_FORMAT(0, 0x0B, VK_FALSE, VK_FALSE, VK_FALSE),
-            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
-        {__VK_FORMAT_R32G32_UINT_2_R32_UINT, TX_FORMAT(0, 0x23, VK_FALSE, VK_FALSE, VK_FALSE),
-            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
-        {__VK_FORMAT_R32G32_SINT_2_R32_SINT, TX_FORMAT(0, 0x23, VK_FALSE, VK_FALSE, VK_FALSE),
-            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
-        {__VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT, TX_FORMAT(0, 0x0A, VK_FALSE, VK_FALSE, VK_FALSE),
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
 
         {VK_FORMAT_B10G11R11_UFLOAT_PACK32, TX_FORMAT(0, 0x1B, VK_FALSE, VK_FALSE, VK_FALSE),
@@ -432,7 +427,7 @@ VkResult __vkComputeClearVal(
 
     switch (img->formatInfo.residentImgFormat)
     {
-    case __VK_FORMAT_A4R4G4B4_UNFORM_PACK16:
+    case __VK_FORMAT_A4R4G4B4_UNORM_PACK16:
         pClearVals[0]
             = (__vkConvertSFLOAT(gcvVALUE_FLAG_UNSIGNED_DENORM, vkClearValue->color.float32[R], 4) <<  8)
             | (__vkConvertSFLOAT(gcvVALUE_FLAG_UNSIGNED_DENORM, vkClearValue->color.float32[G], 4) <<  4)
@@ -473,6 +468,7 @@ VkResult __vkComputeClearVal(
         break;
 
     case VK_FORMAT_R8G8B8A8_UNORM:
+    case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
         pClearVals[0]
             = (__vkConvertSFLOAT(gcvVALUE_FLAG_UNSIGNED_DENORM, vkClearValue->color.float32[R], 8))
             | (__vkConvertSFLOAT(gcvVALUE_FLAG_UNSIGNED_DENORM, vkClearValue->color.float32[G], 8) <<  8)
@@ -492,22 +488,23 @@ VkResult __vkComputeClearVal(
         pClearVals[1] = pClearVals[0];
         break;
 
+    case VK_FORMAT_R8G8B8A8_SRGB:
+    case VK_FORMAT_A8B8G8R8_SRGB_PACK32:
+        pClearVals[0]
+            = (__vkConvertSFLOAT((gceVALUE_TYPE)(gcvVALUE_FLAG_GAMMAR | gcvVALUE_FLAG_UNSIGNED_DENORM), vkClearValue->color.float32[B], 8) << 16)
+            | (__vkConvertSFLOAT((gceVALUE_TYPE)(gcvVALUE_FLAG_GAMMAR | gcvVALUE_FLAG_UNSIGNED_DENORM), vkClearValue->color.float32[G], 8) <<  8)
+            | (__vkConvertSFLOAT((gceVALUE_TYPE)(gcvVALUE_FLAG_GAMMAR | gcvVALUE_FLAG_UNSIGNED_DENORM), vkClearValue->color.float32[R], 8)      )
+            | (__vkConvertSFLOAT(gcvVALUE_FLAG_UNSIGNED_DENORM, vkClearValue->color.float32[A], 8) << 24);
+
+        pClearVals[1] = pClearVals[0];
+        break;
+
     case VK_FORMAT_B8G8R8A8_SRGB:
         pClearVals[0]
             = (__vkConvertSFLOAT((gceVALUE_TYPE)(gcvVALUE_FLAG_GAMMAR | gcvVALUE_FLAG_UNSIGNED_DENORM), vkClearValue->color.float32[R], 8) << 16)
             | (__vkConvertSFLOAT((gceVALUE_TYPE)(gcvVALUE_FLAG_GAMMAR | gcvVALUE_FLAG_UNSIGNED_DENORM), vkClearValue->color.float32[G], 8) <<  8)
             | (__vkConvertSFLOAT((gceVALUE_TYPE)(gcvVALUE_FLAG_GAMMAR | gcvVALUE_FLAG_UNSIGNED_DENORM), vkClearValue->color.float32[B], 8)      )
-            | (__vkConvertSFLOAT(gcvVALUE_FLAG_UNSIGNED_DENORM, vkClearValue->color.float32[3], 8) << 24);
-
-        pClearVals[1] = pClearVals[0];
-        break;
-
-    case VK_FORMAT_R8G8B8A8_SRGB:
-        pClearVals[0]
-            = (__vkConvertSFLOAT((gceVALUE_TYPE)(gcvVALUE_FLAG_GAMMAR | gcvVALUE_FLAG_UNSIGNED_DENORM), vkClearValue->color.float32[R], 8))
-            | (__vkConvertSFLOAT((gceVALUE_TYPE)(gcvVALUE_FLAG_GAMMAR | gcvVALUE_FLAG_UNSIGNED_DENORM), vkClearValue->color.float32[G], 8) <<  8)
-            | (__vkConvertSFLOAT((gceVALUE_TYPE)(gcvVALUE_FLAG_GAMMAR | gcvVALUE_FLAG_UNSIGNED_DENORM), vkClearValue->color.float32[B], 8) <<  16)
-            | (__vkConvertSFLOAT(gcvVALUE_FLAG_UNSIGNED_DENORM, vkClearValue->color.float32[3], 8) << 24);
+            | (__vkConvertSFLOAT(gcvVALUE_FLAG_UNSIGNED_DENORM, vkClearValue->color.float32[A], 8) << 24);
 
         pClearVals[1] = pClearVals[0];
         break;
@@ -765,57 +762,6 @@ VkResult __vkComputeClearVal(
         pClearVals[1] = __vkConvertUINT(vkClearValue->color.uint32[G], 32);
         break;
 
-    case __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT:
-        switch (partIndex)
-        {
-        case 0:
-            pClearVals[0] =
-                pClearVals[1] = __vkConvertSFLOAT(gcvVALUE_FLOAT, vkClearValue->color.float32[R], 32);
-            break;
-        case 1:
-            pClearVals[0] =
-                pClearVals[1] = __vkConvertSFLOAT(gcvVALUE_FLOAT, vkClearValue->color.float32[G], 32);
-            break;
-        default:
-            __VK_ASSERT(!"invalid part index value");
-            break;
-        }
-        break;
-
-    case __VK_FORMAT_R32G32_SINT_2_R32_SINT:
-        switch (partIndex)
-        {
-        case 0:
-            pClearVals[0] =
-                pClearVals[1] = __vkConvertSINT(vkClearValue->color.int32[R], 32);
-            break;
-        case 1:
-            pClearVals[0] =
-                pClearVals[1] = __vkConvertSINT(vkClearValue->color.int32[G], 32);
-            break;
-        default:
-            __VK_ASSERT(!"invalid part index value");
-            break;
-        }
-        break;
-
-    case __VK_FORMAT_R32G32_UINT_2_R32_UINT:
-        switch (partIndex)
-        {
-        case 0:
-            pClearVals[0] =
-                pClearVals[1] = __vkConvertUINT(vkClearValue->color.uint32[R], 32);
-            break;
-        case 1:
-            pClearVals[0] =
-                pClearVals[1] = __vkConvertUINT(vkClearValue->color.uint32[G], 32);
-            break;
-        default:
-            __VK_ASSERT(!"invalid part index value");
-            break;
-        }
-        break;
-
     case VK_FORMAT_D16_UNORM:
         if (aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT)
         {
@@ -881,69 +827,6 @@ VkResult __vkComputeClearVal(
             tmpBitMask |= (tmpBitMask << 16);
             bitMasks[0] = bitMasks[1] = tmpBitMask;
             byteMasks[0] = byteMasks[1] = 0xF;
-        }
-        break;
-
-    case __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT:
-        switch (partIndex)
-        {
-        case 0:
-            pClearVals[1] =
-                pClearVals[0]
-                = (__vkConvertSFLOAT(gcvVALUE_FLAG_FLOAT_TO_FLOAT16, vkClearValue->color.float32[R], 16)      )
-                | (__vkConvertSFLOAT(gcvVALUE_FLAG_FLOAT_TO_FLOAT16, vkClearValue->color.float32[G], 16) << 16);
-            break;
-        case 1:
-            pClearVals[1] =
-                pClearVals[0]
-                = (__vkConvertSFLOAT(gcvVALUE_FLAG_FLOAT_TO_FLOAT16, vkClearValue->color.float32[B], 16)      )
-                | (__vkConvertSFLOAT(gcvVALUE_FLAG_FLOAT_TO_FLOAT16, vkClearValue->color.float32[A], 16) << 16);
-            break;
-        default:
-            __VK_ASSERT(!"invalid part index value");
-            break;
-        }
-        break;
-
-    case __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT:
-        switch (partIndex)
-        {
-        case 0:
-            pClearVals[0] =
-                pClearVals[1]
-                = (__vkConvertSINT(vkClearValue->color.int32[R], 16)
-                | (__vkConvertSINT(vkClearValue->color.int32[G], 16) << 16));
-            break;
-        case 1:
-            pClearVals[0] =
-                pClearVals[1]
-                = (__vkConvertSINT(vkClearValue->color.int32[B], 16)
-                | (__vkConvertSINT(vkClearValue->color.int32[A], 16) << 16));
-            break;
-        default:
-            __VK_ASSERT(!"invalid part index value");
-            break;
-        }
-        break;
-
-    case __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT:
-        switch (partIndex)
-        {
-        case 0:
-            pClearVals[0] =
-                pClearVals[1]
-                = (__vkConvertUINT(vkClearValue->color.uint32[R], 16)
-                | (__vkConvertUINT(vkClearValue->color.uint32[G], 16) << 16));
-            break;
-        case 1:
-            pClearVals[0] =
-                pClearVals[1]
-                = (__vkConvertUINT(vkClearValue->color.uint32[B], 16)
-                | (__vkConvertUINT(vkClearValue->color.uint32[A], 16) << 16));
-            break;
-        default:
-            __VK_ASSERT(!"invalid part index value");
-            break;
         }
         break;
 
@@ -1131,7 +1014,7 @@ VkResult halti5_helper_convertHwBltDesc(
  11:9) - (0 ?
  11:9) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 11:9) - (0 ? 11:9) + 1))))))) << (0 ? 11:9))), VK_FALSE},
-        {__VK_FORMAT_A4R4G4B4_UNFORM_PACK16, 0x01, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        {__VK_FORMAT_A4R4G4B4_UNORM_PACK16, 0x01, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2489,6 +2372,7 @@ VkResult halti5_clearImage(
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)cmdBuf;
     __vkDevContext *devCtx = cmd->devCtx;
+    halti5_module *chipModule = (halti5_module *)(devCtx->chipPriv);
     uint32_t srcTileConfigEx = 0, dstTileConfigEx = 0;
 #if __VK_ENABLETS
     uint32_t fcClearValue[2] = {0};
@@ -2577,9 +2461,11 @@ VkResult halti5_clearImage(
         }
     }
 
-    if ((img->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
+    if (!devCtx->database->PE_A8B8G8R8 &&
+        (img->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
         ((img->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM) ||
-        (img->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB)))
+        (img->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB))
+       )
     {
         img->formatInfo.residentImgFormat = img->createInfo.format;
     }
@@ -2588,6 +2474,22 @@ VkResult halti5_clearImage(
     {
         uint32_t originX, originY;
         uint32_t width, height;
+        /* variable for multi GPU and multi cluster.*/
+        /* suppose gpuCoreCount can never be 0.*/
+        uint32_t gpuCount = (forceSGPU || devCtx->option->affinityMode != __VK_MGPU_AFFINITY_COMBINE) ?
+                             1 : devCtx->chipInfo->gpuCoreCount;
+        /* avoid divide by 0.*/
+        uint32_t clusterAliveCount = (chipModule->clusterInfo.clusterAliveCount > 1) ?
+                                      chipModule->clusterInfo.clusterAliveCount : 1;
+        /* For non-cluster arch.*/
+        uint32_t clusterMask = devCtx->database->MULTI_CLUSTER ? chipModule->clusterInfo.clusterAliveMask : 1;
+        uint32_t i          = 0;
+        uint32_t j          = 0;
+        uint32_t blitUint   = gpuCount * clusterAliveCount;
+        uint32_t averageW   = 0;
+        uint32_t splitWidth = 0;
+        uint32_t dstStartX  = 0;
+        uint32_t leftWidth  = 0;
 
         __VK_ONERROR(__vkComputeClearVal(img,
             subResource->aspectMask,
@@ -2965,21 +2867,17 @@ VkResult halti5_clearImage(
         originY = rect->offset.y * img->sampleInfo.y;
         width   = rect->extent.width  * img->sampleInfo.x;
         height  = rect->extent.height * img->sampleInfo.y;
-        if (!forceSGPU && devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+
+        /* Default value.*/
+        averageW = __VK_ALIGN(width / blitUint, img->sampleInfo.x);
+        splitWidth = width - (blitUint - 1) * averageW;
+        dstStartX = originX;
+        leftWidth = width;
+
+        for (i = 0; i < gpuCount; ++i)
         {
-            uint32_t i;
-            uint32_t gpuCount = devCtx->chipInfo->gpuCoreCount;
-            uint32_t averageW = __VK_ALIGN(width / gpuCount, img->sampleInfo.x);
-            uint32_t splitWidth = width - (gpuCount - 1) * averageW;
-            uint32_t dstStartX = originX;
-            uint32_t leftWidth = width;
-
-            for (i = 0; i < gpuCount; ++i)
+            if (gpuCount > 1)
             {
-                /* Align dstEndX to 64 boundary */
-                uint32_t dstEndX = __VK_ALIGN(dstStartX + splitWidth, 64);
-                splitWidth = __VK_MIN(dstEndX - dstStartX, leftWidth);
-
                 *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -2993,9 +2891,39 @@ VkResult halti5_clearImage(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | ((1 << i));*(*&pCmdBuffer)++ = 0;
 ;
 
+            }
 
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500B, VK_FALSE,
-                      ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            clusterMask = devCtx->database->MULTI_CLUSTER ? chipModule->clusterInfo.clusterAliveMask : 1;
+            j = 0;
+            /* no cmd generated if no cluster alive.*/
+            __VK_ASSERT(clusterMask);
+
+            while(clusterMask)
+            {
+                if (clusterMask & (1 << j))
+                {
+                    /* Align dstEndX to 64 boundary */
+                    uint32_t dstEndX = __VK_ALIGN(dstStartX + splitWidth, 64);
+                    splitWidth = __VK_MIN(dstEndX - dstStartX, leftWidth);
+
+                    if (devCtx->database->MULTI_CLUSTER)
+                    {
+                        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CE, VK_FALSE,
+                            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1))))))) << (0 ?
+ 7:0))) | (((gctUINT32) ((gctUINT32) ((1 << j)) & ((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:0) - (0 ? 7:0) + 1))))))) << (0 ? 7:0)))
+                            );
+                    }
+
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500B, VK_FALSE,
+                        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -3005,7 +2933,7 @@ VkResult halti5_clearImage(
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:16) - (0 ?
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -3015,9 +2943,9 @@ VkResult halti5_clearImage(
  31:16) - (0 ?
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)))
-                    );
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500C, VK_FALSE,
-                      ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                        );
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500C, VK_FALSE,
+                        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -3027,7 +2955,7 @@ VkResult halti5_clearImage(
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:16) - (0 ?
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -3037,13 +2965,36 @@ VkResult halti5_clearImage(
  31:16) - (0 ?
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)))
-                    );
+                        );
 
-                leftWidth -= splitWidth;
-                dstStartX += splitWidth;
-                splitWidth = averageW;
+                    leftWidth -= splitWidth;
+                    dstStartX += splitWidth;
+                    splitWidth = averageW;
+
+                    clusterMask &= ~(1 << j);
+                }
+                j++;
             }
 
+            if (devCtx->database->MULTI_CLUSTER && j > 0)
+            {
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CE, VK_FALSE,
+                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1))))))) << (0 ?
+ 7:0))) | (((gctUINT32) ((gctUINT32) (chipModule->clusterInfo.clusterAliveMask) & ((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:0) - (0 ? 7:0) + 1))))))) << (0 ? 7:0)))
+                    );
+            }
+        }
+
+        if (gpuCount > 1)
+        {
             *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -3057,53 +3008,6 @@ VkResult halti5_clearImage(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_ALL_MASK);*(*&pCmdBuffer)++ = 0;
 ;
 
-        }
-        else
-        {
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500B, VK_FALSE,
-                  ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 15:0) - (0 ?
- 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (originX) & ((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:16) - (0 ?
- 31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 31:16) - (0 ?
- 31:16) + 1))))))) << (0 ?
- 31:16))) | (((gctUINT32) ((gctUINT32) (originY) & ((gctUINT32) ((((1 ?
- 31:16) - (0 ?
- 31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)))
-                );
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500C, VK_FALSE,
-                  ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 15:0) - (0 ?
- 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (width) & ((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:16) - (0 ?
- 31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 31:16) - (0 ?
- 31:16) + 1))))))) << (0 ?
- 31:16))) | (((gctUINT32) ((gctUINT32) (height) & ((gctUINT32) ((((1 ?
- 31:16) - (0 ?
- 31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)))
-                );
         }
 
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x502B, VK_FALSE,
@@ -3232,7 +3136,8 @@ VkResult halti5_copyImage(
     VkCommandBuffer cmdBuf,
     __vkBlitRes *srcRes,
     __vkBlitRes *dstRes,
-    VkBool32 rawCopy
+    VkBool32 rawCopy,
+    VkFilter filter
     )
 {
     HwBLTDesc srcBltDesc = {0}, dstBltDesc = {0};
@@ -3254,6 +3159,7 @@ VkResult halti5_copyImage(
     VkResult result = VK_SUCCESS;
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)cmdBuf;
     __vkDevContext *devCtx = cmd->devCtx;
+    halti5_module *chipModule = (halti5_module *)devCtx->chipPriv;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
     uint32_t srcTileConfigEx = 0, dstTileConfigEx = 0;
     uint32_t partIdx;
@@ -3293,9 +3199,11 @@ VkResult halti5_copyImage(
         srcSampleInfo = srcImg->sampleInfo;
         srcFormat = srcImg->formatInfo.residentImgFormat;
 
-        if ((srcImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
-            ((srcImg->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM)||
-            (srcImg->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB)))
+        if (!devCtx->database->PE_A8B8G8R8 &&
+            (srcImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
+            ((srcImg->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM) ||
+            (srcImg->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB))
+           )
         {
             srcFormat = srcImg->createInfo.format;
         }
@@ -3414,9 +3322,11 @@ VkResult halti5_copyImage(
         dstSampleInfo = dstImg->sampleInfo;
         dstFormat = dstImg->formatInfo.residentImgFormat;
 
-        if ((dstImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
+        if (!devCtx->database->PE_A8B8G8R8 &&
+            (dstImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
             ((dstImg->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM) ||
-            (dstImg->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB)))
+            (dstImg->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB))
+            )
         {
             dstFormat = dstImg->createInfo.format;
         }
@@ -3536,13 +3446,6 @@ VkResult halti5_copyImage(
             srcExtent.width  *= 2;
             dstExtent.width  *= 2;
         }
-
-        if (g_vkFormatInfoTable[dstFormat].bitsPerBlock >= 64 &&
-            srcMsaa != dstMsaa)
-        {
-            useComputeBlit = VK_TRUE;
-            rawCopy = VK_FALSE;
-        }
     }
 
     if (srcParts != dstParts)
@@ -3595,6 +3498,7 @@ VkResult halti5_copyImage(
                 dstExtent.width *= 2;
             }
         }
+
         /* Need special swizzle when copying from D24S8 / D24X8 to buffer */
         if (!dstRes->isImage && srcBltDesc.hwFormat == 0x17)
         {
@@ -3794,7 +3698,7 @@ VkResult halti5_copyImage(
 
     if (useComputeBlit)
     {
-        return (halti5_computeBlit(cmdBuf, srcRes, dstRes, rawCopy, gcvNULL, VK_FILTER_NEAREST));
+        return (halti5_computeBlit(cmdBuf, srcRes, dstRes, rawCopy, gcvNULL, filter));
     }
 
     /* 128BTILE feature, we need program the tilemode,the supertile is same with xmajor */
@@ -4069,6 +3973,25 @@ VkResult halti5_copyImage(
         uint32_t width      = srcExtent.width  * srcSampleInfo.x;
         uint32_t height     = srcExtent.height * srcSampleInfo.y;
 
+        /* variable for multi GPU and multi cluster.*/
+        /* suppose gpuCoreCount can never be 0.*/
+        uint32_t gpuCount = (forceSGPU || devCtx->option->affinityMode != __VK_MGPU_AFFINITY_COMBINE) ?
+                             1 : devCtx->chipInfo->gpuCoreCount;
+        /* avoid divide by 0.*/
+        uint32_t clusterAliveCount = (chipModule->clusterInfo.clusterAliveCount > 1) ?
+                                      chipModule->clusterInfo.clusterAliveCount : 1;
+        /* For non-cluster arch.*/
+        uint32_t clusterMask = devCtx->database->MULTI_CLUSTER ? chipModule->clusterInfo.clusterAliveMask : 1;
+        uint32_t i          = 0;
+        uint32_t j          = 0;
+        uint32_t blitUint   = gpuCount * clusterAliveCount;
+
+        uint32_t averageW   = 0;
+        uint32_t splitWidth = 0;
+        uint32_t srcStartX  = 0;
+        uint32_t dstStartX  = 0;
+        uint32_t leftWidth  = 0;
+
         if ((devCtx)->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE) {halti5_setMultiGpuSync((VkDevice)(devCtx), &(pCmdBuffer), VK_NULL_HANDLE);
  if (forceSGPU) {*(*&(pCmdBuffer))++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -4157,22 +4080,17 @@ VkResult halti5_copyImage(
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE,
             (dstAddress + dstPartSize - 1));
 
-        if (!forceSGPU && devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+        /* Default value.*/
+        averageW = __VK_ALIGN(width / blitUint, srcSampleInfo.x);
+        splitWidth = width - (blitUint - 1) * averageW;
+        srcStartX = srcOriginX;
+        dstStartX = dstOriginX;
+        leftWidth = width;
+
+        for (i = 0; i < gpuCount; ++i)
         {
-            uint32_t i;
-            uint32_t gpuCount = devCtx->chipInfo->gpuCoreCount;
-            uint32_t averageW = __VK_ALIGN(width / gpuCount, srcSampleInfo.x);
-            uint32_t splitWidth = width - (gpuCount - 1) * averageW;
-            uint32_t srcStartX = srcOriginX;
-            uint32_t dstStartX = dstOriginX;
-            uint32_t leftWidth = width;
-
-            for (i = 0; i < gpuCount; ++i)
+            if (gpuCount > 1)
             {
-                /* Align srcEndX to 64 boundary */
-                uint32_t srcEndX = __VK_ALIGN(srcStartX + splitWidth, 64);
-                splitWidth = __VK_MIN(srcEndX - srcStartX, leftWidth);
-
                 *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -4186,10 +4104,39 @@ VkResult halti5_copyImage(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | ((1 << i));*(*&pCmdBuffer)++ = 0;
 ;
 
+            }
 
+            clusterMask = devCtx->database->MULTI_CLUSTER ? chipModule->clusterInfo.clusterAliveMask : 1;
+            j = 0;
+            /* no cmd generated if no cluster alive.*/
+            __VK_ASSERT(clusterMask);
 
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5005, VK_FALSE,
-                      ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            while(clusterMask)
+            {
+                if (clusterMask & (1 << j))
+                {
+                    /* Align dstEndX to 64 boundary */
+                    uint32_t srcEndX = __VK_ALIGN(srcStartX + splitWidth, 64);
+                    splitWidth = __VK_MIN(srcEndX - srcStartX, leftWidth);
+
+                    if (devCtx->database->MULTI_CLUSTER)
+                    {
+                        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CE, VK_FALSE,
+                            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1))))))) << (0 ?
+ 7:0))) | (((gctUINT32) ((gctUINT32) ((1 << j)) & ((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:0) - (0 ? 7:0) + 1))))))) << (0 ? 7:0)))
+                            );
+                    }
+
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5005, VK_FALSE,
+                        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4199,7 +4146,7 @@ VkResult halti5_copyImage(
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:16) - (0 ?
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4209,10 +4156,10 @@ VkResult halti5_copyImage(
  31:16) - (0 ?
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)))
-                    );
+                        );
 
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500B, VK_FALSE,
-                      ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500B, VK_FALSE,
+                        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4222,7 +4169,7 @@ VkResult halti5_copyImage(
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:16) - (0 ?
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4232,10 +4179,10 @@ VkResult halti5_copyImage(
  31:16) - (0 ?
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)))
-                    );
+                        );
 
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500C, VK_FALSE,
-                      ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500C, VK_FALSE,
+                        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4245,7 +4192,7 @@ VkResult halti5_copyImage(
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:16) - (0 ?
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4255,14 +4202,37 @@ VkResult halti5_copyImage(
  31:16) - (0 ?
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)))
-                    );
+                        );
 
-                leftWidth -= splitWidth;
-                srcStartX += splitWidth;
-                dstStartX += (splitWidth / srcSampleInfo.x) * dstSampleInfo.x;
-                splitWidth = averageW;
+                    leftWidth -= splitWidth;
+                    srcStartX += splitWidth;
+                    dstStartX += (splitWidth / srcSampleInfo.x) * dstSampleInfo.x;
+                    splitWidth = averageW;
+
+                    clusterMask &= ~(1 << j);
+                }
+                j++;
             }
 
+            if (devCtx->database->MULTI_CLUSTER && j > 0)
+            {
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CE, VK_FALSE,
+                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1))))))) << (0 ?
+ 7:0))) | (((gctUINT32) ((gctUINT32) (chipModule->clusterInfo.clusterAliveMask) & ((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:0) - (0 ? 7:0) + 1))))))) << (0 ? 7:0)))
+                    );
+            }
+        }
+
+        if (gpuCount > 1)
+        {
             *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -4276,77 +4246,6 @@ VkResult halti5_copyImage(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_ALL_MASK);*(*&pCmdBuffer)++ = 0;
 ;
 
-        }
-        else
-        {
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5005, VK_FALSE,
-                  ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 15:0) - (0 ?
- 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (srcOriginX) & ((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:16) - (0 ?
- 31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 31:16) - (0 ?
- 31:16) + 1))))))) << (0 ?
- 31:16))) | (((gctUINT32) ((gctUINT32) (srcOriginY) & ((gctUINT32) ((((1 ?
- 31:16) - (0 ?
- 31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)))
-                );
-
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500B, VK_FALSE,
-                  ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 15:0) - (0 ?
- 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (dstOriginX) & ((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:16) - (0 ?
- 31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 31:16) - (0 ?
- 31:16) + 1))))))) << (0 ?
- 31:16))) | (((gctUINT32) ((gctUINT32) (dstOriginY) & ((gctUINT32) ((((1 ?
- 31:16) - (0 ?
- 31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)))
-                );
-
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500C, VK_FALSE,
-                  ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 15:0) - (0 ?
- 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (width) & ((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:16) - (0 ?
- 31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 31:16) - (0 ?
- 31:16) + 1))))))) << (0 ?
- 31:16))) | (((gctUINT32) ((gctUINT32) (height) & ((gctUINT32) ((((1 ?
- 31:16) - (0 ?
- 31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)))
-                );
         }
         /* Tilesize for customer config */
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5028, VK_FALSE,
@@ -4541,8 +4440,27 @@ VkResult halti5_fillBuffer(
     uint32_t *states = gcvNULL;
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)cmdBuf;
     __vkDevContext *devCtx = cmd->devCtx;
+    halti5_module *chipModule = (halti5_module *)devCtx->chipPriv;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
     VkBool32 forceSGPU = VK_FALSE;
+
+    /* variable for multi GPU and multi cluster.*/
+    /* suppose gpuCoreCount can never be 0.*/
+    uint32_t gpuCount = (forceSGPU || devCtx->option->affinityMode != __VK_MGPU_AFFINITY_COMBINE) ?
+                        1 : devCtx->chipInfo->gpuCoreCount;
+    /* avoid divide by 0.*/
+    uint32_t clusterAliveCount = (chipModule->clusterInfo.clusterAliveCount > 1) ?
+                                 chipModule->clusterInfo.clusterAliveCount : 1;
+    /* For non-cluster arch.*/
+    uint32_t clusterMask = devCtx->database->MULTI_CLUSTER ? chipModule->clusterInfo.clusterAliveMask : 1;
+    uint32_t i          = 0;
+    uint32_t j          = 0;
+    uint32_t blitUint   = gpuCount * clusterAliveCount;
+
+    uint32_t averageW   = 0;
+    uint32_t splitWidth = 0;
+    uint32_t dstStartX  = 0;
+    uint32_t leftWidth  = 0;
 
     if (size == VK_WHOLE_SIZE)
     {
@@ -4768,7 +4686,6 @@ VkResult halti5_fillBuffer(
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, address);
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5000, VK_FALSE, address);
 
-
     if (devCtx->enabledFeatures.robustBufferAccess &&
         devCtx->database->ROBUSTNESS &&
         devCtx->database->SH_ROBUSTNESS_FIX)
@@ -4804,21 +4721,16 @@ VkResult halti5_fillBuffer(
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE,
         (address + (uint32_t)size - 1));
 
-    if (!forceSGPU && devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+    /* Default value.*/
+    averageW = width / blitUint;
+    splitWidth = width - (blitUint - 1) * averageW;
+    dstStartX = 0;
+    leftWidth = width;
+
+    for (i = 0; i < gpuCount; ++i)
     {
-        uint32_t i;
-        uint32_t gpuCount = devCtx->chipInfo->gpuCoreCount;
-        uint32_t averageW = width / gpuCount;
-        uint32_t splitWidth = width - (gpuCount - 1) * averageW;
-        uint32_t dstStartX = 0;
-        uint32_t leftWidth = width;
-
-        for (i = 0; i < gpuCount; ++i)
+        if (gpuCount > 1)
         {
-            /* Align dstEndX to 64 boundary */
-            uint32_t dstEndX = __VK_ALIGN(dstStartX + splitWidth, 64);
-            splitWidth = __VK_MIN(dstEndX - dstStartX, leftWidth);
-
             *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -4832,9 +4744,39 @@ VkResult halti5_fillBuffer(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | ((1 << i));*(*&pCmdBuffer)++ = 0;
 ;
 
+        }
 
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500B, VK_FALSE,
-                  ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        clusterMask = devCtx->database->MULTI_CLUSTER ? chipModule->clusterInfo.clusterAliveMask : 1;
+        j = 0;
+        /* no cmd generated if no cluster alive.*/
+        __VK_ASSERT(clusterMask);
+
+        while(clusterMask)
+        {
+            if (clusterMask & (1 << j))
+            {
+                /* Align dstEndX to 64 boundary */
+                uint32_t dstEndX = __VK_ALIGN(dstStartX + splitWidth, 64);
+                splitWidth = __VK_MIN(dstEndX - dstStartX, leftWidth);
+
+                if (devCtx->database->MULTI_CLUSTER)
+                {
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CE, VK_FALSE,
+                        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1))))))) << (0 ?
+ 7:0))) | (((gctUINT32) ((gctUINT32) ((1 << j)) & ((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:0) - (0 ? 7:0) + 1))))))) << (0 ? 7:0)))
+                        );
+                }
+
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500B, VK_FALSE,
+                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4844,7 +4786,7 @@ VkResult halti5_fillBuffer(
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:16) - (0 ?
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4854,9 +4796,9 @@ VkResult halti5_fillBuffer(
  31:16) - (0 ?
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)))
-                );
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500C, VK_FALSE,
-                  ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    );
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500C, VK_FALSE,
+                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4866,7 +4808,7 @@ VkResult halti5_fillBuffer(
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:16) - (0 ?
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4876,13 +4818,36 @@ VkResult halti5_fillBuffer(
  31:16) - (0 ?
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)))
-                );
+                    );
 
-            leftWidth -= splitWidth;
-            dstStartX += splitWidth;
-            splitWidth = averageW;
+                leftWidth -= splitWidth;
+                dstStartX += splitWidth;
+                splitWidth = averageW;
+
+                clusterMask &= ~(1 << j);
+            }
+            j++;
         }
 
+        if (devCtx->database->MULTI_CLUSTER && j > 0)
+        {
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CE, VK_FALSE,
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1))))))) << (0 ?
+ 7:0))) | (((gctUINT32) ((gctUINT32) (chipModule->clusterInfo.clusterAliveMask) & ((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:0) - (0 ? 7:0) + 1))))))) << (0 ? 7:0)))
+                );
+        }
+    }
+
+    if (gpuCount > 1)
+    {
         *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -4896,53 +4861,6 @@ VkResult halti5_fillBuffer(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_ALL_MASK);*(*&pCmdBuffer)++ = 0;
 ;
 
-    }
-    else
-    {
-        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500B, VK_FALSE,
-              ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 15:0) - (0 ?
- 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:16) - (0 ?
- 31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 31:16) - (0 ?
- 31:16) + 1))))))) << (0 ?
- 31:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
- 31:16) - (0 ?
- 31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)))
-            );
-        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x500C, VK_FALSE,
-              ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 15:0) - (0 ?
- 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (width) & ((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:16) - (0 ?
- 31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 31:16) - (0 ?
- 31:16) + 1))))))) << (0 ?
- 31:16))) | (((gctUINT32) ((gctUINT32) (height) & ((gctUINT32) ((((1 ?
- 31:16) - (0 ?
- 31:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)))
-            );
     }
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5011, VK_FALSE, data);
@@ -5194,19 +5112,38 @@ VkResult halti5_fillBuffer(
 
 VkResult halti5_copyBuffer(
     VkCommandBuffer cmdBuf,
-     __vkBlitRes *srcRes,
+    __vkBlitRes *srcRes,
     __vkBlitRes *dstRes,
     uint64_t copySize
     )
 {
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)cmdBuf;
     __vkDevContext *devCtx = cmd->devCtx;
+    halti5_module *chipModule = (halti5_module *)devCtx->chipPriv;
     uint32_t *states = gcvNULL;
     VkResult result = VK_SUCCESS;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
     uint64_t srcAddress;
     uint64_t dstAddress;
     VkBool32 forceSGPU = VK_FALSE;
+
+    /* variable for multi GPU and multi cluster.*/
+    /* suppose gpuCoreCount can never be 0.*/
+    uint32_t gpuCount = (forceSGPU || devCtx->option->affinityMode != __VK_MGPU_AFFINITY_COMBINE) ?
+                        1 : devCtx->chipInfo->gpuCoreCount;
+    /* avoid divide by 0.*/
+    uint32_t clusterAliveCount = (chipModule->clusterInfo.clusterAliveCount > 1) ?
+                                 chipModule->clusterInfo.clusterAliveCount : 1;
+    /* For non-cluster arch.*/
+    uint32_t clusterMask = devCtx->database->MULTI_CLUSTER ? chipModule->clusterInfo.clusterAliveMask : 1;
+    uint32_t i          = 0;
+    uint32_t j          = 0;
+    uint32_t blitUint   = gpuCount * clusterAliveCount;
+
+    uint64_t averageSize = 0;
+    uint64_t copyBytes   = 0;
+    uint64_t srcAddr     = 0;
+    uint64_t dstAddr     = 0;
 
     __VK_ASSERT(devCtx->database->REG_BltEngine);
     __VK_ASSERT(!srcRes->isImage && ! dstRes->isImage);
@@ -5246,16 +5183,15 @@ VkResult halti5_copyBuffer(
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))) );;
 
 
-    if (!forceSGPU && devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
-    {
-        uint32_t i;
-        uint32_t gpuCount = devCtx->chipInfo->gpuCoreCount;
-        uint64_t averageSize = copySize / gpuCount;
-        uint64_t copyBytes = copySize - (gpuCount - 1) * averageSize;
-        uint64_t srcAddr = srcAddress;
-        uint64_t dstAddr = dstAddress;
+    /* Default value.*/
+    averageSize = copySize / blitUint;
+    copyBytes = copySize - (blitUint - 1) * averageSize;
+    srcAddr = srcAddress;
+    dstAddr = dstAddress;
 
-        for (i = 0; i < gpuCount; ++i)
+    for (i = 0; i < gpuCount; ++i)
+    {
+        if (gpuCount > 1)
         {
             *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -5270,17 +5206,43 @@ VkResult halti5_copyBuffer(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | ((1 << i));*(*&pCmdBuffer)++ = 0;
 ;
 
+        }
 
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5000, VK_FALSE, (uint32_t)srcAddr);
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, (uint32_t)dstAddr);
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5015, VK_FALSE, (uint32_t)copyBytes);
+        clusterMask = devCtx->database->MULTI_CLUSTER ? chipModule->clusterInfo.clusterAliveMask : 1;
+        j = 0;
+        /* no cmd generated if no cluster alive.*/
+        __VK_ASSERT(clusterMask);
 
-            if (devCtx->enabledFeatures.robustBufferAccess &&
-                devCtx->database->ROBUSTNESS &&
-                devCtx->database->SH_ROBUSTNESS_FIX)
+        while(clusterMask)
+        {
+            if (clusterMask & (1 << j))
             {
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
-                    (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                if (devCtx->database->MULTI_CLUSTER)
+                {
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CE, VK_FALSE,
+                        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1))))))) << (0 ?
+ 7:0))) | (((gctUINT32) ((gctUINT32) ((1 << j)) & ((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:0) - (0 ? 7:0) + 1))))))) << (0 ? 7:0)))
+                        );
+                }
+
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5000, VK_FALSE, (uint32_t)srcAddr);
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, (uint32_t)dstAddr);
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5015, VK_FALSE, (uint32_t)copyBytes);
+
+                if (devCtx->enabledFeatures.robustBufferAccess &&
+                    devCtx->database->ROBUSTNESS &&
+                    devCtx->database->SH_ROBUSTNESS_FIX)
+                {
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+                        (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -5302,23 +5264,46 @@ VkResult halti5_copyBuffer(
  29:29) - (0 ?
  29:29) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
+                }
+
+                {
+                    uint64_t endAddress;
+
+                    endAddress = srcAddr + copyBytes - 1;
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE, (uint32_t)endAddress);
+
+                    endAddress = dstAddr + copyBytes - 1;
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE, (uint32_t)endAddress);
+                }
+
+                srcAddr += copyBytes;
+                dstAddr += copyBytes;
+                copyBytes = averageSize;
+
+                clusterMask &= ~(1 << j);
             }
-
-            {
-                uint64_t endAddress;
-
-                endAddress = srcAddr + copyBytes - 1;
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE, (uint32_t)endAddress);
-
-                endAddress = dstAddr + copyBytes - 1;
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE, (uint32_t)endAddress);
-            }
-
-            srcAddr += copyBytes;
-            dstAddr += copyBytes;
-            copyBytes = averageSize;
+            j++;
         }
 
+        if (devCtx->database->MULTI_CLUSTER && j > 0)
+        {
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CE, VK_FALSE,
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1))))))) << (0 ?
+ 7:0))) | (((gctUINT32) ((gctUINT32) (chipModule->clusterInfo.clusterAliveMask) & ((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:0) - (0 ? 7:0) + 1))))))) << (0 ? 7:0)))
+                );
+        }
+    }
+
+    if (gpuCount > 1)
+    {
         *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -5332,51 +5317,6 @@ VkResult halti5_copyBuffer(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_ALL_MASK);*(*&pCmdBuffer)++ = 0;
 ;
 
-    }
-    else
-    {
-        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5000, VK_FALSE, (uint32_t)srcAddress);
-        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, (uint32_t)dstAddress);
-        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5015, VK_FALSE, (uint32_t)copySize);
-
-        if (devCtx->enabledFeatures.robustBufferAccess &&
-            devCtx->database->ROBUSTNESS &&
-            devCtx->database->SH_ROBUSTNESS_FIX)
-        {
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
-                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 28:28) - (0 ?
- 28:28) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 28:28) - (0 ?
- 28:28) + 1))))))) << (0 ?
- 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 28:28) - (0 ?
- 28:28) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 28:28) - (0 ?
- 28:28) + 1))))))) << (0 ?
- 28:28))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 29:29) - (0 ?
- 29:29) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 29:29) - (0 ?
- 29:29) + 1))))))) << (0 ?
- 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 29:29) - (0 ?
- 29:29) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
-        }
-
-        {
-            uint64_t endAddress;
-
-            endAddress = srcAddress + copySize - 1;
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE, (uint32_t)endAddress);
-
-            endAddress = dstAddress + copySize - 1;
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE, (uint32_t)endAddress);
-        }
     }
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x502B, VK_FALSE,
@@ -5505,8 +5445,27 @@ VkResult halti5_updateBuffer(
     uint32_t *states = gcvNULL;
     VkResult result = VK_SUCCESS;
     __vkDevContext *devCtx = pCmdBuf->devCtx;
+    halti5_module *chipModule = (halti5_module *)devCtx->chipPriv;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
     VkBool32 forceSGPU = VK_FALSE;
+
+    /* variable for multi GPU and multi cluster.*/
+    /* suppose gpuCoreCount can never be 0.*/
+    uint32_t gpuCount = (forceSGPU || devCtx->option->affinityMode != __VK_MGPU_AFFINITY_COMBINE) ?
+                        1 : devCtx->chipInfo->gpuCoreCount;
+    /* avoid divide by 0.*/
+    uint32_t clusterAliveCount = (chipModule->clusterInfo.clusterAliveCount > 1) ?
+                                 chipModule->clusterInfo.clusterAliveCount : 1;
+    /* For non-cluster arch.*/
+    uint32_t clusterMask = devCtx->database->MULTI_CLUSTER ? chipModule->clusterInfo.clusterAliveMask : 1;
+    uint32_t i          = 0;
+    uint32_t j          = 0;
+    uint32_t blitUint   = gpuCount * clusterAliveCount;
+
+    uint64_t averageSize = 0;
+    uint64_t copyBytes   = 0;
+    uint64_t srcAddr     = 0;
+    uint64_t dstAddr     = 0;
 
     /* Allocate scratch gpu memory and copy host data to it first */
     pScratch = __vkGetScratchMem(pCmdBuf, size);
@@ -5548,16 +5507,15 @@ VkResult halti5_updateBuffer(
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))) );;
 
 
-    if (!forceSGPU && devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
-    {
-        uint32_t i;
-        uint32_t gpuCount = devCtx->chipInfo->gpuCoreCount;
-        uint64_t averageSize = size / gpuCount;
-        uint64_t copyBytes = size - (gpuCount - 1) * averageSize;
-        uint64_t srcAddr = srcAddress;
-        uint64_t dstAddr = dstAddress;
+    /* Default value.*/
+    averageSize = size / blitUint;
+    copyBytes = size - (blitUint - 1) * averageSize;
+    srcAddr = srcAddress;
+    dstAddr = dstAddress;
 
-        for (i = 0; i < gpuCount; ++i)
+    for (i = 0; i < gpuCount; ++i)
+    {
+        if (gpuCount > 1)
         {
             *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -5572,17 +5530,43 @@ VkResult halti5_updateBuffer(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | ((1 << i));*(*&pCmdBuffer)++ = 0;
 ;
 
+        }
 
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5000, VK_FALSE, (uint32_t)srcAddr);
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, (uint32_t)dstAddr);
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5015, VK_FALSE, (uint32_t)copyBytes);
+        clusterMask = devCtx->database->MULTI_CLUSTER ? chipModule->clusterInfo.clusterAliveMask : 1;
+        j = 0;
+        /* no cmd generated if no cluster alive.*/
+        __VK_ASSERT(clusterMask);
 
-            if (devCtx->enabledFeatures.robustBufferAccess &&
-                devCtx->database->ROBUSTNESS &&
-                devCtx->database->SH_ROBUSTNESS_FIX)
+        while(clusterMask)
+        {
+            if (clusterMask & (1 << j))
             {
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
-                    (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                if (devCtx->database->MULTI_CLUSTER)
+                {
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CE, VK_FALSE,
+                        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1))))))) << (0 ?
+ 7:0))) | (((gctUINT32) ((gctUINT32) ((1 << j)) & ((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:0) - (0 ? 7:0) + 1))))))) << (0 ? 7:0)))
+                        );
+                }
+
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5000, VK_FALSE, (uint32_t)srcAddr);
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, (uint32_t)dstAddr);
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5015, VK_FALSE, (uint32_t)copyBytes);
+
+                if (devCtx->enabledFeatures.robustBufferAccess &&
+                    devCtx->database->ROBUSTNESS &&
+                    devCtx->database->SH_ROBUSTNESS_FIX)
+                {
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
+                        (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -5604,22 +5588,46 @@ VkResult halti5_updateBuffer(
  29:29) - (0 ?
  29:29) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
+                }
+
+                {
+                    uint64_t endAddress;
+
+                    endAddress = srcAddr + copyBytes - 1;
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE, (uint32_t)endAddress);
+
+                    endAddress = dstAddr + copyBytes - 1;
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE, (uint32_t)endAddress);
+                }
+
+                srcAddr += copyBytes;
+                dstAddr += copyBytes;
+                copyBytes = averageSize;
+
+                clusterMask &= ~(1 << j);
             }
-
-            {
-                uint64_t endAddress;
-
-                endAddress = srcAddr + copyBytes - 1;
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE, (uint32_t)endAddress);
-
-                endAddress = dstAddr + copyBytes - 1;
-                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE, (uint32_t)endAddress);
-            }
-
-            srcAddr += copyBytes;
-            dstAddr += copyBytes;
-            copyBytes = averageSize;
+            j++;
         }
+
+        if (devCtx->database->MULTI_CLUSTER && j > 0)
+        {
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CE, VK_FALSE,
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1))))))) << (0 ?
+ 7:0))) | (((gctUINT32) ((gctUINT32) (chipModule->clusterInfo.clusterAliveMask) & ((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:0) - (0 ? 7:0) + 1))))))) << (0 ? 7:0)))
+                );
+        }
+    }
+
+    if (gpuCount > 1)
+    {
         *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -5633,51 +5641,6 @@ VkResult halti5_updateBuffer(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_ALL_MASK);*(*&pCmdBuffer)++ = 0;
 ;
 
-    }
-    else
-    {
-        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5000, VK_FALSE, (uint32_t)srcAddress);
-        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5006, VK_FALSE, (uint32_t)dstAddress);
-        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5015, VK_FALSE, (uint32_t)size);
-
-        if (devCtx->enabledFeatures.robustBufferAccess &&
-            devCtx->database->ROBUSTNESS &&
-            devCtx->database->SH_ROBUSTNESS_FIX)
-        {
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x006B, VK_FALSE,
-                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 28:28) - (0 ?
- 28:28) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 28:28) - (0 ?
- 28:28) + 1))))))) << (0 ?
- 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 28:28) - (0 ?
- 28:28) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 28:28) - (0 ?
- 28:28) + 1))))))) << (0 ?
- 28:28))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 29:29) - (0 ?
- 29:29) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 29:29) - (0 ?
- 29:29) + 1))))))) << (0 ?
- 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 29:29) - (0 ?
- 29:29) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))));
-        }
-
-        {
-            uint64_t endAddress;
-
-            endAddress = srcAddress + size - 1;
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x503D, VK_FALSE, (uint32_t)endAddress);
-
-            endAddress = dstAddress + size - 1;
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CD, VK_FALSE, (uint32_t)endAddress);
-        }
     }
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x502B, VK_FALSE,
@@ -6179,18 +6142,13 @@ VkResult halti5_helper_convertHwTxDesc(
         tmpResidentImgFormat = residentFormatInfo->residentImgFormat;
         __VK_ASSERT(!bufv);
 
-        if ((img->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
+        if (!devCtx->database->PE_A8B8G8R8 &&
+            (img->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
             ((imgv->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM) ||
-            (imgv->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB)))
+            (imgv->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB))
+            )
         {
             tmpResidentImgFormat = imgv->createInfo.format;
-        }
-
-        if (img->formatInfo.bitsPerBlock == 64 && (img->createInfo.samples & VK_SAMPLE_COUNT_4_BIT) &&
-            !devCtx->database->CACHE128B256BPERLINE)
-        {
-            residentFormatInfo = &img->formatInfo;
-            tmpResidentImgFormat = residentFormatInfo->residentImgFormat;
         }
 
         resourceMemory = img->memory;
@@ -6202,7 +6160,11 @@ VkResult halti5_helper_convertHwTxDesc(
         msaaImage = (img->sampleInfo.product > 1);
         createFormat = imgv->createInfo.format;
         hAlignment = img->hAlignment;
-        hwDescriptorSize *= VK_BORDER_COLOR_RANGE_SIZE;
+
+        if (!devCtx->database->TX_VKBORDER_MODE)
+        {
+            hwDescriptorSize *= VK_BORDER_COLOR_RANGE_SIZE;
+        }
     }
     else if (bufv)
     {
@@ -6814,7 +6776,7 @@ VkResult halti5_helper_convertHwTxDesc(
  ~0U : (~(~0U << ((1 ? 28:28) - (0 ? 28:28) + 1))))))) << (0 ? 28:28)));
         }
 
-        if (imgv)
+        if (!devCtx->database->TX_VKBORDER_MODE && imgv)
         {
             VkBorderColor j;
             gcsTEXTUREDESCRIPTORREGS *nextHwDescriptor;
@@ -6897,14 +6859,16 @@ VkResult halti5_helper_convertHwImgDesc(
             tiling = img->halTiling;
         }
 
-        if ((img->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
+        if (!devCtx->database->PE_A8B8G8R8 &&
+            (img->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
             ((imgv->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM) ||
-            (imgv->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB)))
+            (imgv->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB))
+           )
         {
             tmpResidentImgFormat = imgv->createInfo.format;
         }
 
-        width = userSize ? userSize->width : baseLevel->requestW;
+        width  = userSize ? userSize->width  : baseLevel->requestW;
         height = userSize ? userSize->height : baseLevel->requestH;
         stride = (uint32_t)baseLevel->stride;
         extraPart = (residentFormatInfo->partCount > 1);
@@ -6948,11 +6912,6 @@ VkResult halti5_helper_convertHwImgDesc(
             }
         }
         stride = (uint32_t)(width / residentFormatInfo->blockSize.width) * residentFormatInfo->bitsPerBlock / 8;
-
-        hwImgDesc[0].baseWidth = width;
-        hwImgDesc[0].baseHeight = height;
-        hwImgDesc[0].baseDepth = 1;
-        hwImgDesc[0].baseSlice = stride * height;
     }
     else
     {
@@ -8456,7 +8415,6 @@ VkResult halti5_helper_convertHwImgDesc(
         break;
 
     case VK_FORMAT_R16G16_UINT:
-    case __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT:
         imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
@@ -8540,7 +8498,6 @@ VkResult halti5_helper_convertHwImgDesc(
         break;
 
     case VK_FORMAT_R16G16_SINT:
-    case __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT:
         imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
@@ -8624,7 +8581,6 @@ VkResult halti5_helper_convertHwImgDesc(
         break;
 
     case VK_FORMAT_R16G16_SFLOAT:
-    case __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT:
         imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
@@ -8957,7 +8913,6 @@ VkResult halti5_helper_convertHwImgDesc(
         break;
 
     case VK_FORMAT_R32_UINT:
-    case __VK_FORMAT_R32G32_UINT_2_R32_UINT:
         imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
@@ -9041,7 +8996,6 @@ VkResult halti5_helper_convertHwImgDesc(
         break;
 
     case VK_FORMAT_R32_SINT:
-    case __VK_FORMAT_R32G32_SINT_2_R32_SINT:
         imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
@@ -9125,7 +9079,6 @@ VkResult halti5_helper_convertHwImgDesc(
         break;
 
     case VK_FORMAT_R32_SFLOAT:
-    case __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT:
         imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
@@ -10155,7 +10108,25 @@ void halti5_helper_convertHwSampler(
         0x1, /* VK_COMPARE_OP_GREATER_OR_EQUAL */
         0x6, /* VK_COMPARE_OP_ALWAYS */
     };
+
+    static const uint32_t s_borderXlate[] =
+    {
+        /* VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK */
+        0x0,
+        /* VK_BORDER_COLOR_INT_TRANSPARENT_BLACK */
+        0x0,
+        /* VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK */
+        0x1,
+        /* VK_BORDER_COLOR_INT_OPAQUE_BLACK */
+        0x1,
+        /* VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE */
+        0x3,
+        /* VK_BORDER_COLOR_INT_OPAQUE_WHITE */
+        0x3,
+    };
+
     int32_t  lodbias = 0, minlod = 0, maxlod = 0;
+    VkBool32 unnormalizedCoordinates;
 
     __VK_ASSERT(devCtx->database->REG_TX6bitFrac);
 
@@ -10163,6 +10134,7 @@ void halti5_helper_convertHwSampler(
     lodbias = _Float2SignedFixed(createInfo->mipLodBias, 8, 8);
     maxlod = _Float2SignedFixed(createInfo->maxLod, 5, 8);
     minlod = _Float2SignedFixed(__VK_MAX(0.0f, createInfo->minLod), 5, 8);
+    unnormalizedCoordinates = devCtx->database->TX_UNNORMALIZED_COORD ? createInfo->unnormalizedCoordinates : 0;
 
     hwSamplerDesc->halti5.hwSamplerCtrl0 =
         ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -10267,6 +10239,46 @@ void halti5_helper_convertHwSampler(
  22:21) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:21) - (0 ? 22:21) + 1))))))) << (0 ? 22:21)));
 
+    if (devCtx->database->TX_VKBORDER_MODE)
+    {
+        hwSamplerDesc->halti5.hwSamplerCtrl1 =
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:0) - (0 ?
+ 1:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 1:0) - (0 ?
+ 1:0) + 1))))))) << (0 ?
+ 1:0))) | (((gctUINT32) ((gctUINT32) (s_borderXlate[createInfo->borderColor]) & ((gctUINT32) ((((1 ?
+ 1:0) - (0 ?
+ 1:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ? 1:0)));
+    }
+    else
+    {
+        hwSamplerDesc->halti5.hwSamplerCtrl1 =
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:0) - (0 ?
+ 1:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 1:0) - (0 ?
+ 1:0) + 1))))))) << (0 ?
+ 1:0))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ?
+ 1:0) - (0 ?
+ 1:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ? 1:0)));
+    }
+    hwSamplerDesc->halti5.hwSamplerCtrl1 |=
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 6:6) - (0 ?
+ 6:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 6:6) - (0 ?
+ 6:6) + 1))))))) << (0 ?
+ 6:6))) | (((gctUINT32) ((gctUINT32) (unnormalizedCoordinates) & ((gctUINT32) ((((1 ?
+ 6:6) - (0 ?
+ 6:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ? 6:6)));
+
     hwSamplerDesc->halti5.hwSamplerLodMinMax = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:0) - (0 ?
  12:0) + 1) == 32) ?
@@ -10317,7 +10329,6 @@ void halti5_helper_convertHwSampler(
 
     return;
 }
-
 
 VkResult halti5_createSampler(
     VkDevice device,
@@ -10386,9 +10397,11 @@ VkResult halti5_createImageView(
 
     __VK_MEMZERO(chipImgv, sizeof(halti5_imageView));
 
-    if ((img->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
+    if (!devCtx->database->PE_A8B8G8R8 &&
+        (img->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) &&
         ((imgv->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM) ||
-        (imgv->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB)))
+        (imgv->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB))
+       )
     {
         residentImgFormat = imgv->createInfo.format;
     }
@@ -10404,17 +10417,24 @@ VkResult halti5_createImageView(
         || ((img->createInfo.usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT)
            && (formatFeatureFlags & VK_FORMAT_FEATURE_BLIT_DST_BIT)))
     {
-        if (img->formatInfo.bitsPerBlock == 64 && (img->createInfo.samples & VK_SAMPLE_COUNT_4_BIT) &&
-            !devCtx->database->CACHE128B256BPERLINE)
-        {
-            residentImgFormat = img->formatInfo.residentImgFormat;
-        }
-        __VK_ONERROR(halti5_helper_convertHwPEDesc(residentImgFormat, &chipImgv->peDesc));
+        __VK_ONERROR(halti5_helper_convertHwPEDesc(devCtx, residentImgFormat, &chipImgv->peDesc));
     }
 
-    if (img->createInfo.usage & VK_IMAGE_USAGE_STORAGE_BIT)
+    if ((img->createInfo.usage & VK_IMAGE_USAGE_STORAGE_BIT)
+        ||
+        /*
+        ** Allocate a image for a sampled image because we may use it for opImageFetch.
+        ** VIV: [todo], we may need to move this allocation after program linkage.
+        */
+        (img->createInfo.usage & VK_IMAGE_USAGE_SAMPLED_BIT && !devCtx->pPhyDevice->vscCoreSysCtx.hwCfg.hwFeatureFlags.supportSeparatedTex))
     {
-        __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, imgv, VK_NULL_HANDLE, gcvNULL, chipImgv->imgDesc));
+        result = halti5_helper_convertHwImgDesc(devCtx, imgv, VK_NULL_HANDLE, gcvNULL, chipImgv->imgDesc);
+
+        /* Do not report error if it only has the sampled bit. */
+        if (result != VK_SUCCESS && !(img->createInfo.usage & VK_IMAGE_USAGE_SAMPLED_BIT))
+        {
+            __VK_ONERROR(result);
+        }
     }
 
     if (img->createInfo.usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)
@@ -10477,12 +10497,6 @@ VkResult halti5_createImageView(
     case __VK_FORMAT_R32G32B32A32_UINT_2_R32G32_UINT:
     case __VK_FORMAT_R32G32B32A32_SINT_2_R32G32_SINT:
     case __VK_FORMAT_R32G32B32A32_SFLOAT_2_R32G32_SFLOAT:
-    case __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT:
-    case __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT:
-    case __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT:
-    case __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT:
-    case __VK_FORMAT_R32G32_SINT_2_R32_SINT:
-    case __VK_FORMAT_R32G32_UINT_2_R32_UINT:
         chipImgv->patchKey |= HALTI5_PATCH_TX_EXTRA_INPUT_BIT | HALTI5_PATCH_TX_EXTRA_INPUT_GRAD_BIT;
         /* fall through */
     case VK_FORMAT_R32_UINT:
@@ -10655,8 +10669,7 @@ VkResult halti5_allocDescriptorSet(
     halti5_descriptorSet *chipDescSet;
     __vkDescriptorSet *descSet = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet*, descriptorSet);
     uint32_t numofEntries = descSet->descSetLayout->samplerDescriptorCount
-                          + descSet->descSetLayout->samplerBufferDescriptorCount
-                          + descSet->descSetLayout->inputAttachmentDescriptorCount;
+                          + descSet->descSetLayout->samplerBufferDescriptorCount;
     size_t bytes = __VK_ALIGN(sizeof(halti5_descriptorSet), 8)
                  + __VK_ALIGN(sizeof(halti5_patch_key)  * numofEntries, 8)
                  + __VK_ALIGN(sizeof(halti5_patch_info) * numofEntries, 8);
@@ -10782,60 +10795,6 @@ const char * halti5_helper_patchFuc(
             0,
             0
         },
-        {
-            __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT,
-            HALTI5_PATCH_PE_EXTRA_OUTPUT,
-            0,
-            "_outputcvt_R16G16B16A16SFLOAT_2_R16G16SFLOAT",
-            0,
-            0,
-            0
-        },
-        {
-            __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT,
-            HALTI5_PATCH_PE_EXTRA_OUTPUT,
-            0,
-            "_outputcvt_R16G16B16A16SINT_2_R16G16SINT",
-            0,
-            0,
-            0
-        },
-        {
-            __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT,
-            HALTI5_PATCH_PE_EXTRA_OUTPUT,
-            0,
-            "_outputcvt_R16G16B16A16UINT_2_R16G16UINT",
-            0,
-            0,
-            0
-        },
-        {
-            __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT,
-            HALTI5_PATCH_PE_EXTRA_OUTPUT,
-            0,
-            "_outputcvt_R32G32SFLOAT_2_R32SFLOAT",
-            0,
-            0,
-            0
-        },
-        {
-            __VK_FORMAT_R32G32_SINT_2_R32_SINT,
-            HALTI5_PATCH_PE_EXTRA_OUTPUT,
-            0,
-            "_outputcvt_R32G32SINT_2_R32SINT",
-            0,
-            0,
-            0
-        },
-        {
-            __VK_FORMAT_R32G32_UINT_2_R32_UINT,
-            HALTI5_PATCH_PE_EXTRA_OUTPUT,
-            0,
-            "_outputcvt_R32G32UINT_2_R32UINT",
-            0,
-            0,
-            0
-        },
 
         {
             __VK_FORMAT_R32G32B32A32_SFLOAT_2_R32G32_SFLOAT,
@@ -10856,7 +10815,7 @@ const char * halti5_helper_patchFuc(
           | __VK_IMAGE_VIEW_TYPE_1D_ARRAY_BIT | __VK_IMAGE_VIEW_TYPE_2D_ARRAY_BIT,
             "_inputcvt_R32G32B32A32SINT_2_R32G32SINT",
             VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
-          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH | VSC_RES_OP_BIT_FETCH_MS,
+          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH,
           VSC_RES_ACT_BIT_EXTRA_SAMPLER,
           VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
         },
@@ -10867,75 +10826,7 @@ const char * halti5_helper_patchFuc(
           | __VK_IMAGE_VIEW_TYPE_1D_ARRAY_BIT | __VK_IMAGE_VIEW_TYPE_2D_ARRAY_BIT,
             "_inputcvt_R32G32B32A32UINT_2_R32G32UINT",
             VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
-          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH | VSC_RES_OP_BIT_FETCH_MS,
-          VSC_RES_ACT_BIT_EXTRA_SAMPLER,
-          VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
-        },
-        {
-            __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT,
-            HALTI5_PATCH_TX_EXTRA_INPUT,
-            __VK_IMAGE_VIEW_TYPE_1D_BIT | __VK_IMAGE_VIEW_TYPE_2D_BIT | __VK_IMAGE_VIEW_TYPE_3D_BIT | __VK_IMAGE_VIEW_TYPE_CUBE_BIT
-          | __VK_IMAGE_VIEW_TYPE_1D_ARRAY_BIT | __VK_IMAGE_VIEW_TYPE_2D_ARRAY_BIT,
-            "_inputcvt_R16G16B16A16SFLOAT_2_R16G16SFLOAT",
-            VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
-          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH | VSC_RES_OP_BIT_FETCH_MS,
-          VSC_RES_ACT_BIT_EXTRA_SAMPLER,
-          VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
-
-        },
-        {
-            __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT,
-            HALTI5_PATCH_TX_EXTRA_INPUT,
-            __VK_IMAGE_VIEW_TYPE_1D_BIT | __VK_IMAGE_VIEW_TYPE_2D_BIT | __VK_IMAGE_VIEW_TYPE_3D_BIT | __VK_IMAGE_VIEW_TYPE_CUBE_BIT
-          | __VK_IMAGE_VIEW_TYPE_1D_ARRAY_BIT | __VK_IMAGE_VIEW_TYPE_2D_ARRAY_BIT,
-            "_inputcvt_R16G16B16A16SINT_2_R16G16SINT",
-            VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
-          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH | VSC_RES_OP_BIT_FETCH_MS,
-          VSC_RES_ACT_BIT_EXTRA_SAMPLER,
-          VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
-        },
-        {
-            __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT,
-            HALTI5_PATCH_TX_EXTRA_INPUT,
-            __VK_IMAGE_VIEW_TYPE_1D_BIT | __VK_IMAGE_VIEW_TYPE_2D_BIT | __VK_IMAGE_VIEW_TYPE_3D_BIT | __VK_IMAGE_VIEW_TYPE_CUBE_BIT
-          | __VK_IMAGE_VIEW_TYPE_1D_ARRAY_BIT | __VK_IMAGE_VIEW_TYPE_2D_ARRAY_BIT,
-            "_inputcvt_R16G16B16A16UINT_2_R16G16UINT",
-            VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
-          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH | VSC_RES_OP_BIT_FETCH_MS,
-          VSC_RES_ACT_BIT_EXTRA_SAMPLER,
-          VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
-        },
-        {
-            __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT,
-            HALTI5_PATCH_TX_EXTRA_INPUT,
-            __VK_IMAGE_VIEW_TYPE_1D_BIT | __VK_IMAGE_VIEW_TYPE_2D_BIT | __VK_IMAGE_VIEW_TYPE_3D_BIT | __VK_IMAGE_VIEW_TYPE_CUBE_BIT
-          | __VK_IMAGE_VIEW_TYPE_1D_ARRAY_BIT | __VK_IMAGE_VIEW_TYPE_2D_ARRAY_BIT,
-            "_inputcvt_R32G32SFLOAT_2_R32SFLOAT",
-            VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
-          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH | VSC_RES_OP_BIT_FETCH_MS,
-          VSC_RES_ACT_BIT_EXTRA_SAMPLER,
-          VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
-
-        },
-        {
-            __VK_FORMAT_R32G32_SINT_2_R32_SINT,
-            HALTI5_PATCH_TX_EXTRA_INPUT,
-            __VK_IMAGE_VIEW_TYPE_1D_BIT | __VK_IMAGE_VIEW_TYPE_2D_BIT | __VK_IMAGE_VIEW_TYPE_3D_BIT | __VK_IMAGE_VIEW_TYPE_CUBE_BIT
-          | __VK_IMAGE_VIEW_TYPE_1D_ARRAY_BIT | __VK_IMAGE_VIEW_TYPE_2D_ARRAY_BIT,
-            "_inputcvt_R32G32SINT_2_R32SINT",
-            VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
-          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH | VSC_RES_OP_BIT_FETCH_MS,
-          VSC_RES_ACT_BIT_EXTRA_SAMPLER,
-          VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
-        },
-        {
-            __VK_FORMAT_R32G32_UINT_2_R32_UINT,
-            HALTI5_PATCH_TX_EXTRA_INPUT,
-            __VK_IMAGE_VIEW_TYPE_1D_BIT | __VK_IMAGE_VIEW_TYPE_2D_BIT | __VK_IMAGE_VIEW_TYPE_3D_BIT | __VK_IMAGE_VIEW_TYPE_CUBE_BIT
-          | __VK_IMAGE_VIEW_TYPE_1D_ARRAY_BIT | __VK_IMAGE_VIEW_TYPE_2D_ARRAY_BIT,
-            "_inputcvt_R32G32UINT_2_R32UINT",
-            VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
-          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH | VSC_RES_OP_BIT_FETCH_MS,
+          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH,
           VSC_RES_ACT_BIT_EXTRA_SAMPLER,
           VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
         },
@@ -10967,6 +10858,7 @@ const char * halti5_helper_patchFuc(
             VSC_RES_ACT_BIT_EXTRA_SAMPLER,
             VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
         },
+
 
         {
             VK_FORMAT_R32G32B32A32_SFLOAT,
@@ -11181,6 +11073,7 @@ VkResult halti5_updateDescriptorSet(
     halti5_patch_key *patchKeys = chipDescSet->patchKeys;
     halti5_patch_info *patchInfos = chipDescSet->patchInfos;
 
+
     __VK_MEMZERO(patchKeys, sizeof(halti5_patch_key) * chipDescSet->numofEntries);
     __VK_MEMZERO(patchInfos, sizeof(halti5_patch_info) * chipDescSet->numofEntries);
 
@@ -11267,9 +11160,7 @@ VkResult halti5_updateDescriptorSet(
                 }
                 entryIdx++;
                 break;
-
             case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-            case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
                 if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
                 {
                     __vkImageView *imgv = resInfo->u.imageInfo.imageView;
@@ -11293,6 +11184,7 @@ VkResult halti5_updateDescriptorSet(
                 entryIdx++;
                 break;
 
+            case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
             case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
                 break;
 

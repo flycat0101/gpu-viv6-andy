@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -448,19 +448,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_BeginCommandBuffer(
     __vkCommandPool *cdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandPool *, cmd->commandPool);
     __vkDevContext *devCtx = cmd->devCtx;
 
-#if !__VK_NEW_DEVICE_QUEUE
-    VkResult result = VK_SUCCESS;
-
-    cmd->threadId = (uint32_t)gcmPTR2SIZE(gcoOS_GetCurrentThreadID());;
-
-    /* There can be different threads within a device context so set the current HW type */
-    if (cmd->threadId != devCtx->threadId)
-    {
-        __VK_ONERROR(gcoHAL_Construct(gcvNULL, gcvNULL, &cmd->hal));
-        __VK_ONERROR(gcoHAL_SetHardwareType(cmd->hal, gcvHARDWARE_3D));
-    }
-#endif
-
     /* Reset the command buffer if command pool was created with __VK_CMDBUF_STATE_FREE */
     if (((cmd->state == __VK_CMDBUF_STATE_EXECUTABLE) || (cmd->state == __VK_CMDBUF_STATE_RESET_REQUIRED)) &&
         (cdp->flags & VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT))
@@ -492,12 +479,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_BeginCommandBuffer(
     }
 
     return (*devCtx->chipFuncs->BeginCommandBuffer)(commandBuffer);
-
-#if !__VK_NEW_DEVICE_QUEUE
-OnError:
-
-    return result;
-#endif
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __vk_EndCommandBuffer(
@@ -535,13 +516,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdExecuteCommands(
 
         secondary = (__vkCommandBuffer *)pCmdBuffers[i];
 
-        /* Previous primary must be reset before next submission */
-        if (secondary->secondaryInfo.prevPrimarySubmission != commandBuffer)
-        {
-            __vkCommandBuffer *previous = (__vkCommandBuffer *)secondary->secondaryInfo.prevPrimarySubmission;
-            if (previous && !(secondary->usage & VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT))
-                previous->state = __VK_CMDBUF_STATE_RESET_REQUIRED;
-        }
 
         /* Set secondary state */
         secondary->state = __VK_CMDBUF_STATE_EXECUTION_PENDING;
@@ -589,7 +563,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdExecuteCommands(
     }
 }
 
-#if __VK_NEW_DEVICE_QUEUE
 VkResult __vk_InsertSemaphoreWaits(
     VkQueue queue,
     const VkSemaphore* pSemaphores,
@@ -656,9 +629,9 @@ VkResult __vk_InsertSemaphoreSignals(
     __VK_ONERROR(states ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
 
 #if __VK_ENABLETS
-    __vkCmdLoadFlush3DHWStates(bltTileCache, &states);
+    __vkCmdLoadFlush3DHWStates(bltTileCache, devQueue->pDevContext, &states);
 #else
-    __vkCmdLoadFlush3DHWStates(&states);
+    __vkCmdLoadFlush3DHWStates(devQueue->pDevContext, &states);
 #endif
 
     for (i = 0; i < semaphoreCount; i++)
@@ -774,258 +747,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueWaitIdle(
 
     return __vk_QueueIdle(devQueue);
 }
-
-#else
-
-VkResult __vk_InsertSemaphoreWaits(
-    VkQueue queue,
-    const VkSemaphore* pSemaphores,
-    uint32_t semaphoreCount
-    )
-{
-    __vkDevQueue *devQueue = (__vkDevQueue *)queue;
-    __vkBuffer *fenceBuffer = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, devQueue->pDevContext->fenceBuffer);
-    __vkDeviceMemory *memory = fenceBuffer->memory;
-    gcoCMDBUF reserve;
-    gcoHARDWARE hardware = gcvNULL;
-    uint32_t fenceAddress;
-    uint32_t stateSize;
-    uint32_t *states;
-    uint32_t i;
-    VkResult result = VK_SUCCESS;
-
-    /* Use the current thread's gcoHARDWARE object */
-    __VK_ONERROR(gcoHAL_GetHardware(devQueue->pDevContext->hal, &hardware));
-
-    fenceAddress = memory->devAddr;
-
-    stateSize = 2 * semaphoreCount * sizeof(uint32_t);
-
-    __VK_ONERROR(gcoBUFFER_Reserve(
-        hardware->engine[gcvENGINE_RENDER].buffer,
-        stateSize,
-        gcvTRUE,
-        gcvCOMMAND_3D,
-        &reserve
-        ));
-
-    states = (uint32_t *)gcmUINT64_TO_PTR(reserve->lastReserve);
-
-    for (i = 0; i < semaphoreCount; i++)
-    {
-        __vkSemaphore *sph = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSemaphore *, pSemaphores[i]);
-
-        *states++ = __VK_CMD_HW_FENCE_WAIT(10);
-        *states++ = fenceAddress + sph->fenceIndex * sizeof(__vkHwFenceData);
-    }
-
-OnError:
-
-    return result;
-}
-
-VkResult __vk_InsertSemaphoreSignals(
-    VkQueue queue,
-    const VkSemaphore* pSemaphores,
-    uint32_t semaphoreCount
-    )
-{
-    __vkDevQueue *devQueue = (__vkDevQueue *)queue;
-    __vkBuffer *fenceBuffer = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, devQueue->pDevContext->fenceBuffer);
-    __vkDeviceMemory *memory = fenceBuffer->memory;
-    gcoCMDBUF reserve;
-    gcoHARDWARE hardware = gcvNULL;
-    uint32_t fenceAddress;
-    uint32_t *states;
-    uint32_t stateSize;
-    uint32_t i;
-    VkResult result = VK_SUCCESS;
-#if __VK_ENABLETS
-    VkBool32 bltTileCache = ((!devQueue->pDevContext->database->PE_TILE_CACHE_FLUSH_FIX)
-        && devQueue->pDevContext->database->REG_BltEngine);
-#endif
-
-    /* Use the current thread's gcoHARDWARE object */
-    __VK_ONERROR(gcoHAL_GetHardware(devQueue->pDevContext->hal, &hardware));
-
-    fenceAddress = memory->devAddr;
-
-    stateSize = __VK_3D_FLUSH_PIPE_DMA_SIZE(devQueue->pDevContext) + (6 * semaphoreCount * sizeof(uint32_t));
-
-    __VK_ONERROR(gcoBUFFER_Reserve(
-        hardware->engine[gcvENGINE_RENDER].buffer,
-        stateSize,
-        gcvTRUE,
-        gcvCOMMAND_3D,
-        &reserve
-        ));
-
-    states = (uint32_t *)gcmUINT64_TO_PTR(reserve->lastReserve);
-
-#if __VK_ENABLETS
-    __vkCmdLoadFlush3DHWStates(bltTileCache, &states);
-#else
-    __vkCmdLoadFlush3DHWStates(&states);
-#endif
-
-    for (i = 0; i < semaphoreCount; i++)
-    {
-        __vkSemaphore *sph = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSemaphore *, pSemaphores[i]);
-
-        __vkCmdLoadSingleHWState(&states,
-            0x0E1A, VK_FALSE, (fenceAddress + sph->fenceIndex * sizeof(__vkHwFenceData)));
-        __vkCmdLoadSingleHWState(&states, 0x0E26, VK_FALSE, 0);
-        __vkCmdLoadSingleHWState(&states, 0x0E1B, VK_FALSE, 1);
-    }
-
-OnError:
-
-    return result;
-}
-
-VkResult __vk_CommitSubmitFence(VkQueue queue, VkFence fence)
-{
-    __vkDevQueue *devQueue = (__vkDevQueue *)queue;
-   __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, fence);
-    gcoHARDWARE hardware = gcvNULL;
-    VkResult result = VK_SUCCESS;
-
-    /* Use the current thread's gcoHARDWARE object */
-    __VK_ONERROR(gcoHAL_GetHardware(devQueue->pDevContext->hal, &hardware));
-
-    /* Event to signal when any device submit operation completes */
-    if (fce)
-    {
-        __VK_VERIFY_OK(gcoHAL_ScheduleSignal(
-            fce->signal,
-            gcvNULL,
-            gcmPTR2INT32(gcoOS_GetCurrentProcessID()),
-            gcvKERNEL_BLT
-            ));
-
-        __VK_ONERROR(gcoHAL_Commit(gcvNULL, VK_FALSE));
-    }
-
-OnError:
-
-    return result;
-}
-
-VkResult __vk_CommitStateBuffers(
-    VkQueue queue,
-    __vk_CommitInfo* pCommits,
-    uint32_t commitCount
-    )
-{
-    __vkDevQueue *devQueue = (__vkDevQueue *)queue;
-    VkResult result = VK_SUCCESS;
-    gcoCMDBUF reserve;
-    gcoHARDWARE hardware = gcvNULL;
-    uint32_t i;
-    VkBool32 stallHw = VK_FALSE;
-
-    /* Use the current thread's gcoHARDWARE object */
-    __VK_ONERROR(gcoHAL_GetHardware(devQueue->pDevContext->hal, &hardware));
-
-    for (i = 0; i < commitCount; i++)
-    {
-        __VK_ONERROR(gcoBUFFER_Reserve(
-            hardware->engine[gcvENGINE_RENDER].buffer,
-            pCommits[i].stateSize,
-            gcvTRUE,
-            gcvCOMMAND_3D,
-            &reserve
-            ));
-
-        __VK_MEMCOPY(gcmUINT64_TO_PTR(reserve->lastReserve), pCommits[i].stateStart, pCommits[i].stateSize);
-        hardware->currentPipe = (gcePIPE_SELECT)pCommits[i].statePipe;
-    }
-
-#if __VK_RESOURCE_SAVE_TGA || gcdDUMP
-    stallHw = VK_TRUE;
-#endif
-
-    __VK_ONERROR(gcoHAL_Commit(gcvNULL, stallHw));
-
-OnError:
-
-    return result;
-}
-
-VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueWaitIdle(
-    VkQueue queue
-    )
-{
-    __vkDevQueue *devQueue = (__vkDevQueue *)queue;
-    gcoHARDWARE hardware = gcvNULL;
-    uint32_t flushCmds[__VK_3D_FLUSH_PIPE_DMA_SIZE(devQueue->pDevContext) / sizeof(uint32_t)];
-    uint32_t *states = flushCmds;
-    uint32_t stateSize = 0;
-    uint32_t statePipe;
-    gcoCMDBUF reserve;
-    VkResult result = VK_SUCCESS;
-#if __VK_ENABLETS
-    VkBool32 bltTileCache = ((!cmd->devCtx->database->PE_TILE_CACHE_FLUSH_FIX)
-            && cmd->devCtx->database->REG_BltEngine);
-#endif
-
-    /* Use the current thread's gcoHARDWARE object */
-    __VK_ONERROR(gcoHAL_GetHardware(devQueue->pDevContext->hal, &hardware));
-
-    statePipe = hardware->currentPipe;
-
-    /* Add the appropriate flush to the command buffer. */
-    if (statePipe == gcvPIPE_2D)
-    {
-        stateSize = __VK_2D_FLUSH_PIPE_DMA_SIZE(devQueue->pDevContext) / sizeof(uint32_t);
-#if __VK_ENABLETS
-        __vkCmdLoadFlush2DHWStates(bltTileCache, &states);
-#else
-        __vkCmdLoadFlush2DHWStates(&states);
-#endif
-    }
-    else if (statePipe == gcvPIPE_3D)
-    {
-        stateSize = __VK_3D_FLUSH_PIPE_DMA_SIZE(devQueue->pDevContext) / sizeof(uint32_t);
-
-#if __VK_ENABLETS
-        __vkCmdLoadFlush3DHWStates(bltTileCache, &states);
-#else
-        __vkCmdLoadFlush3DHWStates(&states);
-#endif
-    }
-
-    if (stateSize)
-    {
-        __VK_ONERROR(gcoBUFFER_Reserve(
-            hardware->engine[gcvENGINE_RENDER].buffer,
-            stateSize,
-            gcvTRUE,
-            gcvCOMMAND_3D,
-            &reserve
-            ));
-
-        __VK_MEMCOPY(gcmUINT64_TO_PTR(reserve->lastReserve), flushCmds, stateSize);
-    }
-
-    /* Signal for queue idle */
-    __VK_ONERROR(gcoHAL_ScheduleSignal(
-        devQueue->signal,
-        gcvNULL,
-        gcmPTR2INT32(gcoOS_GetCurrentProcessID()),
-        gcvKERNEL_PIXEL
-        ));
-
-    __VK_ONERROR(gcoHAL_Commit(gcvNULL, VK_FALSE));
-
-    __VK_ONERROR(gcoOS_WaitSignal(gcvNULL, devQueue->signal,gcvINFINITE));
-
-OnError:
-
-    return result;
-}
-
-#endif
 
 __VK_INLINE VkResult __vk_AllocateCommits(
     __vk_CommitInfo **pCommits,
@@ -1346,59 +1067,63 @@ OnError:
 }
 
 void __vki_CmdResolveSubPass(
-    VkCommandBuffer commandBuffer,
-    __vkRenderSubPassInfo *subPassInfo
+    VkCommandBuffer commandBuffer
     )
 {
-    uint32_t j;
+    uint32_t i, j;
     __vkCommandBuffer *cmdBuf = (__vkCommandBuffer *)commandBuffer;
+    __vkRenderPass *rdp = cmdBuf->bindInfo.renderPass.rdp;
     __vkFramebuffer *fb = cmdBuf->bindInfo.renderPass.fb;
 
-    for (j = 0; j < subPassInfo->colorCount; j++)
+    for (i = 0; i < rdp->subPassInfoCount; i++)
     {
-        uint32_t resolve_ref = subPassInfo->resolve_attachment_index[j];
-        uint32_t color_ref = subPassInfo->color_attachment_index[j];
-        VkImageCopy regions;
-
-        if (resolve_ref != VK_ATTACHMENT_UNUSED)
+        __vkRenderSubPassInfo *subPassInfo = &rdp->subPassInfo[i];
+        for (j = 0; j < subPassInfo->colorCount; j++)
         {
-            __vkImageView *colorImageViews = fb->imageViews[color_ref];
-            __vkImageView *resolveImageViews = fb->imageViews[resolve_ref];
-            __vkImage *colorImg = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, colorImageViews->createInfo.image);
-            __vkImage *resolveImg = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, resolveImageViews->createInfo.image);
-            VkImage srcImg = colorImageViews->createInfo.image;
-            VkImage dstImg = resolveImageViews->createInfo.image;
+            uint32_t resolve_ref = subPassInfo->resolve_attachment_index[j];
+            uint32_t color_ref = subPassInfo->color_attachment_index[j];
+            VkImageCopy regions;
 
-            const VkMemoryBarrier memBarrier =
+            if (resolve_ref != VK_ATTACHMENT_UNUSED)
             {
-                VK_STRUCTURE_TYPE_MEMORY_BARRIER,
-                0,
-                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-            };
-            __VK_MEMZERO(&regions, sizeof(VkImageCopy));
+                __vkImageView *colorImageViews = fb->imageViews[color_ref];
+                __vkImageView *resolveImageViews = fb->imageViews[resolve_ref];
+                __vkImage *colorImg = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, colorImageViews->createInfo.image);
+                __vkImage *resolveImg = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, resolveImageViews->createInfo.image);
+                VkImage srcImg = colorImageViews->createInfo.image;
+                VkImage dstImg = resolveImageViews->createInfo.image;
 
-            regions.dstOffset.x = regions.dstOffset.y = regions.dstOffset.z = 0;
-            regions.srcOffset.x = regions.srcOffset.y = regions.srcOffset.z = 0;
+                const VkMemoryBarrier memBarrier =
+                {
+                    VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+                    0,
+                    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                };
+                __VK_MEMZERO(&regions, sizeof(VkImageCopy));
 
-            regions.srcSubresource.aspectMask = colorImageViews->createInfo.subresourceRange.aspectMask;
-            regions.srcSubresource.mipLevel = colorImageViews->createInfo.subresourceRange.baseMipLevel;
-            regions.srcSubresource.baseArrayLayer = colorImageViews->createInfo.subresourceRange.baseArrayLayer;
-            regions.srcSubresource.layerCount = fb->layers;
+                regions.dstOffset.x = regions.dstOffset.y = regions.dstOffset.z = 0;
+                regions.srcOffset.x = regions.srcOffset.y = regions.srcOffset.z = 0;
 
-            regions.dstSubresource.aspectMask = resolveImageViews->createInfo.subresourceRange.aspectMask;
-            regions.dstSubresource.mipLevel = resolveImageViews->createInfo.subresourceRange.baseMipLevel;
-            regions.dstSubresource.baseArrayLayer = resolveImageViews->createInfo.subresourceRange.baseArrayLayer;
-            regions.dstSubresource.layerCount = fb->layers;
+                regions.srcSubresource.aspectMask = colorImageViews->createInfo.subresourceRange.aspectMask;
+                regions.srcSubresource.mipLevel = colorImageViews->createInfo.subresourceRange.baseMipLevel;
+                regions.srcSubresource.baseArrayLayer = colorImageViews->createInfo.subresourceRange.baseArrayLayer;
+                regions.srcSubresource.layerCount = fb->layers;
 
-            regions.extent.width = fb->width;
-            regions.extent.height = fb->height;
-            regions.extent.depth = 1;
+                regions.dstSubresource.aspectMask = resolveImageViews->createInfo.subresourceRange.aspectMask;
+                regions.dstSubresource.mipLevel = resolveImageViews->createInfo.subresourceRange.baseMipLevel;
+                regions.dstSubresource.baseArrayLayer = resolveImageViews->createInfo.subresourceRange.baseArrayLayer;
+                regions.dstSubresource.layerCount = fb->layers;
 
-            __vk_CmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
-                1, &memBarrier, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE);
+                regions.extent.width  = fb->width;
+                regions.extent.height = fb->height;
+                regions.extent.depth  = 1;
 
-            __vk_CmdCopyImage(commandBuffer, srcImg, colorImg->createInfo.initialLayout, dstImg, resolveImg->createInfo.initialLayout, 1, &regions);
+                __vk_CmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
+                    1, &memBarrier, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE);
+
+                __vk_CmdCopyImage(commandBuffer, srcImg, colorImg->createInfo.initialLayout, dstImg, resolveImg->createInfo.initialLayout, 1, &regions);
+            }
         }
     }
 }
@@ -1410,7 +1135,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdNextSubpass(
 {
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
     __vkRenderPass *rdp = cmd->bindInfo.renderPass.rdp;
-    __vkRenderSubPassInfo *subPassInfo = cmd->bindInfo.renderPass.subPass;
 
     cmd->bindInfo.renderPass.subPass++;
     cmd->bindInfo.renderPass.subPassContent = contents;
@@ -1456,7 +1180,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdNextSubpass(
         }
     }
 
-    __vki_CmdResolveSubPass(commandBuffer, subPassInfo);
+    __vki_CmdResolveSubPass(commandBuffer);
 }
 
 VKAPI_ATTR void VKAPI_CALL __vk_CmdEndRenderPass(
@@ -1464,9 +1188,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdEndRenderPass(
     )
 {
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
-    __vkRenderSubPassInfo *subPassInfo = cmd->bindInfo.renderPass.subPass;
 
-    __vki_CmdResolveSubPass(commandBuffer, subPassInfo);
+    __vki_CmdResolveSubPass(commandBuffer);
 
     cmd->state = __VK_CMDBUF_STATE_RECORDING;
 
@@ -1585,6 +1308,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdResolveImage(
         {
             srcRes.u.img.subRes.arrayLayer = pRegions[ir].srcOffset.z;
             srcLayers = pRegions[ir].extent.depth;
+            srcRes.u.img.extent.depth = 1;
         }
         else
         {
@@ -1596,6 +1320,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdResolveImage(
         {
             dstRes.u.img.subRes.arrayLayer = pRegions[ir].dstOffset.z;
             __VK_DEBUG_ONLY(dstLayers = pRegions[ir].extent.depth);
+            dstRes.u.img.extent.depth = 1;
         }
         else
         {
@@ -1610,7 +1335,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdResolveImage(
                 commandBuffer,
                 &srcRes,
                 &dstRes,
-                VK_FALSE
+                VK_FALSE,
+                VK_FILTER_NEAREST
                 ));
 
 #if __VK_RESOURCE_INFO
@@ -2071,6 +1797,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
         {
             srcRes.u.img.subRes.arrayLayer = pRegions[ir].srcOffset.z;
             srcLayers = pRegions[ir].extent.depth;
+            srcRes.u.img.extent.depth = 1;
         }
         else
         {
@@ -2082,6 +1809,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
         {
             dstRes.u.img.subRes.arrayLayer = pRegions[ir].dstOffset.z;
             __VK_DEBUG_ONLY(dstLayers = pRegions[ir].extent.depth);
+            dstRes.u.img.extent.depth = 1;
         }
         else
         {
@@ -2156,7 +1884,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
                             commandBuffer,
                             &srcRes,
                             &srcTmpRes,
-                            VK_FALSE
+                            VK_FALSE,
+                            VK_FILTER_NEAREST
                             ));
 #if __VK_RESOURCE_INFO
                         __vk_utils_insertCopyCmdRes(commandBuffer, &srcRes, &srcTmpRes);
@@ -2210,7 +1939,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
                         commandBuffer,
                         pSrcRes,
                         pDstRes,
-                        VK_TRUE
+                        VK_TRUE,
+                        VK_FILTER_NEAREST
                         ));
 #if __VK_RESOURCE_INFO
                     __vk_utils_insertCopyCmdRes(commandBuffer, pSrcRes, pDstRes);
@@ -2233,7 +1963,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
                         commandBuffer,
                         pDstRes,
                         &dstRes,
-                        VK_FALSE
+                        VK_FALSE,
+                        VK_FILTER_NEAREST
                         ));
 #if __VK_RESOURCE_INFO
                     __vk_utils_insertCopyCmdRes(commandBuffer, pDstRes, &dstRes);
@@ -2262,11 +1993,9 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
         }
     }
 
-    return;
-
 OnError:
-
-    __VK_ASSERT(0);
+    __VK_ASSERT(result == VK_SUCCESS);
+    return;
 }
 
 VKAPI_ATTR void VKAPI_CALL __vk_CmdBlitImage(
@@ -2396,6 +2125,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBlitImage(
             {
                 srcRes.u.img.subRes.arrayLayer = pRegions[ir].srcOffsets[0].z;
                 srcLayers = srcRes.u.img.extent.depth;
+                srcRes.u.img.extent.depth = 1;
             }
             else
             {
@@ -2407,6 +2137,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBlitImage(
             {
                 dstRes.u.img.subRes.arrayLayer = pRegions[ir].dstOffsets[0].z;
                 __VK_DEBUG_ONLY(dstLayers = dstRes.u.img.extent.depth);
+                dstRes.u.img.extent.depth = 1;
             }
             else
             {
@@ -2422,7 +2153,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBlitImage(
                     commandBuffer,
                     &srcRes,
                     &dstRes,
-                    VK_FALSE
+                    VK_FALSE,
+                    filter
                     ));
 
 #if __VK_RESOURCE_INFO
@@ -2513,6 +2245,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyBufferToImage
             */
             dstRes.u.img.subRes.arrayLayer = pRegions[ir].imageOffset.z;
             dstLayers = pRegions[ir].imageExtent.depth;
+            dstRes.u.img.extent.depth = 1;
         }
         else
         {
@@ -2538,7 +2271,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyBufferToImage
                 commandBuffer,
                 &srcRes,
                 &dstRes,
-                VK_FALSE
+                VK_FALSE,
+                VK_FILTER_NEAREST
                 ));
 #if __VK_RESOURCE_INFO
             __vk_utils_insertCopyCmdRes(commandBuffer, &srcRes, &dstRes);
@@ -2570,15 +2304,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImageToBuffer(
     __vkBuffer *pDstBuf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, dstBuffer);
     VkResult result = VK_SUCCESS;
 
-    if (pSrcImg->formatInfo.bitsPerBlock == 128 &&
-        !devCtx->database->CACHE128B256BPERLINE)
-    {
-        if (devCtx->chipFuncs->tweakCopy(commandBuffer, dstBuffer))
-        {
-            return;
-        }
-    }
-
     for (ir = 0; ir < regionCount; ir++)
     {
         const __vkFormatInfo *fmtInfo;
@@ -2606,6 +2331,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImageToBuffer(
             */
             srcRes.u.img.subRes.arrayLayer = pRegions[ir].imageOffset.z;
             srcLayers = pRegions[ir].imageExtent.depth;
+            srcRes.u.img.extent.depth = 1;
         }
         else
         {
@@ -2631,7 +2357,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImageToBuffer(
                 commandBuffer,
                 &srcRes,
                 &dstRes,
-                VK_FALSE
+                VK_FALSE,
+                VK_FILTER_NEAREST
                 ));
 #if __VK_RESOURCE_INFO
             __vk_utils_insertCopyCmdRes(commandBuffer, &srcRes, &dstRes);
@@ -3002,19 +2729,10 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyQueryPoolResults(
 {
     __vkQueryPool *qyp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkQueryPool *, queryPool);
     __vkDevContext *devCtx = ((__vkCommandBuffer*)commandBuffer)->devCtx;
-    __vkBuffer *queryBuffer = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, qyp->queryBuffer);
-    __vkBuffer *fenceBuffer = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, devCtx->fenceBuffer);
-    __vkBuffer *dstBuf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, destBuffer);
-    __vkBlitRes srcRes,dstRes;
-    uint32_t copySize;
     uint32_t iq;
-    srcRes.isImage = dstRes.isImage = VK_FALSE;
-    dstRes.u.buf.pBuffer = dstBuf;
 
     for (iq = firstQuery; iq < (firstQuery + queryCount); iq++)
     {
-        __vkEvent *evt = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkEvent *, qyp->pQueries[iq].event);
-
         if (flags & VK_QUERY_RESULT_WAIT_BIT)
         {
             VkPipelineStageFlags srcFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
@@ -3034,40 +2752,17 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyQueryPoolResults(
                 VK_NULL_HANDLE
                 );
         }
-        srcRes.u.buf.pBuffer = queryBuffer;
-        srcRes.u.buf.offset = iq * sizeof(uint64_t);
-        dstRes.u.buf.offset = destOffset + (iq*destStride);
-        if (flags & VK_QUERY_RESULT_64_BIT)
-        {
-            copySize = sizeof(uint64_t);
-
-        }
-        else
-        {
-            copySize = sizeof(uint32_t);
-        }
 
         /* Copy the query result */
-        __VK_VERIFY_OK(devCtx->chipFuncs->CopyBuffer(
+        __VK_VERIFY_OK(devCtx->chipFuncs->copyQueryResult(
             commandBuffer,
-            &srcRes,
-            &dstRes,
-            copySize
+            queryPool,
+            destBuffer,
+            iq,
+            destOffset,
+            destStride,
+            flags
             ));
-
-        if ((flags & VK_QUERY_RESULT_WITH_AVAILABILITY_BIT) && (destStride >= (2 * copySize)))
-        {
-            /* Copy the query availability status (event fence value) */
-             srcRes.u.buf.pBuffer = fenceBuffer;
-             srcRes.u.buf.offset = evt->fenceIndex * sizeof(__vkHwFenceData);
-             dstRes.u.buf.offset += copySize ;
-            __VK_VERIFY_OK(devCtx->chipFuncs->CopyBuffer(
-                commandBuffer,
-                &srcRes,
-                &dstRes,
-                copySize
-                ));
-        }
     }
 }
 
@@ -3163,7 +2858,7 @@ void __vk_CmdPipeFlush(
     else if (pipe == gcvPIPE_3D)
     {
         uint32_t *states = NULL;
-        uint32_t requestSize = __VK_3D_FLUSH_PIPE_DMA_SIZE((cmd->devCtx)) / sizeof(uint32_t);
+        uint32_t requestSize = __VK_3D_FLUSH_PIPE_DMA_SIZE(cmd->devCtx) / sizeof(uint32_t);
 
         if (bypassDmaFunctions)
         {
@@ -3175,9 +2870,9 @@ void __vk_CmdPipeFlush(
         }
 
 #if __VK_ENABLETS
-        __vkCmdLoadFlush3DHWStates(bltTileCache, &states);
+        __vkCmdLoadFlush3DHWStates(bltTileCache, cmd->devCtx, &states);
 #else
-        __vkCmdLoadFlush3DHWStates(&states);
+        __vkCmdLoadFlush3DHWStates(cmd->devCtx, &states);
 #endif
 
         if (bypassDmaFunctions)

@@ -177,6 +177,15 @@ else
         CCFLAGS += -DgcdUSE_VX=0
 endif
 
+ifeq ($(USE_VXC_BINARY),1)
+  CCFLAGS += -DgcdUSE_VXC_BINARY=1
+  ifeq ($(GPU_CONFIG),)
+    $(error "ERROR: missing GPU_CONFIG build setting")
+  endif
+else
+   CCFLAGS += -DgcdUSE_VXC_BINARY=0
+endif
+
 CCFLAGS += -DgcdDISPLAY_BACK_BUFFERS=3
 
 # GN TODO Check to see if this is required

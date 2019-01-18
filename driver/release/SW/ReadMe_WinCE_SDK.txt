@@ -27,7 +27,6 @@ Files layout
 |    |     gc_hal_dump.h
 |    |     gc_hal_base.h
 |    |     gc_hal_mem.h
-|    |     gc_hal_rename.h
 |    |     gc_hal_raster.h
 |    |     gc_hal_vg.h
 |    |     gc_hal_engine.h

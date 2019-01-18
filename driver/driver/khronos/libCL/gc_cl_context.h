@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -63,7 +63,6 @@ typedef struct _cl_context
     gctUINT                 numDevices;
     clsDeviceId_PTR *       devices;
     clsProgram_PTR          programs;
-    clsKernel_PTR           kernels;
     clsMem_PTR              mems;
     clsCommandQueue_PTR     queueList;
     gctPOINTER              queueListMutex;

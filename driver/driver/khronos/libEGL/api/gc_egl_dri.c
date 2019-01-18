@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -64,6 +64,7 @@ static void _VivGetLock(__DRIdrawablePriv * drawable);
 static void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable);
 
 static pthread_mutex_t drmMutex = PTHREAD_MUTEX_INITIALIZER;
+
 
 #define LINUX_LOCK_FRAMEBUFFER( context )                       \
     do {                                                        \
@@ -614,7 +615,6 @@ static gceSTATUS _CreateOnScreenSurfaceWrapper(
     if ( display->format != gcvSURF_UNKNOWN )
         Format = display->format;
 
-#ifndef DRI_PIXMAPRENDER_ASYNC
     if ((display->physicalAddr) && (drawable->fullScreenMode)) {
         do {
                 gcmERR_BREAK(gcoSURF_ConstructWrapper(gcvNULL,
@@ -635,9 +635,6 @@ static gceSTATUS _CreateOnScreenSurfaceWrapper(
                     display->height));
         } while(gcvFALSE);
     }
-
-#endif
-
     gcmFOOTER_NO();
     return status;
 }
@@ -697,7 +694,7 @@ static gceSTATUS _UnlockVideoNode(
     iface.engine = gcvENGINE_RENDER;
     iface.command = gcvHAL_UNLOCK_VIDEO_MEMORY;
     iface.u.UnlockVideoMemory.node = Node;
-    iface.u.UnlockVideoMemory.type = gcvSURF_BITMAP;
+    iface.u.UnlockVideoMemory.type = gcvVIDMEM_TYPE_BITMAP;
     iface.u.UnlockVideoMemory.asynchroneous = gcvTRUE;
 
 /*
@@ -816,7 +813,7 @@ static void _createPixmapInfo(
         surfformat,
         stride,
         destLogicalAddr[0],
-        (gctUINT32)destPhys[0]
+        destPhys[0]
         ));
 
         /* Set the window. */
@@ -1072,7 +1069,7 @@ static int pickFrameIndex(__DRIdrawablePriv * drawable, int *index)
     gcoOS_AcquireMutex(gcvNULL, drawable->frameMutex, gcvINFINITE);
 
 
-    if ( drawable->w != drawable->ascframe[0].w || drawable->h != drawable->ascframe[0].h)
+    if ( drawable->w != drawable->ascframe[0].w || drawable->h !=drawable->ascframe[0].h)
     {
         gcoOS_ReleaseMutex(gcvNULL, drawable->frameMutex);
         /* stop thread */
@@ -1451,14 +1448,12 @@ static void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable)
     __DRIdrawablePriv *pdp=drawable;
     __DRIDisplay * display;
 
-#ifndef DRI_PIXMAPRENDER_ASYNC
     int x;
     int y;
     int w;
     int h;
     int numClipRects = 0;
     drm_clip_rect_t *pClipRects;
-#endif
     unsigned int stride;
     unsigned int nodeName = 0;
 
@@ -1469,7 +1464,6 @@ static void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable)
 
     pdp->numBackClipRects = 0;
 
-#ifndef DRI_PIXMAPRENDER_ASYNC
     /* Assign __DRIdrawablePrivate first */
     if (!XF86DRIGetDrawableInfo(display->dpy, pdp->screen, pdp->drawable,
                     &pdp->index, &pdp->lastStamp,
@@ -1508,7 +1502,6 @@ static void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable)
         pdp->oldh = (gctUINT)h;
         pdp->olddrawable = pdp->drawable;
     }
-#endif
 
     if (pdp->numClipRects >0 && pdp->pClipRects)
         Xfree((void *)pdp->pClipRects);
@@ -1539,11 +1532,9 @@ static void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable)
     else
     pdp->backNode = 0;
 
-#ifndef DRI_PIXMAPRENDER_ASYNC
 ENDFLAG:
 /* make compiler happy */
 ;
-#endif
 }
 
 static void _FullScreenCovered(__DRIdrawablePriv * drawable)
@@ -1587,36 +1578,6 @@ static void _VivGetLock(__DRIdrawablePriv * drawable)
     }
 }
 
-#ifdef DRI_PIXMAPRENDER_ASYNC
-static void
-_GetDisplayInfo(
-    __DRIDisplay* display,
-    int scrn)
-{
-
-    Display * dpy = display->dpy;
-
-    display->width = DisplayWidth(dpy, scrn);
-    display->height = DisplayHeight(dpy, scrn);
-    display->bpp = DefaultDepth(dpy, scrn);
-
-    if ( display->bpp == 24 ) /* not support 24-bpp */
-        display->bpp = 32;
-
-    switch( display->bpp )
-    {
-        case 16:
-           display->format = gcvSURF_R5G6B5;
-           break;
-        case 32:
-           display->format = gcvSURF_A8R8G8B8;
-           break;
-        default:
-           display->format = gcvSURF_UNKNOWN;
-           break;
-    }
-}
-#else
 static void
 _GetDisplayInfo(
     __DRIDisplay* display,
@@ -1708,7 +1669,6 @@ _GetDisplayInfo(
         }
     }
 }
-#endif
 
 static __DRIcontextPriv * _FindContext(__DRIDisplay* display,
     IN gctPOINTER Context)
@@ -2080,6 +2040,7 @@ dri_CreateContext(IN gctPOINTER localDisplay, IN gctPOINTER Context)
     __DRIDisplay* display;
     gceSTATUS status = gcvSTATUS_OK;
 
+
     gcmHEADER_ARG("localDisplay=0x%x, Context=0x%x\n", localDisplay, Context);
 
     if (localDisplay == gcvNULL)
@@ -2096,13 +2057,11 @@ dri_CreateContext(IN gctPOINTER localDisplay, IN gctPOINTER Context)
 
     memset(context, 0, sizeof(__DRIcontextPriv));
 
-#ifndef DRI_PIXMAPRENDER_ASYNC
     if (!XF86DRICreateContextWithConfig(display->dpy, display->screen, 0/*modes->fbconfigID*/,
                                         &context->contextID, &context->hHWContext)) {
         free(context);
         gcmONERROR(gcvSTATUS_OUT_OF_RESOURCES);
     }
-#endif
 
     context->eglContext = Context;
     context->hwLock = (drm_hw_lock_t *)&display->pSAREA->lock;
@@ -2117,6 +2076,7 @@ dri_CreateContext(IN gctPOINTER localDisplay, IN gctPOINTER Context)
             _CreateBackPixmapForDrawable(context->drawablePriv);
     }
 #endif
+
 
 OnError:
     /* Success. */
@@ -2152,9 +2112,7 @@ dri_DestroyContext(IN gctPOINTER localDisplay, IN gctPOINTER Context)
         }
     }
     if (found) {
-#ifndef DRI_PIXMAPRENDER_ASYNC
         XF86DRIDestroyContext(display->dpy, display->screen, cur->contextID);
-#endif
         if (display->contextStack == cur) {
             display->contextStack = cur->next;
         } else {
@@ -2209,14 +2167,7 @@ dri_MakeCurrent(IN gctPOINTER localDisplay,
 
        _UpdateDrawableInfoDrawableInfo(drawable);
 
-#ifdef DRI_PIXMAPRENDER_ASYNC
-    {
-        static unsigned int fakestamp = 0;
-        drawable->pStamp = &fakestamp;
-    }
-#else
        drawable->pStamp = &(display->pSAREA->drawableTable[drawable->index].stamp);
-#endif
     } else {
 
             _UpdateDrawableInfoDrawableInfo(drawable);
@@ -2268,12 +2219,10 @@ dri_CreateDrawable(IN gctPOINTER localDisplay, IN PlatformWindowType Drawable)
     }
 
     memset(drawable, 0, sizeof(__DRIdrawablePriv));
-#ifndef DRI_PIXMAPRENDER_ASYNC
     if (!XF86DRICreateDrawable(display->dpy, display->screen, Drawable, &drawable->hHWDrawable)) {
         free(drawable);
         gcmONERROR(gcvSTATUS_OUT_OF_RESOURCES);
     }
-#endif
 
     drawable->drawable = Drawable;
     drawable->refcount = 0;
@@ -2376,9 +2325,8 @@ dri_DestroyDrawable(IN gctPOINTER localDisplay, IN PlatformWindowType Drawable)
 #ifdef DRI_PIXMAPRENDER_ASYNC
         asyncRenderKill(cur);
         asyncRenderDestroy(cur);
-#else
-        XF86DRIDestroyDrawable(display->dpy, display->screen, Drawable);
 #endif
+        XF86DRIDestroyDrawable(display->dpy, display->screen, Drawable);
         if (display->drawableStack == cur) {
             display->drawableStack = cur->next;
         } else {
@@ -2845,7 +2793,7 @@ static gcoSURF _GetWrapSurface(gcoSURF ResolveTarget, gctPOINTER phyaddr, gctPOI
         surfformat,
         stride,
         lineaddr,
-        (gctUINT32)phyaddr
+        (gctPHYS_ADDR_T)phyaddr
         ));
 
         /* Set the window. */
@@ -3783,7 +3731,6 @@ dri_InitLocalDisplayInfo(
         _GetDisplayInfo(display, screen);
 
         *localDisplay = (gctPOINTER)display;
-
         gcmFOOTER_ARG("*localDisplay=0x%x", *localDisplay);
         return status;
     }
@@ -4360,7 +4307,7 @@ struct eglWindowInfo
 
     /* Information obtained by dri_GetDisplayInfoEx2. */
     gctPOINTER          logical;
-    unsigned long       physical;
+    gctPHYS_ADDR_T      physical;
     gctINT              stride;
     gctUINT             width;
     gctUINT             height;
@@ -4411,7 +4358,7 @@ _CreateWindowBuffers(
             {
                 gctUINT    offset;
                 gctPOINTER logical;
-                gctUINT    physical;
+                gctPHYS_ADDR_T physical;
 
                 /* Allocate native buffer object. */
                 gcmONERROR(gcoOS_Allocate(gcvNULL,
@@ -4718,7 +4665,7 @@ _QueryWindowInfo(
     {
         Info->fbDirect     = EGL_FALSE;
         Info->logical      = gcvNULL;
-        Info->physical     = gcvINVALID_ADDRESS;
+        Info->physical     = gcvINVALID_PHYSICAL_ADDRESS;
         Info->stride       = 0;
         Info->wrapFB       = gcvFALSE;
         Info->multiBuffer  = 1;
@@ -5892,7 +5839,7 @@ _ConnectPixmap(
     gceSURF_FORMAT pixmapFormat;
     gctINT pixmapBpp;
     gctPOINTER pixmapBits = gcvNULL;
-    gctUINT32 pixmapPhysical = gcvINVALID_ADDRESS;
+    gctPHYS_ADDR_T pixmapPhysical = gcvINVALID_PHYSICAL_ADDRESS;
     gcoSURF wrapper = gcvNULL;
     gcoSURF shadow = gcvNULL;
     gctPOINTER pointer;

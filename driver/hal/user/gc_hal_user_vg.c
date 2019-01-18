@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -9,6 +9,8 @@
 *    without the express written permission of Vivante Corporation.
 *
 *****************************************************************************/
+
+
 
 
 #include "gc_hal_user_precomp.h"
@@ -188,10 +190,7 @@ _GetTessellationBuffer(
             ah = gcmALIGN(Height, 16);
             bufferSize = bufferStride * ah;
 #else
-            if(Vg->renderQuality == gcvVG_NONANTIALIASED)
-                bufferStride = ((Vg->targetWidth + 511) & ~511) * 2;
-            else
-                bufferStride = ((Vg->targetWidth + 127) & ~127) * 8;
+            bufferStride = ((Vg->targetWidth + 127) & ~127) * 8;
 
             bufferSize = bufferStride * ((Vg->targetHeight + 15) & ~15);
 #endif
@@ -351,6 +350,16 @@ _GetTessellationBuffer(
     return status;
 }
 
+void
+gcoVG_SetTesselationSize(
+    IN gcoVG Vg,
+    IN gctUINT Width,
+    IN gctUINT Height
+    )
+{
+    Vg->tsWidth = Width;
+    Vg->tsHeight = Height;
+}
 
 /******************************************************************************\
 ********************************* gcoHAL Object ********************************
@@ -1302,6 +1311,11 @@ gcoVG_SetTarget(
             Vg->target       = Target;
             Vg->targetWidth  = Target->requestW;
             Vg->targetHeight = Target->requestH;
+
+            /* Update TS shortcut. */
+#if gcdMOVG
+            _GetTessellationBuffer(Vg, Vg->tsWidth, Vg->tsHeight, &Vg->curTSBuffer, &Vg->tsWidth, &Vg->tsHeight);
+#endif
         }
     }
     while (gcvFALSE);
@@ -2216,17 +2230,15 @@ gcoVG_SetColorRamp(
     gcoVG_ProfilerSetStates(Vg, TreeDepth, saveLayerTreeDepth, varTreeDepth);
     vghalENTERSUBAPI(gcoVG_SetColorRamp);
 #endif
-
-#if gcdDUMP_2DVG
+#if gcdDUMP
     {
         gctUINT32 address[3] = {0};
         gctPOINTER memory[3] = {gcvNULL};
         gcoSURF_Lock(ColorRamp,address,memory);
-        gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (ColorRamp->stride)*(ColorRamp->alignedH));
+        gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_IMAGE, address[0], memory[0], 0, (ColorRamp->stride)*(ColorRamp->alignedH));
         gcoSURF_Unlock(ColorRamp,memory[0]);
     }
 #endif
-
     /* Set solid paint. */
     status = gcoVGHARDWARE_SetPaintImage(
         Vg->hw,
@@ -2274,15 +2286,18 @@ gcoVG_SetPattern(
     Pattern->requestD = 1;
     Pattern->allocedW = width;
     Pattern->allocedH = height;
-#if gcdDUMP_2DVG
+
+#if gcdDUMP
     {
         gctUINT32 address[3] = {0};
         gctPOINTER memory[3] = {gcvNULL};
+
         gcoSURF_Lock(Pattern,address,memory);
-        gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (Pattern->stride)*(Pattern->alignedH));
+        gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_IMAGE, address[0], memory[0], 0, (Pattern->stride)*(Pattern->alignedH));
         gcoSURF_Unlock(Pattern,memory[0]);
     }
 #endif
+
     status = gcoVGHARDWARE_SetPaintImage(
         Vg->hw,
         Pattern,
@@ -2575,42 +2590,6 @@ gcoVG_DrawPath(
                     tessellationBuffer
                     ));
 
-#if gcdDUMP_2DVG
-        {
-
-            gctUINT8_PTR data;
-            gcsCMDBUFFER_PTR CommandBuffer = &PathData->data;
-            gcsCMDBUFFER_PTR buffer = CommandBuffer;
-            gcsCOMMAND_BUFFER_INFO_PTR bufferInfo;
-            gctUINT commandAlignment;
-            gctUINT bufferDataSize;
-
-            bufferInfo = &Vg->bufferInfo;
-            buffer = CommandBuffer;
-
-            while(buffer)
-            {
-                commandAlignment  = bufferInfo->commandAlignment;
-                /* Determine the data logical pointer. */
-                data
-                    = (gctUINT8_PTR) buffer
-                    + buffer->bufferOffset;
-
-                bufferDataSize = buffer->dataCount * commandAlignment;
-
-                /* Dump it. */
-                gcmDUMP_BUFFER(gcvNULL,
-                    "path",
-                    buffer->address,
-                    data,
-                    0,
-                    bufferDataSize);
-
-                buffer = buffer->nextSubBuffer;
-            }
-        }
-#endif
-
                 /* Draw the path. */
                 gcmERR_BREAK(gcoVGHARDWARE_DrawPath(
                     Vg->hw,
@@ -2632,7 +2611,7 @@ gcoVG_DrawPath(
             tessellationBuffer
             ));
 
-#if gcdDUMP_2DVG
+        #if gcdDUMP
         {
 
             gctUINT8_PTR data;
@@ -2657,7 +2636,7 @@ gcoVG_DrawPath(
 
                 /* Dump it. */
                 gcmDUMP_BUFFER(gcvNULL,
-                    "path",
+                    gcvDUMP_BUFFER_MEMORY,
                     buffer->address,
                     data,
                     0,
@@ -2666,6 +2645,7 @@ gcoVG_DrawPath(
                 buffer = buffer->nextSubBuffer;
             }
         }
+
 #endif
 
         /* Draw the path. */
@@ -2918,6 +2898,123 @@ static gceSTATUS
 
     return status;
 }
+
+
+static gceSTATUS
+    ComputeImageParamsWarp(
+        IN gcoSURF Image,
+        IN const gcsVG_RECT_PTR Rectangle,
+        IN const gctFLOAT UserToSurface[9],
+        IN const gctFLOAT SurfaceToImage[9],
+        OUT gctFLOAT StepX[9],
+        OUT gctFLOAT StepY[9],
+        OUT gctFLOAT Const[9],
+        OUT gcsVG_RECT_PTR ImageRect
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gctINT xAdj = 0, yAdj = 0;
+    gctUINT imgWidth, imgHeight;
+    gcsVG_RECT tRect;
+    gcsVG_RECT_PTR pRect = &tRect;
+
+    gctINT width;
+    gctINT height;
+
+
+    tRect = *Rectangle;
+
+
+    do {
+        /***********************************************************************
+        ** Transform image parameters.
+        */
+        gcoSURF_GetSize(Image, &imgWidth, &imgHeight, gcvNULL);
+        /* Padding x to negative if necessary. */
+        if (pRect->x > 0)
+        {
+            pRect->x --;
+            pRect->width++;
+            xAdj = 1;
+        }
+        else
+        {
+            pRect->x = 0;
+        }
+
+        /* Padding y to negative if necessary. */
+        if (pRect->y > 0)
+        {
+            pRect->y --;
+            pRect->height++;
+            yAdj = 1;
+        }
+        else
+        {
+            pRect->y = 0;
+        }
+
+        /* Padding x to positive if necessary. */
+        if (pRect->x + pRect->width < (gctINT)imgWidth)
+        {
+            pRect->width++;
+        }
+        else
+        {
+            pRect->width=imgWidth - pRect->x;
+        }
+
+        /* Padding y to positive if necessary. */
+        if (pRect->y + pRect->height < (gctINT)imgHeight)
+        {
+            pRect->height++;
+        }
+        else
+        {
+            pRect->height=imgHeight - pRect->y;
+        }
+
+        *ImageRect = *pRect;
+
+        width = pRect->width;
+        height = pRect->height;
+
+        StepX[0] = gcmMAT(SurfaceToImage, 0, 0) / width;
+        StepX[1] = gcmMAT(SurfaceToImage, 1, 0) / height;
+        StepX[2] = gcmMAT(SurfaceToImage, 2, 0);
+
+        StepY[0] = gcmMAT(SurfaceToImage, 0, 1) / width;
+        StepY[1] = gcmMAT(SurfaceToImage, 1, 1) / height;
+        StepY[2] = gcmMAT(SurfaceToImage, 2, 1);
+
+        Const[0] =
+            (
+                0.5f
+                    * ( gcmMAT(SurfaceToImage, 0, 0) + gcmMAT(SurfaceToImage, 0, 1) )
+                    +   gcmMAT(SurfaceToImage, 0, 2) + xAdj
+            )
+            / width;
+
+        Const[1] =
+            (
+                0.5f
+                    * ( gcmMAT(SurfaceToImage, 1, 0) + gcmMAT(SurfaceToImage, 1, 1) )
+                    +   gcmMAT(SurfaceToImage, 1, 2) + yAdj
+            )
+            / height;
+
+        Const[2] =
+            (
+                0.5f
+                    * ( gcmMAT(SurfaceToImage, 2, 0) + gcmMAT(SurfaceToImage, 2, 1) )
+                    +   gcmMAT(SurfaceToImage, 2, 2)
+            );
+
+    } while (0);
+
+    return status;
+}
 #endif
 
 gceSTATUS
@@ -2961,38 +3058,59 @@ gcoVG_TesselateImage(
     vghalENTERSUBAPI(gcoVG_TesselateImage);
 #endif
 
-#if gcdDUMP_2DVG
+#if gcdDUMP
     {
         gctUINT32 address[3] = {0};
         gctPOINTER memory[3] = {gcvNULL};
+
         gcoSURF_Lock(Image,address,memory);
+
         if (Image->format == gcvSURF_NV12)
         {
-            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, 1.5*(Image->stride)*(Image->alignedH));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (gctSIZE_T)((Image->stride)*(Image->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[1], memory[1], 0, (gctSIZE_T)(0.5*(Image->stride)*(Image->alignedH)));
         }
         else if (Image->format == gcvSURF_NV16)
         {
-            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, 2*(Image->stride)*(Image->alignedH));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (gctSIZE_T)((Image->stride)*(Image->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[1], memory[1], 0, (gctSIZE_T)((Image->stride)*(Image->alignedH)));
         }
 #if gcdVG_ONLY
         else if (Image->format == gcvSURF_AYUY2)
         {
-            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, 1.5*(Image->stride)*(Image->alignedH));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (gctSIZE_T)((Image->stride)*(Image->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[1], memory[1], 0, (gctSIZE_T)(0.5*(Image->stride)*(Image->alignedH)));
         }
         else if (Image->format == gcvSURF_ANV12)
         {
-            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, 2.5*(Image->stride)*(Image->alignedH));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (gctSIZE_T)((Image->stride)*(Image->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[1], memory[1], 0, (gctSIZE_T)(0.5*(Image->stride)*(Image->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[2], memory[2], 0, (gctSIZE_T)((Image->stride)*(Image->alignedH)));
         }
         else if (Image->format == gcvSURF_ANV16)
         {
-            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, 3*(Image->stride)*(Image->alignedH));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (gctSIZE_T)(((Image->stride)*(Image->alignedH))));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[1], memory[1], 0, (gctSIZE_T)((Image->stride)*(Image->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[2], memory[2], 0, (gctSIZE_T)((Image->stride)*(Image->alignedH)));
+        }
+        else if (Image->format == gcvSURF_YV16)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (gctSIZE_T)(((Image->stride)*(Image->alignedH))));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[1], memory[1], 0, (gctSIZE_T)(0.5*(Image->stride)*(Image->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[2], memory[2], 0, (gctSIZE_T)(0.5*(Image->stride)*(Image->alignedH)));
         }
 #endif
+        else if (Image->format == gcvSURF_YV12)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (gctSIZE_T)(((Image->stride)*(Image->alignedH))));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[1], memory[1], 0, (gctSIZE_T)(0.25*(Image->stride)*(Image->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[2], memory[2], 0, (gctSIZE_T)(0.25*(Image->stride)*(Image->alignedH)));
+        }
         else
         {
-            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (Image->stride)*(Image->alignedH));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (gctSIZE_T)(((Image->stride)*(Image->alignedH))));
         }
-        gcoSURF_Unlock(Image,memory[0]);
+        gcoSURF_Unlock(Image,memory);
     }
 #endif
 
@@ -3168,6 +3286,44 @@ gcoVG_TesselateImage(
 }
 
 gceSTATUS
+gcoVG_DrawSurfaceToImageMasked(
+    IN gcoVG Vg,
+    IN gcoSURF Image,
+    IN gcsVG_RECT_PTR SrcRect,
+    IN gctINT  X,
+    IN gctINT  Y,
+    IN gctINT  Width,
+    IN gctINT  Height,
+    IN const gctFLOAT Matrix[9]
+)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcsVG_RECT  dstRect;
+
+    do
+    {
+        /* Destination rectangle. */
+        dstRect.x = X;
+        dstRect.y = Y;
+        dstRect.width = Width;
+        dstRect.height = Height;
+
+        /* Draw the surface quad. */
+        gcoVGHARDWARE_DrawSurfaceToImage(
+            Vg->hw,
+            Image,
+            SrcRect,
+            &dstRect,
+            gcvFILTER_BI_LINEAR,
+            gcvFALSE,
+            Matrix);
+
+    } while (gcvFALSE);
+
+    return status;
+}
+
+gceSTATUS
 gcoVG_DrawSurfaceToImage(
     IN gcoVG Vg,
 #if gcdGC355_PROFILER
@@ -3177,18 +3333,35 @@ gcoVG_DrawSurfaceToImage(
 #endif
     IN gcoSURF Image,
     IN const gcsVG_RECT_PTR SrcRectangle,
-    IN const gcsVG_RECT_PTR DstRectangle,
-    IN const gctFLOAT Matrix[9],
+    IN const gctFLOAT DstBounds[4],
+    IN const gctFLOAT DstPoints[8],
+    IN const gctFLOAT ImgMatrix[9],
+    IN const gctFLOAT RectMatrix[9],
     IN gceIMAGE_FILTER Filter,
     IN gctBOOL Mask,
     IN gctBOOL FirstTime
+#if gcdMOVG
+    ,
+    IN gctINT   TSWidth,
+    IN gctINT   TSHeight
+#endif
     )
 {
     gceSTATUS status;
+#if gcdMOVG
+        gctINT tsWidth, tsHeight;
+        gctINT x, y;
+#endif
+
+    static gctFLOAT userToSurface[6] =
+    {
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f
+    };
 
     gcmHEADER_ARG(
-        "Vg=%p Image=%p SrcRectangle=%p DstRectangle=%p Matrix=%p Filter=%d Mask=%d FirstTime=%d",
-        Vg, Image, SrcRectangle, DstRectangle, Matrix, Filter, Mask, FirstTime
+        "Vg=%p Image=%p SrcRectangle=%p Matrix=%p Filter=%d Mask=%d FirstTime=%d",
+        Vg, Image, SrcRectangle, ImgMatrix, Filter, Mask, FirstTime
         );
 
     /* Verify the arguments. */
@@ -3198,27 +3371,149 @@ gcoVG_DrawSurfaceToImage(
     vghalENTERSUBAPI(gcoVG_DrawSurfaceToImage);
 #endif
 
-#if gcdDUMP_2DVG
+#if gcdDUMP
     {
         gctUINT32 address[3] = {0};
         gctPOINTER memory[3] = {gcvNULL};
+
         gcoSURF_Lock(Image,address,memory);
-        gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (Image->stride)*(Image->alignedH));
-        gcoSURF_Unlock(Image,memory[0]);
+
+        if (Image->format == gcvSURF_NV12)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (gctSIZE_T)((Image->stride)*(Image->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[1], memory[1], 0, (gctSIZE_T)(0.5*(Image->stride)*(Image->alignedH)));
+        }
+        else if (Image->format == gcvSURF_NV16)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (gctSIZE_T)((Image->stride)*(Image->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[1], memory[1], 0, (gctSIZE_T)((Image->stride)*(Image->alignedH)));
+        }
+#if gcdVG_ONLY
+        else if (Image->format == gcvSURF_AYUY2)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (gctSIZE_T)((Image->stride)*(Image->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[1], memory[1], 0, (gctSIZE_T)(0.5*(Image->stride)*(Image->alignedH)));
+        }
+        else if (Image->format == gcvSURF_ANV12)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (gctSIZE_T)((Image->stride)*(Image->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[1], memory[1], 0, (gctSIZE_T)(0.5*(Image->stride)*(Image->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[2], memory[2], 0, (gctSIZE_T)((Image->stride)*(Image->alignedH)));
+        }
+        else if (Image->format == gcvSURF_ANV16)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (gctSIZE_T)(((Image->stride)*(Image->alignedH))));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[1], memory[1], 0, (gctSIZE_T)((Image->stride)*(Image->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[2], memory[2], 0, (gctSIZE_T)((Image->stride)*(Image->alignedH)));
+        }
+        else if (Image->format == gcvSURF_YV16)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (gctSIZE_T)(((Image->stride)*(Image->alignedH))));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[1], memory[1], 0, (gctSIZE_T)(0.5*(Image->stride)*(Image->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[2], memory[2], 0, (gctSIZE_T)(0.5*(Image->stride)*(Image->alignedH)));
+        }
+#endif
+        else if (Image->format == gcvSURF_YV12)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (gctSIZE_T)(((Image->stride)*(Image->alignedH))));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[1], memory[1], 0, (gctSIZE_T)(0.25*(Image->stride)*(Image->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "image", address[2], memory[2], 0, (gctSIZE_T)(0.25*(Image->stride)*(Image->alignedH)));
+        }
+        else
+        {
+            gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (gctSIZE_T)(((Image->stride)*(Image->alignedH))));
+        }
+        gcoSURF_Unlock(Image,memory);
     }
 #endif
 
-    /* Draw the image. */
-    status = gcoVGHARDWARE_DrawSurfaceToImage(
-        Vg->hw,
-        Image,
-        SrcRectangle,
-        DstRectangle,
-        Filter,
-        Mask,
-        Matrix,
-        FirstTime
-        );
+    do {
+#if gcdMOVG
+        gcsTESSELATION_PTR tessellationBuffer = gcvNULL;
+
+        gctFLOAT imgStepX[3];
+        gctFLOAT imgStepY[3];
+        gctFLOAT imgConst[3];
+        gcsVG_RECT imgRect;
+
+        gcmERR_BREAK(ComputeImageParamsWarp(Image, SrcRectangle,
+                            RectMatrix, ImgMatrix,
+                            imgStepX, imgStepY, imgConst,
+                            &imgRect)
+                    );
+        tessellationBuffer = Vg->curTSBuffer;
+        tsWidth = Vg->tsWidth;
+        tsHeight= Vg->tsHeight;
+
+        /* Looping tessellation in small tiles. */
+        for (y = (gctINT)DstBounds[1]; y < (gctINT)DstBounds[3]; y += tsHeight)
+        {
+            for (x = (gctINT)DstBounds[0]; x < (gctINT)DstBounds[2]; x += tsWidth)
+            {
+                /* Program tesselation buffers. */
+                gcmERR_BREAK(gcoVGHARDWARE_SetTessellation(
+                    Vg->hw,
+                    gcvFALSE,
+                    x, y,
+                    x, y,
+                    (gctUINT16)tsWidth, (gctUINT16)tsHeight,
+                    0.0f, 1.0f,
+                    userToSurface,
+                    tessellationBuffer
+                    ));
+
+                /* Draw the image. */
+                status = gcoVGHARDWARE_TesselateImage2(
+                    Vg->hw,
+                    gcvFALSE,
+                    Image,
+                    &imgRect,
+                    Filter,
+                    Mask,
+                    imgStepX,
+                    imgStepY,
+                    imgConst,
+                    DstPoints,
+                    DstPoints + 2,
+                    DstPoints + 4,
+                    DstPoints + 6,
+                    (x == (gctINT)DstBounds[0]) && (y == (gctINT)DstBounds[1]),
+                    FirstTime,
+                    tessellationBuffer
+                    );
+            }
+        }
+
+#else
+        gcsTESSELATION_PTR tessellationBuffer;
+        status = _GetTessellationBuffer(
+            Vg, &tessellationBuffer
+            );
+
+        /* Program tesselation buffers. */
+        status = gcoVGHARDWARE_SetTessellation(
+            Vg->hw,
+            gcvFALSE,
+            (gctUINT16)Vg->targetWidth, (gctUINT16)Vg->targetHeight,
+            0.0f, 1.0f,
+            userToSurface,
+            tessellationBuffer
+            );
+
+        /* Draw the image. */
+        status = gcoVGHARDWARE_TesselateImage2(
+            Vg->hw,
+            gcvFALSE,
+            Image,
+            SrcRectangle,
+            Filter,
+            Mask,
+            (gctFLOAT_PTR)RectMatrix,
+            (gctFLOAT_PTR)ImgMatrix,
+            tessellationBuffer
+            );
+#endif  /* gcdMOVG. */
+    } while (gcvFALSE);
 
 #if gcdGC355_PROFILER
     vghalLEAVESUBAPI(gcoVG_DrawSurfaceToImage);
@@ -3680,6 +3975,68 @@ gcoVG_SetColorIndexTable(
     return status;
 }
 
+gceSTATUS
+gcoVG_SetYUV2RGBStdCust(
+    IN gcoVG            Vg,
+    IN gctBOOL          YUV2RGBStdCust
+    )
+{
+    gceSTATUS status;
+    gcmHEADER_ARG("Vg=0x%x YUV2RGBStdCust = %d", Vg, YUV2RGBStdCust);
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Vg, gcvOBJ_VG);
+
+    /* Call gcoVGHARDWARE to enable scissoring. */
+    status = gcoVGHARDWARE_SetYUV2RGBStdCust(Vg->hw, YUV2RGBStdCust);
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoVG_SetYUV2RGB(
+    IN gcoVG            Vg,
+    IN gctFLOAT         *coef,
+    IN gctFLOAT         *offset,
+    IN gctBOOL          *cfg
+)
+{
+    gceSTATUS status;
+    gcmHEADER_ARG("Vg=0x%x coef = 0x%0x offset = 0x%0x cfg = %p cfgCount = %d",
+                  Vg, coef, offset, cfg
+                  );
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Vg, gcvOBJ_VG);
+
+    status = gcoVGHARDWARE_SetYUV2RGB(Vg->hw, coef, offset, cfg);
+
+    gcmFOOTER();
+    return status;
+
+};
+
+gceSTATUS
+gcoVG_SetRGB2YUVParameters(
+    IN gcoVG            Vg,
+    IN gctFLOAT         *coef,
+    IN gctFLOAT         *offset,
+    IN gctBOOL          *cfg
+)
+{
+    gceSTATUS status;
+    gcmHEADER_ARG("Vg=0x%x dst_cust=0x%x coef = 0x%0x offset = 0x%0x cfg = %p cfgCount = %d",
+                  Vg,  coef, offset, cfg
+                  );
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Vg, gcvOBJ_VG);
+
+    status = gcoVGHARDWARE_SetRGB2YUVParameters(Vg->hw, coef, offset, cfg);
+
+    gcmFOOTER();
+    return status;
+
+};
+
 /* VG RS feature support: YUV format conversion. */
 gceSTATUS
 gcoVG_Resolve(
@@ -3696,7 +4053,9 @@ gcoVG_Resolve(
     IN gctINT       Src_standard,
     IN gctINT       Dst_uv,
     IN gctINT       Dst_standard,
-    IN gctINT       Dst_alpha)
+    IN gctINT       Dst_alpha,
+    IN gctINT       Dst_standard_cust
+    )
 {
     gceSTATUS status;
     gcmHEADER_ARG("Vg=%p Source=%p Target=%p SX=%d SY=%d DX=%d Width =%d Height=%d",
@@ -3705,12 +4064,79 @@ gcoVG_Resolve(
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Vg, gcvOBJ_VG);
 
+#if gcdDUMP
+    {
+        gctUINT32 address[3] = {0};
+        gctPOINTER memory[3] = {gcvNULL};
+        gcoSURF_Lock(Source,address,memory);
+        gcmDUMP_BUFFER(gcvNULL, "image", address[0], memory[0], 0, (Source->stride)*(Source->alignedH));
+        gcoSURF_Unlock(Source,memory[0]);
+    }
+#endif
     status = gcoVGHARDWARE_ResolveRect(
         Vg->hw,
         Source, Target,
         SX, SY, DX, DY, Width, Height,
         Src_uv, Src_standard,
-        Dst_uv, Dst_standard, Dst_alpha);
+        Dst_uv, Dst_standard, Dst_alpha, Dst_standard_cust);
+
+
+#if gcdDUMP
+    {
+        gctUINT32 address[3] = {0};
+        gctPOINTER memory[3] = {gcvNULL};
+
+        gcoHAL_Commit(gcvNULL, gcvTRUE);
+        gcoSURF_Lock(Target,address,memory);
+
+        if (Target->format == gcvSURF_NV12)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[0], memory[0], 0, (gctSIZE_T)((Target->stride)*(Target->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[1], memory[1], 0, (gctSIZE_T)(0.5*(Target->stride)*(Target->alignedH)));
+        }
+        else if (Target->format == gcvSURF_NV16)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[0], memory[0], 0, (gctSIZE_T)((Target->stride)*(Target->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[1], memory[1], 0, (gctSIZE_T)((Target->stride)*(Target->alignedH)));
+        }
+#if gcdVG_ONLY
+        else if (Target->format == gcvSURF_AYUY2)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[0], memory[0], 0, (gctSIZE_T)((Target->stride)*(Target->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[1], memory[1], 0, (gctSIZE_T)(0.5*(Target->stride)*(Target->alignedH)));
+        }
+        else if (Target->format == gcvSURF_ANV12)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[0], memory[0], 0, (gctSIZE_T)((Target->stride)*(Target->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[1], memory[1], 0, (gctSIZE_T)(0.5*(Target->stride)*(Target->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[2], memory[2], 0, (gctSIZE_T)((Target->stride)*(Target->alignedH)));
+        }
+        else if (Target->format == gcvSURF_ANV16)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[0], memory[0], 0, (gctSIZE_T)(((Target->stride)*(Target->alignedH))));
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[1], memory[1], 0, (gctSIZE_T)((Target->stride)*(Target->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[2], memory[2], 0, (gctSIZE_T)((Target->stride)*(Target->alignedH)));
+        }
+        else if (Target->format == gcvSURF_YV16)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[0], memory[0], 0, (gctSIZE_T)(((Target->stride)*(Target->alignedH))));
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[1], memory[1], 0, (gctSIZE_T)(0.5*(Target->stride)*(Target->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[2], memory[2], 0, (gctSIZE_T)(0.5*(Target->stride)*(Target->alignedH)));
+        }
+#endif
+        else if (Target->format == gcvSURF_YV12)
+        {
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[0], memory[0], 0, (gctSIZE_T)(((Target->stride)*(Target->alignedH))));
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[1], memory[1], 0, (gctSIZE_T)(0.25*(Target->stride)*(Target->alignedH)));
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[2], memory[2], 0, (gctSIZE_T)(0.25*(Target->stride)*(Target->alignedH)));
+        }
+        else
+        {
+            gcmDUMP_BUFFER(gcvNULL, "frame", address[0], memory[0], 0, (gctSIZE_T)(((Target->stride)*(Target->alignedH))));
+        }
+        gcoSURF_Unlock(Target,memory);
+    }
+#endif
 
     gcmFOOTER();
     return status;

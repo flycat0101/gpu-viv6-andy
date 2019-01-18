@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -104,6 +104,36 @@ VSC_IL_ReplaceSymInOperand(
                     VIR_Operand_SetSym(pOperand, pNewVarSym);
                 }
             }
+
+            /*
+            ** When the operand symbol is a combined sampler, we need to check its separateSampler and separateImage,
+            ** if they are the function parameter, we need to update it.
+            */
+            if (isSymCombinedSampler(pOpndSym))
+            {
+                if (VIR_Symbol_GetSeparateImageFuncId(pOpndSym) != VIR_INVALID_ID)
+                {
+                    VIR_Symbol*     pSeparateImageSym = VIR_Symbol_GetSeparateImage(pShader, pOpndSym);
+
+                    if (vscHTBL_DirectTestAndGet(pTempSet, (void*)pSeparateImageSym, (void **)&pNewVarSym))
+                    {
+                        VIR_Symbol_SetSeparateImageId(pOpndSym,
+                                                      VIR_Symbol_GetIndex(pNewVarSym),
+                                                      (isSymLocal(pNewVarSym) ? VIR_Function_GetSymId(VIR_Symbol_GetHostFunction(pNewVarSym)) : VIR_INVALID_ID));
+                    }
+                }
+                if (VIR_Symbol_GetSeparateSamplerFuncId(pOpndSym) != VIR_INVALID_ID)
+                {
+                    VIR_Symbol*     pSeparateSamplerSym = VIR_Symbol_GetSeparateSampler(pShader, pOpndSym);
+
+                    if (vscHTBL_DirectTestAndGet(pTempSet, (void*)pSeparateSamplerSym, (void **)&pNewVarSym))
+                    {
+                        VIR_Symbol_SetSeparateSamplerId(pOpndSym,
+                                                        VIR_Symbol_GetIndex(pNewVarSym),
+                                                        (isSymLocal(pNewVarSym) ? VIR_Function_GetSymId(VIR_Symbol_GetHostFunction(pNewVarSym)) : VIR_INVALID_ID));
+                    }
+                }
+            }
         }
 
         if (VIR_Operand_GetRelAddrMode(pOperand) != VIR_INDEXED_NONE)
@@ -148,7 +178,7 @@ OnError:
 /* Duplicate a new instruction in Function based on OrigInst */
 VSC_ErrCode
 VSC_IL_DupInstruction(
-    VIR_Inliner         *pInliner,
+    IN  VIR_Inliner     *pInliner,
     IN  VIR_Function    *OrigFunction,
     IN  VIR_Function    *Function,
     IN  VIR_Instruction *OrigInst,
@@ -179,6 +209,7 @@ VSC_IL_DupInstruction(
         gctUINT i;
         VIR_OpCode opcode;
 
+        /* don't need to add symbol to the caller's symbol table, since function symbol table is not used yet */
         memset(inst, 0, sizeof(VIR_Instruction));
         VIR_Inst_SetOpcode(inst, VIR_Inst_GetOpcode(OrigInst));
         VIR_Inst_SetSrcNum(inst, srcNum);
@@ -214,7 +245,7 @@ VSC_IL_DupInstruction(
             VIR_Label       *label = gcvNULL;
             VIR_Label       *newLabel = gcvNULL;
             gctUINT offset = 0;
-            gctCHAR labelName[512];
+            gctCHAR labelName[__MAX_SYM_NAME_LENGTH__];
             VIR_LabelId labelId;
 
             label = VIR_Operand_GetLabel(VIR_Inst_GetDest(OrigInst));
@@ -279,15 +310,47 @@ VSC_IL_DupSingleVariable(
     gctSTRING           oldName = gcvNULL;
     VIR_SymId           newVarSymId = VIR_INVALID_ID;
     VIR_Symbol          *pNewVarSym = gcvNULL;
+    VIR_Symbol          *pVirRegSym = gcvNULL;
     gctINT              indexRange = 0;
     gctUINT             i, regCount;
     gctUINT             newVregId;
     gctBOOL             isCallerMainFunc = VIR_Function_HasFlag(pCallerFunc, VIR_FUNCFLAG_MAIN);
+    gctBOOL             isParam = VIR_Symbol_isParamVariable(pOldSym);
 
+    oldRegId = VIR_Symbol_GetVariableVregIndex(pOldSym);
+    /* for parameter, need to check if the corresponding global variable is array, if so
+     * use the global variable for the copying so it duplicated variable has the correct
+     * register count and can be indexed, otherwise duplicated variable just a scalar which
+     * cannot be indexed */
+    if (isParam)
+    {
+        VIR_Symbol   *pVarSym;
+        VIR_TypeId    typeId;
+        VIR_Type     *type;
+        pVirRegSym = VIR_Shader_FindSymbolByTempIndex(pShader, oldRegId);
+        if (pVirRegSym)
+        {
+            gcmASSERT(VIR_Symbol_isVreg(pVirRegSym));
+            pVarSym = VIR_Symbol_GetVregVariable(pVirRegSym);
+            gcmASSERT(pVarSym);
+            typeId = VIR_Symbol_GetTypeId(pVarSym);
+            type = VIR_Shader_GetTypeFromId(pShader, typeId);
+            if (VIR_Type_isArray(type))
+            {
+                /* the global var is array */
+                if (oldRegId != VIR_Symbol_GetVregIndex(pVarSym))
+                {
+                    /* not first virreg, skip it */
+                    return errCode;
+                }
+                /* use global varialbe to dup the symbol */
+                pOldSym = pVarSym;
+            }
+        }
+    }
     oldTypeId = VIR_Symbol_GetTypeId(pOldSym);
     oldBaseTypeId = VIR_Type_GetBaseTypeId(VIR_Shader_GetTypeFromId(pShader, oldTypeId));
     oldName = VIR_Shader_GetSymNameString(pShader, pOldSym);
-    oldRegId = VIR_Symbol_GetVariableVregIndex(pOldSym);
     indexRange = VIR_Symbol_GetIndexRange(pOldSym) - VIR_Symbol_GetVregIndex(pOldSym);
 
     regCount = VIR_Type_GetRegOrOpaqueCount(pShader,
@@ -299,25 +362,27 @@ VSC_IL_DupSingleVariable(
 
     if (!vscHTBL_DirectTestAndGet(pTempSet, (void*)pOldSym, (void **)&pNewVarSym))
     {
-        gctCHAR     newVarName[128];
+        gctCHAR     newVarName[__MAX_SYM_NAME_LENGTH__];
         gctCHAR     temp[16];
         gctUINT     offset = 0;
 
-        gcoOS_PrintStrSafe(temp, 16, &offset, "%d-", VIR_Function_GetSymId(pCalleeFunc));
-        gcoOS_StrCopySafe(newVarName, 128, temp);
-        gcoOS_StrCatSafe(newVarName, 128, oldName);
+        gcoOS_PrintStrSafe(temp, 16, &offset, "%d-%d-", VIR_Function_GetSymId(pCallerFunc), VIR_Function_GetSymId(pCalleeFunc));
+        gcoOS_StrCopySafe(newVarName, __MAX_SYM_NAME_LENGTH__, temp);
+        gcoOS_StrCatSafe(newVarName, __MAX_SYM_NAME_LENGTH__, oldName);
 
         /* Pass index. */
         offset = 0;
         gcoOS_PrintStrSafe(temp, 16, &offset, "-%d", VSC_IL_GetPassData(pInliner)->passIndex);
         gcoOS_StrCatSafe(newVarName, 128, temp);
 
-        /* Caller index.  */
+        /* Caller index. */
         offset = 0;
         gcoOS_PrintStrSafe(temp, 16, &offset, "-%d", callerIdx);
-        gcoOS_StrCatSafe(newVarName, 128, temp);
+        gcoOS_StrCatSafe(newVarName, __MAX_SYM_NAME_LENGTH__, temp);
 
-        if (isCallerMainFunc)
+        /* 1. put local variables to global scope if the caller is main
+         * 2. put parameter variables to global scope */
+        if (isCallerMainFunc || isParam)
         {
             errCode = VIR_Shader_AddSymbolWithName(pShader,
                                                    VIR_SYM_VARIABLE,
@@ -329,7 +394,7 @@ VSC_IL_DupSingleVariable(
         }
         else
         {
-            /* Change this variable to a local variable. */
+            /* make this variable as a local variable. */
             errCode = VIR_Function_AddLocalVar(pCallerFunc,
                                                newVarName,
                                                oldTypeId,
@@ -341,7 +406,16 @@ VSC_IL_DupSingleVariable(
 
         /* Copy some informations. */
         VIR_Symbol_SetPrecision(pNewVarSym, VIR_Symbol_GetPrecision(pOldSym));
-
+        if (isCallerMainFunc || isParam)
+        {
+            /* Don't inherit the flag LOCAL. */
+            VIR_Symbol_SetFlag(pNewVarSym, (VIR_Symbol_GetFlags(pOldSym) & ~VIR_SYMFLAG_LOCAL));
+        }
+        else
+        {
+            /* Don't inherit the flag LOCAL. */
+            VIR_Symbol_SetFlag(pNewVarSym, VIR_Symbol_GetFlags(pOldSym));
+        }
         /* Create new vreg symbol. */
         if (regCount > 0)
         {
@@ -360,8 +434,12 @@ VSC_IL_DupSingleVariable(
                 tmpVregId = oldRegId + i;
                 pTempVirReg = VIR_Shader_FindSymbolByTempIndex(pShader, tmpVregId);
 
-                if (VIR_Symbol_GetVregVariable(pTempVirReg) == pOldSym &&
-                    !vscHTBL_DirectTestAndGet(pTempSet, (void*)pTempVirReg, (void **)&pNewVirReg))
+                if (pTempVirReg == gcvNULL)
+                {
+                    continue;
+                }
+
+                if (!vscHTBL_DirectTestAndGet(pTempSet, (void*)pTempVirReg, (void **)&pNewVirReg))
                 {
                     errCode = VIR_Shader_AddSymbol(pShader,
                                                    VIR_SYM_VIRREG,
@@ -376,15 +454,6 @@ VSC_IL_DupSingleVariable(
 
                     /* Copy some informations. */
                     VIR_Symbol_SetPrecision(pNewVirReg, VIR_Symbol_GetPrecision(pTempVirReg));
-
-                    /* This vreg symbol is now a local symbol. */
-                    VIR_Symbol_SetStorageClass(pNewVirReg, VIR_STORAGE_UNKNOWN);
-                    VIR_Symbol_SetEncloseFuncSymId(pNewVirReg, VIR_INVALID_ID);
-                    if (!isCallerMainFunc)
-                    {
-                        VIR_Symbol_SetHostFunction(pNewVirReg, pCallerFunc);
-                        VIR_Symbol_SetFlag(pNewVirReg, VIR_SYMFLAG_LOCAL);
-                    }
 
                     /* save the new vreg to the table */
                     vscHTBL_DirectSet(pTempSet, (void*)pTempVirReg, (void*)pNewVirReg);
@@ -522,6 +591,7 @@ VSC_ErrCode VSC_IL_InlineSingleFunction(
         INST_LIST_ADD_NODE(&calleeInsts, node);
     }
 
+
     pLabelSet = vscHTBL_Create(VSC_IL_GetMM(pInliner),
                 (PFN_VSC_HASH_FUNC)vscHFUNC_Label, (PFN_VSC_KEY_CMP)vcsHKCMP_Label, 512);
 
@@ -546,6 +616,7 @@ VSC_ErrCode VSC_IL_InlineSingleFunction(
             {
                 VIR_Instruction *pCallSiteInst =
                     *(VIR_Instruction**) vscSRARR_GetElement(&pCallerEdge->callSiteArray, callerIdx);
+                VIR_Instruction *pCallSitePrevInst = VIR_Inst_GetPrev(pCallSiteInst);
 
                 VSC_IL_INST_LIST_ITERATOR calleeInstsIter;
                 VSC_IL_INST_LIST_NODE     *calleeInstsNode;
@@ -574,7 +645,7 @@ VSC_ErrCode VSC_IL_InlineSingleFunction(
                 if (VIR_Inst_GetOpcode(pCallSiteInst) == VIR_OP_CALL)
                 {
                     gctUINT offset = 0;
-                    gctCHAR labelName[512];
+                    gctCHAR labelName[__MAX_SYM_NAME_LENGTH__];
                     VIR_LabelId labelId;
 
                     VIR_Inst_SetOpcode(pCallSiteInst, VIR_OP_LABEL);
@@ -665,9 +736,21 @@ VSC_ErrCode VSC_IL_InlineSingleFunction(
                                                                pCalleeFunc,
                                                                pCalleeFunc,
                                                                pCallerFunc,
+                                                               pCallSitePrevInst ? VIR_Inst_GetNext(pCallSitePrevInst) : gcvNULL,
                                                                pCallSiteInst,
                                                                gcvTRUE,
                                                                pTempSet);
+            }
+            /* move the kernel info to main if the callee is the currentKernel function
+             * and change the currentKernel function to main */
+            if (pCallerFunc == CG_GET_MAIN_FUNC(pCG) &&
+                pCalleeFunc == VIR_Shader_GetCurrentKernelFunction(pShader))
+            {
+                pCallerFunc->flags |= VIR_FUNCFLAG_KERNEL_MERGED_MAIN;
+                pCallerFunc->kernelInfo = pCalleeFunc->kernelInfo;
+                pCallerFunc->kernelInfo->isMain = gcvTRUE;
+                VIR_Shader_SetCurrentKernelFunction(pShader, pCallerFunc);
+                pCalleeFunc->kernelInfo = gcvNULL;
             }
         }
     }
@@ -735,10 +818,10 @@ VSC_ErrCode VSC_IL_SelectInlineFunctions(
             pEdge = CG_PRED_EDGE_TO_SUCC_EDGE(pEdge);
             callSites += vscSRARR_GetElementCount(&pEdge->callSiteArray);
         }
-        instCount  = instCount * callSites;
-        leftBudget = VSC_IL_GetInlineBudget(pInliner) - instCount;
+        instCount  = (instCount - 1) * (callSites - 1);
+        leftBudget = VSC_IL_GetInlineBudget(pInliner) - instCount + pFunc->paramters.count ;
 
-        if (AlwayInline)
+        if (AlwayInline || callSites == 1)
         {
             vscHTBL_DirectSet(pCandidates, (void*) pFunc, gcvNULL);
             VSC_IL_SetInlineBudget(pInliner, leftBudget);
@@ -789,9 +872,11 @@ VSC_ErrCode VSC_IL_OptimizeCallStackDepth(
     {
         VSC_ADJACENT_LIST_ITERATOR   edgeIter;
         VIR_CG_EDGE*                 pEdge;
+        gctUINT                      origCallDepth;
 
         pFunc = ppFuncBlkRPO[funcIdx]->pVIRFunc;
         pFuncBlk = VIR_Function_GetFuncBlock(pFunc);
+        origCallDepth = pFuncBlk->maxCallDepth;
 
         while (pFuncBlk->maxCallDepth > VSC_MAX_CALL_STACK_DEPTH)
         {
@@ -819,7 +904,8 @@ VSC_ErrCode VSC_IL_OptimizeCallStackDepth(
 
             _VSC_IL_UpdateMaxCallDepth(pInliner, pFuncBlk);
 
-            if (pFuncBlk->maxCallDepth == 0)
+            if (pFuncBlk->maxCallDepth == 0 &&
+                (origCallDepth != 0 || VSC_IL_GetRemoveUnusedFunctions(pInliner)))
             {
                 /* remove this function block from the call graph */
                 vscVIR_RemoveFuncBlockFromCallGraph(pCG, pFuncBlk, gcvTRUE);
@@ -865,13 +951,14 @@ VSC_ErrCode VSC_IL_TopDownInline(
 
     /* Seperate the hueristic with the transformation */
 
-    /* 1. select the ALWAYSINLINE function into the worklist first. */
+    /* 1. select the ALWAYSINLINE/recompile-stub function into the worklist first. */
     for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
     {
         pFunc = ppFuncBlkRPO[funcIdx]->pVIRFunc;
 
         /* Check ALWAYSINLINE functions. */
-        if (VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_ALWAYSINLINE))
+        if (VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_ALWAYSINLINE) ||
+            VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_RECOMPILER_STUB))
         {
             if (VSC_UTILS_MASK(VSC_OPTN_ILOptions_GetTrace(pOption),
                 VSC_OPTN_ILOptions_TRACE))
@@ -891,8 +978,9 @@ VSC_ErrCode VSC_IL_TopDownInline(
         {
             pFunc = ppFuncBlkRPO[funcIdx]->pVIRFunc;
 
-            /* Skip ALWAYSINLINE and NOINLIEN functions. */
+            /* Skip ALWAYSINLINE and NOINLIEN, recompile stub functions. */
             if (!VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_ALWAYSINLINE) &&
+                ! VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_RECOMPILER_STUB) &&
                 !VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_NOINLINE))
             {
                 if (VSC_UTILS_MASK(VSC_OPTN_ILOptions_GetTrace(pOption),
@@ -925,9 +1013,13 @@ VSC_ErrCode VSC_IL_TopDownInline(
         {
             VIR_Function *pFunc = ppFuncBlkRPO[funcIdx]->pVIRFunc;
             VIR_FUNC_BLOCK  *pFuncBlk = gcvNULL;
+            gctUINT origCallDepth;
+
             if (vscHTBL_DirectTestAndGet(pCandidates, (void*) pFunc, gcvNULL))
             {
                 pFuncBlk = VIR_Function_GetFuncBlock(pFunc);
+                origCallDepth = pFuncBlk->maxCallDepth;
+
                 if (VSC_UTILS_MASK(VSC_OPTN_ILOptions_GetTrace(pOption),
                     VSC_OPTN_ILOptions_TRACE))
                 {
@@ -947,7 +1039,8 @@ VSC_ErrCode VSC_IL_TopDownInline(
 
                 _VSC_IL_UpdateMaxCallDepth(pInliner, pFuncBlk);
 
-                if (pFuncBlk->maxCallDepth == 0)
+                if (pFuncBlk->maxCallDepth == 0 &&
+                    (origCallDepth != 0 || VSC_IL_GetRemoveUnusedFunctions(pInliner)))
                 {
                     /* remove this function block from the call graph */
                     vscVIR_RemoveFuncBlockFromCallGraph(pCG, pFuncBlk, gcvTRUE);
@@ -992,6 +1085,9 @@ static VSC_ErrCode VSC_IL_CleanupLables(
             inst = next_inst;
         }
     }
+
+    /* Renumber instruction ID. */
+    VIR_Shader_RenumberInstId(pShader);
 
     return errCode;
 }
@@ -1056,15 +1152,21 @@ static void _VSC_IL_Init(
         maxInstCount = 0;
         break;
     case VSC_OPTN_ILOptions_LEVEL1:
+        if (pHwCfg->hwFeatureFlags.hasInstCache)
+        {
+            maxInstCount = 0x7fffffff;
+        }
         break;
     case VSC_OPTN_ILOptions_LEVEL2:
+        break;
+    case VSC_OPTN_ILOptions_LEVEL3:
         /* If HW has iCache, maybe we can assume more budget. */
         if (pHwCfg->hwFeatureFlags.hasInstCache)
         {
             maxInstCount = 2 * maxInstCount;
         }
         break;
-    case VSC_OPTN_ILOptions_LEVEL3:
+    case VSC_OPTN_ILOptions_LEVEL4:
         /* If HW has iCache, maybe we can assume more budget. */
         if (pHwCfg->hwFeatureFlags.hasInstCache)
         {
@@ -1077,8 +1179,8 @@ static void _VSC_IL_Init(
     }
 
     VSC_IL_SetInlineBudget(pInliner, maxInstCount);
-
     VSC_IL_SetCheckAlwaysInlineOnly(pInliner, pILPassData->bCheckAlwaysInlineOnly);
+    VSC_IL_SetRemoveUnusedFunctions(pInliner, VIR_Shader_CanRemoveUnusedFunctions(pShader));
 
     if ((VSC_OPTN_ILOptions_GetInlineLevel(pOptions) == VSC_OPTN_ILOptions_LEVEL1))
     {
@@ -1105,6 +1207,11 @@ DEF_QUERY_PASS_PROP(VSC_IL_PerformOnShader)
     pPassProp->passFlag.resDestroyReq.s.bInvalidateCg = gcvTRUE;
 }
 
+DEF_SH_NECESSITY_CHECK(VSC_IL_PerformOnShader)
+{
+    return gcvTRUE;
+}
+
 /* ===========================================================================
    VSC_IL_PerformOnShader:
    inliner on shader
@@ -1123,9 +1230,9 @@ VSC_ErrCode VSC_IL_PerformOnShader(
     gctUINT             countOfFuncBlk = vscDG_GetNodeCount(&pCG->dgGraph);
     VSC_IL_PASS_DATA    ILPassData = { 0, gcvFALSE };
 
-    if (pPassWorker->basePassWorker.pPrvData != gcvNULL)
+    if (pPassWorker->basePassWorker.pPassSpecificData != gcvNULL)
     {
-        ILPassData = *(VSC_IL_PASS_DATA *)pPassWorker->basePassWorker.pPrvData;
+        ILPassData = *(VSC_IL_PASS_DATA *)pPassWorker->basePassWorker.pPassSpecificData;
     }
 
     _VSC_IL_Init(&inliner, pShader, &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,

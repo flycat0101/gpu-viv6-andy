@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -20,13 +20,6 @@ extern "C" {
 
 typedef struct __GLchipDrawableRec
 {
-    gctSIZE_T width;
-    gctSIZE_T height;
-
-    gcoSURF rtSurface;
-    gcoSURF depthSurface;
-    gcoSURF stencilSurface;
-
     __GLchipStencilOpt *stencilOpt;
 } __GLchipDrawable;
 

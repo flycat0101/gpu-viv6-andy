@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -33,7 +33,7 @@ gctSTRING __SpvKernelEnqueueFlagsToString(gctUINT flag)
     case 1:  return "WaitKernel";
     case 2:  return "WaitWorkGroup";
 
-    default: return "Bad";
+    default: return "Unsupported  kernel enqueue flag";
     }
 }
 
@@ -46,7 +46,7 @@ gctSTRING __SpvGroupOperationToString(gctUINT gop)
     case 1:  return "InclusiveScan";
     case 2:  return "ExclusiveScan";
 
-    default: return "Bad";
+    default: return "Unsupported group operation";
     }
 }
 
@@ -59,7 +59,7 @@ gctSTRING __SpvScopeToString(gctUINT mem)
     case 3:  return "Subgroup";
     case 4:  return "Invocation";
 
-    default: return "Bad";
+    default: return "Unsupported scope";
     }
 }
 
@@ -75,7 +75,7 @@ gctSTRING __SpvFuncParamAttrToString(gctUINT attr)
     case 6:  return "NoWrite";
     case 7:  return "NoReadWrite";
 
-    default: return "Bad";
+    default: return "Unsupported function parameter";
     }
 }
 
@@ -85,7 +85,7 @@ gctSTRING __SpvLinkageTypeToString(gctUINT type)
     case 0:  return "Export";
     case 1:  return "Import";
 
-    default: return "Bad";
+    default: return "Unsupported linkage type";
     }
 }
 
@@ -97,7 +97,7 @@ gctSTRING __SpvFPRoundingModeToString(gctUINT mode)
     case 2:  return "RTP";
     case 3:  return "RTN";
 
-    default: return "Bad";
+    default: return "Unsupported FP rounding mode";
     }
 }
 
@@ -124,7 +124,7 @@ gctSTRING __SpvImageChannelDataTypeToString(gctUINT type)
     case 16: return "UnormInt101010_2";
 
     default:
-        return "Bad";
+        return "Unsupported image channel datatype";
     }
 }
 
@@ -152,7 +152,7 @@ gctSTRING __SpvImageChannelOrderToString(gctUINT format)
     case 18: return "sBGRA";
 
     default:
-        return "Bad";
+        return "Unsupported image channel order";
     }
 }
 
@@ -162,7 +162,7 @@ gctSTRING __SpvSamplerFilterModeToString(gctUINT mode)
     case 0: return "Nearest";
     case 1: return "Linear";
 
-    default: return "Bad";
+    default: return "Unsupported sampler filter mode";
     }
 }
 
@@ -175,7 +175,7 @@ gctSTRING __SpvSamplerAddressingModeToString(gctUINT mode)
     case 3:  return "Repeat";
     case 4:  return "RepeatMirrored";
 
-    default: return "Bad";
+    default: return "Unsupported sampler addressing mode";
     }
 }
 
@@ -194,8 +194,9 @@ gctSTRING __SpvStorageClassToString(gctUINT StorageClass)
     case 9:  return "PushConstant";
     case 10: return "AtomicCounter";
     case 11: return "Image";
+    case 12: return "StorageBuffer";
 
-    default: return "Bad";
+    default: return "Unsupported storage class";
     }
 }
 
@@ -214,7 +215,7 @@ gctSTRING __SpvDecorationToString(gctUINT decoration)
     case 9:  return "GLSLPacked";
     case 10: return "CPacked";
     case 11: return "BuiltIn";
-    case 12: return "Bad";
+    case 12: return "No exist decoration";
     case 13: return "NoPerspective";
     case 14: return "Flat";
     case 15: return "Patch";
@@ -229,7 +230,7 @@ gctSTRING __SpvDecorationToString(gctUINT decoration)
     case 24: return "NonWritable";
     case 25: return "NonReadable";
     case 26: return "Uniform";
-    case 27: return "Bad";
+    case 27: return "No exist decoration";
     case 28: return "SaturatedConversion";
     case 29: return "Stream";
     case 30: return "Location";
@@ -247,8 +248,11 @@ gctSTRING __SpvDecorationToString(gctUINT decoration)
     case 42: return "NoContraction";
     case 43: return "InputAttachmentIndex";
     case 44: return "Alignment";
+    case 45: return "MaxByteOffset";
+    case 46: return "AlignmentId";
+    case 47: return "MaxByteOffsetId";
 
-    default:  return "Bad";
+    default:  return "Unsupported decoration";
     }
 }
 
@@ -261,7 +265,7 @@ gctSTRING __SpvSourceToString(gctUINT source)
     case 3:  return "OpenCL_C";
     case 4:  return "OpenCL_CPP";
 
-    default: return "Bad";
+    default: return "Unsupported source type";
     }
 }
 
@@ -276,7 +280,7 @@ gctSTRING __SpvExecutionModelToString(gctUINT model)
     case 5:  return "GLCompute";
     case 6:  return "Kernel";
 
-    default: return "Bad";
+    default: return "Unsupported execution model";
     }
 }
 
@@ -296,7 +300,7 @@ gctSTRING __SpvExecutionModeToString(gctUINT mode)
     case 10: return "PointMode";
     case 11: return "Xfb";
     case 12: return "DepthReplacing";
-    case 13: return "Bad";
+    case 13: return "No exist execution mode";
     case 14: return "DepthGreater";
     case 15: return "DepthLess";
     case 16: return "DepthUnchanged";
@@ -315,9 +319,16 @@ gctSTRING __SpvExecutionModeToString(gctUINT mode)
     case 29: return "OutputTriangleStrip";
     case 30: return "VecTypeHint";
     case 31: return "ContractionOff";
-    case 32: return "Bad";
+    case 32: return "No exist execution mode";
+    case 33: return "Initializer";
+    case 34: return "Finalizer";
+    case 35: return "SubgroupSize";
+    case 36: return "SubgroupsPerWorkgroup";
+    case 37: return "SubgroupsPerWorkgroupId";
+    case 38: return "LocalSizeId";
+    case 39: return "LocalSizeHintId";
 
-    default: return "Bad";
+    default: return "Unsupported execution mode";
     }
 }
 
@@ -328,7 +339,7 @@ gctSTRING __SpvMemoryToString(gctUINT mem)
     case 1:  return "GLSL450";
     case 2:  return "OpenCL";
 
-    default: return "Bad";
+    default: return "Unsupported memory mode";
     }
 }
 
@@ -336,6 +347,7 @@ gctSTRING __SpvCapabilityToString(gctUINT info)
 {
     switch (info)
     {
+    /* Basic capabilities. */
     case 0:  return "Matrix";
     case 1:  return "Shader";
     case 2:  return "Geometry";
@@ -352,7 +364,7 @@ gctSTRING __SpvCapabilityToString(gctUINT info)
     case 13: return "ImageBasic";
     case 14: return "ImageReadWrite";
     case 15: return "ImageMipmap";
-    case 16: return "Bad";
+    case 16: return "No exist capability";
     case 17: return "Pipes";
     case 18: return "Groups";
     case 19: return "DeviceEnqueue";
@@ -362,7 +374,7 @@ gctSTRING __SpvCapabilityToString(gctUINT info)
     case 23: return "TessellationPointSize";
     case 24: return "GeometryPointSize";
     case 25: return "ImageGatherExtended";
-    case 26: return "Bad";
+    case 26: return "No exist capability";
     case 27: return "StorageImageMultisample";
     case 28: return "UniformBufferArrayDynamicIndexing";
     case 29: return "SampledImageArrayDynamicIndexing";
@@ -394,8 +406,24 @@ gctSTRING __SpvCapabilityToString(gctUINT info)
     case 55: return "StorageImageReadWithoutFormat";
     case 56: return "StorageImageWriteWithoutFormat";
     case 57: return "MultiViewport";
+    case 58: return "SubGroupDispatch";
+    case 59: return "NamedBarrier";
+    case 60: return "PipeStorage";
+    case 61: return "GroupNonUniform";
+    case 62: return "GroupNonUniformVote";
+    case 63: return "GroupNonUniformArithmetic";
+    case 64: return "GroupNonUniformBallot";
+    case 65: return "GroupNonUniformShuffle";
+    case 66: return "GroupNonUniformShuffleRelative";
+    case 67: return "GroupNonUniformClustered";
+    case 68: return "GroupNonUniformQuad";
 
-    default: return "Bad";
+    /* Extension capabilities. */
+    case 4437:  return "DeviceGroup";
+    case 4441:  return "VariablePointersStorageBuffer";
+
+    /* Unsupport capabilities. */
+    default: return "Unsupported capability";
     }
 }
 
@@ -406,7 +434,7 @@ gctSTRING __SpvAddressingToString(gctUINT addr)
     case 1:  return "Physical32";
     case 2:  return "Physical64";
 
-    default: return "Bad";
+    default: return "Unsupported addressing mode";
     }
 }
 
@@ -415,7 +443,7 @@ gctSTRING __SpvBuiltInToString(gctUINT builtIn)
     switch (builtIn) {
     case 0:  return "Position";
     case 1:  return "PointSize";
-    case 2:  return "Bad";
+    case 2:  return "No exist builtin";
     case 3:  return "ClipDistance";
     case 4:  return "CullDistance";
     case 5:  return "VertexId";
@@ -434,7 +462,7 @@ gctSTRING __SpvBuiltInToString(gctUINT builtIn)
     case 18: return "SampleId";
     case 19: return "SamplePosition";
     case 20: return "SampleMask";
-    case 21: return "Bad";
+    case 21: return "No exist builtin";
     case 22: return "FragDepth";
     case 23: return "HelperInvocation";
     case 24: return "NumWorkgroups";
@@ -448,7 +476,7 @@ gctSTRING __SpvBuiltInToString(gctUINT builtIn)
     case 32: return "EnqueuedWorkgroupSize";
     case 33: return "GlobalOffset";
     case 34: return "GlobalLinearId";
-    case 35: return "Bad";
+    case 35: return "No exist builtin";
     case 36: return "SubgroupSize";
     case 37: return "SubgroupMaxSize";
     case 38: return "NumSubgroups";
@@ -457,8 +485,9 @@ gctSTRING __SpvBuiltInToString(gctUINT builtIn)
     case 41: return "SubgroupLocalInvocationId";
     case 42: return "VertexIndex";                 // TBD: put next to VertexId?
     case 43: return "InstanceIndex";               // TBD: put next to InstanceId?
+    case 4438: return "DeviceIndex";
 
-    default: return "Bad";
+    default: return "Unsupported builtin";
     }
 }
 
@@ -469,7 +498,7 @@ gctSTRING __SpvAccessQualifierToString(gctUINT attr)
     case 1:  return "WriteOnly";
     case 2:  return "ReadWrite";
 
-    default: return "Bad";
+    default: return "Unsupported access qualifier";
     }
 }
 
@@ -530,7 +559,7 @@ gctSTRING __SpvImageFormatToString(gctUINT format)
     case 39: return "R8ui";
 
     default:
-        return "Bad";
+        return "Unsupported image format";
     }
 }
 
@@ -545,7 +574,7 @@ gctSTRING __SpvDimensionToString(gctUINT dim)
     case 5:  return "Buffer";
     case 6:  return "SubpassData";
 
-    default: return "Bad";
+    default: return "Unsupported dimension";
     }
 }
 
@@ -561,13 +590,16 @@ gctSTRING __SpvOpcodeToString(SpvOp opCode)
     case 6:   return "OpMemberName";
     case 7:   return "OpString";
     case 8:   return "OpLine";
+    case 9:   return "No exist opcode";
     case 10:  return "OpExtension";
     case 11:  return "OpExtInstImport";
     case 12:  return "OpExtInst";
+    case 13:  return "No exist opcode";
     case 14:  return "OpMemoryModel";
     case 15:  return "OpEntryPoint";
     case 16:  return "OpExecutionMode";
     case 17:  return "OpCapability";
+    case 18:  return "No exist opcode";
     case 19:  return "OpTypeVoid";
     case 20:  return "OpTypeBool";
     case 21:  return "OpTypeInt";
@@ -589,21 +621,25 @@ gctSTRING __SpvOpcodeToString(SpvOp opCode)
     case 37:  return "OpTypeQueue";
     case 38:  return "OpTypePipe";
     case 39:  return "OpTypeForwardPointer";
+    case 40:  return "No exist opcode";
     case 41:  return "OpConstantTrue";
     case 42:  return "OpConstantFalse";
     case 43:  return "OpConstant";
     case 44:  return "OpConstantComposite";
     case 45:  return "OpConstantSampler";
     case 46:  return "OpConstantNull";
+    case 47:  return "No exist opcode";
     case 48:  return "OpSpecConstantTrue";
     case 49:  return "OpSpecConstantFalse";
     case 50:  return "OpSpecConstant";
     case 51:  return "OpSpecConstantComposite";
     case 52:  return "OpSpecConstantOp";
+    case 53:  return "No exist opcode";
     case 54:  return "OpFunction";
     case 55:  return "OpFunctionParameter";
     case 56:  return "OpFunctionEnd";
     case 57:  return "OpFunctionCall";
+    case 58:  return "No exist opcode";
     case 59:  return "OpVariable";
     case 60:  return "OpImageTexelPointer";
     case 61:  return "OpLoad";
@@ -621,6 +657,7 @@ gctSTRING __SpvOpcodeToString(SpvOp opCode)
     case 73:  return "OpDecorationGroup";
     case 74:  return "OpGroupDecorate";
     case 75:  return "OpGroupMemberDecorate";
+    case 76:  return "No exist opcode";
     case 77:  return "OpVectorExtractDynamic";
     case 78:  return "OpVectorInsertDynamic";
     case 79:  return "OpVectorShuffle";
@@ -629,6 +666,7 @@ gctSTRING __SpvOpcodeToString(SpvOp opCode)
     case 82:  return "OpCompositeInsert";
     case 83:  return "OpCopyObject";
     case 84:  return "OpTranspose";
+    case 85:  return "No exist opcode";
     case 86:  return "OpSampledImage";
     case 87:  return "OpImageSampleImplicitLod";
     case 88:  return "OpImageSampleExplicitLod";
@@ -651,6 +689,7 @@ gctSTRING __SpvOpcodeToString(SpvOp opCode)
     case 105: return "OpImageQueryLod";
     case 106: return "OpImageQueryLevels";
     case 107: return "OpImageQuerySamples";
+    case 108: return "No exist opcode";
     case 109: return "OpConvertFToU";
     case 110: return "OpConvertFToS";
     case 111: return "OpConvertSToF";
@@ -667,6 +706,7 @@ gctSTRING __SpvOpcodeToString(SpvOp opCode)
     case 122: return "OpGenericCastToPtr";
     case 123: return "OpGenericCastToPtrExplicit";
     case 124: return "OpBitcast";
+    case 125: return "No exist opcode";
     case 126: return "OpSNegate";
     case 127: return "OpFNegate";
     case 128: return "OpIAdd";
@@ -694,6 +734,7 @@ gctSTRING __SpvOpcodeToString(SpvOp opCode)
     case 150: return "OpISubBorrow";
     case 151: return "OpUMulExtended";
     case 152: return "OpSMulExtended";
+    case 153: return "No exist opcode";
     case 154: return "OpAny";
     case 155: return "OpAll";
     case 156: return "OpIsNan";
@@ -732,6 +773,8 @@ gctSTRING __SpvOpcodeToString(SpvOp opCode)
     case 189: return "OpFUnordLessThanEqual";
     case 190: return "OpFOrdGreaterThanEqual";
     case 191: return "OpFUnordGreaterThanEqual";
+    case 192: return "No exist opcode";
+    case 193: return "No exist opcode";
     case 194: return "OpShiftRightLogical";
     case 195: return "OpShiftRightArithmetic";
     case 196: return "OpShiftLeftLogical";
@@ -744,6 +787,7 @@ gctSTRING __SpvOpcodeToString(SpvOp opCode)
     case 203: return "OpBitFieldUExtract";
     case 204: return "OpBitReverse";
     case 205: return "OpBitCount";
+    case 206: return "No exist opcode";
     case 207: return "OpDPdx";
     case 208: return "OpDPdy";
     case 209: return "OpFwidth";
@@ -753,12 +797,17 @@ gctSTRING __SpvOpcodeToString(SpvOp opCode)
     case 213: return "OpDPdxCoarse";
     case 214: return "OpDPdyCoarse";
     case 215: return "OpFwidthCoarse";
+    case 216: return "No exist opcode";
+    case 217: return "No exist opcode";
     case 218: return "OpEmitVertex";
     case 219: return "OpEndPrimitive";
     case 220: return "OpEmitStreamVertex";
     case 221: return "OpEndStreamPrimitive";
+    case 222: return "No exist opcode";
+    case 223: return "No exist opcode";
     case 224: return "OpControlBarrier";
     case 225: return "OpMemoryBarrier";
+    case 226: return "No exist opcode";
     case 227: return "OpAtomicLoad";
     case 228: return "OpAtomicStore";
     case 229: return "OpAtomicExchange";
@@ -775,6 +824,8 @@ gctSTRING __SpvOpcodeToString(SpvOp opCode)
     case 240: return "OpAtomicAnd";
     case 241: return "OpAtomicOr";
     case 242: return "OpAtomicXor";
+    case 243: return "No exist opcode";
+    case 244: return "No exist opcode";
     case 245: return "OpPhi";
     case 246: return "OpLoopMerge";
     case 247: return "OpSelectionMerge";
@@ -788,6 +839,7 @@ gctSTRING __SpvOpcodeToString(SpvOp opCode)
     case 255: return "OpUnreachable";
     case 256: return "OpLifetimeStart";
     case 257: return "OpLifetimeStop";
+    case 258: return "No exist opcode";
     case 259: return "OpGroupAsyncCopy";
     case 260: return "OpGroupWaitEvents";
     case 261: return "OpGroupAll";
@@ -801,6 +853,8 @@ gctSTRING __SpvOpcodeToString(SpvOp opCode)
     case 269: return "OpGroupFMax";
     case 270: return "OpGroupUMax";
     case 271: return "OpGroupSMax";
+    case 272: return "No exist opcode";
+    case 273: return "No exist opcode";
     case 274: return "OpReadPipe";
     case 275: return "OpWritePipe";
     case 276: return "OpReservedReadPipe";
@@ -816,6 +870,8 @@ gctSTRING __SpvOpcodeToString(SpvOp opCode)
     case 286: return "OpGroupReserveWritePipePackets";
     case 287: return "OpGroupCommitReadPipe";
     case 288: return "OpGroupCommitWritePipe";
+    case 289: return "No exist opcode";
+    case 290: return "No exist opcode";
     case 291: return "OpEnqueueMarker";
     case 292: return "OpEnqueueKernel";
     case 293: return "OpGetKernelNDrangeSubGroupCount";
@@ -846,9 +902,21 @@ gctSTRING __SpvOpcodeToString(SpvOp opCode)
     case 318: return "OpAtomicFlagTestAndSet";
     case 319: return "OpAtomicFlagClear";
     case 320: return "OpImageSparseRead";
+    case 321: return "OpSizeOf";
+    case 322: return "OpTypePipeStorage";
+    case 323: return "OpConstantPipeStorage";
+    case 324: return "OpCreatePipeFromPipeStorage";
+    case 325: return "OpGetKernelLocalSizeForSubgroupCount";
+    case 326: return "OpGetKernelMaxNumSubgroups";
+    case 327: return "OpTypeNamedBarrier";
+    case 328: return "OpNamedBarrierInitialize";
+    case 329: return "OpMemoryNamedBarrier";
+    case 330: return "OpModuleProcessed";
+    case 331: return "OpExecutionModeId";
+    case 332: return "OpDecorateId";
 
     default:
-        return "Bad";
+        return "Unsupported opcode";
     }
 }
 
@@ -919,18 +987,31 @@ gctSTRING __SpvDumpString(
 
     gcoOS_ZeroMemory(line, SPV_DUMP_MAX_SIZE * gcmSIZEOF(gctCHAR));
 
+    gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, " \t\t\t\t\t\t\t\t\t\t\t\t\t ");
+
     gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "\"");
 
     do {
         gctUINT content = stream[word];
         wordString = (gctSTRING)&content;
 
-        for (i = 0; i < 4; ++i) {
-            if (*wordString == 0) {
+        for (i = 0; i < 4; ++i)
+        {
+            if (*wordString == 0)
+            {
                 done = gcvTRUE;
                 break;
             }
-            gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%c", *(wordString++));
+            if (offset < SPV_DUMP_MAX_SIZE - 2)
+            {
+                gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%c", *(wordString++));
+            }
+            else
+            {
+                spvPRINT("%s", line);
+                offset = 0;
+                gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%c", *(wordString++));
+            }
         }
         ++word;
     } while (!done);
@@ -941,6 +1022,8 @@ gctSTRING __SpvDumpString(
     {
         *charCount = word - startWord;
     }
+
+    spvPRINT(line);
 
     return line;
 }
@@ -1287,6 +1370,7 @@ gceSTATUS __SpvDumpLine(
     gctUINT numOperands)
 {
     gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS needPrint = gcvSTATUS_TRUE;
     gctCHAR line[SPV_DUMP_MAX_SIZE] = { 0 };
     gctUINT offset = 0;
     gctUINT word = 0;
@@ -1333,6 +1417,7 @@ gceSTATUS __SpvDumpLine(
     for (i = 0; i < operandNum && numOperands > 0; i++)
     {
         SpvOperandClass operandClass = __SpvGetOperandClassFromOpCode(opCode, i);
+        needPrint = gcvSTATUS_TRUE;
 
         __PRINT_BUFFER_CACHE__;
 
@@ -1349,6 +1434,10 @@ gceSTATUS __SpvDumpLine(
                 gctUINT i, j;
                 for (i = 0, j = 0; i < numOperands; i++, j++)
                 {
+                    if (opCode == SpvOpEntryPoint)
+                    {
+                        gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "\t\t\t\t\t\t\t\t\t\t\t\t\t\t");
+                    }
                     gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%d ", stream[word + j]);
                     __PRINT_BUFFER_CACHE__;
                 }
@@ -1416,13 +1505,31 @@ gceSTATUS __SpvDumpLine(
 
             --numOperands;
 
+            if (opCode == SpvOpExtInst)
+            {
+                ExtInstSet extInstSet = GLSL450Inst;
+                gctUINT entryPoint = stream[word - 1];
+
+                if (gcoOS_MemCmp("OpenCL", (gctSTRING)(&stream[word - 2]), 6) == gcvSTATUS_OK)
+                {
+                    extInstSet = OpenCLExtInst;
+                }
+
+                if (entryPoint == GLSL450Inst)
+                {
+                }
+            }
             break;
 
         case OperandOptionalLiteralString:
         case OperandLiteralString:
             {
                 gctUINT costWord = 0;
-                gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%s ", __SpvDumpString(stream, word, &costWord));
+                spvPRINT("%s", line);
+                line[0] = '\0';
+                offset = 0;
+                __SpvDumpString(stream, word, &costWord);
+                needPrint = gcvSTATUS_FALSE;
 
                 word += costWord;
                 numOperands -= costWord;
@@ -1489,7 +1596,10 @@ gceSTATUS __SpvDumpLine(
     }
 
 OnError:
-    spvPRINT("%s", line);
+    if (needPrint == gcvSTATUS_TRUE)
+    {
+        spvPRINT("%s", line);
+    }
     return status;
 }
 

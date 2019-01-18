@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -171,6 +171,55 @@ clfReleaseCommand(
             clsCommandNDRangeKernel_PTR NDRangeKernel = &Command->u.NDRangeKernel;
             clfFreeKernelArgs(NDRangeKernel->numArgs, NDRangeKernel->args, gcvFALSE);
             clfReleaseKernel(NDRangeKernel->kernel);
+        }
+        else if (Command->type == clvCOMMAND_NDRANGE_VIR_KERNEL)
+        {
+            clsCommandNDRangeVIRKernel_PTR NDRangeVIRKernel = &Command->u.NDRangeVIRKernel;
+            clfFreeVIRKernelArgs(NDRangeVIRKernel->numArgs, NDRangeVIRKernel->args, NDRangeVIRKernel->localKernelArgSize, gcvFALSE);
+            if(NDRangeVIRKernel->localAddressSpace)
+            {
+                clsMemAllocInfo_PTR memAllocInfo = (clsMemAllocInfo_PTR)NDRangeVIRKernel->localAddressSpace;
+                gcoCL_FreeMemory(memAllocInfo->physical,
+                                memAllocInfo->logical,
+                                memAllocInfo->allocatedSize,
+                                memAllocInfo->node,
+                                gcvSURF_INDEX);
+                gcoOS_Free(gcvNULL, NDRangeVIRKernel->localAddressSpace);
+            }
+            if(NDRangeVIRKernel->privateAddressSpace)
+            {
+                clsMemAllocInfo_PTR memAllocInfo = (clsMemAllocInfo_PTR)NDRangeVIRKernel->privateAddressSpace;
+                gcoCL_FreeMemory(memAllocInfo->physical,
+                                memAllocInfo->logical,
+                                memAllocInfo->allocatedSize,
+                                memAllocInfo->node,
+                                gcvSURF_INDEX);
+                gcoOS_Free(gcvNULL, NDRangeVIRKernel->privateAddressSpace);
+            }
+            if(NDRangeVIRKernel->printfBufferAddress)
+            {
+                clsMemAllocInfo_PTR memAllocInfo = (clsMemAllocInfo_PTR)NDRangeVIRKernel->printfBufferAddress;
+                gcoCL_FreeMemory(memAllocInfo->physical,
+                                memAllocInfo->logical,
+                                memAllocInfo->allocatedSize,
+                                memAllocInfo->node,
+                                gcvSURF_INDEX);
+                gcoOS_Free(gcvNULL,NDRangeVIRKernel->printfBufferAddress );
+            }
+
+            if(NDRangeVIRKernel->spillMemAddressSpace)
+            {
+                clsMemAllocInfo_PTR memAllocInfo = (clsMemAllocInfo_PTR)NDRangeVIRKernel->spillMemAddressSpace;
+                gcoCL_FreeMemory(memAllocInfo->physical,
+                                memAllocInfo->logical,
+                                memAllocInfo->allocatedSize,
+                                memAllocInfo->node,
+                                gcvSURF_INDEX);
+                gcoOS_Free(gcvNULL,NDRangeVIRKernel->spillMemAddressSpace );
+                NDRangeVIRKernel->spillMemAddressSpace = gcvNULL;
+
+            }
+            clfReleaseKernel(NDRangeVIRKernel->kernel);
         }
         else if (Command->type == clvCOMMAND_TASK)
         {
@@ -767,6 +816,10 @@ clfGetSingleFormat(
                      vectorSize = 2;
                      break;
 
+                 case '3':
+                     vectorSize = 3;
+                     break;
+
                  case '4':
                      vectorSize = 4;
                      break;
@@ -1257,19 +1310,19 @@ clfPrintData(
         {
         case cleARGTYPE_CHAR:
             printf(Format, *(gctINT8*)(**Data));
-            **Data = (gctCHAR*)(**Data) + 1;
+            **Data = (gctCHAR*)(**Data) + 4;
             break;
         case cleARGTYPE_UCHAR:
             printf(Format, *(gctUINT8*)(**Data));
-            **Data = (gctUINT8*)(**Data) + 1;
+            **Data = (gctUINT8*)(**Data) + 4;
             break;
         case cleARGTYPE_SHORT:
             printf(Format, *(gctINT16*)(**Data));
-            **Data = (gctINT16*)(**Data) + 1;
+            **Data = (gctINT16*)(**Data) + 2;
             break;
         case cleARGTYPE_USHORT:
             printf(Format, *(gctUINT16*)(**Data));
-            **Data = (gctUINT16*)(**Data) + 1;
+            **Data = (gctUINT16*)(**Data) + 2;
             break;
         case cleARGTYPE_LONG:
 #if (defined(ANDROID) || gcdFPGA_BUILD || defined(__QNXNTO__))
@@ -1406,7 +1459,7 @@ clfPrintData(
              break;
          case 'c':
              printf(Format, *(gctINT8*)(**Data));
-             **Data = (gctINT8*)(**Data) + 1;
+             **Data = (gctINT8*)(**Data) + 4;
              break;
          default:
             break;
@@ -1476,22 +1529,15 @@ void clfPrintParseData(
 {
     gctCHAR* bufPtr = formatString;
     gctPOINTER data = *pData;
-    gctINT tmpData = 0;
 
-    while(*bufPtr || tmpData != 0xFFFFFFFF)
-    {
+    while(*bufPtr) {
         gctCHAR c = *bufPtr++;
-        gctUINT value = 0;
 
-        if(c == '%')
-        {
-            if(*bufPtr == '%')
-            {
+        if(c == '%') {
+            if(*bufPtr == '%') {
                 bufPtr++;
                 continue;
-            }
-            else
-            {
+            }else {
                 /*indentify the conversion specification */
                 gctCHAR* startPtr = bufPtr - 1;
                 while (*bufPtr)
@@ -1510,30 +1556,24 @@ void clfPrintParseData(
                         clfGetSingleFormat(startPtr, endPtr, fmt, &vectorSize, &argType, &flags, &fieldWidth, &precision);
                         if (c == 's')
                         {
-                            value = *((gctINT*)data + 1);
+                            gctUINT value = *((gctINT*)data + 1);
                             if (value == 0xFFFFFFFF) /* handle printf("%s", 0);*/
                             {
                                 printf(fmt, "(null)");
-                            }
-                            else
-                            {
+                            }else{
                                 /* the string is stored in const buffer, offset is stored in printf buffer */
                                 gctUINT offset = value;
                                 printf(fmt, formatString + offset);
                             }
                             data = (gctINT*)data + 2;
-                        }
-                        else
-                        {
+                        }else{
                             clfPrintfFmt(fmt, c, &data, vectorSize, argType, flags, fieldWidth, precision);
                         }
                         break;
                     }
                 }
             }
-        }
-        else
-        {
+        }else {
             gctINT constStrLen = 0;
             gctCHAR* constString;
             gctCHAR* startConstStrPtr;
@@ -1550,14 +1590,6 @@ void clfPrintParseData(
             *(constString + constStrLen) = '\0';
             printf("%s", constString);
             gcoOS_Free(gcvNULL, constString);
-        }
-
-        tmpData = *((gctINT *)data+1);
-
-        if((*bufPtr == 0) && (tmpData != 0xFFFFFFFF))
-        {
-            bufPtr = &formatString[tmpData];
-            data = (gctINT*)data + 2;
         }
     }
 
@@ -1587,18 +1619,20 @@ clfProcessDeferredReleaseCommandList(
 
         if (gcmIS_SUCCESS(gcoCL_WaitSignal(command->releaseSignal, 0)))
         {
+            gctUINT i;
+            char *fmt;
+            gctUINT printBufferSizePerThread = 0;
+            gctPOINTER printBufferAddress = gcvNULL;
+            gctPOINTER curPrintBufferAddress = gcvNULL;
+            gctUINT printThreadNum = 0;
+
             clfRemoveDeferredReleaseCommandFromCommandQueue(CommandQueue, command);
 
             if (command->type == clvCOMMAND_NDRANGE_KERNEL)
             {
-                gctUINT i;
-                char *fmt;
-                gctINT printBufferSizePerThread = 0;
-                gctPOINTER printBufferAddress = gcvNULL;
-                gctPOINTER curPrintBufferAddress = gcvNULL;
-                gctUINT printThreadNum = 0;
                 clsCommandNDRangeKernel_PTR NDRangeKernel = &command->u.NDRangeKernel;
-                fmt = ((gcSHADER)(NDRangeKernel->states->binary))->constantMemoryBuffer;
+
+                fmt = ((gcSHADER)(NDRangeKernel->currentInstance->binary))->constantMemoryBuffer;
 
                 for (i = 0; i < NDRangeKernel->numArgs; i++)
                 {
@@ -1609,6 +1643,7 @@ clfProcessDeferredReleaseCommandList(
                     else if (NDRangeKernel->args[i].isMemAlloc)
                     {
                         clsMemAllocInfo_PTR memAllocInfo = (clsMemAllocInfo_PTR) NDRangeKernel->args[i].data;
+
                         if (isUniformPrintfAddress(NDRangeKernel->args[i].uniform))
                         {
                             printBufferAddress = (void*)((gctUINT*)(memAllocInfo->logical));
@@ -1616,33 +1651,54 @@ clfProcessDeferredReleaseCommandList(
                         }
                     }
                 }
+            }
+            else if (command->type == clvCOMMAND_NDRANGE_VIR_KERNEL)
+            {
 
-                if (printBufferAddress && printBufferSizePerThread > 0)
+                clsCommandNDRangeVIRKernel_PTR NDRangeVIRKernel = &command->u.NDRangeVIRKernel;
+                clsMemAllocInfo_PTR memAllocInfo = (clsMemAllocInfo_PTR) NDRangeVIRKernel->printfBufferAddress;
+
+                fmt = NDRangeVIRKernel->currentInstance->kep.kernelHints.constantMemBuffer;
+                printBufferAddress = memAllocInfo->logical;
+                printThreadNum = NDRangeVIRKernel->printThreadNum;
+                printBufferSizePerThread = NDRangeVIRKernel->printbufferSize;
+            }
+            else
+            {
+                fmt = gcvNULL;
+                gcmASSERT(gcvFALSE);
+            }
+
+            if (printBufferAddress && printBufferSizePerThread > 0)
+            {
+                for (i = 0; i < printThreadNum; i++)
                 {
-                    for (i = 0; i < printThreadNum; i++)
+                    curPrintBufferAddress = printBufferAddress;
+                    do
                     {
-                        curPrintBufferAddress = printBufferAddress;
-                        do
-                        {
-                            gctINT writeMask = *(gctINT*)curPrintBufferAddress;
-                            /* Still printf left in this thread. */
-                            if (writeMask == __OCL_PRINTF_WRITE_MASK__)
-                            {
-                                /* Skip writeMask. */
-                                curPrintBufferAddress = (gctINT*)curPrintBufferAddress + 1;
-                                /* Skip offset. */
-                                curPrintBufferAddress = (gctINT*)curPrintBufferAddress + 1;
-                                clfPrintParseData(fmt, &curPrintBufferAddress);
-                            }
-                            /* No printf left in this thread, switch to the next thread. */
-                            else
-                            {
-                                break;
-                            }
-                        } while (gcmPTR_TO_UINT64(curPrintBufferAddress) < ((gcmPTR_TO_UINT64(printBufferAddress) + printBufferSizePerThread)));
+                        gctINT writeMaskSig1 = *(gctINT*)curPrintBufferAddress;
+                        gctINT writeMaskSig2 = *((gctINT*)curPrintBufferAddress + 1);
 
-                        printBufferAddress = gcmUINT64_TO_PTR(gcmPTR_TO_UINT64(printBufferAddress) + printBufferSizePerThread);
-                    }
+                        /* Still printf left in this thread. */
+                        if (writeMaskSig1 == __OCL_PRINTF_WRITE_SIG1__ &&
+                            writeMaskSig2 == __OCL_PRINTF_WRITE_SIG2__)
+                        {
+                            gctINT offset;
+
+                            /* Skip writeMask. */
+                            curPrintBufferAddress = (gctINT*)curPrintBufferAddress + 2;
+                            offset = *((gctINT *)curPrintBufferAddress);
+                            curPrintBufferAddress = (gctINT*)curPrintBufferAddress + 1;
+                            clfPrintParseData(fmt + offset , &curPrintBufferAddress);
+                        }
+                        /* No printf left in this thread, switch to the next thread. */
+                        else
+                        {
+                            break;
+                        }
+                    } while (gcmPTR_TO_UINT64(curPrintBufferAddress) < ((gcmPTR_TO_UINT64(printBufferAddress) + printBufferSizePerThread)));
+
+                    printBufferAddress = gcmUINT64_TO_PTR(gcmPTR_TO_UINT64(printBufferAddress) + printBufferSizePerThread);
                 }
             }
 
@@ -1717,7 +1773,7 @@ clfRemoveSyncPoint(
     )
 {
     clsSyncPoint_PTR        syncPoint;
-    gctINT                  status;
+    gctINT                  status = CL_SUCCESS;
 
     gcmHEADER_ARG("CommandQueue=0x%x Command=0x%x", CommandQueue, Command);
 
@@ -1734,6 +1790,7 @@ clfRemoveSyncPoint(
     {
         /* No sync point */
         clfUnlockSyncPointList(CommandQueue);
+        gcmFOOTER_ARG("%d", status);
         return CL_SUCCESS;
     }
 
@@ -1764,10 +1821,15 @@ clfRemoveSyncPoint(
     clfUnlockSyncPointList(CommandQueue);
 
     gcoOS_Free(gcvNULL, syncPoint);
-
     status = CL_SUCCESS;
+    gcmFOOTER_ARG("%d", status);
+
+    return status;
 
 OnError:
+    /* Release synchronization mutex. */
+    clfUnlockSyncPointList(CommandQueue);
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -2278,8 +2340,9 @@ clfFlushCommandQueue(
 {
     gctINT                  status;
     clsCommitRequest_PTR    commitRequest = gcvNULL;
-    gctUINT32 i = 0;
+    gctUINT32               i = 0;
     gctBOOL locked = gcvFALSE;
+
     gcmHEADER_ARG("CommandQueue=0x%x", CommandQueue);
 
     clmASSERT(CommandQueue && CommandQueue->objectType == clvOBJECT_COMMAND_QUEUE,
@@ -2311,12 +2374,10 @@ clfFlushCommandQueue(
             gcmVERIFY_OK(gcoCL_WaitSignal(commitRequest->event[i]->completeSignal, gcvINFINITE));
         }
     }
-
     /* Delete the used commit request */
     gcmVERIFY_OK(clfDeleteCommitRequest(commitRequest));
 
      gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
-
      /* we need a function to flush main thread event for multi-thread mode.*/
      gcmONERROR(gcoCL_Flush(Stall));
 
@@ -2333,7 +2394,6 @@ OnError:
     {
         gcmVERIFY_OK(clfDeleteCommitRequest(commitRequest));
     }
-
     /* Return the status. */
     gcmFOOTER_ARG("%d", status);
     return status;
@@ -2359,6 +2419,7 @@ clfSubmitCommand(
 
     clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND,
               CL_INVALID_VALUE);
+
 
     if (Command->outEvent ||
         Blocking)
@@ -2419,6 +2480,13 @@ clfSubmitCommand(
 
     if (Blocking)
     {
+        /* If OCL run in out thread mode, need commit to make sure pending realse mem event to process
+           in thread mode, the hw switch will  commit automaticlally .
+        */
+        if(gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_IN_THREAD) == gcvFALSE)
+        {
+            gcoCL_Commit(gcvFALSE);
+        }
         /* Wait for the command to finish. */
         clmASSERT(commandEvent, CL_INVALID_VALUE);
         clfWaitForEvent(commandEvent);
@@ -2482,6 +2550,7 @@ clfProcessCommitInThread(
         /* Commit all previously queued commands/events to GPU */
         gcmONERROR(gcoCL_Commit(gcvFALSE));
 
+        /* Wake up the corresponding clFlush thead by signal directly */
         for (i  = 0 ; i < gcvENGINE_GPU_ENGINE_COUNT; i++)
         {
             /* Wake up the corresponding clFlush thead by signal directly */
@@ -2491,6 +2560,7 @@ clfProcessCommitInThread(
                 gcmONERROR(gcoCL_SetSignal(CommitRequest->event[i]->completeSignal));
             }
         }
+
     }
 OnError:
     gcmRESTORE_HW();
@@ -2881,7 +2951,8 @@ gceSTATUS clfReleaseCommandQueue(
                      gcoCL_FreeMemory(privateBuf->buffer->physical,
                                       privateBuf->buffer->logical,
                                       privateBuf->buffer->allocatedSize,
-                                      privateBuf->buffer->node);
+                                      privateBuf->buffer->node,
+                                      gcvSURF_INDEX);
                      gcoOS_Free(gcvNULL, privateBuf->buffer);
                  }
 
@@ -3054,7 +3125,6 @@ clCreateCommandQueue(
     {
         queue->inThread = gcvTRUE;
     }
-
     /* Create worker thread. */
     clmONERROR(clfConstructWorkerThread(queue), CL_OUT_OF_HOST_MEMORY);
 
@@ -3319,6 +3389,8 @@ OnError:
     return status;
 }
 
+extern gceSTATUS clfEnqueueNOP(cl_command_queue CommandQueue);
+
 CL_API_ENTRY cl_int CL_API_CALL
 clFinish(
     cl_command_queue CommandQueue
@@ -3344,11 +3416,55 @@ clFinish(
         clmRETURN_ERROR(CL_OUT_OF_RESOURCES);
     }
 
+    if (CommandQueue->inThread)
+    {
+        status = clfEnqueueNOP(CommandQueue);
+    }
+
     VCL_TRACE_API(Finish)(CommandQueue);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
 OnError:
     gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+gctINT
+clfExecuteCommandNOP(
+    clsCommand_PTR          Command
+    )
+{
+    return CL_SUCCESS;
+}
+
+gceSTATUS clfEnqueueNOP(
+    cl_command_queue    CommandQueue
+    )
+{
+    clsCommand_PTR      command = gcvNULL;
+    gctINT              status;
+
+    clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
+
+    command->type       = clvCOMMAND_NOP;
+    command->handler    = &clfExecuteCommandNOP;
+
+    clmONERROR(clfSubmitCommand(CommandQueue, command, gcvTRUE),
+               CL_OUT_OF_HOST_MEMORY);
+
+    return CL_SUCCESS;
+
+OnError:
+    if (status == CL_OUT_OF_HOST_MEMORY)
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-010209: (EnqueueNOP) Run out of memory.\n");
+    }
+
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
+    }
     return status;
 }

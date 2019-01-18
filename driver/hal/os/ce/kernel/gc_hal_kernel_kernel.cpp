@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -63,19 +63,19 @@ gceSTATUS gckKERNEL_QueryVideoMemory(
     /* Get internal memory size and physical address. */
     Interface->u.QueryVideoMemory.internalSize     =
         gchal->GetInternalSize();
-    Interface->u.QueryVideoMemory.internalPhysical =
+    Interface->u.QueryVideoMemory.internalPhysName =
         gcmPTR2INT32(gchal->GetInternalPhysical());
 
     /* Get external memory size and physical address. */
     Interface->u.QueryVideoMemory.externalSize     =
         gchal->GetExternalSize();
-    Interface->u.QueryVideoMemory.externalPhysical =
+    Interface->u.QueryVideoMemory.externalPhysName =
         gcmPTR2INT32(gchal->GetExternalPhysical());
 
     /* Get contiguous memory size and physical address. */
     Interface->u.QueryVideoMemory.contiguousSize     =
         gchal->GetContiguousSize();
-    Interface->u.QueryVideoMemory.contiguousPhysical =
+    Interface->u.QueryVideoMemory.contiguousPhysName =
         gcmPTR2INT32(gchal->GetContiguousPhysical());
 
     gcmkTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_KERNEL,
@@ -245,20 +245,6 @@ gceSTATUS gckKERNEL_UnmapMemory(
     return gckOS_UnmapMemory(Kernel->os, Physical, Bytes, Logical);
 }
 
-gceSTATUS gckKERNEL_MapVideoMemory(
-    IN gckKERNEL Kernel,
-    IN gctBOOL InUserSpace,
-    IN gctUINT32 Address,
-    OUT gctPOINTER * Logical
-    )
-{
-    return gckKERNEL_MapVideoMemoryEx(Kernel,
-                                      gcvCORE_MAJOR,
-                                      InUserSpace,
-                                      Address,
-                                      gcvPOOL_DEFAULT,
-                                      Logical);
-}
 /*******************************************************************************
 **
 **    gckKERNEL_MapVideoMemory
@@ -274,8 +260,14 @@ gceSTATUS gckKERNEL_MapVideoMemory(
 **      gctBOOL InUserSpace
 **          gcvTRUE to map the memory into the user space.
 **
-**        gctUINT32 Address
-**            Hardware specific memory address.
+**      gcePOOL Pool
+**          Specify pool type.
+**
+**      gctUINT32 Offset
+**          Offset to pool start.
+**
+**      gctUINT32 Bytes
+**          Number of bytes to map.
 **
 **    OUTPUT:
 **
@@ -283,23 +275,22 @@ gceSTATUS gckKERNEL_MapVideoMemory(
 **            Pointer to a variable that will hold the logical address of the
 **            specified memory address.
 */
-gceSTATUS gckKERNEL_MapVideoMemoryEx(
+gceSTATUS
+gckKERNEL_MapVideoMemory(
     IN gckKERNEL Kernel,
-    IN gceCORE   Core,
     IN gctBOOL InUserSpace,
-    IN gctUINT32 Address,
     IN gcePOOL Pool,
+    IN gctUINT32 Offset,
+    IN gctUINT32 Bytes,
     OUT gctPOINTER * Logical
     )
 {
     GCHAL * gchal;
-    gcePOOL pool;
-    gctUINT32 offset, base;
     gceSTATUS status;
     gctPOINTER logical;
 
-    gcmkHEADER_ARG("Kernel=%p InUserSpace=%d Address=%08x",
-                   Kernel, InUserSpace, Address);
+    gcmkHEADER_ARG("Kernel=%p InUserSpace=%d Pool=%d Offset=%X Bytes=%X",
+                   Kernel, InUserSpace, Pool, Offset, Bytes);
 
     gcmkTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_KERNEL,
                "[ENTER] gckKERNEL_MapVideoMemory");
@@ -311,89 +302,49 @@ gceSTATUS gckKERNEL_MapVideoMemoryEx(
     /* Extract the pointer to the GCHAL class. */
     gchal = (GCHAL *) Kernel->context;
 
-    do
+    /* Dispatch on pool. */
+    switch (Pool)
     {
-#if gcdENABLE_VG
-        if (Core == gcvCORE_VG)
+    case gcvPOOL_LOCAL_INTERNAL:
+        /* Internal memory. */
+        logical = gchal->GetInternalLogical();
+        break;
+
+    case gcvPOOL_LOCAL_EXTERNAL:
+        /* External memory. */
+        logical = gchal->GetExternalLogical();
+        break;
+
+    case gcvPOOL_SYSTEM:
+        /* System memory. */
+#if UNDER_CE >= 600
+        if (InUserSpace)
         {
-            /* Split the memory address into a pool type and offset. */
-            gcmkERR_BREAK(gckVGHARDWARE_SplitMemory(Kernel->vg->hardware,
-                                             Address,
-                                             &pool,
-                                             &offset));
+            logical = gchal->GetProcessContiguousLogical();
         }
         else
-#endif
         {
-            /* Split the memory address into a pool type and offset. */
-            gcmkERR_BREAK(gckHARDWARE_SplitMemory(Kernel->hardware,
-                                             Address,
-                                             &pool,
-                                             &offset));
-        }
-        /* Dispatch on pool. */
-        switch (pool)
-        {
-        case gcvPOOL_LOCAL_INTERNAL:
-            /* Internal memory. */
-            logical = gchal->GetInternalLogical();
-            break;
-
-        case gcvPOOL_LOCAL_EXTERNAL:
-            /* External memory. */
-            logical = gchal->GetExternalLogical();
-            break;
-
-        case gcvPOOL_SYSTEM:
-            /* System memory. */
-#if UNDER_CE >= 600
-            if (InUserSpace)
-            {
-                logical = gchal->GetProcessContiguousLogical();
-            }
-            else
-            {
-                logical = gchal->GetContiguousLogical();
-            }
-#else
             logical = gchal->GetContiguousLogical();
-#endif
-
-#if gcdENABLE_VG
-            if (Core == gcvCORE_VG)
-            {
-                gcmkVERIFY_OK(gckVGHARDWARE_SplitMemory(Kernel->vg->hardware,
-                                                 gchal->GetContiguousHeap()->baseAddress,
-                                                 &pool,
-                                                 &base));
-            }
-            else
-#endif
-            {
-                gcmkVERIFY_OK(gckHARDWARE_SplitMemory(Kernel->hardware,
-                                                 gchal->GetContiguousHeap()->baseAddress,
-                                                 &pool,
-                                                 &base));
-            }
-            offset -= base;
-            break;
-
-        default:
-            /* Invalid memory pool. */
-            gcmkFATAL("Unknown memory pool: %u", pool);
-            return gcvSTATUS_INVALID_ARGUMENT;
         }
+#else
+        logical = gchal->GetContiguousLogical();
+#endif
+        break;
 
-        if (logical == gcvNULL)
-        {
-            gcmkERR_BREAK(gcvSTATUS_OUT_OF_MEMORY);
-        }
-
-        /* Build logical address of specified address. */
-        *Logical = reinterpret_cast<gctPOINTER>
-            (static_cast<gctUINT8 *>(logical) + offset);
+    default:
+        /* Invalid memory pool. */
+        gcmkFATAL("Unknown memory pool: %u", pool);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
-    while (gcvFALSE);
+
+    if (logical == gcvNULL)
+    {
+        gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
+    }
+
+    /* Build logical address of specified address. */
+    *Logical = reinterpret_cast<gctPOINTER>
+        (static_cast<gctUINT8 *>(logical) + Offset);
 
     if (gcmIS_SUCCESS(status))
     {
@@ -406,6 +357,7 @@ gceSTATUS gckKERNEL_MapVideoMemoryEx(
                "[LEAVE] gckKERNEL_MapVideoMemory(%u)",
                status);
 
+OnError:
     /* Return the status. */
     gcmkFOOTER();
     return status;
@@ -425,23 +377,18 @@ gceSTATUS gckKERNEL_MapVideoMemoryEx(
 **        gceNOTIFY Notification
 **            Notification event.
 **
-**        gctBOOL Data
-**            Optional data for notification.
-**
 **    OUTPUT:
 **
 **        Nothing.
 */
 gceSTATUS gckKERNEL_Notify(
     IN gckKERNEL Kernel,
-    IN gceNOTIFY Notification,
-    IN gctBOOL Data
+    IN gceNOTIFY Notification
     )
 {
     gceSTATUS status;
 
-    gcmkHEADER_ARG("Kernel=%p Notification=%d Data=%d",
-                   Kernel, Notification, Data);
+    gcmkHEADER_ARG("Kernel=%p Notification=%d", Kernel, Notification);
 
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(Kernel, gcvOBJ_KERNEL);
@@ -451,7 +398,7 @@ gceSTATUS gckKERNEL_Notify(
     {
     case gcvNOTIFY_INTERRUPT:
         /* Process interrupt. */
-        status = gckHARDWARE_Interrupt(Kernel->hardware, Data);
+        status = gckHARDWARE_Notify(Kernel->hardware);
         break;
 
 #ifdef EMULATOR
@@ -471,21 +418,4 @@ gceSTATUS gckKERNEL_Notify(
     /* Return the status. */
     gcmkFOOTER();
     return status;
-}
-
-gceSTATUS
-gckKERNEL_QuerySettings(
-    IN gckKERNEL Kernel,
-    OUT gcsKERNEL_SETTINGS * Settings
-    )
-{
-    gcmkHEADER_ARG("Kernel=%p", Kernel);
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Kernel, gcvOBJ_KERNEL);
-    gcmkVERIFY_ARGUMENT(Settings != gcvNULL);
-
-    /* Success. */
-    gcmkFOOTER_NO();
-    return gcvSTATUS_OK;
 }

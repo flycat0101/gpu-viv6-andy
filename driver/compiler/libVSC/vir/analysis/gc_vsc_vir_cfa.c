@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -21,7 +21,7 @@
 #define GLOBAL_BB_HASH_TABLE_SIZE    GNODE_HASH_TABLE_SIZE
 #define INVALID_GLOBAL_BB_ID         INVALID_GNODE_ID
 
-static void _IntializeCallGraph(VIR_CALL_GRAPH* pCg, VIR_Shader* pShader)
+static void _IntializeCallGraph(VSC_MM* pScratchMemPool, VIR_CALL_GRAPH* pCg, VIR_Shader* pShader)
 {
     gctINT instCount = BT_GET_MAX_VALID_ID(&pShader->instTable);
     gctINT hashTblSize;
@@ -29,6 +29,7 @@ static void _IntializeCallGraph(VIR_CALL_GRAPH* pCg, VIR_Shader* pShader)
     vscDG_Initialize(&pCg->dgGraph, &pCg->pmp.mmWrapper, 2, 4, sizeof(VIR_CG_EDGE));
     pCg->pOwnerShader = pShader;
     pCg->nextGlobalBbId = 0;
+    pCg->pScratchMemPool = pScratchMemPool;
     hashTblSize = (instCount/5 > GLOBAL_BB_HASH_TABLE_SIZE) ? instCount/5 : GLOBAL_BB_HASH_TABLE_SIZE;
     vscHTBL_Initialize(&pCg->globalBbHashTable, &pCg->pmp.mmWrapper, _HFUNC_PassThroughGlobalBbId,
                        gcvNULL, hashTblSize);
@@ -228,7 +229,7 @@ static void _AddEdgeForCG(VIR_CALL_GRAPH* pCg, VIR_FUNC_BLOCK* pFromFB,
     vscSRARR_AddElement(&pEdge->callSiteArray, (void*)&pCallSiteInst);
 }
 
-VSC_ErrCode vscVIR_BuildCallGraph(VIR_Shader* pShader, VIR_CALL_GRAPH* pCg)
+VSC_ErrCode vscVIR_BuildCallGraph(VSC_MM* pScratchMemPool, VIR_Shader* pShader, VIR_CALL_GRAPH* pCg)
 {
     VSC_ErrCode            errCode  = VSC_ERR_NONE;
     VIR_Function*          pFunc;
@@ -242,8 +243,11 @@ VSC_ErrCode vscVIR_BuildCallGraph(VIR_Shader* pShader, VIR_CALL_GRAPH* pCg)
     VIR_Instruction*       pInst;
     VSC_CALL_DEPTH_HELPER  callDepth;
 
+    /* So far when we building the call grap we need to remove all unused functions, which is unacceptable for some shaders. */
+    gcmASSERT(VIR_Shader_CanRemoveUnusedFunctions(pShader));
+
     /* Intialize call graph */
-    _IntializeCallGraph(pCg, pShader);
+    _IntializeCallGraph(pScratchMemPool, pCg, pShader);
 
     /* Go through all functions to build function blocks and call graph */
     VIR_FuncIterator_Init(&funcIter, &pShader->functions);
@@ -271,6 +275,8 @@ VSC_ErrCode vscVIR_BuildCallGraph(VIR_Shader* pShader, VIR_CALL_GRAPH* pCg)
                 _AddEdgeForCG(pCg, pThisFuncBlk, pCalleeFuncBlk, pInst);
 
                 vscSRARR_AddElement(&pThisFuncBlk->mixedCallSiteArray, (void*)&pInst);
+
+                /* We need to remove all these connections when remove this call instruction. */
             }
         }
     }
@@ -351,7 +357,7 @@ VSC_ErrCode vscVIR_RemoveFuncBlockFromCallGraph(VIR_CALL_GRAPH* pCg,
  *    Control flow graph related code
  */
 
-static void _IntializeCFG(VIR_CONTROL_FLOW_GRAPH* pCfg, VIR_FUNC_BLOCK* pFuncBlk)
+static void _IntializeCFG(VIR_CONTROL_FLOW_GRAPH* pCfg, VSC_MM* pScratchMemPool, VIR_FUNC_BLOCK* pFuncBlk)
 {
     vscPMP_Intialize(&pCfg->pmp, gcvNULL,
                      20*(sizeof(VIR_BASIC_BLOCK) + 2*sizeof(VIR_DOM_TREE_NODE) + 4*sizeof(VIR_CFG_EDGE)),
@@ -365,6 +371,7 @@ static void _IntializeCFG(VIR_CONTROL_FLOW_GRAPH* pCfg, VIR_FUNC_BLOCK* pFuncBlk
     pCfg->postDomTree.pOwnerCFG = pCfg;
 
     pCfg->pOwnerFuncBlk = pFuncBlk;
+    pCfg->pScratchMemPool = pScratchMemPool;
 }
 
 static void _FinalizeCFG(VIR_CONTROL_FLOW_GRAPH* pCfg)
@@ -677,6 +684,47 @@ static void _RemoveBasicBlockFromCFG(
 
         if (bDeleteInst)
         {
+            /*
+            ** If this instruction is a CALL, we need to remove it from:
+            ** 1) The call site array of the callee function.
+            ** 2) The mixed call site array of the caller function.
+            **
+            */
+            if (VIR_Inst_GetOpcode(pInst) == VIR_OP_CALL)
+            {
+                VIR_Function*               pCalleeFunc = VIR_Inst_GetCallee(pInst);
+                VIR_FUNC_BLOCK*             pCalleeFuncBlk = VIR_Function_GetFuncBlock(pCalleeFunc);
+                VIR_Function*               pCallerFunc = VIR_Inst_GetFunction(pInst);
+                VIR_FUNC_BLOCK*             pCallerFuncBlk = VIR_Function_GetFuncBlock(pCallerFunc);
+
+                if (pCalleeFuncBlk)
+                {
+                    VIR_CG_EDGE*                pCallerEdge;
+                    VSC_ADJACENT_LIST_ITERATOR  callerIter;
+                    gctBOOL                     bFound = gcvFALSE;
+
+                    VSC_ADJACENT_LIST_ITERATOR_INIT(&callerIter, &pCalleeFuncBlk->dgNode.predList);
+
+                    for (pCallerEdge = (VIR_CG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&callerIter);
+                         pCallerEdge != gcvNULL;
+                         pCallerEdge = (VIR_CG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&callerIter))
+                    {
+                        /* Call site info is only stored at successor edge */
+                        pCallerEdge = CG_PRED_EDGE_TO_SUCC_EDGE(pCallerEdge);
+
+                        bFound = vscSRARR_RemoveElementByContent(&pCallerEdge->callSiteArray, (void*)&pInst);
+                        if (bFound)
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                if (pCallerFuncBlk)
+                {
+                    vscSRARR_RemoveElementByContent(&pCallerFuncBlk->mixedCallSiteArray, (void*)&pInst);
+                }
+            }
             VIR_Function_DeleteInstruction(pCFG->pOwnerFuncBlk->pVIRFunc, pInst);
         }
         else
@@ -729,7 +777,7 @@ static void _RemoveUnreachableBasicBlocks(VIR_CONTROL_FLOW_GRAPH* pCFG)
     }
 }
 
-VSC_ErrCode vscVIR_BuildCFGPerFunc(VIR_Function* pFunc)
+VSC_ErrCode vscVIR_BuildCFGPerFunc(VSC_MM* pScratchMemPool, VIR_Function* pFunc)
 {
     VSC_ErrCode             errCode  = VSC_ERR_NONE;
     VIR_CONTROL_FLOW_GRAPH* pCFG;
@@ -743,7 +791,7 @@ VSC_ErrCode vscVIR_BuildCFGPerFunc(VIR_Function* pFunc)
     pCFG = &pFunc->pFuncBlock->cfg;
 
     /* Intialize CFG */
-    _IntializeCFG(pCFG, pFunc->pFuncBlock);
+    _IntializeCFG(pCFG, pScratchMemPool, pFunc->pFuncBlock);
 
     /* Try add all basic blocks to CFG */
     _AddBasicBlocksToCFG(pCFG, pFunc);
@@ -792,7 +840,7 @@ VSC_ErrCode vscVIR_DestroyCFGPerFunc(VIR_Function* pFunc)
     return errCode;
 }
 
-VSC_ErrCode vscVIR_BuildCFG(VIR_Shader* pShader)
+VSC_ErrCode vscVIR_BuildCFG(VSC_MM* pScratchMemPool, VIR_Shader* pShader)
 {
     VSC_ErrCode            errCode  = VSC_ERR_NONE;
     VIR_Function*          pFunc;
@@ -805,7 +853,7 @@ VSC_ErrCode vscVIR_BuildCFG(VIR_Shader* pShader)
     {
         pFunc = pFuncNode->function;
 
-        errCode = vscVIR_BuildCFGPerFunc(pFunc);
+        errCode = vscVIR_BuildCFGPerFunc(pScratchMemPool, pFunc);
         if (errCode != VSC_ERR_NONE)
         {
             return errCode;
@@ -851,7 +899,7 @@ VSC_ErrCode vscVIR_DestroyCFG(VIR_Shader* pShader)
 
 gctBOOL vscVIR_IsCFGBuilt(VIR_Shader* pShader)
 {
-    if (pShader->mainFunction->pFuncBlock)
+    if (pShader && pShader->mainFunction && pShader->mainFunction->pFuncBlock)
     {
         return (pShader->mainFunction->pFuncBlock->cfg.pOwnerFuncBlk != gcvNULL);
     }
@@ -1103,11 +1151,11 @@ VIR_BB_ChangeSuccBBs(
 
         /* remove old link */
         label = VIR_Operand_GetLabel(bbEndDest);
-        if (label)
+        if(label)
         {
             link = VIR_Link_RemoveLink(VIR_Label_GetReferenceAddr(label), (gctUINTPTR_T)bbEnd);
 
-            if (link)
+            if(link)
             {
                 VIR_Function_FreeLink(func, link);
             }
@@ -1147,7 +1195,6 @@ VIR_BB_ChangeSuccBBs(
                 VIR_Label_SetDefInst(newLabel, newLabelInst);
                 label = newLabel;
             }
-
             VIR_Operand_SetLabel(bbEndDest, label);
             VIR_Function_NewLink(func, &link);
             VIR_Link_SetReference(link, (gctUINTPTR_T)bbEnd);
@@ -1567,7 +1614,7 @@ VSC_ErrCode vscVIR_BuildDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
     gctUINT                      hisCountOfBasicBlk = vscDG_GetHistNodeCount(&pCFG->dgGraph);
     VIR_BB_WORKITEM*             pWorkItemArray;
     VIR_BB_WORKLIST              workItemList;
-    VSC_MM*                      pMM = &pCFG->pmp.mmWrapper;
+    VSC_MM*                      pScratchMemPool = gcvNULL;
     gctUINT                      bbIdx, idomBBIdx, domCount;
     gctINT                       bbIdxS, bbIdxT;
     VSC_BIT_VECTOR               workingSet;
@@ -1594,12 +1641,16 @@ VSC_ErrCode vscVIR_BuildDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
         return errCode;
     }
 
+    gcmASSERT(pCFG->pOwnerFuncBlk != gcvNULL);
+    pScratchMemPool = pCFG->pOwnerFuncBlk->pOwnerCG->pScratchMemPool;
+    gcmASSERT(pScratchMemPool);
+
     /*
      *  Firstly resolve dom set of each block
      */
 
     /* Get PO of CFG */
-    ppBasicBlkPO = (VIR_BASIC_BLOCK**)vscMM_Alloc(pMM, sizeof(VIR_BASIC_BLOCK*)*countOfBasicBlk);
+    ppBasicBlkPO = (VIR_BASIC_BLOCK**)vscMM_Alloc(pScratchMemPool, sizeof(VIR_BASIC_BLOCK*)*countOfBasicBlk);
     vscDG_PreOrderTraversal(&pCFG->dgGraph,
                             VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                             gcvFALSE,
@@ -1608,7 +1659,7 @@ VSC_ErrCode vscVIR_BuildDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
 
     /* Allocate workitem array corresponding basic block. Note as iterative analyzer will use id of
        basicblk to index workitem, history node count will be used to allocate these contents */
-    pWorkItemArray = (VIR_BB_WORKITEM*)vscMM_Alloc(pMM,
+    pWorkItemArray = (VIR_BB_WORKITEM*)vscMM_Alloc(pScratchMemPool,
                                                    sizeof(VIR_BB_WORKITEM)*
                                                    hisCountOfBasicBlk);
 
@@ -1617,7 +1668,7 @@ VSC_ErrCode vscVIR_BuildDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
     /* Initialize workitem list and dom-set of each BB */
     for (bbIdx = 0; bbIdx < countOfBasicBlk; bbIdx ++)
     {
-        vscBV_Initialize(&ppBasicBlkPO[bbIdx]->domSet, pMM, hisCountOfBasicBlk);
+        vscBV_Initialize(&ppBasicBlkPO[bbIdx]->domSet, pScratchMemPool, hisCountOfBasicBlk);
 
         /* Initialize each workitem, and add it to workitem list. Note that entry block won't
            be added into workitem list because it won't be changed when iterating */
@@ -1638,7 +1689,7 @@ VSC_ErrCode vscVIR_BuildDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
     }
 
     /* Prepare working set */
-    vscBV_Initialize(&workingSet, pMM, hisCountOfBasicBlk);
+    vscBV_Initialize(&workingSet, pScratchMemPool, hisCountOfBasicBlk);
 
     do
     {
@@ -1685,24 +1736,24 @@ VSC_ErrCode vscVIR_BuildDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
 
     /* Allocate idom set array corresponding basic block. Note as algorithm will use id of
        basicblk to index workitem, history node count will be used to allocate these contents */
-    pIdomSetArray = (VSC_BIT_VECTOR*)vscMM_Alloc(pMM,
+    pIdomSetArray = (VSC_BIT_VECTOR*)vscMM_Alloc(pScratchMemPool,
                                                    sizeof(VSC_BIT_VECTOR)*
                                                    hisCountOfBasicBlk);
-    pDomSetArray = (VSC_BIT_VECTOR*)vscMM_Alloc(pMM,
+    pDomSetArray = (VSC_BIT_VECTOR*)vscMM_Alloc(pScratchMemPool,
                                                 sizeof(VSC_BIT_VECTOR)*
                                                 hisCountOfBasicBlk);
-    ppHisBlockArray = (VIR_BASIC_BLOCK**)vscMM_Alloc(pMM,
+    ppHisBlockArray = (VIR_BASIC_BLOCK**)vscMM_Alloc(pScratchMemPool,
                                                      sizeof(VIR_BASIC_BLOCK*)*
                                                      hisCountOfBasicBlk);
 
     /* Initilize idom set with self bit removed */
     for (bbIdx = 0; bbIdx < countOfBasicBlk; bbIdx ++)
     {
-        vscBV_Initialize(&pIdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pMM, hisCountOfBasicBlk);
+        vscBV_Initialize(&pIdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pScratchMemPool, hisCountOfBasicBlk);
         vscBV_Copy(&pIdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], &ppBasicBlkPO[bbIdx]->domSet);
         vscBV_ClearBit(&pIdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], ppBasicBlkPO[bbIdx]->dgNode.id);
 
-        vscBV_Initialize(&pDomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pMM, hisCountOfBasicBlk);
+        vscBV_Initialize(&pDomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pScratchMemPool, hisCountOfBasicBlk);
         vscBV_Copy(&pDomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], &pIdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id]);
 
         /* Initialize worklist again for tree build in last stage */
@@ -1796,11 +1847,11 @@ VSC_ErrCode vscVIR_BuildDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
         vscBV_Finalize(&pIdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id]);
         vscBV_Finalize(&pDomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id]);
     }
-    vscMM_Free(pMM, pIdomSetArray);
-    vscMM_Free(pMM, pDomSetArray);
-    vscMM_Free(pMM, ppBasicBlkPO);
-    vscMM_Free(pMM, pWorkItemArray);
-    vscMM_Free(pMM, ppHisBlockArray);
+    vscMM_Free(pScratchMemPool, pIdomSetArray);
+    vscMM_Free(pScratchMemPool, pDomSetArray);
+    vscMM_Free(pScratchMemPool, ppBasicBlkPO);
+    vscMM_Free(pScratchMemPool, pWorkItemArray);
+    vscMM_Free(pScratchMemPool, ppHisBlockArray);
 
     return errCode;
 }
@@ -1841,7 +1892,7 @@ VSC_ErrCode vscVIR_BuildPostDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
     gctUINT                      hisCountOfBasicBlk = vscDG_GetHistNodeCount(&pCFG->dgGraph);
     VIR_BB_WORKITEM*             pWorkItemArray;
     VIR_BB_WORKLIST              workItemList;
-    VSC_MM*                      pMM = &pCFG->pmp.mmWrapper;
+    VSC_MM*                      pScratchMemPool;
     gctUINT                      bbIdx, ipdomBBIdx, pdomCount;
     gctINT                       bbIdxS, bbIdxT;
     VSC_BIT_VECTOR               workingSet;
@@ -1868,12 +1919,15 @@ VSC_ErrCode vscVIR_BuildPostDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
         return errCode;
     }
 
+    pScratchMemPool = pCFG->pOwnerFuncBlk->pOwnerCG->pScratchMemPool;
+    gcmASSERT(pScratchMemPool);
+
     /*
      *  Firstly resolve pdom set of each block
      */
 
     /* Get PO of CFG */
-    ppBasicBlkPO = (VIR_BASIC_BLOCK**)vscMM_Alloc(pMM, sizeof(VIR_BASIC_BLOCK*)*countOfBasicBlk);
+    ppBasicBlkPO = (VIR_BASIC_BLOCK**)vscMM_Alloc(pScratchMemPool, sizeof(VIR_BASIC_BLOCK*)*countOfBasicBlk);
     vscDG_PreOrderTraversal(&pCFG->dgGraph,
                             VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                             gcvTRUE,
@@ -1882,16 +1936,15 @@ VSC_ErrCode vscVIR_BuildPostDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
 
     /* Allocate workitem array corresponding basic block. Note as iterative analyzer will use id of
        basicblk to index workitem, history node count will be used to allocate these contents */
-    pWorkItemArray = (VIR_BB_WORKITEM*)vscMM_Alloc(pMM,
-                                                   sizeof(VIR_BB_WORKITEM)*
-                                                   hisCountOfBasicBlk);
+    pWorkItemArray = (VIR_BB_WORKITEM*)vscMM_Alloc(pScratchMemPool,
+                                                   sizeof(VIR_BB_WORKITEM)*hisCountOfBasicBlk);
 
     BB_WORKLIST_INIT(&workItemList);
 
     /* Initialize workitem list and pdom-set of each BB */
     for (bbIdx = 0; bbIdx < countOfBasicBlk; bbIdx ++)
     {
-        vscBV_Initialize(&ppBasicBlkPO[bbIdx]->postDomSet, pMM, hisCountOfBasicBlk);
+        vscBV_Initialize(&ppBasicBlkPO[bbIdx]->postDomSet, pScratchMemPool, hisCountOfBasicBlk);
 
         /* Initialize each workitem, and add it to workitem list. Note that exit block won't
            be added into workitem list because it won't be changed when iterating */
@@ -1912,7 +1965,7 @@ VSC_ErrCode vscVIR_BuildPostDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
     }
 
     /* Prepare working set */
-    vscBV_Initialize(&workingSet, pMM, hisCountOfBasicBlk);
+    vscBV_Initialize(&workingSet, pScratchMemPool, hisCountOfBasicBlk);
 
     do
     {
@@ -1959,24 +2012,24 @@ VSC_ErrCode vscVIR_BuildPostDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
 
     /* Allocate ipdom set array corresponding basic block. Note as algorithm will use id of
        basicblk to index workitem, history node count will be used to allocate these contents */
-    pIpdomSetArray = (VSC_BIT_VECTOR*)vscMM_Alloc(pMM,
+    pIpdomSetArray = (VSC_BIT_VECTOR*)vscMM_Alloc(pScratchMemPool,
                                                    sizeof(VSC_BIT_VECTOR)*
                                                    hisCountOfBasicBlk);
-    pPdomSetArray = (VSC_BIT_VECTOR*)vscMM_Alloc(pMM,
+    pPdomSetArray = (VSC_BIT_VECTOR*)vscMM_Alloc(pScratchMemPool,
                                                  sizeof(VSC_BIT_VECTOR)*
                                                  hisCountOfBasicBlk);
-    ppHisBlockArray = (VIR_BASIC_BLOCK**)vscMM_Alloc(pMM,
+    ppHisBlockArray = (VIR_BASIC_BLOCK**)vscMM_Alloc(pScratchMemPool,
                                                      sizeof(VIR_BASIC_BLOCK*)*
                                                      hisCountOfBasicBlk);
 
     /* Initilize ipdom set with self bit removed */
     for (bbIdx = 0; bbIdx < countOfBasicBlk; bbIdx ++)
     {
-        vscBV_Initialize(&pIpdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pMM, hisCountOfBasicBlk);
+        vscBV_Initialize(&pIpdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pScratchMemPool, hisCountOfBasicBlk);
         vscBV_Copy(&pIpdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], &ppBasicBlkPO[bbIdx]->postDomSet);
         vscBV_ClearBit(&pIpdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], ppBasicBlkPO[bbIdx]->dgNode.id);
 
-        vscBV_Initialize(&pPdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pMM, hisCountOfBasicBlk);
+        vscBV_Initialize(&pPdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pScratchMemPool, hisCountOfBasicBlk);
         vscBV_Copy(&pPdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], &pIpdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id]);
 
         /* Initialize worklist again for tree build in last stage */
@@ -2070,11 +2123,11 @@ VSC_ErrCode vscVIR_BuildPostDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
         vscBV_Finalize(&pIpdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id]);
         vscBV_Finalize(&pPdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id]);
     }
-    vscMM_Free(pMM, pIpdomSetArray);
-    vscMM_Free(pMM, pPdomSetArray);
-    vscMM_Free(pMM, ppBasicBlkPO);
-    vscMM_Free(pMM, pWorkItemArray);
-    vscMM_Free(pMM, ppHisBlockArray);
+    vscMM_Free(pScratchMemPool, pIpdomSetArray);
+    vscMM_Free(pScratchMemPool, pPdomSetArray);
+    vscMM_Free(pScratchMemPool, ppBasicBlkPO);
+    vscMM_Free(pScratchMemPool, pWorkItemArray);
+    vscMM_Free(pScratchMemPool, ppHisBlockArray);
 
     return errCode;
 }
@@ -2515,7 +2568,7 @@ static gctBOOL _BbReach_Iterate_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLO
     VSC_BIT_VECTOR         tmpFlow;
     gctBOOL                bChanged = gcvFALSE;
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
+    vscBV_Initialize(&tmpFlow, (pBaseTsDFA->baseDFA).pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
 
     /* Out = Gen U (In - Kill) */
     vscBV_Minus2(&tmpFlow, pInFlow, pKillFlow);
@@ -2548,7 +2601,7 @@ static gctBOOL _BbReach_Combine_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLO
         return gcvFALSE;
     }
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
+    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
 
     /* In = U all-pred-Outs */
     VSC_ADJACENT_LIST_ITERATOR_INIT(&predEdgeIter, &pBasicBlock->dgNode.predList);
@@ -2582,7 +2635,7 @@ static gctBOOL _BbReach_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA*
 
     gcmASSERT(pBasicBlock->flowType == VIR_FLOW_TYPE_CALL);
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
+    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
 
     /* Out = In U (out flow of callee) */
     vscBV_Or2(&tmpFlow, pInFlow, &pCalleeFuncFlow->outFlow);
@@ -2610,7 +2663,7 @@ static gctBOOL _BbReach_Func_Flow_Combine_From_Callers_Resolver(VIR_BASE_TS_DFA*
     VSC_BIT_VECTOR               tmpFlow;
     gctBOOL                      bChanged = gcvFALSE;
 
-    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
+    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pScratchMemPool, pBaseTsDFA->baseDFA.flowSize);
 
     /* U all in flow of caller at every call site */
     VSC_ADJACENT_LIST_ITERATOR_INIT(&callerIter, &pCalleeFuncBlock->dgNode.predList);
@@ -2793,6 +2846,52 @@ VSC_ErrCode vscVIR_DestroyBbReachRelation(VIR_Shader* pShader)
         }
     }
 
+    return errCode;
+}
+
+VSC_ErrCode vscVIR_CleanDfsVisitOrderIdxOnFunc(VIR_Function* pFunc)
+{
+    VSC_ErrCode             errCode  = VSC_ERR_NONE;
+    VIR_CONTROL_FLOW_GRAPH* pCfg = VIR_Function_GetCFG(pFunc);
+    VIR_BASIC_BLOCK*        pBB = gcvNULL;
+    CFG_ITERATOR            cfgIter;
+
+    CFG_ITERATOR_INIT(&cfgIter, pCfg);
+    for (pBB = CFG_ITERATOR_FIRST(&cfgIter);
+         pBB != gcvNULL;
+         pBB = CFG_ITERATOR_NEXT(&cfgIter))
+    {
+        pBB->dfsPostVisitOrderIdx = NOT_ASSIGNED;
+        pBB->dfsPreVisitOrderIdx = NOT_ASSIGNED;
+    }
+
+    return errCode;
+}
+
+VSC_ErrCode vscVIR_CleanDfsVisitOrderIdxOnShader(VIR_Shader* pShader)
+{
+    VSC_ErrCode             errCode  = VSC_ERR_NONE;
+    VIR_FuncIterator        func_iter;
+    VIR_FunctionNode*       pFuncNode  = gcvNULL;
+    VIR_Function*           pFunc = gcvNULL;
+
+    if (!vscVIR_IsCFGBuilt(pShader))
+    {
+        return errCode;
+    }
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for(pFuncNode = VIR_FuncIterator_First(&func_iter);
+        pFuncNode != gcvNULL;
+        pFuncNode = VIR_FuncIterator_Next(&func_iter))
+    {
+        pFunc = pFuncNode->function;
+
+        errCode = vscVIR_CleanDfsVisitOrderIdxOnFunc(pFunc);
+        ON_ERROR(errCode, "Clean DFS visit order index on function.");
+    }
+
+OnError:
     return errCode;
 }
 

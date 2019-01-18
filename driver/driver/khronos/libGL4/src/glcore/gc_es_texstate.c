@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -893,6 +893,38 @@ __GL_INLINE GLvoid  __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint t
         }
         break;
 
+#ifdef OPENGL40
+    case GL_TEXTURE_SWIZZLE_RGBA:
+        {
+            GLuint i;
+            for (i = 0; i < 4; i++)
+            {
+                param = __glFloat2NearestInt(pv[i]);
+                switch (param)
+                {
+                case GL_RED:
+                case GL_GREEN:
+                case GL_BLUE:
+                case GL_ALPHA:
+                case GL_ZERO:
+                case GL_ONE:
+                    {
+                        if (tex->params.swizzle[i] != (GLenum)param)
+                        {
+                            tex->params.swizzle[i] = (GLenum)param;
+                            dirty = __GL_TEXPARAM_SWIZZLE_R_BIT << i;
+                            tex->uObjStateDirty.s.swizzleDirty = GL_TRUE;
+                        }
+                    }
+                    break;
+                default:
+                    __GL_ERROR_RET(GL_INVALID_ENUM);
+                }
+            }
+        }
+        break;
+#endif
+
     case GL_DEPTH_STENCIL_TEXTURE_MODE:
         switch (param)
         {
@@ -934,9 +966,6 @@ __GL_INLINE GLvoid  __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint t
             __GL_ERROR_RET(GL_INVALID_ENUM);
         }
         break;
-#ifdef OPENGL40
-        /* GL_TEXTURE_BORDER_COLOR is same as GL_TEXTURE_BORDER_COLOR_EXT */
-#endif
     case GL_TEXTURE_BORDER_COLOR_EXT:
         if (__glExtension[__GL_EXTID_EXT_texture_border_clamp].bEnabled)
         {
@@ -957,7 +986,7 @@ __GL_INLINE GLvoid  __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint t
     tex->seqNumber++;
 }
 
-GLvoid GL_APIENTRY __gles_TexParameterfv(__GLcontext *gc, GLenum target, GLenum pname, const GLfloat *pv)
+GLvoid GL_APIENTRY __glim_TexParameterfv(__GLcontext *gc, GLenum target, GLenum pname, const GLfloat *pv)
 {
     GLuint targetIdx;
     __GLtextureObject *activeTex;
@@ -979,6 +1008,11 @@ GLvoid GL_APIENTRY __gles_TexParameterfv(__GLcontext *gc, GLenum target, GLenum 
     case GL_TEXTURE_1D_ARRAY:
         targetIdx = __GL_TEXTURE_1D_ARRAY_INDEX;
         break;
+#if GL_ARB_texture_rectangle
+    case GL_TEXTURE_RECTANGLE_ARB:
+        targetIdx = __GL_TEXTURE_RECTANGLE_INDEX;
+        break;
+#endif
 #endif
     case GL_TEXTURE_2D_ARRAY:
         targetIdx = __GL_TEXTURE_2D_ARRAY_INDEX;
@@ -1028,7 +1062,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_TexParameterf(__GLcontext *gc, GLenum target, GLenum pname, GLfloat f)
+GLvoid GL_APIENTRY __glim_TexParameterf(__GLcontext *gc, GLenum target, GLenum pname, GLfloat f)
 {
     GLuint targetIdx;
     __GLtextureObject *activeTex;
@@ -1096,6 +1130,11 @@ GLvoid GL_APIENTRY __gles_TexParameterf(__GLcontext *gc, GLenum target, GLenum p
     case GL_TEXTURE_1D_ARRAY:
         targetIdx = __GL_TEXTURE_1D_ARRAY_INDEX;
         break;
+#if GL_ARB_texture_rectangle
+    case GL_TEXTURE_RECTANGLE_ARB:
+        targetIdx = __GL_TEXTURE_RECTANGLE_INDEX;
+        break;
+#endif
 #endif
     case GL_TEXTURE_2D_ARRAY:
         targetIdx = __GL_TEXTURE_2D_ARRAY_INDEX;
@@ -1148,7 +1187,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_TexParameteriv(__GLcontext *gc, GLenum target, GLenum pname, const GLint *pv)
+GLvoid GL_APIENTRY __glim_TexParameteriv(__GLcontext *gc, GLenum target, GLenum pname, const GLint *pv)
 {
     GLuint targetIdx;
     __GLtextureObject *activeTex;
@@ -1171,6 +1210,11 @@ GLvoid GL_APIENTRY __gles_TexParameteriv(__GLcontext *gc, GLenum target, GLenum 
     case GL_TEXTURE_1D_ARRAY:
         targetIdx = __GL_TEXTURE_1D_ARRAY_INDEX;
         break;
+#if GL_ARB_texture_rectangle
+    case GL_TEXTURE_RECTANGLE_ARB:
+        targetIdx = __GL_TEXTURE_RECTANGLE_INDEX;
+        break;
+#endif
 #endif
     case GL_TEXTURE_2D_ARRAY:
         targetIdx = __GL_TEXTURE_2D_ARRAY_INDEX;
@@ -1203,7 +1247,26 @@ GLvoid GL_APIENTRY __gles_TexParameteriv(__GLcontext *gc, GLenum target, GLenum 
 
     if (pname == GL_TEXTURE_BORDER_COLOR_EXT)
     {
-        __GL_MEMCOPY(tmpf, pv, 4 * sizeof(GLfloat));
+        if ((__GL_TEXTURE_2D_MS_INDEX == targetIdx) ||
+            (__GL_TEXTURE_2D_MS_ARRAY_INDEX == targetIdx))
+        {
+            __GL_ERROR_EXIT(GL_INVALID_ENUM);
+        }
+        else
+        {
+            tmpf[0] = __GL_I_TO_FLOAT(pv[0]);
+            tmpf[1] = __GL_I_TO_FLOAT(pv[1]);
+            tmpf[2] = __GL_I_TO_FLOAT(pv[2]);
+            tmpf[3] = __GL_I_TO_FLOAT(pv[3]);
+        }
+
+    }
+    else if (pname == GL_TEXTURE_SWIZZLE_RGBA)
+    {
+        tmpf[0] = (GLfloat)(pv[0]);
+        tmpf[1] = (GLfloat)(pv[1]);
+        tmpf[2] = (GLfloat)(pv[2]);
+        tmpf[3] = (GLfloat)(pv[3]);
     }
     else
     {
@@ -1230,7 +1293,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_TexParameteri(__GLcontext *gc, GLenum target, GLenum pname, GLint val)
+GLvoid GL_APIENTRY __glim_TexParameteri(__GLcontext *gc, GLenum target, GLenum pname, GLint val)
 {
     GLuint targetIdx;
     __GLtextureObject *activeTex;
@@ -1298,6 +1361,11 @@ GLvoid GL_APIENTRY __gles_TexParameteri(__GLcontext *gc, GLenum target, GLenum p
     case GL_TEXTURE_1D_ARRAY:
         targetIdx = __GL_TEXTURE_1D_ARRAY_INDEX;
         break;
+#if GL_ARB_texture_rectangle
+    case GL_TEXTURE_RECTANGLE_ARB:
+        targetIdx = __GL_TEXTURE_RECTANGLE_INDEX;
+        break;
+#endif
 #endif
     case GL_TEXTURE_2D_ARRAY:
         targetIdx = __GL_TEXTURE_2D_ARRAY_INDEX;
@@ -1501,62 +1569,71 @@ __glGetTexParameterfv(__GLcontext *gc, GLenum target, GLenum pname, GLfloat *v)
         v[0] = (GLfloat) params->contentProtected;
         break;
 #ifdef OPENGL40
-      case GL_DEPTH_TEXTURE_MODE:
-          v[0] = (GLfloat)params->sampler.depthTexMode;
-          break;
-      case GL_TEXTURE_LOD_BIAS:
-          v[0] = (GLfloat)params->sampler.lodBias;
-          break;
-      case GL_TEXTURE_PRIORITY:
-          v[0] = (GLfloat)params->sampler.priority;
-          break;
-      case GL_GENERATE_MIPMAP:
-          v[0] = (GLfloat)params->sampler.generateMipmap;
-          break;
-      case GL_TEXTURE_RESIDENT:
-         /*
-          v[0] = (*gc->dp.isTextureResident)(gc, tex);
-          */
-          v[0] = 0.0;
-          break;
+    case GL_DEPTH_TEXTURE_MODE:
+        v[0] = (GLfloat)params->sampler.depthTexMode;
+        break;
+    case GL_TEXTURE_LOD_BIAS:
+        v[0] = (GLfloat)params->sampler.lodBias;
+        break;
+    case GL_TEXTURE_PRIORITY:
+        v[0] = (GLfloat)params->sampler.priority;
+        break;
+    case GL_GENERATE_MIPMAP:
+        v[0] = (GLfloat)params->sampler.generateMipmap;
+        break;
+    case GL_TEXTURE_RESIDENT:
+     /*
+      v[0] = (*gc->dp.isTextureResident)(gc, tex);
+      */
+        v[0] = 0.0;
+        break;
+    case GL_TEXTURE_SWIZZLE_RGBA:
+        v[0] = (GLfloat)params->swizzle[0];
+        v[1] = (GLfloat)params->swizzle[1];
+        v[2] = (GLfloat)params->swizzle[2];
+        v[3] = (GLfloat)params->swizzle[3];
+        break;
 #endif
     default:
         __GL_ERROR_RET(GL_INVALID_ENUM);
     }
 }
 
-
-GLvoid GL_APIENTRY __gles_GetTexParameterfv(__GLcontext *gc, GLenum target, GLenum pname, GLfloat v[])
+GLvoid GL_APIENTRY __glim_GetTexParameterfv(__GLcontext *gc, GLenum target, GLenum pname, GLfloat v[])
 {
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
 
     __glGetTexParameterfv(gc, target, pname, v);
 
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetTexParameteriv(__GLcontext *gc, GLenum target, GLenum pname, GLint v[])
+GLvoid GL_APIENTRY __glim_GetTexParameteriv(__GLcontext *gc, GLenum target, GLenum pname, GLint v[])
 {
     GLfloat tmpf[4] = {0.0f};
 
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
 
     __glGetTexParameterfv(gc, target, pname, tmpf);
 
-    if (pname == GL_TEXTURE_BORDER_COLOR_EXT)
+    switch (pname)
     {
-        __GL_MEMCOPY(v, tmpf, 4 * sizeof(GLfloat));
-    }
-    else
-    {
-        if (tmpf[0] < 0)
-        {
-            v[0] = (GLint)(tmpf[0] - 0.5f);
-        }
-        else
-        {
-            v[0] = (GLint)(tmpf[0] + 0.5f);
-        }
+    case GL_TEXTURE_BORDER_COLOR_EXT:
+        v[0] = __GL_FLOAT_TO_I(tmpf[0]);
+        v[1] = __GL_FLOAT_TO_I(tmpf[1]);
+        v[2] = __GL_FLOAT_TO_I(tmpf[2]);
+        v[3] = __GL_FLOAT_TO_I(tmpf[3]);
+        break;
+    case GL_TEXTURE_SWIZZLE_RGBA:
+        v[0] = (GLint)(tmpf[0] + (tmpf[0] < 0 ? - 0.5f : 0.5f));
+        v[1] = (GLint)(tmpf[1] + (tmpf[1] < 0 ? - 0.5f : 0.5f));
+        v[2] = (GLint)(tmpf[2] + (tmpf[2] < 0 ? - 0.5f : 0.5f));
+        v[3] = (GLint)(tmpf[3] + (tmpf[3] < 0 ? - 0.5f : 0.5f));
+    default:
+        v[0] = (GLint)(tmpf[0] + (tmpf[0] < 0 ? - 0.5f : 0.5f));
+        break;
     }
 
     __GL_FOOTER();
@@ -1583,6 +1660,12 @@ __glGetTexLevelParameteriv(__GLcontext *gc, GLenum target, GLint level, GLenum p
       case GL_TEXTURE_1D:
           tex = unit->boundTextures[__GL_TEXTURE_1D_INDEX];
           break;
+      case GL_TEXTURE_1D_ARRAY:
+          tex = unit->boundTextures[__GL_TEXTURE_1D_ARRAY_INDEX];
+          break;
+      case GL_TEXTURE_RECTANGLE:
+          tex = unit->boundTextures[__GL_TEXTURE_RECTANGLE_INDEX];
+          break;
       case GL_PROXY_TEXTURE_1D:
           tex = &gc->texture.proxyTextures[__GL_TEXTURE_1D_INDEX];
           break;
@@ -1600,6 +1683,21 @@ __glGetTexLevelParameteriv(__GLcontext *gc, GLenum target, GLint level, GLenum p
           break;
       case GL_PROXY_TEXTURE_CUBE_MAP:
           tex = &gc->texture.proxyTextures[__GL_TEXTURE_CUBEMAP_INDEX];
+          break;
+      case GL_PROXY_TEXTURE_CUBE_MAP_ARRAY:
+          if (__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
+          {
+              tex= &gc->texture.proxyTextures[__GL_TEXTURE_CUBEMAP_ARRAY_INDEX];
+              break;
+          }
+      case GL_PROXY_TEXTURE_RECTANGLE:
+          tex = &gc->texture.proxyTextures[__GL_TEXTURE_RECTANGLE_INDEX];
+          break;
+      case GL_PROXY_TEXTURE_2D_MULTISAMPLE:
+          tex = &gc->texture.proxyTextures[__GL_TEXTURE_2D_MS_INDEX];
+          break;
+      case GL_PROXY_TEXTURE_2D_MULTISAMPLE_ARRAY:
+          tex = &gc->texture.proxyTextures[__GL_TEXTURE_2D_MS_ARRAY_INDEX];
           break;
 #endif
     case GL_TEXTURE_2D:
@@ -1810,22 +1908,24 @@ __glGetTexLevelParameteriv(__GLcontext *gc, GLenum target, GLint level, GLenum p
 }
 
 
-GLvoid GL_APIENTRY __gles_GetTexLevelParameteriv(__GLcontext *gc, GLenum target, GLint level,
+GLvoid GL_APIENTRY __glim_GetTexLevelParameteriv(__GLcontext *gc, GLenum target, GLint level,
                                                  GLenum pname, GLint *params)
 {
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
 
     __glGetTexLevelParameteriv(gc, target, level, pname, params);
 
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetTexLevelParameterfv(__GLcontext *gc, GLenum target, GLint level,
+GLvoid GL_APIENTRY __glim_GetTexLevelParameterfv(__GLcontext *gc, GLenum target, GLint level,
                                                  GLenum pname, GLfloat *params)
 {
     GLint tmpi = 0;
 
     __GL_HEADER();
+    __GL_SETUP_NOT_IN_BEGIN(gc);
 
     __glGetTexLevelParameteriv(gc, target, level, pname, &tmpi);
 
@@ -1835,7 +1935,7 @@ GLvoid GL_APIENTRY __gles_GetTexLevelParameterfv(__GLcontext *gc, GLenum target,
 }
 
 
-GLvoid GL_APIENTRY __gles_ActiveTexture(__GLcontext *gc, GLenum texture)
+GLvoid GL_APIENTRY __glim_ActiveTexture(__GLcontext *gc, GLenum texture)
 {
     __GL_HEADER();
 
@@ -1939,7 +2039,7 @@ GLvoid __glBindTexture(__GLcontext *gc, GLuint unitIdx, GLuint targetIndex, GLui
     (*gc->dp.bindTexture)(gc, texObj);
 }
 
-GLvoid GL_APIENTRY __gles_BindTexture(__GLcontext *gc, GLenum target, GLuint texture)
+GLvoid GL_APIENTRY __glim_BindTexture(__GLcontext *gc, GLenum target, GLuint texture)
 {
     GLuint targetIndex;
 
@@ -2020,7 +2120,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DeleteTextures(__GLcontext *gc, GLsizei n, const GLuint* textures)
+GLvoid GL_APIENTRY __glim_DeleteTextures(__GLcontext *gc, GLsizei n, const GLuint* textures)
 {
     GLint i;
 
@@ -2178,7 +2278,7 @@ GLboolean __glDeleteTextureObject(__GLcontext *gc, __GLtextureObject *tex)
     return GL_TRUE;
 }
 
-GLvoid GL_APIENTRY __gles_GenTextures(__GLcontext *gc, GLsizei n, GLuint *textures)
+GLvoid GL_APIENTRY __glim_GenTextures(__GLcontext *gc, GLsizei n, GLuint *textures)
 {
     GLint start, i;
 
@@ -2213,7 +2313,7 @@ OnExit:
     __GL_FOOTER();
 }
 
-GLboolean GL_APIENTRY __gles_IsTexture(__GLcontext *gc, GLuint texture)
+GLboolean GL_APIENTRY __glim_IsTexture(__GLcontext *gc, GLuint texture)
 {
     return (NULL != __glGetObject(gc, gc->texture.shared, texture));
 }
@@ -2642,7 +2742,7 @@ GLvoid __glFreeSamplerState(__GLcontext *gc)
     __glFreeSharedObjectState(gc, gc->sampler.shared);
 }
 
-GLvoid GL_APIENTRY __gles_GenSamplers(__GLcontext *gc, GLsizei count, GLuint* samplers)
+GLvoid GL_APIENTRY __glim_GenSamplers(__GLcontext *gc, GLsizei count, GLuint* samplers)
 {
     GLint start, i;
 
@@ -2676,7 +2776,7 @@ OnExit:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DeleteSamplers(__GLcontext *gc, GLsizei count, const GLuint* samplers)
+GLvoid GL_APIENTRY __glim_DeleteSamplers(__GLcontext *gc, GLsizei count, const GLuint* samplers)
 {
     GLint i;
 
@@ -2699,7 +2799,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLboolean GL_APIENTRY __gles_IsSampler(__GLcontext *gc, GLuint sampler)
+GLboolean GL_APIENTRY __glim_IsSampler(__GLcontext *gc, GLuint sampler)
 {
     GLboolean ret = GL_FALSE;
 
@@ -2716,7 +2816,7 @@ GLboolean GL_APIENTRY __gles_IsSampler(__GLcontext *gc, GLuint sampler)
     return ret;
 }
 
-GLvoid GL_APIENTRY __gles_BindSampler(__GLcontext *gc, GLuint unit, GLuint sampler)
+GLvoid GL_APIENTRY __glim_BindSampler(__GLcontext *gc, GLuint unit, GLuint sampler)
 {
     __GL_HEADER();
 
@@ -2731,7 +2831,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_SamplerParameteri(__GLcontext *gc, GLuint sampler, GLenum pname, GLint param)
+GLvoid GL_APIENTRY __glim_SamplerParameteri(__GLcontext *gc, GLuint sampler, GLenum pname, GLint param)
 {
     GLfloat ftemp[4];
     __GLsamplerObject *samplerObj = __glGetSamplerObject(gc, sampler);
@@ -2754,7 +2854,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_SamplerParameteriv(__GLcontext *gc, GLuint sampler, GLenum pname, const GLint* param)
+GLvoid GL_APIENTRY __glim_SamplerParameteriv(__GLcontext *gc, GLuint sampler, GLenum pname, const GLint* param)
 {
     GLfloat ftemp[4];
     __GLsamplerObject *samplerObj = __glGetSamplerObject(gc, sampler);
@@ -2763,7 +2863,10 @@ GLvoid GL_APIENTRY __gles_SamplerParameteriv(__GLcontext *gc, GLuint sampler, GL
 
     if (pname == GL_TEXTURE_BORDER_COLOR_EXT)
     {
-        __GL_MEMCOPY(ftemp, param, 4 * sizeof(GLfloat));
+        ftemp[0] = __GL_I_TO_FLOAT(param[0]);
+        ftemp[1] = __GL_I_TO_FLOAT(param[1]);
+        ftemp[2] = __GL_I_TO_FLOAT(param[2]);
+        ftemp[3] = __GL_I_TO_FLOAT(param[3]);
     }
     else
     {
@@ -2778,7 +2881,7 @@ GLvoid GL_APIENTRY __gles_SamplerParameteriv(__GLcontext *gc, GLuint sampler, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_SamplerParameterf(__GLcontext *gc, GLuint sampler, GLenum pname, GLfloat param)
+GLvoid GL_APIENTRY __glim_SamplerParameterf(__GLcontext *gc, GLuint sampler, GLenum pname, GLfloat param)
 {
     GLfloat ftemp[4];
 
@@ -2802,7 +2905,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_SamplerParameterfv(__GLcontext *gc, GLuint sampler, GLenum pname, const GLfloat* param)
+GLvoid GL_APIENTRY __glim_SamplerParameterfv(__GLcontext *gc, GLuint sampler, GLenum pname, const GLfloat* param)
 {
     __GLsamplerObject *samplerObj = __glGetSamplerObject(gc, sampler);
 
@@ -2816,38 +2919,36 @@ GLvoid GL_APIENTRY __gles_SamplerParameterfv(__GLcontext *gc, GLuint sampler, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetSamplerParameteriv(__GLcontext *gc, GLuint sampler, GLenum pname, GLint* params)
+GLvoid GL_APIENTRY __glim_GetSamplerParameteriv(__GLcontext *gc, GLuint sampler, GLenum pname, GLint* params)
 {
+    GLfloat tmpf[4] = {0.0f};
     __GLsamplerObject *samplerObj = __glGetSamplerObject(gc, sampler);
-    GLfloat ftemp[4] = {0.f};
 
     __GL_HEADER();
 
-    if ((samplerObj != gcvNULL))
+    if (samplerObj != gcvNULL)
     {
-        __glGetSamplerParameterfv(gc, samplerObj, pname, ftemp);
+        __glGetSamplerParameterfv(gc, samplerObj, pname, tmpf);
 
-        if (pname == GL_TEXTURE_BORDER_COLOR_EXT)
+        switch (pname)
         {
-            __GL_MEMCOPY(params, ftemp, 4 * sizeof(GLfloat));
-        }
-        else
-        {
-            if (ftemp[0] < 0)
-            {
-                params[0] = (GLint)(ftemp[0] - 0.5f);
-            }
-            else
-            {
-                params[0] = (GLint)(ftemp[0] + 0.5f);
-            }
+        case GL_TEXTURE_BORDER_COLOR_EXT:
+            params[0] = __GL_FLOAT_TO_I(tmpf[0]);
+            params[1] = __GL_FLOAT_TO_I(tmpf[1]);
+            params[2] = __GL_FLOAT_TO_I(tmpf[2]);
+            params[3] = __GL_FLOAT_TO_I(tmpf[3]);
+            break;
+        default:
+            params[0] = (GLint)(tmpf[0] + (tmpf[0] < 0 ? - 0.5f : 0.5f));
+            break;
         }
     }
+
 
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetSamplerParameterfv(__GLcontext *gc, GLuint sampler, GLenum pname, GLfloat* params)
+GLvoid GL_APIENTRY __glim_GetSamplerParameterfv(__GLcontext *gc, GLuint sampler, GLenum pname, GLfloat* params)
 {
     __GLsamplerObject *samplerObj = __glGetSamplerObject(gc, sampler);
 
@@ -2861,7 +2962,7 @@ GLvoid GL_APIENTRY __gles_GetSamplerParameterfv(__GLcontext *gc, GLuint sampler,
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_TexParameterIiv(__GLcontext *gc, GLenum target, GLenum pname, const GLint *params)
+GLvoid GL_APIENTRY __glim_TexParameterIiv(__GLcontext *gc, GLenum target, GLenum pname, const GLint *params)
 {
     GLuint targetIdx;
     __GLtextureObject *activeTex;
@@ -2931,7 +3032,7 @@ GLvoid GL_APIENTRY __gles_TexParameterIiv(__GLcontext *gc, GLenum target, GLenum
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_TexParameterIuiv(__GLcontext *gc, GLenum target, GLenum pname, const GLuint *params)
+GLvoid GL_APIENTRY __glim_TexParameterIuiv(__GLcontext *gc, GLenum target, GLenum pname, const GLuint *params)
 {
     GLuint targetIdx;
     __GLtextureObject *activeTex;
@@ -3003,7 +3104,7 @@ OnError:
 }
 
 
-GLvoid GL_APIENTRY __gles_SamplerParameterIiv(__GLcontext *gc, GLuint sampler, GLenum pname, const GLint *param)
+GLvoid GL_APIENTRY __glim_SamplerParameterIiv(__GLcontext *gc, GLuint sampler, GLenum pname, const GLint *param)
 {
     GLfloat ftemp[4];
     __GLsamplerObject *samplerObj = __glGetSamplerObject(gc, sampler);
@@ -3027,7 +3128,7 @@ GLvoid GL_APIENTRY __gles_SamplerParameterIiv(__GLcontext *gc, GLuint sampler, G
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_SamplerParameterIuiv(__GLcontext *gc, GLuint sampler, GLenum pname, const GLuint *param)
+GLvoid GL_APIENTRY __glim_SamplerParameterIuiv(__GLcontext *gc, GLuint sampler, GLenum pname, const GLuint *param)
 {
     GLfloat ftemp[4];
     __GLsamplerObject *samplerObj = __glGetSamplerObject(gc, sampler);
@@ -3051,7 +3152,7 @@ GLvoid GL_APIENTRY __gles_SamplerParameterIuiv(__GLcontext *gc, GLuint sampler, 
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetTexParameterIiv(__GLcontext *gc, GLenum target, GLenum pname, GLint *params)
+GLvoid GL_APIENTRY __glim_GetTexParameterIiv(__GLcontext *gc, GLenum target, GLenum pname, GLint *params)
 {
     GLfloat tmpf[4] = {0.0f};
 
@@ -3063,6 +3164,13 @@ GLvoid GL_APIENTRY __gles_GetTexParameterIiv(__GLcontext *gc, GLenum target, GLe
     {
         __GL_MEMCOPY(params, tmpf, 4 * sizeof(GLfloat));
     }
+    else if (pname == GL_TEXTURE_SWIZZLE_RGBA)
+    {
+        params[0] = (GLint)(tmpf[0] + (tmpf[0] < 0 ? - 0.5f : 0.5f));
+        params[1] = (GLint)(tmpf[1] + (tmpf[1] < 0 ? - 0.5f : 0.5f));
+        params[2] = (GLint)(tmpf[2] + (tmpf[2] < 0 ? - 0.5f : 0.5f));
+        params[3] = (GLint)(tmpf[3] + (tmpf[3] < 0 ? - 0.5f : 0.5f));
+    }
     else
     {
         if (tmpf[0] < 0)
@@ -3078,7 +3186,7 @@ GLvoid GL_APIENTRY __gles_GetTexParameterIiv(__GLcontext *gc, GLenum target, GLe
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetTexParameterIuiv(__GLcontext *gc, GLenum target, GLenum pname, GLuint *params)
+GLvoid GL_APIENTRY __glim_GetTexParameterIuiv(__GLcontext *gc, GLenum target, GLenum pname, GLuint *params)
 {
     GLfloat tmpf[4] = {0.0f};
 
@@ -3090,6 +3198,13 @@ GLvoid GL_APIENTRY __gles_GetTexParameterIuiv(__GLcontext *gc, GLenum target, GL
     {
        __GL_MEMCOPY(params, tmpf, 4 * sizeof(GLfloat));
     }
+    else if (pname == GL_TEXTURE_SWIZZLE_RGBA)
+    {
+        params[0] = (GLint)(tmpf[0] + (tmpf[0] < 0 ? - 0.5f : 0.5f));
+        params[1] = (GLint)(tmpf[1] + (tmpf[1] < 0 ? - 0.5f : 0.5f));
+        params[2] = (GLint)(tmpf[2] + (tmpf[2] < 0 ? - 0.5f : 0.5f));
+        params[3] = (GLint)(tmpf[3] + (tmpf[3] < 0 ? - 0.5f : 0.5f));
+    }
     else
     {
         if (tmpf[0] < 0)
@@ -3105,7 +3220,7 @@ GLvoid GL_APIENTRY __gles_GetTexParameterIuiv(__GLcontext *gc, GLenum target, GL
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetSamplerParameterIiv(__GLcontext *gc, GLuint sampler, GLenum pname, GLint *params)
+GLvoid GL_APIENTRY __glim_GetSamplerParameterIiv(__GLcontext *gc, GLuint sampler, GLenum pname, GLint *params)
 {
     __GLsamplerObject *samplerObj = __glGetSamplerObject(gc, sampler);
     GLfloat tmpf[4] = {0.0f};
@@ -3135,7 +3250,7 @@ GLvoid GL_APIENTRY __gles_GetSamplerParameterIiv(__GLcontext *gc, GLuint sampler
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetSamplerParameterIuiv(__GLcontext *gc, GLuint sampler, GLenum pname, GLuint *params)
+GLvoid GL_APIENTRY __glim_GetSamplerParameterIuiv(__GLcontext *gc, GLuint sampler, GLenum pname, GLuint *params)
 {
     __GLsamplerObject *samplerObj = __glGetSamplerObject(gc, sampler);
     GLfloat tmpf[4] = {0.0f};
@@ -3922,46 +4037,8 @@ GLvoid GL_APIENTRY __glim_GetTexGeniv(__GLcontext *gc, GLenum coord, GLenum pnam
 
 /* ES already got one, keep it for later referecne */
 
-GLvoid GL_APIENTRY __glim_GetTexLevelParameterfv(__GLcontext *gc, GLenum target, GLint level, GLenum pname, GLfloat v[])
-{
-    GLint ti = 0;
-    __GL_SETUP_NOT_IN_BEGIN(gc);
-    __glGetTexLevelParameteriv(gc, target, level, pname, &ti);
-    v[0] = (GLfloat)ti;
-}
-
-GLvoid GL_APIENTRY __glim_GetTexLevelParameteriv(__GLcontext *gc, GLenum target, GLint level, GLenum pname, GLint v[])
-{
-    __GL_SETUP_NOT_IN_BEGIN(gc);
-    __glGetTexLevelParameteriv(gc, target, level, pname, v);
-}
 
 /* ES already got one, keep it for later reference */
-
-GLvoid GL_APIENTRY __glim_GetTexParameterfv(__GLcontext *gc, GLenum target, GLenum pname, GLfloat v[])
-{
-    __GL_SETUP_NOT_IN_BEGIN(gc);
-    __glGetTexParameterfv(gc, target, pname, v);
-}
-
-GLvoid GL_APIENTRY __glim_GetTexParameteriv(__GLcontext *gc, GLenum target, GLenum pname, GLint v[])
-{
-    GLfloat tmpf[4] = {0.0, 0.0, 0.0, 0.0};
-    __GL_SETUP_NOT_IN_BEGIN(gc);
-    __glGetTexParameterfv(gc, target, pname, tmpf);
-
-    switch(pname) {
-      case GL_TEXTURE_BORDER_COLOR:
-          v[0] = __GL_FLOAT_TO_I(tmpf[0]);
-          v[1] = __GL_FLOAT_TO_I(tmpf[1]);
-          v[2] = __GL_FLOAT_TO_I(tmpf[2]);
-          v[3] = __GL_FLOAT_TO_I(tmpf[3]);
-          break;
-      default:
-          v[0] = (GLint)(tmpf[0]);
-          break;
-    }
-}
 
 GLvoid GL_APIENTRY __glim_GetTexParameterIivEXT(__GLcontext *gc, GLenum target, GLenum pname, GLint *params)
 {

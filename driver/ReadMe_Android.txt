@@ -47,9 +47,11 @@ Contents
             |
             +---coypbit              : Copybit driver for Android
             |
-            +---hwcomposer           : HWC driver for Android
+            +---hwcomposer0          : HWC driver for Android
             |
-            +---hwcomposer_v1        : HWC driver for Android Jellybean 4.2 and later
+            +---hwcomposer1          : HWC driver for Android Jellybean 4.2 and later
+            |
+            +---hwcomposer2          : HWC driver for Android N, 7.0 and later
             |
             \---gralloc              : gralloc driver for Android
 
@@ -96,7 +98,6 @@ Contents
         USE_PLATFORM_DRIVER         ?= 1
         USE_COPYBIT_MODE_FOR_ANDROID?= 1
         USE_LINUX_MODE_FOR_ANDROID  ?= 0
-        ENABLE_CACHED_VIDEO_MEMORY  ?= 1
 
   5) Set up Android build environment, typicaly,
 
@@ -148,9 +149,6 @@ Contents
 
     USE_LINUX_MODE_FOR_ANDROID   0     Build as vanilla Linux in Android environment with VDK backend; default value;
                                  1     Enable VDK backend support
-
-    ENABLE_CACHED_VIDEO_MEMORY   0     Disable caching for the video memory
-                                 1     Enable caching for the video memory; default value;
 
     BANK_BIT_START               0     Use default start bit of the bank defined in gc_hal_options.h
                   [BANK_BIT_START]     Specifies the start bit of the bank (inclusive).

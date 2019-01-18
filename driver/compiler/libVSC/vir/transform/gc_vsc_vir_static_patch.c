@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,7 +13,11 @@
 
 #include "gc_vsc.h"
 
-static VSC_ErrCode _DoPointCoordYDirectionPatch(VIR_Shader* pShader)
+static VSC_ErrCode _DoPointCoordYDirectionPatch(
+    VIR_DEF_USAGE_INFO*         pDuInfo,
+    VIR_Shader*                 pShader,
+    gctBOOL*                    pChanged
+    )
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     VIR_AttributeIdList*       pAttrIdLsts = VIR_Shader_GetAttributes(pShader);
@@ -22,6 +26,12 @@ static VSC_ErrCode _DoPointCoordYDirectionPatch(VIR_Shader* pShader)
     gctUINT                    attrIdx, attrSymId = VIR_INVALID_ID;
     gctBOOL                    bHasPointCoordAttr = gcvFALSE;
     VIR_Instruction*           pNewInsertedInst;
+    VIR_GENERAL_DU_ITERATOR    duIter;
+    VIR_USAGE*                 pUsage = gcvNULL;
+    VIR_Instruction*           pUsageInst = gcvNULL;
+    VIR_Operand*               pUsageOpnd = gcvNULL;
+    gctUINT                    defIdx;
+    VIR_DEF*                   pDef = gcvNULL;
 
     for (attrIdx = 0; attrIdx < attrCount; attrIdx ++)
     {
@@ -43,8 +53,29 @@ static VSC_ErrCode _DoPointCoordYDirectionPatch(VIR_Shader* pShader)
         return errCode;
     }
 
-    /* Add following inst at the begin of main routine:
+    /* We still need to check DU because sometimes isSymUnused is incorrect(for OGL/OES). */
+    duIter.bSameBBOnly = gcvFALSE;
+    duIter.defKey.pDefInst = VIR_INPUT_DEF_INST;
+    duIter.defKey.regNo = VIR_Symbol_GetVregIndex(pAttrSym);
+    duIter.defKey.channel = VIR_CHANNEL_Y;
+    duIter.pDuInfo = pDuInfo;
 
+    /* If it is not defined, just bail out. */
+    defIdx = vscBT_HashSearch(&pDuInfo->defTable, &duIter.defKey);
+    if (VIR_INVALID_DEF_INDEX == defIdx)
+    {
+        return errCode;
+    }
+
+    /* If it is defined, but not used, just bail out */
+    pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, defIdx);
+    gcmASSERT(pDef);
+    if (DU_CHAIN_GET_USAGE_COUNT(&pDef->duChain) == 0)
+    {
+        return errCode;
+    }
+
+    /* Add following inst at the begin of main routine:
        sub pointCoord.y, 1, pointCoord.y
     */
 
@@ -67,11 +98,68 @@ static VSC_ErrCode _DoPointCoordYDirectionPatch(VIR_Shader* pShader)
     VIR_Operand_SetSwizzle(VIR_Inst_GetSource(pNewInsertedInst, VIR_Operand_Src1), VIR_SWIZZLE_YYYY);
     VIR_Operand_SetPrecision(VIR_Inst_GetSource(pNewInsertedInst, VIR_Operand_Src1), VIR_Symbol_GetPrecision(pAttrSym));
 
+    /* Add def. */
+    vscVIR_AddNewDef(pDuInfo,
+                     pNewInsertedInst,
+                     VIR_Symbol_GetVregIndex(pAttrSym),
+                     1,
+                     VIR_ENABLE_Y,
+                     VIR_HALF_CHANNEL_MASK_FULL,
+                     gcvNULL,
+                     gcvNULL);
+
+    /* Add a new def for all its usages. */
+    vscVIR_InitGeneralDuIterator(&duIter,
+                                 pDuInfo,
+                                 VIR_INPUT_DEF_INST,
+                                 VIR_Symbol_GetVregIndex(pAttrSym),
+                                 VIR_CHANNEL_Y,
+                                 gcvFALSE);
+    for (pUsage = vscVIR_GeneralDuIterator_First(&duIter);
+         pUsage != gcvNULL;
+         pUsage = vscVIR_GeneralDuIterator_Next(&duIter))
+    {
+        pUsageInst = pUsage->usageKey.pUsageInst;
+        pUsageOpnd = pUsage->usageKey.pOperand;
+
+        vscVIR_AddNewUsageToDef(pDuInfo,
+                                pNewInsertedInst,
+                                pUsageInst,
+                                pUsageOpnd,
+                                gcvFALSE,
+                                VIR_Symbol_GetVregIndex(pAttrSym),
+                                1,
+                                VIR_ENABLE_Y,
+                                VIR_HALF_CHANNEL_MASK_FULL,
+                                gcvNULL);
+    }
+
+    /* Add source1 usage. */
+    vscVIR_AddNewUsageToDef(pDuInfo,
+                            VIR_INPUT_DEF_INST,
+                            pNewInsertedInst,
+                            VIR_Inst_GetSource(pNewInsertedInst, VIR_Operand_Src1),
+                            gcvFALSE,
+                            VIR_Symbol_GetVregIndex(pAttrSym),
+                            1,
+                            VIR_ENABLE_Y,
+                            VIR_HALF_CHANNEL_MASK_FULL,
+                            gcvNULL);
+
+    if (pChanged)
+    {
+        *pChanged = gcvTRUE;
+    }
+
 OnError:
     return errCode;
 }
 
-VSC_ErrCode _DoOutSampleMaskPatch(VIR_Shader* pShader)
+VSC_ErrCode _DoOutSampleMaskPatch(
+    VIR_DEF_USAGE_INFO*         pDuInfo,
+    VIR_Shader*                 pShader,
+    gctBOOL*                    pChanged
+    )
 {
     VSC_ErrCode       errCode = VSC_ERR_NONE;
     VIR_FuncIterator  func_iter;
@@ -82,6 +170,7 @@ VSC_ErrCode _DoOutSampleMaskPatch(VIR_Shader* pShader)
     VIR_SymId         newDstSymId;
     gctUINT           newDstRegNo;
     VIR_Instruction*  newInst;
+    gctBOOL           hasHalti5 = gcHWCaps.hwFeatureFlags.hasHalti5;
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
@@ -106,16 +195,44 @@ VSC_ErrCode _DoOutSampleMaskPatch(VIR_Shader* pShader)
             if (VIR_Symbol_GetKind(dstSym) == VIR_SYM_VIRREG)
             {
                 varSym = VIR_Symbol_GetVregVariable(dstSym);
+
+                /* the builtin output variable gl_SampleMask is a special variables, it is
+                 * allocated to r0.z last 4 bits, the other bits are input values for other
+                 * purpose which cannot be changed, so we must only change the last 4 bits
+                 */
                 if (varSym && VIR_Symbol_GetName(varSym) == VIR_NAME_SAMPLE_MASK)
                 {
-                    VIR_Operand *opnd;
+                    VIR_Operand* opnd = gcvNULL;
+                    VIR_OperandInfo dstOpndInfo;
+
                     dstTypeId = VIR_Operand_GetTypeId(dst);
+                    VIR_Operand_GetOperandInfo(inst, dst, &dstOpndInfo);
 
                     /* Since MSAA count we supported is less than 32, and bits we can write for sample-mask
                        has only be 0~3 for a specific channel, so we temp change starr to mov. For general
                        solution, we should do loop optimization to remove all indexed access */
                     if (VIR_Inst_GetOpcode(inst) == VIR_OP_STARR)
                     {
+                        VIR_OperandInfo opndInfo;
+
+                        opnd = VIR_Inst_GetSource(inst, 0);
+                        VIR_Operand_GetOperandInfo(inst, opnd, &opndInfo);
+
+                        if (opndInfo.isVreg)
+                        {
+                            /* Delete usage first. */
+                            vscVIR_DeleteUsage(pDuInfo,
+                                               VIR_ANY_DEF_INST,
+                                               inst,
+                                               opnd,
+                                               gcvFALSE,
+                                               opndInfo.u1.virRegInfo.virReg,
+                                               1,
+                                               VIR_TypeId_Conv2Enable(VIR_Operand_GetTypeId(opnd)),
+                                               VIR_HALF_CHANNEL_MASK_FULL,
+                                               gcvNULL);
+                        }
+
                         VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
                         VIR_Inst_ChangeSource(inst, VIR_Operand_Src0, VIR_Inst_GetSource(inst, VIR_Operand_Src1));
                         VIR_Inst_SetSource(inst, VIR_Operand_Src1, gcvNULL);
@@ -125,70 +242,286 @@ VSC_ErrCode _DoOutSampleMaskPatch(VIR_Shader* pShader)
                     /* Add a new-temp-reg number */
                     newDstRegNo = VIR_Shader_NewVirRegId(pShader, 1);
                     errCode = VIR_Shader_AddSymbol(pShader,
-                                                   VIR_SYM_VIRREG,
-                                                   newDstRegNo,
-                                                   VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT32),
-                                                   VIR_STORAGE_UNKNOWN,
-                                                   &newDstSymId);
+                                                    VIR_SYM_VIRREG,
+                                                    newDstRegNo,
+                                                    VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT32),
+                                                    VIR_STORAGE_UNKNOWN,
+                                                    &newDstSymId);
                     ON_ERROR(errCode, "Add symbol");
 
                     /* Set dst to this new temp reg number */
                     VIR_Operand_SetTempRegister(dst, func, newDstSymId, VIR_TYPE_UINT32);
 
-                    /* sample-mask-out = sample-mask-out & 0xFFFFFFF0 */
+                    /* Delete the def, usage, and add a new def. */
+                    vscVIR_DeleteDef(pDuInfo,
+                                     inst,
+                                     dstOpndInfo.u1.virRegInfo.virReg,
+                                     1,
+                                     VIR_Operand_GetEnable(dst),
+                                     VIR_HALF_CHANNEL_MASK_FULL,
+                                     gcvNULL);
 
-                    errCode = VIR_Function_AddInstructionAfter(func, VIR_OP_AND_BITWISE, VIR_TYPE_UINT32, inst, gcvTRUE, &newInst);
-                    ON_ERROR(errCode, "Add instruction after");
+                    vscVIR_DeleteUsage(pDuInfo,
+                                       inst,
+                                       VIR_OUTPUT_USAGE_INST,
+                                       (VIR_Operand*)(gctUINTPTR_T)dstOpndInfo.u1.virRegInfo.virReg,
+                                       gcvFALSE,
+                                       dstOpndInfo.u1.virRegInfo.virReg,
+                                       1,
+                                       VIR_Operand_GetEnable(dst),
+                                       VIR_HALF_CHANNEL_MASK_FULL,
+                                       gcvNULL);
 
-                    VIR_Operand_SetTempRegister(VIR_Inst_GetDest(newInst), func, dstSym->index, dstTypeId);
-                    VIR_Operand_SetEnable(VIR_Inst_GetDest(newInst), VIR_ENABLE_X);
-                    VIR_Operand_SetPrecision(VIR_Inst_GetDest(newInst), VIR_Symbol_GetPrecision(dstSym));
+                    vscVIR_AddNewDef(pDuInfo,
+                                     inst,
+                                     newDstRegNo,
+                                     1,
+                                     VIR_ENABLE_X,
+                                     VIR_HALF_CHANNEL_MASK_FULL,
+                                     gcvNULL,
+                                     gcvNULL);
 
-                    opnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src0);
-                    VIR_Operand_SetTempRegister(opnd, func, dstSym->index, dstTypeId);
-                    VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_X);
-                    VIR_Operand_SetPrecision(opnd, VIR_Symbol_GetPrecision(dstSym));
+                    if (hasHalti5)
+                    {
+                        /* use bit_insert to only change the last 4 bits for Halti5:
+                         *  BITINSERT1  sample-mask-out, sample-mask-out, new-temp-reg, (4<<8) | 0
+                         */
+                        errCode = VIR_Function_AddInstructionAfter(func, VIR_OP_BITINSERT1, VIR_TYPE_UINT32, inst, gcvTRUE, &newInst);
+                        ON_ERROR(errCode, "Add instruction after");
 
-                    opnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src1);
-                    VIR_Operand_SetImmediateUint(opnd, 0xFFFFFFF0);
+                        VIR_Operand_SetTempRegister(VIR_Inst_GetDest(newInst), func, dstSym->index, dstTypeId);
+                        VIR_Operand_SetEnable(VIR_Inst_GetDest(newInst), VIR_ENABLE_X);
+                        VIR_Operand_SetPrecision(VIR_Inst_GetDest(newInst), VIR_Symbol_GetPrecision(dstSym));
 
-                    /* new-temp-reg = new-temp-reg & 0x0000000F */
+                        opnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src0);
+                        VIR_Operand_SetTempRegister(opnd, func, dstSym->index, dstTypeId);
+                        VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_X);
+                        VIR_Operand_SetPrecision(opnd, VIR_Symbol_GetPrecision(dstSym));
 
-                    errCode = VIR_Function_AddInstructionAfter(func, VIR_OP_AND_BITWISE, VIR_TYPE_UINT32, newInst, gcvTRUE, &newInst);
-                    ON_ERROR(errCode, "Add instruction after");
+                        opnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src1);
+                        VIR_Operand_SetTempRegister(opnd, func, newDstSymId, VIR_TYPE_UINT32);
+                        VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_X);
 
-                    VIR_Operand_SetTempRegister(VIR_Inst_GetDest(newInst), func, newDstSymId, VIR_TYPE_UINT32);
-                    VIR_Operand_SetEnable(VIR_Inst_GetDest(newInst), VIR_ENABLE_X);
+                        opnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src2);
+                        VIR_Operand_SetImmediateUint(opnd, ((4 << 8) | 0));
 
-                    opnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src0);
-                    VIR_Operand_SetTempRegister(opnd, func, newDstSymId, VIR_TYPE_UINT32);
-                    VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_X);
+                        /* Add def. */
+                        vscVIR_AddNewDef(pDuInfo,
+                                         newInst,
+                                         dstOpndInfo.u1.virRegInfo.virReg,
+                                         1,
+                                         VIR_ENABLE_X,
+                                         VIR_HALF_CHANNEL_MASK_FULL,
+                                         gcvNULL,
+                                         gcvNULL);
 
-                    opnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src1);
-                    VIR_Operand_SetImmediateUint(opnd, 0x0000000F);
+                        /* Add output usage. */
+                        vscVIR_AddNewUsageToDef(pDuInfo,
+                                                newInst,
+                                                VIR_OUTPUT_USAGE_INST,
+                                                (VIR_Operand*)(gctUINTPTR_T)dstOpndInfo.u1.virRegInfo.virReg,
+                                                gcvFALSE,
+                                                dstOpndInfo.u1.virRegInfo.virReg,
+                                                1,
+                                                VIR_ENABLE_X,
+                                                VIR_HALF_CHANNEL_MASK_FULL,
+                                                gcvNULL);
 
-                    /* sample-mask-out = sample-mask-out | new-temp-reg */
+                        /* Add source0 usage. */
+                        vscVIR_AddNewUsageToDef(pDuInfo,
+                                                VIR_INPUT_DEF_INST,
+                                                newInst,
+                                                VIR_Inst_GetSource(newInst, VIR_Operand_Src0),
+                                                gcvFALSE,
+                                                dstOpndInfo.u1.virRegInfo.virReg,
+                                                1,
+                                                VIR_ENABLE_X,
+                                                VIR_HALF_CHANNEL_MASK_FULL,
+                                                gcvNULL);
 
-                    errCode = VIR_Function_AddInstructionAfter(func, VIR_OP_OR_BITWISE, VIR_TYPE_UINT32, newInst, gcvTRUE, &newInst);
-                    ON_ERROR(errCode, "Add instruction after");
+                        /* Add source1 usage. */
+                        vscVIR_AddNewUsageToDef(pDuInfo,
+                                                inst,
+                                                newInst,
+                                                VIR_Inst_GetSource(newInst, VIR_Operand_Src1),
+                                                gcvFALSE,
+                                                newDstRegNo,
+                                                1,
+                                                VIR_ENABLE_X,
+                                                VIR_HALF_CHANNEL_MASK_FULL,
+                                                gcvNULL);
 
-                    VIR_Operand_SetTempRegister(VIR_Inst_GetDest(newInst), func, dstSym->index, dstTypeId);
-                    VIR_Operand_SetEnable(VIR_Inst_GetDest(newInst), VIR_ENABLE_X);
-                    VIR_Operand_SetPrecision(VIR_Inst_GetDest(newInst), VIR_Symbol_GetPrecision(dstSym));
+                        /* Move 1 new inst steps */
+                        inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter);
+                    }
+                    else
+                    {
+                        VIR_Instruction*    pSampleFirstDef;
+                        VIR_Instruction*    pNewDstFirstDef;
+                        /* sample-mask-out = sample-mask-out & 0xFFFFFFF0 */
 
-                    opnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src0);
-                    VIR_Operand_SetTempRegister(opnd, func, dstSym->index, dstTypeId);
-                    VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_X);
-                    VIR_Operand_SetPrecision(opnd, VIR_Symbol_GetPrecision(dstSym));
+                        errCode = VIR_Function_AddInstructionAfter(func, VIR_OP_AND_BITWISE, VIR_TYPE_UINT32, inst, gcvTRUE, &newInst);
+                        ON_ERROR(errCode, "Add instruction after");
+                        pSampleFirstDef = newInst;
 
-                    opnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src1);
-                    VIR_Operand_SetTempRegister(opnd, func, newDstSymId, VIR_TYPE_UINT32);
-                    VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_X);
+                        VIR_Operand_SetTempRegister(VIR_Inst_GetDest(newInst), func, dstSym->index, dstTypeId);
+                        VIR_Operand_SetEnable(VIR_Inst_GetDest(newInst), VIR_ENABLE_X);
+                        VIR_Operand_SetPrecision(VIR_Inst_GetDest(newInst), VIR_Symbol_GetPrecision(dstSym));
 
-                    /* Move 3 new inst steps */
-                    inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter);
-                    inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter);
-                    inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter);
+                        opnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src0);
+                        VIR_Operand_SetTempRegister(opnd, func, dstSym->index, dstTypeId);
+                        VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_X);
+                        VIR_Operand_SetPrecision(opnd, VIR_Symbol_GetPrecision(dstSym));
+
+                        opnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src1);
+                        VIR_Operand_SetImmediateUint(opnd, 0xFFFFFFF0);
+
+                        /* Add def. */
+                        vscVIR_AddNewDef(pDuInfo,
+                                         newInst,
+                                         dstOpndInfo.u1.virRegInfo.virReg,
+                                         1,
+                                         VIR_ENABLE_X,
+                                         VIR_HALF_CHANNEL_MASK_FULL,
+                                         gcvNULL,
+                                         gcvNULL);
+
+                        /* Add output usage. */
+                        vscVIR_AddNewUsageToDef(pDuInfo,
+                                                newInst,
+                                                VIR_OUTPUT_USAGE_INST,
+                                                (VIR_Operand*)(gctUINTPTR_T)dstOpndInfo.u1.virRegInfo.virReg,
+                                                gcvFALSE,
+                                                dstOpndInfo.u1.virRegInfo.virReg,
+                                                1,
+                                                VIR_ENABLE_X,
+                                                VIR_HALF_CHANNEL_MASK_FULL,
+                                                gcvNULL);
+
+                        /* Add source0 usage. */
+                        vscVIR_AddNewUsageToDef(pDuInfo,
+                                                VIR_INPUT_DEF_INST,
+                                                newInst,
+                                                VIR_Inst_GetSource(newInst, VIR_Operand_Src0),
+                                                gcvFALSE,
+                                                dstOpndInfo.u1.virRegInfo.virReg,
+                                                1,
+                                                VIR_ENABLE_X,
+                                                VIR_HALF_CHANNEL_MASK_FULL,
+                                                gcvNULL);
+
+                        /* new-temp-reg = new-temp-reg & 0x0000000F */
+
+                        errCode = VIR_Function_AddInstructionAfter(func, VIR_OP_AND_BITWISE, VIR_TYPE_UINT32, newInst, gcvTRUE, &newInst);
+                        ON_ERROR(errCode, "Add instruction after");
+                        pNewDstFirstDef = newInst;
+
+                        VIR_Operand_SetTempRegister(VIR_Inst_GetDest(newInst), func, newDstSymId, VIR_TYPE_UINT32);
+                        VIR_Operand_SetEnable(VIR_Inst_GetDest(newInst), VIR_ENABLE_X);
+
+                        opnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src0);
+                        VIR_Operand_SetTempRegister(opnd, func, newDstSymId, VIR_TYPE_UINT32);
+                        VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_X);
+
+                        opnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src1);
+                        VIR_Operand_SetImmediateUint(opnd, 0x0000000F);
+
+                        /* Add def. */
+                        vscVIR_AddNewDef(pDuInfo,
+                                         newInst,
+                                         newDstRegNo,
+                                         1,
+                                         VIR_ENABLE_X,
+                                         VIR_HALF_CHANNEL_MASK_FULL,
+                                         gcvNULL,
+                                         gcvNULL);
+
+                        /* Add source0 usage. */
+                        vscVIR_AddNewUsageToDef(pDuInfo,
+                                                inst,
+                                                newInst,
+                                                VIR_Inst_GetSource(newInst, VIR_Operand_Src0),
+                                                gcvFALSE,
+                                                newDstRegNo,
+                                                1,
+                                                VIR_ENABLE_X,
+                                                VIR_HALF_CHANNEL_MASK_FULL,
+                                                gcvNULL);
+
+                        /* sample-mask-out = sample-mask-out | new-temp-reg */
+
+                        errCode = VIR_Function_AddInstructionAfter(func, VIR_OP_OR_BITWISE, VIR_TYPE_UINT32, newInst, gcvTRUE, &newInst);
+                        ON_ERROR(errCode, "Add instruction after");
+
+                        VIR_Operand_SetTempRegister(VIR_Inst_GetDest(newInst), func, dstSym->index, dstTypeId);
+                        VIR_Operand_SetEnable(VIR_Inst_GetDest(newInst), VIR_ENABLE_X);
+                        VIR_Operand_SetPrecision(VIR_Inst_GetDest(newInst), VIR_Symbol_GetPrecision(dstSym));
+
+                        opnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src0);
+                        VIR_Operand_SetTempRegister(opnd, func, dstSym->index, dstTypeId);
+                        VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_X);
+                        VIR_Operand_SetPrecision(opnd, VIR_Symbol_GetPrecision(dstSym));
+
+                        opnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src1);
+                        VIR_Operand_SetTempRegister(opnd, func, newDstSymId, VIR_TYPE_UINT32);
+                        VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_X);
+
+                        /* Add def. */
+                        vscVIR_AddNewDef(pDuInfo,
+                                         newInst,
+                                         dstOpndInfo.u1.virRegInfo.virReg,
+                                         1,
+                                         VIR_ENABLE_X,
+                                         VIR_HALF_CHANNEL_MASK_FULL,
+                                         gcvNULL,
+                                         gcvNULL);
+
+                        /* Add output usage. */
+                        vscVIR_AddNewUsageToDef(pDuInfo,
+                                                newInst,
+                                                VIR_OUTPUT_USAGE_INST,
+                                                (VIR_Operand*)(gctUINTPTR_T)dstOpndInfo.u1.virRegInfo.virReg,
+                                                gcvFALSE,
+                                                dstOpndInfo.u1.virRegInfo.virReg,
+                                                1,
+                                                VIR_ENABLE_X,
+                                                VIR_HALF_CHANNEL_MASK_FULL,
+                                                gcvNULL);
+
+                        /* Add source0 usage. */
+                        vscVIR_AddNewUsageToDef(pDuInfo,
+                                                pSampleFirstDef,
+                                                newInst,
+                                                VIR_Inst_GetSource(newInst, VIR_Operand_Src0),
+                                                gcvFALSE,
+                                                dstOpndInfo.u1.virRegInfo.virReg,
+                                                1,
+                                                VIR_ENABLE_X,
+                                                VIR_HALF_CHANNEL_MASK_FULL,
+                                                gcvNULL);
+
+                        /* Add source1 usage. */
+                        vscVIR_AddNewUsageToDef(pDuInfo,
+                                                pNewDstFirstDef,
+                                                newInst,
+                                                VIR_Inst_GetSource(newInst, VIR_Operand_Src1),
+                                                gcvFALSE,
+                                                newDstRegNo,
+                                                1,
+                                                VIR_ENABLE_X,
+                                                VIR_HALF_CHANNEL_MASK_FULL,
+                                                gcvNULL);
+
+                        /* Move 3 new inst steps */
+                        inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter);
+                        inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter);
+                        inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter);
+                    }
+
+                    if (pChanged)
+                    {
+                        *pChanged = gcvTRUE;
+                    }
                 }
             }
         }
@@ -198,7 +531,11 @@ OnError:
     return errCode;
 }
 
-static VSC_ErrCode _DoRtLayerPatch(VIR_Shader* pShader)
+static VSC_ErrCode _DoRtLayerPatch(
+    VIR_DEF_USAGE_INFO*         pDuInfo,
+    VIR_Shader*                 pShader,
+    gctBOOL*                    pChanged
+    )
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     VIR_AttributeIdList*       pAttrIdLsts = VIR_Shader_GetAttributes(pShader);
@@ -294,6 +631,45 @@ static VSC_ErrCode _DoRtLayerPatch(VIR_Shader* pShader)
     VIR_Operand_SetSymbol(opnd, pShader->mainFunction, attrSymId);
     VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_XXXX);
     VIR_Operand_SetPrecision(opnd, VIR_Symbol_GetPrecision(pAttrSym));
+
+    /* Add def. */
+    vscVIR_AddNewDef(pDuInfo,
+                     pNewInsertedInst,
+                     outTmpId,
+                     1,
+                     VIR_ENABLE_X,
+                     VIR_HALF_CHANNEL_MASK_FULL,
+                     gcvNULL,
+                     gcvNULL);
+
+    /* Add output usage. */
+    vscVIR_AddNewUsageToDef(pDuInfo,
+                            pNewInsertedInst,
+                            VIR_OUTPUT_USAGE_INST,
+                            (VIR_Operand*)(gctUINTPTR_T)outTmpId,
+                            gcvFALSE,
+                            outTmpId,
+                            1,
+                            VIR_ENABLE_X,
+                            VIR_HALF_CHANNEL_MASK_FULL,
+                            gcvNULL);
+
+    /* Add source0 usage. */
+    vscVIR_AddNewUsageToDef(pDuInfo,
+                            VIR_INPUT_DEF_INST,
+                            pNewInsertedInst,
+                            opnd,
+                            gcvFALSE,
+                            VIR_Symbol_GetVregIndex(pAttrSym),
+                            1,
+                            VIR_ENABLE_X,
+                            VIR_HALF_CHANNEL_MASK_FULL,
+                            gcvNULL);
+
+    if (pChanged)
+    {
+        *pChanged = gcvTRUE;
+    }
 
 OnError:
     return errCode;
@@ -589,7 +965,7 @@ static VSC_ErrCode _DoLocalMemAccessPatch(VIR_Shader* pShader)
     /* Find #sh_sharedVar. */
     sym = VIR_Shader_FindSymbolByName(pShader,
                                       VIR_SYM_UNIFORM,
-                                      "#sh_sharedVar");
+                                      _sldSharedVariableStorageBlockName);
     gcmASSERT(sym);
     origBaseAddrSymId = VIR_Symbol_GetIndex(sym);
 
@@ -625,12 +1001,21 @@ static VSC_ErrCode _DoLocalMemAccessPatch(VIR_Shader* pShader)
 DEF_QUERY_PASS_PROP(vscVIR_PerformSpecialHwPatches)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_MC;
+    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+}
+
+DEF_SH_NECESSITY_CHECK(vscVIR_PerformSpecialHwPatches)
+{
+    return gcvTRUE;
 }
 
 VSC_ErrCode vscVIR_PerformSpecialHwPatches(VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     VIR_Shader*                pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_DEF_USAGE_INFO*        pDuInfo = pPassWorker->pDuInfo;
+    gctBOOL                    bChanged = gcvFALSE;
 
     if (pShader->shaderKind == VIR_SHADER_FRAGMENT)
     {
@@ -641,19 +1026,19 @@ VSC_ErrCode vscVIR_PerformSpecialHwPatches(VSC_SH_PASS_WORKER* pPassWorker)
         */
         if (!VIR_Shader_IsVulkan(pShader))
         {
-            errCode = _DoPointCoordYDirectionPatch(pShader);
+            errCode = _DoPointCoordYDirectionPatch(pDuInfo, pShader, &bChanged);
             ON_ERROR(errCode, "Do point coord Y direction patch");
         }
 
         /* Hw's output-sample-mask is only located in LSB4, and other bits has use for other
            purpose, so we need patch to insure only LSB4 is touched when output-sample-mask
            is written */
-        errCode = _DoOutSampleMaskPatch(pShader);
+        errCode = _DoOutSampleMaskPatch(pDuInfo, pShader, &bChanged);
         ON_ERROR(errCode, "Do output-sample-mask patch");
 
         /* Hw's PE does not get gl_Layer from RA, so we need add explicit mov to make this
            work */
-        errCode = _DoRtLayerPatch(pShader);
+        errCode = _DoRtLayerPatch(pDuInfo, pShader, &bChanged);
         ON_ERROR(errCode, "Do rt-layer patch");
     }
 
@@ -669,9 +1054,9 @@ VSC_ErrCode vscVIR_PerformSpecialHwPatches(VSC_SH_PASS_WORKER* pPassWorker)
         }
     }
 
-    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    if (bChanged && VirSHADER_DumpCodeGenVerbose(pShader))
     {
-        VIR_Shader_Dump(gcvNULL, "After perform specila HW patches.", pShader, gcvTRUE);
+        VIR_Shader_Dump(gcvNULL, "After special HW patches", pShader, gcvTRUE);
     }
 
 OnError:

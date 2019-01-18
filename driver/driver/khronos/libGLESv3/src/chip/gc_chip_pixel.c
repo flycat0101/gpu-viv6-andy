@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -338,6 +338,7 @@ __glChipReadPixels(
     GLuint lineLength = ps->packModes.lineLength ? ps->packModes.lineLength : (GLuint)width;
     GLuint imageHeight = ps->packModes.imageHeight ? ps->packModes.imageHeight : (GLuint)height;
     __GLformatInfo *formatInfo;
+    gctBOOL tsEnabled = gcvFALSE;
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("gc=0x%x x=%d y=%d width=%d height=%d format=0x%04x type=0x%04x buf=%x",
@@ -469,6 +470,7 @@ __glChipReadPixels(
     bottom = gcmMIN(y + height, (gctINT) h);
     gcmONERROR(gcoSURF_GetSize(dstView.surf, &dstWidth, &dstHeight, gcvNULL));
 
+    tsEnabled = gcoSURF_IsTileStatusEnabled(&srcView);
     /*
     ** Set Non-Linear space for SRGB8_ALPHA8
     */
@@ -515,6 +517,29 @@ __glChipReadPixels(
     while (gcvFALSE);
 
 OnError:
+    if (READ_FRAMEBUFFER_BINDING_NAME != 0 &&
+        (tsEnabled && !gcoSURF_IsTileStatusEnabled(&srcView)))
+    {
+        GLuint unit;
+        __GLfboAttachPoint attachPoint;
+        __GLtextureObject *texObj = gcvNULL;
+        __GLframebufferObject *fbo = gc->frameBuffer.readFramebufObj;
+        GLint attachIdx = __glMapAttachmentToIndex(fbo->readBuffer);
+        attachPoint = gc->frameBuffer.readFramebufObj->attachPoint[attachIdx];
+
+        if (GL_TEXTURE == attachPoint.objType)
+        {
+            texObj = (__GLtextureObject*)attachPoint.object;
+        }
+        for (unit = 0; unit < gc->constants.shaderCaps.maxImageUnit; unit++)
+        {
+            if (texObj == gc->texture.units[unit].currentTexture)
+            {
+                __GL_SET_TEX_UNIT_BIT(gc, unit, __GL_TEX_IMAGE_CONTENT_CHANGED_BIT);
+            }
+        }
+    }
+
     if (packBufInfo && gcvINVALID_ADDRESS != physicalAddress) /* The image is from pack buffer object */
     {
         /* CPU cache will not be flushed in HAL, bc HAL only see wrapped user pool surface.

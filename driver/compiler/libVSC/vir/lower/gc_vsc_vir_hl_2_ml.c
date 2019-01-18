@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -148,7 +148,7 @@ OnError:
 
 DEF_QUERY_PASS_PROP(VIR_Lower_HighLevel_To_MiddleLevel)
 {
-    pPassProp->supportedLevels = VSC_PASS_LEVEL_HL;
+    pPassProp->supportedLevels = (VSC_PASS_LEVEL)(VSC_PASS_LEVEL_HL | VSC_PASS_LEVEL_ML);
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
 
     /* Lower must invalidate all analyzed resources */
@@ -158,6 +158,19 @@ DEF_QUERY_PASS_PROP(VIR_Lower_HighLevel_To_MiddleLevel)
     pPassProp->passFlag.resDestroyReq.s.bInvalidateDu = gcvTRUE;
     pPassProp->passFlag.resDestroyReq.s.bInvalidateWeb = gcvTRUE;
     pPassProp->passFlag.resDestroyReq.s.bInvalidateLvFlow = gcvTRUE;
+}
+
+DEF_SH_NECESSITY_CHECK(VIR_Lower_HighLevel_To_MiddleLevel)
+{
+    VIR_Shader*                  shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+
+    if (VIR_Shader_GetLevel(shader) != VIR_SHLEVEL_Post_High &&
+        VIR_Shader_GetLevel(shader) != VIR_SHLEVEL_Pre_Medium)
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
 }
 
 static VSC_ErrCode
@@ -362,11 +375,6 @@ VIR_Lower_HighLevel_To_MiddleLevel(
     VIR_Shader*                  shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VSC_MM                      *pmm = pPassWorker->basePassWorker.pMM;
 
-    if (VIR_Shader_GetLevel(shader) != VIR_SHLEVEL_Post_High)
-    {
-        return errCode;
-    }
-
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(shader), VIR_Shader_GetId(shader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
         VIR_Shader_Dump(gcvNULL, "Before HighLevel to MiddleLevel.", shader, gcvTRUE);
@@ -389,10 +397,14 @@ VIR_Lower_HighLevel_To_MiddleLevel(
     /* Finalize context. */
     _Lower_Finalize(shader, &context);
 
+    VIR_Shader_SetLevel(shader, VIR_SHLEVEL_Pre_Medium);
+    {
+        VSC_HW_CONFIG*   hwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+        errCode = VIR_Lower_ArraryIndexing_To_LDARR_STARR(shader, hwCfg, gcvNULL);
+        CHECK_ERROR(errCode, "VIR_Lower_ArraryIndexing_To_LDARR_STARR failed.");
+    }
     /* Renumber instruction ID. */
     VIR_Shader_RenumberInstId(shader);
-
-    VIR_Shader_SetLevel(shader, VIR_SHLEVEL_Pre_Medium);
 
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(shader), VIR_Shader_GetId(shader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {

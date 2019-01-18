@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -209,7 +209,6 @@ MACRO SYMBOL Creat
 \******************************************************************************/
 gceSTATUS
 ppoMACRO_SYMBOL_Construct(
-
     ppoPREPROCESSOR         PP,
     IN  gctCONST_STRING     File,
     IN  gctINT              Line,
@@ -235,9 +234,10 @@ ppoMACRO_SYMBOL_Construct(
             )
         );
 
-    rt = pointer;
+    gcoOS_ZeroMemory(pointer, (gctSIZE_T)gcmSIZEOF(struct _ppoMACRO_SYMBOL));
 
-    /*00    base*/
+    rt = (ppoMACRO_SYMBOL)pointer;
+
     gcmONERROR(ppoBASE_Init(
         PP,
         (ppoBASE)rt,
@@ -246,16 +246,12 @@ ppoMACRO_SYMBOL_Construct(
         MoreInfo,
         ppvOBJ_MACRO_SYMBOL));
 
-    /*01    name*/
-    rt->name = Name;
-    /*02    argc*/
-    rt->argc = Argc;
-    /*03    argv*/
-    rt->argv = Argv;
-    /*04    replacementList*/
+    rt->name            = Name;
+    rt->argc            = Argc;
+    rt->argv            = Argv;
     rt->replacementList = Rplst;
-    /*05    undefed*/
-    rt->undefined = gcvFALSE;
+    rt->undefined       = gcvFALSE;
+    rt->hasPara         = gcvFALSE;
 
     *Created = rt;
 

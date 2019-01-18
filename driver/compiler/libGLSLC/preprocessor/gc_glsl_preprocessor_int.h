@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -461,6 +461,8 @@ struct _ppsKEYWORD
     gctSTRING               debug;      /*56 debug */
     gctSTRING               optimize;   /*57 optimize */
     gctSTRING               nul_str;    /*58 nulstr */
+    gctSTRING               gl_core_profile;   /*59 GL_core_profile */
+    gctBOOL                 isVersionUndefined;
 };
 
 

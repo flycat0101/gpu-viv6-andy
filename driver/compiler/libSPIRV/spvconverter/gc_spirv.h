@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -20,13 +20,15 @@
 #include "utils/gc_vsc_err.h"
 #include "utils/gc_vsc_utils_list.h"
 #include "utils/gc_vsc_utils_mm.h"
+#include "utils/gc_vsc_utils_bv.h"
 #include "utils/gc_vsc_utils_hash.h"
 #include "utils/gc_vsc_utils_table.h"
+#include "utils/gc_vsc_utils_io.h"
 #include "old_impl/gc_vsc_old_gcsl.h"
 #include "vir/passmanager/gc_vsc_options.h"
 #include "vir/ir/gc_vsc_vir_ir.h"
 #include "gc_hal_user_precomp.h"
-#include <SPIRV/spirv.h>
+#include <vulkan/spirv.h>
 #include <vulkan/vulkan.h>
 #include "gc_spirv_mempool.h"
 #include "gc_spirv_types.h"
@@ -50,7 +52,6 @@
 #define SPV_DEFAULT_PARAM_NAME      "param"
 #define SPV_DEFAULT_PARAM_LENGTH    5
 
-/* TODO: so far, we use a constant for a struct field number, we need to make it dynamically. */
 #define SPV_STRUCT_FIELD_NUM        16
 
 #define SPV_SKIP_NAME_CHECK         1
@@ -74,11 +75,6 @@ typedef struct
     /* So far for SpvSymDescriptor and SpvConstDescriptor*/
     VIR_SymId virSymId;
 }SpvDescriptorHeader;
-
-typedef enum{
-    SPV_FRAGCOORD = 0,
-    SPV_MAX_BUILTINVAR,
-}SpvBuiltinVariable;
 
 typedef struct {
     gctBOOL hasName;
@@ -261,8 +257,9 @@ typedef struct _SpvConvDecorationData
 
 #define SPV_DECORATION_Initialize(Decoration) \
     do \
-            { \
+    {  \
         (Decoration)->location              = SPV_DEFAULT_LOCATION;     \
+        (Decoration)->component             = -1;                       \
         (Decoration)->binding               = -1;                       \
         (Decoration)->arrayStride           = -1;                       \
         (Decoration)->matrixStride          = -1;                       \
@@ -305,6 +302,11 @@ typedef enum{
     SpvLabelPhi,
 }SpvLabelType;
 
+typedef enum{
+    SPV_FRAGCOORD = 0,
+    SPV_MAX_BUILTINVAR,
+}SpvBuiltinVariable;
+
 typedef struct
 {
     SpvDescriptorHeader descriptorHeader;
@@ -326,7 +328,12 @@ typedef struct
 {
     SpvDescriptorHeader descriptorHeader;
 
-    SpvId spvTypeId;
+    /* This is the base type ID, not pointer type. */
+    SpvId spvBaseTypeId;
+
+    /* This is the pointer type ID, if it is not a pointer, then it equals with the base type ID. */
+    SpvId spvPointerTypeId;
+
     gctBOOL isFuncParam;
     VIR_Function *virFunc;
     gctBOOL isWorkGroup;
@@ -341,6 +348,8 @@ typedef struct
     gctBOOL isPerVertex;
     gctBOOL isPerPatch;
     gctBOOL isPushConstUBO;
+    /* Whether this is used to calculate the memory address. */
+    gctBOOL isMemAddrCalc;
 
     /* For inputAttachment. */
     Spv_AttachmentFlag attachmentFlag;
@@ -360,9 +369,12 @@ typedef struct
     struct
     {
         VIR_AC_OFFSET_INFO virAcOffsetInfo;
-        VIR_SymId   uboArrayVirSymId[20]; /* TODO, dynamic size */
+        VIR_SymId   uboArrayVirSymId[20];
         SpvId acDynamicIndexing;
     } offsetInfo;
+
+    /* If this symbol is created by a accesschain, save the base spv symbol ID. */
+    SpvId baseSpvSymId;
 
     SpvId paramToFunc;
 }SpvSymDescriptor;
@@ -509,7 +521,7 @@ typedef struct {
 
 #define SPV_MAX_SCOPE_ID_NUM         2
 #define SPV_MAX_MEM_SEMANTIC_ID_NUM  2
-#define SPV_INTERNAL_ID_NUM          5
+#define SPV_INTERNAL_ID_NUM          10
 
 typedef struct SpvFuncCallInfo{
     gctUINT funcId;
@@ -531,11 +543,16 @@ typedef struct SpvFuncCallTable{
     gctUINT funcAllocated;
 }SpvFuncCallTable;
 
+
 struct _gcSPV
 {
     gcsOBJECT                   object;
     gctUINT *                   src;
     SpvMemPool *                spvMemPool;
+
+    /* VSC memory pool. */
+    VSC_PRIMARY_MEM_POOL        pmp;
+
     /* Size in gctUINT of SPV binary */
     gctUINT                     size;
     gctUINT                     spvId;
@@ -548,12 +565,12 @@ struct _gcSPV
     gctUINT                     generator;
     gctUINT                     bound;
 
-    /*
-    ** Add 5 temp ID for internal used.
-    ** VIV:TODO: need to change it to a pointer, not an array.
-    */
-    gctUINT                     internalId[SPV_INTERNAL_ID_NUM];
-    gctBOOL                     internalIdUsed[SPV_INTERNAL_ID_NUM];
+    /* Internal spv id list. */
+    SpvId *                     internalIds;
+    VSC_BIT_VECTOR              internalIdMask;
+    gctUINT                     nextValidInternelIdIndex;
+
+    /* Internal symbol pointer. */
     VIR_Symbol *                internalSym;
 
     struct{
@@ -622,6 +639,7 @@ struct _gcSPV
     SpvSourceLanguage           srcLanguage;
     gctUINT                     srcLanguageVersion;
     gctCHAR *                   srcLanguageExternsion;
+    gctCHAR *                   srcExtension;
     gctCHAR *                   srcExtInstImport;
     SpvAddressingModel          srcAddrMode;
     SpvMemoryModel              srcMemoryMode;
@@ -685,6 +703,8 @@ struct _gcSPV
 
     SpvWorkGroupInfo            *workgroupInfo; /* compute shader */
     gctBOOL                     hasWorkGroup;
+
+    gctBOOL                     isLibraryShader;
 
     gctUINT                     localSize[3];
 

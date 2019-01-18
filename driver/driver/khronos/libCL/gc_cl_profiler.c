@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -192,7 +192,7 @@ clfInitializeProfiler(
     CommandQueue->profiler.enable = gcvTRUE;
     CommandQueue->halProfile->profilerClient = gcvCLIENT_OPENCL;
 
-    status = (gctINT)gcoPROFILER_Enable(CommandQueue->halProfile);
+    status = (gctINT)gcoPROFILER_Initialize(CommandQueue->halProfile);
 
     if (status < 0)
     {
@@ -232,7 +232,7 @@ clfInitializeProfiler(
                 BCD(3), BCD(2), BCD(1), BCD(0));
         }
 
-        gcoHAL_GetProductName(gcvNULL, &productName);
+        gcoHAL_GetProductName(gcvNULL, &productName, gcvNULL);
         gcoOS_StrCatSafe(infoRenderer, 9, "Vivante ");
         gcoOS_StrCatSafe(infoRenderer, 23, productName);
         gcmOS_SAFE_FREE(gcvNULL, productName);
@@ -297,7 +297,7 @@ clfBeginProfiler(
     }
 
     gcoOS_GetTime(&CommandQueue->profiler.frameStartTimeusec);
-    gcoPROFILER_Begin(CommandQueue->halProfile, gcvCOUNTER_OP_FRAME);
+    gcoPROFILER_EnableCounters(CommandQueue->halProfile, gcvCOUNTER_OP_FRAME);
 
     /* Return the status. */
     gcmFOOTER_ARG("%d", status);
@@ -367,6 +367,7 @@ clfEndProfiler(
         gcmWRITE_CONST(VPG_END);
 
         gcoPROFILER_Flush(CommandQueue->halProfile);
+
         gcmPRINT("VPC_KERNELNAME: %s\n", Kernel->name);
         gcmPRINT("VPC_ELAPSETIME: %d\n", (gctINT32) (CommandQueue->profiler.frameEndTimeusec
                          - CommandQueue->profiler.frameStartTimeusec));

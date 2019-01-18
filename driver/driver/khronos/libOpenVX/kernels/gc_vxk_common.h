@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -150,8 +150,20 @@ vx_status gcfVX_Accel(
     IN gctUINT32                CmdAddress,
     IN gceVX_ACCELERATOR_TYPE   Type,
     IN gctUINT32                EventId,
-    IN gctBOOL                  waitEvent
+    IN gctBOOL                  waitEvent,
+    IN gctUINT32                gpuId,
+    IN gctBOOL                  sync
     );
+
+vx_status
+gcfVX_CaptureState(
+    gctUINT8_PTR CaptureBuffer,
+    gctUINT32 InputSizeInByte,
+    gctUINT32 *pOutputSizeInByte,
+    gctBOOL Enabled,
+    gctBOOL dropCommandEnabled
+    );
+
 
 #if gcdVX_OPTIMIZER
 gceSTATUS gcfVX_BindObjects(
@@ -167,6 +179,11 @@ gcoVX_AddObject(
     IN gctUINT32 index
     );
 
+gceSTATUS gcfVX_AllocateMemForImageFromHandle(
+    IN OUT vx_image image,
+    IN vx_uint32 planeIndx
+    );
+
 gceSTATUS
 gcfVX_GetImageInfo(
     IN gcoVX_Kernel_Context* Context,
@@ -179,6 +196,7 @@ gceSTATUS
 gcfVX_GetImageInfoFromTensor(
     IN vx_enum              borderMode,
     IN vx_tensor            tensor,
+    vx_uint32               batchID,
     IN gcsVX_IMAGE_INFO_PTR Info
     );
 
@@ -264,7 +282,7 @@ vx_status vxSobelMxN(vx_node node, vx_image input, vx_scalar win, vx_image grad_
 vx_status vxSobelMxN_F16(vx_node node, vx_image input, vx_scalar win, vx_scalar shift, vx_image grad_x, vx_image grad_y, vx_border_t *bordermode);
 vx_status vxNorm(vx_node node, vx_image input_x, vx_image input_y, vx_scalar norm_type, vx_image output);
 vx_status vxNorm_F16(vx_node node, vx_image input_x, vx_image input_y, vx_scalar norm_type, vx_image output);
-vx_status vxNonMaxSuppression(vx_node node, vx_image i_mag, vx_image i_ang, vx_image i_edge, vx_border_t *borders);
+vx_status vxNonMaxSuppressionCanny(vx_node node, vx_image i_mag, vx_image i_ang, vx_image i_edge, vx_border_t *borders);
 
 vx_status vxEdgeTraceThreshold(vx_node node, vx_image input, vx_threshold threshold, vx_image output);
 vx_status vxEdgeTraceHysteresis(vx_node node, vx_image input, vx_scalar flag);
@@ -310,36 +328,11 @@ vx_status vxCensus3x3(vx_node node, vx_image src, vx_image dst);
 
 vx_status vxCopyImage(vx_node node, vx_image src, vx_image dst);
 
-vx_status vxCnnLayer(vx_node node, vx_uint32 layerIndex, vx_uint32 bacthLevelIndex, vx_array nnCmdBuffer, vx_array inputKernelBuffer,
-                     vx_array inputBuffer, vx_uint32 inputOffset,
-                     vx_array outputBuffer, vx_uint32 outputOffset,
-                     vx_scalar batchSize, vx_uint8 dataType, vx_uint32 netFlag);
-
-vx_status vxLRN(vx_node node, vx_array src, vx_scalar width, vx_scalar height, vx_scalar depth, vx_scalar batch, vx_scalar type,
-                     vx_scalar kernel, vx_scalar stride, vx_scalar pad, vx_scalar sf, vx_scalar ap, vx_scalar bt, vx_array dst);
-
-vx_status vxMaxPool3x3(vx_node node, vx_array src, vx_scalar format, vx_scalar width, vx_scalar height, vx_scalar depth, vx_scalar batch, vx_scalar _width_o, vx_scalar _height_o,
-                     vx_scalar kernel, vx_scalar stride, vx_scalar pad, vx_array dst);
-
-
-vx_status vxROIPool(vx_node node, vx_array input1, vx_array input2, vx_scalar kernel, vx_scalar stride, vx_scalar pad, vx_array dst);
-
-vx_status vxRPN(vx_node node, vx_array src, vx_array dst0, vx_array dst1);
-
-vx_status vxRCNNSoftEnd(vx_node node, vx_array src, vx_array src_bbox, vx_array prob, vx_array ddbox, vx_scalar batch, vx_scalar networkType);
-
-vx_status vxNNExecute(vx_node node,
-                      vx_array cmd_buf, vx_uint32 cmdOffset,
-                      vx_weights_biases_parameter weights_biases, vx_uint32 wbOffset,
-                      vx_tensor inputs, vx_uint32 inputOffset,
-                      vx_tensor outputs, vx_uint32 outputOffset);
-
-vx_status vxTPExecute(vx_node node, vx_uint32 op_num,
-                      vx_array cmd_buf, vx_uint32 cmdOffset, vx_uint32 cmdSize,
-                      vx_weights_biases_parameter weights_biases, vx_uint32 wbOffset, vx_uint32 wbSize,
-                      vx_tensor inputs, vx_uint32 inputOffset, vx_uint32 inputSize,
-                      vx_tensor outputs, vx_uint32 outputOffset, vx_uint32 outputSize,
-                      vx_array buffer);
+vx_status vxOpCommandDump(
+    vxnne_operation_command opCommand,
+    vxnne_operation operation,
+    vx_enum dumpStage
+    );
 
 #ifdef __cplusplus
 }

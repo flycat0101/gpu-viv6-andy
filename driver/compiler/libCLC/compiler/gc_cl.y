@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -53,6 +53,8 @@ int yylex(YYSTYPE * pyylval, cloCOMPILER Compiler);
 	clsForExprPair		forExprPair;
 	cloIR_POLYNARY_EXPR	funcCall;
 	gceSTATUS		status;
+    clsASM_MODIFIER     asmModifier;
+    clsASM_MODIFIERS    asmModifiers;
 }
 
 /* ATTENTION!!!
@@ -78,11 +80,12 @@ int yylex(YYSTYPE * pyylval, cloCOMPILER Compiler);
 			T_UINT T_UINT2 T_UINT3 T_UINT4 T_UINT8 T_UINT16
 			T_LONG T_LONG2 T_LONG3 T_LONG4 T_LONG8 T_LONG16
 			T_ULONG T_ULONG2 T_ULONG3 T_ULONG4 T_ULONG8 T_ULONG16
-                        T_SAMPLER_T
+			T_SAMPLER_T T_VIV_GENERIC_GL_SAMPLER
 			T_IMAGE1D_T T_IMAGE1D_ARRAY_T T_IMAGE1D_BUFFER_T
 			T_IMAGE2D_ARRAY_T
 			T_IMAGE2D_T T_IMAGE3D_T
 			T_IMAGE2D_PTR_T T_IMAGE2D_DYNAMIC_ARRAY_T
+			T_VIV_GENERIC_IMAGE_T T_VIV_GENERIC_GL_IMAGE
 			T_SIZE_T T_EVENT_T
 			T_PTRDIFF_T T_INTPTR_T T_UINTPTR_T
 			T_GENTYPE T_F_GENTYPE T_IU_GENTYPE T_I_GENTYPE T_U_GENTYPE T_SIU_GENTYPE
@@ -131,6 +134,8 @@ int yylex(YYSTYPE * pyylval, cloCOMPILER Compiler);
 			T_VEC_STEP
 			T_TYPEOF
 
+%token<token>		T_ASM_OPND_BRACKET
+
 %token<token>           T_VERY_LAST_TERMINAL
 /* types */
 %type<token>		'(' ')' '[' ']' '{' '}' '.' ',' ':' '=' ';' '!'
@@ -153,6 +158,7 @@ int yylex(YYSTYPE * pyylval, cloCOMPILER Compiler);
 					assignment_expression expression constant_expression array_size
 					conditionopt array_declarator
 					initializer initializer_list initializer_list_start
+					viv_asm_opnd
 
 %type<declOrDeclList>	init_declarator_list single_declaration
 			designation designator_list designator
@@ -171,7 +177,7 @@ int yylex(YYSTYPE * pyylval, cloCOMPILER Compiler);
 %type<funcName>		function_prototype function_declarator function_header_with_parameters
 					function_header
 
-%type<attr>		attribute attribute_list attribute_specifier attribute_specifier_opt
+%type<attr>		attribute attribute_list attribute_specifier attribute_specifier_opt attribute_specifier_list
 
 %type<paramName>	parameter_declaration parameter_declarator parameter_type_specifier
 
@@ -192,6 +198,10 @@ int yylex(YYSTYPE * pyylval, cloCOMPILER Compiler);
 %type<forExprPair>	for_control
 
 %type<funcCall>		function_call function_call_header function_call_with_parameters
+
+%type<asmModifier>  viv_asm_modifier
+
+%type<asmModifiers> viv_asm_modifier_list
 
 /* yacc rules */
 %right T_IF T_ELSE
@@ -267,11 +277,27 @@ function_call :
 	;
 
 function_call_with_parameters :
-	function_call_header assignment_expression
+	function_call_header viv_asm_opnd
 		{ $$ = clParseFuncCallArgument(Compiler, $1, $2); }
-	| function_call_with_parameters ',' assignment_expression
+	| function_call_with_parameters ',' viv_asm_opnd
 		{ $$ = clParseFuncCallArgument(Compiler, $1, $3); }
+
+viv_asm_opnd :
+	assignment_expression
+		{ $$ = $1; }
+	| assignment_expression T_ASM_OPND_BRACKET viv_asm_modifier_list '>'
+		{ $$ = clParseAsmAppendOperandModifiers(Compiler, $1, &$3); }
 	;
+
+viv_asm_modifier_list :
+	viv_asm_modifier
+		{ $$ = clParseAsmAppendModifier(Compiler, gcvNULL, &$1); }
+	| viv_asm_modifier_list ',' viv_asm_modifier
+		{ $$ = clParseAsmAppendModifier(Compiler, &$1, &$3); }
+
+viv_asm_modifier :
+	T_IDENTIFIER ':' T_IDENTIFIER
+		{ $$ = clParseAsmModifier(Compiler, &$1, &$3); }
 
 type_cast :
 	'(' fully_specified_type ')'
@@ -512,11 +538,11 @@ tags :
 	;
 
 enum_specifier :
-	T_ENUM attribute_specifier T_IDENTIFIER '{'
+	T_ENUM attribute_specifier_list T_IDENTIFIER '{'
 		enumerator_list
 		'}'
 		{ $$ = clParseEnumSpecifier(Compiler, &$1, $2, &$3, (gctPOINTER)$5); }
-	| T_ENUM attribute_specifier T_IDENTIFIER '{'
+	| T_ENUM attribute_specifier_list T_IDENTIFIER '{'
 		enumerator_list T_INITIALIZER_END
 		{ $$ = clParseEnumSpecifier(Compiler, &$1, $2, &$3, (gctPOINTER)$5); }
 	| T_ENUM T_IDENTIFIER '{'
@@ -526,11 +552,11 @@ enum_specifier :
 	| T_ENUM T_IDENTIFIER '{'
 		enumerator_list  T_INITIALIZER_END
 		{ $$ = clParseEnumSpecifier(Compiler, &$1, gcvNULL, &$2, (gctPOINTER)$4); }
-	| T_ENUM attribute_specifier '{'
+	| T_ENUM attribute_specifier_list '{'
 		enumerator_list
 		'}'
 		{ $$ = clParseEnumSpecifier(Compiler, &$1, $2, gcvNULL, (gctPOINTER)$4); }
-	| T_ENUM attribute_specifier '{'
+	| T_ENUM attribute_specifier_list '{'
 		enumerator_list T_INITIALIZER_END
 		{ $$ = clParseEnumSpecifier(Compiler, &$1, $2, gcvNULL, (gctPOINTER)$4); }
 	| T_ENUM '{'
@@ -592,7 +618,7 @@ function_header_with_parameters :
 	;
 
 function_header :
-	attribute_specifier T_KERNEL fully_specified_type direct_declarator '('
+	attribute_specifier_list T_KERNEL fully_specified_type direct_declarator '('
 		{ $$ = clParseKernelFuncHeader(Compiler, $1, &$3, &$4); }
 	| T_KERNEL attribute_specifier_opt fully_specified_type direct_declarator '('
 		{ $$ = clParseKernelFuncHeader(Compiler, $2, &$3, &$4); }
@@ -600,7 +626,7 @@ function_header :
 		{ $$ = clParseExternKernelFuncHeader(Compiler, $3, &$4, &$5); }
 	| fully_specified_type direct_declarator '('
 		{ $$ = clParseFuncHeader(Compiler, &$1, &$2); }
-	| attribute_specifier fully_specified_type direct_declarator '('
+	| attribute_specifier_list fully_specified_type direct_declarator '('
 		{ $$ = clParseFuncHeaderWithAttr(Compiler, $1, &$2, &$3); }
 	| T_INLINE fully_specified_type direct_declarator '('
 		{ $$ = clParseFuncHeader(Compiler, &$2, &$3);
@@ -613,22 +639,22 @@ function_header :
 	;
 
 parameter_declarator :
-	type_specifier direct_declarator
-		{ $$ = clParseParameterDecl(Compiler, &$1, &$2); }
-	| type_specifier direct_declarator array_declarator
-		{ $$ = clParseArrayParameterDecl(Compiler, &$1, &$2, $3); }
-        | type_specifier type_qualifier_list direct_declarator
+	type_specifier direct_declarator attribute_specifier_opt
+		{ $$ = clParseParameterDecl(Compiler, &$1, &$2, $3); }
+	| type_specifier direct_declarator array_declarator attribute_specifier_opt
+		{ $$ = clParseArrayParameterDecl(Compiler, &$1, &$2, $3, $4); }
+	| type_specifier type_qualifier_list direct_declarator attribute_specifier_opt
 		{
                     clsDECL decl;
                     decl = clParseQualifiedType(Compiler, $2, gcvTRUE, &$1);
-                    $$ = clParseParameterDecl(Compiler, &decl, &$3);
-                }
-	| type_specifier type_qualifier_list direct_declarator array_declarator
-                {
+                    $$ = clParseParameterDecl(Compiler, &decl, &$3, $4);
+		}
+	| type_specifier type_qualifier_list direct_declarator array_declarator attribute_specifier_opt
+		{
                     clsDECL decl;
                     decl = clParseQualifiedType(Compiler, $2, gcvTRUE, &$1);
-		    $$ = clParseArrayParameterDecl(Compiler, &decl, &$3, $4);
-                }
+		    $$ = clParseArrayParameterDecl(Compiler, &decl, &$3, $4, $5);
+		}
 	;
 
 parameter_declaration :
@@ -659,22 +685,21 @@ parameter_qualifier :
 
 parameter_type_specifier :
 	type_specifier
-		{ $$ = clParseParameterDecl(Compiler, &$1, gcvNULL); }
+		{ $$ = clParseParameterDecl(Compiler, &$1, gcvNULL, gcvNULL); }
 	| type_specifier array_declarator
-		{ $$ = clParseArrayParameterDecl(Compiler, &$1, gcvNULL, $2); }
-
+		{ $$ = clParseArrayParameterDecl(Compiler, &$1, gcvNULL, $2, gcvNULL); }
 	| type_specifier pointer
 		{
                     clsDECL decl;
                     decl = clParseQualifiedType(Compiler, $2, gcvTRUE, &$1);
-		    $$ = clParseParameterDecl(Compiler, &decl, gcvNULL);
-                }
+		    $$ = clParseParameterDecl(Compiler, &decl, gcvNULL, gcvNULL);
+		}
 	| type_specifier pointer array_declarator
 		{
                     clsDECL decl;
                     decl = clParseQualifiedType(Compiler, $2, gcvTRUE, &$1);
-		    $$ = clParseArrayParameterDecl(Compiler, &decl, gcvNULL, $3);
-                }
+		    $$ = clParseArrayParameterDecl(Compiler, &decl, gcvNULL, $3, gcvNULL);
+		}
 	;
 
 type_qualifier_list :
@@ -779,9 +804,16 @@ attribute_specifier :
 		{ $$ = $5; }
 	;
 
+attribute_specifier_list :
+	attribute_specifier
+		{ $$ = $1; }
+	| attribute_specifier_list attribute_specifier
+		{$$ = clParseMergeAttributeSpecifier(Compiler, $2, $1); }
+	;
+
 attribute_specifier_opt :
 	{ $$ = gcvNULL; }
-	| attribute_specifier
+	| attribute_specifier_list
 		{ $$ = $1; }
 	;
 
@@ -918,7 +950,13 @@ type_name :
 		{ $$ = $1}
 	| T_IMAGE3D_T
 		{ $$ = $1}
+	| T_VIV_GENERIC_IMAGE_T
+		{ $$ = $1}
+	| T_VIV_GENERIC_GL_IMAGE
+		{ $$ = $1}
 	| T_SAMPLER_T
+		{ $$ = $1}
+	| T_VIV_GENERIC_GL_SAMPLER
 		{ $$ = $1}
 	| T_PTRDIFF_T
 		{ $$ = $1}

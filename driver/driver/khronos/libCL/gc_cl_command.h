@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -123,6 +123,7 @@ typedef enum _cleCOMMAND_TYPE
     clvCOMMAND_MAP_IMAGE,
     clvCOMMAND_UNMAP_MEM_OBJECT,
     clvCOMMAND_NDRANGE_KERNEL,
+    clvCOMMAND_NDRANGE_VIR_KERNEL,
     clvCOMMAND_TASK,
     clvCOMMAND_NATIVE_KERNEL,
     clvCOMMAND_MARKER,
@@ -130,6 +131,7 @@ typedef enum _cleCOMMAND_TYPE
     clvCOMMAND_BARRIER,
     clvCOMMAND_ACQUIRE_GL_OBJECTS,
     clvCOMMAND_RELEASE_GL_OBJECTS,
+    clvCOMMAND_NOP,
 }
 cleCOMMAND_TYPE;
 
@@ -298,9 +300,15 @@ typedef struct {
 } clsCommandUnmapMemObject,
 * clsCommandUnmapMemObject_PTR;
 
+typedef struct __clsVIRRecompileType
+{
+    gctBOOL doImgRecompile;
+    gctBOOL doGlobalWorksizeRecompile;
+}clsVIRRecompileType;
+
 typedef struct {
     clsKernel_PTR       kernel;
-    clsKernelStates_PTR states;
+    clsKernelInstance_PTR currentInstance;
     gctUINT             numArgs;
     clsArgument_PTR     args;
     gctUINT             workDim;
@@ -312,8 +320,29 @@ typedef struct {
 * clsCommandNDRangeKernel_PTR;
 
 typedef struct {
+    clsKernel_PTR         kernel;
+    clsKernelVIRInstance *currentInstance;
+    gctUINT               numArgs;
+    clsSrcArgument_PTR    args;
+    gctUINT               workDim;
+    size_t                globalWorkOffset[3];
+    size_t                globalScale[3];
+    size_t                globalWorkSize[3];
+    size_t                localWorkSize[3];
+    gctPOINTER            localAddressSpace; /* point to the address spcae of local buffer defined inside of the kernel */
+    gctPOINTER            privateAddressSpace; /* point to the address spcae of private buffer defined inside of the kernel */
+    gctPOINTER            spillMemAddressSpace; /*point to the address of spill memory may be used in kernel*/
+    gctPOINTER            printfBufferAddress; /* point to the address spcae of print buffer */
+    gctUINT               printbufferSize;
+    gctUINT               printThreadNum;
+    gctUINT               localKernelArgSize;
+    clsVIRRecompileType   recompileType;
+} clsCommandNDRangeVIRKernel,
+* clsCommandNDRangeVIRKernel_PTR;
+
+typedef struct {
     clsKernel_PTR       kernel;
-    clsKernelStates_PTR states;
+    clsKernelInstance_PTR currentInstance;
     gctUINT             numArgs;
     clsArgument_PTR     args;
 } clsCommandTask,
@@ -380,6 +409,7 @@ typedef struct _cl_command
         clsCommandMapImage          mapImage;
         clsCommandUnmapMemObject    unmapMemObject;
         clsCommandNDRangeKernel     NDRangeKernel;
+        clsCommandNDRangeVIRKernel  NDRangeVIRKernel;
         clsCommandTask              task;
         clsCommandNativeKernel      nativeKernel;
         clsCommandAcquireGLObjects  acquireGLObjects;
@@ -410,6 +440,7 @@ clsCommand;
     (type) == clvCOMMAND_MAP_IMAGE            ? CL_COMMAND_MAP_IMAGE            : \
     (type) == clvCOMMAND_UNMAP_MEM_OBJECT     ? CL_COMMAND_UNMAP_MEM_OBJECT     : \
     (type) == clvCOMMAND_NDRANGE_KERNEL       ? CL_COMMAND_NDRANGE_KERNEL       : \
+    (type) == clvCOMMAND_NDRANGE_VIR_KERNEL   ? CL_COMMAND_NDRANGE_KERNEL       : \
     (type) == clvCOMMAND_TASK                 ? CL_COMMAND_TASK                 : \
     (type) == clvCOMMAND_NATIVE_KERNEL        ? CL_COMMAND_NATIVE_KERNEL        : \
     (type) == clvCOMMAND_MARKER               ? CL_COMMAND_MARKER               : \
@@ -425,6 +456,7 @@ clsCommand;
  */
 #define clmCOMMAND_EXEC_HARDWARE(type) ( \
     (type) == clvCOMMAND_NDRANGE_KERNEL ? gcvTRUE : \
+    (type) == clvCOMMAND_NDRANGE_VIR_KERNEL ? gcvTRUE : \
     (type) == clvCOMMAND_TASK           ? gcvTRUE : gcvFALSE )
 
 /* Return true if command is a sync point

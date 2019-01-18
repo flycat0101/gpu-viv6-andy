@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -78,7 +78,6 @@ extern GLvoid __glSetDrawable(__GLcontext* gc, __GLdrawablePrivate* drawable, __
 extern __GLformatInfo __glFormatInfoTable[];
 
 gceTRACEMODE __glesApiTraceMode = gcvTRACEMODE_NONE;
-GLint __glesApiProfileMode = -1;
 
 
 #define __GL_NOOP(fp)      *(GLvoid (**)())&(fp) = __glNoop;
@@ -593,8 +592,8 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable)
 
     /* If the drawable was current but resized, need to detach old surface before updating new ones. */
     if (glDrawable->gc &&
-        (glDrawable->rtHandle      != eglDrawable->rtHandles[0]    ||
-         glDrawable->depthHandle   != eglDrawable->depthHandle ||
+        (glDrawable->rtHandles[0]  != eglDrawable->rtHandles[0] ||
+         glDrawable->depthHandle   != eglDrawable->depthHandle  ||
          glDrawable->stencilHandle != eglDrawable->stencilHandle
         )
        )
@@ -629,8 +628,8 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable)
         glDrawable->rtFormatInfo = gcvNULL;
     }
 
-    glDrawable->rtHandle = eglDrawable->rtHandles[0];
-    glDrawable->prevRtHandle = eglDrawable->prevRtHandles[0];
+    glDrawable->rtHandles[0] = eglDrawable->rtHandles[0];
+    glDrawable->prevRtHandles[0] = eglDrawable->prevRtHandles[0];
 
     /* Get the depth stencil format Info, see EGL::veglGetFormat() */
     if (eglDrawable->depthHandle)
@@ -675,7 +674,7 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable)
         glDrawable->flags &= ~__GL_DRAWABLE_FLAG_ZERO_WH;
     }
 
-    __glDevicePipe.devUpdateDrawable(glDrawable, glDrawable->rtHandle, glDrawable->depthHandle, glDrawable->stencilHandle);
+    __glDevicePipe.devUpdateDrawable(glDrawable);
 
     return glDrawable;
 }
@@ -727,33 +726,13 @@ GLvoid __glSetDrawable(__GLcontext* gc, __GLdrawablePrivate* drawable, __GLdrawa
 /* Dispatch window system render buffer changes */
 GLvoid __glEvaluateSystemDrawableChange(__GLcontext *gc, GLbitfield flags)
 {
-    GLboolean complete = GL_TRUE;
-
-    if (flags & __GL_BUFFER_DRAW_BIT)
+    if (gc->drawablePrivate->flags & __GL_DRAWABLE_FLAG_ZERO_WH)
     {
-        __GLdrawablePrivate *drawable = gc->drawablePrivate;
-        if (!drawable || (drawable->flags & __GL_DRAWABLE_FLAG_ZERO_WH))
-        {
-            complete = GL_FALSE;
-        }
-    }
-
-    if (flags & __GL_BUFFER_READ_BIT)
-    {
-        __GLdrawablePrivate *readable = gc->readablePrivate;
-        if (!readable || (readable->flags & __GL_DRAWABLE_FLAG_ZERO_WH))
-        {
-            complete = GL_FALSE;
-        }
-    }
-
-    if (complete)
-    {
-        gc->flags &= ~__GL_CONTEXT_SKIP_DRAW_INVALID_RENDERBUFFER;
+        gc->flags |= __GL_CONTEXT_SKIP_DRAW_INVALID_RENDERBUFFER;
     }
     else
     {
-        gc->flags |= __GL_CONTEXT_SKIP_DRAW_INVALID_RENDERBUFFER;
+        gc->flags &= ~__GL_CONTEXT_SKIP_DRAW_INVALID_RENDERBUFFER;
     }
 }
 
@@ -867,10 +846,7 @@ GLvoid __glInitPattern(__GLcontext *gc)
 
 GLvoid __glInitGlobals(__GLApiVersion apiVersion)
 {
-    gctSTRING tracemode = gcvNULL;
-#if VIVANTE_PROFILER
-    gctSTRING profilemode = gcvNULL;
-#endif
+    gctSTRING mode = gcvNULL;
 
     /* Initialize dpGlobalInfo and device entry functions */
     if (__glDpInitialize(&__glDevicePipe) == GL_FALSE)
@@ -878,25 +854,25 @@ GLvoid __glInitGlobals(__GLApiVersion apiVersion)
         return;
     }
 
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_TRACE", &tracemode)) && tracemode)
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_TRACE", &mode)) && mode)
     {
-        if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "0")))
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "0")))
         {
             __glesApiTraceMode = gcvTRACEMODE_NONE;
         }
-        else if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "1")))
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "1")))
         {
             __glesApiTraceMode = gcvTRACEMODE_FULL;
         }
-        else if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "2")))
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "2")))
         {
             __glesApiTraceMode = gcvTRACEMODE_LOGGER;
         }
-        else if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "3")))
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "3")))
         {
             __glesApiTraceMode = gcvTRACEMODE_PRE;
         }
-        else if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "4")))
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "4")))
         {
             __glesApiTraceMode = gcvTRACEMODE_POST;
         }
@@ -911,23 +887,24 @@ GLvoid __glInitGlobals(__GLApiVersion apiVersion)
             __glesApiTraceMode = gcvTRACEMODE_NONE;
         }
     }
+
 #if VIVANTE_PROFILER
-    __glesApiProfileMode = -1;
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_PROFILE", &profilemode)) && profilemode)
+    mode = gcvNULL;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_PROFILE", &mode)) && mode)
     {
-        if (gcmIS_SUCCESS(gcoOS_StrCmp(profilemode, "0")))
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "0")))
         {
             __glesApiProfileMode = 0;
         }
-        else if (gcmIS_SUCCESS(gcoOS_StrCmp(profilemode, "1")))
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "1")))
         {
             __glesApiProfileMode = 1;
         }
-        else if (gcmIS_SUCCESS(gcoOS_StrCmp(profilemode, "2")))
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "2")))
         {
             __glesApiProfileMode = 2;
         }
-        else if (gcmIS_SUCCESS(gcoOS_StrCmp(profilemode, "3")))
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "3")))
         {
             __glesApiProfileMode = 3;
         }
@@ -1075,34 +1052,6 @@ GLvoid *__glCreateContext(GLint clientVersion, VEGLimports *imports, GLvoid* sha
     {
         __glInitGlobals(apiVersion);
         initialized = GL_TRUE;
-    }
-    else
-    {
-#if VIVANTE_PROFILER
-        /* Need to re-init profiler mode
-        */
-        gctSTRING profilemode = gcvNULL;
-        __glesApiProfileMode = -1;
-        if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_PROFILE", &profilemode)) && profilemode)
-        {
-            if (gcmIS_SUCCESS(gcoOS_StrCmp(profilemode, "0")))
-            {
-                __glesApiProfileMode = 0;
-            }
-            else if (gcmIS_SUCCESS(gcoOS_StrCmp(profilemode, "1")))
-            {
-                __glesApiProfileMode = 1;
-            }
-            else if (gcmIS_SUCCESS(gcoOS_StrCmp(profilemode, "2")))
-            {
-                __glesApiProfileMode = 2;
-            }
-            else if (gcmIS_SUCCESS(gcoOS_StrCmp(profilemode, "3")))
-            {
-                __glesApiProfileMode = 3;
-            }
-        }
-#endif
     }
 
     /* Allocate memory for core GL context.

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -372,8 +372,8 @@ __GL_INLINE GLvoid __glConcatListCacheEnd(__GLcontext *gc)
     gc->input.beginMode = __GL_NOT_IN_BEGIN;
 
     /* Restore the generic CallList dispatch entry function */
-    gc->immediateDispatchTable.CallList = __glim_CallList;
-    gc->immediateDispatchTable.CallLists = __glim_CallLists;
+    gc->immedModeDispatch.CallList = __glim_CallList;
+    gc->immedModeDispatch.CallLists = __glim_CallLists;
 }
 
 GLvoid __glDisplayListBatchEnd(__GLcontext *gc)
@@ -394,7 +394,8 @@ GLvoid __glConcatenateDlistPrims(__GLcontext *gc, __GLdlist *dlist)
     __GLPrimBegin *newBegin = (__GLPrimBegin *)(dlist->segment + sizeof(__GLlistExecFunc *));
     __GLPrimBegin *primBegin;
     __GLDlistConcatDraw *listConcatDraw;
-    GLuint dataSize, concatDlists, mask;
+    GLuint dataSize, concatDlists;
+    GLuint64 mask;
     GLint index;
 
     /* Draw dlist immediately if polygon mode is not fill mode */
@@ -433,8 +434,8 @@ Restart:
                 gc->input.beginMode = __GL_SMALL_LIST_BATCH;
 
                 /* Overwrite CallList dispatch entry with __glim_CallList_Cache function */
-                gc->immediateDispatchTable.CallList = __glim_CallList_Cache;
-                gc->immediateDispatchTable.CallLists = __glim_CallLists_Cache;
+                gc->immedModeDispatch.CallList = __glim_CallList_Cache;
+                gc->immedModeDispatch.CallLists = __glim_CallLists_Cache;
 
                 return;
             }

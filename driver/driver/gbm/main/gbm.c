@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -720,8 +720,8 @@ gbm_surface_set_in_fence_fd(struct gbm_surface *surf, int fd)
    surf->gbm->surface_set_in_fence_fd(surf, fd);
 }
 
-GBM_EXPORT uint32_t
-gbm_surface_in_fence_on(struct gbm_surface *surf)
+GBM_EXPORT void
+gbm_surface_set_sync_post(struct gbm_surface *surf, int sync_post)
 {
-   return surf->gbm->surface_in_fence_on(surf);
+   surf->gbm->surface_set_sync_post(surf, sync_post);
 }

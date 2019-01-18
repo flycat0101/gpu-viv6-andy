@@ -1,0 +1,138 @@
+__kernel void gpuTensorDiv_ScalarDivFP32
+    (
+    __read_only     image2d_array_t input,
+    __write_only     image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int width = get_image_width(input);
+    int height = get_image_height(input);
+    int depth = get_image_array_size(input);
+    int4 coord_in = (int4)(0, 0, 0, 0);
+    int4 coord = (int4)(x, y, z, 0);
+    float4 src, dst = {0.0}, tmp;
+    float tmpOut;
+
+    src = read_imagef(input, coord);
+    for(int k = 0; k < depth; k++)
+    {
+        for(int j = 0; j < height; j++)
+        {
+            for(int i = 0; i < width; i++)
+            {
+                tmp = read_imagef(input, coord_in);
+                tmpOut += tmp.x;
+                coord_in.x++;
+            }
+            coord_in.x = 0;
+            coord_in.y++;
+        }
+        coord_in.x = 0;
+        coord_in.y = 0;
+        coord_in.z++;
+    }
+    dst.x = (float)(src.x/tmpOut);
+    write_imagef(output, coord, dst);
+}
+
+__kernel void gpuTensorDiv_ScalarDivQuant8
+    (
+    __read_only     image2d_array_t input,
+    __write_only     image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int width = get_image_width(input);
+    int height = get_image_height(input);
+    int depth = get_image_array_size(input);
+    int4 coord_in = (int4)(0, 0, 0, 0);
+    int4 coord = (int4)(x, y, z, 0);
+    uint4 src, dst = {0}, tmp = {0};
+    uint tmpOut = 0;
+    float outPixel = 0.0;
+
+    src = read_imageui(input, coord);
+    for(int k = 0; k < depth; k++)
+    {
+        for(int j = 0; j < height; j++)
+        {
+            for(int i = 0; i < width; i++)
+            {
+                tmp = read_imageui(input, coord_in);
+                tmpOut += tmp.x;
+                coord_in.x++;
+            }
+            coord_in.x = 0;
+            coord_in.y++;
+        }
+        coord_in.x = 0;
+        coord_in.y = 0;
+        coord_in.z++;
+    }
+
+    outPixel = convert_float(src.x)/convert_float(tmpOut);
+    dst.x = floor(outPixel*256.0 + 0.5);
+    write_imageui(output, coord, dst);
+}
+
+__kernel void gpuTensorDiv_ScalarDivFP32_Dim2
+    (
+    __read_only     image2d_array_t input,
+    __write_only     image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int width = get_image_width(input);
+    int4 coord_in = (int4)(0, 0, 0, 0);
+    int4 coord = (int4)(x, y, z, 0);
+    float4 src, dst = {0.0}, tmp;
+    float tmpOut;
+
+    src = read_imagef(input, coord);
+
+    for(int i = 0; i < width; i++)
+    {
+        tmp = read_imagef(input, coord_in);
+        tmpOut += tmp.x;
+        coord_in.x++;
+    }
+
+    dst.x = (float)(src.x/tmpOut);
+    write_imagef(output, coord, dst);
+}
+
+__kernel void gpuTensorDiv_ScalarDivQuant8_Dim2
+    (
+    __read_only     image2d_array_t input,
+    __write_only     image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int width = get_image_width(input);
+    int4 coord_in = (int4)(0, 0, 0, 0);
+    int4 coord = (int4)(x, y, z, 0);
+    uint4 src, dst = {0}, tmp = {0};
+    uint tmpOut = 0;
+    float outPixel = 0.0;
+
+    src = read_imageui(input, coord);
+
+    for(int i = 0; i < width; i++)
+    {
+        tmp = read_imageui(input, coord_in);
+        tmpOut += tmp.x;
+        coord_in.x++;
+    }
+
+    outPixel = convert_float(src.x)/convert_float(tmpOut);
+    dst.x = floor(outPixel*256.0 + 0.5);
+    write_imageui(output, coord, dst);
+}

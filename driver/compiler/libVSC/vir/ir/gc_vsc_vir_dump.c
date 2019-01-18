@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -40,6 +40,10 @@ typedef struct _VIR_DUMP_TYPE_FORMAT
 {
     gctUINT           FullType:1;
     gctUINT           Ellipsis:1;
+    gctUINT           NoTypeQual:1;     /* no const/volatile/restrict type quailifer */
+    gctUINT           NoAddrQual:1;     /* no const/private/local/global address qualifier */
+    gctUINT           NoWSBeforeStar:1; /* no ' ' bfore *: int* */
+    gctUINT           NoAccessQual:1;   /* no read_only/write_only/read_write access qualifier */
     gctUINT           Indent  :30;
 }
 VIR_DumpTypeFormat;
@@ -77,7 +81,7 @@ _DumpOperand(
     );
 
 static VSC_ErrCode
-_DumpBasicBlockInOut(
+_DumpBasicBlockInOutLength(
     IN OUT VIR_Dumper   *Dumper,
     IN VIR_BB           *Bb
     );
@@ -106,7 +110,6 @@ _BoolToString(
 }
 
 static gctCONST_STRING spaceaddr[] = {"", "global_space ", "const_space ", "local_space "};
-static gctCONST_STRING qualifier[] = {"", "const ", "volatile ", "const volatile "};
 static gctCONST_STRING operand_precision[] = { ""/* .dp */, ".lp", ".mp", ".hp", ".anyp"};
 static gctCONST_STRING symbol_precision[]  = { ""/* dp */, "lp ", "mp ", "hp ", "anyp "};
 
@@ -127,9 +130,9 @@ static VIR_DumpConstFormat formats[] = {
     { VIR_TYPE_UNORM16, "%hx", 1, 16, VIR_DUMP_CONST_NONE, gcvNULL},
     { VIR_TYPE_UNORM8, "%hhx", 1, 8, VIR_DUMP_CONST_NONE, gcvNULL},
 
-    { VIR_TYPE_INT64, "%lld", 1, 64, VIR_DUMP_CONST_INVALID, gcvNULL},
-    { VIR_TYPE_UINT64, "%llu", 1, 64, VIR_DUMP_CONST_INVALID, gcvNULL},
-    { VIR_TYPE_FLOAT64, "%f", 1, 32, VIR_DUMP_CONST_INVALID, gcvNULL}, /* treat as float */
+    { VIR_TYPE_INT64, "%lld", 1, 64, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_UINT64, "%llu", 1, 64, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_FLOAT64, "%f", 1, 32, VIR_DUMP_CONST_NONE, gcvNULL}, /* treat as float */
     { VIR_TYPE_BOOLEAN, "%s", 1, -1, VIR_DUMP_CONST_32TOPOINTER, _BoolToString},
 
     { VIR_TYPE_FLOAT_X2, "%f", 2, 32, VIR_DUMP_CONST_NONE, gcvNULL},
@@ -215,6 +218,53 @@ static VIR_DumpConstFormat formats[] = {
     { VIR_TYPE_INT64_X8, "%lld", 8, 64, VIR_DUMP_CONST_NONE, gcvNULL},
     { VIR_TYPE_INT64_X16, "%lld", 16, 64, VIR_DUMP_CONST_NONE, gcvNULL},
     { VIR_TYPE_INT64_X32, "%lld", 32, 64, VIR_DUMP_CONST_NONE, gcvNULL},
+    /* packed float16 (2 bytes per element) */
+    { VIR_TYPE_FLOAT16_P2, "%f", 2, 32, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_FLOAT16_P3, "%f", 3, 32, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_FLOAT16_P4, "%f", 4, 32, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_FLOAT16_P8, "%f", 8, 32, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_FLOAT16_P16, "%f", 16, 32, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_FLOAT16_P32, "%f", 32, 32, VIR_DUMP_CONST_NONE, gcvNULL},
+
+    /* packed boolean (1 byte per element) */
+    { VIR_TYPE_BOOLEAN_P2, "%s", 2, -1, VIR_DUMP_CONST_32TOPOINTER, _BoolToString},
+    { VIR_TYPE_BOOLEAN_P3, "%s", 3, -1, VIR_DUMP_CONST_32TOPOINTER, _BoolToString},
+    { VIR_TYPE_BOOLEAN_P4, "%s", 4, -1, VIR_DUMP_CONST_32TOPOINTER, _BoolToString},
+    { VIR_TYPE_BOOLEAN_P8, "%s", 8, -1, VIR_DUMP_CONST_32TOPOINTER, _BoolToString},
+    { VIR_TYPE_BOOLEAN_P16, "%s", 16, -1, VIR_DUMP_CONST_32TOPOINTER, _BoolToString},
+    { VIR_TYPE_BOOLEAN_P32, "%s", 32, -1, VIR_DUMP_CONST_32TOPOINTER, _BoolToString},
+
+    /* uchar vectors (1 byte per element) */
+    { VIR_TYPE_UINT8_P2, "%hhu", 2, 8, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_UINT8_P3, "%hhu", 3, 8, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_UINT8_P4, "%hhu", 4, 8, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_UINT8_P8, "%hhu", 8, 8, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_UINT8_P16, "%hhu", 16, 8, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_UINT8_P32, "%hhu", 32, 8, VIR_DUMP_CONST_NONE, gcvNULL},
+
+    /* char vectors (1 byte per element) */
+    { VIR_TYPE_INT8_P2, "%hhd", 2, 8, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_INT8_P3, "%hhd", 3, 8, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_INT8_P4, "%hhd", 4, 8, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_INT8_P8, "%hhd", 8, 8, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_INT8_P16, "%hhd", 16, 8, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_INT8_P32, "%hhd", 32, 8, VIR_DUMP_CONST_NONE, gcvNULL},
+
+    /* ushort vectors (2 bytes per element) */
+    { VIR_TYPE_UINT16_P2, "%hu", 2, 16, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_UINT16_P3, "%hu", 3, 16, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_UINT16_P4, "%hu", 4, 16, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_UINT16_P8, "%hu", 8, 16, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_UINT16_P16, "%hu", 16, 16, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_UINT16_P32, "%hu", 32, 16, VIR_DUMP_CONST_NONE, gcvNULL},
+
+    /* short vectors (2 bytes per element) */
+    { VIR_TYPE_INT16_P2, "%hd", 2, 16, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_INT16_P3, "%hd", 3, 16, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_INT16_P4, "%hd", 4, 16, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_INT16_P8, "%hd", 8, 16, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_INT16_P16, "%hd", 16, 16, VIR_DUMP_CONST_NONE, gcvNULL},
+    { VIR_TYPE_INT16_P32, "%hd", 32, 16, VIR_DUMP_CONST_NONE, gcvNULL},
 };
 
 static void
@@ -318,7 +368,6 @@ _GetStorageClassString(
         return "addr_reg ";
     case VIR_UNIFORM_EXTRA_LAYER:
         return "";
-
     case VIR_UNIFORM_TEXELBUFFER_TO_IMAGE:
         return "";
     default:
@@ -326,6 +375,7 @@ _GetStorageClassString(
         return "";
     }
 }
+
 
 static gctCONST_STRING
 _GetUniformKindString(
@@ -350,6 +400,8 @@ _GetUniformKindString(
         return "const_addr_space ";
     case VIR_UNIFORM_GLOBAL_SIZE:
         return "global_size ";
+    case VIR_UNIFORM_GLOBAL_WORK_SCALE:
+        return "global_work_scale";
     case VIR_UNIFORM_LOCAL_SIZE:
         return "local_size ";
     case VIR_UNIFORM_NUM_GROUPS:
@@ -370,8 +422,6 @@ _GetUniformKindString(
         return "trans_feedback_buffer ";
     case VIR_UNIFORM_TRANSFORM_FEEDBACK_STATE:
         return "trans_feedback_state ";
-    case VIR_UNIFORM_OPT_CONSTANT_TEXLD_COORD:
-        return "opt_const_texld_coord ";
     case VIR_UNIFORM_BLOCK_MEMBER:
         return "uniform block_member ";
     case VIR_UNIFORM_UNIFORM_BLOCK_ADDRESS:
@@ -390,10 +440,6 @@ _GetUniformKindString(
         return "sample location";
     case VIR_UNIFORM_ENABLE_MULTISAMPLE_BUFFERS:
         return "multiSample buffers";
-    case VIR_UNIFORM_WORK_THREAD_COUNT:
-        return "workThreadCount";
-    case VIR_UNIFORM_WORK_GROUP_COUNT:
-        return "workGroupCount";
     case VIR_UNIFORM_TEMP_REG_SPILL_MEM_ADDRESS:
         return "uniform_temp_reg_spill_mem_address";
     case VIR_UNIFORM_CONST_BORDER_VALUE:
@@ -406,6 +452,22 @@ _GetUniformKindString(
         return "extra_layer";
     case VIR_UNIFORM_BASE_INSTANCE:
         return "base_instance";
+    case VIR_UNIFORM_GL_SAMPLER_FOR_IMAGE_T:
+        return "gl_sampler_for_image_t";
+    case VIR_UNIFORM_GL_IMAGE_FOR_IMAGE_T:
+        return "gl_image_for_image_t";
+    case VIR_UNIFORM_WORK_THREAD_COUNT:
+        return "workThreadCount";
+    case VIR_UNIFORM_WORK_GROUP_COUNT:
+        return "workGroupCount";
+    case VIR_UNIFORM_WORK_GROUP_ID_OFFSET:
+        return "workGroupIdOffset";
+    case  VIR_UNIFORM_PRINTF_ADDRESS:
+        return "printf_address";
+    case VIR_UNIFORM_WORKITEM_PRINTF_BUFFER_SIZE:
+        return "workitem_printf_buffer_size";
+    case VIR_UNIFORM_GENERAL_PATCH:
+        return "general_patch";
     case VIR_UNIFORM_TEXELBUFFER_TO_IMAGE:
         return "texelBufferToImage";
     default:
@@ -493,40 +555,79 @@ _DumpVecConst(
             break;
         }
 
-        switch(Format->Size)
+        if(TyFlag & VIR_TYFLAG_PACKED)
         {
-        case -1:
-            VERIFY_OK(VIR_LOG(Dumper, Format->Format, pointer));
-            break;
-        case 64:
-            if(TyFlag & VIR_TYFLAG_ISFLOAT)
+            switch(Format->Size)
             {
-                VERIFY_OK(VIR_LOG(Dumper, Format->Format, *(double *)&p64[i]));
+            case -1:
+                VERIFY_OK(VIR_LOG(Dumper, Format->Format, pointer));
+                break;
+            case 64:
+                if(TyFlag & VIR_TYFLAG_ISFLOAT)
+                {
+                    VERIFY_OK(VIR_LOG(Dumper, Format->Format, *(double *)&p64[i]));
+                }
+                else
+                {
+                    VERIFY_OK(VIR_LOG(Dumper, Format->Format, p64[i]));
+                }
+                break;
+            case 32:
+                if(TyFlag & VIR_TYFLAG_ISFLOAT)
+                {
+                    VERIFY_OK(VIR_LOG(Dumper, Format->Format, *(gctFLOAT *)&p32[i]));
+                    VERIFY_OK(VIR_LOG(Dumper, "[%x]", p32[i]));
+                }
+                else
+                {
+                    VERIFY_OK(VIR_LOG(Dumper, Format->Format, p32[i]));
+                }
+                break;
+            case 16:
+                VERIFY_OK(VIR_LOG(Dumper, Format->Format, p16[i]));
+                break;
+            case 8:
+                VERIFY_OK(VIR_LOG(Dumper, Format->Format, p8[i]));
+                break;
+            default:
+                gcmASSERT(0);
             }
-            else
+        }
+        else
+        {
+            switch(Format->Size)
             {
-                VERIFY_OK(VIR_LOG(Dumper, Format->Format, p64[i]));
-            }
-            break;
-        case 32:
-            if(TyFlag & VIR_TYFLAG_ISFLOAT)
-            {
-                VERIFY_OK(VIR_LOG(Dumper, Format->Format, *(gctFLOAT *)&p32[i]));
-                VERIFY_OK(VIR_LOG(Dumper, "[%x]", p32[i]));
-            }
-            else
-            {
+            case -1:
+                VERIFY_OK(VIR_LOG(Dumper, Format->Format, pointer));
+                break;
+            case 64:
+                if(TyFlag & VIR_TYFLAG_ISFLOAT)
+                {
+                    VERIFY_OK(VIR_LOG(Dumper, Format->Format, *(double *)&p64[i]));
+                }
+                else
+                {
+                    VERIFY_OK(VIR_LOG(Dumper, Format->Format, p64[i]));
+                }
+                break;
+            case 32:
+                if(TyFlag & VIR_TYFLAG_ISFLOAT)
+                {
+                    VERIFY_OK(VIR_LOG(Dumper, Format->Format, *(gctFLOAT *)&p32[i]));
+                    VERIFY_OK(VIR_LOG(Dumper, "[%x]", p32[i]));
+                }
+                else
+                {
+                    VERIFY_OK(VIR_LOG(Dumper, Format->Format, p32[i]));
+                }
+                break;
+            case 16:
+            case 8:
                 VERIFY_OK(VIR_LOG(Dumper, Format->Format, p32[i]));
+                break;
+            default:
+                gcmASSERT(0);
             }
-            break;
-        case 16:
-            VERIFY_OK(VIR_LOG(Dumper, Format->Format, p16[i]));
-            break;
-        case 8:
-            VERIFY_OK(VIR_LOG(Dumper, Format->Format, p8[i]));
-            break;
-        default:
-            gcmASSERT(0);
         }
 
         if(Format->Count != i + 1)
@@ -576,6 +677,7 @@ _DumpConst(
 static VSC_ErrCode
 _DumpModifier(
     IN OUT VIR_Dumper *  Dumper,
+    IN VIR_Instruction * Inst,
     IN  VIR_Operand   *  Operand
     )
 {
@@ -593,9 +695,18 @@ _DumpModifier(
     }
     else if (!VIR_Operand_isTexldParm(Operand))
     {
-        VERIFY_OK(
-            VIR_LOG(Dumper, "%s",
-            VIR_SrcModifier_GetName(VIR_Operand_GetModifier(Operand))));
+        if (VIR_OPCODE_isCmplx(VIR_Inst_GetOpcode(Inst)))
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "%s",
+                VIR_ComplexSrcModifier_GetName(VIR_Operand_GetModifier(Operand))));
+        }
+        else
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "%s",
+                VIR_SrcModifier_GetName(VIR_Operand_GetModifier(Operand))));
+        }
     }
     return errCode;
 }
@@ -683,13 +794,8 @@ _DumpIndexed(
         VIR_Operand_GetRelAddrMode(Operand) != VIR_INDEXED_NONE &&
         VIR_Operand_GetRelAddrMode(Operand) < VIR_INDEXED_AL)
     {
-        VIR_Symbol *sym = gcvNULL;
-        VIR_SymId symId = VIR_Operand_GetRelIndexing(Operand);
-        if (VIR_Operand_isSymLocal(Operand))
-        {
-           VIR_Id_SetFunctionScope(symId);
-        }
-        sym = VIR_Function_GetSymFromId(Func, symId);
+        VIR_Symbol *sym = VIR_Function_GetSymFromId(Func,
+            VIR_Operand_GetRelIndexing(Operand));
         errCode = _DumpSymbol(Dumper, sym, gcvFALSE, gcvFALSE);
         CHECK_ERROR(errCode, "_DumpIndexed");
 
@@ -726,6 +832,21 @@ _DumpHwRegInfo(
                 VIR_LOG(Dumper, "r%d.<%d", hwRegId,
                 VIR_Operand_GetHwShift(Operand)));
         }
+        else if(hwRegId == VIR_SR_INSTATNCEID)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "insId.<%d", VIR_Operand_GetHwShift(Operand)));
+        }
+        else if(hwRegId == VIR_SR_VERTEXID)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "vxId.<%d", VIR_Operand_GetHwShift(Operand)));
+        }
+        else if(hwRegId == VIR_SR_FACE)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "face.<%d", VIR_Operand_GetHwShift(Operand)));
+        }
         else if(hwRegId == VIR_SR_A0)
         {
             VERIFY_OK(
@@ -735,6 +856,36 @@ _DumpHwRegInfo(
         {
             VERIFY_OK(
                 VIR_LOG(Dumper, "b0.<%d", VIR_Operand_GetHwShift(Operand)));
+        }
+        else if(hwRegId == VIR_SR_AL)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "al.<%d", VIR_Operand_GetHwShift(Operand)));
+        }
+        else if(hwRegId == VIR_SR_NEXTPC)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "nxpc.<%d", VIR_Operand_GetHwShift(Operand)));
+        }
+        else if(hwRegId == VIR_REG_MULTISAMPLEDEPTH)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "msdepth.<%d", VIR_Operand_GetHwShift(Operand)));
+        }
+        else if(hwRegId == VIR_REG_SAMPLE_POS)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "sPos.<%d", VIR_Operand_GetHwShift(Operand)));
+        }
+        else if(hwRegId == VIR_REG_SAMPLE_ID)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "sId.<%d", VIR_Operand_GetHwShift(Operand)));
+        }
+        else if(hwRegId == VIR_REG_SAMPLE_MASK_IN)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "smaskIn.<%d", VIR_Operand_GetHwShift(Operand)));
         }
 
         VERIFY_OK(
@@ -894,10 +1045,63 @@ _DumpLayout(
     )
 {
     VSC_ErrCode          errCode = VSC_ERR_NONE;
+    gctBOOL needToDump = gcvFALSE;
 
     /* do not print layout() if it is empty */
     if (VIR_Layout_GetQualifiers(Layout) == VIR_LAYQUAL_NONE)
         return VSC_ERR_NONE;
+
+    if(VIR_Layout_IsPacked(Layout))
+    {
+        needToDump = gcvTRUE;
+    }
+    else if(VIR_Layout_IsShared(Layout))
+    {
+        needToDump = gcvTRUE;
+    }
+    else if(VIR_Layout_IsStd140(Layout))
+    {
+        needToDump = gcvTRUE;
+    }
+    else if(VIR_Layout_IsStd430(Layout))
+    {
+        needToDump = gcvTRUE;
+    }
+    else if(VIR_Layout_IsRowMajor(Layout))
+    {
+        needToDump = gcvTRUE;
+    }
+    else if(VIR_Layout_IsColumnMajor(Layout))
+    {
+        needToDump = gcvTRUE;
+    }
+    else if(VIR_Layout_HasLocation(Layout) && VIR_Layout_GetLocation(Layout) != 0)
+    {
+        needToDump = gcvTRUE;
+    }
+    else if(VIR_Layout_HasBinding(Layout))
+    {
+        needToDump = gcvTRUE;
+    }
+    else if(VIR_Layout_HasOffset(Layout))
+    {
+       needToDump = gcvTRUE;
+    }
+    else if(VIR_Layout_HasBlend(Layout))
+    {
+        needToDump = gcvTRUE;
+    }
+    else if(VIR_Layout_HasImageFormat(Layout))
+    {
+        needToDump = gcvTRUE;
+    }
+    else if (VIR_Layout_GetDescriptorSet(Layout) != -1)
+    {
+       needToDump = gcvTRUE;
+    }
+
+    if(!needToDump)
+       return errCode;
 
     VERIFY_OK(VIR_LOG(Dumper, "layout("));
 
@@ -945,10 +1149,43 @@ _DumpLayout(
     {
         VERIFY_OK(VIR_LOG(Dumper, "image_format=%x ", VIR_Layout_GetImageFormat(Layout)));
     }
+    if (VIR_Layout_GetDescriptorSet(Layout) != -1)
+    {
+        VERIFY_OK(VIR_LOG(Dumper, "set=%d ", VIR_Layout_GetDescriptorSet(Layout)));
+    }
 
     VERIFY_OK(VIR_LOG(Dumper, ") "));
 
     return errCode;
+}
+
+static void
+_DumpTyQualifier(
+   IN OUT VIR_Dumper   *Dumper,
+   IN VIR_TyQualifier qualifier
+   )
+{
+    if (qualifier & VIR_TYQUAL_CONST)
+    {
+        VERIFY_OK(VIR_LOG(Dumper, "const "));
+    }
+    if (qualifier & VIR_TYQUAL_VOLATILE)
+    {
+        VERIFY_OK(VIR_LOG(Dumper, "volatile "));
+    }
+    if (qualifier & VIR_TYQUAL_RESTRICT)
+    {
+        VERIFY_OK(VIR_LOG(Dumper, "restrict "));
+    }
+    if (qualifier & VIR_TYQUAL_READ_ONLY)
+    {
+        VERIFY_OK(VIR_LOG(Dumper, "read_only "));
+    }
+    if (qualifier & VIR_TYQUAL_WRITE_ONLY)
+    {
+        VERIFY_OK(VIR_LOG(Dumper, "write_only "));
+    }
+    return;
 }
 
 static VSC_ErrCode
@@ -970,14 +1207,18 @@ _DumpSymbol(
     if(LVal)
     {
         VERIFY_OK(
-            VIR_LOG(Dumper, "%s%s%s%s%s",
+            VIR_LOG(Dumper, "%s%s",
             isSymArrayedPerVertex(Sym) ? "(ArrayedPerVertex) " : "",
-            spaceaddr[VIR_Symbol_GetAddrSpace(Sym)],
-            qualifier[VIR_Symbol_GetTyQualifier(Sym)],
+            spaceaddr[VIR_Symbol_GetAddrSpace(Sym)]));
+
+        _DumpTyQualifier(Dumper, VIR_Symbol_GetTyQualifier(Sym));
+
+        VERIFY_OK(
+            VIR_LOG(Dumper, "%s%s",
             VIR_Shader_IsCL(Dumper->Shader) ? "" : symbol_precision[VIR_Symbol_GetPrecision(Sym)],
             isSymPrecise(Sym) ? "precise " : ""));
 
-        if(VIR_SYMFLAG_FLAT & VIR_Symbol_GetFlag(Sym))
+        if(VIR_SYMFLAG_FLAT & VIR_Symbol_GetFlags(Sym))
         {
             VERIFY_OK(
                 VIR_LOG(Dumper, "flat "));
@@ -988,6 +1229,9 @@ _DumpSymbol(
         case VIR_SYM_UBO:
         case VIR_SYM_UNIFORM:
         case VIR_SYM_SAMPLER:
+        case VIR_SYM_IMAGE:
+        case VIR_SYM_IMAGE_T:
+        case VIR_SYM_SAMPLER_T:
             str= _GetUniformKindString(VIR_Symbol_GetUniformKind(Sym));
             break;
 
@@ -995,7 +1239,6 @@ _DumpSymbol(
         case VIR_SYM_VARIABLE:
         case VIR_SYM_FUNCTION:
         case VIR_SYM_TEXTURE:
-        case VIR_SYM_IMAGE:
         case VIR_SYM_TYPE:
         case VIR_SYM_VIRREG:
         case VIR_SYM_CONST:
@@ -1045,9 +1288,11 @@ _DumpSymbol(
     case VIR_SYM_SBO:
     case VIR_SYM_TEXTURE:
     case VIR_SYM_IMAGE:
+    case VIR_SYM_IMAGE_T:
     case VIR_SYM_TYPE:           /* typedef */
     case VIR_SYM_LABEL:
     case VIR_SYM_SAMPLER:
+    case VIR_SYM_SAMPLER_T:
     case VIR_SYM_UNIFORM:
     case VIR_SYM_VARIABLE:       /* global/local variables, input/output */
     case VIR_SYM_IOBLOCK:
@@ -1113,6 +1358,15 @@ VIR_Symbol_Dump(
         Dumper->baseDumper.pOffset != gcvNULL);
 
     type = VIR_Symbol_GetType(Sym);
+    if(symKind == VIR_SYM_UNIFORM)
+    {
+        VIR_Uniform * uniform = VIR_Symbol_GetUniform(Sym);
+        if (VIR_Uniform_isKernelArg(uniform) &&
+            VIR_Uniform_GetDerivedType(uniform) != VIR_TYPE_UNKNOWN)
+        {
+            type = VIR_Shader_GetTypeFromId(Dumper->Shader, VIR_Uniform_GetDerivedType(uniform));
+        }
+    }
     if(type == gcvNULL)
     {
         return VSC_ERR_INVALID_ARGUMENT;
@@ -1128,7 +1382,9 @@ VIR_Symbol_Dump(
     {
     case VIR_SYM_UNIFORM:
     case VIR_SYM_IMAGE:
+    case VIR_SYM_IMAGE_T:
     case VIR_SYM_SAMPLER:
+    case VIR_SYM_SAMPLER_T:
         VERIFY_OK(
             VIR_LOG(Dumper, " ==> uniform("));
         errCode = _DumpMapedRegister(Dumper, type,
@@ -1168,11 +1424,11 @@ VIR_Symbol_Dump(
             }
             else {
                 pConstVal = (VIR_Const *)VIR_GetSymFromId(&Dumper->Shader->constTable,
-                                              VIR_Uniform_GetInitializer(Sym->u2.uniform));
-            /* dump initializer */
+                                                          VIR_Uniform_GetInitializer(Sym->u2.uniform));
+                /* dump initializer */
                 VERIFY_OK(VIR_LOG(Dumper, " = "));
-            _DumpConst(Dumper, pConstVal);
-        }
+                _DumpConst(Dumper, pConstVal);
+            }
         }
         break;
     case VIR_SYM_VARIABLE:
@@ -1304,7 +1560,7 @@ _DumpTypeWithSpace(
     errCode = _DumpType(Dumper, Type, LVal, TypeFormat);
     CHECK_ERROR(errCode, "_DumpTypeWithSpace");
 
-    if(VIR_Type_GetBaseTypeId(Type) != VIR_TYPE_FLOAT32 || !TypeFormat.Ellipsis )
+    if(VIR_Shader_IsCL(Dumper->Shader) || (VIR_Type_GetBaseTypeId(Type) != VIR_TYPE_FLOAT32 || !TypeFormat.Ellipsis ))
     {
         VERIFY_OK(
             VIR_LOG(Dumper, " "));
@@ -1342,13 +1598,16 @@ _DumpType(
     case VIR_TY_MATRIX:
     case VIR_TY_SAMPLER:
     case VIR_TY_IMAGE:
+    case VIR_TY_IMAGE_T:
     case VIR_TY_VOID:
         gcmASSERT(VIR_Type_GetFlags(Type) & VIR_TYFLAG_BUILTIN);
-        if(VIR_Type_GetBaseTypeId(Type) != VIR_TYPE_FLOAT32 || !TypeFormat.Ellipsis )
+        if (VIR_Shader_IsCL(Dumper->Shader))
         {
-            VERIFY_OK(
-                VIR_LOG(Dumper, "%s",
-                VIR_Shader_GetTypeNameString(Dumper->Shader, Type)));
+            VERIFY_OK(VIR_LOG(Dumper, "%s", VIR_GetOCLTypeName(VIR_Type_GetIndex(Type))));
+        }
+        else if(VIR_Type_GetBaseTypeId(Type) != VIR_TYPE_FLOAT32 || !TypeFormat.Ellipsis )
+        {
+            VERIFY_OK(VIR_LOG(Dumper, "%s", VIR_GetTypeName(VIR_Type_GetIndex(Type))));
         }
         break;
         /* derived types */
@@ -1379,17 +1638,28 @@ _DumpType(
         {
             return VSC_ERR_INVALID_ARGUMENT;
         }
+        if(!TypeFormat.NoAddrQual)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "%s",
+                spaceaddr[VIR_Type_GetAddrSpace(Type)]));
 
-        VERIFY_OK(
-            VIR_LOG(Dumper, "%s%s",
-            spaceaddr[VIR_Type_GetAddrSpace(Type)],
-            qualifier[VIR_Type_GetQualifier(Type)]));
+            _DumpTyQualifier(Dumper, VIR_Type_GetQualifier(Type));
+        }
 
         errCode = _DumpType(Dumper, baseType, LVal, TypeFormat);
         CHECK_ERROR(errCode, "_DumpType");
 
-        VERIFY_OK(
-            VIR_LOG(Dumper, " *"));
+        if(TypeFormat.NoWSBeforeStar)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "*"));
+        }
+        else
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, " *"));
+        }
         break;
     case VIR_TY_ARRAY:
         baseType = VIR_Shader_GetTypeFromId(Dumper->Shader, VIR_Type_GetBaseTypeId(Type));
@@ -1403,8 +1673,16 @@ _DumpType(
         errCode = _DumpType(Dumper, baseType, LVal, TypeFormat);
         CHECK_ERROR(errCode, "_DumpType");
 
-        VERIFY_OK(
-            VIR_LOG(Dumper, "[%d] ", VIR_Type_GetArrayLength(Type)));
+        if(TypeFormat.NoWSBeforeStar)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "[%d]", VIR_Type_GetArrayLength(Type)));
+        }
+        else
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "[%d] ", VIR_Type_GetArrayLength(Type)));
+        }
         break;
     case VIR_TY_STRUCT:
 
@@ -1417,7 +1695,8 @@ _DumpType(
         else
         {
             VERIFY_OK(
-                VIR_LOG(Dumper, "%s",
+                VIR_LOG(Dumper, "%s %s",
+                VIR_Type_GetFlags(Type) & VIR_TYFLAG_ISUNION ? "union" : "struct",
                 VIR_Shader_GetStringFromId(Dumper->Shader, VIR_Type_GetNameId(Type))));
         }
 
@@ -1463,7 +1742,38 @@ _DumpType(
                 VIR_LOG(Dumper, "}"));
         }
         break;
+
     case VIR_TY_META:
+        break;
+
+    case VIR_TY_TYPEDEF:
+        if(VIR_Type_GetNameId(Type) == VIR_INVALID_ID)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "__anonymous "));
+        }
+        else
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "%s",
+                VIR_Shader_GetStringFromId(Dumper->Shader, VIR_Type_GetNameId(Type))));
+        }
+        break;
+
+    case VIR_TY_ENUM:
+        if(VIR_Type_GetNameId(Type) == VIR_INVALID_ID)
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "__anonymous "));
+        }
+        else
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "enum %s",
+                VIR_Shader_GetStringFromId(Dumper->Shader, VIR_Type_GetNameId(Type))));
+        }
+        break;
+
     default:
         gcmASSERT(0);
     }
@@ -1649,6 +1959,7 @@ _DumpOperand(
         errCode = _DumpSymbol(Dumper, sym,
             VIR_Operand_isLvalue(Operand) || DumpType, gcvFALSE);
         CHECK_ERROR(errCode, "DumpOperand");
+
         break;
     case VIR_OPND_FUNCTION:
         {
@@ -1818,7 +2129,7 @@ _DumpOperand(
         break;
     }
 
-    errCode = _DumpModifier(Dumper, Operand);
+    errCode = _DumpModifier(Dumper, Inst, Operand);
     CHECK_ERROR(errCode, "DumpOperand");
 
     errCode = _DumpRound(Dumper, Operand);
@@ -1909,7 +2220,8 @@ _DumpOpcode(
             "",
             ".t0t1",
             ".t0",
-            ".t1"
+            ".t1",
+            ".highpvec2"
         };
 
         VERIFY_OK(
@@ -1922,6 +2234,11 @@ _DumpOpcode(
         VERIFY_OK(
             VIR_LOG(Dumper, "%s",
             VIR_CondOp_GetName(VIR_Inst_GetConditionOp(Inst))));
+    }
+
+    if (VIR_Inst_GetFlags(Inst) & VIR_INSTFLAG_PACKEDMODE)
+    {
+        VERIFY_OK(VIR_LOG(Dumper, ".pack"));
     }
 
     _DumpAlign(Dumper, OPCODE_ALIGN);
@@ -2025,7 +2342,7 @@ _DumpPhiInst(
         errCode = _DumpOperand(Dumper, Inst, VIR_PhiOperand_GetValue(phiOperand), gcvFALSE);
         CHECK_ERROR(errCode, "PhiInst");
 
-        sym     = VIR_Function_GetSymFromId(func, VIR_PhiOperand_GetLabel(phiOperand)->sym);
+        sym = VIR_Function_GetSymFromId(func, VIR_PhiOperand_GetLabel(phiOperand)->sym);
         if(sym == gcvNULL)
         {
             return VSC_ERR_INVALID_ARGUMENT;
@@ -2039,8 +2356,15 @@ _DumpPhiInst(
         {
             VERIFY_OK(
                 VIR_LOG(Dumper, ", "));
-            _DumpAlign(Dumper, OPERAND_PLUS_ALIGN * (i + 2) + OPCODE_ALIGN);
         }
+
+        /* Dump two operands of Phi instruction per line */
+        if ((i == 0) || (i % 2 == 0))
+        {
+            VIR_LOG(Dumper, "\t");
+            VIR_LOG_FLUSH(Dumper);
+        }
+        _DumpAlign(Dumper, OPERAND_PLUS_ALIGN);
     }
     VERIFY_OK(
         VIR_LOG(Dumper, "}"));
@@ -2548,7 +2872,7 @@ VIR_Function_Dump(
                     gcmASSERT(curBB != gcvNULL);
                     if (Dumper->baseDumper.verbose)
                     {
-                        errCode = _DumpBasicBlockInOut(Dumper, curBB);
+                        errCode = _DumpBasicBlockInOutLength(Dumper, curBB);
                     }
                     preBB = curBB;
                     CHECK_ERROR(errCode, "DumpFunction");
@@ -2861,6 +3185,18 @@ VIR_Shader_Dump(
 
     gcmASSERT(Shader != gcvNULL);
 
+    if (VIR_Shader_IsLibraryShader(Shader) && !gcmGetOptimizerOption()->includeLib)
+    {
+        gcmFOOTER_ARG("errCode=%d", errCode);
+        return errCode;
+    }
+
+    /* re-number shader before dump */
+    if (gcmGetOptimizerOption()->renumberInst)
+    {
+        VIR_Shader_RenumberInstId(Shader);
+    }
+
     *dumper->baseDumper.pOffset = 0;
 
     /******************************************************* Header *********/
@@ -2924,7 +3260,7 @@ VIR_Shader_Dump(
     }
 
     /******************************************************* Per Patch Output ************/
-    if (VIR_IdList_Count(&Shader->perpatchInput) > 0)
+    if (VIR_IdList_Count(&Shader->perpatchOutput) > 0)
     {
         errCode = _DumpVariableList(dumper, &Shader->symTable,
             &Shader->perpatchOutput, ";\n", gcvTRUE, "/* Per Patch Output */");
@@ -3131,6 +3467,7 @@ void dbg_dumpVSym(
 {
     char         buffer[4096];
     VIR_Dumper   dumper;
+    VIR_DumpTypeFormat typeFormat = { gcvTRUE, gcvFALSE };
 
     gcoOS_ZeroMemory(&dumper, sizeof(dumper));
 
@@ -3139,10 +3476,13 @@ void dbg_dumpVSym(
 
     /* reset dumper buffer */
     vscDumper_Initialize(&dumper.baseDumper, gcvNULL, gcvNULL, buffer, sizeof(buffer));
+    VIR_LOG(&dumper, "%s %d(0x%x): ", VIR_GetSymbolKindName(VIR_Symbol_GetKind(Sym)),
+                                      VIR_Symbol_GetIndex(Sym), VIR_Symbol_GetIndex(Sym));
 
+    _DumpType(&dumper, VIR_Symbol_GetType(Sym), gcvTRUE, typeFormat);
+    VERIFY_OK(VIR_LOG(&dumper, " "));
     _DumpSymbol(&dumper, Sym, gcvTRUE, gcvTRUE);
-    VERIFY_OK(
-        VIR_LOG(&dumper, "\n"));
+    VERIFY_OK(VIR_LOG(&dumper, "\n"));
     VIR_LOG_FLUSH(&dumper);
 }
 
@@ -3196,6 +3536,22 @@ void dbg_dumpVNameId(
 void dbg_dumpVShader(IN VIR_Shader *Shader)
 {
     VIR_Shader_Dump(gcvNULL, "Dump Shader", Shader, gcvTRUE);
+}
+
+void dbg_dumpVFunc(IN VIR_Function     *Func)
+{
+    char         buffer[4096];
+    VIR_Dumper   dumper;
+
+    gcoOS_ZeroMemory(&dumper, sizeof(dumper));
+
+    dumper.Shader  = VIR_Function_GetShader(Func);
+    dumper.dumpOperandId = VIR_DUMP_OPNDIDX;
+
+    /* reset dumper buffer */
+    vscDumper_Initialize(&dumper.baseDumper, gcvNULL, gcvNULL, buffer, sizeof(buffer));
+    VIR_Function_Dump(&dumper, Func);
+    return;
 }
 
 void dbg_dumpMCode(
@@ -3297,7 +3653,7 @@ _DumpBasicBlockEdge(
 }
 
 static VSC_ErrCode
-_DumpBasicBlockInOut(
+_DumpBasicBlockInOutLength(
     IN OUT VIR_Dumper *Dumper,
     IN VIR_BB         *Bb
     )
@@ -3307,17 +3663,19 @@ _DumpBasicBlockInOut(
     VERIFY_OK(
         VIR_LOG(Dumper, "/* BasicBlock: "));
     errCode = VIR_BasicBlock_Name_Dump(Dumper, Bb);
-    CHECK_ERROR(errCode, "_DumpBasicBlockInOut");
+    CHECK_ERROR(errCode, "_DumpBasicBlockInOutLength");
 
     VERIFY_OK(
         VIR_LOG(Dumper, " Pred: "));
     errCode = _DumpBasicBlockEdge(Dumper, &Bb->dgNode.predList);
-    CHECK_ERROR(errCode, "_DumpBasicBlockInOut");
+    CHECK_ERROR(errCode, "_DumpBasicBlockInOutLength");
 
     VERIFY_OK(
         VIR_LOG(Dumper, " Succ: "));
     errCode = _DumpBasicBlockEdge(Dumper, &Bb->dgNode.succList);
-    CHECK_ERROR(errCode, "_DumpBasicBlockInOut");
+    CHECK_ERROR(errCode, "_DumpBasicBlockInOutLength");
+
+    VERIFY_OK(VIR_LOG(Dumper, " Length: %d", BB_GET_LENGTH(Bb)));
 
     VERIFY_OK(
         VIR_LOG(Dumper, " */\n"));
@@ -3342,7 +3700,7 @@ VIR_BasicBlock_Dump(
         Dumper->Shader != gcvNULL &&
         Bb != gcvNULL);
 
-    errCode = _DumpBasicBlockInOut(Dumper, Bb);
+    errCode = _DumpBasicBlockInOutLength(Dumper, Bb);
     CHECK_ERROR(errCode, "VIR_BasicBlock_Dump");
     VIR_LOG_FLUSH(Dumper);
 
@@ -3507,8 +3865,7 @@ VIR_CFG_Dump(
 static void
 _VIR_Dump_Usage(
     IN OUT VIR_Dumper*      Dumper,
-    IN VIR_USAGE*           pUsage,
-    gctBOOL                 bFirstUsage
+    IN VIR_USAGE*           pUsage
     )
 {
     VIR_Instruction* pInst = pUsage->usageKey.pUsageInst;
@@ -3517,7 +3874,7 @@ _VIR_Dump_Usage(
     if (pInst == VIR_OUTPUT_USAGE_INST)
     {
         /* Fixed function inst */
-        VIR_LOG(Dumper, "%sFF_INST", bFirstUsage ? "" : ", ");
+        VIR_LOG(Dumper, "FF_INST");
     }
     else
     {
@@ -3530,12 +3887,11 @@ _VIR_Dump_Usage(
             }
         }
 
-        VIR_LOG(Dumper, "%ssrc%d of inst%d(%s)",
-                bFirstUsage ? "" : ", ", srcIdx,
+        VIR_LOG(Dumper, "src%d of inst%d(%s)",
+                srcIdx,
                 pInst->id_,
                 VIR_OPCODE_GetName(VIR_Inst_GetOpcode(pInst)));
     }
-    VIR_LOG_FLUSH(Dumper);
 }
 
 static VSC_ErrCode
@@ -3583,18 +3939,22 @@ _VIR_Def_Dump(
         if (pDef->defKey.pDefInst == VIR_INPUT_DEF_INST)
         {
             /* Fixed function inst */
-            VIR_LOG(Dumper, " at FF_INST\n");
+            VIR_LOG(Dumper, " at FF_INST");
         }
         else if (pDef->defKey.pDefInst == VIR_HW_SPECIAL_DEF_INST)
         {
             /* Hw special inst */
-            VIR_LOG(Dumper, " at HW_SPECIAL_INST\n");
+            VIR_LOG(Dumper, " at HW_SPECIAL_INST");
         }
         else
         {
-            VIR_LOG(Dumper, " at inst%d (%s)\n", pDef->defKey.pDefInst->id_,
+            VIR_LOG(Dumper, " at inst%d (%s)", pDef->defKey.pDefInst->id_,
                     VIR_OPCODE_GetName(VIR_Inst_GetOpcode(pDef->defKey.pDefInst)));
         }
+        VIR_LOG(Dumper, ", next def%d  (webIdx:%d nextDefInWeb %d)",
+                pDef->nextDefIdxOfSameRegNo == VIR_INVALID_DEF_INDEX ? -1 : pDef->nextDefIdxOfSameRegNo,
+                pDef->webIdx,
+                pDef->nextDefInWebIdx == VIR_INVALID_DEF_INDEX ? -1 : pDef->nextDefInWebIdx);
         VIR_LOG_FLUSH(Dumper);
 
         /* DU chain */
@@ -3608,7 +3968,13 @@ _VIR_Def_Dump(
 
             if (IS_VALID_USAGE(pUsage))
             {
-                _VIR_Dump_Usage(Dumper, pUsage, bFirstUsage);
+                if (!bFirstUsage)
+                {
+                    VIR_LOG(Dumper, ",");
+                    VIR_LOG_FLUSH(Dumper);
+                    VIR_LOG(Dumper, "              ");
+                }
+                _VIR_Dump_Usage(Dumper, pUsage);
 
                 if (bFirstUsage)
                 {
@@ -3616,7 +3982,7 @@ _VIR_Def_Dump(
                 }
             }
         }
-        VIR_LOG(Dumper, "]");
+        VIR_LOG(Dumper, " ]");
         VIR_LOG_FLUSH(Dumper);
     }
 
@@ -3640,7 +4006,7 @@ void _PrintDefVector(
         i = index + 1;
 
         /* make print line not too long */
-        if ((count++ % 12) == 0)
+        if ((++count % 12) == 0)
         {
             VIR_LOG_FLUSH(pDumper);
         }
@@ -3731,6 +4097,48 @@ VIR_DU_Info_Dump(
         VIR_LOG_FLUSH(Dumper);
     }
 
+    return errCode;
+}
+
+/* According OCL spec: the type name returned will be
+ * the argument type name as it was declared with any
+ * whitespace removed. If argument type name is an
+ * unsigned scalar type (i.e. unsigned char, unsigned
+ * short, unsigned int, unsigned long), uchar, ushort,
+ * uint and ulong will be returned. The argument type
+ * name returned does not include any type qualifiers.
+ */
+VSC_ErrCode
+VIR_Dump_OCLTypeName(
+    IN VIR_Shader *        pShader,
+    IN VIR_TypeId          TypeId,
+    IN OUT gctSTRING       Buffer,
+    IN gctUINT             Length
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    char                buffer[1024];
+    VIR_Dumper          dumper;
+    VIR_DumpTypeFormat  typeFormat = { gcvFALSE, gcvFALSE, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE };
+    VIR_Type *          type = VIR_Shader_GetTypeFromId(pShader, TypeId);
+
+    gcmASSERT(type != gcvNULL);
+    gcoOS_ZeroMemory(&dumper, sizeof(dumper));
+    vscDumper_Initialize(&dumper.baseDumper, gcvNULL, gcvNULL, buffer, sizeof(buffer));
+
+    dumper.Shader  = pShader;
+    dumper.dumpOperandId = VIR_DUMP_OPNDIDX;
+
+    errCode = _DumpType(&dumper, type, gcvTRUE, typeFormat);
+    ON_ERROR(errCode, "Dump OCL type name");
+
+    if (Length < (gctUINT)dumper.baseDumper.curOffset)
+    {
+        errCode = VSC_ERR_OUT_OF_BOUNDS;
+        ON_ERROR(errCode, "Dump OCL type name buffer too small");
+    }
+    gcoOS_StrCopySafe(Buffer, Length, buffer);
+OnError:
     return errCode;
 }
 

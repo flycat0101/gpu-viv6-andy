@@ -1,6 +1,6 @@
 @REM #########################################################################
 @REM #
-@REM #  Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+@REM #  Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 @REM #
 @REM #  The material in this file is confidential and contains trade secrets
 @REM #  of Vivante Corporation. This is proprietary information owned by
@@ -62,8 +62,6 @@ echo copy gc_hal_statistics.h ...
 copy /y %AQROOT%\hal\inc\gc_hal_statistics.h %VIVANTE_SDK_DIR%\inc\HAL\
 echo copy gc_hal_mem.h ...
 copy /y %AQROOT%\hal\inc\gc_hal_mem.h %VIVANTE_SDK_DIR%\inc\HAL\
-echo copy gc_hal_rename.h ...
-copy /y %AQROOT%\hal\inc\gc_hal_rename.h %VIVANTE_SDK_DIR%\inc\HAL\
 echo copy gc_hal_driver.h ...
 copy /y %AQROOT%\hal\inc\gc_hal_driver.h %VIVANTE_SDK_DIR%\inc\HAL\
 if exist %AQROOT%\hal\inc\gc_hal_cl.h (

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -29,37 +29,99 @@ typedef struct _clsKEYWORD
 }
 clsKEYWORD;
 
+typedef struct _clsKEYWORD_NODE
+{
+    slsDLINK_NODE    node;
+    clsKEYWORD       keyword;
+}
+clsKEYWORD_NODE;
+
 static clsKEYWORD KeywordTable[] =
 {
+    {"_Bool",                T_BOOL,                 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"_Complex",             T_RESERVED_KEYWORD,     1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"_Imaginary",           T_RESERVED_KEYWORD,     1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"__attribute__",        T_ATTRIBUTE__,          0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"__const",              T_CONST,                1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"__constant",           T_CONSTANT,             0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"__global",             T_GLOBAL,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"__inline",             T_INLINE,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"__kernel",             T_KERNEL,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"__local",              T_LOCAL,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"__private",            T_PRIVATE,              0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"__read_only",          T_READ_ONLY,            0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"__read_write",         T_RESERVED_KEYWORD,     1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"__restrict",           T_RESTRICT,             1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"__volatile",           T_VOLATILE,             1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"__write_only",         T_WRITE_ONLY,           0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"_viv_bool16_packed",   T_BOOL16_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_bool2_packed",    T_BOOL2_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_bool32_packed",   T_BOOL32_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_bool3_packed",    T_BOOL3_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_bool4_packed",    T_BOOL4_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_bool8_packed",    T_BOOL8_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_bool_packed",     T_BOOL_PACKED,         0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_char16_packed",   T_CHAR16_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_char2_packed",    T_CHAR2_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_char32_packed",   T_CHAR32_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_char3_packed",    T_CHAR3_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_char4_packed",    T_CHAR4_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_char8_packed",    T_CHAR8_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_char_packed",     T_CHAR_PACKED,         0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_gentype_packed",  T_GENTYPE_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_half16_packed",   T_HALF16_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_half2_packed",    T_HALF2_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_half32_packed",   T_HALF32_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_half3_packed",    T_HALF3_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_half4_packed",    T_HALF4_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_half8_packed",    T_HALF8_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_half_packed",     T_HALF_PACKED,         0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_image2d_array_t", T_IMAGE2D_DYNAMIC_ARRAY_T,   0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_image2d_ptr_t",   T_IMAGE2D_PTR_T,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_short16_packed",  T_SHORT16_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_short2_packed",   T_SHORT2_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_short32_packed",  T_SHORT32_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_short3_packed",   T_SHORT3_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_short4_packed",   T_SHORT4_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_short8_packed",   T_SHORT8_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_short_packed",    T_SHORT_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_uchar16_packed",  T_UCHAR16_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_uchar2_packed",   T_UCHAR2_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_uchar32_packed",  T_UCHAR32_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_uchar3_packed",   T_UCHAR3_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_uchar4_packed",   T_UCHAR4_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_uchar8_packed",   T_UCHAR8_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_uchar_packed",    T_UCHAR_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_uniform",         T_UNIFORM,             0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_ushort16_packed", T_USHORT16_PACKED,     0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_ushort2_packed",  T_USHORT2_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_ushort32_packed", T_USHORT32_PACKED,     0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_ushort3_packed",  T_USHORT3_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_ushort4_packed",  T_USHORT4_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_ushort8_packed",  T_USHORT8_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_ushort_packed",   T_USHORT_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"aligned",              T_ALIGNED,              0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"endian",               T_ENDIAN,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"vec_type_hint",        T_VEC_TYPE_HINT,        0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"reqd_work_group_size", T_REQD_WORK_GROUP_SIZE, 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"work_group_size_hint", T_WORK_GROUP_SIZE_HINT, 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"always_inline",        T_ALWAYS_INLINE,        0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"asm",                  T_RESERVED_KEYWORD,     1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"auto",                 T_RESERVED_KEYWORD,     1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"_Bool",                T_BOOL,                 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"bool",                 T_BOOL,                 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"bool16",               T_BOOL16,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"bool32",               T_BOOL32,               0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"bool2",                T_BOOL2,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"bool3",                T_BOOL3,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"bool32",               T_BOOL32,               0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"bool4",                T_BOOL4,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"bool8",                T_BOOL8,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"char",                 T_CHAR,                 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"char16",               T_CHAR16,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"char32",               T_CHAR32,               0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"char2",                T_CHAR2,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"char3",                T_CHAR3,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"char4",                T_CHAR4,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"char8",                T_CHAR8,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"_Complex",             T_RESERVED_KEYWORD,     1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"complex",              T_RESERVED_KEYWORD,     1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"break",                T_BREAK,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"case",                 T_CASE,                 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"char",                 T_CHAR,                 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"char16",               T_CHAR16,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"char2",                T_CHAR2,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"char3",                T_CHAR3,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"char32",               T_CHAR32,               0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"char4",                T_CHAR4,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"char8",                T_CHAR8,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"complex",              T_RESERVED_KEYWORD,     1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"const",                T_CONST,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"__const",              T_CONST,                1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"constant",             T_CONSTANT,             0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"continue",             T_CONTINUE,             0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"default",              T_DEFAULT,              0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
@@ -71,6 +133,7 @@ static clsKEYWORD KeywordTable[] =
     {"double4",              T_DOUBLE4,              1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"double8",              T_DOUBLE8,              1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"else",                 T_ELSE,                 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"endian",               T_ENDIAN,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"enum",                 T_ENUM,                 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"event_t",              T_EVENT_T,              0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"extern",               T_EXTERN,               1,    clvCL_12, clvEXTENSION_NONE},
@@ -84,20 +147,19 @@ static clsKEYWORD KeywordTable[] =
     {"global",               T_GLOBAL,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"goto",                 T_GOTO,                 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"half",                 T_HALF,                 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"half32",               T_HALF32,               0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"half16",               T_HALF16,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"half2",                T_HALF2,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"half3",                T_HALF3,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"half32",               T_HALF32,               0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"half4",                T_HALF4,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"half8",                T_HALF8,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"if",                   T_IF,                   0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"image1d_t",            T_IMAGE1D_T,            0,    clvCL_12, clvEXTENSION_NONE},
     {"image1d_array_t",      T_IMAGE1D_ARRAY_T,      0,    clvCL_12, clvEXTENSION_NONE},
     {"image1d_buffer_t",     T_IMAGE1D_BUFFER_T,     0,    clvCL_12, clvEXTENSION_NONE},
-    {"image2d_t",            T_IMAGE2D_T,            0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"image1d_t",            T_IMAGE1D_T,            0,    clvCL_12, clvEXTENSION_NONE},
     {"image2d_array_t",      T_IMAGE2D_ARRAY_T,      0,    clvCL_12, clvEXTENSION_NONE},
+    {"image2d_t",            T_IMAGE2D_T,            0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"image3d_t",            T_IMAGE3D_T,            0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"_Imaginary",           T_RESERVED_KEYWORD,     1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"imaginary",            T_RESERVED_KEYWORD,     1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"inline",               T_INLINE,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"int",                  T_INT,                  0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
@@ -109,6 +171,7 @@ static clsKEYWORD KeywordTable[] =
     {"interface",            T_RESERVED_KEYWORD,     1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"intptr_t",             T_INTPTR_T,             0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"kernel",               T_KERNEL,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"kernel_scale_hint",    T_KERNEL_SCALE_HINT,   0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"local",                T_LOCAL,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"long",                 T_LONG,                 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"long16",               T_LONG16,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
@@ -127,21 +190,23 @@ static clsKEYWORD KeywordTable[] =
     {"quad3",                T_QUAD3,                1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"quad4",                T_QUAD4,                1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"quad8",                T_QUAD8,                1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"read_only",            T_READ_ONLY,            0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"read_write",           T_RESERVED_KEYWORD,     1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"register",             T_RESERVED_KEYWORD,     1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"reqd_work_group_size", T_REQD_WORK_GROUP_SIZE, 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"restrict",             T_RESTRICT,             0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"return",               T_RETURN,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"sampler_t",            T_SAMPLER_T,            0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"short",                T_SHORT,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"short16",              T_SHORT16,              0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"short32",              T_SHORT32,              0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"short2",               T_SHORT2,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"short3",               T_SHORT3,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"short32",              T_SHORT32,              0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"short4",               T_SHORT4,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"short8",               T_SHORT8,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"signed",               T_RESERVED_KEYWORD,     1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"sizeof",               T_SIZEOF,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"vec_step",             T_VEC_STEP,             0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"size_t",               T_SIZE_T,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"sizeof",               T_SIZEOF,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"static",               T_STATIC,               1,    clvCL_12, clvEXTENSION_NONE},
     {"struct",               T_STRUCT,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"switch",               T_SWITCH,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
@@ -149,9 +214,9 @@ static clsKEYWORD KeywordTable[] =
     {"typeof",               T_TYPEOF,               0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"uchar",                T_UCHAR,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"uchar16",              T_UCHAR16,              0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"uchar32",              T_UCHAR32,              0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"uchar2",               T_UCHAR2,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"uchar3",               T_UCHAR3,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"uchar32",              T_UCHAR32,              0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"uchar4",               T_UCHAR4,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"uchar8",               T_UCHAR8,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"uint",                 T_UINT,                 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
@@ -171,110 +236,30 @@ static clsKEYWORD KeywordTable[] =
     {"unsigned",             T_UNSIGNED,             0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"ushort",               T_USHORT,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"ushort16",             T_USHORT16,             0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"ushort32",             T_USHORT32,             0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"ushort2",              T_USHORT2,              0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"ushort3",              T_USHORT3,              0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"ushort32",             T_USHORT32,             0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"ushort4",              T_USHORT4,              0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"ushort8",              T_USHORT8,              0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"vec_step",             T_VEC_STEP,             0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"vec_type_hint",        T_VEC_TYPE_HINT,        0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"viv_generic_gl_image", T_VIV_GENERIC_GL_IMAGE, 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"viv_generic_gl_sampler",T_VIV_GENERIC_GL_SAMPLER,0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"viv_generic_image_t",  T_VIV_GENERIC_IMAGE_T,  0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"void",                 T_VOID,                 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"volatile",             T_VOLATILE,             0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"while",                T_WHILE,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"read_only",            T_READ_ONLY,            0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"work_group_size_hint", T_WORK_GROUP_SIZE_HINT, 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"write_only",           T_WRITE_ONLY,           0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"read_write",           T_RESERVED_KEYWORD,     1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"__attribute__",        T_ATTRIBUTE__,          0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"__constant",           T_CONSTANT,             0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"__global",             T_GLOBAL,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"__kernel",             T_KERNEL,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"__local",              T_LOCAL,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"__private",            T_PRIVATE,              0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"__read_only",          T_READ_ONLY,            0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"__write_only",         T_WRITE_ONLY,           0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"__read_write",         T_RESERVED_KEYWORD,     1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"__restrict",           T_RESTRICT,             1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"__volatile",           T_VOLATILE,             1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"_viv_bool_packed",     T_BOOL_PACKED,         0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_bool2_packed",    T_BOOL2_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_bool3_packed",    T_BOOL3_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_bool4_packed",    T_BOOL4_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_bool8_packed",    T_BOOL8_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_bool16_packed",   T_BOOL16_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_bool32_packed",   T_BOOL32_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_char_packed",     T_CHAR_PACKED,         0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_char2_packed",    T_CHAR2_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_char3_packed",    T_CHAR3_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_char4_packed",    T_CHAR4_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_char8_packed",    T_CHAR8_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_char16_packed",   T_CHAR16_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_char32_packed",   T_CHAR32_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_uchar_packed",    T_UCHAR_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_uchar2_packed",   T_UCHAR2_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_uchar3_packed",   T_UCHAR3_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_uchar4_packed",   T_UCHAR4_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_uchar8_packed",   T_UCHAR8_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_uchar16_packed",  T_UCHAR16_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_uchar32_packed",  T_UCHAR32_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_short_packed",    T_SHORT_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_short2_packed",   T_SHORT2_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_short3_packed",   T_SHORT3_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_short4_packed",   T_SHORT4_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_short8_packed",   T_SHORT8_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_short16_packed",  T_SHORT16_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_short32_packed",  T_SHORT32_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_ushort_packed",   T_USHORT_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_ushort2_packed",  T_USHORT2_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_ushort3_packed",  T_USHORT3_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_ushort4_packed",  T_USHORT4_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_ushort8_packed",  T_USHORT8_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_ushort16_packed", T_USHORT16_PACKED,     0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_ushort32_packed", T_USHORT32_PACKED,     0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_half_packed",     T_HALF_PACKED,         0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_half2_packed",    T_HALF2_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_half3_packed",    T_HALF3_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_half4_packed",    T_HALF4_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_half8_packed",    T_HALF8_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_half16_packed",   T_HALF16_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_half32_packed",   T_HALF32_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_gentype_packed",  T_GENTYPE_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_image2d_ptr_t",   T_IMAGE2D_PTR_T,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_image2d_array_t", T_IMAGE2D_DYNAMIC_ARRAY_T,   0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_uniform",         T_UNIFORM,             0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"kernel_scale_hint",    T_KERNEL_SCALE_HINT,   0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
 };
 
 #define _cldMaxRepetitiveError   5
 #define cldKeywordCount  (sizeof(KeywordTable) / sizeof(clsKEYWORD))
 
-#define _clmSearchKeyword(Symbol, Index, Token)  do { \
-     (Index) = _FindKeywordTableIndex(Symbol); \
-     if((Index) < 0) { \
-        (Token) =  T_NOT_KEYWORD; \
-     } \
-     else if (KeywordTable[(Index)].languageVersion | _CL_LanguageVersion) { \
-        (Token) = KeywordTable[(Index)].token; \
-     } \
-     else { \
-        (Token) =  T_RESERVED_KEYWORD; \
-     } \
-   } while (gcvFALSE)
-
 static gctCONST_STRING  _IndexKeywordTableEntries[cldNumTerminalTokens];
 static cltLANGUAGE_VERSION  _CL_LanguageVersion = clvCL_11;
 static cleEXTENSION  _CL_LanguageExtension = clvEXTENSION_NONE;
-
-/** function to compare keyword strings in KeywordTable for qsort **/
-static gctINT
-_Compare_Keywords(const void *T1, const void *T2)
-{
-   gctINT result;
-
-   clsKEYWORD *i1, *i2;
-   i1 = (clsKEYWORD *)T1;
-   i2 = (clsKEYWORD *)T2;
-   result = gcoOS_StrCmp(i1->symbol, i2->symbol);
-   return (result == gcvSTATUS_SMALLER ? -1 :
-         (result == gcvSTATUS_LARGER ? 1 : 0));
-}
+static clsHASH_TABLE  _keywordHash;
 
 void
 clScanInitLanguageVersion(
@@ -305,11 +290,11 @@ clScanInitIndexToKeywordTableEntries(void)
 {
    gctSIZE_T i, index;
    gctCONST_STRING reserved= "reserved keyword";
+   clsKEYWORD_NODE *node;
+   slsDLINK_NODE *bucket;
+   gceSTATUS    status;
 
    gcmHEADER();
-
-/*** Sort the keyword table ***/
-   clQuickSort(KeywordTable, cldKeywordCount, sizeof (clsKEYWORD), _Compare_Keywords);
 
 /** Reserve the zero entry for T_RESERVED_KEYWORD **/
    gcmASSERT(T_RESERVED_KEYWORD == 0);
@@ -325,8 +310,47 @@ clScanInitIndexToKeywordTableEntries(void)
      _IndexKeywordTableEntries[index] = KeywordTable[i].symbol;
    }
 
+   /* init the keyword hash */
+   clsHASH_TABLE_Initialize(&_keywordHash);
+   for(i=0; i< cldKeywordCount; i++) {
+      bucket = clsHASH_TABLE_Bucket(&_keywordHash,
+                                    clmBUCKET_INDEX(clHashString(KeywordTable[i].symbol)));
+
+      status = gcoOS_Allocate(gcvNULL,
+                                    sizeof(clsKEYWORD_NODE),
+                                    (gctPOINTER *) &node);
+      if (gcmIS_ERROR(status))
+         break;
+      node->keyword = KeywordTable[i];
+      slsDLINK_LIST_InsertFirst(bucket, &node->node);
+   }
+
    gcmFOOTER_ARG("*<return>=0x%x", _IndexKeywordTableEntries);
    return _IndexKeywordTableEntries;
+}
+
+gceSTATUS
+clCleanupKeywords(
+void
+)
+{
+   clsKEYWORD_NODE *node;
+   slsDLINK_NODE *bucket;
+   gceSTATUS status = gcvSTATUS_OK;
+   cloCOMPILER compiler = *gcGetKernelCompiler();
+
+   if(!compiler)
+      return status;
+
+   /* Destroy keyword hash table */
+   FOR_EACH_HASH_BUCKET(&_keywordHash, bucket) {
+      while (!slsDLINK_LIST_IsEmpty(bucket)) {
+         slsDLINK_LIST_DetachFirst(bucket, clsKEYWORD_NODE, &node);
+         gcmONERROR(gcoOS_Free(gcvNULL, (gctPOINTER)node));
+      }
+   }
+OnError:
+   return status;
 }
 
 static gctINT
@@ -334,30 +358,21 @@ _SearchKeyword(
 IN gctCONST_STRING Symbol
 )
 {
-    gctINT       low, mid, high;
-    gceSTATUS    result;
+    slsDLINK_NODE *bucket;
+    clsKEYWORD_NODE *node;
 
-    low = 0;
-    high = cldKeywordCount - 1;
+    bucket = clsHASH_TABLE_Bucket(&_keywordHash,
+                                  clmBUCKET_INDEX(clHashString(Symbol)));
 
-    while (low <= high) {
-        mid = (low + high) / 2;
-        result = gcoOS_StrCmp(Symbol, KeywordTable[mid].symbol);
-        if (result == gcvSTATUS_SMALLER) {
-            high    = mid - 1;
-        }
-        else if (result == gcvSTATUS_LARGER) {
-            low = mid + 1;
-        }
-        else {
-            gcmASSERT(gcmIS_SUCCESS(result));
-            if ((KeywordTable[mid].languageVersion & _CL_LanguageVersion) &&
-                (KeywordTable[mid].extension == clvEXTENSION_NONE ||
-                (KeywordTable[mid].extension & _CL_LanguageExtension))) {
-                return KeywordTable[mid].token;
+    FOR_EACH_DLINK_NODE(bucket, clsKEYWORD_NODE, node) {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(node->keyword.symbol, Symbol))) {
+            if ((node->keyword.languageVersion & _CL_LanguageVersion) &&
+                (node->keyword.extension == clvEXTENSION_NONE ||
+                (node->keyword.extension & _CL_LanguageExtension))) {
+                return node->keyword.token;
             }
             else {
-                if(KeywordTable[mid].extension & clvEXTENSION_VIV_VX) {
+                if(node->keyword.extension & clvEXTENSION_VIV_VX) {
                     return T_NOT_KEYWORD;
                 }
                 else return T_RESERVED_KEYWORD;
@@ -369,32 +384,31 @@ IN gctCONST_STRING Symbol
 }
 
 static gctINT
-_FindKeywordTableIndex(
-IN gctCONST_STRING Symbol
+_SearchKeywordSymbol(
+IN gctCONST_STRING Symbol,
+OUT clsKEYWORD **Keyword
 )
 {
-    gctINT       low, mid, high;
-    gceSTATUS    result;
+    slsDLINK_NODE *bucket;
+    clsKEYWORD_NODE *node;
 
-    low = 0;
-    high = cldKeywordCount - 1;
-
-    while (low <= high) {
-        mid = (low + high) / 2;
-        result = gcoOS_StrCmp(Symbol, KeywordTable[mid].symbol);
-        if (result == gcvSTATUS_SMALLER) {
-            high    = mid - 1;
-        }
-        else if (result == gcvSTATUS_LARGER) {
-            low = mid + 1;
-        }
-        else {
-            gcmASSERT(gcmIS_SUCCESS(result));
-            return mid;
+    *Keyword = gcvNULL;
+    bucket = clsHASH_TABLE_Bucket(&_keywordHash,
+                                  clmBUCKET_INDEX(clHashString(Symbol)));
+    FOR_EACH_DLINK_NODE(bucket, clsKEYWORD_NODE, node) {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(node->keyword.symbol, Symbol))) {
+            *Keyword = &(node->keyword);
+            if (node->keyword.languageVersion | _CL_LanguageVersion)
+            {
+                return node->keyword.token;
+            }
+            else
+            {
+                return T_RESERVED_KEYWORD;
+            }
         }
     }
-
-    return -1;
+    return T_NOT_KEYWORD;
 }
 
 static gctINT _doubleMatrixErrCount = 1;
@@ -561,8 +575,8 @@ OUT clsLexToken * Token
 {
     gceSTATUS  status;
     gctINT    tokenType;
-    gctINT  key;
     cltPOOL_STRING    symbolInPool;
+    clsKEYWORD *keyword = gcvNULL;
 
     gcmASSERT(Token);
 
@@ -570,13 +584,12 @@ OUT clsLexToken * Token
     Token->stringNo    = StringNo;
 
     /* Check as a reserved keyword */
-    _clmSearchKeyword(Symbol, key, tokenType);
+    tokenType = _SearchKeywordSymbol(Symbol, &keyword);
 
     if (tokenType == T_RESERVED_KEYWORD) {
         Token->type = T_RESERVED_KEYWORD;
-        gcmASSERT(key >= 0);
-        if(KeywordTable[key].errCount < _cldMaxRepetitiveError) {
-              if(++KeywordTable[key].errCount == _cldMaxRepetitiveError) {
+        if(keyword->errCount < _cldMaxRepetitiveError) {
+              if(++(keyword->errCount) == _cldMaxRepetitiveError) {
                  gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                                  LineNo, StringNo, clvREPORT_ERROR,
                                                  "unsupported reserved data type : '%s'\n"
@@ -594,10 +607,9 @@ OUT clsLexToken * Token
     }
     if (tokenType != T_NOT_KEYWORD) {
         Token->type = tokenType;
-        gcmASSERT(key >= 0);
-        if (KeywordTable[key].errCount &&
-            KeywordTable[key].errCount < _cldMaxRepetitiveError) {
-              if(++KeywordTable[key].errCount == _cldMaxRepetitiveError) {
+        if (keyword->errCount &&
+            keyword->errCount < _cldMaxRepetitiveError) {
+              if(++(keyword->errCount) == _cldMaxRepetitiveError) {
                  gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                                  LineNo, StringNo, clvREPORT_ERROR,
                                                  "unsupported reserved data type : '%s'\n"
@@ -736,22 +748,21 @@ OUT clsLexToken * Token
 {
     gceSTATUS  status;
     gctINT    tokenType;
-    gctINT    key;
     cltPOOL_STRING    symbolInPool;
+    clsKEYWORD *keyword = gcvNULL;
 
     gcmASSERT(Token);
     Token->lineNo    = LineNo;
     Token->stringNo    = StringNo;
 
     /* Check as a reserved keyword */
-    _clmSearchKeyword(Symbol, key, tokenType);
+    tokenType = _SearchKeywordSymbol(Symbol, &keyword);
 
     if (tokenType == T_RESERVED_KEYWORD) {
         Token->type = T_RESERVED_KEYWORD;
-        gcmASSERT(key >= 0);
 
-        if(KeywordTable[key].errCount < _cldMaxRepetitiveError) {
-            if(++KeywordTable[key].errCount == _cldMaxRepetitiveError) {
+        if(keyword->errCount < _cldMaxRepetitiveError) {
+            if(++(keyword->errCount) == _cldMaxRepetitiveError) {
                 gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                                 LineNo, StringNo, clvREPORT_ERROR,
                                                 "unsupported built-in data type : '%s'\n",
@@ -773,10 +784,9 @@ OUT clsLexToken * Token
     }
     if (tokenType != T_NOT_KEYWORD) {
         Token->type = tokenType;
-        gcmASSERT(key >= 0);
-        if (KeywordTable[key].errCount &&
-            KeywordTable[key].errCount < _cldMaxRepetitiveError) {
-              if(++KeywordTable[key].errCount == _cldMaxRepetitiveError) {
+        if (keyword->errCount &&
+            keyword->errCount < _cldMaxRepetitiveError) {
+              if(++(keyword->errCount) == _cldMaxRepetitiveError) {
                  gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                                  LineNo, StringNo, clvREPORT_ERROR,
                                                  "unsupported built-in data type : '%s'\n",
@@ -847,22 +857,21 @@ OUT clsLexToken * Token
 {
     gceSTATUS  status;
     gctINT    tokenType;
-    gctINT    key;
     cltPOOL_STRING    symbolInPool;
+    clsKEYWORD *keyword = gcvNULL;
 
     gcmASSERT(Token);
     Token->lineNo    = LineNo;
     Token->stringNo    = StringNo;
 
     /* Check as a reserved keyword */
-    _clmSearchKeyword(Symbol, key, tokenType);
+    tokenType = _SearchKeywordSymbol(Symbol, &keyword);
 
     if (tokenType == T_RESERVED_KEYWORD) {
         Token->type = T_RESERVED_KEYWORD;
-        gcmASSERT(key >= 0);
 
-        if(KeywordTable[key].errCount < _cldMaxRepetitiveError) {
-            if(++KeywordTable[key].errCount == _cldMaxRepetitiveError) {
+        if(keyword->errCount < _cldMaxRepetitiveError) {
+            if(++(keyword->errCount) == _cldMaxRepetitiveError) {
                 gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                                 LineNo, StringNo, clvREPORT_ERROR,
                                                 "unsupported vivante packed data type : '%s'\n",
@@ -884,10 +893,9 @@ OUT clsLexToken * Token
     }
     if (tokenType != T_NOT_KEYWORD) {
         Token->type = tokenType;
-        gcmASSERT(key >= 0);
-        if (KeywordTable[key].errCount &&
-            KeywordTable[key].errCount < _cldMaxRepetitiveError) {
-              if(++KeywordTable[key].errCount == _cldMaxRepetitiveError) {
+        if (keyword->errCount &&
+            keyword->errCount < _cldMaxRepetitiveError) {
+              if(++(keyword->errCount) == _cldMaxRepetitiveError) {
                  gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                                  LineNo, StringNo, clvREPORT_ERROR,
                                                  "unsupported vivante packed data type : '%s'\n",
@@ -1835,7 +1843,6 @@ OUT gctBOOL *IsUnsigned
      }
 #endif
   }
-
   *Type = type;
   *IsUnsigned = isUnsigned;
   return endPtr;
@@ -1903,7 +1910,7 @@ OUT gctBOOL *IsUnsigned
     }typeList;
     typeList types[4] =
     {{T_INT,    gcvTRUE,    0x7FFFFFFF},
-     {T_UINT,   gcvFALSE,   0x0000000100000000LL},
+     {T_UINT,   gcvFALSE,   0x00000000FFFFFFFFLL},
      {T_LONG,   gcvTRUE,    0x7FFFFFFFFFFFFFFFLL},
      {T_ULONG,  gcvFALSE,   0}};
     gctUINT i;
@@ -1911,7 +1918,7 @@ OUT gctBOOL *IsUnsigned
     for (i = 0; i < 4; i++)
     {
         if (types[i].maxValue == 0 ||
-            Data < types[i].maxValue)
+            Data <= types[i].maxValue)
         {
             type = types[i].type;
             isUnsigned = types[i].isUnsigned;
@@ -2207,6 +2214,30 @@ OUT clsLexToken * Token
                       StringNo,
                       Text));
     return tokenType;
+}
+
+gctINT
+clScanSpecialOperator(
+IN cloCOMPILER Compiler,
+IN cleEXTENSION Extension,
+IN gctUINT LineNo,
+IN gctUINT StringNo,
+IN gctSTRING Text,
+IN gctINT tokenType,
+OUT clsLexToken * Token
+)
+{
+    if (cloCOMPILER_ExtensionEnabled(Compiler, Extension))
+    {
+        return clScanOperator(Compiler,
+                              LineNo,
+                              StringNo,
+                              Text,
+                              tokenType,
+                              Token);
+    }
+
+    return T_EOF;
 }
 
 gctINT

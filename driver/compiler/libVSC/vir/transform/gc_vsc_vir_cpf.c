@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -56,8 +56,7 @@ typedef struct _VSC_CPF_CONSTKEY
 
 static gctUINT _HFUNC_CPF_CONSTKEY(const void* ptr)
 {
-    gctUINT hashVal = (((gctUINT) ((VSC_CPF_CONSTKEY*)ptr)->index) << 4) |
-                        (((VSC_CPF_CONSTKEY*)ptr)->bbId & 0xf);
+    gctUINT hashVal = (((gctUINT) ((VSC_CPF_CONSTKEY*)ptr)->index) << 4) ^ ((VSC_CPF_CONSTKEY*)ptr)->bbId;
 
     return hashVal;
 }
@@ -121,6 +120,7 @@ _VSC_CPF_typeToChannelType(
     case VIR_TYPE_FLOAT_X4:
     case VIR_TYPE_FLOAT_X8:
     case VIR_TYPE_FLOAT_X16:
+    case VIR_TYPE_FLOAT_X32:
     case VIR_TYPE_FLOAT_2X2:
     case VIR_TYPE_FLOAT_3X3:
     case VIR_TYPE_FLOAT_4X4:
@@ -138,6 +138,7 @@ _VSC_CPF_typeToChannelType(
     case VIR_TYPE_INTEGER_X4:
     case VIR_TYPE_INTEGER_X8:
     case VIR_TYPE_INTEGER_X16:
+    case VIR_TYPE_INTEGER_X32:
         *toType = VIR_TYPE_INT32;
         break;
     case VIR_TYPE_UINT32:
@@ -146,6 +147,7 @@ _VSC_CPF_typeToChannelType(
     case VIR_TYPE_UINT_X4:
     case VIR_TYPE_UINT_X8:
     case VIR_TYPE_UINT_X16:
+    case VIR_TYPE_UINT_X32:
         *toType = VIR_TYPE_UINT32;
         break;
     case VIR_TYPE_INT16:
@@ -212,6 +214,9 @@ _VSC_CPF_typeToChannelType(
     case VIR_TYPE_BOOLEAN_X2:
     case VIR_TYPE_BOOLEAN_X3:
     case VIR_TYPE_BOOLEAN_X4:
+    case VIR_TYPE_BOOLEAN_X8:
+    case VIR_TYPE_BOOLEAN_X16:
+    case VIR_TYPE_BOOLEAN_X32:
     case VIR_TYPE_BOOLEAN_P2:
     case VIR_TYPE_BOOLEAN_P3:
     case VIR_TYPE_BOOLEAN_P4:
@@ -221,6 +226,12 @@ _VSC_CPF_typeToChannelType(
         *toType = VIR_TYPE_BOOLEAN;
         break;
     case VIR_TYPE_FLOAT16:
+    case VIR_TYPE_FLOAT16_X2:
+    case VIR_TYPE_FLOAT16_X3:
+    case VIR_TYPE_FLOAT16_X4:
+    case VIR_TYPE_FLOAT16_X8:
+    case VIR_TYPE_FLOAT16_X16:
+    case VIR_TYPE_FLOAT16_X32:
     case VIR_TYPE_FLOAT16_P2:
     case VIR_TYPE_FLOAT16_P3:
     case VIR_TYPE_FLOAT16_P4:
@@ -302,7 +313,7 @@ _VSC_CPF_WorkListQueue(
     VSC_OPTN_CPFOptions  *pOptions      = VSC_CPF_GetOptions(pCPF);
 
     if(VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
-        VSC_OPTN_CPFOptions_TRACE_ALGORITHM))
+        VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
     {
         VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
 
@@ -356,7 +367,7 @@ _VSC_CPF_InWorkList(
 static void
 _VSC_CPF_Init(
     IN OUT VSC_CPF          *pCPF,
-    IN VSC_SH_PASS_WORKER   *pPassWorker,
+    IN VSC_HW_CONFIG        *pHwCfg,
     IN VIR_Shader           *pShader,
     IN VSC_OPTN_CPFOptions  *pOptions,
     IN VIR_Dumper           *pDumper,
@@ -364,7 +375,7 @@ _VSC_CPF_Init(
     )
 {
     VSC_CPF_SetShader(pCPF, pShader);
-    VSC_CPF_SetHwCfg(pCPF, &(pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg));
+    VSC_CPF_SetHwCfg(pCPF, pHwCfg);
     VSC_CPF_SetOptions(pCPF, pOptions);
     VSC_CPF_SetDumper(pCPF, pDumper);
     pCPF->pMM = pMM;
@@ -396,7 +407,7 @@ _VSC_CPF_InitializeBlkFlow(
     VIR_BASIC_BLOCK*   pBasicBlk;
     gctUINT            flowSize = tempCount * 4; /* every vreg has 4 components. */
 
-    pCPF->flowSize = flowSize;
+    VSC_CPF_SetFlowSize(pCPF, flowSize);
 
     vscSRARR_Initialize(pBlkFlowArray,
                         pMM,
@@ -450,7 +461,8 @@ _VSC_CPF_FinallizeBlkFlow(
 static VSC_ErrCode
 _VSC_CPF_InitFunction(
     VSC_CPF         *pCPF,
-    VIR_Function    *pFunc
+    VIR_Function    *pFunc,
+    VSC_OPTN_LoopOptsOptions *pLoopOptsOptions
     )
 {
     VSC_ErrCode     errCode     = VSC_ERR_NONE;
@@ -480,10 +492,20 @@ _VSC_CPF_InitFunction(
 
     /* initialize the const hash table */
     vscHTBL_Initialize(VSC_CPF_GetConstTable(pCPF),
-                    VSC_CPF_GetMM(pCPF),
-                    (PFN_VSC_HASH_FUNC) _HFUNC_CPF_CONSTKEY,
-                    (PFN_VSC_KEY_CMP) _HKCMP_CPF_CONSTKEY,
-                    1024);
+                       VSC_CPF_GetMM(pCPF),
+                       (PFN_VSC_HASH_FUNC) _HFUNC_CPF_CONSTKEY,
+                       (PFN_VSC_KEY_CMP) _HKCMP_CPF_CONSTKEY,
+                       1024);
+
+    /* Initialize the loopOpts. */
+    VIR_LoopOpts_Init(&VSC_CPF_GetLoopOpts(pCPF),
+                      gcvNULL,
+                      VSC_CPF_GetShader(pCPF),
+                      pFunc,
+                      pLoopOptsOptions,
+                      VSC_CPF_GetDumper(pCPF),
+                      VSC_CPF_GetMM(pCPF),
+                      VSC_CPF_GetHwCfg(pCPF));
 
     return errCode;
 };
@@ -505,6 +527,9 @@ _VSC_CPF_FinalizeFunction(
     QUEUE_FINALIZE(VSC_CPF_GetWorkList(pCPF));
 
     vscHTBL_Finalize(VSC_CPF_GetConstTable(pCPF));
+
+    /* Finalize the loopOpts. */
+    VIR_LoopOpts_Final(&VSC_CPF_GetLoopOpts(pCPF));
 
     return errCode;
 };
@@ -947,7 +972,8 @@ _VSC_CPF_GetVRegNo(
     {
         return VIR_INVALID_ID;
     }
-    else if (!VIR_Shader_IsVulkan(pShader) && opndInfo.u1.virRegInfo.virReg >= (256 + orgTempCount))
+    else if (!VIR_Shader_IsVulkan(pShader) &&
+             opndInfo.u1.virRegInfo.virReg >= (256 + orgTempCount))
     {
         return (opndInfo.u1.virRegInfo.virReg - 256);
     }
@@ -1001,28 +1027,33 @@ _VSC_CPF_isScalarConst(
     {
         VIR_Shader* pShader = VIR_Inst_GetShader(pInst);
         VIR_Symbol* uniformSym = VIR_Operand_GetSymbol(pOpnd);
-        if(isSymUniformCompiletimeInitialized(uniformSym))
+        VIR_Uniform* uniform = VIR_Symbol_GetUniform(uniformSym);
+        VIR_TypeId   uniformTypeId = VIR_Symbol_GetTypeId(uniformSym);
+
+        if (uniform && isSymUniformCompiletimeInitialized(uniformSym))
         {
-            VIR_Type *symType = VIR_Symbol_GetType(uniformSym);
-            VIR_Uniform* uniform = VIR_Symbol_GetUniform(uniformSym);
-            VIR_Const* cur_const;
             VIR_ConstId constId;
+            VIR_Const*  pConst;
+            gctUINT     index = symChannel;
+            VIR_Type    *pSymType;
 
-            if(VIR_Type_isArray(symType)) {
-                VIR_TypeId  baseTypeId = VIR_Type_GetBaseTypeId(symType);
-                gctUINT rows = VIR_GetTypeRows(baseTypeId);
-                gctINT arrayIndex;
-                gcmASSERT(VIR_Operand_GetRelAddrMode(pOpnd) == VIR_INDEXED_NONE );
-
-                arrayIndex = (VIR_Operand_GetConstIndexingImmed(pOpnd) +
-                              VIR_Operand_GetMatrixConstIndex(pOpnd)) / rows;
-                constId = *(VIR_Uniform_GetInitializerPtr(uniform) + arrayIndex);
+            pSymType = VIR_Symbol_GetType(uniformSym);
+            if(VIR_Type_isArray(pSymType))
+            {
+                uniformTypeId = VIR_Type_GetBaseTypeId(pSymType);
             }
-            else {
-                constId = VIR_Uniform_GetInitializer(uniform);
+            /* get real index of matrix/vector type */
+            if (VIR_TypeId_isPrimitive(uniformTypeId) && VIR_GetTypeRows(uniformTypeId) > 1)
+            {
+                index = VIR_Operand_GetMatrixConstIndex(pOpnd) * VIR_GetTypeComponents(VIR_GetTypeRowType(uniformTypeId))
+                        + symChannel;
             }
-            cur_const = VIR_Shader_GetConstFromId(pShader, constId);
-            constVal->value = cur_const->value.vecVal.u32Value[symChannel];
+            constId = VIR_Operand_GetConstValForUniform(pShader,
+                                                        pOpnd,
+                                                        uniformSym,
+                                                        uniform);
+            pConst = VIR_Shader_GetConstFromId(pShader, constId);
+            constVal->value = pConst->value.vecVal.u32Value[index];
             constVal->type = type;
             lattic = VSC_CPF_CONSTANT;
         }
@@ -1157,7 +1188,7 @@ _VSC_CPF_FoldConst(
     VIR_Operand         *srcOpnd;
     gctUINT8            channel;
     gctBOOL             folded = gcvFALSE;
-
+    VIR_TypeId          updateDstType; /*update int8/int16 to int32*/
     dstOpnd = VIR_Inst_GetDest(pInst);
     gcmASSERT(dstOpnd != gcvNULL);
     dstType = VIR_Operand_GetTypeId(dstOpnd);
@@ -1183,7 +1214,7 @@ _VSC_CPF_FoldConst(
     }
 
     if(VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
-        VSC_OPTN_CPFOptions_TRACE_ALGORITHM))
+        VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
     {
         VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
         VIR_LOG(pDumper, "[CPF] Fold Const\n");
@@ -1226,6 +1257,7 @@ _VSC_CPF_FoldConst(
 
         VIR_Operand_SetOpKind(srcOpnd, VIR_OPND_IMMEDIATE);
         VIR_Operand_SetTypeId(srcOpnd, dstType);
+        VIR_Operand_SetMatrixConstIndex(srcOpnd, 0); /* reset matrixConstIndex for vector/matrix type*/
         VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
         VIR_Inst_SetConditionOp(pInst, VIR_COP_ALWAYS);
         VIR_Inst_SetSrcNum(pInst, 1);
@@ -1277,8 +1309,18 @@ _VSC_CPF_FoldConst(
             constChannel++;
         }
 
+        /*always use int32/uint32 to represent integer const value */
+        updateDstType = VIR_GetTypeComponentType(dstType);
+        if (updateDstType == VIR_TYPE_UINT8 || updateDstType == VIR_TYPE_UINT16)
+        {
+            updateDstType = VIR_TYPE_UINT32;
+        }
+        else if (updateDstType == VIR_TYPE_INT8 || updateDstType == VIR_TYPE_INT16)
+        {
+            updateDstType = VIR_TYPE_INT32;
+        }
         /* Update the source type. */
-        dstType = VIR_TypeId_ComposeNonOpaqueType(VIR_GetTypeComponentType(dstType),
+        dstType = VIR_TypeId_ComposeNonOpaqueType(updateDstType,
                                                   lastEnableChannel + 1,
                                                   1);
 
@@ -1305,6 +1347,7 @@ _VSC_CPF_FoldConst(
         new_const->type = dstType;
         VIR_Operand_SetConstId(srcOpnd, new_const_id);
         VIR_Operand_SetOpKind(srcOpnd, VIR_OPND_CONST);
+        VIR_Operand_SetMatrixConstIndex(srcOpnd, 0); /* reset matrixConstIndex for srcOpnd's type which is vector or matrix */
         VIR_Operand_SetSwizzle(srcOpnd, new_swizzle);
         VIR_Operand_SetTypeId(srcOpnd, new_const->type);
         VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
@@ -1314,7 +1357,7 @@ _VSC_CPF_FoldConst(
     }
 
     if(folded && VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
-                                VSC_OPTN_CPFOptions_TRACE_ALGORITHM))
+                                VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
     {
         VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
         VIR_LOG(pDumper, "[CPF] to instruction\n");
@@ -1340,7 +1383,7 @@ _VSC_CPF_FoldConst_LDARR(
     VIR_Type            *symType = gcvNULL;
 
     if (VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
-        VSC_OPTN_CPFOptions_TRACE_ALGORITHM))
+        VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
     {
         VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
         VIR_LOG(pDumper, "[CPF] Fold Const LDARR\n");
@@ -1412,7 +1455,9 @@ _VSC_CPF_FoldConst_LDARR(
     }
     case VIR_SYM_UNIFORM:
     case VIR_SYM_SAMPLER:
+    case VIR_SYM_SAMPLER_T:
     case VIR_SYM_IMAGE:
+    case VIR_SYM_IMAGE_T:
     {
         VIR_TypeId  baseTypeId;
         symType = VIR_Symbol_GetType(src0Sym);
@@ -1425,10 +1470,19 @@ _VSC_CPF_FoldConst_LDARR(
             break;
         }
 
-        if ((VIR_Type_isArray(symType) && src1Const < VIR_Type_GetArrayLength(symType)) ||
-            (VIR_Type_isMatrix(symType) && src1Const < VIR_GetTypeRows(VIR_Type_GetIndex(symType))) ||
-            (VIR_GetTypeTypeKind(baseTypeId) == VIR_TY_MATRIX && src1Const < VIR_GetTypeRows(baseTypeId)) ||
-            (VIR_Symbol_HasFlag(src0Sym, VIR_SYMFLAG_IS_FIELD) && src1Const <= (gctUINT)(VIR_Uniform_GetLastIndexingIndex(VIR_Symbol_GetUniform(src0Sym)) - VIR_Uniform_GetGCSLIndex(VIR_Symbol_GetUniform(src0Sym)))))
+        if ((VIR_Type_isArray(symType) && src1Const < VIR_Type_GetArrayLength(symType))
+            ||
+            (VIR_Type_isMatrix(symType) && src1Const < VIR_GetTypeRows(VIR_Type_GetIndex(symType)))
+            ||
+            (VIR_GetTypeTypeKind(baseTypeId) == VIR_TY_MATRIX && src1Const < VIR_GetTypeRows(baseTypeId))
+            ||
+            (VIR_Symbol_HasFlag(src0Sym, VIR_SYMFLAG_IS_FIELD)
+             &&
+             src1Const <= (gctUINT)(VIR_Uniform_GetLastIndexingIndex(VIR_Symbol_GetUniform(src0Sym)) - VIR_Uniform_GetGCSLIndex(VIR_Symbol_GetUniform(src0Sym))))
+            ||
+            /* It is a legal case that SRC0 is the base sampler. */
+            (VIR_Symbol_GetIndex(src0Sym) == VIR_Shader_GetBaseSamplerId(VSC_CPF_GetShader(pCPF)))
+           )
         {
             VIR_Operand_SetIsConstIndexing(src0Opnd, gcvTRUE);
             VIR_Operand_SetRelIndex(src0Opnd, src1Const);
@@ -1450,7 +1504,7 @@ _VSC_CPF_FoldConst_LDARR(
     VIR_Inst_FreeSource(pInst, 1);
 
     if (VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
-        VSC_OPTN_CPFOptions_TRACE_ALGORITHM))
+        VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
     {
         VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
         VIR_LOG(pDumper, "[CPF] to instruction\n");
@@ -1477,7 +1531,7 @@ gctBOOL                 allConst
     VIR_Type            *symType = gcvNULL;
 
     if (VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
-        VSC_OPTN_CPFOptions_TRACE_ALGORITHM))
+        VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
     {
         VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
         VIR_LOG(pDumper, "[CPF] Fold Const LDARR\n");
@@ -1531,7 +1585,9 @@ gctBOOL                 allConst
     }
     case VIR_SYM_UNIFORM:
     case VIR_SYM_SAMPLER:
+    case VIR_SYM_SAMPLER_T:
     case VIR_SYM_IMAGE:
+    case VIR_SYM_IMAGE_T:
         gcmASSERT(gcvFALSE);
         break;
     default:
@@ -1545,7 +1601,7 @@ gctBOOL                 allConst
     VIR_Inst_FreeSource(pInst, 1);
 
     if (VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
-        VSC_OPTN_CPFOptions_TRACE_ALGORITHM))
+        VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
     {
         VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
         VIR_LOG(pDumper, "[CPF] to instruction\n");
@@ -1578,7 +1634,7 @@ _VSC_CPF_PropagateConst(
     gctUINT8 dstEnableCount, opndSwizzleCount;
 
     if(VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
-        VSC_OPTN_CPFOptions_TRACE_ALGORITHM))
+        VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
     {
         VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
         VIR_LOG(pDumper, "[CPF] Propagate const\n");
@@ -1641,7 +1697,7 @@ _VSC_CPF_PropagateConst(
         VIR_Operand_SetOpKind(pOpnd, VIR_OPND_IMMEDIATE);
         /* change the immediate to EvisModifier for EVIS inst if it is modifier operand */
         opCode = VIR_Inst_GetOpcode(pInst);
-        if (VIR_OPCODE_isVXOnly(opCode))
+        if (VIR_OPCODE_isVX(opCode))
         {
             int evisSrcNo = VIR_OPCODE_EVISModifier_SrcNo(opCode);
             VIR_Operand *evisOpnd = VIR_Inst_GetSource(pInst, evisSrcNo);
@@ -1659,7 +1715,7 @@ _VSC_CPF_PropagateConst(
     }
 
     if(VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
-        VSC_OPTN_CPFOptions_TRACE_ALGORITHM))
+        VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
     {
         VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
         VIR_LOG(pDumper, "[CPF] to instruction\n");
@@ -1695,8 +1751,15 @@ _VSC_CPF_EvaluateConst(
             gcmASSERT(srcLattice[0] == VSC_CPF_CONSTANT);       /* otherwise we cannot evaluate */
             if (VIR_TypeId_isFloat(dstType))
             {
-                gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
-                resultVal->value = gcoMATH_FloatAsUInt(f0 >= 0.0 ? f0 : -f0);
+                if (constVal[0].value == 0x80000000)
+                {
+                    resultVal->value = 0;
+                }
+                else
+                {
+                    gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
+                    resultVal->value = gcoMATH_FloatAsUInt(gcmABS(f0));
+                }
             }
             else
             {
@@ -1803,9 +1866,19 @@ _VSC_CPF_EvaluateConst(
             gcmASSERT(srcLattice[0] == VSC_CPF_CONSTANT);       /* otherwise we cannot evaluate */
             if(VIR_TypeId_isFloat(dstType))
             {
-                gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
-
-                resultVal->value = gcoMATH_FloatAsUInt(-f0);
+                if (constVal[0].value == 0x80000000)
+                {
+                    resultVal->value = 0;
+                }
+                else if (constVal[0].value == 0)
+                {
+                    resultVal->value = 0x80000000;
+                }
+                else
+                {
+                    gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
+                    resultVal->value = gcoMATH_FloatAsUInt(-f0);
+                }
             }
             else
             {
@@ -1851,6 +1924,9 @@ _VSC_CPF_EvaluateConst(
             break;
         }
         case VIR_OP_CONVERT:
+        case VIR_OP_I2F:
+        case VIR_OP_F2I:
+        case VIR_OP_I2I:
         {
             if(!VIR_TypeId_isFloat(dstType))
             {
@@ -2015,10 +2091,13 @@ _VSC_CPF_isAssignmentOpcode(
         opcode == VIR_OP_MUL            ||
         opcode == VIR_OP_MULHI          ||
         opcode == VIR_OP_NEG            ||
-        opcode == VIR_OP_COMPARE            ||
-        opcode == VIR_OP_CSELECT         ||
-        opcode == VIR_OP_SELECT      ||
-        opcode == VIR_OP_CONVERT           ||
+        opcode == VIR_OP_COMPARE        ||
+        opcode == VIR_OP_CSELECT        ||
+        opcode == VIR_OP_SELECT         ||
+        opcode == VIR_OP_CONVERT        ||
+        opcode ==  VIR_OP_I2F           ||
+        opcode ==  VIR_OP_F2I           ||
+        opcode ==  VIR_OP_I2I           ||
         opcode == VIR_OP_RCP            ||
         opcode == VIR_OP_SQRT           ||
         opcode == VIR_OP_RSQ            ||
@@ -2189,6 +2268,31 @@ _VSC_CPF_PerformOnInst(
     VIR_OpCode  opcode = VIR_Inst_GetOpcode(pInst);
     VIR_ConditionOp conditionOp = VIR_Inst_GetConditionOp(pInst);
 
+    /* We don't support PACKED type now, skip it. */
+    if (VIR_OPCODE_hasDest(opcode))
+    {
+        VIR_Operand*    pDstOpnd = VIR_Inst_GetDest(pInst);
+        VIR_Enable      dstEnable = VIR_ENABLE_NONE;
+        gctUINT8        channel;
+
+        if (pDstOpnd != gcvNULL && _VSC_CPF_GetVRegNo(pInst, pDstOpnd) != VIR_INVALID_ID)
+        {
+            if (VIR_TypeId_isPacked(VIR_Operand_GetTypeId(pDstOpnd)))
+            {
+                dstEnable = VIR_Operand_GetEnable(pDstOpnd);
+                for (channel = 0; channel < VIR_CHANNEL_NUM; channel++ )
+                {
+                    if (dstEnable & (1 << channel))
+                    {
+                        _VSC_CPF_SetDestNotConst(pCPF, srcBBId, pInst, channel, tmpFlow);
+                    }
+                }
+
+                return errCode;
+            }
+        }
+    }
+
     if (opcode == VIR_OP_CALL)
     {
         /* since it is not the inter function, the return temp should be not-const */
@@ -2204,8 +2308,8 @@ _VSC_CPF_PerformOnInst(
                 _VSC_CPF_SetNotConst(pCPF, tmpFlow, srcBBId, i * 4 + channel, gcvFALSE);
             }
         }
-
     }
+
     if (_VSC_CPF_isAssignmentOpcode(opcode) && conditionOp != VIR_COP_ALLMSB && conditionOp != VIR_COP_ANYMSB)
     {
         gctUINT i;
@@ -2506,7 +2610,7 @@ _VSC_CPF_PerformOnInst(
             {
                 VSC_CPF_Const vecVal[VIR_MAX_SRC_NUM];
                 VSC_CPF_LATTICE srcLattic[VIR_MAX_SRC_NUM] =
-                    {VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE};
+                    {VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE};
 
                 if (!(dstEnable & (1 << channel)))
                 {
@@ -2716,11 +2820,17 @@ _VSC_CPF_PerformOnInst(
 static VSC_ErrCode
 _VSC_CPF_AnalysisOnBlock(
     VSC_CPF         *pCPF,
-    VIR_BASIC_BLOCK *pBB
+    VIR_BASIC_BLOCK *pBB,
+    VIR_LoopInfo    *pCurrentLoopInfo,
+    VSC_HASH_TABLE  *pCalculatedBBInLoopTable
     )
 {
     VSC_ErrCode errCode    = VSC_ERR_NONE;
     VSC_OPTN_CPFOptions *pOptions  = VSC_CPF_GetOptions(pCPF);
+    VIR_LoopInfo        *pLoopInfo = gcvNULL;
+    VIR_BASIC_BLOCK     *pCurrentLoopHeadBB = gcvNULL;
+    VIR_BASIC_BLOCK     *pCurrentLoopEndBB = gcvNULL;
+    gctBOOL             bIsLoopHead = gcvFALSE;
 
     VSC_STATE_VECTOR  tmpFlow;
     VSC_STATE_VECTOR  *inFlow = gcvNULL;
@@ -2734,7 +2844,7 @@ _VSC_CPF_AnalysisOnBlock(
     outFlow = &pBlkFlow->outFlow;
 
     if(VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
-        VSC_OPTN_CPFOptions_TRACE_ALGORITHM))
+        VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
     {
         VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
         VIR_LOG(pDumper, "before merge predecesors\n");
@@ -2742,15 +2852,133 @@ _VSC_CPF_AnalysisOnBlock(
         VIR_LOG_FLUSH(pDumper);
     }
 
-    /* IN = ^OUT(preds) */
+    if (pCurrentLoopInfo != gcvNULL)
+    {
+        pCurrentLoopHeadBB = VIR_LoopInfo_GetLoopHead(pCurrentLoopInfo);
+        pCurrentLoopEndBB = VIR_LoopInfo_GetLoopEnd(pCurrentLoopInfo);
+
+        /* Check if the current BB is the head BB of the loop. */
+        if (pCurrentLoopHeadBB == pBB)
+        {
+            bIsLoopHead = gcvTRUE;
+        }
+    }
+
+    /*
+    ** If the loopBB table is not NULL, it means we are calculating the out flow of a loop,
+    ** we need to add the current BB into the table because after the calculation we need to
+    ** clean up all in/out flow of those BBs and re-calculate it with the new in flow of the loop head BB.
+    */
+    if (pCalculatedBBInLoopTable != gcvNULL)
+    {
+        vscHTBL_DirectSet(pCalculatedBBInLoopTable, (void *)pBB, (void *)pCurrentLoopInfo);
+    }
+
+    /*
+    ** When the current BB is the head BB of a loop, hen one of the OUTs of this BB depends on its IN,
+    ** so we need to calculate the out flow of the entire loop without any in flow, and use the result
+    ** to calculate the in flow of the current BB.
+    */
+    if (!bIsLoopHead
+        &&
+        VIR_LoopOpts_IsBBHeadBlockOfOneLoop(&VSC_CPF_GetLoopOpts(pCPF), pBB, &pLoopInfo))
+    {
+        gctBOOL                 bParentLoop = gcvFALSE;
+        VSC_HASH_TABLE*         pLoopBBTable = gcvNULL;
+        VSC_SIMPLE_QUEUE        currentWorkList;
+        VSC_HASH_ITERATOR       loop_bb_iter;
+        VSC_DIRECT_HNODE_PAIR   loop_bb_pair;
+
+        /* If the hash table is NULL, it means this is the parent loop, we need to do some extra work. */
+        if (pCalculatedBBInLoopTable == gcvNULL)
+        {
+            /* Create the hash table. */
+            pLoopBBTable = vscHTBL_Create(VSC_CPF_GetMM(pCPF), vscHFUNC_Default, vscHKCMP_Default, 32);
+
+            bParentLoop = gcvTRUE;
+        }
+        else
+        {
+            pLoopBBTable = pCalculatedBBInLoopTable;
+        }
+
+        /* save the current working list. */
+        currentWorkList = *VSC_CPF_GetWorkList(pCPF);
+
+        /* init the worklist */
+        QUEUE_INITIALIZE(VSC_CPF_GetWorkList(pCPF));
+        _VSC_CPF_WorkListQueue(pCPF, pBB);
+
+        /* Calculate the in/out of the loop. */
+        while(!QUEUE_CHECK_EMPTY(VSC_CPF_GetWorkList(pCPF)))
+        {
+            VIR_BASIC_BLOCK*    pWorkingBB = gcvNULL;
+            _VSC_CPF_WorkListDequeue(pCPF, &pWorkingBB);
+            _VSC_CPF_AnalysisOnBlock(pCPF, pWorkingBB, pLoopInfo, pLoopBBTable);
+        }
+
+        /* Clean the working list. */
+        QUEUE_FINALIZE(VSC_CPF_GetWorkList(pCPF));
+
+        /* Restore the working list. */
+        *VSC_CPF_GetWorkList(pCPF) = currentWorkList;
+
+        /* Clean the in/out of the BBs in the current loop. */
+        vscHTBLIterator_Init(&loop_bb_iter, pLoopBBTable);
+        for (loop_bb_pair = vscHTBLIterator_DirectFirst(&loop_bb_iter);
+             IS_VALID_DIRECT_HNODE_PAIR(&loop_bb_pair);
+             loop_bb_pair = vscHTBLIterator_DirectNext(&loop_bb_iter))
+        {
+            VIR_BASIC_BLOCK*    pLoopBB = (VIR_BASIC_BLOCK *)VSC_DIRECT_HNODE_PAIR_FIRST(&loop_bb_pair);
+            VIR_LoopInfo*       pBBLoopInfo = (VIR_LoopInfo *)VSC_DIRECT_HNODE_PAIR_SECOND(&loop_bb_pair);
+            VSC_CPF_BLOCK_FLOW* pLoopBlkFlow;
+
+            /* Do not clean the BBs from the other loop. */
+            if (pBBLoopInfo != pLoopInfo)
+            {
+                continue;
+            }
+            pLoopBlkFlow = (VSC_CPF_BLOCK_FLOW*)vscSRARR_GetElement(VSC_CPF_GetBlkFlowArray(pCPF), pLoopBB->dgNode.id);
+
+            /* Clean the in flow. */
+            vscSV_Initialize(&pLoopBlkFlow->inFlow, VSC_CPF_GetMM(pCPF), VSC_CPF_GetFlowSize(pCPF), 4);
+
+            /* Do not clean the out flow of the end BB. */
+            if (pLoopBB != VIR_LoopInfo_GetLoopEnd(pLoopInfo))
+            {
+                vscSV_Initialize(&pLoopBlkFlow->outFlow, VSC_CPF_GetMM(pCPF), VSC_CPF_GetFlowSize(pCPF), 4);
+            }
+
+            /* Remove it from the table. */
+            vscHTBL_Remove(pLoopBBTable, (void *)pLoopBB);
+        }
+
+        /* Finalize. */
+        if (bParentLoop)
+        {
+            /* Destroy the hash table. */
+            vscHTBL_Destroy(pLoopBBTable);
+        }
+    }
+
+    vscSV_Initialize(&tmpFlow, VSC_CPF_GetMM(pCPF), VSC_CPF_GetFlowSize(pCPF), 4);
+    /*
+    ** 1) BB is the head of a loop:
+    **      tmpFlow = inFlow
+    ** 2) BB is not the head of a loop:
+    **      IN = ^OUT(preds)
+    */
+    if (bIsLoopHead)
+    {
+        _VSC_CPF_CopyFlowLattice(&tmpFlow, inFlow);
+    }
+    else
     {
         VIR_BASIC_BLOCK             *pPredBasicBlk;
         VSC_ADJACENT_LIST_ITERATOR  predEdgeIter;
         VIR_CFG_EDGE                *pPredEdge;
         gctBOOL                     firstPred = gcvTRUE;
         gctBOOL                     inChanged = gcvFALSE;
-
-        vscSV_Initialize(&tmpFlow, VSC_CPF_GetMM(pCPF), pCPF->flowSize, 4);
 
         VSC_ADJACENT_LIST_ITERATOR_INIT(&predEdgeIter, &pBB->dgNode.predList);
         pPredEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&predEdgeIter);
@@ -2772,7 +3000,7 @@ _VSC_CPF_AnalysisOnBlock(
             }
 
             if(VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
-                VSC_OPTN_CPFOptions_TRACE_ALGORITHM))
+                VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
             {
                 VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
                 VIR_LOG(pDumper, "merge bb\n");
@@ -2808,7 +3036,7 @@ _VSC_CPF_AnalysisOnBlock(
     _VSC_CPF_CopyConstKey(pCPF, pBB->dgNode.id);
 
     if(VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
-        VSC_OPTN_CPFOptions_TRACE_ALGORITHM))
+        VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
     {
         VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
         VIR_LOG(pDumper, "before walk through bb\n");
@@ -2832,14 +3060,13 @@ _VSC_CPF_AnalysisOnBlock(
     }
 
     /* according to the block type, add its successors to worklist */
+    do
     {
         gctBOOL constCondition = gcvFALSE;
         gctBOOL checkingResult = gcvFALSE;
 
-        if (pBB->flowType == VIR_FLOW_TYPE_ENTRY ||
-            !_VSC_CPF_EqualFlowLattice(outFlow, &tmpFlow))
+        if (pBB->flowType == VIR_FLOW_TYPE_ENTRY || !_VSC_CPF_EqualFlowLattice(outFlow, &tmpFlow))
         {
-
             VIR_BASIC_BLOCK             *psuccBasicBlk;
             VSC_ADJACENT_LIST_ITERATOR  succEdgeIter;
             VIR_CFG_EDGE                *pSuccEdge;
@@ -2847,13 +3074,23 @@ _VSC_CPF_AnalysisOnBlock(
             /* copy the tmpFlow (i.e., new outFlow) to outFlow */
             _VSC_CPF_CopyFlowLattice(outFlow, &tmpFlow);
 
+            /* If meet a STOP BB, do not add its successors to the working list. */
+            if (pCurrentLoopInfo != gcvNULL && pBB == pCurrentLoopEndBB)
+            {
+                break;
+            }
+
             if (pBB->flowType == VIR_FLOW_TYPE_JMPC)
             {
                 VIR_Instruction *inst = BB_GET_END_INST(pBB);
-                gcmASSERT(VIR_Inst_GetOpcode(inst) == VIR_OP_JMPC ||
-                          VIR_Inst_GetOpcode(inst) == VIR_OP_JMP_ANY);
+                VIR_OpCode      opCode = VIR_Inst_GetOpcode(inst);
 
-                if (VIR_Inst_CanGetConditionResult(inst))
+                /* If CPF is called by a LOOP pass, the end instruction of a BB may be changed to a NOP. */
+                gcmASSERT(opCode == VIR_OP_JMPC     ||
+                          opCode == VIR_OP_JMP_ANY  ||
+                          opCode == VIR_OP_NOP);
+
+                if (opCode != VIR_OP_NOP && VIR_Inst_CanGetConditionResult(inst))
                 {
                     constCondition = gcvTRUE;
                     checkingResult = VIR_Inst_EvaluateConditionResult(inst, gcvNULL);
@@ -2871,6 +3108,15 @@ _VSC_CPF_AnalysisOnBlock(
                 if (psuccBasicBlk->flowType != VIR_FLOW_TYPE_EXIT &&
                     BB_GET_END_INST(psuccBasicBlk) != gcvNULL)
                 {
+                    /* It is a rough check, skip the BBs that are not in this loop. */
+                    if (pCurrentLoopInfo != gcvNULL &&
+                        (VIR_Inst_GetId(BB_GET_START_INST(psuccBasicBlk)) > VIR_Inst_GetId(BB_GET_END_INST(pCurrentLoopEndBB))
+                         ||
+                         VIR_Inst_GetId(BB_GET_END_INST(psuccBasicBlk)) < VIR_Inst_GetId(BB_GET_START_INST(pCurrentLoopHeadBB))))
+                    {
+                        continue;
+                    }
+
                     /* JMPC's branch target is VIR_CFG_EDGE_TYPE_FALSE
                        JMPC's next basic block is VIR_CFG_EDGE_TYPE_TRUE */
                     if (!constCondition ||
@@ -2886,10 +3132,10 @@ _VSC_CPF_AnalysisOnBlock(
                 }
             }
         }
-    }
+    } while(gcvFALSE);
 
     if(VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
-        VSC_OPTN_CPFOptions_TRACE_ALGORITHM))
+        VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
     {
         VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
         VIR_LOG(pDumper, "after walk through bb\n");
@@ -2954,10 +3200,18 @@ _VSC_CPF_PerformOnFunction(
     VSC_ErrCode         errCode    = VSC_ERR_NONE;
     VSC_OPTN_CPFOptions *pOptions  = VSC_CPF_GetOptions(pCPF);
 
-    VIR_BASIC_BLOCK     *pBB        = gcvNULL;
+    VIR_BASIC_BLOCK     *pBB       = gcvNULL;
+    VIR_LoopOpts        *pLoopOpts = &VSC_CPF_GetLoopOpts(pCPF);
     CFG_ITERATOR        cfgIter;
+    VSC_OPTN_LoopOptsOptions loopOptions;
 
-    errCode = _VSC_CPF_InitFunction(pCPF, pFunc);
+    memset(&loopOptions, 0, sizeof(VSC_OPTN_LoopOptsOptions));
+
+    errCode = _VSC_CPF_InitFunction(pCPF, pFunc, &loopOptions);
+
+    /* We need to detect the loopInfo to analyze the back edge flow. */
+    VIR_LoopOpts_NewLoopInfoMgr(pLoopOpts);
+    VIR_LoopOpts_DetectNaturalLoops(pLoopOpts);
 
     /* Two phases algorithm:
        first do global constant data flow analysis;
@@ -2975,7 +3229,7 @@ _VSC_CPF_PerformOnFunction(
         _VSC_CPF_WorkListDequeue(pCPF, &pBB);
 
         if(VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
-            VSC_OPTN_CPFOptions_TRACE_ALGORITHM))
+            VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
         {
             VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
 
@@ -2983,7 +3237,7 @@ _VSC_CPF_PerformOnFunction(
             VIR_LOG_FLUSH(pDumper);
         }
 
-        _VSC_CPF_AnalysisOnBlock(pCPF, pBB);
+        _VSC_CPF_AnalysisOnBlock(pCPF, pBB, gcvNULL, gcvNULL);
     }
 
     if(VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
@@ -3000,6 +3254,7 @@ _VSC_CPF_PerformOnFunction(
         _VSC_CPF_TransformOnBlock(pCPF, pBB);
     }
 
+    VIR_LoopOpts_DeleteLoopInfoMgr(pLoopOpts);
     _VSC_CPF_FinalizeFunction(pCPF, pFunc);
 
     return errCode;
@@ -3028,7 +3283,7 @@ _VSC_CPF_PerformOnShader(
     {
         VIR_Function    *func = func_node->function;
 
-        if (VIR_Function_GetInstCount(func) > VSC_OPTN_CPFOptions_GetMaxInstCount(pOptions))
+        if (VIR_Function_GetInstCount(func) > VSC_CPF_MAX_INST_COUNT)
         {
             continue;
         }
@@ -3055,19 +3310,22 @@ DEF_QUERY_PASS_PROP(VSC_CPF_PerformOnShader)
     pPassProp->passFlag.resCreationReq.s.bNeedCfg = gcvTRUE;
 }
 
+DEF_SH_NECESSITY_CHECK(VSC_CPF_PerformOnShader)
+{
+    return gcvTRUE;
+}
+
 /* Interface function to be called by drvi */
 VSC_ErrCode
 VSC_CPF_PerformOnShader(
     IN VSC_SH_PASS_WORKER* pPassWorker
     )
 {
-    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_ErrCode          errCode = VSC_ERR_NONE;
     VIR_Shader           *shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VSC_OPTN_CPFOptions  *options = (VSC_OPTN_CPFOptions*)pPassWorker->basePassWorker.pBaseOption;
     VIR_Dumper           *dumper = pPassWorker->basePassWorker.pDumper;
-    VSC_COMPILER_CONFIG     *compCfg = &pPassWorker->pCompilerParam->cfg;
-
-    VSC_CPF cpf;
+    VSC_CPF             cpf;
 
     if (!VSC_OPTN_InRange(VIR_Shader_GetId(shader), VSC_OPTN_CPFOptions_GetBeforeShader(options),
                           VSC_OPTN_CPFOptions_GetAfterShader(options)))
@@ -3081,16 +3339,8 @@ VSC_CPF_PerformOnShader(
         return errCode;
     }
 
-    {
-        if (compCfg->ctx.appNameId == gcvPATCH_DEQP)
-        {
-              VSC_OPTN_CPFOptions_SetMaxTempCount(options, 1024);
-              VSC_OPTN_CPFOptions_SetMaxInstCount(options, 1024);
-        }
-    }
-
     /* too large shader, don't do CPF */
-    if (VIR_Shader_GetVirRegCount(shader) > VSC_OPTN_CPFOptions_GetMaxTempCount(options))
+    if (VIR_Shader_GetVirRegCount(shader) > VSC_CPF_MAX_TEMP)
     {
         if(VSC_OPTN_CPFOptions_GetTrace(options))
         {
@@ -3101,8 +3351,33 @@ VSC_CPF_PerformOnShader(
         return errCode;
     }
 
-    _VSC_CPF_Init(&cpf, pPassWorker, shader, options, dumper, pPassWorker->basePassWorker.pMM);
+    /* Renumber instruction ID. */
+    VIR_Shader_RenumberInstId(shader);
+
+    _VSC_CPF_Init(&cpf, &(pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg), shader, options, dumper, pPassWorker->basePassWorker.pMM);
     errCode = _VSC_CPF_PerformOnShader(&cpf);
+    _VSC_CPF_Final(&cpf);
+
+    return errCode;
+}
+
+VSC_ErrCode VSC_CPF_PerformOnFunction(
+    IN  VIR_Shader*         pShader,
+    IN  VSC_HW_CONFIG*      pHwCfg,
+    IN  VSC_MM*             pMM,
+    IN  VIR_Function*       pFunc
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VSC_CPF                 cpf;
+    VSC_OPTN_CPFOptions     cpfOptions;
+
+    memset(&cpfOptions, 0, sizeof(VSC_OPTN_CPFOptions));
+
+    _VSC_CPF_Init(&cpf, pHwCfg, pShader, &cpfOptions, gcvNULL, pMM);
+
+    _VSC_CPF_PerformOnFunction(&cpf, pFunc);
+
     _VSC_CPF_Final(&cpf);
 
     return errCode;

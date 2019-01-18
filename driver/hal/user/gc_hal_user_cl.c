@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -46,7 +46,10 @@ gcoCL_InitializeHardware()
     /* Set the hardware type. */
     gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
 
-    gcmONERROR(gcoHARDWARE_SetMultiGPUMode(gcvNULL, gcvMULTI_GPU_MODE_INDEPENDENT));
+    if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_MCFE))
+    {
+        gcoHARDWARE_SelectChannel(gcvNULL, 0, 1);
+    }
 
     /* Switch to the 3D pipe. */
     gcmONERROR(gcoHARDWARE_SelectPipe(gcvNULL, gcvPIPE_3D, gcvNULL));
@@ -140,8 +143,8 @@ gcoCL_RestoreContext(
         gcmHEADER();
 
         gcmONERROR(gcoHARDWARE_Set3DHardware(preHW));
-        gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, preType));
         gcoHAL_SetCoreIndex(gcvNULL, preCoreIndex);
+        gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, preType));
 
 OnError:
         gcmFOOTER();
@@ -169,9 +172,10 @@ OnError:
 **          Pointer to a variable that will receive the aligned number of bytes
 **          allocated.
 **
-**      gctPHYS_ADDR * Physical
-**          Pointer to a variable that will receive the physical addresses of
-**          the allocated memory.
+**      gctUINT32_PTR Physical
+**          Pointer to a variable that will receive the gpu virtual address of
+**          the allocated memory, might be same as gpu physical address for flat
+**          mapping case etc.
 **
 **      gctPOINTER * Logical
 **          Pointer to a variable that will receive the logical address of the
@@ -184,31 +188,23 @@ OnError:
 gceSTATUS
 gcoCL_AllocateMemory(
     IN OUT gctUINT *        Bytes,
-    OUT gctPHYS_ADDR *      Physical,
+    OUT gctUINT32_PTR       Physical,
     OUT gctPOINTER *        Logical,
     OUT gcsSURF_NODE_PTR *  Node,
+    IN  gceSURF_TYPE        Type,
     IN  gctUINT32           Flag
     )
 {
     gceSTATUS status;
     gctUINT bytes;
     gcsSURF_NODE_PTR node = gcvNULL;
-    gctUINT alignBytes = 128;
+    gctUINT alignBytes = 256; /* enlarge the alignment size to 256 to fit the requirement of instruction memory */
+    gctPOINTER pointer = gcvNULL;
 
     gcmHEADER_ARG("*Bytes=%lu", *Bytes);
 
     /* Allocate extra 64 bytes to avoid cache overflow */
     bytes = gcmALIGN(*Bytes + 64, 64);
-
-#if USE_NEW_MEMORY_ALLOCATION
-    /* Allocate the physical buffer for the command. */
-    gcmONERROR(gcoHAL_AllocateContiguous(gcvNULL, &bytes, Physical, Logical));
-
-    /* Return allocated number of bytes. */
-    *Bytes = bytes;
-#else
-    {
-    gctPOINTER pointer = gcvNULL;
 
     /* Allocate node. */
     gcmONERROR(gcoOS_Allocate(gcvNULL,
@@ -222,16 +218,23 @@ gcoCL_AllocateMemory(
         node,
         bytes,
         alignBytes,
-        gcvSURF_INDEX,
+        Type,
         Flag == 0 ? gcvALLOC_FLAG_NONE:Flag,
         gcvPOOL_DEFAULT
         ));
 
     /* Lock the cl buffer. */
     gcmONERROR(gcoHARDWARE_Lock(node,
-                                (gctUINT32 *) Physical,
+                                Physical,
                                 Logical));
 
+    gcmDUMP(gcvNULL, "#[info: initialize OCL node memory at create time]");
+    gcmDUMP_BUFFER(gcvNULL,
+                   gcvDUMP_BUFFER_MEMORY,
+                   *Physical,
+                   *Logical,
+                   0,
+                   node->size);
     if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_ASYNC_BLT) &&
         gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_ASYNC_BLIT))
     {
@@ -244,8 +247,6 @@ gcoCL_AllocateMemory(
 
     /* Return node. */
     *Node = node;
-    }
-#endif
 
     /* Success. */
     gcmFOOTER_ARG("*Bytes=%lu *Physical=0x%x *Logical=0x%x *Node=0x%x",
@@ -271,8 +272,8 @@ OnError:
 **
 **  INPUT:
 **
-**      gctPHYS_ADDR Physical
-**          The physical addresses of the allocated pages.
+**      gctUINT32 Physical
+**          The gpu virtual address of the allocated pages.
 **
 **      gctPOINTER Logical
 **          The logical address of the allocation.
@@ -290,10 +291,11 @@ OnError:
 */
 gceSTATUS
 gcoCL_FreeMemory(
-    IN gctPHYS_ADDR         Physical,
+    IN gctUINT32            Physical,
     IN gctPOINTER           Logical,
     IN gctUINT              Bytes,
-    IN gcsSURF_NODE_PTR     Node
+    IN gcsSURF_NODE_PTR     Node,
+    IN gceSURF_TYPE         Type
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -301,23 +303,17 @@ gcoCL_FreeMemory(
     gcmHEADER_ARG("Physical=0x%x Logical=0x%x Bytes=%u Node=0x%x",
                   Physical, Logical, Bytes, Node);
 
-#if USE_NEW_MEMORY_ALLOCATION
-    gcmONERROR(gcoOS_FreeContiguous(gcvNULL,
-                                    Physical,
-                                    Logical,
-                                    Bytes));
-#else
     /* Do we have a buffer allocated? */
     if (Node && Node->pool != gcvPOOL_UNKNOWN)
     {
         /* Unlock the index buffer. */
         gcmONERROR(gcoHARDWARE_Unlock(Node,
-                                      gcvSURF_INDEX));
+                                      Type));
 
         if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_ASYNC_BLT) &&
         gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_ASYNC_BLIT))
         {
-            gcmONERROR(gcoHARDWARE_UnlockEx(Node, gcvENGINE_BLT, gcvSURF_INDEX));
+            gcmONERROR(gcoHARDWARE_UnlockEx(Node, gcvENGINE_BLT, Type));
         }
 
         /* Create an event to free the video memory. */
@@ -326,7 +322,6 @@ gcoCL_FreeMemory(
         /* Free node. */
         gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Node));
     }
-#endif
 
 OnError:
 
@@ -355,16 +350,16 @@ gcoCL_WrapUserMemory(
     gcsUSER_MEMORY_DESC desc;
     gctPOINTER pointer = gcvNULL;
     gcsSURF_NODE_PTR surf = gcvNULL;
+    gctUINT32 physical;
 
     /* Allocate node. */
     gcoOS_ZeroMemory(&desc, gcmSIZEOF(desc));
     desc.flag     = gcvALLOC_FLAG_USERMEMORY;
     desc.logical  = gcmPTR_TO_UINT64(Ptr);
-    desc.physical = gcvINVALID_ADDRESS;
+    desc.physical = gcvINVALID_PHYSICAL_ADDRESS;
     desc.size     = Bytes;
 
-    /* Map the host ptr to a vidmem node. */
-    gcmONERROR(gcoHAL_WrapUserMemory(&desc, &node));
+    gcmONERROR(gcoHAL_WrapUserMemory(&desc, gcvVIDMEM_TYPE_BITMAP, &node));
 
     gcmONERROR(gcoOS_Allocate(gcvNULL,
                               gcmSIZEOF(gcsSURF_NODE),
@@ -395,9 +390,9 @@ gcoCL_WrapUserMemory(
         surf->hardwareAddresses[i] = gcvINVALID_ADDRESS;
     }
 
-    gcmONERROR(gcoOS_CreateMutex(gcvNULL, &(surf->sharedMutex)));
+    gcmONERROR(gcoHARDWARE_Lock(surf, &physical, gcvNULL));
 
-    gcmONERROR(gcoHARDWARE_Lock(surf, Physical, gcvNULL));
+    *Physical = physical;
 
     if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_ASYNC_BLT) &&
         gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_ASYNC_BLIT))
@@ -420,6 +415,86 @@ OnError:
     return status;
 }
 
+/*******************************************************************************
+**
+**  gcoCL_WrapUserPhysicalMemory
+**
+*/
+gceSTATUS
+gcoCL_WrapUserPhysicalMemory(
+    IN gctUINT32_PTR        Physical,
+    IN gctUINT              Bytes,
+    IN gctBOOL              VIVUnCached,
+    OUT gctPOINTER  *       Logical,
+    OUT gcsSURF_NODE_PTR *  Node
+    )
+{
+    gctUINT32 node = 0;
+    gctUINT i;
+    gceSTATUS status;
+    gcsUSER_MEMORY_DESC desc;
+    gctPOINTER pointer = gcvNULL;
+    gcsSURF_NODE_PTR surf = gcvNULL;
+
+    /* Allocate node. */
+    gcoOS_ZeroMemory(&desc, gcmSIZEOF(desc));
+    desc.flag     = gcvALLOC_FLAG_USERMEMORY;
+    desc.physical = gcmALL_TO_UINT32(Physical);
+    desc.size     = Bytes;
+
+    gcmONERROR(gcoHAL_WrapUserMemory(&desc, gcvVIDMEM_TYPE_BITMAP, &node));
+
+    gcmONERROR(gcoOS_Allocate(gcvNULL,
+                              gcmSIZEOF(gcsSURF_NODE),
+                              &pointer));
+    gcoOS_ZeroMemory(pointer, gcmSIZEOF(gcsSURF_NODE));
+
+    surf = pointer;
+
+    surf->u.normal.node = node;
+    surf->size          = Bytes;
+
+    if (VIVUnCached)
+    {
+        surf->pool          = gcvPOOL_USER;
+        surf->u.normal.cacheable = gcvFALSE;
+    }
+    else
+    {
+        surf->pool          = gcvPOOL_USER;
+        surf->u.normal.cacheable = gcvTRUE;
+    }
+
+    surf->physical2     = gcvINVALID_ADDRESS;
+    surf->physical3     = gcvINVALID_ADDRESS;
+
+    for (i = 0; i < gcvHARDWARE_NUM_TYPES; i++)
+    {
+        surf->hardwareAddresses[i] = gcvINVALID_ADDRESS;
+    }
+
+    gcmONERROR(gcoHARDWARE_Lock(surf, gcvNULL, Logical));
+
+    if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_ASYNC_BLT) &&
+        gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_ASYNC_BLIT))
+    {
+        gcmONERROR(gcoHARDWARE_LockEx(surf, gcvENGINE_BLT,
+                                      gcvNULL, gcvNULL));
+    }
+
+    *Node = surf;
+
+    return gcvSTATUS_OK;
+
+OnError:
+    if (surf)
+    {
+        gcsSURF_NODE_Destroy(surf);
+        gcoOS_Free(gcvNULL, surf);
+    }
+
+    return status;
+}
 /*******************************************************************************
 **
 **  gcoCL_FlushMemory
@@ -555,8 +630,8 @@ OnError:
 **          Pointer to a variable that will receive the aligned number of bytes
 **          allocated.
 **
-**      gctPHYS_ADDR * Physical
-**          Pointer to a variable that will receive the physical addresses of
+**      gctUINT32_PTR Physical
+**          Pointer to a variable that will receive the gpu virtual addresses of
 **          the allocated memory.
 **
 **      gctPOINTER * Logical
@@ -571,7 +646,7 @@ gceSTATUS
 gcoCL_ShareMemoryWithStream(
     IN gcoSTREAM            Stream,
     OUT gctSIZE_T *         Bytes,
-    OUT gctPHYS_ADDR *      Physical,
+    OUT gctUINT32_PTR       Physical,
     OUT gctPOINTER *        Logical,
     OUT gcsSURF_NODE_PTR *  Node
     )
@@ -586,7 +661,7 @@ gcoCL_ShareMemoryWithStream(
 
     /* Lock the cl buffer. */
     gcmONERROR(gcoHARDWARE_Lock(*Node,
-                                (gctUINT32 *) Physical,
+                                Physical,
                                 Logical));
 
     if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_ASYNC_BLT) &&
@@ -623,8 +698,8 @@ OnError:
 **          Pointer to a variable that will receive the aligned number of bytes
 **          allocated.
 **
-**      gctPHYS_ADDR * Physical
-**          Pointer to a variable that will receive the physical addresses of
+**      gctUINT32_PTR  Physical
+**          Pointer to a variable that will receive the gpu virtual addresses of
 **          the allocated memory.
 **
 **      gctPOINTER * Logical
@@ -639,7 +714,7 @@ gceSTATUS
 gcoCL_ShareMemoryWithBufObj(
     IN gcoBUFOBJ            BufObj,
     OUT gctSIZE_T *         Bytes,
-    OUT gctPHYS_ADDR *      Physical,
+    OUT gctUINT32_PTR       Physical,
     OUT gctPOINTER *        Logical,
     OUT gcsSURF_NODE_PTR *  Node
     )
@@ -653,7 +728,7 @@ gcoCL_ShareMemoryWithBufObj(
 
     /* Lock the cl buffer. */
     gcmONERROR(gcoHARDWARE_Lock(*Node,
-                                (gctUINT32 *) Physical,
+                                Physical,
                                 Logical));
 
     if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_ASYNC_BLT) &&
@@ -847,8 +922,8 @@ gcoCL_UnlockSurface(
 **      gcoSURF * Surface
 **          Pointer to a variable that will receive the gcoSURF structure.
 **
-**      gctPHYS_ADDR * Physical
-**          Pointer to a variable that will receive the physical addresses of
+**      gctUINT32 * Physical
+**          Pointer to a variable that will receive the gpu virtual addresses of
 **          the allocated memory.
 **
 **      gctPOINTER * Logical
@@ -914,17 +989,30 @@ gcoCL_CreateTexture(
             do {
                 gcmERR_BREAK(gcoSURF_ConstructWrapper(gcvNULL, &surface));
 
-                if(gcvIMAGE_MEM_HOST_PTR == *MapHostMemory)
+                if(gcvIMAGE_MEM_HOST_PTR == *MapHostMemory || gcvIMAGE_MEM_HOST_PHY_PTR == *MapHostMemory)
                 {
                     surface->node.u.normal.cacheable = gcvTRUE;
                 }
 
-                gcmERR_BREAK(gcoSURF_SetBuffer(surface,
-                                     gcvSURF_BITMAP,
-                                     Format,
-                                     Stride,
-                                     (gctPOINTER) Memory,
-                                     gcvINVALID_ADDRESS));
+                if(gcvIMAGE_MEM_HOST_PTR == *MapHostMemory || gcvIMAGE_MEM_HOST_PTR_UNCACHED == *MapHostMemory)
+                {
+                    gcmERR_BREAK(gcoSURF_SetBuffer(surface,
+                                         gcvSURF_BITMAP,
+                                         Format,
+                                         Stride,
+                                         (gctPOINTER) Memory,
+                                         gcvINVALID_PHYSICAL_ADDRESS));
+                }
+                else
+                {
+                    gcmASSERT(gcvIMAGE_MEM_HOST_PHY_PTR == *MapHostMemory || gcvIMAGE_MEM_HOST_PHY_PTR_UNCACHED == *MapHostMemory);
+                    gcmERR_BREAK(gcoSURF_SetBuffer(surface,
+                                         gcvSURF_BITMAP,
+                                         Format,
+                                         Stride,
+                                         gcvNULL,
+                                         gcmPTR_TO_UINT64(Memory)));
+                }
 
                 gcmERR_BREAK(gcoSURF_SetImage(surface,
                                      0,
@@ -1095,7 +1183,6 @@ gcoCL_SetupTexture(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcsTEXTURE info = {0};
-    gcoHARDWARE Hardware = gcvNULL;
 
     gcmHEADER_ARG("Texture=0x%x", Texture);
 
@@ -1137,24 +1224,11 @@ gcoCL_SetupTexture(
     gcoTEXTURE_Flush(Texture);
     gcoTEXTURE_FlushVS(Texture);
 
-    if (gcvSTATUS_TRUE == gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_DESCRIPTOR))
-    {
-        /* Program texture states. */
-        gcmONERROR(gcoHARDWARE_ProgramTextureDesc(Hardware, gcvNULL));
-    }
-    else
-    {
-        /* Program texture states. */
-        gcmONERROR(gcoHARDWARE_ProgramTexture(Hardware, gcvNULL));
-    }
-
-OnError:
 
     /* Return the status. */
     gcmFOOTER();
     return status;
 }
-
 
 /*******************************************************************************
 **
@@ -1180,7 +1254,7 @@ gcoCL_QueryDeviceInfo(
     gceSTATUS status;
     gctUINT threadCount;
     gctSIZE_T contiguousSize;
-    gctPHYS_ADDR contiguousAddress;
+    gctUINT32 contiguousPhysName;
     gctSIZE_T physicalSystemMemSize;
     gceCHIPMODEL  chipModel = gcv200;
     gctUINT32 chipRevision = 0;
@@ -1193,6 +1267,7 @@ gcoCL_QueryDeviceInfo(
     gcmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg));
 
     gcoHAL_SetHardwareType(gcvNULL,gcvHARDWARE_3D);
+
     /* Number of shader cores and threads */
     gcmONERROR(
         gcoHARDWARE_QueryShaderCaps(gcvNULL,
@@ -1255,7 +1330,7 @@ gcoCL_QueryDeviceInfo(
         gcoOS_QueryVideoMemory(gcvNULL,
                                gcvNULL,            gcvNULL,
                                gcvNULL,            gcvNULL,
-                               &contiguousAddress, &contiguousSize));
+                               &contiguousPhysName, &contiguousSize));
 
         DeviceInfo->maxMemAllocSize       = contiguousSize / 4;
         DeviceInfo->globalMemSize         = contiguousSize / 2;
@@ -1286,8 +1361,8 @@ gcoCL_QueryDeviceInfo(
 
     DeviceInfo->maxPrintfBufferSize   = 1024 * 1024;
 
-    /* Size (in bits) of the largest OpenCL built-in data type (long16) */
-    DeviceInfo->memBaseAddrAlign      = 1024;
+    /* Todo: need to check with HW the alignment requirement of BLT engine */
+    DeviceInfo->memBaseAddrAlign      = 2048;
 
     /* Size (in bytes) of the largest OpenCL builtin data type (long16) */
     DeviceInfo->minDataTypeAlignSize  = 128;
@@ -1370,7 +1445,7 @@ gcoCL_QueryDeviceInfo(
     {
         DeviceInfo->singleFpConfig   |= 0x4;    /* CL_FP_ROUND_TO_NEAREST */
     }
-    gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL);
+    gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
     DeviceInfo->chipModel = chipModel;
     DeviceInfo->chipRevision = chipRevision;
     chipEnableEP = ((chipModel == gcv1500 && chipRevision == 0x5246) ||
@@ -1435,43 +1510,110 @@ OnError:
     return status;
 }
 
+
+  /*  Three modes for openCL
+   *      1. combined mode, one device use all gpucore.
+   *         VIV_MGPU_AFFINITY=0, default mode
+   *      2. independent mode, one device use one gpucore
+   *         VIV_MGPU_AFFINITY=1:0 or 1:1,
+   *      3. mulit-device mode, mulit device ,and every device will use one or more gpu count.
+   *         this mode only work on independent mode.
+   *         VIV_MGPU_AFFINITY=1:0
+   *         VIV_OCL_USE_MULTI_DEVICE=1 or 1:1, 1:2,1:4, 1:2 means multi-device is enable, and every
+   *         device will use 2 gpu core.
+   *
+   */
+
 gceSTATUS
 gcoCL_QueryDeviceCount(
-    OUT gctUINT32 * Count
+    OUT gctUINT32 * DeviceCount,
+    OUT gctUINT32 * GPUCountPerDevice
     )
 {
     gctUINT chipIDs[32];
+    gceMULTI_GPU_MODE mode;
+    gctUINT coreIndex;
+    gctSTRING attr;
+    gctUINT32 gpuCount;
+    static gctUINT gpuCountPerDevice = 1, deviceCount = 1;
+    static gctBOOL queriedOnce = gcvFALSE;
 
-    gcmHEADER();
-
-    /* Verify the arguments. */
-    gcmDEBUG_VERIFY_ARGUMENT(Count != gcvNULL);
-
-    gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_3D, Count, chipIDs);
-
-    if (*Count == 0)
+    if(queriedOnce)
     {
-        gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_3D2D, Count, chipIDs);
+        if(DeviceCount) *DeviceCount = deviceCount;
+        if(GPUCountPerDevice) *GPUCountPerDevice = gpuCountPerDevice;
+
+        return gcvSTATUS_OK;
     }
 
-    gcmFOOTER_ARG("*Count=%d", *Count);
+    queriedOnce = gcvTRUE;
+    gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_3D, &gpuCount, chipIDs);
+
+    if (gpuCount == 0)
+    {
+        gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_3D2D, &gpuCount, chipIDs);
+    }
+
+    gcoHAL_QueryMultiGPUAffinityConfig(gcvHARDWARE_3D, &mode, &coreIndex);
+
+    if(mode == gcvMULTI_GPU_MODE_COMBINED)      /*Combined Mode*/
+    {
+        if(gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_USE_MULTI_DEVICES))
+        {
+            gcmPRINT("VIV Warning : VIV_OCL_USE_MULTI_DEVICES=1 only for INDEPENDENT mode");
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
+
+        gpuCountPerDevice = gpuCount;
+        deviceCount = 1;
+    }
+    else    /* Indepedent mode*/
+    {
+        if(gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_USE_MULTI_DEVICES))  /*multi-device mode is enable */
+        {
+            gcoOS_GetEnv(gcvNULL, "VIV_OCL_USE_MULTI_DEVICE", &attr);
+
+            if(attr && attr[0] == '1')
+            {
+                gpuCountPerDevice = 1;
+
+                if(attr[1] == ':' && ( attr[2] == '2' || attr[2] == '4' || attr[2] =='1' ))
+                {
+                    gpuCountPerDevice = attr[2] - '0';
+                }
+                else if (attr[1] != '\0')
+                {
+                    gcmPRINT("VIV Warning : VIV_OCL_USE_MULIT_DEVICES only supporte 1 | 1:1 | 1:2 | 1:4");
+                }
+            }
+
+            if((gpuCount % gpuCountPerDevice != 0) || (gpuCountPerDevice > gpuCount))
+            {
+                gcmPRINT("VIV Warning: Invalid VIV_OCL_USE_MULIT_DEVICES Env vars PerDevivceGPUCount is invalid");
+                return gcvSTATUS_INVALID_ARGUMENT;
+            }
+
+            deviceCount = gpuCount / gpuCountPerDevice;
+        }
+        else    /* Independent mode , one device and device has only one gpucore */
+        {
+            gpuCountPerDevice = 1;
+            deviceCount = 1;
+
+            if(coreIndex >= gpuCount) /*coreIndex need small than maxCoreCount*/
+            {
+                return gcvSTATUS_INVALID_ARGUMENT;
+            }
+        }
+    }
+
+    if(DeviceCount) *DeviceCount = deviceCount;
+
+    if(GPUCountPerDevice) *GPUCountPerDevice = gpuCountPerDevice;
+
     return gcvSTATUS_OK;
 }
 
-gceSTATUS
-gcoCL_SelectDevice(
-    IN gctUINT32    DeviceId
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-
-    gcmHEADER_ARG("DeviceId=%d", DeviceId);
-
-    status = gcoHAL_SetCoreIndex(gcvNULL, DeviceId);
-
-    gcmFOOTER();
-    return status;
-}
 
 /*
  Example 2, a client wants to use 3D GPU0 and 3D GPU1 separately, it should do like this:
@@ -1488,7 +1630,7 @@ gcoCL_SelectDevice(
 **      k) submit hardware1 related command to kernel
 */
 
- gceSTATUS
+gceSTATUS
 gcoCL_CreateHW(
     IN gctUINT32    DeviceId,
     OUT gcoHARDWARE * Hardware
@@ -1496,14 +1638,39 @@ gcoCL_CreateHW(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcoHARDWARE  hardware = gcvNULL;
+    gctUINT      gpuCountPerDevice, deviceCount;
+    gctUINT32    gpuCoreIndexs[]={0, 1, 2, 3, 4, 5, 6, 7};
+    gceMULTI_GPU_MODE  mode;
+    gctUINT32 mainCoreIndex;
     gcmDECLARE_SWITCHVARS;
     gcmHEADER_ARG("DeviceId=%d", DeviceId);
     gcmSWITCH_TO_DEFAULT();
     gcoHAL_SetHardwareType(gcvNULL,gcvHARDWARE_3D);
-    gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, DeviceId));
 
-    gcmONERROR(gcoHARDWARE_Construct(gcPLS.hal, gcvFALSE, gcvFALSE, &hardware));
-    gcmONERROR(gcoHARDWARE_SetMultiGPUMode(hardware, gcvMULTI_GPU_MODE_INDEPENDENT));
+    gcmONERROR(gcoCL_QueryDeviceCount(&deviceCount, &gpuCountPerDevice));
+
+     if(deviceCount == 1 && gpuCountPerDevice == 1) /*Special deal with independent mode*/
+    {
+         gcoHAL_QueryMultiGPUAffinityConfig(gcvHARDWARE_3D, &mode, &mainCoreIndex);
+
+         gpuCoreIndexs[0] = mainCoreIndex;
+    }
+
+    gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, gpuCoreIndexs[DeviceId * gpuCountPerDevice]));
+
+
+    gcmONERROR(gcoHARDWARE_ConstructEx(gcPLS.hal,
+                                       gcvFALSE,
+                                       gcvFALSE,
+                                       gcvHARDWARE_3D,
+                                       gpuCountPerDevice,
+                                       &gpuCoreIndexs[DeviceId * gpuCountPerDevice],
+                                       &hardware));
+
+    if (gcoHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_MCFE))
+    {
+        gcoHARDWARE_SelectChannel(hardware, 0, 1);
+    }
     /* Switch to the 3D pipe. */
     gcmONERROR(gcoHARDWARE_SelectPipe(hardware, gcvPIPE_3D, gcvNULL));
 
@@ -1520,14 +1687,11 @@ gcoCL_CreateHW(
     {
         gcmVERIFY_OK(gcoHARDWARE_SetRTNERounding(hardware, gcvTRUE));
     }
-
-    gcoHARDWARE_SetFenceEnabled(hardware, gcvTRUE);
-
+    gcmONERROR(gcoHARDWARE_SetFenceEnabled(hardware, gcvTRUE));
     gcoHARDWARE_InitializeCL(hardware);
     gcmRESTORE_HW();
     *Hardware = hardware;
-
-    gcmFOOTER();
+     gcmFOOTER();
     return status;
 
 OnError:
@@ -1552,6 +1716,28 @@ gceSTATUS
  }
 
 
+gceSTATUS
+    gcoCL_GetHWConfigGpuCount(
+     gctUINT32 * GpuCount
+    )
+{
+    gcoHAL_Query3DCoreCount(gcvNULL, GpuCount);
+    return gcvSTATUS_OK;
+}
+
+/*
+** For OCL Mulit-Device  we need flush more GPU cache for every GPU 's commit .
+** The resource may be used in GPU1 but be released on GPU0 ,the event only trigger to
+** flush GPU0's internel cache but the cache is still in  GPU1.
+** So we flush all cache in user command in every OCL's commit for safe.
+**
+*/
+
+gceSTATUS gcoCL_MultiDevcieCacheFlush()
+{
+    return gcoHARDWARE_MultiGPUCacheFlush(gcvNULL, gcvNULL);
+}
+
 /*******************************************************************************
 **
 **  gcoCL_Commit
@@ -1575,8 +1761,16 @@ gcoCL_Commit(
     )
 {
     gceSTATUS status;
+    gctUINT32  deviceCount;
 
     gcmHEADER_ARG("Stall=%d", Stall);
+
+    gcoCL_QueryDeviceCount(&deviceCount, gcvNULL);
+
+    if(deviceCount > 1)
+    {
+        gcmONERROR(gcoCL_MultiDevcieCacheFlush());
+    }
 
     /* Commit the command buffer to hardware. */
     gcmONERROR(gcoHARDWARE_Commit(gcvNULL));
@@ -1693,6 +1887,7 @@ gcoCL_SubmitSignal(
 
     gcmHEADER_ARG("Signal=0x%x Process=0x%x", Signal, Process);
 
+
     /* Sometime we disable BLT engine */
     if (Signal == gcvNULL)
     {
@@ -1796,7 +1991,7 @@ gcoCL_SetSignal(
     IN gctSIGNAL Signal
     )
 {
-    gceSTATUS   status = gcvSTATUS_OK;
+    gceSTATUS    status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("Signal=0x%x", Signal);
 
@@ -1831,10 +2026,8 @@ gcoCL_LoadKernel(
                   ProgramState.stateBufferSize, ProgramState.stateBuffer, ProgramState.hints);
 
     /* Load kernel states. */
-    status = gcLoadKernel(gcvNULL,
-                          ProgramState.stateBufferSize,
-                          ProgramState.stateBuffer,
-                          ProgramState.hints);
+    status = gcLoadShaders(gcvNULL,
+                          ProgramState);
 
     /* Return the status. */
     gcmFOOTER();
@@ -1883,7 +2076,9 @@ gcoCL_InvokeKernel(
     IN size_t              GlobalWorkSize[3],
     IN size_t              LocalWorkSize[3],
     IN gctUINT             ValueOrder,
-    IN gctBOOL             BarrierUsed
+    IN gctBOOL             BarrierUsed,
+    IN gctUINT32           MemoryAccessFlag,
+    IN gctBOOL             bDual16
     )
 {
     gcsTHREAD_WALKER_INFO   info;
@@ -1928,38 +2123,14 @@ gcoCL_InvokeKernel(
     info.swathSizeZ       = 0;
     info.valueOrder       = ValueOrder;
     info.barrierUsed      = BarrierUsed;
+    info.memoryAccessFlag = MemoryAccessFlag;
+    info.bDual16          = bDual16;
 
     gcmONERROR(gcoCL_InvokeThreadWalker(&info));
 
 OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
-}
-
-gceSTATUS
-gcoCL_MultiGPUSync(
-    IN gctUINT32 GPUCount,
-    IN gctUINT_PTR ChipIDs
-    )
-{
-    /* TODO: need refine later */
-    return gcoHARDWARE_MultiGPUSyncV2(gcvNULL, GPUCount, ChipIDs, gcvNULL);
-}
-
-gctBOOL
-gcoCL_MemIsFenceBack(
-    IN gcsSURF_NODE_PTR Node,
-    IN gceENGINE Engine,
-    IN gceFENCE_TYPE WaitType
-    )
-{
-    gctBOOL ret;
-
-    gcoOS_AcquireMutex(gcvNULL, Node->sharedMutex, gcvINFINITE);
-    ret = gcoHARDWARE_IsFenceBack(gcvNULL, Node->fenceCtx, Engine, WaitType);
-    gcoOS_ReleaseMutex(gcvNULL, Node->sharedMutex);
-
-    return ret;
 }
 
 gceSTATUS
@@ -2024,7 +2195,6 @@ gcoCL_ChooseBltEngine(
             }
             else
             {
-                gcoOS_AcquireMutex(gcvNULL, node->sharedMutex, gcvINFINITE);
                 if (!gcoHARDWARE_IsFenceBack(gcvNULL, node->fenceCtx, gcvENGINE_RENDER, gcvFENCE_TYPE_ALL))
                 {
                     *engine = gcvENGINE_RENDER;
@@ -2033,7 +2203,6 @@ gcoCL_ChooseBltEngine(
                 {
                     *engine = gcvENGINE_BLT;
                 }
-                gcoOS_ReleaseMutex(gcvNULL, node->sharedMutex);
             }
         }
         else
@@ -2073,7 +2242,6 @@ OnError:
     gcmFOOTER();
     return status;
 }
-
 
 #endif /* gcdENABLE_3D */
 

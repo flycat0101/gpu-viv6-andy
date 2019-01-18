@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -32,6 +32,8 @@ typedef struct _VIR_IO_VECTORIZABLE_PACKET
     gctUINT          realCount;
     gctBOOL          bOutput;
     gctBOOL          bTFB;
+
+    gctBOOL          bComponentPack;
 }VIR_IO_VECTORIZABLE_PACKET;
 
 typedef struct _VIR_IO_VECTORIZE_PARAM
@@ -53,6 +55,7 @@ VSC_ErrCode vscVIR_VectorizeIoPackets(VIR_IO_VECTORIZE_PARAM* pIoVecParam);
    result, other opts should be done before it, like CSE */
 VSC_ErrCode vscVIR_DoLocalVectorization(VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(vscVIR_DoLocalVectorization);
+DECLARE_SH_NECESSITY_CHECK(vscVIR_DoLocalVectorization);
 
 END_EXTERN_C()
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -439,22 +439,18 @@ _Print(
 {
     /* Output to file or debugger. */
 #if gcdDEBUG_IN_KERNEL
+    char buffer[256];
+    gctUINT n;
     gcsHAL_INTERFACE iface;
 
-    iface.ignoreTLS      = gcvFALSE;
-    iface.command        = gcvHAL_DEBUG;
-    iface.u.Debug.set    = gcvTRUE;
-    iface.u.Debug.level  = _debugLevel;
-    iface.u.Debug.type   = gcvMESSAGE_TEXT;
-    iface.u.Debug.zones  = _debugZones[gcmZONE_GET_API(gcvZONE_API_HAL)];
-    iface.u.Debug.enable = gcvTRUE;
+    n = gcmVSPRINTF(buffer, sizeof(buffer) - 1, Message, Arguments);
 
-    gcmVSPRINTF(
-        iface.u.Debug.message,
-        sizeof(iface.u.Debug.message) - 1,
-        Message,
-        Arguments
-        );
+    iface.ignoreTLS = gcvFALSE;
+    iface.command   = gcvHAL_DEBUG_DUMP;
+    iface.u.DebugDump.type    = gcvDUMP_BUFFER_USER_STRING;
+    iface.u.DebugDump.ptr     = gcmPTR_TO_UINT64(buffer);
+    iface.u.DebugDump.address = ~0U; /* ignored. */
+    iface.u.DebugDump.size    = n + 1; /* include tailing \0'. */
 
     gcoOS_DeviceControl(
         gcvNULL, IOCTL_GCHAL_INTERFACE,
@@ -669,7 +665,7 @@ _Print(
     if ((n <= 0) || (buffer[i + n - 1] != '\n'))
     {
         /* Append new-line. */
-        gcmSTRCAT(buffer, sizeof(buffer), "\n");
+        gcmSTRCAT(buffer, sizeof(buffer) - strlen(buffer) -1, "\n");
         buffer[sizeof(buffer) - 1] = '\0';
     }
 

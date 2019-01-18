@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2018 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -32,7 +32,11 @@
 #ifndef DISABLE_VIVANTE_DRI
 #include "vivante_dri.h"
 #endif
+
+#ifdef USE_PROBE_VIV_FBDEV_DRIVER
 #include "../vivante_extension/vivante_ext.h"
+#endif
+
 #include <errno.h>
 #include <linux/fb.h>
 #include <sys/ioctl.h>
@@ -213,6 +217,7 @@ static int pix24bpp = 0;
 /************************************************************************
  * X Window System Registration (START)
  ************************************************************************/
+#ifdef USE_PROBE_VIV_FBDEV_DRIVER
 _X_EXPORT DriverRec VIV = {
     VIVANTE_VERSION,
     VIVANTE_DRIVER_NAME,
@@ -235,6 +240,7 @@ static SymTabRec VivChipsets[] = {
     {GCCORE_ID, GCCORE_STR},
     {-1, NULL}
 };
+#endif
 
 
 static const OptionInfoRec VivOptions[] = {
@@ -253,6 +259,7 @@ static const OptionInfoRec VivOptions[] = {
     { -1, NULL, OPTV_NONE, {0}, FALSE}
 };
 
+#ifdef USE_PROBE_VIV_FBDEV_DRIVER
 /* -------------------------------------------------------------------- */
 
 #ifdef XFree86LOADER
@@ -311,6 +318,8 @@ VivSetup(pointer module, pointer opts, int *errmaj, int *errmin) {
     TRACE_EXIT(ret);
 }
 #endif /* XFree86LOADER */
+#endif
+
 
 /************************************************************************
  * X Window System Registration (START)
@@ -677,7 +686,7 @@ static Bool DestroyExaLayer(ScreenPtr pScreen) {
 /************************************************************************
  * START OF THE IMPLEMENTATION FOR CORE FUNCTIONS
  ************************************************************************/
-
+#ifdef USE_PROBE_VIV_FBDEV_DRIVER
 static const OptionInfoRec *
 VivAvailableOptions(int chipid, int busid) {
     /*Chip id may also be used for special cases*/
@@ -691,6 +700,7 @@ VivIdentify(int flags) {
     xf86PrintChipsets(VIVANTE_NAME, "fb driver for vivante", VivChipsets);
     TRACE_EXIT();
 }
+#endif
 
 static Bool
 VivProbe(DriverPtr drv, int flags) {
@@ -1223,10 +1233,9 @@ VivScreenInit(SCREEN_INIT_ARGS_DECL)
                 pScrn->displayWidth);
     }
 
-
     xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-            "FB Start = %p  FB Base = %p  FB Offset = %p\n",
-            (void *)fPtr->mFB.mFBStart, (void *)fPtr->mFB.mFBMemory, (void *)fPtr->mFB.mFBOffset);
+            "FB Start = %p    FB Base = %p  FB Offset = %p\n",
+            gcmINT2PTR(fPtr->mFB.mFBStart), gcmINT2PTR(fPtr->mFB.mFBMemory), gcmINT2PTR(fPtr->mFB.mFBOffset));
 
     if(fPtr->rotate == VIV_ROTATE_CW || fPtr->rotate == VIV_ROTATE_CCW)
     {
@@ -1614,3 +1623,6 @@ RestoreSyncFlags(ScrnInfoPtr pScrn)
 }
 #endif
 
+Bool vivante_fbdev_viv_probe(DriverPtr drv, int flags) {
+    return VivProbe(drv, flags);
+}

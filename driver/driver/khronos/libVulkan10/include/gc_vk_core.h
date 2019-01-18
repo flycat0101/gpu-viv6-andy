@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -122,8 +122,6 @@ extern VkAllocationCallbacks __vkAllocatorWrapper;
 #else
 #define __VK_RESOURCE_INFO          0
 #endif
-
-#define __VK_NEW_DEVICE_QUEUE       1
 
 /* 0 means disable TS. while 1 means enable TS. */
 #define __VK_ENABLETS               0

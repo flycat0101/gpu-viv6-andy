@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1330,7 +1330,7 @@ gal_release_memory_mappings( DirectHash    *hash,
                     mapping->gpu_addr );
 
         gcmERR_BREAK(gcoHAL_UnlockVideoMemory( mapping->node,
-                                               gcvSURF_BITMAP,
+                                               gcvVIDMEM_TYPE_BITMAP,
                                                gcvENGINE_RENDER));
 
         gcmERR_BREAK(gcoHAL_ReleaseVideoMemory( mapping->node ));
@@ -1507,7 +1507,7 @@ gal_setup_device( CoreGraphicsDevice *device,
                     "[Hardware info] chipModel: 0x%08X, chipRevision: 0x%08X\n",
                     vdev->chipModel, vdev->chipRevision);
 
-        gcmERR_BREAK(gcoOS_GetBaseAddress( vdrv->os, &vdev->baseAddress));
+        gcmERR_BREAK(gcoHAL_GetBaseAddr(gcvNULL, &vdev->baseAddress));
 
         D_DEBUG_AT( Gal_Driver,
                     "Memory base address: 0x%08X.\n", vdev->baseAddress );

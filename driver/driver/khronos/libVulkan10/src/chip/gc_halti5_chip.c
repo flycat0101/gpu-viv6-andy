@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -28,6 +28,8 @@ __vkChipFuncTable halti5_chip =
     halti5_computeBlit,
     halti5_draw,
     halti5_drawIndexed,
+    halti5_drawDirect,
+    halti5_drawIndexedDirect,
     halti5_drawIndirect,
     halti5_drawIndexedIndirect,
     halti5_dispatch,
@@ -52,7 +54,8 @@ __vkChipFuncTable halti5_chip =
     halti5_bindPipeline,
     halti5_setMultiGpuSync,
     halti5_flushCache,
-    halti5_tweakCopy,
+    halti5_getQueryResult,
+    halti5_copyQueryResult,
 };
 
 static void halti5_helper_computeCentroids(
@@ -278,6 +281,45 @@ static VkResult halti5_finalizeComputeBlit(
     }
 
     return VK_SUCCESS;
+}
+
+static VkResult halti5_initializeClusterInfo(
+    __vkDevContext *devCtx
+    )
+{
+    VkResult result = VK_SUCCESS;
+    halti5_module *chipModule = (halti5_module *)devCtx->chipPriv;
+
+    chipModule->clusterInfo.clusterAliveMask =
+        devCtx->database->ClusterAliveMask & devCtx->pPhyDevice->phyDevConfig.options.userClusterMask;
+    chipModule->clusterInfo.clusterAliveCount = 0;
+    chipModule->clusterInfo.clusterMinID = 0;
+    chipModule->clusterInfo.clusterMaxID = 0;
+
+    /* Compute count.*/
+    if (chipModule->clusterInfo.clusterAliveMask)
+    {
+        uint32_t i = 0;
+        uint32_t clusterMask = chipModule->clusterInfo.clusterAliveMask;
+        while (clusterMask)
+        {
+            if (clusterMask & (1 << i))
+            {
+                chipModule->clusterInfo.clusterAliveCount++;
+
+                if (chipModule->clusterInfo.clusterAliveCount == 1)
+                {
+                    chipModule->clusterInfo.clusterMinID = i;
+                }
+                chipModule->clusterInfo.clusterMaxID = i;
+                clusterMask &= ~(1 << i);
+            }
+
+            ++i;
+        }
+    }
+
+    return result;
 }
 
 VkResult halti5_initializeChipModule(
@@ -842,8 +884,9 @@ VkResult halti5_initializeChipModule(
     decodeInfo.binary = (gctUINT *)gc_halti5_patchlib_frag;
     decodeInfo.sizeInByte = (gctUINT)sizeof(gc_halti5_patchlib_frag);
     decodeInfo.stageInfo = gcvNULL;
-    decodeInfo.specFlag = SPV_SPECFLAG_NONE;
+    decodeInfo.specFlag = SPV_SPECFLAG_DISABLE_IR_DUMP;  /* disable IR dump of the patch lib */
     decodeInfo.tcsInputVertices = 0;
+    decodeInfo.isLibraryShader = gcvTRUE;
 
     __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(&decodeInfo, &chipModule->patchLib)) ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
 
@@ -854,7 +897,8 @@ VkResult halti5_initializeChipModule(
     vscCompileParams.cfg.ctx.pSysCtx = &devCtx->vscSysCtx;
     vscCompileParams.cfg.cFlags = VSC_COMPILER_FLAG_COMPILE_TO_ML
                                 | VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO
-                                | VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC;
+                                | VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC
+                                | VSC_COMPILER_FLAG_DISABLE_IR_DUMP;
     vscCompileParams.cfg.optFlags = (VSC_COMPILER_OPT_FULL & (~VSC_COMPILER_OPT_ILF_LINK)) | VSC_COMPILER_OPT_NO_ILF_LINK;
     vscCompileParams.hShader = chipModule->patchLib;
 
@@ -866,6 +910,9 @@ VkResult halti5_initializeChipModule(
 #endif
 
     devCtx->chipPriv = chipModule;
+
+    /* init cluster info.*/
+    __VK_ONERROR(halti5_initializeClusterInfo(devCtx));
 
     __VK_ONERROR(halti5_tweak_detect(devCtx));
 
@@ -894,9 +941,9 @@ VkResult halti5_finalizeChipModule(
     halti5_module *chipModule = (halti5_module *)devCtx->chipPriv;
     __VK_SET_ALLOCATIONCB(&devCtx->memCb);
 
-    halti5_finalizeComputeBlit(devCtx);
-
     gcFinalizeRecompilation();
+
+    halti5_finalizeComputeBlit(devCtx);
 
     if (chipModule && (chipModule->patchLib))
     {
@@ -921,7 +968,8 @@ VkResult halti5_helper_set_viewport(
     )
 {
     gcuFLOAT_UINT32 xScale, yScale, xOffset, yOffset, zOffset, zScale;
-    float    wClip;
+    float depthFar, depthNear;
+    float wClip;
     /* Compute viewport states. */
     xScale.f  = (viewport->width) / 2.0f;
     xOffset.f = viewport->x + xScale.f;
@@ -934,14 +982,17 @@ VkResult halti5_helper_set_viewport(
 
     wClip = gcmMAX(viewport->width, viewport->height) / (2.0f * 8388607.0f - 8192.0f);
 
+    depthFar = viewport->maxDepth > viewport->minDepth ? viewport->maxDepth : viewport->minDepth;
+    depthNear = viewport->maxDepth > viewport->minDepth ? viewport->minDepth : viewport->maxDepth;
+
     __vkCmdLoadSingleHWState(commandBuffer, 0x0280, VK_FALSE, xScale.u);
     __vkCmdLoadSingleHWState(commandBuffer, 0x0281, VK_FALSE, yScale.u);
     __vkCmdLoadSingleHWState(commandBuffer, 0x0282, VK_FALSE, zScale.u);
     __vkCmdLoadSingleHWState(commandBuffer, 0x0283, VK_FALSE, xOffset.u);
     __vkCmdLoadSingleHWState(commandBuffer, 0x0284, VK_FALSE, yOffset.u);
     __vkCmdLoadSingleHWState(commandBuffer, 0x0285, VK_FALSE, zOffset.u);
-    __vkCmdLoadSingleHWState(commandBuffer, 0x0501, VK_FALSE, *(uint32_t *)&viewport->minDepth);
-    __vkCmdLoadSingleHWState(commandBuffer, 0x0502, VK_FALSE, *(uint32_t *)&viewport->maxDepth);
+    __vkCmdLoadSingleHWState(commandBuffer, 0x0501, VK_FALSE, *(uint32_t*)&depthNear);
+    __vkCmdLoadSingleHWState(commandBuffer, 0x0502, VK_FALSE, *(uint32_t*)&depthFar);
 
     __vkCmdLoadSingleHWState(commandBuffer, 0x02A0, VK_FALSE, *(uint32_t*)&wClip);
 
@@ -1002,68 +1053,6 @@ VkResult halti5_helper_set_linewidth(
 
     __vkCmdLoadSingleHWState(commandBuffer, 0x028E, VK_FALSE, adjustSub.u);
     __vkCmdLoadSingleHWState(commandBuffer, 0x028F, VK_FALSE, adjustAdd.u);
-    return VK_SUCCESS;
-}
-
-VkResult halti5_helper_set_psOutputMode(
-    __vkDevContext *devCtx,
-    uint32_t **commandBuffer,
-    uint32_t oldPsOutCntl4to7,
-    uint32_t newPsOutCntl4to7
-    )
-{
-    uint32_t oldPsOutputCntlSaturate[4];
-    uint32_t psOutCntl4to7;
-
-    oldPsOutputCntlSaturate[0]= (((((gctUINT32) (oldPsOutCntl4to7)) >> (0 ? 7:7)) & ((gctUINT32) ((((1 ? 7:7) - (0 ? 7:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1)))))) );
-    oldPsOutputCntlSaturate[1]= (((((gctUINT32) (oldPsOutCntl4to7)) >> (0 ? 15:15)) & ((gctUINT32) ((((1 ? 15:15) - (0 ? 15:15) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:15) - (0 ? 15:15) + 1)))))) );
-    oldPsOutputCntlSaturate[2]= (((((gctUINT32) (oldPsOutCntl4to7)) >> (0 ? 23:23)) & ((gctUINT32) ((((1 ? 23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ? 23:23) + 1)))))) );
-    oldPsOutputCntlSaturate[3]= (((((gctUINT32) (oldPsOutCntl4to7)) >> (0 ? 31:31)) & ((gctUINT32) ((((1 ? 31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1)))))) );
-
-    psOutCntl4to7 = newPsOutCntl4to7 |
-                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 7:7) - (0 ?
- 7:7) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 7:7) - (0 ?
- 7:7) + 1))))))) << (0 ?
- 7:7))) | (((gctUINT32) ((gctUINT32) (oldPsOutputCntlSaturate[0]) & ((gctUINT32) ((((1 ?
- 7:7) - (0 ?
- 7:7) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7))) |
-                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:15) - (0 ?
- 15:15) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 15:15) - (0 ?
- 15:15) + 1))))))) << (0 ?
- 15:15))) | (((gctUINT32) ((gctUINT32) (oldPsOutputCntlSaturate[1]) & ((gctUINT32) ((((1 ?
- 15:15) - (0 ?
- 15:15) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:15) - (0 ? 15:15) + 1))))))) << (0 ? 15:15))) |
-                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 23:23) - (0 ?
- 23:23) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 23:23) - (0 ?
- 23:23) + 1))))))) << (0 ?
- 23:23))) | (((gctUINT32) ((gctUINT32) (oldPsOutputCntlSaturate[2]) & ((gctUINT32) ((((1 ?
- 23:23) - (0 ?
- 23:23) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 23:23) - (0 ? 23:23) + 1))))))) << (0 ? 23:23))) |
-                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:31) - (0 ?
- 31:31) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 31:31) - (0 ?
- 31:31) + 1))))))) << (0 ?
- 31:31))) | (((gctUINT32) ((gctUINT32) (oldPsOutputCntlSaturate[3]) & ((gctUINT32) ((((1 ?
- 31:31) - (0 ?
- 31:31) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ? 31:31)));
-
-    __vkCmdLoadSingleHWState(commandBuffer, 0x040B, VK_FALSE, psOutCntl4to7);
-
     return VK_SUCCESS;
 }
 
@@ -1302,6 +1291,7 @@ VkResult halti5_helper_set_blendConstants(
 
 
 VkResult halti5_helper_convertHwPEDesc(
+    __vkDevContext *devCtx,
     uint32_t vkFormat,
     HwPEDesc *hwPEDesc
     )
@@ -1314,7 +1304,7 @@ VkResult halti5_helper_convertHwPEDesc(
     }
     s_vkFormatToHwPeDescs[] =
     {
-        {__VK_FORMAT_A4R4G4B4_UNFORM_PACK16, {0x01, VK_FALSE, VK_TRUE, 0x0}},
+        {__VK_FORMAT_A4R4G4B4_UNORM_PACK16, {0x01, VK_FALSE, VK_TRUE, 0x0}},
         {__VK_FORMAT_R8_1_X8R8G8B8, {0x05, VK_FALSE, VK_TRUE, 0x0}},
         {VK_FORMAT_A1R5G5B5_UNORM_PACK16, {0x03, VK_FALSE, VK_TRUE, 0x0}},
         {VK_FORMAT_R5G6B5_UNORM_PACK16, {0x04, VK_FALSE, VK_TRUE, 0x0}},
@@ -1328,15 +1318,18 @@ VkResult halti5_helper_convertHwPEDesc(
         {VK_FORMAT_R8G8_SINT, {0x18, VK_FALSE, VK_FALSE, 0x5}},
         {VK_FORMAT_R8G8_SRGB, {0x1F, VK_TRUE, VK_TRUE, 0x0}},
 
-        {VK_FORMAT_R8G8B8A8_UNORM, {0x06, VK_FALSE, VK_TRUE, 0x0}},
-        {VK_FORMAT_B8G8R8A8_UNORM, {0x06, VK_FALSE, VK_TRUE, 0x0}},
+        {VK_FORMAT_R8G8B8A8_UNORM, {0x2B, VK_FALSE, VK_TRUE, 0x0}},
         {VK_FORMAT_R8G8B8A8_UINT, {0x19, VK_FALSE, VK_FALSE, 0x3}},
         {VK_FORMAT_R8G8B8A8_SINT, {0x19, VK_FALSE, VK_FALSE, 0x5}},
-        {VK_FORMAT_B8G8R8A8_SRGB, {0x06, VK_TRUE, VK_TRUE, 0x0}},
-        {VK_FORMAT_R8G8B8A8_SRGB, {0x06, VK_TRUE, VK_TRUE, 0x0}},
+        {VK_FORMAT_R8G8B8A8_SRGB, {0x2B, VK_TRUE, VK_TRUE, 0x0}},
 
+        {VK_FORMAT_B8G8R8A8_UNORM, {0x06, VK_FALSE, VK_TRUE, 0x0}},
+        {VK_FORMAT_B8G8R8A8_SRGB, {0x06, VK_TRUE, VK_TRUE, 0x0}},
+
+        {VK_FORMAT_A8B8G8R8_UNORM_PACK32, {0x2B, VK_FALSE, VK_TRUE, 0x0}},
         {VK_FORMAT_A8B8G8R8_UINT_PACK32, {0x19, VK_FALSE, VK_FALSE, 0x3}},
         {VK_FORMAT_A8B8G8R8_SINT_PACK32, {0x19, VK_FALSE, VK_FALSE, 0x5}},
+        {VK_FORMAT_A8B8G8R8_SRGB_PACK32, {0x2B, VK_TRUE, VK_TRUE, 0x0}},
 
         {VK_FORMAT_A2B10G10R10_UNORM_PACK32, {0x16, VK_FALSE, VK_TRUE, 0x0}},
         {VK_FORMAT_A2B10G10R10_UINT_PACK32, {0x1E, VK_FALSE, VK_FALSE, 0x4}},
@@ -1362,19 +1355,12 @@ VkResult halti5_helper_convertHwPEDesc(
         {VK_FORMAT_R32G32_SINT, {0x15, VK_FALSE, VK_FALSE, 0x2}},
         {VK_FORMAT_R32G32_SFLOAT, {0x15, VK_FALSE, VK_FALSE, 0x2}},
 
-        {__VK_FORMAT_R32G32_UINT_2_R32_UINT, {0x14, VK_FALSE, VK_FALSE, 0x2}},
-        {__VK_FORMAT_R32G32_SINT_2_R32_SINT, {0x14, VK_FALSE, VK_FALSE, 0x2}},
-        {__VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT, {0x14, VK_FALSE, VK_FALSE, 0x2}},
-
         {VK_FORMAT_B10G11R11_UFLOAT_PACK32, {0x1D, VK_FALSE, VK_FALSE, 0x0}},
 
         {__VK_FORMAT_R32G32B32A32_UINT_2_R32G32_UINT, {0x15, VK_FALSE, VK_FALSE, 0x2}},
         {__VK_FORMAT_R32G32B32A32_SINT_2_R32G32_SINT, {0x15, VK_FALSE, VK_FALSE, 0x2}},
         {__VK_FORMAT_R32G32B32A32_SFLOAT_2_R32G32_SFLOAT, {0x15, VK_FALSE, VK_FALSE, 0x2}},
 
-        {__VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT, {0x1B, VK_FALSE, VK_FALSE, 0x4}},
-        {__VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT, {0x1B, VK_FALSE, VK_FALSE, 0x6}},
-        {__VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT, {0x12, VK_FALSE, VK_FALSE, 0x0}},
     };
 
     for (i = 0; i < __VK_COUNTOF(s_vkFormatToHwPeDescs); i++)
@@ -1389,6 +1375,11 @@ VkResult halti5_helper_convertHwPEDesc(
     {
         __VK_ASSERT(hwPEDesc);
         *hwPEDesc = s_vkFormatToHwPeDescs[i].hwDesc;
+
+        if (!devCtx->database->PE_A8B8G8R8 && hwPEDesc->hwFormat == 0x2B)
+        {
+            hwPEDesc->hwFormat = 0x06;
+        }
 
         return VK_SUCCESS;
     }

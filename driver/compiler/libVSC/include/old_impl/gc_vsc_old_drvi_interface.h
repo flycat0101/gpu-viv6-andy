@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -20,9 +20,8 @@
 #define __gc_vsc_old_drvi_interface_h_
 
 #define _SUPPORT_LONG_ULONG_DATA_TYPE  1
-
-#define _OCL_USE_INTRINSIC_FOR_IMAGE   0
-#define _SUPPORT_NATIVE_IMAGE_READ     0
+#define _OCL_USE_INTRINSIC_FOR_IMAGE   1
+#define _SUPPORT_NATIVE_IMAGE_READ     1
 
 #include "gc_hal_engine.h"
 #include "old_impl/gc_vsc_old_gcsl.h"
@@ -46,6 +45,19 @@ BEGIN_EXTERN_C()
 
 #define GC_ICACHE_PREFETCH_TABLE_SIZE   8
 #define GC_DEFAULT_INLINE_LEVEL         2
+#define GC_DEFAULT_TESS_LEVEL           0xFFFF
+
+/* For OES. */
+#define _sldSharedVariableStorageBlockName  "#sh_sharedVar"
+#define _sldWorkGroupIdName                 "#sh_workgroupId"
+
+/* For OCL. */
+#define _sldLocalStorageAddressName         "#sh_local_address"
+#define _sldWorkGroupCountName              "#workGroupCount"
+#define _sldWorkGroupIdOffsetName           "#workGroupIdOffset"
+
+/* Shared use. */
+#define _sldLocalMemoryAddressName          "#sh_localMemoryAddress"
 
 #define FULL_PROGRAM_BINARY_SIG_1           gcmCC('F', 'U', 'L', 'L')
 #define FULL_PROGRAM_BINARY_SIG_2           gcmCC('P', 'R', 'G', 'M')
@@ -57,10 +69,8 @@ BEGIN_EXTERN_C()
 */
 #define __FULL_PROGRAM_BINARY_HEADER_SIZE__     (sizeof(gctUINT32) * 4) /* Full program binary file header size in bytes*/
 
-#define __OCL_PRINTF_WRITE_MASK__               (0x12345678)
-
-#define __ENABLE_OPTIMIZE_FOR_PRI_MEMORY__      0
-#define __ENABLE_OPTIMIZE_FOR_SHARE_MEMORY__    0
+#define __OCL_PRINTF_WRITE_SIG1__               gcmCC('C', 'L', '\0', '\0')
+#define __OCL_PRINTF_WRITE_SIG2__               gcmCC('P', 'R', 'I', 'N')
 
 typedef enum _gceKernelBinaryKind
 {
@@ -84,18 +94,17 @@ enum gceRecompileKind
     gceRK_PATCH_ALPHA_BLENDING,
     gceRK_PATCH_DEPTH_BIAS,
     gceRK_PATCH_NP2TEXTURE,
-    gceRK_PATCH_GLOBAL_WORK_SIZE,
-    gceRK_PATCH_READ_IMAGE,
-    gceRK_PATCH_WRITE_IMAGE,
+    gceRK_PATCH_GLOBAL_WORK_SIZE, /* OCL */
+    gceRK_PATCH_READ_IMAGE, /* OCL */
+    gceRK_PATCH_WRITE_IMAGE, /* OCL */
     gceRK_PATCH_Y_FLIPPED_TEXTURE,
     gceRK_PATCH_REMOVE_ASSIGNMENT_FOR_ALPHA,
     gceRK_PATCH_Y_FLIPPED_SHADER,
     gceRK_PATCH_SAMPLE_MASK,
     gceRK_PATCH_SIGNEXTENT,
     gceRK_PATCH_TCS_INPUT_COUNT_MISMATCH,
-    gceRK_PATCH_CL_LONGULONG,
+    gceRK_PATCH_CL_LONGULONG, /* OCL */
     gceRK_PATCH_COLOR_KILL,
-    gceRK_PATCH_READ_IMAGE_UNNORM,
     gceRK_PATCH_ALPHA_BLEND,
 };
 
@@ -298,13 +307,13 @@ gcsPatchGlobalWorkSize;
 typedef struct _gcsPatchReadImage
 {
     gctUINT                 samplerNum;
+    gctUINT                 imageNum;
     gctUINT                 imageType;
     gctUINT                 imageDataIndex;
     gctUINT                 imageSizeIndex;
     gctUINT                 samplerValue;
     gctUINT                 channelDataType;
     gctUINT                 channelOrder;
-    gctBOOL                 useImageLoad;
 }
 gcsPatchReadImage;
 
@@ -316,7 +325,6 @@ typedef struct _gcsPatchWriteImage
     gctUINT                 channelDataType;
     gctUINT                 channelOrder;
     gctUINT                 imageType;
-    gctBOOL                 imageStore;
 }
 gcsPatchWriteImage;
 
@@ -452,45 +460,109 @@ gcGL_DRIVER_VERSION;
 typedef struct _gcsHINT *               gcsHINT_PTR;
 typedef struct _gcSHADER_PROFILER *     gcSHADER_PROFILER;
 
+typedef struct _gcsPROGRAM_VidMemPatchOffset
+{
+    gctUINT32 instVidMemInStateBuffer[gcMAX_SHADERS_IN_LINK_GOURP];
+    gctUINT32 gprSpillVidMemInStateBuffer[gcMAX_SHADERS_IN_LINK_GOURP];
+    gctUINT32 crSpillVidMemInStateBuffer[gcMAX_SHADERS_IN_LINK_GOURP];
+    gctUINT32 sharedMemVidMemInStateBuffer;
+
+    gctUINT32 instVidMemInStateDelta[gcMAX_SHADERS_IN_LINK_GOURP];
+    gctUINT32 gprSpillVidMemInStateDelta[gcMAX_SHADERS_IN_LINK_GOURP];
+    gctUINT32 crSpillVidMemInStateDelta[gcMAX_SHADERS_IN_LINK_GOURP];
+    gctUINT32 sharedMemVidMemInStateDelta;
+}
+gcsPROGRAM_VidMemPatchOffset;
+
+
+#define     VSC_STATE_DELTA_END                     0xfeeffeef
+#define     VSC_STATE_DELTA_DESC_SIZE_IN_UINT32     3
+/*
+** stateDelta format is as below in uint32 unit.
+**    offset 0: start state address
+**    offset 1: count of states (n)
+**    offset 2 ~ n + 2: n value of states.
+**    offset n + 3: end tag(VSC_STATE_DELTA_END) for sanity check.
+**    offset n + 4: start state address for next batch
+**    ******
+**    ******
+**    offset of last: end tag(VSC_STATE_DELTA_END)
+*/
+
 typedef struct _gcsPROGRAM_STATE
 {
     /* Shader program state buffer. */
     gctUINT32                stateBufferSize;
     gctPOINTER               stateBuffer;
     gcsHINT_PTR              hints;
+    gcsPROGRAM_VidMemPatchOffset patchOffsetsInDW;
+    gctUINT32                    stateDeltaSize;
+    gctUINT32                    *stateDelta;
 }
 gcsPROGRAM_STATE, *gcsPROGRAM_STATE_PTR;
 
+
+typedef enum _gceUNIFOEM_ALLOC_MODE
+{
+    /* Non unified allocation, all fixed. */
+    gcvUNIFORM_ALLOC_NONE_UNIFIED                               = 0,
+
+    /* Allocated unified but with float base address offset, pack all stages one by one. */
+    gcvUNIFORM_ALLOC_PACK_FLOAT_BASE_OFFSET                     = 1,
+
+    /* Allocated unified but with float base address offset, pack Gpipe one by one and put them in the top, and put PS in the bottom. */
+    gcvUNIFORM_ALLOC_GPIPE_TOP_PS_BOTTOM_FLOAT_BASE_OFFSET      = 2,
+
+    /* Allocated unified but with float base address offset, pack Gpipe one by one and put them in the bottom, and put PS in the top. */
+    gcvUNIFORM_ALLOC_PS_TOP_GPIPE_BOTTOM_FLOAT_BASE_OFFSET      = 3,
+
+    /* Allocated in full scope of unified register file, all stages use the same register for one uniform. */
+    gcvUNIFORM_ALLOC_FULL_UNIFIED                               = 4,
+}gceUNIFOEM_ALLOC_MODE;
+
 typedef struct _gcsPROGRAM_UNIFIED_STATUS
 {
-    gctBOOL     useIcache;          /* Icache enabled or not */
+    gctBOOL                 useIcache;          /* Icache enabled or not */
 
-    gctBOOL     instruction; /* unified instruction enabled or not */
-    gctBOOL     constant;    /* unified const enabled or not */
-    gctBOOL     sampler;     /* unified sampler enabled or not */
+    gctBOOL                 instruction; /* unified instruction enabled or not */
+    gceUNIFOEM_ALLOC_MODE   constantUnifiedMode;
+    gceUNIFOEM_ALLOC_MODE   samplerUnifiedMode;
 
-    gctINT      instVSEnd;       /* VS instr end for unified instruction */
-    gctINT      instPSStart;     /* PS instr start for unified instruction */
-    gctINT      constGPipeEnd;   /* GPipe const end for unified constant */
-    gctINT      constPSStart;    /* PS const start for unified constant */
-    gctINT      samplerGPipeStart; /* GPipe sampler start for unified sampler */
-    gctINT      samplerPSEnd;  /* PS sampler end for unified sampler */
+    gctINT                  instVSEnd;       /* VS instr end for unified instruction */
+    gctINT                  instPSStart;     /* PS instr start for unified instruction */
+    /* Valid if UnifiedMode is gcvUNIFORM_ALLOC_FLOAT_BASE_OFFSET and unifiedUniform is disabled. */
+    gctINT                  constGPipeEnd;   /* GPipe const end for unified constant */
+    gctINT                  constPSStart;    /* PS const start for unified constant */
+    gctINT                  samplerGPipeStart; /* GPipe sampler start for unified sampler */
+    gctINT                  samplerPSEnd;  /* PS sampler end for unified sampler */
+    /* Valid if chip can support unified uniform. */
+    gctINT                  constCount;      /* The constant reg count for all shader stages. */
+    gctINT                  samplerCount;    /* The sampler reg count for all shader stages. */
 }
 gcsPROGRAM_UNIFIED_STATUS;
+
+#define PROGRAM_UNIFIED_STATUS_Initialize(UnifiedStatus, TotalSamplerCount)     \
+    do {                                                                        \
+        (UnifiedStatus)->useIcache            = gcvFALSE;                       \
+        (UnifiedStatus)->instruction          = gcvFALSE;                       \
+        (UnifiedStatus)->constantUnifiedMode  = gcvUNIFORM_ALLOC_NONE_UNIFIED;  \
+        (UnifiedStatus)->samplerUnifiedMode   = gcvUNIFORM_ALLOC_NONE_UNIFIED;  \
+        (UnifiedStatus)->instVSEnd            = -1;                             \
+        (UnifiedStatus)->instPSStart          = -1;                             \
+        (UnifiedStatus)->constGPipeEnd        = -1;                             \
+        (UnifiedStatus)->constPSStart         = -1;                             \
+        (UnifiedStatus)->samplerGPipeStart    = (TotalSamplerCount);            \
+        (UnifiedStatus)->samplerPSEnd         = 0;                              \
+        (UnifiedStatus)->constCount           = -1;                             \
+        (UnifiedStatus)->samplerCount         = -1;                             \
+    } while(0)
 
 typedef struct _gcSHADER_VID_NODES
 {
     gctPOINTER  instVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* SURF Node for instruction buffer for I-Cache. */
-    gctBOOL     flushInstVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* If driver need to flush them. */
-
     gctPOINTER  gprSpillVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* SURF Node for gpr spill memory. */
-    gctBOOL     flushGprSpillVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* If driver need to flush them. */
-
     gctPOINTER  crSpillVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* SURF Node for cr spill memory. */
-    gctBOOL     flushCrSpillVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* If driver need to flush them. */
-
     gctPOINTER  sharedMemVidMemNode;
-    gctBOOL     flushSharedMemVidMemNode;
 }gcSHADER_VID_NODES;
 
 typedef enum _gceMEMORY_ACCESS_FLAG
@@ -509,8 +581,22 @@ typedef enum _gceMEMORY_ACCESS_FLAG
                                       gceMA_FLAG_IMG_WRITE  |
                                       gceMA_FLAG_ATOMIC,
     gceMA_FLAG_BARRIER              = 0x0020,
+    gceMA_FLAG_EVIS_ATOMADD         = 0x0040, /* evis atomadd can operate on 16B data in parallel,
+                                                * we need to tell driver to turn off workgroup packing
+                                                * if it is used so the HW will not merge different
+                                                * workgroup into one which can cause the different
+                                                * address be used for the evis_atom_add */
+/* must sync with SHADER_EDH_MEM_ACCESS_HINT and VIR_MemoryAccessFlag!!! */
 }
 gceMEMORY_ACCESS_FLAG;
+
+typedef enum _gceSHADER_LEVEL
+{
+    gcvSHADER_HIGH_LEVEL            = 0,
+    gcvSHADER_MACHINE_LEVEL         = 1,
+    gcvSHADER_LEVEL_COUNT           = 2,
+}
+gceSHADER_LEVEL;
 
 typedef struct _gcWORK_GROUP_SIZE
 {
@@ -534,14 +620,11 @@ struct _gcsHINT
 
     gctUINT32   balanceMin;         /* Balance minimum. */
     gctUINT32   balanceMax;         /* Balance maximum. */
-    gctBOOL     autoShift;          /* Auto-shift balancing. */
 
-    gceMEMORY_ACCESS_FLAG memoryAccessFlags[gcvPROGRAM_STAGE_LAST]; /* Memory access flag. */
+    gceMEMORY_ACCESS_FLAG memoryAccessFlags[gcvSHADER_LEVEL_COUNT][gcvPROGRAM_STAGE_LAST]; /* Memory access flag. */
 
     gcsPROGRAM_UNIFIED_STATUS unifiedStatus;
 
-    gctBOOL     removeAlphaAssignment; /* Flag whether this program can remove
-                                          alpha assignment*/
 #if TEMP_SHADER_PATCH
     gctUINT32   pachedShaderIdentifier;
 #endif
@@ -555,14 +638,6 @@ struct _gcsHINT
     gctUINT32   vsMaxTemp;          /* Maximum number of temporary registers used in VS. */
     gctUINT32   vsLTCUsedUniformStartAddress; /* the start physical address for
                                                  uniforms only used in LTC expression */
-    gctBOOL     vsHasPointSize;     /* Flag whether VS has point size or not */
-    gctBOOL     vsPtSizeAtLastLinkLoc;/* Flag point size will be put at the last link loc for VS */
-#if gcdUSE_WCLIP_PATCH
-    gctBOOL     vsPositionZDependsOnW; /* Flag whether the VS gl_position.z
-                                          depends on gl_position.w it's a hint
-                                          for wclipping */
-#endif
-    gctBOOL     vsUseStoreAttr;
 
     /* fields for Fragment shader */
     gctUINT     fragmentShaderId;   /*fragment shader id, to help identifying
@@ -576,15 +651,6 @@ struct _gcsHINT
     gctUINT     psInputControlHighpPosition;
     gctUINT     psHighPVaryingCount;
     gctINT32    psOutput2RtIndex[gcdMAX_DRAW_BUFFERS];
-    gctBOOL     psHasFragDepthOut;  /* Flag whether the PS outputs the depth value or not. */
-    gctBOOL     hasKill;            /* Flag whether or not the shader has
-                                       a KILL instruction. */
-    gctBOOL     psHasDiscard;       /* Flag whether the PS code has discard. */
-
-    gctBOOL     threadWalkerInPS;   /* Flag whether the ThreadWalker is in PS. */
-    gctBOOL     fsIsDual16;
-
-    gctUINT     interpolationType[128];
 
 #if gcdALPHA_KILL_IN_SHADER
     /* States to set when alpha kill is enabled. */
@@ -598,36 +664,62 @@ struct _gcsHINT
     gctUINT32   colorKillInstruction[3];
 #endif
 
+    /* gctBOOL isdefined as signed int, 1 bit will have problem if the value
+     * is not used to test zero or not, use 2 bits to avoid the potential error
+     */
+    gctBOOL     removeAlphaAssignment : 2; /* Flag whether this program can remove
+                                              alpha assignment*/
+    gctBOOL     autoShift             : 2; /* Auto-shift balancing. */
+    gctBOOL     vsHasPointSize        : 2; /* Flag whether VS has point size or not */
+    gctBOOL     vsPtSizeAtLastLinkLoc : 2; /* Flag point size will be put at the last link loc for VS */
+    gctBOOL     vsUseStoreAttr        : 2;
+    gctBOOL     psHasFragDepthOut     : 2; /* Flag whether the PS outputs the depth value or not. */
+    gctBOOL     hasKill               : 2; /* Flag whether or not the shader has a KILL instruction. */
+    gctBOOL     psHasDiscard          : 2; /* Flag whether the PS code has discard. */
+
+    gctBOOL     threadWalkerInPS      : 2; /* Flag whether the ThreadWalker is in PS. */
+    gctBOOL     fsIsDual16            : 2;
+    gctBOOL     useSamplePosition     : 2;
+    gctBOOL     useFrontFacing        : 2;
+    gctBOOL     useDSX                : 2;
+    gctBOOL     useDSY                : 2;
+    gctBOOL     yInvertAware          : 2;
+    gctBOOL     hasCentroidInput      : 2; /* flag if PS uses any inputs defined as centroid. */
+    gctBOOL     disableEarlyZ         : 2; /* Disable EarlyZ for this program. */
+    gctBOOL     threadGroupSync       : 2;
+    gctBOOL     usedSampleIdOrSamplePosition : 2; /* For sample shading. */
+    gctBOOL     sampleMaskOutWritten  : 2;
+    gctBOOL     psUsedSampleInput     : 2;
+    gctBOOL     prePaShaderHasPointSize : 2;  /* Flag whether pre-PA has point size or not */
+    gctBOOL     isPtSizeStreamedOut   : 2; /* Flag point size will be streamed out */
+    gctBOOL     hasAttrStreamOuted    : 2; /* Flag any attribute that will be streamed out */
+    gctBOOL     prePaShaderHasPrimitiveId : 2;
+    gctBOOL     sharedMemAllocByCompiler : 2; /* Flag whether share memory is allocated by compiler */
+    /* If any reged CTCs are used in the shader. */
+#if gcdUSE_WCLIP_PATCH
+    gctBOOL     vsPositionZDependsOnW  : 2; /* Flag whether the VS gl_position.z
+                                               depends on gl_position.w it's a hint
+                                               for wclipping */
+    gctBOOL     strictWClipMatch      : 2; /* Strict WClip match. */
+    gctBOOL     WChannelEqualToZ      : 2;
+#endif
     /* flag if the shader uses gl_FragCoord, gl_FrontFacing, gl_PointCoord */
-    gctBOOL     useFragCoord[4];
-    gctBOOL     useSamplePosition;
-    gctBOOL     useFrontFacing;
-    gctBOOL     usePointCoord[4];
-    gctBOOL     useDSX;
-    gctBOOL     useDSY;
-    gctBOOL     useRtImage[4];
-    gctBOOL     yInvertAware;
+    gctCHAR     useFragCoord[4];
+    gctCHAR     usePointCoord[4];
+    gctCHAR     useRtImage[4];
+    gctCHAR     useRegedCTC[gcMAX_SHADERS_IN_LINK_GOURP];
+    gctCHAR     interpolationType[128];
 
-    /* flag if PS uses any inputs defined as centroid. */
-    gctBOOL     hasCentroidInput;
-
-    /* flag if PS uses early fragment tests. */
-    gctBOOL     useEarlyFragmentTest;
+    gctBOOL     useEarlyFragmentTest;    /* flag if PS uses early fragment tests. */
+    gctINT      sampleMaskLoc; /* -1 means loc can be determined by driver */
 
     /* They're component index after packing */
     gctINT      pointCoordComponent;
     gctINT      rtArrayComponent;
     gctINT      primIdComponent;
 
-    /* Disable EarlyZ for this program. */
-    gctBOOL     disableEarlyZ;
-
 #if gcdUSE_WCLIP_PATCH
-    /* Strict WClip match. */
-    gctBOOL     strictWClipMatch;
     gctINT      MVPCount;
-
-    gctBOOL     WChannelEqualToZ;
 #endif
     /* fields for Tessellation control shader */
     gctUINT     tcsShaderId;        /* Tessellation control shader id, to help
@@ -655,53 +747,44 @@ struct _gcsHINT
 
     /* For CL and CS, global/group/local id order. */
     gctUINT32   valueOrder;
-    gctBOOL     threadGroupSync;
 
     /* Deferred-program when flushing as they are in VS output ctrl reg */
     gctINT      vsOutput16RegNo;
     gctINT      vsOutput17RegNo;
     gctINT      vsOutput18RegNo;
-    gctUINT32   hwConstRegBases[gcvPROGRAM_STAGE_LAST];
-    /* For sample shading. */
-    gctINT      sampleMaskLoc; /* -1 means loc can be determined by driver */
-    gctBOOL     usedSampleIdOrSamplePosition;
-    gctBOOL     sampleMaskOutWritten;
-    gctBOOL     psUsedSampleInput;
 
-    /* Pre-PA hints */
-    gctBOOL     prePaShaderHasPointSize;  /* Flag whether pre-PA has point size or not */
-    gctBOOL     isPtSizeStreamedOut;/* Flag point size will be streamed out */
-    gctBOOL     hasAttrStreamOuted; /* Flag any attribute that will be streamed out */
     gctINT32    shader2PaOutputCount; /* Output count from pre-pa shader (excluding pure TFX count) */
     gctUINT     ptSzAttrIndex;
-    gctBOOL     prePaShaderHasPrimitiveId;
-
     /* Sampler Base offset. */
     gctUINT32   samplerBaseOffset[gcvPROGRAM_STAGE_LAST];
 
     /* const regNo base */
+    gctUINT32   hwConstRegBases[gcvPROGRAM_STAGE_LAST];
     gctUINT32   constRegNoBase[gcvPROGRAM_STAGE_LAST];
 
     gctINT      psOutCntl0to3;
     gctINT      psOutCntl4to7;
+    gctINT      psOutCntl8to11;
+    gctINT      psOutCntl12to15;
 
     gcWORK_GROUP_SIZE workGrpSize;
 
     /* per-vertex attributeCount. */
     gctUINT     tcsPerVertexAttributeCount;
 
-    gctUINT     vsInputState;
-
-    /* Local/share memory size. */
-    gctUINT     localMemSizeInByte;
+    gctUINT     extraUscPages;
 
     /* Concurrent workThreadCount. */
     gctUINT16   workThreadCount;
 
+    /* Local/share memory size. */
+    gctUINT     localMemSizeInByte;
+
     /* Concurrent workGroupCount. */
     gctUINT16   workGroupCount;
 
-    gcSHADER_VID_NODES shaderVidNodes; /* SURF Node for memory that is used in shader. */
+    /* SURF Node for memory that is used in shader. */
+    gcSHADER_VID_NODES shaderVidNodes;
 };
 
 #define gcsHINT_isCLShader(Hint)            ((Hint)->clShader)
@@ -719,7 +802,9 @@ typedef enum _gcSHADER_TYPE_KIND
     gceTK_BOOL,
     gceTK_FIXED,
     gceTK_IMAGE,
+    gceTK_IMAGE_T,
     gceTK_SAMPLER,
+    gceTK_SAMPLER_T,
     gceTK_ATOMIC, /* Atomic Counter */
     gceTK_INT64,
     gceTK_UINT64,
@@ -846,7 +931,7 @@ typedef enum _gceSHADER_FLAGS
     gcvSHADER_USE_ALPHA_KILL            = 0x100,
 #endif
 
-    gcvSHADER_I_AM_FREE_FOR_USE         = 0x200,
+    gcvSHADER_ENABLE_MULTI_GPU          = 0x200,
 
     gcvSHADER_TEXLD_W                   = 0x400,
 
@@ -904,6 +989,9 @@ typedef enum _gceSHADER_FLAGS
     gcvSHADER_VIRCG_ONE                 = 0x20000000,
 
     gcvSHADER_MIN_COMP_TIME             = 0x40000000,
+
+    /* Link program pipeline object. */
+    gcvSHADER_LINK_PROGRAM_PIPELINE_OBJ = 0x80000000,
 }
 gceSHADER_FLAGS;
 
@@ -1107,9 +1195,10 @@ struct _InlineStringList
 
 typedef enum _VIRCGKind
 {
-    VIRCG_None,
-    VIRCG_WITH_TREECG, /* go through VIR pass, but use gcSL LinkerTree to generate MC */
-    VIRCG_FULL          /* go through VIR pass and use VIR Full linker to generate MC */
+    VIRCG_None          = 0,
+    VIRCG_DEFAULT       = 1,
+    VIRCG_WITH_TREECG   = 1, /* go through VIR pass, but use gcSL LinkerTree to generate MC */
+    VIRCG_FULL          = 2, /* go through VIR pass and use VIR Full linker to generate MC */
 }VIRCGKind;
 
 typedef struct _gcOPTIMIZER_OPTION
@@ -1118,7 +1207,7 @@ typedef struct _gcOPTIMIZER_OPTION
 
     /* debug & dump options:
 
-         VC_OPTION=-DUMP:SRC|:IR|:OPT|:OPTV|:CG|:CGV|:ALL|:ALLV|:UNIFORM|:T[-]m,n
+         VC_OPTION=-DUMP:SRC|:IR|:OPT|:OPTV|:CG|:CGV|:HTP|:ALL|:ALLV|:UNIFORM|:T[-]m,n|RENUM:[0|1]
 
          SRC:  dump shader source code
          IR:   dump final IR
@@ -1126,16 +1215,17 @@ typedef struct _gcOPTIMIZER_OPTION
          OPTV: dump result IR in each optimization phase
          CG:   dump generated machine code
          CGV:  dump BE tree and optimization detail
+         HTP:  dump hash table performance
          LOG:  dump FE log file in case of compiler error
          Tm:   turn on dump for shader id m
          Tm,n: turn on dump for shader id is in range of [m, n]
          T-m:  turn off dump for shader id m
          T-m,n: turn off dump for shader id is in range of [m, n]
-
          ALL = SRC|OPT|CG|LOG
          ALLV = SRC|OPT|OPTV|CG|CGV|LOG
 
          UNIFORM: dump uniform value when setting uniform
+         RENUM:[0|1]: re-number instruction id when dumping IR
      */
     gctBOOL     dumpShaderSource;      /* dump shader source code */
     gctBOOL     dumpOptimizer;         /* dump incoming and final IR */
@@ -1147,8 +1237,12 @@ typedef struct _gcOPTIMIZER_OPTION
     gctBOOL     dumpUniform;           /* dump uniform value when setting uniform */
     gctBOOL     dumpSpirvIR;           /* dump VIR shader convert from SPIRV */
     gctBOOL     dumpSpirvToFile;       /* dump SPRIV to file */
+    gctBOOL     dumpBinToFile;         /* dump program binary to file when calling gcLoadProgram */
+    gctBOOL     dumpHashPerf;          /* dump hash table performance */
     gctINT      _dumpStart;            /* shader id start to dump */
     gctINT      _dumpEnd;              /* shader id end to dump */
+    gctINT      renumberInst;          /* re-number instruction when dumping IR */
+    gctINT      includeLib;            /* dump library shader too (library shader won't be dumped by default) */
 
     /* Code generation */
 
@@ -1193,6 +1287,14 @@ typedef struct _gcOPTIMIZER_OPTION
 
     /* Power reduction mode options */
     gctBOOL   needPowerOptimization;
+
+     /* If need to dump hash table performance, set hash table max search times,
+        and if the fact search times is more than the max times, also add the number of max search times up,
+        if not to set this option, the max search times is 0, that means can not to statistic search times
+
+              VC_OPTION=-HMST:value
+    */
+    gctINT      hashMaxSearchTimes;
 
     /* Patch TEXLD instruction by adding dummy texld
        (can be used to tune GPU power usage):
@@ -1309,6 +1411,16 @@ typedef struct _gcOPTIMIZER_OPTION
      */
     gctUINT     inlineFormatConversion;
 
+    /* this is a test only option
+
+       VC_OPTION=-TESSLEVEL:x
+       default: GC_DEFAULT_TESS_LEVEL
+
+       set the gl_TessLevelOuter and gl_TessLevelInner to be this value
+       when it is not GC_DEFAULT_TESS_LEVEL
+    */
+    gctUINT     testTessLevel;
+
     /* dual 16 mode
      *
      *    VC_OPTION=-DUAL16:[0-3]
@@ -1380,7 +1492,7 @@ typedef struct _gcOPTIMIZER_OPTION
      */
     VIRCGKind   useVIRCodeGen;
     /* useVIRCodeGen maybe changed for specific test, we need to save the orignal option */
-    gctBOOL     origUseVIRCodeGen;
+    VIRCGKind   origUseVIRCodeGen;
 
     gctBOOL     virCodeGenSpecified;
     gctINT      _vircgStart;
@@ -1430,6 +1542,13 @@ typedef struct _gcOPTIMIZER_OPTION
      *
      */
     gctBOOL     oclInt64InVir;
+
+    /*  OCL uniforms for constant address space variables
+     *
+     *   VC_OPTION=-OCLUNIFORMFORCONSTANT:0|1
+     *
+     */
+    gctBOOL     oclUniformForConstant;
 
     /*  USE gcSL_NEG for -a instead of SUB(0, a)
      *
@@ -1488,12 +1607,26 @@ typedef struct _gcOPTIMIZER_OPTION
      */
     gctBOOL     CLUseVIRCodeGen;
 
-    /* Enable write/read Shader info to/from file:
+    /* Enable register pack in old compiler:
 
-        VC_OPTION=-LIBSHADERFILE:0|1
+        VC_OPTION=-PACKREG:0|1
 
     */
-    gctBOOL     enableLibShaderFile;
+    gctBOOL     enablePackRegister;
+
+    /* Operate shader files :
+     *
+     * VC_OPTION=-LIBSHADERFILE:0|1|2
+     *  0:  Unable to operate shader files
+     *  1:  Enable write/read Shader info to/from file
+     *  2:  Force rewrite shader info to file
+     */
+    gctINT     libShaderFile;
+
+    /* whether driver use new VIR path for driver programming
+     * passed in by driver
+     */
+    gctBOOL     DriverVIRPath;
 
     /* NOTE: when you add a new option, you MUST initialize it with default
        value in theOptimizerOption too */
@@ -1572,6 +1705,8 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_DualFP16Start()      (gcmGetOptimizerOption()->_dual16Start)
 #define gcmOPT_DualFP16End()        (gcmGetOptimizerOption()->_dual16End)
 
+#define gcmOPT_TESSLEVEL()          (gcmGetOptimizerOption()->testTessLevel)
+
 #define gcmOPT_DualFP16PrecisionRule()          (gcmGetOptimizerOption()->dual16PrecisionRule)
 #define gcmOPT_DualFP16PrecisionRuleFromEnv()   (gcmGetOptimizerOption()->dual16PrecisionRuleFromEnv)
 
@@ -1583,6 +1718,7 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_oclOpenCV()          (gcmGetOptimizerOption()->oclOpenCV)
 #define gcmOPT_oclHasLong()         (gcmGetOptimizerOption()->oclHasLong)
 #define gcmOPT_oclInt64InVIR()      (gcmGetOptimizerOption()->oclInt64InVir)
+#define gcmOPT_oclUniformForConstant()   (gcmGetOptimizerOption()->oclUniformForConstant)
 #define gcmOPT_oclUseNeg()          (gcmGetOptimizerOption()->oclUseNeg)
 #define gcmOPT_oclUseImgIntrinsicQuery()   (gcmGetOptimizerOption()->oclUseImgIntrinsicQuery)
 #define gcmOPT_oclPassKernelStructArgByValue()   (gcmGetOptimizerOption()->oclPassKernelStructArgByValue)
@@ -1591,11 +1727,13 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_VIRCGStart()         (gcmGetOptimizerOption()->_vircgStart)
 #define gcmOPT_VIRCGEnd()           (gcmGetOptimizerOption()->_vircgEnd)
 #define gcmOPT_CLUseVIRCodeGen()    (gcmGetOptimizerOption()->CLUseVIRCodeGen)
+#define gcmOPT_DriverVIRPath()      (gcmGetOptimizerOption()->DriverVIRPath)
 #define gcmOPT_CreateDefaultUBO()   (gcmGetOptimizerOption()->createDefaultUBO)
 #define gcmOPT_PatchShader()        (gcmGetOptimizerOption()->patchShader)
 #define gcmOPT_PatchShaderStart()   (gcmGetOptimizerOption()->_patchShaderStart)
 #define gcmOPT_PatchShaderEnd()     (gcmGetOptimizerOption()->_patchShaderEnd)
-#define gcmOPT_LibShaderFile()       (gcmGetOptimizerOption()->enableLibShaderFile)
+#define gcmOPT_PackRegister()       (gcmGetOptimizerOption()->enablePackRegister)
+#define gcmOPT_LibShaderFile()       (gcmGetOptimizerOption()->libShaderFile)
 
 #define gcmOPT_SetOclPackedBasicType(val) do { (gcmGetOptimizerOption()->oclPackedBasicType = (val)); } while(0)
 
@@ -1608,26 +1746,30 @@ extern gctBOOL gcSHADER_DumpOptimizer(gcSHADER Shader);
 extern gctBOOL gcSHADER_DumpOptimizerVerbose(gcSHADER Shader);
 extern gctBOOL gcSHADER_DumpCodeGen(void * Shader);
 extern gctBOOL gcSHADER_DumpCodeGenVerbose(void * Shader);
-extern gctBOOL VirSHADER_DumpCodeGenVerbose(gctINT ShaderId);
+extern gctBOOL VirSHADER_DumpCodeGenVerbose(void * Shader);
 extern gctBOOL gcSHADER_DumpFinalIR(gcSHADER Shader);
 extern gctBOOL VirSHADER_DoDual16(gctINT ShaderId);
+extern gctBOOL gcDoTriageForShaderId(gctINT shaderId, gctINT startId, gctINT endId);
 
 /* Setters */
 /* feature bits */
-#define FB_LIVERANGE_FIX1         0x0001
-#define FB_INLINE_RENAMETEMP      0x0002
-#define FB_UNLIMITED_INSTRUCTION  0x0004
-#define FB_DISABLE_PATCH_CODE     0x0008
-#define FB_DISABLE_MERGE_CONST    0x0010
-#define FB_DISABLE_OLD_DCE        0x0020
-#define FB_INSERT_MOV_INPUT       0x0040  /* insert MOV Rn, Rn for input to help HW team to debug */
-#define FB_ENABLE_FS_OUT_INIT     0x0080  /* enable Fragment shader output
-                                             initialization if it is un-initialized */
-#define FB_ENABLE_CONST_BORDER    0x0100  /* enable const border value, driver need to set $ConstBorderValue uniform */
-#define FB_FORCE_LS_ACCESS        0x8000  /* triage use: enforce all load/store as local storage access,
-                                             remove this feature bit once local storage access is supported */
+#define FB_LIVERANGE_FIX1                   0x0001
+#define FB_INLINE_RENAMETEMP                0x0002
+#define FB_UNLIMITED_INSTRUCTION            0x0004
+#define FB_DISABLE_PATCH_CODE               0x0008
+#define FB_DISABLE_MERGE_CONST              0x0010
+#define FB_DISABLE_OLD_DCE                  0x0020
+#define FB_INSERT_MOV_INPUT                 0x0040  /* insert MOV Rn, Rn for input to help HW team to debug */
+#define FB_ENABLE_FS_OUT_INIT               0x0080  /* enable Fragment shader output
+                                                       initialization if it is un-initialized */
+#define FB_ENABLE_CONST_BORDER              0x0100  /* enable const border value, driver need to set $ConstBorderValue uniform */
+#define FB_FORCE_LS_ACCESS                  0x8000  /* triage use: enforce all load/store as local storage access,
+                                                       remove this feature bit once local storage access is supported */
+#define FB_FORCE_USC_UNALLOC                0x10000 /* triage use: enforce all load/store as USC Unalloc  */
 
-#define FB_DISABLE_GL_LOOP_UNROLLING    0x10000 /* Disable loop unrolling for GL FE. */
+#define FB_TREAT_CONST_ARRAY_AS_UNIFORM     0x20000 /* Treat a const array as a uniform,
+                                                       it can decrease the temp registers but increases the constant registers. */
+#define FB_DISABLE_GL_LOOP_UNROLLING        0x40000 /* Disable loop unrolling for GL FE. */
 
 #define gcmOPT_SetPatchTexld(m,n) (gcmGetOptimizerOption()->patchEveryTEXLDs = (m),\
                                    gcmGetOptimizerOption()->patchDummyTEXLDs = (n))
@@ -1811,6 +1953,19 @@ typedef struct _gcsGLSLCaps
     gcePROVOKING_VERTEX_CONVENSION provokingVertex;
     gctUINT maxGsInvocationCount;
 
+    /* Desktop GL limits */
+    gctUINT maxClipDistances;
+    gctUINT maxClipPlanes;
+    gctUINT maxFragmentUniformComponents;
+    gctUINT maxTextureCoords;
+    gctUINT maxTextureUnits;
+    gctUINT maxVaryingComponents;
+    gctUINT maxVaryingFloats;
+    gctUINT maxVertexUniformComponents;
+    gctUINT maxFragmentInputComponents;
+    gctUINT maxVertexOutputComponents;
+    gctUINT maxGSVaryingComponents;
+
     /* GLSL extension string. */
     gctSTRING extensions;
 } gcsGLSLCaps;
@@ -1955,6 +2110,19 @@ extern gceSTATUS gcInitGLSLCaps(
 #define GetGLMaxGSUniformBufferBindings()     (gcGetGLSLCaps()->maxGsUniformBlocks)
 #define GetGLMaxGSShaderStorageBufferBindings()     (gcGetGLSLCaps()->maxGsShaderStorageBlocks)
 
+/* Desktop GL constants */
+#define GetGLMaxClipDistances()               (gcGetGLSLCaps()->maxClipDistances)
+#define GetGLMaxClipPlanes()                  (gcGetGLSLCaps()->maxClipPlanes)
+#define GetGLMaxFragmentUniformComponents()   (gcGetGLSLCaps()->maxFragmentUniformComponents)
+#define GetGLMaxTextureCoords()               (gcGetGLSLCaps()->maxTextureCoords)
+#define GetGLMaxTextureUnits()                (gcGetGLSLCaps()->maxTextureUnits)
+#define GetGLMaxVaryingComponents()           (gcGetGLSLCaps()->maxVaryingComponents)
+#define GetGLMaxVaryingFloats()               (gcGetGLSLCaps()->maxVaryingFloats)
+#define GetGLMaxVertexUniformComponents()     (gcGetGLSLCaps()->maxVertexUniformComponents)
+#define GetGLMaxFragmentInputComponents()     (gcGetGLSLCaps()->maxFragmentInputComponents)
+#define GetGLMaxVertexOutputComponents()      (gcGetGLSLCaps()->maxVertexOutputComponents)
+#define GetGLMaxGSVaryingComponents()         (gcGetGLSLCaps()->maxGSVaryingComponents)
+
 /* GLSL extension string. */
 #define GetGLExtensionString()                (gcGetGLSLCaps()->extensions)
 
@@ -2088,22 +2256,46 @@ gcSHADER_GetCompilerVersion(
     );
 
 gctBOOL
-gcShader_IsESCompiler(
+gcSHADER_IsESCompiler(
     IN gcSHADER Shader
     );
 
 gctBOOL
-gcShader_IsES11Compiler(
+gcSHADER_IsES11Compiler(
     IN gcSHADER Shader
     );
 
 gctBOOL
-gcShader_IsES30Compiler(
+gcSHADER_IsES30Compiler(
     IN gcSHADER Shader
     );
 
 gctBOOL
-gcShader_IsES31Compiler(
+gcSHADER_IsES31Compiler(
+    IN gcSHADER Shader
+    );
+
+gctBOOL
+gcSHADER_IsES32Compiler(
+    IN gcSHADER Shader
+    );
+
+gctBOOL
+gcSHADER_IsHaltiCompiler(
+    IN gcSHADER Shader
+    );
+
+/*******************************************************************************
+**  gcSHADER_IsOGLCompiler
+**
+**  Check if the shader is OGL shader.
+**  Note: should use this API instead of VIR_Shader_IsDesktopGL() to do this check,
+**        because detecting by clientApiVersion does not work in some cases.
+**
+*/
+
+gctBOOL
+gcSHADER_IsOGLCompiler(
     IN gcSHADER Shader
     );
 
@@ -2342,6 +2534,13 @@ gcSHADER_LoadKernel(
     IN gctSTRING KernelName
     );
 
+/*     Remove unused register.
+ */
+gceSTATUS
+gcSHADER_PackRegister(
+    IN gcSHADER Shader
+    );
+
 /*******************************************************************************
 **                                gcMergeKernel
 ********************************************************************************
@@ -2370,6 +2569,34 @@ gcSHADER_MergeKernel(
     IN gctINT         KernelCount,
     IN gcSHADER *     KernelArray,
     OUT gcSHADER *    MergedKernel
+    );
+
+/*******************************************************************************
+**                                gcMergeShader
+********************************************************************************
+**
+**    Merge a list of OpenGL shader binaries and form a single consistent shader
+**    binary
+**
+**    INPUT:
+**        gctINT ShaderCount
+**            number of gcSHADER object in the shader array
+**
+**        gcSHADER *ShaderArray
+**            Array of gcSHADER object holding information about the compiled
+**            openGL shader.
+**
+**    OUTPUT:
+**
+**        gcSHADER * MergedShader
+**            Pointer to a variable receiving the handle to the merged shader
+**
+*/
+gceSTATUS
+gcSHADER_MergeShader(
+    IN gctINT         ShaderCount,
+    IN gcSHADER *     ShaderArray,
+    OUT gcSHADER *    MergedShader
     );
 
 /*******************************************************************************
@@ -2494,6 +2721,11 @@ gcSHADER_SaveEx(
     IN gcSHADER Shader,
     IN gctPOINTER Buffer,
     IN OUT gctUINT32 * BufferSize
+    );
+
+gceSTATUS
+gcSHADER_LinkBuiltinLibs(
+    IN gcSHADER* Shaders
     );
 
 /*******************************************************************************
@@ -3079,6 +3311,28 @@ gcSHADER_GetKernelUniformCount(
     );
 
 /*******************************************************************************
+**                          gcSHADER_GetKernelOriginalUniformCount
+********************************************************************************
+**
+**    Get the number of kernel original uniforms for this shader.
+**
+**    INPUT:
+**
+**        gcSHADER Shader
+**            Pointer to a gcSHADER object.
+**
+**    OUTPUT:
+**
+**        gctUINT32 * Count
+**            Pointer to a variable receiving the number of original uniforms.
+*/
+gceSTATUS
+gcSHADER_GetKernelOriginalUniformCount(
+    IN gcSHADER Shader,
+    OUT gctUINT32 * Count
+    );
+
+/*******************************************************************************
 **  gcSHADER_GetUniformVectorCountByCategory
 **
 **  Get the number of vectors used by uniforms for this shader according to variable
@@ -3296,6 +3550,34 @@ gcSHADER_GetUniform(
     OUT gcUNIFORM * Uniform
     );
 
+/*******************************************************************************
+**                             gcSHADER_GetUniformByUniformIndex
+********************************************************************************
+**
+**    Get the gcUNIFORM object pointer for an indexed uniform itseft.
+**    For a OCL shader, if it has loaded a specified a uniform,
+**    the index in gcUNIFORM is not the same as the index in gcSHADER->uniforms,
+**    so we can't get the uniform by using gcSHADER->uniforms[index].
+**
+**    INPUT:
+**
+**        gcSHADER Shader
+**            Pointer to a gcSHADER object.
+**
+**        gctUINT16 Index
+**            Index of the uniform to retrieve.
+**
+**    OUTPUT:
+**
+**        gcUNIFORM * Uniform
+**            Pointer to a variable receiving the gcUNIFORM object pointer.
+*/
+gceSTATUS
+gcSHADER_GetUniformByUniformIndex(
+    IN gcSHADER Shader,
+    IN gctUINT16 Index,
+    OUT gcUNIFORM * Uniform
+    );
 
 gceSTATUS
 gcSHADER_GetUniformByName(
@@ -4025,26 +4307,6 @@ gcSHADER_AddOutputWithLocation(
 
 gctINT
 gcSHADER_GetOutputDefaultLocation(
-    IN gcSHADER Shader
-    );
-
-gctBOOL
-gcSHADER_IsESCompiler(
-    IN gcSHADER Shader
-    );
-
-gctBOOL
-gcSHADER_IsHaltiCompiler(
-    IN gcSHADER Shader
-    );
-
-gctBOOL
-gcSHADER_IsES31Compiler(
-    IN gcSHADER Shader
-    );
-
-gctBOOL
-gcSHADER_IsES32Compiler(
     IN gcSHADER Shader
     );
 
@@ -5932,6 +6194,13 @@ gcSHADER_SetConstantMemorySize(
     IN gctCHAR * ConstantMemoryBuffer
     );
 
+gceSTATUS
+gcSHADER_AddConstantMemorySize(
+    IN gcSHADER Shader,
+    IN gctUINT32 ConstantMemorySize,
+    IN gctCHAR * ConstantMemoryBuffer
+    );
+
 /*******************************************************************************
 **  gcSHADER_GetConstantMemorySize
 **
@@ -7121,6 +7390,19 @@ gcCompileShader(
     OUT gctSTRING * Log
     );
 
+
+/*******************************************************************************
+**                              gcSetClientApiVersion
+********************************************************************************
+**
+**    Set Client API version
+**
+*/
+gceSTATUS
+gcSetClientApiVersion(
+    IN gceAPI ApiVersion
+    );
+
 /*******************************************************************************
 **                              gcLoadKernelCompiler
 ********************************************************************************
@@ -7201,6 +7483,8 @@ gcLinkShaders(
     IN OUT gcsPROGRAM_STATE *ProgramState
     );
 
+
+
 /*******************************************************************************************
 **  Initialize libfile
 */
@@ -7213,6 +7497,8 @@ gcInitializeLibFile(void);
 */
 gceSTATUS
 gcFinalizeLibFile(void);
+
+
 
 /*******************************************************************************
 **                                gcSHADER_WriteShaderToFile
@@ -7250,6 +7536,8 @@ gcSHADER_WriteShaderToFile(
 **    OUTPUT:
 **        gcSHADER    Binary,
 **            Pointer to a gcSHADER object holding information about the shader
+**
+
 **
 */
 gceSTATUS
@@ -7469,8 +7757,6 @@ gcCreateReadImageDirective(
     IN gctUINT                  ChannelDataType,
     IN gctUINT                  ChannelOrder,
     IN gctUINT                  ImageType,
-    IN gctBOOL                  PatchUnnormReadImage,
-    IN gctBOOL                  imageLoad,
     OUT gcPatchDirective  **    PatchDirectivePtr
     );
 
@@ -7482,7 +7768,6 @@ gcCreateWriteImageDirective(
     IN gctUINT                  ChannelDataType,
     IN gctUINT                  ChannelOrder,
     IN gctUINT                  ImageType,
-    IN gctBOOL                  imageStore,
     OUT gcPatchDirective  **    PatchDirectivePtr
     );
 
@@ -7545,7 +7830,8 @@ gcDestroyPatchDirective(
 
 gceSTATUS
 gcLoadCLPatchLibrary(
-    IN gcSHADER   Shader
+    IN gcSHADER   Shader,
+    IN gctUINT    LibIndex
     );
 
 gceSTATUS
@@ -7637,6 +7923,38 @@ gcSaveProgram(
     );
 
 /*******************************************************************************
+**                                gcSaveCLSingleKerne
+********************************************************************************
+**
+**    Save pre-compiled shaders and pre-linked programs to a binary file.
+**
+**    INPUT:
+**
+**        gcSHADER KernelShader
+**            Pointer to vertex shader object.
+**
+**        gcsPROGRAM_STATE ProgramState
+**            Program state.
+**
+**    OUTPUT:
+**
+**        gctPOINTER * Binary
+**            Pointer to a variable receiving the binary data to be saved.
+**
+**        gctUINT32 * BinarySize
+**            Pointer to a variable receiving the number of bytes inside 'Binary'.
+*/
+
+gceSTATUS
+gcSaveCLSingleKernel(
+    IN gcSHADER KernelShader,
+    IN gcsPROGRAM_STATE ProgramState,
+    OUT gctPOINTER * Binary,
+    OUT gctUINT32 * BinarySize
+    );
+
+
+/*******************************************************************************
 **                                gcLoadProgram
 ********************************************************************************
 **
@@ -7670,35 +7988,6 @@ gcLoadProgram(
     IN OUT gcsPROGRAM_STATE *ProgramState
     );
 
-/*******************************************************************************
-**                                gcSaveCLSingleKernel
-********************************************************************************
-**
-**    Save pre-compiled shaders and pre-linked programs to a binary file.
-**
-**    INPUT:
-**
-**        gcSHADER KernelShader
-**            Pointer to vertex shader object.
-**
-**        gcsPROGRAM_STATE ProgramState
-**            Program state.
-**
-**    OUTPUT:
-**
-**        gctPOINTER * Binary
-**            Pointer to a variable receiving the binary data to be saved.
-**
-**        gctUINT32 * BinarySize
-**            Pointer to a variable receiving the number of bytes inside 'Binary'.
-*/
-gceSTATUS
-gcSaveCLSingleKernel(
-    IN gcSHADER KernelShader,
-    IN gcsPROGRAM_STATE ProgramState,
-    OUT gctPOINTER * Binary,
-    OUT gctUINT32 * BinarySize
-    );
 
 /*******************************************************************************
 **                                gcLoadCLSingleKernel

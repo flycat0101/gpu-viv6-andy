@@ -906,7 +906,7 @@ void InitHeaderSearch::Realize() {
                     IncludeGroup[Quoted].end());
 
 
-  bool DontSearchCurDir = false;  // TODO: set to true if -I- is set?
+  bool DontSearchCurDir = false;  // VIV:TODO: set to true if -I- is set?
   Headers.SetSearchPaths(SearchList, IncludeGroup[Quoted].size(),
                          DontSearchCurDir);
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1164,4 +1164,67 @@ VG_API_CALL void VG_API_ENTRY vgClear(
             ));
     }
     vgmLEAVEAPI(vgClear);
+}
+
+/*
+** Desc:
+**  Renders a path to a mask layer. The mask will be cleared and replaced by path rendering result.
+*/
+VG_API_CALL void VG_API_ENTRY vgRenderToMaskLayerVIV(
+    VGMaskLayer Layer,
+    VGPath      Path,
+    VGbitfield  Mode
+    )
+{
+    vgmENTERAPI(vgRenderToMaskLayerVIV)
+    {
+        gceSTATUS status = gcvSTATUS_OK;
+        vgsPATH_PTR path = (vgsPATH_PTR)Path;
+        vgsMASK_PTR mask = (vgsMASK_PTR)Layer;
+        vgsIMAGE_PTR maskImage = &mask->image;
+        gctINT32    width = maskImage->size.width;
+        gctINT32    height = maskImage->size.height;
+
+        /* Set the proper matrices. */
+        Context->drawPathFillSurfaceToPaint
+            = &Context->pathFillSurfaceToPaint;
+
+        Context->drawPathStrokeSurfaceToPaint
+            = &Context->pathStrokeSurfaceToPaint;
+
+        if ((Mode & VG_FILL_PATH) == VG_FILL_PATH)
+        {
+
+                /* Check surface pixels. */
+                void *memory;
+                gcoSURF_Lock(maskImage->surface, gcvNULL, &memory);
+
+            /* Reset the  mask. */
+            gcmERR_BREAK(vgfFillColor(
+                Context,
+                maskImage,
+                0, 0, width, height,
+                vgvFLOATCOLOR0000,
+                vgvBYTECOLOR0000,
+                gcvFALSE
+                ));
+
+            /* Draw the path into the mask. */
+            gcmERR_BREAK(vgfDrawPath(
+                Context,
+                maskImage,
+                path,
+                VG_FILL_PATH,
+                Context->defaultPaint,
+                Context->defaultPaint,
+                gcvFALSE,
+                gcvFALSE,
+                gcvTRUE
+                ));
+
+            vgfFlushPipe(Context, gcvFALSE);
+                gcoSURF_Unlock(maskImage->surface, memory);
+        }
+    }
+    vgmLEAVEAPI(vgRenderToMaskLayerVIV);
 }

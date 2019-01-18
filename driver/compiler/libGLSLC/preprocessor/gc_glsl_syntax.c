@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1132,25 +1132,30 @@ ppoPREPROCESSOR_TextLine_Handle_FILE_LINE_VERSION(
     {
 
         creat_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute __FILE__";
-        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d\0", PP->currentSourceFileStringNumber);
+        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", PP->currentSourceFileStringNumber);
 
     }
     else if (What == PP->keyword->_line_)
     {
         creat_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute __LINE__";
-        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d\0", PP->currentSourceFileLineNumber);
+        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", PP->currentSourceFileLineNumber);
 
 
     }
     else if (What == PP->keyword->_version_)
     {
         creat_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute __VERSION__";
-        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d\0", PP->version);
+        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", PP->version);
     }
     else if(What == PP->keyword->gl_es)
     {
         creat_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute GL_ES";
-        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d\0", 1);
+        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", 1);
+    }
+    else if(What == PP->keyword->gl_core_profile)
+    {
+        creat_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute GL_core_profile";
+        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", 1);
     }
     else
     {
@@ -1289,7 +1294,8 @@ ppoPREPROCESSOR_TextLine(
             if (ntoken->poolString == PP->keyword->_file_       ||
                 ntoken->poolString == PP->keyword->_line_       ||
                 ntoken->poolString == PP->keyword->_version_    ||
-                ntoken->poolString == PP->keyword->gl_es)
+                ntoken->poolString == PP->keyword->gl_es        ||
+                ntoken->poolString == PP->keyword->gl_core_profile)
             {
                 gcmONERROR(
                     ppoPREPROCESSOR_TextLine_Handle_FILE_LINE_VERSION(PP, ntoken->poolString)
@@ -1469,8 +1475,14 @@ slsVERSION_INFO;
 slsVERSION_INFO _DefinedVersionInfo[] =
 {
     /* GL version. */
+    {100,   gcvTRUE,    gcvNULL,    gcvFALSE},
     {110,   gcvTRUE,    gcvNULL,    gcvFALSE},
     {120,   gcvTRUE,    gcvNULL,    gcvFALSE},
+    {130,   gcvTRUE,    gcvNULL,    gcvFALSE},
+    {140,   gcvTRUE,    gcvNULL,    gcvFALSE},
+    {150,   gcvTRUE,    gcvNULL,    gcvFALSE},
+    {330,   gcvTRUE,    gcvNULL,    gcvFALSE},
+    {400,   gcvTRUE,    gcvNULL,    gcvFALSE},
     /* GLES version. */
     {100,   gcvFALSE,   gcvNULL,    gcvFALSE},
     {300,   gcvFALSE,   "es",       gcvFALSE},
@@ -1535,8 +1547,8 @@ gceSTATUS ppoPREPROCESSOR_Version(ppoPREPROCESSOR PP)
     gctBOOL             doWeInValidArea = PP->doWeInValidArea;
     gceSTATUS           status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
     gctUINT32           langVersion = 0;
+    gctUINT32           i;
     slsVERSION_INFO*    versionInfo = gcvNULL;
-    gctUINT             i;
     sleSHADER_TYPE      shaderType;
 
     sloCOMPILER_GetShaderType(PP->compiler, &shaderType);
@@ -1556,6 +1568,7 @@ gceSTATUS ppoPREPROCESSOR_Version(ppoPREPROCESSOR PP)
             ppoPREPROCESSOR_Report(PP,
                                    slvREPORT_ERROR,
                                    "Expect a number afer the #version.");
+
             gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
 
             status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
@@ -1568,7 +1581,7 @@ gceSTATUS ppoPREPROCESSOR_Version(ppoPREPROCESSOR PP)
         /* Find the match versionInfo.*/
         for (i = 0; i < __sldDefinedVersionInfoCount; i++)
         {
-            if (_DefinedVersionInfo[i].langVersion == langVersion)
+            if (_DefinedVersionInfo[i].langVersion == langVersion && _DefinedVersionInfo[i].isSupport)
             {
                 versionInfo = &_DefinedVersionInfo[i];
                 break;
@@ -1613,6 +1626,35 @@ gceSTATUS ppoPREPROCESSOR_Version(ppoPREPROCESSOR PP)
                                              &nextToken,
                                              !ppvICareWhiteSpace));
 
+        if (versionInfo->isGLVersion && nextToken && nextToken->poolString != PP->keyword->newline)
+        {
+            /* TODO: Need to deal with the difference between the core and compatibility profile */
+            if (gcmIS_SUCCESS(gcoOS_StrCmp(nextToken->poolString, "core")))
+            {
+                /* TODO */
+            }
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(nextToken->poolString, "compatibility")))
+            {
+                /* TODO */
+            }
+            else
+            {
+                ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
+                                        "'%s' is an illegal profile name.", nextToken->poolString);
+
+                gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+                gcmONERROR(ppoTOKEN_Destroy(PP, nextToken));
+                return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+            }
+
+            gcmONERROR(ppoTOKEN_Destroy(PP, nextToken));
+
+            gcmONERROR(PP->inputStream->GetToken(PP,
+                                            &(PP->inputStream),
+                                            &nextToken,
+                                            !ppvICareWhiteSpace));
+        }
+
         if (nextToken && nextToken->poolString != PP->keyword->newline)
         {
             ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
@@ -1625,7 +1667,7 @@ gceSTATUS ppoPREPROCESSOR_Version(ppoPREPROCESSOR PP)
 
         /* Set the version. */
         PP->version = langVersion;
-        sloCOMPILER_SetLanguageVersion(PP->compiler, langVersion);
+        sloCOMPILER_SetLanguageVersion(PP->compiler, langVersion, versionInfo->isGLVersion);
 
         gcmONERROR(ppoTOKEN_Destroy(PP, nextToken));
         gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
@@ -2272,54 +2314,80 @@ ppoPREPROCESSOR_Undef(ppoPREPROCESSOR PP)
         return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
     }
 
-    if (ntoken->poolString == PP->keyword->gl_es   ||
-        ntoken->poolString == PP->keyword->_line_  ||
-        ntoken->poolString == PP->keyword->_file_  ||
-        ntoken->poolString == PP->keyword->_version_)
+
+    if (sloCOMPILER_GetClientApiVersion(PP->compiler) == gcvAPI_OPENGL)
     {
-        ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
-            "Error(%d,%d) : Can not #undef builtin marcro %s.",
-            PP->currentSourceFileStringNumber,
-            PP->currentSourceFileLineNumber,
-            ntoken->poolString);
+        if (ntoken->poolString == PP->keyword->gl_core_profile)
+        {
+            ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
+                "Error(%d,%d) : Can not #undef builtin marcro %s.",
+                PP->currentSourceFileStringNumber,
+                PP->currentSourceFileLineNumber,
+                ntoken->poolString);
 
-        gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+            gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
 
-        return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+            return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+        }
+    }
+    else
+    {
+        if (ntoken->poolString == PP->keyword->gl_es   ||
+            ntoken->poolString == PP->keyword->_line_  ||
+            ntoken->poolString == PP->keyword->_file_  ||
+            ntoken->poolString == PP->keyword->_version_)
+        {
+            ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
+                "Error(%d,%d) : Can not #undef builtin marcro %s.",
+                PP->currentSourceFileStringNumber,
+                PP->currentSourceFileLineNumber,
+                ntoken->poolString);
+
+            gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+
+            return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+        }
     }
 
     name = ntoken->poolString;
 
-    gcmONERROR(
-        ppoMACRO_MANAGER_GetMacroSymbol(
-        PP,
-        PP->macroManager,
-        name,
-        &ms)
-        );
-
-    if (!ms || ms->undefined == gcvTRUE)
+    if (sloCOMPILER_GetClientApiVersion(PP->compiler) == gcvAPI_OPENGL &&
+        ntoken->poolString == PP->keyword->_version_)
     {
-        ppoPREPROCESSOR_Report(
-            PP,
-            slvREPORT_WARN,
-            "#undef a undefined id.");
-
+        PP->keyword->isVersionUndefined = gcvTRUE;
+    }
+    else
+    {
         gcmONERROR(
-            ppoTOKEN_Destroy(PP, ntoken)
+            ppoMACRO_MANAGER_GetMacroSymbol(
+            PP,
+            PP->macroManager,
+            name,
+            &ms)
             );
 
-        return gcvSTATUS_OK;
+        if (!ms || ms->undefined == gcvTRUE)
+        {
+            ppoPREPROCESSOR_Report(
+                PP,
+                slvREPORT_WARN,
+                "#undef a undefined id.");
+
+            gcmONERROR(
+                ppoTOKEN_Destroy(PP, ntoken)
+                );
+
+            return gcvSTATUS_OK;
+        }
+
+        ms->undefined = gcvTRUE;
+
+        gcmONERROR(
+        ppoMACRO_MANAGER_DestroyMacroSymbol(
+            PP,
+            PP->macroManager,
+            ms));
     }
-
-    ms->undefined = gcvTRUE;
-
-    gcmONERROR(
-    ppoMACRO_MANAGER_DestroyMacroSymbol(
-        PP,
-        PP->macroManager,
-        ms));
-
     gcmONERROR(
         ppoTOKEN_Destroy(PP, ntoken)
         );
@@ -2382,7 +2450,8 @@ ppoPREPROCESSOR_Define(ppoPREPROCESSOR PP)
     if (name == PP->keyword->_line_     ||
         name == PP->keyword->_version_  ||
         name == PP->keyword->_file_     ||
-        name == PP->keyword->gl_es)
+        name == PP->keyword->gl_es      ||
+        name == PP->keyword->gl_core_profile)
     {
         ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
             "Error(%d,%d) : Can not #redefine a builtin marcro %s.",

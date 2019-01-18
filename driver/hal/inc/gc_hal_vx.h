@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -86,13 +86,10 @@ typedef struct _gcsVX_KERNEL_PARAMETERS
 
     vx_evis_no_inst_s   evisNoInst;
 
-    gctUINT32               curDeviceID;
-    gctUINT32               usedDeviceCount;
-    gcsTHREAD_WALKER_INFO   splitInfo[4];
-    gctUINT32               deviceCount;
-    gctPOINTER              *devices;
 
     gctUINT32               optionalOutputs[3];
+    gctBOOL                 hasBarrier;
+    gctBOOL                 hasAtomic;
 }
 gcsVX_KERNEL_PARAMETERS;
 #endif
@@ -118,6 +115,12 @@ gcoVX_BindUniform(
     );
 
 gceSTATUS
+    gcoVX_SetImageInfo(
+    IN  gcUNIFORM,
+    IN gcsVX_IMAGE_INFO_PTR Info
+    );
+
+gceSTATUS
 gcoVX_Commit(
     IN gctBOOL Flush,
     IN gctBOOL Stall,
@@ -136,15 +139,6 @@ gcoVX_InvokeKernel(
     IN gcsVX_KERNEL_PARAMETERS_PTR  Parameters
     );
 
-gceSTATUS
-gcoVX_ConstructionInstruction(
-    IN gctUINT32_PTR    Point,
-    IN gctUINT32        Size,
-    IN gctBOOL          Upload,
-    OUT gctUINT32_PTR   Physical,
-    OUT gctUINT32_PTR   Logical,
-    OUT gcsSURF_NODE_PTR* Node
-    );
 
 gceSTATUS
 gcoVX_AllocateMemory(
@@ -156,11 +150,6 @@ gcoVX_AllocateMemory(
 
 gceSTATUS
 gcoVX_FreeMemory(
-    IN gcsSURF_NODE_PTR Node
-    );
-
-gceSTATUS
-gcoVX_DestroyInstruction(
     IN gcsSURF_NODE_PTR Node
     );
 
@@ -198,7 +187,10 @@ gcoVX_InvokeKernelShader(
     IN size_t              GlobalWorkScale[3],
     IN size_t              GlobalWorkSize[3],
     IN size_t              LocalWorkSize[3],
-    IN gctUINT             ValueOrder
+    IN gctUINT             ValueOrder,
+    IN gctBOOL             BarrierUsed,
+    IN gctUINT32           MemoryAccessFlag,
+    IN gctBOOL             bDual16
     );
 
 gceSTATUS
@@ -211,7 +203,9 @@ gcoVX_TriggerAccelerator(
     IN gctUINT32              CmdAddress,
     IN gceVX_ACCELERATOR_TYPE Type,
     IN gctUINT32              EventId,
-    IN gctBOOL                waitEvent
+    IN gctBOOL                waitEvent,
+    IN gctUINT32              gpuId,
+    IN gctBOOL                sync
     );
 
 gceSTATUS
@@ -226,6 +220,12 @@ gceSTATUS
 gcoVX_SetNNImage(
     IN gctPOINTER Data,
     IN OUT gctUINT32_PTR *Instruction
+    );
+
+gceSTATUS
+gcoVX_QueryDeviceCount(
+    OUT gctUINT32 * DeviceCount,
+    OUT gctUINT32 * GPUCountPerDevice
     );
 
 gceSTATUS
@@ -250,18 +250,20 @@ gcoVX_FlushCache(
 gceSTATUS
 gcoVX_AllocateMemoryEx(
     IN OUT gctUINT *        Bytes,
+    IN  gceSURF_TYPE        Type,
+    IN  gctUINT32           alignment,
     OUT gctUINT32 *         Physical,
     OUT gctPOINTER *        Logical,
     OUT gcsSURF_NODE_PTR *  Node
     );
 
+
 gceSTATUS
 gcoVX_FreeMemoryEx(
-    IN gctUINT32            Physical,
-    IN gctPOINTER           Logical,
-    IN gctUINT              Bytes,
-    IN gcsSURF_NODE_PTR     Node
+    IN gcsSURF_NODE_PTR     Node,
+    IN gceSURF_TYPE         Type
     );
+
 
 gceSTATUS
 gcoVX_GetMemorySize(
@@ -272,43 +274,75 @@ gceSTATUS
 gcoVX_ZeroMemorySize();
 
 gceSTATUS
-gcoVX_CreateDevices(
-    IN gctUINT     maxDeviceCount,
-    IN gctPOINTER   *devices,
-    OUT gctUINT    *deviceCount
+gcoVX_GetHWConfigGpuCount(
+    OUT gctUINT32 *count
     );
 
 gceSTATUS
-gcoVX_DestroyDevices(
-    IN gctUINT      deviceCount,
-    IN gctPOINTER   *devices
-    );
-
-gceSTATUS
-gcoVX_GetCurrentDevice(
-    OUT gctPOINTER   *devices
-    );
-
-gceSTATUS
-gcoVX_SetCurrentDevice(
-    IN gctPOINTER   device,
-    IN gctINT       deviceID
-    );
-
-gceSTATUS
-gcoVX_MultiDeviceSync(
-    IN gctPOINTER   device
-    );
-
-gceSTATUS
-gcoVX_SaveContext(
-    OUT gcoHARDWARE *Hardware
+gcoVX_SwitchContext(
+    IN  gctUINT DeviceID,
+    OUT gcoHARDWARE *SavedHardware,
+    OUT gceHARDWARE_TYPE *SavedType,
+    OUT gctUINT32    *SavedCoreIndex
     );
 
 gceSTATUS
 gcoVX_RestoreContext(
+    IN gcoHARDWARE Hardware,
+    gceHARDWARE_TYPE PreType,
+    gctUINT32 PreCoreIndex
+    );
+
+gctBOOL gcoVX_VerifyHardware();
+
+
+gceSTATUS
+gcoVX_CaptureState(
+    IN OUT gctUINT8 *CaptureBuffer,
+    IN gctUINT32 InputSizeInByte,
+    IN OUT gctUINT32 *OutputSizeInByte,
+    IN gctBOOL Enabled,
+    IN gctBOOL dropCommandEnabled
+    );
+
+gceSTATUS
+gcoVX_CaptureInitState(
+    IN OUT gctPOINTER *CaptureBuffer,
+    IN gctUINT32 InputSizeInByte,
+    IN OUT gctUINT32_PTR OutputSizeInByte,
+    IN gctUINT32 deviceCount
+    );
+
+gceSTATUS
+gcoVX_SetRemapAddress(
+    IN gctUINT32 remapStart,
+    IN gctUINT32 remapEnd,
+    IN gceVX_REMAP_TYPE remapType
+    );
+
+gceSTATUS
+gcoVX_ProgrammYUV2RGBScale(
+    IN gctPOINTER Data,
+    IN gctUINT32  gpuId,
+    IN gctBOOL    mGpuSync
+    );
+
+gceSTATUS
+gcoVX_CreateHW(
+    IN gctUINT32    DeviceId,
+    OUT gcoHARDWARE * Hardware
+    );
+
+gceSTATUS
+gcoVX_DestroyHW(
     IN gcoHARDWARE Hardware
     );
+
+gceSTATUS gcoVX_GetEvisNoInstFeatureCap(
+    OUT vx_evis_no_inst_s *EvisNoInst
+    );
+
+
 
 #ifdef __cplusplus
 }

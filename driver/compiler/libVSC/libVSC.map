@@ -6,17 +6,28 @@
     dbg_dumpIR;
     dbg_dumpShader;
     dbg_dumpOptimizer;
+    dbg_dumpVIR;
+    dbg_dumpVFunc;
+    dbg_dumpMCode;
+    dbg_dumpVShader;
+    dbg_dumpVSym;
+    dbg_dumpVSymId;
+    dbg_dumpVLSymId;
+    dbg_dumpVNameId;
+    dbg_dumpVOperand;
+    dbg_dumpVTypeId;
+    dbg_dumpVType;
     gcDumpOption;
 
     gcOptimizeShader;
     gcLinkShaders;
     gcSaveProgram;
-	gcSaveCLSingleKernel;
+    gcSaveCLSingleKernel;
     gcLinkProgram;
     gcLinkProgramPipeline;
     gcValidateProgramPipeline;
     gcLoadProgram;
-	gcLoadCLSingleKernel;
+    gcLoadCLSingleKernel;
     gcLinkKernel;
     gcFreeProgramState;
     gcInitializeLibFile;
@@ -25,6 +36,8 @@
     gcSHADER_ReadShaderFromFile;
     gcSHADER_WriteBufferToFile;
     gcSHADER_ReadBufferFromFile;
+
+    gcSHADER_IsES11Compiler;
     gcSHADER_IsHaltiCompiler;
     gcSHADER_IsES31Compiler;
     gcSHADER_IsDual16Shader;
@@ -53,7 +66,7 @@
     gcSHADER_AddSaturation;
     gcSHADER_UpdateTargetPacked;
     gcSHADER_UpdateSourcePacked;
-	gcSHADER_UpdateResOpType;
+    gcSHADER_UpdateResOpType;
     gcSHADER_NewTempRegs;
     gcSHADER_AddSource;
     gcSHADER_AddSourceAttribute;
@@ -110,9 +123,11 @@
     gcSHADER_GetOutputIndexByOutput;
     gcSHADER_GetOutputCount;
     gcSHADER_GetUniform;
+    gcSHADER_GetUniformByUniformIndex;
     gcSHADER_GetUniformCount;
     gcSHADER_GetSamplerCount;
     gcSHADER_GetKernelUniformCount;
+    gcSHADER_GetKernelOriginalUniformCount;
     gcSHADER_GetUniformVectorCount;
     gcSHADER_GetUniformVectorCountUsedInShader;
     gcSHADER_GetUniformIndexingRange;
@@ -134,7 +149,7 @@
     gcSHADER_GetIoBlockVariable;
     gcSHADER_GetIoBlockVariableCount;
     gcSHADER_GetVariable;
-	gcSHADER_GetVariableByName;
+    gcSHADER_GetVariableByName;
     gcSHADER_GetVariableCount;
     gcSHADER_GetTempCount;
     gcSHADER_GetVariableIndexingRange;
@@ -144,24 +159,23 @@
     gcSHADER_GetKernelFunctionByName;
     gcSHADER_GetKernelFunctionCount;
     gcSHADER_GetCompilerVersion;
-    gcShader_IsESCompiler;
-    gcShader_IsES11Compiler;
-    gcShader_IsES30Compiler;
-    gcShader_IsES31Compiler;
     gcSHADER_CheckValidity;
     gcSHADER_GetConstantMemorySize;
     gcSHADER_GetPrivateMemorySize;
     gcSHADER_GetLocalMemorySize;
-	gcSHADER_GetWorkGroupSize;
+    gcSHADER_GetWorkGroupSize;
     gcSHADER_GetType;
     gcSHADER_FindLabel;
     gcSHADER_LinkLibFunction;
+    gcSHADER_LinkBuiltinLibs;
     gcSHADER_Load;
     gcSHADER_LoadEx;
     gcSHADER_LoadHeader;
     gcSHADER_LoadKernel;
     gcSHADER_MergeKernel;
+    gcSHADER_MergeShader;
     gcSHADER_Pack;
+    gcSHADER_PackRegister;
     gcSHADER_ExpandArraysOfArrays;
     gcSHADER_AnalyzeFunctions;
     gcSHADER_ReallocateAttributes;
@@ -194,6 +208,7 @@
     gcSHADER_GetDisableEZ;
     gcSHADER_AddTypeNameBuffer;
     gcSHADER_SetConstantMemorySize;
+    gcSHADER_AddConstantMemorySize;
     gcSHADER_SetPrivateMemorySize;
     gcSHADER_SetLocalMemorySize;
     gcSHADER_SetMaxKernelFunctionArgs;
@@ -238,6 +253,7 @@
     gcGetGLSLCaps;
     gcInitGLSLCaps;
     gcUseFullNewLinker;
+
     gcBLOCKTABLE_Init;
     gcBLOCKTABLE_AddData;
     gcBLOCKTABLE_GetAddress;
@@ -259,7 +275,7 @@
     gcSHADER_Has64BitOperation;
     gceLAYOUT_QUALIFIER_HasHWNotSupportingBlendMode;
     gcLoadCLPatchLibrary;
-	gcFreeCLPatchLibrary;
+    gcFreeCLPatchLibrary;
     gcHINTS_GetSamplerBaseOffset;
     gcHINTS_Destroy;
     gcGetSBLastVariable;
@@ -351,10 +367,12 @@
     vscCreateShader;
     vscDestroyShader;
     vscReferenceShader;
+    vscGetDebugInfo;
     vscCopyShader;
     vscSaveShaderToBinary;
     vscQueryShaderBinarySize;
     vscLoadShaderFromBinary;
+	vscFreeVirIntrinsicLib;
     vscExtractSubShader;
     vscCompileShader;
     vscLinkProgram;
@@ -363,25 +381,35 @@
     vscLinkHwShaders;
     vscProgramHwShaderStages;
     vscPrintShader;
-    vscSaveSEPToBinary;
-    vscLoadSEPFromBinary;
+    vscSaveEPToBinary;
+    vscLoadEPFromBinary;
     vscInitializeSEP;
     vscFinalizeSEP;
     vscIsValidSEP;
     vscPrintSEP;
     vscInitializePEP;
     vscFinalizePEP;
+    vscFinalizeKEP;
     vscInitializeHwPipelineShadersStates;
     vscFinalizeHwPipelineShadersStates;
     vscCreatePrivateData;
     vscDestroyPrivateData;
     vscGetShaderKindFromShaderHandle;
+    vscConvertGcShader2VirShader;
+    vscImageSamplerNeedLibFuncForHWCfg;
+    vscImageWriteNeedLibFuncForHWCfg;
+    vscSetDriverVIRPath;
     vscGetTemporaryDir;
+    vscSetIsLibraryShader;
 
     vscPMP_Intialize;
     vscPMP_Finalize;
     vscMM_Alloc;
     vscMM_Free;
+
+    vscBV_Initialize;
+    vscBV_Finalize;
+    vscBV_Resize;
 
     vscERR_ReportError;
     vscERR_ReportWarning;
@@ -390,7 +418,7 @@
     vscMC_BeginCodec;
     vscMC_EndCodec;
     vscMC_DumpInst;
-	vscMC_DisassembleInst;
+    vscMC_DisassembleInst;
 
     vscDIConstructContext;
     vscDIDestroyContext;
@@ -407,11 +435,10 @@
     vscDIGetSWLoc;
     vscDIChangeUniformSWLoc;
     vscDIGetVaribleLocByNameAndPC;
-	vscDIStep;
-	vscDIPushCallStack;
-	vscDIPopCallStack;
+    vscDIStep;
+    vscDIPushCallStack;
+    vscDIPopCallStack;
 
-    VIR_Adjust_Imagetypesize;
     VIR_GetSymFromId;
     VIR_Shader_AddFunction;
     VIR_Shader_AddString;
@@ -427,6 +454,8 @@
     VIR_Shader_GetCreatedSymAliasTable;
     VIR_Shader_IsNameBuiltIn;
     VIR_Shader_DuplicateVariablelFromSymId;
+    VIR_Shader_ReplaceDeviceIndex;
+    VIR_Symbol_GetUniformPointer;
     VIR_SymAliasTable_Insert;
     VIR_Function_AddLabel;
     VIR_Function_AddInstruction;
@@ -463,6 +492,7 @@
     VIR_Operand_SetTexldFetchMS;
     VIR_Operand_SetTexldGatherComp;
     VIR_Operand_SetTexldGatherRefZ;
+    VIR_Operand_Change2Src;
     VIR_Function_NewOperand;
     VIR_ConditionOp_Reverse;
     VIR_IntrisicGetKind;
@@ -470,7 +500,7 @@
     VIR_Type_AddField;
     VIR_Type_GetVirRegCount;
     VIR_Type_GetTypeByteSize;
-	VIR_Type_CalcByteOffset;
+    VIR_Type_CalcByteOffset;
     VIR_TypeId_Conv2Enable;
     VIR_TypeId_ComposeNonOpaqueType;
     VIR_Enable_2_Swizzle_WShift;

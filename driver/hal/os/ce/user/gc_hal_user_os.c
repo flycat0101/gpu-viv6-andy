@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -18,6 +18,7 @@
 #include "gc_hal_user.h"
 #include "gc_hal_eglplatform.h"
 #include "gc_hal_user_os_memory.h"
+#include "gc_hal_dump.h"
 
 #ifndef TLS_OUT_OF_INDEXES
 #define TLS_OUT_OF_INDEXES 0xFFFFFFFF
@@ -74,8 +75,7 @@ static void _ReportDB(
         ));
 
     if ((iface.u.Database.vidMem.counters.bytes     != 0) ||
-        (iface.u.Database.nonPaged.counters.bytes   != 0) ||
-        (iface.u.Database.contiguous.counters.bytes != 0))
+        (iface.u.Database.nonPaged.counters.bytes   != 0))
     {
         gcmTRACE(gcvLEVEL_ERROR, "\n");
         gcmTRACE(gcvLEVEL_ERROR, "******* MEMORY LEAKS DETECTED *******\n");
@@ -97,14 +97,6 @@ static void _ReportDB(
         gcmTRACE(gcvLEVEL_ERROR, "nonPaged.totalBytes = %d\n", iface.u.Database.nonPaged.counters.totalBytes);
     }
 
-    if (iface.u.Database.contiguous.counters.bytes != 0)
-    {
-        gcmTRACE(gcvLEVEL_ERROR, "\n");
-        gcmTRACE(gcvLEVEL_ERROR, "contiguous.bytes      = %d\n", iface.u.Database.contiguous.counters.bytes);
-        gcmTRACE(gcvLEVEL_ERROR, "contiguous.maxBytes   = %d\n", iface.u.Database.contiguous.counters.maxBytes);
-        gcmTRACE(gcvLEVEL_ERROR, "contiguous.totalBytes = %d\n", iface.u.Database.contiguous.counters.totalBytes);
-    }
-
 OnError:;
 }
 #endif
@@ -120,6 +112,7 @@ _SetDumpFileInfo(
     #define DUMP_FILE_PREFIX   "api"
 #endif
 
+#if !gcdDUMP_IN_KERNEL
     char dump_file[128];
     gctUINT offset = 0;
 
@@ -135,7 +128,9 @@ _SetDumpFileInfo(
                  gcdDUMP_KEY));
 
     gcoOS_SetDebugFile(dump_file);
-    gcoDUMP_SetDumpFlag(gcvTRUE);
+#endif
+
+    gcoOS_SetDumpFlag(gcvTRUE);
 }
 #endif
 
@@ -153,9 +148,6 @@ struct _gcoOS
 
     /* Heap. */
     gcoHEAP                     heap;
-
-    /* Base address. */
-    gctUINT32                   baseAddress;
 
     /* Handle to the device. */
     HANDLE                      device;
@@ -192,7 +184,7 @@ _DestroyOs(
         {
             gcoHEAP heap = gcPLS.os->heap;
 
-#if VIVANTE_PROFILER
+#if VIVANTE_PROFILER_SYSTEM_MEMORY
             /* End profiler. */
             gcoHEAP_ProfileEnd(heap, "gcoOS_HEAP");
 #endif
@@ -221,7 +213,7 @@ _DestroyOs(
             gcPLS.os->device = gcvNULL;
         }
 
-#if VIVANTE_PROFILER
+#if VIVANTE_PROFILER_SYSTEM_MEMORY
         /* End profiler. */
         gcoOS_ProfileEnd(gcPLS.os, "gcoOS_Destroy");
 #endif
@@ -277,7 +269,6 @@ _ConstructOs(
         os->object.type = gcvOBJ_OS;
         os->context     = Context;
         os->heap        = gcvNULL;
-        os->baseAddress = gcvINVALID_ADDRESS;
         os->device      = INVALID_HANDLE_VALUE;
 
         /* Set the object pointer to PLS. */
@@ -323,7 +314,7 @@ _ConstructOs(
             os->heap = gcvNULL;
         }
 
-#if VIVANTE_PROFILER
+#if VIVANTE_PROFILER_SYSTEM_MEMORY
         /* Start profiler. */
         gcoOS_ProfileStart(os);
 #endif
@@ -349,89 +340,6 @@ OnError:
 /******************************************************************************\
 ************************* Process/Thread Local Storage *************************
 \******************************************************************************/
-
-static gceSTATUS
-_MapMemory(
-    IN gctPHYS_ADDR Physical,
-    IN gctSIZE_T NumberOfBytes,
-    OUT gctPOINTER * Logical
-    )
-{
-    gceSTATUS status;
-    gcsHAL_INTERFACE iface;
-
-    gcmHEADER_ARG("Physical=0x%x NumberOfBytes=%lu", Physical, NumberOfBytes);
-
-    /* Verify the arguments. */
-    gcmVERIFY_ARGUMENT(NumberOfBytes > 0);
-    gcmVERIFY_ARGUMENT(Logical != gcvNULL);
-
-    /* Call kernel API to unmap the memory. */
-    iface.ignoreTLS            = gcvFALSE;
-    iface.command              = gcvHAL_MAP_MEMORY;
-    iface.u.MapMemory.physical = gcmPTR2SIZE(Physical);
-    iface.u.MapMemory.bytes    = NumberOfBytes;
-
-    gcmONERROR(gcoOS_DeviceControl(
-        gcvNULL,
-        IOCTL_GCHAL_INTERFACE,
-        &iface, gcmSIZEOF(iface),
-        &iface, gcmSIZEOF(iface)
-        ));
-
-    /* Return logical address. */
-    *Logical = gcmUINT64_TO_PTR(iface.u.MapMemory.logical);
-
-    /* Success. */
-    gcmFOOTER_ARG("*Logical=0x%x", *Logical);
-    return gcvSTATUS_OK;
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-static gceSTATUS
-_UnmapMemory(
-    IN gctPHYS_ADDR Physical,
-    IN gctSIZE_T NumberOfBytes,
-    IN gctPOINTER Logical
-    )
-{
-    gceSTATUS status;
-    gcsHAL_INTERFACE iface;
-
-    gcmHEADER_ARG("Physical=0x%x NumberOfBytes=%lu Logical=0x%x",
-                  Physical, NumberOfBytes, Logical);
-
-    /* Verify the arguments. */
-    gcmVERIFY_ARGUMENT(NumberOfBytes > 0);
-    gcmVERIFY_ARGUMENT(Logical != gcvNULL);
-
-    /* Call kernel API to unmap the memory. */
-    iface.ignoreTLS              = gcvFALSE;
-    iface.command                = gcvHAL_UNMAP_MEMORY;
-    iface.u.UnmapMemory.physical = gcmPTR2SIZE(Physical);
-    iface.u.UnmapMemory.bytes    = NumberOfBytes;
-    iface.u.UnmapMemory.logical  = gcmPTR_TO_UINT64(Logical);
-
-    gcmONERROR(gcoOS_DeviceControl(
-        gcvNULL,
-        IOCTL_GCHAL_INTERFACE,
-        &iface, sizeof(iface),
-        &iface, sizeof(iface)
-        ));
-
-    /* Success. */
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
 
 static void
 _PLSDestructor(
@@ -575,6 +483,13 @@ _TLSDestructor(
         tls->vg = gcvNULL;
         tls->currentType = type;
 
+    }
+#endif
+
+#if gcdUSE_VX
+    if(tls->engineVX)
+    {
+        gcmVERIFY_OK(gcoVX_Destroy(tls->engineVX));
     }
 #endif
 
@@ -1413,44 +1328,44 @@ gcoOS_GetPhysicalSystemMemorySize(
 **
 **  OUTPUT:
 **
-**      gctPHYS_ADDR * InternalAddress
-**          Pointer to a variable that will hold the physical address of the
-**          internal memory.  If 'InternalAddress' is gcvNULL, no information
+**      gctUINT32 * InternalPhysName
+**          Pointer to a variable that will hold the physical memory name of the
+**          internal memory.  If 'InternalPhysName' is gcvNULL, no information
 **          about the internal memory will be returned.
 **
 **      gctSIZE_T * InternalSize
 **          Pointer to a variable that will hold the size of the internal
-**          memory.  'InternalSize' cannot be gcvNULL if 'InternalAddress' is
+**          memory.  'InternalSize' cannot be gcvNULL if 'InternalPhysName' is
 **          not gcvNULL.
 **
-**      gctPHYS_ADDR * ExternalAddress
-**          Pointer to a variable that will hold the physical address of the
-**          external memory.  If 'ExternalAddress' is gcvNULL, no information
+**      gctUINT32 * ExternalPhysName
+**          Pointer to a variable that will hold the physical memory name of the
+**          external memory.  If 'ExternalPhysName' is gcvNULL, no information
 **          about the external memory will be returned.
 **
 **      gctSIZE_T * ExternalSize
 **          Pointer to a variable that will hold the size of the external
-**          memory.  'ExternalSize' cannot be gcvNULL if 'ExternalAddress' is
+**          memory.  'ExternalSize' cannot be gcvNULL if 'ExternalPhysName' is
 **          not gcvNULL.
 **
-**      gctPHYS_ADDR * ContiguousAddress
-**          Pointer to a variable that will hold the physical address of the
-**          contiguous memory.  If 'ContiguousAddress' is gcvNULL, no
+**      gctUINT32 * ContiguousPhysName
+**          Pointer to a variable that will hold the physical memory name of the
+**          contiguous memory.  If 'ContiguousPhysName' is gcvNULL, no
 **          information about the contiguous memory will be returned.
 **
 **      gctSIZE_T * ContiguousSize
 **          Pointer to a variable that will hold the size of the contiguous
-**          memory.  'ContiguousSize' cannot be gcvNULL if 'ContiguousAddress'
+**          memory.  'ContiguousSize' cannot be gcvNULL if 'ContiguousPhysName'
 **          is not gcvNULL.
 */
 gceSTATUS
 gcoOS_QueryVideoMemory(
     IN gcoOS Os,
-    OUT gctPHYS_ADDR * InternalAddress,
+    OUT gctUINT32 * InternalPhysName,
     OUT gctSIZE_T * InternalSize,
-    OUT gctPHYS_ADDR * ExternalAddress,
+    OUT gctUINT32 * ExternalPhysName,
     OUT gctSIZE_T * ExternalSize,
-    OUT gctPHYS_ADDR * ContiguousAddress,
+    OUT gctUINT32 * ContiguousPhysName,
     OUT gctSIZE_T * ContiguousSize
     )
 {
@@ -1469,43 +1384,43 @@ gcoOS_QueryVideoMemory(
                                    &iface, gcmSIZEOF(iface),
                                    &iface, gcmSIZEOF(iface)));
 
-        if (InternalAddress != gcvNULL)
-        {
-            /* Verify arguments. */
-            gcmVERIFY_ARGUMENT(InternalSize != gcvNULL);
+    if (InternalPhysName != gcvNULL)
+    {
+        /* Verify arguments. */
+        gcmVERIFY_ARGUMENT(InternalSize != gcvNULL);
 
-            /* Save internal memory size. */
-        *InternalAddress = gcmINT2PTR(iface.u.QueryVideoMemory.internalPhysical);
+        /* Save internal memory size. */
+        *InternalPhysName = iface.u.QueryVideoMemory.internalPhysName;
         *InternalSize    = (gctSIZE_T) iface.u.QueryVideoMemory.internalSize;
-        }
+    }
 
-        if (ExternalAddress != gcvNULL)
-        {
-            /* Verify arguments. */
-            gcmVERIFY_ARGUMENT(ExternalSize != gcvNULL);
+    if (ExternalPhysName != gcvNULL)
+    {
+        /* Verify arguments. */
+        gcmVERIFY_ARGUMENT(ExternalSize != gcvNULL);
 
-            /* Save external memory size. */
-        *ExternalAddress = gcmINT2PTR(iface.u.QueryVideoMemory.externalPhysical);
+        /* Save external memory size. */
+        *ExternalPhysName = iface.u.QueryVideoMemory.externalPhysName;
         *ExternalSize    = (gctSIZE_T) iface.u.QueryVideoMemory.externalSize;
-        }
+    }
 
-        if (ContiguousAddress != gcvNULL)
-        {
-            /* Verify arguments. */
-            gcmVERIFY_ARGUMENT(ContiguousSize != gcvNULL);
+    if (ContiguousPhysName != gcvNULL)
+    {
+        /* Verify arguments. */
+        gcmVERIFY_ARGUMENT(ContiguousSize != gcvNULL);
 
-            /* Save contiguous memory size. */
-        *ContiguousAddress = gcmINT2PTR(iface.u.QueryVideoMemory.contiguousPhysical);
+        /* Save contiguous memory size. */
+        *ContiguousPhysName = iface.u.QueryVideoMemory.contiguousPhysName;
         *ContiguousSize    = (gctSIZE_T) iface.u.QueryVideoMemory.contiguousSize;
-        }
+    }
 
     /* Success. */
-    gcmFOOTER_ARG("*InternalAddress=0x%08x *InternalSize=%lu "
-                  "*ExternalAddress=0x%08x *ExternalSize=%lu "
-                  "*ContiguousAddress=0x%08x *ContiguousSize=%lu",
-                  gcmOPT_VALUE(InternalAddress), gcmOPT_VALUE(InternalSize),
-                  gcmOPT_VALUE(ExternalAddress), gcmOPT_VALUE(ExternalSize),
-                  gcmOPT_VALUE(ContiguousAddress),
+    gcmFOOTER_ARG("*InternalPhysName=0x%08x *InternalSize=%lu "
+                  "*ExternalPhysName=0x%08x *ExternalSize=%lu "
+                  "*ContiguousPhysName=0x%08x *ContiguousSize=%lu",
+                  gcmOPT_VALUE(InternalPhysName), gcmOPT_VALUE(InternalSize),
+                  gcmOPT_VALUE(ExternalPhysName), gcmOPT_VALUE(ExternalSize),
+                  gcmOPT_VALUE(ContiguousPhysName),
                   gcmOPT_VALUE(ContiguousSize));
     return gcvSTATUS_OK;
 
@@ -1516,6 +1431,9 @@ OnError:
 }
 
 /*******************************************************************************
+**
+** Deprecated API: please use gcoHAL_GetBaseAddr() instead.
+**                 This API was kept only for legacy BSP usage.
 **
 **  gcoOS_GetBaseAddress
 **
@@ -1537,16 +1455,15 @@ gcoOS_GetBaseAddress(
     OUT gctUINT32_PTR BaseAddress
     )
 {
-    gceSTATUS status;
-    gceHARDWARE_TYPE type;
-    gcsHAL_INTERFACE iface;
+    gceSTATUS status = gcvSTATUS_OK;
+    gceHARDWARE_TYPE type = gcvHARDWARE_INVALID;
 
     gcmHEADER();
 
     /* Verify the arguments. */
-    gcmVERIFY_ARGUMENT(BaseAddress != gcvNULL);
+    gcmDEBUG_VERIFY_ARGUMENT(BaseAddress);
 
-    gcmVERIFY_OK(gcoHAL_GetHardwareType(gcvNULL, &type));
+    gcmONERROR(gcoHAL_GetHardwareType(gcvNULL, &type));
 
     /* Return base address. */
     if (type == gcvHARDWARE_VG)
@@ -1555,35 +1472,27 @@ gcoOS_GetBaseAddress(
     }
     else
     {
-        if (gcPLS.os->baseAddress == gcvINVALID_ADDRESS)
-        {
-            /* Query base address. */
-            iface.ignoreTLS            = gcvFALSE;
-            iface.command = gcvHAL_GET_BASE_ADDRESS;
+        gcsHAL_INTERFACE iface;
 
-            /* Call kernel driver. */
-            status = gcoOS_DeviceControl(
-                gcvNULL,
-                IOCTL_GCHAL_INTERFACE,
-                &iface, gcmSIZEOF(iface),
-                &iface, gcmSIZEOF(iface)
-                );
+        /* Query base address. */
+        iface.ignoreTLS = gcvFALSE;
+        iface.command = gcvHAL_GET_BASE_ADDRESS;
 
-            if (gcmIS_ERROR(status))
-            {
-                gcmFOOTER();
-                return status;
-            }
+        /* Call kernel driver. */
+        gcmONERROR(gcoOS_DeviceControl(
+            gcvNULL,
+            IOCTL_GCHAL_INTERFACE,
+            &iface, gcmSIZEOF(iface),
+            &iface, gcmSIZEOF(iface)
+            ));
 
-            gcPLS.os->baseAddress = iface.u.GetBaseAddress.baseAddress;
-        }
-
-        *BaseAddress = gcPLS.os->baseAddress;
+        *BaseAddress = iface.u.GetBaseAddress.baseAddress;
     }
 
+OnError:
     /* Success. */
     gcmFOOTER_ARG("*BaseAddress=0x%08x", *BaseAddress);
-    return gcvSTATUS_OK;
+    return status;
 }
 
 /*******************************************************************************
@@ -1970,7 +1879,7 @@ gcoOS_DeviceControl(
             status = gcoOS_GetTLS(&tls);
             if (gcmIS_ERROR(status)) return status;
             inputBuffer->hardwareType = tls->currentType;
-            inputBuffer->coreIndex    = tls->currentCoreIndex;
+            inputBuffer->coreIndex = tls->currentType == gcvHARDWARE_2D ? 0: tls->currentCoreIndex;
             break;
         }
     }
@@ -2009,215 +1918,6 @@ gcoOS_DeviceControl(
 
 OnError:
     /* Return the status. */
-    return status;
-}
-
-/*******************************************************************************
-**
-**  gcoOS_AllocateNonPagedMemory
-**
-**  Allocate non-paged memory from the kernel.
-**
-**  INPUT:
-**
-**      gcoOS Os
-**          Pointer to an gcoOS object.
-**
-**      gctBOOL InUserSpace
-**          gcvTRUE to mape the memory into the user space.
-**
-**      gctSIZE_T * Bytes
-**          Pointer to the number of bytes to allocate.
-**
-**  OUTPUT:
-**
-**      gctSIZE_T * Bytes
-**          Pointer to a variable that will receive the aligned number of bytes
-**          allocated.
-**
-**      gctPHYS_ADDR * Physical
-**          Pointer to a variable that will receive the physical addresses of
-**          the allocated pages.
-**
-**      gctPOINTER * Logical
-**          Pointer to a variable that will receive the logical address of the
-**          allocation.
-*/
-gceSTATUS
-gcoOS_AllocateNonPagedMemory(
-    IN gcoOS Os,
-    IN gctBOOL InUserSpace,
-    IN OUT gctSIZE_T * Bytes,
-    OUT gctPHYS_ADDR * Physical,
-    OUT gctPOINTER * Logical
-    )
-{
-    gcsHAL_INTERFACE iface;
-    gceSTATUS status;
-
-    gcmHEADER_ARG("InUserSpace=%d *Bytes=%lu",
-                  InUserSpace, gcmOPT_VALUE(Bytes));
-
-    /* Verify the arguments. */
-    gcmVERIFY_ARGUMENT(Bytes != gcvNULL);
-    gcmVERIFY_ARGUMENT(Physical != gcvNULL);
-    gcmVERIFY_ARGUMENT(Logical != gcvNULL);
-
-    /* Initialize the gcsHAL_INTERFACE structure. */
-    iface.ignoreTLS            = gcvFALSE;
-    iface.command = gcvHAL_ALLOCATE_NON_PAGED_MEMORY;
-    iface.u.AllocateNonPagedMemory.bytes = *Bytes;
-
-    /* Call kernel driver. */
-    gcmONERROR(gcoOS_DeviceControl(
-        gcvNULL,
-        IOCTL_GCHAL_INTERFACE,
-        &iface, gcmSIZEOF(iface),
-        &iface, gcmSIZEOF(iface)
-        ));
-
-    /* Return allocated memory. */
-    *Bytes = (gctSIZE_T) iface.u.AllocateNonPagedMemory.bytes;
-    *Physical = gcmINT2PTR(iface.u.AllocateNonPagedMemory.physical);
-    *Logical = gcmUINT64_TO_PTR(iface.u.AllocateNonPagedMemory.logical);
-
-    /* Success. */
-        gcmFOOTER_ARG("*Bytes=%lu *Physical=0x%x *Logical=0x%x",
-                      *Bytes, *Physical, *Logical);
-    return gcvSTATUS_OK;
-
-OnError:
-    /* Return the status. */
-        gcmFOOTER();
-    return status;
-}
-
-/*******************************************************************************
-**
-**  gcoOS_FreeNonPagedMemory
-**
-**  Free non-paged memory from the kernel.
-**
-**  INPUT:
-**
-**      gcoOS Os
-**          Pointer to an gcoOS object.
-**
-**      gctBOOL InUserSpace
-**          gcvTRUE to mape the memory into the user space.
-**
-**      gctSIZE_T * Bytes
-**          Pointer to the number of bytes to allocate.
-**
-**  OUTPUT:
-**
-**      gctSIZE_T * Bytes
-**          Pointer to a variable that will receive the aligned number of bytes
-**          allocated.
-**
-**      gctPHYS_ADDR * Physical
-**          Pointer to a variable that will receive the physical addresses of
-**          the allocated pages.
-**
-**      gctPOINTER * Logical
-**          Pointer to a variable that will receive the logical address of the
-**          allocation.
-*/
-gceSTATUS
-gcoOS_FreeNonPagedMemory(
-    IN gcoOS Os,
-    IN gctSIZE_T Bytes,
-    IN gctPHYS_ADDR Physical,
-    IN gctPOINTER Logical
-    )
-{
-    gcsHAL_INTERFACE iface;
-    gceSTATUS status;
-
-    gcmHEADER_ARG("Bytes=%lu Physical=0x%x Logical=0x%x",
-                  Bytes, Physical, Logical);
-
-    /* Initialize the gcsHAL_INTERFACE structure. */
-    iface.ignoreTLS = gcvFALSE;
-    iface.command = gcvHAL_FREE_NON_PAGED_MEMORY;
-    iface.u.FreeNonPagedMemory.bytes    = Bytes;
-    iface.u.FreeNonPagedMemory.physical = gcmPTR2SIZE(Physical);
-    iface.u.FreeNonPagedMemory.logical  = gcmPTR_TO_UINT64(Logical);
-
-    /* Call kernel driver. */
-    gcmONERROR(gcoOS_DeviceControl(
-        gcvNULL,
-        IOCTL_GCHAL_INTERFACE,
-        &iface, sizeof(iface),
-        &iface, sizeof(iface)
-        ));
-
-OnError:
-    /* Return status. */
-    gcmFOOTER();
-    return status;
-}
-
-/*******************************************************************************
-**
-**  gcoOS_FreeContiguous
-**
-**  Free contiguous memory from the kernel.
-**
-**  INPUT:
-**
-**      gcoOS Os
-**          Pointer to an gcoOS object.
-**
-**      gctPHYS_ADDR Physical
-**          The physical addresses of the allocated pages.
-**
-**      gctPOINTER Logical
-**          The logical address of the allocation.
-**
-**      gctSIZE_T Bytes
-**          Number of bytes allocated.
-**
-**  OUTPUT:
-**
-**      Nothing.
-*/
-gceSTATUS
-gcoOS_FreeContiguous(
-    IN gcoOS Os,
-    IN gctPHYS_ADDR Physical,
-    IN gctPOINTER Logical,
-    IN gctSIZE_T Bytes
-    )
-{
-    gcsHAL_INTERFACE iface;
-    gceSTATUS status;
-
-    gcmHEADER_ARG("Physical=0x%x Logical=0x%x Bytes=%lu",
-                  Physical, Logical, Bytes);
-
-    /* Initialize the gcsHAL_INTERFACE structure. */
-    iface.ignoreTLS = gcvFALSE;
-    iface.command = gcvHAL_FREE_CONTIGUOUS_MEMORY;
-    iface.u.FreeContiguousMemory.bytes    = Bytes;
-    iface.u.FreeContiguousMemory.physical = gcmPTR2SIZE(Physical);
-    iface.u.FreeContiguousMemory.logical  = gcmPTR_TO_UINT64(Logical);
-
-    /* Call kernel driver. */
-    gcmONERROR(gcoOS_DeviceControl(
-        gcvNULL,
-        IOCTL_GCHAL_INTERFACE,
-        &iface, gcmSIZEOF(iface),
-        &iface, gcmSIZEOF(iface)
-        ));
-
-    /* Success. */
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
     return status;
 }
 
@@ -2371,6 +2071,64 @@ gcoOS_Close(
     return gcvSTATUS_OK;
 }
 
+gceSTATUS
+gcoOS_Remove(
+    IN gcoOS Os,
+    IN gctCONST_STRING FileName
+    )
+{
+    TCHAR path[MAX_PATH_LENGTH];
+
+    gcmHEADER_ARG("FileName=%s", FileName);
+
+    if (FileName != gcvNULL && FileName[0] != '\\' && FileName[0] != '/')
+    {
+        int i, len;
+        char mbspath[MAX_PATH_LENGTH];
+
+        GetModuleFileName(NULL, path, MAX_PATH_LENGTH);
+
+        memset(mbspath, 0, MAX_PATH_LENGTH);
+        wcstombs(mbspath, path, MAX_PATH_LENGTH);
+
+        len = strlen(mbspath);
+        for (i = len; i > 0; i--)
+        {
+            if (mbspath[i - 1] == '\\')
+            {
+                mbspath[i] = '\0';
+                break;
+            }
+        }
+
+        if (i != 0)
+        {
+            strcat(mbspath, FileName);
+        }
+        else
+        {
+            /* Use default path. */
+            sprintf(mbspath, "\\release\\%s", FileName);
+        }
+
+        mbspath[MAX_PATH_LENGTH - 1] = '\0';
+        mbstowcs(path, mbspath, MAX_PATH_LENGTH);
+    }
+    else
+    {
+        mbstowcs(path, FileName, MAX_PATH_LENGTH);
+    }
+
+    if (DeleteFile(path) == FALSE)
+    {
+        gcmFOOTER_ARG("status=%d", gcvSTATUS_GENERIC_IO);
+        return gcvSTATUS_GENERIC_IO;
+    }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
 /*******************************************************************************
 **
 **  gcoOS_Read
@@ -2516,6 +2274,129 @@ gcoOS_FscanfI(
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
+}
+
+/*******************************************************************************
+**
+**  gcoOS_LockFile
+**
+**  Apply an advisory lock on an open file
+**
+**  INPUT:
+**
+**      gcoOS Os
+**          Pointer to an gcoOS object.
+**
+**      gctFILE File
+**          Pointer to an open file object.
+**
+**      gctBOOL Shared
+**          Place a shared lock if true. More than one process may hold a
+**          shared lock for a given file at a given time.
+**          Place an exclusive lock. Only one process may hold an exclusive
+**          lock for a given file at a given time.
+**
+**      gctBOOL Block
+**          Block if an incompatible lock is held by another process.
+**          Otherwise return immediately with gcvSTATUS_LOCKED error.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcoOS_LockFile(
+    IN gcoOS Os,
+    IN gctFILE File,
+    IN gctBOOL Shared,
+    IN gctBOOL Block
+    )
+{
+    HANDLE handle;
+    BOOL success;
+    DWORD flags;
+    gceSTATUS status = gcvSTATUS_OK;
+    OVERLAPPED overlap = {0};
+
+    gcmHEADER_ARG("File=%p Shared=%d Block=%d", File, Shared, Block);
+
+    handle = (HANDLE)_fileno((FILE *)File);
+
+    flags  = Shared ? 0 : LOCKFILE_EXCLUSIVE_LOCK;
+    flags |= Block  ? 0 : LOCKFILE_FAIL_IMMEDIATELY;
+
+    /* Buffer size is useless. */
+    success = LockFileEx(handle, flags, 0, 8, 0, &overlap);
+
+    if (!success)
+    {
+        DWORD error = GetLastError();
+
+        if (error == ERROR_LOCK_VIOLATION)
+        {
+            gcmONERROR(gcvSTATUS_LOCKED);
+        }
+        else
+        {
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+    }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    gcmFOOTER_ARG("status=%d", status);
+    return status;
+}
+
+/*******************************************************************************
+**
+**  gcoOS_UnlockFile
+**
+**  Remove an advisory lock on an open file.
+**
+**  INPUT:
+**
+**      gcoOS Os
+**          Pointer to an gcoOS object.
+**
+**      gctFILE File
+**          Pointer to an open file object.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcoOS_UnlockFile(
+    IN gcoOS Os,
+    IN gctFILE File
+    )
+{
+    HANDLE handle;
+    BOOL success;
+    gceSTATUS status = gcvSTATUS_OK;
+    OVERLAPPED overlap = {0};
+
+    gcmHEADER_ARG("File=%p", File);
+
+    handle = (HANDLE)_fileno((FILE *)File);
+
+    /* Buffer size is useless. */
+    success = UnlockFileEx(handle, 0, 8, 0, &overlap);
+
+    if (!success)
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    gcmFOOTER_ARG("status=%d", status);
+    return status;
 }
 
 /* Create an endpoint for communication. */
@@ -4021,146 +3902,6 @@ gcoOS_PrintStrVSafe(
 
 /*******************************************************************************
 **
-**  gcoOS_MapUserMemory (obsolete)
-**
-**  This function is obsolete, any new code must not use it.
-**
-**  Lock down a user buffer and return an DMA'able address to be used by the
-**  hardware to access it.
-**
-**  INPUT:
-**
-**      gcoOS Os
-**          Pointer to gcoOS object.
-**
-**      gctPOINTER Memory
-**          Pointer to memory to lock down.
-**
-**      gctSIZE_T Size
-**          Size in bytes of the memory to lock down.
-**
-**  OUTPUT:
-**
-**      gctPOINTER * Info
-**          Pointer to variable receiving the information record required by
-**          gcoOS_UnmapUserMemory.
-**
-**      gctUINT32_PTR Address
-**          Pointer to a variable that will receive the address DMA'able by the
-**          hardware.
-*/
-gceSTATUS
-gcoOS_MapUserMemory(
-    IN gcoOS Os,
-    IN gctPOINTER Memory,
-    IN gctSIZE_T Size,
-    OUT gctPOINTER * Info,
-    OUT gctUINT32_PTR Address
-    )
-{
-    gceSTATUS status;
-
-    gcmHEADER_ARG("Memory=0x%x Size=%lu", Memory, Size);
-
-    gcmVERIFY_ARGUMENT(Memory != gcvNULL);
-
-    status = gcoOS_MapUserMemoryEx(Os, Memory, ~0U, Size, Info, Address);
-
-    gcmFOOTER();
-
-    return status;
-}
-
-gceSTATUS
-gcoOS_MapUserMemoryEx(
-    IN gcoOS Os,
-    IN gctPOINTER Memory,
-    IN gctUINT32 Physical,
-    IN gctSIZE_T Size,
-    OUT gctPOINTER * Info,
-    OUT gctUINT32_PTR Address
-    )
-{
-    gceSTATUS status;
-    gcsUSER_MEMORY_DESC desc;
-    gctUINT32 node = 0;
-
-    gcoOS_ZeroMemory(&desc, gcmSIZEOF(desc));
-
-    desc.flag    = gcvALLOC_FLAG_USERMEMORY;
-    desc.logical = gcmPTR_TO_UINT64(Memory);
-    desc.size    = Size;
-    desc.physical = Physical;
-
-    gcmONERROR(gcoHAL_WrapUserMemory(&desc, &node));
-
-    gcmONERROR(gcoHAL_LockVideoMemory(node, gcvFALSE, gcvENGINE_RENDER, Address, gcvNULL));
-
-    *Info = (gctPOINTER)(gctUINTPTR_T)node;
-
-    return gcvSTATUS_OK;
-
-OnError:
-    if (node)
-    {
-        gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(node));
-    }
-
-    return status;
-}
-
-/*******************************************************************************
-**
-**  gcoOS_UnmapUserMemory (obsolete)
-**
-**  This function is obsolete, any new code must not use it.
-**
-**  Unlock a user buffer and that was previously locked down by
-**  gcoOS_MapUserMemory.
-**
-**  INPUT:
-**
-**      gcoOS Os
-**          Pointer to gcoOS object.
-**
-**      gctPOINTER Memory
-**          Pointer to memory to unlock.
-**
-**      gctSIZE_T Size
-**          Size in bytes of the memory to unlock.
-**
-**      gctPOINTER Info
-**          Information record returned by gcoOS_MapUserMemory.
-**
-**      gctUINT32_PTR Address
-**          The address returned by gcoOS_MapUserMemory.
-**
-**  OUTPUT:
-**
-**      Nothing.
-*/
-gceSTATUS
-gcoOS_UnmapUserMemory(
-    IN gcoOS Os,
-    IN gctPOINTER Memory,
-    IN gctSIZE_T Size,
-    IN gctPOINTER Info,
-    IN gctUINT32 Address
-    )
-{
-    gctUINT32 node;
-
-    node = (gctUINT32)(gctUINTPTR_T) Info;
-
-    gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(node, gcvSURF_BITMAP, gcvENGINE_RENDER));
-
-    gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(node));
-
-    return gcvSTATUS_OK;
-}
-
-/*******************************************************************************
-**
 **  gcoOS_StrDup
 **
 **  Duplicate the given string by copying it into newly allocated memory.
@@ -4366,7 +4107,7 @@ gcoOS_GetProcAddress(
     return status;
 }
 
-#if VIVANTE_PROFILER
+#if VIVANTE_PROFILER_SYSTEM_MEMORY
 gceSTATUS
 gcoOS_ProfileStart(
     IN gcoOS Os
@@ -5263,9 +5004,6 @@ gcoOS_WaitSignal(
     IN gctUINT32 Wait
     )
 {
-#if gcdNULL_DRIVER
-    return gcvSTATUS_OK;
-#else
     DWORD milliseconds;
     gctBOOL loop = gcvTRUE;
     gceSTATUS status = gcvSTATUS_OK;
@@ -5306,7 +5044,6 @@ gcoOS_WaitSignal(
     /* Return the status. */
     gcmFOOTER_ARG("Signal=0x%x status=%d", Signal, status);
     return status;
-#endif
 }
 
 /*******************************************************************************
@@ -5566,8 +5303,8 @@ void gcoOS_LinkageCE(void)
 
 gceSTATUS
 gcoOS_CPUPhysicalToGPUPhysical(
-    IN gctUINT32 CPUPhysical,
-    OUT gctUINT32_PTR GPUPhysical
+    IN gctPHYS_ADDR_T CPUPhysical,
+    OUT gctPHYS_ADDR_T * GPUPhysical
     )
 {
     *GPUPhysical = CPUPhysical;
@@ -5587,3 +5324,13 @@ gcoOS_QuerySystemInfo(
 
     return gcvSTATUS_OK;
 }
+
+#if VIVANTE_PROFILER_SYSTEM_MEMORY
+
+gceSTATUS gcoOS_GetMemoryProfileInfo(size_t                      size,
+                                     struct _memory_profile_info *info)
+{
+    return gcvSTATUS_NOT_SUPPORTED;
+}
+
+#endif

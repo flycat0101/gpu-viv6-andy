@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -192,38 +192,6 @@ LONG_SIZE_ARGUMENT *getArgByIdx(
     return gcvNULL;
 }
 
-
-static gctUINT _VSC_GetChannelwiseOffset(
-    IN VIR_Instruction *inst)
-{
-    gctUINT t = 0;
-    switch(VIR_Inst_GetEnable(inst)) {
-        case VIR_ENABLE_X:
-        case VIR_ENABLE_XY:
-        case VIR_ENABLE_XYZ:
-        case VIR_ENABLE_XYZW:
-            t = 0;
-            break;
-        case VIR_ENABLE_Y:
-        case VIR_ENABLE_YZ:
-        case VIR_ENABLE_YZW:
-            t = 1;
-            break;
-        case VIR_ENABLE_Z:
-        case VIR_ENABLE_ZW:
-            t = 2;
-            break;
-        case VIR_ENABLE_W:
-            t = 3;
-            break;
-        default:
-            /*TODO: unsupported channel bits*/
-            gcmASSERT(0);
-    };
-
-    return t;
-}
-
 /*******************************************************************************
                             _VSC_SIMP_OptimizeParamInCallee
 ********************************************************************************
@@ -343,6 +311,56 @@ VSC_ErrCode _VSC_SIMP_OptimizeParamInCallee(
 
         switch(opcode)
         {
+        case VIR_OP_MOV:
+            if(getInstSrcVregIndex(inst, VIR_Operand_Src0, &src0VregIndex))
+            {
+                continue;
+            }
+            src0 = VIR_Inst_GetSource(inst, VIR_Operand_Src0);
+            sym = VIR_Operand_GetSymbol(src0);
+            /*Check if this mov inst uses the input parameter as sorurce.*/
+            for (i = regStartIndex; i < regEndIndex; i++)
+            {
+                if (src0VregIndex == i)
+                {
+                    /*Add one load inst to replace original inst.*/
+                    errCode = VIR_Function_AddInstructionAfter(currentFunc, VIR_OP_LOAD_S, VIR_TYPE_FLOAT32,
+                        inst, gcvTRUE, &loadInst);
+                    if(errCode)
+                    {
+                        return errCode;
+                    }
+                    dest = VIR_Inst_GetDest(inst);
+
+                    /*Get offset to base memory address.*/
+                    sizeofParamArrayItemVal = VIR_Type_GetTypeByteSize(shader, VIR_Symbol_GetType(sym));
+                    offsetVal = (src0VregIndex - regStartIndex) * sizeofParamArrayItemVal;
+                    errCode = VIR_Function_NewOperand(currentFunc, &loadOffset);
+                    if (errCode != VSC_ERR_NONE)
+                    {
+                        return errCode;
+                    }
+                    VIR_Operand_SetImmediateUint(loadOffset, offsetVal);
+
+                    VIR_Inst_CopyDest(loadInst, dest, gcvFALSE);
+                    VIR_Inst_CopySource(loadInst, VIR_Operand_Src0, paramPtr, gcvFALSE);
+                    VIR_Inst_CopySource(loadInst, VIR_Operand_Src1, loadOffset, gcvFALSE);
+                    VIR_Operand_SetSwizzle(VIR_Inst_GetSource(loadInst, VIR_Operand_Src0),
+                                            VIR_TypeId_Conv2Swizzle(VIR_Operand_GetTypeId(paramPtr)));
+                    /*dump*/
+                    if (VSC_UTILS_MASK(VSC_OPTN_ParamOptOptions_GetTrace(paramOptsOptions),
+                            VSC_OPTN_ParamOptOptions_TRACE))
+                    {
+                        VIR_LOG(paramOptimizer->dumper, "\n[PAOPT]Added one LOAD_S inst:\n");
+                        VIR_Inst_Dump(paramOptimizer->dumper, loadInst);
+                        VIR_LOG_FLUSH(paramOptimizer->dumper);
+                    }
+
+                    VIR_Function_RemoveInstruction(currentFunc, inst);
+                    inst = loadInst;
+                }
+            }
+            break;
         case VIR_OP_LDARR:
             errCode= getInstSrcVregIndex(inst, VIR_Operand_Src0, &src0VregIndex);
             if(errCode)
@@ -465,57 +483,7 @@ VSC_ErrCode _VSC_SIMP_OptimizeParamInCallee(
             }
             break;
         default:
-            {
-                gctUINT8 srcIdx;
-                for (srcIdx = 0; srcIdx < VIR_Inst_GetSrcNum(inst); srcIdx++)
-                {
-                    if(getInstSrcVregIndex(inst, srcIdx, &src0VregIndex))
-                    {
-                        continue;
-                    }
-                    src0 = VIR_Inst_GetSource(inst, srcIdx);
-                    sym = VIR_Operand_GetSymbol(src0);
-                    /*Check if this mov inst uses the input parameter as sorurce.*/
-                    for (i = regStartIndex; i < regEndIndex; i++)
-                    {
-                        if (src0VregIndex == i)
-                        {
-                            /*Add one load inst to replace original inst.*/
-                            errCode = VIR_Function_AddInstructionBefore(currentFunc, VIR_OP_LOAD_S, VIR_TYPE_FLOAT32,
-                                                                        inst, gcvTRUE, &loadInst);
-                            if(errCode)
-                            {
-                                return errCode;
-                            }
-                            /*Get offset to base memory address.*/
-                            sizeofParamArrayItemVal = VIR_Type_GetTypeByteSize(shader, VIR_Symbol_GetType(sym));
-                            offsetVal = (src0VregIndex - regStartIndex) * sizeofParamArrayItemVal;
-                            errCode = VIR_Function_NewOperand(currentFunc, &loadOffset);
-                            if (errCode != VSC_ERR_NONE)
-                            {
-                                return errCode;
-                            }
-                            VIR_Operand_SetImmediateUint(loadOffset, offsetVal);
-
-                            VIR_Inst_CopyDest(loadInst, src0, gcvFALSE);
-                            VIR_Inst_CopySource(loadInst, VIR_Operand_Src0, paramPtr, gcvFALSE);
-                            VIR_Inst_CopySource(loadInst, VIR_Operand_Src1, loadOffset, gcvFALSE);
-                            VIR_Operand_SetEnable(VIR_Inst_GetDest(loadInst), VIR_ENABLE_XYZW);
-                            VIR_Operand_SetSwizzle(VIR_Inst_GetSource(loadInst, VIR_Operand_Src0),
-                                                   VIR_TypeId_Conv2Swizzle(VIR_Operand_GetTypeId(paramPtr)));
-                            /*dump*/
-                            if (VSC_UTILS_MASK(VSC_OPTN_ParamOptOptions_GetTrace(paramOptsOptions),
-                                               VSC_OPTN_ParamOptOptions_TRACE))
-                            {
-                                VIR_LOG(paramOptimizer->dumper, "\n[PAOPT]Added one LOAD_S inst:\n");
-                                VIR_Inst_Dump(paramOptimizer->dumper, loadInst);
-                                VIR_LOG_FLUSH(paramOptimizer->dumper);
-                            }
-                        }
-                    }
-                }
-                break;
-            }
+            break;
         }
     }
     return errCode;
@@ -586,8 +554,8 @@ VSC_ErrCode _VSC_SIMP_OptimizeCaller(
     VIR_Symbol *starrOffsetSym = gcvNULL;
 
     VIR_Symbol *movaDestSym = gcvNULL;
-    VIR_Swizzle src2Swizzle = VIR_SWIZZLE_INVALID;
-    VIR_Type*   storeBaseType = gcvNULL;
+
+
 
     VIR_Symbol *bufferSym = gcvNULL;
     VSC_OPTN_ParamOptOptions* paramOptsOptions = (VSC_OPTN_ParamOptOptions*)pPassWorker->basePassWorker.pBaseOption;
@@ -894,7 +862,7 @@ VSC_ErrCode _VSC_SIMP_OptimizeCaller(
              /*Check if this inst defines one of the optimizable arguments*/
              if (currentArgument != gcvNULL && currentArgument->holderFunction == callerFunc)
              {
-                /*Add one store inst to replace orignal inst.*/
+                 /*Add one store inst to replace orignal inst.*/
                 errCode = VIR_Function_AddInstructionAfter(callerFunc, VIR_OP_STORE_S, VIR_TYPE_FLOAT32,
                     inst, gcvTRUE, &storeInst);
                 if(errCode)
@@ -904,17 +872,14 @@ VSC_ErrCode _VSC_SIMP_OptimizeCaller(
 
                 mmAddr = paramOptimizer->argMmPtr;
                 val = VIR_Inst_GetDest(inst);
-                src2Swizzle = VIR_Enable_2_Swizzle(VIR_Inst_GetEnable(inst));
-                storeBaseType = VIR_Shader_GetTypeFromId(shader, VIR_Operand_GetTypeId(val));
                 /*Add a new operand to hold offset of store inst.*/
                 errCode = VIR_Function_NewOperand(callerFunc, &storeOffset);
                 if (errCode != VSC_ERR_NONE)
                 {
                     return errCode;
                 }
-                /*Offset to base address = byte size of argument * index of vreg within argument + offset to start vreg index of argument + channelwise offset*/
+                /*Offset to base address = byte size of argument * index of vreg within argument + offset to start vreg index of argument*/
                 storeOffsetVal = currentArgument->argTypeByteSize * (destVregIndex - currentArgument->regStartIndex) + currentArgument->offset;
-                storeOffsetVal += _VSC_GetChannelwiseOffset(inst) * VIR_Type_GetTypeByteSize(shader, storeBaseType); /*channel offset*/
                 VIR_Operand_SetImmediateUint(storeOffset, storeOffsetVal);
 
                 VIR_Inst_CopyDest(storeInst, buffer, gcvFALSE);
@@ -928,7 +893,8 @@ VSC_ErrCode _VSC_SIMP_OptimizeCaller(
 
                 VIR_Operand_SetSwizzle(VIR_Inst_GetSource(storeInst, VIR_Operand_Src0),
                                         VIR_TypeId_Conv2Swizzle(VIR_Operand_GetTypeId(mmAddr)));
-                VIR_Operand_SetSwizzle(VIR_Inst_GetSource(storeInst, VIR_Operand_Src2), src2Swizzle);
+                VIR_Operand_SetSwizzle(VIR_Inst_GetSource(storeInst, VIR_Operand_Src2),
+                                        VIR_TypeId_Conv2Swizzle(VIR_Operand_GetTypeId(val)));
 
 
                 inst = storeInst;
@@ -1841,6 +1807,11 @@ DEF_QUERY_PASS_PROP(VSC_PARAM_Optimization_PerformOnShader)
     pPassProp->passFlag.resCreationReq.s.bNeedCfg = gcvTRUE;
     pPassProp->passFlag.resDestroyReq.s.bInvalidateDu = gcvTRUE;
     pPassProp->passFlag.resDestroyReq.s.bInvalidateRdFlow = gcvTRUE;
+}
+
+DEF_SH_NECESSITY_CHECK(VSC_PARAM_Optimization_PerformOnShader)
+{
+    return gcvTRUE;
 }
 
 /*******************************************************************************

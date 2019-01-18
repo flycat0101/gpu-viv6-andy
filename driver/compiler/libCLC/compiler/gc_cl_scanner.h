@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -254,6 +254,17 @@ OUT clsLexToken * Token
 );
 
 gctINT
+clScanSpecialOperator(
+IN cloCOMPILER Compiler,
+IN cleEXTENSION Extension,
+IN gctUINT LineNo,
+IN gctUINT StringNo,
+IN gctSTRING Text,
+IN gctINT tokenType,
+OUT clsLexToken * Token
+);
+
+gctINT
 clScanFieldSelection(
 IN cloCOMPILER Compiler,
 IN gctUINT LineNo,
@@ -302,6 +313,11 @@ int
 cloCOMPILER_Lex(
 YYSTYPE * pyylval,
 cloCOMPILER Compiler
+);
+
+gceSTATUS
+clCleanupKeywords(
+void
 );
 
 void

@@ -2524,8 +2524,6 @@ static struct name_address_pair GLX_functions[] = {
     { NULL, NULL }   /* end of list */
 };
 
-extern __GLesRawDispatchTableStruct __glVIVV_DispatchFuncTable;
-
 extern const __GLprocInfo __glProcInfoTable[];
 
 extern const GLuint __glProcTabSize;

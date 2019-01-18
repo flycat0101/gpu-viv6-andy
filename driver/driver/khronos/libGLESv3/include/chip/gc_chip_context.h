@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -226,7 +226,7 @@ typedef struct __GLchipDirtyRec
             unsigned int activeUniform   : 1;
             unsigned int lastFragData    : 1;
             unsigned int pgInsChanged    : 1;
-            unsigned int polygonOffset   : 1;  /* depthBias depend on polygonOffset state and depth surface */
+            unsigned int polygonOffset   : 1;
             unsigned int reserved        : 11;
         } sDefer;
         unsigned int deferDirty;
@@ -253,7 +253,7 @@ typedef struct __GLchipDirtyRec
 
 #define __GL_DEFAULT_LOOP 0
 
-#define __GL_CHIP_NAME_LEN 23
+#define __GL_CHIP_NAME_LEN 32
 
 
 /*
@@ -292,9 +292,6 @@ typedef struct __GLchipHalRtSlotInfoRec
 struct __GLchipContextRec
 {
     gcoHAL                      hal;
-#ifdef VIVANTE_PROFILER
-    gcoHAL                      phal;
-#endif
     gco3D                       engine;
     gcoOS                       os;
 
@@ -464,7 +461,9 @@ struct __GLchipContextRec
     gctBOOL                     alphaKillInShader;
 #endif
 
+#if VIVANTE_PROFILER
     gcoPROFILER                 profiler;
+#endif
 };
 
 
@@ -538,10 +537,7 @@ __glChipDetachDrawable(
 
 extern GLboolean
 __glChipUpdateDrawable(
-    __GLdrawablePrivate *drawable,
-    GLvoid* rtHandle,
-    GLvoid* depthHandle,
-    GLvoid *stencilHandle
+    __GLdrawablePrivate *drawable
     );
 
 extern GLvoid
@@ -671,8 +667,7 @@ __glChipDrawArraysInstanced(
 
 extern GLboolean
 __glChipFlush(
-    __GLcontext *gc,
-    GLboolean bInternal
+    __GLcontext *gc
     );
 
 extern GLboolean
@@ -1000,6 +995,7 @@ __glChipGetError(
     __GLcontext *gc
     );
 
+#if VIVANTE_PROFILER
 GLboolean
 __glChipProfilerSet(
     IN __GLcontext *gc,
@@ -1028,6 +1024,7 @@ gcChipInitProfileDevicePipeline(
     __GLcontext *gc,
     __GLchipContext *chipCtx
     );
+#endif
 
 GLboolean
 __glChipComputeBegin(

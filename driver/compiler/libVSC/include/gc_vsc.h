@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -76,6 +76,7 @@
 #include "utils/gc_vsc_utils_table.h"
 #include "utils/gc_vsc_utils_tree.h"
 #include "utils/gc_vsc_utils_graph.h"
+#include "utils/gc_vsc_utils_io.h"
 
 /* VIR language */
 #include "vir/ir/gc_vsc_vir_symbol_table.h"

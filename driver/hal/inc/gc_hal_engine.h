@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -284,8 +284,8 @@ typedef enum _gceSPLIT_DRAW_TYPE
     gcvSPLIT_DRAW_XFB,
     gcvSPLIT_DRAW_INDEX_FETCH,
     gcvSPLIT_DRAW_TCS,
-    gcvSPLIT_DRAW_WIDE_LINE,
     gcvSPLIT_DRAW_STIPPLE,
+    gcvSPLIT_DRAW_WIDE_LINE,
     gcvSPLIT_DRAW_LAST
 }
 gceSPLIT_DRAW_TYPE;
@@ -1603,10 +1603,11 @@ typedef struct _gcsTHREAD_WALKER_INFO
 
     gctUINT32   threadAllocation;
     gctBOOL     barrierUsed;
-
+    gctUINT32   memoryAccessFlag; /* same as gceMEMORY_ACCESS_FLAG */
     gctBOOL     indirect;
     gctUINT32   groupNumberUniformIdx;
     gctUINT32   baseAddress;
+    gctBOOL     bDual16;
 }
 gcsTHREAD_WALKER_INFO;
 
@@ -1990,6 +1991,7 @@ typedef struct _gcsTEXTURE
     gceTEXTURE_SRGBDECODE       sRGB;
 
     gcuVALUE                    borderColor[4];
+    gctBOOL                     descDirty;
 }
 gcsTEXTURE, * gcsTEXTURE_PTR;
 
@@ -2360,6 +2362,7 @@ typedef enum _gceVERTEX_FORMAT
     gcvVERTEX_FIXED,
     gcvVERTEX_HALF,
     gcvVERTEX_FLOAT,
+    gcvVERTEX_DOUBLE,
     gcvVERTEX_UNSIGNED_INT_10_10_10_2,
     gcvVERTEX_INT_10_10_10_2,
     gcvVERTEX_UNSIGNED_INT_2_10_10_10_REV,
@@ -2382,6 +2385,7 @@ typedef enum _gceATTRIB_SCHEME
     gcvATTRIB_SCHEME_UBYTE_TO_UVEC4,
     gcvATTRIB_SCHEME_USHORT_TO_UVEC4,
     gcvATTRIB_SCHEME_UINT_TO_UVEC4,
+    gcvATTRIB_SCHEME_DOUBLE_TO_FLOAT,
 } gceATTRIB_SCHEME;
 
 gceSTATUS
@@ -2914,8 +2918,9 @@ gcoBUFOBJ_ReAllocBufNode(
 
 /* Handle GPU cache operations */
 gceSTATUS
-gcoBUFOBJ_GPUCacheOperation(
-    gcoBUFOBJ BufObj
+gcoBUFOBJ_SetCPUWrite(
+    gcoBUFOBJ BufObj,
+    gctBOOL Value
     );
 
 /* Dump buffer. */

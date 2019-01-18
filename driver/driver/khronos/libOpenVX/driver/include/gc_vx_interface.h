@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -21,9 +21,9 @@ extern vx_kernel_description_s internalkernel_NNConvolutionReluPoolingCnnLayer;
 extern vx_kernel_description_s internalkernel_NNFullyConnectedReluLayer;
 extern vx_kernel_description_s internalkernel_NNSoftmaxLayer;
 extern vx_kernel_description_s internalkernel_NNNormalization;
-extern vx_kernel_description_s internalkernel_NNNormalizeImage;
 extern vx_kernel_description_s internalkernel_NNPoolingLayer;
 extern vx_kernel_description_s internalkernel_NNFullyConnectedLayer;
+extern vx_kernel_description_s internalkernel_NNFullyConnectedLayer11;
 extern vx_kernel_description_s internalkernel_NNActivationLayer;
 extern vx_kernel_description_s internalkernel_NNTensorAdd;
 extern vx_kernel_description_s internalkernel_NNTensorSub;
@@ -42,6 +42,31 @@ extern vx_kernel_description_s internalkernel_NNDeConvolutionLayer;
 extern vx_kernel_description_s internalkernel_NNL2NormalizeLayer;
 extern vx_kernel_description_s internalkernel_NNTensorCopy;
 extern vx_kernel_description_s internalkernel_NNConvolutionReluPoolingCnnLayer2;
+extern vx_kernel_description_s internalkernel_NNPoolingLayer2;
+extern vx_kernel_description_s internalkernel_NNTensorReduceSum;
+extern vx_kernel_description_s internalkernel_NNTensorPad;
+extern vx_kernel_description_s internalkernel_NN_LSTMUnit;
+extern vx_kernel_description_s internalkernel_NN_LSTMLayer;
+extern vx_kernel_description_s internalkernel_NNReOrg2;
+extern vx_kernel_description_s internalkernel_NNTensorRounding;
+extern vx_kernel_description_s internalkernel_NNHashLUT;
+extern vx_kernel_description_s internalkernel_NNLSHProjection;
+extern vx_kernel_description_s internalkernel_NNReshape;
+extern vx_kernel_description_s internalkernel_NNTensorScale;
+extern vx_kernel_description_s internalkernel_NNRNNLayer;
+extern vx_kernel_description_s internalkernel_NNSoftmaxLayer2;
+extern vx_kernel_description_s internalkernel_NNSVDFLayer;
+extern vx_kernel_description_s internalkernel_NNLUT2;
+extern vx_kernel_description_s internalkernel_NNNormalizationLayer2;
+extern vx_kernel_description_s internalkernel_NNAdapter;
+extern vx_kernel_description_s internalkernel_NNTensorReverse;
+extern vx_kernel_description_s internalkernel_NNYUV2RGBScale;
+extern vx_kernel_description_s internalkernel_NNTensorMean;
+extern vx_kernel_description_s internalkernel_NNTensorStrideSlice;
+extern vx_kernel_description_s internalkernel_NNTensorSqueeze;
+extern vx_kernel_description_s internalkernel_NNTensorPad2;
+extern vx_kernel_description_s internalkernel_PReluLayer;
+
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Invalid(vx_node node, const vx_reference paramTable[], vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInvalid_ValidateInput(vx_node node, vx_uint32 index);
@@ -98,8 +123,8 @@ VX_PRIVATE_API vx_df_image colorConvert_InputOutputFormat[][2] = {
 };
 
 VX_PRIVATE_API vx_param_description_s basekernel_colorConvert_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 vx_kernel_description_s basekernel_colorconvert = {
@@ -118,9 +143,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_ChannelExtract(vx_node node, 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoChannelExtract_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoChannelExtract_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
 VX_PRIVATE_API vx_param_description_s basekernel_channelExtract_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_ChannelCombine(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -139,11 +164,11 @@ vx_kernel_description_s basekernel_channelextract = {
 };
 
 VX_PRIVATE_API vx_param_description_s basekernel_channelCombine_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 vx_kernel_description_s basekernel_channelcombine = {
@@ -162,9 +187,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Sobel3x3(vx_node node, const 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoSobel3x3_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoSobel3x3_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
 VX_PRIVATE_API vx_param_description_s basekernel_Sobel3x3_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
 };
 
 vx_kernel_description_s basekernel_sobel3x3 = {
@@ -183,9 +208,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Magnitude(vx_node node, const
 VX_PRIVATE_API vx_status VX_CALLBACK vxoMagnitude_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoMagnitude_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
 VX_PRIVATE_API vx_param_description_s basekernel_magnitude_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 vx_kernel_description_s basekernel_magnitude = {
@@ -207,9 +232,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Phase(vx_node node, const vx_
 VX_PRIVATE_API vx_status VX_CALLBACK vxoPhase_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoPhase_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
 VX_PRIVATE_API vx_param_description_s basekernel_phase_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 vx_kernel_description_s basekernel_phase = {
@@ -231,9 +256,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_TableLookup(vx_node node, con
 VX_PRIVATE_API vx_status VX_CALLBACK vxoTableLookup_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoTableLookup_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
 VX_PRIVATE_API vx_param_description_s basekernel_lut_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_LUT, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT,VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_LUT, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT,VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 vx_kernel_description_s basekernel_lut = {
@@ -253,9 +278,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoScaleImage_ValidateInput(vx_node node, v
 VX_PRIVATE_API vx_status VX_CALLBACK vxoScaleImage_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoScaleImage_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_param_description_s basekernel_scale_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_true_e},
 };
 
 vx_kernel_description_s basekernel_scale_image = {
@@ -291,8 +316,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Histogram(vx_node node, const
 VX_PRIVATE_API vx_status VX_CALLBACK vxoHistogram_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoHistogram_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
 VX_PRIVATE_API vx_param_description_s basekernel_histogram_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_DISTRIBUTION, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_DISTRIBUTION, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 vx_kernel_description_s basekernel_histogram = {
@@ -313,8 +338,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoEqualizeHist_ValidateOutput(vx_node node
 VX_PRIVATE_API vx_status VX_CALLBACK vxoEqualizeHist_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoEqualizeHist_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_param_description_s basekernel_equalize_hist_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 vx_kernel_description_s basekernel_equalize_hist = {
@@ -333,9 +358,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_AbsDiff(vx_node node, const v
 VX_PRIVATE_API vx_status VX_CALLBACK vxoAbsDiff_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoAbsDiff_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
 VX_PRIVATE_API vx_param_description_s basekernel_absdiff_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 vx_kernel_description_s basekernel_absdiff = {
@@ -354,9 +379,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_MeanStdDev(vx_node node, cons
 VX_PRIVATE_API vx_status VX_CALLBACK vxoMeanStdDev_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoMeanStdDev_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
 VX_PRIVATE_API vx_param_description_s basekernel_mean_stddev_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 vx_kernel_description_s basekernel_mean_stddev = {
@@ -377,20 +402,28 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoThreshold_ValidatorOutput(vx_node node, 
 VX_PRIVATE_API vx_param_description_s basekernel_threshold_params[] = {
     {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
     {VX_INPUT, VX_TYPE_THRESHOLD, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT,VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT,VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED}
 };
 
 vx_kernel_description_s basekernel_threshold = {
     VX_KERNEL_THRESHOLD,
     "org.khronos.openvx.threshold",
-    vxoBaseKernel_Threshold,
+    NULL,
     basekernel_threshold_params, vxmLENGTH_OF(basekernel_threshold_params),
     NULL,
     vxoThreshold_ValidateInput,
     vxoThreshold_ValidatorOutput,
+    vxoBaseKernel_Threshold,
     NULL,
-    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"threshold.vx"},
 };
+
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_IntegralImage(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoIntegral_ValidateInput(vx_node node, vx_uint32 index);
@@ -398,8 +431,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoIntegral_ValidateOutput(vx_node node, vx
 VX_PRIVATE_API vx_status VX_CALLBACK vxoIntegral_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoIntegral_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_param_description_s basekernel_integral_image_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 vx_kernel_description_s basekernel_integral_image = {
@@ -417,8 +450,8 @@ vx_kernel_description_s basekernel_integral_image = {
 VX_PRIVATE_API vx_status VX_CALLBACK vxoMorphology_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoMorphology_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s*ptr);
 VX_PRIVATE_API vx_param_description_s basekernel_morphology_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Erode3x3(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -450,8 +483,8 @@ vx_kernel_description_s basekernel_dilate3x3 = {
 VX_PRIVATE_API vx_status VX_CALLBACK vxoFilter_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoFilter_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
 VX_PRIVATE_API vx_param_description_s basekernel_filter_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Box3x3(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -498,9 +531,9 @@ vx_kernel_description_s basekernel_gaussian3x3 = {
 };
 
 VX_PRIVATE_API vx_param_description_s basekernel_convolution_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_CONVOLUTION, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_CONVOLUTION, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBasekernel_Convolve(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -519,8 +552,8 @@ vx_kernel_description_s basekernel_convolution = {
 };
 
 static vx_param_description_s basekernel_pyramid_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Pyramid(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -542,9 +575,9 @@ vx_kernel_description_s basekernel_pyramid = {
 
 static vx_param_description_s basekernel_laplacian_pyramid_params[] =
 {
-    { VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED },
-    { VX_OUTPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED },
-    { VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED },
+    { VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e },
+    { VX_OUTPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED, vx_false_e },
+    { VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e },
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_LaplacianPyramid(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -566,9 +599,9 @@ vx_kernel_description_s basekernel_laplacian_pyramid = {
 
 static vx_param_description_s basekernel_laplacian_reconstruct_params[] =
 {
-    { VX_INPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED },
-    { VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED },
-    { VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED },
+    { VX_INPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED, vx_false_e },
+    { VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e },
+    { VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e },
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_LaplacianReconstruct(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -590,10 +623,10 @@ vx_kernel_description_s basekernel_laplacian_reconstruct = {
 
 
 static vx_param_description_s basekernel_filter_kernel_params[] = {
-    { VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED },
-    { VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED },
-    { VX_INPUT, VX_TYPE_MATRIX, VX_PARAMETER_STATE_REQUIRED },
-    { VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED },
+    { VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e },
+    { VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e },
+    { VX_INPUT, VX_TYPE_MATRIX, VX_PARAMETER_STATE_REQUIRED, vx_false_e },
+    { VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e },
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxNonLinearFilterInputValidator(vx_node node, vx_uint32 index);
@@ -612,14 +645,14 @@ vx_kernel_description_s basekernel_nonlinear_filter = {
 };
 
 static vx_param_description_s accumulate_kernel_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_BIDIRECTIONAL, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_BIDIRECTIONAL, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 static vx_param_description_s accumulate_scaled_kernel_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_BIDIRECTIONAL, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_BIDIRECTIONAL, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Accumulate(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -666,13 +699,13 @@ vx_kernel_description_s basekernel_accumulate_square = {
 };
 
 static vx_param_description_s basekernel_minmaxloc_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_MinMaxLoc(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -707,10 +740,10 @@ VX_PRIVATE_API vx_df_image convertDepth_InputOutputFormat[][2] = {
 };
 
 static vx_param_description_s basekernel_convertdepth_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_ConvertDepth(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -729,11 +762,11 @@ vx_kernel_description_s basekernel_convertdepth = {
 };
 
 static vx_param_description_s basekernel_canny_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_THRESHOLD, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_THRESHOLD, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_CannyEdge(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -754,9 +787,9 @@ vx_kernel_description_s basekernel_canny = {
 };
 
 static vx_param_description_s basekernel_binary_bitwise_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_And(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -801,8 +834,8 @@ vx_kernel_description_s basekernel_xor = {
 };
 
 static vx_param_description_s unary_bitwise_kernel_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Not(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -821,12 +854,12 @@ vx_kernel_description_s basekernel_not = {
 };
 
 static vx_param_description_s basekernel_multiply_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Multiply(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -845,10 +878,10 @@ vx_kernel_description_s basekernel_multiply = {
 };
 
 static vx_param_description_s basekernel_add_subtract_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Add(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -880,10 +913,10 @@ vx_kernel_description_s basekernel_subtract = {
 };
 
 static vx_param_description_s basekernel_warp_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_MATRIX, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_MATRIX, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_true_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxWarpAffineKernel(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -916,14 +949,14 @@ vx_kernel_description_s basekernel_warp_perspective = {
 };
 
 static vx_param_description_s basekernel_harris_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
+    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_HarrisCorners(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -944,11 +977,11 @@ vx_kernel_description_s basekernel_harris = {
 };
 
 static vx_param_description_s basekernel_fast9_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
+    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Fast9Corners(vx_node node, const vx_reference parameters[], vx_uint32 num);
@@ -969,16 +1002,16 @@ vx_kernel_description_s basekernel_fast9 = {
 };
 
 static vx_param_description_s basekernel_optpyrlk_params[] = {
-    {VX_INPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_OpticalFlowPyrLK(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -999,10 +1032,10 @@ vx_kernel_description_s basekernel_optpyrlk = {
 };
 
 static vx_param_description_s remap_kernel_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_REMAP, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_REMAP, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_true_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Remap(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1022,10 +1055,10 @@ vx_kernel_description_s basekernel_remap = {
 
 /* internal kernel */
 static vx_param_description_s internlkernel_gradientMxN_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SobelMxN(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1047,13 +1080,14 @@ vx_kernel_description_s internalkernel_sobelMxN = {
 };
 
 static vx_param_description_s internlkernel_gradientMxN_F16_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
 };
 
+VX_PRIVATE_API vx_status VX_CALLBACK vxoGradientMxN_Validate(vx_node node, const vx_reference parameters[], vx_uint32 num, vx_meta_format metas[]);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoGradientMxN_F16_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta);
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SobelMxNF16(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1073,13 +1107,13 @@ vx_kernel_description_s internalkernel_sobelMxN_f16 = {
 };
 
 static vx_param_description_s internalkernel_harrisscore_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_HarrisScore(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1098,10 +1132,10 @@ vx_kernel_description_s internalkernel_harris_score = {
 };
 
 static vx_param_description_s intenralkernel_euclidean_non_max_suppression_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EuclideanNonMaxSuppression(vx_node node, const vx_reference parameters[], vx_uint32 num);
@@ -1118,9 +1152,9 @@ vx_kernel_description_s internalkernel_euclidian_nonmax = {
 };
 
 static vx_param_description_s internalkernel_lister_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_ImageLister(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1141,10 +1175,10 @@ vx_kernel_description_s internalkernel_lister = {
 };
 
 static vx_param_description_s internalkernel_norm_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_Norm(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1198,23 +1232,23 @@ vx_kernel_description_s internalkernel_phase_f16 = {
 #endif
 };
 
-static vx_param_description_s internalkernel_nonmaxsuppression_params[] = {
+static vx_param_description_s internalkernel_nonmaxsuppressioncanny_params[] = {
     {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
     {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
     {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
 };
 
-VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_NonMaxSuppression(vx_node node, const vx_reference parameters[], vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNonMaxSuppression_ValidateInput(vx_node node, vx_uint32 index);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNonMaxSuppression_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta);
-vx_kernel_description_s internalkernel_nonmax = {
-    VX_KERNEL_INTERNAL_NONMAXSUPPRESSION,
-    "org.khronos.internal.nonmaximasuppression",
-    vxoInternalKernel_NonMaxSuppression,
-    internalkernel_nonmaxsuppression_params, vxmLENGTH_OF(internalkernel_nonmaxsuppression_params),
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_NonMaxSuppressionCanny(vx_node node, const vx_reference parameters[], vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoNonMaxSuppressionCanny_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoNonMaxSuppressionCanny_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta);
+vx_kernel_description_s internalkernel_nonmaxcanny = {
+    VX_KERNEL_INTERNAL_NONMAXSUPPRESSION_CANNY,
+    "org.khronos.internal.nonmaximasuppressioncanny",
+    vxoInternalKernel_NonMaxSuppressionCanny,
+    internalkernel_nonmaxsuppressioncanny_params, vxmLENGTH_OF(internalkernel_nonmaxsuppressioncanny_params),
     NULL,
-    vxoNonMaxSuppression_ValidateInput,
-    vxoNonMaxSuppression_ValidateOutput,
+    vxoNonMaxSuppressionCanny_ValidateInput,
+    vxoNonMaxSuppressionCanny_ValidateOutput,
     NULL,
     NULL,
 #if gcdVX_OPTIMIZER
@@ -1223,9 +1257,9 @@ vx_kernel_description_s internalkernel_nonmax = {
 };
 
 static vx_param_description_s internalkernel_edge_trace_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_THRESHOLD, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT,VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_THRESHOLD, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT,VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EdgeTrace(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1246,9 +1280,9 @@ vx_kernel_description_s internalkernel_edge_trace = {
 };
 
 static vx_param_description_s internalkernel_sgm_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SGM(vx_node node, const vx_reference parameters[], vx_uint32 num);
@@ -1269,13 +1303,15 @@ vx_kernel_description_s internalkernel_sgm = {
 };
 
 static vx_param_description_s internalkernel_copy_image_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT,VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT,VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_CopyImage(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoCopyImage_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoCopyImage_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoCopyImage_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoCopyImage_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
 vx_kernel_description_s internalkernel_copy_image = {
     VX_KERNEL_INTERNAL_COPY_IMAGE,
     "vivante.internal.copy_image",
@@ -1290,16 +1326,18 @@ vx_kernel_description_s internalkernel_copy_image = {
 
 
 static vx_param_description_s internalkernel_fast9corners_strength_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT,VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT,VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_Fast9CornersStrength(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersStrength_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersStrength_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersStrength_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersStrength_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
 vx_kernel_description_s internalkernel_Fast9Corners_Strength = {
     VX_KERNEL_INTERNAL_FAST9CORNERS_STRENGTH,
     "vivante.internal.fast9corners_strength",
@@ -1313,15 +1351,17 @@ vx_kernel_description_s internalkernel_Fast9Corners_Strength = {
 };
 
 static vx_param_description_s internalkernel_fast9corners_nonmax_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT,VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT,VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_Fast9CornersNonMax(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersNonMax_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersNonMax_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersNonMax_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersNonMax_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
 vx_kernel_description_s internalKernel_Fast9Corners_NonMax = {
     VX_KERNEL_INTERNAL_FAST9CORNERS_NONMAX,
     "vivante.internal.fast9corners_nonmax",
@@ -1335,9 +1375,9 @@ vx_kernel_description_s internalKernel_Fast9Corners_NonMax = {
 };
 
 static vx_param_description_s internalkernel_createlister_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED}
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED, vx_false_e}
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_CreateLister(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1356,12 +1396,12 @@ vx_kernel_description_s internalKernel_CreateLister = {
 };
 
 static vx_param_description_s internalkernel_pack_arrays_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL}
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e}
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_PackArrays(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1380,12 +1420,12 @@ vx_kernel_description_s internalKernel_PackArrays = {
 };
 
 static vx_param_description_s internalkernel_minmaxloc_pack_arrays_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_OPTIONAL}
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_OPTIONAL, vx_false_e}
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_MinMaxlocPackArrays(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1404,9 +1444,9 @@ vx_kernel_description_s internalKernel_MinMacLocPackArrays = {
 };
 
 static vx_param_description_s internalkernel_minmaxloc_filter_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL}
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e}
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_MinMaxLocFilter(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1425,20 +1465,22 @@ vx_kernel_description_s internalKernel_MinMaxLocFilter = {
 };
 
 static vx_param_description_s internalkernel_minmax_get_location_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL},
-    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL}
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e}
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_MinMaxGetLocation(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxGetLocation_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxGetLocation_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxGetLocation_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxGetLocation_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
 vx_kernel_description_s internalKernel_MinMaxGetLocation = {
     VX_KERNEL_INTERNAL_GET_LOCATION,
     "vivante.internal.minmax.getlocation",
@@ -1450,9 +1492,9 @@ vx_kernel_description_s internalKernel_MinMaxGetLocation = {
 };
 
 static vx_param_description_s internalkernel_edgeTrace_threshold_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_THRESHOLD, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED}
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_THRESHOLD, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e}
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EdgeTraceThreshold(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1469,8 +1511,8 @@ vx_kernel_description_s internalKernel_EdgeTraceThreshold = {
 };
 
 static vx_param_description_s internalkernel_edgeTrace_hysteresis_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED}
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e}
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EdgeTraceHysteresis(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1487,8 +1529,8 @@ vx_kernel_description_s internalKernel_EdgeTraceHysteresis = {
 };
 
 static vx_param_description_s internalkernel_edgeTrace_clamp_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED}
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e}
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EdgeTraceClamp(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1505,9 +1547,9 @@ vx_kernel_description_s internalKernel_EdgeTraceClamp = {
 };
 
 static vx_param_description_s internalkernel_integral_image_step_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED}
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e}
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_IntegralImageStep(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1524,9 +1566,9 @@ vx_kernel_description_s internalKernel_IntegralImageStep = {
 };
 
 static vx_param_description_s internalkernel_scharr3x3_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED}
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e}
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_Scharr3x3(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1543,18 +1585,18 @@ vx_kernel_description_s internalKernel_Scharr3x3 = {
 };
 
 static vx_param_description_s internalkernel_vlk_tracker_params[] = {
-    {VX_INPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_VLKTracker(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1571,9 +1613,9 @@ vx_kernel_description_s internalKernel_VLKTracker = {
 };
 
 static vx_param_description_s internalkernel_equalize_histogram_hist_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED}
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e}
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EqualizeHistogramHist(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1590,10 +1632,10 @@ vx_kernel_description_s internalKernel_EqualizeHistogramHist = {
 };
 
 static vx_param_description_s internalkernel_equalize_histogram_gcdf_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED}
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e}
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EqualizeHistogramGcdf(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1610,10 +1652,10 @@ vx_kernel_description_s internalKernel_EqualizeHistogramGcdf = {
 };
 
 static vx_param_description_s internalkernel_equalize_histogram_cdf_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EqualizeHistogramCdf(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1630,9 +1672,9 @@ vx_kernel_description_s internalKernel_EqualizeHistogramCdf = {
 };
 
 static vx_param_description_s internalkernel_equalize_histogram_lut_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED}
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e}
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EqualizeHistogramLut(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1660,10 +1702,10 @@ vx_kernel_description_s basekernel_laplacian3x3 = {
 };
 
 static vx_param_description_s internalkernel_sgm_cost_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmCost(vx_node node, const vx_reference parameters[], vx_uint32 num);
@@ -1680,9 +1722,9 @@ vx_kernel_description_s internalkernel_sgm_cost = {
 };
 
 static vx_param_description_s internalkernel_sgm_path90_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmPath90(vx_node node, const vx_reference parameters[], vx_uint32 num);
@@ -1699,9 +1741,9 @@ vx_kernel_description_s internalkernel_sgm_path90 = {
 };
 
 static vx_param_description_s internalkernel_sgm_path45_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmPath45(vx_node node, const vx_reference parameters[], vx_uint32 num);
@@ -1718,9 +1760,9 @@ vx_kernel_description_s internalkernel_sgm_path45 = {
 };
 
 static vx_param_description_s internalkernel_sgm_path135_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmPath135(vx_node node, const vx_reference parameters[], vx_uint32 num);
@@ -1737,9 +1779,9 @@ vx_kernel_description_s internalkernel_sgm_path135 = {
 };
 
 static vx_param_description_s internalkernel_sgm_path0_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmPath0(vx_node node, const vx_reference parameters[], vx_uint32 num);
@@ -1756,9 +1798,9 @@ vx_kernel_description_s internalkernel_sgm_path0 = {
 };
 
 static vx_param_description_s internalkernel_sgm_disp_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmDisp(vx_node node, const vx_reference parameters[], vx_uint32 num);
@@ -1775,8 +1817,8 @@ vx_kernel_description_s internalkernel_sgm_disp = {
 };
 
 static vx_param_description_s internalkernel_laplacian3x3_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED}
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e}
 };
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_Laplacian3x3(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1793,8 +1835,8 @@ vx_kernel_description_s internalKernel_Laplacian3x3 = {
 };
 
 static vx_param_description_s internalkernel_census3x3_params[] = {
-    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
-    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED}
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED, vx_false_e}
 };
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_Census3x3(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoCensus3x3_ValidateInput(vx_node node, vx_uint32 index);
@@ -1807,6 +1849,871 @@ vx_kernel_description_s internalKernel_census3x3 = {
     NULL,
     vxoCensus3x3_ValidateInput,
     vxoCensus3x3_ValidateOutput
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMax_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMax_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMax_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s basekernel_max_params[] = {
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+};
+vx_kernel_description_s basekernel_max = {
+    VX_KERNEL_MAX,
+    "org.khronos.openvx.max",
+    NULL,
+    basekernel_max_params, vxmLENGTH_OF(basekernel_max_params),
+    VX_NULL,
+    vxoMax_ValidateInput,
+    vxoMax_ValidateOutput,
+    vxoMax_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"max.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMin_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMin_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMin_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s basekernel_min_params[] = {
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+};
+vx_kernel_description_s basekernel_min = {
+    VX_KERNEL_MIN,
+    "org.khronos.openvx.min",
+    NULL,
+    basekernel_min_params, vxmLENGTH_OF(basekernel_min_params),
+    VX_NULL,
+    vxoMin_ValidateInput,
+    vxoMin_ValidateOutput,
+    vxoMin_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"min.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoNon_max_suppression_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoNon_max_suppression_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoNon_max_suppression_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s basekernel_non_max_suppression_params[] = {
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+};
+vx_kernel_description_s basekernel_non_max_suppression = {
+    VX_KERNEL_NON_MAX_SUPPRESSION,
+    "org.khronos.openvx.non_max_suppression",
+    VX_NULL,
+    basekernel_non_max_suppression_params, vxmLENGTH_OF(basekernel_non_max_suppression_params),
+    VX_NULL,
+    vxoNon_max_suppression_ValidateInput,
+    vxoNon_max_suppression_ValidateOutput,
+    vxoNon_max_suppression_Initialize,
+    VX_NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"non_max_suppression.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMatch_template_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMatch_template_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMatch_template_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s basekernel_match_template_params[] = {
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+};
+vx_kernel_description_s basekernel_match_template = {
+    VX_KERNEL_MATCH_TEMPLATE,
+    "org.khronos.openvx.match_template",
+    NULL,
+    basekernel_match_template_params, vxmLENGTH_OF(basekernel_match_template_params),
+    VX_NULL,
+    vxoMatch_template_ValidateInput,
+    vxoMatch_template_ValidateOutput,
+    vxoMatch_template_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"match_template.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLbp_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLbp_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLbp_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s basekernel_lbp_params[] = {
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+};
+vx_kernel_description_s basekernel_lbp = {
+    VX_KERNEL_LBP,
+    "org.khronos.openvx.lbp",
+    NULL,
+    basekernel_lbp_params, vxmLENGTH_OF(basekernel_lbp_params),
+    VX_NULL,
+    vxoLbp_ValidateInput,
+    vxoLbp_ValidateOutput,
+    vxoLbp_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"lbp.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHoughMakepoints_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHoughMakepoints_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHoughMakepoints_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s internalkernel_hough_makepoints_params[] = {
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED}
+};
+vx_kernel_description_s internalkernel_hough_makepoints = {
+    VX_KERNEL_INTERNAL_HOUGH_MAKEPOINTS,
+    "org.khronos.internal.hough.makepoints",
+    NULL,
+    internalkernel_hough_makepoints_params, vxmLENGTH_OF(internalkernel_hough_makepoints_params),
+    VX_NULL,
+    vxoHoughMakepoints_ValidateInput,
+    vxoHoughMakepoints_ValidateOutput,
+    vxoHoughMakepoints_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"makepoints.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHoughFillaccum_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHoughFillaccum_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHoughFillaccum_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s internalkernel_hough_fillaccum_params[] = {
+    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED}
+};
+vx_kernel_description_s internalkernel_hough_fillaccum = {
+    VX_KERNEL_INTERNAL_HOUGH_FILLACCUM,
+    "org.khronos.internal.hough.fillaccum",
+    NULL,
+    internalkernel_hough_fillaccum_params, vxmLENGTH_OF(internalkernel_hough_fillaccum_params),
+    VX_NULL,
+    vxoHoughFillaccum_ValidateInput,
+    vxoHoughFillaccum_ValidateOutput,
+    vxoHoughFillaccum_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"fillaccum.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHoughGetlines_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHoughGetlines_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHoughGetlines_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s internalkernel_hough_getlines_params[] = {
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED}
+};
+vx_kernel_description_s internalkernel_hough_getlines = {
+    VX_KERNEL_INTERNAL_HOUGH_GETLINES,
+    "org.khronos.internal.hough.getlines",
+    NULL,
+    internalkernel_hough_getlines_params, vxmLENGTH_OF(internalkernel_hough_getlines_params),
+    VX_NULL,
+    vxoHoughGetlines_ValidateInput,
+    vxoHoughGetlines_ValidateOutput,
+    vxoHoughGetlines_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"getlines.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_hough_lines_p(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHough_lines_p_Deinitialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHough_lines_p_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHough_lines_p_Input_Validate(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHough_lines_p_Output_Validate(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_param_description_s basekernel_hough_lines_p_params[] = {
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED}
+};
+vx_kernel_description_s basekernel_hough_lines_p = {
+    VX_KERNEL_HOUGH_LINES_P,
+    "org.khronos.openvx.hough_lines_p",
+    vxoBaseKernel_hough_lines_p,
+    basekernel_hough_lines_p_params, vxmLENGTH_OF(basekernel_hough_lines_p_params),
+    NULL,
+    vxoHough_lines_p_Input_Validate,
+    vxoHough_lines_p_Output_Validate,
+    vxoHough_lines_p_Initialize,
+    vxoHough_lines_p_Deinitialize,
+    {NULL},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorLUT_Validate(vx_node node, const vx_reference parameters[ ], vx_uint32 num, vx_meta_format metas[]);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorLUT_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+
+VX_PRIVATE_API vx_param_description_s basekernel_tensorlut_params[] = {
+    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_LUT, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT,VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED},
+};
+
+vx_kernel_description_s basekernel_tensorlut = {
+    VX_KERNEL_TENSOR_TABLE_LOOKUP,
+    "org.khronos.openvx.tensor_table_lookup",
+    NULL,
+    basekernel_tensorlut_params, vxmLENGTH_OF(basekernel_tensorlut_params),
+    vxoTensorLUT_Validate,
+    NULL,
+    NULL,
+    vxoTensorLUT_Initialize,
+    NULL,
+    {"tensorlut.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoTensor_convert_depth_Validate(vx_node node, const vx_reference parameters[ ], vx_uint32 num, vx_meta_format metas[]);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoTensor_convert_depth_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s basekernel_tensor_convert_depth_params[] = {
+    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED}
+};
+vx_kernel_description_s basekernel_tensor_convert_depth = {
+    VX_KERNEL_TENSOR_CONVERT_DEPTH,
+    "org.khronos.openvx.tensor_convert_depth",
+    NULL,
+    basekernel_tensor_convert_depth_params, vxmLENGTH_OF(basekernel_tensor_convert_depth_params),
+    vxoTensor_convert_depth_Validate,
+    NULL,
+    NULL,
+    vxoTensor_convert_depth_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"tensor_convert_depth.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoTensor_matrix_multiply(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoTensor_matrix_multiply_Validate(vx_node node, const vx_reference parameters[ ], vx_uint32 num, vx_meta_format metas[]);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoTensor_matrix_multiply_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoTensor_matrix_multiply_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s basekernel_tensor_matrix_multiply_params[] = {
+    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL},
+    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED}
+};
+vx_kernel_description_s basekernel_tensor_matrix_multiply = {
+    VX_KERNEL_TENSOR_MATRIX_MULTIPLY,
+    "org.khronos.openvx.tensor_matrix_multiply",
+    vxoTensor_matrix_multiply,
+    basekernel_tensor_matrix_multiply_params, vxmLENGTH_OF(basekernel_tensor_matrix_multiply_params),
+    vxoTensor_matrix_multiply_Validate,
+    NULL,
+    NULL,
+    vxoTensor_matrix_multiply_Initialize,
+    vxoTensor_matrix_multiply_Deinitializer,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {NULL},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoImageCopy_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoImageCopy_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoImageCopy_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s internalkernel_image_copy_params[] = {
+    {VX_INPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED}
+};
+vx_kernel_description_s internalkernel_image_copy = {
+    VX_KERNEL_INTERNAL_IMAGE_COPY,
+    "org.khronos.internal.image.copy",
+    NULL,
+    internalkernel_image_copy_params, vxmLENGTH_OF(internalkernel_image_copy_params),
+    VX_NULL,
+    vxoImageCopy_ValidateInput,
+    vxoImageCopy_ValidateOutput,
+    vxoImageCopy_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"imageCopy.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoScalarCopy_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoScalarCopy_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoScalarCopy_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s internalkernel_scalar_copy_params[] = {
+    {VX_INPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED}
+};
+vx_kernel_description_s internalkernel_scalar_copy = {
+    VX_KERNEL_INTERNAL_SCALAR_COPY,
+    "org.khronos.internal.scalar.copy",
+    NULL,
+    internalkernel_scalar_copy_params, vxmLENGTH_OF(internalkernel_scalar_copy_params),
+    VX_NULL,
+    vxoScalarCopy_ValidateInput,
+    vxoScalarCopy_ValidateOutput,
+    vxoScalarCopy_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"scalarCopy.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoArrayCopy_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoArrayCopy_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoArrayCopy_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s internalkernel_array_copy_params[] = {
+    {VX_INPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+};
+vx_kernel_description_s internalkernel_array_copy = {
+    VX_KERNEL_INTERNAL_ARRAY_COPY,
+    "org.khronos.internal.array.copy",
+    NULL,
+    internalkernel_array_copy_params, vxmLENGTH_OF(internalkernel_array_copy_params),
+    VX_NULL,
+    vxoArrayCopy_ValidateInput,
+    vxoArrayCopy_ValidateOutput,
+    vxoArrayCopy_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"arrayCopy.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLutCopy_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLutCopy_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLutCopy_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s internalkernel_lut_copy_params[] = {
+    {VX_INPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+};
+vx_kernel_description_s internalkernel_lut_copy = {
+    VX_KERNEL_INTERNAL_LUT_COPY,
+    "org.khronos.internal.lut.copy",
+    NULL,
+    internalkernel_lut_copy_params, vxmLENGTH_OF(internalkernel_lut_copy_params),
+    VX_NULL,
+    vxoLutCopy_ValidateInput,
+    vxoLutCopy_ValidateOutput,
+    vxoLutCopy_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"lutCopy.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMatrixCopy_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMatrixCopy_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMatrixCopy_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s internalkernel_matrix_copy_params[] = {
+    {VX_INPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+};
+vx_kernel_description_s internalkernel_matrix_copy = {
+    VX_KERNEL_INTERNAL_MATRIX_COPY,
+    "org.khronos.internal.matrix.copy",
+    NULL,
+    internalkernel_matrix_copy_params, vxmLENGTH_OF(internalkernel_matrix_copy_params),
+    VX_NULL,
+    vxoMatrixCopy_ValidateInput,
+    vxoMatrixCopy_ValidateOutput,
+    vxoMatrixCopy_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"copy.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoConvolutionCopy_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoConvolutionCopy_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoConvolutionCopy_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s internalkernel_convolution_copy_params[] = {
+    {VX_INPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+};
+vx_kernel_description_s internalkernel_convolution_copy = {
+    VX_KERNEL_INTERNAL_CONVOLUTION_COPY,
+    "org.khronos.internal.convolution.copy",
+    NULL,
+    internalkernel_convolution_copy_params, vxmLENGTH_OF(internalkernel_convolution_copy_params),
+    VX_NULL,
+    vxoConvolutionCopy_ValidateInput,
+    vxoConvolutionCopy_ValidateOutput,
+    vxoConvolutionCopy_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"copy.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoDistributtionCopy_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoDistributtionCopy_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoDistributtionCopy_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s internalkernel_distributtion_copy_params[] = {
+    {VX_INPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+};
+vx_kernel_description_s internalkernel_distributtion_copy = {
+    VX_KERNEL_INTERNAL_DISTRIBUTION_COPY,
+    "org.khronos.internal.distributtion.copy",
+    NULL,
+    internalkernel_distributtion_copy_params, vxmLENGTH_OF(internalkernel_distributtion_copy_params),
+    VX_NULL,
+    vxoDistributtionCopy_ValidateInput,
+    vxoDistributtionCopy_ValidateOutput,
+    vxoDistributtionCopy_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"copy.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorCopy_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorCopy_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorCopy_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s internalkernel_tensor_copy_params[] = {
+    {VX_INPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+};
+vx_kernel_description_s internalkernel_tensor_copy = {
+    VX_KERNEL_INTERNAL_TENSOR_COPY,
+    "org.khronos.internal.tensor.copy",
+    NULL,
+    internalkernel_tensor_copy_params, vxmLENGTH_OF(internalkernel_tensor_copy_params),
+    VX_NULL,
+    vxoTensorCopy_ValidateInput,
+    vxoTensorCopy_ValidateOutput,
+    vxoTensorCopy_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"copy.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoThresholdCopy_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoThresholdCopy_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoThresholdCopy_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s internalkernel_threshold_copy_params[] = {
+    {VX_INPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+};
+vx_kernel_description_s internalkernel_threshold_copy = {
+    VX_KERNEL_INTERNAL_THRESHOLD_COPY,
+    "org.khronos.internal.threshold.copy",
+    vxoThresholdCopy_Initialize,
+    internalkernel_threshold_copy_params, vxmLENGTH_OF(internalkernel_threshold_copy_params),
+    VX_NULL,
+    vxoThresholdCopy_ValidateInput,
+    vxoThresholdCopy_ValidateOutput,
+    NULL,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {NULL},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoRemapCopy_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoRemapCopy_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoRemapCopy_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s internalkernel_remap_copy_params[] = {
+    {VX_INPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+};
+vx_kernel_description_s internalkernel_remap_copy = {
+    VX_KERNEL_INTERNAL_REMAP_COPY,
+    "org.khronos.internal.remap.copy",
+    NULL,
+    internalkernel_remap_copy_params, vxmLENGTH_OF(internalkernel_remap_copy_params),
+    VX_NULL,
+    vxoRemapCopy_ValidateInput,
+    vxoRemapCopy_ValidateOutput,
+    vxoRemapCopy_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"remapCopy.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Copy(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoCopy_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoCopy_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoCopy_Validate(vx_node node, const vx_reference parameters[ ], vx_uint32 num, vx_meta_format metas[]);
+VX_PRIVATE_API vx_param_description_s basekernel_copy_params[] = {
+    {VX_INPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+};
+vx_kernel_description_s basekernel_copy = {
+    VX_KERNEL_COPY,
+    "org.khronos.openvx.copy",
+    vxoBaseKernel_Copy,
+    basekernel_copy_params, vxmLENGTH_OF(basekernel_copy_params),
+    vxoCopy_Validate,
+    NULL,
+    NULL,
+    vxoCopy_Initialize,
+    vxoCopy_Deinitializer,
+    {NULL},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxBaseKernelScalarOperation_Validator(vx_node node, const vx_reference parameters[], vx_uint32 num, vx_meta_format metas[]);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernelScalarOperation_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernelScalarOperation_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_ScalarOperation(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s basekernel_scalar_operation_params[] = {
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED}
+};
+vx_kernel_description_s basekernel_scalar_operation = {
+    VX_KERNEL_SCALAR_OPERATION,
+    "org.khronos.openvx.scalar_operation",
+    vxoBaseKernel_ScalarOperation,
+    basekernel_scalar_operation_params, vxmLENGTH_OF(basekernel_scalar_operation_params),
+    vxBaseKernelScalarOperation_Validator,
+    NULL,
+    NULL,
+    vxoBaseKernelScalarOperation_Initialize,
+    vxoBaseKernelScalarOperation_Deinitializer,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {NULL},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalScalar_operation_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalScalar_operation_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalScalar_operation_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s internalkernel_scalar_operation_params[] = {
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+};
+vx_kernel_description_s internalkernel_scalar_operation = {
+    VX_KERNEL_INTERNAL_SCALAR_OPERATION,
+    "org.khronos.internal.scalar_operation",
+    NULL,
+    internalkernel_scalar_operation_params, vxmLENGTH_OF(internalkernel_scalar_operation_params),
+    VX_NULL,
+    vxoInternalScalar_operation_ValidateInput,
+    vxoInternalScalar_operation_ValidateOutput,
+    vxoInternalScalar_operation_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"scalar_operation.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHog_cells_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHog_cells_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHog_cells_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s basekernel_hog_cells_params[] = {
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+};
+vx_kernel_description_s basekernel_hog_cells = {
+    VX_KERNEL_HOG_CELLS,
+    "org.khronos.openvx.hog_cells",
+    NULL,
+    basekernel_hog_cells_params, vxmLENGTH_OF(basekernel_hog_cells_params),
+    VX_NULL,
+    vxoHog_cells_ValidateInput,
+    vxoHog_cells_ValidateOutput,
+    vxoHog_cells_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"hog_cells.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHog_features_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHog_features_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHog_features_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s basekernel_hog_features_params[] = {
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED}
+};
+vx_kernel_description_s basekernel_hog_features = {
+    VX_KERNEL_HOG_FEATURES,
+    "org.khronos.openvx.hog_features",
+    NULL,
+    basekernel_hog_features_params, vxmLENGTH_OF(basekernel_hog_features_params),
+    VX_NULL,
+    vxoHog_features_ValidateInput,
+    vxoHog_features_ValidateOutput,
+    vxoHog_features_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"hog_features.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxBilateralFilterValidator(vx_node node, const vx_reference parameters[], vx_uint32 num, vx_meta_format metas[]);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBilateral_filter_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBilateral_filter_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_BilateralFilter(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s basekernel_bilateral_filter_params[] = {
+    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED}
+};
+vx_kernel_description_s basekernel_bilateral_filter = {
+    VX_KERNEL_BILATERAL_FILTER,
+    "org.khronos.openvx.bilateral_filter",
+    vxoBaseKernel_BilateralFilter,
+    basekernel_bilateral_filter_params, vxmLENGTH_OF(basekernel_bilateral_filter_params),
+    vxBilateralFilterValidator,
+    NULL,
+    NULL,
+    vxoBilateral_filter_Initialize,
+    vxoBilateral_filter_Deinitializer,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {NULL},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalBilateral_filter_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalBilateral_filter_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalBilateral_filter_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_param_description_s internalkernel_bilateral_filter_params[] = {
+    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED}
+};
+vx_kernel_description_s internalkernel_bilateral_filter = {
+    VX_KERNEL_INTERNAL_BILATERAL_FILTER,
+    "org.khronos.internal.bilateral_filter",
+    NULL,
+    internalkernel_bilateral_filter_params, vxmLENGTH_OF(internalkernel_bilateral_filter_params),
+    NULL,
+    vxoInternalBilateral_filter_ValidateInput,
+    vxoInternalBilateral_filter_ValidateOutput,
+    vxoInternalBilateral_filter_Initialize,
+    NULL,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"bilateral_filter.vx"},
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Select(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSelect_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSelect_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSelect_Validate(vx_node node, const vx_reference parameters[], vx_uint32 num, vx_meta_format metas[]);
+VX_PRIVATE_API vx_param_description_s basekernel_select_params[] = {
+    {VX_INPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_REFERENCE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+};
+vx_kernel_description_s basekernel_select = {
+    VX_KERNEL_SELECT,
+    "org.khronos.openvx.select",
+    vxoBaseKernel_Select,
+    basekernel_select_params, vxmLENGTH_OF(basekernel_select_params),
+    vxoSelect_Validate,
+    NULL,
+    NULL,
+    vxoSelect_Initialize,
+    vxoSelect_Deinitializer,
+    {NULL},
+};
+
+VX_PRIVATE_API vx_param_description_s internalkernel_upsample_padding_params[] = {
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+};
+VX_PRIVATE_API vx_status VX_CALLBACK vxoUpSamplePadding_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoUpSamplePadding_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoUpSamplePadding_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+vx_kernel_description_s internalkernel_upsample_padding = {
+    VX_KERNEL_INTERNAL_UPSAMPLE_PADDING,
+    "org.khronos.internal.upsample_padding",
+    NULL,
+    internalkernel_upsample_padding_params, vxmLENGTH_OF(internalkernel_upsample_padding_params),
+    NULL,
+    vxoUpSamplePadding_ValidateInput,
+    vxoUpSamplePadding_ValidateOutput,
+    vxoUpSamplePadding_Initialize,
+    NULL,
+    {"upsample_padding.vx"},
+};
+
+VX_PRIVATE_API vx_param_description_s internalkernel_upsample_convert_params[] = {
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+};
+VX_PRIVATE_API vx_status VX_CALLBACK vxoUpSampleConvert_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoUpSampleConvert_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoUpSampleConvert_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+vx_kernel_description_s internalkernel_upsample_convert = {
+    VX_KERNEL_INTERNAL_UPSAMPLE_CONVERT,
+    "org.khronos.internal.upsample_convert",
+    NULL,
+    internalkernel_upsample_convert_params, vxmLENGTH_OF(internalkernel_upsample_convert_params),
+    NULL,
+    vxoUpSampleConvert_ValidateInput,
+    vxoUpSampleConvert_ValidateOutput,
+    vxoUpSampleConvert_Initialize,
+    NULL,
+    {"upsample_convert.vx"},
+};
+
+VX_PRIVATE_API vx_param_description_s internalkernel_pyramid_copy_image_params[] = {
+    {VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED},
+};
+VX_PRIVATE_API vx_status VX_CALLBACK vxoPyramidCopyImage_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoPyramidCopyImage_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoPyramidCopyImage_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+vx_kernel_description_s internalkernel_pyramid_copy_image = {
+    VX_KERNEL_INTERNAL_PYRAMID_COPY_IMAGE,
+    "org.khronos.internal.pyramid_copy_image",
+    NULL,
+    internalkernel_pyramid_copy_image_params, vxmLENGTH_OF(internalkernel_pyramid_copy_image_params),
+    NULL,
+    vxoPyramidCopyImage_ValidateInput,
+    vxoPyramidCopyImage_ValidateOutput,
+    vxoPyramidCopyImage_Initialize,
+    NULL,
+    {"pyramid_copy_image.vx"},
+};
+
+VX_PRIVATE_API vx_param_description_s internalkernel_transpose_2d_tensor_params[] = {
+    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED},
+};
+VX_PRIVATE_API vx_status VX_CALLBACK vxoTransPose2DTensor_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoTransPose2DTensor_Validate(vx_node node, const vx_reference parameters[ ], vx_uint32 num, vx_meta_format metas[]);
+vx_kernel_description_s internalkernel_transpose_2d_tensor = {
+    VX_KERNEL_INTERNAL_TRANSPOSE_2D_TENSOR,
+    "org.khronos.internal.transpose_2d_tensor",
+    NULL,
+    internalkernel_transpose_2d_tensor_params, vxmLENGTH_OF(internalkernel_transpose_2d_tensor_params),
+    vxoTransPose2DTensor_Validate,
+    NULL,
+    NULL,
+    vxoTransPose2DTensor_Initialize,
+    NULL,
+    {"transpose_2d_tensor.vx"},
+};
+
+VX_PRIVATE_API vx_param_description_s internalkernel_multiply_2d_matrixes_params[] = {
+    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED},
+};
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMultiply2DMatrixes_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMultiply2DMatrixes_Validate(vx_node node, const vx_reference parameters[ ], vx_uint32 num, vx_meta_format metas[]);
+vx_kernel_description_s internalkernel_multiply_2d_matrixes = {
+    VX_KERNEL_INTERNAL_MULTIPLY_2D_MATRIXES,
+    "org.khronos.internal.multiply_2d_matrixes",
+    NULL,
+    internalkernel_multiply_2d_matrixes_params, vxmLENGTH_OF(internalkernel_multiply_2d_matrixes_params),
+    vxoMultiply2DMatrixes_Validate,
+    NULL,
+    NULL,
+    vxoMultiply2DMatrixes_Initialize,
+    NULL,
+    {"multiply_2d_matrixes.vx"},
 };
 #endif
 

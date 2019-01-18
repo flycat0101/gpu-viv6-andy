@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -297,24 +297,6 @@ gco2D_SetColorSourceEx(
     IN gctUINT32 TransparencyColor
     );
 
-/* Same as gco2D_SetColorSourceEx, but with better 64bit SW-path support.
-** Please do NOT export the API now.
-*/
-gceSTATUS
-gco2D_SetColorSource64(
-    IN gco2D Engine,
-    IN gctUINT32 Address,
-    IN gctPOINTER Logical,
-    IN gctUINT32 Stride,
-    IN gceSURF_FORMAT Format,
-    IN gceSURF_ROTATION Rotation,
-    IN gctUINT32 SurfaceWidth,
-    IN gctUINT32 SurfaceHeight,
-    IN gctBOOL CoordRelative,
-    IN gceSURF_TRANSPARENCY Transparency,
-    IN gctUINT32 TransparencyColor
-    );
-
 /* Configure color source. */
 gceSTATUS
 gco2D_SetColorSourceAdvanced(
@@ -365,23 +347,6 @@ gco2D_SetMaskedSourceEx(
     IN gctUINT32 SurfaceHeight
     );
 
-/* Same as gco2D_SetMaskedSourceEx, but with better 64bit SW-path support.
-** Please do NOT export the API now.
-*/
-gceSTATUS
-gco2D_SetMaskedSource64(
-    IN gco2D Engine,
-    IN gctUINT32 Address,
-    IN gctPOINTER Logical,
-    IN gctUINT32 Stride,
-    IN gceSURF_FORMAT Format,
-    IN gctBOOL CoordRelative,
-    IN gceSURF_MONOPACK MaskPack,
-    IN gceSURF_ROTATION Rotation,
-    IN gctUINT32 SurfaceWidth,
-    IN gctUINT32 SurfaceHeight
-    );
-
 /* Setup the source rectangle. */
 gceSTATUS
 gco2D_SetSource(
@@ -416,21 +381,6 @@ gco2D_SetTargetEx(
     IN gctUINT32 SurfaceWidth,
     IN gctUINT32 SurfaceHeight
     );
-
-/* Same as gco2D_SetTargetEx, but with better 64bit SW-path support.
-** Please do NOT export the API now.
-*/
-gceSTATUS
-gco2D_SetTarget64(
-    IN gco2D Engine,
-    IN gctUINT32 Address,
-    IN gctPOINTER Logical,
-    IN gctUINT32 Stride,
-    IN gceSURF_ROTATION Rotation,
-    IN gctUINT32 SurfaceWidth,
-    IN gctUINT32 SurfaceHeight
-    );
-
 
 /* Calculate and program the stretch factors. */
 gceSTATUS

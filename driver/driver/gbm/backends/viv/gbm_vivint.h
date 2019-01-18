@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -83,7 +83,7 @@ struct gbm_viv_surface
 
     gctBOOL extResolve;
     int fence_fd;
-    uint32_t fence_on;
+    int sync_post;
     gctBOOL aSync;
 };
 

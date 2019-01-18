@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -18,7 +18,7 @@
 
 typedef struct __GLdeviceStructRec
 {
-    GLboolean (*devUpdateDrawable)(__GLdrawablePrivate *drawable, GLvoid* rtHandle, GLvoid* depthHandle, GLvoid *stencilHandle);
+    GLboolean (*devUpdateDrawable)(__GLdrawablePrivate *drawable);
 
     GLvoid (*devDestroyDrawable)(__GLdrawablePrivate *drawable);
 

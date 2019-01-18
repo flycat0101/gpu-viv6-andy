@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -38,7 +38,7 @@ typedef va_list gctARGUMENTS;
     va_arg(Arguments, Type)
 
 #define gcmkDECLARE_MUTEX(__lockHandle__) \
-    HANDLE __lockHandle__;
+    HANDLE __lockHandle__
 
 /* Unsafe. */
 #define gcmkMUTEX_LOCK(__lockHandle__) \
@@ -66,14 +66,8 @@ OutputString(
 #define gcmkOUTPUT_STRING(String) \
     OutputString(String)
 
-#define gcmkSPRINTF(Destination, Size, Message, Value) \
-    _snprintf(Destination, Size, Message, Value)
-
-#define gcmkSPRINTF2(Destination, Size, Message, Value1, Value2) \
-    _snprintf(Destination, Size, Message, Value1, Value2)
-
-#define gcmkSPRINTF3(Destination, Size, Message, Value1, Value2, Value3) \
-    _snprintf(Destination, Size, Message, Value1, Value2, Value3)
+#define gcmkSPRINTF(Destination, Size, ...) \
+    _snprintf(Destination, Size, __VA_ARGS__)
 
 #define gcmkVSPRINTF(Destination, Size, Message, Arguments) \
     _vsnprintf(Destination, Size, Message, *((va_list*)Arguments))

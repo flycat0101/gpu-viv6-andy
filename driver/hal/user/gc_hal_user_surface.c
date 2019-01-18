@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -142,9 +142,10 @@ gcoSURF_LockTileStatus(
                                      Surface->tileStatusNode.size,
                                      gcvCACHE_FLUSH));
 
+                gcmDUMP(gcvNULL, "#[info tile status buffer]");
                 /* Dump the memory write. */
                 gcmDUMP_BUFFER(gcvNULL,
-                               "memory",
+                               gcvDUMP_BUFFER_MEMORY,
                                address,
                                Surface->tileStatusNode.logical,
                                0,
@@ -191,8 +192,9 @@ gcoSURF_LockTileStatus(
                                  gcvCACHE_CLEAN));
 
             /* Dump the memory write. */
+            gcmDUMP(gcvNULL, "#[info hzTile status buffer]");
             gcmDUMP_BUFFER(gcvNULL,
-                           "memory",
+                           gcvDUMP_BUFFER_MEMORY,
                            address,
                            Surface->hzTileStatusNode.logical,
                            0,
@@ -990,25 +992,16 @@ _FreeSurface(
             gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, currentType));
         }
 
-        if (Surface->node.pool != gcvPOOL_UNKNOWN)
+        if (Surface->node.u.normal.node != 0)
         {
 #if gcdENABLE_VG
             if (currentType == gcvHARDWARE_VG)
             {
-                if (Surface->node.u.normal.node != 0)
-                {
-                    /* Free the video memory. */
-                    gcmONERROR(
-                        gcoVGHARDWARE_ScheduleVideoMemory(gcvNULL,
-                                                          Surface->node.u.normal.node,
-                                                          gcvFALSE));
-                }
-
-                if (Surface->node.sharedMutex)
-                {
-                    gcoOS_DeleteMutex(gcvNULL, Surface->node.sharedMutex);
-                    Surface->node.sharedMutex = gcvNULL;
-                }
+                /* Free the video memory. */
+                gcmONERROR(
+                    gcoVGHARDWARE_ScheduleVideoMemory(gcvNULL,
+                                                      Surface->node.u.normal.node,
+                                                      gcvFALSE));
             }
             else
 #endif
@@ -1018,25 +1011,16 @@ _FreeSurface(
             }
         }
 
-        if (Surface->node2.pool !=  gcvPOOL_UNKNOWN)
+        if (Surface->node2.u.normal.node != 0)
         {
 #if gcdENABLE_VG
             if (currentType == gcvHARDWARE_VG)
             {
-                if (Surface->node2.u.normal.node != 0)
-                {
-                    /* Free the video memory. */
-                    gcmONERROR(
-                        gcoVGHARDWARE_ScheduleVideoMemory(gcvNULL,
-                                                          Surface->node2.u.normal.node,
-                                                          gcvFALSE));
-                }
-
-                if (Surface->node2.sharedMutex)
-                {
-                    gcoOS_DeleteMutex(gcvNULL, Surface->node2.sharedMutex);
-                    Surface->node2.sharedMutex = gcvNULL;
-                }
+                /* Free the video memory. */
+                gcmONERROR(
+                    gcoVGHARDWARE_ScheduleVideoMemory(gcvNULL,
+                                                      Surface->node2.u.normal.node,
+                                                      gcvFALSE));
             }
             else
 #endif
@@ -1046,25 +1030,16 @@ _FreeSurface(
             }
         }
 
-        if (Surface->node3.pool != gcvPOOL_UNKNOWN)
+        if (Surface->node3.u.normal.node != 0)
         {
 #if gcdENABLE_VG
             if (currentType == gcvHARDWARE_VG)
             {
-                if (Surface->node3.u.normal.node != 0)
-                {
-                    /* Free the video memory. */
-                    gcmONERROR(
-                        gcoVGHARDWARE_ScheduleVideoMemory(gcvNULL,
-                                                          Surface->node3.u.normal.node,
-                                                          gcvFALSE));
-                }
-
-                if (Surface->node3.sharedMutex)
-                {
-                    gcoOS_DeleteMutex(gcvNULL, Surface->node3.sharedMutex);
-                    Surface->node3.sharedMutex = gcvNULL;
-                }
+                /* Free the video memory. */
+                gcmONERROR(
+                    gcoVGHARDWARE_ScheduleVideoMemory(gcvNULL,
+                                                      Surface->node3.u.normal.node,
+                                                      gcvFALSE));
             }
             else
 #endif
@@ -1398,6 +1373,14 @@ _ComputeSurfacePlacement(
             = (Surface->stride / 2 + 0xf) & ~0xf;
 #else
             = (Surface->stride / 2);
+        if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_YUV420_OUTPUT_LINEAR))
+        {
+            /*If YUV420_OUTPUT_LINEAR feature is enabled,For YV12 format, Y need to 64 Bytes alignment,
+                U/V need 32 Bytes alignment*/
+            Surface->stride = gcmALIGN(Surface->stride, 64);
+            Surface->uStride = gcmALIGN(Surface->uStride, 32);
+            Surface->vStride = gcmALIGN(Surface->vStride, 32);
+        }
 #endif
 
         Surface->vOffset
@@ -1411,6 +1394,30 @@ _ComputeSurfacePlacement(
             = Surface->uOffset
             + Surface->uStride * Surface->alignedH / 2;
         break;
+#if gcdVG_ONLY
+    case gcvSURF_YV16:
+        if (calcStride)
+        {
+            Surface->stride = Surface->alignedW;
+        }
+
+        /*  WxH Y plane followed by (W/2)x(H/2) V and U planes. */
+        Surface->uStride =
+        Surface->vStride
+            = (Surface->stride / 2);
+
+        Surface->vOffset
+            = Surface->stride * Surface->alignedH;
+
+        Surface->uOffset
+            = Surface->vOffset
+            + Surface->vStride * Surface->alignedH;
+
+        Surface->sliceSize
+            = Surface->uOffset
+            + Surface->uStride * Surface->alignedH;
+        break;
+#endif
 
     case gcvSURF_I420:
         if (calcStride)
@@ -1429,6 +1436,14 @@ _ComputeSurfacePlacement(
             = (Surface->stride / 2 + 0xf) & ~0xf;
 #else
             = (Surface->stride / 2);
+        if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_YUV420_OUTPUT_LINEAR))
+        {
+            /*If YUV420_OUTPUT_LINEAR feature is enabled,For I420 format, Y need to 64 Bytes alignment,
+                 U/V need 32 Bytes alignment*/
+            Surface->stride = gcmALIGN(Surface->stride, 64);
+            Surface->uStride = gcmALIGN(Surface->uStride, 32);
+            Surface->vStride = gcmALIGN(Surface->vStride, 32);
+        }
 #endif
 
         Surface->uOffset
@@ -1450,6 +1465,12 @@ _ComputeSurfacePlacement(
             Surface->stride = Surface->alignedW;
         }
 
+        if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_YUV420_OUTPUT_LINEAR))
+        {
+            /*If YUV420_OUTPUT_LINEAR feature is enabled,For NV12/NV21 format ,
+                 Y/UV need to 64 Bytes alignment*/
+            Surface->stride = gcmALIGN(Surface->stride, 64);
+        }
         /*  WxH Y plane followed by (W)x(H/2) interleaved U/V plane. */
         Surface->uStride =
         Surface->vStride = Surface->stride;
@@ -1469,6 +1490,12 @@ _ComputeSurfacePlacement(
             Surface->stride = Surface->alignedW;
         }
 
+        if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_YUV420_OUTPUT_LINEAR))
+        {
+            /*If YUV420_OUTPUT_LINEAR feature is enabled,For NV16/NV61 format,
+                 Y/UV need to 64 Bytes alignment*/
+            Surface->stride  = gcmALIGN(Surface->stride, 64);
+        }
         /*  WxH Y plane followed by WxH interleaved U/V(V/U) plane. */
         Surface->uStride =
         Surface->vStride = Surface->stride;
@@ -1605,6 +1632,7 @@ _ComputeSurfacePlacement(
             + Surface->aStride * Surface->alignedH;
         break;
 
+    case gcvSURF_AUYVY:
     case gcvSURF_AYUY2:
         if (calcStride)
         {
@@ -2017,7 +2045,6 @@ _AllocateSurface(
                 tileCountInOneLine = Surface->alignedW;
                 break;
             }
-
             if  (Type & gcvSURF_3D)
             {
                 extraSize = Surface->sliceSize;
@@ -2283,6 +2310,47 @@ _AllocateSurface(
         {
             /* Lock the surface. */
             gcmONERROR(_Lock(Surface));
+#if gcdDUMP
+            {
+                gctUINT32 address;
+                gcmDUMP(gcvNULL, "#[info: initialize surface node memory at create time]");
+                gcmGETHARDWAREADDRESS(Surface->node, address);
+                gcmDUMP_BUFFER(gcvNULL,
+                               gcvDUMP_BUFFER_MEMORY,
+                               address,
+                               Surface->node.logical,
+                               0,
+                               Surface->node.size);
+
+                if (Surface->node2.pool != gcvPOOL_UNKNOWN)
+                {
+                    gcmDUMP(gcvNULL, "#[info node2 buffer]");
+                    gcmGETHARDWAREADDRESS(Surface->node2, address);
+                    gcmDUMP_BUFFER(gcvNULL,
+                                   gcvDUMP_BUFFER_MEMORY,
+                                   address,
+                                   Surface->node2.logical,
+                                   0,
+                                   Surface->node2.size);
+
+                }
+
+                if (Surface->node3.pool != gcvPOOL_UNKNOWN)
+                {
+                    gcmDUMP(gcvNULL, "#[info node3 buffer]");
+                    gcmGETHARDWAREADDRESS(Surface->node3, address);
+                    gcmDUMP_BUFFER(gcvNULL,
+                                   gcvDUMP_BUFFER_MEMORY,
+                                   address,
+                                   Surface->node3.logical,
+                                   0,
+                                   Surface->node3.size);
+
+                }
+            }
+
+#endif
+
         }
     }
 
@@ -2370,7 +2438,7 @@ gcoSURF_Construct(
     surface->dither2D      = gcvFALSE;
     surface->deferDither3D = gcvFALSE;
     surface->paddingFormat = (format == gcvSURF_R8_1_X8R8G8B8 || format == gcvSURF_G8R8_1_X8R8G8B8 ||
-                              format == gcvSURF_A8_1_A8R8G8B8 || format == gcvSURF_A8L8_1_A8R8G8B8)
+                              format == gcvSURF_A8L8_1_A8R8G8B8)
                            ? gcvTRUE : gcvFALSE;
     surface->garbagePadded = gcvTRUE;
 
@@ -2632,8 +2700,8 @@ gcoSURF_QueryVidMemNode(
 **          Logical pointer to the user allocated surface or gcvNULL if no
 **          logical pointer has been provided.
 **
-**      gctUINT32 Physical
-**          Physical pointer(GPU address) to the user allocated surface.
+**      gctUINT32 Address
+**          GPU address to the user allocated surface.
 **
 **  OUTPUT:
 **
@@ -2644,7 +2712,7 @@ gcoSURF_WrapSurface(
     IN gcoSURF Surface,
     IN gctUINT Alignment,
     IN gctPOINTER Logical,
-    IN gctUINT32 Physical
+    IN gctUINT32 Address
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -2652,8 +2720,8 @@ gcoSURF_WrapSurface(
 
     gceHARDWARE_TYPE currentType = gcvHARDWARE_INVALID;
 
-    gcmHEADER_ARG("Surface=0x%x Alignment=%u Logical=0x%x Physical=%08x",
-              Surface, Alignment, Logical, Physical);
+    gcmHEADER_ARG("Surface=0x%x Alignment=%u Logical=0x%x Address=%08x",
+              Surface, Alignment, Logical, Address);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
@@ -2681,8 +2749,8 @@ gcoSURF_WrapSurface(
 
             gcmGETHARDWAREADDRESS(Surface->node, address);
 
-            if ((Physical != gcvINVALID_ADDRESS) &&
-                (Physical != address))
+            if ((Address != gcvINVALID_ADDRESS) &&
+                (Address != address))
             {
                 status = gcvSTATUS_INVALID_ARGUMENT;
                 break;
@@ -2723,13 +2791,17 @@ gcoSURF_WrapSurface(
         Surface->node.u.normal.node = 0;
 
         Surface->node.logical                 = Logical;
-        gcsSURF_NODE_SetHardwareAddress(&Surface->node, Physical);
+        gcsSURF_NODE_SetHardwareAddress(&Surface->node, Address);
         Surface->node.count                   = 1;
 
-        Surface->node.u.wrapped.physical = Physical;
-
-        gcmASSERT(Surface->node.sharedMutex == gcvNULL);
-        gcmERR_BREAK(gcoOS_CreateMutex(gcvNULL, &Surface->node.sharedMutex));
+        if (Address != gcvINVALID_ADDRESS)
+        {
+            Surface->node.u.wrapped.physical = Address;
+        }
+        else
+        {
+            Surface->node.u.wrapped.physical = gcvINVALID_PHYSICAL_ADDRESS;
+        }
     }
     while (gcvFALSE);
 
@@ -2758,8 +2830,8 @@ gcoSURF_WrapSurface(
 **          Logical pointer to the user allocated surface or gcvNULL if no
 **          logical pointer has been provided.
 **
-**      gctUINT32 Physical
-**          Physical pointer to the user allocated surface or gcvINVALID_ADDRESS if no
+**      gctPHYS_ADDR_T Physical
+**          Physical pointer to the user allocated surface or gcvINVALID_PHYSICAL_ADDRESS if no
 **          physical pointer has been provided.
 **
 **  OUTPUT:
@@ -2771,7 +2843,7 @@ gcoSURF_MapUserSurface(
     IN gcoSURF Surface,
     IN gctUINT Alignment,
     IN gctPOINTER Logical,
-    IN gctUINT32 Physical
+    IN gctPHYS_ADDR_T Physical
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -2781,7 +2853,7 @@ gcoSURF_MapUserSurface(
     gctUINT32 address;
     gcsUSER_MEMORY_DESC desc;
 
-    gcmHEADER_ARG("Surface=0x%x Alignment=%u Logical=0x%x Physical=%08x",
+    gcmHEADER_ARG("Surface=0x%x Alignment=%u Logical=0x%x Physical=%010llx",
               Surface, Alignment, Logical, Physical);
 
     /* Verify the arguments. */
@@ -2810,7 +2882,7 @@ gcoSURF_MapUserSurface(
 
             gcmGETHARDWAREADDRESS(Surface->node, address);
 
-            if ((Physical != gcvINVALID_ADDRESS) &&
+            if ((Physical != gcvINVALID_PHYSICAL_ADDRESS) &&
                 (Physical != address))
             {
                 status = gcvSTATUS_INVALID_ARGUMENT;
@@ -2861,14 +2933,12 @@ gcoSURF_MapUserSurface(
 
         gcmERR_BREAK(gcoHAL_WrapUserMemory(
             &desc,
+            (gceVIDMEM_TYPE)Surface->type,
             &Surface->node.u.normal.node
             ));
 
         Surface->node.u.wrapped.physical = Physical;
         Surface->node.logical = logical;
-
-        gcmASSERT(Surface->node.sharedMutex == gcvNULL);
-        gcmERR_BREAK(gcoOS_CreateMutex(gcvNULL, &Surface->node.sharedMutex));
 
         /* Because _FreeSurface() is used to free user surface too, we need to
          * reference this node for current hardware here, like
@@ -2885,12 +2955,6 @@ gcoSURF_MapUserSurface(
         {
             gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(Surface->node.u.normal.node));
             Surface->node.u.normal.node = 0;
-        }
-
-        if (Surface->node.sharedMutex)
-        {
-            gcoOS_DeleteMutex(gcvNULL, Surface->node.sharedMutex);
-            Surface->node.sharedMutex = gcvNULL;
         }
     }
 
@@ -4242,7 +4306,6 @@ gcoSURF_Lock(
                      = address + Surface->aOffset;
             break;
 #endif
-        case gcvSURF_YV12:
         case gcvSURF_I420:
             Surface->node.count = 3;
 
@@ -4257,6 +4320,25 @@ gcoSURF_Lock(
 
             address3 = Surface->node.physical3
                      = address + Surface->vOffset;
+            break;
+
+        case gcvSURF_YV12:
+#if gcdVG_ONLY
+        case gcvSURF_YV16:
+#endif
+            Surface->node.count = 3;
+
+            logical2 = Surface->node.logical
+                     + Surface->vOffset;
+
+            address2 = Surface->node.physical2
+                     = address + Surface->vOffset;
+
+            logical3 = Surface->node.logical
+                     + Surface->uOffset;
+
+            address3 = Surface->node.physical3
+                     = address + Surface->uOffset;
             break;
 
         case gcvSURF_NV12:
@@ -7172,17 +7254,17 @@ gcoSURF_MixSurfacesCPU(
                                   gcvCACHE_CLEAN));
 
 #if gcdDUMP
-        gcmDUMP(gcvNULL, "#[info: verify mix surface source");
+        gcmDUMP(gcvNULL, "#[info: verify mix surface source]");
         /* verify the source */
         gcmDUMP_BUFFER(gcvNULL,
-                       "verify",
+                       gcvDUMP_BUFFER_VERIFY,
                        gcsSURF_NODE_GetHWAddress(&srcSurf->node),
                        srcSurf->node.logical,
                        0,
                        srcSurf->size);
         /* upload the destination */
         gcmDUMP_BUFFER(gcvNULL,
-                       "memory",
+                       gcvDUMP_BUFFER_MEMORY,
                        gcsSURF_NODE_GetHWAddress(&dstSurf->node),
                        dstSurf->node.logical,
                        0,
@@ -8054,10 +8136,9 @@ gcoSURF_Clear2D(
             ));
 
         /* Program the destination. */
-        gcmERR_BREAK(gco2D_SetTarget64(
+        gcmERR_BREAK(gco2D_SetTargetEx(
             engine,
             destAddress[0],
-            destMemory[0],
             DstSurface->stride,
             DstSurface->rotation,
             DstSurface->alignedW,
@@ -8160,10 +8241,9 @@ gcoSURF_Line(
             ));
 
         /* Program the destination. */
-        gcmERR_BREAK(gco2D_SetTarget64(
+        gcmERR_BREAK(gco2D_SetTargetEx(
             engine,
             destAddress[0],
-            destMemory[0],
             DstSurface->stride,
             DstSurface->rotation,
             DstSurface->alignedW,
@@ -8434,10 +8514,11 @@ gcoSURF_Blit(
                     stretchBlt = gcvTRUE;
                 }
 
-                gcmERR_BREAK(gco2D_SetColorSource64(
+                gcmERR_BREAK(gco2D_SetColorSourceEx(
                     engine,
-                    srcAddress[0],
-                    srcMemory[0],
+                    useSoftEngine ?
+                        (gctUINT32)(gctUINTPTR_T)SrcSurface->node.logical
+                        : srcAddress[0],
                     SrcSurface->stride,
                     SrcSurface->format,
                     SrcSurface->rotation,
@@ -8462,10 +8543,11 @@ gcoSURF_Blit(
             destMemory
             ));
 
-        gcmERR_BREAK(gco2D_SetTarget64(
+        gcmERR_BREAK(gco2D_SetTargetEx(
             engine,
-            destAddress[0],
-            destMemory[0],
+            useSoftEngine ?
+                (gctUINT32)(gctUINTPTR_T)DstSurface->node.logical
+                : destAddress[0],
             DstSurface->stride,
             DstSurface->rotation,
             DstSurface->alignedW,
@@ -8482,7 +8564,6 @@ gcoSURF_Blit(
             gctUINT32 tileHeightMask;
             gctUINT32 maxHeight;
             gctUINT32 srcBaseAddress;
-            gctUINT8_PTR srcBaseMemory;
             gcsRECT srcSubRect;
             gcsRECT destSubRect;
             gcsRECT maskRect;
@@ -8570,15 +8651,11 @@ gcoSURF_Blit(
 
             /* Determine the initial source address. */
             srcBaseAddress
-                = srcAddress[0]
-                + srcAlignedTop  * SrcSurface->stride
+                = (useSoftEngine ?
+                        (gctUINT32)(gctUINTPTR_T)SrcSurface->node.logical
+                        : srcAddress[0])
+                +   srcAlignedTop  * SrcSurface->stride
                 + ((srcAlignedLeft * srcFormat[0]->bitsPerPixel) >> 3);
-
-            srcBaseMemory
-                = (gctUINT8_PTR)srcMemory[0]
-                + srcAlignedTop  * SrcSurface->stride
-                + ((srcAlignedLeft * srcFormat[0]->bitsPerPixel) >> 3);
-
 
             /* Set initial mask coordinates. */
             maskRect.left   = srcAlignedLeft;
@@ -8613,17 +8690,13 @@ gcoSURF_Blit(
                     ));
 
                 /* Configure masked source. */
-                gcmERR_BREAK(gco2D_SetMaskedSource64(
+                gcmERR_BREAK(gco2D_SetMaskedSource(
                     engine,
                     srcBaseAddress,
-                    (gctPOINTER)srcBaseMemory,
                     SrcSurface->stride,
                     SrcSurface->format,
                     relativeSource,
-                    streamPack,
-                    gcvSURF_0_DEGREE,
-                    0,
-                    0
+                    streamPack
                     ));
 
                 /* Do the blit. */
@@ -8642,7 +8715,6 @@ gcoSURF_Blit(
 
                 /* Update the source address. */
                 srcBaseAddress += srcSubRect.bottom * SrcSurface->stride;
-                srcBaseMemory  += srcSubRect.bottom * SrcSurface->stride;
 
                 /* Update the line counter. */
                 lines2render -= srcSubRect.bottom;
@@ -8896,10 +8968,11 @@ gcoSURF_MonoBlit(
             destMemory
             ));
 
-        gcmERR_BREAK(gco2D_SetTarget64(
+        gcmERR_BREAK(gco2D_SetTargetEx(
             engine,
-            destAddress[0],
-            destMemory[0],
+            useSotfEngine ?
+                (gctUINT32)(gctUINTPTR_T)DstSurface->node.logical
+                : destAddress[0],
             DstSurface->stride,
             DstSurface->rotation,
             DstSurface->alignedW,
@@ -9506,10 +9579,9 @@ gcoSURF_FilterBlit(
                     engine,
                     &destSubRect));
 
-                gcmERR_BREAK(gco2D_SetColorSource64(
+                gcmERR_BREAK(gco2D_SetColorSourceEx(
                     engine,
                     srcAddress[0],
-                    srcMemory[0],
                     srcSurf->stride,
                     srcSurf->format,
                     srcSurf->rotation,
@@ -9525,10 +9597,9 @@ gcoSURF_FilterBlit(
                     &tempRect
                     ));
 
-                gcmERR_BREAK(gco2D_SetTarget64(
+                gcmERR_BREAK(gco2D_SetTargetEx(
                     engine,
                     destAddress[0],
-                    destMemory[0],
                     DstSurface->stride,
                     DstSurface->rotation,
                     DstSurface->alignedW,
@@ -10316,13 +10387,11 @@ gcoSURF_NODE_Cache(
 
     gcmHEADER_ARG("Node=0x%x, Operation=%d, Bytes=%zu", Node, Operation, Bytes);
 
-#if !gcdPAGED_MEMORY_CACHEABLE
     if (Node->u.normal.cacheable == gcvFALSE)
     {
         gcmFOOTER();
         return gcvSTATUS_OK;
     }
-#endif
 
     if (Node->pool == gcvPOOL_USER)
     {
@@ -11619,9 +11688,9 @@ gcoSURF_SetFlags(
 **          Logical pointer to the user allocated surface or gcvNULL if no
 **          logical pointer has been provided.
 **
-**      gctUINT32 Physical
+**      gctPHYS_ADDR_T Physical
 **          Physical address (NOT GPU address) of a contiguous buffer.
-**          It should be gcvINVALID_ADDRESS for non-contiguous buffer or
+**          It should be gcvINVALID_PHYSICAL_ADDRESS for non-contiguous buffer or
 **          buffer whose physical address is unknown.
 **  OUTPUT:
 **
@@ -11634,7 +11703,7 @@ gcoSURF_SetBuffer(
     IN gceSURF_FORMAT Format,
     IN gctUINT Stride,
     IN gctPOINTER Logical,
-    IN gctUINT32 Physical
+    IN gctPHYS_ADDR_T Physical
     )
 {
     gceSTATUS status;
@@ -11644,7 +11713,7 @@ gcoSURF_SetBuffer(
     gcsSURF_FORMAT_INFO_PTR fmtInfo;
 
     gcmHEADER_ARG("Surface=0x%x Type=%d Format=%d Stride=%u Logical=0x%x "
-                  "Physical=%08x",
+                  "Physical=0x%llx",
                   Surface, Type, Format, Stride, Logical, Physical);
 
     /* Verify the arguments. */
@@ -11900,22 +11969,18 @@ gcoSURF_SetWindow(
     Surface->node.size = Surface->size;
     /* Need to map logical pointer? */
     Surface->node.logical = (gctUINT8_PTR)Surface->userLogical + offset;
-    Surface->node.u.wrapped.physical = Surface->userPhysical + offset;
+    Surface->node.u.wrapped.physical = Surface->userPhysical + (gctUINT64)offset;
 
-    gcmSAFECASTPHYSADDRT(desc.physical, Surface->userPhysical + offset);
+    desc.physical = Surface->node.u.wrapped.physical;
     desc.logical = gcmPTR_TO_UINT64(Surface->node.logical);
     desc.size = Surface->size;
     desc.flag = gcvALLOC_FLAG_USERMEMORY;
 
-    gcmONERROR(gcoHAL_WrapUserMemory(&desc, &Surface->node.u.normal.node));
+    gcmONERROR(gcoHAL_WrapUserMemory(&desc,
+                                     (gceVIDMEM_TYPE)Surface->type,
+                                     &Surface->node.u.normal.node));
 
     Surface->pfGetAddr = gcoHARDWARE_GetProcCalcPixelAddr(gcvNULL, Surface);
-
-    /* Maybe already wrapped before */
-    if(Surface->node.sharedMutex == gcvNULL)
-    {
-        gcmONERROR(gcoOS_CreateMutex(gcvNULL, &Surface->node.sharedMutex));
-    }
 
     /* Initial lock. */
     gcmONERROR(_Lock(Surface));
@@ -12090,22 +12155,18 @@ gcoSURF_SetImage(
     /* Set user pool node size. */
     Surface->node.size = Surface->size;
     Surface->node.logical = (gctUINT8_PTR)Surface->userLogical + offset;
-    Surface->node.u.wrapped.physical = Surface->userPhysical + offset;
+    Surface->node.u.wrapped.physical = Surface->userPhysical + (gctUINT64)offset;
 
-    gcmSAFECASTPHYSADDRT(desc.physical, Surface->userPhysical + offset);
+    desc.physical = Surface->node.u.wrapped.physical;
     desc.logical = gcmPTR_TO_UINT64(Surface->node.logical);
     desc.size = Surface->size;
     desc.flag = gcvALLOC_FLAG_USERMEMORY;
 
-    gcmONERROR(gcoHAL_WrapUserMemory(&desc, &Surface->node.u.normal.node));
+    gcmONERROR(gcoHAL_WrapUserMemory(&desc,
+                                     (gceVIDMEM_TYPE)Surface->type,
+                                     &Surface->node.u.normal.node));
 
     Surface->pfGetAddr = gcoHARDWARE_GetProcCalcPixelAddr(gcvNULL, Surface);
-
-    /* Maybe already wrapped before */
-    if (Surface->node.sharedMutex == gcvNULL)
-    {
-        gcmONERROR(gcoOS_CreateMutex(gcvNULL, &Surface->node.sharedMutex));
-    }
 
     /* Initial lock. */
     gcmONERROR(_Lock(Surface));
@@ -12404,8 +12465,8 @@ gcoSURF_BlitCPU(
     gctINT scissorWidth = 0;
     gctBOOL averagePixels = gcvTRUE;
     gcsSURF_FORMAT_INFO *srcFmtInfo, *dstFmtInfo;
-    gcsSURF_VIEW srcView = {args->srcSurface, args->srcZ, args->srcNumSlice};
-    gcsSURF_VIEW dstView = {args->dstSurface, args->dstZ, args->dstNumSlice};
+    gcsSURF_VIEW srcView;
+    gcsSURF_VIEW dstView;
 
     if (!args || !args->srcSurface || !args->dstSurface)
     {
@@ -12416,6 +12477,13 @@ gcoSURF_BlitCPU(
     {
         return gcvSTATUS_INVALID_ARGUMENT;
     }
+
+    srcView.surf = args->srcSurface;
+    srcView.firstSlice = args->srcZ;
+    srcView.numSlices = args->srcNumSlice;
+    dstView.surf = args->dstSurface;
+    dstView.firstSlice = args->dstZ;
+    dstView.numSlices = args->dstNumSlice;
 
     gcoOS_MemCopy(&blitArgs, args, sizeof(gcsSURF_BLIT_ARGS));
 
@@ -12739,10 +12807,10 @@ gcoSURF_BlitCPU(
 
     if (gcvSURF_BITMAP != srcSurf->type)
     {
-        gcmDUMP(gcvNULL, "#[info: verify BlitCPU source");
+        gcmDUMP(gcvNULL, "#[info: verify BlitCPU source]");
         /* verify the source */
         gcmDUMP_BUFFER(gcvNULL,
-                       "verify",
+                       gcvDUMP_BUFFER_VERIFY,
                        gcsSURF_NODE_GetHWAddress(&srcSurf->node),
                        srcSurf->node.logical,
                        0,
@@ -12751,7 +12819,7 @@ gcoSURF_BlitCPU(
     }
     /* upload the destination */
     gcmDUMP_BUFFER(gcvNULL,
-                   "memory",
+                   gcvDUMP_BUFFER_MEMORY,
                    gcsSURF_NODE_GetHWAddress(&dstSurf->node),
                    dstSurf->node.logical,
                    0,
@@ -13057,6 +13125,42 @@ depr_gcoSURF_Resolve(
     return status;
 }
 
+static gceSTATUS
+_WrapUserMemory(
+    IN gctPOINTER Memory,
+    IN gctSIZE_T Size,
+    OUT gctPOINTER * Info,
+    OUT gctUINT32_PTR Address
+    )
+{
+    gceSTATUS status;
+    gcsUSER_MEMORY_DESC desc;
+    gctUINT32 node = 0;
+
+    gcoOS_ZeroMemory(&desc, gcmSIZEOF(desc));
+
+    desc.flag    = gcvALLOC_FLAG_USERMEMORY;
+    desc.logical = gcmPTR_TO_UINT64(Memory);
+    desc.size    = (gctUINT32)Size;
+    desc.physical = ~0ULL;
+
+    gcmONERROR(gcoHAL_WrapUserMemory(&desc, gcvVIDMEM_TYPE_BITMAP, &node));
+
+    gcmONERROR(gcoHAL_LockVideoMemory(node, gcvFALSE, gcvENGINE_RENDER, Address, gcvNULL));
+
+    *Info = (gctPOINTER)(gctUINTPTR_T)node;
+
+    return gcvSTATUS_OK;
+
+OnError:
+    if (node)
+    {
+        gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(node));
+    }
+
+    return status;
+}
+
 /*******************************************************************************
 **
 **  depr_gcoSURF_ResolveRect
@@ -13216,11 +13320,10 @@ depr_gcoSURF_ResolveRect(
             if (DstBits != gcvNULL)
             {
                 gcmERR_BREAK(
-                    gcoOS_MapUserMemory(gcvNULL,
-                                        DstBits,
-                                        dstSurf->size,
-                                        &mapInfo,
-                                        &address));
+                    _WrapUserMemory(DstBits,
+                                   dstSurf->size,
+                                   &mapInfo,
+                                   &address));
 
                 gcsSURF_NODE_SetHardwareAddress(&dstSurf->node, address);
             }
@@ -13257,7 +13360,7 @@ depr_gcoSURF_ResolveRect(
     while (gcvFALSE);
 
     /* Unlock the surface. */
-    if (destination[0] != gcvNULL)
+    if ((destination[0] != gcvNULL) && DstSurface)
     {
         /* Unlock the resolve buffer. */
         gcmVERIFY_OK(
@@ -13272,11 +13375,7 @@ depr_gcoSURF_ResolveRect(
 
         /* Unmap the user memory. */
         gcmVERIFY_OK(
-            gcoHAL_ScheduleUnmapUserMemory(gcvNULL,
-                                           mapInfo,
-                                           dstSurf->size,
-                                           address,
-                                           DstBits));
+            gcoHARDWARE_ScheduleVideoMemory((gctUINT32)gcmPTR_TO_UINT64(mapInfo)));
     }
 
     /* Return the status. */
@@ -13689,7 +13788,7 @@ gcsSURF_NODE_Construct(
     gctUINT i;
 #if gcdENABLE_3D
     gctBOOL bForceVirtual = gcvFALSE;
-    gceHARDWARE_TYPE type = gcvHARDWARE_INVALID;
+    gceHARDWARE_TYPE type;
 #endif
 
 #if gcdDEBUG_OPTION && gcdDEBUG_OPTION_SPECIFY_POOL
@@ -13739,6 +13838,9 @@ gcsSURF_NODE_Construct(
 #endif
 #endif
 
+    /* Reset CPU write flag, since there is flush when unlock in kernel.*/
+    Node->bCPUWrite = gcvFALSE;
+
 #if gcdENABLE_3D
     gcmVERIFY_OK(gcoHAL_GetHardwareType(gcvNULL, &type));
 
@@ -13757,7 +13859,7 @@ gcsSURF_NODE_Construct(
 
     iface.command   = gcvHAL_ALLOCATE_LINEAR_VIDEO_MEMORY;
 
-    gcmSAFECASTSIZET(alvm->bytes, Bytes);
+    alvm->bytes = Bytes;
 
     alvm->alignment = Alignment;
     alvm->type      = Type;
@@ -13780,11 +13882,7 @@ gcsSURF_NODE_Construct(
 
         Node->u.normal.node = alvm->node;
         Node->pool          = alvm->pool;
-        Node->size          = alvm->bytes;
-
-        gcmASSERT(Node->sharedMutex == gcvNULL);
-
-        gcmONERROR(gcoOS_CreateMutex(gcvNULL, &Node->sharedMutex));
+        Node->size          = (gctSIZE_T)alvm->bytes;
     }
     else
     {
@@ -13818,18 +13916,11 @@ gcsSURF_NODE_Destroy(
     IN gcsSURF_NODE_PTR Node
     )
 {
-    gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status;
     gcmHEADER_ARG("Node=0x%x", Node);
-
 #if gcdSYNC
-    /* When create node fail, we may not create mutex yet */
-    if (Node->sharedMutex)
     {
-        gcsSYNC_CONTEXT_PTR ptr;
-
-        gcoOS_AcquireMutex(gcvNULL, Node->sharedMutex, gcvINFINITE);
-
-        ptr = Node->fenceCtx;
+        gcsSYNC_CONTEXT_PTR ptr = Node->fenceCtx;
 
         while(ptr)
         {
@@ -13839,18 +13930,10 @@ gcsSURF_NODE_Destroy(
 
             ptr = Node->fenceCtx;
         }
-        gcoOS_ReleaseMutex(gcvNULL, Node->sharedMutex);
-
-        gcoOS_DeleteMutex(gcvNULL, Node->sharedMutex);
-
-        Node->sharedMutex = gcvNULL;
     }
 #endif
 
-    if (Node->u.normal.node != 0)
-    {
-        status = gcoHARDWARE_ScheduleVideoMemory(Node->u.normal.node);
-    }
+    status = gcoHARDWARE_ScheduleVideoMemory(Node->u.normal.node);
 
     /* Reset the node. */
     Node->pool  = gcvPOOL_UNKNOWN;
@@ -13899,9 +13982,7 @@ gcsSURF_NODE_GetFence(
 
             if(fenceEnable)
             {
-                gcoOS_AcquireMutex(gcvNULL, Node->sharedMutex, gcvINFINITE);
                 gcoHARDWARE_GetFence(gcvNULL, &Node->fenceCtx, engine, Type);
-                gcoOS_ReleaseMutex(gcvNULL, Node->sharedMutex);
                 Node->fenceStatus = gcvFENCE_ENABLE;
             }
             else
@@ -13922,6 +14003,7 @@ gcsSURF_NODE_WaitFence(
     IN gceFENCE_TYPE Type
 )
 {
+    gceSTATUS status = gcvSTATUS_OK;
 #if gcdSYNC
     if (gcoHAL_GetOption(gcvNULL, gcvOPTION_KERNEL_FENCE))
     {
@@ -13935,19 +14017,22 @@ gcsSURF_NODE_WaitFence(
 
         if(fenceEnable)
         {
-            gcoOS_AcquireMutex(gcvNULL, Node->sharedMutex, gcvINFINITE);
             gcoHARDWARE_WaitFence(gcvNULL, Node->fenceCtx, From, On, Type);
-            gcoOS_ReleaseMutex(gcvNULL, Node->sharedMutex);
         }
-        else if(Node->fenceStatus != gcvFENCE_DISABLE)
+        else
         {
-            Node->fenceStatus = gcvFENCE_ENABLE;
-            gcoHARDWARE_SetFenceEnabled(gcvNULL, gcvTRUE);
-            gcoHAL_Commit(gcvNULL, gcvTRUE);
+            if(Node->fenceStatus == gcvFENCE_GET)
+            {
+                Node->fenceStatus = gcvFENCE_ENABLE;
+                gcoHARDWARE_SetFenceEnabled(gcvNULL, gcvTRUE);
+                gcmONERROR(gcoHAL_Commit(gcvNULL, gcvTRUE));
+            }
         }
+
     }
+OnError:
 #endif
-    return gcvSTATUS_OK;
+    return status;
 }
 
 gceSTATUS
@@ -13964,10 +14049,8 @@ gcsSURF_NODE_IsFenceEnabled(
     }
     else if (Node)
     {
-        status = (Node->fenceStatus != gcvFENCE_DISABLE) ?
-                    gcvSTATUS_TRUE : gcvSTATUS_FALSE;
-
-        return status;
+        return (Node->fenceStatus != gcvFENCE_DISABLE) ?
+                gcvSTATUS_TRUE : gcvSTATUS_FALSE;
     }
     return status;
 
@@ -14103,17 +14186,12 @@ gcoSURF_WrapUserMemory(
     desc.handle = Handle;
 
     /* Wrap user memory to a video memory node. */
-    gcmONERROR(gcoHAL_WrapUserMemory(&desc, &node));
+    gcmONERROR(gcoHAL_WrapUserMemory(&desc, (gceVIDMEM_TYPE)surface->type, &node));
 
     /* Import wrapped video memory node to the surface. */
     surface->node.u.normal.node = node;
     surface->node.pool          = gcvPOOL_VIRTUAL;
     surface->node.size          = surface->size;
-
-    /* Should always NULL, here */
-    gcmASSERT(surface->node.sharedMutex == gcvNULL);
-
-    gcmONERROR(gcoOS_CreateMutex(gcvNULL, &surface->node.sharedMutex));
 
     /* Initial lock. */
     gcmONERROR(_Lock(surface));
@@ -14339,7 +14417,7 @@ gcoSURF_WrapUserMultiBuffer(
         desc.handle = Handle[i];
         desc.flag = Flag;
 
-        gcmONERROR(gcoHAL_WrapUserMemory(&desc, &node[i]));
+        gcmONERROR(gcoHAL_WrapUserMemory(&desc, (gceVIDMEM_TYPE)surface->type, &node[i]));
     }
 
     /* Import wrapped video memory node to the surface. */
@@ -14350,19 +14428,18 @@ gcoSURF_WrapUserMultiBuffer(
         surface->node3.bufferOffset  = BufferOffset[2];
         surface->node3.pool = gcvPOOL_VIRTUAL;
         surface->node3.size = Stride[2] * Height + BufferOffset[2];
-        gcmONERROR(gcoOS_CreateMutex(gcvNULL, &surface->node3.sharedMutex));
+        /* fall through */
     case 2:
         surface->node2.u.normal.node = node[1];
         surface->node2.bufferOffset  = BufferOffset[1];
         surface->node2.pool = gcvPOOL_VIRTUAL;
         surface->node2.size = Stride[1] * Height + BufferOffset[1];
-        gcmONERROR(gcoOS_CreateMutex(gcvNULL, &surface->node2.sharedMutex));
+        /* fall through */
     default:
         surface->node.u.normal.node  = node[0];
         surface->node.bufferOffset   = BufferOffset[0];
         surface->node.pool  = gcvPOOL_VIRTUAL;
         surface->node.size  = Stride[0] * Height + BufferOffset[0];
-        gcmONERROR(gcoOS_CreateMutex(gcvNULL, &surface->node.sharedMutex));
         break;
     }
 

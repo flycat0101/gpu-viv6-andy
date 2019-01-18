@@ -345,7 +345,7 @@ static Bool VIVEXTFULLScreenInfo(Display* dpy, int screen, Drawable drawable)
 #endif
 
 
-extern __GLesDispatchTable *__glNopDispatchTab;
+extern __GLdispatchTable *__glNopDispatchTab;
 extern Bool __glXDisplayIsClosed;
 
 extern GLvoid __glContextModesDestroy( __GLcontextModes * modes );
@@ -733,7 +733,7 @@ static gceSTATUS _UnlockVideoNode(
     iface.engine = gcvENGINE_RENDER;
     iface.command = gcvHAL_UNLOCK_VIDEO_MEMORY;
     iface.u.UnlockVideoMemory.node = Node;
-    iface.u.UnlockVideoMemory.type = gcvSURF_BITMAP;
+    iface.u.UnlockVideoMemory.type = gcvVIDMEM_TYPE_BITMAP;
     iface.u.UnlockVideoMemory.asynchroneous = gcvTRUE;
 /*
     gcmONERROR(gcoHAL_Commit(Hal,gcvTRUE));

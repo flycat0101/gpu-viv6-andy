@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -14,17 +14,18 @@
 #include "gc_es_context.h"
 #include "gc_chip_context.h"
 #include "gc_chip_misc.h"
+#include "gc_hal_dump.h"
 
 #if defined(ANDROID)
 #if ANDROID_SDK_VERSION >= 16
-#      include <ui/ANativeObjectBase.h>
-#   else
-#      include <private/ui/android_natives_priv.h>
-#   endif
+#    include <ui/ANativeObjectBase.h>
+#  else
+#    include <private/ui/android_natives_priv.h>
+#  endif
 
 #if gcdANDROID_IMPLICIT_NATIVE_BUFFER_SYNC
-#      include <gc_gralloc_priv.h>
-#   endif
+#    include <gc_gralloc_priv.h>
+#  endif
 #endif
 
 #define _GC_OBJ_ZONE    __GLES3_ZONE_FBO
@@ -108,7 +109,20 @@ gcChipUtilGetPixelPlane(
         pixelPlaneView->numSlices   = 1;
 
         /* Downsample to pixel plane surface. */
-        gcmONERROR(gcoSURF_ResolveRect(ssbView, pixelPlaneView, gcvNULL));
+#ifdef OPENGL40
+        if (ssbView->numSlices > 1)
+        {
+            gcsSURF_VIEW fsssbView;
+            fsssbView.firstSlice = ssbView->firstSlice;
+            fsssbView.numSlices = 1;
+            fsssbView.surf = ssbView->surf;
+            gcmONERROR(gcoSURF_ResolveRect(&fsssbView, pixelPlaneView, gcvNULL));
+        }
+        else
+#endif
+        {
+            gcmONERROR(gcoSURF_ResolveRect(ssbView, pixelPlaneView, gcvNULL));
+        }
     }
 
 OnError:
@@ -2418,6 +2432,12 @@ __glChipEglImageTargetRenderbufferStorageOES(
 
         chipRBO->formatMapInfo = gcChipGetFormatMapInfo(gc, rbo->formatInfo->drvFormat, patchCase);
 
+        if (chipRBO->surface != gcvNULL)
+        {
+            gcmONERROR(gcoSURF_Destroy(chipRBO->surface));
+            chipRBO->surface = gcvNULL;
+        }
+
         if (image->type == KHR_IMAGE_TEXTURE_CUBE && (image->u.texture.face > 0 ))
         {
             if ((image->u.texture.shadowSurface != gcvNULL) && (image->u.texture.masterDirty == gcvTRUE))
@@ -3381,6 +3401,7 @@ gcChipFBOSyncEGLImageNativeBuffer(
         /* Signal the signal, so CPU apps
          * can lock again once resolve is done. */
         iface.command            = gcvHAL_SIGNAL;
+        iface.engine             = gcvENGINE_RENDER;
         iface.u.Signal.signal    = handle->hwDoneSignal;
         iface.u.Signal.auxSignal = 0;
         /* Stuff the client's PID. */

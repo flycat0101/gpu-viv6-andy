@@ -1,12 +1,54 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    The MIT License (MIT)
 *
-*    The material in this file is confidential and contains trade secrets
-*    of Vivante Corporation. This is proprietary information owned by
-*    Vivante Corporation. No part of this work may be disclosed,
-*    reproduced, copied, transmitted, or used in any way for any purpose,
-*    without the express written permission of Vivante Corporation.
+*    Copyright (c) 2014 - 2019 Vivante Corporation
+*
+*    Permission is hereby granted, free of charge, to any person obtaining a
+*    copy of this software and associated documentation files (the "Software"),
+*    to deal in the Software without restriction, including without limitation
+*    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+*    and/or sell copies of the Software, and to permit persons to whom the
+*    Software is furnished to do so, subject to the following conditions:
+*
+*    The above copyright notice and this permission notice shall be included in
+*    all copies or substantial portions of the Software.
+*
+*    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+*    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+*    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+*    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+*    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+*    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+*    DEALINGS IN THE SOFTWARE.
+*
+*****************************************************************************
+*
+*    The GPL License (GPL)
+*
+*    Copyright (C) 2014 - 2019 Vivante Corporation
+*
+*    This program is free software; you can redistribute it and/or
+*    modify it under the terms of the GNU General Public License
+*    as published by the Free Software Foundation; either version 2
+*    of the License, or (at your option) any later version.
+*
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU General Public License for more details.
+*
+*    You should have received a copy of the GNU General Public License
+*    along with this program; if not, write to the Free Software Foundation,
+*    Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+*
+*****************************************************************************
+*
+*    Note: This software is released under dual MIT and GPL licenses. A
+*    recipient may use this file under the terms of either the MIT license or
+*    GPL License. If you wish to use only one license not the other, you can
+*    indicate your decision by deleting one of the above license notices in your
+*    version of this file.
 *
 *****************************************************************************/
 
@@ -43,26 +85,22 @@ _AllocateMemory(
     gcmkVERIFY_ARGUMENT(Physical != NULL);
     gcmkVERIFY_ARGUMENT(PhysAddr != NULL);
 
-    gcmkONERROR(gckOS_AllocateContiguous(
-        Device->os, gcvFALSE, &Bytes, Physical, Logical
+    gcmkONERROR(gckOS_AllocateNonPagedMemory(
+        Device->os, gcvFALSE, gcvALLOC_FLAG_CONTIGUOUS, &Bytes, Physical, Logical
         ));
 
-    gcmkONERROR(gckOS_GetPhysicalAddress(
-        Device->os, *Logical, &physAddr
+    gcmkONERROR(gckOS_GetPhysicalFromHandle(
+        Device->os, *Physical, 0, &physAddr
         ));
 
-    gcmkSAFECASTPHYSADDRT(*PhysAddr, physAddr);
-
-    /* Success. */
-    gcmkFOOTER_ARG(
-        "*Logical=0x%x *Physical=0x%x *PhysAddr=0x%08x",
-        *Logical, *Physical, *PhysAddr
-        );
-
-    return gcvSTATUS_OK;
+    *PhysAddr = physAddr;
 
 OnError:
-    gcmkFOOTER();
+    gcmkFOOTER_ARG(
+        "*Logical=%p *Physical=%p *PhysAddr=0x%llx",
+        gcmOPT_POINTER(Logical), gcmOPT_POINTER(Physical), gcmOPT_VALUE(PhysAddr)
+        );
+
     return status;
 }
 
@@ -79,7 +117,7 @@ _FreeMemory(
 
     gcmkVERIFY_ARGUMENT(Device != NULL);
 
-    status = gckOS_FreeContiguous(
+    status = gckOS_FreeNonPagedMemory(
         Device->os, Physical, Logical,
         ((PVX_MDL) Physical)->numPages * PAGE_SIZE
         );
@@ -194,7 +232,7 @@ _SetupVidMem(
                 device->requestedContiguousBase = ContiguousBase;
                 device->requestedContiguousSize = ContiguousSize;
 
-                device->contiguousPhysicalName = 0;
+                device->contiguousPhysName = 0;
                 device->contiguousSize = ContiguousSize;
             }
         }
@@ -243,7 +281,7 @@ static void isrRoutine(void *ctxt)
     device = galDevice;
 
     /* Call kernel interrupt notification. */
-    status = gckKERNEL_Notify(device->kernels[core], gcvNOTIFY_INTERRUPT, gcvTRUE);
+    status = gckHARDWARE_Interrupt(device->kernels[core]->hardware);
 
     if (gcmIS_SUCCESS(status))
     {
@@ -279,15 +317,11 @@ static int threadRoutine(void *ctxt)
         if (device->killThread == gcvTRUE)
         {
             gckOS_Delay(device->os, 1);
-            break;
+            return 0;
         }
 
-        gckKERNEL_Notify(device->kernels[core],
-                         gcvNOTIFY_INTERRUPT,
-                         gcvFALSE);
+        gckKERNEL_Notify(device->kernels[core], gcvNOTIFY_INTERRUPT);
     }
-
-    return 0;
 }
 
 static void isrRoutineVG(int irq, void *ctxt)
@@ -552,7 +586,7 @@ gckGALDEVICE_Construct(
             device->kernels[gcvCORE_MAJOR]->hardware, FastClear, Compression
             ));
 
-        gcmkONERROR(gckHARDWARE_SetPowerManagement(
+        gcmkONERROR(gckHARDWARE_EnablePowerManagement(
             device->kernels[gcvCORE_MAJOR]->hardware, PowerManagement
             ));
 
@@ -590,7 +624,7 @@ gckGALDEVICE_Construct(
             gcmkONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
 
-        gcmkONERROR(gckHARDWARE_SetPowerManagement(
+        gcmkONERROR(gckHARDWARE_EnablePowerManagement(
             device->kernels[gcvCORE_2D]->hardware, PowerManagement
             ));
 
@@ -610,7 +644,7 @@ gckGALDEVICE_Construct(
 #if gcdENABLE_VG
         gcmkONERROR(gckDEVICE_AddCore(device->device, gcvCORE_VG, gcvCHIP_ID_DEFAULT, device, &device->kernels[gcvCORE_VG]));
 
-        gcmkONERROR(gckVGHARDWARE_SetPowerManagement(
+        gcmkONERROR(gckVGHARDWARE_EnablePowerManagement(
             device->kernels[gcvCORE_VG]->vg->hardware,
             PowerManagement
             ));
@@ -634,7 +668,7 @@ gckGALDEVICE_Construct(
                  FastClear,
                 Compression));
 
-            gcmkONERROR(gckHARDWARE_SetPowerManagement(
+            gcmkONERROR(gckHARDWARE_EnablePowerManagement(
                 device->kernels[i]->hardware, PowerManagement
                 ));
 
@@ -755,17 +789,17 @@ gckGALDEVICE_Construct(
 
     if (device->internalPhysical)
     {
-        device->internalPhysicalName = gcmPTR_TO_NAME(device->internalPhysical);
+        device->internalPhysName = gcmPTR_TO_NAME(device->internalPhysical);
     }
 
     if (device->externalPhysical)
     {
-        device->externalPhysicalName = gcmPTR_TO_NAME(device->externalPhysical);
+        device->externalPhysName = gcmPTR_TO_NAME(device->externalPhysical);
     }
 
     if (device->contiguousPhysical)
     {
-        device->contiguousPhysicalName = gcmPTR_TO_NAME(device->contiguousPhysical);
+        device->contiguousPhysName = gcmPTR_TO_NAME(device->contiguousPhysical);
     }
 
     /* Return pointer to the device. */
@@ -829,20 +863,20 @@ gckGALDEVICE_Destroy(
             }
         }
 
-        if (Device->internalPhysicalName != 0)
+        if (Device->internalPhysName != 0)
         {
-            gcmRELEASE_NAME(Device->internalPhysicalName);
-            Device->internalPhysicalName = 0;
+            gcmRELEASE_NAME(Device->internalPhysName);
+            Device->internalPhysName = 0;
         }
-        if (Device->externalPhysicalName != 0)
+        if (Device->externalPhysName != 0)
         {
-            gcmRELEASE_NAME(Device->externalPhysicalName);
-            Device->externalPhysicalName = 0;
+            gcmRELEASE_NAME(Device->externalPhysName);
+            Device->externalPhysName = 0;
         }
-        if (Device->contiguousPhysicalName != 0)
+        if (Device->contiguousPhysName != 0)
         {
-            gcmRELEASE_NAME(Device->contiguousPhysicalName);
-            Device->contiguousPhysicalName = 0;
+            gcmRELEASE_NAME(Device->contiguousPhysName);
+            Device->contiguousPhysName = 0;
         }
 
         for (i = 0; i < gcdMAX_GPU_COUNT; i++)
@@ -1274,17 +1308,6 @@ gckGALDEVICE_QueryFrequency(
 
             mcStart[i] = shStart[i] = 0;
 
-            if (Device->args.powerManagement)
-            {
-                gcmkONERROR(gckHARDWARE_SetPowerManagement(
-                    hardware, gcvFALSE
-                    ));
-            }
-
-            gcmkONERROR(gckHARDWARE_SetPowerManagementState(
-                hardware, gcvPOWER_ON_AUTO
-                ));
-
             gckHARDWARE_EnterQueryClock(hardware,
                                         &mcStart[i], &shStart[i]);
         }
@@ -1306,13 +1329,6 @@ gckGALDEVICE_QueryFrequency(
         if (Device->kernels[i] && mcStart[i])
         {
             hardware = Device->kernels[i]->hardware;
-
-            if (Device->args.powerManagement)
-            {
-                gcmkONERROR(gckHARDWARE_SetPowerManagement(
-                    hardware, gcvTRUE
-                    ));
-            }
 
             gckHARDWARE_ExitQueryClock(hardware,
                                        mcStart[i], shStart[i],
@@ -1363,6 +1379,8 @@ gckGALDEVICE_Start(
     /* Start the kernel thread. */
     gcmkONERROR(gckGALDEVICE_Start_Threads(Device));
 
+    gcmkONERROR(gckGALDEVICE_QueryFrequency(Device));
+
     for (i = 0; i < gcvCORE_COUNT; i++)
     {
         if (i == gcvCORE_VG)
@@ -1376,7 +1394,7 @@ gckGALDEVICE_Start(
             gcmkONERROR(gckGALDEVICE_Setup_ISR(i));
 
             /* Switch to SUSPEND power state. */
-            gcmkONERROR(gckHARDWARE_SetPowerManagementState(
+            gcmkONERROR(gckHARDWARE_SetPowerState(
                 Device->kernels[i]->hardware, gcvPOWER_OFF_BROADCAST
                 ));
         }
@@ -1389,7 +1407,7 @@ gckGALDEVICE_Start(
 
 #if gcdENABLE_VG
         /* Switch to SUSPEND power state. */
-        gcmkONERROR(gckVGHARDWARE_SetPowerManagementState(
+        gcmkONERROR(gckVGHARDWARE_SetPowerState(
             Device->kernels[gcvCORE_VG]->vg->hardware, gcvPOWER_OFF_BROADCAST
             ));
 #endif
@@ -1444,12 +1462,12 @@ gckGALDEVICE_Stop(
 
         if (Device->kernels[i] != gcvNULL)
         {
-            gcmkONERROR(gckHARDWARE_SetPowerManagement(
+            gcmkONERROR(gckHARDWARE_EnablePowerManagement(
                 Device->kernels[i]->hardware, gcvTRUE
                 ));
 
             /* Switch to OFF power state. */
-            gcmkONERROR(gckHARDWARE_SetPowerManagementState(
+            gcmkONERROR(gckHARDWARE_SetPowerState(
                 Device->kernels[i]->hardware, gcvPOWER_OFF
                 ));
 
@@ -1465,7 +1483,7 @@ gckGALDEVICE_Stop(
 
 #if gcdENABLE_VG
         /* Switch to OFF power state. */
-        gcmkONERROR(gckVGHARDWARE_SetPowerManagementState(
+        gcmkONERROR(gckVGHARDWARE_SetPowerState(
             Device->kernels[gcvCORE_VG]->vg->hardware, gcvPOWER_OFF
             ));
 #endif
@@ -1547,7 +1565,7 @@ gckGALDEVICE_AddCore(
     gckGALDEVICE_Setup_ISR(core);
 
     /* Set default power management state. */
-    gcmkONERROR(gckHARDWARE_SetPowerManagementState(
+    gcmkONERROR(gckHARDWARE_SetPowerState(
         Device->kernels[core]->hardware, gcvPOWER_OFF_BROADCAST
         ));
 

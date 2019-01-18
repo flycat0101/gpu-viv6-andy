@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -162,14 +162,20 @@ _VIR_CFO_PerformPatternTransformationOnFunction(
                             if(labelJmpc == labelNext2 &&
                                VIR_ConditionOp_Reversable(VIR_Inst_GetConditionOp(inst)))
                             {
+                                VIR_TypeId src0TyId = VIR_Operand_GetTypeId(VIR_Inst_GetSource(inst, 0));
+                                VIR_TypeId src1TyId = VIR_Inst_GetSource(inst, 1) ? VIR_Operand_GetTypeId(VIR_Inst_GetSource(inst, 1)) : VIR_TYPE_UNKNOWN;
                                 if(VIR_CFO_GetHWCfg(cfo)->hwFeatureFlags.supportUnOrdBranch)
                                 {
                                     gcmASSERT(0);
                                 }
-                                else if(VIR_TypeId_isInteger(VIR_Operand_GetTypeId(VIR_Inst_GetSource(inst, 0))) &&
-                                        (VIR_Inst_GetSource(inst, 1) == gcvNULL || VIR_TypeId_isInteger(VIR_Operand_GetTypeId(VIR_Inst_GetSource(inst, 0)))))
+                                else if((VIR_TypeId_isInteger(src0TyId) &&
+                                         (VIR_Inst_GetSource(inst, 1) == gcvNULL || VIR_TypeId_isInteger(src1TyId))) ||
+                                        (VIR_TypeId_isFloat(src0TyId) && VIR_GetTypeComponents(src0TyId) == 1 &&
+                                         (VIR_Inst_GetSource(inst, 1) == gcvNULL ||
+                                          (VIR_TypeId_isFloat(src1TyId) && VIR_GetTypeComponents(src0TyId) == 1))) )
                                 {
-                                    if(VIR_CFO_GetHWCfg(cfo)->hwFeatureFlags.hasHalti4)
+                                    /* ok to transform scalar float point comparison */
+                                    if(VIR_CFO_GetHWCfg(cfo)->hwFeatureFlags.hasHalti4 && VIR_GetTypeComponents(src0TyId) > 1)
                                     {
                                         /* jmpc.cond labelname, int s0, int s1
                                            jmp labelname2
@@ -204,8 +210,8 @@ _VIR_CFO_PerformPatternTransformationOnFunction(
                                         VIR_Function_DeleteInstruction(func, nextInst);
                                         break;
                                     }
-                                    else if(VIR_Swizzle_Channel_Count(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(inst, 0))) == 1 &&
-                                        (VIR_Inst_GetSource(inst, 1) == gcvNULL || VIR_Swizzle_Channel_Count(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(inst, 1))) == 1))
+                                    else if((VIR_Swizzle_Channel_Count(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(inst, 0))) == 1 &&
+                                        (VIR_Inst_GetSource(inst, 1) == gcvNULL || VIR_Swizzle_Channel_Count(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(inst, 1))) == 1)))
                                     {
                                         /* jmpc.cond labelname, int s0.xxxx, int s1.yyyy
                                            jmp labelname2
@@ -418,6 +424,11 @@ DEF_QUERY_PASS_PROP(VIR_CFO_PerformOnShader)
     pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
     pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_CFO;
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+}
+
+DEF_SH_NECESSITY_CHECK(VIR_CFO_PerformOnShader)
+{
+    return gcvTRUE;
 }
 
 VSC_ErrCode

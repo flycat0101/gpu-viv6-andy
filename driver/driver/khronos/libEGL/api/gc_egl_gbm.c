@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1321,7 +1321,7 @@ struct eglWindowInfo
 
     /* Information obtained by gbm_GetDisplayInfoEx2. */
     gctPOINTER          logical;
-    unsigned long       physical;
+    gctPHYS_ADDR_T      physical;
     gctINT              stride;
     gctUINT             width;
     gctUINT             height;
@@ -1372,7 +1372,7 @@ _CreateWindowBuffers(
             {
                 gctUINT    offset;
                 gctPOINTER logical;
-                gctUINT    physical;
+                gctPHYS_ADDR_T physical;
 
                 /* Allocate native buffer object. */
                 gcmONERROR(gcoOS_Allocate(gcvNULL,
@@ -1684,7 +1684,7 @@ _QueryWindowInfo(
     {
         Info->fbDirect     = EGL_TRUE;
         Info->logical      = gcvNULL;
-        Info->physical     = gcvINVALID_ADDRESS;
+        Info->physical     = gcvINVALID_PHYSICAL_ADDRESS;
         Info->stride       = 0;
         Info->wrapFB       = gcvFALSE;
         Info->multiBuffer  = 1;
@@ -2679,13 +2679,13 @@ _SynchronousPost(
     void * win = Surface->hwnd;
     struct gbm_viv_surface* surf = ((struct gbm_viv_surface*) win);
 
-    if (gbm_surface_in_fence_on(&(surf->base)) ||
-        (gbmPlatform.flags & EGL_PLATFORM_FLAG_GBM_ASYNC))
+    if (surf->sync_post &&
+        !(gbmPlatform.flags & EGL_PLATFORM_FLAG_GBM_ASYNC))
     {
-        return EGL_FALSE;
+        return EGL_TRUE;
     }
 
-    return EGL_TRUE;
+    return EGL_FALSE;
 }
 
 static EGLBoolean
@@ -2950,7 +2950,7 @@ _ConnectPixmap(
     gceSURF_FORMAT pixmapFormat;
     gctINT pixmapBpp;
     gctPOINTER pixmapBits = gcvNULL;
-    gctUINT32 pixmapPhysical = gcvINVALID_ADDRESS;
+    gctPHYS_ADDR_T pixmapPhysical = gcvINVALID_PHYSICAL_ADDRESS;
     gcoSURF wrapper = gcvNULL;
     gcoSURF shadow = gcvNULL;
     gctPOINTER pointer;

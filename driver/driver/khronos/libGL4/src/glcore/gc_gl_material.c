@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -74,11 +74,11 @@ GLvoid __glImmedFlushPrim_Material(__GLcontext *gc, GLboolean bFlushPipe)
 
         /* Switch dispatch entry dispatchTable->End
         Current dispatch table should be info table */
-        if(vertexCount > 0 && (gc->currentImmediateTable->End != __glim_End_Material))
+        if(vertexCount > 0 && (gc->immedModeDispatch.End != __glim_End_Material))
         {
             gc->input.indexCount = 0;
-            gc->tnlAccum.glimEnd = gc->currentImmediateTable->End;
-            gc->currentImmediateTable->End = __glim_End_Material;
+            gc->tnlAccum.glimEnd = gc->immedModeDispatch.End;
+            gc->immedModeDispatch.End = __glim_End_Material;
         }
     }
 
@@ -151,22 +151,12 @@ GLvoid APIENTRY __glim_End_Material(__GLcontext *gc)
     __glImmedFlushPrim_Material(gc, GL_TRUE);
     __glImmedUpdateVertexState(gc);
 
-     GL_ASSERT(gc->currentImmediateTable->End == __glim_End_Material);
+     GL_ASSERT(gc->immedModeDispatch.End == __glim_End_Material);
     /* Restore dispatchTable->End to the original function pointer */
-    gc->currentImmediateTable->End = gc->tnlAccum.glimEnd ;
+    gc->immedModeDispatch.End = gc->tnlAccum.glimEnd ;
 
     __glResetImmedVertexBuffer(gc);
 
-
-    /* Switch to outside Begin/End dispatch table.
-    */
-
-    gc->currentImmediateTable = &gc->immediateDispatchTable;
-    /*lan
-    if (gc->dlist.mode == 0) {
-        __GL_SET_API_DISPATCH(__GL_IMMEDIATE_TABLE_OFFSET);
-    }
-    */
     gc->input.beginMode = __GL_NOT_IN_BEGIN;
 }
 

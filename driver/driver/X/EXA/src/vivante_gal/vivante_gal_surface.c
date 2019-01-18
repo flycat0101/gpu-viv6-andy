@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2018 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -92,7 +92,7 @@ gceSTATUS AllocVideoNode(
         iface.u.AllocateLinearVideoMemory.bytes = Surf->mVideoNode.mBytes;
         iface.u.AllocateLinearVideoMemory.alignment = 64;
         iface.u.AllocateLinearVideoMemory.pool = Surf->mVideoNode.mPool;
-        iface.u.AllocateLinearVideoMemory.type = surftype;
+        iface.u.AllocateLinearVideoMemory.type = (gctUINT32)surftype & 0xFF;
         iface.u.AllocateLinearVideoMemory.flag = cacheable ? gcvALLOC_FLAG_CACHEABLE : gcvALLOC_FLAG_NONE;
 
         /* Call kernel API. */
@@ -101,7 +101,7 @@ gceSTATUS AllocVideoNode(
         /* Get allocated node in video memory. */
         Surf->mVideoNode.mNode  = iface.u.AllocateLinearVideoMemory.node;
         Surf->mVideoNode.mPool  = iface.u.AllocateLinearVideoMemory.pool;
-        Surf->mVideoNode.mBytes = iface.u.AllocateLinearVideoMemory.bytes;
+        Surf->mVideoNode.mBytes = (gctSIZE_T)iface.u.AllocateLinearVideoMemory.bytes;
     }
 #endif
 
@@ -200,7 +200,7 @@ gceSTATUS UnlockVideoNode(
     iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_UNLOCK_VIDEO_MEMORY;
     iface.u.UnlockVideoMemory.node = Node;
-    iface.u.UnlockVideoMemory.type = surftype;
+    iface.u.UnlockVideoMemory.type = (gctUINT32)surftype & 0xFF;
     iface.u.UnlockVideoMemory.asynchroneous = gcvTRUE;
 
     /* Call the kernel. */
@@ -275,6 +275,9 @@ static gctUINT MAX_NODE = MAX_SNODE;
 /* Return null, which means the user has not to do the next destroy procedure */
 static GenericSurfacePtr AddGSurfIntoPool(GenericSurfacePtr psurface)
 {
+#ifdef ENABLE_VIVANTE_DRI3
+    return psurface;
+#else
     PGSURFPOOL poolnode = NULL;
     PGSURFPOOL pnextnode = NULL;
     GenericSurfacePtr pretsurf = NULL;
@@ -361,13 +364,16 @@ static GenericSurfacePtr AddGSurfIntoPool(GenericSurfacePtr psurface)
 #endif
 
     return pretsurf;
-
+#endif
 }
 
 /* Grab a surf from the pool, if return null, You have to allocate the new surface */
 /* Otherwise you get surface from the pool, you have not to allocate the surface */
 static GenericSurfacePtr GrabSurfFromPool(gctUINT alignedwidth, gctUINT alignedheight, gctUINT bytesPerPixel)
 {
+#ifdef ENABLE_VIVANTE_DRI3
+    return NULL;
+#else
     PGSURFPOOL pnextnode = NULL;
     GenericSurfacePtr pret = NULL;
     gctUINT size = 0;
@@ -425,7 +431,7 @@ static GenericSurfacePtr GrabSurfFromPool(gctUINT alignedwidth, gctUINT alignedh
 #endif
 
     return pret;
-
+#endif
 }
 
 /************************************************************************
@@ -480,12 +486,11 @@ static gctBOOL FreeGPUSurface(VIVGPUPtr gpuctx, Viv2DPixmapPtr ppriv) {
     if ( surf->mAlignedWidth >= IMX_EXA_NONCACHESURF_WIDTH && surf->mAlignedHeight >= IMX_EXA_NONCACHESURF_HEIGHT )
     {
         surftype = gcvSURF_BITMAP;
-        cacheable = FALSE;
     } else {
 #endif
         if (vivEnableCacheMemory) {
             surftype = gcvSURF_BITMAP;
-            surf->mVideoNode.mPool = gcvPOOL_CONTIGUOUS;
+            surf->mVideoNode.mPool = gcvPOOL_DEFAULT;
         } else {
             surftype = gcvSURF_BITMAP;
         }
@@ -565,7 +570,7 @@ VIV2DGPUSurfaceAlloc(
             {
                 surftype = gcvSURF_BITMAP;
                 cacheable = gcvTRUE;
-                surf->mVideoNode.mPool = gcvPOOL_CONTIGUOUS;
+                surf->mVideoNode.mPool = gcvPOOL_DEFAULT;
             }
             else
             {
@@ -672,7 +677,7 @@ VIV2DGPUSurfaceAllocWithFd(
             {
                 surftype = gcvSURF_BITMAP;
                 cacheable = TRUE;
-                surf->mVideoNode.mPool = gcvPOOL_CONTIGUOUS;
+                surf->mVideoNode.mPool = gcvPOOL_DEFAULT;
             }
             else
             {
@@ -732,7 +737,9 @@ OnError:
 
 Bool ReUseSurface(GALINFOPTR galInfo, PixmapPtr pPixmap, Viv2DPixmapPtr toBeUpdatedpPix)
 {
-
+#ifdef ENABLE_VIVANTE_DRI3
+    TRACE_EXIT(FALSE);
+#else
     GenericSurfacePtr surf = gcvNULL;
     gctUINT alignedWidth, alignedHeight;
     gctUINT bytesPerPixel;
@@ -764,6 +771,7 @@ Bool ReUseSurface(GALINFOPTR galInfo, PixmapPtr pPixmap, Viv2DPixmapPtr toBeUpda
     }
 
     TRACE_EXIT(FALSE);
+#endif
 }
 
 /*Creating and Destroying Functions*/
@@ -895,9 +903,9 @@ Bool WrapSurface(PixmapPtr pPixmap, void * logical, unsigned int physical, Viv2D
     memset(mHandle, 0, sizeof(GenericSurface));
     surf = (GenericSurfacePtr)mHandle;
 
-    alignedWidth = gcmALIGN(pPixmap->drawable.width, WIDTH_ALIGNMENT);
-    alignedHeight = gcmALIGN(pPixmap->drawable.height, HEIGHT_ALIGNMENT);
     bytesPerPixel = BITSTOBYTES(pPixmap->drawable.bitsPerPixel);
+    alignedWidth = gcmALIGN(pPixmap->devKind/bytesPerPixel, WIDTH_ALIGNMENT);
+    alignedHeight = gcmALIGN(pPixmap->drawable.height, HEIGHT_ALIGNMENT);
 
     surf->mVideoNode.mBytes = bytes;
     surf->mVideoNode.mPool = gcvPOOL_USER;
@@ -983,11 +991,11 @@ Bool MapUserMemToGPU(GALINFOPTR galInfo, MemMapInfoPtr mmInfo) {
     gcsUSER_MEMORY_DESC desc = {
         .flag     = gcvALLOC_FLAG_USERMEMORY,
         .logical  = gcmPTR_TO_UINT64(logical),
-        .physical = gcvINVALID_ADDRESS,
+        .physical = gcvINVALID_PHYSICAL_ADDRESS,
         .size     = size,
     };
 
-    status = gcoHAL_WrapUserMemory(&desc, &handle);
+    status = gcoHAL_WrapUserMemory(&desc, gcvVIDMEM_TYPE_BITMAP, &handle);
 
     if (status < 0) {
         TRACE_ERROR("Wrap Failed\n");

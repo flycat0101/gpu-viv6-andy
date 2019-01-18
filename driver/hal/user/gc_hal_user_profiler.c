@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -86,16 +86,15 @@ _SetProfiler(
     gcmONERROR(gcoOS_Open(gcvNULL, profilerName, gcvFILE_CREATE, &Profiler->file));
 
     gcoOS_GetEnv(gcvNULL, "VP_ENABLE_PRINT", &env);
-    if ((env != gcvNULL) && gcmIS_SUCCESS(gcoOS_StrCmp(env, "1")))
-    {
-        Profiler->enablePrint = gcvTRUE;
-    }
 
-    /*set print for vx&cl by default*/
-    if (Profiler->profilerClient == gcvCLIENT_OPENCL ||
+    /*set print for vx&cl by default, bufferCount set to 1 becuase of
+    print counter need get the counter right now for each operation*/
+    if (((env != gcvNULL) && gcmIS_SUCCESS(gcoOS_StrCmp(env, "1"))) ||
+        Profiler->profilerClient == gcvCLIENT_OPENCL ||
         Profiler->profilerClient == gcvCLIENT_OPENVX)
     {
         Profiler->enablePrint = gcvTRUE;
+        Profiler->bufferCount = 1;
     }
 
     gcoOS_GetEnv(gcvNULL, "VP_DISABLE_PROBE", &env);
@@ -165,10 +164,13 @@ _RecordCounters(
     OUT gcsPROFILER_COUNTERS * Counters
     )
 {
-    gctUINT64_PTR memory = gcvNULL;
+    gctUINT32_PTR memory = gcvNULL;
     gctUINT32 offset = 0;
+    gctUINT32 clusterIDWidth = 0;
 
-    memory = (gctUINT64_PTR)Logical;
+    gcoHARDWARE_QueryCluster(gcvNULL, gcvNULL, gcvNULL, gcvNULL, &clusterIDWidth);
+
+    memory = (gctUINT32_PTR)Logical;
 
     gcoOS_ZeroMemory(&Counters->counters_part1, gcmSIZEOF(gcsPROFILER_COUNTERS_PART1));
     gcoOS_ZeroMemory(&Counters->counters_part2, gcmSIZEOF(gcsPROFILER_COUNTERS_PART2));
@@ -346,6 +348,8 @@ _WriteCounters(
     gceCOUNTER_OPTYPE opType;
     gctUINT32 opID;
     gctUINT32 coreId;
+    gceSTATUS status;
+    gctINT32 * counterData = gcvNULL;
 
     gcmASSERT(Profiler->enable);
 
@@ -364,12 +368,11 @@ _WriteCounters(
 
     if (Profiler->counterBuf->needDump)
     {
-        gctINT32 * counterData;
         gctUINT32 counterIndex;
 
         counterIndex = 0;
 
-        gcoOS_Allocate(gcvNULL, Profiler->counterBuf->dataSize, (gctPOINTER *)&counterData);
+        gcmONERROR(gcoOS_Allocate(gcvNULL, Profiler->counterBuf->dataSize, (gctPOINTER *)&counterData));
         gcoOS_ZeroMemory(counterData, Profiler->counterBuf->dataSize);
 
         if (opType == gcvCOUNTER_OP_DRAW  && Profiler->perDrawMode)
@@ -621,6 +624,9 @@ _WriteCounters(
                     counters->counters_part2.hi_total_read_8B_count = counters->counters_part2.hi0_total_read_8B_count + counters->counters_part2.hi1_total_read_8B_count;
                     counters->counters_part2.hi_total_write_8B_count = counters->counters_part2.hi0_total_write_8B_count + counters->counters_part2.hi1_total_write_8B_count;
                 }
+
+                counters->counters_part2.hi_total_readOCB_16B_count = 0xdeaddead;
+                counters->counters_part2.hi_total_writeOCB_16B_count = 0xdeaddead;
             }
             /*non probe mode */
             else if (Profiler->axiBus128bits)
@@ -648,6 +654,8 @@ _WriteCounters(
             gcmRECORD_COUNTER(VPNC_HIIDLECYCLES, gcmGETCOUNTER(counters_part2.hi_total_idle_cycle_count));
             gcmRECORD_COUNTER(VPNC_HIREAD8BYTE, gcmGETCOUNTER(counters_part2.hi_total_read_8B_count));
             gcmRECORD_COUNTER(VPNC_HIWRITE8BYTE, gcmGETCOUNTER(counters_part2.hi_total_write_8B_count));
+            gcmRECORD_COUNTER(VPNC_HIOCBREAD16BYTE, gcmGETCOUNTER(counters_part2.hi_total_readOCB_16B_count));
+            gcmRECORD_COUNTER(VPNC_HIOCBWRITE16BYTE, gcmGETCOUNTER(counters_part2.hi_total_writeOCB_16B_count));
             gcmRECORD_CONST(VPG_END);
 
             gcmRECORD_CONST(VPNG_L2);
@@ -687,8 +695,9 @@ _WriteCounters(
         }
 
         gcoOS_Seek(gcvNULL, Profiler->file, Profiler->counterBuf->startPos, gcvFILE_SEEK_SET);
-        gcoPROFILER_Write(Profiler, Profiler->counterBuf->dataSize, counterData);
-        gcoOS_Free(gcvNULL, counterData);
+        gcmONERROR(gcoPROFILER_Write(Profiler, Profiler->counterBuf->dataSize, counterData));
+        gcmOS_SAFE_FREE(gcvNULL, counterData);
+
     }
 
     if (Profiler->enablePrint)
@@ -709,6 +718,10 @@ _WriteCounters(
                 /* 0.00000095367 = 1 / 1024 / 1024*/
                 gcmPRINT("READ_BANDWIDTH  (MByte): %f\n", counters->counters_part2.hi_total_read_8B_count * 8 * 0.00000095367);
                 gcmPRINT("WRITE_BANDWIDTH (MByte): %f\n", counters->counters_part2.hi_total_write_8B_count * 8 * 0.00000095367);
+                gcmPRINT("READOCB_BANDWIDTH  (MByte): %f\n", counters->counters_part2.hi_total_readOCB_16B_count * 16 * 0.00000095367);
+                gcmPRINT("WRITEOCB_BANDWIDTH (MByte): %f\n", counters->counters_part2.hi_total_writeOCB_16B_count * 16 * 0.00000095367);
+                gcmPRINT("GPUTOTALCYCLES: %u\n", gcmGETCOUNTER(counters_part2.hi_total_cycle_count));
+                gcmPRINT("GPUIDLECYCLES: %u\n", gcmGETCOUNTER(counters_part2.hi_total_idle_cycle_count));
             }
             else
             {
@@ -843,6 +856,13 @@ _WriteCounters(
     }
 
     Profiler->counterBuf->available = gcvTRUE;
+OnError:
+    if (counterData)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, counterData);
+    }
+    return;
+
 }
 
 static gceSTATUS
@@ -1129,7 +1149,7 @@ gcoPROFILER_Destroy(
         &iface, gcmSIZEOF(iface));
 
     /* Free the gcoPROFILER structure. */
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Profiler));
+    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Profiler));
 
 OnError:
     /* Success. */
@@ -1138,7 +1158,7 @@ OnError:
 }
 
 gceSTATUS
-gcoPROFILER_Enable(
+gcoPROFILER_Initialize(
     IN gcoPROFILER Profiler
     )
 {
@@ -1181,9 +1201,10 @@ gcoPROFILER_Enable(
         gctUINT32 physicalAddress;
         gctPOINTER logicalAddress;
         gctUINT32 size;
+        gctUINT32 clusterIDWidth = 0;
         gcoBUFOBJ counterBufobj;
 
-        gcoHAL_ConfigPowerManagement(gcvFALSE);
+        gcoHAL_ConfigPowerManagement(gcvTRUE);
 
         /* disable old profiler in kernel. */
         iface.ignoreTLS = gcvFALSE;
@@ -1196,7 +1217,9 @@ gcoPROFILER_Enable(
             &iface, gcmSIZEOF(iface),
             &iface, gcmSIZEOF(iface)));
 
-        size = gcmSIZEOF(gctUINT64) * TOTAL_PROBE_NUMBER * Profiler->coreCount;
+        gcmONERROR(gcoHARDWARE_QueryCluster(gcvNULL, gcvNULL, gcvNULL, gcvNULL, &clusterIDWidth));
+
+        size = gcmSIZEOF(gctUINT32) * TOTAL_PROBE_NUMBER * Profiler->coreCount * (gctUINT32)(1 << clusterIDWidth);
 
         counterBuffer = Profiler->counterBuf;
 
@@ -1256,7 +1279,15 @@ gcoPROFILER_Enable(
     Profiler->enable = gcvTRUE;
 
     gcmWRITE_CONST(VPHEADER);
-    gcmWRITE_BUFFER(4, "VP12");
+    gcmWRITE_BUFFER(4, VPHEADER_VERSION);
+    if (Profiler->profilerClient <= gcvCLIENT_OPENGL)
+    {
+        gcmWRITE_BUFFER(2, VPFILETYPE_GL);
+    }
+    else
+    {
+        gcmWRITE_BUFFER(2, VPFILETYPE_CL);
+    }
 
     /* Success. */
     gcmFOOTER_ARG("Profiler=0x%x", Profiler);
@@ -1295,7 +1326,7 @@ gcoPROFILER_Disable(
 }
 
 gceSTATUS
-gcoPROFILER_Begin(
+gcoPROFILER_EnableCounters(
     IN gcoPROFILER Profiler,
     IN gceCOUNTER_OPTYPE operationType
     )
@@ -1315,7 +1346,7 @@ gcoPROFILER_Begin(
     /* reset profiler counter */
     if (Profiler->counterEnable == gcvFALSE)
     {
-        if(Profiler->probeMode)
+        if (Profiler->probeMode)
         {
             /* enable hw profiler counter here because of cl maybe do begin in another context which hw counter did not enabled */
             gcmONERROR(gcoHARDWARE_EnableCounters(gcvNULL));
@@ -1409,35 +1440,55 @@ gcoPROFILER_End(
 
     gcmASSERT(Profiler->enable);
 
-    if (!Profiler->counterBuf->available)
+    /* for the counter which need print, should get the counter right now for each draw/frame.*/
+    if (Profiler->enablePrint)
     {
-        gctUINT32 tempPos;
-        gcoOS_GetPos(gcvNULL, Profiler->file, &tempPos);
+        clearCounters = gcvTRUE;
+        Profiler->counterBuf->opType = operationType;
+        Profiler->counterBuf->opID = OpID;
+        Profiler->counterBuf->needDump = Profiler->needDump;
+
+        /*update the counters info of currrent buffer*/
+        gcmONERROR(_UpdateCounters(Profiler, clearCounters));
 
         gcoBUFOBJ_WaitFence((gcoBUFOBJ)Profiler->counterBuf->couterBufobj, gcvFENCE_TYPE_READ);
 
         _WriteCounters(Profiler);
 
-        gcoOS_Seek(gcvNULL, Profiler->file, tempPos, gcvFILE_SEEK_SET);
-
         Profiler->counterBuf->available = gcvTRUE;
-    }
-
-    if (operationType == gcvCOUNTER_OP_FRAME || operationType == gcvCOUNTER_OP_FINISH)
-    {
-        clearCounters = gcvTRUE;
     }
     else
     {
-        clearCounters = gcvFALSE;
+        if (!Profiler->counterBuf->available)
+        {
+            gctUINT32 tempPos;
+            gcoOS_GetPos(gcvNULL, Profiler->file, &tempPos);
+
+            gcoBUFOBJ_WaitFence((gcoBUFOBJ)Profiler->counterBuf->couterBufobj, gcvFENCE_TYPE_READ);
+
+            _WriteCounters(Profiler);
+
+            gcoOS_Seek(gcvNULL, Profiler->file, tempPos, gcvFILE_SEEK_SET);
+
+            Profiler->counterBuf->available = gcvTRUE;
+        }
+
+        if (operationType == gcvCOUNTER_OP_FRAME || operationType == gcvCOUNTER_OP_FINISH)
+        {
+            clearCounters = gcvTRUE;
+        }
+        else
+        {
+            clearCounters = gcvFALSE;
+        }
+
+        Profiler->counterBuf->opType = operationType;
+        Profiler->counterBuf->opID = OpID;
+        Profiler->counterBuf->needDump = Profiler->needDump;
+
+        /*update the counters info of currrent buffer*/
+        gcmONERROR(_UpdateCounters(Profiler, clearCounters));
     }
-
-    Profiler->counterBuf->opType = operationType;
-    Profiler->counterBuf->opID = OpID;
-    Profiler->counterBuf->needDump = Profiler->needDump;
-
-    /*update the counters info of currrent buffer*/
-    gcmONERROR(_UpdateCounters(Profiler, clearCounters));
 
     Profiler->counterBuf = Profiler->counterBuf->next;
 

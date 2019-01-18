@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1096,7 +1096,8 @@ static VkResult __GenPresentCommand(
         sc->cmdBuf,
         &srcRes,
         &dstRes,
-        VK_FALSE
+        VK_FALSE,
+        VK_FILTER_NEAREST
         ));
 
     __VK_ONERROR(__vk_EndCommandBuffer(sc->cmdBuf));
@@ -1149,11 +1150,7 @@ static VkResult __CommitPresentCommand(
         if (gcmIS_ERROR(status))
         {
             *fenceFd = -1;
-#if __VK_NEW_DEVICE_QUEUE
             __vk_QueueWaitIdle(queue);
-#  else
-            gcoHAL_Commit(gcvNULL, gcvTRUE);
-#  endif
             break;
         }
 
@@ -1164,25 +1161,15 @@ static VkResult __CommitPresentCommand(
         iface.u.Signal.auxSignal = 0;
         iface.u.Signal.process   = (gctINT)gcoOS_GetCurrentProcessID();
         iface.u.Signal.fromWhere = gcvKERNEL_PIXEL;
-#if __VK_NEW_DEVICE_QUEUE
         __vk_QueueAppendEvent((__vkDevQueue *)queue, &iface);
         __vk_QueueCommitEvents((__vkDevQueue *)queue, VK_FALSE);
-#  else
-        /* Send event. */
-        gcoHAL_ScheduleEvent(gcvNULL, &iface);
-        gcoHAL_Commit(gcvNULL, gcvFALSE);
-#  endif
         /* Now destroy the sync point. */
         gcoOS_DestroySignal(gcvNULL, signal);
     }
     while (VK_FALSE);
 
 #else
-#if __VK_NEW_DEVICE_QUEUE
     __vk_QueueWaitIdle(queue);
-#  else
-    gcoHAL_Commit(gcvNULL, gcvTRUE);
-#  endif
     *fenceFd = -1;
 #endif
 
@@ -1518,11 +1505,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSignalReleaseImageANDROID(
         if (gcmIS_ERROR(status))
         {
             fenceFd = -1;
-#if __VK_NEW_DEVICE_QUEUE
             __vk_QueueWaitIdle(queue);
-#else
-            gcoHAL_Commit(gcvNULL, gcvTRUE);
-#endif
             break;
         }
 
@@ -1533,25 +1516,15 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSignalReleaseImageANDROID(
         iface.u.Signal.auxSignal = 0;
         iface.u.Signal.process   = (gctINT)gcoOS_GetCurrentProcessID();
         iface.u.Signal.fromWhere = gcvKERNEL_PIXEL;
-#if __VK_NEW_DEVICE_QUEUE
         __vk_QueueAppendEvent((__vkDevQueue *)queue, &iface);
         __vk_QueueCommitEvents((__vkDevQueue *)queue, VK_FALSE);
-#else
-        /* Send event. */
-        gcoHAL_ScheduleEvent(gcvNULL, &iface);
-        gcoHAL_Commit(gcvNULL, gcvFALSE);
-#endif
         /* Now destroy the sync point. */
         gcoOS_DestroySignal(gcvNULL, signal);
     }
     while (VK_FALSE);
 
 #else
-#if __VK_NEW_DEVICE_QUEUE
     __vk_QueueWaitIdle(queue);
-#else
-    gcoHAL_Commit(gcvNULL, gcvTRUE);
-#endif
 #endif
 
     *pNativeFenceFd = fenceFd;

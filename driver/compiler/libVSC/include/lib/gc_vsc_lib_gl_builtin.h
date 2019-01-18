@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -17,6 +17,7 @@
 #define __BUILTIN_SHADER_LENGTH__ (65535 * 8)
 
 extern gctSTRING gcLibFunc_Extension;
+extern gctSTRING gcLibFunc_Extension_For_GL;
 extern gctSTRING gcLibFunc_Extension_For_TexMS2DArray;
 extern gctSTRING gcLibFunc_Extension_For_CubeMapArray;
 extern gctSTRING gcLibFunc_Extension_For_TextureBuffer;
@@ -155,6 +156,7 @@ extern gctSTRING gcLibTextureSize_Func_25;
 extern gctSTRING gcLibTextureSize_Func_26;
 extern gctSTRING gcLibTextureSize_Func_27;
 extern gctSTRING gcLibTextureSize_Func_28;
+extern gctSTRING gcLibTextureSize_Func_29;
 extern gctSTRING gcLibTextureCommon_Func;
 extern gctSTRING gcLibTextureGatherCommon_Func_1;
 extern gctSTRING gcLibTextureGather_Func_1;
@@ -761,6 +763,10 @@ extern gctSTRING gcLibTexLd_sampler_1d_array_bias;
 extern gctSTRING gcLibTexLd_sampler_2d_array;
 extern gctSTRING gcLibTexLd_sampler_2d_array_lod;
 extern gctSTRING gcLibTexLd_sampler_2d_array_bias;
-
+extern gctSTRING gcGLLibGetLocalID;
+extern gctSTRING gcGLLib_AtomcmpxchgPatch_Func_core1_Str;
+extern gctSTRING gcGLLib_AtomcmpxchgPatch_Func_core2_Str;
+extern gctSTRING gcGLLib_AtomcmpxchgPatch_Func_core4_Str;
+extern gctSTRING gcGLLib_AtomcmpxchgPatch_Func_core8_Str;
 #endif /* __gc_vsc_gl_builtin_lib_h_ */
 

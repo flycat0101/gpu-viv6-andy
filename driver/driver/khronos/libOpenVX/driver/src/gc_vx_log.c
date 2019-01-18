@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -15,6 +15,8 @@
 
 VX_API_ENTRY void  VX_API_CALL vxRegisterLogCallback(vx_context context, vx_log_callback_f callback, vx_bool reentrant)
 {
+    gcmDUMP_API("$VX vxRegisterLogCallback: context=%p, callback=%p, reentrant=0x%x", context, callback, reentrant);
+
     if (!vxoContext_IsValid(context)) return;
 
     vxAcquireMutex(context->base.lock);
@@ -62,6 +64,8 @@ VX_API_ENTRY void  VX_API_CALL _vxAddLogEntry(vx_reference ref, vx_status status
     vx_context context;
     va_list argList;
     vx_char buffer[VX_MAX_LOG_MESSAGE_LEN];
+
+    gcmDUMP_API("$VX _vxAddLogEntry: ref=%p, status=0x%x, message=%s", ref, status, message);
 
     if (!vxoReference_IsValidAndNoncontext(ref) && !vxoContext_IsValid((vx_context)ref))
     {
@@ -115,6 +119,8 @@ VX_API_ENTRY void  VX_API_CALL vxAddLogEntry(vx_reference ref, vx_status status,
     vx_context context;
     va_list argList;
     vx_char buffer[VX_MAX_LOG_MESSAGE_LEN];
+
+    gcmDUMP_API("$VX vxAddLogEntry: ref=%p, status=0x%x, message=%s", ref, status, message);
 
     if (!vxoReference_IsValidAndNoncontext(ref) && !vxoContext_IsValid((vx_context)ref))
     {

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -20,8 +20,6 @@
 
 
 __GLdeviceStruct __glDevicePipe;
-
-extern __GLesDispatchTable __glesApiFuncDispatchTable;
 
 extern GLint __glGetDispatchOffset(const char *procName);
 extern __GLprocAddr __glGetProcAddr(const GLchar *procName);
@@ -254,7 +252,7 @@ static void veglFlush_es3(void)
         return;
     }
 
-    __gles_Flush(gc);
+    gc->immedModeDispatch.Flush(gc);
 }
 
 static void veglFinish_es3(void)
@@ -267,7 +265,7 @@ static void veglFinish_es3(void)
         return;
     }
 
-    __gles_Finish(gc);
+    gc->immedModeDispatch.Finish(gc);
 }
 
 static EGLenum veglCreateImageTexture_es3(void * Context,

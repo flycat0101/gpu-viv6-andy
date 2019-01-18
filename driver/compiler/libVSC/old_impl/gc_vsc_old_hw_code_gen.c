@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -5383,8 +5383,6 @@ _isF16_2_F32_hasCMP(
     return gcvFALSE;
 }
 
-DEFINE_WITH_VIR(_isF16_2_F32_hasCMP)
-
 static gctBOOL
 float32_sign(
     IN gcLINKTREE Tree,
@@ -5595,8 +5593,6 @@ _isF32_2_F16_hasCMP(
 
     return gcvFALSE;
 }
-
-DEFINE_WITH_VIR(_isF32_2_F16_hasCMP)
 
 static gctBOOL
 _isF2F(
@@ -15291,11 +15287,6 @@ _ConditionSameAsPrev(
     return gcvFALSE;
 }
 
-extern gctBOOL
-isConditionReversible(
-    IN  gcSL_CONDITION   Condition,
-    OUT gcSL_CONDITION * ReversedCondition
-    );
 
 static gctBOOL
 _ConditionReversedWithPrev(
@@ -15332,8 +15323,12 @@ _isI2F(
     IN OUT gctUINT32 * States
     )
 {
-    if ((gcmSL_TARGET_GET(Instruction->temp, Format) == gcSL_FLOAT)
-    &&  (gcmSL_SOURCE_GET(Instruction->source0, Format) != gcSL_FLOAT))
+    gcSL_FORMAT destFormat = (gcSL_FORMAT)gcmSL_TARGET_GET(Instruction->temp, Format);
+    gcSL_FORMAT src0Format = (gcSL_FORMAT)gcmSL_SOURCE_GET(Instruction->source0, Format);
+
+    if ((destFormat == gcSL_FLOAT || destFormat == gcSL_FLOAT16 || destFormat == gcSL_FLOAT64)
+        &&
+        (src0Format != gcSL_FLOAT && src0Format != gcSL_FLOAT16 && src0Format != gcSL_FLOAT64))
     {
         return gcvTRUE;
     }
@@ -20310,7 +20305,7 @@ const gcsSL_PATTERN patterns_CONV[] =
             lshift temp2, temp2, 0, float16_man_bits, 0
             or temp1, temp1, 0, temp2
     */
-    { 1, gcSL_CONV, 1, 2, 0, 0, 0, USE_WITH_VIR(_isF16_2_F32_hasCMP) },
+    { 1, gcSL_CONV, 1, 2, 0, 0, 0, _isF16_2_F32_hasCMP },
         { -12, 0x5D, gcSL_CG_TEMP1, 2, 0, gcSL_CG_CONSTANT, 0, float16_exp },
         { -11, 0x59, gcSL_CG_TEMP1, gcSL_CG_TEMP1, 0, gcSL_CG_CONSTANT, 0, float16_man_bits },
         { -10, 0x0F, gcSL_CG_TEMP2, gcSL_CG_TEMP1, gcSL_CG_CONSTANT, gcSL_CG_CONSTANT, 0, float16_exp_iszero },
@@ -20338,7 +20333,7 @@ const gcsSL_PATTERN patterns_CONV[] =
             rightshift temp2, temp2, 0, float32_man_bits, 0
             or temp1, temp1, 0, temp2
     */
-    { 1, gcSL_CONV, 1, 2, 0, 0, 0, USE_WITH_VIR(_isF32_2_F16_hasCMP) },
+    { 1, gcSL_CONV, 1, 2, 0, 0, 0, _isF32_2_F16_hasCMP },
         { -12, 0x5D, gcSL_CG_TEMP1, 2, 0, gcSL_CG_CONSTANT, 0, float32_exp },
         { -11, 0x0F, gcSL_CG_TEMP2, gcSL_CG_TEMP1, gcSL_CG_CONSTANT, gcSL_CG_CONSTANT, 0, float16_exp_iszero },
         { -10, 0x31, gcSL_CG_TEMP3, gcSL_CG_TEMP1, gcSL_CG_CONSTANT, gcSL_CG_CONSTANT, 0, float32_exp_isnan },
@@ -21266,6 +21261,13 @@ const gcsSL_PATTERN patterns_ARCTRIG1[] =
 /* 0x83 gcSL_MUL_Z */
 const gcsSL_PATTERN patterns_MUL_Z[] =
 {
+    /*
+        MUL_Z 1, 2, 3
+            mul 1, 2, 3, 0, 0
+    */
+    { 1, gcSL_MUL_Z, 1, 2, 3 },
+        { -1, 0x03, 1, 2, 3, 0, 0, set_norm_mul0zero },
+
     { 0 }
 };
 
@@ -21406,6 +21408,55 @@ const gcsSL_PATTERN patterns_INTRINSIC_ST[] =
 {
     { 0 }
 };
+
+/* 0x93  CMAD */
+const gcsSL_PATTERN patterns_CMAD[] =
+{
+    { 0 }
+};
+
+/* 0x94  CONJ */
+const gcsSL_PATTERN patterns_CONJ[] =
+{
+    { 0 }
+};
+
+/* 0x95  CMUL */
+const gcsSL_PATTERN patterns_CMUL[] =
+{
+    { 0 }
+};
+
+/* 0x96  CMADCJ */
+const gcsSL_PATTERN patterns_CMADCJ[] =
+{
+    { 0 }
+};
+
+/* 0x97  CMULCJ */
+const gcsSL_PATTERN patterns_CMULCJ[] =
+{
+    { 0 }
+};
+
+/* 0x98  CADDCJ */
+const gcsSL_PATTERN patterns_CADDCJ[] =
+{
+    { 0 }
+};
+
+/* 0x99  CSUBCJ */
+const gcsSL_PATTERN patterns_CSUBCJ[] =
+{
+    { 0 }
+};
+
+/* 0x9A  CADD */
+const gcsSL_PATTERN patterns_CADD[] =
+{
+    { 0 }
+};
+
 
 const gcsSL_PATTERN_PTR  patterns[] =
 {
@@ -21556,6 +21607,16 @@ const gcsSL_PATTERN_PTR  patterns[] =
     patterns_PARAM_CHAIN, /* 0x90 gcSL_PARAM_CHAIN */
     patterns_INTRINSIC, /* 0x91 gcSL_INTRINSIC */
     patterns_INTRINSIC_ST, /* 0x92 gcSL_INTRINSIC_ST */
+    patterns_CMAD, /* 0x93 Complex number mad. */
+    patterns_CONJ, /* 0x94 Conjugate modifier. */
+    patterns_CMUL, /* 0x95 Complex number mul. */
+    patterns_CMADCJ, /* 0x96 Complex number conjugate mad. */
+    patterns_CMULCJ, /* 0x97 Complex number conjugate mul. */
+    patterns_CADDCJ, /* 0x98 Complex number conjugate add. */
+    patterns_CSUBCJ, /* 0x99 Complex number conjugate sub. */
+    patterns_CADD, /* 0x9A Complex number add. */
+    gcvNULL, /* 0x9B gcSL_GET_IMAGE_TYPE */
+    gcvNULL, /* gcSL_CLAMPCOORD */
 };
 
 #ifdef WIN32

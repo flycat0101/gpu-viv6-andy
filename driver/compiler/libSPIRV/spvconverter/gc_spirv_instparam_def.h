@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -14,18 +14,18 @@
     /* SpvOpNop = 0 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassMisc,
-            __SpvNop,
-            0,
-            { OperandNone },
-            { gcvNULL },
-            { gcvNULL },
-            VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        __SpvEmitNop,
+        0,
+        { OperandNone },
+        { gcvNULL },
+        { gcvNULL },
+        VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* SpvOpUndef = 1 */
     {
         gcvFALSE, gcvTRUE, gcvTRUE, OpClassConstant,
-        __SpvAddUndef,
+        __SpvEmitUndef,
         0,
         { OperandNone },
         { gcvNULL },
@@ -36,7 +36,7 @@
     /* SpvOpSourceContinued = 2 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassDebug,
-        __SpvNop,
+        __SpvEmitNop,
         1,
         { OperandLiteralString, },
         { "Continued Source", },
@@ -69,7 +69,7 @@
     /* SpvOpName = 5 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassDebug,
-        __SpvAddName,
+        __SpvEmitName,
         2,
         { OperandId, OperandLiteralString, },
         { "'Target'", "'Name'", },
@@ -80,7 +80,7 @@
     /* SpvOpMemberName = 6 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassDebug,
-        __SpvAddName,
+        __SpvEmitName,
         3,
         { OperandId, OperandLiteralNumber, OperandLiteralString, },
         { "'Type'", "'Member'", "'Name'", },
@@ -91,7 +91,7 @@
     /* SpvOpString = 7 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassDebug,
-        __SpvNop,
+        __SpvEmitNop,
         1,
         { OperandLiteralString, },
         { "'String'", },
@@ -102,7 +102,7 @@
     /* SpvOpLine = 8 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassDebug,
-        __SpvNop,
+        __SpvEmitNop,
         3,
         { OperandId, OperandLiteralNumber, OperandLiteralNumber, },
         { "'File'", "'Line'", "'Column'", },
@@ -127,7 +127,7 @@
     /* SpvOpExtInstImport = 11 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassExtension,
-        __SpvAddExtInst,
+        __SpvEmitExtInst,
         1,
         { OperandLiteralString, },
         { "'Name'", },
@@ -138,7 +138,7 @@
     /* SpvOpExtInst = 12 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassExtension,
-        __SpvAddIntrisicFunction,
+        __SpvEmitIntrisicFunction,
         3,
         { OperandId, OperandLiteralNumber, OperandVariableIds, },
         { "'Set'", "'Instruction'", "'Operand 1', +\n'Operand 2', +\n...", },
@@ -199,7 +199,7 @@
     /* SpvOpTypeVoid = 19 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         0,
         { OperandNone },
         { gcvNULL },
@@ -210,7 +210,7 @@
     /* SpvOpTypeBool = 20 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         0,
         { OperandNone },
         { gcvNULL },
@@ -221,7 +221,7 @@
     /* SpvOpTypeInt = 21 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         2,
         { OperandLiteralNumber, OperandLiteralNumber, },
         { "'Width'", "'Signedness'", },
@@ -232,7 +232,7 @@
     /* SpvOpTypeFloat = 22 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         1,
         { OperandLiteralNumber, },
         { "'Width'", },
@@ -243,7 +243,7 @@
     /* SpvOpTypeVector = 23 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         2,
         { OperandId, OperandLiteralNumber, },
         { "'Component Type'", "'Component Count'", },
@@ -254,7 +254,7 @@
     /* SpvOpTypeMatrix = 24 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         2,
         { OperandId, OperandLiteralNumber, },
         { "'Column Type'", "'Column Count'", },
@@ -265,7 +265,7 @@
     /* SpvOpTypeImage = 25 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         8,
         { OperandId, OperandDimensionality, OperandLiteralNumber, OperandLiteralNumber, OperandLiteralNumber, OperandLiteralNumber, OperandSamplerImageFormat, OperandAccessQualifier },
         { "Sampled Type", "", "Depth", "Arrayed", "MS", "Sampled", "", "Access Qualifier" },
@@ -276,7 +276,7 @@
     /* SpvOpTypeSampler = 26 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         0,
         { OperandNone },
         { gcvNULL },
@@ -287,7 +287,7 @@
     /* SpvOpTypeSampledImage = 27 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         1,
         { OperandId },
         { "Image Type" },
@@ -298,7 +298,7 @@
     /* SpvOpTypeArray = 28 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         2,
         { OperandId, OperandId, },
         { "'Element Type'", "'Length'", },
@@ -309,7 +309,7 @@
     /* SpvOpTypeRuntimeArray = 29 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         1,
         { OperandId, },
         { "'Element Type'", },
@@ -320,7 +320,7 @@
     /* SpvOpTypeStruct = 30 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         1,
         { OperandVariableIds, },
         { "'Member 0 type', +\n'member 1 type', +\n...", },
@@ -331,7 +331,7 @@
     /* SpvOpTypeOpaque = 31 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         1,
         { OperandLiteralString, },
         { "The name of the opaque type.", },
@@ -342,7 +342,7 @@
     /* SpvOpTypePointer = 32 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         2,
         { OperandStorage, OperandId, },
         { "", "'Type'", },
@@ -353,7 +353,7 @@
     /* SpvOpTypeFunction = 33 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         2,
         { OperandId, OperandVariableIds, },
         { "'Return Type'", "'Parameter 0 Type', +\n'Parameter 1 Type', +\n...", },
@@ -364,7 +364,7 @@
     /* SpvOpTypeEvent = 34 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         0,
         { OperandNone },
         { gcvNULL },
@@ -375,7 +375,7 @@
     /* SpvOpTypeDeviceEvent = 35 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         0,
         { OperandNone },
         { gcvNULL },
@@ -386,7 +386,7 @@
     /* SpvOpTypeReserveId = 36 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         0,
         { OperandNone },
         { gcvNULL },
@@ -397,7 +397,7 @@
     /* SpvOpTypeQueue = 37 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         0,
         { OperandNone },
         { gcvNULL },
@@ -408,7 +408,7 @@
     /* SpvOpTypePipe = 38 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         1,
         { OperandAccessQualifier, },
         { "'Qualifier'", },
@@ -419,7 +419,7 @@
     /* SpvOpTypeForwardPointer = 39 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassType,
-        __SpvAddType,
+        __SpvEmitType,
         2,
         { OperandId, OperandStorage, },
         { "Pointer Type", "" },
@@ -433,7 +433,7 @@
     /* SpvOpConstantTrue = 41 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassConstant,
-        __SpvAddConstant,
+        __SpvEmitConstant,
         0,
         { OperandNone },
         { gcvNULL },
@@ -444,7 +444,7 @@
     /* SpvOpConstantFalse = 42 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassConstant,
-        __SpvAddConstant,
+        __SpvEmitConstant,
         0,
         { OperandNone },
         { gcvNULL },
@@ -455,7 +455,7 @@
     /* SpvOpConstant = 43 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassConstant,
-        __SpvAddConstant,
+        __SpvEmitConstant,
         1,
         { OperandVariableLiterals, },
         { "'Value'", },
@@ -466,7 +466,7 @@
     /* SpvOpConstantComposite = 44 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassConstant,
-        __SpvAddConstant,
+        __SpvEmitConstant,
         1,
         { OperandVariableIds, },
         { "'Constituents'", },
@@ -477,7 +477,7 @@
     /* SpvOpConstantSampler = 45 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassConstant,
-        __SpvAddConstant,
+        __SpvEmitConstant,
         3,
         { OperandSamplerAddressingMode, OperandLiteralNumber, OperandSamplerFilterMode, },
         { "", "'Param'", "", },
@@ -488,7 +488,7 @@
     /* SpvOpConstantNull = 46 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassConstant,
-        __SpvAddConstant,
+        __SpvEmitConstant,
         0,
         { OperandNone },
         { gcvNULL },
@@ -502,7 +502,7 @@
     /* SpvOpSpecConstantTrue = 48 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassConstant,
-        __SpvAddConstant,
+        __SpvEmitConstant,
         0,
         { OperandNone },
         { gcvNULL },
@@ -513,7 +513,7 @@
     /* SpvOpSpecConstantFalse = 49 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassConstant,
-        __SpvAddConstant,
+        __SpvEmitConstant,
         0,
         { OperandNone },
         { gcvNULL },
@@ -524,7 +524,7 @@
     /* SpvOpSpecConstant = 50 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassConstant,
-        __SpvAddConstant,
+        __SpvEmitConstant,
         1,
         { OperandVariableLiterals, },
         { "'Value'", },
@@ -535,7 +535,7 @@
     /* SpvOpSpecConstantComposite = 51 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassConstant,
-        __SpvAddConstant,
+        __SpvEmitConstant,
         1,
         { OperandVariableIds, },
         { "'Constituents'", },
@@ -560,7 +560,7 @@
     /* SpvOpFunction = 54 */
     {
         gcvFALSE, gcvTRUE, gcvTRUE, OpClassFunction,
-        __SpvAddFunction,
+        __SpvEmitFunction,
         2,
         { OperandFunction, OperandId, },
         { "", "'Function Type'", },
@@ -571,7 +571,7 @@
     /* SpvOpFunctionParameter = 55 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassFunction,
-        __SpvAddFunctionParameter,
+        __SpvEmitFunctionParameter,
         0,
         { OperandNone },
         { gcvNULL },
@@ -582,7 +582,7 @@
     /* SpvOpFunctionEnd = 56 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassFunction,
-        __SpvAddFunctionEnd,
+        __SpvEmitFunctionEnd,
         0,
         { OperandNone },
         { gcvNULL },
@@ -593,7 +593,7 @@
     /* SpvOpFunctionCall = 57 */
     {
         gcvFALSE, gcvTRUE, gcvTRUE, OpClassFunction,
-        __SpvAddFuncCall,
+        __SpvEmitFunctionCall,
         2,
         { OperandId, OperandVariableIds, },
         { "'Function'", "'Argument 0', +\n'Argument 1', +\n...", },
@@ -607,7 +607,7 @@
     /* SpvOpVariable = 59 */
     {
         gcvFALSE, gcvTRUE, gcvTRUE, OpClassMemory,
-        __SpvAddVariable,
+        __SpvEmitVariable,
         2,
         { OperandStorage, OperandId, },
         { "", "'Initializer'", },
@@ -695,7 +695,7 @@
     /* SpvOpPtrAccessChain = 67 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassMemory,
-        gcvNULL,
+        __SpvEmitPtrAccessChain,
         3,
         { OperandId, OperandId, OperandVariableIds, },
         { "'Base'", "Element", "'Indexes'", },
@@ -739,7 +739,7 @@
     /* SpvOpDecorate = 71 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassAnnotate,
-        __SpvAddDecorator,
+        __SpvEmitDecorator,
         3,
         { OperandId, OperandDecoration, OperandVariableLiterals, },
         { "'Target'", "", "See <<Decoration,'Decoration'>>.", },
@@ -750,7 +750,7 @@
     /* SpvOpMemberDecorate = 72 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassAnnotate,
-        __SpvAddDecorator,
+        __SpvEmitDecorator,
         4,
         { OperandId, OperandLiteralNumber, OperandDecoration, OperandVariableLiterals, },
         { "'Structure Type'", "'Member'", "", "See <<Decoration,'Decoration'>>.", },
@@ -761,7 +761,7 @@
     /* SpvOpDecorationGroup = 73 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassAnnotate,
-        __SpvAddDecorator,
+        __SpvEmitDecorator,
         0,
         { OperandNone },
         { gcvNULL },
@@ -772,7 +772,7 @@
     /* SpvOpGroupDecorate = 74 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassAnnotate,
-        __SpvAddDecorator,
+        __SpvEmitDecorator,
         2,
         { OperandId, OperandVariableIds, },
         { "'Decoration Group'", "'Targets'", },
@@ -783,7 +783,7 @@
     /* SpvOpGroupMemberDecorate = 75 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassAnnotate,
-        __SpvAddDecorator,
+        __SpvEmitDecorator,
         2,
         { OperandId, OperandVariableIdLiteral },
         { "'Decoration Group'", "Targets", },
@@ -1042,7 +1042,7 @@
     /* SpvOpImage = 100 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassImage,
-        __SpvAddOpImage,
+        __SpvEmitOpImage,
         1,
         { OperandId },
         { "Sampled Image" },
@@ -2544,7 +2544,7 @@
     /* SpvOpLoopMerge = 246 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassFlowControl,
-        __SpvNop,
+        __SpvEmitNop,
         3,
         { OperandId, OperandId, OperandLoop },
         { "'Merge Block'", "Continue Target", "", },
@@ -2555,7 +2555,7 @@
     /* SpvOpSelectionMerge = 247 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassFlowControl,
-        __SpvNop,
+        __SpvEmitNop,
         2,
         { OperandId, OperandSelect },
         { "'Merge Block'", "", },
@@ -2566,7 +2566,7 @@
     /* SpvOpLabel = 248 */
     {
         gcvFALSE, gcvFALSE, gcvTRUE, OpClassFlowControl,
-        __SpvAddLabel,
+        __SpvEmitLabel,
         0,
         { OperandNone },
         { gcvNULL },
@@ -2577,7 +2577,7 @@
     /* SpvOpBranch = 249 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassFlowControl,
-        __SpvAddBranch,
+        __SpvEmitBranch,
         1,
         { OperandId, },
         { "'Target Label'", },
@@ -2588,7 +2588,7 @@
     /* SpvOpBranchConditional = 250 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassFlowControl,
-        __SpvAddBranchConditional,
+        __SpvEmitBranchConditional,
         4,
         { OperandId, OperandId, OperandId, OperandVariableLiterals, },
         { "'Condition'", "'True Label'", "'False Label'", "'Branch weights'", },
@@ -2621,7 +2621,7 @@
     /* SpvOpReturn = 253 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassFlowControl,
-        __SpvAddReturn,
+        __SpvEmitReturn,
         0,
         { OperandNone },
         { gcvNULL },
@@ -2632,7 +2632,7 @@
     /* SpvOpReturnValue = 254 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassFlowControl,
-        __SpvAddReturnValue,
+        __SpvEmitReturnValue,
         1,
         { OperandId, },
         { "'Value'", },
@@ -3285,7 +3285,7 @@
     /* SpvOpNoLine = 317 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassDebug,
-        __SpvNop,
+        __SpvEmitNop,
         0,
         { OperandNone },
         { gcvNULL },
@@ -3325,3 +3325,135 @@
         { gcvNULL },
         VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
+
+    /* SpvOpSizeOf = 321 */
+    {
+        gcvFALSE, gcvTRUE, gcvTRUE, OpClassMisc,
+        __SpvEmitUnsupported,
+        1,
+        { OperandId },
+        { "Pointer" },
+        { gcvNULL },
+        VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+    },
+
+    /* SpvOpTypePipeStorage = 322 */
+    {
+        gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
+        __SpvEmitUnsupported,
+        0,
+        { OperandNone },
+        { gcvNULL },
+        { gcvNULL },
+        VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+    },
+
+    /* SpvOpConstantPipeStorage = 323 */
+    {
+        gcvFALSE, gcvTRUE, gcvTRUE, OpClassMisc,
+        __SpvEmitUnsupported,
+        3,
+        { OperandLiteralNumber, OperandLiteralNumber, OperandLiteralNumber },
+        { "Packet Size", "Packet Alignment", "Capacity" },
+        { gcvNULL },
+        VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+    },
+
+    /* SpvOpCreatePipeFromPipeStorage = 324 */
+    {
+        gcvFALSE, gcvTRUE, gcvTRUE, OpClassMisc,
+        __SpvEmitUnsupported,
+        1,
+        { OperandId },
+        { "Pipe Storage" },
+        { gcvNULL },
+        VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+    },
+
+    /* SpvOpGetKernelLocalSizeForSubgroupCount = 325 */
+    {
+        gcvFALSE, gcvTRUE, gcvTRUE, OpClassMisc,
+        __SpvEmitUnsupported,
+        5,
+        { OperandId, OperandId, OperandId, OperandId, OperandId },
+        { "Subgroup Count", "Invoke", "Param", "Param Size", "Param Align"},
+        { gcvNULL },
+        VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+    },
+
+    /* SpvOpGetKernelMaxNumSubgroups = 326 */
+    {
+        gcvFALSE, gcvTRUE, gcvTRUE, OpClassMisc,
+        __SpvEmitUnsupported,
+        4,
+        { OperandId, OperandId, OperandId, OperandId },
+        { "Invoke", "Param", "Param Size", "Param Align"},
+        { gcvNULL },
+        VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+    },
+
+    /* SpvOpTypeNamedBarrier = 327 */
+    {
+        gcvFALSE, gcvFALSE, gcvTRUE, OpClassType,
+        __SpvEmitUnsupported,
+        0,
+        { OperandNone },
+        { gcvNULL },
+        { gcvNULL },
+        VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+    },
+
+    /* SpvOpNamedBarrierInitialize = 328 */
+    {
+        gcvFALSE, gcvTRUE, gcvTRUE, OpClassBarrier,
+        __SpvEmitUnsupported,
+        1,
+        { OperandId },
+        { "Subgroup Count"},
+        { gcvNULL },
+        VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+    },
+
+    /* SpvOpMemoryNamedBarrier = 329 */
+    {
+        gcvFALSE, gcvFALSE, gcvFALSE, OpClassBarrier,
+        __SpvEmitUnsupported,
+        3,
+        { OperandId, OperandScope, OperandMemorySemantics, },
+        { "Named Barrier", "Memory", "Semantics", },
+        { gcvNULL },
+        VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+    },
+
+    /* SpvOpModuleProcessed = 330 */
+    {
+        gcvFALSE, gcvFALSE, gcvFALSE, OpClassDebug,
+        gcvNULL,
+        1,
+        { OperandLiteralString, },
+        { "'Process'", },
+        { gcvNULL },
+        VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+    },
+
+    /* SpvOpExecutionModeId = 331 */
+    {
+        gcvFALSE, gcvFALSE, gcvFALSE, OpClassMode,
+        gcvNULL,
+        3,
+        { OperandId, OperandExecutionMode, OperandVariableIds },
+        { "Entry Point", "Mode", "See Execution Mode" },
+        { gcvNULL },
+        VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+    },
+
+    /* SpvOpDecorateId = 332 */
+    {
+        gcvFALSE, gcvFALSE, gcvFALSE, OpClassAnnotate,
+        __SpvEmitUnsupported,
+        3,
+        { OperandId, OperandDecoration, OperandVariableIds, },
+        { "Target", "Decoration", "See Decoration"},
+        { gcvNULL },
+        VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+    }

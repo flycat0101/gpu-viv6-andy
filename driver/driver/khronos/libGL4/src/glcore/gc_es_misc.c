@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -229,14 +229,14 @@ GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
           break;
 
     case GL_LIGHTING:
-    if (es->lighting.lighting ^ val) {
-        __GL_VERTEX_BUFFER_FLUSH(gc);
-        es->lighting.lighting = val;
-        __GL_SET_ATTR_DIRTY_BIT(gc, __GL_LIGHTING_ATTRS, __GL_LIGHTING_ENDISABLE_BIT);
+        if (es->lighting.lighting ^ val) {
+            __GL_VERTEX_BUFFER_FLUSH(gc);
+            es->lighting.lighting = val;
+            __GL_SET_ATTR_DIRTY_BIT(gc, __GL_LIGHTING_ATTRS, __GL_LIGHTING_ENDISABLE_BIT);
 
-        __GL_INPUTMASK_CHANGED(gc);
-    }
-    break;
+            __GL_INPUTMASK_CHANGED(gc);
+        }
+        break;
 
     case GL_LIGHT0:
     case GL_LIGHT1:
@@ -468,22 +468,22 @@ GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
         break;
 
 
-  case GL_LINE_SMOOTH:
-      if (es->line.smooth ^ val) {
+    case GL_LINE_SMOOTH:
+        if (es->line.smooth ^ val) {
           __GL_VERTEX_BUFFER_FLUSH(gc);
           es->line.smooth = val;
           __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_2, __GL_LINESMOOTH_ENDISABLE_BIT);
-      }
-      break;
+        }
+        break;
 
-  case GL_LINE_STIPPLE:
-      if (es->line.stippleRequested ^ val) {
+    case GL_LINE_STIPPLE:
+        if (es->line.stippleRequested ^ val) {
           __GL_DLIST_BUFFER_FLUSH(gc);
           es->line.stippleRequested = val;
           es->line.stipple = val;
           __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_2, __GL_LINESTIPPLE_ENDISABLE_BIT);
-      }
-      break;
+        }
+        break;
 
     case GL_INDEX_LOGIC_OP:
         /* Index logicOp is handled for index mode only
@@ -524,6 +524,75 @@ GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
         }
         break;
 
+    case GL_VERTEX_PROGRAM_POINT_SIZE:
+        if (es->program.vpPointSize ^ val) {
+          __GL_VERTEX_BUFFER_FLUSH(gc);
+          es->program.vpPointSize = val;
+          __GL_SET_ATTR_DIRTY_BIT(gc, __GL_PROGRAM_ATTRS, __GL_DIRTY_VP_POINT_SIZE_ENABLE);
+        }
+        break;
+
+    case GL_VERTEX_PROGRAM_TWO_SIDE:
+        if (es->program.vpTwoSize ^ val) {
+          __GL_VERTEX_BUFFER_FLUSH(gc);
+          es->program.vpTwoSize = val;
+          __GL_SET_ATTR_DIRTY_BIT(gc, __GL_PROGRAM_ATTRS, __GL_DIRTY_VP_TWO_SIDE_ENABLE);
+        }
+        break;
+
+    case GL_POLYGON_OFFSET_POINT:
+        if (es->polygon.polygonOffsetPoint ^ val) {
+            __GL_VERTEX_BUFFER_FLUSH(gc);
+            es->polygon.polygonOffsetPoint = val;
+            __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_1, __GL_POLYGONOFFSET_POINT_ENDISABLE_BIT);
+        }
+        break;
+
+    case GL_POLYGON_OFFSET_LINE:
+        if (es->polygon.polygonOffsetLine ^ val) {
+            __GL_VERTEX_BUFFER_FLUSH(gc);
+            es->polygon.polygonOffsetLine = val;
+            __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_1, __GL_POLYGONOFFSET_LINE_ENDISABLE_BIT);
+        }
+        break;
+
+    case GL_POLYGON_SMOOTH:
+        if (es->polygon.smooth ^ val) {
+          __GL_VERTEX_BUFFER_FLUSH(gc);
+          es->polygon.smooth = val;
+          __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_1, __GL_POLYGONSMOOTH_ENDISABLE_BIT);
+        }
+        break;
+
+    case GL_SAMPLE_ALPHA_TO_ONE:
+        if (es->multisample.alphaToOne ^ val) {
+          __GL_VERTEX_BUFFER_FLUSH(gc);
+          es->multisample.alphaToOne = val;
+          __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_3, __GL_SAMPLE_ALPHA_TO_ONE_ENDISABLE_BIT);
+        }
+        break;
+
+    case GL_FRAMEBUFFER_SRGB:
+        /* Add the code to run glcts*/
+//        GL_ASSERT(0);
+        break;
+
+    case GL_PRIMITIVE_RESTART:
+        /* Add the code to run glcts*/
+//        GL_ASSERT(0);
+        break;
+
+    case GL_DEPTH_CLAMP:
+        /* Add the code to run glcts*/
+        //        GL_ASSERT(0);
+        break;
+
+    case GL_TEXTURE_CUBE_MAP_SEAMLESS:
+        /* Add the code to run glcts*/
+        //        GL_ASSERT(0);
+        break;
+
+
 #endif
 
     default:
@@ -532,7 +601,7 @@ GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
 }
 
 
-GLvoid GL_APIENTRY __gles_Enable(__GLcontext *gc, GLenum cap)
+GLvoid GL_APIENTRY __glim_Enable(__GLcontext *gc, GLenum cap)
 {
     __GL_HEADER();
 
@@ -541,7 +610,7 @@ GLvoid GL_APIENTRY __gles_Enable(__GLcontext *gc, GLenum cap)
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_Disable(__GLcontext *gc, GLenum cap)
+GLvoid GL_APIENTRY __glim_Disable(__GLcontext *gc, GLenum cap)
 {
     __GL_HEADER();
 
@@ -550,7 +619,7 @@ GLvoid GL_APIENTRY __gles_Disable(__GLcontext *gc, GLenum cap)
     __GL_FOOTER();
 }
 
-GLboolean GL_APIENTRY __gles_IsEnabled(__GLcontext *gc, GLenum cap)
+GLboolean GL_APIENTRY __glim_IsEnabled(__GLcontext *gc, GLenum cap)
 {
     __GLenableState *es = &gc->state.enables;
     GLboolean ret;
@@ -611,6 +680,140 @@ GLboolean GL_APIENTRY __gles_IsEnabled(__GLcontext *gc, GLenum cap)
         ret = GL_FALSE;
 #endif
         break;
+
+#ifdef OPENGL40
+    case GL_ALPHA_TEST:
+        return es->colorBuffer.alphaTest;
+
+    case GL_COLOR_MATERIAL:
+        return es->lighting.colorMaterial;
+
+    case GL_FOG:
+        return es->fog;
+
+    case GL_LIGHTING:
+        return es->lighting.lighting;
+
+    case GL_LIGHT0:
+    case GL_LIGHT1:
+    case GL_LIGHT2:
+    case GL_LIGHT3:
+    case GL_LIGHT4:
+    case GL_LIGHT5:
+    case GL_LIGHT6:
+    case GL_LIGHT7:
+        {
+            GLint capOffset = cap - GL_LIGHT0;
+            return es->lighting.light[capOffset];
+        }
+
+    case GL_POLYGON_STIPPLE:
+        return es->polygon.stipple;
+
+    case GL_TEXTURE_GEN_S:
+    case GL_TEXTURE_GEN_T:
+    case GL_TEXTURE_GEN_R:
+    case GL_TEXTURE_GEN_Q:
+        cap = __GL_EVAL2D_INDEX(cap);
+        return es->eval.map2[cap];
+
+    case GL_TEXTURE_1D:
+        return es->texUnits[gc->state.texture.activeTexIndex].texture1D;
+
+    case GL_TEXTURE_2D:
+        return es->texUnits[gc->state.texture.activeTexIndex].texture2D;
+
+    case GL_TEXTURE_3D:
+        return es->texUnits[gc->state.texture.activeTexIndex].texture3D;
+
+    case GL_TEXTURE_CUBE_MAP:
+        return es->texUnits[gc->state.texture.activeTexIndex].textureCubeMap;
+
+#if GL_ARB_texture_rectangle
+    case GL_TEXTURE_RECTANGLE_ARB:
+        return es->texUnits[gc->state.texture.activeTexIndex].textureRec;
+#endif
+    case GL_CLIP_PLANE0:
+    case GL_CLIP_PLANE1:
+    case GL_CLIP_PLANE2:
+    case GL_CLIP_PLANE3:
+    case GL_CLIP_PLANE4:
+    case GL_CLIP_PLANE5:
+        {
+            GLint capOffset = cap - GL_CLIP_PLANE0;
+            return (es->transform.clipPlanesMask & (1 << capOffset)) != 0;
+        }
+
+    case GL_MAP1_COLOR_4:
+    case GL_MAP1_NORMAL:
+    case GL_MAP1_INDEX:
+    case GL_MAP1_TEXTURE_COORD_1:
+    case GL_MAP1_TEXTURE_COORD_2:
+    case GL_MAP1_TEXTURE_COORD_3:
+    case GL_MAP1_TEXTURE_COORD_4:
+    case GL_MAP1_VERTEX_3:
+    case GL_MAP1_VERTEX_4:
+        cap = __GL_EVAL1D_INDEX(cap);
+        return es->eval.map1[cap];
+
+    case GL_MAP2_COLOR_4:
+    case GL_MAP2_NORMAL:
+    case GL_MAP2_INDEX:
+    case GL_MAP2_TEXTURE_COORD_1:
+    case GL_MAP2_TEXTURE_COORD_2:
+    case GL_MAP2_TEXTURE_COORD_3:
+    case GL_MAP2_TEXTURE_COORD_4:
+    case GL_MAP2_VERTEX_3:
+    case GL_MAP2_VERTEX_4:
+        cap = __GL_EVAL1D_INDEX(cap);
+        return es->eval.map2[cap];
+
+    case GL_AUTO_NORMAL:
+        return es->eval.autonormal;
+
+    case GL_NORMALIZE:
+        return es->transform.normalize;
+
+    case GL_MULTISAMPLE:
+        return es->multisample.multisampleOn;
+
+    case GL_COLOR_SUM:
+        return es->colorSum;
+
+    case GL_LINE_SMOOTH:
+        return es->line.smooth;
+
+    case GL_LINE_STIPPLE:
+        return es->line.stippleRequested;
+
+    case GL_INDEX_LOGIC_OP:
+        return es->colorBuffer.indexLogicOp;
+
+    case GL_COLOR_LOGIC_OP:
+        return es->colorBuffer.colorLogicOp;
+
+    case GL_RESCALE_NORMAL:
+        return es->transform.rescaleNormal;
+
+    case GL_VERTEX_PROGRAM_POINT_SIZE:
+        return es->program.vpPointSize;
+
+    case GL_VERTEX_PROGRAM_TWO_SIDE:
+        return es->program.vpTwoSize;
+
+    case GL_POLYGON_OFFSET_POINT:
+        return es->polygon.polygonOffsetPoint;
+
+    case GL_POLYGON_OFFSET_LINE:
+        return es->polygon.polygonOffsetLine;
+
+    case GL_POLYGON_SMOOTH:
+        return es->polygon.smooth;
+
+    case GL_SAMPLE_ALPHA_TO_ONE:
+        return es->multisample.alphaToOne;
+#endif
+
     default:
         ret = GL_FALSE;
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
@@ -661,7 +864,7 @@ __GL_INLINE GLvoid __glClearEnd(__GLcontext *gc, GLbitfield mask, GLint drawbuff
 }
 
 
-GLvoid GL_APIENTRY __gles_Clear(__GLcontext *gc, GLbitfield mask)
+GLvoid GL_APIENTRY __glim_Clear(__GLcontext *gc, GLbitfield mask)
 {
     GLboolean retVal;
 
@@ -788,7 +991,7 @@ void __glClearBuffer(__GLcontext *gc, GLenum buffer, GLint drawbuffer, GLvoid *v
     }
 }
 
-GLvoid GL_APIENTRY __gles_ClearBufferfi(__GLcontext *gc, GLenum buffer, GLint drawbuffer, GLfloat depth, GLint stencil)
+GLvoid GL_APIENTRY __glim_ClearBufferfi(__GLcontext *gc, GLenum buffer, GLint drawbuffer, GLfloat depth, GLint stencil)
 {
     GLbitfield mask;
     GLboolean retVal;
@@ -831,7 +1034,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ClearBufferiv(__GLcontext *gc, GLenum buffer, GLint drawbuffer, const GLint* value)
+GLvoid GL_APIENTRY __glim_ClearBufferiv(__GLcontext *gc, GLenum buffer, GLint drawbuffer, const GLint* value)
 {
     __GL_HEADER();
 
@@ -851,7 +1054,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ClearBufferuiv(__GLcontext *gc, GLenum buffer, GLint drawbuffer, const GLuint* value)
+GLvoid GL_APIENTRY __glim_ClearBufferuiv(__GLcontext *gc, GLenum buffer, GLint drawbuffer, const GLuint* value)
 {
     __GL_HEADER();
 
@@ -866,7 +1069,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ClearBufferfv(__GLcontext *gc, GLenum buffer, GLint drawbuffer, const GLfloat* value)
+GLvoid GL_APIENTRY __glim_ClearBufferfv(__GLcontext *gc, GLenum buffer, GLint drawbuffer, const GLfloat* value)
 {
     __GL_HEADER();
 
@@ -891,7 +1094,7 @@ OnError:
 ** Flush/Finish
 */
 
-GLvoid GL_APIENTRY __gles_Finish(__GLcontext *gc)
+GLvoid GL_APIENTRY __glim_Finish(__GLcontext *gc)
 {
     GLboolean retVal;
 
@@ -908,7 +1111,7 @@ GLvoid GL_APIENTRY __gles_Finish(__GLcontext *gc)
 }
 
 
-GLvoid GL_APIENTRY __gles_Flush(__GLcontext *gc)
+GLvoid GL_APIENTRY __glim_Flush(__GLcontext *gc)
 {
     __GL_HEADER();
 
@@ -922,7 +1125,7 @@ GLvoid GL_APIENTRY __gles_Flush(__GLcontext *gc)
 ** Hint
 */
 
-GLvoid GL_APIENTRY __gles_Hint(__GLcontext *gc, GLenum target, GLenum mode)
+GLvoid GL_APIENTRY __glim_Hint(__GLcontext *gc, GLenum target, GLenum mode)
 {
     __GL_HEADER();
 
@@ -946,6 +1149,32 @@ GLvoid GL_APIENTRY __gles_Hint(__GLcontext *gc, GLenum target, GLenum mode)
         gc->state.hints.fsDerivative = mode;
         break;
 
+#ifdef OPENGL40
+    case GL_PERSPECTIVE_CORRECTION_HINT:
+        gc->state.hints.perspectiveCorrection = mode;
+        break;
+
+    case GL_POINT_SMOOTH_HINT:
+        gc->state.hints.pointSmooth = mode;
+        break;
+
+    case GL_LINE_SMOOTH_HINT:
+        gc->state.hints.lineSmooth = mode;
+        break;
+
+    case GL_POLYGON_SMOOTH_HINT:
+        gc->state.hints.polygonSmooth = mode;
+        break;
+
+    case GL_FOG_HINT:
+        gc->state.hints.fog = mode;
+        break;
+
+    case GL_TEXTURE_COMPRESSION_HINT:
+        gc->state.hints.textureCompressionHint = mode;
+        break ;
+
+#endif
     default:
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
@@ -1046,7 +1275,7 @@ GLvoid __glFreeSyncState(__GLcontext *gc)
     __glFreeSharedObjectState(gc, gc->sync.shared);
 }
 
-GLsync GL_APIENTRY __gles_FenceSync(__GLcontext *gc, GLenum condition, GLbitfield flags)
+GLsync GL_APIENTRY __glim_FenceSync(__GLcontext *gc, GLenum condition, GLbitfield flags)
 {
     GLuint sync = 0;
     GLboolean retVal;
@@ -1090,12 +1319,12 @@ OnError:
     return (GLsync)(gctUINTPTR_T)sync;
 }
 
-GLboolean GL_APIENTRY __gles_IsSync(__GLcontext *gc, GLsync sync)
+GLboolean GL_APIENTRY __glim_IsSync(__GLcontext *gc, GLsync sync)
 {
     return (gcvNULL != __glGetObject(gc, gc->sync.shared, (GLuint)(gctUINTPTR_T)sync));
 }
 
-GLvoid GL_APIENTRY __gles_DeleteSync(__GLcontext *gc, GLsync sync)
+GLvoid GL_APIENTRY __glim_DeleteSync(__GLcontext *gc, GLsync sync)
 {
     __GL_HEADER();
 
@@ -1116,7 +1345,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLenum GL_APIENTRY __gles_ClientWaitSync(__GLcontext *gc, GLsync sync, GLbitfield flags, GLuint64 timeout)
+GLenum GL_APIENTRY __glim_ClientWaitSync(__GLcontext *gc, GLsync sync, GLbitfield flags, GLuint64 timeout)
 {
     __GLsyncObject *syncObj;
     GLenum ret = GL_TIMEOUT_EXPIRED;
@@ -1165,7 +1394,7 @@ OnError:
     return ret;
 }
 
-GLvoid GL_APIENTRY __gles_WaitSync(__GLcontext *gc, GLsync sync, GLbitfield flags, GLuint64 timeout)
+GLvoid GL_APIENTRY __glim_WaitSync(__GLcontext *gc, GLsync sync, GLbitfield flags, GLuint64 timeout)
 {
     __GLsyncObject *syncObj;
 
@@ -1205,7 +1434,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetSynciv(__GLcontext *gc, GLsync sync, GLenum pname, GLsizei bufSize,
+GLvoid GL_APIENTRY __glim_GetSynciv(__GLcontext *gc, GLsync sync, GLenum pname, GLsizei bufSize,
                                     GLsizei* length, GLint* values)
 {
     __GLsyncObject *syncObj;
@@ -1250,7 +1479,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_MemoryBarrier(__GLcontext *gc, GLbitfield barriers)
+GLvoid GL_APIENTRY __glim_MemoryBarrier(__GLcontext *gc, GLbitfield barriers)
 {
     __GL_HEADER();
 
@@ -1279,7 +1508,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_MemoryBarrierByRegion(__GLcontext *gc, GLbitfield barriers)
+GLvoid GL_APIENTRY __glim_MemoryBarrierByRegion(__GLcontext *gc, GLbitfield barriers)
 {
     __GL_HEADER();
 
@@ -1307,7 +1536,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_BlendBarrier(__GLcontext *gc)
+GLvoid GL_APIENTRY __glim_BlendBarrier(__GLcontext *gc)
 {
     __GL_HEADER();
 
@@ -1607,7 +1836,7 @@ GLvoid __glDebugPrintLogMessage(__GLcontext *gc, GLenum source, GLenum type, GLu
     }
 }
 
-GLvoid GL_APIENTRY __gles_DebugMessageControl(__GLcontext *gc, GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint* ids, GLboolean enabled)
+GLvoid GL_APIENTRY __glim_DebugMessageControl(__GLcontext *gc, GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint* ids, GLboolean enabled)
 {
     __GLdbgSrc srcIdx;
     __GLdbgType typeIdx;
@@ -1730,7 +1959,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DebugMessageInsert(__GLcontext *gc, GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* buf)
+GLvoid GL_APIENTRY __glim_DebugMessageInsert(__GLcontext *gc, GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* buf)
 {
     __GLdbgType typeIdx;
     __GLdbgSeverity severityIdx;
@@ -1772,7 +2001,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_DebugMessageCallback(__GLcontext *gc, GLDEBUGPROCKHR callback, const GLvoid* userParam)
+GLvoid GL_APIENTRY __glim_DebugMessageCallback(__GLcontext *gc, GLDEBUGPROCKHR callback, const GLvoid* userParam)
 {
     __GL_HEADER();
 
@@ -1782,7 +2011,7 @@ GLvoid GL_APIENTRY __gles_DebugMessageCallback(__GLcontext *gc, GLDEBUGPROCKHR c
     __GL_FOOTER();
 }
 
-GLuint GL_APIENTRY __gles_GetDebugMessageLog(__GLcontext *gc, GLuint count, GLsizei bufSize, GLenum* sources, GLenum* types, GLuint* ids, GLenum* severities, GLsizei* lengths, GLchar* messageLog)
+GLuint GL_APIENTRY __glim_GetDebugMessageLog(__GLcontext *gc, GLuint count, GLsizei bufSize, GLenum* sources, GLenum* types, GLuint* ids, GLenum* severities, GLsizei* lengths, GLchar* messageLog)
 {
     GLuint i = 0;
     GLsizei loggedLen = 0;
@@ -1858,7 +2087,7 @@ OnError:
     return i;
 }
 
-GLvoid GL_APIENTRY __gles_GetPointerv(__GLcontext *gc, GLenum pname, GLvoid** params)
+GLvoid GL_APIENTRY __glim_GetPointerv(__GLcontext *gc, GLenum pname, GLvoid** params)
 {
     __GL_HEADER();
 
@@ -1884,7 +2113,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_PushDebugGroup(__GLcontext *gc, GLenum source, GLuint id, GLsizei length, const GLchar * message)
+GLvoid GL_APIENTRY __glim_PushDebugGroup(__GLcontext *gc, GLenum source, GLuint id, GLsizei length, const GLchar * message)
 {
     GLsizei msgLen;
     __GLdbgSrc srcIdx;
@@ -1958,7 +2187,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_PopDebugGroup(__GLcontext *gc)
+GLvoid GL_APIENTRY __glim_PopDebugGroup(__GLcontext *gc)
 {
     __GLdbgSrc srcIdx;
     __GLdbgType typeIdx;
@@ -2000,7 +2229,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ObjectLabel(__GLcontext *gc, GLenum identifier, GLuint name, GLsizei length, const GLchar *label)
+GLvoid GL_APIENTRY __glim_ObjectLabel(__GLcontext *gc, GLenum identifier, GLuint name, GLsizei length, const GLchar *label)
 {
     GLchar **pLabel = NULL;
 
@@ -2167,7 +2396,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetObjectLabel(__GLcontext *gc, GLenum identifier, GLuint name, GLsizei bufSize, GLsizei *length, GLchar *label)
+GLvoid GL_APIENTRY __glim_GetObjectLabel(__GLcontext *gc, GLenum identifier, GLuint name, GLsizei bufSize, GLsizei *length, GLchar *label)
 {
     GLsizei len = 0;
     GLchar *objLabel = NULL;
@@ -2334,7 +2563,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_ObjectPtrLabel(__GLcontext *gc, const GLvoid* ptr, GLsizei length, const GLchar *label)
+GLvoid GL_APIENTRY __glim_ObjectPtrLabel(__GLcontext *gc, const GLvoid* ptr, GLsizei length, const GLchar *label)
 {
      __GLsyncObject *syncObj = (__GLsyncObject*)__glGetObject(gc, gc->sync.shared, __GL_PTR2UINT(ptr));
 
@@ -2373,7 +2602,7 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_GetObjectPtrLabel(__GLcontext *gc, const GLvoid* ptr, GLsizei bufSize, GLsizei *length, GLchar *label)
+GLvoid GL_APIENTRY __glim_GetObjectPtrLabel(__GLcontext *gc, const GLvoid* ptr, GLsizei bufSize, GLsizei *length, GLchar *label)
 {
     GLsizei len = 0;
     __GLsyncObject *syncObj = (__GLsyncObject*)__glGetObject(gc, gc->sync.shared, __GL_PTR2UINT(ptr));
@@ -2411,7 +2640,7 @@ OnError:
 }
 
 
-GLvoid GL_APIENTRY __gles_Enablei(__GLcontext *gc, GLenum target, GLuint index)
+GLvoid GL_APIENTRY __glim_Enablei(__GLcontext *gc, GLenum target, GLuint index)
 {
     __GL_HEADER();
 
@@ -2437,7 +2666,7 @@ OnError:
     return;
 }
 
-GLvoid GL_APIENTRY __gles_Disablei(__GLcontext *gc, GLenum target, GLuint index)
+GLvoid GL_APIENTRY __glim_Disablei(__GLcontext *gc, GLenum target, GLuint index)
 {
     __GL_HEADER();
 
@@ -2463,7 +2692,7 @@ OnError:
     return;
 }
 
-GLboolean GL_APIENTRY __gles_IsEnabledi(__GLcontext * gc, GLenum target, GLuint index)
+GLboolean GL_APIENTRY __glim_IsEnabledi(__GLcontext * gc, GLenum target, GLuint index)
 {
     GLboolean ret = GL_FALSE;
 
@@ -2487,7 +2716,7 @@ OnError:
     return ret;
 }
 
-GLvoid GL_APIENTRY __gles_PrimitiveBoundingBox(__GLcontext *gc, GLfloat minX, GLfloat minY, GLfloat minZ, GLfloat minW,
+GLvoid GL_APIENTRY __glim_PrimitiveBoundingBox(__GLcontext *gc, GLfloat minX, GLfloat minY, GLfloat minZ, GLfloat minW,
                                                GLfloat maxX, GLfloat maxY, GLfloat maxZ, GLfloat maxW)
 {
     __GL_HEADER();
@@ -2708,24 +2937,421 @@ GLboolean APIENTRY __glim_IsEnabledIndexedEXT(__GLcontext *gc, GLenum target, GL
         return es->colorBuffer.blend[index];
         break;
     default:
-        return __gles_IsEnabled(gc, target);
+        return __glim_IsEnabled(gc, target);
     }
 }
 #endif
 
-GLvoid GLAPIENTRY __glim_PrimitiveRestartIndex(__GLcontext *gc, GLuint index)
+
+
+
+/*
+** Not implemented APIs
+*/
+
+/* GL_VERSION_1_0 */
+GLvoid GL_APIENTRY __glim_GetDoublev(__GLcontext *gc, GLenum pname, GLdouble *params)
 {
-    /* to do */
+}
+GLvoid GL_APIENTRY __glim_GetPixelMapfv(__GLcontext *gc, GLenum map, GLfloat *values)
+{
+}
+GLvoid GL_APIENTRY __glim_GetPixelMapuiv(__GLcontext *gc, GLenum map, GLuint *values)
+{
+}
+GLvoid GL_APIENTRY __glim_GetPixelMapusv(__GLcontext *gc, GLenum map, GLushort *values)
+{
+}
+GLvoid GL_APIENTRY __glim_DepthRange(__GLcontext *gc, GLclampd near_val, GLclampd far_val)
+{
 }
 
-GLvoid GLAPIENTRY __glim_BeginConditionalRender(__GLcontext *gc, GLuint id, GLenum mode)
+/* GL_VERSION_1_5 */
+GLvoid GL_APIENTRY __glim_GetQueryObjectiv(__GLcontext *gc, GLuint id, GLenum pname, GLint *params)
 {
-    /* to do */
+}
+/* GL_VERSION_3_0 */
+GLvoid GL_APIENTRY __glim_BeginConditionalRender(__GLcontext *gc, GLuint id, GLenum mode)
+{
+}
+GLvoid GL_APIENTRY __glim_EndConditionalRender(__GLcontext *gc)
+{
+}
+/* GL_VERSION_3_1 */
+GLvoid GL_APIENTRY __glim_PrimitiveRestartIndex(__GLcontext *gc, GLuint index)
+{
 }
 
-GLvoid GLAPIENTRY __glim_EndConditionalRender(__GLcontext *gc)
+/* GL_VERSION_3_2 */
+GLvoid GL_APIENTRY __glim_ProvokingVertex(__GLcontext *gc, GLenum mode)
 {
-    /* to do */
 }
+/* GL_VERSION_3_3 */
+GLvoid GL_APIENTRY __glim_BindFragDataLocationIndexed(__GLcontext *gc, GLuint program, GLuint colorNumber, GLuint index, const GLchar *name)
+{
+}
+GLint GL_APIENTRY __glim_GetFragDataIndex(__GLcontext *gc, GLuint program, const GLchar *name)
+{
+    return -1;
+}
+GLvoid GL_APIENTRY __glim_QueryCounter(__GLcontext *gc, GLuint id, GLenum target)
+{
+}
+GLvoid GL_APIENTRY __glim_GetQueryObjecti64v(__GLcontext *gc, GLuint id, GLenum pname, GLint64 *params)
+{
+}
+GLvoid GL_APIENTRY __glim_GetQueryObjectui64v(__GLcontext *gc, GLuint id, GLenum pname, GLuint64 *params)
+{
+}
+GLvoid GL_APIENTRY __glim_VertexAttribP1ui(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, GLuint value)
+{
+}
+GLvoid GL_APIENTRY __glim_VertexAttribP1uiv(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, const GLuint *value)
+{
+}
+GLvoid GL_APIENTRY __glim_VertexAttribP2ui(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, GLuint value)
+{
+}
+GLvoid GL_APIENTRY __glim_VertexAttribP2uiv(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, const GLuint *value)
+{
+}
+GLvoid GL_APIENTRY __glim_VertexAttribP3ui(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, GLuint value)
+{
+}
+GLvoid GL_APIENTRY __glim_VertexAttribP3uiv(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, const GLuint *value)
+{
+}
+GLvoid GL_APIENTRY __glim_VertexAttribP4ui(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, GLuint value)
+{
+}
+GLvoid GL_APIENTRY __glim_VertexAttribP4uiv(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, const GLuint *value)
+{
+}
+GLvoid GL_APIENTRY __glim_VertexP2ui(__GLcontext *gc, GLenum type, GLuint value)
+{
+}
+GLvoid GL_APIENTRY __glim_VertexP2uiv(__GLcontext *gc, GLenum type, const GLuint *value)
+{
+}
+GLvoid GL_APIENTRY __glim_VertexP3ui(__GLcontext *gc, GLenum type, GLuint value)
+{
+}
+GLvoid GL_APIENTRY __glim_VertexP3uiv(__GLcontext *gc, GLenum type, const GLuint *value)
+{
+}
+GLvoid GL_APIENTRY __glim_VertexP4ui(__GLcontext *gc, GLenum type, GLuint value)
+{
+}
+GLvoid GL_APIENTRY __glim_VertexP4uiv(__GLcontext *gc, GLenum type, const GLuint *value)
+{
+}
+GLvoid GL_APIENTRY __glim_TexCoordP1ui(__GLcontext *gc, GLenum type, GLuint coords)
+{
+}
+GLvoid GL_APIENTRY __glim_TexCoordP1uiv(__GLcontext *gc, GLenum type, const GLuint *coords)
+{
+}
+GLvoid GL_APIENTRY __glim_TexCoordP2ui(__GLcontext *gc, GLenum type, GLuint coords)
+{
+}
+GLvoid GL_APIENTRY __glim_TexCoordP2uiv(__GLcontext *gc, GLenum type, const GLuint *coords)
+{
+}
+GLvoid GL_APIENTRY __glim_TexCoordP3ui(__GLcontext *gc, GLenum type, GLuint coords)
+{
+}
+GLvoid GL_APIENTRY __glim_TexCoordP3uiv(__GLcontext *gc, GLenum type, const GLuint *coords)
+{
+}
+GLvoid GL_APIENTRY __glim_TexCoordP4ui(__GLcontext *gc, GLenum type, GLuint coords)
+{
+}
+GLvoid GL_APIENTRY __glim_TexCoordP4uiv(__GLcontext *gc, GLenum type, const GLuint *coords)
+{
+}
+GLvoid GL_APIENTRY __glim_MultiTexCoordP1ui(__GLcontext *gc, GLenum texture, GLenum type, GLuint coords)
+{
+}
+GLvoid GL_APIENTRY __glim_MultiTexCoordP1uiv(__GLcontext *gc, GLenum texture, GLenum type, const GLuint *coords)
+{
+}
+GLvoid GL_APIENTRY __glim_MultiTexCoordP2ui(__GLcontext *gc, GLenum texture, GLenum type, GLuint coords)
+{
+}
+GLvoid GL_APIENTRY __glim_MultiTexCoordP2uiv(__GLcontext *gc, GLenum texture, GLenum type, const GLuint *coords)
+{
+}
+GLvoid GL_APIENTRY __glim_MultiTexCoordP3ui(__GLcontext *gc, GLenum texture, GLenum type, GLuint coords)
+{
+}
+GLvoid GL_APIENTRY __glim_MultiTexCoordP3uiv(__GLcontext *gc, GLenum texture, GLenum type, const GLuint *coords)
+{
+}
+GLvoid GL_APIENTRY __glim_MultiTexCoordP4ui(__GLcontext *gc, GLenum texture, GLenum type, GLuint coords)
+{
+}
+GLvoid GL_APIENTRY __glim_MultiTexCoordP4uiv(__GLcontext *gc, GLenum texture, GLenum type, const GLuint *coords)
+{
+}
+GLvoid GL_APIENTRY __glim_NormalP3ui(__GLcontext *gc, GLenum type, GLuint coords)
+{
+}
+GLvoid GL_APIENTRY __glim_NormalP3uiv(__GLcontext *gc, GLenum type, const GLuint *coords)
+{
+}
+GLvoid GL_APIENTRY __glim_ColorP3ui(__GLcontext *gc, GLenum type, GLuint color)
+{
+}
+GLvoid GL_APIENTRY __glim_ColorP3uiv(__GLcontext *gc, GLenum type, const GLuint *color)
+{
+}
+GLvoid GL_APIENTRY __glim_ColorP4ui(__GLcontext *gc, GLenum type, GLuint color)
+{
+}
+GLvoid GL_APIENTRY __glim_ColorP4uiv(__GLcontext *gc, GLenum type, const GLuint *color)
+{
+}
+GLvoid GL_APIENTRY __glim_SecondaryColorP3ui(__GLcontext *gc, GLenum type, GLuint color)
+{
+}
+GLvoid GL_APIENTRY __glim_SecondaryColorP3uiv(__GLcontext *gc, GLenum type, const GLuint *color)
+{
+}
+
+/* GL_VERSION_4_0 */
+GLint GL_APIENTRY __glim_GetSubroutineUniformLocation(__GLcontext *gc, GLuint program, GLenum shadertype, const GLchar *name)
+{
+    return -1;
+}
+GLuint GL_APIENTRY __glim_GetSubroutineIndex(__GLcontext *gc, GLuint program, GLenum shadertype, const GLchar *name)
+{
+    return (GLuint)-1;
+}
+GLvoid GL_APIENTRY __glim_GetActiveSubroutineUniformiv(__GLcontext *gc, GLuint program, GLenum shadertype, GLuint index, GLenum pname, GLint *values)
+{
+}
+GLvoid GL_APIENTRY __glim_GetActiveSubroutineUniformName(__GLcontext *gc, GLuint program, GLenum shadertype, GLuint index, GLsizei bufsize, GLsizei *length, GLchar *name)
+{
+}
+GLvoid GL_APIENTRY __glim_GetActiveSubroutineName(__GLcontext *gc, GLuint program, GLenum shadertype, GLuint index, GLsizei bufsize, GLsizei *length, GLchar *name)
+{
+}
+GLvoid GL_APIENTRY __glim_UniformSubroutinesuiv(__GLcontext *gc, GLenum shadertype, GLsizei count, const GLuint *indices)
+{
+}
+GLvoid GL_APIENTRY __glim_GetUniformSubroutineuiv(__GLcontext *gc, GLenum shadertype, GLint location, GLuint *params)
+{
+}
+GLvoid GL_APIENTRY __glim_GetProgramStageiv(__GLcontext *gc, GLuint program, GLenum shadertype, GLenum pname, GLint *values)
+{
+}
+GLvoid GL_APIENTRY __glim_PatchParameterfv(__GLcontext *gc, GLenum pname, const GLfloat *values)
+{
+}
+GLvoid GL_APIENTRY __glim_DrawTransformFeedback(__GLcontext *gc, GLenum mode, GLuint id)
+{
+}
+GLvoid GL_APIENTRY __glim_DrawTransformFeedbackStream(__GLcontext *gc, GLenum mode, GLuint id, GLuint stream)
+{
+}
+GLvoid GL_APIENTRY __glim_BeginQueryIndexed(__GLcontext *gc, GLenum target, GLuint index, GLuint id)
+{
+}
+GLvoid GL_APIENTRY __glim_EndQueryIndexed(__GLcontext *gc, GLenum target, GLuint index)
+{
+}
+GLvoid GL_APIENTRY __glim_GetQueryIndexediv(__GLcontext *gc, GLenum target, GLuint index, GLenum pname, GLint *params)
+{
+}
+
+/* GL_ARB_shader_objects */
+GLvoid GL_APIENTRY __glim_DeleteObjectARB(__GLcontext *gc, GLhandleARB obj)
+{
+}
+GLvoid GL_APIENTRY __glim_GetInfoLogARB(__GLcontext *gc, GLhandleARB obj, GLsizei maxLength, GLsizei *length, GLcharARB *infoLog)
+{
+}
+
+
 #endif
+
+__GL_INLINE GLboolean seMaskTest(GLbitmask_PTR Bitmask, GLuint Loc)
+{
+    GL_ASSERT(Loc < Bitmask->size);
+    return ((Bitmask->me[0] & ((__GL_BITMASK_ELT_TYPE) 1 << Loc)) ? gcvTRUE: gcvFALSE);
+}
+
+__GL_INLINE GLvoid seMaskSet(GLbitmask_PTR Bitmask, GLuint Loc)
+{
+    GL_ASSERT(Loc < Bitmask->size);
+    Bitmask->me[0] |= (__GL_BITMASK_ELT_TYPE) 1 << Loc;
+}
+
+__GL_INLINE GLvoid seMaskOR(GLbitmask_PTR BitmaskResult, GLbitmask_PTR Bitmask1, GLbitmask_PTR Bitmask2)
+{
+    BitmaskResult->me[0] = Bitmask1->me[0] | Bitmask2->me[0];
+}
+
+__GL_INLINE GLboolean seMaskTestAndClear(GLbitmask_PTR Bitmask, GLuint Loc)
+{
+    GL_ASSERT(Loc < Bitmask->size);
+    if (Bitmask->me[0] & ((__GL_BITMASK_ELT_TYPE) 1 << Loc))
+    {
+        Bitmask->me[0] &= ~((__GL_BITMASK_ELT_TYPE) 1 << Loc);
+        return gcvTRUE;
+    }
+    return gcvFALSE;
+}
+
+__GL_INLINE GLboolean seMaskIsAllZero(GLbitmask_PTR Bitmask)
+{
+    return (Bitmask->me[0]== (__GL_BITMASK_ELT_TYPE) 0);
+}
+
+__GL_INLINE GLvoid seMaskInit(GLbitmask_PTR Bitmask, GLboolean AllOne)
+{
+    Bitmask->numOfElts = 1;
+    Bitmask->me[0] = AllOne ?  ((__GL_BITMASK_ELT_TYPE) ~0 >> (__GL_BITMASK_ELT_BITS - Bitmask->size))
+                            :  (__GL_BITMASK_ELT_TYPE) 0;
+}
+
+__GL_INLINE GLvoid seMaskSetAll(GLbitmask_PTR Bitmask, GLboolean AllOne)
+{
+    Bitmask->me[0] = AllOne ?  ((__GL_BITMASK_ELT_TYPE) ~0 >> (__GL_BITMASK_ELT_BITS - Bitmask->size))
+                            :  (__GL_BITMASK_ELT_TYPE) 0;
+}
+
+__GL_INLINE GLvoid seMaskClear(GLbitmask_PTR Bitmask, GLuint Loc)
+{
+    GL_ASSERT(Loc < Bitmask->size);
+    Bitmask->me[0] &= ~((__GL_BITMASK_ELT_TYPE) 1 << Loc);
+}
+
+__GL_INLINE GLvoid seMaskSetValue(GLbitmask_PTR Bitmask, GLuint Value)
+{
+    GL_ASSERT(Bitmask->size >= 32);
+    Bitmask->me[0] = (__GL_BITMASK_ELT_TYPE) Value;
+}
+
+
+GLbitmaskFUNCS seMaskFuncs =
+{
+    seMaskTest,
+    seMaskSet,
+    seMaskOR,
+    seMaskTestAndClear,
+    seMaskIsAllZero,
+    seMaskInit,
+    seMaskClear,
+    seMaskSetAll,
+    seMaskSetValue,
+};
+
+__GL_INLINE GLboolean meMaskTest(GLbitmask_PTR Bitmask, GLuint Loc)
+{
+    GL_ASSERT(Loc < Bitmask->size);
+    return ((Bitmask->me[Loc / __GL_BITMASK_ELT_BITS] & ((__GL_BITMASK_ELT_TYPE) 1 << (Loc % __GL_BITMASK_ELT_BITS))) ? gcvTRUE: gcvFALSE);
+}
+
+
+__GL_INLINE GLvoid meMaskSet(GLbitmask_PTR Bitmask, GLuint Loc)
+{
+    GL_ASSERT(Loc < Bitmask->size);
+    Bitmask->me[Loc / __GL_BITMASK_ELT_BITS] |= ((__GL_BITMASK_ELT_TYPE) 1 << (Loc % __GL_BITMASK_ELT_BITS));
+}
+
+__GL_INLINE GLvoid meMaskOR(GLbitmask_PTR BitmaskResult, GLbitmask_PTR Bitmask1, GLbitmask_PTR Bitmask2)
+{
+    GLuint i;
+    GLuint minIndex = __GL_MIN(Bitmask1->numOfElts, Bitmask2->numOfElts);
+    for (i = 0; i < minIndex; i++)
+    {
+        BitmaskResult->me[i] = Bitmask1->me[i] | Bitmask2->me[i];
+    }
+}
+
+__GL_INLINE GLboolean meMaskTestAndClear(GLbitmask_PTR Bitmask, GLuint Loc)
+{
+    GL_ASSERT(Loc < Bitmask->size);
+    if (Bitmask->me[Loc / __GL_BITMASK_ELT_BITS] & ((__GL_BITMASK_ELT_TYPE) 1 << (Loc % __GL_BITMASK_ELT_BITS)))
+    {
+        Bitmask->me[Loc / __GL_BITMASK_ELT_BITS] &= ~((__GL_BITMASK_ELT_TYPE) 1 << (Loc % __GL_BITMASK_ELT_BITS));
+        return gcvTRUE;
+    }
+    return gcvFALSE;
+}
+
+__GL_INLINE GLboolean meMaskIsAllZero(GLbitmask_PTR Bitmask)
+{
+    GLuint i;
+    for (i = 0; i < Bitmask->numOfElts; i++)
+    {
+        if (Bitmask->me[i])
+        {
+            return gcvFALSE;
+        }
+    }
+
+    return gcvTRUE;
+}
+
+
+__GL_INLINE GLvoid meMaskInit(GLbitmask_PTR Bitmask, GLboolean AllOne)
+{
+    GLuint i;
+    Bitmask->numOfElts = (Bitmask->size + (__GL_BITMASK_ELT_BITS -1)) / __GL_BITMASK_ELT_BITS;
+    Bitmask->remainedSize = Bitmask->size & (__GL_BITMASK_ELT_BITS -1);
+    GL_ASSERT(Bitmask->numOfElts <= __GL_BITMASK_ELT_MAXNUM);
+
+    for (i = 0; i < Bitmask->numOfElts; i++)
+    {
+        Bitmask->me[i] = AllOne ? (__GL_BITMASK_ELT_TYPE) ~0 : 0;
+    }
+
+    if (Bitmask->remainedSize)
+    {
+        Bitmask->me[Bitmask->numOfElts-1] >>= (__GL_BITMASK_ELT_BITS - Bitmask->remainedSize);
+    }
+}
+
+__GL_INLINE GLvoid meMaskSetAll(GLbitmask_PTR Bitmask, GLboolean AllOne)
+{
+    GLuint i;
+    for (i = 0; i < Bitmask->numOfElts; i++)
+    {
+        Bitmask->me[i] = AllOne ? (__GL_BITMASK_ELT_TYPE) ~0 : 0;
+    }
+
+    if (Bitmask->remainedSize)
+    {
+        Bitmask->me[Bitmask->numOfElts-1] >>= (__GL_BITMASK_ELT_BITS - Bitmask->remainedSize);
+    }
+}
+
+
+__GL_INLINE GLvoid meMaskClear(GLbitmask_PTR Bitmask, GLuint Loc)
+{
+    Bitmask->me[Loc / __GL_BITMASK_ELT_BITS] &= ~((__GL_BITMASK_ELT_TYPE) 1 << (Loc % __GL_BITMASK_ELT_BITS));
+}
+
+__GL_INLINE GLvoid meMaskSetValue(GLbitmask_PTR Bitmask, GLuint Value)
+{
+    Bitmask->me[0] = (__GL_BITMASK_ELT_TYPE) Value;
+}
+
+GLbitmaskFUNCS meMaskFuncs =
+{
+    meMaskTest,
+    meMaskSet,
+    meMaskOR,
+    meMaskTestAndClear,
+    meMaskIsAllZero,
+    meMaskInit,
+    meMaskClear,
+    meMaskSetAll,
+    meMaskSetValue,
+};
+
+
+
 

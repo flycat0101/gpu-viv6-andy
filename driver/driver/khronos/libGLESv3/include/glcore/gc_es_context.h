@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -196,8 +196,8 @@ enum
     __GL_TEXPARAM_SWIZZLE_G_BIT         = (1 << 16),
     __GL_TEXPARAM_SWIZZLE_B_BIT         = (1 << 17),
     __GL_TEXPARAM_SWIZZLE_A_BIT         = (1 << 18),
-    __GL_TEXPARAM_MAX_ANISTROPY_BIT     = (1 << 19),
-    __GL_TEXPARAM_D_ST_TEXMODE_BIT      = (1 << 20),
+    __GL_TEXPARAM_MAX_ANISOTROPY_BIT    = (1 << 19),
+    __GL_TEXPARAM_DS_TEXMODE_BIT        = (1 << 20),
     __GL_TEXPARAM_SRGB_BIT              = (1 << 21),
     __GL_TEXPARAM_BORDER_COLOR_BIT      = (1 << 22)
 };
@@ -218,8 +218,8 @@ enum
                 __GL_TEXPARAM_MAX_LOD_BIT | \
                 __GL_TEXPARAM_COMPARE_MODE_BIT |  \
                 __GL_TEXPARAM_COMPARE_FUNC_BIT |  \
-                __GL_TEXPARAM_MAX_ANISTROPY_BIT | \
-                __GL_TEXPARAM_SRGB_BIT          | \
+                __GL_TEXPARAM_MAX_ANISOTROPY_BIT | \
+                __GL_TEXPARAM_SRGB_BIT | \
                 __GL_TEXPARAM_BORDER_COLOR_BIT)
 
 #define __GL_TEXPARAMETER_BITS ( \
@@ -228,7 +228,7 @@ enum
                 __GL_TEXPARAM_MIP_HINT_BIT | \
                 __GL_TEXPARAM_BASE_LEVEL_BIT | \
                 __GL_TEXPARAM_MAX_LEVEL_BIT |\
-                __GL_TEXPARAM_D_ST_TEXMODE_BIT)
+                __GL_TEXPARAM_DS_TEXMODE_BIT)
 
 #define __GL_TEXIMAGE_BITS ( \
                 __GL_TEX_IMAGE_CONTENT_CHANGED_BIT | \
@@ -504,7 +504,7 @@ struct __GLcontextRec
      */
     __GLbitmask texUnitAttrDirtyMask;
     __GLbitmask imageUnitDirtyMask;
-    GLbitfield texUnitAttrState[__GL_MAX_TEXTURE_UNITS];
+    GLuint64 texUnitAttrState[__GL_MAX_TEXTURE_UNITS];
     GLbitfield globalDirtyState[__GL_DIRTY_ATTRS_END];
     GLbitfield drawableDirtyMask;
 
@@ -765,9 +765,8 @@ enum
 #define __GLES3_ZONE_PROFILER            (gcvZONE_API_ES30 | (1 << 14))
 #define __GLES3_ZONE_CORE                (gcvZONE_API_ES30 | (1 << 15))
 
-
-
 #define __GLES_MAX_FILENAME_LEN 256
+
 
 #if VIVANTE_PROFILER
 extern GLint __glesApiProfileMode;

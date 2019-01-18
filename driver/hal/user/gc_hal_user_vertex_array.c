@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -831,11 +831,11 @@ gcoVERTEXARRAY_IndexBind_Ex(
                 /* Fill index buffer with First through First + Count - 1. */
                 for (i = 0; i < StreamInfo->count; ++i)
                 {
-                    *ptr++ = first + i;
+                    *ptr++ = (gctUINT32)first + i;
                 }
 
                 /* Append First to index buffer. */
-                *ptr = first;
+                *ptr = (gctUINT32)first;
             }
         }
 
@@ -2263,9 +2263,8 @@ gcoVERTEXARRAY_StreamBind(
             /* increase stream count */
             streamCount++;
         }
-
+        gcmASSERT(streamPtr);
         /* We have our stream */
-        if (streamPtr != gcvNULL)
         {
             attrPtr = gcvNULL;
 

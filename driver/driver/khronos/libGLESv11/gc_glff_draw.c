@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,6 +13,7 @@
 
 #include "gc_glff_precomp.h"
 
+#if gcdUSE_WCLIP_PATCH
 #define readDataForWLimit(Logical, result)                               \
 {                                                                        \
     gctUINT8* ptr;                                                       \
@@ -21,6 +22,7 @@
     data = ((ptr[0]) | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3]) << 24); \
     result = *((gctFLOAT*)(&data));                                      \
 }
+#endif
 
 /* help code for dump frame buffer */
 
@@ -703,6 +705,7 @@ static gceSTATUS _VertexArray(
         (Context->isQuadrant && ((Context->varrayDirty) || (IndexBuffer == gcvNULL))
         ))
     {
+#if gcdUSE_WCLIP_PATCH
         gcmONERROR(gcoVERTEXARRAY_Bind(Context->vertexArray,
             enableBits, Context->attributeArray,
             First, &vertexCount,
@@ -710,7 +713,17 @@ static gceSTATUS _VertexArray(
             PrimitiveType,
             PrimitiveCount,
             gcvNULL,
-            gcvNULL));
+            gcvNULL
+            ));
+#else
+        gcmONERROR(gcoVERTEXARRAY_Bind(Context->vertexArray,
+            enableBits, Context->attributeArray,
+            First, &vertexCount,
+            IndexType, index, (gctPOINTER)Indices,
+            PrimitiveType,
+            PrimitiveCount
+            ));
+#endif
     }
     else
     {
@@ -1170,6 +1183,7 @@ gctBOOL _computeWlimitByData(
                 vector[j] = vertexPtTmp[j];
             }
         }
+#if gcdUSE_WCLIP_PATCH
         else
         {
             for(j=0; j < component; j++)
@@ -1177,7 +1191,7 @@ gctBOOL _computeWlimitByData(
                 readDataForWLimit(vertexPtTmp + j, vector[j])
             }
         }
-
+#endif
 
         x = mvp[ 0] * vector[0]
           + mvp[ 4] * vector[1]
@@ -1858,7 +1872,7 @@ glfSplitDrawIndexFetch(
                                             &streamInfo,
                                             &indexInfo));
 #else
-    gcmONERROR(gcoVERTEXARRAY_StreamBind_Ex(chipCtx->vertexArray,
+    gcmONERROR(gcoVERTEXARRAY_StreamBind_Ex(context->vertexArray,
                                             &streamInfo,
                                             &indexInfo));
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2018 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -30,9 +30,7 @@
 
 #include "gc_vdk.h"
 #include <GLES3/gl32.h>
-#include <GLES3/gl31.h>
 #include <GLES2/gl2ext.h>
-#include <GLES3/gl3ext.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>

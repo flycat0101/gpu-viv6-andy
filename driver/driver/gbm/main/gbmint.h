@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -116,7 +116,7 @@ struct gbm_device {
 
    void (*surface_set_in_fence_fd)(struct gbm_surface *surface, int fd);
 
-   uint32_t (*surface_in_fence_on)(struct gbm_surface *surface);
+   void (*surface_set_sync_post)(struct gbm_surface *surface, int sync_post);
 };
 
 /**

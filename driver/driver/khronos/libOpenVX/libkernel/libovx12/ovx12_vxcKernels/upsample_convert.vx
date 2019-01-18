@@ -1,0 +1,73 @@
+#include "cl_viv_vx_ext.h"
+
+__kernel void upsample_convert_u8_to_u8
+(
+    __read_only  image2d_t      src_image,
+    __write_only image2d_t      dst_image
+)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    uchar value;
+    int tmp;
+    uchar result;
+
+    VXC_ReadImage(value, src_image, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+    tmp = (int)value * 4;
+    result = (uchar)clamp(tmp, 0, UCHAR_MAX);
+
+    VXC_WriteImage(dst_image, coord, result, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void upsample_convert_u8_to_s16
+(
+    __read_only  image2d_t      src_image,
+    __write_only image2d_t      dst_image
+)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    uchar value;
+    int tmp;
+    short result;
+
+    VXC_ReadImage(value, src_image, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+    tmp = (int)value * 4;
+    result = (short)clamp(tmp, SHRT_MIN, SHRT_MAX);
+
+    VXC_WriteImage(dst_image, coord, result, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void upsample_convert_s16_to_u8
+(
+    __read_only  image2d_t      src_image,
+    __write_only image2d_t      dst_image
+)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    short value;
+    int tmp;
+    uchar result;
+
+    VXC_ReadImage(value, src_image, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+    tmp = (int)value * 4;
+    result = (uchar)clamp(tmp, 0, UCHAR_MAX);
+
+    VXC_WriteImage(dst_image, coord, result, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void upsample_convert_s16_to_s16
+(
+    __read_only  image2d_t      src_image,
+    __write_only image2d_t      dst_image
+)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    short value;
+    int tmp;
+    short result;
+
+    VXC_ReadImage(value, src_image, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+    tmp = (int)value * 4;
+    result = (short)clamp(tmp, SHRT_MIN, SHRT_MAX);
+
+    VXC_WriteImage(dst_image, coord, result, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+}

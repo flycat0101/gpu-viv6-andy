@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -102,8 +102,8 @@ static clsBUILTIN_FUNCTION    IntBuiltinFunctions[] =
     {clvEXTENSION_NONE,     "upsample",             T_UINT16,        2, {T_USHORT16, T_USHORT16}, {0}, {0}, 1},
     {clvEXTENSION_NONE,     "upsample",             T_LONG16,        2, {T_INT16, T_UINT16}, {0}, {0}, 1},
     {clvEXTENSION_NONE,     "upsample",             T_ULONG16,       2, {T_UINT16, T_UINT16}, {0}, {0}, 1},
-    {clvEXTENSION_NONE,     "clz",                  T_IU_GENTYPE,    1, {T_IU_GENTYPE}, {0}, {1}, 1},
-    {clvEXTENSION_NONE,     "popcount",             T_GENTYPE,       1, {T_GENTYPE}, {0}, {1}, 1},
+    {clvEXTENSION_NONE,     "clz",                  T_IU_GENTYPE,    1, {T_IU_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_NONE,     "popcount",             T_GENTYPE,       1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE,     "viv_abs",              T_U_GENTYPE,        1, {T_IU_GENTYPE}, {0}, {1}, 1},
     {clvEXTENSION_NONE,     "left_shift#",          T_GENTYPE,        2, {T_GENTYPE, T_IU_GENTYPE}, {0}, {0}, 1},

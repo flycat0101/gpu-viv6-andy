@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -12,430 +12,196 @@
 
 
 #include <gc_vxk_common.h>
-
-//#define COMPARE_TO_REF
-//#define DUMP_NN
+#include <gc_vx_nn_util.h>
 
 #if NN_LAYER_C
 vx_status vxNNLayersC(vx_node node, vx_array cmd_buf, vx_weights_biases_parameter weights_biases,
                      vx_tensor inputs, vx_uint32 inputOffset,
                      vx_tensor outputs, vx_uint32 outputOffset);
-#else
-
-#ifdef COMPARE_TO_REF
-static vx_float32 fp16_to_float32(const vx_int16 in) {
-        vx_int32 t1;
-        vx_int32 t2;
-        vx_int32 t3;
-        vx_float32 out;
-
-        t1 = in & 0x7fff;                       // Non-sign bits
-        t2 = in & 0x8000;                       // Sign bit
-        t3 = in & 0x7c00;                       // Exponent
-
-        t1 <<= 13;                              // Align mantissa on MSB
-        t2 <<= 16;                              // Shift sign bit into position
-
-        t1 += 0x38000000;                       // Adjust bias
-
-        t1 = (t3 == 0 ? 0 : t1);                // Denormals-as-zero
-
-        t1 |= t2;                               // Re-insert sign bit
-
-        *((uint32_t*)&out) = t1;
-
-        return out;
-    };
 #endif
 
-#endif
-
-#ifdef DUMP_NN
-FILE* dumpFILE = VX_NULL;
-void init_nn_dump_file(char* prefix, gctUINT32 layer, gctUINT32 index)
-{
-    char dump_file[128];
-    gctUINT offset = 0;
-
-    gcmVERIFY_OK(gcoOS_PrintStrSafe(
-        dump_file,
-        gcmSIZEOF(dump_file),
-        &offset,
-        "dump_%s_pid-%d_%s_layer%02d_index%d.log",
-        prefix,
-        gcoOS_GetCurrentProcessID(),
-        gcdDUMP_KEY,
-        layer, index));
-
-    dumpFILE = fopen(dump_file, "a+");
-}
-
-void deinit_nn_dump_file()
-{
-    if (dumpFILE != VX_NULL)
-    {
-        fclose(dumpFILE);
-        dumpFILE = VX_NULL;
-    }
-}
-
-void dump_trigger_command(
-    gceVX_ACCELERATOR_TYPE Type,
-    gctUINT32 Physical
+/*
+ * A dump block refers to:
+ * 1. Multiple operations belong to the same SW tiling block.
+ * 2. Single operation which is NOT in any SW tiling block.
+ *
+ * For each block, the followings will be dumped.
+ * 1. Input(s).
+ * 2. Output(s).
+ * 3. Commands.
+ * 4. Weights and bias (if any).
+ *
+ * The dump format is as below.
+ * 1. Driver adds the tag for each dump section as below.
+ *    @[dump id=xx]
+ *      ...
+ *    @[dump_end id=xx, layerid=y1, y2, ..., y, operationid=z1, z2, ..., z]
+ * 2. Parser replaces NN and TP trigger commands in each section if the dump id
+ *    doesn’t match the requested one.
+ */
+vx_status vxOpCommandDump(
+    vxnne_operation_command opCommand,
+    vxnne_operation operation,
+    vx_enum dumpStage
     )
 {
-    static gctUINT32 cmd[] = {0x08010428, 0x0801042E};
-    if (dumpFILE == VX_NULL) return;
+    enum vx_status_e status = VX_SUCCESS;
 
-    fprintf(dumpFILE, "@[command 0x00000001 0x00000030\n");
-    fprintf(dumpFILE, "  0x%08X 0x%08X 0x08010429 0x00000000\n", cmd[Type], Physical);
-    fprintf(dumpFILE, "  0x08010E03 0x00000C23 0x08010E03 0x00000C23\n");
-    fprintf(dumpFILE, "  0x08010594 0x00000001 0x08010E03 0x00000C23\n");
-    fprintf(dumpFILE, "] -- command\n");
-    fprintf(dumpFILE, "@[commit]\n");
-    fprintf(dumpFILE, "@[stall]\n");
-}
+#if gcdDUMP
+    static vx_uint32 dumpId = 0;
+    vxnne_command_buffer commandBuffer;
+    vx_bool dumpHeader, dumpInput, dumpOutput, dumpFooter;
+    vxnne_operation_target_e target = VXNNE_OPERATION_TARGET_NONE;
+    vxnne_convolution_relu_pooling_operation convOperation = VX_NULL;
+    vxnne_tp_operation tpOperation = VX_NULL;
+    vx_tensor inputs = VX_NULL, outputs = VX_NULL;
+    gctPOINTER logical = VX_NULL;
+    vx_uint32 physical = ~0U;
+    vx_uint32 size = 0;
 
-void dump_buffer(
-    gctSTRING Tag,
-    gctUINT32 Physical,
-    gctPOINTER Logical,
-    gctSIZE_T Offset,
-    gctSIZE_T Bytes
-)
-{
-    gctUINT32_PTR ptr = (gctUINT32_PTR) Logical + (Offset >> 2);
-    gctSIZE_T bytes   = gcmALIGN(Bytes + (Offset & 3), 4);
-
-    if (dumpFILE == VX_NULL) return;
-
-    fprintf(dumpFILE, "@[%s 0x%08X 0x%08X\n", Tag, Physical + (Offset & ~3), bytes);
-
-    while (bytes >= 16)
+    if (!opCommand)
     {
-        fprintf(dumpFILE, "  0x%08X 0x%08X 0x%08X 0x%08X\n", ptr[0], ptr[1], ptr[2], ptr[3]);
-        ptr   += 4;
-        bytes -= 16;
+        return VX_ERROR_INVALID_PARAMETERS;
     }
 
-    switch (bytes)
+    target = operation->target;
+
+    switch(target)
     {
-        case 12:
-            fprintf(dumpFILE, "  0x%08X 0x%08X 0x%08X\n", ptr[0], ptr[1], ptr[2]);
-            break;
+    case VXNNE_OPERATION_TARGET_NN:
+        convOperation = (vxnne_convolution_relu_pooling_operation)operation;
+        inputs = (vx_tensor)convOperation->inputs;
+        outputs = (vx_tensor)convOperation->outputs;
 
-        case 8:
-            fprintf(dumpFILE, "  0x%08X 0x%08X\n", ptr[0], ptr[1]);
-            break;
+        break;
 
-        case 4:
-            fprintf(dumpFILE, "  0x%08X\n", ptr[0]);
-            break;
-    }
+    case VXNNE_OPERATION_TARGET_TP:
+        tpOperation = (vxnne_tp_operation)operation;
+        inputs = tpOperation->input;
+        outputs = tpOperation->output;
 
-    fprintf(dumpFILE, "] -- %s\n", Tag);
-}
-#endif
+        break;
 
-static int layerIndex = 0;
-
-vx_status vxNNExecute(vx_node node,
-                      vx_array cmd_buf, vx_uint32 cmdOffset,
-                      vx_weights_biases_parameter weights_biases, vx_uint32 wbOffset,
-                      vx_tensor inputs, vx_uint32 inputOffset,
-                      vx_tensor outputs, vx_uint32 outputOffset)
-{
-
-#if NN_LAYER_C
-    return vxNNLayersC(node, cmd_buf, weights_biases, inputs, inputOffset, outputs, outputOffset);
-#else
-
-    vx_status status = VX_SUCCESS;
-
-    vx_uint32 *nnCmdBufferPtr = NULL;
-
-    gctUINT32 nnCmdBufferAddress = (gctUINT32)cmd_buf->memory.physicals[0] + cmdOffset;
-    gctUINT32 inputKernelAddress = (gctUINT32)weights_biases->memory.physicals[0] + wbOffset;
-    gctUINT32 inputBufferAddress = (gctUINT32)inputs->tensorBuffer->memory.physicals[0] + inputOffset;
-    gctUINT32 outputBufferAddress = (gctUINT32)outputs->tensorBuffer->memory.physicals[0] + outputOffset;
-
-#ifdef DUMP_NN
-    vx_uint32 inputsSize;
-    vx_uint32 outputsSizeDump;
-    vx_uint32 weightBiasSize = 0;
-#endif
-
-#ifdef COMPARE_TO_REF
-    FILE *outputFile = NULL;
-    vx_float32 *pfNN_out, *pfRef_out;
-    vx_float32 fDelta, fMax_delta, fPortion_BigDelta;
-    vx_uint32 i, count_big_delta, offset_max_delta;
-    vx_uint32 outputsElementCount, outputsSize;
-    /**/
-    vx_char *fileName[] = {"layer0//out1_1x96x27x27.dat",
-                           "layer1//out1_1x256x13x13.dat",
-                           "layer1//out1_1x256x13x13.dat",
-                           "layer2//out1_1x384x13x13.dat",
-                           "layer3//out1_1x384x13x13.dat",
-                           "layer3//out1_1x384x13x13.dat",
-                           "layer4//out1_1x256x6x6.dat",
-                           "layer4//out1_1x256x6x6.dat",
-                           "layer5//out1_1x4096.dat",
-                           "layer6//out1_1x4096.dat",
-                           "layer7//out1_1x1000.dat"};
-
-    vx_char fullFileName[256] = {'\0'};
-    gctBOOL doCompare[] = {gcvTRUE,
-                           gcvFALSE,
-                           gcvTRUE,
-                           gcvTRUE,
-                           gcvFALSE,
-                           gcvTRUE,
-                           gcvFALSE,
-                           gcvTRUE,
-                           gcvTRUE,
-                           gcvTRUE,
-                           gcvTRUE};
-#endif
-    static vx_uint32 index = 0;
-
-    nnCmdBufferPtr = (vx_uint32*)(cmd_buf->memory.logicals[0] + cmdOffset);
-
-    nnCmdBufferPtr += 5;
-
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VIP_V7))
-    {
-        *nnCmdBufferPtr |= inputKernelAddress >> 6; /* high 6 bits are for other usage*/
-        nnCmdBufferPtr++;
-    }
-    else
-    {
-        *nnCmdBufferPtr++ = inputKernelAddress >> 6; /* make sure high 6 bits are all 0 */
-    }
-
-    *nnCmdBufferPtr++ = inputBufferAddress;
-
-    *nnCmdBufferPtr++ = outputBufferAddress;
-
-#ifdef DUMP_NN
-    init_nn_dump_file("NN", layerIndex, index);
-
-    if (weights_biases->use_fc_accel)
-    {
-        vx_uint32 weightSize = (vx_uint32)vxDataType_GetSize(weights_biases->weights_data_format);
-        vx_uint32 nnCores = node->base.context->nnConfig.nnCoreCount;
-        vx_uint32_ptr header = (vx_uint32_ptr)(weights_biases->memory.logicals[0] + wbOffset);
-        inputsSize = weights_biases->zgroup_array[index] * weights_biases->input_nonzero_count * weightSize;
-        while (nnCores--)
-        {
-            weightBiasSize += *header++;
-        };
-        weightBiasSize += 64;
-    }
-    else
-    {
-        vxoTensor_GetTensorSize(inputs, &inputsSize);
-        weightBiasSize = weights_biases->memory_size - weights_biases->memroy_head_offset;
-    }
-
-    gcoVX_Flush(gcvTRUE);
-
-    dump_buffer("memory",
-                cmd_buf->memory.physicals[0] + cmdOffset,
-                (gctPOINTER)(cmd_buf->memory.logicals[0] + cmdOffset),
-                0,
-                cmd_buf->capacity * cmd_buf->itemSize);
-
-    dump_buffer("memory",
-                inputs->tensorBuffer->memory.physicals[0] + inputOffset,
-                (gctPOINTER)(inputs->tensorBuffer->memory.logicals[0] + inputOffset),
-                0,
-                inputsSize);
-
-    dump_buffer("memory",
-                weights_biases->memory.physicals[0] + wbOffset,
-                (gctPOINTER)(weights_biases->memory.logicals[0] + wbOffset),
-                0,
-                weightBiasSize);
-
-    dump_trigger_command(gcvVX_ACCELERATOR_NN, (gctUINT32)nnCmdBufferAddress);
-
-    /* close dump file first to avoid incomplete data when hang */
-    deinit_nn_dump_file();
-#endif
-
-    status = gcfVX_Accel((gctUINT32)nnCmdBufferAddress, gcvVX_ACCELERATOR_NN, node->cnnTriggerEventID, node->forceWaitForEvent);
-
-    if (node->base.context->options.enableCNNPerf)
-    {
+#if gcdDUMP_PER_OPERATION
+    case VXNNE_OPERATION_TARGET_SH:
+        /*
+         * Just trigger PPU to make sure PPU commands is not
+         * saved in TP/NN dump block. Sync-flush to flush
+         * PPU's outputs so that it dumps the correct inputs
+         * for TP/NN.
+         */
         gcoVX_Flush(gcvTRUE);
-    }
 
-#ifdef DUMP_NN
-    gcoVX_Flush(gcvTRUE);
-
-    /* reopen again */
-    init_nn_dump_file("NN", layerIndex, index);
-
-    vxoTensor_GetTensorSize(outputs, &outputsSizeDump);
-    dump_buffer("verify",
-                outputs->tensorBuffer->memory.physicals[0] + outputOffset,
-                (gctPOINTER)(outputs->tensorBuffer->memory.logicals[0] + outputOffset),
-                0,
-                outputsSizeDump > 16 ?
-                outputsSizeDump : 16);
-
-    deinit_nn_dump_file();
+        return VX_SUCCESS;
 #endif
 
-#ifdef COMPARE_TO_REF
-    if (doCompare[layerIndex])
+    default:
+        return VX_SUCCESS;
+    }
+
+    commandBuffer = &opCommand->commandBuffer;
+
+    dumpHeader = dumpInput = dumpOutput = dumpFooter = vx_false_e;
+
+    switch (dumpStage)
     {
-        outputsElementCount = (vx_uint32)vxoMemory_ComputeElementCount(&outputs->tensorBuffer->memory, 0);
-        outputsSize = (vx_uint32)vxoMemory_ComputeSize(&outputs->tensorBuffer->memory, 0);
+    case VXNNE_DUMP_PRE_EXECUTION:
 
-        pfNN_out =  (vx_float32*)malloc(outputsElementCount * sizeof(vx_float32));
-        pfRef_out = (vx_float32*)malloc(outputsElementCount * sizeof(vx_float32));
-
-        outputFile = fopen(fileName[layerIndex], "rb");            /* compare to ref output file of each layer */
-        if (outputFile == NULL)
+#if gcdDUMP_PER_OPERATION
+        switch (opCommand->blockFlag)
         {
-            gcmPRINT("can't find file %s", fullFileName);
-            return VX_ERROR_INVALID_PARAMETERS;
-        }
+        case VXNNE_BLOCK_FLAG_NONE:
+        case VXNNE_BLOCK_FLAG_START:
+            dumpHeader = vx_true_e;
+            dumpInput = vx_true_e;
 
-        if(fread(pfRef_out, 1, outputsElementCount*sizeof(vx_float32), outputFile) != outputsElementCount*sizeof(vx_float32))
+            break;
+
+        case VXNNE_BLOCK_FLAG_INTERNAL:
+        case VXNNE_BLOCK_FLAG_END:
+            break;
+
+        default:
+            status = VX_ERROR_INVALID_TYPE;
+            break;
+        }
+#endif
+
+        break;
+
+    case VXNNE_DUMP_POST_EXECUTION:
+#if gcdDUMP_PER_OPERATION
+        switch (opCommand->blockFlag)
         {
-            gcmPRINT("fread failure");
-            return VX_ERROR_INVALID_PARAMETERS;
+        case VXNNE_BLOCK_FLAG_NONE:
+        case VXNNE_BLOCK_FLAG_END:
+            dumpOutput = vx_true_e;
+            dumpFooter = vx_true_e;
+
+            break;
+
+        case VXNNE_BLOCK_FLAG_START:
+        case VXNNE_BLOCK_FLAG_INTERNAL:
+            break;
+
+        default:
+            status = VX_ERROR_INVALID_TYPE;
+            break;
         }
-        fclose(outputFile);
-
-        fMax_delta =0.0f;
-        count_big_delta = 0;
-        offset_max_delta = 0;
-        for (i = 0; i < outputsElementCount; i++)
-        {
-            pfNN_out[i] = fp16_to_float32(*((vx_int16*) outputs->tensorBuffer->memory.logicals[0] + i));
-            if (pfRef_out[i] != 0.0f)
-            {
-                fDelta = (vx_float32)fabs((pfRef_out[i] - pfNN_out[i]) / pfRef_out[i]);
-            }
-            else if (pfNN_out[i] != 0.0f)
-            {
-                fDelta = (vx_float32)fabs((pfRef_out[i] - pfNN_out[i]) / pfNN_out[i]);
-            }
-            else
-            {
-                continue;
-            }
-
-            if (fDelta > 0.01f)
-            {
-                count_big_delta++;
-            }
-            if (fDelta > fMax_delta)
-            {
-                fMax_delta = fDelta;
-                offset_max_delta = i;
-            }
-        }
-
-        fPortion_BigDelta = (float)count_big_delta/(float)outputsElementCount;
-        printf("Portion_BigDelta = %10.7f, Max delta = %10.6f, count_big_delta= %d \n", fPortion_BigDelta, fMax_delta, count_big_delta);
-        free(pfRef_out);
-        free(pfNN_out);
-    }
-
-#endif
-    index++;
-    if (index == weights_biases->zgroup_num)
-    {
-        index = 0;
-        layerIndex++;
-    }
-
-    return status;
-
-#endif
-}
-
-vx_status vxTPExecute(vx_node node, vx_uint32 op_num,
-                      vx_array cmd_buf, vx_uint32 cmdOffset, vx_uint32 cmdSize,
-                      vx_weights_biases_parameter weights_biases, vx_uint32 wbOffset, vx_uint32 wbSize,
-                      vx_tensor inputs, vx_uint32 inputOffset, vx_uint32 inputSize,
-                      vx_tensor outputs, vx_uint32 outputOffset, vx_uint32 outputSize,
-                      vx_array buffer)
-{
-    vx_status status = VX_SUCCESS;
-    gctUINT32 nnCmdBufferAddress = (gctUINT32)cmd_buf->memory.physicals[0] + cmdOffset;
-    static gctUINT32 index = 0;
-
-#ifdef DUMP_NN
-    vx_uint32 outputsSizeDump;
-    vx_uint32 inputsSize = vxoMemory_ComputeSize(&inputs->tensorBuffer->memory, 0);
-
-    init_nn_dump_file("TP", layerIndex, 0);
-
-    dump_buffer("memory",
-                nnCmdBufferAddress,
-                (gctPOINTER)(cmd_buf->memory.logicals[0] + cmdOffset),
-                0,
-                cmdSize);
-
-    dump_buffer("memory",
-                inputs->tensorBuffer->memory.physicals[0] + inputOffset,
-                (gctPOINTER)(inputs->tensorBuffer->memory.logicals[0] + inputOffset),
-                0,
-                inputsSize);
-
-    if (weights_biases != gcvNULL)
-    {
-        dump_buffer("memory",
-                    weights_biases->memory.physicals[0] + wbOffset,
-                    (gctPOINTER)(weights_biases->memory.logicals[0] + wbOffset),
-                    0,
-                    wbSize);
-    }
-    else if (buffer != gcvNULL)
-    {
-        dump_buffer("table",
-                    buffer->memory.physicals[0],
-                    (gctPOINTER)buffer->memory.logicals[0],
-                    0,
-                    buffer->itemCount * buffer->itemSize);
-    }
-
-    dump_trigger_command(gcvVX_ACCELERATOR_TP, (gctUINT32)nnCmdBufferAddress);
-
-    /* close dump file first to avoid incomplete data when hang */
-    deinit_nn_dump_file();
 #endif
 
-    status = gcfVX_Accel((gctUINT32)nnCmdBufferAddress, gcvVX_ACCELERATOR_TP, node->cnnTriggerEventID, node->forceWaitForEvent);
+        break;
 
-#ifdef DUMP_NN
-    gcoVX_Flush(gcvTRUE);
-
-    /* reopen again */
-    init_nn_dump_file("TP", layerIndex, 0);
-
-    vxoTensor_GetTensorSize(outputs, &outputsSizeDump);
-
-    dump_buffer("verify",
-                outputs->tensorBuffer->memory.physicals[0] + outputOffset,
-                (gctPOINTER)(outputs->tensorBuffer->memory.logicals[0] + outputOffset),
-                0,
-                outputSize);
-
-    deinit_nn_dump_file();
-#endif
-
-    if (++index == op_num)
-    {
-        layerIndex++;
-        index = 0;
+    default:
+        status = VX_ERROR_INVALID_PARAMETERS;
+        break;
     }
+
+
+    if (dumpHeader)
+    {
+        gcmDUMP(gcvNULL, "@[dump id=%u]\n", dumpId);
+    }
+
+    if (dumpInput)
+    {
+        vxoTensor_GetTensorBatchArrayViewMemory(inputs, 0, &logical, &physical);
+        vxoTensor_GetTensorSize(inputs, &size);
+
+        gcmDUMP(gcvNULL, "#[input]\n");
+
+        gcmDUMP_BUFFER(gcvNULL,
+                       gcvDUMP_BUFFER_MEMORY,
+                       physical,
+                       logical,
+                       0,
+                       size);
+    }
+
+    if (dumpOutput)
+    {
+        vxoTensor_GetTensorBatchArrayViewMemory(outputs, 0, &logical, &physical);
+        vxoTensor_GetTensorSize(outputs, &size);
+
+        vxnneMultiChannel_SetCurrentChannel(VXNNE_OPERATION_TARGET_SH);
+        gcoVX_Flush(gcvTRUE);
+        vxnneMultiChannel_SetCurrentChannel(target);
+
+        gcmDUMP(gcvNULL, "#[output]\n");
+
+        gcmDUMP_BUFFER(gcvNULL,
+                       gcvDUMP_BUFFER_VERIFY,
+                       physical,
+                       logical,
+                       0,
+                       size);
+    }
+
+    if (dumpFooter)
+    {
+        gcmDUMP(gcvNULL, "@[dumpend id=%u, layerid=0, operationid=0]\n", dumpId++);
+    }
+#endif
 
     return status;
 }
@@ -533,7 +299,7 @@ VX_INTERNAL_API vx_int32 vx_nnu_get_type_size(vx_type_e format)
         size = sizeof(vx_float32);
         break;
     default:
-        printf("Not support format :%d\n", format);
+        vxError("Not support format :%d\n", format);
         break;
     }
 
@@ -564,7 +330,7 @@ VX_INTERNAL_API vx_float32 vx_nnu_get_date(vx_type_e format, vx_int32 index, vx_
             }
             break;
         default:
-            printf("Not support format :%d\n", format);
+            vxError("Not support format :%d\n", format);
             break;
         }
     }
@@ -594,7 +360,7 @@ VX_INTERNAL_API vx_status vx_nnu_save_date(vx_type_e format, vx_int32 index, vx_
         }
         break;
     default:
-        printf("Not support format :%d\n", format);
+        vxError("Not support format :%d\n", format);
         break;
     }
 
@@ -1030,12 +796,8 @@ vx_status vx_nnk_coef_decompress_zrl(vx_uint8_ptr src, vx_type_e format, vx_int3
     vx_int32 g = 0, k = 0, s = 0;
     vx_int32 size = depth_input * kernel_x * kernel_x * depth_output * vx_nnu_get_type_size(format);
 
-    *weight_buffer = (vx_uint8_ptr)malloc(size);
-    *bias_buffer = (vx_uint8_ptr)malloc(depth_output * sizeof(vx_float32));
-
-    memset(*weight_buffer, 0, size);
-
-    memset(*bias_buffer, 0, depth_output * sizeof(vx_float32));
+    *weight_buffer = (vx_uint8_ptr)vxAllocateAndZeroMemory(size);
+    *bias_buffer = (vx_uint8_ptr)vxAllocateAndZeroMemory(depth_output * sizeof(vx_float32));
 
     group_count = gcmALIGN_NP3(depth_output, kernel_per_core);
 
@@ -1139,8 +901,8 @@ vx_status vx_nnk_coef_decompress(vx_uint8_ptr src, vx_uint32 type, vx_type_e for
     vx_int32 g = 0, k = 0, s = 0;
     vx_int32 size = depth_input * kernel_x * kernel_y * depth_output * vx_nnu_get_type_size(format);
 
-    *weights_buf = (vx_uint8_ptr)malloc(size);
-    *bias_buf = (vx_uint8_ptr)malloc(depth_output * sizeof(vx_float32));
+    *weights_buf = (vx_uint8_ptr)vxAllocateAndZeroMemory(size);
+    *bias_buf = (vx_uint8_ptr)vxAllocateAndZeroMemory(depth_output * sizeof(vx_float32));
 
     group_count = gcmALIGN_NP3(depth_output, kernel_per_core);
 
@@ -1225,8 +987,8 @@ vx_status vxNNLayersC(vx_node node, vx_array cmd_buf, vx_weights_biases_paramete
     vx_int32 debug_loop_count = 0;
 #endif
 
-    vx_float32_ptr buffer = (vx_float32_ptr)malloc(sizeof(vx_float32) * depth_output * output_w * output_h);
-    vx_float32_ptr buffer2 = (vx_float32_ptr)malloc(sizeof(vx_float32) * depth_output * output_w * output_h);
+    vx_float32_ptr buffer = (vx_float32_ptr)vxAllocateAndZeroMemory(sizeof(vx_float32) * depth_output * output_w * output_h);
+    vx_float32_ptr buffer2 = (vx_float32_ptr)vxAllocateAndZeroMemory(sizeof(vx_float32) * depth_output * output_w * output_h);
     vx_float32_ptr accum_buf = (vx_float32_ptr)buffer;
     vx_float32_ptr weights_buffer, bias_buffer;
     vx_int32 interleave_mode = vx_nnu_get_interleave(64, tile_x_size);
@@ -1242,7 +1004,7 @@ vx_status vxNNLayersC(vx_node node, vx_array cmd_buf, vx_weights_biases_paramete
         vx_int32 ideal_kernel_per_core = vx_nnu_get_kernel_per_core(64, interleave_mode, tile_y_size, depth_output);
 
         if (kernel_per_core != ideal_kernel_per_core)
-            printf("%s[%d] kernel per core(%d, ideal value = %d) error!\n", __FILE__, __LINE__, kernel_per_core, ideal_kernel_per_core);
+            gcmPRINT("%s[%d] kernel per core(%d, ideal value = %d) error!\n", __FILE__, __LINE__, kernel_per_core, ideal_kernel_per_core);
     }
 #endif
 
@@ -1268,7 +1030,7 @@ vx_status vxNNLayersC(vx_node node, vx_array cmd_buf, vx_weights_biases_paramete
 #endif
 
 #if NN_DEBUG_INFO
-    printf("    [REAL]tile_x = %d, tile_y = %d, interleave = %d, kernel_per_core = %d\n\n", tile_x_size, tile_y_size, interleave_mode, kernel_per_core);
+    gcmPRINT("    [REAL]tile_x = %d, tile_y = %d, interleave = %d, kernel_per_core = %d\n\n", tile_x_size, tile_y_size, interleave_mode, kernel_per_core);
 #endif
 
     Image3DConvJobs(interleave_mode, kernel_per_core, depth_output, tile_y_group,
@@ -1302,7 +1064,7 @@ vx_status vxNNLayersC(vx_node node, vx_array cmd_buf, vx_weights_biases_paramete
         vx_nnu_save_date(format, q, vx_nnu_get_date(VX_TYPE_FLOAT32, q, (vx_uint8_ptr)accum_buf), buffer2);
     }
 #if NN_DEBUG_LOCAL_COUNT
-    printf("debug_loop_count = %d\n", debug_loop_count);
+    gcmPRINT("debug_loop_count = %d\n", debug_loop_count);
 #endif
 
     if (insts->relu)
@@ -1356,11 +1118,11 @@ vx_status vxNNLayersC(vx_node node, vx_array cmd_buf, vx_weights_biases_paramete
     }
 #endif
 
-    free(buffer);
-    free(buffer2);
+    vxFree(buffer);
+    vxFree(buffer2);
 
-    if (weights_buffer)free(weights_buffer);
-    if (bias_buffer)free(bias_buffer);
+    if (weights_buffer) vxFree(weights_buffer);
+    if (bias_buffer) vxFree(bias_buffer);
 
     return status;
 }

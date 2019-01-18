@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -125,7 +125,7 @@ void vscVIR_InitializeBaseMsDFA(VIR_BASE_MS_DFA* pBaseMsDFA, VIR_CALL_GRAPH* pCg
     CG_ITERATOR     funcBlkIter;
     VIR_FUNC_BLOCK* pFuncBlk;
 
-    vscVIR_InitializeBaseDFA(&pBaseMsDFA->baseDFA, pCg, dfaType, flowSize, pMM);
+    vscVIR_InitializeBaseDFA(&pBaseMsDFA->baseDFA, pCg, dfaType, flowSize, pMM, pCg->pScratchMemPool);
 
     pBaseMsDFA->stateCount = stateCount;
 

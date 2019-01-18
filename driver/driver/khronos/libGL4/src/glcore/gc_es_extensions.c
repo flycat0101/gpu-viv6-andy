@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -74,7 +74,6 @@ __GLextension __glExtension[] =
     {__GL_EXTID_OES_texture_float, "GL_OES_texture_float", GL_FALSE, GL_FALSE},
     {__GL_EXTID_OES_primitive_bounding_box, "GL_OES_primitive_bounding_box", GL_FALSE, GL_TRUE},
 
-
     {__GL_EXTID_KHR_texture_compression_astc_hdr, "GL_KHR_texture_compression_astc_hdr", GL_FALSE, GL_FALSE},
     {__GL_EXTID_KHR_texture_compression_astc_ldr, "GL_KHR_texture_compression_astc_ldr", GL_FALSE, GL_FALSE},
     {__GL_EXTID_KHR_blend_equation_advanced, "GL_KHR_blend_equation_advanced", GL_FALSE, GL_TRUE},
@@ -119,32 +118,43 @@ __GLextension __glExtension[] =
 
     {__GL_EXTID_VIV_tex_direct, "GL_VIV_direct_texture", GL_FALSE, GL_FALSE},
 
+
 #ifdef OPENGL40
-    {__GL_EXTID_ARB_vertex_program, "GL_ARB_vertex_program", GL_FALSE, GL_FALSE},
-    {__GL_EXTID_ARB_vertex_buffer_object, "GL_ARB_vertex_buffer_object", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_ARB_shading_language_100, "GL_ARB_shading_language_100", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_ARB_shader_objects, "GL_ARB_shader_objects", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_texture_compression_s3tc, "GL_EXT_texture_compression_s3tc", GL_FALSE, GL_FALSE},
-    {__GL_EXTID_ARB_depth_texture, "GL_ARB_depth_texture", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_texture_shared_exponent, "GL_EXT_texture_shared_exponent", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_ARB_half_float_pixel, "GL_ARB_half_float_pixel", GL_FALSE, GL_FALSE},
-    {__GL_EXTID_packed_float, "GL_EXT_packed_float", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_texture_compression_latc, "GL_EXT_texture_compression_latc", GL_FALSE, GL_FALSE},
-    {__GL_EXTID_texture_compression_rgtc, "GL_EXT_texture_compression_rgtc", GL_FALSE, GL_FALSE},
-    {__GL_EXTID_texture_integer, "GL_EXT_texture_integer", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_texture_sRGB, "GL_EXT_texture_sRGB", GL_FALSE, GL_FALSE},
-    {__GL_EXTID_ARB_texture_float, "GL_ARB_texture_float", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_ARB_texture_array, "GL_EXT_texture_array", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_EXT_framebuffer_blit, "GL_EXT_framebuffer_blit", GL_TRUE, GL_FALSE},
     {__GL_EXTID_EXT_framebuffer_object, "GL_EXT_framebuffer_object", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_ARB_framebuffer_object, "GL_ARB_framebuffer_object", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_EXT_packed_float, "GL_EXT_packed_float", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_EXT_texture_compression_latc, "GL_EXT_texture_compression_latc", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_EXT_texture_compression_rgtc, "GL_EXT_texture_compression_rgtc", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_EXT_texture_integer, "GL_EXT_texture_integer", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_EXT_texture_shared_exponent, "GL_EXT_texture_shared_exponent", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_EXT_texture_sRGB, "GL_EXT_texture_sRGB", GL_FALSE, GL_FALSE},
     {__GL_EXTID_EXT_timer_query, "GL_EXT_timer_query", GL_TRUE, GL_FALSE},
+
+    {__GL_EXTID_ARB_color_buffer_float, "GL_ARB_color_buffer_float", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_ARB_depth_texture, "GL_ARB_depth_texture", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_framebuffer_object, "GL_ARB_framebuffer_object", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_half_float_pixel, "GL_ARB_half_float_pixel", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_ARB_shader_objects, "GL_ARB_shader_objects", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_shading_language_100, "GL_ARB_shading_language_100", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_texture_array, "GL_EXT_texture_array", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_ARB_texture_float, "GL_ARB_texture_float", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_vertex_buffer_object, "GL_ARB_vertex_buffer_object", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_vertex_program, "GL_ARB_vertex_program", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_ARB_window_pos, "GL_ARB_window_pos", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_texture_compression, "GL_ARB_texture_compression", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_multitexture, "GL_ARB_multitexture", GL_TRUE, GL_FALSE},
 #endif
+
     {__GL_EXTID_EXT_LAST, gcvNULL, GL_FALSE, GL_FALSE}
 };
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
-#else
+
 static __GLextProcAlias __glExtProcAlias[] =
 {
+    /* Extension API alias for GL_OES_mapbuffer */
+    {__GL_EXTID_OES_mapbuffer, "MapBufferOES", (__GLprocAddr)glMapBuffer},
+    {__GL_EXTID_OES_mapbuffer, "UnmapBufferOES", (__GLprocAddr)glUnmapBuffer},
+    {__GL_EXTID_OES_mapbuffer, "GetBufferPointervOES", (__GLprocAddr)glGetBufferPointerv},
+
     /* Extension API alias for GL_OES_texture_3D */
     {__GL_EXTID_OES_texture_3D, "TexImage3DOES", (__GLprocAddr)glTexImage3D},
     {__GL_EXTID_OES_texture_3D, "TexSubImage3DOES", (__GLprocAddr)glTexSubImage3D},
@@ -236,7 +246,7 @@ static __GLextProcAlias __glExtProcAlias[] =
     {__GL_EXTID_OES_draw_elements_base_vertex, "DrawElementsBaseVertexOES", (__GLprocAddr)glDrawElementsBaseVertex},
     {__GL_EXTID_OES_draw_elements_base_vertex, "DrawRangeElementsBaseVertexOES", (__GLprocAddr)glDrawRangeElementsBaseVertex},
     {__GL_EXTID_OES_draw_elements_base_vertex, "DrawElementsInstancedBaseVertexOES", (__GLprocAddr)glDrawElementsInstancedBaseVertex},
-    {__GL_EXTID_OES_draw_elements_base_vertex, "MultiDrawElementsBaseVertexOES", (__GLprocAddr)glMultiDrawElementsBaseVertexEXT},
+    {__GL_EXTID_OES_draw_elements_base_vertex, "MultiDrawElementsBaseVertexOES", (__GLprocAddr)glMultiDrawElementsBaseVertex},
 
     /* Extension API alias for GL_EXT_draw_elements_base_vertex */
     {__GL_EXTID_EXT_draw_elements_base_vertex, "DrawElementsBaseVertexEXT", (__GLprocAddr)glDrawElementsBaseVertex},
@@ -278,12 +288,40 @@ static __GLextProcAlias __glExtProcAlias[] =
     {__GL_EXTID_KHR_robustness, "GetnUniformivKHR", (__GLprocAddr)glGetnUniformiv},
     {__GL_EXTID_KHR_robustness, "GetnUniformuivKHR", (__GLprocAddr)glGetnUniformuiv},
 
-    /* Extension API alias for GL_EXT_robustness */
-    {__GL_EXTID_KHR_robustness, "GetGraphicsResetStatusEXT", (__GLprocAddr)glGetGraphicsResetStatus},
-    {__GL_EXTID_KHR_robustness, "ReadnPixelsEXT", (__GLprocAddr)glReadnPixels},
-    {__GL_EXTID_KHR_robustness, "GetnUniformfvEXT", (__GLprocAddr)glGetnUniformfv},
-    {__GL_EXTID_KHR_robustness, "GetnUniformivEXT", (__GLprocAddr)glGetnUniformiv},
+    /* Extension API alias for GL_EXT_multi_draw_arrays */
+    {__GL_EXTID_EXT_multi_draw_arrays, "MultiDrawArraysEXT", (__GLprocAddr)glMultiDrawArrays},
+    {__GL_EXTID_EXT_multi_draw_arrays, "MultiDrawElementsEXT", (__GLprocAddr)glMultiDrawElements},
 
+    /* Extension API alias for GL_EXT_robustness */
+    {__GL_EXTID_EXT_robustness, "GetGraphicsResetStatusEXT", (__GLprocAddr)glGetGraphicsResetStatus},
+    {__GL_EXTID_EXT_robustness, "ReadnPixelsEXT", (__GLprocAddr)glReadnPixels},
+    {__GL_EXTID_EXT_robustness, "GetnUniformfvEXT", (__GLprocAddr)glGetnUniformfv},
+    {__GL_EXTID_EXT_robustness, "GetnUniformivEXT", (__GLprocAddr)glGetnUniformiv},
+
+    /* Extension API alias for GL_EXT_framebuffer_object */
+    {__GL_EXTID_EXT_framebuffer_object, "IsRenderbufferEXT", (__GLprocAddr)glIsRenderbuffer},
+    {__GL_EXTID_EXT_framebuffer_object, "BindRenderbufferEXT", (__GLprocAddr)glBindRenderbuffer},
+    {__GL_EXTID_EXT_framebuffer_object, "DeleteRenderbuffersEXT", (__GLprocAddr)glDeleteRenderbuffers},
+    {__GL_EXTID_EXT_framebuffer_object, "GenRenderbuffersEXT", (__GLprocAddr)glGenRenderbuffers},
+    {__GL_EXTID_EXT_framebuffer_object, "RenderbufferStorageEXT", (__GLprocAddr)glRenderbufferStorage},
+    {__GL_EXTID_EXT_framebuffer_object, "GetRenderbufferParameterivEXT", (__GLprocAddr)glGetRenderbufferParameteriv},
+    {__GL_EXTID_EXT_framebuffer_object, "IsFramebufferEXT", (__GLprocAddr)glIsFramebuffer},
+    {__GL_EXTID_EXT_framebuffer_object, "BindFramebufferEXT", (__GLprocAddr)glBindFramebuffer},
+    {__GL_EXTID_EXT_framebuffer_object, "DeleteFramebuffersEXT", (__GLprocAddr)glDeleteFramebuffers},
+    {__GL_EXTID_EXT_framebuffer_object, "GenFramebuffersEXT", (__GLprocAddr)glGenFramebuffers},
+    {__GL_EXTID_EXT_framebuffer_object, "CheckFramebufferStatusEXT", (__GLprocAddr)glCheckFramebufferStatus},
+    {__GL_EXTID_EXT_framebuffer_object, "FramebufferTexture1DEXT", (__GLprocAddr)glFramebufferTexture1D},
+    {__GL_EXTID_EXT_framebuffer_object, "FramebufferTexture2DEXT", (__GLprocAddr)glFramebufferTexture2D},
+    {__GL_EXTID_EXT_framebuffer_object, "FramebufferTexture3DEXT", (__GLprocAddr)glFramebufferTexture3D},
+    {__GL_EXTID_EXT_framebuffer_object, "FramebufferRenderbufferEXT", (__GLprocAddr)glFramebufferRenderbuffer},
+    {__GL_EXTID_EXT_framebuffer_object, "GetFramebufferAttachmentParameterivEXT", (__GLprocAddr)glGetFramebufferAttachmentParameteriv},
+    {__GL_EXTID_EXT_framebuffer_object, "GenerateMipmapEXT", (__GLprocAddr)glGenerateMipmap},
+
+    /* Extension API alias for GL_EXT_framebuffer_blit */
+    {__GL_EXTID_EXT_framebuffer_object, "BlitFramebufferEXT", (__GLprocAddr)glBlitFramebuffer},
+
+#ifdef OPENGL40
+    /* Extension API alias for GL_ARB_vertex_buffer_object */
     {__GL_EXTID_ARB_vertex_buffer_object, "GenBuffers", (__GLprocAddr)glGenBuffers},
     {__GL_EXTID_ARB_vertex_buffer_object, "BindBuffer", (__GLprocAddr)glBindBuffer},
     {__GL_EXTID_ARB_vertex_buffer_object, "BufferData", (__GLprocAddr)glBufferData},
@@ -291,9 +329,11 @@ static __GLextProcAlias __glExtProcAlias[] =
     {__GL_EXTID_ARB_vertex_buffer_object, "DeleteBuffers", (__GLprocAddr)glDeleteBuffers},
     {__GL_EXTID_ARB_vertex_buffer_object, "IsBuffer", (__GLprocAddr)glIsBuffer},
 
+    /* Extension API alias for GL_ARB_vertex_program */
     {__GL_EXTID_ARB_vertex_program, "EnableVertexAttribArray", (__GLprocAddr)glEnableVertexAttribArray},
     {__GL_EXTID_ARB_vertex_program, "VertexAttribPointer", (__GLprocAddr)glVertexAttribPointer},
 
+    /* Extension API alias for GL_ARB_shader_objects */
     {__GL_EXTID_ARB_shader_objects, "CreateProgramObjectARB", (__GLprocAddr)glCreateProgram},
     {__GL_EXTID_ARB_shader_objects, "DeleteObjectARB", (__GLprocAddr)glDeleteObjectARB},
     {__GL_EXTID_ARB_shader_objects, "UseProgramObjectARB", (__GLprocAddr)glUseProgram},
@@ -308,10 +348,67 @@ static __GLextProcAlias __glExtProcAlias[] =
     {__GL_EXTID_ARB_shader_objects, "Uniform4fARB", (__GLprocAddr)glUniform4f},
     {__GL_EXTID_ARB_shader_objects, "Uniform1iARB", (__GLprocAddr)glUniform1i},
 
+    /* Extension API alias for GL_ARB_color_buffer_float */
+    {__GL_EXTID_ARB_color_buffer_float, "ClampColorARB", (__GLprocAddr)glClampColor},
+
+    /* Extension API alias for GL_ARB_window_pos */
+    {__GL_EXTID_ARB_window_pos, "WindowPos2dARB", (__GLprocAddr)glWindowPos2d},
+    {__GL_EXTID_ARB_window_pos, "WindowPos2dvARB", (__GLprocAddr)glWindowPos2dv},
+    {__GL_EXTID_ARB_window_pos, "WindowPos2fARB", (__GLprocAddr)glWindowPos2f},
+    {__GL_EXTID_ARB_window_pos, "WindowPos2fvARB", (__GLprocAddr)glWindowPos2fv},
+    {__GL_EXTID_ARB_window_pos, "WindowPos2iARB", (__GLprocAddr)glWindowPos2d},
+    {__GL_EXTID_ARB_window_pos, "WindowPos2ivARB", (__GLprocAddr)glWindowPos2dv},
+    {__GL_EXTID_ARB_window_pos, "WindowPos2sARB", (__GLprocAddr)glWindowPos2s},
+    {__GL_EXTID_ARB_window_pos, "WindowPos2svARB", (__GLprocAddr)glWindowPos2sv},
+    {__GL_EXTID_ARB_window_pos, "WindowPos3dARB", (__GLprocAddr)glWindowPos3d},
+    {__GL_EXTID_ARB_window_pos, "WindowPos3dvARB", (__GLprocAddr)glWindowPos3dv},
+    {__GL_EXTID_ARB_window_pos, "WindowPos3fARB", (__GLprocAddr)glWindowPos3f},
+    {__GL_EXTID_ARB_window_pos, "WindowPos3fvARB", (__GLprocAddr)glWindowPos3fv},
+    {__GL_EXTID_ARB_window_pos, "WindowPos3iARB", (__GLprocAddr)glWindowPos3d},
+    {__GL_EXTID_ARB_window_pos, "WindowPos3ivARB", (__GLprocAddr)glWindowPos3dv},
+    {__GL_EXTID_ARB_window_pos, "WindowPos3sARB", (__GLprocAddr)glWindowPos3s},
+    {__GL_EXTID_ARB_window_pos, "WindowPos3svARB", (__GLprocAddr)glWindowPos3sv},
+
+    {__GL_EXTID_ARB_texture_compression, "GetCompressedTexImageARB", (__GLprocAddr)glGetCompressedTexImage},
+
+    {__GL_EXTID_ARB_multitexture, "ActiveTextureARB", (__GLprocAddr)glActiveTexture},
+    {__GL_EXTID_ARB_multitexture, "ClientActiveTextureARB", (__GLprocAddr)glClientActiveTexture},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord1dARB", (__GLprocAddr)glMultiTexCoord1d},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord1dvARB", (__GLprocAddr)glMultiTexCoord1dv},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord1fARB", (__GLprocAddr)glMultiTexCoord1f},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord1fvARB", (__GLprocAddr)glMultiTexCoord1fv},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord1iARB", (__GLprocAddr)glMultiTexCoord1i},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord1ivARB", (__GLprocAddr)glMultiTexCoord1iv},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord1sARB", (__GLprocAddr)glMultiTexCoord1s},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord1svARB", (__GLprocAddr)glMultiTexCoord1sv},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord2dARB", (__GLprocAddr)glMultiTexCoord2d},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord2dvARB", (__GLprocAddr)glMultiTexCoord2dv},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord2fARB", (__GLprocAddr)glMultiTexCoord2f},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord2fvARB", (__GLprocAddr)glMultiTexCoord2fv},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord2iARB", (__GLprocAddr)glMultiTexCoord2i},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord2ivARB", (__GLprocAddr)glMultiTexCoord2iv},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord2sARB", (__GLprocAddr)glMultiTexCoord2s},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord2svARB", (__GLprocAddr)glMultiTexCoord2sv},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord3dARB", (__GLprocAddr)glMultiTexCoord3d},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord3dvARB", (__GLprocAddr)glMultiTexCoord3dv},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord3fARB", (__GLprocAddr)glMultiTexCoord3f},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord3fvARB", (__GLprocAddr)glMultiTexCoord3fv},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord3iARB", (__GLprocAddr)glMultiTexCoord3i},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord3ivARB", (__GLprocAddr)glMultiTexCoord3iv},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord3sARB", (__GLprocAddr)glMultiTexCoord3s},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord3svARB", (__GLprocAddr)glMultiTexCoord3sv},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord4dARB", (__GLprocAddr)glMultiTexCoord4d},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord4dvARB", (__GLprocAddr)glMultiTexCoord4dv},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord4fARB", (__GLprocAddr)glMultiTexCoord4f},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord4fvARB", (__GLprocAddr)glMultiTexCoord4fv},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord4iARB", (__GLprocAddr)glMultiTexCoord4i},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord4ivARB", (__GLprocAddr)glMultiTexCoord4iv},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord4sARB", (__GLprocAddr)glMultiTexCoord4s},
+    {__GL_EXTID_ARB_multitexture, "MultiTexCoord4svARB", (__GLprocAddr)glMultiTexCoord4sv},
+#endif
 
     {__GL_EXTID_EXT_LAST, gcvNULL, gcvNULL}
 };
-#endif
 
 extern const GLuint __glProcTabSize;
 
@@ -320,7 +417,7 @@ __GLprocAddr __glGetProcAddr(const GLchar *procName)
     const __GLprocInfo *procInfo = gcvNULL;
     __GLextProcAlias *curAlias;
     const GLchar *apiName;
-    GLsizei i;
+    GLuint i;
 
     /* Skip invalid names first */
     if (!procName || procName[0] != 'g' || procName[1] != 'l' || procName[2] == '\0')
@@ -330,8 +427,7 @@ __GLprocAddr __glGetProcAddr(const GLchar *procName)
 
     /* Skip the first two characters "gl" of procName */
     apiName = procName + 2;
-#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
-#else
+
     /* Find in __glExtFuncAlias[] table first */
     for (curAlias = __glExtProcAlias; curAlias->index < __GL_EXTID_EXT_LAST; ++curAlias)
     {
@@ -340,7 +436,6 @@ __GLprocAddr __glGetProcAddr(const GLchar *procName)
             return curAlias->func;
         }
     }
-#endif
 
     /* Find API function's offset in __glProcInfoTable[] table */
     for (i = 0; i < __glProcTabSize; ++i)

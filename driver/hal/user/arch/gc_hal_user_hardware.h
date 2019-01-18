@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -34,7 +34,7 @@ extern "C" {
 #define gcvINVALID_TEXTURE_FORMAT   ((gctUINT)(gceSURF_FORMAT) -1)
 #define gcvINVALID_RENDER_FORMAT    ((gctUINT)(gceSURF_FORMAT) -1)
 
-#define gcmTO_CHIP_ID(CoreID) (Hardware->chipIDs[CoreID])
+#define gcmTO_CHIP_ID(Index) (Hardware->chipIDs[Hardware->coreIndexs[Index]])
 
 #define gcmENABLE3DCORE(Memory, CoreId) \
 { \
@@ -169,6 +169,19 @@ typedef struct _gcsCENTROIDS
 }
 gcsCENTROIDS;
 
+typedef struct _gcsUNIFORM_STATE
+{
+    gctUINT32 address;
+    gctUINT32 data[gcdMAX_3DGPU_COUNT][4];
+    gctUINT32 combinedDirty;
+    struct _gcsUNIFORM_STATE_INFO
+    {
+        gctUINT32                         dirty   : 4;  /* 4 component */
+        gctUINT32                         type    : 4;  /* shader type count */
+        gctUINT32                         index   : 24; /* constMax */
+    } info;
+}
+gcsUNIFORM_STATE;
 #endif
 
 #if gcdSYNC
@@ -234,7 +247,7 @@ typedef struct _gcsHARDWARE_CONFIG
 
     gceCHIP_FLAG                chipFlags;
 
-    gctUINT32                   platformFlagBits;
+    gctUINT64                   platformFlagBits;
 
     /* Data extracted from specs bits. */
 #if gcdENABLE_3D
@@ -249,6 +262,14 @@ typedef struct _gcsHARDWARE_CONFIG
     gctUINT32                   pixelPipes;
     gctUINT32                   resolvePipes;
     gctUINT32                   gpuCoreCount;
+    gctUINT32                   clusterCount;
+    gctINT32                    clusterMaxID;
+    gctINT32                    clusterMinID;
+    gctUINT32                   clusterIDWidth;
+    gctUINT32                   clusterAliveMask; /* physical cluster mask really enabled, may not all clusters */
+    gctUINT32                   uscCacheControllers;
+    gctUINT32                   uscBanks;
+    const gctCHAR               *productName;
 #if gcdENABLE_3D
     gctUINT32                   vertexOutputBufferSize;
     /* gcChipSpecs2. */
@@ -279,7 +300,7 @@ typedef struct _gcsHARDWARE_CONFIG
     gctUINT                     vsInstMax;
     gctUINT                     psInstMax;
     gctUINT                     instMax;
-    gctUINT                     uscPagesMaxInKbyte;
+    gctUINT                     uscPagesMaxInKbyte; /* always same as localStorageSizeInKbyte */
     gctUINT                     resultWindowMaxSize;
 
     /* Info not in features/specs. */
@@ -291,8 +312,8 @@ typedef struct _gcsHARDWARE_CONFIG
 
     gctUINT32                   superTileMode;
 
+    gctUINT32                   sRAMSizes[gcvSRAM_COUNT];
 #if gcdENABLE_3D && gcdUSE_VX
-    /* Info of NN */
     vx_nn_config                nnConfig;
 #endif
 }
@@ -552,10 +573,18 @@ typedef struct _gcsSHSTATES
 
     /* Rounding mode */
     gctBOOL                     rtneRounding;
+
+    /*record the const/sampler count when program shader uniform/sampler allocation size*/
+    gctUINT                     constCount;
+    gctUINT                     samplerCount;
+
 #if gcdALPHA_KILL_IN_SHADER
     gctBOOL                     alphaKill;
     gctBOOL                     colorKill;
 #endif
+    gcsUNIFORM_STATE*           uniformStatesPool;
+    gctUINT32*                  uniformStatesIndex;
+    gctUINT32                   uniformBindCount;
 }gcsSHSTATES;
 
 /******** SH dirty ********************************
@@ -564,6 +593,7 @@ typedef struct _gcsSHDIRTY
 {
     gctBOOL                     shaderDirty;
     gctBOOL                     programSwitched;
+    gctBOOL                     uniformDirty;
 }gcsSHDIRTY;
 
 /********* PE states *********************************
@@ -721,6 +751,7 @@ typedef struct _gcsTXDIRTY
     gctUINT32                   hwTxSamplerDirty;
 
     /* Texture descriptor setting */
+    gcsBITMASK                  hwSamplerBindDirty;
     gcsBITMASK                  hwSamplerControl0Dirty;
     gcsBITMASK                  hwSamplerControl1Dirty;
     gcsBITMASK                  hwSamplerLodMinMaxDirty;
@@ -854,6 +885,7 @@ struct _gcoHARDWARE
     gcsSTATE_DELTA_PTR          delta;
 
     gcsSTATE_DELTA_PTR          *deltas;
+    gcsSTATE_DELTA_PTR          tempDelta;
 
     /* Count of deltas it is needed because gpuCoreCount will be changed. */
     gctUINT32                    deltasCount;
@@ -861,7 +893,6 @@ struct _gcoHARDWARE
     /* Chip configuration. */
     gcsHARDWARE_CONFIG *        config;
     gctBOOL                     features[gcvFEATURE_COUNT];
-    gctBOOL                     swwas[gcvSWWA_COUNT];
     gcsHAL_QUERY_CHIP_OPTIONS   options;
 
     gctUINT32                   mcClk;
@@ -946,6 +977,9 @@ struct _gcoHARDWARE
     /* State to collect flushL2 requests, and process it at draw time. */
     gctBOOL                     flushL2;
 
+    /* State to collect flush vertex data cache requests, and process it at draw time. */
+    gctBOOL                     flushVtxData;
+
     gcsHARDWARE_ExeFuncs        *funcPtr;
 
     /* Previsous states. */
@@ -984,6 +1018,12 @@ struct _gcoHARDWARE
     gcsMCDIRTY                  *MCDirty;
     gcsTXDIRTY                  *TXDirty;
     gcsXFBDIRTY                 *XFBDirty;
+
+    /* MCFE semaphore handles. */
+    gctUINT32 *                 mcfeSemaBitmap;
+    gctUINT32                   mcfeSemaCapacity;
+    gctUINT32                   mcfeSemaFreeCount;
+    gctUINT32                   currentMcfeSemaHandle;
 #endif /* gcdENABLE_3D */
 
     gctBOOL                     multiGPURenderingModeDirty;
@@ -1076,7 +1116,6 @@ struct _gcoHARDWARE
     gctBOOL                     notAdjustRotation;
 
 #if gcdDUMP
-    gctUINT32                   contextPhysical[gcdCONTEXT_BUFFER_COUNT];
     gctPOINTER                  contextLogical[gcdCONTEXT_BUFFER_COUNT];
     gctUINT32                   contextBytes;
     gctUINT8                    currentContext;
@@ -1085,6 +1124,9 @@ struct _gcoHARDWARE
 #if gcdDUMP_2D
     gctUINT32                   newDump2DLevel;
 #endif
+
+    /* baseAddr for old MMU without MC20 feature */
+    gctUINT32                   baseAddr;
 
     /* Flat mapping range. */
     gctUINT32                   flatMappingRangeCount;
@@ -1129,6 +1171,12 @@ gcoHARDWARE_ComputeCentroids(
 /* Flush the vertex caches. */
 gceSTATUS
 gcoHARDWARE_FlushL2Cache(
+    IN gcoHARDWARE Hardware,
+    INOUT gctPOINTER *Memory
+    );
+
+gceSTATUS
+gcoHARDWARE_FlushVtxDataCache(
     IN gcoHARDWARE Hardware,
     INOUT gctPOINTER *Memory
     );
@@ -1192,12 +1240,10 @@ gcoHARDWARE_FlushDepthOnly(
     IN gcoHARDWARE Hardware
     );
 
-/* Flush shader video memory node. */
 gceSTATUS
-gcoHARDWARE_FlushShaderVidMemNode(
+gcoHARDWARE_FlushUniform(
     IN gcoHARDWARE Hardware,
-    IN gcsHINT_PTR Hints,
-    INOUT gctPOINTER *Memory
+    IN OUT gctPOINTER *Memory
     );
 
 gceSTATUS
@@ -1222,6 +1268,7 @@ gcoHARDWARE_FlushXfb(
 gceSTATUS
 gcoHARDWARE_FlushDrawID(
     IN gcoHARDWARE Hardware,
+    IN gctBOOL ForComputing,
     INOUT gctPOINTER *Memory
     );
 
@@ -1733,21 +1780,6 @@ gcoHARDWARE_ConvertPixel(
     IN gctBOOL TrgPixelOdd
     );
 
-/* Enable or disable anti-aliasing. */
-gceSTATUS
-gcoHARDWARE_SetAntiAlias(
-    IN gcoHARDWARE Hardware,
-    IN gctBOOL Enable
-    );
-
-/* Write data into the command buffer. */
-gceSTATUS
-gcoHARDWARE_WriteBuffer(
-    IN gcoHARDWARE Hardware,
-    IN gctCONST_POINTER Data,
-    IN gctSIZE_T Bytes,
-    IN gctBOOL Aligned
-    );
 
 #if gcdENABLE_3D
 typedef enum _gceTILE_STATUS_CONTROL
@@ -1803,6 +1835,17 @@ gcoHARDWARE_ProgramResolve(
     );
 
 #endif /* gcdENABLE_3D */
+
+/* Program the Probe command and address to control probe counter. */
+gceSTATUS
+gcoHARDWARE_ProgramProbe(
+    IN gcoHARDWARE Hardware,
+    IN gceProbeCmd Cmd,
+    IN gctUINT32 ProbeAddress,
+    IN gctINT32 Module,
+    IN gctINT32 Counter,
+    INOUT gctPOINTER *Memory
+    );
 
 /* Load one 32-bit state. */
 gceSTATUS
@@ -1924,7 +1967,8 @@ extern const gcsSTATEMIRROR mirroredStates[];
 extern gctUINT mirroredStatesCount;
 
 /* Update the state delta. */
-static gcmINLINE void gcoHARDWARE_UpdateDelta(
+static gcmINLINE void
+gcoHARDWARE_UpdateDelta(
     IN gcsSTATE_DELTA_PTR StateDelta,
     IN gctUINT32 Address,
     IN gctUINT32 Mask,
@@ -1937,6 +1981,11 @@ static gcmINLINE void gcoHARDWARE_UpdateDelta(
     gctUINT32_PTR mapEntryIndex;
     gctUINT deltaID;
     gctUINT32 i;
+
+    if (!StateDelta)
+    {
+        return;
+    }
 
     /* Get the current record array. */
     recordArray = (gcsSTATE_DELTA_RECORD_PTR)(gcmUINT64_TO_PTR(StateDelta->recordArray));
@@ -2001,7 +2050,64 @@ static gcmINLINE void gcoHARDWARE_UpdateDelta(
     }
 }
 
-static gcmINLINE void gcoHARDWARE_CopyDelta(
+static gcmINLINE void
+gcoHARDWARE_UpdateTempDelta(
+    IN gcoHARDWARE Hardware
+    )
+{
+    gcsSTATE_DELTA_PTR tempDelta = Hardware->tempDelta;
+    gcsSTATE_DELTA_PTR currentDelta = Hardware->delta;
+    gctUINT count;
+    gctUINT i;
+    gcsSTATE_DELTA_RECORD_PTR record;
+
+    if (tempDelta == NULL)
+        return;
+
+    /* Get the record count. */
+    count = tempDelta->recordCount;
+
+    /* Set the first record. */
+    record = (gcsSTATE_DELTA_RECORD_PTR)gcmUINT64_TO_PTR(tempDelta->recordArray);
+
+    /* Go through all records. */
+    for (i = 0; i < count; i += 1)
+    {
+        /* Update the delta. */
+        gcoHARDWARE_UpdateDelta(
+            currentDelta, record->address, record->mask, record->data
+            );
+
+        /* Advance to the next state. */
+        record += 1;
+    }
+    /* Update the element count. */
+    if (tempDelta->elementCount != 0)
+    {
+        currentDelta->elementCount = tempDelta->elementCount;
+    }
+
+    /* Reset tempDelta*/
+    tempDelta->id += 1;
+
+    if (tempDelta->id == 0)
+    {
+        /* Reset the map to avoid erroneous ID matches. */
+        gcoOS_ZeroMemory(gcmUINT64_TO_PTR(tempDelta->mapEntryID), tempDelta->mapEntryIDSize);
+
+        /* Increment the main ID to avoid matches after reset. */
+        tempDelta->id += 1;
+    }
+
+    /* Reset the vertex element count. */
+    tempDelta->elementCount = 0;
+
+    /* Reset the record count. */
+    tempDelta->recordCount = 0;
+}
+
+static gcmINLINE void
+gcoHARDWARE_CopyDelta(
     IN gcsSTATE_DELTA_PTR DestStateDelta,
     IN gcsSTATE_DELTA_PTR SrcStateDelta
     )
@@ -2022,15 +2128,6 @@ static gcmINLINE void gcoHARDWARE_CopyDelta(
 
 gceSTATUS gcoHARDWARE_InitializeFormatArrayTable(
     IN gcoHARDWARE Hardware
-    );
-
-gceSTATUS
-gcoHARDWARE_3DBlitCopy(
-    IN gcoHARDWARE Hardware,
-    IN gceENGINE Engine,
-    IN gctUINT32 SrcAddress,
-    IN gctUINT32 DestAddress,
-    IN gctUINT32 CopySize
     );
 
 gceSTATUS

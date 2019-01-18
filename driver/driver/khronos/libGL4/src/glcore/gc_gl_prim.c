@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -11,6 +11,7 @@
 *****************************************************************************/
 
 
+#ifdef OPENGL40
 #include "gc_es_context.h"
 #include "g_asmoff.h"
 #include "api/gc_gl_api_inline.c"
@@ -346,7 +347,7 @@ GLvoid __glValidateImmedBegin(__GLcontext *gc, GLenum mode)
     gc->input.indexPrimEnabled = GL_FALSE;
 }
 
-__GL_INLINE GLuint64 __glInputMask2InconsisFormat(GLuint mask)
+__GL_INLINE GLuint64 __glInputMask2InconsisFormat(GLuint64 mask)
 {
     GLuint i = 0;
     GLuint64 formatMask = 0;
@@ -383,7 +384,7 @@ __GL_INLINE GLuint __glVertexFormat2InputMask(GLuint64 formatMask)
 GLvoid __glComputePrimitiveData(__GLcontext *gc)
 {
     GLuint i, vE;
-    GLuint inputMask;
+    GLuint64 inputMask;
 
     if (gc->input.inconsistentFormat)
     {
@@ -436,9 +437,9 @@ GLvoid __glComputeRequiredInputMask(__GLcontext *gc)
     GLbitfield textureEnableMask;
     __GLTextureEnableState *texUnitEnable;
     __GLtextureUnitState *texUnitState;
-    GLuint vsInputMask = 0;
+    GLuint64 vsInputMask = 0;
     GLuint psInputMask = 0;
-    GLuint totalInputMask = 0;
+    GLuint64 totalInputMask = 0;
 
     if (gc->shaderProgram.vertShaderEnable)
     {
@@ -601,15 +602,15 @@ GLvoid __glComputeRequiredInputMaskInstancedEXT(__GLcontext *gc)
     GLbitfield textureEnableMask;
     __GLTextureEnableState *texUnitEnable;
     __GLtextureUnitState *texUnitState;
-    GLuint vsInputMask = 0;
+    GLuint64 vsInputMask = 0;
     GLuint psInputMask = 0;
-    GLuint totalInputMask = 0;
+    GLuint64 totalInputMask = 0;
 
     if (gc->shaderProgram.vertShaderEnable)
     {
         if(gc->shaderProgram.currentProgram)
         {
-            vsInputMask = gc->shaderProgram.currentProgram->bindingInfo.vsInputArrayMask;
+            vsInputMask = gc->shaderProgram.currentProgram->bindingInfo.vsInputMask;
         }
         else
         {
@@ -747,7 +748,8 @@ GLvoid __glComputeRequiredInputMaskInstancedEXT(__GLcontext *gc)
 
 GLvoid __glFillMissingAttributes(__GLcontext *gc)
 {
-    GLuint inputMask, i, vertexIndex, index, dstStride;
+    GLuint i, vertexIndex, index, dstStride;
+    GLuint64 inputMask;
     __GLvertexInput *input;
     GLfloat *src, *dst;
 
@@ -824,7 +826,8 @@ GLvoid __glFillMissingAttributes(__GLcontext *gc)
 
 GLvoid __glDuplicateVertexAttributes(__GLcontext *gc)
 {
-    GLuint inputMask, i, j, vertexIndex, index, dstStride;
+    GLuint i, j, vertexIndex, index, dstStride;
+    GLuint64 inputMask;
     __GLvertexInput *input;
     GLfloat *src, *dst;
 
@@ -909,7 +912,8 @@ GLvoid __glDuplicateVertexAttributes(__GLcontext *gc)
 GLvoid __glImmedUpdateVertexState(__GLcontext *gc)
 {
     __GLvertexInput *input;
-    GLuint i, mask;
+    GLuint i;
+    GLuint64 mask;
 
     mask = (gc->input.primInputMask & ~(__GL_INPUT_VERTEX | __GL_INPUT_EDGEFLAG));
 
@@ -1136,7 +1140,7 @@ GLvoid __glGenerateVertexIndex(__GLcontext *gc)
 
 GLvoid __glImmedFlushBuffer_Material(__GLcontext *gc)
 {
-    GLuint inputMask;
+    GLuint64 inputMask;
     GLint  i;
 
     /* Cache current primElemSequence and preVertexFormat in gc->input */
@@ -1172,7 +1176,8 @@ GLvoid __glSwitchToNewPrimtiveFormat_Material(__GLcontext *gc, GLuint attFmtIdx)
 {
     GLuint attInpIdx = fmtIndex2InputIndex[attFmtIdx];
     GLuint dataSize, origTotalStrideDW, i, j;
-    GLuint inputMask, formatMask, lastVertexIndex, inputTag;
+    GLuint formatMask, lastVertexIndex, inputTag;
+    GLuint64 inputMask;
     GLfloat *lastVertexBlock, *src, *dst;
     GLuint inputOffsetDW[__GL_TOTAL_VERTEX_ATTRIBUTES] = {0};
     GLuint inputSize[__GL_TOTAL_VERTEX_ATTRIBUTES] = {0};
@@ -1200,7 +1205,7 @@ GLvoid __glSwitchToNewPrimtiveFormat_Material(__GLcontext *gc, GLuint attFmtIdx)
 
 
     /* Change the primitive format to include the new attribute */
-    gc->input.primInputMask |= (__GL_ONE_32 << attInpIdx);
+    gc->input.primInputMask |= (__GL_ONE_64 << attInpIdx);
     gc->input.preVertexFormat |= (__GL_ONE_64 << attFmtIdx);
     gc->input.primitiveFormat = gc->input.preVertexFormat;
     gc->input.currentInput[attInpIdx].sizeDW = fmtIndex2DWSize[attFmtIdx];
@@ -1230,7 +1235,7 @@ GLvoid __glSwitchToNewPrimtiveFormat_Material(__GLcontext *gc, GLuint attFmtIdx)
     j = 0;
     formatMask = __glVertexFormat2InputMask(gc->input.vertexFormat);
     inputMask = formatMask & ~(__GL_INPUT_VERTEX | __GL_INPUT_EDGEFLAG);
-    inputMask &= ~(__GL_ONE_32 << attInpIdx);
+    inputMask &= ~(__GL_ONE_64 << attInpIdx);
     gc->input.vertexFormat = 0;
     while (inputMask)
     {
@@ -1284,7 +1289,8 @@ GLvoid __glSwitchToNewPrimtiveFormat_Material(__GLcontext *gc, GLuint attFmtIdx)
 GLvoid __glSwitchToInconsistentFormat_Material(__GLcontext *gc)
 {
     GLuint dataSize, newTotalStrideDW, origTotalStrideDW, i, j;
-    GLuint inputMask, formatMask, lastVertexIndex, inputTag;
+    GLuint formatMask, lastVertexIndex, inputTag;
+    GLuint64 inputMask;
     GLfloat *LastVert, *src, *dst;
     GLuint inputOffsetDW[__GL_TOTAL_VERTEX_ATTRIBUTES] = {0};
     GLuint inputSize[__GL_TOTAL_VERTEX_ATTRIBUTES] = {0};
@@ -1390,11 +1396,11 @@ GLvoid __glSwitchToInconsistentFormat_Material(__GLcontext *gc)
 */
 GLvoid __glImmediateFlushBuffer(__GLcontext *gc)
 {
-    GLuint64 primElemSequence;
-    GLuint startIndex, endIndex, inputMask;
+    GLuint64 primElemSequence, inputMask;
+    GLuint startIndex, endIndex;
     GLint vertexCount, connectCount = 0, i;
 
-    if(gc->currentImmediateTable->End == __glim_End_Material)
+    if(gc->immedModeDispatch.End == __glim_End_Material)
     {
         __glImmedFlushBuffer_Material(gc);
         return;
@@ -1580,7 +1586,7 @@ GLvoid __glConsistentFormatChange(__GLcontext *gc)
     GLuint i, j, lastVertexIndex, dataSize;
     GLuint inputMask, formatMask, inputTag;
 
-    if(gc->currentImmediateTable->End == __glim_End_Material)
+    if(gc->immedModeDispatch.End == __glim_End_Material)
     {
         GL_ASSERT(0);
     }
@@ -1637,10 +1643,11 @@ GLvoid __glSwitchToNewPrimtiveFormat(__GLcontext *gc, GLuint attFmtIdx)
     GLuint64 primElemSequence = gc->input.primElemSequence;
     GLuint attInpIdx = fmtIndex2InputIndex[attFmtIdx];
     GLuint numVertex, dataSize, newTotalStrideDW, origTotalStrideDW, i, j;
-    GLuint inputMask, formatMask, lastVertexIndex, inputTag, col4ub = 0;
+    GLuint formatMask, lastVertexIndex, inputTag, col4ub = 0;
+    GLuint64 inputMask;
     GLfloat *curPrimPtr, *src, *dst, *cur;
 
-    if(gc->currentImmediateTable->End == __glim_End_Material)
+    if(gc->immedModeDispatch.End == __glim_End_Material)
     {
         __glSwitchToNewPrimtiveFormat_Material(gc, attFmtIdx);
         return;
@@ -1689,7 +1696,7 @@ GLvoid __glSwitchToNewPrimtiveFormat(__GLcontext *gc, GLuint attFmtIdx)
     /* Change the primitive format to include the new attribute */
     gc->input.vertex.index = numVertex;
     gc->input.vertTotalStrideDW = newTotalStrideDW;
-    gc->input.primInputMask |= (__GL_ONE_32 << attInpIdx);
+    gc->input.primInputMask |= (__GL_ONE_64 << attInpIdx);
     gc->input.preVertexFormat |= (__GL_ONE_64 << attFmtIdx);
     gc->input.primitiveFormat = gc->input.preVertexFormat;
 
@@ -1802,12 +1809,13 @@ GLvoid __glSwitchToNewPrimtiveFormat(__GLcontext *gc, GLuint attFmtIdx)
 GLvoid __glSwitchToInconsistentFormat(__GLcontext *gc)
 {
     GLuint numVertex, dataSize, newTotalStrideDW, origTotalStrideDW, i, j, k;
-    GLuint inputMask, formatMask, lastVertexIndex, inputTag;
+    GLuint formatMask, lastVertexIndex, inputTag;
+    GLuint64 inputMask;
     GLfloat *curPrimPtr, *src, *dst;
     GLuint inputOffsetDW[__GL_TOTAL_VERTEX_ATTRIBUTES] = {0};
     GLuint inputSize[__GL_TOTAL_VERTEX_ATTRIBUTES] = {0};
 
-    if(gc->currentImmediateTable->End == __glim_End_Material)
+    if(gc->immedModeDispatch.End == __glim_End_Material)
     {
          __glSwitchToInconsistentFormat_Material(gc);
          return;
@@ -2120,8 +2128,6 @@ GLvoid __glFreeVertexInputState(__GLcontext *gc)
         (*gc->imports.free)(gc, gc->input.edgeflag.pointer);
         gc->input.edgeflag.pointer = NULL;
     }
-
-    __GL_SET_VARRAY_STOP_CACHE_BIT(gc);
 }
 
 /* Allocate twice the size of the maximum vertices to facilitate the clipping */
@@ -2191,3 +2197,4 @@ GLboolean __glFreeImmedCacheInVideoMemory(__GLcontext *gc)
 {
     return GL_TRUE;
 }
+#endif

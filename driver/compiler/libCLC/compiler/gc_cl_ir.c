@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -127,6 +127,7 @@ clsDECL *Decl
       case clvTYPE_IMAGE2D_ARRAY_T:
       case clvTYPE_IMAGE1D_ARRAY_T:
       case clvTYPE_IMAGE1D_BUFFER_T:
+      case clvTYPE_VIV_GENERIC_IMAGE_T:
          if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
              gcmOPT_oclUseImgIntrinsicQuery()) {
              alignment = 16;
@@ -241,6 +242,7 @@ clGetElementTypeName(IN cltELEMENT_TYPE ElementType)
     case clvTYPE_IMAGE1D_T:         return "image1d_t";
     case clvTYPE_IMAGE1D_ARRAY_T:   return "image1d_array_t";
     case clvTYPE_IMAGE1D_BUFFER_T:  return "image1d_buffer_t";
+    case clvTYPE_VIV_GENERIC_IMAGE_T: return "viv_generic_image_t";
 
 
     case clvTYPE_STRUCT:            return "struct";
@@ -316,6 +318,47 @@ IN cltQUALIFIER Qualifier
         gcmASSERT(0);
         return "invalid";
     }
+}
+
+void
+clGetPointedToAddrSpace(
+clsDECL *Decl,
+cltQUALIFIER *AddrSpaceQualifier
+)
+{
+    if(clmDECL_IsPointerType(Decl)) {
+        clsTYPE_QUALIFIER *nextDscr;
+        clsTYPE_QUALIFIER *prevDscr;
+
+        FOR_EACH_SLINK_NODE(Decl->ptrDscr, clsTYPE_QUALIFIER, prevDscr, nextDscr) {
+            if(nextDscr->type == T_EOF) break;
+            switch(nextDscr->type) {
+            case T_CONSTANT:
+            case T_LOCAL:
+            case T_GLOBAL:
+            case T_PRIVATE:
+                *AddrSpaceQualifier = nextDscr->qualifier;
+                break;
+
+            default:
+                break;
+            }
+        }
+    }
+
+    return;
+}
+
+cltQUALIFIER
+clGetAddrSpaceQualifier(
+clsDECL *Decl
+)
+{
+    cltQUALIFIER addrSpaceQualifier = Decl->dataType->addrSpaceQualifier;
+
+    clGetPointedToAddrSpace(Decl,
+                            &addrSpaceQualifier);
+    return addrSpaceQualifier;
 }
 
 gceSTATUS
@@ -645,6 +688,7 @@ IN clsDECL *Decl
       case clvTYPE_IMAGE2D_ARRAY_T:
       case clvTYPE_IMAGE1D_ARRAY_T:
       case clvTYPE_IMAGE1D_BUFFER_T:
+      case clvTYPE_VIV_GENERIC_IMAGE_T:
          if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
              gcmOPT_oclUseImgIntrinsicQuery()) {
              size = 32;
@@ -814,6 +858,7 @@ OUT gctBOOL *Packed
       case clvTYPE_IMAGE2D_ARRAY_T:
       case clvTYPE_IMAGE1D_ARRAY_T:
       case clvTYPE_IMAGE1D_BUFFER_T:
+      case clvTYPE_VIV_GENERIC_IMAGE_T:
          if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
              gcmOPT_oclUseImgIntrinsicQuery()) {
              size = 32;
@@ -984,6 +1029,7 @@ IN clsDECL *Decl
    case clvTYPE_IMAGE2D_ARRAY_T:
    case clvTYPE_IMAGE1D_ARRAY_T:
    case clvTYPE_IMAGE1D_BUFFER_T:
+   case clvTYPE_VIV_GENERIC_IMAGE_T:
       if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
           gcmOPT_oclUseImgIntrinsicQuery()) {
           size = 32;
@@ -1078,6 +1124,7 @@ cltELEMENT_TYPE ElementType
       case clvTYPE_IMAGE2D_ARRAY_T:
       case clvTYPE_IMAGE1D_ARRAY_T:
       case clvTYPE_IMAGE1D_BUFFER_T:
+      case clvTYPE_VIV_GENERIC_IMAGE_T:
         if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
             gcmOPT_oclUseImgIntrinsicQuery()) {
              size = 32;
@@ -1254,6 +1301,7 @@ IN clsDECL * Decl
     case clvTYPE_IMAGE2D_ARRAY_T:
     case clvTYPE_IMAGE1D_ARRAY_T:
     case clvTYPE_IMAGE1D_BUFFER_T:
+    case clvTYPE_VIV_GENERIC_IMAGE_T:
         size = 1;
         break;
 
@@ -1344,6 +1392,7 @@ IN clsDECL * Decl
     case clvTYPE_IMAGE2D_ARRAY_T:
     case clvTYPE_IMAGE1D_ARRAY_T:
     case clvTYPE_IMAGE1D_BUFFER_T:
+    case clvTYPE_VIV_GENERIC_IMAGE_T:
         size = 1;
         break;
 
@@ -1433,6 +1482,7 @@ IN clsDECL *Decl
   case clvTYPE_IMAGE2D_ARRAY_T:
   case clvTYPE_IMAGE1D_ARRAY_T:
   case clvTYPE_IMAGE1D_BUFFER_T:
+  case clvTYPE_VIV_GENERIC_IMAGE_T:
     return gcvFALSE;
 
   case clvTYPE_STRUCT:
@@ -1588,6 +1638,78 @@ IN gctBOOL PtrDominant
     return status;
 }
 
+/* Note: if any fields of a built-in function name or parameter name are changed during compilation,
+         need to reset them here.*/
+gceSTATUS
+clsNAME_Reset(
+    IN cloCOMPILER Compiler,
+    IN clsNAME * Name
+)
+{
+    gceSTATUS status= gcvSTATUS_OK;
+    gctUINT builtinSpecificValue;
+    gcmHEADER();
+
+    do
+    {
+        switch (Name->type)
+        {
+        case clvPARAMETER_NAME:
+            builtinSpecificValue = Name->u.variableInfo.builtinSpecific.value;
+            gcoOS_ZeroMemory(&Name->u.variableInfo, sizeof(clsVARIABLE_INFO));
+            Name->u.variableInfo.builtinSpecific.value = builtinSpecificValue;
+            slmSLINK_LIST_Initialize(Name->u.variableInfo.samplers);
+            gcoOS_ZeroMemory(&Name->context, sizeof(clsNAME_CONTEXT));
+            clmNAME_VariableMemoryOffset_SET(Name, -1);
+            break;
+
+        case clvFUNC_NAME:
+            Name->u.funcInfo.refCount = 0;
+            Name->u.funcInfo.funcBody = gcvNULL;
+            gcoOS_ZeroMemory(&Name->context, sizeof(clsNAME_CONTEXT));
+            break;
+
+        default:
+            break;
+        }
+    }
+    while (gcvFALSE);
+
+    gcmFOOTER();
+    return status;
+}
+
+static gctBOOL
+_IsParamAddress(
+    IN cloCOMPILER      Compiler,
+    IN clsNAME_SPACE*   MySpace,
+    IN clsNAME*         Name
+    )
+{
+    if (!Name->decl.dataType)
+    {
+        return gcvFALSE;
+    }
+
+    if (clmDECL_IsAggregateTypeOverRegLimit(&Name->decl)
+        &&
+        (!clmDECL_IsStructOrUnion(&Name->decl) || !Name->decl.dataType->u.fieldSpace->scopeName->isBuiltin))
+    {
+        return gcvTRUE;
+    }
+
+    if (!(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) || gcmOPT_oclPassKernelStructArgByValue())
+        &&
+        clmDECL_IsAggregateType(&Name->decl)
+        &&
+        (MySpace && MySpace->scopeName && MySpace->scopeName->type == clvKERNEL_FUNC_NAME))
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
 /* Name and Name space. */
 static gceSTATUS
 _clsNAME_Construct(
@@ -1619,11 +1741,17 @@ OUT clsNAME **Name
 
     do {
         gctPOINTER pointer;
-
+#if __USE_VSC_MP__
         status = cloCOMPILER_ZeroMemoryAllocate(Compiler,
                                                 (gctSIZE_T)sizeof(clsNAME),
                                                 (gctPOINTER *) &pointer);
         if (gcmIS_ERROR(status)) break;
+#else
+        status = cloCOMPILER_AllocateName(Compiler,
+                                          (gctPOINTER *) &pointer);
+        if (gcmIS_ERROR(status)) break;
+#endif
+
         name = pointer;
 
         name->mySpace    = MySpace;
@@ -1658,13 +1786,13 @@ OUT clsNAME **Name
             name->u.variableInfo.specifiedAttr = 0;
             name->u.variableInfo.hostEndian = gcvFALSE;
             name->u.variableInfo.isAddressed = gcvFALSE;
-            name->u.variableInfo.isConvertibleType = gcvFALSE;
+            name->u.variableInfo.builtinSpecific.s.isConvertibleType = gcvFALSE;
             name->u.variableInfo.isDirty = gcvFALSE;
             name->u.variableInfo.alias = gcvNULL;
             name->u.variableInfo.aliasOffset = 0;
             name->u.variableInfo.padding = 0;
-            name->u.variableInfo.variableType = 0;
-            name->u.variableInfo.hasGenType = gcvFALSE;
+            name->u.variableInfo.builtinSpecific.s.variableType = 0;
+            name->u.variableInfo.builtinSpecific.s.hasGenType = gcvFALSE;
             name->u.variableInfo.allocated = gcvFALSE;
             name->u.variableInfo.inInterfaceBlock = gcvFALSE;
             name->u.variableInfo.isInitializedWithExtendedVectorConstant = gcvFALSE;
@@ -1676,24 +1804,22 @@ OUT clsNAME **Name
             name->u.variableInfo.u.aliasName = gcvNULL;
             name->u.variableInfo.specifiedAttr = 0;
             name->u.variableInfo.hostEndian = gcvFALSE;
-            if(name->decl.dataType &&
-               ((clmDECL_IsAggregateTypeOverRegLimit(&name->decl) &&
-                (!clmDECL_IsStructOrUnion(&name->decl) || !name->decl.dataType->u.fieldSpace->scopeName->isBuiltin)) ||
-                (!(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
-                   gcmOPT_oclPassKernelStructArgByValue()) &&
-                 clmDECL_IsAggregateType(&name->decl) &&
-                 MySpace && MySpace->scopeName && MySpace->scopeName->type == clvKERNEL_FUNC_NAME))) {
-                clsNAME_SetVariableAddressed(Compiler, name);
-            }
-            else name->u.variableInfo.isAddressed = gcvFALSE;
-            name->u.variableInfo.isConvertibleType = gcvFALSE;
+            name->u.variableInfo.builtinSpecific.s.isConvertibleType = gcvFALSE;
             name->u.variableInfo.isDirty = gcvFALSE;
             name->u.variableInfo.alias = gcvNULL;
             name->u.variableInfo.aliasOffset = 0;
-            name->u.variableInfo.variableType = 0;
-            name->u.variableInfo.hasGenType = gcvFALSE;
+            name->u.variableInfo.builtinSpecific.s.variableType = 0;
+            name->u.variableInfo.builtinSpecific.s.hasGenType = gcvFALSE;
             name->u.variableInfo.allocated = gcvFALSE;
             name->u.variableInfo.inInterfaceBlock = gcvFALSE;
+            if (_IsParamAddress(Compiler, MySpace, name))
+            {
+                clsNAME_SetVariableAddressed(Compiler, name);
+            }
+            else
+            {
+                name->u.variableInfo.isAddressed = gcvFALSE;
+            }
             break;
 
         case clvFUNC_NAME:
@@ -1712,15 +1838,19 @@ OUT clsNAME **Name
             name->u.funcInfo.hasGenType   = gcvFALSE;
             name->u.funcInfo.needLocalMemory = gcvFALSE;
             name->u.funcInfo.localMemorySize = 0;
-            name->u.funcInfo.reqdWorkGroupSize[0] =
-            name->u.funcInfo.reqdWorkGroupSize[1] =
-            name->u.funcInfo.reqdWorkGroupSize[2] = 0;
-            name->u.funcInfo.workGroupSizeHint[0] =
-            name->u.funcInfo.workGroupSizeHint[1] =
-            name->u.funcInfo.workGroupSizeHint[2] = 0;
-            name->u.funcInfo.kernelScaleHint[0] =
-            name->u.funcInfo.kernelScaleHint[1] =
-            name->u.funcInfo.kernelScaleHint[2] = 1;
+
+            /* Those are the optional function attribute qualifiers. */
+            name->u.funcInfo.attrQualifier.attrFlags = clvATTR_NONE;
+            name->u.funcInfo.attrQualifier.vecTypeHint = T_INT;
+            name->u.funcInfo.attrQualifier.reqdWorkGroupSize[0] =
+            name->u.funcInfo.attrQualifier.reqdWorkGroupSize[1] =
+            name->u.funcInfo.attrQualifier.reqdWorkGroupSize[2] = 0;
+            name->u.funcInfo.attrQualifier.workGroupSizeHint[0] =
+            name->u.funcInfo.attrQualifier.workGroupSizeHint[1] =
+            name->u.funcInfo.attrQualifier.workGroupSizeHint[2] = 0;
+            name->u.funcInfo.attrQualifier.kernelScaleHint[0] =
+            name->u.funcInfo.attrQualifier.kernelScaleHint[1] =
+            name->u.funcInfo.attrQualifier.kernelScaleHint[2] = 1;
             break;
 
         case clvLABEL_NAME:
@@ -1801,7 +1931,10 @@ IN clsNAME *Name
 
     _clFreePtrDscr(Compiler, Name->decl.ptrDscr);
 
+    /* do not free name here */
+#if __USE_VSC_MP__
     gcmVERIFY_OK(cloCOMPILER_Free(Compiler, Name));
+#endif
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -2382,8 +2515,8 @@ static  clsVecCompSelType _BuiltinVectorTypes[] =
   {clvTYPE_UINT, {T_UINT, T_UINT, T_UINT2, T_UINT3, T_UINT4, 0, 0, 0, T_UINT8, 0, 0, 0, 0, 0, 0, 0, T_UINT16}},
   {clvTYPE_LONG, {T_LONG, T_LONG, T_LONG2, T_LONG3, T_LONG4, 0, 0, 0, T_LONG8, 0, 0, 0, 0, 0, 0, 0, T_LONG16}},
   {clvTYPE_ULONG, {T_ULONG, T_ULONG, T_ULONG2, T_ULONG3, T_ULONG4, 0, 0, 0, T_ULONG8, 0, 0, 0, 0, 0, 0, 0, T_ULONG16}},
-  {clvTYPE_FLOAT, {T_FLOAT, T_FLOAT, T_FLOAT2, T_FLOAT3, T_FLOAT4, 0, 0, 0, T_FLOAT8, 0, 0, 0, 0, 0, 0, 0, T_FLOAT16}},
   {clvTYPE_HALF, {T_HALF, T_HALF, T_HALF2, T_HALF3, T_HALF4, 0, 0, 0, T_HALF8, 0, 0, 0, 0, 0, 0, 0, T_HALF16}},
+  {clvTYPE_FLOAT, {T_FLOAT, T_FLOAT, T_FLOAT2, T_FLOAT3, T_FLOAT4, 0, 0, 0, T_FLOAT8, 0, 0, 0, 0, 0, 0, 0, T_FLOAT16}},
   {clvTYPE_DOUBLE, {T_DOUBLE, T_DOUBLE, T_DOUBLE2, T_DOUBLE3, T_DOUBLE4, 0, 0, 0, T_DOUBLE8, 0, 0, 0, 0, 0, 0, 0, T_DOUBLE16}},
 };
 
@@ -2399,23 +2532,41 @@ static  clsVecCompSelType _BuiltinPackedVectorTypes[] =
   {clvTYPE_HALF_PACKED, {T_HALF, T_HALF_PACKED, T_HALF2_PACKED, T_HALF3_PACKED, T_HALF4_PACKED, 0, 0, 0, T_HALF8_PACKED, 0, 0, 0, 0, 0, 0, 0, T_HALF16_PACKED}},
 };
 
-const gctUINT  _BuiltinPackedVectorTypeCount = sizeof(_BuiltinPackedVectorTypes) / sizeof(clsVecCompSelType);
+static const gctUINT  _BuiltinPackedVectorTypeCount = sizeof(_BuiltinPackedVectorTypes) / sizeof(clsVecCompSelType);
 
-/** function to compare builtin types for qsort **/
-static gctINT
-_Compare_BuiltinVectorTypes(const void *T1, const void *T2)
+
+static gctBOOL
+_IsBuiltinVecTypeInfoSorted(
+IN cloCOMPILER Compiler
+)
 {
-   clsVecCompSelType *i1, *i2;
-   i1 = (clsVecCompSelType *)T1;
-   i2 = (clsVecCompSelType *)T2;
-   return i1->elementType - i2->elementType;
+   gctUINT i;
+
+   for(i = 0; i < _BuiltinVectorTypeCount; i++) {
+      if(_BuiltinVectorTypes[i].elementType == (gctINT)i)
+          continue;
+      else {
+         if(Compiler) {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                        0,
+                        0,
+                        clvREPORT_FATAL_ERROR,
+                        "builtin vector data type info not sorted at %d"
+                                            " with type %d",
+                                            i, clBuiltinDataTypes[i].type));
+         }
+         return gcvFALSE;
+      }
+   }
+   return gcvTRUE;
 }
 
 void
-cloIR_InitializeVecCompSelTypes()
+cloIR_InitializeVecCompSelTypes(IN cloCOMPILER Compiler)
 {
-    clQuickSort(_BuiltinVectorTypes, _BuiltinVectorTypeCount, sizeof (clsVecCompSelType),
-            _Compare_BuiltinVectorTypes);
+#if gcdDEBUG
+    gcmASSERT(_IsBuiltinVecTypeInfoSorted(Compiler));
+#endif
 }
 
 #define _clmDATA_TYPE_IsValidGenType(dataType) \
@@ -2732,7 +2883,7 @@ IN OUT clsNAME **RefParamName
   paramDecl = &ParamName->decl;
   rDecl = &Argument->decl;
   if(clmDECL_IsScalar(rDecl) &&
-     (clmDECL_IsScalar(paramDecl) || !ParamName->u.variableInfo.hasGenType)) {
+     (clmDECL_IsScalar(paramDecl) || !ParamName->u.variableInfo.builtinSpecific.s.hasGenType)) {
       ParamName->u.variableInfo.effectiveDecl = ParamName->decl;
       if(!clmDECL_IsPointerType(paramDecl)) {
           if(paramDecl->dataType->elementType == clvTYPE_BOOL) {
@@ -2740,7 +2891,7 @@ IN OUT clsNAME **RefParamName
           }
           else if(!clmDECL_IsPointerType(rDecl)
                   && !clmDECL_IsGenType(paramDecl)
-                  && ParamName->u.variableInfo.isConvertibleType) {
+                  && ParamName->u.variableInfo.builtinSpecific.s.isConvertibleType) {
               if(clmDECL_IsIntegerType(rDecl)
                  && clmDECL_IsCompatibleIntegerType(paramDecl)) {  /*implicit integer conversion */
                    return gcvTRUE;
@@ -3038,12 +3189,16 @@ IN OUT clsNAME **RefParamName
 
      if(clmDECL_IsScalar(rDecl) &&
         !clmDECL_IsPointerType(rDecl) &&
-        ParamName->u.variableInfo.isConvertibleType) {  /*implicit conversion */
+        ParamName->u.variableInfo.builtinSpecific.s.isConvertibleType) {  /*implicit conversion */
         sameType = gcvTRUE;
      }
   }
   else if(clmDECL_IsPackedGenType(paramDecl) &&
      clmIsElementTypePacked(rDecl->dataType->elementType)) {
+      sameType = gcvTRUE;
+  }
+  else if(clmIsElementTypeImageGeneric(paramDecl->dataType->elementType) &&
+     clmIsElementTypeImage(rDecl->dataType->elementType)) {
       sameType = gcvTRUE;
   }
 
@@ -3175,13 +3330,18 @@ OUT clsNAME **NewFuncName
    gceSTATUS status = gcvSTATUS_OK;
    clsNAME *newFuncName = gcvNULL;
    clsNAME_SPACE *builtinSpace;
+   clsNAME_SPACE *orgSpace;
 
    /* Verify the arguments. */
    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
 
-   /* Create a new name */
+   /* Create a new name in the FuncName name space */
+   gcmASSERT(FuncName && FuncName->mySpace);
    builtinSpace = cloCOMPILER_GetBuiltinSpace(Compiler);
-   gcmASSERT(builtinSpace);
+   orgSpace = cloCOMPILER_GetCurrentSpace(Compiler);
+
+   cloCOMPILER_SetCurrentSpace(Compiler, builtinSpace);
+
    status = _clsNAME_Construct(Compiler,
                                builtinSpace,
                                FuncCall->exprBase.base.lineNo,
@@ -3193,7 +3353,11 @@ OUT clsNAME **NewFuncName
                                gcvTRUE,
                                FuncName->extension,
                                &newFuncName);
-   if (gcmIS_ERROR(status)) return status;
+
+   if (gcmIS_ERROR(status)) {
+       cloCOMPILER_SetCurrentSpace(Compiler, orgSpace);
+       return status;
+   }
 
    newFuncName->die = cloCOMPILER_AddDIEWithName(Compiler, newFuncName);
 
@@ -3207,6 +3371,7 @@ OUT clsNAME **NewFuncName
    newFuncName->u.funcInfo.isIntrinsicCall = FuncName->u.funcInfo.isIntrinsicCall;
    newFuncName->u.funcInfo.intrinsicKind = FuncName->u.funcInfo.intrinsicKind;
    newFuncName->u.funcInfo.mangledName = gcvNULL;
+
 
    if(FuncCall->operands) {
       clsNAME *paramName;
@@ -3238,12 +3403,14 @@ OUT clsNAME **NewFuncName
                                           clvEXTENSION_NONE,
                                           &newParamName));
         newParamName->u.variableInfo.effectiveDecl = newParamName->decl;
-        newParamName->u.variableInfo.isConvertibleType = gcvFALSE;
-        newParamName->u.variableInfo.hasGenType = paramName->u.variableInfo.hasGenType;
+        newParamName->u.variableInfo.builtinSpecific.s.isConvertibleType = gcvFALSE;
+        newParamName->u.variableInfo.builtinSpecific.s.hasGenType = paramName->u.variableInfo.builtinSpecific.s.hasGenType;
       }
 OnError:
       cloCOMPILER_PopCurrentNameSpace(Compiler, gcvNULL);
    }
+
+   cloCOMPILER_SetCurrentSpace(Compiler, orgSpace);
 
    if(NewFuncName) *NewFuncName = newFuncName;
    return status;
@@ -3260,6 +3427,10 @@ IN clsDECL * RDecl
 
   if(clmDECL_IsPackedType(RDecl) &&
      LDecl->dataType->elementType == clvTYPE_GEN_PACKED) {
+      return gcvTRUE;
+  }
+  else if(clmIsElementTypeImageGeneric(LDecl->dataType->elementType) &&
+     clmIsElementTypeImage(RDecl->dataType->elementType)) {
       return gcvTRUE;
   }
   if(clmDECL_IsScalar(RDecl)) {
@@ -3352,6 +3523,7 @@ OUT clsDATA_TYPE *FuncDataType
     gcmASSERT(PolynaryExpr->funcSymbol);
 
     if (FuncName->symbol != PolynaryExpr->funcSymbol) return gcvFALSE;
+
 
     *FuncDataType = *FuncName->decl.dataType;
     *HasGenType = clmDATA_TYPE_IsGenType(FuncName->decl.dataType);
@@ -3676,9 +3848,9 @@ IN OUT cloIR_POLYNARY_EXPR FuncCall
                                  FuncCall->funcSymbol,
                                  nameSuffix));
 
-   gcmONERROR(cloCOMPILER_FindPoolString(Compiler,
-                                         symbol,
-                                         &symbolInPool));
+   gcmONERROR(cloCOMPILER_FindGeneralPoolString(Compiler,
+                                                symbol,
+                                                &symbolInPool));
    gcmONERROR(cloCOMPILER_Free(Compiler,
                                symbol));
 
@@ -3687,7 +3859,7 @@ IN OUT cloIR_POLYNARY_EXPR FuncCall
    funcNameSaved = FuncCall->funcName;
    FuncCall->operands = argumentSet;
    FuncCall->funcSymbol = symbolInPool;
-   nameSpace = NameSpace;
+   nameSpace = cloCOMPILER_GetBuiltinSpace(Compiler);
    while (nameSpace != gcvNULL) {
       FOR_EACH_DLINK_NODE(&nameSpace->names, clsNAME, name) {
          hasGenType = gcvFALSE;
@@ -3839,11 +4011,12 @@ IN clsNAME *BuiltinName
    clsBUILTIN_FUNCTION_INFO *functionInfo;
 
    if(BuiltinName->isBuiltin) {
+       if (!cldBUILT_IN_NAME_MANGLING_ENABLED) return BuiltinName;
        functionInfo = clGetBuiltinFunctionInfo(PolynaryExpr->funcSymbol);
        gcmASSERT(functionInfo);
        if(functionInfo == gcvNULL) return gcvNULL;
 
-       if(!(cldBUILT_IN_NAME_MANGLING_ENABLED && functionInfo->nameMangled)) return BuiltinName;
+       if(!functionInfo->nameMangled) return BuiltinName;
 
        symbol = clCreateMangledFuncName(Compiler,
                                         BuiltinName);
@@ -4300,22 +4473,26 @@ OUT clsNAME **Name
                 gcmVERIFY_OK(cloCOMPILER_Free(Compiler, pointer));
                 if (gcmIS_ERROR(status)) return status;
             }
-            status = clsNAME_SPACE_Search(Compiler,
-                                          NameSpace,
-                                          symbol,
-                                          gcvFALSE,
-                                          &name);
 
-            if (status == gcvSTATUS_OK) {
-                gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                                LineNo,
-                                                StringNo,
-                                                clvREPORT_ERROR,
-                                                "redefined identifier: '%s'",
-                                                Symbol));
+            if (!cloCOMPILER_IsLoadingBuiltin(Compiler))
+            {
+                status = clsNAME_SPACE_Search(Compiler,
+                                              NameSpace,
+                                              symbol,
+                                              gcvFALSE,
+                                              &name);
 
-                status = gcvSTATUS_INVALID_ARGUMENT;
-                goto OnError;
+                if (status == gcvSTATUS_OK) {
+                    gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                                    LineNo,
+                                                    StringNo,
+                                                    clvREPORT_ERROR,
+                                                    "redefined identifier: '%s'",
+                                                    Symbol));
+
+                    status = gcvSTATUS_INVALID_ARGUMENT;
+                    goto OnError;
+                }
             }
 
             if(Type == clvVARIABLE_NAME) {
@@ -5174,6 +5351,11 @@ IN cloIR_BASE This
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
     clmVERIFY_IR_OBJECT(variable, clvIR_VARIABLE);
 
+    if (variable->exprBase.asmMods != gcvNULL)
+    {
+        gcmVERIFY_OK(cloCOMPILER_Free(Compiler, variable->exprBase.asmMods));
+    }
+
     gcmVERIFY_OK(cloCOMPILER_Free(Compiler, variable));
 
     return gcvSTATUS_OK;
@@ -5315,6 +5497,11 @@ IN cloIR_BASE This
         gcmVERIFY_OK(cloCOMPILER_Free(Compiler, constant->u.uniformArr));
     }
 
+    if (constant->exprBase.asmMods != gcvNULL)
+    {
+        gcmVERIFY_OK(cloCOMPILER_Free(Compiler, constant->exprBase.asmMods));
+    }
+
     gcmVERIFY_OK(cloCOMPILER_Free(Compiler, constant));
     return gcvSTATUS_OK;
 }
@@ -5437,12 +5624,9 @@ OUT cloIR_CONSTANT *Constant
      cloIR_EXPR_Initialize(&constant->exprBase, &s_constantVTab, LineNo, StringNo,
                            decl);
 
-#if _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES
-     if (clmDECL_IsAggregateType(&decl)) {
-#else
-     if (clmDECL_IsUnderlyingStructOrUnion(&decl) &&
-         (clGetOperandCountForRegAlloc(&decl) > _clmMaxOperandCountToUseMemory(&decl))) {
-#endif
+     if((_GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES && clmDECL_IsAggregateType(&decl)) ||
+        (clmDECL_IsUnderlyingStructOrUnion(&decl) &&
+         (clGetOperandCountForRegAlloc(&decl) > _clmMaxOperandCountToUseMemory(&decl)))) {
          constant->valueCount = clsDECL_GetByteSize(Compiler, &decl);
          size = (gctSIZE_T)(sizeof(gctCHAR) * constant->valueCount);
          status = cloCOMPILER_ZeroMemoryAllocate(Compiler,
@@ -7187,8 +7371,11 @@ OUT cloIR_CONSTANT * ResultConstant
 )
 {
   gceSTATUS    status;
-  gctREG_INDEX    index;
+  gctSIZE_T    index;
   gctUINT8    i;
+  gctSIZE_T elementCount = 1;
+  cluCONSTANT_VALUE values[cldMAX_VECTOR_COMPONENT];
+  cluCONSTANT_VALUE *valuePtr;
 
 /* Verify the arguments. */
   clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
@@ -7201,31 +7388,52 @@ OUT cloIR_CONSTANT * ResultConstant
   gcmASSERT(RightConstant->exprBase.decl.dataType);
 
   gcmASSERT(clmDECL_IsInt(&RightConstant->exprBase.decl));
-  index = (gctREG_INDEX)RightConstant->values[0].intValue;
+  index = (gctSIZE_T)RightConstant->values[0].intValue;
 
   if (clmDECL_IsArray(&LeftConstant->exprBase.decl)) {
-    gctSIZE_T elementCount = clsDECL_GetSize(Decl);
-
-    index *= elementCount;
-    for (i = 0; i < elementCount; i++) {
-        LeftConstant->values[i] = LeftConstant->values[index + i];
-    }
-    LeftConstant->valueCount = elementCount;
+      elementCount = clsDECL_GetSize(Decl);
   }
-  else if (clmDECL_IsVectorType(&LeftConstant->exprBase.decl)) {
-    LeftConstant->values[0] = LeftConstant->values[index];
-    LeftConstant->valueCount = 1;
+  else if (!clmDECL_IsVectorType(&LeftConstant->exprBase.decl)) {
+      gcmASSERT(!clmDECL_IsScalar(&LeftConstant->exprBase.decl));
+
+      elementCount = clmDATA_TYPE_matrixRowCount_GET(LeftConstant->exprBase.decl.dataType);
+  }
+
+  if(LeftConstant->buffer) {
+      gctINT elementByteSize;
+      clsDECL elementDecl[1];
+
+      gcmASSERT(LeftConstant->values == gcvNULL);
+      gcmVERIFY_OK(cloCOMPILER_CreateElementDecl(Compiler,
+                                              &LeftConstant->exprBase.decl,
+                                              elementDecl));
+
+      elementByteSize = clsDECL_GetElementByteSize(Compiler,
+                                                   &LeftConstant->exprBase.decl,
+                                                   gcvNULL,
+                                                   gcvNULL);
+      status = clConvFieldConstantToConstantValues(values,
+                                                   elementDecl,
+                                                   LeftConstant->buffer + elementByteSize * index);
+      if(gcmIS_ERROR(status)) return status;
+      valuePtr = values;
+
+      gcmVERIFY_OK(cloCOMPILER_Free(Compiler, LeftConstant->buffer));
+      LeftConstant->buffer = gcvNULL;
+      gcmVERIFY_OK(cloCOMPILER_Allocate(Compiler,
+                                        (gctSIZE_T)(sizeof(cluCONSTANT_VALUE) * elementCount),
+                                        (gctPOINTER *) &LeftConstant->values));
   }
   else {
-    gctUINT rowCount;
-
-    rowCount = clmDATA_TYPE_matrixRowCount_GET(LeftConstant->exprBase.decl.dataType);
-    index *= (gctREG_INDEX)rowCount;
-    for (i = 0; i < rowCount; i++) {
-      LeftConstant->values[i] = LeftConstant->values[index + i];
-    }
-    LeftConstant->valueCount = rowCount;
+      valuePtr = LeftConstant->values + (index * elementCount);
   }
+
+  gcmASSERT(LeftConstant->values);
+  for (i = 0; i < elementCount; i++) {
+      LeftConstant->values[i] = valuePtr[i];
+  }
+  LeftConstant->valueCount = elementCount;
+
   gcmVERIFY_OK(cloIR_OBJECT_Destroy(Compiler, &RightConstant->exprBase.base));
 
   status = cloCOMPILER_CloneDecl(Compiler,
@@ -8581,6 +8789,11 @@ cloIR_UNARY_EXPR_Destroy(
     gcmASSERT(unaryExpr->operand);
     gcmVERIFY_OK(cloIR_OBJECT_Destroy(Compiler, &unaryExpr->operand->base));
 
+    if (unaryExpr->exprBase.asmMods != gcvNULL)
+    {
+        gcmVERIFY_OK(cloCOMPILER_Free(Compiler, unaryExpr->exprBase.asmMods));
+    }
+
     gcmVERIFY_OK(cloCOMPILER_Free(Compiler, unaryExpr));
 
     return gcvSTATUS_OK;
@@ -9851,6 +10064,11 @@ IN cloIR_BASE This
     gcmASSERT(binaryExpr->rightOperand);
     gcmVERIFY_OK(cloIR_OBJECT_Destroy(Compiler, &binaryExpr->rightOperand->base));
 
+    if (binaryExpr->exprBase.asmMods != gcvNULL)
+    {
+        gcmVERIFY_OK(cloCOMPILER_Free(Compiler, binaryExpr->exprBase.asmMods));
+    }
+
     gcmVERIFY_OK(cloCOMPILER_Free(Compiler, binaryExpr));
     return gcvSTATUS_OK;
 }
@@ -10670,9 +10888,7 @@ _NeedImplicitTypeConv(
         }
         binaryExpr = (cloIR_BINARY_EXPR) &BinaryExpr->rightOperand->base;
     }
-    else if(clmDECL_IsPointerType(&BinaryExpr->leftOperand->decl) ||
-            clmDECL_IsPointerType(&BinaryExpr->rightOperand->decl) ||
-            !(clmDECL_IsScalarInteger(&BinaryExpr->leftOperand->decl) &&
+    else if(!(clmDECL_IsScalarInteger(&BinaryExpr->leftOperand->decl) &&
               clmDECL_IsScalarInteger(&BinaryExpr->rightOperand->decl))) /*for integer promotion */
     {
         return gcvFALSE;
@@ -10787,6 +11003,11 @@ IN cloIR_BASE This
 
     if (selection->falseOperand != gcvNULL) {
         gcmVERIFY_OK(cloIR_OBJECT_Destroy(Compiler, selection->falseOperand));
+    }
+
+    if (selection->exprBase.asmMods != gcvNULL)
+    {
+        gcmVERIFY_OK(cloCOMPILER_Free(Compiler, selection->exprBase.asmMods));
     }
 
     gcmVERIFY_OK(cloCOMPILER_Free(Compiler, selection));
@@ -10933,6 +11154,11 @@ IN cloIR_BASE This
         gcmVERIFY_OK(cloIR_OBJECT_Destroy(Compiler, selection->switchBody));
     }
 
+    if (selection->exprBase.asmMods != gcvNULL)
+    {
+        gcmVERIFY_OK(cloCOMPILER_Free(Compiler, selection->exprBase.asmMods));
+    }
+
     gcmVERIFY_OK(cloCOMPILER_Free(Compiler, selection));
 
     return gcvSTATUS_OK;
@@ -11073,6 +11299,11 @@ IN cloIR_BASE This
 
     if (polynaryExpr->operands != gcvNULL) {
         gcmVERIFY_OK(cloIR_OBJECT_Destroy(Compiler, &polynaryExpr->operands->base));
+    }
+
+    if (polynaryExpr->exprBase.asmMods != gcvNULL)
+    {
+        gcmVERIFY_OK(cloCOMPILER_Free(Compiler, polynaryExpr->exprBase.asmMods));
     }
 
     gcmVERIFY_OK(cloCOMPILER_Free(Compiler, polynaryExpr));
@@ -11238,6 +11469,11 @@ IN cloIR_BASE This
 
     if (typeCastArgs->operands != gcvNULL) {
         gcmVERIFY_OK(cloIR_OBJECT_Destroy(Compiler, &typeCastArgs->operands->base));
+    }
+
+    if (typeCastArgs->exprBase.asmMods != gcvNULL)
+    {
+        gcmVERIFY_OK(cloCOMPILER_Free(Compiler, typeCastArgs->exprBase.asmMods));
     }
 
     gcmVERIFY_OK(cloCOMPILER_Free(Compiler, typeCastArgs));

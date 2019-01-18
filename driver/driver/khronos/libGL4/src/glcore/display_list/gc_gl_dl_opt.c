@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -198,8 +198,8 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
 {
     __GLdlistOp *dlistop = cdlist->dlist;
     __GLdlistOp *beginOp, *endOp, *primOp, *primBeginOp = NULL;
-    GLuint firstVertex, index, input, inputMask, datasize, startNewPrim, discardVertexNum;
-    GLuint64 primFormat, fmtMask;
+    GLuint firstVertex, index, input, datasize, startNewPrim, discardVertexNum;
+    GLuint64 primFormat, fmtMask, inputMask;
     __GLPrimBegin prim, *primBegin;
     GLfloat *currentPtr[__GL_TOTAL_VERTEX_ATTRIBUTES];
     GLfloat *startAddr, *v;
@@ -392,7 +392,7 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
                 case __glop_MultiTexCoord2fv:
                     index = ((struct __gllc_MultiTexCoord2fv_Rec *)(dlistop + 1))->texture;
                     index -= GL_TEXTURE0;
-                    inputMask = (__GL_ONE_32 << (__GL_INPUT_TEX0_INDEX + index));
+                    inputMask = (__GL_ONE_64 << (__GL_INPUT_TEX0_INDEX + index));
                     if ((prim.primInputMask & inputMask) == 0) {
                         prim.primInputMask |= inputMask;
                         prim.primitiveFormat |= (__GL_ONE_64 << (__GL_TC2F_INDEX + index));
@@ -410,7 +410,7 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
                 case __glop_MultiTexCoord3fv:
                     index = ((struct __gllc_MultiTexCoord3fv_Rec *)(dlistop + 1))->texture;
                     index -= GL_TEXTURE0;
-                    inputMask = (__GL_ONE_32 << (__GL_INPUT_TEX0_INDEX + index));
+                    inputMask = (__GL_ONE_64 << (__GL_INPUT_TEX0_INDEX + index));
                     if ((prim.primInputMask & inputMask) == 0) {
                         prim.primInputMask |= inputMask;
                         prim.primitiveFormat |= (__GL_ONE_64 << (__GL_TC3F_INDEX + index));
@@ -428,7 +428,7 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
                 case __glop_MultiTexCoord4fv:
                     index = ((struct __gllc_MultiTexCoord4fv_Rec *)(dlistop + 1))->texture;
                     index -= GL_TEXTURE0;
-                    inputMask = (__GL_ONE_32 << (__GL_INPUT_TEX0_INDEX + index));
+                    inputMask = (__GL_ONE_64 << (__GL_INPUT_TEX0_INDEX + index));
                     if ((prim.primInputMask & inputMask) == 0) {
                         prim.primInputMask |= inputMask;
                         prim.primitiveFormat |= (__GL_ONE_64 << (__GL_TC4F_INDEX + index));
@@ -445,7 +445,7 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
                     break;
                 case __glop_VertexAttrib4fv:
                     index = ((struct __gllc_VertexAttrib4fv_Rec *)(dlistop + 1))->index;
-                    inputMask = (__GL_ONE_32 << (__GL_INPUT_ATT0_INDEX + index));
+                    inputMask = (__GL_ONE_64 << (__GL_INPUT_ATT0_INDEX + index));
                     if ((prim.primInputMask & inputMask) == 0) {
                         prim.primInputMask |= inputMask;
                         prim.primitiveFormat |= (__GL_ONE_64 << (__GL_AT4F_I0_INDEX + index));

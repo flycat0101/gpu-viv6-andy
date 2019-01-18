@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -311,6 +311,8 @@ struct _VIR_CONTROL_FLOW_GRAPH
 
     /* Memory pool that this CFG is built on */
     VSC_PRIMARY_MEM_POOL      pmp;
+    /* scratch mem pool can reuse memory be freed */
+    VSC_MM*                   pScratchMemPool;
 };
 
 typedef VSC_GNODE_LIST_ITERATOR CFG_ITERATOR;
@@ -391,6 +393,8 @@ struct _VIR_CALL_GRAPH
 
     /* Memory pool that this CG is built on */
     VSC_PRIMARY_MEM_POOL      pmp;
+    /* scratch mem pool can reuse memory be freed */
+    VSC_MM*                   pScratchMemPool;
 };
 
 typedef VSC_GNODE_LIST_ITERATOR CG_ITERATOR;
@@ -410,7 +414,7 @@ typedef VSC_GNODE_LIST_ITERATOR CG_ITERATOR;
 
 
 /* CG related functions */
-VSC_ErrCode vscVIR_BuildCallGraph(VIR_Shader* pShader, VIR_CALL_GRAPH* pCg);
+VSC_ErrCode vscVIR_BuildCallGraph(VSC_MM* pScratchMemPool, VIR_Shader* pShader, VIR_CALL_GRAPH* pCg);
 VSC_ErrCode vscVIR_DestroyCallGraph(VIR_CALL_GRAPH* pCg);
 gctBOOL vscVIR_IsCallGraphBuilt(VIR_CALL_GRAPH* pCg);
 VSC_ErrCode vscVIR_RemoveFuncBlockFromCallGraph(VIR_CALL_GRAPH* pCg,
@@ -418,9 +422,9 @@ VSC_ErrCode vscVIR_RemoveFuncBlockFromCallGraph(VIR_CALL_GRAPH* pCg,
                                                 gctBOOL bRemoveFuncInShader);
 
 /* CFG related functions */
-VSC_ErrCode vscVIR_BuildCFGPerFunc(VIR_Function* pFunc);
+VSC_ErrCode vscVIR_BuildCFGPerFunc(VSC_MM* pScratchMemPool, VIR_Function* pFunc);
 VSC_ErrCode vscVIR_DestroyCFGPerFunc(VIR_Function* pFunc);
-VSC_ErrCode vscVIR_BuildCFG(VIR_Shader* pShader);
+VSC_ErrCode vscVIR_BuildCFG(VSC_MM* pScratchMemPool, VIR_Shader* pShader);
 VSC_ErrCode vscVIR_DestroyCFG(VIR_Shader* pShader);
 gctBOOL vscVIR_IsCFGBuilt(VIR_Shader* pShader);
 VIR_BASIC_BLOCK* vscVIR_AddBasicBlockToCFG(VIR_CONTROL_FLOW_GRAPH* pCFG,
@@ -513,6 +517,9 @@ VSC_ErrCode vscVIR_DestroyDomFrontier(VIR_Shader* pShader);
 /* BB reach-relation functions */
 VSC_ErrCode vscVIR_BuildBbReachRelation(VIR_Shader* pShader);
 VSC_ErrCode vscVIR_DestroyBbReachRelation(VIR_Shader* pShader);
+
+VSC_ErrCode vscVIR_CleanDfsVisitOrderIdxOnFunc(VIR_Function* pFunc);
+VSC_ErrCode vscVIR_CleanDfsVisitOrderIdxOnShader(VIR_Shader* pShader);
 
 #if LOOP_HIERARCHY_SUPPORT_IN_CFG
 /* Loop hierarchy related functions */

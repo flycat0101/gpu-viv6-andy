@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -40,7 +40,7 @@ _AllocateMemory(
     IN gctSIZE_T Bytes,
     OUT gctPOINTER *Logical,
     OUT gctPHYS_ADDR *Physical,
-    OUT gctUINT32 *PhysAddr
+    OUT gctPHYS_ADDR_T *PhysAddr
     )
 {
     gceSTATUS status;
@@ -53,11 +53,12 @@ _AllocateMemory(
     gcmkVERIFY_ARGUMENT(Physical != NULL);
     gcmkVERIFY_ARGUMENT(PhysAddr != NULL);
 
-    status = gckOS_AllocateContiguous(Device->os,
-                      gcvFALSE,
-                      &Bytes,
-                      Physical,
-                      Logical);
+    status = gckOS_AllocateNonPagedMemory(Device->os,
+                                          gcvFALSE,
+                                          gcvALLOC_FLAG_CONTIGUOUS,
+                                          &Bytes,
+                                          Physical,
+                                          Logical);
 
     if (gcmIS_ERROR(status))
     {
@@ -76,9 +77,9 @@ _AllocateMemory(
     *PhysAddr = node->physicalAddress;
 
     gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_DRIVER,
-                   "_AllocateMemory: phys_addr->0x%x phsical->0x%x Logical->0x%x",
+                   "_AllocateMemory: phys_addr->0x%x phsical->0x%llx Logical->0x%x",
                    (gctUINT32)*Physical,
-                   (gctUINT32)*PhysAddr,
+                   *PhysAddr,
                    (gctUINT32)*Logical);
 
     /* Success. */
@@ -99,10 +100,10 @@ _FreeMemory(
 
     gcmkVERIFY_ARGUMENT(Device != NULL);
 
-    status = gckOS_FreeContiguous(Device->os,
-                                Physical,
-                                Logical,
-                                0);
+    status = gckOS_FreeNonPagedMemory(Device->os,
+                                      Physical,
+                                      Logical,
+                                      0);
 
     gcmkFOOTER();
     return status;
@@ -123,9 +124,7 @@ const struct sigevent* isrRoutine(void* arg, int id)
 
     atomic_add(&g_nQnxInIsrs, 1);
 
-    if (gckKERNEL_Notify(device->kernels[gcvCORE_MAJOR],
-                         gcvNOTIFY_INTERRUPT,
-                         gcvTRUE) == gcvSTATUS_OK)
+    if (gckHARDWARE_Interrupt(device->kernels[gcvCORE_MAJOR]->hardware) == gcvSTATUS_OK)
     {
         atomic_add((volatile unsigned *)&device->interrupts[gcvCORE_MAJOR], 1);
 
@@ -223,7 +222,7 @@ static void* threadRoutine(void *ctxt)
 
         if (pulse.code == GC_HAL_QNX_PULSEVAL_MAJOR)
         {
-            gckKERNEL_Notify(device->kernels[gcvCORE_MAJOR], gcvNOTIFY_INTERRUPT, gcvFALSE);
+            gckKERNEL_Notify(device->kernels[gcvCORE_MAJOR], gcvNOTIFY_INTERRUPT);
         }
     }
 
@@ -245,9 +244,7 @@ const struct sigevent* isrRoutine3D1(void* arg, int id)
 
     atomic_add(&g_nQnxInIsrs, 1);
 
-    if (gckKERNEL_Notify(device->kernels[gcvCORE_3D1],
-                         gcvNOTIFY_INTERRUPT,
-                         gcvTRUE) == gcvSTATUS_OK)
+    if (gckHARDWARE_Interrupt(device->kernels[gcvCORE_3D1]->hardware) == gcvSTATUS_OK)
     {
         atomic_add((volatile unsigned *)&device->interrupts[gcvCORE_3D1], 1);
         atomic_sub(&g_nQnxInIsrs, 1);
@@ -342,7 +339,7 @@ static void* threadRoutine3D1(void *ctxt)
 
         if (pulse.code == GC_HAL_QNX_PULSEVAL_3D1)
         {
-            gckKERNEL_Notify(device->kernels[gcvCORE_3D1], gcvNOTIFY_INTERRUPT, gcvFALSE);
+            gckKERNEL_Notify(device->kernels[gcvCORE_3D1], gcvNOTIFY_INTERRUPT);
         }
     }
 
@@ -364,9 +361,7 @@ const struct sigevent* isrRoutine2D(void* arg, int id)
 
     atomic_add(&g_nQnxInIsrs, 1);
 
-    if (gckKERNEL_Notify(device->kernels[gcvCORE_2D],
-                         gcvNOTIFY_INTERRUPT,
-                         gcvTRUE) == gcvSTATUS_OK)
+    if (gckHARDWARE_Interrupt(device->kernels[gcvCORE_2D]->hardware) == gcvSTATUS_OK)
     {
         atomic_add((volatile unsigned *)&device->interrupts[gcvCORE_2D], 1);
 
@@ -464,9 +459,7 @@ static void* threadRoutine2D(void *ctxt)
 
         if (pulse.code == GC_HAL_QNX_PULSEVAL_2D)
         {
-            gckKERNEL_Notify(device->kernels[gcvCORE_2D],
-                             gcvNOTIFY_INTERRUPT,
-                             gcvFALSE);
+            gckKERNEL_Notify(device->kernels[gcvCORE_2D], gcvNOTIFY_INTERRUPT);
         }
     }
 
@@ -673,7 +666,7 @@ gckGALDEVICE_Construct(
     gctUINT32 internalBaseAddress = 0, internalAlignment = 0;
     gctUINT32 externalBaseAddress = 0, externalAlignment = 0;
     gctUINT32 horizontalTileSize, verticalTileSize;
-    gctUINT32 physAddr;
+    gctPHYS_ADDR_T physAddr;
     gctUINT32 physical;
     gckGALDEVICE device;
     gceSTATUS status;
@@ -822,7 +815,7 @@ gckGALDEVICE_Construct(
 
                 status = gckVIDMEM_Construct(
                     device->os,
-                    physAddr | device->systemMemoryBaseAddress,
+                    physAddr,
                     device->contiguousSize,
                     64,
                     BankSize,
@@ -833,6 +826,7 @@ gckGALDEVICE_Construct(
                 {
                     device->contiguousMapped = gcvFALSE;
                     device->contiguousBase = physAddr;
+                    device->contiguousVidMem->physical = device->contiguousPhysical;
 
                     /* success, abort loop */
                     gcmkTRACE_ZONE(
@@ -866,6 +860,8 @@ gckGALDEVICE_Construct(
     }
     else if (ContiguousSize > 0)
     {
+        gcmkPRINT("%s: TODO: contiguousVidMem->physical!", __func__);
+
         /* Create the contiguous memory heap. */
         status = gckVIDMEM_Construct(
             device->os,
@@ -913,7 +909,7 @@ gckGALDEVICE_Construct(
                     FastClear,
                     Compression));
 
-            gcmkONERROR(gckHARDWARE_SetPowerManagement(
+            gcmkONERROR(gckHARDWARE_EnablePowerManagement(
                 device->kernels[i]->hardware, PowerManagement
                 ));
 
@@ -946,7 +942,7 @@ gckGALDEVICE_Construct(
             gcmkONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
 
-        gcmkONERROR(gckHARDWARE_SetPowerManagement(
+        gcmkONERROR(gckHARDWARE_EnablePowerManagement(
             device->kernels[gcvCORE_2D]->hardware, PowerManagement
             ));
     }
@@ -960,7 +956,7 @@ gckGALDEVICE_Construct(
 #if gcdENABLE_VG
         gckDEVICE_AddCore(device->device, gcvCORE_VG, gcvCHIP_ID_DEFAULT, device, &device->kernels[gcvCORE_VG]);
 
-        gcmkONERROR(gckVGHARDWARE_SetPowerManagement(
+        gcmkONERROR(gckVGHARDWARE_EnablePowerManagement(
             device->kernels[gcvCORE_VG]->vg->hardware,
             PowerManagement
             ));
@@ -1051,6 +1047,7 @@ gckGALDEVICE_Construct(
         else
         {
             /* map internal memory */
+            gcmkPRINT("%s: TODO: internalVidMem->physical!", __func__);
             device->internalPhysical  = gcmUINT64_TO_PTR(physical);
             device->internalLogical = (gctPOINTER)mmap_device_io(device->internalSize, physical);
 
@@ -1078,6 +1075,7 @@ gckGALDEVICE_Construct(
         else
         {
             /* map internal memory */
+            gcmkPRINT("%s: TODO: externalVidMem->physical!", __func__);
             device->externalPhysical = gcmUINT64_TO_PTR(physical);
             device->externalLogical = (gctPOINTER)mmap_device_io(device->externalSize, physical);
 
@@ -1166,6 +1164,29 @@ gckGALDEVICE_Destroy(
             munmap_device_io((uintptr_t)Device->externalLogical, Device->externalSize);
         }
 
+        for (i = 0; i < gcdMAX_GPU_COUNT; i++)
+        {
+            if (Device->registerBases[i] != gcvNULL)
+            {
+                munmap_device_io((uintptr_t)Device->registerBases[i], Device->registerSizes[i]);
+            }
+
+            Device->registerBases[i] = 0;
+            Device->registerSizes[i] = 0;
+            Device->requestedRegisterMemBases[i] = 0;
+            Device->requestedRegisterMemSizes[i] = 0;
+        }
+
+        if (Device->device)
+        {
+            gcmkVERIFY_OK(gckDEVICE_Destroy(Device->os, Device->device));
+            Device->device = gcvNULL;
+        }
+
+        /*
+         * Destroy contiguous memory pool after gckDEVICE destroyed. gckDEVICE
+         * may allocates GPU memory types from SYSTEM pool.
+         */
         if (Device->contiguousVidMem != gcvNULL)
         {
             /* Destroy the contiguous heap */
@@ -1193,29 +1214,10 @@ gckGALDEVICE_Destroy(
             }
         }
 
-        for (i = 0; i < gcdMAX_GPU_COUNT; i++)
-        {
-            if (Device->registerBases[i] != gcvNULL)
-            {
-                munmap_device_io((uintptr_t)Device->registerBases[i], Device->registerSizes[i]);
-            }
-
-            Device->registerBases[i] = 0;
-            Device->registerSizes[i] = 0;
-            Device->requestedRegisterMemBases[i] = 0;
-            Device->requestedRegisterMemSizes[i] = 0;
-        }
-
-        if (Device->device)
-        {
-            gcmkVERIFY_OK(gckDEVICE_Destroy(Device->os, Device->device));
-            Device->device = gcvNULL;
-        }
-
         /* Destroy the gckOS object. */
         gcmkVERIFY_OK(gckOS_Destroy(Device->os));
 
-    resource_manager_exit();
+        resource_manager_exit();
 
         free(Device);
     }
@@ -1567,7 +1569,7 @@ gckGALDEVICE_Start(
     if (Device->kernels[gcvCORE_MAJOR] != gcvNULL)
     {
         /* Switch to SUSPEND power state. */
-        gcmkONERROR(gckHARDWARE_SetPowerManagementState(
+        gcmkONERROR(gckHARDWARE_SetPowerState(
             Device->kernels[gcvCORE_MAJOR]->hardware, gcvPOWER_OFF_BROADCAST
             ));
     }
@@ -1575,7 +1577,7 @@ gckGALDEVICE_Start(
     if (Device->kernels[gcvCORE_3D1] != gcvNULL)
     {
         /* Switch to SUSPEND power state. */
-        gcmkONERROR(gckHARDWARE_SetPowerManagementState(
+        gcmkONERROR(gckHARDWARE_SetPowerState(
             Device->kernels[gcvCORE_3D1]->hardware, gcvPOWER_OFF_BROADCAST
             ));
     }
@@ -1584,7 +1586,7 @@ gckGALDEVICE_Start(
     if (Device->kernels[gcvCORE_2D] != gcvNULL)
     {
         /* Switch to SUSPEND power state. */
-        gcmkONERROR(gckHARDWARE_SetPowerManagementState(
+        gcmkONERROR(gckHARDWARE_SetPowerState(
             Device->kernels[gcvCORE_2D]->hardware, gcvPOWER_OFF_BROADCAST
             ));
     }
@@ -1593,7 +1595,7 @@ gckGALDEVICE_Start(
     {
 #if gcdENABLE_VG
         /* Switch to SUSPEND power state. */
-        gcmkONERROR(gckVGHARDWARE_SetPowerManagementState(
+        gcmkONERROR(gckVGHARDWARE_SetPowerState(
             Device->kernels[gcvCORE_VG]->vg->hardware, gcvPOWER_OFF_BROADCAST
             ));
 #endif
@@ -1640,12 +1642,12 @@ gckGALDEVICE_Stop(
 
     if (Device->kernels[gcvCORE_MAJOR] != gcvNULL)
     {
-        gcmkONERROR(gckHARDWARE_SetPowerManagement(
+        gcmkONERROR(gckHARDWARE_EnablePowerManagement(
             Device->kernels[gcvCORE_MAJOR]->hardware, gcvTRUE
             ));
 
         /* Switch to OFF power state. */
-        gcmkONERROR(gckHARDWARE_SetPowerManagementState(
+        gcmkONERROR(gckHARDWARE_SetPowerState(
             Device->kernels[gcvCORE_MAJOR]->hardware, gcvPOWER_OFF
             ));
     }
@@ -1653,12 +1655,12 @@ gckGALDEVICE_Stop(
 #ifdef gcdDUAL_CORE
     if (Device->kernels[gcvCORE_3D1] != gcvNULL)
     {
-        gcmkONERROR(gckHARDWARE_SetPowerManagement(
+        gcmkONERROR(gckHARDWARE_EnablePowerManagement(
             Device->kernels[gcvCORE_3D1]->hardware, gcvTRUE
             ));
 
         /* Switch to OFF power state. */
-        gcmkONERROR(gckHARDWARE_SetPowerManagementState(
+        gcmkONERROR(gckHARDWARE_SetPowerState(
             Device->kernels[gcvCORE_3D1]->hardware, gcvPOWER_OFF
             ));
     }
@@ -1667,7 +1669,7 @@ gckGALDEVICE_Stop(
     if (Device->kernels[gcvCORE_2D] != gcvNULL)
     {
         /* Switch to OFF power state. */
-        gcmkONERROR(gckHARDWARE_SetPowerManagementState(
+        gcmkONERROR(gckHARDWARE_SetPowerState(
             Device->kernels[gcvCORE_2D]->hardware, gcvPOWER_OFF
             ));
     }
@@ -1676,7 +1678,7 @@ gckGALDEVICE_Stop(
     {
 #if gcdENABLE_VG
         /* Switch to OFF power state. */
-        gcmkONERROR(gckVGHARDWARE_SetPowerManagementState(
+        gcmkONERROR(gckVGHARDWARE_SetPowerState(
             Device->kernels[gcvCORE_VG]->vg->hardware, gcvPOWER_OFF
             ));
 #endif

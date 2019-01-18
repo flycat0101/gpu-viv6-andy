@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -195,13 +195,12 @@ static VkResult __vki_InitializeChipInfo(
         }
     }
 
-#if __VK_NEW_DEVICE_QUEUE
     iface.command = gcvHAL_GET_BASE_ADDRESS;
     __VK_ONERROR(__vk_DeviceControl(&iface, 0));
     chipInfo->flatMappingRangeCount = iface.u.GetBaseAddress.flatMappingRangeCount;
     __VK_MEMCOPY(chipInfo->flatMappingRanges, iface.u.GetBaseAddress.flatMappingRanges,
         sizeof(gcsFLAT_MAPPING_RANGE) * chipInfo->flatMappingRangeCount);
-#endif
+
 
     return VK_SUCCESS;
 

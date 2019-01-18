@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -104,12 +104,12 @@
 #define MIRROR_COORD_1darray \
 "    float fcoord1 = 2.0 * floor(0.5 * fcoord.x + 0.5); \n" \
 "    fcoord.x = viv_fabs(fcoord.x - fcoord1); \n" \
-"    fcoord.y = clamp(fcoord.y, 0, imageSize.y - 1); \n"
+"    fcoord.y = clamp(fcoord.y, 0.0, imageSize.y - 1.0); \n"
 
 #define MIRROR_COORD_2DARRAY \
 "    float2 fcoord1 = 2.0 * floor(0.5 * fcoord.xy + 0.5); \n" \
 "    fcoord.xy = viv_fabs(fcoord.xy - fcoord1); \n" \
-"    fcoord.z = clamp(fcoord.z, 0, imageSize.z - 1); \n"
+"    fcoord.z = clamp(fcoord.z, 0.0, imageSize.z - 1.0); \n"
 
 #define MIRROR_COORD_3d \
 "    float3 fcoord1 = 2.0 * floor(0.5 * fcoord + 0.5); \n" \
@@ -125,17 +125,16 @@
 
 #define CONVERT_NORMALIZED_COORD_TO_UNNORMALIZED_COORD_1darray \
 "    fcoord = fcoord * convert_float2(imageSize); \n" \
-"    fcoord.y = clamp(fcoord.y, 0, imageSize.y - 1); \n"
+"    fcoord.y = clamp(fcoord.y, 0.0, imageSize.y - 1.0); \n"
 
 /* Note that for 2D array, imageSize.z is the array size, the real size is stored in xy. */
 #define CONVERT_NORMALIZED_COORD_TO_UNNORMALIZED_COORD_2DARRAY \
 "    fcoord = fcoord * convert_float3(imageSize); \n" \
-"    fcoord.z = clamp(fcoord.z, 0, imageSize.z - 1); \n"
+"    fcoord.z = clamp(fcoord.z, 0.0, imageSize.z - 1.0); \n"
 
 #define CONVERT_NORMALIZED_COORD_TO_UNNORMALIZED_COORD_3d \
 "    fcoord = fcoord * convert_float3(imageSize); \n"
 
-/* TODO: - Need to optimize the division. */
 #define CONVERT_UNNORMALIZED_COORD_TO_NORMALIZED_COORD_1d \
 "    fcoord = fcoord / convert_float(imageSize); \n"
 
@@ -146,11 +145,11 @@
 
 #define CONVERT_UNNORMALIZED_COORD_TO_NORMALIZED_COORD_1darray \
 "    fcoord = fcoord / convert_float2(imageSize); \n" \
-"    fcoord.y = clamp(fcoord.y, 0, imageSize.y - 1); \n"
+"    fcoord.y = clamp(fcoord.y, 0.0, imageSize.y - 1.0); \n"
 
 #define CONVERT_UNNORMALIZED_COORD_TO_NORMALIZED_COORD_2DARRAY \
 "    fcoord = fcoord / convert_float3(imageSize); \n" \
-"    fcoord.z = clamp(fcoord.z, 0, imageSize.z - 1); \n"
+"    fcoord.z = clamp(fcoord.z, 0.0, imageSize.z - 1.0); \n"
 
 #define CONVERT_UNNORMALIZED_COORD_TO_NORMALIZED_COORD_3d \
 "    fcoord = fcoord / convert_float3(imageSize); \n"
@@ -176,7 +175,6 @@
 #define CONVERT_FLOAT_COORD_TO_INT_COORD_3d \
 "    int3 coord = convert_int3_rtn(fcoord); \n"
 
-/* TODO: - Need to optimize (imageSize - 1). */
 #define CLAMP_COORD_UPPER \
 "    coord = viv_min(coord, imageSize - 1); \n"
 #define CLAMP_COORD_UPPER_1d CLAMP_COORD_UPPER
@@ -199,7 +197,6 @@
 "    coord.z = clamp(coord.z, 0, imageSize.z - 1); \n"
 #define CLAMP_NONE_3d
 
-/* TODO: - Need to optimize (imageSize - 1). */
 #define CLAMP_COORD_1d \
 "    coord = clamp(coord, 0, imageSize - 1); \n"
 
@@ -355,7 +352,6 @@
 "    coordQ.xy = convert_int2(fcoord.xy); \n" \
 "    coordQ.zw = coordQ.xy + 1; \n"
 
-/* TODO: 3D is not done yet. */
 #define GET_I0J0I1J1_SIMPLE_3d \
 "    fcoord = fcoord - 0.5; \n" \
 "    float3 fractUVW = fcoord; \n" \
@@ -365,7 +361,6 @@
 "    coordQ = convert_int3(fcoord); \n" \
 "    coordR = coordQ + 1; \n"
 
-/* TODO: - Need to optimize (imageSize - 1). */
 #define CLAMP_I0J0I1J1_1d \
 "    int imageSizeM1 = imageSize - 1; \n" \
 "    coordQ.x = clamp(coordQ.x, (int)(0), imageSizeM1); \n" \
@@ -388,7 +383,6 @@
 "    coordQ.xy = clamp(coordQ.xy, (int2)(0), imageSizeM1); \n" \
 "    coordQ.zw = clamp(coordQ.zw, (int2)(0), imageSizeM1); \n"
 
-/* TODO: 3D is not done yet. */
 #define CLAMP_I0J0I1J1_3d \
 "    int3 imageSizeM1 = imageSize - 1; \n" \
 "    coordQ = clamp(coordQ, (int3)(0), imageSizeM1); \n" \
@@ -450,7 +444,6 @@
 "    if (coordQ.z >= imageSize.x) coordQ.z -= imageSize.x; \n" \
 "    if (coordQ.w >= imageSize.y) coordQ.w -= imageSize.y; \n"
 
-/* TODO: 3D is not done yet. */
 #define GET_I0J0I1J1_WRAP_3d \
 "    fcoord = fcoord - floor(fcoord); \n" \
 "    fcoord = fcoord * convert_float3(imageSize) - 0.5; \n" \
@@ -527,7 +520,6 @@
 "    coordQ.xy = clamp(coordQ.xy, (int2)(0), imageSizeM1); \n" \
 "    coordQ.zw = clamp(coordQ.zw, (int2)(0), imageSizeM1); \n"
 
-/* TODO: 3D is not done yet. */
 #define GET_I0J0I1J1_MIRROR_3d \
 "    float3 fcoord1 = 2.0 * floor(0.5 * fcoord + 0.5); \n" \
 "    fcoord = viv_fabs(fcoord - fcoord1); \n" \
@@ -1398,12 +1390,7 @@
 "     return (float4)(vload_half((uint)coord.x, base), 0.0f, 0.0f, 1.0f); \n" \
 "} \n" \
 "\n"
-#define LOAD_Half_TEXEL_2DARRAY_R(_TYPE_, _BASE_) LOAD_HALF4_2DARRAY_R
-#define LOAD_HALF4_2DARRAY_R \
-"     half * base = (half *) ((uchar *)image.x + image.y * (uint)coord.y); \n" \
-"     return (float4)(vload_half((uint)coord.x, base), 0.0f, 0.0f, 1.0f); \n" \
-"} \n" \
-"\n"
+#define LOAD_Half_TEXEL_2DARRAY_R(_TYPE_, _BASE_) LOAD_HALF4_3d_R
 
 #define LOAD_Half_TEXEL_3d_R(_TYPE_, _BASE_) LOAD_HALF4_3d_R
 #define LOAD_HALF4_3d_R \
@@ -1690,7 +1677,6 @@
 #define LOAD_4_UNORM_TEXELS_1darray_R(_TYPE_, _BASE_) \
        LOAD_4_UNORM_TEXELS_1darray_R_##_TYPE_(_TYPE_,_BASE_)
 
-/* TODO: 2DARRAY not really implemented, just to pass building. */
 #define LOAD_4_UNORM_TEXELS_2DARRAY(_TYPE_, _BASE_) \
 "    int index = rint(fcoord.z); \n" \
 "    index = clamp(index, 0, imageSize.z - 1); \n" \
@@ -1702,9 +1688,43 @@
 "    float4 T11 = convert_float4(base1[coordQ.z]) / " #_BASE_ "; \n"
 
 #define LOAD_4_UNORM_TEXELS_2DARRAY_BGRA LOAD_4_UNORM_TEXELS_2DARRAY
-#define LOAD_4_UNORM_TEXELS_2DARRAY_R LOAD_4_UNORM_TEXELS_2DARRAY
+#define LOAD_4_UNORM_TEXELS_2DARRAY_CONV(_CONV_TYPE_, _TYPE_, _BASE_) \
+"    int index = rint(fcoord.z); \n" \
+"    index = clamp(index, 0, imageSize.z - 1); \n" \
+"    " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)index); \n" \
+"    float4 T00 = convert_float4((" #_TYPE_ ")(base0[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    float4 T10 = convert_float4((" #_TYPE_ ")(base0[coordQ.z], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    " #_CONV_TYPE_ " * base1 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.w + image.z * (uint)index); \n" \
+"    float4 T01 = convert_float4((" #_TYPE_ ")(base1[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"    float4 T11 = convert_float4((" #_TYPE_ ")(base1[coordQ.z], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n"
 
-/* TODO: The following similiar 3D macros are not proven to be done. */
+#define LOAD_4_UNORM_TEXELS_2DARRAY_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_2DARRAY_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_2DARRAY_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_2DARRAY_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_2DARRAY_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_2DARRAY_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_2DARRAY_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_2DARRAY_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_2DARRAY_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_2DARRAY_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_2DARRAY_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_2DARRAY_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_2DARRAY_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_2DARRAY_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_2DARRAY_R_half(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_2DARRAY_CONV(half,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_2DARRAY_R(_TYPE_, _BASE_) \
+       LOAD_4_UNORM_TEXELS_2DARRAY_R_##_TYPE_(_TYPE_,_BASE_)
+
 #define LOAD_4_UNORM_TEXELS_3d(_TYPE_, _BASE_) \
 "    " #_TYPE_ " * base0 = (" #_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordQ.z); \n" \
 "    float4 T000 = convert_float4(base0[(uint)coordQ.x]) / " #_BASE_ "; \n" \
@@ -1897,7 +1917,7 @@
 #define LOAD_4_SNORM_TEXELS_1darray_R(_TYPE_, _BASE_) \
        LOAD_4_SNORM_TEXELS_1darray_R_##_TYPE_(_TYPE_,_BASE_)
 
-/* TODO: Just to pass building so far. */
+
 #define LOAD_4_SNORM_TEXELS_2DARRAY(_TYPE_, _BASE_) \
 "    int index = rint(fcoord.z); \n" \
 "    index = clamp(index, 0, imageSize.z - 1); \n" \
@@ -1909,9 +1929,43 @@
 "    float4 T11 = max(convert_float4(base1[coordQ.z]) / " #_BASE_ ", -1.0); \n"
 
 #define LOAD_4_SNORM_TEXELS_2DARRAY_BGRA LOAD_4_SNORM_TEXELS_2DARRAY
-#define LOAD_4_SNORM_TEXELS_2DARRAY_R LOAD_4_SNORM_TEXELS_2DARRAY
+#define LOAD_4_SNORM_TEXELS_2DARRAY_CONV(_CONV_TYPE_, _TYPE_, _BASE_) \
+"    int index = rint(fcoord.z); \n" \
+"    index = clamp(index, 0, imageSize.z - 1); \n" \
+"    " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)index); \n" \
+"    float4 T00 = max(convert_float4((" #_TYPE_ ")(base0[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"    float4 T10 = max(convert_float4((" #_TYPE_ ")(base0[coordQ.z], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"    " #_CONV_TYPE_ " * base1 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.w + image.z * (uint)index); \n" \
+"    float4 T01 = max(convert_float4((" #_TYPE_ ")(base1[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"    float4 T11 = max(convert_float4((" #_TYPE_ ")(base1[coordQ.z], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n"
 
-/* TODO: Just to pass building so far. */
+#define LOAD_4_SNORM_TEXELS_2DARRAY_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_2DARRAY_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_2DARRAY_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_2DARRAY_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_2DARRAY_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_2DARRAY_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_2DARRAY_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_2DARRAY_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_2DARRAY_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_2DARRAY_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_2DARRAY_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_2DARRAY_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_2DARRAY_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_2DARRAY_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_2DARRAY_R_half(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_2DARRAY_CONV(half,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_2DARRAY_R(_TYPE_, _BASE_) \
+       LOAD_4_SNORM_TEXELS_2DARRAY_R_##_TYPE_(_TYPE_,_BASE_)
+
 #define LOAD_4_SNORM_TEXELS_3d(_TYPE_, _BASE_) \
 "    " #_TYPE_ " * base0 = (" #_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordQ.z); \n" \
 "    float4 T000 = max(convert_float4(base0[(uint)coordQ.x]) / " #_BASE_ ", -1.0); \n" \
@@ -2024,7 +2078,6 @@
 "    float4 T00 = (float4)(vload_half((uint)coordQ.x, base0), .0f, .0f, 1.0f); \n" \
 "    float4 T11 = (float4)(vload_half((uint)coordQ.y, base0), .0f, .0f, 1.0f); \n" \
 
-/* TODO: Just to pass building so far. */
 #define LOAD_4_Half_TEXELS_2DARRAY(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_2DARRAY
 #define LOAD_4_HALF_TEXELS_2DARRAY \
 "    int index = rint(fcoord.z); \n" \
@@ -2037,9 +2090,17 @@
 "    float4 T11 = vload_half4((uint)coordQ.z, base1); \n"
 
 #define LOAD_4_Half_TEXELS_2DARRAY_BGRA LOAD_4_Half_TEXELS_2DARRAY
-#define LOAD_4_Half_TEXELS_2DARRAY_R LOAD_4_Half_TEXELS_2DARRAY
+#define LOAD_4_Half_TEXELS_2DARRAY_R(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_2DARRAY_R
+#define LOAD_4_HALF_TEXELS_2DARRAY_R \
+"    int index = rint(fcoord.z); \n" \
+"    index = clamp(index, 0, imageSize.z - 1); \n" \
+"    half * base0 = (half *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)index); \n" \
+"    float4 T00 = (float4)(vload_half((uint)coordQ.x, base0), .0f, .0f, 1.0f); \n" \
+"    float4 T10 = (float4)(vload_half((uint)coordQ.z, base0), .0f, .0f, 1.0f); \n" \
+"    half * base1 = (half *) ((uchar *)image.x + image.y * (uint)coordQ.w + image.z * (uint)index); \n" \
+"    float4 T01 = (float4)(vload_half((uint)coordQ.x, base1), .0f, .0f, 1.0f); \n" \
+"    float4 T11 = (float4)(vload_half((uint)coordQ.z, base1), .0f, .0f, 1.0f); \n"
 
-/* TODO: Just to pass building so far. */
 #define LOAD_4_Half_TEXELS_3d(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_3d
 #define LOAD_4_HALF_TEXELS_3d \
 "    half * base0 = (half *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordQ.z); \n" \
@@ -2056,7 +2117,20 @@
 "    float4 T111 = vload_half4((uint)coordR.x, base3); \n"
 
 #define LOAD_4_Half_TEXELS_3d_BGRA LOAD_4_Half_TEXELS_3d
-#define LOAD_4_Half_TEXELS_3d_R LOAD_4_Half_TEXELS_3d
+#define LOAD_4_Half_TEXELS_3d_R(_TYPE_, _BASE_) LOAD_4_HALF_3d_R
+#define LOAD_4_HALF_3d_R \
+"    half * base0 = (half *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordQ.z); \n" \
+"    float4 T000 = (float4)(vload_half((uint)coordQ.x, base0), .0f, .0f, 1.0f); \n" \
+"    float4 T100 = (float4)(vload_half((uint)coordR.x, base0), .0f, .0f, 1.0f); \n" \
+"    half * base1 = (half *) ((uchar *)image.x + image.y * (uint)coordR.y + image.z * (uint)coordQ.z); \n" \
+"    float4 T010 = (float4)(vload_half((uint)coordQ.x, base1), .0f, .0f, 1.0f); \n" \
+"    float4 T110 = (float4)(vload_half((uint)coordR.x, base1), .0f, .0f, 1.0f); \n" \
+"    half * base2 = (half *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordR.z); \n" \
+"    float4 T001 = (float4)(vload_half((uint)coordQ.x, base2), .0f, .0f, 1.0f); \n" \
+"    float4 T101 = (float4)(vload_half((uint)coordR.x, base2), .0f, .0f, 1.0f); \n" \
+"    half * base3 = (half *) ((uchar *)image.x + image.y * (uint)coordR.y + image.z * (uint)coordR.z); \n" \
+"    float4 T011 = (float4)(vload_half((uint)coordQ.x, base3), .0f, .0f, 1.0f); \n" \
+"    float4 T111 = (float4)(vload_half((uint)coordR.x, base3), .0f, .0f, 1.0f); \n"
 
 #define LOAD_4_Float_TEXELS_1d(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_1d
 #define LOAD_4_FLOAT_TEXELS_1d \
@@ -2111,7 +2185,6 @@
 "    float4 T00 = (float4)(base0[coordQ.x], .0f, .0f, 1.0f); \n" \
 "    float4 T11 = (float4)(base0[coordQ.y], .0f, .0f, 1.0f); \n"
 
-/* TODO: Just to pass building so far. */
 #define LOAD_4_Float_TEXELS_2DARRAY(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_2DARRAY
 #define LOAD_4_FLOAT_TEXELS_2DARRAY \
 "    int index = rint(fcoord.z); \n" \
@@ -2124,9 +2197,17 @@
 "    float4 T11 = base1[coordQ.z]; \n"
 
 #define LOAD_4_Float_TEXELS_2DARRAY_BGRA LOAD_4_Float_TEXELS_2DARRAY
-#define LOAD_4_Float_TEXELS_2DARRAY_R LOAD_4_Float_TEXELS_2DARRAY
+#define LOAD_4_Float_TEXELS_2DARRAY_R(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_2DARRAY_R
+#define LOAD_4_FLOAT_TEXELS_2DARRAY_R \
+"    int index = rint(fcoord.z); \n" \
+"    index = clamp(index, 0, imageSize.z - 1); \n" \
+"    float * base0 = (float *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)index); \n" \
+"    float4 T00 = (float4)(base0[coordQ.x], .0f, .0f, 1.0f); \n" \
+"    float4 T10 = (float4)(base0[coordQ.z], .0f, .0f, 1.0f); \n" \
+"    float * base1 = (float *) ((uchar *)image.x + image.y * (uint)coordQ.w + image.z * (uint)index); \n" \
+"    float4 T01 = (float4)(base1[coordQ.x], .0f, .0f, 1.0f); \n" \
+"    float4 T11 = (float4)(base1[coordQ.z], .0f, .0f, 1.0f); \n"
 
-/* TODO: Just to pass building so far. */
 #define LOAD_4_Float_TEXELS_3d(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_3d
 #define LOAD_4_FLOAT_TEXELS_3d \
 "    float4 * base0 = (float4 *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordQ.z); \n" \
@@ -2143,7 +2224,20 @@
 "    float4 T111 = base3[(uint)coordR.x]; \n"
 
 #define LOAD_4_Float_TEXELS_3d_BGRA LOAD_4_Float_TEXELS_3d
-#define LOAD_4_Float_TEXELS_3d_R LOAD_4_Float_TEXELS_3d
+#define LOAD_4_Float_TEXELS_3d_R(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_3d_R
+#define LOAD_4_FLOAT_TEXELS_3d_R \
+"    float * base0 = (float *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordQ.z); \n" \
+"    float4 T000 = (float4)(base0[(uint)coordQ.x], .0f, .0f, 1.0f); \n" \
+"    float4 T100 = (float4)(base0[(uint)coordR.x], .0f, .0f, 1.0f); \n" \
+"    float * base1 = (float *) ((uchar *)image.x + image.y * (uint)coordR.y + image.z * (uint)coordQ.z); \n" \
+"    float4 T010 = (float4)(base1[(uint)coordQ.x], .0f, .0f, 1.0f); \n" \
+"    float4 T110 = (float4)(base1[(uint)coordR.x], .0f, .0f, 1.0f); \n" \
+"    float * base2 = (float *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordR.z); \n" \
+"    float4 T001 = (float4)(base2[(uint)coordQ.x], .0f, .0f, 1.0f); \n" \
+"    float4 T101 = (float4)(base2[(uint)coordR.x], .0f, .0f, 1.0f); \n" \
+"    float * base3 = (float *) ((uchar *)image.x + image.y * (uint)coordR.y + image.z * (uint)coordR.z); \n" \
+"    float4 T011 = (float4)(base3[(uint)coordQ.x], .0f, .0f, 1.0f); \n" \
+"    float4 T111 = (float4)(base3[(uint)coordR.x], .0f, .0f, 1.0f); \n"
 
 #define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1d(_TYPE_, _BASE_) \
 "    float4 T00, T11; \n" \
@@ -2491,7 +2585,7 @@
 #define LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_R(_TYPE_, _BASE_) LOAD_4_UNORM_TEXELS_BORDER_CHECK_1darray_R_##_TYPE_(_TYPE_,_BASE_)
 
 
-/* TODO: Just to pass building so far. */
+
 #define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY(_TYPE_, _BASE_) \
 "    float4 T00, T01, T10, T11; \n" \
 "    int index = rint(fcoord.z); \n" \
@@ -2551,9 +2645,88 @@
 
 #define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_BGRA LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY
 
-#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_R LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_CONV(_CONV_TYPE_, _TYPE_, _BASE_) \
+"    float4 T00, T01, T10, T11; \n" \
+"    int index = rint(fcoord.z); \n" \
+"    index = clamp(index, 0, imageSize.z - 1); \n" \
+"    if (((uint)coordQ.y >= (uint)imageSize.y) || (coordQ.y < 0)) \n" \
+"    { \n" \
+"        T00 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T10 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)index); \n" \
+"        if (((uint)coordQ.x >= (uint)imageSize.x) || (coordQ.x < 0)) \n" \
+"        { \n" \
+"            T00 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T00 = convert_float4((" #_TYPE_ ")(base0[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"        } \n" \
+"        if (((uint)coordQ.z >= (uint)imageSize.x) || (coordQ.z < 0)) \n" \
+"        { \n" \
+"            T10 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T10 = convert_float4((" #_TYPE_ ")(base0[coordQ.z], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"        } \n" \
+"    } \n" \
+"    if (((uint)coordQ.w >= (uint)imageSize.y) || (coordQ.w < 0)) \n" \
+"    { \n" \
+"        T01 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T11 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        " #_CONV_TYPE_ " * base1 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.w + image.z * (uint)index); \n" \
+"        if (((uint)coordQ.x >= (uint)imageSize.x) || (coordQ.x < 0)) \n" \
+"        { \n" \
+"            T01 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T01 = convert_float4((" #_TYPE_ ")(base1[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"        } \n" \
+"        if (((uint)coordQ.z >= (uint)imageSize.x) || (coordQ.z < 0)) \n" \
+"        { \n" \
+"            T11 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T11 = convert_float4((" #_TYPE_ ")(base1[coordQ.z], 0, 0, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"        } \n" \
+"    } \n"
 
-/* TODO: Just to pass building so far. */
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_R_half(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_CONV(half,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_R(_TYPE_, _BASE_) LOAD_4_UNORM_TEXELS_BORDER_CHECK_2DARRAY_R_##_TYPE_(_TYPE_,_BASE_)
+
+
 #define LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d(_TYPE_, _BASE_) \
 "    float4 T000, T010, T100, T110, T001, T011, T101, T111; \n" \
 "    if (((int)coordQ.z >= (int)imageSize.z) || ((int)coordQ.z < 0)) \n" \
@@ -2680,7 +2853,156 @@
 
 #define LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_BGRA LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d
 
-#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_R LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_CONV(_CONV_TYPE_, _TYPE_, _BASE_) \
+"    float4 T000, T010, T100, T110, T001, T011, T101, T111; \n" \
+"    if (((int)coordQ.z >= (int)imageSize.z) || ((int)coordQ.z < 0)) \n" \
+"    { \n" \
+"        T000 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T100 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T010 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T110 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        if (((int)coordQ.y >= (int)imageSize.y) || ((int)coordQ.y < 0)) \n" \
+"        { \n" \
+"            T000 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            T100 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordQ.z); \n" \
+"            if (((int)coordQ.x >= (int)imageSize.x) || ((int)coordQ.x < 0)) \n" \
+"            { \n" \
+"                T000 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T000 = convert_float4((" #_TYPE_ ")(base0[(int)coordQ.x], .0f, .0f, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"            } \n" \
+"            if (((int)coordR.x >= (int)imageSize.x) || ((int)coordR.x < 0)) \n" \
+"            { \n" \
+"                T100 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T100 = convert_float4((" #_TYPE_ ")(base0[(int)coordR.x], .0f, .0f, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"            } \n" \
+"        } \n" \
+"        if (((int)coordR.y >= (int)imageSize.y) || ((int)coordR.y < 0)) \n" \
+"        { \n" \
+"            T010 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            T110 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            " #_CONV_TYPE_ " * base1 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordR.y + image.z * (uint)coordQ.z); \n" \
+"            if (((int)coordQ.x >= (int)imageSize.x) || ((int)coordQ.x < 0)) \n" \
+"            { \n" \
+"                T010 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T010 = convert_float4((" #_TYPE_ ")(base1[(int)coordQ.x], .0f, .0f, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"            } \n" \
+"            if (((int)coordR.x >= (int)imageSize.x) || ((int)coordR.x < 0)) \n" \
+"            { \n" \
+"                T110 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T110 = convert_float4((" #_TYPE_ ")(base1[(int)coordR.x], .0f, .0f, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"            } \n" \
+"        } \n" \
+"    } \n" \
+"    if (((int)coordR.z >= (int)imageSize.z) || ((int)coordR.z < 0)) \n" \
+"    { \n" \
+"        T001 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T101 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T011 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T111 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        if (((int)coordQ.y >= (int)imageSize.y) || ((int)coordQ.y < 0)) \n" \
+"        { \n" \
+"            T001 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            T101 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordR.z); \n" \
+"            if (((int)coordQ.x >= (int)imageSize.x) || ((int)coordQ.x < 0)) \n" \
+"            { \n" \
+"                T001 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T001 = convert_float4((" #_TYPE_ ")(base0[(int)coordQ.x], .0f, .0f, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"            } \n" \
+"            if (((int)coordR.x >= (int)imageSize.x) || ((int)coordR.x < 0)) \n" \
+"            { \n" \
+"                T101 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T101 = convert_float4((" #_TYPE_ ")(base0[(int)coordR.x], .0f, .0f, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"            } \n" \
+"        } \n" \
+"        if (((int)coordR.y >= (int)imageSize.y) || ((int)coordR.y < 0)) \n" \
+"        { \n" \
+"            T011 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            T111 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            " #_CONV_TYPE_ " * base1 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordR.y + image.z * (uint)coordR.z); \n" \
+"            if (((int)coordQ.x >= (int)imageSize.x) || ((int)coordQ.x < 0)) \n" \
+"            { \n" \
+"                T011 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T011 = convert_float4((" #_TYPE_ ")(base1[(int)coordQ.x], .0f, .0f, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"            } \n" \
+"            if (((int)coordR.x >= (int)imageSize.x) || ((int)coordR.x < 0)) \n" \
+"            { \n" \
+"                T111 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T111 = convert_float4((" #_TYPE_ ")(base1[(int)coordR.x], .0f, .0f, " #_BASE_ ")) / " #_BASE_ "; \n" \
+"            } \n" \
+"        } \n" \
+"    } \n"
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_R_half(_TYPE_, _BASE_) \
+    LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_CONV(half,_TYPE_, _BASE_)
+
+#define LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_R(_TYPE_, _BASE_) LOAD_4_UNORM_TEXELS_BORDER_CHECK_3d_R_##_TYPE_(_TYPE_,_BASE_)
+
+
 
 #define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1d(_TYPE_, _BASE_) \
 "    float4 T00, T11; \n" \
@@ -3004,7 +3326,7 @@
 "    " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)index); \n" \
 "    if ((uint)coordQ.x >= (uint)imageSize.x) \n" \
 "    { \n" \
-"        T00 = (float4)0.0; \n" \
+"        T00 = (float4)(.0f, .0f, .0f, 1.f); \n" \
 "    } \n" \
 "    else \n" \
 "    { \n" \
@@ -3012,7 +3334,7 @@
 "    } \n" \
 "    if ((uint)coordQ.y >= (uint)imageSize.x) \n" \
 "    { \n" \
-"        T11 = (float4)0.0; \n" \
+"        T11 = (float4)(.0f, .0f, .0f, 1.f); \n" \
 "    } \n" \
 "    else \n" \
 "    { \n" \
@@ -3048,7 +3370,7 @@
 #define LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_R(_TYPE_, _BASE_) \
        LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_R_##_TYPE_(_TYPE_,_BASE_)
 
-/* TODO: Just to pass building so far. */
+
 #define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY(_TYPE_, _BASE_) \
 "    float4 T00, T01, T10, T11; \n" \
 "    int index = rint(fcoord.z); \n" \
@@ -3108,9 +3430,90 @@
 
 #define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_BGRA LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY
 
-#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_R LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_CONV(_CONV_TYPE_, _TYPE_, _BASE_) \
+"    float4 T00, T01, T10, T11; \n" \
+"    int index = rint(fcoord.z); \n" \
+"    index = clamp(index, 0, imageSize.z - 1); \n" \
+"    if (((uint)coordQ.y >= (uint)imageSize.y) || (coordQ.y < 0)) \n" \
+"    { \n" \
+"        T00 = (float4)(.0f, .0f, .0f, 1.f); \n" \
+"        T10 = (float4)(.0f, .0f, .0f, 1.f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)index); \n" \
+"        if (((uint)coordQ.x >= (uint)imageSize.x) || (coordQ.x < 0)) \n" \
+"        { \n" \
+"            T00 = (float4)(.0f, .0f, .0f, 1.f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T00 = max(convert_float4((" #_TYPE_ ")(base0[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"        } \n" \
+"        if (((uint)coordQ.z >= (uint)imageSize.x) || (coordQ.z < 0)) \n" \
+"        { \n" \
+"            T10 = (float4)(.0f, .0f, .0f, 1.f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T10 = max(convert_float4((" #_TYPE_ ")(base0[coordQ.z], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"        } \n" \
+"    } \n" \
+"    if (((uint)coordQ.w >= (uint)imageSize.y) || (coordQ.w < 0)) \n" \
+"    { \n" \
+"        T01 = (float4)(.0f, .0f, .0f, 1.f); \n" \
+"        T11 = (float4)(.0f, .0f, .0f, 1.f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        " #_CONV_TYPE_ " * base1 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.w + image.z * (uint)index); \n" \
+"        if (((uint)coordQ.x >= (uint)imageSize.x) || (coordQ.x < 0)) \n" \
+"        { \n" \
+"            T01 = (float4)(.0f, .0f, .0f, 1.f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T01 = max(convert_float4((" #_TYPE_ ")(base1[coordQ.x], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"        } \n" \
+"        if (((uint)coordQ.z >= (uint)imageSize.x) || (coordQ.z < 0)) \n" \
+"        { \n" \
+"            T11 = (float4)(.0f, .0f, .0f, 1.f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T11 = max(convert_float4((" #_TYPE_ ")(base1[coordQ.z], 0, 0, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"        } \n" \
+"    } \n"
 
-/* TODO: Just to pass building so far. */
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_R_half(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_1darray_CONV(half,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_R(_TYPE_, _BASE_) \
+       LOAD_4_SNORM_TEXELS_BORDER_CHECK_2DARRAY_R_##_TYPE_(_TYPE_,_BASE_)
+
+
+
 #define LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d(_TYPE_, _BASE_) \
 "    float4 T000, T010, T100, T110, T001, T011, T101, T111; \n" \
 "    if (((int)coordQ.z >= (int)imageSize.z) || ((int)coordQ.z < 0)) \n" \
@@ -3238,7 +3641,155 @@
 
 #define LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_BGRA LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d
 
-#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_R LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_CONV(_CONV_TYPE_, _TYPE_, _BASE_) \
+"    float4 T000, T010, T100, T110, T001, T011, T101, T111; \n" \
+"    if (((int)coordQ.z >= (int)imageSize.z) || ((int)coordQ.z < 0)) \n" \
+"    {\n" \
+"        T000 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T100 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T010 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T110 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"    }\n" \
+"    else\n" \
+"    {\n" \
+"        if (((int)coordQ.y >= (int)imageSize.y) || ((int)coordQ.y < 0)) \n" \
+"        { \n" \
+"            T000 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            T100 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordQ.z); \n" \
+"            if (((int)coordQ.x >= (int)imageSize.x) || ((int)coordQ.x < 0)) \n" \
+"            { \n" \
+"                T000 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T000 = max(convert_float4((" #_TYPE_ ")(base0[(int)coordQ.x], .0f, .0f, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"            } \n" \
+"            if (((int)coordR.x >= (int)imageSize.x) || ((int)coordR.x < 0)) \n" \
+"            { \n" \
+"                T100 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T100 = max(convert_float4((" #_TYPE_ ")(base0[(int)coordR.x], .0f, .0f, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"            } \n" \
+"        } \n" \
+"        if (((int)coordR.y >= (int)imageSize.y) || ((int)coordR.y < 0)) \n" \
+"        { \n" \
+"            T010 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            T110 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            " #_CONV_TYPE_ " * base1 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordR.y + image.z * (uint)coordQ.z); \n" \
+"            if (((int)coordQ.x >= (int)imageSize.x) || ((int)coordQ.x < 0)) \n" \
+"            { \n" \
+"                T010 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T010 = max(convert_float4((" #_TYPE_ ")(base1[(int)coordQ.x], .0f, .0f, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"            } \n" \
+"            if (((int)coordR.x >= (int)imageSize.x) || ((int)coordR.x < 0)) \n" \
+"            { \n" \
+"                T110 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T110 = max(convert_float4((" #_TYPE_ ")(base1[(int)coordR.x], .0f, .0f, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"            } \n" \
+"        } \n" \
+"    }\n" \
+"    if (((int)coordR.z >= (int)imageSize.z) || ((int)coordR.z < 0)) \n" \
+"    {\n" \
+"        T001 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T101 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T011 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T111 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"    }\n" \
+"    else\n" \
+"    {\n" \
+"        if (((int)coordQ.y >= (int)imageSize.y) || ((int)coordQ.y < 0)) \n" \
+"        { \n" \
+"            T001 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            T101 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            " #_CONV_TYPE_ " * base0 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordR.z); \n" \
+"            if (((int)coordQ.x >= (int)imageSize.x) || ((int)coordQ.x < 0)) \n" \
+"            { \n" \
+"                T001 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T001 = max(convert_float4((" #_TYPE_ ")(base0[(int)coordQ.x], .0f, .0f, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"            } \n" \
+"            if (((int)coordR.x >= (int)imageSize.x) || ((int)coordR.x < 0)) \n" \
+"            { \n" \
+"                T101 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T101 = max(convert_float4((" #_TYPE_ ")(base0[(int)coordR.x], .0f, .0f, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"            } \n" \
+"        } \n" \
+"        if (((int)coordR.y >= (int)imageSize.y) || ((int)coordR.y < 0)) \n" \
+"        { \n" \
+"            T011 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            T111 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            " #_CONV_TYPE_ " * base1 = (" #_CONV_TYPE_ " *) ((uchar *)image.x + image.y * (uint)coordR.y + image.z * (uint)coordR.z); \n" \
+"            if (((int)coordQ.x >= (int)imageSize.x) || ((int)coordQ.x < 0)) \n" \
+"            { \n" \
+"                T011 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T011 = max(convert_float4((" #_TYPE_ ")(base1[(int)coordQ.x], .0f, .0f, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"            } \n" \
+"            if (((int)coordR.x >= (int)imageSize.x) || ((int)coordR.x < 0)) \n" \
+"            { \n" \
+"                T111 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T111 = max(convert_float4((" #_TYPE_ ")(base1[(int)coordR.x], .0f, .0f, " #_BASE_ ")) / " #_BASE_ ", -1.0); \n" \
+"            } \n" \
+"        } \n" \
+"    }\n"
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_R_char4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_CONV(char, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_R_uchar4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_CONV(uchar, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_R_ushort4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_CONV(ushort, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_R_short4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_CONV(short, _TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_R_uint4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_CONV(uint,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_R_int4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_CONV(int,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_R_float4(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_CONV(float,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_R_half(_TYPE_, _BASE_) \
+    LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_CONV(half,_TYPE_, _BASE_)
+
+#define LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_R(_TYPE_, _BASE_) \
+       LOAD_4_SNORM_TEXELS_BORDER_CHECK_3d_R_##_TYPE_(_TYPE_,_BASE_)
 
 #define LOAD_4_Half_TEXELS_BORDER_CHECK_1d(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_BORDER_CHECK_1d
 #define LOAD_4_Half_TEXELS_BORDER_CHECK_1dbuffer(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_BORDER_CHECK_1d
@@ -3473,7 +4024,7 @@
 "        T11 = (float4)(vload_half((uint)coordQ.y, base0), .0f, .0f, 1.0f); \n" \
 "    } \n"
 
-/* TODO: Just to pass building so far. */
+
 #define LOAD_4_Half_TEXELS_BORDER_CHECK_2DARRAY(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_BORDER_CHECK_2DARRAY
 #define LOAD_4_HALF_TEXELS_BORDER_CHECK_2DARRAY \
 "    float4 T00, T01, T10, T11; \n" \
@@ -3534,9 +4085,63 @@
 
 #define LOAD_4_Half_TEXELS_BORDER_CHECK_2DARRAY_BGRA LOAD_4_Half_TEXELS_BORDER_CHECK_2DARRAY
 
-#define LOAD_4_Half_TEXELS_BORDER_CHECK_2DARRAY_R LOAD_4_Half_TEXELS_BORDER_CHECK_2DARRAY
+#define LOAD_4_Half_TEXELS_BORDER_CHECK_2DARRAY_R(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_BORDER_CHECK_2DARRAY_R
+#define LOAD_4_HALF_TEXELS_BORDER_CHECK_2DARRAY_R \
+"    float4 T00, T01, T10, T11; \n" \
+"    int index = rint(fcoord.z); \n" \
+"    index = clamp(index, 0, imageSize.z - 1); \n" \
+"    if (((uint)coordQ.y >= (uint)imageSize.y) || (coordQ.y < 0)) \n" \
+"    { \n" \
+"        T00 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T10 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        half * base0 = (half *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)index); \n" \
+"        if (((uint)coordQ.x >= (uint)imageSize.x) || (coordQ.x < 0)) \n" \
+"        { \n" \
+"            T00 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T00 = (float4)(vload_half((uint)coordQ.x, base0), .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        if (((uint)coordQ.z >= (uint)imageSize.x) || (coordQ.z < 0)) \n" \
+"        { \n" \
+"            T10 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T10 = (float4)(vload_half((uint)coordQ.z, base0), .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"    } \n" \
+"    if (((uint)coordQ.w >= (uint)imageSize.y) || (coordQ.w < 0)) \n" \
+"    { \n" \
+"        T01 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T11 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        half * base1 = (half *) ((uchar *)image.x + image.y * (uint)coordQ.w + image.z * (uint)index); \n" \
+"        if (((uint)coordQ.x >= (uint)imageSize.x) || (coordQ.x < 0)) \n" \
+"        { \n" \
+"            T01 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T01 = (float4)(vload_half((uint)coordQ.x, base1), .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        if (((uint)coordQ.z >= (uint)imageSize.x) || (coordQ.z < 0)) \n" \
+"        { \n" \
+"            T11 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T11 = (float4)(vload_half((uint)coordQ.z, base1), .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"    } \n"
 
-/* TODO: Just to pass building so far. */
+
 #define LOAD_4_Half_TEXELS_BORDER_CHECK_3d(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_BORDER_CHECK_3d
 #define LOAD_4_HALF_TEXELS_BORDER_CHECK_3d \
 "    float4 T000, T010, T100, T110, T001, T011, T101, T111; \n" \
@@ -3665,7 +4270,129 @@
 
 #define LOAD_4_Half_TEXELS_BORDER_CHECK_3d_BGRA LOAD_4_Half_TEXELS_BORDER_CHECK_3d
 
-#define LOAD_4_Half_TEXELS_BORDER_CHECK_3d_R LOAD_4_Half_TEXELS_BORDER_CHECK_3d
+#define LOAD_4_Half_TEXELS_BORDER_CHECK_3d_R(_TYPE_, _BASE_) LOAD_4_HALF_TEXELS_BORDER_CHECK_3d_R
+#define LOAD_4_HALF_TEXELS_BORDER_CHECK_3d_R \
+"    float4 T000, T010, T100, T110, T001, T011, T101, T111; \n" \
+"    if (((int)coordQ.z >= (int)imageSize.z) || ((int)coordQ.z < 0)) \n" \
+"    {\n" \
+"        T000 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T100 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T010 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T110 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"    }\n" \
+"    else\n" \
+"    {\n" \
+"        if (((int)coordQ.y >= (int)imageSize.y) || ((int)coordQ.y < 0)) \n" \
+"        { \n" \
+"            T000 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            T100 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            half * base0 = (half *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordQ.z); \n" \
+"            if (((int)coordQ.x >= (int)imageSize.x) || ((int)coordQ.x < 0)) \n" \
+"            { \n" \
+"                T000 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T000 = (float4)(vload_half((uint)coordQ.x, base0), .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            if (((int)coordR.x >= (int)imageSize.x) || ((int)coordR.x < 0)) \n" \
+"            { \n" \
+"                T100 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T100 = (float4)(vload_half((uint)coordR.x, base0), .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"        } \n" \
+"        if (((int)coordR.y >= (int)imageSize.y) || ((int)coordR.y < 0)) \n" \
+"        { \n" \
+"            T010 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            T110 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            half * base1 = (half *) ((uchar *)image.x + image.y * (uint)coordR.y + image.z * (uint)coordQ.z); \n" \
+"            if (((int)coordQ.x >= (int)imageSize.x) || ((int)coordQ.x < 0)) \n" \
+"            { \n" \
+"                T010 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T010 = (float4)(vload_half((uint)coordQ.x, base1), .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            if (((int)coordR.x >= (int)imageSize.x) || ((int)coordR.x < 0)) \n" \
+"            { \n" \
+"                T110 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T110 = (float4)(vload_half((uint)coordR.x, base1), .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"        } \n" \
+"    } \n"\
+"    if (((int)coordR.z >= (int)imageSize.z) || ((int)coordR.z < 0)) \n" \
+"    {\n" \
+"        T001 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T101 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T011 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T111 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"    }\n" \
+"    else\n" \
+"    {\n" \
+"        if (((int)coordQ.y >= (int)imageSize.y) || ((int)coordQ.y < 0)) \n" \
+"        { \n" \
+"            T001 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            T101 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            half * base0 = (half *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordR.z); \n" \
+"            if (((int)coordQ.x >= (int)imageSize.x) || ((int)coordQ.x < 0)) \n" \
+"            { \n" \
+"                T001 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T001 = (float4)(vload_half((uint)coordQ.x, base0), .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            if (((int)coordR.x >= (int)imageSize.x) || ((int)coordR.x < 0)) \n" \
+"            { \n" \
+"                T101 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T101 = (float4)(vload_half((uint)coordR.x, base0), .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"        } \n" \
+"        if (((int)coordR.y >= (int)imageSize.y) || ((int)coordR.y < 0)) \n" \
+"        { \n" \
+"            T011 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            T111 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            half * base1 = (half *) ((uchar *)image.x + image.y * (uint)coordR.y + image.z * (uint)coordR.z); \n" \
+"            if (((int)coordQ.x >= (int)imageSize.x) || ((int)coordQ.x < 0)) \n" \
+"            { \n" \
+"                T011 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T011 = (float4)(vload_half((uint)coordQ.x, base1), .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            if (((int)coordR.x >= (int)imageSize.x) || ((int)coordR.x < 0)) \n" \
+"            { \n" \
+"                T111 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T111 = (float4)(vload_half((uint)coordR.x, base1), .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"        } \n" \
+"    } \n"\
 
 #define LOAD_4_Float_TEXELS_BORDER_CHECK_1d(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_BORDER_CHECK_1d
 #define LOAD_4_Float_TEXELS_BORDER_CHECK_1dbuffer(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_BORDER_CHECK_1d
@@ -3905,7 +4632,7 @@
 "        T11 = (float4)(base0[coordQ.y], .0f, .0f, 1.0f); \n" \
 "    } \n" \
 
-/* TODO: Just to pass building so far. */
+
 #define LOAD_4_Float_TEXELS_BORDER_CHECK_2DARRAY(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_BORDER_CHECK_2DARRAY
 #define LOAD_4_FLOAT_TEXELS_BORDER_CHECK_2DARRAY \
 "    float4 T00, T01, T10, T11; \n" \
@@ -3966,9 +4693,63 @@
 
 #define LOAD_4_Float_TEXELS_BORDER_CHECK_2DARRAY_BGRA LOAD_4_Float_TEXELS_BORDER_CHECK_2DARRAY
 
-#define LOAD_4_Float_TEXELS_BORDER_CHECK_2DARRAY_R LOAD_4_Float_TEXELS_BORDER_CHECK_2DARRAY
+#define LOAD_4_Float_TEXELS_BORDER_CHECK_2DARRAY_R(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_BORDER_CHECK_2DARRAY_R
+#define LOAD_4_FLOAT_TEXELS_BORDER_CHECK_2DARRAY_R \
+"    float4 T00, T01, T10, T11; \n" \
+"    int index = rint(fcoord.z); \n" \
+"    index = clamp(index, 0, imageSize.z - 1); \n" \
+"    if (((uint)coordQ.y >= (uint)imageSize.y) || (coordQ.y < 0)) \n" \
+"    { \n" \
+"        T00 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T10 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        float * base0 = (float *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)index); \n" \
+"        if (((uint)coordQ.x >= (uint)imageSize.x) || (coordQ.x < 0)) \n" \
+"        { \n" \
+"            T00 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T00 = (float4)(base0[coordQ.x], .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        if (((uint)coordQ.z >= (uint)imageSize.x) || (coordQ.z < 0)) \n" \
+"        { \n" \
+"            T10 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T10 = (float4)(base0[coordQ.z], .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"    } \n" \
+"    if (((uint)coordQ.w >= (uint)imageSize.y) || (coordQ.w < 0)) \n" \
+"    { \n" \
+"        T01 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T11 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        float * base1 = (float *) ((uchar *)image.x + image.y * (uint)coordQ.w + image.z * (uint)index); \n" \
+"        if (((uint)coordQ.x >= (uint)imageSize.x) || (coordQ.x < 0)) \n" \
+"        { \n" \
+"            T01 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T01 = (float4)(base1[coordQ.x], .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        if (((uint)coordQ.z >= (uint)imageSize.x) || (coordQ.z < 0)) \n" \
+"        { \n" \
+"            T11 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            T11 = (float4)(base1[coordQ.z], .0f, .0f, 1.0f);\n" \
+"        } \n" \
+"    } \n"
 
-/* TODO: Just to pass building so far. */
+
 #define LOAD_4_Float_TEXELS_BORDER_CHECK_3d(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_BORDER_CHECK_3d
 #define LOAD_4_FLOAT_TEXELS_BORDER_CHECK_3d \
 "    float4 T000, T010, T100, T110, T001, T011, T101, T111; \n" \
@@ -4097,7 +4878,129 @@
 
 #define LOAD_4_Float_TEXELS_BORDER_CHECK_3d_BGRA LOAD_4_Float_TEXELS_BORDER_CHECK_3d
 
-#define LOAD_4_Float_TEXELS_BORDER_CHECK_3d_R LOAD_4_Float_TEXELS_BORDER_CHECK_3d
+#define LOAD_4_Float_TEXELS_BORDER_CHECK_3d_R(_TYPE_, _BASE_) LOAD_4_FLOAT_TEXELS_BORDER_CHECK_3d_R
+#define LOAD_4_FLOAT_TEXELS_BORDER_CHECK_3d_R \
+"    float4 T000, T010, T100, T110, T001, T011, T101, T111; \n" \
+"    if (((int)coordQ.z >= (int)imageSize.z) || ((int)coordQ.z < 0)) \n" \
+"    {\n" \
+"        T000 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T100 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T010 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T110 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"    }\n" \
+"    else\n" \
+"    {\n" \
+"        if (((int)coordQ.y >= (int)imageSize.y) || ((int)coordQ.y < 0)) \n" \
+"        { \n" \
+"            T000 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            T100 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            float * base0 = (float *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordQ.z); \n" \
+"            if (((int)coordQ.x >= (int)imageSize.x) || ((int)coordQ.x < 0)) \n" \
+"            { \n" \
+"                T000 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T000 = (float4)(base0[(int)coordQ.x], .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            if (((int)coordR.x >= (int)imageSize.x) || ((int)coordR.x < 0)) \n" \
+"            { \n" \
+"                T100 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T100 = (float4)(base0[(int)coordR.x], .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"        } \n" \
+"        if (((int)coordR.y >= (int)imageSize.y) || ((int)coordR.y < 0)) \n" \
+"        { \n" \
+"            T010 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            T110 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            float * base1 = (float *) ((uchar *)image.x + image.y * (uint)coordR.y + image.z * (uint)coordQ.z); \n" \
+"            if (((int)coordQ.x >= (int)imageSize.x) || ((int)coordQ.x < 0)) \n" \
+"            { \n" \
+"                T010 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T010 = (float4)(base1[(int)coordQ.x], .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            if (((int)coordR.x >= (int)imageSize.x) || ((int)coordR.x < 0)) \n" \
+"            { \n" \
+"                T110 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T110 = (float4)(base1[(int)coordR.x], .0f, .0f, 1.0f);\n" \
+"            } \n" \
+"        } \n" \
+"    } \n" \
+"    if (((int)coordR.z >= (int)imageSize.z) || ((int)coordR.z < 0)) \n" \
+"    {\n" \
+"        T001 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T101 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T011 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        T111 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"    }\n" \
+"    else\n" \
+"    {\n" \
+"        if (((int)coordQ.y >= (int)imageSize.y) || ((int)coordQ.y < 0)) \n" \
+"        { \n" \
+"            T001 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            T101 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            float * base0 = (float *) ((uchar *)image.x + image.y * (uint)coordQ.y + image.z * (uint)coordR.z); \n" \
+"            if (((int)coordQ.x >= (int)imageSize.x) || ((int)coordQ.x < 0)) \n" \
+"            { \n" \
+"                T001 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T001 = (float4)(base0[(int)coordQ.x], .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            if (((int)coordR.x >= (int)imageSize.x) || ((int)coordR.x < 0)) \n" \
+"            { \n" \
+"                T101 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T101 = (float4)(base0[(int)coordR.x], .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"        } \n" \
+"        if (((int)coordR.y >= (int)imageSize.y) || ((int)coordR.y < 0)) \n" \
+"        { \n" \
+"            T011 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            T111 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"        } \n" \
+"        else \n" \
+"        { \n" \
+"            float * base1 = (float *) ((uchar *)image.x + image.y * (uint)coordR.y + image.z * (uint)coordR.z); \n" \
+"            if (((int)coordQ.x >= (int)imageSize.x) || ((int)coordQ.x < 0)) \n" \
+"            { \n" \
+"                T011 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T011 = (float4)(base1[(int)coordQ.x], .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            if (((int)coordR.x >= (int)imageSize.x) || ((int)coordR.x < 0)) \n" \
+"            { \n" \
+"                T111 = (float4)(.0f, .0f, .0f, 1.0f); \n" \
+"            } \n" \
+"            else \n" \
+"            { \n" \
+"                T111 = (float4)(base1[(int)coordR.x], .0f, .0f, 1.0f);\n" \
+"            } \n" \
+"        } \n" \
+"    } \n"
 
 #define LINEAR_FILTER_1d \
 "    float oneMinusFractUV = 1 - fractUV; \n" \
@@ -4114,11 +5017,7 @@
 "} \n" \
 "\n"
 
-#define LINEAR_FILTER_1d_R \
-"    float oneMinusFractUV = 1 - fractUV; \n" \
-"    return (float4)((oneMinusFractUV * T00 + fractUV * T11).x, .0f, .0f, 1.0f);\n" \
-"} \n" \
-"\n"
+#define LINEAR_FILTER_1d_R LINEAR_FILTER_1d
 
 #define LINEAR_FILTER_1dbuffer LINEAR_FILTER_1d
 #define LINEAR_FILTER_1dbuffer_BGRA LINEAR_FILTER_1d_BGRA
@@ -4143,14 +5042,7 @@
 "} \n" \
 "\n"
 
-#define LINEAR_FILTER_2d_R \
-"     float2 oneMinusFractUV = 1 - fractUV; \n" \
-"     return oneMinusFractUV.x * oneMinusFractUV.y * T00 + \n" \
-"                    fractUV.x * oneMinusFractUV.y * T10 + \n" \
-"            oneMinusFractUV.x *         fractUV.y * T01 + \n" \
-"                    fractUV.x *         fractUV.y * T11; \n" \
-"} \n" \
-"\n"
+#define LINEAR_FILTER_2d_R LINEAR_FILTER_2d
 
 
 #define LINEAR_FILTER_1darray \
@@ -4169,26 +5061,14 @@
 "} \n" \
 "\n"
 
-#define LINEAR_FILTER_1darray_R \
-"    float oneMinusFractUV = 1 - fractUV; \n" \
-"    return (float4)((oneMinusFractUV * T00 + fractUV * T11).x, .0f, .0f, 1.0f);\n" \
-"} \n" \
-"\n"
+#define LINEAR_FILTER_1darray_R LINEAR_FILTER_1darray
+#define LINEAR_FILTER_1dbuffer_R LINEAR_FILTER_1darray
 
-#define LINEAR_FILTER_1dbuffer_R \
-"    float oneMinusFractUV = 1 - fractUV; \n" \
-"    return (float4)((oneMinusFractUV * T00 + fractUV * T11).x, .0f, .0f, 1.0f);\n" \
-"} \n" \
-"\n"
-
-
-/* TODO: Just to pass build so far. */
 #define LINEAR_FILTER_2DARRAY LINEAR_FILTER_2d
 #define LINEAR_FILTER_2DARRAY_BGRA LINEAR_FILTER_2d_BGRA
 #define LINEAR_FILTER_2DARRAY_R LINEAR_FILTER_2d_R
 
 
-/* TODO: 3D is not proven to work yet. */
 #define LINEAR_FILTER_3d \
 "    float3 oneMinusFractUVW = 1 - fractUVW; \n" \
 "    float4 t0, t1, t2, t3, t4, t5, t6;\n" \
@@ -4648,65 +5528,24 @@
     CLAMP_NONE_##IMAGETYPE \
     LOAD_TEXEL_##IMAGETYPE##ORDER(int4, )
 
-static gctSTRING gcLibCLImage_ReadFunc_1D =
-    READFUNC(1d, )
-;
-static gctSTRING gcLibCLImage_ReadFunc_1D_BGRA =
-    READFUNC(1d, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFunc_1D_R =
-    READFUNC(1d, _R)
-;
-
-static gctSTRING gcLibCLImage_ReadFunc_1DBUFFER =
-    READFUNC(1dbuffer,)
-;
-static gctSTRING gcLibCLImage_ReadFunc_1DBUFFER_BGRA =
-    READFUNC(1dbuffer, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFunc_1DBUFFER_R =
-    READFUNC(1dbuffer, _R)
-;
-
-static gctSTRING gcLibCLImage_ReadFunc_2D =
-    READFUNC(2d,)
-;
-static gctSTRING gcLibCLImage_ReadFunc_2D_BGRA =
-    READFUNC(2d, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFunc_2D_R =
-    READFUNC(2d, _R)
-;
-
-static gctSTRING gcLibCLImage_ReadFunc_1DARRAY =
-    READFUNC(1darray,)
-;
-static gctSTRING gcLibCLImage_ReadFunc_1DARRAY_BGRA =
-    READFUNC(1darray, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFunc_1DARRAY_R =
-    READFUNC(1darray, _R)
-;
-
-static gctSTRING gcLibCLImage_ReadFunc_2DARRAY =
-    READFUNC(2DARRAY,)
-;
-static gctSTRING gcLibCLImage_ReadFunc_2DARRAY_BGRA =
-    READFUNC(2DARRAY, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFunc_2DARRAY_R =
-    READFUNC(2DARRAY, _R)
-;
-
-static gctSTRING gcLibCLImage_ReadFunc_3D =
-    READFUNC(3d,)
-;
-static gctSTRING gcLibCLImage_ReadFunc_3D_BGRA =
-    READFUNC(3d, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFunc_3D_R =
-    READFUNC(3d, _R)
-;
+extern gctSTRING gcLibCLImage_ReadFunc_1D;
+extern gctSTRING gcLibCLImage_ReadFunc_1D_BGRA;
+extern gctSTRING gcLibCLImage_ReadFunc_1D_R;
+extern gctSTRING gcLibCLImage_ReadFunc_1DBUFFER ;
+extern gctSTRING gcLibCLImage_ReadFunc_1DBUFFER_BGRA;
+extern gctSTRING gcLibCLImage_ReadFunc_1DBUFFER_R;
+extern gctSTRING gcLibCLImage_ReadFunc_2D;
+extern gctSTRING gcLibCLImage_ReadFunc_2D_BGRA ;
+extern gctSTRING gcLibCLImage_ReadFunc_2D_R;
+extern gctSTRING gcLibCLImage_ReadFunc_1DARRAY;
+extern gctSTRING gcLibCLImage_ReadFunc_1DARRAY_BGRA;
+extern gctSTRING gcLibCLImage_ReadFunc_1DARRAY_R;
+extern gctSTRING gcLibCLImage_ReadFunc_2DARRAY;
+extern gctSTRING gcLibCLImage_ReadFunc_2DARRAY_BGRA;
+extern gctSTRING gcLibCLImage_ReadFunc_2DARRAY_R;
+extern gctSTRING gcLibCLImage_ReadFunc_3D;
+extern gctSTRING gcLibCLImage_ReadFunc_3D_BGRA;
+extern gctSTRING gcLibCLImage_ReadFunc_3D_R;
 
 #define IMGLOAD_FLOAT_TEXEL_2d \
 "    float4 result;\n" \
@@ -4899,231 +5738,53 @@ static gctSTRING gcLibCLImage_ReadFunc_3D_R =
     LINEAR_FILTER_##IMAGETYPE##ORDER
 
 
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_1D =
-READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 1d,)
-READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 1d,)
-READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 1d,)
-READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 1d,)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_1D_BGRA =
-READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 1d, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 1d, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 1d, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 1d, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_1D_R =
-READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 1d, _R)
-READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 1d, _R)
-READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 1d, _R)
-READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 1d, _R)
-;
-
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_1DBUFFER =
-READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 1dbuffer,)
-READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 1dbuffer,)
-READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 1dbuffer,)
-READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 1dbuffer,)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_1DBUFFER_BGRA =
-READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 1dbuffer, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 1dbuffer, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 1dbuffer, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 1dbuffer, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_1DBUFFER_R =
-READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 1dbuffer, _R)
-READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 1dbuffer, _R)
-READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 1dbuffer, _R)
-READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 1dbuffer, _R)
-;
-
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_2D =
-READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 2d,)
-READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 2d,)
-READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 2d,)
-READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 2d,)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_2D_BGRA1 =
-READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 2d, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 2d, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_2D_BGRA2 =
-READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 2d, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 2d, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_2D_R1 =
-READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 2d, _R)
-READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 2d, _R)
-;
-
-static gctSTRING gcLibCLImage_ReadFuncF_IMGLD =
-"#pragma OPENCL EXTENSION  CL_VIV_asm : enable\n" \
-READ_IMAGEF_CHANNEL_TYPE_IMGLD(unorm8, 2d,)
-READ_IMAGEF_CHANNEL_TYPE_IMGLD(unorm8, 2d,_R)
-READ_IMAGEF_CHANNEL_TYPE_IMGLD(unorm8, 2d,_BGRA)
-;
-
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_2D_R2 =
-READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 2d, _R)
-READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 2d, _R)
-;
-
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_1DARRAY1 =
-READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 1darray,)
-READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 1darray,)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_1DARRAY2 =
-READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 1darray,)
-READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 1darray,)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_1DARRAY1_BGRA =
-READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 1darray, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 1darray, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_1DARRAY2_BGRA =
-READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 1darray, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 1darray, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_1DARRAY1_R =
-READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 1darray, _R)
-READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 1darray, _R)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_1DARRAY2_R =
-READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 1darray, _R)
-READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 1darray, _R)
-;
-
-
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_2DARRAY1 =
-READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 2DARRAY,)
-READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 2DARRAY,)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_2DARRAY2 =
-READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 2DARRAY,)
-READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 2DARRAY,)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_2DARRAY1_BGRA =
-READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 2DARRAY, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 2DARRAY, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_2DARRAY2_BGRA =
-READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 2DARRAY, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 2DARRAY, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_2DARRAY1_R =
-READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 2DARRAY, _R)
-READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 2DARRAY, _R)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_2DARRAY2_R =
-READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 2DARRAY, _R)
-READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 2DARRAY, _R)
-;
-
-
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_3D0 =
-READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 3d,)
-READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 3d,);
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_3D1 =
-READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 3d,)
-READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 3d,)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_3D0_BGRA =
-READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 3d, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 3d, _BGRA);
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_3D1_BGRA =
-READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 3d, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 3d, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_3D0_R =
-READ_IMAGEF_CHANNEL_TYPE(unorm8, UNORM, uchar4, 255.0, 3d, _R)
-READ_IMAGEF_CHANNEL_TYPE(snorm8, SNORM, char4, 127.0, 3d, _R);
-static gctSTRING gcLibCLImage_ReadFuncF_NORM_3D1_R =
-READ_IMAGEF_CHANNEL_TYPE(unorm16, UNORM, ushort4, 65535.0, 3d, _R)
-READ_IMAGEF_CHANNEL_TYPE(snorm16, SNORM, short4, 32767.0, 3d, _R)
-;
-
-
-static gctSTRING gcLibCLImage_ReadFuncF_UNNORM_1D =
-READ_IMAGEF_CHANNEL_TYPE(float, Float, ignore, ignore, 1d,)
-READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 1d,)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_UNNORM_1D_BGRA =
-READ_IMAGEF_CHANNEL_TYPE(float, Float, ignore, ignore, 1d, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 1d, _BGRA)
-;
-
-static gctSTRING gcLibCLImage_ReadFuncF_UNNORM_1D_R =
-READ_IMAGEF_CHANNEL_TYPE(float, Float, ignore, ignore, 1d, _R)
-READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 1d, _R)
-;
-
-
-static gctSTRING gcLibCLImage_ReadFuncF_UNNORM_1DBUFFER =
-READ_IMAGEF_CHANNEL_TYPE(float, Float, ignore, ignore, 1dbuffer,)
-READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 1dbuffer,)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_UNNORM_1DBUFFER_BGRA =
-READ_IMAGEF_CHANNEL_TYPE(float, Float, ignore, ignore, 1dbuffer, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 1dbuffer, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_UNNORM_1DBUFFER_R =
-READ_IMAGEF_CHANNEL_TYPE(float, Float, ignore, ignore, 1dbuffer, _R)
-READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 1dbuffer, _R)
-;
-
-static gctSTRING gcLibCLImage_ReadFuncF_UNNORM_2D =
-READ_IMAGEF_CHANNEL_TYPE(float, Float, ignore, ignore, 2d,)
-READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 2d,)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_UNNORM_2D_BGRA =
-READ_IMAGEF_CHANNEL_TYPE(float, Float, ignore, ignore, 2d, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 2d, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_UNNORM_2D_R =
-READ_IMAGEF_CHANNEL_TYPE(float, Float, ignore, ignore, 2d, _R)
-READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 2d, _R)
-;
-
-static gctSTRING gcLibCLImage_ReadFuncF_UNNORM_1DARRAY =
-READ_IMAGEF_CHANNEL_TYPE(float, Float, ignore, ignore, 1darray,)
-READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 1darray,)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_UNNORM_1DARRAY_BGRA =
-READ_IMAGEF_CHANNEL_TYPE(float, Float, ignore, ignore, 1darray, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 1darray, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_UNNORM_1DARRAY_R =
-READ_IMAGEF_CHANNEL_TYPE(float, Float, ignore, ignore, 1darray, _R)
-READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 1darray, _R)
-;
-
-static gctSTRING gcLibCLImage_ReadFuncF_UNNORM_2DARRAY =
-READ_IMAGEF_CHANNEL_TYPE(float, Float, ignore, ignore, 2DARRAY,)
-READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 2DARRAY,)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_UNNORM_2DARRAY_BGRA =
-READ_IMAGEF_CHANNEL_TYPE(float, Float, ignore, ignore, 2DARRAY, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 2DARRAY, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_UNNORM_2DARRAY_R =
-READ_IMAGEF_CHANNEL_TYPE(float, Float, ignore, ignore, 2DARRAY, _R)
-READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 2DARRAY, _R)
-;
-
-
-static gctSTRING gcLibCLImage_ReadFuncF_UNNORM_3D =
-READ_IMAGEF_CHANNEL_TYPE(float, Float, ignore, ignore, 3d,)
-READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 3d,)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_UNNORM_3D_BGRA =
-READ_IMAGEF_CHANNEL_TYPE(float, Float, ignore, ignore, 3d, _BGRA)
-READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 3d, _BGRA)
-;
-static gctSTRING gcLibCLImage_ReadFuncF_UNNORM_3D_R =
-READ_IMAGEF_CHANNEL_TYPE(float, Float, ignore, ignore, 3d, _R)
-READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 3d, _R)
-;
-
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_1D;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_1D_BGRA;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_1D_R;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_1DBUFFER;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_1DBUFFER_BGRA;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_1DBUFFER_R;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_2D;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_2D_BGRA1;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_2D_BGRA2;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_2D_R1;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_2D_R2;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_1DARRAY1;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_1DARRAY2;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_1DARRAY1_BGRA;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_1DARRAY2_BGRA;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_1DARRAY1_R;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_1DARRAY2_R;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_2DARRAY1;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_2DARRAY2;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_2DARRAY1_BGRA;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_2DARRAY2_BGRA;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_2DARRAY1_R;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_2DARRAY2_R;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_3D0;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_3D1;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_3D0_BGRA;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_3D1_BGRA;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_3D0_R;
+extern gctSTRING gcLibCLImage_ReadFuncF_NORM_3D1_R;
+extern gctSTRING gcLibCLImage_ReadFuncF_UNNORM_1D;
+extern gctSTRING gcLibCLImage_ReadFuncF_UNNORM_1D_BGRA;
+extern gctSTRING gcLibCLImage_ReadFuncF_UNNORM_1D_R;
+extern gctSTRING gcLibCLImage_ReadFuncF_UNNORM_1DBUFFER;
+extern gctSTRING gcLibCLImage_ReadFuncF_UNNORM_1DBUFFER_BGRA;
+extern gctSTRING gcLibCLImage_ReadFuncF_UNNORM_1DBUFFER_R;
+extern gctSTRING gcLibCLImage_ReadFuncF_UNNORM_2D;
+extern gctSTRING gcLibCLImage_ReadFuncF_UNNORM_2D_BGRA;
+extern gctSTRING gcLibCLImage_ReadFuncF_UNNORM_2D_R;
+extern gctSTRING gcLibCLImage_ReadFuncF_UNNORM_1DARRAY;
+extern gctSTRING gcLibCLImage_ReadFuncF_UNNORM_1DARRAY_BGRA;
+extern gctSTRING gcLibCLImage_ReadFuncF_UNNORM_1DARRAY_R;
+extern gctSTRING gcLibCLImage_ReadFuncF_UNNORM_2DARRAY;
+extern gctSTRING gcLibCLImage_ReadFuncF_UNNORM_2DARRAY_BGRA;
+extern gctSTRING gcLibCLImage_ReadFuncF_UNNORM_2DARRAY_R;
+extern gctSTRING gcLibCLImage_ReadFuncF_UNNORM_3D;
+extern gctSTRING gcLibCLImage_ReadFuncF_UNNORM_3D_BGRA;
+extern gctSTRING gcLibCLImage_ReadFuncF_UNNORM_3D_R;
 
 #define STORE_TEXEL_1d(CHANNEL_TYPE) \
 "    "#CHANNEL_TYPE" * base = ("#CHANNEL_TYPE" *) ((uchar *)image); \n" \
@@ -5471,7 +6132,6 @@ READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 3d, _R)
 "    "#TYPE" color \n"\
 "    ) \n"
 
-/* TODO: Just to pass build so far. */
 #define WRITE_IMAGE_PROTOTYPE_1darray(TYPE, CHANNEL_TYPE, SWAP_RB) \
 "void\n" \
 "_write_image_"#TYPE"_"#CHANNEL_TYPE#SWAP_RB"_1darray (\n" \
@@ -5490,7 +6150,6 @@ READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 3d, _R)
 "    "#TYPE" color \n"\
 "    ) \n"
 
-/* TODO: Just to pass build so far. */
 #define WRITE_IMAGE_PROTOTYPE_2DARRAY(TYPE, CHANNEL_TYPE, SWAP_RB) \
 "void\n" \
 "_write_image_"#TYPE"_"#CHANNEL_TYPE#SWAP_RB"_2DARRAY (\n" \
@@ -5500,7 +6159,6 @@ READ_IMAGEF_CHANNEL_TYPE(half, Half, ignore, ignore, 3d, _R)
 "    "#TYPE" color \n"\
 "    ) \n"
 
-/* TODO: Just to pass build so far. */
 #define WRITE_IMAGE_PROTOTYPE_3d(TYPE, CHANNEL_TYPE, SWAP_RB) \
 "void\n" \
 "_write_image_"#TYPE"_"#CHANNEL_TYPE#SWAP_RB"_3d (\n" \
@@ -5573,596 +6231,10 @@ WRITE_IMAGE_PROTOTYPE_##IMAGETYPE(float4, CHANNEL_TYPE, _R) \
 "    _viv_asm(IMAGE_WRITE, color, image, coord);\n"\
 "}\n"
 
-static gctSTRING gcLibCLImage_WriteFunc =
-/* write_imageui */
-WRITE_IMAGE(uint4, uchar4, 1d)
-WRITE_IMAGE(uint4, ushort4, 1d)
-WRITE_IMAGE(uint4, uint4, 1d)
-WRITE_IMAGE(uint4, uint4, 1darray)
-WRITE_IMAGE(uint4, uchar4, 1darray)
-WRITE_IMAGE(uint4, ushort4, 1darray)
-WRITE_IMAGE(uint4, uchar4, 2d)
-WRITE_IMAGE(uint4, ushort4, 2d)
-WRITE_IMAGE(uint4, uint4, 2d)
-WRITE_IMAGE(uint4, uchar4, 2DARRAY)
-WRITE_IMAGE(uint4, ushort4, 2DARRAY)
-WRITE_IMAGE(uint4, uint4, 2DARRAY)
-/*WRITE_IMAGE(uint4, uchar4, 3d)
-WRITE_IMAGE(uint4, ushort4, 3d)
-WRITE_IMAGE(uint4, uint4, 3d)*/
-
-/* write_imagei */
-WRITE_IMAGE(int4, char4, 1d)
-WRITE_IMAGE(int4, short4, 1d)
-WRITE_IMAGE(int4, int4, 1d)
-WRITE_IMAGE(int4, char4, 1darray)
-WRITE_IMAGE(int4, short4, 1darray)
-WRITE_IMAGE(int4, int4, 1darray)
-WRITE_IMAGE(int4, char4, 2d)
-WRITE_IMAGE(int4, short4, 2d)
-WRITE_IMAGE(int4, int4, 2d)
-WRITE_IMAGE(int4, char4, 2DARRAY)
-WRITE_IMAGE(int4, short4, 2DARRAY)
-WRITE_IMAGE(int4, int4, 2DARRAY)
-/*WRITE_IMAGE(int4, char4, 3d)
-WRITE_IMAGE(int4, short4, 3d)
-WRITE_IMAGE(int4, int4, 3d)*/
-
-/* write_imagef */
-WRITE_IMAGEF_NORM(uchar4, 255.0, 1d)
-WRITE_IMAGEF_NORM(char4, 127.0, 1d)
-WRITE_IMAGEF_NORM(ushort4, 65535.0, 1d)
-WRITE_IMAGEF_NORM(short4, 32767.0, 1d)
-WRITE_IMAGEF_NORM(uchar4, 255.0, 1darray)
-WRITE_IMAGEF_NORM(char4, 127.0, 1darray)
-WRITE_IMAGEF_NORM(ushort4, 65535.0, 1darray)
-WRITE_IMAGEF_NORM(short4, 32767.0, 1darray)
-WRITE_IMAGEF_NORM(uchar4, 255.0, 2d)
-WRITE_IMAGEF_NORM(char4, 127.0, 2d)
-WRITE_IMAGEF_NORM(ushort4, 65535.0, 2d)
-WRITE_IMAGEF_NORM(short4, 32767.0, 2d)
-WRITE_IMAGEF_NORM(uchar4, 255.0, 2DARRAY)
-WRITE_IMAGEF_NORM(char4, 127.0, 2DARRAY)
-WRITE_IMAGEF_NORM(ushort4, 65535.0, 2DARRAY)
-WRITE_IMAGEF_NORM(short4, 32767.0, 2DARRAY)
-/*WRITE_IMAGEF_NORM(uchar4, 255.0, 3d)
-WRITE_IMAGEF_NORM(char4, 127.0, 3d)
-WRITE_IMAGEF_NORM(ushort4, 65535.0, 3d)
-WRITE_IMAGEF_NORM(short4, 32767.0, 3d)*/
-"#pragma OPENCL EXTENSION  CL_VIV_asm : enable\n" \
-WRITE_IMAGE_IMGST(float4, 2d)
-WRITE_IMAGE_IMGST(int4, 2d)
-WRITE_IMAGE_IMGST(uint4, 2d)
-
-"void\n"
-"_write_image_float4_float4_1d (\n"
-"    uint image, \n"
-"    uint imageSize, \n"
-"    int  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    float4 * base = (float4 *) ((uchar *)image ); \n"
-"    base[coord] = color; \n"
-"} \n"
-"void\n"
-"_write_image_float4_float4_2d (\n"
-"    uint2 image, \n"
-"    uint2 imageSize, \n"
-"    int2  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    float4 * base = (float4 *) ((uchar *)image.x + image.y * (uint)coord.y); \n"
-"    base[coord.x] = color; \n"
-"} \n"
-"void\n"
-"_write_image_float4_float4_1darray (\n"
-"    uint2 image, \n"
-"    uint2 imageSize, \n"
-"    int2  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    float4 * base = (float4 *) ((uchar *)image.x + image.y * (uint)coord.y); \n"
-"    base[coord.x] = color; \n"
-"} \n"
-"void\n"
-"_write_image_float4_float4_2DARRAY (\n"
-"    uint3 image, \n"
-"    uint3 imageSize, \n"
-"    int3  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    float4 * base = (float4 *) ((uchar *)image.x + image.y * (uint)coord.y + image.z * (uint)coord.z); \n"
-"    base[coord.x] = color; \n"
-"} \n"
-/*"void\n"
-"_write_image_float4_float4_3d (\n"
-"    uint3 image, \n"
-"    uint3 imageSize, \n"
-"    int3  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    float4 * base = (float4 *) ((uchar *)image.x + image.y * (uint)coord.y + image.z * (uint)coord.z); \n"
-"    base[coord.x] = color; \n"
-"} \n"*/
-"void\n"
-"_write_image_float4_half4_1d (\n"
-"    uint image, \n"
-"    uint imageSize, \n"
-"    int  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    half * base = (half *) ((uchar *)image); \n"
-"    vstore_half4(color, coord, base); \n"
-"} \n"
-"void\n"
-"_write_image_float4_half4_2d (\n"
-"    uint2 image, \n"
-"    uint2 imageSize, \n"
-"    int2  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    half * base = (half *) ((uchar *)image.x + image.y * (uint)coord.y); \n"
-"    vstore_half4(color, coord.x, base); \n"
-"} \n"
-"void\n"
-"_write_image_float4_half4_1darray (\n"
-"    uint2 image, \n"
-"    uint2 imageSize, \n"
-"    int2  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    half * base = (half *) ((uchar *)image.x + image.y * (uint)coord.y); \n"
-"    vstore_half4(color, coord.x, base); \n"
-"} \n"
-"void\n"
-"_write_image_float4_half4_2DARRAY (\n"
-"    uint3 image, \n"
-"    uint3 imageSize, \n"
-"    int3  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    half * base = (half *) ((uchar *)image.x + image.y * (uint)coord.y + image.z * (uint)coord.z); \n"
-"    vstore_half4(color, coord.x, base); \n"
-"} \n"
-/*"void\n"
-"_write_image_float4_half4_3d (\n"
-"    uint3 image, \n"
-"    uint3 imageSize, \n"
-"    int3  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    half * base = (half *) ((uchar *)image.x + image.y * (uint)coord.y + image.z * (uint)coord.z); \n"
-"    vstore_half4(color, coord.x, base); \n"
-"} \n"*/
-"void\n"
-"_write_image_null_1d (\n"
-"    uint image, \n"
-"    uint imageSize, \n"
-"    int  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"} \n"
-"void\n"
-"_write_image_null_2d (\n"
-"    uint2 image, \n"
-"    uint2 imageSize, \n"
-"    int2  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"} \n"
-"void\n"
-"_write_image_null_1darray (\n"
-"    uint2 image, \n"
-"    uint2 imageSize, \n"
-"    int2  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"} \n"
-"void\n"
-"_write_image_null_2DARRAY (\n"
-"    uint3 image, \n"
-"    uint3 imageSize, \n"
-"    int3  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"} \n";
-/*"void\n"
-"_write_image_null_3d (\n"
-"    uint3 image, \n"
-"    uint3 imageSize, \n"
-"    int3  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"} \n"*/
-
-static gctSTRING gcLibCLImage_WriteFunc_BGRA =
-/* write_imageui */
-WRITE_IMAGE_BGRA(uint4, uchar4, 1d)
-WRITE_IMAGE_BGRA(uint4, ushort4, 1d)
-WRITE_IMAGE_BGRA(uint4, uint4, 1d)
-WRITE_IMAGE_BGRA(uint4, uint4, 1darray)
-WRITE_IMAGE_BGRA(uint4, uchar4, 1darray)
-WRITE_IMAGE_BGRA(uint4, ushort4, 1darray)
-WRITE_IMAGE_BGRA(uint4, uchar4, 2d)
-WRITE_IMAGE_BGRA(uint4, ushort4, 2d)
-WRITE_IMAGE_BGRA(uint4, uint4, 2d)
-WRITE_IMAGE_BGRA(uint4, uchar4, 2DARRAY)
-WRITE_IMAGE_BGRA(uint4, ushort4, 2DARRAY)
-WRITE_IMAGE_BGRA(uint4, uint4, 2DARRAY)
-/*WRITE_IMAGE_BGRA(uint4, uchar4, 3d)
-WRITE_IMAGE_BGRA(uint4, ushort4, 3d)
-WRITE_IMAGE_BGRA(uint4, uint4, 3d)*/
-
-/* write_imagei */
-WRITE_IMAGE_BGRA(int4, char4, 1d)
-WRITE_IMAGE_BGRA(int4, short4, 1d)
-WRITE_IMAGE_BGRA(int4, int4, 1d)
-WRITE_IMAGE_BGRA(int4, char4, 1darray)
-WRITE_IMAGE_BGRA(int4, short4, 1darray)
-WRITE_IMAGE_BGRA(int4, int4, 1darray)
-WRITE_IMAGE_BGRA(int4, char4, 2d)
-WRITE_IMAGE_BGRA(int4, short4, 2d)
-WRITE_IMAGE_BGRA(int4, int4, 2d)
-WRITE_IMAGE_BGRA(int4, char4, 2DARRAY)
-WRITE_IMAGE_BGRA(int4, short4, 2DARRAY)
-WRITE_IMAGE_BGRA(int4, int4, 2DARRAY)
-/*WRITE_IMAGE_BGRA(int4, char4, 3d)
-WRITE_IMAGE_BGRA(int4, short4, 3d)
-WRITE_IMAGE_BGRA(int4, int4, 3d)*/
-
-/* write_imagef */
-WRITE_IMAGEF_NORM_BGRA(uchar4, 255.0, 1d)
-WRITE_IMAGEF_NORM_BGRA(char4, 127.0, 1d)
-WRITE_IMAGEF_NORM_BGRA(ushort4, 65535.0, 1d)
-WRITE_IMAGEF_NORM_BGRA(short4, 32767.0, 1d)
-WRITE_IMAGEF_NORM_BGRA(uchar4, 255.0, 1darray)
-WRITE_IMAGEF_NORM_BGRA(char4, 127.0, 1darray)
-WRITE_IMAGEF_NORM_BGRA(ushort4, 65535.0, 1darray)
-WRITE_IMAGEF_NORM_BGRA(short4, 32767.0, 1darray)
-WRITE_IMAGEF_NORM_BGRA(uchar4, 255.0, 2d)
-WRITE_IMAGEF_NORM_BGRA(char4, 127.0, 2d)
-WRITE_IMAGEF_NORM_BGRA(ushort4, 65535.0, 2d)
-WRITE_IMAGEF_NORM_BGRA(short4, 32767.0, 2d)
-WRITE_IMAGEF_NORM_BGRA(uchar4, 255.0, 2DARRAY)
-WRITE_IMAGEF_NORM_BGRA(char4, 127.0, 2DARRAY)
-WRITE_IMAGEF_NORM_BGRA(ushort4, 65535.0, 2DARRAY)
-WRITE_IMAGEF_NORM_BGRA(short4, 32767.0, 2DARRAY)
-/*WRITE_IMAGEF_NORM_BGRA(uchar4, 255.0, 3d)
-WRITE_IMAGEF_NORM_BGRA(char4, 127.0, 3d)
-WRITE_IMAGEF_NORM_BGRA(ushort4, 65535.0, 3d)
-WRITE_IMAGEF_NORM_BGRA(short4, 32767.0, 3d)*/
-
-"void\n"
-"_write_image_float4_float4_BGRA_1d (\n"
-"    uint image, \n"
-"    uint imageSize, \n"
-"    int  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    float4 * base = (float4 *) ((uchar *)image ); \n"
-"    base[coord] = color; \n"
-"    base[coord].r = color.b; \n"
-"    base[coord].b = color.r; \n"
-"} \n"
-"void\n"
-"_write_image_float4_float4_BGRA_2d (\n"
-"    uint2 image, \n"
-"    uint2 imageSize, \n"
-"    int2  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    float4 * base = (float4 *) ((uchar *)image.x + image.y * (uint)coord.y); \n"
-"    base[coord.x] = color; \n"
-"    base[coord.x].r = color.b; \n"
-"    base[coord.x].b = color.r; \n"
-"} \n"
-"void\n"
-"_write_image_float4_float4_BGRA_1darray (\n"
-"    uint2 image, \n"
-"    uint2 imageSize, \n"
-"    int2  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    float4 * base = (float4 *) ((uchar *)image.x + image.y * (uint)coord.y); \n"
-"    base[coord.x] = color; \n"
-"    base[coord.x].r = color.b; \n"
-"    base[coord.x].b = color.r; \n"
-"} \n"
-"void\n"
-"_write_image_float4_float4_BGRA_2DARRAY (\n"
-"    uint3 image, \n"
-"    uint3 imageSize, \n"
-"    int3  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    float4 * base = (float4 *) ((uchar *)image.x + image.y * (uint)coord.y + image.z * (uint)coord.z); \n"
-"    base[coord.x] = color; \n"
-"    base[coord.x].r = color.b; \n"
-"    base[coord.x].b = color.r; \n"
-"} \n"
-/*"void\n"
-"_write_image_float4_float4_BGRA_3d (\n"
-"    uint3 image, \n"
-"    uint3 imageSize, \n"
-"    int3  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    float4 * base = (float4 *) ((uchar *)image.x + image.y * (uint)coord.y + image.z * (uint)coord.z); \n"
-"    base[coord.x] = color; \n"
-"    base[coord.x].r = color.b; \n"
-"    base[coord.x].b = color.r; \n"
-"} \n"*/
-"void\n"
-"_write_image_float4_half4_BGRA_1d (\n"
-"    uint image, \n"
-"    uint imageSize, \n"
-"    int  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    half * base = (half *) ((uchar *)image); \n"
-"    float4 t = color; \n"
-"    t.r = color.b; \n"
-"    t.b = color.r; \n"
-"    vstore_half4(t, coord, base); \n"
-"} \n"
-"void\n"
-"_write_image_float4_half4_BGRA_2d (\n"
-"    uint2 image, \n"
-"    uint2 imageSize, \n"
-"    int2  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    half * base = (half *) ((uchar *)image.x + image.y * (uint)coord.y); \n"
-"    float4 t = color; \n"
-"    t.r = color.b; \n"
-"    t.b = color.r; \n"
-"    vstore_half4(t, coord.x, base); \n"
-"} \n"
-"void\n"
-"_write_image_float4_half4_BGRA_1darray (\n"
-"    uint2 image, \n"
-"    uint2 imageSize, \n"
-"    int2  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    half * base = (half *) ((uchar *)image.x + image.y * (uint)coord.y); \n"
-"    float4 t = color; \n"
-"    t.r = color.b; \n"
-"    t.b = color.r; \n"
-"    vstore_half4(t, coord.x, base); \n"
-"} \n"
-"void\n"
-"_write_image_float4_half4_BGRA_2DARRAY (\n"
-"    uint3 image, \n"
-"    uint3 imageSize, \n"
-"    int3  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    half * base = (half *) ((uchar *)image.x + image.y * (uint)coord.y + image.z * (uint)coord.z); \n"
-"    float4 t = color; \n"
-"    t.r = color.b; \n"
-"    t.b = color.r; \n"
-"    vstore_half4(t, coord.x, base); \n"
-"} \n";
-/*"void\n"
-"_write_image_float4_half4_BGRA_3d (\n"
-"    uint3 image, \n"
-"    uint3 imageSize, \n"
-"    int3  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    half * base = (half *) ((uchar *)image.x + image.y * (uint)coord.y + image.z * (uint)coord.z); \n"
-"    float4 t = color; \n"
-"    t.r = color.b; \n"
-"    t.b = color.r; \n"
-"    vstore_half4(t, coord.x, base); \n"
-"} \n";*/
-
-static gctSTRING gcLibCLImage_WriteFunc_R =
-/* write_imageui */
-WRITE_IMAGE_R(uint4, uchar4, 1d)
-WRITE_IMAGE_R(uint4, ushort4, 1d)
-WRITE_IMAGE_R(uint4, uint4, 1d)
-WRITE_IMAGE_R(uint4, uint4, 1darray)
-WRITE_IMAGE_R(uint4, uchar4, 1darray)
-WRITE_IMAGE_R(uint4, ushort4, 1darray)
-WRITE_IMAGE_R(uint4, uchar4, 2d)
-WRITE_IMAGE_R(uint4, ushort4, 2d)
-WRITE_IMAGE_R(uint4, uint4, 2d)
-WRITE_IMAGE_R(uint4, uchar4, 2DARRAY)
-WRITE_IMAGE_R(uint4, ushort4, 2DARRAY)
-WRITE_IMAGE_R(uint4, uint4, 2DARRAY)
-/*WRITE_IMAGE_R(uint4, uchar4, 3d)
-WRITE_IMAGE_R(uint4, ushort4, 3d)
-WRITE_IMAGE_R(uint4, uint4, 3d)*/
-
-/* write_imagei */
-WRITE_IMAGE_R(int4, char4, 1d)
-WRITE_IMAGE_R(int4, short4, 1d)
-WRITE_IMAGE_R(int4, int4, 1d)
-WRITE_IMAGE_R(int4, char4, 1darray)
-WRITE_IMAGE_R(int4, short4, 1darray)
-WRITE_IMAGE_R(int4, int4, 1darray)
-WRITE_IMAGE_R(int4, char4, 2d)
-WRITE_IMAGE_R(int4, short4, 2d)
-WRITE_IMAGE_R(int4, int4, 2d)
-WRITE_IMAGE_R(int4, char4, 2DARRAY)
-WRITE_IMAGE_R(int4, short4, 2DARRAY)
-WRITE_IMAGE_R(int4, int4, 2DARRAY)
-/*WRITE_IMAGE_R(int4, char4, 3d)
-WRITE_IMAGE_R(int4, short4, 3d)
-WRITE_IMAGE_R(int4, int4, 3d)*/
-
-/* write_imagef */
-WRITE_IMAGEF_NORM_R(uchar4, 255.0, 1d)
-WRITE_IMAGEF_NORM_R(char4, 127.0, 1d)
-WRITE_IMAGEF_NORM_R(ushort4, 65535.0, 1d)
-WRITE_IMAGEF_NORM_R(short4, 32767.0, 1d)
-WRITE_IMAGEF_NORM_R(uchar4, 255.0, 1darray)
-WRITE_IMAGEF_NORM_R(char4, 127.0, 1darray)
-WRITE_IMAGEF_NORM_R(ushort4, 65535.0, 1darray)
-WRITE_IMAGEF_NORM_R(short4, 32767.0, 1darray)
-WRITE_IMAGEF_NORM_R(uchar4, 255.0, 2d)
-WRITE_IMAGEF_NORM_R(char4, 127.0, 2d)
-WRITE_IMAGEF_NORM_R(ushort4, 65535.0, 2d)
-WRITE_IMAGEF_NORM_R(short4, 32767.0, 2d)
-WRITE_IMAGEF_NORM_R(uchar4, 255.0, 2DARRAY)
-WRITE_IMAGEF_NORM_R(char4, 127.0, 2DARRAY)
-WRITE_IMAGEF_NORM_R(ushort4, 65535.0, 2DARRAY)
-WRITE_IMAGEF_NORM_R(short4, 32767.0, 2DARRAY)
-/*WRITE_IMAGEF_NORM_R(uchar4, 255.0, 3d)
-WRITE_IMAGEF_NORM_R(char4, 127.0, 3d)
-WRITE_IMAGEF_NORM_R(ushort4, 65535.0, 3d)
-WRITE_IMAGEF_NORM_R(short4, 32767.0, 3d)*/
-
-"void\n"
-"_write_image_float4_float4_R_1d (\n"
-"    uint image, \n"
-"    uint imageSize, \n"
-"    int  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    float * base = (float *) ((uchar *)image ); \n"
-"    base[coord] = color.r; \n"
-"} \n"
-"void\n"
-"_write_image_float4_float4_R_2d (\n"
-"    uint2 image, \n"
-"    uint2 imageSize, \n"
-"    int2  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    float * base = (float *) ((uchar *)image.x + image.y * (uint)coord.y); \n"
-"    base[coord.x] = color.r; \n"
-"} \n"
-"void\n"
-"_write_image_float4_float4_R_1darray (\n"
-"    uint2 image, \n"
-"    uint2 imageSize, \n"
-"    int2  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    float * base = (float *) ((uchar *)image.x + image.y * (uint)coord.y); \n"
-"    base[coord.x] = color.r; \n"
-"} \n"
-"void\n"
-"_write_image_float4_float4_R_2DARRAY (\n"
-"    uint3 image, \n"
-"    uint3 imageSize, \n"
-"    int3  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    float * base = (float *) ((uchar *)image.x + image.y * (uint)coord.y + image.z * (uint)coord.z); \n"
-"    base[coord.x] = color.r; \n"
-"} \n"
-/*"void\n"
-"_write_image_float4_float4_R_3d (\n"
-"    uint3 image, \n"
-"    uint3 imageSize, \n"
-"    int3  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    float * base = (float *) ((uchar *)image.x + image.y * (uint)coord.y + image.z * (uint)coord.z); \n"
-"    base[coord.x] = color.r; \n"
-"} \n"*/
-"void\n"
-"_write_image_float4_half4_R_1d (\n"
-"    uint image, \n"
-"    uint imageSize, \n"
-"    int  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    half * base = (half *) ((uchar *)image); \n"
-"    vstore_half(color.x, coord, base); \n"
-"} \n"
-"void\n"
-"_write_image_float4_half4_R_2d (\n"
-"    uint2 image, \n"
-"    uint2 imageSize, \n"
-"    int2  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    half * base = (half *) ((uchar *)image.x + image.y * (uint)coord.y); \n"
-"    vstore_half(color.r, coord.x, base); \n"
-"} \n"
-"void\n"
-"_write_image_float4_half4_R_1darray (\n"
-"    uint2 image, \n"
-"    uint2 imageSize, \n"
-"    int2  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    half * base = (half *) ((uchar *)image.x + image.y * (uint)coord.y); \n"
-"    vstore_half(color.r, coord.x, base); \n"
-"} \n"
-"void\n"
-"_write_image_float4_half4_R_2DARRAY (\n"
-"    uint3 image, \n"
-"    uint3 imageSize, \n"
-"    int3  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    half * base = (half *) ((uchar *)image.x + image.y * (uint)coord.y + image.z * (uint)coord.z); \n"
-"    vstore_half(color.r, coord.x, base); \n"
-"} \n";
-/*"void\n"
-"_write_image_float4_half4_R_3d (\n"
-"    uint3 image, \n"
-"    uint3 imageSize, \n"
-"    int3  coord, \n"
-"    float4 color \n"
-"    ) \n"
-"{ \n"
-"    half * base = (half *) ((uchar *)image.x + image.y * (uint)coord.y + image.z * (uint)coord.z); \n"
-"    vstore_half(color.r, coord.x, base); \n"
-"} \n";*/
-
-static gctSTRING gcLibCLPatch_MainFunc =
-"/* Testing function, not real. */ \n"
-"__kernel void sampleKernel(\n"
-"    read_only image2d_t input, \n"
-"    sampler_t imageSampler, \n"
-"    __global uint4 *results) \n"
-"{ \n"
-"    uint2 imageSize = {64, 64}; \n"
-"    int2 coords = {0.0, 0.0}; \n"
-"\n"
-"    results[0] = _read_image_nearest_unnorm_none_intcoord_ui_uint32_2d(imageSize, as_int2(imageSize), coords); \n"
-"} \n";
+extern gctSTRING gcLibCLImage_WriteFunc;
+extern gctSTRING gcLibCLImage_WriteFunc_BGRA;
+extern gctSTRING gcLibCLImage_WriteFunc_R;
+extern gctSTRING gcLibCLPatch_MainFunc;
 
 #if _SUPPORT_LONG_ULONG_DATA_TYPE
 /************************************* 64-bit integer SHIFT. ***********************************/
@@ -11227,87 +11299,1853 @@ ulong4 ulong_min(uint count, ulong4 x, ulong4 y)\n \
 }\n \
 "
 
-static gctSTRING    gcLibCLLong_Func =
-    _longulong_left_shift_long
-    _longulong_left_shift_ulong
-    _longulong_right_shift_ulong
-    _longulong_right_shift_long
-    _longulong_add_long
-    _longulong_add_ulong
-    longulong_sub
-    _longulong_div_ulong
-    _longulong_mulhi_ulong
-    _longulong_mul_long
-    _longulong_mul_ulong
-    _longulong_jmp_long
-    _longulong_jmp_ulong
-    _longulong_cmp_nz_long
-    _longulong_cmp_nz_ulong
-    _longulong_cmp_z_long
-    _longulong_cmp_z_ulong
-    _longulong_abs
-    _longulong_greater_long
-    _longulong_addsat_long
-    _longulong_greater_ulong
-    _longulong_addsat_ulong
-    _longulong_clz_long
-    _longulong_clz_ulong
-    _longulong_jmp_lessEqual_long
-    _longulong_jmp_lessEqual_ulong
-    _longulong_cmp_lessEqual_long
-    _longulong_cmp_lessEqual_ulong
-    _longulong_jmp_greaterEqual_long
-    _longulong_jmp_greaterEqual_ulong
-    _longulong_cmp_greaterEqual_long
-    _longulong_cmp_greaterEqual_ulong
-    _longulong_jmp_less_long
-    _longulong_jmp_less_ulong
-    _longulong_cmp_less_long
-    _longulong_cmp_less_ulong
-    _longulong_jmp_greater_long
-    _longulong_jmp_greater_ulong
-    _longulong_cmp_greater_long
-    _longulong_cmp_greater_ulong
-    _longulong_jmp_equal_long
-    _longulong_jmp_equal_ulong
-    _longulong_cmp_equal_long
-    _longulong_cmp_equal_ulong
-    _longulong_jmp_notequal_long
-    _longulong_jmp_notequal_ulong
-    _longulong_cmp_notequal_long
-    _longulong_cmp_notequal_ulong;
-
-static gctSTRING    gcLibCLLong_Func1 =
-    _longulong_mad
-    _longulong_f2i_ulong
-    _longulong_i2f
-    _long2char_convert_sat
-    _ulong2char_convert_sat
-    _long2uchar_convert_sat
-    _ulong2uchar_convert_sat
-    _long2short_convert_sat
-    _ulong2short_convert_sat
-    _long2ushort_convert_sat
-    _ulong2ushort_convert_sat
-    _long2int_convert_sat
-    _ulong2int_convert_sat
-    _long2uint_convert_sat
-    _ulong2uint_convert_sat
-    _long2ulong_convert_sat
-    _ulong2long_convert_sat
-    _longulong_rotate
-    _longulong_popcount
-    _long_max
-    _ulong_max
-    _long_min
-    _ulong_min;
-
-static gctSTRING    gcLibCLLong_Func2 =
-    _longulong_subsat_long
-    _longulong_subsat_ulong
-    _longulong_f2i_long
-    _longulong_left_shift_long_scalar
-    _longulong_left_shift_ulong_scalar;
+extern gctSTRING    gcLibCLLong_Func;
+extern gctSTRING    gcLibCLLong_Func1;
+extern gctSTRING    gcLibCLLong_Func2;
 #endif
+
+/****************************************************************************************
+new read_image & write_image
+****************************************************************************************/
+
+/* common code */
+extern gctSTRING gcLibCL_ReadImage_Header_Str;
+extern gctSTRING gcLibCL_ReadImage_Common_Func_Str;
+
+/* common macros */
+#define DECLARE_RESULT(RET_TYPE) \
+"    "#RET_TYPE" result;\n"
+
+#define RETURN_RESULT \
+"    return result;\n"
+
+/* read image with imgld macros */
+#define READ_IMAGE_WITH_IMGLD_FUNC_NAME(RET_TYPE, DIM, COORD_TYPE) \
+#RET_TYPE" _read_image_with_imgld_"#RET_TYPE"_"#DIM"_"#COORD_TYPE"(viv_generic_image_t image, sampler_t sampler, "#COORD_TYPE" coord)\n"
+
+#define DECLARE_AND_GET_GENERIC_IMAGE_DSP(SAMPLER) \
+"    uint8 imageDSP;\n" \
+"    _viv_asm(GET_IMAGE_T_IMAGE_DSP, imageDSP, image, "#SAMPLER");\n"
+
+#define DECLARE_AND_GET_ONE_INT_COORD_FROM_INTEGER_COORD \
+"    int3 intCoord0;\n" \
+"    intCoord0 = _viv_getNearestCoordFromIntegerCoord(imageDSP, sampler, coord);\n"
+
+#define DECLARE_AND_GET_ONE_INT_COORD_FROM_FLOAT_COORD \
+"    int3 intCoord0;\n" \
+"    intCoord0 = _viv_getNearestCoordFromFloatCoord(imageDSP, sampler, coord);\n"
+
+#define READ_IMAGE_WITH_IMGLD_1D_COORD_TYPE_int3(RET_TYPE) \
+    READ_IMAGE_WITH_IMGLD_FUNC_NAME(RET_TYPE, 1d, int3) \
+    "{\n" \
+    DECLARE_RESULT(RET_TYPE) \
+    DECLARE_AND_GET_GENERIC_IMAGE_DSP(sampler) \
+    DECLARE_AND_GET_ONE_INT_COORD_FROM_INTEGER_COORD \
+    "    uint imageType;\n" \
+    "    _viv_asm(GET_IMAGE_T_TYPE, imageType, imageDSP.s0123);\n" \
+    "    if(imageType != 2)                                     /* 1d_array */\n" \
+    "    {\n" \
+    "        intCoord0.s1 = 0;\n" \
+    "    }\n" \
+    "    _viv_asm(IMAGE_READ, result, imageDSP, intCoord0.s01);\n" \
+    RETURN_RESULT \
+    "}\n"
+
+#define READ_IMAGE_WITH_IMGLD_2D_COORD_TYPE_int3(RET_TYPE) \
+    READ_IMAGE_WITH_IMGLD_FUNC_NAME(RET_TYPE, 2d, int3) \
+    "{\n" \
+    DECLARE_RESULT(RET_TYPE) \
+    DECLARE_AND_GET_GENERIC_IMAGE_DSP(sampler) \
+    DECLARE_AND_GET_ONE_INT_COORD_FROM_INTEGER_COORD \
+    "    uint imageType;\n" \
+    "    _viv_asm(GET_IMAGE_T_TYPE, imageType, imageDSP.s0123);\n" \
+    "    if(imageType == 4)                                     /* 2d_array */\n" \
+    "    {\n" \
+    "        intCoord0.s2 = _viv_get3DImageNewBaseAddr(imageDSP, intCoord0);\n" \
+    "        _viv_asm(IMAGE_READ_3D, result, imageDSP, intCoord0);\n" \
+    "    }\n" \
+    "    else\n" \
+    "    {\n" \
+    "        _viv_asm(IMAGE_READ, result, imageDSP, intCoord0.s01);\n" \
+    "    }\n" \
+    RETURN_RESULT \
+    "}\n"
+
+#define READ_IMAGE_WITH_IMGLD_3D_COORD_TYPE_int3(RET_TYPE) \
+    READ_IMAGE_WITH_IMGLD_FUNC_NAME(RET_TYPE, 3d, int3) \
+    "{\n" \
+    DECLARE_RESULT(RET_TYPE) \
+    DECLARE_AND_GET_GENERIC_IMAGE_DSP(sampler) \
+    DECLARE_AND_GET_ONE_INT_COORD_FROM_INTEGER_COORD \
+    "    intCoord0.s2 = _viv_get3DImageNewBaseAddr(imageDSP, intCoord0);\n" \
+    "    _viv_asm(IMAGE_READ_3D, result, imageDSP, intCoord0);\n" \
+    RETURN_RESULT \
+    "}\n"
+
+#define READ_IMAGEIUI_WITH_IMGLD_1D_COORD_TYPE_float3(RET_TYPE) \
+    READ_IMAGE_WITH_IMGLD_FUNC_NAME(RET_TYPE, 1d, float3) \
+    "{\n" \
+    DECLARE_RESULT(RET_TYPE) \
+    DECLARE_AND_GET_GENERIC_IMAGE_DSP(sampler) \
+    DECLARE_AND_GET_ONE_INT_COORD_FROM_FLOAT_COORD \
+    "    uint imageType;\n" \
+    "    _viv_asm(GET_IMAGE_T_TYPE, imageType, imageDSP.s0123);\n" \
+    "    if(imageType != 2)                                     /* 1d_array */\n" \
+    "    {\n" \
+    "        intCoord0.s1 = 0;\n" \
+    "    }\n" \
+    "    _viv_asm(IMAGE_READ, result, imageDSP, intCoord0.s01);\n" \
+    RETURN_RESULT \
+    "}\n"
+
+#define READ_IMAGEIUI_WITH_IMGLD_2D_COORD_TYPE_float3(RET_TYPE) \
+    READ_IMAGE_WITH_IMGLD_FUNC_NAME(RET_TYPE, 2d, float3) \
+    "{\n" \
+    DECLARE_RESULT(RET_TYPE) \
+    DECLARE_AND_GET_GENERIC_IMAGE_DSP(sampler) \
+    DECLARE_AND_GET_ONE_INT_COORD_FROM_FLOAT_COORD \
+    "    uint imageType;\n" \
+    "    _viv_asm(GET_IMAGE_T_TYPE, imageType, imageDSP.s0123);\n" \
+    "    if(imageType == 4)                                     /* 2d_array */\n" \
+    "    {\n" \
+    "        intCoord0.s2 = _viv_get3DImageNewBaseAddr(imageDSP, intCoord0);\n" \
+    "        _viv_asm(IMAGE_READ_3D, result, imageDSP, intCoord0);\n" \
+    "    }\n" \
+    "    else\n" \
+    "    {\n" \
+    "        _viv_asm(IMAGE_READ, result, imageDSP, intCoord0.s01);\n" \
+    "    }\n" \
+    RETURN_RESULT \
+    "}\n"
+
+#define READ_IMAGEIUI_WITH_IMGLD_3D_COORD_TYPE_float3(RET_TYPE) \
+    READ_IMAGE_WITH_IMGLD_FUNC_NAME(RET_TYPE, 3d, float3) \
+    "{\n" \
+    DECLARE_RESULT(RET_TYPE) \
+    DECLARE_AND_GET_GENERIC_IMAGE_DSP(sampler) \
+    DECLARE_AND_GET_ONE_INT_COORD_FROM_FLOAT_COORD \
+    "    intCoord0.s2 = _viv_get3DImageNewBaseAddr(imageDSP, intCoord0);\n" \
+    "    _viv_asm(IMAGE_READ_3D, result, imageDSP, intCoord0);\n" \
+    RETURN_RESULT \
+    "}\n"
+
+#define READ_IMAGEF_WITH_IMGLD_1D_COORD_TYPE_float3 \
+    READ_IMAGE_WITH_IMGLD_FUNC_NAME(float4, 1d, float3) \
+    "{\n" \
+    DECLARE_RESULT(float4) \
+    DECLARE_AND_GET_GENERIC_IMAGE_DSP(sampler) \
+    "    result =  _viv_readImage1dCoordF(imageDSP, sampler, coord);\n" \
+    RETURN_RESULT \
+    "}\n"
+
+#define READ_IMAGEF_WITH_IMGLD_2D_COORD_TYPE_float3 \
+    READ_IMAGE_WITH_IMGLD_FUNC_NAME(float4, 2d, float3) \
+    "{\n" \
+    DECLARE_RESULT(float4) \
+    DECLARE_AND_GET_GENERIC_IMAGE_DSP(sampler) \
+    "    result =  _viv_readImage2dCoordF(imageDSP, sampler, coord);\n" \
+    RETURN_RESULT \
+    "}\n"
+
+#define READ_IMAGEF_WITH_IMGLD_3D_COORD_TYPE_float3 \
+    READ_IMAGE_WITH_IMGLD_FUNC_NAME(float4, 3d, float3) \
+    "{\n" \
+    DECLARE_RESULT(float4) \
+    DECLARE_AND_GET_GENERIC_IMAGE_DSP(sampler) \
+    "    result = _viv_readImage3dCoordF(imageDSP, sampler, coord);\n" \
+    RETURN_RESULT \
+    "}\n"
+
+extern gctSTRING gcLibCL_ReadImage_With_IMGLD_Funcs;
+
+/* read image with texldu macros */
+#define READ_IMAGE_WITH_TEXLDU_FUNC_NAME(RET_TYPE, COORD_TYPE) \
+#RET_TYPE" _read_image_with_texldu_"#RET_TYPE"_"#COORD_TYPE"(viv_generic_image_t image, sampler_t sampler, "#COORD_TYPE" coord)\n"
+
+#define DECLARE_GENERIC_SAMPLER_IDX \
+"    uint glSamplerIndex;\n"
+
+#define GET_IMAGE_T_SAMPLER_IDX_STMT \
+"    _viv_asm(GET_IMAGE_T_SAMPLER_IDX, glSamplerIndex, image);\n"
+
+#define SINGLE_TEXLDU_TO_RESULT \
+"    _viv_asm(TEXU, result, sampler);\n" \
+"    _viv_asm(TEXTURE_LOAD, result, glSamplerIndex, coord);\n"
+
+#define READ_IMAGE_WITH_TEXLDU(RET_TYPE, COORD_TYPE) \
+    READ_IMAGE_WITH_TEXLDU_FUNC_NAME(RET_TYPE, COORD_TYPE) \
+    "{\n" \
+    DECLARE_RESULT(RET_TYPE) \
+    DECLARE_GENERIC_SAMPLER_IDX \
+    GET_IMAGE_T_SAMPLER_IDX_STMT \
+    SINGLE_TEXLDU_TO_RESULT \
+    RETURN_RESULT \
+    "}\n"
+
+extern gctSTRING gcLibCL_ReadImage_With_TEXLDU_Funcs;
+
+extern gctSTRING gcLibCL_ReadImage_With_V55_TEXLDU_Funcs;
+
+extern gctSTRING gcLibCL_ReadImage_With_TEXLD_Funcs;
+
+#define WRITE_IMAGE_WITH_IMGST_FUNC_NAME(DIMENSION, DATA_TYPE) \
+    "void _write_image_with_imgst_"#DIMENSION"_"#DATA_TYPE"(viv_generic_image_t image, int3 coord, "#DATA_TYPE" data)\n"
+
+#define SINGLE_IMAGE_WR_1d \
+    "    coord.s12 = 0;\n" \
+    "    _viv_asm(IMAGE_WRITE, data, imageDSP, coord.s01);\n"
+
+#define SINGLE_IMAGE_WR_2d \
+    "    _viv_asm(IMAGE_WRITE, data, imageDSP, coord.s01);\n"
+
+#define SINGLE_IMAGE_WR_3d \
+    "    coord.s2 = _viv_get3DImageNewBaseAddr(imageDSP, coord);\n" \
+    "    _viv_asm(IMAGE_WRITE_3D, data, imageDSP, coord);\n" \
+
+#define WRITE_IMAGE_WITH_IMGST(DIMENSION, DATA_TYPE) \
+    WRITE_IMAGE_WITH_IMGST_FUNC_NAME(DIMENSION, DATA_TYPE) \
+    "{\n" \
+    DECLARE_AND_GET_GENERIC_IMAGE_DSP(0) \
+    SINGLE_IMAGE_WR_##DIMENSION \
+    "}\n"
+
+extern gctSTRING gcLibCL_WriteImage_With_IMGST_Funcs;
+extern const gctCONST_STRING gcLibCL_ReadImage_VIR_Common_Func_Str;
+extern gctSTRING gcLib_AtomicPatch_Common_Func_core1_Str;
+extern gctSTRING gcLib_AtomicPatch_Common_Func_core2_Str;
+extern gctSTRING gcLib_AtomicPatch_Common_Func_core4_Str;
+extern gctSTRING gcLib_AtomicPatch_Common_Func_core8_Str;
+extern gctSTRING gcCLLib_AtomcmpxchgPatch_Func_core1_Str;
+extern gctSTRING gcCLLib_AtomcmpxchgPatch_Func_core2_Str;
+extern gctSTRING gcCLLib_AtomcmpxchgPatch_Func_core4_Str;
+extern gctSTRING gcCLLib_AtomcmpxchgPatch_Func_core8_Str;
+extern gctSTRING gcCLLibGetLocalID;
+
+/* macro switch */
+#define FIX_LEN_COORD   0
+#define PARAM_FIX       1
+#define HAS_SAMPLER     1
+/* end of macro switch */
+#if HAS_SAMPLER
+#define SAMPLER_PARAM   ", sampler_t sampler"
+#else
+#define SAMPLER_PARAM   ""
+#endif
+
+#if FIX_LEN_COORD
+#undef  PARAM_FIX
+#define PARAM_FIX       1
+#endif
+
+#define _ToStr(x)       #x
+#define ToStr(x)        _ToStr(x)
+
+#define NEWLINE         "\n"
+#define SPLITLINE       "\n"
+
+#define retfloat        "retf"
+#define retint          "reti"
+#define retuint         "retui"
+
+#define half_RET        float
+#define float_RET       float
+#define snorm8_RET      float
+#define snorm16_RET     float
+#define unorm8_RET      float
+#define unorm16_RET     float
+#define int8_RET        int
+#define int16_RET       int
+#define int32_RET       int
+#define uint8_RET       uint
+#define uint16_RET      uint
+#define uint32_RET      uint
+#define unorm555_RET    float
+#define unorm565_RET    float
+#define unorm101010_RET float
+
+#define __RETURN_TYPE(type)     type
+#define _RETURN_TYPE(type)      __RETURN_TYPE(type)
+#define RETURN_TYPE(ch_data)    _RETURN_TYPE(ch_data##_RET)
+
+#define __retRETURN_TYPE(type)  ret##type
+#define _retRETURN_TYPE(type)   __retRETURN_TYPE(type)
+#define retRETURN_TYPE(ch_data) _retRETURN_TYPE(ch_data##_RET)
+
+/* default border color */
+#define BORDER_CLR_RGBA         "(float4)(.0f)"
+#define BORDER_CLR_LUMINANCE    BORDER_CLR_RGBA
+#define BORDER_CLR_BGRA         BORDER_CLR_RGBA
+#define BORDER_CLR_ARGB         BORDER_CLR_RGBA
+#define BORDER_CLR_A            BORDER_CLR_RGBA
+#define BORDER_CLR_RA           BORDER_CLR_RGBA
+#define BORDER_CLR_Rx           BORDER_CLR_RGBA
+#define BORDER_CLR_RGx          BORDER_CLR_RGBA
+#define BORDER_CLR_RGBx         BORDER_CLR_RGBA
+#define BORDER_CLR_R            "(float4)(.0f, .0f, .0f, 1.f)"
+#define BORDER_CLR_RG           BORDER_CLR_R
+#define BORDER_CLR_RGB          BORDER_CLR_R
+#define BORDER_CLR_INTENSITY    BORDER_CLR_R
+
+#define DIM_1d_NUM          1
+#define DIM_1darray_NUM     1
+#define DIM_1dbuffer_NUM    1
+#define DIM_2d_NUM          2
+#define DIM_2darray_NUM     2
+#define DIM_3d_NUM          3
+
+#define DIM_1d_NUM_VEC          ""
+#define DIM_1darray_NUM_VEC     ""
+#define DIM_1dbuffer_NUM_VEC    ""
+#define DIM_2d_NUM_VEC          "2"
+#define DIM_2darray_NUM_VEC     "2"
+#define DIM_3d_NUM_VEC          "3"
+
+#define __DIM_STR(num)      num
+#define _DIM_STR(num)        __DIM_STR(num)
+#define DIM_STR(dim)        _DIM_STR(DIM_##dim##_NUM_VEC)
+#define DIM_NUM_FLOAT(dim)  "float" DIM_STR(dim)
+#define DIM_NUM_INT(dim)    "int" DIM_STR(dim)
+#define DIM_NUM_UINT(dim)   "uint" DIM_STR(dim)
+
+#define COORD_1d_NUM        1
+#define COORD_1darray_NUM   2
+#define COORD_1dbuffer_NUM  1
+#define COORD_2d_NUM        2
+#define COORD_2darray_NUM   3
+#define COORD_3d_NUM        3
+
+#define COORD_1d_NUM_VEC        ""
+#define COORD_1darray_NUM_VEC   "2"
+#define COORD_1dbuffer_NUM_VEC  ""
+#define COORD_2d_NUM_VEC        "2"
+#define COORD_2darray_NUM_VEC   "3"
+#define COORD_3d_NUM_VEC        "3"
+
+#define __COORD_STR(num)    num
+#define _COORD_STR(num)     __COORD_STR(num)
+#define COORD_STR(dim)      _COORD_STR(COORD_##dim##_NUM_VEC)
+
+#if FIX_LEN_COORD
+#define COORD_NUM_INT(dim)      "int4"
+#define COORD_NUM_FLOAT(dim)    "float4"
+#define COORD_X(dim)            ".x"
+#define COORD_ALIGN_1           ", 0, 0, 0"
+#define COORD_ALIGN_2           ", 0, 0"
+#define COORD_ALIGN_3           ", 0"
+#else
+
+#define COORD_NUM_INT(dim)      "int" COORD_STR(dim)
+#define COORD_NUM_UINT(dim)     "uint" COORD_STR(dim)
+#define COORD_NUM_FLOAT(dim)    "float" COORD_STR(dim)
+
+#define COORD_X_1d()        ""
+#define COORD_X_2d()        ".x"
+#define COORD_X_3d()        ".x"
+#define COORD_X_1darray()   ".x"
+#define COORD_X_2darray()   ".x"
+#define COORD_X_1dbuffer()  ""
+#define COORD_X(dim)        COORD_X_##dim()
+
+#if PARAM_FIX
+#define COORD_1d_CVT        x
+#define COORD_1dbuffer_CVT  x
+#define COORD_1darray_CVT   xy
+#define COORD_2d_CVT        xy
+#define COORD_2darray_CVT   xyz
+#define COORD_3d_CVT        xyz
+#else
+#define COORD_1d_CVT        none
+#define COORD_1darray_CVT   none
+#define COORD_1dbuffer_CVT  none
+#define COORD_2d_CVT        none
+#define COORD_2darray_CVT   none
+#define COORD_3d_CVT        none
+#endif
+
+#define COORD_ALIGN_1       ""
+#define COORD_ALIGN_2       ""
+#define COORD_ALIGN_3       ""
+#endif
+
+#define __COORD_ALIGN(num)  COORD_ALIGN_##num
+#define _COORD_ALIGN(num)   __COORD_ALIGN(num)
+#define COORD_ALIGN(dim)    _COORD_ALIGN(COORD_##dim##_NUM)
+
+#define DIM_1d_SUFFIX       ""
+#define DIM_1darray_SUFFIX  "array_"
+#define DIM_1dbuffer_SUFFIX "buffer_"
+#define DIM_2d_SUFFIX       ""
+#define DIM_2darray_SUFFIX  "array_"
+#define DIM_3d_SUFFIX       ""
+
+/* channel data */
+#define CH_TYPE_unorm8          uchar
+#define CH_TYPE_snorm8          char
+#define CH_TYPE_unorm16         ushort
+#define CH_TYPE_snorm16         short
+#define CH_TYPE_uint8           uchar
+#define CH_TYPE_int8            char
+#define CH_TYPE_uint16          ushort
+#define CH_TYPE_int16           short
+#define CH_TYPE_uint32          uint
+#define CH_TYPE_int32           int
+#define CH_TYPE_float           float
+#define CH_TYPE_half            half
+#define CH_TYPE_unorm555        ushort
+#define CH_TYPE_unorm565        ushort
+#define CH_TYPE_unorm101010     uint
+
+#define CH_TYPE_R_unorm8        uchar
+#define CH_TYPE_R_snorm8        char
+#define CH_TYPE_R_unorm16       ushort
+#define CH_TYPE_R_snorm16       short
+#define CH_TYPE_R_uint8         uchar
+#define CH_TYPE_R_int8          char
+#define CH_TYPE_R_uint16        ushort
+#define CH_TYPE_R_int16         short
+#define CH_TYPE_R_uint32        uint
+#define CH_TYPE_R_int32         int
+#define CH_TYPE_R_float         float
+#define CH_TYPE_R_half          float
+#define CH_TYPE_R_unorm555      ushort
+#define CH_TYPE_R_unorm565      ushort
+#define CH_TYPE_R_unorm101010   uint
+
+/* channel order */
+#define CH_ORDERNONE        ""
+#define CH_ORDER_RGBA       "4"
+#define CH_ORDER_BGRA       "4"
+#define CH_ORDER_R          ""
+#define CH_ORDER_Rx         ""
+#define CH_ORDER_A          ""
+#define CH_ORDER_INTENSITY  ""
+#define CH_ORDER_LUMINANCE  ""
+#define CH_ORDER_RG         "2"
+#define CH_ORDER_RGx        "2"
+#define CH_ORDER_RA         "2"
+#define CH_ORDER_RGB        ""
+#define CH_ORDER_RGBx       ""
+#define CH_ORDER_ARGB       "4"
+
+#define _LoadType(ch_data, ch_order)    ToStr(CH_TYPE_##ch_data) CH_ORDER##ch_order
+#define LoadType(ch_data, ch_order)     _LoadType(ch_data, ch_order)
+#define _Load_R_Type(ch_data, ch_order) ToStr(CH_TYPE_R_##ch_data) CH_ORDER##ch_order
+#define Load_R_Type(ch_data, ch_order)  _Load_R_Type(ch_data, ch_order)
+
+/* get image size */
+#define imagesize_1d(dim, type)         COORD_NUM_INT(dim)" imageSize = ("COORD_NUM_INT(dim)")(get_image_width(image)"COORD_ALIGN(dim)");" NEWLINE
+#define imagesize_2d(dim, type)         COORD_NUM_INT(dim)" imageSize = ("COORD_NUM_INT(dim)")(get_image_width(image), get_image_height(image)"COORD_ALIGN(dim)");" NEWLINE
+#define imagesize_3d(dim, type)         COORD_NUM_INT(dim)" imageSize = ("COORD_NUM_INT(dim)")(get_image_width(image), get_image_height(image), get_image_depth(image)"COORD_ALIGN(dim)");" NEWLINE
+#define imagesize_1dbuffer(dim, type)   imagesize_1d(dim, type)
+#define imagesize_1darray(dim, type)    COORD_NUM_INT(dim)" imageSize = ("COORD_NUM_INT(dim)")(get_image_width(image), get_image_array_size(image)"COORD_ALIGN(dim)");" NEWLINE
+#define imagesize_2darray(dim, type)    COORD_NUM_INT(dim)" imageSize = ("COORD_NUM_INT(dim)")(get_image_width(image), get_image_height(image), get_image_array_size(image)"COORD_ALIGN(dim)");" NEWLINE
+#define ImageSize(dim)                  imagesize_##dim(dim, "viv_generic_image_t")
+
+/* coord convert */
+#define norm_COORD(dim, type, coord, cdim)    type"fcoord = convert_"COORD_NUM_FLOAT(dim)"("coord cdim") * convert_"COORD_NUM_FLOAT(dim)"(imageSize);" NEWLINE
+#define unorm_COORD(dim, type, coord, cdim)   type"fcoord = convert_"COORD_NUM_FLOAT(dim)"("coord cdim");" NEWLINE
+#define unnorm_COORD(dim, type, coord, cdim)  unorm_COORD(dim, type, coord, cdim)
+
+/* calculate base address */
+#define BASE_X                          "_viv_getImageAddr(image)"
+#define ROW_STRIDE                      "_viv_getImageRowStride(image)"
+#define SLICE_STRIDE                    "_viv_getImage3DSliceStride(image)"
+
+#define BASE_uchar_1(type, y, z)        type "base =  (uchar *)"BASE_X";" NEWLINE
+#define BASE_uchar_2(type, y, z)        type "base = ((uchar *)"BASE_X") + "ROW_STRIDE" * (uint)"y".y;" NEWLINE
+#define BASE_uchar_3(type, y, z)        type "base = ((uchar *)"BASE_X") + "ROW_STRIDE" * (uint)"y".y + "SLICE_STRIDE" * (uint)"z".z;" NEWLINE
+#define __BASE_uchar(num, type, y, z)   BASE_uchar_##num(type, y, z)
+#define _BASE_uchar(num, type, y, z)    __BASE_uchar(num, type, y, z)
+#define BASE_uchar(dim, type, y, z)     _BASE_uchar(COORD_##dim##_NUM, type, y, z)
+
+/* load value */
+#define vload_uchar(type, num, x)         "(("ToStr(type) num"*)base)["x"]"
+#define vload_char(type, num, x)          "(("ToStr(type) num"*)base)["x"]"
+#define vload_short(type, num, x)         "(("ToStr(type) num"*)base)["x"]"
+#define vload_ushort(type, num, x)        "(("ToStr(type) num"*)base)["x"]"
+#define vload_int(type, num, x)           "(("ToStr(type) num"*)base)["x"]"
+#define vload_uint(type, num, x)          "(("ToStr(type) num"*)base)["x"]"
+#define vload_float(type, num, x)         "(("ToStr(type) num"*)base)["x"]"
+#define vload_half(type, num, x)          "vload_half"num"("x", (half*)base)"
+#define __vload_TYPE(type, num, x)        vload_##type(type, num, x)
+#define _vload_TYPE(type, num, x)         __vload_TYPE(type, num, x)
+#define vload_TYPE(ch_data, ch_order, x)  _vload_TYPE(CH_TYPE_##ch_data, CH_ORDER##ch_order, x)
+
+#define LoadVal(dim, ch_data, ch_order, x, type)    type"val = "vload_TYPE(ch_data, ch_order, x COORD_X(dim))";" NEWLINE
+
+/* store value */
+#define vstore_uchar(type, num, x)          "(("ToStr(type) num"*)base)["x".x] = val"
+#define vstore_char(type, num, x)           "(("ToStr(type) num"*)base)["x".x] = val"
+#define vstore_short(type, num, x)          "(("ToStr(type) num"*)base)["x".x] = val"
+#define vstore_ushort(type, num, x)         "(("ToStr(type) num"*)base)["x".x] = val"
+#define vstore_int(type, num, x)            "(("ToStr(type) num"*)base)["x".x] = val"
+#define vstore_uint(type, num, x)           "(("ToStr(type) num"*)base)["x".x] = val"
+#define vstore_float(type, num, x)          "(("ToStr(type) num"*)base)["x".x] = val"
+#define vstore_half(type, num, x)           "vstore_half"num"(val, "x".x, (half*)base)"
+#define __vstore_TYPE(type, num, x)         vstore_##type(type, num, x)
+#define _vstore_TYPE(type, num, x)          __vstore_TYPE(type, num, x)
+#define vstore_TYPE(ch_data, ch_order, x)   _vstore_TYPE(CH_TYPE_##ch_data, CH_ORDER##ch_order, x)
+#define StoreVal(dim, ch_data, ch_order, x) vstore_TYPE(ch_data, ch_order, x /*COORD_X(dim)*/ )";" NEWLINE
+
+/* convert value to rgba */
+#define snorm8_RGBA_CvtRGBA(type)           type"rgba = max(convert_float4(val) / 127.f, -1.f);" NEWLINE
+#define snorm16_RGBA_CvtRGBA(type)          type"rgba = max(convert_float4(val) / 32767.f, -1.f);" NEWLINE
+#define unorm8_RGBA_CvtRGBA(type)           type"rgba = convert_float4(val) / 255.f;" NEWLINE
+#define unorm16_RGBA_CvtRGBA(type)          type"rgba = convert_float4(val) / 65535.f;" NEWLINE
+#define int8_RGBA_CvtRGBA(type)             type"rgba = convert_int4(val);" NEWLINE
+#define int16_RGBA_CvtRGBA(type)            type"rgba = convert_int4(val);" NEWLINE
+#define int32_RGBA_CvtRGBA(type)            type"rgba = convert_int4(val);" NEWLINE
+#define uint8_RGBA_CvtRGBA(type)            type"rgba = convert_uint4(val);" NEWLINE
+#define uint16_RGBA_CvtRGBA(type)           type"rgba = convert_uint4(val);" NEWLINE
+#define uint32_RGBA_CvtRGBA(type)           type"rgba = convert_uint4(val);" NEWLINE
+#define float_RGBA_CvtRGBA(type)            type"rgba = val;" NEWLINE
+#define half_RGBA_CvtRGBA(type)             type"rgba = val;" NEWLINE
+
+#define snorm8_BGRA_CvtRGBA(type)           type"rgba = max(convert_float4(val.zyxw) / 127.f, -1.f);" NEWLINE
+#define snorm16_BGRA_CvtRGBA(type)          type"rgba = max(convert_float4(val.zyxw) / 32767.f, -1.f);" NEWLINE
+#define unorm8_BGRA_CvtRGBA(type)           type"rgba = convert_float4(val.zyxw) / 255.f;" NEWLINE
+#define unorm16_BGRA_CvtRGBA(type)          type"rgba = convert_float4(val.zyxw) / 65535.f;" NEWLINE
+#define int8_BGRA_CvtRGBA(type)             type"rgba = convert_int4(val.zyxw);" NEWLINE
+#define int16_BGRA_CvtRGBA(type)            type"rgba = convert_int4(val.zyxw);" NEWLINE
+#define int32_BGRA_CvtRGBA(type)            type"rgba = convert_int4(val.zyxw);" NEWLINE
+#define uint8_BGRA_CvtRGBA(type)            type"rgba = convert_uint4(val.zyxw);" NEWLINE
+#define uint16_BGRA_CvtRGBA(type)           type"rgba = convert_uint4(val.zyxw);" NEWLINE
+#define uint32_BGRA_CvtRGBA(type)           type"rgba = convert_uint4(val.zyxw);" NEWLINE
+#define float_BGRA_CvtRGBA(type)            type"rgba = val.zyxw;" NEWLINE
+#define half_BGRA_CvtRGBA(type)             type"rgba = val.zyxw;" NEWLINE
+
+#define snorm8_ARGB_CvtRGBA(type)           type"rgba = max(convert_float4(val.wxyz) / 127.f, -1.f);" NEWLINE
+#define snorm16_ARGB_CvtRGBA(type)          type"rgba = max(convert_float4(val.wxyz) / 32767.f, -1.f);" NEWLINE
+#define unorm8_ARGB_CvtRGBA(type)           type"rgba = convert_float4(val.wxyz) / 255.f;" NEWLINE
+#define unorm16_ARGB_CvtRGBA(type)          type"rgba = convert_float4(val.wxyz) / 65535.f;" NEWLINE
+#define int8_ARGB_CvtRGBA(type)             type"rgba = convert_int4(val.wxyz);" NEWLINE
+#define int16_ARGB_CvtRGBA(type)            type"rgba = convert_int4(val.wxyz);" NEWLINE
+#define int32_ARGB_CvtRGBA(type)            type"rgba = convert_int4(val.wxyz);" NEWLINE
+#define uint8_ARGB_CvtRGBA(type)            type"rgba = convert_uint4(val.wxyz);" NEWLINE
+#define uint16_ARGB_CvtRGBA(type)           type"rgba = convert_uint4(val.wxyz);" NEWLINE
+#define uint32_ARGB_CvtRGBA(type)           type"rgba = convert_uint4(val.wxyz;" NEWLINE
+#define float_ARGB_CvtRGBA(type)            type"rgba = val.wxyz;" NEWLINE
+#define half_ARGB_CvtRGBA(type)             type"rgba = val.wxyz;" NEWLINE
+
+#define snorm8_R_CvtRGBA(type)              type"rgba = max((float4)((float)val / 127.f, .0f, .0f, 1.f), -1.f);" NEWLINE
+#define snorm16_R_CvtRGBA(type)             type"rgba = max((float4)((float)val / 32767.f, .0f, .0f, 1.f), -1.f);" NEWLINE
+#define unorm8_R_CvtRGBA(type)              type"rgba = (float4)((float)val / 255.f, .0f, .0f, 1.f);" NEWLINE
+#define unorm16_R_CvtRGBA(type)             type"rgba = (float4)((float)val / 65535.f, .0f, .0f, 1.f);" NEWLINE
+#define int8_R_CvtRGBA(type)                type"rgba = (int4)(val, 0, 0, 1);" NEWLINE
+#define int16_R_CvtRGBA(type)               type"rgba = (int4)(val, 0, 0, 1);" NEWLINE
+#define int32_R_CvtRGBA(type)               type"rgba = (int4)(val, 0, 0, 1);" NEWLINE
+#define uint8_R_CvtRGBA(type)               type"rgba = (uint4)(val, 0, 0, 1);" NEWLINE
+#define uint16_R_CvtRGBA(type)              type"rgba = (uint4)(val, 0, 0, 1);" NEWLINE
+#define uint32_R_CvtRGBA(type)              type"rgba = (uint4)(val, 0, 0, 1);" NEWLINE
+#define float_R_CvtRGBA(type)               type"rgba = (float4)(val, .0f, .0f, 1.f);" NEWLINE
+#define half_R_CvtRGBA(type)                type"rgba = (float4)(val, .0f, .0f, 1.f);" NEWLINE
+#define snorm8_Rx_CvtRGBA(type)             snorm8_R_CvtRGBA(type)  NEWLINE
+#define snorm16_Rx_CvtRGBA(type)            snorm16_R_CvtRGBA(type) NEWLINE
+#define unorm8_Rx_CvtRGBA(type)             unorm8_R_CvtRGBA(type)  NEWLINE
+#define unorm16_Rx_CvtRGBA(type)            unorm16_R_CvtRGBA(type) NEWLINE
+#define int8_Rx_CvtRGBA(type)               int8_R_CvtRGBA(type)    NEWLINE
+#define int16_Rx_CvtRGBA(type)              int16_R_CvtRGBA(type)   NEWLINE
+#define int32_Rx_CvtRGBA(type)              int32_R_CvtRGBA(type)   NEWLINE
+#define uint8_Rx_CvtRGBA(type)              uint8_R_CvtRGBA(type)   NEWLINE
+#define uint16_Rx_CvtRGBA(type)             uint16_R_CvtRGBA(type)  NEWLINE
+#define uint32_Rx_CvtRGBA(type)             uint32_R_CvtRGBA(type)  NEWLINE
+#define float_Rx_CvtRGBA(type)              float_R_CvtRGBA(type)   NEWLINE
+#define half_Rx_CvtRGBA(type)               half_R_CvtRGBA(type)    NEWLINE
+
+#define snorm8_RG_CvtRGBA(type)             type"rgba = max((float4)(convert_float2(val) / 127.f, .0f, 1.f), -1.f);" NEWLINE
+#define snorm16_RG_CvtRGBA(type)            type"rgba = max((float4)(convert_float2(val) / 32767.f, .0f, 1.f), -1.f);" NEWLINE
+#define unorm8_RG_CvtRGBA(type)             type"rgba = (float4)(convert_float2(val) / 255.f, .0f, 1.f);" NEWLINE
+#define unorm16_RG_CvtRGBA(type)            type"rgba = (float4)(convert_float2(val) / 65535.f, .0f, 1.f);" NEWLINE
+#define int8_RG_CvtRGBA(type)               type"rgba = (int4)(val, 0, 1);" NEWLINE
+#define int16_RG_CvtRGBA(type)              type"rgba = (int4)(val, 0, 1);" NEWLINE
+#define int32_RG_CvtRGBA(type)              type"rgba = (int4)(val, 0, 1);" NEWLINE
+#define uint8_RG_CvtRGBA(type)              type"rgba = (uint4)(val, 0, 1);" NEWLINE
+#define uint16_RG_CvtRGBA(type)             type"rgba = (uint4)(val, 0, 1);" NEWLINE
+#define uint32_RG_CvtRGBA(type)             type"rgba = (uint4)(val, 0, 1);" NEWLINE
+#define float_RG_CvtRGBA(type)              type"rgba = (float4)(val, .0f, 1.f);" NEWLINE
+#define half_RG_CvtRGBA(type)               type"rgba = (float4)(val, .0f, 1.f);" NEWLINE
+#define snorm8_RGx_CvtRGBA(type)            snorm8_RG_CvtRGBA(type)  NEWLINE
+#define snorm16_RGx_CvtRGBA(type)           snorm16_RG_CvtRGBA(type) NEWLINE
+#define unorm8_RGx_CvtRGBA(type)            unorm8_RG_CvtRGBA(type)  NEWLINE
+#define unorm16_RGx_CvtRGBA(type)           unorm16_RG_CvtRGBA(type) NEWLINE
+#define int8_RGx_CvtRGBA(type)              int8_RG_CvtRGBA(type)    NEWLINE
+#define int16_RGx_CvtRGBA(type)             int16_RG_CvtRGBA(type)   NEWLINE
+#define int32_RGx_CvtRGBA(type)             int32_RG_CvtRGBA(type)   NEWLINE
+#define uint8_RGx_CvtRGBA(type)             uint8_RG_CvtRGBA(type)   NEWLINE
+#define uint16_RGx_CvtRGBA(type)            uint16_RG_CvtRGBA(type)  NEWLINE
+#define uint32_RGx_CvtRGBA(type)            uint32_RG_CvtRGBA(type)  NEWLINE
+#define float_RGx_CvtRGBA(type)             float_RG_CvtRGBA(type)   NEWLINE
+#define half_RGx_CvtRGBA(type)              half_RG_CvtRGBA(type)    NEWLINE
+
+#define snorm8_A_CvtRGBA(type)              type"rgba = max((float4)(.0f, .0f, .0f, (float)val / 127.f), -1.f);" NEWLINE
+#define snorm16_A_CvtRGBA(type)             type"rgba = max((float4)(.0f, .0f, .0f, (float)val / 32767.f), -1.f);" NEWLINE
+#define unorm8_A_CvtRGBA(type)              type"rgba = (float4)(.0f, .0f, .0f, (float)val / 255.f);" NEWLINE
+#define unorm16_A_CvtRGBA(type)             type"rgba = (float4)(.0f, .0f, .0f, (float)val / 65535.f);" NEWLINE
+#define int8_A_CvtRGBA(type)                type"rgba = (int4)(0, 0, 0, val);" NEWLINE
+#define int16_A_CvtRGBA(type)               type"rgba = (int4)(0, 0, 0, val);" NEWLINE
+#define int32_A_CvtRGBA(type)               type"rgba = (int4)(0, 0, 0, val);" NEWLINE
+#define uint8_A_CvtRGBA(type)               type"rgba = (uint4)(0, 0, 0, val);" NEWLINE
+#define uint16_A_CvtRGBA(type)              type"rgba = (uint4)(0, 0, 0, val);" NEWLINE
+#define uint32_A_CvtRGBA(type)              type"rgba = (uint4)(0, 0, 0, val);" NEWLINE
+#define float_A_CvtRGBA(type)               type"rgba = (float4)(.0f, .0f, .0f, val);" NEWLINE
+#define half_A_CvtRGBA(type)                type"rgba = (float4)(.0f, .0f, .0f, val);" NEWLINE
+
+#define snorm8_RA_CvtRGBA(type)             type"rgba = max((float4)((float)val.x / 127.f, .0f, .0f, (float)val.y / 127.f), -1.f);" NEWLINE
+#define snorm16_RA_CvtRGBA(type)            type"rgba = max((float4)((float)val.x / 32767.f, .0f, .0f, (float)val.y / 32767.f), -1.f);" NEWLINE
+#define unorm8_RA_CvtRGBA(type)             type"rgba = (float4)((float)val.x / 255.f, .0f, .0f, (float)val.y / 255.f);" NEWLINE
+#define unorm16_RA_CvtRGBA(type)            type"rgba = (float4)((float)val.x / 65535.f, .0f, .0f, (float)val.y / 65535.f);" NEWLINE
+#define int8_RA_CvtRGBA(type)               type"rgba = (int4)(val.x, 0, 0 val.y);" NEWLINE
+#define int16_RA_CvtRGBA(type)              type"rgba = (int4)(val.x, 0, 0 val.y);" NEWLINE
+#define int32_RA_CvtRGBA(type)              type"rgba = (int4)(val.x, 0, 0 val.y);" NEWLINE
+#define uint8_RA_CvtRGBA(type)              type"rgba = (uint4)(val.x, 0, 0 val.y);" NEWLINE
+#define uint16_RA_CvtRGBA(type)             type"rgba = (uint4)(val.x, 0, 0 val.y);" NEWLINE
+#define uint32_RA_CvtRGBA(type)             type"rgba = (uint4)(val.x, 0, 0 val.y);" NEWLINE
+#define float_RA_CvtRGBA(type)              type"rgba = (float4)(val.x, .0f, .0f, val.y);" NEWLINE
+#define half_RA_CvtRGBA(type)               type"rgba = (float4)(val.x, .0f, .0f, val.y);" NEWLINE
+
+#define snorm8_INTENSITY_CvtRGBA(type)      type"rgba = max((float4)((float3)((float)val / 127.f ), 1.f), -1.f);" NEWLINE
+#define snorm16_INTENSITY_CvtRGBA(type)     type"rgba = max((float4)((float3)((float)val / 32767.f), 1.f), -1.f);" NEWLINE
+#define unorm8_INTENSITY_CvtRGBA(type)      type"rgba = (float4)((float3)((float)val / 255.f), 1.f);" NEWLINE
+#define unorm16_INTENSITY_CvtRGBA(type)     type"rgba = (float4)((float3)((float)val / 65535.f), 1.f);" NEWLINE
+#define float_INTENSITY_CvtRGBA(type)       type"rgba = (float4)((float3)(val), 1.f);" NEWLINE
+#define half_INTENSITY_CvtRGBA(type)        type"rgba = (float4)((float3)(val), 1.f);" NEWLINE
+
+#define snorm8_LUMINANCE_CvtRGBA(type)      type"rgba = max((float4)((float)val / 127.f), -1.f);" NEWLINE
+#define snorm16_LUMINANCE_CvtRGBA(type)     type"rgba = max((float4)((float)val / 32767.f), -1.f);" NEWLINE
+#define unorm8_LUMINANCE_CvtRGBA(type)      type"rgba = (float4)((float)val / 255.f);" NEWLINE
+#define unorm16_LUMINANCE_CvtRGBA(type)     type"rgba = (float4)((float)val / 65535.f );" NEWLINE
+#define float_LUMINANCE_CvtRGBA(type)       type"rgba = (float4)(val);" NEWLINE
+#define half_LUMINANCE_CvtRGBA(type)        type"rgba = (float4)(val);" NEWLINE
+
+#define unorm555_RGB_CvtRGBA(type)          type"rgba = (float4)((float)((val >> 10)&0x1f)   (float)((val >> 5 )&0x1f), (float)(val&0x1f), 32.f) / 32.f;" NEWLINE
+#define unorm565_RGB_CvtRGBA(type)          type"rgba = (float4)((float)((val >> 10)&0x1f)   (float)((val >> 5 )&0x1f), (float)(val&0x1f), 32.f) / 32.f;" NEWLINE
+#define unorm101010_RGB_CvtRGBA(type)       type"rgba = (float4)((float)((val >> 20)&0x3ff), (float)((val >> 10)&0x3ff), (float)(val&0x3ff), 1024.f) / 1024.f;" NEWLINE
+#define unorm555_RGBx_CvtRGBA(type)         unorm555_RGB_CvtRGBA(type)      NEWLINE
+#define unorm565_RGBx_CvtRGBA(type)         unorm565_RGB_CvtRGBA(type)      NEWLINE
+#define unorm101010_RGBx_CvtRGBA(type)      unorm101010_RGB_CvtRGBA(type)   NEWLINE
+
+/* convert rgba to value */
+#define snorm8_RGBA_CvtVALUE(type)           type"val = convert_char4_sat  (.5f + rgba * 127.f);" NEWLINE
+#define snorm16_RGBA_CvtVALUE(type)          type"val = convert_short4_sat (.5f + rgba * 32767.f);" NEWLINE
+#define unorm8_RGBA_CvtVALUE(type)           type"val = convert_uchar4_sat (.5f + rgba * 255.f);" NEWLINE
+#define unorm16_RGBA_CvtVALUE(type)          type"val = convert_ushort4_sat(.5f + rgba * 65535.f);" NEWLINE
+#define int8_RGBA_CvtVALUE(type)             type"val = convert_char4_sat  (rgba);" NEWLINE
+#define int16_RGBA_CvtVALUE(type)            type"val = convert_short4_sat (rgba);" NEWLINE
+#define int32_RGBA_CvtVALUE(type)            type"val = convert_int4       (rgba);" NEWLINE
+#define uint8_RGBA_CvtVALUE(type)            type"val = convert_uchar4_sat (rgba);" NEWLINE
+#define uint16_RGBA_CvtVALUE(type)           type"val = convert_ushort4_sat(rgba);" NEWLINE
+#define uint32_RGBA_CvtVALUE(type)           type"val = convert_uint4      (rgba);" NEWLINE
+#define float_RGBA_CvtVALUE(type)            type"val = rgba;" NEWLINE
+#define half_RGBA_CvtVALUE(type)             type"val = rgba;" NEWLINE
+
+#define snorm8_BGRA_CvtVALUE(type)           type"val = convert_char4_sat  (.5f + rgba.zyxw * 127.f);" NEWLINE
+#define snorm16_BGRA_CvtVALUE(type)          type"val = convert_short4_sat (.5f + rgba.zyxw * 32767.f);" NEWLINE
+#define unorm8_BGRA_CvtVALUE(type)           type"val = convert_uchar4_sat (.5f + rgba.zyxw * 255.f);" NEWLINE
+#define unorm16_BGRA_CvtVALUE(type)          type"val = convert_ushort4_sat(.5f + rgba.zyxw * 65535.f);" NEWLINE
+#define int8_BGRA_CvtVALUE(type)             type"val = convert_char4_sat  (rgba.zyxw);" NEWLINE
+#define int16_BGRA_CvtVALUE(type)            type"val = convert_short4_sat (rgba.zyxw);" NEWLINE
+#define int32_BGRA_CvtVALUE(type)            type"val = convert_int4       (rgba.zyxw);" NEWLINE
+#define uint8_BGRA_CvtVALUE(type)            type"val = convert_uchar4_sat (rgba.zyxw);" NEWLINE
+#define uint16_BGRA_CvtVALUE(type)           type"val = convert_ushort4_sat(rgba.zyxw);" NEWLINE
+#define uint32_BGRA_CvtVALUE(type)           type"val = convert_uint4      (rgba.zyxw);" NEWLINE
+#define float_BGRA_CvtVALUE(type)            type"val = rgba.zyxw;" NEWLINE
+#define half_BGRA_CvtVALUE(type)             type"val = rgba.zyxw;" NEWLINE
+
+#define snorm8_ARGB_CvtVALUE(type)           type"val = convert_char4_sat  (.5f + rgba.wxyz * 127.f);" NEWLINE
+#define snorm16_ARGB_CvtVALUE(type)          type"val = convert_short4_sat (.5f + rgba.wxyz * 32767.f);" NEWLINE
+#define unorm8_ARGB_CvtVALUE(type)           type"val = convert_uchar4_sat (.5f + rgba.wxyz * 255.f);" NEWLINE
+#define unorm16_ARGB_CvtVALUE(type)          type"val = convert_ushort4_sat(.5f + rgba.wxyz * 65535.f);" NEWLINE
+#define int8_ARGB_CvtVALUE(type)             type"val = convert_char4_sat  (rgba.wxyz);" NEWLINE
+#define int16_ARGB_CvtVALUE(type)            type"val = convert_short4_sat (rgba.wxyz);" NEWLINE
+#define int32_ARGB_CvtVALUE(type)            type"val = convert_int4       (rgba.wxyz);" NEWLINE
+#define uint8_ARGB_CvtVALUE(type)            type"val = convert_uchar4_sat (rgba.wxyz);" NEWLINE
+#define uint16_ARGB_CvtVALUE(type)           type"val = convert_ushort4_sat(rgba.wxyz);" NEWLINE
+#define uint32_ARGB_CvtVALUE(type)           type"val = convert_uint4      (rgba.wxyz;" NEWLINE
+#define float_ARGB_CvtVALUE(type)            type"val = rgba.wxyz;" NEWLINE
+#define half_ARGB_CvtVALUE(type)             type"val = rgba.wxyz;" NEWLINE
+
+#define snorm8_R_CvtVALUE(type)              type"val = convert_char_sat  (.5f + rgba.x * 127.f);" NEWLINE
+#define snorm16_R_CvtVALUE(type)             type"val = convert_short_sat (.5f + rgba.x * 32767.f);" NEWLINE
+#define unorm8_R_CvtVALUE(type)              type"val = convert_uchar_sat (.5f + rgba.x * 255.f);" NEWLINE
+#define unorm16_R_CvtVALUE(type)             type"val = convert_ushort_sat(.5f + rgba.x * 65535.f);" NEWLINE
+#define int8_R_CvtVALUE(type)                type"val = convert_char_sat  (rgba.x);" NEWLINE
+#define int16_R_CvtVALUE(type)               type"val = convert_short_sat (rgba.x);" NEWLINE
+#define int32_R_CvtVALUE(type)               type"val = convert_int       (rgba.x);" NEWLINE
+#define uint8_R_CvtVALUE(type)               type"val = convert_uchar_sat (rgba.x);" NEWLINE
+#define uint16_R_CvtVALUE(type)              type"val = convert_ushort_sat(rgba.x);" NEWLINE
+#define uint32_R_CvtVALUE(type)              type"val = convert_uint      (rgba.x);" NEWLINE
+#define float_R_CvtVALUE(type)               type"val = (float) (rgba.x);" NEWLINE
+#define half_R_CvtVALUE(type)                type"val = (float) (rgba.x);" NEWLINE
+#define snorm8_Rx_CvtVALUE(type)             snorm8_R_CvtVALUE(type)  NEWLINE
+#define snorm16_Rx_CvtVALUE(type)            snorm16_R_CvtVALUE(type) NEWLINE
+#define unorm8_Rx_CvtVALUE(type)             unorm8_R_CvtVALUE(type)  NEWLINE
+#define unorm16_Rx_CvtVALUE(type)            unorm16_R_CvtVALUE(type) NEWLINE
+#define int8_Rx_CvtVALUE(type)               int8_R_CvtVALUE(type)    NEWLINE
+#define int16_Rx_CvtVALUE(type)              int16_R_CvtVALUE(type)   NEWLINE
+#define int32_Rx_CvtVALUE(type)              int32_R_CvtVALUE(type)   NEWLINE
+#define uint8_Rx_CvtVALUE(type)              uint8_R_CvtVALUE(type)   NEWLINE
+#define uint16_Rx_CvtVALUE(type)             uint16_R_CvtVALUE(type)  NEWLINE
+#define uint32_Rx_CvtVALUE(type)             uint32_R_CvtVALUE(type)  NEWLINE
+#define float_Rx_CvtVALUE(type)              float_R_CvtVALUE(type)   NEWLINE
+#define half_Rx_CvtVALUE(type)               half_R_CvtVALUE(type)    NEWLINE
+
+#define snorm8_RG_CvtVALUE(type)             type"val = convert_char2_sat  (.5f + rgba.xy * 127.f);" NEWLINE
+#define snorm16_RG_CvtVALUE(type)            type"val = convert_short2_sat (.5f + rgba.xy * 32767.f);" NEWLINE
+#define unorm8_RG_CvtVALUE(type)             type"val = convert_uchar2_sat (.5f + rgba.xy * 255.f);" NEWLINE
+#define unorm16_RG_CvtVALUE(type)            type"val = convert_ushort2_sat(.5f + rgba.xy * 65535.f);" NEWLINE
+#define int8_RG_CvtVALUE(type)               type"val = convert_char2_sat  (rgba.xy);" NEWLINE
+#define int16_RG_CvtVALUE(type)              type"val = convert_short2_sat (rgba.xy);" NEWLINE
+#define int32_RG_CvtVALUE(type)              type"val = convert_int2       (rgba.xy);" NEWLINE
+#define uint8_RG_CvtVALUE(type)              type"val = convert_uchar2_sat (rgba.xy);" NEWLINE
+#define uint16_RG_CvtVALUE(type)             type"val = convert_ushort2_sat(rgba.xy);" NEWLINE
+#define uint32_RG_CvtVALUE(type)             type"val = convert_uint2      (rgba.xy);" NEWLINE
+#define float_RG_CvtVALUE(type)              type"val = (float2) (rgba.xy);" NEWLINE
+#define half_RG_CvtVALUE(type)               type"val = (float2) (rgba.xy);" NEWLINE
+#define snorm8_RGx_CvtVALUE(type)            snorm8_RG_CvtVALUE(type)  NEWLINE
+#define snorm16_RGx_CvtVALUE(type)           snorm16_RG_CvtVALUE(type) NEWLINE
+#define unorm8_RGx_CvtVALUE(type)            unorm8_RG_CvtVALUE(type)  NEWLINE
+#define unorm16_RGx_CvtVALUE(type)           unorm16_RG_CvtVALUE(type) NEWLINE
+#define int8_RGx_CvtVALUE(type)              int8_RG_CvtVALUE(type)    NEWLINE
+#define int16_RGx_CvtVALUE(type)             int16_RG_CvtVALUE(type)   NEWLINE
+#define int32_RGx_CvtVALUE(type)             int32_RG_CvtVALUE(type)   NEWLINE
+#define uint8_RGx_CvtVALUE(type)             uint8_RG_CvtVALUE(type)   NEWLINE
+#define uint16_RGx_CvtVALUE(type)            uint16_RG_CvtVALUE(type)  NEWLINE
+#define uint32_RGx_CvtVALUE(type)            uint32_RG_CvtVALUE(type)  NEWLINE
+#define float_RGx_CvtVALUE(type)             float_RG_CvtVALUE(type)   NEWLINE
+#define half_RGx_CvtVALUE(type)              half_RG_CvtVALUE(type)    NEWLINE
+
+#define snorm8_A_CvtVALUE(type)              type"val = convert_char_sat  (.5f + rgba.w * 127.f);" NEWLINE
+#define snorm16_A_CvtVALUE(type)             type"val = convert_short_sat (.5f + rgba.w * 32767.f);" NEWLINE
+#define unorm8_A_CvtVALUE(type)              type"val = convert_uchar_sat (.5f + rgba.w * 255.f);" NEWLINE
+#define unorm16_A_CvtVALUE(type)             type"val = convert_ushort_sat(.5f + rgba.w * 65535.f);" NEWLINE
+#define int8_A_CvtVALUE(type)                type"val = convert_char_sat  (rgba.w);" NEWLINE
+#define int16_A_CvtVALUE(type)               type"val = convert_short_sat (rgba.w);" NEWLINE
+#define int32_A_CvtVALUE(type)               type"val = convert_int       (rgba.w);" NEWLINE
+#define uint8_A_CvtVALUE(type)               type"val = convert_uchar_sat (rgba.w);" NEWLINE
+#define uint16_A_CvtVALUE(type)              type"val = convert_ushort_sat(rgba.w);" NEWLINE
+#define uint32_A_CvtVALUE(type)              type"val = convert_uint      (rgba.w);" NEWLINE
+#define float_A_CvtVALUE(type)               type"val = (float) (rgba.w);" NEWLINE
+#define half_A_CvtVALUE(type)                type"val = (float) (rgba.w);" NEWLINE
+
+#define snorm8_RA_CvtVALUE(type)             type"val = convert_char2_sat  (.5f + rgba.xw * 127.f);" NEWLINE
+#define snorm16_RA_CvtVALUE(type)            type"val = convert_short2_sat (.5f + rgba.xw * 32767.f);" NEWLINE
+#define unorm8_RA_CvtVALUE(type)             type"val = convert_uchar2_sat (.5f + rgba.xw * 255.f);" NEWLINE
+#define unorm16_RA_CvtVALUE(type)            type"val = convert_ushort2_sat(.5f + rgba.xw * 65535.f);" NEWLINE
+#define int8_RA_CvtVALUE(type)               type"val = convert_char2_sat  (rgba.xw);" NEWLINE
+#define int16_RA_CvtVALUE(type)              type"val = convert_short2_sat (rgba.xw);" NEWLINE
+#define int32_RA_CvtVALUE(type)              type"val = convert_int2       (rgba.xw);" NEWLINE
+#define uint8_RA_CvtVALUE(type)              type"val = convert_uchar2_sat (rgba.xw);" NEWLINE
+#define uint16_RA_CvtVALUE(type)             type"val = convert_ushort2_sat(rgba.xw);" NEWLINE
+#define uint32_RA_CvtVALUE(type)             type"val = convert_uint2      (rgba.xw);" NEWLINE
+#define float_RA_CvtVALUE(type)              type"val = (float2) (rgba.xw);" NEWLINE
+#define half_RA_CvtVALUE(type)               type"val = (float2) (rgba.xw);" NEWLINE
+
+#define snorm8_INTENSITY_CvtVALUE(type)      type"val = convert_char_sat  (.5f + rgba.x * 127.f);" NEWLINE
+#define snorm16_INTENSITY_CvtVALUE(type)     type"val = convert_short_sat (.5f + rgba.x * 12768.f);" NEWLINE
+#define unorm8_INTENSITY_CvtVALUE(type)      type"val = convert_uchar_sat (.5f + rgba.x * 255.f);" NEWLINE
+#define unorm16_INTENSITY_CvtVALUE(type)     type"val = convert_ushort_sat(.5f + rgba.x * 65535.f);" NEWLINE
+#define float_INTENSITY_CvtVALUE(type)       type"val = (float)(rgba.x);" NEWLINE
+#define half_INTENSITY_CvtVALUE(type)        type"val = (float)(rgba.x);" NEWLINE
+
+#define snorm8_LUMINANCE_CvtVALUE(type)      type"val = convert_char_sat  (.5f + rgba.x * 127.f);" NEWLINE
+#define snorm16_LUMINANCE_CvtVALUE(type)     type"val = convert_short_sat (.5f + rgba.x * 12768.f);" NEWLINE
+#define unorm8_LUMINANCE_CvtVALUE(type)      type"val = convert_uchar_sat (.5f + rgba.x * 255.f);" NEWLINE
+#define unorm16_LUMINANCE_CvtVALUE(type)     type"val = convert_ushor_sat (.5f + rgba.x * 65535.f);" NEWLINE
+#define float_LUMINANCE_CvtVALUE(type)       type"val = (float)(rgba.x);" NEWLINE
+#define half_LUMINANCE_CvtVALUE(type)        type"val = (float)(rgba.x);" NEWLINE
+
+/* linear support*/
+#define LINEAR_snorm8(x)        x
+#define LINEAR_snorm16(x)       x
+#define LINEAR_unorm8(x)        x
+#define LINEAR_unorm16(x)       x
+#define LINEAR_unorm555(x)      x
+#define LINEAR_unorm565(x)      x
+#define LINEAR_unorm101010(x)   x
+#define LINEAR_float(x)         x
+#define LINEAR_half(x)          x
+#define LINEAR_int8(x)          ""
+#define LINEAR_int16(x)         ""
+#define LINEAR_int32(x)         ""
+#define LINEAR_uint8(x)         ""
+#define LINEAR_uint16(x)        ""
+#define LINEAR_uint32(x)        ""
+#define LINEAR_int(x)           ""
+#define LINEAR_uint(x)          ""
+
+#define LINEAR_SUPPORT(ch_data, x)  LINEAR_##ch_data(x)
+
+#define _LINEAR_1D(dim)    \
+"    "DIM_NUM_FLOAT(dim)" oneMinusFract = 1.f - fract;" NEWLINE \
+"    rgba = oneMinusFract"COORD_X(1d)" * T0 + fract"COORD_X(1d)" * T1;" NEWLINE
+
+#define _LINEAR_2D(dim)    \
+"    "DIM_NUM_FLOAT(dim)" oneMinusFract = 1.f - fract;" NEWLINE \
+"    rgba = oneMinusFract.x * oneMinusFract.y * T00 + " NEWLINE \
+"                   fract.x * oneMinusFract.y * T10 + " NEWLINE \
+"           oneMinusFract.x *         fract.y * T01 + " NEWLINE \
+"                   fract.x *         fract.y * T11;" NEWLINE
+#define _LINEAR_3D(dim)    \
+"    "DIM_NUM_FLOAT(dim)" oneMinusFract = 1.f - fract; " NEWLINE \
+"    float4 t0, t1, t2, t3, t4, t5;" NEWLINE \
+"    t0 = oneMinusFract.x * T000 + fract.x * T100; " NEWLINE \
+"    t1 = oneMinusFract.x * T010 + fract.x * T110; " NEWLINE \
+"    t2 = oneMinusFract.x * T001 + fract.x * T101; " NEWLINE \
+"    t3 = oneMinusFract.x * T011 + fract.x * T111; " NEWLINE \
+"    t4 = oneMinusFract.y * t0   + fract.y * t1; " NEWLINE \
+"    t5 = oneMinusFract.y * t2   + fract.y * t3; " NEWLINE \
+"    rgba = oneMinusFract.z * t4 + fract.z * t5; " NEWLINE
+
+#define __CALC_LINEAR(num, dim) _LINEAR_##num##D(dim)
+#define _CALC_LINEAR(num, dim)  __CALC_LINEAR(num, dim)
+#define CALC_LINEAR(dim)        _CALC_LINEAR(DIM_##dim##_NUM, dim)
+
+/* address */
+#define _none_none          ""
+#define _none_x             ".x"
+#define _none_xy            ".xy"
+#define _none_xyz           ".xyz"
+#define _x_none             ".x"
+#define _xy_none            ".xy"
+#define _xyz_none           ".xyz"
+#define _x_x                ".x"
+#define _xy_x               ".x"
+#define _xyz_x              ".x"
+#define _xy_xy              ".xy"
+#define _xyz_xy             ".xy"
+#define _xyz_xyz            ".xyz"
+
+#define _COORD_ADDRESS_1d           none
+#define _COORD_ADDRESS_1dbuffer     none
+#define _COORD_ADDRESS_2d           xy
+#define _COORD_ADDRESS_3d           xyz
+#define _COORD_ADDRESS_1darray      x
+#define _COORD_ADDRESS_2darray      xy
+#define __COORD_ADDRESS(addr, dim)  _##dim##_##addr
+#define _COORD_ADDRESS(x, y)        __COORD_ADDRESS(x, y)
+#define COORD_ADDRESS(dim)          _COORD_ADDRESS(_COORD_ADDRESS_##dim, _COORD_ADDRESS_1d)
+#define COORD_ADDRESS2(dim)         _COORD_ADDRESS(_COORD_ADDRESS_##dim, COORD_##dim##_CVT)
+
+#define _DIM_ADDRESS_1d             none
+#define _DIM_ADDRESS_1dbuffer       none
+#define _DIM_ADDRESS_2d             xy
+#define _DIM_ADDRESS_3d             xyz
+#define _DIM_ADDRESS_1darray        xy
+#define _DIM_ADDRESS_2darray        xyz
+#define __DIM_ADDRESS(addr, dim)    _##dim##_##addr
+#define _DIM_ADDRESS(x, y)          __DIM_ADDRESS(x, y)
+#define DIM_ADDRESS(dim)            _DIM_ADDRESS(_DIM_ADDRESS_##dim, _DIM_ADDRESS_1d)
+#define DIM_ADDRESS2(dim)           _DIM_ADDRESS(_DIM_ADDRESS_##dim, COORD_##dim##_CVT)
+
+#define _INDEX_1d           ""
+#define _INDEX_1dbuffer     ""
+#define _INDEX_2d           ""
+#define _INDEX_3d           ""
+#define _INDEX_1darray      ".y"
+#define _INDEX_2darray      ".z"
+#define __INDEX_DIM(dmap)   dmap
+#define _INDEX_DIM(dmap)    __INDEX_DIM(dmap)
+#define INDEX_ADDRESS(dim)  _INDEX_DIM(_INDEX_##dim)
+
+#define _SELECT_IMAGE_array(dim, dst, src)      "    "dst INDEX_ADDRESS(dim) " = clamp((int)rint("src INDEX_ADDRESS(dim)"), 0, imageSize" INDEX_ADDRESS(dim)" - 1);" NEWLINE
+#define _SELECT_IMAGE_1darray(dim, dst, src)    _SELECT_IMAGE_array(dim, dst, src)
+#define _SELECT_IMAGE_2darray(dim, dst, src)    _SELECT_IMAGE_array(dim, dst, src)
+#define _SELECT_IMAGE_1dbuffer(dim, dst, src)   ""
+#define _SELECT_IMAGE_1d(dim, dst, src)         ""
+#define _SELECT_IMAGE_2d(dim, dst, src)         ""
+#define _SELECT_IMAGE_3d(dim, dst, src)         ""
+#define SELECT_IMAGE(dim, dst, src)             _SELECT_IMAGE_##dim(dim, dst, src)
+
+#define _SELECT_COORD_array(dim)      "    fcoord"INDEX_ADDRESS(dim)" = coord"INDEX_ADDRESS(dim)";" NEWLINE
+#define _SELECT_COORD_1darray(dim)    _SELECT_COORD_array(dim)
+#define _SELECT_COORD_2darray(dim)    _SELECT_COORD_array(dim)
+#define _SELECT_COORD_1dbuffer(dim)   ""
+#define _SELECT_COORD_1d(dim)         ""
+#define _SELECT_COORD_2d(dim)         ""
+#define _SELECT_COORD_3d(dim)         ""
+#define SELECT_COORD(dim)             _SELECT_COORD_##dim(dim)
+
+/* nearest none */
+#define VIR_READ_IMAGE_LOAD_STORE_none_nearest(retType, normCoord, coordType, ch_data, dim, ch_order) \
+ToStr(retType) "4 _read_image_with_load_nearest_" ToStr(normCoord) "Coord_none_" ToStr(coordType) "coord_" ret##retType "_" ToStr(ch_data) "_" ToStr(dim) ToStr(ch_order) \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    " normCoord##_COORD(dim, COORD_NUM_FLOAT(dim)" ", "coord", DIM_ADDRESS2(dim)) \
+    "    "COORD_NUM_INT(dim)" icoord;" NEWLINE \
+    "    icoord"COORD_ADDRESS(dim)" = convert_"DIM_NUM_INT(dim)"_rte(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    SELECT_IMAGE(dim, "icoord", "fcoord") \
+    "    " BASE_uchar(dim, "uchar *", "icoord", "icoord") \
+    "    " LoadVal(dim, ch_data, ch_order, "icoord", Load_R_Type(ch_data, ch_order)" ") \
+    "    " ch_data##ch_order##_CvtRGBA(ToStr(retType)"4 ") \
+    "    return convert_"ToStr(retType)"4(rgba);" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+/* nearest clamp */
+#define VIR_READ_IMAGE_LOAD_STORE_clamp_nearest(retType, normCoord, coordType, ch_data, dim, ch_order) \
+ToStr(retType) "4 _read_image_with_load_nearest_" ToStr(normCoord) "Coord_clamp_" ToStr(coordType) "coord_" ret##retType "_" ToStr(ch_data) "_" ToStr(dim) ToStr(ch_order) \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    " normCoord##_COORD(dim, COORD_NUM_FLOAT(dim)" ", "coord", DIM_ADDRESS2(dim)) \
+    "    fcoord = clamp(fcoord, ("COORD_NUM_FLOAT(dim)")(0.0), convert_"COORD_NUM_FLOAT(dim)"(imageSize) - 1.f);" NEWLINE \
+    "    "COORD_NUM_INT(dim)" icoord;" NEWLINE \
+    "    icoord"COORD_ADDRESS(dim)" = convert_"DIM_NUM_INT(dim)"(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    SELECT_IMAGE(dim, "icoord", "fcoord") \
+    "    " BASE_uchar(dim, "uchar *", "icoord", "icoord") \
+    "    " LoadVal(dim, ch_data, ch_order, "icoord", Load_R_Type(ch_data, ch_order)" ") \
+    "    " ch_data##ch_order##_CvtRGBA(ToStr(retType)"4 ") \
+    "    return convert_"ToStr(retType)"4(rgba);" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+/* nearest border */
+/* border judge */
+#define BORDER_JUDGE_OK_1(dim)      "(icoord"COORD_X(dim)" >= 0 && icoord"COORD_X(dim)" < imageSize"COORD_X(dim)")"
+#define BORDER_JUDGE_OK_2(dim)      "(icoord.x >= 0 && icoord.x < imageSize.x && icoord.y >= 0 && icoord.y < imageSize.y)"
+#define BORDER_JUDGE_OK_3(dim)      "(icoord.x >= 0 && icoord.x < imageSize.x && icoord.y >= 0 && icoord.y < imageSize.y && icoord.z >= 0 && icoord.z < imageSize.z)"
+#define __BORDER_JUDGE_OK(num, dim) BORDER_JUDGE_OK_##num(dim)
+#define _BORDER_JUDGE_OK(num, dim)  __BORDER_JUDGE_OK(num, dim)
+#define BORDER_JUDGE_OK(dim)        _BORDER_JUDGE_OK(DIM_##dim##_NUM, dim)
+#define VIR_READ_IMAGE_LOAD_STORE_border_nearest(retType, normCoord, coordType, ch_data, dim, ch_order) \
+ToStr(retType) "4 _read_image_with_load_nearest_" ToStr(normCoord) "Coord_border_" ToStr(coordType) "coord_" ret##retType "_" ToStr(ch_data) "_" ToStr(dim) ToStr(ch_order) \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    " normCoord##_COORD(dim, COORD_NUM_FLOAT(dim)" ", "coord", DIM_ADDRESS2(dim)) \
+    "    "COORD_NUM_INT(dim)" icoord;" NEWLINE \
+    "    icoord"COORD_ADDRESS(dim)" = convert_"DIM_NUM_INT(dim)"_rtn(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    if (!" BORDER_JUDGE_OK(dim) ") {" NEWLINE \
+    "        float4 rgba = "BORDER_CLR##ch_order";" NEWLINE \
+    "        return convert_"ToStr(retType)"4(rgba);" NEWLINE \
+    "    }" NEWLINE \
+    SELECT_IMAGE(dim, "icoord", "fcoord") \
+    "    " BASE_uchar(dim, "uchar *", "icoord", "icoord") \
+    "    " LoadVal(dim, ch_data, ch_order, "icoord", Load_R_Type(ch_data, ch_order)" ") \
+    "    " ch_data##ch_order##_CvtRGBA(ToStr(retType)"4 ") \
+    "    return convert_"ToStr(retType)"4(rgba);" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+/* nearest wrap */
+#define VIR_READ_IMAGE_LOAD_STORE_wrap_nearest(retType, normCoord, coordType, ch_data, dim, ch_order) \
+ToStr(retType) "4 _read_image_with_load_nearest_" ToStr(normCoord) "Coord_wrap_" ToStr(coordType) "coord_" ret##retType "_" ToStr(ch_data) "_" ToStr(dim) ToStr(ch_order) \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    "COORD_NUM_FLOAT(dim)" fcoord;" NEWLINE \
+    "    fcoord"COORD_ADDRESS(dim)" = coord" COORD_ADDRESS2(dim)" - floor(coord" COORD_ADDRESS2(dim)");" NEWLINE \
+    SELECT_COORD(dim) \
+    "    " normCoord##_COORD(dim, "", "fcoord", DIM_ADDRESS(dim)) \
+    "    "COORD_NUM_INT(dim)" icoord;" NEWLINE \
+    "    icoord"COORD_ADDRESS(dim)" = convert_"DIM_NUM_INT(dim)"_rtn(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    icoord"COORD_ADDRESS(dim)" = viv_min(icoord"COORD_ADDRESS(dim)", imageSize"COORD_ADDRESS(dim)" - 1);" NEWLINE \
+    SELECT_IMAGE(dim, "icoord", "fcoord") \
+    "    " BASE_uchar(dim, "uchar *", "icoord", "icoord") \
+    "    " LoadVal(dim, ch_data, ch_order, "icoord", Load_R_Type(ch_data, ch_order)" ") \
+    "    " ch_data##ch_order##_CvtRGBA(ToStr(retType)"4 ") \
+    "    return convert_"ToStr(retType)"4(rgba);" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+/* nearest mirror */
+#define VIR_READ_IMAGE_LOAD_STORE_mirror_nearest(retType, normCoord, coordType, ch_data, dim, ch_order) \
+ToStr(retType) "4 _read_image_with_load_nearest_" ToStr(normCoord) "Coord_mirror_" ToStr(coordType) "coord_" ret##retType "_" ToStr(ch_data) "_" ToStr(dim) ToStr(ch_order) \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    "DIM_NUM_FLOAT(dim)" fcoord0 = 2.f * floor(.5f * coord" COORD_ADDRESS2(dim)" + .5f);" NEWLINE \
+    "    "COORD_NUM_FLOAT(dim)" fcoord;" NEWLINE \
+    "    fcoord"COORD_ADDRESS(dim)" = viv_fabs(coord" COORD_ADDRESS2(dim)" - fcoord0);" NEWLINE \
+    SELECT_COORD(dim) \
+    "    " normCoord##_COORD(dim, "", "fcoord", DIM_ADDRESS(dim)) \
+    "    "COORD_NUM_INT(dim)" icoord;" NEWLINE \
+    "    icoord "COORD_ADDRESS(dim)"= convert_"DIM_NUM_INT(dim)"_rtn(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    icoord"COORD_ADDRESS(dim)" = viv_min(icoord"COORD_ADDRESS(dim)", imageSize"COORD_ADDRESS(dim)" - 1);" NEWLINE \
+    SELECT_IMAGE(dim, "icoord", "fcoord") \
+    "    " BASE_uchar(dim, "uchar *", "icoord", "icoord") \
+    "    " LoadVal(dim, ch_data, ch_order, "icoord", Load_R_Type(ch_data, ch_order)" ") \
+    "    " ch_data##ch_order##_CvtRGBA(ToStr(retType)"4 ") \
+    "    return convert_"ToStr(retType)"4(rgba);" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+#define VIR_READ_IMAGE_LOAD_STORE_nearest_all(normCoord, coordType, ch_data, dim, ch_order)    \
+    VIR_READ_IMAGE_LOAD_STORE_none_nearest(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order)   \
+    VIR_READ_IMAGE_LOAD_STORE_clamp_nearest(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order)  \
+    VIR_READ_IMAGE_LOAD_STORE_border_nearest(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order) \
+    VIR_READ_IMAGE_LOAD_STORE_wrap_nearest(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order)   \
+    VIR_READ_IMAGE_LOAD_STORE_mirror_nearest(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order)
+#define VIR_READ_IMAGE_LOAD_STORE_nearest_ncb(normCoord, coordType, ch_data, dim, ch_order)    \
+    VIR_READ_IMAGE_LOAD_STORE_none_nearest(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order)   \
+    VIR_READ_IMAGE_LOAD_STORE_clamp_nearest(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order)  \
+    VIR_READ_IMAGE_LOAD_STORE_border_nearest(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order)
+#define VIR_READ_IMAGE_LOAD_STORE_nearest_adv(normCoord, coordType, ch_data, dim, ch_order)    \
+    VIR_READ_IMAGE_LOAD_STORE_wrap_nearest(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order)   \
+    VIR_READ_IMAGE_LOAD_STORE_mirror_nearest(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order)
+
+/* wrap,mirror: normcoord only */
+/* linear none */
+#define none_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, T0, y, z, T1, base_type, rgba_type, load_type) \
+"    float4 "T0" = " BORDER_CLR##ch_order ";" NEWLINE \
+"    float4 "T1" = " BORDER_CLR##ch_order ";" NEWLINE \
+"    " BASE_uchar(dim, base_type, y, z) \
+"    " LoadVal(dim, ch_data, ch_order, "icoordQ", load_type) \
+"    " ch_data##ch_order##_CvtRGBA(rgba_type) \
+"    "T0" = rgba;" NEWLINE \
+"    " LoadVal(dim, ch_data, ch_order, "icoordR", "") \
+"    " ch_data##ch_order##_CvtRGBA("") \
+"    "T1" = rgba;" NEWLINE \
+"" NEWLINE
+#define none_LINEAR_LOAD_JUDGE_CONV_1(dim, ch_data, ch_order) \
+    none_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T0", "icoordQ", "", "T1", "uchar *", "float4 ", Load_R_Type(ch_data, ch_order)" ")
+#define none_LINEAR_LOAD_JUDGE_CONV_2(dim, ch_data, ch_order) \
+    none_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T00", "icoordQ", "icoordQ", "T10", "uchar *", "float4 ", Load_R_Type(ch_data, ch_order)" ") \
+    none_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T01", "icoordR", "icoordQ", "T11", "", "", "")
+#define none_LINEAR_LOAD_JUDGE_CONV_3(dim, ch_data, ch_order) \
+    none_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T000", "icoordQ", "icoordQ", "T100", "uchar *", "float4 ", Load_R_Type(ch_data, ch_order)" ") \
+    none_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T010", "icoordR", "icoordQ", "T110", "", "", "") \
+    none_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T001", "icoordQ", "icoordR", "T101", "", "", "") \
+    none_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T011", "icoordR", "icoordR", "T111", "", "", "")
+#define __none_LINEAR_LOAD_JUDGE_CONV(num, dim, ch_data, ch_order)  none_LINEAR_LOAD_JUDGE_CONV_##num(dim, ch_data, ch_order)
+#define _none_LINEAR_LOAD_JUDGE_CONV(num, dim, ch_data, ch_order)   __none_LINEAR_LOAD_JUDGE_CONV(num, dim, ch_data, ch_order)
+#define none_LINEAR_LOAD_JUDGE_CONV(dim, ch_data, ch_order)         _none_LINEAR_LOAD_JUDGE_CONV(DIM_##dim##_NUM, dim, ch_data, ch_order)
+
+#define VIR_READ_IMAGE_LOAD_STORE_none_linear(retType, normCoord, coordType, ch_data, dim, ch_order) \
+ToStr(retType) "4 _read_image_with_load_linear_" ToStr(normCoord) "Coord_none_" ToStr(coordType) "coord_" ret##retType "_" ToStr(ch_data) "_" ToStr(dim) ToStr(ch_order) \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    " normCoord##_COORD(dim, COORD_NUM_FLOAT(dim)" ", "coord", DIM_ADDRESS2(dim)) \
+    "    fcoord"COORD_ADDRESS(dim)" = fcoord"COORD_ADDRESS(dim)" - .5f;" NEWLINE \
+    "    "DIM_NUM_FLOAT(dim)" fract = fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    fcoord"COORD_ADDRESS(dim)" = floor(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    fract -= fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    "COORD_NUM_INT(dim)" icoordQ, icoordR;" NEWLINE \
+    "    icoordQ"COORD_ADDRESS(dim)" = convert_"DIM_NUM_INT(dim)"(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    icoordR"COORD_ADDRESS(dim)" = icoordQ"COORD_ADDRESS(dim)" + 1;" NEWLINE \
+    SELECT_IMAGE(dim, "icoordQ", "fcoord") \
+    "" NEWLINE \
+    none_LINEAR_LOAD_JUDGE_CONV(dim, ch_data, ch_order) \
+    CALC_LINEAR(dim) \
+    "    return convert_"ToStr(retType)"4(rgba);" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+/* linear clamp */
+#define clamp_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, T0, y, z, T1, base_type, rgba_type, load_type) \
+"    float4 "T0" = " BORDER_CLR##ch_order ";" NEWLINE \
+"    float4 "T1" = " BORDER_CLR##ch_order ";" NEWLINE \
+"    " BASE_uchar(dim, base_type, y, z) \
+"    " LoadVal(dim, ch_data, ch_order, "icoordQ", load_type) \
+"    " ch_data##ch_order##_CvtRGBA(rgba_type) \
+"    "T0" = rgba;" NEWLINE \
+"    " LoadVal(dim, ch_data, ch_order, "icoordR", "") \
+"    " ch_data##ch_order##_CvtRGBA("") \
+"    "T1" = rgba;" NEWLINE \
+"" NEWLINE
+#define clamp_LINEAR_LOAD_JUDGE_CONV_1(dim, ch_data, ch_order) \
+    clamp_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T0", "icoordQ", "", "T1", "uchar *", "float4 ", Load_R_Type(ch_data, ch_order)" ")
+#define clamp_LINEAR_LOAD_JUDGE_CONV_2(dim, ch_data, ch_order) \
+    clamp_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T00", "icoordQ", "icoordQ", "T10", "uchar *", "float4 ", Load_R_Type(ch_data, ch_order)" ") \
+    clamp_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T01", "icoordR", "icoordQ", "T11", "", "", "")
+#define clamp_LINEAR_LOAD_JUDGE_CONV_3(dim, ch_data, ch_order) \
+    clamp_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T000", "icoordQ", "icoordQ", "T100", "uchar *", "float4 ", Load_R_Type(ch_data, ch_order)" ") \
+    clamp_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T010", "icoordR", "icoordQ", "T110", "", "", "") \
+    clamp_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T001", "icoordQ", "icoordR", "T101", "", "", "") \
+    clamp_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T011", "icoordR", "icoordR", "T111", "", "", "")
+#define __clamp_LINEAR_LOAD_JUDGE_CONV(num, dim, ch_data, ch_order)  clamp_LINEAR_LOAD_JUDGE_CONV_##num(dim, ch_data, ch_order)
+#define _clamp_LINEAR_LOAD_JUDGE_CONV(num, dim, ch_data, ch_order)   __clamp_LINEAR_LOAD_JUDGE_CONV(num, dim, ch_data, ch_order)
+#define clamp_LINEAR_LOAD_JUDGE_CONV(dim, ch_data, ch_order)         _clamp_LINEAR_LOAD_JUDGE_CONV(DIM_##dim##_NUM, dim, ch_data, ch_order)
+
+#define VIR_READ_IMAGE_LOAD_STORE_clamp_linear(retType, normCoord, coordType, ch_data, dim, ch_order) \
+ToStr(retType) "4 _read_image_with_load_linear_" ToStr(normCoord) "Coord_clamp_" ToStr(coordType) "coord_" ret##retType "_" ToStr(ch_data) "_" ToStr(dim) ToStr(ch_order) \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    " normCoord##_COORD(dim, COORD_NUM_FLOAT(dim)" ", "coord", DIM_ADDRESS2(dim)) \
+    "    fcoord"COORD_ADDRESS(dim)" = fcoord"COORD_ADDRESS(dim)" - .5f;" NEWLINE \
+    "    "DIM_NUM_FLOAT(dim)" fract = fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    fcoord"COORD_ADDRESS(dim)" = floor(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    fract -= fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    "COORD_NUM_INT(dim)" icoordQ, icoordR;" NEWLINE \
+    "    icoordQ"COORD_ADDRESS(dim)" = convert_"DIM_NUM_INT(dim)"(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    icoordR"COORD_ADDRESS(dim)" = icoordQ"COORD_ADDRESS(dim)" + 1;" NEWLINE \
+    "    "DIM_NUM_INT(dim)" imgsizeM1 = imageSize"COORD_ADDRESS(dim)" - 1;" NEWLINE \
+    "    icoordQ"COORD_ADDRESS(dim)" = clamp(icoordQ"COORD_ADDRESS(dim)", 0, imgsizeM1);" NEWLINE \
+    "    icoordR"COORD_ADDRESS(dim)" = clamp(icoordR"COORD_ADDRESS(dim)", 0, imgsizeM1);" NEWLINE \
+    SELECT_IMAGE(dim, "icoordQ", "fcoord") \
+    "" NEWLINE \
+    clamp_LINEAR_LOAD_JUDGE_CONV(dim, ch_data, ch_order) \
+    CALC_LINEAR(dim) \
+    "    return convert_"ToStr(retType)"4(rgba);" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+/* linear border */
+#define border_LINEAR_JUDGE_1(dim, y, z) "1"
+#define border_LINEAR_JUDGE_2(dim, y, z) y".y >= 0 && "y".y < imageSize.y"
+#define border_LINEAR_JUDGE_3(dim, y, z) z".z >= 0 && "z".z < imageSize.z && "y".y >= 0 && "y".y < imageSize.y"
+#define __border_LINEAR_JUDGE(num, dim, y, z)  border_LINEAR_JUDGE_##num(dim, y, z)
+#define _border_LINEAR_JUDGE(num, dim, y, z)   __border_LINEAR_JUDGE(num, dim, y, z)
+#define border_LINEAR_JUDGE(dim, y, z)         _border_LINEAR_JUDGE(DIM_##dim##_NUM, dim, y, z)
+
+#define border_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, T0, y, z, T1) \
+"    float4 "T0" = " BORDER_CLR##ch_order ";" NEWLINE \
+"    float4 "T1" = " BORDER_CLR##ch_order ";" NEWLINE \
+"    if ("border_LINEAR_JUDGE(dim, y, z)")" NEWLINE \
+"    {" NEWLINE \
+"        " BASE_uchar(dim, "uchar *", y, z) \
+"        if (icoordQ"COORD_X(dim)" >= 0 && icoordQ"COORD_X(dim)" < imageSize"COORD_X(dim)")" NEWLINE \
+"        {" NEWLINE \
+"           " LoadVal(dim, ch_data, ch_order, "icoordQ", Load_R_Type(ch_data, ch_order)" ") \
+"           " ch_data##ch_order##_CvtRGBA("") \
+"           "T0" = rgba;" NEWLINE \
+"        }" NEWLINE \
+"        if (icoordR"COORD_X(dim)" >= 0 && icoordR"COORD_X(dim)" < imageSize"COORD_X(dim)")" NEWLINE \
+"        {" NEWLINE \
+"            " LoadVal(dim, ch_data, ch_order, "icoordR", Load_R_Type(ch_data, ch_order)" ") \
+"            " ch_data##ch_order##_CvtRGBA("") \
+"            "T1" = rgba;" NEWLINE \
+"        }" NEWLINE \
+"    }" NEWLINE \
+"" NEWLINE
+#define border_LINEAR_LOAD_JUDGE_CONV_1(dim, ch_data, ch_order) \
+    border_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T0", "icoordQ", "", "T1")
+#define border_LINEAR_LOAD_JUDGE_CONV_2(dim, ch_data, ch_order) \
+    border_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T00", "icoordQ", "icoordQ", "T10") \
+    border_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T01", "icoordR", "icoordQ", "T11")
+#define border_LINEAR_LOAD_JUDGE_CONV_3(dim, ch_data, ch_order) \
+    border_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T000", "icoordQ", "icoordQ", "T100") \
+    border_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T010", "icoordR", "icoordQ", "T110") \
+    border_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T001", "icoordQ", "icoordR", "T101") \
+    border_LINEAR_LOAD_JUDGE_CONV_TEMPLETE(dim, ch_data, ch_order, "T011", "icoordR", "icoordR", "T111")
+#define __border_LINEAR_LOAD_JUDGE_CONV(num, dim, ch_data, ch_order)  border_LINEAR_LOAD_JUDGE_CONV_##num(dim, ch_data, ch_order)
+#define _border_LINEAR_LOAD_JUDGE_CONV(num, dim, ch_data, ch_order)   __border_LINEAR_LOAD_JUDGE_CONV(num, dim, ch_data, ch_order)
+#define border_LINEAR_LOAD_JUDGE_CONV(dim, ch_data, ch_order)         _border_LINEAR_LOAD_JUDGE_CONV(DIM_##dim##_NUM, dim, ch_data, ch_order)
+
+#define VIR_READ_IMAGE_LOAD_STORE_border_linear(retType, normCoord, coordType, ch_data, dim, ch_order) \
+ToStr(retType) "4 _read_image_with_load_linear_" ToStr(normCoord) "Coord_border_" ToStr(coordType) "coord_" ret##retType "_" ToStr(ch_data) "_" ToStr(dim) ToStr(ch_order) \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    " normCoord##_COORD(dim, COORD_NUM_FLOAT(dim)" ", "coord", DIM_ADDRESS2(dim)) \
+    "    fcoord"COORD_ADDRESS(dim)" = fcoord"COORD_ADDRESS(dim)" - .5f;" NEWLINE \
+    "    "DIM_NUM_FLOAT(dim)" fract = fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    fcoord"COORD_ADDRESS(dim)" = floor(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    fract -= fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    "COORD_NUM_INT(dim)" icoordQ, icoordR;" NEWLINE \
+    "    icoordQ"COORD_ADDRESS(dim)" = convert_"DIM_NUM_INT(dim)"(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    icoordR"COORD_ADDRESS(dim)" = icoordQ"COORD_ADDRESS(dim)" + 1;" NEWLINE \
+    SELECT_IMAGE(dim, "icoordQ", "fcoord") \
+    "" NEWLINE \
+    "    float4 rgba;" NEWLINE \
+    border_LINEAR_LOAD_JUDGE_CONV(dim, ch_data, ch_order) \
+    CALC_LINEAR(dim) \
+    "    return convert_"ToStr(retType)"4(rgba);" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+/* linear wrap */
+#define wrap_LINEAR_LOAD_JUDGE_CONV(dim, ch_data, ch_order) clamp_LINEAR_LOAD_JUDGE_CONV(dim, ch_data, ch_order)
+#define _wrap_LINEAR_COORD_1(dim) \
+    "    if (icoordQ"COORD_X(dim)" < 0) icoordQ"COORD_X(dim)" += imageSize"COORD_X(dim)"; " NEWLINE \
+    "    if (icoordR"COORD_X(dim)" >= imageSize"COORD_X(dim)") icoordR"COORD_X(dim)" -= imageSize"COORD_X(dim)"; " NEWLINE
+#define _wrap_LINEAR_COORD_2(dim) \
+    "    if (icoordQ.x < 0) icoordQ.x += imageSize.x; " NEWLINE \
+    "    if (icoordQ.y < 0) icoordQ.y += imageSize.y; " NEWLINE \
+    "    if (icoordR.x >= imageSize.x) icoordR.x -= imageSize.x; " NEWLINE \
+    "    if (icoordR.y >= imageSize.y) icoordR.y -= imageSize.y; " NEWLINE
+#define _wrap_LINEAR_COORD_3(dim) \
+    "    if (icoordQ.x < 0) icoordQ.x += imageSize.x; " NEWLINE \
+    "    if (icoordQ.y < 0) icoordQ.y += imageSize.y; " NEWLINE \
+    "    if (icoordQ.z < 0) icoordQ.z += imageSize.z; " NEWLINE \
+    "    if (icoordR.x >= imageSize.x) icoordR.x -= imageSize.x; " NEWLINE \
+    "    if (icoordR.y >= imageSize.y) icoordR.y -= imageSize.y; " NEWLINE \
+    "    if (icoordR.z >= imageSize.z) icoordR.z -= imageSize.z; " NEWLINE
+#define __wrap_LINEAR_COORD(num, dim)   _wrap_LINEAR_COORD_##num(dim)
+#define _wrap_LINEAR_COORD(num, dim)    __wrap_LINEAR_COORD(num, dim)
+#define wrap_LINEAR_COORD(dim)          _wrap_LINEAR_COORD(DIM_##dim##_NUM, dim)
+
+#define VIR_READ_IMAGE_LOAD_STORE_wrap_linear(retType, normCoord, coordType, ch_data, dim, ch_order) \
+ToStr(retType) "4 _read_image_with_load_linear_" ToStr(normCoord) "Coord_wrap_" ToStr(coordType) "coord_" ret##retType "_" ToStr(ch_data) "_" ToStr(dim) ToStr(ch_order) \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    "COORD_NUM_FLOAT(dim)" fcoord;" NEWLINE \
+    "    fcoord"COORD_ADDRESS(dim)" = coord" COORD_ADDRESS2(dim)" - floor(coord" COORD_ADDRESS2(dim)");" NEWLINE \
+    SELECT_COORD(dim) \
+    "    " normCoord##_COORD(dim, "", "fcoord", DIM_ADDRESS(dim)) \
+    "    fcoord"COORD_ADDRESS(dim)" -= .5f;" NEWLINE \
+    "    "DIM_NUM_FLOAT(dim)" fract = fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    fcoord"COORD_ADDRESS(dim)" = floor(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    fract -= fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    "COORD_NUM_INT(dim)" icoordQ, icoordR;" NEWLINE \
+    "    icoordQ"COORD_ADDRESS(dim)" = convert_"DIM_NUM_INT(dim)"(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    icoordR"COORD_ADDRESS(dim)" = icoordQ"COORD_ADDRESS(dim)" + 1;" NEWLINE \
+    wrap_LINEAR_COORD(dim) \
+    SELECT_IMAGE(dim, "icoordQ", "fcoord") \
+    "" NEWLINE \
+    wrap_LINEAR_LOAD_JUDGE_CONV(dim, ch_data, ch_order) \
+    CALC_LINEAR(dim) \
+    "    return convert_"ToStr(retType)"4(rgba);" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+/* linear mirror */
+#define mirror_LINEAR_LOAD_JUDGE_CONV(dim, ch_data, ch_order) clamp_LINEAR_LOAD_JUDGE_CONV(dim, ch_data, ch_order)
+#define VIR_READ_IMAGE_LOAD_STORE_mirror_linear(retType, normCoord, coordType, ch_data, dim, ch_order) \
+ToStr(retType) "4 _read_image_with_load_linear_" ToStr(normCoord) "Coord_mirror_" ToStr(coordType) "coord_" ret##retType "_" ToStr(ch_data) "_" ToStr(dim) ToStr(ch_order) \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    "COORD_NUM_FLOAT(dim)" fcoord;" NEWLINE \
+    "    "DIM_NUM_FLOAT(dim)" fcoord0 = 2. * floor(.5f * coord" COORD_ADDRESS2(dim)" + .5);" NEWLINE \
+    "    fcoord"COORD_ADDRESS(dim)" = viv_fabs(coord"COORD_ADDRESS2(dim)" - fcoord0); " NEWLINE \
+    SELECT_COORD(dim) \
+    "    " normCoord##_COORD(dim, "", "fcoord", DIM_ADDRESS(dim)) \
+    "    fcoord"COORD_ADDRESS(dim)" -= .5f;" NEWLINE \
+    "    "DIM_NUM_FLOAT(dim)" fract = fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    fcoord"COORD_ADDRESS(dim)" = floor(fcoord"COORD_ADDRESS(dim)"); "NEWLINE \
+    "    fract  -= fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    "COORD_NUM_INT(dim)" icoordQ, icoordR;" NEWLINE \
+    "    icoordQ"COORD_ADDRESS(dim)" = convert_"DIM_NUM_INT(dim)"(fcoord"COORD_ADDRESS(dim)"); " NEWLINE \
+    "    icoordR"COORD_ADDRESS(dim)" = icoordQ"COORD_ADDRESS(dim)" + 1; " NEWLINE \
+    "    "DIM_NUM_INT(dim)" imageSizeM1 = imageSize"COORD_ADDRESS(dim)" - 1; " NEWLINE \
+    "    icoordQ"COORD_ADDRESS(dim)" = clamp(icoordQ"COORD_ADDRESS(dim)", 0, imageSizeM1);" NEWLINE \
+    "    icoordR"COORD_ADDRESS(dim)" = clamp(icoordR"COORD_ADDRESS(dim)", 0, imageSizeM1);" NEWLINE \
+    SELECT_IMAGE(dim, "icoordQ", "fcoord") \
+    "" NEWLINE \
+    mirror_LINEAR_LOAD_JUDGE_CONV(dim, ch_data, ch_order) \
+    CALC_LINEAR(dim) \
+    "    return convert_"ToStr(retType)"4(rgba);" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+#define VIR_READ_IMAGE_LOAD_STORE_linear_all(normCoord, coordType, ch_data, dim, ch_order)    \
+    LINEAR_SUPPORT(ch_data, VIR_READ_IMAGE_LOAD_STORE_none_linear(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order))   \
+    LINEAR_SUPPORT(ch_data, VIR_READ_IMAGE_LOAD_STORE_clamp_linear(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order))  \
+    LINEAR_SUPPORT(ch_data, VIR_READ_IMAGE_LOAD_STORE_border_linear(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order)) \
+    LINEAR_SUPPORT(ch_data, VIR_READ_IMAGE_LOAD_STORE_wrap_linear(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order))   \
+    LINEAR_SUPPORT(ch_data, VIR_READ_IMAGE_LOAD_STORE_mirror_linear(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order))
+#define VIR_READ_IMAGE_LOAD_STORE_linear_ncb(normCoord, coordType, ch_data, dim, ch_order)    \
+    LINEAR_SUPPORT(ch_data, VIR_READ_IMAGE_LOAD_STORE_none_linear(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order))   \
+    LINEAR_SUPPORT(ch_data, VIR_READ_IMAGE_LOAD_STORE_clamp_linear(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order))  \
+    LINEAR_SUPPORT(ch_data, VIR_READ_IMAGE_LOAD_STORE_border_linear(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order))
+#define VIR_READ_IMAGE_LOAD_STORE_linear_adv(normCoord, coordType, ch_data, dim, ch_order)    \
+    LINEAR_SUPPORT(ch_data, VIR_READ_IMAGE_LOAD_STORE_wrap_linear(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order))   \
+    LINEAR_SUPPORT(ch_data, VIR_READ_IMAGE_LOAD_STORE_mirror_linear(RETURN_TYPE(ch_data), normCoord, coordType, ch_data, dim, ch_order))
+
+/* write image */
+#define _WRITE_snorm8(x)                x
+#define _WRITE_snorm16(x)               x
+#define _WRITE_unorm8(x)                x
+#define _WRITE_unorm16(x)               x
+#define _WRITE_int8(x)                  x
+#define _WRITE_int16(x)                 x
+#define _WRITE_int32(x)                 x
+#define _WRITE_uint8(x)                 x
+#define _WRITE_uint16(x)                x
+#define _WRITE_uint32(x)                x
+#define _WRITE_float(x)                 x
+#define _WRITE_half(x)                  x
+#define _WRITE_unorm555(x)              ""
+#define _WRITE_unorm565(x)              ""
+#define _WRITE_unorm101010(x)           ""
+#define _WRITE_1d(x)                    x
+#define _WRITE_2d(x)                    x
+#define _WRITE_3d(x)                    ""
+#define _WRITE_1dbuffer(x)              ""
+#define _WRITE_1darray(x)               x
+#define _WRITE_2darray(x)               x
+#define WRITE_SUPPORT(dim, ch_data, x)  _WRITE_##dim(_WRITE_##ch_data(x))
+
+#define VIR_WRITE_IMAGE_LOAD_STORE(retType, ch_data, dim, ch_order) \
+"void _write_image_with_store_" ret##retType "_" ToStr(ch_data) "_" ToStr(dim) ToStr(ch_order) \
+    NEWLINE "    (viv_generic_image_t image, "/*COORD_NUM_INT(dim)*/"int4 coord, " ToStr(retType) "4 rgba)" NEWLINE \
+    "{" NEWLINE \
+    "    " BASE_uchar(dim, "uchar *", "coord", "coord") \
+    "    " ch_data##ch_order##_CvtVALUE(Load_R_Type(ch_data, ch_order)" ")\
+    "    " StoreVal(dim, ch_data, ch_order, "coord") \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+/* group: nearest linear, 1d 2d 3d, 1dbuffer 1darray 2darray */
+/* compiler limit: max string length: 65535         */
+#define VIR_IMAGE_LOAD_STORE_group(ch_data, ch_order) \
+{ NEWLINE \
+VIR_READ_IMAGE_LOAD_STORE_nearest_ncb(unnorm, int, ch_data, 1d, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_nearest_ncb(unnorm, float, ch_data, 1d, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_nearest_all(norm, float, ch_data, 1d, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_linear_ncb (unnorm, float, ch_data, 1d, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_linear_all (norm, float, ch_data, 1d, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_nearest_ncb(unnorm, int, ch_data, 1darray, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_nearest_ncb(unnorm, float, ch_data, 1darray, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_nearest_all(norm, float, ch_data, 1darray, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_linear_ncb (unnorm, float, ch_data, 1darray, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_linear_all (norm, float, ch_data, 1darray, ch_order) \
+WRITE_SUPPORT(1d, ch_data, VIR_WRITE_IMAGE_LOAD_STORE(RETURN_TYPE(ch_data), ch_data, 1d, ch_order)) \
+WRITE_SUPPORT(1darray, ch_data, VIR_WRITE_IMAGE_LOAD_STORE(RETURN_TYPE(ch_data), ch_data, 1darray, ch_order)) \
+, \
+VIR_READ_IMAGE_LOAD_STORE_nearest_ncb(unnorm, int, ch_data, 2d, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_nearest_ncb(unnorm, float, ch_data, 2d, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_nearest_all(norm, float, ch_data, 2d, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_linear_ncb (unnorm, float, ch_data, 2d, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_linear_all (norm, float, ch_data, 2d, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_nearest_ncb(unnorm, int, ch_data, 2darray, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_nearest_ncb(unnorm, float, ch_data, 2darray, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_nearest_all(norm, float, ch_data, 2darray, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_linear_ncb (unnorm, float, ch_data, 2darray, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_linear_all (norm, float, ch_data, 2darray, ch_order) \
+WRITE_SUPPORT(2d, ch_data, VIR_WRITE_IMAGE_LOAD_STORE(RETURN_TYPE(ch_data), ch_data, 2d, ch_order)) \
+WRITE_SUPPORT(2darray, ch_data, VIR_WRITE_IMAGE_LOAD_STORE(RETURN_TYPE(ch_data), ch_data, 2darray, ch_order)) \
+,\
+VIR_READ_IMAGE_LOAD_STORE_nearest_ncb(unnorm, int, ch_data, 3d, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_nearest_ncb(unnorm, float, ch_data, 3d, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_nearest_all(norm, float, ch_data, 3d, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_linear_ncb (unnorm, float, ch_data, 3d, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_linear_all (norm, float, ch_data, 3d, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_nearest_ncb(unnorm, int, ch_data, 1dbuffer, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_nearest_ncb(unnorm, float, ch_data, 1dbuffer, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_nearest_all(norm, float, ch_data, 1dbuffer, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_linear_ncb (unnorm, float, ch_data, 1dbuffer, ch_order) \
+VIR_READ_IMAGE_LOAD_STORE_linear_all (norm, float, ch_data, 1dbuffer, ch_order) \
+WRITE_SUPPORT(3d, ch_data, VIR_WRITE_IMAGE_LOAD_STORE(RETURN_TYPE(ch_data), ch_data, 3d, ch_order)) \
+WRITE_SUPPORT(1dbuffer, ch_data, VIR_WRITE_IMAGE_LOAD_STORE(RETURN_TYPE(ch_data), ch_data, 1dbuffer, ch_order)) \
+};
+
+/* spilt line ******/
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_float_RGBA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_half_RGBA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm8_RGBA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm16_RGBA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_snorm8_RGBA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_snorm16_RGBA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int8_RGBA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int16_RGBA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int32_RGBA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint8_RGBA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint16_RGBA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint32_RGBA[3];
+
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_float_BGRA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_half_BGRA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm8_BGRA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm16_BGRA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_snorm8_BGRA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_snorm16_BGRA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int8_BGRA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int16_BGRA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int32_BGRA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint8_BGRA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint16_BGRA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint32_BGRA[3];
+
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_float_R[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_half_R[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm8_R[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm16_R[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_snorm8_R[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_snorm16_R[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int8_R[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int16_R[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int32_R[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint8_R[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint16_R[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint32_R[3];
+
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_float_A[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_half_A[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm8_A[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm16_A[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_snorm8_A[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_snorm16_A[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int8_A[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int16_A[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int32_A[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint8_A[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint16_A[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint32_A[3] ;
+
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_float_INTENSITY[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_half_INTENSITY[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm8_INTENSITY[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm16_INTENSITY[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_snorm8_INTENSITY[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_snorm16_INTENSITY[3];
+
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_float_LUMINANCE[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_half_LUMINANCE[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm8_LUMINANCE[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm16_LUMINANCE[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_snorm8_LUMINANCE[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_snorm16_LUMINANCE[3];
+
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_float_RG[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_half_RG[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm8_RG[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm16_RG[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_snorm8_RG[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_snorm16_RG[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int8_RG[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int16_RG[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int32_RG[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint8_RG[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint16_RG[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint32_RG[3];
+
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_float_RA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_half_RA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm8_RA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm16_RA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_snorm8_RA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_snorm16_RA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int8_RA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int16_RA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int32_RA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint8_RA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint16_RA[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint32_RA[3];
+
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm555_RGB[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm565_RGB[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm101010_RGB[3];
+
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_float_ARGB[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_half_ARGB[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm8_ARGB[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_unorm16_ARGB[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_snorm8_ARGB[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_snorm16_ARGB[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int8_ARGB[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int16_ARGB[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_int32_ARGB[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint8_ARGB[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint16_ARGB[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_LOAD_uint32_ARGB[3];
+
+/* imgld ****************************************************************/
+/***********************************/
+#define IMGLD_3D_BORDER_PATCH     1
+/***********************************/
+#define IMGLD_SUFFIX_1d           ""
+#define IMGLD_SUFFIX_1dbuffer     ""
+#define IMGLD_SUFFIX_1darray      ""
+#define IMGLD_SUFFIX_2d           ""
+#define IMGLD_SUFFIX_2darray      "_3D"
+#define IMGLD_SUFFIX_3d           "_3D"
+
+#define _MAKE_IMGLD_COORD_1(x, y, z)            "(int2)("x", 0)"
+#define _MAKE_IMGLD_COORD_2(x, y, z)            "(int2)("x", "y")"
+#define _MAKE_IMGLD_COORD_3(x, y, z)            "(int3)("x", "y", "z")"
+#define __MAKE_IMGLD_COORD(address, x, y, z)    _MAKE_IMGLD_COORD_##address(x, y, z)
+#define _MAKE_IMGLD_COORD(address, x, y, z)     __MAKE_IMGLD_COORD(address, x, y, z)
+#define MAKE_IMGLD_COORD(dim, x, y, z)          _MAKE_IMGLD_COORD(IMGLD_ADDRESS_##dim, x, y, z)
+
+#define _VIR_IMAGE_IMGLD_1(type, dim, x, y, z)        "_viv_asm("type IMGLD_SUFFIX_##dim", rgba, image, (int2)("x", 0) );" NEWLINE
+#define _VIR_IMAGE_IMGLD_2(type, dim, x, y, z)        "_viv_asm("type IMGLD_SUFFIX_##dim", rgba, image, (int2)("x", "y") );" NEWLINE
+#define _VIR_IMAGE_IMGLD_3(type, dim, x, y, z)        "_viv_asm("type IMGLD_SUFFIX_##dim", rgba, image, (int3)("x", "y", _viv_get3DImageNewBaseAddr(image, (int3)("x", "y", "z")) ));" NEWLINE
+
+#define __VIR_IMAGE_IMGLD(address, type, dim, x, y, z)  _VIR_IMAGE_IMGLD_##address(type, dim, x, y, z)
+#define _VIR_IMAGE_IMGLD(address, type, dim, x, y, z)   __VIR_IMAGE_IMGLD(address, type, dim, x, y, z)
+#define VIR_IMAGE_IMGLD(type, dim, x, y, z)             _VIR_IMAGE_IMGLD(COORD_##dim##_NUM, type, dim, x, y, z)
+
+#define VIR_IMAGE_IMGLD_R(dim, x, y, z)             VIR_IMAGE_IMGLD("IMAGE_READ", dim, x, y, z)
+#define VIR_IMAGE_IMGLD_W(dim, x, y, z)             VIR_IMAGE_IMGLD("IMAGE_WRITE", dim, x, y, z)
+
+#if (IMGLD_3D_BORDER_PATCH == 1)
+#define _VIR_IMAGE_IMGLD_1_border(type, dim, x, y, z)        _VIR_IMAGE_IMGLD_1(type, dim, x, y, z)
+#define _VIR_IMAGE_IMGLD_2_border(type, dim, x, y, z)        _VIR_IMAGE_IMGLD_2(type, dim, x, y, z)
+#define _VIR_IMAGE_IMGLD_3_border(type, dim, x, y, z)        "_viv_asm("type IMGLD_SUFFIX_##dim", rgba, image, (int3)("x", ("z" < 0 || "z" > imageSize.z - 1) ? -1 : "y", _viv_get3DImageNewBaseAddr(image, (int3)("x", "y", "z")) ));" NEWLINE
+
+#define __VIR_IMAGE_IMGLD_border(address, type, dim, x, y, z)   _VIR_IMAGE_IMGLD_##address##_border(type, dim, x, y, z)
+#define _VIR_IMAGE_IMGLD_border(address, type, dim, x, y, z)    __VIR_IMAGE_IMGLD_border(address, type, dim, x, y, z)
+#define VIR_IMAGE_IMGLD_border(type, dim, x, y, z)              _VIR_IMAGE_IMGLD_border(COORD_##dim##_NUM, type, dim, x, y, z)
+#define VIR_IMAGE_IMGLD_R_border(dim, x, y, z)                  VIR_IMAGE_IMGLD_border("IMAGE_READ", dim, x, y, z)
+#else
+#define VIR_IMAGE_IMGLD_R_border(dim, x, y, z)                  VIR_IMAGE_IMGLD_R(dim, x, y, z)
+#endif
+
+#define IMGLD_LINEAR_SUPPORT_int(x)         ""
+#define IMGLD_LINEAR_SUPPORT_uint(x)        ""
+#define IMGLD_LINEAR_SUPPORT_float(x)       x
+
+/* nearest none */
+#define VIR_READ_IMAGE_IMGLD_none_nearest(retType, normCoord, coordType, dim) \
+ToStr(retType) "4 _read_image_width_imgread_nearest_" ToStr(normCoord) "Coord_none_" ToStr(coordType) "coord_" ToStr(retType)  "_" ToStr(dim)  \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    " normCoord##_COORD(dim, COORD_NUM_FLOAT(dim)" ", "coord", DIM_ADDRESS2(dim)) \
+    "    "COORD_NUM_INT(dim)" icoord;" NEWLINE \
+    "    icoord"COORD_ADDRESS(dim)" = convert_"DIM_NUM_INT(dim)"_rte(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    SELECT_IMAGE(dim, "icoord", "fcoord") \
+    "    "ToStr(retType)"4 rgba;" NEWLINE \
+    "    "VIR_IMAGE_IMGLD_R(dim, "icoord"COORD_X(dim), "icoord.y", "icoord.z") \
+    "    return rgba;" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+/* nearest clamp */
+#define VIR_READ_IMAGE_IMGLD_clamp_nearest(retType, normCoord, coordType, dim) \
+ToStr(retType) "4 _read_image_width_imgread_nearest_" ToStr(normCoord) "Coord_clamp_" ToStr(coordType) "coord_" ToStr(retType)  "_" ToStr(dim)  \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    " normCoord##_COORD(dim, COORD_NUM_FLOAT(dim)" ", "coord", DIM_ADDRESS2(dim)) \
+    "    fcoord = clamp(fcoord, ("COORD_NUM_FLOAT(dim)")(0.0), convert_"COORD_NUM_FLOAT(dim)"(imageSize) - 1.f);" NEWLINE \
+    "    "COORD_NUM_INT(dim)" icoord;" NEWLINE \
+    "    icoord"COORD_ADDRESS(dim)" = convert_"DIM_NUM_INT(dim)"(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    SELECT_IMAGE(dim, "icoord", "fcoord") \
+    "    "ToStr(retType)"4 rgba;" NEWLINE \
+    "    "VIR_IMAGE_IMGLD_R(dim, "icoord"COORD_X(dim), "icoord.y", "icoord.z") \
+    "    return rgba;" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+/* nearest border */
+#define _VIR_IMGLD_border_nearest_1()   ""
+#define _VIR_IMGLD_border_nearest_2()   ""
+#define _VIR_IMGLD_border_nearest_3()   \
+    "    if (!" BORDER_JUDGE_OK(3d) ") {" NEWLINE \
+    "         icoord.x = -1;" NEWLINE \
+    "    }" NEWLINE
+#define __VIR_IMGLD_border_nearest(x)   _VIR_IMGLD_border_nearest_##x()
+#define _VIR_IMGLD_border_nearest(x)    __VIR_IMGLD_border_nearest(x)
+#define VIR_IMGLD_border_nearest(dim)   _VIR_IMGLD_border_nearest(COORD_##dim##_NUM)
+#define VIR_READ_IMAGE_IMGLD_border_nearest(retType, normCoord, coordType, dim) \
+ToStr(retType) "4 _read_image_width_imgread_nearest_" ToStr(normCoord) "Coord_border_" ToStr(coordType) "coord_" ToStr(retType)  "_" ToStr(dim)  \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    " normCoord##_COORD(dim, COORD_NUM_FLOAT(dim)" ", "coord", DIM_ADDRESS2(dim)) \
+    "    "COORD_NUM_INT(dim)" icoord;" NEWLINE \
+    "    icoord"COORD_ADDRESS(dim)" = convert_"DIM_NUM_INT(dim)"_rtn(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    /*"    icoord"COORD_ADDRESS(dim)" = clamp(icoord"COORD_ADDRESS(dim)", -1, imageSize"COORD_ADDRESS(dim)");" NEWLINE*/ \
+    /*VIR_IMGLD_border_nearest(dim)*/ \
+    SELECT_IMAGE(dim, "icoord", "fcoord") \
+    "    "ToStr(retType)"4 rgba;" NEWLINE \
+    "    "VIR_IMAGE_IMGLD_R_border(dim, "icoord"COORD_X(dim), "icoord.y", "icoord.z") \
+    "    return rgba;" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+/* nearest wrap */
+#define VIR_READ_IMAGE_IMGLD_wrap_nearest(retType, normCoord, coordType, dim) \
+ToStr(retType) "4 _read_image_width_imgread_nearest_" ToStr(normCoord) "Coord_wrap_" ToStr(coordType) "coord_" ToStr(retType)  "_" ToStr(dim)  \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    "COORD_NUM_FLOAT(dim)" fcoord;" NEWLINE \
+    "    fcoord"COORD_ADDRESS(dim)" = coord" COORD_ADDRESS2(dim)" - floor(coord" COORD_ADDRESS2(dim)");" NEWLINE \
+    SELECT_COORD(dim) \
+    "    " normCoord##_COORD(dim, "", "fcoord", DIM_ADDRESS(dim)) \
+    "    "COORD_NUM_INT(dim)" icoord;" NEWLINE \
+    "    icoord"COORD_ADDRESS(dim)" = convert_"DIM_NUM_INT(dim)"_rtn(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    icoord"COORD_ADDRESS(dim)" = viv_min(icoord"COORD_ADDRESS(dim)", imageSize"COORD_ADDRESS(dim)" - 1);" NEWLINE \
+    SELECT_IMAGE(dim, "icoord", "fcoord") \
+    "    "ToStr(retType)"4 rgba;" NEWLINE \
+    "    "VIR_IMAGE_IMGLD_R(dim, "icoord"COORD_X(dim), "icoord.y", "icoord.z") \
+    "    return rgba;" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+/* nearest mirror */
+#define VIR_READ_IMAGE_IMGLD_mirror_nearest(retType, normCoord, coordType, dim) \
+ToStr(retType) "4 _read_image_width_imgread_nearest_" ToStr(normCoord) "Coord_mirror_" ToStr(coordType) "coord_" ToStr(retType)  "_" ToStr(dim)  \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    "DIM_NUM_FLOAT(dim)" fcoord0 = 2.f * floor(.5f * coord" COORD_ADDRESS2(dim)" + .5f);" NEWLINE \
+    "    "COORD_NUM_FLOAT(dim)" fcoord;" NEWLINE \
+    "    fcoord"COORD_ADDRESS(dim)" = viv_fabs(coord" COORD_ADDRESS2(dim)" - fcoord0);" NEWLINE \
+    SELECT_COORD(dim) \
+    "    " normCoord##_COORD(dim, "", "fcoord", DIM_ADDRESS(dim)) \
+    "    "COORD_NUM_INT(dim)" icoord;" NEWLINE \
+    "    icoord "COORD_ADDRESS(dim)"= convert_"DIM_NUM_INT(dim)"_rtn(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    icoord"COORD_ADDRESS(dim)" = viv_min(icoord"COORD_ADDRESS(dim)", imageSize"COORD_ADDRESS(dim)" - 1);" NEWLINE \
+    SELECT_IMAGE(dim, "icoord", "fcoord") \
+    "    "ToStr(retType)"4 rgba;" NEWLINE \
+    "    "VIR_IMAGE_IMGLD_R(dim, "icoord"COORD_X(dim), "icoord.y", "icoord.z") \
+    "    return rgba;" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+#define VIR_READ_IMAGE_IMGLD_nearest_all(retType, normCoord, coordType, dim)    \
+    VIR_READ_IMAGE_IMGLD_none_nearest(retType, normCoord, coordType, dim)   \
+    VIR_READ_IMAGE_IMGLD_clamp_nearest(retType, normCoord, coordType, dim)  \
+    VIR_READ_IMAGE_IMGLD_border_nearest(retType, normCoord, coordType, dim) \
+    VIR_READ_IMAGE_IMGLD_wrap_nearest(retType, normCoord, coordType, dim)   \
+    VIR_READ_IMAGE_IMGLD_mirror_nearest(retType, normCoord, coordType, dim)
+#define VIR_READ_IMAGE_IMGLD_nearest_ncb(retType, normCoord, coordType, dim)    \
+    VIR_READ_IMAGE_IMGLD_none_nearest(retType, normCoord, coordType, dim)   \
+    VIR_READ_IMAGE_IMGLD_clamp_nearest(retType, normCoord, coordType, dim)  \
+    VIR_READ_IMAGE_IMGLD_border_nearest(retType, normCoord, coordType, dim)
+#define VIR_READ_IMAGE_IMGLD_nearest_adv(retType, normCoord, coordType, dim)    \
+    VIR_READ_IMAGE_IMGLD_wrap_nearest(retType, normCoord, coordType, dim)   \
+    VIR_READ_IMAGE_IMGLD_mirror_nearest(retType, normCoord, coordType, dim)
+
+/* wrap,mirror: normcoord only */
+/* linear none */
+#define none_LINEAR_IMGLD_JUDGE_CONV_TEMPLETE(dim, T0, y, z, T1) \
+"    float4 "T0" = (float4)(.0f);" NEWLINE \
+"    float4 "T1" = (float4)(.0f);" NEWLINE \
+"    "VIR_IMAGE_IMGLD_R(dim, "icoordQ"COORD_X(dim), y".y", z".z") \
+"    "T0" = rgba;" NEWLINE \
+"    "VIR_IMAGE_IMGLD_R(dim, "icoordR"COORD_X(dim), y".y", z".z") \
+"    "T1" = rgba;" NEWLINE \
+"" NEWLINE
+#define none_LINEAR_IMGLD_JUDGE_CONV_1(dim) \
+    none_LINEAR_IMGLD_JUDGE_CONV_TEMPLETE(dim, "T0", "icoordQ", "", "T1")
+#define none_LINEAR_IMGLD_JUDGE_CONV_2(dim) \
+    none_LINEAR_IMGLD_JUDGE_CONV_TEMPLETE(dim, "T00", "icoordQ", "icoordQ", "T10") \
+    none_LINEAR_IMGLD_JUDGE_CONV_TEMPLETE(dim, "T01", "icoordR", "icoordQ", "T11")
+#define none_LINEAR_IMGLD_JUDGE_CONV_3(dim) \
+    none_LINEAR_IMGLD_JUDGE_CONV_TEMPLETE(dim, "T000", "icoordQ", "icoordQ", "T100") \
+    none_LINEAR_IMGLD_JUDGE_CONV_TEMPLETE(dim, "T010", "icoordR", "icoordQ", "T110") \
+    none_LINEAR_IMGLD_JUDGE_CONV_TEMPLETE(dim, "T001", "icoordQ", "icoordR", "T101") \
+    none_LINEAR_IMGLD_JUDGE_CONV_TEMPLETE(dim, "T011", "icoordR", "icoordR", "T111")
+#define __none_LINEAR_IMGLD_JUDGE_CONV(num, dim)  none_LINEAR_IMGLD_JUDGE_CONV_##num(dim)
+#define _none_LINEAR_IMGLD_JUDGE_CONV(num, dim)   __none_LINEAR_IMGLD_JUDGE_CONV(num, dim)
+#define none_LINEAR_IMGLD_JUDGE_CONV(dim)         _none_LINEAR_IMGLD_JUDGE_CONV(DIM_##dim##_NUM, dim)
+
+#define VIR_READ_IMAGE_IMGLD_none_linear(retType, normCoord, coordType, dim) \
+ToStr(retType) "4 _read_image_width_imgread_linear_" ToStr(normCoord) "Coord_none_" ToStr(coordType) "coord_" ToStr(retType)  "_" ToStr(dim)  \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    " normCoord##_COORD(dim, COORD_NUM_FLOAT(dim)" ", "coord", DIM_ADDRESS2(dim)) \
+    "    fcoord"COORD_ADDRESS(dim)" = fcoord"COORD_ADDRESS(dim)" - .5f;" NEWLINE \
+    "    "DIM_NUM_FLOAT(dim)" fract = fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    fcoord"COORD_ADDRESS(dim)" = floor(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    fract -= fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    "COORD_NUM_INT(dim)" icoordQ, icoordR;" NEWLINE \
+    "    icoordQ"COORD_ADDRESS(dim)" = convert_"DIM_NUM_INT(dim)"(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    icoordR"COORD_ADDRESS(dim)" = icoordQ"COORD_ADDRESS(dim)" + 1;" NEWLINE \
+    SELECT_IMAGE(dim, "icoordQ", "fcoord") \
+    "" NEWLINE \
+    "    "ToStr(retType)"4 rgba;" NEWLINE \
+    none_LINEAR_IMGLD_JUDGE_CONV(dim) \
+    CALC_LINEAR(dim) \
+    "    return rgba;" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+/* linear clamp */
+#define clamp_LINEAR_IMGLD_JUDGE_CONV(dim)         none_LINEAR_IMGLD_JUDGE_CONV(dim)
+#define VIR_READ_IMAGE_IMGLD_clamp_linear(retType, normCoord, coordType, dim) \
+ToStr(retType) "4 _read_image_width_imgread_linear_" ToStr(normCoord) "Coord_clamp_" ToStr(coordType) "coord_" ToStr(retType)  "_" ToStr(dim)  \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    " normCoord##_COORD(dim, COORD_NUM_FLOAT(dim)" ", "coord", DIM_ADDRESS2(dim)) \
+    "    fcoord"COORD_ADDRESS(dim)" = fcoord"COORD_ADDRESS(dim)" - .5f;" NEWLINE \
+    "    "DIM_NUM_FLOAT(dim)" fract = fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    fcoord"COORD_ADDRESS(dim)" = floor(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    fract -= fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    "COORD_NUM_INT(dim)" icoordQ, icoordR;" NEWLINE \
+    "    icoordQ"COORD_ADDRESS(dim)" = convert_"DIM_NUM_INT(dim)"(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    icoordR"COORD_ADDRESS(dim)" = icoordQ"COORD_ADDRESS(dim)" + 1;" NEWLINE \
+    "    "DIM_NUM_INT(dim)" imgsizeM1 = imageSize"COORD_ADDRESS(dim)" - 1;" NEWLINE \
+    "    icoordQ"COORD_ADDRESS(dim)" = clamp(icoordQ"COORD_ADDRESS(dim)", 0, imgsizeM1);" NEWLINE \
+    "    icoordR"COORD_ADDRESS(dim)" = clamp(icoordR"COORD_ADDRESS(dim)", 0, imgsizeM1);" NEWLINE \
+    SELECT_IMAGE(dim, "icoordQ", "fcoord") \
+    "" NEWLINE \
+    "    "ToStr(retType)"4 rgba;" NEWLINE \
+    clamp_LINEAR_IMGLD_JUDGE_CONV(dim) \
+    CALC_LINEAR(dim) \
+    "    return rgba;" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+/* linear border */
+#if (IMGLD_3D_BORDER_PATCH == 1)
+#define border_LINEAR_IMGLD_JUDGE_CONV_TEMPLETE(dim, T0, y, z, T1) \
+"    float4 "T0" = (float4)(.0f);" NEWLINE \
+"    float4 "T1" = (float4)(.0f);" NEWLINE \
+"    "VIR_IMAGE_IMGLD_R_border(dim, "icoordQ"COORD_X(dim), y".y", z".z") \
+"    "T0" = rgba;" NEWLINE \
+"    "VIR_IMAGE_IMGLD_R_border(dim, "icoordR"COORD_X(dim), y".y", z".z") \
+"    "T1" = rgba;" NEWLINE \
+"" NEWLINE
+#define border_LINEAR_IMGLD_JUDGE_CONV_1(dim) \
+    border_LINEAR_IMGLD_JUDGE_CONV_TEMPLETE(dim, "T0", "icoordQ", "", "T1")
+#define border_LINEAR_IMGLD_JUDGE_CONV_2(dim) \
+    border_LINEAR_IMGLD_JUDGE_CONV_TEMPLETE(dim, "T00", "icoordQ", "icoordQ", "T10") \
+    border_LINEAR_IMGLD_JUDGE_CONV_TEMPLETE(dim, "T01", "icoordR", "icoordQ", "T11")
+#define border_LINEAR_IMGLD_JUDGE_CONV_3(dim) \
+    border_LINEAR_IMGLD_JUDGE_CONV_TEMPLETE(dim, "T000", "icoordQ", "icoordQ", "T100") \
+    border_LINEAR_IMGLD_JUDGE_CONV_TEMPLETE(dim, "T010", "icoordR", "icoordQ", "T110") \
+    border_LINEAR_IMGLD_JUDGE_CONV_TEMPLETE(dim, "T001", "icoordQ", "icoordR", "T101") \
+    border_LINEAR_IMGLD_JUDGE_CONV_TEMPLETE(dim, "T011", "icoordR", "icoordR", "T111")
+#define __border_LINEAR_IMGLD_JUDGE_CONV(num, dim)  border_LINEAR_IMGLD_JUDGE_CONV_##num(dim)
+#define _border_LINEAR_IMGLD_JUDGE_CONV(num, dim)   __border_LINEAR_IMGLD_JUDGE_CONV(num, dim)
+#define border_LINEAR_IMGLD_JUDGE_CONV(dim)         _border_LINEAR_IMGLD_JUDGE_CONV(DIM_##dim##_NUM, dim)
+#else
+#define border_LINEAR_IMGLD_JUDGE_CONV(dim)         clamp_LINEAR_IMGLD_JUDGE_CONV(dim)
+#endif
+#define VIR_READ_IMAGE_IMGLD_border_linear(retType, normCoord, coordType, dim) \
+ToStr(retType) "4 _read_image_width_imgread_linear_" ToStr(normCoord) "Coord_border_" ToStr(coordType) "coord_" ToStr(retType)  "_" ToStr(dim)  \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    " normCoord##_COORD(dim, COORD_NUM_FLOAT(dim)" ", "coord", DIM_ADDRESS2(dim)) \
+    "    fcoord"COORD_ADDRESS(dim)" = fcoord"COORD_ADDRESS(dim)" - .5f;" NEWLINE \
+    "    "DIM_NUM_FLOAT(dim)" fract = fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    fcoord"COORD_ADDRESS(dim)" = floor(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    fract -= fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    "COORD_NUM_INT(dim)" icoordQ, icoordR;" NEWLINE \
+    "    icoordQ"COORD_ADDRESS(dim)" = clamp(convert_"DIM_NUM_INT(dim)"(fcoord"COORD_ADDRESS(dim)"), ("DIM_NUM_INT(dim)")(-1), imageSize"COORD_ADDRESS(dim)");" NEWLINE \
+    "    icoordR"COORD_ADDRESS(dim)" = clamp(convert_"DIM_NUM_INT(dim)"(1+fcoord"COORD_ADDRESS(dim)"), ("DIM_NUM_INT(dim)")(-1), imageSize"COORD_ADDRESS(dim)");" NEWLINE \
+    SELECT_IMAGE(dim, "icoordQ", "fcoord") \
+    "" NEWLINE \
+    "    "ToStr(retType)"4 rgba;" NEWLINE \
+    border_LINEAR_IMGLD_JUDGE_CONV(dim) \
+    CALC_LINEAR(dim) \
+    "    return rgba;" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+/* linear wrap */
+#define wrap_LINEAR_IMGLD_JUDGE_CONV(dim) clamp_LINEAR_IMGLD_JUDGE_CONV(dim)
+#define _wrap_LINEAR_IMGLD_COORD_1(dim) \
+    "    if (icoordQ"COORD_X(dim)" < 0) icoordQ"COORD_X(dim)" += imageSize"COORD_X(dim)"; " NEWLINE \
+    "    if (icoordR"COORD_X(dim)" >= imageSize"COORD_X(dim)") icoordR"COORD_X(dim)" -= imageSize"COORD_X(dim)"; " NEWLINE
+#define _wrap_LINEAR_IMGLD_COORD_2(dim) \
+    "    if (icoordQ.x < 0) icoordQ.x += imageSize.x; " NEWLINE \
+    "    if (icoordQ.y < 0) icoordQ.y += imageSize.y; " NEWLINE \
+    "    if (icoordR.x >= imageSize.x) icoordR.x -= imageSize.x; " NEWLINE \
+    "    if (icoordR.y >= imageSize.y) icoordR.y -= imageSize.y; " NEWLINE
+#define _wrap_LINEAR_IMGLD_COORD_3(dim) \
+    "    if (icoordQ.x < 0) icoordQ.x += imageSize.x; " NEWLINE \
+    "    if (icoordQ.y < 0) icoordQ.y += imageSize.y; " NEWLINE \
+    "    if (icoordQ.z < 0) icoordQ.z += imageSize.z; " NEWLINE \
+    "    if (icoordR.x >= imageSize.x) icoordR.x -= imageSize.x; " NEWLINE \
+    "    if (icoordR.y >= imageSize.y) icoordR.y -= imageSize.y; " NEWLINE \
+    "    if (icoordR.z >= imageSize.z) icoordR.z -= imageSize.z; " NEWLINE
+#define __wrap_LINEAR_IMGLD_COORD(num, dim)   _wrap_LINEAR_IMGLD_COORD_##num(dim)
+#define _wrap_LINEAR_IMGLD_COORD(num, dim)    __wrap_LINEAR_IMGLD_COORD(num, dim)
+#define wrap_LINEAR_IMGLD_COORD(dim)          _wrap_LINEAR_IMGLD_COORD(DIM_##dim##_NUM, dim)
+
+#define VIR_READ_IMAGE_IMGLD_wrap_linear(retType, normCoord, coordType, dim) \
+ToStr(retType) "4 _read_image_width_imgread_linear_" ToStr(normCoord) "Coord_wrap_" ToStr(coordType) "coord_" ToStr(retType)  "_" ToStr(dim)  \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    "COORD_NUM_FLOAT(dim)" fcoord;" NEWLINE \
+    "    fcoord"COORD_ADDRESS(dim)" = coord" COORD_ADDRESS2(dim)" - floor(coord" COORD_ADDRESS2(dim)");" NEWLINE \
+    SELECT_COORD(dim) \
+    "    " normCoord##_COORD(dim, "", "fcoord", DIM_ADDRESS(dim)) \
+    "    fcoord"COORD_ADDRESS(dim)" -= .5f;" NEWLINE \
+    "    "DIM_NUM_FLOAT(dim)" fract = fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    fcoord"COORD_ADDRESS(dim)" = floor(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    fract -= fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    "COORD_NUM_INT(dim)" icoordQ, icoordR;" NEWLINE \
+    "    icoordQ"COORD_ADDRESS(dim)" = convert_"DIM_NUM_INT(dim)"(fcoord"COORD_ADDRESS(dim)");" NEWLINE \
+    "    icoordR"COORD_ADDRESS(dim)" = icoordQ"COORD_ADDRESS(dim)" + 1;" NEWLINE \
+    wrap_LINEAR_COORD(dim) \
+    SELECT_IMAGE(dim, "icoordQ", "fcoord") \
+    "" NEWLINE \
+    "    "ToStr(retType)"4 rgba;" NEWLINE \
+    wrap_LINEAR_IMGLD_JUDGE_CONV(dim) \
+    CALC_LINEAR(dim) \
+    "    return rgba;" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+/* linear mirror */
+#define mirror_LINEAR_IMGLD_JUDGE_CONV(dim) clamp_LINEAR_IMGLD_JUDGE_CONV(dim)
+#define VIR_READ_IMAGE_IMGLD_mirror_linear(retType, normCoord, coordType, dim) \
+ToStr(retType) "4 _read_image_width_imgread_linear_" ToStr(normCoord) "Coord_mirror_" ToStr(coordType) "coord_" ToStr(retType)  "_" ToStr(dim)  \
+    NEWLINE "    (viv_generic_image_t image, " ToStr(coordType) "4 coord" SAMPLER_PARAM ")" NEWLINE \
+    "{" NEWLINE \
+    "    "ImageSize(dim) \
+    "    "COORD_NUM_FLOAT(dim)" fcoord;" NEWLINE \
+    "    "DIM_NUM_FLOAT(dim)" fcoord0 = 2. * floor(.5f * coord" COORD_ADDRESS2(dim)" + .5);" NEWLINE \
+    "    fcoord"COORD_ADDRESS(dim)" = viv_fabs(coord"COORD_ADDRESS2(dim)" - fcoord0); " NEWLINE \
+    SELECT_COORD(dim) \
+    "    " normCoord##_COORD(dim, "", "fcoord", DIM_ADDRESS(dim)) \
+    "    fcoord"COORD_ADDRESS(dim)" -= .5f;" NEWLINE \
+    "    "DIM_NUM_FLOAT(dim)" fract = fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    fcoord"COORD_ADDRESS(dim)" = floor(fcoord"COORD_ADDRESS(dim)"); "NEWLINE \
+    "    fract  -= fcoord"COORD_ADDRESS(dim)";" NEWLINE \
+    "    "COORD_NUM_INT(dim)" icoordQ, icoordR;" NEWLINE \
+    "    icoordQ"COORD_ADDRESS(dim)" = convert_"DIM_NUM_INT(dim)"(fcoord"COORD_ADDRESS(dim)"); " NEWLINE \
+    "    icoordR"COORD_ADDRESS(dim)" = icoordQ"COORD_ADDRESS(dim)" + 1; " NEWLINE \
+    "    "DIM_NUM_INT(dim)" imageSizeM1 = imageSize"COORD_ADDRESS(dim)" - 1; " NEWLINE \
+    "    icoordQ"COORD_ADDRESS(dim)" = clamp(icoordQ"COORD_ADDRESS(dim)", 0, imageSizeM1);" NEWLINE \
+    "    icoordR"COORD_ADDRESS(dim)" = clamp(icoordR"COORD_ADDRESS(dim)", 0, imageSizeM1);" NEWLINE \
+    SELECT_IMAGE(dim, "icoordQ", "fcoord") \
+    "" NEWLINE \
+    "    "ToStr(retType)"4 rgba;" NEWLINE \
+    mirror_LINEAR_IMGLD_JUDGE_CONV(dim) \
+    CALC_LINEAR(dim) \
+    "    return rgba;" NEWLINE \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+#define VIR_READ_IMAGE_IMGLD_linear_all(retType, normCoord, coordType, dim)    \
+    VIR_READ_IMAGE_IMGLD_none_linear(retType, normCoord, coordType, dim)   \
+    VIR_READ_IMAGE_IMGLD_clamp_linear(retType, normCoord, coordType, dim)  \
+    VIR_READ_IMAGE_IMGLD_border_linear(retType, normCoord, coordType, dim) \
+    VIR_READ_IMAGE_IMGLD_wrap_linear(retType, normCoord, coordType, dim)   \
+    VIR_READ_IMAGE_IMGLD_mirror_linear(retType, normCoord, coordType, dim)
+#define VIR_READ_IMAGE_IMGLD_linear_ncb(retType, normCoord, coordType, dim)    \
+    VIR_READ_IMAGE_IMGLD_none_linear(retType, normCoord, coordType, dim)   \
+    VIR_READ_IMAGE_IMGLD_clamp_linear(retType, normCoord, coordType, dim)  \
+    VIR_READ_IMAGE_IMGLD_border_linear(retType, normCoord, coordType, dim)
+#define VIR_READ_IMAGE_IMGLD_linear_adv(retType, normCoord, coordType, dim)    \
+    VIR_READ_IMAGE_IMGLD_wrap_linear(retType, normCoord, coordType, dim)   \
+    VIR_READ_IMAGE_IMGLD_mirror_linear(retType, normCoord, coordType, dim)
+
+/* write image */
+#define VIR_WRITE_IMAGE_IMGLD(dataType, dim) \
+"void _write_image_with_imgwrite_" ToStr(dataType) "_"ToStr(dim)    \
+    NEWLINE "    (viv_generic_image_t image, "/*COORD_NUM_INT(dim)*/"int4 coord, "ToStr(dataType)"4 rgba)" NEWLINE \
+    "{" NEWLINE \
+    "    "VIR_IMAGE_IMGLD_W(dim, "coord.x"/*COORD_X(dim)*/, "coord.y", "coord.z") \
+    "}" NEWLINE \
+    "" SPLITLINE
+
+#define VIR_IMAGE_IMGLD_group(type) \
+{ NEWLINE \
+VIR_READ_IMAGE_IMGLD_nearest_ncb(type, unnorm, int, 1d) \
+VIR_READ_IMAGE_IMGLD_nearest_ncb(type, unnorm, float, 1d) \
+VIR_READ_IMAGE_IMGLD_nearest_all(type, norm, float, 1d) \
+LINEAR_SUPPORT(type, VIR_READ_IMAGE_IMGLD_linear_ncb (type, unnorm, float, 1d)) \
+LINEAR_SUPPORT(type, VIR_READ_IMAGE_IMGLD_linear_all (type, norm, float, 1d)) \
+VIR_WRITE_IMAGE_IMGLD(type, 1d) \
+VIR_READ_IMAGE_IMGLD_nearest_ncb(type, unnorm, int, 1darray) \
+VIR_READ_IMAGE_IMGLD_nearest_ncb(type, unnorm, float, 1darray) \
+VIR_READ_IMAGE_IMGLD_nearest_all(type, norm, float, 1darray) \
+LINEAR_SUPPORT(type, VIR_READ_IMAGE_IMGLD_linear_ncb (type, unnorm, float, 1darray)) \
+LINEAR_SUPPORT(type, VIR_READ_IMAGE_IMGLD_linear_all (type, norm, float, 1darray)) \
+VIR_WRITE_IMAGE_IMGLD(type, 1darray) \
+, \
+VIR_READ_IMAGE_IMGLD_nearest_ncb(type, unnorm, int, 2d) \
+VIR_READ_IMAGE_IMGLD_nearest_ncb(type, unnorm, float, 2d) \
+VIR_READ_IMAGE_IMGLD_nearest_all(type, norm, float, 2d) \
+LINEAR_SUPPORT(type, VIR_READ_IMAGE_IMGLD_linear_ncb (type, unnorm, float, 2d)) \
+LINEAR_SUPPORT(type, VIR_READ_IMAGE_IMGLD_linear_all (type, norm, float, 2d)) \
+VIR_WRITE_IMAGE_IMGLD(type, 2d) \
+VIR_READ_IMAGE_IMGLD_nearest_ncb(type, unnorm, int, 2darray) \
+VIR_READ_IMAGE_IMGLD_nearest_ncb(type, unnorm, float, 2darray) \
+VIR_READ_IMAGE_IMGLD_nearest_all(type, norm, float, 2darray) \
+LINEAR_SUPPORT(type, VIR_READ_IMAGE_IMGLD_linear_ncb (type, unnorm, float, 2darray)) \
+LINEAR_SUPPORT(type, VIR_READ_IMAGE_IMGLD_linear_all (type, norm, float, 2darray)) \
+VIR_WRITE_IMAGE_IMGLD(type, 2darray) \
+,\
+VIR_READ_IMAGE_IMGLD_nearest_ncb(type, unnorm, int, 3d) \
+VIR_READ_IMAGE_IMGLD_nearest_ncb(type, unnorm, float, 3d) \
+VIR_READ_IMAGE_IMGLD_nearest_all(type, norm, float, 3d) \
+LINEAR_SUPPORT(type, VIR_READ_IMAGE_IMGLD_linear_ncb (type, unnorm, float, 3d)) \
+LINEAR_SUPPORT(type, VIR_READ_IMAGE_IMGLD_linear_all (type, norm, float, 3d)) \
+VIR_WRITE_IMAGE_IMGLD(type, 3d) \
+};
+
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_IMGLD_int[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_IMGLD_uint[3];
+extern const gctCONST_STRING gcLibCL_VIR_ReadImage_WITH_IMGLD_float[3];
 
 

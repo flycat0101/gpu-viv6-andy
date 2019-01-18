@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -12,8 +12,6 @@
 
 
 #include "gc_vk_precomp.h"
-
-#if __VK_NEW_DEVICE_QUEUE
 
 #define __VK_QUEUE_EVENT_TRUNK_SIZE             15
 #define __VK_QUEUE_MINIMAL_CMDBUF_SIZE          (4 << 10)
@@ -52,47 +50,29 @@ static VkResult __vki_QueueDestroyCMDBUF(
     )
 {
     gcsHAL_INTERFACE iface;
-    _CMDBUFinfo *info = &devQueue->commandBufferInfo;
     VkResult result = VK_SUCCESS;
 
     if (commandBuffer != gcvNULL)
     {
         if (gcmUINT64_TO_PTR(commandBuffer->logical) != gcvNULL)
         {
-            switch (info->source)
-            {
-            case gcvCMDBUF_VIRTUAL:
-                iface.command = gcvHAL_FREE_VIRTUAL_COMMAND_BUFFER;
-                iface.u.FreeVirtualCommandBuffer.bytes    = commandBuffer->bytes;
-                iface.u.FreeVirtualCommandBuffer.physical = commandBuffer->physical;
-                iface.u.FreeVirtualCommandBuffer.logical  = commandBuffer->logical;
-                __VK_ONERROR(__vk_DeviceControl(&iface, 0));
-                break;
+            iface.engine = gcvENGINE_RENDER;
+            iface.command = gcvHAL_UNLOCK_VIDEO_MEMORY;
+            iface.u.UnlockVideoMemory.node = commandBuffer->videoMemNode;
+            iface.u.UnlockVideoMemory.type = gcvVIDMEM_TYPE_COMMAND;
+            __VK_ONERROR(__vk_DeviceControl(&iface, 0));
 
-            case gcvCMDBUF_CONTIGUOUS:
-                iface.command = gcvHAL_FREE_CONTIGUOUS_MEMORY;
-                iface.u.FreeContiguousMemory.bytes    = commandBuffer->bytes;
-                iface.u.FreeContiguousMemory.physical = commandBuffer->physical;
-                iface.u.FreeContiguousMemory.logical  = commandBuffer->logical;
-                __VK_ONERROR(__vk_DeviceControl(&iface, 0));
-                break;
+            /* Do sync'ed unlock. */
+            iface.command = gcvHAL_BOTTOM_HALF_UNLOCK_VIDEO_MEMORY;
+            iface.u.BottomHalfUnlockVideoMemory.node = commandBuffer->videoMemNode;
+            iface.u.BottomHalfUnlockVideoMemory.type = gcvVIDMEM_TYPE_COMMAND;
+            __VK_ONERROR(__vk_DeviceControl(&iface, 0));
 
-            case gcvCMDBUF_RESERVED:
-                iface.engine = gcvENGINE_RENDER;
-                iface.command = gcvHAL_UNLOCK_VIDEO_MEMORY;
-                iface.u.UnlockVideoMemory.node = commandBuffer->physical;
-                iface.u.UnlockVideoMemory.type = gcvSURF_BITMAP;
-                __VK_ONERROR(__vk_DeviceControl(&iface, 0));
+            /* Release the allocated video memory synchronously. */
+            iface.command = gcvHAL_RELEASE_VIDEO_MEMORY;
+            iface.u.ReleaseVideoMemory.node = commandBuffer->videoMemNode;
+            __VK_ONERROR(__vk_DeviceControl(&iface, 0));
 
-                /* Release the allocated video memory synchronously. */
-                iface.command = gcvHAL_RELEASE_VIDEO_MEMORY;
-                iface.u.ReleaseVideoMemory.node = commandBuffer->physical;
-                __VK_ONERROR(__vk_DeviceControl(&iface, 0));
-                break;
-
-                default:
-                    break;
-                }
             /* Reset the buffer pointer. */
             commandBuffer->logical = 0;
 
@@ -106,6 +86,7 @@ static VkResult __vki_QueueDestroyCMDBUF(
                 gcmOS_SAFE_FREE_SHARED_MEMORY(gcvNULL, commandBuffer->mirrors);
             }
         }
+
         /* Destroy signal. */
         if (commandBuffer->signal != gcvNULL)
         {
@@ -138,7 +119,6 @@ static gcoCMDBUF __vki_QueueCreateCMDBUF(
     gcoCMDBUF commandBuffer = gcvNULL;
     gctSIZE_T objectSize    = 0;
     gctPOINTER pointer      = gcvNULL;
-    gctUINT32 tmpSize       = 0;
     gctUINT32 node          = 0;
     gceSTATUS status;
     _CMDBUFinfo *info       = &devQueue->commandBufferInfo;
@@ -181,81 +161,33 @@ static gcoCMDBUF __vki_QueueCreateCMDBUF(
         /* Set the desired size. */
         commandBuffer->bytes = bytes;
 
-        /* Allocate the buffer for the command. */
-        switch (info->source)
-        {
-        case gcvCMDBUF_VIRTUAL:
-            iface.command = gcvHAL_ALLOCATE_VIRTUAL_COMMAND_BUFFER;
-            iface.u.AllocateVirtualCommandBuffer.bytes = commandBuffer->bytes;
+        iface.command   = gcvHAL_ALLOCATE_LINEAR_VIDEO_MEMORY;
+        iface.u.AllocateLinearVideoMemory.bytes = bytes;
+        iface.u.AllocateLinearVideoMemory.alignment = info->alignmentSize;
+        iface.u.AllocateLinearVideoMemory.type = gcvVIDMEM_TYPE_COMMAND;
+        iface.u.AllocateLinearVideoMemory.pool = gcvPOOL_DEFAULT;
+        iface.u.AllocateLinearVideoMemory.flag = 0;
 
-            /* Call kernel service. */
-            result = __vk_DeviceControl(&iface, 0);
+        /* Call kernel service. */
+        result = __vk_DeviceControl(&iface, 0);
 
-            if (result == VK_ERROR_OUT_OF_HOST_MEMORY)
-                goto retry;
+        if (result == VK_ERROR_OUT_OF_HOST_MEMORY)
+            goto retry;
 
-            __VK_ONERROR(result);
+        __VK_ONERROR(result);
 
-            commandBuffer->bytes = (gctUINT32)iface.u.AllocateVirtualCommandBuffer.bytes;
-            commandBuffer->physical = iface.u.AllocateVirtualCommandBuffer.physical;
-            commandBuffer->logical = iface.u.AllocateVirtualCommandBuffer.logical;
-            break;
+        node  = iface.u.AllocateLinearVideoMemory.node;
 
-        case gcvCMDBUF_CONTIGUOUS:
-            /* Initialize the gcsHAL_INTERFACE structure. */
-            iface.command = gcvHAL_ALLOCATE_CONTIGUOUS_MEMORY;
-            iface.u.AllocateContiguousMemory.bytes = commandBuffer->bytes;
+        iface.engine = gcvENGINE_RENDER;
+        iface.command = gcvHAL_LOCK_VIDEO_MEMORY;
+        iface.u.LockVideoMemory.node = node;
+        iface.u.LockVideoMemory.cacheable = gcvFALSE;
 
-            /* Call kernel driver. */
-            /* Call kernel service. */
-            result = __vk_DeviceControl(&iface, 0);
-            if (result == VK_ERROR_OUT_OF_HOST_MEMORY)
-                goto retry;
-
-            __VK_ONERROR(result);
-
-
-            commandBuffer->bytes = (gctUINT32)iface.u.AllocateContiguousMemory.bytes;
-            commandBuffer->physical = iface.u.AllocateContiguousMemory.physical;
-            commandBuffer->logical = iface.u.AllocateContiguousMemory.logical;
-            break;
-
-        case gcvCMDBUF_RESERVED:
-            iface.command   = gcvHAL_ALLOCATE_LINEAR_VIDEO_MEMORY;
-
-            iface.u.AllocateLinearVideoMemory.bytes = bytes;
-            iface.u.AllocateLinearVideoMemory.alignment = info->alignmentSize;
-            iface.u.AllocateLinearVideoMemory.type = gcvSURF_BITMAP;
-            iface.u.AllocateLinearVideoMemory.pool = gcvPOOL_SYSTEM;
-            iface.u.AllocateLinearVideoMemory.flag      = 0;
-
-            /* Call kernel service. */
-            result = __vk_DeviceControl(&iface, 0);
-
-            if (result == VK_ERROR_OUT_OF_HOST_MEMORY)
-                goto retry;
-
-            __VK_ONERROR(result);
-
-            node  = iface.u.AllocateLinearVideoMemory.node;
-            tmpSize = iface.u.AllocateLinearVideoMemory.bytes;
-
-            iface.engine = gcvENGINE_RENDER;
-            iface.command = gcvHAL_LOCK_VIDEO_MEMORY;
-            iface.u.LockVideoMemory.node = node;
-            iface.u.LockVideoMemory.cacheable = gcvFALSE;
-
-            /* Call the kernel. */
-            __VK_ONERROR(__vk_DeviceControl(&iface, 0));
-            commandBuffer->physical = node;
-            commandBuffer->bytes = tmpSize;
-            commandBuffer->logical = iface.u.LockVideoMemory.memory;
-
-            break;
-
-        default:
-            break;
-        }
+        /* Call the kernel. */
+        __VK_ONERROR(__vk_DeviceControl(&iface, 0));
+        commandBuffer->videoMemNode = node;
+        commandBuffer->logical = iface.u.LockVideoMemory.memory;
+        commandBuffer->address = iface.u.LockVideoMemory.address;
 
         /* Initialize command buffer. */
         commandBuffer->free = commandBuffer->bytes;
@@ -270,6 +202,7 @@ retry:
         bytes >>= 1;
     }
 
+    commandBuffer->reservedHead = info->reservedHeadSize;
     commandBuffer->reservedTail = info->reservedTailSize;
 
     if (info->mirrorCount && !mirror)
@@ -519,14 +452,6 @@ static VkResult __vki_QueueInitialize(
                             + info->reservedTailSize
                             + info->reservedUserSize;
 
-#if gcdALLOC_CMD_FROM_RESERVE
-    info->source = gcvCMDBUF_RESERVED;
-#elif gcdSECURITY || gcdDISABLE_GPU_VIRTUAL_ADDRESS || !USE_KERNEL_VIRTUAL_BUFFERS
-    info->source = gcvCMDBUF_CONTIGUOUS;
-#else
-    info->source = gcvCMDBUF_VIRTUAL;
-#endif
-
 OnError:
     return result;
 }
@@ -623,6 +548,35 @@ static void __vki_QueueFreeEvents(
     devQueue->eventCount = 0;
 }
 
+static void
+_BuildCommandBufferList(
+    gcsHAL_COMMAND_LOCATION * Loc,
+    gcoCMDBUF CommandBuffer
+    )
+{
+    Loc->priority     = 0;
+    Loc->channelId    = 0;
+
+    Loc->videoMemNode = CommandBuffer->videoMemNode;
+    Loc->address      = CommandBuffer->address;
+    Loc->logical      = CommandBuffer->logical;
+
+    Loc->startOffset  = CommandBuffer->startOffset;
+    Loc->size         = CommandBuffer->offset - CommandBuffer->startOffset
+                                               + CommandBuffer->reservedTail;
+
+    Loc->reservedHead = CommandBuffer->reservedHead;
+    Loc->reservedTail = CommandBuffer->reservedTail;
+
+    Loc->patchHead    = 0;
+
+    Loc->entryPipe    = CommandBuffer->entryPipe;
+    Loc->exitPipe     = CommandBuffer->exitPipe;
+    Loc->exitIndex    = 0;
+
+    Loc->next         = 0;
+}
+
 VkResult __vk_QueueCommit(
     __vkDevQueue *devQueue
     )
@@ -701,32 +655,42 @@ VkResult __vk_QueueCommit(
         /* The current pipe becomes the exit pipe for the current command buffer. */
         commandBuffer->exitPipe = gcvPIPE_3D;
 
-        iface.u.Commit.commandBuffer = gcmPTR_TO_UINT64(iface.u.Commit.commandBuffers);
-        iface.u.Commit.context = gcmPTR_TO_UINT64(iface.u.Commit.contexts);
-        iface.u.Commit.delta = gcmPTR_TO_UINT64(iface.u.Commit.deltas);
-
         if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
         {
+            gcsHAL_SUBCOMMIT subCommit[gcvCORE_3D_MAX - gcvCORE_MAJOR + 1];
+
             for (coreIdx = 0; coreIdx < devCtx->chipInfo->gpuCoreCount; coreIdx++)
             {
-                iface.u.Commit.contexts[coreIdx] = devCtx->context[coreIdx];
-                iface.command = gcvHAL_COMMIT;
-                iface.engine = s_xlateQueueFamily[devQueue->queueFamilyIndex];
-                iface.u.Commit.commandBuffers[coreIdx] = gcmPTR_TO_UINT64(commandBuffer);
-                iface.u.Commit.deltas[coreIdx] = 0;
-                iface.u.Commit.queue = gcmPTR_TO_UINT64(devQueue->eventHead);
-                iface.u.Commit.shared = gcvTRUE;
-                iface.u.Commit.index = coreIdx;
+                subCommit[coreIdx].coreId  = coreIdx;
+                subCommit[coreIdx].delta   = 0;
+                subCommit[coreIdx].context = devCtx->context[coreIdx];
+                /* Event queue is executed on the first core only. */
+                subCommit[coreIdx].queue   = coreIdx == 0 ? gcmPTR_TO_UINT64(devQueue->eventHead) : 0;
+                subCommit[coreIdx].next    = gcmPTR_TO_UINT64(&subCommit[coreIdx+1]);
 
                 if (commandBufferMirrors && (coreIdx > 0))
                 {
                     __vki_QueueCopyCMDBUF(commandBufferMirrors[coreIdx - 1], commandBuffer);
-                    iface.u.Commit.commandBuffers[coreIdx] = gcmPTR_TO_UINT64(commandBufferMirrors[coreIdx - 1]);
-                    iface.u.Commit.index = 0;
+                    _BuildCommandBufferList(&subCommit[coreIdx].commandBuffer, commandBufferMirrors[coreIdx - 1]);
+                }
+                else
+                {
+                    _BuildCommandBufferList(&subCommit[coreIdx].commandBuffer, commandBuffer);
+                    /* Correct location of the chipEnable/link back command. */
+                    subCommit[coreIdx].commandBuffer.exitIndex = coreIdx;
                 }
             }
             iface.commitMutex = gcvTRUE;
-            iface.u.Commit.count = devCtx->chipInfo->gpuCoreCount;
+
+            /* End the subCommits. */
+            subCommit[coreIdx - 1].next = 0;
+
+            iface.ignoreTLS = gcvFALSE;
+            iface.command = gcvHAL_COMMIT;
+            iface.engine = s_xlateQueueFamily[devQueue->queueFamilyIndex];
+            iface.u.Commit.subCommit = subCommit[0];
+            iface.u.Commit.shared    = gcvTRUE;
+
             __VK_ONERROR(__vk_DeviceControl(&iface, 0));
 
             /* UPdate commit stamp. */
@@ -734,16 +698,21 @@ VkResult __vk_QueueCommit(
         }
         else
         {
+            gcsHAL_SUBCOMMIT *subCommit = &iface.u.Commit.subCommit;
+
             coreIdx = devCtx->option->affinityCoreID;
-            iface.u.Commit.contexts[0] = devCtx->context[coreIdx];
+            subCommit->coreId  = coreIdx;
+            subCommit->delta   = 0;
+            subCommit->context = devCtx->context[coreIdx];
+            subCommit->queue   = gcmPTR_TO_UINT64(devQueue->eventHead);
+            subCommit->next    = 0;
+
+            _BuildCommandBufferList(&subCommit->commandBuffer, commandBuffer);
+
+            iface.ignoreTLS = gcvFALSE;
             iface.command = gcvHAL_COMMIT;
             iface.engine = s_xlateQueueFamily[devQueue->queueFamilyIndex];
-            iface.u.Commit.commandBuffers[0] = gcmPTR_TO_UINT64(commandBuffer);
-            iface.u.Commit.deltas[0] = 0;
-            iface.u.Commit.queue = gcmPTR_TO_UINT64(devQueue->eventHead);
             iface.u.Commit.shared = gcvFALSE;
-            iface.u.Commit.index = 0;
-            iface.u.Commit.count = 1;
             iface.commitMutex = gcvTRUE;
 
             /* Call kernel service. */
@@ -756,19 +725,6 @@ VkResult __vk_QueueCommit(
             uint8_t *dumpLogical;
             uint32_t dumpBytes;
 
-            if (iface.u.Commit.contextSwitched)
-            {
-                /* Dump current context buffer. */
-                gcmDUMP_BUFFER(gcvNULL,
-                               "context",
-                                devCtx->context[devCtx->option->affinityCoreID],
-                                devCtx->contextLogical[devCtx->currentContext],
-                                0,
-                                devCtx->contextBytes);
-
-                /* Advance to next context buffer. */
-                devCtx->currentContext = (devCtx->currentContext + 1) % gcdCONTEXT_BUFFER_COUNT;
-            }
 
             dumpLogical = (gctUINT8_PTR) gcmUINT64_TO_PTR(commandBuffer->logical)
                         + commandBuffer->startOffset
@@ -780,15 +736,14 @@ VkResult __vk_QueueCommit(
 
             /* Dump commited command buffer. */
             gcmDUMP_BUFFER(gcvNULL,
-                           "command",
+                           gcvDUMP_BUFFER_COMMAND,
                            devCtx->context[devCtx->option->affinityCoreID],
                            dumpLogical,
                            0,
                            dumpBytes);
+            /* Dump the commit. */
+            gcmDUMP(gcvNULL, "@[commit]");
         }
-
-        /* Dump the commit. */
-        gcmDUMP(gcvNULL, "@[commit]");
 #endif
 
         /* Advance the offset for next commit. */
@@ -992,8 +947,6 @@ OnError:
     return result;
 }
 
-#endif
-
 
 VkResult __vk_CreateDeviceQueues(
     __vkDevContext *devCtx,
@@ -1033,9 +986,7 @@ VkResult __vk_CreateDeviceQueues(
             devQueue->flags = pQueueCreateInfos[i].flags;
             devQueue->queueFamilyIndex = queueFamilyIndex;
             devQueue->queuePriority = (float)pQueueCreateInfos[i].pQueuePriorities[j];
-#if __VK_NEW_DEVICE_QUEUE
             __VK_ONERROR(__vki_QueueInitialize(devCtx, devQueue));
-#endif
             /* Signal for queue idle */
             __VK_ONERROR(gcoOS_CreateSignal(gcvNULL, VK_FALSE, &devQueue->signal));
         }
@@ -1067,9 +1018,7 @@ void __vk_DestroyDeviceQueues(
 
                 if (devQueue)
                 {
-#if __VK_NEW_DEVICE_QUEUE
                     __vki_QueueFinalize(devCtx, devQueue);
-#endif
                     if (devQueue->signal)
                     {
                         gcoOS_DestroySignal(gcvNULL, devQueue->signal);

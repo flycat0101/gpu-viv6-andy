@@ -36,6 +36,7 @@ SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_brush_cache.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_brush.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_buffer.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_dump.o
+SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_hash.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_heap.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_query.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_queue.o
@@ -60,7 +61,6 @@ SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_format.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_texture.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_mem.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_statistics.o
-SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_resource.o
 
 ifeq ($(USE_OPENCL), 1)
 SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_cl.o

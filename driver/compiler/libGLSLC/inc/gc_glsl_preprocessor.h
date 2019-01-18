@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -46,8 +46,9 @@ sloPREPROCESSOR_Parse(
     );
 
 
-#define ppvMAX_MACRO_ARGS_NUMBER            64
-#define    ppvMAX_PPTOKEN_CHAR_NUMBER            1048
+#define ppvMAX_MACRO_ARGS_NUMBER               64
+#define ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG    16
+#define ppvMAX_PPTOKEN_CHAR_NUMBER             1048
 #define ppvCHAR_EOF                            (char) (unsigned char) 0xFF
 
 #if ppvMAX_PPTOKEN_CHAR_NUMBER < 8

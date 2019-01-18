@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -36,32 +36,32 @@ static const char * _dlls[] =
     "libGLESv1_CM_" GPU_VENDOR ".so",   /* OpenGL ES 1.1 Common */
     "libGLESv2_" GPU_VENDOR ".so",      /* OpenGL ES 2.0 */
     "libGLESv2_" GPU_VENDOR ".so",      /* OpenGL ES 3.0 */
+    "libGL.so",                         /* OpenGL */
     "libOpenVG.so",                     /* OpenVG 1.0 */
-    "libGL.so",
 #elif defined(__QNXNTO__)
     "libEGL_viv",                       /* EGL */
     "glesv1-dlls",                      /* OpenGL ES 1.1 Common Lite */
     "glesv1-dlls",                      /* OpenGL ES 1.1 Common */
     "glesv2-dlls",                      /* OpenGL ES 2.0 */
     "glesv2-dlls",                      /* OpenGL ES 3.0 */
+    "gl-dlls",                          /* OpenGL */
     "vg-dlls",                          /* OpenVG 1.0 */
-    "gl-dlls",
 #elif defined(__APPLE__)
     "libEGL.dylib",                     /* EGL */
     "libGLESv1_CL.dylib",               /* OpenGL ES 1.1 Common Lite */
     "libGLESv1_CM.dylib",               /* OpenGL ES 1.1 Common */
     "libGLESv2.dylib",                  /* OpenGL ES 2.0 */
     "libGLESv3.dylib",                  /* OpenGL ES 3.0 */
+    "libOpenGL.dylib",                  /* OpenGL */
     "libOpenVG.dylib",                  /* OpenVG 1.0 */
-    "libOpenGL.dylib",
 #else
     "libEGL",                           /* EGL */
     "libGLESv1_CL",                     /* OpenGL ES 1.1 Common Lite */
     "libGLESv1_CM",                     /* OpenGL ES 1.1 Common */
     "libGLESv2",                        /* OpenGL ES 2.0 */
     "libGLESv2",                        /* OpenGL ES 3.0 */
+    "libGL",                            /* OpenGL */
     "libOpenVG",                        /* OpenVG 1.0 */
-    "libGL",
 #endif
 };
 
@@ -73,8 +73,8 @@ static const char * _dispatchNames[] =
     "GLES_CM_DISPATCH_TABLE",           /* OpenGL ES 1.1 Common */
     "GLESv2_DISPATCH_TABLE",            /* OpenGL ES 2.0 */
     "GLESv2_DISPATCH_TABLE",            /* OpenGL ES 3.0 */
-    "OpenVG_DISPATCH_TABLE",            /* OpenVG 1.0 */
     "GL_DISPATCH_TABLE",                /* OpenGL GL 3.0 */
+    "OpenVG_DISPATCH_TABLE",            /* OpenVG 1.0 */
 };
 #endif
 
@@ -521,6 +521,7 @@ _CreateApiContext(
     imports.contextFlags = Context->flags;
     imports.debuggable = (Context->flags & EGL_CONTEXT_OPENGL_DEBUG_BIT_KHR) ? gcvTRUE : gcvFALSE;
     imports.fromEGL = gcvTRUE;
+    imports.coreProfile = Context->coreProfile;
 
     /*
      * EGL_EXT_protected_context.
@@ -961,6 +962,7 @@ eglCreateContext(
     gctINT resetNotification = EGL_NO_RESET_NOTIFICATION_EXT;
     gctBOOL robustAttribSet = gcvFALSE;
     EGLBoolean protectedContent = gcvFALSE;
+    EGLenum    glProfileMask = EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT;
 
     gcmHEADER_ARG("Dpy=0x%x config=0x%x SharedContext=0x%x attrib_list=0x%x",
                   Dpy, config, SharedContext, attrib_list);
@@ -1119,6 +1121,10 @@ eglCreateContext(
                     veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
                     gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
                 }
+                else
+                {
+                    glProfileMask = attrib_list[i + 1];
+                }
                 break;
 
             case EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY_KHR:
@@ -1217,11 +1223,6 @@ eglCreateContext(
         gceCHIPMODEL chipModel;
         gctUINT32 chipRevision;
         EGLenum renderableType = eglConfig->renderableType;
-#if defined(ANDROID)
-        gctSTRING esVersion = gcvNULL;
-        gcePATCH_ID patchId = gcvPATCH_INVALID;
-        gcmVERIFY_OK(gcoHAL_GetPatchID(gcvNULL, &patchId));
-#endif
 
         switch (major)
         {
@@ -1253,14 +1254,7 @@ eglCreateContext(
                 match = (minor >= 0 && minor <= 1) ? EGL_TRUE : EGL_FALSE;
             }
             /* Halti0 HW support ES30 only */
-#if defined(ANDROID)
-            else if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI0) &&
-                    !(((patchId == gcePATCH_ANDROID_CTS_GRAPHICS_GLVERSION) || (patchId == gcvPATCH_ANTUTU6X) || (patchId == gcvPATCH_ANTUTU3DBench))
-                    && (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.opengles.version", &esVersion)) &&
-                    esVersion && gcmIS_SUCCESS(gcoOS_StrCmp(esVersion, "131072")))))
-#else
             else if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI0))
-#endif
             {
                 match = (minor == 0) ? EGL_TRUE : EGL_FALSE;
             }
@@ -1371,6 +1365,33 @@ eglCreateContext(
     context->resetNotification = resetNotification;
     context->protectedContent  = protectedContent;
 
+    if (thread->api == EGL_OPENGL_API)
+    {
+        if ((major > 3) || (major == 3 && minor > 1) )
+        {
+            switch (glProfileMask) {
+            case EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT_KHR:
+                context->coreProfile = gcvTRUE;
+                break;
+            case EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT_KHR:
+                context->coreProfile = gcvFALSE;
+                break;
+            }
+
+        }
+        else
+        {
+            if (major == 3 && minor == 1)
+            {
+                context->coreProfile = gcvTRUE;
+            }
+            else
+            {
+                context->coreProfile = gcvFALSE;
+            }
+        }
+    }
+
 #if gcdGC355_PROFILER
     {
         extern gctUINT64 _AppstartTimeusec;
@@ -1423,8 +1444,7 @@ eglCreateContext(
 
         gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, context));
 
-        /* when failed to allocate resources for createContext, should set the EGL_BAD_ALLOC error here. */
-        veglSetEGLerror(thread,  EGL_BAD_ALLOC);
+        veglSetEGLerror(thread,  EGL_BAD_CONFIG);
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
@@ -2536,12 +2556,6 @@ veglMakeCurrent(
         }
     }
 
-    if (thread->dump != gcvNULL)
-    {
-        /* Start a new frame. */
-        gcmVERIFY_OK(gcoDUMP_FrameBegin(thread->dump));
-    }
-
     /* Install the owner thread */
     dpy->ownerThread = gcoOS_GetCurrentThreadID();
 
@@ -2847,7 +2861,7 @@ _SyncImage(
         gcoOS_AcquireMutex(gcvNULL, khrImage->mutex, gcvINFINITE);
 
         /* Flush the tile status and decompress the buffers,
-           since pixmap buffer could be get by QNX system calls.*/
+        since pixmap buffer could be get by QNX system calls.*/
         if ((khrImage->surface != gcvNULL) &&
             (khrImage->type == KHR_IMAGE_PIXMAP))
         {

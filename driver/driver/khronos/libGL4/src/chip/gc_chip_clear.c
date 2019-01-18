@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -653,7 +653,6 @@ __glChipClearBuffer(
     __GLrasterState    *pRasterState = &gc->state.raster;
     gcsSURF_VIEW        *surfView = gcvNULL;
     gceSTATUS           status = gcvSTATUS_OK;
-    GLuint j;
 
     gcmHEADER_ARG("gc=0x%x buffer=%d drawbuffer=%d value=0x%x type=%d",
                    gc, buffer, drawbuffer, value, type);
@@ -740,11 +739,14 @@ __glChipClearBuffer(
         clearArg.flags |= chipCtx->drawLayered ? gcvCLEAR_MULTI_SLICES : 0;
 
 #ifdef OPENGL40
-        for (j = 0; j < gc->constants.shaderCaps.maxDrawBuffers; ++j)
         {
-            if (chipCtx->drawRtViews[j].surf)
+            GLuint i;
+            for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
             {
-                gcmONERROR(gcoSURF_Clear(&chipCtx->drawRtViews[j], &clearArg));
+                if (chipCtx->drawRtViews[i].surf)
+                {
+                    gcmONERROR(gcoSURF_Clear(&chipCtx->drawRtViews[i], &clearArg));
+                }
             }
         }
 #else

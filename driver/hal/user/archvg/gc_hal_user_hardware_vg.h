@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -16,7 +16,6 @@
 
 #include "gc_hal_user_vg.h"
 #include "gc_feature_database.h"
-
 
 /******************************************************************************\
 ********************************** Structures **********************************
@@ -163,6 +162,13 @@ struct _gcoVGHARDWARE
         /* Control registers. */
         gctUINT32                   targetControl;
         gctUINT32                   vgControl;
+#if gcdVG_ONLY
+        /*extend im register. */
+       gctBOOL                      yuv2rgbStdCust;
+       gctFLOAT                     yuv2rgbCoef[9];
+       gctFLOAT                     yuv2rgbOffset[2];
+       gctBOOL                      yuv2rgbCfg;
+#endif
 
         /* Tesselator states. */
         gctUINT32                   tsQuality;

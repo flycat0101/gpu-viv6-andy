@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -245,13 +245,6 @@ GL_API void GL_APIENTRY glPixelStorei(
     glmLEAVE();
 }
 
-#if gcdDUMP || defined(__APPLE__) || defined(_WIN32) || defined(__QNXNTO__) || defined(EMULATOR)
-#define gcdREAD_PIXELS_WORKAROUND 1
-#else
-#define gcdREAD_PIXELS_WORKAROUND 0
-#endif
-
-#if gcdREAD_PIXELS_WORKAROUND
 static GLenum
 _gl2gcFormat(
     GLenum Format,
@@ -428,7 +421,6 @@ _gl2gcFormat(
     /* Success. */
     return GL_NO_ERROR;
 }
-#endif
 
 
 /*******************************************************************************
@@ -531,10 +523,8 @@ GL_API void GL_APIENTRY glReadPixels(
     )
 {
     gceSTATUS status;
-#if gcdREAD_PIXELS_WORKAROUND
     gctUINT8* targetLogical[3];
     gctINT32 targetStride, j, bytespp = 0;
-#endif
 
     gcsSURF_VIEW srcView = {gcvNULL, 0, 1};
     gcsSURF_VIEW dstView = {gcvNULL, 0, 1};
@@ -600,39 +590,50 @@ GL_API void GL_APIENTRY glReadPixels(
             }
         }
 
-#if gcdREAD_PIXELS_WORKAROUND
-        /* Create a temp surface. */
-        gcmERR_BREAK(
-            gcoSURF_Construct(context->hal,
-                              Width, Height, 1,
-                              gcvSURF_BITMAP,
-                              halFormat,
-                              gcvPOOL_DEFAULT,
-                              &dstView.surf));
+        if(context->useInternalMem == gcvFALSE)
+        {
+            /* Create the wrapper surface. */
+            gcmERR_BREAK(gcoSURF_Construct(
+                        context->hal,
+                        Width, Height, 1,
+                        gcvSURF_BITMAP,
+                        halFormat,
+                        gcvPOOL_USER,
+                        &dstView.surf
+                        ));
 
-        /* Lock the surface. */
-        gcmERR_BREAK(
-            gcoSURF_Lock(dstView.surf, gcvNULL, (gctPOINTER *)targetLogical));
+            /* Set the user buffer to the surface. */
+            status = gcoSURF_MapUserSurface(
+                        dstView.surf, context->packAlignment, Pixels, gcvINVALID_ADDRESS
+                        );
 
-        /* Get the stride. */
-        gcmERR_BREAK(
-            gcoSURF_GetAlignedSize(dstView.surf, gcvNULL, gcvNULL, &targetStride));
-#else
-        /* Create the wrapper surface. */
-        gcmERR_BREAK(gcoSURF_Construct(
-            context->hal,
-            Width, Height, 1,
-            gcvSURF_BITMAP,
-            halFormat,
-            gcvPOOL_USER,
-            &dstView.surf
-            ));
+            if(status != gcvSTATUS_OK)
+            {
+                gcoSURF_Destroy(dstView.surf);
+                context->useInternalMem = gcvTRUE;
+            }
+        }
 
-        /* Set the user buffer to the surface. */
-        gcmERR_BREAK(gcoSURF_MapUserSurface(
-            dstView.surf, context->packAlignment, Pixels, gcvINVALID_ADDRESS
-            ));
-#endif
+        if(context->useInternalMem == gcvTRUE)
+        {
+            /* Create a temp surface. */
+            gcmERR_BREAK(
+                    gcoSURF_Construct(context->hal,
+                        Width, Height, 1,
+                        gcvSURF_BITMAP,
+                        halFormat,
+                        gcvPOOL_DEFAULT,
+                        &dstView.surf));
+
+            /* Lock the surface. */
+            gcmERR_BREAK(
+                    gcoSURF_Lock(dstView.surf, gcvNULL, (gctPOINTER *)targetLogical));
+
+            /* Get the stride. */
+            gcmERR_BREAK(
+                    gcoSURF_GetAlignedSize(dstView.surf, gcvNULL, gcvNULL, &targetStride));
+
+        }
 
         if (context->frameBuffer != gcvNULL)
         {
@@ -662,20 +663,22 @@ GL_API void GL_APIENTRY glReadPixels(
         rlvArgs.uArgs.v2.dump        = gcvTRUE;
         gcmERR_BREAK(gcoSURF_CopyPixels(&srcView, &dstView, &rlvArgs));
 
-#if gcdREAD_PIXELS_WORKAROUND
-        _gl2gcFormat(Format, Type, &bytespp);
-        bytespp /= 8;
-
-        /* Copy data from target surface to pixels. */
-        for (j = 0; j < Height; j++)
+        if(context->useInternalMem == gcvTRUE)
         {
-            gcoOS_MemCopy((gctPOINTER)((gctUINT8_PTR)Pixels + j * gcmALIGN(Width * bytespp, context->packAlignment)), targetLogical[0] + j * targetStride, Width * bytespp);
-        }
+            _gl2gcFormat(Format, Type, &bytespp);
+            bytespp /= 8;
 
-        /* Unlock the surface. */
-        gcmERR_BREAK(
-            gcoSURF_Unlock(dstView.surf, targetLogical));
-#endif
+            /* Copy data from target surface to pixels. */
+            for (j = 0; j < Height; j++)
+            {
+                gcoOS_MemCopy((gctPOINTER)((gctUINT8_PTR)Pixels + j * gcmALIGN(Width * bytespp, context->packAlignment)), targetLogical[0] + j * targetStride, Width * bytespp);
+            }
+
+            /* Unlock the surface. */
+            gcmERR_BREAK(
+                    gcoSURF_Unlock(dstView.surf, targetLogical));
+
+        }
 
         gcmDUMP_API("${ES11 glReadPixels 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X (0x%08X)",
             X, Y, Width, Height, Format, Type, Pixels);

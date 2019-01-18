@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -14,77 +14,31 @@
 #include "gc_vsc.h"
 
 VSC_ErrCode
-VIR_IO_AllocateMem(
-    gctUINT Sz,
-    void ** Ptr
-    )
-{
-    /* now we use system allocator to allocate memory */
-    gctPOINTER pointer;
-    gceSTATUS status;
-
-    /* Allocate a new buffer to store the names */
-    status = gcoOS_Allocate(gcvNULL,
-                            gcmSIZEOF(gctCHAR) * Sz,
-                            &pointer);
-    if (gcmIS_ERROR(status)) {
-        /* Error. */
-        gcmFATAL("VIR_IO_AllocateMem: gcoOS_Allocate failed status=%d(%s)", status, gcoOS_DebugStatus2Name(status));
-        return VSC_ERR_OUT_OF_MEMORY;
-    }
-    *Ptr  = pointer;
-    return VSC_ERR_NONE;
-}
-
-VSC_ErrCode
 VIR_IO_ReallocateMem(
     VIR_Shader_IOBuffer * Buf,
     gctUINT               Sz
     )
 {
-    VSC_ErrCode errCode = VSC_ERR_NONE;
-
-    if (Sz > Buf->allocatedBytes)
-    {
-        gctUINT newSz;
-        if (Buf->buffer)
-        {
-            /* no enough space, need to grow the buffer */
-            gctPOINTER pointer;
-            newSz = (gctUINT)(((Sz > 1) ? Sz : 2) * 1.6);
-            errCode = VIR_IO_AllocateMem(newSz, (void **)&pointer);
-            ON_ERROR(errCode, "Failed to reserveBytes %ud", newSz);
-            gcoOS_MemCopy(pointer, Buf->buffer, Buf->curPos);
-            gcmOS_SAFE_FREE(gcvNULL, Buf->buffer);
-            Buf->buffer = (gctCHAR *)pointer;
-        }
-        else
-        {
-            newSz = (Sz + 16);
-        }
-        Buf->allocatedBytes = newSz;
+    return VSC_IO_ReallocateMem(Buf->ioBuffer, Sz);
     }
-OnError:
-    return errCode;
-}
 
 VSC_ErrCode
-VIR_IO_Init(VIR_Shader_IOBuffer *Buf, VIR_Shader *Shader, gctUINT Size, gctBOOL QueryOnly)
+VIR_IO_Init(VIR_Shader_IOBuffer *Buf, VSC_IO_BUFFER *IOBuf, VIR_Shader *Shader, gctUINT Size, gctBOOL QueryOnly)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
 
+    Buf->ioBuffer = IOBuf;
     Buf->shader = Shader;
     if (!QueryOnly)
     {
-        errCode = VIR_IO_AllocateMem(Size, (void **)&Buf->buffer);
-        Buf->allocatedBytes = Size;
+        errCode = VSC_IO_Init(Buf->ioBuffer, Size);
     }
     else
     {
-        Buf->buffer = gcvNULL;
-        Buf->allocatedBytes = 1024;
+        Buf->ioBuffer->buffer = gcvNULL;
+        Buf->ioBuffer->allocatedBytes = 1024;
+        Buf->ioBuffer->curPos = 0;;
     }
-    Buf->curPos = 0;
 
     return errCode;
 }
@@ -94,7 +48,7 @@ VIR_IO_Finalize(VIR_Shader_IOBuffer *Buf, gctBOOL bFreeBuffer)
 {
 #if _DEBUG_VIR_IO_COPY
     {
-        if (VirSHADER_DumpCodeGenVerbose(Buf->shader->_id))
+        if (VirSHADER_DumpCodeGenVerbose(Buf->shader))
         {
             VIR_Dumper       *Dumper = Buf->shader->dumper;
             VERIFY_OK(
@@ -104,44 +58,78 @@ VIR_IO_Finalize(VIR_Shader_IOBuffer *Buf, gctBOOL bFreeBuffer)
         }
     }
 #endif
-    if (bFreeBuffer && Buf->buffer)
+    if (bFreeBuffer && Buf->ioBuffer)
     {
-        gcmOS_SAFE_FREE(gcvNULL, Buf->buffer);
+        VSC_IO_Finalize(Buf->ioBuffer);
     }
 }
 
-#define VIR_IO_ReserveBytes(Buf, Size) (((Buf)->curPos + Size > (Buf)->allocatedBytes) ?  \
-                                        VIR_IO_ReallocateMem(Buf, Buf->curPos + Size) : VSC_ERR_NONE)
+static void
+_VIR_IO_SymbolListQueue(
+    IN VSC_MM                   *pMM,
+    IN VSC_SIMPLE_QUEUE         *pWorkList,
+    IN VIR_Symbol               *pSymbol
+    )
+{
+    VSC_UNI_LIST_NODE_EXT *worklistNode = (VSC_UNI_LIST_NODE_EXT *)vscMM_Alloc(pMM,
+        sizeof(VSC_UNI_LIST_NODE_EXT));
 
-#define VIR_IO_CheckBounds(Buf, Size) (((Buf)->curPos + Size > (Buf)->allocatedBytes) ?  \
+    vscULNDEXT_Initialize(worklistNode, pSymbol);
+    QUEUE_PUT_ENTRY(pWorkList, worklistNode);
+}
+
+static void
+_VIR_IO_SymbolListDequeue(
+    IN VSC_MM                   *pMM,
+    IN VSC_SIMPLE_QUEUE         *pWorkList,
+    OUT VIR_Symbol             **pSymbol
+    )
+{
+    VSC_UNI_LIST_NODE_EXT *worklistNode = (VSC_UNI_LIST_NODE_EXT *)QUEUE_GET_ENTRY(pWorkList);
+
+    *pSymbol = (VIR_Symbol *)vscULNDEXT_GetContainedUserData(worklistNode);
+
+    vscMM_Free(pMM, worklistNode);
+}
+
+VSC_ErrCode
+VIR_IO_UpdateHostFunction(VIR_Shader* pShader, VSC_UNI_LIST* pSymList)
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_MM*             pMM = &pShader->pmp.mmWrapper;
+    VSC_SIMPLE_QUEUE*   pWorkList = (VSC_SIMPLE_QUEUE*)pSymList;
+    VIR_Symbol*         pSym = gcvNULL;
+    VIR_SymId           funcSymId = VIR_INVALID_ID;
+    VIR_Symbol*         pFuncSym = gcvNULL;
+
+    while(!QUEUE_CHECK_EMPTY(pWorkList))
+    {
+        _VIR_IO_SymbolListDequeue(pMM, pWorkList, &pSym);
+        gcmASSERT(isSymLocal(pSym) && VIR_Id_isFunctionScope(VIR_Symbol_GetIndex(pSym)));
+
+        funcSymId = (VIR_SymId)(gcmPTR2INT32(VIR_Symbol_GetHostFunction(pSym)));
+
+        pFuncSym = VIR_Shader_GetSymFromId(pShader, funcSymId);
+        gcmASSERT(VIR_Symbol_isFunction(pFuncSym));
+
+        VIR_Symbol_SetHostFunction(pSym, VIR_Symbol_GetFunction(pFuncSym));
+        gcmASSERT(VIR_Symbol_GetHostFunction(pSym));
+    }
+
+    return errCode;
+    }
+
+#define VIR_IO_ReserveBytes(Buf, Size) ((((Buf)->ioBuffer)->curPos + Size > ((Buf)->ioBuffer)->allocatedBytes) ?  \
+                                        VIR_IO_ReallocateMem(Buf, ((Buf)->ioBuffer)->curPos + Size) : VSC_ERR_NONE)
+
+#define VIR_IO_CheckBounds(Buf, Size) ((((Buf)->ioBuffer)->curPos + Size > ((Buf)->ioBuffer)->allocatedBytes) ?  \
                                         VSC_ERR_OUT_OF_BOUNDS : VSC_ERR_NONE)
-
-
-#define VIR_IO_WRITEBYTE(Buf, Byte)                             \
-    do {                                                        \
-        if ((Buf)->buffer)                                      \
-        {                                                       \
-            (Buf)->buffer[(Buf)->curPos++] = (Byte);            \
-        }                                                       \
-        else                                                    \
-        {                                                       \
-            (Buf)->curPos++;                                    \
-        }                                                       \
-    } while(0)
 
 VSC_ErrCode
 VIR_IO_writeInt(VIR_Shader_IOBuffer *Buf, gctINT Val)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    errCode = VIR_IO_ReserveBytes(Buf, sizeof(gctINT));
-    if (errCode == VSC_ERR_NONE)
-    {
-        gctINT i;
-        for (i = 0; i < sizeof(gctINT); i++)
-        {
-            VIR_IO_WRITEBYTE(Buf, ((gctCHAR*)&Val)[i]);
-        }
-    }
+    errCode = VSC_IO_writeInt(Buf->ioBuffer, Val);
     return errCode;
 }
 
@@ -149,15 +137,7 @@ VSC_ErrCode
 VIR_IO_writeUint(VIR_Shader_IOBuffer *Buf, gctUINT Val)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    errCode = VIR_IO_ReserveBytes(Buf, sizeof(gctUINT));
-    if (errCode == VSC_ERR_NONE)
-    {
-        gctINT i;
-        for (i = 0; i < sizeof(gctUINT); i++)
-        {
-            VIR_IO_WRITEBYTE(Buf, ((gctCHAR*)&Val)[i]);
-        }
-    }
+    errCode = VSC_IO_writeUint(Buf->ioBuffer, Val);
     return errCode;
 }
 
@@ -165,15 +145,7 @@ VSC_ErrCode
 VIR_IO_writeShort(VIR_Shader_IOBuffer *Buf, gctINT16 Val)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    errCode = VIR_IO_ReserveBytes(Buf, sizeof(gctINT16));
-    if (errCode == VSC_ERR_NONE)
-    {
-        gctINT i;
-        for (i = 0; i < sizeof(gctINT16); i++)
-        {
-            VIR_IO_WRITEBYTE(Buf, ((gctCHAR*)&Val)[i]);
-        }
-    }
+    errCode = VSC_IO_writeShort(Buf->ioBuffer, Val);
     return errCode;
 }
 
@@ -181,15 +153,7 @@ VSC_ErrCode
 VIR_IO_writeUshort(VIR_Shader_IOBuffer *Buf, gctUINT16 Val)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    errCode = VIR_IO_ReserveBytes(Buf, sizeof(gctUINT16));
-    if (errCode == VSC_ERR_NONE)
-    {
-        gctINT i;
-        for (i = 0; i < sizeof(gctUINT16); i++)
-        {
-            VIR_IO_WRITEBYTE(Buf, ((gctCHAR*)&Val)[i]);
-        }
-    }
+    errCode = VSC_IO_writeUshort(Buf->ioBuffer, Val);
     return errCode;
 }
 
@@ -197,15 +161,7 @@ VSC_ErrCode
 VIR_IO_writeFloat(VIR_Shader_IOBuffer *Buf, gctFLOAT Val)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    errCode = VIR_IO_ReserveBytes(Buf, sizeof(gctFLOAT));
-    if (errCode == VSC_ERR_NONE)
-    {
-        gctINT i;
-        for (i = 0; i < sizeof(gctFLOAT); i++)
-        {
-            VIR_IO_WRITEBYTE(Buf, ((gctCHAR*)&Val)[i]);
-        }
-    }
+    errCode = VSC_IO_writeFloat(Buf->ioBuffer, Val);
     return errCode;
 }
 
@@ -213,11 +169,7 @@ VSC_ErrCode
 VIR_IO_writeChar(VIR_Shader_IOBuffer *Buf, gctCHAR Val)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    errCode = VIR_IO_ReserveBytes(Buf, sizeof(Val));
-    if (errCode == VSC_ERR_NONE)
-    {
-            VIR_IO_WRITEBYTE(Buf, Val);
-    }
+    errCode = VSC_IO_writeChar(Buf->ioBuffer, Val);
     return errCode;
 }
 
@@ -225,18 +177,9 @@ VSC_ErrCode
 VIR_IO_writeBlock(VIR_Shader_IOBuffer *Buf, gctCHAR *Val, gctUINT Sz)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    errCode = VIR_IO_ReserveBytes(Buf, Sz);
-    if (errCode == VSC_ERR_NONE)
-    {
-        if (Buf->buffer)
-        {
-            gcoOS_MemCopy(Buf->buffer+Buf->curPos, Val, Sz);
-        }
-        Buf->curPos += Sz;
-    }
+    errCode = VSC_IO_writeBlock(Buf->ioBuffer, Val, Sz);
     return errCode;
 }
-
 
 VSC_ErrCode
 VIR_IO_writeBlockTable(VIR_Shader_IOBuffer * Buf,
@@ -245,6 +188,7 @@ VIR_IO_writeBlockTable(VIR_Shader_IOBuffer * Buf,
                        VIR_Id                StartIdToWrite)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_IO_BUFFER   *ioBuffer = Buf->ioBuffer;
     gctUINT usedBytes;
     errCode = VIR_IO_ReserveBytes(Buf, 5*sizeof(gctUINT));
     ON_ERROR(errCode, "Failure on writeBlockTable");
@@ -287,23 +231,23 @@ VIR_IO_writeBlockTable(VIR_Shader_IOBuffer * Buf,
             {
                 if (i == startToWriteBlockIndex)
                 {
-                    if (Buf->buffer)
+                    if (ioBuffer->buffer)
                     {
-                        gcoOS_MemCopy(Buf->buffer+Buf->curPos,
+                        gcoOS_MemCopy(ioBuffer->buffer+ioBuffer->curPos,
                                       pBlockTbl->ppBlockArray[i] + startToWriteBlockOffset,
                                       pBlockTbl->blockSize - startToWriteBlockOffset);
                     }
-                    Buf->curPos += pBlockTbl->blockSize  - startToWriteBlockOffset;
+                    ioBuffer->curPos += pBlockTbl->blockSize  - startToWriteBlockOffset;
                 }
                 else
                 {
-                    if (Buf->buffer)
+                    if (ioBuffer->buffer)
                     {
-                        gcoOS_MemCopy(Buf->buffer+Buf->curPos,
+                        gcoOS_MemCopy(ioBuffer->buffer+ioBuffer->curPos,
                                       pBlockTbl->ppBlockArray[i],
                                       pBlockTbl->blockSize);
                     }
-                    Buf->curPos += pBlockTbl->blockSize;
+                    ioBuffer->curPos += pBlockTbl->blockSize;
                 }
             }
         }
@@ -328,23 +272,23 @@ VIR_IO_writeBlockTable(VIR_Shader_IOBuffer * Buf,
             {
                 if (i == startToWriteBlockIndex)
                 {
-                    if (Buf->buffer)
+                    if (ioBuffer->buffer)
                     {
-                        gcoOS_MemCopy(Buf->buffer+Buf->curPos,
+                        gcoOS_MemCopy(ioBuffer->buffer+ioBuffer->curPos,
                                       pBlockTbl->ppBlockArray[i] + startToWriteBlockOffset,
                                       pBlockTbl->nextOffsetInCurBlock - startToWriteBlockOffset);
                     }
-                    Buf->curPos += pBlockTbl->nextOffsetInCurBlock  - startToWriteBlockOffset;
+                    ioBuffer->curPos += pBlockTbl->nextOffsetInCurBlock  - startToWriteBlockOffset;
                 }
                 else
                 {
-                    if (Buf->buffer)
+                    if (ioBuffer->buffer)
                     {
-                        gcoOS_MemCopy(Buf->buffer+Buf->curPos,
+                        gcoOS_MemCopy(ioBuffer->buffer+ioBuffer->curPos,
                                       pBlockTbl->ppBlockArray[pBlockTbl->curBlockIdx],
                                       pBlockTbl->nextOffsetInCurBlock);
                     }
-                    Buf->curPos += pBlockTbl->nextOffsetInCurBlock;
+                    ioBuffer->curPos += pBlockTbl->nextOffsetInCurBlock;
                }
             }
         }
@@ -532,11 +476,11 @@ VIR_IO_writeUniform(VIR_Shader_IOBuffer *Buf, VIR_Uniform* pUniform)
     VSC_ErrCode errCode = VSC_ERR_NONE;
 
     ON_ERROR0(VIR_IO_writeBlock(Buf, (gctCHAR *)pUniform, sizeof(VIR_Uniform)));
-    if (pUniform->resOpBitsArraySize > 0)
+    if (VIR_Uniform_isSampler(pUniform) && VIR_Uniform_GetResOpBitsArraySize(pUniform) > 0)
     {
-        gcmASSERT(pUniform->resOpBitsArray != gcvNULL);
-        ON_ERROR0(VIR_IO_writeBlock(Buf, (gctCHAR *)pUniform->resOpBitsArray,
-                                   sizeof(gctUINT32) * pUniform->resOpBitsArraySize));
+        gcmASSERT(pUniform->u0.samplerRes.resOpBitsArray != gcvNULL);
+        ON_ERROR0(VIR_IO_writeBlock(Buf, (gctCHAR *)VIR_Uniform_GetResOpBitsArray(pUniform),
+                                   sizeof(gctUINT32) * VIR_Uniform_GetResOpBitsArraySize(pUniform)));
     }
 
 OnError:
@@ -568,7 +512,6 @@ VIR_IO_writeKernelInfo(VIR_Shader_IOBuffer *Buf, VIR_KernelInfo* pKernelInfo)
         ON_ERROR0(VIR_IO_writeInt(Buf, pKernelInfo->samplerIndex));
         ON_ERROR0(VIR_IO_writeValueList(Buf, &pKernelInfo->imageSamplers, (WRITE_NODE_FP)0));
         ON_ERROR0(VIR_IO_writeValueList(Buf, &pKernelInfo->properties, (WRITE_NODE_FP)0));
-        ON_ERROR0(VIR_IO_writeIdList(Buf, &pKernelInfo->propertyValues));
         ON_ERROR0(VIR_IO_writeInt(Buf, pKernelInfo->isMain));
     }
     else
@@ -778,13 +721,13 @@ VIR_IO_writeInst(VIR_Shader_IOBuffer *Buf, VIR_Instruction* pInst)
     val = VIR_Inst_GetConditionOp(pInst) << 27  |
           VIR_Inst_GetFlags(pInst) << 24        |
           VIR_Inst_GetSrcNum(pInst) << 21       |
-          VIR_Inst_GetThreadMode(pInst) << 19   |
-          VIR_Inst_GetParentUseBB(pInst) << 18  |
-          VIR_Inst_GetResOpType(pInst) << 12    |
-          VIR_Inst_IsPatternRep(pInst) << 11    |
-          VIR_Inst_IsLoopInvariant(pInst) << 10 |
-          VIR_Inst_IsEndOfBB(pInst) << 9        |
-          VIR_Inst_IsUSCUnallocate(pInst) << 8;
+          VIR_Inst_GetThreadMode(pInst) << 18   |
+          VIR_Inst_GetParentUseBB(pInst) << 17  |
+          VIR_Inst_GetResOpType(pInst) << 11    |
+          VIR_Inst_IsPatternRep(pInst) << 10    |
+          VIR_Inst_IsLoopInvariant(pInst) << 9 |
+          VIR_Inst_IsEndOfBB(pInst) << 8        |
+          VIR_Inst_IsUSCUnallocate(pInst) << 7;
     ON_ERROR0(VIR_IO_writeUint(Buf, val));
 
     ON_ERROR0(VIR_IO_writeUint(Buf, *(gctUINT *)&pInst->sourceLoc));
@@ -812,6 +755,7 @@ VIR_IO_writeInst(VIR_Shader_IOBuffer *Buf, VIR_Instruction* pInst)
     }
     /* debug help */
     ON_ERROR0(VIR_IO_writeUint(Buf, INST_SIG));
+
 
 OnError:
     return errCode;
@@ -973,6 +917,7 @@ VIR_IO_writeValueList(
     /* debug help */
     ON_ERROR0(VIR_IO_writeUint(Buf, DBUG_SIG));
 
+
 OnError:
     return errCode;
 }
@@ -999,7 +944,8 @@ VIR_IO_writeOperand(VIR_Shader_IOBuffer *Buf, VIR_Operand* pOperand)
         /* Word 2. */
         val = VIR_Operand_GetSwizzle(pOperand) << 24    |
               VIR_Operand_GetPrecision(pOperand) << 21  |
-              VIR_Operand_isBigEndian(pOperand) << 20;
+              VIR_Operand_isBigEndian(pOperand) << 20   |
+              VIR_Operand_GetModOrder(pOperand) << 18;
         ON_ERROR0(VIR_IO_writeUint(Buf, val));
 
         /* Word 3. */
@@ -1018,10 +964,6 @@ VIR_IO_writeOperand(VIR_Shader_IOBuffer *Buf, VIR_Operand* pOperand)
         case VIR_OPND_NONE:
         case VIR_OPND_UNDEF:
         case VIR_OPND_UNUSED:
-            break;
-        case VIR_OPND_IMMEDIATE:
-            /* write bits as uint */
-            ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Operand_GetImmediateUint(pOperand)));
             break;
         case VIR_OPND_EVIS_MODIFIER:
             ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Operand_GetEvisModifier(pOperand)));
@@ -1078,8 +1020,10 @@ VIR_IO_writeOperand(VIR_Shader_IOBuffer *Buf, VIR_Operand* pOperand)
         case VIR_OPND_OFFSETOF:
             gcmASSERT(gcvFALSE);  /* need to refine the definition of the operand */
             break;
+        case VIR_OPND_IMMEDIATE:
         default:
-            gcmASSERT(0);
+            /* write bits as uint */
+            ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Operand_GetImmediateUint(pOperand)));
             break;
         }
         /* u2 */
@@ -1136,11 +1080,19 @@ VIR_IO_writeSymbol(VIR_Shader_IOBuffer *Buf, VIR_Symbol* pSymbol)
     ON_ERROR0(VIR_IO_writeUint(Buf, ((gctUINT*)pSymbol)[1]));
 
     ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetTypeId(pSymbol)));
-    ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetFlag(pSymbol)));
+    ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetFixedTypeId(pSymbol)));
+    ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetFlags(pSymbol)));
     ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetIndex(pSymbol)));
     ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetIOBlockIndex(pSymbol)));
 
     ON_ERROR0(VIR_IO_writeBlock(Buf, (gctCHAR*)&pSymbol->layout, sizeof(pSymbol->layout)));
+
+    /* u0 */
+    if (isSymLocal(pSymbol))
+    {
+        ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Function_GetSymId(VIR_Symbol_GetHostFunction(pSymbol))));
+    }
+
     /* u1 */
     ON_ERROR0(VIR_IO_writeUint(Buf, pSymbol->u1.vregIndex));
 
@@ -1155,9 +1107,17 @@ VIR_IO_writeSymbol(VIR_Shader_IOBuffer *Buf, VIR_Symbol* pSymbol)
         ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Uniform_GetID(VIR_Symbol_GetSampler(pSymbol))));
         ON_ERROR0(VIR_IO_writeUniform(Buf, VIR_Symbol_GetSampler(pSymbol)));
         break;
+    case VIR_SYM_SAMPLER_T:
+        ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Uniform_GetID(VIR_Symbol_GetSamplerT(pSymbol))));
+        ON_ERROR0(VIR_IO_writeUniform(Buf, VIR_Symbol_GetSamplerT(pSymbol)));
+        break;
     case VIR_SYM_IMAGE:
         ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Uniform_GetID(VIR_Symbol_GetImage(pSymbol))));
         ON_ERROR0(VIR_IO_writeUniform(Buf, VIR_Symbol_GetImage(pSymbol)));
+        break;
+    case VIR_SYM_IMAGE_T:
+        ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Uniform_GetID(VIR_Symbol_GetImage(pSymbol))));
+        ON_ERROR0(VIR_IO_writeUniform(Buf, VIR_Symbol_GetImageT(pSymbol)));
         break;
     case VIR_SYM_VARIABLE:
     case VIR_SYM_TEXTURE:
@@ -1181,7 +1141,6 @@ VIR_IO_writeSymbol(VIR_Shader_IOBuffer *Buf, VIR_Symbol* pSymbol)
     case VIR_SYM_FIELD:
         if (VIR_Symbol_GetFieldInfo(pSymbol) != gcvNULL)
         {
-            /* TODO */
             VIR_FieldInfo * fi = VIR_Symbol_GetFieldInfo(pSymbol);
             ON_ERROR0(VIR_IO_writeUint(Buf, 0)); /* marker */
             ON_ERROR0(VIR_IO_writeBlock(Buf, (gctCHAR *)fi, sizeof(VIR_FieldInfo)));
@@ -1211,14 +1170,20 @@ VIR_IO_writeSymbol(VIR_Shader_IOBuffer *Buf, VIR_Symbol* pSymbol)
         break;
     default:
         if (isSymCombinedSampler(pSymbol))
-            ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetSeparateSampler(pSymbol)));
+        {
+            ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetSeparateSamplerId(pSymbol)));
+            ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetSeparateSamplerFuncId(pSymbol)));
+        }
         else
             ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetOffsetInVar(pSymbol)));
         break;
     }
     /* u4 */
     if (isSymCombinedSampler(pSymbol))
-        ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetSeparateImage(pSymbol)));
+    {
+        ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetSeparateImageId(pSymbol)));
+        ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetSeparateImageFuncId(pSymbol)));
+    }
     else if (VIR_Symbol_isParamVirReg(pSymbol))
          ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetParamFuncSymId(pSymbol)));
 
@@ -1242,6 +1207,7 @@ VIR_IO_writeType(VIR_Shader_IOBuffer *Buf, VIR_Type* pType)
     ON_ERROR0(VIR_IO_writeBlock(Buf, (gctCHAR *)pType, sizeof(VIR_Type)));
     switch (pType->_kind) {
     case VIR_TY_STRUCT:
+    case VIR_TY_ENUM:
         /* field id list */
         ON_ERROR0(VIR_IO_writeIdList(Buf, VIR_Type_GetFields(pType)));
         break;
@@ -1263,8 +1229,26 @@ gctUINT VIR_Shader_EstimateSize(VIR_Shader* pShader)
 {
     gctUINT sz = 0;
     /* symbol table size */
-    sz = 32*1024; /* TODO */
+    sz = 32*1024;
     return sz;
+}
+
+VSC_ErrCode
+VIR_Shader_IOBuffer_Initialize(VIR_Shader_IOBuffer *Buf)
+{
+    Buf->ioBuffer = gcvNULL;
+    Buf->shader = gcvNULL;
+    QUEUE_INITIALIZE(&Buf->localSymbolList);
+
+    return VSC_ERR_NONE;
+}
+
+VSC_ErrCode
+VIR_Shader_IOBuffer_Finalize(VIR_Shader_IOBuffer *Buf)
+{
+    QUEUE_FINALIZE(&Buf->localSymbolList);
+
+    return VSC_ERR_NONE;
 }
 
 /* save the shader binary to a buffer allocated by compiler */
@@ -1275,7 +1259,9 @@ VIR_Shader_Save(VIR_Shader* pShader, VIR_Shader_IOBuffer *Buf)
     gcmASSERT (Buf != gcvNULL);
 
     {
-        VIR_IO_Init(Buf, pShader, VIR_Shader_EstimateSize(pShader), gcvFALSE);
+        VSC_IO_BUFFER       ioBuf = {0, 0, 0};
+
+        VIR_IO_Init(Buf, &ioBuf, pShader, VIR_Shader_EstimateSize(pShader), gcvFALSE);
         ON_ERROR0(VIR_IO_writeShader(Buf, pShader));
     }
 OnError:
@@ -1288,16 +1274,25 @@ VSC_ErrCode
 VIR_Shader_Save2Buffer(VIR_Shader* pShader, gctCHAR *Buffer, gctUINT BufSz)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_IO_BUFFER       ioBuf = {0, 0, 0};
     VIR_Shader_IOBuffer buf;
+
+    VIR_Shader_IOBuffer_Initialize(&buf);
+
+    buf.ioBuffer    = &ioBuf;
+    buf.shader      = gcvNULL;
+
     gcmASSERT (Buffer != gcvNULL);
     {
-        buf.allocatedBytes = BufSz;
-        buf.buffer         = Buffer;
+        ioBuf.allocatedBytes    = BufSz;
+        ioBuf.buffer            = Buffer;
+        ioBuf.curPos            = 0;
         buf.shader         = pShader;
-        buf.curPos         = 0;
         ON_ERROR0(VIR_IO_writeShader(&buf, pShader));
     }
+
 OnError:
+    VIR_Shader_IOBuffer_Finalize(&buf);
     return errCode;
 }
 
@@ -1305,30 +1300,57 @@ VSC_ErrCode
 VIR_Shader_QueryBinarySize(VIR_Shader* pShader, gctUINT *BinarySz)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_Shader_IOBuffer buf;
+
+    VIR_Shader_IOBuffer_Initialize(&buf);
+
     gcmASSERT (BinarySz != gcvNULL);
 
     {
-        VIR_Shader_IOBuffer buf;
-        VIR_IO_Init(&buf, pShader, VIR_Shader_EstimateSize(pShader), gcvTRUE);
+        VSC_IO_BUFFER       ioBuf = {0, 0, 0};
+
+        VIR_IO_Init(&buf, &ioBuf, pShader, VIR_Shader_EstimateSize(pShader), gcvTRUE);
         ON_ERROR0(VIR_IO_writeShader(&buf, pShader));
-        *BinarySz = buf.allocatedBytes;
+        *BinarySz = buf.ioBuffer->allocatedBytes;
     }
+
 OnError:
+    VIR_Shader_IOBuffer_Finalize(&buf);
     return errCode;
 }
 
 VSC_ErrCode
-VIR_Shader_Read(VIR_Shader* pShader, VIR_Shader_IOBuffer *Buf)
+VIR_Shader_Read(VIR_Shader* pShader, VIR_Shader_IOBuffer *Buf, gctUINT messageLevel)
 {
-    VSC_ErrCode errCode = VSC_ERR_NONE;
     gcmASSERT (Buf != gcvNULL);
 
-    {
+    return (VIR_IO_readShader(Buf, pShader, messageLevel));
+}
 
-        ON_ERROR0(VIR_IO_readShader(Buf, pShader));
-    }
-OnError:
-    return errCode;
+gctUINT
+VIR_IO_getMagicNum(void)
+{
+    gctUINT   magicNum;
+    gctUINT   buf[16];
+    buf[0]  = sizeof(VIR_Shader);
+    buf[1]  = sizeof(VIR_Uniform);
+    buf[2]  = sizeof(VIR_Function);
+    buf[3]  = sizeof(VIR_UniformBlock);
+    buf[4]  = sizeof(VIR_StorageBlock);
+    buf[5]  = sizeof(VIR_IOBlock);
+    buf[6]  = sizeof(VIR_Label);
+    buf[7]  = sizeof(VIR_Const);
+    buf[8]  = sizeof(VIR_Instruction);
+    buf[9]  = sizeof(VIR_Operand);
+    buf[10] = sizeof(VIR_ParmPassing);
+    buf[11] = sizeof(VIR_OperandList);
+    buf[12] = sizeof(VIR_SymbolList);
+    buf[13] = sizeof(VIR_Symbol);
+    buf[14] = sizeof(VIR_Dumper);
+    buf[15] = sizeof(VIR_Type);
+
+    magicNum = vscEvaluateCRC32(buf, 16 * sizeof(gctUINT));
+    return magicNum;
 }
 
 VSC_ErrCode
@@ -1336,9 +1358,11 @@ VIR_IO_writeShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
 {
     VSC_ErrCode errCode;
     gctUINT i;
-
+    gctUINT magicNum;
+    magicNum = VIR_IO_getMagicNum();
     VIR_IO_writeInt(buf, SHDR_SIG);
     VIR_IO_writeInt(buf, gcdVIR_SHADER_BINARY_FILE_VERSION);
+    VIR_IO_writeUint(buf, magicNum);
     VIR_IO_writeInt(buf, gcGetHWCaps()->chipModel);
     VIR_IO_writeInt(buf, gcGetHWCaps()->chipRevision);
 
@@ -1352,6 +1376,7 @@ VIR_IO_writeShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     VIR_IO_writeInt(buf, pShader->shLevel);
     VIR_IO_writeInt(buf, pShader->shaderKind);
     VIR_IO_writeInt(buf, pShader->flags);
+    VIR_IO_writeInt(buf, pShader->flagsExt1);
     VIR_IO_writeUint(buf, pShader->compilerVersion[0]);
     VIR_IO_writeUint(buf, pShader->compilerVersion[1]);
     VIR_IO_writeInt(buf, pShader->constUniformBlockIndex);
@@ -1477,7 +1502,7 @@ VIR_IO_writeShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     }
 
     VIR_IO_writeUint(buf, pShader->replaceIndex);
-    VIR_IO_writeUint(buf, pShader->memoryAccessFlag);
+    VIR_IO_writeBlock(buf, (gctCHAR *)pShader->memoryAccessFlag, sizeof(pShader->memoryAccessFlag));
     VIR_IO_writeUint(buf, pShader->vsPositionZDependsOnW);
     VIR_IO_writeUint(buf, pShader->psHasDiscard);
     VIR_IO_writeUint(buf, pShader->useEarlyFragTest);
@@ -1487,6 +1512,7 @@ VIR_IO_writeShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     VIR_IO_writeUint(buf, pShader->__IsDual16Shader);
     VIR_IO_writeUint(buf, pShader->__IsMasterDual16Shader);
     VIR_IO_writeUint(buf, pShader->packUnifiedSampler);
+    VIR_IO_writeUint(buf, pShader->fullUnifiedUniforms);
     VIR_IO_writeUint(buf, pShader->needToAdjustSamplerPhysical);
     VIR_IO_writeUint(buf, pShader->_enableDefaultUBO);
 
@@ -1563,6 +1589,7 @@ VIR_IO_writeShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     VIR_IO_writeUint(buf, pShader->hasRegisterSpill);
     VIR_IO_writeUint(buf, pShader->llSlotForSpillVidmem);
     VIR_IO_writeUint(buf, pShader->hasCRegSpill);
+    VIR_IO_writeUint(buf, pShader->useHwManagedLS);
 
     VIR_IO_writeBlock(buf, (gctCHAR *)pShader->psInputPosCompValid, sizeof(pShader->psInputPosCompValid));
 
@@ -1570,6 +1597,7 @@ VIR_IO_writeShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
 
     VIR_IO_writeUint(buf, pShader->inLinkedShaderStage);
     VIR_IO_writeUint(buf, pShader->outLinkedShaderStage);
+    VIR_IO_writeUint(buf, VIR_Shader_GetKernelNameId(pShader));
     VIR_IO_writeInt(buf, ENDS_SIG);
 
 OnError:
@@ -1584,15 +1612,7 @@ VSC_ErrCode
 VIR_IO_readInt(VIR_Shader_IOBuffer *Buf, gctINT * Val)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    errCode = VIR_IO_CheckBounds(Buf, sizeof(gctINT));
-    if (errCode == VSC_ERR_NONE)
-    {
-        gctINT i;
-        for (i = 0; i < sizeof(gctINT); i++)
-        {
-            ((gctCHAR*)Val)[i] = Buf->buffer[Buf->curPos++];
-        }
-    }
+    errCode = VSC_IO_readInt(Buf->ioBuffer, Val);
     return errCode;
 }
 
@@ -1600,15 +1620,7 @@ VSC_ErrCode
 VIR_IO_readUint(VIR_Shader_IOBuffer *Buf, gctUINT * Val)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    errCode = VIR_IO_CheckBounds(Buf, sizeof(gctUINT));
-    if (errCode == VSC_ERR_NONE)
-    {
-        gctINT i;
-        for (i = 0; i < sizeof(gctUINT); i++)
-        {
-            ((gctCHAR*)Val)[i] = Buf->buffer[Buf->curPos++];
-        }
-    }
+    errCode = VSC_IO_readUint(Buf->ioBuffer, Val);
     return errCode;
 }
 
@@ -1616,15 +1628,7 @@ VSC_ErrCode
 VIR_IO_readShort(VIR_Shader_IOBuffer *Buf, gctINT16 * Val)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    errCode = VIR_IO_CheckBounds(Buf, sizeof(gctINT16));
-    if (errCode == VSC_ERR_NONE)
-    {
-        gctINT i;
-        for (i = 0; i < sizeof(gctINT16); i++)
-        {
-            ((gctCHAR*)Val)[i] = Buf->buffer[Buf->curPos++];
-        }
-    }
+    errCode = VSC_IO_readShort(Buf->ioBuffer, Val);
     return errCode;
 }
 
@@ -1632,15 +1636,7 @@ VSC_ErrCode
 VIR_IO_readUshort(VIR_Shader_IOBuffer *Buf, gctUINT16 * Val)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    errCode = VIR_IO_CheckBounds(Buf, sizeof(gctUINT16));
-    if (errCode == VSC_ERR_NONE)
-    {
-        gctINT i;
-        for (i = 0; i < sizeof(gctUINT16); i++)
-        {
-            ((gctCHAR*)Val)[i] = Buf->buffer[Buf->curPos++];
-        }
-    }
+    errCode = VSC_IO_readUshort(Buf->ioBuffer, Val);
     return errCode;
 }
 
@@ -1648,15 +1644,7 @@ VSC_ErrCode
 VIR_IO_readFloat(VIR_Shader_IOBuffer *Buf, gctFLOAT * Val)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    errCode = VIR_IO_CheckBounds(Buf, sizeof(gctFLOAT));
-    if (errCode == VSC_ERR_NONE)
-    {
-        gctINT i;
-        for (i = 0; i < sizeof(gctFLOAT); i++)
-        {
-            ((gctCHAR*)Val)[i] = Buf->buffer[Buf->curPos++];
-        }
-    }
+    errCode = VSC_IO_readFloat(Buf->ioBuffer, Val);
     return errCode;
 }
 
@@ -1664,11 +1652,7 @@ VSC_ErrCode
 VIR_IO_readChar(VIR_Shader_IOBuffer *Buf, gctCHAR * Val)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    errCode = VIR_IO_CheckBounds(Buf, sizeof(Val));
-    if (errCode == VSC_ERR_NONE)
-    {
-       *Val = Buf->buffer[Buf->curPos++];
-    }
+    errCode = VSC_IO_readChar(Buf->ioBuffer, Val);
     return errCode;
 }
 
@@ -1676,12 +1660,7 @@ VSC_ErrCode
 VIR_IO_readBlock(VIR_Shader_IOBuffer *Buf, gctCHAR *Val, gctUINT Sz)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    errCode = VIR_IO_CheckBounds(Buf, Sz);
-    if (errCode == VSC_ERR_NONE)
-    {
-        gcoOS_MemCopy(Val, Buf->buffer+Buf->curPos, Sz);
-        Buf->curPos += Sz;
-    }
+    errCode = VSC_IO_readBlock(Buf->ioBuffer, Val, Sz);
     return errCode;
 }
 
@@ -1691,6 +1670,7 @@ VIR_IO_readBlockTable(VIR_Shader_IOBuffer * Buf,
                       READ_NODE_FP          fp)
 {
     VSC_ErrCode     errCode = VSC_ERR_NONE;
+    VSC_IO_BUFFER   *ioBuffer = Buf->ioBuffer;
     VSC_BLOCK_TABLE blkTbl;
     gctUINT         usedBytes;
     VIR_Id          startIdToRead;
@@ -1754,16 +1734,16 @@ VIR_IO_readBlockTable(VIR_Shader_IOBuffer * Buf,
                 if (i == startToReadBlockIndex)
                 {
                     vscBT_AddContinuousEntries(pBlockTbl,
-                                  Buf->buffer+Buf->curPos,
+                                  ioBuffer->buffer+ioBuffer->curPos,
                                   (pBlockTbl->blockSize - startToReadBlockOffset)/pBlockTbl->entrySize);
-                    Buf->curPos += pBlockTbl->blockSize  - startToReadBlockOffset;
+                    ioBuffer->curPos += pBlockTbl->blockSize  - startToReadBlockOffset;
                 }
                 else
                 {
                     vscBT_AddContinuousEntries(pBlockTbl,
-                                  Buf->buffer + Buf->curPos,
+                                  ioBuffer->buffer + ioBuffer->curPos,
                                   pBlockTbl->entryCountPerBlock);
-                    Buf->curPos += pBlockTbl->blockSize;
+                    ioBuffer->curPos += pBlockTbl->blockSize;
                 }
             }
         }
@@ -1795,16 +1775,16 @@ VIR_IO_readBlockTable(VIR_Shader_IOBuffer * Buf,
                 if (i == startToReadBlockIndex)
                 {
                     vscBT_AddContinuousEntries(pBlockTbl,
-                                  Buf->buffer+Buf->curPos,
+                                  ioBuffer->buffer+ioBuffer->curPos,
                                   (nextOffsetInCurBlock - startToReadBlockOffset)/pBlockTbl->entrySize);
-                    Buf->curPos += nextOffsetInCurBlock  - startToReadBlockOffset;
+                    ioBuffer->curPos += nextOffsetInCurBlock  - startToReadBlockOffset;
                 }
                 else
                 {
                     vscBT_AddContinuousEntries(pBlockTbl,
-                                  Buf->buffer+Buf->curPos,
+                                  ioBuffer->buffer+ioBuffer->curPos,
                                   nextOffsetInCurBlock/pBlockTbl->entrySize);
-                    Buf->curPos += nextOffsetInCurBlock;
+                    ioBuffer->curPos += nextOffsetInCurBlock;
                 }
                 pBlockTbl->nextOffsetInCurBlock = nextOffsetInCurBlock;
             }
@@ -2015,16 +1995,29 @@ VIR_IO_readIdList(VIR_Shader_IOBuffer *Buf, VIR_IdList* pIdList)
 }
 
 VSC_ErrCode
-VIR_IO_readUniform(VIR_Shader_IOBuffer *Buf, VIR_Uniform* pUniform)
+VIR_IO_readUniform(VIR_Shader_IOBuffer *Buf, VIR_Uniform* pUniform, VIR_SymbolKind symKind)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
 
     ON_ERROR0(VIR_IO_readBlock(Buf, (gctCHAR *)pUniform, sizeof(VIR_Uniform)));
-    if (pUniform->resOpBitsArraySize > 0)
+    if (VIR_Uniform_isSampler(pUniform)&& VIR_Uniform_GetResOpBitsArraySize(pUniform) > 0)
     {
-        gcmASSERT(pUniform->resOpBitsArray != gcvNULL);
-        ON_ERROR0(VIR_IO_readBlock(Buf, (gctCHAR *)pUniform->resOpBitsArray,
-                                   sizeof(gctUINT32) * pUniform->resOpBitsArraySize));
+        gcmASSERT(VIR_Uniform_GetResOpBitsArray(pUniform) != gcvNULL);
+        ON_ERROR0(VIR_IO_readBlock(Buf, (gctCHAR *)VIR_Uniform_GetResOpBitsArray(pUniform),
+                                   sizeof(gctUINT32) * VIR_Uniform_GetResOpBitsArraySize(pUniform)));
+    }
+    else if (VIR_Uniform_isImage(pUniform))
+    {
+        VSC_ImageDesc desc = { { 0 } };
+        /* set the image desc to NULL when read shader, it should be set by driver at
+         * runtime if recompile is needed */
+        VIR_Uniform_SetImageDesc(pUniform, desc);
+        if (symKind == VIR_SYM_SAMPLER_T || symKind == VIR_SYM_IMAGE_T)
+        {
+            /* also set the lib func name for the image to NULL, it will be set to correct
+             * value when go through compiling/recompiling */
+            VIR_Uniform_SetImageLibFuncName(pUniform, gcvNULL);
+        }
     }
 
 OnError:
@@ -2076,7 +2069,6 @@ VIR_IO_readKernelInfo(VIR_Shader_IOBuffer *Buf, VIR_KernelInfo** pKernelInfo)
         ON_ERROR0(VIR_IO_readValueList(Buf, &list, (READ_NODE_FP)0));
         list  = &kInfo->properties;
         ON_ERROR0(VIR_IO_readValueList(Buf, &list, (READ_NODE_FP)0));
-        ON_ERROR0(VIR_IO_readIdList(Buf, &kInfo->propertyValues));
         ON_ERROR0(VIR_IO_readInt(Buf, &kInfo->isMain));
     }
 
@@ -2359,13 +2351,13 @@ VIR_IO_readInst(VIR_Shader_IOBuffer *Buf, VIR_Instruction* pInst)
     VIR_Inst_SetConditionOp(pInst, (uVal >> 27) & 0x1F);
     VIR_Inst_SetFlags(pInst, (uVal >> 24) & 0x07);
     VIR_Inst_SetSrcNum(pInst, (uVal >> 21) & 0x07);
-    VIR_Inst_SetThreadMode(pInst, (uVal >> 19) & 0x03);
-    VIR_Inst_SetParentUseBB(pInst, (uVal >> 18) & 0x1);
-    VIR_Inst_SetResOpType(pInst, (VIR_RES_OP_TYPE)((uVal >> 12) & 0x3F));
-    VIR_Inst_SetIsPatternRep(pInst, (uVal >> 11) & 0x1);
-    VIR_Inst_SetLoopInvariant(pInst, (uVal >> 10) & 0x1);
-    VIR_Inst_SetEndOfBB(pInst, (uVal >> 9) & 0x1);
-    VIR_Inst_SetUSCUnallocate(pInst, (uVal >> 8) & 0x1);
+    VIR_Inst_SetThreadMode(pInst, (uVal >> 18) & 0x07);
+    VIR_Inst_SetParentUseBB(pInst, (uVal >> 17) & 0x1);
+    VIR_Inst_SetResOpType(pInst, (VIR_RES_OP_TYPE)((uVal >> 11) & 0x3F));
+    VIR_Inst_SetIsPatternRep(pInst, (uVal >> 10) & 0x1);
+    VIR_Inst_SetLoopInvariant(pInst, (uVal >> 9) & 0x1);
+    VIR_Inst_SetEndOfBB(pInst, (uVal >> 8) & 0x1);
+    VIR_Inst_SetUSCUnallocate(pInst, (uVal >> 7) & 0x1);
 
     ON_ERROR0(VIR_IO_readUint(Buf, (gctUINT *)&pInst->sourceLoc));
 
@@ -2396,6 +2388,7 @@ VIR_IO_readInst(VIR_Shader_IOBuffer *Buf, VIR_Instruction* pInst)
     ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
     /* debug help: check INST_SIG */
     gcmASSERT(uVal == INST_SIG);
+
 OnError:
     return errCode;
 }
@@ -2605,9 +2598,11 @@ VIR_IO_readValueList(VIR_Shader_IOBuffer *Buf, VIR_ValueList** pValueList, READ_
             ON_ERROR0(VIR_IO_readBlock(Buf, list->values, sz));
         }
     }
+
     ON_ERROR0(VIR_IO_readUint(Buf, &sz));
     /* debug help: check DBUG_SIG */
     gcmASSERT(sz == DBUG_SIG);
+
 OnError:
     return errCode;
 }
@@ -2621,9 +2616,11 @@ VIR_IO_readOperand(VIR_Shader_IOBuffer *Buf, VIR_Operand* pOperand)
     VIR_OperandKind opndKind;
 
     /* operand header */
+
     ON_ERROR0(VIR_IO_readUint(Buf, &val));
     /* debug help: check DBUG_SIG */
     gcmASSERT(val == DBUG_SIG);
+
     ON_ERROR0(VIR_IO_readUint(Buf, &val));
     pOperand->header = *(VIR_Operand_Header*)&val;
     opndKind = (VIR_OperandKind)VIR_Operand_GetOpKind(pOperand);
@@ -2646,6 +2643,7 @@ VIR_IO_readOperand(VIR_Shader_IOBuffer *Buf, VIR_Operand* pOperand)
         }
         precision = (VIR_Precision)((val >> 21) & 0x07);
         VIR_Operand_SetBigEndian(pOperand, ((val >> 20) & 0x1));
+        VIR_Operand_SetModOrder(pOperand, ((val >> 18) & 0x2));
 
         /* Word 3. */
         ON_ERROR0(VIR_IO_readUint(Buf, &val));
@@ -2664,10 +2662,6 @@ VIR_IO_readOperand(VIR_Shader_IOBuffer *Buf, VIR_Operand* pOperand)
         case VIR_OPND_NONE:
         case VIR_OPND_UNDEF:
         case VIR_OPND_UNUSED:
-            break;
-        case VIR_OPND_IMMEDIATE:
-            /* write bits as uint */
-            ON_ERROR0(VIR_IO_readUint(Buf, &VIR_Operand_GetImmediateUint(pOperand)));
             break;
         case VIR_OPND_EVIS_MODIFIER:
             ON_ERROR0(VIR_IO_readUint(Buf, &val));
@@ -2725,8 +2719,10 @@ VIR_IO_readOperand(VIR_Shader_IOBuffer *Buf, VIR_Operand* pOperand)
         case VIR_OPND_OFFSETOF:
             gcmASSERT(gcvFALSE);  /* need to refine the definition of the operand */
             break;
+        case VIR_OPND_IMMEDIATE:
         default:
-            gcmASSERT(0);
+            /* write bits as uint */
+            ON_ERROR0(VIR_IO_readUint(Buf, &VIR_Operand_GetImmediateUint(pOperand)));
             break;
         }
         /* u2 */
@@ -2799,6 +2795,8 @@ VIR_IO_readSymbol(VIR_Shader_IOBuffer *Buf, VIR_Symbol* pSymbol)
     ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
     VIR_Symbol_SetTypeId(pSymbol, (VIR_TypeId)uVal);
     ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
+    VIR_Symbol_SetFixedTypeId(pSymbol, (VIR_TypeId)uVal);
+    ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
     VIR_Symbol_SetFlags(pSymbol, (VIR_SymFlag)uVal);
     ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
     VIR_Symbol_SetIndex(pSymbol, uVal);
@@ -2809,7 +2807,11 @@ VIR_IO_readSymbol(VIR_Shader_IOBuffer *Buf, VIR_Symbol* pSymbol)
     /* u0 */
     if (isSymLocal(pSymbol))
     {
-        VIR_Symbol_SetHostFunction(pSymbol, VIR_Shader_GetCurrentFunction(Buf->shader));
+        ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
+        VIR_Symbol_SetHostFunction(pSymbol, (VIR_Function *)gcmINT2PTR(uVal));
+        _VIR_IO_SymbolListQueue(&Buf->shader->pmp.mmWrapper,
+                                &Buf->localSymbolList,
+                                pSymbol);
     }
     else
     {
@@ -2826,12 +2828,13 @@ VIR_IO_readSymbol(VIR_Shader_IOBuffer *Buf, VIR_Symbol* pSymbol)
     {
     case VIR_SYM_UNIFORM:
     case VIR_SYM_SAMPLER:
+    case VIR_SYM_SAMPLER_T:
     case VIR_SYM_IMAGE:
-        /* TODO */
+    case VIR_SYM_IMAGE_T:
         ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
         VIR_Shader_AddSymbolContents(Buf->shader, pSymbol, uVal, gcvFALSE);
         uniform = (pSymbol)->u2.uniform;
-        ON_ERROR0(VIR_IO_readUniform(Buf, uniform));
+        ON_ERROR0(VIR_IO_readUniform(Buf, uniform, symKind));
         break;
     case VIR_SYM_VARIABLE:
     case VIR_SYM_TEXTURE:
@@ -2912,14 +2915,20 @@ VIR_IO_readSymbol(VIR_Shader_IOBuffer *Buf, VIR_Symbol* pSymbol)
         break;
     default:
         if (isSymCombinedSampler(pSymbol))
-            ON_ERROR0(VIR_IO_readUint(Buf, &VIR_Symbol_GetSeparateSampler(pSymbol)));
+        {
+            ON_ERROR0(VIR_IO_readUint(Buf, &VIR_Symbol_GetSeparateSamplerId(pSymbol)));
+            ON_ERROR0(VIR_IO_readUint(Buf, &VIR_Symbol_GetSeparateSamplerFuncId(pSymbol)));
+        }
         else
             ON_ERROR0(VIR_IO_readUint(Buf, &VIR_Symbol_GetOffsetInVar(pSymbol)));
         break;
     }
     /* u4 */
     if (isSymCombinedSampler(pSymbol))
-        ON_ERROR0(VIR_IO_readUint(Buf, &VIR_Symbol_GetSeparateImage(pSymbol)));
+    {
+        ON_ERROR0(VIR_IO_readUint(Buf, &VIR_Symbol_GetSeparateImageId(pSymbol)));
+        ON_ERROR0(VIR_IO_readUint(Buf, &VIR_Symbol_GetSeparateImageFuncId(pSymbol)));
+    }
     else if (VIR_Symbol_isParamVirReg(pSymbol))
          ON_ERROR0(VIR_IO_readUint(Buf, &VIR_Symbol_GetParamFuncSymId(pSymbol)));
 
@@ -2951,6 +2960,7 @@ VIR_IO_readType(VIR_Shader_IOBuffer *Buf, VIR_Type* pType)
 
     switch (pType->_kind) {
     case VIR_TY_STRUCT:
+    case VIR_TY_ENUM:
         /* field id list */
         VIR_Type_SetFields(pType, gcvNULL);
         ON_ERROR0(VIR_IO_readNewIdList(Buf, &VIR_Type_GetFields(pType), gcvTRUE));
@@ -2970,13 +2980,16 @@ OnError:
 }
 
 VSC_ErrCode
-VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
+VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader, gctUINT messageLevel)
 {
     VSC_ErrCode errCode= VSC_ERR_NONE;
     gctUINT     i;
     gctUINT     uVal;
     gctUINT     binaryFileVersion, chipModel, chipRevision;
     VSC_MM *    memPool    = &pShader->pmp.mmWrapper;
+    gctBOOL     needToPrint = gcvFALSE;
+    gctSTRING   messagePrefix = "";
+    gctUINT     magicNum;
 
     ON_ERROR0(VIR_IO_readUint(buf, &uVal));
     if (uVal != SHDR_SIG)
@@ -2985,25 +2998,65 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
         ON_ERROR(errCode, "Invalid shader signature 0x%x.", uVal);
     }
     ON_ERROR0(VIR_IO_readUint(buf, &binaryFileVersion));
+
+    /* If the shader or chip version does not match with current compiler's,
+     * messageLevel = 0: print information messages only when VC_OPTION is set to -DUMP:ALL;
+     * messageLevel = 1: print warning messages;
+     * messageLevel = 2: print error messages. */
+    if (messageLevel > 0 || gcmOPT_DUMP_OPTIMIZER())
+    {
+        needToPrint = gcvTRUE;
+        if (messageLevel == 0)
+            messagePrefix = "INFO";
+        else if (messageLevel == 1)
+            messagePrefix = "WARN";
+        else if (messageLevel == 2)
+            messagePrefix = "ERROR";
+    }
     if (binaryFileVersion != gcdVIR_SHADER_BINARY_FILE_VERSION)
     {
         errCode = VSC_ERR_VERSION_MISMATCH;
-        ON_ERROR(errCode, "Shader file version 0x%x doesn't match current version 0x%x.",
-                 binaryFileVersion, gcdVIR_SHADER_BINARY_FILE_VERSION);
+        if (needToPrint)
+        {
+            gcoOS_Print("%s: Shader file version 0x%x doesn't match current version 0x%x.",
+                        messagePrefix, binaryFileVersion, gcdVIR_SHADER_BINARY_FILE_VERSION);
+        }
+        return errCode;
     }
+
+    ON_ERROR0(VIR_IO_readUint(buf, &magicNum));
+    if (magicNum != VIR_IO_getMagicNum())
+    {
+        errCode = VSC_ERR_VERSION_MISMATCH;
+        if (needToPrint)
+        {
+            gcoOS_Print("%s: Shader file 0x%x doesn't match current file 0x%x.",
+                        messagePrefix, binaryFileVersion, gcdVIR_SHADER_BINARY_FILE_VERSION);
+        }
+        return errCode;
+    }
+
     ON_ERROR0(VIR_IO_readUint(buf, &chipModel));
     if (chipModel != gcGetHWCaps()->chipModel)
     {
         errCode = VSC_ERR_VERSION_MISMATCH;
-        ON_ERROR(errCode, "Shader file chipModel 0x%x doesn't match current chipModel 0x%x.",
-                 chipModel, gcGetHWCaps()->chipModel);
+        if (needToPrint)
+        {
+            gcoOS_Print("%s: Shader file chipModel 0x%x doesn't match current chipModel 0x%x.",
+                        messagePrefix, chipModel, gcGetHWCaps()->chipModel);
+        }
+        return errCode;
     }
     ON_ERROR0(VIR_IO_readUint(buf, &chipRevision));
     if (chipRevision != gcGetHWCaps()->chipRevision)
     {
         errCode = VSC_ERR_VERSION_MISMATCH;
-        ON_ERROR(errCode, "Shader file chipRevision 0x%x doesn't match current chipRevision 0x%x.",
-                 chipRevision, gcGetHWCaps()->chipRevision);
+        if (needToPrint)
+        {
+            gcoOS_Print("%s: Shader file chipRevision 0x%x doesn't match current chipRevision 0x%x.",
+                        messagePrefix, chipRevision, gcGetHWCaps()->chipRevision);
+        }
+        return errCode;
     }
 
     ON_ERROR0(VIR_IO_readInt(buf, (gctINT*)&pShader->clientApiVersion));
@@ -3016,6 +3069,7 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     ON_ERROR0(VIR_IO_readInt(buf, (gctINT*)&pShader->shLevel));
     ON_ERROR0(VIR_IO_readInt(buf, (gctINT*)&pShader->shaderKind));
     ON_ERROR0(VIR_IO_readInt(buf, (gctINT*)&pShader->flags));
+    ON_ERROR0(VIR_IO_readInt(buf, (gctINT*)&pShader->flagsExt1));
     ON_ERROR0(VIR_IO_readUint(buf, &pShader->compilerVersion[0]));
     ON_ERROR0(VIR_IO_readUint(buf, &pShader->compilerVersion[1]));
     ON_ERROR0(VIR_IO_readInt(buf, &pShader->constUniformBlockIndex));
@@ -3159,7 +3213,7 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     }
 
     ON_ERROR0(VIR_IO_readUint(buf, &pShader->replaceIndex));
-    ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->memoryAccessFlag));
+    ON_ERROR0(VIR_IO_readBlock(buf, (gctCHAR *)pShader->memoryAccessFlag, sizeof(pShader->memoryAccessFlag)));
     ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->vsPositionZDependsOnW));
     ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->psHasDiscard));
     ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->useEarlyFragTest));
@@ -3169,6 +3223,7 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->__IsDual16Shader));
     ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->__IsMasterDual16Shader));
     ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->packUnifiedSampler));
+    ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->fullUnifiedUniforms));
     ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->needToAdjustSamplerPhysical));
     ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->_enableDefaultUBO));
 
@@ -3278,6 +3333,8 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     pShader->llSlotForSpillVidmem = uVal;
     ON_ERROR0(VIR_IO_readUint(buf, &uVal));
     pShader->hasCRegSpill = uVal;
+    ON_ERROR0(VIR_IO_readUint(buf, &uVal));
+    pShader->useHwManagedLS = uVal;
 
     ON_ERROR0(VIR_IO_readBlock(buf, (gctCHAR *)pShader->psInputPosCompValid, sizeof(pShader->psInputPosCompValid)));
 
@@ -3288,12 +3345,17 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     ON_ERROR0(VIR_IO_readUint(buf, &uVal));
     pShader->outLinkedShaderStage = (VIR_ShaderKind)uVal;
     ON_ERROR0(VIR_IO_readUint(buf, &uVal));
+    VIR_Shader_SetKernelNameId(pShader, (VIR_NameId)uVal);
+    ON_ERROR0(VIR_IO_readUint(buf, &uVal));
     if (uVal != ENDS_SIG)
     {
         gcmASSERT(gcvFALSE);
         errCode = VSC_ERR_INVALID_DATA;
         ON_ERROR(errCode, "Invalid end of shader signature 0x%x.", uVal);
     }
+
+    /* Now we can update the hostFunction since we have all information we need. */
+    VIR_IO_UpdateHostFunction(buf->shader, &buf->localSymbolList);
 
 OnError:
     return errCode;
@@ -3337,6 +3399,9 @@ void VIR_CopyHashTable(
     GET_KEY_FROM_VAL     fpGetKey
     )
 {
+#ifdef _SANITY_CHECK
+    gctINT      count;
+#endif
     gcmASSERT(pSrcHT && pDstHT);
 
     if (pDstHT->tableSize > 0)
@@ -3344,6 +3409,13 @@ void VIR_CopyHashTable(
         vscHTBL_Reset(pDstHT);
     }
 
+#ifdef _SANITY_CHECK
+    count = vscHTBL_CountItems(pSrcHT);
+    if (count != (gctINT)pSrcHT->itemCount)
+    {
+        ON_ERROR(VSC_ERR_INVALID_DATA, "HashTable damaged: items doesn't match itemCount");
+    }
+#endif
     if (pSrcHT->tableSize > 0)
     {
         VSC_HASH_NODE* pSrcHashNode;
@@ -3357,6 +3429,12 @@ void VIR_CopyHashTable(
             vscHTBL_DirectSet(pDstHT, newKey, pVal);
         }
     }
+    return;
+#ifdef _SANITY_CHECK
+OnError:
+    abort();
+    return;
+#endif
 }
 
 VSC_ErrCode
@@ -3640,7 +3718,6 @@ VIR_CopyKernelInfo(VIR_CopyContext *Ctx, VIR_KernelInfo** pToKernelInfo, VIR_Ker
         ON_ERROR0(VIR_CopyIdList(Ctx, &(*pToKernelInfo)->uniformArguments, &pFromKernelInfo->uniformArguments));
         ON_ERROR0(VIR_CopyValueList(Ctx, &(*pToKernelInfo)->imageSamplers, &pFromKernelInfo->imageSamplers, (COPY_NODE_FP)0));
         ON_ERROR0(VIR_CopyValueList(Ctx, &(*pToKernelInfo)->properties, &pFromKernelInfo->properties, (COPY_NODE_FP)0));
-        ON_ERROR0(VIR_CopyIdList(Ctx, &(*pToKernelInfo)->propertyValues, &pFromKernelInfo->propertyValues));
     }
 
 OnError:
@@ -4269,7 +4346,12 @@ VIR_Copy_FixSymbol(VIR_CopyContext * Ctx, VIR_Symbol* pSymbol)
     /* u0 */
     if (isSymLocal(pSymbol))
     {
-        VIR_Symbol_SetHostFunction(pSymbol, Ctx->curToFunction);
+        VIR_SymId funcSymId = VIR_Function_GetSymId(VIR_Symbol_GetHostFunction(pSymbol));
+
+        VIR_Symbol_SetHostFunction(pSymbol, (VIR_Function *)gcmINT2PTR(funcSymId));
+        _VIR_IO_SymbolListQueue(&Ctx->toShader->pmp.mmWrapper,
+                                &Ctx->localSymbolList,
+                                pSymbol);
     }
     else
     {
@@ -4282,7 +4364,9 @@ VIR_Copy_FixSymbol(VIR_CopyContext * Ctx, VIR_Symbol* pSymbol)
     {
     case VIR_SYM_UNIFORM:
     case VIR_SYM_SAMPLER:
+    case VIR_SYM_SAMPLER_T:
     case VIR_SYM_IMAGE:
+    case VIR_SYM_IMAGE_T:
         uniform = (pSymbol)->u2.uniform;
         /* create a new uniform and add it to symbol */
         ON_ERROR0(VIR_Shader_AddSymbolContents(Ctx->toShader, pSymbol, VIR_Uniform_GetID(uniform), gcvFALSE));
@@ -4395,11 +4479,16 @@ VIR_Copy_FixType(VIR_CopyContext * Ctx, VIR_Type* pType)
     }
     switch (pType->_kind) {
     case VIR_TY_STRUCT:
+    case VIR_TY_ENUM:
         {
             VIR_SymIdList *   fields = VIR_Type_GetFields(pType);
             pType->u2.fields = gcvNULL;
+
             /* field id list */
+            if (fields != gcvNULL)
+            {
             ON_ERROR0(VIR_CopyNewIdList(Ctx, &pType->u2.fields, fields, gcvTRUE));
+        }
         }
         break;
     case VIR_TY_FUNCTION:
@@ -4456,6 +4545,45 @@ VIR_Shader_Copy(
     VSC_MM *             memPool;
     VIR_CopyContext      context = {gcvNULL, Shader, Source, gcvNULL, gcvNULL };
 
+    QUEUE_INITIALIZE(&context.localSymbolList);
+
+#ifdef _SANITY_CHECK
+    {
+        VSC_HASH_TABLE  *   pHT;
+        /* check if from shader is right object type */
+        if (Source->object.type != gcvOBJ_VIR_SHADER)
+        {
+            ERR_REPORT(VSC_ERR_INVALID_DATA, "Shader damaged: object type is not VIR_SHADER");
+            abort();
+        }
+        /* check sanity of shader's hash tables */
+        pHT = Source->stringTable.pHashTable;
+        vscHTBL_CountItems(pHT);
+        if (pHT && vscHTBL_CountItems(pHT) != (gctINT)pHT->itemCount)
+        {
+            ERR_REPORT(VSC_ERR_INVALID_DATA, "StringHashTable damaged: items doesn't match itemCount");
+            abort();
+        }
+        pHT = Source->typeTable.pHashTable;
+        if (pHT && vscHTBL_CountItems(pHT) != (gctINT)pHT->itemCount)
+        {
+            ERR_REPORT(VSC_ERR_INVALID_DATA, "TypeHashTable damaged: items doesn't match itemCount");
+            abort();
+        }
+        pHT = Source->constTable.pHashTable;
+        if (pHT && vscHTBL_CountItems(pHT) != (gctINT)pHT->itemCount)
+        {
+            ERR_REPORT(VSC_ERR_INVALID_DATA, "ConstHashTable damaged: items doesn't match itemCount");
+            abort();
+        }
+        pHT = Source->symTable.pHashTable;
+        if (pHT && vscHTBL_CountItems(pHT) != (gctINT)pHT->itemCount)
+        {
+            ERR_REPORT(VSC_ERR_INVALID_DATA, "SymbolHashTable damaged: items doesn't match itemCount");
+            abort();
+        }
+    }
+#endif
     ON_ERROR0(VIR_Shader_Construct0(gcvNULL, VIR_Shader_GetKind(Source), Shader, gcvFALSE));
     memPool         = &Shader->pmp.mmWrapper;
     context.memPool = memPool;
@@ -4470,6 +4598,7 @@ VIR_Shader_Copy(
     Copy_Field(Shader, Source, shLevel);
     Copy_Field(Shader, Source, shaderKind);
     Copy_Field(Shader, Source, flags);
+    Copy_Field(Shader, Source, flagsExt1);
     Copy_Field(Shader, Source, compilerVersion[0]);
     Copy_Field(Shader, Source, compilerVersion[1]);
     Copy_Field(Shader, Source, constUniformBlockIndex);
@@ -4554,7 +4683,9 @@ VIR_Shader_Copy(
     }
 
     Copy_Field(Shader, Source, replaceIndex);
-    Copy_Field(Shader, Source, memoryAccessFlag);
+    gcoOS_MemCopy(Shader->memoryAccessFlag,
+                 (gctCHAR *)Source->memoryAccessFlag,
+                 sizeof(Shader->memoryAccessFlag));
     Copy_Field(Shader, Source, vsPositionZDependsOnW);
     Copy_Field(Shader, Source, psHasDiscard);
     Copy_Field(Shader, Source, useEarlyFragTest);
@@ -4564,6 +4695,7 @@ VIR_Shader_Copy(
     Copy_Field(Shader, Source, __IsDual16Shader);
     Copy_Field(Shader, Source, __IsMasterDual16Shader);
     Copy_Field(Shader, Source, packUnifiedSampler);
+    Copy_Field(Shader, Source, fullUnifiedUniforms);
     Copy_Field(Shader, Source, needToAdjustSamplerPhysical);
     Copy_Field(Shader, Source, _enableDefaultUBO);
 
@@ -4645,6 +4777,7 @@ VIR_Shader_Copy(
         {
             return VSC_ERR_OUT_OF_MEMORY;
         }
+        Copy_Field(Shader, Source, ltcInstructionCount);
         for (i = 0; i < Source->ltcInstructionCount; i++)
         {
             errCode = VIR_CopyInst(&context, &Shader->ltcExpressions[i], &Source->ltcExpressions[i]);
@@ -4694,6 +4827,7 @@ VIR_Shader_Copy(
     {
         Shader->currentKernelFunction = gcvNULL;
     }
+    Copy_Field(Shader, Source, kernelNameId);
 
     /* more fixes: some information are not available when doing the copy
      * now it is the time to do them */
@@ -4711,6 +4845,7 @@ VIR_Shader_Copy(
     Copy_Field(Shader, Source, hasRegisterSpill);
     Copy_Field(Shader, Source, llSlotForSpillVidmem);
     Copy_Field(Shader, Source, hasCRegSpill);
+    Copy_Field(Shader, Source, useHwManagedLS);
 
     gcoOS_MemCopy(Shader->psInputPosCompValid,
                 (gctCHAR *)Source->psInputPosCompValid,
@@ -4722,6 +4857,11 @@ VIR_Shader_Copy(
 
     Copy_Field(Shader, Source, inLinkedShaderStage);
     Copy_Field(Shader, Source, outLinkedShaderStage);
+
+    /* Now we can update the hostFunction since we have all information we need. */
+    VIR_IO_UpdateHostFunction(Shader, &context.localSymbolList);
+
+    QUEUE_FINALIZE(&context.localSymbolList);
 
 OnError:
     return errCode;

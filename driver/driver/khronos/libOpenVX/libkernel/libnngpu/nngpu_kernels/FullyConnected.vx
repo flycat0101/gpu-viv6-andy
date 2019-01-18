@@ -1,0 +1,135 @@
+__kernel void gpuFullyConnected_FP32Nobias(
+    __read_only image2d_array_t      input,
+    __read_only image2d_array_t      weights,
+    __write_only image2d_array_t     output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int4 coord_in    = (int4)(0, y, 0, 0);
+    int4 coord_wei   = (int4)(0, x, 0, 0);
+    int4 coord_out   = (int4)(x, y, 0, 0);
+    int inputSize    = get_image_width(weights);
+    float4 src0 = {0.0}, src1 = {0.0};
+    float sum = 0;
+    float4 dst = {0.0};
+
+    do
+    {
+        src0 = read_imagef(input, coord_in);
+        src1 = read_imagef(weights, coord_wei);
+        sum += src0.x * src1.x;
+        coord_in.x ++;
+        coord_wei.x++;
+    } while (coord_in.x < inputSize);
+
+    dst.x = sum;
+    write_imagef(output, coord_out, dst);
+}
+
+__kernel void gpuFullyConnected_FP32(
+    __read_only image2d_array_t      input,
+    __read_only image2d_array_t      weights,
+    __read_only image2d_array_t      bias,
+    __write_only image2d_array_t     output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int4 coord_in    = (int4)(0, y, 0, 0);
+    int4 coord_wei   = (int4)(0, x, 0, 0);
+    int4 coord_bias  = (int4)(x, 0, 0, 0);
+    int4 coord_out   = (int4)(x, y, 0, 0);
+    int inputSize    = get_image_width(weights);
+    float4 src0 = {0.0}, src1 = {0.0};
+    float sum = 0;
+    float4 dst = {0.0}, tmp;
+
+    tmp = read_imagef(bias, coord_bias);
+    sum = tmp.x;
+
+    do
+    {
+        src0 = read_imagef(input, coord_in);
+        src1 = read_imagef(weights, coord_wei);
+        sum += src0.x * src1.x;
+        coord_in.x ++;
+        coord_wei.x++;
+    } while (coord_in.x < inputSize);
+
+    dst.x = sum;
+    write_imagef(output, coord_out, dst);
+}
+
+__kernel void gpuFullyConnected_Quant8Nobias(
+    __read_only image2d_array_t      input,
+    __read_only image2d_array_t      weights,
+    float                            scaleIn,
+    float                            scaleWeight,
+    float                            scaleOut,
+    int                              zpIn,
+    int                              zpWeight,
+    int                              zpOut,
+    __write_only image2d_array_t     output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int4 coord_in    = (int4)(0, y, 0, 0);
+    int4 coord_wei   = (int4)(0, x, 0, 0);
+    int4 coord_out   = (int4)(x, y, 0, 0);
+    int inputSize    = get_image_width(weights);
+    float sum = 0, src0, src1;
+    uint4 dst = {0}, tmp;
+
+    do
+    {
+        tmp = read_imageui(input, coord_in);
+        src0 = (convert_int(tmp.x-zpIn))*scaleIn;
+        tmp = read_imageui(weights, coord_wei);
+        src1 = (convert_int(tmp.x-zpWeight))*scaleWeight;
+        sum += src0 * src1;
+        coord_in.x++;
+        coord_wei.x++;
+    } while (coord_in.x < inputSize);
+
+    dst.x = floor(sum*scaleOut + zpOut + 0.5);
+    write_imageui(output, coord_out, dst);
+}
+
+__kernel void gpuFullyConnected_Quant8(
+    __read_only image2d_array_t      input,
+    __read_only image2d_array_t      weights,
+    __read_only image2d_array_t      bias,
+    float                            scaleIn,
+    float                            scaleWeight,
+    float                            scaleOut,
+    int                              zpIn,
+    int                              zpWeight,
+    int                              zpOut,
+    __write_only image2d_array_t     output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int4 coord_in    = (int4)(0, y, 0, 0);
+    int4 coord_wei   = (int4)(0, x, 0, 0);
+    int4 coord_bias  = (int4)(x, 0, 0, 0);
+    int4 coord_out   = (int4)(x, y, 0, 0);
+    int inputSize    = get_image_width(weights);
+    float sum = 0, src0, src1;
+    uint4 dst = {0}, tmp;
+
+    tmp = convert_uint(read_imagei(bias, coord_bias));
+    sum = tmp.x * scaleIn * scaleWeight;
+
+    do
+    {
+        tmp = read_imageui(input, coord_in);
+        src0 = (convert_int(tmp.x-zpIn))*scaleIn;
+        tmp = read_imageui(weights, coord_wei);
+        src1 = (convert_int(tmp.x-zpWeight))*scaleWeight;
+        sum += src0 * src1;
+        coord_in.x++;
+        coord_wei.x++;
+    } while (coord_in.x < inputSize);
+
+    dst.x = floor(sum*scaleOut + zpOut + 0.5);
+    write_imageui(output, coord_out, dst);
+}

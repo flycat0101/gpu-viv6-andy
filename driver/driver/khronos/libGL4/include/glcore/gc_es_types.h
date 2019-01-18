@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -27,6 +27,7 @@
 #endif
 
 #ifdef OPENGL40
+
 #include <GL/gl.h>
 #include <GL/glext.h>
 
@@ -34,9 +35,18 @@
 #define GL_APIENTRY GLAPIENTRY
 #include <KHR/khrplatform.h>
 #include <GLES2/gl2ext.h>
+
 #else
+
+/* Define GL_APICALL and GL_GLEXT_PROTOTYPES before #include <GLES3/gl3.h> */
+#if defined(_WINDOWS) && !defined(__SCITECH_SNAP__) && !defined(UNDER_CE)
+#define GL_APICALL __declspec(dllexport)
+#else
+#define GL_APICALL
+#endif
 #include <GLES3/gl32.h>
 #include <GLES2/gl2ext.h>
+
 #endif
 
 

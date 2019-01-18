@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -274,26 +274,6 @@ __VK_INLINE uint32_t __vkFloorLog2(uint32_t n)
 
     return (i-1);
 }
-
-typedef struct __VkUtilsMD5ContextRec
-{
-    size_t   bytes;     /* Number of bytes processed */
-    uint32_t states[4];
-    uint8_t  buffer[64];
-} __VkUtilsMD5Context;
-
-void __vk_uitls_MD5Init(
-    __VkUtilsMD5Context *ctx
-    );
-void __vk_utils_MD5Update(
-    __VkUtilsMD5Context *ctx,
-    const void *data,
-    size_t bytes
-    );
-void __vk_utils_MD5Final(
-    __VkUtilsMD5Context *ctx,
-    uint8_t digest[16]
-    );
 
 #endif
 

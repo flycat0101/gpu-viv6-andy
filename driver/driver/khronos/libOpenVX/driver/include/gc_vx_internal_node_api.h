@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -39,7 +39,7 @@ VX_INTERNAL_API vx_node vxElementwiseNormF16Node(
 
 VX_INTERNAL_API vx_node vxPhaseF16Node(vx_graph graph, vx_image grad_x, vx_image grad_y, vx_image orientation);
 
-VX_INTERNAL_API vx_node vxNonMaxSuppressionNode(vx_graph graph, vx_image mag, vx_image phase, vx_image edge);
+VX_INTERNAL_API vx_node vxNonMaxSuppressionCannyNode(vx_graph graph, vx_image mag, vx_image phase, vx_image edge);
 
 VX_INTERNAL_API vx_node vxEdgeTraceNode(vx_graph graph, vx_image norm, vx_threshold threshold, vx_image output);
 
@@ -86,19 +86,13 @@ VX_INTERNAL_API vx_node vxSgmCostPath0Node(vx_graph graph, vx_image cost, vx_sca
 VX_INTERNAL_API vx_node vxSgmGetDispNode(vx_graph graph, vx_image path, vx_scalar range, vx_image depth);
 VX_INTERNAL_API vx_node vxLaplacian3x3Node(vx_graph graph, vx_image src, vx_image dst);
 
-VX_INTERNAL_API vx_node vxCnnSoftMaxNode(vx_graph graph, vx_array src, vx_scalar batchSize, vx_scalar networkType, vx_scalar hasInterleave, vx_scalar fractionLength, vx_array dst);
-VX_INTERNAL_API vx_node vxCnnInterleaveBuffersNode(vx_graph graph, vx_array src, vx_scalar itemSize, vx_scalar batchSize, vx_scalar networkType, vx_scalar setEvent, vx_array dst);
-VX_INTERNAL_API vx_node vxCnnLayerNode(vx_graph graph, vx_array src, vx_scalar levelScalar, vx_array kernelBuffer, vx_array nnCmdBuffer, vx_scalar repeatScalar, vx_scalar batchSize, vx_scalar networkType, vx_array dst);
-VX_INTERNAL_API vx_node vxCnnReshuffleImageNode(vx_graph graph, vx_image src, vx_array mean, vx_scalar levelScalar, vx_scalar padScalar, vx_scalar strideX, vx_scalar strideY, vx_scalar batchSize, vx_scalar networkType, vx_array dst);
-VX_INTERNAL_API vx_node vxCnnDataConvertNode(vx_graph graph, vx_image src, vx_scalar batchSize, vx_scalar networkType, vx_array dst);
-VX_INTERNAL_API vx_node vxFasterRCNNSoftMaxNode(vx_graph graph, vx_array src, vx_array src_bbox, vx_scalar batchSize, vx_scalar networkType, vx_array percentArray, vx_array coordArray);
-VX_INTERNAL_API vx_node vxFasterRCNNReshuffleDataNode(vx_graph graph, vx_array src, vx_scalar levelScalar, vx_scalar strideX, vx_scalar strideY, vx_scalar batchSize, vx_scalar networkType, vx_array dst);
-VX_INTERNAL_API vx_node vxFasterRCNNConvertNode(vx_graph graph, vx_array src, vx_scalar src_format, vx_scalar dst_format, vx_scalar set_event, vx_array dst);
-VX_INTERNAL_API vx_node vxLRNNode(vx_graph graph, vx_array src, vx_scalar w, vx_scalar h, vx_scalar d, vx_scalar batch, vx_scalar type, vx_scalar kernel, vx_scalar stride, vx_scalar pad, vx_scalar shift, vx_scalar alpha, vx_scalar beta, vx_array dst);
-VX_INTERNAL_API vx_node vxMaxPoolNode(vx_graph graph, vx_array src, vx_scalar format, vx_scalar w, vx_scalar h, vx_scalar d, vx_scalar batch, vx_scalar w2, vx_scalar h2, vx_scalar kernel, vx_scalar stride, vx_scalar pad, vx_array dst);
-VX_INTERNAL_API vx_node vxROIPoolNode(vx_graph graph, vx_array input1, vx_array input2, vx_scalar kernel, vx_scalar stride, vx_scalar pad, vx_array dst);
-VX_INTERNAL_API vx_node vxRCNNWaitNode(vx_graph graph, vx_graph graph_id, vx_scalar event_id);
-VX_INTERNAL_API vx_node vxRPNNode(vx_graph graph, vx_array input, vx_array dst0, vx_array dst1);
+VX_INTERNAL_API vx_node vxUpSamplePaddingNode(vx_graph graph, vx_image inputImage, vx_image outputImage);
+VX_INTERNAL_API vx_node vxUpSampleConvertNode(vx_graph graph, vx_image inputImage, vx_image outputImage);
+VX_INTERNAL_API vx_node vxPyramidCopyImageNode(vx_graph graph, vx_image inputImage, vx_image outputImage);
+
+VX_INTERNAL_API vx_node vxTransPose2DTensorNode(vx_graph graph, vx_tensor inputTensor, vx_tensor outputTensor);
+VX_INTERNAL_API vx_node vxMultiply2DMatrixesNode(vx_graph graph, vx_tensor inputTensor0, vx_tensor inputTensor1, vx_tensor inputTensor2, vx_scalar enable_tensorC, vx_tensor outputTensor);
+
 EXTERN_C_END
 
 #endif /* __GC_VX_INTERNAL_NODE_API_H__ */

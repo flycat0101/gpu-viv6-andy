@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -176,7 +176,7 @@ gcOpt_RemoveDeadCode(
 
     {
         gctBOOL     useFullNewLinker = gcvFALSE;
-        gctBOOL     hasHalti2 = gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2));
+        gctBOOL     hasHalti2 = gcHWCaps.hwFeatureFlags.hasHalti2;
 
         useFullNewLinker = gcUseFullNewLinker(hasHalti2);
 
@@ -231,6 +231,9 @@ gcOpt_RemoveDeadCode(
         case gcSL_IMAGE_SAMPLER:
         case gcSL_TEXU:
         case gcSL_TEXU_LOD:
+        case gcSL_CMAD:
+        case gcSL_CMADCJ:
+        case gcSL_CMUL:
             if (removeCombinedInstruction)
             {
                 removeCombinedInstruction = gcvFALSE;
@@ -604,6 +607,13 @@ gcOpt_OptimizeMOVInstructions(
         return status;
     }
 
+    /* For CTS, don't do MOV optimizer before LTC so we can move more instructions into LTC. */
+    if (Optimizer->isCTSInline && Optimizer->shader->ltcUniformCount == 0)
+    {
+        gcmFOOTER();
+        return status;
+    }
+
     imagePatch = gcdHasOptimization(Optimizer->option, gcvOPTIMIZATION_IMAGE_PATCHING);
     /* Pass 1: Check if a MOV instruction can be removed by replacing the dependant instructions' target
                with the target of the MOV instruction. */
@@ -723,7 +733,13 @@ gcOpt_OptimizeMOVInstructions(
             gcmSL_OPCODE_GET(depCode->instruction.opcode, Opcode) == gcSL_BITINSERT ||
             gcmSL_OPCODE_GET(depCode->instruction.opcode, Opcode) == gcSL_TEXU ||
             gcmSL_OPCODE_GET(depCode->instruction.opcode, Opcode) == gcSL_TEXU_LOD ||
-            gcmSL_OPCODE_GET(depCode->instruction.opcode, Opcode) == gcSL_STORE) continue;
+            gcmSL_OPCODE_GET(depCode->instruction.opcode, Opcode) == gcSL_STORE ||
+            gcmSL_OPCODE_GET(depCode->instruction.opcode, Opcode) == gcSL_CMAD ||
+            gcmSL_OPCODE_GET(depCode->instruction.opcode, Opcode) == gcSL_CMADCJ ||
+            gcmSL_OPCODE_GET(depCode->instruction.opcode, Opcode) == gcSL_CMUL)
+        {
+                continue;
+        }
 
         /* Skip if dependant instruction has different target format. */
         if (tempArray[depCode->instruction.tempIndex].format !=
@@ -972,9 +988,6 @@ gcOpt_OptimizeMOVInstructions(
 
         if (opcode == gcSL_LOAD && codeEnable != depCodeEnable)
         {
-            /* Assume data loaded are packed from x. */
-            /* TODO - need to generalize if needed. */
-
             /* This is not true after MOV optimization. */
             /* gcmASSERT(depCodeEnable & gcSL_ENABLE_X); */
 
@@ -1447,7 +1460,8 @@ gcOpt_OptimizeMOVInstructions(
 
             if (variable &&
                 (!(variable->_varCategory == gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT &&
-                   isSamplerType(variable->u.type))
+                   (isSamplerType(variable->u.type) ||
+                    isOCLImageType(variable->u.type) || variable->u.type == gcSHADER_SAMPLER_T))
                 )
                )
             {
@@ -1519,10 +1533,9 @@ gcOpt_OptimizeMOVInstructions(
                 {
                     gcUNIFORM uniform = Optimizer->shader->uniforms[gcmSL_INDEX_GET(code->instruction.source0Index, Index)];
 
-                    if (gcmType_Kind(uniform->u.type) == gceTK_IMAGE ||
-                        (uniform->u.type == gcSHADER_SAMPLER))
+                    if (gcmType_Kind(uniform->u.type) == gceTK_IMAGE_T ||
+                        (uniform->u.type == gcSHADER_SAMPLER_T))
                     {
-                        /* TODO - Add a force propagate flag. */
                         propagateUniform = gcvFALSE;
                     }
                 }
@@ -2123,6 +2136,51 @@ gctBOOL isChannelOfEnableEqualSwizzle(
     return gcvTRUE;
 }
 
+static gctBOOL
+_NoAssignmentBetweenDepAndUser(
+    IN gcOPT_CODE   DepCode,
+    IN gcOPT_CODE   UserCode
+    )
+{
+    gcOPT_CODE      codeIter;
+
+    /*
+    ** This is just a rough check, no need to consider the back jump or cross-function usage.
+    ** The only thing we need to make sure that the depCode and the userCode are in the same BB.
+    */
+    if (DepCode->function != UserCode->function || DepCode->id > UserCode->id)
+    {
+        return gcvFALSE;
+    }
+
+    for (codeIter = DepCode->next; codeIter && codeIter != UserCode; codeIter = codeIter->next)
+    {
+        gcSL_OPCODE opCode = (gcSL_OPCODE)gcmSL_OPCODE_GET(codeIter->instruction.opcode, Opcode);
+
+        if (opCode == gcSL_JMP || opCode == gcSL_JMP_ANY || opCode == gcSL_CALL)
+        {
+            return gcvFALSE;
+        }
+
+        if (codeIter->callers != gcvNULL)
+        {
+            return gcvFALSE;
+        }
+
+        if (gcSL_isOpcodeHaveNoTarget(opCode))
+        {
+            continue;
+        }
+
+        if (codeIter->instruction.tempIndex == UserCode->instruction.tempIndex)
+        {
+            return gcvFALSE;
+        }
+    }
+
+    return gcvTRUE;
+}
+
 gceSTATUS
 gcOpt_OptimizeConstantAssignment(
     IN gcOPTIMIZER Optimizer
@@ -2141,9 +2199,10 @@ gcOpt_OptimizeConstantAssignment(
         gcmFOOTER();
         return status;
     }
+
     {
         gctBOOL     useFullNewLinker = gcvFALSE;
-        gctBOOL     hasHalti2 = gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2));
+        gctBOOL     hasHalti2 = gcHWCaps.hwFeatureFlags.hasHalti2;
 
         useFullNewLinker = gcUseFullNewLinker(hasHalti2);
 
@@ -2154,6 +2213,7 @@ gcOpt_OptimizeConstantAssignment(
             return status;
         }
     }
+
     if (Optimizer->shader->codeCount > SHADER_TOO_MANY_CODE &&
         Optimizer->jmpCount > SHADER_TOO_MANY_JMP)
     {
@@ -2225,7 +2285,7 @@ gcOpt_OptimizeConstantAssignment(
         }
 
         /* User has multiple dep, skip it now. */
-        if (depCount != vectorCount)
+        if (depCount != vectorCount || !_NoAssignmentBetweenDepAndUser(endCode, userCode))
         {
             code = endCode;
             continue;
@@ -2555,8 +2615,6 @@ _IsADDForMADD(
     if (depCode->dependencies1 != gcvNULL &&
         _IsSourceModified(Optimizer, depCode->instruction.source1, depCode->instruction.source1Index,
                           depCode->instruction.source1Indexed, depCode->dependencies1, depCode, Code)) return gcvFALSE;
-
-    /* TODO - Check if ADD instruction can be moved to right after the MUL instruction. */
 
     /* A special ugly WAR for dual16 to make dual16 pattern unbroken, it should be removed after
        dual16 enhancement later. Now put here for GFX30 perf tuning. */
@@ -2962,7 +3020,6 @@ _findRerollPattern(
         }
     }
 
-    /* TODO other cases */
     return gcvFALSE;
 }
 
@@ -3095,7 +3152,6 @@ _findNextRerollPattern(
         }
     }
 
-    /* TODO other patterns */
     return gcvFALSE;
 }
 
@@ -3731,7 +3787,7 @@ _updateIndexed(
     {
         gctINT  tempOffset = NewTempIndexStart - OldTempIndexStart;
         /* Adjust temporary register count. */
-        *IndexPtr += (gctUINT16) tempOffset;
+        *IndexPtr +=  (gctUINT16)tempOffset;
         return gcvTRUE;
     }
     return gcvFALSE;
@@ -3855,6 +3911,7 @@ static gceSTATUS
 _RemapTempIndexForExpandFunction(
     IN gcOPTIMIZER Optimizer,
     IN gcOPT_FUNCTION Function,
+    IN VSC_HASH_TABLE* pCallerInstTable,
     IN gcOPT_CODE Caller,
     IN gcOPT_CODE CodeNext,
     IN gctINT OldTempIndexStart,
@@ -3891,7 +3948,6 @@ _RemapTempIndexForExpandFunction(
                 gcoOS_PrintStrSafe(variableName, sizeof(variableName), &offset,
                                     "%s_%d", name, RealCallerCount));
 
-            /* TODO - append suffix to variable name. */
             gcmONERROR(gcSHADER_AddVariableEx(Optimizer->shader,
                                               variableName,
                                               variable->u.type,
@@ -3964,6 +4020,15 @@ _RemapTempIndexForExpandFunction(
                     /* bail out if encountered control follow code */
                     break;
                 }
+
+                /* The CALL may be changed to a NOP, so we need to check if it is in the hash table. */
+                if (opcode == gcSL_NOP
+                    &&
+                    vscHTBL_DirectTestAndGet(pCallerInstTable, (void *)code, gcvNULL))
+                {
+                    break;
+                }
+
                 if (gcmSL_TARGET_GET(code->instruction.temp, Enable) != gcSL_ENABLE_NONE)
                 {
                     gctUINT32   tempIndex = code->instruction.tempIndex;
@@ -4010,6 +4075,14 @@ _RemapTempIndexForExpandFunction(
                 /* bail out if encountered control follow code */
                 if (opcode == gcSL_CALL &&
                     code->callee->function == Function)
+                {
+                    break;
+                }
+
+                /* The CALL may be changed to a NOP, so we need to check if it is in the hash table. */
+                if (opcode == gcSL_NOP
+                    &&
+                    vscHTBL_DirectTestAndGet(pCallerInstTable, (void *)code, gcvNULL))
                 {
                     break;
                 }
@@ -4080,6 +4153,7 @@ static gceSTATUS
 _ExpandOneFunctionCall(
     IN gcOPTIMIZER Optimizer,
     IN gcOPT_FUNCTION Function,
+    IN VSC_HASH_TABLE* pCallerInstTable,
     IN gcOPT_CODE Caller,
     IN gctUINT RealCallerCount,
     IN gctBOOL *RenameArgument
@@ -4117,7 +4191,8 @@ _ExpandOneFunctionCall(
         gcmONERROR(gcOpt_CopyCodeListAfter(Optimizer,
                                            Function->codeHead,
                                            Function->codeTail,
-                                           Caller));
+                                           Caller,
+                                           gcvFALSE));
     }
 
     /* Change the caller to NOP. */
@@ -4196,6 +4271,7 @@ _ExpandOneFunctionCall(
 
         gcmONERROR(_RemapTempIndexForExpandFunction(Optimizer,
                                                     Function,
+                                                    pCallerInstTable,
                                                     Caller,
                                                     codeNext,
                                                     oldTempIndexStart,
@@ -4273,7 +4349,7 @@ _GetInlineBudget(
         /* WAR for some APPs. */
         (patchID != gcvPATCH_YOUILABS_SHADERTEST && !gcdPROC_IS_WEBGL(patchID)))
     {
-        if (patchID == gcvPATCH_GTFES30)
+        if (patchID == gcvPATCH_GTFES30 || patchID == gcvPATCH_DEQP)
         {
             return 0x7FFFFFFF;
         }
@@ -4350,7 +4426,7 @@ _isFunctionInlinable(
         return gcvTRUE;
     }
 
-    /* inline if there are engouh budget left: inline use less than 2/3 of budget */
+    /* inline if there are enough budget left: inline use less than 2/3 of budget */
    if ((gctINT)(funcCodeCount * CallerCount) < (*CurrentBudegt * 2)/3 )
     {
         /* update inline budget */
@@ -4398,55 +4474,89 @@ _getForceInlineKind(
 
 static gctBOOL
 _IsFunctionNeedToBeExpand(
-    IN gcOPT_FUNCTION Function,
-    IN gctUINT inlineDepthComparison,
-    IN gctUINT inlineFormatConversion
-    )
+    IN OUT gctINT *     CurrentBudegt,
+    IN gcOPT_FUNCTION   Function,
+    IN gctUINT          CallerCount,
+    IN gctUINT          inlineDepthComparison,
+    IN gctUINT          inlineFormatConversion,
+    IN gctUINT          InlineLevel)
 {
     gcFUNCTION function;
+    gctUINT funcCodeCount = 0;
+    gctBOOL bNeedToBeExpand = gcvFALSE;
+    gctUINT  inlineFuncCountThreshold = (InlineLevel > 2) ? 0xFFFF : (InlineLevel > 1) ? 4 : 1;
 
     if (Function->shaderFunction == gcvNULL)
+    {
         return gcvFALSE;
+    }
 
     function = Function->shaderFunction;
-
-    if ((gcoOS_StrNCmp(function->name, "_viv_image_store", 16) == 0) ||
-        (gcoOS_StrNCmp(function->name, "_viv_image_load", 15) == 0) ||
-        (gcoOS_StrNCmp(function->name, "_write_image", 12) == 0) ||
-        (gcoOS_StrNCmp(function->name, "_read_image_nearest", 19) == 0))
-    {
-        return gcvTRUE;
-    }
-
-    if (inlineDepthComparison > 0 &&
-        gcoOS_StrNCmp(function->name, "_txpcfcvt", 9) == 0)
-    {
-        return gcvTRUE;
-    }
-
-    if (inlineFormatConversion > 0 &&
-#if DX_SHADER
-        gcoOS_StrNCmp(function->name, "_itxcvt", 7) == 0
-#else
-        gcoOS_StrNCmp(function->name, "_txcvt", 6) == 0
-#endif
-        )
-    {
-        return gcvTRUE;
-    }
+    funcCodeCount = Function->codeTail->id - Function->codeHead->id + 1;
 
     if (IsFunctionParamAsImgSource0(function))
     {
-        return gcvTRUE;
+        bNeedToBeExpand = gcvTRUE;
     }
-
-    if (IsFunctionUsingSamplerVirtual(function))
+    else if (IsFunctionUsingSamplerVirtual(function))
     {
-        return gcvTRUE;
+        bNeedToBeExpand = gcvTRUE;
+    }
+    else if ((gcoOS_StrNCmp(function->name, "_viv_image_store", 16) == 0)   ||
+             (gcoOS_StrNCmp(function->name, "_viv_image_load", 15) == 0)    ||
+             (gcoOS_StrNCmp(function->name, "_write_image", 12) == 0)       ||
+             (gcoOS_StrNCmp(function->name, "_read_image_nearest", 19) == 0))
+    {
+        bNeedToBeExpand = gcvTRUE;
+    }
+    else if (inlineDepthComparison > 0 &&
+             gcoOS_StrNCmp(function->name, "_txpcfcvt", 9) == 0)
+    {
+        bNeedToBeExpand = gcvTRUE;
+    }
+    else if (inlineFormatConversion > 0)
+    {
+        if (gcoOS_StrNCmp(function->name, "_txcvt_swizzle", 14) == 0)
+        {
+            bNeedToBeExpand = gcvTRUE;
+        }
+#if DX_SHADER
+        else if (gcoOS_StrNCmp(function->name, "_itxcvt", 7) == 0)
+        {
+            if (function->name[8] >= 'A' && function->name[8] <= 'Z')
+            {
+                bNeedToBeExpand = gcvTRUE;
+            }
+        }
+#else
+        else if (gcoOS_StrNCmp(function->name, "_txcvt", 6) == 0)
+        {
+            if (function->name[7] >= 'A' && function->name[7] <= 'Z')
+            {
+                bNeedToBeExpand = gcvTRUE;
+            }
+
+            /* If there is no budegt left and this function is used many times, don't inline it. */
+            if (bNeedToBeExpand &&
+                (gcGetHWCaps()->chipModel == gcv880 && gcGetHWCaps()->chipRevision == 0x5124) &&
+                CallerCount >= inlineFuncCountThreshold &&
+                *CurrentBudegt <= 0)
+            {
+                bNeedToBeExpand = gcvFALSE;
+            }
+        }
+#endif
     }
 
-    return gcvFALSE;
+    /* Calculate the budegt. */
+    if (bNeedToBeExpand)
+    {
+        *CurrentBudegt -= (funcCodeCount * CallerCount);
+    }
+
+    return bNeedToBeExpand;
 }
+
 static gceSTATUS
 _InlineSinglelFunction(
     IN gcOPTIMIZER Optimizer,
@@ -4468,16 +4578,13 @@ _InlineSinglelFunction(
     gctBOOL isMainKernelFunction = gcvFALSE;
     gctBOOL renameArgument = gcvFALSE;
     enum ForceInlineKind forceInline;
-    gcePATCH_ID patchID = Optimizer->patchID;
     gctBOOL inlineAllFunctionForCTS = gcvFALSE;
+    VSC_HASH_TABLE* pCallerInstTable = gcvNULL;
+    VSC_PRIMARY_MEM_POOL mp;
 
-    if (function->shaderFunction &&
-        gcoOS_StrNCmp(function->shaderFunction->name, "compare_", 8) == 0 &&
-        Optimizer->shader->storageBlockCount == 0 &&
-        (patchID == gcvPATCH_GTFES30))
+    if (Optimizer->isCTSInline)
     {
         inlineAllFunctionForCTS = gcvTRUE;
-        Optimizer->isCTSInline = gcvTRUE;
     }
 
     /* Remove all the recursive function */
@@ -4542,12 +4649,16 @@ _InlineSinglelFunction(
     if (!alwaysInline
     &&  function->kernelFunction == gcvNULL
     &&  forceInline != FIK_Inline
-    &&  !(_IsFunctionNeedToBeExpand(function, inlineDepthComparison, inlineFormatConversion))
-    && !inlineAllFunctionForCTS
+    &&  !(_IsFunctionNeedToBeExpand(currentBudget, function, realCallerCount, inlineDepthComparison, inlineFormatConversion, inlineLevel))
+    &&  !inlineAllFunctionForCTS
     &&  !_isFunctionInlinable(currentBudget, function, realCallerCount, inlineLevel))
     {
         return gcvSTATUS_FALSE;
     }
+
+    /* Initialize the caller hash table. */
+    vscPMP_Intialize(&mp, gcvNULL, 1024, sizeof(void *), gcvTRUE);
+    pCallerInstTable = vscHTBL_Create(&mp.mmWrapper, vscHFUNC_Default, vscHKCMP_Default, 32);
 
     do
     {
@@ -4592,11 +4703,15 @@ _InlineSinglelFunction(
                         &function->codeHead->callers,
                         codeCaller));
 
+        /* Insert the caller instruction to the hash table. */
+        vscHTBL_DirectSet(pCallerInstTable, (void*)codeCaller, gcvNULL);
+
         gcmONERROR(_ExpandOneFunctionCall(Optimizer,
-                        function,
-                        codeCaller,
-                        realCallerCount,
-                        (realCallerCount == 0) ? &renameArgument : gcvNULL));
+                                          function,
+                                          pCallerInstTable,
+                                          codeCaller,
+                                          realCallerCount,
+                                          (realCallerCount == 0) ? &renameArgument : gcvNULL));
     }
     while (realCallerCount > 0);
 
@@ -4613,6 +4728,12 @@ _InlineSinglelFunction(
     status = gcvSTATUS_TRUE;
 
 OnError:
+    if (pCallerInstTable)
+    {
+        vscHTBL_Destroy(pCallerInstTable);
+        vscPMP_Finalize(&mp);
+    }
+
     /* Return the status. */
     return status;
 }
@@ -4790,7 +4911,8 @@ gcOpt_UpdatePrecision(
 
     gctUINT         dual16PrecisionRule = gcmOPT_DualFP16PrecisionRule();
 
-    if(Optimizer->shader->type != gcSHADER_TYPE_FRAGMENT)
+    if (Optimizer->shader->type != gcSHADER_TYPE_FRAGMENT ||
+        gcShaderIsDesktopGL(Optimizer->shader) /* OpenGL doesn't care precision */)
     {
         return;
     }
@@ -4901,13 +5023,13 @@ gcOpt_UpdatePrecision(
 #if TREAT_DP_AS_ANYP
                      || gcmSL_SOURCE_GET(inst->source0, Precision) == gcSHADER_PRECISION_DEFAULT
 #endif
-                     || (gctUINT)tempArray[gcmSL_INDEX_GET(inst->source0Index, Index)].precision > (gctUINT)gcmSL_SOURCE_GET(inst->source0, Precision)
+                     || (gctUINT)tempArray[inst->source0Index].precision > (gctUINT)gcmSL_SOURCE_GET(inst->source0, Precision)
                     ))
             {
-                gcmASSERT(tempArray[gcmSL_INDEX_GET(inst->source0Index, Index)].precision != gcSHADER_PRECISION_ANY &&
-                          tempArray[gcmSL_INDEX_GET(inst->source0Index, Index)].precision != gcSHADER_PRECISION_DEFAULT);
+                gcmASSERT(tempArray[inst->source0Index].precision != gcSHADER_PRECISION_ANY &&
+                          tempArray[inst->source0Index].precision != gcSHADER_PRECISION_DEFAULT);
 
-                inst->source0 = gcmSL_SOURCE_SET(inst->source0, Precision, tempArray[gcmSL_INDEX_GET(inst->source0Index, Index)].precision);
+                inst->source0 = gcmSL_SOURCE_SET(inst->source0, Precision, tempArray[inst->source0Index].precision);
             }
         }
 
@@ -4980,13 +5102,13 @@ gcOpt_UpdatePrecision(
 #if TREAT_DP_AS_ANYP
                      || gcmSL_SOURCE_GET(inst->source1, Precision) == gcSHADER_PRECISION_DEFAULT
 #endif
-                     || (gctUINT)tempArray[gcmSL_INDEX_GET(inst->source1Index, Index)].precision > (gctUINT)gcmSL_SOURCE_GET(inst->source1, Precision)
+                     || (gctUINT)tempArray[inst->source1Index].precision > (gctUINT)gcmSL_SOURCE_GET(inst->source1, Precision)
                     ))
             {
-                gcmASSERT(tempArray[gcmSL_INDEX_GET(inst->source1Index, Index)].precision != gcSHADER_PRECISION_ANY &&
-                          tempArray[gcmSL_INDEX_GET(inst->source1Index, Index)].precision != gcSHADER_PRECISION_DEFAULT);
+                gcmASSERT(tempArray[inst->source1Index].precision != gcSHADER_PRECISION_ANY &&
+                          tempArray[inst->source1Index].precision != gcSHADER_PRECISION_DEFAULT);
 
-                inst->source1 = gcmSL_SOURCE_SET(inst->source1, Precision, tempArray[gcmSL_INDEX_GET(inst->source1Index, Index)].precision);
+                inst->source1 = gcmSL_SOURCE_SET(inst->source1, Precision, tempArray[inst->source1Index].precision);
             }
         }
 
@@ -5466,7 +5588,8 @@ static gceSTATUS _EvaluateConstantInstruction(
 
                 needToPropagate = gcvTRUE;
             }
-            else if (format0 == gcSL_INTEGER)
+            else if (format0 == gcSL_INTEGER ||
+                     format0 == gcSL_INT8 || format0 == gcSL_INT16)
             {
                 gctINT i, i0;
 
@@ -5480,15 +5603,11 @@ static gceSTATUS _EvaluateConstantInstruction(
 
                 needToPropagate = gcvTRUE;
             }
-            else if (format0 == gcSL_UINT32)
+            else if (format0 == gcSL_UINT32 ||
+                     format0 == gcSL_UINT8 || format0 == gcSL_UINT16)
             {
-                gctUINT i, i0;
-
-                i = i0 = *(gctUINT *) &value0;
+                value = (gctINT)value0 >= 0 ? value0 : (gctUINT)(-(gctINT)value0);
                 sourceUint = code->instruction.source0;
-
-                i = i0;
-                value = *(gctUINT *) &i;
                 sourceIndex = value & 0xFFFF;
                 sourceIndexed = (value >> 16) & 0xFFFF;
 
@@ -6063,7 +6182,6 @@ static gceSTATUS _EvaluateConstantInstruction(
                 }
                 else
                 {
-                    /* TODO - error. */
                 }
 
                 if (format1 == gcSL_FLOAT)
@@ -6195,7 +6313,6 @@ static gceSTATUS _EvaluateConstantInstruction(
             else
             {
                 {
-                    /* TODO: Need to support more data type, such as UNORM8/SNORM8/... */
                 }
             }
 
@@ -6298,9 +6415,6 @@ static gctBOOL _IsCodeMultiDependencies(
     }
 
 
-    /* 2: Check the range all dependencies affect.*/
-    /* TODO. */
-
     /* Defalut. */
     if (DepList && DepList->code == Code && DepList->next == gcvNULL)
         isMulti = gcvFALSE;
@@ -6309,7 +6423,7 @@ static gctBOOL _IsCodeMultiDependencies(
 }
 
 #if defined(_WIN32) && defined(_MSC_VER) && !defined(UNDER_CE)
-#define __SET_ROUNGING_MODE_TO_ZERO__ \
+#define __SET_ROUNDING_MODE_TO_ZERO__ \
     do \
     { \
         _controlfp_s(&oldRound, 0, 0); \
@@ -6325,10 +6439,10 @@ static gctBOOL _IsCodeMultiDependencies(
     } \
     while (gcvFALSE)
 #elif defined(ANDROID) && defined(__arm__) || defined(UNDER_CE)
-#define __SET_ROUNGING_MODE_TO_ZERO__
+#define __SET_ROUNDING_MODE_TO_ZERO__
 #define __RESET_ROUNDING_MODE__
 #else
-#define __SET_ROUNGING_MODE_TO_ZERO__ \
+#define __SET_ROUNDING_MODE_TO_ZERO__ \
     do \
     { \
         oldRound = fegetround(); \
@@ -6363,13 +6477,6 @@ gcOpt_PropagateArgumentConstants(
     gceSTATUS status = gcvSTATUS_OK;
     gcOPT_CODE code;
     gctUINT constPropagated = 0;
-
-#if !(defined(ANDROID) && defined(__arm__) || defined(UNDER_CE))
-    gctUINT32 oldRound = 0;
-#endif
-#if defined(_WIN32) && defined(_MSC_VER) && !defined(UNDER_CE)
-    gctUINT32 value0;
-#endif
 #define INDEX(reg, channel) ((reg) * 4 + (channel))
     typedef struct ConstValue
     {
@@ -6401,13 +6508,6 @@ gcOpt_PropagateArgumentConstants(
         gcmFOOTER();
         return status;
     }
-
-    /* Set round-to-zero mode to match GPU. */
-    if (Optimizer->shader->type == gcSHADER_TYPE_CL)
-    {
-        __SET_ROUNGING_MODE_TO_ZERO__;
-    }
-
     gcmONERROR(gcoOS_Allocate(gcvNULL,
         sizeof(FunctionInfo) * Optimizer->tempCount * 4, (gctPOINTER *)&funcInfo));
     gcoOS_ZeroMemory((gctPOINTER)funcInfo, sizeof(FunctionInfo) * Optimizer->tempCount * 4);
@@ -6605,13 +6705,6 @@ OnError:
     {
         gcoOS_Free(gcvNULL, (gctPOINTER)funcInfo);
     }
-
-    /* Restore rounding mode. */
-    if (Optimizer->shader->type == gcSHADER_TYPE_CL)
-    {
-        __RESET_ROUNDING_MODE__;
-    }
-
     if (constPropagated > 0)
     {
         gcOpt_RebuildFlowGraph(Optimizer);
@@ -6654,21 +6747,7 @@ gcOpt_PropagateConstants(
     gctBOOL needToPropagate;
     gctBOOL needRebuildFlow = gcvFALSE;
     gcOPT_LIST list, nextList;
-#if !(defined(ANDROID) && defined(__arm__) || defined(UNDER_CE))
-    gctUINT32 oldRound = 0;
-#endif
-#if defined(_WIN32) && defined(_MSC_VER) && !defined(UNDER_CE)
-    gctUINT32 value0;
-#endif
-
     gcmHEADER_ARG("Optimizer=0x%x", Optimizer);
-
-    /* Set round-to-zero mode to match GPU. */
-    if (Optimizer->shader->type == gcSHADER_TYPE_CL)
-    {
-        __SET_ROUNGING_MODE_TO_ZERO__;
-    }
-
     /* for each constant, propagate it. */
     for (code = Optimizer->codeHead; code; code = code->next)
     {
@@ -7266,13 +7345,6 @@ gcOpt_PropagateConstants(
             }
         }
     }
-
-    /* Restore rounding mode. */
-    if (Optimizer->shader->type == gcSHADER_TYPE_CL)
-    {
-        __RESET_ROUNDING_MODE__;
-    }
-
     if (constPropagated > 0)
     {
         status = gcvSTATUS_CHANGED;
@@ -7464,7 +7536,6 @@ _EvaluateSingleChannelChecking(
         case gcSL_ANYMSB:
         case gcSL_SELMSB:
         default:
-            /* TODO - Error. */
             return gcvFALSE;
         }
     }
@@ -8049,8 +8120,6 @@ gcOpt_ConditionalizeCode(
 
         /* Check if the definition can be moved before user instruction. */
 
-        /* TODO: handle cases which dependencies can be moved with the
-           definition together */
         if (code->dependencies0 || code->dependencies1
             || code->nextDefines || code->prevDefines
             || !isUserOnlyDependsOn(theUserCode, code)
@@ -8063,8 +8132,6 @@ gcOpt_ConditionalizeCode(
 
         /* Move definition to before the user. */
         if (code->next != theUserCode) {
-            /* Add a check to avoid main's head being moved. */
-            /* TODO - need a general solution. */
             if (code == Optimizer->main->codeHead)
             {
                 Optimizer->main->codeHead = code->next;
@@ -8308,9 +8375,6 @@ _analyzeGlPositionDependency(
 }
 #endif
 
-/* TODO:
-   Need to fully fix undefined reg issue, current fix has potential problem when there are
-   multiple defs from different preceding BBs */
 #define UNDEFINED_REG_FULLY_FIX  1
 
 static gctBOOL
@@ -9250,9 +9314,6 @@ gcOpt_OptimizeBranches(
 
     gcmHEADER_ARG("Optimizer=0x%x", Optimizer);
 
-    /* Optimize adjacent JMPs. */
-    /* TODO */
-
     DUMP_OPTIMIZER("Optimized branches in the shader", Optimizer);
     gcmFOOTER();
     return status;
@@ -9277,9 +9338,6 @@ gcOpt_RemoveCommonExpression(
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("Optimizer=0x%x", Optimizer);
-
-    /* identify common sub-expressions and remove duplicate copies. */
-    /* TODO */
 
     DUMP_OPTIMIZER("Removed common sub-expressions from the shader", Optimizer);
 
@@ -9306,9 +9364,6 @@ gcOpt_MoveLoopInvariants(
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("Optimizer=0x%x", Optimizer);
-
-    /* identify common sub-expressions and move them out of loops. */
-    /* TODO */
 
     DUMP_OPTIMIZER("Moved loop invariants out of loops in the shader", Optimizer);
 
@@ -9793,7 +9848,7 @@ _GetComponentSwizzleAndCount(
             ComponentSwizzle[i][j] = gcmExtractSwizzle(swizzle, j);
         }
         count[0] = gcmEnableChannelCount(gcSL_ConvertSwizzle2Enable(ComponentSwizzle[i][0], ComponentSwizzle[i][1],
-                                                                    ComponentSwizzle[i][2], ComponentSwizzle[i][3]));
+                                                          ComponentSwizzle[i][2], ComponentSwizzle[i][3]));
 
         swizzle = gcmSL_SOURCE_GET(MergedCode[i]->instruction.source1, Swizzle);
         for (j = 4; j < 8; j++)
@@ -9801,7 +9856,7 @@ _GetComponentSwizzleAndCount(
             ComponentSwizzle[i][j] = gcmExtractSwizzle(swizzle, (j - 4));
         }
         count[1] = gcmEnableChannelCount(gcSL_ConvertSwizzle2Enable(ComponentSwizzle[i][4], ComponentSwizzle[i][5],
-                                                                    ComponentSwizzle[i][6], ComponentSwizzle[i][7]));
+                                                          ComponentSwizzle[i][6], ComponentSwizzle[i][7]));
         ComponentCount[i] = count[0] > count[1] ? count[0] : count[1];
         componentSum += ComponentCount[i];
     }
@@ -9949,7 +10004,6 @@ gcOpt_MergeBranchCode(
         }
         else
         {
-            /*TODO: merge multi-component jmp. */
             continue;
         }
 
@@ -10134,6 +10188,1041 @@ _removeUnusedArguments(
 }
 
 /*******************************************************************************
+                            _findFuncByStartIndex
+********************************************************************************
+
+    Mark used codes in code usage list.
+
+    INPUT:
+        gcSHADER Shader
+            Pointer to a gcSHADER structure.
+        gctUINT funStartIndex
+            Function start Index.
+
+    OUTPUT:
+        gctBOOL * isKernelFunc
+           return true if it finds a kernel function.
+        gctUINT * funcIndex
+            Function index in function array.
+
+    ALGORITHM:
+        First search kernel function array and find the kernel function start with funcStartIndex.
+        If it is not found, search function array and find the function start with funcStartIndex.
+*********************************************************************************/
+gceSTATUS
+_findFuncByStartIndex(
+    IN gcSHADER Shader,
+    IN gctUINT funcStartIndex,
+    OUT gctBOOL * isKernelFunc,
+    OUT gctUINT * funcIndex
+    )
+{
+    gctSIZE_T i;
+    gcFUNCTION * functions = Shader->functions;
+    gcKERNEL_FUNCTION * kernelFunctions = Shader->kernelFunctions;
+
+    /* check kernel functions */
+    for (i = 0; i < Shader->kernelFunctionCount; i++)
+    {
+        if (kernelFunctions[i]->codeStart == funcStartIndex)
+        {
+            *funcIndex = i;
+            *isKernelFunc = gcvTRUE;
+            return gcvSTATUS_OK;
+        }
+    }
+    /* check normal functions */
+    for (i = 0; i < Shader->functionCount; i++)
+    {
+        if (functions[i]->codeStart == funcStartIndex)
+        {
+            *funcIndex = i;
+            *isKernelFunc = gcvFALSE;
+            return gcvSTATUS_OK;
+        }
+    }
+
+    return gcvSTATUS_TERMINATE;
+}
+
+/*******************************************************************************
+                            _markUsedFunHelper
+********************************************************************************
+
+    Mark used codes in code usage list.
+
+    INPUT:
+        gcSHADER Shader
+            Pointer to a gcSHADER structure.
+        gctUINT funStartIndex
+            Function start Index.
+
+    INPUT & OUTPUT:
+        gctINT8 * funUsageList
+            Pointer to function usage list.
+
+    ALGORITHM:
+    Traverse through function list and kernel function list, look for function that
+    start index correspond to funStartIndex, mark it as current function or current
+    kernel function.
+    Traverse through all instructions in current function of kernel function, recurse
+    when finding CALL instruction.
+*******************************************************************************/
+gceSTATUS
+_markUsedFuncHelper(
+    IN gcSHADER Shader,
+    IN gctUINT funcStartIndex,
+    INOUT gctINT8 * funcUsageList
+    )
+{
+    gctSIZE_T i;
+
+    gctUINT currentFuncIndex = 0;
+
+    gctUINT funcEndIndex = 0;
+
+    gcFUNCTION * functions = Shader->functions;
+    gcKERNEL_FUNCTION * kernelFunctions = Shader->kernelFunctions;
+
+    gctBOOL isKernalFunction = gcvFALSE;
+
+    gcFUNCTION currentFunction = gcvNULL;
+    gcKERNEL_FUNCTION currentKernelFunction = gcvNULL;
+
+    gcSL_INSTRUCTION code = Shader->code;
+
+    gcmVERIFY_OK(_findFuncByStartIndex(Shader, funcStartIndex, &isKernalFunction, &currentFuncIndex));
+    if (isKernalFunction)
+    {
+        currentKernelFunction = kernelFunctions[currentFuncIndex];
+        isKernalFunction = gcvTRUE;
+    }
+    else
+    {
+        currentFunction = functions[currentFuncIndex];
+        funcUsageList[currentFuncIndex] = gcvTRUE;
+    }
+
+    if (!isKernalFunction)
+    {
+        funcEndIndex = funcStartIndex + currentFunction->codeCount;
+    }
+    else
+    {
+        funcEndIndex = currentKernelFunction->codeEnd;
+    }
+
+    for (i = funcStartIndex; i < funcEndIndex; i++)
+    {
+        gcSL_OPCODE opcode = (gcSL_OPCODE)gcmSL_OPCODE_GET(code[i].opcode, Opcode);
+        if (opcode == gcSL_CALL && ((gctINT)code[i].tempIndex) >= 0 )
+        {
+            /*Make sure there is no self calling.*/
+            gcmASSERT(code[i].tempIndex != funcStartIndex);
+            gcmVERIFY_OK(_markUsedFuncHelper(Shader, code[i].tempIndex, funcUsageList));
+        }
+    }
+
+    return gcvSTATUS_OK;
+
+}
+
+/*******************************************************************************
+                            _markUsedFun
+********************************************************************************
+
+    Mark used codes in code usage list.
+
+    INPUT:
+        gcSHADER Shader
+            Pointer to a gcSHADER structure.
+
+    INPUT & OUTPUT:
+        gctINT8 * funUsageList
+            Pointer to function usage list.
+
+    ALGORITHM:
+    Find the beginning of main function, then call _markUsedFunHelper to recursively
+    mark all used function.
+*******************************************************************************/
+gceSTATUS
+_markUsedFunc(
+    IN gcSHADER Shader,
+    INOUT gctINT8 * funcUsageList
+    )
+{
+    gctSIZE_T i;
+    gctUINT mainStartIndex = 0;
+    gctUINT mainEndIndex = 0;
+    gcSL_INSTRUCTION code = Shader->code;
+
+    gcmVERIFY_OK(gcSHADER_FindMainFunction(Shader, (gctINT *)&mainStartIndex, (gctINT *)&mainEndIndex));
+
+    for (i = mainStartIndex; i < mainEndIndex; i++)
+    {
+        gcSL_OPCODE opcode = (gcSL_OPCODE)gcmSL_OPCODE_GET(code[i].opcode, Opcode);
+        if (opcode == gcSL_CALL && ((gctINT)code[i].tempIndex) >= 0 )
+        {
+            gcmVERIFY_OK(_markUsedFuncHelper(Shader, code[i].tempIndex, funcUsageList));
+        }
+    }
+
+    if (Shader->currentKernelFunction)
+    {
+        for (i = Shader->currentKernelFunction->codeStart; i < Shader->currentKernelFunction->codeEnd; i++)
+        {
+            gcSL_OPCODE opcode = (gcSL_OPCODE)gcmSL_OPCODE_GET(code[i].opcode, Opcode);
+            if (opcode == gcSL_CALL && ((gctINT)code[i].tempIndex) >= 0 )
+            {
+                gcmVERIFY_OK(_markUsedFuncHelper(Shader, code[i].tempIndex, funcUsageList));
+            }
+        }
+    }
+    return gcvSTATUS_OK;
+}
+
+
+
+/*******************************************************************************
+                            _markUsedCode
+********************************************************************************
+
+    Mark used codes in code usage list.
+
+    INPUT:
+        gcSHADER Shader
+            Pointer to a gcSHADER structure.
+        gctINT8 * funUsageList
+            Pointer to function usage list.
+
+    INPUT & OUTPUT:
+        gctINT8 * codeUsageList
+            Pointer to code usage list.
+
+    ALGORITHM:
+    Find the begin and end of main function instructions, and mark all of them
+    as used.
+    For all instructions in kernel function, mark it as used.
+    For all functions that are marked as used in funcUsageList, mark its instructions
+    as used.
+*******************************************************************************/
+gceSTATUS
+_markUsedCode(
+    IN gcSHADER Shader,
+    IN gctINT8 * funcUsageList,
+    INOUT gctINT8 * codeUsageList
+    )
+{
+    gctSIZE_T i;
+    gctSIZE_T j;
+
+    gctUINT mainStartIndex = 0;
+    gctUINT mainEndIndex = 0;
+    gcFUNCTION * functions = gcvNULL;
+    gcKERNEL_FUNCTION * kernelFunctions = gcvNULL;
+
+    if (Shader != gcvNULL)
+    {
+        functions = Shader->functions;
+        kernelFunctions = Shader->kernelFunctions;
+
+    }
+    else
+    {
+        return gcvSTATUS_TERMINATE;
+    }
+
+
+    gcmVERIFY_OK(gcSHADER_FindMainFunction(Shader, (gctINT *)&mainStartIndex, (gctINT *)&mainEndIndex));
+
+    /*mark used code in main function.*/
+    for (i = mainStartIndex; i < mainEndIndex; i++)
+    {
+        codeUsageList[i] = gcvTRUE;
+    }
+
+    /*mark used code in kernel function.*/
+    for (i = 0; i < Shader->kernelFunctionCount; i++)
+    {
+        gcKERNEL_FUNCTION kernelFunction = kernelFunctions[i];
+        if (kernelFunction != Shader->currentKernelFunction &&
+            !kernelFunction->isCalledByEntryKernel)
+        {
+            /* skip unused kernel functions */
+            continue;
+        }
+        for (j = kernelFunction->codeStart; j < kernelFunction->codeEnd; j++)
+        {
+            codeUsageList[j] = gcvTRUE;
+        }
+        if (kernelFunction == Shader->currentKernelFunction && mainStartIndex!= kernelFunction->codeStart)
+        {
+            /* mark all the parameter passing and CALL code after kernel end */
+            j = kernelFunction->codeEnd;
+            while (j < Shader->codeCount)
+            {
+                gcSL_INSTRUCTION code = &Shader->code[j];
+                gcSL_OPCODE opcode = (gcSL_OPCODE)gcmSL_OPCODE_GET(code->opcode, Opcode);
+                codeUsageList[j] = gcvTRUE;
+                if (opcode == gcSL_CALL && (gctINT)code->tempIndex == kernelFunction->codeStart )
+                {
+                    /* found the call to the kernel function, which should
+                     * be the real end of main function */
+                    break;
+                }
+                j++;
+            }
+        }
+    }
+
+    /*mark used code in called functions.*/
+    for (i = 0; i < Shader->functionCount; i++)
+    {
+        gctUINT funcStartIndex = 0;
+        gctUINT funcEndIndex = 0;
+        if (funcUsageList[i] != gcvTRUE)
+        {
+            continue;
+        }
+        funcStartIndex = functions[i]->codeStart;
+        funcEndIndex = funcStartIndex + functions[i]->codeCount - 1;
+        for (j = funcStartIndex; j <= funcEndIndex; j++)
+        {
+            codeUsageList[j] = gcvTRUE;
+        }
+    }
+
+    return gcvSTATUS_OK;
+}
+
+
+typedef struct regMap
+{
+    gctUINT  isUsed : 2;
+    gctUINT packedIndex : 30;
+}regMap;
+
+/*******************************************************************************
+                            _packRegester
+********************************************************************************
+
+    Remove unused register.
+
+    INPUT:
+        gcSHADER Shader
+            Pointer to a gcSHADER structure.
+
+    ALGORITHM:
+    Initialize and allocate memory to local variables that record variable, code,
+    and function usage.
+
+    Mark used functions
+    Mark used instructions;
+
+    Add used register index in instructions to list.
+    Add used register index in variables to list.
+    Add used register index in outputs to list.
+    Add used register index in function local variables and arguments to list.
+    Add used register index in kernel function local variables and arguments to list.
+
+    Generate compacted register index according to index mapping list.
+
+    Assign new packed index to instructions.
+    Assign new packed index to variables.
+    Assign new packed index to outputs.
+    Assign new packed index to function's local variables and arguments.
+    Assign new packed index to kernel function's local variables and arguments.
+
+    free pointers.
+
+*******************************************************************************/
+gceSTATUS
+gcSHADER_PackRegister(
+    IN gcSHADER Shader
+    )
+
+{
+    gctSIZE_T i;
+    gctSIZE_T j;
+    gctSIZE_T k;
+
+    gctUINT32 regIndex = 0;
+    gctUINT regCount = 0;   /*Register count that actually used.*/
+    gctUINT maxCodeCount = 0;
+    gctUINT maxFuncCount = 0;
+    gctUINT maxRegCount = 0;
+    gctUINT maxLocalRegCount = 0;
+    gctUINT maxVarCount = 0;
+    gctUINT maxOutputCount = 0;
+    gcSL_INSTRUCTION code;
+    gcVARIABLE * variables = gcvNULL;
+    gcOUTPUT * outputs = gcvNULL;
+    gctINT8 * codeUsageList = gcvNULL;
+    gctINT8 * funcUsageList = gcvNULL;
+    gctINT8 * varUsageList = gcvNULL;
+    struct regMap * regMapList = gcvNULL;
+
+    if (0 && gcSHADER_DumpOptimizerVerbose(Shader))
+    {
+        gcDump_Shader(gcvNULL, "Before pack resgister shader IR.", gcvNULL, Shader, gcvTRUE);
+    }
+
+    if (Shader != gcvNULL)
+    {
+        code = Shader->code;
+        variables = Shader->variables;
+        outputs = Shader->outputs;
+        maxVarCount = Shader->variableCount;
+        maxFuncCount = Shader->functionCount;
+        maxCodeCount = Shader->codeCount;
+        maxRegCount = Shader->_tempRegCount;
+        maxLocalRegCount = GetShaderMaxLocalTempRegCount(Shader);
+
+        /*Do not pack reserved local register if shader type is gcSHADER_TYPE_CL.*/
+        regIndex = GetShaderType(Shader) == gcSHADER_TYPE_CL ? maxLocalRegCount : 0;
+        maxOutputCount = Shader->outputCount;
+
+        /*Allocate memory to array and set value to zero.*/
+        if (maxCodeCount > 0)
+        {
+            gcoOS_Allocate(gcvNULL, sizeof(gctINT8) * maxCodeCount, (gctPOINTER *)&codeUsageList);
+            gcoOS_ZeroMemory((gctPOINTER)codeUsageList, sizeof(gctINT8) * maxCodeCount);
+        }
+
+        if (maxFuncCount > 0)
+        {
+            gcoOS_Allocate(gcvNULL, sizeof(gctINT8) * maxFuncCount, (gctPOINTER *)&funcUsageList);
+            gcoOS_ZeroMemory((gctPOINTER)funcUsageList, sizeof(gctINT8) * maxFuncCount);
+        }
+        if (maxVarCount > 0)
+        {
+            gcoOS_Allocate(gcvNULL, sizeof(gctINT8) * maxVarCount, (gctPOINTER *)&varUsageList);
+            gcoOS_ZeroMemory((gctPOINTER)varUsageList, sizeof(gctINT8) * maxVarCount);
+        }
+        if (maxRegCount > 0)
+        {
+            gcoOS_Allocate(gcvNULL, sizeof(struct regMap) * (maxRegCount + 1), (gctPOINTER *)&regMapList);
+            gcoOS_ZeroMemory((gctPOINTER)regMapList, sizeof(struct regMap) * (maxRegCount + 1));
+        }
+    }
+    else
+    {
+        return gcvSTATUS_TERMINATE;
+    }
+
+
+    /*mark used function.*/
+    gcmVERIFY_OK(_markUsedFunc(Shader, funcUsageList));
+
+
+    /*mark used code.*/
+    gcmVERIFY_OK(_markUsedCode(Shader, funcUsageList, codeUsageList));
+
+    /***********************************************************************************
+        Add used register index in codes to regMapList.
+        First check if opcode have target, if so, add tempIndex and tempIndexed to list.
+        Notice that we should use two registers if type is long.
+        For the first and second source, if source type is gcSL_TEMP, Add both index and
+        indexed register to list, else if type is gcSL_SAMPLER, gcSL_UNIFORM, or
+        gcSL_ATTRIBUTE and this source is gcSL_NOT_INDEXED, then only add indexed register.
+    ***********************************************************************************/
+    for (i = 0; i < maxCodeCount; i++)
+    {
+        if (codeUsageList[i] != gcvTRUE)
+        {
+            /* change unused code to nop */
+            Shader->code[i] = gcvSL_NOP_INSTR;
+            continue;
+        }
+        if (!gcSL_isOpcodeHaveNoTarget(code[i].opcode) || gcSL_isOpcodeTexldModifier(code[i].opcode))
+        {
+            gcSL_FORMAT targetType = (gcSL_FORMAT) gcmSL_TARGET_GET(code[i].temp, Format);
+
+            if (regMapList[code[i].tempIndex].isUsed == gcvFALSE)
+            {
+                regMapList[code[i].tempIndex].isUsed = gcvTRUE;
+                regCount++;
+            }
+            if (regMapList[code[i].tempIndexed].isUsed == gcvFALSE)
+            {
+                regMapList[code[i].tempIndexed].isUsed = gcvTRUE;
+                regCount++;
+            }
+            /*Mark two registers if type is long*/
+            if (targetType == gcSL_INT64 || targetType == gcSL_UINT64)
+            {
+                if (regMapList[code[i].tempIndex + 1].isUsed == gcvFALSE)
+                {
+                    regMapList[code[i].tempIndex + 1].isUsed = gcvTRUE;
+                    regCount++;
+                }
+            }
+        }
+        if (gcmSL_SOURCE_GET(code[i].source0, Type) == gcSL_TEMP)
+        {
+            gcSL_FORMAT sourceType = (gcSL_FORMAT) gcmSL_SOURCE_GET(code[i].source0, Format);
+
+            if (regMapList[code[i].source0Index].isUsed == gcvFALSE)
+            {
+                regMapList[code[i].source0Index].isUsed = gcvTRUE;
+                regCount++;
+            }
+            if (regMapList[code[i].source0Indexed].isUsed == gcvFALSE
+                && (gcSL_INDEXED) gcmSL_SOURCE_GET(code[i].source0, Indexed) != gcSL_NOT_INDEXED)
+            {
+                regMapList[code[i].source0Indexed].isUsed = gcvTRUE;
+                regCount++;
+            }
+            /*Mark two registers if type is long*/
+            if (sourceType == gcSL_INT64 || sourceType == gcSL_UINT64)
+            {
+                if (regMapList[code[i].source0Index + 1].isUsed == gcvFALSE)
+                {
+                    regMapList[code[i].source0Index + 1].isUsed = gcvTRUE;
+                    regCount++;
+                }
+            }
+        }
+        else if (gcmSL_SOURCE_GET(code[i].source0, Type) == gcSL_SAMPLER
+            ||gcmSL_SOURCE_GET(code[i].source0, Type) == gcSL_UNIFORM
+            ||gcmSL_SOURCE_GET(code[i].source0, Type) == gcSL_ATTRIBUTE
+            ||gcmSL_SOURCE_GET(code[i].source0, Type) == gcSL_OUTPUT)
+        {
+            if (regMapList[code[i].source0Indexed].isUsed == gcvFALSE
+                && (gcSL_INDEXED) gcmSL_SOURCE_GET(code[i].source0, Indexed) != gcSL_NOT_INDEXED)
+            {
+                regMapList[code[i].source0Indexed].isUsed = gcvTRUE;
+                regCount++;
+            }
+        }
+        if (gcmSL_SOURCE_GET(code[i].source1, Type) == gcSL_TEMP)
+        {
+            gcSL_FORMAT sourceType = (gcSL_FORMAT) gcmSL_SOURCE_GET(code[i].source1, Format);
+
+            if (regMapList[code[i].source1Index].isUsed == gcvFALSE)
+            {
+                regMapList[code[i].source1Index].isUsed = gcvTRUE;
+                regCount++;
+            }
+            if (regMapList[code[i].source1Indexed].isUsed == gcvFALSE
+                && (gcSL_INDEXED) gcmSL_SOURCE_GET(code[i].source1, Indexed) != gcSL_NOT_INDEXED)
+            {
+                regMapList[code[i].source1Indexed].isUsed = gcvTRUE;
+                regCount++;
+            }
+            /*Mark two registers if type is long*/
+            if (sourceType == gcSL_INT64 || sourceType == gcSL_UINT64)
+            {
+                if (regMapList[code[i].source1Index + 1].isUsed == gcvFALSE)
+                {
+                    regMapList[code[i].source1Index + 1].isUsed = gcvTRUE;
+                    regCount++;
+                }
+            }
+        }
+        else if (gcmSL_SOURCE_GET(code[i].source1, Type) == gcSL_SAMPLER
+            ||gcmSL_SOURCE_GET(code[i].source1, Type) == gcSL_UNIFORM
+            ||gcmSL_SOURCE_GET(code[i].source1, Type) == gcSL_ATTRIBUTE
+            ||gcmSL_SOURCE_GET(code[i].source1, Type) == gcSL_OUTPUT)
+        {
+            if (regMapList[code[i].source1Indexed].isUsed == gcvFALSE
+                && (gcSL_INDEXED) gcmSL_SOURCE_GET(code[i].source1, Indexed) != gcSL_NOT_INDEXED)
+            {
+                regMapList[code[i].source1Indexed].isUsed = gcvTRUE;
+                regCount++;
+            }
+        }
+
+    }
+
+    /*********************************************************************************************
+        Add used register index in variables to list.
+        For each variables, search from start index to end index, if any one register is marked as
+        used in regMapList, mark this variable as used.
+        For each used variable, add all its registers to regMapList.
+    *********************************************************************************************/
+    for (i = 0; i < maxVarCount; i++)
+    {
+        gcVARIABLE variable = variables[i];
+        gctUINT arraySize = GetVariableKnownArraySize(variable);
+        gctUINT32 startIndex = variable->tempIndex;
+        gctUINT endIndex = startIndex + arraySize * gcmType_Rows(variable->u.type);
+
+        for (j = startIndex; j <= endIndex && j < maxRegCount; j++)
+        {
+            if (regMapList[j].isUsed == gcvTRUE)
+            {
+                varUsageList[i] = gcvTRUE;
+                break;
+            }
+        }
+        if (varUsageList[i])
+        {
+            for (j = startIndex; j <= endIndex && j < maxRegCount; j++)
+            {
+                if (regMapList[j].isUsed == gcvFALSE)
+                {
+                    regMapList[j].isUsed = gcvTRUE;
+                    regCount++;
+                }
+            }
+        }
+    }
+
+    /********************************************************************************************
+        Add used register index in outputs to list.
+    *********************************************************************************************/
+    for (i = 0; i < maxOutputCount; i++)
+    {
+        gcOUTPUT output = outputs[i];
+        if (output != gcvNULL && regMapList[output->tempIndex].isUsed == gcvFALSE)
+        {
+            regMapList[output->tempIndex].isUsed = gcvTRUE;
+            regCount++;
+        }
+    }
+
+    /********************************************************************************************
+        Add used register index in function local variables and arguments to list.
+    *********************************************************************************************/
+    for (i = 0; i < Shader->functionCount; i++)
+    {
+        gcFUNCTION function = gcvNULL;
+        gctUINT32 argumentRegStartIndex = 0;
+        gctUINT32 argumentRegEndIndex = 0;
+        if (funcUsageList[i] != gcvTRUE)
+        {
+            continue;
+        }
+        function = Shader->functions[i];
+        /*Mark function's start index as used*/
+        if (!regMapList[function->tempIndexStart].isUsed && function->tempIndexCount != 0)
+        {
+            regMapList[function->tempIndexStart].isUsed = gcvTRUE;
+            regCount++;
+        }
+        for (j = 0; j < function->localVariableCount; j++)
+        {
+            gcVARIABLE variable = function->localVariables[j];
+            gctUINT32 startIndex = variable->tempIndex;
+            gctUINT arraySize = GetVariableKnownArraySize(variable);
+            gctUINT endIndex = startIndex + arraySize * gcmType_Rows(variable->u.type);
+
+            for (k = startIndex; k <= endIndex && k < maxRegCount; k++)
+            {
+                if (regMapList[k].isUsed == gcvFALSE)
+                {
+                    regMapList[k].isUsed = gcvTRUE;
+                    regCount++;
+                }
+            }
+        }
+        if (function->argumentCount != 0)
+        {
+            argumentRegStartIndex = function->arguments[0].index;
+            /*Mark additional one more register in case the last argument is 64bit long.
+              Since we do not have method to determine whether one argument is 64 bit. This
+              might result to marking one variable that is actually not used. Though this will
+              not result to bugs.*/
+            argumentRegEndIndex = function->arguments[function->argumentCount - 1].index + 1;
+            for (j = argumentRegStartIndex; j <= argumentRegEndIndex; j++)
+            {
+                if (regMapList[j].isUsed == gcvFALSE)
+                {
+                    regMapList[j].isUsed = gcvTRUE;
+                    regCount++;
+                }
+            }
+        }
+    }
+
+    /********************************************************************************************
+        Add used register index in kernel function local variables and arguments to list.
+    *********************************************************************************************/
+    for (i = 0; i < Shader->kernelFunctionCount; i++)
+    {
+        gcKERNEL_FUNCTION function = Shader->kernelFunctions[i];
+        gctUINT32 argumentRegStartIndex = 0;
+        gctUINT32 argumentRegEndIndex = 0;
+
+        /* skip unused kernel functions */
+        if (function == gcvNULL ||
+            (function != Shader->currentKernelFunction && !function->isCalledByEntryKernel))
+        {
+            continue;
+        }
+
+        /*Mark function's start index as used*/
+        if (!regMapList[function->tempIndexStart].isUsed && function->tempIndexCount != 0)
+        {
+            regMapList[function->tempIndexStart].isUsed = gcvTRUE;
+            regCount++;
+        }
+        for (j = 0; j < function->localVariableCount; j++)
+        {
+            gcVARIABLE variable = function->localVariables[j];
+            gctUINT32 startIndex = variable->tempIndex;
+            gctUINT arraySize = GetVariableKnownArraySize(variable);
+            gctUINT endIndex = startIndex + arraySize * gcmType_Rows(variable->u.type);
+
+            for (k = startIndex; k <= endIndex && k < maxRegCount; k++)
+            {
+                if (regMapList[k].isUsed == gcvFALSE)
+                {
+                    regMapList[k].isUsed = gcvTRUE;
+                    regCount++;
+                }
+            }
+        }
+        if (function->argumentCount != 0)
+        {
+            argumentRegStartIndex = function->arguments[0].index;
+            /*Mark additional one more register in case the last argument is 64bit long.
+              Since we do not have method to determine whether one argument is 64 bit. This
+              might result to marking one variable that is actually not used. Though this will
+              not result to bugs.*/
+            argumentRegEndIndex = function->arguments[function->argumentCount - 1].index + 1;
+            for (j = argumentRegStartIndex; j <= argumentRegEndIndex; j++)
+            {
+                if (regMapList[j].isUsed == gcvFALSE)
+                {
+                    regMapList[j].isUsed = gcvTRUE;
+                    regCount++;
+                }
+            }
+        }
+    }
+
+    /************************************************************************************************
+        Assign packed index to register list.
+        For registers which index smaller than maxLocalRegCount, do not change its index.
+        For all registers after, pack the index: Used two pointers, each time move the first to next
+        used index, and move the second one step ahead. Assign the value of second pointer to first.
+     ***********************************************************************************************/
+    if (GetShaderType(Shader) == gcSHADER_TYPE_CL)
+    {
+        for(i = 0; i < maxLocalRegCount; i++)
+        {
+            while(regMapList[i].isUsed != gcvTRUE && (i + 1) < maxRegCount)
+            {
+                i++;
+            }
+            if (i < maxLocalRegCount && regMapList[i].isUsed)
+            {
+                regMapList[i].packedIndex = i;
+            }
+        }
+        for(i = maxLocalRegCount; i < maxRegCount; i++)
+        {
+            while(regMapList[i].isUsed != gcvTRUE && (i + 1) < maxRegCount)
+            {
+                i++;
+            }
+            if (regMapList[i].isUsed)
+            {
+                regMapList[i].packedIndex = regIndex;
+                regIndex++;
+            }
+        }
+    }
+    else
+    {
+        for(i = 0; i < maxRegCount; i++)
+        {
+            while(regMapList[i].isUsed != gcvTRUE && (i + 1) < maxRegCount)
+            {
+                i++;
+            }
+            if (regMapList[i].isUsed)
+            {
+                regMapList[i].packedIndex = regIndex;
+                regIndex++;
+            }
+        }
+    }
+
+
+    /********************************************************************************************
+        Assign new packed index to instructions.
+    *********************************************************************************************/
+    for(i = 0; i < maxCodeCount; i++)
+    {
+        if (codeUsageList[i] != gcvTRUE)
+        {
+            continue;
+        }
+        if (!gcSL_isOpcodeHaveNoTarget(code[i].opcode) || gcSL_isOpcodeTexldModifier(code[i].opcode))
+        {
+            code[i].tempIndex = gcmSL_INDEX_SET(code[i].tempIndex, Index, regMapList[code[i].tempIndex].packedIndex);
+            code[i].tempIndexed = (gctUINT16)gcmSL_INDEX_SET(code[i].tempIndexed, Index, regMapList[code[i].tempIndexed].packedIndex);
+        }
+
+        if (gcmSL_SOURCE_GET(code[i].source0, Type) == gcSL_TEMP)
+        {
+            code[i].source0Index = gcmSL_INDEX_SET(code[i].source0Index, Index, regMapList[code[i].source0Index].packedIndex);
+            if ((gcSL_INDEXED) gcmSL_SOURCE_GET(code[i].source0, Indexed) != gcSL_NOT_INDEXED)
+            {
+                code[i].source0Indexed = (gctUINT16)gcmSL_INDEX_SET(code[i].source0Indexed, Index, regMapList[code[i].source0Indexed].packedIndex);
+            }
+        }
+        else if (gcmSL_SOURCE_GET(code[i].source0, Type) == gcSL_SAMPLER
+            ||gcmSL_SOURCE_GET(code[i].source0, Type) == gcSL_UNIFORM
+            ||gcmSL_SOURCE_GET(code[i].source0, Type) == gcSL_ATTRIBUTE
+            ||gcmSL_SOURCE_GET(code[i].source0, Type) == gcSL_OUTPUT)
+        {
+            if ((gcSL_INDEXED) gcmSL_SOURCE_GET(code[i].source0, Indexed) != gcSL_NOT_INDEXED)
+            {
+                code[i].source0Indexed = (gctUINT16)gcmSL_INDEX_SET(code[i].source0Indexed, Index, regMapList[code[i].source0Indexed].packedIndex);
+            }
+        }
+
+        if (gcmSL_SOURCE_GET(code[i].source1, Type) == gcSL_TEMP)
+        {
+            code[i].source1Index = gcmSL_INDEX_SET(code[i].source1Index, Index, regMapList[code[i].source1Index].packedIndex);
+            if ((gcSL_INDEXED) gcmSL_SOURCE_GET(code[i].source1, Indexed) != gcSL_NOT_INDEXED)
+            {
+                code[i].source1Indexed = (gctUINT16)gcmSL_INDEX_SET(code[i].source1Indexed, Index, regMapList[code[i].source1Indexed].packedIndex);
+            }
+        }
+        else if (gcmSL_SOURCE_GET(code[i].source1, Type) == gcSL_SAMPLER
+            ||gcmSL_SOURCE_GET(code[i].source1, Type) == gcSL_UNIFORM
+            ||gcmSL_SOURCE_GET(code[i].source1, Type) == gcSL_ATTRIBUTE
+            ||gcmSL_SOURCE_GET(code[i].source1, Type) == gcSL_OUTPUT)
+        {
+            if ((gcSL_INDEXED) gcmSL_SOURCE_GET(code[i].source1, Indexed) != gcSL_NOT_INDEXED)
+            {
+                code[i].source1Indexed = (gctUINT16)gcmSL_INDEX_SET(code[i].source1Indexed, Index, regMapList[code[i].source1Indexed].packedIndex);
+            }
+        }
+
+    }
+
+    /********************************************************************************************
+        Renew function's temp register start and end index.
+    *********************************************************************************************/
+    for (i = 0; i < Shader->functionCount; i++)
+    {
+        gctUINT32 originalFuncStartIndex = 0;
+        gctUINT32 originalFuncEndIndex = 0;
+        gctUINT32 originalFuncRegCount = 0;
+        gctUINT32 packedFuncStartIndex = 0;
+        gctUINT32 packedFuncEndIndex = 0;
+        gctUINT32 packedFuncRegCount = 0;
+        gctUINT32 currentStartIndex = 0;
+        gctUINT32 currentEndIndex = 0;
+        if (funcUsageList[i] == gcvTRUE)
+        {
+            originalFuncStartIndex = Shader->functions[i]->tempIndexStart;
+            originalFuncEndIndex = Shader->functions[i]->tempIndexEnd;
+            originalFuncRegCount = Shader->functions[i]->tempIndexCount;
+            gcmASSERT(originalFuncStartIndex <= maxRegCount && originalFuncEndIndex <= maxRegCount);
+            if (originalFuncRegCount == 0)
+            {
+                currentStartIndex = originalFuncStartIndex;
+                /*Move currentIndex to the last used reg index or 0, which means there
+                 is no register used before this function.*/
+                while (currentStartIndex > 0 && !regMapList[currentEndIndex].isUsed)
+                {
+                    currentEndIndex--;
+                }
+                /*Set function start index to the first available register or 0.*/
+                packedFuncStartIndex = regMapList[currentStartIndex].isUsed?
+                    regMapList[currentStartIndex].packedIndex + 1: regMapList[currentStartIndex].packedIndex;
+            }
+            else
+            {
+                currentStartIndex = originalFuncStartIndex;
+                currentEndIndex = originalFuncEndIndex;
+                /*Move currentEndIndex to the last used reg index after currentStartIndex or currentStartIndex itself,
+                 which means there is no register used other than currentStartIndex.*/
+                while (currentStartIndex < currentEndIndex && !regMapList[currentEndIndex].isUsed)
+                {
+                    currentEndIndex--;
+                }
+
+                packedFuncStartIndex = regMapList[currentStartIndex].packedIndex;
+                packedFuncEndIndex = regMapList[currentEndIndex].packedIndex;
+                packedFuncRegCount = packedFuncEndIndex - packedFuncStartIndex + 1;
+            }
+            Shader->functions[i]->tempIndexStart = packedFuncStartIndex;
+            Shader->functions[i]->tempIndexEnd = packedFuncEndIndex;
+            Shader->functions[i]->tempIndexCount = packedFuncRegCount;
+            gcmASSERT(maxRegCount != (gctUINT32)-1);
+        }
+        else
+        {
+            /* mark the function not used */
+            SetFunctionNotUsed(Shader->functions[i]);
+        }
+    }
+
+    /********************************************************************************************
+        Renew kernel function's temp register start and end index.
+    *********************************************************************************************/
+    for (i = 0; i < Shader->kernelFunctionCount; i++)
+    {
+        gctUINT32 originalFuncStartIndex = 0;
+        gctUINT32 originalFuncEndIndex = 0;
+        gctUINT32 originalFuncRegCount = 0;
+        gctUINT32 packedFuncStartIndex = 0;
+        gctUINT32 packedFuncEndIndex = 0;
+        gctUINT32 packedFuncRegCount = 0;
+        gctUINT32 currentStartIndex = 0;
+        gctUINT32 currentEndIndex = 0;
+        gcKERNEL_FUNCTION function = Shader->kernelFunctions[i];
+
+        /* skip unused kernel functions */
+        if (function == gcvNULL ||
+            (function != Shader->currentKernelFunction && !function->isCalledByEntryKernel))
+        {
+            /* mark the kernel function not used */
+            SetFunctionNotUsed(Shader->kernelFunctions[i]);
+            continue;
+        }
+        originalFuncStartIndex = Shader->kernelFunctions[i]->tempIndexStart;
+        originalFuncEndIndex = Shader->kernelFunctions[i]->tempIndexEnd;
+        originalFuncRegCount = Shader->kernelFunctions[i]->tempIndexCount;
+        gcmASSERT(originalFuncStartIndex <= maxRegCount && originalFuncEndIndex <= maxRegCount);
+        if (originalFuncRegCount == 0)
+        {
+            currentStartIndex = originalFuncStartIndex;
+            /*Move currentIndex to the last used reg index or 0, which means there
+                 is no register used before this function.*/
+                while (currentStartIndex > 0 && !regMapList[currentEndIndex].isUsed)
+                {
+                    currentEndIndex--;
+                }
+                /*Set function start index to the first available register or 0.*/
+                packedFuncStartIndex = regMapList[currentStartIndex].isUsed?
+                    regMapList[currentStartIndex].packedIndex + 1: regMapList[currentStartIndex].packedIndex;
+        }
+        else
+        {
+            currentStartIndex = originalFuncStartIndex;
+            currentEndIndex = originalFuncEndIndex;
+            /*Move currentEndIndex to the last used reg index after currentStartIndex or currentStartIndex itself,
+              which means there is no register used other than currentStartIndex.*/
+            while (currentStartIndex <= currentEndIndex && !regMapList[currentEndIndex].isUsed)
+            {
+                currentEndIndex--;
+            }
+
+            packedFuncStartIndex = regMapList[currentStartIndex].packedIndex;
+            packedFuncEndIndex = regMapList[currentEndIndex].packedIndex;
+            packedFuncRegCount = packedFuncEndIndex - packedFuncStartIndex + 1;
+        }
+        Shader->kernelFunctions[i]->tempIndexStart = packedFuncStartIndex;
+        Shader->kernelFunctions[i]->tempIndexEnd = packedFuncEndIndex;
+        Shader->kernelFunctions[i]->tempIndexCount = packedFuncRegCount;
+        gcmASSERT(maxRegCount != (gctUINT32)-1);
+    }
+
+
+    /********************************************************************************************
+        Assign new packed index to variables.
+    *********************************************************************************************/
+    for (i = 0; i < maxVarCount; i++)
+    {
+        if (varUsageList[i])
+        {
+            variables[i]->tempIndex = regMapList[variables[i]->tempIndex].packedIndex;
+        }
+        else
+        {
+            SetVariableIsNotUsed(variables[i]);
+            /*Set unused variable index to one more than last used one.*/
+            variables[i]->tempIndex = regIndex;
+        }
+    }
+
+    /********************************************************************************************
+        Assign new packed index to outputs.
+    *********************************************************************************************/
+    for (i = 0; i < maxOutputCount; i++)
+    {
+        if (outputs[i] != gcvNULL)
+        {
+            outputs[i]->tempIndex = regMapList[outputs[i]->tempIndex].packedIndex;
+        }
+    }
+
+    /********************************************************************************************
+        Assign new packed index to function's local variables and arguments.
+    *********************************************************************************************/
+    for (i = 0; i < Shader->functionCount; i++)
+    {
+        gcFUNCTION function = gcvNULL;
+        if (funcUsageList[i] != gcvTRUE)
+        {
+            continue;
+        }
+        function = Shader->functions[i];
+        for (j = 0; j < function->localVariableCount; j++)
+        {
+            gcVARIABLE variable = function->localVariables[j];
+            variable->tempIndex = regMapList[variable->tempIndex].packedIndex;
+        }
+        for (j = 0; j < function->argumentCount; j++)
+        {
+            gcsFUNCTION_ARGUMENT_PTR argument = &function->arguments[j];
+            argument->index = regMapList[argument->index].packedIndex;
+        }
+
+    }
+
+    /********************************************************************************************
+        Assign new packed index to kernel function's local variables and arguments.
+    *********************************************************************************************/
+    for (i = 0; i < Shader->kernelFunctionCount; i++)
+    {
+        gcKERNEL_FUNCTION function = Shader->kernelFunctions[i];
+        /* skip unused kernel functions */
+        if (function == gcvNULL ||
+            (function != Shader->currentKernelFunction && !function->isCalledByEntryKernel))
+        {
+            continue;
+        }
+        for (j = 0; j < function->localVariableCount; j++)
+        {
+            gcVARIABLE variable = function->localVariables[j];
+            variable->tempIndex = regMapList[variable->tempIndex].packedIndex;
+        }
+        for (j = 0; j < function->argumentCount; j++)
+        {
+            gcsFUNCTION_ARGUMENT_PTR argument = &function->arguments[j];
+            argument->index = regMapList[argument->index].packedIndex;
+        }
+    }
+
+    /*Increase tempRegCount by 2 to hold unused variable.*/
+    Shader->_tempRegCount =  regIndex + 2;
+
+    /********************************************************************************************
+        Free pointers
+    *********************************************************************************************/
+    if (regMapList != gcvNULL)
+    {
+        gcoOS_Free(gcvNULL, (gctPOINTER)regMapList);
+    }
+    if (funcUsageList != gcvNULL)
+    {
+        gcoOS_Free(gcvNULL, (gctPOINTER)funcUsageList);
+    }
+    if (varUsageList != gcvNULL)
+    {
+        gcoOS_Free(gcvNULL, (gctPOINTER)varUsageList);
+    }
+    if (codeUsageList != gcvNULL)
+    {
+        gcoOS_Free(gcvNULL, (gctPOINTER)codeUsageList);
+    }
+
+
+    return gcvSTATUS_OK;
+
+}
+
+/*******************************************************************************
 **                              gcOptimizeShader
 ********************************************************************************
 **
@@ -10232,8 +11321,6 @@ gcOptimizeShader(
         {
             /* The normal full optimization mode. */
             status = gcvSTATUS_OK;
-
-            /* TODO - need to add more features and adjust the sequence. */
 
             if (optimizer->functionCount > 0)
             {
@@ -10639,11 +11726,24 @@ gcOptimizeShader(
         gcmVERIFY_OK(_removeUnusedArguments(Shader));
     }
 
+
+    if (gcmOPT_PackRegister())
+    {
+        if (dumpOptimizer)
+        {
+            gcOpt_Dump(LogFile, "Shader before packing register", gcvNULL, Shader);
+            gcOpt_DumpMessage(gcvNULL, LogFile, "gcOptimizeShader: end\n");
+        }
+
+        gcmVERIFY_OK(gcSHADER_PackRegister(Shader));
+
         if (dumpOptimizer)
         {
             gcOpt_Dump(LogFile, "Final shader after gcOptimizeShader()", gcvNULL, Shader);
             gcOpt_DumpMessage(gcvNULL, LogFile, "gcOptimizeShader: end\n");
         }
+    }
+
     /*gcOpt_GenShader(Shader, LogFile);*/
 
     /* Return the status. */

@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -98,9 +98,10 @@ install: all
 
 ifeq ($(STATIC),1)
 $(TARGET_MODULE): $(OBJECTS)
-	$(AR) -r -c $@ $(OBJECTS)
+	@echo "  ARCHIVE \033[1m$(notdir $@)\033[0m"
+	@$(AR) -r -c $@ $(OBJECTS)
 ifneq ($(USE_ARMCC), 1)
-	$(RANLIB) $@
+	@$(RANLIB) $@
 endif
 endif
 
@@ -115,7 +116,8 @@ $(TARGET_MODULE): $(GLSL_DIR)/compiler/$(OBJ_DIR)/libglslCompiler.a \
                              $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.a)
 
 $(TARGET_MODULE): $(OBJECTS)
-	$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LIBS)
+	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
+	@$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LIBS)
 endif
 
 ################################################################################
@@ -125,8 +127,9 @@ vpath
 vpath %.c ../common
 
 $(OBJ_DIR)/%.o: %.c
+	@echo "  COMPILE $(abspath $<)"
 	@mkdir -p $(OBJ_DIR)
-	$(CC) $(ARMCC_FLAGS) -c $(CFLAGS) -MMD -o $@ $<
+	@$(CC) $(ARMCC_FLAGS) -c $(CFLAGS) -MMD -o $@ $<
 
 # object dependencies.
 -include $(OBJECTS:.o=.d)

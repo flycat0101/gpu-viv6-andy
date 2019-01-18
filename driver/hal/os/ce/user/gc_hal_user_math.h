@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -29,6 +29,7 @@
 #define gcoMATH_Absolute(X)   (gctFLOAT)(fabsf((X)))
 #define gcoMATH_ArcCosine(X)  (gctFLOAT)(acos((X)))
 #define gcoMATH_Tangent(X)    (gctFLOAT)(tan((X)))
+#define gcoMATH_TangentH(X)   (gctFLOAT)(tanh((X)))
 #define gcoMATH_ArcSine(X)    (gctFLOAT)(asin((X)))
 #define gcoMATH_ArcTangent(X) (gctFLOAT)(atan((X)))
 

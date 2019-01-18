@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -61,7 +61,7 @@ static const int formatXlate[] =
     HAL_PIXEL_FORMAT_YCrCb_420_SP,  gcvSURF_NV21,
     HAL_PIXEL_FORMAT_YCbCr_422_I,   gcvSURF_YUY2,
 
-#elif (ANDROID_SDK_VERSION >= 16)
+#elif (ANDROID_SDK_VERSION >= 16) && (ANDROID_SDK_VERSION < 27)
     /* JellyBean and later */
     HAL_PIXEL_FORMAT_YV12,          gcvSURF_YV12,
     /* Legacy formats (deprecated), used by ImageFormat.java */

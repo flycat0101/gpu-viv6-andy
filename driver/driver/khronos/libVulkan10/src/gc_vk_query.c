@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -12,6 +12,9 @@
 
 
 #include "gc_vk_precomp.h"
+
+/* suppose maximum count is 8 under multi-GPU/multi-Cluster architecture.*/
+#define MAX_UNIT_COUNT 8
 
 VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateQueryPool(
     VkDevice device,
@@ -38,6 +41,9 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateQueryPool(
         return result;
     }
 
+    /* maybe overflow maximum size of query pool.*/
+    __VK_ASSERT(pCreateInfo->queryCount * MAX_UNIT_COUNT * sizeof(uint64_t)< __VK_MAX_QUERY_BUF_SIZE);
+
     /* Initialize __vkQueryPool specific data fields here */
     qyp->queryCount = pCreateInfo->queryCount;
 
@@ -54,7 +60,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateQueryPool(
     buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buf_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    buf_info.size = __VK_MAX_QUERY_COUNT * sizeof(uint64_t);
+    buf_info.size = __VK_MAX_QUERY_BUF_SIZE;
 
     qyp->queryBuffer = VK_NULL_HANDLE;
     __VK_ONERROR(__vk_CreateBuffer(device, &buf_info, gcvNULL, &qyp->queryBuffer));
@@ -62,7 +68,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateQueryPool(
     /* Allocate device memory for fences */
     __VK_MEMZERO(&mem_alloc, sizeof(mem_alloc));
     mem_alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    mem_alloc.allocationSize = __VK_MAX_QUERY_COUNT * sizeof(uint64_t);
+    mem_alloc.allocationSize = __VK_MAX_QUERY_BUF_SIZE;
     mem_alloc.memoryTypeIndex = 0;
     __VK_ONERROR(__vk_AllocateMemory(device, &mem_alloc, gcvNULL, &memory));
 
@@ -71,9 +77,9 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateQueryPool(
 
     /* Lock surface for memory */
     __VK_ONERROR(__vk_MapMemory(device, memory, 0,
-        (__VK_MAX_QUERY_COUNT * sizeof(uint64_t)), 0, (void **)&queryMemory));
+        __VK_MAX_QUERY_BUF_SIZE, 0, (void **)&queryMemory));
 
-    __VK_MEMZERO(queryMemory, (__VK_MAX_QUERY_COUNT * sizeof(uint64_t)));
+    __VK_MEMZERO(queryMemory, __VK_MAX_QUERY_BUF_SIZE);
 
     /* Unlock the memory */
     __vk_UnmapMemory(device, memory);
@@ -184,22 +190,11 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_GetQueryPoolResults(
     VkQueryResultFlags flags
     )
 {
+    __vkDevContext *devCtx = (__vkDevContext *)device;
     __vkQueryPool *qyp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkQueryPool *, queryPool);
-    __vkBuffer *queryBuffer = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, qyp->queryBuffer);
-    uint64_t *queryMemory;
     uint32_t iq;
     VkResult result = VK_SUCCESS;
     uint64_t value64 = 0;
-
-    /* Lock surface for memory and mark as unsignalled */
-    __VK_ONERROR(__vk_MapMemory(
-        device,
-        (VkDeviceMemory)(uintptr_t)queryBuffer->memory,
-        0,
-        queryBuffer->memory->size,
-        0,
-        (void **)&queryMemory
-        ));
 
     for (iq = firstQuery; iq < (firstQuery + queryCount); iq++)
     {
@@ -235,8 +230,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_GetQueryPoolResults(
         }
         else
         {
-            result = VK_SUCCESS;
-            value64 = queryMemory[iq];
+            __VK_ONERROR((*devCtx->chipFuncs->getQueryResult)(device, queryPool, iq, &value64));
         }
 
         if (flags & VK_QUERY_RESULT_64_BIT)
@@ -269,12 +263,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_GetQueryPoolResults(
             }
         }
     }
-
-    /* Unlock the memory */
-    __vk_UnmapMemory
-        (device,
-        (VkDeviceMemory)(uintptr_t)queryBuffer->memory
-        );
 
     return result;
 

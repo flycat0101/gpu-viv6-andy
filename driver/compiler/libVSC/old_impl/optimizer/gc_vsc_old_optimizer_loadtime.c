@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -9,6 +9,7 @@
 *    without the express written permission of Vivante Corporation.
 *
 *****************************************************************************/
+
 
 
 #include "gc_vsc.h"
@@ -252,14 +253,6 @@ _isTempRegisterALoadtimeConstant(
        then it is not a loadtime constant */
     dependencies = (SourceNo == 0) ? Code->dependencies0
                                    : Code->dependencies1;
-    /* TODO: check if the target temp register depends on itself indirectly:
-     *
-     *     28: ADD             temp(20).x, temp(0).x, 2.000000
-     *     29: MOV             temp(0).x, temp(20).x
-     *     30: ADD             temp(21).x, temp(19).x, 1.000000
-     *     31: MOV             temp(19).x, temp(21).x
-     *     32: JMP.L           28, temp(19).x, uniform(2).x
-     */
     if (target == Index && gcmSL_OPCODE_GET(inst->opcode, Opcode) != gcSL_JMP)
         return gcvFALSE;  /* the code is depend on itself */
 
@@ -448,6 +441,18 @@ _isLoadtimeConstant(
         {
             if (isUniformTransfromFeedbackState(uniform) ||
                 isUniformTransfromFeedbackBuffer(uniform))
+            {
+                return gcvFALSE;
+            }
+
+            /*
+            ** If a uniform is compile-time-initialized, and its data is saved in the constant buffer,
+            ** or this uniform is with a initializer,
+            ** skip it because driver doesn't support it right now.
+            */
+            if ((isUniformCompiletimeInitialized(uniform) && GetUniformOffset(uniform) >= 0)
+                ||
+                (isUniformWithInitializer(uniform)))
             {
                 return gcvFALSE;
             }
@@ -751,6 +756,7 @@ _addInstructionToLTCList(
             /* mov instruction */
         case gcSL_RCP:
         case gcSL_ABS:
+        case gcSL_NEG:
         case gcSL_FLOOR:
         case gcSL_CEIL:
         case gcSL_FRAC:
@@ -1384,6 +1390,7 @@ _MapTargetFormatToShaderType(
     {
     case gcSL_FLOAT:
     case gcSL_FLOAT16:
+    case gcSL_FLOAT64:
         type = (usedComponents == 4) ? gcSHADER_FLOAT_X4 :
                (usedComponents == 3) ? gcSHADER_FLOAT_X3 :
                (usedComponents == 2) ? gcSHADER_FLOAT_X2 :
@@ -1463,9 +1470,9 @@ _CreateDummyUniformInfo(
         gcoOS_PrintStrSafe(name,
                            gcmSIZEOF(name),
                            &offset,
-                           "#sh%d__ltc_uniform_%d", /* private (internal)
+                           "#sh%d_ltc_uniform_%d", /* private (internal)
                                                        * uniform starts with '#' */
-                           Optimizer->shader->_id,
+                           Optimizer->shader->type,
                            dummyUniformIndex));
     /* add uniform */
     type = _MapTargetFormatToShaderType(Code, ComponentMap);
@@ -1960,8 +1967,6 @@ _replaceShaderCodeByDummyUniform(
             }
             else
             {
-                /* TODO: propagate the value to its users */
-
             }/* if */
         } /* if */
     } /* for */
@@ -2019,6 +2024,12 @@ _FoldLoadtimeConstant(
 
     gcSHADER_GetUniformVectorCount(Optimizer->shader, &curUsedUniform);
 
+    /* For CTS special WAR, we can use more uniforms. */
+    if (Optimizer->isCTSInline)
+    {
+        curUsedUniform = gcmMAX((gctUINT32)((gctFLOAT)curUsedUniform * 0.3), 10);
+    }
+
     maxShaderUniforms = (Optimizer->shader->type == gcSHADER_TYPE_VERTEX)
                         ? Optimizer->maxVertexUniforms
                         : Optimizer->maxFragmentUniforms;
@@ -2055,13 +2066,13 @@ _FoldLoadtimeConstant(
             code = (gcOPT_CODE)(codeNode->data);
 
            _replaceShaderCodeByDummyUniform(Optimizer,
-                                                                code,
-                                                                ltcCodeUniformIndex,
-                                                                &activeLTCInstCount,
-                                                                &curUsedUniform,
-                                                                &dummyUniformCount,
-                                                                codeIndex,
-                                                                gcvFALSE);
+                                            code,
+                                            ltcCodeUniformIndex,
+                                            &activeLTCInstCount,
+                                            &curUsedUniform,
+                                            &dummyUniformCount,
+                                            codeIndex,
+                                            gcvFALSE);
             codeIndex++;
             codeNode = codeNode->next;
         } /* while */
@@ -2121,8 +2132,6 @@ gcOPT_OptimizeLoadtimeConstant(
     Optimizer->tempRegisterMap  = gcvNULL;
     gcmONERROR(_FindLoadtimeConstant(Optimizer));
     gcmONERROR(_FoldLoadtimeConstant(Optimizer));
-    /* cleanup the LTC expressions, remove unneeded stuff */
-    /* TODO: _CleanupLoadtimeConstantData() */
     gcList_Clean(&Optimizer->theLTCTempRegList, gcvFALSE);
     gcList_Clean(&Optimizer->theLTCCodeList, gcvFALSE);
     gcList_Clean(&Optimizer->theLTCRemoveCodeList, gcvFALSE);
@@ -2266,11 +2275,11 @@ _LTCEvaluateUnioperator(
 
                 if (sqrt_s0 == 0.0f)
                 {
-                    /* x,y,z,w are all zero, the normal of the vector is NaN  */
-                    ResultValue->v[0].f32 = FLOAT_NaN;
-                    ResultValue->v[1].f32 = FLOAT_NaN;
-                    ResultValue->v[2].f32 = FLOAT_NaN;
-                    ResultValue->v[3].f32 = FLOAT_NaN;
+                    /* normalize(0) = 0 */
+                    ResultValue->v[0].f32 = 0.0;
+                    ResultValue->v[1].f32 = 0.0;
+                    ResultValue->v[2].f32 = 0.0;
+                    ResultValue->v[3].f32 = 0.0;
                 }
                 else
                 {
@@ -2295,11 +2304,11 @@ _LTCEvaluateUnioperator(
 
                 if (sqrt_s0 == 0)
                 {
-                    /* x,y,z,w are all zero, the normal of the vector is NaN  */
-                    ResultValue->v[0].i32 = INT32_MAX;
-                    ResultValue->v[1].i32 = INT32_MAX;
-                    ResultValue->v[2].i32 = INT32_MAX;
-                    ResultValue->v[3].i32 = INT32_MAX;
+                    /* normalize(0) = 0 */
+                    ResultValue->v[0].i32 = 0;
+                    ResultValue->v[1].i32 = 0;
+                    ResultValue->v[2].i32 = 0;
+                    ResultValue->v[3].i32 = 0;
                 }
                 else
                 {
@@ -2332,10 +2341,10 @@ _LTCEvaluateUnioperator(
 
                 if (sqrt_s0 == 0.0f)
                 {
-                    /* x,y,z are all zero, the normal of the vector is NaN  */
-                    ResultValue->v[0].f32 = FLOAT_NaN;
-                    ResultValue->v[1].f32 = FLOAT_NaN;
-                    ResultValue->v[2].f32 = FLOAT_NaN;
+                    /* normalize(0) = 0 */
+                    ResultValue->v[0].f32 = 0.0;
+                    ResultValue->v[1].f32 = 0.0;
+                    ResultValue->v[2].f32 = 0.0;
                 }
                 else
                 {
@@ -2357,10 +2366,10 @@ _LTCEvaluateUnioperator(
 
                 if (sqrt_s0 == 0)
                 {
-                    /* x,y,z are all zero, the normal of the vector is NaN  */
-                    ResultValue->v[0].i32 = INT32_MAX;
-                    ResultValue->v[1].i32 = INT32_MAX;
-                    ResultValue->v[2].i32 = INT32_MAX;
+                    /* normalize(0) = 0 */
+                    ResultValue->v[0].i32 = 0;
+                    ResultValue->v[1].i32 = 0;
+                    ResultValue->v[2].i32 = 0;
                 }
                 else
                 {
@@ -2390,9 +2399,9 @@ _LTCEvaluateUnioperator(
 
                 if (sqrt_s0 == 0.0f)
                 {
-                    /* x,y are all zero, the normal of the vector is NaN  */
-                    ResultValue->v[0].f32 = FLOAT_NaN;
-                    ResultValue->v[1].f32 = FLOAT_NaN;
+                    /* normalize(0) = 0 */
+                    ResultValue->v[0].f32 = 0.0;
+                    ResultValue->v[1].f32 = 0.0;
                 }
                 else
                 {
@@ -2411,9 +2420,9 @@ _LTCEvaluateUnioperator(
 
                 if (sqrt_s0 == 0)
                 {
-                    /* x,y are all zero, the normal of the vector is NaN  */
-                    ResultValue->v[0].i32 = INT32_MAX;
-                    ResultValue->v[1].i32 = INT32_MAX;
+                    /* normalize(0) = 0 */
+                    ResultValue->v[0].i32 = 0;
+                    ResultValue->v[1].i32 = 0;
                 }
                 else
                 {
@@ -2444,27 +2453,42 @@ _LTCEvaluateUnioperator(
 
         v = Source0Value->v[i];
 
-        if (ResultValue->elementType == gcSL_FLOAT)
+        if (ResultValue->elementType == gcSL_FLOAT || ResultValue->elementType == gcSL_FLOAT64)
         {
             gctFLOAT fDst, f0;
             gctINT   intTemp;
+            gctUINT  uintTemp;
 
             fDst = f0 = v.f32;
 
             switch (Opcode)
             {
             case gcSL_ABS:
-                fDst = f0 >= 0.0f ? f0 : -f0;
-                break;
-            case gcSL_RCP:
-                if (f0 == 0.0f)
+                if (v.u32 == 0x80000000)
                 {
-                    fDst = FLOAT_NaN;
+                    fDst = 0.0f;
                 }
                 else
                 {
-                    fDst = gcoMATH_Divide(1.0f, f0);
+                    fDst = gcmABS(f0);
                 }
+                break;
+            case gcSL_NEG:
+                if (v.u32 == 0x80000000)
+                {
+                    fDst = 0.0f;
+                }
+                else if (v.u32 == 0)
+                {
+                    fDst = -0.0f;
+                }
+                else
+                {
+                    fDst = -f0;
+                }
+                break;
+            case gcSL_RCP:
+                fDst = gcoMATH_Divide(1.0f, f0);
                 break;
             case gcSL_FLOOR:
                 fDst = gcoMATH_Floor(f0);
@@ -2479,10 +2503,7 @@ _LTCEvaluateUnioperator(
                 fDst = gcoMATH_Log2(f0);
                 break;
             case gcSL_RSQ:
-                if (f0 == 0.0f || isF32NaN(f0))
-                    fDst = FLOAT_NaN;
-                else
-                    fDst = gcoMATH_ReciprocalSquareRoot(f0);
+                fDst = gcoMATH_ReciprocalSquareRoot(f0);
                 break;
             case gcSL_SAT:
                 fDst = f0 < 0.0f ? 0.0f : (fDst > 1.0f ? 1.0f : f0);
@@ -2517,8 +2538,16 @@ _LTCEvaluateUnioperator(
                 fDst = gcoMATH_ArcTangent(f0);
                 break;
             case gcSL_I2F:
-                intTemp = v.i32;
-                fDst = gcoMATH_Int2Float(intTemp);
+                if (Source0Value->elementType == gcSL_INT32)
+                {
+                    intTemp = v.i32;
+                    fDst = gcoMATH_Int2Float(intTemp);
+                }
+                else
+                {
+                    uintTemp = v.u32;
+                    fDst = gcoMATH_Int2Float(uintTemp);
+                }
                 break;
             default:
                 gcmASSERT(gcvFALSE);
@@ -2540,6 +2569,9 @@ _LTCEvaluateUnioperator(
                 break;
             case gcSL_ABS:
                 iDst = gcmABS(i0);
+                break;
+            case gcSL_NEG:
+                iDst = -i0;
                 break;
             case gcSL_RCP:
                 /* for openGL, we should not generate NaN */
@@ -2595,6 +2627,9 @@ _LTCEvaluateUnioperator(
             {
             case gcSL_ABS:
                 uDst = u0;
+                break;
+            case gcSL_NEG:
+                uDst = ~u0 + 1;
                 break;
             case gcSL_RCP:
                 /* for openGL, we should not generate NaN */
@@ -3374,7 +3409,7 @@ _LTCSetValues(
         {
             continue;
         }
-        if (ResultValue->elementType == gcSL_FLOAT)
+        if (ResultValue->elementType == gcSL_FLOAT || ResultValue->elementType == gcSL_FLOAT64)
         {
             ResultsArray[InstructionIndex].v[i].f32 = ResultValue->v[i].f32;
             if (ResultLocation != InstructionIndex)
@@ -3821,6 +3856,7 @@ gceSTATUS gcOPT_DoConstantFoldingLTC(
         break;
     case gcSL_RCP:
     case gcSL_ABS:
+    case gcSL_NEG:
     case gcSL_FLOOR:
     case gcSL_CEIL:
     case gcSL_FRAC:

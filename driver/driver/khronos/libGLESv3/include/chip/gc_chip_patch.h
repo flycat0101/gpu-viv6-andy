@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -73,6 +73,7 @@ typedef enum __GCPatchNum_enum
     GC_CHIP_PATCH_NAVIGATION,
     GC_CHIP_PATCH_HOR_BLUR_FILTER,
     GC_CHIP_PATCH_TORCH,
+    GC_CHIP_PATCH_GLBENCH215_FILL_RATE,
     GC_CHIP_PATCH_GLBENCH25,
     GC_CHIP_PATCH_GLBENCH25_FILL_RATE,
     GC_CHIP_PATCH_GLBENCH27_RC,
@@ -145,8 +146,7 @@ typedef enum __GCPatchNum_enum
     GC_CHIP_PATCH_COC_1,
     GC_CHIP_PATCH_CTS_DOT,
     GC_CHIP_PATCH_TREX,
-    GC_CHIP_PATCH_MANHATTAN30,
-    GC_CHIP_PATCH_MANHATTAN40,
+    GC_CHIP_PATCH_MANHATTAN,
     GC_CHIP_PATCH_BATCHCOUNT,
     GC_CHIP_PATCH_NETFLIX_1,
     GC_CHIP_PATCH_ES20_CONF_ATAN2,
@@ -169,17 +169,18 @@ typedef enum __GCPatchNum_enum
     GC_CHIP_PATCH_DEQP_COMPILE_TIME_4,
     GC_CHIP_PATCH_GFX4_FILL2,
     GC_CHIP_PATCH_ES20_CONF_CUBE,
+    GC_CHIP_PATCH_HUMANCAR0,
+    GC_CHIP_PATCH_HUMANCAR1,
     GC_CHIP_PATCH_GLMARK2_ES2,
+    GC_CHIP_PATCH_DEQP_WIDELINE_ES2,
+    GC_CHIP_PATCH_DEQP_WIDELINE_ES3,
     GC_CHIP_PATCH_GLU3,
     GC_CHIP_PATCH_GLU4,
     GC_CHIP_PATCH_MRVELBM20,
-    GC_CHIP_PATCH_DEQP_WIDELINE_ES2,
-    GC_CHIP_PATCH_DEQP_WIDELINE_ES3,
     GC_CHIP_PATCH_DEQP_MULTISAMPLE_INTERPOLATION_1,
     GC_CHIP_PATCH_DEQP_MULTISAMPLE_INTERPOLATION_2,
-    GC_CHIP_PATCH_DEQP_WIDELERPFIX,
     GC_CHIP_PATCH_DEQP_SYNTHETIC,
-    GC_CHIP_PATCH_LAST
+    GC_CHIP_PATCH_DEQP_WIDELERPFIX,     GC_CHIP_PATCH_LAST
 } __GCPatchNum;
 
 #define GC_CHIP_PATCH_NUM (GC_CHIP_PATCH_LAST + 1)
@@ -333,7 +334,7 @@ typedef struct __GLchipPatchBatchRec
     GLvoid                  *uniformData;
 
     /* Texture data. */
-    GLbitfield              texUnitAttrState[__GL_MAX_TEXTURE_UNITS];
+    GLuint64                texUnitAttrState[__GL_MAX_TEXTURE_UNITS];
     __GLbitmask             texUnitAttrDirtyMask;
     __GLbitmask             currentEnableMask;
     __GLtextureUnit         units[__GL_MAX_TEXTURE_UNITS];

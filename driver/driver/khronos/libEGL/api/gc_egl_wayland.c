@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -41,7 +41,7 @@
 #define GC_WL_MAX_SWAP_INTERVAL     1
 #define GC_WL_MIN_SWAP_INTERVAL     0
 
-#define WL_EGL_NUM_BACKBUFFERS          3
+#define WL_EGL_NUM_BACKBUFFERS          6
 #define WL_EGL_MAX_NUM_BACKBUFFERS      8
 
 typedef struct __WLEGLBufferRec *__WLEGLBuffer;
@@ -135,7 +135,6 @@ static pthread_once_t __once_control = PTHREAD_ONCE_INIT;
 static void
 __wl_egl_buffer_destroy(__WLEGLSurface egl_surface, __WLEGLBuffer buffer);
 
-
 static void __wl_swapworkers_done(struct wl_egl_window *window)
 {
     VEGLDisplay dpy = NULL;
@@ -169,7 +168,6 @@ static void __wl_swapworkers_done(struct wl_egl_window *window)
             gcvINFINITE);
     }
 }
-
 
 static void __wl_egl_init(void)
 {
@@ -867,7 +865,6 @@ __wl_egl_surface_destroy(__WLEGLSurface egl_surface)
         __wl_egl_buffer_destroy(egl_surface, buffer);
     }
 
-
     if (display && egl_surface->commit_queue && egl_surface->wl_queue)
     {
         __wl_egl_roundtrip_queue(display->wl_dpy, egl_surface->commit_queue);
@@ -1121,20 +1118,23 @@ __wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
 
         for (;;)
         {
-            int current = egl_surface->next;
-
-            buffer = &egl_surface->buffers[current];
-
-            if (buffer->state == BUFFER_STATE_FREE)
+            int i = 0;
+            for(i = 0; i < egl_surface->nr_buffers; i++)
             {
-                egl_surface->next = current + 1;
+                buffer = &egl_surface->buffers[i];
+                if (buffer->state == BUFFER_STATE_FREE)
+                    break;
+            }
+
+            if (i != egl_surface->nr_buffers)
+            {
+                egl_surface->next = i + 1;
 
                 if (egl_surface->next >= egl_surface->nr_buffers)
                     egl_surface->next -= egl_surface->nr_buffers;
 
                 break;
             }
-
             ret = __wl_egl_dispatch_queue(wl_dpy, wl_queue, 5);
 
             if (ret == -1)
@@ -1227,6 +1227,7 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
         __WLEGLBuffer buffer,
         struct eglRegion *damage)
 {
+    gcoSURF surface = NULL;
     __WLEGLSurface egl_surface = window->driver_private;
     __WLEGLDisplay display = egl_surface->display;
     struct wl_display *wl_dpy = display->wl_dpy;
@@ -1260,20 +1261,17 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
     window->dx = 0;
     window->dy = 0;
 
-    if (buffer->info.surface)
-    {
-        gcoSURF surface = buffer->info.surface;
+    surface = buffer->info.surface;
 
 #if gcdENABLE_3D
-        wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
-            !surface->tileStatusDisabled[0], surface->compressed,
-            surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
+    wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
+        !surface->tileStatusDisabled[0], surface->compressed,
+        surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
 #else
-        wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf, 0, 0, 0, 0, 0);
+    wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf, 0, 0, 0, 0, 0);
 #endif
 
-        gcoSURF_UpdateMetadata(surface, buffer->info.ts_fd);
-    }
+    gcoSURF_UpdateMetadata(surface, buffer->info.ts_fd);
 
     wl_surface_attach(egl_surface->wrap_surface, buffer->wl_buf, window->dx, window->dy);
     wl_surface_damage(egl_surface->wrap_surface, x, y, width, height);
@@ -1307,6 +1305,7 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
         __WLEGLBuffer buffer,
         struct eglRegion *damage)
 {
+    gcoSURF surface = NULL;
     __WLEGLSurface egl_surface = window->driver_private;
     __WLEGLDisplay display = egl_surface->display;
     struct wl_display *wl_dpy = display->wl_dpy;
@@ -1355,20 +1354,16 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
     window->dx = 0;
     window->dy = 0;
 
-    if (buffer->info.surface)
-    {
-        gcoSURF surface = buffer->info.surface;
-
+    surface = buffer->info.surface;
 #if gcdENABLE_3D
-        wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
-            !surface->tileStatusDisabled[0], surface->compressed,
-            surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
+    wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
+        !surface->tileStatusDisabled[0], surface->compressed,
+        surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
 #else
-        wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf, 0, 0, 0, 0, 0);
+    wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf, 0, 0, 0, 0, 0);
 #endif
 
-        gcoSURF_UpdateMetadata(surface, buffer->info.ts_fd);
-    }
+    gcoSURF_UpdateMetadata(surface, buffer->info.ts_fd);
 
     wl_surface_attach(window->surface, buffer->wl_buf, window->dx, window->dy);
     wl_surface_damage(window->surface, x, y, width, height);

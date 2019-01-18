@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -12,8 +12,9 @@
 
 
   {
-        "__unknown",
+        "__unknown", gcvNULL,
         VIR_TYPE_UNKNOWN,
+        0,
         0,
         0,
         0,
@@ -26,8 +27,9 @@
         VIR_TY_INVALID
     },
     {
-        "void",
+        "void", gcvNULL,
         VIR_TYPE_VOID,
+        0,
         0,
         0,
         0,
@@ -40,8 +42,9 @@
         VIR_TY_VOID
     },
     {
-        "float",
+        "float", gcvNULL,
         VIR_TYPE_FLOAT32,
+        1,
         1,
         1,
         1,
@@ -54,8 +57,9 @@
         VIR_TY_SCALAR
     },
     {
-        "half",
+        "half", gcvNULL,
         VIR_TYPE_FLOAT16,
+        1,
         1,
         1,
         1,
@@ -68,8 +72,9 @@
         VIR_TY_SCALAR
     },
     {
-        "int",
+        "int", gcvNULL,
         VIR_TYPE_INT32,
+        1,
         1,
         1,
         1,
@@ -82,8 +87,9 @@
         VIR_TY_SCALAR
     },
     {
-        "short",
+        "short", gcvNULL,
         VIR_TYPE_INT16,
+        1,
         1,
         1,
         1,
@@ -96,8 +102,9 @@
         VIR_TY_SCALAR
     },
     {
-        "char",
+        "char", gcvNULL,
         VIR_TYPE_INT8,
+        1,
         1,
         1,
         1,
@@ -110,8 +117,9 @@
         VIR_TY_SCALAR
     },
     {
-        "uint",
+        "uint", gcvNULL,
         VIR_TYPE_UINT32,
+        1,
         1,
         1,
         1,
@@ -124,8 +132,9 @@
         VIR_TY_SCALAR
     },
     {
-        "ushort",
+        "ushort", gcvNULL,
         VIR_TYPE_UINT16,
+        1,
         1,
         1,
         1,
@@ -138,8 +147,9 @@
         VIR_TY_SCALAR
     },
     {
-        "uchar",
+        "uchar", gcvNULL,
         VIR_TYPE_UINT8,
+        1,
         1,
         1,
         1,
@@ -152,8 +162,9 @@
         VIR_TY_SCALAR
     },
     {
-        "snorm16",
+        "snorm16", gcvNULL,
         VIR_TYPE_SNORM16,
+        1,
         1,
         1,
         1,
@@ -166,8 +177,9 @@
         VIR_TY_SCALAR
     },
     {
-        "snorm8",
+        "snorm8", gcvNULL,
         VIR_TYPE_SNORM8,
+        1,
         1,
         1,
         1,
@@ -180,8 +192,9 @@
         VIR_TY_SCALAR
     },
     {
-        "unorm16",
+        "unorm16", gcvNULL,
         VIR_TYPE_UNORM16,
+        1,
         1,
         1,
         1,
@@ -194,8 +207,9 @@
         VIR_TY_SCALAR
     },
     {
-        "unorm8",
+        "unorm8", gcvNULL,
         VIR_TYPE_UNORM8,
+        1,
         1,
         1,
         1,
@@ -208,8 +222,9 @@
         VIR_TY_SCALAR
     },
     {
-        "int64",
+        "int64", "long",
         VIR_TYPE_INT64,
+        1,
         1,
         1,
         2,
@@ -222,8 +237,9 @@
         VIR_TY_SCALAR
     },
     {
-        "uint64",
+        "uint64", "ulong",
         VIR_TYPE_UINT64,
+        1,
         1,
         1,
         2,
@@ -238,8 +254,9 @@
     /* double  type, fake it as float32 internally,
      * need to change it to real double when HW double is supported */
     {
-        "double",
+        "double", gcvNULL,
         VIR_TYPE_FLOAT64,
+        1,
         1,
         1,
         1,
@@ -252,8 +269,9 @@
         VIR_TY_SCALAR
     },
     {
-        "bool",
+        "bool", gcvNULL,
         VIR_TYPE_BOOLEAN,
+        1,
         1,
         1,
         1,
@@ -266,8 +284,9 @@
         VIR_TY_SCALAR
     },
     {
-        "vec2",
+        "vec2", "float2",
         VIR_TYPE_FLOAT_X2,
+        2,
         2,
         2,
         1,
@@ -280,8 +299,9 @@
         VIR_TY_VECTOR
     },
     {
-        "vec3",
+        "vec3", "float3",
         VIR_TYPE_FLOAT_X3,
+        3,
         3,
         3,
         1,
@@ -294,8 +314,9 @@
         VIR_TY_VECTOR
     },
     {
-        "vec4",
+        "vec4", "float4",
         VIR_TYPE_FLOAT_X4,
+        4,
         4,
         4,
         1,
@@ -308,8 +329,9 @@
         VIR_TY_VECTOR
     },
     {
-        "vec8",
+        "vec8", "float8",
         VIR_TYPE_FLOAT_X8,
+        8,
         4,
         4,
         2,
@@ -322,8 +344,9 @@
         VIR_TY_VECTOR
     },
     {
-        "vec16",
+        "vec16", "float16",
         VIR_TYPE_FLOAT_X16,
+        16,
         4,
         4,
         4,
@@ -336,8 +359,9 @@
         VIR_TY_VECTOR
     },
     {
-        "vec32",
+        "vec32", "float32",
         VIR_TYPE_FLOAT_X32,
+        32,
         4,
         4,
         8,
@@ -350,8 +374,9 @@
         VIR_TY_VECTOR
     },
     {
-        "hvec2",
+        "hvec2", "half2",
         VIR_TYPE_FLOAT16_X2,
+        2,
         2,
         2,
         1,
@@ -364,8 +389,9 @@
         VIR_TY_VECTOR
     },
     {
-        "hvec3",
+        "hvec3", "half3",
         VIR_TYPE_FLOAT16_X3,
+        3,
         3,
         3,
         1,
@@ -378,8 +404,9 @@
         VIR_TY_VECTOR
     },
     {
-        "hvec4",
+        "hvec4", "half4",
         VIR_TYPE_FLOAT16_X4,
+        4,
         4,
         4,
         1,
@@ -392,8 +419,9 @@
         VIR_TY_VECTOR
     },
     {
-        "hvec8",
+        "hvec8", "half8",
         VIR_TYPE_FLOAT16_X8,
+        8,
         4,
         4,
         2,
@@ -406,8 +434,9 @@
         VIR_TY_VECTOR
     },
     {
-        "hvec16",
+        "hvec16", "half16",
         VIR_TYPE_FLOAT16_X16,
+        16,
         4,
         4,
         4,
@@ -420,8 +449,9 @@
         VIR_TY_VECTOR
     },
     {
-        "hvec32",
+        "hvec32", "half32",
         VIR_TYPE_FLOAT16_X32,
+        32,
         4,
         4,
         8,
@@ -437,8 +467,9 @@
     /* double vector type, fake it as float32 vector internally,
      * need to change it to real double when HW double is supported */
     {
-        "dvec2",
+        "dvec2", "double2",
         VIR_TYPE_FLOAT64_X2,
+        2,
         2,
         2,
         1,
@@ -451,8 +482,9 @@
         VIR_TY_VECTOR
     },
     {
-        "dvec3",
+        "dvec3", "double3",
         VIR_TYPE_FLOAT64_X3,
+        3,
         3,
         3,
         1,
@@ -465,8 +497,9 @@
         VIR_TY_VECTOR
     },
     {
-        "dvec4",
+        "dvec4", "double4",
         VIR_TYPE_FLOAT64_X4,
+        4,
         4,
         4,
         1,
@@ -479,8 +512,9 @@
         VIR_TY_VECTOR
     },
     {
-        "dvec8",
+        "dvec8", "double8",
         VIR_TYPE_FLOAT64_X8,
+        8,
         4,
         4,
         2,
@@ -493,8 +527,9 @@
         VIR_TY_VECTOR
     },
     {
-        "dvec16",
+        "dvec16", "double16",
         VIR_TYPE_FLOAT64_X16,
+        16,
         4,
         4,
         4,
@@ -507,8 +542,9 @@
         VIR_TY_VECTOR
     },
     {
-        "dvec32",
+        "dvec32", "double32",
         VIR_TYPE_FLOAT64_X32,
+        32,
         4,
         4,
         8,
@@ -522,8 +558,9 @@
     },
 
     {
-        "bvec2",
+        "bvec2", "bool2",
         VIR_TYPE_BOOLEAN_X2,
+        2,
         2,
         2,
         1,
@@ -536,8 +573,9 @@
         VIR_TY_VECTOR
     },
     {
-        "bvec3",
+        "bvec3", "bool3",
         VIR_TYPE_BOOLEAN_X3,
+        3,
         3,
         3,
         1,
@@ -550,8 +588,9 @@
         VIR_TY_VECTOR
     },
     {
-        "bvec4",
+        "bvec4", "bool4",
         VIR_TYPE_BOOLEAN_X4,
+        4,
         4,
         4,
         1,
@@ -564,8 +603,9 @@
         VIR_TY_VECTOR
     },
     {
-        "bvec8",
+        "bvec8", "bool8",
         VIR_TYPE_BOOLEAN_X8,
+        8,
         4,
         4,
         2,
@@ -578,8 +618,9 @@
         VIR_TY_VECTOR
     },
     {
-        "bvec16",
+        "bvec16", "bool16",
         VIR_TYPE_BOOLEAN_X16,
+        16,
         4,
         4,
         4,
@@ -592,8 +633,9 @@
         VIR_TY_VECTOR
     },
     {
-        "bvec32",
+        "bvec32", "bool32",
         VIR_TYPE_BOOLEAN_X32,
+        32,
         4,
         4,
         8,
@@ -606,8 +648,9 @@
         VIR_TY_VECTOR
     },
     {
-        "ivec2",
+        "ivec2", "int2",
         VIR_TYPE_INTEGER_X2,
+        2,
         2,
         2,
         1,
@@ -620,8 +663,9 @@
         VIR_TY_VECTOR
     },
     {
-        "ivec3",
+        "ivec3", "int3",
         VIR_TYPE_INTEGER_X3,
+        3,
         3,
         3,
         1,
@@ -634,8 +678,9 @@
         VIR_TY_VECTOR
     },
     {
-        "ivec4",
+        "ivec4", "int4",
         VIR_TYPE_INTEGER_X4,
+        4,
         4,
         4,
         1,
@@ -648,8 +693,9 @@
         VIR_TY_VECTOR
     },
     {
-        "ivec8",
+        "ivec8", "int8",
         VIR_TYPE_INTEGER_X8,
+        8,
         4,
         4,
         2,
@@ -662,8 +708,9 @@
         VIR_TY_VECTOR
     },
     {
-        "ivec16",
+        "ivec16", "int16",
         VIR_TYPE_INTEGER_X16,
+        16,
         4,
         4,
         4,
@@ -676,8 +723,9 @@
         VIR_TY_VECTOR
     },
     {
-        "ivec32",
+        "ivec32", "int32",
         VIR_TYPE_INTEGER_X32,
+        32,
         4,
         4,
         8,
@@ -690,8 +738,9 @@
         VIR_TY_VECTOR
     },
     {
-        "uvec2",
+        "uvec2", "uint2",
         VIR_TYPE_UINT_X2,
+        2,
         2,
         2,
         1,
@@ -704,8 +753,9 @@
         VIR_TY_VECTOR
     },
     {
-        "uvec3",
+        "uvec3", "uint3",
         VIR_TYPE_UINT_X3,
+        3,
         3,
         3,
         1,
@@ -718,8 +768,9 @@
         VIR_TY_VECTOR
     },
     {
-        "uvec4",
+        "uvec4", "uint4",
         VIR_TYPE_UINT_X4,
+        4,
         4,
         4,
         1,
@@ -732,8 +783,9 @@
         VIR_TY_VECTOR
     },
     {
-        "uvec8",
+        "uvec8", "uint8",
         VIR_TYPE_UINT_X8,
+        8,
         4,
         4,
         2,
@@ -746,8 +798,9 @@
         VIR_TY_VECTOR
     },
     {
-        "uvec16",
+        "uvec16", "uint16",
         VIR_TYPE_UINT_X16,
+        16,
         4,
         4,
         4,
@@ -760,8 +813,9 @@
         VIR_TY_VECTOR
     },
     {
-        "uvec32",
+        "uvec32", "uint32",
         VIR_TYPE_UINT_X32,
+        32,
         4,
         4,
         8,
@@ -775,8 +829,9 @@
     },
     /* uchar vectors */
     {
-        "uchar_X2",
+        "ucvec2", "uchar2",
         VIR_TYPE_UINT8_X2,
+        2,
         2,
         2,
         1,
@@ -789,8 +844,9 @@
         VIR_TY_VECTOR
     },
     {
-        "uchar_X3",
+        "ucvec3", "uchar3",
         VIR_TYPE_UINT8_X3,
+        3,
         3,
         3,
         1,
@@ -803,8 +859,9 @@
         VIR_TY_VECTOR
     },
     {
-        "uchar_X4",
+        "ucvec4", "uchar4",
         VIR_TYPE_UINT8_X4,
+        4,
         4,
         4,
         1,
@@ -817,8 +874,9 @@
         VIR_TY_VECTOR
     },
     {
-        "uchar_X8",
+        "ucvec8", "uchar8",
         VIR_TYPE_UINT8_X8,
+        8,
         4,
         4,
         2,
@@ -831,8 +889,9 @@
         VIR_TY_VECTOR
     },
     {
-        "uchar_X16",
+        "ucvec16", "uchar16",
         VIR_TYPE_UINT8_X16,
+        16,
         4,
         4,
         4,
@@ -845,8 +904,9 @@
         VIR_TY_VECTOR
     },
     {
-        "uchar_X32",
+        "ucvec32", "uchar32",
         VIR_TYPE_UINT8_X32,
+        32,
         4,
         4,
         8,
@@ -861,8 +921,9 @@
 
     /* char vectors */
     {
-        "char_X2",
+        "cvec2", "char2",
         VIR_TYPE_INT8_X2,
+        2,
         2,
         2,
         1,
@@ -875,8 +936,9 @@
         VIR_TY_VECTOR
     },
     {
-        "char_X3",
+        "cvec3", "char3",
         VIR_TYPE_INT8_X3,
+        3,
         3,
         3,
         1,
@@ -889,8 +951,9 @@
         VIR_TY_VECTOR
     },
     {
-        "char_X4",
+        "cvec4", "char4",
         VIR_TYPE_INT8_X4,
+        4,
         4,
         4,
         1,
@@ -903,8 +966,9 @@
         VIR_TY_VECTOR
     },
     {
-        "char_X8",
+        "cvec8", "char8",
         VIR_TYPE_INT8_X8,
+        8,
         4,
         4,
         2,
@@ -917,8 +981,9 @@
         VIR_TY_VECTOR
     },
     {
-        "char_X16",
+        "cvec16", "char16",
         VIR_TYPE_INT8_X16,
+        16,
         4,
         4,
         4,
@@ -931,8 +996,9 @@
         VIR_TY_VECTOR
     },
     {
-        "char_X32",
+        "cvec32", "char32",
         VIR_TYPE_INT8_X32,
+        32,
         4,
         4,
         8,
@@ -946,8 +1012,9 @@
     },
     /* ushort vectors */
     {
-        "ushort_X2",
+        "usvec2", "ushort2",
         VIR_TYPE_UINT16_X2,
+        2,
         2,
         2,
         1,
@@ -960,8 +1027,9 @@
         VIR_TY_VECTOR
     },
     {
-        "ushort_X3",
+        "usvec3", "ushort3",
         VIR_TYPE_UINT16_X3,
+        3,
         3,
         3,
         1,
@@ -974,8 +1042,9 @@
         VIR_TY_VECTOR
     },
     {
-        "ushort_X4",
+        "usvec4", "ushort4",
         VIR_TYPE_UINT16_X4,
+        4,
         4,
         4,
         1,
@@ -988,8 +1057,9 @@
         VIR_TY_VECTOR
     },
     {
-        "ushort_X8",
+        "usvec8", "ushort8",
         VIR_TYPE_UINT16_X8,
+        8,
         4,
         4,
         2,
@@ -1002,8 +1072,9 @@
         VIR_TY_VECTOR
     },
     {
-        "ushort_X16",
+        "usvec16", "ushort16",
         VIR_TYPE_UINT16_X16,
+        16,
         4,
         4,
         4,
@@ -1016,8 +1087,9 @@
         VIR_TY_VECTOR
     },
     {
-        "ushort_X32",
+        "usvec32", "ushort32",
         VIR_TYPE_UINT16_X32,
+        32,
         4,
         4,
         8,
@@ -1032,8 +1104,9 @@
 
     /* short vectors */
     {
-        "short_X2",
+        "svec2", "short2",
         VIR_TYPE_INT16_X2,
+        2,
         2,
         2,
         1,
@@ -1046,8 +1119,9 @@
         VIR_TY_VECTOR
     },
     {
-        "short_X3",
+        "svec3", "short3",
         VIR_TYPE_INT16_X3,
+        3,
         3,
         3,
         1,
@@ -1060,8 +1134,9 @@
         VIR_TY_VECTOR
     },
     {
-        "short_X4",
+        "svec4", "short4",
         VIR_TYPE_INT16_X4,
+        4,
         4,
         4,
         1,
@@ -1074,8 +1149,9 @@
         VIR_TY_VECTOR
     },
     {
-        "short_X8",
+        "svec8", "short8",
         VIR_TYPE_INT16_X8,
+        8,
         4,
         4,
         2,
@@ -1088,8 +1164,9 @@
         VIR_TY_VECTOR
     },
     {
-        "short_X16",
+        "svec16", "short16",
         VIR_TYPE_INT16_X16,
+        16,
         4,
         4,
         4,
@@ -1102,8 +1179,9 @@
         VIR_TY_VECTOR
     },
     {
-        "short_X32",
+        "svec32", "short32",
         VIR_TYPE_INT16_X32,
+        32,
         4,
         4,
         8,
@@ -1118,12 +1196,13 @@
 
     /* ulong vectors */
     {
-        "ulong_X2",
+        "ulvec2", "ulong2",
         VIR_TYPE_UINT64_X2,
         2,
         2,
         2,
-        VIR_TYPE_UINT_X2,
+        2,
+        VIR_TYPE_UINT64_X2,
         VIR_TYPE_UINT64,
         16/* size */,
         0,
@@ -1132,8 +1211,9 @@
         VIR_TY_VECTOR
     },
     {
-        "ulong_X3",
+        "ulvec3", "ulong3",
         VIR_TYPE_UINT64_X3,
+        3,
         3,
         3,
         2,
@@ -1146,12 +1226,13 @@
         VIR_TY_VECTOR
     },
     {
-        "ulong_X4",
+        "ulvec4", "ulong4",
         VIR_TYPE_UINT64_X4,
         4,
         4,
+        4,
         2,
-        VIR_TYPE_UINT_X4,
+        VIR_TYPE_UINT64_X4,
         VIR_TYPE_UINT64,
         32/* size */,
         0,
@@ -1160,12 +1241,13 @@
         VIR_TY_VECTOR
     },
     {
-        "ulong_X8",
+        "ulvec8", "ulong8",
         VIR_TYPE_UINT64_X8,
-        4,
-        4,
         8,
-        VIR_TYPE_UINT_X4,
+        4,
+        4,
+        4,
+        VIR_TYPE_UINT64_X4,
         VIR_TYPE_UINT64,
         64/* size */,
         0,
@@ -1174,12 +1256,13 @@
         VIR_TY_VECTOR
     },
     {
-        "ulong_X16",
+        "ulvec16", "ulong16",
         VIR_TYPE_UINT64_X16,
-        4,
-        4,
         16,
-        VIR_TYPE_UINT_X4,
+        4,
+        4,
+        8,
+        VIR_TYPE_UINT64_X4,
         VIR_TYPE_UINT64,
         128/* size */,
         0,
@@ -1188,11 +1271,12 @@
         VIR_TY_VECTOR
     },
     {
-        "ulong_X32",
+        "ulvec32", "ulong32",
         VIR_TYPE_UINT64_X32,
-        4,
-        4,
         32,
+        4,
+        4,
+        16,
         VIR_TYPE_UINT_X4,
         VIR_TYPE_UINT64,
         256/* size */,
@@ -1204,12 +1288,13 @@
 
     /* long vectors */
     {
-        "long_X2",
+        "lvec2", "long2",
         VIR_TYPE_INT64_X2,
         2,
         2,
         2,
-        VIR_TYPE_INTEGER_X2,
+        2,
+        VIR_TYPE_INT64_X2,
         VIR_TYPE_INT64,
         16/* size */,
         0,
@@ -1218,8 +1303,9 @@
         VIR_TY_VECTOR
     },
     {
-        "long_X3",
+        "lvec3", "long3",
         VIR_TYPE_INT64_X3,
+        3,
         3,
         3,
         2,
@@ -1232,12 +1318,13 @@
         VIR_TY_VECTOR
     },
     {
-        "long_X4",
+        "lvec4", "long4",
         VIR_TYPE_INT64_X4,
         4,
         4,
+        4,
         2,
-        VIR_TYPE_INTEGER_X4,
+        VIR_TYPE_INT64_X4,
         VIR_TYPE_INT64,
         32/* size */,
         0,
@@ -1246,12 +1333,13 @@
         VIR_TY_VECTOR
     },
     {
-        "long_X8",
+        "lvec8", "long8",
         VIR_TYPE_INT64_X8,
+        8,
         4,
         4,
         4,
-        VIR_TYPE_INTEGER_X4,
+        VIR_TYPE_INT64_X4,
         VIR_TYPE_INT64,
         64/* size */,
         0,
@@ -1260,12 +1348,13 @@
         VIR_TY_VECTOR
     },
     {
-        "long_X16",
+        "lvec16", "long16",
         VIR_TYPE_INT64_X16,
-        4,
-        4,
         16,
-        VIR_TYPE_INTEGER_X4,
+        4,
+        4,
+        8,
+        VIR_TYPE_INT64_X4,
         VIR_TYPE_INT64,
         128/* size */,
         0,
@@ -1274,11 +1363,12 @@
         VIR_TY_VECTOR
     },
     {
-        "long_X32",
+        "lvec32", "long32",
         VIR_TYPE_INT64_X32,
-        4,
-        4,
         32,
+        4,
+        4,
+        16,
         VIR_TYPE_INTEGER_X4,
         VIR_TYPE_INT64,
         256/* size */,
@@ -1292,8 +1382,9 @@
 
     /* packed float16 (2 bytes per element) */
     {
-        "half_P2",
+        "half_P2", "half2P",
         VIR_TYPE_FLOAT16_P2,
+        2,
         1,
         2,
         1,
@@ -1306,8 +1397,9 @@
         VIR_TY_VECTOR
     },
     {
-        "half_P3",
+        "half_P3", "half3P",
         VIR_TYPE_FLOAT16_P3,
+        3,
         1,
         3,
         1,
@@ -1320,8 +1412,9 @@
         VIR_TY_VECTOR
     },
     {
-        "half_P4",
+        "half_P4", "half4P",
         VIR_TYPE_FLOAT16_P4,
+        4,
         1,
         4,
         1,
@@ -1334,8 +1427,9 @@
         VIR_TY_VECTOR
     },
     {
-        "half_P8",
+        "half_P8", "half8P",
         VIR_TYPE_FLOAT16_P8,
+        8,
         2,
         8,
         1,
@@ -1348,8 +1442,9 @@
         VIR_TY_VECTOR
     },
     {
-        "half_P16",
+        "half_P16", "half16P",
         VIR_TYPE_FLOAT16_P16,
+        16,
         4,
         8,
         2,
@@ -1362,8 +1457,9 @@
         VIR_TY_VECTOR
     },
     {
-        "half_P32",
+        "half_P32", "half32P",
         VIR_TYPE_FLOAT16_P32,
+        32,
         4,
         8,
         4,
@@ -1378,8 +1474,9 @@
 
     /* packed boolean (1 byte per element) */
     {
-        "bool_P2",
+        "bool_P2", "bool2P",
         VIR_TYPE_BOOLEAN_P2,
+        2,
         1,
         2,
         1,
@@ -1392,8 +1489,9 @@
         VIR_TY_VECTOR
     },
     {
-        "bool_P3",
+        "bool_P3", "bool3P",
         VIR_TYPE_BOOLEAN_P3,
+        3,
         1,
         3,
         1,
@@ -1406,8 +1504,9 @@
         VIR_TY_VECTOR
     },
     {
-        "bool_P4",
+        "bool_P4", "bool4P",
         VIR_TYPE_BOOLEAN_P4,
+        4,
         1,
         4,
         1,
@@ -1420,8 +1519,9 @@
         VIR_TY_VECTOR
     },
     {
-        "bool_P8",
+        "bool_P8", "bool8P",
         VIR_TYPE_BOOLEAN_P8,
+        8,
         2,
         8,
         1,
@@ -1434,8 +1534,9 @@
         VIR_TY_VECTOR
     },
     {
-        "bool_P16",
+        "bool_P16", "bool16P",
         VIR_TYPE_BOOLEAN_P16,
+        16,
         4,
         16,
         1,
@@ -1448,8 +1549,9 @@
         VIR_TY_VECTOR
     },
     {
-        "bool_P32",
+        "bool_P32", "bool32P",
         VIR_TYPE_BOOLEAN_P32,
+        32,
         4,
         16,
         2,
@@ -1464,8 +1566,9 @@
 
     /* uchar vectors */
     {
-        "uchar_P2",
+        "uchar_P2", "uchar2P",
         VIR_TYPE_UINT8_P2,
+        2,
         1,
         2,
         1,
@@ -1478,8 +1581,9 @@
         VIR_TY_VECTOR
     },
     {
-        "uchar_P3",
+        "uchar_P3", "uchar3P",
         VIR_TYPE_UINT8_P3,
+        3,
         1,
         3,
         1,
@@ -1492,8 +1596,9 @@
         VIR_TY_VECTOR
     },
     {
-        "uchar_P4",
+        "uchar_P4", "uchar4P",
         VIR_TYPE_UINT8_P4,
+        4,
         1,
         4,
         1,
@@ -1506,8 +1611,9 @@
         VIR_TY_VECTOR
     },
     {
-        "uchar_P8",
+        "uchar_P8", "uchar8P",
         VIR_TYPE_UINT8_P8,
+        8,
         2,
         8,
         1,
@@ -1520,8 +1626,9 @@
         VIR_TY_VECTOR
     },
     {
-        "uchar_P16",
+        "uchar_P16", "uchar16P",
         VIR_TYPE_UINT8_P16,
+        16,
         4,
         16,
         1,
@@ -1534,8 +1641,9 @@
         VIR_TY_VECTOR
     },
     {
-        "uchar_P32",
+        "uchar_P32", "uchar32P",
         VIR_TYPE_UINT8_P32,
+        32,
         4,
         16,
         2,
@@ -1550,8 +1658,9 @@
 
     /* char vectors */
     {
-        "char_P2",
+        "char_P2", "char2P",
         VIR_TYPE_INT8_P2,
+        2,
         1,
         2,
         1,
@@ -1564,8 +1673,9 @@
         VIR_TY_VECTOR
     },
     {
-        "char_P3",
+        "char_P3", "char3P",
         VIR_TYPE_INT8_P3,
+        3,
         1,
         3,
         1,
@@ -1578,8 +1688,9 @@
         VIR_TY_VECTOR
     },
     {
-        "char_P4",
+        "char_P4", "char4P",
         VIR_TYPE_INT8_P4,
+        4,
         1,
         4,
         1,
@@ -1592,8 +1703,9 @@
         VIR_TY_VECTOR
     },
     {
-        "char_P8",
+        "char_P8", "char8P",
         VIR_TYPE_INT8_P8,
+        8,
         2,
         8,
         1,
@@ -1606,8 +1718,9 @@
         VIR_TY_VECTOR
     },
     {
-        "char_P16",
+        "char_P16", "char16P",
         VIR_TYPE_INT8_P16,
+        16,
         4,
         16,
         1,
@@ -1620,8 +1733,9 @@
         VIR_TY_VECTOR
     },
     {
-        "char_P32",
+        "char_P32", "char32P",
         VIR_TYPE_INT8_P32,
+        32,
         4,
         16,
         2,
@@ -1635,8 +1749,9 @@
     },
     /* ushort vectors */
     {
-        "ushort_P2",
+        "ushort_P2", "ushort2P",
         VIR_TYPE_UINT16_P2,
+        2,
         1,
         2,
         1,
@@ -1649,8 +1764,9 @@
         VIR_TY_VECTOR
     },
     {
-        "ushort_P3",
+        "ushort_P3", "ushort3P",
         VIR_TYPE_UINT16_P3,
+        3,
         2,
         3,
         1,
@@ -1663,8 +1779,9 @@
         VIR_TY_VECTOR
     },
     {
-        "ushort_P4",
+        "ushort_P4", "ushort4P",
         VIR_TYPE_UINT16_P4,
+        4,
         2,
         4,
         1,
@@ -1677,8 +1794,9 @@
         VIR_TY_VECTOR
     },
     {
-        "ushort_P8",
+        "ushort_P8", "ushort8P",
         VIR_TYPE_UINT16_P8,
+        8,
         4,
         8,
         1,
@@ -1691,8 +1809,9 @@
         VIR_TY_VECTOR
     },
     {
-        "ushort_P16",
+        "ushort_P16", "ushort16P",
         VIR_TYPE_UINT16_P16,
+        16,
         4,
         8,
         2,
@@ -1705,8 +1824,9 @@
         VIR_TY_VECTOR
     },
     {
-        "ushort_P32",
+        "ushort_P32", "ushort32P",
         VIR_TYPE_UINT16_P32,
+        32,
         4,
         8,
         4,
@@ -1721,8 +1841,9 @@
 
     /* short vectors */
     {
-        "short_P2",
+        "short_P2", "short2P",
         VIR_TYPE_INT16_P2,
+        2,
         1,
         2,
         1,
@@ -1735,8 +1856,9 @@
         VIR_TY_VECTOR
     },
     {
-        "short_P3",
+        "short_P3", "short3P",
         VIR_TYPE_INT16_P3,
+        3,
         2,
         3,
         1,
@@ -1749,8 +1871,9 @@
         VIR_TY_VECTOR
     },
     {
-        "short_P4",
+        "short_P4", "short4P",
         VIR_TYPE_INT16_P4,
+        4,
         2,
         4,
         1,
@@ -1763,8 +1886,9 @@
         VIR_TY_VECTOR
     },
     {
-        "short_P8",
+        "short_P8", "short8P",
         VIR_TYPE_INT16_P8,
+        8,
         4,
         8,
         1,
@@ -1777,8 +1901,9 @@
         VIR_TY_VECTOR
     },
     {
-        "short_P16",
+        "short_P16", "short16P",
         VIR_TYPE_INT16_P16,
+        16,
         4,
         16,
         2,
@@ -1791,8 +1916,9 @@
         VIR_TY_VECTOR
     },
     {
-        "short_P32",
+        "short_P32", "short32P",
         VIR_TYPE_INT16_P32,
+        32,
         4,
         16,
         4,
@@ -1807,8 +1933,9 @@
 
     /* matrix type: only support float type */
     {
-        "mat2",
+        "mat2", "float2x2",
         VIR_TYPE_FLOAT_2X2,
+        2,
         2,
         2,
         2,
@@ -1821,8 +1948,9 @@
         VIR_TY_MATRIX
     },
     {
-        "mat3",
+        "mat3", "float3x3",
         VIR_TYPE_FLOAT_3X3,
+        3,
         3,
         3,
         3,
@@ -1835,8 +1963,9 @@
         VIR_TY_MATRIX
     },
     {
-        "mat4",
+        "mat4", "float4x4",
         VIR_TYPE_FLOAT_4X4,
+        4,
         4,
         4,
         4,
@@ -1849,8 +1978,9 @@
         VIR_TY_MATRIX
     },
     {
-        "mat2X3",
+        "mat2X3", "float2x3",
         VIR_TYPE_FLOAT_2X3,
+        3,
         3,
         3,
         2,
@@ -1863,8 +1993,9 @@
         VIR_TY_MATRIX
     },
     {
-        "mat2X4",
+        "mat2X4", "float2x4",
         VIR_TYPE_FLOAT_2X4,
+        4,
         4,
         4,
         2,
@@ -1877,8 +2008,9 @@
         VIR_TY_MATRIX
     },
     {
-        "mat3X2",
+        "mat3X2", "float3x2",
         VIR_TYPE_FLOAT_3X2,
+        2,
         2,
         2,
         3,
@@ -1891,8 +2023,9 @@
         VIR_TY_MATRIX
     },
     {
-        "mat3X4",
+        "mat3X4", "float3x4",
         VIR_TYPE_FLOAT_3X4,
+        4,
         4,
         4,
         3,
@@ -1905,8 +2038,9 @@
         VIR_TY_MATRIX
     },
     {
-        "mat4X2",
+        "mat4X2", "float4x2",
         VIR_TYPE_FLOAT_4X2,
+        2,
         2,
         2,
         4,
@@ -1919,8 +2053,9 @@
         VIR_TY_MATRIX
     },
     {
-        "mat4X3",
+        "mat4X3", "float4x3",
         VIR_TYPE_FLOAT_4X3,
+        3,
         3,
         3,
         4,
@@ -1935,8 +2070,9 @@
     /* double matrix, fake it as float32 matrix internally,
      * need to change it to real double if HW double is supported */
     {
-        "dmat2",
+        "dmat2", "double2x2",
         VIR_TYPE_FLOAT64_2X2,
+        2,
         2,
         2,
         2,
@@ -1949,8 +2085,9 @@
         VIR_TY_MATRIX
     },
     {
-        "dmat3",
+        "dmat3", "double3x3",
         VIR_TYPE_FLOAT64_3X3,
+        3,
         3,
         3,
         3,
@@ -1963,8 +2100,9 @@
         VIR_TY_MATRIX
     },
     {
-        "dmat4",
+        "dmat4", "double4x4",
         VIR_TYPE_FLOAT64_4X4,
+        4,
         4,
         4,
         4,
@@ -1977,10 +2115,11 @@
         VIR_TY_MATRIX
     },
     {
-        "dmat2X3",
+        "dmat2X3", "double2x3",
         VIR_TYPE_FLOAT64_2X3,
         3,
         3,
+        3,
         2,
         VIR_TYPE_FLOAT_X3,
         VIR_TYPE_FLOAT32,
@@ -1991,10 +2130,11 @@
         VIR_TY_MATRIX
     },
     {
-        "dmat2X4",
+        "dmat2X4", "double2x4",
         VIR_TYPE_FLOAT64_2X4,
         4,
         4,
+        4,
         2,
         VIR_TYPE_FLOAT_X4,
         VIR_TYPE_FLOAT32,
@@ -2005,8 +2145,9 @@
         VIR_TY_MATRIX
     },
     {
-        "dmat3X2",
+        "dmat3X2", "double3x2",
         VIR_TYPE_FLOAT64_3X2,
+        2,
         2,
         2,
         3,
@@ -2019,8 +2160,9 @@
         VIR_TY_MATRIX
     },
     {
-        "dmat3X4",
+        "dmat3X4", "double3x4",
         VIR_TYPE_FLOAT64_3X4,
+        4,
         4,
         4,
         3,
@@ -2033,8 +2175,9 @@
         VIR_TY_MATRIX
     },
     {
-        "dmat4X2",
+        "dmat4X2", "double4x2",
         VIR_TYPE_FLOAT64_4X2,
+        2,
         2,
         2,
         4,
@@ -2047,8 +2190,9 @@
         VIR_TY_MATRIX
     },
     {
-        "dmat4X3",
+        "dmat4X3", "double4x3",
         VIR_TYPE_FLOAT64_4X3,
+        3,
         3,
         3,
         4,
@@ -2061,22 +2205,9 @@
         VIR_TY_MATRIX
     },
     {
-        "sampler_generic",
-        VIR_TYPE_SAMPLER_GENERIC,
-        4,
-        4,
-        1,
-        VIR_TYPE_UNKNOWN,
-        VIR_TYPE_UNKNOWN,
-        0/* size */,
-        0,
-        0,
-        0,
-        VIR_TY_SAMPLER
-    },
-    {
-        "sampler1D",
+        "sampler1D", gcvNULL,
         VIR_TYPE_SAMPLER_1D,
+        1,
         4,
         4,
         1,
@@ -2089,8 +2220,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "sampler2D",
+        "sampler2D", gcvNULL,
         VIR_TYPE_SAMPLER_2D,
+        1,
         4,
         4,
         1,
@@ -2103,8 +2235,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "sampler3D",
+        "sampler3D", gcvNULL,
         VIR_TYPE_SAMPLER_3D,
+        1,
         4,
         4,
         1,
@@ -2117,8 +2250,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "samplerCube",
+        "samplerCube", gcvNULL,
         VIR_TYPE_SAMPLER_CUBIC,
+        1,
         4,
         4,
         1,
@@ -2131,8 +2265,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "samplerCubeArray",
+        "samplerCubeArray", gcvNULL,
         VIR_TYPE_SAMPLER_CUBE_ARRAY,
+        1,
         4,
         4,
         1,
@@ -2145,8 +2280,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "sampler",
+        "sampler", gcvNULL,
         VIR_TYPE_SAMPLER,
+        1,
         4,
         4,
         1,
@@ -2159,8 +2295,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "isampler1D",
+        "isampler1D", gcvNULL,
         VIR_TYPE_ISAMPLER_1D,
+        1,
         4,
         4,
         1,
@@ -2173,8 +2310,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "isampler2D",
+        "isampler2D", gcvNULL,
         VIR_TYPE_ISAMPLER_2D,
+        1,
         4,
         4,
         1,
@@ -2187,8 +2325,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "isampler3D",
+        "isampler3D", gcvNULL,
         VIR_TYPE_ISAMPLER_3D,
+        1,
         4,
         4,
         1,
@@ -2201,8 +2340,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "isamplerCube",
+        "isamplerCube", gcvNULL,
         VIR_TYPE_ISAMPLER_CUBIC,
+        1,
         4,
         4,
         1,
@@ -2215,8 +2355,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "isamplerCubeArray",
+        "isamplerCubeArray", gcvNULL,
         VIR_TYPE_ISAMPLER_CUBE_ARRAY,
+        1,
         4,
         4,
         1,
@@ -2229,8 +2370,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "usampler1D",
+        "usampler1D", gcvNULL,
         VIR_TYPE_USAMPLER_1D,
+        1,
         4,
         4,
         1,
@@ -2243,8 +2385,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "usampler2D",
+        "usampler2D", gcvNULL,
         VIR_TYPE_USAMPLER_2D,
+        1,
         4,
         4,
         1,
@@ -2257,8 +2400,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "usampler3D",
+        "usampler3D", gcvNULL,
         VIR_TYPE_USAMPLER_3D,
+        1,
         4,
         4,
         1,
@@ -2271,8 +2415,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "usamplerCube",
+        "usamplerCube", gcvNULL,
         VIR_TYPE_USAMPLER_CUBIC,
+        1,
         4,
         4,
         1,
@@ -2285,8 +2430,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "usamplerCubeArray",
+        "usamplerCubeArray", gcvNULL,
         VIR_TYPE_USAMPLER_CUBE_ARRAY,
+        1,
         4,
         4,
         1,
@@ -2299,8 +2445,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "sampler_exeternal_oes",
+        "sampler_exeternal_oes", gcvNULL,
         VIR_TYPE_SAMPLER_EXTERNAL_OES,
+        1,
         4,
         4,
         1,
@@ -2313,8 +2460,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "sampler_1d_shadow",
+        "sampler_1d_shadow", gcvNULL,
         VIR_TYPE_SAMPLER_1D_SHADOW,
+        1,
         4,
         4,
         1,
@@ -2327,8 +2475,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "sampler_2d_shadow",
+        "sampler_2d_shadow", gcvNULL,
         VIR_TYPE_SAMPLER_2D_SHADOW,
+        1,
         4,
         4,
         1,
@@ -2341,8 +2490,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "sampler_cube_shadow",
+        "sampler_cube_shadow", gcvNULL,
         VIR_TYPE_SAMPLER_CUBE_SHADOW,
+        1,
         4,
         4,
         1,
@@ -2355,8 +2505,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "sampler_cube_array_shadow",
+        "sampler_cube_array_shadow", gcvNULL,
         VIR_TYPE_SAMPLER_CUBE_ARRAY_SHADOW,
+        1,
         4,
         4,
         1,
@@ -2369,8 +2520,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "sampler_1d_array",
+        "sampler_1d_array", gcvNULL,
         VIR_TYPE_SAMPLER_1D_ARRAY,
+        1,
         4,
         4,
         1,
@@ -2383,8 +2535,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "sampler_1d_array_shadow",
+        "sampler_1d_array_shadow", gcvNULL,
         VIR_TYPE_SAMPLER_1D_ARRAY_SHADOW,
+        1,
         4,
         4,
         1,
@@ -2397,8 +2550,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "sampler_2d_array",
+        "sampler_2d_array", gcvNULL,
         VIR_TYPE_SAMPLER_2D_ARRAY,
+        1,
         4,
         4,
         1,
@@ -2411,8 +2565,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "isampler_2d_array",
+        "isampler_2d_array", gcvNULL,
         VIR_TYPE_ISAMPLER_2D_ARRAY,
+        1,
         4,
         4,
         1,
@@ -2425,8 +2580,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "usampler_2d_array",
+        "usampler_2d_array", gcvNULL,
         VIR_TYPE_USAMPLER_2D_ARRAY,
+        1,
         4,
         4,
         1,
@@ -2439,8 +2595,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "sampler_2d_array_shadow",
+        "sampler_2d_array_shadow", gcvNULL,
         VIR_TYPE_SAMPLER_2D_ARRAY_SHADOW,
+        1,
         4,
         4,
         1,
@@ -2453,8 +2610,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "sampler_2d_ms",
+        "sampler_2d_ms", gcvNULL,
         VIR_TYPE_SAMPLER_2D_MS,
+        1,
         4,
         4,
         1,
@@ -2462,13 +2620,14 @@
         VIR_TYPE_UNKNOWN,
         0/* size */,
         0,
-        VIR_TYFLAG_IS_SAMPLER_MS,
+        VIR_TYFLAG_IS_SAMPLER_2D | VIR_TYFLAG_IS_SAMPLER_MS,
         0,
         VIR_TY_SAMPLER
     },
     {
-        "isampler_2d_ms",
+        "isampler_2d_ms", gcvNULL,
         VIR_TYPE_ISAMPLER_2D_MS,
+        1,
         4,
         4,
         1,
@@ -2476,13 +2635,14 @@
         VIR_TYPE_UNKNOWN,
         0/* size */,
         0,
-        VIR_TYFLAG_IS_SAMPLER_MS,
+        VIR_TYFLAG_IS_SAMPLER_2D | VIR_TYFLAG_IS_SAMPLER_MS,
         0,
         VIR_TY_SAMPLER
     },
     {
-        "usampler_2d_ms",
+        "usampler_2d_ms", gcvNULL,
         VIR_TYPE_USAMPLER_2D_MS,
+        1,
         4,
         4,
         1,
@@ -2490,13 +2650,14 @@
         VIR_TYPE_UNKNOWN,
         0/* size */,
         0,
-        VIR_TYFLAG_IS_SAMPLER_MS,
+        VIR_TYFLAG_IS_SAMPLER_2D | VIR_TYFLAG_IS_SAMPLER_MS,
         0,
         VIR_TY_SAMPLER
     },
     {
-        "sampler_2d_ms_array",
+        "sampler_2d_ms_array", gcvNULL,
         VIR_TYPE_SAMPLER_2D_MS_ARRAY,
+        1,
         4,
         4,
         1,
@@ -2504,13 +2665,14 @@
         VIR_TYPE_UNKNOWN,
         0/* size */,
         0,
-        VIR_TYFLAG_IS_SAMPLER_MS | VIR_TYFLAG_IS_SAMPLER_ARRAY,
+        VIR_TYFLAG_IS_SAMPLER_2D | VIR_TYFLAG_IS_SAMPLER_MS | VIR_TYFLAG_IS_SAMPLER_ARRAY,
         0,
         VIR_TY_SAMPLER
     },
     {
-        "isampler_2d_ms_array",
+        "isampler_2d_ms_array", gcvNULL,
         VIR_TYPE_ISAMPLER_2D_MS_ARRAY,
+        1,
         4,
         4,
         1,
@@ -2518,13 +2680,14 @@
         VIR_TYPE_UNKNOWN,
         0/* size */,
         0,
-        VIR_TYFLAG_IS_SAMPLER_MS | VIR_TYFLAG_IS_SAMPLER_ARRAY,
+        VIR_TYFLAG_IS_SAMPLER_2D | VIR_TYFLAG_IS_SAMPLER_MS | VIR_TYFLAG_IS_SAMPLER_ARRAY,
         0,
         VIR_TY_SAMPLER
     },
     {
-        "usampler_2d_ms_array",
+        "usampler_2d_ms_array", gcvNULL,
         VIR_TYPE_USAMPLER_2D_MS_ARRAY,
+        1,
         4,
         4,
         1,
@@ -2532,13 +2695,14 @@
         VIR_TYPE_UNKNOWN,
         0/* size */,
         0,
-        VIR_TYFLAG_IS_SAMPLER_MS | VIR_TYFLAG_IS_SAMPLER_ARRAY,
+        VIR_TYFLAG_IS_SAMPLER_2D | VIR_TYFLAG_IS_SAMPLER_MS | VIR_TYFLAG_IS_SAMPLER_ARRAY,
         0,
         VIR_TY_SAMPLER
     },
     {
-        "samplerBuffer",
+        "samplerBuffer", gcvNULL,
         VIR_TYPE_SAMPLER_BUFFER,
+        1,
         4,
         4,
         1,
@@ -2551,8 +2715,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "isamplerBuffer",
+        "isamplerBuffer", gcvNULL,
         VIR_TYPE_ISAMPLER_BUFFER,
+        1,
         4,
         4,
         1,
@@ -2565,8 +2730,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "usamplerBuffer",
+        "usamplerBuffer", gcvNULL,
         VIR_TYPE_USAMPLER_BUFFER,
+        1,
         4,
         4,
         1,
@@ -2579,8 +2745,24 @@
         VIR_TY_SAMPLER
     },
     {
-        "subpassInput",
+        "viv_generic_gl_sampler", gcvNULL,
+        VIR_TYPE_VIV_GENERIC_GL_SAMPLER,
+        1,
+        4,
+        4,
+        1,
+        VIR_TYPE_UNKNOWN,
+        VIR_TYPE_UNKNOWN,
+        0/* size */,
+        0,
+        0,
+        0,
+        VIR_TY_SAMPLER
+    },
+    {
+        "subpassInput", gcvNULL,
         VIR_TYPE_SUBPASSINPUT,
+        1,
         4,
         4,
         1,
@@ -2593,8 +2775,9 @@
         VIR_TY_IMAGE
     },
     {
-        "subpassInputMS",
+        "subpassInputMS", gcvNULL,
         VIR_TYPE_SUBPASSINPUTMS,
+        1,
         4,
         4,
         1,
@@ -2607,8 +2790,9 @@
         VIR_TY_IMAGE
     },
     {
-        "isubpassInput",
+        "isubpassInput", gcvNULL,
         VIR_TYPE_ISUBPASSINPUT,
+        1,
         4,
         4,
         1,
@@ -2621,8 +2805,9 @@
         VIR_TY_IMAGE
     },
     {
-        "isubpassInputMS",
+        "isubpassInputMS", gcvNULL,
         VIR_TYPE_ISUBPASSINPUTMS,
+        1,
         4,
         4,
         1,
@@ -2635,8 +2820,9 @@
         VIR_TY_IMAGE
     },
     {
-        "usubpassInput",
+        "usubpassInput", gcvNULL,
         VIR_TYPE_USUBPASSINPUT,
+        1,
         4,
         4,
         1,
@@ -2649,8 +2835,9 @@
         VIR_TY_IMAGE
     },
     {
-        "usubpassInputMS",
+        "usubpassInputMS", gcvNULL,
         VIR_TYPE_USUBPASSINPUTMS,
+        1,
         4,
         4,
         1,
@@ -2664,8 +2851,9 @@
     },
     /* All OCL image types are uvec8 descriptor, need to adjust it at init time */
     {
-        "image_1d",
+        "image_1d", gcvNULL,
         VIR_TYPE_IMAGE_1D,
+        1,
         4,
         4,
         1,
@@ -2678,8 +2866,9 @@
         VIR_TY_IMAGE
     },
     {
-        "image_1d_depth",
+        "image_1d_depth", gcvNULL,
         VIR_TYPE_IMAGE_1D_DEPTH,
+        1,
         4,
         4,
         1,
@@ -2692,8 +2881,9 @@
         VIR_TY_IMAGE
     },
     {
-        "image_1d_array",
+        "image_1d_array", gcvNULL,
         VIR_TYPE_IMAGE_1D_ARRAY,
+        1,
         4,
         4,
         1,
@@ -2706,8 +2896,9 @@
         VIR_TY_IMAGE
     },
     {
-        "image_1d_array_depth",
+        "image_1d_array_depth", gcvNULL,
         VIR_TYPE_IMAGE_1D_ARRAY_DEPTH,
+        1,
         4,
         4,
         1,
@@ -2720,8 +2911,9 @@
         VIR_TY_IMAGE
     },
     {
-        "image_1d_buffer",
+        "image_1d_buffer", gcvNULL,
         VIR_TYPE_IMAGE_1D_BUFFER,
+        1,
         4,
         4,
         1,
@@ -2734,8 +2926,9 @@
         VIR_TY_IMAGE
     },
     {
-        "iimage_1d",
+        "iimage_1d", gcvNULL,
         VIR_TYPE_IIMAGE_1D,
+        1,
         4,
         4,
         1,
@@ -2748,8 +2941,9 @@
         VIR_TY_IMAGE
     },
     {
-        "iimage_1d_array",
+        "iimage_1d_array", gcvNULL,
         VIR_TYPE_IIMAGE_1D_ARRAY,
+        1,
         4,
         4,
         1,
@@ -2762,8 +2956,9 @@
         VIR_TY_IMAGE
     },
     {
-        "uimage_1d",
+        "uimage_1d", gcvNULL,
         VIR_TYPE_UIMAGE_1D,
+        1,
         4,
         4,
         1,
@@ -2776,8 +2971,9 @@
         VIR_TY_IMAGE
     },
     {
-        "uimage_1d_array",
+        "uimage_1d_array", gcvNULL,
         VIR_TYPE_UIMAGE_1D_ARRAY,
+        1,
         4,
         4,
         1,
@@ -2790,8 +2986,9 @@
         VIR_TY_IMAGE
     },
     {
-        "image_2d",
+        "image_2d", gcvNULL,
         VIR_TYPE_IMAGE_2D,
+        1,
         4,
         4,
         1,
@@ -2804,8 +3001,9 @@
         VIR_TY_IMAGE
     },
     {
-        "image_2d_array",
+        "image_2d_array", gcvNULL,
         VIR_TYPE_IMAGE_2D_ARRAY,
+        1,
         4,
         4,
         1,
@@ -2818,8 +3016,9 @@
         VIR_TY_IMAGE
     },
     {
-        "image_3d",
+        "image_3d", gcvNULL,
         VIR_TYPE_IMAGE_3D,
+        1,
         4,
         4,
         1,
@@ -2832,8 +3031,9 @@
         VIR_TY_IMAGE
     },
     {
-        "image_2d_mssa",
+        "image_2d_mssa", gcvNULL,
         VIR_TYPE_IMAGE_2D_MSSA,
+        1,
         4,
         4,
         1,
@@ -2846,8 +3046,9 @@
         VIR_TY_IMAGE
     },
     {
-        "image_2d_array_mssa",
+        "image_2d_array_mssa", gcvNULL,
         VIR_TYPE_IMAGE_2D_ARRAY_MSSA,
+        1,
         4,
         4,
         1,
@@ -2860,8 +3061,9 @@
         VIR_TY_IMAGE
     },
     {
-        "image_2d_mssa_depth",
+        "image_2d_mssa_depth", gcvNULL,
         VIR_TYPE_IMAGE_2D_MSSA_DEPTH,
+        1,
         4,
         4,
         1,
@@ -2874,8 +3076,9 @@
         VIR_TY_IMAGE
     },
     {
-        "image_2d_array_mssa_depth",
+        "image_2d_array_mssa_depth", gcvNULL,
         VIR_TYPE_IMAGE_2D_ARRAY_MSSA_DEPTH,
+        1,
         4,
         4,
         1,
@@ -2888,8 +3091,9 @@
         VIR_TY_IMAGE
     },
     {
-        "image_2d_depth",
+        "image_2d_depth", gcvNULL,
         VIR_TYPE_IMAGE_2D_DEPTH,
+        1,
         4,
         4,
         1,
@@ -2902,8 +3106,9 @@
         VIR_TY_IMAGE
     },
     {
-        "image_2d_array_depth",
+        "image_2d_array_depth", gcvNULL,
         VIR_TYPE_IMAGE_2D_ARRAY_DEPTH,
+        1,
         4,
         4,
         1,
@@ -2916,8 +3121,9 @@
         VIR_TY_IMAGE
     },
     {
-        "iimage_2d",
+        "iimage_2d", gcvNULL,
         VIR_TYPE_IIMAGE_2D,
+        1,
         4,
         4,
         1,
@@ -2930,8 +3136,9 @@
         VIR_TY_IMAGE
     },
     {
-        "iimage_2d_mssa",
+        "iimage_2d_mssa", gcvNULL,
         VIR_TYPE_IIMAGE_2D_MSSA,
+        1,
         4,
         4,
         1,
@@ -2944,8 +3151,9 @@
         VIR_TY_IMAGE
     },
     {
-        "iimage_2d_array_mssa",
+        "iimage_2d_array_mssa", gcvNULL,
         VIR_TYPE_IIMAGE_2D_ARRAY_MSSA,
+        1,
         4,
         4,
         1,
@@ -2958,8 +3166,9 @@
         VIR_TY_IMAGE
     },
     {
-        "uimage_2d",
+        "uimage_2d", gcvNULL,
         VIR_TYPE_UIMAGE_2D,
+        1,
         4,
         4,
         1,
@@ -2972,8 +3181,9 @@
         VIR_TY_IMAGE
     },
     {
-        "uimage_2d_mssa",
+        "uimage_2d_mssa", gcvNULL,
         VIR_TYPE_UIMAGE_2D_MSSA,
+        1,
         4,
         4,
         1,
@@ -2986,8 +3196,9 @@
         VIR_TY_IMAGE
     },
     {
-        "uimage_2d_array_mssa",
+        "uimage_2d_array_mssa", gcvNULL,
         VIR_TYPE_UIMAGE_2D_ARRAY_MSSA,
+        1,
         4,
         4,
         1,
@@ -3000,8 +3211,9 @@
         VIR_TY_IMAGE
     },
     {
-        "iimage_3d",
+        "iimage_3d", gcvNULL,
         VIR_TYPE_IIMAGE_3D,
+        1,
         4,
         4,
         1,
@@ -3014,8 +3226,9 @@
         VIR_TY_IMAGE
     },
     {
-        "uimage_3d",
+        "uimage_3d", gcvNULL,
         VIR_TYPE_UIMAGE_3D,
+        1,
         4,
         4,
         1,
@@ -3028,8 +3241,9 @@
         VIR_TY_IMAGE
     },
     {
-        "iimage_2d_array",
+        "iimage_2d_array", gcvNULL,
         VIR_TYPE_IIMAGE_2D_ARRAY,
+        1,
         4,
         4,
         1,
@@ -3042,8 +3256,9 @@
         VIR_TY_IMAGE
     },
     {
-        "uimage_2d_array",
+        "uimage_2d_array", gcvNULL,
         VIR_TYPE_UIMAGE_2D_ARRAY,
+        1,
         4,
         4,
         1,
@@ -3056,8 +3271,9 @@
         VIR_TY_IMAGE
     },
     {
-        "image_cube",
+        "image_cube", gcvNULL,
         VIR_TYPE_IMAGE_CUBE,
+        1,
         4,
         4,
         1,
@@ -3070,8 +3286,9 @@
         VIR_TY_IMAGE
     },
     {
-        "image_cube_depth",
+        "image_cube_depth", gcvNULL,
         VIR_TYPE_IMAGE_CUBE_DEPTH,
+        1,
         4,
         4,
         1,
@@ -3084,8 +3301,9 @@
         VIR_TY_IMAGE
     },
     {
-        "image_cube_array",
+        "image_cube_array", gcvNULL,
         VIR_TYPE_IMAGE_CUBE_ARRAY,
+        1,
         4,
         4,
         1,
@@ -3098,8 +3316,9 @@
         VIR_TY_IMAGE
     },
     {
-        "image_cube_depth_array",
+        "image_cube_depth_array", gcvNULL,
         VIR_TYPE_IMAGE_CUBE_DEPTH_ARRAY,
+        1,
         4,
         4,
         1,
@@ -3112,8 +3331,9 @@
         VIR_TY_IMAGE
     },
     {
-        "iimage_cube",
+        "iimage_cube", gcvNULL,
         VIR_TYPE_IIMAGE_CUBE,
+        1,
         4,
         4,
         1,
@@ -3126,8 +3346,9 @@
         VIR_TY_IMAGE
     },
     {
-        "iimage_cube_depth",
+        "iimage_cube_depth", gcvNULL,
         VIR_TYPE_IIMAGE_CUBE_DEPTH,
+        1,
         4,
         4,
         1,
@@ -3140,8 +3361,9 @@
         VIR_TY_IMAGE
     },
     {
-        "iimage_cube_array",
+        "iimage_cube_array", gcvNULL,
         VIR_TYPE_IIMAGE_CUBE_ARRAY,
+        1,
         4,
         4,
         1,
@@ -3154,8 +3376,9 @@
         VIR_TY_IMAGE
     },
     {
-        "uimage_cube",
+        "uimage_cube", gcvNULL,
         VIR_TYPE_UIMAGE_CUBE,
+        1,
         4,
         4,
         1,
@@ -3169,8 +3392,9 @@
     },
 
     {
-        "uimage_cube_depth",
+        "uimage_cube_depth", gcvNULL,
         VIR_TYPE_UIMAGE_CUBE_DEPTH,
+        1,
         4,
         4,
         1,
@@ -3183,8 +3407,9 @@
         VIR_TY_IMAGE
     },
     {
-        "uimage_cube_array",
+        "uimage_cube_array", gcvNULL,
         VIR_TYPE_UIMAGE_CUBE_ARRAY,
+        1,
         4,
         4,
         1,
@@ -3198,8 +3423,9 @@
     },
 
     {
-        "imageBuffer",
+        "imageBuffer", gcvNULL,
         VIR_TYPE_IMAGE_BUFFER,
+        1,
         4,
         4,
         1,
@@ -3212,8 +3438,9 @@
         VIR_TY_IMAGE
     },
     {
-        "iimageBuffer",
+        "iimageBuffer", gcvNULL,
         VIR_TYPE_IIMAGE_BUFFER,
+        1,
         4,
         4,
         1,
@@ -3226,8 +3453,9 @@
         VIR_TY_IMAGE
     },
     {
-        "uimageBuffer",
+        "uimageBuffer", gcvNULL,
         VIR_TYPE_UIMAGE_BUFFER,
+        1,
         4,
         4,
         1,
@@ -3240,8 +3468,130 @@
         VIR_TY_IMAGE
     },
     {
-        "event_t",
-        VIR_TYPE_EVENT,
+        "viv_generic_gl_image", gcvNULL,
+        VIR_TYPE_VIV_GENERIC_GL_IMAGE,
+        1,
+        4,
+        4,
+        2,
+        VIR_TYPE_UINT_X4,
+        VIR_TYPE_UINT32,
+        16/* size */,
+        0,
+        VIR_TYFLAG_SIZED,
+        4,
+        VIR_TY_IMAGE
+    },
+    /* OCL image types */
+    {
+        "image1d_t", gcvNULL,
+        VIR_TYPE_IMAGE_1D_T,
+        1,
+        4,
+        4,
+        2,
+        VIR_TYPE_UINT_X4,
+        VIR_TYPE_UINT32,
+        32/* size */,
+        0,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_IMAGE_1D,
+        4,
+        VIR_TY_IMAGE_T
+    },
+    {
+        "image1d_buffer_t", gcvNULL,
+        VIR_TYPE_IMAGE_1D_BUFFER_T,
+        1,
+        4,
+        4,
+        2,
+        VIR_TYPE_UINT_X4,
+        VIR_TYPE_UINT32,
+        32/* size */,
+        0,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_IMAGE_1D | VIR_TYFLAG_IS_IMAGE_BUFFER,
+        4,
+        VIR_TY_IMAGE_T
+    },
+    {
+        "image1d_array_t", gcvNULL,
+        VIR_TYPE_IMAGE_1D_ARRAY_T,
+        1,
+        4,
+        4,
+        2,
+        VIR_TYPE_UINT_X4,
+        VIR_TYPE_UINT32,
+        32/* size */,
+        0,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_IMAGE_1D | VIR_TYFLAG_IS_IMAGE_ARRAY,
+        4,
+        VIR_TY_IMAGE_T
+    },
+    {
+        "image2d_t", gcvNULL,
+        VIR_TYPE_IMAGE_2D_T,
+        1,
+        4,
+        4,
+        2,
+        VIR_TYPE_UINT_X4,
+        VIR_TYPE_UINT32,
+        32/* size */,
+        0,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_IMAGE_2D,
+        4,
+        VIR_TY_IMAGE_T
+    },
+    {
+        "image2d_array_t", gcvNULL,
+        VIR_TYPE_IMAGE_2D_ARRAY_T,
+        1,
+        4,
+        4,
+        2,
+        VIR_TYPE_UINT_X4,
+        VIR_TYPE_UINT32,
+        32/* size */,
+        0,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_IMAGE_2D | VIR_TYFLAG_IS_IMAGE_ARRAY,
+        4,
+        VIR_TY_IMAGE_T
+    },
+    {
+        "image3d_t", gcvNULL,
+        VIR_TYPE_IMAGE_3D_T,
+        1,
+        4,
+        4,
+        2,
+        VIR_TYPE_UINT_X4,
+        VIR_TYPE_UINT32,
+        32/* size */,
+        0,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_IMAGE_3D,
+        4,
+        VIR_TY_IMAGE_T
+    },
+    {
+        "viv_generic_image_t", gcvNULL,
+        VIR_TYPE_VIV_GENERIC_IMAGE_T,
+        1,
+        4,
+        4,
+        2,
+        VIR_TYPE_UINT_X4,
+        VIR_TYPE_UINT32,
+        32/* size */,
+        0,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_IMAGE_1D | VIR_TYFLAG_IS_IMAGE_2D | VIR_TYFLAG_IS_IMAGE_3D,
+        4,
+        VIR_TY_IMAGE_T
+    },
+    {
+        "sampler_t", gcvNULL,
+        VIR_TYPE_SAMPLER_T,
+        1,
         1,
         1,
         1,
@@ -3254,8 +3604,24 @@
         VIR_TY_SAMPLER
     },
     {
-        "atomic_uint",
+        "event_t", gcvNULL,
+        VIR_TYPE_EVENT_T,
+        1,
+        1,
+        1,
+        1,
+        VIR_TYPE_UNKNOWN,
+        VIR_TYPE_UNKNOWN,
+        4/* size */,
+        0,
+        0,
+        4,
+        VIR_TY_SAMPLER
+    },
+    {
+        "atomic_uint", gcvNULL,
         VIR_TYPE_ATOMIC_UINT,
+        1,
         1,
         1,
         1,
@@ -3268,8 +3634,9 @@
         VIR_TY_SCALAR
     },
     {
-        "atomic_uint4",
+        "atomic_uint4", gcvNULL,
         VIR_TYPE_ATOMIC_UINT4,
+        4,
         4,
         4,
         1,
@@ -3283,8 +3650,9 @@
     },
     /* OpenGL 4.0 types */
     {
-        "sampler_2d_rect",
+        "sampler_2d_rect", gcvNULL,
         VIR_TYPE_SAMPLER_2D_RECT,
+        1,
         4,
         4,
         1,
@@ -3297,8 +3665,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "isampler_2d_rect",
+        "isampler_2d_rect", gcvNULL,
         VIR_TYPE_ISAMPLER_2D_RECT,
+        1,
         4,
         4,
         1,
@@ -3311,8 +3680,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "usampler_2d_rect",
+        "usampler_2d_rect", gcvNULL,
         VIR_TYPE_USAMPLER_2D_RECT,
+        1,
         4,
         4,
         1,
@@ -3325,8 +3695,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "sampler_2d_rect_shadow",
+        "sampler_2d_rect_shadow", gcvNULL,
         VIR_TYPE_SAMPLER_2D_RECT_SHADOW,
+        1,
         4,
         4,
         1,
@@ -3339,8 +3710,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "isampler_1d_array",
+        "isampler_1d_array", gcvNULL,
         VIR_TYPE_ISAMPLER_1D_ARRAY,
+        1,
         4,
         4,
         1,
@@ -3353,8 +3725,9 @@
         VIR_TY_SAMPLER
     },
     {
-        "usampler_1d_array",
+        "usampler_1d_array", gcvNULL,
         VIR_TYPE_USAMPLER_1D_ARRAY,
+        1,
         4,
         4,
         1,
@@ -3368,9 +3741,10 @@
     },
 
 
+
     /* !!! Add new types above, below is the last item as end of builtin type marker */
-        {
-        gcvNULL,
+    {
+        gcvNULL, gcvNULL,
         0
     }
 

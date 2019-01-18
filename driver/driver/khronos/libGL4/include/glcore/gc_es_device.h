@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -71,8 +71,8 @@ typedef struct __GLdeviceStructRec
     GLvoid (*devInitialize)(GLvoid *);
     GLvoid (*devDeinitialize)(GLvoid *);
 #else
-    GLvoid (*devInitialize)();
     GLboolean (*devDeinitialize)();
+    GLvoid (*devInitialize)();
 #ifdef _WINDOWS
     GLint (*devDescribePixelFormat)(GLint iPixelFormat, GLuint nBytes, GLvoid* ppfd, GLboolean bDisplayableOnly);
     GLboolean (*devSetPixelFormat)(GLint iPixelFormat);

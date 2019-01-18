@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -46,11 +46,11 @@ gcChipPickDrawBuffersForDrawable(
 
     if (drawable)
     {
-        rtViews[0].surf = (gcoSURF)drawable->rtHandle;
+        rtViews[0].surf = (gcoSURF)drawable->rtHandles[0];
         dView.surf      = (gcoSURF)drawable->depthHandle;
         sView.surf      = (gcoSURF)drawable->stencilHandle;
 
-        if (rtViews[0].surf && drawable->prevRtHandle &&
+        if (rtViews[0].surf && drawable->prevRtHandles[0] &&
             !gcoSURF_QueryFlags(rtViews[0].surf, gcvSURF_FLAG_CONTENT_UPDATED) &&
             gcoSURF_QueryFlags(rtViews[0].surf, gcvSURF_FLAG_CONTENT_PRESERVED))
         {
@@ -86,7 +86,7 @@ gcChipPickDrawBuffersForDrawable(
 
             if (!fullClear)
             {
-                gcoSURF prev = (gcoSURF) drawable->prevRtHandle;
+                gcoSURF prev = (gcoSURF)drawable->prevRtHandles[0];
                 gcmVERIFY_OK(gcoSURF_Preserve(prev, rtViews[0].surf, &clearRect));
             }
 
@@ -158,16 +158,16 @@ gcChipPickReadBufferForDrawable(
 
     if (readable)
     {
-        rtView.surf = (gcoSURF)readable->rtHandle;
+        rtView.surf = (gcoSURF)readable->rtHandles[0];
         dView.surf  = (gcoSURF)readable->depthHandle;
         sView.surf  = (gcoSURF)readable->stencilHandle;
 
 #if gcdENABLE_BLIT_BUFFER_PRESERVE
-        if (rtView.surf && readable->prevRtHandle &&
+        if (rtView.surf && readable->prevRtHandles[0] &&
             !gcoSURF_QueryFlags(rtView.surf, gcvSURF_FLAG_CONTENT_UPDATED) &&
             gcoSURF_QueryFlags(rtView.surf, gcvSURF_FLAG_CONTENT_PRESERVED))
         {
-            gcoSURF prev = (gcoSURF) readable->prevRtHandle;
+            gcoSURF prev = (gcoSURF) readable->prevRtHandles[0];
             gcmVERIFY_OK(gcoSURF_Preserve(prev, rtView.surf, gcvNULL));
             gcmVERIFY_OK(gcoSURF_SetFlags(rtView.surf, gcvSURF_FLAG_CONTENT_PRESERVED, gcvFALSE));
         }
@@ -274,8 +274,8 @@ __glChipDetachDrawable(
 
     if (drawable)
     {
-        if (drawable->rtHandle)
-            surfList[surfCount++] = (gcoSURF)drawable->rtHandle;
+        if (drawable->rtHandles[0])
+            surfList[surfCount++] = (gcoSURF)drawable->rtHandles[0];
         if (drawable->depthHandle)
             surfList[surfCount++] = (gcoSURF)drawable->depthHandle;
         if (drawable->stencilHandle)
@@ -284,8 +284,8 @@ __glChipDetachDrawable(
 
     if (readable)
     {
-        if (readable->rtHandle)
-            surfList[surfCount++] = (gcoSURF)readable->rtHandle;
+        if (readable->rtHandles[0])
+            surfList[surfCount++] = (gcoSURF)readable->rtHandles[0];
         if (readable->depthHandle)
             surfList[surfCount++] = (gcoSURF)readable->depthHandle;
         if (readable->stencilHandle)
@@ -308,18 +308,15 @@ __glChipDetachDrawable(
 
 GLboolean
 __glChipUpdateDrawable(
-    __GLdrawablePrivate *drawable,
-    GLvoid* rtHandle,
-    GLvoid* depthHandle,
-    GLvoid *stencilHandle
+    __GLdrawablePrivate *drawable
     )
 {
     gcePATCH_ID patchId = gcvPATCH_INVALID;
     __GLchipDrawable *chipDrawable = (__GLchipDrawable*)drawable->privateData;
     gceSTATUS status = gcvSTATUS_OK;
+    GLboolean ret;
 
-    gcmHEADER_ARG("drawable=0x%x rtHandle=0x%x depthHandle=0x%x stencilHandle=0x%x",
-                   drawable, rtHandle, depthHandle, stencilHandle);
+    gcmHEADER_ARG("drawable=%p", drawable);
 
     /* Get PatchID from HAL in the very beginning */
     gcmONERROR(gcoHAL_GetPatchID(gcvNULL, &patchId));
@@ -333,12 +330,6 @@ __glChipUpdateDrawable(
         gcoOS_ZeroMemory(chipDrawable, gcmSIZEOF(__GLchipDrawable));
         drawable->privateData = chipDrawable;
     }
-
-    chipDrawable->width          = drawable->width;
-    chipDrawable->height         = drawable->height;
-    chipDrawable->rtSurface      = (gcoSURF)rtHandle;
-    chipDrawable->depthSurface   = (gcoSURF)depthHandle;
-    chipDrawable->stencilSurface = (gcoSURF)stencilHandle;
 
     /* Only enable stencil opt for those conformance tests */
     if (patchId == gcvPATCH_GTFES30 || patchId == gcvPATCH_DEQP)
@@ -369,12 +360,10 @@ __glChipUpdateDrawable(
         }
     }
 
-    gcmFOOTER_ARG("return=%d", GL_TRUE);
-    return GL_TRUE;
-
 OnError:
-    gcmFOOTER_ARG("return=%d", GL_FALSE);
-    return GL_FALSE;
+    ret = gcmIS_ERROR(status) ? GL_FALSE : GL_TRUE;
+    gcmFOOTER_ARG("return=%d", ret);
+    return ret;
 }
 
 GLvoid

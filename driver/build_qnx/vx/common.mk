@@ -42,6 +42,7 @@ EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/kernels
 # from libCL (trunk/driver/khronos/libCL/makefile.linux)
 # Core
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_target.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_json.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_context.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_array.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_convolution.o
@@ -49,6 +50,7 @@ SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_delay
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_distribution.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_error.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_graph.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_graph_optimization.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_image.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_kernel.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_log.o
@@ -69,14 +71,15 @@ SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_thres
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_program.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_profiler.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_tensor.o
-SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_layer.o
 
 # API
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_interface.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_extension_interface.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_internal_node_api.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_layer.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_gpu_layer.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_util.o
-SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/ops/gc_vx_nn_extension_concat.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_binary.o
 
 #SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/extension/gc_vxc_interface.o
 # Kernels
@@ -109,13 +112,9 @@ SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/kernels/gc_vxk_sobel3x
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/kernels/gc_vxk_statistics.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/kernels/gc_vxk_threshold.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/kernels/gc_vxk_warp.o
-SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/kernels/gc_vxk_rpn.o
 #SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/utility/vx_utility.o
 
-
 EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/driver/src
-EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/driver/src/ops
-#EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/extension
 EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/kernels
 #EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/utility
 
@@ -127,6 +126,7 @@ ifneq ($(MISSING_OBJECTS), )
 $(error ***** Missing source objects:  $(MISSING_OBJECTS))
 endif
 CCFLAGS += -g -O0 -Wno-error=switch -Wno-error=missing-braces -Wno-unused-function -Wno-unused-variable -Wno-sign-compare -Wno-narrowing
+CCFLAGS += -Wno-unused-local-typedefs
 
 CCFLAGS += -D_LITTLE_ENDIAN_ \
            -DOPENVX_USE_LIST \

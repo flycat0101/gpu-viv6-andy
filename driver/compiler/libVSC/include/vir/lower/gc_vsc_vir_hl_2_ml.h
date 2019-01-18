@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -37,6 +37,7 @@ VIR_Lower_HighLevel_To_MiddleLevel(
     IN VSC_SH_PASS_WORKER* pPassWorker
     );
 DECLARE_QUERY_PASS_PROP(VIR_Lower_HighLevel_To_MiddleLevel);
+DECLARE_SH_NECESSITY_CHECK(VIR_Lower_HighLevel_To_MiddleLevel);
 
 VSC_ErrCode
 VIR_Lower_MiddleLevel_Process_Intrinsics(

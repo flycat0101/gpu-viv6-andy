@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -48,6 +48,8 @@ VX_API_ENTRY vx_parameter VX_API_CALL vxGetKernelParameterByIndex(vx_kernel kern
 {
     vx_parameter parameter;
 
+    gcmDUMP_API("$VX vxGetKernelParameterByIndex: kernel=%p, index=0x%x", kernel, index);
+
     if (!vxoReference_IsValidAndSpecific(&kernel->base, VX_TYPE_KERNEL)) return VX_NULL;
 
     if (index >= VX_MAX_PARAMETERS || index >= kernel->signature.paramCount)
@@ -73,11 +75,15 @@ VX_API_ENTRY vx_parameter VX_API_CALL vxGetKernelParameterByIndex(vx_kernel kern
 
 VX_API_ENTRY vx_parameter VX_API_CALL vxGetParameterByIndex(vx_node node, vx_uint32 index)
 {
+    gcmDUMP_API("$VX vxGetParameterByIndex: node=%p, index=0x%x", node, index);
+
     return vxoNode_GetParameter(node, index);
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseParameter(vx_parameter *parameter)
 {
+    gcmDUMP_API("$VX vxReleaseParameter: parameter=%p", parameter);
+
     if((*parameter)->base.type == VX_TYPE_SCALAR)
     {
         vx_scalar scalar = (vx_scalar)(*parameter);
@@ -93,11 +99,15 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseParameter(vx_parameter *parameter)
 
 VX_API_ENTRY vx_status VX_API_CALL vxSetParameterByIndex(vx_node node, vx_uint32 index, vx_reference value)
 {
+    gcmDUMP_API("$VX vxSetParameterByIndex: node=%p, index=0x%x, value=%p", node, index, value);
+
     return vxoNode_SetParameter(node, index, value);
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxSetParameterByReference(vx_parameter parameter, vx_reference value)
 {
+    gcmDUMP_API("$VX vxSetParameterByReference: parameter=%p, value=%p", parameter, value);
+
     if (!vxoReference_IsValidAndSpecific((vx_reference_s *)parameter, VX_TYPE_PARAMETER))
     {
         return VX_ERROR_INVALID_PARAMETERS;
@@ -111,6 +121,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetParameterByReference(vx_parameter parame
 VX_API_ENTRY vx_status VX_API_CALL vxQueryParameter(vx_parameter parameter, vx_enum attribute, void *ptr, vx_size size)
 {
     vx_reference paramRef;
+
+    gcmDUMP_API("$VX vxQueryParameter: parameter=%p, attribute=0x%x, ptr=%p, size=0x%lx", parameter, attribute, ptr, size);
 
     if (!vxoReference_IsValidAndSpecific(&parameter->base, VX_TYPE_PARAMETER)) return VX_ERROR_INVALID_REFERENCE;
 

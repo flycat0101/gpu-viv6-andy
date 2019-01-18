@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -360,24 +360,6 @@ gcoHAL_IsFeatureAvailable(
     return status;
 }
 
-gceSTATUS
-gcoHAL_IsSwwaNeeded(
-    IN gcoHAL Hal,
-    IN gceSWWA Swwa
-    )
-{
-    gceSTATUS status;
-
-    gcmHEADER_ARG("Swwa=%d", Swwa);
-
-    /* Query support from hardware object. */
-    status = gcoHARDWARE_IsSwwaNeeded(gcvNULL, Swwa);
-
-    gcmFOOTER();
-    return status;
-}
-
-
 /*******************************************************************************
 **
 **  gcoHAL_IsFeatureAvailable1
@@ -421,44 +403,44 @@ gcoHAL_IsFeatureAvailable1(
 **
 **  OUTPUT:
 **
-**      gctPHYS_ADDR * InternalAddress
+**      gctUINT32 * InternalPhysName
 **          Pointer to a variable that will hold the physical address of the
-**          internal memory.  If 'InternalAddress' is gcvNULL, no information about
+**          internal memory.  If 'InternalPhysName' is gcvNULL, no information about
 **          the internal memory will be returned.
 **
 **      gctSIZE_T * InternalSize
 **          Pointer to a variable that will hold the size of the internal
-**          memory.  'InternalSize' cannot be gcvNULL if 'InternalAddress' is not
+**          memory.  'InternalSize' cannot be gcvNULL if 'InternalPhysName' is not
 **          gcvNULL.
 **
-**      gctPHYS_ADDR * ExternalAddress
+**      gctUINT32 * ExternalPhysName
 **          Pointer to a variable that will hold the physical address of the
-**          external memory.  If 'ExternalAddress' is gcvNULL, no information about
+**          external memory.  If 'ExternalPhysName' is gcvNULL, no information about
 **          the external memory will be returned.
 **
 **      gctSIZE_T * ExternalSize
 **          Pointer to a variable that will hold the size of the external
-**          memory.  'ExternalSize' cannot be gcvNULL if 'ExternalAddress' is not
+**          memory.  'ExternalSize' cannot be gcvNULL if 'ExternalPhysName' is not
 **          gcvNULL.
 **
-**      gctPHYS_ADDR * ContiguousAddress
+**      gctUINT32 * ContiguousPhysName
 **          Pointer to a variable that will hold the physical address of the
-**          contiguous memory.  If 'ContiguousAddress' is gcvNULL, no information
+**          contiguous memory.  If 'ContiguousPhysName' is gcvNULL, no information
 **          about the contiguous memory will be returned.
 **
 **      gctSIZE_T * ContiguousSize
 **          Pointer to a variable that will hold the size of the contiguous
-**          memory.  'ContiguousSize' cannot be gcvNULL if 'ContiguousAddress' is
+**          memory.  'ContiguousSize' cannot be gcvNULL if 'ContiguousPhysName' is
 **          not gcvNULL.
 */
 gceSTATUS
 gcoHAL_QueryVideoMemory(
     IN gcoHAL Hal,
-    OUT gctPHYS_ADDR * InternalAddress,
+    OUT gctUINT32 * InternalPhysName,
     OUT gctSIZE_T * InternalSize,
-    OUT gctPHYS_ADDR * ExternalAddress,
+    OUT gctUINT32 * ExternalPhysName,
     OUT gctSIZE_T * ExternalSize,
-    OUT gctPHYS_ADDR * ContiguousAddress,
+    OUT gctUINT32 * ContiguousPhysName,
     OUT gctSIZE_T * ContiguousSize
     )
 {
@@ -467,15 +449,15 @@ gcoHAL_QueryVideoMemory(
     gcmHEADER();
 
     status = gcoOS_QueryVideoMemory(gcvNULL,
-                                    InternalAddress, InternalSize,
-                                    ExternalAddress, ExternalSize,
-                                    ContiguousAddress, ContiguousSize);
+                                    InternalPhysName, InternalSize,
+                                    ExternalPhysName, ExternalSize,
+                                    ContiguousPhysName, ContiguousSize);
 
-    gcmFOOTER_ARG("status=%d InternalAddress=0x%x InternalSize=%lu "
-                  "ExternalAddress=0x%x ExternalSize=%lu ContiguousAddress=0x%x "
-                  "ContiguousSize=%lu", status, gcmOPT_POINTER(InternalAddress),
-                  gcmOPT_VALUE(InternalSize), gcmOPT_POINTER(ExternalAddress),
-                  gcmOPT_VALUE(ExternalSize), gcmOPT_POINTER(ContiguousAddress),
+    gcmFOOTER_ARG("status=%d InternalPhysName=0x%x InternalSize=%lu "
+                  "ExternalPhysName=0x%x ExternalSize=%lu ContiguousPhysName=0x%x "
+                  "ContiguousSize=%lu", status, gcmOPT_VALUE(InternalPhysName),
+                  gcmOPT_VALUE(InternalSize), gcmOPT_VALUE(ExternalPhysName),
+                  gcmOPT_VALUE(ExternalSize), gcmOPT_VALUE(ContiguousPhysName),
                   gcmOPT_VALUE(ContiguousSize));
     return status;
 }
@@ -915,41 +897,9 @@ gcoHAL_SetHardwareType(
 
     gcmONERROR(gcoOS_GetTLS(&__tls__));
 
-    /* if (__tls__->currentType != HardwardType) */
-    {
-        /* When hardware type is changed, reset currentCore according to
-        ** multiple GPUs affinity setting.
-        **
-        ** If mode is gcvMULTI_GPU_MODE_COMBINED, always uses 0 as main
-        ** core index.
-        **
-        ** so hardware with single core works without considering core index,
-        ** hardware with multiple cores must specify core index explicitly
-        ** before every device control calls.
-        **
-        ** Core index is global, for example, if there are four cores whose
-        ** type are gcoHARDWARE_3D, core indexes of them are 0, 1, 2, 3.
-        ** If a gcoHARDWARE object uses two of them 2 and 3, it should set
-        ** currentCore to 2/3 when call device control, instead of 0/1
-        */
-
-        gceMULTI_GPU_MODE mode;
-        gctUINT mainCoreIndex = 0;
-
-        gcmVERIFY_OK(gcoHAL_QueryMultiGPUAffinityConfig(
-            HardwardType,
-            &mode,
-            &mainCoreIndex
-            ));
-
-        if (mode == gcvMULTI_GPU_MODE_COMBINED)
-        {
-            mainCoreIndex = 0;
-        }
-
-        __tls__->currentCoreIndex = mainCoreIndex;
-    }
-
+    /* tls->currentCoreIndex is always 0 for hardware_2D, and it will process at gcoOS_DeviceControl.
+       tls->currentCoreIndex is only for hardware_3D
+    */
     __tls__->currentType = HardwardType;
 
     gcmFOOTER_NO();
@@ -1133,6 +1083,23 @@ gcoHAL_Query3DCoreCount(
     return status;
 }
 
+gceSTATUS
+gcoHAL_QueryCluster(
+    IN gcoHAL       Hal,
+    OUT gctINT32   *ClusterMinID,
+    OUT gctINT32   *ClusterMaxID,
+    OUT gctUINT32  *ClusterCount,
+    OUT gctUINT32  *ClusterIDWidth
+    )
+{
+    gceSTATUS status;
+    gcmHEADER();
+
+    status = gcoHARDWARE_QueryCluster(gcvNULL, ClusterMinID, ClusterMaxID, ClusterCount, ClusterIDWidth);
+
+    gcmFOOTER_NO();
+    return status;
+}
 /*******************************************************************************
 **
 **  gcoHAL_QueryCoreCount
@@ -1210,6 +1177,7 @@ gcoHAL_QueryHybrid2D(
 
     status = gcPLS.hal->hybrid2D ? gcvSTATUS_TRUE
            : gcvSTATUS_FALSE;
+
 
     gcmFOOTER();
     return status;
@@ -1467,6 +1435,16 @@ gcoHAL_QueryMultiGPUAffinityConfig(
     static gceMULTI_GPU_MODE mode = gcvMULTI_GPU_MODE_COMBINED;
     static gctUINT32 coreIndex = 0;
 
+    gcmASSERT(Mode && CoreIndex);
+
+    if (Type != gcvHARDWARE_3D && Type != gcvHARDWARE_3D2D)
+    {
+        mode = *Mode = gcvMULTI_GPU_MODE_COMBINED;
+        *CoreIndex = 0 ;
+
+        return gcvSTATUS_OK;
+    }
+
     if (queriedOnce)
     {
         *Mode = mode;
@@ -1478,27 +1456,14 @@ gcoHAL_QueryMultiGPUAffinityConfig(
         queriedOnce = gcvTRUE;
     }
 
-    if (Type != gcvHARDWARE_3D && Type != gcvHARDWARE_3D2D)
-    {
-        if (Mode)
-        {
-            mode =
-            *Mode = gcvMULTI_GPU_MODE_COMBINED;
-        }
-
-        return gcvSTATUS_OK;
-    }
-
     gcoOS_GetEnv(gcvNULL, "VIV_MGPU_AFFINITY", &affinity);
 
     if (affinity == gcvNULL)
     {
         /* No configure specified, use default. */
-        if (Mode)
-        {
-            mode =
-            *Mode = gcvMULTI_GPU_MODE_COMBINED;
-        }
+
+        mode = *Mode = gcvMULTI_GPU_MODE_COMBINED;
+        *CoreIndex = 0 ;
 
         return gcvSTATUS_OK;
     }
@@ -1512,11 +1477,9 @@ gcoHAL_QueryMultiGPUAffinityConfig(
 
     if (affinity[0] == '0')
     {
-        if (Mode)
-        {
-            mode =
-            *Mode = gcvMULTI_GPU_MODE_COMBINED;
-        }
+
+        mode = *Mode = gcvMULTI_GPU_MODE_COMBINED;
+        *CoreIndex = 0 ;
 
         return gcvSTATUS_OK;
     }
@@ -1525,25 +1488,27 @@ gcoHAL_QueryMultiGPUAffinityConfig(
         if (length != 3
          || affinity[0] != '1'
          || affinity[1] != ':'
-         || (affinity[2] != '0' && affinity[2] != '1')
+         || (affinity[2] < '0' && affinity[2] > '7')
          )
         {
             return gcvSTATUS_INVALID_ARGUMENT;
         }
 
-        if (Mode)
-        {
-            mode =
-            *Mode = gcvMULTI_GPU_MODE_INDEPENDENT;
-        }
-
-        if (CoreIndex)
-        {
-            coreIndex =
-            *CoreIndex = affinity[2] - '0';
-        }
+        mode = *Mode = gcvMULTI_GPU_MODE_INDEPENDENT;
+        coreIndex = *CoreIndex = affinity[2] - '0';
     }
 
     return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoHAL_QuerySRAM(
+    IN gcoHAL Hal,
+    IN gceSRAM Type,
+    OUT gctUINT32 *Base,
+    OUT gctUINT32 *Size
+    )
+{
+    return gcoHARDWARE_QuerySRAM(gcvNULL, Type, Base, Size);
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -118,7 +118,7 @@ gcChipProfilerInitialize(
     /* Clear the profiler. */
     gcoOS_ZeroMemory(&gc->profiler, gcmSIZEOF(glsPROFILER));
 
-    switch (__glesApiProfileMode)
+    switch (__glApiProfileMode)
     {
     case -1:
         profiler->enable = gcvFALSE;
@@ -183,12 +183,12 @@ gcChipProfilerInitialize(
     {
         profiler->perDrawMode =
         chipCtx->profiler->perDrawMode = gcvTRUE;
-        chipCtx->profiler->bufferCount = NumOfPerDrawBuf;
+        chipCtx->profiler->bufferCount = NumOfPerFrameBuf;
     }
 
     chipCtx->profiler->profilerClient = gcvCLIENT_OPENGL;
 
-    if (gcoPROFILER_Enable(chipCtx->profiler) != gcvSTATUS_OK)
+    if (gcoPROFILER_Initialize(chipCtx->profiler) != gcvSTATUS_OK)
     {
         profiler->enable = gcvFALSE;
         gcmFOOTER();
@@ -373,16 +373,16 @@ gcChipProfilerWrite(
                     case GLES3_DRAWRANGEELEMENTS:
                     case GLES3_DRAWARRAYSINSTANCED:
                     case GLES3_DRAWELEMENTSINSTANCED:
-                    case GLES3_MULTIDRAWARRAYSEXT:
-                    case GLES3_MULTIDRAWELEMENTSEXT:
+                    case GLES3_MULTIDRAWARRAYS:
+                    case GLES3_MULTIDRAWELEMENTS:
                     case GLES31_DRAWARRAYSINDIRECT:
                     case GLES31_DRAWELEMENTSINDIRECT:
-                    case GLES31_MULTIDRAWARRAYSINDIRECTEXT:
-                    case GLES31_MULTIDRAWELEMENTSINDIRECTEXT:
+                    case GLES31_MULTIDRAWARRAYSINDIRECT:
+                    case GLES31_MULTIDRAWELEMENTSINDIRECT:
                     case GLES31_DRAWELEMENTSBASEVERTEX:
                     case GLES31_DRAWRANGEELEMENTSBASEVERTEX:
                     case GLES31_DRAWELEMENTSINSTANCEDBASEVERTEX:
-                    case GLES31_MULTIDRAWELEMENTSBASEVERTEXEXT:
+                    case GLES31_MULTIDRAWELEMENTSBASEVERTEX:
                         totalDrawCalls += gc->profiler.apiCalls[i];
                         break;
 
@@ -556,7 +556,7 @@ __glChipProfilerSet(
 
     Profiler = chipCtx->profiler;
 
-    switch (__glesApiProfileMode)
+    switch (__glApiProfileMode)
     {
     case 1:
         if (profiler->frameCount == 0 || profiler->frameNumber < profiler->frameCount)
@@ -619,7 +619,7 @@ __glChipProfilerSet(
     case GL3_PROFILER_FINISH_BEGIN:
 
         gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_BEGIN));
-        gcmONERROR(gcoPROFILER_Begin(chipCtx->profiler, gcvCOUNTER_OP_FINISH));
+        gcmONERROR(gcoPROFILER_EnableCounters(chipCtx->profiler, gcvCOUNTER_OP_FINISH));
         profiler->drawCount = 0;
         break;
 
@@ -669,7 +669,7 @@ __glChipProfilerSet(
     case GL3_PROFILER_DRAW_BEGIN:
 
         gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_BEGIN));
-        gcmONERROR(gcoPROFILER_Begin(chipCtx->profiler, gcvCOUNTER_OP_DRAW));
+        gcmONERROR(gcoPROFILER_EnableCounters(chipCtx->profiler, gcvCOUNTER_OP_DRAW));
         break;
 
     case GL3_PROFILER_DRAW_END:
@@ -686,7 +686,7 @@ __glChipProfilerSet(
         gcmONERROR(gcChipProfilerWrite(gc, GL3_PROFILER_WRITE_FRAME_BEGIN));
         if (!profiler->perDrawMode)
         {
-            gcmONERROR(gcoPROFILER_Begin(chipCtx->profiler, gcvCOUNTER_OP_FRAME));
+            gcmONERROR(gcoPROFILER_EnableCounters(chipCtx->profiler, gcvCOUNTER_OP_FRAME));
         }
         gcmWRITE_CONST(VPG_PROG);
         gcmWRITE_COUNTER(VPC_PROGRAMHANDLE, gcmPTR2INT32(Value));
@@ -2188,6 +2188,29 @@ __glChipProfile_CopyBufferSubData(
 }
 
 GLboolean
+__glChipProfile_GetBufferSubData(
+    __GLcontext* gc,
+    GLuint targetIndex,
+    __GLbufferObject* bufObj,
+    GLintptr offset,
+    GLsizeiptr size,
+    GLvoid*  data
+    )
+{
+    GLboolean ret;
+    __GLCHIP_PROFILER_HEADER();
+    ret = __glChipGetBufferSubData(gc,
+                                     targetIndex,
+                                     bufObj,
+                                     offset,
+                                     size,
+                                     data);
+    __GLCHIP_PROFILER_FOOTER();
+    return ret;
+}
+
+
+GLboolean
 __glChipProfile_BindDrawFramebuffer(
     __GLcontext *gc,
     __GLframebufferObject *preFBO,
@@ -2755,7 +2778,13 @@ __glChipProfile_BlendBarrier(
 
 }
 
+
 #if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+
+extern GLvoid __glChipNotifyChangeBufferSize(__GLcontext * gc);
+extern GLvoid __glChipNotifyDestroyBuffers(__GLcontext *gc);
+extern GLvoid __glChipNotifyDrawableSwitch(__GLcontext *gc);
+
 GLvoid
 __glChipProfile_NotifyChangeBufferSize(
 __GLcontext * gc
@@ -2907,6 +2936,7 @@ gcChipInitProfileDevicePipeline(
     gc->dp.bufferData = __glChipProfile_BufferData;
     gc->dp.bufferSubData = __glChipProfile_BufferSubData;
     gc->dp.copyBufferSubData = __glChipProfile_CopyBufferSubData;
+    gc->dp.getBufferSubData = __glChipProfile_GetBufferSubData;
 
     /* FBO */
     gc->dp.bindDrawFramebuffer = __glChipProfile_BindDrawFramebuffer;

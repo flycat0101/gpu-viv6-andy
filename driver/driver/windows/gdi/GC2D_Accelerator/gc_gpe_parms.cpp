@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -396,7 +396,7 @@ gctBOOL GC2DParms::SetSurface(
             desc.physical = phys;
             desc.size     = surf->mSize;
 
-            status = gcoHAL_WrapUserMemory(&desc, &node);
+            status = gcoHAL_WrapUserMemory(&desc, gcvVIDMEM_TYPE_BITMAP, &node);
             if (gcmIS_ERROR(status))
             {
                 GC2D_DebugTrace(GC2D_ERROR_TRACE,
@@ -484,7 +484,7 @@ gctBOOL GC2DParms::ResetSurface(gctBOOL bSrc)
     {
         gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(
             surf->mWrappedNode,
-            gcvSURF_BITMAP,
+            gcvVIDMEM_TYPE_BITMAP,
             gcvENGINE_RENDER));
 
         gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(

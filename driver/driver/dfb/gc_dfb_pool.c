@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -407,7 +407,7 @@ galAllocateBuffer( CoreSurfacePool       *pool,
             alloc->tssize = alloc->size / 64;
             gcmERR_BREAK(gcoHAL_AllocateVideoMemory(
                 256,
-                gcvSURF_BITMAP,
+                gcvVIDMEM_TYPE_BITMAP,
                 0,
                 gcvPOOL_DEFAULT,
                 &alloc->tssize,
@@ -507,7 +507,7 @@ galDeallocateBuffer( CoreSurfacePool       *pool,
     if (vdrv->vdev->hw_2d_compression &&
         alloc->tsphysical != gcvINVALID_ADDRESS)
     {
-        gcoHAL_UnlockVideoMemory(alloc->tsnode, gcvSURF_BITMAP, gcvENGINE_RENDER);
+        gcoHAL_UnlockVideoMemory(alloc->tsnode, gcvVIDMEM_TYPE_BITMAP, gcvENGINE_RENDER);
         gcoHAL_ReleaseVideoMemory(alloc->tsnode);
         alloc->tsphysical = gcvINVALID_ADDRESS;
     }

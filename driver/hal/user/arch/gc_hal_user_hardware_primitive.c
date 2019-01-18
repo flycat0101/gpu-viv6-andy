@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -348,7 +348,7 @@ static gceSTATUS _RenderRectangle(
 
         /* Dump the results. */
         gcmDUMP_BUFFER(gcvNULL,
-                       "memory",
+                       gcvDUMP_BUFFER_MEMORY,
                        gcsSURF_NODE_GetHWAddress(&State->dstSurface.node),
                        State->dstSurface.node.logical,
                        0,
@@ -463,7 +463,7 @@ static gctUINT _ReserveBufferSize(
         /* pattern. */
         + (usePattern ? 54 : 0)
         /* source. */
-        + ((srcCurrent > 0) ? (srcCurrent * (Hardware->features[gcvFEATURE_2D_MULTI_SOURCE_BLT_EX2] ? 76 : 68)) : 24)
+        + ((srcCurrent > 0) ? (srcCurrent * (Hardware->features[gcvFEATURE_2D_MULTI_SOURCE_BLT_EX2] ? 72 : 68)) : 24)
         /* pallete. */
         + (usePallete ? 258 : 0)
         /* input CSC. */
@@ -2757,42 +2757,55 @@ OnError:
 gceSTATUS
 gcoHARDWARE_FlushDrawID(
     IN gcoHARDWARE Hardware,
+    IN gctBOOL  ForComputing,
     INOUT gctPOINTER *Memory
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-
-#if gcdFRAMEINFO_STATISTIC
-    gctUINT32 drawCount;
-    gctUINT32 frameCount;
-#else
-    gctUINT32 programID;
-#endif
 
     gctUINT32 drawID;
 
     gcmHEADER_ARG("Hardware=0x%x", Hardware);
 
 #if gcdFRAMEINFO_STATISTIC
-    gcoHAL_FrameInfoOps(gcvNULL,
-                        gcvFRAMEINFO_FRAME_NUM,
-                        gcvFRAMEINFO_OP_GET,
-                        &frameCount);
+    if (ForComputing)
+    {
+        gctUINT32  computeCount;
+        gcoHAL_FrameInfoOps(gcvNULL,
+                            gcvFRAMEINFO_COMPUTE_NUM,
+                            gcvFRAMEINFO_OP_GET,
+                            &computeCount);
+        computeCount--;
+        drawID = computeCount;
 
-    gcoHAL_FrameInfoOps(gcvNULL,
-                        gcvFRAMEINFO_DRAW_NUM,
-                        gcvFRAMEINFO_OP_GET,
-                        &drawCount);
+    }
+    else
+    {
+        gctUINT32 drawCount;
+        gctUINT32 frameCount;
+        gcoHAL_FrameInfoOps(gcvNULL,
+                            gcvFRAMEINFO_FRAME_NUM,
+                            gcvFRAMEINFO_OP_GET,
+                            &frameCount);
 
-    drawCount --;
+        gcoHAL_FrameInfoOps(gcvNULL,
+                            gcvFRAMEINFO_DRAW_NUM,
+                            gcvFRAMEINFO_OP_GET,
+                            &drawCount);
 
-    drawID = (frameCount << 16) | drawCount;
+        drawCount --;
+        drawID = (frameCount << 16) | drawCount;
+
+    }
 #else
-    gcoHAL_FrameInfoOps(gcvNULL,
-                        gcvFRAMEINFO_PROGRAM_ID,
-                        gcvFRAMEINFO_OP_GET,
-                        &programID);
-    drawID = programID;
+    {
+        gctUINT32 programID;
+        gcoHAL_FrameInfoOps(gcvNULL,
+                            gcvFRAMEINFO_PROGRAM_ID,
+                            gcvFRAMEINFO_OP_GET,
+                            &programID);
+        drawID = programID;
+    }
 #endif
 
     gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW(Hardware, 0x0389C, drawID, Memory));
@@ -2820,6 +2833,7 @@ static gceSTATUS _CheckTargetDeferDither(
     /* Disable dither for fake formats */
     if (!Hardware->features[gcvFEATURE_PE_DITHER_FIX] &&
         Hardware->PEStates->ditherEnable &&
+        (rtSurf && !(rtSurf->flags & gcvSURF_FLAG_DITHER_DISABLED)) &&
         !fakeFmt)
     {
         gctUINT32 i;
@@ -2972,6 +2986,12 @@ static gceSTATUS gcoHARDWARE_FlushStates(
         gcmONERROR(gcoHARDWARE_FlushPA(Hardware, Memory));
     }
 
+    if (Hardware->SHDirty->uniformDirty)
+    {
+        /* Flush uniform states*/
+        gcmONERROR(gcoHARDWARE_FlushUniform(Hardware, Memory));
+    }
+
     if (Hardware->SHDirty->shaderDirty)
     {
         /* Flush shader states. */
@@ -3001,6 +3021,12 @@ static gceSTATUS gcoHARDWARE_FlushStates(
         gcmONERROR(gcoHARDWARE_FlushL2Cache(Hardware, Memory));
     }
 
+    if (Hardware->flushVtxData && Hardware->features[gcvFEATURE_MULTI_CLUSTER])
+    {
+        /* Flush Vertex data cache. */
+        gcmONERROR(gcoHARDWARE_FlushVtxDataCache(Hardware, Memory));
+    }
+
     if (Hardware->multiGPURenderingModeDirty && (Hardware->config->gpuCoreCount > 1))
     {
         gcmONERROR(gcoHARDWARE_FlushMultiGPURenderingMode(Hardware, Memory));
@@ -3008,7 +3034,7 @@ static gceSTATUS gcoHARDWARE_FlushStates(
 
     if (Hardware->features[gcvFEATURE_DRAW_ID])
     {
-        gcmONERROR(gcoHARDWARE_FlushDrawID(Hardware, Memory));
+        gcmONERROR(gcoHARDWARE_FlushDrawID(Hardware, gcvFALSE, Memory));
     }
 
 #if gcdENABLE_TRUST_APPLICATION
@@ -4980,8 +5006,7 @@ _InternalTFBSwitch(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x7002) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x7002, physical);
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
@@ -5033,8 +5058,7 @@ _InternalTFBSwitch(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x7020) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x7020, 0);
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
@@ -5086,8 +5110,7 @@ _InternalTFBSwitch(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x7030) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x7030, 16);
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
@@ -5173,8 +5196,7 @@ _InternalTFBSwitch(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x7001) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x7001, tfbCmd);
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
@@ -5303,8 +5325,7 @@ _SinglePEPipeSwitch(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0E03) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0E03, flush);
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
@@ -5358,8 +5379,7 @@ _SinglePEPipeSwitch(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x052F) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x052F, ((((gctUINT32) (Hardware->PEStates->peConfigExReg)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
  0:0) + 1) == 32) ?
@@ -5540,8 +5560,7 @@ gcoHARDWARE_DrawPrimitives(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0E05) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0E05, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -5616,8 +5635,7 @@ gcoHARDWARE_DrawPrimitives(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0E05) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0E05, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -5935,8 +5953,7 @@ gcoHARDWARE_DrawIndirectPrimitives(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0E05) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0E05, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -6011,8 +6028,7 @@ gcoHARDWARE_DrawIndirectPrimitives(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0E05) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0E05, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -6094,7 +6110,17 @@ gcoHARDWARE_DrawIndirectPrimitives(
  3:0))) | (((gctUINT32) ((gctUINT32) (xlate[Type]) & ((gctUINT32) ((((1 ?
  3:0) - (0 ?
  3:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)));
+ ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)))
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 14:14) - (0 ?
+ 14:14) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 14:14) - (0 ?
+ 14:14) + 1))))))) << (0 ?
+ 14:14))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 14:14) - (0 ?
+ 14:14) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 14:14) - (0 ? 14:14) + 1))))))) << (0 ? 14:14)));
 
 
     /* Program the GCCMD_DRAW_INDIRECT_ADDRESS data. */
@@ -6354,8 +6380,7 @@ gcoHARDWARE_MultiDrawIndirectPrimitives(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0E05) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0E05, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -6430,8 +6455,7 @@ gcoHARDWARE_MultiDrawIndirectPrimitives(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0E05) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0E05, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -6513,7 +6537,17 @@ gcoHARDWARE_MultiDrawIndirectPrimitives(
  3:0))) | (((gctUINT32) ((gctUINT32) (xlate[Type]) & ((gctUINT32) ((((1 ?
  3:0) - (0 ?
  3:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)));
+ ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 14:14) - (0 ?
+ 14:14) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 14:14) - (0 ?
+ 14:14) + 1))))))) << (0 ?
+ 14:14))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 14:14) - (0 ?
+ 14:14) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 14:14) - (0 ? 14:14) + 1))))))) << (0 ? 14:14)));
 
 
     /* Program the GCCMD_DRAW_INDIRECT_ADDRESS data. */
@@ -6885,8 +6919,7 @@ gcoHARDWARE_DrawInstancedPrimitives(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0E05) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0E05, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -6960,8 +6993,7 @@ gcoHARDWARE_DrawInstancedPrimitives(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0E05) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0E05, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -7109,6 +7141,7 @@ gcoHARDWARE_DrawNullPrimitives(
 {
     gceSTATUS status;
     gctPOINTER *outside = gcvNULL;
+    gctBOOL useOneCore = gcvFALSE;
 
     /* Define state buffer variables. */
     gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);
@@ -7139,6 +7172,61 @@ gcoHARDWARE_DrawNullPrimitives(
 
     /* Flush pipe states. */
     gcmONERROR(gcoHARDWARE_FlushStates(Hardware, gcvPRIMITIVE_TRIANGLE_LIST, (gctPOINTER *)&memory));
+
+    if (Hardware->gpuRenderingMode == gcvMULTI_GPU_RENDERING_MODE_OFF)
+    {
+        useOneCore = gcvTRUE;
+    }
+
+    if (Hardware->features[gcvFEATURE_HW_TFB])
+    {
+        _InternalTFBSwitch(Hardware, gcvTRUE, (gctPOINTER *)&memory);
+    }
+
+    if (useOneCore)
+    {
+        gcoHARDWARE_MultiGPUSync(Hardware, &memory);
+        { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | gcvCORE_3D_0_MASK << gcmTO_CHIP_ID(0); memory++;
+  gcmDUMP(gcvNULL, "#[chip.enable 0x%04X]", gcvCORE_3D_0_MASK << gcmTO_CHIP_ID(0));
+ } };
+
+    }
+    /* null draw command */
+
+    if (useOneCore)
+    {
+        { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | gcvCORE_3D_ALL_MASK; memory++;
+  gcmDUMP(gcvNULL, "#[chip.enable 0x%04X]", gcvCORE_3D_ALL_MASK);
+ } };
+
+        gcoHARDWARE_MultiGPUSync(Hardware, &memory);
+    }
+
+    if (Hardware->features[gcvFEATURE_HW_TFB])
+    {
+        _InternalTFBSwitch(Hardware, gcvFALSE, (gctPOINTER *)&memory);
+    }
 
     /* Make compiler happy */
 #ifndef __clang__
@@ -7364,8 +7452,7 @@ gcoHARDWARE_DrawPrimitivesCount(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0E05) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0E05, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -7440,8 +7527,7 @@ gcoHARDWARE_DrawPrimitivesCount(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0E05) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0E05, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -7521,7 +7607,7 @@ gcoHARDWARE_DrawPrimitivesCount(
     gcmDUMP(gcvNULL,
             "#[draw 0x%08X 0x%08X 0x%08X]",
             xlate[Type],
-            StartVertex,
+            (gctUINTPTR_T) StartVertex,
             PrimitiveCount);
 
     if (useOneCore)
@@ -7781,8 +7867,7 @@ gcoHARDWARE_DrawIndexedPrimitives(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0E05) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0E05, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -7857,8 +7942,7 @@ gcoHARDWARE_DrawIndexedPrimitives(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0E05) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0E05, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -8200,8 +8284,7 @@ _FastDrawIndexedPrimitive(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0E05) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW_FAST(stateDelta, reserve, memory, gcvFALSE, 0x0E05, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -8355,8 +8438,7 @@ _FastDrawIndexedPrimitive(
  15:0))) | (((gctUINT32) ((gctUINT32) (0x0E05) & ((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));    gcmSKIPSECUREUSER();
-};
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
     gcmSETSTATEDATA_NEW_FAST(stateDelta, reserve, memory, gcvFALSE, 0x0E05, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -8483,7 +8565,7 @@ gcoHARDWARE_DrawPattern(
 
     gcmHEADER_ARG("Hardware=0x%x", Hardware);
 
-    gcoBUFFER_StartTEMPCMDBUF(Hardware->engine[gcvENGINE_RENDER].buffer, &tempCMD);
+    gcoBUFFER_StartTEMPCMDBUF(Hardware->engine[gcvENGINE_RENDER].buffer, Hardware->engine[gcvENGINE_RENDER].queue, &tempCMD);
 
     cmdBuffer = tempCMD->buffer;
 
@@ -9234,10 +9316,6 @@ gcoHARDWARE_MonoBlit(
             }
         }
     }
-
-#if gcdDUMP
-    gcmDUMP_DATA(gcvNULL, "prim2D", buffer, destStreamSize);
-#endif
 
     /* Commit the data. */
     gcmONERROR(gcoHARDWARE_Commit(Hardware));

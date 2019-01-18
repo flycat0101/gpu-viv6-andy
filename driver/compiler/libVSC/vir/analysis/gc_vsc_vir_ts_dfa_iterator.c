@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -14,7 +14,7 @@
 #include "gc_vsc.h"
 
 void vscVIR_InitializeBaseDFA(VIR_BASE_DFA* pBaseDFA, VIR_CALL_GRAPH* pCg, VIR_DFA_TYPE dfaType,
-                              gctINT flowSize, VSC_MM* pMM)
+                              gctINT flowSize, VSC_MM* pMM, VSC_MM* pScratchMemPool)
 {
     pBaseDFA->dfaType = dfaType;
     pBaseDFA->flowSize = flowSize;
@@ -22,6 +22,7 @@ void vscVIR_InitializeBaseDFA(VIR_BASE_DFA* pBaseDFA, VIR_CALL_GRAPH* pCg, VIR_D
     pBaseDFA->cmnDfaFlags.bFlowInvalidated = gcvFALSE;
     pBaseDFA->pOwnerCG = pCg;
     pBaseDFA->pMM = pMM;
+    pBaseDFA->pScratchMemPool = pScratchMemPool;
 }
 
 void vscVIR_FinalizeBaseDFA(VIR_BASE_DFA* pBaseDFA)
@@ -145,7 +146,10 @@ void vscVIR_FinalizeTsFuncFlow(VIR_TS_FUNC_FLOW* pTsFuncFlow)
         VIR_TS_BLOCK_FLOW* pBlkFlow = (VIR_TS_BLOCK_FLOW*)vscSRARR_GetElement(&pTsFuncFlow->tsBlkFlowArray,
                                                                               pBasicBlk->dgNode.id);
 
-        vscVIR_FinalizeTsBlockFlow(pBlkFlow);
+        if (pBlkFlow)
+        {
+            vscVIR_FinalizeTsBlockFlow(pBlkFlow);
+        }
     }
 
     vscSRARR_Finalize(&pTsFuncFlow->tsBlkFlowArray);
@@ -157,7 +161,7 @@ void vscVIR_InitializeBaseTsDFA(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_CALL_GRAPH* pCg
     CG_ITERATOR     funcBlkIter;
     VIR_FUNC_BLOCK* pFuncBlk;
 
-    vscVIR_InitializeBaseDFA(&pBaseTsDFA->baseDFA, pCg, dfaType, flowSize, pMM);
+    vscVIR_InitializeBaseDFA(&pBaseTsDFA->baseDFA, pCg, dfaType, flowSize, pMM, pCg->pScratchMemPool);
 
     /* Set DFA resolvers */
     pBaseTsDFA->tsDfaResolvers.ts_combineBlockFlow_resolver = pTsDfaResolvers->ts_combineBlockFlow_resolver;

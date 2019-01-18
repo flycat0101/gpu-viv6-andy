@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -20,13 +20,7 @@ _hasUniformType(
     IN gcUNIFORM Uniform
     )
 {
-    if (isUniformNormal(Uniform) ||
-        isUniformBlockMember(Uniform) ||
-        isUniformBlockAddress(Uniform) ||
-        isUniformLodMinMax(Uniform) ||
-        isUniformLevelBaseSize(Uniform) ||
-        isUniformSampleLocation(Uniform) ||
-        isUniformMultiSampleBuffers(Uniform))
+    if (isUniformBasicType(Uniform))
     {
         return gcvTRUE;
     }
@@ -570,6 +564,8 @@ _gcConvertTEXLD2MOV(
     ** Change
     **      MOV      r1, vec2(0, 0)
     **      TEXLD    r2, s1, r1
+    **  or
+    **      TEXLD    r2, s1, 0
     ** -->
     **      MOV      r2, c1
     */
@@ -578,44 +574,62 @@ _gcConvertTEXLD2MOV(
         gcSL_INSTRUCTION code = &FragmentShader->code[i];
         gcSL_INSTRUCTION prevCode = gcvNULL, coordMovCode = gcvNULL;
         gctBOOL findDef = gcvFALSE;
+        gctBOOL isSrc1ConstZero = gcvFALSE;
 
-        if (gcmSL_OPCODE_GET(code->opcode, Opcode) != gcSL_TEXLD ||
-            gcmSL_SOURCE_GET(code->source1, Type) != gcSL_TEMP)
+        if (gcmSL_OPCODE_GET(code->opcode, Opcode) != gcSL_TEXLD)
         {
             continue;
         }
 
-        /* Find the coord MOV. */
-        for (j = i - 1; j >= 0; j--)
+        if (gcmSL_SOURCE_GET(code->source1, Type) != gcSL_TEMP)
         {
-            prevCode = &FragmentShader->code[j];
+            if (gcmSL_SOURCE_GET(code->source1, Type) == gcSL_CONSTANT &&
+                code->source1Index == 0 &&
+                code->source1Indexed == 0)
+            {
+                isSrc1ConstZero = gcvTRUE;
+            }
 
-            if (gcmSL_OPCODE_GET(prevCode->opcode, Opcode) != gcSL_MOV ||
-                prevCode->tempIndex != code->source1Index)
+            if (!isSrc1ConstZero)
             {
                 continue;
             }
-
-            /* Multi def, skip this TEXLD. */
-            if (findDef)
-            {
-                coordMovCode = gcvNULL;
-                break;
-            }
-
-            /* Find the match MOV. */
-            if (gcmSL_SOURCE_GET(prevCode->source0, Type) == gcSL_CONSTANT &&
-                prevCode->source0Index == 0 &&
-                prevCode->source0Indexed == 0)
-            {
-                coordMovCode = prevCode;
-            }
-            findDef = gcvTRUE;
         }
 
-        if (coordMovCode == gcvNULL)
+        if (!isSrc1ConstZero)
         {
-            continue;
+            /* Find the coord MOV. */
+            for (j = i - 1; j >= 0; j--)
+            {
+                prevCode = &FragmentShader->code[j];
+
+                if (gcmSL_OPCODE_GET(prevCode->opcode, Opcode) != gcSL_MOV ||
+                    prevCode->tempIndex != code->source1Index)
+                {
+                    continue;
+                }
+
+                /* Multi def, skip this TEXLD. */
+                if (findDef)
+                {
+                    coordMovCode = gcvNULL;
+                    break;
+                }
+
+                /* Find the match MOV. */
+                if (gcmSL_SOURCE_GET(prevCode->source0, Type) == gcSL_CONSTANT &&
+                    prevCode->source0Index == 0 &&
+                    prevCode->source0Indexed == 0)
+                {
+                    coordMovCode = prevCode;
+                }
+                findDef = gcvTRUE;
+            }
+
+            if (coordMovCode == gcvNULL)
+            {
+                continue;
+            }
         }
 
         /* Create the constant uniform. */
@@ -823,31 +837,35 @@ _gcPackMainFunction(
         gcmONERROR(_gcFixedJmpInMainFunc(Shader));
 
         /* Find a main function code segment. */
-        _gcFindMainFunctionCodeSegment(Shader, 0, &currentCodeSegmentStartIdx, &currentCodeSegmentEndIdx);
-
-        while (((currentCodeSegmentEndIdx + 1) < Shader->lastInstruction)
-               &&
-               _gcFindMainFunctionCodeSegment(Shader,
-                                              currentCodeSegmentEndIdx + 1,
-                                              &newCodeSegmentStartIdx,
-                                              &newCodeSegmentEndIdx))
+        if (_gcFindMainFunctionCodeSegment(Shader,
+                                           0,
+                                           &currentCodeSegmentStartIdx,
+                                           &currentCodeSegmentEndIdx))
         {
-            gcmONERROR(gcSHADER_MoveCodeListBeforeCode(Shader,
-                                                       newCodeSegmentStartIdx,
-                                                       currentCodeSegmentStartIdx,
-                                                       currentCodeSegmentEndIdx));
+            while (((currentCodeSegmentEndIdx + 1) < Shader->lastInstruction)
+                   &&
+                   _gcFindMainFunctionCodeSegment(Shader,
+                                                  currentCodeSegmentEndIdx + 1,
+                                                  &newCodeSegmentStartIdx,
+                                                  &newCodeSegmentEndIdx))
+            {
+                gcmONERROR(gcSHADER_MoveCodeListBeforeCode(Shader,
+                                                           newCodeSegmentStartIdx,
+                                                           currentCodeSegmentStartIdx,
+                                                           currentCodeSegmentEndIdx));
 
-            currentCodeSegmentEndIdx = newCodeSegmentEndIdx + currentCodeSegmentEndIdx - currentCodeSegmentStartIdx + 1;
-            currentCodeSegmentStartIdx = newCodeSegmentStartIdx;
-        }
+                currentCodeSegmentEndIdx = newCodeSegmentEndIdx + currentCodeSegmentEndIdx - currentCodeSegmentStartIdx + 1;
+                currentCodeSegmentStartIdx = newCodeSegmentStartIdx;
+            }
 
-        /* Now main function should be a single code segment. */
-        if (currentCodeSegmentEndIdx != Shader->lastInstruction)
-        {
-            gcmONERROR(gcSHADER_MoveCodeListBeforeCode(Shader,
-                                                       Shader->lastInstruction,
-                                                       currentCodeSegmentStartIdx,
-                                                       currentCodeSegmentEndIdx));
+            /* Now main function should be a single code segment. */
+            if (currentCodeSegmentEndIdx != Shader->lastInstruction)
+            {
+                gcmONERROR(gcSHADER_MoveCodeListBeforeCode(Shader,
+                                                           Shader->lastInstruction,
+                                                           currentCodeSegmentStartIdx,
+                                                           currentCodeSegmentEndIdx));
+            }
         }
     }
 
@@ -1773,8 +1791,32 @@ OnError:
     return status;
 }
 
+
 gceSTATUS
-_gcLinkBuiltinLibs(
+gcSHADER_MergeCompileTimeInitializedUniforms(
+    IN gcSHADER Shader,
+    IN gcSHADER LibShader
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    if(gcShaderConstantMemoryReferenced(LibShader))
+    {
+        gctUINT32 constantMemorySize = GetShaderConstantMemorySize(LibShader);
+
+        gcmASSERT(constantMemorySize);
+        gcmONERROR(gcSHADER_AddConstantMemorySize(Shader,
+                                                  constantMemorySize,
+                                                  GetShaderConstantMemoryBuffer(LibShader)));
+        gcShaderClrConstantMemoryReferenced(LibShader);
+    }
+
+OnError:
+    return status;
+}
+
+gceSTATUS
+gcSHADER_LinkBuiltinLibs(
     IN gcSHADER* Shaders
     )
 {
@@ -1812,22 +1854,10 @@ _gcLinkBuiltinLibs(
 
         if (GetShaderNeedPatchForCentroid(Shaders[i]))
         {
-            status = gcSHADER_PatchCentroidVaryingAsCenter(Shaders[i]);
-
-            if (gcmIS_ERROR(status))
-            {
-                return status;
-            }
+            gcmONERROR(gcSHADER_PatchCentroidVaryingAsCenter(Shaders[i]));
 
             /* after patch successfully, reset the flag */
             SetShaderNeedPatchForCentroid(Shaders[i], gcvFALSE);
-        }
-
-        if (gcmOPT_oclInt64InVIR() && gcShaderHasInt64(Shaders[i]))
-        {
-            gcmONERROR(gcSHADER_PatchInt64(Shaders[i]));
-
-            gcShaderClrHasInt64(Shaders[i]);
         }
 
         if (GetShaderHasIntrinsicBuiltin(Shaders[i]))
@@ -1838,37 +1868,38 @@ _gcLinkBuiltinLibs(
             if (Shaders[i]->type == gcSHADER_TYPE_CL)
             {
                 libType = gcLIB_CL_BUILTIN;
-                status = gcSHADER_CompileCLBuiltinLibrary(Shaders[i],
-                                                          gcSHADER_TYPE_LIBRARY,
-                                                          libType,
-                                                          &libBinary);
-                if (gcmIS_ERROR(status))
-                {
-                    return status;
-                }
+                gcmONERROR(gcSHADER_CompileCLBuiltinLibrary(Shaders[i],
+                                                            gcSHADER_TYPE_LIBRARY,
+                                                            libType,
+                                                            &libBinary));
+                gcShaderClrConstantMemoryReferenced(libBinary);
             }
             else
             {
-                status = gcSHADER_CompileBuiltinLibrary(Shaders[i],
-                                                        gcSHADER_TYPE_LIBRARY,
-                                                        libType,
-                                                        &libBinary);
-                if (gcmIS_ERROR(status))
-                {
-                    return status;
-                }
+                gcmONERROR(gcSHADER_CompileBuiltinLibrary(Shaders[i],
+                                                          gcSHADER_TYPE_LIBRARY,
+                                                          libType,
+                                                          &libBinary));
             }
 
-            status = gcSHADER_LinkBuiltinLibrary(Shaders[i],
-                                                 libBinary,
-                                                 libType);
-            if (gcmIS_ERROR(status))
-            {
-                return status;
-            }
+            gcmONERROR(gcSHADER_LinkBuiltinLibrary(Shaders[i],
+                                                   libBinary,
+                                                   libType));
 
             /* after linking successfully, reset the flag */
             SetShaderHasIntrinsicBuiltin(Shaders[i], gcvFALSE);
+
+            if (Shaders[i]->type == gcSHADER_TYPE_CL)
+            {
+                gcSHADER_MergeCompileTimeInitializedUniforms(Shaders[i], libBinary);
+            }
+        }
+        if (Shaders[i]->type == gcSHADER_TYPE_CL &&
+            gcmOPT_oclInt64InVIR() && gcShaderHasInt64(Shaders[i]))
+        {
+            gcmONERROR(gcSHADER_PatchInt64(Shaders[i]));
+
+            gcShaderClrHasInt64(Shaders[i]);
         }
 #endif
 
@@ -1876,33 +1907,25 @@ _gcLinkBuiltinLibs(
         {
             gcSHADER libBinary = gcvNULL;
 
-            status = gcSHADER_CompileBuiltinLibrary(
-                                    Shaders[i],
-                                    GetShaderType(Shaders[i]),
-                                    gcLIB_BLEND_EQUATION,
-                                    &libBinary);
+            gcmONERROR(gcSHADER_CompileBuiltinLibrary(Shaders[i],
+                                                      GetShaderType(Shaders[i]),
+                                                      gcLIB_BLEND_EQUATION,
+                                                      &libBinary));
 
-            if (gcmIS_ERROR(status))
-            {
-                return status;
-            }
-
-            status = gcSHADER_LinkBuiltinLibrary(
-                                    Shaders[i],
-                                    libBinary,
-                                    gcLIB_BLEND_EQUATION);
-
-            if (gcmIS_ERROR(status))
-            {
-                return status;
-            }
+            gcmONERROR(gcSHADER_LinkBuiltinLibrary(Shaders[i],
+                                                   libBinary,
+                                                   gcLIB_BLEND_EQUATION));
 
             /* after linking successfully, reset the flag */
             ClearShaderOutputBlends(Shaders[i]);
         }
 
         /* After link all built-in functions, analyze them. */
-        gcSHADER_AnalyzeFunctions(Shaders[i], gcvFALSE);
+        gcmONERROR(gcSHADER_AnalyzeFunctions(Shaders[i], gcvFALSE));
+        if (gcSHADER_DumpCodeGenVerbose(Shaders[i]))
+        {
+            gcDump_Shader(gcvNULL, "Shader after LinkBuiltinLibs ", gcvNULL, Shaders[i], gcvTRUE);
+        }
     }
 
 OnError:
@@ -2196,6 +2219,24 @@ gcGetFormatFromType(
         format = gcSL_FLOAT;
         break;
 
+    case gcSHADER_FLOAT64_X1:
+    case gcSHADER_FLOAT64_X2:
+    case gcSHADER_FLOAT64_X3:
+    case gcSHADER_FLOAT64_X4:
+    case gcSHADER_FLOAT64_X8:
+    case gcSHADER_FLOAT64_X16:
+    case gcSHADER_FLOAT64_4X2:
+    case gcSHADER_FLOAT64_4X3:
+    case gcSHADER_FLOAT64_4X4:
+    case gcSHADER_FLOAT64_2X2:
+    case gcSHADER_FLOAT64_2X3:
+    case gcSHADER_FLOAT64_2X4:
+    case gcSHADER_FLOAT64_3X2:
+    case gcSHADER_FLOAT64_3X3:
+    case gcSHADER_FLOAT64_3X4:
+        format = gcSL_FLOAT;
+        break;
+
     case gcSHADER_INTEGER_X1:
     case gcSHADER_INTEGER_X2:
     case gcSHADER_INTEGER_X3:
@@ -2317,19 +2358,23 @@ gcGetFormatFromType(
         format = gcSL_UINT32;
         break;
 
-    case gcSHADER_IMAGE_2D:                      /* 0x17 */
-    case gcSHADER_IMAGE_3D:                      /* 0x18 */
-    case gcSHADER_IMAGE_CUBE:                    /* 0x3D */
-    case gcSHADER_IMAGE_CUBEMAP_ARRAY:           /* 0x50 */
+    case gcSHADER_IMAGE_2D:                      /* 0x3E */
+    case gcSHADER_IMAGE_3D:                      /* 0x41 */
+    case gcSHADER_IMAGE_CUBE:                    /* 0x44 */
+    case gcSHADER_IMAGE_CUBEMAP_ARRAY:           /* 0x47 */
     case gcSHADER_IMAGE_2D_ARRAY:                /* 0x40 */
-    case gcSHADER_IMAGE_1D:                      /* 0x44 */
-    case gcSHADER_IMAGE_1D_ARRAY:                /* 0x45 */
-    case gcSHADER_IMAGE_1D_BUFFER:               /* 0x46 */
-    case gcSHADER_IMAGE_BUFFER:                  /* 0x59 */
+    case gcSHADER_IMAGE_BUFFER:                  /* 0x5E */
         format = gcSL_FLOAT;
         break;
 
-    case gcSHADER_SAMPLER:
+    case gcSHADER_IMAGE_1D_T:                    /* 0x17 */
+    case gcSHADER_IMAGE_1D_BUFFER_T:             /* 0x18 */
+    case gcSHADER_IMAGE_1D_ARRAY_T:              /* 0x19 */
+    case gcSHADER_IMAGE_2D_T:                    /* 0x1A */
+    case gcSHADER_IMAGE_2D_ARRAY_T:              /* 0x1B */
+    case gcSHADER_IMAGE_3D_T:                    /* 0x1C */
+    case gcSHADER_VIV_GENERIC_IMAGE_T:           /* 0x1D */
+    case gcSHADER_SAMPLER_T:                     /* 0x1E */
         format = gcSL_UINT32;
         break;
 
@@ -3256,7 +3301,7 @@ gcDoPreprocess(
     /* if there is intrinsic builtin functions,
        compile the builtin libary and
        link the library functions into the shader*/
-    _gcLinkBuiltinLibs(Shaders);
+    gcmONERROR(gcSHADER_LinkBuiltinLibs(Shaders));
 
     for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i ++)
     {

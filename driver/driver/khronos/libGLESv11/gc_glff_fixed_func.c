@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -15,6 +15,59 @@
 
 #define _GC_OBJ_ZONE glvZONE_TRACE
 
+/******************************************************************************
+** util fuction: the same as gcUNIFORM_SetValue_Ex/gcUNIFORM_SetValueF_Ex,
+** which will be use by VG/VX etc,
+** figure out a individual function which only used by es11
+********************************************************************************/
+gceSTATUS
+glfUtilUniformSetValue(
+    IN gcUNIFORM Uniform,
+    IN gctUINT32 Count,
+    IN gcsHINT_PTR Hints,
+    IN const gctPOINTER Value
+    )
+{
+#if gcdNULL_DRIVER < 2
+    gceSTATUS status;
+    gctUINT32 columns, rows, physicalAddress;
+    gctBOOL useFullNewLinker = gcUseFullNewLinker(gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_HALTI2));
+
+    gcmHEADER_ARG("Uniform=0x%x Count=%lu Value=0x%x", Uniform, Count, Value);
+
+    /* Verify the argiments. */
+    gcmVERIFY_OBJECT(Uniform, gcvOBJ_UNIFORM);
+    gcmDEBUG_VERIFY_ARGUMENT(Count > 0);
+    gcmDEBUG_VERIFY_ARGUMENT(Value != gcvNULL);
+
+    gcTYPE_GetTypeInfo(Uniform->u.type, &columns, &rows, 0);
+    rows *= gcmMIN((gctINT) Count,
+                   useFullNewLinker ? Uniform->usedArraySize : Uniform->arraySize);
+
+    physicalAddress = Uniform->address;
+    if (useFullNewLinker)
+    {
+        gcSHADER_ComputeUniformPhysicalAddress(Hints->hwConstRegBases,
+                                               Uniform,
+                                               &physicalAddress);
+    }
+
+    status = gcoSHADER_BindUniform(gcvNULL,
+                                   physicalAddress, GetUniformPhysical(Uniform),
+                                   columns, rows,
+                                   1, gcvFALSE,
+                                   columns * 4,
+                                   0,
+                                   (gctPOINTER) Value,
+                                   gcvUNIFORMCVT_NONE,
+                                   Uniform->shaderKind);
+
+    gcmFOOTER();
+    return status;
+#else
+    return gcvSTATUS_OK;
+#endif
+}
 
 /*******************************************************************************
 ** Shader generation helpers.
@@ -38,7 +91,7 @@ gceSTATUS glfSetUniformFromFractions(
     vector[2] = Z;
     vector[3] = W;
 
-    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, Hints, vector);
+    status = glfUtilUniformSetValue(Uniform, 1, Hints, (gctPOINTER)vector);
 
     gcmFOOTER();
 
@@ -91,7 +144,8 @@ gceSTATUS glfSetUniformFromFloats(
         }
     }
 
-    status = gcUNIFORM_SetValueF_Ex(Uniform, Count, Hints, ValueArray);
+    status = glfUtilUniformSetValue(Uniform, Count, Hints, (gctPOINTER)ValueArray);
+
     gcmFOOTER();
 
     return status;
@@ -121,7 +175,8 @@ gceSTATUS glfSetUniformFromVectors(
         vector += 4;
     }
 
-    status = gcUNIFORM_SetFracValue(Uniform, Count, Hints, ValueArray);
+    status = glfUtilUniformSetValue(Uniform, Count, Hints, (gctPOINTER)ValueArray);
+
     gcmFOOTER();
 
     return status;
@@ -162,7 +217,8 @@ gceSTATUS glfSetUniformFromMatrix(
         }
     }
 
-    status = gcUNIFORM_SetFracValue(Uniform, MatrixCount * RowCount, Hints, ValueArray);
+    status = glfUtilUniformSetValue(Uniform, MatrixCount * RowCount, Hints, (gctPOINTER)ValueArray);
+
     gcmFOOTER();
 
     return status;
@@ -391,10 +447,11 @@ static gceSTATUS _Set_uTexCoord(
         vector += 4;
     }
 
-    status = gcUNIFORM_SetFracValue(Uniform,
+    status = glfUtilUniformSetValue(Uniform,
                                     glvMAX_TEXTURES,
                                     Context->currProgram->programState.hints,
-                                    valueArray);
+                                    (gctPOINTER)valueArray);
+
     gcmFOOTER();
     return status;
 }
@@ -505,7 +562,7 @@ static gceSTATUS _LoadUniforms(
         gcoBUFOBJ_FastLock(ShaderControl->halBufObj, &physical, (gctPOINTER *)&ubPtr);
 
         /* this is DUBO uniform */
-        gcUNIFORM_SetValue_Ex(ubUniform, 1, Context->currProgram->programState.hints, (gctINT *)&physical);
+        glfUtilUniformSetValue(ubUniform, 1, Context->currProgram->programState.hints, (gctPOINTER)&physical);
 
         ShaderControl->logicalAddress = (gctPOINTER)ubPtr;
     }
@@ -633,7 +690,7 @@ gceSTATUS glfLoadShader(
 
             if (Context->currProgram != gcvNULL &&
                 Context->currProgram->programState.hints != gcvNULL &&
-                Context->currProgram->programState.hints->unifiedStatus.constant)
+                Context->currProgram->programState.hints->unifiedStatus.constantUnifiedMode == gcvUNIFORM_ALLOC_GPIPE_TOP_PS_BOTTOM_FLOAT_BASE_OFFSET)
             {
                 prevPsConstStart = Context->currProgram->programState.hints->unifiedStatus.constPSStart;
             }
@@ -641,7 +698,7 @@ gceSTATUS glfLoadShader(
             Context->currProgram = program;
             Context->programDirty = gcvTRUE;
             /* Create new program if necessary. */
-            if (Context->currProgram->programState.stateBufferSize== 0
+            if (Context->currProgram->programState.stateBufferSize == 0
                 || Context->currProgram->vs.shader == gcvNULL
                 || Context->currProgram->fs.shader == gcvNULL)
             {

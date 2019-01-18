@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -16,17 +16,11 @@
 */
 
 #include "gc_vsc.h"
-
-#if _WIN32
+#if DX_SHADER
 #include <Windows.h>
-#if !defined(UNDER_CE)
-# include <io.h>
 #endif
-#else
-#include <sys/file.h>
-#include <stdio.h>
-extern int fileno(FILE *stream);
-#endif
+
+#define NEW_READ_WRITE_IMAGE    1
 
 #define _GC_OBJ_ZONE    gcvZONE_COMPILER
 
@@ -46,8 +40,11 @@ extern int fileno(FILE *stream);
 /* library for gl built-in functions that are written in high level shader */
 #include "lib/gc_vsc_lib_gl_builtin.h"
 
+
 /* library for cl built-in functions that are written in high level shader */
-#include "lib/gc_vsc_lib_cl_builtin.h"
+/*#include "lib/gc_vsc_lib_cl_builtin.h"*/
+
+#include "lib/gc_vsc_lib_common.h"
 
 extern gctGLSLCompiler gcGLSLCompiler;
 gcSHADER gcTexFormatConvertLibrary = gcvNULL;
@@ -62,8 +59,8 @@ gcSHADER gcBlendEquationLibrary = gcvNULL;
 
 extern gctCLCompiler gcCLCompiler;
 #if _SUPPORT_LONG_ULONG_DATA_TYPE
-#define CL_LIB_COUNT    4
-#define LONG_ULONG_LIB_INDEX 3
+#define CL_LIB_COUNT    5
+#define LONG_ULONG_LIB_INDEX 4
 #define CL_LONG_ULONG_FUNCS \
             { \
                 gcLibCLLong_Func, \
@@ -93,8 +90,8 @@ extern gctCLCompiler gcCLCompiler;
             }
 
 #else
-#define CL_LIB_COUNT    3
-#define LONG_ULONG_LIB_INDEX 2
+#define CL_LIB_COUNT    4
+#define LONG_ULONG_LIB_INDEX 3
 #endif
 gcSHADER gcCLPatchLibrary[CL_LIB_COUNT]  = {gcvNULL};
 
@@ -1187,6 +1184,8 @@ gcGetLongULongFunctionName(
     gctUINT     index;
 
     static const gctSTRING typeName[] = {"long", "ulong"};
+    static gctUINT typeNameCount = gcmSIZEOF(typeName) / gcmSIZEOF(gctSTRING);
+
     static const gctSTRING opName[] = /*{"_LeftShift", "_RightShift"};*/
     {
     "",/*gcSL_NOP, */                     /* 0x00 */
@@ -1336,8 +1335,10 @@ gcGetLongULongFunctionName(
     "", /*gcSL_PARAM_CHAIN, */          /* 0x90 No specific semantic, only used to chain two sources to one dest. */
     "", /*gcSL_INTRINSIC, */          /* 0x91 Instrinsic dest, IntrinsicId, Param */
     "", /*gcSL_INTRINSIC_ST, */          /* 0x92 Instrinsic_st dest, IntrinsicId, Param */
-};
-static const gctSTRING conditionName[] = /*{"_LeftShift", "_RightShift"};*/
+    };
+    static gctUINT opNameCount = gcmSIZEOF(opName) / gcmSIZEOF(gctSTRING);
+
+    static const gctSTRING conditionName[] = /*{"_LeftShift", "_RightShift"};*/
     {
     "_always", /*gcSL_ALWAYS*/                                                /* 0x0 */
     "_notEqual", /*gcSL_NOT_EQUAL*/                                             /* 0x1 */
@@ -1356,6 +1357,8 @@ static const gctSTRING conditionName[] = /*{"_LeftShift", "_RightShift"};*/
     "_lessEqual0", /*gcSL_LESS_OREQUAL_ZERO*/                                     /* 0xE */
     "_less0", /*gcSL_LESS_ZERO*/                                             /* 0xF */
     };
+    static gctUINT conditionNameCount = gcmSIZEOF(conditionName) / gcmSIZEOF(gctSTRING);
+
     gctCHAR name[128] = {'\0'};
 
     gctUINT srcFormat;
@@ -1382,7 +1385,13 @@ static const gctSTRING conditionName[] = /*{"_LeftShift", "_RightShift"};*/
     }
 
     /* data type name: long/ulong, */
+    gcmASSERT(srcFormat >= gcSL_INT64);
     index = srcFormat - gcSL_INT64;
+
+    if (index >= typeNameCount)
+    {
+        return gcvSTATUS_UNSAT_LIB_SYMBOL;
+    }
     gcoOS_StrCatSafe(name, sizeof(name), typeName[index]);
 
     /* opcode name. */
@@ -1426,11 +1435,20 @@ static const gctSTRING conditionName[] = /*{"_LeftShift", "_RightShift"};*/
     {
         gcSL_CONDITION condition = gcmSL_TARGET_GET(Instruction->temp, Condition);
         index = opcode - gcSL_NOP;
+
+        if (index >= opNameCount)
+        {
+            return gcvSTATUS_UNSAT_LIB_SYMBOL;
+        }
         gcoOS_StrCatSafe(name, sizeof(name), opName[index]);
 
         if(gcmSL_SOURCE_GET(Instruction->source1, Type) != gcSL_CONSTANT)
         {
             index = condition - gcSL_ALWAYS;
+            if (index >= conditionNameCount)
+            {
+                return gcvSTATUS_UNSAT_LIB_SYMBOL;
+            }
             gcoOS_StrCatSafe(name, sizeof(name), conditionName[index]);
         }
         else if((condition == gcSL_NOT_EQUAL) && (gcmSL_SOURCE_GET(Instruction->source1, Type) == gcSL_CONSTANT))
@@ -1445,6 +1463,10 @@ static const gctSTRING conditionName[] = /*{"_LeftShift", "_RightShift"};*/
     else
     {
         index = opcode - gcSL_NOP;
+        if (index >= opNameCount)
+        {
+            return gcvSTATUS_UNSAT_LIB_SYMBOL;
+        }
         gcoOS_StrCatSafe(name, sizeof(name), opName[index]);
         *isI2I = gcvFALSE;
         if (opcode == gcSL_JMP)
@@ -1452,11 +1474,19 @@ static const gctSTRING conditionName[] = /*{"_LeftShift", "_RightShift"};*/
             if (condition != gcSL_NOT_EQUAL && condition != gcSL_EQUAL) /* gcSL_NOT_EQUAL gcSL_EQUAL use other name ruler */
             {
                 index = condition - gcSL_ALWAYS;
+                if (index >= conditionNameCount)
+                {
+                    return gcvSTATUS_UNSAT_LIB_SYMBOL;
+                }
                 gcoOS_StrCatSafe(name, sizeof(name), conditionName[index]);
             }
             else if(gcmSL_SOURCE_GET(Instruction->source1, Type) != gcSL_CONSTANT)
             {
                 index = condition - gcSL_ALWAYS;
+                if (index >= conditionNameCount)
+                {
+                    return gcvSTATUS_UNSAT_LIB_SYMBOL;
+                }
                 gcoOS_StrCatSafe(name, sizeof(name), conditionName[index]);
             }
         }
@@ -1733,6 +1763,87 @@ OnError:
 #endif
 
 gceSTATUS
+gcGetReadImageWithTexlduFunctionName(
+    IN gcsPatchReadImage *  ReadImage,
+    IN gcSL_FORMAT          DataType,
+    IN gcSL_FORMAT          CoordType,
+    OUT gctSTRING *         ConvertFuncName
+    )
+{
+    gceSTATUS               status = gcvSTATUS_OK;
+    gctCHAR                 name[128] = "_read_image_with_texldu";
+
+    static const gctSTRING  dataTypeName[] = {"_float4", "_int4", "_b", "_uint4"};
+    static const gctSTRING  coordTypeName[] = {"_float3", "_int3"};
+
+    gcmASSERT(DataType <= gcSL_UINT32);
+    gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), dataTypeName[DataType]));
+
+    gcmASSERT(CoordType <= gcSL_INT32);
+    gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), coordTypeName[CoordType]));
+
+    /* dup the name to ConvertFuncName */
+    gcmONERROR(gcoOS_StrDup(gcvNULL, name, ConvertFuncName));
+
+OnError:
+    /* Return the status. */
+    return status;
+}
+
+gceSTATUS
+gcGetReadImageWithImgldFunctionName(
+    IN gcsPatchReadImage *  ReadImage,
+    IN gcSL_FORMAT          DataType,
+    IN gcSL_FORMAT          CoordType,
+    OUT gctSTRING *         ConvertFuncName
+    )
+{
+    gceSTATUS               status = gcvSTATUS_OK;
+    gctCHAR                 name[128] = "_read_image_with_imgld";
+
+    static const gctSTRING  dataTypeName[] = {"_float4", "_int4", "_b", "_uint4"};
+    static const gctSTRING  coordTypeName[] = {"_float3", "_int3"};
+
+    gcmASSERT(DataType <= gcSL_UINT32);
+    gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), dataTypeName[DataType]));
+
+/*#define CL_MEM_OBJECT_BUFFER                        0x10F0
+#define CL_MEM_OBJECT_IMAGE2D                       0x10F1
+#define CL_MEM_OBJECT_IMAGE3D                       0x10F2
+#define CL_MEM_OBJECT_IMAGE2D_ARRAY                 0x10F3
+#define CL_MEM_OBJECT_IMAGE1D                       0x10F4
+#define CL_MEM_OBJECT_IMAGE1D_ARRAY                 0x10F5
+#define CL_MEM_OBJECT_IMAGE1D_BUFFER                0x10F6*/
+    switch(ReadImage->imageType)
+    {
+        case 0x10F4:
+        case 0x10F6:
+        case 0x10F5:
+            gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_1d"));
+            break;
+        case 0x10F3:
+        case 0x10F1:
+            gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_2d"));
+            break;
+        case 0x10F2:
+            gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_3d"));
+            break;
+        default:
+            gcmASSERT(0);
+    }
+
+    gcmASSERT(CoordType <= gcSL_INT32);
+    gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), coordTypeName[CoordType]));
+
+    /* dup the name to ConvertFuncName */
+    gcmONERROR(gcoOS_StrDup(gcvNULL, name, ConvertFuncName));
+
+OnError:
+    /* Return the status. */
+    return status;
+}
+
+gceSTATUS
 gcGetReadImageFunctionName(
     IN gcsPatchReadImage *  ReadImage,
     IN gceTexldFlavor       TexldFlavor,
@@ -1761,8 +1872,6 @@ gcGetReadImageFunctionName(
     static const gctSTRING  imageTypeName[] = {"_buffer","_2d","_3d","_2DARRAY","_1d","_1darray","_1dbuffer"};
     static const gctSTRING  channelOrderName[] = {"_R", "_A", "_RG", "_RA", "_RGB", "_RGBA", "_BGRA", "_ARGB",
         "_INTENSITY", "_LUMINANCE", "_Rx", "_RGx", "_RGBx"};
-
-    static const gctSTRING tail = "_imageLd";
 
     filterMode = (ReadImage->samplerValue >> 8) & 0xF;
     gcmASSERT(filterMode <= 1);
@@ -1797,11 +1906,6 @@ gcGetReadImageFunctionName(
         gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), channelOrderName[channelOrder]));
     }
 
-    if (ReadImage->useImageLoad)
-    {
-        gcmONERROR(gcoOS_StrCatSafe(name, gcmSIZEOF(name), tail));
-    }
-
     /* dup the name to ConvertFuncName */
     gcmONERROR(gcoOS_StrDup(gcvNULL, name, ConvertFuncName));
 
@@ -1824,25 +1928,48 @@ _createReadImageFunction(
     gceSTATUS       status          = gcvSTATUS_OK;
     gctSTRING       convertFuncName = gcvNULL;
     gcFUNCTION      convertFunction = gcvNULL;
-    gceTexldFlavor  texldFlavor;
+    gctBOOL         computeOnlyGpu = gcHWCaps.hwFeatureFlags.computeOnly;
+    gctBOOL         halti5 = gcHWCaps.hwFeatureFlags.hasHalti5;
 
-    gcmASSERT(Library != gcvNULL);
-    if (TexldStatusInstOpcode != gcSL_TEXGRAD)
+    if(halti5 && NEW_READ_WRITE_IMAGE)
     {
-        texldFlavor = _getTexldFlavor(gcSL_TEXLD, gcSL_NOP);
+        if(computeOnlyGpu && 0)
+        {
+            gcmONERROR(gcGetReadImageWithTexlduFunctionName(ReadImage,
+                                                   DataType,
+                                                   CoordType,
+                                                   &convertFuncName));
+        }
+        else
+        {
+            gcmONERROR(gcGetReadImageWithImgldFunctionName(ReadImage,
+                                                   DataType,
+                                                   CoordType,
+                                                   &convertFuncName));
+        }
     }
     else
     {
-        texldFlavor = _getTexldFlavor(gcSL_TEXLD, TexldStatusInstOpcode);
-    }
+        gceTexldFlavor  texldFlavor;
 
-    /* get convert function name according to sampler info and
-       texld status instruction type */
-    gcmONERROR(gcGetReadImageFunctionName(ReadImage,
-                                          texldFlavor,
-                                          DataType,
-                                          CoordType,
-                                          &convertFuncName));
+        gcmASSERT(Library != gcvNULL);
+        if (TexldStatusInstOpcode != gcSL_TEXGRAD)
+        {
+            texldFlavor = _getTexldFlavor(gcSL_TEXLD, gcSL_NOP);
+        }
+        else
+        {
+            texldFlavor = _getTexldFlavor(gcSL_TEXLD, TexldStatusInstOpcode);
+        }
+
+        /* get convert function name according to sampler info and
+           texld status instruction type */
+        gcmONERROR(gcGetReadImageFunctionName(ReadImage,
+                                              texldFlavor,
+                                              DataType,
+                                              CoordType,
+                                              &convertFuncName));
+    }
 
     /* Check if convertFunction already exists. */
     gcmONERROR(gcSHADER_GetFunctionByName(Shader,
@@ -1869,6 +1996,7 @@ _createReadImageFunction(
     }
 
     SetFunctionRecompiler(convertFunction);
+    SetFunctionUsingSamplerVirtual(convertFunction);
 
 OnError:
     if (convertFuncName)
@@ -1887,68 +2015,92 @@ _createWriteImageFunction(
     IN gcSL_FORMAT          ColorType,
     IN gctUINT              ImageType,
     IN gctUINT              ChannelOrder,
-    IN gctBOOL              imageStore,
     OUT gcFUNCTION *        NewFunction
     )
 {
     gceSTATUS       status                  = gcvSTATUS_OK;
-    gctCHAR         convertFuncName[128]    = "_write_image_";
     gcFUNCTION      convertFunction         = gcvNULL;
-    gctSTRING       dataTypeName, colorTypeName;
-    gctUINT         imgType;
-    gctUINT         channelOrder;
-    static const gctSTRING  imageTypeName[] = {"_buffer","_2d","_3d","_2DARRAY","_1d","_1darray","_1dbuffer"};
-    static const gctSTRING  swizzleName[] = {"_R", "", "", "", "", "", "_BGRA", "", "", "", "", "", "", "", "" };
+    gctBOOL         halti5 = gcHWCaps.hwFeatureFlags.hasHalti5;
+    gctCHAR         convertFuncName[128]    = "_write_image_";
 
-    switch (ColorType)
+    if(halti5 && NEW_READ_WRITE_IMAGE)
     {
-        case gcSL_FLOAT:
+        static const gctSTRING  dataTypeName[] = {"_float4", "_int4", "_b", "_uint4"};
+
+        gcmONERROR(gcoOS_StrCatSafe(convertFuncName, gcmSIZEOF(convertFuncName), "with_imgst"));
+
+        /*#define CL_MEM_OBJECT_BUFFER                        0x10F0
+#define CL_MEM_OBJECT_IMAGE2D                       0x10F1
+#define CL_MEM_OBJECT_IMAGE3D                       0x10F2
+#define CL_MEM_OBJECT_IMAGE2D_ARRAY                 0x10F3
+#define CL_MEM_OBJECT_IMAGE1D                       0x10F4
+#define CL_MEM_OBJECT_IMAGE1D_ARRAY                 0x10F5
+#define CL_MEM_OBJECT_IMAGE1D_BUFFER                0x10F6*/
+        switch(ImageType)
         {
-            static const gctSTRING  channelDataTypeName[16] =
-            {"char4", "short4", "uchar4", "ushort4", "", "", "",
-            "char4", "short4", "", "uchar4", "ushort4", "", "half4", "float4"};
-            dataTypeName = channelDataTypeName[DataType & 0xf];
-            colorTypeName = "float4_";
-            break;
-        }
-        case gcSL_INTEGER:
-        {
-            static const gctSTRING  channelDataTypeName[16] =
-            {"char4", "short4", "char4", "short4", "", "", "",
-            "char4", "short4", "int4", "", "", "", "", ""};
-            dataTypeName = channelDataTypeName[DataType & 0xf];
-            colorTypeName = "int4_";
-            break;
-        }
-        case gcSL_UINT32:
-        {
-            static const gctSTRING  channelDataTypeName[16] =
-            {"", "", "", "", "", "", "",
-            "", "", "", "uchar4", "ushort4", "uint4", "", ""};
-            dataTypeName = channelDataTypeName[DataType & 0xf];
-            colorTypeName = "uint4_";
-            break;
+            case 0x10F4:
+            case 0x10F6:
+                gcmONERROR(gcoOS_StrCatSafe(convertFuncName, gcmSIZEOF(convertFuncName), "_1d"));
+                break;
+            case 0x10F5:
+            case 0x10F1:
+                gcmONERROR(gcoOS_StrCatSafe(convertFuncName, gcmSIZEOF(convertFuncName), "_2d"));
+                break;
+            case 0x10F3:
+            case 0x10F2:
+                gcmONERROR(gcoOS_StrCatSafe(convertFuncName, gcmSIZEOF(convertFuncName), "_3d"));
+                break;
+            default:
+                gcmASSERT(0);
         }
 
-    default:
-        colorTypeName = "";
-        dataTypeName  = "";
-        break;
-    }
-
-    if (imageStore)
-    {
-        gcmONERROR(gcoOS_StrCatSafe(convertFuncName,
-                                    gcmSIZEOF(convertFuncName),
-                                    colorTypeName));
-
-        imgType = ImageType & 0xF;
-        gcmASSERT(imgType <= 6);
-        gcmONERROR(gcoOS_StrCatSafe(convertFuncName, gcmSIZEOF(convertFuncName), imageTypeName[imgType] + 1));
-
+        gcmONERROR(gcoOS_StrCatSafe(convertFuncName, gcmSIZEOF(convertFuncName), dataTypeName[ColorType]));
     }
     else
     {
+
+        gctSTRING       dataTypeName, colorTypeName;
+        gctUINT         imgType;
+        gctUINT         channelOrder;
+        static const gctSTRING  imageTypeName[] = {"_buffer","_2d","_3d","_2DARRAY","_1d","_1darray","_1dbuffer"};
+        static const gctSTRING  swizzleName[] = {"_R", "", "", "", "", "", "_BGRA", "", "", "", "", "", "", "", "" };
+
+        switch (ColorType)
+        {
+            case gcSL_FLOAT:
+            {
+                static const gctSTRING  channelDataTypeName[16] =
+                {"char4", "short4", "uchar4", "ushort4", "", "", "",
+                "char4", "short4", "", "uchar4", "ushort4", "", "half4", "float4"};
+                dataTypeName = channelDataTypeName[DataType & 0xf];
+                colorTypeName = "float4_";
+                break;
+            }
+            case gcSL_INTEGER:
+            {
+                static const gctSTRING  channelDataTypeName[16] =
+                {"char4", "short4", "char4", "short4", "", "", "",
+                "char4", "short4", "int4", "", "", "", "", ""};
+                dataTypeName = channelDataTypeName[DataType & 0xf];
+                colorTypeName = "int4_";
+                break;
+            }
+            case gcSL_UINT32:
+            {
+                static const gctSTRING  channelDataTypeName[16] =
+                {"", "", "", "", "", "", "",
+                "", "", "", "uchar4", "ushort4", "uint4", "", ""};
+                dataTypeName = channelDataTypeName[DataType & 0xf];
+                colorTypeName = "uint4_";
+                break;
+            }
+
+        default:
+            colorTypeName = "";
+            dataTypeName  = "";
+            break;
+        }
+
         if (gcoOS_StrCmp(dataTypeName, "") == gcvSTATUS_OK)
         {
             gcmONERROR(gcoOS_StrCatSafe(convertFuncName,
@@ -1993,6 +2145,7 @@ _createWriteImageFunction(
     }
 
     SetFunctionRecompiler(convertFunction);
+    SetFunctionUsingSamplerVirtual(convertFunction);
 
 OnError:
     *NewFunction = convertFunction;
@@ -3303,6 +3456,120 @@ _createReadImageStubFunction(
     return stubFunction;
 }
 
+static gcFUNCTION
+_createReadImageStubFunction2(
+    IN gcSHADER             Shader,
+    IN gcsPatchReadImage *  ReadImage,
+    IN gcFUNCTION           ConvertFunction,
+    IN gctUINT              CodeIndex,
+    IN gcSL_INSTRUCTION     TexldStatusInst
+    )
+{
+    gctCHAR          funcName[32];
+    gctUINT          offset         = 0;
+    gcFUNCTION       stubFunction    = gcvNULL;
+    gctUINT          argNo;
+    gcSL_INSTRUCTION tempCode = gcvNULL;
+    gctPOINTER       pointer = gcvNULL;
+    gcSL_INSTRUCTION code;
+    gcsValue         val0;
+    gcUNIFORM        samplerUniform;
+
+    gcmVERIFY_OK(
+        gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
+                           "_readImage_%d", CodeIndex));
+
+    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+
+    tempCode = (gcSL_INSTRUCTION) pointer;
+
+    gcoOS_MemCopy(tempCode, &Shader->code[CodeIndex], sizeof(struct _gcSL_INSTRUCTION));
+
+    code = tempCode;
+
+    /* Add stubFunction to Shader. */
+    gcSHADER_AddFunction(Shader, funcName, &stubFunction);
+    SetFunctionRecompilerStub(stubFunction);
+
+    /* add arguments */
+    /* we don't add new arguments to pass value to  stub, since there
+       is only one caller per stub, we can reuse the temp variables for
+       conversion function parameter directly in stub function:
+
+          10  texld target, sampler, coord
+
+          ==>
+
+          10  call stub_10
+
+
+          stub_10:
+              mov  arg0, image_t
+              mov  arg1, sampler_t
+              mov  arg2, coord
+              call _convert_func_n
+              mov  target, arg3
+              ret
+     */
+
+    /*
+    gcFUNCTION_AddArgument(stubFunction,
+          TempIndex,
+          Enable,
+          Qualifier);
+     */
+    gcSHADER_BeginFunction(Shader, stubFunction);
+
+    argNo = 0;
+
+    /* mov  arg0, uniformIndex of image data */
+    gcSHADER_GetUniform(Shader, ReadImage->samplerNum, &samplerUniform);
+    val0.u32 = samplerUniform->parent;
+    _addArgPassInst(Shader, ConvertFunction, stubFunction, code,
+                    argNo++ /*ARG0*/, gcvUIntUniformIndex, &val0,
+                    gcSL_SWIZZLE_XYZW, gcvFALSE, Shader->uniforms[samplerUniform->parent]->precision);
+
+    /* mov  arg1, uniformIndex of image size */
+    val0.u32 = ReadImage->samplerValue;
+    _addArgPassInst(Shader, ConvertFunction, stubFunction, code,
+                    argNo++ /*ARG1*/,
+                    gcvUIntConstant,
+                    &val0,
+                    gcSL_SWIZZLE_XYZW,
+                    gcvFALSE,
+                    gcSHADER_PRECISION_HIGH);
+
+    /* mov  arg2, coord */
+    _addArgPassInst(Shader, ConvertFunction, stubFunction, code, argNo++ /*ARG3*/,
+                    gcvSource1, gcvNULL, gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
+
+    /* call _convert_func_n */
+    _addCallInst(Shader, ConvertFunction);
+
+    /* mov  target, arg3 */
+    _addRetValueInst(Shader, ConvertFunction, code, argNo++ /*ARG3*/, gcvDest /*DEST*/, gcvNULL);
+
+    /* ret */
+    _addRetInst(Shader);
+
+    gcSHADER_EndFunction(Shader, stubFunction);
+
+    /* set TexldStatusInst to NOP, the convertFunction takes care of it now. */
+    if (TexldStatusInst)
+    {
+        /* Shader->code may be resized to a new array, so need to use index. */
+        code = &Shader->code[CodeIndex - 1];
+        gcSL_SetInst2NOP(code);
+    }
+
+    if (tempCode)
+    {
+        /* Free the current code buffer. */
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, tempCode));
+    }
+
+    return stubFunction;
+}
 
 static gcFUNCTION
 _createWriteImageStubFunction(
@@ -3392,6 +3659,113 @@ _createWriteImageStubFunction(
                     gcvSource1, gcvNULL, gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
 
     /* mov  arg3, color */
+    _addArgPassInst(Shader, ConvertFunction, stubFunction, code, argNo++ /*ARG3*/,
+                    gcvDest, gcvNULL, gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
+
+    /* call _convert_func_n */
+    _addCallInst(Shader, ConvertFunction);
+
+    /* ret */
+    _addRetInst(Shader);
+
+    gcmONERROR(gcSHADER_EndFunction(Shader, stubFunction));
+
+    /* set TexldStatusInst to NOP, the convertFunction takes care of it now. */
+    if (TexldStatusInst)
+    {
+        /* Shader->code may be resized to a new array, so need to use index. */
+        code = &Shader->code[CodeIndex - 1];
+        gcSL_SetInst2NOP(code);
+    }
+
+OnError:
+    if (tempCode)
+    {
+        /* Free the current code buffer. */
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, tempCode));
+    }
+
+    return stubFunction;
+}
+
+static gcFUNCTION
+_createWriteImageStubFunction2(
+    IN gcSHADER              Shader,
+    IN gcsPatchWriteImage *  WriteImage,
+    IN gcFUNCTION            ConvertFunction,
+    IN gctUINT               CodeIndex,
+    IN gcSL_INSTRUCTION      TexldStatusInst
+    )
+{
+    gceSTATUS        status = gcvSTATUS_OK;
+    gctCHAR          funcName[32];
+    gctUINT          offset         = 0;
+    gcFUNCTION       stubFunction    = gcvNULL;
+    gctUINT          argNo;
+    gcSL_INSTRUCTION tempCode = gcvNULL;
+    gctPOINTER       pointer = gcvNULL;
+    gcSL_INSTRUCTION code;
+    gcsValue         val0;
+
+    gcmVERIFY_OK(
+        gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
+                           "_writeImage_%d", CodeIndex));
+
+    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+
+    tempCode = (gcSL_INSTRUCTION) pointer;
+
+    gcoOS_MemCopy(tempCode, &Shader->code[CodeIndex], sizeof(struct _gcSL_INSTRUCTION));
+
+    code = tempCode;
+
+    /* Add stubFunction to Shader. */
+    gcmONERROR(gcSHADER_AddFunction(Shader, funcName, &stubFunction));
+    SetFunctionRecompilerStub(stubFunction);
+
+    /* add arguments */
+    /* we don't add new arguments to pass value to  stub, since there
+       is only one caller per stub, we can reuse the temp variables for
+       conversion function parameter directly in stub function:
+
+          10  image_wr color, target, coord
+
+          ==>
+
+          10  call stub_10
+
+
+          stub_10:
+              mov  arg0, image_data
+              mov  arg1, coord
+              mov  arg2, color
+              call _convert_func_n
+              ret
+     */
+
+    /*
+    gcFUNCTION_AddArgument(stubFunction,
+          TempIndex,
+          Enable,
+          Qualifier);
+     */
+    gcmONERROR(gcSHADER_BeginFunction(Shader, stubFunction));
+
+    argNo = 0;
+
+    /* mov  arg0, uniformIndex of image data */
+    val0.u32 = WriteImage->samplerNum;
+    _addArgPassInst(Shader, ConvertFunction, stubFunction, code,
+                    argNo++ /*ARG0*/,
+                    gcvUIntUniformIndex,
+                    &val0,
+                    gcSL_SWIZZLE_XYZW, gcvFALSE, Shader->uniforms[WriteImage->samplerNum]->precision);
+
+    /* mov  arg1, coord */
+    _addArgPassInst(Shader, ConvertFunction, stubFunction, code, argNo++ /*ARG3*/,
+                    gcvSource1, gcvNULL, gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
+
+    /* mov  arg2, color */
     _addArgPassInst(Shader, ConvertFunction, stubFunction, code, argNo++ /*ARG3*/,
                     gcvDest, gcvNULL, gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
 
@@ -3593,7 +3967,6 @@ _createDepthComparisonStubFunction(
 
     code = tempCode;
 
-    /* TODO: we need to add indexed sampler support for recompiler. */
     gcmASSERT(gcmSL_SOURCE_GET(code->source0, Indexed) == gcSL_NOT_INDEXED);
 
     opcode = gcmSL_OPCODE_GET(code->opcode, Opcode);
@@ -4671,6 +5044,7 @@ gcFinalizeRecompilation(void)
         gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, _RecompileLockRef));
 
         _RecompileLockRef = gcvNULL;
+        _RecompileLock    = gcvNULL;
     }
 
     gcmFOOTER_ARG("status=%d", status);
@@ -4679,19 +5053,12 @@ gcFinalizeRecompilation(void)
 
 gceSTATUS
 gcLoadCLPatchLibrary(
-    IN gcSHADER   Shader
+    IN gcSHADER   Shader,
+    IN gctUINT    LibIndex
     )
 {
     gceSTATUS   status          = gcvSTATUS_OK;
     gctSTRING   gcCLPatchSource[CL_LIB_COUNT] = {gcvNULL};
-    gctSTRING   gcCLPatchLibFileName[CL_LIB_COUNT] = {
-        "viv_gc_patch_00.lib",
-        "viv_gc_patch_01.lib",
-        "viv_gc_patch_02.lib",
-#if _SUPPORT_LONG_ULONG_DATA_TYPE
-        "viv_gc_patch_03.lib"
-#endif
-    };
     gctSTRING   log = gcvNULL;
     gctINT      i, j;
     gctBOOL     locked = gcvFALSE;
@@ -4700,11 +5067,11 @@ gcLoadCLPatchLibrary(
     gcmONERROR(gcLockLoadLibrary());
     locked = gcvTRUE;
 
-    if (gcCLPatchLibrary[0] == gcvNULL)
+    if (gcCLPatchLibrary[LibIndex] == gcvNULL)
     {
         gcSHADER    library;
 #if __COMPILE_CL_PATCH_LIBRARY__
-        gctSTRING   CLPatchLib[][24] =
+        gctCONST_STRING   CLPatchLib[][24] =
         {
             {
                 gcLibCLImage_ReadFunc_1D,
@@ -4782,8 +5149,34 @@ gcLoadCLPatchLibrary(
                 gcLibCLImage_ReadFuncF_UNNORM_2DARRAY_R,
                 gcLibCLImage_ReadFuncF_UNNORM_3D_R,
                 gcLibCLImage_WriteFunc_R,
-                gcLibCLImage_ReadFuncF_IMGLD,
-                },
+                ""
+            },
+            {
+                gcLibCL_ReadImage_Header_Str,
+                gcLibCL_ReadImage_Common_Func_Str,
+                gcLibCL_ReadImage_With_IMGLD_Funcs,
+                gcLibCL_ReadImage_With_TEXLDU_Funcs,
+                gcLibCL_ReadImage_With_V55_TEXLDU_Funcs,
+                gcLibCL_ReadImage_With_TEXLD_Funcs,
+                gcLibCL_WriteImage_With_IMGST_Funcs,
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+            },
 #if _SUPPORT_LONG_ULONG_DATA_TYPE
             CL_LONG_ULONG_FUNCS
 #endif
@@ -4800,96 +5193,55 @@ gcLoadCLPatchLibrary(
             return gcvSTATUS_INVALID_ADDRESS;
         }
 
-        if (gcmOPT_LibShaderFile())
-        {
-            gcmONERROR(gcInitializeLibFile());
-        }
         for (j = 0; j < CL_LIB_COUNT; j++)
         {
-            if(gcCLPatchLibrary[j] &&
-               (LONG_ULONG_LIB_INDEX != j ||
-                (gcShaderHasInt64Patch(gcCLPatchLibrary[j]) != gcmOPT_oclInt64InVIR()))) continue; /* loaded already */
-            library = gcvNULL;
-            if (gcmOPT_LibShaderFile())
+            if(gcCLPatchLibrary[j]) continue; /* loaded already */
+            stringNum = sizeof(CLPatchLib[j]) / sizeof(gctSTRING);
+            patchLen = stringNum;
+            for (i = 0; i < stringNum; i++)
             {
-                /* read lib shader from file  */
-                status =  gcSHADER_ReadGCSLShaderFromFile(gcCLPatchLibFileName[j], &library);
+                patchLen += gcoOS_StrLen(CLPatchLib[j][i], gcvNULL);
             }
-            if ((status == gcvSTATUS_VERSION_MISMATCH) || (library == gcvNULL) ||
-                (j == LONG_ULONG_LIB_INDEX && (gcShaderHasInt64Patch(library) == gcmOPT_oclInt64InVIR())))
+            gcmONERROR(gcoOS_Allocate(gcvNULL, patchLen, &pointer));
+            gcCLPatchSource[j] = (gctSTRING)pointer;
+
+            /* Get library source based on hardware capability. */
+            length = gcoOS_StrLen(CLPatchLib[j][0], gcvNULL);
+            gcoOS_StrCopySafe(gcCLPatchSource[j], length + 1, CLPatchLib[j][0]);
+
+            for (i = 1; i < stringNum; i++)
             {
-                gctBOOL int64Patch = gcvFALSE;
-
-                stringNum = sizeof(CLPatchLib[j]) / sizeof(gctSTRING);
-                patchLen = stringNum;
-                for (i = 0; i < stringNum; i++)
-                {
-                    patchLen += gcoOS_StrLen(CLPatchLib[j][i], gcvNULL);
-                }
-                gcmONERROR(gcoOS_Allocate(gcvNULL, patchLen, &pointer));
-                gcCLPatchSource[j] = (gctSTRING)pointer;
-
-                /* Get library source based on hardware capability. */
-                length = gcoOS_StrLen(CLPatchLib[j][0], gcvNULL);
-                gcoOS_StrCopySafe(gcCLPatchSource[j], length + 1, CLPatchLib[j][0]);
-
-                for (i = 1; i < stringNum; i++)
-                {
-                    gcoOS_StrCatSafe(gcCLPatchSource[j],
-                        patchLen, CLPatchLib[j][i]);
-                }
-
-                sourceSize = gcoOS_StrLen(gcCLPatchSource[j], gcvNULL);
-                options = "";
-                if(LONG_ULONG_LIB_INDEX == j)
-                {
-                    if(!gcmOPT_oclInt64InVIR())
-                    {
-                        options = "-cl-viv-longulong-patch";
-                        int64Patch = gcvTRUE;
-
-                    }
-                }
-                status = (*gcCLCompiler)(gcvNULL,
-                                            sourceSize,
-                                            gcCLPatchSource[j],
-                                            options,
-                                            &library,
-                                            &log);
-
-                if (status != gcvSTATUS_OK)
-                {
-                    /* report error */
-                    gcoOS_Print("Compiler Error:");
-                    if (log)
-                    {
-                        gcoOS_Print("%s\n", log);
-                    }
-                    goto OnError;
-                }
-                if(int64Patch)
-                {
-                    gcShaderSetHasInt64Patch(library);
-                }
-                if (gcmOPT_LibShaderFile())
-                {
-                    /* write lib shader to file */
-                    status = gcSHADER_WriteGCSLShaderToFile(library, gcCLPatchLibFileName[j]);
-
-                    if (status != gcvSTATUS_OK)
-                    {
-                        if (gcSHADER_DumpCodeGenVerbose(library))
-                            gcoOS_Print("gcSHADER_WriteGCSLShaderToFile Error:%d\n", status);
-                        status = gcvSTATUS_OK;
-                    }
-                }
+                gcoOS_StrCatSafe(gcCLPatchSource[j],
+                    patchLen, CLPatchLib[j][i]);
             }
+
+            sourceSize = gcoOS_StrLen(gcCLPatchSource[j], gcvNULL);
+            options = "";
+            if(Shader && gcShaderHasInt64Patch(Shader) && LONG_ULONG_LIB_INDEX == j)
+            {
+                options = "-cl-viv-longulong-patch";
+            }
+            status = (*gcCLCompiler)(gcvNULL,
+                                     sourceSize,
+                                     gcCLPatchSource[j],
+                                     options,
+                                     &library,
+                                     &log);
+
+            if (status != gcvSTATUS_OK)
+            {
+                /* report error */
+                gcoOS_Print("Compiler Error:");
+                if (log)
+                {
+                    gcoOS_Print("%s\n", log);
+                }
+                goto OnError;
+            }
+
             gcCLPatchLibrary[j] = library;
         }
-        if (gcmOPT_LibShaderFile())
-        {
-            gcmONERROR(gcFinalizeLibFile());
-        }
+
 #else
         gctCHAR libName[32];
         gctFILE libFile;
@@ -4939,18 +5291,23 @@ OnError:
 }
 
 static gceSTATUS
-_LoadCLPatchLongULongLibrary()
+_LoadCLPatchLongULongLibrary(
+    IN gcSHADER  Shader
+    )
 {
     gceSTATUS   status = gcvSTATUS_OK;
     gctSTRING   patchSource = gcvNULL;
     gctSTRING   log = gcvNULL;
     gctINT      i;
     gctBOOL     locked = gcvFALSE;
+    gcSHADER    library;
+    gctBOOL     rewriteFile = gcvFALSE;
 
-    if (gcCLPatchLibrary[LONG_ULONG_LIB_INDEX] == gcvNULL)
+    library = gcCLPatchLibrary[LONG_ULONG_LIB_INDEX];
+    if(library == gcvNULL ||
+       (gcShaderHasInt64Patch(library) == gcmOPT_oclInt64InVIR())) /* not yet loaded */
     {
-        gcSHADER    library;
-        gctSTRING   patchLib[] = CL_LONG_ULONG_FUNCS;
+        gctCONST_STRING   patchLib[] = CL_LONG_ULONG_FUNCS;
         gctSIZE_T   sourceSize, length;
         gctPOINTER  pointer = gcvNULL;
         gctINT      stringNum;
@@ -4966,45 +5323,71 @@ _LoadCLPatchLongULongLibrary()
             return gcvSTATUS_INVALID_ADDRESS;
         }
 
-        stringNum = sizeof(patchLib) / sizeof(gctSTRING);
-        patchLen = stringNum;
-        for (i = 0; i < stringNum; i++)
+        library = gcvNULL;
+        if ((gcmOPT_LibShaderFile() == 1) || (gcmOPT_LibShaderFile() == 2))
         {
-            patchLen += gcoOS_StrLen(patchLib[i], gcvNULL);
-        }
-        gcmONERROR(gcoOS_Allocate(gcvNULL, patchLen, &pointer));
-        patchSource = (gctSTRING)pointer;
+            gcmONERROR(gcInitializeLibFile());
 
-        /* Get library source based on hardware capability. */
-        length = gcoOS_StrLen(patchLib[0], gcvNULL);
-        gcoOS_StrCopySafe(patchSource, length + 1, patchLib[0]);
-
-        for (i = 1; i < stringNum; i++)
-        {
-            gcoOS_StrCatSafe(patchSource, patchLen, patchLib[i]);
-        }
-
-        sourceSize = gcoOS_StrLen(patchSource, gcvNULL);
-        status = (*gcCLCompiler)(gcvNULL,
-                                 sourceSize,
-                                 patchSource,
-                                 "-cl-viv-longulong-patch",
-                                 &library,
-                                 &log);
-
-        if (status != gcvSTATUS_OK)
-        {
-            /* report error */
-            gcoOS_Print("Compiler Error:");
-            if (log)
+            if (gcmOPT_LibShaderFile() == 2)
             {
-                gcoOS_Print("%s\n", log);
+                rewriteFile = gcvTRUE; /* Force rewrite shader info to file  */
             }
-            goto OnError;
+            else
+            {
+                status =  gcSHADER_ReadPatchLibFromFile(gcvTRUE, gcLIB_CL_LONG_ULONG_FUNCS, &library); /* read lib shader from file  */
+            }
         }
 
-        gcCLPatchLibrary[LONG_ULONG_LIB_INDEX] = library;
+        if ((rewriteFile == gcvTRUE) || (status == gcvSTATUS_VERSION_MISMATCH) || (library == gcvNULL))
+        {
+            stringNum = sizeof(patchLib) / sizeof(gctSTRING);
+            patchLen = stringNum;
+            for (i = 0; i < stringNum; i++)
+            {
+                patchLen += gcoOS_StrLen(patchLib[i], gcvNULL);
+            }
+            gcmONERROR(gcoOS_Allocate(gcvNULL, patchLen, &pointer));
+            patchSource = (gctSTRING)pointer;
+
+            /* Get library source based on hardware capability. */
+            length = gcoOS_StrLen(patchLib[0], gcvNULL);
+            gcoOS_StrCopySafe(patchSource, length + 1, patchLib[0]);
+
+            for (i = 1; i < stringNum; i++)
+            {
+                gcoOS_StrCatSafe(patchSource, patchLen, patchLib[i]);
+            }
+
+            sourceSize = gcoOS_StrLen(patchSource, gcvNULL);
+            status = (*gcCLCompiler)(gcvNULL,
+                                     sourceSize,
+                                     patchSource,
+                                     "",
+                                     &library,
+                                     &log);
+            if (gcmIS_ERROR(status))
+            {
+                /* report error */
+                gcoOS_Print("Compiler Error:");
+                if (log)
+                {
+                    gcoOS_Print("%s\n", log);
+                }
+                gcmONERROR(status);
+            }
+
+            if ((gcmOPT_LibShaderFile() == 1) || (gcmOPT_LibShaderFile() == 2))
+            {
+                status = gcSHADER_WritePatchLibToFile(library, gcvTRUE, gcLIB_CL_LONG_ULONG_FUNCS);
+                if(gcmIS_ERROR(status) && gcSHADER_DumpCodeGenVerbose(Shader))
+                {
+                    gcoOS_Print("gcSHADER_WriteBuiltinLibToFile Error:%d\n", status);
+                }
+                gcmONERROR(gcFinalizeLibFile());
+            }
+        }
     }
+    gcCLPatchLibrary[LONG_ULONG_LIB_INDEX] = library;
 
 OnError:
     if (patchSource)
@@ -5389,8 +5772,7 @@ _insertNOP2Shader(
     gctUINT     origCodeCount = (gctINT)Shader->lastInstruction;
     gctUINT     i;
 
-    gcmASSERT(InsertAtInst >= 0 &&
-              InsertAtInst <=  (gctINT)Shader->lastInstruction);
+    gcmASSERT(InsertAtInst <=  (gctINT)Shader->lastInstruction);
 
     /* force the shader to increase instruction count */
     Shader->instrIndex = gcSHADER_SOURCE1;
@@ -5543,8 +5925,7 @@ _addDepthBiasUniform(
     gctUINT      offset   = 0;
 
     /* construct const vector name, create and initialize constant uniform */
-    gcoOS_PrintStrSafe(name, sizeof(name), &offset, "#sh_DepthBias",
-                       Shader->_id, Shader->_constVectorId++);
+    gcoOS_PrintStrSafe(name, sizeof(name), &offset, "#sh_DepthBias");
     gcmONERROR(gcSHADER_AddUniform(Shader, name, gcSHADER_FLOAT_X2, 1, gcSHADER_PRECISION_HIGH, &uniform));
     SetUniformFlag(uniform, gcvUNIFORM_FLAG_COMPILER_GEN);
     DepthBias->depthBiasUniform = uniform;
@@ -7421,7 +7802,6 @@ _patchTexldFormatConversion(
             gctCHAR funcName[32];
             gctUINT funcNameOffset = 0;
 
-            /* TODO - Need to add support to handle temp. */
             if (indexed != gcSL_NOT_INDEXED)
                 continue;
 
@@ -7659,7 +8039,7 @@ _patchOutputFormatConversion(
                             Shader,
                             gcTexFormatConvertLibrary,
                             OutputConversion,
-                            gcSL_ENABLE_XYZW, /* TODO: set enable */
+                            gcSL_ENABLE_XYZW,
                             &convertFunction));
 
     if (convertFunction == gcvNULL)
@@ -7743,7 +8123,6 @@ _patchDepthComparison(
 
             gcmASSERT(type == gcSL_SAMPLER || type == gcSL_UNIFORM);
 
-            /* TODO: need to handle indexed sampler. */
             if (gcmSL_SOURCE_GET(code->source0, Indexed) != gcSL_NOT_INDEXED)
                 continue;
 
@@ -7781,7 +8160,6 @@ _patchDepthComparison(
                 isSamplerMatch = gcvTRUE;
             }
 
-            /* TODO - Need to add support to handle temp. */
             if (!isSamplerMatch)
             {
                 continue;
@@ -8181,7 +8559,7 @@ _patchLongULong(
     /*  gcCLPatchLibrary[LONG_ULONG_LIB_INDEX] is used as long/ulong patch lib. */
     if (gcCLPatchLibrary[LONG_ULONG_LIB_INDEX] == gcvNULL)
     {
-        gcmONERROR(gcLoadCLPatchLibrary(Shader));
+        gcmONERROR(gcLoadCLPatchLibrary(Shader, LONG_ULONG_LIB_INDEX));
     }
 
     gcmASSERT(Patch);
@@ -8189,33 +8567,38 @@ _patchLongULong(
         gctUINT lastInstruction;
         gcSHADER_INSTRUCTION_INDEX instrIndex;
         gcSL_CONDITION condition = gcmSL_TARGET_GET(Shader->code[Patch->instructionIndex].temp, Condition);
+        gcSL_INSTRUCTION code    = &Shader->code[Patch->instructionIndex+Shader->InsertCount];
+        gctUINT32   srcLoc;
 
         /* Construct longULong processing function. */
-        if(gcmSL_OPCODE_GET(Shader->code[Patch->instructionIndex + Shader->InsertCount].opcode, Opcode) == gcSL_JMP &&
-           ((gcmSL_TARGET_GET(Shader->code[Patch->instructionIndex+Shader->InsertCount].temp, Condition) == gcSL_NOT_EQUAL) ||
-            (gcmSL_TARGET_GET(Shader->code[Patch->instructionIndex+Shader->InsertCount].temp, Condition) == gcSL_EQUAL)) &&
-           (gcmSL_SOURCE_GET(Shader->code[Patch->instructionIndex + Shader->InsertCount].source1, Type) == gcSL_CONSTANT) )
+        if(gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_JMP &&
+           ((gcmSL_TARGET_GET(code->temp, Condition) == gcSL_NOT_EQUAL) ||
+            (gcmSL_TARGET_GET(code->temp, Condition) == gcSL_EQUAL)) &&
+           (gcmSL_SOURCE_GET(code->source1, Type) == gcSL_CONSTANT) )
         {
             gctPOINTER pointer = gcvNULL;
             gcSL_INSTRUCTION tempCode = gcvNULL, curCode = gcvNULL;
             gctUINT i = Patch->instructionIndex + Shader->InsertCount;
-            gcFUNCTION          convertFunction_jmp = gcvNULL;
-            gcFUNCTION          stubFunction_jmp = gcvNULL;
+            gcFUNCTION convertFunction_jmp = gcvNULL;
+            gcFUNCTION stubFunction_jmp = gcvNULL;
             gctUINT32 jmpIndex = 0;
 
+            srcLoc = code->srcLoc;
 #if gcmIS_DEBUG(gcdDEBUG_ASSERT)
-            gcSL_INSTRUCTION code     = &Shader->code[Patch->instructionIndex+Shader->InsertCount];
-            gcSL_FORMAT src0Format  = gcmSL_SOURCE_GET(GetInstSource0(code), Format);
-            gcSL_FORMAT src1Format  = gcmSL_SOURCE_GET(GetInstSource1(code), Format);
-            gcSL_FORMAT dstFormat   = gcmSL_TARGET_GET(GetInstTemp(code), Format);
+            {
+                gcSL_FORMAT src0Format  = gcmSL_SOURCE_GET(GetInstSource0(code), Format);
+                gcSL_FORMAT src1Format  = gcmSL_SOURCE_GET(GetInstSource1(code), Format);
+                gcSL_FORMAT dstFormat   = gcmSL_TARGET_GET(GetInstTemp(code), Format);
+
+                gcmASSERT((Patch->instructionIndex + Shader->InsertCount < Shader->codeCount) &&
+                        (src0Format == gcSL_UINT64 ||
+                         src0Format == gcSL_INT64  ||
+                         src1Format == gcSL_UINT64 ||
+                         src1Format == gcSL_INT64  ||
+                         dstFormat  == gcSL_UINT64 ||
+                         dstFormat  == gcSL_INT64));
+            }
 #endif
-            gcmASSERT((Patch->instructionIndex + Shader->InsertCount < Shader->codeCount) &&
-                    (src0Format == gcSL_UINT64 ||
-                     src0Format == gcSL_INT64  ||
-                     src1Format == gcSL_UINT64 ||
-                     src1Format == gcSL_INT64  ||
-                     dstFormat  == gcSL_UINT64 ||
-                     dstFormat  == gcSL_INT64));
 
             {
                 /* Construct longULong processing function. */
@@ -8264,7 +8647,7 @@ _patchLongULong(
                                               gcSL_JMP,
                                               (condition == gcSL_NOT_EQUAL ? gcSL_NOT_ZERO : gcSL_ZERO),
                                               tmpLabel1,
-                                              0);
+                                              srcLoc);
 
                 gcSHADER_AddSource(Shader, gcSL_TEMP, jmpIndex,
                                    gcSL_SWIZZLE_XXXX, gcSL_INT32, convertFunction_jmp->arguments[1].precision);
@@ -8303,7 +8686,7 @@ _patchLongULong(
                                             gcSL_JMP,
                                             gcSL_ZERO,
                                             tmpLabel2,
-                                            0);
+                                            srcLoc);
                 gcSHADER_AddSource(Shader, gcSL_TEMP, jmpIndex,
                                 gcSL_SWIZZLE_XXXX, gcSL_INT32, convertFunction_jmp->arguments[1].precision);
                 gcoOS_MemCopy(Shader->code+i+2, tempCode+i+1,
@@ -8342,7 +8725,6 @@ _patchLongULong(
                     }
                 }
 
-                /* TODO: modify jump/call target index on function _insertNOP2BeforeCode. */
                 for (j = 0; j < (gctINT)Shader->functionCount; ++j)
                 {
                     /* If the code is inside the function, update the code count. */
@@ -8410,6 +8792,9 @@ _patchLongULong(
             gctUINT   jmpLabel = 0;
             gcSL_INSTRUCTION code;
             gctUINT32   origJmpLabel = 0;
+
+            srcLoc = Shader->code[patchInstrIndex].srcLoc;
+
             /*1D to 2D Patch will add 3 instruction in the top of binary, we need add 3 offset in instructionIndex if Patch is set. */
             Patch->instructionIndex += (Patched1Dto2D?3:0);
 
@@ -8462,7 +8847,7 @@ _patchLongULong(
                                         gcSL_JMP,
                                         gcSL_NOT_ZERO,
                                         jmpLabel,
-                                        0);
+                                        srcLoc);
 
             gcSHADER_AddSource(Shader, gcSL_TEMP, jmpIndex,
                                 gcSL_SWIZZLE_XXXX, gcSL_INT32, convertFunction_jmp->arguments[1].precision);
@@ -8496,7 +8881,6 @@ _patchLongULong(
                     }
                 }
 
-                /* TODO: modify jump/call target index on function _insertNOP2BeforeCode. */
                 for (j = 0; j < (gctINT)Shader->functionCount; ++j)
                 {
                     /* If the code is inside the function, update the code count. */
@@ -8565,22 +8949,25 @@ _patchLongULong(
         }
         else
         {
-            gcFUNCTION          convertFunction = gcvNULL;
-            gcFUNCTION          stubFunction = gcvNULL;
-            gcSL_INSTRUCTION code     = &Shader->code[Patch->instructionIndex];
+            gcFUNCTION       convertFunction = gcvNULL;
+            gcFUNCTION       stubFunction = gcvNULL;
+            gcSL_INSTRUCTION code = &Shader->code[Patch->instructionIndex];
 
 #if gcmIS_DEBUG(gcdDEBUG_ASSERT)
-            gcSL_FORMAT src0Format  = gcmSL_SOURCE_GET(GetInstSource0(code), Format);
-            gcSL_FORMAT src1Format  = gcmSL_SOURCE_GET(GetInstSource1(code), Format);
-            gcSL_FORMAT dstFormat   = gcmSL_TARGET_GET(GetInstTemp(code), Format);
+            {
+                gcSL_FORMAT src0Format  = gcmSL_SOURCE_GET(GetInstSource0(code), Format);
+                gcSL_FORMAT src1Format  = gcmSL_SOURCE_GET(GetInstSource1(code), Format);
+                gcSL_FORMAT dstFormat   = gcmSL_TARGET_GET(GetInstTemp(code), Format);
+
+                gcmASSERT(code &&
+                        (src0Format == gcSL_UINT64 ||
+                         src0Format == gcSL_INT64  ||
+                         src1Format == gcSL_UINT64 ||
+                         src1Format == gcSL_INT64  ||
+                         dstFormat  == gcSL_UINT64 ||
+                         dstFormat  == gcSL_INT64));
+            }
 #endif
-            gcmASSERT(code &&
-                    (src0Format == gcSL_UINT64 ||
-                     src0Format == gcSL_INT64  ||
-                     src1Format == gcSL_UINT64 ||
-                     src1Format == gcSL_INT64  ||
-                     dstFormat  == gcSL_UINT64 ||
-                     dstFormat  == gcSL_INT64));
 
             /* Construct longULong processing function. */
             status = _createLongULongFunction(Shader,
@@ -8593,7 +8980,7 @@ _patchLongULong(
             /* Construct call stub function. */
             stubFunction = _createLongULongStubFunction(Shader,
                                                         Patch,
-                                                         convertFunction);
+                                                        convertFunction);
 
             /* Change the instruciton to call stub */
             code = &Shader->code[Patch->instructionIndex];
@@ -8610,7 +8997,199 @@ _patchLongULong(
     }
 
 OnError:
-    return gcvSTATUS_OK;
+    return status;
+}
+
+static gceSTATUS
+_patchLongULongVIR(
+    IN OUT gcSHADER         Shader,
+    IN gcsPatchLongULong *  Patch
+    )
+{
+    /*
+       Patch long/ulong IR in VIR mode
+       How to do patch.
+       1. Ensure the precompiled patch lib for long/ulong is ready;
+       2. Create long/ulong handling function (find it in the lib);
+       3. Create the calling function to the long/ulong function.
+    */
+
+    gceSTATUS   status = gcvSTATUS_OK;
+
+    /*  gcCLPatchLibrary[LONG_ULONG_LIB_INDEX] is used as long/ulong patch lib. */
+    if (gcCLPatchLibrary[LONG_ULONG_LIB_INDEX] == gcvNULL)
+    {
+        gcmONERROR(gcLoadCLPatchLibrary(Shader, LONG_ULONG_LIB_INDEX));
+    }
+
+    {
+        gctUINT lastInstruction;
+        gcSHADER_INSTRUCTION_INDEX instrIndex;
+        gctUINT patchInstrIndex  = Patch->instructionIndex;
+        gcSL_INSTRUCTION code    = &Shader->code[patchInstrIndex];
+        gcSL_CONDITION condition = gcmSL_TARGET_GET(code->temp, Condition);
+        gctUINT32   srcLoc;
+
+        /* Construct longULong processing function. */
+        if(gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_JMP &&
+           ((gcmSL_TARGET_GET(code->temp, Condition) == gcSL_NOT_EQUAL) ||
+            (gcmSL_TARGET_GET(code->temp, Condition) == gcSL_EQUAL)) &&
+           (gcmSL_SOURCE_GET(code->source1, Type) == gcSL_CONSTANT) )
+        {
+            gcFUNCTION   convertFunction_jmp = gcvNULL;
+            gcFUNCTION   stubFunction_jmp = gcvNULL;
+            gctUINT32    jmpIndex = 0;
+            gctUINT32    origJmpLabel = 0;
+            gctUINT      jmpLabel = 0;
+
+            srcLoc = code->srcLoc;
+
+            {
+                /* Construct longULong processing function. */
+                gcmONERROR(_createLongULongFunction_jmp(Shader,
+                                                        gcCLPatchLibrary[LONG_ULONG_LIB_INDEX],
+                                                        Patch,
+                                                        &convertFunction_jmp));
+
+                /* Construct call stub function. */
+                stubFunction_jmp = _createLongULongStubFunction_jmp(Shader,
+                                                                    Patch,
+                                                                    convertFunction_jmp,
+                                                                    &jmpIndex);
+            }
+
+            /* Insert NOPs first. */
+            gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader,
+                                                     patchInstrIndex + 1,
+                                                     1,
+                                                     gcvFALSE,
+                                                     gcvFALSE));
+
+            /* Change the instruciton to call stub */
+            code = &Shader->code[patchInstrIndex];
+            origJmpLabel = gcmSL_JMP_TARGET(code);
+            gcSL_SetInst2NOP(code);
+            lastInstruction = Shader->lastInstruction;
+            instrIndex = Shader->instrIndex;
+            Shader->lastInstruction = patchInstrIndex;
+            Shader->instrIndex = gcSHADER_OPCODE;
+
+            _addCallInst(Shader, stubFunction_jmp);
+
+            jmpLabel = _FindClNextUnusedJmpLabelId(Shader);
+            /* add JMP instruction to jump same target like before */
+            gcSHADER_AddOpcodeConditional(Shader,
+                                          gcSL_JMP,
+                                          (condition == gcSL_NOT_EQUAL ? gcSL_NOT_ZERO : gcSL_ZERO),
+                                          jmpLabel,
+                                          srcLoc);
+
+            gcSHADER_AddSource(Shader, gcSL_TEMP, jmpIndex,
+                               gcSL_SWIZZLE_XXXX, gcSL_INT32, convertFunction_jmp->arguments[1].precision);
+
+            /* add JMP instruction label */
+            Shader->lastInstruction = origJmpLabel;
+            Shader->instrIndex = gcSHADER_OPCODE;
+            gcSHADER_AddLabel(Shader, jmpLabel);
+            Shader->lastInstruction = lastInstruction;
+            Shader->instrIndex = instrIndex;
+        }
+        else if(code->opcode == gcSL_JMP &&
+            ((condition == gcSL_LESS_OR_EQUAL) ||
+             (condition == gcSL_GREATER_OR_EQUAL) ||
+             (condition == gcSL_LESS) ||
+             (condition == gcSL_GREATER) ||
+             (condition == gcSL_EQUAL) ||
+             (condition == gcSL_NOT_EQUAL)) )
+        {
+            gcFUNCTION    convertFunction_jmp = gcvNULL;
+            gcFUNCTION    stubFunction_jmp = gcvNULL;
+            gctUINT32   jmpIndex = 0;
+            gctUINT32   origJmpLabel = 0;
+            gctUINT     jmpLabel = 0;
+
+            srcLoc = Shader->code[patchInstrIndex].srcLoc;
+
+            /* Construct longULong processing function. */
+            gcmONERROR(_createLongULongFunction_jmp(Shader,
+                                                    gcCLPatchLibrary[LONG_ULONG_LIB_INDEX],
+                                                    Patch,
+                                                    &convertFunction_jmp));
+
+            /* Construct call stub function. */
+            stubFunction_jmp = _createLongULongStubFunction_jmp_src2(Shader,
+                                                                     Patch,
+                                                                     convertFunction_jmp,
+                                                                     &jmpIndex);
+            /* Insert NOPs first. */
+            gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader,
+                                                     patchInstrIndex + 1,
+                                                     1,
+                                                     gcvFALSE,
+                                                     gcvFALSE));
+
+            /* Change the original JMP instruciton to call stub */
+            code = &Shader->code[patchInstrIndex];
+            origJmpLabel = gcmSL_JMP_TARGET(code);
+            gcSL_SetInst2NOP(code);
+            lastInstruction = Shader->lastInstruction;
+            instrIndex = Shader->instrIndex;
+            Shader->lastInstruction = patchInstrIndex;
+            Shader->instrIndex = gcSHADER_OPCODE;
+            _addCallInst(Shader, stubFunction_jmp);
+
+            jmpLabel = _FindClNextUnusedJmpLabelId(Shader);
+            /* add JMP instruction to jump same target like before */
+            gcSHADER_AddOpcodeConditional(Shader,
+                                          gcSL_JMP,
+                                          gcSL_NOT_ZERO,
+                                          jmpLabel,
+                                          srcLoc);
+
+            gcSHADER_AddSource(Shader, gcSL_TEMP, jmpIndex,
+                               gcSL_SWIZZLE_XXXX, gcSL_INT32, convertFunction_jmp->arguments[1].precision);
+
+            /* add JMP instruction label */
+            Shader->lastInstruction = origJmpLabel;
+            Shader->instrIndex = gcSHADER_OPCODE;
+            gcSHADER_AddLabel(Shader, jmpLabel);
+
+            Shader->lastInstruction = lastInstruction;
+            Shader->instrIndex = instrIndex;
+        }
+        else
+        {
+            gcFUNCTION       convertFunction = gcvNULL;
+            gcFUNCTION       stubFunction = gcvNULL;
+
+            /* Construct longULong processing function. */
+            gcmONERROR(_createLongULongFunction(Shader,
+                                                gcCLPatchLibrary[LONG_ULONG_LIB_INDEX],
+                                                Patch,
+                                                &convertFunction,
+                                                Patch->channelCount == 1? gcvTRUE : gcvFALSE));
+
+            /* Construct call stub function. */
+            stubFunction = _createLongULongStubFunction(Shader,
+                                                        Patch,
+                                                        convertFunction);
+
+            /* Change the instruciton to call stub */
+            code = &Shader->code[patchInstrIndex];
+            gcSL_SetInst2NOP(code);
+            lastInstruction = Shader->lastInstruction;
+            instrIndex = Shader->instrIndex;
+            Shader->lastInstruction = patchInstrIndex;
+            Shader->instrIndex = gcSHADER_OPCODE;
+            _addCallInst(Shader, stubFunction);
+            Shader->lastInstruction = lastInstruction;
+            Shader->instrIndex = instrIndex;
+        }
+    }
+
+OnError:
+
+    return status;
 }
 #endif
 
@@ -8624,12 +9203,13 @@ _patchReadImage(
     gctUINT             origCodeCount = Shader->codeCount;
     gcFUNCTION          convertFunction = gcvNULL;
     gcFUNCTION          stubFunction = gcvNULL;
+    gctBOOL             halti5 = gcHWCaps.hwFeatureFlags.hasHalti5;
     gctUINT             i, j;
 
     if (gcCLPatchLibrary[0] == gcvNULL)
     {
         gcmASSERT(gcCLPatchLibrary[1] == gcvNULL);
-        gcmONERROR(gcLoadCLPatchLibrary(Shader));
+        gcmONERROR(gcLoadCLPatchLibrary(Shader, 0));
     }
 
     /* Pre-allocate more space to reduce overhead. */
@@ -8673,7 +9253,6 @@ _patchReadImage(
                 prevCode   = gcvNULL;
                 prevOpcode = gcSL_NOP;
 
-                /* TODO - Need to handle other modifier. */
             }
 
             /* Construct read image function. */
@@ -8697,12 +9276,24 @@ _patchReadImage(
             gcmONERROR(status);
 
             /* Construct call stub function. */
-            stubFunction = _createReadImageStubFunction(
-                                    Shader,
-                                    ReadImage,
-                                    convertFunction,
-                                    i,
-                                    prevCode);
+            if(halti5 && NEW_READ_WRITE_IMAGE)
+            {
+                stubFunction = _createReadImageStubFunction2(
+                                        Shader,
+                                        ReadImage,
+                                        convertFunction,
+                                        i,
+                                        prevCode);
+            }
+            else
+            {
+                stubFunction = _createReadImageStubFunction(
+                                        Shader,
+                                        ReadImage,
+                                        convertFunction,
+                                        i,
+                                        prevCode);
+            }
 
             /* Change the texld instruciton to call stub */
             code = &Shader->code[i];
@@ -8725,183 +9316,6 @@ OnError:
     return status;
 }
 
-#if gcdOCL_READ_IMAGE_OPTIMIZATION
-static gceSTATUS
-_patchReadImageUnnorm(
-    IN OUT gcSHADER         Shader,
-    IN gcsPatchReadImage *  ReadImage
-    )
-{
-    gceSTATUS           status = gcvSTATUS_OK;
-    gctUINT             origCodeCount = Shader->codeCount;
-    gctUINT             i;
-
-    /* Pre-allocate more space to reduce overhead. */
-    if (Shader->lastInstruction + 64 >= Shader->codeCount)
-    {
-        /* Allocate 160 extra instruction slots. */
-        gcmONERROR(_ExpandCode(Shader, 160));
-    }
-
-    for (i = 0; i < origCodeCount; i++)
-    {
-        gcSL_INSTRUCTION code       = &Shader->code[i];
-        gcSL_OPCODE      opcode     = gcmSL_OPCODE_GET(code->opcode, Opcode);
-        gcSL_INSTRUCTION prevCode   = gcvNULL;
-        gcSL_OPCODE      prevOpcode = gcSL_NOP;
-
-        /* Find the instruction which need to do format conversion */
-        if (opcode == gcSL_TEXLD)
-        {
-            gctUINT samplerId = gcmSL_INDEX_GET(code->source0Index, Index);
-            gctUINT extraInstNum;
-            gctUINT32 newTempIndex;
-            gctUINT enable;
-            gctUINT swizzle;
-            gctBOOL needToAddI2F;
-
-            /* Assume optimizer has inline all functions that use IMAGE_RD. */
-            /* texld and samplers are added by compiler, so no indexed. */
-            if (samplerId != ReadImage->samplerNum)
-            {
-                continue;
-            }
-
-            /* Need to add MUL rcpImageSize. */
-            extraInstNum = 1;
-            if (gcmSL_SOURCE_GET(code->source1, Format) != gcSL_FLOAT)
-            {
-                /* Need to add I2F. */
-                extraInstNum++;
-                needToAddI2F = gcvTRUE;
-            }
-            else
-            {
-                needToAddI2F = gcvFALSE;
-            }
-
-            if (i > 0)
-            {
-                prevCode = &Shader->code[i - 1];
-                prevOpcode = gcmSL_OPCODE_GET(prevCode->opcode, Opcode);
-                if (prevOpcode == gcSL_NOP)
-                {
-                    extraInstNum--;
-                    if (i > 1)
-                    {
-                        prevCode = &Shader->code[i - 2];
-                        prevOpcode = gcmSL_OPCODE_GET(prevCode->opcode, Opcode);
-                        if (prevOpcode == gcSL_NOP)
-                        {
-                            extraInstNum--;
-                        }
-                    }
-                }
-            }
-
-            if (extraInstNum > 0)
-            {
-                gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, i, extraInstNum, gcvTRUE, gcvTRUE));
-
-                /* Need to get code again after insert NOP. */
-                i += extraInstNum;
-                code = &Shader->code[i];
-            }
-
-            if (ReadImage->imageType == gcSHADER_IMAGE_2D ||
-                ReadImage->imageType == gcSHADER_IMAGE_1D_ARRAY)
-            {
-                newTempIndex = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X2);
-                enable = gcSL_ENABLE_XY;
-                swizzle = gcSL_SWIZZLE_XYYY;
-            }
-            else if (ReadImage->imageType == gcSHADER_IMAGE_3D ||
-                     ReadImage->imageType == gcSHADER_IMAGE_2D_ARRAY)
-            {
-                newTempIndex = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X3);
-                enable = gcSL_ENABLE_XYZ;
-                swizzle = gcSL_SWIZZLE_XYZZ;
-            }
-            else
-            {
-                newTempIndex = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X1);
-                enable = gcSL_ENABLE_X;
-                swizzle = gcSL_SWIZZLE_XXXX;
-            }
-
-            if (needToAddI2F)
-            {
-                /* Add I2F. */
-                prevCode = &Shader->code[i - 2];
-                prevCode->opcode = gcSL_I2F;
-                prevCode->temp = gcmSL_TARGET_SET(0, Format, gcSL_FLOAT)
-                               | gcmSL_TARGET_SET(0, Indexed, gcSL_NOT_INDEXED)
-                               | gcmSL_TARGET_SET(0, Condition, gcSL_ALWAYS)
-                               | gcmSL_TARGET_SET(0, Enable, enable);
-                prevCode->tempIndex = newTempIndex;
-                prevCode->tempIndexed = 0;
-
-                prevCode->source0        = code->source1;
-                prevCode->source0Index   = code->source1Index;
-                prevCode->source0Indexed = code->source1Indexed;
-
-                /* Add MUL. */
-                prevCode = &Shader->code[i - 1];
-                prevCode->opcode = gcSL_MUL;
-                prevCode->temp = gcmSL_TARGET_SET(0, Format, gcSL_FLOAT)
-                               | gcmSL_TARGET_SET(0, Indexed, gcSL_NOT_INDEXED)
-                               | gcmSL_TARGET_SET(0, Condition, gcSL_ALWAYS)
-                               | gcmSL_TARGET_SET(0, Enable, enable);
-                prevCode->tempIndex = newTempIndex;
-                prevCode->tempIndexed = 0;
-
-                prevCode->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_TEMP)
-                                  | gcmSL_SOURCE_SET(0, Format, gcSL_FLOAT)
-                                  | gcmSL_SOURCE_SET(0, Swizzle, swizzle);
-                prevCode->source0Index = newTempIndex;
-
-                prevCode->source1 = gcmSL_SOURCE_SET(0, Type, gcSL_UNIFORM)
-                                  | gcmSL_SOURCE_SET(0, Format, gcSL_FLOAT)
-                                  | gcmSL_SOURCE_SET(0, Swizzle, swizzle);
-                prevCode->source1Index = ReadImage->imageSizeIndex;
-            }
-            else
-            {
-                /* Add MUL. */
-                prevCode = &Shader->code[i - 1];
-                prevCode->opcode = gcSL_MUL;
-                prevCode->temp = gcmSL_TARGET_SET(0, Format, gcSL_FLOAT)
-                               | gcmSL_TARGET_SET(0, Indexed, gcSL_NOT_INDEXED)
-                               | gcmSL_TARGET_SET(0, Condition, gcSL_ALWAYS)
-                               | gcmSL_TARGET_SET(0, Enable, enable);
-                prevCode->tempIndex = newTempIndex;
-                prevCode->tempIndexed = 0;
-
-                prevCode->source0        = code->source1;
-                prevCode->source0Index   = code->source1Index;
-                prevCode->source0Indexed = code->source1Indexed;
-
-                prevCode->source1 = gcmSL_SOURCE_SET(0, Type, gcSL_UNIFORM)
-                                  | gcmSL_SOURCE_SET(0, Format, gcSL_FLOAT)
-                                  | gcmSL_SOURCE_SET(0, Swizzle, swizzle);
-                prevCode->source1Index =  ReadImage->imageSizeIndex;
-            }
-
-            /* Change TEXLS's src1 to new temp. */
-            code->source1 = gcmSL_SOURCE_SET(0, Type, gcSL_TEMP)
-                          | gcmSL_SOURCE_SET(0, Format, gcSL_FLOAT)
-                          | gcmSL_SOURCE_SET(0, Swizzle, swizzle);
-            code->source1Index   = newTempIndex;
-            code->source1Indexed = 0;
-        }
-    }
-
-OnError:
-    /* Return the status. */
-    return status;
-}
-#endif
-
 static gceSTATUS
 _patchWriteImage(
     IN OUT gcSHADER         Shader,
@@ -8913,11 +9327,12 @@ _patchWriteImage(
     gcFUNCTION          convertFunction = gcvNULL;
     gcFUNCTION          stubFunction = gcvNULL;
     gctUINT             i, j;
+    gctBOOL             halti5 = gcHWCaps.hwFeatureFlags.hasHalti5;
 
     if (gcCLPatchLibrary[0] == gcvNULL)
     {
         gcmASSERT(gcCLPatchLibrary[1] == gcvNULL);
-        gcmONERROR(gcLoadCLPatchLibrary(Shader));
+        gcmONERROR(gcLoadCLPatchLibrary(Shader, 0));
     }
 
     for (i = 0; i < origCodeCount; i++)
@@ -8948,7 +9363,6 @@ _patchWriteImage(
                                     (gcSL_FORMAT)gcmSL_TARGET_GET(code->temp, Format),
                                     WriteImage->imageType,
                                     WriteImage->channelOrder,
-                                    WriteImage->imageStore,
                                     &convertFunction);
 
                 if (!gcmIS_ERROR(status))
@@ -8960,12 +9374,24 @@ _patchWriteImage(
             gcmONERROR(status);
 
             /* Construct call stub function. */
-            stubFunction = _createWriteImageStubFunction(
-                                    Shader,
-                                    WriteImage,
-                                    convertFunction,
-                                    i,
-                                    prevCode);
+            if(halti5 && NEW_READ_WRITE_IMAGE)
+            {
+                stubFunction = _createWriteImageStubFunction2(
+                                        Shader,
+                                        WriteImage,
+                                        convertFunction,
+                                        i,
+                                        prevCode);
+            }
+            else
+            {
+                stubFunction = _createWriteImageStubFunction(
+                                        Shader,
+                                        WriteImage,
+                                        convertFunction,
+                                        i,
+                                        prevCode);
+            }
 
             /* Change the texld instruciton to call stub */
             code = &Shader->code[i];
@@ -9014,7 +9440,6 @@ _patchYFlippedTexture(
 
             gcmASSERT(type == gcSL_SAMPLER || type == gcSL_UNIFORM);
 
-            /* TODO: need to handle indexed sampler. */
             if (gcmSL_SOURCE_GET(code->source0, Indexed) != gcSL_NOT_INDEXED)
                 continue;
 
@@ -9314,6 +9739,16 @@ gcSHADER_DynamicPatch(
     if (curDirective)
         _addInstNopToEndOfMainFunc(Shader);
 
+    gcShaderClrHasInt64Patch(Shader);
+    for (; curDirective; curDirective = curDirective->next)
+    {
+        if (curDirective->kind == gceRK_PATCH_CL_LONGULONG)
+        {
+            gcShaderSetHasInt64Patch(Shader);
+            break;
+        }
+    }
+
     curDirective = PatchDirective;
 
     for (; curDirective; curDirective = curDirective->next)
@@ -9359,12 +9794,6 @@ gcSHADER_DynamicPatch(
             status = _patchReadImage(Shader,
                            curDirective->patchValue.readImage);
             break;
-#if gcdOCL_READ_IMAGE_OPTIMIZATION
-        case gceRK_PATCH_READ_IMAGE_UNNORM:
-            status = _patchReadImageUnnorm(Shader,
-                           curDirective->patchValue.readImage);
-            break;
-#endif
         case gceRK_PATCH_WRITE_IMAGE:
             status = _patchWriteImage(Shader,
                            curDirective->patchValue.writeImage);
@@ -9567,7 +9996,7 @@ gctBOOL isAppConformance(gcePATCH_ID patchId)
     if (patchId == gcvPATCH_GTFES30 || patchId == gcvPATCH_DEQP)
         return gcvTRUE;
 
-    return gcvFALSE;   /* TODO: patch confomance app */
+    return gcvFALSE;
 }
 
 /* The followings are for compiling/linking built-in functions in the library */
@@ -9665,6 +10094,7 @@ gcSHADER_CompileBuiltinLibrary(
     gceSTATUS   status          = gcvSTATUS_OK;
     gctSTRING   sloBuiltinSource = gcvNULL;
     gctSTRING   log    = gcvNULL;
+    gctBOOL     rewriteFile = gcvFALSE;
 
     gctBOOL     isSupportImgAddr = gcHWCaps.hwFeatureFlags.supportImgAddr;
     gctBOOL     isSupportImgInst = gcHWCaps.hwFeatureFlags.hasHalti5 ?
@@ -9705,13 +10135,20 @@ gcSHADER_CompileBuiltinLibrary(
         }
     }
 
-    if (gcmOPT_LibShaderFile())
+    if ((gcmOPT_LibShaderFile() == 1) || (gcmOPT_LibShaderFile() == 2))
     {
-        gctSTRING   libName = gcSHADER_GetLibFileName(gcvFALSE, isSupportImgInst,LibType);
         gcmONERROR(gcInitializeLibFile());
-        status =  gcSHADER_ReadGCSLShaderFromFile(libName, Binary);
 
-        if ((status == gcvSTATUS_VERSION_MISMATCH) || (*Binary == gcvNULL))
+        if (gcmOPT_LibShaderFile() == 2)
+        {
+            rewriteFile = gcvTRUE; /* Force rewrite shader info to file. */
+        }
+        else
+        {
+            status =  gcSHADER_ReadBuiltinLibFromFile(isSupportImgInst,LibType, Binary);
+        }
+
+        if ((rewriteFile == gcvTRUE) || (status == gcvSTATUS_VERSION_MISMATCH) || (*Binary == gcvNULL))
         {
             status =  gcSHADER_InitBuiltinLibrary(Shader,
                 ShaderType,
@@ -9737,12 +10174,12 @@ gcSHADER_CompileBuiltinLibrary(
                     goto OnError;
                 }
                 /*write binary to file*/
-                status = gcSHADER_WriteGCSLShaderToFile(*Binary, libName);
+                status = gcSHADER_WriteBuiltinLibToFile(*Binary,isSupportImgInst,LibType);
 
                 if (status != gcvSTATUS_OK)
                 {
                     if (gcSHADER_DumpCodeGenVerbose(*Binary))
-                        gcoOS_Print("gcSHADER_WriteGCSLShaderToFile Error:%d\n", status);
+                        gcoOS_Print("gcSHADER_WriteBuiltinLibToFile Error:%d\n", status);
                     status = gcvSTATUS_OK;
                 }
             }
@@ -9819,8 +10256,9 @@ gcSHADER_CompileCLBuiltinLibrary(
     OUT gcSHADER    *Binary
     )
 {
-    gceSTATUS   status        = gcvSTATUS_OK;
+    gceSTATUS   status = gcvSTATUS_OK;
     gctBOOL     locked = gcvFALSE;
+    gctBOOL     rewriteFile = gcvFALSE;
     gctSTRING   builtinSource = gcvNULL;
 
     gctSTRING   log    = gcvNULL;
@@ -9863,13 +10301,20 @@ gcSHADER_CompileCLBuiltinLibrary(
         }
     }
 
-    if (gcmOPT_LibShaderFile())
+    if ((gcmOPT_LibShaderFile() == 1) || (gcmOPT_LibShaderFile() == 2))
     {
-        gctSTRING   libName = gcSHADER_GetLibFileName(gcvFALSE, useImgInst, LibType);
         gcmONERROR(gcInitializeLibFile());
-        status =  gcSHADER_ReadGCSLShaderFromFile(libName, Binary);
 
-        if ((status == gcvSTATUS_VERSION_MISMATCH) || (*Binary == gcvNULL))
+        if (gcmOPT_LibShaderFile() == 2)
+        {
+            rewriteFile = gcvTRUE; /* Force rewrite shader info to file. */
+        }
+        else
+        {
+            status =  gcSHADER_ReadBuiltinLibFromFile(useImgInst,LibType, Binary);
+        }
+
+        if ((rewriteFile == gcvTRUE) || (status == gcvSTATUS_VERSION_MISMATCH) || (*Binary == gcvNULL))
         {
             status =  gcSHADER_InitClBuiltinLibrary(Shader,
                 ShaderType,
@@ -9896,12 +10341,12 @@ gcSHADER_CompileCLBuiltinLibrary(
                     gcoOS_Print("Builtin library compile Error:\n%s\n", log);
                     gcmONERROR(status);
                 }
-                status = gcSHADER_WriteGCSLShaderToFile(*Binary, libName);
+                status = gcSHADER_WriteBuiltinLibToFile(*Binary,useImgInst,LibType);
 
                 if (status != gcvSTATUS_OK)
                 {
                     if (gcSHADER_DumpCodeGenVerbose(*Binary))
-                        gcoOS_Print("gcSHADER_WriteGCSLShaderToFile Error:%d\n", status);
+                        gcoOS_Print("gcSHADER_WriteBuiltinLibToFile Error:%d\n", status);
                     status = gcvSTATUS_OK;
                 }
             }
@@ -9969,7 +10414,6 @@ OnError:
     }
     return status;
 }
-
 #endif /* DX_SHADER */
 
 /* For a Call node which calls a function in Library, link the the callee
@@ -10056,7 +10500,6 @@ _fixTempIndexByMappingTable(
     }
     else
     {
-        /* TODO: handling global variables */
         if (gcSHADER_DumpCodeGenVerbose(MI->LibList->lib))
         {
             gcDump_Shader(gcvNULL, "Library shader ", gcvNULL, MI->LibList->lib, gcvTRUE);
@@ -10085,7 +10528,7 @@ _fixUniformIndexByMappingTable(
     gcmASSERT(*UniformIndexPtr < MI->LibList->uniformMappingTableEntries);
     if (MI->LibList->uniformMappingTable[*UniformIndexPtr] != (gctUINT16)-1)
     {
-        /* already mapped, use the mapped temp index */
+        /* already mapped, use the mapped uniform index */
         *UniformIndexPtr = (gctUINT16) MI->LibList->uniformMappingTable[*UniformIndexPtr];
         gcmASSERT(*UniformIndexPtr < MI->Shader->uniformCount + MI->Shader->maxKernelFunctionArgs);
         return;
@@ -10107,6 +10550,9 @@ _fixUniformIndexByMappingTable(
     {
         gctINT16    parentUniformIndex = -1,
                     prevSiblingUniformIndex = -1;
+        gctINT      constantMemorySize = 0;
+        gctBOOL     setCompileTimeInitialized = gcvFALSE;
+
         if (libUniform->parent != -1)
         {
             /* first link in parent */
@@ -10121,13 +10567,21 @@ _fixUniformIndexByMappingTable(
             _fixUniformIndexByMappingTable(MI, &uniformIndex);
             prevSiblingUniformIndex = uniformIndex;
         }
+        if (MI->Shader->type == gcSHADER_TYPE_CL &&
+            isUniformCompiletimeInitialized(libUniform) &&
+            libUniform->offset != -1)
+        {
+            constantMemorySize = (gctINT)GetShaderConstantMemorySize(MI->Shader);
+            gcShaderSetConstantMemoryReferenced(MI->LibList->lib);
+            setCompileTimeInitialized = gcvTRUE;
+        }
         gcSHADER_AddUniformEx1(MI->Shader,
                 libUniform->name,
                 libUniform->u.type,
                 libUniform->precision,
                 libUniform->location,
                 libUniform->binding,
-                libUniform->offset,
+                libUniform->offset + constantMemorySize,
                 libUniform->arrayLengthCount,
                 libUniform->arrayLengthList,
                 libUniform->_varCategory,
@@ -10137,6 +10591,11 @@ _fixUniformIndexByMappingTable(
                 (gctUINT16)libUniform->imageFormat,
                 &newUniformIndex,
                 &newUniform);
+
+         if(setCompileTimeInitialized)
+         {
+            SetUniformFlag(newUniform, gcvUNIFORM_FLAG_COMPILETIME_INITIALIZED);
+         }
     }
     /* enter the mapping */
     MI->LibList->uniformMappingTable[*UniformIndexPtr] = (gctUINT16)newUniformIndex;
@@ -10657,6 +11116,7 @@ OnError:
 
 static gctBOOL
 _inputOutputArgument(
+    IN gcSHADER   Shader,
     IN gcFUNCTION Function,
     IN gctUINT    Index,
     IN gctBOOL    IsInput,
@@ -10665,33 +11125,127 @@ _inputOutputArgument(
 {
     gctUINT     i;
 
-    for (i = 0; i < Function->argumentCount; i++)
+    if (Shader->type == gcSHADER_TYPE_CL)
     {
-        gcsFUNCTION_ARGUMENT_PTR argument = Function->arguments + i;
-
-        if (IsInput)
+        gctINT      gtArg = -1;
+        for (i = 0; i < Function->argumentCount; i++)
         {
-            if (argument->qualifier == gcvFUNCTION_INPUT ||
-                argument->qualifier == gcvFUNCTION_INOUT)
+            gcsFUNCTION_ARGUMENT_PTR argument = Function->arguments + i;
+
+            if (IsInput)
             {
-                if (argument->index == Index)
+                if (argument->qualifier == gcvFUNCTION_INPUT ||
+                    argument->qualifier == gcvFUNCTION_INOUT)
                 {
-                    if (argIndex)
-                        *argIndex = i;
-                    return gcvTRUE;
+                    if (argument->index == Index)
+                    {
+                        if (argIndex)
+                            *argIndex = i;
+                        return gcvTRUE;
+                    }
+                    else if (argument->index > Index)
+                    {
+                        if(i != 0 && Function->arguments[i-1].index < Index)
+                        {
+                            if (argIndex)
+                                *argIndex = i - 1;
+                            return gcvTRUE;
+                        }
+                    }
+                    else if (argument->index < Index)
+                    {
+                        gtArg = (gctINT)i;
+                    }
+                }
+            }
+            else
+            {
+                if (argument->qualifier == gcvFUNCTION_OUTPUT ||
+                    argument->qualifier == gcvFUNCTION_INOUT)
+                {
+                    if (argument->index == Index)
+                    {
+                        if (argIndex)
+                            *argIndex = i;
+                        return gcvTRUE;
+                    }
+                    else if (argument->index > Index)
+                    {
+                        if(i != 0 && Function->arguments[i-1].index < Index)
+                        {
+                            if (argIndex)
+                                *argIndex = i - 1;
+                            return gcvTRUE;
+                        }
+                    }
+                    else if (argument->index < Index)
+                    {
+                        gtArg = (gctINT)i;
+                    }
                 }
             }
         }
-        else
+
+        if(gtArg != -1)
         {
-            if (argument->qualifier == gcvFUNCTION_OUTPUT ||
-                argument->qualifier == gcvFUNCTION_INOUT)
+            i = gtArg + 1;
+            if(i < Function->argumentCount)
             {
-                if (argument->index == Index)
+                if(Function->arguments[i].index > Index)
                 {
                     if (argIndex)
-                        *argIndex = i;
+                        *argIndex = gtArg;
                     return gcvTRUE;
+                }
+            }
+            else if (Function->arguments[gtArg].variableIndex != 0xffff)
+            {
+                gcVARIABLE variable = Shader->variables[Function->arguments[gtArg].variableIndex];
+
+                gcmASSERT(variable);
+                if(isVariableNormal(variable))
+                {
+                    gctUINT rows = gcmType_Rows(GetVariableType(variable));
+
+                    if((Function->arguments[gtArg].index + rows) > Index)
+                    {
+                        if (argIndex)
+                            *argIndex = gtArg;
+                        return gcvTRUE;
+                    }
+                }
+            }
+        }
+    }
+    else {
+        for (i = 0; i < Function->argumentCount; i++)
+        {
+            gcsFUNCTION_ARGUMENT_PTR argument = Function->arguments + i;
+
+            if (IsInput)
+            {
+                if (argument->qualifier == gcvFUNCTION_INPUT ||
+                    argument->qualifier == gcvFUNCTION_INOUT)
+                {
+                    if (argument->index == Index)
+                    {
+                        if (argIndex)
+                            *argIndex = i;
+                        return gcvTRUE;
+                    }
+                }
+            }
+            else
+            {
+                if (argument->qualifier == gcvFUNCTION_OUTPUT ||
+                    argument->qualifier == gcvFUNCTION_INOUT)
+                {
+                    if (argument->index == Index)
+                    {
+                        if (argIndex)
+                            *argIndex = i;
+                        return gcvTRUE;
+                    }
                 }
             }
         }
@@ -10713,11 +11267,11 @@ _findFunctionByArgumentIndex(
     for (i = 0; i < Shader->functionCount; i++)
     {
         function = Shader->functions[i];
-        if (_inputOutputArgument(function, Index, gcvTRUE, gcvNULL))
+        if (_inputOutputArgument(Shader, function, Index, gcvTRUE, gcvNULL))
         {
             break;
         }
-        if (_inputOutputArgument(function, Index, gcvFALSE, gcvNULL))
+        if (_inputOutputArgument(Shader, function, Index, gcvFALSE, gcvNULL))
         {
             break;
         }
@@ -11523,13 +12077,13 @@ _LinkImageLibFuc(
     gcUNIFORM uniform = gcvNULL, extraUniform = gcvNULL;
     gctUINT32 i, j, movIndex = 0, callIndex = 0, index_constVal = 0;
     gcFUNCTION  imgLibFunc = Function;
-    gctSTRING formatLibName = gcvNULL;
-    gctPOINTER pointer = gcvNULL;
 
     for (i = 0; i < codeCount; i++)
     {
         gctSIZE_T length = 0;
         gctUINT offset = 0;
+        gctPOINTER pointer = gcvNULL;
+        gctSTRING formatLibName = gcvNULL;
         gctBOOL extraArg = gcvFALSE;
 
         uniform = gcvNULL;
@@ -11816,7 +12370,7 @@ _LinkImageLibFuc(
                     gcmONERROR(gcSHADER_GetUniform(Shader, (gctUINT)uniform->firstChild, &extraUniform));
                     /* Insert one argument assignment */
                     gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, movIndex + 1, 1, gcvTRUE, gcvTRUE));
-                    gcSHADER_Pack(Shader);
+                    gcmONERROR(gcSHADER_Pack(Shader));
 
                     argCode = &Shader->code[movIndex + 1];
                     argCode->opcode = gcSL_MOV;
@@ -11886,10 +12440,6 @@ _LinkImageLibFuc(
     }
 
 OnError:
-    if (pointer != gcvNULL)
-    {
-        gcmOS_SAFE_FREE(gcvNULL, pointer);
-    }
     return status;
 }
 
@@ -11959,10 +12509,8 @@ gcSHADER_LinkLibFunction(
     gcmONERROR(gcSHADER_GetFunctionByName(Library, functionName, &libFunction));
     if (libFunction == gcvNULL)
     {
-#if gcmIS_DEBUG(gcdDEBUG_CODE)
         gcoOS_Print("Error: Failed to link unsatified function %s to shader (id:%d)",
                          functionName, GetShaderID(Shader));
-#endif
         *Function = gcvNULL;
         return gcvSTATUS_UNSAT_LIB_SYMBOL;
     }
@@ -11972,10 +12520,8 @@ gcSHADER_LinkLibFunction(
         if(libFunction->intrinsicsKind == gceINTRIN_source)
         {
             gcmASSERT(libFunction->codeCount == 0);
-#if gcmIS_DEBUG(gcdDEBUG_CODE)
             gcoOS_Print("Error: Failed to link unsatified function %s to shader (id:%d)",
                         functionName, GetShaderID(Shader));
-#endif
             *Function = gcvNULL;
             return gcvSTATUS_UNSAT_LIB_SYMBOL;
         }
@@ -12004,7 +12550,7 @@ gcSHADER_FindLibFunction(
     gctINT      codeOffset;
     gctINT      tempOffset;
     gctUINT     lowTemp;
-    gctUINT     i;
+    gctUINT     i, j;
     _MappingInfo mi;
     gcLibraryList *libList;
     gctBOOL      funcInShader = gcvTRUE;
@@ -12207,17 +12753,73 @@ gcSHADER_FindLibFunction(
         paraMapping[i] = -1;
     }
 
-    for (i = 0; i < function->argumentCount; i++)
+    if(Shader->type == gcSHADER_TYPE_CL)
     {
-        gctINT mappedTempRegIndex;
+        gctINT      funcTempIndexDiff, libFuncTempIndexDiff;
+        gctBOOL     updateFuncTempIndexDiff, updateLibFuncTempIndexDiff;
 
-        mappedTempRegIndex = (gctINT)libFunction->arguments[i].index + tempOffset;
+        funcTempIndexDiff = libFuncTempIndexDiff = 0;
+        i = j = 0;
+        updateFuncTempIndexDiff = updateLibFuncTempIndexDiff = gcvFALSE;
+        while(i < function->argumentCount)
+        {
+            gctINT mappedTempRegIndex;
 
-        _MapTempRegister(libList,
-                         libFunction->arguments[i].index,
-                         mappedTempRegIndex);
+            if(updateFuncTempIndexDiff) {
+                funcTempIndexDiff = function->arguments[i].index - function->arguments[i-1].index;
+                updateFuncTempIndexDiff = gcvFALSE;
+            }
+            while(j < libFunction->argumentCount)
+            {
+                if(updateLibFuncTempIndexDiff) {
+                    libFuncTempIndexDiff = libFunction->arguments[j].index - libFunction->arguments[j-1].index;
+                    updateLibFuncTempIndexDiff = gcvFALSE;
+                }
+                if(funcTempIndexDiff > libFuncTempIndexDiff) {
+                    funcTempIndexDiff -= libFuncTempIndexDiff;
+                    mappedTempRegIndex = (gctINT)libFunction->arguments[j].index + tempOffset;
+                    _MapTempRegister(libList,
+                                     libFunction->arguments[j].index,
+                                     mappedTempRegIndex);
+                    updateLibFuncTempIndexDiff = gcvTRUE;
+                }
+                else if(funcTempIndexDiff < libFuncTempIndexDiff) {
+                    libFuncTempIndexDiff -= funcTempIndexDiff;
+                    paraMapping[i] = paraMapping[i-1] + funcTempIndexDiff;
+                    updateFuncTempIndexDiff = gcvTRUE;
+                    j++;
+                    break;
+                }
+                else {
+                    mappedTempRegIndex = (gctINT)libFunction->arguments[j].index + tempOffset;
+                    _MapTempRegister(libList,
+                                     libFunction->arguments[j].index,
+                                     mappedTempRegIndex);
 
-        paraMapping[i] = mappedTempRegIndex;
+                    paraMapping[i] = mappedTempRegIndex;
+                    updateFuncTempIndexDiff = updateLibFuncTempIndexDiff = gcvTRUE;
+                    j++;
+                    break;
+                }
+                j++;
+            }
+            i++;
+        }
+    }
+    else
+    {
+        for (i = 0; i < function->argumentCount; i++)
+        {
+            gctINT mappedTempRegIndex;
+
+            mappedTempRegIndex = (gctINT)libFunction->arguments[i].index + tempOffset;
+
+            _MapTempRegister(libList,
+                             libFunction->arguments[i].index,
+                             mappedTempRegIndex);
+
+            paraMapping[i] = mappedTempRegIndex;
+        }
     }
 
     mi.Shader      = Shader;
@@ -12262,10 +12864,17 @@ gcSHADER_FindLibFunction(
                     if (opcode == gcSL_CALL || opcode == gcSL_RET || opcode == gcSL_JMP)
                         break;
 
-                    if (_inputOutputArgument(function, code->tempIndex, gcvTRUE, &argIndex))
+                    if (_inputOutputArgument(Shader, function, code->tempIndex, gcvTRUE, &argIndex))
                     {
                         gcmASSERT(paraMapping[argIndex] != -1);
-                        code->tempIndex = (gctUINT32) paraMapping[argIndex];
+                        if(function->arguments[argIndex].index == code->tempIndex)
+                            code->tempIndex = (gctUINT32) paraMapping[argIndex];
+                        else
+                        {
+                            gcmASSERT(code->tempIndex > function->arguments[argIndex].index);
+                            code->tempIndex = (gctUINT32) paraMapping[argIndex] +
+                                               code->tempIndex - function->arguments[argIndex].index;
+                        }
                     }
                 }
 
@@ -12291,17 +12900,31 @@ gcSHADER_FindLibFunction(
                         break;
 
                     if ((gcmSL_SOURCE_GET(code->source0, Type) == gcSL_TEMP) &&
-                        _inputOutputArgument(function, code->source0Index, gcvFALSE, &argIndex))
+                        _inputOutputArgument(Shader, function, code->source0Index, gcvFALSE, &argIndex))
                     {
                         gcmASSERT(paraMapping[argIndex] != -1);
-                        code->source0Index = (gctUINT32) paraMapping[argIndex];
+                        if(function->arguments[argIndex].index == code->source0Index)
+                            code->source0Index = (gctUINT32) paraMapping[argIndex];
+                        else
+                        {
+                            gcmASSERT(code->source0Index > function->arguments[argIndex].index);
+                            code->source0Index = (gctUINT32) paraMapping[argIndex] +
+                                                 code->source0Index - function->arguments[argIndex].index;
+                        }
                     }
 
                     if ((gcmSL_SOURCE_GET(code->source1, Type) == gcSL_TEMP) &&
-                        _inputOutputArgument(function, code->source1Index, gcvFALSE, &argIndex))
+                        _inputOutputArgument(Shader, function, code->source1Index, gcvFALSE, &argIndex))
                     {
                         gcmASSERT(paraMapping[argIndex] != -1);
-                        code->source1Index = (gctUINT32) paraMapping[argIndex];
+                        if(function->arguments[argIndex].index == code->source1Index)
+                            code->source1Index = (gctUINT32) paraMapping[argIndex];
+                        else
+                        {
+                            gcmASSERT(code->source1Index > function->arguments[argIndex].index);
+                            code->source1Index = (gctUINT32) paraMapping[argIndex] +
+                                                 code->source1Index - function->arguments[argIndex].index;
+                        }
                     }
                 }
             }
@@ -12318,10 +12941,6 @@ gcSHADER_FindLibFunction(
 
     for (i = 0; i < function->argumentCount; i++)
     {
-        gctINT mappedTempRegIndex;
-
-        mappedTempRegIndex = (gctINT)libFunction->arguments[i].index + tempOffset;
-
         /*
         ** It is possible that more than one arguments map to one variable(if this variable is an array or a structure),
         ** so we only need to update this variable one time.
@@ -12330,11 +12949,11 @@ gcSHADER_FindLibFunction(
             checkVariable &&
             !checkVariable[function->arguments[i].variableIndex])
         {
-            Shader->variables[function->arguments[i].variableIndex]->tempIndex = (gctUINT32) mappedTempRegIndex;
+            Shader->variables[function->arguments[i].variableIndex]->tempIndex = (gctUINT32) paraMapping[i];
             checkVariable[function->arguments[i].variableIndex] = gcvTRUE;
         }
 
-        function->arguments[i].index = (gctUINT32) mappedTempRegIndex;
+        function->arguments[i].index = (gctUINT32) paraMapping[i];
     }
 
     if (checkVariable)
@@ -12469,7 +13088,7 @@ gcSHADER_FindLibFunction(
             }
             if (gcmSL_SOURCE_GET(code->source1, Type) == gcSL_UNIFORM)
             {
-                gctUINT16 uniformIndexed;
+                gctUINT16 uniformIndexed = (gctUINT16)code->source1Index;
                 /* Adjust uniform index . */
                 _fixUniformIndexByMappingTable(&mi, &uniformIndexed);
                 code->source1Index = (gctUINT32)uniformIndexed;
@@ -13033,7 +13652,6 @@ gcSHADER_LinkBuiltinLibrary(
             {
                 for (j = 0; j < unSupportedBlendNum; j++)
                 {
-                    /* TO-Do to support OR (e.g., mode1 | mode2) cases */
                     if (output->layoutQualifier == unSupportedBlendModes[j])
                     {
                         outputTempIndex = output->tempIndex;
@@ -13111,8 +13729,8 @@ _InstNeedInt64Patch(
      (opcode == gcSL_MOD)  ||\
      (opcode == gcSL_I2F)     ||\
      (opcode == gcSL_F2I)     ||\
-     (opcode == gcSL_CONV && (dstFormat == gcSL_INT8 || dstFormat == gcSL_UINT8 || dstFormat == gcSL_INT16 || dstFormat == gcSL_UINT16 || dstFormat == gcSL_INT32 || dstFormat == gcSL_UINT32 || dstFormat == gcSL_INT64 || dstFormat == gcSL_UINT64) && (gcmSL_OPCODE_GET((inst->opcode), Sat) == gcSL_SATURATE)) || \
-     (opcode == gcSL_CONV && (dstFormat == gcSL_FLOAT || gcmSL_SOURCE_GET(inst->source0, Format) == gcSL_FLOAT)) ||\
+     (opcode == gcSL_CONV && (src0Format == gcSL_INT64 || src0Format == gcSL_UINT64) && (dstFormat == gcSL_INT8 || dstFormat == gcSL_UINT8 || dstFormat == gcSL_INT16 || dstFormat == gcSL_UINT16 || dstFormat == gcSL_INT32 || dstFormat == gcSL_UINT32 || dstFormat == gcSL_INT64 || dstFormat == gcSL_UINT64) && (gcmSL_OPCODE_GET((inst->opcode), Sat) == gcSL_SATURATE)) || \
+     (opcode == gcSL_CONV && (dstFormat == gcSL_FLOAT || src0Format == gcSL_FLOAT)) ||\
      (opcode == gcSL_CMP) ||\
      (opcode == gcSL_ABS) ||\
      (opcode == gcSL_ROTATE) ||\
@@ -13124,6 +13742,7 @@ _InstNeedInt64Patch(
 
     gctBOOL patch = gcvFALSE;
     gctUINT dstFormat = gcmSL_TARGET_GET(GetInstTemp(Instruction), Format);
+    gctUINT src0Format = gcmSL_SOURCE_GET(GetInstSource0(Instruction), Format);
     gctUINT opcode = gcmSL_OPCODE_GET(Instruction->opcode, Opcode);
     gcSL_CONDITION condition = gcmSL_TARGET_GET(GetInstTemp(Instruction), Condition);
 
@@ -13164,6 +13783,7 @@ gcSHADER_PatchInt64(
 {
     gctINT i;
     gctINT numInst = GetShaderCodeCount(Shader);
+    gctBOOL patched = gcvFALSE;
 
     /* Check for int64 opeartions for patch. */
     for (i = numInst - 1; i >= 0; i--)
@@ -13182,7 +13802,7 @@ gcSHADER_PatchInt64(
             _InstNeedInt64Patch(inst))
         {
             gceSTATUS status;
-            gctUINT opcode = gcmSL_OPCODE_GET(inst->opcode, Opcode);
+            gcSL_OPCODE opcode = gcmSL_OPCODE_GET(inst->opcode, Opcode);
 #if defined __GNUC__
             gcsPatchLongULong  longULongPatch[1] = { };
 #else
@@ -13198,12 +13818,24 @@ gcSHADER_PatchInt64(
                 longULongPatch->channelCount = _Countbits(channelBits, 4);
             }
 
-            _LoadCLPatchLongULongLibrary();
-            status = _patchLongULong(Shader,
-                                     gcvNULL,
-                                     longULongPatch);
+            _LoadCLPatchLongULongLibrary(Shader);
+            status = _patchLongULongVIR(Shader,
+                                        longULongPatch);
             if (gcmIS_ERROR(status)) return status;
+            patched = gcvTRUE;
         }
+    }
+
+    if(patched) {
+        gcSHADER patchLib = gcCLPatchLibrary[LONG_ULONG_LIB_INDEX];
+
+        gcmASSERT(patchLib);
+        gcSHADER_MergeCompileTimeInitializedUniforms(Shader, patchLib);
+    }
+
+    if (gcSHADER_DumpCodeGenVerbose(Shader))
+    {
+        gcDump_Shader(gcvNULL, "Dynamic Patched INT64 Shader", gcvNULL, Shader, gcvTRUE);
     }
     return gcvSTATUS_OK;
 }
@@ -13449,2141 +14081,6 @@ OnError:
     }
     return status;
 }
-
-gceSTATUS
-gcSHADER_InitClBuiltinLibrary(
-    IN gcSHADER     Shader,
-    IN gctINT       ShaderType,
-    IN gcLibType    LibType,
-    OUT gcSHADER    *Binary,
-    OUT gctSTRING   *builtinSource)
-{
-    gceSTATUS   status        = gcvSTATUS_OK;
-    gctINT      i, stringNum = 0;
-    gctSIZE_T   length;
-    gctPOINTER  pointer = gcvNULL;
-    gctBOOL     fmaSupported = gcHWCaps.hwFeatureFlags.supportAdvancedInsts;
-    gctBOOL     isHalti5 = gcHWCaps.hwFeatureFlags.hasHalti5;
-    gctBOOL     isHalti2 = gcHWCaps.hwFeatureFlags.hasHalti2;
-    gctBOOL     useImgInst = gcHWCaps.hwFeatureFlags.supportImgAddr&&
-        !gcdHasOptimization(gcGetOptimizerOptionVariable()->optFlags, gcvOPTIMIZATION_IMAGE_PATCHING) &&
-        gcSHADER_GoVIRPass(Shader);
-    gcePATCH_ID patchId = *gcGetPatchId();
-    /* built-in function library */
-
-    gctSTRING   builtinLib[] =
-    {
-        gcCLLibLongMADSAT_Funcs,
-        gcCLLibLongNEXTAFTER_Funcs,
-    };
-
-    gctSTRING   builtinLib_Triangle[] =
-    {
-        gcCLLibASIN_ACOS_Funcs_Common,
-        gcCLLibASIN_Funcs,
-        gcCLLibACOS_Funcs,
-        gcCLLibATAN_Funcs,
-        gcCLLibATAN2_Funcs,
-    };
-
-    gctSTRING   builtinLib_Triangle_halti2[] =
-    {
-        gcCLLibASIN_Funcs_halti2,
-        gcCLLibACOS_Funcs_halti2,
-        gcCLLibATAN_Funcs_halti2,
-        gcCLLibATAN2_Funcs_halti2,
-    };
-
-    gctSTRING   builtinLib_Triangle_halti5[] =
-    {
-        gcCLLibASIN_Funcs_halti5,
-        gcCLLibACOS_Funcs_halti5,
-        gcCLLibATAN_Funcs_halti5,
-        gcCLLibATAN2_Funcs_halti5,
-    };
-
-    gctSTRING   builtinLib_Triangle_halti5_fmasupported[] =
-    {
-        gcCLLibASIN_Funcs_halti5_fmaSupported,
-        gcCLLibACOS_Funcs_halti5_fmaSupported,
-        gcCLLibATAN_Funcs_halti5_fmaSupported,
-        gcCLLibATAN2_Funcs_halti5_fmaSupported,
-    };
-
-    gcmASSERT((LibType == gcLIB_CL_BUILTIN && GetShaderHasIntrinsicBuiltin(Shader)));
-
-    gcmONERROR(gcoOS_Allocate(gcvNULL, __BUILTIN_SHADER_LENGTH__, &pointer));
-    *builtinSource = pointer;
-
-    /* add the header source */
-    length = gcoOS_StrLen(gcCLLibHeader, gcvNULL);
-    gcoOS_StrCopySafe(*builtinSource, length + 1, gcCLLibHeader);
-
-    /* add the extension pragma */
-    length = gcoOS_StrLen(gcCLLibFunc_Extension, gcvNULL);
-    gcoOS_StrCopySafe(*builtinSource, length + 1, gcCLLibFunc_Extension);
-
-    if (LibType == gcLIB_CL_BUILTIN)
-    {
-        stringNum = sizeof(builtinLib) / sizeof(gctSTRING);
-        for (i = 0; i < stringNum; i++)
-        {
-            gcoOS_StrCatSafe(*builtinSource,
-                __BUILTIN_SHADER_LENGTH__, builtinLib[i]);
-        }
-
-        if (!_OCL_USE_INTRINSIC_FOR_IMAGE)
-        {
-            if (useImgInst)
-            {
-                /* add the intrinsic builtin function source in gc7000*/
-                gcoOS_StrCatSafe(*builtinSource,
-                    __BUILTIN_SHADER_LENGTH__, gcCLLibImageQuery_Funcs_UseImgInst);
-            }
-            else
-            {
-                /* add the intrinsic builtin function source in gc3000/5000*/
-                gcoOS_StrCatSafe(*builtinSource,
-                    __BUILTIN_SHADER_LENGTH__, gcCLLibImageQuery_Funcs);
-            }
-        }
-
-        if(fmaSupported && isHalti5)
-        {
-            gcoOS_StrCatSafe(*builtinSource,
-                __BUILTIN_SHADER_LENGTH__, gcCLLibFMA_Func_fmaSupported);
-
-            stringNum = sizeof(builtinLib_Triangle_halti5_fmasupported) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*builtinSource,
-                    __BUILTIN_SHADER_LENGTH__, builtinLib_Triangle_halti5_fmasupported[i]);
-            }
-        }
-        else if(isHalti5)
-        {
-            stringNum = sizeof(builtinLib_Triangle_halti5) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*builtinSource,
-                    __BUILTIN_SHADER_LENGTH__, builtinLib_Triangle_halti5[i]);
-            }
-        }
-        else if(isHalti2 || patchId == gcvPATCH_OCLCTS)
-        {
-            stringNum = sizeof(builtinLib_Triangle_halti2) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*builtinSource,
-                    __BUILTIN_SHADER_LENGTH__, builtinLib_Triangle_halti2[i]);
-            }
-        }
-        else
-        {
-            stringNum = sizeof(builtinLib_Triangle) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*builtinSource,
-                    __BUILTIN_SHADER_LENGTH__, builtinLib_Triangle[i]);
-            }
-        }
-    }
-
-OnError:
-    return status;
-
-}
-
-
-gceSTATUS
-gcSHADER_InitBuiltinLibrary(
-    IN gcSHADER     Shader,
-    IN gctINT       ShaderType,
-    IN gcLibType    LibType,
-    OUT gcSHADER    *Binary,
-    OUT gctSTRING   *sloBuiltinSource
-    )
-{
-
-    gceSTATUS   status          = gcvSTATUS_OK;
-
-    gcePATCH_ID patchId = gcPatchId;
-
-    gctSIZE_T   length;
-    gctPOINTER  pointer = gcvNULL;
-    gctINT      i, stringNum = 0;
-
-
-    gctBOOL     fmaSupported = gcHWCaps.hwFeatureFlags.supportAdvancedInsts;
-    gctBOOL     isHalti5 = gcHWCaps.hwFeatureFlags.hasHalti5;
-    gctBOOL     isHalti4 = gcHWCaps.hwFeatureFlags.hasHalti4;
-    gctBOOL     isHalti2 = gcHWCaps.hwFeatureFlags.hasHalti2;
-    gctBOOL     isHalti0 = gcHWCaps.hwFeatureFlags.hasHalti0;
-    gctBOOL     isSupportTextureGather = gcHWCaps.hwFeatureFlags.supportTxGather;
-    gctBOOL     isSupportImgAddr = gcHWCaps.hwFeatureFlags.supportImgAddr;
-    gctBOOL     isSupportImgInst = gcHWCaps.hwFeatureFlags.hasHalti5 ?
-        gcHWCaps.hwFeatureFlags.hasUscGosAddrFix :
-    isSupportImgAddr;
-    gctBOOL     isSupportTexelFetchForMSAA = gcHWCaps.hwFeatureFlags.supportMSAATexture;
-    /* Use extension string to check extension feature. */
-    gctBOOL     isSupportTexMSAA2DArray = gcoOS_StrStr(GetGLExtensionString(), "GL_OES_texture_storage_multisample_2d_array", gcvNULL);
-    gctBOOL     isSupportCubeMapArray = gcoOS_StrStr(GetGLExtensionString(), "GL_EXT_texture_cube_map_array", gcvNULL);
-    gctBOOL     isSupportTextureBuffer = gcoOS_StrStr(GetGLExtensionString(), "GL_EXT_texture_buffer", gcvNULL);
-    gctBOOL     isSupportMSShading = gcoOS_StrStr(GetGLExtensionString(), "GL_OES_shader_multisample_interpolation", gcvNULL);
-
-
-
-    /* built-in function library */
-
-    /* the following builtin functions have different implementation in gc3000/5000 and gc7000 */
-
-    /* gc3000/5000 implementation */
-    gctSTRING   BuiltinLib[] =
-    {
-        gcLibFindLSB_Func_1,
-        gcLibFindLSB_Func_2,
-        gcLibFindLSB_Func_3,
-        gcLibFindLSB_Func_4,
-        gcLibFindLSB_Func_5,
-        gcLibFindLSB_Func_6,
-        gcLibFindLSB_Func_7,
-        gcLibFindLSB_Func_8,
-
-        gcLibFindMSB_Func_1,
-        gcLibFindMSB_Func_2,
-        gcLibFindMSB_Func_3,
-        gcLibFindMSB_Func_4,
-        gcLibFindMSB_Func_5,
-        gcLibFindMSB_Func_6,
-        gcLibFindMSB_Func_7,
-        gcLibFindMSB_Func_8,
-
-        gcLibBitfieldReverse_Func_1,
-        gcLibBitfieldReverse_Func_2,
-        gcLibBitfieldReverse_Func_3,
-        gcLibBitfieldReverse_Func_4,
-        gcLibBitfieldReverse_Func_5,
-        gcLibBitfieldReverse_Func_6,
-        gcLibBitfieldReverse_Func_7,
-        gcLibBitfieldReverse_Func_8,
-
-        gcLibBitfieldExtract_Func,
-
-        gcLibBitfieldInsert_Func,
-
-        gcLibUaddCarry_Func,
-    };
-
-    /* gc7000 implementation */
-    gctSTRING   BuiltinLib_hati4[] =
-    {
-        gcLibFindLSB_Func_1_hati4,
-        gcLibFindLSB_Func_2_hati4,
-        gcLibFindLSB_Func_3_hati4,
-        gcLibFindLSB_Func_4_hati4,
-        gcLibFindLSB_Func_5_hati4,
-        gcLibFindLSB_Func_6_hati4,
-        gcLibFindLSB_Func_7_hati4,
-        gcLibFindLSB_Func_8_hati4,
-
-        gcLibFindMSB_Func_1_hati4,
-        gcLibFindMSB_Func_2_hati4,
-        gcLibFindMSB_Func_3_hati4,
-        gcLibFindMSB_Func_4_hati4,
-        gcLibFindMSB_Func_5_hati4,
-        gcLibFindMSB_Func_6_hati4,
-        gcLibFindMSB_Func_7_hati4,
-        gcLibFindMSB_Func_8_hati4,
-
-        gcLibBitfieldReverse_Func_1_hati4,
-        gcLibBitfieldReverse_Func_2_hati4,
-        gcLibBitfieldReverse_Func_3_hati4,
-        gcLibBitfieldReverse_Func_4_hati4,
-        gcLibBitfieldReverse_Func_5_hati4,
-        gcLibBitfieldReverse_Func_6_hati4,
-        gcLibBitfieldReverse_Func_7_hati4,
-        gcLibBitfieldReverse_Func_8_hati4,
-
-        gcLibBitfieldExtract_Func_halti4,
-
-        gcLibBitfieldInsert_Func_halti4,
-
-        gcLibUaddCarry_Func_hati4,
-
-    };
-
-#define BUILTINLIB_MIX_IDX    0
-    /* the following builtin functions have same implementation in gc3000/5000 and gc7000 */
-    gctSTRING   BuiltinLib_Common[] =
-    {
-        gcLib_2instMixFunc, /* it can be replaced with 3 inst version for comformance */
-
-        gcLibMODF_Func,
-
-        /* common functions */
-        gcLibCommon_Func,
-        gcLibACOSH_Funcs,
-
-        gcLibLDEXP_Func,
-
-        gcLibFREXP_Func,
-
-        gcLibUsubBorrow_Func,
-
-        gcLibPack_Func,
-        gcLibUnpack_Func,
-
-        gcLibUmulExtended_Func,
-        gcLibImulExtended_Func,
-
-        gcLibFMA_Func_fmaSupported,
-
-        /* textureSize functions. */
-        gcLibTextureSize_Func_1,
-        gcLibTextureSize_Func_2,
-        gcLibTextureSize_Func_3,
-        gcLibTextureSize_Func_4,
-        gcLibTextureSize_Func_5,
-        gcLibTextureSize_Func_6,
-        gcLibTextureSize_Func_7,
-        gcLibTextureSize_Func_8,
-        gcLibTextureSize_Func_9,
-        gcLibTextureSize_Func_10,
-        gcLibTextureSize_Func_11,
-        gcLibTextureSize_Func_12,
-        gcLibTextureSize_Func_13,
-        gcLibTextureSize_Func_14,
-        gcLibTextureSize_Func_15,
-        gcLibTextureSize_Func_16,
-        gcLibTextureSize_Func_17,
-        gcLibTextureSize_Func_18,
-
-        gcLibTextureCommon_Func,
-        gcLibTextureGatherCommon_Func_1,
-    };
-
-    gctSTRING   BuiltinLib_Reflect[] =
-    {
-        gcLibREFLECT_Func_float,
-        gcLibREFLECT_Func_vec2,
-        gcLibREFLECT_Func_vec3,
-        gcLibREFLECT_Func_vec4,
-    };
-    gctSTRING   BuiltinLib_Reflect_fmaSupported[] =
-    {
-        gcLibREFLECT_Func_float_fmaSupported,
-        gcLibREFLECT_Func_vec2_fmaSupported,
-        gcLibREFLECT_Func_vec3_fmaSupported,
-        gcLibREFLECT_Func_vec4_fmaSupported,
-    };
-
-    /* advanced blend equation library */
-    /* blend equations have different implementation on gc3000/5000 and gc7000,
-    since on gc7000, hardware has some advanced blend equation support and
-    texld_u instruction. While, on gc3000/5000, there are no such support. */
-
-    /* gc3000/5000 implementation */
-    gctSTRING   BlendEquationLib_all[] =
-    {
-        gcLibBlendEquation_Multiply,
-        gcLibBlendEquation_Screen,
-        gcLibBlendEquation_Overlay,
-        gcLibBlendEquation_Darken,
-        gcLibBlendEquation_Lighten,
-        gcLibBlendEquation_Hardlight,
-        gcLibBlendEquation_Difference,
-        gcLibBlendEquation_Exclusion,
-
-        gcLibBlendEquation_Colordodge,
-        gcLibBlendEquation_Colorburn,
-        gcLibBlendEquation_Softlight,
-        gcLibBlendEquation_HSL_HUE,
-        gcLibBlendEquation_HSL_SATURATION,
-        gcLibBlendEquation_HSL_COLOR,
-        gcLibBlendEquation_HSL_LUMINOSITY,
-        gcLibBlendEquation_ALL,
-
-    };
-
-    /* gc7000 implementation */
-    gctSTRING   BlendEquationLib_part0[] =
-    {
-        gcLibBlendEquation_Colordodge_hati4,
-        gcLibBlendEquation_Colorburn_hati4,
-        gcLibBlendEquation_Softlight_hati4,
-        gcLibBlendEquation_HSL_HUE_hati4,
-        gcLibBlendEquation_HSL_SATURATION_hati4,
-        gcLibBlendEquation_HSL_COLOR_hati4,
-        gcLibBlendEquation_HSL_LUMINOSITY_hati4,
-        gcLibBlendEquation_ALL_hati4,
-
-    };
-
-    /* HW that can directly support textureGather. */
-    gctSTRING TextureGatherLib[] =
-    {
-        gcLibTextureGather_Func_1,
-        gcLibTextureGather_Func_2,
-        gcLibTextureGather_Func_3,
-        gcLibTextureGather_Func_4,
-        gcLibTextureGather_Func_5,
-        gcLibTextureGather_Func_6,
-        gcLibTextureGather_Func_7,
-        gcLibTextureGather_Func_8,
-        gcLibTextureGather_Func_9,
-        gcLibTextureGather_Func_10,
-        gcLibTextureGather_Func_11,
-        gcLibTextureGather_Func_12,
-        gcLibTextureGather_Func_13,
-        gcLibTextureGather_Func_14,
-        gcLibTextureGather_Func_15,
-        gcLibTextureGather_Func_16,
-        gcLibTextureGather_Func_17,
-        gcLibTextureGather_Func_18,
-        gcLibTextureGather_Func_19,
-        gcLibTextureGather_Func_20,
-        gcLibTextureGather_Func_21
-    };
-
-    /* HW that can't directly support textureGather. */
-    gctSTRING TextureGatherLib_2[] =
-    {
-        gcLibTextureGather_Func_2_0,
-        gcLibTextureGather_Func_2_1,
-        gcLibTextureGather_Func_2_2,
-        gcLibTextureGather_Func_2_3,
-        gcLibTextureGather_Func_2_4,
-        gcLibTextureGather_Func_2_5,
-        gcLibTextureGather_Func_2_6,
-        gcLibTextureGather_Func_2_7,
-        gcLibTextureGather_Func_2_8,
-        gcLibTextureGather_Func_2_9,
-        gcLibTextureGather_Func_2_10,
-        gcLibTextureGather_Func_2_11,
-        gcLibTextureGather_Func_2_12,
-        gcLibTextureGather_Func_2_13,
-        gcLibTextureGather_Func_2_14,
-        gcLibTextureGather_Func_2_15,
-        gcLibTextureGather_Func_2_16,
-        gcLibTextureGather_Func_2_17,
-        gcLibTextureGather_Func_2_18,
-        gcLibTextureGather_Func_2_19,
-        gcLibTextureGather_Func_2_20,
-        gcLibTextureGather_Func_2_21
-    };
-
-    gctSTRING TextureGatherOffsetLib[] =
-    {
-        gcLibTextureGatherOffset_Func_1,
-        gcLibTextureGatherOffset_Func_2,
-        gcLibTextureGatherOffset_Func_3,
-        gcLibTextureGatherOffset_Func_4,
-        gcLibTextureGatherOffset_Func_5,
-        gcLibTextureGatherOffset_Func_6,
-        gcLibTextureGatherOffset_Func_7,
-        gcLibTextureGatherOffset_Func_8,
-        gcLibTextureGatherOffset_Func_9,
-        gcLibTextureGatherOffset_Func_10,
-        gcLibTextureGatherOffset_Func_11,
-        gcLibTextureGatherOffset_Func_12,
-        gcLibTextureGatherOffset_Func_13,
-        gcLibTextureGatherOffset_Func_14
-    };
-
-    gctSTRING TextureGatherOffsetsLib[] =
-    {
-        gcLibTextureGatherOffsets_Func_1,
-        gcLibTextureGatherOffsets_Func_2,
-        gcLibTextureGatherOffsets_Func_3,
-        gcLibTextureGatherOffsets_Func_4,
-        gcLibTextureGatherOffsets_Func_5,
-        gcLibTextureGatherOffsets_Func_6,
-        gcLibTextureGatherOffsets_Func_7,
-        gcLibTextureGatherOffsets_Func_8,
-        gcLibTextureGatherOffsets_Func_9,
-        gcLibTextureGatherOffsets_Func_10,
-        gcLibTextureGatherOffsets_Func_11,
-        gcLibTextureGatherOffsets_Func_12,
-        gcLibTextureGatherOffsets_Func_13,
-        gcLibTextureGatherOffsets_Func_14
-    };
-
-    gctSTRING TexelFetchForMSAALib[] =
-    {
-        gcLibTexelFetchForMSAA_Func_1,
-        gcLibTexelFetchForMSAA_Func_2,
-        gcLibTexelFetchForMSAA_Func_3,
-    };
-
-    gctSTRING TexelFetchForMSAALib_2[] =
-    {
-        gcLibTexelFetchForMSAA_Func_2_1,
-        gcLibTexelFetchForMSAA_Func_2_2,
-        gcLibTexelFetchForMSAA_Func_2_3,
-    };
-
-    gctSTRING TexMS2DArrayLib[] =
-    {
-        gcLibTextureSize_Func_19,
-        gcLibTextureSize_Func_20,
-        gcLibTextureSize_Func_21,
-        gcLibTexelFetchForMSAA_Func_4,
-        gcLibTexelFetchForMSAA_Func_5,
-        gcLibTexelFetchForMSAA_Func_6
-    };
-
-    gctSTRING TexMS2DArrayLib_2[] =
-    {
-        gcLibTextureSize_Func_19,
-        gcLibTextureSize_Func_20,
-        gcLibTextureSize_Func_21,
-        gcLibTexelFetchForMSAA_Func_2_4,
-        gcLibTexelFetchForMSAA_Func_2_5,
-        gcLibTexelFetchForMSAA_Func_2_6
-    };
-
-    gctSTRING ImageLib_common[] =
-    {
-        gcLibImageSize,
-        gcLibImageSize_2D_float,
-        gcLibImageSize_3D_float,
-        gcLibImageSize_CUBE_float,
-        gcLibImageSize_2DArray_float,
-        gcLibImageSize_2D_int,
-        gcLibImageSize_3D_int,
-        gcLibImageSize_CUBE_int,
-        gcLibImageSize_2DArray_int,
-        gcLibImageSize_2D_uint,
-        gcLibImageSize_3D_uint,
-        gcLibImageSize_CUBE_uint,
-        gcLibImageSize_2DArray_uint,
-    };
-
-    /* image_load, image_store gc3000/5000 implementation */
-    gctSTRING ImageLib[] =
-    {
-        /* gcLibImageAddr must be the first element. */
-        gcLibImageAddr,
-        gcLibImageSwizzle,
-        gcLibImageStoreSwizzle,
-
-        gcLibImageLoad_2D_int, /* 16i */
-        gcLibImageLoad_2D_int_rgba32i,
-        gcLibImageLoad_2D_int_rgba8i,
-        gcLibImageLoad_2D_int_r32i,
-        gcLibImageLoad_2D_uint, /* 16ui */
-        gcLibImageLoad_2D_uint_rgba32ui,
-        gcLibImageLoad_2D_uint_rgba8ui,
-        gcLibImageLoad_2D_uint_r32ui,
-        gcLibImageLoad_2D_float, /* 16f */
-        gcLibImageLoad_2D_float_rgba8,
-        gcLibImageLoad_2D_float_rgba8_snorm,
-        gcLibImageLoad_2D_float_rgba32f,
-        gcLibImageLoad_2D_float_r32f,
-
-        gcLibImageLoad_3Dcommon,
-        gcLibImageLoad_3D,
-        gcLibImageLoad_cube,
-        gcLibImageLoad_2DArray,
-
-        gcLibImageStore_2D_float, /* 16f */
-        gcLibImageStore_2D_float_rgba32f,
-        gcLibImageStore_2D_float_r32f,
-        gcLibImageStore_2D_float_rgba8,
-        gcLibImageStore_2D_float_rgba8_snorm,
-        gcLibImageStore_2D_int, /* 16i */
-        gcLibImageStore_2D_int_rgba32i,
-        gcLibImageStore_2D_int_r32i,
-        gcLibImageStore_2D_int_rgba8i,
-        gcLibImageStore_2D_uint, /* 16ui */
-        gcLibImageStore_2D_uint_rgba32ui,
-        gcLibImageStore_2D_uint_r32ui,
-        gcLibImageStore_2D_uint_rgba8ui,
-
-        gcLibImageStore_3Dcommon,
-        gcLibImageStore_3D,
-        gcLibImageStore_cube,
-        gcLibImageStore_2DArray,
-
-        gcLibImageAtomicAdd_2D_int,
-        gcLibImageAtomicAdd_2D_uint,
-        gcLibImageAtomicAdd_3D_int,
-        gcLibImageAtomicAdd_3D_uint,
-        gcLibImageAtomicAdd_CUBE_int,
-        gcLibImageAtomicAdd_CUBE_uint,
-        gcLibImageAtomicAdd_2DARRAY_int,
-        gcLibImageAtomicAdd_2DARRAY_uint,
-        gcLibImageAtomicMin_2D_int,
-        gcLibImageAtomicMin_2D_uint,
-        gcLibImageAtomicMin_3D_int,
-        gcLibImageAtomicMin_3D_uint,
-        gcLibImageAtomicMin_CUBE_int,
-        gcLibImageAtomicMin_CUBE_uint,
-        gcLibImageAtomicMin_2DARRAY_int,
-        gcLibImageAtomicMin_2DARRAY_uint,
-        gcLibImageAtomicMax_2D_int,
-        gcLibImageAtomicMax_2D_uint,
-        gcLibImageAtomicMax_3D_int,
-        gcLibImageAtomicMax_3D_uint,
-        gcLibImageAtomicMax_CUBE_int,
-        gcLibImageAtomicMax_CUBE_uint,
-        gcLibImageAtomicMax_2DARRAY_int,
-        gcLibImageAtomicMax_2DARRAY_uint,
-        gcLibImageAtomicAnd_2D_int,
-        gcLibImageAtomicAnd_2D_uint,
-        gcLibImageAtomicAnd_3D_int,
-        gcLibImageAtomicAnd_3D_uint,
-        gcLibImageAtomicAnd_CUBE_int,
-        gcLibImageAtomicAnd_CUBE_uint,
-        gcLibImageAtomicAnd_2DARRAY_int,
-        gcLibImageAtomicAnd_2DARRAY_uint,
-        gcLibImageAtomicOr_2D_int,
-        gcLibImageAtomicOr_2D_uint,
-        gcLibImageAtomicOr_3D_int,
-        gcLibImageAtomicOr_3D_uint,
-        gcLibImageAtomicOr_CUBE_int,
-        gcLibImageAtomicOr_CUBE_uint,
-        gcLibImageAtomicOr_2DARRAY_int,
-        gcLibImageAtomicOr_2DARRAY_uint,
-        gcLibImageAtomicXor_2D_int,
-        gcLibImageAtomicXor_2D_uint,
-        gcLibImageAtomicXor_3D_int,
-        gcLibImageAtomicXor_3D_uint,
-        gcLibImageAtomicXor_CUBE_int,
-        gcLibImageAtomicXor_CUBE_uint,
-        gcLibImageAtomicXor_2DARRAY_int,
-        gcLibImageAtomicXor_2DARRAY_uint,
-        gcLibImageAtomicXchg_2D_int,
-        gcLibImageAtomicXchg_2D_uint,
-        gcLibImageAtomicXchg_2D_float,
-        gcLibImageAtomicXchg_3D_int,
-        gcLibImageAtomicXchg_3D_uint,
-        gcLibImageAtomicXchg_3D_float,
-        gcLibImageAtomicXchg_CUBE_int,
-        gcLibImageAtomicXchg_CUBE_uint,
-        gcLibImageAtomicXchg_CUBE_float,
-        gcLibImageAtomicXchg_2DARRAY_int,
-        gcLibImageAtomicXchg_2DARRAY_uint,
-        gcLibImageAtomicXchg_2DARRAY_float,
-        gcLibImageAtomicCmpXchg_2D_int,
-        gcLibImageAtomicCmpXchg_2D_uint,
-        gcLibImageAtomicCmpXchg_3D_int,
-        gcLibImageAtomicCmpXchg_3D_uint,
-        gcLibImageAtomicCmpXchg_CUBE_int,
-        gcLibImageAtomicCmpXchg_CUBE_uint,
-        gcLibImageAtomicCmpXchg_2DARRAY_int,
-        gcLibImageAtomicCmpXchg_2DARRAY_uint,
-    };
-
-    /* image_load, image_store gc7000 implementation */
-    gctSTRING ImageLib_hati4[] =
-    {
-        gcLibImageLoad_2D_float_hati4,
-        gcLibImageLoad_2D_float_1_hati4,
-        gcLibImageLoad_2D_int_hati4,
-        gcLibImageLoad_2D_int_1_hati4,
-        gcLibImageLoad_2D_uint_hati4,
-        gcLibImageLoad_2D_uint_1_hati4,
-
-        gcLibImageLoad_3D_float_hati4,
-        gcLibImageLoad_3D_float_1_hati4,
-        gcLibImageLoad_3D_int_hati4,
-        gcLibImageLoad_3D_int_1_hati4,
-        gcLibImageLoad_3D_uint_hati4,
-        gcLibImageLoad_3D_uint_1_hati4,
-
-        gcLibImageLoad_cube_float_hati4,
-        gcLibImageLoad_cube_float_1_hati4,
-        gcLibImageLoad_cube_int_hati4,
-        gcLibImageLoad_cube_int_1_hati4,
-        gcLibImageLoad_cube_uint_hati4,
-        gcLibImageLoad_cube_uint_1_hati4,
-
-        gcLibImageLoad_2DArray_float_hati4,
-        gcLibImageLoad_2DArray_float_1_hati4,
-        gcLibImageLoad_2DArray_int_hati4,
-        gcLibImageLoad_2DArray_int_1_hati4,
-        gcLibImageLoad_2DArray_uint_hati4,
-        gcLibImageLoad_2DArray_uint_1_hati4,
-
-        gcLibImageStore_2D_float_hati4,
-        gcLibImageStore_2D_float_1_hati4,
-        gcLibImageStore_2D_int_hati4,
-        gcLibImageStore_2D_int_1_hati4,
-        gcLibImageStore_2D_uint_hati4,
-        gcLibImageStore_2D_uint_1_hati4,
-
-        gcLibImageStore_3D_float_hati4,
-        gcLibImageStore_3D_float_1_hati4,
-        gcLibImageStore_3D_int_hati4,
-        gcLibImageStore_3D_int_1_hati4,
-        gcLibImageStore_3D_uint_hati4,
-        gcLibImageStore_3D_uint_1_hati4,
-
-        gcLibImageStore_cube_float_hati4,
-        gcLibImageStore_cube_float_1_hati4,
-        gcLibImageStore_cube_int_hati4,
-        gcLibImageStore_cube_int_1_hati4,
-        gcLibImageStore_cube_uint_hati4,
-        gcLibImageStore_cube_uint_1_hati4,
-
-        gcLibImageStore_2DArray_float_hati4,
-        gcLibImageStore_2DArray_float_1_hati4,
-        gcLibImageStore_2DArray_int_hati4,
-        gcLibImageStore_2DArray_int_1_hati4,
-        gcLibImageStore_2DArray_uint_hati4,
-        gcLibImageStore_2DArray_uint_1_hati4,
-
-        gcLibImageAtomicAdd_2D_int_hati4,
-        gcLibImageAtomicAdd_2D_uint_hati4,
-        gcLibImageAtomicAdd_3D_int_hati4,
-        gcLibImageAtomicAdd_3D_uint_hati4,
-        gcLibImageAtomicAdd_CUBE_int_hati4,
-        gcLibImageAtomicAdd_CUBE_uint_hati4,
-        gcLibImageAtomicAdd_2DARRAY_int_hati4,
-        gcLibImageAtomicAdd_2DARRAY_uint_hati4,
-        gcLibImageAtomicMin_2D_int_hati4,
-        gcLibImageAtomicMin_2D_uint_hati4,
-        gcLibImageAtomicMin_3D_int_hati4,
-        gcLibImageAtomicMin_3D_uint_hati4,
-        gcLibImageAtomicMin_CUBE_int_hati4,
-        gcLibImageAtomicMin_CUBE_uint_hati4,
-        gcLibImageAtomicMin_2DARRAY_int_hati4,
-        gcLibImageAtomicMin_2DARRAY_uint_hati4,
-        gcLibImageAtomicMax_2D_int_hati4,
-        gcLibImageAtomicMax_2D_uint_hati4,
-        gcLibImageAtomicMax_3D_int_hati4,
-        gcLibImageAtomicMax_3D_uint_hati4,
-        gcLibImageAtomicMax_CUBE_int_hati4,
-        gcLibImageAtomicMax_CUBE_uint_hati4,
-        gcLibImageAtomicMax_2DARRAY_int_hati4,
-        gcLibImageAtomicMax_2DARRAY_uint_hati4,
-        gcLibImageAtomicAnd_2D_int_hati4,
-        gcLibImageAtomicAnd_2D_uint_hati4,
-        gcLibImageAtomicAnd_3D_int_hati4,
-        gcLibImageAtomicAnd_3D_uint_hati4,
-        gcLibImageAtomicAnd_CUBE_int_hati4,
-        gcLibImageAtomicAnd_CUBE_uint_hati4,
-        gcLibImageAtomicAnd_2DARRAY_int_hati4,
-        gcLibImageAtomicAnd_2DARRAY_uint_hati4,
-        gcLibImageAtomicOr_2D_int_hati4,
-        gcLibImageAtomicOr_2D_uint_hati4,
-        gcLibImageAtomicOr_3D_int_hati4,
-        gcLibImageAtomicOr_3D_uint_hati4,
-        gcLibImageAtomicOr_CUBE_int_hati4,
-        gcLibImageAtomicOr_CUBE_uint_hati4,
-        gcLibImageAtomicOr_2DARRAY_int_hati4,
-        gcLibImageAtomicOr_2DARRAY_uint_hati4,
-        gcLibImageAtomicXor_2D_int_hati4,
-        gcLibImageAtomicXor_2D_uint_hati4,
-        gcLibImageAtomicXor_3D_int_hati4,
-        gcLibImageAtomicXor_3D_uint_hati4,
-        gcLibImageAtomicXor_CUBE_int_hati4,
-        gcLibImageAtomicXor_CUBE_uint_hati4,
-        gcLibImageAtomicXor_2DARRAY_int_hati4,
-        gcLibImageAtomicXor_2DARRAY_uint_hati4,
-        gcLibImageAtomicXchg_2D_int_hati4,
-        gcLibImageAtomicXchg_2D_uint_hati4,
-        gcLibImageAtomicXchg_2D_float_hati4,
-        gcLibImageAtomicXchg_3D_int_hati4,
-        gcLibImageAtomicXchg_3D_uint_hati4,
-        gcLibImageAtomicXchg_3D_float_hati4,
-        gcLibImageAtomicXchg_CUBE_int_hati4,
-        gcLibImageAtomicXchg_CUBE_uint_hati4,
-        gcLibImageAtomicXchg_CUBE_float_hati4,
-        gcLibImageAtomicXchg_2DARRAY_int_hati4,
-        gcLibImageAtomicXchg_2DARRAY_uint_hati4,
-        gcLibImageAtomicXchg_2DARRAY_float_hati4,
-        gcLibImageAtomicCmpXchg_2D_int_hati4,
-        gcLibImageAtomicCmpXchg_2D_uint_hati4,
-        gcLibImageAtomicCmpXchg_3D_int_hati4,
-        gcLibImageAtomicCmpXchg_3D_uint_hati4,
-        gcLibImageAtomicCmpXchg_CUBE_int_hati4,
-        gcLibImageAtomicCmpXchg_CUBE_uint_hati4,
-        gcLibImageAtomicCmpXchg_2DARRAY_int_hati4,
-        gcLibImageAtomicCmpXchg_2DARRAY_uint_hati4,
-    };
-
-    /*--------------------extension built-in support--------------------*/
-    /* texture buffer related built-in functions. */
-    gctSTRING TextureBuffer_general[] =
-    {
-        gcLibTextureSize_Func_26,
-        gcLibTextureSize_Func_27,
-        gcLibTextureSize_Func_28,
-        gcLibImageSize_Buffer_float,
-        gcLibImageSize_Buffer_int,
-        gcLibImageSize_Buffer_uint,
-    };
-
-    gctSTRING TextureBuffer[] =
-    {
-        /* imageLoad/imageStore.*/
-        gcLibImageLoad_Buffer_int, /* 16i */
-        gcLibImageLoad_Buffer_int_rgba32i,
-        gcLibImageLoad_Buffer_int_rgba8i,
-        gcLibImageLoad_Buffer_int_r32i,
-        gcLibImageLoad_Buffer_uint, /* 16ui */
-        gcLibImageLoad_Buffer_uint_rgba32ui,
-        gcLibImageLoad_Buffer_uint_rgba8ui,
-        gcLibImageLoad_Buffer_uint_r32ui,
-        gcLibImageLoad_Buffer_float, /* 16f */
-        gcLibImageLoad_Buffer_float_rgba8,
-        gcLibImageLoad_Buffer_float_rgba8_snorm,
-        gcLibImageLoad_Buffer_float_rgba32f,
-        gcLibImageLoad_Buffer_float_r32f,
-        gcLibImageStore_Buffer_float, /* 16f */
-        gcLibImageStore_Buffer_float_rgba32f,
-        gcLibImageStore_Buffer_float_r32f,
-        gcLibImageStore_Buffer_float_rgba8,
-        gcLibImageStore_Buffer_float_rgba8_snorm,
-        gcLibImageStore_Buffer_int, /* 16i */
-        gcLibImageStore_Buffer_int_rgba32i,
-        gcLibImageStore_Buffer_int_r32i,
-        gcLibImageStore_Buffer_int_rgba8i,
-        gcLibImageStore_Buffer_uint, /* 16ui */
-        gcLibImageStore_Buffer_uint_rgba32ui,
-        gcLibImageStore_Buffer_uint_r32ui,
-        gcLibImageStore_Buffer_uint_rgba8ui,
-
-        /* imageAtomicXXX. */
-        gcLibImageAtomicAdd_buffer_int,
-        gcLibImageAtomicAdd_buffer_uint,
-
-        gcLibImageAtomicMin_buffer_int,
-        gcLibImageAtomicMin_buffer_uint,
-
-        gcLibImageAtomicMax_buffer_int,
-        gcLibImageAtomicMax_buffer_uint,
-
-        gcLibImageAtomicAnd_buffer_int,
-        gcLibImageAtomicAnd_buffer_uint,
-
-        gcLibImageAtomicOr_buffer_int,
-        gcLibImageAtomicOr_buffer_uint,
-
-        gcLibImageAtomicXor_buffer_int,
-        gcLibImageAtomicXor_buffer_uint,
-
-        gcLibImageAtomicXchg_buffer_int,
-        gcLibImageAtomicXchg_buffer_uint,
-        gcLibImageAtomicXchg_buffer_float,
-
-        gcLibImageAtomicCmpXchg_buffer_int,
-        gcLibImageAtomicCmpXchg_buffer_uint,
-    };
-
-    gctSTRING TextureBuffer_support_img_access[] =
-    {
-        /* imageLoad/imageStore.*/
-        gcLibImageLoad_Buffer_float_img_access,
-        gcLibImageLoad_Buffer_int_img_access,
-        gcLibImageLoad_Buffer_uint_img_access,
-        gcLibImageStore_Buffer_float_img_access,
-        gcLibImageStore_Buffer_int_img_access,
-        gcLibImageStore_Buffer_uint_img_access,
-
-        /* imageAtomicXXX. */
-        gcLibImageAtomicAdd_buffer_int_img_access,
-        gcLibImageAtomicAdd_buffer_uint_img_access,
-
-        gcLibImageAtomicMin_buffer_int_img_access,
-        gcLibImageAtomicMin_buffer_uint_img_access,
-
-        gcLibImageAtomicMax_buffer_int_img_access,
-        gcLibImageAtomicMax_buffer_uint_img_access,
-
-        gcLibImageAtomicAnd_buffer_int_img_access,
-        gcLibImageAtomicAnd_buffer_uint_img_access,
-
-        gcLibImageAtomicOr_buffer_int_img_access,
-        gcLibImageAtomicOr_buffer_uint_img_access,
-
-        gcLibImageAtomicXor_buffer_int_img_access,
-        gcLibImageAtomicXor_buffer_uint_img_access,
-
-        gcLibImageAtomicXchg_buffer_int_img_access,
-        gcLibImageAtomicXchg_buffer_uint_img_access,
-        gcLibImageAtomicXchg_buffer_float_img_access,
-
-        gcLibImageAtomicCmpXchg_buffer_int_img_access,
-        gcLibImageAtomicCmpXchg_buffer_uint_img_access,
-    };
-
-    /* cubeMap related built-in functions. */
-    gctSTRING ImageLib_cubeMapArray_general[] =
-    {
-        gcLibTextureSize_Func_22,
-        gcLibTextureSize_Func_23,
-        gcLibTextureSize_Func_24,
-        gcLibTextureSize_Func_25,
-
-        gcLibImageSize_CubeArray_float,
-        gcLibImageSize_CubeArray_int,
-        gcLibImageSize_CubeArray_uint,
-    };
-
-    gctSTRING ImageLib_cubeMapArray[] =
-    {
-        gcLibImageLoad_CubeArray,
-        gcLibImageStore_CubeArray,
-    };
-
-    gctSTRING ImageLib_cubeMapArray_img_access[] =
-    {
-        gcLibImageLoad_CubeArray_float_img_access,
-        gcLibImageLoad_CubeArray_float_1_img_access,
-        gcLibImageLoad_CubeArray_int_img_access,
-        gcLibImageLoad_CubeArray_int_1_img_access,
-        gcLibImageLoad_CubeArray_uint_img_access,
-        gcLibImageLoad_CubeArray_uint_1_img_access,
-
-        gcLibImageStore_CubeArray_float_img_access,
-        gcLibImageStore_CubeArray_float_1_img_access,
-        gcLibImageStore_CubeArray_int_img_access,
-        gcLibImageStore_CubeArray_int_1_img_access,
-        gcLibImageStore_CubeArray_uint_img_access,
-        gcLibImageStore_CubeArray_uint_1_img_access,
-    };
-
-    gctSTRING TextureGatherLib_cubeMapArray_halti4[] =
-    {
-        gcLibTextureGather_Func_22,
-        gcLibTextureGather_Func_23,
-        gcLibTextureGather_Func_24,
-        gcLibTextureGather_Func_25,
-        gcLibTextureGather_Func_26,
-        gcLibTextureGather_Func_27,
-        gcLibTextureGather_Func_28,
-    };
-
-    /* MS shading related built-in functions. */
-    gctSTRING MSShadingLib[] =
-    {
-        gcLibInterpolateCommon,
-        gcLibInterpolateAtCentroid_float,
-        gcLibInterpolateAtCentroid_vec2,
-        gcLibInterpolateAtCentroid_vec3,
-        gcLibInterpolateAtCentroid_vec4,
-
-        gcLibInterpolateAtSample_float,
-        gcLibInterpolateAtSample_vec2,
-        gcLibInterpolateAtSample_vec3,
-        gcLibInterpolateAtSample_vec4,
-
-        gcLibInterpolateAtOffset_float,
-        gcLibInterpolateAtOffset_vec2,
-        gcLibInterpolateAtOffset_vec3,
-        gcLibInterpolateAtOffset_vec4,
-    };
-
-    if (isSupportImgAddr && !isSupportImgInst &&
-        (GetShaderType(Shader) == gcSHADER_TYPE_COMPUTE || GetShaderType(Shader) == gcSHADER_TYPE_CL))
-    {
-        isSupportImgInst = gcvTRUE;
-    }
-
-    if (isSupportImgAddr && !isSupportImgInst)
-    {
-        ImageLib[0] = gcLibImageAddr_halti4;
-    }
-
-    gcmASSERT((LibType == gcLIB_BUILTIN && GetShaderHasIntrinsicBuiltin(Shader)) ||
-        (LibType == gcLIB_BLEND_EQUATION &&
-        gceLAYOUT_QUALIFIER_HasHWNotSupportingBlendMode(GetShaderOutputBlends(Shader))));
-
-    if (gcGLSLCompiler == gcvNULL)
-    {
-        return gcvSTATUS_LINK_LIB_ERROR;
-    }
-    /*
-    if (LibType == gcLIB_BUILTIN)
-    {
-    if (isSupportImgInst)
-    {
-    if (gcBuiltinLibrary1 != gcvNULL)
-    {
-    *Binary = gcBuiltinLibrary1;
-    return gcvSTATUS_OK;
-    }
-    }
-    else
-    {
-    if (gcBuiltinLibrary0 != gcvNULL)
-    {
-    *Binary = gcBuiltinLibrary0;
-    return gcvSTATUS_OK;
-    }
-    }
-    }
-    else if (LibType == gcLIB_BLEND_EQUATION)
-    {
-    if (gcBlendEquationLibrary != gcvNULL)
-    {
-    * Binary = gcBlendEquationLibrary;
-    return gcvSTATUS_OK;
-    }
-    }*/
-
-    gcmONERROR(gcoOS_Allocate(gcvNULL, __BUILTIN_SHADER_LENGTH__, &pointer));
-    *sloBuiltinSource = pointer;
-
-    /* add the extension source */
-    {
-        length = gcoOS_StrLen(gcLibFunc_Extension, gcvNULL);
-        gcoOS_StrCopySafe(*sloBuiltinSource, length + 1, gcLibFunc_Extension);
-    }
-
-    /* add the extension source */
-    if (isSupportTexMSAA2DArray)
-    {
-        gcoOS_StrCatSafe(*sloBuiltinSource, __BUILTIN_SHADER_LENGTH__, gcLibFunc_Extension_For_TexMS2DArray);
-    }
-
-    if (isSupportCubeMapArray)
-    {
-        gcoOS_StrCatSafe(*sloBuiltinSource, __BUILTIN_SHADER_LENGTH__, gcLibFunc_Extension_For_CubeMapArray);
-    }
-
-    if (isSupportTextureBuffer)
-    {
-        gcoOS_StrCatSafe(*sloBuiltinSource, __BUILTIN_SHADER_LENGTH__, gcLibFunc_Extension_For_TextureBuffer);
-    }
-
-    if (isSupportMSShading)
-    {
-        gcoOS_StrCatSafe(*sloBuiltinSource, __BUILTIN_SHADER_LENGTH__, gcLibFunc_Extension_For_MSShading);
-    }
-
-    if (LibType == gcLIB_BUILTIN)
-    {
-        /* add the header source */
-        gcoOS_StrCatSafe(*sloBuiltinSource, __BUILTIN_SHADER_LENGTH__, gcLibFunc_TextureBufferSize_For_OES);
-        gcoOS_StrCatSafe(*sloBuiltinSource, __BUILTIN_SHADER_LENGTH__, gcLibFunc_BuiltinHeader);
-
-        if (isHalti4)
-        {
-            /* add the intrinsic builtin function source in gc7000*/
-            stringNum = sizeof(BuiltinLib_hati4) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, BuiltinLib_hati4[i]);
-            }
-        }
-        else
-        {
-            /* add the intrinsic builtin function source in gc3000/5000*/
-            stringNum = sizeof(BuiltinLib) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, BuiltinLib[i]);
-            }
-        }
-
-        if (fmaSupported && isHalti5)
-        {
-            gcoOS_StrCatSafe(*sloBuiltinSource,
-                __BUILTIN_SHADER_LENGTH__, gcLibASIN_ACOS_Funcs_halti5_fmaSupported);
-            gcoOS_StrCatSafe(*sloBuiltinSource,
-                __BUILTIN_SHADER_LENGTH__, gcLibATAN_Funcs_halti5_fmaSupported);
-            gcoOS_StrCatSafe(*sloBuiltinSource,
-                __BUILTIN_SHADER_LENGTH__, gcLibATAN2_Funcs_halti5_fmaSupported);
-        }
-        else if (isHalti5)
-        {
-            gcoOS_StrCatSafe(*sloBuiltinSource,
-                __BUILTIN_SHADER_LENGTH__, gcLibASIN_ACOS_Funcs_halti5);
-            gcoOS_StrCatSafe(*sloBuiltinSource,
-                __BUILTIN_SHADER_LENGTH__, gcLibATAN_Funcs_halti5);
-            gcoOS_StrCatSafe(*sloBuiltinSource,
-                __BUILTIN_SHADER_LENGTH__, gcLibATAN2_Funcs_halti5);
-        }
-        else if (isHalti2 && isAppConformance(patchId))
-        {
-            gcoOS_StrCatSafe(*sloBuiltinSource,
-                __BUILTIN_SHADER_LENGTH__, gcLibASIN_ACOS_Funcs_halti2);
-            gcoOS_StrCatSafe(*sloBuiltinSource,
-                __BUILTIN_SHADER_LENGTH__, gcLibATAN_Funcs_halti2);
-            gcoOS_StrCatSafe(*sloBuiltinSource,
-                __BUILTIN_SHADER_LENGTH__, gcLibATAN2_Funcs_halti2);
-        }
-        else
-        {
-            gcoOS_StrCatSafe(*sloBuiltinSource,
-                __BUILTIN_SHADER_LENGTH__, gcLibASIN_ACOS_Funcs_Common);
-            if (isHalti0)
-            {
-                gcoOS_StrCatSafe(*sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, gcLibASIN_Funcs_halti0);
-            }
-            else
-            {
-                gcoOS_StrCatSafe(*sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, gcLibASIN_Funcs);
-            }
-            gcoOS_StrCatSafe(*sloBuiltinSource,
-                __BUILTIN_SHADER_LENGTH__, gcLibACOS_Funcs);
-            gcoOS_StrCatSafe(*sloBuiltinSource,
-                __BUILTIN_SHADER_LENGTH__, gcLibATAN_Funcs);
-            gcoOS_StrCatSafe(*sloBuiltinSource,
-                __BUILTIN_SHADER_LENGTH__, gcLibATAN2_Funcs);
-        }
-
-        /* Add tan functions. */
-        gcoOS_StrCatSafe(*sloBuiltinSource,
-            __BUILTIN_SHADER_LENGTH__, gcLibTAN_Funcs_Halti);
-
-        /* add common intrinsic builtin function source */
-        gcmASSERT(BuiltinLib_Common[BUILTINLIB_MIX_IDX] == gcLib_2instMixFunc);
-        if (isAppConformance(patchId))
-        {
-            BuiltinLib_Common[BUILTINLIB_MIX_IDX] = gcLib_3instMixFunc;
-        }
-        stringNum = sizeof(BuiltinLib_Common) / sizeof(gctSTRING);
-        for (i = 0; i < stringNum; i++)
-        {
-            gcoOS_StrCatSafe(*sloBuiltinSource,
-                __BUILTIN_SHADER_LENGTH__, BuiltinLib_Common[i]);
-        }
-
-        if (fmaSupported)
-        {
-            stringNum = sizeof(BuiltinLib_Reflect_fmaSupported) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, BuiltinLib_Reflect_fmaSupported[i]);
-            }
-        }
-        else
-        {
-            stringNum = sizeof(BuiltinLib_Reflect) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, BuiltinLib_Reflect[i]);
-            }
-        }
-
-        if (isSupportTextureGather)
-        {
-            stringNum = sizeof(TextureGatherLib) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, TextureGatherLib[i]);
-            }
-        }
-        else
-        {
-            stringNum = sizeof(TextureGatherLib_2) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, TextureGatherLib_2[i]);
-            }
-        }
-
-        /* add textureGatherOffset functions. */
-        stringNum = sizeof(TextureGatherOffsetLib) / sizeof(gctSTRING);
-        for (i = 0; i < stringNum; i++)
-        {
-            gcoOS_StrCatSafe(*sloBuiltinSource,
-                __BUILTIN_SHADER_LENGTH__, TextureGatherOffsetLib[i]);
-        }
-
-        /* add textureGatherOffsets functions. */
-        stringNum = sizeof(TextureGatherOffsetsLib) / sizeof(gctSTRING);
-        for (i = 0; i < stringNum; i++)
-        {
-            gcoOS_StrCatSafe(*sloBuiltinSource,
-                __BUILTIN_SHADER_LENGTH__, TextureGatherOffsetsLib[i]);
-        }
-
-        stringNum = sizeof(ImageLib_common) / sizeof(gctSTRING);
-        for (i = 0; i < stringNum; i++)
-        {
-            gcoOS_StrCatSafe(*sloBuiltinSource,
-                __BUILTIN_SHADER_LENGTH__, ImageLib_common[i]);
-        }
-        /* hati4 support image instruction */
-        if (isSupportImgInst)
-        {
-            stringNum = sizeof(ImageLib_hati4) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, ImageLib_hati4[i]);
-            }
-        }
-        else
-        {
-            stringNum = sizeof(ImageLib) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, ImageLib[i]);
-            }
-        }
-
-        /* texelFetch for MSAA. */
-        if (isSupportTexelFetchForMSAA)
-        {
-            stringNum = sizeof(TexelFetchForMSAALib) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, TexelFetchForMSAALib[i]);
-            }
-        }
-        else
-        {
-            stringNum = sizeof(TexelFetchForMSAALib_2) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, TexelFetchForMSAALib_2[i]);
-            }
-        }
-
-        /* MSAA Tex 2D Array */
-        if (isSupportTexMSAA2DArray)
-        {
-            if (isSupportTexelFetchForMSAA)
-            {
-                stringNum = sizeof(TexMS2DArrayLib) / sizeof(gctSTRING);
-                for (i = 0; i < stringNum; i++)
-                {
-                    gcoOS_StrCatSafe(*sloBuiltinSource, __BUILTIN_SHADER_LENGTH__, TexMS2DArrayLib[i]);
-                }
-            }
-            else
-            {
-                stringNum = sizeof(TexMS2DArrayLib_2) / sizeof(gctSTRING);
-                for (i = 0; i < stringNum; i++)
-                {
-                    gcoOS_StrCatSafe(*sloBuiltinSource, __BUILTIN_SHADER_LENGTH__, TexMS2DArrayLib_2[i]);
-                }
-            }
-        }
-
-        if (isSupportCubeMapArray)
-        {
-            stringNum = sizeof(ImageLib_cubeMapArray_general) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, ImageLib_cubeMapArray_general[i]);
-            }
-
-            stringNum = sizeof(TextureGatherLib_cubeMapArray_halti4) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, TextureGatherLib_cubeMapArray_halti4[i]);
-            }
-
-            if (isSupportImgInst)
-            {
-                stringNum = sizeof(ImageLib_cubeMapArray_img_access) / sizeof(gctSTRING);
-                for (i = 0; i < stringNum; i++)
-                {
-                    gcoOS_StrCatSafe(*sloBuiltinSource,
-                        __BUILTIN_SHADER_LENGTH__, ImageLib_cubeMapArray_img_access[i]);
-                }
-            }
-            else
-            {
-                stringNum = sizeof(ImageLib_cubeMapArray) / sizeof(gctSTRING);
-                for (i = 0; i < stringNum; i++)
-                {
-                    gcoOS_StrCatSafe(*sloBuiltinSource,
-                        __BUILTIN_SHADER_LENGTH__, ImageLib_cubeMapArray[i]);
-                }
-            }
-        }
-
-        if (isSupportTextureBuffer)
-        {
-            stringNum = sizeof(TextureBuffer_general) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, TextureBuffer_general[i]);
-            }
-
-            if (isSupportImgInst)
-            {
-                stringNum = sizeof(TextureBuffer_support_img_access) / sizeof(gctSTRING);
-                for (i = 0; i < stringNum; i++)
-                {
-                    gcoOS_StrCatSafe(*sloBuiltinSource,
-                        __BUILTIN_SHADER_LENGTH__, TextureBuffer_support_img_access[i]);
-                }
-            }
-            else
-            {
-                stringNum = sizeof(TextureBuffer) / sizeof(gctSTRING);
-                for (i = 0; i < stringNum; i++)
-                {
-                    gcoOS_StrCatSafe(*sloBuiltinSource,
-                        __BUILTIN_SHADER_LENGTH__, TextureBuffer[i]);
-                }
-            }
-        }
-
-        if (isSupportMSShading)
-        {
-            stringNum = sizeof(MSShadingLib) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, MSShadingLib[i]);
-            }
-        }
-
-    }
-    else if (LibType == gcLIB_BLEND_EQUATION)
-    {
-        /* add the header source */
-        gcoOS_StrCatSafe(*sloBuiltinSource, __BUILTIN_SHADER_LENGTH__, gcLibFunc_BlendEquationHeader);
-
-        if (gcHWCaps.hwFeatureFlags.supportAdvBlendPart0)
-        {
-            /* add the blend equation source that are not supported by HW in gc7000 */
-            stringNum = sizeof(BlendEquationLib_part0) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, BlendEquationLib_part0[i]);
-            }
-        }
-        else
-        {
-            /* add the blend equation source that are not supported by HW in gc3000/5000*/
-            stringNum = sizeof(BlendEquationLib_all) / sizeof(gctSTRING);
-            for (i = 0; i < stringNum; i++)
-            {
-                gcoOS_StrCatSafe(*sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, BlendEquationLib_all[i]);
-            }
-        }
-    }
-
-OnError:
-    return status;
-}
-
-static gceSTATUS _ProcessExLockLibFile(gctFILE filp, gctUINT32 bufferSize)
-{
-    gceSTATUS status = gcvSTATUS_OK;
-
-    gcmVERIFY_ARGUMENT(filp != gcvNULL);
-
-#if defined(_WIN32)
-    {
-        OVERLAPPED olap= {0};
-#if !defined(UNDER_CE)
-        HANDLE h=(HANDLE)_get_osfhandle(_fileno((FILE *)filp));
-#elif defined(UNDER_CE)
-        HANDLE h=(HANDLE)(_fileno((FILE *)filp));
-#endif
-        /*status = LockFileEx(filp,LOCKFILE_EXCLUSIVE_LOCK|LOCKFILE_FAIL_IMMEDIATELY,0,bufferSize,0,&olap);*/
-        status = LockFileEx(h,LOCKFILE_EXCLUSIVE_LOCK|LOCKFILE_FAIL_IMMEDIATELY,0,bufferSize,0,&olap);
-        if (status == gcvSTATUS_FALSE)/*lockfile return val is nonzero(true) ,zero(false)*/
-        {
-            gctUINT error = GetLastError();/*21=error_not_ready*/
-            status = gcvSTATUS_LOCKED;
-            gcoOS_Print("_ProcessExLockLibFile: Failed to exlock libfile %d",error);
-        }
-        else
-        {
-            status=gcvSTATUS_OK;
-            if (0 && gcmOPT_DUMP_CODEGEN_VERBOSE())
-            {
-                gcoOS_Print("_ProcessExLockLibFile: Successfully exlock libfile ");
-            }
-        }
-    }
-#else
-    status =flock(fileno((FILE *)filp), LOCK_EX|LOCK_NB);/*__USE_POSIX*/
-    /*status =ftrylockfile(filp);*/
-    if (!gcmIS_SUCCESS(status))
-    {
-        gcoOS_Print("_ProcessExLockLibFile:Failed to exlock libfile ");
-    }
-#endif
-
-    return status;
-}
-
-static gceSTATUS _ProcessShLockLibFile(gctFILE filp, gctUINT32 bufferSize)
-{
-    gceSTATUS status = gcvSTATUS_OK;
-
-    gcmVERIFY_ARGUMENT(filp != gcvNULL);
-
-
-#if defined(_WIN32)
-    {
-        OVERLAPPED olap= {0};
-#if !defined(UNDER_CE)
-        HANDLE h=(HANDLE)_get_osfhandle(_fileno((FILE *)filp));
-#elif defined(UNDER_CE)
-        HANDLE h=(HANDLE)(_fileno((FILE *)filp));
-#endif
-        /*status = LockFileEx(filp,LOCKFILE_FAIL_IMMEDIATELY,0,bufferSize,0,&olap);*/
-        status = LockFileEx(h,LOCKFILE_FAIL_IMMEDIATELY,0,bufferSize,0,&olap) ? gcvSTATUS_TRUE : gcvSTATUS_FALSE;
-        if (status == gcvSTATUS_FALSE)/*lockfile return val is nonzero(true) ,zero(false)*/
-        {
-            gctUINT error = GetLastError();
-            status = gcvSTATUS_LOCKED;
-            gcoOS_Print("_ProcessShLockLibFile: Failed to shlock libfile %d",error);
-        }
-        else
-        {
-            status=gcvSTATUS_OK;
-            if (0 && gcmOPT_DUMP_CODEGEN_VERBOSE())
-            {
-                gcoOS_Print("_ProcessShLockLibFile: Successfully shlock libfile ");
-            }
-        }
-    }
-#else
-    status =flock(fileno((FILE *)filp), LOCK_SH|LOCK_NB);
-    /*status =ftrylockfile(filp);*//*lock_ex*/
-    if (!gcmIS_SUCCESS(status))
-    {
-        gcoOS_Print("_ProcessShLockLibFile:Failed to lock libfile ");
-    }
-#endif
-
-    return status;
-}
-
-static gceSTATUS _ProcessUnLockLibFile(gctFILE filp, gctUINT32 bufferSize)
-{
-    gceSTATUS status = gcvSTATUS_OK;
-
-    gcmVERIFY_ARGUMENT(filp != gcvNULL);
-
-
-#if defined(_WIN32)
-    {
-        OVERLAPPED olap = {0};
-#if !defined(UNDER_CE)
-        HANDLE h=(HANDLE)_get_osfhandle(_fileno((FILE *)filp));
-#elif defined(UNDER_CE)
-        HANDLE h=(HANDLE)(_fileno((FILE *)filp));
-#endif
-        status = UnlockFileEx(h,0,bufferSize,0,&olap) ? gcvSTATUS_TRUE : gcvSTATUS_FALSE;
-        if (status == gcvSTATUS_FALSE)/*lunockfile return val is nonzero(true) ,zero(false)*/
-        {
-            gctUINT error = GetLastError();
-            status = gcvSTATUS_LOCKED;
-            gcoOS_Print("_ProcessUnLockLibFile: Failed to unlock libfile %d",error);
-        }
-        else
-        {
-            status=gcvSTATUS_OK;
-            if (0 && gcmOPT_DUMP_CODEGEN_VERBOSE())
-            {
-                gcoOS_Print("_ProcessUnLockLibFile: Successfully unlock libfile ");
-            }
-        }
-    }
-#else
-    status =flock(fileno((FILE *)filp), LOCK_UN);
-    /*status =funlockfile(filp);*/
-    if (!gcmIS_SUCCESS(status))
-    {
-        gcoOS_Print("_ProcessUnLockLibFile:Failed to unlock libfile ");
-    }
-#endif
-
-    return status;
-}
-
-static gcsATOM_PTR  _LibFileLockRef = gcvNULL;
-static gctPOINTER   _LibFileLock = gcvNULL;
-
-static gceSTATUS _ThreadLockLibFile(void)
-{
-    gceSTATUS status = gcvSTATUS_OK;
-
-    if (_LibFileLock == gcvNULL)
-    {
-        if (_LibFileLockRef != gcvNULL)
-        {
-            status = gcvSTATUS_INVALID_OBJECT;
-        }
-        else
-        {
-            status = gcvSTATUS_OK;
-        }
-    }
-    else
-    {
-        status = gcoOS_AcquireMutex(gcvNULL, _LibFileLock, gcvINFINITE);
-    }
-
-    return status;
-}
-
-static gceSTATUS _ThreadUnLockLibFile(void)
-{
-    gceSTATUS status = gcvSTATUS_OK;
-
-    if (_LibFileLock == gcvNULL)
-    {
-        if (_LibFileLockRef != gcvNULL)
-        {
-            status = gcvSTATUS_INVALID_OBJECT;
-        }
-        else
-        {
-            status = gcvSTATUS_OK;
-        }
-    }
-    else
-    {
-        status = gcoOS_ReleaseMutex(gcvNULL, _LibFileLock);
-    }
-
-    return status;
-}
-
-/*******************************************************************************************
-**  Initialize LibFile
-*/
-gceSTATUS
-gcInitializeLibFile(void)
-{
-    gctINT32 reference;
-    gceSTATUS status;
-
-    if (_LibFileLockRef == gcvNULL)
-    {
-        /* Create a new reference counter. */
-        gcmONERROR(gcoOS_AtomConstruct(gcvNULL, &_LibFileLockRef));
-    }
-
-    /* Increment the reference counter */
-    gcmONERROR(gcoOS_AtomIncrement(gcvNULL, _LibFileLockRef, &reference));
-
-    if (reference == 0)
-    {
-        /* Create a global lock. */
-        status = gcoOS_CreateMutex(gcvNULL, &_LibFileLock);
-
-        if (gcmIS_ERROR(status))
-        {
-            _LibFileLock = gcvNULL;
-        }
-    }
-
-OnError:
-    return status;
-
-}
-
-/*******************************************************************************************
-**  Finalize LibFile.
-*/
-gceSTATUS
-gcFinalizeLibFile(void)
-{
-    gctINT32 reference = 0;
-    gceSTATUS status = gcvSTATUS_OK;
-
-    /* _LibFileLockRef could be NULL when Construction failed. */
-    if(_LibFileLockRef != gcvNULL)
-    {
-        /* Decrement the reference counter */
-        gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, _LibFileLockRef, &reference));
-    }
-
-    if (reference == 1)
-    {
-        /* Delete the global lock */
-        gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, _LibFileLock));
-
-        /* Destroy the reference counter */
-        gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, _LibFileLockRef));
-
-        _LibFileLockRef = gcvNULL;
-    }
-
-    return status;
-}
-
-#define _cldFILENAME_MAX 1024
-
-static gceSTATUS gcSHADER_GetTemporaryDir(OUT gctSTRING gcTmpDir)
-{
-    gctSTRING TmpDir = gcvNULL;
-    gceSTATUS   status          = gcvSTATUS_OK;
-
-#if defined(UNDER_CE)
-    char cwdpath[MAX_PATH];
-#elif defined(ANDROID)
-    char path[_cldFILENAME_MAX];
-#endif
-
-    gcoOS_GetEnv(gcvNULL,
-        "TMPDIR",
-        &TmpDir);
-    if (!TmpDir) {
-        gcoOS_GetEnv(gcvNULL,
-            "TEMP",
-            &TmpDir);
-    }
-    if (!TmpDir) {
-        gcoOS_GetEnv(gcvNULL,
-            "TMP",
-            &TmpDir);
-    }
-    if (!TmpDir) {
-        gcoOS_GetEnv(gcvNULL,
-                    "TEMPDIR",
-                    &TmpDir);
-    }
-#if defined(LINUX) && !defined(ANDROID)
-    if (!TmpDir) {
-        FILE *fp = fopen("/tmp", "r");
-        if (fp != gcvNULL)
-        {
-            /* /tmp is exist and readable, use it as temp directory */
-            TmpDir = "/tmp";
-            fclose(fp);
-        }
-    }
-#endif
-
-    if (!TmpDir)
-    {
-#if defined(UNDER_CE)
-        /* Wince has no relative path */
-        gcoOS_GetCwd(gcvNULL, MAX_PATH, cwdpath);
-        TmpDir = cwdpath;
-#elif defined(ANDROID)
-        gctSIZE_T len=0;
-        gctFILE filp=gcvNULL;
-        gctINT i=0;
-        static const char prefix[] = "/data/data/";
-
-        /* Could these fail? */
-        gcoOS_Open(gcvNULL, "/proc/self/cmdline", gcvFILE_READ, &filp);
-        gcoOS_Read(gcvNULL, filp, _cldFILENAME_MAX - 1, path, &len);
-        gcoOS_Close(gcvNULL, filp);
-
-        /* Add terminator. */
-        path[len] = '\0';
-
-        if (strchr(path, '/')) {
-            /* Like a relative path or abs path. */
-            TmpDir = ".";
-        }
-        else if (strchr(path, '.') && len < _cldFILENAME_MAX - sizeof (prefix)) {
-            /* Like an android apk. */
-            for (i = len; i >= 0; i--) {
-                path[i + sizeof (prefix) - 1] = path[i];
-            }
-
-            gcoOS_MemCopy(path, prefix, sizeof (prefix) - 1);
-            gcoOS_StrCatSafe(path, _cldFILENAME_MAX, "/cache/");
-
-            TmpDir = path;
-        }
-        else {
-            TmpDir = ".";
-        }
-#else
-        TmpDir = (gctSTRING) ".";
-#endif
-    }
-
-    gcmONERROR(gcoOS_StrCopySafe(gcTmpDir, _cldFILENAME_MAX,TmpDir));
-
-OnError:
-    return status;
-}
-
-gctSTRING gcSHADER_GetLibFileName(IN gctBOOL     isPatch,
-                                  IN gctBOOL     isSupportImgInst,
-                                  IN gcLibType    LibType
-                                        )
-{
-    gctSTRING libname = gcvNULL;
-    if (isPatch)
-    {
-        switch(LibType)
-        {
-        case gcLIB_BUILTIN:
-            if(isSupportImgInst)
-                libname = "viv_gc_img_patch.lib";
-            else
-                libname = "viv_gc_noimg_patch.lib";
-            break;
-        case gcLIB_CL_BUILTIN:
-            libname = "viv_cl_patch.lib";
-            break;
-        default:
-            gcoOS_Print("gcSHADER_GetTemporaryName:Failed to get the Patch BUILTIN LIBTYPE");
-            break;
-        }
-    }
-    else
-    {
-        switch(LibType)
-        {
-        case gcLIB_BUILTIN:
-            if(isSupportImgInst)
-                libname = "viv_gc_img_builtin.lib";
-            else
-                libname = "viv_gc_noimg_builtin.lib";
-            break;
-        case gcLIB_BLEND_EQUATION:
-            libname = "viv_blend_equation.lib";
-            break;
-        case gcLIB_DX_BUILTIN:
-            libname = "viv_dx_builtin.lib";
-            break;
-        case gcLIB_CL_BUILTIN:
-            if(isSupportImgInst)
-                libname = "viv_cl_img_builtin.lib";
-            else
-                libname = "viv_cl_noimg_builtin.lib";
-            break;
-        default:
-            gcoOS_Print("gcSHADER_GetTemporaryName:Failed to get the BUILTIN LIBTYPE");
-            break;
-        }
-    }
-    return libname;
-}
-
-static gceSTATUS gcSHADER_GetTempFileName(IN  gctSTRING libname,
-                                          OUT gctSTRING nameBuffer,
-                                          IN  gctUINT   nameBufferSize)
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gctCHAR gcTmpFileName[_cldFILENAME_MAX+1];
-    gcePATCH_ID patchId = gcPatchId;
-
-    gcmONERROR(gcSHADER_GetTemporaryDir(gcTmpFileName));
-#if _WIN32
-    gcmONERROR(gcoOS_StrCatSafe(gcTmpFileName,
-        _cldFILENAME_MAX,
-        "\\"));
-#else
-    gcmONERROR(gcoOS_StrCatSafe(gcTmpFileName,
-        _cldFILENAME_MAX,
-        "/"));
-#endif
-
-    if (isAppConformance(patchId))
-    {
-        gcmONERROR(gcoOS_StrCatSafe(gcTmpFileName, _cldFILENAME_MAX, "cts_"));
-    }
-
-    gcmONERROR(gcoOS_StrCatSafe(gcTmpFileName, _cldFILENAME_MAX, libname));
-
-    gcmONERROR(gcoOS_StrCopySafe(nameBuffer, nameBufferSize,gcTmpFileName));
-
-OnError:
-    return status;
-
-}
-
-gceSTATUS
-gcSHADER_WriteBufferToFile(
-    IN gctSTRING buffer,
-    IN gctUINT32 bufferSize,
-    IN gctSTRING ShaderName
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gctFILE filp = gcvNULL;
-    gcoOS os = gcvNULL;
-
-    gcmONERROR(_ThreadLockLibFile());
-    status = gcoOS_Open(gcvNULL, ShaderName, gcvFILE_CREATE, &filp);
-    if (gcmIS_SUCCESS(status))
-    {
-        gcmONERROR(_ProcessExLockLibFile(filp, bufferSize));
-
-        status = gcoOS_Write(os, filp, bufferSize, buffer);
-        gcmASSERT(status == gcvSTATUS_OK);
-        if (!gcmIS_SUCCESS(status))
-        {
-            gcoOS_Print("gcSHADER_WriteBufferToFile: Failed to write the buffer to file %s", ShaderName);
-        }
-        gcmONERROR(_ProcessUnLockLibFile(filp, bufferSize));
-    }
-    else
-    {
-        gcoOS_Print("gcSHADER_WriteBufferToFile: Failed to open the file %s for writing", ShaderName);
-    }
-
-OnError:
-    if (filp != gcvNULL)
-    {
-        gcoOS_Close(os, filp);
-    }
-    gcmVERIFY_OK(_ThreadUnLockLibFile());
-    return status;
-}
-
-gceSTATUS
-gcSHADER_WriteShaderToFile(
-    IN gcSHADER    Binary,
-    IN gctSTRING   ShaderName
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gcSHADER    binary = Binary;
-    gctUINT32 bufferSize = 0;
-    gctSTRING buffer = gcvNULL;
-    gcoOS os = gcvNULL;
-
-    gcmVERIFY_ARGUMENT(ShaderName != gcvNULL);
-
-    if(binary->type == gcSHADER_TYPE_CL)
-        status = gcSHADER_SaveEx(binary,gcvNULL,&bufferSize);
-    else
-        status = gcSHADER_Save(binary,gcvNULL,&bufferSize);
-
-    if (gcmIS_ERROR(status))
-    {
-        gcoOS_Print("gcSHADER_WriteShaderToFile:Failed to get the buffer size of Shader");
-    }
-
-    status = gcoOS_Allocate(os, bufferSize, (gctPOINTER *)&buffer);
-    if (!gcmIS_SUCCESS(status))
-    {
-        gcoOS_Print("gcSHADER_WriteShaderToFile: Failed to allocate memory for buffer");
-        return status;
-    }
-
-    if(binary->type == gcSHADER_TYPE_CL)
-        status = gcSHADER_SaveEx(binary,buffer,&bufferSize);
-    else
-        status = gcSHADER_Save(binary,buffer,&bufferSize);
-
-    if (!gcmIS_SUCCESS(status))
-    {
-        gcoOS_Print("gcSHADER_WriteShaderToFile: Failed to save the shader to buffer status=%d", status);
-    }
-    else
-    {
-        status = gcSHADER_WriteBufferToFile(buffer, bufferSize, ShaderName);
-        if (0 && gcmIS_SUCCESS(status) && gcmOPT_DUMP_CODEGEN_VERBOSE())
-        {
-            gcoOS_Print("gcSHADER_WriteShaderToFile: Successfully write the library file %s\n", ShaderName);
-        }
-    }
-
-    if (buffer != gcvNULL)
-    {
-        gcoOS_Free(os, buffer);
-    }
-
-    return status;
-}
-
-gceSTATUS
-gcSHADER_ReadBufferFromFile(
-    IN gctSTRING    ShaderName,
-    OUT gctSTRING    *buf,
-    OUT gctUINT *bufSize
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gctFILE filp = gcvNULL;
-    gctUINT32 fileSize = 0;
-    gctSIZE_T bufferSize = 0;
-    gcoOS os = gcvNULL;
-    gctSTRING buffer = gcvNULL;
-
-    gcmONERROR(_ThreadLockLibFile());
-
-    gcmVERIFY_ARGUMENT(ShaderName != gcvNULL);
-
-    status = gcoOS_Open(os, ShaderName, gcvFILE_READ, &filp);
-    if (gcmIS_ERROR(status))
-    {
-        if (gcmOPT_DUMP_CODEGEN())
-        {
-            gcoOS_Print("gcSHADER_ReadBufferFromFile: Cannot open the library file: %s\n", ShaderName);
-        }
-    }
-    else
-    {
-        gcmONERROR(gcoOS_Seek(os, filp, 0,gcvFILE_SEEK_END));
-        gcmONERROR(gcoOS_GetPos(os, filp, &fileSize));
-
-        /*when other process write file,the filesize is 0*/
-        if(fileSize == 0)
-        {
-            status = gcvSTATUS_INVALID_DATA;
-        }
-        else
-        {
-            status = gcoOS_Allocate(os,fileSize + 1,(gctPOINTER*)&buffer); /* one extra byte for '\0' end of string */
-            if (!gcmIS_SUCCESS(status))
-            {
-                gcoOS_Print("gcSHADER_ReadBufferFromFile:Failed to allocate the mem to buffer ");
-            }
-            else
-            {
-                *buf = buffer;
-                gcmONERROR(gcoOS_Seek(gcvNULL, filp, 0, gcvFILE_SEEK_SET));/*file pos to 0;*/
-
-                gcmONERROR(_ProcessShLockLibFile(filp, fileSize));
-                status = gcoOS_Read(os, filp ,fileSize, buffer, &bufferSize);
-                *bufSize = bufferSize;
-                if (gcmIS_SUCCESS(status) && (fileSize == bufferSize))
-                {
-                    if (0 && gcmOPT_DUMP_CODEGEN_VERBOSE())
-                    {
-                        gcoOS_Print("gcSHADER_ReadBufferFromFile: Successfully read file %s",ShaderName);
-                    }
-                }
-                else
-                {
-                    gcoOS_Print("gcSHADER_ReadBufferFromFile: Failed to read file %s",ShaderName);
-                    status = gcvSTATUS_INVALID_DATA;
-                }
-                gcmONERROR(_ProcessUnLockLibFile(filp, fileSize));
-            }
-        }
-    }
-
-OnError:
-    if (filp != gcvNULL)
-    {
-        gcoOS_Close(os, filp);
-    }
-
-    gcmVERIFY_OK(_ThreadUnLockLibFile());
-
-    return status;
-}
-
-gceSTATUS
-gcSHADER_ReadShaderFromFile(
-    IN gctSTRING    ShaderName,
-    OUT gcSHADER    *Binary
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gctUINT bufferSize = 0;
-    gcoOS os = gcvNULL;
-    gctSTRING buffer = gcvNULL;
-    gcSHADER_KIND ShaderType;
-    /*struct stat fileinfo;*/
-
-    /*multi thread variable binary share the same global memory*/
-    if(*Binary!=gcvNULL)
-        return status;
-
-    status = gcSHADER_ReadBufferFromFile(ShaderName ,&buffer,&bufferSize);
-    if ((gcmIS_SUCCESS(status)))
-    {
-        ShaderType = (gcSHADER_KIND)((*(gctUINT32 *) ((gceOBJECT_TYPE *) buffer + 4))>>16);/*get the shadertype from word4*/
-        if (ShaderType >= gcSHADER_TYPE_UNKNOWN &&  ShaderType <= gcSHADER_KIND_COUNT)
-        {
-            gctUINT32           shaderVersion;
-            gcmONERROR(gcSHADER_Construct(ShaderType, Binary));
-
-            status = gcSHADER_LoadHeader(*Binary,buffer,bufferSize,&shaderVersion);
-            if (gcmIS_SUCCESS(status))
-            {
-                if (ShaderType == gcSHADER_TYPE_CL)
-                    status = gcSHADER_LoadEx(*Binary, buffer, bufferSize);
-                else
-                    status = gcSHADER_Load(*Binary, buffer, bufferSize);
-
-                if (!gcmIS_SUCCESS(status))
-                {
-                    gcoOS_Print("gcSHADER_ReadShaderFromFile:Failed to extract the buffer to shader status=%d ",status);
-                }
-
-                if (gcSHADER_DumpCodeGenVerbose(*Binary))
-                {
-                    gcoOS_Print("gcSHADER_ReadShaderFromFile:  %s,status=%d\n", ShaderName,status);
-                }
-            }
-            else
-            {
-                gcoOS_Print("gcSHADER_ReadShaderFromFile:Failed to extract the buffer to shader status=%d ",status);
-                status = gcvSTATUS_VERSION_MISMATCH;
-            }
-        }
-        else
-        {
-            gcoOS_Print("gcSHADER_ReadShaderFromFile:Failed to get the shadre type=%d ",ShaderType);
-            status = gcvSTATUS_VERSION_MISMATCH;
-        }
-    }
-
-OnError:
-    if (buffer != gcvNULL)
-    {
-        gcoOS_Free(os, buffer);
-    }
-    if (!gcmIS_SUCCESS(status))
-    {
-        if(*Binary!=gcvNULL)
-        {
-            gcSHADER_Destroy(*Binary);
-            *Binary = gcvNULL;
-            Binary = gcvNULL;
-        }
-    }
-
-    return status;
-}
-
-gceSTATUS
-gcSHADER_WriteGCSLShaderToFile(
-    IN gcSHADER    Binary,
-    IN gctSTRING   ShaderFileName
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gctCHAR gcTmpFileName[_cldFILENAME_MAX+1];
-
-    gcmONERROR(gcSHADER_GetTempFileName(ShaderFileName, gcTmpFileName, _cldFILENAME_MAX));
-
-    gcmONERROR(gcSHADER_WriteShaderToFile(Binary, gcTmpFileName));
-
-OnError:
-
-    return status;
-}
-
-
-gceSTATUS
-gcSHADER_ReadGCSLShaderFromFile(
-    IN gctSTRING     ShaderFileName,
-    OUT gcSHADER    *Binary
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gctCHAR gcTmpFileName[_cldFILENAME_MAX+1];
-
-    gcmONERROR(gcSHADER_GetTempFileName(ShaderFileName, gcTmpFileName, _cldFILENAME_MAX));
-
-    status = gcSHADER_ReadShaderFromFile(gcTmpFileName, Binary);
-
-OnError:
-
-    return status;
-}
-
-
-static gceSTATUS
-gcSHADER_GetTempVirFileName(
-    IN gctSTRING virLibName,
-    IN gctINT nameBufferSize,
-    OUT gctSTRING nameBuffer)
-{
-
-    gceSTATUS status = gcvSTATUS_OK;
-
-    gcmONERROR(gcSHADER_GetTemporaryDir(nameBuffer));
-#if _WIN32
-    gcmONERROR(gcoOS_StrCatSafe(nameBuffer,
-        _cldFILENAME_MAX,
-        "\\"));
-#else
-    gcmONERROR(gcoOS_StrCatSafe(nameBuffer,
-        _cldFILENAME_MAX,
-        "/"));
-#endif
-
-    gcmVERIFY_ARGUMENT(virLibName != gcvNULL);
-
-    gcmONERROR(gcoOS_StrCatSafe(nameBuffer, nameBufferSize, virLibName));
-
-OnError:
-    return status;
-
-}
-
-gceSTATUS
-gcSHADER_WriteVirLibToFile(
-    IN gctSTRING        virLibName,
-    IN SHADER_HANDLE    hVirShader
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gctCHAR gcTmpFileName[_cldFILENAME_MAX+1];
-    gctUINT   bufferSize = 0;
-    gctSTRING   buffer = gcvNULL;
-    VIR_Shader    *VirShader = (VIR_Shader *)hVirShader;
-    gcmVERIFY_ARGUMENT(virLibName != gcvNULL);
-
-    gcmONERROR(gcSHADER_GetTempVirFileName(virLibName, gcmSIZEOF(gcTmpFileName),gcTmpFileName));
-
-    gcmONERROR(vscSaveShaderToBinary(VirShader, (gctPOINTER *)&buffer, &bufferSize));
-
-    status = gcSHADER_WriteBufferToFile(buffer, bufferSize, gcTmpFileName);
-
-OnError:
-
-    if(buffer != gcvNULL)
-    {
-        gcoOS_Free(gcvNULL, buffer);
-    }
-
-    return status;
-}
-
-gceSTATUS
-gcSHADER_ReadVirLibFromFile(
-    IN gctSTRING          virLibName,
-    OUT SHADER_HANDLE    *hVirShader
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gctCHAR gcTmpFileName[_cldFILENAME_MAX+1];
-    gctSTRING buf = gcvNULL;
-    gctUINT bufSize = 0;
-    VIR_Shader    **VirShader = (VIR_Shader **)hVirShader;
-
-    gcmVERIFY_ARGUMENT(virLibName != gcvNULL);
-
-    gcmONERROR(gcSHADER_GetTempVirFileName(virLibName,gcmSIZEOF(gcTmpFileName),gcTmpFileName));
-
-    status = gcSHADER_ReadBufferFromFile(gcTmpFileName, &buf,&bufSize);
-
-    if (gcmIS_SUCCESS(status))
-    {
-        gcmONERROR(vscLoadShaderFromBinary(buf, bufSize, (SHADER_HANDLE*)VirShader, gcvFALSE));
-    }
-
-OnError:
-    if (buf != gcvNULL)
-    {
-        gcoOS_Free(gcvNULL, buf);
-    }
-    if (!gcmIS_SUCCESS(status))
-    {
-        if (*VirShader != gcvNULL)
-        {
-            VIR_Shader_Destroy(*VirShader);
-            *VirShader = gcvNULL;
-        }
-    }
-
-    return status;
-}
-
 
 #endif /*gcdENABLE_3D*/
 

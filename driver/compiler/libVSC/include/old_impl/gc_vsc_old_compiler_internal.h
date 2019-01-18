@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -233,6 +233,7 @@ typedef struct _gcBuiltinsTempIndex
    gctINT       InPointSizeTempIndex;
    gctINT       BoundingBoxTempIndex;
    gctINT       LastFragDataTempIndex;
+   gctINT       ClusterIDTempIndex;
 } gcBuiltinsTempIndex;
 
 typedef struct _gcShaderCodeInfo
@@ -492,37 +493,26 @@ gcsCODE_CALLER;
 typedef struct _gcsCODE_HINT
 {
     /* Pointer to function or kernel function to which this code belongs. */
-    gctPOINTER                      owner;
+    gctPOINTER            owner;
 
-    /* Is the owner a kernel function?. */
-    gctBOOL                         isOwnerKernel;
+    gctINT                callNest;        /* Nesting of call. */
+    gcsCODE_CALLER_PTR    callers;         /* Callers to this instruction. */
+    gcLINKTREE_TEMP_LIST  liveTemps;       /* the list of temps which a alive when enter the
+                                            *  instruction,their live range start before this
+                                            * instruction (loop head or function head)
+                                            */
+    gctINT                lastUseForTemp;  /* Last use for temp register used in code gen. */
 
-    gctBOOL                         isBackJump;
-    gctBOOL                         isCall;
-    gctBOOL                         isLoopHeader;
-    /* Callers to this instruction. */
-    gcsCODE_CALLER_PTR              callers;
+    gctINT                lastLoadUser;
+    gctINT                loadDestIndex;
 
-    /* Nesting of call. */
-    gctINT                          callNest;
-
-    /* the list of temps which a alive when enter the instruction,
-       their live range start before this instruction (loop head or
-       function head)
-     */
-    gcLINKTREE_TEMP_LIST            liveTemps;
-
-    /* Last use for temp register used in code gen. */
-    gctINT                          lastUseForTemp;
-
-    gctINT                          lastLoadUser;
-    gctINT                          loadDestIndex;
-
-    /* Flag whether the PS code has discard. */
-    gctBOOL                         psHasDiscard;
-
-    /* Flag to indicate uniform block uploaded. */
-    gctBOOL                         uploadedUBO;
+    gctBOOL               isOwnerKernel    : 2;  /* Is the owner a kernel function?. */
+    gctBOOL               isBackJump       : 2;
+    gctBOOL               isCall           : 2;  /* Is this instruction a CALL. */
+    gctBOOL               isBackJumpTarget : 2;  /* Is this instruction a target of a back jump, we can
+                                                  * also use it to check if it is a header of a LOOP. */
+    gctBOOL               psHasDiscard     : 2;  /* Flag whether the PS code has discard. */
+    gctBOOL               uploadedUBO      : 2;  /* Flag to indicate uniform block uploaded. */
 }
 gcsCODE_HINT, *gcsCODE_HINT_PTR;
 
@@ -928,7 +918,12 @@ struct _gcsCODE_GENERATOR
     gctUINT32                       stateBufferOffset;
     gctUINT32 *                     lastStateCommand;
     gctUINT32                       lastStateCount;
-    gctUINTPTR_T                    lastStateAddress;
+    gctUINT32                       lastStateAddress;
+    gctUINT32                       stateDeltaSize;
+    gctUINT32*                      stateDeltaBuffer;
+    gctUINT32                       stateDeltaBufferOffset;
+    gctUINT32*                      lastStateDeltaBatchEnd;
+    gctUINT32*                      lastStateDeltaBatchHead;
 
     /* FragCoord usage. */
     gctBOOL                         usePosition;
@@ -1228,6 +1223,7 @@ typedef enum _gcLibType
     gcLIB_BLEND_EQUATION,
     gcLIB_DX_BUILTIN,
     gcLIB_CL_BUILTIN,
+    gcLIB_CL_LONG_ULONG_FUNCS,
 }   gcLibType;
 
 /* compile the builtin function library */
@@ -1300,6 +1296,12 @@ gcSHADER_PatchInt64(
     );
 
 gceSTATUS
+gcSHADER_MergeCompileTimeInitializedUniforms(
+    IN gcSHADER Shader,
+    IN gcSHADER LibShader
+    );
+
+gceSTATUS
 gcSHADER_FindMainFunction(
     IN   gcSHADER           Shader,
     OUT  gctINT *           StartCode,
@@ -1338,10 +1340,6 @@ gcGetVIRCGKind(
     IN gctBOOL              HasHalti2
     );
 
-gctBOOL
-gcUseFullNewLinker(
-    IN gctBOOL              HasHalti2
-    );
 
 gctUINT
 gcGetDualFP16Mode(
@@ -1357,85 +1355,6 @@ gcGetDualFP16Mode(
         }                                                      \
     }                                                          \
     while(0)                                                   \
-
-void
-gcoSHADER_AllocateVidMemForNoKernel(
-    gctPOINTER context,
-    gceSURF_TYPE type,
-    gctSTRING tag,
-    gctSIZE_T size,
-    gctUINT32 align,
-    gctPOINTER *vidMem,
-    gctPOINTER *memory,
-    gctUINT32 *physical,
-    gctPOINTER initialData,
-    gctBOOL zeroMemory
-    );
-
-void
-gcoSHADER_FreeVidMemForNoKernel(
-    gctPOINTER context,
-    gceSURF_TYPE type,
-    gctSTRING tag,
-    gctPOINTER vidMem
-    );
-
-/* shader library file IO */
-/* Builtin library for HW that can't support IMG instructions.*/
-extern gcSHADER gcBuiltinLibrary0 ;
-/* Builtin library for HW taht can support IMG instructions. */
-extern gcSHADER gcBuiltinLibrary1 ;
-extern gcSHADER gcBlendEquationLibrary ;
-
-
-gceSTATUS
-gcSHADER_InitClBuiltinLibrary(
-    IN gcSHADER     Shader,
-    IN gctINT       ShaderType,
-    IN gcLibType    LibType,
-    OUT gcSHADER    *Binary,
-    OUT gctSTRING   *builtinSource);
-
-gceSTATUS
-gcSHADER_InitBuiltinLibrary(
-    IN gcSHADER     Shader,
-    IN gctINT       ShaderType,
-    IN gcLibType    LibType,
-    OUT gcSHADER    *Binary,
-    OUT gctSTRING   *sloBuiltinSource
-    );
-
-gctSTRING
-gcSHADER_GetLibFileName(
-    IN gctBOOL     isPatch,
-    IN gctBOOL     isSupportImgInst,
-    IN gcLibType   LibType
-    );
-
-gceSTATUS
-gcSHADER_ReadGCSLShaderFromFile(
-    IN gctSTRING     ShaderFileName,
-    OUT gcSHADER    *Binary
-    );
-
-gceSTATUS
-gcSHADER_WriteGCSLShaderToFile(
-    IN gcSHADER    Binary,
-    IN gctSTRING   ShaderFileName
-    );
-
-
-gceSTATUS
-gcSHADER_ReadVirLibFromFile(
-    IN gctSTRING          virLibName,
-    OUT SHADER_HANDLE    *VirShader
-    );
-
-gceSTATUS
-gcSHADER_WriteVirLibToFile(
-    IN gctSTRING        virLibName,
-    IN SHADER_HANDLE    VirShader
-    );
 
 END_EXTERN_C()
 

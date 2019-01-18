@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -599,7 +599,7 @@ gcoSTREAM_Upload(
                                           Bytes,
                                           gcvCACHE_CLEAN));
             gcmDUMP_BUFFER(gcvNULL,
-                           "stream",
+                           gcvDUMP_BUFFER_STREAM,
                            gcsSURF_NODE_GetHWAddress(&Stream->node),
                            Stream->node.logical,
                            Offset,
@@ -693,7 +693,7 @@ gcoSTREAM_ReAllocBufNode(
     gcmONERROR(_FreeMemory(Stream));
 
     gcmDUMP_BUFFER(gcvNULL,
-                   "stream",
+                   gcvDUMP_BUFFER_STREAM,
                    gcsSURF_NODE_GetHWAddress(&tmpMemory),
                    tmpMemory.logical,
                    0,
@@ -1457,7 +1457,7 @@ _PackStreams(
             }
 
             gcmDUMP_BUFFER(gcvNULL,
-                     "stream",
+                     gcvDUMP_BUFFER_STREAM,
                      gcsSURF_NODE_GetHWAddress(&Streams[0]->node),
                      Streams[0]->node.logical,
                      0,
@@ -1472,7 +1472,6 @@ _PackStreams(
     }
     return gcvSTATUS_OK;
 }
-
 
 static gceSTATUS
 _RebuildStream(
@@ -1962,7 +1961,7 @@ _Unalias(
         stream = Stream;
     }
      gcmDUMP_BUFFER(gcvNULL,
-                    "stream",
+                    gcvDUMP_BUFFER_STREAM,
                     gcsSURF_NODE_GetHWAddress(&stream->node),
                      stream->node.logical,
                      0,
@@ -2230,7 +2229,7 @@ gcoSTREAM_Flush(
 
     /* Dump the buffer. */
     gcmDUMP_BUFFER(gcvNULL,
-                   "stream",
+                   gcvDUMP_BUFFER_STREAM,
                    gcsSURF_NODE_GetHWAddress(&Stream->node),
                    Stream->node.logical,
                    0,
@@ -2721,6 +2720,11 @@ _NewDynamicCache(
 
             gcmOS_SAFE_FREE(gcvNULL,cache->dynamicNode);
 
+            if (cache->signal != gcvNULL)
+            {
+                gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL, cache->signal));
+            }
+
             /* Reset the cache. */
             cache->offset = 0;
             cache->free   = 0;
@@ -2946,7 +2950,7 @@ gcoVERTEX_AdjustStreamPoolEx(
         }
 
         stride = streamPtr->stream == gcvNULL ? streamPtr->dynamicCacheStride : streamPtr->stride;
-        base   = (gctUINT32)streamPtr->attributePtr->offset;
+        base    = (gctUINT32)streamPtr->attributePtr->offset;
 
         if (streamPtr->stream != gcvNULL)
         {
@@ -3404,7 +3408,7 @@ gcoSTREAM_UploadUnCacheableAttributes(
 
         /* Dump the buffer. */
         gcmDUMP_BUFFER(gcvNULL,
-            "stream",
+            gcvDUMP_BUFFER_STREAM,
             physical,
             logical,
             0,
@@ -3428,6 +3432,10 @@ gcoSTREAM_UploadUnCacheableAttributes(
     }
 
 OnError:
+    if (newStream)
+    {
+        gcoSTREAM_Destroy(newStream);
+    }
     /* Return the status. */
     gcmFOOTER();
     return status;
@@ -3477,6 +3485,12 @@ gcoSTREAM_DynamicCacheAttributes(
     /* Index current cache. */
     cache = &Stream->cache[(Stream->cacheCurrent) % gcdSTREAM_CACHE_COUNT];
 
+    if (gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_MULTI_CLUSTER))
+    {
+        const gctUINT cacheLineWidth = 64;
+        Bytes = gcmALIGN(Bytes, cacheLineWidth);
+    }
+
     if (Bytes > gcdSTREAM_CACHE_SIZE)
     {
        gcmONERROR(gcvSTATUS_INVALID_REQUEST);
@@ -3498,6 +3512,7 @@ gcoSTREAM_DynamicCacheAttributes(
         gcmONERROR(_NewDynamicCache(Stream, Bytes));
         cache = &Stream->cache[(Stream->cacheCurrent) % gcdSTREAM_CACHE_COUNT];
     }
+    gcmASSERT(cache->dynamicNode);
 
     /* Allocate data form the cache. */
     offset         = cache->offset;
@@ -3523,7 +3538,7 @@ gcoSTREAM_DynamicCacheAttributes(
 
     /* Dump the buffer. */
     gcmDUMP_BUFFER(gcvNULL,
-                   "stream",
+                   gcvDUMP_BUFFER_STREAM,
                    gcsSURF_NODE_GetHWAddress(cache->dynamicNode),
                    cache->dynamicNode->logical,
                    offset,
@@ -3578,6 +3593,13 @@ gcoSTREAM_DynamicCacheAttributesEx(
         /* Need virtual pool, but current cache is physical.*/
         bForceVirtual = bForceVirtual && (((address + cache->offset) & 0x80000000) == 0);
     }
+
+    if (gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_MULTI_CLUSTER))
+    {
+        const gctUINT cacheLineWidth = 64;
+        TotalBytes = gcmALIGN(TotalBytes, cacheLineWidth);
+    }
+
     /* Check if the stream will fit in the current cache. */
     if (TotalBytes > cache->free || bForceVirtual)
     {
@@ -3585,6 +3607,8 @@ gcoSTREAM_DynamicCacheAttributesEx(
         gcmONERROR(_NewDynamicCache(Stream, TotalBytes));
         cache = &Stream->cache[(Stream->cacheCurrent) % gcdSTREAM_CACHE_COUNT];
     }
+
+    gcmASSERT(cache->dynamicNode);
 
     /* Allocate data form the cache. */
     offset         = cache->offset;
@@ -3611,7 +3635,7 @@ gcoSTREAM_DynamicCacheAttributesEx(
 
     /* Dump the buffer. */
     gcmDUMP_BUFFER(gcvNULL,
-                   "stream",
+                   gcvDUMP_BUFFER_STREAM,
                    address,
                    cache->dynamicNode->logical,
                    offset,
@@ -3795,7 +3819,7 @@ gcoSTREAM_CacheAttributesEx(
 
         /* Dump the buffer. */
         gcmDUMP_BUFFER(gcvNULL,
-            "stream",
+            gcvDUMP_BUFFER_STREAM,
             physical,
             logical,
             0,
@@ -3824,6 +3848,10 @@ gcoSTREAM_CacheAttributesEx(
     return gcvSTATUS_OK;
 
 OnError:
+    if (newStream)
+    {
+        gcoSTREAM_Destroy(newStream);
+    }
     /* Return the status. */
     gcmFOOTER();
     return status;

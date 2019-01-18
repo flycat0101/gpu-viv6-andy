@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -112,150 +112,154 @@
      T_ULONG8 = 347,
      T_ULONG16 = 348,
      T_SAMPLER_T = 349,
-     T_IMAGE1D_T = 350,
-     T_IMAGE1D_ARRAY_T = 351,
-     T_IMAGE1D_BUFFER_T = 352,
-     T_IMAGE2D_ARRAY_T = 353,
-     T_IMAGE2D_T = 354,
-     T_IMAGE3D_T = 355,
-     T_IMAGE2D_PTR_T = 356,
-     T_IMAGE2D_DYNAMIC_ARRAY_T = 357,
-     T_SIZE_T = 358,
-     T_EVENT_T = 359,
-     T_PTRDIFF_T = 360,
-     T_INTPTR_T = 361,
-     T_UINTPTR_T = 362,
-     T_GENTYPE = 363,
-     T_F_GENTYPE = 364,
-     T_IU_GENTYPE = 365,
-     T_I_GENTYPE = 366,
-     T_U_GENTYPE = 367,
-     T_SIU_GENTYPE = 368,
-     T_BOOL_PACKED = 369,
-     T_BOOL2_PACKED = 370,
-     T_BOOL3_PACKED = 371,
-     T_BOOL4_PACKED = 372,
-     T_BOOL8_PACKED = 373,
-     T_BOOL16_PACKED = 374,
-     T_BOOL32_PACKED = 375,
-     T_CHAR_PACKED = 376,
-     T_CHAR2_PACKED = 377,
-     T_CHAR3_PACKED = 378,
-     T_CHAR4_PACKED = 379,
-     T_CHAR8_PACKED = 380,
-     T_CHAR16_PACKED = 381,
-     T_CHAR32_PACKED = 382,
-     T_UCHAR_PACKED = 383,
-     T_UCHAR2_PACKED = 384,
-     T_UCHAR3_PACKED = 385,
-     T_UCHAR4_PACKED = 386,
-     T_UCHAR8_PACKED = 387,
-     T_UCHAR16_PACKED = 388,
-     T_UCHAR32_PACKED = 389,
-     T_SHORT_PACKED = 390,
-     T_SHORT2_PACKED = 391,
-     T_SHORT3_PACKED = 392,
-     T_SHORT4_PACKED = 393,
-     T_SHORT8_PACKED = 394,
-     T_SHORT16_PACKED = 395,
-     T_SHORT32_PACKED = 396,
-     T_USHORT_PACKED = 397,
-     T_USHORT2_PACKED = 398,
-     T_USHORT3_PACKED = 399,
-     T_USHORT4_PACKED = 400,
-     T_USHORT8_PACKED = 401,
-     T_USHORT16_PACKED = 402,
-     T_USHORT32_PACKED = 403,
-     T_HALF_PACKED = 404,
-     T_HALF2_PACKED = 405,
-     T_HALF3_PACKED = 406,
-     T_HALF4_PACKED = 407,
-     T_HALF8_PACKED = 408,
-     T_HALF16_PACKED = 409,
-     T_HALF32_PACKED = 410,
-     T_GENTYPE_PACKED = 411,
-     T_FLOATNXM = 412,
-     T_DOUBLENXM = 413,
-     T_BUILTIN_DATA_TYPE = 414,
-     T_RESERVED_DATA_TYPE = 415,
-     T_VIV_PACKED_DATA_TYPE = 416,
-     T_IDENTIFIER = 417,
-     T_TYPE_NAME = 418,
-     T_FLOATCONSTANT = 419,
-     T_UINTCONSTANT = 420,
-     T_INTCONSTANT = 421,
-     T_BOOLCONSTANT = 422,
-     T_CHARCONSTANT = 423,
-     T_STRING_LITERAL = 424,
-     T_FIELD_SELECTION = 425,
-     T_LSHIFT_OP = 426,
-     T_RSHIFT_OP = 427,
-     T_INC_OP = 428,
-     T_DEC_OP = 429,
-     T_LE_OP = 430,
-     T_GE_OP = 431,
-     T_EQ_OP = 432,
-     T_NE_OP = 433,
-     T_AND_OP = 434,
-     T_OR_OP = 435,
-     T_XOR_OP = 436,
-     T_MUL_ASSIGN = 437,
-     T_DIV_ASSIGN = 438,
-     T_ADD_ASSIGN = 439,
-     T_MOD_ASSIGN = 440,
-     T_LEFT_ASSIGN = 441,
-     T_RIGHT_ASSIGN = 442,
-     T_AND_ASSIGN = 443,
-     T_XOR_ASSIGN = 444,
-     T_OR_ASSIGN = 445,
-     T_SUB_ASSIGN = 446,
-     T_STRUCT_UNION_PTR = 447,
-     T_INITIALIZER_END = 448,
-     T_BREAK = 449,
-     T_CONTINUE = 450,
-     T_RETURN = 451,
-     T_GOTO = 452,
-     T_WHILE = 453,
-     T_FOR = 454,
-     T_DO = 455,
-     T_ELSE = 456,
-     T_IF = 457,
-     T_SWITCH = 458,
-     T_CASE = 459,
-     T_DEFAULT = 460,
-     T_CONST = 461,
-     T_RESTRICT = 462,
-     T_VOLATILE = 463,
-     T_STATIC = 464,
-     T_EXTERN = 465,
-     T_CONSTANT = 466,
-     T_GLOBAL = 467,
-     T_LOCAL = 468,
-     T_PRIVATE = 469,
-     T_KERNEL = 470,
-     T_UNIFORM = 471,
-     T_READ_ONLY = 472,
-     T_WRITE_ONLY = 473,
-     T_PACKED = 474,
-     T_ALIGNED = 475,
-     T_ENDIAN = 476,
-     T_VEC_TYPE_HINT = 477,
-     T_ATTRIBUTE__ = 478,
-     T_REQD_WORK_GROUP_SIZE = 479,
-     T_WORK_GROUP_SIZE_HINT = 480,
-     T_KERNEL_SCALE_HINT = 481,
-     T_ALWAYS_INLINE = 482,
-     T_UNSIGNED = 483,
-     T_STRUCT = 484,
-     T_UNION = 485,
-     T_TYPEDEF = 486,
-     T_ENUM = 487,
-     T_INLINE = 488,
-     T_SIZEOF = 489,
-     T_TYPE_CAST = 490,
-     T_VEC_STEP = 491,
-     T_TYPEOF = 492,
-     T_VERY_LAST_TERMINAL = 493
+     T_VIV_GENERIC_GL_SAMPLER = 350,
+     T_IMAGE1D_T = 351,
+     T_IMAGE1D_ARRAY_T = 352,
+     T_IMAGE1D_BUFFER_T = 353,
+     T_IMAGE2D_ARRAY_T = 354,
+     T_IMAGE2D_T = 355,
+     T_IMAGE3D_T = 356,
+     T_IMAGE2D_PTR_T = 357,
+     T_IMAGE2D_DYNAMIC_ARRAY_T = 358,
+     T_VIV_GENERIC_IMAGE_T = 359,
+     T_VIV_GENERIC_GL_IMAGE = 360,
+     T_SIZE_T = 361,
+     T_EVENT_T = 362,
+     T_PTRDIFF_T = 363,
+     T_INTPTR_T = 364,
+     T_UINTPTR_T = 365,
+     T_GENTYPE = 366,
+     T_F_GENTYPE = 367,
+     T_IU_GENTYPE = 368,
+     T_I_GENTYPE = 369,
+     T_U_GENTYPE = 370,
+     T_SIU_GENTYPE = 371,
+     T_BOOL_PACKED = 372,
+     T_BOOL2_PACKED = 373,
+     T_BOOL3_PACKED = 374,
+     T_BOOL4_PACKED = 375,
+     T_BOOL8_PACKED = 376,
+     T_BOOL16_PACKED = 377,
+     T_BOOL32_PACKED = 378,
+     T_CHAR_PACKED = 379,
+     T_CHAR2_PACKED = 380,
+     T_CHAR3_PACKED = 381,
+     T_CHAR4_PACKED = 382,
+     T_CHAR8_PACKED = 383,
+     T_CHAR16_PACKED = 384,
+     T_CHAR32_PACKED = 385,
+     T_UCHAR_PACKED = 386,
+     T_UCHAR2_PACKED = 387,
+     T_UCHAR3_PACKED = 388,
+     T_UCHAR4_PACKED = 389,
+     T_UCHAR8_PACKED = 390,
+     T_UCHAR16_PACKED = 391,
+     T_UCHAR32_PACKED = 392,
+     T_SHORT_PACKED = 393,
+     T_SHORT2_PACKED = 394,
+     T_SHORT3_PACKED = 395,
+     T_SHORT4_PACKED = 396,
+     T_SHORT8_PACKED = 397,
+     T_SHORT16_PACKED = 398,
+     T_SHORT32_PACKED = 399,
+     T_USHORT_PACKED = 400,
+     T_USHORT2_PACKED = 401,
+     T_USHORT3_PACKED = 402,
+     T_USHORT4_PACKED = 403,
+     T_USHORT8_PACKED = 404,
+     T_USHORT16_PACKED = 405,
+     T_USHORT32_PACKED = 406,
+     T_HALF_PACKED = 407,
+     T_HALF2_PACKED = 408,
+     T_HALF3_PACKED = 409,
+     T_HALF4_PACKED = 410,
+     T_HALF8_PACKED = 411,
+     T_HALF16_PACKED = 412,
+     T_HALF32_PACKED = 413,
+     T_GENTYPE_PACKED = 414,
+     T_FLOATNXM = 415,
+     T_DOUBLENXM = 416,
+     T_BUILTIN_DATA_TYPE = 417,
+     T_RESERVED_DATA_TYPE = 418,
+     T_VIV_PACKED_DATA_TYPE = 419,
+     T_IDENTIFIER = 420,
+     T_TYPE_NAME = 421,
+     T_FLOATCONSTANT = 422,
+     T_UINTCONSTANT = 423,
+     T_INTCONSTANT = 424,
+     T_BOOLCONSTANT = 425,
+     T_CHARCONSTANT = 426,
+     T_STRING_LITERAL = 427,
+     T_FIELD_SELECTION = 428,
+     T_LSHIFT_OP = 429,
+     T_RSHIFT_OP = 430,
+     T_INC_OP = 431,
+     T_DEC_OP = 432,
+     T_LE_OP = 433,
+     T_GE_OP = 434,
+     T_EQ_OP = 435,
+     T_NE_OP = 436,
+     T_AND_OP = 437,
+     T_OR_OP = 438,
+     T_XOR_OP = 439,
+     T_MUL_ASSIGN = 440,
+     T_DIV_ASSIGN = 441,
+     T_ADD_ASSIGN = 442,
+     T_MOD_ASSIGN = 443,
+     T_LEFT_ASSIGN = 444,
+     T_RIGHT_ASSIGN = 445,
+     T_AND_ASSIGN = 446,
+     T_XOR_ASSIGN = 447,
+     T_OR_ASSIGN = 448,
+     T_SUB_ASSIGN = 449,
+     T_STRUCT_UNION_PTR = 450,
+     T_INITIALIZER_END = 451,
+     T_BREAK = 452,
+     T_CONTINUE = 453,
+     T_RETURN = 454,
+     T_GOTO = 455,
+     T_WHILE = 456,
+     T_FOR = 457,
+     T_DO = 458,
+     T_ELSE = 459,
+     T_IF = 460,
+     T_SWITCH = 461,
+     T_CASE = 462,
+     T_DEFAULT = 463,
+     T_CONST = 464,
+     T_RESTRICT = 465,
+     T_VOLATILE = 466,
+     T_STATIC = 467,
+     T_EXTERN = 468,
+     T_CONSTANT = 469,
+     T_GLOBAL = 470,
+     T_LOCAL = 471,
+     T_PRIVATE = 472,
+     T_KERNEL = 473,
+     T_UNIFORM = 474,
+     T_READ_ONLY = 475,
+     T_WRITE_ONLY = 476,
+     T_PACKED = 477,
+     T_ALIGNED = 478,
+     T_ENDIAN = 479,
+     T_VEC_TYPE_HINT = 480,
+     T_ATTRIBUTE__ = 481,
+     T_REQD_WORK_GROUP_SIZE = 482,
+     T_WORK_GROUP_SIZE_HINT = 483,
+     T_KERNEL_SCALE_HINT = 484,
+     T_ALWAYS_INLINE = 485,
+     T_UNSIGNED = 486,
+     T_STRUCT = 487,
+     T_UNION = 488,
+     T_TYPEDEF = 489,
+     T_ENUM = 490,
+     T_INLINE = 491,
+     T_SIZEOF = 492,
+     T_TYPE_CAST = 493,
+     T_VEC_STEP = 494,
+     T_TYPEOF = 495,
+     T_ASM_OPND_BRACKET = 496,
+     T_VERY_LAST_TERMINAL = 497
    };
 #endif
 #define T_VERY_FIRST_TERMINAL 258
@@ -350,150 +354,154 @@
 #define T_ULONG8 347
 #define T_ULONG16 348
 #define T_SAMPLER_T 349
-#define T_IMAGE1D_T 350
-#define T_IMAGE1D_ARRAY_T 351
-#define T_IMAGE1D_BUFFER_T 352
-#define T_IMAGE2D_ARRAY_T 353
-#define T_IMAGE2D_T 354
-#define T_IMAGE3D_T 355
-#define T_IMAGE2D_PTR_T 356
-#define T_IMAGE2D_DYNAMIC_ARRAY_T 357
-#define T_SIZE_T 358
-#define T_EVENT_T 359
-#define T_PTRDIFF_T 360
-#define T_INTPTR_T 361
-#define T_UINTPTR_T 362
-#define T_GENTYPE 363
-#define T_F_GENTYPE 364
-#define T_IU_GENTYPE 365
-#define T_I_GENTYPE 366
-#define T_U_GENTYPE 367
-#define T_SIU_GENTYPE 368
-#define T_BOOL_PACKED 369
-#define T_BOOL2_PACKED 370
-#define T_BOOL3_PACKED 371
-#define T_BOOL4_PACKED 372
-#define T_BOOL8_PACKED 373
-#define T_BOOL16_PACKED 374
-#define T_BOOL32_PACKED 375
-#define T_CHAR_PACKED 376
-#define T_CHAR2_PACKED 377
-#define T_CHAR3_PACKED 378
-#define T_CHAR4_PACKED 379
-#define T_CHAR8_PACKED 380
-#define T_CHAR16_PACKED 381
-#define T_CHAR32_PACKED 382
-#define T_UCHAR_PACKED 383
-#define T_UCHAR2_PACKED 384
-#define T_UCHAR3_PACKED 385
-#define T_UCHAR4_PACKED 386
-#define T_UCHAR8_PACKED 387
-#define T_UCHAR16_PACKED 388
-#define T_UCHAR32_PACKED 389
-#define T_SHORT_PACKED 390
-#define T_SHORT2_PACKED 391
-#define T_SHORT3_PACKED 392
-#define T_SHORT4_PACKED 393
-#define T_SHORT8_PACKED 394
-#define T_SHORT16_PACKED 395
-#define T_SHORT32_PACKED 396
-#define T_USHORT_PACKED 397
-#define T_USHORT2_PACKED 398
-#define T_USHORT3_PACKED 399
-#define T_USHORT4_PACKED 400
-#define T_USHORT8_PACKED 401
-#define T_USHORT16_PACKED 402
-#define T_USHORT32_PACKED 403
-#define T_HALF_PACKED 404
-#define T_HALF2_PACKED 405
-#define T_HALF3_PACKED 406
-#define T_HALF4_PACKED 407
-#define T_HALF8_PACKED 408
-#define T_HALF16_PACKED 409
-#define T_HALF32_PACKED 410
-#define T_GENTYPE_PACKED 411
-#define T_FLOATNXM 412
-#define T_DOUBLENXM 413
-#define T_BUILTIN_DATA_TYPE 414
-#define T_RESERVED_DATA_TYPE 415
-#define T_VIV_PACKED_DATA_TYPE 416
-#define T_IDENTIFIER 417
-#define T_TYPE_NAME 418
-#define T_FLOATCONSTANT 419
-#define T_UINTCONSTANT 420
-#define T_INTCONSTANT 421
-#define T_BOOLCONSTANT 422
-#define T_CHARCONSTANT 423
-#define T_STRING_LITERAL 424
-#define T_FIELD_SELECTION 425
-#define T_LSHIFT_OP 426
-#define T_RSHIFT_OP 427
-#define T_INC_OP 428
-#define T_DEC_OP 429
-#define T_LE_OP 430
-#define T_GE_OP 431
-#define T_EQ_OP 432
-#define T_NE_OP 433
-#define T_AND_OP 434
-#define T_OR_OP 435
-#define T_XOR_OP 436
-#define T_MUL_ASSIGN 437
-#define T_DIV_ASSIGN 438
-#define T_ADD_ASSIGN 439
-#define T_MOD_ASSIGN 440
-#define T_LEFT_ASSIGN 441
-#define T_RIGHT_ASSIGN 442
-#define T_AND_ASSIGN 443
-#define T_XOR_ASSIGN 444
-#define T_OR_ASSIGN 445
-#define T_SUB_ASSIGN 446
-#define T_STRUCT_UNION_PTR 447
-#define T_INITIALIZER_END 448
-#define T_BREAK 449
-#define T_CONTINUE 450
-#define T_RETURN 451
-#define T_GOTO 452
-#define T_WHILE 453
-#define T_FOR 454
-#define T_DO 455
-#define T_ELSE 456
-#define T_IF 457
-#define T_SWITCH 458
-#define T_CASE 459
-#define T_DEFAULT 460
-#define T_CONST 461
-#define T_RESTRICT 462
-#define T_VOLATILE 463
-#define T_STATIC 464
-#define T_EXTERN 465
-#define T_CONSTANT 466
-#define T_GLOBAL 467
-#define T_LOCAL 468
-#define T_PRIVATE 469
-#define T_KERNEL 470
-#define T_UNIFORM 471
-#define T_READ_ONLY 472
-#define T_WRITE_ONLY 473
-#define T_PACKED 474
-#define T_ALIGNED 475
-#define T_ENDIAN 476
-#define T_VEC_TYPE_HINT 477
-#define T_ATTRIBUTE__ 478
-#define T_REQD_WORK_GROUP_SIZE 479
-#define T_WORK_GROUP_SIZE_HINT 480
-#define T_KERNEL_SCALE_HINT 481
-#define T_ALWAYS_INLINE 482
-#define T_UNSIGNED 483
-#define T_STRUCT 484
-#define T_UNION 485
-#define T_TYPEDEF 486
-#define T_ENUM 487
-#define T_INLINE 488
-#define T_SIZEOF 489
-#define T_TYPE_CAST 490
-#define T_VEC_STEP 491
-#define T_TYPEOF 492
-#define T_VERY_LAST_TERMINAL 493
+#define T_VIV_GENERIC_GL_SAMPLER 350
+#define T_IMAGE1D_T 351
+#define T_IMAGE1D_ARRAY_T 352
+#define T_IMAGE1D_BUFFER_T 353
+#define T_IMAGE2D_ARRAY_T 354
+#define T_IMAGE2D_T 355
+#define T_IMAGE3D_T 356
+#define T_IMAGE2D_PTR_T 357
+#define T_IMAGE2D_DYNAMIC_ARRAY_T 358
+#define T_VIV_GENERIC_IMAGE_T 359
+#define T_VIV_GENERIC_GL_IMAGE 360
+#define T_SIZE_T 361
+#define T_EVENT_T 362
+#define T_PTRDIFF_T 363
+#define T_INTPTR_T 364
+#define T_UINTPTR_T 365
+#define T_GENTYPE 366
+#define T_F_GENTYPE 367
+#define T_IU_GENTYPE 368
+#define T_I_GENTYPE 369
+#define T_U_GENTYPE 370
+#define T_SIU_GENTYPE 371
+#define T_BOOL_PACKED 372
+#define T_BOOL2_PACKED 373
+#define T_BOOL3_PACKED 374
+#define T_BOOL4_PACKED 375
+#define T_BOOL8_PACKED 376
+#define T_BOOL16_PACKED 377
+#define T_BOOL32_PACKED 378
+#define T_CHAR_PACKED 379
+#define T_CHAR2_PACKED 380
+#define T_CHAR3_PACKED 381
+#define T_CHAR4_PACKED 382
+#define T_CHAR8_PACKED 383
+#define T_CHAR16_PACKED 384
+#define T_CHAR32_PACKED 385
+#define T_UCHAR_PACKED 386
+#define T_UCHAR2_PACKED 387
+#define T_UCHAR3_PACKED 388
+#define T_UCHAR4_PACKED 389
+#define T_UCHAR8_PACKED 390
+#define T_UCHAR16_PACKED 391
+#define T_UCHAR32_PACKED 392
+#define T_SHORT_PACKED 393
+#define T_SHORT2_PACKED 394
+#define T_SHORT3_PACKED 395
+#define T_SHORT4_PACKED 396
+#define T_SHORT8_PACKED 397
+#define T_SHORT16_PACKED 398
+#define T_SHORT32_PACKED 399
+#define T_USHORT_PACKED 400
+#define T_USHORT2_PACKED 401
+#define T_USHORT3_PACKED 402
+#define T_USHORT4_PACKED 403
+#define T_USHORT8_PACKED 404
+#define T_USHORT16_PACKED 405
+#define T_USHORT32_PACKED 406
+#define T_HALF_PACKED 407
+#define T_HALF2_PACKED 408
+#define T_HALF3_PACKED 409
+#define T_HALF4_PACKED 410
+#define T_HALF8_PACKED 411
+#define T_HALF16_PACKED 412
+#define T_HALF32_PACKED 413
+#define T_GENTYPE_PACKED 414
+#define T_FLOATNXM 415
+#define T_DOUBLENXM 416
+#define T_BUILTIN_DATA_TYPE 417
+#define T_RESERVED_DATA_TYPE 418
+#define T_VIV_PACKED_DATA_TYPE 419
+#define T_IDENTIFIER 420
+#define T_TYPE_NAME 421
+#define T_FLOATCONSTANT 422
+#define T_UINTCONSTANT 423
+#define T_INTCONSTANT 424
+#define T_BOOLCONSTANT 425
+#define T_CHARCONSTANT 426
+#define T_STRING_LITERAL 427
+#define T_FIELD_SELECTION 428
+#define T_LSHIFT_OP 429
+#define T_RSHIFT_OP 430
+#define T_INC_OP 431
+#define T_DEC_OP 432
+#define T_LE_OP 433
+#define T_GE_OP 434
+#define T_EQ_OP 435
+#define T_NE_OP 436
+#define T_AND_OP 437
+#define T_OR_OP 438
+#define T_XOR_OP 439
+#define T_MUL_ASSIGN 440
+#define T_DIV_ASSIGN 441
+#define T_ADD_ASSIGN 442
+#define T_MOD_ASSIGN 443
+#define T_LEFT_ASSIGN 444
+#define T_RIGHT_ASSIGN 445
+#define T_AND_ASSIGN 446
+#define T_XOR_ASSIGN 447
+#define T_OR_ASSIGN 448
+#define T_SUB_ASSIGN 449
+#define T_STRUCT_UNION_PTR 450
+#define T_INITIALIZER_END 451
+#define T_BREAK 452
+#define T_CONTINUE 453
+#define T_RETURN 454
+#define T_GOTO 455
+#define T_WHILE 456
+#define T_FOR 457
+#define T_DO 458
+#define T_ELSE 459
+#define T_IF 460
+#define T_SWITCH 461
+#define T_CASE 462
+#define T_DEFAULT 463
+#define T_CONST 464
+#define T_RESTRICT 465
+#define T_VOLATILE 466
+#define T_STATIC 467
+#define T_EXTERN 468
+#define T_CONSTANT 469
+#define T_GLOBAL 470
+#define T_LOCAL 471
+#define T_PRIVATE 472
+#define T_KERNEL 473
+#define T_UNIFORM 474
+#define T_READ_ONLY 475
+#define T_WRITE_ONLY 476
+#define T_PACKED 477
+#define T_ALIGNED 478
+#define T_ENDIAN 479
+#define T_VEC_TYPE_HINT 480
+#define T_ATTRIBUTE__ 481
+#define T_REQD_WORK_GROUP_SIZE 482
+#define T_WORK_GROUP_SIZE_HINT 483
+#define T_KERNEL_SCALE_HINT 484
+#define T_ALWAYS_INLINE 485
+#define T_UNSIGNED 486
+#define T_STRUCT 487
+#define T_UNION 488
+#define T_TYPEDEF 489
+#define T_ENUM 490
+#define T_INLINE 491
+#define T_SIZEOF 492
+#define T_TYPE_CAST 493
+#define T_VEC_STEP 494
+#define T_TYPEOF 495
+#define T_ASM_OPND_BRACKET 496
+#define T_VERY_LAST_TERMINAL 497
 
 
 
@@ -520,9 +528,11 @@ typedef union YYSTYPE {
     clsForExprPair        forExprPair;
     cloIR_POLYNARY_EXPR    funcCall;
     gceSTATUS        status;
+    clsASM_MODIFIER     asmModifier;
+    clsASM_MODIFIERS    asmModifiers;
 } YYSTYPE;
 /* Line 1250 of yacc.c.  */
-#line 534 "gc_cl.tab.h"
+#line 544 "gc_cl.tab.h"
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
 # define YYSTYPE_IS_TRIVIAL 1

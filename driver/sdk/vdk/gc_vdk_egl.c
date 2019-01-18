@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2018 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -333,6 +333,7 @@ vdkSetupEGL(
             EGL_NONE,
         };
 
+
         Egl->eglContext =
             eglCreateContext(Egl->eglDisplay,
                                   Egl->eglConfig,
@@ -340,6 +341,7 @@ vdkSetupEGL(
                                   (ContextAttributes == VDK_CONTEXT_ES20)
                                       ? contextES20
                                       : ContextAttributes);
+
 
         /* Test for error. */
         if (Egl->eglContext == EGL_NO_CONTEXT)

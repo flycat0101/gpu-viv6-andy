@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -65,6 +65,7 @@ typedef struct VIR_INLINER
 
     VSC_IL_PASS_DATA            *pILPassData;
     gctBOOL                     bCheckAlwaysInlineOnly;
+    gctBOOL                     bRemoveUnusedFunctions;
     gctINT                      inlineBudget;
 
 } VIR_Inliner;
@@ -86,12 +87,15 @@ typedef struct VIR_INLINER
 #define VSC_IL_SetPassData(inliner, data)  ((inliner)->pILPassData = (data))
 #define VSC_IL_GetCheckAlwaysInlineOnly(inliner)    ((inliner)->bCheckAlwaysInlineOnly)
 #define VSC_IL_SetCheckAlwaysInlineOnly(inliner, V) ((inliner)->bCheckAlwaysInlineOnly = (V))
+#define VSC_IL_GetRemoveUnusedFunctions(inliner)    ((inliner)->bRemoveUnusedFunctions)
+#define VSC_IL_SetRemoveUnusedFunctions(inliner, V) ((inliner)->bRemoveUnusedFunctions = (V))
 #define VSC_IL_GetInlineBudget(inliner)     ((inliner)->inlineBudget)
 #define VSC_IL_SetInlineBudget(inliner, bg) ((inliner)->inlineBudget = (bg))
 
 extern VSC_ErrCode VSC_IL_PerformOnShader(
     VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(VSC_IL_PerformOnShader);
+DECLARE_SH_NECESSITY_CHECK(VSC_IL_PerformOnShader);
 
 END_EXTERN_C()
 

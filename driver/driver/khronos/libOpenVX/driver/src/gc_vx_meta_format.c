@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -36,6 +36,8 @@ VX_INTERNAL_API void vxoMetaFormat_Release(vx_meta_format_ptr metaFormatPtr)
 
 VX_API_ENTRY vx_status VX_API_CALL vxSetMetaFormatAttribute(vx_meta_format meta_format, vx_enum attribute, const void *ptr, vx_size size)
 {
+    gcmDUMP_API("$VX vxSetMetaFormatAttribute: meta_format=%p, attribute=0x%x, ptr=%p, size=0x%lx", meta_format, attribute, ptr, size);
+
     if (!vxoReference_IsValidAndSpecific(&meta_format->base, VX_TYPE_META_FORMAT)) return VX_ERROR_INVALID_REFERENCE;
 
     if (VX_TYPE(attribute) != (vx_uint32)meta_format->type && (attribute != VX_VALID_RECT_CALLBACK)) return VX_ERROR_INVALID_TYPE;
@@ -185,6 +187,10 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetMetaFormatAttribute(vx_meta_format meta_
 
             break;
 
+        case VX_THRESHOLD_INPUT_FORMAT:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_df_image, 0x3);
+            meta_format->u.thresholdInfo.input_format = *(vx_df_image *)ptr;
+
         case VX_VALID_RECT_CALLBACK:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_kernel_image_valid_rectangle_f, 0x0);
 
@@ -204,6 +210,37 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetMetaFormatAttribute(vx_meta_format meta_
             meta_format->u.objectArrayInfo.item_count = *(vx_size *)ptr;
             break;
 
+        case VX_TENSOR_DATA_TYPE:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
+
+            meta_format->u.tensorInfo.dataFormat = *(vx_enum *)ptr;
+            break;
+
+        case VX_TENSOR_FIXED_POINT_POSITION:
+            vxmVALIDATE_PARAMETERS_EX(ptr, size, vx_uint8);
+
+            meta_format->u.tensorInfo.fixedPointPosition = *(vx_uint8 *)ptr;
+           break;
+
+        case VX_TENSOR_NUMBER_OF_DIMS:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
+
+            meta_format->u.tensorInfo.numOfDims = *(vx_uint32 *)ptr;
+           break;
+
+        case VX_TENSOR_DIMS:
+            if (size <= (sizeof(vx_size)*VX_CONTEXT_TENSOR_MAX_DIMENSION) && ((vx_size)ptr & 0x3) == 0)
+            {
+                vx_uint32 i;
+                for (i = 0; i < size / sizeof(vx_size); i++)
+                    meta_format->u.tensorInfo.dimensions[i] = (vx_uint32)(*(vx_size*)((vx_uint8*)ptr + i * sizeof(vx_size)));
+            }
+            else
+            {
+                return VX_ERROR_INVALID_PARAMETERS;
+            }
+           break;
+
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
             return VX_ERROR_NOT_SUPPORTED;
@@ -215,6 +252,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetMetaFormatAttribute(vx_meta_format meta_
 VX_API_ENTRY vx_status VX_API_CALL vxSetMetaFormatFromReference(vx_meta_format meta, vx_reference examplar)
 {
     vx_status status = VX_SUCCESS;
+
+    gcmDUMP_API("$VX vxSetMetaFormatFromReference: meta=%p, examplar=%p", meta, examplar);
 
     if (vxoReference_IsValidAndSpecific(&meta->base, VX_TYPE_META_FORMAT) == vx_false_e)
         return VX_ERROR_INVALID_REFERENCE;

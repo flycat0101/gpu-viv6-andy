@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,41 +13,83 @@
 
 #include <gc_vxk_common.h>
 
-#if defined(__linux__)
-VX_INTERNAL_API struct timeval gcfVX_PerfStart(vx_reference ref)
+VX_INTERNAL_API gctUINT64 gcfVX_PerfStart(vx_reference ref)
 {
-    struct timeval start = {0};
+    gctUINT64 start = 0;
     if(ref->context->options.enableCNNPerf)
     {
-        gettimeofday(&start, 0);
+        gcoOS_GetTime(&start);
     }
 
     return start;
 }
 
-VX_INTERNAL_API vx_uint32 gcfVX_PerfEnd(vx_reference ref, struct timeval start)
+VX_INTERNAL_API vx_uint32 gcfVX_PerfEnd(vx_reference ref, gctUINT64 start)
 {
     vx_uint32 interval = 0;
 
     if(ref->context->options.enableCNNPerf)
     {
-        struct timeval end = {0};
-        gettimeofday(&end, 0);
-        interval = 1000000 * (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec);
+        gctUINT64 end;
+        gcoOS_GetTime(&end);
+        interval = (vx_uint32)(end - start);
     }
 
     return interval;
 }
-#endif
 
-gceSTATUS gcfVX_Kernel_ConvertFormat(
-    IN vx_df_image Format,
-    OUT gcsVX_IMAGE_INFO_PTR Info
-    )
+#define GCREG_SH_INSTRUCTION_TYPE_FLOAT32 0x0
+#define GCREG_SH_INSTRUCTION_TYPE_FLOAT16 0x1
+#define GCREG_SH_INSTRUCTION_TYPE_SIGNED32 0x2
+#define GCREG_SH_INSTRUCTION_TYPE_SIGNED16 0x3
+#define GCREG_SH_INSTRUCTION_TYPE_SIGNED8 0x4
+#define GCREG_SH_INSTRUCTION_TYPE_UNSIGNED32 0x5
+#define GCREG_SH_INSTRUCTION_TYPE_UNSIGNED16 0x6
+#define GCREG_SH_INSTRUCTION_TYPE_UNSIGNED8 0x7
+
+static gceSTATUS _FillImageInfoFromFormat(vx_df_image Format, gcsVX_IMAGE_INFO_PTR Info)
 {
     gceSTATUS status = gcvSTATUS_OK;
+    gctUINT32 format = 0;
 
     gcmHEADER_ARG("Format=%d Info=%d", Format, Info);
+
+    switch(Format)
+    {
+    case VX_DF_IMAGE_U8:
+    case VX_DF_IMAGE_YUV4:
+    case VX_DF_IMAGE_NV21:
+    case VX_DF_IMAGE_NV12:
+        format = 0x7;
+        break;
+    case VX_DF_IMAGE_U16:
+    case VX_DF_IMAGE_UYVY:
+    case VX_DF_IMAGE_YUYV:
+        format = 0x6;
+        break;
+    case VX_DF_IMAGE_S16:
+        format = 0x3;
+        break;
+    case VX_DF_IMAGE_U32:
+    case VX_DF_IMAGE_RGB:
+    case VX_DF_IMAGE_RGBX:
+        format = 0x5;
+        break;
+    case VX_DF_IMAGE_S32:
+        format = 0x2;
+        break;
+    case VX_DF_IMAGE_F32:
+        format = 0x0;
+        break;
+    default:
+        format = 0x7;
+        break;
+    }
+
+    Info->format = format;
+
+    Info->isFloat = (Info->format == 0x0 ||
+                       Info->format == 0x1) ? gcvTRUE : gcvFALSE;
 
     /* Convert image format into plane count and bits per pixel.*/
     switch (Format)
@@ -150,52 +192,6 @@ gceSTATUS gcfVX_Kernel_ConvertFormat(
     gcmFOOTER_ARG("%d", status);
     return status;
 }
-#define GCREG_SH_INSTRUCTION_TYPE_FLOAT32 0x0
-#define GCREG_SH_INSTRUCTION_TYPE_FLOAT16 0x1
-#define GCREG_SH_INSTRUCTION_TYPE_SIGNED32 0x2
-#define GCREG_SH_INSTRUCTION_TYPE_SIGNED16 0x3
-#define GCREG_SH_INSTRUCTION_TYPE_SIGNED8 0x4
-#define GCREG_SH_INSTRUCTION_TYPE_UNSIGNED32 0x5
-#define GCREG_SH_INSTRUCTION_TYPE_UNSIGNED16 0x6
-#define GCREG_SH_INSTRUCTION_TYPE_UNSIGNED8 0x7
-
-gctUINT32 gcfVX_ConvertFormat(vx_df_image vx_format)
-{
-    gctUINT32 format = 0;
-    switch(vx_format)
-    {
-    case VX_DF_IMAGE_U8:
-    case VX_DF_IMAGE_YUV4:
-    case VX_DF_IMAGE_NV21:
-    case VX_DF_IMAGE_NV12:
-        format = 0x7;
-        break;
-    case VX_DF_IMAGE_U16:
-    case VX_DF_IMAGE_UYVY:
-    case VX_DF_IMAGE_YUYV:
-        format = 0x6;
-        break;
-    case VX_DF_IMAGE_S16:
-        format = 0x3;
-        break;
-    case VX_DF_IMAGE_U32:
-    case VX_DF_IMAGE_RGB:
-    case VX_DF_IMAGE_RGBX:
-        format = 0x5;
-        break;
-    case VX_DF_IMAGE_S32:
-        format = 0x2;
-        break;
-    case VX_DF_IMAGE_F32:
-        format = 0x0;
-        break;
-    default:
-        format = 0x7;
-        break;
-    }
-
-    return format;
-}
 
 static vx_status _SetBorderMode(vx_enum border, gctUINT32 *viv_border)
 {
@@ -223,9 +219,8 @@ static vx_status _SetBorderMode(vx_enum border, gctUINT32 *viv_border)
     return status;
 }
 
-gceSTATUS
-gcfVX_BindInstructions(
-    IN gcoVX_Kernel_Context          *C
+static gceSTATUS _BindInstructions(
+    IN gcoVX_Kernel_Context *C
     )
 {
 #if gcdVX_OPTIMIZER > 1
@@ -328,7 +323,7 @@ gcfVX_BindInstructions(
             }
             /* Allocal a local hwContext for execution. */
             C->hwContext[i] = (gcoVX_Hardware_Context *) vxAllocate(sizeof(gcoVX_Hardware_Context));
-            if (C->hwContext[i] == gcvNULL) return VX_ERROR_NO_MEMORY;
+            if (C->hwContext[i] == gcvNULL) return (gceSTATUS)VX_ERROR_NO_MEMORY;
             hwContext = C->hwContext[i];
 
 #if GC_VX_ASM
@@ -401,6 +396,8 @@ gcfVX_BindInstructions(
 
 
     gcmONERROR(gcoVX_KernelConstruct(hwContext));
+    Context->hasBarrier = hwContext->hasBarrier;
+    Context->hasAtomic  = hwContext->hasAtomic;
 #if gcdVX_OPTIMIZER
     if (!C->codeGenOnly)
     {
@@ -448,6 +445,38 @@ gcoVX_AddObject(
     return obj;
 }
 
+gceSTATUS gcfVX_AllocateMemForImageFromHandle(vx_image image, vx_uint32 planeIndx)
+{
+    gcsSURF_NODE_PTR imageNode = gcvNULL;
+    gceSTATUS status = gcvSTATUS_OK;
+
+    vxQuerySurfaceNode((vx_reference)image, planeIndx, (void**)&imageNode);
+    if (imageNode == NULL)
+    {
+        vx_context context = vxGetContext((vx_reference)image);
+
+        vx_rectangle_t rect;
+        vx_size size = 0;
+        gctUINT32_PTR logical = 0;
+
+        vxGetValidRegionImage(image, &rect);
+        size = vxComputeImagePatchSize(image, &rect, planeIndx);
+
+        status = gcoVX_AllocateMemory((gctUINT32)size, (gctPOINTER*)&logical,
+                                    &image->memory.physicals[planeIndx],
+                                    &image->memory.nodePtrs[planeIndx]);
+
+        context->memoryCount ++;
+
+        imageNode = image->memory.nodePtrs[planeIndx];
+
+        if (size > 0)
+            gcoOS_MemCopy(imageNode->logical, image->memory.logicals[planeIndx], size);
+    }
+
+    return status;
+}
+
 gceSTATUS
 gcfVX_GetImageInfo(
     IN gcoVX_Kernel_Context* Context,
@@ -473,12 +502,8 @@ gcfVX_GetImageInfo(
     vxQueryImage(Image, VX_IMAGE_HEIGHT, &Info->height, sizeof(vx_uint32));
     vxQueryImage(Image, VX_IMAGE_FORMAT, &format, sizeof(format));
 
-    /* Initialize information structure.*/
-    Info->format    = gcfVX_ConvertFormat(format);
-    Info->isFloat   = (Info->format == 0x0 ||
-                       Info->format == 0x1) ? gcvTRUE : gcvFALSE;
-
-    gcmONERROR(gcfVX_Kernel_ConvertFormat(format, Info));
+    /* Initialize image info.*/
+    gcmONERROR(_FillImageInfoFromFormat(format, Info));
 
     /* Process all planes.*/
     for (plane = 0; plane < Info->planes; plane++)
@@ -511,34 +536,10 @@ gcfVX_GetImageInfo(
             }
             else
             {
-                node = gcvNULL;
-                vxQuerySurfaceNode((vx_reference)Image, plane, (void**)&node);
-
-                if (node == NULL)
-                {
-                    vx_context context = vxGetContext((vx_reference)Image);
-
-                    vx_rectangle_t rect;
-                    vx_size size = 0;
-                    gctUINT32_PTR logical = 0;
-
-                    vxGetValidRegionImage(Image, &rect);
-                    size = vxComputeImagePatchSize(Image, &rect, plane);
-
-                    gcoVX_AllocateMemory((gctUINT32)size, (gctPOINTER*)&logical,
-                                                &Image->memory.physicals[plane],
-                                                &Image->memory.nodePtrs[plane]);
-
-                    context->memoryCount ++;
-
-                    node = Image->memory.nodePtrs[plane];
-
-                    if (size > 0)
-                        gcoOS_MemCopy(node->logical, Image->memory.logicals[plane], size);
-                }
+                gcfVX_AllocateMemForImageFromHandle(Image, plane);
 
                 Info->physicals[plane] = (gctUINT32)Image->memory.physicals[plane];
-                Info->logicals[plane] = (gctPOINTER)node->logical;
+                Info->logicals[plane] = (gctPOINTER)Image->memory.nodePtrs[plane]->logical;
             }
         }
         else if (Image->importType == VX_MEMORY_TYPE_DMABUF ||
@@ -555,7 +556,7 @@ gcfVX_GetImageInfo(
             node = gcvNULL;
             vxQuerySurfaceNode((vx_reference)Image, plane, (void**)&node);
 
-            Info->physicals[plane] = (gctUINT32)Image->memory.physicals[plane];
+            Info->physicals[plane] = (gctUINT32)(Image->memory.physicals[plane] + Image->memory.offset[plane]);
             Info->logicals[plane] = Image->memory.logicals[plane];
         }
     }
@@ -580,6 +581,7 @@ gceSTATUS
 gcfVX_GetImageInfoFromTensor(
     IN vx_enum              borderMode,
     IN vx_tensor            tensor,
+    vx_uint32               batchID,
     IN gcsVX_IMAGE_INFO_PTR Info
     )
 {
@@ -587,7 +589,7 @@ gcfVX_GetImageInfoFromTensor(
 
     gcmHEADER_ARG("borderMode=%d", borderMode);
 
-    if ((tensor->viewRegion.dimCount < 2) || (tensor->viewRegion.dimCount > 3))
+    if ((tensor->viewRegion.dimCount < 2) || (tensor->viewRegion.dimCount > 4))
     {
         status =  gcvSTATUS_INVALID_ARGUMENT;
         goto OnError;
@@ -600,7 +602,7 @@ gcfVX_GetImageInfoFromTensor(
 
     Info->isFloat = gcvFALSE;
     /* Initialize information structure.*/
-    switch (tensor->tensorBuffer->dataFormat)
+    switch (TENSOR_DATA_TYPE(tensor))
     {
     case VX_TYPE_INT8:
         Info->format = 0x4;
@@ -665,12 +667,14 @@ gcfVX_GetImageInfoFromTensor(
         goto OnError;
     }
 
-    vxoTensor_GetTensorViewMemory(tensor, VX_NULL, &(Info->physicals[0]));
+    vxoTensor_GetTensorBatchArrayViewMemory(tensor, batchID, &(Info->logicals[0]), &(Info->physicals[0]));
     Info->stride[0] = TENSOR_STRIDE_INDEX(tensor, 1);
     Info->sliceSize = TENSOR_STRIDE_INDEX(tensor, 2);
 
     /* for imageArray/image3D  plane count should be 1 */
-    Info->arraySize = (tensor->viewRegion.dimCount == 3 ? (tensor->viewRegion.viewEnds[2] - tensor->viewRegion.viewStarts[2]) : 1);
+    Info->arraySize = (tensor->viewRegion.dimCount >= 3 ? (tensor->viewRegion.viewEnds[2] - tensor->viewRegion.viewStarts[2]) : 1);
+
+    Info->bytes = gcmALIGN(Info->stride[0] * Info->height, 64);
 
 OnError:
     gcmFOOTER_ARG("%d", status);
@@ -679,13 +683,11 @@ OnError:
 }
 
 
-gceSTATUS gcfVX_GetInfo(
-    IN gcoVX_Kernel_Context *Context
-    )
+static gceSTATUS _GetInfo(gcoVX_Kernel_Context *Context)
 {
     gceSTATUS status = gcvSTATUS_OK;
     vx_uint32 i = 0;
-    gcsVX_IMAGE_INFO_PTR globel = gcvNULL;
+    gcsVX_IMAGE_INFO_PTR global = gcvNULL;
     gcsSURF_NODE_PTR node = gcvNULL;
 
     gcmHEADER_ARG("Context=%d", Context);
@@ -708,8 +710,8 @@ gceSTATUS gcfVX_GetInfo(
 
             gcmONERROR(gcoVX_BindImage(object->index, info));
 
-            if(globel == gcvNULL)
-                globel = info;
+            if(global == gcvNULL)
+                global = info;
 
             break;
 
@@ -739,7 +741,7 @@ gceSTATUS gcfVX_GetInfo(
 
             vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
-            info->physicals[0] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
+            info->physicals[0] = (node->hardwareAddresses[1] != ~0u) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
             info->logicals[0] = node->logical;
 
             gcmONERROR(gcoVX_BindImage(object->index, info));
@@ -751,7 +753,7 @@ gceSTATUS gcfVX_GetInfo(
             node = gcvNULL;
             vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
-            info->physicals[0] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
+            info->physicals[0] = (node->hardwareAddresses[1] != ~0u) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
             info->logicals[0] = node->logical;
 
 #if !gcdVX_OPTIMIZER
@@ -764,12 +766,12 @@ gceSTATUS gcfVX_GetInfo(
 
             vxQueryLUT((vx_lut)object->obj, VX_LUT_COUNT, &info->width, sizeof(vx_uint32));
 
-            gcfVX_Kernel_ConvertFormat(VX_DF_IMAGE_U8, info);
+            _FillImageInfoFromFormat(VX_DF_IMAGE_U8, info);
 
             info->height = 1;
             vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
-            info->physicals[0] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
+            info->physicals[0] = (node->hardwareAddresses[1] != ~0u) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
             info->logicals[0] = node->logical;
 
             gcmONERROR(gcoVX_BindImage(object->index, info));
@@ -778,7 +780,7 @@ gceSTATUS gcfVX_GetInfo(
 
         case GC_VX_CONTEXT_OBJECT_SCALAR:
 
-            gcfVX_Kernel_ConvertFormat(VX_DF_IMAGE_S16, info);
+            _FillImageInfoFromFormat(VX_DF_IMAGE_S16, info);
 
             info->width = 16;
             info->height = 1;
@@ -786,7 +788,7 @@ gceSTATUS gcfVX_GetInfo(
 
             vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
-            info->physicals[0] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
+            info->physicals[0] = (node->hardwareAddresses[1] != ~0u) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
             info->logicals[0] = node->logical;
 
             gcmONERROR(gcoVX_BindImage(object->index, info));
@@ -800,7 +802,7 @@ gceSTATUS gcfVX_GetInfo(
                 status = (gceSTATUS)vxQueryArray((vx_array)object->obj, VX_ARRAY_ITEMSIZE, &itemsize, sizeof(itemsize));
                 status = (gceSTATUS)vxQueryArray((vx_array)object->obj, VX_ARRAY_NUMITEMS, &numItems, sizeof(numItems));
 
-                gcfVX_Kernel_ConvertFormat(VX_DF_IMAGE_S16, info);
+                _FillImageInfoFromFormat(VX_DF_IMAGE_S16, info);
 
                 info->width = (vx_uint32)capacity;
                 info->height = 1;
@@ -808,7 +810,7 @@ gceSTATUS gcfVX_GetInfo(
 
                 vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
-                info->physicals[0] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
+                info->physicals[0] = (node->hardwareAddresses[1] != ~0u) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
                 info->logicals[0] = node->logical;
 
                 gcmONERROR(gcoVX_BindImage(object->index, info));
@@ -817,10 +819,10 @@ gceSTATUS gcfVX_GetInfo(
         }
     }
 
-    Context->params.xmax = (Context->params.xmax > 0) ? Context->params.xmax : globel->width;
-    Context->params.xstep = (Context->params.xstep > 0) ? Context->params.xstep : 1;
+    Context->params.xmax = (Context->params.xmax > 0) ? Context->params.xmax : (global ? global->width : 0);
+    Context->params.xstep = (Context->params.xstep > 0) ?Context->params.xstep : 1;
 
-    Context->params.ymax = (Context->params.ymax > 0) ? Context->params.ymax : globel->height;
+    Context->params.ymax = (Context->params.ymax > 0) ? Context->params.ymax : (global ? global ->height : 0);
     Context->params.ystep = (Context->params.ystep > 0) ? Context->params.ystep : 1;
 
     Context->params.threadcount = 1;
@@ -890,7 +892,7 @@ gceSTATUS gcfVX_Commit(
         {
             /* Dump memory */
             gcmDUMP_BUFFER(gcvNULL,
-                        "verify",
+                        gcvDUMP_BUFFER_VERIFY,
                         Context->obj[i].info.physicals[0],
                         (gctPOINTER)Context->obj[i].info.logicals[0],
                         0,
@@ -903,9 +905,7 @@ gceSTATUS gcfVX_Commit(
     return status;
 }
 
-gceSTATUS gcfVX_SyncMemoryForOutPut(
-    IN gcoVX_Kernel_Context *Context
-    )
+static gceSTATUS _SyncMemoryForOutPut(gcoVX_Kernel_Context *Context)
 {
     gceSTATUS status = gcvSTATUS_OK;
     vx_uint32 i = 0, plane = 0;
@@ -927,12 +927,11 @@ gceSTATUS gcfVX_SyncMemoryForOutPut(
                     continue;
 
                 gcoVX_Flush(gcvTRUE);
-
                 vxGetValidRegionImage(image, &rect);
 
                 for (plane = 0; plane < image->memory.planeCount; plane++)
                 {
-                    if (image->memory.nodePtrs[plane] != VX_NULL && image->memory.logicals[plane] != image->memory.nodePtrs[plane]->logical)
+                    if (image->memory.nodePtrs[plane] != VX_NULL && image->memory.logicals[plane] != (image->memory.nodePtrs[plane]->logical + image->memory.offset[plane]))
                     {
                         vx_size size = 0;
                         size = vxComputeImagePatchSize(image, &rect, plane);
@@ -943,15 +942,6 @@ gceSTATUS gcfVX_SyncMemoryForOutPut(
                 }
             }
             break;
-
-        case GC_VX_CONTEXT_OBJECT_IMAGE_INPUT:
-        case GC_VX_CONTEXT_OBJECT_DISTRIBUTION:
-        case GC_VX_CONTEXT_OBJECT_REMAP:
-        case GC_VX_CONTEXT_OBJECT_LUT:
-        case GC_VX_CONTEXT_OBJECT_SCALAR:
-        case GC_VX_CONTEXT_OBJECT_ARRAY:
-           break;
-
         default:
             break;
         }
@@ -961,22 +951,15 @@ gceSTATUS gcfVX_SyncMemoryForOutPut(
     return status;
 }
 
-gceSTATUS
-gcfVX_RunKernel(
-    IN gcoVX_Kernel_Context *Context
-    )
+static gceSTATUS _RunKernel(gcoVX_Kernel_Context *Context)
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcoHARDWARE savedHardware = gcvNULL;
     gcmHEADER_ARG("Context=%d", Context);
 
-    gcmONERROR(gcoVX_SaveContext(&savedHardware));
-
-    gcmONERROR(gcoVX_Initialize(NULL));
-
+    gcmASSERT(gcoVX_VerifyHardware());
     /* get infos from objects*/
-    gcmONERROR(gcfVX_GetInfo(Context));
+    gcmONERROR(_GetInfo(Context));
 
 #if gcdVX_OPTIMIZER
     if (!Context->codeGenOnly)
@@ -985,7 +968,7 @@ gcfVX_RunKernel(
     }
 #endif
 
-    gcmONERROR(gcfVX_BindInstructions(Context));
+    gcmONERROR(_BindInstructions(Context));
 
 #if VX_NN_SH_PARALLEL
     /* sync CNN layer */
@@ -1005,7 +988,7 @@ gcfVX_RunKernel(
         gcmONERROR(gcoVX_InvokeKernel(&Context->params));
     }
 
-    gcmONERROR(gcfVX_SyncMemoryForOutPut(Context));
+    gcmONERROR(_SyncMemoryForOutPut(Context));
 
 #if VX_NN_SH_PARALLEL
     if (Context->node->cnnWaitEventID1 != 0xffffffff)
@@ -1031,7 +1014,6 @@ gcfVX_RunKernel(
 #endif
 
 OnError:
-    gcmVERIFY_OK(gcoVX_RestoreContext(savedHardware));
     gcmFOOTER_ARG("%d", status);
 
     return status;
@@ -1044,46 +1026,10 @@ gcfVX_Kernel(
     )
 {
     gceSTATUS status;
-    gctINT32  i;
 
     gcmHEADER_ARG("Context=%d", Context);
 
-
-    Context->params.deviceCount = Context->node->base.context->deviceCount;
-    Context->params.devices     = Context->node->base.context->devices;
-
-    if (Context->params.deviceCount > 1)
-    {
-        Context->params.curDeviceID = 0;
-
-        gcmONERROR(gcfVX_RunKernel(Context));
-
-        if (Context->params.usedDeviceCount > 1)
-        {
-            for (i = 1; i < (gctINT32)Context->params.usedDeviceCount; i++)
-            {
-                Context->params.curDeviceID = i;
-
-                gcmONERROR(gcoVX_SetCurrentDevice(Context->params.devices[i], i));
-
-                gcmONERROR(gcfVX_RunKernel(Context));
-
-            }
-
-            for (i = (gctINT32)(Context->params.usedDeviceCount - 1); i >= 0 ; i--)
-            {
-                Context->params.curDeviceID = i;
-                gcmONERROR(gcoVX_SetCurrentDevice(Context->params.devices[i], i));
-                gcmONERROR(gcoVX_MultiDeviceSync(gcvNULL));
-            }
-
-        }
-    }
-    else
-    {
-        gcmONERROR(gcfVX_RunKernel(Context));
-    }
-
+    gcmONERROR(_RunKernel(Context));
 
     gcmFOOTER_ARG("%d", status);
     return VX_SUCCESS;
@@ -1100,16 +1046,10 @@ gcfVX_Flush(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gcoHARDWARE savedHardware;
 
     gcmHEADER_ARG("Stall=%d", Stall);
+    gcoVX_Flush(Stall);
 
-    gcmONERROR(gcoVX_SaveContext(&savedHardware));
-    /* stall */
-    gcmONERROR(gcoVX_Commit(gcvTRUE, Stall, NULL, NULL));
-
-OnError:
-    gcmVERIFY_OK(gcoVX_RestoreContext(savedHardware));
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -1118,22 +1058,54 @@ vx_status gcfVX_Accel(
     IN gctUINT32                CmdAddress,
     IN gceVX_ACCELERATOR_TYPE   Type,
     IN gctUINT32                EventId,
-    IN gctBOOL                  waitEvent
+    IN gctBOOL                  waitEvent,
+    IN gctUINT32                gpuId,
+    IN gctBOOL                  sync
     )
 {
-    vx_status status = VX_SUCCESS;
+    gceSTATUS status = gcvSTATUS_OK;
 
-    status = gcoVX_TriggerAccelerator(CmdAddress, Type, EventId, waitEvent);
+    gcmHEADER_ARG("CmdAddress=0x%x Type=%d EventId=%d waitEvent=%d", CmdAddress, Type, EventId, waitEvent);
 
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VIP_V7))
+    gcmASSERT(gcoVX_VerifyHardware());
+    gcmONERROR(gcoVX_TriggerAccelerator(CmdAddress, Type, EventId, waitEvent, gpuId, sync));
+
+OnError:
+    gcmFOOTER_ARG("%d", status);
+    return (gcmIS_SUCCESS(status) ? VX_SUCCESS : VX_ERROR_NOT_SUPPORTED);
+
+}
+
+
+vx_status
+gcfVX_CaptureState(
+    gctUINT8_PTR CaptureBuffer,
+    gctUINT32 InputSizeInByte,
+    gctUINT32 *pOutputSizeInByte,
+    gctBOOL Enabled,
+    gctBOOL dropCommandEnabled
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("CaptureBuffer=0x%x InputSizeInByte=%d pOutputSizeInByte=0x%x Enabled=%d dropCommandEnabled=%d",
+                   CaptureBuffer, InputSizeInByte, pOutputSizeInByte, Enabled, dropCommandEnabled);
+
+    gcmASSERT(gcoVX_VerifyHardware());
+#if gcdDEBUG
+    if (Enabled)
     {
-        status = gcoVX_Flush(gcvFALSE);
+        gcmASSERT(CaptureBuffer && InputSizeInByte);
     }
     else
     {
-        status = gcoVX_Flush(gcvTRUE);
+        gcmASSERT(pOutputSizeInByte);
     }
+#endif
+    gcmONERROR(gcoVX_CaptureState(CaptureBuffer, InputSizeInByte, pOutputSizeInByte, Enabled, dropCommandEnabled));
 
-    return status;
+OnError:
+    gcmFOOTER_ARG("%d", status);
+    return (gcmIS_SUCCESS(status) ? VX_SUCCESS : VX_ERROR_NO_MEMORY);
 }
 

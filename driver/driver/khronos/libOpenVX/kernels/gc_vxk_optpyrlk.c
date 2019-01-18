@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -98,7 +98,6 @@ vx_status vxVLKTracker(vx_node node, vx_pyramid oldPyramid, vx_pyramid newPyrami
     kernelContext->params.maxLevel = (gctINT32)maxLevel;
     kernelContext->params.winSize = (gctINT32)winSize;
 
-    /*set the initial value (prevPts) to nextPts*/
     {
         vx_size i;
         vx_uint8_ptr dstDataPtr = (vx_uint8_ptr)nextPts->memory.logicals[0];
@@ -389,15 +388,13 @@ vx_status vxVLKTracker(vx_node node, vx_pyramid oldPyramid, vx_pyramid newPyrami
     }
 #endif
 
-#if gcdDUMP
-        /* Verify Output Array */
-        gcmDUMP_BUFFER(gcvNULL,
-                    "verify",
-                    kernelContext->obj[1].info.physicals[0],
-                    (gctPOINTER)kernelContext->obj[1].info.logicals[0],
-                    0,
-                    kernelContext->obj[1].info.bytes);
-#endif
+    /* Verify Output Array */
+    gcmDUMP_BUFFER(gcvNULL,
+                   gcvDUMP_BUFFER_VERIFY,
+                   kernelContext->obj[1].info.physicals[0],
+                   (gctPOINTER)kernelContext->obj[1].info.logicals[0],
+                   0,
+                   kernelContext->obj[1].info.bytes);
 
     return status;
 }

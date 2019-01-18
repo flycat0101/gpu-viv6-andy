@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -24,10 +24,6 @@
 #define GL_GLEXT_PROTOTYPES
 
 #if gcvVERSION_MAJOR >= 5
-/* GLES3 */
-#include <EGL/egl.h>
-#include <GLES3/gl32.h>
-#include <GLES2/gl2ext.h>
 #if defined(ANDROID)
     #if ANDROID_SDK_VERSION >= 20
         #define  GL_VERSION_SUPPORT_CL CL_TRUE
@@ -39,13 +35,21 @@
 #else
     #define  GL_VERSION_SUPPORT_CL CL_TRUE
 #endif
-
+#if GL_VERSION_SUPPORT_CL
+/* GLES3 */
+#include <EGL/egl.h>
+#include <GLES3/gl32.h>
+#include <GLES2/gl2ext.h>
+#endif
 #else
+
+#define  GL_VERSION_SUPPORT_CL CL_FALSE
+#if GL_VERSION_SUPPORT_CL
 /* GLES2 */
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
-#define  GL_VERSION_SUPPORT_CL CL_FALSE
+#endif
 #endif
 
 
@@ -91,7 +95,7 @@ clfExecuteCommandAcquireGLObjects(
             case CL_GL_OBJECT_RENDERBUFFER:
                 {
                     size_t origin[3] = { 0, 0, 0};
-                    size_t region[3] = {aqGLObj->memObjects[i]->u.image.width, aqGLObj->memObjects[i]->u.image.height, aqGLObj->memObjects[i]->u.image.depth};
+                    size_t region[3] = {aqGLObj->memObjects[i]->u.image.imageDesc.image_width, aqGLObj->memObjects[i]->u.image.imageDesc.image_height, aqGLObj->memObjects[i]->u.image.imageDesc.image_depth};
                     clsCommand      command;
                     clsCommandWriteImage_PTR writeImage;
                     command.objectType             = clvOBJECT_COMMAND;
@@ -110,8 +114,8 @@ clfExecuteCommandAcquireGLObjects(
                     writeImage->region[0]            = region[0];
                     writeImage->region[1]            = region[1];
                     writeImage->region[2]            = region[2];
-                    writeImage->inputRowPitch        = aqGLObj->memObjects[i]->u.image.rowPitch;
-                    writeImage->inputSlicePitch      = aqGLObj->memObjects[i]->u.image.slicePitch;
+                    writeImage->inputRowPitch        = aqGLObj->memObjects[i]->u.image.imageDesc.image_row_pitch;
+                    writeImage->inputSlicePitch      = aqGLObj->memObjects[i]->u.image.imageDesc.image_slice_pitch;
                     writeImage->ptr                  = aqGLObj->objectsDatas[i];
                     clfWriteImage(&command);
                 }
@@ -180,7 +184,7 @@ clfExecuteCommandReleaseGLObjects(
                 && (rlsGLObj->objectsDatas[i] != gcvNULL))
             {
                 size_t origin[3] = { 0, 0, 0};
-                size_t region[3] = {rlsGLObj->memObjects[i]->u.image.width, rlsGLObj->memObjects[i]->u.image.height, rlsGLObj->memObjects[i]->u.image.depth};
+                size_t region[3] = {rlsGLObj->memObjects[i]->u.image.imageDesc.image_width, rlsGLObj->memObjects[i]->u.image.imageDesc.image_height, rlsGLObj->memObjects[i]->u.image.imageDesc.image_depth};
                 clsCommand      command;
                 clsCommandReadImage_PTR readImage;
                 command.objectType             = clvOBJECT_COMMAND;
@@ -199,8 +203,8 @@ clfExecuteCommandReleaseGLObjects(
                 readImage->region[0]            = region[0];
                 readImage->region[1]            = region[1];
                 readImage->region[2]            = region[2];
-                readImage->rowPitch             = rlsGLObj->memObjects[i]->u.image.rowPitch;
-                readImage->slicePitch           = rlsGLObj->memObjects[i]->u.image.slicePitch;
+                readImage->rowPitch             = rlsGLObj->memObjects[i]->u.image.imageDesc.image_row_pitch;
+                readImage->slicePitch           = rlsGLObj->memObjects[i]->u.image.imageDesc.image_slice_pitch;
                 readImage->ptr                  = rlsGLObj->objectsDatas[i];
                 clfReadImage(&command);
             }
@@ -641,9 +645,11 @@ clCreateFromGLBuffer(
 {
     clsMem_PTR      buffer     = gcvNULL;
     gctINT          status;
+    GLint           orgBuf = 0;
 
     gcmHEADER_ARG("Context=0x%x Flags=0x%x BufObj=%u ",
                    Context, Flags, BufObj);
+
     gcmDUMP_API("${OCL clCreateFromGLBuffer %s, 0x%x}", Context, Flags);
     VCL_TRACE_API(CreateFromGLBuffer_Pre)(Context, Flags, BufObj, ErrcodeRet);
 
@@ -669,6 +675,12 @@ clCreateFromGLBuffer(
     buffer->fromGL    = gcvTRUE;
     buffer->glObj     = BufObj;
     buffer->glObjType = CL_GL_OBJECT_BUFFER;
+
+    /* TODO - Need to check if BufObj is valid GL buffer object. */
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &orgBuf);
+    glBindBuffer(GL_ARRAY_BUFFER, BufObj);
+    glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, (GLint*)&buffer->u.buffer.size);
+    glBindBuffer(GL_ARRAY_BUFFER, orgBuf);
 
     if (ErrcodeRet)
     {
@@ -976,9 +988,7 @@ clCreateFromGLTexture2D(
 
     imageFormat.image_channel_order = realCLFormat;
     imageFormat.image_channel_data_type = realCLType;
-
     image = clCreateImage2D(Context, Flags, &imageFormat, realWidth, realHeight, 0, gcvNULL, ErrcodeRet);
-
 
     image->fromGL               = gcvTRUE;
     image->glObj                = Texture;
@@ -1093,7 +1103,6 @@ clCreateFromGLTexture3D(
 
     imageFormat.image_channel_order = realCLFormat;
     imageFormat.image_channel_data_type = realCLType;
-
     image = clCreateImage3D(Context, Flags, &imageFormat, realWidth, realHeight, realDepth, 0, 0, gcvNULL, ErrcodeRet);
 
     image->fromGL               = gcvTRUE;
@@ -1204,6 +1213,7 @@ clGetGLObjectInfo(
 
     gcmHEADER_ARG("MemObj=0x%x GLObjectType=%u GLObjectName=0x%x",
                   MemObj, GLObjectType, GLObjectName);
+
     gcmDUMP_API("${OCL clGetGLObjectInfo %s}", MemObj);
 
     if (MemObj == gcvNULL || MemObj->objectType != clvOBJECT_MEM)
@@ -1254,6 +1264,7 @@ clGetGLTextureInfo(
 
     gcmHEADER_ARG("MemObj=0x%x ParamName=%u ParamValueSize=%lu ParamValue=0x%x",
                   MemObj, ParamName, ParamValueSize, ParamValue);
+
     gcmDUMP_API("${OCL clGetGLTextureInfo %s}", MemObj);
 
     if (MemObj == gcvNULL || MemObj->objectType != clvOBJECT_MEM)
@@ -1343,6 +1354,7 @@ clEnqueueAcquireGLObjects(
     gcmHEADER_ARG("CommandQueue=0x%x NumObjects=%d MemObjects=0x%x "
                   "NumEventsInWaitList=%u EventWaitList=0x%x Event=0x%x",
                   CommandQueue, NumObjects, MemObjects, NumEventsInWaitList, EventWaitList, Event);
+
     gcmDUMP_API("${OCL clEnqueueAcquireGLObjects 0x%x}", CommandQueue);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
@@ -1501,7 +1513,7 @@ clEnqueueAcquireGLObjects(
                                                        &buffer->u.buffer.physical,
                                                        &buffer->u.buffer.logical,
                                                        &buffer->u.buffer.node),
-                           CL_MEM_OBJECT_ALLOCATION_FAILURE);
+                                                       CL_MEM_OBJECT_ALLOCATION_FAILURE);
             #else
                 /* GLES2 */
                 clmONERROR(gcoCL_ShareMemoryWithStream((gcoSTREAM) data,
@@ -1524,8 +1536,8 @@ clEnqueueAcquireGLObjects(
         case CL_GL_OBJECT_TEXTURE2D:
             {
                 gctINT          status;
-                GLint           realWidth  = MemObjects[i]->u.image.width;
-                GLint           realHeight = MemObjects[i]->u.image.height;
+                GLint           realWidth  = MemObjects[i]->u.image.imageDesc.image_width;
+                GLint           realHeight = MemObjects[i]->u.image.imageDesc.image_height;
                 GLint           realDepth = 1;
                 GLenum          target;
                 if (  MemObjects[i]->u.image.textureTarget == GL_TEXTURE_CUBE_MAP_POSITIVE_X
@@ -1579,9 +1591,9 @@ clEnqueueAcquireGLObjects(
         case CL_GL_OBJECT_TEXTURE3D:
             {
                 gctINT          status;
-                GLint           realWidth  = MemObjects[i]->u.image.width;
-                GLint           realHeight = MemObjects[i]->u.image.height;
-                GLint           realDepth = MemObjects[i]->u.image.depth;
+                GLint           realWidth  = MemObjects[i]->u.image.imageDesc.image_width;
+                GLint           realHeight = MemObjects[i]->u.image.imageDesc.image_height;
+                GLint           realDepth = MemObjects[i]->u.image.imageDesc.image_depth;
 
                 if (MemObjects[i]->flags != CL_MEM_WRITE_ONLY)
                 {
@@ -1627,7 +1639,7 @@ clEnqueueAcquireGLObjects(
 
                 if (MemObjects[i]->flags != CL_MEM_WRITE_ONLY)
                 {
-                    outBytes = MemObjects[i]->u.image.width * MemObjects[i]->u.image.height * elemenSize;
+                    outBytes = MemObjects[i]->u.image.imageDesc.image_width * MemObjects[i]->u.image.imageDesc.image_height * elemenSize;
                     status = gcoOS_Allocate(gcvNULL, outBytes, &pointers[i]);
                     if (gcmIS_ERROR(status))
                     {
@@ -1638,7 +1650,7 @@ clEnqueueAcquireGLObjects(
 
                     /* TODO - Use resolve to speed up the conversion. */
                     glFinish();
-                    glReadPixels(0, 0, (GLsizei)MemObjects[i]->u.image.width, (GLsizei)MemObjects[i]->u.image.height, glFormat, glType, pointers[i]);
+                    glReadPixels(0, 0, (GLsizei)MemObjects[i]->u.image.imageDesc.image_width, (GLsizei)MemObjects[i]->u.image.imageDesc.image_height, glFormat, glType, pointers[i]);
                 }
                 aqGLObj->objectsDatas[i] = (cl_char *) pointers[i];
 
@@ -1725,6 +1737,7 @@ clEnqueueReleaseGLObjects(
     gcmHEADER_ARG("CommandQueue=0x%x NumObjects=%d MemObjects=0x%x "
                   "NumEventsInWaitList=%u EventWaitList=0x%x Event=0x%x",
                   CommandQueue, NumObjects, MemObjects, NumEventsInWaitList, EventWaitList, Event);
+
     gcmDUMP_API("${OCL clEnqueueReleaseGLObjects 0x%x}", CommandQueue);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
@@ -1814,7 +1827,6 @@ clEnqueueReleaseGLObjects(
     command->outEvent               = Event;
     command->numEventsInWaitList    = NumEventsInWaitList;
     command->eventWaitList          = (clsEvent_PTR *)pointer;
-
     pointer = gcvNULL;
 
     rlsGLObj                = &command->u.releaseGLObjects;
@@ -1847,9 +1859,9 @@ clEnqueueReleaseGLObjects(
                 size_t          outBytes            = 0;
                 if (MemObjects[i]->flags != CL_MEM_READ_ONLY)
                 {
-                    outBytes = MemObjects[i]->u.image.width
-                               * MemObjects[i]->u.image.height
-                               * MemObjects[i]->u.image.depth
+                    outBytes = MemObjects[i]->u.image.imageDesc.image_width
+                               * MemObjects[i]->u.image.imageDesc.image_height
+                               * MemObjects[i]->u.image.imageDesc.image_depth
                                * MemObjects[i]->u.image.elementSize;
                     status = gcoOS_Allocate(gcvNULL, outBytes, &pointers[i]);
                     if (gcmIS_ERROR(status))
@@ -1884,9 +1896,7 @@ clEnqueueReleaseGLObjects(
 
     retCommand = command;
     command = gcvNULL;
-
     retCommand = retCommand;
-
     /* Update */
     for (i = 0; i < NumObjects; i++)
     {
@@ -1923,8 +1933,8 @@ clEnqueueReleaseGLObjects(
                                 MemObjects[i]->u.image.mipLevel,
                                 0,
                                 0,
-                                MemObjects[i]->u.image.width,
-                                MemObjects[i]->u.image.height,
+                                MemObjects[i]->u.image.imageDesc.image_width,
+                                MemObjects[i]->u.image.imageDesc.image_height,
                                 MemObjects[i]->u.image.glFormat,
                                 MemObjects[i]->u.image.glType,
                                 pointers[i]);
@@ -1942,9 +1952,9 @@ clEnqueueReleaseGLObjects(
                              0,
                              0,
                              0,
-                             MemObjects[i]->u.image.width,
-                             MemObjects[i]->u.image.height,
-                             MemObjects[i]->u.image.depth,
+                             MemObjects[i]->u.image.imageDesc.image_width,
+                             MemObjects[i]->u.image.imageDesc.image_height,
+                             MemObjects[i]->u.image.imageDesc.image_depth,
                              MemObjects[i]->u.image.glFormat,
                              MemObjects[i]->u.image.glType,
                              pointers[i]);
@@ -1990,7 +2000,7 @@ clEnqueueReleaseGLObjects(
 
                 /* TODO - Use resolve to speed up the conversion. */
 
-                glTexImage2D( GL_TEXTURE_2D, 0, renderbufferFormat, MemObjects[i]->u.image.width, MemObjects[i]->u.image.height, 0, rbFormat, rbType, pointers[i] );
+                glTexImage2D( GL_TEXTURE_2D, 0, renderbufferFormat, MemObjects[i]->u.image.imageDesc.image_width, MemObjects[i]->u.image.imageDesc.image_height, 0, rbFormat, rbType, pointers[i] );
                 /* Render fullscreen textured quad */
                 glViewport(0, 0, width, height);
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -89,7 +89,7 @@ GLvoid __glComputeArrayPrimBegin(__GLcontext *gc, GLenum mode, GLsizei count, __
     __GLPrimBegin *prevPrimBegin;
     GLuint copyPrevPrimBegin;
     GLint i, offset, size = 0;
-    GLuint mask;
+    GLuint64 mask;
 
     /* We can copy primBegin from prevPrimBegin if vertex format is not changed */
     copyPrevPrimBegin = GL_FALSE;
@@ -396,7 +396,7 @@ GLvoid APIENTRY __gllc_DrawElements(__GLcontext *gc, GLenum mode, GLsizei count,
     GLenum error = GL_NO_ERROR;
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->immediateDispatchTable.DrawElements)(gc, mode, count, type, elemIndices);
+        (*gc->immedModeDispatch.DrawElements)(gc, mode, count, type, elemIndices);
     }
 
     if (mode > GL_TRIANGLE_STRIP_ADJACENCY_EXT) {
@@ -519,7 +519,8 @@ GLvoid APIENTRY __gllc_DrawElements(__GLcontext *gc, GLenum mode, GLsizei count,
         if (bufObj) {
             /* to do */
             GL_ASSERT(0);
-            /* indices = (GLubyte *)(*gc->dp.mapBuffer)(gc, bufObj) + (GLuint)(ULONG_PTR)(elemIndices); */
+            /* indices = (GLubyte*)(*gc->dp.mapBufferRange)(gc, bufObj, __GL_ELEMENT_ARRAY_BUFFER_INDEX, 0, bufObj->size, GL_MAP_READ_BIT)
+                       + (GLuint)(ULONG_PTR)(elemIndices); */
         }
         else {
             indices = (GLvoid *)elemIndices;
@@ -620,7 +621,7 @@ GLvoid APIENTRY __gllc_DrawArrays(__GLcontext *gc, GLenum mode, GLint first, GLs
     GLenum error = GL_NO_ERROR;
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->immediateDispatchTable.DrawArrays)(gc, mode, first, count);
+        (*gc->immedModeDispatch.DrawArrays)(gc, mode, first, count);
     }
 
     if (mode > GL_TRIANGLE_STRIP_ADJACENCY_EXT) {
@@ -770,7 +771,7 @@ GLvoid APIENTRY __gllc_DrawRangeElements(__GLcontext *gc, GLenum mode, GLuint st
 }
 
 GLvoid APIENTRY __gllc_MultiDrawElements(__GLcontext *gc, GLenum mode, const GLsizei *count,
-                            GLenum type, const GLvoid **indices, GLsizei primcount)
+                            GLenum type, const GLvoid *const*indices, GLsizei primcount)
 {
     GLint i;
     for (i = 0; i < primcount; i++) {
@@ -779,7 +780,7 @@ GLvoid APIENTRY __gllc_MultiDrawElements(__GLcontext *gc, GLenum mode, const GLs
     }
 }
 
-GLvoid APIENTRY __gllc_MultiDrawArrays(__GLcontext *gc, GLenum mode, GLint *first, GLsizei *count, GLsizei primcount)
+GLvoid APIENTRY __gllc_MultiDrawArrays(__GLcontext *gc, GLenum mode, const GLint *first, const GLsizei *count, GLsizei primcount)
 {
     GLint i;
     for (i = 0; i < primcount; i++)
@@ -801,7 +802,7 @@ GLvoid APIENTRY __gllc_ArrayElement(__GLcontext *gc, GLint element)
     GLenum error;
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-        (*gc->immediateDispatchTable.ArrayElement)(gc, element);
+        (*gc->immedModeDispatch.ArrayElement)(gc, element);
     }
 
     __GL_MEMZERO(tagBuf, __GL_TOTAL_VERTEX_ATTRIBUTES * sizeof(GLuint));
@@ -823,38 +824,38 @@ GLvoid APIENTRY __gllc_ArrayElement(__GLcontext *gc, GLint element)
         switch (tagBuf[i])
         {
         case __GL_V2F_TAG:
-            (*gc->listCompileDispatchTable.Vertex2fv)(gc, bufptr);
+            (*gc->dlCompileDispatch.Vertex2fv)(gc, bufptr);
             bufptr += 2;
             loop = GL_FALSE;
             break;
         case __GL_V3F_TAG:
-            (*gc->listCompileDispatchTable.Vertex3fv)(gc, bufptr);
+            (*gc->dlCompileDispatch.Vertex3fv)(gc, bufptr);
             bufptr += 3;
             loop = GL_FALSE;
             break;
         case __GL_V4F_TAG:
-            (*gc->listCompileDispatchTable.Vertex4fv)(gc, bufptr);
+            (*gc->dlCompileDispatch.Vertex4fv)(gc, bufptr);
             bufptr += 4;
             loop = GL_FALSE;
             break;
         case __GL_C3F_TAG:
-            (*gc->listCompileDispatchTable.Color3fv)(gc, bufptr);
+            (*gc->dlCompileDispatch.Color3fv)(gc, bufptr);
             bufptr += 3;
             break;
         case __GL_C4F_TAG:
-            (*gc->listCompileDispatchTable.Color4fv)(gc, bufptr);
+            (*gc->dlCompileDispatch.Color4fv)(gc, bufptr);
             bufptr += 4;
             break;
         case __GL_C4UB_TAG:
-            (*gc->listCompileDispatchTable.Color4ubv)(gc, (GLubyte *)bufptr);
+            (*gc->dlCompileDispatch.Color4ubv)(gc, (GLubyte *)bufptr);
             bufptr += 1;
             break;
         case __GL_N3F_TAG:
-            (*gc->listCompileDispatchTable.Normal3fv)(gc, bufptr);
+            (*gc->dlCompileDispatch.Normal3fv)(gc, bufptr);
             bufptr += 3;
             break;
         case __GL_TC2F_TAG:
-            (*gc->listCompileDispatchTable.TexCoord2fv)(gc, bufptr);
+            (*gc->dlCompileDispatch.TexCoord2fv)(gc, bufptr);
             bufptr += 2;
             break;
         case __GL_TC2F_U1_TAG:
@@ -865,11 +866,11 @@ GLvoid APIENTRY __gllc_ArrayElement(__GLcontext *gc, GLint element)
         case __GL_TC2F_U6_TAG:
         case __GL_TC2F_U7_TAG:
             index = GL_TEXTURE0 + (tagBuf[i] - __GL_TC2F_TAG);
-            (*gc->listCompileDispatchTable.MultiTexCoord2fv)(gc, index, bufptr);
+            (*gc->dlCompileDispatch.MultiTexCoord2fv)(gc, index, bufptr);
             bufptr += 2;
             break;
         case __GL_TC3F_TAG:
-            (*gc->listCompileDispatchTable.TexCoord3fv)(gc, bufptr);
+            (*gc->dlCompileDispatch.TexCoord3fv)(gc, bufptr);
             bufptr += 3;
             break;
         case __GL_TC3F_U1_TAG:
@@ -880,11 +881,11 @@ GLvoid APIENTRY __gllc_ArrayElement(__GLcontext *gc, GLint element)
         case __GL_TC3F_U6_TAG:
         case __GL_TC3F_U7_TAG:
             index = GL_TEXTURE0 + (tagBuf[i] - __GL_TC3F_TAG);
-            (*gc->listCompileDispatchTable.MultiTexCoord3fv)(gc, index, bufptr);
+            (*gc->dlCompileDispatch.MultiTexCoord3fv)(gc, index, bufptr);
             bufptr += 3;
             break;
         case __GL_TC4F_TAG:
-            (*gc->listCompileDispatchTable.TexCoord4fv)(gc, bufptr);
+            (*gc->dlCompileDispatch.TexCoord4fv)(gc, bufptr);
             bufptr += 4;
             break;
         case __GL_TC4F_U1_TAG:
@@ -895,18 +896,18 @@ GLvoid APIENTRY __gllc_ArrayElement(__GLcontext *gc, GLint element)
         case __GL_TC4F_U6_TAG:
         case __GL_TC4F_U7_TAG:
             index = GL_TEXTURE0 + (tagBuf[i] - __GL_TC4F_TAG);
-            (*gc->listCompileDispatchTable.MultiTexCoord4fv)(gc, index, bufptr);
+            (*gc->dlCompileDispatch.MultiTexCoord4fv)(gc, index, bufptr);
             bufptr += 4;
             break;
         case __GL_EDGEFLAG_TAG:
-            (*gc->listCompileDispatchTable.EdgeFlag)(gc, edgeflag);
+            (*gc->dlCompileDispatch.EdgeFlag)(gc, edgeflag);
             break;
         case __GL_SC3F_TAG:
-            (*gc->listCompileDispatchTable.SecondaryColor3fv)(gc, bufptr);
+            (*gc->dlCompileDispatch.SecondaryColor3fv)(gc, bufptr);
             bufptr += 3;
             break;
         case __GL_FOG1F_TAG:
-            (*gc->listCompileDispatchTable.FogCoordfv)(gc, bufptr);
+            (*gc->dlCompileDispatch.FogCoordfv)(gc, bufptr);
             bufptr += 1;
             break;
         case __GL_AT4F_I0_TAG:
@@ -926,7 +927,7 @@ GLvoid APIENTRY __gllc_ArrayElement(__GLcontext *gc, GLint element)
         case __GL_AT4F_I14_TAG:
         case __GL_AT4F_I15_TAG:
             index = (tagBuf[i] - __GL_AT4F_I0_TAG);
-            (*gc->listCompileDispatchTable.VertexAttrib4fv)(gc, index, bufptr);
+            (*gc->dlCompileDispatch.VertexAttrib4fv)(gc, index, bufptr);
             bufptr += 4;
             break;
 

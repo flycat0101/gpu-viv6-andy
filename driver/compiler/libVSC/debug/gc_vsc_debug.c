@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1295,7 +1295,7 @@ void vscDIStep(void * ptr, unsigned int pc, unsigned int stepFlag)
 {
     VSC_DIContext * context = (VSC_DIContext *)ptr;
 
-    if (context == gcvNULL || pc < 0)
+    if (context == gcvNULL || (int)pc < 0)
         return;
 
     context->stepState = (VSC_STEP_STATE)stepFlag;

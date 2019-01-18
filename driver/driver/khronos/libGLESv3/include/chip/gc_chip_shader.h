@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -528,14 +528,16 @@ typedef struct __GLchipProgramFlagsRec
 
     gctUINT outputHighpConversion   : 1;
 
+    gctUINT helperInvocationCheck   : 1;
+    gctUINT wideLineFix             : 1;
+
+    /* Link flags. */
     gctUINT VIRCGNone               : 1;    /* for compile-time purpose */
     gctUINT VIRCGOne                : 1;    /* for compile-time purpose */
     gctUINT disableInline           : 1;
     gctUINT deqpMinCompTime         : 1;    /* for compile-time purpose */
 
-    gctUINT helperInvocationCheck   : 1;
-    gctUINT wideLineFix             : 1;
-
+    /* Compile flags. */
     gctUINT disableLoopUnrolling    : 1;
 
     gctUINT reserved                : 8;

@@ -34,8 +34,7 @@
 **
 */
 
-#include "gl.h"
-
+#include <GL/gl.h>
 #include "size.h"
 
 GLint __glFogiv_size(GLenum pname)

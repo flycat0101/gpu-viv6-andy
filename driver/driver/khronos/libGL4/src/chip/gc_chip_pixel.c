@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -685,13 +685,13 @@ gceSTATUS resolveDrawToTempBitmap(
 /* Save current states */
 GLvoid saveAttributes(__GLcontext* gc, __GLchipContext *chipCtx)
 {
-    __GLesDispatchTable *pDispatchTable = gc->currentImmediateTable;
+    __GLdispatchTable *pDispatchTable = &gc->immedModeDispatch;
 
     /* Save current states affected by push/pop */
     pDispatchTable->PushAttrib(gc, GL_CURRENT_BIT  | GL_POLYGON_BIT        | GL_POLYGON_STIPPLE_BIT |
-                               GL_VIEWPORT_BIT | GL_COLOR_BUFFER_BIT   | GL_DEPTH_BUFFER_BIT |
-                               GL_FOG_BIT      | GL_STENCIL_BUFFER_BIT | GL_ENABLE_BIT |
-                               GL_ALL_ATTRIB_BITS);
+                                   GL_VIEWPORT_BIT | GL_COLOR_BUFFER_BIT   | GL_DEPTH_BUFFER_BIT    |
+                                   GL_FOG_BIT      | GL_STENCIL_BUFFER_BIT | GL_ENABLE_BIT          |
+                                   GL_ALL_ATTRIB_BITS);
 
     /* Save current multi sample enable */
     chipCtx->multiSampleOn = gc->state.enables.multisample.multisampleOn;
@@ -704,8 +704,7 @@ GLvoid saveAttributes(__GLcontext* gc, __GLchipContext *chipCtx)
 /* Reset current states to default states for manual draw */
 GLvoid resetAttributes(__GLcontext* gc, __GLchipContext *chipCtx)
 {
-    __GLesDispatchTable *pDispatchTable = gc->currentImmediateTable;
-    __GLesDispatchTable *pESDispatchTable = &(gc->apiDispatchTable);
+    __GLdispatchTable *pDispatchTable = &gc->immedModeDispatch;
 
     /* Push Matrix*/
     pDispatchTable->MatrixMode(gc, GL_MODELVIEW);
@@ -724,39 +723,39 @@ GLvoid resetAttributes(__GLcontext* gc, __GLchipContext *chipCtx)
     pDispatchTable->LoadIdentity(gc);
 
     /* Reset most of the states */
-    pESDispatchTable->Disable(gc, GL_LIGHTING);
-    pESDispatchTable->Disable(gc, GL_CULL_FACE);
-    pESDispatchTable->Disable(gc, GL_POLYGON_STIPPLE);
-    pESDispatchTable->Disable(gc, GL_POLYGON_OFFSET_FILL);
-    pESDispatchTable->Disable(gc, GL_ALPHA_TEST);
-    pESDispatchTable->Disable(gc, GL_BLEND);
-    pESDispatchTable->Disable(gc, GL_LOGIC_OP);
-    pESDispatchTable->Disable(gc, GL_STENCIL_TEST);
-    pESDispatchTable->Disable(gc, GL_DEPTH_TEST);
-    pESDispatchTable->Disable(gc, GL_SCISSOR_TEST);
-    pESDispatchTable->DepthMask(gc, GL_FALSE);
-    pESDispatchTable->Disable(gc, GL_VERTEX_PROGRAM_ARB);
-    pESDispatchTable->Disable(gc, GL_FRAGMENT_PROGRAM_ARB);
-    pESDispatchTable->Disable(gc, GL_FOG);
+    pDispatchTable->Disable(gc, GL_LIGHTING);
+    pDispatchTable->Disable(gc, GL_CULL_FACE);
+    pDispatchTable->Disable(gc, GL_POLYGON_STIPPLE);
+    pDispatchTable->Disable(gc, GL_POLYGON_OFFSET_FILL);
+    pDispatchTable->Disable(gc, GL_ALPHA_TEST);
+    pDispatchTable->Disable(gc, GL_BLEND);
+    pDispatchTable->Disable(gc, GL_LOGIC_OP);
+    pDispatchTable->Disable(gc, GL_STENCIL_TEST);
+    pDispatchTable->Disable(gc, GL_DEPTH_TEST);
+    pDispatchTable->Disable(gc, GL_SCISSOR_TEST);
+    pDispatchTable->DepthMask(gc, GL_FALSE);
+    pDispatchTable->Disable(gc, GL_VERTEX_PROGRAM_ARB);
+    pDispatchTable->Disable(gc, GL_FRAGMENT_PROGRAM_ARB);
+    pDispatchTable->Disable(gc, GL_FOG);
     pDispatchTable->PolygonMode(gc, GL_FRONT_AND_BACK, GL_FILL);
-    pESDispatchTable->Viewport(gc, 0, 0, gc->drawablePrivate->width, gc->drawablePrivate->height);
-    pESDispatchTable->DepthRangef(gc, 0, 1);
-    pESDispatchTable->Disable(gc, GL_CLIP_PLANE0);
-    pESDispatchTable->Disable(gc, GL_CLIP_PLANE1);
-    pESDispatchTable->Disable(gc, GL_CLIP_PLANE2);
-    pESDispatchTable->Disable(gc, GL_CLIP_PLANE3);
-    pESDispatchTable->Disable(gc, GL_CLIP_PLANE4);
-    pESDispatchTable->Disable(gc, GL_CLIP_PLANE5);
-    pESDispatchTable->ActiveTexture(gc, GL_TEXTURE0);
-    pESDispatchTable->Enable(gc, GL_TEXTURE_2D);
-    pESDispatchTable->ActiveTexture(gc, GL_TEXTURE1);
-    pESDispatchTable->Enable(gc, GL_TEXTURE_2D);
+    pDispatchTable->Viewport(gc, 0, 0, gc->drawablePrivate->width, gc->drawablePrivate->height);
+    pDispatchTable->DepthRangef(gc, 0, 1);
+    pDispatchTable->Disable(gc, GL_CLIP_PLANE0);
+    pDispatchTable->Disable(gc, GL_CLIP_PLANE1);
+    pDispatchTable->Disable(gc, GL_CLIP_PLANE2);
+    pDispatchTable->Disable(gc, GL_CLIP_PLANE3);
+    pDispatchTable->Disable(gc, GL_CLIP_PLANE4);
+    pDispatchTable->Disable(gc, GL_CLIP_PLANE5);
+    pDispatchTable->ActiveTexture(gc, GL_TEXTURE0);
+    pDispatchTable->Enable(gc, GL_TEXTURE_2D);
+    pDispatchTable->ActiveTexture(gc, GL_TEXTURE1);
+    pDispatchTable->Enable(gc, GL_TEXTURE_2D);
 
     /* Disable MSAA */
-    pESDispatchTable->Disable(gc, GL_MULTISAMPLE);
+    pDispatchTable->Disable(gc, GL_MULTISAMPLE);
 
     /*Disable glsl path*/
-    pESDispatchTable->UseProgram(gc, 0);
+    pDispatchTable->UseProgram(gc, 0);
     /* Clear error code */
     gc->error = 0;
 }
@@ -764,8 +763,7 @@ GLvoid resetAttributes(__GLcontext* gc, __GLchipContext *chipCtx)
 /* Restore current states according to last save result */
 GLvoid restoreAttributes(__GLcontext* gc, __GLchipContext *chipCtx)
 {
-    __GLesDispatchTable *pDispatchTable = gc->currentImmediateTable;
-    __GLesDispatchTable *pESDispatchTable = &(gc->apiDispatchTable);
+    __GLdispatchTable *pDispatchTable = &gc->immedModeDispatch;
 
     /* Restore previous pushed states */
     pDispatchTable->PopAttrib(gc);
@@ -773,11 +771,11 @@ GLvoid restoreAttributes(__GLcontext* gc, __GLchipContext *chipCtx)
     /* Restore previous MSAA enable or disable */
     if(chipCtx->multiSampleOn)
     {
-        pESDispatchTable->Enable(gc, GL_MULTISAMPLE);
+        pDispatchTable->Enable(gc, GL_MULTISAMPLE);
     }
     else
     {
-        pESDispatchTable->Disable(gc, GL_MULTISAMPLE);
+        pDispatchTable->Disable(gc, GL_MULTISAMPLE);
     }
 
     /* Restore previous error code */
@@ -800,7 +798,7 @@ GLvoid __glChipAccum(__GLcontext* gc, GLenum op, GLfloat value)
     gcsSURF_VIEW surfView = {gcvNULL, 0, 1};
     gcoSURF renderSurf = gcvNULL;
 
-    __GLesDispatchTable *pDispatchTable = gc->currentImmediateTable;
+    __GLdispatchTable *pDispatchTable = &gc->immedModeDispatch;
 
     __GLcoord vertex[4] =
     {
@@ -828,7 +826,7 @@ GLvoid __glChipAccum(__GLcontext* gc, GLenum op, GLfloat value)
     case GL_ADD:
         /* When accum on accum buffer, it should not affected by color mask */
         pDispatchTable->ColorMask(gc, GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-        pDispatchTable->ClampColorARB(gc, GL_CLAMP_FRAGMENT_COLOR_ARB, GL_FALSE);
+        pDispatchTable->ClampColor(gc, GL_CLAMP_FRAGMENT_COLOR_ARB, GL_FALSE);
         break;
 
     case GL_RETURN:
@@ -1175,8 +1173,7 @@ GLboolean __glChipBitmaps(__GLcontext *gc, GLsizei width, GLsizei height, GLfloa
         __GLcoord vertex = gc->state.rasterPos.rPos.winPos;
         __GLcolor color = gc->state.rasterPos.rPos.colors[__GL_FRONTFACE];
         __GLcolor secondaryColor = gc->state.rasterPos.rPos.colors2[__GL_FRONTFACE];
-        __GLesDispatchTable *pDispatchTable = gc->currentImmediateTable;
-        __GLesDispatchTable *pESDispatchTable = &(gc->apiDispatchTable);
+        __GLdispatchTable *pDispatchTable = &gc->immedModeDispatch;
 
         /* The simulation need to use the last texture unit. But if it was already been used, return FALSE */
         if (gc->state.enables.texUnits[texStage].enabledDimension > 0 )
@@ -1194,7 +1191,7 @@ GLboolean __glChipBitmaps(__GLcontext *gc, GLsizei width, GLsizei height, GLfloa
         pDispatchTable->PushAttrib(gc, GL_ALL_ATTRIB_BITS | GL_CURRENT_BIT | GL_LIGHTING_BIT | GL_POLYGON_BIT | GL_POLYGON_STIPPLE_BIT |
                                    GL_TEXTURE_BIT | GL_TRANSFORM_BIT | GL_VIEWPORT_BIT | GL_ENABLE_BIT);
 
-        pESDispatchTable->ActiveTexture(gc, GL_TEXTURE0 + texStage);
+        pDispatchTable->ActiveTexture(gc, GL_TEXTURE0 + texStage);
 
         /* Push Matrix*/
         pDispatchTable->MatrixMode(gc, GL_MODELVIEW);
@@ -1205,35 +1202,35 @@ GLboolean __glChipBitmaps(__GLcontext *gc, GLsizei width, GLsizei height, GLfloa
         pDispatchTable->PushMatrix(gc);
 
         /* State setting */
-        pESDispatchTable->Disable(gc, GL_LIGHTING);/*Disable lighting*/
-        pESDispatchTable->Disable(gc, GL_CULL_FACE);
-        pESDispatchTable->Disable(gc, GL_POLYGON_STIPPLE);
+        pDispatchTable->Disable(gc, GL_LIGHTING);/*Disable lighting*/
+        pDispatchTable->Disable(gc, GL_CULL_FACE);
+        pDispatchTable->Disable(gc, GL_POLYGON_STIPPLE);
         pDispatchTable->PolygonMode(gc, GL_FRONT_AND_BACK, GL_FILL);
-        pESDispatchTable->Disable(gc, GL_CLIP_PLANE0);
-        pESDispatchTable->Disable(gc, GL_CLIP_PLANE1);
-        pESDispatchTable->Disable(gc, GL_CLIP_PLANE2);
-        pESDispatchTable->Disable(gc, GL_CLIP_PLANE3);
-        pESDispatchTable->Disable(gc, GL_CLIP_PLANE4);
-        pESDispatchTable->Disable(gc, GL_CLIP_PLANE5);
-        pESDispatchTable->Enable(gc, GL_ALPHA_TEST);
+        pDispatchTable->Disable(gc, GL_CLIP_PLANE0);
+        pDispatchTable->Disable(gc, GL_CLIP_PLANE1);
+        pDispatchTable->Disable(gc, GL_CLIP_PLANE2);
+        pDispatchTable->Disable(gc, GL_CLIP_PLANE3);
+        pDispatchTable->Disable(gc, GL_CLIP_PLANE4);
+        pDispatchTable->Disable(gc, GL_CLIP_PLANE5);
+        pDispatchTable->Enable(gc, GL_ALPHA_TEST);
         pDispatchTable->AlphaFunc(gc, GL_GREATER, 0);
 
 
         /* Texture initialization */
-        pESDispatchTable->GenTextures(gc, 1, &texture);   /* Create a texture*/
-        pESDispatchTable->BindTexture(gc, GL_TEXTURE_2D, texture);
-        pESDispatchTable->Enable(gc, GL_TEXTURE_2D);      /* Enable texture */
-        pESDispatchTable->TexParameteri(gc, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        pESDispatchTable->TexParameteri(gc, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        pDispatchTable->GenTextures(gc, 1, &texture);   /* Create a texture*/
+        pDispatchTable->BindTexture(gc, GL_TEXTURE_2D, texture);
+        pDispatchTable->Enable(gc, GL_TEXTURE_2D);      /* Enable texture */
+        pDispatchTable->TexParameteri(gc, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        pDispatchTable->TexParameteri(gc, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         pDispatchTable->TexEnvi(gc, GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, __GL_STIPPLE);
         pDispatchTable->TexEnvi(gc, GL_TEXTURE_ENV, GL_RGB_SCALE, 1);
         pDispatchTable->TexEnvi(gc, GL_TEXTURE_ENV, GL_ALPHA_SCALE, 1);
-        pESDispatchTable->Disable(gc, GL_TEXTURE_GEN_S);
-        pESDispatchTable->Disable(gc, GL_TEXTURE_GEN_T);
-        pESDispatchTable->Disable(gc, GL_TEXTURE_GEN_R);
-        pESDispatchTable->Disable(gc, GL_TEXTURE_GEN_Q);
+        pDispatchTable->Disable(gc, GL_TEXTURE_GEN_S);
+        pDispatchTable->Disable(gc, GL_TEXTURE_GEN_T);
+        pDispatchTable->Disable(gc, GL_TEXTURE_GEN_R);
+        pDispatchTable->Disable(gc, GL_TEXTURE_GEN_Q);
 
-        pESDispatchTable->TexImage2D(gc, GL_TEXTURE_2D, 0, GL_LUMINANCE_ALPHA,
+        pDispatchTable->TexImage2D(gc, GL_TEXTURE_2D, 0, GL_LUMINANCE_ALPHA,
                                    width, height, 0, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, texImageData);
 
         /* Transformation Matrix */
@@ -1243,10 +1240,10 @@ GLboolean __glChipBitmaps(__GLcontext *gc, GLsizei width, GLsizei height, GLfloa
         pDispatchTable->LoadIdentity(gc);
         // The raster pos are already in screen space, its depth are already in range [0, 1]
         pDispatchTable->Ortho(gc, 0,gc->drawablePrivate->width, 0, gc->drawablePrivate->height, 0, -1);
-        pESDispatchTable->Viewport(gc, 0, 0, gc->drawablePrivate->width, gc->drawablePrivate->height);
+        pDispatchTable->Viewport(gc, 0, 0, gc->drawablePrivate->width, gc->drawablePrivate->height);
 
         /* Depth Range */
-        pESDispatchTable->DepthRangef(gc, 0, 1);
+        pDispatchTable->DepthRangef(gc, 0, 1);
 
         /*==============Issue draw====================*/
         /* Draw a Quad*/
@@ -1272,10 +1269,10 @@ GLboolean __glChipBitmaps(__GLcontext *gc, GLsizei width, GLsizei height, GLfloa
         pDispatchTable->Vertex4fv(gc, (GLfloat *)&vertex);
         pDispatchTable->End(gc);
 
-        pESDispatchTable->Flush(gc);
+        pDispatchTable->Flush(gc);
 
         /*Delete texture*/
-        pESDispatchTable->DeleteTextures(gc, 1, &texture);
+        pDispatchTable->DeleteTextures(gc, 1, &texture);
 
         /*=============restore state===========================*/
         /* Pop Matrix*/
@@ -1348,8 +1345,7 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
     __GLcoord vertex = gc->state.rasterPos.rPos.winPos;
     __GLcolor color = gc->state.rasterPos.rPos.colors[__GL_FRONTFACE];
     __GLcolor secondaryColor = gc->state.rasterPos.rPos.colors2[__GL_FRONTFACE];
-    __GLesDispatchTable *pDispatchTable = gc->currentImmediateTable;
-    __GLesDispatchTable *pESDispatchTable = &(gc->apiDispatchTable);
+    __GLdispatchTable *pDispatchTable = &gc->immedModeDispatch;
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
 
     if (gc->renderMode != GL_RENDER  || format == GL_STENCIL_INDEX)
@@ -1392,7 +1388,7 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
     pDispatchTable->PushAttrib(gc, GL_CURRENT_BIT | GL_LIGHTING_BIT | GL_POLYGON_BIT | GL_POLYGON_STIPPLE_BIT |
                                GL_TEXTURE_BIT | GL_TRANSFORM_BIT | GL_VIEWPORT_BIT | GL_ENABLE_BIT);
 
-    pESDispatchTable->ActiveTexture(gc, GL_TEXTURE0 + texStage);
+    pDispatchTable->ActiveTexture(gc, GL_TEXTURE0 + texStage);
 
     /* Push Matrix*/
     pDispatchTable->MatrixMode(gc, GL_MODELVIEW);
@@ -1403,38 +1399,36 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
     pDispatchTable->PushMatrix(gc);
 
     /* State setting */
-    pESDispatchTable->Disable(gc, GL_LIGHTING);/*Disable lighting*/
-    pESDispatchTable->Disable(gc, GL_CULL_FACE);
-    pESDispatchTable->Disable(gc, GL_POLYGON_STIPPLE);
+    pDispatchTable->Disable(gc, GL_LIGHTING);/*Disable lighting*/
+    pDispatchTable->Disable(gc, GL_CULL_FACE);
+    pDispatchTable->Disable(gc, GL_POLYGON_STIPPLE);
     pDispatchTable->PolygonMode(gc, GL_FRONT_AND_BACK, GL_FILL);
-    pESDispatchTable->Disable(gc, GL_CLIP_PLANE0);
-    pESDispatchTable->Disable(gc, GL_CLIP_PLANE1);
-    pESDispatchTable->Disable(gc, GL_CLIP_PLANE2);
-    pESDispatchTable->Disable(gc, GL_CLIP_PLANE3);
-    pESDispatchTable->Disable(gc, GL_CLIP_PLANE4);
-    pESDispatchTable->Disable(gc, GL_CLIP_PLANE5);
+    pDispatchTable->Disable(gc, GL_CLIP_PLANE0);
+    pDispatchTable->Disable(gc, GL_CLIP_PLANE1);
+    pDispatchTable->Disable(gc, GL_CLIP_PLANE2);
+    pDispatchTable->Disable(gc, GL_CLIP_PLANE3);
+    pDispatchTable->Disable(gc, GL_CLIP_PLANE4);
+    pDispatchTable->Disable(gc, GL_CLIP_PLANE5);
 
     /* Texture initialization */
-    pESDispatchTable->GenTextures(gc, 1, &texture);   /* Create a texture*/
-    pESDispatchTable->BindTexture(gc, GL_TEXTURE_2D, texture);
-    pESDispatchTable->Enable(gc, GL_TEXTURE_2D);      /* Enable texture */
-    pESDispatchTable->TexParameteri(gc, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    pESDispatchTable->TexParameteri(gc, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    pDispatchTable->GenTextures(gc, 1, &texture);   /* Create a texture*/
+    pDispatchTable->BindTexture(gc, GL_TEXTURE_2D, texture);
+    pDispatchTable->Enable(gc, GL_TEXTURE_2D);      /* Enable texture */
+    pDispatchTable->TexParameteri(gc, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    pDispatchTable->TexParameteri(gc, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     pDispatchTable->TexEnvi(gc, GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
     pDispatchTable->TexEnvi(gc, GL_TEXTURE_ENV, GL_RGB_SCALE, 1);
     pDispatchTable->TexEnvi(gc, GL_TEXTURE_ENV, GL_ALPHA_SCALE, 1);
-    pESDispatchTable->Disable(gc, GL_TEXTURE_GEN_S);
-    pESDispatchTable->Disable(gc, GL_TEXTURE_GEN_T);
-    pESDispatchTable->Disable(gc, GL_TEXTURE_GEN_R);
-    pESDispatchTable->Disable(gc, GL_TEXTURE_GEN_Q);
+    pDispatchTable->Disable(gc, GL_TEXTURE_GEN_S);
+    pDispatchTable->Disable(gc, GL_TEXTURE_GEN_T);
+    pDispatchTable->Disable(gc, GL_TEXTURE_GEN_R);
+    pDispatchTable->Disable(gc, GL_TEXTURE_GEN_Q);
 
     chipCtx->hashKey.hashPixelTransfer = 0;
     checkPixelTransferAttrib(gc, chipCtx);
 
     if (format == GL_DEPTH_COMPONENT)
     {
- //       gc->texture.drawDepthStage = texStage;
-
         /* For depth component, the current color should be set to the current raster color*/
         pDispatchTable->Color4f(gc, color.r, color.g, color.b, color.a);
         pDispatchTable->SecondaryColor3f(gc, secondaryColor.r, secondaryColor.g, secondaryColor.b);
@@ -1463,27 +1457,7 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
     case GL_DEPTH_COMPONENT:
         internalFormat = format;
         break;
-/*
-    case GL_RGBA_INTEGER_EXT:
-    case GL_BGRA_INTEGER_EXT:
-        internalFormat = GL_RGBA32UI_EXT;
-        break;
-    case GL_BLUE_INTEGER_EXT:
-    case GL_GREEN_INTEGER_EXT:
-    case GL_ALPHA_INTEGER_EXT:
-        internalFormat = GL_R32UI;
-        break;
-    case GL_RGB_INTEGER_EXT:
-    case GL_BGR_INTEGER_EXT:
-        internalFormat = GL_RGB32UI_EXT;
-        break;
-    case GL_LUMINANCE_INTEGER_EXT:
-        internalFormat = GL_LUMINANCE32UI_EXT;
-        break;
-    case GL_LUMINANCE_ALPHA_INTEGER_EXT:
-        internalFormat = GL_LUMINANCE_ALPHA32UI_EXT;
-        break;
-*/
+
     default:
         if(gc->modes.rgbFloatMode)
         {
@@ -1547,7 +1521,7 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
             pixels = mappedPixels;
         }
 
-        pESDispatchTable->TexImage2D(gc, GL_TEXTURE_2D, 0, internalFormat,
+        pDispatchTable->TexImage2D(gc, GL_TEXTURE_2D, 0, internalFormat,
                                    width, height, 0, format, type, pixels);
 
         if (mappedPixels != gcvNULL)
@@ -1558,7 +1532,7 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
     }
     else
     {
-        pESDispatchTable->CopyTexImage2D(gc, GL_TEXTURE_2D, 0, internalFormat,
+        pDispatchTable->CopyTexImage2D(gc, GL_TEXTURE_2D, 0, internalFormat,
                                        x, y, width, height, 0);
     }
 
@@ -1595,10 +1569,10 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
     pDispatchTable->Vertex3fv(gc, (GLfloat *)&vertex);
     pDispatchTable->End(gc);
 
-    pESDispatchTable->Flush(gc);
+    pDispatchTable->Flush(gc);
 
     /*Delete texture*/
-    pESDispatchTable->DeleteTextures(gc, 1, &texture);
+    pDispatchTable->DeleteTextures(gc, 1, &texture);
 
     /* Pop Matrix*/
     pDispatchTable->MatrixMode(gc, GL_MODELVIEW);
@@ -1758,6 +1732,19 @@ GLboolean __glChipDrawPixels(__GLcontext *gc, GLsizei width, GLsizei height, GLe
     return simulatePixelOperation(gc, 0, 0, width, height, format, type, pixels, GL_TRUE);
 }
 
+typedef struct sD32F_S8
+{
+    GLfloat depth;
+    GLuint stencil;
+} D32F_S8;
+
+typedef struct
+{
+    GLfloat depth;
+    GLfloat stencil;
+} D32F_S8_1_G32R32F;
+
+
 #define GET_SOURCE(s) \
     ((*s >> (srcShift)) & srcMax) \
 
@@ -1769,6 +1756,13 @@ GLboolean __glChipDrawPixels(__GLcontext *gc, GLsizei width, GLsizei height, GLe
 
 #define CONVERT_NONE(dstDataType, srcDataType) \
     *d = (dstDataType) GET_SOURCE(s) \
+
+#define CONVERT_DEPTH(D32F_S8, D32F_S8_1_G32R32F) \
+    d->stencil = (GLuint)(s->stencil) & 0xff; \
+    d->depth = s->depth \
+
+#define CONVERT_DEPTH_ONLY(dstDataType, D32F_S8_1_G32R32F) \
+    *d = (dstDataType)(s->depth) \
 
 #define CONVERT_DEPTH_PIXELS(dstDataType, srcDataType, convertFunc) \
     do \
@@ -1795,16 +1789,18 @@ __glChipReadDepthStencilPixels(__GLcontext *gc,
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     gceSURF_FORMAT srcFormat;
-    gctUINT32 srcWidth, srcHeight;
-    GLint dx, dy, sx, sy, w, h, i, j;
+    gctUINT32 srcWidth, srcHeight, dstWidth, dstHeight;
+    GLint dx, dy, sx, sy, w, h, i, j, right, bottom, Width, Height;
     gctINT srcStride, dstStride;
     gctUINT32 srcShift, srcMax, dstMax;
     gctPOINTER srcData[3] = {gcvNULL};
     gctPOINTER dstData;
-    gcsSURF_VIEW srcView = chipCtx->readDepthView;
+    gcsSURF_VIEW srcView;
     gcsSURF_VIEW tmpView = {gcvNULL, 0, 1};
 
     gceSTATUS status = gcvSTATUS_OK;
+
+    srcView = gcChipFboSyncFromShadowSurface(gc, &chipCtx->readDepthView, GL_TRUE);
 
     if (srcView.surf == gcvNULL)
     {
@@ -1817,10 +1813,34 @@ __glChipReadDepthStencilPixels(__GLcontext *gc,
                                &srcHeight,
                                gcvNULL));
 
-    sx = x; sy = y; dx = 0; dy = 0; w = width; h = height;
+    right  = gcmMIN(x + width,  (gctINT) srcWidth);
+    bottom = gcmMIN(y + height, (gctINT) srcHeight);
+
+    Width = right - x;
+    Height = bottom - y;
+
+    gcmONERROR(gcoSURF_GetFormat(srcView.surf, gcvNULL, &srcFormat));
+
+    gcmONERROR(gcoSURF_Construct(gcvNULL,
+                                 width, height, 1,
+                                 gcvSURF_BITMAP,
+                                 srcFormat,
+                                 gcvPOOL_DEFAULT,
+                                 &tmpView.surf));
+
+    gcmONERROR(gcoSURF_GetSize(tmpView.surf,
+                            &dstWidth,
+                            &dstHeight,
+                            gcvNULL));
+
+
+    sx = x;
+    sy = y;
+    dx = 0;
+    dy = 0;
 
     if (!calculateArea(&dx, &dy, &sx, &sy,
-                        &w, &h, width, height,
+                        &Width, &Height, dstWidth, dstHeight,
                         srcWidth, srcHeight))
     {
         status = gcvSTATUS_INVALID_ARGUMENT;
@@ -1833,21 +1853,14 @@ __glChipReadDepthStencilPixels(__GLcontext *gc,
         /* 2. can not resolve a depth surface to a user surface */
         gcsSURF_RESOLVE_ARGS rlvArgs = {0};
 
-        gcmONERROR(gcoSURF_GetFormat(srcView.surf, gcvNULL, &srcFormat));
 
-        gcmONERROR(gcoSURF_Construct(gcvNULL,
-                                     w, h, 1,
-                                     gcvSURF_BITMAP,
-                                     srcFormat,
-                                     gcvPOOL_DEFAULT,
-                                     &tmpView.surf));
 
         rlvArgs.version = gcvHAL_ARG_VERSION_V2;
-        rlvArgs.uArgs.v2.yInverted = gcvTRUE;
+        rlvArgs.uArgs.v2.yInverted   = chipCtx->readYInverted;
         rlvArgs.uArgs.v2.srcOrigin.x = sx;
-        rlvArgs.uArgs.v2.srcOrigin.y = sy;
-        rlvArgs.uArgs.v2.rectSize.x  = w;
-        rlvArgs.uArgs.v2.rectSize.y  = h;
+        rlvArgs.uArgs.v2.srcOrigin.y = chipCtx->readYInverted ? (GLint)(srcHeight - (sy + Height)) : sy;
+        rlvArgs.uArgs.v2.rectSize.x  = Width;
+        rlvArgs.uArgs.v2.rectSize.y  = Height;
         rlvArgs.uArgs.v2.numSlices   = 1;
         gcmONERROR(gcoSURF_ResolveRect(&srcView, &tmpView, &rlvArgs));
 
@@ -1865,6 +1878,8 @@ __glChipReadDepthStencilPixels(__GLcontext *gc,
     gcmONERROR(gcoSURF_Lock(tmpView.surf, gcvNULL, srcData));
 
     dstData = buf; sx = 0; sy = 0;
+    w = Width;
+    h = Height;
 
     switch (srcFormat)
     {
@@ -1884,9 +1899,52 @@ __glChipReadDepthStencilPixels(__GLcontext *gc,
             dstStride = width;
             CONVERT_DEPTH_PIXELS(gctUINT8, gctUINT16, CONVERT_FIXED_TO_FIXED);
             break;
-        default : break;
+        case GL_FLOAT:
+            dstMax = 0;
+            dstStride = width * 4;
+            CONVERT_DEPTH_PIXELS(gctFLOAT, gctUINT16, CONVERT_FIXED_TO_FLOAT);
+            break;
+        default:
+            break;
         }
         break;
+
+    case gcvSURF_D24X8:
+        srcShift = 8;
+        srcMax = (1 << 24) - 1;
+
+        switch(type)
+        {
+        case GL_FLOAT:
+            dstMax = 0;
+            dstStride = width * 4;
+            CONVERT_DEPTH_PIXELS(gctFLOAT, gctUINT32, CONVERT_FIXED_TO_FLOAT);
+            break;
+        case GL_UNSIGNED_SHORT:
+            dstMax = (1 << 16) - 1;
+            dstStride = width * 2;
+            CONVERT_DEPTH_PIXELS(gctUINT16, gctUINT32, CONVERT_FIXED_TO_FIXED);
+            break;
+        case GL_UNSIGNED_INT:
+            dstStride = width * 4;
+            CONVERT_DEPTH_PIXELS(gctUINT32, gctUINT32, CONVERT_NONE);
+            break;
+        case GL_UNSIGNED_INT_24_8_EXT:
+            srcShift = 0;
+            srcMax = 0xFFFFFFFF;
+            dstStride = width * 4;
+            CONVERT_DEPTH_PIXELS(gctUINT32, gctUINT32, CONVERT_NONE);
+            break;
+        case GL_UNSIGNED_BYTE:
+            dstStride = width;
+            dstMax = (1 << 8) - 1;
+            CONVERT_DEPTH_PIXELS(gctUINT8, gctUINT32, CONVERT_FIXED_TO_FIXED);
+            break;
+        default:
+            break;
+        }
+        break;
+
 
     case gcvSURF_D24S8:
         srcShift = (format == GL_DEPTH_COMPONENT) ? 8 : 0;
@@ -1927,11 +1985,28 @@ __glChipReadDepthStencilPixels(__GLcontext *gc,
                 CONVERT_DEPTH_PIXELS(gctUINT8, gctUINT32, CONVERT_FIXED_TO_FIXED);
             }
             break;
-        default : break;
+        default:
+            break;
         }
         break;
 
-    default :
+    case gcvSURF_S8D32F_1_G32R32F:
+        switch(type)
+        {
+        case GL_FLOAT_32_UNSIGNED_INT_24_8_REV:
+            dstStride = width * 8;
+            CONVERT_DEPTH_PIXELS(D32F_S8, D32F_S8_1_G32R32F, CONVERT_DEPTH);
+            break;
+        case GL_FLOAT:
+            dstStride = width * 4;
+            CONVERT_DEPTH_PIXELS(gctFLOAT, D32F_S8_1_G32R32F, CONVERT_DEPTH_ONLY);
+            break;
+        default:
+            break;
+        }
+        break;
+
+    default:
         break;
     }
 
@@ -1980,10 +2055,10 @@ __glChipReadPixels(
     __GLformatInfo *formatInfo;
 #ifdef OPENGL40
     GLboolean     RGBFloat = GL_FALSE;
-    gceSURF_FORMAT      floatFmt;
+    gceSURF_FORMAT      floatFmt = gcvSURF_UNKNOWN;
     float  *bit = gcvNULL;
     float  *temp = gcvNULL;
-    GLuint  i,j;
+    GLint  i,j;
 #endif
     gceSTATUS status = gcvSTATUS_OK;
 
@@ -2014,7 +2089,6 @@ __glChipReadPixels(
     default:
         break;
     }
-
 #endif
     srcView = gcChipFboSyncFromShadowSurface(gc, &chipCtx->readRtView, GL_TRUE);
 
@@ -2178,7 +2252,6 @@ __glChipReadPixels(
         wrapformat = gcvSURF_B5G6R5;
         break;
 #endif
-
     default:
         break;
     }

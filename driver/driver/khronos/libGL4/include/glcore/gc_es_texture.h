@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -113,9 +113,9 @@ enum
     ((targetIdx == __GL_TEXTURE_2D_MS_INDEX) || (targetIdx == __GL_TEXTURE_2D_MS_ARRAY_INDEX))
 
 #define __GL_IS_TEXTURE_ARRAY(targetIdx) \
-    ((__GL_IS_2D_TEXTURE_ARRAY(targetIdx)) || \
-     (targetIdx == __GL_TEXTURE_CUBEMAP_ARRAY_INDEX) || \
-     (__GL_IS_1D_TEXTURE_ARRAY(targetIdx)))
+    ((__GL_IS_1D_TEXTURE_ARRAY(targetIdx)) || \
+     (__GL_IS_2D_TEXTURE_ARRAY(targetIdx)) || \
+     (targetIdx == __GL_TEXTURE_CUBEMAP_ARRAY_INDEX))
 
 #define __GL_IS_TEXTURE_CUBE(targetIdx) \
     ((targetIdx == __GL_TEXTURE_CUBEMAP_INDEX) || (targetIdx == __GL_TEXTURE_CUBEMAP_ARRAY_INDEX))
@@ -638,7 +638,39 @@ typedef struct __GLtextureMachineRec
         __GL_ERROR_RET(GL_INVALID_ENUM); \
     }
 
-
+    /* Macro to get 2D texture target and get the texture object
+     */
+#define __GL_TEXSUBIMAGE2D_GET_OBJECT() \
+        activeUnit = gc->state.texture.activeTexIndex;\
+        switch (target) \
+        { \
+        case GL_TEXTURE_1D_ARRAY_EXT: \
+            face = 0; \
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_1D_ARRAY_INDEX]; \
+            tex->arrays = height; \
+            break; \
+        case GL_TEXTURE_2D: \
+            face = 0; \
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_2D_INDEX]; \
+            tex->arrays = 1; \
+            break; \
+        case GL_TEXTURE_RECTANGLE_ARB: \
+            face = 0; \
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_RECTANGLE_INDEX]; \
+            tex->arrays = 1;   \
+            break; \
+        case GL_TEXTURE_CUBE_MAP_POSITIVE_X: \
+        case GL_TEXTURE_CUBE_MAP_NEGATIVE_X: \
+        case GL_TEXTURE_CUBE_MAP_POSITIVE_Y: \
+        case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y: \
+        case GL_TEXTURE_CUBE_MAP_POSITIVE_Z: \
+        case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z: \
+            face = target - GL_TEXTURE_CUBE_MAP_POSITIVE_X; \
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_INDEX]; \
+            break; \
+        default: \
+            __GL_ERROR_RET(GL_INVALID_ENUM); \
+        }
 
 #else
 
@@ -665,6 +697,29 @@ typedef struct __GLtextureMachineRec
         __GL_ERROR_RET(GL_INVALID_ENUM); \
     }
 
+    /* Macro to get 2D texture target and get the texture object
+     */
+#define __GL_TEXSUBIMAGE2D_GET_OBJECT() \
+        activeUnit = gc->state.texture.activeTexIndex;\
+        switch (target) \
+        { \
+        case GL_TEXTURE_2D: \
+            face = 0; \
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_2D_INDEX]; \
+            break; \
+        case GL_TEXTURE_CUBE_MAP_POSITIVE_X: \
+        case GL_TEXTURE_CUBE_MAP_NEGATIVE_X: \
+        case GL_TEXTURE_CUBE_MAP_POSITIVE_Y: \
+        case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y: \
+        case GL_TEXTURE_CUBE_MAP_POSITIVE_Z: \
+        case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z: \
+            face = target - GL_TEXTURE_CUBE_MAP_POSITIVE_X; \
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_INDEX]; \
+            break; \
+        default: \
+            __GL_ERROR_RET(GL_INVALID_ENUM); \
+        }
+
 #endif
 #define __GL_TEXIMAGE3D_GET_OBJECT() \
     activeUnit = gc->state.texture.activeTexIndex; \
@@ -685,29 +740,6 @@ typedef struct __GLtextureMachineRec
             tex->arrays = depth; \
         break; \
         } \
-    default: \
-        __GL_ERROR_RET(GL_INVALID_ENUM); \
-    }
-
-/* Macro to get 2D texture target and get the texture object
- */
-#define __GL_TEXSUBIMAGE2D_GET_OBJECT() \
-    activeUnit = gc->state.texture.activeTexIndex;\
-    switch (target) \
-    { \
-    case GL_TEXTURE_2D: \
-        face = 0; \
-        tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_2D_INDEX]; \
-        break; \
-    case GL_TEXTURE_CUBE_MAP_POSITIVE_X: \
-    case GL_TEXTURE_CUBE_MAP_NEGATIVE_X: \
-    case GL_TEXTURE_CUBE_MAP_POSITIVE_Y: \
-    case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y: \
-    case GL_TEXTURE_CUBE_MAP_POSITIVE_Z: \
-    case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z: \
-        face = target - GL_TEXTURE_CUBE_MAP_POSITIVE_X; \
-        tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_INDEX]; \
-        break; \
     default: \
         __GL_ERROR_RET(GL_INVALID_ENUM); \
     }

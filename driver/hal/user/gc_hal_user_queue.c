@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -24,12 +24,6 @@
 /* Zone used for header/footer. */
 #define _GC_OBJ_ZONE    gcvZONE_BUFFER
 
-typedef struct _gcsChunkHead * gcsChunkHead_PTR;
-struct _gcsChunkHead
-{
-    gcsChunkHead_PTR next;
-};
-
 gceSTATUS
 gcoQUEUE_Construct(
     IN gcoOS Os,
@@ -39,7 +33,6 @@ gcoQUEUE_Construct(
 {
     gcoQUEUE queue = gcvNULL;
     gceSTATUS status;
-    gctPOINTER pointer = gcvNULL;
 
     gcmHEADER();
 
@@ -50,8 +43,7 @@ gcoQUEUE_Construct(
     gcmONERROR(
         gcoOS_Allocate(gcvNULL,
                        gcmSIZEOF(struct _gcoQUEUE),
-                       &pointer));
-    queue = pointer;
+                       (gctPOINTER *)&queue));
 
     /* Initialize the object. */
     queue->object.type = gcvOBJ_QUEUE;
@@ -61,9 +53,9 @@ gcoQUEUE_Construct(
 
     queue->recordCount = 0;
     queue->maxUnlockBytes= 0;
+    queue->tmpBufferRecordCount = 0;
 
-    queue->chunks = gcvNULL;
-
+    queue->chunks   = gcvNULL;
     queue->freeList = gcvNULL;
 
     queue->engine = Engine;
@@ -79,7 +71,7 @@ OnError:
     if (queue != gcvNULL)
     {
         /* Roll back. */
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, queue));
+        gcoOS_Free(gcvNULL, queue);
     }
 
     /* Return the status. */
@@ -93,7 +85,7 @@ gcoQUEUE_Destroy(
     )
 {
     gceSTATUS status;
-    gcsChunkHead_PTR p;
+    gcsQUEUE_CHUNK * chunk;
 
     gcmHEADER_ARG("Queue=0x%x", Queue);
 
@@ -106,20 +98,19 @@ gcoQUEUE_Destroy(
     while (Queue->chunks != gcvNULL)
     {
         /* Unlink the first chunk. */
-        p = Queue->chunks;
-        Queue->chunks = p->next;
+        chunk = Queue->chunks;
+        Queue->chunks = chunk->next;
 
         /* Free the memory. */
-        gcmONERROR(gcmOS_SAFE_FREE_SHARED_MEMORY(gcvNULL, p));
+        gcoOS_FreeSharedMemory(gcvNULL, chunk);
     }
 
     /* Free the queue. */
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Queue));
+    gcoOS_Free(gcvNULL, Queue);
 
     /* Success. */
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
-
 OnError:
     /* Return the status. */
     gcmFOOTER();
@@ -134,9 +125,8 @@ gcoQUEUE_AppendEvent(
 {
     gceSTATUS status;
     gcsQUEUE_PTR record = gcvNULL;
-    gctPOINTER pointer = gcvNULL;
-    gcsChunkHead_PTR p;
-    gctSIZE_T i, count = 15;
+    gcsQUEUE_CHUNK * chunk;
+    gctSIZE_T i;
 
     gcmHEADER_ARG("Queue=0x%x Interface=0x%x", Queue, Interface);
 
@@ -147,22 +137,20 @@ gcoQUEUE_AppendEvent(
     /* Check if we have records on the free list. */
     if (Queue->freeList == gcvNULL)
     {
-        gcmONERROR(gcoOS_AllocateSharedMemory(
-                                    gcvNULL,
-                                    gcmSIZEOF(*p) + gcmSIZEOF(*record) * count,
-                                    &pointer));
-
-        p = pointer;
+        gcmONERROR(
+            gcoOS_AllocateSharedMemory(gcvNULL,
+                                       sizeof(*chunk),
+                                       (gctPOINTER *)&chunk));
 
         /* Put it on the chunk list. */
-        p->next       = Queue->chunks;
-        Queue->chunks = p;
+        chunk->next   = Queue->chunks;
+        Queue->chunks = chunk;
 
         /* Put the records on free list. */
-        for (i = 0, record = (gcsQUEUE_PTR)(p + 1); i < count; i++, record++)
+        for (i = 0; i < gcmCOUNTOF(chunk->record); i++)
         {
-            record->next    = gcmPTR_TO_UINT64(Queue->freeList);
-            Queue->freeList = record;
+            chunk->record[i].next = gcmPTR_TO_UINT64(Queue->freeList);
+            Queue->freeList = &chunk->record[i];
         }
     }
 
@@ -199,8 +187,13 @@ gcoQUEUE_AppendEvent(
     {
         if (Queue->maxUnlockBytes < Interface->u.UnlockVideoMemory.bytes)
         {
-            Queue->maxUnlockBytes = Interface->u.UnlockVideoMemory.bytes;
+            Queue->maxUnlockBytes = (gctUINT)Interface->u.UnlockVideoMemory.bytes;
         }
+    }
+
+    if (Interface->command != gcvHAL_SIGNAL)
+    {
+        Queue->tmpBufferRecordCount++;
     }
 
     /* Success. */
@@ -224,22 +217,18 @@ gcoQUEUE_Free(
     gcmVERIFY_OBJECT(Queue, gcvOBJ_QUEUE);
 
     /* Free any records in the queue. */
-    while (Queue->head != gcvNULL)
+    if (Queue->tail)
     {
-        gcsQUEUE_PTR record;
+        Queue->tail->next = gcmPTR_TO_UINT64(Queue->freeList);
+        Queue->freeList = Queue->tail;
 
-        /* Unlink the first record from the queue. */
-        record      = Queue->head;
-        Queue->head = gcmUINT64_TO_PTR(record->next);
-
-        /* Put record on free list. */
-        record->next    = gcmPTR_TO_UINT64(Queue->freeList);
-        Queue->freeList = record;
+        Queue->head = Queue->tail = gcvNULL;
     }
 
     /* Update count */
     Queue->recordCount = 0;
     Queue->maxUnlockBytes = 0;
+    Queue->tmpBufferRecordCount = 0;
 
     /* Success. */
     gcmFOOTER_NO();

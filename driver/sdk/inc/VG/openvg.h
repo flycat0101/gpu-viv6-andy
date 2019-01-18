@@ -161,6 +161,16 @@ typedef enum {
   VG_EXT_COLOR_INDEX                          = 0x1202,
   VG_EXT_COLOR_INDEX_COUNT                    = 0x1203,
 
+  VG_EXT_YUV2RGB_STANDARD_CUST                = 0x1210,
+  VG_EXT_YUV2RGB_COEF                         = 0x1211,
+  VG_EXT_YUV2RGB_OFFSET                       = 0X1212,
+  VG_EXT_YUV2RGB_ELEMENT_CFG                  = 0x1213,
+
+  VG_EXT_RGB2YUV_STANDARD_CUST                = 0x1220,
+  VG_EXT_RGB2YUV_COEF                         = 0x1221,
+  VG_EXT_RGB2YUV_OFFSET                       = 0X1222,
+  VG_EXT_RGB2YUV_ELEMENT_CFG                  = 0x1223,
+
   VG_PARAM_TYPE_FORCE_SIZE                    = VG_MAX_ENUM
 } VGParamType;
 
@@ -401,6 +411,10 @@ typedef enum {
   VG_EXT_AYUY2                                = 22,
   VG_EXT_ANV12                                = 23,
   VG_EXT_ANV16                                = 24,
+  VG_EXT_UYVY                                 = 25,
+  VG_EXT_AUYVY                                = 26,
+  VG_EXT_YV16                                 = 27,
+  VG_EXT_YV12                                 = 28,
 
   /* {A,X}RGB channel ordering */
   VG_sXRGB_8888                               =  0 | (1 << 6),

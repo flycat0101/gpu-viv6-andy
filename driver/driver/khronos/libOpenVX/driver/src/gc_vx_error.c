@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -31,25 +31,25 @@ VX_INTERNAL_API vx_status vxError_Release(vx_error_ptr errorPtr)
 
 VX_INTERNAL_API vx_error_s *vxoError_GetErrorObject(vx_context_s *context, vx_status status)
 {
-    vx_error_s *error = NULL;
-    vx_size i = 0ul;
-    vxAcquireMutex(context->base.lock);
-    for (i = 0ul; i < context->refCount; i++)
-    {
-        if (context->refTable[i] == NULL)
-            continue;
+    vx_reference_item current;
 
-        if (context->refTable[i]->type == VX_TYPE_ERROR)
+    vxAcquireMutex(context->base.lock);
+
+    current = context->refListHead;
+
+    while (current != VX_NULL)
+    {
+        if (current->ref != VX_NULL && current->ref->type == VX_TYPE_ERROR)
         {
-            error = (vx_error_s *)context->refTable[i];
-            if (error->status == status)
-            {
-                break;
-            }
-            error = NULL;
+            vx_error error = (vx_error_s *)current->ref;
+
+            if (error->status == status) return error;
         }
+
+        current = current->next;
     }
+
     vxReleaseMutex(context->base.lock);
-    return error;
+    return VX_NULL;
 }
 

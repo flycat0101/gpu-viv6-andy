@@ -255,10 +255,20 @@ typedef struct {
 } VGMatrix;
 
 #ifdef VG_VGEXT_PROTOTYPES
-VG_API_CALL void VG_API_ENTRY vgDrawWarpedImageVIV(VGImage Image, VGuint RectangleCount, const VGRectangle* SrcRectangles, const VGRectangle *DstRectangles, const VGMatrix* Matrices) VG_API_EXIT;
+VG_API_CALL void VG_API_ENTRY vgDrawWarpedImageVIV(VGImage Image, VGuint RectangleCount, const VGRectangle* SrcRectangles, const VGfloat DstBounds[][4], const VGfloat DstPoints[][8], const VGfloat Matrices[][9], const VGfloat InvMatrices[][9]) VG_API_EXIT;
+VG_API_CALL void VG_API_ENTRY vgDrawWarpedImageMaskVIV(VGImage Image, VGuint RectangleCount, const VGRectangle* SrcRectangles, VGint DestOrig[][2], VGMaskLayer Masks[], const VGfloat InvMatrices[][9]) VG_API_EXIT;
 #endif
-typedef void (VG_API_ENTRYP PFNVGDRAWARPEDIMAGEPROC) (VGImage Image, VGuint RectangleCount, const VGRectangle* SrcRectangles, const VGRectangle *DstRectangles, const VGMatrix* Matrices);
+typedef void (VG_API_ENTRYP PFNVGDRAWARPEDIMAGEPROC) (VGImage Image, VGuint RectangleCount, const VGRectangle* SrcRectangles, const VGfloat DstBounds[][4], const VGfloat DstPoints[][8], const VGfloat Matrices[][9], const VGfloat InvMatrices[][9]);
+typedef void (VG_API_ENTRYP PFNVGDRAWARPEDIMAGEMASKPROC) (VGImage Image, VGuint RectangleCount, const VGRectangle* SrcRectangles, VGint DestOrig[][2], VGMaskLayer Masks[], const VGfloat InvMatrices[][9]) VG_API_EXIT;
+#endif
 
+#ifndef VG_VIV_render_to_mask_layer
+#define VG_VIV_render_to_mask_layer 1
+
+#ifdef VG_VGEXT_PROTOTYPES
+VG_API_CALL void VG_API_ENTRY  vgRenderToMaskLayerVIV(VGMaskLayer Layer, VGPath Path, VGbitfield  Mode);
+#   endif
+typedef void (VG_API_ENTRY PFNVGRENDERTOMASKLAYERPROC) (VGMaskLayer Layer, VGPath Path, VGbitfield  Mode);
 #endif
 
 #ifndef VG_VIV_image_matrix_invert

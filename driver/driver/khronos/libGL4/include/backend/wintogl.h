@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -37,10 +37,10 @@ typedef struct __VEGLEXimports
     void  (*dereferenceImage)(khrEGL_IMAGE *);
 
     /* Memory management */
-    gctPOINTER (*malloc)(void *ctx, gctSIZE_T size);
-    gctPOINTER (*calloc)(void *ctx, gctSIZE_T numElem, gctSIZE_T elemSize);
-    gctPOINTER (*realloc)(void *ctx, gctPOINTER oldAddr, gctSIZE_T newSize);
-    void       (*free)(void *ctx, gctPOINTER addr);
+    gctPOINTER (*malloc)(__GLcontext *gc, gctSIZE_T size);
+    gctPOINTER (*calloc)(__GLcontext *gc, gctSIZE_T numElem, gctSIZE_T elemSize);
+    gctPOINTER (*realloc)(__GLcontext *gc, gctPOINTER oldAddr, gctSIZE_T newSize);
+    void       (*free)(__GLcontext *gc, gctPOINTER addr);
     gctUINT (*getMemoryStatus)(__GLmemoryStatus);
 
 
@@ -107,7 +107,6 @@ typedef struct __VEGLEXimports
     /* Device DLL interface */
     void *device;
     gctUINT deviceIndex;
-
 
     /* Operating system dependent data goes here */
     void *other;

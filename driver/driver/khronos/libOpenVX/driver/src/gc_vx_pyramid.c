@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -143,6 +143,7 @@ VX_INTERNAL_CALLBACK_API void vxoPyramid_Destructor(vx_reference ref)
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleasePyramid(vx_pyramid *pyramid)
 {
+    gcmDUMP_API("$VX vxReleasePyramid: pyramid=%p", pyramid);
     return vxoReference_Release((vx_reference_ptr)pyramid, VX_TYPE_PYRAMID, VX_REF_EXTERNAL);
 }
 
@@ -150,6 +151,9 @@ VX_API_ENTRY vx_pyramid VX_API_CALL vxCreateVirtualPyramid(
         vx_graph graph, vx_size levels, vx_float32 scale, vx_uint32 width, vx_uint32 height, vx_df_image format)
 {
     vx_pyramid pyramid;
+
+    gcmDUMP_API("$VX vxCreateVirtualPyramid: graph=%p, levels=0x%lx, scale=%f, width=0x%x, height=0x%x, format=0x%x",
+        graph, levels, scale, width, height, format);
 
     if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_NULL;
 
@@ -165,6 +169,10 @@ VX_API_ENTRY vx_pyramid VX_API_CALL vxCreateVirtualPyramid(
 VX_API_ENTRY vx_pyramid VX_API_CALL vxCreatePyramid(
         vx_context context, vx_size levels, vx_float32 scale, vx_uint32 width, vx_uint32 height, vx_df_image format)
 {
+
+    gcmDUMP_API("$VX vxCreatePyramid: context=%p, levels=0x%lx, scale=%f, width=0x%x, height=0x%x, format=0x%x",
+        context, levels, scale, width, height, format);
+
     if (!vxoContext_IsValid(context)) return VX_NULL;
 
     if (width == 0 || height == 0 || format == VX_DF_IMAGE_VIRT)
@@ -177,6 +185,8 @@ VX_API_ENTRY vx_pyramid VX_API_CALL vxCreatePyramid(
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryPyramid(vx_pyramid pyramid, vx_enum attribute, void *ptr, vx_size size)
 {
+    gcmDUMP_API("$VX vxQueryPyramid: pyramid=%p, attribute=0x%x, ptr=%p, size=0x%lx", pyramid, attribute, ptr, size);
+
     if (!vxoReference_IsValidAndSpecific(&pyramid->base, VX_TYPE_PYRAMID)) return VX_ERROR_INVALID_REFERENCE;
 
     switch (attribute)
@@ -222,6 +232,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryPyramid(vx_pyramid pyramid, vx_enum at
 VX_API_ENTRY vx_image VX_API_CALL vxGetPyramidLevel(vx_pyramid pyramid, vx_uint32 index)
 {
     vx_image image;
+
+    gcmDUMP_API("$VX vxGetPyramidLevel: pyramid=%p, index=0x%x", pyramid, index);
 
     if (!vxoReference_IsValidAndSpecific(&pyramid->base, VX_TYPE_PYRAMID)) return VX_NULL;
 

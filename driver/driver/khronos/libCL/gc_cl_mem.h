@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -79,7 +79,6 @@ typedef struct _cl_image_header
     gctUINT                 imageType;
     gceTILING               tiling;
     gctUINT                 physical;           /* GPU address: 32 bit only. */
-    gctUINT                 elementSize;
 }
 clsImageHeader;
 
@@ -109,14 +108,17 @@ typedef struct _cl_mem
     gctPOINTER              mutex;
 
     gcsSURF_NODE_PTR        tmpNode;  /* Used for write buffer Command */
-    union {
-        struct {
+
+    union
+    {
+        struct
+        {
             size_t                  size;
             clsMem_PTR              parentBuffer;
             cl_buffer_create_type   createType;  /* buffer or sub-buffer */
             cl_buffer_region        bufferCreateInfo;
             gctUINT                 allocatedSize;
-            gctPHYS_ADDR            physical;
+            gctUINT32               physical; /* gpu virtual address */
             gctPOINTER              logical;
             gcsSURF_NODE_PTR        node;
             gctBOOL                 wrapped;
@@ -124,37 +126,38 @@ typedef struct _cl_mem
 
         } buffer;
 
-        struct {
-            void *                  image;
-            clsImageFormat          format;
-            size_t                  width;
-            size_t                  height;
-            size_t                  depth;
-            size_t                  rowPitch;
-            size_t                  slicePitch;
+        struct
+        {
+            /* arg from APP, empty arg will compute by driver */
+            cl_image_desc           imageDesc;
+            clsImageFormat          imageFormat;
+
+            /* queried HW format */
             gctSIZE_T               elementSize;
-            gctSIZE_T               size;
-            gctUINT                 allocatedSize;
-            gctPHYS_ADDR            physical;           /* Image header. */
-            gctPOINTER              logical;            /* Image header. */
-            gcsSURF_NODE_PTR        node;
             gceSURF_FORMAT          internalFormat;
+
+            gctUINT                 headerSize;               /* Image header size */
+            gctUINT32               headerPhysical;           /* Image header. */
+            gctPOINTER              headerLogical;            /* Image header. */
+            gcsSURF_NODE_PTR        headerNode;
+
+            VSC_ImageDesc           imageDescriptor;
+
             gcoTEXTURE              texture;
             gcoSURF                 surface;
             gceIMAGE_MEM_TYPE       surfaceMapped;
             gctUINT32               texturePhysical;    /* Texture data. */
             gctPOINTER              textureLogical;     /* Texture data. */
             gctUINT                 textureStride;      /* Texture data. */
-
+            gctSIZE_T               size;
             gceTILING               tiling;
+
             /* GL sharing. */
             cl_GLenum               textureTarget;
             cl_GLint                mipLevel;
             cl_GLenum               glType;
             cl_GLenum               glFormat;
             gctUINT                 textureSlicePitch;  /* Texture data. */
-            clsMem_PTR              buffer;
-            size_t                  arraySize;
         } image;
     } u;
 }

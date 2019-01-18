@@ -11,7 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// TODO: GCC Diagnostics emitted by the lexer:
+// VIV:TODO: GCC Diagnostics emitted by the lexer:
 // PEDWARN: (form feed|vertical tab) in preprocessing directive
 //
 // Universal characters, unicode, char mapping:
@@ -19,7 +19,7 @@
 // WARNING: `%.*s' is not in NFC
 //
 // Other:
-// TODO: Options to support:
+// VIV:TODO: Options to support:
 //    -fexec-charset,-fwide-exec-charset
 //
 //===----------------------------------------------------------------------===//
@@ -222,7 +222,7 @@ static bool isWhitespace(unsigned char c);
 unsigned Lexer::MeasureTokenLength(SourceLocation Loc,
                                    const SourceManager &SM,
                                    const LangOptions &LangOpts) {
-  // TODO: this could be special cased for common tokens like identifiers, ')',
+  // VIV:TODO: this could be special cased for common tokens like identifiers, ')',
   // etc to make this faster, if it mattered.  Just look at StrData[0] to handle
   // all obviously single-char tokens.  This could use
   // Lexer::isObviouslySimpleCharacter for example to handle identifiers or
@@ -865,7 +865,7 @@ void Lexer::LexIdentifier(Token &Result, const char *CurPtr) {
   // or UCN, and ? might be a trigraph for '\', an escaped newline or UCN.
   // FIXME: UCNs.
   //
-  // TODO: Could merge these checks into a CharInfo flag to make the comparison
+  // VIV:TODO: Could merge these checks into a CharInfo flag to make the comparison
   // cheaper
   if (C != '\\' && C != '?' && (C != '$' || !Features.DollarIdents)) {
 FinishIdentifier:

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -309,14 +309,6 @@ __glChipMapBufferRange(
     GLbitfield access
     );
 
-#ifdef OPENGL40
-extern GLvoid*
-__glChiptMapBufferObject(
-    __GLcontext* gc,
-    __GLbufferObject* bufObj
-    );
-#endif
-
 extern GLboolean
 __glChipFlushMappedBufferRange(
     __GLcontext* gc,
@@ -361,6 +353,16 @@ __glChipCopyBufferSubData(
     GLintptr readOffset,
     GLintptr writeOffset,
     GLsizeiptr size
+    );
+
+extern GLboolean
+__glChipGetBufferSubData(
+    __GLcontext* gc,
+    GLuint targetIndex,
+    __GLbufferObject* bufObj,
+    GLintptr offset,
+    GLsizeiptr size,
+    GLvoid* data
     );
 
 extern gceSTATUS

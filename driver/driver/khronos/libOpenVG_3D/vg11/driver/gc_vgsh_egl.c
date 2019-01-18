@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -39,7 +39,7 @@ static void _ConstructChipName(
     *ChipName++ = 'e';
     *ChipName++ = ' ';
 
-    gcmONERROR(gcoHAL_GetProductName(Context->hal, &productName));
+    gcmONERROR(gcoHAL_GetProductName(Context->hal, &productName, gcvNULL));
     gcoOS_StrCatSafe(Context->chipName, vgdCHIP_NAME_LEN, productName);
 
     gcmOS_SAFE_FREE(Context->os, productName);
@@ -49,40 +49,6 @@ OnError:
     gcmFOOTER_NO();
     return;
 
-}
-#endif
-
-#ifdef _DUMP_FILE
-static void
-_AddSurface(
-    gcoDUMP Dump,
-    gcoSURF Surface
-    )
-{
-    gctUINT32 address;
-    gctPOINTER memory[3];
-    gctUINT width, height;
-    gctINT stride;
-    gceSURF_FORMAT format;
-
-    /* Lock the surface. */
-    gcmVERIFY_OK(gcoSURF_Lock(Surface, &address, memory));
-
-    /* Get the size of the surface. */
-    gcmVERIFY_OK(gcoSURF_GetAlignedSize(Surface, &width, &height, &stride));
-
-    /* Get the format of the surface. */
-    gcmVERIFY_OK(gcoSURF_GetFormat(Surface, gcvNULL, &format));
-
-    /* Dump the surface. */
-    gcmVERIFY_OK(gcoDUMP_AddSurface(Dump,
-                                    width, height,
-                                    format,
-                                    address,
-                                    stride * height));
-
-    /* Unlock the surface. */
-    gcmVERIFY_OK(gcoSURF_Unlock(Surface, memory[0]));
 }
 #endif
 

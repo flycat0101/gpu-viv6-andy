@@ -523,7 +523,7 @@ ConstantRange::sub(const ConstantRange &Other) const {
 
 ConstantRange
 ConstantRange::multiply(const ConstantRange &Other) const {
-  // TODO: If either operand is a single element and the multiply is known to
+  // VIV:TODO: If either operand is a single element and the multiply is known to
   // be non-wrapping, round the result min and max value to the appropriate
   // multiple of that element. If wrapping is possible, at least adjust the
   // range according to the greatest power-of-two factor of the single element.

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -184,7 +184,6 @@ gcChipBatchPlay(
     __GLchipPatchBatch  savedBatch;
     __GLchipPatchBatch  *batch;
     __GLchipContext   *chipCtx = CHIP_CTXINFO(gc);
-    __GLesDispatchTable *dispatch = &gc->apiDispatchTable;
 
     /* Disable stack saving. */
     chipCtx->patchInfo.stackSave = gcvFALSE;
@@ -212,7 +211,7 @@ gcChipBatchPlay(
             __GL_SET_TEX_UNIT_BIT(gc, 0, __GL_TEXPARAMETER_BITS | __GL_TEXIMAGE_BITS);
 
             /* Execute the batch. */
-            dispatch->DrawElements(gc,
+            gc->immedModeDispatch.DrawElements(gc,
                                    batch->mode,
                                    (GLsizei)batch->count,
                                    batch->type,
@@ -458,7 +457,7 @@ gcChipPatchCKZombies2_Replace(
 
     gctCONST_STRING vertSource = patchedSrcs[__GLSL_STAGE_VS]
                                ? patchedSrcs[__GLSL_STAGE_VS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_VS] = gcChipPatchShaderReplace(SHADER_TYPE_VERT, vertSource, vertexShaders);
 
 }
@@ -501,7 +500,7 @@ gcChipPatchAndroidCTSTextureView_Replace(
 
     fragSource = patchedSrcs[__GLSL_STAGE_FS]
                ? patchedSrcs[__GLSL_STAGE_FS]
-               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     fragReplace = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragShaders);
 
     /* Check some state.*/
@@ -544,7 +543,7 @@ gcChipPatchA8_Remove(
 
     gctCONST_STRING vertSource = patchedSrcs[__GLSL_STAGE_VS]
                                ? patchedSrcs[__GLSL_STAGE_VS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_VS] = gcChipPatchShaderReplace(SHADER_TYPE_VERT, vertSource, vertexShaders);
 
 }
@@ -1503,7 +1502,7 @@ gcChipPatch9(
 
     /* Replace shaders. */
     gcChipUtilsDecrypt(fragmentShader);
-    patchedSrcs[__GLSL_STAGE_VS] = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_VS] = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
@@ -1626,7 +1625,7 @@ gcChipPatch10(
 
     /* Replace shaders. */
     gcChipUtilsDecrypt(fragmentShader);
-    patchedSrcs[__GLSL_STAGE_VS] = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_VS] = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
@@ -2089,7 +2088,7 @@ gcChipPatch101(
 
     /* Replace shaders. */
     gcChipUtilsDecrypt(fragmentShader);
-    patchedSrcs[__GLSL_STAGE_VS] = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_VS] = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
@@ -2341,7 +2340,7 @@ gcChipPatch115(
 
     /* Replace shaders. */
     gcChipUtilsDecrypt(fragmentShader);
-    patchedSrcs[__GLSL_STAGE_VS] = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_VS] = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
@@ -2606,7 +2605,7 @@ gcChipPatch2711(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
 
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
@@ -2684,7 +2683,7 @@ gcChipPatch120(
 
     /* Replace shaders. */
     gcChipUtilsDecrypt(fragmentShader);
-    patchedSrcs[__GLSL_STAGE_VS] = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_VS] = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
@@ -2698,9 +2697,10 @@ gcChipPatch119(
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
 
+#if gcdUSE_WCLIP_PATCH
     chipCtx->clipW = gcvTRUE;
+#endif
     chipCtx->patchInfo.patchFlags.clipW = 1;
-
 }
 
 #endif
@@ -2785,7 +2785,7 @@ gcChipPatch19(
     gcATTRIBUTE texcoord0;
     gcSHADER shader = gcvNULL;
     gceSTATUS status = gcvSTATUS_OK;
-    __GLshaderObject *fragShaderObj = progObj->programInfo.attachedShader[__GLSL_STAGE_FS];
+    __GLshaderObject *fragShaderObj = progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader;
     gctUINT32_PTR compilerVersion = gcvNULL;
 
     gcmHEADER_ARG("gc=0x%x progObj=0x%x index=%d", gc, progObj, index);
@@ -6764,7 +6764,7 @@ gcChipPatch2701(
     gctCONST_STRING vertReplace;
     vertSource = patchedSrcs[__GLSL_STAGE_VS]
                ? patchedSrcs[__GLSL_STAGE_VS]
-               : progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
+               : progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.source;
     vertReplace = gcChipPatchShaderReplace(SHADER_TYPE_VERT, vertSource, vertexShaders);
 
     if (vertReplace && vertReplace[0] != '\0')
@@ -6774,7 +6774,7 @@ gcChipPatch2701(
 
     fragSource = patchedSrcs[__GLSL_STAGE_FS]
                ? patchedSrcs[__GLSL_STAGE_FS]
-               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
 
     if (gcChipUtilFindString(SH_ENC, fragSource, define6, &searchIndex) != gcvNULL)
     {
@@ -8183,7 +8183,7 @@ gcChipPatch2720(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragmentShaders);
 
 }
@@ -8699,7 +8699,7 @@ gcChipPatch2702(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
 
     if (gcChipUtilFindString(gcvTRUE, fragSource, fragment270Shaders->searchString, &searchIndex) != gcvNULL)
         patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment270Shaders);
@@ -8787,7 +8787,7 @@ gcChipPatch2152(
 {
     gcSHADER shader = gcvNULL;
     gceSTATUS status;
-    __GLshaderObject *fragShaderObj = progObj->programInfo.attachedShader[__GLSL_STAGE_FS];
+    __GLshaderObject *fragShaderObj = progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader;
     gctUINT32_PTR compilerVersion = gcvNULL;
 
     do
@@ -9265,7 +9265,7 @@ gcChipPatch2156(
 
     gctCONST_STRING vertSource = patchedSrcs[__GLSL_STAGE_VS]
                                ? patchedSrcs[__GLSL_STAGE_VS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_VS] = gcChipPatchShaderReplace(SHADER_TYPE_VERT, vertSource, vertexShaders);
 
     gcChipUtilsDecrypt(fragmentShader);
@@ -9704,7 +9704,7 @@ gcChipPatch3033(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
@@ -9913,7 +9913,7 @@ gcChipPatch3033_31(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 
 }
@@ -10041,7 +10041,7 @@ gcChipPatch3034(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
@@ -10280,7 +10280,7 @@ gcChipPatch3036(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
@@ -10470,7 +10470,7 @@ gcChipPatch3036_31(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
@@ -11264,7 +11264,7 @@ gcChipPatch3037(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     gctINT searchIndex = 0;
 
     static gctCONST_STRING finalKeyWord =
@@ -11826,7 +11826,7 @@ gcChipPatch3037_31(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30FinalShaders);
 }
 
@@ -11881,7 +11881,7 @@ gcChipPatch3038(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
@@ -11916,7 +11916,7 @@ gcChipPatch3038_31(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
@@ -11980,7 +11980,7 @@ gcChipPatch3039(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
@@ -12187,7 +12187,7 @@ gcChipPatch303A(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
@@ -12422,7 +12422,7 @@ gcChipPatch303A_31(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
@@ -13037,7 +13037,7 @@ gcChipPatch3133(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
@@ -13250,7 +13250,7 @@ gcChipPatch3136(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
@@ -13511,7 +13511,7 @@ gcChipPatch3137(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30FinalShaders);
 }
 
@@ -13554,7 +13554,7 @@ gcChipPatch3138(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
@@ -13825,7 +13825,7 @@ gcChipPatch313A(
 
     gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
                                ? patchedSrcs[__GLSL_STAGE_FS]
-                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.source;
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
@@ -14561,7 +14561,7 @@ gcChipPatch_PSC(
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-    __GLshaderInfo *vsShaderInfo = &progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo;
+    __GLshaderInfo *vsShaderInfo = &progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo;
 
     chipCtx->wLimitPSC = gcvTRUE;
 
@@ -29032,7 +29032,7 @@ gcChipPatchLink(
 {
 #if !gcdRENDER_QUALITY_CHECK
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-    __GLshaderObject **ppShaders = programObject->programInfo.attachedShader;
+    __GLshaderObjectList **ppShaders = programObject->programInfo.attachedShader;
     gctCONST_STRING searchSrc[__GLSL_STAGE_LAST] = {gcvNULL};
     gctINT searchIndex = 0;
     __GLSLStage stage;
@@ -29058,12 +29058,12 @@ gcChipPatchLink(
             for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
             {
                 if (ppShaders[stage] &&
-                    ppShaders[stage]->shaderInfo.source &&
+                    ppShaders[stage]->shader->shaderInfo.source &&
                     patch->fromStages[stage] &&
-                    gcSHADER_DoPatch((gcSHADER)ppShaders[stage]->shaderInfo.hBinary))
+                    gcSHADER_DoPatch((gcSHADER)ppShaders[stage]->shader->shaderInfo.hBinary))
                 {
                     searchSrc[stage] = gcChipUtilFindString(patch->encrypted,
-                                                            ppShaders[stage]->shaderInfo.source,
+                                                            ppShaders[stage]->shader->shaderInfo.source,
                                                             patch->fromStages[stage],
                                                             &searchIndex);
                 }
@@ -29108,7 +29108,7 @@ gcChipPatchLink(
         for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
         {
             gctCONST_STRING searched = gcChipUtilFindString(gcvTRUE,
-                                                            ppShaders[stage]->shaderInfo.source,
+                                                            ppShaders[stage]->shader->shaderInfo.source,
                                                             chipCtx->patchInfo.rgbSearch,
                                                             &searchIndex);
 
@@ -29116,7 +29116,7 @@ gcChipPatchLink(
             {
                 ((GLchar*)searched)[0] = '/';
                 ((GLchar*)searched)[1] = '/';
-                patchedSrcs[stage] = ppShaders[stage]->shaderInfo.source;
+                patchedSrcs[stage] = ppShaders[stage]->shader->shaderInfo.source;
             }
         }
     }
@@ -29272,7 +29272,7 @@ gcChipPatchShadow(
 
         if (rtView.surf)
         {
-            __GLesDispatchTable *dispatch = &gc->apiDispatchTable;
+            __GLdispatchTable *dispatch = &gc->immedModeDispatch;
             __GLfboAttachPoint *attachPoint = &fbo->attachPoint[0];
             __GLtextureObject *bound = gc->texture.units[gc->state.texture.activeTexIndex].boundTextures[__GL_TEXTURE_2D_INDEX];
             __GLtextureObject *tex;
@@ -30144,8 +30144,8 @@ gcChipPatchClear(
                 gcmONERROR(gcoTEXTURE_ConstructEx(gcvNULL, __glChipTexTargetToHAL[texObj->targetIndex], &texInfo->object));
                 gcmONERROR(gcoTEXTURE_AddMipMap(texInfo->object, 0, 0, format, width/SCALE, height/SCALE, 1, 1, gcvPOOL_DEFAULT, gcvTRUE, &rtView0.surf));
                 /* Recall to update RT info */
-                gc->apiDispatchTable.FramebufferTexture2D(gc, GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
-                gc->apiDispatchTable.FramebufferTexture2D(gc, GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texName, 0);
+                gc->immedModeDispatch.FramebufferTexture2D(gc, GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+                gc->immedModeDispatch.FramebufferTexture2D(gc, GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texName, 0);
 
                 /* Resize depth surface */
                 gcoSURF_GetFormat(dView.surf, &type, &format);
@@ -30346,11 +30346,11 @@ gcChipPatchUpdateUniformData(
             boundTexObj = gc->texture.units[0].boundTextures[__GL_TEXTURE_2D_INDEX];
             if (boundTexObj->params.sampler.minFilter == GL_NEAREST && boundTexObj->params.sampler.magFilter == GL_NEAREST)
             {
-                __gles_Uniform1i(gc, enableFetch, 1);
+                gc->immedModeDispatch.Uniform1i(gc, enableFetch, 1);
             }
             else
             {
-                __gles_Uniform1i(gc, enableFetch, 0);
+                gc->immedModeDispatch.Uniform1i(gc, enableFetch, 0);
             }
         }
     }

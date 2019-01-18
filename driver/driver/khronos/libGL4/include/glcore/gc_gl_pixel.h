@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -18,7 +18,7 @@
 #include "gc_es_context.h"
 
 /*
-** Pixel format not explicitly defined by the spec, but implictly suggested.
+** Pixel format not explicitly defined by the spec, but implicitly suggested.
 ** (for processing luminance alpha texture images)
 */
 
@@ -73,12 +73,6 @@
      (gc)->state.pixel.transferMode.b_bias != 0.0 ||    \
      (gc)->state.pixel.transferMode.a_bias != 0.0 ||    \
      (gc)->state.pixel.transferMode.mapColor ||         \
-     (gc)->state.enables.colorTable ||                  \
-     (gc)->state.enables.convolution.convolution2D ||   \
-     (gc)->state.enables.convolution.separable2D ||     \
-     (gc)->state.enables.postConvColorTable ||          \
-     (gc)->state.enables.histogram ||                   \
-     (gc)->state.enables.minmax ||                      \
      (gc)->transform.color->matrix.matrixType != __GL_MT_IDENTITY)
 
 #define __GL_PIXELTRANSFER_ENABLED_DEPTH(gc)            \
@@ -132,77 +126,9 @@ typedef struct __GLpixelTransferModeRec {
     GLint indexOffset;
     GLboolean mapColor;
     GLboolean mapStencil;
-    __GLcolor postConvolutionScale;
-    __GLcolor postConvolutionBias;
     __GLcolor postColorMatrixScale;
     __GLcolor postColorMatrixBias;
 } __GLpixelTransferMode;
-
-
-/*
-** Number of convolution filter targets
-*/
-#define __GL_NUM_CONVOLUTION_TARGETS    3
-#define __GL_CONVOLUTION_1D_INDEX       0
-#define __GL_CONVOLUTION_2D_INDEX       1
-#define __GL_SEPARABLE_2D_INDEX         2
-
-/*
-** Stackable per convolution filter state
-*/
-typedef struct __GLconvolutionFilterStateRec {
-    __GLcolor scale;
-    __GLcolor bias;
-    GLenum borderMode;
-    __GLcolor borderColor;
-} __GLconvolutionFilterState;
-
-/*
-** Convolution filter state
-*/
-typedef struct __GLconvolutionFilterRec {
-    GLenum target;
-    GLsizei width;
-    GLsizei height;
-    GLenum format;            /* actual internal format */
-    GLenum formatReturn;    /* requested internal format */
-    GLenum baseFormat;        /* internal format w/o size info */
-    GLenum type;
-    GLfloat *filter;        /* fixed size. Separable2D filter also in one array.*/
-    __GLconvolutionFilterState state;    /* stackable state */
-} __GLconvolutionFilter;
-
-
-/*
-** Histogram buffer state
-*/
-typedef struct __GLhistogramRec {
-    GLuint *array;
-    GLuint arraySize;
-    GLsizei width;
-    GLenum format;            /* actual internal format */
-    GLenum formatReturn;    /* requested internal format */
-    GLenum baseFormat;        /* internal format w/o size info */
-    GLenum type;
-    GLsizei redSize;
-    GLsizei greenSize;
-    GLsizei blueSize;
-    GLsizei alphaSize;
-    GLsizei luminanceSize;
-    GLboolean sink;            /* toss pixels after histogram */
-} __GLhistogram;
-
-/*
-** Minmax buffer state
-*/
-typedef struct __GLminmaxRec {
-    GLfloat array[8];
-    GLenum format;            /* actual internal format */
-    GLenum formatReturn;    /* requested internal format */
-    GLenum baseFormat;        /* internal format w/o size info */
-    GLenum type;
-    GLboolean sink;            /* toss pixels after minmax */
-} __GLminmax;
 
 typedef struct __GLpixelStateRec {
     __GLpixelTransferMode transferMode;
@@ -221,16 +147,6 @@ typedef struct __GLpixelStateRec {
     ** GL_FRONT_LEFT.
     */
     GLenum readBufferReturn;
-
-    __GLcolorTable colorTable[__GL_NUM_COLOR_TABLE_TARGETS];
-    __GLcolorTable proxyColorTable[__GL_NUM_COLOR_TABLE_TARGETS];
-
-    __GLconvolutionFilter convolutionFilter[__GL_NUM_CONVOLUTION_TARGETS];
-
-    __GLhistogram histogram;
-    __GLhistogram proxyHistogram;
-    __GLminmax minmax;
-
 } __GLpixelState;
 
 typedef struct __GLpixelSpanModInfo {
@@ -431,34 +347,26 @@ struct __GLpixelSpanInfoRec {
     GLint convFinalSpans;
     GLint convModifierIndex;    /* index of the convolution span Modifier */
 
-    __GLconvolutionFilter *filter;
-    GLvoid **spanCache;        /* cache of spans for convolution */
-    GLvoid (*convolveRows)(__GLcontext *gc, GLint spanCount,
-            __GLconvolutionFilter *filter, GLint firstRow, GLint lastRow,
-            GLint width, GLint height, const GLfloat *inspan,
-            GLint cacheRow, GLfloat **spanCache);
-
-
     struct {
         GLubyte *pixels; /* pixel data read from the frame buffer */
-        GLint pitch; /* picth of the internal pixel data*/
+        GLint pitch; /* pitch of the internal pixel data*/
         GLint alignment;
         GLenum format;
         GLenum type;
-    }internalReadPixels;
+    } internalReadPixels;
 
     struct {
         GLubyte *pixels; /* pixel data to be drawn to the frame buffer */
         GLenum format;
         GLenum type;
-    }internalDrawPixels;
+    } internalDrawPixels;
 
     /*
     ** Temp space for per span transform.
     */
     /*
     ** ATTATION!: It's not recommended to use __GLpixelSpanInfoRec to declare a member variable directly.
-    **                     Allocating it in heap is prefered, otherwise it will take lots of stack.
+    **                     Allocating it in heap is preferred, otherwise it will take lots of stack.
     */
     GLubyte spanData1[__GL_MAX_SPAN_SIZE];
     GLubyte spanData2[__GL_MAX_SPAN_SIZE];
@@ -469,13 +377,6 @@ struct __GLpixelSpanInfoRec {
 };
 
 typedef struct __GLpixelMachineRec {
-
-    __GLconvolutionFilter *currentFilter1D;
-    GLint adjustWidth1D;
-
-    __GLconvolutionFilter *currentFilter2D;
-    GLint adjustWidth2D;
-    GLint adjustHeight2D;
 
     GLuint pixelModeFlags;    /* Operations affecting pixel rectangles */
 
@@ -523,14 +424,6 @@ extern GLboolean __glNeedScaleBias(__GLcontext *gc, __GLcolor *scale, __GLcolor 
 extern GLvoid __glLoadUnpackModes(__GLcontext *gc, __GLpixelSpanInfo *spanInfo);
 extern GLvoid __glLoadPackModes(__GLcontext *gc, __GLpixelSpanInfo *spanInfo);
 
-
-/*
-** s_ctable.c
-*/
-extern GLenum __glCheckColorTableArgs(__GLcontext *gc, GLenum target,
-GLenum internalformat, GLsizei width, GLenum format, GLenum type);
-extern GLenum __glCheckColorSubTableArgs(__GLcontext *gc, GLenum target,
-    GLsizei start, GLsizei count, GLenum format, GLenum type);
 
 /*data types which aren't defined by spec. but supported by Vivante internal*/
 #define __GL_UNSIGNED_BYTE_4_4_REV_VIVPRIV                   0x1FFFF

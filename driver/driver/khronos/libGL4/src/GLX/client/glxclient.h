@@ -628,7 +628,7 @@ extern char * __glXGetStringFromServer( Display * dpy, int opcode,
 
 extern char *__glXstrdup(const char *str);
 
-extern __GLesDispatchTable *__glXNewIndirectAPI(GLvoid);
+extern __GLdispatchTable *__glXNewIndirectAPI(GLvoid);
 
 extern GLboolean __drawableIsPixmap(GLXDrawable drawable);
 

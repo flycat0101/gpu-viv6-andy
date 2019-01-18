@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,6 +13,7 @@
 
 #include "gc_cl_precomp.h"
 #include "stdio.h"
+#include "stdlib.h"
 
 #define __NEXT_MSG_ID__     001007
 
@@ -45,63 +46,21 @@ static struct _cl_device_id _device =
                                 /* Device Info      */
 };
 
-#if defined (__QNXNTO__)
-        static char *extension_w_atomic = "cl_khr_byte_addressable_store "
-                                          "cl_khr_global_int32_base_atomics "
-                                          "cl_khr_global_int32_extended_atomics "
-                                          "cl_khr_local_int32_base_atomics "
-                                          "cl_khr_local_int32_extended_atomics ";
+static char *extension_w_atomic = "cl_khr_byte_addressable_store "
+                                  "cl_khr_global_int32_base_atomics "
+                                  "cl_khr_global_int32_extended_atomics "
+                                  "cl_khr_local_int32_base_atomics "
+                                  "cl_khr_local_int32_extended_atomics "
+                                  "cl_khr_gl_sharing ";
 
-        static char *extension_without_atomic = "cl_khr_byte_addressable_store ";
-#else
-    #if gcvVERSION_MAJOR >= 5
-        #if defined(ANDROID)
-            #if ANDROID_SDK_VERSION >= 20
-                static char *extension_w_atomic = "cl_khr_byte_addressable_store "
-                                                  "cl_khr_global_int32_base_atomics "
-                                                  "cl_khr_global_int32_extended_atomics "
-                                                  "cl_khr_local_int32_base_atomics "
-                                                  "cl_khr_local_int32_extended_atomics "
-                                                  "cl_khr_gl_sharing ";
+static char *extension_without_atomic = "cl_khr_byte_addressable_store "
+                                        "cl_khr_gl_sharing ";
+static char *extension_w_atomic_wo_glsharing = "cl_khr_byte_addressable_store "
+                                  "cl_khr_global_int32_base_atomics "
+                                  "cl_khr_global_int32_extended_atomics "
+                                  "cl_khr_local_int32_base_atomics "
+                                  "cl_khr_local_int32_extended_atomics ";
 
-                static char *extension_without_atomic = "cl_khr_byte_addressable_store "
-                                                        "cl_khr_gl_sharing ";
-                static char *extension_w_atomic_wo_glsharing = "cl_khr_byte_addressable_store "
-                                                  "cl_khr_global_int32_base_atomics "
-                                                  "cl_khr_global_int32_extended_atomics "
-                                                  "cl_khr_local_int32_base_atomics "
-                                                  "cl_khr_local_int32_extended_atomics ";
-
-            #else
-                static char *extension_w_atomic = "cl_khr_byte_addressable_store "
-                                                  "cl_khr_global_int32_base_atomics "
-                                                  "cl_khr_global_int32_extended_atomics "
-                                                  "cl_khr_local_int32_base_atomics "
-                                                  "cl_khr_local_int32_extended_atomics ";
-
-                static char *extension_without_atomic = "cl_khr_byte_addressable_store ";
-            #endif
-        #else
-            static char *extension_w_atomic = "cl_khr_byte_addressable_store "
-                                              "cl_khr_global_int32_base_atomics "
-                                              "cl_khr_global_int32_extended_atomics "
-                                              "cl_khr_local_int32_base_atomics "
-                                              "cl_khr_local_int32_extended_atomics "
-                                              "cl_khr_gl_sharing ";
-
-            static char *extension_without_atomic = "cl_khr_byte_addressable_store "
-                                                    "cl_khr_gl_sharing ";
-        #endif
-    #else
-        static char *extension_w_atomic = "cl_khr_byte_addressable_store "
-                                          "cl_khr_global_int32_base_atomics "
-                                          "cl_khr_global_int32_extended_atomics "
-                                          "cl_khr_local_int32_base_atomics "
-                                          "cl_khr_local_int32_extended_atomics ";
-
-        static char *extension_without_atomic = "cl_khr_byte_addressable_store ";
-    #endif
-#endif
 
 cl_device_id clgDefaultDevice = gcvNULL;
 clsDeviceId_PTR clgDevices = gcvNULL;
@@ -167,10 +126,10 @@ clGetDeviceIDs(
 
     if (platform->devices == gcvNULL)
     {
-        gctUINT         numDevices;
+        gctUINT32         numDevices;
 
         /* Query number GPUs. */
-        gcoCL_QueryDeviceCount(&numDevices);
+        clmONERROR(gcoCL_QueryDeviceCount(&numDevices, gcvNULL),CL_INVALID_VALUE);
 
         if(clgDevices == gcvNULL)
         {
@@ -236,22 +195,20 @@ clGetDeviceIDs(
                 gcePATCH_ID patchId = platform->patchId;
                 gctUINT offset;
                 gctSTRING productName = gcvNULL;
-#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 20)
                 gctBOOL skipCLGLSharingExtension = gcvFALSE;
-#endif
                 const gctSTRING epProfile = "EMBEDDED_PROFILE";
                 gctBOOL chipEnableEP = gcvFALSE;
                 chipModel = clgDefaultDevice->deviceInfo.chipModel;
                 chipRevision = clgDefaultDevice->deviceInfo.chipRevision;
 
                 chipEnableEP = ((chipModel == gcv1500 && chipRevision == 0x5246) ||
-                        (chipModel == gcv2000 && chipRevision == 0x5108) ||
-                        (chipModel == gcv3000 && chipRevision == 0x5513) ||
-                        (chipModel == gcv3000 && chipRevision == 0x5451) ||
-                        (chipModel == gcv5000));
+                                (chipModel == gcv2000 && chipRevision == 0x5108) ||
+                                (chipModel == gcv3000 && chipRevision == 0x5513) ||
+                                (chipModel == gcv3000 && chipRevision == 0x5451) ||
+                                (chipModel == gcv5000));
                 if((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) != gcvSTATUS_TRUE) ||
-                        (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) != gcvSTATUS_TRUE)   ||
-                        chipEnableEP)
+                   (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) != gcvSTATUS_TRUE)   ||
+                   chipEnableEP)
                 {
                     /*if the features on the device are not availble, still report embedded profile even if BUILD_OPENCL_FP is 1*/
                     clgDefaultDevice->profile = epProfile;
@@ -260,31 +217,25 @@ clGetDeviceIDs(
                 gcoOS_MemCopy(&clgDevices[i], clgDefaultDevice, sizeof(clsDeviceId));
                 clmONERROR(gcoOS_AtomIncrement(gcvNULL, clgGlobalId, (gctINT*)&clgDevices[i].id), CL_INVALID_VALUE);
 
-#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 20)
                 if(patchId == gcvPATCH_COMPUTBENCH_CL)
                 {
                     skipCLGLSharingExtension = gcvTRUE;
                 }
-#endif
 
+#if defined (__QNXNTO__)
+                skipCLGLSharingExtension = gcvTRUE;
+#endif
                 clgDevices[i].gpuId = i;
                 if (clgDefaultDevice->deviceInfo.atomicSupport)
                 {
-#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 20)
                     clgDevices[i].extensions = skipCLGLSharingExtension ? extension_w_atomic_wo_glsharing : extension_w_atomic;
-#else
-                    clgDevices[i].extensions = extension_w_atomic;
-#endif
                 }
                 else
                 {
                     clgDevices[i].extensions = extension_without_atomic;
                 }
 
-                gcoHAL_GetProductName(gcvNULL, &productName);
-                if(chipModel == gcv3000 && chipRevision == 0x5450)
-                {
-                }
+                gcoHAL_GetProductName(gcvNULL, &productName, gcvNULL);
 
                 offset = 0;
                 gcmVERIFY_OK(gcoOS_PrintStrSafe(clgDevices[i].name,
@@ -345,7 +296,6 @@ clGetDeviceIDs(
     default:
         clmRETURN_ERROR(CL_INVALID_DEVICE_TYPE);
     }
-
 
     VCL_TRACE_API(GetDeviceIDs)(Platform, DeviceType, NumEntries, Devices, NumDevices);
     gcmFOOTER_ARG("%d *Devices=0x%x *NumDevices=%u",

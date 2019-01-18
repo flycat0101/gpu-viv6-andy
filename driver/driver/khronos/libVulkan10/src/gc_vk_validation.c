@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -5750,6 +5750,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL __valid_GetPhysicalDeviceXlibPresentationSupportK
     return VK_TRUE;
 }
 #endif
+
 #ifdef VK_USE_PLATFORM_XCB_KHR
 VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateXcbSurfaceKHR(VkInstance instance, xcb_connection_t* connection, xcb_window_t window, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface)
 {
@@ -5761,6 +5762,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL __valid_GetPhysicalDeviceXcbPresentationSupportKH
     return VK_TRUE;
 }
 #endif
+
 #ifdef VK_USE_PLATFORM_WAYLAND_KHR
 VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateWaylandSurfaceKHR(VkInstance instance, const VkWaylandSurfaceCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface)
 {
@@ -5791,9 +5793,32 @@ vk_Exit:
 
 VKAPI_ATTR VkBool32 VKAPI_CALL __valid_GetPhysicalDeviceWaylandPresentationSupportKHR(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex, struct wl_display* display)
 {
-    return VK_TRUE;
+    __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
+    VkBool32 result = VK_SUCCESS;
+
+    __VK_LOG_API("(tid=%p): vkGetPhysicalDeviceWaylandPresentationSupportKHR(%p, %u, %p)", gcoOS_GetCurrentThreadID(), physicalDevice, queueFamilyIndex, display);
+
+    /* API validation logic that can be skipped at runtime */
+    if (!phyDev || phyDev->sType != __VK_OBJECT_TYPE_PHYSICAL_DEVICE)
+    {
+        result = __VK_ERROR_INVALID_HANDLE;
+        goto vk_Exit;
+    }
+    if (queueFamilyIndex >= phyDev->queueFamilyCount)
+    {
+        result = __VK_ERROR_INVALID_VALUE;
+        goto vk_Exit;
+    }
+
+    result = __vk_GetPhysicalDeviceWaylandPresentationSupportKHR(physicalDevice, queueFamilyIndex, display);
+
+vk_Exit:
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
+
+    return result;
 }
 #endif
+
 #ifdef VK_USE_PLATFORM_MIR_KHR
 VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateMirSurfaceKHR(VkInstance instance, MirConnection* connection, MirSurface* mirSurface, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface)
 {
@@ -5805,6 +5830,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL __valid_GetPhysicalDeviceMirPresentationSupportKH
     return VK_TRUE;
 }
 #endif
+
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
 VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSurfaceCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface)
 {
@@ -5832,6 +5858,7 @@ vk_Exit:
 
     return result;
 }
+
 #if (ANDROID_SDK_VERSION >= 24)
 VKAPI_ATTR VkResult VKAPI_CALL __valid_GetSwapchainGrallocUsageANDROID(VkDevice device, VkFormat format, VkImageUsageFlags imageUsage, int* grallocUsage)
 {
@@ -5920,6 +5947,7 @@ vk_Exit:
 }
 #  endif
 #endif
+
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateWin32SurfaceKHR(VkInstance instance, const VkWin32SurfaceCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface)
 {

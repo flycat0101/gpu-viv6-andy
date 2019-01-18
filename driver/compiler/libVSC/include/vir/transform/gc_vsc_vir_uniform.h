@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -243,7 +243,8 @@ VSC_UF_UtilizeAuxUBO(
     IN OUT VSC_AllShaders           *all_shaders,
     IN VSC_HW_CONFIG                *hwCfg,
     IN VSC_PROGRAM_RESOURCE_LAYOUT  *pgResourceLayout,
-    IN VSC_OPTN_UF_AUBOOptions      *options
+    IN VSC_OPTN_UF_AUBOOptions      *options,
+    IN OUT gctBOOL                  *trans
     );
 
 VSC_ErrCode
@@ -263,6 +264,21 @@ VSC_UF_CreateAUBO(
     IN VSC_GPG_PASS_WORKER* pPassWorker
     );
 DECLARE_QUERY_PASS_PROP(VSC_UF_CreateAUBO);
+DECLARE_GPG_NECESSITY_CHECK(VSC_UF_CreateAUBO);
+
+VSC_ErrCode
+VSC_UF_UnifiedUniformAlloc(
+    IN VSC_GPG_PASS_WORKER* pPassWorker
+    );
+DECLARE_QUERY_PASS_PROP(VSC_UF_UnifiedUniformAlloc);
+DECLARE_GPG_NECESSITY_CHECK(VSC_UF_UnifiedUniformAlloc);
+
+VSC_ErrCode
+VSC_UF_CreateAUBOForCLShader(
+    IN VSC_SH_PASS_WORKER* pPassWorker
+    );
+DECLARE_QUERY_PASS_PROP(VSC_UF_CreateAUBOForCLShader);
+DEF_SH_NECESSITY_CHECK(VSC_UF_CreateAUBOForCLShader);
 
 END_EXTERN_C()
 

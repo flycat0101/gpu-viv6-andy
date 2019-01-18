@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2007,7 +2007,7 @@ GLvoid GL_APIENTRY __gles_BlitFramebuffer(__GLcontext *gc,
             }
             else
             {
-                if (!readable->rtHandle)
+                if (!readable->rtHandles[0])
                 {
                     mask &= ~GL_COLOR_BUFFER_BIT;
                 }
@@ -2048,13 +2048,13 @@ GLvoid GL_APIENTRY __gles_BlitFramebuffer(__GLcontext *gc,
             }
             else
             {
-                if (drawable->rtHandle)
+                if (drawable->rtHandles[0])
                 {
                     bHaveDrawbuffer = GL_TRUE;
                 }
 
                 /* Surface of default drawFBO must be different than named readFBO */
-                if ((0 == readFBO->name) && (readable->rtHandle == drawable->rtHandle))
+                if ((0 == readFBO->name) && (readable->rtHandles[0] == drawable->rtHandles[0]))
                 {
                     __GL_ERROR_EXIT(GL_INVALID_OPERATION);
                 }

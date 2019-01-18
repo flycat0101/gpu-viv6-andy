@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -19,7 +19,6 @@
 extern "C" {
 #endif
 
-#define     USE_NEW_MEMORY_ALLOCATION   0
 /******************************************************************************\
 ****************************** Object Declarations *****************************
 \******************************************************************************/
@@ -172,7 +171,7 @@ gcoCL_RestoreContext(
 **
 **  gcoCL_AllocateMemory
 **
-**  Allocate contiguous memory from the kernel.
+**  Allocate memory from the kernel.
 **
 **  INPUT:
 **
@@ -185,9 +184,10 @@ gcoCL_RestoreContext(
 **          Pointer to a variable that will receive the aligned number of bytes
 **          allocated.
 **
-**      gctPHYS_ADDR * Physical
-**          Pointer to a variable that will receive the physical addresses of
-**          the allocated memory.
+**      gctUINT32_PTR Physical
+**          Pointer to a variable that will receive the gpu virtual address of
+**          the allocated memory, might be same as gpu physical address for flat
+**          mapping case etc.
 **
 **      gctPOINTER * Logical
 **          Pointer to a variable that will receive the logical address of the
@@ -200,9 +200,10 @@ gcoCL_RestoreContext(
 gceSTATUS
 gcoCL_AllocateMemory(
     IN OUT gctUINT *        Bytes,
-    OUT gctPHYS_ADDR *      Physical,
+    OUT gctUINT32_PTR       Physical,
     OUT gctPOINTER *        Logical,
     OUT gcsSURF_NODE_PTR *  Node,
+    IN  gceSURF_TYPE        Type,
     IN  gctUINT32           Flag
     );
 
@@ -214,8 +215,8 @@ gcoCL_AllocateMemory(
 **
 **  INPUT:
 **
-**      gctPHYS_ADDR Physical
-**          The physical addresses of the allocated pages.
+**      gctUINT32 Physical
+**          The gpu virutal addresses of the allocated pages.
 **
 **      gctPOINTER Logical
 **          The logical address of the allocation.
@@ -233,10 +234,11 @@ gcoCL_AllocateMemory(
 */
 gceSTATUS
 gcoCL_FreeMemory(
-    IN gctPHYS_ADDR         Physical,
+    IN gctUINT32            Physical,
     IN gctPOINTER           Logical,
     IN gctUINT              Bytes,
-    IN gcsSURF_NODE_PTR     Node
+    IN gcsSURF_NODE_PTR     Node,
+    IN gceSURF_TYPE         Type
     );
 
 /*******************************************************************************
@@ -253,6 +255,19 @@ gcoCL_WrapUserMemory(
     OUT gcsSURF_NODE_PTR *  Node
     );
 
+/*******************************************************************************
+**
+**  gcoCL_WrapUserPhysicalMemory
+**
+*/
+gceSTATUS
+gcoCL_WrapUserPhysicalMemory(
+    IN gctUINT32_PTR        Physical,
+    IN gctUINT              Bytes,
+    IN gctBOOL              VIVUnCached,
+    OUT gctPOINTER *        Logical,
+    OUT gcsSURF_NODE_PTR *  Node
+    );
 /*******************************************************************************
 **
 **  gcoCL_FlushMemory
@@ -328,8 +343,8 @@ gcoCL_InvalidateMemoryCache(
 **          Pointer to a variable that will receive the aligned number of bytes
 **          allocated.
 **
-**      gctPHYS_ADDR * Physical
-**          Pointer to a variable that will receive the physical addresses of
+**      gctUINT32_PTR  Physical
+**          Pointer to a variable that will receive the gpu virtual addresses of
 **          the allocated memory.
 **
 **      gctPOINTER * Logical
@@ -344,7 +359,7 @@ gceSTATUS
 gcoCL_ShareMemoryWithStream(
     IN gcoSTREAM            Stream,
     OUT gctSIZE_T *         Bytes,
-    OUT gctPHYS_ADDR *      Physical,
+    OUT gctUINT32_PTR       Physical,
     OUT gctPOINTER *        Logical,
     OUT gcsSURF_NODE_PTR *  Node
     );
@@ -366,8 +381,8 @@ gcoCL_ShareMemoryWithStream(
 **          Pointer to a variable that will receive the aligned number of bytes
 **          allocated.
 **
-**      gctPHYS_ADDR * Physical
-**          Pointer to a variable that will receive the physical addresses of
+**      gctUINT32_PTR  Physical
+**          Pointer to a variable that will receive the gpu virtual addresses of
 **          the allocated memory.
 **
 **      gctPOINTER * Logical
@@ -382,7 +397,7 @@ gceSTATUS
 gcoCL_ShareMemoryWithBufObj(
     IN gcoBUFOBJ            BufObj,
     OUT gctSIZE_T *         Bytes,
-    OUT gctPHYS_ADDR *      Physical,
+    OUT gctUINT32_PTR       Physical,
     OUT gctPOINTER *        Logical,
     OUT gcsSURF_NODE_PTR *  Node
     );
@@ -477,8 +492,8 @@ gcoCL_UnlockSurface(
 **      gcoSURF * Surface
 **          Pointer to a variable that will receive the gcoSURF structure.
 **
-**      gctPHYS_ADDR * Physical
-**          Pointer to a variable that will receive the physical addresses of
+**      gctUINT32 * Physical
+**          Pointer to a variable that will receive the gpu virtual addresses of
 **          the allocated memory.
 **
 **      gctPOINTER * Logical
@@ -559,25 +574,26 @@ gcoCL_QueryDeviceInfo(
 
 gceSTATUS
 gcoCL_QueryDeviceCount(
-    OUT gctUINT32 * Count
+    OUT gctUINT32 * DeviceCount,
+    OUT gctUINT32 * GPUCountPerDevice
     );
+
 
 gceSTATUS
-gcoCL_SelectDevice(
-    IN gctUINT32    DeviceId
-    );
-
- gceSTATUS
-    gcoCL_CreateHW(
+gcoCL_CreateHW(
     IN gctUINT32    DeviceId,
     OUT gcoHARDWARE * Hardware
     );
 
 gceSTATUS
-    gcoCL_DestroyHW(
+gcoCL_DestroyHW(
     gcoHARDWARE  Hardware
     );
 
+gceSTATUS
+gcoCL_GetHWConfigGpuCount(
+     gctUINT32 * GpuCount
+    );
 /*******************************************************************************
 **
 **  gcoCL_Commit
@@ -653,7 +669,7 @@ gcoCL_DestroySignal(
 gceSTATUS
 gcoCL_SubmitSignal(
     IN gctSIGNAL    Signal,
-    IN gctHANDLE    Process,
+    IN gctHANDLE    Processs,
     IN gceENGINE    Engine
     );
 
@@ -725,7 +741,9 @@ gcoCL_InvokeKernel(
     IN size_t       GlobalWorkSize[3],
     IN size_t       LocalWorkSize[3],
     IN gctUINT      ValueOrder,
-    IN gctBOOL      BarrierUsed
+    IN gctBOOL      BarrierUsed,
+    IN gctUINT32    MemoryAccessFlag,
+    IN gctBOOL      bDual16
     );
 
 gceSTATUS
@@ -734,24 +752,11 @@ gcoCL_InvokeThreadWalker(
     );
 
 gceSTATUS
-gcoCL_MultiGPUSync(
-    IN gctUINT32 GPUCount,
-    IN gctUINT_PTR ChipIDs
-    );
-
-gceSTATUS
 gcoCL_MemBltCopy(
     IN gctUINT32 SrcAddress,
     IN gctUINT32 DestAddress,
     IN gctUINT32 CopySize,
     IN gceENGINE engine
-    );
-
-gctBOOL
-gcoCL_MemIsFenceBack(
-    IN gcsSURF_NODE_PTR Node,
-    IN gceENGINE Engine,
-    IN gceFENCE_TYPE WaitType
     );
 
 gceSTATUS
@@ -767,7 +772,6 @@ gcoCL_ChooseBltEngine(
     IN gcsSURF_NODE_PTR node,
     OUT gceENGINE * engine
     );
-
 
 #ifdef __cplusplus
 }

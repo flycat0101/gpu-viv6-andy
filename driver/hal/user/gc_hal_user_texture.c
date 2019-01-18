@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -331,7 +331,7 @@ static gceSTATUS _uploadBlitBlt(
             gcvCACHE_CLEAN));
 
         gcmDUMP_BUFFER(gcvNULL,
-            "texture",
+            gcvDUMP_BUFFER_TEXTURE,
             gcsSURF_NODE_GetHWAddress(&srcSurf->node),
             srcSurf->node.logical,
             0,
@@ -360,8 +360,11 @@ static gceSTATUS _uploadBlitBlt(
                 gcoHARDWARE_UnlockEx(&srcSurf->node, engine, srcSurf->type);
             }
 
-            /* Free the video memory. */
-            gcmVERIFY_OK(gcsSURF_NODE_Destroy(&srcSurf->node));
+            if (srcSurf->node.u.normal.node != 0)
+            {
+                /* Free the video memory. */
+                gcmVERIFY_OK(gcsSURF_NODE_Destroy(&srcSurf->node));
+            }
 
             /* Mark the memory as freed. */
             srcSurf->node.pool = gcvPOOL_UNKNOWN;
@@ -1078,14 +1081,14 @@ gcoTEXTURE_Upload(
         }
 
         /* Dump the buffer. */
-        gcmDUMP_BUFFER(gcvNULL, "texture", address[0], memory[0], offset, map->sliceSize);
+        gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_TEXTURE, address[0], memory[0], offset, map->sliceSize);
     }
 
 OnError:
     if (srcSurf != gcvNULL)
         gcoSURF_Destroy(srcSurf);
 
-    if (memory[0] != gcvNULL)
+    if (map && (memory[0] != gcvNULL))
         gcmVERIFY_OK(gcoSURF_Unlock(map->surface, memory[0]));
 
     /* Return the status. */
@@ -1327,7 +1330,7 @@ gcoTEXTURE_UploadSub(
             gcmERR_BREAK(gcoSURF_ResolveRect(&wrapView, &mipView, gcvNULL));
 
             gcmDUMP_BUFFER(gcvNULL,
-                           "memory",
+                           gcvDUMP_BUFFER_MEMORY,
                            gcsSURF_NODE_GetHWAddress(&wrapView.surf->node),
                            wrapView.surf->node.logical,
                            offset,
@@ -1408,7 +1411,7 @@ gcoTEXTURE_UploadSub(
 
         /* Dump the buffer. */
         gcmDUMP_BUFFER(gcvNULL,
-                       "texture",
+                       gcvDUMP_BUFFER_TEXTURE,
                        address[0],
                        memory[0],
                        offset,
@@ -1417,7 +1420,7 @@ gcoTEXTURE_UploadSub(
 
 OnError:
     /* Unlock the surface. */
-    if (memory[0])
+    if (memory[0] && map)
     {
         gcmVERIFY_OK(gcoSURF_Unlock(map->surface, memory[0]));
     }
@@ -2285,7 +2288,7 @@ gcoTEXTURE_AddMipMapFromSurface(
         gcmVERIFY_OK(gcoSURF_Lock(Surface, address, memory));
 
         gcmDUMP_BUFFER(gcvNULL,
-                       "texture",
+                       gcvDUMP_BUFFER_TEXTURE,
                        address[0],
                        memory[0],
                        0,
@@ -2932,7 +2935,7 @@ gceSTATUS gcoTEXTURE_UploadYUV(
 
     /* Dump the buffer. */
     gcmDUMP_BUFFER(gcvNULL,
-                   "texture",
+                   gcvDUMP_BUFFER_TEXTURE,
                    address[0],
                    memory[0],
                    offset,
@@ -3028,7 +3031,7 @@ gcoTEXTURE_UploadCompressed(
     if (map == gcvNULL)
     {
         /* Requested map might be too large. */
-        gcmONERROR(gcvSTATUS_MIPMAP_TOO_LARGE);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
     /* Convert face into index. */
@@ -3103,7 +3106,7 @@ gcoTEXTURE_UploadCompressed(
                                                    size));
 
     /* Dump the buffer. */
-    gcmDUMP_BUFFER(gcvNULL, "texture", address[0], memory[0], offset, map->sliceSize);
+    gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_TEXTURE, address[0], memory[0], offset, map->sliceSize);
 
 OnError:
     if (memory[0])
@@ -3198,7 +3201,7 @@ gcoTEXTURE_UploadCompressedSub(
     if (!map || !map->surface)
     {
         /* Requested map might be too large, or not been created yet. */
-        gcmONERROR(gcvSTATUS_MIPMAP_TOO_LARGE);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
     if ((XOffset + Width > map->width) || (YOffset + Height > map->height))
@@ -3280,7 +3283,7 @@ gcoTEXTURE_UploadCompressedSub(
                                                    size));
 
     /* Dump the buffer. */
-    gcmDUMP_BUFFER(gcvNULL, "texture", address[0], memory[0], offset, map->sliceSize);
+    gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_TEXTURE, address[0], memory[0], offset, map->sliceSize);
 
 OnError:
     /* Unlock the surface. */
@@ -4034,6 +4037,9 @@ _UpdateTextureDesc(
         }
     }
 
+    if (!baseSurf || !baseMipMap)
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_ASTC_BASE_LOD_FIX) == gcvFALSE &&
         baseSurf->formatInfo.fmtClass == gcvFORMAT_CLASS_ASTC &&
         baseLevel > 0)
@@ -4392,10 +4398,11 @@ gcoTEXTURE_BindTextureDesc(
             }
         }
 
-        if (Texture->descDirty)
+        if (Texture->descDirty || Info->descDirty)
         {
             gcmONERROR(_UpdateTextureDesc(Texture, Info));
             Texture->descDirty = gcvFALSE;
+            Info->descDirty = gcvFALSE;
         }
 
         pDescNode = &Texture->descArray[Texture->descCurIndex];
@@ -4478,11 +4485,11 @@ gcoTEXTURE_BindTextureDesc(
             gcmASSERT((!texSurf->isMsaa) ||
                       (Texture->type == gcvTEXTURE_2D_MS || Texture->type == gcvTEXTURE_2D_MS_ARRAY));
 
-            if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_TILE_STATUS_READ) == gcvFALSE) ||
+            if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_TILE_STATUS_READ) == gcvFALSE)               ||
                 (texSurf->compressed && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_DECOMPRESSOR) == gcvFALSE) ||
-                (gcoHAL_IsSwwaNeeded(gcvNULL, gcvSWWA_1165)) ||
+                (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_MULTISAMPLER_FC_FIX) == gcvFALSE)                 ||
                 ((texSurf->bitsPerPixel < 16) &&
-                (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_8BPP_TS_FIX) == gcvFALSE)) ||
+                    (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_8BPP_TS_FIX) == gcvFALSE))                    ||
                 !canTsEnable
                 )
             {
@@ -4974,12 +4981,12 @@ gcoTEXTURE_BindTextureEx(
                 gcmASSERT((!baseSurf->isMsaa) ||
                           (Texture->type == gcvTEXTURE_2D_MS || Texture->type == gcvTEXTURE_2D_MS_ARRAY));
 
-                if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_TILE_STATUS_READ) == gcvFALSE) ||
+                if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_TILE_STATUS_READ) == gcvFALSE)                ||
                     (baseSurf->compressed && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_DECOMPRESSOR) == gcvFALSE) ||
-                    (gcoHAL_IsSwwaNeeded(gcvNULL, gcvSWWA_1165)) ||
+                    (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_MULTISAMPLER_FC_FIX) == gcvFALSE)                  ||
                     ((baseSurf->bitsPerPixel < 16) &&
-                    (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_8BPP_TS_FIX) == gcvFALSE))||
-                    (baseSurf->isMsaa && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MSAA_TEXTURE) == gcvFALSE) ||
+                        (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_8BPP_TS_FIX) == gcvFALSE))                     ||
+                    (baseSurf->isMsaa && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MSAA_TEXTURE) == gcvFALSE)        ||
                     !canTsEnable
                     )
                 {
@@ -5139,6 +5146,7 @@ gcoTEXTURE_InitParams(
         TexParams->compareFunc                      = gcvCOMPARE_LESS_OR_EQUAL;
         TexParams->dsMode                           = gcvTEXTURE_DS_MODE_DEPTH;
         TexParams->sRGB                             = gcvTEXTURE_DECODE;
+        TexParams->descDirty                        = gcvFALSE;
     }
 
     /* Success. */
@@ -5378,7 +5386,7 @@ OnError:
                 blitArgs.xReverse           = gcvFALSE;
                 blitArgs.yReverse           = gcvFALSE;
                 blitArgs.scissorTest        = gcvFALSE;
-                blitArgs.srcNumSlice        = 1;
+                blitArgs.srcNumSlice        = srcSurface->requestD;
                 blitArgs.dstNumSlice        = 1;
                 blitArgs.needDecode         = sRGBDecodeEnable;
                 status = gcoSURF_BlitCPU(&blitArgs);

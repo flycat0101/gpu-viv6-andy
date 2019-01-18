@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -852,41 +852,6 @@ gceSTATUS gckOS_UnmapMemory(
 
 /*******************************************************************************
 **
-**  gckOS_UnmapUserLogical
-**
-**  Unmap user logical memory out of physical memory.
-**
-**  INPUT:
-**
-**      gckOS Os
-**          Pointer to an gckOS object.
-**
-**      gctPHYS_ADDR Physical
-**          Start of physical address memory.
-**
-**      gctSIZE_T Bytes
-**          Number of bytes to unmap.
-**
-**      gctPOINTER Memory
-**          Pointer to a previously mapped memory region.
-**
-**  OUTPUT:
-**
-**      Nothing.
-*/
-gceSTATUS
-gckOS_UnmapUserLogical(
-    IN gckOS Os,
-    IN gctPHYS_ADDR Physical,
-    IN gctSIZE_T Bytes,
-    IN gctPOINTER Logical
-    )
-{
-    return gcvSTATUS_OK;
-}
-
-/*******************************************************************************
-**
 **  gckOS_AllocateNonPagedMemory
 **
 **  Allocate a number of pages from non-paged memory.
@@ -994,7 +959,7 @@ gceSTATUS gckOS_AllocateNonPagedMemory(
     {
         if (InUserSpace)
         {
-            gcmkONERROR(gckOS_LockPages(Os, physical, physical->bytes, gcvFALSE, Logical, gcvNULL));
+            gcmkONERROR(gckOS_LockPages(Os, physical, physical->bytes, gcvFALSE, Logical));
         }
         else
         {
@@ -1066,14 +1031,14 @@ OnError:
 **      gckOS Os
 **          Pointer to an gckOS object.
 **
-**      gctSIZE_T Bytes
-**          Number of bytes allocated.
-**
 **      gctPHYS_ADDR Physical
 **          Physical address of the allocated memory.
 **
 **      gctPOINTER Logical
 **          Logical address of the allocated memory.
+**
+**      gctSIZE_T Bytes
+**          Number of bytes allocated.
 **
 **  OUTPUT:
 **
@@ -1081,9 +1046,9 @@ OnError:
 */
 gceSTATUS gckOS_FreeNonPagedMemory(
     IN gckOS Os,
-    IN gctSIZE_T Bytes,
     IN gctPHYS_ADDR Physical,
-    IN gctPOINTER Logical
+    IN gctPOINTER Logical,
+    IN gctSIZE_T Bytes
     )
 {
     gcmkHEADER_ARG("Os=0x%X Bytes=%lu Physical=0x%X Logical=0x%X",
@@ -1159,43 +1124,16 @@ gceSTATUS gckOS_FreeNonPagedMemory(
 **      gckOS Os
 **          Pointer to an gckOS object.
 **
-**      gctSIZE_T Bytes
-**          Number of bytes to allocate.
-**
-**  OUTPUT:
-**
-**      gctPHYS_ADDR * Physical
-**          Pointer to a variable that receives the physical address of the
-**          memory allocation.
-*/
-gceSTATUS
-gckOS_AllocatePagedMemory(
-    IN gckOS Os,
-    IN gctSIZE_T Bytes,
-    OUT gctPHYS_ADDR * Physical
-    )
-{
-    return gckOS_AllocatePagedMemoryEx(Os, gcvALLOC_FLAG_NONE, Bytes, gcvNULL, Physical);
-}
-
-/*******************************************************************************
-**
-**  gckOS_AllocatePagedMemoryEx
-**
-**  Allocate memory from the paged pool.
-**
-**  INPUT:
-**
-**      gckOS Os
-**          Pointer to an gckOS object.
-**
 **      gctUINT32 Flag
 **          Allocation attribute.
 **
-**      gctSIZE_T Bytes
+**      gctSIZE_T * Bytes
 **          Number of bytes to allocate.
 **
 **  OUTPUT:
+**
+**      gctSIZE_T * Bytes
+**          Pointer to a variable that hold the number of bytes allocated.
 **
 **      gctUINT32 * Gid
 **          Save the global ID for the piece of allocated memory.
@@ -1204,10 +1142,11 @@ gckOS_AllocatePagedMemory(
 **          Pointer to a variable that receives the physical address of the
 **          memory allocation.
 */
-gceSTATUS gckOS_AllocatePagedMemoryEx(
+gceSTATUS
+gckOS_AllocatePagedMemory(
     IN gckOS Os,
     IN gctUINT32 Flag,
-    IN gctSIZE_T Bytes,
+    IN OUT gctSIZE_T * Bytes,
     OUT gctUINT32 * Gid,
     OUT gctPHYS_ADDR * Physical
     )
@@ -1215,26 +1154,28 @@ gceSTATUS gckOS_AllocatePagedMemoryEx(
     gceSTATUS status = gcvSTATUS_OK;
     gcsPHYSICAL* physical = gcvNULL;
     gctBOOL contiguous = Flag & gcvALLOC_FLAG_CONTIGUOUS;
+    gctSIZE_T bytes = *Bytes;
 
-    gcmkHEADER_ARG("Os=0x%X Flag=%x Bytes=%lu", Os, Flag, Bytes);
+    gcmkHEADER_ARG("Os=0x%X Flag=%x *Bytes=%zu", Os, Flag, *Bytes);
 
     // Verify the arguments.
     gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
-    gcmkVERIFY_ARGUMENT(Bytes > 0);
+    gcmkVERIFY_ARGUMENT(bytes > 0);
     gcmkVERIFY_ARGUMENT(Physical != gcvNULL);
 
     // Align requested bytes to page boundary.
-    Bytes = gcmALIGN(Bytes, PAGE_SIZE);
+    bytes = gcmALIGN(bytes, PAGE_SIZE);
 #if UNDER_CE <= 500
-    Bytes = max(Bytes, 2 << 20);
+    bytes = max(bytes, 2 << 20);
 #endif
 
     if (contiguous)
     {
-        gcmkONERROR(gckOS_AllocateContiguous(
+        gcmkONERROR(gckOS_AllocateNonPagedMemory(
             Os,
             gcvFALSE,
-            &Bytes,
+            gcvALLOC_FLAG_CONTIGUOUS,
+            &bytes,
             Physical,
             gcvNULL
             ));
@@ -1251,7 +1192,7 @@ gceSTATUS gckOS_AllocatePagedMemoryEx(
 
         // Reserve the requested number of pages.
         physical->logical = VirtualAlloc(gcvNULL,
-                                         Bytes,
+                                         bytes,
                                          MEM_RESERVE,
                                          PAGE_NOACCESS);
         if (physical->logical == gcvNULL)
@@ -1262,7 +1203,7 @@ gceSTATUS gckOS_AllocatePagedMemoryEx(
 
         // Commit the requested number of pages.
         if (gcvNULL == VirtualAlloc(physical->logical,
-                                 Bytes,
+                                 bytes,
                                  MEM_COMMIT,
                                  PAGE_READWRITE | PAGE_NOCACHE))
         {
@@ -1272,7 +1213,7 @@ gceSTATUS gckOS_AllocatePagedMemoryEx(
 
         if (!LockPages(
             physical->logical,
-            Bytes,
+            bytes,
             NULL,
             LOCKFLAG_READ | LOCKFLAG_WRITE))
         {
@@ -1280,7 +1221,7 @@ gceSTATUS gckOS_AllocatePagedMemoryEx(
         }
 
 
-        physical->bytes = Bytes;
+        physical->bytes = bytes;
         physical->type  = gcvPHYSICAL_TYPE_VIRTUAL;
         physical->reference = 1;
 
@@ -1295,11 +1236,13 @@ gceSTATUS gckOS_AllocatePagedMemoryEx(
 
 #ifdef MEMORY_STAT
         SpecialHeapMemoryCount += sizeof(gcsPHYSICAL);
-        PagedMemoryCount       += Bytes;
+        PagedMemoryCount       += bytes;
 #endif // MEMORY_STAT
     }
 
     gcmkASSERT(((gcsPHYSICAL*)*Physical)->bytes);
+
+    *Bytes = bytes;
 
 OnError:
 
@@ -1307,7 +1250,7 @@ OnError:
     {
 #if gcdDEBUG
         gckOS_DebugTrace(gcvLEVEL_ERROR, "ERROR: %s(%d) failed to allocate memory: %d(%d)",
-            __FUNCTION__, __LINE__, Bytes, contiguous);
+            __FUNCTION__, __LINE__, bytes, contiguous);
 #endif
 
         if (physical)
@@ -1316,7 +1259,7 @@ OnError:
             {
                 // Free the reserved number of pages.
                 gcmkVERIFY(VirtualFree(physical->logical,
-                                        Bytes,
+                                        bytes,
                                         MEM_DECOMMIT));
 
                 gcmkVERIFY(VirtualFree(physical->logical,
@@ -1411,7 +1354,7 @@ gceSTATUS gckOS_FreePagedMemory(
     }
     else
     {
-        gcmkVERIFY_OK(gckOS_FreeContiguous(
+        gcmkVERIFY_OK(gckOS_FreeNonPagedMemory(
             Os,
             physical,
             physical->logical,
@@ -1421,131 +1364,6 @@ gceSTATUS gckOS_FreePagedMemory(
     // Success.
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
-}
-
-/*******************************************************************************
-**
-**  gckOS_AllocateContiguous
-**
-**  Allocate memory from the contiguous pool.
-**
-**  INPUT:
-**
-**      gckOS Os
-**          Pointer to an gckOS object.
-**
-**      gctBOOL InUserSpace
-**          gcvTRUE if the pages need to be mapped into user space.
-**
-**      gctSIZE_T * Bytes
-**          Pointer to the number of bytes to allocate.
-**
-**  OUTPUT:
-**
-**      gctSIZE_T * Bytes
-**          Pointer to a variable that receives the number of bytes allocated.
-**
-**      gctPHYS_ADDR * Physical
-**          Pointer to a variable that receives the physical address of the
-**          memory allocation.
-**
-**      gctPOINTER * Logical
-**          Pointer to a variable that receives the logical address of the
-**          memory allocation.
-*/
-gceSTATUS
-gckOS_AllocateContiguous(
-    IN gckOS Os,
-    IN gctBOOL InUserSpace,
-    IN OUT gctSIZE_T * Bytes,
-    OUT gctPHYS_ADDR * Physical,
-    OUT gctPOINTER * Logical
-    )
-{
-    gceSTATUS status;
-
-    gcmkHEADER_ARG("Os=0x%X InUserSpace=%d *Bytes=%lu",
-                   Os, InUserSpace, gcmOPT_VALUE(Bytes));
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
-    gcmkVERIFY_ARGUMENT(Bytes != gcvNULL);
-    gcmkVERIFY_ARGUMENT(*Bytes > 0);
-    gcmkVERIFY_ARGUMENT(Physical != gcvNULL);
-
-    /* Same as non-paged memory for now. */
-    gcmkONERROR(gckOS_AllocateNonPagedMemory(Os,
-                                             InUserSpace,
-                                             gcvALLOC_FLAG_CONTIGUOUS,
-                                             Bytes,
-                                             Physical,
-                                             Logical));
-
-    /* Success. */
-    gcmkFOOTER_ARG("*Bytes=%lu *Physical=0x%X *Logical=0x%X",
-                   *Bytes, *Physical, gcmOPT_POINTER(Logical));
-    return gcvSTATUS_OK;
-
-OnError:
-    /* Return the status. */
-    gcmkFOOTER();
-    return status;
-}
-
-/*******************************************************************************
-**
-**  gckOS_FreeContiguous
-**
-**  Free memory allocated from the contiguous pool.
-**
-**  INPUT:
-**
-**      gckOS Os
-**          Pointer to an gckOS object.
-**
-**      gctPHYS_ADDR Physical
-**          Physical address of the allocation.
-**
-**      gctPOINTER Logical
-**          Logicval address of the allocation.
-**
-**      gctSIZE_T Bytes
-**          Number of bytes of the allocation.
-**
-**  OUTPUT:
-**
-**      Nothing.
-*/
-gceSTATUS
-gckOS_FreeContiguous(
-    IN gckOS Os,
-    IN gctPHYS_ADDR Physical,
-    IN gctPOINTER Logical,
-    IN gctSIZE_T Bytes
-    )
-{
-    gceSTATUS status;
-
-    gcmkHEADER_ARG("Os=0x%X Physical=0x%X Logical=0x%X Bytes=%lu",
-                   Os, Physical, Logical, Bytes);
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
-    gcmkVERIFY_ARGUMENT(Physical != gcvNULL);
-    gcmkVERIFY_ARGUMENT(Logical != gcvNULL);
-    gcmkVERIFY_ARGUMENT(Bytes > 0);
-
-    /* Same of non-paged memory for now. */
-    gcmkONERROR(gckOS_FreeNonPagedMemory(Os, Bytes, Physical, Logical));
-
-    /* Success. */
-    gcmkFOOTER_NO();
-    return gcvSTATUS_OK;
-
-OnError:
-    /* Return the status. */
-    gcmkFOOTER();
-    return status;
 }
 
 /*******************************************************************************
@@ -1734,7 +1552,7 @@ gceSTATUS gckOS_ReleaseMutex(
 **      gckOS Os
 **          Pointer to an gckOS object.
 **
-**      gctUINT32 Physical
+**      gctPHYS_ADDR_T Physical
 **          Physical address of the memory to map.
 **
 **      gctSIZE_T Bytes
@@ -1748,12 +1566,12 @@ gceSTATUS gckOS_ReleaseMutex(
 */
 gceSTATUS gckOS_MapPhysical(
     IN gckOS Os,
-    IN gctUINT32 Physical,
+    IN gctPHYS_ADDR_T Physical,
     IN gctSIZE_T Bytes,
     OUT gctPOINTER * Logical
     )
 {
-    gcmkHEADER_ARG("Os=0x%X Physical=0x%X Bytes=%lu", Os, Physical, Bytes);
+    gcmkHEADER_ARG("Os=0x%X Physical=0x%llX Bytes=%lu", Os, Physical, Bytes);
 
     // Verify the arguments.
     gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
@@ -1761,8 +1579,8 @@ gceSTATUS gckOS_MapPhysical(
     gcmkVERIFY_ARGUMENT(Logical != gcvNULL);
 
     // Align to pages.
-    gctUINT offset   = Physical & (PAGE_SIZE - 1);
-    DWORD physical = Physical - offset;
+    gctUINT offset   = (gctUINT32)Physical & (PAGE_SIZE - 1);
+    DWORD physical = (gctUINT32)Physical - offset;
     DWORD bytes    = gcmALIGN(Bytes + offset, PAGE_SIZE);
 
     // Create static mapping.
@@ -1885,6 +1703,57 @@ gckOS_ReadRegisterEx(
     return gcvSTATUS_OK;
 }
 
+static gceSTATUS
+_WriteRegisterEx(
+    IN gckOS Os,
+    IN gceCORE Core,
+    IN gctUINT32 Address,
+    IN gctUINT32 Data,
+    IN gctBOOL Dump
+    )
+{
+    gcmkHEADER_ARG("Os=0x%X Core=%d Address=0x%X Data=0x%08x", Os, Core, Address, Data);
+
+    // Verify the arguments.
+    gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
+
+    gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_OS,
+               "gckOS_WriteRegisterEx: Writing 0x%08X to register 0x%04X",
+               Data, Address >> 2);
+
+    if (Dump)
+    {
+        gcmkDUMP(Os, "@[register.write %u 0x%05X 0x%08X]", Core, Address, Data);
+    }
+
+#ifdef EMULATOR
+    // Write data to the register.
+    Dma->WriteRegister(Address, Data);
+
+    // Monitor AQ_CMD_BUFFER_CTRL register. */
+    if (Address == AQ_CMD_BUFFER_CTRL_Address)
+    {
+        if (gcmVERIFYFIELDVALUE(Data, AQ_CMD_BUFFER_CTRL, ENABLE, ENABLE))
+        {
+            // Start the threads when command queue gets enabled.
+            Os->gchal->StartThreads();
+        }
+        else
+        {
+            // Stop the threads when command queue gets disabled.
+            Os->gchal->StopThreads();
+        }
+    }
+#else
+    // Write data to the register.
+    WRITE_REGISTER_ULONG((PULONG) Os->gchal->GetRegisterAddress(Core, Address), Data);
+#endif
+
+    // Success.
+    gcmkFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
 /*******************************************************************************
 **
 **  gckOS_WriteRegister
@@ -1913,7 +1782,7 @@ gckOS_WriteRegister(
     IN gctUINT32 Data
     )
 {
-    return gckOS_WriteRegisterEx(Os, gcvCORE_MAJOR, Address, Data);
+    return _WriteRegisterEx(Os, gcvCORE_MAJOR, Address, Data, gcvTRUE);
 }
 
 gceSTATUS
@@ -1924,41 +1793,18 @@ gckOS_WriteRegisterEx(
     IN gctUINT32 Data
     )
 {
-    gcmkHEADER_ARG("Os=0x%X Core=%d Address=0x%X Data=0x%08x", Os, Core, Address, Data);
+    return _WriteRegisterEx(Os, Core, Address, Data, gcvTRUE);
+}
 
-    // Verify the arguments.
-    gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
-
-    gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_OS,
-               "gckOS_WriteRegisterEx: Writing 0x%08X to register 0x%04X",
-               Data, Address >> 2);
-
-#ifdef EMULATOR
-    // Write data to the register.
-    Dma->WriteRegister(Address, Data);
-
-    // Monitor AQ_CMD_BUFFER_CTRL register. */
-    if (Address == AQ_CMD_BUFFER_CTRL_Address)
-    {
-        if (gcmVERIFYFIELDVALUE(Data, AQ_CMD_BUFFER_CTRL, ENABLE, ENABLE))
-        {
-            // Start the threads when command queue gets enabled.
-            Os->gchal->StartThreads();
-        }
-        else
-        {
-            // Stop the threads when command queue gets disabled.
-            Os->gchal->StopThreads();
-        }
-    }
-#else
-    // Write data to the register.
-    WRITE_REGISTER_ULONG((PULONG) Os->gchal->GetRegisterAddress(Core, Address), Data);
-#endif
-
-    // Success.
-    gcmkFOOTER_NO();
-    return gcvSTATUS_OK;
+gceSTATUS
+gckOS_WriteRegisterEx_NoDump(
+    IN gckOS Os,
+    IN gceCORE Core,
+    IN gctUINT32 Address,
+    IN gctUINT32 Data
+    )
+{
+    return _WriteRegisterEx(Os, Core, Address, Data, gcvFALSE);
 }
 
 /*******************************************************************************
@@ -2167,6 +2013,38 @@ gceSTATUS gckOS_GetPhysicalAddress(
     return gcvSTATUS_OK;
 }
 
+gceSTATUS
+gckOS_GetPhysicalFromHandle(
+    IN gckOS Os,
+    IN gctPHYS_ADDR PhysHandle,
+    IN gctUINT32 Offset,
+    OUT gctPHYS_ADDR_T * PhysicalAddress
+    )
+{
+    gctUINT8 *logical;
+
+    gcmkHEADER_ARG("Os=%p PhysHandle=%p Offset=%x",
+                   Os, PhysHandle, Offset);
+
+    logical = (gctUINT8 *)((gcsPHYSICAL*)PhysHandle)->logical + Offset;
+
+    // Query the physical page.
+    DWORD page;
+    if (!LockPages(logical, 1, &page, LOCKFLAG_QUERY_ONLY))
+    {
+        // Out of resources.
+        return gcvSTATUS_OUT_OF_RESOURCES;
+    }
+
+    // Return the physical address.
+    *PhysicalAddress = (page << UserKInfo[KINX_PFN_SHIFT]) |
+                       ((gctUINT32) logical & (PAGE_SIZE - 1));
+
+    // Success.
+    gcmkFOOTER_ARG("*PhysicalAddress=0x%llx", *PhysicalAddress);
+    return gcvSTATUS_OK;
+}
+
 /*******************************************************************************
 **
 **  gckOS_UserLogicalToPhysical
@@ -2220,18 +2098,13 @@ gceSTATUS gckOS_UserLogicalToPhysical(
 **      gctPOINTER * Logical
 **          Pointer to a variable that receives the address of the mapped
 **          memory.
-**
-**      gctSIZE_T * PageCount
-**          Pointer to a variable that receives the number of pages required for
-**          the page table.
 */
 gceSTATUS gckOS_LockPages(
     IN gckOS Os,
     IN gctPHYS_ADDR Physical,
     IN gctSIZE_T Bytes,
     IN gctBOOL Cacheable,
-    OUT gctPOINTER * Logical,
-    OUT gctSIZE_T * PageCount
+    OUT gctPOINTER * Logical
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -2248,24 +2121,6 @@ gceSTATUS gckOS_LockPages(
 
     gcmkONERROR(gckOS_MapMemory(
             Os, physical, Bytes, Logical));
-
-    if (PageCount)
-    {
-        if (physical->logical)
-        {
-            *PageCount = ADDRESS_AND_SIZE_TO_SPAN_PAGES(physical->logical, Bytes);
-        }
-        else if (physical->physical.LowPart != ~0U)
-        {
-            *PageCount = ADDRESS_AND_SIZE_TO_SPAN_PAGES(physical->physical.LowPart, Bytes);
-        }
-        else
-        {
-            *PageCount = 0;
-        }
-
-        *PageCount += physical->extraPage;
-    }
 
 OnError:
 
@@ -2324,41 +2179,6 @@ gceSTATUS gckOS_UnlockPages(
     return status;
 }
 
-/*******************************************************************************
-**
-**  gckOS_MapPages
-**
-**  Map paged memory into a page table.
-**
-**  INPUT:
-**
-**      gckOS Os
-**          Pointer to an gckOS object.
-**
-**      gctPHYS_ADDR Physical
-**          Physical address of the allocation.
-**
-**      gctSIZE_T PageCount
-**          Number of pages required for the physical address.
-**
-**      gctPOINTER PageTable
-**          Pointer to the page table to fill in.
-**
-**  OUTPUT:
-**
-**      Nothing.
-*/
-gceSTATUS
-gckOS_MapPages(
-    IN gckOS Os,
-    IN gctPHYS_ADDR Physical,
-    IN gctSIZE_T PageCount,
-    IN gctPOINTER PageTable
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
 gceSTATUS
 gckOS_MapPagesEx(
     IN gckOS Os,
@@ -2368,7 +2188,7 @@ gckOS_MapPagesEx(
     IN gctUINT32 Address,
     IN gctPOINTER PageTable,
     IN gctBOOL Writable,
-    IN gceSURF_TYPE Type
+    IN gceVIDMEM_TYPE Type
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -2462,6 +2282,7 @@ gckOS_MapPagesEx(
             gcmkONERROR(
                     gckMMU_SetPage(Os->gchal->GetKernel(Core)->mmu,
                            pageTable[i],
+                           gcvPAGE_TYPE_4K,
                            Writable,
                            pageTable + i));
         }
@@ -2472,6 +2293,21 @@ OnError:
 
     gcmkFOOTER();
     return status;
+}
+
+gceSTATUS
+gckOS_Map1MPages(
+    IN gckOS Os,
+    IN gceCORE Core,
+    IN gctPHYS_ADDR Physical,
+    IN gctSIZE_T PageCount,
+    IN gctUINT32 Address,
+    IN gctPOINTER PageTable,
+    IN gctBOOL Writable,
+    IN gceVIDMEM_TYPE Type
+    )
+{
+    return gcvSTATUS_OK;
 }
 
 gceSTATUS
@@ -3167,93 +3003,6 @@ gckOS_UnmapSignal(
     return status;
 }
 
-struct USER_MAPPING_INFO
-{
-    gctPOINTER    logical;
-    gctUINT32_PTR mmuTable;
-    gctSIZE_T     pageCount;
-    gctUINT32     address;
-    DWORD         physTable[1];
-};
-
-/*******************************************************************************
-**
-**  gckOS_MapUserMemory
-**
-**  Lock down a user buffer and return an DMA'able address to be used by the
-**  hardware to access it.
-**
-**  INPUT:
-**
-**      gctPOINTER Memory
-**          Pointer to memory to lock down.
-**
-**      gctSIZE_T Size
-**          Size in bytes of the memory to lock down.
-**
-**  OUTPUT:
-**
-**      gctPOINTER * Info
-**          Pointer to variable receiving the information record required by
-**          gckOS_UnmapUserMemory.
-**
-**
-**      gctUINT32_PTR Address
-**          Pointer to a variable that will receive the address DMA'able by the
-**          hardware.
-*/
-gceSTATUS
-gckOS_MapUserMemory(
-    IN gckOS Os,
-    IN gceCORE Core,
-    IN gctPOINTER Memory,
-    IN gctUINT32 Physical,
-    IN gctSIZE_T Size,
-    OUT gctPOINTER * Info,
-    OUT gctUINT32_PTR Address
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-/*******************************************************************************
-**
-**  gckOS_UnmapUserMemory
-**
-**  Unlock a user buffer and that was previously locked down by
-**  gckOS_MapUserMemory.
-**
-**  INPUT:
-**
-**      gctPOINTER Memory
-**          Pointer to memory to unlock.
-**
-**      gctSIZE_T Size
-**          Size in bytes of the memory to unlock.
-**
-**      gctPOINTER Info
-**          Information record returned by gckOS_MapUserMemory.
-**
-**      gctUINT32_PTR Address
-**          The address returned by gckOS_MapUserMemory.
-**
-**  OUTPUT:
-**
-**      Nothing.
-*/
-gceSTATUS
-gckOS_UnmapUserMemory(
-    IN gckOS Os,
-    IN gceCORE Core,
-    IN gctPOINTER Memory,
-    IN gctSIZE_T Size,
-    IN gctPOINTER Info,
-    IN gctUINT32 Address
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
 /*******************************************************************************
 **
 **  gckOS_GetBaseAddress
@@ -3849,9 +3598,6 @@ gckOS_FreeMemory(
 **      gctPHYS_ADDR Handle
 **          Physical address handle.  If gcvNULL it is video memory.
 **
-**      gctSIZE_T Offset
-**          Offset to this memory block.
-**
 **      gctPOINTER Logical
 **          Logical address to flush.
 **
@@ -3891,9 +3637,6 @@ gckOS_CacheClean(
 **      gctPHYS_ADDR Handle
 **          Physical address handle.  If gcvNULL it is video memory.
 **
-**      gctSIZE_T Offset
-**          Offset to this memory block.
-**
 **      gctPOINTER Logical
 **          Logical address to flush.
 **
@@ -3932,9 +3675,6 @@ gckOS_CacheInvalidate(
 **
 **      gctPHYS_ADDR Handle
 **          Physical address handle.  If gcvNULL it is video memory.
-**
-**      gctSIZE_T Offset
-**          Offset to this memory block.
 **
 **      gctPOINTER Logical
 **          Logical address to flush.
@@ -3987,8 +3727,8 @@ gckOS_Broadcast(
 
         /* Put GPU OFF. */
         gcmkONERROR(
-            gckHARDWARE_SetPowerManagementState(Hardware,
-                                                gcvPOWER_OFF_BROADCAST));
+            gckHARDWARE_SetPowerState(Hardware,
+                                      gcvPOWER_OFF_BROADCAST));
         break;
 
     case gcvBROADCAST_GPU_IDLE:
@@ -3997,12 +3737,12 @@ gckOS_Broadcast(
         /* Put GPU IDLE. */
 #if gcdPOWER_SUSPEND_WHEN_IDLE
         gcmkONERROR(
-            gckHARDWARE_SetPowerManagementState(Hardware,
-                                                gcvPOWER_SUSPEND_BROADCAST));
+            gckHARDWARE_SetPowerState(Hardware,
+                                      gcvPOWER_SUSPEND_BROADCAST));
 #else
         gcmkONERROR(
-            gckHARDWARE_SetPowerManagementState(Hardware,
-                                                gcvPOWER_IDLE_BROADCAST));
+            gckHARDWARE_SetPowerState(Hardware,
+                                      gcvPOWER_IDLE_BROADCAST));
 #endif
 
         /* Add idle process DB. */
@@ -4023,7 +3763,7 @@ gckOS_Broadcast(
 
         /* Put GPU ON. */
         gcmkONERROR(
-            gckHARDWARE_SetPowerManagementState(Hardware, gcvPOWER_ON_AUTO));
+            gckHARDWARE_SetPowerState(Hardware, gcvPOWER_ON_AUTO));
         break;
 
     case gcvBROADCAST_GPU_STUCK:
@@ -4669,91 +4409,6 @@ gckOS_VerifyThread(
     /* Return the status. */
     return status;
 }
-
-gceSTATUS
-gckOS_GetKernelLogical(
-    IN gckOS Os,
-    IN gctUINT32 Address,
-    OUT gctPOINTER * KernelPointer)
-{
-    return gckOS_GetKernelLogicalEx(Os, gcvCORE_MAJOR, Address, KernelPointer);
-}
-
-gceSTATUS
-gckOS_GetKernelLogicalEx(
-    IN gckOS Os,
-    IN gceCORE Core,
-    IN gctUINT32 Address,
-    OUT gctPOINTER * KernelPointer
-    )
-{
-    gceSTATUS status;
-
-    gcmkHEADER_ARG("Os=0x%X Core=%d Address=0x%08x", Os, Core, Address);
-
-    do
-    {
-        gcePOOL pool;
-        gctUINT32 offset;
-        gctPOINTER logical = gcvNULL;
-
-#if gcdENABLE_VG
-       if (Core == gcvCORE_VG)
-       {
-           gcmkERR_BREAK(gckVGHARDWARE_SplitMemory(
-                Os->gchal->GetKernel(Core)->vg->hardware, Address, &pool, &offset
-                ));
-       }
-       else
-#endif
-       {
-        /* Split the memory address into a pool type and offset. */
-            gcmkERR_BREAK(gckHARDWARE_SplitMemory(
-                Os->gchal->GetKernel(Core)->hardware, Address, &pool, &offset
-                ));
-       }
-
-        /* Dispatch on pool. */
-        switch (pool)
-        {
-        case gcvPOOL_LOCAL_INTERNAL:
-            /* Internal memory. */
-            logical =  Os->gchal->GetInternalLogical();
-            break;
-
-        case gcvPOOL_LOCAL_EXTERNAL:
-            /* External memory. */
-            logical =  Os->gchal->GetExternalLogical();
-            break;
-
-        case gcvPOOL_SYSTEM:
-            /* System memory. */
-            logical =  Os->gchal->GetContiguousLogical();
-            break;
-
-        default:
-            /* Invalid memory pool. */
-            return gcvSTATUS_INVALID_ARGUMENT;
-        }
-
-        if (logical == gcvNULL)
-        {
-            gcmkERR_BREAK(gcvSTATUS_OUT_OF_MEMORY);
-        }
-
-        /* Build logical address of specified address. */
-        * KernelPointer = ((gctUINT8_PTR) logical) + offset;
-
-        /* Success. */
-        gcmkFOOTER_ARG("*KernelPointer=0x%X", *KernelPointer);
-        return gcvSTATUS_OK;
-    }
-    while (gcvFALSE);
-
-    /* Return status. */
-    gcmkFOOTER();
-    return status;
-}
 #endif
 
 /*******************************************************************************
@@ -5375,6 +5030,9 @@ gckOS_CreateKernelMapping(
     OUT gctPOINTER * Logical
     )
 {
+    gcsPHYSICAL *physical = (gcsPHYSICAL *)Physical;
+
+    *Logical = (gctUINT8_PTR)physical->logical + Offset;
     return gcvSTATUS_OK;
 }
 
@@ -5386,57 +5044,6 @@ gckOS_DestroyKernelMapping(
     )
 {
     return gcvSTATUS_OK;
-}
-
-gceSTATUS
-gckOS_CreateKernelVirtualMapping(
-    IN gckOS Os,
-    IN gctPHYS_ADDR Physical,
-    IN gctSIZE_T Bytes,
-    OUT gctPOINTER * Logical,
-    OUT gctSIZE_T * PageCount
-    )
-{
-    gcsPHYSICAL * physical = (gcsPHYSICAL *)Physical;
-
-    *PageCount = ADDRESS_AND_SIZE_TO_SPAN_PAGES(physical->logical, Bytes);
-    *Logical   = physical->logical;
-
-    return gcvSTATUS_OK;
-}
-
-gceSTATUS
-gckOS_DestroyKernelVirtualMapping(
-    IN gckOS Os,
-    IN gctPHYS_ADDR Physical,
-    IN gctSIZE_T Bytes,
-    IN gctPOINTER Logical
-    )
-{
-    return gcvSTATUS_OK;
-}
-
-gceSTATUS
-gckOS_CreateUserVirtualMapping(
-    IN gckOS Os,
-    IN gctPHYS_ADDR Physical,
-    IN gctSIZE_T Bytes,
-    OUT gctPOINTER * Logical,
-    OUT gctSIZE_T * PageCount
-    )
-{
-    return gckOS_LockPages(Os, Physical, Bytes, gcvFALSE, Logical, PageCount);
-}
-
-gceSTATUS
-gckOS_DestroyUserVirtualMapping(
-    IN gckOS Os,
-    IN gctPHYS_ADDR Physical,
-    IN gctSIZE_T Bytes,
-    IN gctPOINTER Logical
-    )
-{
-    return gckOS_UnlockPages(Os, Physical, Bytes, Logical);
 }
 
 void
@@ -5491,7 +5098,7 @@ gceSTATUS
 gckOS_QueryOption(
     IN gckOS Os,
     IN gctCONST_STRING Option,
-    OUT gctUINT32 * Value
+    OUT gctUINT64 * Value
     )
 {
     if (!strcmp(Option, "physBase"))
@@ -5529,7 +5136,8 @@ gckOS_WrapMemory(
     IN gcsUSER_MEMORY_DESC_PTR Desc,
     OUT gctSIZE_T *Bytes,
     OUT gctPHYS_ADDR * Physical,
-    OUT gctBOOL *Contiguous
+    OUT gctBOOL *Contiguous,
+    OUT gctSIZE_T * PageCountCpu
     )
 {
     gceSTATUS status;
@@ -5554,7 +5162,7 @@ gckOS_WrapMemory(
     gcmkVERIFY_ARGUMENT(Contiguous != gcvNULL);
 
     /* Verify the user memory info. */
-    if ((Desc->physical == gcvINVALID_ADDRESS) && (Desc->logical == 0))
+    if ((Desc->physical == gcvINVALID_PHYSICAL_ADDRESS) && (Desc->logical == 0))
     {
         gcmkONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
@@ -5567,11 +5175,12 @@ gckOS_WrapMemory(
     logical = gcmINT2PTR(Desc->logical);
 
     /* Check if the memory is physically contiguous. */
-    if (Desc->physical != gcvINVALID_ADDRESS)
+    if (Desc->physical != gcvINVALID_PHYSICAL_ADDRESS)
     {
-        address = Desc->physical;
+        address = (gctUINT32)Desc->physical;
 
         contiguous = gcvTRUE;
+        pageCount = ADDRESS_AND_SIZE_TO_SPAN_PAGES(address, Desc->size);
     }
     else
     {
@@ -5645,7 +5254,7 @@ gckOS_WrapMemory(
     }
 
     physical->type              = gcvPHYSICAL_TYPE_WRAPPED_MEMORY;
-    physical->physical.LowPart  = Desc->physical;
+    physical->physical.LowPart  = (gctUINT32)Desc->physical;
     physical->physical.HighPart = 0;
     physical->logical           = logical;
     physical->bytes             = Desc->size;
@@ -5663,6 +5272,11 @@ gckOS_WrapMemory(
     *Bytes      = Desc->size;
     *Physical   = (gctPHYS_ADDR) physical;
     *Contiguous = contiguous;
+
+    if (PageCountCpu)
+    {
+        *PageCountCpu = pageCount + physical->extraPage;
+    }
 
     /* Success. */
     gcmkFOOTER_ARG("*Bytes=%d, *Physical=0x%08x, *Contiguous=%d", \
@@ -5690,20 +5304,9 @@ OnError:
 }
 
 gceSTATUS
-gckOS_PhysicalToPhysicalAddress(
-    IN gckOS Os,
-    IN gctPOINTER Physical,
-    IN gctUINT32 Offset,
-    OUT gctPHYS_ADDR_T * PhysicalAddress
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
 gckOS_GetPolicyID(
     IN gckOS Os,
-    IN gceSURF_TYPE Type,
+    IN gceVIDMEM_TYPE Type,
     OUT gctUINT32_PTR PolicyID,
     OUT gctUINT32_PTR AXIConfig
     )

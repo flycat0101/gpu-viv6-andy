@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -19,6 +19,8 @@ EXTERN_C_BEGIN
 VX_INTERNAL_CALLBACK_API void vxoScalar_Destructor(vx_reference ref);
 
 VX_INTERNAL_API vx_enum vxoScalar_GetDataType(vx_scalar scalar);
+
+VX_INTERNAL_API vx_uint32 vxoScalar_GetTypeSize(vx_scalar scalar);
 
 VX_INTERNAL_API void vxoScalar_Dump(vx_scalar scalar);
 

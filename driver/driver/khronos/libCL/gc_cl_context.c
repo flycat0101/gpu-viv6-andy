@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -51,17 +51,17 @@ gctINT clfReleaseContext(
     if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
     {
         gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-002008: (clfReleaseContext) invalid Context.\n");
+            "OCL-002007: (clfReleaseContext) invalid Context.\n");
         clmRETURN_ERROR(CL_INVALID_CONTEXT);
     }
 
     gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, Context->referenceCount, &oldReference));
-
     if (oldReference == 1)
     {
 #if !gcdFPGA_BUILD
         gcoHAL_SetTimeOut(gcvNULL, gcdGPU_TIMEOUT);
 #endif
+
         /* Send signal to stop event list worker thread. */
         gcoCL_SetSignal(Context->eventListWorkerStopSignal);
 
@@ -119,9 +119,6 @@ gctINT clfReleaseContext(
         gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, Context->referenceCount));
         Context->referenceCount = gcvNULL;
 
-        /* Destroy CL patch library. */
-        gcmVERIFY_OK(gcFreeCLPatchLibrary());
-
         if (Context->devices)
         {
             gcoOS_Free(gcvNULL, Context->devices);
@@ -131,7 +128,7 @@ gctINT clfReleaseContext(
         gcoOS_Free(gcvNULL, Context);
     }
     gcmFOOTER_ARG("%d", CL_SUCCESS);
-    return CL_SUCCESS;
+    return gcvSTATUS_OK;
 
 OnError:
     if (status != CL_INVALID_CONTEXT)
@@ -161,6 +158,7 @@ clCreateContext(
     gctPOINTER      pointer = gcvNULL;
     gctINT          status;
     gctUINT         i;
+
     /*cl_context_properties prop[CONTEXT_PROPERTIES]={0};*/
     cl_context_properties  propPlatform = 0;
 
@@ -247,7 +245,6 @@ clCreateContext(
     context->objectType      = clvOBJECT_CONTEXT;
     context->dispatch        = Devices[0]->dispatch;
     context->programs        = gcvNULL;
-    context->kernels         = gcvNULL;
     context->mems            = gcvNULL;
     context->queueList       = gcvNULL;
     context->eventList       = gcvNULL;
@@ -373,64 +370,63 @@ OnError:
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-002004: (clCreateContext) cannot create context.  Maybe run out of memory.\n");
     }
+    if (context != gcvNULL)
+    {
+        if (context->referenceCount)
+        {
+            gcoOS_AtomDestroy(gcvNULL, context->referenceCount);
+        }
 
-    if (context->referenceCount)
-    {
-        gcoOS_AtomDestroy(gcvNULL, context->referenceCount);
-    }
+        if (context->queueListMutex)
+        {
+            gcoOS_DeleteMutex(gcvNULL, context->queueListMutex);
+        }
 
-    if (context->queueListMutex)
-    {
-        gcoOS_DeleteMutex(gcvNULL, context->queueListMutex);
-    }
+        if (context->eventListMutex)
+        {
+            gcoOS_DeleteMutex(gcvNULL, context->eventListMutex);
+        }
 
-    if (context->eventListMutex)
-    {
-        gcoOS_DeleteMutex(gcvNULL, context->eventListMutex);
-    }
+        if (context->addDependencyMutex)
+        {
+            gcoOS_DeleteMutex(gcvNULL, context->addDependencyMutex);
+        }
 
-    if (context->addDependencyMutex)
-    {
-        gcoOS_DeleteMutex(gcvNULL, context->addDependencyMutex);
-    }
+        if (context->eventListWorkerStartSignal)
+        {
+            gcoCL_DestroySignal(context->eventListWorkerStartSignal);
+        }
 
-    if (context->eventListWorkerStartSignal)
-    {
-        gcoCL_DestroySignal(context->eventListWorkerStartSignal);
-    }
+        if (context->eventListWorkerStopSignal)
+        {
+            gcoCL_DestroySignal(context->eventListWorkerStopSignal);
+        }
 
-    if (context->eventListWorkerStopSignal)
-    {
-        gcoCL_DestroySignal(context->eventListWorkerStopSignal);
-    }
+        if (context->eventListWorkerThread)
+        {
+            gcoOS_CloseThread(gcvNULL, context->eventListWorkerThread);
+        }
 
-    if (context->eventListWorkerThread)
-    {
-        gcoOS_CloseThread(gcvNULL, context->eventListWorkerThread);
-    }
+        if (context->eventCallbackListMutex)
+        {
+            gcoOS_DeleteMutex(gcvNULL,
+                              context->eventCallbackListMutex);
+        }
 
-    if (context->eventCallbackListMutex)
-    {
-        gcoOS_DeleteMutex(gcvNULL,
-                          context->eventCallbackListMutex);
-    }
+        if (context->eventCallbackWorkerStartSignal)
+        {
+            gcoCL_DestroySignal(context->eventCallbackWorkerStartSignal);
+        }
 
-    if (context->eventCallbackWorkerStartSignal)
-    {
-        gcoCL_DestroySignal(context->eventCallbackWorkerStartSignal);
-    }
+        if (context->eventCallbackWorkerStopSignal)
+        {
+            gcoCL_DestroySignal(context->eventCallbackWorkerStopSignal);
+        }
 
-    if (context->eventCallbackWorkerStopSignal)
-    {
-        gcoCL_DestroySignal(context->eventCallbackWorkerStopSignal);
-    }
-
-    if(context != gcvNULL && context->devices != gcvNULL)
-    {
-        gcoOS_Free(gcvNULL, context->devices);
-    }
-    if(context != gcvNULL)
-    {
+        if(context->devices != gcvNULL)
+        {
+            gcoOS_Free(gcvNULL, context->devices);
+        }
         gcoOS_Free(gcvNULL, context);
     }
     if (ErrcodeRet)
@@ -509,7 +505,7 @@ clCreateContextFromType(
             }
         }
     }
-    else
+    if (platform == gcvNULL)
     {
         clfGetDefaultPlatformID(&platform);
     }

@@ -31,7 +31,7 @@ void sys::MemoryFence() {
 #if !defined(UNDER_CE)
   MemoryBarrier();
 #else
-  // TODO - Need to find MemoryBarrier for WinCE.
+  // VIV:TODO - Need to find MemoryBarrier for WinCE.
   return;
 #endif
 #  else
@@ -54,7 +54,7 @@ sys::cas_flag sys::CompareAndSwap(volatile sys::cas_flag* ptr,
 #if !defined(UNDER_CE)
   return InterlockedCompareExchange(ptr, new_value, old_value);
 #else
-  // TODO - Need to find InterlockedCompareExchange for WinCE.
+  // VIV:TODO - Need to find InterlockedCompareExchange for WinCE.
   sys::cas_flag result = *ptr;
   if (result == old_value)
     *ptr = new_value;
@@ -75,7 +75,7 @@ sys::cas_flag sys::AtomicIncrement(volatile sys::cas_flag* ptr) {
 #if !defined(UNDER_CE)
   return InterlockedIncrement(ptr);
 #else
-  // TODO - Need to find InterlockedIncrement for WinCE.
+  // VIV:TODO - Need to find InterlockedIncrement for WinCE.
   ++(*ptr);
   return *ptr;
 #endif
@@ -94,7 +94,7 @@ sys::cas_flag sys::AtomicDecrement(volatile sys::cas_flag* ptr) {
 #if !defined(UNDER_CE)
   return InterlockedDecrement(ptr);
 #else
-  // TODO - Need to find InterlockedDecrement for WinCE.
+  // VIV:TODO - Need to find InterlockedDecrement for WinCE.
   --(*ptr);
   return *ptr;
 #endif
@@ -113,7 +113,7 @@ sys::cas_flag sys::AtomicAdd(volatile sys::cas_flag* ptr, sys::cas_flag val) {
 #if !defined(UNDER_CE)
   return InterlockedExchangeAdd(ptr, val) + val;
 #else
-  // TODO - Need to find InterlockedExchangeAdd for WinCE.
+  // VIV:TODO - Need to find InterlockedExchangeAdd for WinCE.
   *ptr += val;
   return *ptr;
 #endif

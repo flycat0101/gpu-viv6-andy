@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -30,6 +30,7 @@ VIR_Lower_HighLevel_To_HighLevel_Expand(
     IN VSC_SH_PASS_WORKER* pPassWorker
     );
 DECLARE_QUERY_PASS_PROP(VIR_Lower_HighLevel_To_HighLevel_Expand);
+DECLARE_SH_NECESSITY_CHECK(VIR_Lower_HighLevel_To_HighLevel_Expand);
 
 END_EXTERN_C()
 #endif

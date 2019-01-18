@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -215,7 +215,13 @@ LIBS	+=	$(A)
 
 LIBS	+=	-L$(CLC_DIR)/../libVSC/$(OBJ_DIR) -lVSC
 LIBS	+=	-L$(GAL_DIR)/user/$(OBJ_DIR) -lGAL
-LIBS	+=	-lm -lpthread -lstdc++ -ldl
+LIBS	+=	-lm -lpthread -ldl
+ifeq ($(USE_STATIC_STDCxx), 1)
+LIBS    += -lgcc_s -static-libgcc -static-libstdc++
+CC      = $(CROSS_COMPILE)g++
+else
+LIBS	+=	-lstdc++
+endif
 endif
 
 ################################################################################

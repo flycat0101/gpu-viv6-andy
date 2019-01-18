@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -30,6 +30,8 @@ __glChipBeginQuery(
     __GLchipQueryObject *chipQuery;
     __GLchipQueryHeader *queryHeader = gcvNULL;
     gceSTATUS status = gcvSTATUS_OK;
+    __GLprogramObject *fsProgObj = __glGetCurrentStageProgram(gc, __GLSL_STAGE_FS);
+    __GLchipSLProgram *fsProgram = fsProgObj ? (__GLchipSLProgram*)fsProgObj->privateData : gcvNULL;
     gctUINT32 physical;
 
     gcmHEADER_ARG("gc=0x%x queryObj=0x%x", gc, queryObj);
@@ -63,14 +65,23 @@ __glChipBeginQuery(
     if ((queryObj->target == GL_ANY_SAMPLES_PASSED) ||
         (queryObj->target == GL_ANY_SAMPLES_PASSED_CONSERVATIVE))
     {
+        if ((fsProgram && fsProgram->progFlags.msaaOQ) &&
+            !chipCtx->chipFeature.hwFeature.hasBugFixes18)
+        {
+            gcmFOOTER_ARG("return=%d", GL_TRUE);
+            return GL_TRUE;
+        }
+
         if (chipQuery->queryHeader == gcvNULL)
         {
             gctUINT32 gpuCount = 0;
+            gctUINT32 clusterIDWidth = 0;
 
             gcmONERROR(gcoHAL_Query3DCoreCount(chipCtx->hal, &gpuCount));
+            gcmONERROR(gcoHAL_QueryCluster(chipCtx->hal, gcvNULL, gcvNULL, gcvNULL, &clusterIDWidth));
 
             queryHeader = (__GLchipQueryHeader*)(*gc->imports.calloc)(gc, 1, sizeof(__GLchipQueryHeader));
-            queryHeader->headerSize = 64 * gcmSIZEOF(gctUINT64) * gpuCount;
+            queryHeader->headerSize = 64 * gpuCount * gcmSIZEOF(gctUINT32) * (gctUINT32)(1<< clusterIDWidth);
             queryHeader->headerIndex = -1;
             queryHeader->headerSurfType = gcvSURF_INDEX;
             chipQuery->type = gcvQUERY_OCCLUSION;
@@ -121,14 +132,12 @@ __glChipBeginQuery(
     gcoOS_ZeroMemory(queryHeader->headerLocked, queryHeader->headerSize);
     gcmGETHARDWAREADDRESS(queryHeader->headerNode, physical);
 
-#if gcdDUMP
     gcmDUMP_BUFFER(gcvNULL,
-                   "memory",
+                   gcvDUMP_BUFFER_MEMORY,
                    physical,
                    queryHeader->headerLocked,
                    0,
                    queryHeader->headerSize);
-#endif
 
     gcmONERROR(gco3D_SetQuery(chipCtx->engine, physical, chipQuery->type, gcvTRUE));
 
@@ -149,6 +158,8 @@ __glChipEndQuery(
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     __GLchipQueryObject *chipQuery = (__GLchipQueryObject *)queryObj->privateData;
+    __GLprogramObject *fsProgObj = __glGetCurrentStageProgram(gc, __GLSL_STAGE_FS);
+    __GLchipSLProgram *fsProgram = fsProgObj ? (__GLchipSLProgram*)fsProgObj->privateData : gcvNULL;
     gceSTATUS status = gcvSTATUS_OK;
     gcsHAL_INTERFACE iface;
 
@@ -161,6 +172,15 @@ __glChipEndQuery(
          !chipCtx->chipFeature.hwFeature.hasHwTFB)
     {
         queryObj->resultAvailable = GL_TRUE;
+        gcmFOOTER_ARG("return=%d", GL_TRUE);
+        return GL_TRUE;
+    }
+
+    if ((fsProgram && fsProgram->progFlags.msaaOQ) &&
+        ((queryObj->target == GL_ANY_SAMPLES_PASSED) ||
+        (queryObj->target == GL_ANY_SAMPLES_PASSED_CONSERVATIVE)) &&
+        !chipCtx->chipFeature.hwFeature.hasBugFixes18)
+    {
         gcmFOOTER_ARG("return=%d", GL_TRUE);
         return GL_TRUE;
     }
@@ -207,6 +227,8 @@ __glChipGetQueryObject(
     __GLchipQueryObject *chipQuery ;
     gctUINT32 timeout;
     gctINT i;
+    __GLprogramObject *fsProgObj = __glGetCurrentStageProgram(gc, __GLSL_STAGE_FS);
+    __GLchipSLProgram *fsProgram = fsProgObj ? (__GLchipSLProgram*)fsProgObj->privateData : gcvNULL;
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("gc=0x%x pname=0x%04x queryObj=0x%x", gc, pname, queryObj);
@@ -216,6 +238,36 @@ __glChipGetQueryObject(
          queryObj->target == GL_PRIMITIVES_GENERATED_EXT) &&
          !chipCtx->chipFeature.hwFeature.hasHwTFB)
     {
+        queryObj->resultAvailable = GL_TRUE;
+        gcmFOOTER_ARG("return=%d", GL_TRUE);
+        return GL_TRUE;
+    }
+
+    if ((fsProgram && fsProgram->progFlags.msaaOQ) &&
+        ((queryObj->target == GL_ANY_SAMPLES_PASSED) ||
+        (queryObj->target == GL_ANY_SAMPLES_PASSED_CONSERVATIVE)) &&
+        !chipCtx->chipFeature.hwFeature.hasBugFixes18)
+    {
+        gctSIZE_T num = chipCtx->drawRTWidth * chipCtx->drawRTHeight;
+        GLubyte *pixels = (GLubyte*)gc->imports.malloc(gc, 4 * num);
+
+        __glEvaluateDrawableChange(gc, __GL_BUFFER_READ_BIT);
+
+        if (__glChipReadPixels(gc, 0, 0, (GLsizei)chipCtx->drawRTWidth, (GLsizei)chipCtx->drawRTHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels))
+        {
+            gctSIZE_T i = 0;
+            queryObj->count = 0;
+            for (i = 0; i < num; ++i)
+            {
+                if (pixels[i * 4] != 0)
+                {
+                    queryObj->count++;
+                    break;
+                }
+            }
+        }
+
+        gc->imports.free(gc, pixels);
         queryObj->resultAvailable = GL_TRUE;
         gcmFOOTER_ARG("return=%d", GL_TRUE);
         return GL_TRUE;
@@ -238,8 +290,6 @@ __glChipGetQueryObject(
     if (gcmIS_SUCCESS(status))
     {
         __GLattribute *cState = &gc->commitState;
-        __GLprogramObject *fsProgObj = __glGetCurrentStageProgram(gc, __GLSL_STAGE_FS);
-        __GLchipSLProgram *fsProgram = fsProgObj ? (__GLchipSLProgram*)fsProgObj->privateData : gcvNULL;
 
         queryHeader = chipQuery->queryHeader;
 
@@ -265,7 +315,8 @@ __glChipGetQueryObject(
             cState->stencil.front.testFunc == GL_EQUAL &&
             cState->stencil.back.testFunc == GL_EQUAL &&
             cState->stencil.front.reference == 0 &&
-            cState->stencil.back.reference == 0)
+            cState->stencil.back.reference == 0 &&
+            queryObj->count != 0)
         {
             gctSIZE_T num = chipCtx->drawRTWidth * chipCtx->drawRTHeight;
             GLubyte *pixels = (GLubyte*)gc->imports.malloc(gc, 4 * num);
@@ -298,9 +349,9 @@ __glChipGetQueryObject(
         {
             gctUINT32 physical = 0;
             gcmGETHARDWAREADDRESS(queryHeader->headerNode, physical);
-            gcmDUMP(gcvNULL, "#[info: verify occlusion/xfb/prim query");
+            gcmDUMP(gcvNULL, "#[info: verify occlusion/xfb/prim query]");
             gcmDUMP_BUFFER(gcvNULL,
-                           "verify",
+                           gcvDUMP_BUFFER_VERIFY,
                            physical,
                            queryHeader->headerLocked,
                            0,
@@ -679,42 +730,12 @@ __glChipEndXFB(
         gctPOINTER buffer;
         gctUINT32 physical;
         gctSIZE_T size;
-        /* Flush the cache. */
-        gcmONERROR(gcoSURF_Flush(gcvNULL));
-
-        /* Commit command buffer. */
-        gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
 #endif
-
         if (progObj->bindingInfo.xfbMode == GL_INTERLEAVED_ATTRIBS)
         {
             GL_ASSERT(pXfbBindingPoints[0].boundBufObj);
             chipBufInfo = (__GLchipVertexBufferInfo *)pXfbBindingPoints[0].boundBufObj->privateData;
             gcmONERROR(gcoBUFOBJ_GetFence(chipBufInfo->bufObj, gcvFENCE_TYPE_WRITE));
-#if gcdDUMP
-            gcmVERIFY_OK(gcoBUFOBJ_Lock(chipBufInfo->bufObj,
-                                        &physical,
-                                        &buffer));
-            gcmVERIFY_OK(gcoBUFOBJ_GetSize(chipBufInfo->bufObj, &size));
-
-            gcmDUMP(gcvNULL, "#[info: verify xfb buffer when endxfb");
-            gcmDUMP_BUFFER(gcvNULL,
-                           "verify",
-                           physical,
-                           buffer,
-                           0,
-                           size);
-
-            gcmDUMP(gcvNULL, "#[info: upload stream with xfb out in case 2nd pass rendering");
-            gcmDUMP_BUFFER(gcvNULL,
-                           "stream",
-                           physical,
-                           buffer,
-                           0,
-                           size);
-
-            gcmVERIFY_OK(gcoBUFOBJ_Unlock(chipBufInfo->bufObj));
-#endif
         }
         else
         {
@@ -724,32 +745,74 @@ __glChipEndXFB(
                 GL_ASSERT(pXfbBindingPoints[i].boundBufObj);
                 chipBufInfo = (__GLchipVertexBufferInfo *)pXfbBindingPoints[i].boundBufObj->privateData;
                 gcmONERROR(gcoBUFOBJ_GetFence(chipBufInfo->bufObj, gcvFENCE_TYPE_WRITE));
+            }
+        }
 #if gcdDUMP
+        /* Flush the cache. */
+        gcmONERROR(gcoSURF_Flush(gcvNULL));
+
+        /* Commit command buffer. */
+        gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
+
+        if (progObj->bindingInfo.xfbMode == GL_INTERLEAVED_ATTRIBS)
+        {
+            GL_ASSERT(pXfbBindingPoints[0].boundBufObj);
+            chipBufInfo = (__GLchipVertexBufferInfo *)pXfbBindingPoints[0].boundBufObj->privateData;
+            gcmVERIFY_OK(gcoBUFOBJ_Lock(chipBufInfo->bufObj,
+                                        &physical,
+                                        &buffer));
+            gcmVERIFY_OK(gcoBUFOBJ_GetSize(chipBufInfo->bufObj, &size));
+
+            gcmDUMP(gcvNULL, "#[info: verify xfb buffer when endxfb]");
+            gcmDUMP_BUFFER(gcvNULL,
+                           gcvDUMP_BUFFER_VERIFY,
+                           physical,
+                           buffer,
+                           0,
+                           size);
+
+            gcmDUMP(gcvNULL, "#[info: upload stream with xfb out in case 2nd pass rendering]");
+            gcmDUMP_BUFFER(gcvNULL,
+                           gcvDUMP_BUFFER_VERIFY,
+                           physical,
+                           buffer,
+                           0,
+                           size);
+
+            gcmVERIFY_OK(gcoBUFOBJ_Unlock(chipBufInfo->bufObj));
+        }
+        else
+        {
+            GL_ASSERT(progObj->bindingInfo.xfbMode == GL_SEPARATE_ATTRIBS);
+            for (i = 0; i < progObj->bindingInfo.numActiveXFB; i++)
+            {
+                GL_ASSERT(pXfbBindingPoints[i].boundBufObj);
+                chipBufInfo = (__GLchipVertexBufferInfo *)pXfbBindingPoints[i].boundBufObj->privateData;
                 gcmVERIFY_OK(gcoBUFOBJ_Lock(chipBufInfo->bufObj,
                                             &physical,
                                             &buffer));
                 gcmVERIFY_OK(gcoBUFOBJ_GetSize(chipBufInfo->bufObj, &size));
 
-                gcmDUMP(gcvNULL, "#[info: verify xfb buffer when endxfb");
+                gcmDUMP(gcvNULL, "#[info: verify xfb buffer when endxfb]");
                 gcmDUMP_BUFFER(gcvNULL,
-                               "verify",
+                               gcvDUMP_BUFFER_VERIFY,
                                physical,
                                buffer,
                                0,
                                size);
 
-                gcmDUMP(gcvNULL, "#[info: upload stream with xfb out in case 2nd pass rendering");
+                gcmDUMP(gcvNULL, "#[info: upload stream with xfb out in case 2nd pass rendering]");
                 gcmDUMP_BUFFER(gcvNULL,
-                               "stream",
+                               gcvDUMP_BUFFER_STREAM,
                                physical,
                                buffer,
                                0,
                                size);
 
                 gcmVERIFY_OK(gcoBUFOBJ_Unlock(chipBufInfo->bufObj));
-#endif
             }
         }
+#endif
     }
 
     gcmFOOTER();

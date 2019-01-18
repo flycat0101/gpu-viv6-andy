@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -19,7 +19,9 @@ EXTERN_C_BEGIN
 VX_INTERNAL_API void vxoArray_Dump(vx_array array);
 
 VX_INTERNAL_API vx_array vxoArray_Create(
-        vx_context context, vx_enum itemType, vx_size capacity, vx_bool isVirtual, vx_enum type);
+        vx_context context, vx_enum itemType, vx_size capacity, vx_bool isVirtual, vx_enum type, vx_bool isVivArray);
+
+VX_INTERNAL_API void vxoArray_Destroy(vx_array* array);
 
 VX_INTERNAL_CALLBACK_API void vxoArray_Destructor(vx_reference reference);
 
@@ -28,6 +30,9 @@ VX_INTERNAL_API vx_bool vxoArray_InitializeAsVirtual(vx_array array, vx_enum ite
 VX_INTERNAL_API vx_bool vxoArray_CheckItemTypeAndCapacity(vx_array array, vx_enum itemType, vx_size capacity);
 
 VX_INTERNAL_API vx_bool vxoArray_AllocateMemory(vx_array array);
+VX_INTERNAL_API vx_bool vxoArray_AllocateMemoryEx(vx_array array);
+VX_INTERNAL_API vx_bool vxoArray_FreeMemory(vx_array array);
+VX_INTERNAL_API vx_bool vxoArray_FreeMemoryEx(vx_array array);
 
 VX_INTERNAL_API vx_status vxoArray_AccessRange(vx_array array, vx_size start, vx_size end, vx_size* pStride, void **ptr, vx_enum usage);
 

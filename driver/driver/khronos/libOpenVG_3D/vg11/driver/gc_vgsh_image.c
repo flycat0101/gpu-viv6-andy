@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1633,7 +1633,7 @@ _DumpTexture(
 
         gcmVERIFY_OK(gcoSURF_GetAlignedSize(Surface, &width, &height, &stride));
 
-        gcmDUMP_BUFFER(Os, "texture", address, memory[0], 0, height * stride);
+        gcmDUMP_BUFFER(Os, gcvDUMP_BUFFER_TEXTURE, address, memory[0], 0, height * stride);
 
         gcmVERIFY_OK(gcoSURF_Unlock(Surface, memory[0]));
     }

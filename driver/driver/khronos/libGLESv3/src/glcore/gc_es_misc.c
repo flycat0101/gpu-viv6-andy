@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -544,7 +544,7 @@ GLvoid GL_APIENTRY __gles_Flush(__GLcontext *gc)
 {
     __GL_HEADER();
 
-    (*gc->dp.flush)(gc, gcvFALSE);
+    (*gc->dp.flush)(gc);
 
     __GL_FOOTER();
 }
@@ -779,7 +779,7 @@ GLenum GL_APIENTRY __gles_ClientWaitSync(__GLcontext *gc, GLsync sync, GLbitfiel
 
     if (flags & GL_SYNC_FLUSH_COMMANDS_BIT)
     {
-        (*gc->dp.flush)(gc, gcvFALSE);
+        (*gc->dp.flush)(gc);
     }
 
     /* Call dp function to wait sync */

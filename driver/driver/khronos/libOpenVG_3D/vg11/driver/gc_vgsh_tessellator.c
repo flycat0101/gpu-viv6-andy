@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2018 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1269,6 +1269,7 @@ END_PROFILE
             OVG_FREE(context->os, counts);
             OVG_FREE(context->os, points);
         }
+
         OVG_SAFE_FREE(context->os, streamPipe.stream);
         gcmFOOTER_ARG("return=%d", 0);
         return 0;
@@ -3416,7 +3417,6 @@ gctINT32 _FlattenPath(
                     gcmFOOTER_ARG("return=%d", 0);
                     return  0;
                 }
-
                 fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
                 fContext->pointsInSegment[currentSegment][0].inTan.x = UN_INIT_TAN_VALUE;
                 fContext->pointsInSegment[currentSegment][1].flags = POINT_FLAT;
@@ -3505,7 +3505,6 @@ gctINT32 _FlattenPath(
                     gcmFOOTER_ARG("return=%d", 0);
                     return  0;
                 }
-
                 fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
                 fContext->pointsInSegment[currentSegment][0].inTan.x = UN_INIT_TAN_VALUE;
                 fContext->pointsInSegment[currentSegment][1].flags = POINT_FLAT;
@@ -3620,7 +3619,6 @@ gctINT32 _FlattenPath(
                         gcmFOOTER_ARG("return=%d", 0);
                         return  0;
                     }
-
                     fContext->pointsInSegment[currentSegment][0].coord = oPoint;
                     fContext->pointsInSegment[currentSegment][1].coord = oPoint;
                     fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
@@ -3749,7 +3747,6 @@ gctINT32 _FlattenPath(
                         gcmFOOTER_ARG("return=%d", 0);
                         return  0;
                     }
-
                     fContext->pointsInSegment[currentSegment][0].coord = oPoint;
                     fContext->pointsInSegment[currentSegment][1].coord = oPoint;
                     fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
@@ -3886,7 +3883,6 @@ gctINT32 _FlattenPath(
                         gcmFOOTER_ARG("return=%d", 0);
                         return  0;
                     }
-
                     fContext->pointsInSegment[currentSegment][0].coord = oPoint;
                     fContext->pointsInSegment[currentSegment][1].coord = oPoint;
                     fContext->pointsInSegment[currentSegment][0].inTan.x = UN_INIT_TAN_VALUE;
@@ -4017,7 +4013,6 @@ gctINT32 _FlattenPath(
                         gcmFOOTER_ARG("return=%d", 0);
                         return  0;
                     }
-
                     fContext->pointsInSegment[currentSegment][0].coord = oPoint;
                     fContext->pointsInSegment[currentSegment][1].coord = oPoint;
                     fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
@@ -4137,7 +4132,6 @@ gctINT32 _FlattenPath(
                         gcmFOOTER_ARG("return=%d", 0);
                         return  0;
                     }
-
                     fContext->pointsInSegment[currentSegment][0].coord = currentPoints[0];
                     fContext->pointsInSegment[currentSegment][1].coord = currentPoints[3];
                     fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
@@ -4285,7 +4279,6 @@ gctINT32 _FlattenPath(
                         gcmFOOTER_ARG("return=%d", 0);
                         return  0;
                     }
-
                     fContext->pointsInSegment[currentSegment][0].coord = currentPoints[0];
                     fContext->pointsInSegment[currentSegment][1].coord = currentPoints[3];
                     fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
@@ -4436,7 +4429,6 @@ gctINT32 _FlattenPath(
                         gcmFOOTER_ARG("return=%d", 0);
                         return  0;
                     }
-
                     fContext->pointsInSegment[currentSegment][0].coord = currentPoints[0];
                     fContext->pointsInSegment[currentSegment][1].coord = currentPoints[3];
                     fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
@@ -4579,7 +4571,6 @@ gctINT32 _FlattenPath(
                         gcmFOOTER_ARG("return=%d", 0);
                         return  0;
                     }
-
                     fContext->pointsInSegment[currentSegment][0].coord = currentPoints[0];
                     fContext->pointsInSegment[currentSegment][1].coord = currentPoints[3];
                     fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
