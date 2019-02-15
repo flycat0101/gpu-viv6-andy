@@ -1719,8 +1719,14 @@ _SynchronousPost(
     struct wl_egl_window *window = Surface->hwnd;
     struct wl_egl_surface *egl_surface = window->driver_private;
     gceHARDWARE_TYPE hwType = gcvHARDWARE_INVALID;
+    char *p;
 
     gcoHAL_GetHardwareType(gcvNULL, &hwType);
+    p = getenv("WL_EGL_SYNC_SWAP");
+    if (p && p[0] == '1')
+    {
+        return EGL_TRUE;
+    }
 
     if (egl_surface->nr_buffers == 1 || hwType == gcvHARDWARE_VG)
     {
