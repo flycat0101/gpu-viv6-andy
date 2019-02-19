@@ -2047,7 +2047,7 @@ _VSC_CPF_SourceChannelCouldBeNonConst(
     )
 {
     VIR_OpCode opcode = VIR_Inst_GetOpcode(pInst);
-    VSC_CPF_Const constVal0, constVal1;
+    VSC_CPF_Const constVal0 = {0}, constVal1;
 
     switch(opcode)
     {

@@ -40,7 +40,7 @@ computeWLimit(gctFLOAT_PTR Logical,
         gctFLOAT * wLimitRms,
         gctBOOL * wLimitRmsDirty)
 {
-    gctFLOAT bboxMin[3], bboxMax[3], rms = 0.f;
+    gctFLOAT bboxMin[3] = {0.0F, 0.0F, 0.0F}, bboxMax[3] = {0.0F, 0.0F, 0.0F}, rms = 0.f;
     gctUINT i, j;
     gctUINT upLimit;
 

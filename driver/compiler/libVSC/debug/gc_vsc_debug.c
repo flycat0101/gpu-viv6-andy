@@ -103,7 +103,7 @@ gctUINT _vscGetNameID(VSC_DIContext * context, gctCONST_STRING src)
     gctUINT ret;
     gctSIZE_T bytes;
     gctSTRING ptr;
-    gctUINT newSize;
+    gctUINT newSize = 0;
 
     ret = _LookUpInStrTable(context, src);
 

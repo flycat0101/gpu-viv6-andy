@@ -2146,7 +2146,7 @@ gcoOS_AllocateSharedMemory(
     )
 {
     gceSTATUS status;
-    gctPHYS_ADDR physical;
+    gctPHYS_ADDR physical = 0;
     gctPOINTER pointer = gcvNULL;
     gcsSharedMemoryNode node;
 

@@ -43,7 +43,7 @@
     }
 
 #   undef  gcmTRACE_ZONE
-#   define gcmTRACE_ZONE            __do_nothing
+#   define gcmTRACE_ZONE(...)
 #endif
 
 #endif /* __gc_hal_user_precomp_h__ */

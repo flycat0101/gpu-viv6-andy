@@ -45,7 +45,9 @@ POST_CLEAN=$(RM_HOST) $(LOCAL_INSTALL)/*$(NAME)*
 # 64 bit
 ifeq ($(CPU),aarch64)
 AARCH64 = 1
-CCFLAGS += -DAARCH64
+CCFLAGS += -DAARCH64 -O3
+#Use the following option to finetune for A72/A53 architecture
+#CCFLAGS += -mtune=cortex-a72.cortex-a53
 LIBS += stringsa64S
 endif
 
@@ -222,7 +224,8 @@ endif
 # Build for debugging
 ifeq ($(ENABLE_DEBUG),1)
 	CCFLAGS += -g -O0 -DgcdDEBUG=1
-#else
+else
+        CCFLAGS += -Wc,-fno-stack-protector
 #	CCFLAGS += -O2
 #	CCFLAGS += -Wno-strict-aliasing
 endif

@@ -3476,7 +3476,7 @@ _VSC_UF_AUBO_InsertInstructions(
                 VIR_TypeId indexSymTypeId = VIR_Symbol_GetTypeId(indexSym);
 
                 VSC_UF_AUBO_UniformInfoNode* sameIndex = VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(uin);
-                gctUINT strides[4];
+                gctUINT strides[4] = {0};
                 VIR_Swizzle swizzles[4];
                 VIR_VirRegId lastSymId = indexSymId;
                 VIR_Swizzle lastSwizzle;

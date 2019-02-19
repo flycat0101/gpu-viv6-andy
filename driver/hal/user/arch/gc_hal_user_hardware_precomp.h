@@ -35,7 +35,7 @@
     }
 
 #   undef  gcmTRACE_ZONE
-#   define gcmTRACE_ZONE            __do_nothing
+#   define gcmTRACE_ZONE(...)
 #endif
 
 #endif /* __gc_hal_user_hardware_precomp_h_ */
