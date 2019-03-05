@@ -1242,6 +1242,7 @@ _CheckErrorForSubscriptExpr(
         if (((sloIR_BINARY_EXPR)expr)->type == slvBINARY_SUBSCRIPT)
         {
             while (sloIR_OBJECT_GetType(&expr->base) != slvIR_VARIABLE &&
+                   sloIR_OBJECT_GetType(&expr->base) != slvIR_CONSTANT &&
                    sloIR_OBJECT_GetType(&expr->base) != slvIR_UNARY_EXPR)
             {
                 sleBINARY_EXPR_TYPE type;
