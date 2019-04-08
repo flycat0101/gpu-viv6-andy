@@ -2,6 +2,7 @@
  * $QNXLicenseC:
  * Copyright 2014, QNX Software Systems. All Rights Reserved.
  * Copyright 2016, Freescale Semiconductor, Inc.
+ * Copyright 2017-2019 NXP
  *
  * You must obtain a written license from and pay applicable
  * license fees to QNX Software Systems before you may reproduce,
@@ -30,7 +31,7 @@
 #include <screen/screen.h>
 #include <KHR/khronos_utils.h>
 
-#include "g2d.h"
+#include "g2dExt.h"
 
 #include <gc_hal.h>
 #include <gc_hal_raster.h>
@@ -46,6 +47,13 @@
 #include <EGL/egl.h>
 #include "gc_hal_types.h"
 #endif
+
+#include <WF/wfd.h>
+#include <WF/wfdext.h>
+
+#include <assert.h>
+
+#include <imx8_common_wfd_g2d.h>
 
 /* XXX Move to sys/slogcodes.h */
 #ifndef _SLOGC_GRAPHICS_WINMGR
@@ -82,9 +90,9 @@
 #define	IS_SCALED( args )    ( (args).sw != (args).dw || (args).sh != (args).dh)
 
 typedef struct {
-	struct g2d_surface G2DSurface;
-	gctPOINTER      MappingInfo;
-    win_image_t    *NativeImage;
+        struct g2d_surfaceEx G2DSurfaceEx;
+        gctPOINTER      MappingInfo;
+        win_image_t    *NativeImage;
 } vivante_handle_t;
 
 /* This is the maximum for SetCurrentSourceIndex(), and a multisource blit */
@@ -119,7 +127,11 @@ struct win_blit_ctx {
 static void do_blits( struct win_blit_ctx * );
 #endif
 
+#if defined (gcdMMUV2_ENABLE)
+#error "gcdMMUV2 is not supported!"
+#endif
 
+/*
 static int
 gc_rc_2_errno(int gc_rc)
 {
@@ -151,7 +163,7 @@ gc_rc_2_errno(int gc_rc)
     }
 }
 
-/*
+
 #define gc_rc_2_a_line(x) do { if (gc_rc == (x)) return #x; } while (0)
 static const char *
 gc_rc_2_a(int gc_rc)
@@ -424,8 +436,6 @@ vivante_ctx_fini(win_blit_ctx_t ctx)
 static int
 update_g2d_surface(vivante_handle_t *handle) {
 
-
-
 	switch (handle->NativeImage->format) {
 	case SCREEN_FORMAT_BYTE:
 		// gcvSURF_L8 - NOTES not BYTE format supported by g2d??
@@ -448,35 +458,35 @@ update_g2d_surface(vivante_handle_t *handle) {
 		G2D_FORMAT_NOT_SUPPORTED(RGBA5551);
 		break;
 	case SCREEN_FORMAT_RGB565:
-		handle->G2DSurface.format = G2D_RGB565;
+		handle->G2DSurfaceEx.base.format = G2D_RGB565;
 		break;
 	case SCREEN_FORMAT_RGB888:
 		//gcvSURF_R8G8B8 - NOTES RGB888 format not supported by g2d??
-		handle->G2DSurface.format = G2D_RGB888;
+		handle->G2DSurfaceEx.base.format = G2D_RGB888;
 		break;
 	case SCREEN_FORMAT_RGBA8888:
-		handle->G2DSurface.format = G2D_BGRA8888;
+		handle->G2DSurfaceEx.base.format = G2D_BGRA8888;
 		break;
 	case SCREEN_FORMAT_RGBX8888:
-		handle->G2DSurface.format = G2D_BGRX8888;
+		handle->G2DSurfaceEx.base.format = G2D_BGRX8888;
 		break;
 	case SCREEN_FORMAT_UYVY:
-		handle->G2DSurface.format = G2D_UYVY;
+		handle->G2DSurfaceEx.base.format = G2D_UYVY;
 		break;
 	case SCREEN_FORMAT_YUY2:
-		handle->G2DSurface.format = G2D_YUYV;
+		handle->G2DSurfaceEx.base.format = G2D_YUYV;
 		break;
 	case SCREEN_FORMAT_YV12:
-		handle->G2DSurface.format = G2D_YV12;
+		handle->G2DSurfaceEx.base.format = G2D_YV12;
 		break;
 	case SCREEN_FORMAT_YUV420:
-		handle->G2DSurface.format = G2D_I420;
+		handle->G2DSurfaceEx.base.format = G2D_I420;
 		break;
 	case SCREEN_FORMAT_YVYU:
-		handle->G2DSurface.format = G2D_YVYU;
+		handle->G2DSurfaceEx.base.format = G2D_YVYU;
 		break;
 	case SCREEN_FORMAT_NV12:
-		handle->G2DSurface.format = G2D_NV12;
+		handle->G2DSurfaceEx.base.format = G2D_NV12;
 		break;
 	default:
 		error("%s: format %d not supported", __FUNCTION__, handle->NativeImage->format);
@@ -485,17 +495,17 @@ update_g2d_surface(vivante_handle_t *handle) {
 	}
 
 	/* Update stride of the g2d surface structure */
-	switch(handle->G2DSurface.format)
+	switch(handle->G2DSurfaceEx.base.format)
 	{
 	case G2D_RGB565:
 	case G2D_BGR565:
 	case G2D_YUYV:
 	case G2D_UYVY:
 	case G2D_YVYU:
-		handle->G2DSurface.stride = handle->NativeImage->strides[0]/2;
+		handle->G2DSurfaceEx.base.stride = handle->NativeImage->strides[0]/2;
 		break;
 	case G2D_RGB888:
-		handle->G2DSurface.stride = handle->NativeImage->strides[0]/3;
+		handle->G2DSurfaceEx.base.stride = handle->NativeImage->strides[0]/3;
 		break;
 	case G2D_RGBA8888:
 	case G2D_RGBX8888:
@@ -505,20 +515,20 @@ update_g2d_surface(vivante_handle_t *handle) {
 	case G2D_ABGR8888:
 	case G2D_XRGB8888:
 	case G2D_XBGR8888:
-		handle->G2DSurface.stride = handle->NativeImage->strides[0]/4;
+		handle->G2DSurfaceEx.base.stride = handle->NativeImage->strides[0]/4;
 		break;
         case G2D_NV12:
         case G2D_NV16:
         case G2D_YV12:
         case G2D_I420:
-		handle->G2DSurface.stride = handle->NativeImage->strides[0];
+        handle->G2DSurfaceEx.base.stride = handle->NativeImage->strides[0];
 		break;
 	default:
 		break;
 	}
 
 	/* Update planes part of the g2d surface */
-	switch (handle->G2DSurface.format) {
+	switch (handle->G2DSurfaceEx.base.format) {
 	case G2D_RGB565:
 	case G2D_RGB888:
 	case G2D_RGBA8888:
@@ -533,12 +543,12 @@ update_g2d_surface(vivante_handle_t *handle) {
 		break;
 	case G2D_NV12:
 	case G2D_NV16:
-		handle->G2DSurface.planes[1] = handle->G2DSurface.planes[0] + handle->G2DSurface.stride * handle->G2DSurface.height;
+                handle->G2DSurfaceEx.base.planes[1] = handle->G2DSurfaceEx.base.planes[0] + handle->NativeImage->planar_offsets[1];
 		break;
 	case G2D_YV12:
 	case G2D_I420:
-		handle->G2DSurface.planes[1] = handle->G2DSurface.planes[0] + handle->G2DSurface.stride * handle->G2DSurface.height;
-		handle->G2DSurface.planes[2] = handle->G2DSurface.planes[1]  + handle->G2DSurface.stride * handle->G2DSurface.height / 4;
+		handle->G2DSurfaceEx.base.planes[1] = handle->G2DSurfaceEx.base.planes[0] + handle->NativeImage->planar_offsets[1];
+		handle->G2DSurfaceEx.base.planes[2] = handle->G2DSurfaceEx.base.planes[0] + handle->NativeImage->planar_offsets[2];
 		break;
 	default:
 		break;
@@ -551,7 +561,7 @@ update_g2d_surface(vivante_handle_t *handle) {
 void printbuff(const char *message,  win_image_t *image) {
   uint32_t *vaddr = image->vaddr;
   
-  info("%s paddr 0x%08llx buffer: %08x %08x %08x %08x %08x %08x %08x %08x", message, image->paddr,
+  info("%s paddr 0x%08lx buffer: %08x %08x %08x %08x %08x %08x %08x %08x", message, image->paddr,
 	vaddr[0], vaddr[1], vaddr[2], vaddr[3], vaddr[4], vaddr[5], vaddr[6], vaddr[7]);
 }
 
@@ -586,19 +596,19 @@ vivante_fill(win_blit_ctx_t ctx, win_handle_t dst,
         do_blits( ctx );
     }
 #endif
-    d->G2DSurface.width = d->NativeImage->width;
-    d->G2DSurface.height = d->NativeImage->height;
-    d->G2DSurface.left = rect->x1;
-    d->G2DSurface.top = rect->y1;
-    d->G2DSurface.right = rect->x2;
-    d->G2DSurface.bottom = rect->y2;
-    d->G2DSurface.clrcolor = clrColor;
-    d->G2DSurface.rot = G2D_ROTATION_0;
+    d->G2DSurfaceEx.base.width = d->NativeImage->width;
+    d->G2DSurfaceEx.base.height = d->NativeImage->height;
+    d->G2DSurfaceEx.base.left = rect->x1;
+    d->G2DSurfaceEx.base.top = rect->y1;
+    d->G2DSurfaceEx.base.right = rect->x2;
+    d->G2DSurfaceEx.base.bottom = rect->y2;
+    d->G2DSurfaceEx.base.clrcolor = clrColor;
+    d->G2DSurfaceEx.base.rot = G2D_ROTATION_0;
 
 
     G2D_LOGERR_CALL_GC(update_g2d_surface,(d));
 
-    G2D_LOGERR_CALL_GC(g2d_clear, (blt_ctx->G2Dhandle, &d->G2DSurface));
+    G2D_LOGERR_CALL_GC(g2d_clear, (blt_ctx->G2Dhandle, &d->G2DSurfaceEx.base));
 
     pthread_mutex_unlock(&blt_ctx->mutex);
 
@@ -643,11 +653,11 @@ blit(win_blit_ctx_t ctx, win_handle_t src, win_handle_t dst, const win_blit_t *a
     }
 
     /* Set G2D transparency */
-	s->G2DSurface.blendfunc = G2D_ONE;
-	d->G2DSurface.blendfunc = G2D_ONE_MINUS_SRC_ALPHA;
+	s->G2DSurfaceEx.base.blendfunc = G2D_ONE;
+	d->G2DSurfaceEx.base.blendfunc = G2D_ONE_MINUS_SRC_ALPHA;
 
 	if(!args->premult_alpha) {
-		s->G2DSurface.blendfunc |= G2D_PRE_MULTIPLIED_ALPHA;
+		s->G2DSurfaceEx.base.blendfunc |= G2D_PRE_MULTIPLIED_ALPHA;
 	}
 
 	if (args->transp == SCREEN_TRANSPARENCY_TEST) {
@@ -656,7 +666,7 @@ blit(win_blit_ctx_t ctx, win_handle_t src, win_handle_t dst, const win_blit_t *a
 	} else if (args->transp == SCREEN_TRANSPARENCY_SOURCE_OVER) {
 		G2D_LOGERR_CALL_GC(g2d_enable,(ctx->G2Dhandle, G2D_BLEND));
 	} else if(args->global_alpha < 255) {
-		s->G2DSurface.global_alpha = args->global_alpha;
+		s->G2DSurfaceEx.base.global_alpha = args->global_alpha;
 		G2D_LOGERR_CALL_GC(g2d_enable,(ctx->G2Dhandle, G2D_BLEND));
 		G2D_LOGERR_CALL_GC(g2d_enable, (ctx->G2Dhandle, G2D_GLOBAL_ALPHA));
 	} else {
@@ -664,14 +674,14 @@ blit(win_blit_ctx_t ctx, win_handle_t src, win_handle_t dst, const win_blit_t *a
 	}
 
 	/* Set size and rotation parameters */
-	s->G2DSurface.width = s->NativeImage->width;
-	s->G2DSurface.height = s->NativeImage->height;
+	s->G2DSurfaceEx.base.width = s->NativeImage->width;
+	s->G2DSurfaceEx.base.height = s->NativeImage->height;
 
-	s->G2DSurface.left = args->sx;
-	s->G2DSurface.top = args->sy;
-	s->G2DSurface.right = args->sx + args->sw;
-	s->G2DSurface.bottom = args->sy + args->sh;
-	s->G2DSurface.rot = G2D_ROTATION_0;
+	s->G2DSurfaceEx.base.left = args->sx;
+	s->G2DSurfaceEx.base.top = args->sy;
+	s->G2DSurfaceEx.base.right = args->sx + args->sw;
+	s->G2DSurfaceEx.base.bottom = args->sy + args->sh;
+	s->G2DSurfaceEx.base.rot = G2D_ROTATION_0;
 	if (args->mirror && args->flip) {
 		/* Mirror and flip together means rotation by 180degree */
 		rotation += 180;
@@ -679,35 +689,35 @@ blit(win_blit_ctx_t ctx, win_handle_t src, win_handle_t dst, const win_blit_t *a
 			rotation -= 360;
 		}
 	} else if (args->mirror) {
-		s->G2DSurface.rot = G2D_FLIP_H;
+		s->G2DSurfaceEx.base.rot = G2D_FLIP_H;
 	} else if (args->flip) {
-		s->G2DSurface.rot = G2D_FLIP_V;
+		s->G2DSurfaceEx.base.rot = G2D_FLIP_V;
 	}
 	G2D_LOGERR_CALL_GC(update_g2d_surface,(s));
 
-	d->G2DSurface.width = d->NativeImage->width;
-	d->G2DSurface.height = d->NativeImage->height;
-	d->G2DSurface.left = args->dx;
-	d->G2DSurface.top = args->dy;
-	d->G2DSurface.right = args->dx + args->dw;
-	d->G2DSurface.bottom = args->dy + args->dh;
+	d->G2DSurfaceEx.base.width = d->NativeImage->width;
+	d->G2DSurfaceEx.base.height = d->NativeImage->height;
+	d->G2DSurfaceEx.base.left = args->dx;
+	d->G2DSurfaceEx.base.top = args->dy;
+	d->G2DSurfaceEx.base.right = args->dx + args->dw;
+	d->G2DSurfaceEx.base.bottom = args->dy + args->dh;
     switch (rotation) {
 	case 90:
-		d->G2DSurface.rot = G2D_ROTATION_90;
+		d->G2DSurfaceEx.base.rot = G2D_ROTATION_90;
 		break;
 	case 180:
-		d->G2DSurface.rot = G2D_ROTATION_180;
+		d->G2DSurfaceEx.base.rot = G2D_ROTATION_180;
 		break;
 	case 270:
-		d->G2DSurface.rot = G2D_ROTATION_270;
+		d->G2DSurfaceEx.base.rot = G2D_ROTATION_270;
 		break;
 	default:
-		d->G2DSurface.rot = G2D_ROTATION_0;
+		d->G2DSurfaceEx.base.rot = G2D_ROTATION_0;
 		break;
     }
     G2D_LOGERR_CALL_GC(update_g2d_surface,(d));
 
-    G2D_LOGERR_CALL_GC(g2d_blit,(ctx->G2Dhandle, &s->G2DSurface, &d->G2DSurface));
+    G2D_LOGERR_CALL_GC(g2d_blitEx,(ctx->G2Dhandle, &s->G2DSurfaceEx, &d->G2DSurfaceEx));
     G2D_LOGERR_CALL_GC(g2d_disable,(ctx->G2Dhandle, G2D_GLOBAL_ALPHA));
     G2D_LOGERR_CALL_GC(g2d_disable,(ctx->G2Dhandle, G2D_BLEND));
 
@@ -775,58 +785,80 @@ vivante_finish(win_blit_ctx_t ctx)
  * @return Pointer to the new window handle.
  * @retval NULL In case of an error.
  */
-
-
 static win_handle_t
 vivante_alloc(win_blit_ctx_t ctx, win_image_t *img)
 {
     vivante_handle_t    *handle;
-    gceSTATUS           gc_rc;
 
+    /* TODO - FIXME - remove the unneeded cast to struct win_blit_ctx * -
+     * here and other instances.
+     */
     struct win_blit_ctx *blt_ctx   = (struct win_blit_ctx *)ctx;
+
+    if (!(img->flags & WIN_IMAGE_FLAG_PHYS_CONTIG)) {
+        error("%s: could not ascertain if the buffer is contiguous. "
+                "g2d blitter does not handle non-contiguous buffers!", __FUNCTION__);
+        return NULL;
+    }
+
+    enum wfd_imx8_tiling_mode tiling_mode = GET_TILING_MODE(img->format);
+    if (!is_valid_tiling_mode(tiling_mode)) {
+        error("%s: Unsupported tiling mode: 0x%#x", __FUNCTION__, tiling_mode);
+        return NULL;
+    }
+
     pthread_mutex_lock(&blt_ctx->mutex);
 
     if (blt_ctx->tls_errno != EOK) {
-	error("%s:%d: thread creation failed, errno %s", __FUNCTION__, __LINE__, strerror(blt_ctx->tls_errno));
         pthread_mutex_unlock(&blt_ctx->mutex);
-	return NULL;
+        error("%s:%d: thread creation failed, errno %s", __FUNCTION__, __LINE__, strerror(blt_ctx->tls_errno));
+        return NULL;
     }
 
     handle = malloc(sizeof(*handle));
     if (!handle) {
-        error("%s: could not allocate memory for handle", __FUNCTION__);
         pthread_mutex_unlock(&blt_ctx->mutex);
+        error("%s: could not allocate memory for handle", __FUNCTION__);
         return NULL;
     }
 
     handle->NativeImage = img;
+    handle->MappingInfo = NULL;
+    handle->G2DSurfaceEx.base.planes[0] = handle->NativeImage->paddr;
 
-    /* NOTES image is allocated by screen? Then I can't use the g2d_alloc.
-     * I shall keep the gcoOS_MapUserMemory for gpu, just replace it with gcoHAL_WrapUserMemory/gcoHAL_LockVideoMemory at some point
-     * in the future (gcoOS_MapUserMemory is obsolete in 6.0.x). Iris????? */
+    switch (tiling_mode) {
+    case WFD_FORMAT_IMX8X_TILING_MODE_LINEAR:
+        handle->G2DSurfaceEx.tiling = G2D_LINEAR;
+        break;
+    case WFD_FORMAT_IMX8X_TILING_MODE_VIVANTE_TILED:
+        handle->G2DSurfaceEx.tiling = G2D_TILED;
+        break;
+    case WFD_FORMAT_IMX8X_TILING_MODE_VIVANTE_SUPER_TILED:
+        handle->G2DSurfaceEx.tiling = G2D_SUPERTILED;
+        break;
+    case WFD_FORMAT_IMX8X_TILING_MODE_AMPHION_TILED:
+        handle->G2DSurfaceEx.tiling = G2D_AMPHION_TILED;
+        break;
+    case WFD_FORMAT_IMX8X_TILING_MODE_AMPHION_INTERLACED:
+        handle->G2DSurfaceEx.tiling = G2D_AMPHION_INTERLACED;
+        break;
+    default:
+        free(handle);
+        pthread_mutex_unlock(&blt_ctx->mutex);
+        error("%s: unknown tiling format!", __FUNCTION__);
+        return NULL;
+    }
 
-#if !defined(gcdMMUV2_ENABLE)
-    if ( handle->NativeImage->flags & WIN_IMAGE_FLAG_PHYS_CONTIG ) {
-        handle->MappingInfo = NULL;
-        handle->G2DSurface.planes[0] = handle->NativeImage->paddr;
-    }
-    else
-#endif
-    {
-        gc_rc = gcoOS_MapUserMemory(gcvNULL, handle->NativeImage->vaddr, handle->NativeImage->size, &handle->MappingInfo, (gctUINT32_PTR)&handle->G2DSurface.planes[0]);
-    	if ( gc_rc != gcvSTATUS_OK ) {
-            error( "%s: gcoOS_MapUserMemory vaddr=%p, error %d (%s)", __FUNCTION__, handle->NativeImage->vaddr, gc_rc, strerror(gc_rc_2_errno(gc_rc)) );
-            free(handle);
-            errno = gc_rc_2_errno(gc_rc);
-            pthread_mutex_unlock(&blt_ctx->mutex);
-            return NULL;
-        }
-    }
+    /* once we have the tiling info, we can knock the tiling
+     * bits out of the format - until detiling support is added for hardware.
+     */
+    handle->NativeImage->format = WIN_FORMAT(handle->NativeImage->format);
 
     pthread_mutex_unlock(&blt_ctx->mutex);
 
     return handle;
 }
+
 /**
  * Destroy the window handle
  *
@@ -837,27 +869,12 @@ static void
 vivante_free(win_blit_ctx_t ctx, win_handle_t hnd)
 {
     vivante_handle_t    *handle = hnd;
-    gceSTATUS           gc_rc;
 
-    struct win_blit_ctx *blt_ctx   = (struct win_blit_ctx *)ctx;
+    struct win_blit_ctx *blt_ctx  = (struct win_blit_ctx *)ctx;
+
     pthread_mutex_lock(&blt_ctx->mutex);
-
-    /* NOTES image is allocated by screen? Then I can't use the g2d_alloc.
-         * I shall keep the gcoOS_MapUserMemory for gpu, just replace it with gcoHAL_UnlockVideoMemory/gcoHAL_ReleaseVideoMemory at some point
-         * in the future (gcoOS_MapUserMemory is obsolete in 6.0.x). Iris????? */
-
-    if ( handle->MappingInfo ) {
-        gc_rc = gcoOS_UnmapUserMemory(gcvNULL, handle->NativeImage->vaddr, handle->NativeImage->size, handle->MappingInfo, handle->G2DSurface.planes[0]);
-    	if ( gc_rc != gcvSTATUS_OK ) {
-            error( "%s: unmapping user memory vaddr=%p, paddr=%#x, error %d", __FUNCTION__, handle->NativeImage->vaddr, handle->G2DSurface.planes[0], gc_rc );
-        }
-        handle->G2DSurface.planes[0] = 0;
-        handle->MappingInfo = NULL;
-    }
     free(handle);
-
     pthread_mutex_unlock(&blt_ctx->mutex);
-
 }
 
 static int
@@ -884,12 +901,12 @@ vivante_blit( win_blit_ctx_t ctx, win_handle_t src, win_handle_t dst, const win_
 
     if( blt_ctx->print_stats > 1 ) {
         info("%p: blt%d"
-                ",srchdl=%p,paddr=0x%llx, srcfmt=%d,srcx=%d,srcy=%d,srcw=%d,srch=%d",
+                ",srchdl=%p,paddr=0x%lx, srcfmt=%d,srcx=%d,srcy=%d,srcw=%d,srch=%d",
                 blt_ctx, blt_ctx->n_blits+1,
                 src, ((vivante_handle_t*)src)->NativeImage->paddr, ((vivante_handle_t*)src)->NativeImage->format, args->sx, args->sy, args->sw, args->sh
             );
 		info("%p: blt%d"
-                ",dsthdl=%p,paddr=0x%llx, dstfmt=%d,dstx=%d,dsty=%d,dstw=%d,dsth=%d",
+                ",dsthdl=%p,paddr=0x%lx, dstfmt=%d,dstx=%d,dsty=%d,dstw=%d,dsth=%d",
                 blt_ctx, blt_ctx->n_blits+1,		
                 dst, ((vivante_handle_t*)dst)->NativeImage->paddr, ((vivante_handle_t*)dst)->NativeImage->format, args->dx, args->dy, args->dw, args->dh
             );

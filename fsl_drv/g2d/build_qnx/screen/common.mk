@@ -20,6 +20,7 @@ EXTRA_INCVPATH += $(VIVANTE_SDK_DIR)/hal/os/qnx/user
 EXTRA_INCVPATH += $(VIVANTE_SDK_DIR)/hal/user
 EXTRA_INCVPATH += $(VIVANTE_SDK_DIR)/sdk/inc
 EXTRA_INCVPATH += $(VIVANTE_SDK_DIR)/compiler/libVSC/include
+EXTRA_INCVPATH += $(driver_root)/screen
 EXTRA_INCVPATH += $(driver_root)/include
 
 SOURCE_OBJECTS += $(driver_root)/screen/vivante_g2d.o
