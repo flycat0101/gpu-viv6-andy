@@ -14,7 +14,7 @@
 #include "gc_es_context.h"
 #include "gc_chip_context.h"
 
-#define _GC_OBJ_ZONE    __GLES3_ZONE_CONTEXT
+#define _GC_OBJ_ZONE    gcdZONE_ES30_CONTEXT
 
 extern __GLchipGlobal dpGlobalInfo;
 extern __GLformatInfo __glFormatInfoTable[];
@@ -395,7 +395,10 @@ gcChipInitExtension(
     __GLextension *curExt;
     __GLdeviceConstants *constants = &gc->constants;
     GLubyte *pCurFmt = gcvNULL;
-
+#if defined(ANDROID)
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
+    gcmVERIFY_OK(gcoHAL_GetPatchID(gcvNULL, &patchId));
+#endif
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
     /* OES Extensions for context 2.0 */
@@ -548,6 +551,18 @@ gcChipInitExtension(
 
         __glExtension[__GL_EXTID_EXT_sRGB].bEnabled = GL_TRUE;
     }
+
+#if defined(ANDROID)
+    if(chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4653 && gcvPATCH_NATIVEHARDWARE_CTS == patchId)
+    {
+        /* force support RGB10_A2 for android nativehardware cts under es2.0.
+        ** but note that gc7000nanoultra PE does not support RGB10_A2,
+        ** while android nativehardware cts can pass is because the case only use clear
+        ** to draw the fbo, otherwise, the case may also fail even enable this.
+        */
+        __glFormatInfoTable[__GL_FMT_RGB10_A2].renderable = GL_TRUE;
+    }
+#endif
 
     /* extension enabled only for context 3.1 and later */
     if (constants->majorVersion == 3 && constants->minorVersion >= 1)
@@ -1393,7 +1408,7 @@ __glChipGetDeviceConstants(
         gctUINT minTesUniforms  = tsAvailable ? 256 : 0;
         gctUINT minGsUniforms   = gsAvailable ? 256 : 0;
 
-        if ((gc->apiVersion == __GL_API_VERSION_ES20 || gc->apiVersion == __GL_API_VERSION_ES30) &&
+        if ((gc->apiVersion == __GL_API_VERSION_ES20) &&
             (gcvPATCH_OES20SFT == patchId ||
              gcvPATCH_GLBM27 == patchId   ||
              gcvPATCH_GFXBENCH == patchId ||

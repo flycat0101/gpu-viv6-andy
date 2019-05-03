@@ -166,6 +166,11 @@ reserved_mem_attach(
     struct reserved_mem *res;
     struct resource *region = NULL;
 
+    if (Desc == gcvNULL)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
     res = kzalloc(sizeof(struct reserved_mem), GFP_KERNEL | gcdNOWARN);
 
     if (!res)

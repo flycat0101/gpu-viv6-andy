@@ -27,7 +27,7 @@
 #define _REMOVE_UNUSED_FUNCTION_CODE_   0
 #define _RECURSIVE_BUILD_DU_            1
 
-#define _GC_OBJ_ZONE    gcvZONE_COMPILER
+#define _GC_OBJ_ZONE    gcdZONE_COMPILER
 
 gcOPTIMIZER_OPTION theOptimizerOption =
 {
@@ -395,6 +395,12 @@ gcOPTIMIZER_OPTION theOptimizerOption =
      */
     gcvTRUE, /* CLUseVIRCodeGen; */
 
+    /* CLC use new preprocessor:
+     *
+     *   VC_OPTION=-USECLNEWPP:0|1
+     */
+    gcvFALSE, /* UseCLNewPreprocessor; */
+
     /* Enable register pack in old compiler:
      *   VC_OPTION=-PACKREG:0|1
     */
@@ -430,6 +436,7 @@ gcmMEM_DeclareAFSMemPool(struct _gcOPT_FUNCTION, FunctionArray, )
 gcmMEM_DeclareAFSMemPool(struct _gcOPT_TEMP, TempArray, )
 gcmMEM_DeclareAFSMemPool(struct _gcOPT_TEMP_DEFINE, TempDefineArray, )
 
+#if (!VSC_LITE_BUILD)
 static gceSTATUS
 _MemPoolInit(
     gcOPTIMIZER         Optimizer
@@ -746,6 +753,7 @@ OnError:
     gcmFOOTER();
     return status;
 } /* gcList_RemoveNode */
+#endif
 
 gctBOOL
 gcDoTriageForShaderId(
@@ -789,6 +797,7 @@ gctINT gcSHADER_getEffectiveShaderId(
 }
 
 /* */
+#if (!VSC_LITE_BUILD)
 gctBOOL
 gcOPT_doVaryingPackingForShader(
     IN gcSHADER         Shader
@@ -900,6 +909,7 @@ gcSHADER_DumpCodeGen(void * Shader)
     }
     return gcvFALSE;
 }
+#endif
 
 gctBOOL
 gcSHADER_DumpCodeGenVerbose(void * Shader)
@@ -915,6 +925,7 @@ gcSHADER_DumpCodeGenVerbose(void * Shader)
     return gcvFALSE;
 }
 
+#if (!VSC_LITE_BUILD)
 gctBOOL
 gcSHADER_DumpFinalIR(gcSHADER Shader)
 {
@@ -2040,7 +2051,7 @@ gcOpt_InitializeTempArray(
         if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
         {
             /* Get pointer to temporary register. */
-            temp = tempArray + code->instruction.source0Index;
+            temp = tempArray + gcmSL_INDEX_GET(code->instruction.source0Index, Index);
 
             _UpdateTempRegState(Optimizer, temp, code->function, gcmSL_SOURCE_GET(code->instruction.source0, Format));
         }
@@ -2064,7 +2075,7 @@ gcOpt_InitializeTempArray(
         if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
         {
             /* Get pointer to temporary register. */
-            temp = tempArray + code->instruction.source1Index;
+            temp = tempArray + gcmSL_INDEX_GET(code->instruction.source1Index, Index);
 
             _UpdateTempRegState(Optimizer, temp, code->function, gcmSL_SOURCE_GET(code->instruction.source1, Format));
         }
@@ -2530,7 +2541,7 @@ _BuildGlobalUsage(
             if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
             {
                 /* Get pointer to temporary register. */
-                temp = tempArray + code->instruction.source0Index;
+                temp = tempArray + gcmSL_INDEX_GET(code->instruction.source0Index, Index);
 
                 if (temp->isGlobal)
                 {
@@ -2542,7 +2553,7 @@ _BuildGlobalUsage(
                     {
                         temp->tempInt = gcvFUNCTION_INOUT;
                     }
-                    enableUseArray[code->instruction.source0Index] |= enable;
+                    enableUseArray[gcmSL_INDEX_GET(code->instruction.source0Index, Index)] |= enable;
                 }
             }
 
@@ -2570,7 +2581,6 @@ _BuildGlobalUsage(
                 }
             }
 
-
             /* Determine usage of source1. */
             source = code->instruction.source1;
             swizzlex = gcmSL_SOURCE_GET(source, SwizzleX);
@@ -2585,7 +2595,7 @@ _BuildGlobalUsage(
             if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
             {
                 /* Get pointer to temporary register. */
-                temp = tempArray + code->instruction.source1Index;
+                temp = tempArray + gcmSL_INDEX_GET(code->instruction.source1Index, Index);
 
                 if (temp->isGlobal)
                 {
@@ -2597,9 +2607,8 @@ _BuildGlobalUsage(
                     {
                         temp->tempInt = gcvFUNCTION_INOUT;
                     }
-                    enableUseArray[code->instruction.source1Index] |= enable;
+                    enableUseArray[gcmSL_INDEX_GET(code->instruction.source1Index, Index)] |= enable;
                 }
-
             }
 
             if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED)
@@ -6232,11 +6241,11 @@ _BuildDataFlowForCode(
         }
 
         gcmERR_RETURN(_AddTempUsage(Optimizer,
-                            &TempDefineArray[code->source0Index],
+                            &TempDefineArray[gcmSL_INDEX_GET(code->source0Index, Index)],
                             enable,
                             &Code->dependencies0,
                             Code,
-                            _needSuccessiveReg(Optimizer, code->source0Index)));
+                            _needSuccessiveReg(Optimizer, gcmSL_INDEX_GET(code->source0Index, Index))));
     }
 
     if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED ||
@@ -6274,9 +6283,9 @@ _BuildDataFlowForCode(
                             (gcSL_SWIZZLE) gcmSL_SOURCE_GET(source, SwizzleZ),
                             (gcSL_SWIZZLE) gcmSL_SOURCE_GET(source, SwizzleW));
 
-            if (Optimizer->tempArray[code->source0Index].arrayVariable)
+            if (Optimizer->tempArray[gcmSL_INDEX_GET(code->source0Index, Index)].arrayVariable)
             {
-                gcVARIABLE variable = Optimizer->tempArray[code->source0Index].arrayVariable;
+                gcVARIABLE variable = Optimizer->tempArray[gcmSL_INDEX_GET(code->source0Index, Index)].arrayVariable;
 
                 gctUINT startIndex, endIndex;
                 gcmASSERT(isVariableNormal(variable));
@@ -6320,11 +6329,11 @@ _BuildDataFlowForCode(
         }
 
         gcmERR_RETURN(_AddTempUsage(Optimizer,
-                            &TempDefineArray[code->source1Index],
+                            &TempDefineArray[gcmSL_INDEX_GET(code->source1Index, Index)],
                             enable,
                             &Code->dependencies1,
                             Code,
-                            _needSuccessiveReg(Optimizer, code->source1Index)));
+                            _needSuccessiveReg(Optimizer, gcmSL_INDEX_GET(code->source1Index, Index))));
     }
 
     if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED || opcode == gcSL_COPY)
@@ -6361,9 +6370,9 @@ _BuildDataFlowForCode(
                             (gcSL_SWIZZLE) gcmSL_SOURCE_GET(source, SwizzleZ),
                             (gcSL_SWIZZLE) gcmSL_SOURCE_GET(source, SwizzleW));
 
-            if (Optimizer->tempArray[code->source1Index].arrayVariable)
+            if (Optimizer->tempArray[gcmSL_INDEX_GET(code->source1Index, Index)].arrayVariable)
             {
-                gcVARIABLE variable = Optimizer->tempArray[code->source1Index].arrayVariable;
+                gcVARIABLE variable = Optimizer->tempArray[gcmSL_INDEX_GET(code->source1Index, Index)].arrayVariable;
 
                 gctUINT startIndex, endIndex;
                 gcmASSERT(isVariableNormal(variable));
@@ -6383,7 +6392,7 @@ _BuildDataFlowForCode(
             }
             else
             {
-                gcmASSERT(Optimizer->tempArray[code->source1Index].arrayVariable || opcode == gcSL_COPY);
+                gcmASSERT(Optimizer->tempArray[gcmSL_INDEX_GET(code->source1Index, Index)].arrayVariable || opcode == gcSL_COPY);
             }
         }
     }
@@ -6450,9 +6459,8 @@ _BuildFunctionFlowGraph(
     gcmVERIFY_OK(_AddUndefined(Optimizer, tempDefineArray));
 
     /* Build data flow. */
-    for (code = Function->codeHead;
-         code && (code != Function->codeTail->next);
-         code = code->next)
+    code = Function->codeHead;
+    while (code && code != Function->codeTail->next)
     {
         if(lastBackwardCallee && code->id == lastBackwardCallee->id)
         {
@@ -6506,16 +6514,16 @@ _BuildFunctionFlowGraph(
         {
             gcOPT_CODE codeDest = code->callee;
 
-            if (! code->backwardJump)
+            if (!code->backwardJump)
             {
                 gcmERR_RETURN(_MergeTempDefineArray(Optimizer,
                                         tempDefineArray, gcvFALSE, &codeDest->tempDefine));
             }
-            else if (! code->handled)
+            else if (!code->handled)
             {
                 code->handled = gcvTRUE;
                 for (code = code->prev;
-                     code != gcvNULL && code != codeDest->prev;
+                     code != gcvNULL && code != codeDest;
                      code = code->prev)
                 {
                     /* Reset handled flag for the codes in between. */
@@ -6539,6 +6547,7 @@ _BuildFunctionFlowGraph(
                 gcmVERIFY_OK(gcOpt_ClearTempArray(Optimizer, tempDefineArray));
             }
         }
+        code = code->next;
     }
 
     /* Output dependancies are already added by RET instruction (main program has extra RET instruction). */
@@ -7745,8 +7754,8 @@ gcOpt_RemapTempIndexForCode(
         for (i = 0; i < 2; i++)
         {
             gctSOURCE_t source = (i==0) ? inst->source0 : inst->source1;
-            gctUINT32 * index  = (i==0) ? &inst->source0Index
-                                        : &inst->source1Index;
+            gctUINT32 index = (i == 0) ? gcmSL_INDEX_GET(inst->source0Index, Index)
+                                       : gcmSL_INDEX_GET(inst->source1Index, Index);
 
             if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
             {
@@ -7754,8 +7763,17 @@ gcOpt_RemapTempIndexForCode(
                                       Function,
                                       TempIndexMappingArray,
                                       CurrentTempIndex,
-                                      index))
+                                      &index))
                 {
+                    if (i == 0)
+                    {
+                        inst->source0Index = gcmSL_INDEX_SET(inst->source0Index, Index, index);
+                    }
+                    else
+                    {
+                        inst->source1Index = gcmSL_INDEX_SET(inst->source1Index, Index, index);
+                    }
+
                     renamed = gcvTRUE;
                 }
             }
@@ -7944,7 +7962,7 @@ OnError:
     gcmFOOTER_NO();
     return status;
 }
-
+#endif
 #endif
 
 

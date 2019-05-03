@@ -13,7 +13,7 @@
 
 #include "gc_glff_precomp.h"
 
-#define _GC_OBJ_ZONE glvZONE_FRAGMENT
+#define _GC_OBJ_ZONE gcdZONE_ES11_FRAGMENT
 
 /*******************************************************************************
 ** Strings for debugging.
@@ -1635,14 +1635,14 @@ static gceSTATUS _GetCombineArguments(
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
             /* Report source allocation. */
             gcmTRACE_ZONE(
-                gcvLEVEL_VERBOSE, gcvZONE_TEXTURE,
+                gcvLEVEL_VERBOSE, gcdZONE_ES11_TEXTURE,
                 "           Source %d: from %s(reg=%d),",
                 i,
                 g_sourceName[source], Sources[source]
                 );
 
             gcmTRACE_ZONE(
-                gcvLEVEL_VERBOSE, gcvZONE_TEXTURE,
+                gcvLEVEL_VERBOSE, gcdZONE_ES11_TEXTURE,
                 "                      take %s(reg=%d).",
                 g_operandName[operand], *argumentRegister
                 );
@@ -2295,13 +2295,13 @@ static gceSTATUS _TexFuncCombineComponent(
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
             /* Report texture function. */
             gcmTRACE_ZONE(
-                gcvLEVEL_VERBOSE, gcvZONE_TEXTURE,
+                gcvLEVEL_VERBOSE, gcdZONE_ES11_TEXTURE,
                 "         Pass=%s,",
                 g_passName[i]
                 );
 
             gcmTRACE_ZONE(
-                gcvLEVEL_VERBOSE, gcvZONE_TEXTURE,
+                gcvLEVEL_VERBOSE, gcdZONE_ES11_TEXTURE,
                 "             function=%s, scale factor=%.5f.",
                 g_combineFunctionName[combine->function],
                 combine->scale
@@ -2361,7 +2361,7 @@ static gceSTATUS _TexFuncCombineComponent(
             else
             {
                 gcmTRACE_ZONE(
-                    gcvLEVEL_VERBOSE, gcvZONE_TEXTURE,
+                    gcvLEVEL_VERBOSE, gcdZONE_ES11_TEXTURE,
                     "         Skipped."
                     );
             }
@@ -3104,14 +3104,14 @@ static gceSTATUS _ProcessTexture(
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
             /* Report texture function. */
             gcmTRACE_ZONE(
-                gcvLEVEL_VERBOSE, gcvZONE_TEXTURE,
+                gcvLEVEL_VERBOSE, gcdZONE_ES11_TEXTURE,
                 "[FS11] Stage=%d, format=%s,",
                 i,
                 _GetTextureFormatName(sampler->binding->format)
                 );
 
             gcmTRACE_ZONE(
-                gcvLEVEL_VERBOSE, gcvZONE_TEXTURE,
+                gcvLEVEL_VERBOSE, gcdZONE_ES11_TEXTURE,
                 "       texture function=%s.",
                 g_functionName[sampler->function]
                 );
@@ -3802,6 +3802,7 @@ gceSTATUS glfGenerateFSFixedFunction(
                 gcSHADER_TYPE_FRAGMENT,
                 &fsControl.i->shader
                 ));
+            gcmONERROR(gcSHADER_SetClientApiVersion(fsControl.i->shader, gcvAPI_OPENGL_ES11));
         }
 
         /* Initialize the fragment shader. */

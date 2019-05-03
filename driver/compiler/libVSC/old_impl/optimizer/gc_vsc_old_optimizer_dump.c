@@ -21,7 +21,7 @@
 
 #include "old_impl/gc_vsc_old_optimizer.h"
 
-#define _GC_OBJ_ZONE    gcvZONE_COMPILER
+#define _GC_OBJ_ZONE    gcdZONE_COMPILER
 
 #define INDENT_GAP      4
 
@@ -2409,7 +2409,6 @@ gcDump_Shader(
     /* Loadtime Optimization related data */
     if (shader->ltcUniformCount > 0)
     {
-
         offset = 0;
         gcmVERIFY_OK(
             gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,
@@ -2419,15 +2418,18 @@ gcDump_Shader(
 
         for (i = 0; i < (gctUINT)shader->ltcInstructionCount; i++)
         {
-            if (shader->ltcCodeUniformIndex[i] == -1 ) continue;
+            gctINT uniformIndex = GetShaderLtcCodeUniformIndex(shader, i);
+            if (uniformIndex == -1)
+            {
+                continue;
+            }
             offset = 0;
             gcmVERIFY_OK(
                 gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,
                                    " \t ltcCodeUniformIndex[%d] = %d ",
-                                   i, shader->ltcCodeUniformIndex[i]));
+                                   i, uniformIndex));
             gcOpt_DumpBuffer(os, File, buffer, offset);
         }
-
 
         /* LTC expressions */
         offset = 0;

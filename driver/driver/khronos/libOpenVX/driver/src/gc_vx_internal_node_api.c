@@ -14,6 +14,8 @@
 #include <gc_vx_common.h>
 #include <gc_vx_internal_node_api.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_NODE
+
 VX_INTERNAL_API vx_node vxSobelMxNNode(vx_graph graph, vx_image input, vx_scalar ws, vx_image gx, vx_image gy)
 {
     vx_reference parameters[] = {
@@ -541,4 +543,94 @@ VX_INTERNAL_API vx_node vxMultiply2DMatrixesNode(vx_graph graph, vx_tensor input
     return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_MULTIPLY_2D_MATRIXES, parameters, vxmLENGTH_OF(parameters));
 }
 
+VX_INTERNAL_API vx_node vxROIPoolingReluLayer(
+    vx_graph  graph,
+    vx_tensor input_data,
+    vx_tensor input_rois,
+    const vx_nn_roi_pool_params_t *roi_pool_params,
+    vx_size size_of_roi_params,
+    vx_tensor output_arr,
+    vx_bool enable_relu
+    )
+{
+    gcmHEADER_ARG("graph=%p, input_data=%p, input_rois=%p, roi_pool_params=%p, size_of_roi_params=0x%lx, output_arr=%p",
+        graph, input_data, input_rois, roi_pool_params, size_of_roi_params, output_arr);
+    gcmDUMP_API("$VX vxROIPoolingLayer: graph=%p, input_data=%p, input_rois=%p, roi_pool_params=%p, size_of_roi_params=0x%lx, output_arr=%p",
+        graph, input_data, input_rois, roi_pool_params, size_of_roi_params, output_arr);
+
+
+    if (size_of_roi_params != sizeof(vx_nn_roi_pool_params_ext_t))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
+    else
+    {
+
+        vx_reference parameters[] = {
+            (vx_reference)input_data,
+            (vx_reference)input_rois,
+            NULL,
+            NULL,
+            NULL,
+            NULL,
+            (vx_reference)output_arr,
+            NULL
+        };
+
+        vx_context context = vxGetContext((vx_reference)graph);
+        vx_node node;
+
+        vx_scalar pool_types = NULL;
+        vx_scalar spatial_scales = NULL;
+        vx_scalar pooled_heights = NULL;
+        vx_scalar pooled_widths = NULL;
+        vx_scalar relu = NULL;
+
+        vx_nn_roi_pool_params_ext_t * roi_pool_params_ext = (vx_nn_roi_pool_params_ext_t *)roi_pool_params;
+
+        pool_types = vxCreateScalar(context, VX_TYPE_ENUM, &roi_pool_params_ext->khr.pool_type);
+        if (vxoReference_GetStatus((vx_reference)pool_types) != VX_SUCCESS) {
+            gcmFOOTER_NO();
+            return (vx_node)pool_types;
+        }
+        spatial_scales = vxCreateScalar(context, VX_TYPE_FLOAT32, &roi_pool_params_ext->spatial_scale);
+        if (vxoReference_GetStatus((vx_reference)spatial_scales) != VX_SUCCESS) {
+            gcmFOOTER_NO();
+            return (vx_node)spatial_scales;
+        }
+        pooled_heights = vxCreateScalar(context, VX_TYPE_INT32, &roi_pool_params_ext->pooled_height);
+        if (vxoReference_GetStatus((vx_reference)pooled_heights) != VX_SUCCESS) {
+            gcmFOOTER_NO();
+            return (vx_node)pooled_heights;
+        }
+        pooled_widths = vxCreateScalar(context, VX_TYPE_INT32, &roi_pool_params_ext->pooled_width);
+        if (vxoReference_GetStatus((vx_reference)pooled_widths) != VX_SUCCESS) {
+            gcmFOOTER_NO();
+            return (vx_node)pooled_widths;
+        }
+
+        relu = vxCreateScalar(context, VX_TYPE_BOOL, &enable_relu);
+        if (vxoReference_GetStatus((vx_reference)relu) != VX_SUCCESS) {
+            gcmFOOTER_NO();
+            return (vx_node)relu;
+        }
+        parameters[2]  = (vx_reference)pool_types;
+        parameters[3]  = (vx_reference)spatial_scales;
+        parameters[4]  = (vx_reference)pooled_heights;
+        parameters[5]  = (vx_reference)pooled_widths;
+        parameters[7]  = (vx_reference)relu;
+
+        node = vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_ROI_POOLING_RELU_LAYER, parameters, vxmLENGTH_OF(parameters));
+
+        vxReleaseScalar(&pool_types);
+        vxReleaseScalar(&spatial_scales);
+        vxReleaseScalar(&pooled_heights);
+        vxReleaseScalar(&pooled_widths);
+        vxReleaseScalar(&relu);
+
+        gcmFOOTER_NO();
+        return node;
+    }
+}
 

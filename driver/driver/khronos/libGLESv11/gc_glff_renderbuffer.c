@@ -13,7 +13,7 @@
 
 #include "gc_glff_precomp.h"
 
-#define _GC_OBJ_ZONE glvZONE_TRACE
+#define _GC_OBJ_ZONE gcdZONE_ES11_TRACE
 
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
@@ -488,7 +488,7 @@ OnError:
 #ifdef _GC_OBJ_ZONE
 #undef _GC_OBJ_ZONE
 #endif
-#define _GC_OBJ_ZONE    glvZONE_BUFFER
+#define _GC_OBJ_ZONE    gcdZONE_ES11_BUFFER
 
 GL_API void GL_APIENTRY glGenRenderbuffersOES(
     GLsizei Count,

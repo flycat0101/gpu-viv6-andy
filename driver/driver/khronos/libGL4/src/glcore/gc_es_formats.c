@@ -20,7 +20,7 @@
 ** +private tc block type
 */
 
-#define _GC_OBJ_ZONE __GLES3_ZONE_CORE
+#define _GC_OBJ_ZONE gcdZONE_GL40_CORE
 
 
 __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =

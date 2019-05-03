@@ -509,6 +509,8 @@ typedef enum _sleFUNC_FLAG
     slvFUNC_IS_INTRINSIC        = 0x0020,       /* is an intrinsic function. */
     slvFUNC_DEFINED             = 0x0040,       /* is defined before. */
     slvFUNC_TREAT_FLOAT_AS_INT  = 0x0080,       /* treat float as int. */
+    slvFUNC_SKIP_AS_INTRINSIC   = 0x0100,       /* skip treating intrinsic as intrinsic when certain HW
+                                                   condition is met. */
 } sleBUILT_IN_FUNC_FLAG;
 
 typedef gctUINT8 sltFUNC_FLAG;

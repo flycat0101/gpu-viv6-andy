@@ -17,7 +17,7 @@
 #include "gc_chip_hash.h"
 #include "gc_chip_pixel.h"
 
-#define _GC_OBJ_ZONE __GLES3_ZONE_FIXFRAG
+#define _GC_OBJ_ZONE gcdZONE_GL40_FIXFRAG
 
 /*******************************************************************************
 ** Strings for debugging.
@@ -2097,14 +2097,14 @@ static gceSTATUS getCombineArguments(
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
             /* Report source allocation. */
             gcmTRACE_ZONE(
-                gcvLEVEL_VERBOSE, gcvZONE_TEXTURE,
+                gcvLEVEL_VERBOSE, gcdZONE_GL40_TEXTURE,
                 "           Source %d: from %s(reg=%d),",
                 i,
                 g_sourceName[source], Sources[source]
                 );
 
             gcmTRACE_ZONE(
-                gcvLEVEL_VERBOSE, gcvZONE_TEXTURE,
+                gcvLEVEL_VERBOSE, gcdZONE_GL40_TEXTURE,
                 "                      take %s(reg=%d).",
                 g_operandName[operand], *argumentRegister
                 );
@@ -2756,13 +2756,13 @@ static gceSTATUS texFuncCombineComponent(
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
             /* Report texture function. */
             gcmTRACE_ZONE(
-                gcvLEVEL_VERBOSE, gcvZONE_TEXTURE,
+                gcvLEVEL_VERBOSE, gcdZONE_GL40_TEXTURE,
                 "         Pass=%s,",
                 g_passName[i]
                 );
 
             gcmTRACE_ZONE(
-                gcvLEVEL_VERBOSE, gcvZONE_TEXTURE,
+                gcvLEVEL_VERBOSE, gcdZONE_GL40_TEXTURE,
                 "             function=%s, scale factor=%.5f.",
                 g_combineFunctionName[combine->function],
                 //glfFloatFromMutant(&combine->scale)
@@ -2823,7 +2823,7 @@ static gceSTATUS texFuncCombineComponent(
             else
             {
                 gcmTRACE_ZONE(
-                    gcvLEVEL_VERBOSE, gcvZONE_TEXTURE,
+                    gcvLEVEL_VERBOSE, gcdZONE_GL40_TEXTURE,
                     "         Skipped."
                     );
             }
@@ -3842,14 +3842,14 @@ static gceSTATUS processTexture(
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
             /* Report texture function. */
             gcmTRACE_ZONE(
-                gcvLEVEL_VERBOSE, gcvZONE_TEXTURE,
+                gcvLEVEL_VERBOSE, gcdZONE_GL40_TEXTURE,
                 "[FS11] Stage=%d, format=%s,",
                 i,
                 _GetTextureFormatName(sampler->binding->format)
                 );
 
             gcmTRACE_ZONE(
-                gcvLEVEL_VERBOSE, gcvZONE_TEXTURE,
+                gcvLEVEL_VERBOSE, gcdZONE_GL40_TEXTURE,
                 "       texture function=%s.",
                 g_functionName[sampler->function]
                 );

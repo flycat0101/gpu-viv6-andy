@@ -80,7 +80,7 @@ vxoMemoryPool_RequestList(
     vx_uint32           list_count,
     vx_uint32           start,
     vx_uint32           count,
-    vx_memory *         error_mem
+    vx_uint32           *max_sizes
     );
 
 EXTERN_C_END

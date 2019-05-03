@@ -17,7 +17,7 @@
 
 #if gcdNULL_DRIVER < 2
 
-#define _GC_OBJ_ZONE            gcvZONE_STREAM
+#define _GC_OBJ_ZONE            gcdZONE_STREAM
 #define gcdDEBUG_REBUILD        0
 
 /*******************************************************************************
@@ -4113,7 +4113,7 @@ gcoSTREAM_MergeStreams(
         /* Construct a new stream. */
         gcmONERROR(gcoSTREAM_Construct(gcvNULL, &merged));
 
-        gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_STREAM,
+        gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_STREAM,
                       "Created a new merged stream 0x%x",
                       merged);
 
@@ -4137,13 +4137,13 @@ gcoSTREAM_MergeStreams(
             {
                 if (merged->dirty)
                 {
-                    gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_STREAM,
+                    gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_STREAM,
                                   "Merged stream 0x%x is dirty",
                                   merged);
                 }
                 else
                 {
-                    gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_STREAM,
+                    gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_STREAM,
                                   "Merged stream 0x%x now holds %u vertices",
                                   merged, count);
                 }
@@ -4164,7 +4164,7 @@ gcoSTREAM_MergeStreams(
                 /* We need to copy. */
                 copy = gcvTRUE;
 
-                gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_STREAM,
+                gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_STREAM,
                               "Merged stream 0x%x now holds %u streams",
                               merged, index);
             }
@@ -4552,7 +4552,7 @@ gcoSTREAM_CPUCacheOperation_Range(
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("Stream=0x%x, Offset=%zu Length=%zu Operation=%d", Stream, Offset, Length, Operation);
+    gcmHEADER_ARG("Stream=0x%x, Offset=%u Length=%u Operation=%d", Stream, Offset, Length, Operation);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Stream, gcvOBJ_STREAM);

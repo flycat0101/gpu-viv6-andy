@@ -1302,6 +1302,7 @@ _CheckErrorForSubscriptExpr(
         if (((sloIR_BINARY_EXPR)expr)->type == slvBINARY_SUBSCRIPT)
         {
             while (sloIR_OBJECT_GetType(&expr->base) != slvIR_VARIABLE &&
+                   sloIR_OBJECT_GetType(&expr->base) != slvIR_CONSTANT &&
                    sloIR_OBJECT_GetType(&expr->base) != slvIR_UNARY_EXPR)
             {
                 sleBINARY_EXPR_TYPE type;
@@ -7373,7 +7374,6 @@ _CheckQualifiers(
     sleSHADER_TYPE shaderType;
     gctUINT lineNo = sloCOMPILER_GetCurrentLineNo(Compiler);
     gctUINT stringNo = sloCOMPILER_GetCurrentStringNo(Compiler);
-    gceAPI clientVersion = sloCOMPILER_GetClientApiVersion(Compiler);
 
     gcmHEADER_ARG("Compiler=0x%x Qualifiers=0x%x",
                   Compiler, Qualifiers);
@@ -7410,7 +7410,7 @@ _CheckQualifiers(
     {
         if (Qualifiers->u.qualifiers.storage != slvSTORAGE_QUALIFIER_OUT &&
             Qualifiers->u.qualifiers.storage != slvSTORAGE_QUALIFIER_VARYING_OUT &&
-            (clientVersion != gcvAPI_OPENGL_ES20 || Qualifiers->u.qualifiers.storage != slvSTORAGE_QUALIFIER_VARYING_IN)
+            (!sloCOMPILER_IsES20Version(Compiler) || Qualifiers->u.qualifiers.storage != slvSTORAGE_QUALIFIER_VARYING_IN)
            )
         {
             gcmVERIFY_OK(sloCOMPILER_Report(Compiler,

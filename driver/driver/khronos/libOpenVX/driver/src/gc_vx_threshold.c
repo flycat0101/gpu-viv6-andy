@@ -13,6 +13,8 @@
 
 #include <gc_vx_common.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_THRESHOLD
+
 static vx_bool vxoIsValidThresholdFormat(vx_df_image format)
 {
     vx_bool ret = vx_false_e;
@@ -78,19 +80,28 @@ VX_API_ENTRY vx_threshold VX_API_CALL vxCreateThreshold(vx_context context, vx_e
 {
     vx_threshold threshold;
 
+    gcmHEADER_ARG("context=%p, thresh_type=0x%x, data_type=0x%x", context, thresh_type, data_type);
     gcmDUMP_API("$VX vxCreateThreshold: context=%p, thresh_type=0x%x, data_type=0x%x", context, thresh_type, data_type);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
 
     if (!vxoThreshold_IsValidDataType(data_type) || !vxoThreshold_IsValidType(thresh_type))
     {
+        gcmFOOTER_NO();
         return (vx_threshold)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_TYPE);
     }
 
     threshold = (vx_threshold)vxoReference_Create(context, VX_TYPE_THRESHOLD, VX_REF_EXTERNAL, &context->base);
 
-    if (vxoReference_GetStatus((vx_reference)threshold) != VX_SUCCESS) return threshold;
-
+    if (vxoReference_GetStatus((vx_reference)threshold) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return threshold;
+    }
     threshold->thresholdType = thresh_type;
     threshold->dataType      = data_type;
 
@@ -123,6 +134,7 @@ VX_API_ENTRY vx_threshold VX_API_CALL vxCreateThreshold(vx_context context, vx_e
     default:
         break;
     }
+    gcmFOOTER_NO();
     return threshold;
 }
 
@@ -130,6 +142,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetThresholdAttribute(vx_threshold threshol
 {
     vx_status status = VX_SUCCESS;
 
+    gcmHEADER_ARG("threshold=%p, attribute=0x%x, ptr=%p, size=0x%lx", threshold, attribute, ptr, size);
     gcmDUMP_API("$VX vxSetThresholdAttribute: threshold=%p, attribute=0x%x, ptr=%p, size=0x%lx", threshold, attribute, ptr, size);
 
     if (vxoReference_IsValidAndSpecific(&threshold->base, VX_TYPE_THRESHOLD))
@@ -231,6 +244,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetThresholdAttribute(vx_threshold threshol
     {
         status = VX_ERROR_INVALID_REFERENCE;
     }
+
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -238,6 +253,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryThreshold(vx_threshold threshold, vx_e
 {
     vx_status status = VX_SUCCESS;
 
+    gcmHEADER_ARG("threshold=%p, attribute=0x%x, ptr=%p, size=0x%lx", threshold, attribute, ptr, size);
     gcmDUMP_API("$VX vxQueryThreshold: threshold=%p, attribute=0x%x, ptr=%p, size=0x%lx", threshold, attribute, ptr, size);
 
 
@@ -380,6 +396,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryThreshold(vx_threshold threshold, vx_e
     {
         status = VX_ERROR_INVALID_REFERENCE;
     }
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -391,15 +408,20 @@ VX_API_ENTRY vx_threshold VX_API_CALL vxCreateThresholdForImage(
 {
 //
     vx_threshold threshold;
-
+    gcmHEADER_ARG("context=%p, thresh_type=0x%x, input_format=0x%x, output_format=0x%x",
+        context, thresh_type, input_format, output_format);
     gcmDUMP_API("$VX vxCreateThresholdForImage: context=%p, thresh_type=0x%x, input_format=0x%x, output_format=0x%x",
         context, thresh_type, input_format, output_format);
 
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (!vxoThreshold_IsValidType(thresh_type))
     {
+        gcmFOOTER_NO();
         return (vx_threshold)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_TYPE);
     }
     if (((vxoIsValidThresholdFormat  (input_format) == vx_false_e) &&
@@ -412,7 +434,11 @@ VX_API_ENTRY vx_threshold VX_API_CALL vxCreateThresholdForImage(
     }
     threshold = (vx_threshold)vxoReference_Create(context, VX_TYPE_THRESHOLD, VX_REF_EXTERNAL, &context->base);
 
-    if (vxoReference_GetStatus((vx_reference)threshold) != VX_SUCCESS) return threshold;
+    if (vxoReference_GetStatus((vx_reference)threshold) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return threshold;
+    }
 
     //threshold->thresholdType = thresh_type;
     //threshold->dataType      = data_type;
@@ -506,6 +532,7 @@ VX_API_ENTRY vx_threshold VX_API_CALL vxCreateThresholdForImage(
             }
         }
     }
+    gcmFOOTER_NO();
     return threshold;
 }
 
@@ -517,9 +544,10 @@ VX_API_ENTRY vx_threshold VX_API_CALL vxCreateVirtualThresholdForImage(vx_graph 
     vx_threshold threshold = NULL;
     vx_reference_s *gref = (vx_reference_s *)graph;
 
+    gcmHEADER_ARG("graph=%p, thresh_type=0x%x, input_format=0x%x, output_format=0x%x",
+        graph, thresh_type, input_format, output_format);
     gcmDUMP_API("$VX vxCreateVirtualThresholdForImage: graph=%p, thresh_type=0x%x, input_format=0x%x, output_format=0x%x",
         graph, thresh_type, input_format, output_format);
-
 
     if(vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH))
     {
@@ -534,6 +562,7 @@ VX_API_ENTRY vx_threshold VX_API_CALL vxCreateVirtualThresholdForImage(vx_graph 
             threshold = (vx_threshold)vxoContext_GetErrorObject(graph->base.context, VX_ERROR_INVALID_PARAMETERS);
         }
     }
+    gcmFOOTER_NO();
     return threshold;
 }
 
@@ -545,6 +574,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyThresholdOutput(vx_threshold threshold,
 {
     vx_status status = VX_ERROR_INVALID_REFERENCE;
 
+    gcmHEADER_ARG("threshold=%p, true_value_ptr=%p, false_value_ptr=%p, usage=0x%x"\
+        " user_mem_type=0x%x", threshold, true_value_ptr, false_value_ptr, usage, user_mem_type);
     gcmDUMP_API("$VX vxCopyThresholdOutput: threshold=%p, true_value_ptr=%p, false_value_ptr=%p, usage=0x%x"\
         " user_mem_type=0x%x", threshold, true_value_ptr, false_value_ptr, usage, user_mem_type);
 
@@ -552,6 +583,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyThresholdOutput(vx_threshold threshold,
     if (vxoReference_IsValidAndSpecific(&threshold->base, VX_TYPE_THRESHOLD) == vx_false_e)
     {
         status = VX_ERROR_INVALID_REFERENCE;
+        gcmFOOTER_ARG("%d", status);
         return status;
     }
 
@@ -560,6 +592,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyThresholdOutput(vx_threshold threshold,
         if (threshold->base.accessible == vx_false_e)
         {
             status = VX_ERROR_OPTIMIZED_AWAY;
+            gcmFOOTER_ARG("%d", status);
             return status;
         }
     }
@@ -608,6 +641,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyThresholdOutput(vx_threshold threshold,
     {
         status = VX_ERROR_NO_MEMORY;
     }
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -620,6 +654,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyThresholdRange(vx_threshold threshold,
 {
     vx_status status = VX_ERROR_INVALID_REFERENCE;
 
+    gcmHEADER_ARG("threshold=%p, lower_value_ptr=%p, upper_value_ptr=%p, usage=0x%x,"\
+        " user_mem_type=0x%x", threshold, lower_value_ptr, upper_value_ptr, usage, user_mem_type);
     gcmDUMP_API("$VX vxCopyThresholdRange: threshold=%p, lower_value_ptr=%p, upper_value_ptr=%p, usage=0x%x,"\
         " user_mem_type=0x%x", threshold, lower_value_ptr, upper_value_ptr, usage, user_mem_type);
 
@@ -627,6 +663,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyThresholdRange(vx_threshold threshold,
     if (vxoReference_IsValidAndSpecific(&threshold->base, VX_TYPE_THRESHOLD) == vx_false_e)
     {
         status = VX_ERROR_INVALID_REFERENCE;
+        gcmFOOTER_ARG("%d", status);
         return status;
     }
 
@@ -635,6 +672,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyThresholdRange(vx_threshold threshold,
         if (threshold->base.accessible == vx_false_e)
         {
             status = VX_ERROR_OPTIMIZED_AWAY;
+            gcmFOOTER_ARG("%d", status);
             return status;
         }
     }
@@ -683,7 +721,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyThresholdRange(vx_threshold threshold,
     {
         status = VX_ERROR_NO_MEMORY;
     }
-
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -696,6 +734,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyThresholdValue(vx_threshold threshold,
 {
     vx_status status = VX_ERROR_INVALID_REFERENCE;
 
+    gcmHEADER_ARG("threshold=%p, value_ptr=%p, usage=0x%x, user_mem_type=0x%x",
+        threshold, value_ptr, usage, user_mem_type);
     gcmDUMP_API("$VX vxCopyThresholdValue: threshold=%p, value_ptr=%p, usage=0x%x, user_mem_type=0x%x",
         threshold, value_ptr, usage, user_mem_type);
 
@@ -703,6 +743,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyThresholdValue(vx_threshold threshold,
     if (vxoReference_IsValidAndSpecific(&threshold->base, VX_TYPE_THRESHOLD) == vx_false_e)
     {
         status = VX_ERROR_INVALID_REFERENCE;
+        gcmFOOTER_ARG("%d", status);
         return status;
     }
 
@@ -711,6 +752,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyThresholdValue(vx_threshold threshold,
         if (threshold->base.accessible == vx_false_e)
         {
             status = VX_ERROR_OPTIMIZED_AWAY;
+            gcmFOOTER_ARG("%d", status);
             return status;
         }
     }
@@ -751,7 +793,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyThresholdValue(vx_threshold threshold,
     {
         status = VX_ERROR_NO_MEMORY;
     }
-
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 

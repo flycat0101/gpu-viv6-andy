@@ -20,8 +20,10 @@
 
 #include <gc_vx_common.h>
 #include <gc_vx_nn_util.h>
-
-extern vx_int32  gSkippedExecution;
+#include "gc_nn_arch_model.h"
+#ifdef USE_LIB_NN_ARCH_PERF
+#include "nnArchPerf.h"
+#endif
 
 #define AXI_BURST_SIZE 64
 
@@ -31,39 +33,6 @@ extern vx_int32  gSkippedExecution;
 #define VX_SAVE_DATA_TO_TENSOR(tensor, data, index) \
     vxnneSaveDataExt((vx_type_e)TENSOR_DATA_TYPE(tensor), TENSOR_QUANT_TYPE(tensor), index, data, TENSOR_LOGICAL_ADDR(tensor), TENSOR_POS(tensor), TENSOR_TF_ZEROPOINT(tensor), TENSOR_TF_SCALE(tensor), TENSOR_ROUNDING_MODE(tensor))
 
-#if gcdDUMP
-void dumpNNCommandInfo(vx_uint32 sliceIndex, vx_uint32 sliceNum, vx_nn_cmd_info_u *info, vxnne_operation_command operationCommand);
-#endif
-void fillInCmdTPBufferEx(
-    vx_context                   context,
-    vx_node                      node,
-    vxnne_tensor_info            input,
-    vxnne_tensor_info            output,
-    vxnne_command_buffer         cmd_buffer,
-    vx_op_param                  conv_cmd_ptr,
-    vx_tp_value_cmd              value_cmd_ptr,
-    vx_tensor                    data_buff,
-    vx_uint32                    index,
-    vx_bool                      multi_tp,
-    vx_uint32                    cmd_size,
-    vx_uint32                    batch_count,
-    vx_bool                      last
-    );
-
-void fillInCmdNNBufferEx(
-    vx_context                   context,
-    vx_node                      node,
-    vxnne_tensor_info            input,
-    vxnne_tensor_info            output,
-    vxnne_command_buffer         cmd_buffer,
-    vx_op_param                  conv_cmd_ptr,
-    vx_uint32                    slice_index
-    );
-
-static vx_float32 vxnneConvertDynamicFixPointValueToFloat32(
-    vx_float32 value,
-    vx_int8 fixedPointPos
-    );
 
 #if NN_LAYER_C
 extern vx_status vx_nnk_pool_nn_layer_cpu(vx_uint8_ptr src, vx_int32 type, vx_type_e format, vx_int32 input_width, vx_int32 input_height, vx_int32 depth,
@@ -158,91 +127,6 @@ vx_int16 Fp32toFp16(vx_float32 val)
     return f16;
 }
 
-vx_float32 Fp21toFp32(const vx_uint32 in)
-{
-    vx_uint32 t1;
-    vx_uint32 t2;
-    vx_uint32 t3;
-    vx_float32 out;
-
-    t1 = in & 0xfffff;                      // Non-sign bits
-    t2 = in & 0x100000;                     // Sign bit
-    t3 = in & 0xf8000;                      // Exponent
-
-    t1 <<= 8;                               // Align mantissa on MSB
-    t2 <<= 11;                              // Shift sign bit into position
-
-    t1 += 0x38000000;                       // Adjust bias
-
-    t1 = (t3 == 0 ? 0 : t1);                // Denormals-as-zero
-
-    t1 |= t2;                               // Re-insert sign bit
-
-    *((uint32_t*)&out) = t1;
-
-    return out;
-}
-
-vx_int32 Fp32toFp21(vx_float32 val)
-{
-    vx_uint32 f32 = (*(vx_uint32 *) &val);
-    vx_int32 f21 = 0;
-    /* Decode IEEE 754 little-endian 32-bit floating-point value */
-    int sign = (f32 >> 11) & 0x100000;
-    /* Map exponent to the range [-127,128] */
-    int exponent = ((f32 >> 23) & 0xff) - 127;
-    int mantissa = f32 & 0x007fffff;
-    if (exponent == 128)
-    { /* Infinity or NaN */
-        if (mantissa)
-        {
-            /* Flush NaN to 0. */
-            f21 = sign;
-        }
-        else
-        {
-            /* Clamp to HALF_MAX/HALF_MIN. */
-            f21 = sign | ((F16_EXPONENT_BITS - 1) << F21_EXPONENT_SHIFT) | F21_MANTISSA_BITS;
-        }
-    }
-    else if (exponent > 15)
-    { /* Overflow - clamp to HALF_MAX/HALF_MIN. */
-        f21 = sign | ((F16_EXPONENT_BITS - 1) << F21_EXPONENT_SHIFT) | F21_MANTISSA_BITS;
-    }
-    else if (exponent > -15)
-    { /* Representable value */
-        /* RTNE */
-        int roundingBit = (mantissa >> (F21_MANTISSA_SHIFT - 1)) & 0x1;
-        int stickyBits = mantissa & 0xFFF;
-        exponent += F16_EXPONENT_BIAS;
-        mantissa >>= F21_MANTISSA_SHIFT;
-        if (roundingBit && stickyBits)
-        {
-            mantissa++;
-            if (mantissa > F21_MANTISSA_BITS)
-            {
-                exponent++;
-                if (exponent > 30)
-                {
-                    /* Clamp to HALF_MAX/HALF_MIN. */
-                    exponent--;
-                    mantissa--;
-                }
-                else
-                {
-                    mantissa &= F21_MANTISSA_BITS;
-                }
-            }
-        }
-        f21 = sign | (exponent << F21_EXPONENT_SHIFT) | mantissa;
-    }
-    else
-    {
-        f21 = sign;
-    }
-    return f21;
-}
-
 /* this function is only for fullyconnect acceleration*/
 vx_int8 Fp32toInt8_fc(vx_float32 val)
 {
@@ -259,6 +143,34 @@ vx_float64 _copysign(vx_float64 number, vx_float64 sign)
     return (sign > 0) ? value : (-value);
 }
 #endif
+
+VX_INTERNAL_API void calculateSplitSize(
+    vx_uint32                    whole_size,
+    vx_uint32                    split_num,
+    vx_uint32                    split_size_array[],
+    vx_uint32                    split_offset_array[]
+    )
+{
+    split_num = gcmMIN(whole_size, split_num);
+
+    if (split_num <= 1)
+    {
+        split_size_array[0] = whole_size;
+        split_offset_array[0] = 0;
+    }
+    else
+    {
+        vx_uint32 i;
+        vx_uint32 quot = whole_size / split_num;
+        vx_uint32 remain = whole_size % split_num;
+
+        for (i = 0; i < split_num; i++)
+        {
+            split_size_array[i] = i < remain ? quot + 1 : quot;
+            split_offset_array[i] = i < remain ? i * split_size_array[i] : remain * (quot + 1) + (i - remain) * split_size_array[i];
+        }
+    }
+}
 
 void vxnneBatch_SetCurrentBatchArray(struct _vxnne_operation_s *operation, vx_uint32 batchIndex)
 {
@@ -476,7 +388,7 @@ vx_int16 Fp32toInt16(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode)
     return result;
 }
 
-static vx_float32 vxnneConvertDynamicFixPointValueToFloat32(vx_float32 value, vx_int8 fixedPointPos)
+vx_float32 vxnneConvertDynamicFixPointValueToFloat32(vx_float32 value, vx_int8 fixedPointPos)
 {
     vx_float32 result = 0.0f;
 
@@ -717,8 +629,19 @@ vx_bool checkOutputTensorDoAlu(vx_tensor src, vx_tensor dst)
     vx_enum    srcQFormat            = TENSOR_QUANT_TYPE(src);
     vx_enum    dstFormat             = TENSOR_DATA_TYPE(dst);
     vx_enum    dstQFormat            = TENSOR_QUANT_TYPE(dst);
+    vx_context context               = vxoContext_GetFromReference((vx_reference)src);
+    vx_bool    formatCheck           = vx_false_e;
 
-    if (srcFormat == dstFormat && srcFormat == VX_TYPE_FLOAT16)
+    if(context->evisNoInst.supportEVIS)
+    {
+        formatCheck = (vx_bool)(srcFormat == VX_TYPE_FLOAT16);
+    }
+    else
+    {
+        formatCheck = (vx_bool)(srcFormat == VX_TYPE_FLOAT16 || srcFormat == VX_TYPE_FLOAT32);
+    }
+
+    if (srcFormat == dstFormat && formatCheck)
     {
         return vx_false_e;
     }
@@ -771,78 +694,15 @@ vx_int32 vxnneGetTypeSize(vx_type_e format)
     case VX_TYPE_INT32:
         size = sizeof(vx_int32);
         break;
+    case VX_TYPE_INT64:
+        size = sizeof(vx_int64);
+        break;
     default:
         vxError("Not support format :%d\n", format);
         break;
     }
 
     return size;
-}
-
-void vxnneSRAMGetkernelPattenField(
-    vx_uint32 vipSRAMSizeInKB,
-    vx_uint32 kernelStreamSize,
-    vx_uint32_ptr kernelCacheStartAddress,
-    vx_uint32_ptr kernelCachingMode,
-    vx_uint32_ptr kernelPatternLow32Bits,
-    vx_uint32_ptr kernelPatternHigh32Bits,
-    vx_uint32_ptr kernelPatternMsb
-    )
-{
-    vx_uint32 totalSramSize = vipSRAMSizeInKB * 1024;
-    vx_uint32 sramkernelCacheSize = 0;
-    vx_uint64 kernelPatternBits = 0;
-    vx_uint32 cachingMode;
-    vx_uint32 ratio = 0;
-
-    sramkernelCacheSize = totalSramSize - *kernelCacheStartAddress;
-
-    if (sramkernelCacheSize <= 0)
-    {
-        cachingMode = 0;
-    }
-    else if (kernelStreamSize < sramkernelCacheSize)
-    {
-        cachingMode = 1;
-    }
-    else
-    {
-        cachingMode = 2;
-    }
-
-    if (kernelCachingMode != VX_NULL)
-    {
-        *kernelCachingMode = cachingMode;
-    }
-
-    if (cachingMode == 2)
-    {
-        ratio = (vx_int32)gcoMATH_Ceiling((vx_float32)(kernelStreamSize - sramkernelCacheSize) / sramkernelCacheSize);
-
-        if (ratio >= 63)
-        {
-            // drv set pattern 0x8000 0000 0000 0000, end addr no more than SRAM size.
-            // sram fetch from sram until end of boundary
-            ratio = 63;
-        }
-
-        if (kernelPatternMsb != VX_NULL)
-        {
-            *kernelPatternMsb = ratio;
-        }
-
-        kernelPatternBits = ((vx_uint64) 1 ) << ratio;
-
-        if (kernelPatternLow32Bits != VX_NULL)
-        {
-            *kernelPatternLow32Bits = kernelPatternBits & 0xFFFFFFFF;
-        }
-
-        if (kernelPatternHigh32Bits != VX_NULL)
-        {
-            *kernelPatternHigh32Bits = kernelPatternBits >> 32;
-        }
-    }
 }
 
 vx_uint32 vxnneGetOneNumber(vx_uint32 value)
@@ -1026,7 +886,7 @@ vx_float32 vxnneGetDataExt(vx_type_e format, vx_enum quant_format, vx_int32 inde
 
 vx_status vxnneSaveDataExt(vx_type_e format, vx_enum quant_format, vx_int32 index, vx_float64 data, vx_ptr dst_data, vx_int8 fixedPointPos, vx_int32 zeroPoint, vx_float32 scale, vx_enum roundMode)
 {
-    if (quant_format == VX_QUANT_AFFINE_SCALE)
+    if (format == VX_TYPE_UINT8 && quant_format == VX_QUANT_AFFINE_SCALE)
         return vxnneSaveDataQuant(format, index, data, dst_data, zeroPoint, scale, roundMode);
     else
         return vxnneSaveData(format, index, data, dst_data, fixedPointPos, roundMode);
@@ -1087,10 +947,7 @@ void reshuffleData(vx_nn_reshuffle_s *src, vx_uint32 strideStepX, vx_uint32 stri
                     src_data = (uint8_t*)src->data + w * dstWStride + z * srcZStride + y * srcYStride + x * srcXStride;
                     dstX = x/strideStepX;
                     dstY = y/strideStepY;
-                    if (strideStepX == 1)
-                        dstZ = (y%strideStepY) + (z%src->zSize) * strideStepX * strideStepY;
-                    else
-                        dstZ = x%strideStepX + (y%strideStepY)*strideStepY + (z%src->zSize) * strideStepX * strideStepY;
+                    dstZ = x%strideStepX + (y%strideStepY)*strideStepX + (z%src->zSize) * strideStepX * strideStepY;
                     dstW = w;
                     dst_data = (uint8_t*)dst->data + dstX * dstXStride + dstY * dstYStride + dstZ * dstZStride + dstW * dstWStride;
                     *dst_data = *src_data;
@@ -1104,1691 +961,11 @@ void reshuffleData(vx_nn_reshuffle_s *src, vx_uint32 strideStepX, vx_uint32 stri
     }
 }
 
-static vx_uint32 _kernel_size_in_pixel_by_arch_perf(
-    vxnne_operation_target_e opTarget,
-    vxnne_operator_e opType,
-    vx_arch_perf perf,
-    vx_bool full_chache_kernel_head_fix)
-{
-    vx_float64 coefCompressionRatio = perf->coefCompressRatio;
-    if (opTarget != VXNNE_OPERATION_TARGET_TP || opType == VXNNE_OPERATOR_FULLYCONNECTED)
-    {
-        if (coefCompressionRatio)
-        {
-            if (full_chache_kernel_head_fix)
-            {
-                return (vx_uint32)(perf->info.kx
-                          * perf->info.ky
-                          * perf->info.kz
-                          * perf->info.outz
-                          * coefCompressionRatio * 1.05f + 0.5f);
-            }
-            else
-            {
-               return (vx_uint32)((vx_float32)perf->info.kx
-                          * perf->info.ky
-                          * perf->info.kz
-                          * ceilf((vx_float32)perf->info.outz / perf->info.nnCores) * perf->info.nnCores
-                          * coefCompressionRatio * 1.05f + 0.5f);
-            }
-        }
-    }
-    return 0;
-}
-
-static vx_int8 gOrigShowType = -1;
-static const vx_char *archModelVersion = "0.133";
-static const vx_char *SWTilingVersion = "0.114";
-vx_status showArchPerformance(
-    vx_context context,
-    vxnne_layer layer,
-    vxnne_operation op,
-    vx_arch_perf perf
-    )
-{
-    vx_uint32 i;
-    vx_uint32 profileMode = 0;
-    vx_float32 mutiGpuFactor = (context->nnConfig.fixedFeature.vipCoreCount > 1) ? (0.7f * context->nnConfig.fixedFeature.vipCoreCount) : 1.0f;
-    if (gOrigShowType != (vx_int8)context->options.collectPerfType)
-    {
-        vxInfo("\nArchModelVersion: %s\nSWTilingVersion: %s\nProfileMode: %d\n"
-               "NumNNCores:%d\nNumNNCoresInt8: %d\nNumNNCoresInt16: %d\nNumNNCoresFloat16: %d\n"
-               "NumTPCores: %d\nNumTPLiteCores: %d\nMadPerCore: %d\nVIP7Version: %d\n"
-               "InBuffDepth: %d\nAccumBufferDepth: %d\nDPAmount: %d\n"
-               "XYDPX: %d\nXYDPY: %d\nZDP: %d\n"
-               "AXISRAMSizeInKB: %d\nVIPSRAMSizeInKB: %d\nL2CacheWidth: %d\n"
-               "USCCacheSize: %d\nBrickMode: %d\nSWTiling: %d\n"
-               "SmallBatchEnable: %d\nSWTilingPhase1: %d\nTPWithFCLayer: %d\n"
-               "TPCircularBufferSupport: %d\nKERNEL_HEADER_NOT_CACHED_FIX: %d\n"
-               "NNFCNonPruneAccel: %d\nConv1x1HalfPerformance: %d\n"
-               "DDRLatency: %d\nCacheLineModeDisabled: %d\n"
-               "PER_3D_TILE_BUBBLE_FIX: %d\nSWConv1x1To1x2: %d\n"
-               "TP_LOCALIZATION_REORDER_DISABLED_Fix: %d\nUSCCacheControllers: %d\n"
-               "AsyncCopyPerfFix: %d\nZDP3NoCompressFix: %d\n"
-               "ZXDP3KernelReadConflictFix: %d\n",
-               archModelVersion,
-               SWTilingVersion,
-               (context->options.collectPerfType == COLLECT_PERF_ESTIMATE) ? 1 : profileMode,
-               context->nnConfig.fixedFeature.nnCoreCount,
-               context->nnConfig.fixedFeature.nnCoreCountInt8,
-               context->nnConfig.fixedFeature.nnCoreCountInt16,
-               context->nnConfig.fixedFeature.nnCoreCountFloat16,
-               context->nnConfig.fixedFeature.tpCoreCount,
-               context->nnConfig.fixedFeature.tpliteCoreCount,
-               context->nnConfig.fixedFeature.nnMadPerCore,
-               context->nnConfig.fixedFeature.vip7Version,
-               context->nnConfig.fixedFeature.nnInputBufferDepth,
-               context->nnConfig.fixedFeature.nnAccumBufferDepth,
-               context->nnConfig.derivedFeature.nnDPAmount,
-               context->nnConfig.derivedFeature.nnXYDPX,
-               context->nnConfig.derivedFeature.nnXYDPY,
-               context->nnConfig.derivedFeature.nnZDP,
-               context->nnConfig.customizedFeature.axiSRAMSizeInKB,
-               context->nnConfig.customizedFeature.vipSRAMSizeInKB,
-               context->nnConfig.fixedFeature.equivalentVipsramWidthInByte,
-               context->nnConfig.unifiedFeature.nnUSCCacheSize,
-               context->nnConfig.fixedFeature.vipBrickMode,
-               context->nnConfig.customizedFeature.vipSWTiling,
-               context->nnConfig.unifiedFeature.smallBatchEnable, /*smallBatchEnable*/
-               vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE1) ? 1 : 0,
-               1, /*TPWithFCLayer*/
-               vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE2) ? 1 : 0,
-               context->nnConfig.unifiedFeature.fullCacheKernelHeadFix,/*KERNEL_HEADER_NOT_CACHED_BUG1968*/
-               0, /*NNFCNonPruneAccel*/
-               context->nnConfig.unifiedFeature.conv1x1HalfPerformance,
-               (vx_uint32)context->nnConfig.customizedFeature.ddrLatency,
-               context->nnConfig.unifiedFeature.cacheLineModeDisabled,
-               context->nnConfig.unifiedFeature.per3DTileBubbleFix,
-               0, /*swConv1x1To1x2*/
-               context->nnConfig.unifiedFeature.tpReOrderFix,
-               context->nnConfig.fixedFeature.uscCacheControllers,
-               context->nnConfig.unifiedFeature.asyncCopyPerfFix,
-               context->nnConfig.unifiedFeature.zdp3NoCompressFix,
-               context->nnConfig.unifiedFeature.zxdp3KernelReadConflictFix
-               );
-
-        vxInfo("CoefDecodePerf: %d\nVectorPrune: %d\nEnableCacheDataFromSRAM: %d\n"
-               "IMAGE_PARTIAL_CACHE_FIX: %d\nDDRReadBandWidthLimit: %.2f\n"
-               "DDRWriteBandWidthLimit: %.2f\nDDRTotalBandWidthLimit: %.2f\n"
-               "AXISRAMReadBandWidthLimit: %.2f\nAXISRAMWriteBandWidthLimit: %.2f\n"
-               "AXISRAMTotalBandWidthLimit: %.2f\nAXIBusReadBandWidthLimit: %.2f\n"
-               "AXIBusWriteBandWidthLimit: %.2f\nAXIBusTotalBandWidthLimit: %.2f\n\n",
-               context->nnConfig.unifiedFeature.vipCoefDecodePerf,
-               context->nnConfig.customizedFeature.vipVectorPrune,
-               context->nnConfig.unifiedFeature.vipCachedReadFromSram,
-               context->nnConfig.unifiedFeature.vipImagePartialCache,
-               context->nnConfig.customizedFeature.ddrReadBWLimit,
-               context->nnConfig.customizedFeature.ddrWriteBWLimit,
-               context->nnConfig.customizedFeature.ddrTotalBWLimit,
-               context->nnConfig.customizedFeature.axiSramReadBWLimit,
-               context->nnConfig.customizedFeature.axiSramWriteBWLimit,
-               context->nnConfig.customizedFeature.axiSramTotalBWLimit,
-               context->nnConfig.customizedFeature.axiBusReadBWLimit,
-               context->nnConfig.customizedFeature.axiBusWriteBWLimit,
-               context->nnConfig.customizedFeature.axiBusTotalBWLimit);
-
-        vxInfo("HANDLE_ABBUFFER: %d\nHANDLE_SUBIMAGE: %d\nHANDLE_BRANCH: %d\n\n",
-               (context->options.enableSwtilingPhase1 == VX_SWTILING_OPTION_ALL || context->options.enableSwtilingPhase1 == VX_SWTILING_OPTION_AB) ? 1 : 0,
-               (context->options.enableSwtilingPhase1 == VX_SWTILING_OPTION_ALL || context->options.enableSwtilingPhase1 == VX_SWTILING_OPTION_TILING) ? 1 : 0,
-               (context->options.collectPerfType == 1) ? 1 : context->options.enableHandleBranch);
-
-        vxInfo("FreqInMHZ: %u\nAxiClockFreqInMHZ: %u\nOutstandingTransfer: %d\nInternalWriteBWLimit: %.2f\n\n",
-               context->nnConfig.customizedFeature.freqInMHZ,
-               context->nnConfig.customizedFeature.axiClockFreqInMHZ,
-               context->nnConfig.fixedFeature.maxOTNumber,
-               (vx_float32)context->nnConfig.fixedFeature.nnLanesPerOutCycle);
-
-        vxInfo("LanesPerConv: %u\nMaxTileSize: %u\nAxiSramSlowedDownByAddr: %d\nSLOW_NN_REQ_ARBITRATION_FIX: %d\n\n",
-               context->nnConfig.unifiedFeature.lanesPerConv,
-               context->nnConfig.unifiedFeature.maxTileSize,
-               context->nnConfig.unifiedFeature.axiSramSlowedDownByAddr,
-               context->nnConfig.unifiedFeature.slowNNReqArbitrationFix);
-
-        vxInfo("FLOAT_XYDP_X: %u\nFLOAT_XYDP_Y: %u\nFLOAT_ZDP: %d\n",
-               context->nnConfig.fixedFeature.nnFP16XYDPX,
-               context->nnConfig.fixedFeature.nnFP16XYDPY,
-               context->nnConfig.fixedFeature.nnFP16ZDP);
-
-        vxInfo("SINGLE_PORT_ACC_BUFFER: %d\nMAX_ZRL_BIT_WIDTH: %d\nMAX_SOC_OUT_STANDING_NUMBER: %d\n\n",
-            context->nnConfig.unifiedFeature.singlePortAccBuffer,
-            context->nnConfig.fixedFeature.zrlBits,
-            context->nnConfig.customizedFeature.maxSocOTNumber
-            );
-
-        vxInfo("SWTilingPhase3: %d\nAXI_SRAM_ONLY_SW_TILING: %d\n",
-            vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE3) ? 1 : 0,
-            context->nnConfig.unifiedFeature.axiSramOnlySWTiling
-            );
-
-        vxInfo("VIP_CORE_COUNT: %d\n",
-            context->nnConfig.fixedFeature.vipCoreCount
-            );
-
-        vxInfo("DEPTH_WISE_SUPPORT: %d\nNN_WRITE_WITHOUT_USC: %d\n",
-            context->nnConfig.customizedFeature.depthWiseSupport,
-            context->nnConfig.customizedFeature.nnWriteWithoutUSC
-            );
-
-        vxInfo("EQUIVALENT_VIP_SRAM_WIDTH_IN_BYTE: %d\n",
-            context->nnConfig.fixedFeature.equivalentVipsramWidthInByte
-            );
-
-        vxInfo("IMAGE_NOT_PACKED_IN_SRAM: %d\n",
-            context->nnConfig.unifiedFeature.imageNotPackedInSram
-            );
-
-        vxInfo("NN_COEF_COMPRESSION_ENHANCEMENT: %d\nTP_COMPRESSION_ENHANCEMENT: %d\n\n",
-            vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_COEF_COMPRESSION_ENHANCEMENT),
-            vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_COMPRESSION_ENHANCEMENT)
-            );
-
-        gOrigShowType = (vx_int8)context->options.collectPerfType;
-    }
-
-    vxInfo("\n");
-    vxInfo("===========================\n");
-    vxInfo("**********Show Perf********\n");
-    vxInfo("===========================\n");
-
-    vxInfo("layer_id:%d layer_name:%s\noperation_id:%d operation_name:%s operation_target:%s\n",
-             layer->node->id, layer->name,
-             op->id, vxnneGetOperatorTypeName(op->operatorType), vxnneGetOperatorTargetName(op->target));
-
-    vxInfo("upstream_layer_num:%d upstream_opertaion_num:%d\n",
-             op->parentLayerNum, op->parentOpNum);
-
-    for (i = 0; i < op->parentOpNum; i++)
-    {
-        vxInfo("%d) upstream_operation_id:%d uptream_operation_name:%s (upstream_layer_id:%d upstream_layer_name:%s)\n",
-                 i, op->parentOps[i]->id,
-                 vxnneGetOperatorTypeName(op->parentOps[i]->operatorType),
-                 op->parentOps[i]->layer->node->id, op->parentOps[i]->layer->name);
-    }
-
-    vxInfo("downstream_layer_num:%d downstream_opertaion_num:%d\n",
-             op->childLayerNum, op->childOpNum);
-
-    for (i = 0; i < op->childOpNum; i++)
-    {
-        vxInfo("%d) downstream_operation_id:%d downstream_operation_name:%s (downstream_layer_id:%d downstream_layer_name:%s)\n",
-                 i, op->childOps[i]->id,
-                 vxnneGetOperatorTypeName(op->childOps[i]->operatorType),
-                 op->childOps[i]->layer->node->id, op->childOps[i]->layer->name);
-    }
-
-    if (op->target == VXNNE_OPERATION_TARGET_SH ||
-        op->target == VXNNE_OPERATION_TARGET_SW)
-    {
-        return VX_SUCCESS;
-    }
-
-    if (!perf->swTilingInfo.origOutX || !perf->swTilingInfo.origOutY || !perf->swTilingInfo.origOutZ)
-    {
-        perf->swTilingInfo.origOutX = perf->info.poolingSize > 1 ? (perf->swTilingInfo.origInX - perf->info.poolingSize + perf->info.poolingStride - 1) / perf->info.poolingStride + 1 : perf->swTilingInfo.origInX;
-        perf->swTilingInfo.origOutY = perf->info.poolingSize > 1 ? (perf->swTilingInfo.origInY - perf->info.poolingSize + perf->info.poolingStride - 1) / perf->info.poolingStride + 1 : perf->swTilingInfo.origInY;
-        perf->swTilingInfo.origOutZ = perf->info.outz;
-    }
-
-    if (!perf->info.outx || !perf->info.outy)
-    {
-        perf->info.outx = perf->info.pix;
-        perf->info.outy = perf->info.piy;
-    }
-
-    if (perf->opTarget == VXNNE_OPERATION_TARGET_NN)
-    {
-        vxInfo("NumUsedNNCores: %d\nConvOutFIFODepth: %d\n\n", perf->info.nnCores, perf->info.convOutFifoDepth);
-    }
-
-
-    if (perf->opType == VXNNE_OPERATOR_CONVOLUTION
-        || perf->opType == VXNNE_OPERATOR_DEPTH_WISE_CONV
-        || (perf->opTarget == VXNNE_OPERATION_TARGET_NN && perf->opType == VXNNE_OPERATOR_FULLYCONNECTED))
-    {
-        vxInfo("OrigInImageX: %d\nOrigInImageY: %d\nOrigInImageZ: %d\nNNOutImageX: %d (sub: %d)\nNNOutImageY: %d (sub: %d)\nNNOutImageZ: %d (sub: %d)\nFinalOutImageX: %d\nFinalOutImageY: %d\nFinalOutImageZ: %d\n",
-                    perf->info.oinx, perf->info.oiny, perf->info.oinz,
-                    perf->swTilingInfo.origInX, perf->info.inx,
-                    perf->swTilingInfo.origInY, perf->info.iny,
-                    perf->swTilingInfo.origOutZ, perf->info.outz,
-                    perf->swTilingInfo.origOutX,
-                    perf->swTilingInfo.origOutY,
-                    perf->swTilingInfo.origOutZ);
-    }
-    else if (perf->opType == VXNNE_OPERATOR_POOLING)
-    {
-        vxInfo("InImageX: %d (sub: %d)\nInImageY: %d (sub: %d)\nInImageZ: %d (sub: %d)\nOutImageX: %d\nOutImageY: %d\nOutImageZ: %d\n",
-                    perf->swTilingInfo.origInX, perf->info.inx,
-                    perf->swTilingInfo.origInY, perf->info.iny,
-                    perf->info.oinz, perf->info.outz,
-                    perf->swTilingInfo.origOutX,
-                    perf->swTilingInfo.origOutY,
-                    perf->swTilingInfo.origOutZ);
-    }
-    else
-    {
-        vxInfo("InImageX: %d\nInImageY: %d\nInImageZ: %d\nOutImageX: %d (sub: %d)\nOutImageY: %d (sub: %d)\nOutImageZ: %d (sub: %d)\n",
-                    perf->swTilingInfo.origInX,
-                    perf->swTilingInfo.origInY,
-                    perf->info.oinz,
-                    perf->swTilingInfo.origOutX, perf->info.outx,
-                    perf->swTilingInfo.origOutY, perf->info.outy,
-                    perf->swTilingInfo.origOutZ, perf->info.outz);
-    }
-
-    vxInfo("KernelX: %d\nKernelY: %d\nKernelZ: %d\nPoolingSize: %d\nPoolingStride: %d\nDataSize: %d\nFP16: %d\n",
-            perf->info.kx, perf->info.ky, perf->info.kz,
-            perf->info.poolingSize, perf->info.poolingStride,
-            perf->info.dataSize, perf->info.inputDataFormat == VX_TYPE_FLOAT16 ? 1 : 0);
-
-    vxInfo("archModel_kernelSize: %u\nkernelSize: %u\n",
-        _kernel_size_in_pixel_by_arch_perf(perf->opTarget, perf->opType, perf, context->nnConfig.unifiedFeature.fullCacheKernelHeadFix ? vx_true_e : vx_false_e),
-        perf->info.kernelSize
-        );
-
-    vxInfo("SrcBuf: %s\nDstBuf: %s\nKernelBuf: %s\n",
-            !perf->swTilingInfo.srcBuf ? "DDR" : "SRAM",
-            !perf->swTilingInfo.dstBuf ? "DDR" : "SRAM",
-            !perf->swTilingInfo.kernelBuf ? "DDR" : "SRAM");
-
-    vxInfo("KernelCacheMode=%s\nImageCacheMode=%s\n",
-             vxnneGetCacheModeName(perf->swTilingInfo.kernelCacheMode),
-             vxnneGetCacheModeName(perf->swTilingInfo.imageCacheMode));
-
-    vxInfo("xOffset: %d, yOffset: %d\n", perf->info.xOffSet, perf->info.yOffSet);
-
-    if (perf->opType == VXNNE_OPERATOR_CONVOLUTION ||
-        perf->opType == VXNNE_OPERATOR_DEPTH_WISE_CONV ||
-        perf->opType == VXNNE_OPERATOR_FULLYCONNECTED)
-    {
-        vxInfo("coefNonZeroRatio: %.15f\ncoefCompression: %.15f\nimageCompression: %.15f\nimageNonZeroRatio: %.15f\n\n",
-                 perf->coefNonZeroRatio,
-                 perf->coefCompressRatio,
-                 perf->imageCompressRatio,
-                 perf->imageNonZeroRatio
-                );
-        vxInfo("coefNonZeroRatio__llu: %llu\ncoefCompression_llu: %llu\nimageCompression_llu: %llu\nimageNonZeroRatio_llu: %llu\n\n",
-                 *(vx_uint64 *)&perf->coefNonZeroRatio,
-                 *(vx_uint64 *)&perf->coefCompressRatio,
-                 *(vx_uint64 *)&perf->imageCompressRatio,
-                 *(vx_uint64 *)&perf->imageNonZeroRatio
-                );
-
-        if (perf->opType == VXNNE_OPERATOR_CONVOLUTION ||
-            perf->opType == VXNNE_OPERATOR_DEPTH_WISE_CONV ||
-            (perf->opTarget == VXNNE_OPERATION_TARGET_NN && perf->opType == VXNNE_OPERATOR_FULLYCONNECTED))
-        {
-            vxInfo("OutImageTileXSize: %d\nOutImageTileYSize: %d\nKernelsPerCore: %d\n\n",
-                     perf->resultInfo.outImageTileXSize,
-                     perf->resultInfo.outImageTileYSize,
-                     perf->resultInfo.kernelsPerCore
-                  );
-        }
-    }
-    else
-    {
-        vxInfo("\n");
-    }
-
-    vxInfo("kernelDDRReadBW: %llu\nInImageDDrReadBW: %llu\n",
-             (vx_uint64)(perf->resultInfo.perfKernelReadBandWidth + 0.5f),
-             (vx_uint64)(perf->resultInfo.perfInImageReadBandWidth + 0.5f));
-
-    vxInfo("ReadBW: %llu\nWriteBW: %llu\nCycleCount: %llu\n\n",
-             (vx_uint64)(perf->resultInfo.perfReadBandWidth + 0.5f),
-             (vx_uint64)(perf->resultInfo.perfWriteBandWidth + 0.5f),
-             (vx_uint64)(perf->resultInfo.perfCycleCount / mutiGpuFactor + 0.5f));
-
-    return VX_SUCCESS;
-}
-
-static vx_uint32 _calcInImageInterleaveMode(vx_uint32 x, vx_uint32 max_tile_size, vx_uint32 kernel_xy, vx_bool vip7_fp16, vx_bool interleave8)
-{
-    if (vip7_fp16)
-    {
-        if ((max_tile_size + 8) / 4 < (x + kernel_xy - 1))
-        {
-            return 1;
-        }
-        else if ((max_tile_size + 8) / 8 < (x + kernel_xy - 1) || !interleave8)
-        {
-            return 2;
-        }
-        return 4;
-    }
-    else
-    {
-        if ((max_tile_size + 8) / 2 < (x + kernel_xy - 1))
-        {
-            return 1;
-        }
-        else if ((max_tile_size + 8) / 4 < (x + kernel_xy - 1))
-        {
-            return 2;
-        }
-        else if ((max_tile_size + 8) / 8 < (x + kernel_xy - 1) || !interleave8)
-        {
-            return 4;
-        }
-        return 8;
-    }
-}
-
-static vx_uint32 _calcOutImageInterleaveMode(vx_uint32 x, vx_uint32 max_tile_size, vx_bool vip7_fp16, vx_bool interleave8)
-{
-    if (vip7_fp16)
-    {
-        return (x > (max_tile_size / 4)) ? 1
-            : ((x > (max_tile_size / 8)) || !interleave8) ? 2
-            : 4;
-    }
-    else
-    {
-        return (x > (max_tile_size / 2)) ? 1
-            : (x > (max_tile_size / 4)) ? 2
-            : ((x > (max_tile_size / 8)) || !interleave8) ? 4
-            : 8;
-    }
-}
-
-static vx_uint32 _calcImageInterleaveMode(vx_uint32 x, vx_uint32 mad_per_core, vx_uint32 kxy, vx_bool vip7_fp16, vx_bool interleave8)
-{
-    /*mad_per_core = 64;*/
-    return gcmMIN(_calcOutImageInterleaveMode(x, mad_per_core, vip7_fp16, interleave8),
-                  _calcInImageInterleaveMode(x, mad_per_core, kxy, vip7_fp16, interleave8));
-}
-
-static vx_float64 _calcPartialAlignedBW(vx_uint32 size, vx_uint32 ppc, vx_uint32 inc, vx_uint32 line_length, vx_uint32 line_phases, vx_uint32 base_addr, vx_int32 xoffset)
-{
-    vx_uint32 lineCount = 0, stepCount = 0, i, j;
-    vx_float64 partialAlignedBW;
-    for (j = 0; j < line_phases; j++)
-    {
-        vx_uint32 accum = ((base_addr + (j * ppc / line_phases)) % ppc) + xoffset;
-        for (i = 0; i < line_length; i += size)
-        {
-            stepCount++;
-            if ((accum + size) > (2 * ppc))
-            {
-                lineCount += 3;
-            }
-            else if ((accum + size) > ppc)
-            {
-                lineCount += 2;
-            }
-            else
-            {
-                lineCount += 1;
-            }
-            accum = (accum + inc) % ppc;
-        }
-    }
-
-    partialAlignedBW = ((vx_float64)lineCount / stepCount) * ppc;
-    return partialAlignedBW;
-}
-
-static vx_float64 _calcUnalignedBW(vx_float64 size, vx_float64 ppc)
-{
-    vx_float64 ret = ((vx_int32)((size - 1.0f) / ppc)
-        + 1 + ((vx_int32)(size - 1.0f) % (vx_uint32)ppc ) / ppc)
-        * ppc;
-    return ret;
-}
-
-static vx_uint32 _calcNumOfKernel(vx_uint32 tile_x, vx_uint32 tile_y, vx_uint32 z, vx_uint32 accu_buf_depth, vx_uint32 cores, vx_uint32 interleave_mode, vx_uint32 zdp, vx_uint32 kx, vx_uint32 ky, vx_bool isV8)
-{
-    vx_uint32 numKernel;
-
-    numKernel = (vx_uint32)(accu_buf_depth * interleave_mode / tile_y);
-    numKernel = gcmMIN(127, (vx_uint32)gcmMIN(numKernel, ceilf((vx_float32)z / cores)));
-
-    if ((kx == 1) && (ky == 1) && (zdp != 1) && !isV8)
-    {
-        numKernel = (vx_uint32)(gcmMIN(numKernel, accu_buf_depth / 3));
-    }
-    return (vx_uint32)numKernel;
-}
-
-static vx_float64 _calcKernel4DSingleReadRepeated(vx_uint32 tile_x, vx_uint32 tile_y, vx_uint32 x, vx_uint32 y)
-{
-    return ceilf((vx_float32)x / tile_x) * ceilf((vx_float32)y / tile_y);
-}
-
-static vx_float64 _calcKernel4DSingleReadBW(vx_uint32 kx, vx_uint32 ky, vx_uint32 kz, vx_uint32 z, vx_float64 coef_compress_ratio)
-{
-    return (vx_float64)kx * ky * kz * z * coef_compress_ratio;
-}
-
-static vx_float64 _calcTile3DImageSingleReadRepeated(vx_uint32 z, vx_uint32 kernel_per_core, vx_uint32 cores, vx_bool is_depth_wise)
-{
-    return is_depth_wise ? 1.0f : ceilf((vx_float32)z / (kernel_per_core * cores));
-}
-
-static vx_float64 _calcTile3DImageSingleReadBW(
-    vx_uint32 tile_x, vx_uint32 tile_y,
-    vx_uint32 kx, vx_uint32 ky, vx_uint32 kz,
-    vx_uint32 x, vx_uint32 y,
-    vx_uint32 inx, vx_uint32 iny,
-    vx_uint32 brick_mode,
-    vx_uint32 data_size,
-    vx_float64 image_compress_ratio,
-    vx_bool cache_line_mode_disabled,
-    vx_bool async_copy_perf_fix,
-    vx_bool accurate_tile_bw,
-    vx_uint32 in_image_stride,
-    vx_uint32 in_image_slice,
-    vx_uint32 zdp,
-    vx_uint32 mem_acc_unit_size_in_byte)
-{
-    vx_uint32 intileX, intileY;
-    vx_float64 ppc, tile3DImageSingleReadBW;
-
-    intileX = tile_x + kx - 1;
-    intileY = tile_y + ky - 1;
-
-    intileX = gcmMIN(intileX, in_image_stride);
-    intileY = gcmMIN(intileY, (vx_uint32)ceilf((vx_float32)in_image_slice / in_image_stride));
-
-    ppc = mem_acc_unit_size_in_byte / ((vx_float32)data_size / 8);
-
-    if ((
-        ((zdp == 1) || (kx != 1) || (ky != 1))
-        && (inx == in_image_stride) && (inx * iny == in_image_slice)
-        && (inx <= intileX) && (iny <= intileY) && !cache_line_mode_disabled
-        )
-        || brick_mode == 1)
-    {
-        tile3DImageSingleReadBW = _calcUnalignedBW((vx_float64)intileX * intileY * kz, ppc) * image_compress_ratio;
-    }
-    else
-    {
-        if (
-            ((((in_image_stride % tile_x) == 0) && (((vx_uint32)ppc % tile_x) == 0) && (kx == 1))
-             || (((in_image_stride % (vx_uint32)ppc) == 0) && (ppc >= inx)))
-            && ((in_image_slice % (vx_uint32)ppc) == 0))
-        {
-            tile3DImageSingleReadBW = ceilf(intileX / (vx_float32)ppc) * intileY * ppc * kz * image_compress_ratio;
-        }
-        else if (accurate_tile_bw && ((in_image_stride % (vx_uint32)ppc) == 0) && ((in_image_slice % in_image_stride) == 0))
-        {
-            tile3DImageSingleReadBW = _calcPartialAlignedBW(intileX, (vx_uint32)ppc, tile_x, inx, 1, 0, 0) * intileY * kz * image_compress_ratio;
-        }
-        else if (in_image_stride == intileX)
-        {
-            /*Async Copy can always merge requests when inimage_stride = tile_xsize*/
-            if (((in_image_stride * intileY) % (vx_uint32)ppc) == 0 && (in_image_slice % (vx_uint32)ppc) == 0)
-            {
-                tile3DImageSingleReadBW = ceilf(intileX * intileY / (vx_float32)ppc) * ppc * kz * image_compress_ratio;
-            }
-            else
-            {
-                tile3DImageSingleReadBW = _calcUnalignedBW((vx_float32)intileX * intileY, ppc) * kz * image_compress_ratio;
-            }
-        }
-        else if (accurate_tile_bw && ((in_image_stride % (vx_uint32)(ppc / 2)) == 0) && ((in_image_slice % in_image_stride) == 0))
-        {
-            tile3DImageSingleReadBW = _calcPartialAlignedBW(intileX, (vx_uint32)ppc, tile_x, inx, 2, 0, 0) * intileY * kz * image_compress_ratio;
-        }
-        else if (accurate_tile_bw && ((in_image_stride % (vx_uint32)(ppc / 4)) == 0) && ((in_image_slice % in_image_stride) == 0))
-        {
-             tile3DImageSingleReadBW = _calcPartialAlignedBW(intileX, (vx_uint32)ppc, tile_x, inx, 4, 0, 0) * intileY * kz * image_compress_ratio;
-        }
-        else
-        {
-            tile3DImageSingleReadBW = _calcUnalignedBW((vx_float32)intileX, ppc) * intileY * kz * image_compress_ratio;
-        }
-
-        if (async_copy_perf_fix)
-        {
-            if (((in_image_slice % (vx_uint32)ppc) == 0) && (((in_image_stride * intileY) % (vx_uint32)ppc) == 0))
-            {
-                tile3DImageSingleReadBW = gcmMIN(in_image_stride * intileY * kz * image_compress_ratio, tile3DImageSingleReadBW);
-            }
-            else
-            {
-                tile3DImageSingleReadBW = gcmMIN(_calcUnalignedBW((vx_float32)in_image_stride * intileY, ppc) * kz * image_compress_ratio, tile3DImageSingleReadBW);
-            }
-        }
-    }
-    return tile3DImageSingleReadBW;
-}
-
-static vx_float64 _calcKernelReadBandWidth(
-    vx_uint32 tile_x,
-    vx_uint32 tile_y,
-    vx_uint32 kernel_per_core,
-    vx_uint32 kx, vx_uint32 ky, vx_uint32 kz,
-    vx_uint32 x, vx_uint32 y, vx_uint32 z,
-    vx_uint32 inx, vx_uint32 iny,
-    vx_uint32 cores,
-    vx_uint32 brick_mode,
-    vx_uint32 data_size,
-    vx_float64 coef_compress_ratio,
-    vx_float64 image_compress_ratio,
-    vx_float64 cache_size_in_pixel,
-    vx_bool full_cach_kernel_head_fix,
-    vx_bool is_depth_wise)
-{
-    vx_float64 kernelIdealCache, kernelRepeatRead, kernelReadBandWidth, kernelNonIdealCache;
-    vx_float64 zPerCore = ceilf((vx_float32)z/cores);
-    vx_float64 adjCacheSizeInPixel;
-    vx_uint32 kernelHeaderReadBandWidth = 0;
-    kernelRepeatRead = _calcKernel4DSingleReadRepeated(tile_x, tile_y, x, y);
-    if (is_depth_wise)
-    {
-        kernelIdealCache = _calcKernel4DSingleReadBW(kx, ky, 1, z, 1);
-        kernelNonIdealCache = ceilf((vx_float32)_calcKernel4DSingleReadBW(kx, ky, 1, (vx_uint32)zPerCore, 1)/AXI_BURST_SIZE) * AXI_BURST_SIZE * cores;
-    }
-    else
-    {
-        kernelIdealCache = _calcKernel4DSingleReadBW(kx, ky, kz, z, coef_compress_ratio);
-        kernelNonIdealCache = ceilf((vx_float32)_calcKernel4DSingleReadBW(kx, ky, kz, (vx_uint32)zPerCore, coef_compress_ratio)/AXI_BURST_SIZE) * AXI_BURST_SIZE * cores;
-    }
-    if (full_cach_kernel_head_fix)
-    {
-        adjCacheSizeInPixel = cache_size_in_pixel;
-        kernelHeaderReadBandWidth = 0;
-    }
-    else
-    {
-        adjCacheSizeInPixel = cache_size_in_pixel * kernelIdealCache / kernelNonIdealCache;
-        kernelHeaderReadBandWidth = AXI_BURST_SIZE;
-    }
-    kernelReadBandWidth = ((kernelIdealCache + kernelHeaderReadBandWidth) * kernelRepeatRead) - (gcmMIN(kernelIdealCache, adjCacheSizeInPixel) * (kernelRepeatRead - 1));
-    kernelReadBandWidth *= (data_size / 8);
-
-    return kernelReadBandWidth;
-}
-
-static vx_float64 _calcImageReadBandWidth(
-    vx_uint32 tile_x,
-    vx_uint32 tile_y,
-    vx_uint32 kernel_per_core,
-    vx_uint32 kx, vx_uint32 ky, vx_uint32 kz,
-    vx_uint32 x, vx_uint32 y, vx_uint32 z,
-    vx_uint32 inx, vx_uint32 iny,
-    vx_uint32 cores,
-    vx_uint32 brick_mode,
-    vx_uint32 data_size,
-    vx_float64 coef_compress_ratio,
-    vx_float64 image_compress_ratio,
-    vx_float64 cache_size_in_pixel,
-    vx_bool image_not_packed_in_sram,
-    vx_bool cache_line_mode_disabled,
-    vx_bool async_copy_perf_fix,
-    vx_bool accurate_tile_bw,
-    vx_bool is_depth_wise,
-    vx_uint32 equivalent_vip_sram_width_in_byte,
-    vx_uint32 in_image_stride,
-    vx_uint32 in_image_slice,
-    vx_uint32 zdp,
-    vx_uint32 mem_acc_unit_size_in_byte)
-{
-    vx_float64 imageRepeatSingleRead, imageRepeatRead, imageRepeatCacheRead, imageIdealCache, imageReadBandWidth, imageTile3DBW;
-    vx_float64 tmp;
-    vx_uint32 intile_x = (tile_x + kx - 1);
-    vx_uint32 intile_y = (tile_y + ky - 1);
-    intile_x = gcmMIN(intile_x, inx);
-    intile_y = gcmMIN(intile_y, iny);
-
-    tmp = ((vx_float64)x / tile_x) * ((vx_float64)y / tile_y);
-    imageRepeatSingleRead = _calcTile3DImageSingleReadRepeated(z, kernel_per_core, cores, is_depth_wise);
-    imageRepeatRead = imageRepeatSingleRead * tmp;
-    imageRepeatCacheRead = (imageRepeatSingleRead - 1.0f) * tmp;
-    imageTile3DBW = _calcTile3DImageSingleReadBW(tile_x, tile_y, kx, ky, kz, x, y, inx, iny, brick_mode, data_size, image_compress_ratio,
-                          cache_line_mode_disabled, async_copy_perf_fix, accurate_tile_bw, in_image_stride, in_image_slice, zdp, mem_acc_unit_size_in_byte);
-    if (image_not_packed_in_sram)
-    {
-        imageIdealCache = ceilf(ceilf((vx_float32)intile_x * intile_y / 16) * 16 * kz / (equivalent_vip_sram_width_in_byte * 2))
-                         * (equivalent_vip_sram_width_in_byte * 2) * data_size / 8;
-    }
-    else
-    {
-        imageIdealCache = (vx_float32)intile_x * intile_y * kz * data_size / 8;
-    }
-    imageReadBandWidth = imageTile3DBW * (imageRepeatRead - (gcmMIN(imageIdealCache, cache_size_in_pixel) * imageRepeatCacheRead / imageIdealCache));
-    imageReadBandWidth = imageReadBandWidth * (data_size / 8);
-
-    return imageReadBandWidth;
-}
-
-static vx_float64 _calcReadBandWidth(
-    vx_uint32 tile_x,
-    vx_uint32 tile_y,
-    vx_uint32 kernel_per_core,
-    vx_uint32 kx, vx_uint32 ky, vx_uint32 kz,
-    vx_uint32 x, vx_uint32 y, vx_uint32 z,
-    vx_uint32 inx, vx_uint32 iny,
-    vx_uint32 cores,
-    vx_uint32 brick_mode,
-    vx_uint32 data_size,
-    vx_float64 coef_compress_ratio,
-    vx_float64 image_compress_ratio,
-    vx_uint32 l2cache_size,
-    vx_bool image_partial_cache,
-    vx_uint32 nn_cmd_size,
-    vx_bool image_not_packed_in_sram,
-    vx_bool full_cach_kernel_head_fix,
-    vx_bool cache_line_mode_disabled,
-    vx_bool async_copy_perf_fix,
-    vx_bool accurate_tile_bw,
-    vx_bool is_depth_wise,
-    vx_uint32 in_image_stride,
-    vx_uint32 in_image_slice,
-    vx_uint32 zdp,
-    vx_uint32 mem_acc_unit_size_in_byte,
-    vx_uint32 equivalent_vip_sram_width_in_byte,
-    vx_float64 *ddrKernelReadBW,
-    vx_float64 *ddrInImageReadBW)
-{
-    vx_float64 cacheSizeInPixel, kernelIdealCache, imageIdealCache;
-    vx_float64 kernelRepeatRead, imageRepeatSingleRead, imageRepeatRead, readBandWidth = 0, kernelNonIdealCache, kernelStorage;
-    vx_float64 kernelReadBW, inImageReadBW;
-    vx_float32 tmp, zPerCore;
-    vx_uint32 intile_x = (tile_x + kx - 1);
-    vx_uint32 intile_y = (tile_y + ky - 1);
-    intile_x = gcmMIN(intile_x, inx);
-    intile_y = gcmMIN(intile_y, iny);
-
-    tmp = ((vx_float32)x / tile_x) * ((vx_float32)y / tile_y);
-    cacheSizeInPixel = l2cache_size * 1024 / ((vx_float32)data_size / 8);
-
-    kernelRepeatRead = _calcKernel4DSingleReadRepeated(tile_x, tile_y, x, y);
-    imageRepeatSingleRead = _calcTile3DImageSingleReadRepeated(z, kernel_per_core, cores, is_depth_wise);
-    imageRepeatRead = imageRepeatSingleRead * tmp;
-    zPerCore = ceilf((vx_float32)z / cores);
-    if (is_depth_wise)
-    {
-        kernelIdealCache = _calcKernel4DSingleReadBW(kx, ky, 1, z, 1);
-        kernelNonIdealCache = ceilf((vx_float32)_calcKernel4DSingleReadBW(kx, ky, 1, (vx_uint32)zPerCore, 1) / AXI_BURST_SIZE) * AXI_BURST_SIZE * cores;
-    }
-    else
-    {
-        kernelIdealCache = _calcKernel4DSingleReadBW(kx, ky, kz, z, coef_compress_ratio);
-        kernelNonIdealCache = ceilf((vx_float32)_calcKernel4DSingleReadBW(kx, ky, kz, (vx_uint32)zPerCore, coef_compress_ratio) / AXI_BURST_SIZE) * AXI_BURST_SIZE * cores;
-    }
-    kernelStorage = full_cach_kernel_head_fix ? kernelIdealCache : kernelNonIdealCache;
-    if (image_not_packed_in_sram)
-    {
-        imageIdealCache = ceilf(ceilf((vx_float32)intile_x * intile_y / 16) * 16 * kz / (equivalent_vip_sram_width_in_byte * 2))
-                         * (equivalent_vip_sram_width_in_byte * 2) * data_size / 8;
-    }
-    else
-    {
-        imageIdealCache = (vx_float32)intile_x * intile_y * kz * data_size / 8;
-    }
-    if (image_partial_cache)
-    {
-        if (kernelRepeatRead >= imageRepeatRead)
-        {
-            kernelReadBW = _calcKernelReadBandWidth(tile_x, tile_y, kernel_per_core, kx, ky, kz, x, y, z, inx, iny, cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel, full_cach_kernel_head_fix, is_depth_wise);
-            cacheSizeInPixel = cacheSizeInPixel - gcmMIN(kernelStorage, cacheSizeInPixel);
-            inImageReadBW = _calcImageReadBandWidth(tile_x, tile_y, kernel_per_core, kx, ky, kz, x, y, z, inx, iny,
-                cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel, image_not_packed_in_sram,
-                cache_line_mode_disabled, async_copy_perf_fix, accurate_tile_bw, is_depth_wise, equivalent_vip_sram_width_in_byte, in_image_stride, in_image_slice, zdp, mem_acc_unit_size_in_byte);
-        }
-        else
-        {
-
-            inImageReadBW = _calcImageReadBandWidth(tile_x, tile_y, kernel_per_core, kx, ky, kz, x, y, z, inx, iny,
-                cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel, image_not_packed_in_sram,
-                cache_line_mode_disabled, async_copy_perf_fix, accurate_tile_bw, is_depth_wise, equivalent_vip_sram_width_in_byte, in_image_stride, in_image_slice, zdp, mem_acc_unit_size_in_byte);
-            cacheSizeInPixel = cacheSizeInPixel - gcmMIN(imageIdealCache, cacheSizeInPixel);
-            kernelReadBW = _calcKernelReadBandWidth(tile_x, tile_y, kernel_per_core, kx, ky, kz, x, y, z, inx, iny,
-                cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel, full_cach_kernel_head_fix, is_depth_wise);
-        }
-    }
-    else
-    {
-        if (imageIdealCache < cacheSizeInPixel)
-        {
-            inImageReadBW = _calcImageReadBandWidth(tile_x, tile_y, kernel_per_core, kx, ky, kz, x, y, z, inx, iny,
-                cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel, image_not_packed_in_sram,
-                cache_line_mode_disabled, async_copy_perf_fix, accurate_tile_bw, is_depth_wise, equivalent_vip_sram_width_in_byte, in_image_stride, in_image_slice, zdp, mem_acc_unit_size_in_byte);
-            cacheSizeInPixel = cacheSizeInPixel - gcmMIN(imageIdealCache, cacheSizeInPixel);
-            kernelReadBW = _calcKernelReadBandWidth(tile_x, tile_y, kernel_per_core, kx, ky, kz, x, y, z, inx, iny, cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel, full_cach_kernel_head_fix, is_depth_wise);
-        }
-        else
-        {
-            inImageReadBW = _calcImageReadBandWidth(tile_x, tile_y, kernel_per_core, kx, ky, kz, x, y, z, inx, iny,
-                cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio, 0, image_not_packed_in_sram,
-                cache_line_mode_disabled, async_copy_perf_fix, accurate_tile_bw, is_depth_wise, equivalent_vip_sram_width_in_byte, in_image_stride, in_image_slice, zdp, mem_acc_unit_size_in_byte);
-            kernelReadBW = _calcKernelReadBandWidth(tile_x, tile_y, kernel_per_core, kx, ky, kz, x, y, z, inx, iny,
-                cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel, full_cach_kernel_head_fix, is_depth_wise);
-        }
-    }
-    if (ddrKernelReadBW) *ddrKernelReadBW = kernelReadBW;
-    if (ddrInImageReadBW) *ddrInImageReadBW = inImageReadBW;
-    readBandWidth = nn_cmd_size + kernelReadBW + inImageReadBW;
-    return readBandWidth;
-}
-
-static vx_float64 _calcWriteBandWidth(
-    vx_uint32 tile_x,
-    vx_uint32 tile_y,
-    vx_uint32 x,
-    vx_uint32 y,
-    vx_uint32 z,
-    vx_uint32 data_size,
-    vx_float64 image_compress_ratio,
-    vx_uint32 usc_cache_size,
-    vx_uint32 pooling_stride,
-    vx_uint32 out_image_stride,
-    vx_uint32 out_image_slice,
-    vx_bool is_nn_write_without_usc)
-{
-    vx_float32 ppc, poolX, poolY, poolTileX, poolTileY, hGap, vGap;
-    vx_float64 cacheSizeInPixel;
-    vx_float64 allTilesBW, rowTilesBW, tileBW, writeBW;
-
-    cacheSizeInPixel = usc_cache_size * 1024 / ((vx_float64)data_size / 8);
-    ppc = AXI_BURST_SIZE / ((vx_float32)data_size / 8);
-
-    gcmASSERT(x >= pooling_stride);
-    gcmASSERT(y >= pooling_stride);
-
-    poolX = (vx_float32)x / pooling_stride;
-    poolY = (vx_float32)y / pooling_stride;
-    poolTileX = (vx_float32)tile_x / pooling_stride;
-    poolTileY = (vx_float32)tile_y / pooling_stride;
-
-    allTilesBW = _calcUnalignedBW((vx_float64)out_image_slice * z, ppc) * image_compress_ratio;
-    if (((((vx_uint32)(out_image_stride * poolTileY) % (vx_uint32)ppc) == 0) || (((vx_uint32)ppc % (vx_uint32)(out_image_stride * poolTileY)) == 0))
-        && (poolTileX == poolX)
-        && ((out_image_slice % (vx_uint32)ppc) == 0))
-    {
-        rowTilesBW = ceilf((vx_float32)out_image_stride * poolTileY / ppc) * ppc * z * image_compress_ratio;
-    }
-    else
-    {
-        rowTilesBW = _calcUnalignedBW((vx_float32)out_image_stride * poolTileY, ppc) * z * image_compress_ratio;
-    }
-
-    if (((((out_image_stride % (vx_uint32)poolTileX) == 0) && (((vx_uint32)ppc % (vx_uint32)poolTileX) == 0))
-          || (((out_image_stride % (vx_uint32)ppc) == 0) && (ppc >= poolX)))
-       && ((out_image_slice % (vx_uint32)ppc) == 0))
-    {
-        tileBW     = ceilf(poolTileX / ppc) * ppc * poolTileY * z * image_compress_ratio;
-    }
-    else
-    {
-        tileBW     = _calcUnalignedBW(poolTileX, ppc) * poolTileY * z * image_compress_ratio;
-    }
-
-    hGap = (vx_float32)out_image_stride - poolTileX;
-    vGap = (vx_float32)out_image_slice - poolTileY * out_image_stride + hGap;
-
-    if (!is_nn_write_without_usc && (tileBW < (cacheSizeInPixel / 2) || rowTilesBW < (cacheSizeInPixel / 2)))
-    {
-        writeBW = allTilesBW;
-    }
-    else if (!is_nn_write_without_usc && (tileBW < cacheSizeInPixel || rowTilesBW < cacheSizeInPixel))
-    {
-        writeBW = allTilesBW * 1.2f;
-    }
-    else if (vGap < ppc)
-    {
-        writeBW = allTilesBW * poolX * poolY / (poolTileX * poolTileY);
-    }
-    else if (hGap < ppc)
-    {
-        writeBW = rowTilesBW * poolX * poolY / (poolTileX * poolTileY);
-    }
-    else
-    {
-        writeBW = tileBW * poolX * poolY / (poolTileX * poolTileY);
-    }
-
-    writeBW = writeBW * (data_size / 8);
-    return writeBW;
-}
-
-vx_float64 _calcComputeCycleCount(
-    vx_uint32 tile_x,
-    vx_uint32 tile_y,
-    vx_uint32 kernel_per_core,
-    vx_uint32 kx,
-    vx_uint32 ky,
-    vx_uint32 kz,
-    vx_uint32 x,
-    vx_uint32 y,
-    vx_uint32 z,
-    vx_float64 non_zero_ratio,
-    vx_uint32 xydp_x,
-    vx_uint32 xydp_y,
-    vx_uint32 zdp,
-    vx_uint32 float_xydp_x,
-    vx_uint32 float_xydp_y,
-    vx_uint32 float_zdp,
-    vx_uint32 data_size,
-    vx_uint32 vector_prune,
-    vx_uint32 interleave_mode,
-    vx_uint32 lanes_per_conv,
-    vx_uint32 coef_decode_perf,
-    vx_uint32 zrl_bits,
-    vx_bool is_depth_wise,
-    vx_bool vip_v7_16bit,
-    vx_bool fp16,
-    vx_bool conv1x1_half_performance,
-    vx_bool zxdp3_kernel_read_conflict_fix,
-    vx_bool single_port_acc_buffer,
-    vx_float64 *refined_non_zero_ratio
-    )
-{
-    vx_uint32 tmp, pipeLatency;
-    vx_int32 dpAmount;
-    vx_uint32 dpKX, dpKY, dpKZ;
-    vx_float64 accumCycle, tile3DComputeCycle, bottomTile3DComputeCycle;
-    vx_float64 dpNonZeroRatio = 1.0;
-    vx_float64 computeCycle;
-    vx_uint32 xydpVectorPruneAmount, zdpVectorPruneAmount, numOfPruneGroupsInDpn, numOfDpnInImgBuf;
-    vx_uint32 selected_xydp_x, selected_xydp_y, selected_zdp;
-
-    if (xydp_x == 0 || xydp_y == 0) /*zdp only arch*/
-    {
-        tile3DComputeCycle = ceilf(((vx_float32)tile_y * tile_x) / lanes_per_conv) * kernel_per_core;
-        bottomTile3DComputeCycle = ceilf((1.0f * (y % tile_y) * tile_x) / lanes_per_conv) * kernel_per_core;
-
-        if (vector_prune > 0)
-        {
-            dpNonZeroRatio = non_zero_ratio;
-        }
-        else
-        {
-            for (tmp = 0; tmp < zdp; tmp++)
-            {
-                dpNonZeroRatio *= (1.0f - non_zero_ratio);
-            }
-            dpNonZeroRatio = 1.0f - dpNonZeroRatio;
-        }
-        computeCycle = tile3DComputeCycle *(vx_uint32)(y / tile_y) + bottomTile3DComputeCycle;
-        if (is_depth_wise)
-        {
-            computeCycle = computeCycle * ceilf((vx_float32)kx * ky / zdp) * z * ceilf((vx_float32)x / tile_x) / kernel_per_core;
-        }
-        else
-        {
-            computeCycle = computeCycle * ceilf((vx_float32)kx * ky * kz / zdp) * z * dpNonZeroRatio * ceilf((vx_float32)x / tile_x) / kernel_per_core;
-        }
-
-        if (data_size == 16) /*INT16 only; no FP16 support*/
-        {
-            computeCycle *= 4;
-        }
-        *refined_non_zero_ratio = non_zero_ratio;
-        return computeCycle;
-    }
-
-    pipeLatency = (data_size != 8 && fp16 != 0)  ? 6
-        : ((xydp_x != 1) || (xydp_y != 1) || (zdp != 1)) ? 1 : 4;
-
-    accumCycle = ceilf((vx_float32)tile_y / interleave_mode);
-
-    if (kx * ky == 1)
-    {
-        tile3DComputeCycle = gcmMAX(ceilf((vx_float32)tile_y / interleave_mode) * kernel_per_core, pipeLatency);
-    }
-    else if (accumCycle == 4)
-    {
-        tile3DComputeCycle = 4 * (vx_float32)kernel_per_core;
-    }
-    else
-    {
-        tile3DComputeCycle = gcmMAX(ceilf((vx_float32)tile_y / interleave_mode), pipeLatency) * kernel_per_core;
-    }
-
-    tmp = y % tile_y;
-    if (tmp != 0)
-    {
-        accumCycle = ceilf((vx_float32)tmp / interleave_mode);
-
-        if (kx * ky == 1)
-        {
-            bottomTile3DComputeCycle = gcmMAX(ceilf((vx_float32)tmp / interleave_mode) * kernel_per_core, pipeLatency);
-        }
-        else if (accumCycle == 4)
-        {
-            bottomTile3DComputeCycle = 4 * (vx_float32)kernel_per_core;
-        }
-        else
-        {
-            bottomTile3DComputeCycle = gcmMAX(ceilf((vx_float32)tmp / interleave_mode), pipeLatency) * kernel_per_core;
-        }
-    }
-    else
-    {
-        bottomTile3DComputeCycle = 0;
-    }
-
-    if (fp16 == 1)
-    {
-        selected_xydp_x = float_xydp_x;
-        selected_xydp_y = float_xydp_y;
-        selected_zdp = float_zdp;
-    }
-    else
-    {
-         selected_xydp_x = xydp_x;
-         selected_xydp_y = xydp_y;
-         selected_zdp = zdp;
-    }
-
-    if (vector_prune > 0)
-    {
-        xydpVectorPruneAmount = selected_xydp_x * selected_xydp_y;
-        zdpVectorPruneAmount = 2 * selected_zdp;
-    }
-    else
-    {
-        xydpVectorPruneAmount = 1;
-        zdpVectorPruneAmount = 1;
-    }
-
-    if (kx != 1 || ky != 1)
-    {
-        dpKX = (vx_uint32)ceilf((vx_float32)kx / selected_xydp_x);
-        dpKY = (vx_uint32)ceilf((vx_float32)ky / selected_xydp_y);
-        dpKZ = kz;
-        dpAmount = selected_xydp_x * selected_xydp_y;
-        numOfPruneGroupsInDpn = (vx_uint32)ceilf((vx_float32)selected_xydp_x * selected_xydp_y / xydpVectorPruneAmount);
-        numOfDpnInImgBuf = (vx_uint32)ceilf((vx_float32)kx / selected_xydp_x) * (vx_uint32)ceilf((vx_float32)ky / selected_xydp_y);
-
-        if (vector_prune > 0)
-        {
-            non_zero_ratio = gcmMAX(non_zero_ratio, (vx_float64)((vx_float64)gcmMIN(selected_xydp_x, kx) * gcmMIN(selected_xydp_y, ky) / (pow(2, zrl_bits) - 1)));
-        }
-    }
-    else
-    {
-        dpKX = kx;
-        dpKY = ky;
-        if (selected_zdp > 1)
-        {
-            if (single_port_acc_buffer)
-            {
-                dpKZ = (vx_uint32)ceilf((vx_float32)kz / (2 * selected_zdp)) * 2;
-                dpAmount = 2 * selected_zdp;
-                numOfPruneGroupsInDpn = (vx_uint32)ceilf((vx_float32)2 * selected_zdp / zdpVectorPruneAmount);
-                numOfDpnInImgBuf = 2;
-            }
-            else
-            {
-                dpKZ = (vx_uint32)ceilf((vx_float32)kz / selected_zdp);
-                dpAmount = selected_zdp;
-                numOfPruneGroupsInDpn = (vx_uint32)ceilf((vx_float32)selected_zdp / zdpVectorPruneAmount);
-                numOfDpnInImgBuf = 1;
-            }
-        }
-        else
-        {
-            dpKZ = kz;
-            dpAmount = 1;
-            numOfPruneGroupsInDpn = 1;
-            numOfDpnInImgBuf = 1;
-        }
-        if (vector_prune > 0)
-        {
-            non_zero_ratio = gcmMAX(non_zero_ratio, (vx_float64)selected_zdp / ((vx_float64)pow(2, zrl_bits) - 1));
-        }
-    }
-    for (tmp = 0; tmp < numOfPruneGroupsInDpn; tmp++)
-    {
-        dpNonZeroRatio *= (1.0f - non_zero_ratio);
-    }
-    dpNonZeroRatio = 1.0f - dpNonZeroRatio;
-
-    if (single_port_acc_buffer)
-    {
-        /* find the probably of exactly 1 non-zero DPN operation in a 2D kernel or in a 2*ZDP region
-        the cycle count of this 1 non-zero DPN operation needs to be doubled because of single port accum buffer RW conflict*/
-        vx_float64 probExactlyOneNonZeroDpn, tmpRatio = 1.0f;
-        for (tmp = 0; tmp < (numOfDpnInImgBuf - 1); tmp++)
-        {
-            tmpRatio *= (1.0f - dpNonZeroRatio);
-        }
-        probExactlyOneNonZeroDpn = dpNonZeroRatio * tmpRatio;
-        dpNonZeroRatio = dpNonZeroRatio + probExactlyOneNonZeroDpn;
-    }
-
-    if (vip_v7_16bit && (fp16 == 0))
-    {
-        vx_bool int16OutSideConvCore = vx_false_e;
-        if (int16OutSideConvCore == 1)
-        {
-            dpKZ = (kz * 2);
-        }
-        else
-        {
-            dpKY = ky;
-            dpKZ = kz;
-        }
-    }
-
-    computeCycle = tile3DComputeCycle * (vx_int32)(y / tile_y) + bottomTile3DComputeCycle;
-    if (is_depth_wise)
-    {
-        computeCycle = computeCycle * dpKX * dpKY * z * ceilf((vx_float32)x / tile_x) / kernel_per_core;
-    }
-    else
-    {
-        computeCycle = computeCycle * dpKX * dpKY * dpKZ * z * dpNonZeroRatio * ceilf((vx_float32)x / tile_x) / kernel_per_core;
-    }
-    if (kx == 1 && ky == 1 && conv1x1_half_performance && selected_zdp == 1)
-    {
-        computeCycle = computeCycle * 2;
-    }
-    else if (!zxdp3_kernel_read_conflict_fix && single_port_acc_buffer && kx <=2 && ky <= 2)
-    {
-        computeCycle = (computeCycle * 12/10);
-    }
-    *refined_non_zero_ratio = non_zero_ratio;
-    return computeCycle;
-}
-
-static vx_float64 _calcNNCycleCountBandWidth(
-    vx_uint32  tile_x,
-    vx_uint32  tile_y,
-    vx_uint32  kernel_per_core,
-    vx_uint32  x,
-    vx_uint32  y,
-    vx_uint32  z,
-    vx_uint32  kx,
-    vx_uint32  ky,
-    vx_uint32  kz,
-    vx_uint32  inx,
-    vx_uint32  iny,
-    vx_uint32  pooling_stride,
-    vx_float64 non_zero_ratio,
-    vx_float64 coef_compress_ratio,
-    vx_float64 image_compress_ratio,
-    vx_uint32  cores,
-    vx_uint32  brick_mode,
-    vx_uint32  data_size,
-    vx_uint32  l2cache_sizeInKB,
-    vx_uint32  l2cache_width,
-    vx_uint32  xydp_x,
-    vx_uint32  xydp_y,
-    vx_uint32  zdp,
-    vx_uint32  float_xydp_x,
-    vx_uint32  float_xydp_y,
-    vx_uint32  float_zdp,
-    vx_uint32  usc_cache_size,
-    vx_uint32  nn_cmd_size,
-    vx_uint32  coef_decode_perf,
-    vx_uint32  vector_prune,
-    vx_uint32  image_partial_cache,
-    vx_uint32  data_read_from_sram,
-    vx_uint32  first_cmd,
-    vx_uint32  src_buf,
-    vx_uint32  dst_buf,
-    vx_uint32  kernel_buf,
-    vx_float32 axi_sram_read_bw_limit,
-    vx_float32 axi_sram_write_bw_limit,
-    vx_float32 axi_sram_total_bw_limit,
-    vx_float32 axi_bus_read_bw_limit,
-    vx_float32 axi_bus_write_bw_limit,
-    vx_float32 axi_bus_total_bw_limit,
-    vx_float32 internal_write_bw_limit,
-    vx_uint32  interleave_mode,
-    vx_uint32  lanes_per_conv,
-    vx_uint32  outstanding_transfer,
-    vx_uint32  zrl_bits,
-    vx_uint32  equivalent_vip_sram_width_in_byte,
-    vx_float32 ddr_latency,
-    vx_float32 total_latency,
-    vx_float32 ddr_read_bw_in_byte_per_cycle,
-    vx_float32 ddr_write_bw_in_byte_per_cycle,
-    vx_float32 ddr_total_bw_in_byte_per_cycle,
-    vx_bool    image_not_packed_in_sram,
-    vx_bool    vip_v7_16bit,
-    vx_bool    fp16,
-    vx_bool    kernel_head_not_cached_fix,
-    vx_bool    conv1x1_half_performance,
-    vx_bool    cache_line_mode_disabled,
-    vx_bool    per_3d_tile_bubble_fix,
-    vx_bool    zdp3_no_compress_fix,
-    vx_bool    async_copy_perf_fix,
-    vx_bool    zxdp3_kernel_read_conflict_fix,
-    vx_bool    accurate_tile_bw,
-    vx_bool    axi_sram_slowed_down_by_addr,
-    vx_bool    slow_nn_req_arbitration_fix,
-    vx_bool    single_port_acc_buffer,
-    vx_bool    small_batch_enable,
-    vx_bool    is_depth_wise,
-    vx_bool    is_nn_write_without_usc,
-    vx_uint32  in_image_stride,
-    vx_uint32  in_image_slice,
-    vx_uint32  out_image_stride,
-    vx_uint32  out_image_slice,
-    vx_bool    flush,
-    vx_uint32  conv_out_fifo_depth,
-    vx_float64* ddr_kernel_read_bandwidth,
-    vx_float64* ddr_in_image_read_bandwidth,
-    vx_float64* ddr_read_bandwidth,
-    vx_float64* ddr_write_bandwidth,
-    vx_float64* axi_read_bandwidth,
-    vx_float64* axi_write_bandwidth,
-    vx_bool *  is_compute_bottle_neck
-    )
-{
-    vx_uint32 kernelFromDDR, kernelFromAXISram, sizeForAXISram;
-    vx_float64 cacheSizeInPixel, kernelIdealCache, imageIdealCache;
-    vx_float64 ddrReadBandWidth, vipSramReadBandWidth, axiSramReadBandWidth, axiBusReadBandWidth;
-    vx_float64 ddrWriteBandWidth, axiSramWriteBandWidth, vipSramWriteBandWidth, axiBusWriteBandWidth;
-    vx_float64 ddrTotalBandWidth, axiSramTotalBandWidth, axiBusTotalBandWidth;
-    vx_float64 ddrReadCycleCount, axiSramReadCycleCount, axiBusReadCycleCount;
-    vx_float64 ddrWriteCycleCount, axiSramWriteCycleCount, axiBusWriteCycleCount, vipSramWriteCycleCount;
-    vx_float64 ddrTotalCycleCount, axiSramTotalCycleCount, axiBusTotalCycleCount;
-    vx_float64 computeCycleCount, vipSramReadCycleCount, kernelDecodeBWCycleCount;
-    vx_float64 nnCycleCount, internalWriteCycleCount;
-    vx_float32 adjustedAXISraReadBandWidthLimit = axi_sram_read_bw_limit;
-    vx_float64 imageRepeatedSingleRead;
-    vx_float64 arbCycleCount, xBarCycleCount = 0;
-    vx_uint32 axiAccUnitSizeInByte = AXI_BURST_SIZE;
-    vx_uint32 vipSramAccUnitSizeInByte = l2cache_width * 2; /* x2 because we are using half freq SRAM */
-    vx_uint32 vipSramInImageStride, vipSramInImageSlice;
-    vx_float64 refined_non_zero_ratio;
-    vx_float64 ddrKernelReadBW = 0, ddrInImageReadBW = 0;
-    if (src_buf != SW_TILING_FROM_VIP_SRAM)
-    {
-        vipSramInImageStride = gcmMIN(tile_x + kx - 1, in_image_stride);
-        vipSramInImageSlice = gcmMIN((vipSramInImageStride * (tile_y + ky - 1)), in_image_slice);
-    }
-    else
-    {
-        vipSramInImageStride = in_image_stride;
-        vipSramInImageSlice = in_image_slice;
-    }
-
-    if (zdp > 1 && kx == 1 && ky == 1 && data_size == 8 && !zdp3_no_compress_fix)
-    {
-        gcmASSERT(non_zero_ratio == 1);
-        coef_compress_ratio = gcmMAX(1, coef_compress_ratio);
-        non_zero_ratio = 1;
-    }
-
-    non_zero_ratio = gcmMAX(non_zero_ratio, (vx_float64)1/((vx_float64)pow(2, zrl_bits) - 1)); /* for limitation of zrl_bit_width <= 5 */
-
-    computeCycleCount = _calcComputeCycleCount(tile_x, tile_y, kernel_per_core,
-                                               kx, ky, kz, x, y, z, non_zero_ratio,
-                                               xydp_x, xydp_y, zdp,
-                                               float_xydp_x, float_xydp_y, float_zdp,
-                                               data_size, vector_prune,
-                                               interleave_mode, lanes_per_conv, coef_decode_perf,
-                                               zrl_bits, is_depth_wise,
-                                               vip_v7_16bit, fp16, conv1x1_half_performance, zxdp3_kernel_read_conflict_fix, single_port_acc_buffer, &refined_non_zero_ratio)
-                                               / cores;
-
-    vipSramReadBandWidth = _calcKernelReadBandWidth(tile_x, tile_y, kernel_per_core,
-        kx, ky, kz, x, y, z, x, y,
-        cores, brick_mode, data_size,
-        coef_compress_ratio, image_compress_ratio, 0, kernel_head_not_cached_fix, is_depth_wise)
-        + _calcImageReadBandWidth(tile_x, tile_y, kernel_per_core,
-        kx, ky, kz, x, y, z, x, y,
-        cores, brick_mode, data_size,
-        coef_compress_ratio, 1, 0, image_not_packed_in_sram, cache_line_mode_disabled, async_copy_perf_fix, accurate_tile_bw, is_depth_wise, equivalent_vip_sram_width_in_byte,
-        vipSramInImageStride, vipSramInImageSlice, zdp, vipSramAccUnitSizeInByte);
-    vipSramReadCycleCount = vipSramReadBandWidth / l2cache_width;
-
-    ddrReadBandWidth = (vx_float32)nn_cmd_size;
-    axiSramReadBandWidth = 0;
-    kernelFromDDR = kernel_buf == SW_TILING_FROM_DDR || (first_cmd && ((kernel_buf == SW_TILING_FROM_AXI_SRAM) || (kernel_buf == SW_TILING_FROM_VIP_SRAM)));
-    kernelFromAXISram = (!first_cmd && (kernel_buf == SW_TILING_FROM_AXI_SRAM)) || (kernel_buf == SW_TILING_PERM_AXI_SRAM);
-
-    cacheSizeInPixel = (vx_float32)l2cache_sizeInKB * 1024 / (data_size / 8);
-
-    if (kernelFromDDR && src_buf == SW_TILING_FROM_DDR)
-    {
-        ddrReadBandWidth = _calcReadBandWidth(tile_x, tile_y, kernel_per_core,
-            kx, ky, kz, x, y, z, inx, iny,
-            cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio,
-            l2cache_sizeInKB, (vx_bool)image_partial_cache, nn_cmd_size, image_not_packed_in_sram,
-            kernel_head_not_cached_fix, cache_line_mode_disabled,
-            async_copy_perf_fix, accurate_tile_bw, is_depth_wise, in_image_stride, in_image_slice, zdp, axiAccUnitSizeInByte,
-            equivalent_vip_sram_width_in_byte, &ddrKernelReadBW, &ddrInImageReadBW);
-    }
-    else if (kernelFromDDR)
-    {
-        ddrKernelReadBW = _calcKernelReadBandWidth(tile_x, tile_y, kernel_per_core,
-            kx, ky, kz, x, y, z, x, y,
-            cores, brick_mode, data_size, coef_compress_ratio,
-            image_compress_ratio, cacheSizeInPixel, kernel_head_not_cached_fix, is_depth_wise);
-        ddrReadBandWidth = nn_cmd_size + ddrKernelReadBW;
-        ddrInImageReadBW = 0;
-        if (src_buf == SW_TILING_FROM_AXI_SRAM)
-        {
-            vx_uint32 zPerCore = (vx_uint32)ceilf((vx_float32)z / cores);
-            vx_float64 kernelNonIdealCache, kernelStorage;
-            if (is_depth_wise)
-            {
-                kernelIdealCache = _calcKernel4DSingleReadBW(kx, ky, 1, z, 1);
-                kernelNonIdealCache = ceilf((vx_float32)_calcKernel4DSingleReadBW(kx, ky, 1, zPerCore, 1) / AXI_BURST_SIZE) * AXI_BURST_SIZE * cores;
-            }
-            else
-            {
-                kernelIdealCache = _calcKernel4DSingleReadBW(kx, ky, kz, z, coef_compress_ratio);
-                kernelNonIdealCache = ceilf((vx_float32)_calcKernel4DSingleReadBW(kx, ky, kz, zPerCore, coef_compress_ratio) / AXI_BURST_SIZE) * AXI_BURST_SIZE * cores;
-            }
-            kernelStorage = kernel_head_not_cached_fix ? kernelIdealCache : kernelNonIdealCache;
-
-            cacheSizeInPixel = (cacheSizeInPixel - gcmMIN(kernelStorage, cacheSizeInPixel)) * data_read_from_sram;
-            axiSramReadBandWidth = _calcImageReadBandWidth(tile_x, tile_y, kernel_per_core, kx, ky, kz, x, y, z, inx, iny,
-                cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel, image_not_packed_in_sram,
-                cache_line_mode_disabled, async_copy_perf_fix, accurate_tile_bw, is_depth_wise, equivalent_vip_sram_width_in_byte, in_image_stride, in_image_slice, zdp, axiAccUnitSizeInByte);
-            if (axi_sram_slowed_down_by_addr && (first_cmd || (cacheSizeInPixel != 0)))
-            {
-                vx_uint32 maxOutstandingCycle = outstanding_transfer * 4;
-                if (total_latency > maxOutstandingCycle)
-                {
-                    vx_float32 bwLimitedByLatency = (vx_float32)(16.0 * maxOutstandingCycle) / total_latency;
-                    adjustedAXISraReadBandWidthLimit = gcmMIN(axi_sram_read_bw_limit, bwLimitedByLatency);
-                }
-            }
-        }
-    }
-    else if (src_buf == SW_TILING_FROM_DDR)
-    {
-        ddrKernelReadBW = 0;
-        ddrInImageReadBW = _calcImageReadBandWidth(tile_x, tile_y, kernel_per_core, kx, ky, kz, x, y, z, inx, iny,
-            cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel, image_not_packed_in_sram,
-            cache_line_mode_disabled, async_copy_perf_fix, accurate_tile_bw, is_depth_wise, equivalent_vip_sram_width_in_byte, in_image_stride, in_image_slice, zdp, axiAccUnitSizeInByte);
-        ddrReadBandWidth = nn_cmd_size + ddrInImageReadBW;
-        if (kernelFromAXISram)
-        {
-            vx_uint32 intile_x = (tile_x + kx - 1);
-            vx_uint32 intile_y = (tile_y + ky - 1);
-            intile_x = gcmMIN(intile_x, inx);
-            intile_y = gcmMIN(intile_y, iny);
-            if (image_not_packed_in_sram)
-            {
-                imageIdealCache = ceilf(ceilf((vx_float32)intile_x * intile_y / 16) * 16 * kz / (equivalent_vip_sram_width_in_byte * 2))
-                                  * (equivalent_vip_sram_width_in_byte * 2) * data_size / 8;
-            }
-            else
-            {
-                imageIdealCache = (vx_float32)intile_x * intile_y * kz * data_size / 8;
-            }
-            cacheSizeInPixel = (cacheSizeInPixel - gcmMIN(imageIdealCache, cacheSizeInPixel)) * data_read_from_sram;
-            axiSramReadBandWidth = _calcKernelReadBandWidth(tile_x, tile_y, kernel_per_core, kx, ky, kz, inx, iny, z, x, y,
-                cores, brick_mode, data_size, coef_compress_ratio,
-                image_compress_ratio, cacheSizeInPixel, kernel_head_not_cached_fix, is_depth_wise);
-            if (axi_sram_slowed_down_by_addr)
-            {
-                vx_uint32 maxOutstandingCycle = outstanding_transfer * 4;
-                if (total_latency > maxOutstandingCycle)
-                {
-                    vx_float32 bwLimitedByLatency = (vx_float32)(16.0 * maxOutstandingCycle) / total_latency;
-                    adjustedAXISraReadBandWidthLimit = gcmMIN(axi_sram_read_bw_limit, bwLimitedByLatency);
-                }
-            }
-        }
-    }
-    else if (kernelFromAXISram && src_buf == SW_TILING_FROM_AXI_SRAM)
-    {
-        sizeForAXISram = data_read_from_sram * l2cache_sizeInKB;
-        axiSramReadBandWidth = _calcReadBandWidth(tile_x, tile_y, kernel_per_core,
-            kx, ky, kz, x, y, z, inx, iny,
-            cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio, sizeForAXISram,
-            (vx_bool)image_partial_cache, nn_cmd_size, image_not_packed_in_sram, kernel_head_not_cached_fix, cache_line_mode_disabled,
-            async_copy_perf_fix, accurate_tile_bw, is_depth_wise, in_image_stride, in_image_slice, zdp, axiAccUnitSizeInByte, equivalent_vip_sram_width_in_byte, NULL, NULL);
-    }
-    else if (kernelFromAXISram)
-    {
-        cacheSizeInPixel = cacheSizeInPixel * data_read_from_sram;
-        axiSramReadBandWidth = _calcKernelReadBandWidth(tile_x, tile_y, kernel_per_core,
-            kx, ky, kz, x, y, z, inx, iny,
-            cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel,
-            kernel_head_not_cached_fix, is_depth_wise);
-    }
-    else if (src_buf == SW_TILING_FROM_AXI_SRAM)
-    {
-        cacheSizeInPixel = cacheSizeInPixel * data_read_from_sram;
-        axiSramReadBandWidth = _calcImageReadBandWidth(tile_x, tile_y, kernel_per_core, kx, ky, kz, x, y, z, inx, iny,
-            cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel, image_not_packed_in_sram,
-            cache_line_mode_disabled, async_copy_perf_fix, accurate_tile_bw, is_depth_wise, equivalent_vip_sram_width_in_byte, in_image_stride, in_image_slice, zdp, axiAccUnitSizeInByte);
-    }
-    axiBusReadBandWidth = ddrReadBandWidth + axiSramReadBandWidth;
-
-    ddrReadCycleCount = ddrReadBandWidth / ddr_read_bw_in_byte_per_cycle;
-    axiSramReadCycleCount = axiSramReadBandWidth / adjustedAXISraReadBandWidthLimit;
-    axiBusReadCycleCount = axiBusReadBandWidth / axi_bus_read_bw_limit;
-
-    ddrWriteBandWidth = 0;
-    axiSramWriteBandWidth = 0;
-    vipSramWriteBandWidth = ddrReadBandWidth;
-    if (dst_buf == SW_TILING_FROM_DDR)
-    {
-        ddrWriteBandWidth = _calcWriteBandWidth(tile_x, tile_y, x, y, z, data_size, image_compress_ratio, usc_cache_size, pooling_stride, out_image_stride, out_image_slice, is_nn_write_without_usc);
-    }
-    else if (dst_buf == SW_TILING_FROM_AXI_SRAM)
-    {
-        axiSramWriteBandWidth = _calcWriteBandWidth(tile_x, tile_y, x, y, z, data_size, image_compress_ratio, usc_cache_size, pooling_stride, out_image_stride, out_image_slice, is_nn_write_without_usc);
-    }
-    else
-    {
-        vipSramWriteBandWidth = vipSramWriteBandWidth + _calcWriteBandWidth(tile_x, tile_y, x, y, z, data_size, 1, usc_cache_size, pooling_stride, out_image_stride, out_image_slice, is_nn_write_without_usc);
-    }
-    axiBusWriteBandWidth = ddrWriteBandWidth + axiSramWriteBandWidth;
-
-    ddrWriteCycleCount = ddrWriteBandWidth / ddr_write_bw_in_byte_per_cycle;
-    axiSramWriteCycleCount = axiSramWriteBandWidth / axi_sram_write_bw_limit;
-    axiBusWriteCycleCount = axiBusWriteBandWidth / axi_bus_write_bw_limit;
-    vipSramWriteCycleCount = vipSramWriteBandWidth / l2cache_width;
-    {
-        vx_bool isV8 = (xydp_x == 0 && xydp_y == 0) ? vx_true_e : vx_false_e;
-        vx_float32 tmp_internal_write_bw_limit = internal_write_bw_limit;
-        vx_uint32 zdpLoopCount = 3;
-        if (isV8) /*for v8*/
-        {
-            vx_float32 slowInternalWriteBWLimit;
-            vx_float64 slowInternalWriteCycleCount, slowCompCycleCount;
-            if (data_size == 16 || ((kx * ky * kz) > 512))
-            {
-                tmp_internal_write_bw_limit = tmp_internal_write_bw_limit / 2;
-            }
-
-            slowInternalWriteBWLimit = gcmMIN(internal_write_bw_limit, (vx_float32)lanes_per_conv / zdpLoopCount);
-            slowInternalWriteCycleCount = ceilf((vx_float32)tile_x * tile_y / slowInternalWriteBWLimit) * ceilf((vx_float32)x / tile_x) * ceilf((vx_float32)y / tile_y) * z * (data_size * data_size) / (8 * 8);
-            slowCompCycleCount = computeCycleCount + ceilf((vx_float32)tile_x * tile_y / lanes_per_conv) * ceilf((vx_float32)x / tile_x) * ceilf((vx_float32)y / tile_y) * ceilf((vx_float32)z / cores) * (data_size * data_size) / (8 * 8);
-            if (slowInternalWriteCycleCount > slowCompCycleCount)
-            {
-                computeCycleCount = slowCompCycleCount;
-                internalWriteCycleCount = ceilf((vx_float32)tile_x * tile_y / tmp_internal_write_bw_limit) * ceilf((vx_float32)x / tile_x) * ceilf((vx_float32)y / tile_y) * z * (data_size * data_size) / (8 * 8);
-            }
-            else
-            {
-                internalWriteCycleCount = slowInternalWriteCycleCount;
-            }
-        }
-        else
-        {
-            internalWriteCycleCount = ceilf(1.0f * tile_x * interleave_mode / tmp_internal_write_bw_limit) * ceilf(1.0f * x / tile_x) * ceilf(1.0f * tile_y / interleave_mode) * ceilf(1.0f * y / tile_y) * z * data_size / 8;
-        }
-    }
-    ddrTotalBandWidth = ddrReadBandWidth + ddrWriteBandWidth;
-    axiSramTotalBandWidth = axiSramReadBandWidth + axiSramWriteBandWidth;
-    axiBusTotalBandWidth = axiBusReadBandWidth + axiBusWriteBandWidth;
-
-    ddrTotalCycleCount = ddrTotalBandWidth / ddr_total_bw_in_byte_per_cycle;
-    axiSramTotalCycleCount = axiSramTotalBandWidth / axi_sram_total_bw_limit;
-    axiBusTotalCycleCount = axiBusTotalBandWidth / axi_bus_total_bw_limit;
-
-    imageRepeatedSingleRead = _calcTile3DImageSingleReadRepeated(z, kernel_per_core, cores, is_depth_wise);
-    kernelDecodeBWCycleCount = refined_non_zero_ratio * kx * ky * kz * z * _calcKernel4DSingleReadRepeated(tile_x, tile_y, x, y) / (cores * coef_decode_perf);
-
-    if ((src_buf == SW_TILING_FROM_DDR) || (src_buf == SW_TILING_FROM_AXI_SRAM))
-    {
-        if (!slow_nn_req_arbitration_fix)
-        {
-            if ((zdp > 1) && (kx == 1) && (ky == 1))
-            {
-                arbCycleCount = imageRepeatedSingleRead * ceilf((vx_float32)kz / (2 * zdp)) * ceilf((vx_float32)x / tile_x) * y * (4 + 6);
-            }
-            else
-            {
-                arbCycleCount = imageRepeatedSingleRead * kz * ceilf((vx_float32)x / tile_x) * ceilf((vx_float32)y / tile_y) * (4 + 4);
-            }
-        }
-        else
-        {
-            if ((zdp > 1) && (kx == 1) && (ky == 1))
-            {
-                arbCycleCount = imageRepeatedSingleRead * ceilf((vx_float32)kz / (2 * zdp)) * ceilf((vx_float32)x / tile_x) * y * 6;
-            }
-            else
-            {
-                arbCycleCount = imageRepeatedSingleRead * kz * ceilf((vx_float32)x / tile_x) * ceilf((vx_float32)y / tile_y) * 4;
-            }
-        }
-    }
-    else
-    {
-        arbCycleCount = 0;
-    }
-
-
-    if (xydp_x == 0 || xydp_y == 0)
-    {
-        vx_float64 regTile3DXBarCycleCount, bottomTile3DXBarCycleCount;
-        vx_float64 regTile2DXBarCycleCount = gcmMAX(ceilf((vx_float32)tile_y * tile_x / lanes_per_conv), ceilf((vx_float32)tile_y / 8));
-        vx_float64 bottomTile2DXBarCycleCount = gcmMAX(ceilf((1.0f * (y % tile_y) * tile_x) / lanes_per_conv), ceilf(1.0f * (y % tile_y) / 8));
-        if (is_depth_wise)
-        {
-            regTile3DXBarCycleCount = regTile2DXBarCycleCount * ceilf((vx_float32)kx * ky / 3) * z;
-            bottomTile3DXBarCycleCount = bottomTile2DXBarCycleCount * ceilf((vx_float32)kx * ky / 3) * z;
-        }
-        else
-        {
-            regTile3DXBarCycleCount = regTile2DXBarCycleCount * ceilf((vx_float32)kx * ky * kz / 3) * ceilf((vx_float32)z / (kernel_per_core * cores));
-            bottomTile3DXBarCycleCount = bottomTile2DXBarCycleCount * ceilf((vx_float32)kx * ky * kz / 3) * ceilf((vx_float32)z / (kernel_per_core * cores));
-        }
-        xBarCycleCount = regTile3DXBarCycleCount * (vx_uint32)(1.0f * y / tile_y) + bottomTile3DXBarCycleCount;
-        xBarCycleCount = xBarCycleCount * ceilf((vx_float32)x / tile_x);
-    }
-
-    nnCycleCount = gcmMAX(gcmMAX(gcmMAX(computeCycleCount, kernelDecodeBWCycleCount), arbCycleCount), xBarCycleCount);
-    nnCycleCount = gcmMAX(gcmMAX(gcmMAX(gcmMAX(nnCycleCount, ddrReadCycleCount), axiSramReadCycleCount), axiBusReadCycleCount), vipSramReadCycleCount);
-    nnCycleCount = gcmMAX(gcmMAX(gcmMAX(gcmMAX(nnCycleCount, ddrWriteCycleCount), axiSramWriteCycleCount), axiBusWriteCycleCount), vipSramWriteCycleCount);
-    nnCycleCount = gcmMAX(gcmMAX(gcmMAX(nnCycleCount, ddrTotalCycleCount), axiSramTotalCycleCount), axiBusTotalCycleCount);
-    nnCycleCount = gcmMAX(nnCycleCount, internalWriteCycleCount);
-
-    if (is_compute_bottle_neck)
-    {
-        *is_compute_bottle_neck = (nnCycleCount == computeCycleCount) ? vx_true_e : vx_false_e;
-    }
-
-    if (flush || !small_batch_enable)/*small_batch_en == 0 || flush_and_wait*/
-    {
-        nnCycleCount += gcmMIN(ceilf((vx_float32)tile_x / 8) * interleave_mode * conv_out_fifo_depth,
-                               gcmMIN(z, cores * kernel_per_core) * (ceilf((vx_float32)tile_x / 8) - 1) * tile_y); /*Emptying Conv Out FIFO*/
-        nnCycleCount += (1791 - 1407) + (cores - 1) * (560 - 557) + 1407 + ddr_latency;
-    }
-
-    {
-        /*Each 3D Tile needs to wait if CONV_OUT_FIFO is not deep enough*/
-        vx_float32 tileRow = gcmMIN(z, cores * kernel_per_core) * (vx_float32)tile_y / interleave_mode;
-        vx_float32 tileRowSlow = tileRow - conv_out_fifo_depth * (1 + (vx_float32)8 / lanes_per_conv);
-        vx_float32 tileOverhead = 0;
-        vx_float64 imageRepeatedSingleRead = _calcTile3DImageSingleReadRepeated(z, kernel_per_core, cores, is_depth_wise);
-        if (tileRowSlow > 0)
-        {
-            tileOverhead = tileRowSlow * ceilf((vx_float32)tile_x / 8) * interleave_mode;
-        }
-
-        if (!per_3d_tile_bubble_fix && imageRepeatedSingleRead != 1)
-        {
-            tileOverhead += ddr_latency + 150 + (cores - 1) * ceilf((vx_float32)tile_y / interleave_mode) * kernel_per_core;
-        }
-
-        nnCycleCount += tileOverhead * ceilf((vx_float32)y / tile_y) * ceilf((vx_float32)x / tile_x);
-    }
-    *ddr_kernel_read_bandwidth = ddrKernelReadBW;
-    *ddr_in_image_read_bandwidth = ddrInImageReadBW;
-    *ddr_read_bandwidth  = ddrReadBandWidth;
-    *ddr_write_bandwidth = ddrWriteBandWidth;
-    *axi_read_bandwidth = axiSramReadBandWidth;
-    *axi_write_bandwidth = axiSramWriteBandWidth;
-    return nnCycleCount;
-}
-
-static vx_float64 _calcTPComputeCycleCount(vx_enum type, vx_uint32 x, vx_uint32 y, vx_uint32 z, vx_uint32 kz, vx_float64 coef_nonzero_ratio, vx_uint32 cores, vx_float64 image_nonzero_ratio)
-{
-    if (type == VXNNE_OPERATOR_NORMALIZATION || type == VXNNE_OPERATOR_ACTIVATION)
-    {
-        return (vx_float64)x * y * z / cores + 512;
-    }
-    else if (type == VXNNE_OPERATOR_FULLYCONNECTED)
-    {
-        return (vx_float64)x * y * z * kz * coef_nonzero_ratio * image_nonzero_ratio / cores;
-    }
-    else
-    {
-        return (vx_float64)x * y * z / cores;
-    }
-}
-
-static vx_float64 _calcTPCycleCountCore(vx_enum type, vx_uint32 x, vx_uint32 y, vx_uint32 z, vx_uint32 kz,
-                           vx_float64 coef_nonzero_ratio, vx_float64 coef_compress_ratio,
-                           vx_float64 image_nonzero_ratio, vx_uint32 cores, vx_uint32 tp_cmd_size,
-                           vx_uint32 pooling_stride,
-                           vx_float32 axi_sram_read_bw_limit, vx_float32 axi_sram_write_bw_limit, vx_float32 axi_sram_total_bw_limit,
-                           vx_float32 axi_bus_read_bw_limit, vx_float32 axi_bus_write_bw_limit, vx_float32 axi_bus_total_bw_limit,
-                           vx_uint32 l2cache_width,
-                           vx_uint32 data_size,
-                           vx_uint32 sw_tiling, vx_uint32 src_buf, vx_uint32 dst_buf, vx_uint32 kernel_buf,
-                           vx_uint32 outstanding_transfer,
-                           vx_float32 ddr_latency,
-                           vx_float32 total_latency,
-                           vx_float32 ddr_read_bw_in_byte_per_cycle,
-                           vx_float32 ddr_write_bw_in_byte_per_cycle,
-                           vx_float32 ddr_total_bw_in_byte_per_cycle,
-                           vx_uint32 usc_cache_controllers,
-                           vx_bool tp_reorder_fix,
-                           vx_bool flush,
-                           vx_bool small_batch_enable,
-                           vx_bool axi_sram_slowed_down_by_ddr,
-                           vx_float64 *ddr_kernel_read_bw, vx_float64 *ddr_in_image_read_bw,
-                           vx_float64 *ddr_read_bw, vx_float64 *ddr_write_bw,
-                           vx_float64 *axi_sram_read_bw, vx_float64 *axi_sram_write_bw
-                           )
-{
-    vx_float64 ddrReadBandWidth = (vx_float64)tp_cmd_size;
-    vx_float64 ddrWriteBandWidth = 0;
-    vx_float64 ddrTotalBandWidth = 0;
-    vx_float64 ddrReadCycleCount = 0;
-    vx_float64 ddrWriteCycleCount = 0;
-    vx_float64 ddrTotalCycleCount = 0;
-    vx_float64 axiSRAMReadBandWidth = 0;
-    vx_float64 axiSRAMWriteBandWidth = 0;
-    vx_float64 axiSRAMReadCycleCount = 0;
-    vx_float64 axiSRAMWriteCycleCount = 0;
-    vx_float64 axiSRAMTotalCycleCount = 0;
-    vx_float64 vipSRAMReadBandWidth = 0;
-    vx_float64 vipSRAMWriteBandWidth = 0;
-    vx_float64 vipSRAMReadCycleCount = 0;
-    vx_float64 vipSRAMWriteCycleCount = 0;
-    vx_float64 axiBusReadBandWidth = 0;
-    vx_float64 axiBusWriteBandWidth = 0;
-    vx_float64 axiBusReadCycleCount = 0;
-    vx_float64 axiBusWriteCycleCount = 0;
-    vx_float64 axiBusTotalCycleCount = 0;
-    vx_float64 readBW, writeBW;
-    vx_float64 compCycleCount = 0, tpCycleCountCore = 0, cacheControllerCycleCount = 0;
-    vx_float64 adjustedAXISraReadBandWidthLimit = (vx_float64)axi_sram_read_bw_limit;
-    vx_float64 ddrKernelReadBW = 0, ddrInImageReadBW = 0;
-    vx_uint32 inz = z;
-    if (type == VXNNE_OPERATOR_FULLYCONNECTED)
-    {
-        ddrKernelReadBW = x * y * z * kz * coef_compress_ratio * image_nonzero_ratio * data_size / 8; /*' always store kernel in DDR*/
-        ddrReadBandWidth = ddrReadBandWidth + ddrKernelReadBW;
-        inz = kz;
-    }
-
-    readBW = (vx_float64)(x * y * inz * data_size / 8);
-    writeBW = (vx_float64)(x * y * z / (pooling_stride * pooling_stride));
-
-    if (src_buf == SW_TILING_FROM_DDR)
-    {
-        ddrReadBandWidth = ddrReadBandWidth + readBW;
-        ddrInImageReadBW = readBW;
-    }
-    else if (src_buf == SW_TILING_FROM_AXI_SRAM)
-    {
-        axiSRAMReadBandWidth = axiSRAMReadBandWidth + readBW;
-        if ((type == VXNNE_OPERATOR_FULLYCONNECTED) && (kernel_buf == SW_TILING_FROM_DDR))
-        {
-            if (axi_sram_slowed_down_by_ddr)
-            {
-                vx_float64 maxOutstandingCycle = (vx_float64)outstanding_transfer * 4;
-                if (total_latency > maxOutstandingCycle)
-                {
-                    vx_float64 bwLimitedByLatency = (16 * maxOutstandingCycle) / total_latency;
-                    adjustedAXISraReadBandWidthLimit = gcmMIN(adjustedAXISraReadBandWidthLimit, bwLimitedByLatency);
-                }
-            }
-        }
-    }
-    else if (src_buf == SW_TILING_FROM_VIP_SRAM)
-    {
-        vipSRAMReadBandWidth = vipSRAMReadBandWidth + readBW;
-    }
-
-    if (dst_buf == SW_TILING_FROM_DDR)
-    {
-        ddrWriteBandWidth = writeBW;
-    }
-    else if (dst_buf == SW_TILING_FROM_AXI_SRAM)
-    {
-        axiSRAMWriteBandWidth = writeBW;
-    }
-    else if (dst_buf == SW_TILING_FROM_VIP_SRAM)
-    {
-        vipSRAMWriteBandWidth = writeBW;
-    }
-
-
-    axiBusReadBandWidth = ddrReadBandWidth + axiSRAMReadBandWidth;
-    axiBusWriteBandWidth = ddrWriteBandWidth + axiSRAMWriteBandWidth;
-
-    ddrTotalBandWidth = ddrReadBandWidth + ddrWriteBandWidth;
-
-    ddrReadCycleCount = ddrReadBandWidth / ddr_read_bw_in_byte_per_cycle;
-    ddrWriteCycleCount = ddrWriteBandWidth / ddr_write_bw_in_byte_per_cycle;
-    ddrTotalCycleCount = ddrTotalBandWidth / ddr_total_bw_in_byte_per_cycle;
-
-    axiSRAMReadCycleCount = axiSRAMReadBandWidth / adjustedAXISraReadBandWidthLimit;
-    axiSRAMWriteCycleCount = axiSRAMWriteBandWidth / axi_sram_write_bw_limit;
-    axiSRAMTotalCycleCount = (axiSRAMReadBandWidth + axiSRAMWriteBandWidth) / axi_sram_total_bw_limit;
-
-    axiBusReadCycleCount = axiBusReadBandWidth / axi_bus_read_bw_limit;
-    axiBusWriteCycleCount = axiBusWriteBandWidth / axi_bus_write_bw_limit;
-    axiBusTotalCycleCount = (axiBusReadBandWidth + axiSRAMWriteBandWidth) / axi_bus_total_bw_limit;
-
-    vipSRAMReadCycleCount = vipSRAMReadBandWidth / l2cache_width;
-    vipSRAMWriteCycleCount = vipSRAMWriteBandWidth / 16;
-
-    cacheControllerCycleCount = readBW / (4 * usc_cache_controllers); /* assume we do 4 byte per cache command */
-    if (tp_reorder_fix ||
-        ((type != VXNNE_OPERATOR_TENSOR_TRANS) && (type != VXNNE_OPERATOR_ROIPOOL)))
-    {
-        cacheControllerCycleCount += writeBW / (4 * usc_cache_controllers); /* assume we do 4 byte per cache command */
-    }
-    else
-    {
-        cacheControllerCycleCount += writeBW / usc_cache_controllers; /* assume we do 1 byte per cache command */
-    }
-
-    compCycleCount = _calcTPComputeCycleCount(type, x, y, z, kz, coef_nonzero_ratio, cores, image_nonzero_ratio);
-    tpCycleCountCore = gcmMAX(ddrTotalCycleCount, gcmMAX(ddrWriteCycleCount, gcmMAX(ddrReadCycleCount, compCycleCount)));
-    tpCycleCountCore = gcmMAX(axiSRAMTotalCycleCount, gcmMAX(axiSRAMWriteCycleCount, gcmMAX(axiSRAMReadCycleCount, tpCycleCountCore)));
-    tpCycleCountCore = gcmMAX(axiBusTotalCycleCount, gcmMAX(axiBusWriteCycleCount, gcmMAX(axiBusReadCycleCount, tpCycleCountCore)));
-    tpCycleCountCore = gcmMAX(vipSRAMWriteCycleCount, gcmMAX(vipSRAMReadCycleCount, tpCycleCountCore));
-    tpCycleCountCore = gcmMAX(cacheControllerCycleCount, tpCycleCountCore);
-
-    if (tp_reorder_fix)
-    {
-        if (type == VXNNE_OPERATOR_TENSOR_TRANS || type == VXNNE_OPERATOR_ROIPOOL)
-        {
-            tpCycleCountCore += 256; /*half of 512 in average*/
-        }
-    }
-
-    if (flush || !small_batch_enable)/*small_batch_en = 0 || (flush_and_wait == 1) */
-    {
-        tpCycleCountCore += 1000 + 1407 + ddr_latency;
-    }
-    *ddr_kernel_read_bw = ddrKernelReadBW;
-    *ddr_in_image_read_bw = ddrInImageReadBW;
-    *ddr_read_bw = ddrReadBandWidth;
-    *ddr_write_bw = ddrWriteBandWidth;
-    *axi_sram_read_bw = axiSRAMReadBandWidth;
-    *axi_sram_write_bw = axiSRAMWriteBandWidth;
-    return tpCycleCountCore;
-}
-
-
 void initUndefinedHardwareConfig(vx_context context)
 {
+#ifdef USE_LIB_NN_ARCH_PERF
+    char *useLibNNArchPerf = VX_NULL;
+#endif
 #define USC_CACHE_SIZE                         8
 #define CACHED_DATA_READ_FROM_SRAM             1
 #define DDR_READ_BANDWIDTH_LIMIT               3.8f
@@ -2810,6 +987,7 @@ void initUndefinedHardwareConfig(vx_context context)
 #define MAX_SOC_OUT_STANDING_NUMBER            32
 #define NN_WRITE_WITHOUT_USC                   0
 
+    context->nnConfig.unifiedFeature.coefDeltaCordOverFlowZRL8BitFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_COEF_DELTA_CORD_OVERFLOW_ZRL_8BIT_FIX) ? 1 : 0;
     context->nnConfig.unifiedFeature.imageNotPackedInSram = !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_IMAGE_NOT_PACKED_IN_SRAM_FIX) ? 1 : 0;
     context->nnConfig.unifiedFeature.nnUSCCacheSize = USC_CACHE_SIZE;
     context->nnConfig.unifiedFeature.nnCmdSizeInBytes = NNE_COMMAND_SIZE;
@@ -2871,6 +1049,7 @@ void initUndefinedHardwareConfig(vx_context context)
                                                           && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_ZDP3_NO_COMPRESS_FIX)) ? 1 : 0;
     context->nnConfig.unifiedFeature.asyncCopyPerfFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_ASYNC_COPY_PERF_FIX) ? 1 : 0;
     context->nnConfig.unifiedFeature.zxdp3KernelReadConflictFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_ZXDP3_KERNEL_READ_CONFLICT_FIX) ? 1 : 0;
+    context->nnConfig.unifiedFeature.xyOffsetLimitationFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_XY_OFFSET_LIMITATION_FIX) ? 1 : 0;
     context->nnConfig.unifiedFeature.accurateTileBW = ACCURATE_TILE_BW;
     context->nnConfig.unifiedFeature.lanesPerConv = LANES_PER_CORE;
     context->nnConfig.unifiedFeature.maxTileSize = MAX_TILE_XSIZE;
@@ -2945,10 +1124,10 @@ void initUndefinedHardwareConfig(vx_context context)
             context->nnConfig.customizedFeature.axiBusTotalBWLimit = AXI_BUS_TOTAL_BANDWIDTH_LIMIT;
     }
 
-    if (context->options.vipSRAMSizeInKB != VX_INVALID_VALUE)
-        context->nnConfig.customizedFeature.vipSRAMSizeInKB = context->options.vipSRAMSizeInKB;
-    if (context->options.axiSRAMSizeInKB != VX_INVALID_VALUE)
-        context->nnConfig.customizedFeature.axiSRAMSizeInKB = context->options.axiSRAMSizeInKB;
+    if (context->options.vipSRAMSize != VX_INVALID_VALUE)
+        context->nnConfig.customizedFeature.vipSRAMSize = context->options.vipSRAMSize;
+    if (context->options.axiSRAMSize != VX_INVALID_VALUE)
+        context->nnConfig.customizedFeature.axiSRAMSize = context->options.axiSRAMSize;
 
     if (context->nnConfig.customizedFeature.ddrLatency == 0)
     {
@@ -2991,7 +1170,7 @@ void initUndefinedHardwareConfig(vx_context context)
     {
         vx_float32 maxOutstandingCycle = (vx_float32)context->nnConfig.fixedFeature.maxOTNumber * 4;
         context->nnConfig.derivedFeature.internalLatency = (vx_float32)(20.0 + (11.0 + 6.0) * context->nnConfig.customizedFeature.freqInMHZ / context->nnConfig.customizedFeature.axiClockFreqInMHZ);
-        context->nnConfig.derivedFeature.totalLatency = context->nnConfig.customizedFeature.ddrLatency + context->nnConfig.derivedFeature.internalLatency;
+        context->nnConfig.derivedFeature.totalLatency = 1.0f * (vx_uint32)(context->nnConfig.customizedFeature.ddrLatency + context->nnConfig.derivedFeature.internalLatency + 0.5f);
         context->nnConfig.derivedFeature.ddrReadBWInBytePerCycle = context->nnConfig.customizedFeature.ddrReadBWLimit;
         context->nnConfig.derivedFeature.ddrWriteBWInBytePerCycle = context->nnConfig.customizedFeature.ddrWriteBWLimit;
         if (context->nnConfig.derivedFeature.totalLatency > maxOutstandingCycle)
@@ -3002,953 +1181,30 @@ void initUndefinedHardwareConfig(vx_context context)
         }
     }
 
-}
-
-struct _archModelCost_u64
-{
-    vx_uint64 cycle;
-    vx_uint64 bw;
-};
-
-vx_bool _cur_cost_u64_is_more_better(struct _archModelCost_u64 *cost, struct _archModelCost_u64 *cur)
-{
-    vx_float64 f = -(1.0f * (vx_int64)(cur->cycle - cost->cycle) / gcmMAX(cur->cycle, cost->cycle) * 20 + 1.0f * (vx_int64)(cur->bw - cost->bw) / gcmMAX(cur->bw, cost->bw) * 1);
-    if (f > 0) return vx_true_e;
-    return vx_false_e;
-}
-
-vx_status calculateArchPerf(
-    vx_context context,
-    vxnne_layer layer,
-    vxnne_operation operation,
-    vx_arch_perf perf,
-    vx_weights_biases_parameter wb,
-    vxnne_operation_target_e op_target,
-    vxnne_operator_e op_type)
-{
-    /* version 0.29 - 0.50.5 */
-    vx_uint32 numCores, tpCores, lanesPerConv, accuBuffDepth, adjustAccuBuffDepth, inputBuffDepth, inputBuffDepthForOneTile, l2CacheSizeInKB, l2CacheWidth, brickMode, swTiling, uscCacheSize, vip7Version, nnCmdSizeInBytes, tpCmdSizeInBytes;
-    vx_uint32 inXSize, inYSize, outZSize, kernelXSize, kernelYSize, kernelZSize, poolingSize, poolingStride, dataSize;
-    vx_int32 xOffSet, yOffSet;
-    vx_uint32 x, y, k;
-    vx_uint32 tmpMaxOutTileYSize, tmpCovAccuMode, tmpCovMode, interleaveMode, cacheLineMode, maxInTileXSize, maxOutTileXSize, minOutTileXSize, minOutTileYSize;
-    vx_bool initMinCost = vx_false_e;
-    struct _archModelCost_u64 minCost, curCost;
-    vx_float64 newCycleCount;
-    vx_uint64  minCycleCount;
-    vx_float64 newRDBandWidth, newNCRDBandWidth, newWTBandWidth;
-    vx_uint64 minRDBandWidth, minNCRDBandWidth, minWTBandWidth;
-    vx_float64 ddrKernelReadBandWidth, ddrInImageReadBandWidth, ddrRDBandWidth, ddrWTBandWidth, axiRDBandWidth, axiWTBandWidth;
-    vx_float64 coefNonZeroRatio=0.0f, coefCompressRatio=0.0f, imageCompressRatio=0.0f, imageNonZeroRatio=0.0f;
-    vx_float32 axiSramReadBWLimit, axiSramWriteBWLimit, axiSramTotalBWLimit, axiBusReadBWLimit, axiBusWriteBWLimit, axiBusTotalBWLimit;
-    vx_bool vip7_16bit, interleave8, fp16;
-    vx_uint32 imagePartialCache, srcBuf, dstBuf, kernelBuf, cachedReadFromSram, vectorPrune, coefDecodePerf;
-    vx_float32 ddrLatency = context->nnConfig.customizedFeature.ddrLatency;
-    vx_uint32 convOutFifoDepth = 0;
-    vx_uint32 uscCacheControllers = context->nnConfig.fixedFeature.uscCacheControllers;
-    vx_bool tpReOrderFix = context->nnConfig.unifiedFeature.tpReOrderFix ? vx_true_e : vx_false_e;
-    vx_bool fullCacheKernelHeadFix = context->nnConfig.unifiedFeature.fullCacheKernelHeadFix ? vx_true_e : vx_false_e;
-    vx_bool conv1x1HalfPerformance = context->nnConfig.unifiedFeature.conv1x1HalfPerformance ? vx_true_e : vx_false_e;
-    vx_bool cacheLineModeDisabled = context->nnConfig.unifiedFeature.cacheLineModeDisabled ? vx_true_e : vx_false_e;
-    vx_bool per3DTileBubbleFix = context->nnConfig.unifiedFeature.per3DTileBubbleFix ? vx_true_e : vx_false_e;
-    vx_bool zdp3NoCompressFix = context->nnConfig.unifiedFeature.zdp3NoCompressFix ? vx_true_e : vx_false_e;
-    vx_bool asyncCopyPerfFix = context->nnConfig.unifiedFeature.asyncCopyPerfFix ? vx_true_e : vx_false_e;
-    vx_bool zxdp3KernelReadConflictFix = context->nnConfig.unifiedFeature.zxdp3KernelReadConflictFix ? vx_true_e : vx_false_e;
-    vx_bool accurateTileBW = context->nnConfig.unifiedFeature.accurateTileBW ? vx_true_e : vx_false_e;
-    vx_bool isComputeBottleNeck = vx_false_e;
-    vx_bool axiSramSlowedDownByAddr = context->nnConfig.unifiedFeature.axiSramSlowedDownByAddr ? vx_true_e : vx_false_e;
-    vx_bool slowNNReqArbitrationFix = context->nnConfig.unifiedFeature.slowNNReqArbitrationFix ? vx_true_e : vx_false_e;
-    vx_bool singlePortAccBuffer = context->nnConfig.unifiedFeature.singlePortAccBuffer ? vx_true_e : vx_false_e;
-    vx_bool isDepthWise = (vx_bool)(context->nnConfig.customizedFeature.depthWiseSupport && (op_type == VXNNE_OPERATOR_DEPTH_WISE_CONV));
-    vx_bool isNNWriteWithoutUSC = context->nnConfig.customizedFeature.nnWriteWithoutUSC ? vx_true_e : vx_false_e;
-    vx_bool isV8 = (context->nnConfig.derivedFeature.nnXYDPX == 0 && context->nnConfig.derivedFeature.nnXYDPX == 0) ? vx_true_e : vx_false_e;
-    vx_bool imageNotPackedInSram = context->nnConfig.unifiedFeature.imageNotPackedInSram ? vx_true_e : vx_false_e;
-    vx_uint32 zrlBits = context->nnConfig.fixedFeature.zrlBits;
-    vx_float32 totalLatency = context->nnConfig.derivedFeature.totalLatency;
-    vx_uint32 outstandingTransfer = context->nnConfig.fixedFeature.maxOTNumber;
-    vx_float32 ddrReadBWInBytePerCycle = 0, ddrWriteBWInBytePerCycle, ddrTotalBWInBytePerCycle, internalWriteBWLimit;
-    vx_uint32 inSIXRefined = 0, inSIYRefined = 0;
-    vx_uint32 inImageStride = 0, inImageSlice = 0;
-    vx_uint32 outImageStride = 0, outImageSlice = 0;
-    vx_uint32 axiAccUnitSizeInByte = 64;
-    vx_uint32 vipSramAccUnitSizeInByte;
-    vx_uint32 zdp = context->nnConfig.derivedFeature.nnZDP;
-    vx_uint32 equivalentVipSramWidthInByte = context->nnConfig.fixedFeature.equivalentVipsramWidthInByte;
-    perf->info.poolingStride = !perf->info.poolingSize ? 1 : gcmMAX(1, perf->info.poolingStride);
-    perf->info.poolingSize = gcmMAX(1, perf->info.poolingSize);
-
-    gcmASSERT(perf->info.kx && perf->info.inx && perf->info.dataSize);
-
-    if (!perf->calculated)
+#ifdef USE_LIB_NN_ARCH_PERF
+    if ((gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "USE_LIB_NN_ARCH_PERF", &useLibNNArchPerf)) && useLibNNArchPerf && atoi(useLibNNArchPerf)))
     {
-        /********** input/output/wb configuration **********/
-        kernelXSize   = perf->info.kx;
-        kernelYSize   = perf->info.ky;
-        kernelZSize   = perf->info.kz;
-        inXSize       = perf->info.inx;
-        inYSize       = perf->info.iny;
-        dataSize      = perf->info.dataSize;
-        poolingSize   = perf->info.poolingSize;
-        poolingStride = perf->info.poolingStride;
-        xOffSet       = perf->info.xOffSet;
-        yOffSet       = perf->info.yOffSet;
+        BWL_T bwl = {
+            /*ddr bw limit*/context->nnConfig.customizedFeature.ddrReadBWLimit, context->nnConfig.customizedFeature.ddrWriteBWLimit, context->nnConfig.customizedFeature.ddrTotalBWLimit,
+            /*axi bw limit*/context->nnConfig.customizedFeature.axiSramReadBWLimit,context->nnConfig.customizedFeature.axiSramWriteBWLimit,context->nnConfig.customizedFeature.axiSramTotalBWLimit,
+            /*axi-bus bw limit*/context->nnConfig.customizedFeature.axiBusReadBWLimit,context->nnConfig.customizedFeature.axiBusWriteBWLimit,context->nnConfig.customizedFeature.axiBusTotalBWLimit,
+            /*internal write bw limite*/ (vx_float32)context->nnConfig.fixedFeature.nnLanesPerOutCycle,
+            /*ddr latency*/context->nnConfig.customizedFeature.ddrLatency,
+            /*total latency*/context->nnConfig.derivedFeature.totalLatency
+        };
+        APM_IN_PARAM_T inParam;
+        gcsHAL_CHIPIDENTITY chipIdentity;
+        gcoHAL_QueryChipIdentityEx(VX_NULL, sizeof(gcsHAL_CHIPIDENTITY), &chipIdentity);
+        inParam.chipDef.ChipID = (vx_uint32)chipIdentity.chipModel;
+        inParam.chipDef.ChipVersion = chipIdentity.chipRevision;
+        inParam.chipDef.ProductID = chipIdentity.productID;
+        inParam.chipDef.EcoID = chipIdentity.ecoID;
+        inParam.chipDef.CustomerID = chipIdentity.customerID;
 
-        /********** HW configuration **********/
-
-        if (perf->info.inputDataFormat == VX_TYPE_FLOAT16)
-            numCores       = context->nnConfig.fixedFeature.nnCoreCountFloat16;
-        else if (perf->info.inputDataFormat == VX_TYPE_INT16)
-            numCores       = context->nnConfig.fixedFeature.nnCoreCountInt16;
-        else
-            numCores       = context->nnConfig.fixedFeature.nnCoreCount;
-        if (numCores == 0 && (op_target == VXNNE_OPERATION_TARGET_NN))
-        {
-            vxError("ERROR: not support input data format: %d\n", perf->info.inputDataFormat);
-            vxmASSERT(0);
-            return VX_FAILURE;
-        }
-
-        if (context->nnConfig.unifiedFeature.convOutFifoDepthFix)
-        {
-            convOutFifoDepth = (vx_uint32)ceilf(1.0f * context->nnConfig.fixedFeature.nnAccumBufferDepth * numCores * (64 - 8) / 64);
-        }
-        else
-        {
-            convOutFifoDepth = context->nnConfig.fixedFeature.nnAccumBufferDepth;
-        }
-        perf->info.convOutFifoDepth = convOutFifoDepth;
-        perf->info.nnCores = numCores;
-        tpCores = op_type != VXNNE_OPERATOR_FULLYCONNECTED ?
-            context->nnConfig.fixedFeature.tpCoreCount : context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
-        lanesPerConv   = context->nnConfig.unifiedFeature.lanesPerConv;
-        maxInTileXSize = context->nnConfig.unifiedFeature.maxTileSize + 8;
-        maxOutTileXSize = context->nnConfig.unifiedFeature.maxTileSize;
-        inputBuffDepth = context->nnConfig.fixedFeature.nnInputBufferDepth;
-        if ((context->nnConfig.derivedFeature.nnXYDPY >= 3) &&
-            (dataSize == 8) &&
-            (kernelXSize != 1 && kernelYSize != 1))
-        {
-            /* XYDP9. */
-            inputBuffDepthForOneTile = inputBuffDepth / 2;
-        }
-        else if ((context->nnConfig.derivedFeature.nnZDP >= 6) &&
-                 (kernelXSize == 1 && kernelYSize == 1))
-        {
-            /* ZDP6. */
-            inputBuffDepthForOneTile = 32; /* A decent size. */
-        }
-        else
-        {
-            inputBuffDepthForOneTile = inputBuffDepth;
-        }
-        accuBuffDepth  = context->nnConfig.fixedFeature.nnAccumBufferDepth;
-        gcmASSERT(perf->info.inputDataFormat != VX_TYPE_INVALID);
-        if (perf->info.inputDataFormat == VX_TYPE_FLOAT16)
-        {
-            fp16 = vx_true_e;
-        }
-        else
-        {
-            fp16 = vx_false_e;
-        }
-
-        if (fp16 && isV8)
-        {
-            adjustAccuBuffDepth = accuBuffDepth / 16;
-        }
-        else if (!fp16 && dataSize == 16)
-        {
-            adjustAccuBuffDepth = isV8 ? (accuBuffDepth / 4) : (accuBuffDepth / 2);
-        }
-        else
-        {
-            adjustAccuBuffDepth = accuBuffDepth;
-        }
-
-        vip7Version    = context->nnConfig.fixedFeature.vip7Version;
-
-        uscCacheSize       = context->nnConfig.unifiedFeature.nnUSCCacheSize;
-        l2CacheWidth       = context->nnConfig.fixedFeature.equivalentVipsramWidthInByte;
-        vipSramAccUnitSizeInByte = l2CacheWidth * 2; /* x2 because we are using half freq SRAM */
-        nnCmdSizeInBytes   = context->nnConfig.unifiedFeature.nnCmdSizeInBytes;
-        tpCmdSizeInBytes   = context->nnConfig.unifiedFeature.tpCmdSizeInBytes;
-        coefDecodePerf     = context->nnConfig.unifiedFeature.vipCoefDecodePerf;
-        vectorPrune        = context->nnConfig.customizedFeature.vipVectorPrune;
-        cachedReadFromSram = context->nnConfig.unifiedFeature.vipCachedReadFromSram;
-        imagePartialCache  = context->nnConfig.unifiedFeature.vipImagePartialCache;
-        brickMode          = context->nnConfig.fixedFeature.vipBrickMode;
-
-        swTiling = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE1) ? vx_true_e : vx_false_e;
-
-        vip7_16bit = (vip7Version && dataSize == 16) ? vx_true_e : vx_false_e;
-        if (vip7_16bit)
-        {
-            maxOutTileXSize /= 2;
-            maxInTileXSize /= 2;
-        }
-
-        interleave8 = vx_false_e; /*removed by arch perf revision 40*/
-        context->nnConfig.fixedFeature.vipBrickMode = brickMode = (op_type != VXNNE_OPERATOR_CONVOLUTION && op_type != VXNNE_OPERATOR_DEPTH_WISE_CONV) ?
-                            0 : vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_BRICK_MODE);
-
-        if (swTiling)
-        {
-            srcBuf = perf->swTilingInfo.srcBuf;
-            dstBuf = perf->swTilingInfo.dstBuf;
-            kernelBuf = perf->swTilingInfo.kernelBuf;
-        }
-        else
-        {
-            srcBuf = SW_TILING_FROM_DDR;
-            dstBuf = SW_TILING_FROM_DDR;
-            kernelBuf = SW_TILING_FROM_DDR;
-        }
-
-        ddrReadBWInBytePerCycle = context->nnConfig.derivedFeature.ddrReadBWInBytePerCycle;
-        ddrWriteBWInBytePerCycle = context->nnConfig.derivedFeature.ddrWriteBWInBytePerCycle;
-        ddrTotalBWInBytePerCycle = context->nnConfig.customizedFeature.ddrTotalBWLimit;
-        internalWriteBWLimit = (vx_float32)context->nnConfig.fixedFeature.nnLanesPerOutCycle;
-        axiSramReadBWLimit  = context->nnConfig.customizedFeature.axiSramReadBWLimit;
-        axiSramWriteBWLimit = context->nnConfig.customizedFeature.axiSramWriteBWLimit;
-        axiSramTotalBWLimit = context->nnConfig.customizedFeature.axiSramTotalBWLimit;
-        axiBusReadBWLimit  = context->nnConfig.customizedFeature.axiBusReadBWLimit;
-        axiBusWriteBWLimit = context->nnConfig.customizedFeature.axiBusWriteBWLimit;
-        axiBusTotalBWLimit = context->nnConfig.customizedFeature.axiBusTotalBWLimit;
-
-        l2CacheSizeInKB  = (perf->swTilingInfo.cacheSpaceInKB == -1) ?
-            context->nnConfig.customizedFeature.vipSRAMSizeInKB : perf->swTilingInfo.cacheSpaceInKB;
-
-        outZSize = perf->info.outz;
-
-        {
-            if (wb != VX_NULL)
-            {
-                perf->coefNonZeroRatio  = WB_NON_ZERO_RATIO(wb);
-                perf->coefCompressRatio = WB_COMPRESS_RATIO(wb);
-                perf->imageCompressRatio = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_VIP_DEC400) ? 0.7f : 1.0f;
-                perf->imageNonZeroRatio  = 0.300000000000000;
-            }
-            else
-            {
-                perf->coefNonZeroRatio   = 0.0f;
-                perf->coefCompressRatio  = 0.0f;
-                perf->imageCompressRatio = 0.0f;
-                perf->imageNonZeroRatio  = 0.0f;
-            }
-
-            coefNonZeroRatio   = perf->coefNonZeroRatio;
-            coefCompressRatio  = perf->coefCompressRatio;
-            imageCompressRatio = perf->imageCompressRatio;
-            imageNonZeroRatio  = perf->imageNonZeroRatio;
-
-            if (op_target == VXNNE_OPERATION_TARGET_NN)
-            {
-                /* init to default */
-                vx_uint32 tmpInX = perf->swTilingInfo.origInX + perf->info.kx - 1 + 2 * xOffSet;
-                vx_uint32 tmpInY = perf->swTilingInfo.origInY + perf->info.ky - 1 + 2 * yOffSet;
-                inSIXRefined = gcmMIN(tmpInX, perf->info.inx + perf->info.kx - 1);
-                inSIYRefined = gcmMIN(tmpInY, perf->info.iny + perf->info.ky - 1);
-                inImageStride = tmpInX;
-                inImageSlice = tmpInX * tmpInY;
-                if (srcBuf != SW_TILING_FROM_DDR)
-                {
-                    inImageStride = inSIXRefined;
-                    inImageSlice = inSIXRefined * inSIYRefined;
-                }
-                if (swTiling && perf->swTilingInfo.outImageStride != 0)
-                {
-                    outImageStride =  perf->swTilingInfo.outImageStride;
-                    outImageSlice = perf->swTilingInfo.outImageSlice;
-                }
-                else
-                {
-                    if (dstBuf != SW_TILING_FROM_DDR)
-                    {
-                        outImageStride = (vx_uint32)ceilf((vx_float32)(perf->info.inx - perf->info.p3) / perf->info.poolingStride);
-                        outImageSlice = (vx_uint32)(outImageStride * ((vx_uint32)ceilf((vx_float32)(perf->info.iny - perf->info.p3) / perf->info.poolingStride) + perf->info.nextKY - 1));
-                    }
-                    else
-                    {
-                        outImageStride = perf->info.pix;
-                        outImageSlice = perf->info.pix * perf->info.piy;
-                    }
-                }
-
-                if (perf->resultInfo.calculated != HALF_DONE)
-                {
-                    perf->resultInfo.outImageTileXSize = 0;
-                    perf->resultInfo.outImageTileYSize = 0;
-                    perf->resultInfo.kernelsPerCore    = 0;
-                    minCycleCount    = ~0ULL;
-                    minRDBandWidth   = ~0ULL;
-                    minNCRDBandWidth = ~0ULL;
-                    minWTBandWidth   = ~0ULL;
-
-                    maxOutTileXSize = gcmMIN(gcmMIN(inXSize, maxOutTileXSize), maxInTileXSize - kernelXSize + 1);
-                    minOutTileXSize = gcmMAX((vx_int32)poolingSize, gcmMAX(-xOffSet - (vx_int32)kernelXSize + 1 + 1, 0));
-                    minOutTileYSize = gcmMAX((vx_int32)poolingSize, gcmMAX(-yOffSet - (vx_int32)kernelYSize + 1 + 1, 0));
-                    if (maxOutTileXSize < minOutTileXSize)
-                    {
-                        vxInfo("WARNING: maxOutTileXSize < minOutTileXSize\n");
-                        goto errCalcArchPerf;
-                    }
-
-                    for (x = minOutTileXSize; x <= maxOutTileXSize; x++)
-                    {
-                        if ((poolingSize != 2 && poolingSize != 3) ||
-                            (poolingSize == 2 && x % 2 == 0) ||
-                            (poolingSize == 3 && x == inXSize))
-                        {
-                            interleaveMode = _calcImageInterleaveMode(
-                                                  x,
-                                                  context->nnConfig.unifiedFeature.maxTileSize,
-                                                  kernelXSize,
-                                                  vip7_16bit,
-                                                  interleave8);
-
-                            tmpCovMode = inputBuffDepthForOneTile * interleaveMode;
-                            tmpCovAccuMode = adjustAccuBuffDepth * interleaveMode;
-
-                            if (tmpCovMode < kernelYSize)
-                            {
-                                break;
-                            }
-
-                            tmpMaxOutTileYSize = gcmMIN(127, gcmMIN(tmpCovMode-kernelYSize+1, gcmMIN(tmpCovAccuMode, inYSize)));
-
-                            if (tmpMaxOutTileYSize < minOutTileYSize)
-                            {
-                                if (poolingSize == 3)
-                                {
-                                    vxmASSERT("Hit NN Pooling Size = 3 limitation, either perform pooling in TP or split image into smaller vertical subimages\n" && 0);
-                                }
-                                continue;
-                            }
-                            for (y = minOutTileYSize; y <= tmpMaxOutTileYSize; y++)
-                            {
-                                if (inXSize - xOffSet <= x + kernelXSize -1 &&
-                                    inYSize - yOffSet <= y + kernelYSize -1)
-                                {
-                                    cacheLineMode = 1;
-                                }
-                                else
-                                {
-                                    cacheLineMode = 0;
-                                }
-                                if ((brickMode || !cacheLineMode || (x == inXSize && y == inYSize)) &&
-                                    ((poolingSize != 2 && poolingSize != 3) ||
-                                     (poolingSize == 2 && y % 2 == 0) ||
-                                     (poolingSize == 3 && (y != 3 || inYSize == 3))))
-                                {
-                                    vx_uint32 vipSramInimageStride = gcmMIN((x + kernelXSize - 1), inXSize);
-                                    vx_uint32 vipSramInimageSlice = vipSramInimageStride * gcmMIN((y + kernelYSize - 1), inYSize);
-                                    k = _calcNumOfKernel(x, y, outZSize, adjustAccuBuffDepth, numCores, interleaveMode,
-                                        zdp, kernelXSize, kernelYSize, isV8);
-                                    newRDBandWidth = _calcReadBandWidth(x, y, k, kernelXSize, kernelYSize, kernelZSize,
-                                        inXSize, inYSize, outZSize, inSIXRefined, inSIYRefined,
-                                        numCores, brickMode, dataSize, coefCompressRatio, imageCompressRatio,
-                                        l2CacheSizeInKB, (vx_bool)imagePartialCache, nnCmdSizeInBytes, imageNotPackedInSram,
-                                        fullCacheKernelHeadFix,
-                                        context->nnConfig.unifiedFeature.cacheLineModeDisabled ? vx_true_e : vx_false_e,
-                                        context->nnConfig.unifiedFeature.asyncCopyPerfFix ? vx_true_e : vx_false_e,
-                                        context->nnConfig.unifiedFeature.accurateTileBW ? vx_true_e : vx_false_e,
-                                        isDepthWise,
-                                        inImageStride, inImageSlice, zdp, axiAccUnitSizeInByte, equivalentVipSramWidthInByte, NULL, NULL);
-                                    newNCRDBandWidth = _calcReadBandWidth(x, y, k, kernelXSize, kernelYSize, kernelZSize,
-                                        inXSize, inYSize, outZSize, inSIXRefined, inSIYRefined,
-                                        numCores, brickMode, dataSize, coefCompressRatio, imageCompressRatio,
-                                        0, (vx_bool)imagePartialCache, nnCmdSizeInBytes, imageNotPackedInSram,
-                                        fullCacheKernelHeadFix,
-                                        context->nnConfig.unifiedFeature.cacheLineModeDisabled ? vx_true_e : vx_false_e,
-                                        context->nnConfig.unifiedFeature.asyncCopyPerfFix ? vx_true_e : vx_false_e,
-                                        context->nnConfig.unifiedFeature.accurateTileBW ? vx_true_e : vx_false_e,
-                                        isDepthWise,
-                                        vipSramInimageStride, vipSramInimageSlice, zdp, vipSramAccUnitSizeInByte, equivalentVipSramWidthInByte, NULL, NULL);
-                                    newWTBandWidth = _calcWriteBandWidth(x, y, inXSize, inYSize, outZSize,
-                                        dataSize, imageCompressRatio, uscCacheSize, poolingStride, outImageStride, outImageSlice, isNNWriteWithoutUSC);
-                                    newCycleCount = _calcNNCycleCountBandWidth(
-                                                                x, y, k,
-                                                                inXSize, inYSize, outZSize,
-                                                                kernelXSize, kernelYSize, kernelZSize,
-                                                                inSIXRefined, inSIYRefined,
-                                                                poolingStride,
-                                                                coefNonZeroRatio, coefCompressRatio, imageCompressRatio,
-                                                                numCores, brickMode, dataSize,
-                                                                l2CacheSizeInKB, l2CacheWidth,
-                                                                context->nnConfig.derivedFeature.nnXYDPX,
-                                                                context->nnConfig.derivedFeature.nnXYDPY,
-                                                                zdp,
-                                                                context->nnConfig.fixedFeature.nnFP16XYDPX,
-                                                                context->nnConfig.fixedFeature.nnFP16XYDPY,
-                                                                context->nnConfig.fixedFeature.nnFP16ZDP,
-                                                                uscCacheSize,
-                                                                nnCmdSizeInBytes,
-                                                                coefDecodePerf,
-                                                                vectorPrune,
-                                                                imagePartialCache,
-                                                                cachedReadFromSram,
-                                                                1,
-                                                                srcBuf,
-                                                                dstBuf,
-                                                                kernelBuf,
-                                                                axiSramReadBWLimit,
-                                                                axiSramWriteBWLimit,
-                                                                axiSramTotalBWLimit,
-                                                                axiBusReadBWLimit,
-                                                                axiBusWriteBWLimit,
-                                                                axiBusTotalBWLimit,
-                                                                internalWriteBWLimit,
-                                                                interleaveMode,
-                                                                lanesPerConv,
-                                                                outstandingTransfer,
-                                                                zrlBits,
-                                                                equivalentVipSramWidthInByte,
-                                                                ddrLatency,
-                                                                totalLatency,
-                                                                ddrReadBWInBytePerCycle,
-                                                                ddrWriteBWInBytePerCycle,
-                                                                ddrTotalBWInBytePerCycle,
-                                                                imageNotPackedInSram,
-                                                                vip7_16bit,
-                                                                fp16,
-                                                                fullCacheKernelHeadFix,
-                                                                conv1x1HalfPerformance,
-                                                                cacheLineModeDisabled,
-                                                                per3DTileBubbleFix,
-                                                                zdp3NoCompressFix,
-                                                                asyncCopyPerfFix,
-                                                                zxdp3KernelReadConflictFix,
-                                                                accurateTileBW,
-                                                                axiSramSlowedDownByAddr,
-                                                                slowNNReqArbitrationFix,
-                                                                singlePortAccBuffer,
-                                                                context->nnConfig.unifiedFeature.smallBatchEnable,
-                                                                isDepthWise,
-                                                                isNNWriteWithoutUSC,
-                                                                inImageStride, inImageSlice,
-                                                                outImageStride, outImageSlice,
-                                                                perf->info.flush ? vx_true_e : vx_false_e,
-                                                                convOutFifoDepth,
-                                                                &ddrKernelReadBandWidth,
-                                                                &ddrInImageReadBandWidth,
-                                                                &ddrRDBandWidth,
-                                                                &ddrWTBandWidth,
-                                                                &axiRDBandWidth,
-                                                                &axiWTBandWidth,
-                                                                &isComputeBottleNeck);
-                                    curCost.cycle = (vx_uint64)(newCycleCount + 0.5f);
-                                    curCost.bw = (vx_uint64)(newRDBandWidth + 0.5f) + (vx_uint64)(newWTBandWidth + 0.5f);
-                                    if (!initMinCost || _cur_cost_u64_is_more_better(&minCost, &curCost))
-                                    {
-                                        initMinCost = vx_true_e;
-                                        minCycleCount    = (vx_uint64)(newCycleCount + 0.5f);
-                                        minRDBandWidth   = (vx_uint64)(newRDBandWidth + 0.5f);
-                                        minNCRDBandWidth = (vx_uint64)(newNCRDBandWidth + 0.5f);
-                                        minWTBandWidth   = (vx_uint64)(newWTBandWidth + 0.5f);
-                                        minCost.cycle = minCycleCount;
-                                        minCost.bw = minRDBandWidth + minWTBandWidth;
-                                        perf->resultInfo.outImageTileXSize     = x;
-                                        perf->resultInfo.outImageTileYSize     = y;
-                                        perf->resultInfo.kernelsPerCore        = k;
-                                        perf->resultInfo.interleaveMode        = interleaveMode;
-                                        perf->resultInfo.nnCoreCount           = numCores;
-                                        perf->resultInfo.perfCycleCount        = newCycleCount;
-                                        perf->resultInfo.perfKernelReadBandWidth = ddrKernelReadBandWidth;
-                                        perf->resultInfo.perfInImageReadBandWidth = ddrInImageReadBandWidth;
-                                        perf->resultInfo.perfReadBandWidth     = ddrRDBandWidth;
-                                        perf->resultInfo.perfWriteBandWidth    = ddrWTBandWidth;
-                                        perf->resultInfo.perfAXIReadBandWidth  = axiRDBandWidth;
-                                        perf->resultInfo.perfAXIWriteBandWidth = axiWTBandWidth;
-                                        perf->resultInfo.isFirstComputeBottleNeck = isComputeBottleNeck;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    vxmASSERT(perf->resultInfo.outImageTileXSize <= maxOutTileXSize);
-                    vxmASSERT(perf->resultInfo.outImageTileXSize >= minOutTileXSize);
-                    vxmASSERT(perf->resultInfo.outImageTileYSize >= minOutTileYSize);
-                }
-                else
-                {
-                    perf->resultInfo.perfCycleCount = _calcNNCycleCountBandWidth(
-                                                        perf->resultInfo.outImageTileXSize,
-                                                        perf->resultInfo.outImageTileYSize,
-                                                        perf->resultInfo.kernelsPerCore,
-                                                        inXSize, inYSize, outZSize,
-                                                        kernelXSize, kernelYSize, kernelZSize,
-                                                        inSIXRefined, inSIYRefined,
-                                                        poolingStride,
-                                                        coefNonZeroRatio, coefCompressRatio, imageCompressRatio,
-                                                        numCores, brickMode, dataSize,
-                                                        l2CacheSizeInKB, l2CacheWidth,
-                                                        context->nnConfig.derivedFeature.nnXYDPX,
-                                                        context->nnConfig.derivedFeature.nnXYDPY,
-                                                        context->nnConfig.derivedFeature.nnZDP,
-                                                        context->nnConfig.fixedFeature.nnFP16XYDPX,
-                                                        context->nnConfig.fixedFeature.nnFP16XYDPY,
-                                                        context->nnConfig.fixedFeature.nnFP16ZDP,
-                                                        uscCacheSize,
-                                                        nnCmdSizeInBytes,
-                                                        coefDecodePerf,
-                                                        vectorPrune,
-                                                        imagePartialCache,
-                                                        cachedReadFromSram,
-                                                        1,
-                                                        srcBuf,
-                                                        dstBuf,
-                                                        kernelBuf,
-                                                        axiSramReadBWLimit,
-                                                        axiSramWriteBWLimit,
-                                                        axiSramTotalBWLimit,
-                                                        axiBusReadBWLimit,
-                                                        axiBusWriteBWLimit,
-                                                        axiBusTotalBWLimit,
-                                                        internalWriteBWLimit,
-                                                        perf->resultInfo.interleaveMode,
-                                                        lanesPerConv,
-                                                        outstandingTransfer,
-                                                        zrlBits,
-                                                        equivalentVipSramWidthInByte,
-                                                        ddrLatency,
-                                                        totalLatency,
-                                                        ddrReadBWInBytePerCycle,
-                                                        ddrWriteBWInBytePerCycle,
-                                                        ddrTotalBWInBytePerCycle,
-                                                        imageNotPackedInSram,
-                                                        vip7_16bit,
-                                                        fp16,
-                                                        fullCacheKernelHeadFix,
-                                                        conv1x1HalfPerformance,
-                                                        cacheLineModeDisabled,
-                                                        per3DTileBubbleFix,
-                                                        zdp3NoCompressFix,
-                                                        asyncCopyPerfFix,
-                                                        zxdp3KernelReadConflictFix,
-                                                        accurateTileBW,
-                                                        axiSramSlowedDownByAddr,
-                                                        slowNNReqArbitrationFix,
-                                                        singlePortAccBuffer,
-                                                        context->nnConfig.unifiedFeature.smallBatchEnable,
-                                                        isDepthWise,
-                                                        isNNWriteWithoutUSC,
-                                                        inImageStride, inImageSlice,
-                                                        outImageStride, outImageSlice,
-                                                        perf->info.flush ? vx_true_e : vx_false_e,
-                                                        convOutFifoDepth,
-                                                        &ddrKernelReadBandWidth,
-                                                        &ddrInImageReadBandWidth,
-                                                        &ddrRDBandWidth,
-                                                        &ddrWTBandWidth,
-                                                        &axiRDBandWidth,
-                                                        &axiWTBandWidth,
-                                                        &isComputeBottleNeck);
-                    perf->resultInfo.perfKernelReadBandWidth = ddrKernelReadBandWidth;
-                    perf->resultInfo.perfInImageReadBandWidth = ddrInImageReadBandWidth;
-                    perf->resultInfo.perfReadBandWidth = ddrRDBandWidth;
-                    perf->resultInfo.perfWriteBandWidth = ddrWTBandWidth;
-                    perf->resultInfo.perfAXIReadBandWidth = axiRDBandWidth;
-                    perf->resultInfo.perfAXIWriteBandWidth = axiWTBandWidth;
-                    perf->resultInfo.isFirstComputeBottleNeck = isComputeBottleNeck;
-                }
-            }
-            else
-            {
-                perf->resultInfo.outImageTileXSize   = 0;
-                perf->resultInfo.outImageTileYSize   = 0;
-                perf->resultInfo.kernelsPerCore     = 0;
-
-                newCycleCount = _calcTPCycleCountCore(op_type, inXSize, inYSize, outZSize, kernelZSize,
-                                                      coefNonZeroRatio, coefCompressRatio, imageNonZeroRatio,
-                                                      tpCores, tpCmdSizeInBytes, poolingStride,
-                                                      axiSramReadBWLimit, axiSramWriteBWLimit, axiSramTotalBWLimit,
-                                                      axiBusReadBWLimit, axiBusWriteBWLimit, axiBusTotalBWLimit,
-                                                      l2CacheWidth, dataSize, swTiling, srcBuf, dstBuf, kernelBuf,
-                                                      outstandingTransfer,
-                                                      ddrLatency,
-                                                      totalLatency,
-                                                      ddrReadBWInBytePerCycle,
-                                                      ddrWriteBWInBytePerCycle,
-                                                      ddrTotalBWInBytePerCycle,
-                                                      uscCacheControllers,
-                                                      tpReOrderFix,
-                                                      (perf->info.flush ? vx_true_e : vx_false_e),
-                                                      context->nnConfig.unifiedFeature.smallBatchEnable,
-                                                      axiSramSlowedDownByAddr,
-                                                      &ddrKernelReadBandWidth,
-                                                      &ddrInImageReadBandWidth,
-                                                      &ddrRDBandWidth,
-                                                      &ddrWTBandWidth,
-                                                      &axiRDBandWidth,
-                                                      &axiWTBandWidth);
-
-                perf->resultInfo.perfCycleCount        = newCycleCount;
-                perf->resultInfo.perfKernelReadBandWidth = ddrKernelReadBandWidth;
-                perf->resultInfo.perfInImageReadBandWidth = ddrInImageReadBandWidth;
-                perf->resultInfo.perfReadBandWidth     = ddrRDBandWidth;
-                perf->resultInfo.perfWriteBandWidth    = ddrWTBandWidth;
-                perf->resultInfo.perfAXIReadBandWidth  = axiRDBandWidth;
-                perf->resultInfo.perfAXIWriteBandWidth = axiWTBandWidth;
-            }
-        }
-
-        if (swTiling && op_target == VXNNE_OPERATION_TARGET_NN && perf->swTilingInfo.calcNonFirstCmd)
-        {
-            interleaveMode = _calcImageInterleaveMode(
-                                  perf->resultInfo.outImageTileXSize,
-                                  context->nnConfig.unifiedFeature.maxTileSize,
-                                  kernelXSize,
-                                  vip7_16bit,
-                                  interleave8);
-
-            perf->swTilingInfo.perfNonFirstCycleCount = _calcNNCycleCountBandWidth(
-                                                           perf->resultInfo.outImageTileXSize,
-                                                           perf->resultInfo.outImageTileYSize,
-                                                           perf->resultInfo.kernelsPerCore,
-                                                           inXSize, inYSize, outZSize,
-                                                           kernelXSize, kernelYSize, kernelZSize,
-                                                           inSIXRefined, inSIYRefined,
-                                                           poolingStride,
-                                                           coefNonZeroRatio, coefCompressRatio, imageCompressRatio,
-                                                           numCores, brickMode, dataSize,
-                                                           l2CacheSizeInKB, l2CacheWidth,
-                                                           context->nnConfig.derivedFeature.nnXYDPX,
-                                                           context->nnConfig.derivedFeature.nnXYDPY,
-                                                           zdp,
-                                                           context->nnConfig.fixedFeature.nnFP16XYDPX,
-                                                           context->nnConfig.fixedFeature.nnFP16XYDPY,
-                                                           context->nnConfig.fixedFeature.nnFP16ZDP,
-                                                           uscCacheSize,
-                                                           nnCmdSizeInBytes,
-                                                           coefDecodePerf,
-                                                           vectorPrune,
-                                                           imagePartialCache,
-                                                           cachedReadFromSram,
-                                                           0,
-                                                           srcBuf,
-                                                           dstBuf,
-                                                           kernelBuf,
-                                                           axiSramReadBWLimit,
-                                                           axiSramWriteBWLimit,
-                                                           axiSramTotalBWLimit,
-                                                           axiBusReadBWLimit,
-                                                           axiBusWriteBWLimit,
-                                                           axiBusTotalBWLimit,
-                                                           internalWriteBWLimit,
-                                                           interleaveMode,
-                                                           lanesPerConv,
-                                                           outstandingTransfer,
-                                                           zrlBits,
-                                                           equivalentVipSramWidthInByte,
-                                                           ddrLatency,
-                                                           totalLatency,
-                                                           ddrReadBWInBytePerCycle,
-                                                           ddrWriteBWInBytePerCycle,
-                                                           ddrTotalBWInBytePerCycle,
-                                                           imageNotPackedInSram,
-                                                           vip7_16bit,
-                                                           fp16,
-                                                           fullCacheKernelHeadFix,
-                                                           conv1x1HalfPerformance,
-                                                           cacheLineModeDisabled,
-                                                           per3DTileBubbleFix,
-                                                           zdp3NoCompressFix,
-                                                           asyncCopyPerfFix,
-                                                           zxdp3KernelReadConflictFix,
-                                                           accurateTileBW,
-                                                           axiSramSlowedDownByAddr,
-                                                           slowNNReqArbitrationFix,
-                                                           singlePortAccBuffer,
-                                                           context->nnConfig.unifiedFeature.smallBatchEnable,
-                                                           isDepthWise,
-                                                           isNNWriteWithoutUSC,
-                                                           inImageStride, inImageSlice,
-                                                           outImageStride, outImageSlice,
-                                                           perf->info.flush ? vx_true_e : vx_false_e,
-                                                           convOutFifoDepth,
-                                                           &ddrKernelReadBandWidth,
-                                                           &ddrInImageReadBandWidth,
-                                                           &ddrRDBandWidth,
-                                                           &ddrWTBandWidth,
-                                                           &axiRDBandWidth,
-                                                           &axiWTBandWidth,
-                                                           &isComputeBottleNeck);
-            perf->swTilingInfo.perfNonFirstKernelReadBandWidth = ddrKernelReadBandWidth;
-            perf->swTilingInfo.perfNonFirstInImageReadBandWidth = ddrInImageReadBandWidth;
-            perf->swTilingInfo.perfNonFirstReadBandWidth = ddrRDBandWidth;
-            perf->swTilingInfo.perfNonFirstWriteBandWidth = ddrWTBandWidth;
-            perf->swTilingInfo.perfNonFirstAXIReadBandWidth = axiRDBandWidth;
-            perf->swTilingInfo.perfNonFirstAXIWriteBandWidth = axiWTBandWidth;
-            perf->swTilingInfo.isNonFirstComputeBottleNeck = isComputeBottleNeck;
-        }
-
-        perf->calculated = vx_true_e;
-
-        if ((wb != NULL) && (wb->weights_sizes[0] == 1 && wb->weights_sizes[1] == 1
-            && (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3) || vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6))
-            && (wb->wb_base->weights_data_format == VX_TYPE_INT8 || wb->wb_base->weights_data_format == VX_TYPE_UINT8)) && !isV8)
-        {
-            /*Per HW, there's a limition for HW now, arch perf's kernel per core should less equre than (accuBuffDepth / zdpNum) when zdp3 & zdp6*/
-            vx_uint32 zdpNum = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6) ? 6 : 3;
-            if (!(perf->resultInfo.kernelsPerCore <= (accuBuffDepth / zdpNum)))
-            {
-                vxError("Assert: perf->resultInfo.kernelsPerCore <= (accuBuffDepth / zdpNum) must be true: kernelPerCore: %d, accuBuffDepth: %d, zdpNum: %d\n", perf->resultInfo.kernelsPerCore, accuBuffDepth, zdpNum);
-            }
-            vxmASSERT(perf->resultInfo.kernelsPerCore <= (accuBuffDepth / zdpNum));
-            zdpNum++; /* Make release build pass*/
-        }
+        memcpy(&inParam.bwl, &bwl, sizeof(bwl));
+        context->apm = CreateAPModel(inParam);
     }
-
-    perf->opType = op_type;
-    perf->opTarget = op_target;
-    return VX_SUCCESS;
-
-errCalcArchPerf:
-    perf->calculated = vx_true_e;
-    perf->resultInfo.outImageTileXSize   = 0;
-    perf->resultInfo.outImageTileYSize   = 0;
-    perf->resultInfo.kernelsPerCore     = 0;
-    perf->opType = op_type;
-    perf->opTarget = op_target;
-    return VX_FAILURE;
-}
-
-void calculateArchPerfFromTiling(
-    vx_context context,
-    vxnne_layer layer,
-    vx_arch_perf perf,
-    vxnne_tensor_info input_tiling,
-    vxnne_tensor_info output_tiling,
-    vx_tensor input,
-    vx_tensor output,
-    vx_weights_biases_parameter wb,
-    vxnne_operation_command  op_command,
-    vxnne_operation_target_e op_target,
-    vxnne_operator_e op_type)
-{
-    vx_uint32 kernelXSize, kernelYSize, kernelZSize, poolingSize, poolingStride, strideX, strideY;
-    vx_int32 dataSize, xOffSet, yOffSet;
-    vx_op_param conv_cmd = &op_command->parameter;
-    vx_bool axiSramOnlySWTiling = context->nnConfig.unifiedFeature.axiSramOnlySWTiling ? vx_true_e : vx_false_e;
-
-    kernelXSize = wb != VX_NULL && op_type != VXNNE_OPERATOR_RESHUFFLE ? WB_KERNEL_X(wb) : 1;
-    kernelYSize = wb != VX_NULL && op_type != VXNNE_OPERATOR_RESHUFFLE ? WB_KERNEL_Y(wb) : 1;
-    kernelZSize = wb != VX_NULL ? WB_KERNEL_Z(wb) : input_tiling->depth;
-
-    xOffSet = (-1) * conv_cmd->pad_x_left;
-    yOffSet = (-1) * conv_cmd->pad_y_top;
-
-    poolingStride = !conv_cmd->pool_size_y ? 1 : gcmMAX(1, conv_cmd->pool_stride);
-    poolingSize = gcmMAX(1, conv_cmd->pool_size_y);
-
-    dataSize = 8 * gcmMIN(TENSOR_DATA_SIZE(input), TENSOR_DATA_SIZE(output));
-    strideX = op_type == VXNNE_OPERATOR_RESHUFFLE ? WB_STRIDE_X(wb) : 1;
-    strideY = op_type == VXNNE_OPERATOR_RESHUFFLE ? WB_STRIDE_Y(wb) : 1;
-
-    /********** left perf structure configuration **********/
-    perf->info.kx = kernelXSize;
-    perf->info.ky = kernelYSize;
-    perf->info.kz = kernelZSize;
-    perf->info.oinx = TENSOR_VIEW_SIZE_INDEX(input, 0);
-    perf->info.oiny = TENSOR_VIEW_SIZE_INDEX(input, 1);
-    perf->info.oinz = TENSOR_VIEW_SIZE_INDEX(input, 2);
-    perf->info.stridex = strideX;
-    perf->info.stridey = strideY;
-    perf->info.dataSize = dataSize;
-    perf->info.poolingSize = poolingSize;
-    perf->info.poolingStride = poolingStride;
-    perf->info.xOffSet = xOffSet;
-    perf->info.yOffSet = yOffSet;
-    perf->info.inputDataFormat = TENSOR_DATA_TYPE(input);
-    perf->info.p3 = (poolingSize == 3) ? 1 : 0;
-
-    perf->info.inx = op_type == VXNNE_OPERATOR_POOLING ? input_tiling->width : output_tiling->width;
-    perf->info.iny = op_type == VXNNE_OPERATOR_POOLING ? input_tiling->height : output_tiling->height;
-    perf->info.outz = output_tiling->depth;
-    perf->info.pix = (vx_uint32)ceilf((vx_float32)(output_tiling->width - perf->info.p3) / poolingStride);
-    perf->info.piy = (vx_uint32)ceilf((vx_float32)(output_tiling->height - perf->info.p3) / poolingStride);
-
-    if ((op_target != VXNNE_OPERATION_TARGET_TP || op_type == VXNNE_OPERATOR_FULLYCONNECTED) && wb)
-        perf->info.kernelSize = (vx_uint32)(gcmALIGN_NP2(WB_STREAM_ALIGN_SIZE_INDEX(wb, 0), CACHE_ALIGNMENT_SIZE));
-    perf->swTilingInfo.origOutX = TENSOR_VIEW_SIZE_INDEX(output, 0);
-    perf->swTilingInfo.origOutY = TENSOR_VIEW_SIZE_INDEX(output, 1);
-    perf->swTilingInfo.origOutZ = TENSOR_VIEW_SIZE_INDEX(output, 2);
-    perf->swTilingInfo.cacheSpaceInKB = context->nnConfig.customizedFeature.vipSRAMSizeInKB - VX_VIP_SRAM_IMAGE_STREAM_SIZE / 1024;
-    if (op_type == VXNNE_OPERATOR_CONVOLUTION || op_type == VXNNE_OPERATOR_DEPTH_WISE_CONV)
-    {
-        perf->swTilingInfo.outImageStride = output->strides[1];
-        perf->swTilingInfo.outImageSlice = output->strides[1] * output_tiling->height;
-
-        ComputeInputSize(
-            perf->swTilingInfo.origOutX,
-            WB_KERNEL_X(wb),
-            WB_PAD_LEFT(wb),
-            WB_PAD_RIGHT(wb),
-            WB_POOLING_SIZE_X(wb),
-            WB_POOLING_STRIDE(wb),
-            &perf->swTilingInfo.origInX,
-            1);
-
-        ComputeInputSize(
-            perf->swTilingInfo.origOutY,
-            WB_KERNEL_Y(wb),
-            WB_PAD_TOP(wb),
-            WB_PAD_BOTTOM(wb),
-            WB_POOLING_SIZE_Y(wb),
-            WB_POOLING_STRIDE(wb),
-            &perf->swTilingInfo.origInY,
-            1);
-    }
-    else
-    {
-        perf->swTilingInfo.origInX = perf->info.oinx;
-        perf->swTilingInfo.origInY = perf->info.oiny;
-    }
-
-    if (op_type == VXNNE_OPERATOR_FULLYCONNECTED && op_target == VXNNE_OPERATION_TARGET_TP)
-    {
-        /*convert TP FC input/output info for arch model analysis when dims<=2 */
-        vx_uint32 inDims = input->dimCount;
-        vx_uint32 outDims = output->dimCount;
-        if ((inDims == 2) || (inDims == 1))
-        {
-            perf->info.inx = 1;
-            perf->info.iny = 1;
-            perf->info.pix = 1;
-            perf->info.piy = 1;
-            perf->info.oinx = 1;
-            perf->info.oinx = 1;
-            perf->swTilingInfo.origInX = 1;
-            perf->swTilingInfo.origInY = 1;
-            perf->info.inz = TENSOR_VIEW_SIZE_INDEX(input, 0) * TENSOR_VIEW_SIZE_INDEX(input, 1) * TENSOR_VIEW_SIZE_INDEX(input, 2);
-            perf->info.oinz = perf->info.inz;
-        }
-
-        if (((outDims == 2) || (outDims == 1)) && (wb != VX_NULL))
-        {
-            perf->info.inx = 1;
-            perf->info.iny = 1;
-            perf->info.pix = 1;
-            perf->info.piy = 1;
-            perf->swTilingInfo.origOutX = 1;
-            perf->swTilingInfo.origOutY = 1;
-            perf->swTilingInfo.origOutZ = wb->weights_sizes[3];
-            perf->info.outz = wb->weights_sizes[3];
-            perf->swTilingInfo.origInX = perf->info.oinx;
-            perf->swTilingInfo.origInY = perf->info.oiny;
-        }
-    }
-
-    perf->swTilingInfo.srcBuf = input_tiling->sRAM ? (axiSramOnlySWTiling ? SW_TILING_FROM_AXI_SRAM : SW_TILING_FROM_VIP_SRAM) : SW_TILING_FROM_DDR;
-    perf->swTilingInfo.dstBuf = output_tiling->sRAM ? (axiSramOnlySWTiling ? SW_TILING_FROM_AXI_SRAM : SW_TILING_FROM_VIP_SRAM) : SW_TILING_FROM_DDR;
-    perf->swTilingInfo.kernelBuf = (op_command->cmdInfo.kernelCacheMode == VXNNE_SRAM_CACHE_MODE_STREAM_CACHE) ? SW_TILING_FROM_VIP_SRAM : SW_TILING_FROM_DDR;
-
-    perf->info.flush = op_command->cmdInfo.flush;
-
-    calculateArchPerf(context, layer, VX_NULL, perf, wb, op_target, op_type);
-}
-
-void calculateArchPerfFromWB(
-    vx_context context,
-    vx_arch_perf perf,
-    vx_weights_biases_parameter wb,
-    vx_uint32 orig_input_dims[],
-    vx_uint32 output_dims[],
-    vx_int32* offsets,
-    vx_int32 flush,
-    vx_uint8 src_buf,
-    vx_uint8 dst_buf,
-    vx_uint8 kernel_buf,
-    vx_int32 cached_space_in_kb,
-    vxnne_operation_target_e op_target,
-    vxnne_operator_e op_type)
-{
-    vx_uint32 outXSize, outYSize, kernelXSize, kernelYSize, kernelZSize, poolingSize, poolingStride;
-    vx_int32 dataSize, xOffSet, yOffSet;
-
-    ComputeInputSize(
-        output_dims[0],
-        WB_KERNEL_X(wb),
-        WB_PAD_LEFT(wb),
-        WB_PAD_RIGHT(wb),
-        WB_POOLING_SIZE_X(wb),
-        WB_POOLING_STRIDE(wb),
-        &outXSize,
-        1);
-
-    ComputeInputSize(
-        output_dims[1],
-        WB_KERNEL_Y(wb),
-        WB_PAD_TOP(wb),
-        WB_PAD_BOTTOM(wb),
-        WB_POOLING_SIZE_Y(wb),
-        WB_POOLING_STRIDE(wb),
-        &outYSize,
-        1);
-
-    kernelXSize = WB_KERNEL_X(wb);
-    kernelYSize = WB_KERNEL_Y(wb);
-    kernelZSize = WB_KERNEL_Z(wb);
-    poolingSize = gcmMAX(1, WB_POOLING_SIZE_X(wb));
-    poolingStride = WB_POOLING_SIZE_X(wb) ? 2 : 1;
-    xOffSet = offsets == VX_NULL ? WB_STRIDE_X(wb) > 1 ? 0 : ((-1) * WB_PAD_LEFT(wb)) : offsets[0];
-    yOffSet = offsets == VX_NULL ? WB_STRIDE_Y(wb) > 1 ? 0 : ((-1) *  WB_PAD_TOP(wb)) : offsets[1];
-    dataSize = 8 * (vx_uint32)vxDataType_GetSize((vx_type_e)WB_WEIGHT_DATA_FORMAT(wb));
-
-    /********** left perf structure configuration **********/
-    perf->info.kx = kernelXSize;
-    perf->info.ky = kernelYSize;
-    perf->info.kz = kernelZSize;
-    perf->info.oinx = orig_input_dims[0];
-    perf->info.oiny = orig_input_dims[1];
-    perf->info.oinz = orig_input_dims[2];
-    if (op_type == VXNNE_OPERATOR_POOLING)
-    {
-        perf->info.inx = orig_input_dims[0];
-        perf->info.iny = orig_input_dims[1];
-        perf->info.inz = orig_input_dims[2];
-    }
-    else
-    {
-        perf->info.inx = outXSize;
-        perf->info.iny = outYSize;
-        perf->info.inz = kernelZSize;
-    }
-    perf->info.outx = output_dims[0];
-    perf->info.outy = output_dims[1];
-    perf->info.outz = output_dims[2];
-    perf->info.stridex = WB_STRIDE_X(wb);
-    perf->info.stridey = WB_STRIDE_Y(wb);
-    perf->info.dataSize = dataSize;
-    perf->info.poolingSize = poolingSize;
-    perf->info.poolingStride = poolingStride;
-    perf->info.xOffSet = xOffSet;
-    perf->info.yOffSet = yOffSet;
-
-    if (op_type == VXNNE_OPERATOR_CONVOLUTION || op_type == VXNNE_OPERATOR_DEPTH_WISE_CONV)
-    {
-        perf->swTilingInfo.origInX = perf->info.inx;
-        perf->swTilingInfo.origInY = perf->info.iny;
-    }
-    else
-    {
-        perf->swTilingInfo.origInX = perf->info.oinx;
-        perf->swTilingInfo.origInY = perf->info.oiny;
-    }
-    perf->swTilingInfo.cacheSpaceInKB = cached_space_in_kb;
-    perf->swTilingInfo.srcBuf = src_buf;
-    perf->swTilingInfo.dstBuf = dst_buf;
-    perf->swTilingInfo.kernelBuf = kernel_buf;
-
-    perf->info.p3 = (poolingSize == 3) ? 1: 0;
-    perf->info.pix = (vx_uint32)ceilf((vx_float32)(outXSize - perf->info.p3) / poolingStride);
-    perf->info.piy = (vx_uint32)ceilf((vx_float32)(outYSize - perf->info.p3) / poolingStride);
-    if ((op_target != VXNNE_OPERATION_TARGET_TP || op_type == VXNNE_OPERATOR_FULLYCONNECTED) && wb)
-      perf->info.kernelSize = (vx_uint32)(gcmALIGN_NP2(WB_STREAM_ALIGN_SIZE_INDEX(wb, 0), CACHE_ALIGNMENT_SIZE));
-    /* use wb's format as input data format for arch model performance calculation */
-    perf->info.inputDataFormat = WB_WEIGHT_DATA_FORMAT(wb);
-    perf->info.flush = 1;
-    calculateArchPerf(context, VX_NULL, VX_NULL, perf, wb, op_target, op_type);
+#endif
 }
 
 /* Write dataBits bits from data to buffer starting from bitOffset. */
@@ -4640,41 +1896,6 @@ vx_bool vxoWeightsBiasesParameter_IsValid(
     return vx_true_e;
 }
 
-VX_PRIVATE_API vx_int8 getHWDataFormat(vx_enum dataFormat)
-{
-    switch (dataFormat)
-    {
-    case VX_TYPE_UINT8:
-        return 0x0;
-    case VX_TYPE_INT8:
-        return 0x2;
-    case VX_TYPE_FLOAT16:
-        return 0x1;
-    case VX_TYPE_INT16:
-        return 0x4;
-    default:
-        break;
-    }
-
-    vxError("hw not support this data format. function %s line %d", __FUNCTION__, __LINE__);
-    return -1;
-}
-
-VX_PRIVATE_API vx_int32 getHwPoolingSze(vx_uint32 poolingSize)
-{
-    switch (poolingSize)
-    {
-    case 2:
-        return 0;
-    case 3:
-        return 1;
-    default:
-        break;
-    }
-
-    return -1;
-}
-
 vx_int32 getHwPoolingType(vx_enum poolingType)
 {
     switch (poolingType)
@@ -4897,7 +2118,273 @@ vx_status vxnneOperation_ExecuteCommands(vxnne_operation operation, vxnne_comman
     }
 }
 
-vx_status vxnneOperationCommand_GenerateTPCommands(
+void ReplaceOperationCmmdZdpOpt(
+    vxnne_tensor_info inputInfo,
+    vxnne_tensor_info outputInfo,
+    vx_weights_biases_parameter wb)
+{
+    vx_uint32 fitN = 0;
+    vx_context context = vxGetContext((vx_reference)wb);
+    vx_uint32 inputSize = vxDataType_GetSize((vx_type_e)inputInfo->dataFormat);
+    vx_uint32 outputSize = vxDataType_GetSize((vx_type_e)outputInfo->dataFormat);
+
+    calcFitZdp3N(context, inputInfo->width, inputInfo->height, &fitN, 1, wb->wb_base->pooling_size_x);
+
+    /* Need reshape input[x, y, kz] --> [x*y/fitN, fitN, kz] */
+    /* Need reshape output[x, y, vz] --> [x*y/fitN, fitN, vz] */
+    inputInfo->width = inputInfo->width * inputInfo->height / fitN;
+    inputInfo->height = fitN;
+
+    outputInfo->width = outputInfo->width * outputInfo->height / fitN;
+    outputInfo->height = fitN;
+
+    inputInfo->yStride        = inputSize * inputInfo->width;
+    inputInfo->zStride        = inputInfo->yStride * inputInfo->height;
+    outputInfo->yStride       = outputSize * outputInfo->width;
+}
+
+void ReplaceOperationCmmd1xN(
+    vxnne_tensor_info inputInfo,
+    vxnne_tensor_info outputInfo,
+    vx_weights_biases_parameter wb)
+{
+    vx_uint32 fitN = 0;
+    vx_context context = vxGetContext((vx_reference)wb);
+    vx_uint32 inputSize = vxDataType_GetSize((vx_type_e)inputInfo->dataFormat);
+    vx_uint32 outputSize = vxDataType_GetSize((vx_type_e)outputInfo->dataFormat);
+
+    fitN = calcFit1xN(context, inputInfo->depth, inputInfo->width, inputInfo->height);
+
+    /* Need reshape input[x, y, kz] --> [x*y, fitN, kz/fitN] */
+    /* Need reshape output[x, y, vz] --> [x*y, 1, vz] */
+    inputInfo->width = inputInfo->width * inputInfo->height;
+    inputInfo->height = fitN;
+    inputInfo->depth = inputInfo->depth / fitN;
+
+    outputInfo->width = outputInfo->width * outputInfo->height;
+    outputInfo->height = 1;
+
+    inputInfo->yStride        = inputSize * inputInfo->width;
+    inputInfo->zStride        = inputInfo->yStride * inputInfo->height;
+    outputInfo->yStride       = outputSize * outputInfo->width;
+}
+
+vx_uint8 MemPoolTypeToPerfType(
+    vx_enum memPoolType)
+{
+    return memPoolType == VXNNE_MEM_POOL_TYPE_AXI_SRAM ?
+                          SW_TILING_FROM_AXI_SRAM :
+                          (memPoolType == VXNNE_MEM_POOL_TYPE_VIP_SRAM ? SW_TILING_FROM_VIP_SRAM : SW_TILING_FROM_DDR);
+}
+
+VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateNNCommands(
+    vx_context               context,
+    vxnne_operation_command  operationCommand,
+    vxnne_tiling_rect        input,
+    vxnne_tiling_rect        output,
+    vxnne_command_buffer     commandBuffer)
+{
+    vx_status status;
+    vxnne_tensor_info_s inputInfo, outputInfo;
+    vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)operationCommand->operation;
+    vx_op_param parameter = &operationCommand->parameter;
+
+    vx_uint32 physical  = 0;
+    gctPOINTER logical  = gcvNULL;
+    vx_node node = convOperation->base.layer->node;
+
+    /* fix the base address here, only for DDR  */
+    if (!input->sRAM)
+    {
+        vxoTensor_GetTensorBatchArrayViewMemory(
+                convOperation->inputs,
+                operationCommand->batchID,
+                &logical,
+                &physical);
+
+        gcmASSERT(physical);
+
+        input->physical += physical;
+        input->logical   = (vx_uint8*)logical + (vx_uint32)(gctUINTPTR_T)input->logical;
+        input->logicalBase = logical;
+    }
+
+    inputInfo.width          = input->width;
+    inputInfo.height         = input->height;
+    inputInfo.depth          = TENSOR_VIEW_SIZE_INDEX(convOperation->inputs, 2);
+
+    vxmASSERT(convOperation->weights_biases->wb_base->hw_depth_wise || (WB_KERNEL_Z(convOperation->weights_biases) == inputInfo.depth));
+
+    inputInfo.dataFormat     = TENSOR_DATA_TYPE(convOperation->inputs);
+    inputInfo.roundingMode   = TENSOR_ROUNDING_MODE(convOperation->inputs);
+    inputInfo.fixedPointPos  = TENSOR_POS(convOperation->inputs);
+    inputInfo.scale          = TENSOR_TF_SCALE(convOperation->inputs);
+    inputInfo.quantFormat    = TENSOR_QUANT_TYPE(convOperation->inputs);
+    inputInfo.zeroPoint      = TENSOR_TF_ZEROPOINT(convOperation->inputs);
+    inputInfo.padZeorValue   = TENSOR_PAD_ZERO_VALUE(convOperation->inputs);
+    inputInfo.yStride          = input->yStride;
+    inputInfo.zStride          = input->zStride;
+    inputInfo.circleBufferSize = input->circleBufferSize;
+    inputInfo.physical.start   = input->physical;
+    inputInfo.sRAM             = input->sRAM;
+    inputInfo.physical.circularBufEndAddrPlus1 = input->circularBufEndAddrPlus1;
+    inputInfo.brickMode        = vx_false_e;
+    inputInfo.memoryPhysicalBase = input->memoryPhysicalBase;
+    inputInfo.memorySize         = input->memorySize;
+
+    /* fix the base address here, only for DDR  */
+    if (!output->sRAM)
+    {
+        vxoTensor_GetTensorBatchArrayViewMemory(
+                convOperation->outputs,
+                operationCommand->batchID,
+                &logical,
+                &physical);
+
+        gcmASSERT(physical);
+
+        output->physical += physical;
+        output->logical   = (vx_uint8*)logical + (vx_uint32)(gctUINTPTR_T)output->logical;
+        output->logicalBase = logical;
+    }
+
+    outputInfo.width          = output->width;
+    outputInfo.height         = output->height;
+    outputInfo.depth          = TENSOR_VIEW_SIZE_INDEX(convOperation->outputs, 2);
+
+    if (convOperation->pool_size_y != 0)
+    {
+        outputInfo.width      = operationCommand->cmdInfo.convWidth;
+        outputInfo.height     = operationCommand->cmdInfo.convHeight;
+    }
+
+    outputInfo.dataFormat     = TENSOR_DATA_TYPE(convOperation->outputs);
+    outputInfo.roundingMode   = TENSOR_ROUNDING_MODE(convOperation->outputs);
+    outputInfo.fixedPointPos  = TENSOR_POS(convOperation->outputs);
+    outputInfo.scale          = TENSOR_TF_SCALE(convOperation->outputs);
+    outputInfo.quantFormat    = TENSOR_QUANT_TYPE(convOperation->outputs);
+    outputInfo.zeroPoint      = TENSOR_TF_ZEROPOINT(convOperation->outputs);
+    outputInfo.padZeorValue   = TENSOR_PAD_ZERO_VALUE(convOperation->outputs);
+    outputInfo.yStride        = output->yStride;
+    outputInfo.zStride        = output->zStride;
+    outputInfo.circleBufferSize = output->circleBufferSize;
+    outputInfo.sRAM             = output->sRAM;
+    outputInfo.physical.start   = output->physical;
+    outputInfo.physical.circularBufEndAddrPlus1 = output->circularBufEndAddrPlus1;
+    outputInfo.brickMode        = vx_false_e;
+    outputInfo.flush            = operationCommand->cmdInfo.flush;
+    outputInfo.memoryPhysicalBase = output->memoryPhysicalBase;
+    outputInfo.memorySize         = output->memorySize;
+
+    gcmASSERT(inputInfo.physical.start && outputInfo.physical.start);
+
+    parameter->pad_x_left = operationCommand->cmdInfo.padLeft;
+    parameter->pad_y_top  = operationCommand->cmdInfo.padTop;
+    parameter->pad_x_right = 0;
+    parameter->pad_y_bottom = 0;
+    parameter->pad_mode = convOperation->padMode;
+    parameter->pad_const = convOperation->padConst != VX_NULL ? convOperation->padConst->value->n32 : 0;
+    parameter->conv_rounding_type = convOperation->conv_rounding_type;
+    parameter->enable_relu = convOperation->enable_relu;
+    parameter->pool_type = convOperation->pool_type;
+    parameter->pool_size_x = convOperation->pool_size_x;
+    parameter->pool_size_y = convOperation->pool_size_y;
+    parameter->pool_stride = operationCommand->operation->parameter.pool_size_x ? operationCommand->operation->parameter.pool_stride : 1;
+
+
+    if (convOperation->weights_biases->wb_base->do_zdp_opt &&
+        context->options.do1xnAfterSwtiling)
+    {
+        ReplaceOperationCmmdZdpOpt(&inputInfo, &outputInfo, convOperation->weights_biases);
+    }
+    else if (convOperation->weights_biases->wb_base->do_1xN &&
+        context->options.do1xnAfterSwtiling)
+    {
+        ReplaceOperationCmmd1xN(&inputInfo, &outputInfo, convOperation->weights_biases);
+    }
+
+    if (operationCommand->cmdInfo.tilingParam.kernelsPerCore == 0)
+    {
+        /*ab, ddr->ddr path*/
+        parameter->interleave_mode  = convOperation->resultInfo.interleaveMode;
+        parameter->kernels_per_core = convOperation->resultInfo.kernelsPerCore;
+        parameter->out_image_tile_x = convOperation->resultInfo.outImageTileXSize;
+        parameter->out_image_tile_y = convOperation->resultInfo.outImageTileYSize;
+        parameter->nnCoreCount      = convOperation->resultInfo.nnCoreCount;
+    }
+    else
+    {
+        /* swtiling path */
+        parameter->interleave_mode  = operationCommand->cmdInfo.tilingParam.interleaveMode;
+        parameter->kernels_per_core = operationCommand->cmdInfo.tilingParam.kernelsPerCore;
+        parameter->out_image_tile_x = operationCommand->cmdInfo.tilingParam.outImageTileXSize;
+        parameter->out_image_tile_y = operationCommand->cmdInfo.tilingParam.outImageTileYSize;
+        parameter->nnCoreCount      = operationCommand->cmdInfo.tilingParam.nnCoreCount;
+    }
+
+    vxmASSERT(operationCommand->cmdInfo.wb);
+
+    parameter->kernel_x    = WB_KERNEL_X(operationCommand->cmdInfo.wb);
+    parameter->kernel_y    = WB_KERNEL_Y(operationCommand->cmdInfo.wb);
+    parameter->kernel_z    = WB_KERNEL_Z(operationCommand->cmdInfo.wb);
+    parameter->other_ref   =  (vx_reference)operationCommand->cmdInfo.wb;
+
+    parameter->imageCacheSize   = operationCommand->cmdInfo.imageCacheSize;
+    parameter->imageCacheStart  = operationCommand->cmdInfo.imageCacheStart;
+    parameter->imageCacheMode   = operationCommand->cmdInfo.imageCacheMode;
+    parameter->kernelCacheSize  = operationCommand->cmdInfo.kernelCacheSize;
+    parameter->kernelCacheStart = operationCommand->cmdInfo.kernelCacheStart;
+    parameter->kernelCacheMode  = operationCommand->cmdInfo.kernelCacheMode;
+
+    vxmONERROR(vxnneCommandBuffer_GenerateCommands(context, node, operationCommand, &inputInfo, &outputInfo, VXNNE_OPERATION_TARGET_NN, parameter, commandBuffer));
+
+#if gcdDUMP
+    dumpNNCommandInfo(0, convOperation->weights_biases->slice_num, NULL, operationCommand);
+#endif
+
+    if (context->options.collectPerfType == COLLECT_PERF_RUN)
+    {
+        vx_arch_perf_s perf;
+        vx_tensor input, output;
+        vx_weights_biases_parameter wb;
+
+        INITIALIZE_STRUCT(perf);
+
+        input  = convOperation->inputs;
+        output = convOperation->outputs;
+        wb     = operationCommand->cmdInfo.wb;
+
+        perf.resultInfo.calculated        = HALF_DONE;
+        perf.resultInfo.interleaveMode    = operationCommand->parameter.interleave_mode;
+        perf.resultInfo.outImageTileXSize = operationCommand->parameter.out_image_tile_x;
+        perf.resultInfo.outImageTileYSize = operationCommand->parameter.out_image_tile_y;
+        perf.resultInfo.kernelsPerCore    = operationCommand->parameter.kernels_per_core;
+
+        perf.swTilingInfo.kernelCacheMode = operationCommand->parameter.kernelCacheMode;
+        perf.swTilingInfo.imageCacheMode  = operationCommand->parameter.imageCacheMode;
+
+        calculateArchPerfFromTiling(context,
+                                    convOperation->base.layer,
+                                    &perf,
+                                    &inputInfo,
+                                    &outputInfo,
+                                    input, output, wb,
+                                    operationCommand,
+                                    convOperation->base.target,
+                                    convOperation->base.operatorType);
+
+         if (context->options.enableNNArchPerfPrint)
+            showArchPerformance(context, convOperation->base.layer, &convOperation->base, &perf);
+
+    }
+
+    return VX_SUCCESS;
+
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateTPCommands(
     vx_context               context,
     vxnne_operation_command  operationCommand,
     vxnne_tiling_rect        input,
@@ -4911,7 +2398,7 @@ vx_status vxnneOperationCommand_GenerateTPCommands(
     vxnne_tp_operation tpOperation = (vxnne_tp_operation)operationCommand->operation;
     vx_op_param tpParams = &operationCommand->parameter;
 
-    vx_uint32 i, physical  = 0;
+    vx_uint32 physical  = 0;
     gctPOINTER logical  = gcvNULL;
 
     INITIALIZE_STRUCT(inputInfo);
@@ -5010,56 +2497,11 @@ vx_status vxnneOperationCommand_GenerateTPCommands(
             outputDims,
             outputInfo.dataFormat,
             -1));
-
-        vxoWeightsBiases_Clear(tpOperation->weights_biases);
     }
 
-    commandBuffer->commandCount = vxnneCalculateMultiTPSliceEx(
-                                    context,
-                                    tpParams->tpType,
-                                    inputInfo.width,
-                                    inputInfo.height,
-                                    inputInfo.depth,
-                                    outputInfo.width,
-                                    outputInfo.height,
-                                    outputInfo.depth,
-                                    tpParams->other_ref,
-                                    tpOperation->tp_value);
+    vxmONERROR(vxnneCommandBuffer_GenerateCommands(context, tpOperation->base.layer->node, operationCommand, &inputInfo, &outputInfo, VXNNE_OPERATION_TARGET_TP, tpParams, commandBuffer));
 
-    commandBuffer->eventID = (gctUINT_PTR)vxAllocate(commandBuffer->commandCount * sizeof(gctUINT32));
-    if (commandBuffer->eventID == gcvNULL) return VX_ERROR_NO_MEMORY;
-
-    if (gcoVX_AllocateMemory(
-               TP_COMMAND_SIZE * commandBuffer->commandCount,
-               &commandBuffer->logical,
-               &commandBuffer->physical,
-               &commandBuffer->node) != gcvSTATUS_OK)
-    {
-        vxmONERROR(VX_ERROR_NO_MEMORY);
-    }
-
-    for (i = 0; i < commandBuffer->commandCount; i++)
-    {
-        fillInCmdTPBufferEx(context,
-                            tpOperation->base.layer->node,
-                            &inputInfo, &outputInfo,
-                            commandBuffer,
-                            tpParams,
-                            tp_values != VX_NULL && tpOperation->separate_value ? &tp_values[i] : tp_values,
-                            tpOperation->buffer,
-                            i,
-                            commandBuffer->commandCount > 1,
-                            tpOperation->base.perCmdSize,
-                            1,
-                            i == commandBuffer->commandCount - 1 ? vx_true_e : vx_false_e);
-
-        commandBuffer->eventID[i] = i != commandBuffer->commandCount - 1 ? 1 : 0;
-
-        if (operationCommand->operation->operatorType == VXNNE_OPERATOR_FULLYCONNECTED)
-        {
-            commandBuffer->eventID[i] |= 0x80000000;
-        }
-    }
+    tpOperation->slice_num = commandBuffer->commandCount;
 
     if (context->options.collectPerfType == COLLECT_PERF_RUN)
     {
@@ -5094,320 +2536,7 @@ OnError:
     return status;
 }
 
-void ReplaceOperationCmmdZdpOpt(
-    vxnne_tensor_info inputInfo,
-    vxnne_tensor_info outputInfo,
-    vx_weights_biases_parameter wb)
-{
-    vx_uint32 fitN = 0;
-    vx_context context = vxGetContext((vx_reference)wb);
-    vx_uint32 inputSize = vxDataType_GetSize((vx_type_e)inputInfo->dataFormat);
-    vx_uint32 outputSize = vxDataType_GetSize((vx_type_e)outputInfo->dataFormat);
-
-    calcFitZdp3N(context, inputInfo->width, inputInfo->height, &fitN, 1, wb->wb_base->pooling_size_x);
-
-    /* Need reshape input[x, y, kz] --> [x*y/fitN, fitN, kz] */
-    /* Need reshape output[x, y, vz] --> [x*y/fitN, fitN, vz] */
-    inputInfo->width = inputInfo->width * inputInfo->height / fitN;
-    inputInfo->height = fitN;
-
-    outputInfo->width = outputInfo->width * outputInfo->height / fitN;
-    outputInfo->height = fitN;
-
-    inputInfo->yStride        = inputSize * inputInfo->width;
-    inputInfo->zStride        = inputInfo->yStride * inputInfo->height;
-    outputInfo->yStride       = outputSize * outputInfo->width;
-}
-
-void ReplaceOperationCmmd1xN(
-    vxnne_tensor_info inputInfo,
-    vxnne_tensor_info outputInfo,
-    vx_weights_biases_parameter wb)
-{
-    vx_uint32 fitN = 0;
-    vx_context context = vxGetContext((vx_reference)wb);
-    vx_uint32 inputSize = vxDataType_GetSize((vx_type_e)inputInfo->dataFormat);
-    vx_uint32 outputSize = vxDataType_GetSize((vx_type_e)outputInfo->dataFormat);
-
-    fitN = calcFit1xN(context, inputInfo->depth, inputInfo->width, inputInfo->height);
-
-    /* Need reshape input[x, y, kz] --> [x*y, fitN, kz/fitN] */
-    /* Need reshape output[x, y, vz] --> [x*y, 1, vz] */
-    inputInfo->width = inputInfo->width * inputInfo->height;
-    inputInfo->height = fitN;
-    inputInfo->depth = inputInfo->depth / fitN;
-
-    outputInfo->width = outputInfo->width * outputInfo->height;
-    outputInfo->height = 1;
-
-    inputInfo->yStride        = inputSize * inputInfo->width;
-    inputInfo->zStride        = inputInfo->yStride * inputInfo->height;
-    outputInfo->yStride       = outputSize * outputInfo->width;
-}
-
-VX_INTERNAL_API vx_status vxnneOperationCommand_GenerateNNCommands(
-    vx_context               context,
-    vxnne_operation_command  operationCommand,
-    vxnne_tiling_rect        input,
-    vxnne_tiling_rect        output,
-    vxnne_command_buffer     commandBuffer)
-{
-    vx_status status;
-    vxnne_tensor_info_s inputInfo, outputInfo;
-    vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)operationCommand->operation;
-    vx_bool phase3 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE3);
-    vx_op_param parameter = &operationCommand->parameter;
-
-    vx_uint32 physical  = 0, i;
-    gctPOINTER logical  = gcvNULL;
-    vx_node node = convOperation->base.layer->node;
-
-    /* fix the base address here, only for DDR  */
-    if (!input->sRAM)
-    {
-        vxoTensor_GetTensorBatchArrayViewMemory(
-                convOperation->inputs,
-                operationCommand->batchID,
-                &logical,
-                &physical);
-
-        gcmASSERT(physical);
-
-        input->physical += physical;
-        input->logical   = (vx_uint8*)logical + (vx_uint32)(gctUINTPTR_T)input->logical;
-        input->logicalBase = logical;
-    }
-
-    inputInfo.width          = input->width;
-    inputInfo.height         = input->height;
-    inputInfo.depth          = WB_KERNEL_Z(convOperation->weights_biases);
-
-    inputInfo.dataFormat     = TENSOR_DATA_TYPE(convOperation->inputs);
-    inputInfo.roundingMode   = TENSOR_ROUNDING_MODE(convOperation->inputs);
-    inputInfo.fixedPointPos  = TENSOR_POS(convOperation->inputs);
-    inputInfo.scale          = TENSOR_TF_SCALE(convOperation->inputs);
-    inputInfo.quantFormat    = TENSOR_QUANT_TYPE(convOperation->inputs);
-    inputInfo.zeroPoint      = TENSOR_TF_ZEROPOINT(convOperation->inputs);
-    inputInfo.padZeorValue   = TENSOR_PAD_ZERO_VALUE(convOperation->inputs);
-    inputInfo.yStride          = input->yStride;
-    inputInfo.zStride          = input->zStride;
-    inputInfo.circleBufferSize = input->circleBufferSize;
-    inputInfo.physical.start   = input->physical;
-    inputInfo.sRAM             = input->sRAM;
-    inputInfo.physical.circularBufEndAddrPlus1 = input->circularBufEndAddrPlus1;
-    inputInfo.brickMode        = vx_false_e;
-    inputInfo.memoryPhysicalBase = input->memoryPhysicalBase;
-    inputInfo.memorySize         = input->memorySize;
-
-    /* fix the base address here, only for DDR  */
-    if (!output->sRAM)
-    {
-        vxoTensor_GetTensorBatchArrayViewMemory(
-                convOperation->outputs,
-                operationCommand->batchID,
-                &logical,
-                &physical);
-
-        gcmASSERT(physical);
-
-        output->physical += physical;
-        output->logical   = (vx_uint8*)logical + (vx_uint32)(gctUINTPTR_T)output->logical;
-        output->logicalBase = logical;
-    }
-
-    outputInfo.width          = output->width;
-    outputInfo.height         = output->height;
-    outputInfo.depth          = TENSOR_VIEW_SIZE_INDEX(convOperation->outputs, 2);
-
-    if (convOperation->pool_size_y != 0)
-    {
-        outputInfo.width      = operationCommand->cmdInfo.convWidth;
-        outputInfo.height     = operationCommand->cmdInfo.convHeight;
-    }
-
-    outputInfo.dataFormat     = TENSOR_DATA_TYPE(convOperation->outputs);
-    outputInfo.roundingMode   = TENSOR_ROUNDING_MODE(convOperation->outputs);
-    outputInfo.fixedPointPos  = TENSOR_POS(convOperation->outputs);
-    outputInfo.scale          = TENSOR_TF_SCALE(convOperation->outputs);
-    outputInfo.quantFormat    = TENSOR_QUANT_TYPE(convOperation->outputs);
-    outputInfo.zeroPoint      = TENSOR_TF_ZEROPOINT(convOperation->outputs);
-    outputInfo.padZeorValue   = TENSOR_PAD_ZERO_VALUE(convOperation->outputs);
-    outputInfo.yStride        = output->yStride;
-    outputInfo.zStride        = output->zStride;
-    outputInfo.circleBufferSize = output->circleBufferSize;
-    outputInfo.sRAM             = output->sRAM;
-    outputInfo.physical.start   = output->physical;
-    outputInfo.physical.circularBufEndAddrPlus1 = output->circularBufEndAddrPlus1;
-    outputInfo.brickMode        = vx_false_e;
-    outputInfo.flush            = operationCommand->cmdInfo.flush;
-    outputInfo.memoryPhysicalBase = output->memoryPhysicalBase;
-    outputInfo.memorySize         = output->memorySize;
-
-    gcmASSERT(inputInfo.physical.start && outputInfo.physical.start);
-
-    parameter->pad_x_left = operationCommand->cmdInfo.padLeft;
-    parameter->pad_y_top  = operationCommand->cmdInfo.padTop;
-    parameter->pad_x_right = 0;
-    parameter->pad_y_bottom = 0;
-    parameter->pad_mode = convOperation->padMode;
-    parameter->pad_const = convOperation->padConst != VX_NULL ? convOperation->padConst->value->n32 : 0;
-    parameter->conv_rounding_type = convOperation->conv_rounding_type;
-    parameter->enable_relu = convOperation->enable_relu;
-    parameter->pool_type = convOperation->pool_type;
-    parameter->pool_size_x = convOperation->pool_size_x;
-    parameter->pool_size_y = convOperation->pool_size_y;
-    parameter->pool_stride = operationCommand->operation->parameter.pool_size_x ? operationCommand->operation->parameter.pool_stride : 1;
-
-
-    if (operationCommand->cmdInfo.wb == VX_NULL)
-    {
-        vx_uint32 outputDims[3] = {output->width, output->height, TENSOR_SIZE_INDEX(convOperation->outputs, 2)};
-        /* compress original wb */
-        vxmONERROR(vxoWeightsBiases_Compress(
-            context,
-            convOperation->weights_biases,
-            WB_PERF_KERNEL_PER_CORE(convOperation->weights_biases),
-            outputDims,
-            outputInfo.dataFormat,
-            -1));
-
-        vxoWeightsBiases_Clear(convOperation->weights_biases);
-
-        parameter->interleave_mode  = WB_PERF_INTERLEAVE_MODE(convOperation->weights_biases);
-        parameter->kernels_per_core = WB_PERF_KERNEL_PER_CORE(convOperation->weights_biases);
-        parameter->out_image_tile_x = WB_PERF_OUT_IMAGE_TILE_X(convOperation->weights_biases);
-        parameter->out_image_tile_y = WB_PERF_OUT_IMAGE_TILE_Y(convOperation->weights_biases);
-        parameter->nnCoreCount      = WB_PERF_NN_CORE_COUNT(convOperation->weights_biases);
-
-        vxnneOperation_CaculateSRAMCache(context,
-                                         operationCommand->operation,
-                                         phase3 && input->sRAM ? vx_false_e : vx_true_e,
-                                         &operationCommand->cmdInfo.kernelCacheSize,
-                                         &operationCommand->cmdInfo.kernelCacheStart,
-                                         &operationCommand->cmdInfo.kernelCacheMode,
-                                         &operationCommand->cmdInfo.imageCacheSize,
-                                         &operationCommand->cmdInfo.imageCacheStart,
-                                         &operationCommand->cmdInfo.imageCacheMode);
-
-        operationCommand->cmdInfo.wb = convOperation->weights_biases;
-        vxoReference_Increment((vx_reference)operationCommand->cmdInfo.wb, VX_REF_INTERNAL);
-    }
-    else
-    {
-        parameter->interleave_mode  = operationCommand->cmdInfo.tilingParam.interleaveMode;
-        parameter->kernels_per_core = operationCommand->cmdInfo.tilingParam.kernelsPerCore;
-        parameter->out_image_tile_x = operationCommand->cmdInfo.tilingParam.outImageTileXSize;
-        parameter->out_image_tile_y = operationCommand->cmdInfo.tilingParam.outImageTileYSize;
-        parameter->nnCoreCount      = operationCommand->cmdInfo.tilingParam.nnCoreCount;
-        if (phase3 && input->sRAM)
-        {
-            operationCommand->cmdInfo.imageCacheMode = VXNNE_SRAM_CACHE_MODE_STREAM_CACHE;
-        }
-    }
-
-    parameter->kernel_x    = WB_KERNEL_X(operationCommand->cmdInfo.wb);
-    parameter->kernel_y    = WB_KERNEL_Y(operationCommand->cmdInfo.wb);
-    parameter->other_ref   =  (vx_reference)operationCommand->cmdInfo.wb;
-
-    parameter->imageCacheSize   = operationCommand->cmdInfo.imageCacheSize;
-    parameter->imageCacheStart  = operationCommand->cmdInfo.imageCacheStart;
-    parameter->imageCacheMode   = operationCommand->cmdInfo.imageCacheMode;
-    parameter->kernelCacheSize  = operationCommand->cmdInfo.kernelCacheSize;
-    parameter->kernelCacheStart = operationCommand->cmdInfo.kernelCacheStart;
-    parameter->kernelCacheMode  = operationCommand->cmdInfo.kernelCacheMode;
-
-    commandBuffer->commandCount = 1;
-
-    if (inputInfo.height > NN_IMAGE_YSIZE_MAX)
-    {
-        commandBuffer->commandCount *= gcmALIGN_NP2(inputInfo.height, NN_IMAGE_YSIZE_MAX) / NN_IMAGE_YSIZE_MAX;
-    }
-
-    if (inputInfo.width > NN_IMAGE_XSIZE_MAX)
-    {
-        commandBuffer->commandCount *= gcmALIGN_NP2(inputInfo.width, NN_IMAGE_XSIZE_MAX) / NN_IMAGE_XSIZE_MAX;
-    }
-
-    commandBuffer->eventID = (gctUINT_PTR)vxAllocate(commandBuffer->commandCount * sizeof(gctUINT32));
-    if (commandBuffer->eventID == gcvNULL) return VX_ERROR_NO_MEMORY;
-
-    if (gcoVX_AllocateMemory(
-               NNE_COMMAND_SIZE * commandBuffer->commandCount,
-               &commandBuffer->logical,
-               &commandBuffer->physical,
-               &commandBuffer->node) != gcvSTATUS_OK)
-    {
-        vxmONERROR(VX_ERROR_NO_MEMORY);
-    }
-
-    for (i = 0; i < commandBuffer->commandCount; i++)
-    {
-        fillInCmdNNBufferEx(context,
-                            node,
-                            &inputInfo,
-                            &outputInfo,
-                            commandBuffer,
-                            parameter,
-                            i);
-
-        if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_SMALLBATCH_PHASE1))
-        {
-            commandBuffer->eventID[i] = 0;
-        }
-        else
-        {
-            commandBuffer->eventID[i] = i != commandBuffer->commandCount - 1 ? 1 : 0;
-        }
-    }
-
-
-#if gcdDUMP
-    dumpNNCommandInfo(0, convOperation->weights_biases->slice_num, NULL, operationCommand);
-#endif
-
-    if (context->options.collectPerfType == COLLECT_PERF_RUN)
-    {
-        vx_arch_perf_s perf;
-        vx_tensor input, output;
-        vx_weights_biases_parameter wb;
-
-        INITIALIZE_STRUCT(perf);
-
-        input  = convOperation->inputs;
-        output = convOperation->outputs;
-        wb     = operationCommand->cmdInfo.wb;
-
-        perf.resultInfo.calculated        = HALF_DONE;
-        perf.resultInfo.interleaveMode    = operationCommand->parameter.interleave_mode;
-        perf.resultInfo.outImageTileXSize = operationCommand->parameter.out_image_tile_x;
-        perf.resultInfo.outImageTileYSize = operationCommand->parameter.out_image_tile_y;
-        perf.resultInfo.kernelsPerCore    = operationCommand->parameter.kernels_per_core;
-
-        perf.swTilingInfo.kernelCacheMode = operationCommand->parameter.kernelCacheMode;
-        perf.swTilingInfo.imageCacheMode  = operationCommand->parameter.imageCacheMode;
-
-        calculateArchPerfFromTiling(context,
-                                    convOperation->base.layer,
-                                    &perf,
-                                    &inputInfo,
-                                    &outputInfo,
-                                    input, output, wb,
-                                    operationCommand,
-                                    convOperation->base.target,
-                                    convOperation->base.operatorType);
-
-         if (context->options.enableNNArchPerfPrint)
-            showArchPerformance(context, convOperation->base.layer, &convOperation->base, &perf);
-
-    }
-
-    return VX_SUCCESS;
-
-OnError:
-    return status;
-}
-
-vx_status vxnneOperationCommand_GenerateCommands(
+VX_INTERNAL_API vx_status vxnneOperationCommand_GenerateCommands(
     vx_context               context,
     vxnne_operation_command  operationCommand)
 {
@@ -5423,7 +2552,7 @@ vx_status vxnneOperationCommand_GenerateCommands(
                         context, operationCommand,
                         &operationCommand->inputTile,
                         &operationCommand->outputTile,
-                        ((vxnne_tp_operation)operation)->tp_value,
+                        operation->parameter.tp_value,
                         &operationCommand->commandBuffer);
         }
         else
@@ -5711,63 +2840,7 @@ VX_INTERNAL_API vx_status vxnneSRAM_AllocateEx(
     vx_enum                 allocateFlag
     )
 {
-    gctPOINTER logicalOut = 0;
-    gctUINT32  physicalOut = 0;
-
-    if (allocateFlag & VXNNE_BUFFER_ALLOCATE_FLAG_HEAD)
-    {
-        logicalOut = sRam->logical;
-        physicalOut = sRam->physical;
-
-        if (allocateFlag & VXNNE_BUFFER_ALLOCATE_FLAG_APPEND)
-        {
-            vxmASSERT(sRam->used != 0);
-            /*free the tail*/
-            sRam->tailUsed = 0;
-            logicalOut = (gctUINT8*)logicalOut + sRam->used;
-            physicalOut += sRam->used;
-            sRam->used += size;
-        }
-        else
-        {
-            sRam->used = size;
-        }
-
-    }
-    else if (allocateFlag & VXNNE_BUFFER_ALLOCATE_FLAG_TAIL)
-    {
-        logicalOut = (vx_uint8*)sRam->logical + sRam->size;
-        physicalOut = sRam->physical + sRam->size;
-
-        if (allocateFlag & VXNNE_BUFFER_ALLOCATE_FLAG_APPEND)
-        {
-            vxmASSERT(sRam->tailUsed != 0);
-            /*free the head*/
-            sRam->used = 0;
-            sRam->tailUsed += size;
-        }
-        else
-        {
-
-            sRam->tailUsed = size;
-        }
-
-        logicalOut = (gctUINT8*)logicalOut - sRam->tailUsed;
-        physicalOut -= sRam->tailUsed;
-    }
-    else
-    {
-        vxmASSERT(0);
-        return VX_ERROR_INVALID_VALUE;
-    }
-
-    vxmASSERT(sRam->tailUsed + sRam->used <= sRam->size);
-    vxmASSERT((vx_uint8*)logicalOut + size <= (vx_uint8*)sRam->logical + sRam->size);
-    vxmASSERT(physicalOut + size <= sRam->physical + sRam->size);
-
-    if (logical) *logical = logicalOut;
-    if (physical) *physical = physicalOut;
-
+    vxmASSERT(0);
     return VX_SUCCESS;
 }
 
@@ -5788,3751 +2861,6 @@ VX_INTERNAL_API vx_status vxnneSRAM_Reset(
     sRam->used = 0;
     sRam->tailUsed = 0;
     return VX_SUCCESS;
-}
-
-void fillInCmdNNBufferEx(
-    vx_context                   context,
-    vx_node                      node,
-    vxnne_tensor_info            input,
-    vxnne_tensor_info            output,
-    vxnne_command_buffer         cmd_buffer,
-    vx_op_param                  conv_cmd_ptr,
-    vx_uint32                    slice_index
-    )
-{
-    vx_nn_cmd_info_u info;
-    vx_uint32 inImageTileSizeX, inImageTileSizeY, outImageTileSizeX, outImageTileSizeY;
-    vx_uint32 kernelX, kernelY, kernelZ, kernelsPerCore, interleaveMode, nnCoreCount;
-    vx_uint32 inXSize, inYSize, outXSize, outYSize, outZSize, xcount, ycount;
-    vx_enum inDataFormat, inQuantFormat, outDataFormat, outQuantFormat, outRMode;
-    vx_int8 inFPP, outFPP;
-    vx_int32 inZP, outZP;
-    vx_float32 inScale, outScale;
-    vx_weights_biases_parameter weights_biases = (vx_weights_biases_parameter) conv_cmd_ptr->other_ref;
-    vx_bool isV8 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP0);
-
-    memset(&info, 0, sizeof(vx_nn_cmd_info_u));
-
-    inXSize = input->width;
-    inYSize = input->height;
-    kernelZ = input->depth;
-    outXSize = output->width;
-    outYSize = output->height;
-    outZSize = output->depth;
-    inDataFormat   = input->dataFormat;
-    inQuantFormat  = input->quantFormat;
-    outDataFormat  = output->dataFormat;
-    outQuantFormat = output->quantFormat;
-    inFPP  = input->fixedPointPos;
-    outFPP = output->fixedPointPos;
-    outRMode = output->roundingMode;
-    inScale  = input->scale;
-    outScale = output->scale;
-    inZP  = input->zeroPoint;
-    outZP = output->zeroPoint;
-
-    kernelX = conv_cmd_ptr->kernel_x;
-    kernelY = conv_cmd_ptr->kernel_y;
-    outImageTileSizeX  = conv_cmd_ptr->out_image_tile_x;
-    outImageTileSizeY  = conv_cmd_ptr->out_image_tile_y;
-    kernelsPerCore     = conv_cmd_ptr->kernels_per_core;
-    interleaveMode     = conv_cmd_ptr->interleave_mode;
-    nnCoreCount        = conv_cmd_ptr->nnCoreCount;
-
-    info.vx_nn_general_cmd_info.kernelXSize       = kernelX;
-    info.vx_nn_general_cmd_info.kernelYSize       = kernelY;
-    info.vx_nn_general_cmd_info.kernelZSize       = kernelZ;
-    info.vx_nn_general_cmd_info.kernelsPerCore    = kernelsPerCore;
-
-
-    info.vx_nn_general_cmd_info.kernelAddress     = (vx_uint32)WB_MEM_PHYSICAL_ADDR_INDEX(weights_biases, 0);
-
-
-    info.vx_nn_general_cmd_info.pooling           = getHwPoolingType(conv_cmd_ptr->pool_type);
-    info.vx_nn_general_cmd_info.poolingXYSize     = getHwPoolingSze(conv_cmd_ptr->pool_size_x);
-    info.vx_nn_general_cmd_info.relu              = conv_cmd_ptr->enable_relu;
-    info.vx_nn_general_cmd_info.inImageXSize      = inXSize;
-    info.vx_nn_general_cmd_info.inImageYSize      = inYSize;
-    info.vx_nn_general_cmd_info.outImageXSize     = outXSize;
-    info.vx_nn_general_cmd_info.outImageYSize     = outYSize;
-    info.vx_nn_general_cmd_info.outImageZSize     = outZSize;
-
-    info.vx_nn_general_cmd_info.hwDepthWise       = weights_biases->wb_base->hw_depth_wise ? 1 : 0;
-    info.vx_nn_general_cmd_info.noZOffset         = 0;
-    info.vx_nn_general_cmd_info.pRelu             = 0;
-    info.vx_nn_general_cmd_info.perChannelPostMul = 0;
-
-    /* add assert for hw limitation */
-    gcmASSERT(info.vx_nn_general_cmd_info.outImageZSize <= NN_IMAGE_ZSIZE_MAX);
-
-    info.vx_nn_general_cmd_info.inImageAddress = input->physical.start;
-    info.vx_nn_general_cmd_info.inImageXstride = input->yStride;
-    info.vx_nn_general_cmd_info.inImageYstride = input->zStride / input->yStride;
-
-    info.vx_nn_general_cmd_info.outImageAddress = output->physical.start;
-    info.vx_nn_general_cmd_info.outImageXstride = output->yStride;
-    info.vx_nn_general_cmd_info.outImageYstride = output->zStride / output->yStride;
-
-    if (output->sRAM)
-    {
-        info.vx_nn_general_cmd_info.outImageCircularBufSize = output->circleBufferSize;
-        info.vx_nn_general_cmd_info.outImageCircularBufEndAddrPlus1 = output->physical.circularBufEndAddrPlus1;
-    }
-    else
-    {
-        info.vx_nn_general_cmd_info.outImageCircularBufSize         = 0;
-        info.vx_nn_general_cmd_info.outImageCircularBufEndAddrPlus1 = 0xFFFFFFFF;
-    }
-
-    if (input->sRAM)
-    {
-        /*inImageCircularBufSize*/
-        info.vx_nn_general_cmd_info.inImageCircularBufSize = input->circleBufferSize;
-        /*inImageCircularBufEndAddrPlus1*/
-        info.vx_nn_general_cmd_info.inImageCircularBufEndAddrPlus1  = input->physical.circularBufEndAddrPlus1;
-    }
-    else
-    {
-        /*inImageCircularBufSize*/
-        info.vx_nn_general_cmd_info.inImageCircularBufSize   = 0;
-        /*inImageCircularBufEndAddrPlus1*/
-        info.vx_nn_general_cmd_info.inImageCircularBufEndAddrPlus1     = 0xFFFFFFFF;
-    }
-
-    info.vx_nn_general_cmd_info.noFlush           = output->flush ? 0 : 1;
-
-    if (input->brickMode)
-    {
-        info.vx_nn_general_cmd_info.inImageXOffset    = 0;
-        info.vx_nn_general_cmd_info.inImageYOffset    = 0;
-    }
-    else
-    {
-        info.vx_nn_general_cmd_info.inImageXOffset    = (-1) * conv_cmd_ptr->pad_x_left;
-        info.vx_nn_general_cmd_info.inImageYOffset    = (-1) * conv_cmd_ptr->pad_y_top;
-
-        switch (context->nnConfig.fixedFeature.nnInImageOffsetBits)
-        {
-        case 4:
-            /* 4-bit XYOffset: [-8, 7]. */
-            gcmASSERT((info.vx_nn_general_cmd_info.inImageXOffset >= -8 && info.vx_nn_general_cmd_info.inImageXOffset <= 7) &&
-                      (info.vx_nn_general_cmd_info.inImageYOffset >= -8 && info.vx_nn_general_cmd_info.inImageYOffset <= 7));
-            break;
-        case 3:
-            /* 3-bit XYOffset: [-4, 3]. */
-            gcmASSERT((info.vx_nn_general_cmd_info.inImageXOffset >= -4 && info.vx_nn_general_cmd_info.inImageXOffset <= 3) &&
-                      (info.vx_nn_general_cmd_info.inImageYOffset >= -4 && info.vx_nn_general_cmd_info.inImageYOffset <= 3));
-            break;
-        default:
-            vxError("Invalid nnInImageOffsetBits: %u.\n", context->nnConfig.fixedFeature.nnInImageOffsetBits);
-            gcmASSERT(0);
-            break;
-        }
-
-    }
-
-    xcount = gcmALIGN_NP2(info.vx_nn_general_cmd_info.inImageXSize, NN_IMAGE_XSIZE_MAX) / NN_IMAGE_XSIZE_MAX;
-    ycount = gcmALIGN_NP2(info.vx_nn_general_cmd_info.inImageYSize, NN_IMAGE_YSIZE_MAX) / NN_IMAGE_YSIZE_MAX;
-
-    if (info.vx_nn_general_cmd_info.inImageXSize > NN_IMAGE_XSIZE_MAX)
-    {
-        vx_uint32 isize, osize, ioffset, ooffset;
-        vx_uint32 slice = slice_index % xcount;
-
-        osize = info.vx_nn_general_cmd_info.outImageXSize / xcount;
-        ooffset = slice * osize;
-
-        if (info.vx_nn_general_cmd_info.pooling == VIV_NN_POOLING_NON)
-        {
-            isize = osize - 1 + info.vx_nn_general_cmd_info.kernelXSize;
-        }
-        else
-        {
-            isize = ((osize - 1) * conv_cmd_ptr->pool_stride + info.vx_nn_general_cmd_info.poolingXYSize) - 1 + info.vx_nn_general_cmd_info.kernelXSize;
-        }
-
-        if (slice)
-        {
-            ioffset = info.vx_nn_general_cmd_info.inImageXOffset ? gcmMAX(0, (vx_int32)(ooffset + info.vx_nn_general_cmd_info.inImageXOffset)) : ooffset;
-
-            info.vx_nn_general_cmd_info.inImageAddress += ioffset * vxnneGetTypeSize(inDataFormat);
-            info.vx_nn_general_cmd_info.outImageAddress += ooffset * vxnneGetTypeSize(outDataFormat);
-            info.vx_nn_general_cmd_info.inImageXOffset = gcmMIN(0, (vx_int32)(ooffset + info.vx_nn_general_cmd_info.inImageXOffset));
-
-            if (slice == xcount - 1)
-            {
-                isize = info.vx_nn_general_cmd_info.inImageXSize - ioffset;
-                osize = info.vx_nn_general_cmd_info.outImageXSize - ooffset;
-            }
-        }
-
-        info.vx_nn_general_cmd_info.inImageXSize = slice == xcount - 1 ? isize : isize + info.vx_nn_general_cmd_info.inImageXOffset;
-        info.vx_nn_general_cmd_info.outImageXSize = osize;
-    }
-
-    if (info.vx_nn_general_cmd_info.inImageYSize > NN_IMAGE_YSIZE_MAX)
-    {
-        vx_uint32 isize, osize, ioffset, ooffset;
-        vx_uint32 slice = slice_index / xcount;
-
-        osize = info.vx_nn_general_cmd_info.outImageYSize / ycount;
-        ooffset = slice * osize;
-
-        if (info.vx_nn_general_cmd_info.pooling == VIV_NN_POOLING_NON)
-        {
-            isize = osize - 1 + info.vx_nn_general_cmd_info.kernelYSize;
-        }
-        else
-        {
-            isize = ((osize - 1) * conv_cmd_ptr->pool_stride + info.vx_nn_general_cmd_info.poolingXYSize) - 1 + info.vx_nn_general_cmd_info.kernelYSize;
-        }
-
-        if (slice)
-        {
-            ioffset = info.vx_nn_general_cmd_info.inImageYOffset ? gcmMAX(0, (vx_int32)(ooffset + info.vx_nn_general_cmd_info.inImageYOffset)) : ooffset;
-
-            info.vx_nn_general_cmd_info.inImageAddress += ioffset * info.vx_nn_general_cmd_info.inImageXstride;
-            info.vx_nn_general_cmd_info.outImageAddress += ooffset * info.vx_nn_general_cmd_info.outImageXstride;
-            info.vx_nn_general_cmd_info.inImageYOffset = gcmMIN(0, (vx_int32)(ooffset + info.vx_nn_general_cmd_info.inImageYOffset));
-
-            if (slice == ycount - 1)
-            {
-                isize = info.vx_nn_general_cmd_info.inImageYSize - ioffset;
-                osize = info.vx_nn_general_cmd_info.outImageYSize - ooffset;
-            }
-        }
-
-        info.vx_nn_general_cmd_info.inImageYSize = slice == ycount - 1 ? isize : isize + info.vx_nn_general_cmd_info.inImageYOffset;
-        info.vx_nn_general_cmd_info.outImageYSize = osize;
-    }
-
-    gcmASSERT((info.vx_nn_general_cmd_info.outImageXSize <= NN_IMAGE_XSIZE_MAX) && (info.vx_nn_general_cmd_info.outImageYSize <= NN_IMAGE_YSIZE_MAX));
-
-    info.vx_nn_general_cmd_info.outImageTileXSize = outImageTileSizeX;
-    info.vx_nn_general_cmd_info.outImageTileYSize = outImageTileSizeY;
-
-    /* Fixed same type in this stage. */
-    info.vx_nn_general_cmd_info.kernelDataType    = getHWDataFormat(WB_WEIGHT_DATA_FORMAT(weights_biases));
-    info.vx_nn_general_cmd_info.inImageDataType   = getHWDataFormat(inDataFormat);
-    info.vx_nn_general_cmd_info.outImageDataType  = getHWDataFormat(outDataFormat);
-
-    /* Since V7 HW WORD1 only has 2 bits for kerenl data type, input data type & output data type,
-     * int16 value 0x4 will overflow, need add MSB value to WORD15 to cover
-     */
-    if (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT16)
-        info.vx_nn_general_cmd_info.kernelDataTypeMsb = 1;
-
-    if (inDataFormat == VX_TYPE_INT16)
-        info.vx_nn_general_cmd_info.inImageDataTypeMsb = 1;
-
-    if (outDataFormat == VX_TYPE_INT16)
-        info.vx_nn_general_cmd_info.outImageDataTypeMsb = 1;
-
-    gcmASSERT(info.vx_nn_general_cmd_info.inImageDataType == info.vx_nn_general_cmd_info.kernelDataType);
-
-    info.vx_nn_general_cmd_info.postMultiplier = 0;
-    info.vx_nn_general_cmd_info.roundingMode   = getHWRoundingMode((vx_nn_round_mode_e)outRMode, outDataFormat, vx_false_e);
-
-    if (((inDataFormat == VX_TYPE_UINT8) && (inQuantFormat == VX_QUANT_AFFINE_SCALE)) ||
-        ((WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_UINT8) && (WB_WEIGHT_QUANT_FORMAT(weights_biases) == VX_QUANT_AFFINE_SCALE)) ||
-        ((outDataFormat == VX_TYPE_UINT8) && (outQuantFormat == VX_QUANT_AFFINE_SCALE)))
-    {
-        vx_float32 scale;
-        vx_uint32 uintScale;
-        vx_uint32 tmpMultiply;
-        vx_int32 exp;
-        vx_int8 tmpPostShift;
-        vx_float32 wScale = WB_WEIGHT_SCALE(weights_biases);
-        vx_float32 bScale = WB_BIAS_SCALE(weights_biases);
-
-        if (inQuantFormat  == VX_QUANT_DYNAMIC_FIXED_POINT)
-        {
-            inScale = vxnneConvertDynamicFixPointValueToFloat32(1.0, inFPP);
-        }
-
-        if (WB_WEIGHT_QUANT_FORMAT(weights_biases) == VX_QUANT_DYNAMIC_FIXED_POINT)
-        {
-            wScale = vxnneConvertDynamicFixPointValueToFloat32(1.0, WB_WEIGHT_FPP(weights_biases));
-            bScale = vxnneConvertDynamicFixPointValueToFloat32(1.0, WB_BIAS_FPP(weights_biases));
-        }
-
-        if (outQuantFormat == VX_QUANT_DYNAMIC_FIXED_POINT)
-        {
-            outScale = vxnneConvertDynamicFixPointValueToFloat32(1.0, outFPP);
-        }
-
-        scale = inScale * wScale / outScale;
-        uintScale = *((vx_uint32*)(&scale));
-        tmpMultiply = (uintScale & 0x7FFFFF) >> 8; /* postMultiply is high 15-bit of Scale's mantissa*/
-        exp = (uintScale & 0x7F800000) >> 23; /* postShift is Scale's exp*/
-
-        /* HW design follow the paper, biasScale = inputScale * coefScale*/
-        if (!weights_biases->wb_base->no_bias)
-        {
-            vxmASSERT(gcmABS(bScale - inScale * wScale) < 0.000001);
-        }
-
-        info.vx_nn_general_cmd_info.postMultiplier = tmpMultiply & 1;
-        tmpMultiply = tmpMultiply >> 1;
-        info.vx_nn_general_cmd_info.postMultiplierBit6to1 = tmpMultiply & 0x3F;
-        tmpMultiply = tmpMultiply >> 6;
-        info.vx_nn_general_cmd_info.postMultiplierBit14to7 = tmpMultiply;
-
-        if (isV8)
-            tmpPostShift = 127 - (vx_int8)exp;
-        else
-            tmpPostShift = 15 - ((vx_int8)exp - 127);
-        info.vx_nn_general_cmd_info.postShift = tmpPostShift & 0x1F;
-        tmpPostShift = tmpPostShift >> 5;
-        info.vx_nn_general_cmd_info.postShiftBit6to5 = tmpPostShift & 3;
-
-        info.vx_nn_general_cmd_info.coefZP = WB_WEIGHT_ZP(weights_biases);
-        info.vx_nn_general_cmd_info.outputZP = outZP;
-    }
-    else if ((inQuantFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ||
-             (WB_WEIGHT_QUANT_FORMAT(weights_biases) == VX_QUANT_DYNAMIC_FIXED_POINT) ||
-             (outQuantFormat == VX_QUANT_DYNAMIC_FIXED_POINT))
-    {
-        if (WB_BIAS_DATA(weights_biases) != VX_NULL)
-        {
-            /* fl(in) + fl(weights) == fl(bias) */
-           vxmASSERT(inFPP + WB_WEIGHT_FPP(weights_biases) == WB_BIAS_FPP(weights_biases));
-        }
-        info.vx_nn_general_cmd_info.postShift = inFPP - outFPP + WB_WEIGHT_FPP(weights_biases);
-        if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) &&
-           (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT8 && outDataFormat != VX_TYPE_FLOAT16) &&
-           !isV8)
-        {
-            info.vx_nn_general_cmd_info.postShift += 15;
-        }
-    }
-    else
-    {
-        info.vx_nn_general_cmd_info.postShift = 0;
-    }
-
-#if NN_WSZIE_REG
-    info.vx_nn_general_cmd_info.wSize = 1;
-#endif
-
-#if NN_LAYER_FLUSH
-    info.vx_nn_general_cmd_info.nn_layer_flush = 1;
-#else
-    info.vx_nn_general_cmd_info.nn_layer_flush = 0;
-#endif
-
-    inImageTileSizeX = outImageTileSizeX - 1 + kernelX;
-    inImageTileSizeY = outImageTileSizeY - 1 + kernelY;
-
-    if (input->brickMode)
-    {
-        info.vx_nn_general_cmd_info.brickMode = 1;
-        info.vx_nn_general_cmd_info.brickDistance = inImageTileSizeX * inImageTileSizeY * kernelZ * vxnneGetTypeSize((vx_type_e)inDataFormat);
-    }
-    else
-    {
-        info.vx_nn_general_cmd_info.brickMode = 0;
-        info.vx_nn_general_cmd_info.brickDistance = 0;
-    }
-
-    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SRAM))
-    {
-        if (conv_cmd_ptr->imageCacheMode == VXNNE_SRAM_CACHE_MODE_FULL_CACHE &&
-            checkImageCacheMode(info.vx_nn_general_cmd_info.outImageZSize, info.vx_nn_general_cmd_info.kernelsPerCore, nnCoreCount))
-        {
-            info.vx_nn_general_cmd_info.imageCachingMode    = 1;
-            info.vx_nn_general_cmd_info.imageStartAddress   = conv_cmd_ptr->imageCacheStart;
-            info.vx_nn_general_cmd_info.imageEndAddress     = conv_cmd_ptr->imageCacheStart + conv_cmd_ptr->imageCacheSize;
-            vxmASSERT(conv_cmd_ptr->imageCacheSize != 0);
-        }
-        else
-        {
-            info.vx_nn_general_cmd_info.imageCachingMode              = 0;
-            info.vx_nn_general_cmd_info.imageStartAddress             = 0;
-            info.vx_nn_general_cmd_info.imageEndAddress               = 2048;
-            conv_cmd_ptr->imageCacheMode                              = VXNNE_SRAM_CACHE_MODE_NONE;
-        }
-
-        if (conv_cmd_ptr->kernelCacheMode == VXNNE_SRAM_CACHE_MODE_STREAM_CACHE)
-        {
-            info.vx_nn_general_cmd_info.kernelCachingMode = 0;
-            info.vx_nn_general_cmd_info.kernelCacheStartAddress = conv_cmd_ptr->kernelCacheStart;
-            info.vx_nn_general_cmd_info.kernelCacheEndAddress   = conv_cmd_ptr->kernelCacheStart + conv_cmd_ptr->kernelCacheSize;
-            info.vx_nn_general_cmd_info.kernelDirectStreamFromVipSram = 1;
-            vxmASSERT(info.vx_nn_general_cmd_info.kernelCacheStartAddress && info.vx_nn_general_cmd_info.kernelCacheEndAddress);
-        }
-        else if (conv_cmd_ptr->kernelCacheMode == VXNNE_SRAM_CACHE_MODE_FULL_CACHE)
-        {
-            info.vx_nn_general_cmd_info.kernelCachingMode = 1;
-            info.vx_nn_general_cmd_info.kernelCacheStartAddress = conv_cmd_ptr->kernelCacheStart;
-            info.vx_nn_general_cmd_info.kernelCacheEndAddress   = conv_cmd_ptr->kernelCacheStart + conv_cmd_ptr->kernelCacheSize;
-        }
-        else if (conv_cmd_ptr->kernelCacheMode == VXNNE_SRAM_CACHE_MODE_PARTIAL_CACHE)
-        {
-            vx_uint32 kernelStreamAlignSize = (vx_uint32)gcmALIGN_NP2(WB_CONV_STREAM_ALIGN_SIZE(weights_biases), CACHE_ALIGNMENT_SIZE);
-
-            vx_float32 ratio = (vx_float32)(kernelStreamAlignSize - conv_cmd_ptr->kernelCacheSize) / conv_cmd_ptr->kernelCacheSize;
-
-            vx_uint64 kernelPatternBits = 0;
-            vx_uint32 dataUnitByte = 64;
-            vx_uint32 numZero = 0;
-            vx_uint32 numOne = 0;
-
-            /* drv set pattern 0x8000 0000 0000 0000, end addr no more than SRAM size.
-               sram fetch from sram until end of boundary*/
-            ratio = (ratio >= 63) ? 63 : ratio;
-
-            if (ratio > 1)
-            {
-                numOne = 1;
-                numZero = (gctUINT32)gcoMATH_Ceiling(ratio);
-            }
-            else
-            {
-                numOne = gcoMATH_MIN((gctUINT32)gcoMATH_Floor(1/ratio), 63);
-                numZero = 1;
-            }
-
-            vxmASSERT(kernelStreamAlignSize - conv_cmd_ptr->kernelCacheSize > 0);
-
-            kernelPatternBits = ((((vx_uint64)-1) >> (64 - (numOne + numZero)))) >> numZero;
-            info.vx_nn_general_cmd_info.kernelPatternMsb        = (numOne + numZero) - 1;
-            info.vx_nn_general_cmd_info.kernelPatternLow32Bits  = kernelPatternBits & 0xFFFFFFFF;
-            info.vx_nn_general_cmd_info.kernelPatternHigh32Bits = kernelPatternBits >> 32;
-
-            info.vx_nn_general_cmd_info.kernelCachingMode       = 2;
-            info.vx_nn_general_cmd_info.partialCacheDataUnit    = NN_KS_PARTIAL_CACHE_DATA_UNIT;
-            switch (info.vx_nn_general_cmd_info.partialCacheDataUnit)
-            {
-            case 0:
-                dataUnitByte = 64;
-                break;
-            case 1:
-                dataUnitByte = 128;
-                break;
-            case 2:
-                dataUnitByte = 256;
-                break;
-            case 3:
-                dataUnitByte = 512;
-                break;
-            }
-
-            info.vx_nn_general_cmd_info.kernelCacheStartAddress = conv_cmd_ptr->kernelCacheStart;
-
-            info.vx_nn_general_cmd_info.kernelCacheEndAddress =
-                info.vx_nn_general_cmd_info.kernelCacheStartAddress +
-                ((vx_uint32)gcoMATH_Ceiling((vx_float32)WB_CONV_STREAM_ALIGN_SIZE(weights_biases) /
-                 (dataUnitByte * (info.vx_nn_general_cmd_info.kernelPatternMsb + 1)))) *
-                (dataUnitByte * (vxnneGetOneNumber(info.vx_nn_general_cmd_info.kernelPatternLow32Bits) +
-                                 vxnneGetOneNumber(info.vx_nn_general_cmd_info.kernelPatternHigh32Bits)));
-
-            if(info.vx_nn_general_cmd_info.kernelCacheEndAddress > context->vipSRAM.physical + context->vipSRAM.size)
-            {
-                vx_uint32 kernelCacheSizeInSram = 0x0;
-                info.vx_nn_general_cmd_info.kernelCacheEndAddress = context->vipSRAM.physical + context->vipSRAM.size;
-                kernelCacheSizeInSram = info.vx_nn_general_cmd_info.kernelCacheEndAddress - info.vx_nn_general_cmd_info.kernelCacheStartAddress;
-                if(kernelCacheSizeInSram % dataUnitByte != 0 )
-                {
-                    kernelCacheSizeInSram = (kernelCacheSizeInSram / dataUnitByte) * dataUnitByte;
-                    vxmASSERT(kernelCacheSizeInSram != 0);
-                    info.vx_nn_general_cmd_info.kernelCacheEndAddress = info.vx_nn_general_cmd_info.kernelCacheStartAddress + kernelCacheSizeInSram;
-                }
-            }
-
-            gcmASSERT(info.vx_nn_general_cmd_info.kernelCacheEndAddress > info.vx_nn_general_cmd_info.kernelCacheStartAddress);
-            gcmASSERT(((info.vx_nn_general_cmd_info.kernelCacheEndAddress - info.vx_nn_general_cmd_info.kernelCacheStartAddress) % dataUnitByte) == 0);
-        }
-        else
-        {
-            vxmASSERT(conv_cmd_ptr->kernelCacheMode == VXNNE_SRAM_CACHE_MODE_NONE);
-
-            info.vx_nn_general_cmd_info.kernelCachingMode = 0;
-            info.vx_nn_general_cmd_info.partialCacheDataUnit = 0;
-            info.vx_nn_general_cmd_info.kernelPatternMsb = 0;
-            info.vx_nn_general_cmd_info.kernelPatternLow32Bits = 0;
-            info.vx_nn_general_cmd_info.kernelPatternHigh32Bits = 0;
-            info.vx_nn_general_cmd_info.kernelCacheStartAddress = 0;
-            info.vx_nn_general_cmd_info.kernelCacheEndAddress = 0;
-        }
-        if (context->options.enableSramStreamMode)  /* test for image stream mode and kernel stream mode */
-        {
-            info.vx_nn_general_cmd_info.imageCachingMode = 0;
-            info.vx_nn_general_cmd_info.imageStartAddress = 0;
-            info.vx_nn_general_cmd_info.imageEndAddress = 2048;
-
-            info.vx_nn_general_cmd_info.kernelCachingMode = 0;
-            info.vx_nn_general_cmd_info.partialCacheDataUnit = 0;
-            info.vx_nn_general_cmd_info.kernelPatternMsb = 0;
-            info.vx_nn_general_cmd_info.kernelPatternLow32Bits = 0;
-            info.vx_nn_general_cmd_info.kernelPatternHigh32Bits = 0;
-            info.vx_nn_general_cmd_info.kernelCacheStartAddress = 0;
-            info.vx_nn_general_cmd_info.kernelCacheEndAddress = 0;
-        }
-    }
-
-    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_BORDER_MODE))
-    {
-        info.vx_nn_general_cmd_info.inImageBorderMode = getHWBorderMode(conv_cmd_ptr->pad_mode, gcvVX_ACCELERATOR_NN);
-        info.vx_nn_general_cmd_info.inImageBorderConst = (inDataFormat == VX_TYPE_INT8) ?
-                                                            (vx_int8)conv_cmd_ptr->pad_const : (vx_int16)conv_cmd_ptr->pad_const;
-        if ((info.vx_nn_general_cmd_info.inImageBorderMode == 0x2)
-            || (info.vx_nn_general_cmd_info.inImageBorderMode == 0x3))
-        {
-            gcmASSERT(info.vx_nn_general_cmd_info.inImageXOffset <= 5);
-            gcmASSERT(info.vx_nn_general_cmd_info.inImageYOffset <= 5);
-        }
-    }
-
-    info.vx_nn_general_cmd_info.inImageBorderMode = 0x0;
-    if ((inQuantFormat == VX_QUANT_AFFINE_SCALE) && (inDataFormat == VX_TYPE_UINT8))
-    {
-        info.vx_nn_general_cmd_info.inImageBorderConst = inZP;
-    }
-    else
-    {
-        info.vx_nn_general_cmd_info.inImageBorderConst = 0;
-    }
-
-    vxmASSERT(!(info.vx_nn_general_cmd_info.imageStartAddress & (CACHE_ALIGNMENT_SIZE - 1)));
-    vxmASSERT(!(info.vx_nn_general_cmd_info.imageEndAddress & (CACHE_ALIGNMENT_SIZE - 1)));
-    vxmASSERT(!(info.vx_nn_general_cmd_info.kernelAddress & (CACHE_ALIGNMENT_SIZE - 1)));
-    vxmASSERT(!(info.vx_nn_general_cmd_info.kernelCacheStartAddress & (CACHE_ALIGNMENT_SIZE - 1)));
-    vxmASSERT(!(info.vx_nn_general_cmd_info.kernelCacheStartAddress & (CACHE_ALIGNMENT_SIZE - 1)));
-
-    {
-        vx_uint32 * cmdBufPtr;
-        vx_uint32 cmdOffset;
-
-        cmdOffset = NNE_COMMAND_SIZE * slice_index;
-
-        cmdBufPtr = (vx_uint32*)((vx_uint8_ptr)cmd_buffer->logical + cmdOffset);
-
-        gcoVX_ProgrammCrossEngine((void*)&info, gcvVX_ACCELERATOR_NN, (void*)&context->options, &cmdBufPtr);
-
-#if gcdDUMP
-        gcmDUMP(gcvNULL, "#[nn command]\n");
-        gcmDUMP_BUFFER(gcvNULL,
-                       gcvDUMP_BUFFER_MEMORY,
-                       cmd_buffer->physical + cmdOffset,
-                       (gctPOINTER)((vx_uint8_ptr)cmd_buffer->logical + cmdOffset),
-                       0,
-                       NNE_COMMAND_SIZE);
-        dumpNNCommandInfo(slice_index, ((vx_weights_biases_parameter)conv_cmd_ptr->other_ref)->slice_num, &info, NULL);
-#endif
-
-        if (node->graph->binarySave)
-        {
-
-            vx_uint8_ptr ksDataLogical  = (vx_uint8_ptr)WB_MEM_LOGICAL_ADDR_INDEX(weights_biases, 0);
-            vx_uint32 ksDataPhysical    = (vx_uint32)WB_MEM_PHYSICAL_ADDR_INDEX(weights_biases, 0);
-            vx_uint32 ksDataSize        = (vx_uint32)WB_MEM_SIZE_INDEX(weights_biases, 0);
-
-            vxoGraphBinary_SaveTPNNOperation(node,
-                                        (vx_uint8_ptr)cmd_buffer->logical + cmdOffset,
-                                        cmd_buffer->physical + cmdOffset,
-                                        NNE_COMMAND_SIZE,
-                                        VX_BINARY_OPERATION_TYPE_NN,
-                                        ksDataLogical,
-                                        ksDataPhysical,
-                                        ksDataSize,
-                                        input,
-                                        output,
-                                        info.vx_nn_general_cmd_info.inImageAddress,
-                                        info.vx_nn_general_cmd_info.outImageAddress
-                                        );
-        }
-    }
-}
-
-VX_PRIVATE_API void
-configTPBrickMode(
-    vx_weights_biases_parameter weights_biases,
-    vxnne_tensor_info input,
-    vxnne_tensor_info output,
-    vx_arch_perf perf,
-    vx_uint32 index,
-    vx_bool multi_tp,
-    vx_nn_cmd_info_u *info,
-    vx_bool last
-    )
-{
-    vx_context context;
-    vx_uint32 tpCoreCount;
-
-    vx_uint32 inXSize, inYSize, inZSize;
-    vx_uint32 inputBase, outputBase;
-    vx_uint32 inWindowYEnd;
-
-    vx_uint32 outTileXSize, outTileYSize;
-    vx_uint32 outLeftTileXSize, outRightTileXSize;
-    vx_uint32 outUpperTileYSize, outLowerTileYSize;
-
-    vx_uint32 outTilePerSlice, outTileXNum, outTileYNum;
-    vx_uint32 outTileSliceUL, outTileSliceUC, outTileSliceUR;
-    vx_uint32 outTileSliceCL, outTileSliceCC, outTileSliceCR;
-    vx_uint32 outTileSliceLL, outTileSliceLC, outTileSliceLR;
-    vx_uint32 sliceNum, outTileYNumInSlice;
-    vx_uint32 outImageTileXSize, outImageTileYSize;
-
-    vx_uint32 brickDistSize;
-
-    vx_uint32 strideXSize, strideYSize;
-
-    vx_uint32 kernelXSize = WB_KERNEL_X(weights_biases);
-    vx_uint32 kernelYSize = WB_KERNEL_Y(weights_biases);
-
-    gcmASSERT(info != VX_NULL);
-
-    context = vxGetContext((vx_reference)weights_biases);
-
-    tpCoreCount = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_MULTI_TP) ?
-                  context->nnConfig.fixedFeature.tpCoreCount : 1;
-
-    inXSize = input->width;
-    inYSize = input->height;
-    inZSize = input->depth;
-
-    inputBase = outputBase = 0;
-
-    strideXSize = WB_STRIDE_X(weights_biases);
-    strideYSize = WB_STRIDE_Y(weights_biases);
-
-    outImageTileXSize = perf->resultInfo.outImageTileXSize;
-    outImageTileYSize = perf->resultInfo.outImageTileYSize;
-
-    outTileXSize = outImageTileXSize + kernelXSize - 1;
-    outTileYSize = outImageTileYSize + kernelYSize - 1;
-
-    /* The edege regions should be changed according to the in-image size. */
-    outTileXNum = (perf->info.outx + outImageTileXSize - 1) / outImageTileXSize;
-    outTileYNum = (perf->info.outy + outImageTileYSize - 1) / outImageTileYSize;
-
-    sliceNum = gcmMIN(outTileYNum, tpCoreCount);
-
-    outTileYNumInSlice = outTileYNum / sliceNum;
-    if ((outTileYNum % sliceNum) && (index < (outTileYNum % sliceNum)))
-    {
-        outTileYNumInSlice += 1;
-    }
-
-    if ((outTileXNum == 1) && (perf->info.outx % outImageTileXSize))
-    {
-        outLeftTileXSize = perf->info.outx % outImageTileXSize + kernelXSize - 1;
-    }
-    else
-    {
-        outLeftTileXSize = outTileXSize;
-    }
-
-    outRightTileXSize = perf->info.outx % outImageTileXSize ?
-                        perf->info.outx % outImageTileXSize + kernelXSize - 1 : outTileXSize;
-
-    if ((last && outTileYNumInSlice == 1) &&
-        (perf->info.outy % outImageTileYSize))
-    {
-        outUpperTileYSize = perf->info.outy % outImageTileYSize + kernelYSize - 1;
-    }
-    else
-    {
-        outUpperTileYSize = outTileYSize;
-    }
-
-    if (last && (perf->info.outy % outImageTileYSize))
-    {
-        outLowerTileYSize = perf->info.outy % outImageTileYSize + kernelYSize - 1;
-    }
-    else
-    {
-        outLowerTileYSize = outTileYSize;
-    }
-
-    outTileSliceUL = outUpperTileYSize * outLeftTileXSize;
-    outTileSliceUC = outUpperTileYSize * outTileXSize;
-    outTileSliceUR = outUpperTileYSize * outRightTileXSize;
-    outTileSliceCL = outTileYSize * outLeftTileXSize;
-    outTileSliceCC = outTileYSize * outTileXSize;
-    outTileSliceCR = outTileYSize * outRightTileXSize;
-    outTileSliceLL = outLowerTileYSize * outLeftTileXSize;
-    outTileSliceLC = outLowerTileYSize * outTileXSize;
-    outTileSliceLR = outLowerTileYSize * outRightTileXSize;
-
-    brickDistSize = outTileXSize * outTileYSize * inZSize * strideXSize * strideYSize;
-    outTilePerSlice = outTileXNum * outTileYNumInSlice;
-
-    /* Inputs. */
-    info->vx_nn_tp_cmd_info.inImageXSize  = inXSize;
-    info->vx_nn_tp_cmd_info.inImageYSize  = inYSize;
-    info->vx_nn_tp_cmd_info.inImageZSize  = inZSize;
-    info->vx_nn_tp_cmd_info.inImageStride = inXSize;
-    info->vx_nn_tp_cmd_info.inImageSlice  = inXSize * inYSize;
-
-    info->vx_nn_tp_cmd_info.inTileSequence      = 0x0;
-    info->vx_nn_tp_cmd_info.inImageGlobalMem    = 1;
-    info->vx_nn_tp_cmd_info.inImageBaseAddress  = inputBase;
-
-    /* Output paddings in bricks. */
-    info->vx_nn_tp_cmd_info.inTileXSize = outTileXSize * strideXSize;
-    info->vx_nn_tp_cmd_info.inTileYSize = outTileYSize * strideYSize;
-    info->vx_nn_tp_cmd_info.inTileXInc  = (outTileXSize - (kernelXSize - 1)) * strideXSize;
-    info->vx_nn_tp_cmd_info.inTileYInc  = (outTileYSize - (kernelYSize - 1)) * strideXSize;
-
-    info->vx_nn_tp_cmd_info.inWindowXStart = (-1) * (vx_int32)WB_PAD_LEFT(weights_biases);
-    info->vx_nn_tp_cmd_info.inWindowXEnd   = info->vx_nn_tp_cmd_info.inWindowXStart + WB_PAD_LEFT(weights_biases) + inXSize + WB_PAD_RIGHT(weights_biases) - 1;
-    info->vx_nn_tp_cmd_info.inWindowYStart = (-1) * (vx_int32)WB_PAD_TOP(weights_biases) + (index * (outTileYNum / sliceNum) + gcmMIN(index, outTileYNum % sliceNum)) * info->vx_nn_tp_cmd_info.inTileYInc;
-    inWindowYEnd = info->vx_nn_tp_cmd_info.inWindowYStart + (outTileYNumInSlice - 1) * info->vx_nn_tp_cmd_info.inTileYInc + info->vx_nn_tp_cmd_info.inTileYSize - 1;
-    info->vx_nn_tp_cmd_info.inWindowYEnd = gcmMIN(inWindowYEnd, inYSize + WB_PAD_BOTTOM(weights_biases) - 1);
-
-    /* Outputs. */
-    info->vx_nn_tp_cmd_info.outBaseAddress = outputBase + (index * (outTileYNum / sliceNum) + gcmMIN(index, outTileYNum % sliceNum)) * outTileXNum * brickDistSize;
-    info->vx_nn_tp_cmd_info.outGlobalMem   = 1;
-
-    info->vx_nn_tp_cmd_info.outLoop0Inc   = (outTileSliceUC << 16) | outTileSliceUL;
-    info->vx_nn_tp_cmd_info.outLoop0Count = strideXSize;
-    info->vx_nn_tp_cmd_info.outLoop1Inc   = (outTileSliceCL << 16) | outTileSliceUR;
-    info->vx_nn_tp_cmd_info.outLoop1Count = 0;
-    info->vx_nn_tp_cmd_info.outLoop1Reset = 1;
-    info->vx_nn_tp_cmd_info.outLoop2Inc   = (outTileSliceCR << 16) | outTileSliceCC;
-    info->vx_nn_tp_cmd_info.outLoop2Count = strideYSize;
-    info->vx_nn_tp_cmd_info.outLoop2Reset = 0;
-    info->vx_nn_tp_cmd_info.outLoop3Inc   = (outTileSliceLC << 16) | outTileSliceLL;
-    info->vx_nn_tp_cmd_info.outLoop3Count = 0;
-    info->vx_nn_tp_cmd_info.outLoop3Reset = 1;
-    info->vx_nn_tp_cmd_info.outLoop4Inc   = brickDistSize;
-    info->vx_nn_tp_cmd_info.outLoop4Count = outTilePerSlice;
-    info->vx_nn_tp_cmd_info.outLoop5Inc   = outTileSliceLR;
-    info->vx_nn_tp_cmd_info.outLoop5Count = 1;
-    info->vx_nn_tp_cmd_info.outLoop6Inc   = 0;
-
-    info->vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-    info->vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-    info->vx_nn_tp_cmd_info.aluReluEnable = 0;
-    info->vx_nn_tp_cmd_info.aluI2FEnable = 0;
-    info->vx_nn_tp_cmd_info.aluF2IEnable = 0;
-
-    info->vx_nn_tp_cmd_info.outBrickMode  = 1;
-}
-
-void _getMultiTPParam(
-    vx_uint32                    size,
-    vx_uint32                    core,
-    vx_uint32                    index,
-    vx_bool                      multi_tp,
-    vx_uint32_ptr                new_size_ptr,
-    vx_uint32_ptr                new_offset_ptr
-    )
-{
-    vx_uint32 nsize, noffset;
-
-    if (!multi_tp)
-    {
-        nsize = size;
-        noffset = 0;
-    }
-    else if (core >= size)
-    {
-        nsize = 1;
-        noffset = index;
-    }
-    else
-    {
-        vx_uint32 quot = size / core;
-        vx_uint32 remain = size % core;
-
-        nsize = index < remain ? quot + 1 : quot;
-        noffset = index < remain ? index * nsize : remain * (quot + 1) + (index - remain) * nsize;
-    }
-
-    if (new_size_ptr != VX_NULL) *new_size_ptr = nsize;
-    if (new_offset_ptr != VX_NULL) *new_offset_ptr = noffset;
-}
-
-void fillInCmdTPBufferEx(
-    vx_context                   context,
-    vx_node                      node,
-    vxnne_tensor_info            input,
-    vxnne_tensor_info            output,
-    vxnne_command_buffer         cmd_buffer,
-    vx_op_param                  conv_cmd_ptr,
-    vx_tp_value_cmd              value_cmd_ptr,
-    vx_tensor                    data_buff,
-    vx_uint32                    tp_index,
-    vx_bool                      multi_tp,
-    vx_uint32                    cmd_size,
-    vx_uint32                    batch_count,
-    vx_bool                      last
-    )
-{
-    vx_nn_cmd_info_u info;
-    vx_uint32 inXSize, inYSize, inZSize, inYStride, inZStride, outXSize, outYSize, outZSize, outYStride, outZStride, outTileXSize, outTileYSize;
-    vx_uint32 strideXSize, strideYSize, outSliceSize, outStrideSliceSize, sliceIndex, strideIndex;
-    vx_uint32 poolingStride, inputElemSize, outputElemSize, inputBase, outputBase, multiInZSize, multiInZOffset;
-    vx_enum inFormat, outFormat, inQFormat, outQFormat, outRMode;
-    vx_int8 inFPP, outFPP;
-    vx_int32 inZP, outZP, inPadZValue;
-    vx_float32 inScale, outScale;
-    vx_bool needReorder = vx_false_e;
-    vx_enum tp_type;
-    vx_reference other_tensor;
-    vx_uint32 tpCoreCount;
-    vx_bool hasInputQuant = vx_false_e;
-    vx_bool hasOutputQuant = vx_false_e;
-    vx_bool hasWQuant = vx_false_e;
-    vx_bool tpRealInt16 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16);
-    vx_bool tfQuant = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT);
-
-    memset(&info, 0, sizeof(vx_nn_cmd_info_u));
-
-    inXSize = input->width;
-    inYSize = input->height;
-    inZSize = input->depth;
-    inYStride = input->yStride;
-    inZStride = input->zStride;
-    outXSize = output->width;
-    outYSize = output->height;
-    outZSize = output->depth;
-    outYStride = output->yStride;
-    outZStride = output->zStride;
-    inFormat  = input->dataFormat;
-    outFormat = output->dataFormat;
-    inputElemSize  = vxnneGetTypeSize(inFormat);
-    outputElemSize = vxnneGetTypeSize(outFormat);
-    inFPP  = input->fixedPointPos;
-    outFPP = output->fixedPointPos;
-    inQFormat = input->quantFormat;
-    outQFormat = output->quantFormat;
-    outRMode = output->roundingMode;
-    inScale  = input->scale;
-    outScale = output->scale;
-    inZP  = input->zeroPoint;
-    outZP = output->zeroPoint;
-
-    gcmASSERT(conv_cmd_ptr != VX_NULL);
-    inPadZValue = conv_cmd_ptr != VX_NULL ? conv_cmd_ptr->pad_const : input->padZeorValue;
-    tp_type = conv_cmd_ptr->tpType;
-    other_tensor = conv_cmd_ptr->other_ref;
-
-    tpCoreCount = tp_type != TP_SINGLE_FC ? context->nnConfig.fixedFeature.tpCoreCount :
-                                            context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
-
-    _getMultiTPParam(inZSize, tpCoreCount, tp_index, multi_tp, &multiInZSize, &multiInZOffset);
-
-    inputBase = input->physical.start;
-    outputBase = output->physical.start;
-
-    hasInputQuant  = (vx_bool)((inFormat == VX_TYPE_UINT8) && (inQFormat == VX_QUANT_AFFINE_SCALE));
-    hasOutputQuant = (vx_bool)((outFormat == VX_TYPE_UINT8) && (outQFormat == VX_QUANT_AFFINE_SCALE));
-
-    if ((tp_type == TP_SINGLE_FC) &&
-        (WB_WEIGHT_DATA_FORMAT((vx_weights_biases_parameter)other_tensor) == VX_TYPE_UINT8) &&
-        (WB_WEIGHT_QUANT_FORMAT((vx_weights_biases_parameter)other_tensor) == VX_QUANT_AFFINE_SCALE))
-    {
-        hasWQuant      = vx_true_e;
-    }
-
-    /* Common settings. Might be overwritten by specific configuration. */
-    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) && tp_type == TP_RESHUFFLE)
-    {
-        info.vx_nn_tp_cmd_info.inImageBorderMode = 0x0;
-        info.vx_nn_tp_cmd_info.inImageBorderConst = inPadZValue & 0xFF;
-    }
-    else
-    {
-        info.vx_nn_tp_cmd_info.inImageBorderMode = getHWBorderMode(conv_cmd_ptr->pad_mode, gcvVX_ACCELERATOR_TP);
-
-        if (info.vx_nn_tp_cmd_info.inImageBorderMode == 0x0)
-        {
-            info.vx_nn_tp_cmd_info.inImageBorderConst = (inFormat == VX_TYPE_INT8) ? (vx_int8)conv_cmd_ptr->pad_const : (vx_int16)conv_cmd_ptr->pad_const;
-        }
-    }
-
-    switch (tp_type)
-    {
-        case TP_RESHUFFLE:
-        {
-            vx_weights_biases_parameter weights_biases = (vx_weights_biases_parameter) other_tensor;
-
-            strideXSize = WB_STRIDE_X(weights_biases);
-            strideYSize = WB_STRIDE_Y(weights_biases);
-            outStrideSliceSize = strideXSize * strideYSize;
-            outSliceSize = outZStride / outputElemSize;
-
-            if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_REORDER) &&
-                !context->options.typeTPFunc[TP_RESHUFFLE] &&
-                inXSize <= context->nnConfig.fixedFeature.tpReorderInImageSize)
-            {
-                vx_uint32 inXSizeTmp = outXSize * strideXSize;
-
-                if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REORDER_FIX))
-                {
-                    needReorder = vx_true_e;
-                }
-                else if (inXSizeTmp <= inXSize + conv_cmd_ptr->pad_x_left ||
-                         inXSize + conv_cmd_ptr->pad_x_left - inXSizeTmp < strideXSize)
-                {
-                    inXSize = inXSizeTmp;
-                    needReorder = vx_true_e;
-                }
-            }
-
-            info.vx_nn_tp_cmd_info.inImageXSize = inXSize;
-            info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inImageZSize = multiInZSize;
-            info.vx_nn_tp_cmd_info.inImageStride = inYStride / inputElemSize;
-            info.vx_nn_tp_cmd_info.inImageSlice = inZStride / inputElemSize;
-            info.vx_nn_tp_cmd_info.inWindowXStart = (-1) * (vx_int32)conv_cmd_ptr->pad_x_left;
-            info.vx_nn_tp_cmd_info.inWindowYStart = (-1) * (vx_int32)conv_cmd_ptr->pad_y_top;
-            info.vx_nn_tp_cmd_info.inWindowXEnd = outXSize * strideXSize + info.vx_nn_tp_cmd_info.inWindowXStart - 1;
-            info.vx_nn_tp_cmd_info.inWindowYEnd = outYSize * strideYSize + info.vx_nn_tp_cmd_info.inWindowYStart - 1;
-            info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-            info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + inZStride * multiInZOffset;
-            info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-            info.vx_nn_tp_cmd_info.inTileXSize = (outXSize - 1) * strideXSize + strideXSize;
-            info.vx_nn_tp_cmd_info.inTileYSize = (outYSize - 1) * strideYSize + strideYSize;
-            info.vx_nn_tp_cmd_info.inTileXInc = outXSize * strideXSize;
-            info.vx_nn_tp_cmd_info.inTileYInc = outYSize * strideYSize;
-            info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + outSliceSize * outStrideSliceSize * multiInZOffset * outputElemSize;
-            info.vx_nn_tp_cmd_info.outGlobalMem  = 1;
-
-            if (WB_KERNEL_X(weights_biases) == 1 && WB_KERNEL_Y(weights_biases) == 1 &&
-                WB_ORG_KERNEL_X(weights_biases) == 1 && WB_ORG_KERNEL_Y(weights_biases) == 1)
-            {
-                /* optimize reshuffle for FC layer */
-                info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + outSliceSize * multiInZOffset * outputElemSize;
-                info.vx_nn_tp_cmd_info.outBrickMode  = 0;
-                info.vx_nn_tp_cmd_info.outLoop0Inc   = outSliceSize * outZSize / outStrideSliceSize;
-                info.vx_nn_tp_cmd_info.outLoop0Count = strideXSize;
-                info.vx_nn_tp_cmd_info.outLoop1Inc   = 1;
-                info.vx_nn_tp_cmd_info.outLoop1Count = outXSize;
-                info.vx_nn_tp_cmd_info.outLoop1Reset = 1;
-                info.vx_nn_tp_cmd_info.outLoop2Inc   = outSliceSize * outZSize / outStrideSliceSize;
-                info.vx_nn_tp_cmd_info.outLoop2Count = strideYSize;
-                info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-                info.vx_nn_tp_cmd_info.outLoop3Inc   = outXSize;
-                info.vx_nn_tp_cmd_info.outLoop3Count = outYSize;
-                info.vx_nn_tp_cmd_info.outLoop3Reset = 1;
-                info.vx_nn_tp_cmd_info.outLoop4Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop6Inc   = outSliceSize;
-            }
-            else
-            {
-                switch (context->options.typeTPFunc[TP_RESHUFFLE])
-                {
-                    case 0: /* 2D tile walking sequence. */
-                    default:
-                        {
-                            info.vx_nn_tp_cmd_info.outBrickMode  = 0;
-                            info.vx_nn_tp_cmd_info.outLoop0Inc   = outSliceSize;
-                            info.vx_nn_tp_cmd_info.outLoop0Count = strideXSize;
-                            info.vx_nn_tp_cmd_info.outLoop1Inc   = 1;
-                            info.vx_nn_tp_cmd_info.outLoop1Count = outXSize;
-                            info.vx_nn_tp_cmd_info.outLoop1Reset = 1;
-                            info.vx_nn_tp_cmd_info.outLoop2Inc   = outSliceSize * strideXSize;
-                            info.vx_nn_tp_cmd_info.outLoop2Count = strideYSize;
-                            info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-                            info.vx_nn_tp_cmd_info.outLoop3Inc   = outXSize;
-                            info.vx_nn_tp_cmd_info.outLoop3Count = outYSize;
-                            info.vx_nn_tp_cmd_info.outLoop3Reset = 1;
-                            info.vx_nn_tp_cmd_info.outLoop4Inc   = 0;
-                            info.vx_nn_tp_cmd_info.outLoop4Count = 1;
-                            info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-                            info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-                            info.vx_nn_tp_cmd_info.outLoop6Inc   = outSliceSize * outStrideSliceSize;
-                        }
-                        break;
-
-                    case 1:
-                        gcmASSERT(outSliceSize < 65536);
-                        info.vx_nn_tp_cmd_info.outBrickMode  = 1;
-                        info.vx_nn_tp_cmd_info.outLoop0Inc   = outSliceSize | (outSliceSize << 16);
-                        info.vx_nn_tp_cmd_info.outLoop0Count = strideXSize;
-                        info.vx_nn_tp_cmd_info.outLoop1Inc   = outSliceSize | (outSliceSize << 16);
-                        info.vx_nn_tp_cmd_info.outLoop1Count = 0;
-                        info.vx_nn_tp_cmd_info.outLoop1Reset = 1;
-                        info.vx_nn_tp_cmd_info.outLoop2Inc   = outSliceSize | (outSliceSize << 16);
-                        info.vx_nn_tp_cmd_info.outLoop2Count = strideYSize;
-                        info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-                        info.vx_nn_tp_cmd_info.outLoop3Inc   = outSliceSize | (outSliceSize << 16);
-                        info.vx_nn_tp_cmd_info.outLoop3Count = 0;
-                        info.vx_nn_tp_cmd_info.outLoop3Reset = 1;
-                        info.vx_nn_tp_cmd_info.outLoop4Inc   = outSliceSize * (multi_tp ? outStrideSliceSize * multiInZOffset : outZSize);
-                        info.vx_nn_tp_cmd_info.outLoop4Count = 1;
-                        info.vx_nn_tp_cmd_info.outLoop5Inc   = outSliceSize | (outSliceSize << 16);
-                        info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-                        info.vx_nn_tp_cmd_info.outLoop6Inc   = 0;
-                        break;
-
-                    case 2: /* special 2D tile walking sequence to improve output performance. */
-                        sliceIndex = tp_index / strideXSize;
-                        strideIndex = tp_index % strideXSize;
-                        info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + sliceIndex * inZStride;
-                        info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + sliceIndex * outSliceSize * outStrideSliceSize * outputElemSize + strideIndex * outSliceSize * outputElemSize;
-                        info.vx_nn_tp_cmd_info.inImageZSize = multi_tp ? 1 : inZSize;
-                        info.vx_nn_tp_cmd_info.inWindowXStart += strideIndex;
-                        info.vx_nn_tp_cmd_info.inWindowXEnd -= strideXSize - 1 - strideIndex;
-                        info.vx_nn_tp_cmd_info.inTileXSize   = 1;
-                        info.vx_nn_tp_cmd_info.inTileYSize   = 1;
-                        info.vx_nn_tp_cmd_info.inTileXInc    = strideXSize;
-                        info.vx_nn_tp_cmd_info.inTileYInc    = 1;
-                        info.vx_nn_tp_cmd_info.outBrickMode  = 0;
-                        info.vx_nn_tp_cmd_info.outLoop0Inc   = 1;
-                        info.vx_nn_tp_cmd_info.outLoop0Count = outXSize;
-                        info.vx_nn_tp_cmd_info.outLoop1Inc   = outSliceSize * strideXSize;
-                        info.vx_nn_tp_cmd_info.outLoop1Count = strideYSize;
-                        info.vx_nn_tp_cmd_info.outLoop1Reset = 0;
-                        info.vx_nn_tp_cmd_info.outLoop2Inc   = outXSize;
-                        info.vx_nn_tp_cmd_info.outLoop2Count = outYSize;
-                        info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-                        info.vx_nn_tp_cmd_info.outLoop3Inc   = 0;
-                        info.vx_nn_tp_cmd_info.outLoop3Count = 1;
-                        info.vx_nn_tp_cmd_info.outLoop3Reset = 0;
-                        info.vx_nn_tp_cmd_info.outLoop4Inc   = 0;
-                        info.vx_nn_tp_cmd_info.outLoop4Count = 1;
-                        info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-                        info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-                        info.vx_nn_tp_cmd_info.outLoop6Inc   = outSliceSize * outStrideSliceSize;
-                        break;
-                }
-            }
-
-            info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-            info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-            info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-            info.vx_nn_tp_cmd_info.aluI2FEnable = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info.vx_nn_tp_cmd_info.aluF2IEnable = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            break;
-        }
-
-        case TP_SINGLE_FC:
-        {
-            vx_weights_biases_parameter weights_biases = (vx_weights_biases_parameter) other_tensor;
-            vx_uint32 zOffset, kzOffset, kzOffset2, kzGroup;
-
-            gcmASSERT(WB_IS_USE_TP_FC(weights_biases));
-            gcmASSERT(value_cmd_ptr != VX_NULL);
-
-            kzGroup = value_cmd_ptr->u32[0];
-            if (kzGroup == 1)
-            {
-                zOffset = value_cmd_ptr->u32[1];
-                outZSize = WB_OUTPUT_Z_INDEX(weights_biases, tp_index);
-
-                info.vx_nn_tp_cmd_info.inImageXSize = 1;
-                info.vx_nn_tp_cmd_info.inImageYSize = 1;
-                info.vx_nn_tp_cmd_info.inImageZSize = WB_KERNEL_Z(weights_biases);
-                info.vx_nn_tp_cmd_info.inImageStride = 1;
-                info.vx_nn_tp_cmd_info.inImageSlice = 1;
-                info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-                info.vx_nn_tp_cmd_info.inWindowYStart = 0;
-                info.vx_nn_tp_cmd_info.inWindowXEnd = 0;
-                info.vx_nn_tp_cmd_info.inWindowYEnd = 0;
-                info.vx_nn_tp_cmd_info.inTileSequence = 0x3;
-                info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-                info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase;
-                info.vx_nn_tp_cmd_info.inTileXSize = 1;
-                info.vx_nn_tp_cmd_info.inTileYSize = 1;
-                info.vx_nn_tp_cmd_info.inTileXInc = 1;
-                info.vx_nn_tp_cmd_info.inTileYInc = 1;
-                info.vx_nn_tp_cmd_info.aluSquarePreshift = 0;
-                info.vx_nn_tp_cmd_info.aluSquareEnable = 0;
-                info.vx_nn_tp_cmd_info.aluHorzProcessing = getHWDataFormat(WB_WEIGHT_DATA_FORMAT(weights_biases));
-                info.vx_nn_tp_cmd_info.aluHorzProcCount = (outZSize - 1) & 0x3F;    /* Lower 6 bits of FcOutZsizeMinusOne. */
-                info.vx_nn_tp_cmd_info.aluHorzProcStride = 0;
-                info.vx_nn_tp_cmd_info.aluVertProcessing = 0;
-                info.vx_nn_tp_cmd_info.aluVertProcCount = (outZSize - 1) >> 6;      /* Higher 3 bits of FcOutZsizeMinusOne. */
-                info.vx_nn_tp_cmd_info.aluVertProcStride = 0;
-                info.vx_nn_tp_cmd_info.aluPwlEnable = 0;
-                info.vx_nn_tp_cmd_info.aluMultEnable = 0;
-                info.vx_nn_tp_cmd_info.aluLoadPwlLUT = 0;
-                info.vx_nn_tp_cmd_info.aluLoadPwlLUTAddress = (vx_uint32)WB_MEM_PHYSICAL_ADDR_INDEX(weights_biases, tp_index);
-                info.vx_nn_tp_cmd_info.aluLoadPwlLUTGlobalMem = 1;
-
-                info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + zOffset * outputElemSize;
-                info.vx_nn_tp_cmd_info.outGlobalMem  = 1;
-                info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-                info.vx_nn_tp_cmd_info.outBrickMode  = 0;
-                info.vx_nn_tp_cmd_info.outLoop0Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop0Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop1Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop1Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop1Reset = 0x0;
-                info.vx_nn_tp_cmd_info.outLoop2Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop2Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop2Reset = 0x0;
-                info.vx_nn_tp_cmd_info.outLoop3Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop3Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop3Reset = 0x0;
-                info.vx_nn_tp_cmd_info.outLoop4Inc   = 1;
-                info.vx_nn_tp_cmd_info.outLoop4Count = outZSize;
-                info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop6Inc   = 0;
-                info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-                info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-                info.vx_nn_tp_cmd_info.aluReluEnable =  conv_cmd_ptr->enable_relu;
-                info.vx_nn_tp_cmd_info.aluInputPreshift   = 0;
-                info.vx_nn_tp_cmd_info.aluOutputPostshift =
-                     ((inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0)
-                   - (outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT ? outFPP : 0)
-                   + (WB_WEIGHT_QUANT_FORMAT(weights_biases) == VX_QUANT_DYNAMIC_FIXED_POINT ? WB_WEIGHT_FPP(weights_biases) : 0);
-                info.vx_nn_tp_cmd_info.aluI2FEnable = (inFormat == VX_TYPE_FLOAT16) ? 0 : 1;
-                info.vx_nn_tp_cmd_info.aluF2IEnable = (outFormat == VX_TYPE_FLOAT16) ? 0 : 1;
-            }
-            else
-            {
-                if (value_cmd_ptr->e32[0] == 0)
-                {
-                    zOffset = value_cmd_ptr->u32[1];
-                    kzOffset = value_cmd_ptr->u32[2];
-                    kzOffset2 = value_cmd_ptr->u32[3];
-                    inZSize = WB_KERNEL_Z_INDEX(weights_biases, tp_index);
-                    outZSize = WB_OUTPUT_Z_INDEX(weights_biases, tp_index);
-
-                    info.vx_nn_tp_cmd_info.inImageXSize = 1;
-                    info.vx_nn_tp_cmd_info.inImageYSize = 1;
-                    info.vx_nn_tp_cmd_info.inImageZSize = inZSize;
-                    info.vx_nn_tp_cmd_info.inImageStride = 1;
-                    info.vx_nn_tp_cmd_info.inImageSlice = 1;
-                    info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-                    info.vx_nn_tp_cmd_info.inWindowYStart = 0;
-                    info.vx_nn_tp_cmd_info.inWindowXEnd = 0;
-                    info.vx_nn_tp_cmd_info.inWindowYEnd = 0;
-                    info.vx_nn_tp_cmd_info.inTileSequence = 0x3;
-                    info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-                    info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + kzOffset * inputElemSize;
-                    info.vx_nn_tp_cmd_info.inTileXSize = 1;
-                    info.vx_nn_tp_cmd_info.inTileYSize = 1;
-                    info.vx_nn_tp_cmd_info.inTileXInc = 1;
-                    info.vx_nn_tp_cmd_info.inTileYInc = 1;
-                    info.vx_nn_tp_cmd_info.aluHorzProcessing = getHWDataFormat(WB_WEIGHT_DATA_FORMAT(weights_biases));
-                    info.vx_nn_tp_cmd_info.aluHorzProcCount = (outZSize - 1) & 0x3F;
-                    info.vx_nn_tp_cmd_info.aluHorzProcStride = 0;
-                    info.vx_nn_tp_cmd_info.aluVertProcessing = 0;
-                    info.vx_nn_tp_cmd_info.aluVertProcCount = (outZSize - 1) >> 6;
-                    info.vx_nn_tp_cmd_info.aluVertProcStride = 0;
-                    info.vx_nn_tp_cmd_info.aluLoadPwlLUT = 0;
-                    info.vx_nn_tp_cmd_info.aluLoadPwlLUTAddress = (vx_uint32)WB_MEM_PHYSICAL_ADDR_INDEX(weights_biases, tp_index);
-                    info.vx_nn_tp_cmd_info.aluLoadPwlLUTGlobalMem = 1;
-
-                    info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + (kzOffset2 + zOffset) * outputElemSize;
-                    info.vx_nn_tp_cmd_info.outLoop0Inc   = 0;
-                    info.vx_nn_tp_cmd_info.outLoop0Count = 1;
-                    info.vx_nn_tp_cmd_info.outLoop1Inc   = 0;
-                    info.vx_nn_tp_cmd_info.outLoop1Count = 1;
-                    info.vx_nn_tp_cmd_info.outLoop1Reset = 0x0;
-                    info.vx_nn_tp_cmd_info.outLoop2Inc   = 0;
-                    info.vx_nn_tp_cmd_info.outLoop2Count = 1;
-                    info.vx_nn_tp_cmd_info.outLoop2Reset = 0x0;
-                    info.vx_nn_tp_cmd_info.outLoop3Inc   = 0;
-                    info.vx_nn_tp_cmd_info.outLoop3Count = 1;
-                    info.vx_nn_tp_cmd_info.outLoop3Reset = 0x0;
-                    info.vx_nn_tp_cmd_info.outLoop4Inc   = 1;
-                    info.vx_nn_tp_cmd_info.outLoop4Count = outZSize;
-                    info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-                    info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-                    info.vx_nn_tp_cmd_info.outLoop6Inc   = 0;
-                    info.vx_nn_tp_cmd_info.aluReluEnable = conv_cmd_ptr->enable_relu;
-                    info.vx_nn_tp_cmd_info.aluInputPreshift   = 0;
-                    info.vx_nn_tp_cmd_info.aluOutputPostshift =
-                         ((inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0)
-                       - (outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT ? outFPP : 0)
-                       + (WB_WEIGHT_QUANT_FORMAT(weights_biases) == VX_QUANT_DYNAMIC_FIXED_POINT ? WB_WEIGHT_FPP(weights_biases) : 0);
-                }
-                else
-                {
-                    /* sum filter */
-                    outZSize = value_cmd_ptr->u32[1];
-                    outTileXSize = gcmMIN(outZSize, 64);
-
-                    info.vx_nn_tp_cmd_info.inImageXSize = outZSize;
-                    info.vx_nn_tp_cmd_info.inImageYSize = kzGroup;
-                    info.vx_nn_tp_cmd_info.inImageZSize = 1;
-                    info.vx_nn_tp_cmd_info.inImageStride = outZSize;
-                    info.vx_nn_tp_cmd_info.inImageSlice = outZSize * kzGroup;
-                    info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-                    info.vx_nn_tp_cmd_info.inWindowYStart = 0;
-                    info.vx_nn_tp_cmd_info.inWindowXEnd = outZSize - 1;
-                    info.vx_nn_tp_cmd_info.inWindowYEnd = kzGroup - 1;
-                    info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-                    info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-                    info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase;
-                    info.vx_nn_tp_cmd_info.inTileXSize = outTileXSize;
-                    info.vx_nn_tp_cmd_info.inTileYSize = kzGroup;
-                    info.vx_nn_tp_cmd_info.inTileXInc = outTileXSize;
-                    info.vx_nn_tp_cmd_info.inTileYInc = kzGroup;
-                    info.vx_nn_tp_cmd_info.aluHorzProcessing = 0;
-                    info.vx_nn_tp_cmd_info.aluHorzProcCount = 0;
-                    info.vx_nn_tp_cmd_info.aluHorzProcStride = 0;
-                    info.vx_nn_tp_cmd_info.aluVertProcessing = 0x0;
-                    info.vx_nn_tp_cmd_info.aluVertProcCount = kzGroup - 1;
-                    info.vx_nn_tp_cmd_info.aluVertProcStride = 0;
-                    info.vx_nn_tp_cmd_info.aluLoadPwlLUT = 0;
-                    info.vx_nn_tp_cmd_info.aluLoadPwlLUTAddress = 0;
-                    info.vx_nn_tp_cmd_info.aluLoadPwlLUTGlobalMem = 1;
-                    info.vx_nn_tp_cmd_info.outBaseAddress = outputBase;
-                    info.vx_nn_tp_cmd_info.outLoop0Inc   = 0;
-                    info.vx_nn_tp_cmd_info.outLoop0Count = 1;
-                    info.vx_nn_tp_cmd_info.outLoop1Inc   = 1;
-                    info.vx_nn_tp_cmd_info.outLoop1Count = 0;
-                    info.vx_nn_tp_cmd_info.outLoop1Reset = 0x1;
-                    info.vx_nn_tp_cmd_info.outLoop2Inc   = outTileXSize;
-                    info.vx_nn_tp_cmd_info.outLoop2Count = gcmALIGN(outZSize, outTileXSize) / outTileXSize;
-                    info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-                    info.vx_nn_tp_cmd_info.outLoop3Inc   = 0;
-                    info.vx_nn_tp_cmd_info.outLoop3Count = 1;
-                    info.vx_nn_tp_cmd_info.outLoop3Reset = 0;
-                    info.vx_nn_tp_cmd_info.outLoop4Inc   = 0;
-                    info.vx_nn_tp_cmd_info.outLoop4Count = 1;
-                    info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-                    info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-                    info.vx_nn_tp_cmd_info.outLoop6Inc   = 0;
-                    info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-                    info.vx_nn_tp_cmd_info.aluInputPreshift = (inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0;
-                    info.vx_nn_tp_cmd_info.aluOutputPostshift = (outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? (0 - outFPP) : 0;
-                }
-                info.vx_nn_tp_cmd_info.outGlobalMem  = 1;
-                info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-                info.vx_nn_tp_cmd_info.outBrickMode  = 0;
-                info.vx_nn_tp_cmd_info.aluSquarePreshift = 0;
-                info.vx_nn_tp_cmd_info.aluSquareEnable = 0;
-                info.vx_nn_tp_cmd_info.aluPwlEnable = 0;
-                info.vx_nn_tp_cmd_info.aluMultEnable = 0;
-                info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-                info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-                info.vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-                info.vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-
-            }
-            break;
-        }
-
-        case TP_TRANSPOSE:
-        {
-#define TP_MAX_XYSIZE (0x1<<16)
-            vx_uint32 totalSize, inXSizeNew, inYSizeNew;
-            vx_uint32 i, j, dims[VX_CONTEXT_TENSOR_MAX_DIMENSION], distances[VX_CONTEXT_TENSOR_MAX_DIMENSION], strides[VX_CONTEXT_TENSOR_MAX_DIMENSION];
-            vx_uint32_ptr perm;
-            vx_uint32 pnum, dsize = TENSOR_DATA_SIZE((vx_tensor)other_tensor);
-
-            gcmASSERT(value_cmd_ptr != VX_NULL);
-
-            perm = (vx_uint32_ptr) value_cmd_ptr->p8[0];
-            pnum = value_cmd_ptr->u32[0];
-
-            vxoTensor_GetTensorDimStride((vx_tensor)other_tensor, &pnum, dims, strides);
-            for (i = 0; i < pnum; i++)
-            {
-                vx_uint32 dim = 1;
-                for (j = 0; j < i; j++)
-                    dim *= dims[perm[j]];
-                distances[perm[i]] = dim;
-            }
-
-            /* Merge input tensor to 2D image. X/YSize < 2^16. */
-            totalSize = strides[pnum-1] * dims[pnum-1] / dsize;
-            inXSizeNew = dims[0];
-            inYSizeNew = totalSize / inXSizeNew;
-            if (!multi_tp)
-            {
-                for (i = 1; i < pnum; i++)
-                {
-                    if (inXSizeNew >= TP_MAX_XYSIZE || inYSizeNew < TP_MAX_XYSIZE)
-                    {
-                        break;
-                    }
-                    else
-                    {
-                        inXSizeNew *= dims[i];
-                        inYSizeNew /= dims[i];
-                    }
-                }
-            }
-            else
-            {
-                for (i = pnum - 1; (vx_int32)i >=0; i--)
-                {
-                    if (dims[i] > 1) break;
-                }
-                pnum = i + 1;
-                j = gcmALIGN_NP2(inYSizeNew, TP_MAX_XYSIZE-1) / (TP_MAX_XYSIZE-1);
-                _getMultiTPParam(dims[i], j, tp_index, multi_tp, &multiInZSize, &multiInZOffset);
-                inYSizeNew = strides[i] / dsize / dims[0] * multiInZSize;
-            }
-            gcmASSERT(inXSizeNew < TP_MAX_XYSIZE && inYSizeNew < TP_MAX_XYSIZE);
-
-            info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + strides[pnum-1] * multiInZOffset * inputElemSize;
-            info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-            info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + distances[pnum-1] * multiInZOffset * outputElemSize;
-            info.vx_nn_tp_cmd_info.outGlobalMem  = 1;
-            info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-            info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-            info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-            info.vx_nn_tp_cmd_info.aluI2FEnable = 0;
-            info.vx_nn_tp_cmd_info.aluF2IEnable = 0;
-            info.vx_nn_tp_cmd_info.inImageXSize   = inXSizeNew;
-            info.vx_nn_tp_cmd_info.inImageYSize   = inYSizeNew;
-            info.vx_nn_tp_cmd_info.inImageZSize   = 1;
-            info.vx_nn_tp_cmd_info.inImageStride  = inXSizeNew;
-            info.vx_nn_tp_cmd_info.inImageSlice   = totalSize;
-            info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-            info.vx_nn_tp_cmd_info.inWindowYStart = 0;
-            info.vx_nn_tp_cmd_info.inWindowXEnd   = inXSizeNew - 1;
-            info.vx_nn_tp_cmd_info.inWindowYEnd   = inYSizeNew - 1;
-            info.vx_nn_tp_cmd_info.inTileXSize    = 1;
-            info.vx_nn_tp_cmd_info.inTileYSize    = 1;
-            info.vx_nn_tp_cmd_info.inTileXInc     = 1;
-            info.vx_nn_tp_cmd_info.inTileYInc     = 1;
-            info.vx_nn_tp_cmd_info.outLoop0Inc   = distances[0];
-            info.vx_nn_tp_cmd_info.outLoop0Count = dims[0];
-            info.vx_nn_tp_cmd_info.outLoop1Inc   = 0;
-            info.vx_nn_tp_cmd_info.outLoop1Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop1Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop2Inc   = distances[1];
-            info.vx_nn_tp_cmd_info.outLoop2Count = multi_tp && pnum == 2 ? multiInZSize : dims[1];
-            info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop3Inc   = pnum > 2 ? distances[2] : 0;
-            info.vx_nn_tp_cmd_info.outLoop3Count = multi_tp && pnum == 3 ? multiInZSize : pnum > 2 ? dims[2] : 1;
-            info.vx_nn_tp_cmd_info.outLoop3Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop4Inc   = pnum > 3 ? distances[3] : 0;
-            info.vx_nn_tp_cmd_info.outLoop4Count = multi_tp && pnum == 4 ? multiInZSize : pnum > 3 ? dims[3] : 1;
-            info.vx_nn_tp_cmd_info.outLoop5Inc   = pnum > 4 ? distances[4] : 0;
-            info.vx_nn_tp_cmd_info.outLoop5Count = multi_tp && pnum == 5 ? multiInZSize : pnum > 4 ? dims[4] : 1;
-            info.vx_nn_tp_cmd_info.outLoop6Inc   = pnum > 5 ? distances[5] : 0;
-            break;
-        }
-
-        case TP_MAX_POOLING:
-            poolingStride = conv_cmd_ptr->pool_stride;
-            outTileXSize = (64 + poolingStride - conv_cmd_ptr->pool_size_x) / poolingStride;
-            outTileYSize = 1;
-
-            gcmASSERT((poolingStride == 1 && conv_cmd_ptr->pool_size_x <= 3) ||
-                      ((poolingStride == conv_cmd_ptr->pool_size_x || poolingStride == conv_cmd_ptr->pool_size_x-1) &&
-                        conv_cmd_ptr->pool_size_x <= 64));
-
-            info.vx_nn_tp_cmd_info.inImageXSize = inXSize;
-            info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inImageZSize = multiInZSize;
-            info.vx_nn_tp_cmd_info.inImageStride = inYStride / inputElemSize;
-            info.vx_nn_tp_cmd_info.inImageSlice = inZStride / inputElemSize;
-            info.vx_nn_tp_cmd_info.inWindowXStart = (-1) * (vx_int32)conv_cmd_ptr->pad_x_left;
-            info.vx_nn_tp_cmd_info.inWindowYStart = (-1) * (vx_int32)conv_cmd_ptr->pad_y_top;
-            info.vx_nn_tp_cmd_info.inWindowXEnd = (outXSize - 1) * poolingStride + conv_cmd_ptr->pool_size_x - 1 - conv_cmd_ptr->pad_x_left;
-            info.vx_nn_tp_cmd_info.inWindowYEnd = (outYSize - 1) * poolingStride + conv_cmd_ptr->pool_size_y - 1 - conv_cmd_ptr->pad_y_top;
-
-            info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-            info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + inZStride * multiInZOffset;
-            info.vx_nn_tp_cmd_info.inTileXSize = outTileXSize * poolingStride + conv_cmd_ptr->pool_size_x - poolingStride;
-            info.vx_nn_tp_cmd_info.inTileYSize = outTileYSize * poolingStride + conv_cmd_ptr->pool_size_y - poolingStride;
-            info.vx_nn_tp_cmd_info.inTileXInc = outTileXSize * poolingStride;
-            info.vx_nn_tp_cmd_info.inTileYInc = outTileYSize * poolingStride;
-            info.vx_nn_tp_cmd_info.aluSquarePreshift = 0;
-            info.vx_nn_tp_cmd_info.aluSquareEnable = 0;
-            if (poolingStride == 1)
-            {
-                info.vx_nn_tp_cmd_info.aluHorzProcessing = 0x1;
-                info.vx_nn_tp_cmd_info.aluHorzProcCount = conv_cmd_ptr->pool_size_x - 1;
-                info.vx_nn_tp_cmd_info.aluHorzProcStride = 0;
-                info.vx_nn_tp_cmd_info.aluVertProcessing = 0x1;
-                info.vx_nn_tp_cmd_info.aluVertProcCount = conv_cmd_ptr->pool_size_y - 1;
-                info.vx_nn_tp_cmd_info.aluVertProcStride = 0;
-            }
-            else
-            {
-                info.vx_nn_tp_cmd_info.aluHorzProcessing = 0x3;
-                info.vx_nn_tp_cmd_info.aluHorzProcCount = conv_cmd_ptr->pool_size_x - 1;
-                info.vx_nn_tp_cmd_info.aluHorzProcStride = conv_cmd_ptr->pool_size_x == poolingStride ?
-                    0x0 : 0x1;
-                info.vx_nn_tp_cmd_info.aluVertProcessing = 0x3;
-                info.vx_nn_tp_cmd_info.aluVertProcCount = conv_cmd_ptr->pool_size_y - 1;
-                info.vx_nn_tp_cmd_info.aluVertProcStride = conv_cmd_ptr->pool_size_y == poolingStride ?
-                    0x0 : 0x1;
-            }
-            info.vx_nn_tp_cmd_info.aluPwlEnable = 0;
-            info.vx_nn_tp_cmd_info.aluMultEnable = 0;
-            info.vx_nn_tp_cmd_info.aluLoadPwlLUT = 0;
-            info.vx_nn_tp_cmd_info.aluLoadPwlLUTAddress = 0;
-            info.vx_nn_tp_cmd_info.aluLoadPwlLUTGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + outZStride * multiInZOffset;
-            info.vx_nn_tp_cmd_info.outGlobalMem  = 1;
-            info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-            info.vx_nn_tp_cmd_info.outBrickMode  = 0;
-            info.vx_nn_tp_cmd_info.outLoop0Inc   = 0;
-            info.vx_nn_tp_cmd_info.outLoop0Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop1Inc   = 1;
-            info.vx_nn_tp_cmd_info.outLoop1Count = 0;
-            info.vx_nn_tp_cmd_info.outLoop1Reset = 0x1;
-            info.vx_nn_tp_cmd_info.outLoop2Inc   = outXSize;
-            info.vx_nn_tp_cmd_info.outLoop2Count = 0;
-            info.vx_nn_tp_cmd_info.outLoop2Reset = 0x1;
-            info.vx_nn_tp_cmd_info.outLoop3Inc   = outTileXSize;
-            info.vx_nn_tp_cmd_info.outLoop3Count = (outXSize + outTileXSize - 1) / outTileXSize;
-            info.vx_nn_tp_cmd_info.outLoop3Reset = 0x0;
-            info.vx_nn_tp_cmd_info.outLoop4Inc   = outTileYSize * outXSize;
-            info.vx_nn_tp_cmd_info.outLoop4Count = (outYSize + outTileYSize - 1) / outTileYSize;
-            info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-            info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop6Inc   = outZStride / outputElemSize;
-            info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-            info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-            info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-            info.vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-            info.vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-            info.vx_nn_tp_cmd_info.aluInputPreshift   = 0;
-            info.vx_nn_tp_cmd_info.aluOutputPostshift = ((inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0) - ((outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? outFPP : 0);
-
-            /* Select the correct border mode if padding is not specified. */
-            if (conv_cmd_ptr->orig_no_pad &&
-                ((inXSize - conv_cmd_ptr->pool_size_x) % conv_cmd_ptr->pool_stride ||
-                 (inYSize - conv_cmd_ptr->pool_size_y) % conv_cmd_ptr->pool_stride))
-            {
-                info.vx_nn_tp_cmd_info.inImageBorderMode = 0x1;
-            }
-
-            break;
-
-        case TP_ACTIVATION:
-        {
-            vx_float32  scale;
-            vx_uint16 * pwlLUTBase = (vx_uint16 *)data_buff->tensorBuffer->memory.logicals[0];
-            vx_uint32 * pwlLUTBaseEx = (vx_uint32 *)data_buff->tensorBuffer->memory.logicals[0];
-            vx_uint16   fixed16, base, baseF16;
-            vx_uint32   fixed21, baseF21;
-            vx_float32  baseF32;
-            vx_float32  pwlValue;
-            vx_float32  value = inQFormat == VX_QUANT_AFFINE_SCALE ? inScale : 1.0f;
-            vx_bool     tileOff = vx_false_e;
-
-            gcmASSERT(value_cmd_ptr != VX_NULL);
-            gcmASSERT(pwlLUTBase != VX_NULL);
-
-            scale = value_cmd_ptr->f32[0];
-
-            if (inXSize == outXSize && inYSize == outYSize && inZSize == outZSize)
-            {
-                outTileXSize = 64;
-                outTileYSize = 16;
-            }
-            else
-            {
-                outTileXSize = outXSize;
-                outTileYSize = outYSize;
-                tileOff = vx_true_e;
-            }
-
-            info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-            info.vx_nn_tp_cmd_info.inWindowYStart = 0;
-            info.vx_nn_tp_cmd_info.inWindowXEnd = inXSize - 1;
-            info.vx_nn_tp_cmd_info.inWindowYEnd = inYSize - 1;
-            info.vx_nn_tp_cmd_info.inTileXSize = outTileXSize;
-            info.vx_nn_tp_cmd_info.inTileYSize = outTileYSize;
-            info.vx_nn_tp_cmd_info.inTileXInc = outTileXSize;
-            info.vx_nn_tp_cmd_info.inTileYInc = outTileYSize;
-            info.vx_nn_tp_cmd_info.aluHorzProcCount = 0;
-            info.vx_nn_tp_cmd_info.aluVertProcCount = 0;
-            info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-
-            switch (value_cmd_ptr->e32[0])
-            {
-                case VX_NN_ACTIVATION_RELU:
-                    if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16))
-                    {
-                        for (base = 0; base < 0x10; base++)
-                        {
-                            pwlLUTBase[base] = 0x0;         /* Half float positive zero. */
-                        }
-                        for (base = 0x10; base < 0x1F0; base++)
-                        {
-                            baseF16 = base << 6;
-                            pwlLUTBase[base] = baseF16;
-                        }
-                        pwlLUTBase[0x1F0] = 0x7c00;         /* Half float positive infinity. */
-                        for (base = 0x1F1; base < 0x200; base++)
-                        {
-                            pwlLUTBase[base] = 0x7e00;      /* Half float positive NaN. */
-                        }
-                        for (base = 0x200; base < 0x400; base++)
-                        {
-                            pwlLUTBase[base] = 0x8000;      /* Half float negative zero. */
-                        }
-                    }
-                    else
-                    {
-                        for (base = 0; base < 0x10; base++)
-                        {
-                            pwlLUTBaseEx[base] = 0x0;         /* Half float positive zero. */
-                        }
-                        for (base = 0x10; base < 0x1F0; base++)
-                        {
-                            baseF21 = base << 11;
-                            pwlLUTBaseEx[base] = baseF21;
-                        }
-                        pwlLUTBaseEx[0x1F0] = 0xf8000;         /* Half float positive infinity. */
-                        for (base = 0x1F1; base < 0x200; base++)
-                        {
-                            pwlLUTBaseEx[base] = 0xfc000;      /* Half float positive NaN. */
-                        }
-                        for (base = 0x200; base < 0x400; base++)
-                        {
-                            pwlLUTBaseEx[base] = 0x100000;      /* Half float negative zero. */
-                        }
-                    }
-                    break;
-
-                case VX_NN_ACTIVATION_LEAKYRELU:
-                case VX_NN_ACTIVATION_LEAKYRELU_MAX_POOLING:
-                    if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16))
-                    {
-                        /* Flush denorms to 0.0f. */
-                        for (base = 0; base < 0x10; base++)
-                        {
-                            pwlLUTBase[base] = 0x0;         /* Half float positive zero. */
-                        }
-                        for (base = 0x200; base < 0x210; base++)
-                        {
-                            pwlLUTBase[base] = 0x8000;      /* Half float negative zero. */
-                        }
-                        for (base = 0x10; base < 0x1F0; base++)
-                        {
-                            baseF16 = base << 6;
-                            pwlLUTBase[base] = baseF16;
-                        }
-                        for (base = 0x210; base < 0x3F0; base++)
-                        {
-                            baseF16 = base << 6;
-                            baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = baseF32 * scale;
-                            pwlLUTBase[base] = Fp32toFp16(pwlValue);
-                        }
-                        pwlLUTBase[0x1F0] = 0x7c00;         /* Half float positive infinity. */
-                        pwlLUTBase[0x3F0] = 0xfc00;         /* Half float negative infinity. */
-                        /* NaN in, NaN out. */
-                        for (base = 0x1F1; base < 0x200; base++)
-                        {
-                            pwlLUTBase[base] = 0x7e00;      /* Half float positive NaN. */
-                        }
-                        for (base = 0x3F1; base < 0x400; base++)
-                        {
-                            pwlLUTBase[base] = 0xfe00;      /* Half float negative NaN. */
-                        }
-                    }
-                    else
-                    {
-                        /* Flush denorms to 0.0f. */
-                        for (base = 0; base < 0x10; base++)
-                        {
-                            pwlLUTBaseEx[base] = 0x0;         /* Half float positive zero. */
-                        }
-                        for (base = 0x200; base < 0x210; base++)
-                        {
-                            pwlLUTBaseEx[base] = 0x100000;      /* Half float negative zero. */
-                        }
-                        for (base = 0x10; base < 0x1F0; base++)
-                        {
-                            baseF21 = base << 11;
-                            pwlLUTBaseEx[base] = baseF21;
-                        }
-                        for (base = 0x210; base < 0x3F0; base++)
-                        {
-                            baseF21 = base << 11;
-                            baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = baseF32 * scale;
-                            pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
-                        }
-                        pwlLUTBaseEx[0x1F0] = 0xf8000;          /* Half float positive infinity. */
-                        pwlLUTBaseEx[0x3F0] = 0x1f8000;         /* Half float negative infinity. */
-                        /* NaN in, NaN out. */
-                        for (base = 0x1F1; base < 0x200; base++)
-                        {
-                            pwlLUTBaseEx[base] = 0xfc000;      /* Half float positive NaN. */
-                        }
-                        for (base = 0x3F1; base < 0x400; base++)
-                        {
-                            pwlLUTBaseEx[base] = 0x1fc000;      /* Half float negative NaN. */
-                        }
-                    }
-
-                    if (value_cmd_ptr->e32[0] == VX_NN_ACTIVATION_LEAKYRELU_MAX_POOLING)
-                    {
-                        outTileXSize = 32;
-                        outTileYSize = 16;
-                        poolingStride = conv_cmd_ptr->pool_stride;
-
-                        gcmASSERT(conv_cmd_ptr->pool_size_x != 1);
-                        gcmASSERT((poolingStride == 1 && conv_cmd_ptr->pool_size_x <= 5) ||
-                                  (poolingStride == 2 && conv_cmd_ptr->pool_size_x <= 3));
-
-                        info.vx_nn_tp_cmd_info.inWindowXStart = (-1) * (vx_int32)conv_cmd_ptr->pad_x_left;
-                        info.vx_nn_tp_cmd_info.inWindowYStart = (-1) * (vx_int32)conv_cmd_ptr->pad_y_top;
-                        info.vx_nn_tp_cmd_info.inWindowXEnd = (outXSize - 1) * poolingStride + conv_cmd_ptr->pool_size_x - 1 - conv_cmd_ptr->pad_x_left;
-                        info.vx_nn_tp_cmd_info.inWindowYEnd = (outYSize - 1) * poolingStride + conv_cmd_ptr->pool_size_y - 1 - conv_cmd_ptr->pad_y_top;
-                        info.vx_nn_tp_cmd_info.inTileXSize = outTileXSize * poolingStride + conv_cmd_ptr->pool_size_x - poolingStride;
-                        info.vx_nn_tp_cmd_info.inTileYSize = outTileYSize * poolingStride + conv_cmd_ptr->pool_size_y - poolingStride;
-                        info.vx_nn_tp_cmd_info.inTileXInc = outTileXSize * poolingStride;
-                        info.vx_nn_tp_cmd_info.inTileYInc = outTileYSize * poolingStride;
-                        if (poolingStride == 1)
-                        {
-                            info.vx_nn_tp_cmd_info.aluHorzProcessing = 0x1;
-                            info.vx_nn_tp_cmd_info.aluHorzProcCount = conv_cmd_ptr->pool_size_x - 1;
-                            info.vx_nn_tp_cmd_info.aluHorzProcStride = 0;
-                            info.vx_nn_tp_cmd_info.aluVertProcessing = 0x1;
-                            info.vx_nn_tp_cmd_info.aluVertProcCount = conv_cmd_ptr->pool_size_y - 1;
-                            info.vx_nn_tp_cmd_info.aluVertProcStride = 0;
-                        }
-                        else
-                        {
-                            info.vx_nn_tp_cmd_info.aluHorzProcessing = 0x3;
-                            info.vx_nn_tp_cmd_info.aluHorzProcCount = conv_cmd_ptr->pool_size_x - 1;
-                            info.vx_nn_tp_cmd_info.aluHorzProcStride = conv_cmd_ptr->pool_size_x == 2 ?
-                                0x0 : 0x1;
-                            info.vx_nn_tp_cmd_info.aluVertProcessing = 0x3;
-                            info.vx_nn_tp_cmd_info.aluVertProcCount = conv_cmd_ptr->pool_size_y - 1;
-                            info.vx_nn_tp_cmd_info.aluVertProcStride = conv_cmd_ptr->pool_size_y == 2 ?
-                                0x0 : 0x1;
-                        }
-                        info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 1;
-                    }
-                    break;
-
-                case VX_NN_ACTIVATION_RELU1:
-                    if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16))
-                    {
-                        for (base = 0x0; base < 0x10; base++)
-                        {
-                            pwlLUTBase[base] = 0x0;             /* Flush denorms to 0.0f. */
-                        }
-                        for (base = 0x10; base < 0x200; base++)
-                        {
-                            baseF16 = base << 6;
-                            baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = baseF32 * value;
-                            if (pwlValue >= 1.0f) break;
-                            pwlLUTBase[base] = Fp32toFp16(pwlValue);
-                        }
-                        fixed16 = Fp32toFp16(1.0f);
-                        for (; base < 0x200; base++)
-                        {
-                            pwlLUTBase[base] = fixed16;         /* large than one to 1.0f. */
-                        }
-                        for (base = 0x200; base < 0x210; base++)
-                        {
-                            pwlLUTBase[base] = 0x8000;          /* Flush negative denorms to -0.0f. */
-                        }
-                        for (base = 0x210; base < 0x400; base++)
-                        {
-                            baseF16 = base << 6;
-                            baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = baseF32 * value;
-                            if (pwlValue <= -1.0f) break;
-                            pwlLUTBase[base] = Fp32toFp16(pwlValue);
-                        }
-                        fixed16 = Fp32toFp16(-1.0f);
-                        for (; base < 0x400; base++)
-                        {
-                            pwlLUTBase[base] = fixed16;         /* smaller than negative one to -1.0f. */
-                        }
-                    }
-                    else
-                    {
-                        for (base = 0x0; base < 0x10; base++)
-                        {
-                            pwlLUTBaseEx[base] = 0x0;               /* Flush denorms to 0.0f. */
-                        }
-                        for (base = 0x10; base < 0x200; base++)
-                        {
-                            baseF21 = base << 11;
-                            baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = baseF32 * value;
-                            if (pwlValue >= 1.0f) break;
-                            pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
-                        }
-                        fixed21 = Fp32toFp21(1.0f);
-                        for (; base < 0x200; base++)
-                        {
-                            pwlLUTBaseEx[base] = fixed21;           /* large than one to 1.0f. */
-                        }
-                        for (base = 0x200; base < 0x210; base++)
-                        {
-                            pwlLUTBaseEx[base] = 0x100000;          /* Flush negative denorms to -0.0f. */
-                        }
-                        for (base = 0x210; base < 0x400; base++)
-                        {
-                            baseF21 = base << 11;
-                            baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = baseF32 * value;
-                            if (pwlValue <= -1.0f) break;
-                            pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
-                        }
-                        fixed21 = Fp32toFp21(-1.0f);
-                        for (; base < 0x400; base++)
-                        {
-                            pwlLUTBaseEx[base] = fixed21;           /* smaller than negative one to -1.0f. */
-                        }
-                    }
-                    break;
-
-                case VX_NN_ACTIVATION_RELU6:
-                    if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16))
-                    {
-                        for (base = 0; base < 0x10; base++)
-                        {
-                            pwlLUTBase[base] = 0x0;
-                        }
-                        for (base = 0x10; base < 0x200; base++)
-                        {
-                            baseF16 = base << 6;
-                            baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = baseF32 * value;
-                            if (pwlValue >= 6.0f) break;
-                            pwlLUTBase[base] = Fp32toFp16(pwlValue);
-                        }
-                        fixed16 = Fp32toFp16(6.0f);
-                        for (; base < 0x200; base++)
-                        {
-                            pwlLUTBase[base] = fixed16;         /* Clamp large than six to 6.0f. */
-                        }
-                        for (base = 0x200; base < 0x400; base++)
-                        {
-                            pwlLUTBase[base] = 0x0;             /* smaller than zero to 0.0f. */
-                        }
-                    }
-                    else
-                    {
-                        for (base = 0; base < 0x10; base++)
-                        {
-                            pwlLUTBaseEx[base] = 0x0;
-                        }
-                        for (base = 0x10; base < 0x200; base++)
-                        {
-                            baseF21 = base << 11;
-                            baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = baseF32 * value;
-                            if (pwlValue >= 6.0f) break;
-                            pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
-                        }
-                        fixed21 = Fp32toFp21(6.0f);
-                        for (; base < 0x200; base++)
-                        {
-                            pwlLUTBaseEx[base] = fixed21;         /* Clamp large than six to 6.0f. */
-                        }
-                        for (base = 0x200; base < 0x400; base++)
-                        {
-                            pwlLUTBaseEx[base] = 0x0;             /* smaller than zero to 0.0f. */
-                        }
-                    }
-                    break;
-
-                case VX_NN_ACTIVATION_LOGISTIC:
-                    if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16))
-                    {
-                        fixed16 = Fp32toFp16(0.5f);
-                        for (base = 0; base < 0x10; base++)
-                        {
-                            pwlLUTBase[base] = fixed16;
-                        }
-                        for (base = 0x10; base < 0x1F0; base++)
-                        {
-                            baseF16 = base << 6;
-                            baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * value));
-                            pwlLUTBase[base] = Fp32toFp16(pwlValue);
-                        }
-                        fixed16 = Fp32toFp16(1.0f);
-                        for (base = 0x1F0; base < 0x200; base++)
-                        {
-                            pwlLUTBase[base] = fixed16;
-                        }
-
-                        fixed16 = Fp32toFp16(0.5f);
-                        for (base = 0x200; base < 0x210; base++)
-                        {
-                            pwlLUTBase[base] = fixed16;
-                        }
-                        for (base = 0x210; base < 0x3F0; base++)
-                        {
-                            baseF16 = base << 6;
-                            baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * value));
-                            pwlLUTBase[base] = Fp32toFp16(pwlValue);
-                        }
-                        fixed16 = Fp32toFp16(0.0f);
-                        for (base = 0x3F0; base < 0x400; base++)
-                        {
-                            pwlLUTBase[base] = fixed16;
-                        }
-                    }
-                    else
-                    {
-                        fixed21 = Fp32toFp21(0.5f);
-                        for (base = 0; base < 0x10; base++)
-                        {
-                            pwlLUTBaseEx[base] = fixed21;
-                        }
-                        for (base = 0x10; base < 0x1F0; base++)
-                        {
-                            baseF21 = base << 11;
-                            baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * value));
-                            pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
-                        }
-                        fixed21 = Fp32toFp21(1.0f);
-                        for (base = 0x1F0; base < 0x200; base++)
-                        {
-                            pwlLUTBaseEx[base] = fixed21;
-                        }
-
-                        fixed21 = Fp32toFp21(0.5f);
-                        for (base = 0x200; base < 0x210; base++)
-                        {
-                            pwlLUTBaseEx[base] = fixed21;
-                        }
-                        for (base = 0x210; base < 0x3F0; base++)
-                        {
-                            baseF21 = base << 11;
-                            baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * value));
-                            pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
-                        }
-                        fixed21 = Fp32toFp21(0.0f);
-                        for (base = 0x3F0; base < 0x400; base++)
-                        {
-                            pwlLUTBaseEx[base] = fixed21;
-                        }
-                    }
-                    break;
-
-                case VX_NN_ACTIVATION_HYPERBOLIC_TAN:
-                    if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16))
-                    {
-                        fixed16 = Fp32toFp16(0.0f);
-                        for (base = 0; base < 0x20; base++)
-                        {
-                            pwlLUTBase[base] = fixed16;
-                        }
-                        for (base = 0x20; base < 0x3E0; base++)
-                        {
-                            baseF16 = base << 5;
-                            baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = gcoMATH_TangentH(baseF32 * value);
-                            pwlLUTBase[base] = Fp32toFp16(pwlValue);
-                        }
-                        fixed16 = Fp32toFp16(1.0f);
-                        for (base = 0x3E0; base < 0x400; base++)
-                        {
-                            pwlLUTBase[base] = fixed16;
-                        }
-                    }
-                    else
-                    {
-                        fixed21 = Fp32toFp21(0.0f);
-                        for (base = 0; base < 0x20; base++)
-                        {
-                            pwlLUTBaseEx[base] = fixed21;
-                        }
-                        for (base = 0x20; base < 0x3E0; base++)
-                        {
-                            baseF21 = base << 10;
-                            baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = gcoMATH_TangentH(baseF32 * value);
-                            pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
-                        }
-                        fixed21 = Fp32toFp21(1.0f);
-                        for (base = 0x3E0; base < 0x400; base++)
-                        {
-                            pwlLUTBaseEx[base] = fixed21;
-                        }
-                    }
-                    break;
-
-                default:
-                    break;
-            }
-
-            info.vx_nn_tp_cmd_info.inImageXSize = inXSize;
-            info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inImageZSize = multiInZSize;
-            info.vx_nn_tp_cmd_info.inImageStride = inYStride / inputElemSize;
-            info.vx_nn_tp_cmd_info.inImageSlice = inZStride / inputElemSize;
-            info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-            info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + inZStride * multiInZOffset;
-            info.vx_nn_tp_cmd_info.aluSquarePreshift = 0;
-            info.vx_nn_tp_cmd_info.aluSquareEnable = 0;
-            info.vx_nn_tp_cmd_info.aluPwlEnable = 1;
-            info.vx_nn_tp_cmd_info.aluMultEnable = 0;
-            info.vx_nn_tp_cmd_info.aluLoadPwlLUT = 1;
-            info.vx_nn_tp_cmd_info.aluLoadPwlLUTAddress = data_buff->tensorBuffer->memory.physicals[0];
-            info.vx_nn_tp_cmd_info.aluLoadPwlLUTGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + outZStride * multiInZOffset;
-            info.vx_nn_tp_cmd_info.outGlobalMem  = 1;
-            info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-            info.vx_nn_tp_cmd_info.outBrickMode  = 0;
-            info.vx_nn_tp_cmd_info.outLoop0Inc   = 0;
-            info.vx_nn_tp_cmd_info.outLoop0Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop1Inc   = 1;
-            info.vx_nn_tp_cmd_info.outLoop1Count = tileOff ? outXSize : 0;
-            info.vx_nn_tp_cmd_info.outLoop1Reset = tileOff ? 0 : 0x1;
-            info.vx_nn_tp_cmd_info.outLoop2Inc   = outXSize;
-            info.vx_nn_tp_cmd_info.outLoop2Count = tileOff ? outYSize : 0;
-            info.vx_nn_tp_cmd_info.outLoop2Reset = tileOff ? 0 : 0x1;
-            info.vx_nn_tp_cmd_info.outLoop3Inc   = outTileXSize;
-            info.vx_nn_tp_cmd_info.outLoop3Count = (outXSize + outTileXSize - 1) / outTileXSize;
-            info.vx_nn_tp_cmd_info.outLoop3Reset = 0x0;
-            info.vx_nn_tp_cmd_info.outLoop4Inc   = outTileYSize * outXSize;
-            info.vx_nn_tp_cmd_info.outLoop4Count = (outYSize + outTileYSize - 1) / outTileYSize;
-            info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-            info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop6Inc   = outZStride / outputElemSize;
-            info.vx_nn_tp_cmd_info.aluPwlSignSupport = (value_cmd_ptr->e32[0] == VX_NN_ACTIVATION_HYPERBOLIC_TAN) ? 0 : 1;
-            info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-            info.vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-            info.vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-            info.vx_nn_tp_cmd_info.aluInputPreshift = (inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0;
-            info.vx_nn_tp_cmd_info.aluOutputPostshift = (outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? (0 - outFPP) : 0;
-            break;
-        }
-
-        case TP_LRN:
-        {
-            vx_float32  alpha, beta, shift;
-            vx_uint32   kernel;
-            vx_lrn_algorithm_type algorithmType;
-            vx_uint16 * pwlLUTBase = (vx_uint16 *)data_buff->tensorBuffer->memory.logicals[0];
-            vx_uint32 * pwlLUTBaseEx = (vx_uint32 *)data_buff->tensorBuffer->memory.logicals[0];
-            vx_uint16   base, fixed16, baseF16;
-            vx_float32  baseF32;
-            vx_uint32   baseU32, fixed21, baseF21;
-            vx_float32  pwlValue;
-            vx_float32  ks;
-            vx_uint32   halfK, preShift = 4, preShiftValue = 1 << (preShift*2);
-            vx_float32  value = inQFormat == VX_QUANT_AFFINE_SCALE ? inScale * inScale : 1.0f;
-
-            gcmASSERT(value_cmd_ptr != VX_NULL);
-            gcmASSERT(pwlLUTBase != VX_NULL);
-
-            alpha = value_cmd_ptr->f32[0];
-            beta = value_cmd_ptr->f32[1];
-            shift = value_cmd_ptr->f32[2];
-            kernel = value_cmd_ptr->u32[0];
-            algorithmType = (vx_lrn_algorithm_type)value_cmd_ptr->u32[1];
-            halfK = kernel / 2;
-            if (algorithmType == LRN_ALGORITHM_TYPE_LRN)
-            {
-                ks = value_cmd_ptr->e32[0] == VX_NN_NORMALIZATION_SAME_MAP ? (vx_float32)(kernel * kernel) : (vx_float32)kernel;
-            }
-            else
-            {
-                ks = 1.0f;
-            }
-
-            gcmASSERT(kernel <= 5);
-            gcmASSERT(kernel & 0x1);
-
-            /* Setup PWL. */
-            if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16))
-            {
-                fixed16 = Fp32toFp16(1.0f);
-                for (base = 0; base < 0x20; base++)
-                {
-                    pwlLUTBase[base] = fixed16;
-                }
-                for (base = 0x20; base < 0x3E0; base++)
-                {
-                    baseF16 = base << 5;
-                    baseF32 = Fp16toFp32(baseF16);
-                    pwlValue = shift + alpha * (baseF32 * value * (vx_float32)preShiftValue / ks);
-                    pwlValue = 1.0f / (vx_float32)pow(pwlValue, beta);
-                    pwlLUTBase[base] = Fp32toFp16(pwlValue);
-                }
-                baseU32 = (31 - 15 + 127) << 23;
-                baseF32 = *((vx_float32*) &baseU32);
-                pwlValue = shift + alpha * (baseF32 * (vx_float32)preShiftValue / ks);
-                pwlValue = 1.0f / (vx_float32)pow(pwlValue, beta);
-                fixed16 = Fp32toFp16(pwlValue);
-                for (base = 0x3E0; base < 0x400; base++)
-                {
-                    pwlLUTBase[base] = fixed16;
-                }
-            }
-            else
-            {
-                fixed21 = Fp32toFp21(1.0f);
-                for (base = 0; base < 0x20; base++)
-                {
-                    pwlLUTBaseEx[base] = fixed21;
-                }
-                for (base = 0x20; base < 0x3E0; base++)
-                {
-                    baseF21 = base << 10;
-                    baseF32 = Fp21toFp32(baseF21);
-                    pwlValue = shift + alpha * (baseF32 * value * (vx_float32)preShiftValue / ks);
-                    pwlValue = 1.0f / (vx_float32)pow(pwlValue, beta);
-                    pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
-                }
-                baseU32 = (31 - 15 + 127) << 23;
-                baseF32 = *((vx_float32*) &baseU32);
-                pwlValue = shift + alpha * (baseF32 * (vx_float32)preShiftValue / ks);
-                pwlValue = 1.0f / (vx_float32)pow(pwlValue, beta);
-                fixed21 = Fp32toFp21(pwlValue);
-                for (base = 0x3E0; base < 0x400; base++)
-                {
-                    pwlLUTBaseEx[base] = fixed21;
-                }
-            }
-
-            info.vx_nn_tp_cmd_info.aluLoadPwlLUTAddress = data_buff->tensorBuffer->memory.physicals[0];
-            info.vx_nn_tp_cmd_info.aluPwlEnable = 1;
-            info.vx_nn_tp_cmd_info.aluMultEnable = 1;
-            info.vx_nn_tp_cmd_info.aluLoadPwlLUT = 1;
-            info.vx_nn_tp_cmd_info.aluLoadPwlLUTGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-            info.vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-            info.vx_nn_tp_cmd_info.aluInputPreshift = (inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0;
-            info.vx_nn_tp_cmd_info.aluOutputPostshift = (outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? (0 - outFPP) : 0;
-
-            if (value_cmd_ptr->e32[0]  == VX_NN_NORMALIZATION_SAME_MAP)
-            {
-                outTileXSize = 62;
-                outTileYSize = 16;
-                info.vx_nn_tp_cmd_info.inImageXSize = inXSize;
-                info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-                info.vx_nn_tp_cmd_info.inImageZSize = multiInZSize;
-                info.vx_nn_tp_cmd_info.inImageStride = inYStride / inputElemSize;
-                info.vx_nn_tp_cmd_info.inImageSlice = inZStride / inputElemSize;
-                info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + inZStride * multiInZOffset;
-                info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + outZStride * multiInZOffset;
-                info.vx_nn_tp_cmd_info.inWindowXStart = halfK * (-1);
-                info.vx_nn_tp_cmd_info.inWindowYStart = halfK * (-1);
-                info.vx_nn_tp_cmd_info.inWindowXEnd = inXSize - 1 + halfK;
-                info.vx_nn_tp_cmd_info.inWindowYEnd = inYSize - 1 + halfK;
-                info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-                info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-                info.vx_nn_tp_cmd_info.inTileXSize = outTileXSize + kernel - halfK;
-                info.vx_nn_tp_cmd_info.inTileYSize = outTileYSize + kernel - halfK;
-                info.vx_nn_tp_cmd_info.inTileXInc = outTileXSize;
-                info.vx_nn_tp_cmd_info.inTileYInc = outTileYSize;
-                info.vx_nn_tp_cmd_info.aluSquarePreshift = preShift;
-                info.vx_nn_tp_cmd_info.aluSquareEnable = 1;
-                info.vx_nn_tp_cmd_info.aluHorzProcessing = 0x0;
-                info.vx_nn_tp_cmd_info.aluHorzProcCount = kernel - 1;
-                info.vx_nn_tp_cmd_info.aluHorzProcStride = 0;
-                info.vx_nn_tp_cmd_info.aluVertProcessing = 0x0;
-                info.vx_nn_tp_cmd_info.aluVertProcCount = kernel - 1;
-                info.vx_nn_tp_cmd_info.aluVertProcStride = 0;
-                info.vx_nn_tp_cmd_info.outGlobalMem  = 1;
-                info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-                info.vx_nn_tp_cmd_info.outBrickMode  = 0;
-                info.vx_nn_tp_cmd_info.outLoop0Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop0Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop1Inc   = 1;
-                info.vx_nn_tp_cmd_info.outLoop1Count = 0;
-                info.vx_nn_tp_cmd_info.outLoop1Reset = 0x1;;
-                info.vx_nn_tp_cmd_info.outLoop2Inc   = inXSize;
-                info.vx_nn_tp_cmd_info.outLoop2Count = 0;
-                info.vx_nn_tp_cmd_info.outLoop2Reset = 0x1;
-                info.vx_nn_tp_cmd_info.outLoop3Inc   = outTileXSize;
-                info.vx_nn_tp_cmd_info.outLoop3Count = (inXSize + outTileXSize - 1) / outTileXSize;
-                info.vx_nn_tp_cmd_info.outLoop3Reset = 0x0;
-                info.vx_nn_tp_cmd_info.outLoop4Inc   = outTileYSize * inXSize;
-                info.vx_nn_tp_cmd_info.outLoop4Count = (inYSize + outTileYSize - 1) / outTileYSize;
-                info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop6Inc   = outZStride / outputElemSize;
-                info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-                info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-                info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-            }
-            else /* VX_NN_NORMALIZATION_ACROSS_MAPS */
-            {
-                if (inXSize * inYSize < 65536)
-                {
-                    /* Convert to 2D same map LRN. */
-                    outTileXSize = 32;
-                    outTileYSize = inZSize;
-
-                    _getMultiTPParam(inXSize*inYSize, tpCoreCount, tp_index, multi_tp, &multiInZSize, &multiInZOffset);
-
-                    info.vx_nn_tp_cmd_info.inImageXSize = multiInZSize;
-                    info.vx_nn_tp_cmd_info.inImageYSize = inZSize;
-                    info.vx_nn_tp_cmd_info.inImageZSize = 1;
-                    info.vx_nn_tp_cmd_info.inImageStride = inZStride / inputElemSize;
-                    info.vx_nn_tp_cmd_info.inImageSlice = inZStride / inputElemSize * inZSize;
-                    info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + multiInZOffset * inputElemSize;
-                    info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + multiInZOffset * outputElemSize;
-                    info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-                    info.vx_nn_tp_cmd_info.inWindowYStart = halfK * (-1);
-                    info.vx_nn_tp_cmd_info.inWindowXEnd = multiInZSize - 1;
-                    info.vx_nn_tp_cmd_info.inWindowYEnd = inZSize - 1 + halfK;
-                    info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-                    info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-                    info.vx_nn_tp_cmd_info.inTileXSize = outTileXSize;
-                    info.vx_nn_tp_cmd_info.inTileYSize = outTileYSize + kernel - 1;
-                    info.vx_nn_tp_cmd_info.inTileXInc = outTileXSize;
-                    info.vx_nn_tp_cmd_info.inTileYInc = outTileYSize;
-                    info.vx_nn_tp_cmd_info.aluSquarePreshift = preShift;
-                    info.vx_nn_tp_cmd_info.aluSquareEnable = 1;
-                    info.vx_nn_tp_cmd_info.aluHorzProcessing = 0x0;
-                    info.vx_nn_tp_cmd_info.aluHorzProcCount = 0;
-                    info.vx_nn_tp_cmd_info.aluHorzProcStride = 0;
-                    info.vx_nn_tp_cmd_info.aluVertProcessing = 0x0;
-                    info.vx_nn_tp_cmd_info.aluVertProcCount = kernel - 1;
-                    info.vx_nn_tp_cmd_info.aluVertProcStride = 0;
-                    info.vx_nn_tp_cmd_info.aluZFilterMode = 0;
-                    info.vx_nn_tp_cmd_info.inWindowZStartOverfetch = 0;
-                    info.vx_nn_tp_cmd_info.inWindowZEndOverfetch = 0;
-                    info.vx_nn_tp_cmd_info.outGlobalMem  = 1;
-                    info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-                    info.vx_nn_tp_cmd_info.outBrickMode  = 0;
-                    info.vx_nn_tp_cmd_info.outLoop0Inc   = 0;
-                    info.vx_nn_tp_cmd_info.outLoop0Count = 1;
-                    info.vx_nn_tp_cmd_info.outLoop1Inc   = 1;
-                    info.vx_nn_tp_cmd_info.outLoop1Count = 0;
-                    info.vx_nn_tp_cmd_info.outLoop1Reset = 0x1;
-                    info.vx_nn_tp_cmd_info.outLoop2Inc   = outZStride / outputElemSize;
-                    info.vx_nn_tp_cmd_info.outLoop2Count = 0;
-                    info.vx_nn_tp_cmd_info.outLoop2Reset = 0x1;
-                    info.vx_nn_tp_cmd_info.outLoop3Inc   = outTileXSize;
-                    info.vx_nn_tp_cmd_info.outLoop3Count = (multiInZSize + outTileXSize - 1) / outTileXSize;
-                    info.vx_nn_tp_cmd_info.outLoop3Reset = 0x0;
-                    info.vx_nn_tp_cmd_info.outLoop4Inc   = outTileYSize * outYStride / outputElemSize;
-                    info.vx_nn_tp_cmd_info.outLoop4Count = (inZSize + outTileYSize - 1) / outTileYSize;
-                    info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-                    info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-                    info.vx_nn_tp_cmd_info.outLoop6Inc   = 0;
-                    info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-                    info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-                    info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-                }
-                else
-                {
-                    /* Turn on z filter. */
-                    /* Input X-Z plain as X-Y plain. */
-                    outTileXSize = 32;
-                    outTileYSize = 1;
-
-                    _getMultiTPParam(inXSize, tpCoreCount, tp_index, multi_tp, &multiInZSize, &multiInZOffset);
-
-                    info.vx_nn_tp_cmd_info.inImageXSize = multiInZSize;
-                    info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-                    info.vx_nn_tp_cmd_info.inImageZSize = inZSize;
-                    info.vx_nn_tp_cmd_info.inImageStride = inYStride / inputElemSize;
-                    info.vx_nn_tp_cmd_info.inImageSlice = inZStride / inputElemSize;
-                    info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + multiInZOffset * inputElemSize;
-                    info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + multiInZOffset * outputElemSize;
-                    info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-                    info.vx_nn_tp_cmd_info.inWindowYStart = 0;
-                    info.vx_nn_tp_cmd_info.inWindowXEnd = multiInZSize - 1;
-                    info.vx_nn_tp_cmd_info.inWindowYEnd = inYSize - 1;
-                    info.vx_nn_tp_cmd_info.inTileSequence = 0x1;
-                    info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-                    info.vx_nn_tp_cmd_info.inTileXSize = outTileXSize;
-                    info.vx_nn_tp_cmd_info.inTileYSize = outTileYSize;
-                    info.vx_nn_tp_cmd_info.inTileXInc = outTileXSize;
-                    info.vx_nn_tp_cmd_info.inTileYInc = outTileYSize;
-                    info.vx_nn_tp_cmd_info.aluSquarePreshift = preShift;
-                    info.vx_nn_tp_cmd_info.aluSquareEnable = 1;
-                    info.vx_nn_tp_cmd_info.aluHorzProcessing = 0x0;
-                    info.vx_nn_tp_cmd_info.aluHorzProcCount = 0;
-                    info.vx_nn_tp_cmd_info.aluHorzProcStride = 0;
-                    info.vx_nn_tp_cmd_info.aluVertProcessing = 0x0;
-                    info.vx_nn_tp_cmd_info.aluVertProcCount = kernel - 1;
-                    info.vx_nn_tp_cmd_info.aluVertProcStride = 0;
-                    info.vx_nn_tp_cmd_info.aluZFilterMode = 1;
-                    info.vx_nn_tp_cmd_info.inWindowZStartOverfetch = halfK;
-                    info.vx_nn_tp_cmd_info.inWindowZEndOverfetch = halfK;
-                    info.vx_nn_tp_cmd_info.outGlobalMem  = 1;
-                    info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-                    info.vx_nn_tp_cmd_info.outBrickMode  = 0;
-                    info.vx_nn_tp_cmd_info.outLoop0Inc   = 0;
-                    info.vx_nn_tp_cmd_info.outLoop0Count = 1;
-                    info.vx_nn_tp_cmd_info.outLoop1Inc   = 1;
-                    info.vx_nn_tp_cmd_info.outLoop1Count = 0;
-                    info.vx_nn_tp_cmd_info.outLoop1Reset = 0x1;
-                    info.vx_nn_tp_cmd_info.outLoop2Inc   = outZStride / outputElemSize;;
-                    info.vx_nn_tp_cmd_info.outLoop2Count = outZSize;
-                    info.vx_nn_tp_cmd_info.outLoop2Reset = 0x0;
-                    info.vx_nn_tp_cmd_info.outLoop3Inc   = outTileXSize;
-                    info.vx_nn_tp_cmd_info.outLoop3Count = (multiInZSize + outTileXSize - 1) / outTileXSize;
-                    info.vx_nn_tp_cmd_info.outLoop3Reset = 0x0;
-                    info.vx_nn_tp_cmd_info.outLoop4Inc   = outYStride / outputElemSize;
-                    info.vx_nn_tp_cmd_info.outLoop4Count = outYSize;
-                    info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-                    info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-                    info.vx_nn_tp_cmd_info.outLoop6Inc   = 0;
-                    info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-                    info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-                    info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-                }
-            }
-            break;
-        }
-
-        case TP_ROI_POOLING:
-        case TP_ROI_POOLING_STEP_1:
-        case TP_ROI_POOLING_STEP_2:
-        {
-            vx_uint32 poolWidth, poolHeight, roiNum;
-            vx_uint32 maxPoolSize, poolXSize, poolYSize, poolZSize;
-
-            gcmASSERT(value_cmd_ptr != VX_NULL);
-
-            poolWidth = value_cmd_ptr->u32[0];
-            poolHeight = value_cmd_ptr->u32[1];
-            maxPoolSize = value_cmd_ptr->u32[2];
-            poolXSize = value_cmd_ptr->u32[3];
-            poolYSize = value_cmd_ptr->u32[4];
-            poolZSize = value_cmd_ptr->u32[5];
-            roiNum = value_cmd_ptr->u32[6];
-            outTileXSize = inXSize;
-            outTileYSize = 16;
-
-            info.vx_nn_tp_cmd_info.aluSquarePreshift = 0;
-            info.vx_nn_tp_cmd_info.aluSquareEnable = 0;
-            info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-            info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-            info.vx_nn_tp_cmd_info.aluPwlEnable = 0;
-            info.vx_nn_tp_cmd_info.aluMultEnable = 0;
-            info.vx_nn_tp_cmd_info.aluLoadPwlLUT = 0;
-            info.vx_nn_tp_cmd_info.aluLoadPwlLUTAddress = 0;
-            info.vx_nn_tp_cmd_info.aluLoadPwlLUTGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.outGlobalMem  = 1;
-            info.vx_nn_tp_cmd_info.outBrickMode  = 0;
-
-            if (value_cmd_ptr->e32[0] == 0)
-            {
-                info.vx_nn_tp_cmd_info.inImageXSize = inXSize;
-                info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-                info.vx_nn_tp_cmd_info.inImageZSize = multiInZSize;
-                info.vx_nn_tp_cmd_info.inImageStride = inYStride / inputElemSize;
-                info.vx_nn_tp_cmd_info.inImageSlice = inZStride / inputElemSize;
-                info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-                info.vx_nn_tp_cmd_info.inWindowYStart = 0;
-                info.vx_nn_tp_cmd_info.inWindowXEnd = outTileXSize - 1 + maxPoolSize - 1;
-                info.vx_nn_tp_cmd_info.inWindowYEnd = inYSize - 1;
-                info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-                info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-                info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + inZStride * multiInZOffset;
-                info.vx_nn_tp_cmd_info.inTileListAddress = 0;
-                info.vx_nn_tp_cmd_info.inTileListGlobalMem = 1;
-                info.vx_nn_tp_cmd_info.outTileSkipAtborder = 1;
-                info.vx_nn_tp_cmd_info.inTileXSize = outTileXSize;
-                info.vx_nn_tp_cmd_info.inTileXInc = 1;
-                info.vx_nn_tp_cmd_info.aluHorzProcessing = 0x2;
-                info.vx_nn_tp_cmd_info.aluHorzProcCount = maxPoolSize - 1;
-                info.vx_nn_tp_cmd_info.aluHorzProcStride = 0;
-                info.vx_nn_tp_cmd_info.aluVertProcessing = 0;
-                info.vx_nn_tp_cmd_info.aluVertProcCount = 0;
-                info.vx_nn_tp_cmd_info.aluVertProcStride = 0;
-                info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + poolXSize * poolYSize * multiInZOffset * outputElemSize;
-                info.vx_nn_tp_cmd_info.outLoop0Inc   = poolXSize * poolYSize * poolZSize;
-                info.vx_nn_tp_cmd_info.outLoop0Count = maxPoolSize;
-                info.vx_nn_tp_cmd_info.outLoop1Inc   = poolYSize * maxPoolSize;
-                info.vx_nn_tp_cmd_info.outLoop1Count = 0;
-                info.vx_nn_tp_cmd_info.outLoop1Reset = 0x1;
-                info.vx_nn_tp_cmd_info.outLoop2Inc   = 1;
-                info.vx_nn_tp_cmd_info.outLoop2Count = 0;
-                info.vx_nn_tp_cmd_info.outLoop2Reset = 0x1;
-                info.vx_nn_tp_cmd_info.outLoop3Inc   = poolYSize;
-                info.vx_nn_tp_cmd_info.outLoop3Count = maxPoolSize;
-                info.vx_nn_tp_cmd_info.outLoop3Reset = 0x0;
-                info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop6Inc   = poolXSize * poolYSize;
-                info.vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-                info.vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-                info.vx_nn_tp_cmd_info.aluInputPreshift   = 0;
-                info.vx_nn_tp_cmd_info.aluOutputPostshift = ((inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0) - ((outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? outFPP : 0);
-
-
-                info.vx_nn_tp_cmd_info.inTileYSize = outTileYSize;
-                info.vx_nn_tp_cmd_info.inTileYInc = outTileYSize;
-                info.vx_nn_tp_cmd_info.outLoop4Inc   = outTileYSize;
-                info.vx_nn_tp_cmd_info.outLoop4Count = (inYSize + outTileYSize - 1) / outTileYSize;
-            }
-            else if (value_cmd_ptr->e32[0] == 1)
-            {
-                vx_uint32 proposalsInterleaved, zTogether;
-                vx_tensor inputTensor = (vx_tensor)other_tensor;
-
-                gcmASSERT(data_buff != VX_NULL);
-
-                _getMultiTPParam(roiNum, tpCoreCount, tp_index, multi_tp, &multiInZSize, &multiInZOffset);
-
-                inXSize = TENSOR_VIEW_SIZE_INDEX(inputTensor, 0);
-                inYSize = TENSOR_VIEW_SIZE_INDEX(inputTensor, 1);
-                inZSize = TENSOR_VIEW_SIZE_INDEX(inputTensor, 2);
-
-                proposalsInterleaved = 1;
-                zTogether = 1;
-
-                info.vx_nn_tp_cmd_info.inImageXSize = inYSize;
-                info.vx_nn_tp_cmd_info.inImageYSize = inXSize;
-                info.vx_nn_tp_cmd_info.inImageZSize = inZSize;
-                info.vx_nn_tp_cmd_info.inImageStride = poolYSize;
-                info.vx_nn_tp_cmd_info.inImageSlice = poolXSize * poolYSize;
-                info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-                info.vx_nn_tp_cmd_info.inWindowYStart = 0;
-                info.vx_nn_tp_cmd_info.inWindowXEnd = inYSize - 1 + maxPoolSize - 1;
-                info.vx_nn_tp_cmd_info.inWindowYEnd = inXSize - 1;
-                info.vx_nn_tp_cmd_info.inTileSequence = 0x2;
-                info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-                info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase;
-                info.vx_nn_tp_cmd_info.inTileListGlobalMem = 1;
-                info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-                info.vx_nn_tp_cmd_info.inTileListAddress = data_buff->tensorBuffer->memory.physicals[0] + multiInZOffset * sizeof(vx_tp_roi_pool);
-                info.vx_nn_tp_cmd_info.inTileXSize = poolHeight;
-                info.vx_nn_tp_cmd_info.inTileYSize = poolWidth;
-                info.vx_nn_tp_cmd_info.inTileXInc = zTogether;
-                info.vx_nn_tp_cmd_info.inTileYInc = 0;
-                info.vx_nn_tp_cmd_info.aluHorzProcessing = 0;
-                info.vx_nn_tp_cmd_info.aluHorzProcCount = 0;
-                info.vx_nn_tp_cmd_info.aluHorzProcStride = 0;
-                info.vx_nn_tp_cmd_info.aluVertProcessing = 0;
-                info.vx_nn_tp_cmd_info.aluVertProcCount = 0;
-                info.vx_nn_tp_cmd_info.aluVertProcStride = 0;
-                info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + poolWidth * poolHeight * inZSize * multiInZOffset * outputElemSize;
-                info.vx_nn_tp_cmd_info.outLoop0Inc   = poolWidth * proposalsInterleaved;
-                info.vx_nn_tp_cmd_info.outLoop0Count = poolHeight;
-                info.vx_nn_tp_cmd_info.outLoop1Inc   = proposalsInterleaved;
-                info.vx_nn_tp_cmd_info.outLoop1Count = poolWidth;
-                info.vx_nn_tp_cmd_info.outLoop1Reset = 0x0;
-                info.vx_nn_tp_cmd_info.outLoop2Inc   = poolWidth * poolHeight * proposalsInterleaved;
-                info.vx_nn_tp_cmd_info.outLoop2Count = zTogether;
-                info.vx_nn_tp_cmd_info.outLoop2Reset = 0x0;
-                info.vx_nn_tp_cmd_info.outLoop3Inc   = 1;
-                info.vx_nn_tp_cmd_info.outLoop3Count = proposalsInterleaved;
-                info.vx_nn_tp_cmd_info.outLoop3Reset = 0x0;
-                info.vx_nn_tp_cmd_info.outLoop4Inc   = poolWidth * poolHeight * inZSize;
-                info.vx_nn_tp_cmd_info.outLoop4Count = multiInZSize;
-                info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop6Inc   = poolWidth * poolHeight * proposalsInterleaved * zTogether;
-                info.vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-                info.vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-                info.vx_nn_tp_cmd_info.aluInputPreshift   = 0;
-                info.vx_nn_tp_cmd_info.aluOutputPostshift = ((inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0) - ((outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? outFPP: 0);
-            }
-            break;
-        }
-
-
-        case TP_REORG:
-            gcmASSERT(value_cmd_ptr != VX_NULL);
-
-            strideXSize = strideYSize = value_cmd_ptr->u32[0];
-            outXSize = inXSize;
-            outYSize = inYSize;
-            outZSize = inZSize;
-            inXSize = inXSize * strideXSize;
-            inYSize = inYSize * strideYSize;
-            inZSize = inZSize / strideXSize / strideYSize;
-
-            _getMultiTPParam(inZSize, tpCoreCount, tp_index, multi_tp, &multiInZSize, &multiInZOffset);
-
-            info.vx_nn_tp_cmd_info.inImageXSize = inXSize;
-            info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inImageZSize = multiInZSize;
-            info.vx_nn_tp_cmd_info.inImageStride = inXSize;
-            info.vx_nn_tp_cmd_info.inImageSlice = inXSize * inYSize;
-            info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-            info.vx_nn_tp_cmd_info.inWindowYStart = 0;
-            info.vx_nn_tp_cmd_info.inWindowXEnd = inXSize - 1;
-            info.vx_nn_tp_cmd_info.inWindowYEnd = inYSize - 1;
-            info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-            info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + inXSize * inYSize * multiInZOffset * inputElemSize;
-            info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-            info.vx_nn_tp_cmd_info.inTileXSize = inXSize;
-            info.vx_nn_tp_cmd_info.inTileYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inTileXInc = inXSize;
-            info.vx_nn_tp_cmd_info.inTileYInc = inYSize;
-            info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + outXSize * outYSize * multiInZOffset * outputElemSize;
-            info.vx_nn_tp_cmd_info.outGlobalMem  = 1;
-            info.vx_nn_tp_cmd_info.outBrickMode  = 0;
-            info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-            info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-            info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-            info.vx_nn_tp_cmd_info.aluI2FEnable = 0;
-            info.vx_nn_tp_cmd_info.aluF2IEnable = 0;
-            info.vx_nn_tp_cmd_info.outLoop0Inc   = outXSize * outYSize * inZSize;
-            info.vx_nn_tp_cmd_info.outLoop0Count = strideXSize;
-            info.vx_nn_tp_cmd_info.outLoop1Inc   = 1;
-            info.vx_nn_tp_cmd_info.outLoop1Count = outXSize;
-            info.vx_nn_tp_cmd_info.outLoop1Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop2Inc   = outXSize * outYSize * strideXSize * inZSize;
-            info.vx_nn_tp_cmd_info.outLoop2Count = strideYSize;
-            info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop3Inc   = outXSize;
-            info.vx_nn_tp_cmd_info.outLoop3Count = outYSize;
-            info.vx_nn_tp_cmd_info.outLoop3Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop4Inc   = 0;
-            info.vx_nn_tp_cmd_info.outLoop4Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-            info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop6Inc   = outXSize * outYSize;
-            info.vx_nn_tp_cmd_info.aluI2FEnable = 0;
-            info.vx_nn_tp_cmd_info.aluF2IEnable = 0;
-            break;
-
-        case TP_REORG_DEPTH2SPACE:
-        {
-            vx_uint32 blockSize;
-
-            gcmASSERT(value_cmd_ptr != VX_NULL);
-
-            blockSize = value_cmd_ptr->u32[0];
-
-            vxmASSERT(outXSize == (inXSize * blockSize));
-            vxmASSERT(outYSize == (inYSize * blockSize));
-            vxmASSERT((outZSize * blockSize * blockSize) == inZSize);
-
-            _getMultiTPParam(inZSize, tpCoreCount, tp_index, multi_tp, &multiInZSize, &multiInZOffset);
-
-            info.vx_nn_tp_cmd_info.inImageXSize = inXSize;
-            info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inImageZSize = multiInZSize;
-            info.vx_nn_tp_cmd_info.inImageStride = inXSize;
-            info.vx_nn_tp_cmd_info.inImageSlice = inXSize * inYSize;
-            info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-            info.vx_nn_tp_cmd_info.inWindowYStart = 0;
-            info.vx_nn_tp_cmd_info.inWindowXEnd = inXSize - 1;
-            info.vx_nn_tp_cmd_info.inWindowYEnd = inYSize - 1;
-            info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-            info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + inXSize * inYSize * multiInZOffset * inputElemSize;
-            info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-            info.vx_nn_tp_cmd_info.inTileXSize = inXSize;
-            info.vx_nn_tp_cmd_info.inTileYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inTileXInc = inXSize;
-            info.vx_nn_tp_cmd_info.inTileYInc = inYSize;
-            info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + outXSize * outYSize * multiInZOffset * outputElemSize;
-            info.vx_nn_tp_cmd_info.outGlobalMem  = 1;
-            info.vx_nn_tp_cmd_info.outBrickMode  = 0;
-            info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-            info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-            info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-            info.vx_nn_tp_cmd_info.aluI2FEnable = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info.vx_nn_tp_cmd_info.aluF2IEnable = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info.vx_nn_tp_cmd_info.outLoop0Inc   = blockSize;
-            info.vx_nn_tp_cmd_info.outLoop0Count = inXSize;
-            info.vx_nn_tp_cmd_info.outLoop1Inc   = outXSize * blockSize;
-            info.vx_nn_tp_cmd_info.outLoop1Count = inYSize;
-            info.vx_nn_tp_cmd_info.outLoop1Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop2Inc   = outXSize * outYSize;
-            info.vx_nn_tp_cmd_info.outLoop2Count = outZSize;
-            info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop3Inc   = 1;
-            info.vx_nn_tp_cmd_info.outLoop3Count = blockSize;
-            info.vx_nn_tp_cmd_info.outLoop3Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop4Inc   = outXSize;
-            info.vx_nn_tp_cmd_info.outLoop4Count = blockSize;
-            info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-            info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop6Inc   = 0;
-            break;
-        }
-
-        case TP_REORG_SPACE2DEPTH:
-        {
-            vx_uint32 blockSize;
-
-            gcmASSERT(value_cmd_ptr != VX_NULL);
-
-            blockSize = value_cmd_ptr->u32[0];
-
-            vxmASSERT(inXSize == (outXSize * blockSize));
-            vxmASSERT(inYSize == (outYSize * blockSize));
-            vxmASSERT((inZSize * blockSize * blockSize) == outZSize);
-
-            _getMultiTPParam(inZSize, tpCoreCount, tp_index, multi_tp, &multiInZSize, &multiInZOffset);
-
-            info.vx_nn_tp_cmd_info.inImageXSize = inXSize;
-            info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inImageZSize = multiInZSize;
-            info.vx_nn_tp_cmd_info.inImageStride = inXSize;
-            info.vx_nn_tp_cmd_info.inImageSlice = inXSize * inYSize;
-            info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-            info.vx_nn_tp_cmd_info.inWindowYStart = 0;
-            info.vx_nn_tp_cmd_info.inWindowXEnd = inXSize - 1;
-            info.vx_nn_tp_cmd_info.inWindowYEnd = inYSize - 1;
-            info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-            info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + inXSize * inYSize * multiInZOffset * inputElemSize;
-            info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-            info.vx_nn_tp_cmd_info.inTileXSize = inXSize;
-            info.vx_nn_tp_cmd_info.inTileYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inTileXInc = inXSize;
-            info.vx_nn_tp_cmd_info.inTileYInc = inYSize;
-            info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + outXSize * outYSize * multiInZOffset * outputElemSize;
-            info.vx_nn_tp_cmd_info.outGlobalMem  = 1;
-            info.vx_nn_tp_cmd_info.outBrickMode  = 0;
-            info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-            info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-            info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-            info.vx_nn_tp_cmd_info.aluI2FEnable = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info.vx_nn_tp_cmd_info.aluF2IEnable = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info.vx_nn_tp_cmd_info.outLoop0Inc   = outXSize * outYSize * inZSize;
-            info.vx_nn_tp_cmd_info.outLoop0Count = blockSize;
-            info.vx_nn_tp_cmd_info.outLoop1Inc   = 1;
-            info.vx_nn_tp_cmd_info.outLoop1Count = outXSize;
-            info.vx_nn_tp_cmd_info.outLoop1Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop2Inc   = outXSize * outYSize * inZSize * blockSize;
-            info.vx_nn_tp_cmd_info.outLoop2Count = blockSize;
-            info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop3Inc   = outXSize;
-            info.vx_nn_tp_cmd_info.outLoop3Count = outYSize;
-            info.vx_nn_tp_cmd_info.outLoop3Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop4Inc   = outXSize * outYSize;
-            info.vx_nn_tp_cmd_info.outLoop4Count = inZSize;
-            info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-            info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop6Inc   = 0;
-            break;
-        }
-
-        case TP_REORG_SPACE2BATCH:
-        {
-            vx_uint32 blockWidth, blockHeight;
-            vx_uint32 inNSize, outNSize, inZNSize;
-            vx_uint32 padXLeft, padYTop, padXRight, padYBottom;
-
-            gcmASSERT(value_cmd_ptr != VX_NULL);
-
-            blockWidth  = value_cmd_ptr->u32[0];
-            blockHeight = value_cmd_ptr->u32[1];
-            inNSize     = value_cmd_ptr->u32[2];
-            outNSize    = inNSize * blockWidth * blockHeight;
-            /* Take input as 3D tensor. */
-            inZNSize    = inZSize * inNSize;
-            padXLeft    = conv_cmd_ptr->pad_x_left;
-            padYTop     = conv_cmd_ptr->pad_y_top;
-            padXRight   = outXSize * blockWidth - inXSize - padXLeft;
-            padYBottom  = outYSize * blockHeight - inYSize - padYTop;
-
-            vxmASSERT(inZSize == outZSize);
-
-            _getMultiTPParam(inZNSize, tpCoreCount, tp_index, multi_tp, &multiInZSize, &multiInZOffset);
-
-            info.vx_nn_tp_cmd_info.inImageXSize = inXSize;
-            info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inImageZSize = multiInZSize;
-            info.vx_nn_tp_cmd_info.inImageStride = inXSize;
-            info.vx_nn_tp_cmd_info.inImageSlice = inXSize * inYSize;
-            info.vx_nn_tp_cmd_info.inWindowXStart = (-1) * (vx_int32)padXLeft;
-            info.vx_nn_tp_cmd_info.inWindowYStart = (-1) * (vx_int32)padYTop;
-            info.vx_nn_tp_cmd_info.inWindowXEnd = inXSize + padXRight - 1;
-            info.vx_nn_tp_cmd_info.inWindowYEnd = inYSize +padYBottom - 1;
-            info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-            info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + inXSize * inYSize * multiInZOffset * inputElemSize;
-            info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-            info.vx_nn_tp_cmd_info.inTileXSize = inXSize + padXLeft + padXRight;
-            info.vx_nn_tp_cmd_info.inTileYSize = inYSize + padYTop + padYBottom;
-            info.vx_nn_tp_cmd_info.inTileXInc = inXSize + padXLeft + padXRight;
-            info.vx_nn_tp_cmd_info.inTileYInc = inYSize + padYTop + padYBottom;
-            info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + outXSize * outYSize * multiInZOffset * outputElemSize;
-            info.vx_nn_tp_cmd_info.outGlobalMem  = 1;
-            info.vx_nn_tp_cmd_info.outBrickMode  = 0;
-            info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-            info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-            info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-            info.vx_nn_tp_cmd_info.aluI2FEnable = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info.vx_nn_tp_cmd_info.aluF2IEnable = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info.vx_nn_tp_cmd_info.outLoop0Inc   = outXSize * outYSize * outZSize;
-            info.vx_nn_tp_cmd_info.outLoop0Count = blockWidth;
-            info.vx_nn_tp_cmd_info.outLoop1Inc   = 1;
-            info.vx_nn_tp_cmd_info.outLoop1Count = outXSize;
-            info.vx_nn_tp_cmd_info.outLoop1Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop2Inc   = outXSize * outYSize * outZSize * blockWidth;
-            info.vx_nn_tp_cmd_info.outLoop2Count = blockHeight;
-            info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop3Inc   = outXSize;
-            info.vx_nn_tp_cmd_info.outLoop3Count = outYSize;
-            info.vx_nn_tp_cmd_info.outLoop3Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop4Inc   = outXSize * outYSize;
-            info.vx_nn_tp_cmd_info.outLoop4Count = outZSize;
-            info.vx_nn_tp_cmd_info.outLoop5Inc   = outXSize * outYSize * outZSize * blockWidth * blockHeight;
-            info.vx_nn_tp_cmd_info.outLoop5Count = inNSize;
-            info.vx_nn_tp_cmd_info.outLoop6Inc   = 0;
-
-            break;
-        }
-
-        case TP_REORG_BATCH2SPACE:
-        {
-            vx_uint32 blockWidth, blockHeight;
-            vx_uint32 inNSize, outNSize, inZNSize;
-
-            gcmASSERT(value_cmd_ptr != VX_NULL);
-
-            blockWidth  = value_cmd_ptr->u32[0];
-            blockHeight = value_cmd_ptr->u32[1];
-            inNSize     = value_cmd_ptr->u32[2];
-
-            vxmASSERT(inNSize % (blockWidth * blockHeight) == 0);
-            outNSize = inNSize / blockWidth / blockHeight;
-            /* Take input as 3D tensor. */
-            inZNSize = inZSize * inNSize;
-
-            vxmASSERT(inZSize == outZSize);
-
-            _getMultiTPParam(inZNSize, tpCoreCount, tp_index, multi_tp, &multiInZSize, &multiInZOffset);
-
-            info.vx_nn_tp_cmd_info.inImageXSize = inXSize;
-            info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inImageZSize = multiInZSize;
-            info.vx_nn_tp_cmd_info.inImageStride = inXSize;
-            info.vx_nn_tp_cmd_info.inImageSlice = inXSize * inYSize;
-            info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-            info.vx_nn_tp_cmd_info.inWindowYStart = 0;
-            info.vx_nn_tp_cmd_info.inWindowXEnd = inXSize - 1;
-            info.vx_nn_tp_cmd_info.inWindowYEnd = inYSize - 1;
-            info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-            info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + inXSize * inYSize * multiInZOffset * inputElemSize;
-            info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-            info.vx_nn_tp_cmd_info.inTileXSize = inXSize;
-            info.vx_nn_tp_cmd_info.inTileYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inTileXInc = inXSize;
-            info.vx_nn_tp_cmd_info.inTileYInc = inYSize;
-            info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + outXSize * outYSize * multiInZOffset * outputElemSize;
-            info.vx_nn_tp_cmd_info.outGlobalMem  = 1;
-            info.vx_nn_tp_cmd_info.outBrickMode  = 0;
-            info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-            info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-            info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-            info.vx_nn_tp_cmd_info.aluI2FEnable = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info.vx_nn_tp_cmd_info.aluF2IEnable = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info.vx_nn_tp_cmd_info.outLoop0Inc   = blockWidth;
-            info.vx_nn_tp_cmd_info.outLoop0Count = inXSize;
-            info.vx_nn_tp_cmd_info.outLoop1Inc   = outXSize * blockHeight;
-            info.vx_nn_tp_cmd_info.outLoop1Count = inYSize;
-            info.vx_nn_tp_cmd_info.outLoop1Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop2Inc   = outXSize * outYSize;
-            info.vx_nn_tp_cmd_info.outLoop2Count = inZSize;
-            info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop3Inc   = 1;
-            info.vx_nn_tp_cmd_info.outLoop3Count = blockWidth;
-            info.vx_nn_tp_cmd_info.outLoop3Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop4Inc   = outXSize;
-            info.vx_nn_tp_cmd_info.outLoop4Count = blockHeight;
-            info.vx_nn_tp_cmd_info.outLoop5Inc   = outXSize * outYSize * outZSize;
-            info.vx_nn_tp_cmd_info.outLoop5Count = outNSize;
-            info.vx_nn_tp_cmd_info.outLoop6Inc   = 0;
-
-            break;
-        }
-
-        case TP_ADD:
-            gcmASSERT(other_tensor != VX_NULL);
-            {
-                vx_uint32 inputBase2 = 0;
-                outTileXSize = 32;
-                outTileYSize = 1;
-                outXSize = inXSize;
-                outYSize = inYSize * multiInZSize;
-
-                if (inputBase && outputBase)
-                {
-                    inputBase2 = ((vxnne_tensor_info)other_tensor)->physical.start;
-                    if (inputBase2 < inputBase)
-                    {
-                        vx_uint32 tmpBase = inputBase;
-                        inputBase = inputBase2;
-                        inputBase2 = tmpBase;
-                    }
-                }
-
-                info.vx_nn_tp_cmd_info.inImageXSize = inXSize;
-                info.vx_nn_tp_cmd_info.inImageYSize = outYSize;
-                info.vx_nn_tp_cmd_info.inImageZSize = 2;
-                info.vx_nn_tp_cmd_info.inImageStride = inYStride / inputElemSize;
-                info.vx_nn_tp_cmd_info.inImageSlice = inputBase && inputBase2 ? (inputBase2 - inputBase) / inputElemSize : inputElemSize; /* change */
-                info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + inZStride * multiInZOffset;
-                info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-                info.vx_nn_tp_cmd_info.inWindowYStart = 0;
-                info.vx_nn_tp_cmd_info.inWindowXEnd = inXSize - 1;
-                info.vx_nn_tp_cmd_info.inWindowYEnd = outYSize - 1;
-                info.vx_nn_tp_cmd_info.inTileSequence = 0x1;
-                info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-                info.vx_nn_tp_cmd_info.inTileXSize = outTileXSize;
-                info.vx_nn_tp_cmd_info.inTileYSize = outTileYSize;
-                info.vx_nn_tp_cmd_info.inTileXInc = outTileXSize;
-                info.vx_nn_tp_cmd_info.inTileYInc = outTileYSize;
-                info.vx_nn_tp_cmd_info.aluHorzProcessing = 0x0;
-                info.vx_nn_tp_cmd_info.aluHorzProcCount = 0;
-                info.vx_nn_tp_cmd_info.aluHorzProcStride = 0;
-                info.vx_nn_tp_cmd_info.aluVertProcessing = 0x0;
-                info.vx_nn_tp_cmd_info.aluVertProcCount = 1;
-                info.vx_nn_tp_cmd_info.aluVertProcStride = 0;
-                info.vx_nn_tp_cmd_info.aluZFilterMode = 1;
-                info.vx_nn_tp_cmd_info.inWindowZStartOverfetch = 0;
-                info.vx_nn_tp_cmd_info.inWindowZEndOverfetch = 0;
-                info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + outZStride * multiInZOffset;
-                info.vx_nn_tp_cmd_info.outGlobalMem  = 1;
-                info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-                info.vx_nn_tp_cmd_info.outBrickMode  = 0;
-                info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-                info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-                info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-                info.vx_nn_tp_cmd_info.aluLoadPwlLUT = 0;
-                info.vx_nn_tp_cmd_info.aluLoadPwlLUTAddress = 0;
-                info.vx_nn_tp_cmd_info.aluLoadPwlLUTGlobalMem = 1;
-                info.vx_nn_tp_cmd_info.outLoop0Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop0Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop1Inc   = 1;
-                info.vx_nn_tp_cmd_info.outLoop1Count = 0;
-                info.vx_nn_tp_cmd_info.outLoop1Reset = 0x1;
-                info.vx_nn_tp_cmd_info.outLoop2Inc   = outXSize;
-                info.vx_nn_tp_cmd_info.outLoop2Count = 0;
-                info.vx_nn_tp_cmd_info.outLoop2Reset = 0x1;
-                info.vx_nn_tp_cmd_info.outLoop3Inc   = outTileXSize;
-                info.vx_nn_tp_cmd_info.outLoop3Count = (outXSize + outTileXSize - 1) / outTileXSize;
-                info.vx_nn_tp_cmd_info.outLoop3Reset = 0x0;
-                info.vx_nn_tp_cmd_info.outLoop4Inc   = outTileYSize * outXSize;
-                info.vx_nn_tp_cmd_info.outLoop4Count = (outYSize + outTileYSize - 1) / outTileYSize;
-                info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop6Inc   = outZStride / outputElemSize; /* no use */
-                info.vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-                info.vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-                info.vx_nn_tp_cmd_info.aluInputPreshift = (inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0;
-                info.vx_nn_tp_cmd_info.aluOutputPostshift = (outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? (0 - outFPP) : 0;
-            }
-            break;
-
-        case TP_REVERSE:
-        {
-            vx_uint32 i, dim = 0, outOffset = 0, max = 0x1<<16, total = 1;
-            vx_uint32 dims[VX_CONTEXT_TENSOR_MAX_DIMENSION], strides[VX_CONTEXT_TENSOR_MAX_DIMENSION];
-            vx_bool reverseArray[VX_CONTEXT_TENSOR_MAX_DIMENSION]= {vx_false_e};
-            vx_uint32_ptr axis;
-            vx_uint32 axisn;
-
-            gcmASSERT(value_cmd_ptr != VX_NULL);
-
-            axis = (vx_uint32_ptr) value_cmd_ptr->p8[0];
-            axisn = value_cmd_ptr->u32[0];
-
-            vxoTensor_GetTensorDimStride((vx_tensor)other_tensor, &dim, dims, strides);
-
-            for (i = 0; i < axisn; i++)
-            {
-                gcmASSERT(axis[i] < dim);
-                reverseArray[axis[i]] = vx_true_e;
-            }
-
-            for (i = 0; i < dim; i++)
-            {
-                if (reverseArray[i])
-                {
-                    outOffset += (dims[i] - 1) * strides[i];
-                }
-                total *= dims[i];
-            }
-
-            inXSize = dims[0];
-            inYSize = total / inXSize;
-            for (i = 1; i < dim; i++)
-            {
-                if (inYSize < max)
-                {
-                    break;
-                }
-                else
-                {
-                    inXSize *= dims[i];
-                    inYSize /= dims[i];
-                }
-            }
-
-            info.vx_nn_tp_cmd_info.inImageXSize = inXSize;
-            info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inImageZSize = 1;
-            info.vx_nn_tp_cmd_info.inImageStride = inXSize;
-            info.vx_nn_tp_cmd_info.inImageSlice = total;
-            info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-            info.vx_nn_tp_cmd_info.inWindowYStart = 0;
-            info.vx_nn_tp_cmd_info.inWindowXEnd = inXSize - 1;
-            info.vx_nn_tp_cmd_info.inWindowYEnd = inYSize - 1;
-            info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-            info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase;
-            info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-            info.vx_nn_tp_cmd_info.inTileXSize = inXSize;
-            info.vx_nn_tp_cmd_info.inTileYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inTileXInc = inXSize;
-            info.vx_nn_tp_cmd_info.inTileYInc = inYSize;
-            info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + outOffset;
-            info.vx_nn_tp_cmd_info.outGlobalMem  = 1;
-            info.vx_nn_tp_cmd_info.outBrickMode  = 0;
-            info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-            info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-            info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-            info.vx_nn_tp_cmd_info.aluI2FEnable = 0;
-            info.vx_nn_tp_cmd_info.aluF2IEnable = 0;
-            info.vx_nn_tp_cmd_info.outLoop0Inc   = reverseArray[0] ? -1 : 1;
-            info.vx_nn_tp_cmd_info.outLoop0Count = dims[0];
-            info.vx_nn_tp_cmd_info.outLoop1Inc   = dim < 2 ? 0 : strides[1] / inputElemSize * (reverseArray[1] ? -1 : 1);
-            info.vx_nn_tp_cmd_info.outLoop1Count = dim < 2 ? 1 : dims[1];
-            info.vx_nn_tp_cmd_info.outLoop1Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop2Inc   = dim < 3 ? 0 : strides[2] / inputElemSize * (reverseArray[2] ? -1 : 1);
-            info.vx_nn_tp_cmd_info.outLoop2Count = dim < 3 ? 1 : dims[2];
-            info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop3Inc   = dim < 4 ? 0 : strides[3] / inputElemSize * (reverseArray[3] ? -1 : 1);
-            info.vx_nn_tp_cmd_info.outLoop3Count = dim < 4 ? 1 : dims[3];
-            info.vx_nn_tp_cmd_info.outLoop3Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop4Inc   = dim < 5 ? 0 : strides[4] / inputElemSize * (reverseArray[4] ? -1 : 1);
-            info.vx_nn_tp_cmd_info.outLoop4Count = dim < 5 ? 1 : dims[4];
-            info.vx_nn_tp_cmd_info.outLoop5Inc   = dim < 6 ? 0 : strides[5] / inputElemSize * (reverseArray[5] ? -1 : 1);
-            info.vx_nn_tp_cmd_info.outLoop5Count = dim < 6 ? 1 : dims[5];
-            info.vx_nn_tp_cmd_info.outLoop6Inc   = 0;
-            info.vx_nn_tp_cmd_info.aluI2FEnable = 0;
-            info.vx_nn_tp_cmd_info.aluF2IEnable = 0;
-            break;
-        }
-
-        case TP_UPSAMPLE:
-            {
-                vx_int32 strideX = gcmALIGN_NP2(outXSize, inXSize)/inXSize, strideY = gcmALIGN_NP2(outYSize, inYSize)/inYSize, dilate = 1;
-
-                _getMultiTPParam(outZSize, tpCoreCount, tp_index, multi_tp, &multiInZSize, &multiInZOffset);
-
-                info.vx_nn_tp_cmd_info.inImageGlobalMem    = 1;
-                info.vx_nn_tp_cmd_info.inImageBaseAddress  = inputBase + inZStride * multiInZOffset * strideX * strideY;
-                info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-                info.vx_nn_tp_cmd_info.outBaseAddress      = outputBase + outZStride * multiInZOffset;
-                info.vx_nn_tp_cmd_info.outGlobalMem        = 1;
-                info.vx_nn_tp_cmd_info.aluFilterPwlSwap    = 0;
-                info.vx_nn_tp_cmd_info.aluPwlSignSupport   = 0;
-                info.vx_nn_tp_cmd_info.aluReluEnable       = 0;
-                info.vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-                info.vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-                info.vx_nn_tp_cmd_info.inImageXSize        = inXSize;
-                info.vx_nn_tp_cmd_info.inImageYSize        = inYSize;
-                info.vx_nn_tp_cmd_info.inImageZSize        = multiInZSize * strideX * strideY;
-                info.vx_nn_tp_cmd_info.inImageStride       = inXSize;
-                info.vx_nn_tp_cmd_info.inImageSlice        = inXSize * inYSize;
-                info.vx_nn_tp_cmd_info.inWindowXStart      = 0;
-                info.vx_nn_tp_cmd_info.inWindowYStart      = 0;
-                info.vx_nn_tp_cmd_info.inWindowXEnd        = inXSize - 1;
-                info.vx_nn_tp_cmd_info.inWindowYEnd        = inYSize - 1;
-                info.vx_nn_tp_cmd_info.inTileXSize         = 1;
-                info.vx_nn_tp_cmd_info.inTileYSize         = 1;
-                info.vx_nn_tp_cmd_info.inTileXInc          = 1;
-                info.vx_nn_tp_cmd_info.inTileYInc          = 1;
-                info.vx_nn_tp_cmd_info.outLoop0Inc         = strideX;
-                info.vx_nn_tp_cmd_info.outLoop0Count       = inXSize;
-                info.vx_nn_tp_cmd_info.outLoop1Inc         = inXSize * strideX * strideY;
-                info.vx_nn_tp_cmd_info.outLoop1Count       = inYSize;
-                info.vx_nn_tp_cmd_info.outLoop1Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop2Inc         = dilate;
-                info.vx_nn_tp_cmd_info.outLoop2Count       = strideX;
-                info.vx_nn_tp_cmd_info.outLoop2Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop3Inc         = inXSize * strideX;
-                info.vx_nn_tp_cmd_info.outLoop3Count       = strideY;
-                info.vx_nn_tp_cmd_info.outLoop3Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Inc         = outXSize * outYSize;
-                info.vx_nn_tp_cmd_info.outLoop4Count       = outZSize;
-                info.vx_nn_tp_cmd_info.outLoop5Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop5Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop6Inc         = 0;
-            }
-            break;
-        case TP_UPSAMPLE_CLIP:
-        {
-            vx_int32 pad_x_left = conv_cmd_ptr->pad_x_left, pad_y_top = conv_cmd_ptr->pad_y_top;
-
-            info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + inZStride * multiInZOffset;
-            info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-            info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + outZStride * multiInZOffset;
-            info.vx_nn_tp_cmd_info.outGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-            info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-            info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-            info.vx_nn_tp_cmd_info.aluI2FEnable = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info.vx_nn_tp_cmd_info.aluF2IEnable = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info.vx_nn_tp_cmd_info.inImageXSize = inXSize;
-            info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inImageZSize = multiInZSize;
-            info.vx_nn_tp_cmd_info.inImageStride = inXSize;
-            info.vx_nn_tp_cmd_info.inImageSlice = inXSize * inYSize;
-            info.vx_nn_tp_cmd_info.inWindowXStart = pad_x_left;
-            info.vx_nn_tp_cmd_info.inWindowYStart = pad_y_top;
-            info.vx_nn_tp_cmd_info.inWindowXEnd = outXSize - 1 + pad_x_left;
-            info.vx_nn_tp_cmd_info.inWindowYEnd = outYSize - 1 + pad_y_top;
-            info.vx_nn_tp_cmd_info.inTileXSize = 1;
-            info.vx_nn_tp_cmd_info.inTileYSize = 1;
-            info.vx_nn_tp_cmd_info.inTileXInc = 1;
-            info.vx_nn_tp_cmd_info.inTileYInc = 1;
-            info.vx_nn_tp_cmd_info.outLoop0Inc = 1;
-            info.vx_nn_tp_cmd_info.outLoop0Count = outXSize;
-            info.vx_nn_tp_cmd_info.outLoop1Inc = outXSize;
-            info.vx_nn_tp_cmd_info.outLoop1Count = outYSize;
-            info.vx_nn_tp_cmd_info.outLoop1Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop2Inc = outXSize * outYSize;
-            info.vx_nn_tp_cmd_info.outLoop2Count = outZSize;
-            info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop3Inc = 1;
-            info.vx_nn_tp_cmd_info.outLoop3Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop3Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop4Inc = 0;
-            info.vx_nn_tp_cmd_info.outLoop4Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop5Inc = 0;
-            info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop6Inc = 0;
-        }
-        break;
-
-        case TP_DILATE_UPSAMPLE:
-            {
-                vx_int32 dilationX = outXSize/inXSize, dilationY = outYSize/inYSize, stride = 1;
-                vx_uint32 batch = dilationX * dilationY;
-
-                info.vx_nn_tp_cmd_info.inImageGlobalMem    = 1;
-                info.vx_nn_tp_cmd_info.inImageBaseAddress  = inputBase;
-                info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-                info.vx_nn_tp_cmd_info.outBaseAddress      = outputBase;
-                info.vx_nn_tp_cmd_info.outGlobalMem        = 1;
-                info.vx_nn_tp_cmd_info.aluFilterPwlSwap    = 0;
-                info.vx_nn_tp_cmd_info.aluPwlSignSupport   = 0;
-                info.vx_nn_tp_cmd_info.aluReluEnable       = 0;
-                info.vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-                info.vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-                info.vx_nn_tp_cmd_info.inImageXSize        = inXSize;
-                info.vx_nn_tp_cmd_info.inImageYSize        = inYSize;
-                info.vx_nn_tp_cmd_info.inImageZSize        = inZSize * batch;
-                info.vx_nn_tp_cmd_info.inImageStride       = inXSize;
-                info.vx_nn_tp_cmd_info.inImageSlice        = inXSize * inYSize;
-                info.vx_nn_tp_cmd_info.inWindowXStart      = 0;
-                info.vx_nn_tp_cmd_info.inWindowYStart      = 0;
-                info.vx_nn_tp_cmd_info.inWindowXEnd        = inXSize - 1;
-                info.vx_nn_tp_cmd_info.inWindowYEnd        = inYSize - 1;
-                info.vx_nn_tp_cmd_info.inTileXSize         = 1;
-                info.vx_nn_tp_cmd_info.inTileYSize         = 1;
-                info.vx_nn_tp_cmd_info.inTileXInc          = 1;
-                info.vx_nn_tp_cmd_info.inTileYInc          = 1;
-                info.vx_nn_tp_cmd_info.outLoop0Inc         = dilationX;
-                info.vx_nn_tp_cmd_info.outLoop0Count       = inXSize;
-                info.vx_nn_tp_cmd_info.outLoop1Inc         = inXSize * dilationX * dilationY;
-                info.vx_nn_tp_cmd_info.outLoop1Count       = inYSize;
-                info.vx_nn_tp_cmd_info.outLoop1Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop2Inc         = (batch > 1)?(inXSize * dilationX * inYSize * dilationY):stride;
-                info.vx_nn_tp_cmd_info.outLoop2Count       = (batch > 1)?inZSize:dilationX;
-                info.vx_nn_tp_cmd_info.outLoop2Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop3Inc         = (batch > 1)?1:(inXSize * dilationX);
-                info.vx_nn_tp_cmd_info.outLoop3Count       = (batch > 1)?dilationX:dilationY;
-                info.vx_nn_tp_cmd_info.outLoop3Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Inc         = (batch > 1)?inXSize * dilationX:(outXSize * outYSize);
-                info.vx_nn_tp_cmd_info.outLoop4Count       = (batch > 1)? dilationY:outZSize;
-                info.vx_nn_tp_cmd_info.outLoop5Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop5Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop6Inc         = 0;
-            }
-            break;
-
-        case TP_DILATE_UPSAMPLE2:
-            {
-                info.vx_nn_tp_cmd_info.inImageGlobalMem    = 1;
-                info.vx_nn_tp_cmd_info.inImageBaseAddress  = inputBase;
-                info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-                info.vx_nn_tp_cmd_info.outBaseAddress      = outputBase;
-                info.vx_nn_tp_cmd_info.outGlobalMem        = 1;
-                info.vx_nn_tp_cmd_info.aluFilterPwlSwap    = 0;
-                info.vx_nn_tp_cmd_info.aluPwlSignSupport   = 0;
-                info.vx_nn_tp_cmd_info.aluReluEnable       = 0;
-                info.vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-                info.vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-                info.vx_nn_tp_cmd_info.inImageXSize        = inXSize;
-                info.vx_nn_tp_cmd_info.inImageYSize        = inYSize;
-                info.vx_nn_tp_cmd_info.inImageZSize        = inZSize;
-                info.vx_nn_tp_cmd_info.inImageStride       = inXSize;
-                info.vx_nn_tp_cmd_info.inImageSlice        = inXSize * inYSize;
-                info.vx_nn_tp_cmd_info.inWindowXStart      = 0;
-                info.vx_nn_tp_cmd_info.inWindowYStart      = 0;
-                info.vx_nn_tp_cmd_info.inWindowXEnd        = outXSize - 1;
-                info.vx_nn_tp_cmd_info.inWindowYEnd        = outYSize - 1;
-                info.vx_nn_tp_cmd_info.inTileXSize         = 1;
-                info.vx_nn_tp_cmd_info.inTileYSize         = 1;
-                info.vx_nn_tp_cmd_info.inTileXInc          = 1;
-                info.vx_nn_tp_cmd_info.inTileYInc          = 1;
-                info.vx_nn_tp_cmd_info.outLoop0Inc         = 1;
-                info.vx_nn_tp_cmd_info.outLoop0Count       = outXSize;
-                info.vx_nn_tp_cmd_info.outLoop1Inc         = outXSize;
-                info.vx_nn_tp_cmd_info.outLoop1Count       = outYSize;
-                info.vx_nn_tp_cmd_info.outLoop1Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop2Inc         = outXSize * outYSize;
-                info.vx_nn_tp_cmd_info.outLoop2Count       = outZSize;
-                info.vx_nn_tp_cmd_info.outLoop2Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop3Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop3Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop3Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop5Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop5Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop6Inc         = 0;
-            }
-            break;
-
-        case TP_DILATE_RESHUFFLE:
-            {
-                vx_scalar dilationX = (vx_scalar)other_tensor;
-                vx_int32 dilate = dilationX->value->n32 + 1;
-
-                info.vx_nn_tp_cmd_info.inImageGlobalMem    = 1;
-                info.vx_nn_tp_cmd_info.inImageBaseAddress  = inputBase;
-                info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-                info.vx_nn_tp_cmd_info.outBaseAddress      = outputBase;
-                info.vx_nn_tp_cmd_info.outGlobalMem        = 1;
-                info.vx_nn_tp_cmd_info.aluFilterPwlSwap    = 0;
-                info.vx_nn_tp_cmd_info.aluPwlSignSupport   = 0;
-                info.vx_nn_tp_cmd_info.aluReluEnable       = 0;
-                info.vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-                info.vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-                info.vx_nn_tp_cmd_info.inImageXSize        = inXSize;
-                info.vx_nn_tp_cmd_info.inImageYSize        = inYSize;
-                info.vx_nn_tp_cmd_info.inImageZSize        = inZSize;
-                info.vx_nn_tp_cmd_info.inImageStride       = inXSize;
-                info.vx_nn_tp_cmd_info.inImageSlice        = inXSize * inYSize;
-                info.vx_nn_tp_cmd_info.inWindowXStart      = 0;
-                info.vx_nn_tp_cmd_info.inWindowYStart      = 0;
-                info.vx_nn_tp_cmd_info.inWindowXEnd        = outXSize * dilate - 1;//inXSize - 1;/**/
-                info.vx_nn_tp_cmd_info.inWindowYEnd        = outYSize * dilate - 1;//inYSize - 1;/**/
-                info.vx_nn_tp_cmd_info.inTileXSize         = 1;
-                info.vx_nn_tp_cmd_info.inTileYSize         = 1;
-                info.vx_nn_tp_cmd_info.inTileXInc          = 1;
-                info.vx_nn_tp_cmd_info.inTileYInc          = 1;
-                info.vx_nn_tp_cmd_info.outLoop0Inc         = outXSize * outYSize * inZSize;/* 4*4*21=336 */
-                info.vx_nn_tp_cmd_info.outLoop0Count       = dilate;/* 6 */
-                info.vx_nn_tp_cmd_info.outLoop1Inc         = 1;
-                info.vx_nn_tp_cmd_info.outLoop1Count       = outXSize;/* 4 * 4 */
-                info.vx_nn_tp_cmd_info.outLoop1Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop2Inc         = outXSize * outYSize * inZSize * dilate;
-                info.vx_nn_tp_cmd_info.outLoop2Count       = dilate;/* 6 */
-                info.vx_nn_tp_cmd_info.outLoop2Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop3Inc         = outXSize;/* 4 */
-                info.vx_nn_tp_cmd_info.outLoop3Count       = outYSize * inZSize;/* 21 */
-                info.vx_nn_tp_cmd_info.outLoop3Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop5Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop5Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop6Inc         = 0;
-            }
-            break;
-
-        case TP_RNN_INTERLEAVE:
-            {
-                info.vx_nn_tp_cmd_info.inImageGlobalMem    = 1;
-                info.vx_nn_tp_cmd_info.inImageBaseAddress  = inputBase;
-                info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-                info.vx_nn_tp_cmd_info.outBaseAddress      = outputBase + conv_cmd_ptr->pad_x_left;
-                info.vx_nn_tp_cmd_info.outGlobalMem        = 1;
-                info.vx_nn_tp_cmd_info.aluFilterPwlSwap    = 0;
-                info.vx_nn_tp_cmd_info.aluPwlSignSupport   = 0;
-                info.vx_nn_tp_cmd_info.aluReluEnable       = 0;
-                info.vx_nn_tp_cmd_info.aluI2FEnable        = 0;
-                info.vx_nn_tp_cmd_info.aluF2IEnable        = 0;
-                info.vx_nn_tp_cmd_info.inImageXSize        = inXSize;
-                info.vx_nn_tp_cmd_info.inImageYSize        = inYSize;
-                info.vx_nn_tp_cmd_info.inImageZSize        = 1;
-                info.vx_nn_tp_cmd_info.inImageStride       = inXSize;
-                info.vx_nn_tp_cmd_info.inImageSlice        = inXSize;
-                info.vx_nn_tp_cmd_info.inWindowXStart      = 0;
-                info.vx_nn_tp_cmd_info.inWindowYStart      = 0;
-                info.vx_nn_tp_cmd_info.inWindowXEnd        = inXSize - 1;
-                info.vx_nn_tp_cmd_info.inWindowYEnd        = inYSize - 1;
-                info.vx_nn_tp_cmd_info.inTileXSize         = 1;
-                info.vx_nn_tp_cmd_info.inTileYSize         = 1;
-                info.vx_nn_tp_cmd_info.inTileXInc          = 1;
-                info.vx_nn_tp_cmd_info.inTileYInc          = 1;
-                info.vx_nn_tp_cmd_info.outLoop0Inc         = 1;
-                info.vx_nn_tp_cmd_info.outLoop0Count       = inXSize;/*8*/
-                info.vx_nn_tp_cmd_info.outLoop1Inc         = outZSize;/*24*/
-                info.vx_nn_tp_cmd_info.outLoop1Count       = inYSize;
-                info.vx_nn_tp_cmd_info.outLoop1Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop2Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop2Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop2Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop3Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop3Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop3Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop5Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop5Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop6Inc         = 0;
-            }
-            break;
-
-        case TP_TENSOR_COPY:
-            {
-                info.vx_nn_tp_cmd_info.inImageXSize = inXSize;
-                info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-                info.vx_nn_tp_cmd_info.inImageZSize = multiInZSize;
-                info.vx_nn_tp_cmd_info.inImageStride = inYStride / inputElemSize;
-                info.vx_nn_tp_cmd_info.inImageSlice  = inZStride / inputElemSize;
-                info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-                info.vx_nn_tp_cmd_info.inWindowYStart = 0;
-                info.vx_nn_tp_cmd_info.inWindowXEnd = inXSize - 1;
-                info.vx_nn_tp_cmd_info.inWindowYEnd = inYSize - 1;
-                info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-                info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-                info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + inZStride * multiInZOffset;
-                info.vx_nn_tp_cmd_info.inTileXSize = inXSize;
-                info.vx_nn_tp_cmd_info.inTileYSize = inYSize;
-                info.vx_nn_tp_cmd_info.inTileXInc = inXSize;
-                info.vx_nn_tp_cmd_info.inTileYInc = inYSize;
-                info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-                info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + outZStride * multiInZOffset;
-                info.vx_nn_tp_cmd_info.outGlobalMem = 1;
-                info.vx_nn_tp_cmd_info.aluFilterPwlSwap    = 0;
-                info.vx_nn_tp_cmd_info.aluPwlSignSupport   = 0;
-                info.vx_nn_tp_cmd_info.aluReluEnable       = 0;
-                info.vx_nn_tp_cmd_info.aluI2FEnable = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : (inFormat != outFormat ? 1 : 0));
-                info.vx_nn_tp_cmd_info.aluF2IEnable = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : (((inFormat != outFormat) && (outFormat != VX_TYPE_FLOAT16)) ? 1 : 0));
-                info.vx_nn_tp_cmd_info.aluInputPreshift   = 0;
-                info.vx_nn_tp_cmd_info.aluOutputPostshift = ((inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0) - ((outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? outFPP : 0);
-                info.vx_nn_tp_cmd_info.outLoop0Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop0Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop1Inc   = 1;
-                info.vx_nn_tp_cmd_info.outLoop1Count = outXSize;
-                info.vx_nn_tp_cmd_info.outLoop1Reset = 0;
-                info.vx_nn_tp_cmd_info.outLoop2Inc   = outXSize;
-                info.vx_nn_tp_cmd_info.outLoop2Count = outYSize;
-                info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-                info.vx_nn_tp_cmd_info.outLoop3Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop3Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop3Reset = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop6Inc   = outZStride / outputElemSize;
-            }
-            break;
-
-        case TP_TENSOR_PAD:
-            {
-                info.vx_nn_tp_cmd_info.inImageXSize = inXSize;
-                info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-                info.vx_nn_tp_cmd_info.inImageZSize = multiInZSize;
-                info.vx_nn_tp_cmd_info.inImageStride = inYStride / inputElemSize;
-                info.vx_nn_tp_cmd_info.inImageSlice  = inZStride / inputElemSize;
-                info.vx_nn_tp_cmd_info.inWindowXStart = (-1) * (vx_int32)conv_cmd_ptr->pad_x_left;
-                info.vx_nn_tp_cmd_info.inWindowYStart = (-1) * (vx_int32)conv_cmd_ptr->pad_y_top;
-                info.vx_nn_tp_cmd_info.inWindowXEnd = info.vx_nn_tp_cmd_info.inWindowXStart + outXSize - 1;
-                info.vx_nn_tp_cmd_info.inWindowYEnd = info.vx_nn_tp_cmd_info.inWindowYStart + outYSize - 1;
-                info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-                info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-                info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + inZStride * multiInZOffset;
-                info.vx_nn_tp_cmd_info.inTileXSize = outXSize;
-                info.vx_nn_tp_cmd_info.inTileYSize = outYSize;
-                info.vx_nn_tp_cmd_info.inTileXInc = outXSize;
-                info.vx_nn_tp_cmd_info.inTileYInc = outYSize;
-                info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-                info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + outZStride * multiInZOffset;
-                info.vx_nn_tp_cmd_info.outGlobalMem = 1;
-                info.vx_nn_tp_cmd_info.aluFilterPwlSwap    = 0;
-                info.vx_nn_tp_cmd_info.aluPwlSignSupport   = 0;
-                info.vx_nn_tp_cmd_info.aluReluEnable       = 0;
-                info.vx_nn_tp_cmd_info.aluI2FEnable = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-                info.vx_nn_tp_cmd_info.aluF2IEnable = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-                info.vx_nn_tp_cmd_info.aluInputPreshift = 0;
-                info.vx_nn_tp_cmd_info.aluOutputPostshift = 0;
-                info.vx_nn_tp_cmd_info.outLoop0Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop0Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop1Inc   = 1;
-                info.vx_nn_tp_cmd_info.outLoop1Count = outXSize;
-                info.vx_nn_tp_cmd_info.outLoop1Reset = 0;
-                info.vx_nn_tp_cmd_info.outLoop2Inc   = outXSize;
-                info.vx_nn_tp_cmd_info.outLoop2Count = outYSize;
-                info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-                info.vx_nn_tp_cmd_info.outLoop3Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop3Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop3Reset = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop6Inc   = outZStride / outputElemSize;
-            }
-            break;
-
-        case TP_TENSOR_SQUEEZE:
-        {
-            info.vx_nn_tp_cmd_info.inImageXSize = inXSize;
-            info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inImageZSize = multiInZSize;
-            info.vx_nn_tp_cmd_info.inImageStride = inYStride / inputElemSize;
-            info.vx_nn_tp_cmd_info.inImageSlice = inZStride / inputElemSize;
-            info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-            info.vx_nn_tp_cmd_info.inWindowYStart = 0;
-            info.vx_nn_tp_cmd_info.inWindowXEnd = inXSize - 1;
-            info.vx_nn_tp_cmd_info.inWindowYEnd = inYSize - 1;
-            info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-            info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + inZStride * multiInZOffset;
-            info.vx_nn_tp_cmd_info.inTileXSize = inXSize;
-            info.vx_nn_tp_cmd_info.inTileYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inTileXInc = inXSize;
-            info.vx_nn_tp_cmd_info.inTileYInc = inYSize;
-            info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-            info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + inZStride * multiInZOffset;
-            info.vx_nn_tp_cmd_info.outGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-            info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-            info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-            info.vx_nn_tp_cmd_info.aluI2FEnable = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info.vx_nn_tp_cmd_info.aluF2IEnable = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info.vx_nn_tp_cmd_info.aluInputPreshift = 0;
-            info.vx_nn_tp_cmd_info.aluOutputPostshift = 0;
-            info.vx_nn_tp_cmd_info.outLoop0Inc = 0;
-            info.vx_nn_tp_cmd_info.outLoop0Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop1Inc = 1;
-            info.vx_nn_tp_cmd_info.outLoop1Count = inXSize;
-            info.vx_nn_tp_cmd_info.outLoop1Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop2Inc = inXSize;
-            info.vx_nn_tp_cmd_info.outLoop2Count = inYSize;
-            info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop3Inc = 0;
-            info.vx_nn_tp_cmd_info.outLoop3Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop3Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop4Inc = 0;
-            info.vx_nn_tp_cmd_info.outLoop4Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop5Inc = 0;
-            info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop6Inc = inZStride / inputElemSize;
-        }
-        break;
-
-        case TP_TENSOR_STRIDED_SLICE:
-        {
-            vx_int32 begin_dims[2] = { conv_cmd_ptr->pad_x_left, conv_cmd_ptr->pad_x_right};
-            vx_int32 end_dims[2] = { conv_cmd_ptr->pad_y_top, conv_cmd_ptr->pad_y_bottom };
-            vx_int32 stride_dims[2] = { conv_cmd_ptr->pad_w_front, conv_cmd_ptr->pad_w_back };
-
-            info.vx_nn_tp_cmd_info.inImageXSize = inXSize;
-            info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inImageZSize = multiInZSize;
-            info.vx_nn_tp_cmd_info.inImageStride = inXSize / inputElemSize;
-            info.vx_nn_tp_cmd_info.inImageSlice = inYStride / inputElemSize;
-            info.vx_nn_tp_cmd_info.inWindowXStart = gcmMAX(0, begin_dims[0]);
-            info.vx_nn_tp_cmd_info.inWindowYStart = gcmMAX(0, begin_dims[1]);
-            info.vx_nn_tp_cmd_info.inWindowXEnd = gcmMIN((vx_int32)inXSize - 1, end_dims[0]);
-            info.vx_nn_tp_cmd_info.inWindowYEnd = gcmMIN((vx_int32)inYSize - 1, end_dims[1]);
-            info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-            info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + inZStride * multiInZOffset;
-            info.vx_nn_tp_cmd_info.inTileXSize = 1;
-            info.vx_nn_tp_cmd_info.inTileYSize = 1;
-            info.vx_nn_tp_cmd_info.inTileXInc = stride_dims[0];
-            info.vx_nn_tp_cmd_info.inTileYInc = stride_dims[1];
-            info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-            info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + inZStride * multiInZOffset;
-            info.vx_nn_tp_cmd_info.outGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-            info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-            info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-            info.vx_nn_tp_cmd_info.aluI2FEnable = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info.vx_nn_tp_cmd_info.aluF2IEnable = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info.vx_nn_tp_cmd_info.aluInputPreshift = 0;
-            info.vx_nn_tp_cmd_info.aluOutputPostshift = 0;
-            info.vx_nn_tp_cmd_info.outLoop0Inc = 1;
-            info.vx_nn_tp_cmd_info.outLoop0Count = (end_dims[0] - begin_dims[0] + 1)/ stride_dims[0];
-            info.vx_nn_tp_cmd_info.outLoop1Inc = 1;
-            info.vx_nn_tp_cmd_info.outLoop1Count = (end_dims[1] - begin_dims[1] + 1) / stride_dims[1];
-            info.vx_nn_tp_cmd_info.outLoop1Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop2Inc = 1;
-            info.vx_nn_tp_cmd_info.outLoop2Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop3Inc = 0;
-            info.vx_nn_tp_cmd_info.outLoop3Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop3Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop4Inc = 0;
-            info.vx_nn_tp_cmd_info.outLoop4Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop5Inc = 0;
-            info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop6Inc = 0;
-        }
-        break;
-
-        case TP_TENSOR_SVDF_MAP:
-
-            {
-            vx_int32 stride = outXSize / inZSize;
-
-            info.vx_nn_tp_cmd_info.inImageXSize = inZSize;
-            info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inImageZSize = inXSize;
-            info.vx_nn_tp_cmd_info.inImageStride = inZSize / inputElemSize;
-            info.vx_nn_tp_cmd_info.inImageSlice = inZSize / inputElemSize;
-            info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-            info.vx_nn_tp_cmd_info.inWindowYStart = 0;
-            info.vx_nn_tp_cmd_info.inWindowXEnd = inZSize - 1;
-            info.vx_nn_tp_cmd_info.inWindowYEnd = inYSize - 1;
-            info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-            info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + inZStride * multiInZOffset;
-            info.vx_nn_tp_cmd_info.inTileXSize = inZSize;
-            info.vx_nn_tp_cmd_info.inTileYSize = inYSize;
-            info.vx_nn_tp_cmd_info.inTileXInc = inZSize;
-            info.vx_nn_tp_cmd_info.inTileYInc = inYSize;
-            info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-            info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + (stride - 1) * inputElemSize + inZStride * multiInZOffset;
-            info.vx_nn_tp_cmd_info.outGlobalMem = 1;
-            info.vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
-            info.vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-            info.vx_nn_tp_cmd_info.aluReluEnable = 0;
-            info.vx_nn_tp_cmd_info.aluI2FEnable = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info.vx_nn_tp_cmd_info.aluF2IEnable = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info.vx_nn_tp_cmd_info.aluInputPreshift = 0;
-            info.vx_nn_tp_cmd_info.aluOutputPostshift = 0;
-            info.vx_nn_tp_cmd_info.outLoop0Inc = stride;
-            info.vx_nn_tp_cmd_info.outLoop0Count = inZSize;
-            info.vx_nn_tp_cmd_info.outLoop1Inc = 0;
-            info.vx_nn_tp_cmd_info.outLoop1Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop1Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop2Inc = 1;
-            info.vx_nn_tp_cmd_info.outLoop2Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop3Inc = 0;
-            info.vx_nn_tp_cmd_info.outLoop3Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop3Reset = 0;
-            info.vx_nn_tp_cmd_info.outLoop4Inc = 0;
-            info.vx_nn_tp_cmd_info.outLoop4Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop5Inc = 0;
-            info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-            info.vx_nn_tp_cmd_info.outLoop6Inc = 1;
-            }
-            break;
-
-        case TP_LSTM_RESHUFFLE_INPUT:
-            {
-                vx_int32 InXSize2 = TENSOR_SIZE_INDEX((vx_tensor)conv_cmd_ptr->other_ref, 0);
-
-                info.vx_nn_tp_cmd_info.inImageGlobalMem    = 1;
-                info.vx_nn_tp_cmd_info.inImageBaseAddress  = inputBase + inZStride * multiInZOffset;
-                info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-                info.vx_nn_tp_cmd_info.outBaseAddress      = outputBase + outZStride * multiInZOffset;
-                info.vx_nn_tp_cmd_info.outGlobalMem        = 1;
-                info.vx_nn_tp_cmd_info.aluFilterPwlSwap    = 0;
-                info.vx_nn_tp_cmd_info.aluPwlSignSupport   = 0;
-                info.vx_nn_tp_cmd_info.aluReluEnable       = 0;
-                info.vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-                info.vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-                info.vx_nn_tp_cmd_info.inImageXSize        = inXSize;
-                info.vx_nn_tp_cmd_info.inImageYSize        = inYSize;
-                info.vx_nn_tp_cmd_info.inImageZSize        = multiInZSize;
-                info.vx_nn_tp_cmd_info.inImageStride       = inXSize;
-                info.vx_nn_tp_cmd_info.inImageSlice        = inYSize;
-                info.vx_nn_tp_cmd_info.inWindowXStart      = 0;
-                info.vx_nn_tp_cmd_info.inWindowYStart      = 0;
-                info.vx_nn_tp_cmd_info.inWindowXEnd        = inXSize - 1;
-                info.vx_nn_tp_cmd_info.inWindowYEnd        = inYSize - 1;
-                info.vx_nn_tp_cmd_info.inTileXSize         = 1;
-                info.vx_nn_tp_cmd_info.inTileYSize         = 1;
-                info.vx_nn_tp_cmd_info.inTileXInc          = 1;
-                info.vx_nn_tp_cmd_info.inTileYInc          = 1;
-                info.vx_nn_tp_cmd_info.outLoop0Inc         = 1;
-                info.vx_nn_tp_cmd_info.outLoop0Count       = inXSize + InXSize2;    /* 2 + 4 */
-                info.vx_nn_tp_cmd_info.outLoop1Inc         = outZSize;
-                info.vx_nn_tp_cmd_info.outLoop1Count       = inXSize;
-                info.vx_nn_tp_cmd_info.outLoop1Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop2Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop2Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop2Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop3Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop3Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop3Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop5Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop5Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop6Inc         = 0;
-            }
-            break;
-
-        case VXNNE_OPERATOR_LSTM_STATE_OUT:
-            {
-                vx_int32 InXSize2 = TENSOR_SIZE_INDEX((vx_tensor)conv_cmd_ptr->other_ref, 0);
-
-                info.vx_nn_tp_cmd_info.inImageGlobalMem    = 1;
-                info.vx_nn_tp_cmd_info.inImageBaseAddress  = inputBase + inZStride * multiInZOffset;
-                info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-                info.vx_nn_tp_cmd_info.outBaseAddress      = outputBase+ InXSize2 * vxnneGetTypeSize(input->dataFormat) + outZStride * multiInZOffset;
-                info.vx_nn_tp_cmd_info.outGlobalMem        = 1;
-                info.vx_nn_tp_cmd_info.aluFilterPwlSwap    = 0;
-                info.vx_nn_tp_cmd_info.aluPwlSignSupport   = 0;
-                info.vx_nn_tp_cmd_info.aluReluEnable       = 0;
-                info.vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-                info.vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-                info.vx_nn_tp_cmd_info.inImageXSize        = inXSize;
-                info.vx_nn_tp_cmd_info.inImageYSize        = inYSize;
-                info.vx_nn_tp_cmd_info.inImageZSize        = multiInZSize;
-                info.vx_nn_tp_cmd_info.inImageStride       = inXSize;
-                info.vx_nn_tp_cmd_info.inImageSlice        = inYSize;
-                info.vx_nn_tp_cmd_info.inWindowXStart      = 0;
-                info.vx_nn_tp_cmd_info.inWindowYStart      = 0;
-                info.vx_nn_tp_cmd_info.inWindowXEnd        = inXSize - 1;
-                info.vx_nn_tp_cmd_info.inWindowYEnd        = inYSize - 1;
-                info.vx_nn_tp_cmd_info.inTileXSize         = 1;
-                info.vx_nn_tp_cmd_info.inTileYSize         = 1;
-                info.vx_nn_tp_cmd_info.inTileXInc          = 1;
-                info.vx_nn_tp_cmd_info.inTileYInc          = 1;
-                info.vx_nn_tp_cmd_info.outLoop0Inc         = 1;
-                info.vx_nn_tp_cmd_info.outLoop0Count       = inXSize + InXSize2;    /* 2 + 4 */
-                info.vx_nn_tp_cmd_info.outLoop1Inc         = outZSize;
-                info.vx_nn_tp_cmd_info.outLoop1Count       = inXSize;
-                info.vx_nn_tp_cmd_info.outLoop1Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop2Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop2Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop2Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop3Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop3Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop3Reset       = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop5Inc         = 0;
-                info.vx_nn_tp_cmd_info.outLoop5Count       = 1;
-                info.vx_nn_tp_cmd_info.outLoop6Inc         = 0;
-            }
-            break;
-
-        case TP_TENSOR_COPY4CONCAT:
-            {
-                info.vx_nn_tp_cmd_info.inImageXSize = inXSize;
-                info.vx_nn_tp_cmd_info.inImageYSize = inYSize;
-                info.vx_nn_tp_cmd_info.inImageZSize = multiInZSize;
-                info.vx_nn_tp_cmd_info.inImageStride = inYStride / inputElemSize;
-                info.vx_nn_tp_cmd_info.inImageSlice  = inZStride / inputElemSize;
-                info.vx_nn_tp_cmd_info.inWindowXStart = 0;
-                info.vx_nn_tp_cmd_info.inWindowYStart = 0;
-                info.vx_nn_tp_cmd_info.inWindowXEnd = inXSize - 1;
-                info.vx_nn_tp_cmd_info.inWindowYEnd = inYSize - 1;
-                info.vx_nn_tp_cmd_info.inTileSequence = 0x0;
-                info.vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-                info.vx_nn_tp_cmd_info.inImageBaseAddress = inputBase + inZStride * multiInZOffset;
-                info.vx_nn_tp_cmd_info.inTileXSize = inXSize;
-                info.vx_nn_tp_cmd_info.inTileYSize = inYSize;
-                info.vx_nn_tp_cmd_info.inTileXInc = inXSize;
-                info.vx_nn_tp_cmd_info.inTileYInc = inYSize;
-                info.vx_nn_tp_cmd_info.outTileSkipAtborder = 0;
-                info.vx_nn_tp_cmd_info.outBaseAddress = outputBase + outZStride * multiInZOffset;
-                info.vx_nn_tp_cmd_info.outGlobalMem = 1;
-                info.vx_nn_tp_cmd_info.aluFilterPwlSwap    = 0;
-                info.vx_nn_tp_cmd_info.aluPwlSignSupport   = 0;
-                info.vx_nn_tp_cmd_info.aluReluEnable       = 0;
-                info.vx_nn_tp_cmd_info.aluI2FEnable = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : (inFormat != outFormat ? 1 : 0));
-                info.vx_nn_tp_cmd_info.aluF2IEnable = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : (((inFormat != outFormat) && (outFormat != VX_TYPE_FLOAT16)) ? 1 : 0));
-                info.vx_nn_tp_cmd_info.aluInputPreshift = 0;
-                info.vx_nn_tp_cmd_info.aluOutputPostshift = 0;
-                info.vx_nn_tp_cmd_info.outLoop0Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop0Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop1Inc   = 1;
-                info.vx_nn_tp_cmd_info.outLoop1Count = outXSize;
-                info.vx_nn_tp_cmd_info.outLoop1Reset = 0;
-                info.vx_nn_tp_cmd_info.outLoop2Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop2Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop2Reset = 0;
-                info.vx_nn_tp_cmd_info.outLoop3Inc   = outYStride / outputElemSize;
-                info.vx_nn_tp_cmd_info.outLoop3Count = outYSize;
-                info.vx_nn_tp_cmd_info.outLoop3Reset = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop4Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop5Inc   = 0;
-                info.vx_nn_tp_cmd_info.outLoop5Count = 1;
-                info.vx_nn_tp_cmd_info.outLoop6Inc   = outZStride / outputElemSize;
-            }
-            break;
-
-        default:
-            break;
-    }
-
-#if gcdDUMP
-    if (info.vx_nn_tp_cmd_info.aluLoadPwlLUTAddress != 0)
-    {
-        gcmDUMP(gcvNULL, "#[LUT]\n");
-        if ((data_buff != VX_NULL) &&
-            (info.vx_nn_tp_cmd_info.aluLoadPwlLUTAddress == data_buff->tensorBuffer->memory.physicals[0]))
-        {
-            vx_size size;
-            vxoTensor_GetTensorWholeSize(data_buff, &size);
-            gcmDUMP_BUFFER(gcvNULL,
-                        gcvDUMP_BUFFER_MEMORY,
-                        info.vx_nn_tp_cmd_info.aluLoadPwlLUTAddress,
-                        (gctPOINTER)(data_buff->tensorBuffer->memory.logicals[0]),
-                        0,
-                        size);
-        }
-        else if (other_tensor != VX_NULL)
-        {
-            vx_weights_biases_parameter weights_biases = (vx_weights_biases_parameter) other_tensor;
-            gcmDUMP_BUFFER(gcvNULL,
-                            gcvDUMP_BUFFER_MEMORY,
-                            info.vx_nn_tp_cmd_info.aluLoadPwlLUTAddress,
-                            (gctPOINTER)WB_MEM_LOGICAL_ADDR_INDEX(weights_biases, tp_index),
-                            0,
-                            WB_MEM_SIZE_INDEX(weights_biases, tp_index));
-        }
-    }
-#endif
-
-    {
-        /* TP output pixel must larger than 1 */
-        vx_uint64 outPixel;
-
-        if (tp_type == TP_ACTIVATION || tp_type == TP_TENSOR_COPY || tp_type == TP_ADD || tp_type == TP_LRN || tp_type == TP_TENSOR_SVDF_MAP || tp_type == TP_TENSOR_STRIDED_SLICE)
-        {
-            outPixel = info.vx_nn_tp_cmd_info.inImageXSize *
-                       info.vx_nn_tp_cmd_info.inImageYSize *
-                       info.vx_nn_tp_cmd_info.inImageZSize;
-        }
-        else
-        {
-            outPixel = info.vx_nn_tp_cmd_info.outLoop0Count *
-                       (!info.vx_nn_tp_cmd_info.outLoop1Count ? gcmMIN(info.vx_nn_tp_cmd_info.inTileXSize, inXSize) : info.vx_nn_tp_cmd_info.outLoop1Count) *
-                       (!info.vx_nn_tp_cmd_info.outLoop2Count ? gcmMIN(info.vx_nn_tp_cmd_info.inTileYSize, inYSize) : info.vx_nn_tp_cmd_info.outLoop2Count) *
-                       info.vx_nn_tp_cmd_info.outLoop3Count *
-                       info.vx_nn_tp_cmd_info.outLoop4Count *
-                       info.vx_nn_tp_cmd_info.outLoop5Count;
-
-            if (info.vx_nn_tp_cmd_info.outLoop6Inc != 0)
-            {
-                outPixel *= info.vx_nn_tp_cmd_info.inImageZSize;
-            }
-        }
-
-        gcmASSERT(outPixel > 1);
-    }
-
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16))
-    {
-        info.vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-        info.vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-    }
-
-    if ((tp_type != TP_RESHUFFLE && tp_type != TP_TRANSPOSE && tp_type != TP_REVERSE && tp_type != TP_REORG && tp_type != TP_REORG_DEPTH2SPACE && tp_type != TP_REORG_SPACE2DEPTH && tp_type != TP_BRICK && tp_type != TP_UPSAMPLE && tp_type != TP_UPSAMPLE_CLIP && tp_type != TP_TENSOR_COPY && tp_type != TP_TENSOR_SQUEEZE) ||
-        (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) && (hasInputQuant || hasOutputQuant || hasWQuant) && (inZP != outZP || inScale != outScale)))
-    {
-        if (hasInputQuant || hasOutputQuant || hasWQuant)
-        {
-            vx_float32 scale;
-            vx_uint32 uintScale, tmpMultiply;
-            vx_int32 exp;
-            vx_int8 tmpPostShift;
-            vx_weights_biases_parameter weights_biases = VX_NULL;
-
-            /* Regular the input or output quant scale value in case it is not TF quant format. */
-            if (!hasOutputQuant)
-            {
-                outScale = (outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? vxnneConvertDynamicFixPointValueToFloat32(1.0f, outFPP) : 1.0f;
-            }
-            else if (!hasInputQuant)
-            {
-                inScale = (inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? vxnneConvertDynamicFixPointValueToFloat32(1.0f, inFPP) : 1.0f;
-            }
-
-            if (tp_type == TP_SINGLE_FC)
-            {
-                vx_float32 wScale = 0.0f;
-
-                weights_biases = (vx_weights_biases_parameter) other_tensor;
-
-                if (hasWQuant)
-                {
-                    wScale = WB_WEIGHT_SCALE(weights_biases);
-                }
-                else
-                {
-                    wScale = (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_QUANT_DYNAMIC_FIXED_POINT) ? vxnneConvertDynamicFixPointValueToFloat32(1.0f, WB_WEIGHT_FPP(weights_biases)) : 1.0f;
-                }
-                scale = inScale * wScale / outScale;
-            }
-            else if ((tp_type == TP_ACTIVATION) &&
-                        (value_cmd_ptr->e32[0] != VX_NN_ACTIVATION_RELU) &&
-                        (value_cmd_ptr->e32[0] != VX_NN_ACTIVATION_LEAKYRELU) &&
-                        (value_cmd_ptr->e32[0] != VX_NN_ACTIVATION_LEAKYRELU_MAX_POOLING))
-            {
-                scale = 1.0f / outScale;
-            }
-            else if (tp_type == TP_ROI_POOLING_STEP_1)
-            {
-                /* Scaling is handled in VPooling, so no scaling in HPooling. */
-                scale = 1.0f;
-            }
-            else
-            {
-                scale = inScale / outScale;
-            }
-            uintScale = *((vx_uint32*)(&scale));
-            /* RTNE */
-            if (uintScale & 0x80)
-            {
-                if ((uintScale & 0x7F) || (uintScale & 0x100))
-                {
-                    uintScale += 0x100;
-                }
-            }
-            tmpMultiply = (uintScale & 0x7FFFFF) >> 8; /* postMultiply is high 15-bit of Scale's mantissa */
-            exp = (uintScale & 0x7F800000) >> 23; /* postShift is Scale's exp */
-
-            tmpPostShift = (vx_int8)(127 - exp);
-            info.vx_nn_tp_cmd_info.aluOutputPostshift = tmpPostShift & 0x1F;
-            tmpPostShift = tmpPostShift >> 5;
-            info.vx_nn_tp_cmd_info.aluOutputPostshiftBit6to5 = tmpPostShift & 3;
-
-            info.vx_nn_tp_cmd_info.aluOutputPostMultiplier = tmpMultiply;
-            info.vx_nn_tp_cmd_info.coefZP = weights_biases == VX_NULL ? 0 : WB_WEIGHT_ZP(weights_biases);
-            if (tp_type == TP_ROI_POOLING_STEP_1)
-            {
-                /* Zero point is handled in VPooling, so no zero point in HPooling. */
-                info.vx_nn_tp_cmd_info.inputZP = 0;
-                info.vx_nn_tp_cmd_info.outputZP = 0;
-            }
-            else
-            {
-                info.vx_nn_tp_cmd_info.inputZP  = hasInputQuant ? inZP : 0;
-                info.vx_nn_tp_cmd_info.outputZP = hasOutputQuant ? outZP : 0;
-            }
-        }
-        else
-        {
-            vx_int8 tmpPostShift = (vx_int8) info.vx_nn_tp_cmd_info.aluOutputPostshift;
-            info.vx_nn_tp_cmd_info.aluOutputPostshift = tmpPostShift & 0x1F;
-            tmpPostShift = tmpPostShift >> 5;
-            info.vx_nn_tp_cmd_info.aluOutputPostshiftBit6to5 = tmpPostShift & 3;
-            info.vx_nn_tp_cmd_info.aluOutputPostMultiplier = 0;
-        }
-    }
-
-    if (needReorder)
-    {
-        if (!info.vx_nn_tp_cmd_info.aluReorderLoop2Mode)
-        {
-            info.vx_nn_tp_cmd_info.aluReorderBitsUsed = (vx_uint32)gcoMATH_Ceiling(gcoMATH_Log2((vx_float32)info.vx_nn_tp_cmd_info.inTileXSize));
-        }
-        else
-        {
-            info.vx_nn_tp_cmd_info.aluReorderBitsUsed =
-                (vx_uint32)gcoMATH_Ceiling(gcoMATH_Log2((vx_float32)(info.vx_nn_tp_cmd_info.inTileXSize * info.vx_nn_tp_cmd_info.inTileYSize)));
-        }
-    }
-
-    if (output->sRAM)
-    {
-        info.vx_nn_tp_cmd_info.outImageCircularBufSize = output->circleBufferSize;
-        info.vx_nn_tp_cmd_info.outImageCircularBufEndAddrPlus1 = output->physical.circularBufEndAddrPlus1;
-
-        if (info.vx_nn_tp_cmd_info.outBaseAddress >= output->physical.circularBufEndAddrPlus1)
-        {
-            vx_uint32 offset = info.vx_nn_tp_cmd_info.outBaseAddress - output->physical.circularBufEndAddrPlus1;
-            offset = offset % info.vx_nn_tp_cmd_info.outImageCircularBufSize;
-            info.vx_nn_tp_cmd_info.outBaseAddress = output->physical.circularBufEndAddrPlus1 - output->circleBufferSize + offset;
-        }
-        gcmASSERT(info.vx_nn_tp_cmd_info.outBaseAddress < info.vx_nn_tp_cmd_info.outImageCircularBufEndAddrPlus1);
-    }
-    else
-    {
-        info.vx_nn_tp_cmd_info.outImageCircularBufSize         = 0;
-        info.vx_nn_tp_cmd_info.outImageCircularBufEndAddrPlus1 = 0xFFFFFFFF;
-    }
-
-    if (input->sRAM)
-    {
-        info.vx_nn_tp_cmd_info.inImageCircularBufSize = input->circleBufferSize;
-        info.vx_nn_tp_cmd_info.inImageCircularBufEndAddrPlus1  = input->physical.circularBufEndAddrPlus1;
-
-        if (info.vx_nn_tp_cmd_info.inImageBaseAddress >= input->physical.circularBufEndAddrPlus1)
-        {
-            vx_uint32 offset = info.vx_nn_tp_cmd_info.inImageBaseAddress - input->physical.circularBufEndAddrPlus1;
-            offset = offset % info.vx_nn_tp_cmd_info.inImageBaseAddress;
-            info.vx_nn_tp_cmd_info.inImageBaseAddress = input->physical.circularBufEndAddrPlus1 - input->circleBufferSize + offset;
-        }
-        gcmASSERT(info.vx_nn_tp_cmd_info.inImageBaseAddress < info.vx_nn_tp_cmd_info.inImageCircularBufEndAddrPlus1);
-    }
-    else
-    {
-        info.vx_nn_tp_cmd_info.inImageCircularBufSize   = 0;
-        info.vx_nn_tp_cmd_info.inImageCircularBufEndAddrPlus1     = 0xFFFFFFFF;
-    }
-
-    info.vx_nn_tp_cmd_info.inImageDataType = getHWDataFormat(inFormat);
-    info.vx_nn_tp_cmd_info.outImageDataType = getHWDataFormat(outFormat);
-    info.vx_nn_tp_cmd_info.floatRoundingMode = getHWRoundingMode((vx_nn_round_mode_e)outRMode, outFormat, vx_true_e);
-    info.vx_nn_tp_cmd_info.integeroundingMode = 0x1;
-    info.vx_nn_tp_cmd_info.noFlush = (last ? 0 : 1);
-    info.vx_nn_tp_cmd_info.last = 1;
-
-    {
-        vx_uint32 * cmdBufPtr;
-        vx_uint32 cmdOffset;
-
-        cmdOffset = TP_COMMAND_SIZE * tp_index;
-
-        cmdBufPtr = (vx_uint32*)((vx_uint8_ptr)cmd_buffer->logical + cmdOffset);
-        gcoVX_ProgrammCrossEngine((void*)&info, gcvVX_ACCELERATOR_TP, VX_NULL, &cmdBufPtr);
-
-#if gcdDUMP
-    gcmDUMP(gcvNULL, "#[tp command]\n");
-    gcmDUMP_BUFFER(gcvNULL,
-                   gcvDUMP_BUFFER_MEMORY,
-                   cmd_buffer->physical + cmdOffset,
-                   (gctPOINTER)((vx_uint8_ptr)cmd_buffer->logical + cmdOffset),
-                   0,
-                   TP_COMMAND_SIZE);
-#endif
-
-        if (node->graph->binarySave)
-        {
-            vx_weights_biases_parameter weights_biases = VX_NULL;
-            vx_uint8_ptr lutDataLogical = VX_NULL;
-            vx_uint32 lutDataPhysical = 0;
-            vx_uint32 lutDataSize = 0;
-
-            weights_biases = (vx_weights_biases_parameter) other_tensor;
-
-            if ((data_buff != VX_NULL) && ((info.vx_nn_tp_cmd_info.aluLoadPwlLUTAddress != 0) ||
-                (info.vx_nn_tp_cmd_info.inTileListAddress != 0)))
-            {
-                vx_size size = 0;
-                lutDataLogical = (vx_uint8_ptr)(data_buff->tensorBuffer->memory.logicals[0]);
-                lutDataPhysical = (vx_uint32)(data_buff->tensorBuffer->memory.physicals[0]);
-                vxoTensor_GetTensorWholeSize(data_buff, &size);
-                lutDataSize = (vx_uint32)size;
-            }
-            else if ((weights_biases != VX_NULL)  && ((info.vx_nn_tp_cmd_info.aluLoadPwlLUTAddress != 0) ||
-                (info.vx_nn_tp_cmd_info.inTileListAddress != 0)))
-            {
-                lutDataLogical  = (vx_uint8_ptr)WB_MEM_LOGICAL_ADDR_INDEX(weights_biases, tp_index);
-                lutDataPhysical = (vx_uint32)WB_MEM_PHYSICAL_ADDR_INDEX(weights_biases, tp_index);
-                lutDataSize     = (vx_uint32)WB_MEM_SIZE_INDEX(weights_biases, tp_index);
-            }
-
-            vxoGraphBinary_SaveTPNNOperation(node,
-                                        (vx_uint8_ptr)cmd_buffer->logical + cmdOffset,
-                                        cmd_buffer->physical + cmdOffset,
-                                        TP_COMMAND_SIZE,
-                                        VX_BINARY_OPERATION_TYPE_TP,
-                                        lutDataLogical,
-                                        lutDataPhysical,
-                                        lutDataSize,
-                                        input,
-                                        output,
-                                        info.vx_nn_tp_cmd_info.inImageBaseAddress,
-                                        info.vx_nn_tp_cmd_info.outBaseAddress
-                                        );
-        }
-    }
 }
 
 void vxoNNExternsionDoReshuffle(
@@ -9919,6 +3247,9 @@ vx_float64 vxnneWarp(vx_float64 data, vx_enum format)
 
     switch(format)
     {
+    case VX_TYPE_INT64:
+        value = (vx_float64)data;
+        break;
     case VX_TYPE_FLOAT32:
         value = (vx_float32)data;
         break;
@@ -10323,6 +3654,33 @@ vx_float32 vx_nn_rpn_iou_cpu(vx_float32_ptr A, vx_float32_ptr B)
     /* IOU */
     return area / (A_area + B_area - area);
 }
+vx_bool vx_nn_rpn_iou_cpu1(vx_float32_ptr A, vx_float32_ptr B,vx_float32 nms_thresh)
+{
+    vx_float32 x1,y1,x2,y2,width,height,area,A_area,B_area;
+
+    if (A[0] > B[2] || A[1] > B[3] || A[2] < B[0] || A[3] < B[1])
+    {
+      return 0;
+    }
+
+    /* overlapped region (=box) */
+    x1 = gcmMAX(A[0], B[0]);
+    y1 = gcmMAX(A[1], B[1]);
+    x2 = gcmMIN(A[2], B[2]);
+    y2 = gcmMIN(A[3], B[3]);
+
+    /* intersection area */
+    width    = gcmMAX(0.0f, x2 - x1 + 1.0f);
+    height   = gcmMAX(0.0f, y2 - y1 + 1.0f);
+    area     = width * height;
+
+    /* area of A, B */
+    A_area   = (A[2] - A[0] + 1.0f) * (A[3] - A[1] + 1.0f);
+    B_area   = (B[2] - B[0] + 1.0f) * (B[3] - B[1] + 1.0f);
+
+    /* IOU */
+    return (vx_bool)(area > (A_area + B_area - area)*nms_thresh);
+}
 void vx_nn_rpn_nms_cpu_f16(vx_uint32 num_boxes,
                               vx_int16_ptr boxes,
                               vx_uint32_ptr index_out,
@@ -10371,34 +3729,74 @@ void vx_nn_rpn_nms_cpu(
     vx_uint32 max_num_out
     )
 {
-    vx_uint32 i,j,count = 0;
-    vx_char_ptr is_dead = (vx_char_ptr)vxAllocateAndZeroMemory(num_boxes * sizeof(vx_char));
-    memset(is_dead, 0, (num_boxes * sizeof(vx_char)));
-
-    for(i = 0; i < num_boxes; ++i)
+    if(index_out!=NULL)
     {
-        if(is_dead[i])
-        {
-            continue;
-        }
+        vx_uint32 i,j,count = 0;
+        vx_char_ptr is_dead = (vx_char_ptr)vxAllocateAndZeroMemory(num_boxes * sizeof(vx_char));
+        memset(is_dead, 0, (num_boxes * sizeof(vx_char)));
 
-        index_out[count++] = base_index + i;
-        if(count == max_num_out)
+        for(i = 0; i < num_boxes; ++i)
         {
-            break;
-        }
-
-        for(j = i + 1; j < num_boxes; ++j)
-        {
-            if(!is_dead[j] && vx_nn_rpn_iou_cpu(&boxes[i * 5], &boxes[j * 5]) > nms_thresh)
+            if(is_dead[i])
             {
-                is_dead[j] = 1;
+                continue;
+            }
+
+            index_out[count++] = base_index + i;
+            if(count == max_num_out)
+            {
+                break;
+            }
+
+            for(j = i + 1; j < num_boxes; ++j)
+            {
+                if(!is_dead[j] && vx_nn_rpn_iou_cpu(&boxes[i * 5], &boxes[j * 5]) > nms_thresh)
+                {
+                    is_dead[j] = 1;
+                }
             }
         }
-    }
 
-    *num_out = count;
-    vxFree(is_dead);
+        *num_out = count;
+        vxFree(is_dead);
+    }
+    else
+    {
+        vx_uint32 i,j,count = 0;
+        vx_bool is_dead ;
+        int call_cnt = 0;
+        count = 1;
+
+        for(i = 1; i < num_boxes; i++)
+        {
+            is_dead = vx_false_e;
+            for(j=0;j<count;j++)
+            {
+                call_cnt ++;
+                if(vx_nn_rpn_iou_cpu1(&boxes[j * 5], &boxes[i * 5], nms_thresh))
+                {
+                    is_dead = vx_true_e;
+                    break; //boxes[i * 5] pk dead
+                }
+
+            }
+            if(is_dead)
+                continue;
+            //update boxes
+            boxes[count*5+0] = boxes[i * 5+0];
+            boxes[count*5+1] = boxes[i * 5+1];
+            boxes[count*5+2] = boxes[i * 5+2];
+            boxes[count*5+3] = boxes[i * 5+3];
+            boxes[count*5+4] = boxes[i * 5+4];
+            count++;
+            if(count == max_num_out)
+            {
+                break;
+            }
+        }
+
+        *num_out = count;
+   }
 }
 
 vx_status vxnnePoolingMax(
@@ -11729,6 +5127,12 @@ vx_size calculateWeightBiasBalanceSizeForZeroRunLen(
     vx_bool hasXYDP9 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP9);
     vx_bool hasXYDP6 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP6);
 
+    vx_uint32 totalNonZeroCount = 0;
+    vx_float32 averageNZCPerFilter = 0;
+    vx_float32 varianceFL32 = 0;
+    vx_uint32 variance = 0;
+    vx_bool reorder = vx_false_e;
+
     typedef struct _gcVXNonZeroWeights
     {
         vx_uint32 nonZeroCount;
@@ -11776,21 +5180,36 @@ vx_size calculateWeightBiasBalanceSizeForZeroRunLen(
                 }
             }
         }
+        totalNonZeroCount += nonZeroWeights[filterIndex].nonZeroCount;
     }
 
     /*Sort*/
+    averageNZCPerFilter = (vx_float32)totalNonZeroCount / filterTotalCount;
     for (filterIndex = 0; filterIndex < filterTotalCount; filterIndex++)
     {
-        tmp.nonZeroCount = nonZeroWeights[filterIndex].nonZeroCount;
-        tmp.filterIdx = filterIndex;
+        varianceFL32 += gcoMATH_Power((nonZeroWeights[filterIndex].nonZeroCount - averageNZCPerFilter), 2);
+    }
+    variance = (vx_uint32)(varianceFL32 / filterTotalCount + 0.5f);
 
-        for (m = filterIndex - 1; m >= 0 && nonZeroWeights[m].nonZeroCount > tmp.nonZeroCount; m--)
+    if (variance > 12)
+        reorder = vx_true_e;
+
+    if (reorder)
+    {
+        /*Sort*/
+        for (filterIndex = 0; filterIndex < filterTotalCount; filterIndex++)
         {
-            nonZeroWeights[m+1].nonZeroCount = nonZeroWeights[m].nonZeroCount;
-            nonZeroWeights[m+1].filterIdx = nonZeroWeights[m].filterIdx;
+            tmp.nonZeroCount = nonZeroWeights[filterIndex].nonZeroCount;
+            tmp.filterIdx = filterIndex;
+
+            for (m = filterIndex - 1; m >= 0 && nonZeroWeights[m].nonZeroCount > tmp.nonZeroCount; m--)
+            {
+                nonZeroWeights[m+1].nonZeroCount = nonZeroWeights[m].nonZeroCount;
+                nonZeroWeights[m+1].filterIdx = nonZeroWeights[m].filterIdx;
+            }
+            nonZeroWeights[m+1].nonZeroCount = tmp.nonZeroCount;
+            nonZeroWeights[m+1].filterIdx = tmp.filterIdx;
         }
-        nonZeroWeights[m+1].nonZeroCount = tmp.nonZeroCount;
-        nonZeroWeights[m+1].filterIdx = tmp.filterIdx;
     }
 
     if (weightFomat == VX_TYPE_INT16) biasBitSize = NN_INTEGER_BIAS_BITS_VIP_V7_INT16;
@@ -11819,6 +5238,7 @@ vx_size calculateWeightBiasBalanceSizeForZeroRunLen(
             vx_uint32 kid = 0;
             vx_uint32 unusedCoreCount = (filterTotalCount % nnCoreCount == 0) ? 0 : nnCoreCount - (filterTotalCount % nnCoreCount);
             vx_uint32 sortedIndex = 0;
+            vx_uint32 filterStart = 0;
 
             if (coreIndex == 0)
                 core0FilterCount = actualFilterCount;
@@ -11834,39 +5254,62 @@ vx_size calculateWeightBiasBalanceSizeForZeroRunLen(
                     return vx_false_e;
                 }
             }
-            /*Dispatch filter to each vzGroup*/
-            for (kid = 0; kid < actualFilterCount; kid++)
+
+            if (reorder)
             {
-                if (groupIndex == groupCount - 1 &&
-                    kid == core0FilterCount - 1 &&
-                    kid != 0)
+                /*Dispatch filter to each vzGroup*/
+                for (kid = 0; kid < actualFilterCount; kid++)
                 {
-                    if ((kid + usedKid) % 2 == 0)
-                        sortedIndex = groupFilterStart + kid * nnCoreCount + coreIndex - unusedCoreCount;
+                    if (groupIndex == groupCount - 1 &&
+                        kid == core0FilterCount - 1)
+                    {
+                        if ((kid + usedKid) % 2 == 0)
+                            sortedIndex = groupFilterStart + kid * nnCoreCount + coreIndex;
+                        else
+                            sortedIndex = groupFilterStart + (kid + 1) * nnCoreCount - coreIndex - 1 - unusedCoreCount;
+                    }
                     else
-                        sortedIndex = groupFilterStart + (kid + 1) * nnCoreCount - coreIndex - 1 - unusedCoreCount;
+                    {
+                        if ((kid + usedKid) % 2 == 0)
+                            sortedIndex = groupFilterStart + kid * nnCoreCount + coreIndex;
+                        else
+                            sortedIndex = groupFilterStart + (kid + 1) * nnCoreCount - coreIndex - 1;
+                    }
+
+                    filterGroup[kid] = nonZeroWeights[sortedIndex].filterIdx;
+                }
+
+                /*sort the vz group real filter to avoid write output cross*/
+                for (kid = 0; kid < actualFilterCount; kid++)
+                {
+                    vx_uint32 tmp = filterGroup[kid];
+
+                    for (m = kid - 1; m >= 0 && filterGroup[m] > tmp; m--)
+                    {
+                        filterGroup[m+1] = filterGroup[m];
+                    }
+                    filterGroup[m+1] = tmp;
+                }
+            }
+            else
+            {
+                /*if variance is small, don't reorder the filters*/
+                if ((groupIndex == groupCount - 1)
+                && (coreIndex >= (filterTotalCount % nnCoreCount)))
+                {
+                    filterStart = groupIndex * nnCoreCount * filterCount
+                                + (filterTotalCount % nnCoreCount) * (actualFilterCount + 1)
+                                + (coreIndex - (filterTotalCount % nnCoreCount)) * actualFilterCount;
                 }
                 else
                 {
-                    if ((kid + usedKid) % 2 == 0)
-                        sortedIndex = groupFilterStart + kid * nnCoreCount + coreIndex;
-                    else
-                        sortedIndex = groupFilterStart + (kid + 1) * nnCoreCount - coreIndex - 1;
+                    filterStart = groupIndex * nnCoreCount *filterCount + coreIndex * actualFilterCount;
                 }
 
-                filterGroup[kid] = nonZeroWeights[sortedIndex].filterIdx;
-            }
-
-            /*sort the vz group real filter to avoid write output cross*/
-            for (kid = 0; kid < actualFilterCount; kid++)
-            {
-                vx_uint32 tmp = filterGroup[kid];
-
-                for (m = kid - 1; m >= 0 && filterGroup[m] > tmp; m--)
+                for (kid = 0; kid < actualFilterCount; kid++)
                 {
-                    filterGroup[m+1] = filterGroup[m];
+                    filterGroup[kid] = filterStart + kid;
                 }
-                filterGroup[m+1] = tmp;
             }
 
             if (wb->weights_sizes[0] == 1 && wb->weights_sizes[1] == 1 &&
@@ -12301,6 +5744,12 @@ vx_bool calculateWeightBiasBalanceSizeForZeroRunLenEx(
 
     vx_uint32 maxZeroRunLen = (1 << context->nnConfig.fixedFeature.zrlBits) - 1;
 
+    vx_uint32 totalNonZeroCount = 0;
+    vx_float32 averageNZCPerFilter = 0;
+    vx_float32 varianceFL32 = 0;
+    vx_uint32 variance = 0;
+    vx_bool reorder = vx_false_e;
+
     typedef struct _gcVXNonZeroWeights
     {
         vx_uint32 nonZeroCount;
@@ -12348,21 +5797,36 @@ vx_bool calculateWeightBiasBalanceSizeForZeroRunLenEx(
                 }
             }
         }
+        totalNonZeroCount += nonZeroWeights[filterIndex].nonZeroCount;
     }
 
     /*Sort*/
+    averageNZCPerFilter = (vx_float32)totalNonZeroCount / filterTotalCount;
     for (filterIndex = 0; filterIndex < filterTotalCount; filterIndex++)
     {
-        tmp.nonZeroCount = nonZeroWeights[filterIndex].nonZeroCount;
-        tmp.filterIdx = filterIndex;
+        varianceFL32 += gcoMATH_Power((nonZeroWeights[filterIndex].nonZeroCount - averageNZCPerFilter), 2);
+    }
+    variance = (vx_uint32)(varianceFL32 / filterTotalCount + 0.5f);
 
-        for (m = filterIndex - 1; m >= 0 && nonZeroWeights[m].nonZeroCount > tmp.nonZeroCount; m--)
+    if (variance > 12)
+        reorder = vx_true_e;
+
+    if (reorder)
+    {
+        /*Sort*/
+        for (filterIndex = 0; filterIndex < filterTotalCount; filterIndex++)
         {
-            nonZeroWeights[m+1].nonZeroCount = nonZeroWeights[m].nonZeroCount;
-            nonZeroWeights[m+1].filterIdx = nonZeroWeights[m].filterIdx;
+            tmp.nonZeroCount = nonZeroWeights[filterIndex].nonZeroCount;
+            tmp.filterIdx = filterIndex;
+
+            for (m = filterIndex - 1; m >= 0 && nonZeroWeights[m].nonZeroCount > tmp.nonZeroCount; m--)
+            {
+                nonZeroWeights[m+1].nonZeroCount = nonZeroWeights[m].nonZeroCount;
+                nonZeroWeights[m+1].filterIdx = nonZeroWeights[m].filterIdx;
+            }
+            nonZeroWeights[m+1].nonZeroCount = tmp.nonZeroCount;
+            nonZeroWeights[m+1].filterIdx = tmp.filterIdx;
         }
-        nonZeroWeights[m+1].nonZeroCount = tmp.nonZeroCount;
-        nonZeroWeights[m+1].filterIdx = tmp.filterIdx;
     }
 
 
@@ -12382,6 +5846,8 @@ vx_bool calculateWeightBiasBalanceSizeForZeroRunLenEx(
             vxFree(maxBasePad);
         if (zerosPerCoreArray)
             vxFree(zerosPerCoreArray);
+        if (nonZeroWeights)
+            vxFree(nonZeroWeights);
         vxError("calculateWeightBiasBufferSizeForZeroRunLenEx: OUT OF MEMORY");
         return vx_false_e;
     }
@@ -12406,6 +5872,7 @@ vx_bool calculateWeightBiasBalanceSizeForZeroRunLenEx(
             vx_uint32 kid = 0;
             vx_uint32 unusedCoreCount = (filterTotalCount % nnCoreCount == 0) ? 0 : nnCoreCount - (filterTotalCount % nnCoreCount);
             vx_uint32 sortedIndex = 0;
+            vx_uint32 filterStart = 0;
 
             if (coreIndex == 0)
                 core0FilterCount = actualFilterCount;
@@ -12417,45 +5884,73 @@ vx_bool calculateWeightBiasBalanceSizeForZeroRunLenEx(
                     vxError("fillinKernelBufferBalance: OUT OF MEMORY");
                     if (nonZeroWeights)
                         vxFree(nonZeroWeights);
+                    if (origBitsArray)
+                        vxFree(origBitsArray);
+                    if (maxBasePad)
+                        vxFree(maxBasePad);
+                    if (zerosPerCoreArray)
+                        vxFree(zerosPerCoreArray);
                     return vx_false_e;
                 }
             }
             else
                 continue;
 
-            /*Dispatch filter to each vzGroup*/
-            for (kid = 0; kid < actualFilterCount; kid++)
+            if (reorder)
             {
-                if (groupIndex == groupCount - 1 &&
-                    kid == core0FilterCount - 1 &&
-                    kid != 0)
+                /*Dispatch filter to each vzGroup*/
+                for (kid = 0; kid < actualFilterCount; kid++)
                 {
-                    if ((kid + usedKid) % 2 == 0)
-                        sortedIndex = groupFilterStart + kid * nnCoreCount + coreIndex - unusedCoreCount;
+                    if (groupIndex == groupCount - 1 &&
+                        kid == core0FilterCount - 1)
+                    {
+                        if ((kid + usedKid) % 2 == 0)
+                            sortedIndex = groupFilterStart + kid * nnCoreCount + coreIndex;
+                        else
+                            sortedIndex = groupFilterStart + (kid + 1) * nnCoreCount - coreIndex - 1 - unusedCoreCount;
+                    }
                     else
-                        sortedIndex = groupFilterStart + (kid + 1) * nnCoreCount - coreIndex - 1 - unusedCoreCount;
+                    {
+                        if ((kid + usedKid) % 2 == 0)
+                            sortedIndex = groupFilterStart + kid * nnCoreCount + coreIndex;
+                        else
+                            sortedIndex = groupFilterStart + (kid + 1) * nnCoreCount - coreIndex - 1;
+                    }
+
+                    filterGroup[kid] = nonZeroWeights[sortedIndex].filterIdx;
+                }
+
+                /*sort the vz group real filter to avoid write output cross*/
+                for (kid = 0; kid < actualFilterCount; kid++)
+                {
+                    vx_uint32 tmp = filterGroup[kid];
+
+                    for (m = kid - 1; m >= 0 && filterGroup[m] > tmp; m--)
+                    {
+                        filterGroup[m+1] = filterGroup[m];
+                    }
+                    filterGroup[m+1] = tmp;
+                }
+            }
+            else
+            {
+                /*if variance is small, don't reorder the filters*/
+                if ((groupIndex == groupCount - 1)
+                && (coreIndex >= (filterTotalCount % nnCoreCount)))
+                {
+                    filterStart = groupIndex * nnCoreCount * filterCount
+                                + (filterTotalCount % nnCoreCount) * (actualFilterCount + 1)
+                                + (coreIndex - (filterTotalCount % nnCoreCount)) * actualFilterCount;
                 }
                 else
                 {
-                    if ((kid + usedKid) % 2 == 0)
-                        sortedIndex = groupFilterStart + kid * nnCoreCount + coreIndex;
-                    else
-                        sortedIndex = groupFilterStart + (kid + 1) * nnCoreCount - coreIndex - 1;
+                    filterStart = groupIndex * nnCoreCount *filterCount + coreIndex * actualFilterCount;
                 }
 
-                filterGroup[kid] = nonZeroWeights[sortedIndex].filterIdx;
-            }
-
-            /*sort the vz group real filter to avoid write output cross*/
-            for (kid = 0; kid < actualFilterCount; kid++)
-            {
-                vx_uint32 tmp = filterGroup[kid];
-
-                for (m = kid - 1; m >= 0 && filterGroup[m] > tmp; m--)
+                for (kid = 0; kid < actualFilterCount; kid++)
                 {
-                    filterGroup[m+1] = filterGroup[m];
+                    filterGroup[kid] = filterStart + kid;
                 }
-                filterGroup[m+1] = tmp;
             }
 
             if (wb->weights_sizes[0] == 1 && wb->weights_sizes[1] == 1 &&
@@ -13333,7 +6828,8 @@ void reorderWeightBiasBufferForHuffman(
     vx_uint8* postShift,
     vx_uint32* reoder_stream_count_per_core,
     vx_uint32* non_coef_index,
-    vx_uint32* zrl_limit_index
+    vx_uint32* zrl_limit_index,
+    vx_bool calc_perf
     )
 {
     vx_uint32 nnCoreCount = weight_format == VX_TYPE_INT16 ?
@@ -13379,6 +6875,9 @@ void reorderWeightBiasBufferForHuffman(
     vx_bool hasBiasAtEnd = vx_false_e;
     vx_bool hasNNPerFilterPostMultiply = vx_false_e;
     vx_bool hasNNPerFilterPostShift = vx_false_e;
+
+    vx_float64* nonZeroRatioPerCorePerVZG = VX_NULL;
+    vx_uint32 groupIndex;
 
     typedef struct _gcVXWeightsMinusZP
     {
@@ -13438,38 +6937,51 @@ void reorderWeightBiasBufferForHuffman(
         }
     }
 
-    if (wb->max_per_core_per_vzgroup_nzr == VX_NULL)
+    if (calc_perf)
     {
-        wb->max_per_core_per_vzgroup_nzr = (vx_float64*)vxAllocateAndZeroMemory(nnCoreCount * sizeof(vx_float64));
         if (wb->max_per_core_per_vzgroup_nzr == VX_NULL)
         {
-            vxError("reorderWeightBiasBufferForHuffman: OUT OF MEMORY\n");
+            wb->max_per_core_per_vzgroup_nzr = (vx_float64*)vxAllocateAndZeroMemory(groupCount * sizeof(vx_float64));
+            if (wb->max_per_core_per_vzgroup_nzr == VX_NULL)
+            {
+                vxError("reorderWeightBiasBufferForHuffman: OUT OF MEMORY\n");
+                goto exit;
+            }
+        }
+
+        nonZeroRatioPerCorePerVZG = (vx_float64*)vxAllocateAndZeroMemory(nnCoreCount * groupCount * sizeof(vx_float64));
+        if (nonZeroRatioPerCorePerVZG == VX_NULL)
+        {
+            vxError("reorderWeightBiasBufferForHuffman: OUT OF MEMORY");
             goto exit;
         }
     }
-
     for (coreIndex = 0; coreIndex < nnCoreCount; coreIndex++)
     {
         vx_uint32 coreFilterCount = (coreIndex < oddFilterPerCore) ? totalFilterPerCore + 1 : totalFilterPerCore;
-        vx_uint32 groupIndex;
+
         reoder_stream_count_per_core[coreIndex] = 0;
-        wb->max_per_core_per_vzgroup_nzr[coreIndex] = 0;
-        /* Save kernels per core*/
-        if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
+
+
+        if (coreFilterCount > 0)
         {
-            *((vx_uint16 *)kernelBufferInt8Ptr) = (vx_uint16)coreFilterCount;
-            kernelBufferInt8Ptr += 2;
-            reoder_stream_count_per_core[coreIndex] += (16 / weightBitSize);
-        }
-        else
-        {
-            *kernelBufferInt16Ptr = (vx_uint16)coreFilterCount;
-            kernelBufferInt16Ptr ++;
-            reoder_stream_count_per_core[coreIndex] += (16 / weightBitSize);
-        }
-        for (idx = 0; idx < (16 / weightBitSize); idx++)
-        {
-            non_coef_index[nonCoefIndex++] = elementIndex++;
+            /* Save kernels per core*/
+            if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
+            {
+                *((vx_uint16 *)kernelBufferInt8Ptr) = (vx_uint16)coreFilterCount;
+                kernelBufferInt8Ptr += 2;
+                reoder_stream_count_per_core[coreIndex] += (16 / weightBitSize);
+            }
+            else
+            {
+                *kernelBufferInt16Ptr = (vx_uint16)coreFilterCount;
+                kernelBufferInt16Ptr ++;
+                reoder_stream_count_per_core[coreIndex] += (16 / weightBitSize);
+            }
+            for (idx = 0; idx < (16 / weightBitSize); idx++)
+            {
+                non_coef_index[nonCoefIndex++] = elementIndex++;
+            }
         }
 
         for (groupIndex = 0; groupIndex < groupCount; groupIndex++)
@@ -13478,7 +6990,7 @@ void reorderWeightBiasBufferForHuffman(
             vx_uint32 filterStart, filterEnd;
             vx_uint32 blockCount = 0;
             vx_uint32 nonZeroCount = 0;
-            vx_float64 nonZeroRatio = 0;
+            vx_uint32 nonZrlIdx = groupIndex + coreIndex * groupCount;
 
             if ((groupIndex == groupCount - 1)
                 && (coreIndex >= (filterTotalCount % nnCoreCount)))
@@ -14055,9 +7567,21 @@ void reorderWeightBiasBufferForHuffman(
                     }
                 }
             }
-            nonZeroRatio = (vx_float64)nonZeroCount / (vx_float64)blockCount;
-            if (wb->max_per_core_per_vzgroup_nzr[coreIndex] < nonZeroRatio)
-                wb->max_per_core_per_vzgroup_nzr[coreIndex] = nonZeroRatio;
+            if (calc_perf)
+                nonZeroRatioPerCorePerVZG[nonZrlIdx] = (vx_float64)nonZeroCount / (vx_float64)blockCount;
+        }
+    }
+
+    if (calc_perf)
+    {
+        for (groupIndex = 0; groupIndex < groupCount; groupIndex++)
+        {
+            for (coreIndex = 0; coreIndex < nnCoreCount; coreIndex++)
+            {
+                vx_uint32 nonZrlIdx = groupIndex + coreIndex * groupCount;
+                if (wb->max_per_core_per_vzgroup_nzr[groupIndex] < nonZeroRatioPerCorePerVZG[nonZrlIdx])
+                    wb->max_per_core_per_vzgroup_nzr[groupIndex] = nonZeroRatioPerCorePerVZG[nonZrlIdx];
+            }
         }
     }
 
@@ -14088,7 +7612,1000 @@ void reorderWeightBiasBufferForHuffman(
 exit:
     if (weightsMinusZP)
         vxFree(weightsMinusZP);
+    if (nonZeroRatioPerCorePerVZG)
+        vxFree(nonZeroRatioPerCorePerVZG);
+    return;
+}
 
+#define PRINT_PER_CORE_SIZE 0
+void reorderKernelBufferV7HuffmanBalance(
+    vx_context context,
+    vx_weights_biases_parameter wb,
+    vx_uint32 slice_count,
+    vx_uint32 z_count,
+    vx_uint32 filters_per_core,
+    vx_enum  weight_format,
+    vx_enum  bias_format,
+    vx_int32 z_offset,
+    vx_int32 output_size,
+    vx_uint32 skip_value,
+    vx_uint32 output_final_x,
+    vx_uint32 output_final_y,
+    vx_uint8_ptr reorder_stream,
+    vx_uint8_ptr weight_base_ptr,
+    vx_uint32* bias_base_ptr,
+    vx_uint8* postMul,
+    vx_uint8* postShift,
+    vx_uint32* reoder_stream_count_per_core,
+    vx_uint32* non_coef_index,
+    vx_uint32* zrl_limit_index,
+    vx_bool calc_perf
+    )
+{
+    vx_uint32 nnCoreCount = weight_format == VX_TYPE_INT16 ?
+                  context->nnConfig.fixedFeature.nnCoreCountInt16 : weight_format == VX_TYPE_FLOAT16 ?
+                      context->nnConfig.fixedFeature.nnCoreCountFloat16 : context->nnConfig.fixedFeature.nnCoreCount;
+
+    vx_uint32 filterTotalCount   = z_count;
+    vx_uint32 sliceCount         = slice_count;
+    vx_uint32 totalFilterPerCore = filterTotalCount / nnCoreCount;
+    vx_uint32 oddFilterPerCore   = filterTotalCount % nnCoreCount;
+    vx_uint32 filterCount        = filters_per_core; /* filter count every group */
+    vx_uint32 batchSize          = nnCoreCount * filterCount;
+    vx_uint32 groupCount         = (filterTotalCount + batchSize - 1) / batchSize;
+
+    vx_uint32 weightCount        = wb->weights_sizes[0] * wb->weights_sizes[1];
+    vx_uint32 weightSize         = (vx_uint32)vxDataType_GetSize((vx_type_e)weight_format);
+    vx_uint32 weightBitSize      = weightSize * 8;
+    vx_uint32 biasSize           = (vx_uint32)vxDataType_GetSize((vx_type_e)bias_format);
+    vx_uint32 biasBitSize        = biasSize * 8;
+    vx_uint32 biasData           = 0;
+
+    vx_uint32 filterSliceSize    = weightCount * weightSize;
+    vx_uint32 filterSize         = weightCount * weightSize * slice_count;
+    vx_uint8* kernelDataPtr      = VX_NULL;
+    vx_uint8* kernelBufferInt8Ptr    = reorder_stream;
+    vx_uint16* kernelBufferInt16Ptr    = (vx_uint16*)reorder_stream;
+
+    vx_uint32 inputZP = wb->wb_base->inputZP;
+    vx_uint32 coefZP = wb->wb_base->coefZP;
+
+    vx_uint32 coreIndex;
+    vx_uint32 elementIndex = 0;
+    vx_uint32 nonCoefIndex = 0;
+    vx_uint32 limitZRLIndex = 0;
+    vx_uint32 idx = 0;
+    vx_uint32 filterIndex, sliceIndex;
+    vx_uint32 weightXIndex, weightYIndex;
+    vx_uint32 skipValue = skip_value;
+
+    vx_bool hasZDP3 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3);
+    vx_bool hasZDP6 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6);
+    vx_bool hasXYDP9 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP9);
+    vx_bool hasXYDP6 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP6);
+    vx_bool hasBiasAtEnd = vx_false_e;
+    vx_bool hasNNPerFilterPostMultiply = vx_false_e;
+    vx_bool hasNNPerFilterPostShift = vx_false_e;
+
+    vx_uint32 totalNonZeroCount = 0;
+    vx_float32 averageNZCPerFilter = 0;
+    vx_float32 varianceFL32 = 0;
+    vx_uint32 variance = 0;
+    vx_bool reorder = vx_false_e;
+
+    vx_float64* nonZeroRatioPerCorePerVZG = VX_NULL;
+    vx_uint32 groupIndex;
+
+    typedef struct _gcVXWeightsMinusZP
+    {
+        vx_int32 sum;
+        vx_uint32 filterIdx;
+    }gcVXWeightsMinusZP;
+
+    gcVXWeightsMinusZP *weightsMinusZP = VX_NULL;
+
+    typedef struct _gcVXNonZeroWeights
+    {
+        vx_uint32 nonZeroCount;
+        vx_uint32 filterIdx;
+    }gcVXNonZeroWeights;
+
+#if PRINT_PER_CORE_SIZE
+    vx_uint32* nonZeroCoefPerCore = VX_NULL;
+#endif
+
+    gcVXNonZeroWeights *nonZeroWeights = VX_NULL;
+    vx_int32 i = 0;
+    vx_uint32 core0FilterCount = 0;
+    gcVXNonZeroWeights tmp;
+
+    nonZeroWeights = (gcVXNonZeroWeights*)vxAllocateAndZeroMemory(filterTotalCount * sizeof(gcVXNonZeroWeights));
+    if (nonZeroWeights == VX_NULL)
+    {
+        vxError("fillinKernelBuffer: OUT OF MEMORY");
+        goto exit;
+    }
+#if PRINT_PER_CORE_SIZE
+    nonZeroCoefPerCore = (vx_uint32*)vxAllocateAndZeroMemory(nnCoreCount * sizeof(vx_uint32));
+    if (nonZeroCoefPerCore == VX_NULL)
+    {
+        vxError("fillinKernelBuffer: OUT OF MEMORY");
+        goto exit;
+    }
+#endif
+
+    /* calc each filter non-zero weights num*/
+    for (filterIndex = 0; filterIndex < filterTotalCount; filterIndex++)
+    {
+        nonZeroWeights[filterIndex].filterIdx = filterIndex;
+        for (sliceIndex = 0; sliceIndex < sliceCount; sliceIndex++)
+        {
+            /* add one slice data every filter */
+            kernelDataPtr = weight_base_ptr + filterIndex * filterSize + filterSliceSize * sliceIndex;
+
+            for (weightYIndex = 0; weightYIndex < wb->weights_sizes[1]; weightYIndex++)
+            {
+                for (weightXIndex = 0; weightXIndex < wb->weights_sizes[0]; weightXIndex++)
+                {
+                    vx_uint32 weight = 0;
+
+                    if (weight_format == VX_TYPE_INT8)
+                        weight = *((vx_int8 *)kernelDataPtr);
+                    else if (weight_format == VX_TYPE_UINT8)
+                        weight = *((vx_uint8 *)kernelDataPtr);
+                    else
+                        weight = *((vx_uint16 *)kernelDataPtr);
+                    kernelDataPtr = kernelDataPtr + weightSize;
+
+                    if (weight != skipValue)
+                        nonZeroWeights[filterIndex].nonZeroCount++;
+
+                }
+            }
+        }
+        totalNonZeroCount += nonZeroWeights[filterIndex].nonZeroCount;
+    }
+
+    /*Sort*/
+    averageNZCPerFilter = (vx_float32)totalNonZeroCount / filterTotalCount;
+    for (filterIndex = 0; filterIndex < filterTotalCount; filterIndex++)
+    {
+        varianceFL32 += gcoMATH_Power((nonZeroWeights[filterIndex].nonZeroCount - averageNZCPerFilter), 2);
+    }
+    variance = (vx_uint32)(varianceFL32 / filterTotalCount + 0.5f);
+
+    reorder = vx_true_e;
+
+    if (reorder)
+    {
+        /*Sort*/
+        for (filterIndex = 0; filterIndex < filterTotalCount; filterIndex++)
+        {
+            tmp.nonZeroCount = nonZeroWeights[filterIndex].nonZeroCount;
+            tmp.filterIdx = filterIndex;
+
+            for (i = filterIndex - 1; i >= 0 && nonZeroWeights[i].nonZeroCount > tmp.nonZeroCount; i--)
+            {
+                nonZeroWeights[i+1].nonZeroCount = nonZeroWeights[i].nonZeroCount;
+                nonZeroWeights[i+1].filterIdx = nonZeroWeights[i].filterIdx;
+            }
+            nonZeroWeights[i+1].nonZeroCount = tmp.nonZeroCount;
+            nonZeroWeights[i+1].filterIdx = tmp.filterIdx;
+        }
+    }
+
+    if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
+    {
+        if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VIP_V7))
+        {
+            biasBitSize = NN_INTEGER_BIAS_BITS_VIP_V7;
+        }
+        else
+        {
+            biasBitSize = NN_INTEGER_BIAS_BITS;
+        }
+    }
+    else if (weight_format == VX_TYPE_INT16)
+    {
+        biasBitSize = NN_INTEGER_BIAS_BITS_VIP_V7_INT16;
+    }
+
+    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) && inputZP != 0 && weight_format == VX_TYPE_UINT8)
+    {
+        weightsMinusZP = (gcVXWeightsMinusZP*)vxAllocateAndZeroMemory(filterTotalCount * sizeof(gcVXWeightsMinusZP));
+
+        if (!weightsMinusZP)
+        {
+            vxError("fillinKernelBuffer: OUT OF MEMORY");
+            goto exit;
+        }
+
+        /*Calc sum((coef[i] - coefZP) * InZP) */
+        for (filterIndex = 0; filterIndex < filterTotalCount; filterIndex++)
+        {
+            weightsMinusZP[filterIndex].filterIdx = filterIndex;
+            weightsMinusZP[filterIndex].sum = 0;
+            for (sliceIndex = 0; sliceIndex < slice_count; sliceIndex++)
+            {
+                kernelDataPtr = weight_base_ptr + filterIndex * filterSize + filterSliceSize * sliceIndex;
+
+                for (weightYIndex = 0; weightYIndex < wb->weights_sizes[1]; weightYIndex++)
+                {
+                    for (weightXIndex = 0; weightXIndex < wb->weights_sizes[0]; weightXIndex++)
+                    {
+                        vx_int32 weight = 0;
+                        weight = *((vx_uint8 *)kernelDataPtr);
+                        kernelDataPtr = kernelDataPtr + weightSize;
+
+                        weightsMinusZP[filterIndex].sum += (weight - coefZP) * inputZP;
+                    }
+                }
+            }
+        }
+    }
+
+    if (calc_perf)
+    {
+        if (wb->max_per_core_per_vzgroup_nzr == VX_NULL)
+        {
+            wb->max_per_core_per_vzgroup_nzr = (vx_float64*)vxAllocateAndZeroMemory(groupCount * sizeof(vx_float64));
+            if (wb->max_per_core_per_vzgroup_nzr == VX_NULL)
+            {
+                vxError("reorderWeightBiasBufferForHuffman: OUT OF MEMORY\n");
+                goto exit;
+            }
+        }
+
+        nonZeroRatioPerCorePerVZG = (vx_float64*)vxAllocateAndZeroMemory(nnCoreCount * groupCount * sizeof(vx_float64));
+        if (nonZeroRatioPerCorePerVZG == VX_NULL)
+        {
+            vxError("reorderWeightBiasBufferForHuffman: OUT OF MEMORY");
+            goto exit;
+        }
+    }
+
+    for (coreIndex = 0; coreIndex < nnCoreCount; coreIndex++)
+    {
+        vx_uint32 coreFilterCount = (coreIndex < oddFilterPerCore) ? totalFilterPerCore + 1 : totalFilterPerCore;
+
+        vx_uint32 usedKid = 0;
+        vx_uint32* filterGroup = VX_NULL;
+
+        reoder_stream_count_per_core[coreIndex] = 0;
+
+        if (coreFilterCount > 0)
+        {
+            /* Save kernels per core*/
+            if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
+            {
+                *((vx_uint16 *)kernelBufferInt8Ptr) = (vx_uint16)coreFilterCount;
+                kernelBufferInt8Ptr += 2;
+                reoder_stream_count_per_core[coreIndex] += (16 / weightBitSize);
+            }
+            else
+            {
+                *kernelBufferInt16Ptr = (vx_uint16)coreFilterCount;
+                kernelBufferInt16Ptr ++;
+                reoder_stream_count_per_core[coreIndex] += (16 / weightBitSize);
+            }
+            for (idx = 0; idx < (16 / weightBitSize); idx++)
+            {
+                non_coef_index[nonCoefIndex++] = elementIndex++;
+            }
+        }
+
+        for (groupIndex = 0; groupIndex < groupCount; groupIndex++)
+        {
+            vx_uint32 blockCount = 0;
+            vx_uint32 nonZeroCount = 0;
+            vx_uint32 nonZrlIdx = groupIndex + coreIndex * groupCount;
+
+            vx_uint32 actualFilterCount = (groupIndex == groupCount - 1) ? (coreFilterCount - groupIndex * filterCount) : filterCount;
+            vx_uint32 groupFilterStart = groupIndex * nnCoreCount * filterCount;
+            vx_uint32 kid = 0;
+            vx_uint32 unusedCoreCount = (filterTotalCount % nnCoreCount == 0) ? 0 : nnCoreCount - (filterTotalCount % nnCoreCount);
+            vx_uint32 sortedIndex = 0;
+            vx_uint32 filterStart = 0;
+
+            if (coreIndex == 0)
+                core0FilterCount = actualFilterCount;
+
+            if (actualFilterCount)
+            {
+                filterGroup = (vx_uint32*)vxAllocateAndZeroMemory(actualFilterCount * sizeof(vx_uint32));
+                if (filterGroup == VX_NULL)
+                {
+                    vxError("fillinKernelBufferBalance: OUT OF MEMORY");
+                    goto exit;
+                }
+            }
+
+            if (reorder)
+            {
+                /*Dispatch filter to each vzGroup*/
+                for (kid = 0; kid < actualFilterCount; kid++)
+                {
+                    if (groupIndex == groupCount - 1 &&
+                        kid == core0FilterCount - 1)
+                    {
+                        if ((kid + usedKid) % 2 == 0)
+                            sortedIndex = groupFilterStart + kid * nnCoreCount + coreIndex;
+                        else
+                            sortedIndex = groupFilterStart + (kid + 1) * nnCoreCount - coreIndex - 1 - unusedCoreCount;
+                    }
+                    else
+                    {
+                        if ((kid + usedKid) % 2 == 0)
+                            sortedIndex = groupFilterStart + kid * nnCoreCount + coreIndex;
+                        else
+                            sortedIndex = groupFilterStart + (kid + 1) * nnCoreCount - coreIndex - 1;
+                    }
+
+                    filterGroup[kid] = nonZeroWeights[sortedIndex].filterIdx;
+#if PRINT_PER_CORE_SIZE
+                    nonZeroCoefPerCore[coreIndex] += nonZeroWeights[sortedIndex].nonZeroCount;
+#endif
+                }
+
+                /*sort the vz group real filter to avoid write output cross*/
+                for (kid = 0; kid < actualFilterCount; kid++)
+                {
+                    vx_uint32 tmp = filterGroup[kid];
+
+                    for (i = kid - 1; i >= 0 && filterGroup[i] > tmp; i--)
+                    {
+                        filterGroup[i+1] = filterGroup[i];
+                    }
+                    filterGroup[i+1] = tmp;
+                }
+            }
+            else
+            {
+                /*if variance is small, don't reorder the filters*/
+                if ((groupIndex == groupCount - 1)
+                && (coreIndex >= (filterTotalCount % nnCoreCount)))
+                {
+                    filterStart = groupIndex * nnCoreCount * filterCount
+                                + (filterTotalCount % nnCoreCount) * (actualFilterCount + 1)
+                                + (coreIndex - (filterTotalCount % nnCoreCount)) * actualFilterCount;
+                }
+                else
+                {
+                    filterStart = groupIndex * nnCoreCount *filterCount + coreIndex * actualFilterCount;
+                }
+
+                for (kid = 0; kid < actualFilterCount; kid++)
+                {
+                    filterGroup[kid] = filterStart + kid;
+                }
+            }
+
+
+            if (wb->weights_sizes[0] == 1 && wb->weights_sizes[1] == 1 &&
+                (hasZDP3 || hasZDP6) &&
+                (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8))
+            {
+                vx_uint32 zdpNum = hasZDP6 ? 6 : 3;
+
+                /* zdp3 zdp6 can not enable same time */
+                vxmASSERT(!(hasZDP3 && hasZDP6));
+
+                for (sliceIndex = 0; sliceIndex < slice_count; sliceIndex += (zdpNum * 2))
+                {
+                    vx_uint32 weight = 0;
+                    vx_uint32 realSliceIndex = 0;
+
+                    /* add slices of every filter*/
+                    for (kid = 0; kid < actualFilterCount; kid++)
+                    {
+                        vx_uint32 nonZeroInBlock1Count = 0; /*Check if there's non-zero point in first zdpNum block*/
+                        vx_uint32 nonZeroInBlock2Count = 0; /*Check if there's non-zero point in another zdpNum block*/
+
+                        filterIndex = filterGroup[kid];
+
+                        for (realSliceIndex = sliceIndex; realSliceIndex < sliceIndex + (zdpNum * 2); realSliceIndex++)
+                        {
+                            if (realSliceIndex >= slice_count)
+                                break;
+
+                            if (realSliceIndex == 0)
+                            {
+                                if (bias_base_ptr)
+                                    biasData = *(bias_base_ptr + filterIndex);
+                                else
+                                    biasData = 0;
+
+                                /* NewBias = sum((Coef[i] - CoefZP) * - InZP) + Bias*/
+                                if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT)
+                                    && inputZP != 0
+                                    && weight_format == VX_TYPE_UINT8)
+                                {
+                                    biasData -= weightsMinusZP[filterIndex].sum;
+                                }
+
+                                if (!hasBiasAtEnd)
+                                {
+                                    *((vx_uint32 *)kernelBufferInt8Ptr) = biasData;
+                                    kernelBufferInt8Ptr += 4;
+                                    reoder_stream_count_per_core[coreIndex] += (biasBitSize / weightBitSize);
+                                    for (idx = 0; idx < (biasBitSize / weightBitSize); idx++)
+                                    {
+                                        non_coef_index[nonCoefIndex++] = elementIndex++;
+                                    }
+                                }
+                            }
+
+                            /* add one slice data every filter */
+                            kernelDataPtr = weight_base_ptr + filterIndex * filterSize + filterSliceSize * realSliceIndex;
+                            if (weight_format == VX_TYPE_INT8)
+                                weight = *((vx_int8 *)kernelDataPtr);
+                            else if (weight_format == VX_TYPE_UINT8)
+                                weight = *((vx_uint8 *)kernelDataPtr);
+                            else
+                                weight = *((vx_uint16 *)kernelDataPtr);
+
+                            if (realSliceIndex - sliceIndex < zdpNum && weight != skipValue)
+                                nonZeroInBlock1Count++;
+                            else if (weight != skipValue)
+                                nonZeroInBlock2Count++;
+
+                            *kernelBufferInt8Ptr = (vx_uint8)weight;
+                            kernelBufferInt8Ptr++;
+                            reoder_stream_count_per_core[coreIndex] += 1;
+
+                            if ((kid == actualFilterCount - 1) && realSliceIndex == 0)
+                                zrl_limit_index[limitZRLIndex++] = elementIndex;
+
+                            elementIndex++;
+
+                            /* add offet behind the last point of the last slice of each filter */
+                            if (realSliceIndex == slice_count - 1)
+                            {
+                                vx_uint32 offsetValue;
+
+                                if (hasNNPerFilterPostMultiply)
+                                {
+                                    /*add post multiply to each filter*/
+
+                                    vx_uint32 postMulSize = 8;
+                                    *kernelBufferInt8Ptr = postMul[filterIndex];
+                                    kernelBufferInt8Ptr++;
+                                    reoder_stream_count_per_core[coreIndex] += (postMulSize / weightBitSize);
+                                    for (idx = 0; idx < (postMulSize / weightBitSize); idx++)
+                                    {
+                                        non_coef_index[nonCoefIndex++] = elementIndex++;
+                                    }
+                                }
+                                if (hasNNPerFilterPostShift)
+                                {
+                                    /*add post multiply to each filter*/
+
+                                    vx_uint32 postShiftSize = 8;
+                                    *kernelBufferInt8Ptr = postShift[filterIndex];
+                                    kernelBufferInt8Ptr++;
+                                    reoder_stream_count_per_core[coreIndex] += (postShiftSize / weightBitSize);
+                                    for (idx = 0; idx < (postShiftSize / weightBitSize); idx++)
+                                    {
+                                        non_coef_index[nonCoefIndex++] = elementIndex++;
+                                    }
+                                }
+
+                                if (z_offset > 0)
+                                    offsetValue = (vx_uint32)z_offset * filterIndex;
+                                else if (output_size > 0)
+                                    offsetValue = output_final_x * output_final_y * output_size * filterIndex;
+                                else
+                                    offsetValue = output_final_x * output_final_y * weightSize * filterIndex;
+
+                                if (hasBiasAtEnd)
+                                {
+                                    *((vx_uint32 *)kernelBufferInt8Ptr) = biasData;
+                                    kernelBufferInt8Ptr += 4;
+                                    reoder_stream_count_per_core[coreIndex] += (biasBitSize / weightBitSize);
+
+                                    for (idx = 0; idx < (biasBitSize / weightBitSize); idx++)
+                                    {
+                                        non_coef_index[nonCoefIndex++] = elementIndex++;
+                                    }
+                                }
+
+                                if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VIP_V7))
+                                {
+                                    *((vx_uint32 *)kernelBufferInt8Ptr) = offsetValue;
+                                    kernelBufferInt8Ptr += 4;
+                                    reoder_stream_count_per_core[coreIndex] += (NN_Z_POSITION_OFFSET_BITS_VIP_V7 / weightBitSize);
+                                    for (idx = 0; idx < (NN_Z_POSITION_OFFSET_BITS_VIP_V7 / weightBitSize); idx++)
+                                    {
+                                        non_coef_index[nonCoefIndex++] = elementIndex++;
+                                    }
+                                }
+                            }
+                        }
+                        if (sliceIndex + zdpNum >= slice_count)
+                            blockCount++;
+                        else
+                            blockCount += 2;
+
+                        if (nonZeroInBlock1Count)
+                            nonZeroCount++;
+                        if (nonZeroInBlock2Count)
+                            nonZeroCount++;
+                    }
+                }
+            }
+            /*Only INT8/UINT8 support XY DP9 now*/
+            else if ((hasXYDP9 || hasXYDP6)
+                && (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8))
+            {
+                vx_uint32 xStep = 0, yStep = 0;
+                vx_uint32 inImageBufferSize = hasXYDP9 ? 2 : 1;
+
+                /* xydp9 xydp6 can not enable same time */
+                vxmASSERT(!(hasXYDP9 && hasXYDP6));
+
+                if (hasXYDP6)
+                {
+                    xStep = 3;
+                    yStep = 2;
+                }
+                else
+                {
+                    xStep = 3;
+                    yStep = 3;
+                }
+
+                for (sliceIndex = 0; sliceIndex < slice_count; sliceIndex += inImageBufferSize)
+                {
+                    vx_uint32 weight = 0;
+                    vx_uint32 realSliceIndex = 0;
+                    vx_uint32 realWeightXIndex = 0, realWeightYIndex = 0;
+                    vx_uint32 subKxSize = 0, subKySize = 0, subKzSize = 0;
+
+                    subKzSize = gcmMIN((slice_count - sliceIndex), inImageBufferSize);
+                    /* add slices of every filter*/
+                    for (kid = 0; kid < actualFilterCount; kid++)
+                    {
+                        filterIndex = filterGroup[kid];
+                        for (weightYIndex = 0; weightYIndex < wb->weights_sizes[1]; weightYIndex += yStep)
+                        {
+                            subKySize = gcmMIN((wb->weights_sizes[1] - weightYIndex), yStep);
+                            for (weightXIndex = 0; weightXIndex < wb->weights_sizes[0]; weightXIndex += xStep)
+                            {
+                                subKxSize = gcmMIN((wb->weights_sizes[0] - weightXIndex), xStep);
+                                for (realSliceIndex = sliceIndex; realSliceIndex < sliceIndex + subKzSize; realSliceIndex++)
+                                {
+                                    vx_uint32 nonZeroInBlockCount = 0; /*Check if there's non-zero point in one 3x3 block*/
+                                    /* add one slice data every filter */
+                                    kernelDataPtr = weight_base_ptr + filterIndex * filterSize + filterSliceSize * realSliceIndex;
+                                    if (realSliceIndex == 0)
+                                    {
+                                        if (bias_base_ptr)
+                                            biasData = *(bias_base_ptr + filterIndex);
+                                        else
+                                            biasData = 0;
+
+                                        /* NewBias = sum((Coef[i] - CoefZP) * - InZP) + Bias*/
+                                        if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT)
+                                            && inputZP != 0
+                                            && weight_format == VX_TYPE_UINT8)
+                                        {
+                                            biasData -= weightsMinusZP[filterIndex].sum;
+                                        }
+                                    }
+
+                                    for (realWeightYIndex = weightYIndex; realWeightYIndex < weightYIndex + subKySize; realWeightYIndex++)
+                                    {
+                                        for (realWeightXIndex = weightXIndex; realWeightXIndex < weightXIndex + subKxSize; realWeightXIndex++)
+                                        {
+                                            vx_uint8_ptr realKernelDataPtr = kernelDataPtr + (realWeightYIndex * wb->weights_sizes[0] + realWeightXIndex) * weightSize;
+
+                                            if (weight_format == VX_TYPE_INT8)
+                                                weight = *((vx_int8 *)realKernelDataPtr);
+                                            else if (weight_format == VX_TYPE_UINT8)
+                                                weight = *((vx_uint8 *)realKernelDataPtr);
+                                            else
+                                                weight = *((vx_uint16 *)realKernelDataPtr);
+
+                                            if (weight != skipValue)
+                                                nonZeroInBlockCount++;
+
+                                            if (!hasBiasAtEnd &&
+                                                realWeightYIndex == 0 &&
+                                                realWeightXIndex == 0 &&
+                                                realSliceIndex == 0)
+                                            {
+                                                *((vx_uint32 *)kernelBufferInt8Ptr) = biasData;
+                                                kernelBufferInt8Ptr += 4;
+                                                reoder_stream_count_per_core[coreIndex] += (biasBitSize / weightBitSize);
+                                                for (idx = 0; idx < (biasBitSize / weightBitSize); idx++)
+                                                {
+                                                    non_coef_index[nonCoefIndex++] = elementIndex++;
+                                                }
+                                            }
+                                            *kernelBufferInt8Ptr = (vx_uint8)weight;
+                                            kernelBufferInt8Ptr++;
+                                            reoder_stream_count_per_core[coreIndex] += 1;
+
+                                            if ((kid == actualFilterCount - 1) && realSliceIndex == 0 &&
+                                                realWeightXIndex == 0 && realWeightYIndex == 0)
+                                                zrl_limit_index[limitZRLIndex++] = elementIndex;
+
+                                            elementIndex++;
+
+                                            /* add offet behind the last point of the last slice of each filter */
+                                            if (realSliceIndex == slice_count - 1 &&
+                                                realWeightXIndex == wb->weights_sizes[0] - 1 &&
+                                                realWeightYIndex == wb->weights_sizes[1] - 1)
+                                            {
+                                                vx_uint32 offsetValue;
+
+                                                if (hasNNPerFilterPostMultiply)
+                                                {
+                                                    /*add post multiply to each filter*/
+
+                                                    vx_uint32 postMulSize = 8;
+                                                    *kernelBufferInt8Ptr = postMul[filterIndex];
+                                                    kernelBufferInt8Ptr++;
+                                                    reoder_stream_count_per_core[coreIndex] += (postMulSize / weightBitSize);
+                                                    for (idx = 0; idx < (postMulSize / weightBitSize); idx++)
+                                                    {
+                                                        non_coef_index[nonCoefIndex++] = elementIndex++;
+                                                    }
+                                                }
+                                                if (hasNNPerFilterPostShift)
+                                                {
+                                                    /*add post multiply to each filter*/
+
+                                                    vx_uint32 postShiftSize = 8;
+                                                    *kernelBufferInt8Ptr = postShift[filterIndex];
+                                                    kernelBufferInt8Ptr++;
+                                                    reoder_stream_count_per_core[coreIndex] += (postShiftSize / weightBitSize);
+                                                    for (idx = 0; idx < (postShiftSize / weightBitSize); idx++)
+                                                    {
+                                                        non_coef_index[nonCoefIndex++] = elementIndex++;
+                                                    }
+                                                }
+
+                                                if (z_offset > 0)
+                                                    offsetValue = (vx_uint32)z_offset * filterIndex;
+                                                else if (output_size > 0)
+                                                    offsetValue = output_final_x * output_final_y * output_size * filterIndex;
+                                                else
+                                                    offsetValue = output_final_x * output_final_y * weightSize * filterIndex;
+
+                                                if (hasBiasAtEnd)
+                                                {
+                                                    *((vx_uint32 *)kernelBufferInt8Ptr) = biasData;
+                                                    kernelBufferInt8Ptr += 4;
+                                                    reoder_stream_count_per_core[coreIndex] += (biasBitSize / weightBitSize);
+                                                    for (idx = 0; idx < (biasBitSize / weightBitSize); idx++)
+                                                    {
+                                                        non_coef_index[nonCoefIndex++] = elementIndex++;
+                                                    }
+                                                }
+
+                                                if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VIP_V7))
+                                                {
+                                                    *((vx_uint32 *)kernelBufferInt8Ptr) = offsetValue;
+                                                    kernelBufferInt8Ptr += 4;
+                                                    reoder_stream_count_per_core[coreIndex] += (NN_Z_POSITION_OFFSET_BITS_VIP_V7 / weightBitSize);
+                                                    for (idx = 0; idx < (NN_Z_POSITION_OFFSET_BITS_VIP_V7 / weightBitSize); idx++)
+                                                    {
+                                                        non_coef_index[nonCoefIndex++] = elementIndex++;
+                                                    }
+                                                }
+
+                                            }
+                                        }
+                                    }
+                                    blockCount++;
+                                    if (nonZeroInBlockCount)
+                                        nonZeroCount++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                for (sliceIndex = 0; sliceIndex < slice_count; sliceIndex++)
+                {
+                    /* add slices of every filter*/
+                    for (kid = 0; kid < actualFilterCount; kid++)
+                    {
+                        filterIndex = filterGroup[kid];
+                        /* add one slice data every filter */
+                        kernelDataPtr = weight_base_ptr + filterIndex * filterSize + filterSliceSize * sliceIndex;
+                        if (sliceIndex == 0)
+                        {
+                            if (bias_base_ptr)
+                                biasData = *(bias_base_ptr + filterIndex);
+                            else
+                                biasData = 0;
+
+                            /* NewBias = sum((Coef[i] - CoefZP) * - InZP) + Bias*/
+                            if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT)
+                                && inputZP != 0
+                                && weight_format == VX_TYPE_UINT8)
+                            {
+                                biasData -= weightsMinusZP[filterIndex].sum;
+                            }
+                        }
+
+                        for (weightYIndex = 0; weightYIndex < wb->weights_sizes[1]; weightYIndex++)
+                        {
+                            vx_uint32 nonZeroCountInDP3 = 0; /*Check if there's non-zero point in one 3x1 block*/
+                            for (weightXIndex = 0; weightXIndex < wb->weights_sizes[0]; weightXIndex++)
+                            {
+                                vx_uint32 weight = 0;
+
+                                if (weight_format == VX_TYPE_INT8)
+                                    weight = *((vx_int8 *)kernelDataPtr);
+                                else if (weight_format == VX_TYPE_UINT8)
+                                    weight = *((vx_uint8 *)kernelDataPtr);
+                                else
+                                    weight = *((vx_uint16 *)kernelDataPtr);
+                                kernelDataPtr = kernelDataPtr + weightSize;
+
+                                {
+                                    if (weight != skipValue)
+                                        nonZeroCountInDP3++;
+
+                                    /*V7, DP3, one block is 3x1*/
+                                    if ((weightXIndex + 1) % 3 == 0 || weightXIndex == wb->weights_sizes[0] - 1)
+                                    {
+                                        blockCount++;
+                                        if (nonZeroCountInDP3)
+                                            nonZeroCount++;
+                                        nonZeroCountInDP3 = 0;
+                                    }
+                                }
+
+                                if (!hasBiasAtEnd &&
+                                    weightXIndex == 0 &&
+                                    weightYIndex == 0 &&
+                                    sliceIndex == 0)
+                                {
+                                    if (weight_format == VX_TYPE_INT16)
+                                    {
+                                        vx_int64 bias64 = 0;
+                                        vx_int32 bias32;
+                                        vx_int16 bias16;
+
+                                        if ((vx_int32)biasData < 0)
+                                        {
+                                            bias64 = ~0;
+                                            bias64 = (bias64 >> 32) << 32;
+                                            bias64 = bias64 | (vx_int64)biasData;
+                                        }
+                                        else
+                                            bias64 = (vx_int64)biasData;
+
+                                        bias32 = (vx_int32)bias64;
+                                        *((vx_uint32 *)kernelBufferInt16Ptr) = bias32;
+                                        kernelBufferInt16Ptr += 2;
+                                        reoder_stream_count_per_core[coreIndex] += (32 / weightBitSize);
+                                        bias16 = (vx_int16)(bias64 >> 32);
+                                        *kernelBufferInt16Ptr = bias16;
+                                        kernelBufferInt16Ptr++;
+                                        reoder_stream_count_per_core[coreIndex] += (16 / weightBitSize);
+                                    }
+                                    else if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
+                                    {
+                                        *((vx_uint32 *)kernelBufferInt8Ptr) = biasData;
+                                        kernelBufferInt8Ptr += 4;
+                                        reoder_stream_count_per_core[coreIndex] += (biasBitSize / weightBitSize);
+                                    }
+                                    else
+                                    {
+                                        *((vx_uint32 *)kernelBufferInt16Ptr) = biasData;
+                                        kernelBufferInt16Ptr += 2;
+                                        reoder_stream_count_per_core[coreIndex] += (biasBitSize / weightBitSize);
+                                    }
+
+                                    for (idx = 0; idx < (biasBitSize / weightBitSize); idx++)
+                                    {
+                                        non_coef_index[nonCoefIndex++] = elementIndex++;
+                                    }
+                                }
+
+                                if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
+                                {
+                                    *kernelBufferInt8Ptr = (vx_uint8)weight;
+                                    kernelBufferInt8Ptr++;
+                                }
+                                else
+                                {
+                                    if (weight_format == VX_TYPE_FLOAT16)
+                                        weight = (weight & 0x7fff) * 2 + weight/(1<<15);
+
+                                    *kernelBufferInt16Ptr = (vx_uint16)weight;
+                                    kernelBufferInt16Ptr++;
+                                }
+                                reoder_stream_count_per_core[coreIndex] += 1;
+
+                                if ((kid == actualFilterCount - 1) && sliceIndex == 0 &&
+                                    weightXIndex == 0 && weightYIndex == 0)
+                                    zrl_limit_index[limitZRLIndex++] = elementIndex;
+
+                                elementIndex++;
+                            }
+                        }
+
+                        /* add offet behind the last point of the last slice of each filter */
+                        if (sliceIndex == slice_count - 1)
+                        {
+                            vx_uint32 offsetValue;
+
+                            if (hasNNPerFilterPostMultiply && hasNNPerFilterPostShift)
+                            {
+                                if (weight_format == VX_TYPE_INT16 || weight_format == VX_TYPE_FLOAT16)
+                                {
+                                    vx_uint32 postMulSize = 16;
+                                    vx_uint32 postShiftSize = 16;
+                                    /*add post multiply to each filter*/
+                                    *kernelBufferInt16Ptr = (vx_uint16)postMul[filterIndex];
+                                    kernelBufferInt16Ptr++;
+                                    reoder_stream_count_per_core[coreIndex] += (postMulSize / weightBitSize);
+                                    /*add post multiply to each filter*/
+                                    *kernelBufferInt16Ptr = (vx_uint16)postShift[filterIndex];
+                                    kernelBufferInt16Ptr++;
+                                    reoder_stream_count_per_core[coreIndex] += (postShiftSize / weightBitSize);
+                                }
+                                else
+                                {
+                                    vx_uint32 postMulSize = 8;
+                                    vx_uint32 postShiftSize = 8;
+                                    /*add post multiply to each filter*/
+                                    *kernelBufferInt8Ptr = postMul[filterIndex];
+                                    kernelBufferInt8Ptr++;
+                                    reoder_stream_count_per_core[coreIndex] += (postMulSize / weightBitSize);
+                                    /*add post multiply to each filter*/
+                                    *kernelBufferInt8Ptr = postShift[filterIndex];
+                                    kernelBufferInt8Ptr++;
+                                    reoder_stream_count_per_core[coreIndex] += (postShiftSize / weightBitSize);
+                                }
+
+                                for (idx = 0; idx < 2; idx++)
+                                {
+                                    non_coef_index[nonCoefIndex++] = elementIndex++;
+                                }
+                            }
+
+                            if (z_offset > 0)
+                                offsetValue = (vx_uint32)z_offset * filterIndex;
+                            else if (output_size > 0)
+                                offsetValue = output_final_x * output_final_y * output_size * filterIndex;
+                            else
+                                offsetValue = output_final_x * output_final_y * weightSize * filterIndex;
+
+                            if (hasBiasAtEnd)
+                            {
+                                if (weight_format == VX_TYPE_INT16)
+                                {
+                                    vx_int64 bias64 = 0;
+                                    vx_int32 bias32;
+                                    vx_int16 bias16;
+
+                                    if ((vx_int32)biasData < 0)
+                                    {
+                                        bias64 = ~0;
+                                        bias64 = (bias64 >> 32) << 32;
+                                        bias64 = bias64 | (vx_int64)biasData;
+                                    }
+                                    else
+                                        bias64 = (vx_int64)biasData;
+
+                                    bias32 = (vx_int32)bias64;
+                                    *((vx_uint32 *)kernelBufferInt16Ptr) = bias32;
+                                    kernelBufferInt16Ptr += 2;
+                                    reoder_stream_count_per_core[coreIndex] += (32 / weightBitSize);
+                                    bias16 = (vx_int16)(bias64 >> 32);
+                                    *kernelBufferInt16Ptr = bias16;
+                                    kernelBufferInt16Ptr++;
+                                    reoder_stream_count_per_core[coreIndex] += (16 / weightBitSize);
+                                }
+                                else if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
+                                {
+                                    *((vx_uint32 *)kernelBufferInt8Ptr) = biasData;
+                                    kernelBufferInt8Ptr += 4;
+                                    reoder_stream_count_per_core[coreIndex] += (biasBitSize / weightBitSize);
+                                }
+                                else
+                                {
+                                    *((vx_uint32 *)kernelBufferInt16Ptr) = biasData;
+                                    kernelBufferInt16Ptr += 2;
+                                    reoder_stream_count_per_core[coreIndex] += (biasBitSize / weightBitSize);
+                                }
+
+                                for (idx = 0; idx < (biasBitSize / weightBitSize); idx++)
+                                {
+                                    non_coef_index[nonCoefIndex++] = elementIndex++;
+                                }
+                            }
+
+                            if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VIP_V7))
+                            {
+                                if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
+                                {
+                                    *((vx_uint32 *)kernelBufferInt8Ptr) = offsetValue;
+                                    kernelBufferInt8Ptr += 4;
+                                }
+                                else
+                                {
+                                    *((vx_uint32 *)kernelBufferInt16Ptr) = offsetValue;
+                                    kernelBufferInt16Ptr += 2;
+                                }
+                                reoder_stream_count_per_core[coreIndex] += (NN_Z_POSITION_OFFSET_BITS_VIP_V7 / weightBitSize);
+                                for (idx = 0; idx < (NN_Z_POSITION_OFFSET_BITS_VIP_V7 / weightBitSize); idx++)
+                                {
+                                    non_coef_index[nonCoefIndex++] = elementIndex++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (calc_perf)
+                nonZeroRatioPerCorePerVZG[nonZrlIdx] = (vx_float64)nonZeroCount / (vx_float64)blockCount;
+
+            usedKid += actualFilterCount;
+            if (filterGroup)
+            {
+                vxFree(filterGroup);
+                filterGroup = VX_NULL;
+            }
+        }
+    }
+
+    if (calc_perf)
+    {
+        for (groupIndex = 0; groupIndex < groupCount; groupIndex++)
+        {
+            for (coreIndex = 0; coreIndex < nnCoreCount; coreIndex++)
+            {
+                vx_uint32 nonZrlIdx = groupIndex + coreIndex * groupCount;
+                if (wb->max_per_core_per_vzgroup_nzr[groupIndex] < nonZeroRatioPerCorePerVZG[nonZrlIdx])
+                    wb->max_per_core_per_vzgroup_nzr[groupIndex] = nonZeroRatioPerCorePerVZG[nonZrlIdx];
+            }
+        }
+    }
+#if DEBUG_COMP_ENHANCE_ENC
+    {
+        unsigned char * pChar = (unsigned char*)reorder_stream;
+        unsigned char data;
+        vx_uint32 i;
+        vx_uint32 totalByteCount = weightCount * slice_count * z_count * weightSize + z_count * 4 + z_count * (biasBitSize / 8) + nnCoreCount * 2;
+        FILE * pfile1 = NULL;
+        pfile1 = fopen("reordered_kernel.txt", "wb");
+
+        if(pfile1 != NULL)
+        {
+            for(i=0; i!=totalByteCount; i++)
+            {
+                data = *pChar;
+                fprintf(pfile1, "coef: 0x%x\n", data);
+                pChar++;
+            }
+
+            fclose(pfile1);
+        }
+
+    }
+#endif
+
+exit:
+    if (weightsMinusZP)
+        vxFree(weightsMinusZP);
+    if (nonZeroRatioPerCorePerVZG)
+        vxFree(nonZeroRatioPerCorePerVZG);
+    if (nonZeroWeights)
+        vxFree(nonZeroWeights);
+#if PRINT_PER_CORE_SIZE
+    if(nonZeroCoefPerCore)
+        vxFree(nonZeroCoefPerCore);
+#endif
     return;
 }
 
@@ -14131,6 +8648,8 @@ void analysisKernelStreamForHuffman(
     vx_uint32 limitZRLCountIdx = 0;
     vx_bool isCoef;
     vx_bool isLimitZRL;
+    /*per PRD, V8 will disable pre & bias mode*/
+    vx_bool isV8 = (vx_bool)(context->nnConfig.derivedFeature.nnXYDPX == 0 || context->nnConfig.derivedFeature.nnXYDPY == 0);
 
     /* this variable indicate DataAccumCount when Start of core*/
     vx_int32 *accumCountEndOfCore = (vx_int32 *)vxAllocateAndZeroMemory(nnCoreCount * sizeof(vx_int32));
@@ -14211,7 +8730,7 @@ void analysisKernelStreamForHuffman(
         }
         histo[i>>(bit16Flag*8)]++;
         /*Get statistic of prediction from previous pixel*/
-        if(bit16Flag == 0)
+        if(bit16Flag == 0 && !isV8)
         {
             j = i;
             i = (i-prev)&0xff;
@@ -14302,8 +8821,9 @@ void analysisKernelStreamForHuffman(
 
     if (bit16Flag == 0)
     {
-        if (prevEntropy < entropy || 2*prevHisto[0] + prevHisto[255] + prevHisto[1] > 3*histo[bias] + histo[(bias+1)&0xff] + histo[(bias-1)&0xff])
+        if ((prevEntropy < entropy || 2*prevHisto[0] + prevHisto[255] + prevHisto[1] > 3*histo[bias] + histo[(bias+1)&0xff] + histo[(bias-1)&0xff]) && !isV8)
         {
+            /*per PRD, V8 will disable pre & bias mode*/
             entropy = prevEntropy;
             prevEncode = 1; /*Using prevEncode, prediction from previous pixel*/
             for (i = 0; i < 256; i++)
@@ -14315,6 +8835,10 @@ void analysisKernelStreamForHuffman(
         }
     }
     prevEntropy = entropy;
+
+
+    if (isV8)
+        bias = 0;
 
     if (bias != 0)
     {
@@ -14569,7 +9093,11 @@ void analysisKernelStreamForHuffman(
         }
     }
 
-
+    /*per PRD, V8 will disable pre & bias mode*/
+    if (isV8)
+    {
+        gcmASSERT(prevEncode == 0 && bias == 0);
+    }
     /* update compression header*/
     wb->huffmanConfig[index].preEncode = (vx_uint8)prevEncode;
     wb->huffmanConfig[index].bit16Flag  = bit16Flag;
@@ -14709,8 +9237,16 @@ vx_uint32 calcKernelStreamSizeHuffman(
         goto exit;
     }
 
-    reorderWeightBiasBufferForHuffman(context, wb, slice_count, z_count, filters_per_core, weight_format, bias_format, z_offset,
-        output_size, skip_value, output_final_x, output_final_y, reorderStream, weight_base_ptr, bias_base_ptr, VX_NULL, VX_NULL, reorderStreamPerCoreCount, nonCoefIndex, limitZRLIndex);
+    if (context->options.enableNonZeroBalance)
+    {
+        reorderKernelBufferV7HuffmanBalance(context, wb, slice_count, z_count, filters_per_core, weight_format, bias_format, z_offset,
+        output_size, skip_value, output_final_x, output_final_y, reorderStream, weight_base_ptr, bias_base_ptr, VX_NULL, VX_NULL, reorderStreamPerCoreCount, nonCoefIndex, limitZRLIndex, vx_false_e);
+    }
+    else
+    {
+        reorderWeightBiasBufferForHuffman(context, wb, slice_count, z_count, filters_per_core, weight_format, bias_format, z_offset,
+            output_size, skip_value, output_final_x, output_final_y, reorderStream, weight_base_ptr, bias_base_ptr, VX_NULL, VX_NULL, reorderStreamPerCoreCount, nonCoefIndex, limitZRLIndex, vx_false_e);
+    }
 
     analysisKernelStreamForHuffman(context, wb, 0, nnCoreCount, reorderStream, reorderStreamSize, reorderStreamPerCoreCount, invSizeOrder, nonCoefIndex, nonCoefCount, limitZRLIndex, limitZRLCount, index);
 
@@ -15125,7 +9661,7 @@ void fillinKernelBufferHuffman(
     reorderStreamAllCount = (filterTotalCount * (biasBitSize / weightBitSize))
         + (weightCount * slice_count * filterTotalCount)
         + (filterTotalCount * (NN_Z_POSITION_OFFSET_BITS_VIP_V7 / weightBitSize))
-        + (nnCoreCount * (16 / weightBitSize));/*filterPerCore need 16 bit * nnCoreCount */
+        + (usedCoreCount * (16 / weightBitSize));/*filterPerCore need 16 bit * usedCoreCount */
 
     reorderStreamSize = reorderStreamAllCount * weightSize;
 
@@ -15161,8 +9697,16 @@ void fillinKernelBufferHuffman(
         goto exit;
     }
 
-    reorderWeightBiasBufferForHuffman(context, wb, slice_count, z_count, filters_per_core, weight_format, bias_format, z_offset,
-        output_size, skip_value, output_final_x, output_final_y, reorderStream, weight_base_ptr, bias_base_ptr, VX_NULL, VX_NULL, reorderStreamPerCoreCount, nonCoefIndex, limitZRLIndex);
+    if (context->options.enableNonZeroBalance)
+    {
+        reorderKernelBufferV7HuffmanBalance(context, wb, slice_count, z_count, filters_per_core, weight_format, bias_format, z_offset,
+            output_size, skip_value, output_final_x, output_final_y, reorderStream, weight_base_ptr, bias_base_ptr, VX_NULL, VX_NULL, reorderStreamPerCoreCount, nonCoefIndex, limitZRLIndex, vx_false_e);
+    }
+    else
+    {
+        reorderWeightBiasBufferForHuffman(context, wb, slice_count, z_count, filters_per_core, weight_format, bias_format, z_offset,
+            output_size, skip_value, output_final_x, output_final_y, reorderStream, weight_base_ptr, bias_base_ptr, VX_NULL, VX_NULL, reorderStreamPerCoreCount, nonCoefIndex, limitZRLIndex, vx_false_e);
+    }
 
     analysisKernelStreamForHuffman(context, wb, 0, nnCoreCount, reorderStream, reorderStreamSize, reorderStreamPerCoreCount, invSizeOrder, nonCoefIndex, nonCoefCount, limitZRLIndex, limitZRLCount, index);
 
@@ -15193,7 +9737,7 @@ void fillinKernelBufferHuffman(
     }
     /*align to 64 byte*/
     packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
-    wb->slice_array[index].kernel_align_stream_size += (vx_size)((vx_uint8 *)kernelBufferPtr - wb_base_ptr);
+    wb->slice_array[index].kernel_stream_full_cache_size = 0;
 
     for (i = 0; i < THROUGHPUT * 3; i++)
     {
@@ -15627,6 +10171,9 @@ void fillinKernelBufferHuffman(
         packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
         kernelStreamSize = (vx_uint32)((vx_uint8 *)kernelBufferPtr - kernelStreamBasePtr);
 
+        /*With RTL bug fix, full cache mode size needn't using maxSize * coreCount*/
+        wb->slice_array[index].kernel_stream_full_cache_size += kernelStreamSize;
+
         compressionRatio = (vx_float64)kernelStreamSize / (vx_float64)(dataSizeOfCore * weightSize);
         if (wb->max_per_core_compression_ratio < compressionRatio)
             wb->max_per_core_compression_ratio = compressionRatio;
@@ -15637,7 +10184,7 @@ void fillinKernelBufferHuffman(
         prev = 0;
     }
     vxmASSERT(reorderStreamAllCount == reorderStreamCheckCount); /*Check if the data count is the same*/
-    wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * nnCoreCount);
+    wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount);
 exit:
     if (reorderStream)
         vxFree(reorderStream);
@@ -15780,6 +10327,7 @@ void reorderDepthWiseKernelBufferV8Huffman(
     vx_uint32 slice_count,
     vx_uint32 z_count,
     vx_uint32 filters_per_core,
+    vx_uint32 skip_value,
     vx_enum  weight_format,
     vx_uint8_ptr reorder_stream,
     vx_uint8_ptr weight_base_ptr,
@@ -15859,39 +10407,44 @@ void reorderDepthWiseKernelBufferV8Huffman(
             if (coreIndex == 0)
                 core0FilterCount = actualFilterCount;
 
-            for (k = 0; k < weightCount * slice_count; k += linesInImageBuffer)
+            for (kid = 0; kid < actualFilterCount; kid++)
             {
-                kSize = gcmMIN((weightCount * slice_count - k), linesInImageBuffer);
+                if (groupIndex == groupCount - 1 &&
+                    kid == core0FilterCount - 1)
+                    filterIndex = adjFilterStart + kid * nnCoreCount - unusedCoreCount;
+                else
+                    filterIndex = adjFilterStart + kid * nnCoreCount;
 
-                for (kid = 0; kid < actualFilterCount; kid++)
+                for (k = 0; k < weightCount * slice_count; k += linesInImageBuffer)
                 {
-                    if (groupIndex == groupCount - 1 &&
-                        kid == core0FilterCount - 1 &&
-                        kid != 0)
-                        filterIndex = adjFilterStart + kid * nnCoreCount - unusedCoreCount;
-                    else
-                        filterIndex = adjFilterStart + kid * nnCoreCount;
-                    for (sk = 0; sk < kSize; sk++)
+                    kSize = gcmMIN((weightCount * slice_count - k), linesInImageBuffer);
+
+                    for (sk = 0; sk < linesInImageBuffer; sk++)
                     {
                         weightZIndex = (k + sk) / weightCount;
                         weightYIndex = (k + sk) % weightCount;
                         weightYIndex /= wb->weights_sizes[0];
                         weightXIndex = (k + sk) % wb->weights_sizes[0];
-
-                        realKernelDataPtr = weight_base_ptr + filterIndex * filterSize +
-                            filterSliceSize * weightZIndex +
-                            (weightYIndex * wb->weights_sizes[0] + weightXIndex) * weightSize;
-
-                        if (weight_format == VX_TYPE_INT8)
-                            coef = *((vx_int8 *)realKernelDataPtr);
-                        else if (weight_format == VX_TYPE_UINT8)
-                            coef = *((vx_uint8 *)realKernelDataPtr);
+                        /*Packl 0 in the last dp group*/
+                        if (sk >= kSize)
+                            coef = skip_value;
                         else
-                            coef = *((vx_uint16 *)realKernelDataPtr);
+                        {
+                            realKernelDataPtr = weight_base_ptr + filterIndex * filterSize +
+                                filterSliceSize * weightZIndex +
+                                (weightYIndex * wb->weights_sizes[0] + weightXIndex) * weightSize;
 
+                            if (weight_format == VX_TYPE_INT8)
+                                coef = *((vx_int8 *)realKernelDataPtr);
+                            else if (weight_format == VX_TYPE_UINT8)
+                                coef = *((vx_uint8 *)realKernelDataPtr);
+                            else
+                                coef = *((vx_uint16 *)realKernelDataPtr);
+                        }
                         if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
                         {
-                            *kernelBufferInt8Ptr = (vx_uint8)coef;
+                            vx_int8 newCoef = ((vx_int32)coef - (vx_int32)skip_value) & 0xFF;
+                            *kernelBufferInt8Ptr = (vx_uint8)newCoef;
                             kernelBufferInt8Ptr++;
                         }
                         else
@@ -15917,12 +10470,14 @@ void reorderKernelBufferV8Huffman(
     vx_uint32 slice_count,
     vx_uint32 z_count,
     vx_uint32 filters_per_core,
+    vx_uint32 skip_value,
     vx_enum  weight_format,
     vx_uint8_ptr reorder_stream,
     vx_uint8_ptr weight_base_ptr,
     vx_uint32 nn_core_count,
     vx_uint32* reoder_stream_count_per_core,
-    vx_uint32* non_coef_index
+    vx_uint32* non_coef_index,
+    vx_uint32* last_vz_group_index
     )
 {
     vx_uint32 nnCoreCount = nn_core_count;
@@ -16002,33 +10557,45 @@ void reorderKernelBufferV8Huffman(
             }
             filterEnd = filterStart + actualFilterCount - 1;
 
+            if (actualFilterCount > 0)
+            {
+                if (groupIndex == groupCount - 1)
+                    last_vz_group_index[coreIndex] = elementIndex;
+            }
+
             for (k = 0; k < weightCount * slice_count; k += linesInImageBuffer)
             {
                 kSize = gcmMIN((weightCount * slice_count - k), linesInImageBuffer);
 
                 for (filterIndex = filterStart; filterIndex <= filterEnd; filterIndex++)
                 {
-                    for (sk = 0; sk < kSize; sk++)
+                    for (sk = 0; sk < linesInImageBuffer; sk++)
                     {
                         weightZIndex = (k + sk) / weightCount;
                         weightYIndex = (k + sk) % weightCount;
                         weightYIndex /= wb->weights_sizes[0];
                         weightXIndex = (k + sk) % wb->weights_sizes[0];
-
-                        realKernelDataPtr = weight_base_ptr + filterIndex * filterSize +
-                            filterSliceSize * weightZIndex +
-                            (weightYIndex * wb->weights_sizes[0] + weightXIndex) * weightSize;
-
-                        if (weight_format == VX_TYPE_INT8)
-                            coef = *((vx_int8 *)realKernelDataPtr);
-                        else if (weight_format == VX_TYPE_UINT8)
-                            coef = *((vx_uint8 *)realKernelDataPtr);
+                        /*Packl 0 in the last dp group*/
+                        if (sk >= kSize)
+                            coef = skip_value;
                         else
-                            coef = *((vx_uint16 *)realKernelDataPtr);
+                        {
+                            realKernelDataPtr = weight_base_ptr + filterIndex * filterSize +
+                                filterSliceSize * weightZIndex +
+                                (weightYIndex * wb->weights_sizes[0] + weightXIndex) * weightSize;
+
+                            if (weight_format == VX_TYPE_INT8)
+                                coef = *((vx_int8 *)realKernelDataPtr);
+                            else if (weight_format == VX_TYPE_UINT8)
+                                coef = *((vx_uint8 *)realKernelDataPtr);
+                            else
+                                coef = *((vx_uint16 *)realKernelDataPtr);
+                        }
 
                         if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
                         {
-                            *kernelBufferInt8Ptr = (vx_uint8)coef;
+                            vx_int8 newCoef = ((vx_int32)coef - (vx_int32)skip_value) & 0xFF;
+                            *kernelBufferInt8Ptr = (vx_uint8)newCoef;
                             kernelBufferInt8Ptr++;
                         }
                         else
@@ -16046,6 +10613,359 @@ void reorderKernelBufferV8Huffman(
             }
         }
     }
+}
+
+void reorderKernelBufferV8HuffmanBalance(
+    vx_context context,
+    vx_weights_biases_parameter wb,
+    vx_uint32 slice_count,
+    vx_uint32 z_count,
+    vx_uint32 filters_per_core,
+    vx_uint32 skip_value,
+    vx_enum  weight_format,
+    vx_uint8_ptr reorder_stream,
+    vx_uint8_ptr weight_base_ptr,
+    vx_uint32 nn_core_count,
+    vx_uint32* reoder_stream_count_per_core,
+    vx_uint32* non_coef_index,
+    vx_uint32* real_vz_index,
+    vx_uint32* last_vz_group_index
+    )
+{
+    vx_uint32 nnCoreCount = nn_core_count;
+    vx_uint32 filterTotalCount   = z_count;
+    vx_uint32 sliceCount         = slice_count;
+    vx_uint32 totalFilterPerCore = filterTotalCount / nnCoreCount;
+    vx_uint32 oddFilterPerCore   = filterTotalCount % nnCoreCount;
+    vx_uint32 filterCount        = filters_per_core; /* filter count every group */
+    vx_uint32 batchSize          = nnCoreCount * filterCount;
+    vx_uint32 groupCount         = (filterTotalCount + batchSize - 1) / batchSize;
+
+    vx_uint32 weightCount        = wb->weights_sizes[0] * wb->weights_sizes[1];
+    vx_uint32 weightSize         = (vx_uint32)vxDataType_GetSize((vx_type_e)weight_format);
+    vx_uint32 weightBitSize      = weightSize * 8;
+
+    vx_uint32 filterSliceSize    = weightCount * weightSize;
+    vx_uint32 filterSize         = weightCount * weightSize * slice_count;
+    vx_uint8* kernelBufferInt8Ptr    = reorder_stream;
+    vx_uint16* kernelBufferInt16Ptr    = (vx_uint16*)reorder_stream;
+
+    vx_uint32 coreIndex;
+    vx_uint32 filterIndex;
+    vx_uint32 sliceIndex;
+    vx_uint32 k, sk;
+    vx_uint32 kSize;
+    vx_uint32 weightXIndex, weightYIndex, weightZIndex;
+
+    vx_bool hasZDP3 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3);
+    vx_uint32 dpAmount = hasZDP3 ? 3 : 1;
+    vx_uint32 zDPLoopCount = 3;
+    vx_uint32 linesInImageBuffer = dpAmount * zDPLoopCount;
+
+    vx_uint32 nonCoefIndex = 0, idx = 0, elementIndex = 0;
+    vx_uint8* kernelDataPtr      = VX_NULL;
+
+    vx_uint32 totalNonZeroCount = 0;
+    vx_float32 averageNZCPerFilter = 0;
+    vx_float32 varianceFL32 = 0;
+    vx_uint32 variance = 0;
+    vx_bool reorder = vx_false_e;
+
+    typedef struct _gcVXNonZeroWeights
+    {
+        vx_uint32 nonZeroCount;
+        vx_uint32 filterIdx;
+    }gcVXNonZeroWeights;
+
+#if PRINT_PER_CORE_SIZE
+    vx_uint32* nonZeroCoefPerCore = VX_NULL;
+#endif
+
+    gcVXNonZeroWeights *nonZeroWeights = VX_NULL;
+    vx_int32 i = 0;
+    vx_uint32 core0FilterCount = 0;
+    gcVXNonZeroWeights tmp;
+
+    nonZeroWeights = (gcVXNonZeroWeights*)vxAllocateAndZeroMemory(filterTotalCount * sizeof(gcVXNonZeroWeights));
+    if (nonZeroWeights == VX_NULL)
+    {
+        vxError("fillinKernelBuffer: OUT OF MEMORY");
+        goto exit;
+    }
+#if PRINT_PER_CORE_SIZE
+    nonZeroCoefPerCore = (vx_uint32*)vxAllocateAndZeroMemory(nnCoreCount * sizeof(vx_uint32));
+    if (nonZeroCoefPerCore == VX_NULL)
+    {
+        vxError("fillinKernelBuffer: OUT OF MEMORY");
+        goto exit;
+    }
+#endif
+
+    /* calc each filter non-zero weights num*/
+    for (filterIndex = 0; filterIndex < filterTotalCount; filterIndex++)
+    {
+        nonZeroWeights[filterIndex].filterIdx = filterIndex;
+        for (sliceIndex = 0; sliceIndex < sliceCount; sliceIndex++)
+        {
+            /* add one slice data every filter */
+            kernelDataPtr = weight_base_ptr + filterIndex * filterSize + filterSliceSize * sliceIndex;
+
+            for (weightYIndex = 0; weightYIndex < wb->weights_sizes[1]; weightYIndex++)
+            {
+                for (weightXIndex = 0; weightXIndex < wb->weights_sizes[0]; weightXIndex++)
+                {
+                    vx_uint32 weight = 0;
+
+                    if (weight_format == VX_TYPE_INT8)
+                        weight = *((vx_int8 *)kernelDataPtr);
+                    else if (weight_format == VX_TYPE_UINT8)
+                        weight = *((vx_uint8 *)kernelDataPtr);
+                    else
+                        weight = *((vx_uint16 *)kernelDataPtr);
+                    kernelDataPtr = kernelDataPtr + weightSize;
+
+                    if (weight != skip_value)
+                        nonZeroWeights[filterIndex].nonZeroCount++;
+
+                }
+            }
+        }
+        totalNonZeroCount += nonZeroWeights[filterIndex].nonZeroCount;
+    }
+
+    /*Sort*/
+    averageNZCPerFilter = (vx_float32)totalNonZeroCount / filterTotalCount;
+    for (filterIndex = 0; filterIndex < filterTotalCount; filterIndex++)
+    {
+        varianceFL32 += gcoMATH_Power((nonZeroWeights[filterIndex].nonZeroCount - averageNZCPerFilter), 2);
+    }
+    variance = (vx_uint32)(varianceFL32 / filterTotalCount + 0.5f);
+
+    reorder = vx_true_e;
+
+    if (reorder)
+    {
+        /*Sort*/
+        for (filterIndex = 0; filterIndex < filterTotalCount; filterIndex++)
+        {
+            tmp.nonZeroCount = nonZeroWeights[filterIndex].nonZeroCount;
+            tmp.filterIdx = filterIndex;
+
+            for (i = filterIndex - 1; i >= 0 && nonZeroWeights[i].nonZeroCount > tmp.nonZeroCount; i--)
+            {
+                nonZeroWeights[i+1].nonZeroCount = nonZeroWeights[i].nonZeroCount;
+                nonZeroWeights[i+1].filterIdx = nonZeroWeights[i].filterIdx;
+            }
+            nonZeroWeights[i+1].nonZeroCount = tmp.nonZeroCount;
+            nonZeroWeights[i+1].filterIdx = tmp.filterIdx;
+        }
+    }
+
+    for (coreIndex = 0; coreIndex < nnCoreCount; coreIndex++)
+    {
+        vx_uint32 coreFilterCount = (coreIndex < oddFilterPerCore) ? totalFilterPerCore + 1 : totalFilterPerCore;
+        vx_uint32 groupIndex;
+        vx_uint32 coef = 0;
+        vx_uint32 usedKid = 0;
+        vx_uint32* filterGroup = VX_NULL;
+        vx_uint8_ptr realKernelDataPtr = VX_NULL;
+        reoder_stream_count_per_core[coreIndex] = 0;
+
+        if (coreFilterCount > 0)
+        {
+            /* Save kernels per core*/
+            if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
+            {
+                *((vx_uint16 *)kernelBufferInt8Ptr) = (vx_uint16)coreFilterCount;
+                kernelBufferInt8Ptr += 2;
+            }
+            else
+            {
+                *kernelBufferInt16Ptr = (vx_uint16)coreFilterCount;
+                kernelBufferInt16Ptr ++;
+            }
+            reoder_stream_count_per_core[coreIndex] += (16 / weightBitSize);
+
+            for (idx = 0; idx < (16 / weightBitSize); idx++)
+            {
+                non_coef_index[nonCoefIndex++] = elementIndex++;
+            }
+        }
+
+        for (groupIndex = 0; groupIndex < groupCount; groupIndex++)
+        {
+            vx_uint32 actualFilterCount = (groupIndex == groupCount - 1) ? (coreFilterCount - groupIndex * filterCount) : filterCount;
+            vx_uint32 groupFilterStart = groupIndex * nnCoreCount * filterCount;
+            vx_uint32 kid = 0;
+            vx_uint32 unusedCoreCount = (filterTotalCount % nnCoreCount == 0) ? 0 : nnCoreCount - (filterTotalCount % nnCoreCount);
+            vx_uint32 sortedIndex = 0;
+            vx_uint32 filterStart, filterEnd;
+
+            if ((groupIndex == groupCount - 1)
+                && (coreIndex >= (filterTotalCount % nnCoreCount)))
+            {
+                filterStart = groupIndex * nnCoreCount * filterCount
+                            + (filterTotalCount % nnCoreCount) * (actualFilterCount + 1)
+                            + (coreIndex - (filterTotalCount % nnCoreCount)) * actualFilterCount;
+            }
+            else
+            {
+                filterStart = groupIndex * nnCoreCount *filterCount + coreIndex * actualFilterCount;
+            }
+            filterEnd = filterStart + actualFilterCount - 1;
+
+            if (coreIndex == 0)
+                core0FilterCount = actualFilterCount;
+
+            if (actualFilterCount)
+            {
+                filterGroup = (vx_uint32*)vxAllocateAndZeroMemory(actualFilterCount * sizeof(vx_uint32));
+                if (filterGroup == VX_NULL)
+                {
+                    vxError("fillinKernelBufferBalance: OUT OF MEMORY");
+                    goto exit;
+                }
+                if (groupIndex == groupCount - 1)
+                    last_vz_group_index[coreIndex] = elementIndex;
+            }
+
+            if (reorder)
+            {
+                /*Dispatch filter to each vzGroup*/
+                for (kid = 0; kid < actualFilterCount; kid++)
+                {
+                    if (groupIndex == groupCount - 1 &&
+                        kid == core0FilterCount - 1)
+                    {
+                        if ((kid + usedKid) % 2 == 0)
+                            sortedIndex = groupFilterStart + kid * nnCoreCount + coreIndex;
+                        else
+                            sortedIndex = groupFilterStart + (kid + 1) * nnCoreCount - coreIndex - 1 - unusedCoreCount;
+                    }
+                    else
+                    {
+                        if ((kid + usedKid) % 2 == 0)
+                            sortedIndex = groupFilterStart + kid * nnCoreCount + coreIndex;
+                        else
+                            sortedIndex = groupFilterStart + (kid + 1) * nnCoreCount - coreIndex - 1;
+                    }
+
+                    filterGroup[kid] = nonZeroWeights[sortedIndex].filterIdx;
+#if PRINT_PER_CORE_SIZE
+                    nonZeroCoefPerCore[coreIndex] += nonZeroWeights[sortedIndex].nonZeroCount;
+#endif
+                }
+
+                /*sort the vz group real filter to avoid write output cross*/
+                for (kid = 0; kid < actualFilterCount; kid++)
+                {
+                    vx_uint32 tmp = filterGroup[kid];
+
+                    for (i = kid - 1; i >= 0 && filterGroup[i] > tmp; i--)
+                    {
+                        filterGroup[i+1] = filterGroup[i];
+                    }
+                    filterGroup[i+1] = tmp;
+                }
+            }
+            else
+            {
+                /*if variance is small, don't reorder the filters*/
+                if ((groupIndex == groupCount - 1)
+                && (coreIndex >= (filterTotalCount % nnCoreCount)))
+                {
+                    filterStart = groupIndex * nnCoreCount * filterCount
+                                + (filterTotalCount % nnCoreCount) * (actualFilterCount + 1)
+                                + (coreIndex - (filterTotalCount % nnCoreCount)) * actualFilterCount;
+                }
+                else
+                {
+                    filterStart = groupIndex * nnCoreCount *filterCount + coreIndex * actualFilterCount;
+                }
+
+                for (kid = 0; kid < actualFilterCount; kid++)
+                {
+                    filterGroup[kid] = filterStart + kid;
+                }
+            }
+
+            if (real_vz_index)
+            {
+                vx_uint32 id = 0;
+                for (filterIndex = filterStart; filterIndex <= filterEnd; filterIndex++)
+                {
+                    /*Save real filter index*/
+                    real_vz_index[filterIndex] = filterGroup[id++];
+                }
+            }
+
+            for (k = 0; k < weightCount * slice_count; k += linesInImageBuffer)
+            {
+                kSize = gcmMIN((weightCount * slice_count - k), linesInImageBuffer);
+
+                for (kid = 0; kid < actualFilterCount; kid++)
+                {
+                    filterIndex = filterGroup[kid];
+
+                    for (sk = 0; sk < linesInImageBuffer; sk++)
+                    {
+                        weightZIndex = (k + sk) / weightCount;
+                        weightYIndex = (k + sk) % weightCount;
+                        weightYIndex /= wb->weights_sizes[0];
+                        weightXIndex = (k + sk) % wb->weights_sizes[0];
+                        /*Packl 0 in the last dp group*/
+                        if (sk >= kSize)
+                            coef = skip_value;
+                        else
+                        {
+                            realKernelDataPtr = weight_base_ptr + filterIndex * filterSize +
+                                filterSliceSize * weightZIndex +
+                                (weightYIndex * wb->weights_sizes[0] + weightXIndex) * weightSize;
+
+                            if (weight_format == VX_TYPE_INT8)
+                                coef = *((vx_int8 *)realKernelDataPtr);
+                            else if (weight_format == VX_TYPE_UINT8)
+                                coef = *((vx_uint8 *)realKernelDataPtr);
+                            else
+                                coef = *((vx_uint16 *)realKernelDataPtr);
+                        }
+
+                        if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
+                        {
+                            vx_int8 newCoef = ((vx_int32)coef - (vx_int32)skip_value) & 0xFF;
+                            *kernelBufferInt8Ptr = (vx_uint8)newCoef;
+                            kernelBufferInt8Ptr++;
+                        }
+                        else
+                        {
+                            if (weight_format == VX_TYPE_FLOAT16)
+                                coef = (coef & 0x7fff) * 2 + coef/(1<<15);
+
+                            *kernelBufferInt16Ptr = (vx_uint16)coef;
+                            kernelBufferInt16Ptr++;
+                        }
+                        reoder_stream_count_per_core[coreIndex]++;
+                        elementIndex++;
+                    }
+                }
+            }
+            usedKid += actualFilterCount;
+            if (filterGroup)
+            {
+                vxFree(filterGroup);
+                filterGroup = VX_NULL;
+            }
+        }
+    }
+exit:
+
+    if (nonZeroWeights)
+        vxFree(nonZeroWeights);
+#if PRINT_PER_CORE_SIZE
+    if(nonZeroCoefPerCore)
+        vxFree(nonZeroCoefPerCore);
+#endif
+    return;
 }
 
 vx_uint32 calcKernelSizeV8Huffman(
@@ -16102,17 +11022,24 @@ vx_uint32 calcKernelSizeV8Huffman(
     CodeSymbol codeSymbol[THROUGHPUT * 3];
 
     vx_bool hasNoBias = vx_false_e;
-    vx_bool hasNoZOffset = vx_false_e;
-    vx_bool hasNNPerFilterPostMultiply = vx_false_e;
-    vx_bool hasNNPreLU = vx_false_e;
+    vx_bool hasNoZOffset = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_NO_Z_LOCATION_OFFSET);
+    vx_bool hasNNPerFilterPostMultiply = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_POST_MULTIPLY);
+    vx_bool hasNNPreLU = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU);
+    vx_bool hasZDP3 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3);
+    vx_uint32 dpAmount = hasZDP3 ? 3 : 1;
+    vx_uint32 zDPLoopCount = 3;
+    vx_uint32 linesInImageBuffer = dpAmount * zDPLoopCount;
+    vx_uint32 numOfInImageBuffer = (vx_uint32)gcoMATH_Ceiling((vx_float32)(weightCount * slice_count) / (vx_float32)linesInImageBuffer);
 
     vx_uint32 nonCoefCount = 0;
     vx_uint32* nonCoefIndex = VX_NULL;
+    vx_uint32* lastVzGroupIndex = VX_NULL;
     vx_uint32 totalCountIdx = 0;
     vx_uint32 nonCoefCountIdx = 0;
     vx_uint32 kernelStreamSizePerCore = 0;
+    vx_uint32 limitZRLCountIdx = 0;
 
-    reorderStreamAllCount = (weightCount * slice_count * filterTotalCount)
+    reorderStreamAllCount = (numOfInImageBuffer * linesInImageBuffer * filterTotalCount)
         + (usedCoreCount * (16 / weightBitSize));/*filterPerCore need 16 bit * nnCoreCount */
 
     reorderStreamSize = reorderStreamAllCount * weightSize;
@@ -16145,12 +11072,21 @@ vx_uint32 calcKernelSizeV8Huffman(
         goto exit;
     }
 
-    if (wb->wb_base->hw_depth_wise)
-        reorderDepthWiseKernelBufferV8Huffman(context, wb, slice_count, z_count, filters_per_core, weight_format, reorderStream, weight_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex);
-    else
-        reorderKernelBufferV8Huffman(context, wb, slice_count, z_count, filters_per_core, weight_format, reorderStream, weight_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex);
+    lastVzGroupIndex = (vx_uint32 *)vxAllocateAndZeroMemory(usedCoreCount * sizeof(vx_uint32));
+    if (!lastVzGroupIndex)
+    {
+        vxError("fillinKernelBufferHuffman: OUT OF MEMORY");
+        goto exit;
+    }
 
-    analysisKernelStreamForHuffman(context, wb, 0, nnCoreCount, reorderStream, reorderStreamSize, reorderStreamPerCoreCount, invSizeOrder, nonCoefIndex, nonCoefCount, VX_NULL, 0, index);
+    if (wb->wb_base->hw_depth_wise)
+        reorderDepthWiseKernelBufferV8Huffman(context, wb, slice_count, z_count, filters_per_core, skip_value, weight_format, reorderStream, weight_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex);
+    else if (context->options.enableNonZeroBalance && !hasNoZOffset) /*Only those chip has z_offset support zero balance*/
+        reorderKernelBufferV8HuffmanBalance(context, wb, slice_count, z_count, filters_per_core, skip_value, weight_format, reorderStream, weight_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex, VX_NULL, lastVzGroupIndex);
+    else
+        reorderKernelBufferV8Huffman(context, wb, slice_count, z_count, filters_per_core, skip_value, weight_format, reorderStream, weight_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex, lastVzGroupIndex);
+
+    analysisKernelStreamForHuffman(context, wb, 0, nnCoreCount, reorderStream, reorderStreamSize, reorderStreamPerCoreCount, invSizeOrder, nonCoefIndex, nonCoefCount, lastVzGroupIndex, usedCoreCount, index);
 
     kernelBitSize += 16;
     kernelBitSize += 8 * MAX_RUNLEN_SIZE;
@@ -16185,6 +11121,7 @@ vx_uint32 calcKernelSizeV8Huffman(
         vx_int32 coef16 = 0;
         vx_int32 k = 0, j = 0, m = 0;
         vx_bool isCoef;
+        vx_bool isLimitZRL;
         /* update position of each core's beginning of compressed kernel*/
         reorderStreamCheckCount += reorderStreamPerCoreCount[coreIndex];
 
@@ -16214,6 +11151,16 @@ vx_uint32 calcKernelSizeV8Huffman(
             }
             else
                 isCoef = vx_true_e;
+
+            if (lastVzGroupIndex != VX_NULL &&
+                totalCountIdx == lastVzGroupIndex[limitZRLCountIdx] &&
+                limitZRLCountIdx < usedCoreCount)
+            {
+                isLimitZRL = vx_true_e;
+                limitZRLCountIdx++;
+            }
+            else
+                isLimitZRL = vx_false_e;
 
             totalCountIdx++;
 
@@ -16279,7 +11226,7 @@ vx_uint32 calcKernelSizeV8Huffman(
             }
             else /* RZL enable*/
             {
-                if (coef == 0 && isCoef)
+                if (coef == 0 && isCoef && !isLimitZRL)
                 {
                     run++;
                     if (dataRemainingOfCore != 0)
@@ -16287,7 +11234,7 @@ vx_uint32 calcKernelSizeV8Huffman(
                         continue;
                     }
                 }
-                if (coef || (dataRemainingOfCore == 0) || !isCoef) /* if last pixel, force process run zeros*/
+                if (coef || (dataRemainingOfCore == 0) || !isCoef || isLimitZRL) /* if last pixel, force process run zeros*/
                 {
                     /* process run zeros*/
                     while(run)
@@ -16394,7 +11341,7 @@ vx_uint32 calcKernelSizeV8Huffman(
                             kernelBitSize += 8;
                         }
                     }
-                    else
+                    else if (!isCoef || (dataRemainingOfCore != 0x0) || isLimitZRL)
                     {
                         /*those non-coef count like bias, num_of_vz & z_offset couldn't skip by zero-run as HW requres,
                         need also encode those 0 to huffman code,
@@ -16458,27 +11405,31 @@ vx_uint32 calcKernelSizeV8Huffman(
     }
 
     /*Add non compressed biases & Z_OFFSET & perFilterPostMul & perFilterPostShift after huffman bit stream*/
+    kernelStreamSizePerCore = 0;
     for (filterIndex = 0; filterIndex < filterTotalCount; filterIndex++)
     {
         if (!hasNoBias)
         {
-            kernelSize += biasSize;
+            kernelStreamSizePerCore += biasSize;
         }
 
         if (hasNNPerFilterPostMultiply)
         {
-            kernelSize += 4;
+            kernelStreamSizePerCore += 4;
         }
 
         if (!hasNoZOffset)
         {
-            kernelSize += NN_Z_POSITION_OFFSET_BITS_VIP_V7 / 8;
+            kernelStreamSizePerCore += NN_Z_POSITION_OFFSET_BITS_VIP_V7 / 8;
         }
         else if (hasNNPreLU)
         {
-            kernelSize += 4;
+            kernelStreamSizePerCore += 4;
         }
     }
+    /*align to 64 byte*/
+    kernelStreamSizePerCore = (kernelStreamSizePerCore + 63) & 0xFFFFFFC0;
+    kernelSize += kernelStreamSizePerCore;
 
 exit:
     if (reorderStream)
@@ -16487,6 +11438,8 @@ exit:
         vxFree(reorderStreamPerCoreCount);
     if (nonCoefIndex)
         vxFree(nonCoefIndex);
+    if (lastVzGroupIndex)
+        vxFree(lastVzGroupIndex);
 
     return kernelSize;
 }
@@ -16513,8 +11466,7 @@ void fillinKernelBufferV8Huffman(
     vx_uint32* bias_base_ptr,
     vx_uint32* post_mul,
     vx_uint32* post_shift,
-    vx_uint32* neg_post_mul,
-    vx_uint32* neg_post_shift,
+    vx_tensor alpha,
     vx_uint32 index
     )
 {
@@ -16561,9 +11513,14 @@ void fillinKernelBufferV8Huffman(
     CodeSymbol codeSymbol[THROUGHPUT * 3];
 
     vx_bool hasNoBias = vx_false_e;
-    vx_bool hasNoZOffset = vx_false_e;
-    vx_bool hasNNPerFilterPostMultiply = vx_false_e;
-    vx_bool hasNNPreLU = vx_false_e;
+    vx_bool hasNoZOffset = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_NO_Z_LOCATION_OFFSET);
+    vx_bool hasNNPerFilterPostMultiply = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_POST_MULTIPLY);
+    vx_bool hasNNPreLU = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU);
+    vx_bool hasZDP3 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3);
+    vx_uint32 dpAmount = hasZDP3 ? 3 : 1;
+    vx_uint32 zDPLoopCount = 3;
+    vx_uint32 linesInImageBuffer = dpAmount * zDPLoopCount;
+    vx_uint32 numOfInImageBuffer = (vx_uint32)gcoMATH_Ceiling((vx_float32)(weightCount * slice_count) / (vx_float32)linesInImageBuffer);
 
     vx_uint32 dummyStage[3] = {0};
     vx_uint32 dummyBitLength[3] = {0};
@@ -16575,6 +11532,16 @@ void fillinKernelBufferV8Huffman(
     vx_uint32* nonCoefIndex = VX_NULL;
 
     vx_int32* coefSum = VX_NULL;
+    vx_uint32* realVzIndex = VX_NULL;
+    vx_uint32* lastVzGroupIndex = VX_NULL;
+    vx_uint32 limitZRLCountIdx = 0;
+    /*prelu parameter alpha*/
+    gctPOINTER alphaBase = VX_NULL;
+    vx_int32    alphaZP  = 0;
+    vx_int8     alphaFP  = 0;
+    vx_float32  alphaScale = 0;
+    vx_type_e   alphaFormat = 0;
+    vx_enum     alphaQuantFormat = 0;
 
     typedef struct _gcVXWeightsMinusZP
     {
@@ -16582,6 +11549,16 @@ void fillinKernelBufferV8Huffman(
         vx_uint32 filterIdx;
     }gcVXWeightsMinusZP;
     gcVXWeightsMinusZP *weightsMinusZP = VX_NULL;
+
+    if (alpha != VX_NULL)
+    {
+        vxoTensor_GetTensorViewMemory(alpha, &alphaBase, VX_NULL);
+        alphaZP = alpha->zeroPoint;
+        alphaScale = alpha->scale;
+        alphaFP = alpha->fixedPointPos;
+        alphaFormat = (vx_type_e)alpha->tensorBuffer->dataFormat;
+        alphaQuantFormat = alpha->quantFormat;
+    }
 
     if (weight_format == VX_TYPE_INT16 || weight_format == VX_TYPE_UINT8)
     {
@@ -16650,7 +11627,7 @@ void fillinKernelBufferV8Huffman(
         }
     }
 
-    reorderStreamAllCount = (weightCount * slice_count * filterTotalCount)
+    reorderStreamAllCount = (numOfInImageBuffer * linesInImageBuffer * filterTotalCount)
         + (usedCoreCount * (16 / weightBitSize));/*filterPerCore need 16 bit * nnCoreCount */
 
     reorderStreamSize = reorderStreamAllCount * weightSize;
@@ -16662,14 +11639,14 @@ void fillinKernelBufferV8Huffman(
 
     if (!reorderStream)
     {
-        vxError("fillinKernelBufferHuffman: OUT OF MEMORY");
+        vxError("fillinKernelBufferV8Huffman: OUT OF MEMORY");
         goto exit;
     }
 
     reorderStreamPerCoreCount = (vx_uint32 *)vxAllocateAndZeroMemory(nnCoreCount * sizeof(vx_uint32));
     if (!reorderStreamPerCoreCount)
     {
-        vxError("fillinKernelBufferHuffman: OUT OF MEMORY");
+        vxError("fillinKernelBufferV8Huffman: OUT OF MEMORY");
         goto exit;
     }
 
@@ -16680,16 +11657,34 @@ void fillinKernelBufferV8Huffman(
     nonCoefIndex = (vx_uint32 *)vxAllocateAndZeroMemory(nonCoefCount * sizeof(vx_uint32));
     if (!nonCoefIndex)
     {
+        vxError("fillinKernelBufferV8Huffman: OUT OF MEMORY");
+        goto exit;
+    }
+
+    lastVzGroupIndex = (vx_uint32 *)vxAllocateAndZeroMemory(usedCoreCount * sizeof(vx_uint32));
+    if (!lastVzGroupIndex)
+    {
         vxError("fillinKernelBufferHuffman: OUT OF MEMORY");
         goto exit;
     }
 
     if (wb->wb_base->hw_depth_wise)
-        reorderDepthWiseKernelBufferV8Huffman(context, wb, slice_count, z_count, filters_per_core, weight_format, reorderStream, weight_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex);
+        reorderDepthWiseKernelBufferV8Huffman(context, wb, slice_count, z_count, filters_per_core, skip_value, weight_format, reorderStream, weight_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex);
+    else if (context->options.enableNonZeroBalance && !hasNoZOffset)
+    {
+        /*Only those chip has z_offset support zero balance*/
+        realVzIndex = (vx_uint32 *)vxAllocateAndZeroMemory(z_count * sizeof(vx_uint32));
+        if (!realVzIndex)
+        {
+            vxError("fillinKernelBufferV8Huffman: OUT OF MEMORY");
+            goto exit;
+        }
+        reorderKernelBufferV8HuffmanBalance(context, wb, slice_count, z_count, filters_per_core, skip_value, weight_format, reorderStream, weight_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex, realVzIndex, lastVzGroupIndex);
+    }
     else
-        reorderKernelBufferV8Huffman(context, wb, slice_count, z_count, filters_per_core, weight_format, reorderStream, weight_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex);
+        reorderKernelBufferV8Huffman(context, wb, slice_count, z_count, filters_per_core, skip_value, weight_format, reorderStream, weight_base_ptr, nnCoreCount, reorderStreamPerCoreCount, nonCoefIndex, lastVzGroupIndex);
 
-    analysisKernelStreamForHuffman(context, wb, 0, nnCoreCount, reorderStream, reorderStreamSize, reorderStreamPerCoreCount, invSizeOrder, nonCoefIndex, nonCoefCount, VX_NULL, 0, index);
+    analysisKernelStreamForHuffman(context, wb, 0, nnCoreCount, reorderStream, reorderStreamSize, reorderStreamPerCoreCount, invSizeOrder, nonCoefIndex, nonCoefCount, lastVzGroupIndex, usedCoreCount, index);
 
     /* Write huffman header*/
     writeBits(&kernelBufferPtr, &bitOffset, wb->huffmanConfig[index].preEncode, 1);
@@ -16718,7 +11713,7 @@ void fillinKernelBufferV8Huffman(
     }
     /*align to 64 byte*/
     packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
-    wb->slice_array[index].kernel_align_stream_size += (vx_size)((vx_uint8 *)kernelBufferPtr - wb_base_ptr);
+    wb->slice_array[index].kernel_stream_full_cache_size = 0;
 
     for (i = 0; i < THROUGHPUT * 3; i++)
     {
@@ -16747,6 +11742,7 @@ void fillinKernelBufferV8Huffman(
         vx_int32 coef16 = 0;
         vx_int32 k = 0, j = 0, m = 0;
         vx_bool isCoef;
+        vx_bool isLimitZRL;
         vx_float64 compressionRatio = 0;
         /* update position of each core's beginning of compressed kernel*/
         kernelStreamBasePtr = (vx_uint8*)kernelBufferPtr;
@@ -16784,6 +11780,16 @@ void fillinKernelBufferV8Huffman(
             }
             else
                 isCoef = vx_true_e;
+
+            if (lastVzGroupIndex != VX_NULL &&
+                totalCountIdx == lastVzGroupIndex[limitZRLCountIdx] &&
+                limitZRLCountIdx < usedCoreCount)
+            {
+                isLimitZRL = vx_true_e;
+                limitZRLCountIdx++;
+            }
+            else
+                isLimitZRL = vx_false_e;
 
             totalCountIdx++;
 
@@ -16935,7 +11941,7 @@ void fillinKernelBufferV8Huffman(
                     setDummy = vx_true_e;
                 }
 
-                if (coef == 0 && isCoef)
+                if (coef == 0 && isCoef && !isLimitZRL)
                 {
                     run++;
                     if (dataRemainingOfCore != 0)
@@ -16943,7 +11949,7 @@ void fillinKernelBufferV8Huffman(
                         continue;
                     }
                 }
-                if (coef || (dataRemainingOfCore == 0) || !isCoef) /* if last pixel, force process run zeros*/
+                if (coef || (dataRemainingOfCore == 0) || !isCoef || isLimitZRL) /* if last pixel, force process run zeros*/
                 {
                     /* process run zeros*/
                     while(run)
@@ -17079,7 +12085,7 @@ void fillinKernelBufferV8Huffman(
                         OutputAt(x, &kernelBufferPtr, &bitOffset, codeSymbol);
                         x++; /*counter*/
                     }
-                    else
+                    else if (!isCoef || (dataRemainingOfCore != 0x0) || isLimitZRL)
                     {
                         /*those non-coef count like bias, num_of_vz & z_offset couldn't skip by zero-run as HW requres,
                         need also encode those 0 to huffman code,
@@ -17140,6 +12146,8 @@ void fillinKernelBufferV8Huffman(
         /* pad 0 at the end of core*/
         packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
         kernelStreamSize = (vx_uint32)((vx_uint8 *)kernelBufferPtr - kernelStreamBasePtr);
+        /*With RTL bug fix, full cache mode size needn't using maxSize * coreCount*/
+        wb->slice_array[index].kernel_stream_full_cache_size += kernelStreamSize;
 
         if (maxKernelStreamSizePerCore < kernelStreamSize)
             maxKernelStreamSizePerCore = kernelStreamSize;
@@ -17151,17 +12159,27 @@ void fillinKernelBufferV8Huffman(
         prev = 0;
     }
     vxmASSERT(reorderStreamAllCount == reorderStreamCheckCount); /*Check if the data count is the same*/
-    wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * nnCoreCount);
 
     /*Add non compressed biases & Z_OFFSET & perFilterPostMul & perFilterPostShift after huffman bit stream*/
+    kernelStreamBasePtr = (vx_uint8*)kernelBufferPtr;
     for (filterIndex = 0; filterIndex < filterTotalCount; filterIndex++)
     {
 
         if (!hasNoBias)
         {
             vx_uint32 biasData = 0;
+            vx_uint32 realFilterIndex;
+
+            if (context->options.enableNonZeroBalance &&
+                !hasNoZOffset &&
+                !wb->wb_base->hw_depth_wise &&
+                realVzIndex != VX_NULL)
+                realFilterIndex = realVzIndex[filterIndex];
+            else
+                realFilterIndex = filterIndex;
+
             if (bias_base_ptr)
-                biasData = *(bias_base_ptr + filterIndex);
+                biasData = *(bias_base_ptr + realFilterIndex);
             else
                 biasData = 0;
 
@@ -17170,11 +12188,11 @@ void fillinKernelBufferV8Huffman(
                 && input_zp != 0
                 && weight_format == VX_TYPE_UINT8)
             {
-                biasData -= weightsMinusZP[filterIndex].sum;
+                biasData -= weightsMinusZP[realFilterIndex].sum;
             }
 
             if (weight_format == VX_TYPE_UINT8)
-                biasData += coefSum[filterIndex] * 128;
+                biasData += coefSum[realFilterIndex] * 128;
 
             if (weight_format == VX_TYPE_INT16)
             {
@@ -17192,14 +12210,14 @@ void fillinKernelBufferV8Huffman(
                 else
                     bias64 = (vx_int64)biasData;
 
-                if (coefSum[filterIndex] < 0)
+                if (coefSum[realFilterIndex] < 0)
                 {
                     sum64 = ~0;
                     sum64 = (sum64 >> 32) << 32;
-                    sum64 = sum64 | (vx_int64)coefSum[filterIndex];
+                    sum64 = sum64 | (vx_int64)coefSum[realFilterIndex];
                 }
                 else
-                    sum64 = (vx_int64)coefSum[filterIndex];
+                    sum64 = (vx_int64)coefSum[realFilterIndex];
 
                 bias64 += sum64 * 128;
                 bias32 = (vx_int32)bias64;
@@ -17209,8 +12227,6 @@ void fillinKernelBufferV8Huffman(
             }
             else
                 writeBits(&kernelBufferPtr, &bitOffset, biasData, biasBitSize);
-
-            wb->slice_array[index].kernel_align_stream_size += biasBitSize / 8;
         }
 
         if (hasNNPerFilterPostMultiply)
@@ -17222,45 +12238,74 @@ void fillinKernelBufferV8Huffman(
             postMul = *(post_mul + filterIndex);
             postShift = *(post_shift + filterIndex);
 
-            writeBits(&kernelBufferPtr, &bitOffset, postMul, 7);
-            writeBits(&kernelBufferPtr, &bitOffset, postShift, 15);
+            writeBits(&kernelBufferPtr, &bitOffset, postMul, 15);
+            writeBits(&kernelBufferPtr, &bitOffset, postShift, 7);
             /*unused zero for 10 bit*/
             writeBits(&kernelBufferPtr, &bitOffset, 0, 10);
-
-            wb->slice_array[index].kernel_align_stream_size += 8;
         }
 
         if (!hasNoZOffset)
         {
             vx_uint32 offsetValue;
-            if (z_offset > 0)
-                offsetValue = (vx_uint32)z_offset * filterIndex;
-            else if (output_size > 0)
-                offsetValue = output_final_x * output_final_y * output_size * filterIndex;
+            vx_uint32 realFilterIndex;
+
+            if (context->options.enableNonZeroBalance &&
+                !wb->wb_base->hw_depth_wise &&
+                realVzIndex != VX_NULL)
+                realFilterIndex = realVzIndex[filterIndex];
             else
-                offsetValue = output_final_x * output_final_y * weightSize * filterIndex;
+                realFilterIndex = filterIndex;
+
+            if (z_offset > 0)
+                offsetValue = (vx_uint32)z_offset * realFilterIndex;
+            else if (output_size > 0)
+                offsetValue = output_final_x * output_final_y * output_size * realFilterIndex;
+            else
+                offsetValue = output_final_x * output_final_y * weightSize * realFilterIndex;
 
             writeBits(&kernelBufferPtr, &bitOffset, offsetValue, NN_Z_POSITION_OFFSET_BITS_VIP_V7);
-
-            wb->slice_array[index].kernel_align_stream_size += NN_Z_POSITION_OFFSET_BITS_VIP_V7 / 8;
         }
-        else if (hasNNPreLU)
+        else if (hasNNPerFilterPostMultiply && hasNNPreLU)
         {
+            /*per PRD, prelu only enable when hasNoZOffset == 1 && hasNNPerFilterPostMultiply == 1*/
             vx_int32 negPostMul = 0;
             vx_int32 negPostShift = 0;
-            vxmASSERT(neg_post_mul != VX_NULL && neg_post_shift != VX_NULL);
+            vx_float32 alphaValue = 0;
 
-            negPostMul = *(neg_post_mul + filterIndex);
-            negPostShift = *(neg_post_shift + filterIndex);
+            if (alphaBase != VX_NULL)
+            {
+                vx_uint32 uintAlpha;
+                vx_int32 exp;
 
-            writeBits(&kernelBufferPtr, &bitOffset, negPostMul, 7);
-            writeBits(&kernelBufferPtr, &bitOffset, negPostShift, 15);
+                alphaValue = vxnneGetDataExt(alphaFormat, alphaQuantFormat, filterIndex, (vx_uint8_ptr)alphaBase, alphaFP, alphaZP, alphaScale);
+
+                uintAlpha = *((vx_uint32*)(&alphaValue));
+                exp = ((uintAlpha >> 23) & 0xff) - 127;
+                /*negPostShift range is [-63, 64]*/
+                if (exp > 64)
+                    exp = 64;
+                else if (exp < -63)
+                    exp = -63;
+
+                negPostShift = exp + 63; /*exp = shift - (2^7 - 1) */
+                negPostMul = (uintAlpha & 0x7FFFFF) >> 8; /* negMultiply only has 15 bit, using high 15-bit of alpha's mantissa*/
+            }
+
+            writeBits(&kernelBufferPtr, &bitOffset, negPostMul, 15);
+            writeBits(&kernelBufferPtr, &bitOffset, negPostShift, 7);
             /*unused zero for 10 bit*/
             writeBits(&kernelBufferPtr, &bitOffset, 0, 10);
-
-            wb->slice_array[index].kernel_align_stream_size += 4;
         }
     }
+    /*Also align to 64 byte for post processing stream*/
+    packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
+    kernelStreamSize = (vx_uint32)((vx_uint8 *)kernelBufferPtr - kernelStreamBasePtr);
+    wb->slice_array[index].kernel_stream_full_cache_size += kernelStreamSize;
+
+    if (maxKernelStreamSizePerCore < kernelStreamSize)
+        maxKernelStreamSizePerCore = kernelStreamSize;
+    /*Per HW, post processing stream size is needed in SRAM, when partial mode, need be noted as one core*/
+    wb->slice_array[index].kernel_align_stream_size = (vx_size)(maxKernelStreamSizePerCore * (usedCoreCount + 1));
 
 exit:
     if (coefSum)
@@ -17273,6 +12318,11 @@ exit:
         vxFree(reorderStreamPerCoreCount);
     if (nonCoefIndex)
         vxFree(nonCoefIndex);
+    if (realVzIndex)
+        vxFree(realVzIndex);
+    if (lastVzGroupIndex)
+        vxFree(lastVzGroupIndex);
+
     return;
 }
 
@@ -18796,6 +13846,40 @@ void calculateWeightBiasStreamRelatedSize(
         *max_zero_run_len = (1 << minZeroRunLen) - 1;
 }
 
+vx_size estimateWeightBiasStreamSize(
+    vx_weights_biases_parameter wb,
+    gctPOINTER weight_data
+    )
+{
+    vx_size kernelStreamSize = 0;
+    vx_context context = vxGetContext((vx_reference)wb);
+    vx_uint32 sliceCount = wb->wb_base->weights_sizes[2];
+    vx_uint32 filterCount = wb->wb_base->weights_sizes[3];
+    vx_enum weightFormat = wb->wb_base->weights_data_format;
+    vx_enum biasFormat = wb->wb_base->biases_data_format;
+    vx_uint32 nnCoreCount = (weightFormat == VX_TYPE_INT16) ?
+                  context->nnConfig.fixedFeature.nnCoreCountInt16 : (weightFormat == VX_TYPE_FLOAT16) ?
+                      context->nnConfig.fixedFeature.nnCoreCountFloat16 : context->nnConfig.fixedFeature.nnCoreCount;
+    vx_uint32 filterPerCore = (filterCount % nnCoreCount == 0) ? filterCount / nnCoreCount : filterCount / nnCoreCount + 1;
+
+    calculateWeightBiasStreamRelatedSize(
+            context,
+            wb,
+            weight_data,
+            sliceCount, /* slice */
+            filterCount, /* z count */
+            filterPerCore, /* kernel per core */
+            weightFormat,
+            biasFormat,
+            wb->wb_base->skipValue,
+            wb->weights_sizes[2] <= 1 ? 0 : wb->wb_base->setZeroLength,
+            (vx_uint8)context->options.nnZeroRunLen,
+            0,
+            &kernelStreamSize, VX_NULL, VX_NULL);
+
+    return kernelStreamSize;
+}
+
 vx_float32 calculateWeightNonZeroRatio(
     vx_context context,
     vx_uint32 skip_value,
@@ -19271,7 +14355,7 @@ void fillinKernelBuffer(
     vx_uint32 alignedOffset      = ((vx_uint32)(gctUINTPTR_T)kernelBufferPtr) & 0x3F;
     vx_uint8_ptr kernelDataPtr   = VX_NULL;
     vx_uint8_ptr kernelStreamBasePtr = VX_NULL;
-
+    vx_uint32 usedCoreCount      = (filterTotalCount > nnCoreCount) ? nnCoreCount : filterTotalCount;
     vx_uint32 maxKernelStreamSizePerCore = 0;
     vx_float64* nonZeroRatioPerCorePerVZG = 0;
 
@@ -19368,8 +14452,8 @@ void fillinKernelBuffer(
         writeBits(&kernelBufferPtr, &bitOffset, kernelStreamSize, 32);
     }
     packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
+    wb->slice_array[index].kernel_stream_full_cache_size = 0;
 
-    wb->slice_array[index].kernel_align_stream_size += (vx_size)((vx_uint8 *)kernelBufferPtr - wb_base_ptr);
     wb->max_per_core_compression_ratio = 0;
 
     for (coreIndex = 0; coreIndex < nnCoreCount; coreIndex++)
@@ -19380,10 +14464,13 @@ void fillinKernelBuffer(
         kernelStreamBasePtr = (vx_uint8_ptr)kernelBufferPtr;
 
         /* zeroRunLen */
-        writeBits(&kernelBufferPtr, &bitOffset, min_zero_run_len, 8);
+        if (coreFilterCount > 0)
+        {
+            /* zeroRunLen */
+            writeBits(&kernelBufferPtr, &bitOffset, min_zero_run_len, 8);
 
-        writeBits(&kernelBufferPtr, &bitOffset, coreFilterCount, 16);
-
+            writeBits(&kernelBufferPtr, &bitOffset, coreFilterCount, 16);
+        }
         /* fill weight value and bias for every group */
         zeroRun = 0;
         for (groupIndex = 0; groupIndex < groupCount; groupIndex++)
@@ -19864,6 +14951,8 @@ void fillinKernelBuffer(
 
         /* Go back to update kernelStreamSize. */
         kernelStreamSize = (vx_uint32)((vx_uint8 *)kernelBufferPtr - kernelStreamBasePtr);
+        /*With RTL bug fix, full cache mode size needn't using maxSize * coreCount*/
+        wb->slice_array[index].kernel_stream_full_cache_size += kernelStreamSize;
 
         compressionRatio = (vx_float64)kernelStreamSize / (vx_float64)coreOrgKernelSize;
         if (wb->max_per_core_compression_ratio < compressionRatio)
@@ -19875,7 +14964,7 @@ void fillinKernelBuffer(
         writeBits(&kernelStreamSizePtr, &streamSizeBitOffset, kernelStreamSize, 32);
     }
 
-    wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * nnCoreCount);
+    wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount);
 
     if (z_offset > 0)
         wb->orgZOffsetValue = z_offset;
@@ -20036,8 +15125,7 @@ void fillinDepthWiseKernelBuffer(
         writeBits(&kernelBufferPtr, &bitOffset, kernelStreamSize, 32);
     }
     packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
-
-    wb->slice_array[index].kernel_align_stream_size += (vx_size)((vx_uint8 *)kernelBufferPtr - wb_base_ptr);
+    wb->slice_array[index].kernel_stream_full_cache_size = 0;
 
     for (coreIndex = 0; coreIndex < nnCoreCount; coreIndex++)
     {
@@ -20217,6 +15305,8 @@ void fillinDepthWiseKernelBuffer(
 
         /* Go back to update kernelStreamSize. */
         kernelStreamSize = (vx_uint32)((vx_uint8 *)kernelBufferPtr - kernelStreamBasePtr);
+        /*With RTL bug fix, full cache mode size needn't using maxSize * coreCount*/
+        wb->slice_array[index].kernel_stream_full_cache_size += kernelStreamSize;
 
         if (kernelStreamSize > maxKernelStreamSizePerCore)
             maxKernelStreamSizePerCore = kernelStreamSize;
@@ -20285,6 +15375,7 @@ void fillinKernelBufferBalance(
     vx_uint32 biasSize           = (vx_uint32)vxDataType_GetSize(bias_format);
     vx_uint32 biasBitSize        = biasSize * 8;
     vx_uint32 biasData           = 0;
+    vx_int64  biasData_64bits    = 0;
 
     vx_uint32 sliceCount         = weight_z;
     vx_uint32 filterSliceSize    = weight_x * weight_y * weightSize;
@@ -20304,8 +15395,14 @@ void fillinKernelBufferBalance(
     vx_uint32 alignedOffset      = ((vx_uint32)(gctUINTPTR_T)kernelBufferPtr) & 0x3F;
     vx_uint8_ptr kernelDataPtr   = VX_NULL;
     vx_uint8_ptr kernelStreamBasePtr = VX_NULL;
-
+    vx_uint32 usedCoreCount      = (filterTotalCount > nnCoreCount) ? nnCoreCount : filterTotalCount;
     vx_uint32 maxKernelStreamSizePerCore = 0;
+    vx_float64* nonZeroRatioPerCorePerVZG = 0;
+    vx_uint32 totalNonZeroCount = 0;
+    vx_float32 averageNZCPerFilter = 0;
+    vx_float32 varianceFL32 = 0;
+    vx_uint32 variance = 0;
+    vx_bool reorder = vx_false_e;
 
     typedef struct _gcVXWeightsMinusZP
     {
@@ -20320,9 +15417,10 @@ void fillinKernelBufferBalance(
         vx_uint32 nonZeroCount;
         vx_uint32 filterIdx;
     }gcVXNonZeroWeights;
-#define PRINT_PER_CORE_SIZE 1
-    vx_uint32* nonZeroCoefPerCore = VX_NULL;
 
+#if PRINT_PER_CORE_SIZE
+    vx_uint32* nonZeroCoefPerCore = VX_NULL;
+#endif
     gcVXNonZeroWeights *nonZeroWeights = VX_NULL;
     vx_int32 i = 0;
     vx_uint32 core0FilterCount = 0;
@@ -20371,21 +15469,36 @@ void fillinKernelBufferBalance(
                 }
             }
         }
+        totalNonZeroCount += nonZeroWeights[filterIndex].nonZeroCount;
     }
 
     /*Sort*/
+    averageNZCPerFilter = (vx_float32)totalNonZeroCount / filter_count;
     for (filterIndex = 0; filterIndex < filter_count; filterIndex++)
     {
-        tmp.nonZeroCount = nonZeroWeights[filterIndex].nonZeroCount;
-        tmp.filterIdx = filterIndex;
+        varianceFL32 += gcoMATH_Power((nonZeroWeights[filterIndex].nonZeroCount - averageNZCPerFilter), 2);
+    }
+    variance = (vx_uint32)(varianceFL32 / filter_count + 0.5f);
 
-        for (i = filterIndex - 1; i >= 0 && nonZeroWeights[i].nonZeroCount > tmp.nonZeroCount; i--)
+    if (variance > 12)
+        reorder = vx_true_e;
+
+    if (reorder)
+    {
+        /*Sort*/
+        for (filterIndex = 0; filterIndex < filter_count; filterIndex++)
         {
-            nonZeroWeights[i+1].nonZeroCount = nonZeroWeights[i].nonZeroCount;
-            nonZeroWeights[i+1].filterIdx = nonZeroWeights[i].filterIdx;
+            tmp.nonZeroCount = nonZeroWeights[filterIndex].nonZeroCount;
+            tmp.filterIdx = filterIndex;
+
+            for (i = filterIndex - 1; i >= 0 && nonZeroWeights[i].nonZeroCount > tmp.nonZeroCount; i--)
+            {
+                nonZeroWeights[i+1].nonZeroCount = nonZeroWeights[i].nonZeroCount;
+                nonZeroWeights[i+1].filterIdx = nonZeroWeights[i].filterIdx;
+            }
+            nonZeroWeights[i+1].nonZeroCount = tmp.nonZeroCount;
+            nonZeroWeights[i+1].filterIdx = tmp.filterIdx;
         }
-        nonZeroWeights[i+1].nonZeroCount = tmp.nonZeroCount;
-        nonZeroWeights[i+1].filterIdx = tmp.filterIdx;
     }
 
     if (weightFomat == VX_TYPE_INT8 || weightFomat == VX_TYPE_UINT8)
@@ -20448,6 +15561,24 @@ void fillinKernelBufferBalance(
             goto exit;
         }
     }
+
+    if (wb->max_per_core_per_vzgroup_nzr == VX_NULL)
+    {
+        wb->max_per_core_per_vzgroup_nzr = (vx_float64*)vxAllocateAndZeroMemory(groupCount * sizeof(vx_float64));
+        if (wb->max_per_core_per_vzgroup_nzr == VX_NULL)
+        {
+            vxError("fillinKernelBuffer: OUT OF MEMORY\n");
+            goto exit;
+        }
+    }
+
+    nonZeroRatioPerCorePerVZG = (vx_float64*)vxAllocateAndZeroMemory(nnCoreCount * groupCount * sizeof(vx_float64));
+    if (nonZeroRatioPerCorePerVZG == VX_NULL)
+    {
+        vxError("fillinKernelBuffer: OUT OF MEMORY");
+        goto exit;
+    }
+
     wb->numOfVz = filter_count;
 
     /* kernel Buffer size for each core */
@@ -20456,22 +15587,24 @@ void fillinKernelBufferBalance(
         writeBits(&kernelBufferPtr, &bitOffset, kernelStreamSize, 32);
     }
     packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
-
-    wb->slice_array[index].kernel_align_stream_size += (vx_size)((vx_uint8 *)kernelBufferPtr - wb_base_ptr);
+    wb->slice_array[index].kernel_stream_full_cache_size = 0;
 
     for (coreIndex = 0; coreIndex < nnCoreCount; coreIndex++)
     {
         vx_uint32 coreFilterCount = (coreIndex < oddFilterPerCore) ? totalFilterPerCore + 1 : totalFilterPerCore;
         vx_uint32 usedKid = 0;
         vx_uint32* filterGroup = VX_NULL;
+        vx_uint32 coreOrgKernelSize = coreFilterCount * (filterSize + biasSize);
+        vx_float64 compressionRatio = 0;
 
         kernelStreamBasePtr = (vx_uint8_ptr)kernelBufferPtr;
+        if (coreFilterCount > 0)
+        {
+            /* zeroRunLen */
+            writeBits(&kernelBufferPtr, &bitOffset, min_zero_run_len, 8);
 
-        /* zeroRunLen */
-        writeBits(&kernelBufferPtr, &bitOffset, min_zero_run_len, 8);
-
-        writeBits(&kernelBufferPtr, &bitOffset, coreFilterCount, 16);
-
+            writeBits(&kernelBufferPtr, &bitOffset, coreFilterCount, 16);
+        }
         /* fill weight value and bias for every group */
         zeroRun = 0;
         for (groupIndex = 0; groupIndex < groupCount; groupIndex++)
@@ -20481,6 +15614,10 @@ void fillinKernelBufferBalance(
             vx_uint32 kid = 0;
             vx_uint32 unusedCoreCount = (filterTotalCount % nnCoreCount == 0) ? 0 : nnCoreCount - (filterTotalCount % nnCoreCount);
             vx_uint32 sortedIndex = 0;
+            vx_uint32 blockCount = 0;
+            vx_uint32 nonZeroCount = 0;
+            vx_uint32 nonZrlIdx = groupIndex + groupCount * coreIndex;
+            vx_uint32 filterStart;
 
             if (coreIndex == 0)
                 core0FilterCount = actualFilterCount;
@@ -20494,42 +15631,65 @@ void fillinKernelBufferBalance(
                     goto exit;
                 }
             }
-            /*Dispatch filter to each vzGroup*/
-            for (kid = 0; kid < actualFilterCount; kid++)
+
+            if (reorder)
             {
-                if (groupIndex == groupCount - 1 &&
-                    kid == core0FilterCount - 1 &&
-                    kid != 0)
+                /*Dispatch filter to each vzGroup*/
+                for (kid = 0; kid < actualFilterCount; kid++)
                 {
-                    if ((kid + usedKid) % 2 == 0)
-                        sortedIndex = groupFilterStart + kid * nnCoreCount + coreIndex - unusedCoreCount;
+                    if (groupIndex == groupCount - 1 &&
+                        kid == core0FilterCount - 1)
+                    {
+                        if ((kid + usedKid) % 2 == 0)
+                            sortedIndex = groupFilterStart + kid * nnCoreCount + coreIndex;
+                        else
+                            sortedIndex = groupFilterStart + (kid + 1) * nnCoreCount - coreIndex - 1 - unusedCoreCount;
+                    }
                     else
-                        sortedIndex = groupFilterStart + (kid + 1) * nnCoreCount - coreIndex - 1 - unusedCoreCount;
+                    {
+                        if ((kid + usedKid) % 2 == 0)
+                            sortedIndex = groupFilterStart + kid * nnCoreCount + coreIndex;
+                        else
+                            sortedIndex = groupFilterStart + (kid + 1) * nnCoreCount - coreIndex - 1;
+                    }
+
+                    filterGroup[kid] = nonZeroWeights[sortedIndex].filterIdx;
+#if PRINT_PER_CORE_SIZE
+                    nonZeroCoefPerCore[coreIndex] += nonZeroWeights[sortedIndex].nonZeroCount;
+#endif
+                }
+
+                /*sort the vz group real filter to avoid write output cross*/
+                for (kid = 0; kid < actualFilterCount; kid++)
+                {
+                    vx_uint32 tmp = filterGroup[kid];
+
+                    for (i = kid - 1; i >= 0 && filterGroup[i] > tmp; i--)
+                    {
+                        filterGroup[i+1] = filterGroup[i];
+                    }
+                    filterGroup[i+1] = tmp;
+                }
+            }
+            else
+            {
+                /*if variance is small, don't reorder the filters*/
+                if ((groupIndex == groupCount - 1)
+                && (coreIndex >= (filterTotalCount % nnCoreCount)))
+                {
+                    filterStart = groupIndex * nnCoreCount * filterCount
+                                + (filterTotalCount % nnCoreCount) * (actualFilterCount + 1)
+                                + (coreIndex - (filterTotalCount % nnCoreCount)) * actualFilterCount;
                 }
                 else
                 {
-                    if ((kid + usedKid) % 2 == 0)
-                        sortedIndex = groupFilterStart + kid * nnCoreCount + coreIndex;
-                    else
-                        sortedIndex = groupFilterStart + (kid + 1) * nnCoreCount - coreIndex - 1;
+                    filterStart = groupIndex * nnCoreCount *filterCount + coreIndex * actualFilterCount;
                 }
 
-                filterGroup[kid] = nonZeroWeights[sortedIndex].filterIdx;
-#if PRINT_PER_CORE_SIZE
-                nonZeroCoefPerCore[coreIndex] += nonZeroWeights[sortedIndex].nonZeroCount;
-#endif
-            }
-
-            /*sort the vz group real filter to avoid write output cross*/
-            for (kid = 0; kid < actualFilterCount; kid++)
-            {
-                vx_uint32 tmp = filterGroup[kid];
-
-                for (i = kid - 1; i >= 0 && filterGroup[i] > tmp; i--)
+                for (kid = 0; kid < actualFilterCount; kid++)
                 {
-                    filterGroup[i+1] = filterGroup[i];
+                    filterGroup[kid] = filterStart + kid;
                 }
-                filterGroup[i+1] = tmp;
             }
 
             /* Only UINT8/INT8 support ZDP3/ZDP6 */
@@ -20550,6 +15710,8 @@ void fillinKernelBufferBalance(
                     /* add slices of every filter*/
                     for (kid = 0; kid < actualFilterCount; kid++)
                     {
+                        vx_uint32 nonZeroInBlock1Count = 0; /*Check if there's non-zero point in first zdpNum block*/
+                        vx_uint32 nonZeroInBlock2Count = 0; /*Check if there's non-zero point in another zdpNum block*/
                         filterIndex = filterGroup[kid];
 
                         for (realSliceIndex = sliceIndex; realSliceIndex < sliceIndex + (zdpNum * 2); realSliceIndex++)
@@ -20584,6 +15746,11 @@ void fillinKernelBufferBalance(
                                 weight = *((vx_uint8 *)kernelDataPtr);
                             else
                                 weight = *((vx_uint16 *)kernelDataPtr);
+
+                            if (realSliceIndex - sliceIndex < zdpNum && weight != skipValue)
+                                nonZeroInBlock1Count++;
+                            else if (weight != skipValue)
+                                nonZeroInBlock2Count++;
 
                             if ((zeroRun == max_zero_run)
                                 || ((realSliceIndex == 0)
@@ -20656,6 +15823,15 @@ void fillinKernelBufferBalance(
                                     writeBits(&kernelBufferPtr, &bitOffset, offsetValue, NN_Z_POSITION_OFFSET_BITS);
                             }
                         }
+                        if (sliceIndex + zdpNum >= sliceCount)
+                            blockCount++;
+                        else
+                            blockCount += 2;
+
+                        if (nonZeroInBlock1Count)
+                            nonZeroCount++;
+                        if (nonZeroInBlock2Count)
+                            nonZeroCount++;
                     }
                 }
             }
@@ -20705,6 +15881,7 @@ void fillinKernelBufferBalance(
                                 for (realSliceIndex = sliceIndex; realSliceIndex < sliceIndex + subKzSize; realSliceIndex++)
                                 {
                                     vx_uint8 needToWriteBias = (sliceIndex == 0) ? 1 : 0;
+                                    vx_uint32 nonZeroInBlockCount = 0; /*Check if there's non-zero point in one 3x3 block*/
 
                                     /* add one slice data every filter */
                                     kernelDataPtr = weight_base_ptr + filterIndex * filterSize + filterSliceSize * realSliceIndex;
@@ -20736,6 +15913,9 @@ void fillinKernelBufferBalance(
                                                 weight = *((vx_uint8 *)realKernelDataPtr);
                                             else
                                                 weight = *((vx_uint16 *)realKernelDataPtr);
+
+                                            if (weight != skipValue)
+                                                nonZeroInBlockCount++;
 
                                             if ((zeroRun == max_zero_run)
                                                 || ((realSliceIndex == 0)
@@ -20817,6 +15997,9 @@ void fillinKernelBufferBalance(
                                             }
                                         }
                                     }
+                                    blockCount++;
+                                    if (nonZeroInBlockCount)
+                                        nonZeroCount++;
                                 }
                             }
                         }
@@ -20839,7 +16022,12 @@ void fillinKernelBufferBalance(
                         if (sliceIndex == 0)
                         {
                             if (bias_base_ptr)
-                                biasData = *(bias_base_ptr + filterIndex);
+                            {
+                                if(bias_format == VX_TYPE_INT64)
+                                    biasData_64bits = *(((vx_int64 *)bias_base_ptr) + filterIndex);
+                                else
+                                    biasData = *(bias_base_ptr + filterIndex);
+                            }
                             else
                                 biasData = 0;
 
@@ -20854,6 +16042,7 @@ void fillinKernelBufferBalance(
 
                         for (weightYIndex = 0; weightYIndex < weight_y; weightYIndex++)
                         {
+                            vx_uint32 nonZeroCountInDP3 = 0; /*Check if there's non-zero point in one 3x1 block*/
                             for (weightXIndex = 0; weightXIndex < weight_x; weightXIndex++)
                             {
                                 vx_uint32 weight = 0;
@@ -20865,6 +16054,20 @@ void fillinKernelBufferBalance(
                                 else
                                     weight = *((vx_uint16 *)kernelDataPtr);
                                 kernelDataPtr = kernelDataPtr + weightSize;
+
+                                {
+                                    if (weight != skipValue)
+                                        nonZeroCountInDP3++;
+
+                                    /*V7, DP3, one block is 3x1*/
+                                    if ((weightXIndex + 1) % 3 == 0 || weightXIndex == wb->weights_sizes[0] - 1)
+                                    {
+                                        blockCount++;
+                                        if (nonZeroCountInDP3)
+                                            nonZeroCount++;
+                                        nonZeroCountInDP3 = 0;
+                                    }
+                                }
 
                                 if ((zeroRun == max_zero_run)
                                     || ((sliceIndex == 0)
@@ -20895,19 +16098,30 @@ void fillinKernelBufferBalance(
                                             vx_int32 bias32;
                                             vx_int16 bias16;
 
-                                            if ((vx_int32)biasData < 0)
+                                            /*64bits bias*/
+                                            if(bias_format == VX_TYPE_INT64)
                                             {
-                                                bias64 = ~0;
-                                                bias64 = (bias64 >> 32) << 32;
-                                                bias64 = bias64 | (vx_int64)biasData;
+                                                bias32 = (vx_int32)biasData_64bits;
+                                                writeBits(&kernelBufferPtr, &bitOffset, bias32, 32);
+                                                bias16 = (vx_int16)(biasData_64bits >> 32);
+                                                writeBits(&kernelBufferPtr, &bitOffset, (vx_int32)bias16, 16);
                                             }
-                                            else
-                                                bias64 = (vx_int64)biasData;
+                                            else    /*32bits bias*/
+                                            {
+                                                if ((vx_int32)biasData < 0)
+                                                {
+                                                    bias64 = ~0;
+                                                    bias64 = (bias64 >> 32) << 32;
+                                                    bias64 = bias64 | (vx_int64)biasData;
+                                                }
+                                                else
+                                                    bias64 = (vx_int64)biasData;
 
-                                            bias32 = (vx_int32)bias64;
-                                            writeBits(&kernelBufferPtr, &bitOffset, bias32, 32);
-                                            bias16 = (vx_int16)(bias64 >> 32);
-                                            writeBits(&kernelBufferPtr, &bitOffset, (vx_int32)bias16, 16);
+                                                bias32 = (vx_int32)bias64;
+                                                writeBits(&kernelBufferPtr, &bitOffset, bias32, 32);
+                                                bias16 = (vx_int16)(bias64 >> 32);
+                                                writeBits(&kernelBufferPtr, &bitOffset, (vx_int32)bias16, 16);
+                                            }
                                         }
                                         else
                                             writeBits(&kernelBufferPtr, &bitOffset, biasData, biasBitSize);
@@ -20948,6 +16162,8 @@ void fillinKernelBufferBalance(
                     }
                 }
             }
+            nonZeroRatioPerCorePerVZG[nonZrlIdx] = (vx_float64)nonZeroCount / (vx_float64)blockCount;
+
             usedKid += actualFilterCount;
             if (filterGroup)
             {
@@ -20961,6 +16177,12 @@ void fillinKernelBufferBalance(
 
         /* Go back to update kernelStreamSize. */
         kernelStreamSize = (vx_uint32)((vx_uint8 *)kernelBufferPtr - kernelStreamBasePtr);
+        /*With RTL bug fix, full cache mode size needn't using maxSize * coreCount*/
+        wb->slice_array[index].kernel_stream_full_cache_size += kernelStreamSize;
+
+        compressionRatio = (vx_float64)kernelStreamSize / (vx_float64)coreOrgKernelSize;
+        if (wb->max_per_core_compression_ratio < compressionRatio)
+            wb->max_per_core_compression_ratio = compressionRatio;
 
         if (kernelStreamSize > maxKernelStreamSizePerCore)
             maxKernelStreamSizePerCore = kernelStreamSize;
@@ -20971,7 +16193,7 @@ void fillinKernelBufferBalance(
 #endif
     }
 
-    wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * nnCoreCount);
+    wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount);
 
     if (z_offset > 0)
         wb->orgZOffsetValue = z_offset;
@@ -20980,13 +16202,28 @@ void fillinKernelBufferBalance(
     else
         wb->orgZOffsetValue = output_final_x * output_final_y * weightSize;
 
+    for (groupIndex = 0; groupIndex < groupCount; groupIndex++)
+    {
+        for (coreIndex = 0; coreIndex < nnCoreCount; coreIndex++)
+        {
+            vx_uint32 nonZrlIdx = groupIndex + coreIndex * groupCount;
+            if (wb->max_per_core_per_vzgroup_nzr[groupIndex] < nonZeroRatioPerCorePerVZG[nonZrlIdx])
+                wb->max_per_core_per_vzgroup_nzr[groupIndex] = nonZeroRatioPerCorePerVZG[nonZrlIdx];
+        }
+    }
+
 exit:
     if (nonZeroWeights)
         vxFree(nonZeroWeights);
+#if PRINT_PER_CORE_SIZE
     if (nonZeroCoefPerCore)
         vxFree(nonZeroCoefPerCore);
+#endif
     if (weightsMinusZP)
         vxFree(weightsMinusZP);
+
+    if (nonZeroRatioPerCorePerVZG)
+        vxFree(nonZeroRatioPerCorePerVZG);
 
     return;
 }
@@ -21365,15 +16602,26 @@ VX_INTERNAL_CALLBACK_API void vxoWeightsBiasesBase_Destructor(vx_reference ref)
         wbBase->zrlTpFcPtr = VX_NULL;
     }
 
-    if (wbBase->weightPtr != VX_NULL)
+    if (ref->context->options.enableMemOptimization)
     {
-        vxFree(wbBase->weightPtr);
-        wbBase->weightPtr = VX_NULL;
+        if (wbBase->reshuffleWeightPtr != VX_NULL)
+        {
+            vxFree(wbBase->reshuffleWeightPtr);
+            wbBase->reshuffleWeightPtr = VX_NULL;
+        }
     }
-    if (wbBase->biasPtr != VX_NULL)
+    else
     {
-        vxFree(wbBase->biasPtr);
-        wbBase->biasPtr = VX_NULL;
+        if (wbBase->weightPtr != VX_NULL)
+        {
+            vxFree(wbBase->weightPtr);
+            wbBase->weightPtr = VX_NULL;
+        }
+        if (wbBase->biasPtr != VX_NULL)
+        {
+            vxFree(wbBase->biasPtr);
+            wbBase->biasPtr = VX_NULL;
+        }
     }
 
     if (wbBase->origWeight != VX_NULL)
@@ -21385,6 +16633,12 @@ VX_INTERNAL_CALLBACK_API void vxoWeightsBiasesBase_Destructor(vx_reference ref)
     if (wbBase->origBias != VX_NULL)
     {
         vxoReference_Release((vx_reference_ptr)&wbBase->origBias, VX_TYPE_TENSOR, VX_REF_INTERNAL);
+        wbBase->origBias = VX_NULL;
+    }
+
+    if (wbBase->origAlpha != VX_NULL)
+    {
+        vxoReference_Release((vx_reference_ptr)&wbBase->origAlpha, VX_TYPE_TENSOR, VX_REF_INTERNAL);
         wbBase->origBias = VX_NULL;
     }
 }
@@ -21405,10 +16659,26 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
     vx_size minKernelBufferSize[MAX_ZGROUP_COUNT*MAX_KZGROUP_COUNT];
     vx_uint8_ptr zrlTmpPtr = VX_NULL;
     vx_uint32 kzNum = 0, zNum = 0, oneFilterSize = 0, weightSize = 0, i = 0, j = 0, kzoffset = 0;
-    vx_uint8_ptr weight_ptr = wb_base->weightPtr;
+    vx_uint8_ptr weight_ptr = VX_NULL;
 
     vxmASSERT(context);
     vxmASSERT(wb_base);
+
+    if (context->options.enableMemOptimization)
+    {
+        if (wb_base->reshuffleWeightPtr)
+        {
+            weight_ptr = wb_base->reshuffleWeightPtr;
+        }
+        else
+        {
+            vxoTensor_GetTensorViewMemory(wb_base->origWeight, (gctPOINTER*)(&weight_ptr), VX_NULL);
+        }
+    }
+    else
+    {
+        weight_ptr = wb_base->weightPtr;
+    }
 
     wb = (vx_weights_biases_parameter)vxoReference_Create(context, VX_TYPE_WEIGHTS_BIASES_PARAMETER, VX_REF_INTERNAL, &context->base);
     if (vxoReference_GetStatus((vx_reference)wb) != VX_SUCCESS)
@@ -21436,7 +16706,7 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
         /* Estimate sub wb stream size first */
         if (layer_type == VX_NN_FULLYCONNECTED_LAYER &&
             vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_SINGLE_FC) &&
-            weight_dims[3] > 1 && wb_base->nn_fc_batch_mode == vx_false_e)
+            weight_dims[3] > 1 && wb_base->nn_fc_batch_mode == vx_false_e && wb_base->biases_data_format != VX_TYPE_INT64)
         {
             vx_uint32 coreCount = context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
             sliceCount = weight_dims[2];
@@ -21621,7 +16891,8 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
         if ((wb->weights_sizes[0] == 1 && wb->weights_sizes[1] == 1
         && (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3) || vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6))
         && (wb->wb_base->weights_data_format == VX_TYPE_INT8 || wb->wb_base->weights_data_format == VX_TYPE_UINT8))
-        && !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_ZDP3_NO_COMPRESS_FIX))
+        && !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_ZDP3_NO_COMPRESS_FIX)
+        && !wb->use_tp_fc)
         {
             /*force non_zero_ratio to 1 as HW will not be skipping any zero without ZDP3_NO_COMPRESS_FIX*/
             wb->non_zero_ratio = 1.0f;
@@ -21654,6 +16925,7 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
     if (!first_time) vxoReference_Increment(&wb_base->base, VX_REF_INTERNAL);
 
 exit:
+
     return status == VX_SUCCESS ? wb : VX_NULL;
 }
 
@@ -21674,8 +16946,8 @@ vx_status vxoWeightsBiases_Compress(
     vx_uint32 oneFilterSize, weightSize, i, j, kzoffset, sliceCount, filterCount;
     vx_weights_biases_parameter_base wb_base = wb->wb_base;
     vx_uint8_ptr zrlTmpPtr = VX_NULL, minZeroRunLenTPFC = wb_base->zrlTpFcPtr;
-    vx_uint8_ptr weight_ptr = wb_base->weightPtr;
-    vx_uint32_ptr bias_ptr = wb_base->biasPtr;
+    vx_uint8_ptr weight_ptr = VX_NULL;
+    vx_uint32_ptr bias_ptr = VX_NULL;
 
     vxmASSERT(context);
     vxmASSERT(wb);
@@ -21683,7 +16955,29 @@ vx_status vxoWeightsBiases_Compress(
 
     if (WB_MEM_SIZE_INDEX(wb, 0) > 0) return status;
 
-    vxmASSERT(weight_ptr != VX_NULL && bias_ptr != VX_NULL);
+    if (context->options.enableMemOptimization)
+    {
+        if (WB_BASE(wb)->reshuffleWeightPtr != VX_NULL)
+        {
+            weight_ptr = WB_BASE(wb)->reshuffleWeightPtr;
+        }
+        else
+        {
+            vxoTensor_GetTensorViewMemory(WB_WEIGHT_TENSOR(wb), (gctPOINTER*)(&weight_ptr), VX_NULL);
+        }
+
+        if (WB_BIAS_TENSOR(wb))
+        {
+            vxoTensor_GetTensorViewMemory(WB_BIAS_TENSOR(wb), (gctPOINTER*)(&bias_ptr), VX_NULL);
+        }
+    }
+    else
+    {
+        weight_ptr = wb_base->weightPtr;
+        bias_ptr = wb_base->biasPtr;
+    }
+
+    vxmASSERT(weight_ptr != VX_NULL);
 
     weightSize = (vx_uint32)vxDataType_GetSize((vx_type_e)wb_base->weights_data_format);
     oneFilterSize = wb_base->weights_sizes[0] *
@@ -21713,6 +17007,7 @@ vx_status vxoWeightsBiases_Compress(
                                         VX_NULL,
                                         0
                                         );
+            minKernelBufferSize[0] = minTotalKernelBufferSize;
         }
         else if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_COEF_COMPRESSION_ENHANCEMENT))
         {
@@ -21738,6 +17033,7 @@ vx_status vxoWeightsBiases_Compress(
                                         (bias_ptr != VX_NULL) ? bias_ptr: VX_NULL,
                                         0
                                         );
+            minKernelBufferSize[0] = minTotalKernelBufferSize;
         }
         else
         {
@@ -21875,8 +17171,7 @@ vx_status vxoWeightsBiases_Compress(
                             (bias_ptr != VX_NULL) ? bias_ptr + biasDataDWordOffset : VX_NULL,
                             VX_NULL,
                             VX_NULL,
-                            VX_NULL,
-                            VX_NULL,
+                            wb->wb_base->origAlpha,
                             index);
                     }
                     else if (wb->wb_base->hw_depth_wise)
@@ -21987,8 +17282,8 @@ vx_status vxoWeightsBiases_Compress(
                 kzoffset += sliceCount * weightSize;
 
                 wb->slice_array[index].memory_offset = compressDataBytesOffset;
-                wb->slice_array[index].memory_size = wb_base->memory_pad + wb->use_tp_fc ?
-                                                        wb->slice_array[index].kernel_stream_size : minKernelBufferSize[index];
+                wb->slice_array[index].memory_size = wb_base->memory_pad + (wb->use_tp_fc ?
+                                                        wb->slice_array[index].kernel_stream_size : minKernelBufferSize[index]);
                 compressDataBytesOffset += wb->slice_array[index].memory_size;
 
                 index++;
@@ -22012,40 +17307,6 @@ vx_status vxoWeightsBiases_Compress(
 
 exit:
     return status;
-}
-
-void vxoWeightsBiases_Clear(vx_weights_biases_parameter wb)
-{
-    vx_weights_biases_parameter_base wbBase;
-
-    vxmASSERT(wb);
-
-    wbBase = wb->wb_base;
-
-    vxmASSERT(wbBase);
-
-    if (wbBase->weightPtr != VX_NULL)
-    {
-        vxFree(wbBase->weightPtr);
-        wbBase->weightPtr = VX_NULL;
-    }
-    if (wbBase->biasPtr != VX_NULL)
-    {
-        vxFree(wbBase->biasPtr);
-        wbBase->biasPtr = VX_NULL;
-    }
-
-    if (wbBase->origWeight != VX_NULL)
-    {
-        vxoReference_Release((vx_reference_ptr)&wbBase->origWeight, VX_TYPE_TENSOR, VX_REF_INTERNAL);
-        wbBase->origWeight = VX_NULL;
-    }
-
-    if (wbBase->origBias != VX_NULL)
-    {
-        vxoReference_Release((vx_reference_ptr)&wbBase->origBias, VX_TYPE_TENSOR, VX_REF_INTERNAL);
-        wbBase->origBias = VX_NULL;
-    }
 }
 
 VX_INTERNAL_CALLBACK_API void vxoWeightsBiases_Destructor(vx_reference ref)
@@ -22121,6 +17382,51 @@ void vxoWeightsBiases_Destroy(
     vxoReference_Release((vx_reference_ptr)&(wb->wb_base), VX_TYPE_WEIGHTS_BIASES_PARAMETER_BASE, VX_REF_INTERNAL);
 }
 
+void vxoWeightsBiases_Clear(vx_weights_biases_parameter wb)
+{
+    vx_weights_biases_parameter_base wbBase;
+
+    vxmASSERT(wb);
+
+    wbBase = wb->wb_base;
+
+    vxmASSERT(wbBase);
+
+    if (wb->base.context->options.enableMemOptimization)
+    {
+        if (wbBase->reshuffleWeightPtr != VX_NULL)
+        {
+            vxFree(wbBase->reshuffleWeightPtr);
+            wbBase->reshuffleWeightPtr = VX_NULL;
+        }
+    }
+    else
+    {
+        if (wbBase->weightPtr != VX_NULL)
+        {
+            vxFree(wbBase->weightPtr);
+            wbBase->weightPtr = VX_NULL;
+        }
+        if (wbBase->biasPtr != VX_NULL)
+        {
+            vxFree(wbBase->biasPtr);
+            wbBase->biasPtr = VX_NULL;
+        }
+    }
+
+    if (wbBase->origWeight != VX_NULL)
+    {
+        vxoReference_Release((vx_reference_ptr)&wbBase->origWeight, VX_TYPE_TENSOR, VX_REF_INTERNAL);
+        wbBase->origWeight = VX_NULL;
+    }
+
+    if (wbBase->origBias != VX_NULL)
+    {
+        vxoReference_Release((vx_reference_ptr)&wbBase->origBias, VX_TYPE_TENSOR, VX_REF_INTERNAL);
+        wbBase->origBias = VX_NULL;
+    }
+}
+
 vx_weights_biases_parameter _createWeightsBiasesParameterFromTensors(
     vx_context  context,
     vx_enum     layer_type,
@@ -22144,6 +17450,8 @@ vx_weights_biases_parameter _createWeightsBiasesParameterFromTensors(
     vx_enum     rank_mode,
     vx_tensor   weights,
     vx_tensor   biases,
+    vx_tensor   alpha,
+    vx_bool     doPRelu,
     vx_bool     do1xN
     )
 {
@@ -22178,11 +17486,8 @@ vx_weights_biases_parameter _createWeightsBiasesParameterFromTensors(
     vx_uint32 filterTotalCount;
     vx_uint32 i;
 
-    gctPOINTER weightBase           = VX_NULL;
     gctPOINTER convertedWeightData  = VX_NULL;
     gctPOINTER weightData           = VX_NULL;
-    vx_uint8_ptr startWeightDataPtr = VX_NULL;
-    gctPOINTER biasBase             = VX_NULL;
     vx_bool    reallyDo1xN          = vx_false_e;
     vx_bool    doZdpOpt             = vx_false_e;
 
@@ -22201,8 +17506,6 @@ vx_weights_biases_parameter _createWeightsBiasesParameterFromTensors(
         vxError("_createWeightsBiasesParameterFromTensors: current NN didn't support this format 0x%x", weightDataType);
         goto exit;
     }
-
-    context->options.fcZMax = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VIP_V7) ? (1<<20) - 1 : (1<<14) - 1;
 
     vxoTensor_GetTensorViewRegion(weights, weightDimCount, weightViewStarts, weightViewEnds);
 
@@ -22378,7 +17681,6 @@ vx_weights_biases_parameter _createWeightsBiasesParameterFromTensors(
 
         stride_x = (stride_x > 0) ? stride_x : gcmCEIL((vx_float32)inputDims[index_w] / convOutputDims[index_w]);
         stride_y = (stride_y > 0) ? stride_y : gcmCEIL((vx_float32)inputDims[index_h] / convOutputDims[index_h]);
-        gcmASSERT(stride_x == stride_y);
 
         doZdpOpt = calcFitZdp3N(context, inputs_dims[index_w], inputs_dims[index_h], &fitN, stride_x, pooling_size_x);
         fitOutN = fitN / stride_x;
@@ -22441,6 +17743,14 @@ vx_weights_biases_parameter _createWeightsBiasesParameterFromTensors(
         biasScale = TENSOR_TF_SCALE(biases);
         biasFp = TENSOR_POS(biases);
 
+        if (biasDataType != VX_TYPE_INT32 &&
+            biasDataType != VX_TYPE_FLOAT32 &&
+            biasDataType != VX_TYPE_INT64)
+        {
+            status = VX_ERROR_INVALID_TYPE;
+            vxError("_createWeightsBiasesParameterFromTensors: current NN didn't support this bias format 0x%x", biasDataType);
+            goto exit;
+        }
         vxoTensor_GetTensorViewRegion(biases, biasDimCount, biasViewStarts, biasViewEnds);
         if (biases->isViewed)
         {
@@ -22510,6 +17820,12 @@ vx_weights_biases_parameter _createWeightsBiasesParameterFromTensors(
     else
         wb_base->no_bias = vx_true_e;
 
+    if (doPRelu && alpha != VX_NULL)
+    {
+        wb_base->origAlpha = alpha;
+        vxoReference_Increment((vx_reference)wb_base->origAlpha, VX_REF_INTERNAL);
+    }
+
     wb_base->do_1xN = reallyDo1xN;
     wb_base->do_zdp_opt = doZdpOpt;
 
@@ -22518,14 +17834,13 @@ vx_weights_biases_parameter _createWeightsBiasesParameterFromTensors(
         !wb_base->do_zdp_opt &&
         (wb_base->weights_data_format == VX_TYPE_INT8 || wb_base->weights_data_format == VX_TYPE_UINT8) &&
         pooling_size_x == 0 &&
-        inputDims[0] % 2 == 0 &&
-        (layer_type == VX_NN_CONVOLUTION_LAYER || (layer_type == VX_NN_DEPTH_WISE_CONVOLUTION_LAYER && hasHwDepthWise)))
+        ((inputDims[0] % 2 == 0 && layer_type == VX_NN_CONVOLUTION_LAYER) || (layer_type == VX_NN_DEPTH_WISE_CONVOLUTION_LAYER && hasHwDepthWise)))
     {
         /* Per Arch, only support INT8 3x3 conv right now*/
         /* First pixel pooling is 2x2 poooling stride is 2, so convolution output should be even*/
         vx_float32 nonZeroRatio = calculateWeightNonZeroRatio(context, wb_base->skipValue, weights);
 
-        if (nonZeroRatio * weights->dims[0] * weights->dims[1] < 6.3)
+        if (nonZeroRatio * weights->dims[0] * weights->dims[1] < 6.3 || (layer_type == VX_NN_DEPTH_WISE_CONVOLUTION_LAYER && hasHwDepthWise))
         {
             /* If no pooling & stride = 2 && non-zero-ratio * kx * ky less than 0.7 * 9, do first pixel pooling(2x2, stride = 2), no need reshuffle */
             wb_base->strideX = 1;
@@ -22548,7 +17863,15 @@ vx_weights_biases_parameter _createWeightsBiasesParameterFromTensors(
        strideX == 1 &&
        strideY == 1 &&
        (wb_base->weights_data_format == VX_TYPE_INT8 || wb_base->weights_data_format == VX_TYPE_UINT8))
+    {
         wb_base->hw_depth_wise = vx_true_e;
+        if (wb_base->weights_sizes[2] != 1 && wb_base->weights_sizes[3] == 1)
+        {
+            /*default set kz = 1, vz = outZ*/
+            wb_base->weights_sizes[3] = wb_base->weights_sizes[2];
+            wb_base->weights_sizes[2] = 1;
+        }
+    }
     else
         wb_base->hw_depth_wise = vx_false_e;
 
@@ -22564,108 +17887,120 @@ vx_weights_biases_parameter _createWeightsBiasesParameterFromTensors(
     weightCount = wb_base->weights_sizes[0] * wb_base->weights_sizes[1];
     filterTotalCount = wb_base->weights_sizes[3];
 
-    /* Get weights & bias base memory */
-    vxoTensor_GetTensorViewMemory(weights, &weightBase, VX_NULL);
-    startWeightDataPtr = (vx_uint8*)weightBase;
-
-    /* If need reshuffle? */
-    if (((strideX > 1) || (strideY > 1)) && weightDims[0] != 1 && weightDims[1] != 1)
+    if (context->options.enableMemOptimization)
     {
-        /* do reshuffle*/
-        vx_uint32 alignWeightWidth = vxnneAlignWithStride(weightDims[0], strideX);
-        vx_uint32 alignWeightHeight = vxnneAlignWithStride(weightDims[1], strideY);
-        vx_uint32 depth = weightDims[2];
-        vx_nn_reshuffle_s src = {NULL, alignWeightWidth, alignWeightHeight, depth, weightDims[3] * 1, (vx_type_e)TENSOR_DATA_TYPE(weights)};
-        vx_nn_reshuffle_s dst = {NULL, wb_base->weights_sizes[0], wb_base->weights_sizes[1], wb_base->weights_sizes[2], wb_base->weights_sizes[3]*1, (vx_type_e)wb_base->weights_data_format};
-        vx_uint32 x, y, z, w;
-        vx_uint32 orgXSize = weightDims[0], orgYSize = weightDims[1], orgZSize = depth;
-        vx_uint32 weightItemCount = weightCount * sliceCount * filterTotalCount;
+        /* reshuffle weight data and save in wb_base->reshuffleWeightPtr if kernel stride > 1 */
+        vxoWeightsBiases_Reshuffle(wb_base);
+    }
+    else
+    {
+        gctPOINTER weightBase           = VX_NULL;
+        vx_uint8_ptr startWeightDataPtr = VX_NULL;
+        gctPOINTER biasBase             = VX_NULL;
 
-        {
-            convertedWeightData = vxAllocateAndZeroMemory(weightItemCount * weightSize);
-        }
+        /* Get weights & bias base memory */
+        vxoTensor_GetTensorViewMemory(weights, &weightBase, VX_NULL);
+        startWeightDataPtr = (vx_uint8*)weightBase;
 
-        /* Allocate temp buffer for weight data */
+        /* If need reshuffle? */
+        if (((strideX > 1) || (strideY > 1)) && (weightDims[0] != 1 || weightDims[1] != 1))
         {
-            weightData = vxAllocateAndZeroMemory(weightItemCount * weightSize);
-        }
+            /* do reshuffle*/
+            vx_uint32 alignWeightWidth = vxnneAlignWithStride(weightDims[0], strideX);
+            vx_uint32 alignWeightHeight = vxnneAlignWithStride(weightDims[1], strideY);
+            vx_uint32 depth = weightDims[2];
+            vx_nn_reshuffle_s src = {NULL, alignWeightWidth, alignWeightHeight, depth, weightDims[3] * 1, (vx_type_e)TENSOR_DATA_TYPE(weights)};
+            vx_nn_reshuffle_s dst = {NULL, wb_base->weights_sizes[0], wb_base->weights_sizes[1], wb_base->weights_sizes[2], wb_base->weights_sizes[3]*1, (vx_type_e)wb_base->weights_data_format};
+            vx_uint32 x, y, z, w;
+            vx_uint32 orgXSize = weightDims[0], orgYSize = weightDims[1], orgZSize = depth;
+            vx_uint32 weightItemCount = weightCount * sliceCount * filterTotalCount;
 
-        if (convertedWeightData == VX_NULL || weightData == VX_NULL)
-        {
-            status = VX_ERROR_NO_MEMORY;
-            goto exit;
-        }
-
-        for (w = 0; w < src.wSize; w++)
-        {
-            for (z = 0; z < src.zSize; z++)
             {
-                /* convert float32 to float16 and fill edge with 0 */
-                for (y = 0; y < src.ySize; y++)
+                convertedWeightData = vxAllocateAndZeroMemory(weightItemCount * weightSize);
+            }
+
+            /* Allocate temp buffer for weight data */
+            {
+                weightData = vxAllocateAndZeroMemory(weightItemCount * weightSize);
+            }
+
+            if (convertedWeightData == VX_NULL || weightData == VX_NULL)
+            {
+                status = VX_ERROR_NO_MEMORY;
+                goto exit;
+            }
+
+            for (w = 0; w < src.wSize; w++)
+            {
+                for (z = 0; z < src.zSize; z++)
                 {
-                    for (x = 0; x < src.xSize; x++)
+                    /* convert float32 to float16 and fill edge with 0 */
+                    for (y = 0; y < src.ySize; y++)
                     {
-                        vx_uint32 orgOffsetSize = (w * orgZSize * orgYSize * orgXSize + z * orgYSize * orgXSize + y * orgXSize + x) * weightSize;
-                        vx_uint32 fpOffsetSize = (w * src.zSize * src.ySize * src.xSize + z * src.ySize * src.xSize + y * src.xSize + x) * weightSize;
-                        vx_uint32 zero = (TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE) ? TENSOR_TF_ZEROPOINT(weights) : 0;
-                        vx_uint8 *converted, *orig;
-
-                        converted = (vx_uint8*)convertedWeightData + fpOffsetSize;
-
-                        if ((x > orgXSize - 1) || (y > orgYSize - 1))
+                        for (x = 0; x < src.xSize; x++)
                         {
-                            _DataGeneralConvert((void*)&zero, (void*)converted, weightSize, weightSize);
-                        }
-                        else
-                        {
-                            orig = startWeightDataPtr + orgOffsetSize;
-                            _DataGeneralConvert((void*)orig, (void*)converted, weightSize, weightSize);
+                            vx_uint32 orgOffsetSize = (w * orgZSize * orgYSize * orgXSize + z * orgYSize * orgXSize + y * orgXSize + x) * weightSize;
+                            vx_uint32 fpOffsetSize = (w * src.zSize * src.ySize * src.xSize + z * src.ySize * src.xSize + y * src.xSize + x) * weightSize;
+                            vx_uint32 zero = (TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE) ? TENSOR_TF_ZEROPOINT(weights) : 0;
+                            vx_uint8 *converted, *orig;
+
+                            converted = (vx_uint8*)convertedWeightData + fpOffsetSize;
+
+                            if ((x > orgXSize - 1) || (y > orgYSize - 1))
+                            {
+                                _DataGeneralConvert((void*)&zero, (void*)converted, weightSize, weightSize);
+                            }
+                            else
+                            {
+                                orig = startWeightDataPtr + orgOffsetSize;
+                                _DataGeneralConvert((void*)orig, (void*)converted, weightSize, weightSize);
+                            }
                         }
                     }
                 }
             }
+
+            /*reshuffle kernel data*/
+            src.data   = convertedWeightData;
+            dst.data   = weightData;
+            reshuffleData(&src, strideX, strideY, &dst);
+
+            /* re-wrap weight buffer */
+            weightBase = weightData;
+
+            {
+                vxFree(convertedWeightData);
+            }
+
+            convertedWeightData = VX_NULL;
         }
 
-        /*reshuffle kernel data*/
-        src.data   = convertedWeightData;
-        dst.data   = weightData;
-        reshuffleData(&src, strideX, strideY, &dst);
+        if (biases) vxoTensor_GetTensorViewMemory(biases, &biasBase, VX_NULL);
 
-        /* re-wrap weight buffer */
-        weightBase = weightData;
-
+        /* Save original weight/bias data for sw-tiling */
         {
-            vxFree(convertedWeightData);
+            vx_uint32 size;
+
+            size = wb_base->weights_sizes[0] * wb_base->weights_sizes[1] * wb_base->weights_sizes[2] * wb_base->weights_sizes[3] *
+                   vxDataType_GetSize((vx_type_e)wb_base->weights_data_format);;
+            wb_base->weightPtr = (vx_uint8_ptr)vxAllocate(size);
+            if (wb_base->weightPtr == VX_NULL)
+            {
+                status = VX_ERROR_NO_MEMORY;
+                goto exit;
+            }
+            vxMemCopy(wb_base->weightPtr, weightBase, size);
+
+            size = wb_base->weights_sizes[3] * vxDataType_GetSize((vx_type_e)wb_base->biases_data_format);
+            wb_base->biasPtr = (vx_uint32_ptr)vxAllocate(size);
+            if (wb_base->biasPtr == VX_NULL)
+            {
+                status = VX_ERROR_NO_MEMORY;
+                goto exit;
+            }
+            if (biases != VX_NULL)
+                vxMemCopy(wb_base->biasPtr, biasBase, size);
         }
-
-        convertedWeightData = VX_NULL;
-    }
-
-    if (biases) vxoTensor_GetTensorViewMemory(biases, &biasBase, VX_NULL);
-
-    /* Save original weight/bias data for sw-tiling */
-    {
-        vx_uint32 size;
-
-        size = wb_base->weights_sizes[0] * wb_base->weights_sizes[1] * wb_base->weights_sizes[2] * wb_base->weights_sizes[3] *
-               vxDataType_GetSize((vx_type_e)wb_base->weights_data_format);;
-        wb_base->weightPtr = (vx_uint8_ptr)vxAllocate(size);
-        if (wb_base->weightPtr == VX_NULL)
-        {
-            status = VX_ERROR_NO_MEMORY;
-            goto exit;
-        }
-        vxMemCopy(wb_base->weightPtr, weightBase, size);
-
-        size = wb_base->weights_sizes[3] * vxDataType_GetSize((vx_type_e)wb_base->biases_data_format);
-        wb_base->biasPtr = (vx_uint32_ptr)vxAllocate(size);
-        if (wb_base->biasPtr == VX_NULL)
-        {
-            status = VX_ERROR_NO_MEMORY;
-            goto exit;
-        }
-        if (biases != VX_NULL)
-            vxMemCopy(wb_base->biasPtr, biasBase, size);
     }
 
     weight_bias = vxoWeightsBiases_Create(context,
@@ -22696,41 +18031,6 @@ vx_weights_biases_parameter _createWeightsBiasesParameterFromTensors(
         weight_bias->mGpuWBCount = 0;
     }
 
-    {
-        vx_uint32 outputs_xy_dims[3];
-
-        if (rank_mode == VX_TENSOR_RANK_CWHN)
-        {
-            outputs_xy_dims[0] = convOutputDims[2] / wb_base->pooling_stride;
-            outputs_xy_dims[1] = convOutputDims[1] / wb_base->pooling_stride;
-        }
-        else
-        {
-            memcpy(outputs_xy_dims, finalOutputDims, sizeof(vx_uint32) * 2);
-        }
-
-        outputs_xy_dims[2] = wb_base->weights_sizes[3];
-
-        calculateArchPerfFromWB(context,
-                                weight_bias->archPerfHandle,
-                                weight_bias,
-                                inputDims,
-                                outputs_xy_dims,
-                                VX_NULL,
-                                1,
-                                SW_TILING_FROM_DDR, SW_TILING_FROM_DDR, SW_TILING_FROM_DDR,
-                                (vx_int32)(context->nnConfig.customizedFeature.vipSRAMSizeInKB - VX_VIP_SRAM_IMAGE_STREAM_SIZE / 1024),
-                                weight_bias->use_tp_fc ? VXNNE_OPERATION_TARGET_TP : VXNNE_OPERATION_TARGET_NN,
-                                layer_type == VX_NN_FULLYCONNECTED_LAYER ? VXNNE_OPERATOR_FULLYCONNECTED :
-                                layer_type == VX_NN_DEPTH_WISE_CONVOLUTION_LAYER ? VXNNE_OPERATOR_DEPTH_WISE_CONV : VXNNE_OPERATOR_CONVOLUTION);
-
-         vxoWeightsBiases_Compress(context,
-                                      weight_bias,
-                                      weight_bias->archPerfHandle->resultInfo.kernelsPerCore,
-                                      outputs_xy_dims,
-                                      output_format,
-                                      -1);
-    }
 
 exit:
     /* Free temp weight data buffer */
@@ -22827,14 +18127,14 @@ vx_status vxnneCalculateConvTilingParam(
     vx_context                                context,
     vxnne_convolution_relu_pooling_operation  conv_op,
     vxnne_tiling_info                         info,
-    vx_bool                                   inputSRAM,
-    vx_bool                                   outputSRAM,
-    vx_uint32                                 count
+    vx_uint8                                  inputSRAM,
+    vx_uint8                                  outputSRAM,
+    vx_uint32                                 count,
+    vx_uint32                                 vipSize
     )
 {
     vx_uint32 i, minKPK=0xFFFFFFFF, imode = 0;
     vx_arch_perf_s perf;
-
 
     for (i = 0; i < count; i++)
     {
@@ -22851,8 +18151,8 @@ vx_status vxnneCalculateConvTilingParam(
         perf.swTilingInfo.origInY = TENSOR_SIZE_INDEX(conv_op->inputs, 1);
         perf.swTilingInfo.origOutX = TENSOR_SIZE_INDEX(conv_op->outputs, 0);
         perf.swTilingInfo.origOutY = TENSOR_SIZE_INDEX(conv_op->outputs, 1);
-        perf.swTilingInfo.srcBuf = inputSRAM  ? SW_TILING_FROM_AXI_SRAM : SW_TILING_FROM_DDR;
-        perf.swTilingInfo.dstBuf = outputSRAM ? SW_TILING_FROM_AXI_SRAM : SW_TILING_FROM_DDR;
+        perf.swTilingInfo.srcBuf = inputSRAM ;
+        perf.swTilingInfo.dstBuf = outputSRAM;
         perf.swTilingInfo.kernelBuf = SW_TILING_FROM_VIP_SRAM;
         perf.swTilingInfo.outImageStride = conv_op->outputs->strides[1];
         perf.swTilingInfo.outImageSlice = conv_op->outputs->strides[1] * info[i].output.height;
@@ -22864,7 +18164,7 @@ vx_status vxnneCalculateConvTilingParam(
                                 offsets,
                                 1,
                                 perf.swTilingInfo.srcBuf, perf.swTilingInfo.dstBuf, perf.swTilingInfo.kernelBuf,
-                                (vx_int32)(context->nnConfig.customizedFeature.vipSRAMSizeInKB - VX_VIP_SRAM_IMAGE_STREAM_SIZE / 1024),
+                                vipSize,
                                 VXNNE_OPERATION_TARGET_NN,
                                 VXNNE_OPERATOR_CONVOLUTION);
 
@@ -22888,201 +18188,15 @@ vx_status vxnneCalculateConvTilingParam(
     return VX_SUCCESS;
 }
 
-vx_uint32 vxnneCalculateMultiTPSliceEx(
-    vx_context                   context,
-    vx_enum                      tp_type,
-    vx_uint32                    input_x_size,
-    vx_uint32                    input_y_size,
-    vx_uint32                    input_z_size,
-    vx_uint32                    output_x_size,
-    vx_uint32                    output_y_size,
-    vx_uint32                    output_z_size,
-    vx_reference                 other_ref,
-    vx_tp_value_cmd              value
-    )
-{
-    vx_uint32 slice, stride, size = input_z_size;
-    vx_uint32 core = tp_type != TP_SINGLE_FC ? context->nnConfig.fixedFeature.tpCoreCount :
-                                               context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
-    vx_bool mult = context->options.enableMultiTP && core > 1;
-
-    switch (tp_type)
-    {
-        case TP_RESHUFFLE:
-            gcmASSERT(other_ref != VX_NULL);
-            {
-                vx_weights_biases_parameter wb = (vx_weights_biases_parameter)other_ref;
-                stride = context->options.typeTPFunc[TP_RESHUFFLE] == 2 && WB_KERNEL_X(wb) != 1 && WB_KERNEL_Y(wb) != 1 ? WB_STRIDE_X(wb) : 1;
-                slice = !mult ? 1 : input_z_size < core || context->options.typeTPFunc[TP_RESHUFFLE] == 2 ? input_z_size : core;
-                slice *= stride;
-            }
-            break;
-
-        case TP_SINGLE_FC:
-            gcmASSERT(other_ref != VX_NULL);
-            if (!value->e32[0]) slice = ((vx_weights_biases_parameter)other_ref)->slice_num;
-            else slice = 1;
-            break;
-
-        case TP_MAX_POOLING:
-        case TP_ADD:
-        case TP_TENSOR_PAD:
-            slice = !mult ? 1 : gcmMIN(input_z_size, core);
-            break;
-
-        case TP_ACTIVATION:
-        case TP_TENSOR_COPY:
-            if (!mult || input_x_size != output_x_size || input_y_size != output_y_size || input_z_size != output_z_size)
-            {
-                slice = 1;
-            }
-            else
-            {
-                slice = gcmMIN(input_z_size, core);
-            }
-            break;
-
-        case TP_TENSOR_SQUEEZE:
-            slice = 1;
-            break;
-
-        case TP_LRN:
-            if (value->e32[0] == VX_NN_NORMALIZATION_SAME_MAP)
-            {
-                slice = !mult || input_z_size != output_z_size ? 1 : gcmMIN(input_z_size, core);
-            }
-            else /* VX_NN_NORMALIZATION_ACROSS_MAPS */
-            {
-                if (input_x_size * input_y_size < 65536)
-                {
-                    size = input_x_size * input_y_size;
-                    output_y_size = input_z_size;
-                }
-                else
-                {
-                    size = input_x_size;
-                    output_x_size = output_z_size;
-                }
-                slice = !mult ? 1 : gcmMIN(size, core);
-            }
-            break;
-
-        case TP_ROI_POOLING:
-        case TP_ROI_POOLING_STEP_1:
-        case TP_ROI_POOLING_STEP_2:
-            if (!value->e32[0])
-            {
-                slice = !mult ? 1 : gcmMIN(input_z_size, core);
-                output_x_size = input_x_size;
-                output_y_size = value->u32[2];
-            }
-            else
-            {
-                slice = !mult ? 1 : gcmMIN(value->u32[6], core);
-                size = value->u32[6];
-            }
-            break;
-
-        case TP_REORG:
-            output_z_size = input_z_size / value->u32[0] / value->u32[0];
-            slice = !mult ? 1 : gcmMIN(output_z_size, core);
-            size = output_z_size;
-            output_x_size *= value->u32[0];
-            output_y_size *= value->u32[0];
-            break;
-
-        case TP_TRANSPOSE:
-            {
-                vx_uint32 i, x, y, dnum = value->u32[0], dsize;
-                vx_uint32 dims[VX_CONTEXT_TENSOR_MAX_DIMENSION], strides[VX_CONTEXT_TENSOR_MAX_DIMENSION];
-                gcmASSERT(other_ref != VX_NULL);
-                vxoTensor_GetTensorDimStride((vx_tensor)other_ref, &dnum, dims, strides);
-                gcmASSERT(dims[0] < TP_MAX_XYSIZE && dims[1] < TP_MAX_XYSIZE);
-                dsize = TENSOR_DATA_SIZE((vx_tensor)other_ref);
-                x = dims[0];
-                y = strides[dnum-1] * dims[dnum-1] / dsize / dims[0];
-                for (i = 1; i < dnum; i++)
-                {
-                    if (x >= TP_MAX_XYSIZE || y < TP_MAX_XYSIZE)
-                    {
-                        break;
-                    }
-                    else
-                    {
-                        x *= dims[i];
-                        y /= dims[i];
-                    }
-                }
-                if (x < TP_MAX_XYSIZE && y < TP_MAX_XYSIZE)
-                {
-                    slice = 1;
-                }
-                else
-                {
-                    /* TP X/Y size has max size limitation, must split */
-                    y = strides[dnum-1] * dims[dnum-1] / dsize / dims[0];
-                    slice = gcmALIGN_NP2(y, TP_MAX_XYSIZE-1) / (TP_MAX_XYSIZE-1);
-                }
-            }
-            break;
-
-        case TP_REVERSE:
-        case TP_RNN_INTERLEAVE:
-        case TP_LSTM_RESHUFFLE_INPUT:
-        case VXNNE_OPERATOR_LSTM_STATE_OUT:
-            slice = 1;
-            break;
-
-        case TP_UPSAMPLE:
-        case TP_UPSAMPLE_CLIP:
-            slice = (mult == vx_true_e && core > 0)?gcmMIN(output_z_size, core):1;
-            break;
-
-        default:
-            slice = 1;
-            break;
-    }
-
-    if (slice != 1 && tp_type != TP_SINGLE_FC && output_x_size == 1 && output_y_size == 1)
-    {
-        vx_uint32 last;
-        /* TP output pixel must larger than 1 */
-        _getMultiTPParam(size, core, slice - 1, vx_true_e, &last, VX_NULL);
-        if (last == 1)
-        {
-            slice = 1;
-        }
-    }
-
-    return slice;
-}
-
-vx_uint32 vxnneCalculateMultiTPSlice(
-    vx_context                   context,
-    vxnne_tp_operation           operation
-    )
-{
-    vx_tensor input  = operation->input;
-    vx_tensor output  = operation->output;
-
-    return vxnneCalculateMultiTPSliceEx(context,
-                                        operation->base.parameter.tpType,
-                                        TENSOR_VIEW_SIZE_INDEX(input, 0),
-                                        TENSOR_VIEW_SIZE_INDEX(input, 1),
-                                        TENSOR_VIEW_SIZE_INDEX(input, 2),
-                                        TENSOR_VIEW_SIZE_INDEX(output, 0),
-                                        TENSOR_VIEW_SIZE_INDEX(output, 1),
-                                        TENSOR_VIEW_SIZE_INDEX(output, 2),
-                                        operation->base.parameter.other_ref,
-                                        operation->tp_value);
-}
-
 vx_status vxnneOperation_InitializeCommand(
     vx_context context,
+    vx_graph graph,
     vxnne_operation operation,
     vxnne_operation_command_s * command
     )
 {
+    vx_status status = VX_SUCCESS;
+
     vxnne_tiling_rect input  = &command->inputTile;
     vxnne_tiling_rect output = &command->outputTile;
 
@@ -23155,6 +18269,87 @@ vx_status vxnneOperation_InitializeCommand(
             command->cmdInfo.convWidth = output->width;
             command->cmdInfo.convHeight = output->height;
         }
+
+        {
+            vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)operation;
+            vxnne_mem_request requestList;
+            vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat, imageTileSize, kernelbufferSize;
+            vxnne_operation_info_s opInfo;
+            vxnneOperation_GetInfo(operation, &opInfo);
+
+            outImageTileX  = convOperation->resultInfo.outImageTileXSize;
+            outImageTileY  = convOperation->resultInfo.outImageTileYSize;
+            interleaveMode = convOperation->resultInfo.interleaveMode;
+            kernelX = opInfo.weightsBiases->weights_sizes[0];
+            kernelY = opInfo.weightsBiases->weights_sizes[1];
+            inImageZ = TENSOR_SIZE_INDEX(opInfo.input, 2);
+            inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
+
+            imageTileSize = caculate3DTileSize(context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
+
+            kernelbufferSize = (vx_uint32)gcmALIGN_NP2(opInfo.weightsBiases->slice_array[0].kernel_align_stream_size, CACHE_ALIGNMENT_SIZE);
+
+            requestList = graph->layer->memRequestList + command->operationID;
+
+            if (context->vipSRAM.size > VX_VIP_SRAM_IMAGE_STREAM_SIZE)
+            {
+                gcoOS_ZeroMemory(&requestList->kernelCache, sizeof(vx_memory_s));
+                requestList->kernelCache.lastUseId = requestList->kernelCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
+                requestList->kernelCache.sizes[0] = kernelbufferSize;
+                requestList->kernelCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+                requestList->kernelCache.allocPriority = VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_2;
+                requestList->kernelCache.allocPartial = vx_true_e;
+                requestList->inputMemory[requestList->inputCount] = &requestList->kernelCache;
+                requestList->inputCount++;
+
+                gcoOS_ZeroMemory(&requestList->imageCache, sizeof(vx_memory_s));
+                requestList->imageCache.lastUseId = requestList->imageCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
+                requestList->imageCache.sizes[0] = imageTileSize;
+                requestList->imageCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+                requestList->imageCache.allocPartial = vx_false_e;
+                requestList->imageCache.allocPriority = VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1;
+                requestList->inputMemory[requestList->inputCount] = &requestList->imageCache;
+                requestList->inputCount++;
+            }
+
+            status = vxoMemoryPool_RequestList(graph, graph->layer->memRequestList, graph->layer->base.num_operations, command->operationID, 1, VX_NULL);
+            if (status != VX_SUCCESS)
+            {
+                vxmASSERT(0);
+                goto OnError;
+            }
+
+            if (requestList->imageCache.physicals[0] != 0)
+            {
+                command->cmdInfo.imageCacheSize  = (vx_uint32)requestList->imageCache.sizes[0];
+                command->cmdInfo.imageCacheStart = requestList->imageCache.physicals[0];
+                command->cmdInfo.imageCacheMode  = VXNNE_SRAM_CACHE_MODE_FULL_CACHE;
+                vxmASSERT(requestList->imageCache.allocPartial == vx_false_e);
+            }
+            else
+            {
+                command->cmdInfo.imageCacheMode = VXNNE_SRAM_CACHE_MODE_NONE;
+                command->cmdInfo.imageCacheSize = 0;
+            }
+            if (requestList->kernelCache.physicals[0] != 0)
+            {
+                command->cmdInfo.kernelCacheSize  = (vx_uint32)requestList->kernelCache.sizes[0];
+                command->cmdInfo.kernelCacheStart = requestList->kernelCache.physicals[0];
+                command->cmdInfo.kernelCacheMode = requestList->kernelCache.allocPartial ? VXNNE_SRAM_CACHE_MODE_PARTIAL_CACHE : VXNNE_SRAM_CACHE_MODE_FULL_CACHE;
+            }
+            else
+            {
+                command->cmdInfo.kernelCacheMode = VXNNE_SRAM_CACHE_MODE_NONE;
+                command->cmdInfo.kernelCacheSize = 0;
+            }
+
+            if (context->vipSRAM.size > VX_VIP_SRAM_IMAGE_STREAM_SIZE)
+            {
+                requestList->inputCount = requestList->inputCount - 2;
+            }
+
+            command->cmdInfo.wb = opInfo.weightsBiases;
+        }
     }
     else
     {
@@ -23164,11 +18359,12 @@ vx_status vxnneOperation_InitializeCommand(
     command->cmdInfo.padLeft = operation->parameter.pad_x_left;
     command->cmdInfo.padTop = operation->parameter.pad_y_top;
     command->cmdInfo.flush = vx_true_e;
-    command->cmdInfo.wb = VX_NULL;
+
 
     memcpy(&command->parameter, &operation->parameter, sizeof(vx_op_param_s));
 
-    return VX_SUCCESS;
+OnError:
+    return status;
 }
 
 vx_uint32 caculate3DTileSize(
@@ -23177,7 +18373,7 @@ vx_uint32 caculate3DTileSize(
     vx_uint32 outputTileYSize,
     vx_uint32 kernelX,
     vx_uint32 kernelY,
-    vx_uint32 kernelZ,
+    vx_uint32 inImageZ,
     vx_uint32 dataFormat,
     vx_uint32 interleaveMode
     )
@@ -23191,11 +18387,11 @@ vx_uint32 caculate3DTileSize(
         && (dataFormat == VX_TYPE_INT8 || dataFormat == VX_TYPE_UINT8)))
     {
         vx_uint32 zdpNum = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6) ? 6 : 3;
-        imageTileSize = gcmALIGN_NP2(inImageTileSizeX * interleaveMode * (zdpNum * 2), 16) * gcmCEIL((vx_float32)inImageTileSizeY/interleaveMode) * gcmCEIL((vx_float32)kernelZ/(zdpNum * 2));
+        imageTileSize = gcmALIGN_NP2_SAFE(inImageTileSizeX * interleaveMode * (zdpNum * 2), 16) * gcmCEIL((vx_float32)inImageTileSizeY/interleaveMode) * gcmCEIL((vx_float32)inImageZ/(zdpNum * 2));
     }
     else
     {
-        imageTileSize = gcmALIGN_NP2(inImageTileSizeX  * inImageTileSizeY, 16) * kernelZ * vxnneGetTypeSize((vx_type_e)dataFormat);
+        imageTileSize = gcmALIGN_NP2_SAFE(inImageTileSizeX  * inImageTileSizeY, 16) * inImageZ * vxnneGetTypeSize((vx_type_e)dataFormat);
     }
 
     return gcmALIGN_NP2(imageTileSize, CACHE_ALIGNMENT_SIZE);
@@ -23340,7 +18536,7 @@ vx_status vxnneOperation_CaculateSRAMCache(
     vx_enum*        imageCacheMode
     )
 {
-    vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, kernelZ, inputDataFormat;
+    vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
     vxnne_operation_info_s opInfo;
     vx_status status = VX_SUCCESS;
 
@@ -23355,10 +18551,10 @@ vx_status vxnneOperation_CaculateSRAMCache(
     interleaveMode = opInfo.weightsBiases->archPerfHandle->resultInfo.interleaveMode;
     kernelX = opInfo.weightsBiases->weights_sizes[0];
     kernelY = opInfo.weightsBiases->weights_sizes[1];
-    kernelZ = opInfo.weightsBiases->weights_sizes[2];
+    inImageZ = TENSOR_SIZE_INDEX(opInfo.input, 2);
     inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
 
-    *imageCacheSize = caculate3DTileSize(context, outImageTileX, outImageTileY, kernelX, kernelY, kernelZ, inputDataFormat, interleaveMode);
+    *imageCacheSize = caculate3DTileSize(context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
 
     vxmASSERT(*imageCacheSize != 0);
 
@@ -23439,6 +18635,7 @@ vx_status vxnneOperation_NodeDump(
     vx_uint32 elementCount = 0;
     vx_uint32 index;
     vx_bool isDumpOperation = vx_false_e;
+    size_t len = 0;
 
     for (i = 0; i < opCommand->operation->outputsNum; i++)
     {
@@ -23456,10 +18653,20 @@ vx_status vxnneOperation_NodeDump(
             {
                 if (opCommand->operation->id == (opCommand->operation->layer->num_operations - 1))
                 {
+                    len = 0;
                     offset = 0;
                     memset(layerFileName, 0, sizeof(layerFileName));
-                    gcoOS_PrintStrSafe(layerFileName, 256, &offset, "%d_%s_%d_%d_%d_%d.txt", layerNum, opCommand->operation->layer->name, width, height, depth, opCommand->batchID);
-
+                    len = strlen(((vx_reference)output)->name);
+                    if (len > 0)
+                    {
+                        gcoOS_PrintStrSafe(layerFileName, 256, &offset, "tensorName_%s_NodeID_%d_%s_w_%d_h_%d_d_%d_batchID_%d_out_%d.txt",
+                            ((vx_reference)output)->name, opCommand->operation->layer->node->nodeID, opCommand->operation->layer->name, width, height, depth, opCommand->batchID, i);
+                    }
+                    else
+                    {
+                        gcoOS_PrintStrSafe(layerFileName, 256, &offset, "NodeID_%d_%s_w_%d_h_%d_d_%d_batchID_%d_out_%d.txt",
+                            opCommand->operation->layer->node->nodeID, opCommand->operation->layer->name, width, height, depth, opCommand->batchID, i);
+                    }
                     fpLayer = fopen(layerFileName,"w");
                     if(!fpLayer)
                     {
@@ -23718,6 +18925,203 @@ vx_bool vxnneIsTPSupportFormat(
     else
     {
         return (vx_bool)(isTpSupportFormat[0] && isTpSupportFormat[1] && isTpSupportFormat[2]);
+    }
+}
+
+/* Get irreducible fraction of ratio, return numeration and denominator */
+void vxnneGetIrreducibleFraction(vx_float32 ratio, vx_uint32 *numerationPtr, vx_uint32 *denominatorPtr)
+{
+    vx_uint32 x, y;
+    vx_float32 bestRatio = 0.0f;
+
+    if ((numerationPtr == VX_NULL) || (denominatorPtr == VX_NULL))
+    {
+        return;
+    }
+
+    if (ratio >= (VX_KERNEL_PATTERN_BIT_SIZE - 1))
+    {
+        *numerationPtr = (VX_KERNEL_PATTERN_BIT_SIZE - 1);
+        *denominatorPtr = 1;
+        return;
+    }
+    else if ((ratio < 1.0f) &&
+             ((1.0f / ratio) >= (VX_KERNEL_PATTERN_BIT_SIZE - 1)))
+    {
+        *numerationPtr = 1;
+        *denominatorPtr = (VX_KERNEL_PATTERN_BIT_SIZE - 1);
+        return;
+    }
+
+    for (y = 1; y < VX_KERNEL_PATTERN_BIT_SIZE; y++)
+    {
+        for (x = 1; x < VX_KERNEL_PATTERN_BIT_SIZE; x++)
+        {
+            vx_float32 temp = ((vx_float32)x / y);
+
+            if (((x + y) > VX_KERNEL_PATTERN_BIT_SIZE) ||
+                (temp > ratio))
+            {
+                break;
+            }
+
+            if (temp > bestRatio)
+            {
+                bestRatio = temp;
+                *numerationPtr = x;
+                *denominatorPtr = y;
+            }
+        }
+    }
+
+    vxmASSERT(((vx_float32)(*numerationPtr)/(*denominatorPtr)) <= ratio);
+}
+
+/* get kernel pattern bits, equidistribute binary bit '1' and '0' for hw requirement */
+void vxnneGetKernelPatternBits(vx_uint32 oneNum, vx_uint32 zeroNum, vx_uint64 *kernelPatternBitPtr)
+{
+    vx_uint32 i = 0;
+    vx_uint32 min = gcmMIN(oneNum, zeroNum);
+    vx_uint32 delta = gcmABS((gctINT32)(oneNum - zeroNum));
+    vx_uint64 result = 0;
+    vx_uint64 temp1 = 0;
+    vx_uint64 temp2 = 0;
+
+    if (kernelPatternBitPtr == VX_NULL)
+    {
+        return;
+    }
+
+    /* compute repeated part(binary is "10"), if oneNum is 3 and zeroNum is 2, kernelPatternBit may be "10101", there are two repeated part "10" */
+    for (i = 0; i < min; i++)
+    {
+        if (i == 0)
+        {
+            result = 0x2;
+        }
+        else
+        {
+            result = result << 2;
+            result = result | 0x2;
+        }
+    }
+
+    /* compute the rest binary "1" or "0" part and integrate with the repeated part */
+    if (oneNum > zeroNum)
+    {
+        temp1 = ((((vx_uint64)-1) >> (64 - delta)));
+        temp2 = temp1 << (min * 2);
+        result = result | temp2;
+    }
+    else
+    {
+        result = result << delta;
+    }
+
+    *kernelPatternBitPtr = result;
+}
+
+void vxoWeightsBiases_Reshuffle(
+    vx_weights_biases_parameter_base      wb_base
+    )
+{
+    vx_nn_reshuffle_s src = {
+        NULL,
+        vxnneAlignWithStride(wb_base->org_weights_sizes[0], wb_base->strideX),
+        vxnneAlignWithStride(wb_base->org_weights_sizes[1], wb_base->strideY),
+        wb_base->org_weights_sizes[2],
+        wb_base->org_weights_sizes[3],
+        (vx_type_e)wb_base->weights_data_format
+    };
+    vx_nn_reshuffle_s dst = {
+        NULL,
+        wb_base->weights_sizes[0],
+        wb_base->weights_sizes[1],
+        wb_base->weights_sizes[2],
+        wb_base->weights_sizes[3],
+        (vx_type_e)wb_base->weights_data_format
+    };
+    vx_uint32 x, y, z, w;
+    vx_uint32 orgXSize = wb_base->org_weights_sizes[0];
+    vx_uint32 orgYSize = wb_base->org_weights_sizes[1];
+    vx_uint32 orgZSize = wb_base->org_weights_sizes[2];
+    vx_uint32 weightItemCount = wb_base->weights_sizes[0] * wb_base->weights_sizes[1] * wb_base->weights_sizes[2] *wb_base->weights_sizes[3];
+    vx_uint32 weightSize = (vx_uint32)vxDataType_GetSize((vx_type_e)wb_base->weights_data_format);
+    vx_uint8_ptr startWeightDataPtr = VX_NULL;
+    gctPOINTER convertedWeightData  = VX_NULL;
+
+    if (((wb_base->strideX > 1) || (wb_base->strideY > 1)) &&
+        (wb_base->org_weights_sizes[0] != 1 || wb_base->org_weights_sizes[1] != 1) &&
+        wb_base->reshuffleWeightPtr == VX_NULL)
+    {
+        wb_base->reshuffleWeightPtr = (vx_uint8_ptr)vxAllocateAndZeroMemory(weightItemCount * weightSize);
+        if (wb_base->reshuffleWeightPtr == VX_NULL)
+        {
+            goto exit;
+        }
+
+        {
+            convertedWeightData = vxAllocateAndZeroMemory(weightItemCount * weightSize);
+        }
+
+        if (convertedWeightData == VX_NULL)
+        {
+            goto exit;
+        }
+
+        vxoTensor_GetTensorViewMemory(wb_base->origWeight, (gctPOINTER*)(&startWeightDataPtr), VX_NULL);
+
+        for (w = 0; w < src.wSize; w++)
+        {
+            for (z = 0; z < src.zSize; z++)
+            {
+                /* convert float32 to float16 and fill edge with 0 */
+                for (y = 0; y < src.ySize; y++)
+                {
+                    for (x = 0; x < src.xSize; x++)
+                    {
+                        vx_uint32 orgOffsetSize = (w * orgZSize * orgYSize * orgXSize + z * orgYSize * orgXSize + y * orgXSize + x) * weightSize;
+                        vx_uint32 fpOffsetSize = (w * src.zSize * src.ySize * src.xSize + z * src.ySize * src.xSize + y * src.xSize + x) * weightSize;
+                        vx_uint32 zero = (TENSOR_DATA_TYPE(wb_base->origWeight) == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(wb_base->origWeight) == VX_QUANT_AFFINE_SCALE) ?
+                            TENSOR_TF_ZEROPOINT(wb_base->origWeight) : 0;
+                        vx_uint8 *converted, *orig;
+
+                        converted = (vx_uint8*)convertedWeightData + fpOffsetSize;
+
+                        if ((x > orgXSize - 1) || (y > orgYSize - 1))
+                        {
+                            _DataGeneralConvert((void*)&zero, (void*)converted, weightSize, weightSize);
+                        }
+                        else
+                        {
+                            orig = startWeightDataPtr + orgOffsetSize;
+                            _DataGeneralConvert((void*)orig, (void*)converted, weightSize, weightSize);
+                        }
+                    }
+                }
+            }
+        }
+
+        /*reshuffle kernel data*/
+        src.data   = convertedWeightData;
+        dst.data   = wb_base->reshuffleWeightPtr;
+        reshuffleData(&src, wb_base->strideX, wb_base->strideY, &dst);
+
+        if (convertedWeightData)
+        {
+                vxFree(convertedWeightData);
+
+            convertedWeightData = VX_NULL;
+        }
+
+        return;
+
+exit:
+        if (wb_base->reshuffleWeightPtr)
+        {
+            vxFree(wb_base->reshuffleWeightPtr);
+            wb_base->reshuffleWeightPtr = VX_NULL;
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -48,7 +48,11 @@ static gctBOOL g_UseRange = gcvFALSE;
 
 #if defined(LINUX) || defined(ANDROID)
 /* Video memory mapping. */
+#if ((gcvVERSION_MAJOR > 6) ||((gcvVERSION_MAJOR == 6) && (gcvVERSION_MINOR >= 3)))
+static gctUINT32 g_InternalPhysical, g_ExternalPhysical, g_ContiguousPhysical;
+#else
 static gctPHYS_ADDR g_InternalPhysical, g_ExternalPhysical, g_ContiguousPhysical;
+#endif
 static gctSIZE_T    g_InternalSize,     g_ExternalSize,     g_ContiguousSize;
 static gctPOINTER   g_Internal,         g_External,         g_Contiguous;
 #endif

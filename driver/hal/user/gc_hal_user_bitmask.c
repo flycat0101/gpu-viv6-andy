@@ -19,7 +19,7 @@
 
 #if (gcdENABLE_3D || gcdENABLE_2D)
 /* Zone used for header/footer. */
-#define _GC_OBJ_ZONE    gcvZONE_BUFFER
+#define _GC_OBJ_ZONE    gcdZONE_BUFFER
 
 typedef struct _gcsBITMASKFUNCS
 {

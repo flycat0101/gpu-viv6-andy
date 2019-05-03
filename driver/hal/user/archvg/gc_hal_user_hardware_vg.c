@@ -20,7 +20,7 @@
 
 #include <math.h>
 
-#define _GC_OBJ_ZONE            gcvZONE_VG
+#define _GC_OBJ_ZONE            gcdZONE_VG
 
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
@@ -9077,7 +9077,7 @@ gcoVGHARDWARE_Unlock(
     if (Node->lockCounts[type][engine] <= 0)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_WARNING, gcvZONE_SURFACE,
+            gcvLEVEL_WARNING, gcdZONE_SURFACE,
             "gcoHARDWARE_Unlock: Node=0x%x; unlock called on an unlocked surface.",
             Node
             );

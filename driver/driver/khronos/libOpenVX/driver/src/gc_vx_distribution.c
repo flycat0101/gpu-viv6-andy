@@ -13,6 +13,8 @@
 
 #include <gc_vx_common.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_DIST
+
 VX_INTERNAL_CALLBACK_API void vxoDistribution_Destructor(vx_reference ref)
 {
     vx_distribution distribution = (vx_distribution)ref;
@@ -24,19 +26,27 @@ VX_API_ENTRY vx_distribution VX_API_CALL vxCreateDistribution(vx_context context
 {
     vx_distribution distribution;
 
+    gcmHEADER_ARG("context=%p, numBins=0x%lx, offset=0x%x, range=0x%x", context, numBins, offset, range);
     gcmDUMP_API("$VX vxCreateDistribution: context=%p, numBins=0x%lx, offset=0x%x, range=0x%x", context, numBins, offset, range);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (numBins == 0 || range == 0)
     {
+        gcmFOOTER_NO();
         return (vx_distribution)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
     }
 
     distribution = (vx_distribution)vxoReference_Create(context, VX_TYPE_DISTRIBUTION, VX_REF_EXTERNAL, &context->base);
 
-    if (vxoReference_GetStatus((vx_reference)distribution) != VX_SUCCESS) return distribution;
-
+    if (vxoReference_GetStatus((vx_reference)distribution) != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("%p", distribution);
+        return distribution;
+    }
     distribution->memory.planeCount                 = 1;
     distribution->memory.dimCount                   = 2;
     distribution->memory.strides[0][VX_DIM_CHANNEL] = sizeof(vx_int32);
@@ -52,6 +62,7 @@ VX_API_ENTRY vx_distribution VX_API_CALL vxCreateDistribution(vx_context context
     distribution->rangeX    = range;
     distribution->rangeY    = 1;
 
+    gcmFOOTER_ARG("%p", distribution);
     return distribution;
 }
 
@@ -66,10 +77,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryDistribution(vx_distribution distribut
 {
     vx_int32 dims;
 
+    gcmHEADER_ARG("distribution=%p, attribute=0x%x, ptr=%p, size=0x%lx", distribution, attribute, ptr, size);
     gcmDUMP_API("$VX vxQueryDistribution: distribution=%p, attribute=0x%x, ptr=%p, size=0x%lx", distribution, attribute, ptr, size);
 
-    if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     switch (attribute)
     {
         case VX_DISTRIBUTION_DIMENSIONS:
@@ -120,20 +135,29 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryDistribution(vx_distribution distribut
 
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
+            gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
             return VX_ERROR_NOT_SUPPORTED;
     }
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxAccessDistribution(vx_distribution distribution, void **ptr, vx_enum usage)
 {
+    gcmHEADER_ARG("distribution=%p, ptr=%p, usage=0x%x", distribution, ptr, usage);
     gcmDUMP_API("$VX vxAccessDistribution: distribution=%p, ptr=%p, usage=0x%x", distribution, ptr, usage);
 
-    if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION)) return VX_ERROR_INVALID_REFERENCE;
-
-    if (!vxoMemory_Allocate(distribution->base.context, &distribution->memory)) return VX_ERROR_NO_MEMORY;
-
+    if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+    if (!vxoMemory_Allocate(distribution->base.context, &distribution->memory))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_NO_MEMORY);
+        return VX_ERROR_NO_MEMORY;
+    }
     if (ptr != VX_NULL)
     {
         vx_size size;
@@ -160,17 +184,25 @@ VX_API_ENTRY vx_status VX_API_CALL vxAccessDistribution(vx_distribution distribu
 
     vxoReference_Increment(&distribution->base, VX_REF_EXTERNAL);
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxCommitDistribution(vx_distribution distribution, const void *ptr)
 {
+    gcmHEADER_ARG("distribution=%p, ptr=%p", distribution, ptr);
     gcmDUMP_API("$VX vxCommitDistribution: distribution=%p, ptr=%p", distribution, ptr);
 
-    if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION)) return VX_ERROR_INVALID_REFERENCE;
-
-    if (!vxoMemory_Allocate(distribution->base.context, &distribution->memory)) return VX_ERROR_NO_MEMORY;
-
+    if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+    if (!vxoMemory_Allocate(distribution->base.context, &distribution->memory))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_NO_MEMORY);
+        return VX_ERROR_NO_MEMORY;
+    }
     if (ptr != VX_NULL)
     {
         vxAcquireMutex(distribution->base.lock);
@@ -189,6 +221,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCommitDistribution(vx_distribution distribu
 
     vxoReference_Decrement(&distribution->base, VX_REF_EXTERNAL);
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
@@ -197,6 +230,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyDistribution(vx_distribution distributi
     vx_status status = VX_FAILURE;
     vx_size size = 0;
 
+    gcmHEADER_ARG("distribution=%p, user_ptr=%p, usage=0x%x, mem_type=0x%x", distribution, user_ptr, usage, mem_type);
     gcmDUMP_API("$VX vxCopyDistribution: distribution=%p, user_ptr=%p, usage=0x%x, mem_type=0x%x", distribution, user_ptr, usage, mem_type);
 
     /* bad references */
@@ -205,6 +239,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyDistribution(vx_distribution distributi
     {
         status = VX_ERROR_INVALID_REFERENCE;
         vxError("Not a valid distribution object!\n");
+        gcmFOOTER_ARG("%d", status);
         return status;
     }
 
@@ -214,6 +249,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyDistribution(vx_distribution distributi
     {
         status = VX_ERROR_INVALID_PARAMETERS;
         vxError("Invalid parameters to copy distribution\n");
+        gcmFOOTER_ARG("%d", status);
         return status;
     }
 
@@ -244,6 +280,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyDistribution(vx_distribution distributi
         break;
     }
 
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -366,7 +403,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapDistribution(vx_distribution distributio
 {
     vx_status status = VX_FAILURE;
     vx_size size = 0;
-
+    gcmHEADER_ARG("distribution=%p, map_id=%p, ptr=%p, usage=0x%x, mem_type=0x%x, flags=0x%x", distribution, map_id, ptr, usage, mem_type, flags);
     gcmDUMP_API("$VX vxMapDistribution: distribution=%p, map_id=%p, ptr=%p, usage=0x%x, mem_type=0x%x, flags=0x%x", distribution, map_id, ptr, usage, mem_type, flags);
 
     /* bad references */
@@ -375,6 +412,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapDistribution(vx_distribution distributio
     {
         status = VX_ERROR_INVALID_REFERENCE;
         vxError("Not a valid distribution object!\n");
+        gcmFOOTER_ARG("%d", status);
         return status;
     }
 
@@ -384,6 +422,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapDistribution(vx_distribution distributio
     {
         status = VX_ERROR_INVALID_PARAMETERS;
         vxError("Invalid parameters to map distribution\n");
+        gcmFOOTER_ARG("%d", status);
         return status;
     }
 
@@ -394,10 +433,12 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapDistribution(vx_distribution distributio
     {
         status = VX_ERROR_INVALID_PARAMETERS;
         vxError("failed to map distribution\n");
+        gcmFOOTER_ARG("%d", status);
         return status;
     }
 
     vxoReference_Increment(&distribution->base, VX_REF_EXTERNAL);
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
@@ -405,6 +446,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapDistribution(vx_distribution distribut
 {
     vx_status status = VX_FAILURE;
 
+    gcmHEADER_ARG("distribution=%p, map_id=%p", distribution, map_id);
     gcmDUMP_API("$VX vxUnmapDistribution: distribution=%p, map_id=%p", distribution, map_id);
 
     /* bad references */
@@ -413,6 +455,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapDistribution(vx_distribution distribut
     {
         status = VX_ERROR_INVALID_REFERENCE;
         vxError("Not a valid distribution object!\n");
+        gcmFOOTER_ARG("%d", status);
         return status;
     }
 
@@ -421,6 +464,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapDistribution(vx_distribution distribut
     {
         status = VX_ERROR_INVALID_PARAMETERS;
         vxError("not found mapped distribution\n");
+        gcmFOOTER_ARG("%d", status);
         return status;
     }
 
@@ -430,6 +474,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapDistribution(vx_distribution distribut
      * was successful and thus ref was locked once by a call to vxoReference_Increment() */
     vxoReference_Decrement(&distribution->base, VX_REF_EXTERNAL);
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 #endif
@@ -439,18 +484,26 @@ VX_API_ENTRY vx_distribution VX_API_CALL vxCreateVirtualDistribution(vx_graph gr
     vx_distribution distribution;
     vx_context context = vxoContext_GetFromReference((vx_reference)graph);
 
+    gcmHEADER_ARG("graph=%p, numBins=0x%lx, offset=0x%x, range=0x%x", graph, numBins, offset, range);
     gcmDUMP_API("$VX vxCreateVirtualDistribution: graph=%p, numBins=0x%lx, offset=0x%x, range=0x%x", graph, numBins, offset, range);
 
-    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_NULL;
-
+    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     distribution = vxCreateDistribution(context, numBins, offset, range);
 
-    if (vxoReference_GetStatus((vx_reference)distribution) != VX_SUCCESS) return distribution;
-
+    if (vxoReference_GetStatus((vx_reference)distribution) != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("%p", distribution);
+        return distribution;
+    }
     distribution->base.scope        = (vx_reference)graph;
 
     distribution->base.isVirtual    = vx_true_e;
 
+    gcmFOOTER_ARG("%p", distribution);
     return distribution;
 }
 

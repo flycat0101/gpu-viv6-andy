@@ -1,7 +1,7 @@
 __kernel void gpuDepthwiseConv_FP32(
     image2d_array_t input,
     image2d_array_t weight,
-    image2d_array_t bias,
+    image2d_t bias,
     int channel_multiplier,
     int kernelX,
     int kernelY,
@@ -18,7 +18,7 @@ __kernel void gpuDepthwiseConv_FP32(
     int inputHeight = get_image_height(input);
     int inputDepth = get_image_array_size(input);
     int4 coord_out = (int4)(x, y, z, 0);
-    int inz = z / channel_multiplier;
+    int inz = convert_int(convert_short(z)/convert_short(channel_multiplier));
     int inyStart = y * strideY - padY;
     int inyEnd = inyStart + kernelY;
     int inxStart = x * strideX - padX;
@@ -32,7 +32,7 @@ __kernel void gpuDepthwiseConv_FP32(
 
     inyEnd = min(inyEnd, inputHeight);
     inxEnd = min(inxEnd, inputWeight);
-    sum = read_imagef(bias, (int4)(z, 0, 0, 0)).x;
+    sum = read_imagef(bias, (int2)(z, 0)).x;
     coord_wei = (int4)(0, 0, z, 0);
 
     if (inz < inputDepth)
@@ -58,7 +58,7 @@ __kernel void gpuDepthwiseConv_FP32(
 __kernel void gpuDepthwiseConv_Quant8(
     image2d_array_t input,
     image2d_array_t weight,
-    image2d_array_t bias,
+    image2d_t bias,
     int channel_multiplier,
     int kernelX,
     int kernelY,
@@ -81,7 +81,7 @@ __kernel void gpuDepthwiseConv_Quant8(
     int inputHeight = get_image_height(input);
     int inputDepth = get_image_array_size(input);
     int4 coord_out = (int4)(x, y, z, 0);
-    int inz = z / channel_multiplier;
+    int inz = convert_int(convert_short(z)/convert_short(channel_multiplier));
     int inyStart = y * strideY - padY;
     int inyEnd = inyStart + kernelY;
     int inxStart = x * strideX - padX;
@@ -90,12 +90,13 @@ __kernel void gpuDepthwiseConv_Quant8(
     int4 coord_wei = (int4)(0, 0, z, 0);
     float sum = 0;
     uint4 dst = {0}, tmp = {0};
+    int4 biasData;
     float pixel = 0.0, weightValue = 0.0;
 
     inyEnd = min(inyEnd, inputHeight);
-    inxEnd = min(inxEnd, inputHeight);
-    tmp = convert_float(read_imagei(bias, (int4)(z, 0, 0, 0)));
-    sum = tmp.x;
+    inxEnd = min(inxEnd, inputWeight);
+    biasData = convert_int(read_imagei(bias, (int2)(z, 0)));
+    sum = biasData.x;
 
     if (inz < inputDepth)
     {
@@ -104,18 +105,19 @@ __kernel void gpuDepthwiseConv_Quant8(
             for (coord_in.x = inxStart; coord_in.x < inxEnd; coord_in.x++)
             {
                 tmp = read_imageui(input, coord_in);
-                pixel = (convert_int(tmp.x-zpIn))*scaleIn;
                 tmp = read_imageui(weight, coord_wei);
-                weightValue = (convert_int(tmp.x-zpWeight))*scaleWeight;
-                sum += (pixel * weightValue);
                 coord_wei.x++;
+
+                pixel = convert_float(convert_int(tmp.x-zpIn));
+                weightValue = convert_float(convert_int(tmp.x-zpWeight));
+                sum += (pixel * weightValue);
             }
             coord_wei.x = 0;
             coord_wei.y++;
         }
     }
 
-    dst.x = floor(sum*scaleOut + zpOut + 0.5);
+    dst.x = floor(sum * scaleOut * scaleIn * scaleWeight + zpOut + 0.5);
     write_imageui(output, coord_out, dst);
 }
 
@@ -138,7 +140,7 @@ __kernel void gpuDepthwiseConvNoBias_FP32(
     int inputHeight = get_image_height(input);
     int inputDepth = get_image_array_size(input);
     int4 coord_out = (int4)(x, y, z, 0);
-    int inz = z / channel_multiplier;
+    int inz = convert_int(convert_short(z)/convert_short(channel_multiplier));
     int inyStart = y * strideY - padY;
     int inyEnd = inyStart + kernelY;
     int inxStart = x * strideX - padX;
@@ -151,7 +153,7 @@ __kernel void gpuDepthwiseConvNoBias_FP32(
     float4 weightValue = {0.0};
 
     inyEnd = min(inyEnd, inputHeight);
-    inxEnd = min(inxEnd, inputHeight);
+    inxEnd = min(inxEnd, inputWeight);
 
     if (inz < inputDepth)
     {
@@ -161,8 +163,10 @@ __kernel void gpuDepthwiseConvNoBias_FP32(
             {
                 pixel = read_imagef(input, coord_in);
                 weightValue = read_imagef(weight, coord_wei);
-                sum += (pixel.x * weightValue.x);
+
                 coord_wei.x++;
+
+                sum += (pixel.x * weightValue.x);
             }
             coord_wei.x = 0;
             coord_wei.y++;
@@ -198,7 +202,7 @@ __kernel void gpuDepthwiseConvNoBias_Quant8(
     int inputHeight = get_image_height(input);
     int inputDepth = get_image_array_size(input);
     int4 coord_out = (int4)(x, y, z, 0);
-    int inz = z / channel_multiplier;
+    int inz = convert_int(convert_short(z)/convert_short(channel_multiplier));
     int inyStart = y * strideY - padY;
     int inyEnd = inyStart + kernelY;
     int inxStart = x * strideX - padX;
@@ -210,7 +214,7 @@ __kernel void gpuDepthwiseConvNoBias_Quant8(
     float pixel = 0.0, weightValue = 0.0;
 
     inyEnd = min(inyEnd, inputHeight);
-    inxEnd = min(inxEnd, inputHeight);
+    inxEnd = min(inxEnd, inputWeight);
 
     if (inz < inputDepth)
     {
@@ -219,9 +223,9 @@ __kernel void gpuDepthwiseConvNoBias_Quant8(
             for (coord_in.x = inxStart; coord_in.x < inxEnd; coord_in.x++)
             {
                 tmp = read_imageui(input, coord_in);
-                pixel = (convert_int(tmp.x-zpIn))*scaleIn;
+                pixel = (convert_int(tmp.x-zpIn));
                 tmp = read_imageui(weight, coord_wei);
-                weightValue = (convert_int(tmp.x-zpWeight))*scaleWeight;
+                weightValue = (convert_int(tmp.x-zpWeight));
                 sum += (pixel * weightValue);
                 coord_wei.x++;
             }
@@ -230,6 +234,6 @@ __kernel void gpuDepthwiseConvNoBias_Quant8(
         }
     }
 
-    dst.x = floor(sum*scaleOut + zpOut + 0.5);
+    dst.x = floor(sum * scaleOut * scaleIn * scaleWeight + zpOut + 0.5);
     write_imageui(output, coord_out, dst);
 }

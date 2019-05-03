@@ -63,7 +63,7 @@ cloCOMPILER_Lex(YYSTYPE * pyylval, cloCOMPILER Compiler)
     return tokenType;
 }
 
-static gctCONST_STRING *_IndexKeywordStrings = gcvNULL;
+gctCONST_STRING *_IndexKeywordStrings = gcvNULL;
 gceSTATUS
 cloCOMPILER_Parse(
 IN cloCOMPILER Compiler,

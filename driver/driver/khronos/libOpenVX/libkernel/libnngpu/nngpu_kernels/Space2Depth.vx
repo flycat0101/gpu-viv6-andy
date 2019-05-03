@@ -29,7 +29,8 @@ __kernel void gpuReorg2_Space2DepthFP32
     int z = get_global_id(2);
     int inDepth = get_image_array_size(input);
     int4 coord = (int4)(x, y, z, 0);
-    int4 coord_out = (int4)(x / block_size, y / block_size, 0, 0);
+    short short_blockSize = convert_short(block_size);
+    int4 coord_out = (int4)(convert_short(x)/short_blockSize, convert_short(y)/short_blockSize, 0, 0);
     float4 tmp = {0.0};
 
     tmp = read_imagef(input, coord);
@@ -75,7 +76,8 @@ __kernel void gpuReorg2_Space2DepthQuant8
     int z = get_global_id(2);
     int inDepth = get_image_array_size(input);
     int4 coord = (int4)(x, y, z, 0);
-    int4 coord_out = (int4)(x / block_size, y / block_size, 0, 0);
+    short short_blockSize = convert_short(block_size);
+    int4 coord_out = (int4)(convert_short(x)/short_blockSize, convert_short(y)/short_blockSize, 0, 0);
     uint4 tmp = {0};
 
     tmp = read_imageui(input, coord);

@@ -16,6 +16,9 @@
 
 #include "gc_vsc.h"
 
+#define VSC_CPP_MAX_INST_COUNT_GENERAL      3400
+#define VSC_CPP_MAX_INST_COUNT_DEQP         2048
+
 BEGIN_EXTERN_C()
 
 typedef enum _VSC_CPP_FLAG
@@ -38,6 +41,7 @@ typedef struct _VSC_CPP_PASS_DATA
 
 typedef struct VIR_CPP_COPYPROPAGATION
 {
+    gcePATCH_ID             appNameId;
     VIR_Shader              *shader;
     VIR_BASIC_BLOCK         *curr_bb;
     VIR_DEF_USAGE_INFO      *du_info;
@@ -51,8 +55,12 @@ typedef struct VIR_CPP_COPYPROPAGATION
 
     VSC_MM                  *pMM;
 
+    gctBOOL                 bInvalidCfg;
+
 } VSC_CPP_CopyPropagation;
 
+#define VSC_CPP_GetAppNameId(cpp)       ((cpp)->appNameId)
+#define VSC_CPP_SetAppNameId(cpp, s)    ((cpp)->appNameId = (s))
 #define VSC_CPP_GetShader(cpp)          ((cpp)->shader)
 #define VSC_CPP_SetShader(cpp, s)       ((cpp)->shader = (s))
 #define VSC_CPP_GetCurrBB(cpp)          ((cpp)->curr_bb)
@@ -74,6 +82,8 @@ typedef struct VIR_CPP_COPYPROPAGATION
 #define VSC_CPP_SetBWOptCount(cpp, s)   ((cpp)->bwOptCount = (s))
 #define VSC_CPP_SetMM(cpp, s)           ((cpp)->pMM = (s))
 #define VSC_CPP_GetMM(cpp)              ((cpp)->pMM)
+#define VSC_CPP_SetInvalidCfg(cpp, s)   ((cpp)->bInvalidCfg = (s))
+#define VSC_CPP_GetInvalidCfg(cpp)      ((cpp)->bInvalidCfg)
 
 extern VSC_ErrCode VSC_CPP_PerformOnShader(
     IN VSC_SH_PASS_WORKER* pPassWorker

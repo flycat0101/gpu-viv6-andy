@@ -3294,7 +3294,7 @@ _AllocMemoryOffsetsForNormalStruct(
                     gcmASSERT(structChild->firstChild != -1);
 
                     clmGetUniform(binary, structChild->firstChild, structChild, status);
-                    gcmVERIFY_OK(status);
+                    if (gcmIS_ERROR(status)) return status;
                 }
 
                 structParent->offset = structChild->offset;
@@ -3415,10 +3415,10 @@ _AllocMemoryOffsetsForStruct(
         gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
 
         clmGetUniform(binary, parent, parentUniform, status);
-        gcmVERIFY_OK(status);
+        if (gcmIS_ERROR(status)) return status;
 
         clmGetUniform(binary, parentUniform->firstChild, childUniform, status);
-        gcmVERIFY_OK(status);
+        if (gcmIS_ERROR(status)) return status;
 
         clmGetArrayElementCount(Decl->array, 1, count);
         SetUniformArrayStride(parentUniform, count * childUniform->arrayStride);

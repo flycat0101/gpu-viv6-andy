@@ -1,15 +1,9 @@
-The parameter set of vx_tutorial4 is as the following:
--f  data_file_list.txt    Input data list. Please put your test data names here (data at per row, ).
--w  1920           	Width of input data
--h  1080            Height of input data
--c  10              GPU clock on FPGA
-
-
-Say "vx_tutorial4" is the name of the executive file. For example:
-
-If you want to display the result on screen, using:
-vx_tutorial4 -f bmp_list.txt -w 1920 -h 1080 -c 10
-
-If you want to generate outputs as files, using:
-vx_tutorial4 -f bmp_list.txt -w 1920 -h 1080
-
+This tutorial include two projects: kernel library project in the folder of kernel and application project which in app folder. Appliation project using kernel library.
+The tutorial4 kernel implements the Bayer Demosaic Filtering, please refer to the relevant algorithm documents at the path of \vx_tutorial4\app\Doc.
+In this kernel, we are not only using EVIS instructions, but also using DP tools to define the specific instructions, we can get DP uniforms in the folder of unifom.
+In application project,
+	The parameter set of vx_tutorial4 is as the following:
+	-f  data_file_list.txt    Input data list. Please put your test data names here (data at per row, ).
+	-w  1920           	Width of input data
+	-h  1080            Height of input data
+	-c  10              GPU clock on FPGA

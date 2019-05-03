@@ -73,7 +73,7 @@ ppoPREPROCESSOR_PreprocessingFile(ppoPREPROCESSOR PP)
                 ntoken2->poolString == PP->keyword->error        ||
                 ntoken2->poolString == PP->keyword->line        ||
                 ntoken2->poolString == PP->keyword->version        ||
-                ntoken2->poolString == PP->keyword->extension    ||
+                ntoken2->poolString == PP->keyword->include      ||
                 ntoken2->poolString == PP->keyword->define        ||
                 ntoken2->poolString == PP->keyword->undef)
             {
@@ -180,17 +180,18 @@ ppoPREPROCESSOR_Group(ppoPREPROCESSOR PP)
                 ppoTOKEN_Destroy(PP, ntoken)
                 );
 
-            if( ntoken2->poolString == PP->keyword->eof            ||
-                ntoken2->poolString == PP->keyword->newline        ||
-                ntoken2->poolString == PP->keyword->if_            ||
+            if( ntoken2->poolString == PP->keyword->eof          ||
+                ntoken2->poolString == PP->keyword->newline      ||
+                ntoken2->poolString == PP->keyword->if_          ||
                 ntoken2->poolString == PP->keyword->ifdef        ||
-                ntoken2->poolString == PP->keyword->ifndef        ||
-                ntoken2->poolString == PP->keyword->pragma        ||
+                ntoken2->poolString == PP->keyword->ifndef       ||
+                ntoken2->poolString == PP->keyword->pragma       ||
                 ntoken2->poolString == PP->keyword->error        ||
-                ntoken2->poolString == PP->keyword->line        ||
-                ntoken2->poolString == PP->keyword->version        ||
+                ntoken2->poolString == PP->keyword->line         ||
+                ntoken2->poolString == PP->keyword->version      ||
                 ntoken2->poolString == PP->keyword->extension    ||
-                ntoken2->poolString == PP->keyword->define        ||
+                ntoken2->poolString == PP->keyword->include      ||
+                ntoken2->poolString == PP->keyword->define       ||
                 ntoken2->poolString == PP->keyword->undef)
             {
                 ppmCheckFuncOk(
@@ -300,6 +301,7 @@ ppoPREPROCESSOR_GroupPart(ppoPREPROCESSOR PP)
         ||    ntoken2->poolString == PP->keyword->line
         ||    ntoken2->poolString == PP->keyword->version
         ||    ntoken2->poolString == PP->keyword->extension
+        ||    ntoken2->poolString == PP->keyword->include
         ||    ntoken2->poolString == PP->keyword->define
         ||    ntoken2->poolString == PP->keyword->undef)
         {
@@ -329,6 +331,14 @@ ppoPREPROCESSOR_GroupPart(ppoPREPROCESSOR PP)
             else
             {
                 PP->otherStatementHasAlreadyAppeared = gcvTRUE;
+            }
+
+            if(PP->outputTokenStreamHead != gcvNULL &&
+               PP->outputTokenStreamHead->type != ppvTokenType_NUL &&
+               PP->outputTokenStreamHead->type != ppvTokenType_NL &&
+               PP->outputTokenStreamHead->type != ppvTokenType_EOF)
+            {
+                PP->outputTokenStreamHead->hasTrailingControl = gcvTRUE;
             }
             status = ppoTOKEN_Destroy(PP, ntoken2); ppmCheckOK();
             return ppoPREPROCESSOR_ControlLine(PP);
@@ -980,17 +990,17 @@ ppoPREPROCESSOR_TextLine_Handle_FILE_LINE_VERSION(
 
     char* creat_str = gcvNULL;
 
-    char    numberbuffer [128];
+    char    numberbuffer [1024];
 
     gctUINT    offset = 0;
 
-    gcoOS_MemFill(numberbuffer, 0, 128);
+    gcoOS_MemFill(numberbuffer, 0, 1024);
 
     if (What == PP->keyword->_file_)
     {
 
         creat_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute __FILE__";
-        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d\0", PP->currentSourceFileStringNumber);
+        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%s", PP->currentSourceFileStringName);
 
     }
     else if (What == PP->keyword->_line_)
@@ -1142,9 +1152,7 @@ ppoPREPROCESSOR_TextLine(ppoPREPROCESSOR PP)
             /*pre-defined macro, should not be editable.*/
 
             if (ntoken->poolString == PP->keyword->_file_
-            ||    ntoken->poolString == PP->keyword->_line_
-            ||    ntoken->poolString == PP->keyword->_version_
-            ||    ntoken->poolString == PP->keyword->gl_es)
+            ||    ntoken->poolString == PP->keyword->_line_)
             {
                 ppmCheckFuncOk(
                     ppoPREPROCESSOR_TextLine_Handle_FILE_LINE_VERSION(PP, ntoken->poolString)
@@ -1220,7 +1228,6 @@ ppoPREPROCESSOR_TextLine(ppoPREPROCESSOR PP)
                             status = ppoPREPROCESSOR_AddToOutputStreamOfPP(
                                 PP,
                                 head);
-
                             if(status != gcvSTATUS_OK) return status;
                         }
                     }
@@ -1287,7 +1294,15 @@ ppoPREPROCESSOR_ControlLine(ppoPREPROCESSOR PP)
         PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace)
         );
 
-    if(ntoken ->poolString == PP->keyword->define)
+    if(ntoken ->poolString == PP->keyword->include)
+    {
+        ppmCheckFuncOk(
+            ppoTOKEN_Destroy(PP, ntoken)
+            );
+
+        return ppoPREPROCESSOR_Include(PP);
+    }
+    else if(ntoken ->poolString == PP->keyword->define)
     {
         ppmCheckFuncOk(
             ppoTOKEN_Destroy(PP, ntoken)
@@ -1316,14 +1331,6 @@ ppoPREPROCESSOR_ControlLine(ppoPREPROCESSOR PP)
         ppmCheckFuncOk(ppoTOKEN_Destroy(PP, ntoken));
 
         return ppoPREPROCESSOR_Pragma(PP);
-    }
-    else if(ntoken ->poolString == PP->keyword->extension)
-    {
-        ppmCheckFuncOk(
-            ppoTOKEN_Destroy(PP, ntoken)
-            );
-
-        return ppoPREPROCESSOR_Extension(PP);
     }
     else if(ntoken ->poolString == PP->keyword->version)
     {
@@ -1416,13 +1423,13 @@ gceSTATUS ppoPREPROCESSOR_Line(ppoPREPROCESSOR PP)
     gctINT    line    = 0;
     gctINT    string    = 0;
     gceSTATUS    status = gcvSTATUS_INVALID_DATA;
+    ppoTOKEN    ntoken1 = gcvNULL;
 
     gcmASSERT(PP);
 
     doWeInValidArea    = PP->doWeInValidArea;
 
     line    = PP->currentSourceFileLineNumber;
-
     string    = PP->currentSourceFileStringNumber;
 
     if(doWeInValidArea)
@@ -1471,12 +1478,33 @@ gceSTATUS ppoPREPROCESSOR_Line(ppoPREPROCESSOR PP)
         {
             if(ntoken->type != ppvTokenType_INT)
             {
-                ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR,
-                    "Expect  source-string-number after #line.",
-                    PP->currentSourceFileStringNumber,
-                    PP->currentSourceFileLineNumber);
-
-                return gcvSTATUS_INVALID_DATA;
+                if (gcvSTATUS_OK == gcoOS_StrNCmp(ntoken->poolString, "\"", 1))
+                {
+                    gcoOS_StrCatSafe(PP->currentSourceFileStringName, 1024, ntoken->poolString);
+                    do
+                    {
+                        gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken1, !ppvICareWhiteSpace));
+                        if (ntoken1->poolString == PP->keyword->eof ||
+                            ntoken1->poolString == PP->keyword->newline)
+                        {
+                            gcmASSERT(gcvFALSE);
+                            return ppoTOKEN_Destroy(PP, ntoken1);
+                        }
+                        if (gcvSTATUS_OK == gcoOS_StrNCmp(ntoken1->poolString, "\"", 1))
+                        {
+                            gcoOS_StrCatSafe(PP->currentSourceFileStringName, 1024, ntoken1->poolString);
+                            gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken1));
+                            ntoken1 = gcvNULL;
+                            break;
+                        }
+                        else
+                        {
+                            gcoOS_StrCatSafe(PP->currentSourceFileStringName, 1024, ntoken1->poolString);
+                            gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken1));
+                            ntoken1 = gcvNULL;
+                        }
+                    } while (gcvTRUE);
+                }
             }
             else
             {
@@ -1487,8 +1515,6 @@ gceSTATUS ppoPREPROCESSOR_Line(ppoPREPROCESSOR PP)
                     ntoken,
                     &string)
                     );
-
-
 
                 if(string < 0)
                 {
@@ -1520,184 +1546,12 @@ gceSTATUS ppoPREPROCESSOR_Line(ppoPREPROCESSOR PP)
     PP->currentSourceFileLineNumber = line;
 
     return gcvSTATUS_OK;
-}
-/******************************************************************************\
-Extension
-\******************************************************************************/
-gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
-{
-    gctBOOL doWeInValidArea = PP->doWeInValidArea;
-    if(doWeInValidArea == gcvTRUE)
-    {
-        ppoTOKEN    ntoken = gcvNULL;
-        ppoTOKEN    feature = gcvNULL;
-        ppoTOKEN    behavior = gcvNULL;
-        gceSTATUS    status = gcvSTATUS_INVALID_DATA;
 
-
-        status = PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace);ppmCheckOK();
-
-        if(ntoken->type != ppvTokenType_ID)
-        {
-            ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR, "Expect extension name here.");
-            return gcvSTATUS_INVALID_DATA;
-        }
-
-        feature = ntoken;
-
-        if (gcmIS_SUCCESS(gcoOS_StrCmp(feature->poolString, "all"))
-            || gcmIS_SUCCESS(gcoOS_StrCmp(feature->poolString, "GL_OES_standard_derivatives"))
-            || gcmIS_SUCCESS(gcoOS_StrCmp(feature->poolString, "CL_VIV_asm")))
-        {
-            /* Just filer this extension, do not report error. */
-        }
-        else
-        {
-            ppoPREPROCESSOR_Report(PP,clvREPORT_WARN,"Extension : %s is not provided by this compiler.", feature->poolString);
-        }
-
-        status = PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace);ppmCheckOK();
-
-        if(ntoken->poolString != PP->keyword->colon)
-        {
-            ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR, "Expect : here.");
-            return gcvSTATUS_INVALID_DATA;
-        }
-
-        ppmCheckFuncOk(ppoTOKEN_Destroy(PP, ntoken));
-
-        status = PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace);ppmCheckOK();
-
-        if( ntoken->poolString != PP->keyword->require    &&
-            ntoken->poolString != PP->keyword->enable    &&
-            ntoken->poolString != PP->keyword->warn        &&
-            ntoken->poolString != PP->keyword->disable)
-        {
-            ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR,
-                "Expect 'require' or 'enable' or 'warn' or 'disable' here.");
-            return gcvSTATUS_INVALID_DATA;
-        }
-
-        behavior = ntoken;
-
-        status = PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace);ppmCheckOK();
-
-        if(ntoken->poolString != PP->keyword->newline && ntoken->poolString != PP->keyword->eof)
-        {
-            ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR,"Expect 'New Line' or 'End of File' here.");
-
-            return gcvSTATUS_INVALID_DATA;
-        }
-
-
-        /*sematic checking*/
-
-        /*require*/
-        if(behavior->poolString == PP->keyword->require)
-        {
-            if(feature->poolString == PP->keyword->all)
-            {
-                ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR,"Expect all's behavior should be warn or disable.");
-                return gcvSTATUS_INVALID_DATA;
-            }
-            else
-            {
-                ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR,"Extension %s do not support 'require'.",
-                    feature->poolString);
-            }
-            return gcvSTATUS_INVALID_DATA;
-        }
-
-        /*enable*/
-        if( behavior->poolString == PP->keyword->enable)
-        {
-            if(gcmIS_SUCCESS(gcoOS_StrCmp(feature->poolString, "GL_OES_standard_derivatives")))
-            {
-                gcmVERIFY_OK(cloCOMPILER_EnableExtension(
-                    PP->compiler,
-                    clvEXTENSION_STANDARD_DERIVATIVES,
-                    gcvTRUE));
-            }
-            else if(gcmIS_SUCCESS(gcoOS_StrCmp(feature->poolString, "CL_VIV_asm")))
-            {
-                gcmVERIFY_OK(cloCOMPILER_EnableExtension(
-                    PP->compiler,
-                    clvEXTENSION_VASM,
-                    gcvTRUE));
-            }
-            else if(feature->poolString == PP->keyword->all)
-            {
-                ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR,"Expect all's behavior should be warn or disable.");
-                return gcvSTATUS_INVALID_DATA;
-            }
-            else
-            {
-                ppoPREPROCESSOR_Report(PP,clvREPORT_WARN,"Extension %s do not support 'enable'.",
-                    feature->poolString);
-            }
-        }
-
-        /*warn*/
-        if( behavior->poolString == PP->keyword->warn)
-        {
-            if(feature->poolString != PP->keyword->all)
-            {
-                ppoPREPROCESSOR_Report(PP,clvREPORT_WARN,"Extension %s do not support 'warn'.",
-                    feature->poolString);
-            }
-        }
-
-        /*disable*/
-        if( behavior->poolString == PP->keyword->disable)
-        {
-            if(gcmIS_SUCCESS(gcoOS_StrCmp(feature->poolString, "GL_OES_standard_derivatives")))
-            {
-                gcmVERIFY_OK(cloCOMPILER_EnableExtension(
-                    PP->compiler,
-                    clvEXTENSION_STANDARD_DERIVATIVES,
-                    gcvFALSE));
-            }
-            else if(gcmIS_SUCCESS(gcoOS_StrCmp(feature->poolString, "CL_VIV_asm")))
-            {
-                gcmVERIFY_OK(cloCOMPILER_EnableExtension(
-                    PP->compiler,
-                    clvEXTENSION_VASM,
-                    gcvFALSE));
-            }
-            else if(feature->poolString == PP->keyword->all)
-            {
-                gcmVERIFY_OK(cloCOMPILER_EnableExtension(
-                    PP->compiler,
-                    clvEXTENSION_ALL,
-                    gcvFALSE));
-            }
-            else
-            {
-                ppoPREPROCESSOR_Report(PP,clvREPORT_WARN,"Extension %s do not support 'disable'.",
-                    feature->poolString);
-            }
-        }
-
-
-
-        ppmCheckFuncOk(
-            ppoTOKEN_Destroy(PP, feature)
-            );
-
-        ppmCheckFuncOk(
-            ppoTOKEN_Destroy(PP, behavior)
-            );
-
-        ppmCheckFuncOk(
-            ppoTOKEN_Destroy(PP, ntoken)
-            );
-
-        return gcvSTATUS_OK;
-    }
-    else
-    {
-        return ppoPREPROCESSOR_ToEOL(PP);
-    }
+OnError:
+    if (ntoken1)
+        ppoTOKEN_Destroy(PP, ntoken1);
+    status = ppoPREPROCESSOR_ToEOL(PP);
+    return status;
 }
 /******************************************************************************\
 Error
@@ -1736,10 +1590,151 @@ gceSTATUS ppoPREPROCESSOR_Error(ppoPREPROCESSOR PP)
 /******************************************************************************\
 Pragma
 \******************************************************************************/
-gceSTATUS ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
+gceSTATUS
+ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
 {
+    ppoTOKEN     ntoken  = gcvNULL;
+    ppoTOKEN     ntoken1 = gcvNULL;
+    gceSTATUS    status  = gcvSTATUS_OK;
+    gctBOOL      prevValidStatus = PP->doWeInValidArea;
+    cleEXTENSION Extension = clvEXTENSION_NONE;
+    gctBOOL      Enable = gcvFALSE;
+
+    /* Set current area as invalid so we can accept invalid tokens. */
+    PP->doWeInValidArea = gcvFALSE;
+
+    status = (PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace));
+
+    /* Ignore a unrecognized preprocessor token. */
+    if (status != gcvSTATUS_OK)
+    {
+        ppoPREPROCESSOR_ToEOL(PP);
+    }
+    else if (ntoken->poolString == PP->keyword->eof || ntoken->poolString == PP->keyword->newline)
+    {
+        PP->doWeInValidArea = prevValidStatus;
+        if (ntoken != gcvNULL)
+        {
+            gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+        }
+        return status;
+    }
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "OPENCL")))
+    {
+        gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+        ntoken = gcvNULL;
+
+        /* #pragma OPENCL FP_CONTRACT do nothing.
+
+           #pragma OPENCL EXTENSION XXX:
+             Supported: all, CL_VIV_asm, cl_viv_bitfield_extension, cl_viv_cmplx_extension
+             other extensions will be ignored silently.
+         */
+        gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace));
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "EXTENSION")))
+        {
+            gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+            ntoken = gcvNULL;
+            gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace));
+            if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "all")))
+            {
+                Extension = clvEXTENSION_ALL;
+            }
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "CL_VIV_asm")))
+            {
+                Extension = clvEXTENSION_VASM;
+            }
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_viv_bitfield_extension")))
+            {
+                Extension = clvEXTENSION_VIV_BITFIELD;
+            }
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_viv_cmplx_extension")))
+            {
+                Extension = clvEXTENSION_VIV_CMPLX;
+            }
+            else
+            {
+            }
+
+            gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken1, !ppvICareWhiteSpace));
+
+            if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken1->poolString, ":")))
+            {
+                gcmONERROR(ppoTOKEN_Destroy(PP, ntoken1));
+                ntoken1 = gcvNULL;
+                gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken1, !ppvICareWhiteSpace));
+                if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken1->poolString, "enable")))
+                {
+                    Enable = gcvTRUE;
+                }
+            }
+
+            if (Extension == clvEXTENSION_ALL)
+            {
+                gcmVERIFY_OK(cloCOMPILER_EnableExtension(
+                        PP->compiler,
+                        clvEXTENSION_VASM,
+                        Enable));
+
+                gcmVERIFY_OK(cloCOMPILER_EnableExtension(
+                        PP->compiler,
+                        clvEXTENSION_VIV_BITFIELD,
+                        Enable));
+
+                gcmVERIFY_OK(cloCOMPILER_EnableExtension(
+                        PP->compiler,
+                        clvEXTENSION_VIV_CMPLX,
+                        Enable));
+            }
+            else
+            {
+                gcmVERIFY_OK(cloCOMPILER_EnableExtension(
+                        PP->compiler,
+                        Extension,
+                        Enable));
+                if (Enable)
+                {
+                    ppoPREPROCESSOR_addMacroDef_Int(PP, ntoken->poolString, "1");
+                }
+                else
+                {
+                    /* TODO: need to undef the macro */
+                }
+            }
+            gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+            ntoken = gcvNULL;
+            gcmONERROR(ppoTOKEN_Destroy(PP, ntoken1));
+            ntoken1 = gcvNULL;
+        }
+        else if(gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "FP_CONTRACT")))
+        {
+            /* ignore it for now */
+        }
+        else
+        {
+            ppoPREPROCESSOR_Report(PP,
+                                    clvREPORT_ERROR,
+                                    "OpenCL not support this pragma directive."
+                                    );
+        }
+    }
+
+    /* Reset invalid area. */
+    PP->doWeInValidArea = prevValidStatus;
+    if (ntoken != gcvNULL)
+    {
+        gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+    }
     return ppoPREPROCESSOR_ToEOL(PP);
+
+OnError:
+    if (ntoken != gcvNULL)
+    {
+        gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken));
+    }
+    return status;
 }
+
 /******************************************************************************\
 Undef
 \******************************************************************************/
@@ -1803,136 +1798,378 @@ ppoPREPROCESSOR_Undef(ppoPREPROCESSOR PP)
     return gcvSTATUS_OK;
 }
 
+#define _cldFILENAME_MAX 1024
+
+static gctBOOL
+ppoPREPROCESSOR_ReadHeaderFile(
+    IN gcoOS Os,
+    IN ppoPREPROCESSOR PP,
+    IN gctCONST_STRING FileName,
+    OUT gctSIZE_T * SourceSize,
+    OUT gctSTRING * Source
+    )
+{
+    gceSTATUS   status = gcvSTATUS_NOT_FOUND;
+    gctFILE     file = gcvNULL;
+    gctUINT32   count = 0;
+    gctSIZE_T   byteRead = 0;
+    gctSTRING   source = gcvNULL;
+    gctCHAR     Path[_cldFILENAME_MAX] = {'\0'};
+    ppoHEADERFILEPATH headerFilePathNode = gcvNULL;
+#if defined( WIN32 )
+    const gctSTRING sep = "\\";
+#else
+    const gctSTRING sep = "/";
+#endif
+
+    gcmASSERT(FileName != gcvNULL);
+
+    status = gcoOS_Open(Os, FileName, gcvFILE_READ, &file);
+    if (status != gcvSTATUS_OK)
+    {
+        /* remove "./" if any */
+        if (gcoOS_StrLen(FileName, gcvNULL) > 2 && *FileName == '.' && *(FileName + 1) == '/')
+        {
+            FileName = FileName + 2;
+        }
+        /* The order of searching
+           1.Current Path "./";
+           2."-I" and "-cl-viv-vx-extension" option added path;*/
+        headerFilePathNode = PP->headerFilePathList;
+        while (headerFilePathNode != gcvNULL)
+        {
+            gcoOS_StrCopySafe(Path,_cldFILENAME_MAX, headerFilePathNode->headerFilePath);
+            gcoOS_StrCatSafe(Path, _cldFILENAME_MAX, sep);
+            gcoOS_StrCatSafe(Path, _cldFILENAME_MAX, FileName);
+            status = gcoOS_Open(Os, Path, gcvFILE_READ, &file);
+            if (status == gcvSTATUS_OK)
+            {
+                break;
+            }
+            headerFilePathNode = (void*)headerFilePathNode->base.node.next;
+        }
+    }
+    if (status != gcvSTATUS_OK)
+    {
+        ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR,
+            "Error(%d,%d) : Cannot find the header file %s.",
+            PP->currentSourceFileStringNumber,
+            PP->currentSourceFileLineNumber,
+            FileName);
+        return gcvFALSE;
+    }
+
+    gcmVERIFY_OK(gcoOS_Seek(Os, file, 0, gcvFILE_SEEK_END));
+    gcmVERIFY_OK(gcoOS_GetPos(Os, file, &count));
+
+    source = gcvNULL;
+    gcmONERROR(cloCOMPILER_Allocate(PP->compiler, count + 1, (gctPOINTER *) &source));
+
+    if (!gcmIS_SUCCESS(status))
+    {
+        gcmPRINT("ERROR: Not enough memory.\n");
+        return gcvFALSE;
+    }
+
+    if (!gcmIS_SUCCESS(status))
+    {
+        gcmPRINT("ERROR: Not enough memory.\n");
+        return gcvFALSE;
+    }
+
+    gcmVERIFY_OK(gcoOS_SetPos(Os, file, 0));
+
+    status = gcoOS_Read(Os, file, count, source, &byteRead);
+    if (!gcmIS_SUCCESS(status) || byteRead != count)
+    {
+        ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR,
+            "Error(%d,%d) : Failed to read the header file %s.",
+            PP->currentSourceFileStringNumber,
+            PP->currentSourceFileLineNumber,
+            FileName);
+        gcmVERIFY_OK(gcoOS_Close(Os, file));
+        cloCOMPILER_Free(PP->compiler, source);
+        return gcvFALSE;
+    }
+
+    source[count] = '\0';
+    *SourceSize = count;
+    *Source = source;
+
+OnError:
+    gcmVERIFY_OK(gcoOS_Close(Os, file));
+    return gcvTRUE;
+}
+
+/******************************************************************************\
+Include
+\******************************************************************************/
+gceSTATUS
+ppoPREPROCESSOR_Include(ppoPREPROCESSOR PP)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    ppoTOKEN ntoken1 = gcvNULL, ntoken2 = gcvNULL;
+    gctSIZE_T sourceSize = 0;
+    gctSTRING source = gcvNULL;
+    gctCHAR fileName[1024] = "\0";
+    ppoINPUT_STREAM tmpbis = gcvNULL;
+    ppoBYTE_INPUT_STREAM tmpbisCreated = gcvNULL;
+
+    /* TODO: Lex the include file name */
+    gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken1, !ppvICareWhiteSpace));
+    if (gcvSTATUS_OK == gcoOS_StrNCmp(ntoken1->poolString, "\"", 1))
+    {
+        do
+        {
+            gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken2, !ppvICareWhiteSpace));
+            if (ntoken2->poolString == PP->keyword->eof ||
+                ntoken2->poolString == PP->keyword->newline)
+            {
+                gcmASSERT(gcvFALSE);
+                return ppoTOKEN_Destroy(PP, ntoken2);
+            }
+            if (gcvSTATUS_OK == gcoOS_StrNCmp(ntoken2->poolString, "\"", 1))
+            {
+                gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken2));
+                break;
+            }
+            else
+            {
+                gcoOS_StrCatSafe(fileName, 1024, ntoken2->poolString);
+                gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken2));
+            }
+        } while (gcvTRUE);
+    }
+
+    if (!ppoPREPROCESSOR_ReadHeaderFile(gcvNULL, PP, fileName, &sourceSize, &source))
+    {
+        goto OnError;
+    }
+
+    gcmONERROR(ppoBYTE_INPUT_STREAM_Construct(
+        PP,
+        gcvNULL,/*prev node*/
+        gcvNULL,/*next node*/
+        __FILE__,
+        __LINE__,
+        "ppoPREPROCESSOR_SetSourceStrings : Creat to init CPP input stream",
+        source,
+        -1, /* input string number is -1 for header file */
+        sourceSize,
+        &tmpbisCreated
+        ));
+
+    tmpbis = (ppoINPUT_STREAM) tmpbisCreated;
+
+    if( gcvNULL == PP->inputStream )
+    {
+        PP->inputStream = tmpbis;
+        tmpbis->base.node.prev = gcvNULL;
+        tmpbis->base.node.next = gcvNULL;
+    }
+    else
+    {
+        ppoINPUT_STREAM tmp_is = PP->inputStream;
+        PP->inputStream = tmpbis;
+        tmpbis->base.node.prev = (void*)tmp_is;
+        tmpbis->base.node.next = (void*)gcvNULL;
+        tmp_is->base.node.next = (void*)tmpbis;
+    }
+    status = ppoPREPROCESSOR_Group(PP);
+
+OnError:
+    if (ntoken1 != gcvNULL)
+    {
+        gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken1));
+        ntoken1 = gcvNULL;
+    }
+    return status;
+}
+
 /******************************************************************************\
 Define
 \******************************************************************************/
 gceSTATUS
 ppoPREPROCESSOR_Define(ppoPREPROCESSOR PP)
 {
-    gctSTRING                name        = gcvNULL;
+    gctSTRING            name        = gcvNULL;
     gctINT                argc        = 0;
     ppoTOKEN            argv        = gcvNULL;
     ppoTOKEN            rlst        = gcvNULL;
     ppoTOKEN            ntoken        = gcvNULL;
     ppoMACRO_SYMBOL        ms            = gcvNULL;
-    gceSTATUS            status        = gcvSTATUS_INVALID_ARGUMENT;
+    gceSTATUS            status        = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
     gctBOOL                doWeInValidArea        = PP->doWeInValidArea;
+    gctBOOL                redefined    = gcvFALSE;
+    gctBOOL                redefError    = gcvFALSE;
+    gctBOOL             hasPara = gcvFALSE;
+    ppoTOKEN            ntokenNext    = gcvNULL;
+    ppoTOKEN            mstokenNext    = gcvNULL;
 
-    if(doWeInValidArea == gcvFALSE)
+    if (doWeInValidArea == gcvFALSE)
     {
         return ppoPREPROCESSOR_ToEOL(PP);
     }
 
-    status = PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace);            ppmCheckOK();
+    gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace));
 
-
-    if(ntoken->type != ppvTokenType_ID){
+    if (ntoken->type != ppvTokenType_ID)
+    {
         ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR,
             "Error(%d,%d) : #define should followed by id.",
             PP->currentSourceFileStringNumber,
             PP->currentSourceFileLineNumber);
 
-        ppmCheckFuncOk(ppoTOKEN_Destroy(PP, ntoken));
-
-        return gcvSTATUS_INVALID_ARGUMENT;
+        gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+        return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
     }
 
     /*01 name*/
-
     name = ntoken->poolString;
 
-    ppmCheckFuncOk(ppoTOKEN_Destroy(PP, ntoken));
+    gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+    ntoken = gcvNULL;
 
-    if(    name == PP->keyword->_line_ ||
-        name == PP->keyword->_version_ ||
-        name == PP->keyword->_file_)
+    if (name == PP->keyword->_line_     ||
+        name == PP->keyword->_file_       )
     {
-        ppoPREPROCESSOR_Report(PP,clvREPORT_WARN,
-            "No Effect with re-defining of %s.",
+        ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR,
+            "Error(%d,%d) : Can not #redefine a builtin marcro %s.",
+            PP->currentSourceFileStringNumber,
+            PP->currentSourceFileLineNumber,
             name);
-        return ppoPREPROCESSOR_ToEOL(PP);
+        return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
     }
 
-    /*check if preceded by GL_ or __*/
-    if(!gcoOS_StrNCmp(name , "GL_",3))
+    gcmONERROR(
+        ppoMACRO_MANAGER_GetMacroSymbol(PP, PP->macroManager, name, &ms)
+        );
+
+    if (ms != gcvNULL)
     {
-        ppoPREPROCESSOR_Report(PP,clvREPORT_WARN,
-            "GL_ is reserved to used by feature.");
-    }
-    if(!gcoOS_StrNCmp(name , "__",2))
-    {
-        ppoPREPROCESSOR_Report(PP,clvREPORT_WARN,
-            "__ is reserved to used by the compiler.");
+        redefined = gcvTRUE;
     }
 
+    gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, ppvICareWhiteSpace));
 
-    status = PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, ppvICareWhiteSpace);            ppmCheckOK();
-
-    if(ntoken->poolString == PP->keyword->lpara)
+    if (ntoken->poolString == PP->keyword->lpara)
     {
         /*macro with (arguments-opt)*/
+        hasPara = gcvTRUE;
 
         /*collect argv*/
 
-        ppmCheckFuncOk(ppoTOKEN_Destroy(PP, ntoken));
+        gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+        ntoken = gcvNULL;
 
-        status = ppoPREPROCESSOR_Define_BufferArgs(PP, &argv, &argc);
-        if(status != gcvSTATUS_OK)
-        {
-            return status;
-        }
-        if(argc == 0)
-        {
-            ppoPREPROCESSOR_Report(PP,clvREPORT_WARN, "No argument in () of macro.");
-            gcmASSERT(argv);
-        }
+        gcmONERROR(ppoPREPROCESSOR_Define_BufferArgs(PP, &argv, &argc));
     }
-    else if(ntoken->type != ppvTokenType_WS)
+    else if (ntoken->type != ppvTokenType_WS)
     {
-        if(ntoken->type != ppvTokenType_NL)
+        if (ntoken->type != ppvTokenType_NL)
         {
             ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR, "White Space or New Line inputStream expected.");
         }
         else
         {
             /*NL*/
-            ppmCheckFuncOk(
+            gcmONERROR(
                 ppoINPUT_STREAM_UnGetToken(PP, &(PP->inputStream), ntoken)
                 );
-
         }
 
-        ppmCheckFuncOk(ppoTOKEN_Destroy(PP, ntoken));
+        gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+        ntoken = gcvNULL;
     }
     else
     {
-        ppoTOKEN_Destroy(PP, ntoken);
+        gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+        ntoken = gcvNULL;
     }
 
     /*replacement list*/
 
-    ppmCheckFuncOk(
+    gcmONERROR(
         ppoPREPROCESSOR_Define_BufferReplacementList(PP, &rlst)
         );
 
+    if (redefined)
+    {
+        if (argc != ms->argc)
+        {
+            ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR,
+                                "Can not redefine defined macro %s.",name);
+            redefError = gcvTRUE;
+        }
+        else
+        {
+            ntokenNext = rlst;
+            mstokenNext = ms->replacementList;
+
+            while(ntokenNext || mstokenNext)
+            {
+                if (/* One of token is NULL */
+                    (ntokenNext != mstokenNext && (mstokenNext == gcvNULL || ntokenNext == gcvNULL)) ||
+                    /* Different replacement list */
+                    (!gcmIS_SUCCESS(gcoOS_StrCmp(ntokenNext->poolString,mstokenNext->poolString))))
+                {
+                    ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR,
+                        "Can not redefine defined macro %s.",name);
+                    redefError = gcvTRUE;
+                    break;
+                }
+
+                ntokenNext = (ppoTOKEN)ntokenNext->inputStream.base.node.prev;
+                mstokenNext = (ppoTOKEN)mstokenNext->inputStream.base.node.prev;
+            }
+        }
+
+        while (argv)
+        {
+            ntokenNext = (ppoTOKEN)argv->inputStream.base.node.prev;
+            gcmONERROR(ppoTOKEN_Destroy(PP, argv));
+            argv = ntokenNext;
+        }
+
+        while (rlst)
+        {
+            ntokenNext = (ppoTOKEN)rlst->inputStream.base.node.prev;
+            gcmONERROR(ppoTOKEN_Destroy(PP, rlst));
+            rlst = ntokenNext;
+        }
+
+        if (redefError)
+        {
+            return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+        }
+
+        return gcvSTATUS_OK;
+    }
+
     /*make ms*/
-    status = ppoMACRO_SYMBOL_Construct(
+    gcmONERROR(ppoMACRO_SYMBOL_Construct(
         (void*)PP,
         __FILE__,
         __LINE__,
-        "ppoPREPROCESSOR_PPDefine : find a macro name, \
-        prepare to add a macro in the cpp's mac manager.",
+        "ppoPREPROCESSOR_PPDefine : find a macro name, prepare to add a macro in the cpp's mac manager.",
         name,
         argc,
         argv,
         rlst,
-        &ms);
-
-    ppmCheckOK();
+        &ms));
+    ms->hasPara = hasPara;
 
     return ppoMACRO_MANAGER_AddMacroSymbol(
         PP,
         PP->macroManager,
         ms);
+
+OnError:
+    if (ntoken != gcvNULL)
+    {
+        gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken));
+        ntoken = gcvNULL;
+    }
+    return status;
 }
 

@@ -17,7 +17,7 @@
 #include "gc_chip_buffer.h"
 #endif
 
-#define _GC_OBJ_ZONE    __GLES3_ZONE_PIXEL
+#define _GC_OBJ_ZONE    gcdZONE_GL40_PIXEL
 
 #if (defined(DEBUG) || defined(_DEBUG) || gcdDUMP_FRAME_STATS)
 extern GLboolean g_dbgPerDrawKickOff;

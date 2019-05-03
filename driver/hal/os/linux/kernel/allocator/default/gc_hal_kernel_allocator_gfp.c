@@ -170,12 +170,12 @@ _GFPAllocatorDebugfsCleanup(
 static void
 _NonContiguousFree(
     IN struct page ** Pages,
-    IN gctUINT32 NumPages
+    IN gctSIZE_T NumPages
     )
 {
-    gctINT i;
+    gctSIZE_T i;
 
-    gcmkHEADER_ARG("Pages=%p, NumPages=%u", Pages, NumPages);
+    gcmkHEADER_ARG("Pages=%p, NumPages=%zx", Pages, NumPages);
 
     gcmkASSERT(Pages != gcvNULL);
 
@@ -198,17 +198,19 @@ _NonContiguousFree(
 
 static struct page **
 _NonContiguousAlloc(
-    IN gctUINT32 NumPages,
+    IN gctSIZE_T NumPages,
     IN gctUINT32 Gfp
     )
 {
     struct page ** pages;
     struct page *p;
-    gctINT i, size;
+    gctSIZE_T i, size;
 
-    gcmkHEADER_ARG("NumPages=%u", NumPages);
+    gcmkHEADER_ARG("NumPages=%zx", NumPages);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 32)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
+    if (NumPages > totalram_pages())
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 32)
     if (NumPages > totalram_pages)
 #else
     if (NumPages > num_physpages)
@@ -434,7 +436,7 @@ _GFPAlloc(
     )
 {
     gceSTATUS status;
-    gctUINT i;
+    gctSIZE_T i = 0;
     u32 gfp = GFP_KERNEL | __GFP_HIGHMEM | gcdNOWARN;
     gctBOOL contiguous = Flags & gcvALLOC_FLAG_CONTIGUOUS;
 
@@ -699,9 +701,9 @@ _GFPGetSGT(
 
     gceSTATUS status = gcvSTATUS_OK;
     gctSIZE_T offset = Offset & ~PAGE_MASK; /* Offset to the first page */
-    gctINT skipPages = Offset >> PAGE_SHIFT;     /* skipped pages */
-    gctINT numPages = (PAGE_ALIGN(Offset + Bytes) >> PAGE_SHIFT) - skipPages;
-    gctINT i;
+    gctSIZE_T skipPages = Offset >> PAGE_SHIFT;     /* skipped pages */
+    gctSIZE_T numPages = (PAGE_ALIGN(Offset + Bytes) >> PAGE_SHIFT) - skipPages;
+    gctSIZE_T i;
 
     gcmkASSERT(Offset + Bytes <= Mdl->numPages << PAGE_SHIFT);
 
@@ -759,7 +761,7 @@ _GFPFree(
     IN OUT PLINUX_MDL Mdl
     )
 {
-    gctINT i;
+    gctSIZE_T i;
     struct page * page;
     struct gfp_alloc *priv = (struct gfp_alloc *)Allocator->privateData;
     struct gfp_mdl_priv *mdlPriv = Mdl->priv;
@@ -905,7 +907,7 @@ _GFPMmap(
     }
     else
     {
-        gctUINT i;
+        gctSIZE_T i;
         unsigned long start = vma->vm_start;
 
         for (i = 0; i < numPages; ++i)
@@ -1076,7 +1078,7 @@ _GFPMapKernel(
     )
 {
     void *addr = 0;
-    gctINT numPages = Mdl->numPages;
+    gctSIZE_T numPages = Mdl->numPages;
     struct gfp_mdl_priv *mdlPriv = Mdl->priv;
     unsigned long pgoff = (Offset >> PAGE_SHIFT);
     struct page ** pages;
@@ -1092,7 +1094,7 @@ _GFPMapKernel(
 
     if (Mdl->contiguous)
     {
-        gctINT i;
+        gctSIZE_T i;
 
         pages = kmalloc(sizeof(struct page *) * numPages, GFP_KERNEL | gcdNOWARN);
 
@@ -1170,6 +1172,7 @@ _GFPCache(
 {
     struct gfp_mdl_priv *mdlPriv = Mdl->priv;
     enum dma_data_direction dir;
+    gctINT numPages = GetPageCount(Bytes, Offset);
 
     switch (Operation)
     {
@@ -1179,7 +1182,7 @@ _GFPCache(
         if (mdlPriv->contiguous)
         {
             dma_sync_single_for_device(galcore_device,
-                    mdlPriv->dma_addr, Mdl->numPages << PAGE_SHIFT, dir);
+                    mdlPriv->dma_addr, numPages << PAGE_SHIFT, dir);
         }
         else
         {
@@ -1194,7 +1197,7 @@ _GFPCache(
         if (mdlPriv->contiguous)
         {
             dma_sync_single_for_device(galcore_device,
-                    mdlPriv->dma_addr, Mdl->numPages << PAGE_SHIFT, dir);
+                    mdlPriv->dma_addr, numPages << PAGE_SHIFT, dir);
         }
         else
         {
@@ -1207,7 +1210,7 @@ _GFPCache(
         if (mdlPriv->contiguous)
         {
             dma_sync_single_for_cpu(galcore_device,
-                    mdlPriv->dma_addr, Mdl->numPages << PAGE_SHIFT, dir);
+                    mdlPriv->dma_addr, numPages << PAGE_SHIFT, dir);
         }
         else
         {
@@ -1222,7 +1225,7 @@ _GFPCache(
         if (mdlPriv->contiguous)
         {
             dma_sync_single_for_cpu(galcore_device,
-                    mdlPriv->dma_addr, Mdl->numPages << PAGE_SHIFT, dir);
+                    mdlPriv->dma_addr, numPages << PAGE_SHIFT, dir);
         }
         else
         {

@@ -30,7 +30,7 @@
 #include <fenv.h>
 #endif
 
-#define _GC_OBJ_ZONE    gcvZONE_COMPILER
+#define _GC_OBJ_ZONE    gcdZONE_COMPILER
 
 #define SHADER_TOO_MANY_CODE        5000
 #define SHADER_TOO_MANY_JMP         600
@@ -5344,7 +5344,7 @@ gcOpt_OptimizeCallStackDepth(
         {
             minFunction = _GetMinimumCodeFunction(Optimizer, function);
             status = _InlineSinglelFunction(Optimizer, minFunction, inlineDepthComparison, inlineFormatConversion,
-                                        inlineLevel, gcvFALSE, gcvFALSE, gcvNULL, &currentBudget, &functionRemoved);
+                                        inlineLevel, gcvFALSE, gcvTRUE, gcvNULL, &currentBudget, &functionRemoved);
             if (status)
             {
                 gcOpt_UpdateCallStackDepth(Optimizer, gcvTRUE);

@@ -11,7 +11,10 @@
 *****************************************************************************/
 
 
+#define _GC_OBJ_ZONE                gcdZONE_VG3D_SCANLINE
+
 #if defined(USE_SCAN_LINE) && USE_SCAN_LINE
+
 
 /*
 **    Scan line tessellation module.

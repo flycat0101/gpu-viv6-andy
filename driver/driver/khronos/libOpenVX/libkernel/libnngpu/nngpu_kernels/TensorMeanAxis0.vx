@@ -1,0 +1,51 @@
+__kernel void gpuTensorMeanAxis0_FP32(
+    __read_only  image2d_array_t input,
+    float                        axis_scale,
+    __write_only image2d_array_t output
+    )
+{
+    int4 coord = (int4)(0, get_global_id(0), get_global_id(1), 0);
+    float4 tmp, dst = {0.0};
+    float sum = 0.0;
+    int count = get_image_width(input);
+
+    do
+    {
+        tmp = read_imagef(input, coord);
+        sum += tmp.x;
+        coord.x ++;
+    }while(coord.x < count);
+
+    sum *= axis_scale;
+    dst.x = sum;
+    coord.x = 0;
+    write_imagef(output, coord, dst);
+}
+
+__kernel void gpuTensorMeanAxis0_Quant8(
+    __read_only  image2d_array_t input,
+    float                        axis_scale,
+    float                        scaleIn,
+    int                          zpIn,
+    float                        scaleOut,
+    int                          zpOut,
+    __write_only image2d_array_t output
+    )
+{
+    int4 coord = (int4)(0, get_global_id(0), get_global_id(1), 0);
+    uint4 tmp, dst = {0.0};
+    float sum = 0.0;
+    int count = get_image_width(input);
+
+    do
+    {
+        tmp = read_imageui(input, coord);
+        sum += (convert_int(tmp.x-zpIn))*scaleIn;
+        coord.x ++;
+    }while(coord.x < count);
+
+    sum *= axis_scale;
+    dst.x = floor(sum*scaleOut + zpOut + 0.5);
+    coord.x = 0;
+    write_imageui(output, coord, dst);
+}

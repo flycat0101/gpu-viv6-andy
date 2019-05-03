@@ -20,8 +20,6 @@
 
 #include "gc_hal_vx.h"
 
-#define _GC_OBJ_ZONE            gcvZONE_API_VX
-
 #include <VX/vx.h>
 #include <gc_vx_common.h>
 #include <math.h>

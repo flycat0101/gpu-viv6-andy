@@ -13,6 +13,8 @@
 
 #include "gc_vg_precomp.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG_PATH
+
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
 \******************************************************************************/
@@ -1104,7 +1106,7 @@ VG_API_CALL VGPath VG_API_ENTRY vgCreatePath(
         gceSTATUS status;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%04X, 0x%04X, %.10ff, %.10ff, %d, %d, 0x%08X);\n",
             __FUNCTION__,
             PathFormat, Datatype,
@@ -1195,7 +1197,7 @@ VG_API_CALL VGPath VG_API_ENTRY vgCreatePath(
         vgmSET_PATH_NUMBER(Context, path);
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s() = 0x%08X;\n",
             __FUNCTION__,
             path
@@ -1250,7 +1252,7 @@ VG_API_CALL void VG_API_ENTRY vgClearPath(
         vgsPATH_PTR path;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%08X);\n",
             __FUNCTION__,
             Path, Capabilities
@@ -1316,7 +1318,7 @@ VG_API_CALL void VG_API_ENTRY vgDestroyPath(
 #endif
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X);\n",
             __FUNCTION__,
             Path
@@ -1390,7 +1392,7 @@ VG_API_CALL void VG_API_ENTRY vgRemovePathCapabilities(
         vgsPATH_PTR path;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%08X);\n",
             __FUNCTION__,
             Path, Capabilities
@@ -1515,7 +1517,7 @@ VG_API_CALL void VG_API_ENTRY vgAppendPath(
         gctUINT appendCount;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%08X);\n",
             __FUNCTION__,
             DestinationPath, SourcePath
@@ -1773,7 +1775,7 @@ VG_API_CALL void VG_API_ENTRY vgAppendPathData(
             );
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, %d, PathSegments, PathData);\n",
             __FUNCTION__,
             DestinationPath, NumSegments
@@ -2014,7 +2016,7 @@ VG_API_CALL void VG_API_ENTRY vgModifyPathCoords(
         gctUINT lastSegment;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, %d, %d, PathData);\n",
             __FUNCTION__,
             DestinationPath, StartSegment, NumSegments
@@ -2264,7 +2266,7 @@ VG_API_CALL void VG_API_ENTRY vgTransformPath(
         vgsMATRIX_PTR matrix;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, %d, %d, PathData);\n",
             __FUNCTION__,
             DestinationPath, SourcePath
@@ -2506,7 +2508,7 @@ VG_API_CALL VGboolean VG_API_ENTRY vgInterpolatePath(
         gctUINT segmentsLeft;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%08X, 0x%08X, %.10ff);\n",
             __FUNCTION__,
             DestinationPath, StartPath, EndPath, Amount
@@ -3336,7 +3338,7 @@ VG_API_CALL void VG_API_ENTRY vgDrawPath(
         vgmADVANCE_DRAWPATH_COUNT(Context);
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%08X);\n",
             __FUNCTION__,
             Path, PaintModes

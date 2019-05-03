@@ -13,6 +13,7 @@
 
 #include "gc_vgsh_precomp.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG3D_HARDWARE
 
 void _vgCORECtor(_vgCORE *core)
 {

@@ -26,14 +26,13 @@ extern "C" {
 #define VX_MAX_OPERTAION_PARAMETERS         64
 #define VX_MAX_OPERTAION_INPUTS_OUTPUTS     30
 #define VX_MAX_OPERTAION_GENERICS           (VX_MAX_OPERTAION_PARAMETERS - (VX_MAX_OPERTAION_INPUTS_OUTPUTS<<1))
-#define VX_MAX_TILING_OPERATION_COUNT       64
 #define VX_MAX_OPERATION_COUNT              8192
-#define VX_MAX_BLOCK_COUNT                  128
-#define VX_MAX_SEGMENT_COUNT                16
+#define VX_MAX_BLOCK_COUNT                  1024
+#define VX_MAX_SEGMENT_COUNT                1024
+#define VX_MAX_BLOCK_SEGMENT_COUNT          8
 
 #define VX_VIP_SRAM_IMAGE_STREAM_SIZE       2048
 #define SW_TILING_DEBUG                     1
-#define SW_TILING_REORDER_FLUSH             1
 
 struct _vxnne_operation_s;
 struct _vxnne_layer_s;
@@ -59,6 +58,7 @@ typedef struct _vxnne_sram_s
 {
     gctPOINTER                              logical;
     gctUINT32                               physical;
+    gctUINT32                               physBase;
     gctUINT32                               size;
     gctUINT32                               used;
     gctUINT32                               tailUsed;
@@ -162,10 +162,14 @@ vxnne_adapter_type_e;
 
 enum
 {
-    VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NONE_BIT     = 0,
-    VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NO_BATCH_BIT = 1 << 0,
-    VXNNE_SHADER_PARAMETERS_ATTRIBUTE_INPUT_BIT    = 1 << 1, /* This parameter is an input of the shader operation */
-    VXNNE_SHADER_PARAMETERS_ATTRIBUTE_OUTPUT_BIT   = 1 << 2, /* This parameter is an output of the shader operation */
+    VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NONE_BIT          = 0,
+    VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NO_BATCH_BIT      = 1 << 0,
+    VXNNE_SHADER_PARAMETERS_ATTRIBUTE_INPUT_BIT         = 1 << 1, /* This parameter is an input of the shader operation */
+    VXNNE_SHADER_PARAMETERS_ATTRIBUTE_OUTPUT_BIT        = 1 << 2, /* This parameter is an output of the shader operation */
+    VXNNE_SHADER_PARAMETERS_ATTRIBUTE_ONE_COMPONENTS    = 1 << 3, /* This parameter is an tensor's components of the shader operation */
+    VXNNE_SHADER_PARAMETERS_ATTRIBUTE_TWO_COMPONENTS    = 1 << 4, /* This parameter is an tensor's components of the shader operation */
+    VXNNE_SHADER_PARAMETERS_ATTRIBUTE_THREE_COMPONENTS  = 1 << 5, /* This parameter is an tensor's components of the shader operation */
+    VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS   = 1 << 6, /* This parameter is an tensor's components of the shader operation */
 };
 
 typedef enum vxnne_operator_e
@@ -194,6 +198,7 @@ typedef enum vxnne_operator_e
     VXNNE_OPERATOR_RPN_RETRIEVE,
     VXNNE_OPERATOR_RPN,
     VXNNE_OPERATOR_ROIPOOL,
+    VXNNE_OPERATOR_ROIPOOLRELU,
     VXNNE_OPERATOR_CONCAT2,
     VXNNE_OPERATOR_CONCATINDEFINITE,
     VXNNE_OPERATOR_REORG,
@@ -219,10 +224,8 @@ typedef enum vxnne_operator_e
     VXNNE_OPERATOR_TENSOR_SCALE,
     VXNNE_OPERATOR_YUV2RGB_SCALE,
     VXNNE_OPERATOR_RNN,
-    VXNNE_OPERATOR_SOFTMAX2,
     VXNNE_OPERATOR_SVDF,
     VXNNE_OPERATOR_LUT2,
-    VXNNE_OPERATOR_LRN2,
     VXNNE_OPERATOR_UPSAMPLE,
     VXNNE_OPERATOR_DILATION_RESHUFFLE,
     VXNNE_OPERATOR_DILATION_UPSAMPLE,
@@ -246,6 +249,7 @@ typedef enum vxnne_operator_e
     VXNNE_OPERATOR_DEPTH_WISE_CONV,
     VXNNE_OPERATOR_SVDF_MAP,
     VXNNE_OPERATOR_SVDF_ROTATION,
+    VXNNE_OPERATOR_LAYERNORM,
     VXNNE_OPERATOR_TENSOR_MAX,
 }
 vxnne_operator_e;
@@ -312,6 +316,11 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_TENSOR_STRIDE_SLICE = 57,
     VXNNE_KERNEL_PRELU = 58,
     VXNNE_KERNEL_TENSOR_MAXVALUE = 59,
+    VXNNE_KERNEL_TENSOR_LSTMUNIT_STATEOUT_EXT = 60,
+    VXNNE_KERNEL_LAYERNORM = 61,
+    VXNNE_KERNEL_TENSOR_LSTMUNIT_HIDDENOUT_EXT = 62,
+    VXNNE_KERNEL_LSTMUNIT_LAYER_NORM_STATE_OUT = 63,
+    VXNNE_KERNEL_TENSOR_2D_ADD = 64,
     VXNNE_KERNEL_FIXED_COUNT,
 };
 
@@ -375,11 +384,10 @@ typedef struct _vx_op_param_s
     vx_int32     pad_const;
     vx_size      dilationX;
     vx_size      dilationY;
-    vx_reference other_ref;
-    vx_tensor    data_buff; /*dim size = 1, to replace vx_array*/
     /* for NN */
     vx_uint32    kernel_x;
     vx_uint32    kernel_y;
+    vx_uint32    kernel_z;
     vx_uint32    out_image_tile_x;
     vx_uint32    out_image_tile_y;
     vx_uint32    kernels_per_core;
@@ -392,8 +400,11 @@ typedef struct _vx_op_param_s
     vx_uint32    imageCacheSize;
     vx_enum      imageCacheMode;
     /* for TP */
-    vx_enum      tpType;
-    vx_bool      orig_no_pad;
+    vx_enum          tpType;
+    vx_tp_value_cmd  tp_value;
+    vx_reference     other_ref;
+    vx_tensor        data_buff; /* TP lut or roi list */
+    vx_bool          orig_no_pad;
 }
 vx_op_param_s, *vx_op_param;
 
@@ -422,6 +433,14 @@ typedef struct _vxnne_operation_s
     gctUINT32                       semaWaitHandle;
     gctUINT32                       semaWakeHandle;
 
+    vx_uint32                       circuleBufferHeight;
+    vx_uint32                       imageCacheStart;
+    vx_uint32                       imageCacheSize;
+    vx_enum                         imageCacheMode;
+    vx_uint32                       kernelCacheStart;
+    vx_uint32                       kernelCacheSize;
+    vx_enum                         kernelCacheMode;
+
     vx_uint32                       perCmdSize;
 
     /* all references pass through operations */
@@ -443,17 +462,19 @@ typedef struct _vxnne_operation_s
 
     vx_op_param_s                   parameter;
 
-#define MAX_PARENT_CHILD_OP_NUM 128
+#define MAX_PARENT_CHILD_OP_NUM 400
     struct _vxnne_operation_s*      parentOps[MAX_PARENT_CHILD_OP_NUM];
-    vx_uint8                        parentOpNum;
-    vx_uint8                        parentLayerNum;
+    vx_uint32                       parentOpNum;
+    vx_uint32                       parentLayerNum;
     struct _vxnne_operation_s*      childOps[MAX_PARENT_CHILD_OP_NUM];
-    vx_uint8                        childOpNum;
-    vx_uint8                        childLayerNum;
+    vx_uint32                       childOpNum;
+    vx_uint32                       childLayerNum;
     vx_uint32                       segIndex;
 
+    vx_uint32                       absoluteOperationID;
     vx_uint32                       gpuId;
     vx_bool                         mGpuSync;
+    struct _vxnne_operation_s*      mGpuNext;
 }
 vxnne_operation_s, *vxnne_operation;
 
@@ -507,13 +528,6 @@ typedef enum vxnne_operation_reference_e
 }
 vxnne_operation_reference_e;
 
-typedef struct _vxnne_batch_block_info_s
-{
-    vx_uint32                    start;
-    vx_uint32                    count;
-    vx_bool                      pipelineBatch;
-}vxnne_batch_block_info_s, *vxnne_batch_block_info;
-
 typedef struct _vxnne_tiling_rect_s
 {
     vx_uint32   x;
@@ -564,17 +578,33 @@ typedef struct _vxnne_tiling_perf_param_s
     vx_uint32                    nnCoreCount;
 }vxnne_tiling_perf_param_s, *vxnne_tiling_perf_param;
 
+
 typedef struct _vxnne_tiling_info_s
 {
+    /*1st level data*/
     vxnne_tiling_rect_info_s        input;
     vxnne_tiling_rect_info_s        output;
     vx_uint32                       convWidth;
     vx_uint32                       convHeight;
     vx_uint32                       padLeft;
     vx_uint32                       padTop;
+
     vx_enum                         kernelMode;
+    /*2nd level data*/
     vxnne_tiling_perf_param_s       tilingParam;
+
+    /*3rd level data*/
+    vx_bool                         flush;
+    vx_bool                         walked;
+
 }vxnne_tiling_info_s, *vxnne_tiling_info;
+
+typedef struct _vxnne_tiling_order_info_s
+{
+    vx_uint32                   opID;
+    vx_uint32                   subID;
+    vxnne_tiling_info           tilingInfo;
+}vxnne_tiling_order_info_s, *vxnne_tiling_order_info;
 
 typedef struct _vxnne_segment_tiling_info_s
 {
@@ -582,13 +612,14 @@ typedef struct _vxnne_segment_tiling_info_s
     vx_uint32                    count;
     vx_uint32                    M;
     vx_uint32                    N;
+    vx_uint32                    estimateAxiSRAMUsed;
+    vx_uint32                    estimateVipSRAMUsed;
     vx_uint32                    tileXCount;
     vx_uint32                    tileYCount;
     vxnne_tiling_info            tilingInfo;
-    vx_uint32                    fixedTileHeight[VX_MAX_TILING_OPERATION_COUNT];
-    vx_weights_biases_parameter  weightsBias[VX_MAX_TILING_OPERATION_COUNT];
+    vx_uint32                    tilingOrderCount;
+    vxnne_tiling_order_info      tilingOrderInfo;
 }vxnne_segment_tiling_info_s, *vxnne_segment_tiling_info;
-
 
 enum
 {
@@ -596,21 +627,12 @@ enum
     VXNNE_SEGMENT_TYPE_TILING
 };
 
-
 typedef struct _vxnne_segment_s
 {
     vx_enum        type;
-
     vx_uint32      start;
     vx_uint32      end;
     vx_uint32      count;
-    vx_uint32      kernelCacheStart[VX_MAX_TILING_OPERATION_COUNT];
-    vx_uint32      kernelCacheSize[VX_MAX_TILING_OPERATION_COUNT];
-    vx_uint32      imageCacheStart[VX_MAX_TILING_OPERATION_COUNT];
-    vx_uint32      imageCacheSize[VX_MAX_TILING_OPERATION_COUNT];
-    vx_enum        kernelCacheMode[VX_MAX_TILING_OPERATION_COUNT];
-    vx_enum        imageCacheMode[VX_MAX_TILING_OPERATION_COUNT];
-
     union
     {
         vxnne_segment_tiling_info_s tiling;
@@ -625,41 +647,16 @@ typedef struct _vxnne_segment_collection_s
 
 }vxnne_segment_collection_s, *vxnne_segment_collection;
 
-
-enum
-{
-    VXNNE_BUFFER_ALLOCATE_FLAG_NONE     = 0x0,
-    VXNNE_BUFFER_ALLOCATE_FLAG_HEAD     = 0x1,
-    VXNNE_BUFFER_ALLOCATE_FLAG_TAIL     = 0x2,
-    VXNNE_BUFFER_ALLOCATE_FLAG_APPEND   = 0x4,
-};
-
-typedef struct _vxnne_buffer_desc_s
-{
-    vx_uint32        xStride;
-    vx_uint32        yStride;
-    vx_uint32        zStride;
-    vx_uint32        bufferSize;
-    vx_uint32        physical;
-    vx_uint32        circularBufEndAddrPlus1;
-    gctPOINTER       logical;
-    vx_bool          circle;
-    vx_bool          sRAM;
-    vx_enum          allocateFlag;
-}vxnne_buffer_desc_s, *vxnne_buffer_desc;
-
-
 typedef struct _vxnne_block_s
 {
     vx_uint32           start;
     vx_uint32           count;
-    vx_uint32           totalCommandCount;
     vx_uint32           segmentNum;
-    vxnne_segment_s     segments[2 * VX_MAX_SEGMENT_COUNT];
-    vx_uint32           bufferCount;
-    vxnne_buffer_desc_s bufferDesc[VX_MAX_OPERATION_COUNT+1];
-    vx_enum             currentAllocateFlag;
+    vxnne_segment_s     segments[VX_MAX_BLOCK_SEGMENT_COUNT];
     vxnne_mem_param     memParam;
+    vx_uint32           totalCommandCount;
+
+
 }vxnne_block_s, *vxnne_block;
 
 typedef struct _vxnne_command_buffer_s
@@ -830,9 +827,7 @@ typedef struct _vxnne_tp_operation_s
     vx_tensor                       input_ex;
     vx_weights_biases_parameter     weights_biases;
     vx_tensor                       output;
-    vx_tensor                       buffer; /* dim size == 1, to replace vx_array */
-    vx_bool                         separate_value;
-    vx_tp_value_cmd                 tp_value;
+    vx_uint32                       slice_num;
 }
 vxnne_tp_operation_s, *vxnne_tp_operation;
 
@@ -887,6 +882,25 @@ typedef struct _vxnne_resize_operation_s
 }
 vxnne_resize_operation_s, *vxnne_resize_operation;
 
+typedef struct _vx_performance_info_s
+{
+#define HALF_DONE 0x5
+    vx_uint8                                 calculated;
+    vx_uint32                                kernelsPerCore;
+    vx_uint32                                outImageTileXSize;
+    vx_uint32                                outImageTileYSize;
+    vx_uint32                                interleaveMode;
+    vx_uint32                                nnCoreCount;
+    vx_float64                               perfCycleCount;
+    vx_float64                               perfReadBandWidth;
+    vx_float64                               perfWriteBandWidth;
+    vx_float64                               perfAXIReadBandWidth;
+    vx_float64                               perfAXIWriteBandWidth;
+    vx_float64                               perfKernelReadBandWidth;
+    vx_float64                               perfInImageReadBandWidth;
+    vx_bool                                  isFirstComputeBottleNeck;
+}
+vx_performance_info_s, *vx_performance_info;
 
 typedef struct _vxnne_convolution_relu_pooling_operation_s
 {
@@ -914,6 +928,10 @@ typedef struct _vxnne_convolution_relu_pooling_operation_s
     vx_enum                         down_scale_size_rounding;
     vx_tensor                       outputs;
     vx_weights_biases_parameter     sub_wb;
+    /* temp fix, need to remove later */
+    vx_weights_biases_parameter     swtWeightBiases;
+
+    vx_performance_info_s           resultInfo;
 }
 vxnne_convolution_relu_pooling_operation_s, *vxnne_convolution_relu_pooling_operation;
 
@@ -1038,6 +1056,29 @@ typedef struct _vxnne_batchnorm_layer_s
 }
 vxnne_batchnorm_layer_s, *vxnne_batchnorm_layer;
 
+typedef struct _vxnne_layernorm_sw_operation_s
+{
+    vxnne_operation_s                base;
+
+    vx_scalar                        eps;
+
+    vx_tensor                        bias;
+    vx_tensor                        scale;
+
+    vx_tensor                        input;
+    vx_tensor                        output;
+}
+vxnne_layernorm_sw_operation_s, *vxnne_layernorm_sw_operation;
+
+typedef struct _vxnne_layernorm_layer_s
+{
+    vxnne_layer_s                                  base;
+    vxnne_operation                                operations[1];
+    vxnne_layernorm_sw_operation_s                 layernorm_operation;
+    vxnne_shader_operation_s                       layernorm_sh_operation;
+}
+vxnne_layernorm_layer_s, *vxnne_layernorm_layer;
+
 typedef struct _vxnne_eltwise_sw_operation_s
 {
     vxnne_operation_s                base;
@@ -1091,10 +1132,12 @@ typedef struct _vxnne_normalization_operation_s
 {
     vxnne_operation_s                base;
     vx_tensor                        inputs;
-    vx_enum                          type;
+    vx_enum                          norm_type;
     vx_uint32                        norm_size;
+    vx_uint32                        div;
     vx_float32                       alpha;
     vx_float32                       beta;
+    vx_float32                       bias;
     vx_tensor                        outputs;
 }
 vxnne_normalization_operation_s, * vxnne_normalization_operation;
@@ -1103,9 +1146,9 @@ typedef struct _vxnne_normalization_layer_s
 {
     vxnne_layer_s                                   base;
     vxnne_operation                                 operations[1];
-    vxnne_normalization_operation_s                 normalization_sw_operation;
-    vxnne_shader_operation_s                        normalization_sh_operation;
-    vxnne_tp_operation_s                            normalization_tp_operation;
+    vxnne_normalization_operation_s                 lrn_sw_operation;
+    vxnne_shader_operation_s                        lrn_sh_operation;
+    vxnne_tp_operation_s                            lrn_tp_operation;
 }
 vxnne_normalization_layer_s, *vxnne_normalization_layer;
 
@@ -1114,6 +1157,7 @@ typedef struct _vxnne_softmax_operation_s
     vxnne_operation_s                base;
     vx_tensor                        inputs;
     vx_tensor                        outputs;
+    vx_scalar                        beta;
 }
 vxnne_softmax_operation_s, * vxnne_softmax_operation;
 
@@ -1181,6 +1225,13 @@ typedef struct _vxnne_tensor_copy_s
     vxnne_tp_operation_s                            tensor_copy_tp_operation;
 }
 vxnne_tensor_copy_s, *vxnne_tensor_copy;
+
+typedef struct _vxnne_tensor_copy_operation_s {
+    vxnne_tp_operation_s tp_operation;
+    vxnne_shader_operation_s sh_operation;
+    vxnne_tensor_copy_sw_operation_s sw_operation;
+}
+vxnne_tensor_copy_operation_s, *vxnne_tensor_copy_operation;
 
 typedef struct _vxnne_tensor_reverse_sw_operation_s
 {
@@ -1348,6 +1399,7 @@ typedef struct _vxnne_tensor_trans_layer_s
     vxnne_operation                                 operations[1];
     vxnne_tensor_trans_operation_s                  tensor_trans_sw_operation;
     vxnne_shader_operation_s                        tensor_trans_shader_operation;
+    vxnne_shader_operation_s                        tensor_copy_sh_operation;
     vxnne_tp_operation_s                            tensor_trans_tp_operation;
 }
 vxnne_tensor_trans_layer_s, *vxnne_tensor_trans_layer;
@@ -1578,6 +1630,7 @@ typedef struct _vxnne_tensor_roipool_operation_s
     vx_scalar                        pooled_height;
     vx_scalar                        pooled_width;
     vx_tensor                        output;
+    vx_scalar                        relu;
 }
 vxnne_tensor_roipool_operation_s, *vxnne_tensor_roipool_operation;
 
@@ -1898,8 +1951,10 @@ typedef struct _vxnne_yuv2rgb_scale_operation_s
     vx_rectangle_t                   rect;
     vx_uint32                        x_scale;
     vx_uint32                        y_scale;
-    vx_uint32                        x_init_error;
-    vx_uint32                        y_init_error;
+    vx_uint16                        x_init_error;
+    vx_uint16                        y_init_error;
+    vx_uint16                        x_init_int_error;
+    vx_uint16                        y_init_int_error;
     vx_tensor                        outputs;
 }
 vxnne_yuv2rgb_scale_operation_s, * vxnne_yuv2rgb_scale_operation;
@@ -1961,20 +2016,11 @@ typedef struct _vxnne_rnn_layer_s
 }
 vxnne_rnn_layer_s, *vxnne_rnn_layer;
 
-typedef struct _vxnne_softmax2_operation_s
-{
-    vxnne_operation_s                base;
-    vx_tensor                        inputs;
-    vx_scalar                        beta;
-    vx_tensor                        outputs;
-}
-vxnne_softmax2_operation_s, * vxnne_softmax2_operation;
-
 typedef struct _vxnne_softmax2_layer_s
 {
     vxnne_layer_s                                   base;
     vxnne_operation                                 operations[3];
-    vxnne_softmax2_operation_s                      softmax2_sw_operation;
+    vxnne_softmax_operation_s                      softmax2_sw_operation;
     vxnne_shader_operation_s                        softmax2_SHoperation;
     vxnne_shader_operation_s                        softmax2_SHTensorMaxValueoperation;
     vxnne_shader_operation_s                        softmax2_SHTensorDivoperation;
@@ -2030,29 +2076,6 @@ typedef struct _vxnne_lut2_layer_s
 }
 vxnne_lut2_layer_s, *vxnne_lut2_layer;
 
-typedef struct _vxnne_lrn2_operation_s
-{
-    vxnne_operation_s                base;
-    vx_tensor                        inputs;
-    vx_scalar                        type;
-    vx_scalar                        norm_size;
-    vx_scalar                        alpha;
-    vx_scalar                        beta;
-    vx_scalar                        bias;
-    vx_tensor                        outputs;
-}
-vxnne_lrn2_operation_s, * vxnne_lrn2_operation;
-
-typedef struct _vxnne_lrn2_layer_s
-{
-    vxnne_layer_s                                   base;
-    vxnne_operation                                 operations[1];
-    vxnne_tp_operation_s                            lrn2_tp_operation;
-    vxnne_lrn2_operation_s                          lrn2_sw_operation;
-    vxnne_shader_operation_s                        normalization_sh_operation;
-}
-vxnne_lrn2_layer_s, *vxnne_lrn2_layer;
-
 typedef struct _vxnne_adapter_operation_s
 {
     vxnne_operation_s                base;
@@ -2065,9 +2088,10 @@ vxnne_adapter_operation_s, * vxnne_adapter_operation;
 typedef struct _vxnne_adapter_layer_s
 {
     vxnne_layer_s                                   base;
-    vxnne_operation                                 operations[1];
+    vxnne_operation                                 operations[2];
     vxnne_adapter_operation_s                       adapter_sw_operation;
     vxnne_shader_operation_s                        adapter_sh_operation;
+    vxnne_shader_operation_s                        adapter_convert_sh_operation;
     vxnne_tp_operation_s                            adapter_tp_operation;
 }
 vxnne_adapter_layer_s, *vxnne_adapter_layer;
@@ -2159,6 +2183,18 @@ typedef struct _vxnne_lstm_hidden_unit_sw_operation_s
 }
 vxnne_lstm_hidden_unit_sw_operation_s, *vxnne_lstm_hidden_unit_sw_operation;
 
+typedef struct _vxnne_fc_operation_s {
+    vxnne_tp_operation_s tp_operation;
+    vxnne_tp_operation_s aux_tp_operation;
+    vxnne_tp_operation_s copy_tp_operation;
+    vxnne_tensor_copy_sw_operation_s copy_sw_operation;
+    vxnne_convolution_relu_pooling_operation_s nn_operation;
+    vxnne_shader_operation_s sh_operation;
+    vxnne_fully_connected_sw_operation_s sw_operation;
+    vx_weights_biases_parameter weights_biases;
+}
+vxnne_fc_operation_s, *vxnne_fc_operation;
+
 typedef struct _vxnne_lstm_unit_s
 {
     vxnne_layer_s                                   base;
@@ -2178,6 +2214,7 @@ typedef struct _vxnne_lstm_unit_s
     vxnne_convolution_relu_pooling_operation_s      lstm_nn_operation;
 
     vxnne_tp_operation_s                            lstm_tp_fc_operation;
+    vxnne_fc_operation_s                            fc_operation;
 }
 vxnne_lstm_unit_s, *vxnne_lstm_unit;
 
@@ -2232,9 +2269,11 @@ typedef struct _vxnne_lstm_hidden_unit_s
     vxnne_shader_operation_s                        lstm_hidden_unit_sh_operation;
 
     vxnne_tp_operation_s                            lstm_tp_fc_operation;
+    vxnne_tp_operation_s                            lstm_aux_tp_fc_operation;
     vxnne_convolution_relu_pooling_operation_s      lstm_nn_operation;
 
     vxnne_fully_connected_sw_operation_s            lstm_sw_operation;
+    vxnne_fc_operation_s                            recurrent_fc_operation;
 }
 vxnne_lstm_hidden_unit_s, *vxnne_lstm_hidden_unit;
 
@@ -2260,7 +2299,9 @@ typedef struct _vxnne_lstm_layer_s
     vxnne_lstm_unit                                 units;
 
     vxnne_operation*                                operations3;
+    vxnne_fc_operation_s                            input_fc_operation;
     vxnne_lstm_hidden_unit                          hidden_units;
+    vx_uint32                                       hidden_unit_num;
     vx_weights_biases_parameter                     sub_wb;
 }
 vxnne_lstm_layer_s, *vxnne_lstm_layer;
@@ -2489,31 +2530,15 @@ vx_status vxnneCalculateConvTilingParam(
     vx_context                                context,
     vxnne_convolution_relu_pooling_operation  conv_op,
     vxnne_tiling_info                         info,
-    vx_bool                                   inputSRAM,
-    vx_bool                                   outputSRAM,
-    vx_uint32                                 count
-    );
-
-vx_uint32 vxnneCalculateMultiTPSliceEx(
-    vx_context                   context,
-    vx_enum                      tp_type,
-    vx_uint32                    input_x_size,
-    vx_uint32                    input_y_size,
-    vx_uint32                    input_z_size,
-    vx_uint32                    output_x_size,
-    vx_uint32                    output_y_size,
-    vx_uint32                    output_z_size,
-    vx_reference                 other_ref,
-    vx_tp_value_cmd              value
-    );
-
-vx_uint32 vxnneCalculateMultiTPSlice(
-    vx_context                   context,
-    vxnne_tp_operation           operation
+    vx_uint8                                  inputSRAM,
+    vx_uint8                                  outputSRAM,
+    vx_uint32                                 count,
+    vx_uint32                                 vipSize
     );
 
 vx_status vxnneOperation_InitializeCommand(
     vx_context context,
+    vx_graph graph,
     vxnne_operation operation,
     vxnne_operation_command_s * command
     );
@@ -2563,10 +2588,6 @@ vx_status vxoWeightsBiases_Compress(
     vx_uint32 *                      pooling_output_dims,
     vx_enum                          output_format,
     vx_int32                         z_offset
-    );
-
-void vxoWeightsBiases_Clear(
-    vx_weights_biases_parameter wb
     );
 
 vx_status vxnneOperation_Initialize(
@@ -2945,13 +2966,33 @@ vxnne_shader_executable vxnneGetHashLUTShaderExecutable(
     vx_tensor               output
     );
 
+vxnne_shader_executable vxnneGetMeanStddevNormalizationShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_float32              eps,
+    vx_tensor               output
+    );
+
+vxnne_shader_executable vxnneGetTensorAddMeanStdNormalizationShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_tensor               input1,
+    vx_float32              eps,
+    vx_tensor               output
+    );
+
 vxnne_shader_executable vxnneVertMaxPoolShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
     vx_tensor               input,
-    vx_uint32                pool_width,
-    vx_uint32                pool_height,
+    vx_uint32               pool_width,
+    vx_uint32               pool_height,
+    vx_bool                 enable_relu,
     vx_tensor               output
     );
 
@@ -3174,6 +3215,7 @@ vxnne_shader_executable vxnneROIPoolShaderExecutable(
     vx_uint32               pool_width,
     vx_uint32               pool_height,
     vx_float32              spatial_scale,
+    vx_bool                 enable_relu,
     vx_tensor               output);
 
 vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
@@ -3270,6 +3312,19 @@ vxnne_shader_executable vxnneGetLSTMUnitHiddenOutShaderExecutable(
     vx_tensor               hidden_state_out,
     vx_tensor               hidden_conv);
 
+vxnne_shader_executable vxnneGetLSTMUnitHiddenOutExtShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_bool                 enable_cell_in,
+    vx_tensor               input_conv,
+    vx_float32              forget_bias,
+    vx_tensor               cell_state_in,
+    vx_tensor               output,
+    vx_tensor               cell_state_out,
+    vx_tensor               hidden_state_out,
+    vx_tensor               hidden_conv);
+
 vxnne_shader_executable vxnneGetLSTMUnitHiddenOut_PackedShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
@@ -3282,6 +3337,19 @@ vxnne_shader_executable vxnneGetLSTMUnitHiddenOut_PackedShaderExecutable(
     vx_tensor               cell_state_out,
     vx_tensor               hidden_state_out,
     vx_tensor               hidden_conv);
+
+vxnne_shader_executable vxnneGetLSTMUnitStateOutExtShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               inputs_conv,
+    vx_float32              forget_bias,
+    vx_tensor               cell_state_in,
+    vx_tensor               biases,
+    vx_tensor               output,
+    vx_tensor               cell_state_out,
+    vx_tensor               hidden_state_out,
+    vx_tensor               recurrents_conv);
 
 vxnne_shader_executable vxnneGetTensorPadShaderExecutable(
     vx_context              context,
@@ -3358,6 +3426,41 @@ vxnne_shader_executable vxnneGetUserShaderExecutable(
     vx_kernel_execution_parameters_t *   execution_params
     );
 
+vxnne_shader_executable vxnneGetLayerNormShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_tensor               biases,
+    vx_tensor               scale,
+    vx_tensor               output,
+    vx_scalar               eps);
+
+vxnne_shader_executable vxnneGetLSTMUnitLayerNormStateOutShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               inputs_conv,
+    vx_float32              forget_bias,
+    vx_tensor               cell_state_in,
+    vx_tensor               biases,
+    vx_tensor               layer_norm_weights,
+    vx_tensor               output,
+    vx_tensor               cell_state_out,
+    vx_tensor               hidden_state_out,
+    vx_bool                 enable_cifg,
+    vx_float32              cell_clip
+    );
+
+vxnne_shader_executable vxnneGetTensor2DAddShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input0,
+    vx_tensor               input1,
+    vx_int32                activation,
+    vx_tensor               output);
+
 vx_status vxnneWrapUserNode(
     vx_context context,
     vx_node node,
@@ -3372,7 +3475,8 @@ vx_status vxnneComputeYUV2RGBInputParameter(
     vx_uint32 * outputSizes,
     vx_uint32 * inputStarts,
     vx_uint32 * inputSizes,
-    vx_uint32 * inputInitErrors
+    vx_uint16 * inputInitErrors,
+    vx_uint16 * inputInitIntErrors
 );
 /*nn gpu function declair*/
 vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
@@ -3610,7 +3714,6 @@ vxnne_shader_executable vxnneGetGPUSoftmaxShaderExecutable(
     vx_border_mode_t        *borderMode,
     vx_scalar               beta,
     vx_tensor               input,
-    vx_array                maxValue,
     vx_tensor               output
     );
 
@@ -3645,6 +3748,120 @@ vxnne_shader_executable vxnneGetGPUTensorElewiseShaderExecutable(
     vx_int32                activation,
     vx_enum                 operation,
     vx_tensor               output);
+
+vxnne_shader_executable vxnneGPULSTMUnitShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_tensor               w_h,
+    vx_tensor               h_state_in,
+    vx_tensor               c_state,
+    vx_float32              cellClipValue,
+    vx_bool                 enable_cifg,
+    vx_bool                 enable_peephole,
+    vx_bool                 enable_projection,
+    vx_tensor               cell2input_weight,
+    vx_tensor               cell2forget_weight,
+    vx_tensor               cell2output_weight,
+    vx_tensor               c_state_out,
+    vx_tensor               h_state_out,
+    vx_enum                 activation,
+    vx_tensor               output);
+
+vxnne_shader_executable vxnneGetGPULSTMUnitProjectionShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_tensor               weights,
+    vx_tensor               bias,
+    vx_float32              projClipValue,
+    vx_tensor               output_state_out,
+    vx_tensor               output);
+
+vxnne_shader_executable vxnneGetGPUBatch2SpaceShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_tensor               stride,
+    vx_tensor               output);
+
+vxnne_shader_executable vxnneGetGPUSpace2BatchShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_tensor               stride,
+    vx_scalar               outc,
+    vx_tensor               output,
+    vx_uint32*              padList);
+
+vxnne_shader_executable vxnneGetGPUTensorMeanAxis0ShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_float32              axis_coef,
+    vx_tensor               input,
+    vx_tensor               output);
+
+vxnne_shader_executable vxnneGetGPUSvdfShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_tensor               bias,
+    vx_tensor               weight,
+    vx_tensor               recurrent,
+    vx_enum                 activation,
+    vx_int32                rank,
+    vx_tensor               state_in,
+    vx_tensor               state_out,
+    vx_tensor               output
+    );
+
+vxnne_shader_executable vxnneGetGPUTensorPadShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               inputs,
+    vx_scalar               padLeft,
+    vx_scalar               padRight,
+    vx_scalar               padTop,
+    vx_scalar               padBottom,
+    vx_scalar               padMode,
+    vx_scalar               padConst,
+    vx_tensor               outputs);
+
+vxnne_shader_executable vxnneGetGPUTensorCropShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_int32                start[4],
+    vx_int32                stop[4],
+    vx_tensor               input,
+    vx_tensor               output);
+
+vxnne_shader_executable vxnneGetGPUTensorStridedSliceShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_int32                start[4],
+    vx_int32                stop[4],
+    vx_int32                stride[4],
+    vx_tensor               input,
+    vx_tensor               output);
+
+vxnne_shader_executable vxnneGetGPUReverseShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_tensor               output,
+    vx_uint32               axsisNum,
+    vx_uint32*              axsis
+    );
 #ifdef __cplusplus
 }
 #endif

@@ -1079,7 +1079,7 @@ static VSC_ErrCode VSC_IL_CleanupLables(
             if (VIR_Inst_GetOpcode(inst) == VIR_OP_LABEL &&
                 VIR_Inst_GetJmpLabel(inst)->referenced == gcvNULL)
             {
-                VIR_Function_DeleteInstruction(func, inst);
+                VIR_Pass_DeleteInstruction(func, inst, gcvNULL);
             }
 
             inst = next_inst;
@@ -1182,7 +1182,7 @@ static void _VSC_IL_Init(
     VSC_IL_SetCheckAlwaysInlineOnly(pInliner, pILPassData->bCheckAlwaysInlineOnly);
     VSC_IL_SetRemoveUnusedFunctions(pInliner, VIR_Shader_CanRemoveUnusedFunctions(pShader));
 
-    if ((VSC_OPTN_ILOptions_GetInlineLevel(pOptions) == VSC_OPTN_ILOptions_LEVEL1))
+    if (VSC_OPTN_ILOptions_GetInlineLevel(pOptions) == VSC_OPTN_ILOptions_LEVEL1)
     {
         VSC_IL_SetCheckAlwaysInlineOnly(pInliner, gcvTRUE);
     }

@@ -178,6 +178,45 @@ void vscERR_ReportWarning(const char* file, gctUINT line, VSC_ErrCode status, co
         }                                                     \
     } while (0)
 
+/* BOPOT : Bool or Pointer */
+#define VERIFY_EXPRESSION_ERRCODE_RET_BOPOT(Err, ...)         \
+    do {                                                      \
+        VSC_ErrCode _errCode = (Err);                         \
+        if (_errCode != VSC_ERR_NONE)                         \
+        {                                                     \
+            ERR_REPORT(_errCode, "expression verify failed.");\
+            return gcvNULL;                                   \
+        }                                                     \
+    } while (0)
+
+#define VERIFY_EXPRESSION_BOOL_RET_BOPOT(Exp, ...)            \
+    do {                                                      \
+        if (!(Exp))                                           \
+        {                                                     \
+            return gcvNULL;                                   \
+        }                                                     \
+    } while (0)
+
+#define VERIFY_EXPRESSION_ERRCODE_RET_ERR(Err, ...)           \
+    do {                                                      \
+        VSC_ErrCode _errCode = (Err);                         \
+        if (_errCode != VSC_ERR_NONE)                         \
+        {                                                     \
+            ERR_REPORT(_errCode, "expression verify failed.");\
+            return _errCode;                                  \
+        }                                                     \
+    } while (0)
+
+#define VERIFY_EXPRESSION_BOOL_RET_ERR(Exp, Err, ...)         \
+    do {                                                      \
+        VSC_ErrCode _errCode = (Err);                         \
+        if (!(Exp))                                           \
+        {                                                     \
+            return _errCode;                                  \
+        }                                                     \
+    } while (0)
+
+
 gceSTATUS vscERR_CastErrCode2GcStatus(VSC_ErrCode _errCode);
 VSC_ErrCode vscERR_CastGcStatus2ErrCode(gceSTATUS Status);
 

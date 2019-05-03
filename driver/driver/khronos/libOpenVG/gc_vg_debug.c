@@ -15,6 +15,9 @@
 #if vgvENABLE_ENTRY_SCAN
 #include <string.h>
 #endif
+
+#define _GC_OBJ_ZONE                gcdZONE_VG_DEBUG
+
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
 \******************************************************************************/
@@ -754,7 +757,7 @@ void vgfDumpMatrix(
     gctUINT row, col;
 
     gcmTRACE_ZONE(
-        gcvLEVEL_INFO, gcvZONE_AUX,
+        gcvLEVEL_INFO, _GC_OBJ_ZONE,
         "%s @ %p, identity=%d (%s), determinant=%.4f (%s)\n",
         Message,
         Matrix,
@@ -775,7 +778,7 @@ void vgfDumpMatrix(
             VGfloat value = vgmMAT(Matrix, row, col);
 
             gcmTRACE_ZONE(
-                gcvLEVEL_INFO, gcvZONE_AUX,
+                gcvLEVEL_INFO, _GC_OBJ_ZONE,
                 " %4.4f (%08X)",
                 value,
                 * (gctUINT32_PTR) &value
@@ -783,7 +786,7 @@ void vgfDumpMatrix(
         }
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_AUX,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "\n"
             );
     }
@@ -854,7 +857,7 @@ void vgfDumpImage(
 
     /* Print image information. */
     gcmTRACE_ZONE(
-        gcvLEVEL_INFO, gcvZONE_IMAGE,
+        gcvLEVEL_INFO, _GC_OBJ_ZONE,
         "%s:\n"
         "  %dx%d, bits per pixel: %d, %s\n"
         "  vg format: %d, hal format: %d\n",
@@ -866,21 +869,21 @@ void vgfDumpImage(
     if (Image->parent == Image)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_IMAGE,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "  root image\n"
             );
     }
     else
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_IMAGE,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "  child image with origin %d, %d\n",
             originX, originY
             );
     }
 
     gcmTRACE_ZONE(
-        gcvLEVEL_INFO, gcvZONE_IMAGE,
+        gcvLEVEL_INFO, _GC_OBJ_ZONE,
         "  format specifics: %s, %s\n",
         format->luminance ? "luminance" : "rgba",
         format->linear    ? "linear"    : "non-linear"
@@ -889,7 +892,7 @@ void vgfDumpImage(
     if (!format->luminance)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_IMAGE,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "  components:\n"
             "    R: width=%d, offset=%d\n"
             "    G: width=%d, offset=%d\n"
@@ -939,7 +942,7 @@ void vgfDumpImage(
     if ((X != 0) || (Y != 0) || (Width != width) || (Height != height))
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_IMAGE,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "  dumping subrectangle only: %d,%d %dx%d\n",
             X, Y, Width, Height
             );
@@ -962,7 +965,7 @@ void vgfDumpImage(
 
         /* Print the prefix. */
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_IMAGE,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "  0x%08X:", line
             );
 
@@ -976,7 +979,7 @@ void vgfDumpImage(
                     gctUINT8 value = (*pixel >> shift) & 0x1;
 
                     gcmTRACE_ZONE(
-                        gcvLEVEL_INFO, gcvZONE_IMAGE,
+                        gcvLEVEL_INFO, _GC_OBJ_ZONE,
                         " %d", value
                         );
 
@@ -993,7 +996,7 @@ void vgfDumpImage(
                     gctUINT8 value = (*pixel >> shift) & 0xF;
 
                     gcmTRACE_ZONE(
-                        gcvLEVEL_INFO, gcvZONE_IMAGE,
+                        gcvLEVEL_INFO, _GC_OBJ_ZONE,
                         " 0x%X", value
                         );
 
@@ -1006,7 +1009,7 @@ void vgfDumpImage(
 
             case 8:
                 gcmTRACE_ZONE(
-                    gcvLEVEL_INFO, gcvZONE_IMAGE,
+                    gcvLEVEL_INFO, _GC_OBJ_ZONE,
                     " 0x%02X", *pixel
                     );
 
@@ -1015,7 +1018,7 @@ void vgfDumpImage(
 
             case 16:
                 gcmTRACE_ZONE(
-                    gcvLEVEL_INFO, gcvZONE_IMAGE,
+                    gcvLEVEL_INFO, _GC_OBJ_ZONE,
                     " 0x%04X", * (gctUINT16_PTR) pixel
                     );
 
@@ -1024,7 +1027,7 @@ void vgfDumpImage(
 
             case 32:
                 gcmTRACE_ZONE(
-                    gcvLEVEL_INFO, gcvZONE_IMAGE,
+                    gcvLEVEL_INFO, _GC_OBJ_ZONE,
                     " 0x%08X", * (gctUINT32_PTR) pixel
                     );
 
@@ -1035,7 +1038,7 @@ void vgfDumpImage(
 
         /* Print EOL. */
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_IMAGE,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "\n"
             );
 
@@ -1117,7 +1120,7 @@ static void _DumpArray(
     gctUINT8_PTR data;
 
     gcmTRACE_ZONE(
-        gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+        gcvLEVEL_INFO, _GC_OBJ_ZONE,
         "const %s %s[] =\n{",
         _arrayType[DataType], ArrayName
         );
@@ -1137,14 +1140,14 @@ static void _DumpArray(
         if ((i % width) == 0)
         {
             gcmTRACE_ZONE(
-                gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+                gcvLEVEL_INFO, _GC_OBJ_ZONE,
                 "\n\t"
                 );
         }
         else
         {
             gcmTRACE_ZONE(
-                gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+                gcvLEVEL_INFO, _GC_OBJ_ZONE,
                 " "
                 );
         }
@@ -1153,7 +1156,7 @@ static void _DumpArray(
         {
         case vgeDUMP_BYTE:
             gcmTRACE_ZONE(
-                gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+                gcvLEVEL_INFO, _GC_OBJ_ZONE,
                 "0x%02X", * (gctUINT8_PTR) data
                 );
             data += gcmSIZEOF(gctUINT8);
@@ -1161,7 +1164,7 @@ static void _DumpArray(
 
         case vgeDUMP_SHORT:
             gcmTRACE_ZONE(
-                gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+                gcvLEVEL_INFO, _GC_OBJ_ZONE,
                 "%d", (gctINT) * (gctINT16_PTR) data
                 );
             data += gcmSIZEOF(gctINT16);
@@ -1169,7 +1172,7 @@ static void _DumpArray(
 
         case vgeDUMP_WORD:
             gcmTRACE_ZONE(
-                gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+                gcvLEVEL_INFO, _GC_OBJ_ZONE,
                 "0x%04X", * (gctUINT16_PTR) data
                 );
             data += gcmSIZEOF(gctUINT16);
@@ -1177,7 +1180,7 @@ static void _DumpArray(
 
         case vgeDUMP_INT:
             gcmTRACE_ZONE(
-                gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+                gcvLEVEL_INFO, _GC_OBJ_ZONE,
                 "%d", * (gctINT_PTR) data
                 );
             data += gcmSIZEOF(gctINT);
@@ -1185,7 +1188,7 @@ static void _DumpArray(
 
         case vgeDUMP_DWORD:
             gcmTRACE_ZONE(
-                gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+                gcvLEVEL_INFO, _GC_OBJ_ZONE,
                 "0x%08X", * (gctUINT_PTR) data
                 );
             data += gcmSIZEOF(gctUINT);
@@ -1193,7 +1196,7 @@ static void _DumpArray(
 
         case vgeDUMP_FLOAT:
             gcmTRACE_ZONE(
-                gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+                gcvLEVEL_INFO, _GC_OBJ_ZONE,
                 "%.10ff", * (gctFLOAT_PTR) data
                 );
             data += gcmSIZEOF(gctFLOAT);
@@ -1203,14 +1206,14 @@ static void _DumpArray(
         if (i < Count - 1)
         {
             gcmTRACE_ZONE(
-                gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+                gcvLEVEL_INFO, _GC_OBJ_ZONE,
                 ","
                 );
         }
     }
 
     gcmTRACE_ZONE(
-        gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+        gcvLEVEL_INFO, _GC_OBJ_ZONE,
         "\n};\n"
         );
 }

@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -36,6 +36,9 @@ ifdef TARGET_2ND_ARCH
   LOCAL_SRC_FILES := $(call all-subdir-java-files)
 
   LOCAL_JNI_SHARED_LIBRARIES := libcover_flow
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 23),1)
+  LOCAL_JNI_SHARED_LIBRARIES += libc++
+endif
 
   LOCAL_PACKAGE_NAME := cover_flow-64
   LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
@@ -48,6 +51,9 @@ ifdef TARGET_2ND_ARCH
   LOCAL_SRC_FILES := $(call all-subdir-java-files)
 
   LOCAL_JNI_SHARED_LIBRARIES := libcover_flow
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 23),1)
+  LOCAL_JNI_SHARED_LIBRARIES += libc++
+endif
 
   LOCAL_PACKAGE_NAME := cover_flow-32
   LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
@@ -60,6 +66,9 @@ ifdef TARGET_2ND_ARCH
   LOCAL_SRC_FILES := $(call all-subdir-java-files)
 
   LOCAL_JNI_SHARED_LIBRARIES := libcover_flow
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 23),1)
+  LOCAL_JNI_SHARED_LIBRARIES += libc++
+endif
 
   LOCAL_PACKAGE_NAME := cover_flow-multilib
   LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
@@ -72,6 +81,9 @@ include $(CLEAR_VARS)
   LOCAL_SRC_FILES := $(call all-subdir-java-files)
 
   LOCAL_JNI_SHARED_LIBRARIES := libcover_flow
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 23),1)
+  LOCAL_JNI_SHARED_LIBRARIES += libc++
+endif
 
   LOCAL_PACKAGE_NAME := cover_flow
   LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/

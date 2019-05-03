@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -77,7 +77,7 @@ void DestroyShaders();
 // to hold vdk information.
 vdkEGL egl;
 #endif
-NativePixmapType pixmap;
+NativePixmapType pixmap = (NativePixmapType)0;
 
 EGLImageKHR eglimage;
 
@@ -403,9 +403,6 @@ bool RenderInit()
 // Actual rendering here.
 void Render()
 {
-
-
-
     glClearColor(0.0f, 0.5f, 0.5f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     if(switchPixmapData)
@@ -435,6 +432,11 @@ void Render()
 void RenderCleanup()
 {
     // cleanup
+    if (pixmap != (NativePixmapType)0)
+    {
+        vdkDestroyPixmap(pixmap);
+        pixmap = (NativePixmapType)0;
+    }
     glDisableVertexAttribArray(locVertices);
     glDisableVertexAttribArray(locTexcoord);
     DestroyShaders();

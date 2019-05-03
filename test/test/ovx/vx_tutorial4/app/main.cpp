@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -28,6 +28,8 @@
 
 #include <VX/vx.h>
 #include <VX/vxu.h>
+#include <VX/vx_compatibility.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
@@ -40,6 +42,10 @@
 using namespace std;
 
 #include "bmp_interface.hpp"
+
+#if gcdSTATIC_LINK
+extern "C" vx_status VX_API_CALL vxPublishKernels(vx_context ContextVX);
+#endif
 
 #define OBJCHECK(objVX) if(!(objVX)) { printf("%s:%d, %s\n",__FILE__, __LINE__, "obj create error.");status=-1;goto exit; }
 #define FUNCHECK(funRet) if(VX_SUCCESS!=(funRet)) { printf("%s:%d, %s\n",__FILE__, __LINE__, "function error.");status=funRet;goto exit;}
@@ -252,7 +258,11 @@ vx_node vxTutorial4Node(vx_graph graph, vx_image in_image, vx_image out_image)
     vx_int32 index = 0;
 
     context = vxGetContext((vx_reference)graph);
+#if gcdSTATIC_LINK
+    status = vxPublishKernels(context);
+#else
     status = vxLoadKernels(context, "tutorial4_kernel");
+#endif
     if(VX_SUCCESS == status)
     {
         kernel = vxGetKernelByName(context, "com.vivantecorp.extension.tutorial4VXC");

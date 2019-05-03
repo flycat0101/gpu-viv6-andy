@@ -110,9 +110,9 @@ struct _cloCOMPILER
         gctBOOL          basicTypePacked;
         gctBOOL          gcslDriverImage;
         gctBOOL          longUlongPatch;
-        gctBOOL          hasCalculatePreScaleGlobalID;
         VSC_DIContext *  debugInfo;
         gctBOOL          mainFile;
+        gctBOOL          useNewPP;
     } context;
     cloPREPROCESSOR      preprocessor;
     cloCODE_EMITTER      codeEmitter;
@@ -162,6 +162,7 @@ cloCOMPILER_Unload(void)
      if(gcmIS_ERROR(status)) return status;
      status = clCleanupBuiltins();
      if(gcmIS_ERROR(status)) return status;
+     gcKernelCompiler[0] = gcvNULL;
    }
 
    return status;
@@ -256,12 +257,13 @@ cloCOMPILER_Construct(
         compiler->context.constantMemorySize = 0;
         compiler->context.privateMemorySize = 0;
         compiler->context.maxKernelFunctionArgs = 0;
-        compiler->context.hasCalculatePreScaleGlobalID = gcvFALSE;
 
         compiler->context.hasFloatOps = 0;
         compiler->context.hasFloatOpsAux = 0;
         compiler->context.fpConfig = cldFpFAST_RELAXED_MATH;
         compiler->context.allowExternSymbols = gcvFALSE;
+        /* query the VC option and set this flag accordingly */
+        compiler->context.useNewPP = gcmOPT_UseCLNewPreprocessor();
 
         patchId = *gcGetPatchId();
 
@@ -366,7 +368,7 @@ cloCOMPILER_Construct(
 
 #ifndef CL_SCAN_NO_PREPROCESSOR
         /* Create the preprocessor */
-        status = cloPREPROCESSOR_Construct(compiler, &compiler->preprocessor);
+        status = cloPREPROCESSOR_Construct(compiler, compiler->context.useNewPP, &compiler->preprocessor);
         if (gcmIS_ERROR(status)) break;
 #endif
 
@@ -889,7 +891,7 @@ cloCOMPILER_AddLog(
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
     gcmASSERT(Log);
 
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, Log);
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, Log);
 
     requiredLogBufSize = (gctUINT) gcoOS_StrLen(Log, gcvNULL) + 1;
 
@@ -1498,6 +1500,13 @@ cloCOMPILER_Compile(
         *Binary    = Compiler->binary;
         Compiler->binary = gcvNULL;
 
+        /* copy the source code to shader binary when debug option is on */
+        if (StringCount == 1 && (*Binary)->debugInfo)
+        {
+            (*Binary)->sourceLength = (gctUINT)gcoOS_StrLen(Strings[0], gcvNULL) + 1;
+            gcoOS_StrDup(gcvNULL, Strings[0], &(*Binary)->source);
+        }
+
         if (Log != gcvNULL) {
             *Log    = Compiler->log;
             Compiler->log    = gcvNULL;
@@ -2045,29 +2054,6 @@ IN cloCOMPILER Compiler
     clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
 
     Compiler->context.longUlongPatch = gcvTRUE;
-    return gcvSTATUS_OK;
-}
-
-gctBOOL
-cloCOMPILER_HasCalculatePreScaleGlobalId(
-    IN cloCOMPILER Compiler
-    )
-{
-    /* Verify the arguments. */
-    clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
-    return Compiler->context.hasCalculatePreScaleGlobalID;
-}
-
-/* Set long ulong patch library */
-gceSTATUS
-cloCOMPILER_SetHasCalculatePreScaleGlobalId(
-    IN cloCOMPILER Compiler
-    )
-{
-    /* Verify the arguments. */
-    clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
-
-    Compiler->context.hasCalculatePreScaleGlobalID = gcvTRUE;
     return gcvSTATUS_OK;
 }
 
@@ -2681,18 +2667,30 @@ cloCOMPILER_MakeCurrent(
 
     CurrentCompiler    = Compiler;
 #ifndef CL_SCAN_NO_PREPROCESSOR
+    if (Compiler->context.useNewPP)
     {
-      cloPREPROCESSOR   PP= cloCOMPILER_GetPreprocessor(Compiler);
+        /* This message is for testing now, will remove it later */
+        gcmPRINT("INFO: New preprocessor is used.\n");
+        status = cloPREPROCESSOR_SetSourceStrings(
+                                            Compiler->preprocessor,
+                                            StringCount,
+                                            Strings,
+                                            Options);
+        if (gcmIS_ERROR(status))         return status;
+    }
+    else
+    {
+        cloPREPROCESSOR   PP= cloCOMPILER_GetPreprocessor(Compiler);
 
-      status = cloPREPROCESSOR_Parse(PP,
-                                     StringCount,
-                                     Strings,
-                                     Options);
-      if (gcmIS_ERROR(status)) return status;
-      status = cloPREPROCESSOR_GetPPedInfo(PP,
-                                           (gctCONST_STRING **) &CurrentCompiler->context.strings,
-                                           &CurrentCompiler->context.stringCount);
-      if (gcmIS_ERROR(status)) return status;
+        status = cloPREPROCESSOR_Parse(PP,
+                                       StringCount,
+                                       Strings,
+                                       Options);
+        if (gcmIS_ERROR(status)) return status;
+        status = cloPREPROCESSOR_GetPPedInfo(PP,
+                                             (gctCONST_STRING **) &CurrentCompiler->context.strings,
+                                             &CurrentCompiler->context.stringCount);
+        if (gcmIS_ERROR(status)) return status;
     }
 #else
     CurrentCompiler->context.stringCount    = StringCount;
@@ -2718,14 +2716,35 @@ OUT gctSTRING Buffer
 )
 {
     gctINT ch;
+    gceSTATUS   status;
+    gctINT      actualSize;
 
     gcmASSERT(CurrentCompiler);
-    gcmVERIFY_OK(cloCOMPILER_GetChar(CurrentCompiler, &ch));
+    if (CurrentCompiler->context.useNewPP)
+    {
+        status = cloPREPROCESSOR_Parse_New(
+                                    CurrentCompiler->preprocessor,
+                                    MaxSize,
+                                    gcvNULL,
+                                    Buffer,
+                                    &actualSize);
 
-    if (ch == T_EOF) return 0;
+        if (gcmIS_ERROR(status))
+        {
+            return 0;
+        }
+        return actualSize;
+    }
+    else
+    {
+        gcmVERIFY_OK(cloCOMPILER_GetChar(CurrentCompiler, &ch));
 
-    Buffer[0] = (gctCHAR)ch;
-    return 1;
+        if (ch == T_EOF) return 0;
+
+        Buffer[0] = (gctCHAR)ch;
+        return 1;
+    }
+
 }
 
 gctPOINTER

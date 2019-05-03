@@ -15,7 +15,7 @@
 
 #if gcdENABLE_VG
 
-#define _GC_OBJ_ZONE            gcvZONE_VG
+#define _GC_OBJ_ZONE            gcdZONE_VG
 
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************

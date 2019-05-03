@@ -13,7 +13,7 @@
 
 #include "gc_glff_precomp.h"
 
-#define _GC_OBJ_ZONE glvZONE_TRACE
+#define _GC_OBJ_ZONE gcdZONE_ES11_TRACE
 
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
@@ -208,7 +208,7 @@ GLboolean glfQueryPixelState(
 #ifdef _GC_OBJ_ZONE
 #undef _GC_OBJ_ZONE
 #endif
-#define _GC_OBJ_ZONE    glvZONE_PIXEL
+#define _GC_OBJ_ZONE    gcdZONE_ES11_PIXEL
 
 GL_API void GL_APIENTRY glPixelStorei(
     GLenum Name,

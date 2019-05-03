@@ -40,6 +40,7 @@
 
 #include "gc_vgsh_precomp.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG3D_VGU
 
 static void append(VGPath path, gctINT32 numSegments, const VGubyte* segments, gctINT32 numCoordinates, const VGfloat* coordinates)
 {

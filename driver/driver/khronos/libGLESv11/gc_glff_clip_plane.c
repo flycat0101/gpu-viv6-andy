@@ -13,7 +13,7 @@
 
 #include "gc_glff_precomp.h"
 
-#define _GC_OBJ_ZONE    glvZONE_CLIP
+#define _GC_OBJ_ZONE    gcdZONE_ES11_CLIP
 
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
@@ -398,7 +398,7 @@ GL_API void GL_APIENTRY glClipPlanexIMG(
 */
 
 #undef  _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE    glvZONE_QUERY
+#define _GC_OBJ_ZONE    gcdZONE_ES11_QUERY
 
 GL_API void GL_APIENTRY glGetClipPlanef(
     GLenum Plane,

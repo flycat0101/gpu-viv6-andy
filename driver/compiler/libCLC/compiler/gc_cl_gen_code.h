@@ -34,6 +34,7 @@
 #define cldConstantMemoryAddressRegIndex _gcdOCL_ConstantMemoryAddressRegIndex  /*constant memory address register index */
 #define cldPrintfStartMemoryAddressRegIndex _gcdOCL_PrintfStartMemoryAddressRegIndex  /*printf start memory address register index */
 #define cldPrintfEndMemoryAddressRegIndex   _gcdOCL_PrintfEndMemoryAddressRegIndex  /*printf end memory address register index */
+#define cldPreScaleGlobalIdRegIndex _gcdOCL_PreScaleGlobalIdRegIndex
 #define cldMaxLocalTempRegs _gcdOCL_MaxLocalTempRegs /* maximum number of local temp register */
 
 gctUINT

@@ -13,7 +13,7 @@
 
 #include "gc_glff_precomp.h"
 
-#define _GC_OBJ_ZONE glvZONE_TRACE
+#define _GC_OBJ_ZONE gcdZONE_ES11_TRACE
 
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************

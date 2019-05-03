@@ -18,7 +18,7 @@
 /*
 ** Enable/Disable
 */
-#define _GC_OBJ_ZONE __GLES3_ZONE_CORE
+#define _GC_OBJ_ZONE gcdZONE_ES30_CORE
 
 __GL_INLINE GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
 {

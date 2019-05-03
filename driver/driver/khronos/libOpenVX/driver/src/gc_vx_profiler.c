@@ -14,6 +14,8 @@
 #include <gc_vx_common.h>
 #include <gc_vx_profiler.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_OTHERS
+
 #if VIVANTE_PROFILER
 gctINT
 vxoProfiler_Initialize(
@@ -27,8 +29,10 @@ vxoProfiler_Initialize(
 
     gcmHEADER_ARG("context=0x%x ", context);
 
-    if (!vxoContext_IsValid(context)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoContext_IsValid(context)) {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_PROFILE", &env)) && env)
     {
         if gcmIS_SUCCESS(gcoOS_StrCmp(env, "0"))
@@ -192,13 +196,18 @@ vxoProfiler_End(
     gctINT status = gcvSTATUS_OK;
     vx_context context;
     gcoPROFILER Profiler;
+    gcmHEADER_ARG("reference=%p", reference);
 
     context = vxoContext_GetFromReference(reference);
 
-    if (!vxoContext_IsValid(context)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_ARG("%d", status);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     if (!context->profiler.enable)
     {
+        gcmFOOTER_ARG("%d", status);
         return status;
     }
 
@@ -222,6 +231,7 @@ vxoProfiler_End(
     vxInfo("*********\n");
     context->profiler.frameNumber++;
 
+    gcmFOOTER_ARG("%d", status);
     /* Return the status. */
     return status;
 }

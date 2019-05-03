@@ -22,10 +22,18 @@ gceSTATUS
 ppoPREPROCESSOR_ToEOL(ppoPREPROCESSOR PP)
 {
     ppoTOKEN    ntoken = gcvNULL;
+    gctBOOL     toTheEnd = gcvFALSE;
 
-    gceSTATUS    status = gcvSTATUS_INVALID_ARGUMENT;
+    gceSTATUS    status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
 
-    ppmCheckFuncOk(
+    toTheEnd = PP->toLineEnd;
+    if(!PP->doWeInValidArea)
+    {
+        PP->toLineEnd = gcvTRUE;
+        PP->skipLine = PP->currentSourceFileLineNumber;
+    }
+
+    gcmONERROR(
         PP->inputStream->GetToken(
         PP,
         &(PP->inputStream),
@@ -38,15 +46,24 @@ ppoPREPROCESSOR_ToEOL(ppoPREPROCESSOR PP)
         ntoken->poolString != PP->keyword->newline)
     {
 
-        ppmCheckFuncOk(
+        gcmONERROR(
             ppoTOKEN_Destroy(PP, ntoken)
             );
 
-        status = PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, gcvFALSE);            ppmCheckOK();
+        gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, gcvFALSE));
 
     }
 
-    return ppoTOKEN_Destroy(PP, ntoken);
+    PP->toLineEnd = toTheEnd;
+
+    gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+
+    /* Success. */
+    return gcvSTATUS_OK;
+
+OnError:
+    /* Return the status. */
+    return status;
 }
 /******************************************************************************\
 MatchDoubleToken
@@ -60,25 +77,25 @@ ppoPREPROCESSOR_MatchDoubleToken(
 {
     ppoTOKEN    ntoken1 = gcvNULL;
     ppoTOKEN    ntoken2 = gcvNULL;
-    gceSTATUS    status = gcvSTATUS_INVALID_ARGUMENT;
+    gceSTATUS    status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
 
-    ppmCheckFuncOk(
+    gcmONERROR(
         ppoPREPROCESSOR_PassEmptyLine(PP)
         );
 
-    ppmCheckFuncOk(
+    gcmONERROR(
         PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken1, !ppvICareWhiteSpace)
         );
 
-    ppmCheckFuncOk(
+    gcmONERROR(
         PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken2, !ppvICareWhiteSpace)
         );
 
-    ppmCheckFuncOk(
+    gcmONERROR(
         ppoINPUT_STREAM_UnGetToken(PP, &PP->inputStream, ntoken2)
         );
 
-    ppmCheckFuncOk(
+    gcmONERROR(
         ppoINPUT_STREAM_UnGetToken(PP, &PP->inputStream, ntoken1)
         );
 
@@ -87,26 +104,45 @@ ppoPREPROCESSOR_MatchDoubleToken(
     {
         *Match = gcvTRUE;
 
-        ppmCheckFuncOk(
+        gcmONERROR(
             ppoTOKEN_Destroy(PP, ntoken2)
             );
+        ntoken2 = gcvNULL;
 
-        return     ppoTOKEN_Destroy(PP, ntoken1);
-    }
-    else
-    {
-        *Match = gcvFALSE;
-
-        ppmCheckFuncOk(
-            ppoTOKEN_Destroy(PP, ntoken2)
-            );
-
-        ppmCheckFuncOk(
+        gcmONERROR(
             ppoTOKEN_Destroy(PP, ntoken1)
             );
 
         return gcvSTATUS_OK;
     }
+    else
+    {
+        *Match = gcvFALSE;
+
+        gcmONERROR(
+            ppoTOKEN_Destroy(PP, ntoken2)
+            );
+        ntoken2 = gcvNULL;
+
+        gcmONERROR(
+            ppoTOKEN_Destroy(PP, ntoken1)
+            );
+
+        return gcvSTATUS_OK;
+    }
+
+OnError:
+    if (ntoken1 != gcvNULL)
+    {
+        gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken1));
+        ntoken1 = gcvNULL;
+    }
+    if (ntoken2 != gcvNULL)
+    {
+        gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken2));
+        ntoken2 = gcvNULL;
+    }
+    return status;
 }
 
 
@@ -120,34 +156,43 @@ gceSTATUS
 ppoPREPROCESSOR_PassEmptyLine(ppoPREPROCESSOR PP)
 {
     ppoTOKEN    ntoken = gcvNULL;
-    gceSTATUS    status = gcvSTATUS_INVALID_ARGUMENT;
+    gceSTATUS    status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
     gcmASSERT(PP && PP->base.type == ppvOBJ_PREPROCESSOR);
 
 
-    ppmCheckFuncOk(
+    gcmONERROR(
         PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace)
         );
 
     while(ntoken->type != ppvTokenType_EOF && ntoken->poolString == PP->keyword->newline)
     {
-        ppmCheckFuncOk(
+        gcmONERROR(
             ppoTOKEN_Destroy(PP, ntoken)
             );
+        ntoken = gcvNULL;
 
-        ppmCheckFuncOk(
+        gcmONERROR(
             PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, gcvFALSE)
             );
     }
 
-    ppmCheckFuncOk(
+    gcmONERROR(
         ppoINPUT_STREAM_UnGetToken(PP, &PP->inputStream, ntoken)
         );
 
-    ppmCheckFuncOk(
+    gcmONERROR(
         ppoTOKEN_Destroy(PP, ntoken)
         );
 
     return gcvSTATUS_OK;
+
+OnError:
+    if (ntoken != gcvNULL)
+    {
+        gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken));
+        ntoken = gcvNULL;
+    }
+    return status;
 
 
 }
@@ -163,49 +208,90 @@ gceSTATUS
 ppoPREPROCESSOR_Define_BufferReplacementList(ppoPREPROCESSOR PP, ppoTOKEN* RList)
 {
     ppoTOKEN    ntoken    = gcvNULL;
+    ppoTOKEN    nextToken = gcvNULL;
     ppoTOKEN    colon    = gcvNULL;
     ppoTOKEN    lastone    = gcvNULL;
-    gceSTATUS    status    = gcvSTATUS_INVALID_ARGUMENT;
+    gceSTATUS    status    = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
 
+    gcmHEADER_ARG("PP=0x%x RList=0x%x", PP, RList);
     gcmASSERT(RList);
 
     *RList = gcvNULL;
 
-    status = PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace);            ppmCheckOK();
+    status = PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace);
+    ppmCheckOK();
 
-    while(
-        ntoken->poolString != PP->keyword->eof        &&
-        ntoken->poolString != PP->keyword->newline)
+    if(ntoken->poolString == PP->keyword->eof        ||
+       ntoken->poolString == PP->keyword->newline) {
+           ntoken->type = ppvTokenType_NUL;
+           ntoken->poolString = PP->keyword->nul_str;
+           ntoken->hasLeadingWS = gcvTRUE;
+
+           *RList = ntoken;
+           gcmFOOTER_NO();
+           return gcvSTATUS_OK;
+    }
+    else
     {
-        colon = ntoken;
-
-        /*Add this formal para to the para stack.*/
-        if(*RList)
+        while(ntoken->poolString != PP->keyword->eof &&
+            ntoken->poolString != PP->keyword->newline)
         {
-            lastone->inputStream.base.node.prev    = (void*)colon;
-            colon->inputStream.base.node.next        = (void*)lastone;
-            colon->inputStream.base.node.prev        = gcvNULL;
-            lastone = colon;
-        }
-        else
-        {
-            *RList = colon;
-            lastone = colon;
-        }
-        /*Get a token, check.*/
-        status = PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace);        ppmCheckOK();
+            colon = ntoken;
 
-    }/*while*/
+            /*Add this formal para to the para stack.*/
+            if(*RList)
+            {
+                lastone->inputStream.base.node.prev    = (void*)colon;
+                colon->inputStream.base.node.next        = (void*)lastone;
+                colon->inputStream.base.node.prev        = gcvNULL;
+                lastone = colon;
+            }
+            else
+            {
+                *RList = colon;
+                lastone = colon;
+            }
 
-    ppmCheckFuncOk(
+            if (ntoken->poolString == PP->keyword->ws)
+            {
+                gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &nextToken, ppvICareWhiteSpace));
+
+                /* Get the next non-WS token. */
+                while (nextToken->poolString == PP->keyword->ws)
+                {
+                    gcmONERROR(ppoTOKEN_Destroy(PP, nextToken));
+
+                    gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &nextToken, ppvICareWhiteSpace));
+                }
+                gcmONERROR(ppoINPUT_STREAM_UnGetToken(PP, &PP->inputStream, nextToken));
+                gcmONERROR(ppoTOKEN_Destroy(PP, nextToken));
+            }
+
+            /*Get a token, check.*/
+            gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, ppvICareWhiteSpace));
+        }/*while*/
+    }
+
+    gcmONERROR(
         ppoINPUT_STREAM_UnGetToken(PP, &(PP->inputStream), ntoken)
         );
 
-    ppmCheckFuncOk(
+    gcmONERROR(
         ppoTOKEN_Destroy(PP, ntoken)
         );
 
+    gcmFOOTER_NO();
     return gcvSTATUS_OK;
+
+OnError:
+    if (ntoken != gcvNULL)
+    {
+        ppoTOKEN_Destroy(PP, ntoken);
+        ntoken = gcvNULL;
+    }
+
+    gcmFOOTER();
+    return status;
 
 }
 
@@ -216,78 +302,109 @@ In    :    This function inputStream called just after the name of #define
 gceSTATUS
 ppoPREPROCESSOR_Define_BufferArgs(ppoPREPROCESSOR PP, ppoTOKEN* args, gctINT* argc)
 {
-    ppoTOKEN ntoken = gcvNULL;
-    ppoTOKEN colon    = gcvNULL;
-    ppoTOKEN lastone    = gcvNULL;
+    ppoTOKEN    ntoken = gcvNULL;
+    ppoTOKEN    colon    = gcvNULL;
+    ppoTOKEN    lastone    = gcvNULL;
     gctBOOL     boolean= gcvFALSE;
-    gceSTATUS    status = gcvSTATUS_INVALID_ARGUMENT;
-    gcmASSERT( (*args) == gcvNULL && (*argc) == 0 );
+    gctBOOL     firstToken = gcvTRUE;
+    gceSTATUS   status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
 
-    while(1)
+    gcmHEADER_ARG("PP=0x%x args=0x%x argc=0x%x", PP, args, argc);
+
+    gcmASSERT((*args) == gcvNULL && (*argc) == 0);
+
+    /* Get first token. */
+    gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace));
+
+    while (gcvTRUE)
     {
-        status = PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace);
-
-        if(status != gcvSTATUS_OK){return status;}
-        /*Get One Para*/
-        if(ntoken->type != ppvTokenType_ID)
+        /* If this token is a ')', return. */
+        if (ntoken->poolString == PP->keyword->rpara)
         {
-            ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR, "Id is expected.");
-            return gcvSTATUS_INVALID_ARGUMENT;
+            break;
         }
-        else
+        /* If this token is a ',', then we expect that the next token is a ID. */
+        else if (ntoken->poolString == PP->keyword->comma)
+        {
+            gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+            ntoken = gcvNULL;
+
+            if (firstToken)
+            {
+                ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR, "Id is expected.");
+                gcmONERROR(gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR);
+            }
+
+            /* Get the next token, expect a ID token. */
+            gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace));
+            if (ntoken->type != ppvTokenType_ID)
+            {
+                ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR, "Id is expected.");
+                gcmONERROR(gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR);
+            }
+        }
+        /* If this token is a ID, check this ID. */
+        else if (ntoken->type == ppvTokenType_ID)
         {
             /*Check if this para inputStream already in the list*/
-            status = ppoTOKEN_STREAM_FindID(PP, *args,ntoken->poolString, &boolean);
-            if(status != gcvSTATUS_OK)
-            {
-                return status;
-            }
-            if(boolean)
+            ppoTOKEN_STREAM_FindID(PP, *args,ntoken->poolString, &boolean);
+            if (boolean)
             {
                 ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR,
                     "The formal para name should not be the same.%s.",ntoken->poolString);
-                return gcvSTATUS_INVALID_ARGUMENT;
+                gcmONERROR(gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR);
             }
-
             colon = ntoken;
 
             /*Add this formal para to the para stack.*/
-            if(*args)
+            if (*args)
             {
+                if (lastone == gcvNULL)
+                    gcmONERROR(gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR);
+
                 lastone->inputStream.base.node.prev = (void*)colon;
                 colon->inputStream.base.node.prev = gcvNULL;
                 colon->inputStream.base.node.next = (void*)lastone;
                 lastone = colon;
                 ++(*argc);
             }
-            else{
+            else
+            {
                 *args = colon;
                 lastone = *args;
                 ++(*argc);
             }
-        }
-        status = PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace);        ppmCheckOK();
 
-        if(ntoken->poolString != PP->keyword->comma)
+            /* Get the next token. */
+            gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace));
+
+            /* Expect ',' or ')'. */
+            if (ntoken->poolString != PP->keyword->rpara &&
+                ntoken->poolString != PP->keyword->comma)
+            {
+                ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR, "',' or ')' is expected.");
+                gcmONERROR(gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR);
+            }
+        }
+        else
         {
-            if(ntoken->poolString != PP->keyword->rpara)
-            {
-                ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR,
-                    "Need a ) here.");
-                return gcvSTATUS_INVALID_ARGUMENT;
-            }
-            else
-            {
-                return ppoTOKEN_Destroy(PP, ntoken);
-            }
+            ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR, "Id is expected.");
+            gcmONERROR(gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR);
         }
 
-        ppmCheckFuncOk(
-            ppoTOKEN_Destroy(PP, ntoken)
-            );
+        firstToken = gcvFALSE;
+    }
 
-    }/*while(1)*/
+OnError:
+    if (ntoken != gcvNULL)
+    {
+        gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken));
+        ntoken = gcvNULL;
+    }
+    gcmFOOTER();
+    return status;
 }
+
 /******************************************************************************\
 Buffer Actual Args
 When meet a macro call in texline, we call this function to collect
@@ -300,7 +417,9 @@ ppoPREPROCESSOR_BufferActualArgs(ppoPREPROCESSOR PP, ppoINPUT_STREAM *IS, ppoTOK
 {
     ppoTOKEN            ntoken        = gcvNULL;
     gctINT                locallevel    = 0;
-    gceSTATUS            status        = gcvSTATUS_INVALID_DATA;
+    gceSTATUS            status        = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+
+    gcmHEADER_ARG("PP=0x%x IS=0x%x Head=0x%x End=0x%x", PP, IS, Head, End);
 
     *Head    = gcvNULL;
     *End    = gcvNULL;
@@ -310,10 +429,17 @@ ppoPREPROCESSOR_BufferActualArgs(ppoPREPROCESSOR PP, ppoINPUT_STREAM *IS, ppoTOK
     if((*IS) == gcvNULL)
     {
         ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR, "unexpected end of file.");
-        return gcvSTATUS_INVALID_DATA;
+        status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+        gcmFOOTER();
+        return status;
     }
 
-    status = (*IS)->GetToken(PP, IS, &ntoken, !ppvICareWhiteSpace);if(status != gcvSTATUS_OK){return status;}
+    status = (*IS)->GetToken(PP, IS, &ntoken, !ppvICareWhiteSpace);
+    if(status != gcvSTATUS_OK)
+    {
+        gcmFOOTER();
+        return status;
+    }
 
     while(1)
     {
@@ -322,21 +448,33 @@ ppoPREPROCESSOR_BufferActualArgs(ppoPREPROCESSOR PP, ppoINPUT_STREAM *IS, ppoTOK
             ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR,
                 "unexpected end of file.");
 
-            ppmCheckFuncOk(
+            gcmONERROR(
                 ppoTOKEN_Destroy(PP, ntoken)
                 );
 
-            return gcvSTATUS_INVALID_DATA;
+            status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+            gcmFOOTER();
+            return status;
         }
         else    if(ntoken->poolString == PP->keyword->rpara && locallevel == 0)
         {
             if(*IS)
             {
-                ppmCheckFuncOk(
+                gcmONERROR(
                     ppoINPUT_STREAM_UnGetToken(PP, IS, ntoken)
                     );
 
-                return ppoTOKEN_Destroy(PP, ntoken);
+                status = ppoTOKEN_Destroy(PP, ntoken);
+                if (gcmIS_SUCCESS(status))
+                {
+                    gcmFOOTER_NO();
+                    return gcvSTATUS_OK;
+                }
+                else
+                {
+                    gcmFOOTER();
+                    return status;
+                }
             }
             else
             {
@@ -346,6 +484,7 @@ ppoPREPROCESSOR_BufferActualArgs(ppoPREPROCESSOR PP, ppoINPUT_STREAM *IS, ppoTOK
 
                 (*IS)  = (ppoINPUT_STREAM)ntoken;
 
+                gcmFOOTER_NO();
                 return gcvSTATUS_OK;
             }
         }
@@ -353,13 +492,14 @@ ppoPREPROCESSOR_BufferActualArgs(ppoPREPROCESSOR PP, ppoINPUT_STREAM *IS, ppoTOK
         {
             if(*IS)
             {
-                ppmCheckFuncOk(
+                gcmONERROR(
                     ppoINPUT_STREAM_UnGetToken(PP, IS, ntoken)
                     );
 
-                ppmCheckFuncOk(
+                gcmONERROR(
                     ppoTOKEN_Destroy(PP, ntoken)
                     );
+                ntoken = gcvNULL;
             }
             else
             {
@@ -370,6 +510,7 @@ ppoPREPROCESSOR_BufferActualArgs(ppoPREPROCESSOR PP, ppoINPUT_STREAM *IS, ppoTOK
                 (*IS)  = (ppoINPUT_STREAM)ntoken;
             }
 
+            gcmFOOTER_NO();
             return gcvSTATUS_OK;
 
         }
@@ -403,14 +544,24 @@ ppoPREPROCESSOR_BufferActualArgs(ppoPREPROCESSOR PP, ppoINPUT_STREAM *IS, ppoTOK
         }
         else
         {
-            ppmCheckFuncOk(
+            gcmONERROR(
                 ppoTOKEN_Destroy(PP, ntoken)
                 );
 
             ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR, "unexpected end of file.");
 
-            return gcvSTATUS_INVALID_DATA;
+            status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+            gcmFOOTER();
+            return status;
         }
     }/*while(1)*/
+OnError:
+    if (ntoken != gcvNULL)
+    {
+        gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken));
+        ntoken = gcvNULL;
+    }
+    gcmFOOTER();
+    return status;
 }
 

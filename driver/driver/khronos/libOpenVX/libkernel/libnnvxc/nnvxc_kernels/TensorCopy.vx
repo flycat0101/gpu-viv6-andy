@@ -366,3 +366,97 @@ __kernel void tensorCopy_Fp32toFp32
     coord.y ++;
     write_imagef(output, coord, src3);
 }
+
+_viv_uniform VXC_512Bits uniConvertF16toF32Lo_4x4;
+_viv_uniform VXC_512Bits uniConvertF16toF32Hi_4x4;
+__kernel void tensorCopy_F16toF32
+    (
+    __read_only     image2d_array_t input,
+    __write_only    image2d_array_t output
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    vxc_short8 vect;
+    vxc_half8 src;
+    VXC_ReadImage2DArray(vect, input,coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, src, vect, 16);
+
+    vxc_float4 dst0, dst1;
+    VXC_DP4x4(dst0, src, src, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertF16toF32Lo_4x4);
+    VXC_DP4x4(dst1, src, src, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertF16toF32Hi_4x4);
+
+    write_imagef(output, coord, dst0);
+    coord.x += 4;
+    write_imagef(output, coord, dst1);
+}
+
+__kernel void tensorCopy_F16toF32_2D
+    (
+    __read_only     image2d_array_t input,
+    __write_only    image2d_array_t output
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    vxc_short8 vect;
+    vxc_half8 src;
+    VXC_ReadImage(vect, input, coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, src, vect, 16);
+
+    vxc_float4 dst0, dst1;
+    VXC_DP4x4(dst0, src, src, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertF16toF32Lo_4x4);
+    VXC_DP4x4(dst1, src, src, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertF16toF32Hi_4x4);
+
+    write_imagef(output, coord, dst0);
+    coord.x += 4;
+    write_imagef(output, coord, dst1);
+}
+
+_viv_uniform VXC_512Bits uniPackedEvenData_2x8;
+__kernel void tensorCopy_F32toF16
+    (
+    __read_only     image2d_array_t input,
+    __write_only    image2d_array_t output
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    vxc_float4 src0, src1;
+    src0 = read_imagef(input, coord);
+    coord.x += 4;
+    src1 = read_imagef(input, coord);
+    coord.x -= 4;
+
+    half4 dst0, dst1;
+    _viv_asm(CONV, dst0, src0);
+    _viv_asm(CONV, dst1, src1);
+
+    vxc_half8 vec;
+    vxc_short8 dst;
+    VXC_DP2x8(vec, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniPackedEvenData_2x8);
+    _viv_asm(COPY, dst, vec, 16);
+    VXC_WriteImage2DArray(output, coord, dst, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+}
+
+__kernel void tensorCopy_F32toF16_2D
+    (
+    __read_only     image2d_array_t input,
+    __write_only    image2d_array_t output
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    vxc_float4 src0, src1;
+    src0 = read_imagef(input, coord);
+    coord.x += 4;
+    src1 = read_imagef(input, coord);
+    coord.x -= 4;
+
+    half4 dst0, dst1;
+    _viv_asm(CONV, dst0, src0);
+    _viv_asm(CONV, dst1, src1);
+
+    vxc_half8 vec;
+    vxc_short8 dst;
+    VXC_DP2x8(vec, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniPackedEvenData_2x8);
+    _viv_asm(COPY, dst, vec, 16);
+    VXC_WriteImage(output, coord.xy, dst, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+}
+

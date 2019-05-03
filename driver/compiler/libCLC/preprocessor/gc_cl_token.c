@@ -21,8 +21,12 @@ ppoTOKEN_Destroy(
 {
     ppoHIDE_SET tmp, prev;
 
-    gceSTATUS    status;
+    gceSTATUS   status;
 
+    if(Token == gcvNULL)
+    {
+        return gcvSTATUS_OK;
+    }
     gcmASSERT(PP && PP->base.type == ppvOBJ_PREPROCESSOR && Token);
 
     tmp = (ppoHIDE_SET)Token->hideSet;
@@ -31,7 +35,7 @@ ppoTOKEN_Destroy(
     {
         prev = (ppoHIDE_SET)tmp->base.node.prev;
 
-        ppmCheckFuncOk(
+        gcmONERROR(
             ppoHIDE_SET_Destroy(PP, tmp)
             );
 
@@ -39,8 +43,11 @@ ppoTOKEN_Destroy(
     }
 
     cloCOMPILER_Free(PP->compiler, Token);
-
+    Token = gcvNULL;
     return gcvSTATUS_OK;
+
+OnError:
+    return status;
 }
 
 gceSTATUS
@@ -57,7 +64,7 @@ ppoTOKEN_STREAM_Destroy(
     {
         ppoTOKEN p = (ppoTOKEN)t->inputStream.base.node.prev;
 
-        ppmCheckFuncOk(
+        gcmONERROR(
             ppoTOKEN_Destroy(PP, t)
             );
 
@@ -65,14 +72,17 @@ ppoTOKEN_STREAM_Destroy(
     }
 
     return gcvSTATUS_OK;
+
+OnError:
+    return status;
 }
 /*******************************TOKEN FindID***********************************/
 gceSTATUS
 ppoTOKEN_FindPoolString(
-                        ppoPREPROCESSOR        PP,
-                        ppoTOKEN_STREAM        TS,
-                        gctSTRING                Name,
-                        ppoTOKEN*            Finded)
+                        ppoPREPROCESSOR     PP,
+                        ppoTOKEN_STREAM     TS,
+                        gctSTRING               Name,
+                        ppoTOKEN*           Finded)
 {
     ppoTOKEN tmp = TS;
     while(tmp)
@@ -90,21 +100,22 @@ ppoTOKEN_FindPoolString(
 /******************************TOKEN_Creat*************************************/
 gceSTATUS
 ppoTOKEN_Construct(
-                   ppoPREPROCESSOR        PP,
+                   ppoPREPROCESSOR      PP,
                    /*01*/gctCONST_STRING            File,
-                   /*02*/gctINT        Line,
+                   /*02*/gctINT     Line,
                    /*03*/gctCONST_STRING            MoreInfo,
-                   /*04*/ppoTOKEN*        Created)
+                   /*04*/ppoTOKEN*      Created)
 {
-    ppoTOKEN    rt        = gcvNULL;
-    gceSTATUS    status    = gcvSTATUS_INVALID_ARGUMENT;
+    ppoTOKEN    rt      = gcvNULL;
+    gceSTATUS   status  = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+    gctPOINTER  pointer = gcvNULL;
     gcmASSERT(PP && Created);
 
-    ppmCheckFuncOk(
+    gcmONERROR(
         cloCOMPILER_Allocate(
         PP->compiler,
         sizeof(struct _ppoTOKEN),
-        (gctPOINTER*)&rt)
+        &pointer)
         );
 
     if(status != gcvSTATUS_OK)
@@ -112,17 +123,19 @@ ppoTOKEN_Construct(
         return status;
     }
 
+    rt = pointer;
+
     gcoOS_MemFill(rt, 0, sizeof(*rt));
     /*00    isBase*/
-    ppmCheckFuncOk(
+    gcmONERROR(
         ppoINPUT_STREAM_Init(
         PP,
         /*00    youris*/    (void*)rt,
-        /*01    file*/        File,
-        /*02    line*/        Line,
-        /*03    moreInfo*/    MoreInfo,
+        /*01    file*/      File,
+        /*02    line*/      Line,
+        /*03    moreInfo*/  MoreInfo,
         /*04    istype*/    ppvOBJ_TOKEN,
-        /*05    gettoken*/    ppoTOKEN_GetToken)
+        /*05    gettoken*/  ppoTOKEN_GetToken)
         );
 
     /*02    type*/
@@ -136,14 +149,22 @@ ppoTOKEN_Construct(
 
     *Created = rt;
     return gcvSTATUS_OK;
+OnError:
+    if (rt != gcvNULL)
+    {
+        gcmVERIFY_OK(cloCOMPILER_Free(PP->compiler, rt));
+        rt = gcvNULL;
+    }
+    return status;
 }
+
 /*******************    ppoTOKEN GetToken *************************************/
 gceSTATUS
 ppoTOKEN_GetToken(
-                  ppoPREPROCESSOR        PP,
+                  ppoPREPROCESSOR       PP,
                   ppoINPUT_STREAM* IS,
-                  ppoTOKEN*        Token,
-                  gctBOOL            WhiteSpace)
+                  ppoTOKEN*     Token,
+                  gctBOOL           WhiteSpace)
 {
     gcmASSERT(IS && (*IS)->base.type == ppvOBJ_TOKEN);
 
@@ -160,14 +181,14 @@ Colon a token, the base, should be clear.
 \******************************************************************************/
 gceSTATUS
 ppoTOKEN_Colon(
-               ppoPREPROCESSOR        PP,
-               ppoTOKEN    Token,
-               gctCONST_STRING        File,
-               gctINT        Line,
-               gctCONST_STRING        MoreInfo,
+               ppoPREPROCESSOR      PP,
+               ppoTOKEN Token,
+               gctCONST_STRING      File,
+               gctINT       Line,
+               gctCONST_STRING      MoreInfo,
                ppoTOKEN*    Coloned)
 {
-    gceSTATUS    status = gcvSTATUS_OK;
+    gceSTATUS   status = gcvSTATUS_OK;
     gcmASSERT(Token && Token->inputStream.base.type == ppvOBJ_TOKEN);
 
     /*00*/
@@ -192,22 +213,29 @@ ppoTOKEN_Colon(
     }
     /*04    poolString*/
     (*Coloned)->poolString = Token->poolString;
+
+    /*07    hasLeadingWS*/
+    (*Coloned)->hasLeadingWS = Token->hasLeadingWS;
+
+    /*08    hasTrailingControl*/
+    (*Coloned)->hasTrailingControl = Token->hasTrailingControl;
     return gcvSTATUS_OK;
 }
 
 /******************************************************************************\
-Colon    Token    List
+Colon   Token   List
 \******************************************************************************/
 gceSTATUS
 ppoTOKEN_ColonTokenList(
-                        ppoPREPROCESSOR        PP,
+                        ppoPREPROCESSOR     PP,
                         ppoTOKEN    SrcTLst,
-                        gctCONST_STRING        File,
-                        gctINT        Line,
-                        gctCONST_STRING        MoreInfo,
-                        ppoTOKEN*    ColonedHead)
+                        gctCONST_STRING     File,
+                        gctINT      Line,
+                        gctCONST_STRING     MoreInfo,
+                        ppoTOKEN*   ColonedHead,
+            ppoTOKEN    RefId)
 {
-    gceSTATUS    status = gcvSTATUS_OK;
+    gceSTATUS   status = gcvSTATUS_OK;
 
     if(!SrcTLst)
     {
@@ -216,6 +244,9 @@ ppoTOKEN_ColonTokenList(
     }
 
     status = ppoTOKEN_Colon(PP, SrcTLst, File, Line, MoreInfo, ColonedHead);
+    if(RefId && RefId->hasLeadingWS) {
+      (*ColonedHead)->hasLeadingWS = gcvTRUE;
+    }
     if(status != gcvSTATUS_OK)
     {
         return status;
@@ -228,7 +259,8 @@ ppoTOKEN_ColonTokenList(
             File,
             Line,
             MoreInfo,
-            (void*)&((*ColonedHead)->inputStream.base.node.prev));
+            (void*)&((*ColonedHead)->inputStream.base.node.prev),
+            gcvNULL);
     }
     else
     {
@@ -236,10 +268,10 @@ ppoTOKEN_ColonTokenList(
         return gcvSTATUS_OK;
     }
 }
-/**********************    TOKEN DumpTokenList    ***********************************/
+/********************** TOKEN DumpTokenList ***********************************/
 gceSTATUS
 ppoTOKEN_Dump(
-              ppoPREPROCESSOR        PP,
+              ppoPREPROCESSOR       PP,
               ppoTOKEN    Token)
 {
     ppoTOKEN local = gcvNULL;
@@ -290,7 +322,7 @@ IsInIdTokenList
 \******************************************************************************/
 gceSTATUS
 ppoTOKEN_STREAM_FindID(
-                       ppoPREPROCESSOR        PP,ppoTOKEN TokenList, gctSTRING ID, gctBOOL* FindOrNot)
+                       ppoPREPROCESSOR      PP,ppoTOKEN TokenList, gctSTRING ID, gctBOOL* FindOrNot)
 {
     ppoTOKEN tmp = TokenList;
     *FindOrNot = gcvFALSE;

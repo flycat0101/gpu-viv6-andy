@@ -56,7 +56,7 @@ struct backend_desc {
 };
 
 static const struct backend_desc backends[] = {
-   { "gbm_viv.so", &gbm_viv_backend },
+   { "libgbm_viv.so", &gbm_viv_backend },
 };
 
 static const void *

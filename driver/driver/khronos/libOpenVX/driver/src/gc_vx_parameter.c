@@ -15,9 +15,12 @@
 #include <gc_hal_user_precomp.h>
 #include <gc_hal_vx.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_PARAM
+
 VX_INTERNAL_CALLBACK_API void vxoParameter_Destructor(vx_reference ref)
 {
     vx_parameter parameter = (vx_parameter)ref;
+    gcmHEADER_ARG("ref=%p", ref);
 
     vxmASSERT(vxoReference_IsValidAndSpecific(&parameter->base, VX_TYPE_PARAMETER));
 
@@ -42,26 +45,35 @@ VX_INTERNAL_CALLBACK_API void vxoParameter_Destructor(vx_reference ref)
             vxoReference_Release((vx_reference_ptr)&parameter->kernel, VX_TYPE_KERNEL, VX_REF_INTERNAL);
         }
     }
+    gcmFOOTER_NO();
 }
 
 VX_API_ENTRY vx_parameter VX_API_CALL vxGetKernelParameterByIndex(vx_kernel kernel, vx_uint32 index)
 {
     vx_parameter parameter;
 
+    gcmHEADER_ARG("kernel=%p, index=0x%x", kernel, index);
     gcmDUMP_API("$VX vxGetKernelParameterByIndex: kernel=%p, index=0x%x", kernel, index);
 
-    if (!vxoReference_IsValidAndSpecific(&kernel->base, VX_TYPE_KERNEL)) return VX_NULL;
-
+    if (!vxoReference_IsValidAndSpecific(&kernel->base, VX_TYPE_KERNEL))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (index >= VX_MAX_PARAMETERS || index >= kernel->signature.paramCount)
     {
+        gcmFOOTER_NO();
         return (vx_parameter)vxoContext_GetErrorObject(kernel->base.context, VX_ERROR_INVALID_PARAMETERS);
     }
 
     parameter = (vx_parameter)vxoReference_Create(kernel->base.context, VX_TYPE_PARAMETER,
                                                     VX_REF_EXTERNAL, &kernel->base.context->base);
 
-    if (vxoReference_GetStatus((vx_reference)parameter) != VX_SUCCESS) return parameter;
-
+    if (vxoReference_GetStatus((vx_reference)parameter) != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("%d", VX_SUCCESS);
+        return parameter;
+    }
     parameter->index    = index;
 
     parameter->node     = VX_NULL;
@@ -70,6 +82,7 @@ VX_API_ENTRY vx_parameter VX_API_CALL vxGetKernelParameterByIndex(vx_kernel kern
     /* Add the ref count of the kernel from the parameter */
     vxoReference_Increment(&parameter->kernel->base, VX_REF_INTERNAL);
 
+    gcmFOOTER_ARG("parameter=%p", parameter);
     return parameter;
 }
 
@@ -82,6 +95,7 @@ VX_API_ENTRY vx_parameter VX_API_CALL vxGetParameterByIndex(vx_node node, vx_uin
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseParameter(vx_parameter *parameter)
 {
+    gcmHEADER_ARG("parameter=%p", parameter);
     gcmDUMP_API("$VX vxReleaseParameter: parameter=%p", parameter);
 
     if((*parameter)->base.type == VX_TYPE_SCALAR)
@@ -93,7 +107,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseParameter(vx_parameter *parameter)
             scalar->node = NULL;
         }
     }
-
+    gcmFOOTER_NO();
     return vxoReference_Release((vx_reference_ptr)parameter, VX_TYPE_PARAMETER, VX_REF_EXTERNAL);
 }
 
@@ -122,10 +136,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryParameter(vx_parameter parameter, vx_e
 {
     vx_reference paramRef;
 
+    gcmHEADER_ARG("parameter=%p, attribute=0x%x, ptr=%p, size=0x%lx", parameter, attribute, ptr, size);
     gcmDUMP_API("$VX vxQueryParameter: parameter=%p, attribute=0x%x, ptr=%p, size=0x%lx", parameter, attribute, ptr, size);
 
-    if (!vxoReference_IsValidAndSpecific(&parameter->base, VX_TYPE_PARAMETER)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoReference_IsValidAndSpecific(&parameter->base, VX_TYPE_PARAMETER))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     switch (attribute)
     {
         case VX_PARAMETER_DIRECTION:
@@ -155,8 +173,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryParameter(vx_parameter parameter, vx_e
         case VX_PARAMETER_REF:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_reference, 0x3);
 
-            if (parameter->node == VX_NULL) return VX_ERROR_NOT_SUPPORTED;
-
+            if (parameter->node == VX_NULL)
+            {
+                gcmFOOTER_NO();
+                return VX_ERROR_NOT_SUPPORTED;
+            }
             paramRef = parameter->node->paramTable[parameter->index];
 
             if (paramRef != VX_NULL) vxoReference_Extract(paramRef);
@@ -166,9 +187,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryParameter(vx_parameter parameter, vx_e
 
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
+            gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
             return VX_ERROR_NOT_SUPPORTED;
     }
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 

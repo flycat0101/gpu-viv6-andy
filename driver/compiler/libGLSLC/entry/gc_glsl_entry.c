@@ -664,6 +664,7 @@ gcFinalizeCompiler(void)
     gctINT32 reference = 0;
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT i;
+    gctBOOL locked = gcvFALSE;
 
     gcmHEADER();
 
@@ -672,6 +673,9 @@ gcFinalizeCompiler(void)
 
     if (reference == 1)
     {
+        gcmONERROR(_LockCompiler());
+        locked = gcvTRUE;
+
         for (i = 0; i < __GC_COMPILER_NUMBER__; i++)
         {
             if (*gcGetCompiler(i) != gcvNULL)
@@ -680,10 +684,18 @@ gcFinalizeCompiler(void)
                 *gcGetCompiler(i) = gcvNULL;
             }
         }
+
+        locked = gcvFALSE;
+        gcmONERROR(_UnLockCompiler());
     }
     gcmONERROR(gcFinalizeRecompilation());
 
 OnError:
+    if (locked == gcvTRUE)
+    {
+        gcmVERIFY_OK(_UnLockCompiler());
+    }
+
     gcmFOOTER_ARG("status=%d", status);
     return status;
 }

@@ -203,6 +203,11 @@ sloCOMPILER_IsHaltiVersion(
 );
 
 gctBOOL
+sloCOMPILER_IsES20Version(
+    IN sloCOMPILER Compiler
+    );
+
+gctBOOL
 sloCOMPILER_IsES30Version(
     IN sloCOMPILER Compiler
 );
@@ -541,6 +546,7 @@ typedef enum _sleEXTENSION
     slvEXTENSION_SUPPORT_OGL                                = 0x10000000,
     slvEXTENSION_INTEGER_MIX                                = 0x20000000,
     slvEXTENSION_EGL_IMAGE_EXTERNAL_ESSL3                   = 0x40000000,
+    slvEXTENSION_HALTI5_WITH_FMA_SUPPORT                    = 0x80000000,
 
     slvEXTENSION_ANDROID_EXTENSION_PACK_ES31A               = slvEXTENSION_BLEND_EQUATION_ADVANCED              |
                                                               slvEXTENSION_SAMPLE_VARIABLES                     |

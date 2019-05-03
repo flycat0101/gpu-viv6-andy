@@ -58,6 +58,9 @@ typedef struct _VIV_VIDMEM_METADATA
 
     int32_t  ts_fd;
     void *   ts_dma_buf;
+#ifdef gcdANDROID
+    dma_addr_t ts_address;
+#endif
 
     uint32_t fc_enabled;
     uint32_t fc_value;
@@ -72,5 +75,4 @@ typedef struct _VIV_VIDMEM_METADATA
 #endif
 
 #endif /* __gc_hal_kernel_metadata_h_ */
-
 

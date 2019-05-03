@@ -17,7 +17,7 @@
 #include "gc_chip_pixel.h"
 #include "gc_chip_hash.h"
 
-#define _GC_OBJ_ZONE __GLES3_ZONE_FIXVERTEX
+#define _GC_OBJ_ZONE gcdZONE_GL40_FIXVERTEX
 
 
 /*******************************************************************************

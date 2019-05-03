@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -41,8 +41,8 @@ _viv_uniform VXC_512Bits EO_OO_PackBGR_1; \n\
 \n\
 __kernel void tutorial4VXC \n\
     ( \n\
-    __read_only image2d_t 	in_image, \n\
-    __write_only image2d_t 	out_image \n\
+    __read_only image2d_t     in_image, \n\
+    __write_only image2d_t     out_image \n\
     ) \n\
 { \n\
     int2 coord_in = (int2)(get_global_id(0), get_global_id(1)); \n\
@@ -63,9 +63,9 @@ __kernel void tutorial4VXC \n\
     VXC_ReadImage(lineD, in_image, coord_in, 0x80, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0)); \n\
     VXC_DP4x8(acc_1, lineC, lineC, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), EE_EO_AccOneLine); \n\
     VXC_DP4x8(acc_2, lineD, lineA, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), EE_EO_AccTwoLines); \n\
-	dst = acc_0 + acc_1 + acc_2; \n\
-	VXC_DP2x8(bgr_register, lineC, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), EE_EO_PackBGR_0); \n\
-	VXC_DP2x8(bgr_register, lineC, dst, VXC_MODIFIER(8, 11, 0, VXC_RM_TowardZero, 1), EE_EO_PackBGR_1); \n\
+    dst = acc_0 + acc_1 + acc_2; \n\
+    VXC_DP2x8(bgr_register, lineC, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), EE_EO_PackBGR_0); \n\
+    VXC_DP2x8(bgr_register, lineC, dst, VXC_MODIFIER(8, 11, 0, VXC_RM_TowardZero, 1), EE_EO_PackBGR_1); \n\
     VXC_WriteImage(out_image, coord_out, bgr_register, VXC_MODIFIER(0, 11, 0, VXC_RM_TowardZero, 0)); \n\
     coord_out.y ++; \n\
  \n\
@@ -74,9 +74,9 @@ __kernel void tutorial4VXC \n\
     VXC_ReadImage(lineB, in_image, coord_in, 0xa0, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0)); \n\
     VXC_DP4x8(acc_2, lineA, lineA, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), EO_OO_AccOneLine); \n\
     VXC_DP4x8(acc_1, lineB, lineD, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), EO_OO_AccTwoLines); \n\
-	dst = acc_0 + acc_1 + acc_2; \n\
-	VXC_DP2x8(bgr_register, lineA, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), EO_OO_PackBGR_0); \n\
-	VXC_DP2x8(bgr_register, lineA, dst, VXC_MODIFIER(8, 11, 0, VXC_RM_TowardZero, 1), EO_OO_PackBGR_1); \n\
+    dst = acc_0 + acc_1 + acc_2; \n\
+    VXC_DP2x8(bgr_register, lineA, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), EO_OO_PackBGR_0); \n\
+    VXC_DP2x8(bgr_register, lineA, dst, VXC_MODIFIER(8, 11, 0, VXC_RM_TowardZero, 1), EO_OO_PackBGR_1); \n\
     VXC_WriteImage(out_image, coord_out, bgr_register, VXC_MODIFIER(0, 11, 0, VXC_RM_TowardZero, 0)); \n\
 }"
 };

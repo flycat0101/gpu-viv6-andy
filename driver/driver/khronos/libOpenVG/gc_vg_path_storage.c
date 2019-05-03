@@ -13,6 +13,7 @@
 
 #include "gc_vg_precomp.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG_PATH
 
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************

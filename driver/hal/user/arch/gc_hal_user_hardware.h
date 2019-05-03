@@ -249,6 +249,16 @@ typedef struct _gcsHARDWARE_CONFIG
 
     gctUINT64                   platformFlagBits;
 
+    /* hw features fields. */
+    gctUINT32                   chipFeatures;
+    gctUINT32                   chipMinorFeatures;
+    gctUINT32                   chipMinorFeatures1;
+    gctUINT32                   chipMinorFeatures2;
+    gctUINT32                   chipMinorFeatures3;
+    gctUINT32                   chipMinorFeatures4;
+    gctUINT32                   chipMinorFeatures5;
+    gctUINT32                   chipMinorFeatures6;
+
     /* Data extracted from specs bits. */
 #if gcdENABLE_3D
     /* gcChipSpecs. */
@@ -315,6 +325,7 @@ typedef struct _gcsHARDWARE_CONFIG
     gctUINT32                   sRAMSizes[gcvSRAM_COUNT];
 #if gcdENABLE_3D && gcdUSE_VX
     vx_nn_config                nnConfig;
+    vx_hw_chip_info             hwChipInfo;
 #endif
 }
 gcsHARDWARE_CONFIG;

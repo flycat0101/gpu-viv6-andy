@@ -12,7 +12,7 @@
 
 
 #include "gc_glff_precomp.h"
-#define _GC_OBJ_ZONE glvZONE_TRACE
+#define _GC_OBJ_ZONE gcdZONE_ES11_TRACE
 
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
@@ -320,7 +320,7 @@ static GLboolean _SetClientState(
 #ifdef _GC_OBJ_ZONE
 #undef _GC_OBJ_ZONE
 #endif
-#define _GC_OBJ_ZONE    glvZONE_ENABLE
+#define _GC_OBJ_ZONE    gcdZONE_ES11_ENABLE
 
 GL_API void GL_APIENTRY glEnable(
     GLenum State

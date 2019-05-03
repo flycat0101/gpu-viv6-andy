@@ -348,8 +348,6 @@ typedef struct
     gctBOOL isPerVertex;
     gctBOOL isPerPatch;
     gctBOOL isPushConstUBO;
-    /* Whether this is used to calculate the memory address. */
-    gctBOOL isMemAddrCalc;
 
     /* For inputAttachment. */
     Spv_AttachmentFlag attachmentFlag;
@@ -466,6 +464,9 @@ typedef struct
 
     /* if this ID has been initialzied before.*/
     gctBOOL initialized;
+
+    /* Whether this is used to calculate the memory address. */
+    gctBOOL isMemAddrCalc;
 
     union{
         SpvSymDescriptor sym;

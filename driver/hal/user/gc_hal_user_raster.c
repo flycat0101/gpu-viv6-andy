@@ -21,7 +21,7 @@
 #include "gc_hal_user_brush.h"
 
 /* Zone used for header/footer. */
-#define _GC_OBJ_ZONE    gcvZONE_2D
+#define _GC_OBJ_ZONE    gcdZONE_2D
 
 /******************************************************************************\
 ********************************** Structures **********************************
@@ -46,7 +46,7 @@ struct _gco2D
         /* Free the array. */                                                  \
         if(gcmIS_ERROR(gcoOS_Free(gcvNULL, KernelInfo.kernelStates)))          \
         {                                                                      \
-            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_2D,                          \
+            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_2D,                          \
                 "2D Engine: Failed to free kernel table.");                    \
         }                                                                      \
         else                                                                   \
@@ -839,7 +839,7 @@ gco2D_Destroy(
             Engine->state.paletteTable
             )))
         {
-            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_2D,
+            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_2D,
                 "2D Engine: Failed to free palette table.");
         }
         else
@@ -852,7 +852,7 @@ gco2D_Destroy(
     {
         if(gcmIS_ERROR(gcoBRUSH_CACHE_Destroy(Engine->brushCache)))
         {
-            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_2D,
+            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_2D,
                 "2D Engine: Failed to free brush cache.");
         }
         else
@@ -866,7 +866,7 @@ gco2D_Destroy(
     /* Free the gco2D object. */
     if(gcmIS_ERROR(gcoOS_Free(gcvNULL, Engine)))
     {
-        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_2D,
+        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_2D,
             "2D Engine: Failed to free gco2D object.");
     }
     else
@@ -1716,6 +1716,107 @@ OnError:
     return status;
 }
 
+/* Same as gco2D_SetColorSourceEx, but with better 64bit SW-path support.
+** Please do NOT export the API now.
+*/
+gceSTATUS
+gco2D_SetColorSource64(
+    IN gco2D Engine,
+    IN gctUINT32 Address,
+    IN gctPOINTER Logical,
+    IN gctUINT32 Stride,
+    IN gceSURF_FORMAT Format,
+    IN gceSURF_ROTATION Rotation,
+    IN gctUINT32 SurfaceWidth,
+    IN gctUINT32 SurfaceHeight,
+    IN gctBOOL CoordRelative,
+    IN gceSURF_TRANSPARENCY Transparency,
+    IN gctUINT32 TransparencyColor
+    )
+{
+    gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
+
+#if gcdENABLE_2D
+    gcoSURF surface;
+    gcs2D_MULTI_SOURCE_PTR curSrc;
+    gctUINT32 n;
+
+    gcmHEADER_ARG("Engine=0x%x Address=%x Logical=%p Stride=%d Format=%d "
+                  "Rotation=%d SurfaceWidth=%d SurfaceHeight=%d "
+                  "CoordRelative=%d Transparency=%d TransparencyColor=%x",
+                  Engine, Address, Logical, Stride, Format, Rotation,
+                  SurfaceWidth, SurfaceHeight, CoordRelative,
+                  Transparency, TransparencyColor);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
+
+    gcmONERROR(_CheckFormat(Format, &n, gcvNULL, gcvNULL));
+
+    if (n != 1)
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    gcmONERROR(_CheckSurface(Engine, gcvTRUE, Format, &Address, &Stride,
+        SurfaceWidth, SurfaceHeight, Rotation, gcvLINEAR));
+
+    curSrc = Engine->state.multiSrc + Engine->state.currentSrcIndex;
+
+    if (Format != gcvSURF_INDEX8)
+    {
+        /* Set the transparency color. */
+        gcmONERROR(gcoHARDWARE_ColorPackToARGB8(
+            Format,
+            TransparencyColor,
+            &TransparencyColor
+            ));
+    }
+
+    /* Set the source. */
+    gcmONERROR(gcoHARDWARE_TranslateSurfTransparency(
+        Transparency,
+        &curSrc->srcTransparency,
+        &curSrc->dstTransparency,
+        &curSrc->patTransparency
+        ));
+
+    curSrc->srcColorKeyHigh =
+    curSrc->srcColorKeyLow = TransparencyColor;
+
+    surface                     = &curSrc->srcSurface;
+    surface->type               = gcvSURF_BITMAP;
+    surface->format             = Format;
+    surface->alignedW           = SurfaceWidth;
+    surface->alignedH           = SurfaceHeight;
+    surface->rotation           = Rotation;
+    surface->stride             = Stride;
+    curSrc->srcRelativeCoord    = CoordRelative;
+
+    if (Engine->hwAvailable)
+    {
+        gcsSURF_NODE_SetHardwareAddress(&surface->node, Address);
+    }
+    else
+    {
+        surface->node.logical = (gctUINT8_PTR)Logical;
+    }
+
+    curSrc->srcType = gcv2D_SOURCE_COLOR;
+
+    /* Succeed. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+
+    /* Return status. */
+    gcmFOOTER();
+#endif  /* gcdENABLE_2D */
+
+    return status;
+}
+
 /*******************************************************************************
 **
 **  gco2D_SetColorSourceAdvanced
@@ -2003,6 +2104,94 @@ gco2D_SetMaskedSourceEx(
     else
     {
         surface->node.logical = (gctUINT8_PTR)(gctUINTPTR_T) Address;
+    }
+
+    curSrc->srcType = gcv2D_SOURCE_MASKED;
+
+    /* Succeed. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+
+    /* Return status. */
+    gcmFOOTER();
+#endif  /* gcdENABLE_2D */
+
+    return status;
+}
+
+/* Same as gco2D_SetMaskedSourceEx, but with better 64bit SW-path support.
+** Please do NOT export the API now.
+*/
+gceSTATUS
+gco2D_SetMaskedSource64(
+    IN gco2D Engine,
+    IN gctUINT32 Address,
+    IN gctPOINTER Logical,
+    IN gctUINT32 Stride,
+    IN gceSURF_FORMAT Format,
+    IN gctBOOL CoordRelative,
+    IN gceSURF_MONOPACK MaskPack,
+    IN gceSURF_ROTATION Rotation,
+    IN gctUINT32 SurfaceWidth,
+    IN gctUINT32 SurfaceHeight
+    )
+{
+    gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
+
+#if gcdENABLE_2D
+    gctUINT32 n;
+    gcoSURF surface;
+    gcs2D_MULTI_SOURCE_PTR curSrc;
+
+    gcmHEADER_ARG("Engine=0x%x Address=%x Stride=%d Format=%d CoordRelative=%d "
+                    "MaskPack=%d Rotation=%d SurfaceWidth=%d SurfaceHeight=%d",
+                    Engine, Address, Stride, Format, CoordRelative,
+                    MaskPack, Rotation, SurfaceWidth, SurfaceHeight);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
+
+    gcmONERROR(_CheckFormat(Format, &n, gcvNULL, gcvNULL));
+
+    if (n != 1)
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    gcmONERROR(_CheckSurface(Engine, gcvTRUE, Format, &Address, &Stride,
+        SurfaceWidth, SurfaceHeight, Rotation, gcvLINEAR));
+
+    curSrc = Engine->state.multiSrc + Engine->state.currentSrcIndex;
+
+    /* Set the transparency. */
+    gcmONERROR(gcoHARDWARE_TranslateSurfTransparency(
+        gcvSURF_SOURCE_MASK,
+        &curSrc->srcTransparency,
+        &curSrc->dstTransparency,
+        &curSrc->patTransparency
+        ));
+
+    /* Set the surface of the current source. */
+    surface                  = &curSrc->srcSurface;
+    surface->type            = gcvSURF_BITMAP;
+    surface->format          = Format;
+    surface->stride          = Stride;
+    surface->rotation        = Rotation;
+    surface->alignedW        = SurfaceWidth;
+    surface->alignedH        = SurfaceHeight;
+    curSrc->srcMonoPack      = MaskPack;
+    curSrc->srcRelativeCoord = CoordRelative;
+    curSrc->srcStream        = gcvFALSE;
+
+    if (Engine->hwAvailable)
+    {
+        gcsSURF_NODE_SetHardwareAddress(&surface->node, Address);
+    }
+    else
+    {
+        surface->node.logical = (gctUINT8_PTR)Logical;
     }
 
     curSrc->srcType = gcv2D_SOURCE_MASKED;
@@ -2317,6 +2506,67 @@ gco2D_SetTargetEx(
     else
     {
         surface->node.logical = (gctUINT8_PTR)(gctUINTPTR_T) Address;
+    }
+
+    /* Succeed. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+
+    /* Return status. */
+    gcmFOOTER();
+#endif  /* gcdENABLE_2D */
+
+    return status;
+}
+
+/* Same as gco2D_SetTargetEx, but with better 64bit SW-path support.
+** Please do NOT export the API now.
+*/
+gceSTATUS
+gco2D_SetTarget64(
+    IN gco2D Engine,
+    IN gctUINT32 Address,
+    IN gctPOINTER Logical,
+    IN gctUINT32 Stride,
+    IN gceSURF_ROTATION Rotation,
+    IN gctUINT32 SurfaceWidth,
+    IN gctUINT32 SurfaceHeight
+    )
+{
+    gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
+
+#if gcdENABLE_2D
+    gcoSURF surface;
+
+    gcmHEADER_ARG("Engine=0x%x Address=%x Logical=%p Stride=%d "
+                  "Rotation=%d SurfaceWidth=%d SurfaceHeight=%d",
+                  Engine, Address, Logical, Stride, Rotation, SurfaceWidth, SurfaceHeight);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
+
+    /* Assume the target format is gcvSURF_A8R8G8B8 because this API is only used
+        to receive the RGB/BGR format surface and 32bpp would apply the max alignment. */
+    gcmONERROR(_CheckSurface(Engine, gcvFALSE, gcvSURF_A8R8G8B8, &Address, &Stride,
+        SurfaceWidth, SurfaceHeight, Rotation, gcvLINEAR));
+
+    /* Fill in the structure. */
+    surface                = &Engine->state.dstSurface;
+    surface->type          = gcvSURF_BITMAP;
+    surface->alignedW      = SurfaceWidth;
+    surface->alignedH      = SurfaceHeight;
+    surface->rotation      = Rotation;
+    surface->stride        = Stride;
+
+    if (Engine->hwAvailable)
+    {
+        gcsSURF_NODE_SetHardwareAddress(&surface->node, Address);
+    }
+    else
+    {
+        surface->node.logical = (gctUINT8_PTR)Logical;
     }
 
     /* Succeed. */
@@ -2855,6 +3105,8 @@ gco2D_Clear(
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
 
 #if gcdENABLE_2D
+    gctUINT32 planeNum = 1;
+
     gcmHEADER_ARG("Engine=0x%x RectCount=%d Rect=0x%x Color32=%x "
                     "FgRop=%x BgRop=%x DstFormat=%d",
                     Engine, RectCount, Rect, Color32,
@@ -2870,6 +3122,14 @@ gco2D_Clear(
          (FgRop != 0xCC && FgRop != 0xF0 && FgRop != 0xAA)))
     {
         gcmFOOTER_ARG("status=%d", gcvSTATUS_NOT_SUPPORTED);
+        return gcvSTATUS_NOT_SUPPORTED;
+    }
+
+    _CheckFormat(DstFormat,&planeNum, gcvNULL,gcvNULL);
+    if(planeNum != 1 && Engine->state.multiSrc[Engine->state.currentSrcIndex].enableAlpha)
+    {
+        gcmFOOTER_ARG("Clear cannot support alphablending with multi-plane format,status=%d",
+            gcvSTATUS_NOT_SUPPORTED);
         return gcvSTATUS_NOT_SUPPORTED;
     }
 
@@ -6719,7 +6979,8 @@ gco2D_SetSourceTileStatus(
         CompressedFormat = gcvSURF_UNKNOWN;
     }
     else if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_FC_SOURCE) != gcvTRUE &&
-             gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_V4COMPRESSION) != gcvTRUE)
+             gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_V4COMPRESSION) != gcvTRUE &&
+             gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_FAST_CLEAR) != gcvTRUE)
     {
         gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
@@ -7861,7 +8122,7 @@ gco2D_UnSet2DEngine(
     {
         if(gcmIS_ERROR(gcoHARDWARE_Destroy(Engine->hardware, gcvTRUE)))
         {
-            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_2D,
+            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_2D,
                 "2D Engine: Failed to free hardware in 2D engine.");
         }
 

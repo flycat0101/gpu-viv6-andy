@@ -1,9 +1,9 @@
-__kernel void gpuGemm_FP32
+__kernel void gpuGemm_FP32_non_static
     (
     image2d_array_t input,
-    image2d_array_t weight,
-    image2d_array_t bias,
-    int Cycles,
+    image2d_t weight,
+    image2d_t bias,
+    int input_width,
     image2d_array_t output
     )
 {
@@ -15,31 +15,180 @@ __kernel void gpuGemm_FP32
     float4 sum = 0;
     float4 inPixel, wPixel;
 
-    sum = read_imagef(bias, coord.ywww);
+    sum = read_imagef(bias, coord.yx);
      do
     {
+        wPixel = read_imagef(weight, coord.xy);
         inPixel = read_imagef(input, coord_in.xzyw);
-        wPixel = read_imagef(weight, coord.xyzw);
-        sum += (inPixel * wPixel);
+
         coord_in.x += 1;
         coord.x += 1;
-    } while (coord_in.x < Cycles);
+
+        sum += (inPixel * wPixel);
+    } while (coord_in.x < input_width);
 
     write_imagef(output, (int4)(x, y, z, 0), sum);
 }
 
-__kernel void gpuGemm_Quant8
+__kernel void gpuGemm_FP32
     (
     image2d_array_t input,
-    image2d_array_t weights,
-    image2d_array_t bias,
-    int Cycles,
-    float scaleIn,
-    float scaleWeight,
-    float scaleOut,
+    image2d_t weight,
+    image2d_t bias,
+    int input_width,
+    image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord_in = (int4)(0, y, x, 0);
+    int4 coord = (int4)(0, z, 0, 0);
+    float4 sum = 0;
+    float4 inPixel, wPixel;
+
+    sum = read_imagef(bias, coord.yx);
+     do
+    {
+        wPixel = read_imagef(weight, coord.xy);
+        inPixel = read_imagef(input, coord_in.xzyw);
+
+        coord_in.x += 4;
+        coord.x += 4;
+
+        sum.x += dot(inPixel, wPixel);
+    } while (coord_in.x < input_width);
+
+    write_imagef(output, (int4)(x, y, z, 0), sum);
+}
+
+
+__kernel void gpuGemm_FP32_4X
+    (
+    image2d_array_t input,
+    image2d_t weight,
+    image2d_t bias,
+    int input_width,
+    image2d_array_t output
+    )
+{
+    int x = get_global_id(0) << 2;
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+
+    int4 coord_in = (int4)(0, y, x, 0);
+    int4 coord = (int4)(0, z, 0, 0);
+    float4 sum = 0;
+    float4 inPixel0, inPixel1, inPixel2, inPixel3, wPixel;
+
+    sum = read_imagef(bias, coord.yx);
+    sum = sum.xxxx;
+
+    do
+    {
+        wPixel = read_imagef(weight, coord.xy);
+        inPixel0 = read_imagef(input, coord_in.xzyw);
+        coord_in.z ++;
+        inPixel1 = read_imagef(input, coord_in.xzyw);
+        coord_in.z ++;
+        inPixel2 = read_imagef(input, coord_in.xzyw);
+        coord_in.z ++;
+        inPixel3 = read_imagef(input, coord_in.xzyw);
+
+        coord_in.z = x;
+        coord_in.x += 4;
+        coord.x += 4;
+
+        sum.x += dot(inPixel0, wPixel);
+        sum.y += dot(inPixel1, wPixel);
+        sum.z += dot(inPixel2, wPixel);
+        sum.w += dot(inPixel3, wPixel);
+    } while (coord_in.x < input_width);
+
+    write_imagef(output, (int4)(x, y, z, 0), sum);
+}
+
+__kernel void gpuGemm_FP32_2D
+    (
+    image2d_t input,
+    image2d_t weight,
+    image2d_t bias,
+    int input_width,
+    image2d_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+
+    int4 coord = (int4)(0, y, x, x);
+    float4 sum = 0;
+    float4 inPixel, wPixel;
+
+    sum = read_imagef(bias, coord.yx);
+    do
+    {
+        wPixel = read_imagef(weight, coord.xy);
+        inPixel = read_imagef(input, coord.xz);
+
+        coord.x += 4;
+
+        sum.x += dot(inPixel, wPixel);
+    } while (coord.x < input_width);
+
+    write_imagef(output, coord.wy, sum);
+}
+
+__kernel void gpuGemm_FP32_2D_4X
+    (
+    image2d_t input,
+    image2d_t weight,
+    image2d_t bias,
+    int input_width,
+    image2d_t output
+    )
+{
+    int x = get_global_id(0) << 2;
+    int y = get_global_id(1);
+
+    int4 coord = (int4)(0, y, x, x);
+    float4 sum = 0;
+    float4 inPixel0, inPixel1, inPixel2, inPixel3, wPixel;
+
+    sum = read_imagef(bias, coord.yx);
+    sum = sum.xxxx;
+    do
+    {
+        wPixel = read_imagef(weight, coord.xy);
+        inPixel0 = read_imagef(input, coord.xz);
+        coord.z ++;
+        inPixel1 = read_imagef(input, coord.xz);
+        coord.z ++;
+        inPixel2 = read_imagef(input, coord.xz);
+        coord.z ++;
+        inPixel3 = read_imagef(input, coord.xz);
+
+        coord.x += 4;
+        coord.z = coord.w;
+
+        sum.x += dot(inPixel0, wPixel);
+        sum.y += dot(inPixel1, wPixel);
+        sum.z += dot(inPixel2, wPixel);
+        sum.w += dot(inPixel3, wPixel);
+    } while (coord.x < input_width);
+
+    write_imagef(output, coord.wy, sum);
+}
+
+__kernel void gpuGemm_Quant8_non_static
+    (
+    image2d_array_t input,
+    image2d_t weights,
+    image2d_t bias,
+    int input_width,
+    float uint8Scale,
     int zpIn,
     int zpWeight,
-    int zpOut,
+    float zpOut,
     image2d_array_t output
     )
 {
@@ -49,22 +198,230 @@ __kernel void gpuGemm_Quant8
     int4 coord_in = (int4)(0, y, x, 0);
     int4 coord = (int4)(0, z, 0, 0);
     float4 sum = {0.0}, inPixel= {0.0}, wPixel= {0.0};
-    uint4 dst = {0}, tmp;
+    uint4 dst = {0}, tmp0, tmp1;
+    int4 biasData;
 
-    tmp = convert_uint(read_imagei(bias, coord.ywww));
-    sum.x = tmp.x * scaleIn * scaleWeight;
+    biasData = convert_int(read_imagei(bias, coord.yw));
+    sum.x = biasData.x;
 
     do
     {
-        tmp = read_imageui(input, coord_in.xzyw);
-        inPixel.x = (convert_int(tmp.x-zpIn))*scaleIn;
-        tmp = read_imageui(weights, coord.xyzw);
-        wPixel.x = (convert_int(tmp.x-zpWeight))*scaleWeight;
-        sum += (inPixel * wPixel);
+        tmp1 = read_imageui(weights, coord.xy);
+        tmp0 = read_imageui(input, coord_in.xzyw);
+
         coord_in.x += 1;
         coord.x += 1;
-    } while (coord_in.x < Cycles);
 
-    dst.x = floor(sum.x*scaleOut + zpOut + 0.5);
+        wPixel.x = (convert_int(tmp1.x - zpWeight));
+        inPixel.x = (convert_int(tmp0.x - zpIn));
+
+        sum += (inPixel * wPixel);
+    } while (coord_in.x < input_width);
+
+    dst.x = floor(sum.x * uint8Scale + zpOut + 0.5f);
     write_imageui(output, (int4)(x, y, z, 0), dst);
 }
+
+__kernel void gpuGemm_Quant8
+    (
+    image2d_array_t input,
+    image2d_t weights,
+    image2d_t bias,
+    int input_width,
+    float uint8Scale,
+    int zpIn,
+    int zpWeight,
+    float zpOut,
+    image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord_in = (int4)(0, y, x, 0);
+    int4 coord = (int4)(0, z, 0, 0);
+    float4 inPixel, wPixel;
+    float sum;
+    uint4 dst = {0}, tmp0, tmp1;
+    int4 biasData;
+
+    biasData = convert_int(read_imagei(bias, coord.yw));
+    sum = biasData.x;
+
+    do
+    {
+        tmp1 = read_imageui(weights, coord.xy);
+        tmp0 = read_imageui(input, coord_in.xzyw);
+
+        coord_in.x += 4;
+        coord.x += 4;
+
+        wPixel = convert_float4(convert_int4(tmp1 - zpWeight));
+        inPixel = convert_float4(tmp0);
+
+        sum += dot(inPixel, wPixel);
+    } while (coord.x < input_width);
+
+    dst.x = floor(sum * uint8Scale + zpOut + 0.5f);
+    write_imageui(output, (int4)(x, y, z, 0), dst);
+}
+
+__kernel void gpuGemm_Quant8_2D
+    (
+    image2d_t input,
+    image2d_t weights,
+    image2d_t bias,
+    int input_width,
+    float uint8Scale,
+    int zpIn,
+    int zpWeight,
+    float zpOut,
+    image2d_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord = (int4)(0, y, x, x);
+    float4 inPixel, wPixel;
+    float sum;
+    uint4 dst = {0}, tmp0, tmp1;
+    int4 biasData;
+
+    biasData = convert_int(read_imagei(bias, coord.yx));
+    sum = biasData.x;
+
+    do
+    {
+        tmp1 = read_imageui(weights, coord.xy);
+        tmp0 = read_imageui(input, coord.xz);
+
+        coord.x += 4;
+
+        wPixel = convert_float4(convert_int4(tmp1 - zpWeight));
+        inPixel = convert_float4(tmp0);
+
+        sum += dot(inPixel, wPixel);
+    } while (coord.x < input_width);
+
+    dst.x = floor(sum * uint8Scale + zpOut + 0.5f);
+    write_imageui(output, coord.wy, dst);
+}
+
+__kernel void gpuGemm_Quant8_2D_4X
+    (
+    image2d_t input,
+    image2d_t weights,
+    image2d_t bias,
+    int input_width,
+    float uint8Scale,
+    int zpIn,
+    int zpWeight,
+    float zpOut,
+    image2d_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+
+    int4 coord = (int4)(0, y, x << 2, x << 2);
+    float4 inPixel0, inPixel1, inPixel2, inPixel3, wPixel;
+    float4 sum;
+    uint4 tmp0, tmp1, tmp2, tmp3, tmp, dst = {0};
+    int4 tmpBias;
+
+    tmpBias = convert_int(read_imagei(bias, coord.yx));
+    sum = tmpBias.x;
+    sum = sum.xxxx;
+
+    do
+    {
+        tmp0 = read_imageui(input, coord.xz);
+        coord.z ++;
+        tmp1 = read_imageui(input, coord.xz);
+        coord.z ++;
+        tmp2 = read_imageui(input, coord.xz);
+        coord.z ++;
+        tmp3 = read_imageui(input, coord.xz);
+        tmp = read_imageui(weights, coord.xy);
+        coord.x +=4;
+        coord.z = coord.w;
+
+        inPixel0 = convert_float4(tmp0);
+        inPixel1 = convert_float4(tmp1);
+        inPixel2 = convert_float4(tmp2);
+        inPixel3 = convert_float4(tmp3);
+
+        wPixel  = convert_float4(convert_int4(tmp - zpWeight));
+
+        sum.x += dot(inPixel0, wPixel);
+        sum.y += dot(inPixel1, wPixel);
+        sum.z += dot(inPixel2, wPixel);
+        sum.w += dot(inPixel3, wPixel);
+
+    } while (coord.x < input_width);
+
+    dst = convert_uint4(sum * uint8Scale + zpOut + 0.5f);
+    write_imageui(output, coord.wy, dst);
+}
+
+
+__kernel void gpuGemm_Quant8_4X
+    (
+    image2d_array_t input,
+    image2d_t weights,
+    image2d_t bias,
+    int input_width,
+    float uint8Scale,
+    int zpIn,
+    int zpWeight,
+    float zpOut,
+    image2d_array_t output
+    )
+{
+    int x = get_global_id(0) << 2;
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord_in = (int4)(0, y, x, 0);
+    int4 coord = (int4)(0, z, 0, 0);
+    float4 inPixel0, inPixel1, inPixel2, inPixel3, wPixel;
+    float4 sum;
+    uint4 tmp0, tmp1, tmp2, tmp3, tmp, dst = {0};
+    int4 tmpBias;
+
+    tmpBias = convert_int(read_imagei(bias, coord.yx));
+    sum = tmpBias.x;
+    sum = sum.xxxx;
+
+    do
+    {
+        tmp0 = read_imageui(input, coord_in.xzyw);
+        coord_in.z ++;
+        tmp1 = read_imageui(input, coord_in.xzyw);
+        coord_in.z ++;
+        tmp2 = read_imageui(input, coord_in.xzyw);
+        coord_in.z ++;
+        tmp3 = read_imageui(input, coord_in.xzyw);
+        tmp = read_imageui(weights, coord.xy);
+
+        coord_in.z = x;
+        coord_in.x += 4;
+        coord.x += 4;
+
+        inPixel0 = convert_float4(tmp0);
+        inPixel1 = convert_float4(tmp1);
+        inPixel2 = convert_float4(tmp2);
+        inPixel3 = convert_float4(tmp3);
+
+        wPixel  = convert_float4(convert_int4(tmp - zpWeight));
+
+        sum.x += dot(inPixel0, wPixel);
+        sum.y += dot(inPixel1, wPixel);
+        sum.z += dot(inPixel2, wPixel);
+        sum.w += dot(inPixel3, wPixel);
+    } while (coord.x < input_width);
+
+    dst = convert_uint4(sum * uint8Scale + zpOut + 0.5f);
+    write_imageui(output, (int4)(x, y, z, 0), dst);
+}
+

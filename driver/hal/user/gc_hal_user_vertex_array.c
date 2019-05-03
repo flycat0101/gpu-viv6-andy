@@ -17,7 +17,7 @@
 
 #if gcdNULL_DRIVER < 2
 
-#define _GC_OBJ_ZONE            gcvZONE_VERTEX
+#define _GC_OBJ_ZONE            gcdZONE_VERTEXARRAY
 #define WCLIP_DATA_LIMIT        5000
 #define SPILIT_INDEX_OFFSET       48
 #define SPILIT_INDEX_CHUNCK_BYTE  64
@@ -89,7 +89,7 @@ computeWLimit(gctFLOAT_PTR Logical,
     {
         gctFLOAT value;
 
-        gcmTRACE_ZONE(gcvLEVEL_WARNING, gcvZONE_VERTEX,
+        gcmTRACE_ZONE(gcvLEVEL_WARNING, _GC_OBJ_ZONE,
                       "Logical address is not 4 byte aligned.");
 
         /* Initialize bbox to first entry. */
@@ -486,7 +486,7 @@ _CopySpilitIndex(
     gctBOOL indexLocked;
 
     gcmHEADER_ARG("Index=0x%x IndexMemory=0x%x Offset=%u IndexType=%d "
-                  "PrimitiveType=%u Buffer=0x%x SpilitCount=%zu",
+                  "PrimitiveType=%u Buffer=0x%x SpilitCount=%u",
                   Index, IndexMemory, Offset, IndexType,
                   gcmOPT_VALUE(PrimitiveType), gcmOPT_VALUE(Buffer), gcmOPT_VALUE(SpilitCount));
 
@@ -1353,7 +1353,7 @@ gcoVERTEXARRAY_StreamBind_Ex(
                 if (gcmIS_ERROR(status))
                 {
                     /* Error rebuilding. */
-                    gcmTRACE_ZONE(gcvLEVEL_WARNING, gcvZONE_VERTEX,
+                    gcmTRACE_ZONE(gcvLEVEL_WARNING, _GC_OBJ_ZONE,
                                   "gcoSTREAM_Rebuild returned status=%d",
                                   status);
                 }

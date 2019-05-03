@@ -22,7 +22,7 @@
 
 #if (gcdENABLE_3D || gcdENABLE_2D)
 
-#define _GC_OBJ_ZONE            gcvZONE_BUFFER
+#define _GC_OBJ_ZONE            gcdZONE_BUFFER
 
 #define gcdMAX_TEMPCMD_BUFFER_SIZE      0x20000
 
@@ -535,7 +535,7 @@ _GetCommandBuffer(
             Buffer->commandBufferTail = temp;
 
             Buffer->count += 1;
-            gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_BUFFER,
+            gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                           "Using %lu command buffers.",
                           Buffer->count);
 
@@ -2076,7 +2076,7 @@ gcoBUFFER_Reserve(
 
     if (Buffer->threadDefault)
     {
-        gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+        gcmTRACE_ZONE(gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
             "Thread Default command buffer is accumulating commands");
     }
 
@@ -2310,7 +2310,7 @@ gcoBUFFER_Commit(
 
     if (Buffer->threadDefault)
     {
-        gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_BUFFER, "Thread Default command buffer is comitting commands");
+        gcmTRACE_ZONE(gcvLEVEL_VERBOSE, _GC_OBJ_ZONE, "Thread Default command buffer is comitting commands");
     }
 
     gcmONERROR(gcoHAL_GetCurrentCoreIndex(gcvNULL, &currentCoreId));

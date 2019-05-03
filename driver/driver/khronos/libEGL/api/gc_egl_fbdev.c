@@ -3523,6 +3523,13 @@ _SynchronousPost(
     IN VEGLSurface Surface
     )
 {
+#if defined(WL_EGL_PLATFORM) || defined(EGL_API_FB) || defined(__GBM__)
+    if(Display->enableServer != -1)
+    {
+        return (Display->enableServer == 0);
+    }
+#endif
+
     return fbdev_SynchronousFlip((PlatformDisplayType)Display->hdc);
 }
 

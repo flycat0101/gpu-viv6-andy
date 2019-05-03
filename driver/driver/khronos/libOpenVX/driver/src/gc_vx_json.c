@@ -28,6 +28,8 @@
 
 #include "gc_vx_json.h"
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_OTHERS
+
 /* define our own boolean type */
 
 typedef struct {
@@ -106,8 +108,11 @@ VX_PRIVATE_API unsigned char* vxoJson_strdup(const unsigned char* string, const 
     size_t length = 0;
     unsigned char *copy = NULL;
 
+    gcmHEADER_ARG("string=%s, hooks=%p", string, hooks);
+
     if (string == NULL)
     {
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -115,21 +120,25 @@ VX_PRIVATE_API unsigned char* vxoJson_strdup(const unsigned char* string, const 
     copy = (unsigned char*)hooks->allocate(length);
     if (copy == NULL)
     {
+        gcmFOOTER_NO();
         return NULL;
     }
     memcpy(copy, string, length);
 
+    gcmFOOTER_ARG("%s", copy);
     return copy;
 }
 
 VX_INTERNAL_API void vxoJson_InitHooks(vxoJson_Hooks* hooks)
 {
+    gcmHEADER_ARG("hooks=%p", hooks);
     if (hooks == NULL)
     {
         /* Reset hooks */
         global_hooks.allocate = malloc;
         global_hooks.deallocate = free;
         global_hooks.reallocate = realloc;
+        gcmFOOTER_NO();
         return;
     }
 
@@ -151,17 +160,20 @@ VX_INTERNAL_API void vxoJson_InitHooks(vxoJson_Hooks* hooks)
     {
         global_hooks.reallocate = realloc;
     }
+    gcmFOOTER_NO();
 }
 
 /* Internal constructor. */
 VX_PRIVATE_API vxcJSON *vxoJson_New_Item(const internal_hooks * const hooks)
 {
     vxcJSON* node = (vxcJSON*)hooks->allocate(sizeof(vxcJSON));
+    gcmHEADER_ARG("hooks=%p", hooks);
     if (node)
     {
         memset(node, '\0', sizeof(vxcJSON));
     }
 
+    gcmFOOTER_ARG("node=%p", node);
     return node;
 }
 
@@ -169,6 +181,8 @@ VX_PRIVATE_API vxcJSON *vxoJson_New_Item(const internal_hooks * const hooks)
 VX_INTERNAL_API void vxoJson_Delete(vxcJSON *item)
 {
     vxcJSON *next = NULL;
+    gcmHEADER_ARG("item=%p", item);
+
     while (item != NULL)
     {
         next = item->next;
@@ -187,6 +201,7 @@ VX_INTERNAL_API void vxoJson_Delete(vxcJSON *item)
         global_hooks.deallocate(item);
         item = next;
     }
+    gcmFOOTER_NO();
 }
 
 /* get the decimal point character of the current locale */
@@ -226,8 +241,11 @@ VX_PRIVATE_API vx_bool parse_number(vxcJSON * const item, parse_buffer * const i
     unsigned char decimal_point = get_decimal_point();
     size_t i = 0;
 
+    gcmHEADER_ARG("item=%p, input_buffer=%p", item, input_buffer);
+
     if ((input_buffer == NULL) || (input_buffer->content == NULL))
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
     }
 
@@ -269,6 +287,7 @@ loop_end:
     number = strtod((const char*)number_c_string, (char**)&after_end);
     if (number_c_string == after_end)
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e; /* parse_error */
     }
 
@@ -291,6 +310,8 @@ loop_end:
     item->type = vxoJson_Number;
 
     input_buffer->offset += (size_t)(after_end - number_c_string);
+
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
@@ -330,30 +351,38 @@ VX_PRIVATE_API unsigned char* ensure(printbuffer * const p, size_t needed)
     unsigned char *newbuffer = NULL;
     size_t newsize = 0;
 
+    gcmHEADER_ARG("p=%p, needed=0x%lx", p, needed);
+
     if ((p == NULL) || (p->buffer == NULL))
     {
+        gcmFOOTER_NO();
         return NULL;
     }
 
     if ((p->length > 0) && (p->offset >= p->length))
     {
         /* make sure that offset is valid */
+        gcmFOOTER_NO();
         return NULL;
     }
 
     if (needed > INT_MAX)
     {
         /* sizes bigger than INT_MAX are currently not supported */
+        gcmFOOTER_NO();
         return NULL;
     }
 
     needed += p->offset + 1;
     if (needed <= p->length)
     {
+        gcmFOOTER_NO();
         return p->buffer + p->offset;
     }
 
-    if (p->noalloc) {
+    if (p->noalloc)
+    {
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -367,6 +396,7 @@ VX_PRIVATE_API unsigned char* ensure(printbuffer * const p, size_t needed)
         }
         else
         {
+            gcmFOOTER_NO();
             return NULL;
         }
     }
@@ -384,7 +414,7 @@ VX_PRIVATE_API unsigned char* ensure(printbuffer * const p, size_t needed)
             p->hooks.deallocate(p->buffer);
             p->length = 0;
             p->buffer = NULL;
-
+            gcmFOOTER_NO();
             return NULL;
         }
     }
@@ -397,7 +427,7 @@ VX_PRIVATE_API unsigned char* ensure(printbuffer * const p, size_t needed)
             p->hooks.deallocate(p->buffer);
             p->length = 0;
             p->buffer = NULL;
-
+            gcmFOOTER_NO();
             return NULL;
         }
         if (newbuffer)
@@ -409,6 +439,7 @@ VX_PRIVATE_API unsigned char* ensure(printbuffer * const p, size_t needed)
     p->length = newsize;
     p->buffer = newbuffer;
 
+    gcmFOOTER_NO();
     return newbuffer + p->offset;
 }
 
@@ -416,13 +447,16 @@ VX_PRIVATE_API unsigned char* ensure(printbuffer * const p, size_t needed)
 VX_PRIVATE_API void update_offset(printbuffer * const buffer)
 {
     const unsigned char *buffer_pointer = NULL;
+    gcmHEADER_ARG("buffer=%p", buffer);
     if ((buffer == NULL) || (buffer->buffer == NULL))
     {
+        gcmFOOTER_NO();
         return;
     }
     buffer_pointer = buffer->buffer + buffer->offset;
 
     buffer->offset += strlen((const char*)buffer_pointer);
+    gcmFOOTER_NO();
 }
 
 /* Render the number nicely from the given item into a string. */
@@ -436,8 +470,11 @@ VX_PRIVATE_API vx_bool print_number(const vxcJSON * const item, printbuffer * co
     unsigned char decimal_point = get_decimal_point();
     double test;
 
+    gcmHEADER_ARG("item=%p, output_buffer=%p", item, output_buffer);
+
     if (output_buffer == NULL)
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
     }
 
@@ -462,6 +499,7 @@ VX_PRIVATE_API vx_bool print_number(const vxcJSON * const item, printbuffer * co
     /* sprintf failed or buffer overrun occured */
     if ((length < 0) || (length > (int)(sizeof(number_buffer) - 1)))
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
     }
 
@@ -469,6 +507,7 @@ VX_PRIVATE_API vx_bool print_number(const vxcJSON * const item, printbuffer * co
     output_pointer = ensure(output_buffer, (size_t)length + sizeof(""));
     if (output_pointer == NULL)
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
     }
 
@@ -488,6 +527,7 @@ VX_PRIVATE_API vx_bool print_number(const vxcJSON * const item, printbuffer * co
 
     output_buffer->offset += (size_t)length;
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
@@ -538,6 +578,8 @@ VX_PRIVATE_API unsigned char utf16_literal_to_utf8(const unsigned char * const i
     unsigned char utf8_position = 0;
     unsigned char sequence_length = 0;
     unsigned char first_byte_mark = 0;
+
+    gcmHEADER_ARG("input_pointer=%s, input_end=%s, output_pointer=%p", input_pointer, input_end, output_pointer);
 
     if ((input_end - first_sequence) < 6)
     {
@@ -643,9 +685,11 @@ VX_PRIVATE_API unsigned char utf16_literal_to_utf8(const unsigned char * const i
 
     *output_pointer += utf8_length;
 
+    gcmFOOTER_ARG("sequence_length=0x%x", sequence_length);
     return sequence_length;
 
 fail:
+    gcmFOOTER_ARG("%d", 0);
     return 0;
 }
 
@@ -656,6 +700,8 @@ VX_PRIVATE_API vx_bool parse_string(vxcJSON * const item, parse_buffer * const i
     const unsigned char *input_end = buffer_at_offset(input_buffer) + 1;
     unsigned char *output_pointer = NULL;
     unsigned char *output = NULL;
+
+    gcmHEADER_ARG("item=%p, input_buffer=%p", item, input_buffer);
 
     /* not a string */
     if (buffer_at_offset(input_buffer)[0] != '\"')
@@ -762,6 +808,7 @@ VX_PRIVATE_API vx_bool parse_string(vxcJSON * const item, parse_buffer * const i
     input_buffer->offset = (size_t) (input_end - input_buffer->content);
     input_buffer->offset++;
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 
 fail:
@@ -775,6 +822,7 @@ fail:
         input_buffer->offset = (size_t)(input_pointer - input_buffer->content);
     }
 
+    gcmFOOTER_ARG("%d", vx_false_e);
     return vx_false_e;
 }
 
@@ -788,8 +836,11 @@ VX_PRIVATE_API vx_bool print_string_ptr(const unsigned char * const input, print
     /* numbers of additional characters needed for escaping */
     size_t escape_characters = 0;
 
+    gcmHEADER_ARG("input=%s, output_buffer=%p", input, output_buffer);
+
     if (output_buffer == NULL)
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
     }
 
@@ -799,10 +850,12 @@ VX_PRIVATE_API vx_bool print_string_ptr(const unsigned char * const input, print
         output = ensure(output_buffer, sizeof("\"\""));
         if (output == NULL)
         {
+            gcmFOOTER_ARG("%d", vx_false_e);
             return vx_false_e;
         }
         strcpy((char*)output, "\"\"");
 
+        gcmFOOTER_ARG("%d", vx_true_e);
         return vx_true_e;
     }
 
@@ -835,6 +888,7 @@ VX_PRIVATE_API vx_bool print_string_ptr(const unsigned char * const input, print
     output = ensure(output_buffer, output_length + sizeof("\"\""));
     if (output == NULL)
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
     }
 
@@ -846,6 +900,7 @@ VX_PRIVATE_API vx_bool print_string_ptr(const unsigned char * const input, print
         output[output_length + 1] = '\"';
         output[output_length + 2] = '\0';
 
+        gcmFOOTER_ARG("%d", vx_true_e);
         return vx_true_e;
     }
 
@@ -896,7 +951,7 @@ VX_PRIVATE_API vx_bool print_string_ptr(const unsigned char * const input, print
     }
     output[output_length + 1] = '\"';
     output[output_length + 2] = '\0';
-
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
@@ -917,8 +972,11 @@ VX_PRIVATE_API vx_bool print_object(const vxcJSON * const item, printbuffer * co
 /* Utility to jump whitespace and cr/lf */
 VX_PRIVATE_API parse_buffer *buffer_skip_whitespace(parse_buffer * const buffer)
 {
+    gcmHEADER_ARG("buffer=%p", buffer);
+
     if ((buffer == NULL) || (buffer->content == NULL))
     {
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -932,14 +990,17 @@ VX_PRIVATE_API parse_buffer *buffer_skip_whitespace(parse_buffer * const buffer)
         buffer->offset--;
     }
 
+    gcmFOOTER_ARG("buffer=%p", buffer);
     return buffer;
 }
 
 /* skip the UTF-8 BOM (byte order mark) if it is at the beginning of a buffer */
 VX_PRIVATE_API parse_buffer *skip_utf8_bom(parse_buffer * const buffer)
 {
+    gcmHEADER_ARG("buffer=%p", buffer);
     if ((buffer == NULL) || (buffer->content == NULL) || (buffer->offset != 0))
     {
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -948,6 +1009,7 @@ VX_PRIVATE_API parse_buffer *skip_utf8_bom(parse_buffer * const buffer)
         buffer->offset += 3;
     }
 
+    gcmFOOTER_ARG("buffer=%p", buffer);
     return buffer;
 }
 
@@ -956,6 +1018,8 @@ VX_INTERNAL_API vxcJSON * vxoJson_ParseWithOpts(const char *value, const char **
 {
     parse_buffer buffer = { 0, 0, 0, 0, { 0, 0, 0 } };
     vxcJSON *item = NULL;
+
+    gcmHEADER_ARG("value=%s, return_parse_end=%p, require_null_terminated=0x%x", value, return_parse_end, require_null_terminated);
 
     /* reset error position */
     global_error.json = NULL;
@@ -997,6 +1061,7 @@ VX_INTERNAL_API vxcJSON * vxoJson_ParseWithOpts(const char *value, const char **
         *return_parse_end = (const char*)buffer_at_offset(&buffer);
     }
 
+    gcmFOOTER_ARG("item=%p", item);
     return item;
 
 fail:
@@ -1028,6 +1093,7 @@ fail:
         global_error = local_error;
     }
 
+    gcmFOOTER_NO();
     return NULL;
 }
 
@@ -1044,6 +1110,8 @@ VX_PRIVATE_API unsigned char *print(const vxcJSON * const item, vx_bool format, 
     VX_PRIVATE_API const size_t default_buffer_size = 256;
     printbuffer buffer[1];
     unsigned char *printed = NULL;
+
+    gcmHEADER_ARG("item=%p, format=0x%x, hooks=%p", item, format, hooks);
 
     memset(buffer, 0, sizeof(buffer));
 
@@ -1087,6 +1155,7 @@ VX_PRIVATE_API unsigned char *print(const vxcJSON * const item, vx_bool format, 
         hooks->deallocate(buffer->buffer);
     }
 
+    gcmFOOTER_ARG("printed=%s", printed);
     return printed;
 
 fail:
@@ -1100,6 +1169,7 @@ fail:
         hooks->deallocate(printed);
     }
 
+    gcmFOOTER_NO();
     return NULL;
 }
 
@@ -1297,9 +1367,11 @@ VX_PRIVATE_API vx_bool parse_array(vxcJSON * const item, parse_buffer * const in
 {
     vxcJSON *head = NULL; /* head of the linked list */
     vxcJSON *current_item = NULL;
+    gcmHEADER_ARG("item=%p, input_buffer=%p", item, input_buffer);
 
     if (input_buffer->depth >= CJSON_NESTING_LIMIT)
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e; /* to deeply nested */
     }
     input_buffer->depth++;
@@ -1375,6 +1447,7 @@ success:
 
     input_buffer->offset++;
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 
 fail:
@@ -1383,6 +1456,7 @@ fail:
         vxoJson_Delete(head);
     }
 
+    gcmFOOTER_ARG("%d", vx_false_e);
     return vx_false_e;
 }
 
@@ -1393,8 +1467,11 @@ VX_PRIVATE_API vx_bool print_array(const vxcJSON * const item, printbuffer * con
     size_t length = 0;
     vxcJSON *current_element = item->child;
 
+    gcmHEADER_ARG("item=%p, output_buffer=%p", item, output_buffer);
+
     if (output_buffer == NULL)
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
     }
 
@@ -1403,6 +1480,7 @@ VX_PRIVATE_API vx_bool print_array(const vxcJSON * const item, printbuffer * con
     output_pointer = ensure(output_buffer, 1);
     if (output_pointer == NULL)
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
     }
 
@@ -1414,6 +1492,7 @@ VX_PRIVATE_API vx_bool print_array(const vxcJSON * const item, printbuffer * con
     {
         if (!print_value(current_element, output_buffer))
         {
+            gcmFOOTER_ARG("%d", vx_false_e);
             return vx_false_e;
         }
         update_offset(output_buffer);
@@ -1423,6 +1502,7 @@ VX_PRIVATE_API vx_bool print_array(const vxcJSON * const item, printbuffer * con
             output_pointer = ensure(output_buffer, length + 1);
             if (output_pointer == NULL)
             {
+                gcmFOOTER_ARG("%d", vx_false_e);
                 return vx_false_e;
             }
             *output_pointer++ = ',';
@@ -1439,12 +1519,14 @@ VX_PRIVATE_API vx_bool print_array(const vxcJSON * const item, printbuffer * con
     output_pointer = ensure(output_buffer, 2);
     if (output_pointer == NULL)
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
     }
     *output_pointer++ = ']';
     *output_pointer = '\0';
     output_buffer->depth--;
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
@@ -1454,8 +1536,11 @@ VX_PRIVATE_API vx_bool parse_object(vxcJSON * const item, parse_buffer * const i
     vxcJSON *head = NULL; /* linked list head */
     vxcJSON *current_item = NULL;
 
+    gcmHEADER_ARG("item=%p, input_buffer=%p", item, input_buffer);
+
     if (input_buffer->depth >= CJSON_NESTING_LIMIT)
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e; /* to deeply nested */
     }
     input_buffer->depth++;
@@ -1546,6 +1631,7 @@ success:
     item->child = head;
 
     input_buffer->offset++;
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 
 fail:
@@ -1553,7 +1639,7 @@ fail:
     {
         vxoJson_Delete(head);
     }
-
+    gcmFOOTER_ARG("%d", vx_false_e);
     return vx_false_e;
 }
 
@@ -1563,9 +1649,11 @@ VX_PRIVATE_API vx_bool print_object(const vxcJSON * const item, printbuffer * co
     unsigned char *output_pointer = NULL;
     size_t length = 0;
     vxcJSON *current_item = item->child;
+    gcmHEADER_ARG("item=%p, output_buffer=%p", item, output_buffer);
 
     if (output_buffer == NULL)
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
     }
 
@@ -1574,6 +1662,7 @@ VX_PRIVATE_API vx_bool print_object(const vxcJSON * const item, printbuffer * co
     output_pointer = ensure(output_buffer, length + 1);
     if (output_pointer == NULL)
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
     }
 
@@ -1593,6 +1682,7 @@ VX_PRIVATE_API vx_bool print_object(const vxcJSON * const item, printbuffer * co
             output_pointer = ensure(output_buffer, output_buffer->depth);
             if (output_pointer == NULL)
             {
+                gcmFOOTER_ARG("%d", vx_false_e);
                 return vx_false_e;
             }
             for (i = 0; i < output_buffer->depth; i++)
@@ -1605,6 +1695,7 @@ VX_PRIVATE_API vx_bool print_object(const vxcJSON * const item, printbuffer * co
         /* print key */
         if (!print_string_ptr((unsigned char*)current_item->string, output_buffer))
         {
+            gcmFOOTER_ARG("%d", vx_false_e);
             return vx_false_e;
         }
         update_offset(output_buffer);
@@ -1613,6 +1704,7 @@ VX_PRIVATE_API vx_bool print_object(const vxcJSON * const item, printbuffer * co
         output_pointer = ensure(output_buffer, length);
         if (output_pointer == NULL)
         {
+            gcmFOOTER_ARG("%d", vx_false_e);
             return vx_false_e;
         }
         *output_pointer++ = ':';
@@ -1625,6 +1717,7 @@ VX_PRIVATE_API vx_bool print_object(const vxcJSON * const item, printbuffer * co
         /* print value */
         if (!print_value(current_item, output_buffer))
         {
+            gcmFOOTER_ARG("%d", vx_false_e);
             return vx_false_e;
         }
         update_offset(output_buffer);
@@ -1634,6 +1727,7 @@ VX_PRIVATE_API vx_bool print_object(const vxcJSON * const item, printbuffer * co
         output_pointer = ensure(output_buffer, length + 1);
         if (output_pointer == NULL)
         {
+            gcmFOOTER_ARG("%d", vx_false_e);
             return vx_false_e;
         }
         if (current_item->next)
@@ -1654,6 +1748,7 @@ VX_PRIVATE_API vx_bool print_object(const vxcJSON * const item, printbuffer * co
     output_pointer = ensure(output_buffer, output_buffer->format ? (output_buffer->depth + 1) : 2);
     if (output_pointer == NULL)
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
     }
     if (output_buffer->format)
@@ -1668,6 +1763,7 @@ VX_PRIVATE_API vx_bool print_object(const vxcJSON * const item, printbuffer * co
     *output_pointer = '\0';
     output_buffer->depth--;
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
@@ -1677,8 +1773,11 @@ VX_INTERNAL_API int vxoJson_GetArraySize(const vxcJSON *array)
     vxcJSON *child = NULL;
     size_t size = 0;
 
+    gcmHEADER_ARG("array=%p", array);
+
     if (array == NULL)
     {
+        gcmFOOTER_ARG("%d", 0);
         return 0;
     }
 
@@ -1692,6 +1791,7 @@ VX_INTERNAL_API int vxoJson_GetArraySize(const vxcJSON *array)
 
     /* FIXME: Can overflow here. Cannot be fixed without breaking the API */
 
+    gcmFOOTER_ARG("size=0x%lx", size);
     return (int)size;
 }
 
@@ -1728,8 +1828,11 @@ VX_PRIVATE_API vxcJSON *get_object_item(const vxcJSON * const object, const char
 {
     vxcJSON *current_element = NULL;
 
+    gcmHEADER_ARG("object=%p, name=%s, case_sensitive=0x%x", object, name, case_sensitive);
+
     if ((object == NULL) || (name == NULL))
     {
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -1749,6 +1852,7 @@ VX_PRIVATE_API vxcJSON *get_object_item(const vxcJSON * const object, const char
         }
     }
 
+    gcmFOOTER_ARG("current_element=%p", current_element);
     return current_element;
 }
 
@@ -1778,14 +1882,17 @@ VX_PRIVATE_API void suffix_object(vxcJSON *prev, vxcJSON *item)
 VX_PRIVATE_API vxcJSON *create_reference(const vxcJSON *item, const internal_hooks * const hooks)
 {
     vxcJSON *reference = NULL;
+    gcmHEADER_ARG("item=%p, hooks=%p", item, hooks);
     if (item == NULL)
     {
+        gcmFOOTER_NO();
         return NULL;
     }
 
     reference = vxoJson_New_Item(hooks);
     if (reference == NULL)
     {
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -1793,6 +1900,8 @@ VX_PRIVATE_API vxcJSON *create_reference(const vxcJSON *item, const internal_hoo
     reference->string = NULL;
     reference->type |= vxoJson_IsReference;
     reference->next = reference->prev = NULL;
+
+    gcmFOOTER_ARG("reference=%p", reference);
     return reference;
 }
 
@@ -1800,8 +1909,11 @@ VX_PRIVATE_API vx_bool add_item_to_array(vxcJSON *array, vxcJSON *item)
 {
     vxcJSON *child = NULL;
 
+    gcmHEADER_ARG("array=%p, item=%p", array, item);
+
     if ((item == NULL) || (array == NULL))
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
     }
 
@@ -1822,6 +1934,7 @@ VX_PRIVATE_API vx_bool add_item_to_array(vxcJSON *array, vxcJSON *item)
         suffix_object(child, item);
     }
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
@@ -1852,8 +1965,11 @@ VX_PRIVATE_API vx_bool add_item_to_object(vxcJSON * const object, const char * c
     char *new_key = NULL;
     int new_type = vxoJson_Invalid;
 
+    gcmHEADER_ARG("object=%p, string=%s, item=%p, hooks=%p, constant_key=0x%x", object, string, item, hooks, constant_key);
+
     if ((object == NULL) || (string == NULL) || (item == NULL))
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
     }
 
@@ -1867,6 +1983,7 @@ VX_PRIVATE_API vx_bool add_item_to_object(vxcJSON * const object, const char * c
         new_key = (char*)vxoJson_strdup((const unsigned char*)string, hooks);
         if (new_key == NULL)
         {
+            gcmFOOTER_ARG("%d", vx_false_e);
             return vx_false_e;
         }
 
@@ -1881,6 +1998,7 @@ VX_PRIVATE_API vx_bool add_item_to_object(vxcJSON * const object, const char * c
     item->string = new_key;
     item->type = new_type;
 
+    gcmFOOTER_NO();
     return add_item_to_array(object, item);
 }
 
@@ -2025,8 +2143,10 @@ VX_INTERNAL_API vxcJSON* vxoJson_AddArrayToObject(vxcJSON * const object, const 
 
 VX_INTERNAL_API vxcJSON * vxoJson_DetachItemViaPointer(vxcJSON *parent, vxcJSON * const item)
 {
+    gcmHEADER_ARG("parent=%p, item=%p", parent, item);
     if ((parent == NULL) || (item == NULL))
     {
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -2050,6 +2170,7 @@ VX_INTERNAL_API vxcJSON * vxoJson_DetachItemViaPointer(vxcJSON *parent, vxcJSON 
     item->prev = NULL;
     item->next = NULL;
 
+    gcmFOOTER_ARG("item=%p", item);
     return item;
 }
 
@@ -2097,8 +2218,11 @@ VX_INTERNAL_API void vxoJson_InsertItemInArray(vxcJSON *array, int which, vxcJSO
 {
     vxcJSON *after_inserted = NULL;
 
+    gcmHEADER_ARG("array=%p, which=0x%x, newitem=%p", array, which, newitem);
+
     if (which < 0)
     {
+        gcmFOOTER_NO();
         return;
     }
 
@@ -2106,6 +2230,7 @@ VX_INTERNAL_API void vxoJson_InsertItemInArray(vxcJSON *array, int which, vxcJSO
     if (after_inserted == NULL)
     {
         add_item_to_array(array, newitem);
+        gcmFOOTER_NO();
         return;
     }
 
@@ -2120,17 +2245,22 @@ VX_INTERNAL_API void vxoJson_InsertItemInArray(vxcJSON *array, int which, vxcJSO
     {
         newitem->prev->next = newitem;
     }
+    gcmFOOTER_NO();
 }
 
 VX_INTERNAL_API vx_bool vxoJson_ReplaceItemViaPointer(vxcJSON * const parent, vxcJSON * const item, vxcJSON * replacement)
 {
+    gcmHEADER_ARG("parent=%p, item=%p, replacement=%p", parent, item, replacement);
+
     if ((parent == NULL) || (replacement == NULL) || (item == NULL))
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
     }
 
     if (replacement == item)
     {
+        gcmFOOTER_ARG("%d", vx_true_e);
         return vx_true_e;
     }
 
@@ -2154,6 +2284,7 @@ VX_INTERNAL_API vx_bool vxoJson_ReplaceItemViaPointer(vxcJSON * const parent, vx
     item->prev = NULL;
     vxoJson_Delete(item);
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
@@ -2169,8 +2300,10 @@ VX_INTERNAL_API void vxoJson_ReplaceItemInArray(vxcJSON *array, int which, vxcJS
 
 VX_PRIVATE_API vx_bool replace_item_in_object(vxcJSON *object, const char *string, vxcJSON *replacement, vx_bool case_sensitive)
 {
+    gcmHEADER_ARG("object=%p, string=%s, replacement=%p, case_sensitive=0x%x", object, string, replacement, case_sensitive);
     if ((replacement == NULL) || (string == NULL))
     {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
     }
 
@@ -2184,6 +2317,7 @@ VX_PRIVATE_API vx_bool replace_item_in_object(vxcJSON *object, const char *strin
 
     vxoJson_ReplaceItemViaPointer(object, get_object_item(object, string, case_sensitive), replacement);
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
@@ -2201,50 +2335,56 @@ VX_INTERNAL_API void vxoJson_ReplaceItemInObjectCaseSensitive(vxcJSON *object, c
 VX_INTERNAL_API vxcJSON * vxoJson_CreateNull(void)
 {
     vxcJSON *item = vxoJson_New_Item(&global_hooks);
+    gcmHEADER();
     if(item)
     {
         item->type = vxoJson_NULL;
     }
-
+    gcmFOOTER_ARG("item=%p", item);
     return item;
 }
 
 VX_INTERNAL_API vxcJSON * vxoJson_CreateTrue(void)
 {
     vxcJSON *item = vxoJson_New_Item(&global_hooks);
+    gcmHEADER();
     if(item)
     {
         item->type = vxoJson_True;
     }
-
+    gcmFOOTER_ARG("item=%p", item);
     return item;
 }
 
 VX_INTERNAL_API vxcJSON * vxoJson_CreateFalse(void)
 {
     vxcJSON *item = vxoJson_New_Item(&global_hooks);
+    gcmHEADER();
     if(item)
     {
         item->type = vxoJson_False;
     }
-
+    gcmFOOTER_ARG("item=%p", item);
     return item;
 }
 
 VX_INTERNAL_API vxcJSON * vxoJson_CreateBool(vx_bool b)
 {
     vxcJSON *item = vxoJson_New_Item(&global_hooks);
+    gcmHEADER_ARG("b=0x%x", b);
     if(item)
     {
         item->type = b ? vxoJson_True : vxoJson_False;
     }
-
+    gcmFOOTER_ARG("item=%p", item);
     return item;
 }
 
 VX_INTERNAL_API vxcJSON * vxoJson_CreateNumber(double num)
 {
     vxcJSON *item = vxoJson_New_Item(&global_hooks);
+
+    gcmHEADER_ARG("num=%f", num);
     if(item)
     {
         item->type = vxoJson_Number;
@@ -2264,13 +2404,14 @@ VX_INTERNAL_API vxcJSON * vxoJson_CreateNumber(double num)
             item->valueint = (int)num;
         }
     }
-
+    gcmFOOTER_ARG("item=%p", item);
     return item;
 }
 
 VX_INTERNAL_API vxcJSON * vxoJson_CreateString(const char *string)
 {
     vxcJSON *item = vxoJson_New_Item(&global_hooks);
+    gcmHEADER_ARG("string=%s", string);
     if(item)
     {
         item->type = vxoJson_String;
@@ -2281,46 +2422,56 @@ VX_INTERNAL_API vxcJSON * vxoJson_CreateString(const char *string)
             return NULL;
         }
     }
-
+    gcmFOOTER_ARG("item=%p", item);
     return item;
 }
 
 VX_INTERNAL_API vxcJSON * vxoJson_CreateStringReference(const char *string)
 {
     vxcJSON *item = vxoJson_New_Item(&global_hooks);
+
+    gcmHEADER_ARG("string=%s", string);
     if (item != NULL)
     {
         item->type = vxoJson_String | vxoJson_IsReference;
         item->valuestring = (char*)cast_away_const(string);
     }
-
+    gcmFOOTER_ARG("item=%p", item);
     return item;
 }
 
 VX_INTERNAL_API vxcJSON * vxoJson_CreateObjectReference(const vxcJSON *child)
 {
     vxcJSON *item = vxoJson_New_Item(&global_hooks);
+    gcmHEADER_ARG("child=%p", child);
+
     if (item != NULL) {
         item->type = vxoJson_Object | vxoJson_IsReference;
         item->child = (vxcJSON*)cast_away_const(child);
     }
-
+    gcmFOOTER_ARG("item=%p", item);
     return item;
 }
 
 VX_INTERNAL_API vxcJSON * vxoJson_CreateArrayReference(const vxcJSON *child) {
     vxcJSON *item = vxoJson_New_Item(&global_hooks);
+
+    gcmHEADER_ARG("child=%p", child);
+
     if (item != NULL) {
         item->type = vxoJson_Array | vxoJson_IsReference;
         item->child = (vxcJSON*)cast_away_const(child);
     }
 
+    gcmFOOTER_ARG("item=%p", item);
     return item;
 }
 
 VX_INTERNAL_API vxcJSON * vxoJson_CreateRaw(const char *raw)
 {
     vxcJSON *item = vxoJson_New_Item(&global_hooks);
+
+    gcmHEADER_ARG("raw=%s", raw);
     if(item)
     {
         item->type = vxoJson_Raw;
@@ -2331,29 +2482,32 @@ VX_INTERNAL_API vxcJSON * vxoJson_CreateRaw(const char *raw)
             return NULL;
         }
     }
-
+    gcmFOOTER_ARG("item=%p", item);
     return item;
 }
 
 VX_INTERNAL_API vxcJSON * vxoJson_CreateArray(void)
 {
     vxcJSON *item = vxoJson_New_Item(&global_hooks);
+    gcmHEADER();
     if(item)
     {
         item->type=vxoJson_Array;
     }
-
+    gcmFOOTER_ARG("item=%p", item);
     return item;
 }
 
 VX_INTERNAL_API vxcJSON * vxoJson_CreateObject(void)
 {
     vxcJSON *item = vxoJson_New_Item(&global_hooks);
+    gcmHEADER();
     if (item)
     {
         item->type = vxoJson_Object;
     }
 
+    gcmFOOTER_ARG("item=%p", item);
     return item;
 }
 
@@ -2364,9 +2518,11 @@ VX_INTERNAL_API vxcJSON * vxoJson_CreateIntArray(const int *numbers, int count)
     vxcJSON *n = NULL;
     vxcJSON *p = NULL;
     vxcJSON *a = NULL;
+    gcmHEADER_ARG("numbers=%p, count=0x%x", numbers, count);
 
     if ((count < 0) || (numbers == NULL))
     {
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -2377,6 +2533,7 @@ VX_INTERNAL_API vxcJSON * vxoJson_CreateIntArray(const int *numbers, int count)
         if (!n)
         {
             vxoJson_Delete(a);
+            gcmFOOTER_NO();
             return NULL;
         }
         if(!i)
@@ -2390,6 +2547,7 @@ VX_INTERNAL_API vxcJSON * vxoJson_CreateIntArray(const int *numbers, int count)
         p = n;
     }
 
+    gcmFOOTER_ARG("a=%p", a);
     return a;
 }
 
@@ -2400,8 +2558,11 @@ VX_INTERNAL_API vxcJSON * vxoJson_CreateFloatArray(const float *numbers, int cou
     vxcJSON *p = NULL;
     vxcJSON *a = NULL;
 
+    gcmHEADER_ARG("numbers=%p, count=0x%x", numbers, count);
+
     if ((count < 0) || (numbers == NULL))
     {
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -2413,6 +2574,7 @@ VX_INTERNAL_API vxcJSON * vxoJson_CreateFloatArray(const float *numbers, int cou
         if(!n)
         {
             vxoJson_Delete(a);
+            gcmFOOTER_NO();
             return NULL;
         }
         if(!i)
@@ -2426,6 +2588,7 @@ VX_INTERNAL_API vxcJSON * vxoJson_CreateFloatArray(const float *numbers, int cou
         p = n;
     }
 
+    gcmFOOTER_ARG("a=%p", a);
     return a;
 }
 
@@ -2436,8 +2599,11 @@ VX_INTERNAL_API vxcJSON * vxoJson_CreateDoubleArray(const double *numbers, int c
     vxcJSON *p = NULL;
     vxcJSON *a = NULL;
 
+    gcmHEADER_ARG("numbers=%p, count=0x%x", numbers, count);
+
     if ((count < 0) || (numbers == NULL))
     {
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -2449,6 +2615,7 @@ VX_INTERNAL_API vxcJSON * vxoJson_CreateDoubleArray(const double *numbers, int c
         if(!n)
         {
             vxoJson_Delete(a);
+            gcmFOOTER_NO();
             return NULL;
         }
         if(!i)
@@ -2462,6 +2629,7 @@ VX_INTERNAL_API vxcJSON * vxoJson_CreateDoubleArray(const double *numbers, int c
         p = n;
     }
 
+    gcmFOOTER_ARG("a=%p", a);
     return a;
 }
 
@@ -2472,8 +2640,11 @@ VX_INTERNAL_API vxcJSON * vxoJson_CreateStringArray(const char **strings, int co
     vxcJSON *p = NULL;
     vxcJSON *a = NULL;
 
+    gcmHEADER_ARG("strings=%p, count=0x%x", strings, count);
+
     if ((count < 0) || (strings == NULL))
     {
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -2485,6 +2656,7 @@ VX_INTERNAL_API vxcJSON * vxoJson_CreateStringArray(const char **strings, int co
         if(!n)
         {
             vxoJson_Delete(a);
+            gcmFOOTER_NO();
             return NULL;
         }
         if(!i)
@@ -2498,6 +2670,7 @@ VX_INTERNAL_API vxcJSON * vxoJson_CreateStringArray(const char **strings, int co
         p = n;
     }
 
+    gcmFOOTER_ARG("a=%p", a);
     return a;
 }
 
@@ -2508,6 +2681,8 @@ VX_INTERNAL_API vxcJSON * vxoJson_Duplicate(const vxcJSON *item, vx_bool recurse
     vxcJSON *child = NULL;
     vxcJSON *next = NULL;
     vxcJSON *newchild = NULL;
+
+    gcmHEADER_ARG("items=%p, recurse=0x%x", item, recurse);
 
     /* Bail on bad ptr */
     if (!item)
@@ -2543,6 +2718,7 @@ VX_INTERNAL_API vxcJSON * vxoJson_Duplicate(const vxcJSON *item, vx_bool recurse
     /* If non-recursive, then we're done! */
     if (!recurse)
     {
+        gcmFOOTER_ARG("newitem=%p", newitem);
         return newitem;
     }
     /* Walk the ->next chain for the child. */
@@ -2570,6 +2746,7 @@ VX_INTERNAL_API vxcJSON * vxoJson_Duplicate(const vxcJSON *item, vx_bool recurse
         child = child->next;
     }
 
+    gcmFOOTER_ARG("newitem=%p", newitem);
     return newitem;
 
 fail:
@@ -2577,7 +2754,7 @@ fail:
     {
         vxoJson_Delete(newitem);
     }
-
+    gcmFOOTER_NO();
     return NULL;
 }
 
@@ -2585,8 +2762,11 @@ VX_INTERNAL_API void vxoJson_Minify(char *json)
 {
     unsigned char *into = (unsigned char*)json;
 
+    gcmHEADER_ARG("json=%p", json);
+
     if (json == NULL)
     {
+        gcmFOOTER_NO();
         return;
     }
 
@@ -2649,6 +2829,7 @@ VX_INTERNAL_API void vxoJson_Minify(char *json)
 
     /* and null-terminate. */
     *into = '\0';
+    gcmFOOTER_NO();
 }
 
 VX_INTERNAL_API vx_bool vxoJson_IsInvalid(const vxcJSON * const item)

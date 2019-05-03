@@ -13,7 +13,7 @@
 
 #include "gc_es_context.h"
 
-#define _GC_OBJ_ZONE __GLES3_ZONE_CORE
+#define _GC_OBJ_ZONE gcdZONE_GL40_CORE
 
 
 extern  const __GLprocInfo __glProcInfoTable[];

@@ -344,7 +344,7 @@ static VSC_LCSE_Key* _VSC_LCSE_ExpMap_FindSameExpKey(
         VIR_Instruction* keyInst = VSC_LCSE_Key_GetInst(key);
         VIR_OpCode      keyOpcode = VIR_Inst_GetOpcode(keyInst);
 
-        if(VIR_Inst_IdenticalExpression(keyInst, inst, VSC_LCSE_ExpMap_GetShader(expMap), gcvTRUE))
+        if(VIR_Inst_IdenticalExpression(keyInst, inst, VSC_LCSE_ExpMap_GetShader(expMap), gcvTRUE, gcvTRUE))
         {
             /* load r1.xy, base, offset
                load r1.yz, base, offset

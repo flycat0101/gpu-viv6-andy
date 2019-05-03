@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -28,6 +28,7 @@
 
 #include <VX/vx.h>
 #include <VX/vxu.h>
+#include <VX/vx_compatibility.h>
 
 #include <stdio.h>
 #include <stdlib.h>

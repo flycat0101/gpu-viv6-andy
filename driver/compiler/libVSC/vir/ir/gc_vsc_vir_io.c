@@ -122,8 +122,21 @@ VIR_IO_UpdateHostFunction(VIR_Shader* pShader, VSC_UNI_LIST* pSymList)
 #define VIR_IO_ReserveBytes(Buf, Size) ((((Buf)->ioBuffer)->curPos + Size > ((Buf)->ioBuffer)->allocatedBytes) ?  \
                                         VIR_IO_ReallocateMem(Buf, ((Buf)->ioBuffer)->curPos + Size) : VSC_ERR_NONE)
 
-#define VIR_IO_CheckBounds(Buf, Size) ((((Buf)->ioBuffer)->curPos + Size > ((Buf)->ioBuffer)->allocatedBytes) ?  \
-                                        VSC_ERR_OUT_OF_BOUNDS : VSC_ERR_NONE)
+VSC_ErrCode
+VIR_IO_CheckBounds(VIR_Shader_IOBuffer *Buf, gctUINT Size)
+{
+    gctUINT64 tempCount;
+    tempCount = (gctUINT64)(Buf->ioBuffer->curPos) + (gctUINT64)Size;
+    if ((tempCount > gcvMAXUINT32) ||
+        ((Buf->ioBuffer)->curPos + Size > ((Buf)->ioBuffer)->allocatedBytes))
+    {
+        return VSC_ERR_OUT_OF_BOUNDS;
+    }
+    else
+    {
+        return VSC_ERR_NONE;
+    }
+}
 
 VSC_ErrCode
 VIR_IO_writeInt(VIR_Shader_IOBuffer *Buf, gctINT Val)
@@ -1503,6 +1516,8 @@ VIR_IO_writeShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
 
     VIR_IO_writeUint(buf, pShader->replaceIndex);
     VIR_IO_writeBlock(buf, (gctCHAR *)pShader->memoryAccessFlag, sizeof(pShader->memoryAccessFlag));
+    VIR_IO_writeBlock(buf, (gctCHAR *)pShader->flowControlFlag, sizeof(pShader->flowControlFlag));
+    VIR_IO_writeBlock(buf, (gctCHAR *)pShader->texldFlag, sizeof(pShader->texldFlag));
     VIR_IO_writeUint(buf, pShader->vsPositionZDependsOnW);
     VIR_IO_writeUint(buf, pShader->psHasDiscard);
     VIR_IO_writeUint(buf, pShader->useEarlyFragTest);
@@ -1678,6 +1693,7 @@ VIR_IO_readBlockTable(VIR_Shader_IOBuffer * Buf,
     gctUINT         startToReadBlockOffset;
     gctUINT         curBlockIdx;
     gctUINT         nextOffsetInCurBlock;
+    gctUINT64       tempCount;
 
     ON_ERROR0(VIR_IO_readUint(Buf, (gctUINT*)&startIdToRead));
     startToReadBlockIndex = BT_GET_BLOCK_INDEX(pBlockTbl, startIdToRead);
@@ -1695,7 +1711,16 @@ VIR_IO_readBlockTable(VIR_Shader_IOBuffer * Buf,
               blkTbl.entrySize == pBlockTbl->entrySize &&
               blkTbl.flag == pBlockTbl->flag);
     /* get used bolck table size */
-    usedBytes = vscBT_GetUsedSize(&blkTbl);
+    tempCount = (gctUINT64)blkTbl.curBlockIdx * (gctUINT64)blkTbl.blockSize +
+                (gctUINT64)blkTbl.nextOffsetInCurBlock;
+    if (tempCount < gcvMAXUINT32)
+    {
+        usedBytes = vscBT_GetUsedSize(&blkTbl);
+    }
+    else
+    {
+        return VSC_ERR_OUT_OF_BOUNDS;
+    }
     if (!fp)
     {
         errCode = VIR_IO_CheckBounds(Buf, usedBytes);
@@ -1706,7 +1731,14 @@ VIR_IO_readBlockTable(VIR_Shader_IOBuffer * Buf,
         gctUINT j;
         /* set the block table to start to write position */
         /* make sure all used blocks in blockArray are pre-allocated */
-        ON_ERROR0(vscBT_ResizeBlockArray (pBlockTbl, curBlockIdx+1, gcvTRUE));
+        if (((gctUINT64)curBlockIdx + 1) < gcvMAXUINT32)
+        {
+            ON_ERROR0(vscBT_ResizeBlockArray (pBlockTbl, curBlockIdx + 1, gcvTRUE));
+        }
+        else
+        {
+            return VSC_ERR_OUT_OF_BOUNDS;
+        }
 
         /* read whole blocks */
         for (i=startToReadBlockIndex; i < curBlockIdx; i++)
@@ -1812,8 +1844,11 @@ VIR_IO_readStringTable(VIR_Shader_IOBuffer *Buf, VIR_StringTable* pStringTbl)
         if (nameId == VIR_INVALID_ID)
             break;
         /* make sure the namId is in the string table id range */
-        gcmASSERT(nameId <= pStringTbl->curBlockIdx * pStringTbl->blockSize +
-                             pStringTbl->nextOffsetInCurBlock);
+        if ((nameId <= pStringTbl->curBlockIdx * pStringTbl->blockSize +
+            pStringTbl->nextOffsetInCurBlock) == 0)
+        {
+            return VSC_ERR_OUT_OF_BOUNDS;
+        }
         str = (gctCHAR *)BT_GET_ENTRY_DATA(pStringTbl, nameId);
         vscBT_AddToHash(pStringTbl, nameId, str);
     } while (1);
@@ -2350,7 +2385,14 @@ VIR_IO_readInst(VIR_Shader_IOBuffer *Buf, VIR_Instruction* pInst)
     ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
     VIR_Inst_SetConditionOp(pInst, (uVal >> 27) & 0x1F);
     VIR_Inst_SetFlags(pInst, (uVal >> 24) & 0x07);
+
     VIR_Inst_SetSrcNum(pInst, (uVal >> 21) & 0x07);
+    if (VIR_Inst_GetSrcNum(pInst) > VIR_MAX_SRC_NUM)
+    {
+        gcmASSERT(gcvFALSE);
+        VIR_Inst_SetSrcNum(pInst, VIR_OPCODE_GetSrcOperandNum(VIR_Inst_GetOpcode(pInst)));
+    }
+
     VIR_Inst_SetThreadMode(pInst, (uVal >> 18) & 0x07);
     VIR_Inst_SetParentUseBB(pInst, (uVal >> 17) & 0x1);
     VIR_Inst_SetResOpType(pInst, (VIR_RES_OP_TYPE)((uVal >> 11) & 0x3F));
@@ -2469,9 +2511,19 @@ VIR_IO_readTransformFeedback(VIR_Shader_IOBuffer *Buf, VIR_TransformFeedback *tf
     else
     {
         gctINT i;
+        gctUINT64 allocSize;
+        VIR_UniformId * uniformIds;
         /* VIR_FEEDBACK_SEPARATE mode */
-        gctUINT allocSize = sizeof(VIR_UniformId) * tfb->shaderTempCount;
-        VIR_UniformId * uniformIds = (VIR_UniformId *)vscMM_Alloc(&Buf->shader->pmp.mmWrapper, allocSize);
+        allocSize = sizeof(VIR_UniformId) * (gctUINT64)(tfb->shaderTempCount);
+        if (allocSize > gcvMAXUINT32)
+        {
+            return VSC_ERR_OUT_OF_BOUNDS;
+        }
+        else
+        {
+            allocSize = sizeof(VIR_UniformId) * tfb->shaderTempCount;
+        }
+        uniformIds = (VIR_UniformId *)vscMM_Alloc(&Buf->shader->pmp.mmWrapper, (gctUINT)allocSize);
         tfb->feedbackBuffer.separateBufUniformIds = uniformIds;
         if (uniformIds == gcvNULL)
         {
@@ -3172,8 +3224,16 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader, gctUINT message
     {
         ON_ERROR0(VIR_IO_readUint(buf, &pShader->ltcUniformBegin));
         ON_ERROR0(VIR_IO_readUint(buf, &pShader->ltcInstructionCount));
-        pShader->ltcCodeUniformIndex =
-            (gctINT32 *)vscMM_Alloc(memPool, pShader->ltcUniformCount * sizeof(gctINT));
+
+        if ((gctUINT64)pShader->ltcUniformCount * sizeof(gctINT) > gcvMAXUINT32)
+        {
+            ON_ERROR0(VSC_ERR_OUT_OF_MEMORY);
+        }
+        else
+        {
+            pShader->ltcCodeUniformIndex =
+                (gctINT32 *)vscMM_Alloc(memPool, pShader->ltcUniformCount * sizeof(gctINT));
+        }
         if (pShader->ltcCodeUniformIndex == gcvNULL)
         {
             ON_ERROR0(VSC_ERR_OUT_OF_MEMORY);
@@ -3182,8 +3242,17 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader, gctUINT message
         {
             ON_ERROR0(VIR_IO_readInt(buf, &pShader->ltcCodeUniformIndex[i]));
         }
-        pShader->ltcExpressions =
-            (VIR_Instruction *)vscMM_Alloc(memPool, pShader->ltcInstructionCount * sizeof(VIR_Instruction));
+
+        if ((gctUINT64)pShader->ltcInstructionCount * sizeof(VIR_Instruction) > gcvMAXUINT32)
+        {
+            ON_ERROR0(VSC_ERR_OUT_OF_MEMORY);
+        }
+        else
+        {
+            pShader->ltcExpressions =
+                (VIR_Instruction *)vscMM_Alloc(memPool, pShader->ltcInstructionCount * sizeof(VIR_Instruction));
+        }
+
         if (pShader->ltcCodeUniformIndex == gcvNULL)
         {
             ON_ERROR0(VSC_ERR_OUT_OF_MEMORY);
@@ -3214,6 +3283,8 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader, gctUINT message
 
     ON_ERROR0(VIR_IO_readUint(buf, &pShader->replaceIndex));
     ON_ERROR0(VIR_IO_readBlock(buf, (gctCHAR *)pShader->memoryAccessFlag, sizeof(pShader->memoryAccessFlag)));
+    ON_ERROR0(VIR_IO_readBlock(buf, (gctCHAR *)pShader->flowControlFlag, sizeof(pShader->flowControlFlag)));
+    ON_ERROR0(VIR_IO_readBlock(buf, (gctCHAR *)pShader->texldFlag, sizeof(pShader->texldFlag)));
     ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->vsPositionZDependsOnW));
     ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->psHasDiscard));
     ON_ERROR0(VIR_IO_readUint(buf, (gctUINT*)&pShader->useEarlyFragTest));
@@ -4606,6 +4677,7 @@ VIR_Shader_Copy(
     Copy_Field(Shader, Source, maxKernelFunctionArgs);
     Copy_Field(Shader, Source, privateMemorySize);
     Copy_Field(Shader, Source, localMemorySize);
+    Copy_Field(Shader, Source, debugInfo);
 
     Copy_Field(Shader, Source, constUBOSize);
     if (Source->constUBOSize)
@@ -4686,6 +4758,12 @@ VIR_Shader_Copy(
     gcoOS_MemCopy(Shader->memoryAccessFlag,
                  (gctCHAR *)Source->memoryAccessFlag,
                  sizeof(Shader->memoryAccessFlag));
+    gcoOS_MemCopy(Shader->flowControlFlag,
+                 (gctCHAR *)Source->flowControlFlag,
+                 sizeof(Shader->flowControlFlag));
+    gcoOS_MemCopy(Shader->texldFlag,
+                 (gctCHAR *)Source->texldFlag,
+                 sizeof(Shader->texldFlag));
     Copy_Field(Shader, Source, vsPositionZDependsOnW);
     Copy_Field(Shader, Source, psHasDiscard);
     Copy_Field(Shader, Source, useEarlyFragTest);

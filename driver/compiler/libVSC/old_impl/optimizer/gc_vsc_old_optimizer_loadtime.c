@@ -19,7 +19,7 @@
 #if gcdENABLE_3D
 
 
-#define _GC_OBJ_ZONE    gcvZONE_COMPILER
+#define _GC_OBJ_ZONE    gcdZONE_COMPILER
 /*
 **  Load Time Optimizer module.
 **   load time optimizer is divided in two parts, compiler-time optimization
@@ -1903,7 +1903,6 @@ static gceSTATUS
 _replaceShaderCodeByDummyUniform(
     IN gcOPTIMIZER Optimizer,
     IN gcOPT_CODE Code,
-    IN gctINT * LTCCodeUniformIndex,
     IN gctINT * ActiveLTCInstCount,
     IN gctUINT32 * CurUsedUniform,
     IN gctUINT * DummyUniformCount,
@@ -1933,8 +1932,11 @@ _replaceShaderCodeByDummyUniform(
             if (!_isLTCExpressionOnlySimpleMoves(code) || IsWithinJmp)
             {
                 gctINT    componentMap[4] = {0, 0, 0, 0};
+                gctINT    uniformIndex;
+                gcSHADER_LIST list = gcvNULL;
+
                 /* check if the dummy uniform is already created */
-                if (LTCCodeUniformIndex[CodeIndex] == -1)
+                if (!gcSHADER_FindList(Optimizer->shader, Optimizer->shader->ltcCodeUniformMappingList, CodeIndex, &list))
                 {
                     /* not created yet, we need to create a dummy uniform
                      * for the expression */
@@ -1950,17 +1952,26 @@ _replaceShaderCodeByDummyUniform(
                                                        precision));
 
                     /* map the codeIndex to uniform index */
-                    LTCCodeUniformIndex[CodeIndex] =
-                              aDummyUniformPtr->index;
+                    gcSHADER_InsertList(Optimizer->shader,
+                                        &Optimizer->shader->ltcCodeUniformMappingList,
+                                        CodeIndex,
+                                        aDummyUniformPtr->index,
+                                        0);
+
+                    uniformIndex = (gctINT)aDummyUniformPtr->index;
 
                     *DummyUniformCount = *DummyUniformCount + 1;
                     *CurUsedUniform = *CurUsedUniform + 1;
+                }
+                else
+                {
+                    uniformIndex = list->data0;
                 }
 
                 /* convert target = expr to MOV target, dummy_uniform */
                 _CreateMoveAndChangeDependencies(
                               Optimizer,
-                              LTCCodeUniformIndex[CodeIndex],
+                              (gctUINT)uniformIndex,
                               code,
                               componentMap);
                 *ActiveLTCInstCount = CodeIndex + 1;
@@ -2000,7 +2011,6 @@ _FoldLoadtimeConstant(
     )
 {
     gceSTATUS            status = gcvSTATUS_OK;
-    gctINT *             ltcCodeUniformIndex = 0;
     gctINT               i;
 
     gcOPT_CODE           code;
@@ -2037,11 +2047,6 @@ _FoldLoadtimeConstant(
     /* clone the ltc expressions to shader */
     if (_CloneLTCExpressionToShader(Optimizer, &Optimizer->theLTCCodeList) == gcvSTATUS_OK)
     {
-        /* create ltcCodeUniformIndex array */
-        gcmONERROR(ltcAllocator.allocate(
-                       sizeof(gctINT) * Optimizer->theLTCCodeList.count,
-                       (gctPOINTER *)&ltcCodeUniformIndex));
-
         if (gcDumpOption(gceLTC_DUMP_COLLECTING))
         {
             codeNode = Optimizer->theLTCCodeList.head;
@@ -2053,10 +2058,6 @@ _FoldLoadtimeConstant(
             }
         }
 
-        /* initialize the array */
-        for (i=0; i<Optimizer->theLTCCodeList.count; i++)
-            ltcCodeUniformIndex[i] = -1;
-
         codeNode = Optimizer->theLTCCodeList.head;
         codeIndex = 0;    /* the index number for codeNode in theTLCCodeList */
         /* go through each code in the theLTCCodeList to decide if we need
@@ -2067,7 +2068,6 @@ _FoldLoadtimeConstant(
 
            _replaceShaderCodeByDummyUniform(Optimizer,
                                             code,
-                                            ltcCodeUniformIndex,
                                             &activeLTCInstCount,
                                             &curUsedUniform,
                                             &dummyUniformCount,
@@ -2087,7 +2087,6 @@ _FoldLoadtimeConstant(
     Optimizer->shader->ltcUniformCount = dummyUniformCount;
     Optimizer->shader->ltcUniformBegin = ltcUniformBegin;
 
-    Optimizer->shader->ltcCodeUniformIndex = ltcCodeUniformIndex;
     Optimizer->shader->ltcInstructionCount = activeLTCInstCount;
     gcmASSERT(activeLTCInstCount <= Optimizer->theLTCCodeList.count);
 
@@ -2099,13 +2098,6 @@ _FoldLoadtimeConstant(
     }
     else
     {
-        /* remove allocated storage if there is no dummy uniform created */
-        if (Optimizer->shader->ltcCodeUniformIndex != gcvNULL)
-        {
-            gcmONERROR(gcoOS_Free(gcvNULL,
-                                  Optimizer->shader->ltcCodeUniformIndex));
-            Optimizer->shader->ltcCodeUniformIndex = gcvNULL;
-        }
         if (Optimizer->shader->ltcExpressions != gcvNULL)
         {
             gcmONERROR(gcoOS_Free(gcvNULL,

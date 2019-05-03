@@ -64,7 +64,7 @@ GLvoid __glBindRenderbuffer(__GLcontext *gc, GLenum target, GLuint renderbuffer)
 GLboolean __glDeleteRenderbufferObject(__GLcontext *gc, __GLrenderbufferObject *renderbuffer);
 
 
-#define _GC_OBJ_ZONE __GLES3_ZONE_CORE
+#define _GC_OBJ_ZONE gcdZONE_GL40_CORE
 
 __GL_INLINE GLvoid __glFramebufferResetAttachPoint(__GLcontext *gc, __GLfboAttachPoint *attachPoint)
 {

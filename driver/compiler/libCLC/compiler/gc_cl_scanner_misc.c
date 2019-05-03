@@ -329,6 +329,7 @@ clScanInitIndexToKeywordTableEntries(void)
    return _IndexKeywordTableEntries;
 }
 
+extern gctCONST_STRING *_IndexKeywordStrings;
 gceSTATUS
 clCleanupKeywords(
 void
@@ -349,6 +350,7 @@ void
          gcmONERROR(gcoOS_Free(gcvNULL, (gctPOINTER)node));
       }
    }
+   _IndexKeywordStrings = gcvNULL;
 OnError:
    return status;
 }

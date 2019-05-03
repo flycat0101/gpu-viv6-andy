@@ -29,6 +29,7 @@ VSC_ErrCode vscVIR_RemoveNop(VSC_SH_PASS_WORKER* pPassWorker)
     VIR_Shader*       pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VIR_FuncIterator  func_iter;
     VIR_FunctionNode* func_node;
+    gctBOOL           bInvalidCfg = gcvFALSE;
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
@@ -47,11 +48,16 @@ VSC_ErrCode vscVIR_RemoveNop(VSC_SH_PASS_WORKER* pPassWorker)
 
             if (VIR_Inst_GetOpcode(inst) == VIR_OP_NOP)
             {
-                VIR_Function_DeleteInstruction(func, inst);
+                VIR_Pass_DeleteInstruction(func, inst, &bInvalidCfg);
             }
 
             inst = nextinst;
         }
+    }
+
+    if (bInvalidCfg)
+    {
+        pPassWorker->pResDestroyReq->s.bInvalidateCfg = bInvalidCfg;
     }
 
     return errCode;
@@ -76,6 +82,8 @@ VSC_ErrCode vscVIR_RecordInstructionStatus(VSC_SH_PASS_WORKER* pPassWorker)
     VIR_FuncIterator        func_iter;
     VIR_FunctionNode*       pFunc_node;
     VIR_MemoryAccessFlag    memoryAccessFlag = VIR_MA_FLAG_NONE;
+    VIR_FlowControlFlag     flowControlFlag = VIR_FC_FLAG_NONE;
+    VIR_TexldFlag           texldFlag = VIR_TEXLD_FLAG_NONE;
 
     /* Now we only record them at these two levels. */
     gcmASSERT(curShLevel == VIR_SHLEVEL_Pre_Low || curShLevel == VIR_SHLEVEL_Post_Machine);
@@ -125,11 +133,29 @@ VSC_ErrCode vscVIR_RecordInstructionStatus(VSC_SH_PASS_WORKER* pPassWorker)
             {
                 memoryAccessFlag |= VIR_MA_FLAG_EVIS_ATOMADD;
             }
+            else if (VIR_OPCODE_isBranch(opCode))
+            {
+                flowControlFlag |= VIR_FC_FLAG_JMP;
+            }
+            else if (VIR_OPCODE_isCall(opCode))
+            {
+                flowControlFlag |= VIR_FC_FLAG_CALL;
+            }
+            else if (opCode == VIR_OP_KILL)
+            {
+                flowControlFlag |= VIR_FC_FLAG_KILL;
+            }
+            else if (VIR_OPCODE_isTexLd(opCode))
+            {
+                texldFlag |= VIR_TEXLD_FLAG_TEXLD;
+            }
         }
     }
 
     /* Save the result. */
     pShader->memoryAccessFlag[curShLevel] = memoryAccessFlag;
+    pShader->flowControlFlag[curShLevel] = flowControlFlag;
+    pShader->texldFlag[curShLevel] = texldFlag;
 
     return errCode;
 }
@@ -385,13 +411,14 @@ static gctBOOL _IsConstScalar(VIR_Shader* pShader,
 
         if (uniform && isSymUniformCompiletimeInitialized(uniformSym) && VIR_Operand_GetRelAddrMode(pOpnd) == VIR_INDEXED_NONE)
         {
-                VIR_ConstId constId;
+            VIR_ConstId constId;
             VIR_Type*   pConstType;
 
             constId = VIR_Operand_GetConstValForUniform(pShader,
                                                         pOpnd,
                                                         uniformSym,
-                                                        uniform);
+                                                        uniform,
+                                                        0);
             pConst = VIR_Shader_GetConstFromId(pShader, constId);
             pConstType = VIR_Shader_GetTypeFromId(pShader, pConst->type);
 
@@ -914,6 +941,7 @@ VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWo
     gctUINT                    i, j, firstConstRegNo, thisConstRegNo, newDstRegNo;
     VIR_SymId                  newDstSymId;
     VIR_Symbol*                pSym = gcvNULL, *pNewSym = gcvNULL, *firstSym = gcvNULL;
+    VIR_Type*                  pType = gcvNULL;
     VIR_Uniform*               pUniform;
     VIR_Instruction*           pNewInsertedInst;
     gctBOOL                    bFirstConstRegIndexing, bHitReadPortLimitation;
@@ -1043,12 +1071,18 @@ VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWo
                                 if (vscHTBL_DirectTestAndGet(replacedUniformSet, (void*)pSym, (void**)&pNewInsertedInst))
                                 {
                                     VIR_Operand *dest = VIR_Inst_GetDest(pNewInsertedInst);
+
                                     pNewSym = VIR_Operand_GetSymbol(dest);
                                     gcmASSERT(pNewSym && VIR_Symbol_GetKind(pNewSym) == VIR_SYM_VIRREG);
+
+                                    newTempRegTypeId = VIR_Symbol_GetTypeId(pNewSym);
+
                                     if (VIR_Operand_GetPrecision(opnd) == VIR_Symbol_GetPrecision(pNewSym) &&
                                         (!VIR_Operand_GetIsConstIndexing(opnd)) &&
                                         (!VIR_Operand_GetMatrixConstIndex(opnd)) &&
-                                        (VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE))
+                                        (VIR_Operand_GetRelAddrMode(opnd) == VIR_INDEXED_NONE) &&
+                                        /* In case the inserted MOV instruction is not cover this channel, insert a new one. */
+                                        (VIR_GetTypeComponents(newTempRegTypeId) >= _GetCompCountFromEnable(VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(opnd)))))
                                     {
                                         newDstSymId = VIR_Symbol_GetIndex(pNewSym);
                                         newDstRegNo = VIR_Symbol_GetVregIndex(pNewSym);
@@ -1060,8 +1094,35 @@ VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWo
                                 }
                                 if (pNewInsertedInst == gcvNULL)
                                 {
-                                    newTempRegTypeId = VIR_TypeId_isPrimitive(VIR_Symbol_GetTypeId(pSym)) ?
-                                                       VIR_Symbol_GetTypeId(pSym) : VIR_Operand_GetTypeId(opnd);
+                                    /* Try to use the uniform type first so we can cover all channels. */
+                                    if (VIR_TypeId_isPrimitive(VIR_Symbol_GetTypeId(pSym)))
+                                    {
+                                        newTempRegTypeId = VIR_Symbol_GetTypeId(pSym);
+                                    }
+                                    else
+                                    {
+                                        pType = VIR_Symbol_GetType(pSym);
+                                        if (VIR_Type_isArray(pType))
+                                        {
+                                            while (VIR_Type_isArray(pType))
+                                            {
+                                                pType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pType));
+                                            }
+                                            if (VIR_Type_isPrimitive(pType))
+                                            {
+                                                newTempRegTypeId = VIR_Type_GetIndex(pType);
+                                            }
+                                            else
+                                            {
+                                                newTempRegTypeId = VIR_Operand_GetTypeId(opnd);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            newTempRegTypeId = VIR_Operand_GetTypeId(opnd);
+                                        }
+                                    }
+
                                     /* make new created symbol type consistent with src's swizzle channel
                                      * if newTempRegTypeId is float32 computed by operand type while .w is used like following inst
                                      * MUL                hp temp(3).hp.w, hp  uColor.hp.w, hp  uTexCombScale[2].hp.w
@@ -1149,7 +1210,6 @@ VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWo
 
                                 /* Change happens. */
                                 bChanged = gcvTRUE;
-
                             }
                         }
                     }
@@ -5845,7 +5905,8 @@ OnError:
 
 VSC_ErrCode _ConvertRetToJmpForFunction(
     IN OUT VIR_Shader* pShader,
-    IN OUT VIR_Function* pFunc
+    IN OUT VIR_Function* pFunc,
+    IN OUT gctBOOL*    pInvalidCfg
     )
 {
     VSC_ErrCode        errCode = VSC_ERR_NONE;
@@ -5886,8 +5947,8 @@ VSC_ErrCode _ConvertRetToJmpForFunction(
             {
                 if (isMainFunc)
                 {
-                    errCode = VIR_Function_DeleteInstruction(pFunc, pInst);
-                    ON_ERROR(errCode, "VIR_Function_DeleteInstruction");
+                    errCode = VIR_Pass_DeleteInstruction(pFunc, pInst, pInvalidCfg);
+                    ON_ERROR(errCode, "delete instruction");
                 }
                 break;
             }
@@ -5925,8 +5986,8 @@ VSC_ErrCode _ConvertRetToJmpForFunction(
                 pNewInst = VIR_InstIterator_Next(&instIter);
 
                 /* Remove the RET instruction. */
-                errCode = VIR_Function_DeleteInstruction(pFunc, pInst);
-                ON_ERROR(errCode, "VIR_Function_DeleteInstruction");
+                errCode = VIR_Pass_DeleteInstruction(pFunc, pInst, pInvalidCfg);
+                ON_ERROR(errCode, "delete instruction");
 
                 pInst = pNewInst;
             }
@@ -5938,7 +5999,8 @@ OnError:
 }
 
 VSC_ErrCode _ConvertRetToJmpForFunctions(
-    IN OUT VIR_Shader* pShader
+    IN OUT VIR_Shader* pShader,
+    IN OUT gctBOOL*    pInvalidCfg
     )
 {
     VSC_ErrCode        errCode = VSC_ERR_NONE;
@@ -5955,7 +6017,8 @@ VSC_ErrCode _ConvertRetToJmpForFunctions(
         func = func_node->function;
 
         errCode = _ConvertRetToJmpForFunction(pShader,
-                                              func);
+                                              func,
+                                              pInvalidCfg);
         ON_ERROR(errCode, "convert ret to jmp");
 
     }
@@ -6419,6 +6482,7 @@ VSC_ErrCode vscVIR_PreprocessLLShader(VSC_SH_PASS_WORKER* pPassWorker)
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_Shader* pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VSC_HW_CONFIG* pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    gctBOOL bInvalidCfg = gcvFALSE;
 
     /* Convert integer to float, if hardware doesn't support integer */
     if (!pHwCfg->hwFeatureFlags.hasHalti0)
@@ -6441,7 +6505,7 @@ VSC_ErrCode vscVIR_PreprocessLLShader(VSC_SH_PASS_WORKER* pPassWorker)
     ON_ERROR(errCode, "precision update");
 
     /* Change all RETs to JMPs and only keep one RET at the end of the function. */
-    errCode = _ConvertRetToJmpForFunctions(pShader);
+    errCode = _ConvertRetToJmpForFunctions(pShader, &bInvalidCfg);
     ON_ERROR(errCode, "Convert RET to JMP for functions");
 
     /* Disable this opt, since it does not consider DU. For example,
@@ -6472,6 +6536,11 @@ VSC_ErrCode vscVIR_PreprocessLLShader(VSC_SH_PASS_WORKER* pPassWorker)
     /* Change all scalar vector constant source into immediate. */
     errCode = _ConvertScalarVectorConstToImm(pShader);
     ON_ERROR(errCode, "Convert Scalar vector constant to imm");
+
+    if (bInvalidCfg)
+    {
+        pPassWorker->pResDestroyReq->s.bInvalidateCfg = bInvalidCfg;
+    }
 
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
@@ -7221,6 +7290,7 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
     VIR_USAGE*                  pUsage;
     VIR_Operand*                pUsageOpnd = gcvNULL;
     VIR_Instruction*            pUsageInst = gcvNULL;
+    VIR_Swizzle                 usageSwizzle;
     VIR_DEF*                    pDef;
     gctUINT                     i, j, usageCount, usageIdx, defIdx;
     VIR_OperandInfo             operandInfo, operandInfo1;
@@ -7269,72 +7339,76 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
             /* Even usage has defs, however, some of pathes might have no definition. So far,
                only loop is checked. */
 
-            if (!bNeedInitialization && bNeedToCheckDef)
+            if (!bNeedInitialization && bNeedToCheckDef && !VIR_IS_OUTPUT_USAGE_INST(pUsageInst))
             {
-                if (pUsageInst < VIR_OUTPUT_USAGE_INST)
+                gctBOOL bSkipCheck = gcvFALSE;
+
+                usageSwizzle = VIR_Operand_GetSwizzle(pUsageOpnd);
+                bNeedInitialization = gcvTRUE;
+
+                /* Only check the used channel. */
+                for (i = 0; i < VIR_CHANNEL_COUNT; i++)
                 {
-                    gctBOOL bSkipCheck = gcvFALSE;
-
-                    bNeedInitialization = gcvTRUE;
-
-                    /* Only check the used channel. */
-                    for (i = 0; i < VIR_CHANNEL_COUNT; i++)
+                    if (VIR_Inst_isComponentwise(pUsageInst))
                     {
                         if ((1 << i) & pUsage->realChannelMask)
                         {
-                            bChannelInitialized[i] = gcvFALSE;
+                            bChannelInitialized[VIR_Swizzle_GetChannel(usageSwizzle, i)] = gcvFALSE;
+                        }
+                    }
+                    else
+                    {
+                        bChannelInitialized[VIR_Swizzle_GetChannel(usageSwizzle, i)] = gcvFALSE;
+                    }
+                }
+
+                for (i = 0; i < UD_CHAIN_GET_DEF_COUNT(&pUsage->udChain); i ++)
+                {
+                    defIdx = UD_CHAIN_GET_DEF(&pUsage->udChain, i);
+                    gcmASSERT(VIR_INVALID_DEF_INDEX != defIdx);
+                    pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, defIdx);
+
+                    /* Skip some checks. */
+                    if (VIR_IS_IMPLICIT_DEF_INST(pDef->defKey.pDefInst))
+                    {
+                        bNeedInitialization = gcvFALSE;
+                        bSkipCheck = gcvTRUE;
+                        break;
+                    }
+
+                    if (VIR_Inst_GetFunction(pDef->defKey.pDefInst) != VIR_Inst_GetFunction(pUsageInst))
+                    {
+                        bNeedInitialization = gcvFALSE;
+                        bSkipCheck = gcvTRUE;
+                        break;
+                    }
+
+                    if (!VIR_IS_OUTPUT_USAGE_INST(pDef->defKey.pDefInst))
+                    {
+                        if (VIR_Inst_GetId(pDef->defKey.pDefInst) < VIR_Inst_GetId(pUsageInst))
+                        {
+                            bNeedInitialization = gcvFALSE;
                         }
                     }
 
-                    for (i = 0; i < UD_CHAIN_GET_DEF_COUNT(&pUsage->udChain); i ++)
+                    for (j = 0; j < VIR_CHANNEL_COUNT; j++)
                     {
-                        defIdx = UD_CHAIN_GET_DEF(&pUsage->udChain, i);
-                        gcmASSERT(VIR_INVALID_DEF_INDEX != defIdx);
-                        pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, defIdx);
-
-                        /* Skip some checks. */
-                        if (pDef->defKey.pDefInst == VIR_HW_SPECIAL_DEF_INST ||
-                            pDef->defKey.pDefInst == VIR_INPUT_DEF_INST)
+                        if (pDef->OrgEnableMask & (VIR_ENABLE_X << j))
                         {
-                            bNeedInitialization = gcvFALSE;
-                            bSkipCheck = gcvTRUE;
-                            break;
-                        }
-
-                        if (VIR_Inst_GetFunction(pDef->defKey.pDefInst) != VIR_Inst_GetFunction(pUsageInst))
-                        {
-                            bNeedInitialization = gcvFALSE;
-                            bSkipCheck = gcvTRUE;
-                            break;
-                        }
-
-                        if (pDef->defKey.pDefInst < VIR_OUTPUT_USAGE_INST)
-                        {
-                            if (VIR_Inst_GetId(pDef->defKey.pDefInst) < VIR_Inst_GetId(pUsageInst))
-                            {
-                                bNeedInitialization = gcvFALSE;
-                            }
-                        }
-
-                        for (j = 0; j < VIR_CHANNEL_COUNT; j++)
-                        {
-                            if (pDef->OrgEnableMask & (VIR_ENABLE_X << j))
-                            {
-                                bChannelInitialized[j] = gcvTRUE;
-                            }
+                            bChannelInitialized[j] = gcvTRUE;
                         }
                     }
+                }
 
-                    /* Check if any channel is uninitialized. */
-                    if (!bNeedInitialization && !bSkipCheck)
+                /* Check if any channel is uninitialized. */
+                if (!bNeedInitialization && !bSkipCheck)
+                {
+                    for (i = 0; i < VIR_CHANNEL_COUNT; i++)
                     {
-                        for (i = 0; i < VIR_CHANNEL_COUNT; i++)
+                        if (!bChannelInitialized[i])
                         {
-                            if (!bChannelInitialized[i])
-                            {
-                                bNeedInitialization = gcvTRUE;
-                                break;
-                            }
+                            bNeedInitialization = gcvTRUE;
+                            break;
                         }
                     }
                 }
@@ -9914,6 +9988,7 @@ _UpdateWorkGroupIdForMultiGPU(
     VIR_Operand*            pNewOpnd = gcvNULL;
     gctUINT                 i, defIdx = 0;
     VIR_DEF*                pDef;
+    gctBOOL                 bUseLocalMemory = (VIR_Shader_GetShareMemorySize(pShader) > 0);
 
     /* Find the workGroupId. */
     for (i = 0; i < VIR_IdList_Count(pAttrIdLists); i++)
@@ -9974,11 +10049,63 @@ _UpdateWorkGroupIdForMultiGPU(
     VIR_Symbol_SetTyQualifier(pWorkGroupIdOffsetSym, VIR_TYQUAL_CONST);
 
     /* Insert a ADD instruction: workGroupId = workGroupId + workGroupOffset. */
-    errCode = VIR_Function_PrependInstruction(pMainFunc,
-                                              VIR_OP_ADD,
-                                              VIR_TYPE_UINT_X3,
-                                              &pNewAddInst);
-    ON_ERROR(errCode, "Insert a ADD instruction.");
+    /*
+    ** If this shader don't use LocalMemory, insert this ADD in the beginning of the shader,
+    ** if no, insert this ADD after the local memory address calculation.
+    */
+    if (bUseLocalMemory)
+    {
+        VIR_InstIterator    inst_iter;
+        VIR_Instruction*    pInst;
+        VIR_Instruction*    pInsertPosInst = gcvNULL;
+        VIR_OperandInfo     opndInfo;
+
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(VIR_Shader_GetMainFunction(pShader)));
+        for (pInst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             pInst != gcvNULL;
+             pInst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            if (VIR_OPCODE_hasDest(VIR_Inst_GetOpcode(pInst)))
+            {
+                VIR_Operand_GetOperandInfo(pInst, VIR_Inst_GetDest(pInst), &opndInfo);
+
+                if (opndInfo.isVreg && opndInfo.u1.virRegInfo.virReg == VIR_OCL_LocalMemoryAddressRegIndex)
+                {
+                    pInsertPosInst = pInst;
+                    break;
+                }
+            }
+        }
+
+        if (pInsertPosInst)
+        {
+            errCode = VIR_Function_AddInstructionAfter(pMainFunc,
+                                                       VIR_OP_ADD,
+                                                       VIR_TYPE_UINT_X3,
+                                                       pInsertPosInst,
+                                                       gcvTRUE,
+                                                       &pNewAddInst);
+            ON_ERROR(errCode, "Insert a ADD instruction.");
+        }
+        else
+        {
+            gcmASSERT(gcvFALSE);
+
+            errCode = VIR_Function_PrependInstruction(pMainFunc,
+                                                      VIR_OP_ADD,
+                                                      VIR_TYPE_UINT_X3,
+                                                      &pNewAddInst);
+            ON_ERROR(errCode, "Insert a ADD instruction.");
+        }
+    }
+    else
+    {
+        errCode = VIR_Function_PrependInstruction(pMainFunc,
+                                                  VIR_OP_ADD,
+                                                  VIR_TYPE_UINT_X3,
+                                                  &pNewAddInst);
+        ON_ERROR(errCode, "Insert a ADD instruction.");
+    }
 
     /* Set DEST. */
     pNewOpnd = VIR_Inst_GetDest(pNewAddInst);
@@ -10092,9 +10219,9 @@ VSC_ErrCode vscVIR_PreprocessMCShader(VSC_SH_PASS_WORKER* pPassWorker)
     /* add temp register spill addr uniform (should be done before dubo) */
     spillMemUniform = VIR_Shader_GetTempRegSpillAddrUniform(pShader, needBoundsCheck);
     if (spillMemUniform == gcvNULL)
-            {
+    {
         errCode = VSC_ERR_OUT_OF_MEMORY;
-            }
+    }
 
     /* Update the local memory and the private memory */
     _UpdateLocMemAndPrivMem(pPassWorker);
@@ -10107,7 +10234,7 @@ VSC_ErrCode vscVIR_PreprocessMCShader(VSC_SH_PASS_WORKER* pPassWorker)
         VIR_Shader_IsCL(pShader))
     {
         _UpdateWorkGroupIdForMultiGPU(pPassWorker, &bChanged);
-            }
+    }
 
     if (bChanged &&
         VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))

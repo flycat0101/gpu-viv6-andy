@@ -17,7 +17,7 @@
 
 #if gcdNULL_DRIVER < 2
 
-#define _GC_OBJ_ZONE            gcvZONE_BUFOBJ
+#define _GC_OBJ_ZONE            gcdZONE_BUFOBJ
 #define BUFFER_OBJECT_ALIGNMENT 16 /* max alignmet for all buffer object types */
 #define BUFFER_INDEX_ALIGNMENT  16 /* max alignmet for index buffer object types */
 #define BUFFER_OBJECT_SURFTYPE  gcvSURF_VERTEX
@@ -1485,7 +1485,7 @@ gcoBUFOBJ_CPUCacheOperation_Range(
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("BufObj=0x%x, Offset=%zu Length=%zu Operation=%d", BufObj, Offset, Length, Operation);
+    gcmHEADER_ARG("BufObj=0x%x, Offset=%u Length=%u Operation=%d", BufObj, Offset, Length, Operation);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(BufObj, gcvOBJ_BUFOBJ);

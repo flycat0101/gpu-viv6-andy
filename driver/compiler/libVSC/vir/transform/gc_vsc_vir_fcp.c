@@ -69,7 +69,8 @@ void _VIR_ReplaceLDARR(
     VIR_Shader          *pShader,
     VIR_Function        *pFunc,
     VIR_DEF_USAGE_INFO  *pDuInfo,
-    VIR_Instruction     *pInst)
+    VIR_Instruction     *pInst,
+    gctBOOL             *pInvalidCfg)
 {
     VIR_Operand             *pSrc1Opnd = VIR_Inst_GetSource(pInst, 1);
     VIR_Operand             *pSrc0Opnd = VIR_Inst_GetSource(pInst, 0);
@@ -255,7 +256,7 @@ void _VIR_ReplaceLDARR(
         if (!hasOtherDef)
         {
             /* case 1: remove the LDARR */
-            VIR_Function_RemoveInstruction(pFunc, pInst);
+            VIR_Pass_RemoveInstruction(pFunc, pInst, pInvalidCfg);
         }
         else
         {
@@ -780,7 +781,8 @@ static VSC_ErrCode _VIR_MergeICASTP(
     IN VSC_OPTN_FCPOptions *options,
     IN VIR_Instruction* icast,
     IN VSC_MM*     pMM,
-    IN VIR_Dumper* dumper
+    IN VIR_Dumper* dumper,
+    IN gctBOOL* pInvalidCfg
     )
 {
     VSC_ErrCode errCode  = VSC_ERR_NONE;
@@ -916,7 +918,7 @@ static VSC_ErrCode _VIR_MergeICASTP(
             vscVIR_DeleteDef(du_info, icast, icast_dest_info.u1.virRegInfo.virReg,
                              1, icast_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
         }
-        VIR_Function_RemoveInstruction(func, icast);
+        VIR_Pass_RemoveInstruction(func, icast, pInvalidCfg);
         vscHTBL_Destroy(def_inst_set0);
         return errCode;
     }
@@ -932,7 +934,8 @@ static VSC_ErrCode _VIR_MergeICASTD(
     IN VSC_OPTN_FCPOptions *options,
     IN VIR_Instruction* icast,
     IN VSC_MM*     pMM,
-    IN VIR_Dumper* dumper
+    IN VIR_Dumper* dumper,
+    IN gctBOOL* pInvalidCfg
     )
 {
     VSC_ErrCode errCode  = VSC_ERR_NONE;
@@ -1063,7 +1066,8 @@ static VSC_ErrCode _VIR_MergeICASTD(
                 VIR_Inst_Dump(dumper, vx_inst);
                 VIR_LOG_FLUSH(dumper);
             }
-            VIR_Function_RemoveInstruction(func, icast);
+
+            VIR_Pass_RemoveInstruction(func, icast, pInvalidCfg);
         }
         return errCode;
     }
@@ -1254,8 +1258,8 @@ static VSC_ErrCode _ConvEvisInstForShader(
                     vscVIR_InitGeneralUdIterator(&udIter, pDuInfo, pInst, pSrc2Opnd, gcvFALSE, gcvFALSE);
 
                     for (pDef = vscVIR_GeneralUdIterator_First(&udIter);
-                            pDef != gcvNULL;
-                            pDef = vscVIR_GeneralUdIterator_Next(&udIter))
+                         pDef != gcvNULL;
+                         pDef = vscVIR_GeneralUdIterator_Next(&udIter))
                     {
                         vscVIR_AddNewUsageToDef(pDuInfo,
                                                 pDef->defKey.pDefInst,
@@ -1665,6 +1669,7 @@ VSC_ErrCode vscVIR_PostMCCleanup(
     VSC_MM*             pMM = pPassWorker->basePassWorker.pMM;
     gctBOOL             bRAEnabled = *(gctBOOL*)pPassWorker->basePassWorker.pPassSpecificData;
     VSC_HW_CONFIG       *pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    gctBOOL             bInvalidCfg = gcvFALSE;
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
@@ -1686,7 +1691,7 @@ VSC_ErrCode vscVIR_PostMCCleanup(
             {
                 if (opCode == VIR_OP_LDARR)
                 {
-                    _VIR_ReplaceLDARR(pShader, func, pDuInfo, inst);
+                    _VIR_ReplaceLDARR(pShader, func, pDuInfo, inst, &bInvalidCfg);
                 }
 
                 if (opCode == VIR_OP_STARR)
@@ -1699,11 +1704,11 @@ VSC_ErrCode vscVIR_PostMCCleanup(
             {
                 if (opCode == VIR_OP_VX_ICASTP)
                 {
-                    _VIR_MergeICASTP(pDuInfo, pShader, pOptions, inst, pMM, pDumper);
+                    _VIR_MergeICASTP(pDuInfo, pShader, pOptions, inst, pMM, pDumper, &bInvalidCfg);
                 }
                 else if (opCode == VIR_OP_VX_ICASTD)
                 {
-                    _VIR_MergeICASTD(pDuInfo, pShader, pOptions, inst, pMM, pDumper);
+                    _VIR_MergeICASTD(pDuInfo, pShader, pOptions, inst, pMM, pDumper, &bInvalidCfg);
                 }
             }
 
@@ -1746,6 +1751,11 @@ VSC_ErrCode vscVIR_PostMCCleanup(
     {
         VIR_Shader_Dump(gcvNULL, "Shader after post-MC-cleanup phase\n", pShader, gcvTRUE);
         VIR_LOG_FLUSH(pDumper);
+    }
+
+    if (bInvalidCfg)
+    {
+        pPassWorker->pResDestroyReq->s.bInvalidateCfg = gcvTRUE;
     }
 
 OnError:

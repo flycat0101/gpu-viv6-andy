@@ -35,14 +35,15 @@ BEGIN_EXTERN_C()
 #define HWSUPPORTDUAL16HIGHVEC2    0      /* this is a temporary MACRO to enable dual-t highpvec2, disable by default*/
 
 /* Defines for OCL on reserved temp registers used for memory space addresses, copy from gcSL*/
-#define VIR_OCL_NumMemoryAddressRegs             6  /*number of memory address registers */
 #define VIR_OCL_PrivateMemoryAddressRegIndex     1  /*private memory address register index */
-#define VIR_OCL_LocalMemoryAddressRegIndex       2  /*local memory address register index */
-#define VIR_OCL_ConstantMemoryAddressRegIndex    3  /*constant memory address register index */
-#define VIR_OCL_PrintfStartMemoryAddressRegIndex 4  /*printf start memory address register index */
-#define VIR_OCL_PrintfEndMemoryAddressRegIndex   5  /*printf end memory address register index */
-#define VIR_OCL_MaxLocalTempRegs                16  /*maximum # of local temp register including the reserved ones for base addresses to memory spaces*/
-
+#define VIR_OCL_LocalMemoryAddressRegIndex       2  /*local memory address register index for the local variables within kernel function */
+#define VIR_OCL_ParmLocalMemoryAddressRegIndex   3  /*local memory address register index for the local parameters */
+#define VIR_OCL_ConstantMemoryAddressRegIndex    4  /*constant memory address register index */
+#define VIR_OCL_PrintfStartMemoryAddressRegIndex 5  /*printf start memory address register index */
+#define VIR_OCL_PrintfEndMemoryAddressRegIndex   6  /*printf end memory address register index */
+#define VIR_OCL_PreScaleGlobalIdRegIndex         7  /*pre-scale global ID register index */
+#define VIR_OCL_NumMemoryAddressRegs             8  /*number of memory address registers */
+#define VIR_OCL_MaxLocalTempRegs                 16  /*maximum # of local temp register including the reserved ones for base addresses to memory spaces*/
 
 #define __USE_CONST_REG_SAVE_PUSH_CONST__       1
 
@@ -128,20 +129,13 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_OPCODE_isTranscendental(Opcode)   \
     (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_Transcendental)
 
-#define VIR_OPCODE_isIntegerOnly(Opcode)   \
-    (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_IntegerOnly)
-
 #define VIR_OPCODE_isControlFlow(Opcode)   \
     (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_ControlFlow)
 
 #define VIR_OPCODE_isVX(Opcode)   \
     ((VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_VX1)      ||  \
      (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_VX2)      ||  \
-     (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_VX1_2)    ||  \
-     (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_VXOnly))
-
-#define VIR_OPCODE_isVXOnly(Opcode)   \
-    (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_VXOnly)
+     (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_VX1_2))
 
 #define VIR_OPCODE_U512_SrcNo(Opcode)   \
     ((VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_Use512Unifrom_MASK) >> VIR_OPFLAG_Use512Unifrom_SHIFT)
@@ -431,6 +425,16 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
     ((Opcode) == VIR_OP_BARRIER       ||    \
      (Opcode) == VIR_OP_MEM_BARRIER)
 
+#define VIR_OPCODE_isScatter(Opcode)        \
+    ((Opcode) == VIR_OP_VX_SCATTER    ||    \
+     (Opcode) == VIR_OP_VX_SCATTER_B)
+
+#define VIR_OPCODE_hasStoreOperation(Opcode)\
+    (VIR_OPCODE_isMemSt(Opcode)       ||    \
+     VIR_OPCODE_isImgSt(Opcode)       ||    \
+     VIR_OPCODE_isAttrSt(Opcode)      ||    \
+     VIR_OPCODE_isScatter(Opcode))
+
 /* not finished */
 #define VIR_OPCODE_BITWISE(Opcode)     \
     ((Opcode == VIR_OP_AND_BITWISE)  ||      \
@@ -461,10 +465,10 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
      (Opcode) == VIR_OP_JMP_ANY         ||      \
      (Opcode) == VIR_OP_ABS             ||      \
      (Opcode) == VIR_OP_NEG             ||      \
-     (Opcode) == VIR_OP_CMP          ||      \
-     (Opcode) == VIR_OP_SET          ||      \
-     (Opcode) == VIR_OP_I2I          ||      \
-     (Opcode) == VIR_OP_I2F          ||      \
+     (Opcode) == VIR_OP_CMP             ||      \
+     (Opcode) == VIR_OP_SET             ||      \
+     (Opcode) == VIR_OP_I2I             ||      \
+     (Opcode) == VIR_OP_I2F             ||      \
      (Opcode) == VIR_OP_RCP             ||      \
      (Opcode) == VIR_OP_IMG_LOAD        ||      \
      (Opcode) == VIR_OP_IMG_LOAD_3D     ||      \
@@ -509,6 +513,26 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_OPCODE_SrcsTemp256(Opcode)          \
     (VIR_OPCODE_Src0Src1Temp256(Opcode) ||      \
      VIR_OPCODE_Src1Src2Temp256(Opcode))
+
+#define VIR_OPCODE_Src0Src1Commutative(Opcode)  \
+    ((Opcode) == VIR_OP_MUL             ||      \
+     (Opcode) == VIR_OP_MULHI           ||      \
+     (Opcode) == VIR_OP_MULLO           ||      \
+     (Opcode) == VIR_OP_MULSAT          ||      \
+     (Opcode) == VIR_OP_MUL_Z           ||      \
+     (Opcode) == VIR_OP_ADD             ||      \
+     (Opcode) == VIR_OP_ADDC            ||      \
+     (Opcode) == VIR_OP_ADDLO           ||      \
+     (Opcode) == VIR_OP_ADDSAT          ||      \
+     (Opcode) == VIR_OP_ADD_CC          ||      \
+     (Opcode) == VIR_OP_MAD             ||      \
+     (Opcode) == VIR_OP_MADC            ||      \
+     (Opcode) == VIR_OP_MADSAT          ||      \
+     (Opcode) == VIR_OP_MAD_CC          ||      \
+     (Opcode) == VIR_OP_IMADHI0         ||      \
+     (Opcode) == VIR_OP_IMADHI1         ||      \
+     (Opcode) == VIR_OP_IMADLO0         ||      \
+     (Opcode) == VIR_OP_IMADLO1)
 
 #define VIR_SymTable_MaxValidId(SymTable)   BT_GET_MAX_VALID_ID(SymTable)
 
@@ -2432,21 +2456,21 @@ typedef enum _VIR_OP_FLAG
     VIR_OPFLAG_NoDest               = 0x00,
     VIR_OPFLAG_HasDest              = 0x01,
     VIR_OPFLAG_Transcendental       = 0x02,
-    VIR_OPFLAG_IntegerOnly          = 0x04,
-    VIR_OPFLAG_ControlFlow          = 0x08,
-    VIR_OPFLAG_VX1                  = 0x10,
-    VIR_OPFLAG_VX2                  = 0x20,
-    VIR_OPFLAG_VX1_2                = 0x30, /* in VX1 and VX2 */
-    VIR_OPFLAG_VXOnly               = 0x70, /* VX only instruction (EVIS) */
-    VIR_OPFLAG_Componentwise        = 0x80, /* the operation is componentwise */
-    VIR_OPFLAG_Src0Componentwise    = 0x100,
-    VIR_OPFLAG_Src1Componentwise    = 0x200,
-    VIR_OPFLAG_Src2Componentwise    = 0x400,
-    VIR_OPFLAG_Src3Componentwise    = 0x800,
-    VIR_OPFLAG_OnlyUseEnable        = 0x1000,
-    VIR_OPFLAG_Loads                = 0x2000,
-    VIR_OPFLAG_Stores               = 0x4000,
-    VIR_OPFLAG_Expression           = 0x8000,
+    VIR_OPFLAG_ControlFlow          = 0x04,
+    VIR_OPFLAG_VX1                  = 0x08,
+    VIR_OPFLAG_VX2                  = 0x10,
+    VIR_OPFLAG_VX1_2                = VIR_OPFLAG_VX1 | VIR_OPFLAG_VX2, /* in VX1 and VX2 */
+    VIR_OPFLAG_Componentwise        = 0x20, /* the operation is componentwise */
+    VIR_OPFLAG_Src0Componentwise    = 0x40,
+    VIR_OPFLAG_Src1Componentwise    = 0x80,
+    VIR_OPFLAG_Src2Componentwise    = 0x100,
+    VIR_OPFLAG_Src3Componentwise    = 0x200,
+    VIR_OPFLAG_OnlyUseEnable        = 0x400,
+    VIR_OPFLAG_Loads                = 0x800,
+    VIR_OPFLAG_Stores               = 0x1000,
+    VIR_OPFLAG_Expression           = 0x2000,
+    VIR_OPFLAG_UseCondCode          = 0x4000,
+    /* One more enumeration left here. */
     VIR_OPFLAG_ExpdPrecFromHighest  = 0x10000, /*expected result precision should be the same as */
     VIR_OPFLAG_ExpdPrecFromSrc0     = 0x20000,
     VIR_OPFLAG_ExpdPrecFromSrc12    = 0x30000,
@@ -2454,7 +2478,6 @@ typedef enum _VIR_OP_FLAG
     VIR_OPFLAG_ExpdPrecHP           = 0x50000,
     VIR_OPFLAG_ExpdPrecMP           = 0x60000,
     VIR_OPFLAG_ExpdPrecFromBits     = 0x70000,
-    VIR_OPFLAG_UseCondCode          = 0x80000,
     VIR_OPFLAG_EVIS_Modifier_MASK   = 0x700000, /* VX inst EVIS_Modifier operand number */
     VIR_OPFLAG_EVIS_Modifier_SHIFT  = 20, /* VX inst EVIS_Modifier shift count */
     VIR_OPFLAG_Use512Unifrom_MASK   = 0x3800000, /* VX instruction, 512 bit uniform operand number */
@@ -2636,6 +2659,7 @@ typedef enum _VIR_UNIFORMKIND
     VIR_UNIFORM_GLOBAL_SIZE,
     VIR_UNIFORM_LOCAL_SIZE,
     VIR_UNIFORM_NUM_GROUPS,
+    VIR_UNIFORM_NUM_GROUPS_FOR_SINGLE_GPU,
     VIR_UNIFORM_GLOBAL_OFFSET,
     VIR_UNIFORM_WORK_DIM,
     VIR_UNIFORM_TRANSFORM_FEEDBACK_BUFFER,
@@ -4603,7 +4627,7 @@ typedef enum _VIR_SHADERFLAGS
     VIR_SHFLAG_PS_SPECIALLY_ALLOC_POINT_COORD   = 0x10000, /* Alloc pt-coord at (last - 1) among all attributes of ps */
     VIR_SHFLAG_PS_SPECIALLY_ALLOC_PRIMTIVE_ID   = 0x20000, /* Alloc primId at last among all attributes of ps */
     VIR_SHFLAG_PS_SAMPLE_SHADING                = 0x40000, /* ps runs on sample-shading mode */
-    VIR_SHFLAG_PS_NEED_ALPHA_KILL_PATCH         = 0x800000, /* ps needs alpha-kill patch */
+    VIR_SHFLAG_PS_NEED_ALPHA_KILL_PATCH         = 0x80000, /* ps needs alpha-kill patch */
 
     /* common shader control flag */
 
@@ -4852,6 +4876,24 @@ typedef enum _VIR_MEMORY_ACCESS_FLAG
 /* must sync with SHADER_EDH_MEM_ACCESS_HINT!!! */
 } VIR_MemoryAccessFlag;
 
+/* must sync with SHADER_EDH_FLOW_CONTROL_HINT!!! */
+typedef enum _VIR_FLOW_CONTROL_FLAG
+{
+    VIR_FC_FLAG_NONE                 = 0x0000,
+    VIR_FC_FLAG_JMP                  = 0x0001,
+    VIR_FC_FLAG_CALL                 = 0x0002,
+    VIR_FC_FLAG_KILL                 = 0x0004,
+/* must sync with SHADER_EDH_FLOW_CONTROL_HINT!!! */
+} VIR_FlowControlFlag;
+
+/* must sync with SHADER_EDH_TEXLD_HINT!!! */
+typedef enum _VIR_TEXLD_FLAG
+{
+    VIR_TEXLD_FLAG_NONE                 = 0x0000,
+    VIR_TEXLD_FLAG_TEXLD                = 0x0001,
+/* must sync with SHADER_EDH_TEXLD_HINT!!! */
+} VIR_TexldFlag;
+
 typedef enum _VIR_SHADER_RESOURCE_ENTRY_FLAG
 {
     VIR_SRE_FLAG_NONE                           = 0x0000,
@@ -5054,6 +5096,8 @@ struct _VIR_SHADER
 #endif
 
     VIR_MemoryAccessFlag    memoryAccessFlag[VIR_SHLEVEL_COUNT];
+    VIR_FlowControlFlag     flowControlFlag[VIR_SHLEVEL_COUNT];
+    VIR_TexldFlag           texldFlag[VIR_SHLEVEL_COUNT];
     gctBOOL             vsPositionZDependsOnW;    /* for wClip */
     gctBOOL             psHasDiscard;
     gctBOOL             useEarlyFragTest;
@@ -5346,6 +5390,11 @@ VIR_Shader_IsESCompiler(
 
 gctBOOL
 VIR_Shader_IsES11Compiler(
+    IN VIR_Shader * Shader
+    );
+
+gctBOOL
+VIR_Shader_IsES20Compiler(
     IN VIR_Shader * Shader
     );
 
@@ -6515,7 +6564,8 @@ VIR_Inst_IdenticalExpression(
     IN VIR_Instruction  *Inst0,
     IN VIR_Instruction  *Inst1,
     IN VIR_Shader       *Shader,
-    IN gctBOOL          precisionMatters
+    IN gctBOOL          bPrecisionMatters,
+    IN gctBOOL          bAllowCommutative
     );
 
 VIR_TypeId
@@ -7161,7 +7211,8 @@ VIR_Operand_GetConstValForUniform(
     IN  VIR_Shader         *pShader,
     IN  VIR_Operand        *pOpnd,
     IN  VIR_Symbol         *pUniformSym,
-    IN  VIR_Uniform        *pUniform
+    IN  VIR_Uniform        *pUniform,
+    IN  gctUINT             arrayOffset
     );
 
 gctBOOL
@@ -7787,6 +7838,29 @@ VirShader_GenInvocationIndex(
 #define SYMB_SIG    gcmCC('S', 'Y', 'M', 'B')
 #define INST_SIG    gcmCC('I', 'N', 'S', 'T')
 #define DBUG_SIG    gcmCC('D', 'B', 'U', 'G')
+
+/* Those functions are used in the PASS only. */
+VSC_ErrCode
+VIR_Pass_RemoveInstruction(
+    IN VIR_Function*    pFunction,
+    IN VIR_Instruction* pInst,
+    INOUT gctBOOL*      pInvalidCFG
+    );
+
+VSC_ErrCode
+VIR_Pass_DeleteInstruction(
+    IN VIR_Function*    pFunction,
+    IN VIR_Instruction* pInst,
+    INOUT gctBOOL*      pInvalidCFG
+    );
+
+VSC_ErrCode
+VIR_Pass_MoveInstructionBefore(
+    IN VIR_Function*    pMoveFunction,
+    IN VIR_Instruction* pBeforeMe,
+    IN VIR_Instruction* pInst,
+    INOUT gctBOOL*      pInvalidCFG
+    );
 
 END_EXTERN_C()
 

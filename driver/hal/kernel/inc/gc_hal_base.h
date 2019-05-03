@@ -58,6 +58,7 @@
 
 #include "gc_hal_enum.h"
 #include "gc_hal_types.h"
+#include "gc_hal_debug_zones.h"
 
 
 #ifdef __cplusplus
@@ -141,13 +142,14 @@ typedef struct _gcsNN_FIXED_FEATURE
     gctUINT  nnLanesPerOutCycle;
     gctUINT  maxOTNumber;
     gctUINT  equivalentVipsramWidthInByte;
+    gctUINT  shaderCoreCount;
 } gcsNN_FIXED_FEATURE;
 
 /* Features can be customized from outside */
 typedef struct _gcsNN_CUSTOMIZED_FEATURE
 {
-    gctUINT  vipSRAMSizeInKB;
-    gctUINT  axiSRAMSizeInKB;
+    gctUINT  vipSRAMSize;
+    gctUINT  axiSRAMSize;
     gctFLOAT ddrReadBWLimit;
     gctFLOAT ddrWriteBWLimit;
     gctFLOAT ddrTotalBWLimit;
@@ -194,6 +196,8 @@ typedef struct _gcsNN_UNIFIED_FEATURE
     gctUINT  smallBatchEnable : 1;
     gctUINT  axiSramOnlySWTiling : 1;
     gctUINT  imageNotPackedInSram : 1;
+    gctUINT  coefDeltaCordOverFlowZRL8BitFix : 1;
+    gctUINT  xyOffsetLimitationFix : 1;
 } gcsNN_UNIFIED_FEATURE;
 
 /* Features are derived from above ones */
@@ -377,6 +381,7 @@ typedef enum _gcePOOL
     gcvPOOL_LOCAL_EXTERNAL,
     gcvPOOL_UNIFIED,
     gcvPOOL_SYSTEM,
+    gcvPOOL_SRAM,
     gcvPOOL_VIRTUAL,
     gcvPOOL_USER,
 
@@ -3200,26 +3205,14 @@ gcoOS_GetDebugLevel(
     );
 
 void
-gcoOS_SetDebugZone(
-    IN gctUINT32 Zone
-    );
-
-void
 gcoOS_GetDebugZone(
     IN gctUINT32 Zone,
     OUT gctUINT32_PTR DebugZone
     );
 
 void
-gcoOS_SetDebugLevelZone(
-    IN gctUINT32 Level,
+gcoOS_SetDebugZone(
     IN gctUINT32 Zone
-    );
-
-void
-gcoOS_SetDebugZones(
-    IN gctUINT32 Zones,
-    IN gctBOOL Enable
     );
 
 void
@@ -3347,80 +3340,6 @@ gcoOS_DebugTrace(
 #   define gcmkTRACE            __dummy_trace
 #   define gcmkTRACE_N          __dummy_trace_n
 #endif
-
-/* Zones common for kernel and user. */
-#define gcvZONE_OS              (1 << 0)
-#define gcvZONE_HARDWARE        (1 << 1)
-#define gcvZONE_HEAP            (1 << 2)
-#define gcvZONE_SIGNAL          (1 << 3)
-
-/* Kernel zones. */
-#define gcvZONE_KERNEL          (1 << 4)
-#define gcvZONE_VIDMEM          (1 << 5)
-#define gcvZONE_COMMAND         (1 << 6)
-#define gcvZONE_DRIVER          (1 << 7)
-#define gcvZONE_CMODEL          (1 << 8)
-#define gcvZONE_MMU             (1 << 9)
-#define gcvZONE_EVENT           (1 << 10)
-#define gcvZONE_DEVICE          (1 << 11)
-#define gcvZONE_DATABASE        (1 << 12)
-#define gcvZONE_INTERRUPT       (1 << 13)
-#define gcvZONE_POWER           (1 << 14)
-#define gcvZONE_ASYNC_COMMAND   (1 << 15)
-#define gcvZONE_ALLOCATOR       (1 << 16)
-
-/* User zones. */
-#define gcvZONE_HAL             (1 << 4)
-#define gcvZONE_BUFFER          (1 << 5)
-#define gcvZONE_CONTEXT         (1 << 6)
-#define gcvZONE_SURFACE         (1 << 7)
-#define gcvZONE_INDEX           (1 << 8)
-#define gcvZONE_STREAM          (1 << 9)
-#define gcvZONE_TEXTURE         (1 << 10)
-#define gcvZONE_2D              (1 << 11)
-#define gcvZONE_3D              (1 << 12)
-#define gcvZONE_COMPILER        (1 << 13)
-#define gcvZONE_MEMORY          (1 << 14)
-#define gcvZONE_STATE           (1 << 15)
-#define gcvZONE_AUX             (1 << 16)
-#define gcvZONE_VERTEX          (1 << 17)
-#define gcvZONE_CL              (1 << 18)
-#define gcvZONE_VG              (1 << 19)
-#define gcvZONE_VX              (1 << 20)
-#define gcvZONE_IMAGE           (1 << 21)
-#define gcvZONE_UTILITY         (1 << 22)
-#define gcvZONE_PARAMETERS      (1 << 23)
-#define gcvZONE_BUFOBJ          (1 << 24)
-#define gcvZONE_SHADER          (1 << 25)
-#define gcvZONE_STREAM_OUT      (1 << 26)
-
-/* API definitions. */
-#define gcvZONE_API_HAL         ((gctUINT32) 1  << 28)
-#define gcvZONE_API_EGL         ((gctUINT32) 2  << 28)
-#define gcvZONE_API_ES11        ((gctUINT32) 3  << 28)
-#define gcvZONE_API_ES20        ((gctUINT32) 4  << 28)
-#define gcvZONE_API_ES30        ((gctUINT32) 4  << 28)
-#define gcvZONE_API_VG11        ((gctUINT32) 5  << 28)
-#define gcvZONE_API_GL          ((gctUINT32) 6  << 28)
-#define gcvZONE_API_DFB         ((gctUINT32) 7  << 28)
-#define gcvZONE_API_GDI         ((gctUINT32) 8  << 28)
-#define gcvZONE_API_D3D         ((gctUINT32) 9  << 28)
-#define gcvZONE_API_CL          ((gctUINT32) 10 << 28)
-#define gcvZONE_API_VX          ((gctUINT32) 11 << 28)
-
-
-#define gcmZONE_GET_API(zone)   ((zone) >> 28)
-/*Set gcdZONE_MASE like 0x0 | gcvZONE_API_EGL
-will enable print EGL module debug info*/
-#define gcdZONE_MASK            0x0FFFFFFF
-
-/* Handy zones. */
-#define gcvZONE_NONE            0
-#define gcvZONE_ALL             0x0FFFFFFF
-
-/*Dump API depth set 1 for API, 2 for API and API behavior*/
-#define gcvDUMP_API_DEPTH       1
-
 
 /*******************************************************************************
 **
@@ -4539,8 +4458,8 @@ gckOS_Verify(
         } \
         while (gcvFALSE)
 #else
-#   define gcmVERIFY_OK(func)       (void)func
-#   define gcmkVERIFY_OK(func)      (void)func
+#   define gcmVERIFY_OK(func)       func
+#   define gcmkVERIFY_OK(func)      func
 #endif
 
 gctCONST_STRING

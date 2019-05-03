@@ -13,6 +13,8 @@
 
 #include "gc_vg_precomp.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG_ARC
+
 static VGfloat _Angle(
     vgsCONTEXT_PTR Context,
     VGfloat Ux,

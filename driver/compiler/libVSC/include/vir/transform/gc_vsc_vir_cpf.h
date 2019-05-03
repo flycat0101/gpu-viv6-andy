@@ -22,8 +22,9 @@
 #include "gc_vsc.h"
 #include "gc_vsc_vir_loop.h"
 
-#define     VSC_CPF_MAX_TEMP        3072
-#define     VSC_CPF_MAX_INST_COUNT  3400
+#define VSC_CPF_MAX_TEMP                    3072
+#define VSC_CPF_MAX_INST_COUNT_GENERAL      3400
+#define VSC_CPF_MAX_INST_COUNT_DEQP         2048
 
 BEGIN_EXTERN_C()
 
@@ -50,6 +51,7 @@ typedef struct _VSC_CPF_BLOCK_FLOW
 
 typedef struct _VSC_CPF
 {
+    gcePATCH_ID                 appNameId;
     VIR_Shader                  *pShader;
     VSC_HW_CONFIG               *pHwCfg;
     VSC_OPTN_CPFOptions         *pOptions;
@@ -67,6 +69,8 @@ typedef struct _VSC_CPF
     VIR_LoopOpts                loopOpts;
 } VSC_CPF;
 
+#define VSC_CPF_GetAppNameId(cpf)               ((cpf)->appNameId)
+#define VSC_CPF_SetAppNameId(cpf, s)            ((cpf)->appNameId = (s))
 #define VSC_CPF_GetShader(cpf)                  ((cpf)->pShader)
 #define VSC_CPF_SetShader(cpf, s)               ((cpf)->pShader = (s))
 #define VSC_CPF_GetHwCfg(cpf)                   ((cpf)->pHwCfg)

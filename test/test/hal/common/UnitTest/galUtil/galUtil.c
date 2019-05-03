@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -2886,8 +2886,8 @@ gceSTATUS CDECL GalPackStream(
                 case gcvSURF_PACKED8:
                     if (GalIsBigEndian())
                     {
-                        * (gctUINT8_PTR) gcmINT2PTR((gcmPTR2INT(destByte) & (~3)) + (3 - (gcmPTR2INT(destByte) % 4))) =
-                            * (gctUINT8_PTR) gcmINT2PTR((gcmPTR2INT(srcByte) & (~3)) + (3 - (gcmPTR2INT(srcByte) % 4)));
+                        * (gctUINT8_PTR) gcmINT2PTR((gcmPTR2SIZE(destByte) & (~3)) + (3 - (gcmPTR2SIZE(destByte) % 4))) =
+                            * (gctUINT8_PTR) gcmINT2PTR((gcmPTR2SIZE(srcByte) & (~3)) + (3 - (gcmPTR2SIZE(srcByte) % 4)));
                     }
                     else
                     {
@@ -2898,8 +2898,8 @@ gceSTATUS CDECL GalPackStream(
                 case gcvSURF_PACKED16:
                     if (GalIsBigEndian())
                     {
-                        * (gctUINT16_PTR) gcmINT2PTR((gcmPTR2INT(destByte) & (~3)) + (2 - (gcmPTR2INT(destByte) % 4))) =
-                            * (gctUINT16_PTR) gcmINT2PTR((gcmPTR2INT(srcByte) & (~3)) + (2 - (gcmPTR2INT(srcByte) % 4)));
+                        * (gctUINT16_PTR) gcmINT2PTR((gcmPTR2SIZE(destByte) & (~3)) + (2 - (gcmPTR2SIZE(destByte) % 4))) =
+                            * (gctUINT16_PTR) gcmINT2PTR((gcmPTR2SIZE(srcByte) & (~3)) + (2 - (gcmPTR2SIZE(srcByte) % 4)));
                     }
                     else
                     {
@@ -3600,7 +3600,7 @@ gceSTATUS GalCreateTSurfWithPool(
         break;
 
     default:
-        alignedWidth = gcmALIGN(Width, 8);
+        alignedWidth = gcmALIGN(Width, 16);
         alignedHeight = gcmALIGN(Height, 1);
         break;
     }
@@ -3779,7 +3779,8 @@ gceSTATUS GalCreateTSurfWithPool(
         aligned = gcmALIGN_NP2(aligned, 80);
     }
     else if (gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_2D_YUV420_OUTPUT_LINEAR) &&
-             (Format == gcvSURF_NV12 || Format == gcvSURF_NV21))
+             (Format == gcvSURF_NV12 || Format == gcvSURF_NV21 || Format == gcvSURF_YV12 ||
+              Format == gcvSURF_NV16 || Format == gcvSURF_NV61 || Format == gcvSURF_I420))
     {
         alignedStride = gcmALIGN(alignedStride, 64);
         aligned = gcmALIGN(aligned, 64);
@@ -4083,13 +4084,20 @@ gceSTATUS GalCreateTSurfWithPool(
                 surf->address[1] = gcmALIGN(surf->address[0] + size, aligned);
                 delta = surf->address[1] - surf->address[0] - size;
                 surf->logical[1] = GAL_POINTER_OFFSET(surf->logical[0], size + delta);
-                surf->stride[1] = alignedWidth >> 1;
-
+                if(gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_2D_YUV420_OUTPUT_LINEAR))
+                {
+                    /*I420 and YV12 UV stride must be 32 bytes alignment*/
+                    surf->stride[1] = gcmALIGN(alignedWidth >> 1, 32);
+                    surf->stride[2] = gcmALIGN(alignedWidth >> 1, 32);
+                } else
+                {
+                    surf->stride[1] = alignedWidth >> 1;
+                    surf->stride[2] = alignedWidth >> 1;
+                }
                 size >>= 2;
                 surf->address[2] = gcmALIGN(surf->address[1] + size, aligned);
                 delta = surf->address[2] - surf->address[1] - size;
                 surf->logical[2] = GAL_POINTER_OFFSET(surf->logical[1], size + delta);
-                surf->stride[2] = alignedWidth >> 1;
             }
             break;
 
@@ -4419,6 +4427,14 @@ gceSTATUS GalLoadVimgToTSurfWithPool(
         VIMG_V2 *v2 = gcvNULL;
         VIMG_V2 vhead;
 
+        gctUINT32 width[3] = {0, 0, 0};
+        gctUINT32 height[3] = {0, 0, 0};
+        gctUINT32 lineSize;
+        gctUINT32 bpp[3] = {0, 0, 0};
+        gctUINT nPlane, i;
+        gctBOOL swap = gcvFALSE;
+        gceSURF_FORMAT format;
+
         gceTILING tiling;
         gce2D_TILE_STATUS_CONFIG tsc = gcv2D_TSC_DISABLE;
         gctUINT n;
@@ -4468,6 +4484,75 @@ gceSTATUS GalLoadVimgToTSurfWithPool(
         {
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         }
+        format = v1->format;
+        switch (format)
+        {
+        case gcvSURF_I420:
+            nPlane = 3;
+            width[0] = v1->imageWidth;
+            height[0] = v1->imageHeight;
+            bpp[0] = 1;
+            width[1] = width[2] = v1->imageWidth / 2;
+            height[1] = height[2] = v1->imageHeight / 2;
+            bpp[1] = bpp[2] = 1;
+            break;
+
+        case gcvSURF_YV12:
+            nPlane = 3;
+            width[0] = v1->imageWidth;
+            height[0] = v1->imageHeight;
+            bpp[0] = 1;
+            width[1] = width[2] = v1->imageWidth / 2;
+            height[1] = height[2] = v1->imageHeight / 2;
+            bpp[1] = bpp[2] = 1;
+            swap = gcvTRUE;
+            break;
+
+        case gcvSURF_NV16:
+            nPlane = 2;
+            width[0] = v1->imageWidth;
+            height[0] = v1->imageHeight;
+            bpp[0] = 1;
+            width[1] = v1->imageWidth / 2;
+            height[1] = v1->imageHeight;
+            bpp[1] = 2;
+            break;
+
+        case gcvSURF_NV12:
+            format = gcvSURF_NV12;
+            nPlane = 2;
+            width[0] = v1->imageWidth;
+            height[0] = v1->imageHeight;
+            bpp[0] = 1;
+            width[1] = v1->imageWidth / 2;
+            height[1] = v1->imageHeight / 2;
+            bpp[1] = 2;
+            break;
+
+        case gcvSURF_NV21:
+            nPlane = 2;
+            width[0] = v1->imageWidth;
+            height[0] = v1->imageHeight;
+            bpp[0] = 1;
+            width[1] = v1->imageWidth / 2;
+            height[1] = v1->imageHeight / 2;
+            bpp[1] = 2;
+            break;
+
+        case gcvSURF_NV61:
+            nPlane = 2;
+            width[0] = v1->imageWidth;
+            height[0] = v1->imageHeight;
+            bpp[0] = 1;
+            width[1] = v1->imageWidth / 2;
+            height[1] = v1->imageHeight;
+            bpp[1] = 2;
+            break;
+
+        default:
+            /*do nothing*/
+            break;
+        }
 
         gcmONERROR(gcoOS_Seek(
             NULL,
@@ -4506,86 +4591,187 @@ gceSTATUS GalLoadVimgToTSurfWithPool(
                 v1->bitsOffset,
                 gcvFILE_SEEK_SET
                 ));
+        /*write YUV planar format data*/
+        if(format >= gcvSURF_YV12 && format <= gcvSURF_NV61)
+        {
 
-    if (!GalIsBigEndian() || v2 != gcvNULL)
-    {
-        gcmONERROR(gcoOS_Read(
-            gcvNULL,
-            file,
-            surf->vNode.size,
-            surf->logical[0],
-            gcvNULL
-            ));
+            lineSize = width[0] * bpp[0];
+            for (n = 0; n < height[0]; n++)
+            {
+                /* Fill plane 1. */
+                gctUINT8_PTR p = (gctUINT8_PTR)surf->logical[0] + n * surf->stride[0];
+
+                gcmONERROR(gcoOS_Read(
+                        gcvNULL,
+                        file,
+                        lineSize,
+                        p,
+                        gcvNULL
+                        ));
+
+                if (GalIsBigEndian() && (bpp[0] == 2))
+                {
+                    gctUINT16 *s = (gctUINT16 *)p;
+
+                    for (i = 0; i < lineSize; i += 2)
+                    {
+                        *s = swap_word(*s);
+                        s++;
+                    }
+                }
+            }
+
+
+            if (nPlane > 1)
+            {
+                gctUINT aStride1 = surf->stride[1];
+                gctUINT lineSize1 = width[1] * bpp[1];
+
+                if (surf->logical[1] == gcvNULL)
+                {
+                    gcmONERROR(gcvSTATUS_INVALID_DATA);
+                }
+
+                for (n = 0; n < height[1]; n++)
+                {
+                    /* Fill plane 2. */
+                    gctUINT8_PTR p = (gctUINT8_PTR)surf->logical[swap ? 2 : 1] + n * aStride1;
+
+                    gcmONERROR(gcoOS_Read(
+                            gcvNULL,
+                            file,
+                            lineSize1,
+                            p,
+                            gcvNULL
+                            ));
+
+                    if (GalIsBigEndian() && (bpp[1] == 2))
+                    {
+                        gctUINT16 *s = (gctUINT16 *)p;
+
+                        for (i = 0; i < lineSize1; i += 2)
+                        {
+                            *s = swap_word(*s);
+                            s++;
+                        }
+                    }
+                }
+
+                if (nPlane > 2)
+                {
+                    gctUINT aStride2;
+                    gctUINT lineSize2;
+
+                    if (nPlane != 3)
+                    {
+                        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+                    }
+
+                    if (surf->logical[2] == gcvNULL)
+                    {
+                        gcmONERROR(gcvSTATUS_INVALID_DATA);
+                    }
+
+                    aStride2 = surf->stride[2];
+                    lineSize2 = width[2] * bpp[2];
+                    for (n = 0; n < height[2]; n++)
+                    {
+                        /* Fill plane 3. */
+                        gctUINT8_PTR p = (gctUINT8_PTR)surf->logical[swap ? 1 : 2] + n * aStride2;
+
+                        gcmONERROR(gcoOS_Read(
+                                gcvNULL,
+                                file,
+                                lineSize2,
+                                p,
+                                gcvNULL
+                                ));
+
+                        if (GalIsBigEndian() && (bpp[2] == 2))
+                        {
+                            gctUINT16 *s = (gctUINT16 *)p;
+
+                            for (i = 0; i < lineSize2; i += 2)
+                            {
+                                *s = swap_word(*s);
+                                s++;
+                            }
+                        }
+                    }
+                }
+            }
     }
     else
+    /* non-YUV_planar format */
     {
-        switch (v1->imageStride / v1->imageWidth)
+        if (!GalIsBigEndian() || v2 != gcvNULL)
         {
-        case 1:
             gcmONERROR(gcoOS_Read(
                 gcvNULL,
                 file,
                 surf->vNode.size,
-                surf->vNode.memory,
+                surf->logical[0],
                 gcvNULL
-                   ));
-            break;
-
-        case 2:
-            {
-            unsigned short* p = (unsigned short*) surf->vNode.memory;
-            int n = surf->vNode.size / 2;
-            while (n > 0)
-            {
-                *p = read_word(file);
-                p++;
-                n--;
-            }
-            }
-            break;
-
-        case 3:
-            {
-            unsigned char* p = (unsigned char*) surf->vNode.memory;
-            int n = surf->vNode.size / 3;
-            while (n > 0)
-            {
-                *(p + 2) = read_byte(file);
-                *(p + 1) = read_byte(file);
-                *(p)     = read_byte(file);
-                p += 3;
-                n--;
-            }
-            }
-            break;
-
-        case 4:
-            {
-            unsigned int* p = (unsigned int*) surf->vNode.memory;
-            int n = surf->vNode.size / 4;
-            while (n > 0)
-            {
-                *p = read_dword(file);
-                p++;
-                n--;
-            }
-            }
-            break;
+                ));
         }
-    }
+        else
+        {
+            switch (v1->imageStride / v1->imageWidth)
+            {
+            case 1:
+                gcmONERROR(gcoOS_Read(
+                    gcvNULL,
+                    file,
+                    surf->vNode.size,
+                    surf->vNode.memory,
+                    gcvNULL
+                       ));
+                break;
 
-    if (surf->format == gcvSURF_YV12)
-    {
-        gctUINT32 phyT;
-        gctPOINTER logT;
-        phyT = surf->address[1];
-        surf->address[1] = surf->address[2];
-        surf->address[2] = phyT;
+            case 2:
+                {
+                unsigned short* p = (unsigned short*) surf->vNode.memory;
+                int n = surf->vNode.size / 2;
+                while (n > 0)
+                {
+                    *p = read_word(file);
+                    p++;
+                    n--;
+                }
+                }
+                break;
 
-        logT = surf->logical[1];
-        surf->logical[1] = surf->logical[2];
-        surf->logical[2] = logT;
-    }
+            case 3:
+                {
+                unsigned char* p = (unsigned char*) surf->vNode.memory;
+                int n = surf->vNode.size / 3;
+                while (n > 0)
+                {
+                    *(p + 2) = read_byte(file);
+                    *(p + 1) = read_byte(file);
+                    *(p)     = read_byte(file);
+                    p += 3;
+                    n--;
+                }
+                }
+                break;
+
+            case 4:
+                {
+                unsigned int* p = (unsigned int*) surf->vNode.memory;
+                int n = surf->vNode.size / 4;
+                while (n > 0)
+                {
+                    *p = read_dword(file);
+                    p++;
+                    n--;
+                }
+                }
+                break;
+            }
+        }
+
+        }
 
         if (v2 != gcvNULL)
         {
@@ -4918,6 +5104,8 @@ gceSTATUS CDECL GalLoadVimgToSurface(
         gcmONERROR(gcoSURF_GetAlignedSize(surf, &alignedWidth,
             &alignedHeight, &alignedStride));
 
+        aStride = (gctUINT32)((gctFLOAT)alignedWidth * bpp[0]);
+        lineSize = (gctUINT32)((gctFLOAT)width[0] * bpp[0]);
         gcmONERROR(gcoSURF_Lock(surf, address, memory));
 
         {
@@ -4972,9 +5160,13 @@ gceSTATUS CDECL GalLoadVimgToSurface(
         {
             gcmONERROR(gcvSTATUS_INVALID_DATA);
         }
+        if(gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_2D_YUV420_OUTPUT_LINEAR))
+        {
+            if(head.format == gcvSURF_YV12 || head.format == gcvSURF_I420 || head.format == gcvSURF_NV12 ||
+                 head.format == gcvSURF_NV21 || head.format == gcvSURF_NV16 || head.format == gcvSURF_NV61)
+                aStride = alignedStride;
+        }
 
-        aStride = (gctUINT32)((gctFLOAT)alignedWidth * bpp[0]);
-        lineSize = (gctUINT32)((gctFLOAT)width[0] * bpp[0]);
 
         gcmONERROR(gcoOS_Seek(
                 gcvNULL,
@@ -5012,6 +5204,16 @@ gceSTATUS CDECL GalLoadVimgToSurface(
         {
             gctUINT aStride1 = (gctUINT32)((gctFLOAT)(alignedWidth/2) * bpp[1]);
             gctUINT lineSize1 = (gctUINT32)((gctFLOAT)width[1] * bpp[1]);
+
+            if(gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_2D_YUV420_OUTPUT_LINEAR))
+            {
+
+                if(head.format == gcvSURF_YV12 || head.format == gcvSURF_I420)
+                    aStride1 = alignedStride / 2;
+                else if(head.format == gcvSURF_NV12 || head.format == gcvSURF_NV21 ||
+                    head.format == gcvSURF_NV16 || head.format == gcvSURF_NV61)
+                    aStride1 = alignedStride;
+            }
 
             if (memory[1] == gcvNULL)
             {
@@ -5060,6 +5262,14 @@ gceSTATUS CDECL GalLoadVimgToSurface(
 
                 aStride2 = (gctUINT32)((alignedWidth/2) * bpp[2]);
                 lineSize2 = (gctUINT32)(width[2] * bpp[2]);
+                if(gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_2D_YUV420_OUTPUT_LINEAR))
+                {
+                    if(head.format == gcvSURF_YV12 || head.format == gcvSURF_I420)
+                        aStride2 = alignedStride / 2;
+                    else if(head.format == gcvSURF_NV12 || head.format == gcvSURF_NV21 ||
+                        head.format == gcvSURF_NV16 || head.format == gcvSURF_NV61)
+                        aStride2 = alignedStride;
+                }
                 for (n = 0; n < height[2]; n++)
                 {
                     /* Fill plane 3. */
@@ -6546,7 +6756,7 @@ ConvertToGalTiling(
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
 
-    if (tiling == gcvSUPERTILED)
+    if (tiling & gcvSUPERTILED)
     {
         switch (GETBITS(Value, G2D_TILING_SUPERTILE_VERSION_START,
                     G2D_TILING_SUPERTILE_VERSION_END))
@@ -7998,6 +8208,7 @@ const struct FeatureInfo
     {"gcvFEATURE_2D_YUV420_OUTPUT_LINEAR " , "2D YUV420 output", gcvFEATURE_2D_YUV420_OUTPUT_LINEAR, gcvFALSE},
     {"gcvFEATURE_TPCV11_COMPRESSION " , "TPCv11 compression", gcvFEATURE_TPCV11_COMPRESSION, gcvFALSE},
     {"gcvFEATURE_DEC400_COMPRESSION " , "DEC400 compression", gcvFEATURE_DEC400_COMPRESSION, gcvFALSE},
+    {"gcvFEATURE_2D_FAST_CLEAR " , "2D tilestatus Fast Clear", gcvFEATURE_2D_FAST_CLEAR, gcvFALSE},
 };
 
 gceSTATUS GalQueryFeatureStr(

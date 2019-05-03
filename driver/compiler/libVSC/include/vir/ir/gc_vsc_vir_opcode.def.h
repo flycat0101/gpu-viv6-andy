@@ -14,7 +14,6 @@
 #define HasDest             VIR_OPFLAG_HasDest
 #define NoDest              VIR_OPFLAG_NoDest
 #define Transcendental      VIR_OPFLAG_Transcendental
-#define IntegerOnly         VIR_OPFLAG_IntegerOnly
 #define ControlFlow         VIR_OPFLAG_ControlFlow
 #define VX1                 VIR_OPFLAG_VX1
 #define VX2                 VIR_OPFLAG_VX2
@@ -492,10 +491,14 @@
        src0 <- addr, src1 <- offset
            LOAD dest, src0, src1 */
     VIR_OPINFO(LOAD, 2, HasDest|Loads|Expr, 1, AL),
+    /* Same as LOAD, expect for that the instruction type is same as the dest type. */
+    VIR_OPINFO(LOAD_D, 2, HasDest|Loads|Expr, 1, HL),
     /* memory store, with pre-operation: addr[offset] = val
        src0 <- addr, src1 <- offset, val <- src2, dest used as buffer for USC constrain
             STORE  dest, src0, src1, src2 */
     VIR_OPINFO(STORE, 3, HasDest|Stores|Src2Componentwise|EPFromS2, 1, AL),
+    /* Same as STORE, expect for that the instruction type is same as the dest type. */
+    VIR_OPINFO(STORE_D, 3, HasDest|Stores|Src2Componentwise|EPFromS2, 1, HL),
     /* load address, dest = addr + offset
             LDA dest, src0, src1 */
     VIR_OPINFO(LDA, 2, HasDest|Expr, 1, NU),
@@ -1289,7 +1292,7 @@
      * are performed. Currently, this instruction can work only on local-storage, no
      * global memory support.
      */
-    VIR_OPINFO(VX_SCATTER, 4, NoDest|Expr|VX2|EVISModifier(3), 0, AL),
+    VIR_OPINFO(VX_SCATTER, 4, HasDest|Expr|VX2|EVISModifier(3), 1, AL),
 
     /* SCATTER_B dest, BaseAddr, Offsets, Offsets_b, Data, Modifier(StartBin, EndBin, SoureBin, OffsetType)
      * Store multiple bins of data (source_2) to different memory offsets (source_1) with
@@ -1298,7 +1301,7 @@
      * global memory support.
      * It take stemp256 as two offsets source, src1 is the tmp256.hi, src2 is the tmp256.lo
      */
-    VIR_OPINFO(VX_SCATTER_B, 5, NoDest|Expr|VX2|EVISModifier(4), 0, AL),
+    VIR_OPINFO(VX_SCATTER_B, 5, HasDest|Expr|VX2|EVISModifier(4), 1, AL),
 
     /* ATOMIC_S dest, BaseAddr, Offsets, AtomicData, Modifier(StartBin, EndBin, SoureBin, OffsetType)
      * Load multiple bins of data from different memory offsets (source_1) with same base
@@ -1434,7 +1437,6 @@
 #undef HasDest
 #undef NoDest
 #undef Transcendental
-#undef IntegerOnly
 #undef ControlFlow
 #undef UseCondCode
 #undef Componentwise

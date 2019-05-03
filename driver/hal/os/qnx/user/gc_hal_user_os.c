@@ -1940,6 +1940,12 @@ gcoOS_Allocate(
 {
     gceSTATUS status;
 
+    /*
+     * The max of all additions to Bytes in following functions,
+     * which is gcmSIZEOF(gcsHEAP) (16 bytes) + gcmSIZEOF(gcsNODE) (16 bytes)
+     */
+    gctSIZE_T bytesToAdd = 32;
+
     gcmHEADER_ARG("Bytes=%lu", Bytes);
 
     /* Special wrapper when gcPLS.os is gcvNULL. */
@@ -1961,6 +1967,13 @@ gcoOS_Allocate(
         /* Verify the arguments. */
         gcmDEBUG_VERIFY_ARGUMENT(Bytes > 0);
         gcmDEBUG_VERIFY_ARGUMENT(Memory != gcvNULL);
+
+        /* Make sure Bytes doesn't exceed MAX_SIZET after additions */
+        if (Bytes > gcvMAXSIZE_T - bytesToAdd)
+        {
+            gcmFOOTER_ARG("%d", gcvSTATUS_DATA_TOO_LARGE);
+            return gcvSTATUS_DATA_TOO_LARGE;
+        }
 
         if ((gcPLS.os != gcvNULL) && (gcPLS.os->heap != gcvNULL))
         {
@@ -2887,11 +2900,16 @@ gcoOS_Read(
     if (ByteRead != gcvNULL)
     {
         *ByteRead = (gctSIZE_T) byteRead;
+        /* Success. */
+        gcmFOOTER_ARG("*ByteRead=%lu", gcmOPT_VALUE(ByteRead));
+        return gcvSTATUS_OK;
     }
-
-    /* Success. */
-    gcmFOOTER_ARG("*ByteRead=%lu", gcmOPT_VALUE(ByteRead));
-    return gcvSTATUS_OK;
+    else
+    {
+        /* Failure. */
+        gcmFOOTER_ARG("%d", gcvSTATUS_TRUE);
+        return gcvSTATUS_TRUE;
+    }
 }
 
 /*******************************************************************************
@@ -3397,6 +3415,7 @@ gcoOS_GetPos(
     OUT gctUINT32 * Position
     )
 {
+    gctINT64 ret;
     gcmHEADER_ARG("File=0x%x", File);
 
     /* Verify the arguments. */
@@ -3404,11 +3423,31 @@ gcoOS_GetPos(
     gcmDEBUG_VERIFY_ARGUMENT(Position != gcvNULL);
 
     /* Get the current file position. */
-    *Position = ftell((FILE *) File);
+    ret = ftell((FILE *) File);
 
-    /* Success. */
-    gcmFOOTER_ARG("*Position=%u", *Position);
-    return gcvSTATUS_OK;
+    /* Check if ftell encounters error. */
+    if (ret == -1)
+    {
+        gcmFOOTER_ARG("%d", gcvSTATUS_TRUE);
+        return gcvSTATUS_TRUE;
+    }
+    /* If no error, ret contains a file size of a positive number.
+       Check if this file size is supported.
+       Since file size will be stored in UINT32, up to 2^32 = 4Gb is supported.
+    */
+    else if (ret >= gcvMAXUINT32)
+    {
+        gcmFOOTER_ARG("%d", gcvSTATUS_DATA_TOO_LARGE);
+        return gcvSTATUS_DATA_TOO_LARGE;
+    }
+    else
+    {
+        /* Now we're sure file size takes <= 32 bit and cast it to UINT32 safely. */
+        *Position = (gctUINT32) ret;
+
+        gcmFOOTER_ARG("*Position=%u", *Position);
+        return gcvSTATUS_OK;
+    }
 }
 
 /*******************************************************************************
@@ -4071,11 +4110,17 @@ gcoOS_StrCatSafe(
 
         /* Put this there in case the strncpy overflows. */
         Destination[DestinationSize - 1] = '\0';
-    }
 
-    /* Success. */
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
+        /* Success. */
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+    else
+    {
+        /* Failure */
+        gcmFOOTER_ARG("%d", gcvSTATUS_TRUE);
+        return gcvSTATUS_TRUE;
+    }
 }
 
 /*******************************************************************************

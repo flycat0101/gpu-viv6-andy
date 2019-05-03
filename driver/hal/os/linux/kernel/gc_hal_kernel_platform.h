@@ -83,6 +83,8 @@ typedef struct _gcsMODULE_PARAMETERS
 
     /* SRAM. */
     gctPHYS_ADDR_T          sRAMBases[gcvCORE_COUNT][gcvSRAM_COUNT];
+    gctUINT32               sRAMSizes[gcvCORE_COUNT][gcvSRAM_COUNT];
+    gctUINT32               sRAMMode;
 
     gctPHYS_ADDR_T          baseAddress;
     gctSIZE_T               physSize;

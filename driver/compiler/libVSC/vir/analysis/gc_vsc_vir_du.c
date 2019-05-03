@@ -1818,10 +1818,10 @@ static gctBOOL _AddNewUsageToTable(VIR_DEF_USAGE_INFO* pDuInfo,
 
                             /* On some HW, there is no per-component dependence support for LD/ST/TEXLD def.
                                For ST instruction, the def is same as src2 if it is temp. */
-                            if ((VIR_OPCODE_isMemSt(VIR_Inst_GetOpcode(pUsageInst)) ||
-                                 VIR_OPCODE_isImgSt(VIR_Inst_GetOpcode(pUsageInst)) ||
-                                 VIR_OPCODE_isAttrSt(VIR_Inst_GetOpcode(pUsageInst))) &&
-                                VIR_Inst_GetSourceIndex(pUsageInst, pOperand) == 2)
+                            if (VIR_OPCODE_hasStoreOperation(VIR_Inst_GetOpcode(pUsageInst)) &&
+                                ((VIR_OPCODE_useSrc3AsInstType(VIR_Inst_GetOpcode(pUsageInst)) && VIR_Inst_GetSourceIndex(pUsageInst, pOperand) == 3)
+                                 ||
+                                 (!VIR_OPCODE_useSrc3AsInstType(VIR_Inst_GetOpcode(pUsageInst)) && VIR_Inst_GetSourceIndex(pUsageInst, pOperand) == 2)))
                             {
                                 pDef->flags.deducedDefFlags.bHasUsageOnFalseDepInst = gcvTRUE;
                             }

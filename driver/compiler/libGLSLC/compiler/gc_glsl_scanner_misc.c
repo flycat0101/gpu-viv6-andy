@@ -556,9 +556,9 @@ slScanIdentifier(
     slsNAME *       typeName;
     gctSIZE_T       length = 0;
 
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "LineNo=%u", LineNo);
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "StringNo=%u", StringNo);
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "Symbol=%s", gcmOPT_STRING(Symbol));
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "LineNo=%u", LineNo);
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "StringNo=%u", StringNo);
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "Symbol=%s", gcmOPT_STRING(Symbol));
 
     gcmASSERT(Token);
 

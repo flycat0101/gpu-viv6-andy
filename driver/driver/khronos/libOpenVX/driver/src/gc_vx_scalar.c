@@ -15,6 +15,8 @@
 #include <gc_hal_user_precomp.h>
 #include <gc_hal_vx.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_SCALAR
+
 VX_INTERNAL_API vx_enum vxoScalar_GetDataType(vx_scalar scalar)
 {
     return scalar->dataType;
@@ -172,10 +174,18 @@ VX_INTERNAL_API void vxoScalar_Dump(vx_scalar scalar)
 
 VX_PRIVATE_API vx_status vxoScalar_CommitValue(vx_scalar scalar, const void *ptr)
 {
-    if (!vxoReference_IsValidAndSpecific(&scalar->base,VX_TYPE_SCALAR)) return VX_ERROR_INVALID_REFERENCE;
+    gcmHEADER_ARG("scalar=%p, ptr=%p", scalar, ptr);
 
-    if (ptr == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
-
+    if (!vxoReference_IsValidAndSpecific(&scalar->base,VX_TYPE_SCALAR))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+    if (ptr == VX_NULL)
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
     vxAcquireMutex(scalar->base.lock);
 
     if(vxmIS_SCALAR(scalar->dataType))
@@ -253,7 +263,7 @@ VX_PRIVATE_API vx_status vxoScalar_CommitValue(vx_scalar scalar, const void *ptr
 
                 vxError("The value type of the scalar, %p->%d, is not supported", scalar, scalar->dataType);
                 vxmASSERT(0);
-
+                gcmFOOTER_NO();
                 return VX_ERROR_NOT_SUPPORTED;
         }
 
@@ -285,7 +295,7 @@ VX_PRIVATE_API vx_status vxoScalar_CommitValue(vx_scalar scalar, const void *ptr
     vxReleaseMutex(scalar->base.lock);
 
     vxoReference_IncrementWriteCount(&scalar->base);
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -294,19 +304,27 @@ VX_INTERNAL_API vx_scalar vxoScalar_Create(vx_context context, vx_enum dataType,
     vx_scalar scalar;
     vx_uint32 dataSize;
     vx_int32 index = vxoContext_GetUserStructIndex(context, dataType);
+    gcmHEADER_ARG("context=%p, dataType=0x%x, ptr=%p, size=0x%x", context, dataType, ptr, size);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (!vxmIS_SCALAR(dataType) && index == -1)
     {
         vxError("The value type, %d, is not a scalar type", dataType);
+        gcmFOOTER_NO();
         return (vx_scalar)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_TYPE);
     }
 
     scalar = (vx_scalar)vxoReference_Create(context, VX_TYPE_SCALAR, VX_REF_EXTERNAL, &context->base);
 
-    if (vxoReference_GetStatus((vx_reference)scalar) != VX_SUCCESS) return scalar;
-
+    if (vxoReference_GetStatus((vx_reference)scalar) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return scalar;
+    }
     scalar->dataType = dataType;
 
     if(vxmIS_SCALAR(dataType))
@@ -328,10 +346,9 @@ VX_INTERNAL_API vx_scalar vxoScalar_Create(vx_context context, vx_enum dataType,
 
     vxoScalar_CommitValue(scalar, (vx_ptr)ptr);
 
+    gcmFOOTER_NO();
     return scalar;
 }
-
-void vxoReference_Destroy(vx_reference ref);
 
 VX_INTERNAL_CALLBACK_API void vxoScalar_Destructor(vx_reference ref)
 {
@@ -356,6 +373,7 @@ VX_API_ENTRY vx_scalar VX_API_CALL vxCreateScalar(vx_context context, vx_enum da
 {
     vx_scalar scalar;
 
+    gcmHEADER_ARG("context=%p, dataType=0x%x, ptr=%p", context, dataType, ptr);
     gcmDUMP_API("$VX vxCreateScalar: context=%p, dataType=0x%x, ptr=%p", context, dataType, ptr);
 
     scalar = vxoScalar_Create(context, dataType, ptr, 0);
@@ -364,11 +382,12 @@ VX_API_ENTRY vx_scalar VX_API_CALL vxCreateScalar(vx_context context, vx_enum da
     {
         vxError("%s[%d]: Get scalar reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&context->base, VX_ERROR_INVALID_REFERENCE, "%s[%d]: Get scalar reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return scalar;
     }
 
     context->memoryCount ++;
-
+    gcmFOOTER_NO();
     return scalar;
 }
 
@@ -381,10 +400,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseScalar(vx_scalar *scalar)
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryScalar(vx_scalar scalar, vx_enum attribute, void *ptr, vx_size size)
 {
+    gcmHEADER_ARG("scalar=%p, attribute=0x%x, ptr=%p, size=0x%lx", scalar, attribute, ptr, size);
     gcmDUMP_API("$VX vxQueryScalar: scalar=%p, attribute=0x%x, ptr=%p, size=0x%lx", scalar, attribute, ptr, size);
 
-    if (!vxoReference_IsValidAndSpecific(&scalar->base,VX_TYPE_SCALAR)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoReference_IsValidAndSpecific(&scalar->base,VX_TYPE_SCALAR))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     switch (attribute)
     {
         case VX_SCALAR_TYPE:
@@ -395,19 +418,23 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryScalar(vx_scalar scalar, vx_enum attri
 
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
+            gcmFOOTER_NO();
             return VX_ERROR_NOT_SUPPORTED;
     }
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
 static vx_status gcoVX_ScalarToHostMem(vx_scalar scalar, void* user_ptr, vx_uint32 size)
 {
     vx_status status = VX_SUCCESS;
+    gcmHEADER_ARG("scalar=%p, user_ptr=%p, size=0x%x", scalar, user_ptr, size);
 
     if (vx_false_e == vxAcquireMutex(scalar->base.lock))
+    {
+        gcmFOOTER_ARG("%d", status);
         return VX_ERROR_NO_RESOURCES;
-
+    }
     //vxPrintScalarValue(scalar);
     if(vxmIS_SCALAR(scalar->dataType))
     {
@@ -449,19 +476,26 @@ static vx_status gcoVX_ScalarToHostMem(vx_scalar scalar, void* user_ptr, vx_uint
 
 
     if (vx_false_e == vxReleaseMutex(scalar->base.lock))
+    {
+        gcmFOOTER_ARG("%d", status);
         return VX_ERROR_NO_RESOURCES;
+    }
 
     vxoReference_IncrementReadCount(&scalar->base);
 
+    gcmFOOTER_ARG("%d", status);
     return status;
 } /* gcoVX_ScalarToHostMem() */
 
 static vx_status gcoVX_HostMemToScalar(vx_scalar scalar, void* user_ptr, vx_uint32 size)
 {
     vx_status status = VX_SUCCESS;
+    gcmHEADER_ARG("scalar=%p, user_ptr=%p, size=0x%x", scalar, user_ptr, size);
 
-    if (vx_false_e == vxAcquireMutex(scalar->base.lock))
+    if (vx_false_e == vxAcquireMutex(scalar->base.lock)){
+        gcmFOOTER_ARG("%d", status);
         return VX_ERROR_NO_RESOURCES;
+    }
 
     if(vxmIS_SCALAR(scalar->dataType))
     {
@@ -503,11 +537,14 @@ static vx_status gcoVX_HostMemToScalar(vx_scalar scalar, void* user_ptr, vx_uint
 
     //vxPrintScalarValue(scalar);
 
-    if (vx_false_e == vxReleaseMutex(scalar->base.lock))
+    if (vx_false_e == vxReleaseMutex(scalar->base.lock)){
+        gcmFOOTER_ARG("%d", status);
         return VX_ERROR_NO_RESOURCES;
+    }
 
     vxoReference_IncrementWriteCount(&scalar->base);
 
+    gcmFOOTER_ARG("%d", status);
     return status;
 } /* gcoVX_HostMemToScalar() */
 
@@ -515,12 +552,19 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyScalar(vx_scalar scalar, void* user_ptr
 {
     vx_status status = VX_SUCCESS;
 
+    gcmHEADER_ARG("scalar=%p, user_ptr=%p, usage=0x%x, user_mem_type=0x%x", scalar, user_ptr, usage, user_mem_type);
     gcmDUMP_API("$VX vxReleaseScalar: scalar=%p, user_ptr=%p, usage=0x%x, user_mem_type=0x%x", scalar, user_ptr, usage, user_mem_type);
 
-    if (!vxoReference_IsValidAndSpecific(&scalar->base,VX_TYPE_SCALAR)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoReference_IsValidAndSpecific(&scalar->base,VX_TYPE_SCALAR))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     if (NULL == user_ptr || VX_MEMORY_TYPE_HOST != user_mem_type)
+    {
+        gcmFOOTER_NO();
         return VX_ERROR_INVALID_PARAMETERS;
+    }
 
     switch (usage)
     {
@@ -532,17 +576,25 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyScalar(vx_scalar scalar, void* user_ptr
         break;
     }
 
+    gcmFOOTER_NO();
     return status;
 } /* vxCopyScalar() */
 
 VX_API_ENTRY vx_status VX_API_CALL vxReadScalarValue(vx_scalar scalar, void *ptr)
 {
+    gcmHEADER_ARG("scalar=%p, user_ptr=%p", scalar, ptr);
     gcmDUMP_API("$VX vxReadScalarValue: scalar=%p, user_ptr=%p", scalar, ptr);
 
-    if (!vxoReference_IsValidAndSpecific(&scalar->base,VX_TYPE_SCALAR)) return VX_ERROR_INVALID_REFERENCE;
-
-    if (ptr == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
-
+    if (!vxoReference_IsValidAndSpecific(&scalar->base,VX_TYPE_SCALAR))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+    if (ptr == VX_NULL)
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
     vxAcquireMutex(scalar->base.lock);
 
     if(vxmIS_SCALAR(scalar->dataType))
@@ -620,7 +672,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxReadScalarValue(vx_scalar scalar, void *ptr
 
                 vxError("The value type of the scalar, %p->%d, is not supported", scalar, scalar->dataType);
                 vxmASSERT(0);
-
+                gcmFOOTER_NO();
                 return VX_ERROR_NOT_SUPPORTED;
         }
     }
@@ -638,6 +690,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxReadScalarValue(vx_scalar scalar, void *ptr
 
     vxoScalar_Dump(scalar);
 
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -651,15 +704,18 @@ VX_API_ENTRY vx_status VX_API_CALL vxWriteScalarValue(vx_scalar scalar, const vo
 VX_API_ENTRY vx_scalar VX_API_CALL vxCreateScalarWithSize(vx_context context, vx_enum data_type, const void *ptr, vx_size size)
 {
     vx_scalar scalar;
-
+    gcmHEADER_ARG("context=%p, data_type=0x%x, ptr=%p, size=0x%lx", context, data_type, ptr, size);
     gcmDUMP_API("$VX vxCreateScalarWithSize: context=%p, data_type=0x%x, ptr=%p, size=0x%lx", context, data_type, ptr, size);
 
     scalar = vxoScalar_Create(context, data_type, ptr, (vx_uint32)size);
 
-    if (vxoReference_GetStatus((vx_reference)scalar) != VX_SUCCESS) return scalar;
-
+    if (vxoReference_GetStatus((vx_reference)scalar) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return scalar;
+    }
     context->memoryCount ++;
-
+    gcmFOOTER_NO();
     return scalar;
 }
 
@@ -668,16 +724,20 @@ VX_API_ENTRY vx_scalar VX_API_CALL vxCreateVirtualScalar(vx_graph graph, vx_enum
     vx_scalar scalar;
     vx_context context = vxoContext_GetFromReference((vx_reference)graph);
 
+    gcmHEADER_ARG("graph=%p, data_type=0x%x", graph, data_type);
     gcmDUMP_API("$VX vxCreateVirtualScalar: graph=%p, data_type=0x%x", graph, data_type);
 
     scalar = vxoScalar_Create(context, data_type, VX_NULL, 0);
 
-    if (vxoReference_GetStatus((vx_reference)scalar) != VX_SUCCESS) return scalar;
-
+    if (vxoReference_GetStatus((vx_reference)scalar) != VX_SUCCESS) {
+        gcmFOOTER_NO();
+        return scalar;
+    }
     scalar->base.isVirtual = vx_true_e;
 
     scalar->base.scope = (vx_reference)graph;
 
+    gcmFOOTER_NO();
     return scalar;
 }
 
@@ -685,12 +745,18 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyScalarWithSize(vx_scalar scalar, vx_siz
 {
     vx_status status = VX_SUCCESS;
 
+    gcmHEADER_ARG("scalar=%p, size=0x%lx, usage=0x%x, user_mem_type=0x%x", scalar, size, usage, user_mem_type);
     gcmDUMP_API("$VX vxCopyScalarWithSize: scalar=%p, size=0x%lx, usage=0x%x, user_mem_type=0x%x", scalar, size, usage, user_mem_type);
 
-    if (!vxoReference_IsValidAndSpecific(&scalar->base,VX_TYPE_SCALAR)) return VX_ERROR_INVALID_REFERENCE;
+    if (!vxoReference_IsValidAndSpecific(&scalar->base,VX_TYPE_SCALAR)) {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_REFERENCE;
+    }
 
-    if (NULL == user_ptr || VX_MEMORY_TYPE_HOST != user_mem_type)
+    if (NULL == user_ptr || VX_MEMORY_TYPE_HOST != user_mem_type){
+        gcmFOOTER_NO();
         return VX_ERROR_INVALID_PARAMETERS;
+    }
 
     switch (usage)
     {
@@ -701,7 +767,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyScalarWithSize(vx_scalar scalar, vx_siz
         status = VX_ERROR_INVALID_PARAMETERS;
         break;
     }
-
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 

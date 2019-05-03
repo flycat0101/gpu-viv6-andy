@@ -26,7 +26,7 @@
 
 /* help code for dump frame buffer */
 
-#define _GC_OBJ_ZONE    glvZONE_DRAW
+#define _GC_OBJ_ZONE    gcdZONE_ES11_DRAW
 
 #define PER_VERTEX_WLIMIT_NUM    36
 

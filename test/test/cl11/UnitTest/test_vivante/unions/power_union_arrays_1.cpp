@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -176,12 +176,12 @@ private:
 
         for (int i = 0; i < _numElements; ++i) {
             for (int j = 0; j < 4; ++j) {
-                checkResult1 = (*(unsigned int *)&(_goldStandard[i].r[j]) + 4);
-                checkResult2 = (*(unsigned int *)&(_goldStandard[i].r[j]) - 4);
+                checkResult1 = (*(unsigned int *)&(_goldStandard[i].r[j]) + 128);
+                checkResult2 = (*(unsigned int *)&(_goldStandard[i].r[j]) - 128);
                 checkResult3 = fabsf(*( float *) &checkResult1);
                 checkResult4 = fabsf(*( float *) &checkResult2);
-                if ((fabsf(_result[i].r[j]) > checkResult3 || fabsf(_result[i].r[j]) < checkResult4) && !isnan(_goldStandard[i].r[j]) && !isinf(_goldStandard[i].r[j])){
-                    std::cout << "  c:" << _goldStandard[i].r[j] << " ocl:" << _result[i].r[j] << std::endl;
+                if ((fabsf(_result[i].r[j]) > checkResult3 || fabsf(_result[i].r[j]) < checkResult4) && !isnan(_goldStandard[i].r[j]) && !isinf(_goldStandard[i].r[j]) &&  !isnan(_result[i].r[j]) && !isinf(_result[i].r[j])){
+                    std::cout << "  x: " << (float)_inputA[i].a[j] << "  y: " << i << "  c:" << _goldStandard[i].r[j] << " ocl:" << _result[i].r[j] << std::endl;
                     return false;
                 }
             }
@@ -225,7 +225,7 @@ int power_union_arrays_1(void)
 
         std::vector<cl::Device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
 
-        
+
         const char* clProgramSource = kernel_power_union_arrays_1;//oclLoadProgSource("multiply.cl", "", &szKernelLength);
         if (clProgramSource == 0) {
             std::cerr << "OpenCL program not found." << std::endl;
@@ -257,6 +257,7 @@ int power_union_arrays_1(void)
                 cnt = 0;
             }
             std::cout << "RUN " << i + 1<< ": " << (control ? "PASSED" : "FAILED!") << std::endl;
+            control = true;
         }
         power_union_arrays_1.TearDown();
     }

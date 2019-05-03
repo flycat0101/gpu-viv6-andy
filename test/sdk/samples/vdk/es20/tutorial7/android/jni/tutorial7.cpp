@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -36,21 +36,17 @@
 #endif
 
 #include <nativehelper/jni.h>
-#include <utils/Log.h>
-#if ANDROID_SDK_VERSION >= 16
-#   include <ui/ANativeObjectBase.h>
+#include <android/log.h>
+#include <time.h>
 
-#   undef LOGI
-#   undef LOGD
-#   undef LOGW
-#   undef LOGE
-#   define LOGI(...) ALOGI(__VA_ARGS__)
-#   define LOGD(...) ALOGD(__VA_ARGS__)
-#   define LOGW(...) ALOGW(__VA_ARGS__)
-#   define LOGE(...) ALOGE(__VA_ARGS__)
-#else
-#   include <ui/android_native_buffer.h>
-#endif
+#undef LOGI
+#undef LOGD
+#undef LOGW
+#undef LOGE
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
@@ -68,7 +64,7 @@
 #endif
 
 extern int frames, width, height;
-extern GLuint programHandle[2];
+extern unsigned int programHandle[2];
 static int start;
 static int end;
 static int frameCount;

@@ -25,7 +25,6 @@ endef
 
 NAME=libOpenVX
 
-
 include $(qnx_build_dir)/common.mk
 
 EXTRA_INCVPATH += $(driver_root)/hal/inc
@@ -34,7 +33,7 @@ EXTRA_INCVPATH += $(driver_root)/sdk/inc
 EXTRA_INCVPATH += $(driver_root)/arch/XAQ2/cmodel/inc
 EXTRA_INCVPATH += $(driver_root)/compiler/libVSC/include
 EXTRA_INCVPATH += $(driver_root)/hal/os/qnx/user
-#EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/driver/include
+EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/libarchmodel/include
 EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/driver/include
 EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/kernels
 
@@ -72,13 +71,23 @@ SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_progr
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_profiler.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_tensor.o
 
+# Operations
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/ops/gc_vx_op_fc.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/ops/gc_vx_op_debug.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/ops/gc_vx_op_tensor_copy.o
+
+# Layers
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_lstm.o
+
 # API
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_interface.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_extension_interface.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_internal_node_api.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_layer.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_lstm.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_gpu_layer.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_util.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_command.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_binary.o
 
 #SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/extension/gc_vxc_interface.o
@@ -115,6 +124,8 @@ SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/kernels/gc_vxk_warp.o
 #SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/utility/vx_utility.o
 
 EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/driver/src
+EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/driver/src/ops
+EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers
 EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/kernels
 #EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/utility
 
@@ -144,6 +155,11 @@ EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECT
 
 include $(MKFILES_ROOT)/qmacros.mk
 
+STATIC_LIBS += archmodelS
+$(foreach lib, $(STATIC_LIBS), $(eval LIBPREF_$(lib) = -Bstatic))
+$(foreach lib, $(STATIC_LIBS), $(eval LIBPOST_$(lib) = -Bdynamic))
+
+LIBS += $(STATIC_LIBS)
 LIBS += LLVM_viv CLC VSC GAL
 
 #CCFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_0_APIS

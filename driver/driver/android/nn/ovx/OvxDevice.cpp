@@ -80,7 +80,7 @@ Return<ErrorStatus> OvxDevice::prepareModel_1_1(
 
     // TODO: make asynchronous later
     sp<OvxPreparedModel> preparedModel = new OvxPreparedModel(model);
-    if (!preparedModel->initialize()) {
+    if (!preparedModel->initialize(mContext)) {
        callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
        return ErrorStatus::INVALID_ARGUMENT;
     }
@@ -124,11 +124,12 @@ int OvxDevice::run() {
     return 1;
 }
 
-bool OvxPreparedModel::initialize() {
+bool OvxPreparedModel::initialize(vx_context context) {
 
     setRunTimePoolInfosFromHidlMemories(&mPoolInfos, mModel.pools);
 
-    mExecutor.initalize(&mModel, &mPoolInfos);
+    mExecutor = new OvxExecutor();
+    mExecutor->initalize(context, &mModel, &mPoolInfos);
 
     return true;
 }
@@ -141,7 +142,7 @@ void OvxPreparedModel::asyncExecute(const Request& request,
         return;
     }
 
-    int n = mExecutor.run(mModel, request, requestPoolInfos);
+    int n = mExecutor->run(mModel, request, requestPoolInfos);
     ErrorStatus executionStatus =
             n == ANEURALNETWORKS_NO_ERROR ? ErrorStatus::NONE : ErrorStatus::GENERAL_FAILURE;
     Return<void> returned = callback->notify(executionStatus);

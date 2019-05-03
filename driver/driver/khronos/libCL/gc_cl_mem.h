@@ -107,8 +107,6 @@ typedef struct _cl_mem
     /* Modify mutex lock. */
     gctPOINTER              mutex;
 
-    gcsSURF_NODE_PTR        tmpNode;  /* Used for write buffer Command */
-
     union
     {
         struct

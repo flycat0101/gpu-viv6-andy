@@ -19,7 +19,7 @@
 #endif
 
 
-#define _GC_OBJ_ZONE __GLES3_ZONE_CORE
+#define _GC_OBJ_ZONE gcdZONE_GL40_CORE
 /*******************************************************************************
 ***** Version Signature *******************************************************/
 
@@ -1342,15 +1342,25 @@ GLvoid __glInitGlobals(__GLApiVersion apiVersion)
         }
         else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "3")))
         {
-            __glApiTraceMode = gcvTRACEMODE_PRE;
+            __glApiTraceMode = gcvTRACEMODE_ALLZONE;
         }
         else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "4")))
+        {
+            __glApiTraceMode = gcvTRACEMODE_PRE;
+        }
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(mode, "5")))
         {
             __glApiTraceMode = gcvTRACEMODE_POST;
         }
         else
         {
             gcmPRINT("ES: Unsupported trace mode");
+        }
+
+        if (__glApiTraceMode == gcvTRACEMODE_ALLZONE)
+        {
+            gcoOS_SetDebugLevel(gcvLEVEL_VERBOSE);
+            gcoOS_SetDebugZone(gcdZONE_ALL);
         }
 
         if (!__glInitTracerDispatchTable(__glApiTraceMode, apiVersion))

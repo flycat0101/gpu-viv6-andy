@@ -164,6 +164,7 @@
     gcSHADER_GetPrivateMemorySize;
     gcSHADER_GetLocalMemorySize;
     gcSHADER_GetWorkGroupSize;
+    gcSHADER_GetLtcCodeUniformIndex;
     gcSHADER_GetType;
     gcSHADER_FindLabel;
     gcSHADER_LinkLibFunction;
@@ -368,6 +369,8 @@
     vscDestroyShader;
     vscReferenceShader;
     vscGetDebugInfo;
+    vscDupDebugInfo;
+    vscDestroyDebugInfo;
     vscCopyShader;
     vscSaveShaderToBinary;
     vscQueryShaderBinarySize;
@@ -438,6 +441,7 @@
     vscDIStep;
     vscDIPushCallStack;
     vscDIPopCallStack;
+    vscDICopyDebugInfo;
 
     VIR_GetSymFromId;
     VIR_Shader_AddFunction;

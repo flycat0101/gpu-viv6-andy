@@ -318,6 +318,12 @@ vscDILoadDebugInfo(
     gctUINT32 * bufferSize
     );
 
+gceSTATUS
+vscDICopyDebugInfo(
+    VSC_DIContext * Context,
+    gctPOINTER * Buffer
+    );
+
 void
 vscDIDumpLineTable(
     VSC_DIContext * context

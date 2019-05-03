@@ -234,6 +234,11 @@ gcoVX_GetNNConfig(
     );
 
 gceSTATUS
+gcoVX_QueryHWChipInfo(
+    IN OUT vx_hw_chip_info * HwChipInfo
+    );
+
+gceSTATUS
 gcoVX_WaitNNEvent(
     gctUINT32 EventId
     );
@@ -349,5 +354,4 @@ gceSTATUS gcoVX_GetEvisNoInstFeatureCap(
 #endif
 #endif
 #endif /* __gc_hal_user_vx_h_ */
-
 

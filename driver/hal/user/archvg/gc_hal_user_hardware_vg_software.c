@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include <math.h>
 
-#define _GC_OBJ_ZONE            gcvZONE_VG
+#define _GC_OBJ_ZONE            gcdZONE_VG
 
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
@@ -367,7 +367,7 @@ static gctBOOL _UpdatePixel(
 #endif
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_VERBOSE, gcvZONE_UTILITY,
+            gcvLEVEL_VERBOSE, gcdZONE_UTILITY,
             "      update: X = %d, Y = %d, offset = 0x%08X, case count = 0x%08X\n"
             "          L1: l1Offset = 0x%08X, l1Bit = %d, l1Mask = 0x%02X\n"
             "          L2: l2Offset = 0x%08X, l2Bit = %d, l2Mask = 0x%02X\n",
@@ -407,7 +407,7 @@ static gctBOOL _Pixel(
 #endif
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_VERBOSE, gcvZONE_UTILITY,
+            gcvLEVEL_VERBOSE, gcdZONE_UTILITY,
             "      X = %d, Y = %d, x = %d, y = %d, up = %d, left = %d, anyPixel = %d\n",
             X, Y, x, y, up, left, anyPixel
             );
@@ -720,7 +720,7 @@ static void _Fill(
 #endif
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_VERBOSE, gcvZONE_UTILITY,
+            gcvLEVEL_VERBOSE, gcdZONE_UTILITY,
             "   FILL:\n"
             "      original X0 = %2.10f, Y0 = %2.10f, X1   = %2.10f, Y1   = %2.10f\n"
             "      xformed  x0 = %2.10f, y0 = %2.10f, x1   = %2.10f, y1   = %2.10f\n"
@@ -730,7 +730,7 @@ static void _Fill(
             );
 
         gcmTRACE_ZONE(
-            gcvLEVEL_VERBOSE, gcvZONE_UTILITY,
+            gcvLEVEL_VERBOSE, gcdZONE_UTILITY,
             "      dx = %2.10f, dy = %2.10f, first = %d, xMajor = %d, left = %d, (y==yEnd) = %d\n",
             dx, dy, first, xMajor, left, (y == yEnd)
             );
@@ -767,7 +767,7 @@ static void _Fill(
         gctINT plotX;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_VERBOSE, gcvZONE_UTILITY,
+            gcvLEVEL_VERBOSE, gcdZONE_UTILITY,
             "      down = %d, nx = %2.10f, ny = %2.10f, nc = %2.10f\n",
             down, nx, ny, nc
             );
@@ -779,7 +779,7 @@ static void _Fill(
                 error = ((x + incX / 2) / 16.0f) * nx + ((y + incY / 2) / 16.0f) * ny - nc;
 
                 gcmTRACE_ZONE(
-                    gcvLEVEL_VERBOSE, gcvZONE_UTILITY,
+                    gcvLEVEL_VERBOSE, gcdZONE_UTILITY,
                     "      error = %2.10f\n",
                     error
                     );
@@ -790,7 +790,7 @@ static void _Fill(
                     error = ((x + incX / 2) / 16.0f) * nx + ((y + incY / 2) / 16.0f) * ny - nc;
 
                     gcmTRACE_ZONE(
-                        gcvLEVEL_VERBOSE, gcvZONE_UTILITY,
+                        gcvLEVEL_VERBOSE, gcdZONE_UTILITY,
                         "      x = %2.10f, error = %2.10f\n",
                         x / 16.0, error
                         );
@@ -799,7 +799,7 @@ static void _Fill(
                 plotX = x + ((error > 0) ? incX : 0);
 
                 gcmTRACE_ZONE(
-                    gcvLEVEL_VERBOSE, gcvZONE_UTILITY,
+                    gcvLEVEL_VERBOSE, gcdZONE_UTILITY,
                     "      plotX = %2.10f\n",
                     plotX
                     );
@@ -807,7 +807,7 @@ static void _Fill(
                 if (xMajor && (left ? (plotX < xEnd) : (plotX > xEnd)))
                 {
                     gcmTRACE_ZONE(
-                        gcvLEVEL_VERBOSE, gcvZONE_UTILITY,
+                        gcvLEVEL_VERBOSE, gcdZONE_UTILITY,
                         "      use xEnd as plotX value, xEnd = %2.10f\n",
                         xEnd
                         );
@@ -826,7 +826,7 @@ static void _Fill(
                 error = ((x + incX / 2) / 16.0f) * nx + ((y + incY / 2) / 16.0f) * ny - nc;
 
                 gcmTRACE_ZONE(
-                    gcvLEVEL_VERBOSE, gcvZONE_UTILITY,
+                    gcvLEVEL_VERBOSE, gcdZONE_UTILITY,
                     "      error = %2.10f\n",
                     error
                     );
@@ -837,7 +837,7 @@ static void _Fill(
                     error = ((x + incX / 2) / 16.0f) * nx + ((y + incY / 2) / 16.0f) * ny - nc;
 
                     gcmTRACE_ZONE(
-                        gcvLEVEL_VERBOSE, gcvZONE_UTILITY,
+                        gcvLEVEL_VERBOSE, gcdZONE_UTILITY,
                         "      x = %2.10f, error = %2.10f\n",
                         x / 16.0, error
                         );
@@ -846,7 +846,7 @@ static void _Fill(
                 plotX = x + ((error > 0) ? incX : 0);
 
                 gcmTRACE_ZONE(
-                    gcvLEVEL_VERBOSE, gcvZONE_UTILITY,
+                    gcvLEVEL_VERBOSE, gcdZONE_UTILITY,
                     "      plotX = %2.10f\n",
                     plotX
                     );
@@ -854,7 +854,7 @@ static void _Fill(
                 if (xMajor && (left ? (plotX < xEnd) : (plotX > xEnd)))
                 {
                     gcmTRACE_ZONE(
-                        gcvLEVEL_VERBOSE, gcvZONE_UTILITY,
+                        gcvLEVEL_VERBOSE, gcdZONE_UTILITY,
                         "      use xEnd as plotX value, xEnd = %2.10f\n",
                         xEnd
                         );
@@ -1025,7 +1025,7 @@ static void _Data(
 
 #if gcvDEBUG && gcvDUMP_COMMAND_NAME
             gcmTRACE_ZONE(
-                gcvLEVEL_INFO, gcvZONE_UTILITY
+                gcvLEVEL_INFO, gcdZONE_UTILITY
 , gcmSEGMENT_DUMP_FORMAT("")
 , gcmGETCOUNT(_countCommands)
 , gcmDUMP_COMMAND_NAME(0x00, ~0)
@@ -1039,7 +1039,7 @@ static void _Data(
 
 #if gcvDEBUG && gcvDUMP_COMMAND_NAME
             gcmTRACE_ZONE(
-                gcvLEVEL_INFO, gcvZONE_UTILITY
+                gcvLEVEL_INFO, gcdZONE_UTILITY
 , gcmSEGMENT_DUMP_FORMAT("")
 , gcmGETCOUNT(_countCommands)
 , gcmDUMP_COMMAND_NAME(0x0A, ~0)
@@ -1053,7 +1053,7 @@ static void _Data(
 
 #if gcvDEBUG
             gcmTRACE_ZONE(
-                gcvLEVEL_INFO, gcvZONE_UTILITY
+                gcvLEVEL_INFO, gcdZONE_UTILITY
 , gcmSEGMENT_DUMP_FORMAT("")
 , gcmGETCOUNT(_countCommands)
 , gcmDUMP_COMMAND_NAME(0x01, ~0)
@@ -1114,7 +1114,7 @@ static void _Data(
 
 #if gcvDEBUG
             gcmTRACE_ZONE(
-                gcvLEVEL_INFO, gcvZONE_UTILITY
+                gcvLEVEL_INFO, gcdZONE_UTILITY
 , gcmSEGMENT_DUMP_FORMAT("%2.10f, %2.10f")
 , gcmGETCOUNT(_countCommands)
 , gcmDUMP_COMMAND_NAME(0x02, 0x03)
@@ -1153,7 +1153,7 @@ static void _Data(
 
 #if gcvDEBUG
             gcmTRACE_ZONE(
-                gcvLEVEL_INFO, gcvZONE_UTILITY
+                gcvLEVEL_INFO, gcdZONE_UTILITY
 , gcmSEGMENT_DUMP_FORMAT("%2.10f, %2.10f")
 , gcmGETCOUNT(_countCommands)
 , gcmDUMP_COMMAND_NAME(0x04, 0x05)
@@ -1211,7 +1211,7 @@ static void _Data(
 
 #if gcvDEBUG
             gcmTRACE_ZONE(
-                gcvLEVEL_INFO, gcvZONE_UTILITY
+                gcvLEVEL_INFO, gcdZONE_UTILITY
 , gcmSEGMENT_DUMP_FORMAT("%2.10f, %2.10f, %2.10f, %2.10f")
 , gcmGETCOUNT(_countCommands)
 , gcmDUMP_COMMAND_NAME(0x06, 0x07)
@@ -1284,7 +1284,7 @@ static void _Data(
 
 #if gcvDEBUG
             gcmTRACE_ZONE(
-                gcvLEVEL_INFO, gcvZONE_UTILITY
+                gcvLEVEL_INFO, gcdZONE_UTILITY
 , gcmSEGMENT_DUMP_FORMAT("%2.10f, %2.10f, %2.10f, %2.10f, %2.10f, %2.10f")
 , gcmGETCOUNT(_countCommands)
 , gcmDUMP_COMMAND_NAME(0x08, 0x09)

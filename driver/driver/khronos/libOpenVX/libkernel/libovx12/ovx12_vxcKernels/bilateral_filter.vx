@@ -51,31 +51,39 @@ void vxBilateralFilter_u8
         radius = out_size;
     }
 
-    ComputeGlobalPositionsFromIndex(pX, dims_ptr, src_strides_ptr, num_dims, &src_pos);
-    ComputeGlobalPositionsFromIndex(pX, dims_ptr, dst_strides_ptr, num_dims, &dst_pos);
-
-    src_ptr = src + src_pos;
-    dst_ptr = dst + dst_pos;
-
-    for(j = -radius; j <= radius; j++)
+    if(pX >= radius && pX < (out_size-radius))
     {
-        float color_weight;
-        float space_weight;
 
-        ComputeGlobalPositionsFromIndex(pX + j, dims_ptr, src_strides_ptr, num_dims, &nei_pos);
-        nei_ptr = src + nei_pos;
+        //ComputeGlobalPositionsFromIndex(pX, dims_ptr, src_strides_ptr, num_dims, &src_pos);
+        //ComputeGlobalPositionsFromIndex(pX, dims_ptr, dst_strides_ptr, num_dims, &dst_pos);
 
-        int color_diff = *nei_ptr - *src_ptr;
-        color_weight = (float)exp(gauss_color_coeff * abs(color_diff) * abs(color_diff));
+        //src_ptr = src + src_pos;
+        //dst_ptr = dst + dst_pos;
 
-        space_weight = (float)exp(gauss_space_coeff * j * j);
+        src_ptr = src + pX;
+        dst_ptr = dst + pX;
 
-        w = space_weight * color_weight;
-        sum += (*nei_ptr)*w;
-        wsum += w;
+        for(j = -radius; j <= radius; j++)
+        {
+            float color_weight;
+            float space_weight;
+
+            //ComputeGlobalPositionsFromIndex(pX + j, dims_ptr, src_strides_ptr, num_dims, &nei_pos);
+            //nei_ptr = src + nei_pos;
+            nei_ptr = src + (pX + j);
+
+            int color_diff = *nei_ptr - *src_ptr;
+            color_weight = (float)exp(gauss_color_coeff * abs(color_diff) * abs(color_diff));
+
+            space_weight = (float)exp(gauss_space_coeff * j * j);
+
+            w = space_weight * color_weight;
+            sum += (*nei_ptr)*w;
+            wsum += w;
+        }
+
+        *dst_ptr = round(sum/wsum);
     }
-
-    *dst_ptr = round(sum/wsum);
 }
 
 void vxBilateralFilter_s16
@@ -112,36 +120,42 @@ void vxBilateralFilter_s16
         radius = out_size;
     }
 
-    ComputeGlobalPositionsFromIndex(pX, dims_ptr, src_strides_ptr, num_dims, &src_pos);
-    ComputeGlobalPositionsFromIndex(pX, dims_ptr, dst_strides_ptr, num_dims, &dst_pos);
-
-    src_ptr = src + src_pos;
-    dst_ptr = dst + dst_pos;
-
-    for(j = -radius; j <= radius; j++)
+    if(pX >= radius && pX < (out_size-radius))
     {
-        float color_weight;
-        float space_weight;
-        short *nei_s16_ptr = 0, *src_s16_ptr = 0;
+        //ComputeGlobalPositionsFromIndex(pX, dims_ptr, src_strides_ptr, num_dims, &src_pos);
+        //ComputeGlobalPositionsFromIndex(pX, dims_ptr, dst_strides_ptr, num_dims, &dst_pos);
 
-        ComputeGlobalPositionsFromIndex(pX + j, dims_ptr, src_strides_ptr, num_dims, &nei_pos);
-        nei_ptr = src + nei_pos;
+        //src_ptr = src + src_pos;
+        //dst_ptr = dst + dst_pos;
+        src_ptr = src + pX * 2;
+        dst_ptr = dst + pX * 2;
 
-        src_s16_ptr = (short *)src_ptr;
-        nei_s16_ptr = (short *)nei_ptr;
+        for(j = -radius; j <= radius; j++)
+        {
+            float color_weight;
+            float space_weight;
+            short *nei_s16_ptr = 0, *src_s16_ptr = 0;
 
-        int color_diff = *nei_s16_ptr - *src_s16_ptr;
-        color_weight = (float)exp(gauss_color_coeff * abs(color_diff) * abs(color_diff));
+            //ComputeGlobalPositionsFromIndex(pX + j, dims_ptr, src_strides_ptr, num_dims, &nei_pos);
+            //nei_ptr = src + nei_pos;
+            nei_ptr = src + (pX + j) * 2;
 
-        space_weight = (float)exp(gauss_space_coeff * j * j);
+            src_s16_ptr = (short *)src_ptr;
+            nei_s16_ptr = (short *)nei_ptr;
 
-        w = space_weight * color_weight;
-        sum += (*nei_s16_ptr)*w;
-        wsum += w;
+            int color_diff = *nei_s16_ptr - *src_s16_ptr;
+            color_weight = (float)exp(gauss_color_coeff * abs(color_diff) * abs(color_diff));
+
+            space_weight = (float)exp(gauss_space_coeff * j * j);
+
+            w = space_weight * color_weight;
+            sum += (*nei_s16_ptr)*w;
+            wsum += w;
+        }
+
+        dst_s16_ptr = (short *)dst_ptr;
+        *dst_s16_ptr = round(sum/wsum);
     }
-
-    dst_s16_ptr = (short *)dst_ptr;
-    *dst_s16_ptr = round(sum/wsum);
 }
 
 __kernel void bilateral_filter

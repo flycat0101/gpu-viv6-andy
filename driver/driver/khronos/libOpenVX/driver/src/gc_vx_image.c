@@ -13,6 +13,8 @@
 
 #include <gc_vx_common.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_IMAGE
+
 VX_INTERNAL_API vx_bool vxImageFormat_IsSupported(vx_df_image imageFormat)
 {
     switch (imageFormat)
@@ -187,6 +189,7 @@ VX_INTERNAL_API void vxoImage_Initialize(
 {
     vx_uint32 channelSize = (vx_uint32)vxImageFormat_GetChannelSize(imageFormat);
 
+    gcmHEADER_ARG("image=%p, width=0x%x, height=0x%x, imageFormat=%p", image, width, height, imageFormat);
     vxmASSERT(image);
 
     image->width                = width;
@@ -308,12 +311,15 @@ VX_INTERNAL_API void vxoImage_Initialize(
     image->useInternalMem       = vx_true_e;
 
     vxoImage_Dump(image);
+
+    gcmFOOTER_NO();
 }
 
 VX_INTERNAL_CALLBACK_API void vxoImage_Destructor(vx_reference ref)
 {
     vx_image image = (vx_image)ref;
 
+    gcmHEADER_ARG("ref=%p", ref);
     vxmASSERT(image);
 
     if (image->importType == VX_MEMORY_TYPE_NONE && image->parent == VX_NULL)
@@ -378,6 +384,7 @@ VX_INTERNAL_CALLBACK_API void vxoImage_Destructor(vx_reference ref)
 
         image->memory.allocated = vx_false_e;
     }
+    gcmFOOTER_NO();
 }
 
 VX_INTERNAL_API void vxoImage_Dump(vx_image image)
@@ -427,6 +434,8 @@ VX_INTERNAL_API vx_bool vxoImage_WrapUserMemory(vx_image image)
     vx_uint32 planeIndex;
     vx_bool status = vx_false_e;
 
+    gcmHEADER_ARG("image=%p", image);
+
     status = vxoMemory_WrapUserMemory(image->base.context, &image->memory);
 
     if(status == vx_false_e)
@@ -465,13 +474,17 @@ VX_INTERNAL_API vx_bool vxoImage_WrapUserMemory(vx_image image)
                     goto OnError;
                 }
                 context->memoryCount++;
-                if (image->memory.sizes[planeIndex] > 0) gcoOS_MemCopy(logical, image->memory.logicals[planeIndex], image->memory.sizes[planeIndex]);
+                if (image->memory.sizes[planeIndex] > 0)
+                {
+                    gcoOS_MemCopy(logical, image->memory.logicals[planeIndex], image->memory.sizes[planeIndex]);
+                }
             }
             if (!vxCreateMutex(OUT &image->memory.writeLocks[planeIndex]))
             {
                 goto OnError;
             }
         }
+        gcmFOOTER_ARG("%d", vx_true_e);
         return vx_true_e;
     }
     else
@@ -484,7 +497,7 @@ VX_INTERNAL_API vx_bool vxoImage_WrapUserMemory(vx_image image)
             gcoOS_CacheFlush(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
         }
     }
-
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 
 OnError:
@@ -496,6 +509,7 @@ OnError:
             image->memory.writeLocks[planeIndex]  = VX_NULL;
         }
     }
+    gcmFOOTER_ARG("%d", vx_false_e);
     return vx_false_e;
 }
 
@@ -512,25 +526,34 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromROI(vx_image image, const vx_
     vx_uint32   planeIndex;
     vx_rectangle_t image_rect;
 
+    gcmHEADER_ARG("image=%p, rect=%p", image, rect);
     gcmDUMP_API("$VX vxCreateImageFromROI: image=%p, rect=%p", image, rect);
 
-    if (!vxoImage_IsValid(image)) return VX_NULL;
-
+    if (!vxoImage_IsValid(image))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (rect == VX_NULL)
     {
+        gcmFOOTER_NO();
         return (vx_image)vxoContext_GetErrorObject(image->base.context, VX_ERROR_INVALID_PARAMETERS);
     }
 
     if (!vxoMemory_Allocate(image->base.context, &image->memory))
     {
+        gcmFOOTER_NO();
         return (vx_image)vxoContext_GetErrorObject(image->base.context, VX_ERROR_NO_RESOURCES);
     }
 
     subImage = (vx_image)vxoReference_Create(
                             image->base.context, VX_TYPE_IMAGE, VX_REF_EXTERNAL, &image->base.context->base);
 
-    if (vxoReference_GetStatus((vx_reference)subImage) != VX_SUCCESS) return subImage;
-
+    if (vxoReference_GetStatus((vx_reference)subImage) != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("subImage=%p", subImage);
+        return subImage;
+    }
     subImage->parent            = image;
 
     for(planeIndex = 0; planeIndex < VX_MAX_REF_COUNT; planeIndex++)
@@ -598,6 +621,7 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromROI(vx_image image, const vx_
 
     vxoImage_Dump(subImage);
 
+    gcmFOOTER_ARG("subImage=%p", subImage);
     return subImage;
 }
 
@@ -606,45 +630,69 @@ VX_PRIVATE_API vx_image vxoImage_Create(
 {
     vx_image image;
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
+    gcmHEADER_ARG("context=%p, width=0x%x, height=0x%x, format=%p, isVirtual=0x%x", context, width, height, format, isVirtual);
 
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (!vxImageFormat_IsSupported(format))
     {
+        gcmFOOTER_NO();
         return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_FORMAT);
     }
 
     if (!vxImageFormat_IsValidWidthAndHeight(format, width, height))
     {
+        gcmFOOTER_NO();
         return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_DIMENSION);
     }
 
     image = (vx_image)vxoReference_Create(context, VX_TYPE_IMAGE, VX_REF_EXTERNAL, &context->base);
 
-    if (vxoReference_GetStatus((vx_reference)image) != VX_SUCCESS) return image;
-
+    if (vxoReference_GetStatus((vx_reference)image) != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("image=%p", image);
+        return image;
+    }
     image->base.isVirtual = isVirtual;
 
     vxoImage_Initialize(image, width, height, format);
 
+    gcmFOOTER_ARG("image=%p", image);
     return image;
 }
 
 VX_API_ENTRY vx_image VX_API_CALL vxCreateImage(vx_context context, vx_uint32 width, vx_uint32 height, vx_df_image format)
 {
+    gcmHEADER_ARG("context=%p, width=0x%x, height=0x%x, format=%p", context, width, height, format);
     gcmDUMP_API("$VX vxCreateImage: context=%p, width=0x%x, height=0x%x, format=%p", context, width, height, format);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (format == VX_DF_IMAGE_VIRT)
     {
+        gcmFOOTER_NO();
         return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
     }
 
     if (width == 0 || height == 0)
     {
+        gcmFOOTER_NO();
         return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_DIMENSION);
     }
 
+    if (width > OVX_IMAGE_HW_MAX_WIDTH || height > OVX_IMAGE_HW_MAX_HEIGHT)
+    {
+        vxError("Due to the HW limitation, the width or height of image can not exceed 65535.\n");
+        return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_DIMENSION);
+    }
+
+    gcmFOOTER_NO();
     return vxoImage_Create(context, width, height, format, vx_false_e);
 }
 
@@ -652,16 +700,31 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateVirtualImage(vx_graph graph, vx_uint32
 {
     vx_image image;
 
+    gcmHEADER_ARG("graph=%p, width=0x%x, height=0x%x, format=%p", graph, width, height, format);
     gcmDUMP_API("$VX vxCreateVirtualImage: graph=%p, width=0x%x, height=0x%x, format=%p", graph, width, height, format);
 
-    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_NULL;
+    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
+
+    if (width > OVX_IMAGE_HW_MAX_WIDTH || height > OVX_IMAGE_HW_MAX_HEIGHT)
+    {
+        vxError("Due to the HW limitation, the width or height of image can not exceed 65535.\n");
+        return VX_NULL;
+    }
 
     image = vxoImage_Create(graph->base.context, width, height, format, vx_true_e);
 
-    if (vxoReference_GetStatus((vx_reference)image) != VX_SUCCESS) return image;
-
+    if (vxoReference_GetStatus((vx_reference)image) != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("image=%p", image);
+        return image;
+    }
     image->base.scope = (vx_reference)graph;
 
+    gcmFOOTER_ARG("image=%p", image);
     return image;
 }
 
@@ -672,29 +735,45 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateUniformImage(
     vx_uint32 x, y, planeIndex;
     vx_rectangle_t rect = {0, 0, width, height};
 
+    gcmHEADER_ARG("context=%p, width=0x%x, height=0x%x, format=%p, value=%p", context, width, height, format, value);
     gcmDUMP_API("$VX vxCreateUniformImage: context=%p, width=0x%x, height=0x%x, format=%p, value=%p", context, width, height, format, value);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (format == VX_DF_IMAGE_VIRT)
     {
+        gcmFOOTER_NO();
         return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_FORMAT);
     }
 
     if (width == 0 || height == 0)
     {
+        gcmFOOTER_NO();
+        return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_DIMENSION);
+    }
+
+    if (width > OVX_IMAGE_HW_MAX_WIDTH || height > OVX_IMAGE_HW_MAX_HEIGHT)
+    {
+        vxError("Due to the HW limitation, the width or height of image can not exceed 65535.\n");
         return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_DIMENSION);
     }
 
     if (value == VX_NULL)
     {
+        gcmFOOTER_NO();
         return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
     }
 
     image = vxoImage_Create(context, width, height, format, vx_false_e);
 
-    if (vxoReference_GetStatus((vx_reference)image) != VX_SUCCESS) return image;
-
+    if (vxoReference_GetStatus((vx_reference)image) != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("image=%p", image);
+        return image;
+    }
     for (planeIndex = 0; planeIndex < image->planeCount; planeIndex++)
     {
         vx_imagepatch_addressing_t  patchAddr;
@@ -706,6 +785,7 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateUniformImage(
         if (status != VX_SUCCESS)
         {
             vxReleaseImage(&image);
+            gcmFOOTER_NO();
             return (vx_image)vxoContext_GetErrorObject(context, status);
         }
 
@@ -845,6 +925,7 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateUniformImage(
 
                     default:
                         vxmASSERT(0);
+                        gcmFOOTER_NO();
                         return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_FORMAT);
                 } /* switch */
             }
@@ -855,6 +936,7 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateUniformImage(
         if (status != VX_SUCCESS)
         {
             vxReleaseImage(&image);
+            gcmFOOTER_NO();
             return (vx_image)vxoContext_GetErrorObject(context, status);
         }
     }
@@ -865,6 +947,7 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateUniformImage(
         ((vx_image_s *)image)->isUniform = vx_true_e;
     }
 
+    gcmFOOTER_ARG("image=%p", image);
     return image;
 }
 
@@ -872,6 +955,7 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromChannel(vx_image image, vx_en
 {
     vx_image_s* subimage = NULL;
 
+    gcmHEADER_ARG("image=%p, channel=0x%x", image, channel);
     gcmDUMP_API("$VX vxCreateImageFromChannel: image=%p, channel=0x%x", image, channel);
 
     if (vxoImage_IsValid(image) == vx_true_e)
@@ -891,6 +975,7 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromChannel(vx_image image, vx_en
                     {
                         vx_context context = vxGetContext((vx_reference)subimage);
                         subimage = (vx_image)vxoError_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
+                        gcmFOOTER_ARG("subimage=%p", subimage);
                         return subimage;
                     }
                     break;
@@ -904,6 +989,7 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromChannel(vx_image image, vx_en
                     {
                         vx_context context = vxGetContext((vx_reference)subimage);
                         subimage = (vx_image)vxoError_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
+                        gcmFOOTER_ARG("subimage=%p", subimage);
                         return subimage;
                     }
                     break;
@@ -913,6 +999,7 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromChannel(vx_image image, vx_en
                 {
                     vx_context context = vxGetContext((vx_reference)subimage);
                     subimage = (vx_image)vxoError_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
+                    gcmFOOTER_ARG("subimage=%p", subimage);
                     return subimage;
                 }
             }
@@ -1062,6 +1149,7 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromChannel(vx_image image, vx_en
         subimage = (vx_image)vxoError_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
     }
 
+    gcmFOOTER_ARG("subimage=%p", subimage);
     return (vx_image)subimage;
 }
 
@@ -1072,22 +1160,38 @@ VX_INTERNAL_API vx_image VX_API_CALL vxoImage_CreateImageFromInternalHandle(
     vx_image    image;
     vx_uint32   planeIndex, dimIndex;
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
+    gcmHEADER_ARG("context=%p, format=%p, addrs=%p, ptrs=%p, phys=%p", context, format, addrs, ptrs, phys);
 
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (format == VX_DF_IMAGE_VIRT)
     {
+        gcmFOOTER_NO();
         return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_FORMAT);
     }
 
     if (addrs == VX_NULL || addrs[0].dim_x == 0 || addrs[0].dim_y == 0)
     {
+        gcmFOOTER_NO();
+        return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_DIMENSION);
+    }
+
+    if (addrs[0].dim_x > OVX_IMAGE_HW_MAX_WIDTH || addrs[0].dim_y > OVX_IMAGE_HW_MAX_HEIGHT)
+    {
+        vxError("Due to the HW limitation, the width or height of image can not exceed 65535.\n");
         return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_DIMENSION);
     }
 
     image = vxoImage_Create(context, addrs[0].dim_x, addrs[0].dim_y, format, vx_false_e);
 
-    if (vxoReference_GetStatus((vx_reference)image) != VX_SUCCESS) return image;
-
+    if (vxoReference_GetStatus((vx_reference)image) != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("image=%p", image);
+        return image;
+    }
     image->importType       = VX_MEMORY_TYPE_INTERNAL;
 
     if (image->planeCount > 1) goto OnError;
@@ -1123,7 +1227,7 @@ VX_INTERNAL_API vx_image VX_API_CALL vxoImage_CreateImageFromInternalHandle(
     }
 
     image->memory.allocated = vx_true_e;
-
+    gcmFOOTER_ARG("image=%p", image);
     return image;
 
 OnError:
@@ -1137,7 +1241,7 @@ OnError:
     }
 
     vxReleaseImage(&image);
-
+    gcmFOOTER_NO();
     return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_NO_RESOURCES);
 }
 
@@ -1148,29 +1252,45 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromHandle(
     vx_image    image;
     vx_uint32   planeIndex;
 
+    gcmHEADER_ARG("context=%p, format=%p, addrs=%p, ptrs=%p, import_type=0x%x", context, format, addrs, ptrs, import_type);
     gcmDUMP_API("$VX vxCreateImageFromHandle: context=%p, format=%p, addrs=%p, ptrs=%p, import_type=0x%x", context, format, addrs, ptrs, import_type);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (!vxIsValidImportType(import_type))
     {
+        gcmFOOTER_NO();
         return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_FORMAT);
     }
 
     if (format == VX_DF_IMAGE_VIRT)
     {
+        gcmFOOTER_NO();
         return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_FORMAT);
     }
 
     if (addrs == VX_NULL || addrs[0].dim_x == 0 || addrs[0].dim_y == 0)
     {
+        gcmFOOTER_NO();
+        return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_DIMENSION);
+    }
+
+    if (addrs[0].dim_x > OVX_IMAGE_HW_MAX_WIDTH || addrs[0].dim_y > OVX_IMAGE_HW_MAX_HEIGHT)
+    {
+        vxError("Due to the HW limitation, the width or height of image can not exceed 65535.\n");
         return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_DIMENSION);
     }
 
     image = vxoImage_Create(context, addrs[0].dim_x, addrs[0].dim_y, format, vx_false_e);
 
-    if (vxoReference_GetStatus((vx_reference)image) != VX_SUCCESS) return image;
-
+    if (vxoReference_GetStatus((vx_reference)image) != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("image=%p", image);
+        return image;
+    }
     image->importType       = import_type;
 
     if (import_type == VX_MEMORY_TYPE_HOST)
@@ -1188,21 +1308,22 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromHandle(
         image->memory.strides[planeIndex][VX_DIM_CHANNEL]   = (vx_uint32)vxImageFormat_GetChannelSize(format);
         image->memory.strides[planeIndex][VX_DIM_X]         = addrs[planeIndex].stride_x;
         image->memory.strides[planeIndex][VX_DIM_Y]         = addrs[planeIndex].stride_y;
-
     }
 
     if (!vxoImage_WrapUserMemory(image)) goto OnError;
 
+    gcmFOOTER_ARG("image=%p", image);
     return image;
 
 OnError:
     vxReleaseImage(&image);
-
+    gcmFOOTER_NO();
     return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_NO_RESOURCES);
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseImage(vx_image *image)
 {
+    gcmHEADER_ARG("image=%p", image);
     gcmDUMP_API("$VX vxReleaseImage: image=%p", image);
 
     if(image != NULL)
@@ -1224,6 +1345,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseImage(vx_image *image)
             }
         }
     }
+    gcmFOOTER_NO();
     return vxoReference_Release((vx_reference_ptr)image, VX_TYPE_IMAGE, VX_REF_EXTERNAL);
 }
 
@@ -1232,10 +1354,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryImage(vx_image image, vx_enum attribut
     vx_size     imageSize = 0;
     vx_uint32   planeIndex;
 
+    gcmHEADER_ARG("image=%p, attribute=0x%x, ptr=%p, size=0x%lx", image, attribute, ptr, size);
     gcmDUMP_API("$VX vxQueryImage: image=%p, attribute=0x%x, ptr=%p, size=0x%lx", image, attribute, ptr, size);
 
-    if (!vxoImage_IsValid(image)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoImage_IsValid(image))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     switch (attribute)
     {
         case VX_IMAGE_FORMAT:
@@ -1292,18 +1418,24 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryImage(vx_image image, vx_enum attribut
 
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
+            gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
             return VX_ERROR_NOT_SUPPORTED;
     }
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxSetImageAttribute(vx_image image, vx_enum attribute, const void *ptr, vx_size size)
 {
+    gcmHEADER_ARG("image=%p, attribute=0x%x, ptr=%p, size=0x%lx", image, attribute, ptr, size);
     gcmDUMP_API("$VX vxSetImageAttribute: image=%p, attribute=0x%x, ptr=%p, size=0x%lx", image, attribute, ptr, size);
 
-    if (!vxoImage_IsValid(image)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoImage_IsValid(image))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     switch (attribute)
     {
         case VX_IMAGE_SPACE:
@@ -1320,9 +1452,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetImageAttribute(vx_image image, vx_enum a
 
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
+            gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
             return VX_ERROR_NOT_SUPPORTED;
     }
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
@@ -1331,8 +1465,45 @@ VX_API_ENTRY vx_size VX_API_CALL vxComputeImagePatchSize(
 {
     vx_size pixelCount, pixelSize;
 
+    gcmHEADER_ARG("image=%p, rect=%p, plane_index=0x%x", image, rect, plane_index);
     gcmDUMP_API("$VX vxComputeImagePatchSize: image=%p, rect=%p, plane_index=0x%x", image, rect, plane_index);
 
+    if (!vxoImage_IsValid(image))
+    {
+        gcmFOOTER_ARG("%d", 0);
+        return 0;
+    }
+    if (rect == VX_NULL)
+    {
+        gcmFOOTER_ARG("%d", 0);
+        return 0;
+    }
+    if (image->memory.logicals[0] == VX_NULL)
+    {
+        if (!vxoImage_AllocateMemory(image))
+        {
+            gcmFOOTER_ARG("%d", 0);
+            return 0;
+        }
+    }
+
+    if (plane_index >= image->planeCount)
+    {
+        gcmFOOTER_ARG("%d", 0);
+        return 0;
+    }
+    pixelCount  = ((rect->end_x - rect->start_x) / image->scales[plane_index][VX_DIM_X])
+                    * ((rect->end_y - rect->start_y) / image->scales[plane_index][VX_DIM_Y]);
+
+    pixelSize   = image->memory.strides[plane_index][VX_DIM_X];
+
+    gcmFOOTER_NO();
+    return pixelCount * pixelSize;
+}
+
+VX_INTERNAL_ENTRY vx_size VX_API_CALL vxComputeWholeImageSize(
+        vx_image image, const vx_rectangle_t *rect, vx_uint32 plane_index)
+{
     if (!vxoImage_IsValid(image)) return 0;
 
     if (rect == VX_NULL) return 0;
@@ -1344,12 +1515,7 @@ VX_API_ENTRY vx_size VX_API_CALL vxComputeImagePatchSize(
 
     if (plane_index >= image->planeCount) return 0;
 
-    pixelCount  = ((rect->end_x - rect->start_x) / image->scales[plane_index][VX_DIM_X])
-                    * ((rect->end_y - rect->start_y) / image->scales[plane_index][VX_DIM_Y]);
-
-    pixelSize   = image->memory.strides[plane_index][VX_DIM_X];
-
-    return pixelCount * pixelSize;
+    return image->memory.strides[plane_index][VX_DIM_Y] * image->memory.dims[plane_index][VX_DIM_Y] - rect->start_x * image->memory.strides[plane_index][VX_DIM_X];
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxAccessImagePatch(
@@ -1358,33 +1524,65 @@ VX_API_ENTRY vx_status VX_API_CALL vxAccessImagePatch(
 {
     vx_bool         mapped = vx_false_e;
     vx_uint8_ptr    memoryPtr;
-
+    gcmHEADER_ARG("image=%p, rect=%p, plane_index=0x%x, patchAddr=%p, ptr=%p, usage=0x%x", image, rect, plane_index, patchAddr, ptr, usage);
     gcmDUMP_API("$VX vxAccessImagePatch: image=%p, rect=%p, plane_index=0x%x, patchAddr=%p, ptr=%p, usage=0x%x", image, rect, plane_index, patchAddr, ptr, usage);
 
-    if (!vxoImage_IsValid(image)) return VX_ERROR_INVALID_REFERENCE;
-
-    if (rect == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
-
-    if (patchAddr == VX_NULL || ptr == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
-
-    if (usage < VX_READ_ONLY || VX_READ_AND_WRITE < usage) return VX_ERROR_INVALID_PARAMETERS;
-
-    if (image->base.isVirtual && !image->base.accessible) return VX_ERROR_OPTIMIZED_AWAY;
-
-    if (patchAddr == VX_NULL || ptr == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
-
-    if (rect->start_x >= rect->end_x || rect->start_y >= rect->end_y) return VX_ERROR_INVALID_PARAMETERS;
-
-    if (plane_index >= image->planeCount || plane_index >= image->memory.planeCount) return VX_ERROR_INVALID_PARAMETERS;
-
+    if (!vxoImage_IsValid(image))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+    if (rect == VX_NULL)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
+    if (patchAddr == VX_NULL || ptr == VX_NULL)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
+    if (usage < VX_READ_ONLY || VX_READ_AND_WRITE < usage)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
+    if (image->base.isVirtual && !image->base.accessible)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_OPTIMIZED_AWAY);
+        return VX_ERROR_OPTIMIZED_AWAY;
+    }
+    if (patchAddr == VX_NULL || ptr == VX_NULL)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
+    if (rect->start_x >= rect->end_x || rect->start_y >= rect->end_y)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
+    if (plane_index >= image->planeCount || plane_index >= image->memory.planeCount)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
     if (image->memory.logicals[0] == VX_NULL)
     {
-        if (!vxoImage_AllocateMemory(image)) return VX_ERROR_NO_MEMORY;
+        if (!vxoImage_AllocateMemory(image))
+        {
+            gcmFOOTER_ARG("%d", VX_ERROR_NO_MEMORY);
+            return VX_ERROR_NO_MEMORY;
+        }
     }
 
     if (image->isUniform)
     {
-        if (usage == VX_WRITE_ONLY || usage == VX_READ_AND_WRITE) return VX_ERROR_NOT_SUPPORTED;
+        if (usage == VX_WRITE_ONLY || usage == VX_READ_AND_WRITE)
+        {
+            gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
+            return VX_ERROR_NOT_SUPPORTED;
+        }
     }
 
     if (*ptr == VX_NULL)
@@ -1396,7 +1594,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxAccessImagePatch(
     {
         if (usage != VX_READ_ONLY)
         {
-            if (!vxAcquireMutex(image->memory.writeLocks[plane_index])) return VX_ERROR_NO_RESOURCES;
+            if (!vxAcquireMutex(image->memory.writeLocks[plane_index]))
+            {
+                gcmFOOTER_ARG("%d", VX_ERROR_NO_RESOURCES);
+                return VX_ERROR_NO_RESOURCES;
+            }
         }
 
         vxoMemory_Dump(&image->memory);
@@ -1429,6 +1631,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxAccessImagePatch(
         if (!vxoContext_AddAccessor(image->base.context, vxComputeImagePatchSize(image, rect, plane_index),
                                     usage, *ptr, &image->base, OUT &accessorIndex, addrSave))
         {
+            gcmFOOTER_ARG("%d", VX_ERROR_NO_MEMORY);
             return VX_ERROR_NO_MEMORY;
         }
 
@@ -1444,9 +1647,12 @@ VX_API_ENTRY vx_status VX_API_CALL vxAccessImagePatch(
 
         if (usage != VX_READ_ONLY)
         {
-            if (!vxAcquireMutex(image->memory.writeLocks[plane_index])) return VX_ERROR_NO_RESOURCES;
+            if (!vxAcquireMutex(image->memory.writeLocks[plane_index]))
+            {
+                gcmFOOTER_ARG("%d", VX_ERROR_NO_RESOURCES);
+                return VX_ERROR_NO_RESOURCES;
+            }
         }
-
         patchAddr->dim_x    = rect->end_x - rect->start_x;
         patchAddr->dim_y    = rect->end_y - rect->start_y;
         patchAddr->step_x   = image->scales[plane_index][VX_DIM_X];
@@ -1500,6 +1706,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxAccessImagePatch(
         vxoReference_Increment(&image->base, VX_REF_EXTERNAL);
     }
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
@@ -1511,10 +1718,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxCommitImagePatch(
     vx_bool     foundAccessor;
     vx_uint32   accessorIndex;
 
+    gcmHEADER_ARG("image=%p, rect=%p, plane_index=0x%x, patchAddr=%p, ptr=%p", image, rect, plane_index, patchAddr, ptr);
     gcmDUMP_API("$VX vxCommitImagePatch: image=%p, rect=%p, plane_index=0x%x, patchAddr=%p, ptr=%p", image, rect, plane_index, patchAddr, ptr);
 
-    if (!vxoImage_IsValid(image)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoImage_IsValid(image))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     if (rect != VX_NULL)
     {
         isZeroRect = (vx_bool)(rect->end_x - rect->start_x == 0 || rect->end_y - rect->start_y == 0);
@@ -1522,33 +1733,54 @@ VX_API_ENTRY vx_status VX_API_CALL vxCommitImagePatch(
 
     if (image->base.isVirtual && !isZeroRect)
     {
-        if (!image->base.accessible) return VX_ERROR_OPTIMIZED_AWAY;
+        if (!image->base.accessible)
+        {
+            gcmFOOTER_ARG("%d", VX_ERROR_OPTIMIZED_AWAY);
+            return VX_ERROR_OPTIMIZED_AWAY;
+        }
     }
 
     if (!isZeroRect)
     {
         vxmASSERT(rect);
 
-        if (plane_index >= image->planeCount || plane_index >= image->memory.planeCount) return VX_ERROR_INVALID_PARAMETERS;
-
-        if (patchAddr == VX_NULL || ptr == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
-
-        if (rect->start_x >= rect->end_x || rect->start_y >= rect->end_y) return VX_ERROR_INVALID_PARAMETERS;
-
-        if (rect->end_x - rect->start_x > patchAddr->dim_x) return VX_ERROR_INVALID_PARAMETERS;
-
-        if (rect->end_y - rect->start_y > patchAddr->dim_y) return VX_ERROR_INVALID_PARAMETERS;
-
+        if (plane_index >= image->planeCount || plane_index >= image->memory.planeCount)
+        {
+            gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+            return VX_ERROR_INVALID_PARAMETERS;
+        }
+        if (patchAddr == VX_NULL || ptr == VX_NULL)
+        {
+            gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+            return VX_ERROR_INVALID_PARAMETERS;
+        }
+        if (rect->start_x >= rect->end_x || rect->start_y >= rect->end_y)
+        {
+            gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+            return VX_ERROR_INVALID_PARAMETERS;
+        }
+        if (rect->end_x - rect->start_x > patchAddr->dim_x)
+        {
+            gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+            return VX_ERROR_INVALID_PARAMETERS;
+        }
+        if (rect->end_y - rect->start_y > patchAddr->dim_y)
+        {
+            gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+            return VX_ERROR_INVALID_PARAMETERS;
+        }
         if (rect->end_x > (vx_uint32)image->memory.dims[plane_index][VX_DIM_X]
                             * (vx_uint32)image->scales[plane_index][VX_DIM_X])
         {
-             return VX_ERROR_INVALID_PARAMETERS;
+            gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+            return VX_ERROR_INVALID_PARAMETERS;
         }
 
         if (rect->end_y > (vx_uint32)image->memory.dims[plane_index][VX_DIM_Y]
                             * (vx_uint32)image->scales[plane_index][VX_DIM_Y])
         {
-             return VX_ERROR_INVALID_PARAMETERS;
+            gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+            return VX_ERROR_INVALID_PARAMETERS;
         }
     }
 
@@ -1558,8 +1790,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxCommitImagePatch(
     {
         vxmASSERT(rect);
 
-        if (image->isUniform) return VX_ERROR_NOT_SUPPORTED;
-
+        if (image->isUniform)
+        {
+            gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
+            return VX_ERROR_NOT_SUPPORTED;
+        }
         if (foundAccessor && image->base.context->accessorTable[accessorIndex].usage == VX_READ_ONLY)
         {
             vxoContext_RemoveAccessor(image->base.context, accessorIndex);
@@ -1655,6 +1890,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCommitImagePatch(
 
     vxoReference_Decrement(&image->base, VX_REF_EXTERNAL);
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
@@ -1674,7 +1910,9 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyImagePatch(
     vx_uint32 end_y = rect ? rect->end_y : 0u;
     vx_bool zero_area = ((((end_x - start_x) == 0) || ((end_y - start_y) == 0)) ? vx_true_e : vx_false_e);
 
-    gcmDUMP_API("$VX vxCopyImagePatch: image=%p, rect=%p, plane_index=0x%x, addr=%p, ptr=%p, usage=0x%x, mem_type=0x%x", image, rect, plane_index, addr, ptr, usage, mem_type);
+    gcmHEADER_ARG("image=%p, rect=%p, plane_index=0x%x, addr=%p, ptr=%p, usage=0x%x, mem_type=0x%x", image, rect, plane_index, addr, ptr, usage, mem_type);
+    gcmDUMP_API("$VX vxCopyImagePatch: image=%p, rect=%p, plane_index=0x%x, addr=%p, ptr=%p, usage=0x%x, mem_type=0x%x",
+        image, rect, plane_index, addr, ptr, usage, mem_type);
 
     /* bad parameters */
     if (((VX_READ_ONLY != usage) && (VX_WRITE_ONLY != usage)) ||
@@ -1744,10 +1982,18 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyImagePatch(
 
         vx_uint32 x;
         vx_uint32 y;
-        vx_uint8* pSrc = image->memory.logicals[plane_index];
+        vx_uint8* pSrc;
         vx_uint8* pDst = (vx_uint8*)ptr;
-
         vx_imagepatch_addressing_t addr_save = VX_IMAGEPATCH_ADDR_INIT;
+
+        if (image->useInternalMem && image->memory.nodePtrs[plane_index] != VX_NULL && image->memory.logicals[plane_index] != image->memory.nodePtrs[plane_index]->logical)
+        {
+            pSrc = image->memory.nodePtrs[plane_index]->logical;
+        }
+        else
+        {
+            pSrc = image->memory.logicals[plane_index];
+        }
 
         /* Strides given by the application */
         addr_save.dim_x    = addr->dim_x;
@@ -1774,7 +2020,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyImagePatch(
 
                 vx_uint32 len = vxComputePlaneRangeSize(image, end_x - start_x/*image->width*/, plane_index);
 
-                vxInfo("%s[%d]: %p[%u] <= %p[%u] for %u\n", __FILE__, __LINE__, pDst, dstOffset, pSrc, srcOffset, len);
+                /* vxInfo("%s[%d]: %p[%u] <= %p[%u] for %u\n", __FILE__, __LINE__, pDst, dstOffset, pSrc, srcOffset, len); */
 
                 memcpy(pDstLine, pSrcLine, len);
             }
@@ -1814,9 +2060,17 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyImagePatch(
         vx_uint32 x;
         vx_uint32 y;
         vx_uint8* pSrc = (vx_uint8*)ptr;
-        vx_uint8* pDst = image->memory.logicals[plane_index];
-
+        vx_uint8* pDst;
         vx_imagepatch_addressing_t addr_save = VX_IMAGEPATCH_ADDR_INIT;
+
+        if (image->useInternalMem && image->memory.nodePtrs[plane_index] != VX_NULL && image->memory.logicals[plane_index] != image->memory.nodePtrs[plane_index]->logical)
+        {
+            pDst = image->memory.nodePtrs[plane_index]->logical;
+        }
+        else
+        {
+            pDst = image->memory.logicals[plane_index];
+        }
 
         /* Strides given by the application */
         addr_save.dim_x    = addr->dim_x;
@@ -1850,7 +2104,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyImagePatch(
 
                 vx_uint32 len = vxComputePatchRangeSize((end_x - start_x), &addr_save);
 
-                vxInfo("%s[%d]: %p[%u] <= %p[%u] for %u\n", __FILE__, __LINE__, pDst, srcOffset, pSrc, dstOffset, len);
+                /* vxInfo("%s[%d]: %p[%u] <= %p[%u] for %u\n", __FILE__, __LINE__, pDst, srcOffset, pSrc, dstOffset, len); */
 
                 memcpy(pDstLine, pSrcLine, len);
             }
@@ -1905,6 +2159,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyImagePatch(
     status = VX_SUCCESS;
 
 exit:
+    gcmFOOTER_ARG("%d", status);
     return status;
 } /* vxCopyImagePatch() */
 
@@ -2209,7 +2464,10 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapImagePatch(
     vx_bool zero_area = ((((end_x - start_x) == 0) || ((end_y - start_y) == 0)) ? vx_true_e : vx_false_e);
     vx_status status = VX_FAILURE;
 
-    gcmDUMP_API("$VX vxMapImagePatch: image=%p, rect=%p, plane_index=0x%x, map_id=%p, addr=%p, ptr=%p, usage=0x%x, mem_type=0x%x, flags=0x%x", image, rect, plane_index, map_id, addr, ptr, usage, mem_type, flags);
+    gcmHEADER_ARG("image=%p, rect=%p, plane_index=0x%x, map_id=%p, addr=%p, ptr=%p, usage=0x%x, mem_type=0x%x, flags=0x%x",
+        image, rect, plane_index, map_id, addr, ptr, usage, mem_type, flags);
+    gcmDUMP_API("$VX vxMapImagePatch: image=%p, rect=%p, plane_index=0x%x, map_id=%p, addr=%p, ptr=%p, usage=0x%x, mem_type=0x%x, flags=0x%x",
+        image, rect, plane_index, map_id, addr, ptr, usage, mem_type, flags);
 
     /* bad parameters */
     if ((rect == NULL) || (map_id == NULL) || (addr == NULL) || (ptr == NULL) )
@@ -2316,6 +2574,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapImagePatch(
     }
 
 exit:
+    gcmFOOTER_ARG("%d", status);
     return status;
 } /* vxMapImagePatch() */
 
@@ -2323,6 +2582,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapImagePatch(vx_image image, vx_map_id m
 {
     vx_status status = VX_FAILURE;
 
+    gcmHEADER_ARG("image=%p, map_id=%p", image, map_id);
     gcmDUMP_API("$VX vxUnmapImagePatch: image=%p, map_id=%p", image, map_id);
 
     /* bad references */
@@ -2337,6 +2597,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapImagePatch(vx_image image, vx_map_id m
     {
         status = VX_ERROR_INVALID_PARAMETERS;
         vxError("Invalid parameters to unmap image patch\n");
+        gcmFOOTER_ARG("%d", status);
         return status;
     }
 
@@ -2387,6 +2648,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapImagePatch(vx_image image, vx_map_id m
     }
 
 exit:
+    gcmFOOTER_ARG("%d", status);
     return status;
 } /* vxUnmapImagePat*/
 #endif
@@ -2395,6 +2657,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetImageValidRectangle(vx_image image, cons
 {
     vx_status status = VX_ERROR_INVALID_REFERENCE;
 
+    gcmHEADER_ARG("image=%p, rect=%p", image, rect);
     gcmDUMP_API("$VX vxSetImageValidRectangle: image=%p, rect=%p", image, rect);
 
     if (vxoImage_IsValid(image) == vx_true_e)
@@ -2423,19 +2686,27 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetImageValidRectangle(vx_image image, cons
             status = VX_SUCCESS;
         }
     }
-
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
 VX_API_ENTRY void * VX_API_CALL vxFormatImagePatchAddress1d(
         void *ptr, vx_uint32 planeIndex, const vx_imagepatch_addressing_t *patchAddr)
 {
+    gcmHEADER_ARG("ptr=%p, planeIndex=0x%x, patchAddr=%p", ptr, planeIndex, patchAddr);
     gcmDUMP_API("$VX vxFormatImagePatchAddress1d: ptr=%p, planeIndex=0x%x, patchAddr=%p", ptr, planeIndex, patchAddr);
 
-    if (ptr == VX_NULL) return VX_NULL;
-
-    if (planeIndex >= patchAddr->dim_x * patchAddr->dim_y) return VX_NULL;
-
+    if (ptr == VX_NULL)
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
+    if (planeIndex >= patchAddr->dim_x * patchAddr->dim_y)
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
+    gcmFOOTER_NO();
     return (vx_uint8_ptr)ptr
             + vxComputePatchOffset(planeIndex % patchAddr->dim_x, planeIndex / patchAddr->dim_x, patchAddr);
 }
@@ -2443,23 +2714,39 @@ VX_API_ENTRY void * VX_API_CALL vxFormatImagePatchAddress1d(
 VX_API_ENTRY void * VX_API_CALL vxFormatImagePatchAddress2d(
         void *ptr, vx_uint32 x, vx_uint32 y, const vx_imagepatch_addressing_t *patchAddr)
 {
+    gcmHEADER_ARG("ptr=%p, x=0x%x, y=0x%x, patchAddr=%p", ptr, x, y, patchAddr);
     gcmDUMP_API("$VX vxFormatImagePatchAddress2d: ptr=%p, x=0x%x, y=0x%x, patchAddr=%p", ptr, x, y, patchAddr);
 
-    if (ptr == VX_NULL) return VX_NULL;
+    if (ptr == VX_NULL)
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
+    if (x >= patchAddr->dim_x || y >= patchAddr->dim_y)
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
 
-    if (x >= patchAddr->dim_x || y >= patchAddr->dim_y) return VX_NULL;
-
+    gcmFOOTER_NO();
     return (vx_uint8_ptr)ptr + vxComputePatchOffset(x, y, patchAddr);
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxGetValidRegionImage(vx_image image, vx_rectangle_t *rect)
 {
+    gcmHEADER_ARG("image=%p, rect=%p", image, rect);
     gcmDUMP_API("$VX vxGetValidRegionImage: image=%p, rect=%p", image, rect);
 
-    if (!vxoImage_IsValid(image)) return VX_ERROR_INVALID_REFERENCE;
-
-    if (rect == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
-
+    if (!vxoImage_IsValid(image))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+    if (rect == VX_NULL)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
     if (image->region.start_x <= image->region.end_x && image->region.start_y <= image->region.end_y)
     {
         rect->start_x   = image->region.start_x;
@@ -2475,6 +2762,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxGetValidRegionImage(vx_image image, vx_rect
         rect->end_y     = image->height;
     }
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
@@ -2482,7 +2770,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapImageHandle(vx_image image, void* const
 {
     vx_status status = VX_SUCCESS;
 
-     gcmDUMP_API("$VX vxSwapImageHandle: image=%p, new_ptrs=%p, prev_ptrs=%p, num_planes=0x%lx", image, new_ptrs, prev_ptrs, num_planes);
+    gcmHEADER_ARG("image=%p, new_ptrs=%p, prev_ptrs=%p, num_planes=0x%lx", image, new_ptrs, prev_ptrs, num_planes);
+    gcmDUMP_API("$VX vxSwapImageHandle: image=%p, new_ptrs=%p, prev_ptrs=%p, num_planes=0x%lx", image, new_ptrs, prev_ptrs, num_planes);
 
     if (vxoImage_IsValid(image) == vx_true_e)
     {
@@ -2495,13 +2784,17 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapImageHandle(vx_image image, void* const
                 for (p = 0; p < image->planeCount; p++)
                 {
                     if (new_ptrs[p] == NULL)
+                    {
+                        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
                         return VX_ERROR_INVALID_PARAMETERS;
+                    }
                 }
             }
 
             if (prev_ptrs != NULL && image->parent != NULL)
             {
                 /* do not return prev pointers for subimages */
+                gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
                 return VX_ERROR_INVALID_PARAMETERS;
             }
 
@@ -2622,6 +2915,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapImageHandle(vx_image image, void* const
         status = VX_ERROR_INVALID_REFERENCE;
     }
 
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -2629,10 +2923,12 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetImagePixelValues(vx_image image, const v
 {
     vx_status status = VX_SUCCESS;
 
+    gcmHEADER_ARG("image=%p, pixel_value=%p", image, pixel_value);
     gcmDUMP_API("$VX vxSetImagePixelValues: image=%p, pixel_value=%p", image, pixel_value);
 
     if(pixel_value == VX_NULL)
     {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
@@ -2640,6 +2936,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetImagePixelValues(vx_image image, const v
     {
         if(image->isUniform == vx_true_e || image->base.isVirtual)
         {
+            gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
             return VX_ERROR_INVALID_REFERENCE;
         }
         else
@@ -2778,9 +3075,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetImagePixelValues(vx_image image, const v
     }
     else
     {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
         return VX_ERROR_INVALID_REFERENCE;
     }
 
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 

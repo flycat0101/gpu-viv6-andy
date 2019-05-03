@@ -564,8 +564,6 @@ void vgfDumpImage(
 
 #endif
 
-#define _GC_OBJ_ZONE                (gcvZONE_API_VG11 | 0xffff)
-
 #ifdef __cplusplus
 }
 #endif

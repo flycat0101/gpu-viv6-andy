@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -53,6 +53,8 @@ static gctCONST_STRING s_CaseDescription = \
 "Alphablend: [disable]\n" \
 "HW feature dependency: ";
 
+#define MAX_SRC 8
+
 typedef struct _MultiSrc
 {
     gcoSURF         srcSurf;
@@ -80,7 +82,7 @@ typedef struct Test2D {
     gctPOINTER      dstLgcAddr;
 
     //source surface
-    MultiSrc multiSrc[8];
+    MultiSrc multiSrc[MAX_SRC];
 } Test2D;
 
 static gceSTATUS ReloadSourceSurface(Test2D *t2d, gctUINT SrcIndex, const char * sourcefile)
@@ -430,6 +432,29 @@ OnError:
 static void CDECL Destroy(Test2D *t2d)
 {
     gceSTATUS status = gcvSTATUS_OK;
+
+    gctUINT8 SrcIndex = 0;
+    for(SrcIndex = 0; SrcIndex < MAX_SRC; SrcIndex ++)
+    {
+        MultiSrcPTR curSrc = &t2d->multiSrc[SrcIndex];
+        // destroy source surface
+        if (curSrc->srcSurf != gcvNULL)
+        {
+            if (curSrc->srcLgcAddr[0])
+            {
+                if(gcmIS_ERROR(gcoSURF_Unlock(curSrc->srcSurf, curSrc->srcLgcAddr)))
+                {
+                    GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock srcSurf[%d] failed:%s\n",SrcIndex, GalStatusString(status));
+                }
+                curSrc->srcLgcAddr[0] = gcvNULL;
+            }
+            if(gcmIS_ERROR(gcoSURF_Destroy(curSrc->srcSurf)))
+            {
+                GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy srcSurf[%d] failed:%s\n",SrcIndex, GalStatusString(status));
+            }
+            curSrc->srcSurf = gcvNULL;
+        }
+    }
 
     if ((t2d->dstSurf != gcvNULL) && (t2d->dstLgcAddr != gcvNULL))
     {

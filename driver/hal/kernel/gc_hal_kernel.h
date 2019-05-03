@@ -412,7 +412,8 @@ gckMMU_GetPageEntry(
 gceSTATUS
 gckMMU_SetupPerHardware(
     IN gckMMU Mmu,
-    IN gckHARDWARE Hardware
+    IN gckHARDWARE Hardware,
+    IN gckDEVICE Device
     );
 
 gceSTATUS
@@ -616,6 +617,15 @@ struct _gckKERNEL
     gctUINT32                   contiguousBaseAddress;
     gctUINT32                   externalBaseAddress;
     gctUINT32                   internalBaseAddress;
+
+    /* Per core SRAM description. */
+    gctUINT32                   sRAMIndex;
+    gckVIDMEM                   sRAMVideoMem[gcvSRAM_COUNT];
+    gctPHYS_ADDR                sRAMPhysical[gcvSRAM_COUNT];
+    gctUINT32                   sRAMBaseAddress[gcvSRAM_COUNT];
+    gctUINT32                   sRAMSizes[gcvSRAM_COUNT];
+    /* SRAM mode. */
+    gctUINT32                   sRAMNonExclusive;
 };
 
 struct _FrequencyHistory
@@ -790,6 +800,8 @@ struct _gckCOMMAND
     /* MCFE semaphore id tracking ring. */
     gctUINT32                   nextSemaId;
     gctUINT32                   freeSemaId;
+
+    gctUINT32                   semaMinThreshhold;
 
     /* pending semaphore id tracking ring. */
     struct
@@ -1373,6 +1385,10 @@ typedef struct _gcsDEVICE
     /* Same hardware type shares one MMU. */
     gckMMU                      mmus[gcvHARDWARE_NUM_TYPES];
 
+    gctUINT64                   sRAMBases[gcvCORE_COUNT][gcvSRAM_COUNT];
+    gctUINT32                   sRAMSizes[gcvCORE_COUNT][gcvSRAM_COUNT];
+    gctUINT32                   sRAMBaseAddress[gcvCORE_COUNT][gcvSRAM_COUNT];
+
     /* Mutex to make sure stuck dump for multiple cores doesn't interleave. */
     gctPOINTER                  stuckDumpMutex;
 
@@ -1714,6 +1730,8 @@ struct _gckMMU
     gcsADDRESS_AREA             secureArea;
 
     gctBOOL                     dynamicAreaSetuped;
+
+    gctBOOL                     sRAMMapped;
 
     gctUINT32                   contiguousBaseAddress;
     gctUINT32                   externalBaseAddress;

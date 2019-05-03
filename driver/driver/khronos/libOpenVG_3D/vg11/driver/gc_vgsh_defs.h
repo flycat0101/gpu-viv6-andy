@@ -91,26 +91,6 @@ typedef gctCONST_POINTER    _VGPointer;
 #define OVG_ZONE_CALLTIME           (1 << 2)
 #define OVG_ZONE_HALLCALL           (1 << 3)
 
-/* DEBUG Log Definitions (Unified to Other Drivers). */
-#define    vgdZONE_TRACE                (gcvZONE_API_VG11 | (1 << 0))
-#define    vgdZONE_STATE                (gcvZONE_API_VG11 | (1 << 1))
-#define    vgdZONE_FONT                (gcvZONE_API_VG11 | (1 << 2))
-#define    vgdZONE_HARDWARE            (gcvZONE_API_VG11 | (1 << 3))
-#define    vgdZONE_IMAGE                (gcvZONE_API_VG11 | (1 << 4))
-#define    vgdZONE_MASK                (gcvZONE_API_VG11 | (1 << 5))
-#define    vgdZONE_MATRIX                (gcvZONE_API_VG11 | (1 << 7))
-#define    vgdZONE_PATH                (gcvZONE_API_VG11 | (1 << 8))
-#define    vgdZONE_PAINT                (gcvZONE_API_VG11 | (1 << 9))
-#define    vgdZONE_TESSELLATOR            (gcvZONE_API_VG11 | (1 << 10))
-#define    vgdZONE_VGU                    (gcvZONE_API_VG11 | (1 << 11))
-
-#define    vgdZONE_ALL                    (gcvZONE_API_VG11 | 0xffff)
-
-#ifndef _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE                vgdZONE_TRACE
-#endif
-
-
 typedef struct _VGObject     _VGObject;
 typedef struct _VGContext    _VGContext;
 typedef struct _VGImage      _VGImage;

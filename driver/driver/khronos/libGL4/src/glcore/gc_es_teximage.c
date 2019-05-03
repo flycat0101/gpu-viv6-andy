@@ -16,7 +16,7 @@
 #include "gc_es_device.h"
 
 
-#define _GC_OBJ_ZONE __GLES3_ZONE_CORE
+#define _GC_OBJ_ZONE gcdZONE_GL40_CORE
 
 extern GLboolean __glIsTextureComplete(__GLcontext *gc, __GLtextureObject *texObj, GLenum minFilter,
                                        GLenum magFilter, GLenum compareMode, GLint maxLevelUsed);

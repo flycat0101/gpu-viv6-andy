@@ -114,3 +114,26 @@ __kernel void gpuTransposeQuant8_CHW2CWH(__read_only image2d_array_t   input,
     write_imageui(output, coord_out, tmp);
 }
 
+__kernel void gpuTransposeFP32_2D(
+                __read_only image2d_array_t input,
+                __write_only image2d_array_t output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    float4 tmp = {0};
+
+    tmp = read_imagef(input, (int4)(x, y, 0, 0));
+    write_imagef(output, (int4)(y, x, 0, 0), tmp);
+}
+
+__kernel void gpuTransposeQuant8_2D(
+                __read_only image2d_array_t input,
+                __write_only image2d_array_t output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    uint4 tmp = {0};
+
+    tmp = read_imageui(input, (int4)(x, y, 0, 0));
+    write_imageui(output, (int4)(y, x, 0, 0), tmp);
+}

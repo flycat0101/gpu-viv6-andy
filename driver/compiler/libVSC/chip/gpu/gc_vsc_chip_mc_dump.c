@@ -273,6 +273,7 @@ static void _DumpOpcode(gctUINT baseOpcode, gctUINT extOpcode, VSC_DUMPER* pDump
         "img_store_3d",
         "store_attr",
         "storep",
+        "vx_scatter",
     };
 
     static const char * _strCmplxSubOpcode[] =
@@ -288,7 +289,14 @@ static void _DumpOpcode(gctUINT baseOpcode, gctUINT extOpcode, VSC_DUMPER* pDump
     }
     else if (baseOpcode == 0x45)
     {
-        vscDumper_PrintStrSafe(pDumper, "%s", _strVisionExtOpcode[extOpcode]);
+        if (extOpcode >= MC_AUXILIARY_OP_CODE_TEXLD_LOD)
+        {
+            vscDumper_PrintStrSafe(pDumper, "%s", _strAuxOpcode[extOpcode - MC_AUXILIARY_OP_CODE_OFFSET]);
+        }
+        else
+        {
+            vscDumper_PrintStrSafe(pDumper, "%s", _strVisionExtOpcode[extOpcode]);
+        }
     }
     else if (baseOpcode >= MC_AUXILIARY_OP_CODE_OFFSET)
     {

@@ -1128,6 +1128,24 @@ _hasB0(
 }
 
 static gctBOOL
+_supportVectorB0(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return _hasB0(Context, Inst) && (((VIR_PatternLowerContext *)Context)->hwCfg->hwFeatureFlags.supportVectorB0);
+}
+
+static gctBOOL
+_supportScalarB0Only(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return _hasB0(Context, Inst) && !(((VIR_PatternLowerContext *)Context)->hwCfg->hwFeatureFlags.supportVectorB0);
+}
+
+static gctBOOL
 _hasB0_VG(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -1513,6 +1531,22 @@ _setMOVAEnableIntUniform(
     )
 {
     _setMOVAEnableInt(Context, Inst, Opnd);
+    VIR_Operand_SetFlag(Opnd, VIR_OPNDFLAG_UNIFORM_INDEX);
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_setMOVAEnableXIntUniform(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand*    pDest = VIR_Inst_GetDest(Inst);
+
+    _setMOVAEnableInt(Context, Inst, Opnd);
+    VIR_Operand_SetEnable(pDest, VIR_ENABLE_X);
     VIR_Operand_SetFlag(Opnd, VIR_OPNDFLAG_UNIFORM_INDEX);
 
     return gcvTRUE;
@@ -6926,7 +6960,7 @@ static VIR_PatternReplaceInst _ldarrRepInst0[] = {
 };
 
 static VIR_PatternMatchInst _ldarrPatInst1[] = {
-    { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasInteger_long_ulong_isRAEnabled_src0_uniform_src1_float, _isRAEnabled_src1_uniform, _hasB0 }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasInteger_long_ulong_isRAEnabled_src0_uniform_src1_float, _isRAEnabled_src1_uniform, _supportVectorB0 }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _ldarrRepInst1[] = {
@@ -6939,10 +6973,23 @@ static VIR_PatternReplaceInst _ldarrRepInst1[] = {
 };
 
 static VIR_PatternMatchInst _ldarrPatInst2[] = {
-    { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasInteger_long_ulong_isRAEnabled_src0_uniform_src1_float, _isRAEnabled_src1_uniform }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasInteger_long_ulong_isRAEnabled_src0_uniform_src1_float, _isRAEnabled_src1_uniform, _supportScalarB0Only }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _ldarrRepInst2[] = {
+    { VIR_OP_F2I, 0, 0, { -1, 3, 0, 0 }, { _setEnableInt } },
+    { VIR_OP_MOVA, 0, 0, { -2, -1, 0, 0 }, { _setMOVAEnableXIntUniform } },
+    { VIR_OP_LDARR, 0, 0, {  1, 2, -2, 0 }, { _setLDARRSwizzleInt, VIR_Lower_SetLongUlongInstType, _setOperandUniformIndex } },
+    { VIR_OP_ADD, 0, 0, { -3, 3, 0, 0 }, { int_value_type0_const_1 } },
+    { VIR_OP_MOVA, 0, 0, { -2, -3, 0, 0 }, { _setMOVAEnableXIntUniform } },
+    { VIR_OP_LDARR, 0, 0, {  1, 2, -2, 0 }, { _setLDARRSwizzleInt, _SetLongUlongDestNextRegInstType, _setOperandUniformIndex } },
+};
+
+static VIR_PatternMatchInst _ldarrPatInst3[] = {
+    { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasInteger_long_ulong_isRAEnabled_src0_uniform_src1_float, _isRAEnabled_src1_uniform }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _ldarrRepInst3[] = {
     { VIR_OP_MOVA, 0, 0, { -1, 3, 0, 0 }, { _setMOVAEnableFloatUniform } },
     { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleInt, VIR_Lower_SetLongUlongInstType, _setOperandUniformIndex } },
     { VIR_OP_ADD, 0, 0, { -2, 3, 0, 0 }, { int_value_type0_const_1 } },
@@ -6950,11 +6997,23 @@ static VIR_PatternReplaceInst _ldarrRepInst2[] = {
     { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleInt, _SetLongUlongDestNextRegInstType, _setOperandUniformIndex } },
 };
 
-static VIR_PatternMatchInst _ldarrPatInst3[] = {
+static VIR_PatternMatchInst _ldarrPatInst4[] = {
+    { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasInteger_long_ulong_isRAEnabled_src0_uniform, _isRAEnabled_src1_uniform, _supportScalarB0Only }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _ldarrRepInst4[] = {
+    { VIR_OP_MOVA, 0, 0, { -1, 3, 0, 0 }, { _setMOVAEnableXIntUniform } },
+    { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleInt, VIR_Lower_SetLongUlongInstType, _setOperandUniformIndex } },
+    { VIR_OP_ADD, 0, 0, { -2, 3, 0, 0 }, { int_value_type0_const_1 } },
+    { VIR_OP_MOVA, 0, 0, { -1, -2, 0, 0 }, { _setMOVAEnableXIntUniform } },
+    { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleInt, _SetLongUlongDestNextRegInstType, _setOperandUniformIndex } },
+};
+
+static VIR_PatternMatchInst _ldarrPatInst5[] = {
     { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasInteger_long_ulong_isRAEnabled_src0_uniform, _isRAEnabled_src1_uniform }, VIR_PATN_MATCH_FLAG_AND },
 };
 
-static VIR_PatternReplaceInst _ldarrRepInst3[] = {
+static VIR_PatternReplaceInst _ldarrRepInst5[] = {
     { VIR_OP_MOVA, 0, 0, { -1, 3, 0, 0 }, { _setMOVAEnableIntUniform } },
     { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleInt, VIR_Lower_SetLongUlongInstType, _setOperandUniformIndex } },
     { VIR_OP_ADD, 0, 0, { -2, 3, 0, 0 }, { int_value_type0_const_1 } },
@@ -6962,11 +7021,11 @@ static VIR_PatternReplaceInst _ldarrRepInst3[] = {
     { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleInt, _SetLongUlongDestNextRegInstType, _setOperandUniformIndex } },
 };
 
-static VIR_PatternMatchInst _ldarrPatInst4[] = {
+static VIR_PatternMatchInst _ldarrPatInst6[] = {
     { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasInteger_long_ulong_isRAEnabled_src0_uniform_src1_float }, VIR_PATN_MATCH_FLAG_OR },
 };
 
-static VIR_PatternReplaceInst _ldarrRepInst4[] = {
+static VIR_PatternReplaceInst _ldarrRepInst6[] = {
     { VIR_OP_MOVA, 0, 0, { -1, 3, 0, 0 }, { _setMOVAEnableFloat } },
     { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleFloat, VIR_Lower_SetLongUlongInstType, _resetOperandUniformIndex } },
     { VIR_OP_ADD, 0, 0, { -2, 3, 0, 0 }, { int_value_type0_const_1 } },
@@ -6974,11 +7033,11 @@ static VIR_PatternReplaceInst _ldarrRepInst4[] = {
     { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleFloat, _SetLongUlongDestNextRegInstType, _resetOperandUniformIndex } },
 };
 
-static VIR_PatternMatchInst _ldarrPatInst5[] = {
+static VIR_PatternMatchInst _ldarrPatInst7[] = {
     { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasInteger_long_ulong_isRAEnabled_src0_uniform }, VIR_PATN_MATCH_FLAG_OR },
 };
 
-static VIR_PatternReplaceInst _ldarrRepInst5[] = {
+static VIR_PatternReplaceInst _ldarrRepInst7[] = {
     { VIR_OP_MOVA, 0, 0, { -1, 3, 0, 0 }, { _setMOVAEnableInt } },
     { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleInt, VIR_Lower_SetLongUlongInstType, _resetOperandUniformIndex } },
     { VIR_OP_ADD, 0, 0, { -2, 3, 0, 0 }, { int_value_type0_const_1 } },
@@ -6986,11 +7045,11 @@ static VIR_PatternReplaceInst _ldarrRepInst5[] = {
     { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleInt, _SetLongUlongDestNextRegInstType, _resetOperandUniformIndex } },
 };
 
-static VIR_PatternMatchInst _ldarrPatInst6[] = {
+static VIR_PatternMatchInst _ldarrPatInst8[] = {
     { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasInteger_long_ulong_isRAEnabled_src0_not_sampler_src1_float }, VIR_PATN_MATCH_FLAG_OR },
 };
 
-static VIR_PatternReplaceInst _ldarrRepInst6[] = {
+static VIR_PatternReplaceInst _ldarrRepInst8[] = {
     { VIR_OP_MOVA, 0, 0, { -1, 3, 0, 0 }, { _setMOVAEnableFloat } },
     { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleFloat, VIR_Lower_SetLongUlongInstType } },
     { VIR_OP_ADD, 0, 0, { -2, 3, 0, 0 }, { int_value_type0_const_1 } },
@@ -6998,11 +7057,11 @@ static VIR_PatternReplaceInst _ldarrRepInst6[] = {
     { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleFloat, _SetLongUlongDestNextRegInstType } },
 };
 
-static VIR_PatternMatchInst _ldarrPatInst7[] = {
+static VIR_PatternMatchInst _ldarrPatInst9[] = {
     { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasInteger_long_ulong_isRAEnabled }, VIR_PATN_MATCH_FLAG_OR },
 };
 
-static VIR_PatternReplaceInst _ldarrRepInst7[] = {
+static VIR_PatternReplaceInst _ldarrRepInst9[] = {
     { VIR_OP_MOVA, 0, 0, { -1, 3, 0, 0 }, { _setMOVAEnableInt } },
     { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleInt, VIR_Lower_SetLongUlongInstType } },
     { VIR_OP_ADD, 0, 0, { -2, 3, 0, 0 }, { int_value_type0_const_1 } },
@@ -7010,77 +7069,96 @@ static VIR_PatternReplaceInst _ldarrRepInst7[] = {
     { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleInt, _SetLongUlongDestNextRegInstType} },
 };
 
-static VIR_PatternMatchInst _ldarrPatInst8[] = {
+static VIR_PatternMatchInst _ldarrPatInst10[] = {
     { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isRAEnabled_src0_uniform_src1_float, _hasB0_VG }, VIR_PATN_MATCH_FLAG_AND },
 };
 
-static VIR_PatternReplaceInst _ldarrRepInst8[] = {
+static VIR_PatternReplaceInst _ldarrRepInst10[] = {
     { VIR_OP_F2I, 0, 0, { -1, 3, 0, 0 }, { _setEnableInt } },
     { VIR_OP_MOVA, 0, 0, { -2, -1, 0, 0 }, { _setMOVAEnableIntUniform } },
     { VIR_OP_LDARR, 0, 0, {  1, 2, -2, 0 }, { _setLDARRSwizzleInt, 0, _setOperandUniformIndex } },
 };
 
 /* b0 has to be interger */
-static VIR_PatternMatchInst _ldarrPatInst9[] = {
-    { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isRAEnabled_src0_uniform_src1_float, _isRAEnabled_src1_uniform, _hasB0 }, VIR_PATN_MATCH_FLAG_AND },
+static VIR_PatternMatchInst _ldarrPatInst11[] = {
+    { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isRAEnabled_src0_uniform_src1_float, _isRAEnabled_src1_uniform, _supportVectorB0 }, VIR_PATN_MATCH_FLAG_AND },
 };
 
-static VIR_PatternReplaceInst _ldarrRepInst9[] = {
+static VIR_PatternReplaceInst _ldarrRepInst11[] = {
     { VIR_OP_F2I, 0, 0, { -1, 3, 0, 0 }, { _setEnableInt } },
     { VIR_OP_MOVA, 0, 0, { -2, -1, 0, 0 }, { _setMOVAEnableIntUniform } },
     { VIR_OP_LDARR, 0, 0, {  1, 2, -2, 0 }, { _setLDARRSwizzleInt, 0, _setOperandUniformIndex } },
 };
 
-static VIR_PatternMatchInst _ldarrPatInst10[] = {
+static VIR_PatternMatchInst _ldarrPatInst12[] = {
+    { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isRAEnabled_src0_uniform_src1_float, _isRAEnabled_src1_uniform, _supportScalarB0Only }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _ldarrRepInst12[] = {
+    { VIR_OP_F2I, 0, 0, { -1, 3, 0, 0 }, { _setEnableInt } },
+    { VIR_OP_MOVA, 0, 0, { -2, -1, 0, 0 }, { _setMOVAEnableXIntUniform } },
+    { VIR_OP_LDARR, 0, 0, {  1, 2, -2, 0 }, { _setLDARRSwizzleInt, 0, _setOperandUniformIndex } },
+};
+
+static VIR_PatternMatchInst _ldarrPatInst13[] = {
     { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isRAEnabled_src0_uniform_src1_float, _isRAEnabled_src1_uniform }, VIR_PATN_MATCH_FLAG_AND },
 };
 
-static VIR_PatternReplaceInst _ldarrRepInst10[] = {
+static VIR_PatternReplaceInst _ldarrRepInst13[] = {
     { VIR_OP_MOVA, 0, 0, { -1, 3, 0, 0 }, { _setMOVAEnableFloatUniform } },
     { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleFloat, 0, _setOperandUniformIndex } },
 };
 
-static VIR_PatternMatchInst _ldarrPatInst11[] = {
+static VIR_PatternMatchInst _ldarrPatInst14[] = {
+    { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isRAEnabled_src0_uniform, _isRAEnabled_src1_uniform, _supportScalarB0Only }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _ldarrRepInst14[] = {
+    { VIR_OP_MOVA, 0, 0, { -1, 3, 0, 0 }, { _setMOVAEnableXIntUniform } },
+    { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleInt, 0, _setOperandUniformIndex } },
+};
+
+static VIR_PatternMatchInst _ldarrPatInst15[] = {
     { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isRAEnabled_src0_uniform, _isRAEnabled_src1_uniform }, VIR_PATN_MATCH_FLAG_AND },
 };
 
-static VIR_PatternReplaceInst _ldarrRepInst11[] = {
+static VIR_PatternReplaceInst _ldarrRepInst15[] = {
     { VIR_OP_MOVA, 0, 0, { -1, 3, 0, 0 }, { _setMOVAEnableIntUniform } },
     { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleInt, 0, _setOperandUniformIndex } },
 };
 
-static VIR_PatternMatchInst _ldarrPatInst12[] = {
+static VIR_PatternMatchInst _ldarrPatInst16[] = {
     { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isRAEnabled_src0_uniform_src1_float }, VIR_PATN_MATCH_FLAG_OR },
 };
 
-static VIR_PatternReplaceInst _ldarrRepInst12[] = {
+static VIR_PatternReplaceInst _ldarrRepInst16[] = {
     { VIR_OP_MOVA, 0, 0, { -1, 3, 0, 0 }, { _setMOVAEnableFloat } },
     { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleFloat, 0, _resetOperandUniformIndex } },
 };
 
-static VIR_PatternMatchInst _ldarrPatInst13[] = {
+static VIR_PatternMatchInst _ldarrPatInst17[] = {
     { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isRAEnabled_src0_uniform }, VIR_PATN_MATCH_FLAG_OR },
 };
 
-static VIR_PatternReplaceInst _ldarrRepInst13[] = {
+static VIR_PatternReplaceInst _ldarrRepInst17[] = {
     { VIR_OP_MOVA, 0, 0, { -1, 3, 0, 0 }, { _setMOVAEnableInt } },
     { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleInt, 0, _resetOperandUniformIndex } },
 };
 
-static VIR_PatternMatchInst _ldarrPatInst14[] = {
+static VIR_PatternMatchInst _ldarrPatInst18[] = {
     { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isRAEnabled_src0_not_sampler_src1_float }, VIR_PATN_MATCH_FLAG_OR },
 };
 
-static VIR_PatternReplaceInst _ldarrRepInst14[] = {
+static VIR_PatternReplaceInst _ldarrRepInst18[] = {
     { VIR_OP_MOVA, 0, 0, { -1, 3, 0, 0 }, { _setMOVAEnableFloat } },
     { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleFloat } },
 };
 
-static VIR_PatternMatchInst _ldarrPatInst15[] = {
+static VIR_PatternMatchInst _ldarrPatInst19[] = {
     { VIR_OP_LDARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isRAEnabled }, VIR_PATN_MATCH_FLAG_OR },
 };
 
-static VIR_PatternReplaceInst _ldarrRepInst15[] = {
+static VIR_PatternReplaceInst _ldarrRepInst19[] = {
     { VIR_OP_MOVA, 0, 0, { -1, 3, 0, 0 }, { _setMOVAEnableInt } },
     { VIR_OP_LDARR, 0, 0, {  1, 2, -1, 0 }, { _setLDARRSwizzleInt } },
 };
@@ -7102,6 +7180,10 @@ static VIR_Pattern _ldarrPattern[] = {
     { VIR_PATN_FLAG_SET_TEMP_IN_FUNC, CODEPATTERN(_ldarr, 13) },
     { VIR_PATN_FLAG_SET_TEMP_IN_FUNC, CODEPATTERN(_ldarr, 14) },
     { VIR_PATN_FLAG_SET_TEMP_IN_FUNC, CODEPATTERN(_ldarr, 15) },
+    { VIR_PATN_FLAG_SET_TEMP_IN_FUNC, CODEPATTERN(_ldarr, 16) },
+    { VIR_PATN_FLAG_SET_TEMP_IN_FUNC, CODEPATTERN(_ldarr, 17) },
+    { VIR_PATN_FLAG_SET_TEMP_IN_FUNC, CODEPATTERN(_ldarr, 18) },
+    { VIR_PATN_FLAG_SET_TEMP_IN_FUNC, CODEPATTERN(_ldarr, 19) },
     { VIR_PATN_FLAG_NONE }
 };
 
@@ -8780,7 +8862,15 @@ _genFloatCoordDataLod(
     VIR_ScalarConstVal imm;
     gctUINT dataType = 0x1; /* 0x1 */
     gctUINT mode = 0x1; /* 0x1 */
-    gctUINT addressingType = 0x0; /* 0x0 */
+    /* WEBGL spec is inconsistent with OES spec when fetch a texel outside of the texture's size.
+     * OES would return undefined result but webgl hopes(0,0,0,0), use ADDRESSING_BORDER for webGL by default
+     * adopt the WebGL behavior as the default GLES driver behavior instead of a WebGL patch.
+     * The WebGL Spec requirement:
+     * Texel fetches that have undefined results in the OpenGL ES 3.0 API must return zero,
+     * or a texture source color of (0, 0, 0, 1) in the case of a texel fetch from an incomplete texture in the WebGL 2.0 API.
+     * also conforms to GLES Spec which allows the result as "undefined" (any value is fine).
+     */
+    gctUINT addressingType = 0x1;
 
     imm.uValue = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ?
@@ -8828,7 +8918,15 @@ _genIntegeroordDataLod(
     VIR_ScalarConstVal imm;
     gctUINT dataType = 0x0; /* 0x0 */
     gctUINT mode = 0x1; /* 0x1 */
-    gctUINT addressingType = 0x0; /* 0x0 */
+    /* WEBGL spec is inconsistent with OES spec when fetch a texel outside of the texture's size.
+     * OES would return undefined result but webgl hopes(0,0,0,0), use ADDRESSING_BORDER for webGL by default
+     * adopt the WebGL behavior as the default GLES driver behavior instead of a WebGL patch.
+     * The WebGL Spec requirement:
+     * Texel fetches that have undefined results in the OpenGL ES 3.0 API must return zero,
+     * or a texture source color of (0, 0, 0, 1) in the case of a texel fetch from an incomplete texture in the WebGL 2.0 API.
+     * also conforms to GLES Spec which allows the result as "undefined" (any value is fine).
+     */
+    gctUINT addressingType = 0x1;
     gctUINT magFilter = 0x0; /* 0x0 */
     gctUINT minFilter = 0x0; /* 0x0 */
 
@@ -15012,6 +15110,10 @@ gctBOOL _componentXYZW(
     return (VIR_GetTypeComponents(VIR_Lower_GetBaseType(Context->shader, VIR_Inst_GetSource(Inst, 0))) == 4);
 }
 
+/*
+** Here we use the operand type to select which DP instruction we should use,
+** so we need to make sure the all optimizations don't change the operand type.
+*/
 static VIR_PatternMatchInst _dotPatInst0[] = {
     { VIR_OP_DOT, VIR_PATTERN_ANYCOND, 0, {  1, 2, 3, 0, 0}, { _componentX }, VIR_PATN_MATCH_FLAG_OR },
 };

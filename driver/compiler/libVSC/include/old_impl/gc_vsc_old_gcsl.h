@@ -110,11 +110,14 @@ BEGIN_EXTERN_C()
 /* bump up version to 1.26 for adding output's shader mode on 09/28/2018 */
 /* bump up version to 1.27 for modify _viv_atan2_float() to comform to CL spec on 11/20/2018 */
 /* bump up version to 1.28 for using HALTI5 trig functions for all cases (not just conformance) on 12/3/2018 */
+/* bump up version to 1.29 for new header with chipModel and chpRevision on 03/19/2019 */
+/* bump up version to 1.30 for saving source string on 03/26/2019 */
+/* bump up version to 1.31 for saving some flags in hints on 04/17/2019 */
 
 /* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 28)
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 31)
 
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 28)
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 31)
 
 typedef union _gcsValue
 {
@@ -1191,6 +1194,7 @@ typedef enum _gceUNIFORM_FLAGS
     gcvUNIFORM_KIND_IMAGE_EXTRA_LAYER           = 21,
     gcvUNIFORM_KIND_TEMP_REG_SPILL_ADDRESS      = 22,
     gcvUNIFORM_KIND_GLOBAL_WORK_SCALE           = 23,
+    gcvUNIFORM_KIND_NUM_GROUPS_FOR_SINGLE_GPU   = 24,
 
     /* Use this to check if this flag is a special uniform kind. */
     gcvUNIFORM_FLAG_SPECIAL_KIND_MASK           = 0x1F,
@@ -1241,6 +1245,7 @@ gceUNIFORM_FLAGS;
                                      (k) == gcvUNIFORM_KIND_WORK_DIM                  || \
                                      (k) == gcvUNIFORM_KIND_PRINTF_ADDRESS            || \
                                      (k) == gcvUNIFORM_KIND_GLOBAL_WORK_SCALE         || \
+                                     (k) == gcvUNIFORM_KIND_NUM_GROUPS_FOR_SINGLE_GPU || \
                                      (k) == gcvUNIFORM_KIND_WORKITEM_PRINTF_BUFFER_SIZE)
 
 #define isUniformKindKernelArg(k)   ((k) == gcvUNIFORM_KIND_KERNEL_ARG                || \
@@ -1282,6 +1287,7 @@ gceUNIFORM_FLAGS;
 #define isUniformGlobalSize(u)               (GetUniformKind(u) == gcvUNIFORM_KIND_GLOBAL_SIZE)
 #define isUniformLocalSize(u)                (GetUniformKind(u) == gcvUNIFORM_KIND_LOCAL_SIZE)
 #define isUniformNumGroups(u)                (GetUniformKind(u) == gcvUNIFORM_KIND_NUM_GROUPS)
+#define isUniformNumGroupsForSingleGPU(u)    (GetUniformKind(u) == gcvUNIFORM_KIND_NUM_GROUPS_FOR_SINGLE_GPU)
 #define isUniformGlobalOffset(u)             (GetUniformKind(u) == gcvUNIFORM_KIND_GLOBAL_OFFSET)
 #define isUniformLocalAddressSpace(u)        (GetUniformKind(u) == gcvUNIFORM_KIND_LOCAL_ADDRESS_SPACE)
 #define isUniformPrivateAddressSpace(u)      (GetUniformKind(u) == gcvUNIFORM_KIND_PRIVATE_ADDRESS_SPACE)
@@ -4492,8 +4498,7 @@ struct _gcSHADER
     /* load-time optimization uniforms */
     gctINT                      ltcUniformCount;      /* load-time constant uniform count */
     gctUINT                     ltcUniformBegin;      /* the begin offset of ltc in uniforms */
-    gctINT *                    ltcCodeUniformIndex;  /* an array to map code index to uniform index,
-                                                         element which has 0 value means no uniform for the code*/
+    gcSHADER_LIST               ltcCodeUniformMappingList; /* Map code index to the uniform index. */
     gctUINT                     ltcInstructionCount;  /* the total instruction count of the LTC expressions */
     gcSL_INSTRUCTION            ltcExpressions;       /* the expression array for ltc uniforms, which is a list of instructions */
 
@@ -4566,13 +4571,15 @@ struct _gcSHADER
 };
 
 /* Defines for OCL on reserved temp registers used for memory space addresses */
-#define _gcdOCL_NumMemoryAddressRegs             7  /*number of memory address registers */
+/* Once add a new entry, please also do the corresponding change in gc_vsc_vir_ir.h. */
 #define _gcdOCL_PrivateMemoryAddressRegIndex     1  /*private memory address register index */
 #define _gcdOCL_LocalMemoryAddressRegIndex       2  /*local memory address register index for the local variables within kernel function */
 #define _gcdOCL_ParmLocalMemoryAddressRegIndex   3  /*local memory address register index for the local parameters */
 #define _gcdOCL_ConstantMemoryAddressRegIndex    4  /*constant memory address register index */
 #define _gcdOCL_PrintfStartMemoryAddressRegIndex 5  /*printf start memory address register index */
 #define _gcdOCL_PrintfEndMemoryAddressRegIndex   6  /*printf end memory address register index */
+#define _gcdOCL_PreScaleGlobalIdRegIndex         7  /*pre-scale global ID register index */
+#define _gcdOCL_NumMemoryAddressRegs             8  /*number of memory address registers */
 #define _gcdOCL_MaxLocalTempRegs                16  /*maximum # of local temp register including the reserved ones for base addresses to memory spaces*/
 
 #define gcShaderIsDesktopGL(S)                  ((S)->clientApiVersion == gcvAPI_OPENGL)
@@ -4648,7 +4655,7 @@ struct _gcSHADER
 #define GetShaderLoadUsers(s)                   ((s)->loadUsers)
 #define GetShaderLtcUniformCount(s)             ((s)->ltcUniformCount)
 #define GetShaderLtcUniformBegin(s)             ((s)->ltcUniformBegin)
-#define GetShaderLtcCodeUniformIndex(s, i)      ((s)->ltcCodeUniformIndex[(i)])
+#define GetShaderLtcCodeUniformIndex(s, i)      (gcSHADER_GetLtcCodeUniformIndex((s), (i)))
 #define GetShaderLtcInstructionCount(s)         ((s)->ltcInstructionCount)
 #define GetShaderLtcExpressions(s)              ((s)->ltcExpressions)
 #define GetShaderLtcExpression(s, i)            (&((s)->ltcExpressions[(i)]))

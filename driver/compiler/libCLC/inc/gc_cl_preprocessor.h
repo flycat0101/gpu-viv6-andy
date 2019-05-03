@@ -21,6 +21,7 @@ typedef struct    _ppoPREPROCESSOR*    cloPREPROCESSOR;
 gceSTATUS
 cloPREPROCESSOR_Construct(
     IN cloCOMPILER Compiler,
+    IN gctBOOL UseNewPP,
     OUT cloPREPROCESSOR * PP
     );
 
@@ -34,7 +35,8 @@ gceSTATUS
 cloPREPROCESSOR_SetSourceStrings(
     IN cloPREPROCESSOR PP,
     IN gctUINT StringCount,
-    IN gctCONST_STRING Strings[]
+    IN gctCONST_STRING Strings[],
+    IN gctCONST_STRING Options
 );
 
 gceSTATUS
@@ -46,12 +48,22 @@ cloPREPROCESSOR_Parse(
     );
 
 gceSTATUS
+cloPREPROCESSOR_Parse_New(
+    IN      cloPREPROCESSOR     Preprocessor,
+    IN      gctINT              MaxSize,
+    IN      gctCONST_STRING     Options,
+    OUT     gctSTRING           Buffer,
+    OUT     gctINT              *ActualSize
+    );
+
+gceSTATUS
 cloPREPROCESSOR_GetPPedInfo(IN cloPREPROCESSOR PP,
  OUT gctCONST_STRING **Strings,
  OUT gctUINT *StringCount);
 
-#define ppvMAX_MACRO_ARGS_NUMBER            64
-#define    ppvMAX_PPTOKEN_CHAR_NUMBER            1000
+#define ppvMAX_MACRO_ARGS_NUMBER               64
+#define ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG    16
+#define ppvMAX_PPTOKEN_CHAR_NUMBER             1048
 #define ppvCHAR_EOF                            (char) (unsigned char) 0xFF
 
 #if ppvMAX_PPTOKEN_CHAR_NUMBER < 8

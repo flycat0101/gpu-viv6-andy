@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -55,21 +55,21 @@ static GLuint    Program = 0;
 */
 
 /*    We use this two matrix to fix the view */
-
-static float    UniformViewMatrix [] =
+/* Column-major order, and it does not need to transpose again for GLES */
+static const float    UniformViewMatrix [] =
 {
     1.0f, 0.0f, 0.0f, 0.0f,
     0.0f, 1.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 1.0f, -80.0f,
-    0.0f, 0.0f, 0.0f, 1.0f,
+    0.0f, 0.0f, 1.0f, 0.0f,
+    0.0f, 0.0f, -80.0f, 1.0f,
 };
 
-static float    UniformViewProjectionMatrix [] =
+static const float    UniformViewProjectionMatrix [] =
 {
     0.943787f, 0.0f, 0.0f, 0.0f,
     0.0f, 1.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, -1.0f, 80.0f,
-    0.0f, 0.0f, -1.0f, 80.0f,
+    0.0f, 0.0f, -1.0f, -1.0f,
+    0.0f, 0.0f, 80.0f, 80.0f,
 };
 
 /*
@@ -293,21 +293,10 @@ VDKS_BOOL SnakeInit()
 
             if(!strcmp(name, "mvp"))
             {
-
-                /* Make sure the matrix is transposed just once. */
-                static int transposed = 0;
-
-                assert(transposed == 0);
-
-                transposed = 1;
-
                 assert(size == 1);
                 assert(type == GL_FLOAT_MAT4);
 
                 location = glGetUniformLocation(Program, name);
-
-
-                VDKS_Func_Matrix_Transpose(UniformViewProjectionMatrix);
 
                 glUniformMatrix4fv(location, 1, GL_FALSE, UniformViewProjectionMatrix);
 
@@ -315,25 +304,12 @@ VDKS_BOOL SnakeInit()
             }
             else if(!strcmp(name, "mv"))
             {
-
-                /* Make sure the matrix is transposed just once. */
-                static int transposed = 0;
-
-                assert(transposed == 0);
-
-                transposed = 1;
-
-
                 assert(size == 1);
                 assert(type == GL_FLOAT_MAT4);
 
                 location = glGetUniformLocation(Program, name);
 
-
-                VDKS_Func_Matrix_Transpose(UniformViewMatrix);
-
                 glUniformMatrix4fv(location, 1, GL_FALSE, UniformViewMatrix);
-
 
                 VDKS_Macro_CheckGLError();
             }

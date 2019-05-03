@@ -17,6 +17,8 @@
 #include <EGL/eglext.h>
 #include <gc_egl_common.h>
 
+#define _GC_OBJ_ZONE                gcdZONE_VG_CONTEXT
+
 #define _gcmTXT2STR(t) #t
 #define gcmTXT2STR(t) _gcmTXT2STR(t)
 const char * _OPENVG_VERSION = "\n\0$VERSION$"
@@ -367,7 +369,7 @@ veglCreateContext(
     gctCHAR dumpAPITimeFileName[256] = {'\0'};
 
     gcmTRACE_ZONE(
-        gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+        gcvLEVEL_INFO, _GC_OBJ_ZONE,
         "%s(0x%08X, 0x%08X, 0x%08X);\n",
         __FUNCTION__,
         Os, Hal, SharedContext
@@ -653,7 +655,7 @@ veglCreateContext(
     }
 
     gcmTRACE_ZONE(
-        gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+        gcvLEVEL_INFO, _GC_OBJ_ZONE,
         "%s() = 0x%08X;\n",
         __FUNCTION__,
         context
@@ -702,7 +704,7 @@ veglDestroyContext(
     gctCHAR* env = gcvNULL;
 
     gcmTRACE_ZONE(
-        gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+        gcvLEVEL_INFO, _GC_OBJ_ZONE,
         "%s(0x%08X);\n",
         __FUNCTION__,
         Context
@@ -960,7 +962,7 @@ veglSetContext(
     gcoSURF Depth = Drawable ? (gcoSURF)Drawable->depthHandle : gcvNULL;*/
 
     gcmTRACE_ZONE(
-        gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+        gcvLEVEL_INFO, _GC_OBJ_ZONE,
         "%s(0x%08X, 0x%08X, 0x%08X, 0x%08X);\n",
         __FUNCTION__,
         Context, Draw
@@ -1098,7 +1100,7 @@ veglSetContext(
         /* Print target info. */
         gcmTRACE_ZONE(
             gcvLEVEL_INFO,
-            gcvZONE_CONTEXT,
+            _GC_OBJ_ZONE,
             "%s(%d) DRAW SURFACE SET:\n"
             "  %dx%d, %s%s R%dG%dB%dA%d (%d bits per pixel), format=%d\n",
             __FUNCTION__, __LINE__,
@@ -1924,7 +1926,7 @@ VG_API_CALL void VG_API_ENTRY vgFlush(
     vgmENTERAPI(vgFlush)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s();\n",
             __FUNCTION__
             );
@@ -1960,7 +1962,7 @@ VG_API_CALL void VG_API_ENTRY vgFinish(
     vgmENTERAPI(vgFinish)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s();\n",
             __FUNCTION__
             );

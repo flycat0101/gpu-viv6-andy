@@ -19,7 +19,7 @@
 
 #include "gc_hal_user_precomp.h"
 
-#define _GC_OBJ_ZONE        gcvZONE_SURFACE
+#define _GC_OBJ_ZONE        gcdZONE_SURFACE
 
 gcsFORMAT_COMPONENT gcvPIXEL_COMP_XXX8 = {  0, 8 };
 gcsFORMAT_COMPONENT gcvPIXEL_COMP_XX8X = {  8, 8 };
@@ -94,7 +94,7 @@ gcoSURF_ComputeColorMask(
 }
 
 #undef  _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE        gcvZONE_HAL
+#define _GC_OBJ_ZONE        gcdZONE_HAL_API
 
 /*******************************************************************************
 **

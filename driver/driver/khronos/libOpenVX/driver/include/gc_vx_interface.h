@@ -66,7 +66,7 @@ extern vx_kernel_description_s internalkernel_NNTensorStrideSlice;
 extern vx_kernel_description_s internalkernel_NNTensorSqueeze;
 extern vx_kernel_description_s internalkernel_NNTensorPad2;
 extern vx_kernel_description_s internalkernel_PReluLayer;
-
+extern vx_kernel_description_s internalkernel_NNROIPoolReluLayer;
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Invalid(vx_node node, const vx_reference paramTable[], vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInvalid_ValidateInput(vx_node node, vx_uint32 index);

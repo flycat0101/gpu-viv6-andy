@@ -14,7 +14,7 @@
 #include "gc_es_context.h"
 #include "gc_chip_context.h"
 
-#define _GC_OBJ_ZONE    __GLES3_ZONE_TRACE
+#define _GC_OBJ_ZONE    gcdZONE_ES30_TRACE
 
 #if __GL_CHIP_PATCH_ENABLED
 /************************************************************************/
@@ -18049,6 +18049,35 @@ gcChipPatchDEQP_WideLerpFix(
     }
 }
 
+static void
+gcChipPatchDEQP_DepthComponentFix(
+    __GLcontext *gc,
+    __GLprogramObject *progObj,
+    const gctCHAR **patchedSrcs,
+    gctINT* index
+    )
+{
+    static gldREPLACE_SHADERS fragment20Shaders[] =
+    {
+        {
+            gcvTRUE,
+            "\x98\xf4\xab\xed\x9f\xfe\x99\xda\xb5\xd9\xb6\xc4\xf9\x9a\xf5\x99"
+            "\xf6\x84\xbf"
+            ,
+            "\x98\xf4\xab\xed\x9f\xfe\x99\xda\xb5\xd9\xb6\xc4\xf9\x8f\xea\x89"
+            "\xbd\x95\xf6\x99\xf5\x9a\xe8\xc6\xb4\x98\xa8\x86\xb6\x9a\xaa\x84"
+            "\xb4\x98\xa9\x87\xb7\x9e\xa5"
+        },
+        {gcvFALSE, gcvNULL, gcvNULL}
+    };
+
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment20Shaders);
+}
+
 #define GLchipPatch_Shader          0x1
 #define GLchipPatch_Hardware        0x2
 
@@ -32437,6 +32466,46 @@ static __GLchipPatch gcChipPatches[] =
         gcChipPatchDEQP_WideLerpFix,
     },
 
+    {
+        GC_CHIP_PATCH_DEQP_DEPTHCOMPONENT_ES2,
+        "gcChipPatchDEQP_depthComponentFix, internalFormat depthComponent16/24/32 fix, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+            /* VS  */
+            "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x97\xa7\x97\xf6\x82\xf6\x84\xed"
+            "\x8f\xfa\x8e\xeb\x83\xea\x8d\xe5\x95\xe3\x86\xe5\xd7\xa7\xc8\xbb"
+            "\xd2\xa6\xcf\xa0\xce\xf5\x94\xe0\x94\xe6\x8f\xed\x98\xec\x89\xe1"
+            "\x88\xef\x87\xf7\x81\xe4\x87\xb5\xdc\xb2\xe6\x83\xfb\x98\xf7\x98"
+            "\xea\x8e\xb5\xc3\xa2\xd0\xa9\xc0\xae\xc9\xa1\xc8\xaf\xc7\xb7\xc1"
+            "\xa4\xc7\xf5\x81\xe4\x9c\xff\x90\xff\x8d\xe9\xd2\xa4\xcb\xa2\xc6"
+            "\xab\xca\xa3\xcd\xe5\xcc\xb7\xc3\xa6\xde\xbd\xd2\xbd\xcf\xab\x96"
+            "\xff\x91\xc5\xa0\xd8\xbb\xd4\xbb\xc9\xad\x96\xf1\x9d\xc2\x92\xfd"
+            "\x8e\xe7\x93\xfa\x95\xfb\xc6\xb0\xd5\xb6\x82\xaa\xda\xb5\xc6\xaf"
+            "\xdb\xb2\xdd\xb3\x9f\xaf\x81\xb1\x9d\xac\x82\xb2\x9b\xa0\xdd"
+            ,
+            gcvNULL,    /* TCS */
+            gcvNULL,    /* TES */
+            gcvNULL,    /* GS  */
+
+            /* FS */
+            "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x97\xa7\x97\xe2\x8c\xe5\x83\xec"
+            "\x9e\xf3\x9b\xf2\x95\xfd\x8d\xfe\x9f\xf2\x82\xee\x8b\xf9\xcb\x8f"
+            "\xfc\x9d\xf0\x80\xec\x89\xfb\xc0\xb6\xd7\xa5\xdc\xb5\xdb\xbc\xd4"
+            "\xbd\xda\xb2\xc2\xb4\xd1\xb2\x80\xf4\x91\xe9\x8a\xe5\x8a\xf8\x9c"
+            "\xa7\xd1\xbe\xd7\xb3\xde\xbf\xd6\xb8\x90\xb9\xc2\xaa\xc3\xa4\xcc"
+            "\xbc\xca\xaf\xcc\xf8\x9b\xf4\x98\xf7\x85\xb8\xcc\xa9\xd1\xa5\xd0"
+            "\xa2\xc7\xf5\xb1\x99\xea\x8b\xe6\x96\xfa\x9f\xed\xc1\xb5\xd0\xa8"
+            "\xcb\xa4\xcb\xb9\xdd\xf4\xcf\xa8\xc4\x9b\xdd\xaf\xce\xa9\xea\x85"
+            "\xe9\x86\xf4\xc9\xaa\xc5\xa9\xc6\xb4\x8f\xf2"
+            ,
+            gcvNULL,    /* CS  */
+        },
+
+        gcChipPatchDEQP_DepthComponentFix,
+    },
+
     {GC_CHIP_PATCH_LAST, gcvNULL, 0, gcvFALSE, {gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL}, gcvNULL}
 };
 
@@ -32453,7 +32522,7 @@ gcChipUtilFindString(
     gctCONST_STRING search;
     gctUINT8        key = Encrypted ? 0xFF : 0x00;
 
-    gcmHEADER_ARG("Encrypted=%d, String=%s Search=%s SearchIndex=0x%x",
+    gcmHEADER_ARG("Encrypted=%d, String=%s Search=%p SearchIndex=0x%x",
                   Encrypted, String, Search, SearchIndex);
 
     /* Start from the beginning of the source string. */
@@ -32767,6 +32836,13 @@ gcChipGetPatchConditionTb(
         !chipCtx->chipFeature.hwFeature.txLerpLessBit)
     {
         chipCtx->doPatchCondition[GC_CHIP_PATCH_DEQP_WIDELERPFIX] = GL_FALSE;
+    }
+
+    if (!(chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30) ||
+        !(chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4653) ||
+        chipCtx->chipFeature.hwFeature.hasTxSwizzle)
+    {
+        chipCtx->doPatchCondition[GC_CHIP_PATCH_DEQP_DEPTHCOMPONENT_ES2] = GL_FALSE;
     }
 
     return;

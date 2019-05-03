@@ -68,7 +68,7 @@ GLvoid __glBindRenderbuffer(__GLcontext *gc, GLenum target, GLuint renderbuffer)
 GLboolean __glDeleteRenderbufferObject(__GLcontext *gc, __GLrenderbufferObject *renderbuffer);
 
 
-#define _GC_OBJ_ZONE __GLES3_ZONE_CORE
+#define _GC_OBJ_ZONE gcdZONE_ES30_CORE
 
 
 __GL_INLINE GLvoid __glFramebufferResetAttachPoint(__GLcontext *gc, __GLfboAttachPoint *attachPoint)
@@ -1819,7 +1819,7 @@ GLvoid GL_APIENTRY __gles_GetFramebufferAttachmentParameteriv(__GLcontext *gc, G
             {
                 *params = formatInfo->category;
             }
-            return;
+            __GL_EXIT();
 
         case GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING:
             *params = formatInfo->encoding;

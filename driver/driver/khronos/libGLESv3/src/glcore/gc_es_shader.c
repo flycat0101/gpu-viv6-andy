@@ -34,7 +34,7 @@ GLvoid    __glBindProgramPipeline(__GLcontext *gc, GLuint pipeline);
 GLboolean __glDeleteProgramPipelineObj(__GLcontext *gc, __GLprogramPipelineObject *ppObj);
 extern GLvoid __glDispatchCompute(__GLcontext *gc);
 
-#define _GC_OBJ_ZONE __GLES3_ZONE_CORE
+#define _GC_OBJ_ZONE gcdZONE_ES30_CORE
 
 __GL_INLINE __GLSLStage __glGetShaderStage(GLenum type)
 {
@@ -1336,7 +1336,7 @@ GLvoid GL_APIENTRY __gles_GetShaderInfoLog(__GLcontext *gc, GLuint shader, GLsiz
 
         if (len > 0)
         {
-            strncpy(infoLog, shaderObject->shaderInfo.compiledLog, len);
+            memcpy(infoLog, shaderObject->shaderInfo.compiledLog, len);
         }
         infoLog[len] = '\0';
     }
@@ -1705,7 +1705,7 @@ GLvoid GL_APIENTRY __gles_GetProgramInfoLog(__GLcontext *gc, GLuint program, GLs
 
         if (len > 0)
         {
-            strncpy(infoLog, programObject->programInfo.infoLog, len);
+            memcpy(infoLog, programObject->programInfo.infoLog, len);
         }
         infoLog[len] = '\0';
     }
@@ -4727,7 +4727,7 @@ GLvoid GL_APIENTRY __gles_GetProgramPipelineInfoLog(__GLcontext *gc, GLuint pipe
 
         if (len > 0)
         {
-            strncpy(infoLog, ppObj->infoLog, len);
+            memcpy(infoLog, ppObj->infoLog, len);
         }
         infoLog[len] = '\0';
     }

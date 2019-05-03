@@ -13,6 +13,8 @@
 
 #include "gc_vg_precomp.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG_FILTER
+
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
 \******************************************************************************/
@@ -575,7 +577,7 @@ VG_API_CALL void VG_API_ENTRY vgColorMatrix(
             );
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%08X, Matrix);\n",
             __FUNCTION__,
             DestinationImage, SourceImage
@@ -895,7 +897,7 @@ VG_API_CALL void VG_API_ENTRY vgConvolve(
             );
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%08X, %d, %d, %d, %d, Kernel, %.10ff, %.10ff, 0x%04X);\n",
             __FUNCTION__,
             DestinationImage, SourceImage,
@@ -1218,7 +1220,7 @@ VG_API_CALL void VG_API_ENTRY vgSeparableConvolve(
             );
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%08X, %d, %d, %d, %d, KernelX, KernelY, %.10ff, %.10ff, 0x%04X);\n",
             __FUNCTION__,
             DestinationImage, SourceImage,
@@ -1575,7 +1577,7 @@ VG_API_CALL void VG_API_ENTRY vgGaussianBlur(
         vgmADVANCE_GAUSSIAN_COUNT(Context);
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%08X, %.10ff, %.10ff, 0x%04X);\n",
             __FUNCTION__,
             DestinationImage, SourceImage,
@@ -1966,7 +1968,7 @@ VG_API_CALL void VG_API_ENTRY vgLookup(
             );
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%08X, RedLUT, GreenLUT, BlueLUT, AlphaLUT, %d, %d);\n",
             __FUNCTION__,
             DestinationImage, SourceImage,
@@ -2192,7 +2194,7 @@ VG_API_CALL void VG_API_ENTRY vgLookupSingle(
             );
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%08X, LookupTable, 0x%04X, %d, %d);\n",
             __FUNCTION__,
             DestinationImage, SourceImage,

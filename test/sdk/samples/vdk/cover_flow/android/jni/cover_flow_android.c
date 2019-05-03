@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -152,7 +152,7 @@ JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_Native_init
                             "Loading texture %d of %d.\n",
                             i + 1, NUM_IMAGES);
 
-        glGenTextures(1, &app.textures[i]);
+        glGenTextures(1, (GLuint *)&app.textures[i]);
         glBindTexture(GL_TEXTURE_2D, app.textures[i]);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 

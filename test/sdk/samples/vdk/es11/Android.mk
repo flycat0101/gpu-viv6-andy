@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -37,3 +37,4 @@ include $(TOP_LOCAL_PATH)/tutorial4/android/Android.mk
 include $(TOP_LOCAL_PATH)/tutorial5/android/Android.mk
 include $(TOP_LOCAL_PATH)/tutorial6/android/Android.mk
 include $(TOP_LOCAL_PATH)/tutorial7/android/Android.mk
+include $(TOP_LOCAL_PATH)/tutorial9/android/Android.mk

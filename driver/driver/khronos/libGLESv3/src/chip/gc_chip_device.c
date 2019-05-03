@@ -20,7 +20,7 @@
 #include "gc_chip_context.h"
 #include "gc_es_device.h"
 
-#define _GC_OBJ_ZONE    __GLES3_ZONE_DEVICE
+#define _GC_OBJ_ZONE    gcdZONE_ES30_DEVICE
 
 __GLchipGlobal dpGlobalInfo;
 

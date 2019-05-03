@@ -1687,6 +1687,10 @@ static VSC_ErrCode _ProgramVS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     pStatesPgmer->pHints->extraUscPages += extraUscSize;
     pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_VERTEX] = (gceMEMORY_ACCESS_FLAG)pVsSEP->exeHints.nativeHints.globalStates.memoryAccessHint;
     pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_VERTEX] = (gceMEMORY_ACCESS_FLAG)pVsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
+    pStatesPgmer->pHints->flowControlFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_VERTEX] = (gceFLOW_CONTROL_FLAG)pVsSEP->exeHints.nativeHints.globalStates.flowControlHint;
+    pStatesPgmer->pHints->flowControlFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_VERTEX] = (gceFLOW_CONTROL_FLAG)pVsSEP->exeHints.derivedHints.globalStates.flowControlHint;
+    pStatesPgmer->pHints->texldFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_VERTEX] = (gceTEXLD_FLAG)pVsSEP->exeHints.nativeHints.globalStates.texldHint;
+    pStatesPgmer->pHints->texldFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_VERTEX] = (gceTEXLD_FLAG)pVsSEP->exeHints.derivedHints.globalStates.texldHint;
     pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_VERTEX] = pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
 
     _ProgramSamplerCountInfo(pShHwInfo, pStatesPgmer, gcvTRUE);
@@ -2403,6 +2407,10 @@ static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     pStatesPgmer->pHints->extraUscPages += extraUscSize;
     pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_TCS] = (gceMEMORY_ACCESS_FLAG)pHsSEP->exeHints.nativeHints.globalStates.memoryAccessHint;
     pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_TCS] = (gceMEMORY_ACCESS_FLAG)pHsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
+    pStatesPgmer->pHints->flowControlFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_TCS] = (gceFLOW_CONTROL_FLAG)pHsSEP->exeHints.nativeHints.globalStates.flowControlHint;
+    pStatesPgmer->pHints->flowControlFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_TCS] = (gceFLOW_CONTROL_FLAG)pHsSEP->exeHints.derivedHints.globalStates.flowControlHint;
+    pStatesPgmer->pHints->texldFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_TCS] = (gceTEXLD_FLAG)pHsSEP->exeHints.nativeHints.globalStates.texldHint;
+    pStatesPgmer->pHints->texldFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_TCS] = (gceTEXLD_FLAG)pHsSEP->exeHints.derivedHints.globalStates.texldHint;
     pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_TCS] = pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
 
     _ProgramSamplerCountInfo(pShHwInfo, pStatesPgmer, gcvTRUE);
@@ -2945,6 +2953,10 @@ static VSC_ErrCode _ProgramDS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     pStatesPgmer->pHints->shader2PaOutputCount = dsOutputCount - soOnlyOutputCount - dummyOutputCount;
     pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_TES] = (gceMEMORY_ACCESS_FLAG)pDsSEP->exeHints.nativeHints.globalStates.memoryAccessHint;
     pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_TES] = (gceMEMORY_ACCESS_FLAG)pDsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
+    pStatesPgmer->pHints->flowControlFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_TES] = (gceFLOW_CONTROL_FLAG)pDsSEP->exeHints.nativeHints.globalStates.flowControlHint;
+    pStatesPgmer->pHints->flowControlFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_TES] = (gceFLOW_CONTROL_FLAG)pDsSEP->exeHints.derivedHints.globalStates.flowControlHint;
+    pStatesPgmer->pHints->texldFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_TES] = (gceTEXLD_FLAG)pDsSEP->exeHints.nativeHints.globalStates.texldHint;
+    pStatesPgmer->pHints->texldFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_TES] = (gceTEXLD_FLAG)pDsSEP->exeHints.derivedHints.globalStates.texldHint;
     pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_TES] = pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
 
     _ProgramSamplerCountInfo(pShHwInfo, pStatesPgmer, gcvTRUE);
@@ -3564,6 +3576,10 @@ static VSC_ErrCode _ProgramGS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     pStatesPgmer->pHints->shader2PaOutputCount = gsOutputCount - soOnlyOutputCount - dummyOutputCount;
     pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_GEOMETRY] = (gceMEMORY_ACCESS_FLAG)pGsSEP->exeHints.nativeHints.globalStates.memoryAccessHint;
     pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_GEOMETRY] = (gceMEMORY_ACCESS_FLAG)pGsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
+    pStatesPgmer->pHints->flowControlFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_GEOMETRY] = (gceFLOW_CONTROL_FLAG)pGsSEP->exeHints.nativeHints.globalStates.flowControlHint;
+    pStatesPgmer->pHints->flowControlFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_GEOMETRY] = (gceFLOW_CONTROL_FLAG)pGsSEP->exeHints.derivedHints.globalStates.flowControlHint;
+    pStatesPgmer->pHints->texldFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_GEOMETRY] = (gceTEXLD_FLAG)pGsSEP->exeHints.nativeHints.globalStates.texldHint;
+    pStatesPgmer->pHints->texldFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_GEOMETRY] = (gceTEXLD_FLAG)pGsSEP->exeHints.derivedHints.globalStates.texldHint;
     pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_GEOMETRY] = pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
 
     _ProgramSamplerCountInfo(pShHwInfo, pStatesPgmer, gcvTRUE);
@@ -5243,6 +5259,10 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     pStatesPgmer->pHints->psHasDiscard = pStatesPgmer->pHints->hasKill = pPsSEP->exeHints.derivedHints.prvStates.ps.bPxlDiscard;
     pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_FRAGMENT] = (gceMEMORY_ACCESS_FLAG)pPsSEP->exeHints.nativeHints.globalStates.memoryAccessHint;
     pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_FRAGMENT] = (gceMEMORY_ACCESS_FLAG)pPsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
+    pStatesPgmer->pHints->flowControlFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_FRAGMENT] = (gceFLOW_CONTROL_FLAG)pPsSEP->exeHints.nativeHints.globalStates.flowControlHint;
+    pStatesPgmer->pHints->flowControlFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_FRAGMENT] = (gceFLOW_CONTROL_FLAG)pPsSEP->exeHints.derivedHints.globalStates.flowControlHint;
+    pStatesPgmer->pHints->texldFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_FRAGMENT] = (gceTEXLD_FLAG)pPsSEP->exeHints.nativeHints.globalStates.texldHint;
+    pStatesPgmer->pHints->texldFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_FRAGMENT] = (gceTEXLD_FLAG)pPsSEP->exeHints.derivedHints.globalStates.texldHint;
     pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_FRAGMENT] = pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
 
     _ProgramSamplerCountInfo(pShHwInfo, pStatesPgmer, gcvFALSE);
@@ -7425,6 +7445,17 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
                                (gceMEMORY_ACCESS_FLAG)pGpsSEP->exeHints.nativeHints.globalStates.memoryAccessHint;
         pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_OPENCL] =
                                (gceMEMORY_ACCESS_FLAG)pGpsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
+
+        pStatesPgmer->pHints->flowControlFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_COMPUTE] =
+                               (gceFLOW_CONTROL_FLAG)pGpsSEP->exeHints.nativeHints.globalStates.flowControlHint;
+        pStatesPgmer->pHints->flowControlFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_COMPUTE] =
+                               (gceFLOW_CONTROL_FLAG)pGpsSEP->exeHints.derivedHints.globalStates.flowControlHint;
+
+        pStatesPgmer->pHints->texldFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_COMPUTE] =
+                               (gceTEXLD_FLAG)pGpsSEP->exeHints.nativeHints.globalStates.texldHint;
+        pStatesPgmer->pHints->texldFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_COMPUTE] =
+                               (gceTEXLD_FLAG)pGpsSEP->exeHints.derivedHints.globalStates.texldHint;
+
         pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_OPENCL] =
                                pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
     }
@@ -7434,6 +7465,15 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
                                (gceMEMORY_ACCESS_FLAG)pGpsSEP->exeHints.nativeHints.globalStates.memoryAccessHint;
         pStatesPgmer->pHints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_COMPUTE] =
                                (gceMEMORY_ACCESS_FLAG)pGpsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
+
+        pStatesPgmer->pHints->flowControlFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_COMPUTE] =
+                               (gceFLOW_CONTROL_FLAG)pGpsSEP->exeHints.nativeHints.globalStates.flowControlHint;
+        pStatesPgmer->pHints->flowControlFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_COMPUTE] =
+                               (gceFLOW_CONTROL_FLAG)pGpsSEP->exeHints.derivedHints.globalStates.flowControlHint;
+        pStatesPgmer->pHints->texldFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_COMPUTE] =
+                               (gceTEXLD_FLAG)pGpsSEP->exeHints.nativeHints.globalStates.texldHint;
+        pStatesPgmer->pHints->texldFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_COMPUTE] =
+                               (gceTEXLD_FLAG)pGpsSEP->exeHints.derivedHints.globalStates.texldHint;
         pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_COMPUTE] =
                                pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
     }

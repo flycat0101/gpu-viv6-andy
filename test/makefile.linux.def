@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -27,7 +27,7 @@
 
 
 #
-# Common inlude file for Linux build.
+#  Common inlude file for Linux build.
 #
 
 ################################################################
@@ -56,18 +56,20 @@ VIVANTE_ENABLE_3D   ?= 1
 VIVANTE_NO_VG       ?= 0
 
 LINUX_EMULATOR      ?= 0
+LINUX_VSIMULATOR    ?= 0
 NO_KERNEL           ?= 0
 
 USE_OPENCL          ?= 1
 USE_OPENVX          ?= 0
+USE_VULKAN          ?= 0
 USE_VDK             ?= 0
 
 EGL_API_FB          ?= 0
 EGL_API_WL          ?= 0
 EGL_API_DRI         ?= 0
+X11_DRI3        ?= 0
 EGL_API_DFB         ?= 0
 EGL_API_X           ?= 0
-USE_SW_FB           ?= 0
 
 USE_MOVG            ?= 0
 GC355_MEM_PRINT     ?= 0
@@ -82,26 +84,33 @@ USE_LOADTIME_OPT    ?= 1
 YOCTO_DRI_BUILD     ?= 0
 VSC_VIR_BUILD       ?= 1
 USE_EXA_G2D         ?= 0
+GL4_LINUX_ENABLE    ?= 1
 
-PLATFORM_CALLBACK   ?= platform/default/gc_hal_user_platform_default
+SOC_PLATFORM        ?= default
+
+GPU_CONFIG          ?= default
+USE_VXC_BINARY      ?= 0
+
+USE_KMS             ?= 0
 
 ################################################################
 # Option dependency.
 
 ifeq ($(VIVANTE_ENABLE_3D),1)
   ifeq ($(USE_OPENCL),1)
-    BUILD_OPENCL_ICD:= 1
-    BUILD_OPENCL_FP := 1
-    ENABLE_CL_GL    := 0
-  else
+    ifeq ($(LINUX_VSIMULATOR),1)
+    ENABLE_CL_GL    ?= 0
     BUILD_OPENCL_ICD:= 0
-    BUILD_OPENCL_FP := 0
-    ENABLE_CL_GL    := 0
+    else
+    ENABLE_CL_GL    ?= 1
+    BUILD_OPENCL_ICD:= 1
+    endif
+  else
+    ENABLE_CL_GL    ?= 0
+    BUILD_OPENCL_ICD:= 0
   endif
 else
   BUILD_OPENCL_ICD  := 0
-  BUILD_OPENCL_FP   := 0
-  ENABLE_CL_GL      := 0
 endif
 
 ifeq ($(VIVANTE_NO_VG),1)
@@ -121,10 +130,10 @@ endif
 ################################################################
 # Initialize build flags.
 
-ORIG_CFLAGS       ?= $(CFLAGS)
-ORIG_CXXFLAGS     ?= $(CXXFLAGS)
-ORIG_LFLAGS       ?= $(LFLAGS)
-ORIG_PFLAGS       ?= $(PFLAGS)
+ORIG_CFLAGS         ?= $(CFLAGS)
+ORIG_CXXFLAGS       ?= $(CXXFLAGS)
+ORIG_LFLAGS         ?= $(LFLAGS)
+ORIG_PFLAGS         ?= $(PFLAGS)
 
 export ORIG_CFLAGS ORIG_CXXFLAGS ORIG_LFLAGS ORIG_PFLAGS
 
@@ -157,9 +166,7 @@ else
   STRIP             := $(CROSS_COMPILE)strip
 endif
 
-ifeq ($(PKG_CONFIG),)
-  PKG_CONFIG        := $(CROSS_COMPILE)pkg-config
-endif
+PKG_CONFIG          ?= $(CROSS_COMPILE)pkg-config
 
 ################################################################
 # Resource.
@@ -173,6 +180,11 @@ WAYLAND_DIR         ?= $(TOOL_DIR)/wayland
 VIVANTE_SDK_DIR     ?= $(AQROOT)/build/sdk
 VIVANTE_SDK_INC     ?= $(VIVANTE_SDK_DIR)/include
 VIVANTE_SDK_LIB     ?= $(VIVANTE_SDK_DIR)/drivers
+
+ifeq ($(EGL_API_GBM),1)
+  GBM_CFLAGS        ?= $(shell $(PKG_CONFIG) --cflags gbm 2>/dev/null)
+  GBM_LIBS          ?= $(shell $(PKG_CONFIG) --libs gbm 2>/dev/null)
+endif
 
 ################################################################
 # Target directory.
@@ -276,19 +288,13 @@ ifeq ($(VIVANTE_NO_VG),1)
 endif
 
 ifeq ($(VIVANTE_ENABLE_3D),1)
-  CFLAGS            += -DgcdUSE_OPENCL=$(USE_OPENCL)
-else
-  CFLAGS            += -DgcdUSE_OPENCL=0
-endif
-
-ifeq ($(VIVANTE_ENABLE_3D),1)
   CFLAGS            += -DgcdUSE_VX=$(USE_OPENVX)
 else
   CFLAGS            += -DgcdUSE_VX=0
 endif
 
 ifneq ($(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_VG),0_0)
-  CFLAGS            += -DUSE_VDK=$(USE_VDK) -DUSE_SW_FB=$(USE_SW_FB)
+  CFLAGS            += -DUSE_VDK=$(USE_VDK)
 else
   CFLAGS            += -DUSE_VDK=0
 endif
@@ -324,18 +330,40 @@ endif
 
 ifeq ($(EGL_API_WL),1)
   CFLAGS            += -DEGL_API_WL -DWL_EGL_PLATFORM -Wno-deprecated-declarations
+  ifeq ($(GL4_LINUX_ENABLE),1)
+    CFLAGS            += -DOPENGL40
+  endif
   LFLAGS             += -L$(VIVANTE_SDK_LIB) -L$(ROOTFS_USR)/lib
 endif
 
 ifeq ($(EGL_API_DRI),1)
   ifeq ($(YOCTO_DRI_BUILD),1)
-    CFLAGS          += -DDRI_PIXMAPRENDER_ASYNC
-    CFLAGS          += -DDRI_PIXMAPRENDER_GL
+    CFLAGS            += -I$(X11_ARM_DIR)/include/arm-linux-gnueabi
   endif
+  CFLAGS          += -DDRI_PIXMAPRENDER_ASYNC
+  CFLAGS          += -DDRI_PIXMAPRENDER_GL
 
-  CFLAGS            += -DEGL_API_DRI
+  ifeq ($(GL4_LINUX_ENABLE),1)
+   CFLAGS            += -DEGL_API_DRI -DOPENGL40
+  else
+   CFLAGS            += -DEGL_API_DRI
+  endif
   CFLAGS            += -I$(X11_ARM_DIR)/include
-  CFLAGS            += -I$(X11_ARM_DIR)/include/arm-linux-gnueabi
+endif
+
+ifeq ($(X11_DRI3),1)
+  ifeq ($(YOCTO_DRI_BUILD),1)
+    CFLAGS            += -I$(X11_ARM_DIR)/include/arm-linux-gnueabi
+  endif
+  CFLAGS          += -DDRI_PIXMAPRENDER_ASYNC
+  CFLAGS          += -DDRI_PIXMAPRENDER_GL
+
+  ifeq ($(GL4_LINUX_ENABLE),1)
+   CFLAGS            += -DX11_DRI3 -DOPENGL40
+  else
+   CFLAGS            += -DX11_DRI3
+  endif
+  CFLAGS            += -I$(X11_ARM_DIR)/include
 endif
 
 ifeq ($(EGL_API_DFB),1)
@@ -407,10 +435,30 @@ else
   CFLAGS            += -DGC_ENABLE_LOADTIME_OPT=0
 endif
 
+ifeq ($(USE_VXC_BINARY),1)
+  CFLAGS            += -DgcdUSE_VXC_BINARY=1
+  ifeq ($(GPU_CONFIG),)
+    $(error "ERROR: missing GPU_CONFIG build setting")
+  endif
+else
+   CFLAGS            += -DgcdUSE_VXC_BINARY=0
+endif
+
+
+ifeq ($(LINUX_VSIMULATOR),1)
+  CFLAGS            += -DEMULATOR -DVSIMULATOR_DEBUG
+  CXXFLAGS          += -DEMULATOR -DVSIMULATOR_DEBUG
+endif
 
 
 CFLAGS              += -DgcdGC355_MEM_PRINT=$(GC355_MEM_PRINT)
 CFLAGS              += -DgcdGC355_PROFILER=$(GC355_PROFILER)
+
+# platform configs.
+soc_vendor    := $(firstword $(subst -, ,$(SOC_PLATFORM)))
+soc_board     := $(lastword  $(subst -, ,$(SOC_PLATFORM)))
+
+-include hal/os/linux/user/platform/$(soc_vendor)/gc_hal_user_platform_$(soc_board).config
 
 ################################################################################
 # Build with profiler
@@ -439,6 +487,9 @@ GLES2X_DIR          := $(AQROOT)/driver/khronos/libGLESv3
 GLSLC_DIR           := $(AQROOT)/compiler/libGLSLC
 VSC_DIR             := $(AQROOT)/compiler/libVSC
 
+VULKAN_DIR          := $(AQROOT)/driver/khronos/libVulkan10
+SPIRV_DIR           := $(AQROOT)/compiler/libSPIRV
+
 VG113D_DIR          := $(AQROOT)/driver/khronos/libOpenVG_3D/vg11/driver
 VG112D_DIR          := $(AQROOT)/driver/khronos/libOpenVG
 GFX_DIR             := $(AQROOT)/driver/dfb
@@ -449,7 +500,11 @@ else
 EXA_DIR             := $(AQROOT)/driver/X/EXA/src
 endif
 
+ifeq ($(GL4_LINUX_ENABLE),1)
+GL21_DIR            := $(AQROOT)/driver/khronos/libGL4
+else
 GL21_DIR            := $(AQROOT)/driver/khronos/libGL2
+endif
 
 CL11_DIR            := $(AQROOT)/driver/khronos/libCL
 CL11_ICD_DIR        := $(AQROOT)/driver/khronos/libCL/icdloader12

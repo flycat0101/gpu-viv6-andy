@@ -49,8 +49,10 @@
 /* 0.0.1.26 remove some enumerations for VIR_ShaderFlags on 01/02/2019 */
 /* 0.0.1.27 Add VIR_ModifierOrder in VIR_Operand on 01/03/2019 */
 /* 0.0.1.28 Add magicNumber on shaderIOBuffer 01/08/2019 */
-#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 28)
-#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 28)
+/* 0.0.1.29 Add some new opcodes 04/01/2019 */
+/* 0.0.1.30 Add some flags in VIR_Shader and hints 04/17/2019 */
+#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 30)
+#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 30)
 
 #if !defined(gcdTARGETHOST_BIGENDIAN)
 #define gcdTARGETHOST_BIGENDIAN 0  /* default host little endian, to change the
@@ -653,7 +655,8 @@ typedef struct _VSC_HW_CONFIG
 
         /* word 3 */
         gctUINT          hasPointSizeFix        : 1;
-        gctUINT          reserved1              : 31;
+        gctUINT          supportVectorB0        : 1;
+        gctUINT          reserved1              : 30;
 
         /* Last word */
         /* Followings will be removed after shader programming is removed out of VSC */
@@ -1106,6 +1109,8 @@ gceSTATUS vscFreeVirIntrinsicLib(void);
 gceSTATUS vscQueryShaderBinarySize(SHADER_HANDLE hShader, gctUINT* pSizeInByte);
 
 gctPOINTER vscGetDebugInfo(IN SHADER_HANDLE    Shader);
+gctPOINTER vscDupDebugInfo(IN SHADER_HANDLE    Shader);
+gceSTATUS  vscDestroyDebugInfo(IN gctPOINTER DebugInfo);
 
 /* Shader copy */
 gceSTATUS vscCopyShader(SHADER_HANDLE * hToShader, SHADER_HANDLE hFromShader);

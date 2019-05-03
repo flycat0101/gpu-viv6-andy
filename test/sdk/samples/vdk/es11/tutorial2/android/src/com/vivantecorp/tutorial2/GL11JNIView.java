@@ -69,7 +69,6 @@ class GL11JNIView extends GLSurfaceView {
     private class Renderer implements GLSurfaceView.Renderer {
         private static final String TAG = "Renderer";
         public void onDrawFrame(GL10 gl) {
-			Log.i("GL11_Tutorial1",String.format("Render ..."));
            if(!GL11JNILib.repaint())
 				//((Activity) context).finish();
 				android.os.Process.killProcess(android.os.Process.myPid());

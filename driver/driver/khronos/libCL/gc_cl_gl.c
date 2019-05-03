@@ -14,6 +14,7 @@
 #include "gc_cl_precomp.h"
 
 #define __NEXT_MSG_ID__     011076
+#define _GC_OBJ_ZONE        gcdZONE_CL_GL
 
 #if (defined(UNDER_CE) || defined(__QNXNTO__) || defined(LINUX))
 #define MAP_TO_DEVICE 1

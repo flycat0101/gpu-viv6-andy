@@ -1,0 +1,55 @@
+__kernel void gpuBatch2Space_FP32
+    (
+    image2d_array_t input,
+    int             block_w,
+    int             block_h,
+    unsigned int    input_depth,
+    image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int in_b = convert_int(convert_short(z) / convert_short(input_depth));
+    short short_b = convert_short(in_b);
+    short short_blockw = convert_short(block_w);
+    short short_blockh = convert_short(block_h);
+    int in_z = z - in_b * input_depth;
+    int out_b = max((int)(short_b/convert_short(block_w * block_h) - 1), (int)0);
+    int biasX = convert_int(short_b / short_blockw);
+    int out_w = (x * block_w + (in_b - biasX * block_w));
+    int out_h = (y * block_h + convert_int(short_b / short_blockh));
+    int out_z = out_b * input_depth + in_z;
+    float4 tmp = {0.0};
+
+    tmp = read_imagef(input, (int4)(x, y, z, 0));
+    write_imagef(output, (int4)(out_w, out_h, out_z, 0), tmp);
+}
+
+__kernel void gpuBatch2Space_Quant8
+    (
+    image2d_array_t input,
+    int             block_w,
+    int             block_h,
+    unsigned int    input_depth,
+    image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int in_b = convert_int(convert_short(z) / convert_short(input_depth));
+    short short_b = convert_short(in_b);
+    short short_blockw = convert_short(block_w);
+    short short_blockh = convert_short(block_h);
+    int in_z = z - in_b * input_depth;
+    int out_b = max((int)(short_b/convert_short(block_w * block_h) - 1), (int)0);
+    int biasX = convert_int(short_b / short_blockw);
+    int out_w = (x * block_w + (in_b - biasX * block_w));
+    int out_h = (y * block_h + convert_int(short_b / short_blockh));
+    int out_z = out_b * input_depth + in_z;
+    uint4 tmp = {0.0};
+
+    tmp = read_imageui(input, (int4)(x, y, z, 0));
+    write_imageui(output, (int4)(out_w, out_h, out_z, 0), tmp);
+}

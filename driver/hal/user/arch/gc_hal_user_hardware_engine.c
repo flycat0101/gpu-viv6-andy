@@ -2073,7 +2073,7 @@ gcoHARDWARE_BindIndex(
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("Hardware=0x%x Address=0x%x"
-                  "EndAdress=0x%x IndexType=%d Bytes=%zu",
+                  "EndAdress=0x%x IndexType=%d Bytes=%u",
                   Hardware, Address, EndAddress, IndexType, Bytes);
 
 
@@ -8870,6 +8870,13 @@ gcoHARDWARE_FlushTarget(
                           )
                         ? 0x0
                         : 0x1;
+    }
+
+    if ((Hardware->patchID == gcvPATCH_DEQP || Hardware->patchID == gcvPATCH_GTFES30) &&
+       (Hardware->config->gpuCoreCount > 1 && Hardware->config->chipModel == gcv7000) &&
+       (Hardware->XFBDirty->s.cmdDirty || (Hardware->XFBStates->status == gcvXFB_Enabled)))
+    {
+         destinationRead = 0x0;
     }
 
     gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_HARDWARE,

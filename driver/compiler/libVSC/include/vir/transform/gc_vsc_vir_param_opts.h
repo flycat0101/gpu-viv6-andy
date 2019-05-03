@@ -29,6 +29,8 @@ typedef struct VIR_PARAM_OPTIMIZATION
     gctUINT paramLengthThreshold;
     VSC_OPTN_ParamOptOptions *options;
     VIR_DEF_USAGE_INFO *duInfo;
+
+    gctBOOL     cfgChanged;
 } VSC_PARAM_optimization;
 
 typedef struct _CANDIDATE_FUNCTION
@@ -61,23 +63,24 @@ typedef struct _LONG_SIZE_ARGUMENT
     gctUINT isDefinedInCaller;
 }LONG_SIZE_ARGUMENT;
 
-#define VSC_PARAM_optimization_GetShader(po)             ((po)->shader)
-#define VSC_PARAM_optimization_SetShader(po, s)          ((po)->shader = (s))
-#define VSC_PARAM_optimization_GetOptions(po)            ((po)->options)
-#define VSC_PARAM_optimization_SetOptions(po, o)         ((po)->options = (o))
-#define VSC_PARAM_optimization_GetCandidateFuncs(po)     ((po)->candidateFuncs)
-#define VSC_PARAM_optimization_SetCandidateFuncs(po, c)  ((po)->candidateFuncs = (c))
+#define VSC_PARAM_optimization_GetShader(po)                ((po)->shader)
+#define VSC_PARAM_optimization_SetShader(po, s)             ((po)->shader = (s))
+#define VSC_PARAM_optimization_GetOptions(po)               ((po)->options)
+#define VSC_PARAM_optimization_SetOptions(po, o)            ((po)->options = (o))
+#define VSC_PARAM_optimization_GetCandidateFuncs(po)        ((po)->candidateFuncs)
+#define VSC_PARAM_optimization_SetCandidateFuncs(po, c)     ((po)->candidateFuncs = (c))
 #define VSC_PARAM_optimization_GetlongSizeArguments(po)     ((po)->longSizeArguments)
 #define VSC_PARAM_optimization_SetlongSizeArguments(po, l)  ((po)->longSizeArguments = (l))
-#define VSC_PARAM_optimization_GetArgumentPtr(po)             ((po)->argMmPtr)
-#define VSC_PARAM_optimization_SetArgumentPtr(po, a)          ((po)->argMmPtr = (a))
+#define VSC_PARAM_optimization_GetArgumentPtr(po)           ((po)->argMmPtr)
+#define VSC_PARAM_optimization_SetArgumentPtr(po, a)        ((po)->argMmPtr = (a))
 #define VSC_PARAM_optimization_GetThreshold(po)             ((po)->paramLengthThreshold)
 #define VSC_PARAM_optimization_SetThreshold(po, t)          ((po)->paramLengthThreshold = (t))
-#define VSC_PARAM_optimization_GetDumper(po)             ((po)->dumper)
-#define VSC_PARAM_optimization_SetDumper(po, d)          ((po)->dumper = (d))
-#define VSC_PARAM_optimization_GetDuInfo(po)             ((po)->duInfo)
-#define VSC_PARAM_optimization_SetDuInfo(po, du)          ((po)->duInfo = (du))
-
+#define VSC_PARAM_optimization_GetDumper(po)                ((po)->dumper)
+#define VSC_PARAM_optimization_SetDumper(po, d)             ((po)->dumper = (d))
+#define VSC_PARAM_optimization_GetDuInfo(po)                ((po)->duInfo)
+#define VSC_PARAM_optimization_SetDuInfo(po, du)            ((po)->duInfo = (du))
+#define VSC_PARAM_optimization_GetCfgChanged(po)            ((po)->cfgChanged)
+#define VSC_PARAM_optimization_SetCfgChanged(po, du)        ((po)->cfgChanged = (du))
 
 extern void VSC_PARAM_optimization_Init(
     IN OUT VSC_PARAM_optimization *po,

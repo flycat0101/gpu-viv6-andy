@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -45,7 +45,7 @@ CC ?= $(CROSS_COMPILE)g++
 ################################################################################
 # Supply additional include directories.
 
-INCLUDE += -I$(VIVANTE_SDK_INC) -I$(VIVANTE_SDK_INC)/HAL -I$(VIVANTE_SDK_INC)
+INCLUDE += -I$(VIVANTE_SDK_INC) -I$(VIVANTE_SDK_INC)/HAL -I$(AQROOT)/sdk/inc
 ifeq ($(EGL_API_DRI), 1)
 	INCLUDE += -I$(X11_ARM_DIR)/include
 endif
@@ -55,7 +55,6 @@ endif
 ifeq ($(EGL_API_DFB), 1)
 	INCLUDE += -I$(DFB_DIR)/include/directfb
 endif
-
 CFLAGS += $(INCLUDE)
 
 ################################################################################
@@ -69,18 +68,18 @@ else
   else
     LIBS += -L$(VIVANTE_SDK_LIB)
   endif
-  LIBS += -lVDK -lGAL -lEGL -lGLESv2
+  LIBS += -l VDK -l EGL -l GLESv2
 endif
 
 ifeq ($(QNX), 1)
   LIBS += -lm -lstdc++
 else
-  LIBS += -lm -lpthread -ldl -lstdc++ -lrt
+  LIBS += -l m -l pthread -l dl -l stdc++ -lrt
   ifeq ($(EGL_API_DRI), 1)
-    LIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11
+    LIBS += -L$(X11_ARM_DIR)/lib -Wl,-rpath-link,$(X11_ARM_DIR)/lib -lX11
   endif
   ifeq ($(EGL_API_X), 1)
-    LIBS += -L$(X11_ARM_DIR)/lib -lXau -lXdmcp -lX11
+    LIBS += -L$(X11_ARM_DIR)/lib -Wl,-rpath-link,$(X11_ARM_DIR)/lib -lX11
   endif
   ifeq ($(EGL_API_DFB), 1)
     LIBS += -L$(DFB_DIR)/lib -ldirectfb -ldirect -lfusion

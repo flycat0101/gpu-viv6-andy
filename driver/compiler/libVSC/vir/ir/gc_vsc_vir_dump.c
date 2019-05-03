@@ -15,7 +15,7 @@
 
 #define OPCODE_ALIGN       (24)
 #define OPERAND_PLUS_ALIGN (24)
-#define _GC_OBJ_ZONE    gcvZONE_COMPILER
+#define _GC_OBJ_ZONE    gcdZONE_COMPILER
 
 typedef enum _VIR_DUMP_CONST_KIND
 {
@@ -406,6 +406,8 @@ _GetUniformKindString(
         return "local_size ";
     case VIR_UNIFORM_NUM_GROUPS:
         return "num_groups ";
+    case VIR_UNIFORM_NUM_GROUPS_FOR_SINGLE_GPU:
+        return "num_groups_for_single_gpu ";
     case VIR_UNIFORM_GLOBAL_OFFSET:
         return "global_offset ";
     case VIR_UNIFORM_WORK_DIM:

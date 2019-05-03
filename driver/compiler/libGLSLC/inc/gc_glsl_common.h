@@ -32,7 +32,7 @@ typedef const char *    gctCONST_CHAR_PTR;
 #include "gc_glsl_hash_table.h"
 
 #ifndef _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE    gcvZONE_COMPILER
+#define _GC_OBJ_ZONE    gcdZONE_COMPILER
 #endif
 
 gctUINT

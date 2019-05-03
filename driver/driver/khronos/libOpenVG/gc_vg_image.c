@@ -13,6 +13,7 @@
 
 #include "gc_vg_precomp.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG_IMAGE
 
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
@@ -2939,7 +2940,7 @@ VG_API_CALL VGImage VG_API_ENTRY vgCreateImage(
         gctINT byteCount;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%04X, %d, %d, 0x%08X);\n",
             __FUNCTION__,
             Format, Width, Height, AllowedQuality
@@ -3060,7 +3061,7 @@ VG_API_CALL VGImage VG_API_ENTRY vgCreateImage(
 #endif
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s() = 0x%08X (surface 0x%08X);\n",
             __FUNCTION__,
             image, image->surface
@@ -3103,7 +3104,7 @@ VG_API_CALL void VG_API_ENTRY vgDestroyImage(
     vgmENTERAPI(vgDestroyImage)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X);\n",
             __FUNCTION__,
             Image
@@ -3228,7 +3229,7 @@ VG_API_CALL void VG_API_ENTRY vgClearImage(
         vgsIMAGE_PTR image;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, %d, %d, %d, %d);\n",
             __FUNCTION__,
             Image, X, Y, Width, Height
@@ -3364,7 +3365,7 @@ VG_API_CALL void VG_API_ENTRY vgImageSubData(
         gcsSURF_FORMAT_INFO *info;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, Data, %d, 0x%04X, %d, %d, %d, %d);\n",
             __FUNCTION__,
             Image, DataStride, DataFormat, X, Y, Width, Height
@@ -3650,7 +3651,7 @@ VG_API_CALL VGImage VG_API_ENTRY vgChildImage(
         vgsIMAGE_PTR parent;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, %d, %d, %d, %d);\n",
             __FUNCTION__,
             Parent, X, Y, Width, Height
@@ -3725,7 +3726,7 @@ VG_API_CALL VGImage VG_API_ENTRY vgChildImage(
         child->surfArgValid     = parent->surfArgValid;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s() = 0x%08X;\n",
             __FUNCTION__,
             child
@@ -3891,7 +3892,7 @@ VG_API_CALL void VG_API_ENTRY vgCopyImage(
         vgmADVANCE_COPYIMAGE_COUNT(Context);
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, %d, %d, 0x%08X, %d, %d, %d, %d, %d);\n",
             __FUNCTION__,
             DestinationImage, TargetX, TargetY,
@@ -4021,7 +4022,7 @@ VG_API_CALL void VG_API_ENTRY vgDrawImage(
         vgmADVANCE_DRAWIMAGE_COUNT(Context);
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X);\n",
             __FUNCTION__,
             Image
@@ -4129,7 +4130,7 @@ VG_API_CALL void VG_API_ENTRY vgSetPixels(
         vgsIMAGE_PTR source;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(%d, %d, 0x%08X, %d, %d, %d, %d);\n",
             __FUNCTION__,
             TargetX, TargetY,
@@ -4254,7 +4255,7 @@ VG_API_CALL void VG_API_ENTRY vgWritePixels(
         gcsSURF_FORMAT_INFO *info;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(Data, %d, 0x%04X, %d, %d, %d, %d);\n",
             __FUNCTION__,
             DataStride, DataFormat, TargetX, TargetY, Width, Height
@@ -4398,7 +4399,7 @@ VG_API_CALL void VG_API_ENTRY vgGetPixels(
         vgsIMAGE_PTR target;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, %d, %d, %d, %d, %d, %d);\n",
             __FUNCTION__,
             DestinationImage,
@@ -4515,7 +4516,7 @@ VG_API_CALL void VG_API_ENTRY vgReadPixels(
     {
         vgsFORMAT_PTR surfaceFormat;
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(Data, %d, 0x%04X, %d, %d, %d, %d);\n",
             __FUNCTION__,
             DataStride, DataFormat, SourceX, SourceY, Width, Height
@@ -4620,7 +4621,7 @@ VG_API_CALL void VG_API_ENTRY vgCopyPixels(
 #endif
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(%d, %d, %d, %d, %d, %d);\n",
             __FUNCTION__,
             TargetX, TargetY, SourceX, SourceY, Width, Height
@@ -4679,7 +4680,7 @@ VG_API_CALL void VG_API_ENTRY vgDrawWarpedImageVIV(
         VGImageQuality imageQuality;
         gceIMAGE_FILTER halImageQuality;
         VGuint quality;
-        gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+        gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                       "%s(%p, %u, %p, %p);\n",
                       __FUNCTION__,
                       Image, RectangleCount, SrcRectangles, Matrices
@@ -4977,7 +4978,7 @@ VG_API_CALL VGImage VG_API_ENTRY vgCreateImageConstVIV(
         gctINT byteCount;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%04X, %d, %d, 0x%08X);\n",
             __FUNCTION__,
             Format, Width, Height, AllowedQuality
@@ -5036,7 +5037,7 @@ VG_API_CALL VGImage VG_API_ENTRY vgCreateImageConstVIV(
             ));
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s() = 0x%08X (surface 0x%08X);\n",
             __FUNCTION__,
             image, image->surface

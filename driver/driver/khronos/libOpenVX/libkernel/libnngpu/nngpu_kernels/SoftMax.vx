@@ -1,7 +1,6 @@
 __kernel void gpuSoftMax_FP32
     (
     __read_only     image2d_array_t input,
-    __global float *                maxValue,
     float                           scale,
     __write_only     image2d_array_t output
     )
@@ -9,18 +8,69 @@ __kernel void gpuSoftMax_FP32
     int x = get_global_id(0);
     int y = get_global_id(1);
     int z = get_global_id(2);
+    int width = get_image_width(input);
+    int height = get_image_height(input);
+    int depth = get_image_array_size(input);
+    int4 coord_in = (int4)(0, 0, 0, 0);
+    float maxValue = ((float) -3.4028235e+038);
     int4 coord = (int4)(x, y, z, 0);
     float4 src, dst = {0.0};
 
+    for(int k = 0; k < depth; k++)
+    {
+        for(int j = 0; j < height; j++)
+        {
+            for(int i = 0; i < width; i++)
+            {
+                src = read_imagef(input, coord_in);
+                maxValue = fmax(src.x, maxValue);
+                coord_in.x++;
+            }
+            coord_in.x = 0;
+            coord_in.y++;
+        }
+        coord_in.x = 0;
+        coord_in.y = 0;
+        coord_in.z++;
+    }
+
     src = read_imagef(input, coord);
-    dst.x = exp2((src.x-maxValue[0])*scale);
+    dst.x = exp2((src.x-maxValue)*scale);
     write_imagef(output, coord, dst);
 }
+
+__kernel void gpuSoftMax_Dim2FP32
+    (
+    __read_only     image2d_array_t input,
+    float                           scale,
+    __write_only     image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int width = get_image_width(input);
+    int4 coord_in = (int4)(0, 0, 0, 0);
+    float maxValue = ((float) -3.4028235e+038);
+    int4 coord = (int4)(x, y, z, 0);
+    float4 src, dst = {0.0};
+
+    for(int i = 0; i < width; i++)
+    {
+        src = read_imagef(input, coord_in);
+        maxValue = fmax(src.x, maxValue);
+        coord_in.x++;
+    }
+
+    src = read_imagef(input, coord);
+    dst.x = exp2((src.x-maxValue)*scale);
+    write_imagef(output, coord, dst);
+}
+
 
 __kernel void gpuSoftMax_Quant8
     (
     __read_only     image2d_array_t input,
-    __global uint *                 maxValue,
     float                           scale,
     float                           scaleIn,
     int                             zpIn,
@@ -31,14 +81,68 @@ __kernel void gpuSoftMax_Quant8
     int y = get_global_id(1);
     int z = get_global_id(2);
     int4 coord = (int4)(x, y, z, 0);
+    int width = get_image_width(input);
+    int height = get_image_height(input);
+    int depth = get_image_array_size(input);
     uint4 src, dst = {0};
-    uint inMax = maxValue[0];
-    float tmpOut, max, outPixel;
+    int4 coord_in = (int4)(0, 0, 0, 0);
+    float tmpOut, maxValue= (convert_int(-zpIn))*scaleIn, outPixel;
+
+    for(int k = 0; k < depth; k++)
+    {
+        for(int j = 0; j < height; j++)
+        {
+            for(int i = 0; i < width; i++)
+            {
+                src = read_imageui(input, coord_in);
+                tmpOut = (convert_int(src.x)-zpIn)*scaleIn;
+                maxValue = fmax(tmpOut, maxValue);
+                coord_in.x++;
+            }
+            coord_in.x = 0;
+            coord_in.y++;
+        }
+        coord_in.x = 0;
+        coord_in.y = 0;
+        coord_in.z++;
+    }
 
     src = read_imageui(input, coord);
     tmpOut = (convert_int(src.x)-zpIn)*scaleIn;
-    max = (convert_int(inMax)-zpIn)*scaleIn;
-    outPixel = exp2((tmpOut-max)*scale);
+    outPixel = exp2((tmpOut-maxValue)*scale);
+    dst.x = floor(outPixel*256.0 + 0.5);
+    write_imageui(output, coord, dst);
+}
+
+__kernel void gpuSoftMax_Dim2Quant8
+    (
+    __read_only     image2d_array_t input,
+    float                           scale,
+    float                           scaleIn,
+    int                             zpIn,
+    __write_only     image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord = (int4)(x, y, z, 0);
+    int width = get_image_width(input);
+    uint4 src, dst = {0};
+    int4 coord_in = (int4)(0, 0, 0, 0);
+    float tmpOut, maxValue= (convert_int(-zpIn))*scaleIn, outPixel;
+
+    for(int i = 0; i < width; i++)
+    {
+        src = read_imageui(input, coord_in);
+        tmpOut = (convert_int(src.x)-zpIn)*scaleIn;
+        maxValue = fmax(tmpOut, maxValue);
+        coord_in.x++;
+    }
+
+    src = read_imageui(input, coord);
+    tmpOut = (convert_int(src.x)-zpIn)*scaleIn;
+    outPixel = exp2((tmpOut-maxValue)*scale);
     dst.x = floor(outPixel*256.0 + 0.5);
     write_imageui(output, coord, dst);
 }

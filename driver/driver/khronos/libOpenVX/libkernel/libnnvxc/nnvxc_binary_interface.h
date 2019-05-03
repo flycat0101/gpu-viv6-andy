@@ -1,21 +1,77 @@
-/****************************************************************************
-*
-*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
-*
-*    The material in this file is confidential and contains trade secrets
-*    of Vivante Corporation. This is proprietary information owned by
-*    Vivante Corporation. No part of this work may be disclosed,
-*    reproduced, copied, transmitted, or used in any way for any purpose,
-*    without the express written permission of Vivante Corporation.
-*
-*****************************************************************************/
-
-
 #ifndef __NN_VXC_BINARY_INTERFACE_H__
 #define __NN_VXC_BINARY_INTERFACE_H__
 
 typedef enum _nnvxc_kernel_enum
 {
+    TensorTranspose,
+    Batch2Space,
+    NormalizationUint8,
+    L2Pooling,
+    Activation,
+    Space2Batch,
+    TensorAddMeanStddevNorm,
+    Rnn,
+    L2NormSumSqrt,
+    LSTMUnitStateOutExt,
+    Gemm_noBias,
+    Floor,
+    TensorStridedSlice,
+    LSTMLayer,
+    TensorCopy,
+    Tensor2DAdd,
+    Reshuffle,
+    TensorPad,
+    Space2Depth,
+    Tensor2Row,
+    FullyConnected,
+    TensorMul,
+    MeanStddevNorm,
+    LSTMUnitLayerNormStateOut,
+    ActivationSoftRelu,
+    ROIPool,
+    RPNNms,
+    TensorAdd,
+    AvgPooling_Int16,
+    LSTMUnitHiddenOutExt,
+    DeConvolution,
+    ResizeNearestNeighbor,
+    Reverse,
+    VertMaxPool,
+    LeakyRelu,
+    L2NormSumScale,
+    Activation_UInt8,
+    RPNRegression,
+    Normalization,
+    MaxPooling,
+    LSTMUnitProjection,
+    BatchNorm,
+    TFAvgPooling,
+    PreTreatedRect,
+    AvgPooling,
+    Depth2Space,
+    TensorMeanAxis0,
+    RPNRetrieve,
+    Softmax,
+    LSTMUnitHiddenOut,
+    Svdf,
+    HashLUT,
+    PRelu,
+    RPNSort,
+    AvgPooling_UInt8,
+    ROIRect2ROIList,
+    TensorConvFormat,
+    LayerNorm,
+    TensorCrop,
+    Gemm,
+    EmbeddingLUT,
+    HorzMaxPool,
+    TensorDiv,
+    LSTMUnit,
+    Reorg,
+    RPNSoftMax,
+    LSTMUnitHiddenOut_Packed,
+    TensorScale,
+    DepthwiseConv,
     NNVXC_KERNEL_NUM /*NNVXC_KERNEL_NUM should be the last item in the enum*/
 }
 nnvxc_kernel_enum;

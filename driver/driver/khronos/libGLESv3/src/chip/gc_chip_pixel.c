@@ -14,7 +14,7 @@
 #include "gc_es_context.h"
 #include "gc_chip_context.h"
 
-#define _GC_OBJ_ZONE    __GLES3_ZONE_PIXEL
+#define _GC_OBJ_ZONE    gcdZONE_ES30_PIXEL
 
 #if (defined(DEBUG) || defined(_DEBUG) || gcdDUMP_FRAME_STATS)
 extern GLboolean g_dbgPerDrawKickOff;

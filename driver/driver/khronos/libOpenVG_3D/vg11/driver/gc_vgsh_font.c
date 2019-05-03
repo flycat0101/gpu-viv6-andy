@@ -13,6 +13,8 @@
 
 #include "gc_vgsh_precomp.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG3D_FONT
+
 void _VGFontCtor(gcoOS os, _VGFont *font)
 {
     gcmHEADER_ARG("os=0x%x font=0x%x",

@@ -15,7 +15,7 @@
 
 #if gcdENABLE_VG
 
-#define _GC_OBJ_ZONE    gcvZONE_VG
+#define _GC_OBJ_ZONE    gcdZONE_VGBUFFER
 
 /******************************************************************************\
 ********************************* Definitions **********************************
@@ -265,7 +265,7 @@ _ValidateBuffer(
     bufferAlignmentMask = Buffer->bufferInfo.addressAlignment - 1;
 
     gcmCMDBUF_VERBOSE(
-        gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+        gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
         "%s(%d) CURRENT BUFFER STATE (validation #%d)\n",
         __FUNCTION__, __LINE__, _validateCounter
         );
@@ -276,7 +276,7 @@ _ValidateBuffer(
         : Buffer->queueCurrent - Buffer->queueFirst + 1;
 
     gcmCMDBUF_VERBOSE(
-        gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+        gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
         "  The queue currently contains %d buffer(s) scheduled.\n",
         queueLength
         );
@@ -284,7 +284,7 @@ _ValidateBuffer(
     if (queueLength)
     {
         gcmCMDBUF_VERBOSE(
-            gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+            gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
             "  Last scheduled buffer is %s @ 0x%08X\n",
             Buffer->queueCurrent->dynamic
                 ? "dynamic"
@@ -309,49 +309,49 @@ _ValidateBuffer(
     do
     {
         gcmCMDBUF_VERBOSE(
-            gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+            gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
             "  Command buffer #%d @ 0x%08X\n",
             bufferCount, currentBuffer
             );
 
         gcmCMDBUF_VERBOSE(
-            gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+            gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
             "    Reference counter ...................... %d\n",
             currentBuffer->reference
             );
 
         gcmCMDBUF_VERBOSE(
-            gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+            gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
             "    Container buffer node .................. 0x%08X\n",
             currentBuffer->node
             );
 
         gcmCMDBUF_VERBOSE(
-            gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+            gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
             "    Hardware address of the buffer ......... 0x%08X\n",
             currentBuffer->address
             );
 
         gcmCMDBUF_VERBOSE(
-            gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+            gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
             "    Offset of the buffer from the header ... %d\n",
             currentBuffer->bufferOffset
             );
 
         gcmCMDBUF_VERBOSE(
-            gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+            gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
             "    Buffer size ............................ %d\n",
             currentBuffer->size
             );
 
         gcmCMDBUF_VERBOSE(
-            gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+            gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
             "    Current offset into the buffer ......... %d\n",
             currentBuffer->offset
             );
 
         gcmCMDBUF_VERBOSE(
-            gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+            gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
             "    Data count in the buffer ............... %d\n",
             currentBuffer->dataCount
             );
@@ -415,7 +415,7 @@ _PrintCompletion(
     if (CommandBuffer->completion == gcvVACANT_BUFFER)
     {
         gcmBUFFER_TRACE(
-            gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+            gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
             "%s(%d): buf=0x%08X, completion not assigned\n",
             Name, Line,
             CommandBuffer
@@ -430,7 +430,7 @@ _PrintCompletion(
             );
 
         gcmBUFFER_TRACE(
-            gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+            gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
             "%s(%d): buf=0x%08X, compl=0x%08X, sig=0x%08X, ref=%d, completed=%s\n",
             Name, Line,
             CommandBuffer,
@@ -460,7 +460,7 @@ _PrintBuffers(
     current = Buffer->bufferLast->nextAllocated;
 
     gcmBUFFER_TRACE(
-        gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+        gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
         "%s(%d): uncommitted=%d, threshold=%d\n",
         Name, Line,
         Buffer->uncommittedSize,
@@ -486,7 +486,7 @@ _PrintBuffers(
         totalSize  += currentSize;
 
         gcmBUFFER_TRACE(
-            gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+            gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
             "  %s wrapper @ 0x%08X, node=0x%08X, address=0x%08X, buffer offset=%d\n",
             (current == Buffer->bufferCurrent)
                 ? "-->"
@@ -498,7 +498,7 @@ _PrintBuffers(
             );
 
         gcmBUFFER_TRACE(
-            gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+            gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
             "      size=%d, offset=%d, data count=%d, size with header=%d\n",
             current->size,
             current->offset,
@@ -509,7 +509,7 @@ _PrintBuffers(
         if (current->completion == gcvVACANT_BUFFER)
         {
             gcmBUFFER_TRACE(
-                gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+                gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
                 "        completion not assigned\n"
                 );
         }
@@ -522,7 +522,7 @@ _PrintBuffers(
                 );
 
             gcmBUFFER_TRACE(
-                gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+                gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
                 "        completion=0x%08X, signal=0x%08X, reference=%d, complete=%s\n",
                 current->completion,
                 current->completion->complete,
@@ -546,14 +546,14 @@ _PrintBuffers(
                 if ((i % 32) == 0)
                 {
                     gcmBUFFER_TRACE(
-                        gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+                        gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
                         "\n        %4d:",
                         i / 8 + 1
                         );
                 }
 
                 gcmBUFFER_TRACE(
-                    gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+                    gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
                     " %08X",
                     * data
                     );
@@ -564,7 +564,7 @@ _PrintBuffers(
             if (i != 0)
             {
                 gcmBUFFER_TRACE(
-                    gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+                    gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
                     "\n\n"
                     );
             }
@@ -580,7 +580,7 @@ _PrintBuffers(
     }
 
     gcmBUFFER_TRACE(
-        gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+        gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
         "Total buffer size=%d\n",
         totalSize
         );
@@ -652,7 +652,7 @@ _AllocateCompletion(
             gcsCOMPLETION_SIGNAL_PTR current;
 
             gcmBUFFER_TRACE(
-                gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+                gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
                 "%s: allocating completion pool.\n",
                 __FUNCTION__
                 );
@@ -700,7 +700,7 @@ _AllocateCompletion(
         else
         {
             gcmBUFFER_TRACE(
-                gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+                gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
                 "%s: using next free completion.\n",
                 __FUNCTION__
                 );
@@ -732,7 +732,7 @@ _AllocateCompletion(
                 ));
 
             gcmBUFFER_TRACE(
-                gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+                gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
                 "%s: created completion signal 0x%08X\n",
                 __FUNCTION__,
                 completion->complete
@@ -741,7 +741,7 @@ _AllocateCompletion(
         else
         {
             gcmBUFFER_TRACE(
-                gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+                gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
                 "%s: completion signal 0x%08X\n",
                 __FUNCTION__,
                 completion->complete
@@ -759,7 +759,7 @@ _AllocateCompletion(
         * Completion = completion;
 
         gcmBUFFER_TRACE(
-            gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+            gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
             "%s: completion=0x%08X\n",
             __FUNCTION__,
             completion
@@ -1462,7 +1462,7 @@ gcoVGBUFFER_Construct(
     gcmHEADER_ARG("HAL=0x%x Hardware=0x%x", Hal, Hardware);
 
     gcmBUFFER_TRACE(
-        gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+        gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
         "[ENTER] %s: CommandBufferSize=%u, TaskBufferGranulatiry=%u, QueueEntryCount=%u\n",
         __FUNCTION__, CommandBufferSize, TaskBufferGranulatiry, QueueEntryCount
         );
@@ -1677,7 +1677,7 @@ gcoVGBUFFER_Construct(
         *Buffer = buffer;
 
         gcmBUFFER_TRACE(
-            gcvLEVEL_INFO, gcvZONE_BUFFER,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "[LEAVE] %s: Created gcoVGBUFFER at %p\n",
             __FUNCTION__, buffer
             );
@@ -1689,7 +1689,7 @@ gcoVGBUFFER_Construct(
     while (gcvFALSE);
 
     gcmBUFFER_TRACE(
-        gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+        gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
         "[FAILED] %s: %d\n",
         __FUNCTION__, status
         );
@@ -1765,7 +1765,7 @@ gcoVGBUFFER_Destroy(
                   Buffer);
 
     gcmBUFFER_TRACE(
-        gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+        gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
         "[ENTER] %s: Buffer=%p\n",
         __FUNCTION__, Buffer
         );
@@ -1887,7 +1887,7 @@ gcoVGBUFFER_Destroy(
     while (gcvFALSE);
 
     gcmBUFFER_TRACE(
-        gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+        gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
         "[LEAVE] %s: %d\n",
         __FUNCTION__, status
         );
@@ -2045,7 +2045,7 @@ gcoVGBUFFER_AssociateCompletion(
         if (Buffer->completionCurrent == gcvVACANT_BUFFER)
         {
             gcmBUFFER_TRACE(
-                gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+                gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
                 "%s: assigning the current completion.\n",
                 __FUNCTION__
                 );
@@ -3323,7 +3323,7 @@ gcoVGBUFFER_Commit(
         /* Determine the length of the queue. */
         queueLength = (gctUINT32)(Buffer->queueCurrent - Buffer->queueFirst + 1);
         gcmBUFFER_TRACE(
-            gcvLEVEL_VERBOSE, gcvZONE_BUFFER,
+            gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
             "%s: queue length=%d, task couint=%d\n",
             __FUNCTION__,
             queueLength, Buffer->taskTable.count

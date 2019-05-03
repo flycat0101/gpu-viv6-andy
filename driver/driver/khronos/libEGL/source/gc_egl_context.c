@@ -1055,7 +1055,14 @@ eglCreateContext(
                     major = attrib_list[i + 1];
                     break;
                 default:
-                    veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
+                    if (eglConfig->renderableType & EGL_OPENVG_BIT)
+                    {
+                        veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
+                    }
+                    else
+                    {
+                        veglSetEGLerror(thread, EGL_BAD_CONFIG);
+                    }
                     gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
                 }
                 break;
@@ -1454,8 +1461,9 @@ eglCreateContext(
     }
 
     /* Useful for debugging */
-    gcmTRACE(
-        gcvLEVEL_INFO,"a,b,g,r=%d,%d,%d,%d, d,s=%d,%d, id=%d, AA=%d, t=0x%08X",
+    gcmTRACE_ZONE(
+        gcvLEVEL_INFO, _GC_OBJ_ZONE,
+            "a,b,g,r=%d,%d,%d,%d, d,s=%d,%d, id=%d, AA=%d, t=0x%08X",
             eglConfig->alphaSize,
             eglConfig->blueSize,
             eglConfig->greenSize,

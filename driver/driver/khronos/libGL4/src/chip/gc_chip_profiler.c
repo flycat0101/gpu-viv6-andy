@@ -16,7 +16,7 @@
 #include "gc_chip_context.h"
 
 
-#define _GC_OBJ_ZONE    __GLES3_ZONE_PROFILER
+#define _GC_OBJ_ZONE    gcdZONE_GL40_PROFILER
 
 
 #if VIVANTE_PROFILER

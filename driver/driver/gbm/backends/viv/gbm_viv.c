@@ -974,15 +974,23 @@ gbm_viv_surface_create(
         gcmVERIFY_OK(gcoOS_StrToInt(envctrl, &extraBufferCount));
         gcmONERROR(gcoOS_CreateMutex(gcvNULL, &surf->lock));
     }
+    else
+    {
+        surf->aSync = gcvFALSE;
+    }
 
+    /* For aSync mode, we need more backBuffer for performance.
+    ** Use VIV_GBM_ENABLE_ASYNC to control.
+    */
     if (surf->aSync)
     {
-        surf->buffer_count = gcmMIN(GBM_MAX_BUFFER, (3 + extraBufferCount));
+        surf->buffer_count = gcmMIN(8, (3 + extraBufferCount));
     }
     else
     {
-        surf->buffer_count = 3;
+        surf->buffer_count = GBM_MAX_BUFFER;
     }
+
     surf->base.gbm = gbm;
     surf->base.width = width;
     surf->base.height = height;
@@ -998,8 +1006,6 @@ gbm_viv_surface_create(
 
     gcmONERROR(gbm_viv_create_buffers(surf, width, height,
         format, usage, modifiers, count));
-
-    surf->aSync = gcvFALSE;
 
     return &surf->base;
 

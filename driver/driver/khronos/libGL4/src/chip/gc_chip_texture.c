@@ -28,7 +28,7 @@
 #endif
 
 
-#define _GC_OBJ_ZONE    __GLES3_ZONE_TEXTURE
+#define _GC_OBJ_ZONE    gcdZONE_GL40_TEXTURE
 
 gceTEXTURE_TYPE __glChipTexTargetToHAL[] =
 {

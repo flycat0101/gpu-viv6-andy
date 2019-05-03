@@ -13,19 +13,26 @@
 
 #include <gc_vx_common.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_METAFMT
+
 VX_INTERNAL_API vx_meta_format vxoMetaFormat_Create(vx_context context)
 {
     vx_meta_format metaFormat;
 
+    gcmHEADER_ARG("context=%p", context);
     vxmASSERT(context);
 
     metaFormat = (vx_meta_format)vxoReference_Create(context, VX_TYPE_META_FORMAT, VX_REF_EXTERNAL, &context->base);
 
-    if (vxoReference_GetStatus((vx_reference)metaFormat) != VX_SUCCESS) return metaFormat;
-
+    if (vxoReference_GetStatus((vx_reference)metaFormat) != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("metaFormat=%p", metaFormat);
+        return metaFormat;
+    }
     metaFormat->size = sizeof(vx_meta_format_s);
     metaFormat->type = VX_TYPE_INVALID;
 
+    gcmFOOTER_ARG("metaFormat=%p", metaFormat);
     return metaFormat;
 }
 
@@ -36,12 +43,19 @@ VX_INTERNAL_API void vxoMetaFormat_Release(vx_meta_format_ptr metaFormatPtr)
 
 VX_API_ENTRY vx_status VX_API_CALL vxSetMetaFormatAttribute(vx_meta_format meta_format, vx_enum attribute, const void *ptr, vx_size size)
 {
+    gcmHEADER_ARG("meta_format=%p, attribute=0x%x, ptr=%p, size=0x%lx", meta_format, attribute, ptr, size);
     gcmDUMP_API("$VX vxSetMetaFormatAttribute: meta_format=%p, attribute=0x%x, ptr=%p, size=0x%lx", meta_format, attribute, ptr, size);
 
-    if (!vxoReference_IsValidAndSpecific(&meta_format->base, VX_TYPE_META_FORMAT)) return VX_ERROR_INVALID_REFERENCE;
-
-    if (VX_TYPE(attribute) != (vx_uint32)meta_format->type && (attribute != VX_VALID_RECT_CALLBACK)) return VX_ERROR_INVALID_TYPE;
-
+    if (!vxoReference_IsValidAndSpecific(&meta_format->base, VX_TYPE_META_FORMAT))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+    if (VX_TYPE(attribute) != (vx_uint32)meta_format->type && (attribute != VX_VALID_RECT_CALLBACK))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_TYPE);
+        return VX_ERROR_INVALID_TYPE;
+    }
     switch (attribute)
     {
         case VX_IMAGE_FORMAT:
@@ -237,15 +251,18 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetMetaFormatAttribute(vx_meta_format meta_
             }
             else
             {
+                gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
                 return VX_ERROR_INVALID_PARAMETERS;
             }
            break;
 
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
+            gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
             return VX_ERROR_NOT_SUPPORTED;
     }
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
@@ -253,14 +270,20 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetMetaFormatFromReference(vx_meta_format m
 {
     vx_status status = VX_SUCCESS;
 
+    gcmHEADER_ARG("meta=%p, examplar=%p", meta, examplar);
     gcmDUMP_API("$VX vxSetMetaFormatFromReference: meta=%p, examplar=%p", meta, examplar);
 
     if (vxoReference_IsValidAndSpecific(&meta->base, VX_TYPE_META_FORMAT) == vx_false_e)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
         return VX_ERROR_INVALID_REFERENCE;
+    }
 
     if (vxoReference_IsValidAndNoncontext(examplar) == vx_false_e)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
         return VX_ERROR_INVALID_REFERENCE;
-
+    }
     switch (examplar->type)
     {
         case VX_TYPE_IMAGE:
@@ -445,6 +468,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetMetaFormatFromReference(vx_meta_format m
         break;
     }
 
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 

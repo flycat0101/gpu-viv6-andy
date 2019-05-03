@@ -17,6 +17,8 @@
 #include <gc_hal_vx.h>
 #include <gc_vx_nn_util.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_TARGET
+
 extern vx_status VX_CALLBACK vxoProgramKernel_FunctionVX(vx_node node, const vx_reference parameters[], vx_uint32 paramCount);
 
 extern vx_kernel_description_s *    target_kernels[];
@@ -28,7 +30,7 @@ VX_PRIVATE_API vx_status vxInitializeTarget(
     vx_uint32 kernelCount)
 {
     vx_uint32   index;
-
+    gcmHEADER_ARG("target=%p, kernelDescTable=%p, kernelCount=0x%x", target, kernelDescTable, kernelCount);
     vxmASSERT(target);
     vxmASSERT(kernelDescTable);
     vxmASSERT(kernelCount > 0);
@@ -36,6 +38,7 @@ VX_PRIVATE_API vx_status vxInitializeTarget(
     /* ToDo : Add more specific return status check */
     if (gcoVX_Initialize(&target->base.context->evisNoInst) != gcvSTATUS_OK)
     {
+        gcmFOOTER_NO();
         return VX_FAILURE;
     }
 
@@ -46,7 +49,7 @@ VX_PRIVATE_API vx_status vxInitializeTarget(
         vx_status status = VX_FAILURE;
         vx_kernel kernel = &target->kernelTable[index];
 
-        if (kernel != NULL && kernel->base.type != VX_TYPE_ERROR)
+        if (kernel != NULL && kernel->base.type != VX_TYPE_ERROR && kernel->base.type != VX_TYPE_INVALID)
         {
             kernel->enabled = vx_false_e;
             vxRemoveKernel(kernel);
@@ -69,22 +72,28 @@ VX_PRIVATE_API vx_status vxInitializeTarget(
 , kernelDescTable[index]->optAttributes
 #endif
                                             );
-        if (status != VX_SUCCESS) return status;
-
+        if (status != VX_SUCCESS)
+        {
+            gcmFOOTER_NO();
+            return status;
+        }
         status = vxFinalizeKernel(&target->kernelTable[index]);
-        if (status != VX_SUCCESS) return status;
-
+        if (status != VX_SUCCESS)
+        {
+            gcmFOOTER_NO();
+            return status;
+        }
         target->kernelCount++;
         target->base.context->kernelCount++;
     }
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
 VX_PRIVATE_API vx_status vxDeinitializeTarget(vx_target target)
 {
     vx_uint32 index;
-
+    gcmHEADER_ARG("target=%p", target);
     vxmASSERT(target);
 
     for (index = 0; index < VX_MAX_KERNEL_COUNT; index++)
@@ -97,12 +106,16 @@ VX_PRIVATE_API vx_status vxDeinitializeTarget(vx_target target)
 
         if (vxoKernel_IsUnique(&target->kernelTable[index])) target->base.context->uniqueKernelCount--;
 
-        if (vxoKernel_InternalRelease(&kernel) != VX_SUCCESS) return VX_FAILURE;
+        if (vxoKernel_InternalRelease(&kernel) != VX_SUCCESS)
+        {
+            gcmFOOTER_NO();
+            return VX_FAILURE;
+        }
     }
 
     target->base.context->kernelCount -= target->kernelCount;
     target->kernelCount = 0;
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -130,9 +143,13 @@ VX_PRIVATE_API vx_status vxoTarget_IsKernelSupported(
         OUT vx_uint32_ptr indexPtr)
 {
     vx_uint32 index;
+    gcmHEADER_ARG("target=%p, targetName=%s, kernelName=%s", target, targetName, kernelName);
 
-    if (vxIsSameString(targetName, VX_DEFAULT_TARGET_NAME, VX_MAX_TARGET_NAME)) return VX_ERROR_NOT_SUPPORTED;
-
+    if (vxIsSameString(targetName, VX_DEFAULT_TARGET_NAME, VX_MAX_TARGET_NAME))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_NOT_SUPPORTED;
+    }
     for (index = 0; index < VX_MAX_KERNEL_COUNT; index++)
     {
         vx_char         kernelFullName[VX_MAX_KERNEL_NAME+1] = {'\0'};
@@ -161,10 +178,11 @@ VX_PRIVATE_API vx_status vxoTarget_IsKernelSupported(
             )
         {
             if (indexPtr != VX_NULL) *indexPtr = index;
+            gcmFOOTER_NO();
             return VX_SUCCESS;
         }
     }
-
+    gcmFOOTER_NO();
     return VX_ERROR_NOT_SUPPORTED;
 }
 
@@ -174,6 +192,7 @@ VX_PRIVATE_API vx_status vxoTarget_ExecuteKernel(vx_node node, const vx_referenc
 {
     vx_status status = VX_SUCCESS;
     vxnne_operation_target_e operationTarget = VXNNE_OPERATION_TARGET_NONE;
+    gcmHEADER_ARG("node=%p, parameters=%p, num=0x%x", node, parameters, num);
 
     if (!node->layer)
     {
@@ -197,6 +216,7 @@ VX_PRIVATE_API vx_status vxoTarget_ExecuteKernel(vx_node node, const vx_referenc
         vxnneMultiChannel_SetCurrentChannel(operationTarget);
     }
 
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -204,7 +224,7 @@ VX_PRIVATE_API vx_action vxoTarget_ProcessNodes(
         vx_target target, vx_node nodes[], vx_size startIndex, vx_size nodeCount)
 {
     vx_size index;
-
+    gcmHEADER_ARG("target=%p, nodes=%p, startIndex=0x%lx, nodeCount=0x%lx", target, nodes, startIndex, nodeCount);
     vxmASSERT(target);
     vxmASSERT(nodes);
 
@@ -305,17 +325,24 @@ VX_PRIVATE_API vx_action vxoTarget_ProcessNodes(
 #if VIVANTE_PROFILER
         vxoProfiler_End((vx_reference)target);
 #endif
-        if (status != VX_SUCCESS) return VX_ACTION_ABANDON;
-
+        if (status != VX_SUCCESS)
+        {
+            gcmFOOTER_NO();
+            return VX_ACTION_ABANDON;
+        }
         if (node->completeCallback != VX_NULL)
         {
             vx_action action = node->completeCallback(node);
 
-            if (action != VX_ACTION_CONTINUE) return action;
+            if (action != VX_ACTION_CONTINUE)
+            {
+                gcmFOOTER_NO();
+                return action;
+            }
         }
 
     }
-
+    gcmFOOTER_NO();
     return VX_ACTION_CONTINUE;
 }
 
@@ -325,11 +352,17 @@ VX_PRIVATE_API vx_action vxoTarget_ProcessNodesBlock(
     vx_status status;
     vx_size i;
 
+    gcmHEADER_ARG("target=%p, nodeBlock=%p", target, nodeBlock);
     vxmASSERT(target);
     vxmASSERT(nodeBlock);
 
-    if (nodeBlock->executed) return VX_ACTION_CONTINUE;
 
+
+    if (nodeBlock->executed)
+    {
+        gcmFOOTER_NO();
+        return VX_ACTION_CONTINUE;
+    }
     status = nodeBlock->execute(nodeBlock);
 
     nodeBlock->executed = vx_true_e;
@@ -341,8 +374,12 @@ VX_PRIVATE_API vx_action vxoTarget_ProcessNodesBlock(
         nodeBlock->nodes[i]->status = status;
     }
 
-    if (status != VX_SUCCESS) return VX_ACTION_ABANDON;
-
+    if (status != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("%d", status);
+        return VX_ACTION_ABANDON;
+    }
+    gcmFOOTER_ARG("%d", status);
     return VX_ACTION_CONTINUE;
 }
 
@@ -375,6 +412,9 @@ VX_PRIVATE_API vx_kernel vxoTarget_AddKernel(
 {
     vx_uint32 index;
 
+    gcmHEADER_ARG("target=%s, name=%s, enumeration=0x%x, program=%p, funcPtr=%p, paramCount=0x%x, validate=%p, input=%p, output=%p, initialize=%p, deinitialize=%p",
+        target, name, enumeration, program, funcPtr, paramCount, validate, input, output, initialize, deinitialize);
+
     vxmASSERT(target);
     vxmASSERT(name);
     vxmASSERT(funcPtr);
@@ -401,16 +441,18 @@ VX_PRIVATE_API vx_kernel vxoTarget_AddKernel(
 
             if (status != VX_SUCCESS)
             {
+                gcmFOOTER_NO();
                 return (vx_kernel)vxoContext_GetErrorObject(target->base.context, status);
             }
 
             target->kernelCount++;
 
             target->base.context->kernelCount++;
+            gcmFOOTER_NO();
             return kernel;
         }
     }
-
+    gcmFOOTER_NO();
     return (vx_kernel)vxoContext_GetErrorObject(target->base.context, VX_ERROR_NO_RESOURCES);
 }
 
@@ -423,6 +465,8 @@ VX_PRIVATE_API vx_kernel vxoTarget_AddTilingKernel(
 {
     vx_uint32 index;
 
+    gcmHEADER_ARG("target=%s, name=%s, enumeration=0x%x, flexibleFuncPtr=%p, fastFuncPtr=%p, paramCount=0x%x, input=%p, output=%p",
+        target, name, enumeration, flexibleFuncPtr, fastFuncPtr, paramCount, input, output);
     vxmASSERT(target);
     vxmASSERT(name);
     vxmASSERT(flexibleFuncPtr);
@@ -448,6 +492,7 @@ VX_PRIVATE_API vx_kernel vxoTarget_AddTilingKernel(
 
             if (status != VX_SUCCESS)
             {
+                gcmFOOTER_ARG("%d", status);
                 return (vx_kernel)vxoContext_GetErrorObject(target->base.context, status);
             }
 
@@ -456,17 +501,18 @@ VX_PRIVATE_API vx_kernel vxoTarget_AddTilingKernel(
             target->kernelCount++;
 
             target->base.context->kernelCount++;
+            gcmFOOTER_ARG("%d", status);
             return kernel;
         }
     }
-
+    gcmFOOTER_NO();
     return (vx_kernel)vxoContext_GetErrorObject(target->base.context, VX_ERROR_NO_RESOURCES);
 }
 
 VX_PRIVATE_API vx_status vxGetImagePatchToTile(vx_image image, vx_rectangle_t *rect, vx_tile_t *tile)
 {
     vx_uint32 index;
-
+    gcmHEADER_ARG("image=%p, rect=%p, tile=%p", image, rect, tile);
     vxmASSERT(image);
     vxmASSERT(tile);
 
@@ -478,9 +524,12 @@ VX_PRIVATE_API vx_status vxGetImagePatchToTile(vx_image image, vx_rectangle_t *r
 
         status = vxAccessImagePatch(image, rect, 0,
                                     &tile->addr[index], (vx_ptr_ptr)&tile->base[index], VX_READ_AND_WRITE);
-        if (status != VX_SUCCESS) return status;
+        if (status != VX_SUCCESS) {
+            gcmFOOTER_ARG("%d", status);
+            return status;
+        }
     }
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -488,15 +537,21 @@ VX_PRIVATE_API vx_status vxSetTileToImagePatch(vx_image image, vx_rectangle_t *r
 {
     vx_uint32 index;
 
+    gcmHEADER_ARG("image=%p, rect=%p, tile=%p", image, rect, tile);
+
     vxmASSERT(image);
     vxmASSERT(tile);
 
     for (index = 0; index < image->planeCount; index++)
     {
         vx_status status = vxCommitImagePatch(image, rect, 0, &tile->addr[index], tile->base[index]);
-         if (status != VX_SUCCESS) return status;
-    }
+         if (status != VX_SUCCESS) {
+             gcmFOOTER_ARG("%d", status);
+             return status;
 
+         }
+    }
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -520,21 +575,31 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
     vx_uint32           tileWidth, tileHeight;
     vx_uint32           x, y;
 
+    gcmHEADER_ARG("node=%p, paramTable=%p, paramCount=0x%x", node, paramTable, paramCount);
 
     for (paramIndex = 0; paramIndex < paramCount; paramIndex++)
     {
         vx_parameter param = vxGetParameterByIndex(node, paramIndex);
 
-        if (vxoReference_GetStatus((vx_reference)param) != VX_SUCCESS) return VX_ERROR_INVALID_PARAMETERS;
-
+        if (vxoReference_GetStatus((vx_reference)param) != VX_SUCCESS)
+        {
+            gcmFOOTER_NO();
+            return VX_ERROR_INVALID_PARAMETERS;
+        }
         status = vxQueryParameter(param, VX_PARAMETER_DIRECTION,
                                     &dirTable[paramIndex], sizeof(dirTable[paramIndex]));
-        if (status != VX_SUCCESS) return status;
-
+        if (status != VX_SUCCESS)
+        {
+            gcmFOOTER_ARG("%d", status);
+            return status;
+        }
         status = vxQueryParameter(param, VX_PARAMETER_TYPE,
                                     &typeTable[paramIndex], sizeof(typeTable[paramIndex]));
-        if (status != VX_SUCCESS) return status;
-
+        if (status != VX_SUCCESS)
+        {
+            gcmFOOTER_ARG("%d", status);
+            return status;
+        }
         vxReleaseParameter(&param);
 
         switch (typeTable[paramIndex])
@@ -542,34 +607,55 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
             case VX_TYPE_IMAGE:
                 status = vxQueryNode(node, VX_NODE_OUTPUT_TILE_BLOCK_SIZE,
                             &tileTable[paramIndex].tile_block, sizeof(vx_tile_block_size_t));
-                if (status != VX_SUCCESS) return status;
-
+                if (status != VX_SUCCESS)
+                {
+                    gcmFOOTER_ARG("%d", status);
+                    return status;
+                }
                 status = vxQueryNode(node, VX_NODE_INPUT_NEIGHBORHOOD,
                             &tileTable[paramIndex].neighborhood, sizeof(vx_neighborhood_size_t));
-                if (status != VX_SUCCESS) return status;
-
+                if (status != VX_SUCCESS)
+                {
+                    gcmFOOTER_ARG("%d", status);
+                    return status;
+                }
                 imageTable[paramIndex] = (vx_image)paramTable[paramIndex];
 
                 status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_WIDTH,
                                         &tileTable[paramIndex].image.width, sizeof(vx_uint32));
-                if (status != VX_SUCCESS) return status;
-
+                if (status != VX_SUCCESS)
+                {
+                    gcmFOOTER_ARG("%d", status);
+                    return status;
+                }
                 status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_HEIGHT,
                                         &tileTable[paramIndex].image.height, sizeof(vx_uint32));
-                if (status != VX_SUCCESS) return status;
-
+                if (status != VX_SUCCESS)
+                {
+                    gcmFOOTER_ARG("%d", status);
+                    return status;
+                }
                 status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_FORMAT,
                                         &tileTable[paramIndex].image.format, sizeof(vx_df_image));
-                if (status != VX_SUCCESS) return status;
-
+                if (status != VX_SUCCESS)
+                {
+                    gcmFOOTER_ARG("%d", status);
+                    return status;
+                }
                 status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_SPACE,
                                         &tileTable[paramIndex].image.space, sizeof(vx_enum));
-                if (status != VX_SUCCESS) return status;
-
+                if (status != VX_SUCCESS)
+                {
+                    gcmFOOTER_ARG("%d", status);
+                    return status;
+                }
                 status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_RANGE,
                                         &tileTable[paramIndex].image.range, sizeof(vx_enum));
-                if (status != VX_SUCCESS) return status;
-
+                if (status != VX_SUCCESS)
+                {
+                    gcmFOOTER_ARG("%d", status);
+                    return status;
+                }
                 tileKernelParams[paramIndex] = &tileTable[paramIndex];
 
                 if (dirTable[paramIndex] == VX_OUTPUT)
@@ -580,34 +666,53 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
 
             case VX_TYPE_SCALAR:
                 status = vxReadScalarValue((vx_scalar)paramTable[paramIndex], (void *)&scalarTable[paramIndex]);
-                if (status != VX_SUCCESS) return status;
-
+                if (status != VX_SUCCESS)
+                {
+                    gcmFOOTER_ARG("%d", status);
+                    return status;
+                }
                 tileKernelParams[paramIndex] = &scalarTable[paramIndex];
                 break;
         }
     }
 
-    if (firstOutputImageIndex == VX_INVALID_INDEX) return VX_ERROR_INVALID_PARAMETERS;
-
+    if (firstOutputImageIndex == VX_INVALID_INDEX)
+    {
+        gcmFOOTER_ARG("%d", status);
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
     status = vxQueryImage(imageTable[firstOutputImageIndex], VX_IMAGE_WIDTH,
                             &imageWidth, sizeof(imageWidth));
-    if (status != VX_SUCCESS) return status;
-
+    if (status != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
     status = vxQueryImage(imageTable[firstOutputImageIndex], VX_IMAGE_HEIGHT,
                             &imageHeight, sizeof(imageHeight));
-    if (status != VX_SUCCESS) return status;
-
+    if (status != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
     status = vxQueryNode(node, VX_NODE_BORDER, &borderMode, sizeof(borderMode));
-    if (status != VX_SUCCESS) return status;
-
+    if (status != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
     if (borderMode.mode != VX_BORDER_UNDEFINED && borderMode.mode != VX_BORDER_MODE_SELF)
     {
+        gcmFOOTER_ARG("%d", status);
         return VX_ERROR_NOT_SUPPORTED;
     }
 
     status = vxQueryNode(node, VX_NODE_TILE_MEMORY_SIZE, &tileMemorySize, sizeof(tileMemorySize));
-    if (status != VX_SUCCESS) return status;
-
+    if (status != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
     tileHeight  = imageHeight / VX_TILE_BLOCK_MULTIPLER;
     tileWidth   = imageWidth;
 
@@ -631,13 +736,20 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
                     tileTable[paramIndex].tile_y = y;
 
                     status = vxGetImagePatchToTile(imageTable[paramIndex], &rect, &tileTable[paramIndex]);
-                    if (status != VX_SUCCESS) return status;
+                    if (status != VX_SUCCESS)
+                    {
+                        gcmFOOTER_ARG("%d", status);
+                        return status;
+                    }
                 }
             }
 
             status = vxQueryNode(node, VX_NODE_TILE_MEMORY_PTR, &tileMemoryPtr, sizeof(vx_ptr));
-            if (status != VX_SUCCESS) return status;
-
+            if (status != VX_SUCCESS)
+            {
+                gcmFOOTER_ARG("%d", status);
+                return status;
+            }
             node->kernel->tilingFunction(tileKernelParams, tileMemoryPtr, tileMemorySize);
 
             for (paramIndex = 0; paramIndex < paramCount; paramIndex++)
@@ -653,12 +765,16 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
                         status = vxSetTileToImagePatch(imageTable[paramIndex], &rect, &tileTable[paramIndex]);
                     }
 
-                    if (status != VX_SUCCESS) return status;
+                    if (status != VX_SUCCESS)
+                    {
+                        gcmFOOTER_ARG("%d", status);
+                        return status;
+                    }
                 }
             }
         }
     }
-
+    gcmFOOTER_ARG("%d", status);
     return VX_SUCCESS;
 }
 
@@ -692,6 +808,7 @@ VX_INTERNAL_API vx_status vxoTarget_Load(vx_context context, vx_string moduleNam
     vx_target   target;
     vx_char     modulePath[VX_MAX_PATH];
 
+    gcmHEADER_ARG("context=%p, moduleName=%s", context, moduleName);
     vxmASSERT(context);
 
     for (index = 0; index < VX_MAX_TARGET_COUNT; index++)
@@ -699,8 +816,11 @@ VX_INTERNAL_API vx_status vxoTarget_Load(vx_context context, vx_string moduleNam
         if (context->targetTable[index].module.handle == VX_NULL_MODULE_HANDLE) break;
     }
 
-    if (index == VX_MAX_TARGET_COUNT) return VX_FAILURE;
-
+    if (index == VX_MAX_TARGET_COUNT)
+    {
+        gcmFOOTER_NO();
+        return VX_FAILURE;
+    }
     target = &context->targetTable[index];
 
     if (moduleName == VX_NULL) moduleName = VX_DEFAULT_TARGET_MODULE_NAME;
@@ -717,6 +837,7 @@ VX_INTERNAL_API vx_status vxoTarget_Load(vx_context context, vx_string moduleNam
     if (target->module.handle == VX_NULL)
     {
         vxError("Failed to load module \"%s\"\n", modulePath);
+        gcmFOOTER_NO();
         return VX_ERROR_NO_RESOURCES;
     }
 
@@ -736,7 +857,7 @@ VX_INTERNAL_API vx_status vxoTarget_Load(vx_context context, vx_string moduleNam
     target->funcs.processnodesBlock = vxoTarget_ProcessNodesBlock;
     target->funcs.processLayer      = vxoTarget_ProcessLayer;
     target->context                 = context;
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -744,10 +865,14 @@ VX_INTERNAL_API vx_status vxoTarget_Unload(vx_context context, vx_uint32 index, 
 {
     vx_target target;
 
+    gcmHEADER_ARG("context=%p, index=0x%x, unloadModule=0x%x", context, index, unloadModule);
     vxmASSERT(context);
 
-    if (index >= VX_MAX_TARGET_COUNT) return VX_ERROR_INVALID_PARAMETERS;
-
+    if (index >= VX_MAX_TARGET_COUNT)
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
     target = &context->targetTable[index];
 
     vxmASSERT(target);
@@ -769,20 +894,26 @@ VX_INTERNAL_API vx_status vxoTarget_Unload(vx_context context, vx_uint32 index, 
         vxoReference_Release((vx_reference_ptr)&target, (vx_type_e)VX_TYPE_TARGET, VX_REF_INTERNAL);
     }
 
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
 VX_PRIVATE_API vx_uint32 vxoTarget_GetIndex(vx_target target)
 {
     vx_uint32 index;
-
+    gcmHEADER_ARG("target=%p", target);
     vxmASSERT(target);
 
     for (index = 0; index < target->base.context->targetCount; index++)
     {
-        if (target == &target->base.context->targetTable[index]) return index;
+        if (target == &target->base.context->targetTable[index])
+        {
+            gcmFOOTER_NO();
+            return index;
+        }
     }
 
+    gcmFOOTER_NO();
     return index;
 }
 
@@ -792,13 +923,18 @@ VX_API_ENTRY vx_target VX_API_CALL VX_API_CALL vxGetTargetByIndex(vx_context con
 {
     vx_target target;
 
+    gcmHEADER_ARG("context=%p, index=0x%x", context, index);
     gcmDUMP_API("$VX vxGetTargetByIndex: context=%p, index=0x%x", context, index);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (index >= context->targetCount)
     {
         vxError("Invalid target index: %d", index);
+        gcmFOOTER_NO();
         return (vx_target)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
     }
 
@@ -808,6 +944,7 @@ VX_API_ENTRY vx_target VX_API_CALL VX_API_CALL vxGetTargetByIndex(vx_context con
 
     vxoTarget_Dump(target, index);
 
+    gcmFOOTER_NO();
     return target;
 }
 
@@ -816,13 +953,18 @@ VX_API_ENTRY vx_target VX_API_CALL vxGetTargetByName(vx_context context, const v
     vx_uint32 index;
     vx_target target;
 
+    gcmHEADER_ARG("context=%p, name=%s", context, name);
     gcmDUMP_API("$VX vxGetTargetByName: context=%p, name=%s", context, name);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (name == VX_NULL)
     {
         vxError("Target name is null");
+        gcmFOOTER_NO();
         return (vx_target)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
     }
 
@@ -836,11 +978,14 @@ VX_API_ENTRY vx_target VX_API_CALL vxGetTargetByName(vx_context context, const v
 
             vxoTarget_Dump(target, index);
 
+            gcmFOOTER_NO();
+
             return target;
         }
     }
 
     vxError("Invalid target name: \"%s\"", name);
+    gcmFOOTER_NO();
     return (vx_target)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
 }
 
@@ -858,10 +1003,12 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryTarget(vx_target target, vx_enum attri
     vx_kernel_info_t *  kernelTable;
     vx_uint32           kernelTableSize;
 
+    gcmHEADER_ARG("target=%p, attribute=0x%x, size=0x%x", target, attribute, size);
     gcmDUMP_API("$VX vxQueryTarget: target=%p, attribute=0x%x, size=0x%x", target, attribute, size);
 
     if (!vxoReference_IsValidAndSpecific((vx_reference)target, (vx_type_e)VX_TYPE_TARGET))
     {
+        gcmFOOTER_NO();
         return VX_ERROR_INVALID_REFERENCE;
     }
 
@@ -872,14 +1019,20 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryTarget(vx_target target, vx_enum attri
 
             targetIndex = vxoTarget_GetIndex(target);
 
-            if (targetIndex == target->base.context->targetCount) return VX_ERROR_INVALID_PARAMETERS;
-
+            if (targetIndex == target->base.context->targetCount)
+            {
+                gcmFOOTER_NO();
+                return VX_ERROR_INVALID_PARAMETERS;
+            }
             *(vx_uint32 *)ptr = targetIndex;
             break;
 
         case VX_TARGET_ATTRIBUTE_NAME:
-            if (size > VX_MAX_TARGET_NAME || ptr == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
-
+            if (size > VX_MAX_TARGET_NAME || ptr == VX_NULL)
+            {
+                gcmFOOTER_NO();
+                return VX_ERROR_INVALID_PARAMETERS;
+            }
             vxStrCopySafe((vx_string)ptr, size, target->name);
             break;
 
@@ -912,9 +1065,10 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryTarget(vx_target target, vx_enum attri
 
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
+            gcmFOOTER_NO();
             return VX_ERROR_NOT_SUPPORTED;
     }
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -922,12 +1076,18 @@ VX_API_ENTRY vx_status VX_API_CALL vxAssignNodeAffinity(vx_node node, vx_target 
 {
     vx_uint32 kernelIndex;
 
+    gcmHEADER_ARG("node=%p, target=%p", node, target);
     gcmDUMP_API("$VX vxAssignNodeAffinity: node=%p, target=%p", node, target);
 
-    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) return VX_ERROR_INVALID_REFERENCE;
-
-    if (!vxoReference_IsValidAndSpecific(&target->base, (vx_type_e)VX_TYPE_TARGET)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+    if (!vxoReference_IsValidAndSpecific(&target->base, (vx_type_e)VX_TYPE_TARGET))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     for (kernelIndex = 0; kernelIndex < VX_MAX_KERNEL_COUNT; kernelIndex++)
     {
         if(target->kernelTable[kernelIndex].enabled == vx_false_e
@@ -937,10 +1097,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxAssignNodeAffinity(vx_node node, vx_target 
         if (node->kernel->enumeration == target->kernelTable[kernelIndex].enumeration)
         {
             node->targetIndex = vxoTarget_GetIndex(target);
+            gcmFOOTER_NO();
             return VX_SUCCESS;
         }
     }
-
+    gcmFOOTER_NO();
     return VX_ERROR_NOT_SUPPORTED;
 }
 
@@ -948,6 +1109,8 @@ static vx_const_string gcoOS_ReverseStrstr(vx_const_string string, vx_const_stri
 {
     vx_const_string last = NULL;
     vx_const_string cur = string;
+    gcmHEADER_ARG("string=%s, substr=%s", string, substr);
+
     do {
         cur = (vx_const_string) strstr(cur, substr);
         if (cur != NULL)
@@ -956,6 +1119,8 @@ static vx_const_string gcoOS_ReverseStrstr(vx_const_string string, vx_const_stri
             cur = cur+1;
         }
     } while (cur != NULL);
+
+    gcmFOOTER_NO();
     return last;
 }
 
@@ -968,6 +1133,7 @@ vx_bool vxoTarget_MatchTargetNameWithString(const char* targetName, const char* 
     vx_bool match = vx_false_e;
     size_t len = strlen(targetString);
     vx_string lowerString = (char*)calloc(len + 1, sizeof(char));
+    gcmHEADER_ARG("targetName=%p, targetString=%p", targetName, targetString);
 
     if (lowerString != VX_NULL)
     {
@@ -990,7 +1156,7 @@ vx_bool vxoTarget_MatchTargetNameWithString(const char* targetName, const char* 
 
         free(lowerString);
     }
-
+    gcmFOOTER_NO();
     return match;
 }
 

@@ -1326,6 +1326,22 @@ _GetArgumentVariable(
 }
 
 gceSTATUS
+slFuncCheckForAtrigAsIntrinsic(
+    IN sloCOMPILER Compiler,
+    IN struct _slsNAME * FuncName,
+    IN struct _sloIR_POLYNARY_EXPR * PolynaryExpr
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    if(sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_HALTI5_WITH_FMA_SUPPORT))
+    {
+        slsFUNC_SET_FLAG(&(FuncName->u.funcInfo), slvFUNC_SKIP_AS_INTRINSIC);
+    }
+    return status;
+}
+
+gceSTATUS
 slFuncCheckForInterpolate(
     IN sloCOMPILER Compiler,
     IN struct _slsNAME * FuncName,
@@ -2055,9 +2071,9 @@ slGetBuiltInVariableImplSymbol(
     gcmASSERT(ImplSymbol);
     gcmASSERT(ImplQualifier);
 
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "Symbol=%s", gcmOPT_STRING(Symbol));
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "ImplSymbol=%x", gcmOPT_POINTER(ImplSymbol));
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "*ImplQualifier=%u", gcmOPT_VALUE(ImplQualifier));
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "Symbol=%s", gcmOPT_STRING(Symbol));
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "ImplSymbol=%x", gcmOPT_POINTER(ImplSymbol));
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "*ImplQualifier=%u", gcmOPT_VALUE(ImplQualifier));
 
     shaderType = Compiler->shaderType;
 
@@ -8722,6 +8738,35 @@ _GenAsinhCode(
 }
 
 gceSTATUS
+_GenAcoshCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER();
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    slmVERIFY_IR_OBJECT(PolynaryExpr, slvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand);
+    gcmASSERT(OperandCount == 1);
+
+    status = _GenAsinhOrAcoshCode(Compiler, CodeGenerator, PolynaryExpr,
+                            OperandsParameters, IOperand, gcvFALSE);
+
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
 _EvaluateAcosh(
     IN sloCOMPILER Compiler,
     IN gctUINT OperandCount,
@@ -11879,6 +11924,110 @@ _GenMixCode(
 
         if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
     }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+_GenAcosCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    )
+{
+    gceSTATUS   status;
+
+    gcmHEADER();
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    slmVERIFY_IR_OBJECT(PolynaryExpr, slvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 1);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand);
+
+    status = slGenGenericCode1(
+                            Compiler,
+                            PolynaryExpr->exprBase.base.lineNo,
+                            PolynaryExpr->exprBase.base.stringNo,
+                            slvOPCODE_ACOS,
+                            IOperand,
+                            &OperandsParameters[0].rOperands[0]);
+
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+_GenAsinCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    )
+{
+    gceSTATUS   status;
+
+    gcmHEADER();
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    slmVERIFY_IR_OBJECT(PolynaryExpr, slvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 1);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand);
+
+    status = slGenGenericCode1(
+                            Compiler,
+                            PolynaryExpr->exprBase.base.lineNo,
+                            PolynaryExpr->exprBase.base.stringNo,
+                            slvOPCODE_ASIN,
+                            IOperand,
+                            &OperandsParameters[0].rOperands[0]);
+
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+_GenAtanCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    )
+{
+    gceSTATUS   status;
+
+    gcmHEADER();
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    slmVERIFY_IR_OBJECT(PolynaryExpr, slvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 1);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand);
+
+    status = slGenGenericCode1(
+                            Compiler,
+                            PolynaryExpr->exprBase.base.lineNo,
+                            PolynaryExpr->exprBase.base.stringNo,
+                            slvOPCODE_ATAN,
+                            IOperand,
+                            &OperandsParameters[0].rOperands[0]);
+
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;

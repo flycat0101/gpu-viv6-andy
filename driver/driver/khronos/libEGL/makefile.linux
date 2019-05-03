@@ -93,8 +93,11 @@ ifeq ($(EGL_API_DFB),1)
              -I$(DFB_DIR)/include/directfb
 endif
 
-CFLAGS  += $(INCLUDE) -DgcdUSE_KMS=$(USE_KMS)
-
+ifeq ($(USE_KMS),1)
+  CFLAGS += $(INCLUDE) -DgcdUSE_KMS=$(USE_KMS)
+else
+  CFLAGS += $(INCLUDE) -DgcdUSE_KMS=0
+endif
 ################################################################################
 # Add extra flags for object files.
 ifneq ($(filter 1,$(EGL_API_X) $(EGL_API_DRI) $(X11_DRI3)),)
@@ -169,7 +172,7 @@ ifeq ($(EGL_API_GBM),1)
   ifneq ($(GBM_LIBS),)
     LDLIBS += $(GBM_LIBS)
   else
-    LDLIBS += -L$(SDK_DIR)/drivers -L$(AQROOT)/driver/gbm/main/$(OBJ_DIR) -lgbm -L$(AQROOT)/driver/gbm/backends/viv/$(OBJ_DIR) -l:gbm_viv.so
+    LDLIBS += -L$(SDK_DIR)/drivers -L$(AQROOT)/driver/gbm/main/$(OBJ_DIR) -lgbm -L$(AQROOT)/driver/gbm/backends/viv/$(OBJ_DIR) -lgbm_viv
   endif
 endif
 

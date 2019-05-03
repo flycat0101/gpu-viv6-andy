@@ -2033,6 +2033,9 @@ static void _CollectExeHints(VSC_SHADER_COMPILER_PARAM* pCompilerParam, VSC_SEP_
                                                                            gcvTRUE : VIR_Shader_IsSeparated(pShader);
     pOutSEP->exeHints.nativeHints.globalStates.bLinkProgramPipeline = (pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_LINK_PROGRAM_PIPELINE_OBJ);
     pOutSEP->exeHints.nativeHints.globalStates.memoryAccessHint = (SHADER_EDH_MEM_ACCESS_HINT)pShader->memoryAccessFlag[VIR_SHLEVEL_Pre_Low];
+    pOutSEP->exeHints.nativeHints.globalStates.flowControlHint = (SHADER_EDH_FLOW_CONTROL_HINT)pShader->flowControlFlag[VIR_SHLEVEL_Pre_Low];
+    pOutSEP->exeHints.nativeHints.globalStates.texldHint = (SHADER_EDH_TEXLD_HINT)pShader->texldFlag[VIR_SHLEVEL_Pre_Low];
+
 
     if (pShader->shaderKind == VIR_SHADER_FRAGMENT)
     {
@@ -2179,6 +2182,8 @@ static void _CollectExeHints(VSC_SHADER_COMPILER_PARAM* pCompilerParam, VSC_SEP_
     pOutSEP->exeHints.derivedHints.globalStates.gprSpillSize = pShader->vidmemSizeOfSpill;
     pOutSEP->exeHints.derivedHints.globalStates.bCrSpilled   = pShader->hasCRegSpill;
     pOutSEP->exeHints.derivedHints.globalStates.memoryAccessHint = (SHADER_EDH_MEM_ACCESS_HINT)pShader->memoryAccessFlag[VIR_SHLEVEL_Post_Machine];
+    pOutSEP->exeHints.derivedHints.globalStates.flowControlHint = (SHADER_EDH_FLOW_CONTROL_HINT)pShader->flowControlFlag[VIR_SHLEVEL_Post_Machine];
+    pOutSEP->exeHints.derivedHints.globalStates.texldHint = (SHADER_EDH_TEXLD_HINT)pShader->texldFlag[VIR_SHLEVEL_Post_Machine];
     pOutSEP->exeHints.derivedHints.globalStates.hwStartRegNoForUSCAddrs = pShader->remapRegStart;
     pOutSEP->exeHints.derivedHints.globalStates.hwStartRegChannelForUSCAddrs = pShader->remapChannelStart;
     pOutSEP->exeHints.derivedHints.globalStates.bIoUSCAddrsPackedToOneReg = (pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL) ?
@@ -2342,6 +2347,9 @@ static SHS_PRIV_CONSTANT_KIND _MapUniformKindToPrivConstKind(VIR_Shader* pShader
     /* General uniform kind. */
     case VIR_UNIFORM_NUM_GROUPS:
         privConstKind = SHS_PRIV_CONSTANT_KIND_COMPUTE_GROUP_NUM;
+        break;
+    case VIR_UNIFORM_NUM_GROUPS_FOR_SINGLE_GPU:
+        privConstKind = SHS_PRIV_CONSTANT_KIND_COMPUTE_GROUP_NUM_FOR_SINGLE_GPU;
         break;
 
     case VIR_UNIFORM_BASE_INSTANCE:

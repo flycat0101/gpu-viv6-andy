@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -415,8 +415,8 @@ int BmpInterface::readBMP(const char* filename, u08 *inputBuf, u32 width, u32 he
             return -1;
         }
         fileSize = sizeof(FileHeader) + sizeof(InfoHeader);
-	    if( NULL==tmpBuf )
-		    tmpBuf = (u08*)malloc(fileSize);
+        if( NULL==tmpBuf )
+            tmpBuf = (u08*)malloc(fileSize);
 
         fread(tmpBuf, fileSize, 1, srcFile);
         fileOffset = ((((FileHeader*)tmpBuf)->fileOffset2) << 16) + (((FileHeader*)tmpBuf)->fileOffset1);
@@ -512,8 +512,8 @@ int BmpInterface::rgb2YUV(u08* inputBuf, u32 xSize, u32 ySize)
 #ifdef LINUX
 int BmpInterface::showFPGA(u08* inputBuf, u32 xSize, u32 ySize)
 {
-#ifdef NO_SHOW	// for goke cann't call ioctl
-	return 0;
+#ifdef NO_SHOW    // for goke cann't call ioctl
+    return 0;
 #endif
 
     struct fb_var_screeninfo vInfo;
@@ -528,7 +528,7 @@ int BmpInterface::showFPGA(u08* inputBuf, u32 xSize, u32 ySize)
     u32 yEnd = 0;
     u32 desIndex=0;
     u32 srcIndex=0;
-	u32 xWidthInPixel;
+    u32 xWidthInPixel;
 
     // read frame buffer info
     hFB = open("/dev/fb0", O_RDWR);

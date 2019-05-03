@@ -3202,6 +3202,7 @@ static VSC_MC_CODEC_TYPE _GetExtendedOpcodeCodecType(VSC_MC_CODEC* pMcCodec,
         case 0x1E:
             return VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_ALU;
         case 0x1F:
+        case MC_AUXILIARY_OP_CODE_USC_SCATTER:
             return VSC_MC_CODEC_TYPE_SCATTER;
         case 0x20:
             return VSC_MC_CODEC_TYPE_3_SRCS_ALU;
@@ -5509,15 +5510,18 @@ static gctBOOL _Encode_Mc_Scatter_Inst(VSC_MC_CODEC* pMcCodec,
     gctUINT           srcIdx;
 
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_SCATTER);
-    gcmASSERT(!pInCodecHelperInst->bDstValid);
+    gcmASSERT(!pInCodecHelperInst->bDstValid || pInCodecHelperInst->extOpcode == MC_AUXILIARY_OP_CODE_USC_SCATTER);
     gcmASSERT(pInCodecHelperInst->srcCount == 3);
 
     /* Opcode */
     ENCODE_BASE_OPCODE(pOutMcInst, 0x45);
     ENCODE_EXT_OPCODE(pOutMcInst, 0x45, 0x1F);
 
-    /*  Why dst is valid, but has no channel to be written? */
-    gcmASSERT(pInCodecHelperInst->dst.u.evisDst.compIdxRange > 0);
+    /* Dst */
+    if (pInCodecHelperInst->bDstValid)
+    {
+        _EncodeDst(pMcCodec, &pInCodecHelperInst->dst, gcvTRUE, pOutMcInst);
+    }
 
     /* Get the startBin/endBin first. */
     pOutMcInst->evis_inst.inst.startDstCompIdx = pInCodecHelperInst->dst.u.evisDst.startCompIdx;
@@ -6329,10 +6333,18 @@ static gctBOOL _Decode_Mc_Scatter_Inst(VSC_MC_CODEC* pMcCodec,
     pOutCodecHelperInst->baseOpcode = 0x45;
     pOutCodecHelperInst->extOpcode = 0x1F;
 
-    /* Dst, get the startBin/endBin. */
-    pOutCodecHelperInst->bDstValid = gcvFALSE;
-    pOutCodecHelperInst->dst.u.evisDst.startCompIdx = pInMcInst->evis_inst.inst.startDstCompIdx;
-    pOutCodecHelperInst->dst.u.evisDst.compIdxRange = pInMcInst->evis_inst.inst.endDstCompIdx - pInMcInst->evis_inst.inst.startDstCompIdx + 1;
+    /* Dst */
+    pOutCodecHelperInst->bDstValid = _DecodeDst(pMcCodec, pInMcInst, gcvTRUE, &pOutCodecHelperInst->dst);
+
+    if (pOutCodecHelperInst->bDstValid)
+    {
+        pOutCodecHelperInst->extOpcode = MC_AUXILIARY_OP_CODE_USC_SCATTER;
+    }
+    else
+    {
+        pOutCodecHelperInst->dst.u.evisDst.startCompIdx = pInMcInst->evis_inst.inst.startDstCompIdx;
+        pOutCodecHelperInst->dst.u.evisDst.compIdxRange = pInMcInst->evis_inst.inst.endDstCompIdx - pInMcInst->evis_inst.inst.startDstCompIdx + 1;
+    }
 
     /* Src */
     for (srcIdxOfHelperInst = 0; ; srcIdxOfHelperInst ++)
@@ -6731,7 +6743,8 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
     if (pCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_USC_STORE ||
         pCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_USC_IMG_STORE ||
         pCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_USC_IMG_STORE_3D ||
-        pCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_USC_STORE_ATTR)
+        pCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_USC_STORE_ATTR ||
+        pCodecHelperInst->extOpcode  == MC_AUXILIARY_OP_CODE_USC_SCATTER)
     {
         if (!pMcCodec->pHwCfg->hwFeatureFlags.supportUSC)
         {
@@ -6953,7 +6966,8 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
     if (pCodecHelperInst->baseOpcode == 0x7F &&
         pCodecHelperInst->extOpcode == 0x13)
     {
-        if (pCodecHelperInst->dst.u.nmlDst.writeMask != WRITEMASK_X)
+        if (!pMcCodec->pHwCfg->hwFeatureFlags.supportVectorB0 &&
+            pCodecHelperInst->dst.u.nmlDst.writeMask != WRITEMASK_X)
         {
             GotoError();
         }

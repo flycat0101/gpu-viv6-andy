@@ -3427,7 +3427,7 @@ gcSHADER_ReadShaderFromFile(
         return status;
 
     status = gcSHADER_ReadBufferFromFile(ShaderName ,&buffer,&bufferSize);
-    if ((gcmIS_SUCCESS(status)))
+    if (gcmIS_SUCCESS(status))
     {
         ShaderType = (gcSHADER_KIND)((*(gctUINT32 *) ((gceOBJECT_TYPE *) buffer + 4))>>16);/*get the shadertype from word4*/
         if (ShaderType >= gcSHADER_TYPE_UNKNOWN &&  ShaderType <= gcSHADER_KIND_COUNT)
@@ -3575,11 +3575,11 @@ gcSHADER_GetTempVirFileName(
     gcmONERROR(vscGetTemporaryDir(nameBuffer));
 #if _WIN32
     gcmONERROR(gcoOS_StrCatSafe(nameBuffer,
-        _cldFILENAME_MAX,
+        nameBufferSize,
         "\\"));
 #else
     gcmONERROR(gcoOS_StrCatSafe(nameBuffer,
-        _cldFILENAME_MAX,
+        nameBufferSize,
         "/"));
 #endif
 

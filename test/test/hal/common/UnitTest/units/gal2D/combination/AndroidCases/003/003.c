@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -321,6 +321,12 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
             char buff[128];
             sprintf(buff, "%s_%02d.bmp", t2d->runtime->saveFullName, loop);
             GalSaveTSurfToDIB(result, buff);
+        }
+
+        if (result != gcvNULL)
+        {
+            GalDeleteTSurf(gcvNULL, result);
+            result = NULL;
         }
     }
 

@@ -1266,7 +1266,7 @@ static gceSTATUS _StartVR(
 
         Hardware->hw2DCmdBuffer = gcvNULL;
         Hardware->hw2DCmdSize = 0;
-        Hardware->hw2DCmdIndex = (type == gceFILTER_BLIT_TYPE_ONE_PASS)? 278 : 178;
+        Hardware->hw2DCmdIndex = (type == gceFILTER_BLIT_TYPE_ONE_PASS)? 280 : 180;
 
         if (Hardware->hw3DEngine)
         {
@@ -1274,6 +1274,7 @@ static gceSTATUS _StartVR(
         }
 
         if (Hardware->features[gcvFEATURE_2D_FC_SOURCE]||
+            Hardware->features[gcvFEATURE_2D_FAST_CLEAR]||
             Hardware->features[gcvFEATURE_2D_V4COMPRESSION])
         {
             Hardware->hw2DCmdIndex += 10;
@@ -4424,6 +4425,7 @@ gceSTATUS gcoHARDWARE_End2DRender(
 
     /* Flush the Tile cache if available. */
     if ((Hardware->features[gcvFEATURE_2D_FC_SOURCE]
+        || Hardware->features[gcvFEATURE_2D_FAST_CLEAR]
         || Hardware->features[gcvFEATURE_2D_COMPRESSION]
         || Hardware->features[gcvFEATURE_2D_V4COMPRESSION]) &&
         !Hardware->features[gcvFEATURE_TPC_COMPRESSION] &&

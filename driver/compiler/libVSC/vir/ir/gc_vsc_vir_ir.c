@@ -1551,10 +1551,10 @@ VIR_GetSymFromId(
     VIR_Symbol * sym;
     VIR_SymId    unscopedSymId =  VIR_Id_GetIndex(SymId);
 
-    gcmASSERT(VIR_Id_isValid(SymId));
-    gcmASSERT(!VIR_Id_isFunctionScope(SymId) || BT_IS_FUNCTION_SCOPE(SymTable));
+    VERIFY_EXPRESSION_BOOL_RET_BOPOT(VIR_Id_isValid(SymId));
+    VERIFY_EXPRESSION_BOOL_RET_BOPOT(!VIR_Id_isFunctionScope(SymId) || BT_IS_FUNCTION_SCOPE(SymTable));
 
-    gcmASSERT(VIR_SymTable_MaxValidId(SymTable) > unscopedSymId);
+    VERIFY_EXPRESSION_BOOL_RET_BOPOT(VIR_SymTable_MaxValidId(SymTable) > unscopedSymId);
     sym = (VIR_Symbol *)VIR_GetEntryFromId(SymTable, unscopedSymId);
     return sym;
 }
@@ -2167,13 +2167,31 @@ VIR_Shader_IsES11Compiler(
     IN VIR_Shader * Shader
     )
 {
-    gctBOOL isES11Compiler;
+    if (VIR_Shader_GetClientApiVersion(Shader) == gcvAPI_OPENGL_ES11)
+    {
+        return gcvTRUE;
+    }
 
-    isES11Compiler = ((Shader->compilerVersion[0] & 0xFFFF) == _SHADER_GL_LANGUAGE_TYPE &&
+    return gcvFALSE;
+}
+
+gctBOOL
+VIR_Shader_IsES20Compiler(
+    IN VIR_Shader * Shader
+    )
+{
+    gctBOOL isES20Compiler;
+
+    if (VIR_Shader_IsES11Compiler(Shader))
+    {
+        return gcvFALSE;
+    }
+
+    isES20Compiler = ((Shader->compilerVersion[0] & 0xFFFF) == _SHADER_GL_LANGUAGE_TYPE &&
         (Shader->compilerVersion[1] >= _SHADER_ES11_VERSION) &&
         (Shader->compilerVersion[1] < _SHADER_HALTI_VERSION));
 
-    return isES11Compiler;
+    return isES20Compiler;
 }
 
 gctBOOL
@@ -10963,14 +10981,19 @@ VIR_Inst_Store_Have_Dst(
     VIR_Operand *pOpnd = gcvNULL;
     VIR_OpCode  opcode = VIR_Inst_GetOpcode(Inst);
 
-    if (VIR_OPCODE_isMemSt(opcode) ||
-        VIR_OPCODE_isImgSt(opcode) ||
-        VIR_OPCODE_isAttrSt(opcode))
+    if (VIR_OPCODE_hasStoreOperation(opcode))
     {
         /* in v60, USC has constraint. If src2 is immediate/uniform/indirect,
         there must be a store destination. the client needs to check v60,
         store includes: memory store, atomic, img_store */
-        pOpnd = VIR_Inst_GetSource(Inst, 2);
+        if (VIR_OPCODE_useSrc3AsInstType(opcode))
+        {
+            pOpnd = VIR_Inst_GetSource(Inst, 3);
+        }
+        else
+        {
+            pOpnd = VIR_Inst_GetSource(Inst, 2);
+        }
         gcmASSERT(!VIR_Operand_isUndef(pOpnd));
 
         if (VIR_Operand_GetOpKind(pOpnd) == VIR_OPND_IMMEDIATE ||
@@ -11212,9 +11235,13 @@ VIR_Inst_IdenticalExpression(
     IN VIR_Instruction  *Inst0,
     IN VIR_Instruction  *Inst1,
     IN VIR_Shader       *Shader,
-    IN gctBOOL          precisionMatters
+    IN gctBOOL          bPrecisionMatters,
+    IN gctBOOL          bAllowCommutative
     )
 {
+    gctUINT             i;
+    gctBOOL             bMatched = gcvTRUE;
+
     if(Inst0 == gcvNULL || Inst1 == gcvNULL)
     {
         return gcvFALSE;
@@ -11246,24 +11273,53 @@ VIR_Inst_IdenticalExpression(
         return gcvFALSE;
     }
 
-    if(precisionMatters &&
+    if(bPrecisionMatters &&
         VIR_Operand_GetPrecision(VIR_Inst_GetDest(Inst0)) != VIR_Operand_GetPrecision(VIR_Inst_GetDest(Inst1)))
     {
         return gcvFALSE;
     }
 
+    /* Check all sources. */
+    bMatched = gcvTRUE;
+    for (i = 0; i < VIR_Inst_GetSrcNum(Inst0); i++)
     {
-        gctUINT i;
-        for(i = 0; i < VIR_Inst_GetSrcNum(Inst0); i++)
+        if (!VIR_Operand_Identical(VIR_Inst_GetSource(Inst0, i), VIR_Inst_GetSource(Inst1, i), Shader))
         {
-            if(!VIR_Operand_Identical(VIR_Inst_GetSource(Inst0, i), VIR_Inst_GetSource(Inst1, i), Shader))
+            bMatched = gcvFALSE;
+            break;
+        }
+    }
+    if (bMatched || !bAllowCommutative)
+    {
+        return bMatched;
+    }
+
+    /* If this OPCODE is commutative, check the commutative sources. */
+    if (i < 2 && VIR_OPCODE_Src0Src1Commutative(VIR_Inst_GetOpcode(Inst0)))
+    {
+        /* Swap src0 and src1. */
+        if (!VIR_Operand_Identical(VIR_Inst_GetSource(Inst0, 0), VIR_Inst_GetSource(Inst1, 1), Shader))
+        {
+            return gcvFALSE;
+        }
+        if (!VIR_Operand_Identical(VIR_Inst_GetSource(Inst0, 1), VIR_Inst_GetSource(Inst1, 0), Shader))
+        {
+            return gcvFALSE;
+        }
+
+        /* Check the left sources. */
+        for (i = 2; i < VIR_Inst_GetSrcNum(Inst0); i++)
+        {
+            if (!VIR_Operand_Identical(VIR_Inst_GetSource(Inst0, i), VIR_Inst_GetSource(Inst1, i), Shader))
             {
                 return gcvFALSE;
             }
         }
+
+        return gcvTRUE;
     }
 
-    return gcvTRUE;
+    return gcvFALSE;
 }
 
 VIR_TypeId
@@ -14054,7 +14110,8 @@ VIR_Operand_GetConstValForUniform(
     IN  VIR_Shader         *pShader,
     IN  VIR_Operand        *pOpnd,
     IN  VIR_Symbol         *pUniformSym,
-    IN  VIR_Uniform        *pUniform
+    IN  VIR_Uniform        *pUniform,
+    IN  gctUINT             arrayOffset
     )
 {
     VIR_ConstId             constId;
@@ -14066,6 +14123,9 @@ VIR_Operand_GetConstValForUniform(
     gcmASSERT(pUniform && isSymUniformCompiletimeInitialized(pUniformSym));
 
     pBaseType = pSymType = VIR_Symbol_GetType(pUniformSym);
+
+    gcmASSERT(arrayOffset == 0 || VIR_Type_isArray(pBaseType));
+
     while (VIR_Type_isArray(pBaseType))
     {
         pBaseType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pBaseType));
@@ -14078,7 +14138,7 @@ VIR_Operand_GetConstValForUniform(
         gctUINT rows = VIR_GetTypeRows(VIR_Type_GetIndex(pBaseType));
 
         arrayIndex = index / rows;
-        constId = *(VIR_Uniform_GetInitializerPtr(pUniform) + arrayIndex);
+        constId = *(VIR_Uniform_GetInitializerPtr(pUniform) + arrayIndex + arrayOffset);
         index -= arrayIndex * 2;
     }
     else
@@ -14091,7 +14151,6 @@ VIR_Operand_GetConstValForUniform(
     */
     if(VIR_GetTypeSize(VIR_GetTypeComponentType(VIR_Type_GetIndex(pBaseType))) >= 8)
     {
-
         VIR_Const       *pConst;
         VIR_ConstVal    constVal;
         gctUINT64       data;
@@ -17502,7 +17561,7 @@ VIR_Shader_ComputeWorkThreadNum(
     VSC_HW_CONFIG   *pHwCfg
     )
 {
-    gctUINT maxFreeReg = vscGetHWMaxFreeRegCount(pHwCfg);
+    gctUINT maxFreeReg = pHwCfg->maxGPRCountPerCore / 4;
     gctUINT threadCount = pHwCfg->maxCoreCount * 4 * (VIR_Shader_isDual16Mode(pShader) ? 2 : 1);
     gctUINT hwRegCount = VIR_Shader_GetRegWatermark(pShader);
     gctUINT numWorkThread;
@@ -17510,14 +17569,14 @@ VIR_Shader_ComputeWorkThreadNum(
     gcmASSERT(VIR_Shader_GetKind(pShader) == VIR_SHADER_COMPUTE);
 
     /* Since we only use workThreadNum to calculate the private memory, it is OK that our result is larger than expect. */
-    numWorkThread = (gctUINT)(ceil((gctFLOAT)maxFreeReg / (gctFLOAT)hwRegCount)) * threadCount;
+    numWorkThread = (gctUINT)(floor((gctFLOAT)maxFreeReg / (gctFLOAT)hwRegCount)) * threadCount;
 
     if (numWorkThread == 0)
     {
         numWorkThread = 1;
     }
 
-    return numWorkThread;
+    return numWorkThread * 2;
 }
 
 /* return the number of workgroups launched at the same time */
@@ -17528,7 +17587,7 @@ VIR_Shader_ComputeWorkGroupNum(
     )
 {
     gctUINT numWorkGroup;
-    gctUINT maxFreeReg = vscGetHWMaxFreeRegCount(pHwCfg);
+    gctUINT maxFreeReg = pHwCfg->maxGPRCountPerCore / 4;
     gctUINT hwRegCount = VIR_Shader_GetRegWatermark(pShader);
     gctUINT workGroupSize = 0;
     gctUINT threadCount = pHwCfg->maxCoreCount * 4 * (VIR_Shader_isDual16Mode(pShader) ? 2 : 1);
@@ -17557,7 +17616,7 @@ VIR_Shader_ComputeWorkGroupNum(
         numWorkGroup = 1;
     }
 
-    return numWorkGroup;
+    return numWorkGroup * 2;
 }
 
 /* return the workGroupCount per shader group. */
@@ -18129,6 +18188,71 @@ VirShader_GenInvocationIndex(
                                 IndexSymId,
                                 VIR_TYPE_UINT32);
     VIR_Operand_SetEnable(VIR_Inst_GetDest(add2Inst), VIR_ENABLE_X);
+
+    return errCode;
+}
+
+/* Those functions are used in the PASS only. */
+VSC_ErrCode
+VIR_Pass_RemoveInstruction(
+    IN VIR_Function*    pFunction,
+    IN VIR_Instruction* pInst,
+    INOUT gctBOOL*      pInvalidCFG
+    )
+{
+    VSC_ErrCode         errCode  = VSC_ERR_NONE;
+    VIR_BASIC_BLOCK*    pBB = VIR_Inst_GetBasicBlock(pInst);
+
+    VIR_Function_RemoveInstruction(pFunction, pInst);
+
+    /* If there is no instruction within one BB, we need to rebuild CFG. */
+    if (pInvalidCFG && pBB && BB_GET_LENGTH(pBB) == 0)
+    {
+        *pInvalidCFG = gcvTRUE;
+    }
+
+    return errCode;
+}
+
+VSC_ErrCode
+VIR_Pass_DeleteInstruction(
+    IN VIR_Function*    pFunction,
+    IN VIR_Instruction* pInst,
+    INOUT gctBOOL*      pInvalidCFG
+    )
+{
+    VSC_ErrCode         errCode  = VSC_ERR_NONE;
+    VIR_BASIC_BLOCK*    pBB = VIR_Inst_GetBasicBlock(pInst);
+
+    VIR_Function_DeleteInstruction(pFunction, pInst);
+
+    /* If there is no instruction within one BB, we need to rebuild CFG. */
+    if (pInvalidCFG && pBB && BB_GET_LENGTH(pBB) == 0)
+    {
+        *pInvalidCFG = gcvTRUE;
+    }
+
+    return errCode;
+}
+
+VSC_ErrCode
+VIR_Pass_MoveInstructionBefore(
+    IN VIR_Function*    pMoveFunction,
+    IN VIR_Instruction* pBeforeMe,
+    IN VIR_Instruction* pInst,
+    INOUT gctBOOL*      pInvalidCFG
+    )
+{
+    VSC_ErrCode         errCode  = VSC_ERR_NONE;
+    VIR_BASIC_BLOCK*    pBB = VIR_Inst_GetBasicBlock(pInst);
+
+    VIR_Function_MoveInstructionBefore(pMoveFunction, pBeforeMe, pInst);
+
+    /* If there is no instruction within one BB, we need to rebuild CFG. */
+    if (pInvalidCFG && pBB && BB_GET_LENGTH(pBB) == 0)
+    {
+        *pInvalidCFG = gcvTRUE;
+    }
 
     return errCode;
 }

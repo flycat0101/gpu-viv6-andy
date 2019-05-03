@@ -9,8 +9,9 @@ __kernel void gpuReorg2_Depth2SpaceFP32
     int y = get_global_id(1);
     int z = get_global_id(2);
     int outDepth = get_image_array_size(output);
-    int inx = x / block_size;
-    int iny = y / block_size;
+    short short_blockSize = convert_short(block_size);
+    int inx = convert_int(convert_short(x)/short_blockSize);
+    int iny = convert_int(convert_short(y)/short_blockSize);
     int inz = ((x - inx * block_size) + (y - iny * block_size) * block_size) * outDepth + z;
     float4 tmp = {0.0};
 
@@ -51,9 +52,10 @@ __kernel void gpuReorg2_Depth2SpaceQuant8
     int y = get_global_id(1);
     int z = get_global_id(2);
     int outDepth = get_image_array_size(output);
-    int inx = x / block_size;
-    int iny = y / block_size;
-    int inz = (x % block_size) * outDepth + (y % block_size) * block_size * outDepth + z;
+    short short_blockSize = convert_short(block_size);
+    int inx = convert_int(convert_short(x)/short_blockSize);
+    int iny = convert_int(convert_short(y)/short_blockSize);
+    int inz = ((x - inx * block_size) + (y - iny * block_size) * block_size) * outDepth + z;
     uint4 tmp = {0};
 
     tmp = read_imageui(input, (int4)(inx, iny, inz, 0));

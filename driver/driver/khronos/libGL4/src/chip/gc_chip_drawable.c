@@ -15,7 +15,7 @@
 #include "gc_es_device.h"
 #include "gc_chip_context.h"
 
-#define _GC_OBJ_ZONE    __GLES3_ZONE_TRACE
+#define _GC_OBJ_ZONE    gcdZONE_GL40_TRACE
 
 #if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
 #include "viv_lock.h"

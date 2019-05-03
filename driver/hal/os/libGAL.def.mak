@@ -99,12 +99,9 @@ EXPORTS
     gcoOS_Send
     gcoOS_WaitForSend
     gcoOS_SetDebugFile
-    gcoOS_ReplaceDebugFile
     gcoOS_SetDebugLevel
-    gcoOS_SetDebugLevelZone
     gcoOS_SetDebugShaderFiles
     gcoOS_SetDebugZone
-    gcoOS_SetDebugZones
     gcoOS_SetDriverTLS
     gcoOS_SetPLSValue
     gcoOS_SetPos
@@ -1031,6 +1028,7 @@ EXPORTS
     gcoVX_ProgrammCrossEngine
     gcoVX_SetNNImage
     gcoVX_GetNNConfig
+	gcoVX_QueryHWChipInfo
     gcoVX_FlushCache
     gcoVX_AllocateMemoryEx
     gcoVX_FreeMemoryEx

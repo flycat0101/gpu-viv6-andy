@@ -20,7 +20,7 @@ __kernel void gpuPooling_AvgNoPadFP32(__read_only image2d_array_t   input,
         }
     }
 
-    tmpOut = tmpOut/count;
+    tmpOut.x = tmpOut.x/convert_float(count);
 
     write_imagef(output, (int4)(x, y, z, 0), tmpOut);
 }
@@ -53,7 +53,7 @@ __kernel void gpuPooling_AvgNoPadQuant8(__read_only image2d_array_t   input,
         }
     }
 
-    tmpOut.x = tmpOut.x/count;
+    tmpOut.x = tmpOut.x/convert_float(count);
     tmp.x = floor(tmpOut.x*scaleOut + zeroPointOut + 0.5);
 
     write_imageui(output, (int4)(x, y, z, 0), tmp);
@@ -93,7 +93,7 @@ __kernel void gpuPooling_AvgPadFP32(__read_only image2d_array_t   input,
         }
     }
 
-    tmpOut = tmpOut/count;
+    tmpOut.x = tmpOut.x/convert_float(count);
 
     write_imagef(output, (int4)(x, y, z, 0), tmpOut);
 }
@@ -138,7 +138,7 @@ __kernel void gpuPooling_AvgPadQuant8(__read_only image2d_array_t   input,
         }
     }
 
-    tmpOut.x = tmpOut.x/count;
+    tmpOut.x = tmpOut.x/convert_float(count);
     tmp.x = floor(tmpOut.x*scaleOut + zeroPointOut + 0.5);
 
     write_imageui(output, (int4)(x, y, z, 0), tmp);

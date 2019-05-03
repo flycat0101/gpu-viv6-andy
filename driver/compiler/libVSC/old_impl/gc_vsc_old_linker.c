@@ -17,7 +17,7 @@
 
 #include "vir/transform/gc_vsc_vir_uniform.h"
 #include "old_impl/gc_vsc_old_optimizer.h"
-#define _GC_OBJ_ZONE    gcvZONE_COMPILER
+#define _GC_OBJ_ZONE    gcdZONE_COMPILER
 
 #define _USE_NEW_VARIABLE_HANDLER_  0
 
@@ -6897,7 +6897,7 @@ gcLINKTREE_Link(
 
             if (j == VertexTree->outputCount && FragmentTree->attributeArray[i].inUse)
             {
-                gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: input %s in fragment shader is \"%s\" "
+                gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: input %s in fragment shader is \"%s\" "
                          "undefined in vertex shader", attribute->name);
                 /* No matching vertex output found. */
                 return gcvSTATUS_UNDECLARED_VARYING;
@@ -7026,7 +7026,7 @@ gcLINKTREE_Link(
 
                     if(mismatch)
                     {
-                         gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block \"%s\" array size "
+                         gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block \"%s\" array size "
                                   "does not match with corresponding uniform block array size in fragment shader",
                                   GetUBName(vertUniformBlock));
 
@@ -7036,7 +7036,7 @@ gcLINKTREE_Link(
                     /* Make sure the block memory layout are of the same. */
                     if(GetUBMemoryLayout(vertUniformBlock) != GetUBMemoryLayout(fragUniformBlock))
                     {
-                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block \"%\" memory layout "
+                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block \"%\" memory layout "
                                  "does not match with corresponding uniform block in fragment shader",
                                  GetUBName(vertUniformBlock));
 
@@ -7046,7 +7046,7 @@ gcLINKTREE_Link(
 
                     if (GetUBBinding(vertUniformBlock) != GetUBBinding(fragUniformBlock))
                     {
-                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block \"%s\" binding "
+                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block \"%s\" binding "
                                     "does not match with corresponding uniform block binding in fragment shader",
                                     GetUBName(vertUniformBlock));
 
@@ -7060,7 +7060,7 @@ gcLINKTREE_Link(
                         gcoOS_StrCmp(GetUBName(fragUniformBlock), "#DefaultUBO") != gcvSTATUS_OK &&
                         GetUBNumBlockElement(vertUniformBlock) != GetUBNumBlockElement(fragUniformBlock))
                     {
-                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block \"%\" member count "
+                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block \"%\" member count "
                                  "does not match with corresponding uniform block in fragment shader",
                                  GetUBName(vertUniformBlock));
 
@@ -7104,7 +7104,7 @@ gcLINKTREE_Link(
                                                           fragUniform->name,
                                                           vertUniform->nameLength)))
                         {
-                            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member name \"%s\" "
+                            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member name \"%s\" "
                                      "does not match with corresponding uniform block member name \"%s\" in fragment shader",
                                      vertUniform->name, fragUniform->name);
 
@@ -7112,7 +7112,7 @@ gcLINKTREE_Link(
                         }
                         if (vertUniform->isRowMajor != fragUniform->isRowMajor)
                         {
-                            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member \"%s\" layout "
+                            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member \"%s\" layout "
                                      "does not match with corresponding uniform block member layout in fragment shader",
                                      vertUniform->name);
 
@@ -7121,7 +7121,7 @@ gcLINKTREE_Link(
                         if (GetUniformCategory(vertUniform) != GetUniformCategory(fragUniform) ||
                             vertUniform->u.type != fragUniform->u.type)
                         {
-                            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member \"%s\" type "
+                            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member \"%s\" type "
                                      "does not match with corresponding uniform block member type in fragment shader",
                                      vertUniform->name);
 
@@ -7132,7 +7132,7 @@ gcLINKTREE_Link(
                         if ((GetUniformFlagsSpecialKind(vertUniformFlag) != GetUniformFlagsSpecialKind(fragUniformFlag))
                             || (vertUniform->arraySize != fragUniform->arraySize))
                         {
-                            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member \"%s\" array size %d "
+                            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member \"%s\" array size %d "
                                      "does not match with corresponding uniform block member array size %d in fragment shader",
                                      vertUniform->name, vertUniform->arraySize, fragUniform->arraySize);
 
@@ -7141,7 +7141,7 @@ gcLINKTREE_Link(
 
                         if (GetUniformBinding(vertUniform) != GetUniformBinding(fragUniform))
                         {
-                            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member \"%s\" binding "
+                            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member \"%s\" binding "
                                      "does not match with corresponding uniform block member binding in fragment shader",
                                      vertUniform->name);
 
@@ -7242,7 +7242,7 @@ gcLINKTREE_Link(
 
                 if(mismatch)
                 {
-                     gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block \"%s\" array size "
+                     gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block \"%s\" array size "
                               "does not match with corresponding storage block array size in fragment shader",
                               GetSBName(vertStorageBlock));
 
@@ -7252,7 +7252,7 @@ gcLINKTREE_Link(
                 /* Make sure the block memory layout are of the same. */
                 if(GetSBMemoryLayout(vertStorageBlock) != GetSBMemoryLayout(fragStorageBlock))
                 {
-                    gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block \"%\" memory layout "
+                    gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block \"%\" memory layout "
                              "does not match with corresponding storage block in fragment shader",
                              GetSBName(vertStorageBlock));
                     return gcvSTATUS_SSBO_MISMATCH;
@@ -7261,7 +7261,7 @@ gcLINKTREE_Link(
 
                 if (GetSBBinding(vertStorageBlock) != GetSBBinding(fragStorageBlock))
                 {
-                    gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block \"%s\" binding "
+                    gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block \"%s\" binding "
                                 "does not match with corresponding storage block binding in fragment shader",
                                 GetSBName(vertStorageBlock));
 
@@ -7374,7 +7374,7 @@ gcLINKTREE_Link(
 
                     if(mismatch)
                     {
-                         gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block \"%s\" array size "
+                         gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block \"%s\" array size "
                                   "does not match with corresponding storage block array size in fragment shader",
                                   GetSBName(vertStorageBlock));
 
@@ -7384,7 +7384,7 @@ gcLINKTREE_Link(
                     /* Make sure the block memory layout are of the same. */
                     if(GetSBMemoryLayout(vertStorageBlock) != GetSBMemoryLayout(fragStorageBlock))
                     {
-                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block \"%\" memory layout "
+                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block \"%\" memory layout "
                                  "does not match with corresponding storage block in fragment shader",
                                  GetSBName(vertStorageBlock));
                         return gcvSTATUS_SSBO_MISMATCH;
@@ -7393,7 +7393,7 @@ gcLINKTREE_Link(
 
                     if (GetSBBinding(vertStorageBlock) != GetSBBinding(fragStorageBlock))
                     {
-                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block \"%s\" binding "
+                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block \"%s\" binding "
                                     "does not match with corresponding storage block binding in fragment shader",
                                     GetSBName(vertStorageBlock));
 
@@ -7482,7 +7482,7 @@ gcLINKTREE_Link(
 
                 if (!match)
                 {
-                    gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: fragment shader uniform struct \"%s\" "
+                    gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: fragment shader uniform struct \"%s\" "
                              "does not match with corresponding uniform in vertex shader", vertUniform->name);
                     gcmOS_SAFE_FREE(gcvNULL, uniformArray);
                     return gcvSTATUS_UNIFORM_MISMATCH;
@@ -7498,7 +7498,9 @@ gcLINKTREE_Link(
         }
 
         if (FragmentTree->shader->uniformCount != 0)
+        {
             gcmOS_SAFE_FREE(gcvNULL, uniformArray);
+        }
 
         /***************************************************************************
         ** Walk all normal uniforms in the fragment tree and
@@ -7560,7 +7562,7 @@ gcLINKTREE_Link(
 
                 if (!match)
                 {
-                    gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: fragment shader uniform \"%s\" "
+                    gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: fragment shader uniform \"%s\" "
                              "does not match with corresponding uniform in vertex shader", vertUniform->name);
                     return gcvSTATUS_UNIFORM_MISMATCH;
                 }
@@ -7699,7 +7701,7 @@ gcLINKTREE_Link(
 
                 if(mismatch)
                 {
-                     gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block \"%s\" array size "
+                     gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block \"%s\" array size "
                               "does not match with corresponding storage block array size in fragment shader",
                               GetSBName(vertStorageBlock));
 
@@ -7709,7 +7711,7 @@ gcLINKTREE_Link(
                 /* Make sure the storage block memory layout are of the same. */
                 if(GetSBMemoryLayout(vertStorageBlock) != GetSBMemoryLayout(fragUniformBlock))
                 {
-                    gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block \"%\" memory layout "
+                    gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block \"%\" memory layout "
                              "does not match with corresponding storage block in fragment shader",
                              GetUBName(vertStorageBlock));
 
@@ -7721,7 +7723,7 @@ gcLINKTREE_Link(
                 */
                 if (GetSBNumBlockElement(vertStorageBlock) != GetSBNumBlockElement(fragUniformBlock))
                 {
-                    gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block \"%\" member count "
+                    gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block \"%\" member count "
                              "does not match with corresponding storage block in fragment shader",
                              GetSBName(vertStorageBlock));
 
@@ -7759,7 +7761,7 @@ gcLINKTREE_Link(
                                                       fragStorageVariable->name,
                                                       vertStorageVariable->nameLength)))
                     {
-                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block member name \"%s\" "
+                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block member name \"%s\" "
                                  "does not match with corresponding storage block member name \"%s\" in fragment shader",
                                  vertStorageVariable->name, fragStorageVariable->name);
 
@@ -7767,7 +7769,7 @@ gcLINKTREE_Link(
                     }
                     if (GetVariableIsRowMajor(vertStorageVariable) != GetVariableIsRowMajor(fragStorageVariable))
                     {
-                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block member \"%s\" layout "
+                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block member \"%s\" layout "
                                  "does not match with corresponding storage block member layout in fragment shader",
                                  vertStorageVariable->name);
 
@@ -7776,7 +7778,7 @@ gcLINKTREE_Link(
                     if (GetUniformCategory(vertStorageVariable) != GetUniformCategory(fragStorageVariable) ||
                         vertStorageVariable->u.type != fragStorageVariable->u.type)
                     {
-                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block member \"%s\" type "
+                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block member \"%s\" type "
                                  "does not match with corresponding storage block member type in fragment shader",
                                  vertStorageVariable->name);
 
@@ -7786,7 +7788,7 @@ gcLINKTREE_Link(
 
                     if ((GetVariableArraySize(vertStorageVariable) != GetVariableArraySize(fragStorageVariable)))
                     {
-                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block member \"%s\" array size %d "
+                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcdZONE_COMPILER, "gcLINKTREE_Link: verter shader storage block member \"%s\" array size %d "
                                  "does not match with corresponding storage block member array size %d in fragment shader",
                                  vertStorageVariable->name, GetVariableArraySize(vertStorageVariable),
                                  GetVariableArraySize(fragStorageVariable));
@@ -13918,8 +13920,8 @@ OnError:
     if (geoVirShader) {VIR_Shader_Destroy(geoVirShader); gcoOS_Free(gcvNULL, geoVirShader);}
     if (fsVirShader) {VIR_Shader_Destroy(fsVirShader); gcoOS_Free(gcvNULL, fsVirShader);}
     if (csVirShader) {VIR_Shader_Destroy(csVirShader); gcoOS_Free(gcvNULL, csVirShader);}
-    if (stateBuffer) gcmOS_SAFE_FREE(gcvNULL, stateBuffer);
-    if (hints)  gcmOS_SAFE_FREE(gcvNULL, hints);
+    if (stateBuffer) {gcmOS_SAFE_FREE(gcvNULL, stateBuffer);}
+    if (hints)  {gcmOS_SAFE_FREE(gcvNULL, hints);}
 
     if (coreSysCtx.hPrivData)
     {
@@ -18138,6 +18140,12 @@ _gcCalculateWorkGroupIdForMultiGPU(
             continue;
         }
 
+        /* Do not replace the workGroupIdAttr if it is used for the local memory address calculation. */
+        if (Shader->code[i].tempIndex == _gcdOCL_LocalMemoryAddressRegIndex)
+        {
+            continue;
+        }
+
         for (j = 0; j < 2; j++)
         {
             gctSOURCE_t*    pSource = (j == 0) ? &Shader->code[i].source0 : &Shader->code[i].source1;
@@ -20160,1412 +20168,6 @@ OnError:
 }
 
 #endif /* !DX_SHADER */
-
-/* Save/Load shader video nodes. */
-static gctUINT32
-_CaculateShaderVidNodesSize(
-    IN gcSHADER Shader,
-    IN gcsHINT_PTR Hints
-    )
-{
-    gctUINT32       sizeInByte = 0;
-    gctUINT         i;
-
-    if (Hints == gcvNULL)
-    {
-        return sizeInByte;
-    }
-
-    do
-    {
-        for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i++)
-        {
-            /* Inst video memory. */
-            sizeInByte += gcmSIZEOF(gctUINT32);
-            if (Hints->shaderVidNodes.instVidmemNode[i] != gcvNULL)
-            {
-                gcsSURF_NODE_PTR surfNode = (gcsSURF_NODE_PTR)Hints->shaderVidNodes.instVidmemNode[i];
-
-                sizeInByte += surfNode->size;
-            }
-
-            /* gpr spill memory. */
-            sizeInByte += gcmSIZEOF(gctUINT32);
-            if (Hints->shaderVidNodes.gprSpillVidmemNode[i] != gcvNULL)
-            {
-                gcsSURF_NODE_PTR surfNode = (gcsSURF_NODE_PTR)Hints->shaderVidNodes.gprSpillVidmemNode[i];
-
-                sizeInByte += surfNode->size;
-            }
-
-            /* cr spill memory. */
-            sizeInByte += gcmSIZEOF(gctUINT32);
-            if (Hints->shaderVidNodes.crSpillVidmemNode[i] != gcvNULL)
-            {
-                gcsSURF_NODE_PTR surfNode = (gcsSURF_NODE_PTR)Hints->shaderVidNodes.crSpillVidmemNode[i];
-
-                sizeInByte += surfNode->size;
-            }
-        }
-
-        /* shared memory. */
-        sizeInByte += gcmSIZEOF(gctUINT32);
-        if (Hints->shaderVidNodes.sharedMemVidMemNode)
-        {
-            gcsSURF_NODE_PTR surfNode = (gcsSURF_NODE_PTR)Hints->shaderVidNodes.sharedMemVidMemNode;
-
-            sizeInByte += surfNode->size;
-        }
-    } while (gcvFALSE);
-
-    return sizeInByte;
-}
-
-static gceSTATUS
-_SaveShaderVidNodes(
-    IN gcSHADER Shader,
-    IN gcsHINT_PTR Hints,
-    INOUT gctPOINTER Buffer
-    )
-{
-    gceSTATUS       status = gcvSTATUS_OK;
-    gctUINT8_PTR    buffer = (gctUINT8_PTR)Buffer;
-    gctUINT         i;
-
-    gcmASSERT(Hints);
-
-    do
-    {
-        gctPOINTER          memory = gcvNULL;
-        gctPOINTER          data = gcvNULL;
-        gctUINT32           sizeInByte = 0;
-
-        for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i++)
-        {
-            /* Inst video memory. */
-            memory = Hints->shaderVidNodes.instVidmemNode[i];
-            data = gcvNULL;
-            sizeInByte = 0;
-
-            /* Get the size. */
-            if (memory != gcvNULL)
-            {
-                sizeInByte += ((gcsSURF_NODE_PTR)memory)->size;
-                gcmERR_BREAK(gcoSURF_LockNode((gcsSURF_NODE_PTR)memory,
-                                              gcvNULL,
-                                              &data));
-
-                gcmASSERT(sizeInByte != 0);
-            }
-
-            /* Copy the size. */
-            gcoOS_MemCopy(buffer, &sizeInByte, gcmSIZEOF(gctUINT32));
-            buffer += gcmSIZEOF(gctUINT32);
-
-            /* Copy the data. */
-            if (sizeInByte != 0)
-            {
-                gcoOS_MemCopy(buffer, data, sizeInByte);
-                buffer += sizeInByte;
-                gcoSURF_UnLockNode((gcsSURF_NODE_PTR)memory, gcvSURF_ICACHE);
-            }
-
-            /* gpr spill memory. */
-            memory = Hints->shaderVidNodes.gprSpillVidmemNode[i];
-            data = gcvNULL;
-            sizeInByte = 0;
-
-            /* Get the size. */
-            if (memory != gcvNULL)
-            {
-                sizeInByte += ((gcsSURF_NODE_PTR)memory)->size;
-                gcmERR_BREAK(gcoSURF_LockNode((gcsSURF_NODE_PTR)memory,
-                                              gcvNULL,
-                                              &data));
-
-                gcmASSERT(sizeInByte != 0);
-            }
-
-            /* Copy the size. */
-            gcoOS_MemCopy(buffer, &sizeInByte, gcmSIZEOF(gctUINT32));
-            buffer += gcmSIZEOF(gctUINT32);
-
-            /* Copy the data. */
-            if (sizeInByte != 0)
-            {
-                gcoOS_MemCopy(buffer, data, sizeInByte);
-                buffer += sizeInByte;
-                gcoSURF_UnLockNode((gcsSURF_NODE_PTR)memory, gcvSURF_VERTEX);
-            }
-
-            /* cr spill memory. */
-            memory = Hints->shaderVidNodes.crSpillVidmemNode[i];
-            data = gcvNULL;
-            sizeInByte = 0;
-
-            /* Get the size. */
-            if (memory != gcvNULL)
-            {
-                sizeInByte += ((gcsSURF_NODE_PTR)memory)->size;
-                gcmERR_BREAK(gcoSURF_LockNode((gcsSURF_NODE_PTR)memory,
-                                              gcvNULL,
-                                              &data));
-
-                gcmASSERT(sizeInByte != 0);
-            }
-
-            /* Copy the size. */
-            gcoOS_MemCopy(buffer, &sizeInByte, gcmSIZEOF(gctUINT32));
-            buffer += gcmSIZEOF(gctUINT32);
-
-            /* Copy the data. */
-            if (sizeInByte != 0)
-            {
-                gcoOS_MemCopy(buffer, data, sizeInByte);
-                buffer += sizeInByte;
-                gcoSURF_UnLockNode((gcsSURF_NODE_PTR)memory, gcvSURF_VERTEX);
-            }
-        }
-
-        /* shared memory. */
-        memory = Hints->shaderVidNodes.sharedMemVidMemNode;
-        data = gcvNULL;
-        sizeInByte = 0;
-
-        /* Get the size. */
-        if (memory != gcvNULL)
-        {
-            sizeInByte += ((gcsSURF_NODE_PTR)memory)->size;
-            gcmERR_BREAK(gcoSURF_LockNode((gcsSURF_NODE_PTR)memory,
-                                          gcvNULL,
-                                          &data));
-
-            gcmASSERT(sizeInByte != 0);
-        }
-
-        /* Copy the size. */
-        gcoOS_MemCopy(buffer, &sizeInByte, gcmSIZEOF(gctUINT32));
-        buffer += gcmSIZEOF(gctUINT32);
-
-        /* Copy the data. */
-        if (sizeInByte != 0)
-        {
-            gcoOS_MemCopy(buffer, data, sizeInByte);
-            buffer += sizeInByte;
-            gcoSURF_UnLockNode((gcsSURF_NODE_PTR)memory, gcvSURF_VERTEX);
-        }
-    } while (gcvFALSE);
-
-    return status;
-}
-
-static gceSTATUS
-_LoadShaderVidNodesAndFixup(
-    IN gcSHADER Shader,
-    IN gcsPROGRAM_STATE *ProgramState,
-    IN gctPOINTER Buffer
-    )
-{
-    gceSTATUS       status = gcvSTATUS_OK;
-    gctUINT8_PTR    buffer = (gctUINT8_PTR)Buffer;
-    gctUINT         i;
-    gcsHINT_PTR     Hints = ProgramState->hints;
-
-    gcmASSERT(Hints);
-
-    do
-    {
-        gctUINT32           sizeInByte = 0;
-        gctUINT32           physical = 0;
-        gctUINT32           *pPatchPoint = gcvNULL;
-
-        for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i++)
-        {
-            /* Inst video memory. */
-            sizeInByte = *(gctUINT32*)buffer;
-            physical = (gctUINT32)~0;
-            pPatchPoint = gcvNULL;
-
-            buffer += gcmSIZEOF(gctUINT32);
-
-            if (sizeInByte > 0)
-            {
-                gcoSHADER_AllocateVidMem(gcvNULL,
-                                         gcvSURF_ICACHE,
-                                         "video memory for loading CL kernel",
-                                         sizeInByte,
-                                         256,
-                                         (gctPOINTER *)&Hints->shaderVidNodes.instVidmemNode[i],
-                                         gcvNULL,
-                                         &physical,
-                                         buffer,
-                                         gcvFALSE);
-
-                gcmASSERT((gctUINT32)~0 != physical);
-                gcmASSERT(ProgramState->patchOffsetsInDW.instVidMemInStateBuffer[i] != 0);
-                gcmASSERT(ProgramState->patchOffsetsInDW.instVidMemInStateDelta[i] != 0);
-                pPatchPoint = (gctUINT32*)ProgramState->stateBuffer
-                            + ProgramState->patchOffsetsInDW.instVidMemInStateBuffer[i];
-                *pPatchPoint = physical;
-                pPatchPoint = ProgramState->stateDelta
-                            + ProgramState->patchOffsetsInDW.instVidMemInStateDelta[i];
-                *pPatchPoint = physical;
-            }
-
-            buffer += sizeInByte;
-
-            /* gpr spill memory. */
-            sizeInByte = *(gctUINT32*)buffer;
-            physical = (gctUINT32)~0;
-            pPatchPoint = gcvNULL;
-
-            buffer += gcmSIZEOF(gctUINT32);
-
-            if (sizeInByte > 0)
-            {
-                gcoSHADER_AllocateVidMem(gcvNULL,
-                                         gcvSURF_VERTEX,
-                                         "temp register spill memory",
-                                         sizeInByte,
-                                         256,
-                                         (gctPOINTER *)&Hints->shaderVidNodes.gprSpillVidmemNode[i],
-                                         gcvNULL,
-                                         &physical,
-                                         buffer,
-                                         gcvFALSE);
-
-                gcmASSERT((gctUINT32)~0 != physical);
-                gcmASSERT(ProgramState->patchOffsetsInDW.gprSpillVidMemInStateBuffer[i] != 0);
-                gcmASSERT(ProgramState->patchOffsetsInDW.gprSpillVidMemInStateDelta[i] != 0);
-                pPatchPoint = (gctUINT32*)ProgramState->stateBuffer
-                            + ProgramState->patchOffsetsInDW.gprSpillVidMemInStateBuffer[i];
-                *pPatchPoint = physical;
-                pPatchPoint = ProgramState->stateDelta
-                            + ProgramState->patchOffsetsInDW.gprSpillVidMemInStateDelta[i];
-                *pPatchPoint = physical;
-            }
-
-            buffer += sizeInByte;
-
-            /* cr spill memory. */
-            sizeInByte = *(gctUINT32*)buffer;
-            physical = (gctUINT32)~0;
-            pPatchPoint = gcvNULL;
-
-            buffer += gcmSIZEOF(gctUINT32);
-
-            if (sizeInByte > 0)
-            {
-                gcoSHADER_AllocateVidMem(gcvNULL,
-                                         gcvSURF_VERTEX,
-                                         "immediate constant spill memory",
-                                         sizeInByte,
-                                         256,
-                                         (gctPOINTER *)&Hints->shaderVidNodes.crSpillVidmemNode[i],
-                                         gcvNULL,
-                                         &physical,
-                                         buffer,
-                                         gcvFALSE);
-
-                gcmASSERT((gctUINT32)~0 != physical);
-                gcmASSERT(ProgramState->patchOffsetsInDW.crSpillVidMemInStateBuffer[i] != 0);
-                gcmASSERT(ProgramState->patchOffsetsInDW.crSpillVidMemInStateDelta[i] != 0);
-                pPatchPoint = (gctUINT32*)ProgramState->stateBuffer
-                            + ProgramState->patchOffsetsInDW.crSpillVidMemInStateBuffer[i];
-                *pPatchPoint = physical;
-                pPatchPoint = ProgramState->stateDelta
-                            + ProgramState->patchOffsetsInDW.crSpillVidMemInStateDelta[i];
-                *pPatchPoint = physical;
-            }
-
-            buffer += sizeInByte;
-        }
-
-        /* shared memory. */
-        sizeInByte = *(gctUINT32*)buffer;
-        physical = (gctUINT32)~0;
-        pPatchPoint = gcvNULL;
-
-        buffer += gcmSIZEOF(gctUINT32);
-
-        if (sizeInByte > 0)
-        {
-            gcoSHADER_AllocateVidMem(gcvNULL,
-                                     gcvSURF_VERTEX,
-                                     "shared memory",
-                                     sizeInByte,
-                                     256,
-                                     (gctPOINTER *)&Hints->shaderVidNodes.sharedMemVidMemNode,
-                                     gcvNULL,
-                                     &physical,
-                                     buffer,
-                                     gcvFALSE);
-
-            gcmASSERT((gctUINT32)~0 != physical);
-            gcmASSERT(ProgramState->patchOffsetsInDW.sharedMemVidMemInStateBuffer != 0);
-            gcmASSERT(ProgramState->patchOffsetsInDW.sharedMemVidMemInStateDelta != 0);
-            pPatchPoint = (gctUINT32*)ProgramState->stateBuffer
-                        + ProgramState->patchOffsetsInDW.sharedMemVidMemInStateBuffer;
-            *pPatchPoint = physical;
-            pPatchPoint = ProgramState->stateDelta
-                        + ProgramState->patchOffsetsInDW.sharedMemVidMemInStateDelta;
-            *pPatchPoint = physical;
-        }
-
-        buffer += sizeInByte;
-    } while (gcvFALSE);
-
-    return status;
-}
-
-/** Program binary file header format: -
-       Word 1:  gcmCC('P', 'R', 'G', 'M') Program binary file signature
-       Word 2:  ('\od' '\od' '\od' '\od') od = octal digits; program binary file version
-       Word 3:  ('\E' '\S' '\0' '\0') or Language type
-                ('C' 'L' '\0' '\0')
-       Word 4: ('\0' '\0' '\10' '\0') chip model  e.g. gc800
-       Wor5: ('\1' '\3' '\6' '\4') chip version e.g. 4.6.3_rc1
-       Word 6: size of program binary file in bytes excluding this header */
-#define _gcdProgramBinaryHeaderSize   (6 * 4)  /*Program binary file header size in bytes*/
-
-/*******************************************************************************
-**  _gcLoadProgramHeader
-**
-**  Load a shader proggram from a binary buffer.  The binary buffer is layed out
-**  as follows:
-**      // Six word header
-**      // Signature, must be 'S','H','D','R'.
-**      gctINT8             signature[4];
-**      gctUINT32           prgBinFileVersion;
-**      gctUINT32           laguage;
-**      gctUINT32           chipModel;
-**      gctUINT32           chipVersion;
-**      gctUINT32           binarySize;
-**
-**  INPUT:
-**
-**      gctPOINTER Buffer
-**          Pointer to a program binary buffer containing the program data to load.
-**
-**      gctSIZE_T BufferSize
-**          Number of bytes inside the binary buffer pointed to by 'Buffer'.
-**
-**  OUTPUT:
-**      gctUINT32 *Language
-**          the third word in the header containing Language type
-**
-*/
-static gceSTATUS
-_gcLoadProgramHeader(
-    IN gctPOINTER Buffer,
-    IN gctSIZE_T BufferSize,
-    OUT gctPOINTER Language
-    )
-{
-    gctUINT32 * signature;
-    gctSIZE_T bytes;
-    gctUINT32 *version;
-    gctUINT32 *language;
-    gctUINT32 *chipModel;
-    gctUINT32 *chipVersion;
-    gctUINT32 *size;
-    gctUINT8 *bytePtr;
-
-    gcmHEADER_ARG("Buffer=0x%x BufferSize=%lu",
-                  Buffer, BufferSize);
-
-    /* Verify the arguments. */
-    gcmDEBUG_VERIFY_ARGUMENT(Buffer != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(BufferSize > 0);
-
-    /* Load the Header */
-    bytes = BufferSize;
-    if(bytes < _gcdProgramBinaryHeaderSize) {
-        /* Invalid file format */
-        gcoOS_Print("_gcLoadProgramHeader: Invalid program binary file format");
-        gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-        return gcvSTATUS_INVALID_DATA;
-    }
-
-    /* Verify the signature. */
-    signature = (gctUINT32 *) Buffer;
-    if (*signature != gcmCC('P', 'R', 'G', 'M')) {
-        /* Signature mismatch. */
-        gcoOS_Print("_gcLoadProgramHeader: Signature does not match with 'PRGM'");
-        gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-        return gcvSTATUS_INVALID_DATA;
-    }
-
-    /* Word 2: program binary file version # */
-    version = (gctUINT32 *) (signature + 1);
-    /* Need to make sure the program binary file's version is matched with current compiler version */
-    if(*version != gcdSL_SHADER_BINARY_FILE_VERSION) {
-        gctUINT8 *inputVerPtr, *curVerPtr;
-        gctUINT32 curVer[1] = {gcdSL_SHADER_BINARY_FILE_VERSION};
-
-        inputVerPtr = (gctUINT8 *) version;
-        curVerPtr = (gctUINT8 *) curVer;
-        gcoOS_Print("gcSHADER_LoadHeader: shader binary file's version of %u.%u.%u:%u "
-                 "is not compatible with current version %u.%u.%u:%u\n"
-                 "Please recompile source.",
-                 inputVerPtr[0], inputVerPtr[1], inputVerPtr[2], inputVerPtr[3],
-                 curVerPtr[0], curVerPtr[1], curVerPtr[2], curVerPtr[3]);
-        gcmFOOTER_ARG("status=%d", gcvSTATUS_VERSION_MISMATCH);
-        return gcvSTATUS_VERSION_MISMATCH;
-    }
-
-    /* Word 3: language type */
-    language = (gctUINT32 *) (version + 1);
-    bytePtr = (gctUINT8 *) language;
-
-    if((bytePtr[0] == 'E' && bytePtr[1] != 'S') ||
-       (bytePtr[0] == 'C' && bytePtr[1] != 'L') ||
-       (bytePtr[0] != 'E' && bytePtr[0] != 'C')) {
-       gcoOS_Print("_gcLoadProgramHeader: unrecognizable laguage type \"%c%c\"", bytePtr[0], bytePtr[1]);
-       gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-       return gcvSTATUS_INVALID_DATA;
-    }
-
-    /* Word 4: chip model */
-    chipModel = (gctUINT32 *) (language + 1);
-
-    /* Word 5: chip version */
-    chipVersion  = (gctUINT32 *) (chipModel + 1);
-
-    /* Word 6: size of program binary excluding header */
-    bytes -= _gcdProgramBinaryHeaderSize;
-    size = (gctUINT32 *) (chipVersion + 1);
-    if(bytes != *size) {
-        /* program binary size mismatch. */
-        gcoOS_Print("_gcLoadProgramHeader: program binary size %u does not match actual file size %u",
-                 bytes, *size);
-        gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-        return gcvSTATUS_INVALID_DATA;
-    }
-    /* Success. */
-    *(gctUINT32 *)Language = *language;
-    gcmFOOTER_ARG("*Language=%u", *language);
-    return gcvSTATUS_OK;
-}
-
-/*******************************************************************************
-**                                gcSaveProgram
-********************************************************************************
-**
-**  Save pre-compiled shaders and pre-linked programs to a binary file.
-**
-**  INPUT:
-**
-**      gcSHADER VertexShader
-**          Pointer to vertex shader object.
-**
-**      gcSHADER FragmentShader
-**          Pointer to fragment shader object.
-**
-**      gcsPROGRAM_STATE ProgramState
-**          Pointer to program state buffer.
-**
-**  OUTPUT:
-**
-**      gctPOINTER * Binary
-**          Pointer to a variable receiving the binary data to be saved.
-**
-**      gctUINT32 * BinarySize
-**          Pointer to a variable receiving the number of bytes inside 'Binary'.
-*/
-gceSTATUS
-gcSaveProgram(
-    IN gcSHADER VertexShader,
-    IN gcSHADER FragmentShader,
-    IN gcsPROGRAM_STATE ProgramState,
-    OUT gctPOINTER * Binary,
-    OUT gctUINT32 * BinarySize
-    )
-{
-    gctUINT32 vertexShaderBytes;
-    gctUINT32 fragmentShaderBytes;
-    gctUINT32 bytes;
-    gctUINT32 hintSize = ProgramState.hints ? gcSHADER_GetHintSize() : 0;
-    gctUINT8_PTR bytePtr;
-    gctUINT32 bufferSize;
-    gctUINT8_PTR buffer = gcvNULL;
-    gceSTATUS status;
-
-    gcmHEADER_ARG("VertexShader=0x%x FragmentShader=0x%x ProgramBufferSize=%lu "
-                  "ProgramBuffer=0x%x Hints=0x%x",
-                  VertexShader, FragmentShader, ProgramState.stateBufferSize,
-                  ProgramState.stateBuffer, ProgramState.hints);
-
-    do
-    {
-        /* Get size of vertex shader bibary. */
-        gcmERR_BREAK(gcSHADER_Save(VertexShader,
-                                   gcvNULL,
-                                   &vertexShaderBytes));
-
-        /* Get size of fragment shader binary. */
-        gcmERR_BREAK(gcSHADER_Save(FragmentShader,
-                                   gcvNULL,
-                                   &fragmentShaderBytes));
-
-        /* Compute number of bytes required for binary buffer. */
-        bufferSize = _gcdProgramBinaryHeaderSize
-                     + gcmSIZEOF(gctUINT32) + gcmALIGN(vertexShaderBytes, 4)
-                     + gcmSIZEOF(gctUINT32) + gcmALIGN(fragmentShaderBytes, 4)
-                     + gcmSIZEOF(gctUINT32) + ProgramState.stateBufferSize
-                     + gcmSIZEOF(gctUINT32) + hintSize;
-
-        if (BinarySize)
-        {
-            *BinarySize = bufferSize;
-        }
-
-        if (Binary == gcvNULL)
-        {
-            gcmFOOTER_NO();
-            return gcvSTATUS_OK;
-        }
-
-        if (*Binary)
-        {
-            /* a buffer has been passed here */
-            /* Make sure the buffer is large enough. */
-            if(BinarySize)
-            {
-                if (*BinarySize < bufferSize)
-                {
-                    *BinarySize = bufferSize;
-                    gcmFOOTER_ARG("*BinarySize=%d status=%d",
-                                  *BinarySize, gcvSTATUS_BUFFER_TOO_SMALL);
-                    return gcvSTATUS_BUFFER_TOO_SMALL;
-                }
-           }
-        }
-        else
-        {
-            /* Allocate binary buffer. */
-            gcmERR_BREAK(gcoOS_Allocate(gcvNULL,
-                                        bufferSize,
-                                        Binary));
-        }
-
-        /* Cast binary buffer to UINT8 pointer for easy byte copying. */
-        buffer    = (gctUINT8_PTR) *Binary;
-
-        /* Word 1: program binary signature */
-        buffer[0] = 'P';
-        buffer[1] = 'R';
-        buffer[2] = 'G';
-        buffer[3] = 'M';
-        buffer += 4;
-
-        /* Word 2: binary file version # */
-        *(gctUINT32 *) buffer = gcdSL_PROGRAM_BINARY_FILE_VERSION;
-        buffer += sizeof(gctUINT32);
-
-        /* Word 3: language type */
-        *(gctUINT32 *) buffer = VertexShader->compilerVersion[0];
-        buffer += sizeof(gctUINT32);
-
-        /* Word 4: chip model */
-        *(gctUINT32 *) buffer = gcmCC('\0', '\0', '\0', '\0');
-        buffer += sizeof(gctUINT32);
-
-        /* Word 5: chip version */
-        *(gctUINT32 *) buffer = gcmCC('\1', gcvVERSION_PATCH, gcvVERSION_MINOR, gcvVERSION_MAJOR);
-        buffer += sizeof(gctUINT32);
-
-        /* Word 6: size of binary excluding header */
-        *(gctUINT32 *) buffer = bufferSize - _gcdProgramBinaryHeaderSize;
-        buffer += sizeof(gctUINT32);
-
-        /* Copy the size of the vertex shader binary. */
-        gcoOS_MemCopy(buffer,
-                      &vertexShaderBytes,
-                      gcmSIZEOF(gctUINT32));
-        buffer += gcmSIZEOF(gctUINT32);
-
-        /* Save the vertex shader binary. */
-        gcmERR_BREAK(gcSHADER_Save(VertexShader,
-                                   buffer,
-                                   &vertexShaderBytes));
-        bytePtr = buffer + vertexShaderBytes;
-        buffer += gcmALIGN(vertexShaderBytes, 4);
-        while (bytePtr < buffer)
-        {
-            /* clear the alignment bytes to help file comparison when needed*/
-            *bytePtr++ = '\0';
-        }
-
-        /* Copy the size of the fragment shader binary. */
-        gcoOS_MemCopy(buffer,
-                      &fragmentShaderBytes,
-                      gcmSIZEOF(gctUINT32));
-        buffer += gcmSIZEOF(gctUINT32);
-
-        /* Save the fragment shader binary. */
-        gcmERR_BREAK(gcSHADER_Save(FragmentShader,
-                                   buffer,
-                                   &fragmentShaderBytes));
-        bytePtr = buffer + fragmentShaderBytes;
-        buffer += gcmALIGN(fragmentShaderBytes, 4);
-        while (bytePtr < buffer)
-        {
-            /* clear the alignment bytes to help file comparison when needed*/
-            *bytePtr++ = '\0';
-        }
-
-        /* Copy the size of the state buffer. */
-        gcoOS_MemCopy(buffer,
-                      &ProgramState.stateBufferSize,
-                      gcmSIZEOF(gctUINT32));
-        buffer += gcmSIZEOF(gctUINT32);
-
-        /* Copy the state buffer if needed. */
-        if (ProgramState.stateBufferSize > 0)
-        {
-            gcoOS_MemCopy(buffer,
-                          ProgramState.stateBuffer,
-                          ProgramState.stateBufferSize);
-        }
-        buffer += ProgramState.stateBufferSize;
-
-        /* Copy the size of the HINT structure. */
-        bytes = hintSize;
-        gcoOS_MemCopy(buffer,
-                      &bytes,
-                      gcmSIZEOF(gctUINT32));
-        buffer += gcmSIZEOF(gctUINT32);
-
-        /* Copy the HINT structure if needed. */
-        if (bytes > 0)
-        {
-            gcoOS_MemCopy(buffer, ProgramState.hints, bytes);
-        }
-        buffer += bytes;
-
-        /* Assert we copied the right number of bytes */
-        gcmASSERT(buffer - *BinarySize == *Binary);
-
-        /* Success. */
-        gcmFOOTER_ARG("*Binary=0x%x *BinarySize=%ul", *Binary, *BinarySize);
-        return gcvSTATUS_OK;
-    }
-    while (gcvFALSE);
-
-    if (gcmIS_ERROR(status) && (buffer != gcvNULL))
-    {
-        /* Free binary buffer on error. */
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, *Binary));
-
-        /* Reset pointers on error. */
-        *Binary     = gcvNULL;
-        if (BinarySize)
-        {
-            *BinarySize = 0;
-        }
-    }
-
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-/*******************************************************************************
-**                                gcSaveCLSingleKernel
-********************************************************************************
-**
-**    Save pre-compiled shaders and pre-linked programs to a binary file.
-**
-**    INPUT:
-**
-**        gcSHADER KernelShader
-**            Pointer to vertex shader object.
-**
-**        gcsPROGRAM_STATE ProgramState
-**            Program state.
-**
-**    OUTPUT:
-**
-**        gctPOINTER * Binary
-**            Pointer to a variable receiving the binary data to be saved.
-**
-**        gctUINT32 * BinarySize
-**            Pointer to a variable receiving the number of bytes inside 'Binary'.
-*/
-gceSTATUS
-gcSaveCLSingleKernel(
-    IN gcSHADER KernelShader,
-    IN gcsPROGRAM_STATE ProgramState,
-    OUT gctPOINTER * Binary,
-    OUT gctUINT32 * BinarySize
-    )
-{
-    gctUINT32 kernelShaderBytes;
-    gctUINT32 bytes;
-    /*
-    ** Because there are some pointer variables within gcsHINT, the size with 32bit&64bit OS are different,
-    ** we can't save the whole structure, we need to exclude gcSHADER_VID_NODES.
-    */
-    gctUINT32 hintSize = ProgramState.hints ? gcmOFFSETOF(_gcsHINT, shaderVidNodes) : 0;
-    gctUINT32 vidNodesSize = _CaculateShaderVidNodesSize(KernelShader, ProgramState.hints);
-    gctUINT8_PTR bytePtr;
-    gctUINT32 bufferSize;
-    gctUINT8_PTR buffer = gcvNULL;
-    gceSTATUS status;
-
-    gcmHEADER_ARG("KernelShader=0x%x ProgramBufferSize=%lu "
-                  "ProgramBuffer=0x%x Hints=0x%x",
-                  KernelShader, ProgramState.stateBufferSize,
-                  ProgramState.stateBuffer, ProgramState.hints);
-
-    do
-    {
-        /* Get size of kernel shader bibary. */
-        gcmERR_BREAK(gcSHADER_SaveEx(KernelShader,
-                                    gcvNULL,
-                                    &kernelShaderBytes));
-
-        /* Compute number of bytes required for binary buffer. */
-        bufferSize = _gcdProgramBinaryHeaderSize
-                     + gcmSIZEOF(gctUINT32) + gcmALIGN(kernelShaderBytes, 4)
-                     + gcmSIZEOF(gctUINT32) + ProgramState.stateBufferSize
-                     + gcmSIZEOF(gctUINT32) + hintSize
-                     + gcmSIZEOF(gctUINT32) + ProgramState.stateDeltaSize
-                     + gcmSIZEOF(gctUINT32) + gcmSIZEOF(gcsPROGRAM_VidMemPatchOffset)
-                     + gcmSIZEOF(gctUINT32) + vidNodesSize;
-
-        if (BinarySize)
-        {
-            *BinarySize = bufferSize;
-        }
-
-        if (Binary == gcvNULL)
-        {
-            gcmFOOTER_NO();
-            return gcvSTATUS_OK;
-        }
-
-        if (*Binary)
-        {
-            /* a buffer has been passed here */
-            /* Make sure the buffer is large enough. */
-            if(BinarySize)
-            {
-                if (*BinarySize < bufferSize)
-                {
-                    *BinarySize = bufferSize;
-                    gcmFOOTER_ARG("*BinarySize=%d status=%d",
-                                  *BinarySize, gcvSTATUS_BUFFER_TOO_SMALL);
-                    return gcvSTATUS_BUFFER_TOO_SMALL;
-                }
-           }
-        }
-        else
-        {
-            /* Allocate binary buffer. */
-            gcmERR_BREAK(gcoOS_Allocate(gcvNULL,
-                                        bufferSize,
-                                        Binary));
-        }
-
-        /* Cast binary buffer to UINT8 pointer for easy byte copying. */
-        buffer    = (gctUINT8_PTR) *Binary;
-
-        /* Word 1: program binary signature */
-        buffer[0] = 'P';
-        buffer[1] = 'R';
-        buffer[2] = 'G';
-        buffer[3] = 'M';
-        buffer += 4;
-
-        /* Word 2: binary file version # */
-        *(gctUINT32 *) buffer = gcdSL_PROGRAM_BINARY_FILE_VERSION;
-        buffer += sizeof(gctUINT32);
-
-        /* Word 3: language type */
-        *(gctUINT32 *) buffer = KernelShader->compilerVersion[0];
-        buffer += sizeof(gctUINT32);
-
-        /* Word 4: chip model */
-        *(gctUINT32 *) buffer = gcmCC('\0', '\0', '\0', '\0');
-        buffer += sizeof(gctUINT32);
-
-        /* Word 5: chip version */
-        *(gctUINT32 *) buffer = gcmCC('\1', gcvVERSION_PATCH, gcvVERSION_MINOR, gcvVERSION_MAJOR);
-        buffer += sizeof(gctUINT32);
-
-        /* Word 6: size of binary excluding header */
-        *(gctUINT32 *) buffer = bufferSize - _gcdProgramBinaryHeaderSize;
-        buffer += sizeof(gctUINT32);
-
-        /* Copy the size of the vertex shader binary. */
-        gcoOS_MemCopy(buffer,
-                      &kernelShaderBytes,
-                      gcmSIZEOF(gctUINT32));
-        buffer += gcmSIZEOF(gctUINT32);
-
-        /* Save the vertex shader binary. */
-        gcmERR_BREAK(gcSHADER_SaveEx(KernelShader,
-                                     buffer,
-                                     &kernelShaderBytes));
-        bytePtr = buffer + kernelShaderBytes;
-        buffer += gcmALIGN(kernelShaderBytes, 4);
-        while (bytePtr < buffer)
-        {
-            /* clear the alignment bytes to help file comparison when needed*/
-            *bytePtr++ = '\0';
-        }
-
-        /* Copy the size of the state buffer. */
-        gcoOS_MemCopy(buffer,
-                      &ProgramState.stateBufferSize,
-                      gcmSIZEOF(gctUINT32));
-        buffer += gcmSIZEOF(gctUINT32);
-
-        /* Copy the state buffer if needed. */
-        if (ProgramState.stateBufferSize > 0)
-        {
-            gcoOS_MemCopy(buffer,
-                          ProgramState.stateBuffer,
-                          ProgramState.stateBufferSize);
-        }
-        buffer += ProgramState.stateBufferSize;
-
-        /* Copy the size of the HINT structure. */
-        bytes = hintSize;
-        gcoOS_MemCopy(buffer,
-                      &bytes,
-                      gcmSIZEOF(gctUINT32));
-        buffer += gcmSIZEOF(gctUINT32);
-
-        /* Copy the HINT structure if needed. */
-        if (bytes > 0)
-        {
-            gcoOS_MemCopy(buffer, ProgramState.hints, bytes);
-        }
-        buffer += bytes;
-
-        /* Copy the size of the state delta. */
-        bytes = ProgramState.stateDeltaSize;
-        gcoOS_MemCopy(buffer,
-                      &bytes,
-                      gcmSIZEOF(gctUINT32));
-        buffer += gcmSIZEOF(gctUINT32);
-        /* Copy the state delta */
-        if (ProgramState.stateDeltaSize)
-        {
-            gcoOS_MemCopy(buffer,
-                          ProgramState.stateDelta,
-                          ProgramState.stateDeltaSize);
-        }
-        buffer += ProgramState.stateDeltaSize;
-
-        /* Copy the size of patch offset */
-        bytes = gcmSIZEOF(gcsPROGRAM_VidMemPatchOffset);
-        gcoOS_MemCopy(buffer,
-                      &bytes,
-                      gcmSIZEOF(gctUINT32));
-        buffer += gcmSIZEOF(gctUINT32);
-        /* Copy the patch offsets */
-        gcoOS_MemCopy(buffer,
-                      &ProgramState.patchOffsetsInDW,
-                      gcmSIZEOF(gcsPROGRAM_VidMemPatchOffset));
-        buffer += gcmSIZEOF(gcsPROGRAM_VidMemPatchOffset);
-
-        /* Copy the size of the video nodes. */
-        bytes = vidNodesSize;
-        gcoOS_MemCopy(buffer,
-                      &bytes,
-                      gcmSIZEOF(gctUINT32));
-        buffer += gcmSIZEOF(gctUINT32);
-
-        /* Copy the video nodes if needed. */
-        if (bytes > 0)
-        {
-            gcmASSERT(ProgramState.hints);
-            gcmERR_BREAK(_SaveShaderVidNodes(KernelShader,
-                                             ProgramState.hints,
-                                             buffer));
-        }
-        buffer += bytes;
-
-        /* Assert we copied the right number of bytes */
-        gcmASSERT(buffer - *BinarySize == *Binary);
-
-        /* Success. */
-        gcmFOOTER_ARG("*Binary=0x%x *BinarySize=%ul", *Binary, *BinarySize);
-        return gcvSTATUS_OK;
-    }
-    while (gcvFALSE);
-
-    if (gcmIS_ERROR(status) && (buffer != gcvNULL))
-    {
-        /* Free binary buffer on error. */
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, *Binary));
-
-        /* Reset pointers on error. */
-        *Binary     = gcvNULL;
-        if (BinarySize)
-        {
-            *BinarySize = 0;
-        }
-    }
-
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-
-/*******************************************************************************
-**                                gcLoadProgram
-********************************************************************************
-**
-**    Load pre-compiled shaders and pre-linked programs from a binary file.
-**
-**    INPUT:
-**
-**        gctPOINTER Binary
-**            Pointer to the binary data loaded.
-**
-**        gctUINT32 BinarySize
-**            Number of bytes in 'Binary'.
-**
-**        gcSHADER VertexShader
-**            Pointer to a vertex shader object.
-**
-**        gcSHADER FragmentShader
-**            Pointer to a fragment shader object.
-**
-**    OUTPUT:
-**
-**        gcsPROGRAM_STATE *ProgramState
-**            Pointer to a variable receiving the program state.
-*/
-gceSTATUS
-gcLoadProgram(
-    IN gctPOINTER Binary,
-    IN gctUINT32 BinarySize,
-    OUT gcSHADER VertexShader,
-    OUT gcSHADER FragmentShader,
-    IN OUT gcsPROGRAM_STATE *ProgramState
-    )
-{
-    gcoOS os;
-    gctUINT32 bytes;
-    gctUINT8_PTR buffer;
-    gctUINT32 *bufferSize;
-    gctUINT32 alignBufferSize;
-    gceSTATUS status = gcvSTATUS_OK;
-    gctUINT8 language[4];
-    gctPOINTER pointer;
-
-    gcmHEADER_ARG("Binary=0x%x BinarySize=%lu",
-                  Binary, BinarySize);
-
-    do {
-        if (ProgramState)
-        {
-            ProgramState->stateBuffer = gcvNULL;
-            ProgramState->stateBufferSize = 0;
-            ProgramState->hints = gcvNULL;
-        }
-
-        /* Extract the gcoOS object pointer. */
-        os = gcvNULL;
-
-        if (gcmGetOptimizerOption()->dumpBinToFile)
-        {
-#define _FILENAMEMAX 1024
-            gctCHAR fullFileName[_FILENAMEMAX+1];
-            gctCHAR fileName[64];
-            gctUINT offset = 0;
-            gctUINT64 time;
-
-            gcmERR_BREAK(vscGetTemporaryDir(fullFileName));
-#if _WIN32
-            gcmERR_BREAK(gcoOS_StrCatSafe(fullFileName, _FILENAMEMAX, "\\"));
-#else
-            gcmERR_BREAK(gcoOS_StrCatSafe(fullFileName, _FILENAMEMAX, "/"));
-#endif
-            gcoOS_GetTime(&time);
-            gcmERR_BREAK(gcoOS_PrintStrSafe(fileName, gcmSIZEOF(fileName), &offset, "viv_program_%lld.gcPGM", (gctUINT64)time));
-            gcmERR_BREAK(gcoOS_StrCatSafe(fullFileName, _FILENAMEMAX, fileName));
-            status = gcSHADER_WriteBufferToFile((gctSTRING)Binary, BinarySize, fullFileName);
-            if (status == gcvSTATUS_OK)
-            {
-                gcoOS_Print("gcLoadProgram: save the program binary to the file %s\n", fullFileName);
-            }
-        }
-
-        gcmERR_BREAK(_gcLoadProgramHeader(Binary, BinarySize, (gctPOINTER)language));
-
-        if (language[0] != 'E' || language[1] != 'S')
-        {
-           gcoOS_Print("gcLoadProgram: expect language type 'ES' instead of %c%c",
-                    language[0], language[1]);
-           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-           return gcvSTATUS_INVALID_DATA;
-        }
-
-        buffer = (gctUINT8 *)Binary + _gcdProgramBinaryHeaderSize;
-        bytes = BinarySize - _gcdProgramBinaryHeaderSize;
-
-        bufferSize = (gctUINT32 *) buffer;
-
-        if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
-        {
-           /* Invalid vertex shader size. */
-           gcoOS_Print("gcLoadProgram: Invalid vertex shader size %u", bytes);
-           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-           return gcvSTATUS_INVALID_DATA;
-        }
-
-        bytes -=  sizeof(gctUINT32);
-        buffer += gcmSIZEOF(gctUINT32);
-
-        /* Load vertex shader bibary. */
-        gcmERR_BREAK(gcSHADER_Load(VertexShader,
-                                   buffer,
-                                   *bufferSize));
-
-        alignBufferSize = gcmALIGN(*bufferSize, 4);
-        buffer += alignBufferSize;
-        bytes -=  alignBufferSize;
-        bufferSize = (gctUINT32 *) buffer;
-
-        if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
-        {
-           /* Invalid fragment shader size. */
-           gcoOS_Print("gcLoadProgram: Invalid fragment shader size %u", bytes);
-           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-           return gcvSTATUS_INVALID_DATA;
-        }
-
-        bytes -=  sizeof(gctUINT32);
-        buffer += gcmSIZEOF(gctUINT32);
-
-        /* Load fragment shader binary. */
-        gcmERR_BREAK(gcSHADER_Load(FragmentShader,
-                                   buffer,
-                                   *bufferSize));
-
-        alignBufferSize = gcmALIGN(*bufferSize, 4);
-        buffer += alignBufferSize;
-        bytes -=  alignBufferSize;
-        bufferSize = (gctUINT32 *) buffer;
-
-        if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
-        {
-           /* Invalid program states size. */
-           gcoOS_Print("gcLoadProgram: Invalid program states size %u", bytes);
-           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-           return gcvSTATUS_INVALID_DATA;
-        }
-
-        bytes -=  gcmSIZEOF(gctUINT32);
-        buffer += gcmSIZEOF(gctUINT32);
-
-        if (ProgramState)
-        {
-            ProgramState->stateBufferSize = *bufferSize;
-        }
-
-        /* If this binary saves state buffer, then load it. */
-        if (ProgramState && *bufferSize > 0)
-        {
-            /* Allocate program states buffer. */
-            gcmERR_BREAK(gcoOS_Allocate(os, *bufferSize, &pointer));
-            ProgramState->stateBuffer= pointer;
-            gcoOS_MemCopy(ProgramState->stateBuffer, buffer, *bufferSize);
-        }
-
-        buffer += *bufferSize;
-        bytes -=  *bufferSize;
-        bufferSize = (gctUINT32 *) buffer;
-
-        if (bytes < sizeof(gctUINT32) ||
-            bytes < (*bufferSize + sizeof(gctUINT32)))
-        {
-           /* Invalid hint size. */
-           gcoOS_Print("gcLoadProgram: Invalid hints size %u", bytes);
-           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-           return gcvSTATUS_INVALID_DATA;
-        }
-
-        buffer += gcmSIZEOF(gctUINT32);
-
-        /* If this binary saves hints, then load it. */
-        if (ProgramState && *bufferSize > 0)
-        {
-          /* Allocate hint structure buffer. */
-          gcmERR_BREAK(gcoOS_Allocate(os,
-                                      gcSHADER_GetHintSize(),
-                                      &pointer));
-
-          ProgramState->hints = pointer;
-
-          /* Copy the HINT structure. */
-          gcoOS_MemCopy(ProgramState->hints, buffer, *bufferSize);
-        }
-
-        buffer += *bufferSize;
-
-        /* Assert we copied the right number of bytes */
-        gcmASSERT(buffer - BinarySize == Binary);
-
-        /* Success. */
-        gcmFOOTER_ARG("*ProgramBufferSize=%lu *ProgramBuffer=0x%x *Hints=0x%x",
-                      ProgramState ? ProgramState->stateBufferSize : 0,
-                      ProgramState ? ProgramState->stateBuffer : gcvNULL,
-                      ProgramState ? ProgramState->hints : gcvNULL);
-
-        return gcvSTATUS_OK;
-    }
-    while (gcvFALSE);
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-
-/*******************************************************************************
-**                                gcLoadCLSingleKernel
-********************************************************************************
-**
-**    Load pre-compiled shaders and pre-linked programs from a binary file.
-**
-**    INPUT:
-**
-**        gctPOINTER Binary
-**            Pointer to the binary data loaded.
-**
-**        gctUINT32 BinarySize
-**            Number of bytes in 'Binary'.
-**
-**    OUTPUT:
-**
-**        gcSHADER KernelShader
-**            Pointer to a vertex shader object.
-**
-**        gcsPROGRAM_STATE *ProgramState
-**            Pointer to a variable receicing the program state.
-*/
-gceSTATUS
-gcLoadCLSingleKernel(
-    IN gctPOINTER Binary,
-    IN gctUINT32 BinarySize,
-    OUT gcSHADER KernelShader,
-    IN OUT gcsPROGRAM_STATE *ProgramState
-    )
-{
-    gcoOS os;
-    gctUINT32 bytes;
-    gctUINT8_PTR buffer;
-    gctUINT32 *bufferSize;
-    gctUINT32 alignBufferSize;
-    gceSTATUS status = gcvSTATUS_OK;
-    gctUINT8 language[4];
-    gctPOINTER pointer;
-
-    gcmHEADER_ARG("Binary=0x%x BinarySize=%lu",
-                  Binary, BinarySize);
-
-    do {
-        if (ProgramState)
-        {
-            ProgramState->stateBuffer = gcvNULL;
-            ProgramState->stateBufferSize = 0;
-            ProgramState->hints = gcvNULL;
-        }
-
-        /* Extract the gcoOS object pointer. */
-        os = gcvNULL;
-
-        gcmERR_BREAK(_gcLoadProgramHeader(Binary, BinarySize, (gctPOINTER)language));
-
-        if (language[0] != 'C' || language[1] != 'L')
-        {
-            gcoOS_Print("gcLoadCLSingleKernel: expect language type 'CL' instead of %c%c",
-                    language[0], language[1]);
-            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-            return gcvSTATUS_INVALID_DATA;
-        }
-
-        buffer = (gctUINT8 *)Binary + _gcdProgramBinaryHeaderSize;
-        bytes = BinarySize - _gcdProgramBinaryHeaderSize;
-
-        bufferSize = (gctUINT32 *) buffer;
-
-        if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
-        {
-            /* Invalid kernel shader size. */
-            gcoOS_Print("gcLoadCLSingleKernel: Invalid kernel shader size %u", bytes);
-            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-            return gcvSTATUS_INVALID_DATA;
-        }
-
-        bytes -=  sizeof(gctUINT32);
-        buffer += gcmSIZEOF(gctUINT32);
-
-        /* Load kernel shader bibary. */
-        gcmERR_BREAK(gcSHADER_LoadEx(KernelShader,
-                                     buffer,
-                                     *bufferSize));
-
-        alignBufferSize = gcmALIGN(*bufferSize, 4);
-        buffer += alignBufferSize;
-        bytes -=  alignBufferSize;
-        bufferSize = (gctUINT32 *) buffer;
-
-        if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
-        {
-            /* Invalid program states size. */
-            gcoOS_Print("gcLoadProgram: Invalid program states size %u", bytes);
-            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-            return gcvSTATUS_INVALID_DATA;
-        }
-
-        bytes -=  gcmSIZEOF(gctUINT32);
-        buffer += gcmSIZEOF(gctUINT32);
-
-        if (ProgramState)
-        {
-            ProgramState->stateBufferSize = *bufferSize;
-        }
-
-        /* If this binary saves state buffer, then load it. */
-        if (ProgramState && *bufferSize > 0)
-        {
-            /* Allocate program states buffer. */
-            gcmERR_BREAK(gcoOS_Allocate(os, *bufferSize, &pointer));
-            ProgramState->stateBuffer = pointer;
-            gcoOS_MemCopy(ProgramState->stateBuffer, buffer, *bufferSize);
-        }
-
-        buffer += *bufferSize;
-        bytes -=  *bufferSize;
-        bufferSize = (gctUINT32 *) buffer;
-
-        if (bytes < sizeof(gctUINT32) ||
-            bytes < (*bufferSize + sizeof(gctUINT32)))
-        {
-            /* Invalid hint size. */
-            gcoOS_Print("gcLoadCLSingleKernel: Invalid hints size %u", bytes);
-            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-            return gcvSTATUS_INVALID_DATA;
-        }
-
-        buffer += gcmSIZEOF(gctUINT32);
-        bytes -= gcmSIZEOF(gctUINT32);
-
-        /* If this binary saves hints, then load it. */
-        if (ProgramState && *bufferSize > 0)
-        {
-            /* Allocate hint structure buffer. */
-            gcmERR_BREAK(gcoOS_Allocate(os,
-                                        gcSHADER_GetHintSize(),
-                                        &pointer));
-
-            gcoOS_ZeroMemory(pointer, gcSHADER_GetHintSize());
-            ProgramState->hints = (gcsHINT_PTR)pointer;
-
-            /* Copy the HINT structure. */
-            gcoOS_MemCopy(ProgramState->hints, buffer, *bufferSize);
-        }
-
-        buffer += *bufferSize;
-        bytes -= *bufferSize;
-
-        /* Load state delta */
-        bufferSize = (gctUINT32 *) buffer;
-        if (bytes < sizeof(gctUINT32) ||
-            bytes < (*bufferSize + sizeof(gctUINT32)))
-        {
-            gcoOS_Print("gcLoadCLSingleKernel: Invalid state delta %u", bytes);
-            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-            return gcvSTATUS_INVALID_DATA;
-        }
-        if (ProgramState)
-        {
-            ProgramState->stateDeltaSize = *bufferSize;
-        }
-        buffer += gcmSIZEOF(gctUINT32);
-        bytes -= gcmSIZEOF(gctUINT32);
-        if (ProgramState && (*bufferSize > 0))
-        {
-            /* Allocate program states delta. */
-            gcmERR_BREAK(gcoOS_Allocate(os, *bufferSize, &pointer));
-            ProgramState->stateDelta = pointer;
-            gcoOS_MemCopy(ProgramState->stateDelta, buffer, *bufferSize);
-        }
-        buffer += *bufferSize;
-        bytes -= *bufferSize;
-
-        /* Load patch offsets */
-        bufferSize = (gctUINT32 *)buffer;
-        if (bytes < sizeof(gctUINT32) ||
-            bytes < (*bufferSize + sizeof(gctUINT32)))
-        {
-            gcoOS_Print("gcLoadCLSingleKernel: Invalid patch offsets %u", bytes);
-            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-            return gcvSTATUS_INVALID_DATA;
-        }
-        buffer += gcmSIZEOF(gctUINT32);
-        bytes -= gcmSIZEOF(gctUINT32);
-        if (ProgramState && (*bufferSize > 0))
-        {
-            gcoOS_MemCopy(&ProgramState->patchOffsetsInDW, buffer, *bufferSize);
-        }
-        buffer += *bufferSize;
-        bytes -= *bufferSize;
-
-        /* Load video nodes. */
-        bufferSize = (gctUINT32 *) buffer;
-        if (bytes < sizeof(gctUINT32) ||
-            bytes < (*bufferSize + sizeof(gctUINT32)))
-        {
-            /* Invalid video nodes. */
-            gcoOS_Print("gcLoadCLSingleKernel: Invalid video nodes %u", bytes);
-            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-            return gcvSTATUS_INVALID_DATA;
-        }
-
-        buffer += gcmSIZEOF(gctUINT32);
-        bytes -= gcmSIZEOF(gctUINT32);
-
-        /* Load vide nodes. */
-        if (ProgramState && *bufferSize > 0)
-        {
-            gcmASSERT(ProgramState->hints);
-            /* Allocate hint structure buffer. */
-            gcmERR_BREAK(_LoadShaderVidNodesAndFixup(KernelShader,
-                                                     ProgramState,
-                                                     buffer));
-        }
-        buffer += *bufferSize;
-        bytes -= *bufferSize;
-
-
-        /* Assert we copied the right number of bytes */
-        gcmASSERT(buffer - BinarySize == Binary);
-
-        /* Success. */
-        gcmFOOTER_ARG("*stateBufferSize=%lu *stateBuffer=0x%x *Hints=0x%x stateDeltaSize=%lu *stateDelta=0x%x",
-                      ProgramState ? ProgramState->stateBufferSize : 0,
-                      ProgramState ? ProgramState->stateBuffer : gcvNULL,
-                      ProgramState ? ProgramState->hints : gcvNULL,
-                      ProgramState ? ProgramState->stateDeltaSize: gcvNULL,
-                      ProgramState ? ProgramState->stateDelta: gcvNULL);
-
-        return gcvSTATUS_OK;
-    }
-    while (gcvFALSE);
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
 
 static gceSTATUS
 _gcLINKTREE_CreateColorOutput(

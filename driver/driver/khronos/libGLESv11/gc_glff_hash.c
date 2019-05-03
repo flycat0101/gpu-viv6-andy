@@ -13,7 +13,7 @@
 
 #include "gc_glff_precomp.h"
 
-#define _GC_OBJ_ZONE glvZONE_TRACE
+#define _GC_OBJ_ZONE gcdZONE_ES11_TRACE
 
 /*******************************************************************************
 ** Hash table constants.
@@ -132,12 +132,14 @@ static gceSTATUS _CreateShaderEntry(
             gcSHADER_TYPE_VERTEX,
             &entry->program.vs.shader
             ));
+        gcmERR_BREAK(gcSHADER_SetClientApiVersion(entry->program.vs.shader, gcvAPI_OPENGL_ES11));
 
         /* Construct the fragment shader object. */
         gcmERR_BREAK(gcSHADER_Construct(
             gcSHADER_TYPE_FRAGMENT,
             &entry->program.fs.shader
             ));
+        gcmERR_BREAK(gcSHADER_SetClientApiVersion(entry->program.fs.shader, gcvAPI_OPENGL_ES11));
 
         /* Set the timestamp. */
         entry->program.timestamp = ++timestamp;
@@ -442,19 +444,19 @@ gceSTATUS glfGetHashedProgram(
 
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
     gcmTRACE_ZONE(
-        gcvLEVEL_VERBOSE, glvZONE_HASH,
+        gcvLEVEL_VERBOSE, gcdZONE_ES11_HASH,
         "[HASH] hash bucket = 0x%08X",
         bucket
         );
 
     gcmTRACE_ZONE(
-        gcvLEVEL_VERBOSE, glvZONE_HASH,
+        gcvLEVEL_VERBOSE, gcdZONE_ES11_HASH,
         "       table index = %d",
         index
         );
 
     gcmTRACE_ZONE(
-        gcvLEVEL_VERBOSE, glvZONE_HASH,
+        gcvLEVEL_VERBOSE, gcdZONE_ES11_HASH,
         "       number of collisions = %d",
         hashEntry->entryCount ? hashEntry->entryCount - 1 : 0
         );
@@ -490,7 +492,7 @@ gceSTATUS glfGetHashedProgram(
                 /* Print statistics. */
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
                 gcmTRACE_ZONE(
-                    gcvLEVEL_VERBOSE, glvZONE_HASH,
+                    gcvLEVEL_VERBOSE, gcdZONE_ES11_HASH,
                     "       found on attempt: %d",
                     ++attempt
                     );
@@ -527,7 +529,7 @@ gceSTATUS glfGetHashedProgram(
         {
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
             gcmTRACE_ZONE(
-                gcvLEVEL_VERBOSE, glvZONE_HASH,
+                gcvLEVEL_VERBOSE, gcdZONE_ES11_HASH,
                 "       deleting the least used entry (timestamp = %d).",
                 currEntry->program.timestamp
                 );
@@ -559,7 +561,7 @@ gceSTATUS glfGetHashedProgram(
 
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
         gcmTRACE_ZONE(
-            gcvLEVEL_VERBOSE, glvZONE_HASH,
+            gcvLEVEL_VERBOSE, gcdZONE_ES11_HASH,
             "       created new entry (timestamp = %d).",
             currEntry->program.timestamp
             );

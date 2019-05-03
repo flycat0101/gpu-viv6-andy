@@ -500,6 +500,7 @@ static gctUINT _ReserveBufferSize(
     }
 
     if (Hardware->features[gcvFEATURE_2D_FC_SOURCE] ||
+        Hardware->features[gcvFEATURE_2D_FAST_CLEAR] ||
         Hardware->features[gcvFEATURE_2D_V4COMPRESSION])
     {
         size += 10;
@@ -5471,7 +5472,7 @@ gcoHARDWARE_DrawPrimitives(
         0x8
     };
 
-    gcmHEADER_ARG("Hardware=0x%x Type=%d StartVertex=%d PrimitiveCount=%zu",
+    gcmHEADER_ARG("Hardware=0x%x Type=%d StartVertex=%d PrimitiveCount=%u",
                   Hardware, Type, StartVertex, PrimitiveCount);
 
     gcmGETHARDWARE(Hardware);
@@ -6740,7 +6741,7 @@ gcoHARDWARE_DrawInstancedPrimitives(
         0xD,
     };
 
-    gcmHEADER_ARG("Hardware=0x%x Type=%d StartVertex=%d PrimitiveCount=%zu, VertexCount=%zu, IntanceCount=%zu",
+    gcmHEADER_ARG("Hardware=0x%x Type=%d StartVertex=%d PrimitiveCount=%u, VertexCount=%u, IntanceCount=%u",
                   Hardware, Type, StartVertex, PrimitiveCount, VertexCount, InstanceCount);
 
     gcmGETHARDWARE(Hardware);
@@ -7376,7 +7377,7 @@ gcoHARDWARE_DrawPrimitivesCount(
         0x8
     };
 
-    gcmHEADER_ARG("Hardware=0x%x Type=%d StartVertex=%d PrimitiveCount=%zu",
+    gcmHEADER_ARG("Hardware=0x%x Type=%d StartVertex=%d PrimitiveCount=%u",
                   Hardware, Type, StartVertex, PrimitiveCount);
 
     gcmGETHARDWARE(Hardware);
@@ -7701,7 +7702,7 @@ gcoHARDWARE_DrawPrimitivesOffset(
     IN gctSIZE_T PrimitiveCount
     )
 {
-    gcmHEADER_ARG("Type=%d StartOffset=%d PrimitiveCount=%zu",
+    gcmHEADER_ARG("Type=%d StartOffset=%d PrimitiveCount=%u",
                    Type, StartOffset, PrimitiveCount);
 
     /* No supported on XAQ2. */
@@ -7790,7 +7791,7 @@ gcoHARDWARE_DrawIndexedPrimitives(
     };
 
     gcmHEADER_ARG("Hardware=0x%x Type=%d BaseVertex=%d "
-                    "StartIndex=%d PrimitiveCount=%zu",
+                    "StartIndex=%d PrimitiveCount=%u",
                     Hardware, Type, BaseVertex,
                     StartIndex, PrimitiveCount);
 
@@ -8120,7 +8121,7 @@ gcoHARDWARE_DrawIndexedPrimitivesOffset(
     )
 {
     gcmHEADER_ARG("Type=%d BaseOffset=%d "
-                  "StartOffset=%d PrimitiveCount=%zu",
+                  "StartOffset=%d PrimitiveCount=%u",
                   Type, BaseOffset,
                   StartOffset, PrimitiveCount);
 

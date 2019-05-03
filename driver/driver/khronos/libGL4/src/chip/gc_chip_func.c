@@ -17,7 +17,7 @@
 #include "gc_chip_hash.h"
 
 
-#define _GC_OBJ_ZONE __GLES3_ZONE_TRACE
+#define _GC_OBJ_ZONE gcdZONE_GL40_TRACE
 
 extern gceSTATUS getHashedProgram( __GLchipContext  *chipCtx, glsPROGRAMINFO_PTR* Program);
 extern gceSTATUS gcLoadShaders( IN gcoHAL Hal, IN gcsPROGRAM_STATE ProgramState);

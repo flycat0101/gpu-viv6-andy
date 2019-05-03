@@ -80,6 +80,11 @@ EXTERN_C_BEGIN
 
 #define GET_TENSOR_BATCH(tensor) (TENSOR_DIM_NUM(tensor) == 2 ? TENSOR_SIZE_INDEX(tensor, 1) : TENSOR_SIZE_INDEX(tensor,3))
 
+#define GET_HW_FEATURE_ACCUM_BUf_SIZE(ref)      (((vx_reference)(ref) )->context->nnConfig.fixedFeature.nnAccumBufferDepth)
+#define GET_HW_FEATURE_INPUT_BUF_SIZE(ref)    (((vx_reference)(ref) )->context->nnConfig.fixedFeature.nnInputBufferDepth)
+#define GET_HW_FEATURE_PAD_BIT_SIZE(ref)    (((vx_reference)(ref) )->context->nnConfig.fixedFeature.nnInImageOffsetBits)
+
+
 typedef enum _node_op_type_e
 {
     OP_INVALID                  = 0,
@@ -94,10 +99,14 @@ typedef enum _node_op_type_e
     OP_FC_ANDROID               = 0x1<<8,
     OP_CONVOLUTION_NxM          = 0x1<<9,
     OP_CONVOLUTION_DW           = 0x1<<10,
+    OP_TRANSPOSE                = 0x1<<11,
+    OP_ROIPOOL                  = 0x1<<12,
+    OP_CONVOLUTION_PAD          = 0x1<<13,
     OP_CONVOLUTION_RELU         = OP_CONVOLUTION | OP_RELU,
     OP_FULLYCONNECTED_RELU      = OP_FULLYCONNECTED | OP_RELU,
     OP_CONVOLUTION_POOLING      = OP_CONVOLUTION | OP_POOLING,
     OP_CONVOLUTION_RELU_POOLING = OP_CONVOLUTION | OP_RELU | OP_POOLING,
+    OP_ROIPOOL_RELU             = OP_ROIPOOL | OP_RELU,
     OP_MAX,
 } node_op_type_e;
 
@@ -202,6 +211,10 @@ typedef enum _param_concat2_index_e
     PARAM_CONCAT2_OUTPUT_INDEX = 2,
     PARAM_CONCAT2_INDEX_MAX
 } param_concat2_index_e;
+
+typedef vx_status (*perpareQuantizedWeightAndBiasFunc) (vx_tensor *weight, vx_tensor *bias, vx_tensor tensorIn[2], vx_uint32 coreNum, vx_int32 factor);
+
+extern vx_status vxnneAdapter_Tensor_FormatConvert(vx_tensor inputs, vx_tensor outputs);
 
 VX_INTERNAL_API vx_enum vxoGraph_getKernelType(vx_node node);
 

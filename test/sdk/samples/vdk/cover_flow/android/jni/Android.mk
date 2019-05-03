@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -31,7 +31,9 @@ include $(CLEAR_VARS)
 LOCAL_CFLAGS := \
 			-DANDROID \
 			-DANDROID_SDK_VERSION=$(PLATFORM_SDK_VERSION) \
-			-DLOG_TAG=\"cover_flow\"
+			-DLOG_TAG=\"cover_flow\" \
+			-Wno-unused-parameter \
+			-Wno-typedef-redefinition
 
 LOCAL_SRC_FILES:= \
 	android/jni/cover_flow_android.c \

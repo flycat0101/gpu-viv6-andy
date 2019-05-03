@@ -16,6 +16,7 @@
 #include "stdlib.h"
 
 #define __NEXT_MSG_ID__     001007
+#define _GC_OBJ_ZONE        gcdZONE_CL_DEVICE
 
 static struct _cl_device_id _device =
 {

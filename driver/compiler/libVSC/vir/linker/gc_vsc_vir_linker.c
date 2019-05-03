@@ -4317,6 +4317,7 @@ VIR_Lib_UpdateCallSites(
     VIR_Function        *func;
     VIR_OpCode          opcode;
     VIR_Enable          movEnable = VIR_ENABLE_NONE;
+    VIR_Swizzle         movSrc0Swizzle = VIR_SWIZZLE_XYZW;
     VIR_Type            *parmType = gcvNULL, *dstType = gcvNULL;
     VIR_TypeId          parmTypeId, typeId;
     gctUINT             i, argIndex, texldModifierIndex = 0;
@@ -4439,12 +4440,16 @@ VIR_Lib_UpdateCallSites(
                 if (VIR_Symbol_isInParam(parmSym))
                 {
                     VIR_TypeId  newSrcType = VIR_TYPE_UNKNOWN;
+                    gctBOOL     bMapSwizzle = gcvTRUE;
+
                     opcode = VIR_OP_MOV;
                     typeId = VIR_Operand_GetTypeId(opnd);
                     if (VIR_TypeId_isSampler(VIR_Operand_GetTypeId(opnd)))
                     {
                         opcode = VIR_OP_GET_SAMPLER_IDX;
                         typeId = VIR_TYPE_UINT_X4;
+
+                        bMapSwizzle = gcvFALSE;
                     }
                     else if (VIR_Operand_isSymbol(opnd))
                     {
@@ -4466,6 +4471,8 @@ VIR_Lib_UpdateCallSites(
                             typeId = VIR_TYPE_UINT_X8;
                             newSrcType = VIR_Symbol_GetTypeId(sym);
                         }
+
+                        bMapSwizzle = gcvFALSE;
                     }
                     /* matrix and struct's input is already lowered */
                     VIR_Function_AddInstructionBefore(pCallerFunc,
@@ -4487,7 +4494,18 @@ VIR_Lib_UpdateCallSites(
                     {
                         VIR_Operand_SetTypeId(newOpnd, newSrcType);
                     }
-                    VIR_Operand_SetSwizzle(newOpnd, VIR_Enable_2_Swizzle(movEnable));
+
+                    if (bMapSwizzle)
+                    {
+                        /* We should map the swizzle based on the swizzle of the call argument. */
+                        movSrc0Swizzle = VIR_Swizzle_ApplyMappingSwizzle(VIR_Enable_2_Swizzle_WShift(movEnable),
+                                                                         VIR_Operand_GetSwizzle(newOpnd));
+                    }
+                    else
+                    {
+                        movSrc0Swizzle = VIR_Enable_2_Swizzle_WShift(movEnable);
+                    }
+                    VIR_Operand_SetSwizzle(newOpnd, movSrc0Swizzle);
 
                     /* Set the offset.*/
                     if (VIR_TypeId_isSampler(VIR_Operand_GetTypeId(opnd)))

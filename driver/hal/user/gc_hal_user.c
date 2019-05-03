@@ -23,7 +23,7 @@
 #endif
 
 /* Zone used for header/footer. */
-#define _GC_OBJ_ZONE    gcvZONE_HAL
+#define _GC_OBJ_ZONE    gcdZONE_HAL_API
 
 /*******************************************************************************
 ***** Version Signature *******************************************************/
@@ -105,7 +105,7 @@ _WForFilterBlit(
     while(gcvFALSE);
 
     if (gcmIS_ERROR(status)) {
-        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_HAL,
+        gcmTRACE_ZONE(gcvLEVEL_ERROR, _GC_OBJ_ZONE,
             "Failed to workarond for GC300.");
 
         if (srcSurf)
@@ -593,11 +593,11 @@ gcoHAL_ConstructEx(
         }
 
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
-    gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_HAL,
+    gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                   "HAL user version %d.%d.%d build %u",
                   gcvVERSION_MAJOR, gcvVERSION_MINOR,
                   gcvVERSION_PATCH, gcvVERSION_BUILD);
-    gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_HAL,
+    gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                   "HAL kernel version %d.%d.%d build %u",
                   iface.u.Version.major, iface.u.Version.minor,
                   iface.u.Version.patch, iface.u.Version.build);
@@ -2711,7 +2711,7 @@ gcoHAL_AllocateVideoMemory(
     struct _gcsHAL_ALLOCATE_LINEAR_VIDEO_MEMORY * alvm
         = (struct _gcsHAL_ALLOCATE_LINEAR_VIDEO_MEMORY *) &iface.u;
 
-    gcmHEADER_ARG("Node=%p, Bytes=%zu, Alignement=%d, Type=%d, Flag=%d, Pool=%d",
+    gcmHEADER_ARG("Node=%p, Bytes=%u, Alignement=%d, Type=%d, Flag=%d, Pool=%d",
                   Node, *Bytes, Alignment, Type, Flag, Pool);
 
     iface.command   = gcvHAL_ALLOCATE_LINEAR_VIDEO_MEMORY;

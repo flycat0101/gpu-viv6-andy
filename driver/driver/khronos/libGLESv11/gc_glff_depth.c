@@ -13,7 +13,7 @@
 
 #include "gc_glff_precomp.h"
 
-#define _GC_OBJ_ZONE glvZONE_TRACE
+#define _GC_OBJ_ZONE gcdZONE_ES11_TRACE
 
 /******************************************************************************\
 ********************************* GL Name Arrays *******************************
@@ -786,7 +786,7 @@ gceSTATUS glfFlushDepthStates(
 #ifdef _GC_OBJ_ZONE
 #undef _GC_OBJ_ZONE
 #endif
-#define _GC_OBJ_ZONE    glvZONE_STATES
+#define _GC_OBJ_ZONE    gcdZONE_ES11_STATES
 
 GLenum glfEnableDepthTest(
     glsCONTEXT_PTR Context,
@@ -1254,7 +1254,7 @@ glfDetectDepthOnly(
 */
 
 #undef  _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE    glvZONE_STATES
+#define _GC_OBJ_ZONE    gcdZONE_ES11_STATES
 
 GL_API void GL_APIENTRY glDepthRangef(
     GLclampf zNear,
@@ -1355,7 +1355,7 @@ GL_API void GL_APIENTRY glDepthRangexOES(
 */
 
 #undef  _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE    glvZONE_FRAGMENT
+#define _GC_OBJ_ZONE    gcdZONE_ES11_FRAGMENT
 
 GL_API void GL_APIENTRY glDepthFunc(
     GLenum Function
@@ -1426,7 +1426,7 @@ GL_API void GL_APIENTRY glDepthMask(
 */
 
 #undef  _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE    glvZONE_CLEAR
+#define _GC_OBJ_ZONE    gcdZONE_ES11_CLEAR
 
 GL_API void GL_APIENTRY glClearDepthx(
     GLclampx ClearValue
@@ -1525,7 +1525,7 @@ GL_API void GL_APIENTRY glClearDepthfOES(
 */
 
 #undef  _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE    glvZONE_POLIGON
+#define _GC_OBJ_ZONE    gcdZONE_ES11_POLIGON
 
 GL_API void GL_APIENTRY glPolygonOffsetx(
     GLfixed Factor,
@@ -1638,7 +1638,7 @@ GL_API void GL_APIENTRY glPolygonOffset(
 */
 
 #undef  _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE    glvZONE_FRAGMENT
+#define _GC_OBJ_ZONE    gcdZONE_ES11_FRAGMENT
 
 GL_API void GL_APIENTRY glStencilFunc(
     GLenum Function,
@@ -1935,7 +1935,7 @@ GL_API void GL_APIENTRY glStencilOp(
 */
 
 #undef  _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE    glvZONE_CLEAR
+#define _GC_OBJ_ZONE    gcdZONE_ES11_CLEAR
 
 GL_API void GL_APIENTRY glClearStencil(
     GLint ClearValue

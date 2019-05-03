@@ -17,7 +17,7 @@
 /*
 ** Enable/Disable
 */
-#define _GC_OBJ_ZONE __GLES3_ZONE_CORE
+#define _GC_OBJ_ZONE gcdZONE_GL40_CORE
 
 #ifdef OPENGL40
 /* temporarily keep this function in gc_gl_enbale.c, it perhaps is moved into gc_es_misc.c */
@@ -2950,9 +2950,6 @@ GLboolean APIENTRY __glim_IsEnabledIndexedEXT(__GLcontext *gc, GLenum target, GL
 */
 
 /* GL_VERSION_1_0 */
-GLvoid GL_APIENTRY __glim_GetDoublev(__GLcontext *gc, GLenum pname, GLdouble *params)
-{
-}
 GLvoid GL_APIENTRY __glim_GetPixelMapfv(__GLcontext *gc, GLenum map, GLfloat *values)
 {
 }

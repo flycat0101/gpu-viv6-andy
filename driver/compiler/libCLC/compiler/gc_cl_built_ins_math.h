@@ -216,6 +216,7 @@ clsBUILTIN_FUNCTION    MathBuiltinFunctions[] =
 
     /* Vivante Primitive Exponential Functions */
     {clvEXTENSION_NONE,     "viv_pow",                 T_F_GENTYPE,    2, {T_F_GENTYPE, T_F_GENTYPE}, {0}, {1, 1}, 1},
+    {clvEXTENSION_NONE,     "viv_native_pow",          T_F_GENTYPE,    2, {T_F_GENTYPE, T_F_GENTYPE}, {0}, {1, 1}, 1},
 
     {clvEXTENSION_NONE,     "viv_half_powr",           T_F_GENTYPE,    2, {T_F_GENTYPE, T_F_GENTYPE}, {0}, {1, 1}, 1},
     {clvEXTENSION_NONE,     "viv_native_powr",         T_F_GENTYPE,    2, {T_F_GENTYPE, T_F_GENTYPE}, {0}, {1, 1}, 1},
@@ -21160,7 +21161,116 @@ _GenPowCode(
     }
     return gcvSTATUS_OK;
 }
-/*Should be simpler than Pow, but we call pow here. Right wait is to call pow normal part */
+
+static gceSTATUS
+_GenNativePowCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    gceSTATUS      status;
+    clsSELECTION_CONTEXT    slctCntxtXGE0;
+    clsROPERAND    zeroROperand;
+
+    gcmASSERT(OperandCount == 2);
+    clsROPERAND_InitializeIntOrIVecConstant(&zeroROperand,
+                                            clmGenCodeDataType(T_UINT),
+                                            0);
+    /* The selection begins, for x >= 0? */
+    status = clDefineSelectionBegin(Compiler,
+                                    CodeGenerator,
+                                    gcvTRUE,
+                                    &slctCntxtXGE0);
+    if (gcmIS_ERROR(status)) return status;
+
+    /*  */
+    status = clGenSelectionCompareConditionCode(Compiler,
+                                                CodeGenerator,
+                                                &slctCntxtXGE0,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
+                                                clvCONDITION_GREATER_THAN_EQUAL,
+                                                &OperandsParameters[0].rOperands[0],
+                                                &zeroROperand);
+    if (gcmIS_ERROR(status)) return status;
+
+    /* When x >= 0, use fast implementation of pow() */
+    status = clDefineSelectionTrueOperandBegin(Compiler,
+                                            CodeGenerator,
+                                            &slctCntxtXGE0);
+    if (gcmIS_ERROR(status)) return status;
+
+    status = clGenGenericCode2(Compiler,
+                               PolynaryExpr->exprBase.base.lineNo,
+                               PolynaryExpr->exprBase.base.stringNo,
+                               clvOPCODE_POW,
+                               IOperand,
+                               &OperandsParameters[0].rOperands[0],
+                               &OperandsParameters[1].rOperands[0]);
+    if (gcmIS_ERROR(status)) return status;
+
+    status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
+                                    CodeGenerator,
+                                    &slctCntxtXGE0,
+                                    gcvFALSE);
+    if (gcmIS_ERROR(status)) return status;
+
+    /* For x < 0, use long implementation */
+    status = clDefineSelectionFalseOperandBegin(Compiler,
+                                                CodeGenerator,
+                                                &slctCntxtXGE0);
+    if (gcmIS_ERROR(status)) return status;
+
+    status =  _GenPowCode(Compiler,
+                          CodeGenerator,
+                          PolynaryExpr,
+                          OperandCount,
+                          OperandsParameters,
+                          IOperand);
+    if (gcmIS_ERROR(status)) return status;
+
+    status = clDefineSelectionFalseOperandEnd(Compiler,
+                                              CodeGenerator,
+                                              &slctCntxtXGE0);
+    if (gcmIS_ERROR(status)) return status;
+
+    return clDefineSelectionEnd(Compiler,
+                                CodeGenerator,
+                                &slctCntxtXGE0);
+}
+
+static gceSTATUS
+_GenNativePowrCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    gceSTATUS                    status;
+    gcmHEADER();
+
+    gcmASSERT(OperandCount == 2);
+    status = clGenGenericCode2(Compiler,
+                               PolynaryExpr->exprBase.base.lineNo,
+                               PolynaryExpr->exprBase.base.stringNo,
+                               clvOPCODE_POW,
+                               IOperand,
+                               &OperandsParameters[0].rOperands[0],
+                               &OperandsParameters[1].rOperands[0]);
+    gcmFOOTER();
+    return status;
+}
+
+/*Should be simpler than Pow, but we call pow here. Right way is to call pow normal part */
 static gceSTATUS
 _GenPowrCode(
     IN cloCOMPILER Compiler,

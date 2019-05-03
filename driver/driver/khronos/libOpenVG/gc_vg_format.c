@@ -17,6 +17,7 @@
 #include "gc_vg_format_writer.c"
 #include "gc_vg_format_array.c"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG_FORMAT
 
 /*******************************************************************************
 **

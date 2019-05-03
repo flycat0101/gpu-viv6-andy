@@ -1138,9 +1138,16 @@ gctBOOL VIR_CG_ConstUniformExistBefore(
         valid[0] = gcvTRUE;
         break;
 
-
     case VIR_TYPE_FLOAT16_X4:
-        return gcvFALSE;
+        valid[3] = gcvTRUE;
+    case VIR_TYPE_FLOAT16_X3:
+        valid[2] = gcvTRUE;
+    case VIR_TYPE_FLOAT16_X2:
+        valid[1] = gcvTRUE;
+    case VIR_TYPE_FLOAT16:
+        valid[0] = gcvTRUE;
+        break;
+
     default:
         gcmASSERT(gcvFALSE);
         return gcvFALSE;
@@ -1348,6 +1355,7 @@ static gctBOOL _VIR_CG_isUniformAllocable(
         case VIR_UNIFORM_GLOBAL_SIZE:
         case VIR_UNIFORM_LOCAL_SIZE:
         case VIR_UNIFORM_NUM_GROUPS:
+        case VIR_UNIFORM_NUM_GROUPS_FOR_SINGLE_GPU:
         case VIR_UNIFORM_GLOBAL_OFFSET:
         case VIR_UNIFORM_WORK_DIM:
         case VIR_UNIFORM_KERNEL_ARG:
@@ -1525,13 +1533,15 @@ _VIR_CG_IsUniformRestricted(
     )
 {
     gctBOOL restricted = gcvFALSE;
+    VIR_UniformKind uniformKind = VIR_Symbol_GetUniformKind(pSymbol);
 
     /*
     ** 1) for #num_group, it must be c.xyz
     ** 2) for #base_instance, it must be c.x
     */
-    if (VIR_Symbol_GetUniformKind(pSymbol) == VIR_UNIFORM_NUM_GROUPS    ||
-        VIR_Symbol_GetUniformKind(pSymbol) == VIR_UNIFORM_BASE_INSTANCE)
+    if (uniformKind == VIR_UNIFORM_NUM_GROUPS    ||
+        uniformKind == VIR_UNIFORM_NUM_GROUPS_FOR_SINGLE_GPU ||
+        uniformKind == VIR_UNIFORM_BASE_INSTANCE)
     {
         restricted = gcvTRUE;
     }

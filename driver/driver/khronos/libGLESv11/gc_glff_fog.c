@@ -13,7 +13,7 @@
 
 #include "gc_glff_precomp.h"
 
-#define _GC_OBJ_ZONE glvZONE_TRACE
+#define _GC_OBJ_ZONE gcdZONE_ES11_TRACE
 
 /******************************************************************************\
 ********************************* GL Name Arrays *******************************
@@ -636,7 +636,7 @@ GLboolean glfQueryFogState(
 #ifdef _GC_OBJ_ZONE
 #undef _GC_OBJ_ZONE
 #endif
-#define _GC_OBJ_ZONE    glvZONE_FOG
+#define _GC_OBJ_ZONE    gcdZONE_ES11_FOG
 
 GL_API void GL_APIENTRY glFogf(
     GLenum Name,

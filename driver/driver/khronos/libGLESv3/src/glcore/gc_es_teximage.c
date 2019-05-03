@@ -16,7 +16,7 @@
 #include "gc_es_device.h"
 
 
-#define _GC_OBJ_ZONE __GLES3_ZONE_CORE
+#define _GC_OBJ_ZONE gcdZONE_ES30_CORE
 
 extern GLboolean __glIsTextureComplete(__GLcontext *gc, __GLtextureObject *texObj, GLenum minFilter,
                                        GLenum magFilter, GLenum compareMode, GLint maxLevelUsed);
@@ -215,6 +215,8 @@ static const __GLformatCombine canonicalformats[] = {
     { GL_RGBA, GL_RGBA, GL_HALF_FLOAT_OES, 8, GL_TRUE },
     { GL_RGB, GL_RGB, GL_HALF_FLOAT_OES, 6, GL_TRUE },
 
+    /* required by GL_EXT_BGRA extension */
+    { GL_BGRA_EXT, GL_BGRA_EXT, GL_UNSIGNED_BYTE, 4, GL_TRUE }
 };
 
 
@@ -484,7 +486,6 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
                                         GLenum internalFormat)
 {
     GLboolean invalid = GL_FALSE;
-    gcePATCH_ID patchID = gcvPATCH_INVALID;
 
     if (!tex)
     {
@@ -600,8 +601,7 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         ** but in GLES spec3.0, it is a valid texture format.
         */
         case GL_SRGB8_ALPHA8:
-            gcoHAL_GetPatchID(gcvNULL, &patchID);
-            if(gc->apiVersion < __GL_API_VERSION_ES30 && (patchID == gcvPATCH_GTFES30 || patchID == gcvPATCH_DEQP))
+            if(gc->constants.majorVersion < 3)
             {
                 invalid = GL_TRUE;
             }
@@ -2593,7 +2593,7 @@ GLvoid GL_APIENTRY __gles_TexSubImage3D(__GLcontext *gc,
             break;
         }
     default:
-        __GL_ERROR_RET(GL_INVALID_ENUM);
+        __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
     /* Check arguments */
@@ -2644,6 +2644,7 @@ GLvoid GL_APIENTRY __gles_TexSubImage3D(__GLcontext *gc,
     __glSetTexImageDirtyBit(gc, tex, __GL_TEX_IMAGE_CONTENT_CHANGED_BIT | mipHintDirty);
 
 OnExit:
+OnError:
     __GL_FOOTER();
     return;
 }

@@ -28,6 +28,7 @@ VIR_CFO_Init(
     VIR_CFO_SetOptions(cfo, options);
     VIR_CFO_SetDumper(cfo, dumper);
     VIR_CFO_SetMM(cfo, mm);
+    VIR_CFO_SetInvalidCfg(cfo, gcvFALSE);
 }
 
 void
@@ -77,7 +78,7 @@ _VIR_CFO_PerformPatternTransformationOnFunction(
                         VIR_Inst_Dump(dumper, inst);
                     }
 
-                    VIR_Function_DeleteInstruction(func, inst);
+                    VIR_Pass_DeleteInstruction(func, inst, &VIR_CFO_GetInvalidCfg(cfo));
                     inst = nextInst;
                     break;
                 }
@@ -116,7 +117,7 @@ _VIR_CFO_PerformPatternTransformationOnFunction(
                             VIR_Label_SetReference(label, startLink);
                             VIR_Label_SetReference(labelNext, gcvNULL);
                         }
-                        VIR_Function_DeleteInstruction(func, nextInst);
+                        VIR_Pass_DeleteInstruction(func, nextInst, &VIR_CFO_GetInvalidCfg(cfo));
                         break;
                     }
                 }
@@ -144,7 +145,7 @@ _VIR_CFO_PerformPatternTransformationOnFunction(
                                 VIR_LOG(dumper, "remove instruction:\n");
                                 VIR_Inst_Dump(dumper, inst);
                             }
-                            VIR_Function_DeleteInstruction(func, inst);
+                            VIR_Pass_DeleteInstruction(func, inst, &VIR_CFO_GetInvalidCfg(cfo));
                             inst = nextInst;
                             break;
                         }
@@ -207,7 +208,7 @@ _VIR_CFO_PerformPatternTransformationOnFunction(
                                             VIR_LOG(dumper, "remove instruction:\n");
                                             VIR_Inst_Dump(dumper, nextInst);
                                         }
-                                        VIR_Function_DeleteInstruction(func, nextInst);
+                                        VIR_Pass_DeleteInstruction(func, nextInst, &VIR_CFO_GetInvalidCfg(cfo));
                                         break;
                                     }
                                     else if((VIR_Swizzle_Channel_Count(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(inst, 0))) == 1 &&
@@ -242,7 +243,7 @@ _VIR_CFO_PerformPatternTransformationOnFunction(
                                             VIR_LOG(dumper, "remove instruction:\n");
                                             VIR_Inst_Dump(dumper, nextInst);
                                         }
-                                        VIR_Function_DeleteInstruction(func, nextInst);
+                                        VIR_Pass_DeleteInstruction(func, nextInst, &VIR_CFO_GetInvalidCfg(cfo));
                                         break;
                                     }
                                 }
@@ -274,7 +275,7 @@ _VIR_CFO_PerformPatternTransformationOnFunction(
                                 VIR_LOG(dumper, "remove instruction:\n");
                                 VIR_Inst_Dump(dumper, inst);
                             }
-                            VIR_Function_DeleteInstruction(func, inst);
+                            VIR_Pass_DeleteInstruction(func, inst, &VIR_CFO_GetInvalidCfg(cfo));
                             inst = nextInst;
                             break;
                         }
@@ -294,7 +295,7 @@ _VIR_CFO_PerformPatternTransformationOnFunction(
                     VIR_LOG(dumper, "remove instruction:\n");
                     VIR_Inst_Dump(dumper, inst);
                 }
-                VIR_Function_DeleteInstruction(func, inst);
+                VIR_Pass_DeleteInstruction(func, inst, &VIR_CFO_GetInvalidCfg(cfo));
                 inst = nextInst;
                 break;
             }
@@ -490,12 +491,12 @@ VIR_CFO_PerformOnShader(
         }
     }
 
-    VIR_CFO_Final(&cfo);
-
-    if(globalChanged)
+    if(globalChanged || VIR_CFO_GetInvalidCfg(&cfo))
     {
         pPassWorker->pResDestroyReq->s.bInvalidateCfg = gcvTRUE;
     }
+
+    VIR_CFO_Final(&cfo);
 
     if(VSC_OPTN_CFOOptions_GetTrace(options))
     {

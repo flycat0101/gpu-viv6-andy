@@ -282,34 +282,6 @@ do { } while (gcvFALSE)
             : gcvSTATUS_GENERIC_IO \
     )
 
-
-/******************************************************************************\
-************************ Debug zones (28 are available). ***********************
-\******************************************************************************/
-
-#define glvZONE_BUFFER          (gcvZONE_API_ES11 | (1 <<  0))
-#define glvZONE_CLEAR           (gcvZONE_API_ES11 | (1 <<  1))
-#define glvZONE_CLIP            (gcvZONE_API_ES11 | (1 <<  2))
-#define glvZONE_CONTEXT         (gcvZONE_API_ES11 | (1 <<  3))
-#define glvZONE_DRAW            (gcvZONE_API_ES11 | (1 <<  4))
-#define glvZONE_ENABLE          (gcvZONE_API_ES11 | (1 <<  5))
-#define glvZONE_EXTENTION       (gcvZONE_API_ES11 | (1 <<  6))
-#define glvZONE_FOG             (gcvZONE_API_ES11 | (1 <<  7))
-#define glvZONE_FRAGMENT        (gcvZONE_API_ES11 | (1 <<  8))
-#define glvZONE_LIGHT           (gcvZONE_API_ES11 | (1 <<  9))
-#define glvZONE_MATRIX          (gcvZONE_API_ES11 | (1 << 10))
-#define glvZONE_PIXEL           (gcvZONE_API_ES11 | (1 << 11))
-#define glvZONE_POLIGON         (gcvZONE_API_ES11 | (1 << 12))
-#define glvZONE_LINE            (gcvZONE_API_ES11 | (1 << 13))
-#define glvZONE_QUERY           (gcvZONE_API_ES11 | (1 << 14))
-#define glvZONE_TEXTURE         (gcvZONE_API_ES11 | (1 << 15))
-#define glvZONE_STATES          (gcvZONE_API_ES11 | (1 << 16))
-#define glvZONE_STREAM          (gcvZONE_API_ES11 | (1 << 17))
-#define glvZONE_VIEWPORT        (gcvZONE_API_ES11 | (1 << 18))
-#define glvZONE_SHADER          (gcvZONE_API_ES11 | (1 << 19))
-#define glvZONE_HASH            (gcvZONE_API_ES11 | (1 << 20))
-#define glvZONE_TRACE           (gcvZONE_API_ES11 | (1 << 21))
-
 #ifdef UNDER_CE
 #define gldSUPPORT_SHARED_CONTEXT           1
 #else

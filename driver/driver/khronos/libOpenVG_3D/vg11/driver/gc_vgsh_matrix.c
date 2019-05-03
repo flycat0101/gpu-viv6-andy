@@ -13,6 +13,8 @@
 
 #include "gc_vgsh_precomp.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG3D_MATRIX
+
 void _VGMatrixCtor(_VGMatrix3x3 *matrix)
 {
     _vgSetMatrix(matrix, 1.0f, 0.0f, 0.0f,

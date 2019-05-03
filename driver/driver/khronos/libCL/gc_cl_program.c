@@ -14,6 +14,7 @@
 #include "gc_cl_precomp.h"
 
 #define __NEXT_MSG_ID__     006030
+#define _GC_OBJ_ZONE        gcdZONE_CL_PROGRAM
 
 #if gcdSTATIC_LINK
 
@@ -262,9 +263,15 @@ OnError:
             "OCL-006003: (clCreateProgramWithSource) cannot create program.  Maybe run out of memory.\n");
     }
 
-    if(source != gcvNULL) gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, source));
+    if(source != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, source);
+    }
 
-    if (sizes  != gcvNULL) gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, sizes));
+    if (sizes  != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, sizes);
+    }
 
     if(program != gcvNULL && program->devices != gcvNULL)
     {
@@ -273,7 +280,10 @@ OnError:
 
     if(program != gcvNULL && program->referenceCount) gcoOS_AtomDestroy(gcvNULL, program->referenceCount);
 
-    if(program != gcvNULL) gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, program));
+    if(program != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, program);
+    }
 
     if (ErrcodeRet)
     {
@@ -694,11 +704,10 @@ clBuildProgram(
     Program->buildStatus = CL_BUILD_IN_PROGRESS;
 
     platform = Program->context->platform;
+    clmONERROR(clfLoadCompiler(platform), CL_BUILD_PROGRAM_FAILURE);
 
     if (Program->binary == gcvNULL)
     {
-        clmONERROR(clfLoadCompiler(platform), CL_BUILD_PROGRAM_FAILURE);
-
         clmONERROR(clfUpdateCompileOption(platform, &Program->buildOptions), CL_OUT_OF_HOST_MEMORY);
 
         status = (*platform->compiler11)(gcvNULL,

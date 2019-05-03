@@ -15,6 +15,7 @@
 #include "gc_hal_user_math.h"
 
 #define __NEXT_MSG_ID__     007032
+#define _GC_OBJ_ZONE        gcdZONE_CL_KERNEL
 
 extern gctBOOL gcSHADER_GoVIRPass(gcSHADER Shader);
 
@@ -208,7 +209,10 @@ clfReleaseKernel(
         }
         gcFreeProgramState(Kernel->masterInstance.programState);
         if (Kernel->masterInstance.binary) gcSHADER_Destroy((gcSHADER)Kernel->masterInstance.binary);
-        if (Kernel->name) gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Kernel->name));
+        if (Kernel->name)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, Kernel->name);
+        }
 
         if (Kernel->virMasterInstance)
         {
@@ -1258,6 +1262,93 @@ clfLoadKernelArgValues(
                    CL_INVALID_VALUE);
 
     }
+    else if (isUniformNumGroupsForSingleGPU(Arg->uniform))
+    {
+        gctUINT32 gpuCount,usedGpu;
+        gctUINT i = 0, j = 0, maxDimIndex = 0;
+        gctUINT eachGPUWorkGroupSizes[gcdMAX_3DGPU_COUNT] = { 0 };
+        gctUINT eachGPUWorkGroupNum[gcdMAX_3DGPU_COUNT][3] = {{ 0 }};
+        gctUINT eachGPUGroupCount, restGroupCount;
+        gctINT *datas[gcdMAX_3DGPU_COUNT] = {gcvNULL};
+        gctUINT maxWorkGroupCount = GlobalWorkSize[0] / LocalWorkSize[0];
+        gctBOOL atomic_access = (hints->memoryAccessFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_OPENCL] & gceMA_FLAG_ATOMIC) != 0;
+        /* TODO - For 64-bit GPU. */
+        /*size_t numGroups[3];*/
+        gctUINT32 numGroups[3]    = { 0 };
+
+        gcoCL_GetHWConfigGpuCount(&gpuCount);
+        usedGpu = gpuCount;
+
+        numGroups[0] = GlobalWorkSize[0] / (LocalWorkSize[0] ? LocalWorkSize[0] : 1);
+        numGroups[1] = WorkDim > 1 ? (GlobalWorkSize[1] / (LocalWorkSize[1] ? LocalWorkSize[1] : 1)) : 0;
+        numGroups[2] = WorkDim > 2 ? (GlobalWorkSize[2] / (LocalWorkSize[2] ? LocalWorkSize[2] : 1)) : 0;
+
+        if (gpuCount > 1 && !atomic_access)
+        {
+            for(i = 1; i < WorkDim; i++)  /*The split method shoud match with gcoHardware_InvokThreadWalker  */
+            {
+                if(GlobalWorkSize[i] / LocalWorkSize[i] > maxWorkGroupCount)
+                {
+                    maxWorkGroupCount = GlobalWorkSize[i] / LocalWorkSize[i];
+                    maxDimIndex = i;
+                }
+            }
+
+            eachGPUGroupCount = maxWorkGroupCount / gpuCount;
+            restGroupCount = maxWorkGroupCount % gpuCount;
+
+            for(i = 0 ;i < gpuCount; i++)
+            {
+                eachGPUWorkGroupSizes[i] = eachGPUGroupCount;
+            }
+
+            for(i = 0 ;i <restGroupCount; i++)
+            {
+                eachGPUWorkGroupSizes[i]++;
+            }
+
+            if(eachGPUGroupCount == 0) usedGpu = restGroupCount;
+
+            for (i = 0; i < WorkDim; i++)
+            {
+                if (i == maxDimIndex)
+                {
+                    for (j = 0; j < usedGpu; j++)
+                    {
+                        eachGPUWorkGroupNum[j][i] = eachGPUWorkGroupSizes[j];
+                    }
+                }
+                else
+                {
+                    for (j = 0; j < usedGpu; j++)
+                    {
+                        eachGPUWorkGroupNum[j][i] = numGroups[i];
+                    }
+                }
+            }
+
+            for(i = 0; i < gpuCount; i++)
+            {
+                datas[i] = (gctINT *) eachGPUWorkGroupNum[i];
+            }
+
+           clmONERROR(clfSetUniformValueCombinedMode(Arg->uniform,
+                                          length,
+                                          datas,
+                                          gpuCount),
+                      CL_INVALID_VALUE);
+        }
+        else
+        {
+            gcoOS_MemCopy(Arg->data, numGroups, gcmSIZEOF(numGroups));
+
+            clmONERROR(clfSetUniformValue(Arg->uniform,
+                                          length,
+                                          Arg->data),
+                       CL_INVALID_VALUE);
+        }
+
+    }
     else if (isUniformGlobalOffset(Arg->uniform))
     {
         /* TODO - For 64-bit GPU. */
@@ -1586,6 +1677,8 @@ clfLoadKernelArgValues(
                     if (isUniformGlobalSize(tempArg->uniform))
                         continue;
                     if (isUniformNumGroups(tempArg->uniform))
+                        continue;
+                    if (isUniformNumGroupsForSingleGPU(tempArg->uniform))
                         continue;
                     if (isUniformLocalSize(tempArg->uniform))
                         continue;
@@ -2264,7 +2357,7 @@ clfAdjustLocalWorkSize(
             }
         }
 
-        gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_CL,
+        gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_CL,
             "Adjusted LocalWorkSize: [%d, %d, %d]\n",
             LocalWorkSize[0], LocalWorkSize[1], LocalWorkSize[2]);
     }
@@ -3331,6 +3424,7 @@ clfFlushVIRKernelResource(
 
                         switch(arg->type)
                         {
+                        case VSC_SHADER_DATA_TYPE_INT8:
                         case VSC_SHADER_DATA_TYPE_INT8_X2:
                         case VSC_SHADER_DATA_TYPE_INT8_X3:
                         case VSC_SHADER_DATA_TYPE_INT8_X4:
@@ -3341,6 +3435,7 @@ clfFlushVIRKernelResource(
                             signExt = 0xFFFFFF00;
                             packedData = gcvTRUE;
                             break;
+                        case VSC_SHADER_DATA_TYPE_UINT8:
                         case VSC_SHADER_DATA_TYPE_UINT8_X2:
                         case VSC_SHADER_DATA_TYPE_UINT8_X3:
                         case VSC_SHADER_DATA_TYPE_UINT8_X4:
@@ -3351,6 +3446,7 @@ clfFlushVIRKernelResource(
                             signExt = 0;
                             packedData = gcvTRUE;
                             break;
+                        case VSC_SHADER_DATA_TYPE_INT16:
                         case VSC_SHADER_DATA_TYPE_INT16_X2:
                         case VSC_SHADER_DATA_TYPE_INT16_X3:
                         case VSC_SHADER_DATA_TYPE_INT16_X4:
@@ -3361,6 +3457,7 @@ clfFlushVIRKernelResource(
                             signExt = 0xFFFF0000;
                             packedData = gcvTRUE;
                             break;
+                        case VSC_SHADER_DATA_TYPE_UINT16:
                         case VSC_SHADER_DATA_TYPE_UINT16_X2:
                         case VSC_SHADER_DATA_TYPE_UINT16_X3:
                         case VSC_SHADER_DATA_TYPE_UINT16_X4:
@@ -3528,6 +3625,85 @@ clfFlushVIRKernelResource(
                 numGroups[2] = NDRangeKernel->globalWorkSize[2] / (NDRangeKernel->localWorkSize[2] ? NDRangeKernel->localWorkSize[2] : 1);
                 data = (gctPOINTER)numGroups;
                 Columns = 3;
+                break;
+            case SHS_PRIV_CONSTANT_KIND_COMPUTE_GROUP_NUM_FOR_SINGLE_GPU:
+                {
+                    gctUINT32 gpuCount,usedGpu;
+                    gctUINT i = 0, j = 0, maxDimIndex = 0;
+                    gctUINT eachGPUWorkGroupSizes[gcdMAX_3DGPU_COUNT] = { 0};
+                    gctUINT eachGPUWorkGroupNum[gcdMAX_3DGPU_COUNT][3] = {{ 0 }};
+                    gctUINT eachGPUGroupCount, restGroupCount;
+                    gctINT *datas[gcdMAX_3DGPU_COUNT] = {gcvNULL};
+                    gctUINT maxWorkGroupCount = NDRangeKernel->globalWorkSize[0] / NDRangeKernel->localWorkSize[0];
+                    gctBOOL atomic_access = (hints->memoryAccessFlags[gcvSHADER_HIGH_LEVEL][gcvPROGRAM_STAGE_OPENCL] & gceMA_FLAG_ATOMIC) != 0;
+
+                    gcoCL_GetHWConfigGpuCount(&gpuCount);
+
+                    numGroups[0] = NDRangeKernel->globalWorkSize[0] / (NDRangeKernel->localWorkSize[0] ? NDRangeKernel->localWorkSize[0] : 1);
+                    numGroups[1] = NDRangeKernel->globalWorkSize[1] / (NDRangeKernel->localWorkSize[1] ? NDRangeKernel->localWorkSize[1] : 1);
+                    numGroups[2] = NDRangeKernel->globalWorkSize[2] / (NDRangeKernel->localWorkSize[2] ? NDRangeKernel->localWorkSize[2] : 1);
+
+                    if (gpuCount > 1 && !atomic_access)
+                    {
+                        usedGpu = gpuCount;
+                        isCombinedMode = gcvTRUE;
+
+                        for(i = 1; i < NDRangeKernel->workDim ; i++)  /*The split method shoud match with gcoHardware_InvokThreadWalker  */
+                        {
+                            if(NDRangeKernel->globalWorkSize[i] / NDRangeKernel->localWorkSize[i] > maxWorkGroupCount)
+                            {
+                                maxWorkGroupCount = NDRangeKernel->globalWorkSize[i] / NDRangeKernel->localWorkSize[i];
+                                maxDimIndex = i;
+                            }
+                        }
+
+                        eachGPUGroupCount = maxWorkGroupCount / gpuCount;
+                        restGroupCount = maxWorkGroupCount % gpuCount;
+
+                        for(i = 0 ;i < gpuCount; i++)
+                        {
+                            eachGPUWorkGroupSizes[i] = eachGPUGroupCount;
+                        }
+
+                        for(i = 0 ;i <restGroupCount; i++)
+                        {
+                            eachGPUWorkGroupSizes[i]++;
+                        }
+                        if(eachGPUGroupCount == 0) usedGpu = restGroupCount;
+
+                        for (i = 0; i < NDRangeKernel->workDim; i++)
+                        {
+                            if (i == maxDimIndex)
+                            {
+                                for (j = 0; j < usedGpu; j++)
+                                {
+                                    eachGPUWorkGroupNum[j][i] = eachGPUWorkGroupSizes[j];
+                                }
+                            }
+                            else
+                            {
+                                for (j = 0; j < usedGpu; j++)
+                                {
+                                    eachGPUWorkGroupNum[j][i] = numGroups[i];
+                                }
+                            }
+                        }
+
+                        for(i = 0; i < gpuCount; i++)
+                        {
+                            datas[i] = (gctINT *) eachGPUWorkGroupNum[i];
+                        }
+
+                        Columns = 3;
+                        gcmONERROR(gcoSHADER_BindUniformCombinedMode(gcvNULL, hwConstRegAddr, hwConstRegNo, Columns, Rows,
+                            1, gcvFALSE, Columns * 4, 0, (gctPOINTER) datas, gpuCount,gcvUNIFORMCVT_NONE, gcSHADER_TYPE_CL));
+                    }
+                    else
+                    {
+                        data = (gctPOINTER)numGroups;
+                        Columns = 3;
+                    }
+                }
                 break;
             case SHS_PRIV_CONSTANT_KIND_LOCAL_ADDRESS_SPACE:
                 {
@@ -4988,7 +5164,9 @@ clfBuildKernelArgs(
 
 OnError:
     if (memAllocInfo)
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, memAllocInfo));
+    {
+        gcmOS_SAFE_FREE(gcvNULL, memAllocInfo);
+    }
     return status;
 }
 
@@ -5566,7 +5744,10 @@ clfFreeVIRKernelArgs(
                                  memAllocInfo->node,
                                  gcvSURF_INDEX);
 
-                if (FreePrivateKernelArg && memAllocInfo->data) gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, memAllocInfo->data));
+                if (FreePrivateKernelArg && memAllocInfo->data)
+                {
+                    gcmOS_SAFE_FREE(gcvNULL, memAllocInfo->data);
+                }
             }
             else if(Args[i].isLocal)
             {
@@ -5619,7 +5800,10 @@ clfFreeKernelArgs(
 
                              gcvSURF_INDEX);
             }
-            if (FreeAllocData && memAllocInfo->data) gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, memAllocInfo->data));
+            if (FreeAllocData && memAllocInfo->data)
+            {
+                gcmOS_SAFE_FREE(gcvNULL, memAllocInfo->data);
+            }
         }
         if (Args[i].data)
         {
@@ -5868,7 +6052,7 @@ clfLoadAndLinkGCShader(
         for (i = 0; i < GetShaderKernelFunctionCount(kernelBinary); i++)
         {
             kernelFunction = GetShaderKernelFunction(kernelBinary, i);
-            if (kernelFunction && GetKFunctionIsMain(kernelFunction))
+            if (kernelFunction && gcmIS_SUCCESS(gcoOS_StrCmp(GetKFunctionName(kernelFunction), kernel->name)))
             {
                 gcmASSERT(gcmIS_SUCCESS(gcoOS_StrCmp(GetKFunctionName(kernelFunction), kernel->name)));
                 break;
@@ -6116,7 +6300,10 @@ OnError:
         }
     }
 
-    if(pointer != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, pointer);
+    if(pointer != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pointer);
+    }
 
     return status;
 }
@@ -6737,7 +6924,10 @@ OnError:
         gcmOS_SAFE_FREE(gcvNULL, kernel);
     }
 
-    if(pointer != gcvNULL) gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, pointer));
+    if(pointer != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pointer);
+    }
 
     gcmFOOTER_ARG("%d", status);
     return gcvNULL;

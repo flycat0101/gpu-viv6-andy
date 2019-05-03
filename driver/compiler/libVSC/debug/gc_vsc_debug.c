@@ -1193,6 +1193,100 @@ vscDILoadDebugInfo(VSC_DIContext ** context, gctPOINTER* buffer, gctUINT32 * buf
     return gcvSTATUS_OK;
 }
 
+gceSTATUS
+vscDICopyDebugInfo(VSC_DIContext* Context, gctPOINTER* Buffer)
+{
+    VSC_DIContext * ctx;
+    gctUINT size;
+    PFN_Allocate pfnAllocate;
+    PFN_Free pfnFree;
+
+    if (Context == gcvNULL || Buffer == gcvNULL)
+        return gcvSTATUS_INVALID_ARGUMENT;
+
+    pfnAllocate = gcoOS_Allocate;
+    pfnFree = gcoOS_Free;
+
+    if (gcmIS_ERROR(pfnAllocate(gcvNULL,gcmSIZEOF(VSC_DIContext), (gctPOINTER *)&ctx)))
+    {
+        return gcvSTATUS_OUT_OF_MEMORY;
+    }
+
+    ctx->pfnAllocate = pfnAllocate;
+    ctx->pfnFree = pfnFree;
+    gcoOS_MemCopy(ctx, Context, gcmSIZEOF(VSC_DIContext));
+
+    if (Context->dieTable.count > 0)
+    {
+        size = Context->dieTable.count * gcmSIZEOF(VSC_DIE);
+        if (gcmIS_ERROR(ctx->pfnAllocate(gcvNULL, size, (gctPOINTER *)&ctx->dieTable.die)))
+        {
+            vsdDIPRINT("out of memory when allocate dieTable");
+            return gcvSTATUS_OUT_OF_MEMORY;
+        }
+
+        gcoOS_MemCopy(ctx->dieTable.die, Context->dieTable.die, size);
+    }
+
+    if (Context->strTable.size > 0)
+    {
+        size = Context->strTable.size;
+        if (gcmIS_ERROR(ctx->pfnAllocate(gcvNULL, size, (gctPOINTER *)&ctx->strTable.str)))
+        {
+            vsdDIPRINT("out of memory when allocate strTable");
+            return gcvSTATUS_OUT_OF_MEMORY;
+        }
+
+        gcoOS_MemCopy(ctx->strTable.str, Context->strTable.str, size);
+    }
+
+    if (Context->lineTable.count > 0)
+    {
+        size = Context->lineTable.count * gcmSIZEOF(VSC_DI_LINE_TABLE_MAP);
+        if (gcmIS_ERROR(ctx->pfnAllocate(gcvNULL, size, (gctPOINTER *)&ctx->lineTable.map)))
+        {
+            vsdDIPRINT("out of memory when allocate dieTable");
+            return gcvSTATUS_OUT_OF_MEMORY;
+        }
+
+        gcoOS_MemCopy(ctx->lineTable.map, Context->lineTable.map, size);
+    }
+
+    if (Context->swLocTable.count > 0)
+    {
+        size = Context->swLocTable.count * gcmSIZEOF(VSC_DI_SW_LOC);
+        if (gcmIS_ERROR(ctx->pfnAllocate(gcvNULL, size, (gctPOINTER *)&ctx->swLocTable.loc)))
+        {
+            vsdDIPRINT("out of memory when allocate dieTable");
+            return gcvSTATUS_OUT_OF_MEMORY;
+        }
+
+        gcoOS_MemCopy(ctx->swLocTable.loc, Context->swLocTable.loc, size);
+    }
+
+    if (Context->locTable.count > 0)
+    {
+        size = Context->locTable.count * gcmSIZEOF(VSC_DI_HW_LOC);
+        if (gcmIS_ERROR(ctx->pfnAllocate(gcvNULL, size, (gctPOINTER *)&ctx->locTable.loc)))
+        {
+            vsdDIPRINT("out of memory when allocate dieTable");
+            return gcvSTATUS_OUT_OF_MEMORY;
+        }
+
+        gcoOS_MemCopy(ctx->locTable.loc, Context->locTable.loc, size);
+    }
+
+    if (gcmIS_ERROR(pfnAllocate(gcvNULL,VSC_DI_TEMP_LOG_SIZE,(gctPOINTER *)&ctx->tmpLog)))
+    {
+        vsdDIPRINT("out of memory when allocate dieTable");
+        return gcvSTATUS_OUT_OF_MEMORY;
+    }
+    gcoOS_MemCopy(ctx->tmpLog, Context->tmpLog, VSC_DI_TEMP_LOG_SIZE);
+
+    *Buffer = ctx;
+    return gcvSTATUS_OK;
+}
+
 void _vscDIInitCallStack(VSC_DIContext * context)
 {
     gctUINT32 i;
@@ -1206,6 +1300,7 @@ void _vscDIInitCallStack(VSC_DIContext * context)
     }
 }
 
+#if (!VSC_LITE_BUILD)
 gceSTATUS vscDIConstructContext(PFN_Allocate allocPfn, PFN_Free freePfn, VSC_DIContext ** context)
 {
     VSC_DIContext * ptr;
@@ -1247,6 +1342,7 @@ gceSTATUS vscDIConstructContext(PFN_Allocate allocPfn, PFN_Free freePfn, VSC_DIC
         return gcvSTATUS_INVALID_CONFIG;
     }
 }
+#endif
 
 void vscDIDestroyContext(VSC_DIContext * context)
 {
@@ -1391,7 +1487,7 @@ void vscDIGetPCBySrcLine(void * ptr, unsigned int src, unsigned int refPC, unsig
     for (i = 0 ; i < context->lineTable.count; i++)
     {
         if (/*(context->lineTable.map[i].sourcLoc.fileId == src.fileId) && */
-            (context->lineTable.map[i].sourcLoc.lineNo == src))
+            context->lineTable.map[i].sourcLoc.lineNo == src)
         {
             if (*start == VSC_DI_INVALID_PC)
             {
@@ -1435,7 +1531,7 @@ void vscDIGetNearPCBySrcLine(void * ptr, unsigned int src,unsigned int * newSrc,
         for (i = 0 ; i < context->lineTable.count; i++)
         {
             if (/*(context->lineTable.map[i].sourcLoc.fileId == src.fileId) && */
-                (context->lineTable.map[i].sourcLoc.lineNo == chosenLine))
+                context->lineTable.map[i].sourcLoc.lineNo == chosenLine)
             {
                 if (*start == VSC_DI_INVALID_PC)
                 {

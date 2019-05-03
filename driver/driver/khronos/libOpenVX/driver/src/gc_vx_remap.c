@@ -13,6 +13,8 @@
 
 #include <gc_vx_common.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_REMAP
+
 VX_INTERNAL_CALLBACK_API void vxoRemap_Destructor(vx_reference ref)
 {
     vx_remap remap = (vx_remap)ref;
@@ -25,20 +27,29 @@ VX_API_ENTRY vx_remap VX_API_CALL vxCreateRemap(
 {
     vx_remap remap;
 
+    gcmHEADER_ARG("context=%p, src_width=0x%x, src_height=0x%x, dst_width=0x%x, dst_height=0x%x",
+        context, src_width, src_height, dst_width, dst_height);
     gcmDUMP_API("$VX vxCreateRemap: context=%p, src_width=0x%x, src_height=0x%x, dst_width=0x%x, dst_height=0x%x",
         context, src_width, src_height, dst_width, dst_height);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (src_width == 0 || src_height == 0 || dst_width == 0 || dst_height == 0)
     {
+        gcmFOOTER_NO();
         return (vx_remap)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
     }
 
     remap = (vx_remap)vxoReference_Create(context, VX_TYPE_REMAP, VX_REF_EXTERNAL, &context->base);
 
-    if (vxoReference_GetStatus((vx_reference)remap) != VX_SUCCESS) return remap;
-
+    if (vxoReference_GetStatus((vx_reference)remap) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return remap;
+    }
     remap->srcWidth     = src_width;
     remap->srcHeight    = src_height;
     remap->destWidth    = dst_width;
@@ -51,6 +62,7 @@ VX_API_ENTRY vx_remap VX_API_CALL vxCreateRemap(
     remap->memory.dims[0][VX_DIM_Y]             = dst_height;
     remap->memory.strides[0][VX_DIM_CHANNEL]    = sizeof(vx_float32);
 
+    gcmFOOTER_NO();
     return remap;
 }
 
@@ -63,10 +75,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseRemap(vx_remap *remap)
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryRemap(vx_remap remap, vx_enum attribute, void *ptr, vx_size size)
 {
+    gcmHEADER_ARG("remap=%p, attribute=0x%x, ptr=%p, size=0x%lx", remap, attribute, ptr, size);
     gcmDUMP_API("$VX vxQueryRemap: remap=%p, attribute=0x%x, ptr=%p, size=0x%lx", remap, attribute, ptr, size);
 
-    if (!vxoReference_IsValidAndSpecific(&remap->base, VX_TYPE_REMAP)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoReference_IsValidAndSpecific(&remap->base, VX_TYPE_REMAP))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     switch (attribute)
     {
         case VX_REMAP_SOURCE_WIDTH:
@@ -95,9 +111,10 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryRemap(vx_remap remap, vx_enum attribut
 
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
+            gcmFOOTER_NO();
             return VX_ERROR_NOT_SUPPORTED;
     }
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -105,15 +122,24 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetRemapPoint(
         vx_remap remap, vx_uint32 dst_x, vx_uint32 dst_y, vx_float32 src_x, vx_float32 src_y)
 {
     vx_float32_ptr ptr;
-
+    gcmHEADER_ARG("remap=%p, dst_x=0x%x, dst_y=0x%x, src_x=%f, src_y=%f", remap, dst_x, dst_y, src_x, src_y);
     gcmDUMP_API("$VX vxSetRemapPoint: remap=%p, dst_x=0x%x, dst_y=0x%x, src_x=%f, src_y=%f", remap, dst_x, dst_y, src_x, src_y);
 
-    if (!vxoReference_IsValidAndSpecific(&remap->base, VX_TYPE_REMAP)) return VX_ERROR_INVALID_REFERENCE;
-
-    if (dst_x >= remap->destWidth || dst_y >= remap->destHeight) return VX_ERROR_INVALID_VALUE;
-
-    if (!vxoMemory_Allocate(remap->base.context, &remap->memory)) return VX_ERROR_NO_MEMORY;
-
+    if (!vxoReference_IsValidAndSpecific(&remap->base, VX_TYPE_REMAP))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+    if (dst_x >= remap->destWidth || dst_y >= remap->destHeight)
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_VALUE;
+    }
+    if (!vxoMemory_Allocate(remap->base.context, &remap->memory))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_NO_MEMORY;
+    }
     ptr = (vx_float32_ptr)vxFormatMemoryPtr(&remap->memory, 0, dst_x, dst_y, 0);
     *ptr = src_x;
 
@@ -121,7 +147,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetRemapPoint(
     *ptr = src_y;
 
     vxoReference_IncrementWriteCount(&remap->base);
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -129,12 +155,18 @@ VX_API_ENTRY vx_status VX_API_CALL vxGetRemapPoint(
         vx_remap remap, vx_uint32 dst_x, vx_uint32 dst_y, vx_float32 *src_x, vx_float32 *src_y)
 {
     vx_float32_ptr ptr;
-
+    gcmHEADER_ARG("remap=%p, dst_x=0x%x, dst_y=0x%x, src_x=%p, src_y=%p", remap, dst_x, dst_y, src_x, src_y);
     gcmDUMP_API("$VX vxGetRemapPoint: remap=%p, dst_x=0x%x, dst_y=0x%x, src_x=%p, src_y=%p", remap, dst_x, dst_y, src_x, src_y);
-    if (!vxoReference_IsValidAndSpecific(&remap->base, VX_TYPE_REMAP)) return VX_ERROR_INVALID_REFERENCE;
-
-    if (dst_x >= remap->destWidth || dst_y >= remap->destHeight) return VX_ERROR_INVALID_VALUE;
-
+    if (!vxoReference_IsValidAndSpecific(&remap->base, VX_TYPE_REMAP))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+    if (dst_x >= remap->destWidth || dst_y >= remap->destHeight)
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_VALUE;
+    }
     ptr = (vx_float32_ptr)vxFormatMemoryPtr(&remap->memory, 0, dst_x, dst_y, 0);
     *src_x = *ptr;
 
@@ -143,6 +175,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxGetRemapPoint(
 
     vxoReference_IncrementReadCount(&remap->base);
 
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -150,6 +183,8 @@ static vx_status vxSetCoordValue(vx_remap remap, vx_uint32 dst_x, vx_uint32 dst_
                                  vx_float32 src_x, vx_float32 src_y)
 {
     vx_status status = VX_FAILURE;
+    gcmHEADER_ARG("remap=%p, dst_x=0x%x, dst_y=0x%x, src_x=%f, src_y=%f", remap, dst_x, dst_y, src_x, src_y);
+
     if ((vxoReference_IsValidAndSpecific(&remap->base, VX_TYPE_REMAP) == vx_true_e) &&
          (vxoMemory_Allocate(remap->base.context, &remap->memory) == vx_true_e))
     {
@@ -174,6 +209,7 @@ static vx_status vxSetCoordValue(vx_remap remap, vx_uint32 dst_x, vx_uint32 dst_
     {
         status = VX_ERROR_INVALID_REFERENCE;
     }
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -193,6 +229,8 @@ static vx_status vxGetCoordValue(vx_remap remap, vx_uint32 dst_x, vx_uint32 dst_
                                  vx_float32 *src_x, vx_float32 *src_y)
 {
     vx_status status = VX_FAILURE;
+    gcmHEADER_ARG("remap=%p, dst_x=0x%x, dst_y=0x%x, src_x=%p, src_y=%p", remap, dst_x, dst_y, src_x, src_y);
+
     if (vxoReference_IsValidAndSpecific(&remap->base, VX_TYPE_REMAP) == vx_true_e)
     {
         if ((dst_x < remap->destWidth) &&
@@ -216,6 +254,7 @@ static vx_status vxGetCoordValue(vx_remap remap, vx_uint32 dst_x, vx_uint32 dst_
     {
         status = VX_ERROR_INVALID_REFERENCE;
     }
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -229,6 +268,8 @@ VX_API_ENTRY vx_remap VX_API_CALL vxCreateVirtualRemap(
     vx_remap remap = NULL;
     vx_reference_s *gref = (vx_reference_s *)graph;
 
+    gcmHEADER_ARG("graph=%p, src_width=0x%x, src_height=0x%x, dst_width=0x%x, dst_height=0x%x",
+        graph, src_width, src_height, dst_width, dst_height);
     gcmDUMP_API("$VX vxCreateVirtualRemap: graph=%p, src_width=0x%x, src_height=0x%x, dst_width=0x%x, dst_height=0x%x",
         graph, src_width, src_height, dst_width, dst_height);
     if (vxoReference_IsValidAndSpecific(gref, VX_TYPE_GRAPH) == vx_true_e)
@@ -241,6 +282,7 @@ VX_API_ENTRY vx_remap VX_API_CALL vxCreateVirtualRemap(
         }
     }
     /* else, the graph is invalid, we can't get any context and then error object */
+    gcmFOOTER_NO();
     return remap;
 }
 
@@ -267,6 +309,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapRemapPatch(
     vx_bool zero_area = ((((end_x - start_x) == 0) || ((end_y - start_y) == 0)) ? vx_true_e : vx_false_e);
     vx_status status = VX_FAILURE;
 
+    gcmHEADER_ARG("remap=%p, rect=%p, map_id=%p, stride_y=%p, ptr=%p, coordinate_type=0x%x, usage=0x%x, mem_type=0x%x",
+        remap, rect, map_id, stride_y, ptr, coordinate_type, usage, mem_type);
     gcmDUMP_API("$VX vxMapRemapPatch: remap=%p, rect=%p, map_id=%p, stride_y=%p, ptr=%p, coordinate_type=0x%x, usage=0x%x, mem_type=0x%x",
         remap, rect, map_id, stride_y, ptr, coordinate_type, usage, mem_type);
 
@@ -372,6 +416,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapRemapPatch(
         goto exit;
     }
 exit:
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -381,6 +426,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapRemapPatch(vx_remap remap, vx_map_id m
     vx_context context;
     vx_memory_map_s* map;
 
+    gcmHEADER_ARG("remap=%p, map_id=0x%x", remap, map_id);
     gcmDUMP_API("$VX vxUnmapRemapPatch: remap=%p, map_id=0x%x", remap, map_id);
 
     /* bad references */
@@ -439,6 +485,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapRemapPatch(vx_remap remap, vx_map_id m
         goto exit;
     }
 exit:
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -459,6 +506,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyRemapPatch(
     vx_uint32 end_y = rect ? rect->end_y : 0u;
     vx_bool zero_area = ((((end_x - start_x) == 0) || ((end_y - start_y) == 0)) ? vx_true_e : vx_false_e);
 
+    gcmHEADER_ARG("remap=%p, rect=%p, user_stride_y=%p, user_ptr=%p, user_coordinate_type=0x%x, usage=0x%x, user_mem_type=0x%x",
+        remap, rect, user_stride_y, user_ptr, user_coordinate_type, usage, user_mem_type);
     gcmDUMP_API("$VX vxCopyRemapPatch: remap=%p, rect=%p, user_stride_y=%p, user_ptr=%p, user_coordinate_type=0x%x, usage=0x%x, user_mem_type=0x%x",
         remap, rect, user_stride_y, user_ptr, user_coordinate_type, usage, user_mem_type);
 
@@ -558,6 +607,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyRemapPatch(
     }
     status = VX_SUCCESS;
 exit:
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 

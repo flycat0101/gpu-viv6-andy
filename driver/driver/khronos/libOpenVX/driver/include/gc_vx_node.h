@@ -16,6 +16,7 @@
 
 EXTERN_C_BEGIN
 
+#define HIGH_PRECISION_COMPUTE 0
 VX_INTERNAL_API vx_node vxoNode_CreateSpecific(
         vx_graph graph, vx_enum kernelEnum, vx_reference parameters[], vx_uint32 paramCount);
 
@@ -69,8 +70,6 @@ VX_INTERNAL_API vx_bool vxoNode_IsLeakyReluNode(vx_node node);
 
 VX_INTERNAL_API vx_bool vxoNode_IsMaxPoolingNode(vx_node node);
 
-VX_INTERNAL_API vx_node vxoNode_TransferFC2FCRelu(vx_node FCnode);
-
 VX_INTERNAL_API void vxoNode_getInfoFromFCNode(vx_node FCnode, vx_uint32 *pad, vx_uint8 *acc,
                                                vx_uint32 *rounding, vx_uint32 *overflow, vx_uint32 *down_scale_round);
 
@@ -79,6 +78,7 @@ VX_INTERNAL_API vx_status vxoNode_setTensorVxcOptimize(vx_node node);
 
 VX_INTERNAL_API vx_status vxoNode_resetTensorVxcOptimize(vx_node node);
 
+VX_INTERNAL_API vx_bool vxoNode_CheckF32Support(vx_node node);
 EXTERN_C_END
 
 #endif /* __GC_VX_NODE_H__ */

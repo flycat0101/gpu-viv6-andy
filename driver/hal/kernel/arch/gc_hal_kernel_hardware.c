@@ -58,6 +58,7 @@
 #include "gc_hal_kernel_context.h"
 
 #include "gc_feature_database.h"
+#include <gc_hal_kernel_debug.h>
 
 #define _GC_OBJ_ZONE    gcvZONE_HARDWARE
 
@@ -160,6 +161,7 @@ static gceSTATUS
 _IdentifyHardwareByDatabase(
     IN gckHARDWARE Hardware,
     IN gckOS Os,
+    IN gckDEVICE Device,
     IN gceCORE Core,
     OUT gcsHAL_QUERY_CHIP_IDENTITY_PTR Identity
     )
@@ -168,8 +170,8 @@ _IdentifyHardwareByDatabase(
     gctUINT32 chipIdentity;
     gctUINT32 debugControl0;
     gctUINT32 chipInfo;
-    gctUINT64 sRAMBases[gcvCORE_COUNT][gcvSRAM_COUNT];
     gcsFEATURE_DATABASE *database;
+    gctUINT i = 0;
 
     gcmkHEADER_ARG("Os=0x%x", Os);
 
@@ -268,6 +270,41 @@ _IdentifyHardwareByDatabase(
                                 0x00030,
                                 &Identity->customerID));
 
+     /*get hw minor features*/
+    gcmkONERROR(
+        gckOS_ReadRegisterEx(Os, Core,
+                                0x0001C,
+                                &Identity->chipFeatures));
+
+    gcmkONERROR(
+        gckOS_ReadRegisterEx(Os, Core,
+                                0x00034,
+                                &Identity->chipMinorFeatures));
+    gcmkONERROR(
+        gckOS_ReadRegisterEx(Os, Core,
+                                0x00074,
+                                &Identity->chipMinorFeatures1));
+    gcmkONERROR(
+        gckOS_ReadRegisterEx(Os, Core,
+                                0x00084,
+                                &Identity->chipMinorFeatures2));
+    gcmkONERROR(
+        gckOS_ReadRegisterEx(Os, Core,
+                                0x00088,
+                                &Identity->chipMinorFeatures3));
+    gcmkONERROR(
+        gckOS_ReadRegisterEx(Os, Core,
+                                0x00094,
+                                &Identity->chipMinorFeatures4));
+    gcmkONERROR(
+        gckOS_ReadRegisterEx(Os, Core,
+                                0x000A0,
+                                &Identity->chipMinorFeatures5));
+    gcmkONERROR(
+        gckOS_ReadRegisterEx(Os, Core,
+                                0x000DC,
+                                &Identity->chipMinorFeatures6));
+
     /***************************************************************************
     ** Get chip features.
     */
@@ -302,24 +339,52 @@ _IdentifyHardwareByDatabase(
     Identity->gpuCoreCount                  = database->CoreCount;
     Identity->streamCount                   = database->Streams;
     Identity->clusterAvailMask              = database->ClusterAliveMask;
-    Identity->sRAMSizes[gcvSRAM_INTERNAL]   = database->VIP_SRAM_SIZE * 1024;
-    Identity->sRAMSizes[gcvSRAM_EXTERNAL0]  = database->AXI_SRAM_SIZE * 1024;
 
-    if (gcmIS_SUCCESS(gckOS_QueryOption(Hardware->os, "sRAMBases", sRAMBases[0])))
+    gckOS_QueryOption(Hardware->os, "sRAMMode", (gctUINT64 *)&Hardware->sRAMNonExclusive);
+
+    if (gcmIS_SUCCESS(gckOS_QueryOption(Hardware->os, "sRAMBases", Device->sRAMBases[0])))
     {
         gckOS_MemCopy(
             Identity->sRAMBases,
-            sRAMBases[Core],
+            Device->sRAMBases[Core],
             sizeof(gctUINT64) * gcvSRAM_COUNT
             );
     }
     else
     {
-        gctUINT i;
         for (i = 0; i < gcvSRAM_COUNT; i++)
         {
             Identity->sRAMBases[i] = gcvINVALID_PHYSICAL_ADDRESS;
         }
+    }
+
+    if (gcmIS_SUCCESS(gckOS_QueryOption(Hardware->os, "sRAMSizes", (gctUINT64 *)Device->sRAMSizes[0])))
+    {
+        gckOS_MemCopy(
+            Identity->sRAMSizes,
+            Device->sRAMSizes[Core],
+            sizeof(gctUINT32) * gcvSRAM_COUNT
+            );
+    }
+
+    for (i = gcvSRAM_EXTERNAL0; i < gcvSRAM_COUNT; i++)
+    {
+        if (Identity->sRAMSizes[i])
+        {
+            break;
+        }
+    }
+
+    /* If module parameter doesn't set SRAM sizes. */
+    if (i == gcvSRAM_COUNT)
+    {
+        /* Set default mode to exclusive mode. */
+        Hardware->sRAMNonExclusive = gcvFALSE;
+
+        /* Try to get SRAM sizes from database. */
+        /* Need this path for VIP exclusive mode. */
+        Device->sRAMSizes[Core][gcvSRAM_INTERNAL] = Identity->sRAMSizes[gcvSRAM_INTERNAL] = database->VIP_SRAM_SIZE;
+        Device->sRAMSizes[Core][gcvSRAM_EXTERNAL0] = Identity->sRAMSizes[gcvSRAM_EXTERNAL0] = database->AXI_SRAM_SIZE;
     }
 
     if (Identity->chipModel == gcv320)
@@ -1930,6 +1995,58 @@ OnError:
     return status;
 }
 
+static gceSTATUS
+_SetupSRAMVidMem(
+    IN gckHARDWARE Hardware
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT i;
+
+    for (i = gcvSRAM_EXTERNAL0; i < gcvSRAM_COUNT; i++)
+    {
+        if (Hardware->identity.sRAMSizes[i] &&
+           (Hardware->identity.sRAMBases[i] != gcvINVALID_PHYSICAL_ADDRESS))
+        {
+            char sRAMName[20];
+            gcmkSPRINTF(sRAMName, gcmSIZEOF(sRAMName) - 1, "GPU core%d axi sram%d", Hardware->core, i);
+
+            gcmkPRINT("%s\n", sRAMName);
+
+            status = gckVIDMEM_Construct(
+                Hardware->os,
+                Hardware->identity.sRAMBases[i],
+                Hardware->identity.sRAMSizes[i],
+                64,
+                0,
+                &Hardware->sRAMVideoMem[i]
+                );
+
+            if (gcmIS_ERROR(status))
+            {
+                Hardware->identity.sRAMSizes[i] = 0;
+                Hardware->sRAMVideoMem[i] = gcvNULL;
+            }
+            else
+            {
+                gcmkONERROR(gckOS_RequestReservedMemory(
+                    Hardware->os,
+                    Hardware->identity.sRAMBases[i],
+                    Hardware->identity.sRAMSizes[i],
+                    sRAMName,
+                    0,
+                    &Hardware->sRAMPhysical[i]
+                    ));
+
+                Hardware->sRAMVideoMem[i]->physical = Hardware->sRAMPhysical[i];
+            }
+        }
+    }
+
+OnError:
+    return status;
+}
+
 /******************************************************************************\
 ****************************** gckHARDWARE API code *****************************
 \******************************************************************************/
@@ -1957,6 +2074,7 @@ OnError:
 gceSTATUS
 gckHARDWARE_Construct(
     IN gckOS Os,
+    IN gckDEVICE Device,
     IN gceCORE Core,
     OUT gckHARDWARE * Hardware
     )
@@ -1997,7 +2115,13 @@ gckHARDWARE_Construct(
     gcmkONERROR(_GetHardwareSignature(hardware, Os, Core, &hardware->signature));
 
     /* Identify the hardware. */
-    gcmkONERROR(_IdentifyHardwareByDatabase(hardware, Os, Core, &hardware->identity));
+    gcmkONERROR(_IdentifyHardwareByDatabase(hardware, Os, Device, Core, &hardware->identity));
+
+    /* Setup SRAM memory heap. */
+    if (hardware->sRAMNonExclusive)
+    {
+        gcmkONERROR(_SetupSRAMVidMem(hardware));
+    }
 
     _SetHardwareOptions(hardware);
 

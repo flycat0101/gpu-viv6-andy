@@ -13,7 +13,7 @@
 
 #include "gc_glff_precomp.h"
 
-#define _GC_OBJ_ZONE glvZONE_TRACE
+#define _GC_OBJ_ZONE gcdZONE_ES11_TRACE
 
 /******************************************************************************\
 ********************** Individual State Setting Functions **********************
@@ -957,7 +957,7 @@ GLboolean glfQueryVertexState(
 #ifdef _GC_OBJ_ZONE
 #undef _GC_OBJ_ZONE
 #endif
-#define _GC_OBJ_ZONE    glvZONE_STREAM
+#define _GC_OBJ_ZONE    gcdZONE_ES11_STREAM
 
 GL_API void GL_APIENTRY glNormal3x(
     GLfixed X,
@@ -1215,7 +1215,7 @@ GL_API void GL_APIENTRY glColor4f(
 */
 
 #undef  _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE    glvZONE_FOG
+#define _GC_OBJ_ZONE    gcdZONE_ES11_FOG
 
 GL_API void GL_APIENTRY glPointSize(
     GLfloat Size
@@ -1311,7 +1311,7 @@ GL_API void GL_APIENTRY glPointSizexOES(
 */
 
 #undef  _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE    glvZONE_TEXTURE
+#define _GC_OBJ_ZONE    gcdZONE_ES11_TEXTURE
 
 GL_API void GL_APIENTRY glMultiTexCoord4x(
     GLenum Target,
@@ -1451,7 +1451,7 @@ GL_API void GL_APIENTRY glMultiTexCoord4f(
 */
 
 #undef  _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE    glvZONE_STREAM
+#define _GC_OBJ_ZONE    gcdZONE_ES11_STREAM
 
 GL_API void GL_APIENTRY glVertexPointer(
     GLint Size,
@@ -1761,7 +1761,7 @@ GL_API void GL_APIENTRY glColorPointer(
 */
 
 #undef  _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE    glvZONE_EXTENTION
+#define _GC_OBJ_ZONE    gcdZONE_ES11_EXTENTION
 
 GL_API void GL_APIENTRY glPointSizePointerOES(
     GLenum Type,
@@ -2075,7 +2075,7 @@ GL_API void GL_APIENTRY glWeightPointerOES(
 */
 
 #undef  _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE    glvZONE_TEXTURE
+#define _GC_OBJ_ZONE    gcdZONE_ES11_TEXTURE
 
 GL_API void GL_APIENTRY glTexCoordPointer(
     GLint Size,

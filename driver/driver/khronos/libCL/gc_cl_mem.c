@@ -15,6 +15,7 @@
 #include <limits.h>
 
 #define __NEXT_MSG_ID__     004068
+#define _GC_OBJ_ZONE        gcdZONE_CL_MEM
 
 #if (defined(UNDER_CE) || defined(__QNXNTO__) || defined(LINUX))
 #if (0 || defined(ANDROID))
@@ -224,19 +225,6 @@ clfReleaseMemObject(
                 clfReleaseMemObject(parentBuffer);
             }
 
-            if(MemObj->tmpNode)
-            {
-                gctUINT32 physical = 0;
-
-                gcsSURF_NODE_GetHardwareAddress(MemObj->tmpNode,&physical,gcvNULL, gcvNULL, gcvNULL);
-
-                gcoCL_FreeMemory(physical,
-                                (gctPOINTER)MemObj->tmpNode->logical,
-                                MemObj->u.buffer.allocatedSize,
-                                MemObj->tmpNode,
-                                gcvSURF_INDEX);
-            }
-
             if (MemObj->mapCount == 0)
             {
                 if (MemObj->fromGL)
@@ -251,6 +239,11 @@ clfReleaseMemObject(
                                      MemObj->u.buffer.allocatedSize,
                                      MemObj->u.buffer.node,
                                      gcvSURF_INDEX);
+
+                    if(MemObj->u.buffer.wrapped)
+                    {
+                        gcoCL_Commit(gcvTRUE);
+                    }
                 }
 
                 /* Invoke and free callbacks */
@@ -355,11 +348,11 @@ clfExecuteHWCopy(
 
     switch (Command->type)
     {
-        case clvCOMMAND_READ_BUFFER:
+         case clvCOMMAND_READ_BUFFER:
             {
                 clsCommandReadBuffer_PTR readBuffer = gcvNULL;
                 gctUINT32 physical;
-
+                gctPOINTER src;
                 readBuffer  = &Command->u.readBuffer;
                 srcBuffer = readBuffer->buffer;
                 /* wrap dest */
@@ -367,12 +360,25 @@ clfExecuteHWCopy(
 
                 /* src address */
                 srcPhysical = gcmPTR2SIZE(srcBuffer->u.buffer.physical) + readBuffer->offset;
+                src = (gctPOINTER) (gcmPTR2SIZE(srcBuffer->u.buffer.logical) + readBuffer->offset);
                 gcoCL_ChooseBltEngine(srcBuffer->u.buffer.node, &engine);
 
-                /* flush and invalid user ptr cache */
-                gcoCL_FlushMemory(gcvNULL, readBuffer->ptr, size);
+                /* wrap need cpu cacheline alignement,  size and ptr need 64 byte alignment
+                   blt engine need 256 byte alignment,
+                */
+                if ((gcmPTR2SIZE(readBuffer->ptr) & 0xFF) ||  (size & 0x3F) || (srcPhysical & 0xFF))
+                {
+                    gcmONERROR(gcvSTATUS_NOT_ALIGNED);
+                }
+
+                if(readBuffer->ptr == src)
+                {
+                    gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+                }
 
                 gcmONERROR(gcoCL_WrapUserMemory(readBuffer->ptr, size, gcvFALSE, &physical, &node));
+                /* flush and invalid user ptr cache */
+                gcoCL_FlushMemory(node, (gctPOINTER)readBuffer->ptr, size);
 
                 dstPhysical = physical;
 
@@ -384,62 +390,31 @@ clfExecuteHWCopy(
         case clvCOMMAND_WRITE_BUFFER:
             {
                 clsCommandWriteBuffer_PTR writeBuffer = gcvNULL;
-                gctPOINTER logical = gcvNULL;
+                gctPOINTER dst;
+
                 writeBuffer  = &Command->u.writeBuffer;
                 dstBuffer = writeBuffer->buffer;
                 size = writeBuffer->cb;
+                 /* dst address */
+                dstPhysical = gcmPTR2SIZE(dstBuffer->u.buffer.physical) + writeBuffer->offset;
+                dst = (gctPOINTER) (gcmPTR2SIZE(dstBuffer->u.buffer.logical) + writeBuffer->offset);
 
-                /*src address */
-                if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE) == gcvSTATUS_FALSE)
+                /* wrap need cpu cacheline alignement,  size and ptr need 64 byte alignment
+                   blt engine need 256 byte alignment,
+                */
+                if ((gcmPTR2SIZE(writeBuffer->ptr) & 0xFF) ||  (size & 0x3F) || (dstPhysical & 0xFF) )
                 {
-                    gctUINT32 physical = 0;
-                    gctUINT   bytes = dstBuffer->u.buffer.allocatedSize;
-
-                    if(dstBuffer->tmpNode)
-                    {
-                        gcsSURF_NODE_GetHardwareAddress(dstBuffer->tmpNode,&physical,gcvNULL, gcvNULL, gcvNULL);
-                        gcoCL_FreeMemory( physical,
-                                         (gctPOINTER)dstBuffer->tmpNode->logical,
-                                         dstBuffer->u.buffer.allocatedSize,
-                                         dstBuffer->tmpNode,
-                                         gcvSURF_INDEX
-                                         );
-
-                        dstBuffer->tmpNode = gcvNULL;
-                    }
-
-                    gcmONERROR(gcoCL_AllocateMemory(&bytes,
-                                                    &physical,
-                                                    &logical,
-                                                    &dstBuffer->tmpNode,
-                                                    gcvSURF_INDEX,
-                                                    0));
-                }
-                else
-                {
-                    if(dstBuffer->tmpNode == gcvNULL)
-                    {
-                        gctUINT         bytes = dstBuffer->u.buffer.allocatedSize;
-                        gctUINT32    physical = 0;
-
-                        gcmONERROR(gcoCL_AllocateMemory(&bytes,
-                                                        &physical,
-                                                        &logical,
-                                                        &dstBuffer->tmpNode,
-                                                        gcvSURF_INDEX,
-                                                        0));
-                    }
-
-                    gcoCL_MemWaitAndGetFence(dstBuffer->tmpNode, gcvENGINE_CPU, gcvFENCE_TYPE_WRITE, gcvFENCE_TYPE_READ);
+                    gcmONERROR(gcvSTATUS_NOT_ALIGNED);
                 }
 
-                /*Src address */
-                gcsSURF_NODE_GetHardwareAddress(dstBuffer->tmpNode,&srcPhysical,gcvNULL, gcvNULL, gcvNULL);
-                logical = dstBuffer->tmpNode->logical;
-                if(logical != writeBuffer->ptr)
+                if(dst == writeBuffer->ptr)
                 {
-                    gcoOS_MemCopy(logical,writeBuffer->ptr,writeBuffer->cb);
+                    gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
                 }
+
+                gcmONERROR(gcoCL_WrapUserMemory((gctPOINTER)writeBuffer->ptr, size, gcvFALSE, &srcPhysical, &node));
+                 /* flush and invalid user ptr cache */
+                gcoCL_FlushMemory(node, (gctPOINTER)writeBuffer->ptr, size);
 
                 gcmDUMP_BUFFER(gcvNULL,
                                gcvDUMP_BUFFER_MEMORY,
@@ -448,15 +423,11 @@ clfExecuteHWCopy(
                                0,
                                writeBuffer->cb);
 
-                /* dst address */
-                dstPhysical = gcmPTR2SIZE(dstBuffer->u.buffer.physical) + writeBuffer->offset;
                 gcoCL_ChooseBltEngine(dstBuffer->u.buffer.node, &engine);
                 EVENT_SET_GPU_RUNNING(Command, engine);
 
                 node0 = dstBuffer->u.buffer.node;
-                node1 = dstBuffer->tmpNode;
                 gcoCL_MemWaitAndGetFence(node0, engine, gcvFENCE_TYPE_WRITE, gcvFENCE_TYPE_ALL);
-                gcoCL_MemWaitAndGetFence(node1, engine, gcvFENCE_TYPE_READ, gcvFENCE_TYPE_READ);
             }
             break;
 
@@ -521,8 +492,9 @@ clfExecuteCommandReadBuffer(
 
     hwCopy   = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_ENGINE);
 
-    /* Tmp disable HW copy for read buffer before resolve wrap node issue */
-    hwCopy = gcvFALSE;
+#ifdef __QNXNTO__
+    hwCopy   = gcvFALSE;
+#endif
 
     /*Try Hardware Copy*/
     if(hwCopy)
@@ -709,6 +681,10 @@ clfExecuteCommandWriteBuffer(
         hwCopy = hwCopy && (!(gcmPTR2SIZE(buffer->u.buffer.logical) & 0xFF));
     }
 
+#ifdef __QNXNTO__
+    hwCopy   = gcvFALSE;
+#endif
+
     /*Try Hardware Copy*/
     if (hwCopy)
     {
@@ -718,7 +694,6 @@ clfExecuteCommandWriteBuffer(
         }
 
     }
-
 
     if(!hwCopy)
     {
@@ -1497,6 +1472,15 @@ clfExecuteCommandCopyImage(
             if(srcLine != dstLine)
             {
                 gcoOS_MemCopy(dstLine, srcLine, lineSize);
+
+                gcmDUMP(gcvNULL, "#[info: copy image to image by cpu");
+
+                gcmDUMP_BUFFER(gcvNULL,
+                               gcvDUMP_BUFFER_TEXTURE,
+                               gcmPTR2SIZE( dstImage->u.image.texturePhysical),
+                               dstImage->u.image.textureLogical,
+                               gcmPTR2SIZE(dstLine) - gcmPTR2SIZE(dstImage->u.image.textureLogical),
+                               lineSize);
             }
             srcLine += srcRowPitch;
             dstLine += dstRowPitch;
@@ -3121,15 +3105,23 @@ clCreateBuffer(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-    if((Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV) && ((Flags & (CL_MEM_USE_HOST_PTR | CL_MEM_COPY_HOST_PTR)) == 0))
+    if ((Flags & CL_MEM_USE_HOST_PHYSICAL_ADDR_VIV) &&
+        (Flags & (CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR)))
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-004002: (clCreateBuffer) invalid Flags.\n");
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-    if ((HostPtr == gcvNULL && (Flags & (CL_MEM_USE_HOST_PTR | CL_MEM_COPY_HOST_PTR))) ||
-        (HostPtr && (Flags & (CL_MEM_USE_HOST_PTR | CL_MEM_COPY_HOST_PTR)) == 0))
+    if((Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV) && ((Flags & (CL_MEM_USE_HOST_PTR | CL_MEM_COPY_HOST_PTR | CL_MEM_USE_HOST_PHYSICAL_ADDR_VIV)) == 0))
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-004002: (clCreateBuffer) invalid Flags.\n");
+        clmRETURN_ERROR(CL_INVALID_VALUE);
+    }
+    /* CL_MEM_USE_HOST_PTR| CL_MEM_COPY_HOST_PTR | CL_MEM_USE_HOST_PHYSICAL_ADDR_VIV the three flag will use the HostPtr*/
+    if ((HostPtr == gcvNULL && (Flags & (CL_MEM_USE_HOST_PTR | CL_MEM_COPY_HOST_PTR | CL_MEM_USE_HOST_PHYSICAL_ADDR_VIV))) ||
+        (HostPtr && (Flags & (CL_MEM_USE_HOST_PTR | CL_MEM_COPY_HOST_PTR | CL_MEM_USE_HOST_PHYSICAL_ADDR_VIV)) == 0))
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-004003: (clCreateBuffer) invalid HostPtr.\n");
@@ -3188,22 +3180,28 @@ clCreateBuffer(
     else if(Flags & CL_MEM_USE_HOST_PHYSICAL_ADDR_VIV)
     {
         gctPOINTER logical = gcvNULL;
+        gctUINT32  physical;
 
         if (Flags & CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV)
         {
-            clmONERROR(gcoCL_WrapUserPhysicalMemory((gctUINT32_PTR)HostPtr, Size, gcvTRUE, &logical, &buffer->u.buffer.node), CL_MAP_FAILURE);
+            status = gcoCL_WrapUserPhysicalMemory((gctUINT32_PTR)HostPtr, Size, gcvTRUE, &logical, &physical, &buffer->u.buffer.node);
         }
         else
         {
-            clmONERROR(gcoCL_WrapUserPhysicalMemory((gctUINT32_PTR)HostPtr, Size, gcvFALSE, &logical, &buffer->u.buffer.node), CL_MAP_FAILURE);
+            status = gcoCL_WrapUserPhysicalMemory((gctUINT32_PTR)HostPtr, Size, gcvFALSE, &logical, &physical, &buffer->u.buffer.node);
         }
 
-        buffer->u.buffer.allocatedSize  = Size;
-        buffer->u.buffer.physical       = gcmALL_TO_UINT32(HostPtr);
-        buffer->u.buffer.logical        = logical;
-        buffer->u.buffer.wrapped        = gcvTRUE;
+        if(clmNO_ERROR(status))
+        {
 
-        gcoCL_FlushMemory(buffer->u.buffer.node, logical, Size);
+            buffer->u.buffer.allocatedSize  = Size;
+            buffer->u.buffer.physical       = physical;
+            buffer->u.buffer.logical        = logical;
+            buffer->u.buffer.wrapped        = gcvTRUE;
+
+            gcoCL_FlushMemory(buffer->u.buffer.node, logical, Size);
+            bwrap = gcvTRUE;
+        }
 
     }
 
@@ -4735,7 +4733,7 @@ clGetSupportedImageFormats(
         /*{CL_R,      CL_UNORM_INT16},*/
         {CL_R,      CL_SIGNED_INT16},
         /*{CL_R,      CL_UNSIGNED_INT16},*/
-        /*{CL_R,      CL_SIGNED_INT32},*/
+        {CL_R,      CL_SIGNED_INT32},
         {CL_R,      CL_UNSIGNED_INT32},
         /*{CL_R,      CL_HALF_FLOAT},*/
         {CL_R,      CL_FLOAT}

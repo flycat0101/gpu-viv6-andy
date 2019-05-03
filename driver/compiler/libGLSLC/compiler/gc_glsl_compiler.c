@@ -371,40 +371,47 @@ sloCOMPILER_Destroy_General(
     if (Compiler->codeEmitter != gcvNULL)
     {
         gcmVERIFY_OK(sloCODE_EMITTER_Destroy(Compiler, Compiler->codeEmitter));
+        Compiler->codeEmitter = gcvNULL;
     }
 
 #ifndef SL_SCAN_NO_PREPROCESSOR
     if (Compiler->preprocessor != gcvNULL)
     {
         gcmVERIFY_OK(sloPREPROCESSOR_Destroy(Compiler, Compiler->preprocessor));
+        Compiler->preprocessor = gcvNULL;
     }
 #endif
 
     if (Compiler->binary != gcvNULL)
     {
         gcmVERIFY_OK(gcSHADER_Destroy(Compiler->binary));
+        Compiler->binary = gcvNULL;
     }
 
     if (Compiler->log != gcvNULL)
     {
         gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Compiler->log));
+        Compiler->log = gcvNULL;
     }
 
     /* Destory the whole IR tree */
     if (Compiler->context.rootSet != gcvNULL)
     {
         gcmVERIFY_OK(sloIR_OBJECT_Destroy(Compiler, &Compiler->context.rootSet->base));
+        Compiler->context.rootSet = gcvNULL;
     }
 
     /* Destroy unnamed name space */
     if (Compiler->context.unnamedSpace != gcvNULL)
     {
         gcmVERIFY_OK(slsNAME_SPACE_Destory(Compiler, Compiler->context.unnamedSpace));
+        Compiler->context.unnamedSpace = gcvNULL;
     }
 
     if (Compiler->context.debugInfo != gcvNULL)
     {
         vscDIDestroyContext(Compiler->context.debugInfo);
+        Compiler->context.debugInfo = gcvNULL;
     }
 
     /* Destroy vec constant list */
@@ -456,6 +463,7 @@ sloCOMPILER_Destroy_General(
     if (Compiler->context.generalBuiltinSpace != gcvNULL)
     {
         gcmVERIFY_OK(slsNAME_SPACE_Destory(Compiler, Compiler->context.generalBuiltinSpace));
+        Compiler->context.generalBuiltinSpace = gcvNULL;
     }
 
     /* Destroy switch scope */
@@ -911,7 +919,7 @@ sloCOMPILER_AddLog(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     gcmASSERT(Log);
 
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, Log);
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, Log);
 
     length = (gctUINT)gcoOS_StrLen(Log, gcvNULL);
 
@@ -1230,6 +1238,11 @@ sloCOMPILER_Compile(
     Compiler->context.dumpOptions           = DumpOptions;
     Compiler->context.scannerState          = slvSCANNER_NORMAL;
 
+    /* Check if HW has HALTI5 and FMA support */
+    if(GetHWHasHalti5() && GetHWHasFmaSupport())
+    {
+        sloCOMPILER_EnableExtension(Compiler, slvEXTENSION_HALTI5_WITH_FMA_SUPPORT, gcvTRUE);
+    }
     do
     {
         /* Set the global scope as current */
@@ -3188,8 +3201,8 @@ sloCOMPILER_SearchName(
                   "Recursive=%d Name=0x%x",
                   Compiler, Symbol, Recursive, Name);
 
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "Symbol=%s", gcmOPT_STRING(Symbol));
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "Name=%x", gcmOPT_POINTER(Name));
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "Symbol=%s", gcmOPT_STRING(Symbol));
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "Name=%x", gcmOPT_POINTER(Name));
 
     /* Verify the arguments. */
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
@@ -3229,8 +3242,8 @@ sloCOMPILER_SearchBuiltinName(
     gcmHEADER_ARG("Compiler=0x%x Symbol=0x%x Name=0x%x",
                   Compiler, Symbol, Name);
 
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "Symbol=%s", gcmOPT_STRING(Symbol));
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "Name=%x", gcmOPT_POINTER(Name));
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "Symbol=%s", gcmOPT_STRING(Symbol));
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "Name=%x", gcmOPT_POINTER(Name));
 
     /* Verify the arguments. */
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
@@ -3267,8 +3280,8 @@ sloCOMPILER_SearchIntrinsicBuiltinName(
     gcmHEADER_ARG("Compiler=0x%x Symbol=0x%x Name=0x%x",
                   Compiler, Symbol, Name);
 
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "Symbol=%s", gcmOPT_STRING(Symbol));
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "Name=%x", gcmOPT_POINTER(Name));
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "Symbol=%s", gcmOPT_STRING(Symbol));
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "Name=%x", gcmOPT_POINTER(Name));
 
     /* Verify the arguments. */
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
@@ -4068,6 +4081,14 @@ sloCOMPILER_IsHaltiVersion(
     )
 {
     return (sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_HALTI_VERSION || sloCOMPILER_IsOGLVersion(Compiler));
+}
+
+gctBOOL
+sloCOMPILER_IsES20Version(
+    IN sloCOMPILER Compiler
+    )
+{
+    return (sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_ES11_VERSION && !sloCOMPILER_IsOGLVersion(Compiler));
 }
 
 gctBOOL

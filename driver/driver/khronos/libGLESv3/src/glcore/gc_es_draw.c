@@ -19,7 +19,7 @@ extern GLboolean __glIsTextureComplete(__GLcontext *gc, __GLtextureObject *texOb
                                        GLenum magFilter, GLenum compareMode, GLint maxLevelUsed);
 
 
-#define _GC_OBJ_ZONE __GLES3_ZONE_CORE
+#define _GC_OBJ_ZONE gcdZONE_ES30_CORE
 
 /* Set all attribute dirty bits.
  */

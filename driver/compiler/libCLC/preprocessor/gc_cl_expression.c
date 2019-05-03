@@ -368,6 +368,13 @@ gceSTATUS    ppoPREPROCESSOR_Eval_GetToken(
 
     status = PP->inputStream->GetToken(PP, &(PP->inputStream), &token, !ppvICareWhiteSpace); ppmCheckOK();
 
+    /* If this token is from a macro, it may be a NUL, we need to skip it. */
+    while (token->type == ppvTokenType_NUL)
+    {
+        status = ppoTOKEN_Destroy(PP, token);
+        status = PP->inputStream->GetToken(PP, &(PP->inputStream), &token, !ppvICareWhiteSpace); ppmCheckOK();
+    }
+
     if(token->type != ppvTokenType_ID || token->poolString == PP->keyword->defined)
     {
         *Token = token;
@@ -383,7 +390,6 @@ gceSTATUS    ppoPREPROCESSOR_Eval_GetToken(
         return ppoTOKEN_Destroy(PP, token);
     }
     /*Try to expand this ID.*/
-
     status = ppoHIDE_SET_LIST_ContainSelf(PP, token, &token_contain_self);
 
     status = ppoMACRO_MANAGER_GetMacroSymbol(PP, PP->macroManager, token->poolString, &ms);
@@ -457,23 +463,11 @@ ppoPREPROCESSOR_Eval_Case_Basic_Level(
                                       gctINT*            Result
                                       )
 {
-    if ((Token->type == ppvTokenType_ID)
-    &&  gcmIS_SUCCESS(gcoOS_StrCmp(Token->poolString, "GL_FRAGMENT_PRECISION_HIGH"))
-    )
-    {
-        *Result = 1;
-        return gcvSTATUS_OK;
-    }
-
     if(Token->type != ppvTokenType_INT)
     {
-        ppoPREPROCESSOR_Report(
-            PP,
-            clvREPORT_ERROR,
-            "Integer is expected."
-            );
-
-        return gcvSTATUS_INVALID_ARGUMENT;
+        /* Treat undefined ID as zero */
+        *Result = 0;
+        return gcvSTATUS_OK;
     }
 
     return ppoPREPROCESSOR_EvalInt(PP, Token, Result);
@@ -531,9 +525,7 @@ ppoPREPROCESSOR_Eval_Case_Unary_Op(
 
             status = ppoPREPROCESSOR_Defined(PP, &id); ppmCheckOK();
             if (id == PP->keyword->_file_
-                ||    id == PP->keyword->_line_
-                ||    id == PP->keyword->_version_
-                ||    id == PP->keyword->gl_es)
+                ||    id == PP->keyword->_line_)
             {
                 *Result = 1;
 
@@ -543,13 +535,13 @@ ppoPREPROCESSOR_Eval_Case_Unary_Op(
             {
                 status = ppoMACRO_MANAGER_GetMacroSymbol(PP, PP->macroManager, id, &ms); ppmCheckOK();
 
-                if ( ms == gcvNULL )
+                if ( ms == gcvNULL ||  ms->undefined )
                 {
                     *Result = gcvFALSE;
                 }
                 else
                 {
-                    *Result    = gcvTRUE;
+                    *Result = gcvTRUE;
                 }
 
                 return gcvSTATUS_OK;

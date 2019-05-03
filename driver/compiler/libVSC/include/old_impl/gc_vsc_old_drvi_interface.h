@@ -590,6 +590,24 @@ typedef enum _gceMEMORY_ACCESS_FLAG
 }
 gceMEMORY_ACCESS_FLAG;
 
+typedef enum _gceFLOW_CONTROL_FLAG
+{
+    gceFC_FLAG_NONE                 = 0x0000,
+    gceFC_FLAG_JMP                  = 0x0001,
+    gceFC_FLAG_CALL                 = 0x0002,
+    gceFC_FLAG_KILL                 = 0x0004,
+/* must sync with SHADER_EDH_FLOW_CONTROL_HINT and VIR_FlowControlFlag!!! */
+}
+gceFLOW_CONTROL_FLAG;
+
+typedef enum _gceTEXLD_FLAG
+{
+    gceTEXLD_FLAG_NONE                 = 0x0000,
+    gceTEXLD_FLAG_TEXLD                = 0x0001,
+/* must sync with SHADER_EDH_TEXLD_HINT and VIR_TexldFlag!!! */
+}
+gceTEXLD_FLAG;
+
 typedef enum _gceSHADER_LEVEL
 {
     gcvSHADER_HIGH_LEVEL            = 0,
@@ -622,6 +640,10 @@ struct _gcsHINT
     gctUINT32   balanceMax;         /* Balance maximum. */
 
     gceMEMORY_ACCESS_FLAG memoryAccessFlags[gcvSHADER_LEVEL_COUNT][gcvPROGRAM_STAGE_LAST]; /* Memory access flag. */
+
+    gceFLOW_CONTROL_FLAG flowControlFlags[gcvSHADER_LEVEL_COUNT][gcvPROGRAM_STAGE_LAST]; /* Flow control flag. */
+
+    gceTEXLD_FLAG texldFlags[gcvSHADER_LEVEL_COUNT][gcvPROGRAM_STAGE_LAST]; /* Texld flag. */
 
     gcsPROGRAM_UNIFIED_STATUS unifiedStatus;
 
@@ -1607,6 +1629,12 @@ typedef struct _gcOPTIMIZER_OPTION
      */
     gctBOOL     CLUseVIRCodeGen;
 
+    /* CLC use new preprocessor:
+     *
+     *   VC_OPTION=-USECLNEWPP:0|1
+    */
+    gctBOOL    UseCLNewPP;
+
     /* Enable register pack in old compiler:
 
         VC_OPTION=-PACKREG:0|1
@@ -1727,6 +1755,7 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_VIRCGStart()         (gcmGetOptimizerOption()->_vircgStart)
 #define gcmOPT_VIRCGEnd()           (gcmGetOptimizerOption()->_vircgEnd)
 #define gcmOPT_CLUseVIRCodeGen()    (gcmGetOptimizerOption()->CLUseVIRCodeGen)
+#define gcmOPT_UseCLNewPreprocessor() (gcmGetOptimizerOption()->UseCLNewPP)
 #define gcmOPT_DriverVIRPath()      (gcmGetOptimizerOption()->DriverVIRPath)
 #define gcmOPT_CreateDefaultUBO()   (gcmGetOptimizerOption()->createDefaultUBO)
 #define gcmOPT_PatchShader()        (gcmGetOptimizerOption()->patchShader)
@@ -1991,6 +2020,8 @@ extern gcsHWCaps *
 #define GetHWHasHalti0()                      (gcGetHWCaps()->hwFeatureFlags.hasHalti0)
 #define GetHWHasHalti1()                      (gcGetHWCaps()->hwFeatureFlags.hasHalti1)
 #define GetHWHasHalti2()                      (gcGetHWCaps()->hwFeatureFlags.hasHalti2)
+#define GetHWHasHalti5()                      (gcGetHWCaps()->hwFeatureFlags.hasHalti5)
+#define GetHWHasFmaSupport()                  (gcGetHWCaps()->hwFeatureFlags.supportAdvancedInsts)
 #define GetHWHasTS()                          (gcGetHWCaps()->hwFeatureFlags.supportTS)
 #define GetHWHasGS()                          (gcGetHWCaps()->hwFeatureFlags.supportGS)
 #define GetHWHasSamplerBaseOffset()           (gcGetHWCaps()->hwFeatureFlags.hasSamplerBaseOffset)
@@ -6325,6 +6356,12 @@ gceSTATUS
 gcSHADER_GetWorkGroupSize(
     IN gcSHADER Shader,
     OUT gctUINT * WorkGroupSize
+    );
+
+gctINT
+gcSHADER_GetLtcCodeUniformIndex(
+    IN gcSHADER Shader,
+    IN gctUINT CodeIndex
     );
 
 /*******************************************************************************

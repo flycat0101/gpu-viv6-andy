@@ -16,7 +16,7 @@
 #include "gc_es_object_inline.c"
 #include "gc_hal_dump.h"
 
-#define _GC_OBJ_ZONE    __GLES3_ZONE_TRACE
+#define _GC_OBJ_ZONE    gcdZONE_ES30_UTILS
 
 GLuint
 gcChipUtilsEvaluateCRC32(

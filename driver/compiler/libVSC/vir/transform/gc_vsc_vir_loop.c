@@ -424,7 +424,14 @@ _VIR_LoopUpbound_GetTypeId(
     }
     else
     {
-        return VIR_GetTypeComponentType(VIR_Symbol_GetTypeId(VIR_LoopUpbound_GetUpboundSym(upbound)));
+        if (VIR_LoopUpbound_GetUpboundOpndTypeId(upbound) != VIR_TYPE_UNKNOWN)
+        {
+            return VIR_GetTypeComponentType(VIR_LoopUpbound_GetUpboundOpndTypeId(upbound));
+        }
+        else
+        {
+            return VIR_GetTypeComponentType(VIR_Symbol_GetTypeId(VIR_LoopUpbound_GetUpboundSym(upbound)));
+        }
     }
 }
 
@@ -1895,6 +1902,142 @@ _VIR_LoopInfo_IsInstAllUsagesWithinLoop(
     return bAllUsagesWithinLoop;
 }
 
+static gctBOOL
+_VIR_LoopInfo_IsInvariantNeedToBeMoved(
+    VIR_LoopOpts*           pLoopOpts,
+    VIR_LoopInfo*           pLoopInfo,
+    VIR_Instruction*        pInst
+    )
+{
+    VIR_DEF_USAGE_INFO*     pDuInfo = VIR_LoopOpts_GetDuInfo(VIR_LoopInfoMgr_GetLoopOpts(VIR_LoopInfo_GetLoopInfoMgr(pLoopInfo)));
+    gctUINT                 loopLength = _VIR_LoopInfo_GetInstCount(pLoopInfo);
+    gctUINT                 maxLoopLength = VSC_OPTN_LoopOptsOptions_GetLICMFactor(VIR_LoopInfo_GetOptions(pLoopInfo));
+    VIR_OpCode              opCode = VIR_Inst_GetOpcode(pInst);
+    VIR_GENERAL_DU_ITERATOR du_iter;
+    VIR_USAGE*              usage = gcvNULL;
+    VIR_Instruction*        pUsageInst = gcvNULL;
+    VIR_Operand*            pUsageOpnd = gcvNULL;
+    VIR_OperandInfo         destInfo, src0Info;
+
+    /*
+    ** When move a invariant instruction out of this loop, it may increase the live range of this instruction,
+    ** now we use a simple rule to check if we need to move this instruction:
+    **  1) All usages of this instruction is within this loop, then don't move it.
+    **  2) One usage is not in this loop, but it is in front of this loop, we can treat it.
+    */
+    if (loopLength > maxLoopLength &&  /* if loop is large */
+        (!VIR_OPCODE_isMemLd(opCode)) &&
+        (!VIR_LoopOpts_HWsupportPerCompDepForLS(pLoopOpts)) &&
+        _VIR_LoopInfo_IsInstAllUsagesWithinLoop(pLoopInfo, pInst))
+    {
+        return gcvFALSE;
+    }
+
+    /* We may also skip some instruction patterns which can be optimized in the further optimization. */
+    /* Some logic checks in PH. */
+    if (opCode == VIR_OP_LSHIFT)
+    {
+        do
+        {
+            VIR_Operand_GetOperandInfo(pInst, VIR_Inst_GetDest(pInst), &destInfo);
+            if (destInfo.isOutput || !destInfo.isVreg)
+            {
+                break;
+            }
+
+            vscVIR_InitGeneralDuIterator(&du_iter, pDuInfo, pInst, destInfo.u1.virRegInfo.virReg, VIR_CHANNEL_ANY, gcvFALSE);
+            for (usage = vscVIR_GeneralDuIterator_First(&du_iter);
+                 usage != gcvNULL;
+                 usage = vscVIR_GeneralDuIterator_Next(&du_iter))
+            {
+                pUsageInst = usage->usageKey.pUsageInst;
+                pUsageOpnd = usage->usageKey.pOperand;
+
+                if (VIR_IS_OUTPUT_USAGE_INST(pUsageInst))
+                {
+                    continue;
+                }
+
+                if (!VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(pUsageInst)) &&
+                    !VIR_OPCODE_isMemSt(VIR_Inst_GetOpcode(pUsageInst)))
+                {
+                    continue;
+                }
+
+                if (VIR_Inst_GetBasicBlock(pInst) != VIR_Inst_GetBasicBlock(pUsageInst))
+                {
+                    continue;
+                }
+
+                if (!vscVIR_IsUniqueDefInstOfUsageInst(pDuInfo,
+                                                       pUsageInst,
+                                                       pUsageOpnd,
+                                                       usage->usageKey.bIsIndexingRegUsage,
+                                                       pInst,
+                                                       gcvNULL))
+                {
+                    continue;
+                }
+
+                return gcvFALSE;
+            }
+        } while (gcvFALSE);
+    }
+    /* Some logic checks in CPP. */
+    else if (opCode == VIR_OP_CONVERT || opCode == VIR_OP_MOV || opCode == VIR_OP_COPY)
+    {
+        do
+        {
+            VIR_Operand_GetOperandInfo(pInst, VIR_Inst_GetDest(pInst), &destInfo);
+            VIR_Operand_GetOperandInfo(pInst, VIR_Inst_GetSource(pInst, 0), &src0Info);
+
+            if (destInfo.isOutput || !destInfo.isVreg)
+            {
+                break;
+            }
+
+            /* If the source0 of this MOV/CONVERT/COPY is not a temp register, then we might be optimized it in CPP. */
+            if (!src0Info.isInput && !src0Info.isUniform && !src0Info.isVecConst)
+            {
+                break;
+            }
+
+            vscVIR_InitGeneralDuIterator(&du_iter, pDuInfo, pInst, destInfo.u1.virRegInfo.virReg, VIR_CHANNEL_ANY, gcvFALSE);
+            for (usage = vscVIR_GeneralDuIterator_First(&du_iter);
+                 usage != gcvNULL;
+                 usage = vscVIR_GeneralDuIterator_Next(&du_iter))
+            {
+                pUsageInst = usage->usageKey.pUsageInst;
+                pUsageOpnd = usage->usageKey.pOperand;
+
+                if (VIR_IS_OUTPUT_USAGE_INST(pUsageInst))
+                {
+                    continue;
+                }
+
+                if (VIR_Inst_GetBasicBlock(pInst) != VIR_Inst_GetBasicBlock(pUsageInst))
+                {
+                    continue;
+                }
+
+                if (!vscVIR_IsUniqueDefInstOfUsageInst(pDuInfo,
+                                                       pUsageInst,
+                                                       pUsageOpnd,
+                                                       usage->usageKey.bIsIndexingRegUsage,
+                                                       pInst,
+                                                       gcvNULL))
+                {
+                    continue;
+                }
+
+                return gcvFALSE;
+            }
+        } while (gcvFALSE);
+    }
+
+    return gcvTRUE;
+}
+
 static VIR_IVMgr*
 _VIR_LoopInfo_NewIVMgr(
     VIR_LoopInfo* loopInfo
@@ -1937,6 +2080,7 @@ _VIR_LoopInfo_NewUpbound(
     if(upbound)
     {
         gcoOS_ZeroMemory(upbound, sizeof(VIR_LoopUpbound));
+        VIR_LoopUpbound_SetUpboundOpndTypeId(upbound, VIR_TYPE_UNKNOWN);
     }
     VIR_LoopInfo_SetUpbound(loopInfo, upbound);
 
@@ -1961,6 +2105,7 @@ _VIR_LoopInfo_NewLowbound(
         gcoOS_ZeroMemory(lowbound, sizeof(VIR_LoopLowbound));
     }
     VIR_LoopInfo_SetLowbound(loopInfo, lowbound);
+    VIR_LoopInfo_SetMoveInvariantCodeCount(loopInfo, 0);
 
     return lowbound;
 }
@@ -2524,17 +2669,21 @@ VIR_LoopOpts_Init(
     VSC_HW_CONFIG* pHwCfg
     )
 {
+    VSC_HASH_TABLE* processedLoopInfos = vscHTBL_Create(mm, vscHFUNC_Default, vscHKCMP_Default, 16);
     memset(loopOpts, 0, sizeof(VIR_LoopOpts));
 
     VIR_LoopOpts_SetShader(loopOpts, shader);
     VIR_LoopOpts_SetDuInfo(loopOpts, pDuInfo);
     VIR_LoopOpts_SetFunc(loopOpts, func);
     VIR_LoopOpts_SetLoopInfoMgr(loopOpts, gcvNULL);
+    VIR_LoopOpts_SetProcessedLoopInfos(loopOpts, processedLoopInfos);
     VIR_LoopOpts_SetOptions(loopOpts, options);
     VIR_LoopOpts_SetDumper(loopOpts, dumper);
     VIR_LoopOpts_SetMM(loopOpts, mm);
     VIR_LoopOpts_SetHwCfg(loopOpts, pHwCfg);
     VIR_LoopOpts_SetHWsupportPerCompDepForLS(loopOpts, pHwCfg->hwFeatureFlags.supportPerCompDepForLS);
+    VIR_LoopOpts_SetOuterLoopFirst(loopOpts, gcvFALSE);
+    VIR_LoopOpts_SetCurInvariantCodeMotionCount(loopOpts, 0);
 }
 
 void
@@ -2546,6 +2695,8 @@ VIR_LoopOpts_Final(
     {
         vscMM_Free(VIR_LoopOpts_GetMM(loopOpts), VIR_LoopOpts_GetLoopInfoMgr(loopOpts));
     }
+
+    vscHTBL_Destroy(VIR_LoopOpts_GetProcessedLoopInfos(loopOpts));
 }
 
 VIR_LoopInfoMgr*
@@ -2577,9 +2728,6 @@ VIR_LoopOpts_DeleteLoopInfoMgr(
     }
 
     vscMM_Free(VIR_LoopOpts_GetMM(loopOpts), loopInfoMgr);
-
-    /* We need to clean the visit order index so next time we can build it again correctly. */
-    vscVIR_CleanDfsVisitOrderIdxOnFunc(VIR_LoopOpts_GetFunc(loopOpts));
 }
 
 /* Parameter passing into traversal callbacks of CFG */
@@ -2683,6 +2831,9 @@ VIR_LoopOpts_DetectNaturalLoops(
             bLoopDetected = gcvTRUE;
         }
     }
+
+    /* We need to clean the visit order index so next time we can build it again correctly. */
+    vscVIR_CleanDfsVisitOrderIdxOnFunc(func);
 
     /* No need to keep DOM tree */
     vscVIR_DestroyDOMTreePerCFG(cfg);
@@ -3062,7 +3213,6 @@ _VIR_LoopOpts_IdentifyBreakContinues(VIR_LoopOpts* loopOpts)
 VSC_ErrCode
 _VIR_LoopInfo_PerformLoopInversionOnLoop(
     VIR_LoopInfo* loopInfo,
-    void * privateData,
     gctBOOL* changed
     )
 {
@@ -3082,7 +3232,7 @@ _VIR_LoopInfo_PerformLoopInversionOnLoop(
         {
             VIR_LoopInfo* childLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(node);
 
-            _VIR_LoopInfo_PerformLoopInversionOnLoop(childLoopInfo, privateData, changed);
+            _VIR_LoopInfo_PerformLoopInversionOnLoop(childLoopInfo, changed);
         }
     }
 
@@ -3330,11 +3480,11 @@ _VIR_LoopInfo_BuildBackBoneSet(
 VSC_ErrCode
 _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
     VIR_LoopInfo* loopInfo,
-    void * privateData,
     gctBOOL* changed
     )
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_LoopOpts*  loopOpts = VIR_LoopInfoMgr_GetLoopOpts(VIR_LoopInfo_GetLoopInfoMgr(loopInfo));
     VIR_LoopInfo_BBIterator bbIter = {gcvNULL, 0, gcvNULL, 0, gcvNULL};
     VIR_BASIC_BLOCK* bb;
     VIR_LoopDU* du;
@@ -3354,7 +3504,7 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
         {
             VIR_LoopInfo* childLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(node);
 
-            _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(childLoopInfo, privateData, changed);
+            _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(childLoopInfo, changed);
         }
     }
 
@@ -3407,6 +3557,12 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
         {
             VIR_Instruction* inst = BB_GET_START_INST(bb);
 
+            if (VIR_LoopOpts_GetCurInvariantCodeMotionCount(loopOpts) >= VIR_LoopOpts_GetMaxInvariantCodeMotionCount(loopOpts))
+            {
+                repeat = gcvFALSE;
+                break;
+            }
+
             if(!_VIR_LoopInfo_BBIsBackBone(loopInfo, bb))
             {
                 continue;
@@ -3414,6 +3570,12 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
 
             while(gcvTRUE)
             {
+                if (VIR_LoopOpts_GetCurInvariantCodeMotionCount(loopOpts) >= VIR_LoopOpts_GetMaxInvariantCodeMotionCount(loopOpts))
+                {
+                    repeat = gcvFALSE;
+                    break;
+                }
+
                 if(VIR_OPCODE_IsExpr(VIR_Inst_GetOpcode(inst)) && !VIR_Inst_IsLoopInvariant(inst))
                 {
                     /* check whether we have multiple definitions */
@@ -3486,18 +3648,9 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
                             }
                         }
 
-                        /*
-                        ** When move a invariant instruction out of this loop, it may increase the live range of this instruction,
-                        ** now we use a simple rule to check if we need to move this instruction:
-                        **  1) All usages of this instruction is within this loop, then don't move it.
-                        **  2) One usage is not in this loop, but it is in front of this loop, we can treat it
-                        */
                         if (bValidCase)
                         {
-                            VIR_LoopOpts*  loopOpts = VIR_LoopInfoMgr_GetLoopOpts(VIR_LoopInfo_GetLoopInfoMgr(loopInfo));
-                            if ((!VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(inst))) &&
-                                (!VIR_LoopOpts_HWsupportPerCompDepForLS(loopOpts)) &&
-                                _VIR_LoopInfo_IsInstAllUsagesWithinLoop(loopInfo, inst))
+                            if (!_VIR_LoopInfo_IsInvariantNeedToBeMoved(loopOpts, loopInfo, inst))
                             {
                                 bValidCase = gcvFALSE;
                             }
@@ -3525,6 +3678,9 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
                                 VIR_LOG(VIR_LoopInfo_GetDumper(loopInfo), "the following instruction is loop invariant:\n");
                                 VIR_Inst_Dump(VIR_LoopInfo_GetDumper(loopInfo), inst);
                             }
+
+                            VIR_LoopInfo_SetMoveInvariantCodeCount(loopInfo, VIR_LoopInfo_GetMoveInvariantCodeCount(loopInfo) + 1);
+                            VIR_LoopOpts_SetCurInvariantCodeMotionCount(loopOpts, VIR_LoopOpts_GetCurInvariantCodeMotionCount(loopOpts) + 1);
                         }
                     }
                 }
@@ -3625,6 +3781,7 @@ _VIR_LoopInfo_DetectLoopUpbound(
                 VIR_Operand* cmpSrc1 = VIR_Inst_GetSource(cmpInst, 1);
                 VIR_Symbol* cmpSym0 = gcvNULL;
                 VIR_Symbol* cmpSym1 = gcvNULL;
+                VIR_TypeId cmpSrc1TypeId = VIR_Operand_GetTypeId(cmpSrc1);
                 VIR_IV* iv0 = gcvNULL;
                 VIR_IV* iv1 = gcvNULL;
 
@@ -3660,6 +3817,7 @@ _VIR_LoopInfo_DetectLoopUpbound(
                         if(VIR_Operand_isSymbol(cmpSrc1))
                         {
                             VIR_LoopUpbound_SetUpboundSym(upbound, cmpSym1);
+                            VIR_LoopUpbound_SetUpboundOpndTypeId(upbound, cmpSrc1TypeId);
                             VIR_LoopUpbound_SetUpboundSymChannel(upbound, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(cmpSrc1), 0));
                         }
                         else if(VIR_Operand_isImm(cmpSrc1))
@@ -3726,6 +3884,7 @@ _VIR_LoopInfo_DetectLoopUpbound(
             VIR_Operand* jmpcSrc1 = VIR_Inst_GetSource(lastInst, 1);
             VIR_Symbol* jmpcSym0 = gcvNULL;
             VIR_Symbol* jmpcSym1 = gcvNULL;
+            VIR_TypeId jmpcSrc1TypeId = VIR_Operand_GetTypeId(jmpcSrc1);
             VIR_IV* iv0 = gcvNULL;
             VIR_IV* iv1 = gcvNULL;
 
@@ -3761,6 +3920,7 @@ _VIR_LoopInfo_DetectLoopUpbound(
                     if(VIR_Operand_isSymbol(jmpcSrc1))
                     {
                         VIR_LoopUpbound_SetUpboundSym(upbound, jmpcSym1);
+                        VIR_LoopUpbound_SetUpboundOpndTypeId(upbound, jmpcSrc1TypeId);
                         VIR_LoopUpbound_SetUpboundSymChannel(upbound, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(jmpcSrc1), 0));
                     }
                     else if(VIR_Operand_isImm(jmpcSrc1))
@@ -4557,32 +4717,28 @@ _VIR_LoopInfo_MatchIterationFactor(
     return gcvTRUE;
 }
 
-/* return false if loop has memory instruction and hwSupportPerCompDepForLS is false */
+/* return false if loop has barrier instruction */
 static gctBOOL
 _VIR_LoopInfo_CanDoStaticllyUnroll(
-    VIR_LoopInfo* loopInfo
+    VIR_LoopInfo* loopInfo,
+    gctUINT       iterations
     )
 {
     VIR_BB* loopHead = VIR_LoopInfo_GetLoopHead(loopInfo);
     VIR_BB* loopEnd = VIR_LoopInfo_GetLoopEnd(loopInfo);
     VIR_Instruction* instIter = BB_GET_START_INST(loopHead);
-    gctUINT instCounts, memInstCount = 0;
 
     if (VIR_LoopOpts_HWsupportPerCompDepForLS(VIR_LoopInfoMgr_GetLoopOpts(VIR_LoopInfo_GetLoopInfoMgr(loopInfo))))
     {
         return gcvTRUE;
     }
-
-    instCounts = BB_GET_LENGTH(loopHead);
     while(gcvTRUE)
     {
         VIR_OpCode opcode = VIR_Inst_GetOpcode(instIter);
-
-        if (VIR_OPCODE_isMemLd(opcode))
+        if (opcode == VIR_OP_BARRIER)
         {
-            memInstCount++;
+            return gcvFALSE;
         }
-
         if(instIter == BB_GET_END_INST(loopHead))
         {
             break;
@@ -4595,17 +4751,15 @@ _VIR_LoopInfo_CanDoStaticllyUnroll(
 
     if(loopEnd != loopHead)
     {
-        instCounts += BB_GET_LENGTH(loopEnd);
         instIter = BB_GET_START_INST(loopEnd);
 
         while(gcvTRUE)
         {
             VIR_OpCode opcode = VIR_Inst_GetOpcode(instIter);
-            if (VIR_OPCODE_isMemLd(opcode) || VIR_OPCODE_isMemSt(opcode))
+            if (opcode == VIR_OP_BARRIER)
             {
-                 memInstCount++;
+                return gcvFALSE;
             }
-
             if(instIter == BB_GET_END_INST(loopEnd))
             {
                 break;
@@ -4617,8 +4771,7 @@ _VIR_LoopInfo_CanDoStaticllyUnroll(
         }
     }
 
-    /* if HWsupportPerCompDepForLS is false, the register used for ld/st need 8 instructions to reuse again */
-    return (instCounts >= (memInstCount << 3));
+    return gcvTRUE;
 }
 
 static VSC_ErrCode
@@ -4734,18 +4887,21 @@ _VIR_LoopInfo_CanDoDynamicallyUnroll(
         gctUINT addedLength = loopLength * VSC_OPTN_LoopOptsOptions_GetPartialUnrollingFactor(options);
         gctUINT shaderLength = VIR_Shader_GetTotalInstructionCount(VIR_LoopInfo_GetShader(loopInfo));
         VIR_LoopOpts*  loopOpts = VIR_LoopInfoMgr_GetLoopOpts(VIR_LoopInfo_GetLoopInfoMgr(loopInfo));
-
-        if((addedLength > 2048) ||
+        /* reduce addedLength for dynamic loop unroll to avoid register pressure if HWsupportPerCompDepForLS is false */
+        gctUINT addedLengthUpperLimit = VIR_LoopOpts_HWsupportPerCompDepForLS(loopOpts) ?
+                                       2048 : 512;
+        if((addedLength > addedLengthUpperLimit) ||
             (addedLength + shaderLength > VIR_LoopOpts_GetAllowedInstNumAfterUnroll(loopOpts)))
         {
             return gcvFALSE;
         }
-    }
-
-    /* skip dynamic unroll to avoid register pressure if HWsupportPerCompDepForLS is false */
-    if (!VIR_LoopOpts_HWsupportPerCompDepForLS(VIR_LoopInfoMgr_GetLoopOpts(VIR_LoopInfo_GetLoopInfoMgr(loopInfo))))
-    {
-        return gcvFALSE;
+        /* skip daynamic unroll for vx shader if HWsupportPerCompDepForLS is false
+         * from register allocation side
+         */
+        if ((!VIR_LoopOpts_HWsupportPerCompDepForLS(loopOpts)) && VIR_Shader_HasVivVxExtension(VIR_LoopOpts_GetShader(loopOpts)))
+        {
+            return gcvFALSE;
+        }
     }
 
     /* check load ratio */
@@ -4946,6 +5102,10 @@ _VIR_LoopInfo_DynamicallyUnroll(
 
                 VIR_Operand_SetSymbol(src0, func, VIR_Symbol_GetIndex(upboundSym));
                 VIR_Operand_SetSwizzle(src0, (VIR_Swizzle)upboundSymChannel);
+                if (VIR_LoopUpbound_GetUpboundOpndTypeId(upbound) != VIR_TYPE_UNKNOWN)
+                {
+                    VIR_Operand_SetTypeId(src0, VIR_LoopUpbound_GetUpboundOpndTypeId(upbound));
+                }
             }
 
             if(VIR_TypeId_isFloat(upboundTypeId))
@@ -5012,6 +5172,10 @@ _VIR_LoopInfo_DynamicallyUnroll(
 
                 VIR_Operand_SetSymbol(src0, func, VIR_Symbol_GetIndex(upboundSym));
                 VIR_Operand_SetSwizzle(src0, (VIR_Swizzle)upboundSymChannel);
+                if (VIR_LoopUpbound_GetUpboundOpndTypeId(upbound) != VIR_TYPE_UNKNOWN)
+                {
+                    VIR_Operand_SetTypeId(src0, VIR_LoopUpbound_GetUpboundOpndTypeId(upbound));
+                }
             }
             VIR_Operand_SetSymbol(src1, func, newUpboundSymId);
             VIR_Operand_SetSwizzle(src1, VIR_SWIZZLE_XXXX);
@@ -5105,7 +5269,6 @@ _VIR_LoopInfo_DynamicallyUnroll(
 VSC_ErrCode
 _VIR_LoopInfo_PerformLoopUnrollingOnLoop(
     VIR_LoopInfo* loopInfo,
-    void * privateData,
     gctBOOL* changed
     )
 {
@@ -5118,32 +5281,49 @@ _VIR_LoopInfo_PerformLoopUnrollingOnLoop(
     VIR_LoopOpts*  loopOpts = VIR_LoopInfoMgr_GetLoopOpts(VIR_LoopInfo_GetLoopInfoMgr(loopInfo));
     VIR_Shader*     pShader = VIR_LoopInfo_GetShader(loopInfo);
     gctBOOL bHasChildLoop = (VIR_LoopInfo_GetChildLoopCount(loopInfo) != 0);
-    VSC_HASH_TABLE* loopInfoTable = (VSC_HASH_TABLE *)privateData;
+    VSC_HASH_TABLE* processedLoopInfos = VIR_LoopOpts_GetProcessedLoopInfos(loopOpts);
 
-    /* check shader instrs number, early quit if shader program is too large */
-    if (VIR_Shader_GetTotalInstructionCount(pShader) > VIR_LoopOpts_GetAllowedInstNumAfterUnroll(loopOpts))
-    {
-         return errCode;
-    }
-
-    if (vscHTBL_DirectTestAndGet(loopInfoTable, (void *)loopInfo, gcvNULL))
+    if (vscHTBL_DirectTestAndGet(processedLoopInfos, (void *)loopInfo, gcvNULL))
     {
         return errCode;
     }
-    else
+    /* check shader instrs number, early quit if shader program is too large */
+    if (VIR_Shader_GetTotalInstructionCount(pShader) > VIR_LoopOpts_GetAllowedInstNumAfterUnroll(loopOpts))
     {
-        vscHTBL_DirectSet(loopInfoTable, (void *)loopInfo, gcvNULL);
+        vscHTBL_DirectSet(processedLoopInfos, (void *)loopInfo, gcvNULL);
+        return errCode;
     }
 
     /*
     ** If a loop have a parent loop, handle the parent loop first because the IV of the parent loop may be used as
     ** the bound check of the child loop, after do a CPF for the parent loop, the IV could be changed to a imm constant.
     */
-    if (VIR_LoopInfo_GetParentLoop(loopInfo))
+    if (VIR_LoopOpts_GetOuterLoopFirst(loopOpts) && VIR_LoopInfo_GetParentLoop(loopInfo))
     {
-        _VIR_LoopInfo_PerformLoopUnrollingOnLoop(VIR_LoopInfo_GetParentLoop(loopInfo), privateData, &localChanged);
+        _VIR_LoopInfo_PerformLoopUnrollingOnLoop(VIR_LoopInfo_GetParentLoop(loopInfo), &localChanged);
+    }
+    else if (!VIR_LoopOpts_GetOuterLoopFirst(loopOpts))
+    {
+        /* tranverse from inner */
+        if(VIR_LoopInfo_GetChildLoopCount(loopInfo))
+        {
+            VSC_UL_ITERATOR iter;
+            VSC_UNI_LIST_NODE_EXT* node;
+
+            vscULIterator_Init(&iter, VIR_LoopInfo_GetChildLoopSet(loopInfo));
+            for(node = CAST_ULN_2_ULEN(vscULIterator_First(&iter));
+                node != gcvNULL;
+                node = CAST_ULN_2_ULEN(vscULIterator_Next(&iter)))
+            {
+                VIR_LoopInfo* childLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(node);
+
+                _VIR_LoopInfo_PerformLoopUnrollingOnLoop(childLoopInfo, &localChanged);
+            }
+        }
     }
 
+    /* check current loop */
+    vscHTBL_DirectSet(processedLoopInfos, (void *)loopInfo, gcvNULL);
     if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(VIR_LoopInfo_GetOptions(loopInfo)), VSC_OPTN_LoopOptsOptions_TRACE_UNROLL))
     {
         VIR_LOG(VIR_LoopInfo_GetDumper(loopInfo), "loop unrolling input loop:\n");
@@ -5173,16 +5353,15 @@ _VIR_LoopInfo_PerformLoopUnrollingOnLoop(
                 gctUINT loopLength = _VIR_LoopInfo_GetInstCount(loopInfo);
                 gctUINT addedLength = loopLength * (gctUINT)(iterations - 1);
                 gctUINT shaderLength = VIR_Shader_GetTotalInstructionCount(pShader);
-
-                if((addedLength < 2048) &&
+                if((addedLength < 1024) &&
                    (addedLength + shaderLength < VIR_LoopOpts_GetAllowedInstNumAfterUnroll(loopOpts)) &&
-                   _VIR_LoopInfo_CanDoStaticllyUnroll(loopInfo))
+                   _VIR_LoopInfo_CanDoStaticllyUnroll(loopInfo, iterations))
                 {
                     errCode = _VIR_LoopInfo_StaticallyUnroll(loopInfo, (gctUINT)(iterations - 1));
 
                     localChanged = gcvTRUE;
 
-                    if (bHasChildLoop)
+                    if (VIR_LoopOpts_GetOuterLoopFirst(loopOpts) && bHasChildLoop)
                     {
                         errCode = VSC_CPF_PerformOnFunction(pShader,
                                                             VIR_LoopOpts_GetHwCfg(loopOpts),
@@ -5225,31 +5404,104 @@ OnError:
     return errCode;
 }
 
-typedef VSC_ErrCode (*_VIR_LoopInfo_OptFuncP)(VIR_LoopInfo* loopInfo, void * privateData, gctBOOL* changed);
+/* return true if current loop is innest loop and loop bound is nonConst */
+static gctBOOL _VIR_LoopInfo_InnestLoopBoundIsNonConst(
+    VIR_LoopInfo* loopInfo)
+{
+    if (VIR_LoopInfo_GetChildLoopCount(loopInfo) > 0)
+    {
+        /* not innest loop */
+        return gcvFALSE;
+    }
+    _VIR_LoopInfo_IdentifyBasicIVs(loopInfo);
+    if(VIR_LoopInfo_GetIVCount(loopInfo))
+    {
+        VIR_LoopUpbound *upperBound = gcvNULL;
+        VIR_LoopLowbound *lowBound = gcvNULL;
+        _VIR_LoopInfo_DetectLoopBound(loopInfo);
+        upperBound = VIR_LoopInfo_GetUpbound(loopInfo);
+        lowBound = VIR_LoopInfo_GetLowbound(loopInfo);
+        if (upperBound != gcvNULL && lowBound!= gcvNULL)
+        {
+            if (VIR_LoopUpbound_GetUpboundSym(upperBound) != gcvNULL ||
+                VIR_LoopLowbound_GetLowboundSym(lowBound) != gcvNULL)
+                {
+                    /* loop bound is not const */
+                    return gcvTRUE;
+                }
+        }
+    }
+    return gcvFALSE;
+}
+
+typedef VSC_ErrCode (*_VIR_LoopInfo_OptFuncP)(VIR_LoopInfo* loopInfo, gctBOOL* changed);
 
 VSC_ErrCode
 _VIR_LoopOpts_PerformSpecOptOnLoops(
     VIR_LoopOpts* loopOpts,
     _VIR_LoopInfo_OptFuncP optFunc,
     gctBOOL bInnerLoopFirst,
-    void * privateData,
     gctBOOL* changed
     )
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    /*VIR_Shader* shader = VIR_LoopOpts_GetShader(loopOpts);
-    VIR_Function* func = VIR_Shader_GetCurrentFunction(shader);
-    VIR_CONTROL_FLOW_GRAPH* cfg = VIR_Function_GetCFG(func);*/
     VIR_LoopInfoMgr* loopInfoMgr = VIR_LoopOpts_GetLoopInfoMgr(loopOpts);
     VIR_LoopInfo* loopInfo;
     VSC_UL_ITERATOR iter;
+    VSC_HASH_TABLE* processedLoopInfos = VIR_LoopOpts_GetProcessedLoopInfos(loopOpts);
+
+    vscHTBL_Reset(processedLoopInfos);
 
     vscULIterator_Init(&iter, VIR_LoopInfoMgr_GetLoopInfos(loopInfoMgr));
-
     for(loopInfo = (VIR_LoopInfo*)vscULIterator_First(&iter);
         loopInfo != gcvNULL;
         loopInfo = (VIR_LoopInfo*)vscULIterator_Next(&iter))
     {
+        if (vscHTBL_DirectTestAndGet(processedLoopInfos, (void *)loopInfo, gcvNULL))
+        {
+            continue;
+        }
+        if (optFunc == _VIR_LoopInfo_PerformLoopUnrollingOnLoop)
+        {
+            /* if loop is innest loop and the bound has non const,
+             * call unroll optFunc and outerLoop First */
+            if (_VIR_LoopInfo_InnestLoopBoundIsNonConst(loopInfo))
+            {
+                VIR_LoopOpts_SetOuterLoopFirst(loopOpts, gcvTRUE);
+                errCode = (*optFunc)(loopInfo, changed);
+                if(errCode)
+                {
+                    break;
+                }
+                VIR_LoopOpts_SetOuterLoopFirst(loopOpts, gcvFALSE); /* reset tranverse sequence */
+                /* once the outestLoop was dealt,
+                 * clear all kids under outer loop
+                 * this is used for parallel child loops of loopInfo
+                 * some parallel cases are const bound and were not dealt yet */
+                {
+                    VIR_LoopInfo *outerLoop = VIR_LoopInfo_GetParentLoop(loopInfo);
+                    while (outerLoop)
+                    {
+                        VSC_UL_ITERATOR iter;
+                        VSC_UNI_LIST_NODE_EXT* node;
+                        vscULIterator_Init(&iter, VIR_LoopInfo_GetChildLoopSet(outerLoop));
+                        for(node = CAST_ULN_2_ULEN(vscULIterator_First(&iter));
+                            node != gcvNULL;
+                            node = CAST_ULN_2_ULEN(vscULIterator_Next(&iter)))
+                        {
+                            VIR_LoopInfo* childLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(node);
+                            errCode = (*optFunc)(childLoopInfo, changed);
+                            if(errCode)
+                            {
+                                break;
+                            }
+                        }
+                        outerLoop = VIR_LoopInfo_GetParentLoop(outerLoop);
+                    }
+                }
+                continue;
+            }
+        }
         /*
         ** 1. When innerLoopFirst, all child loops are handled in OptFunc.
         ** 2. When outerLoopFirst, all parent loops are handled in OptFunc.
@@ -5269,12 +5521,15 @@ _VIR_LoopOpts_PerformSpecOptOnLoops(
             }
         }
 
-        errCode = (*optFunc)(loopInfo, privateData, changed);
+        errCode = (*optFunc)(loopInfo, changed);
 
         if(errCode)
         {
             break;
         }
+
+        vscHTBL_DirectSet(processedLoopInfos, (void *)loopInfo, gcvNULL);
+        VIR_LoopOpts_SetOuterLoopFirst(loopOpts, (!bInnerLoopFirst)); /* reset tranverse sequence */
     }
 
     return errCode;
@@ -5331,7 +5586,7 @@ VIR_LoopOpts_PerformOnFunction(
             {
                 return errCode;
             }
-            _VIR_LoopOpts_PerformSpecOptOnLoops(loopOpts, _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop, gcvTRUE, gcvNULL, &localChanged);
+            _VIR_LoopOpts_PerformSpecOptOnLoops(loopOpts, _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop, gcvTRUE, &localChanged);
 
             errCode = vscVIR_DestroyDOMTreePerCFG(VIR_Function_GetCFG(func));
             if (errCode)
@@ -5359,7 +5614,7 @@ VIR_LoopOpts_PerformOnFunction(
                 VIR_LOG_FLUSH(dumper);
                 VIR_Function_Dump(dumper, func);
             }
-            _VIR_LoopOpts_PerformSpecOptOnLoops(loopOpts, _VIR_LoopInfo_PerformLoopInversionOnLoop, gcvTRUE, gcvNULL, &localChanged);
+            _VIR_LoopOpts_PerformSpecOptOnLoops(loopOpts, _VIR_LoopInfo_PerformLoopInversionOnLoop, gcvTRUE, &localChanged);
             if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(options), VSC_OPTN_LoopOptsOptions_TRACE_INVERSION_FUNC_OUTPUT))
             {
                 VIR_Dumper* dumper = VIR_LoopOpts_GetDumper(loopOpts);
@@ -5372,7 +5627,6 @@ VIR_LoopOpts_PerformOnFunction(
         if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetOpts(options), VSC_OPTN_LoopOptsOptions_OPTS_LOOP_UNROLLING))
         {
             gctBOOL localChanged = gcvFALSE;
-            VSC_HASH_TABLE* loopInfoTable = gcvNULL;
 
             if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(options), VSC_OPTN_LoopOptsOptions_TRACE_UNROLL_FUNC_INPUT))
             {
@@ -5391,9 +5645,7 @@ VIR_LoopOpts_PerformOnFunction(
                 return errCode;
             }
 
-            loopInfoTable = vscHTBL_Create(VIR_LoopOpts_GetMM(loopOpts), vscHFUNC_Default, vscHKCMP_Default, 16);
-            _VIR_LoopOpts_PerformSpecOptOnLoops(loopOpts, _VIR_LoopInfo_PerformLoopUnrollingOnLoop, gcvFALSE, (void *)loopInfoTable, &localChanged);
-            vscHTBL_Destroy(loopInfoTable);
+            _VIR_LoopOpts_PerformSpecOptOnLoops(loopOpts, _VIR_LoopInfo_PerformLoopUnrollingOnLoop, gcvTRUE, &localChanged);
 
             errCode = vscVIR_DestroyDOMTreePerCFG(VIR_Function_GetCFG(func));
             if (errCode)
@@ -5451,7 +5703,50 @@ _VIR_AllowedInstNumAfterUnroll(
     }
 
     return maxInstCount;
+}
 
+static gctUINT
+_VIR_MaxInvariantCodeMotionCount(
+    VSC_SH_PASS_WORKER* pPassWorker
+    )
+{
+    VSC_HW_CONFIG*      pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    VIR_Shader*         pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    gctUINT             maxInvariantCodeCount = 16;
+
+    /* Almost the same implementation of _VIR_RA_LS_GetMaxReg in RA. */
+    if (VIR_Shader_HasBarrier(pShader))
+    {
+        gctUINT         maxFreeReg = 0;
+        gctFLOAT        workGroupSize = 0, threadCount;
+
+        threadCount = (gctFLOAT)(pHwCfg->maxCoreCount * 4 * (VIR_Shader_isDual16Mode(pShader) ? 2 : 1));
+        maxFreeReg = vscGetHWMaxFreeRegCount(pHwCfg);
+
+        if (VIR_Shader_IsGlCompute(pShader) || VIR_Shader_IsCL(pShader))
+        {
+            /* Use initWorkGroupSizeToCalcRegCount to calculate the maxRegCount if needed. */
+            if (!VIR_Shader_IsWorkGroupSizeAdjusted(pShader) &&
+                !VIR_Shader_IsWorkGroupSizeFixed(pShader))
+            {
+                gcmASSERT(GetHWMaxWorkGroupSize() == VIR_Shader_GetWorkGroupSize(pShader));
+
+                VIR_Shader_SetWorkGroupSizeAdjusted(pShader, gcvTRUE);
+                VIR_Shader_SetAdjustedWorkGroupSize(pShader, GetHWInitWorkGroupSizeToCalcRegCount());
+            }
+            workGroupSize = (gctFLOAT)VIR_Shader_GetWorkGroupSize(pShader);
+            maxFreeReg = maxFreeReg / (gctUINT)(ceil(workGroupSize / threadCount));
+        }
+        else if (pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL)
+        {
+            workGroupSize = (gctFLOAT)(pShader->shaderLayout.tcs.tcsPatchOutputVertices);
+            maxFreeReg = maxFreeReg / (gctUINT)(ceil(workGroupSize / threadCount));
+        }
+
+        maxInvariantCodeCount = (gctUINT)(floor((gctFLOAT)maxFreeReg / 2.0));
+    }
+
+    return maxInvariantCodeCount;
 }
 
 DEF_QUERY_PASS_PROP(VIR_LoopOpts_PerformOnShader)
@@ -5483,6 +5778,7 @@ VIR_LoopOpts_PerformOnShader(
     VSC_OPTN_LoopOptsOptions* options = (VSC_OPTN_LoopOptsOptions*)pPassWorker->basePassWorker.pBaseOption;
     /* set the max instrunction numbers after unroll */
     gctUINT allowedInstNumsAfterUnroll =  _VIR_AllowedInstNumAfterUnroll(pPassWorker);
+    gctUINT maxInvariantCodeMotionCount = _VIR_MaxInvariantCodeMotionCount(pPassWorker);
 
     if(!VSC_OPTN_InRange(VIR_Shader_GetId(shader), VSC_OPTN_LoopOptsOptions_GetBeforeShader(options), VSC_OPTN_LoopOptsOptions_GetAfterShader(options)))
     {
@@ -5527,6 +5823,8 @@ VIR_LoopOpts_PerformOnShader(
                           pPassWorker->basePassWorker.pMM,
                           &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg);
         VIR_LoopOpts_SetAllowedInstNumAfterUnroll(&loopOpts, allowedInstNumsAfterUnroll);
+        VIR_LoopOpts_SetMaxInvariantCodeMotionCount(&loopOpts, maxInvariantCodeMotionCount);
+
         errcode = VIR_LoopOpts_PerformOnFunction(&loopOpts);
         VIR_LoopOpts_Final(&loopOpts);
 

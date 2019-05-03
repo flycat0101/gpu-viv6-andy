@@ -574,8 +574,9 @@ __kernel void pRelu_F16toF16_2d
     _viv_asm(COPY, para_fp16, para_s16, 16);
     _viv_asm(COPY, img_fp16, img1_s16, 16);
     VXC_DP2x8(val_fp16, img_fp16, para_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniFP16Mul_dp2x8);
-    VXC_Clamp_Half(img_fp16, img_fp16, val_fp16, img_fp16, VXC_MODIFIER_CLAMP(0, 7, 0, 0));
-    _viv_asm(COPY, val_s16, img_fp16, 16);
+    vxc_short8 mulData;
+    _viv_asm(COPY, mulData, val_fp16, 16);
+    val_s16 = img1_s16 > 0 ? img1_s16 : mulData;
     VXC_WriteImage(output, coord, val_s16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
 
@@ -598,8 +599,9 @@ __kernel void pRelu_F16toF16
     _viv_asm(COPY, para_fp16, para_s16, 16);
     _viv_asm(COPY, img_fp16, img1_s16, 16);
     VXC_DP2x8(val_fp16, img_fp16, para_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniFP16Mul_dp2x8);
-    VXC_Clamp_Half(img_fp16, img_fp16, val_fp16, img_fp16, VXC_MODIFIER_CLAMP(0, 7, 0, 0));
-    _viv_asm(COPY, val_s16, img_fp16, 16);
+    vxc_short8 mulData;
+    _viv_asm(COPY, mulData, val_fp16, 16);
+    val_s16 = img1_s16 > 0 ? img1_s16 : mulData;
     VXC_WriteImage2DArray(output, coord, val_s16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
 

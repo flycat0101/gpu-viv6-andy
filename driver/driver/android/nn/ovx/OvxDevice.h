@@ -55,8 +55,17 @@ namespace ovx_driver {
 // on the CPU.  An actual driver would not do that.
 class OvxDevice : public IDevice {
 public:
-    OvxDevice(const char* name) : mName(name) {}
-    ~OvxDevice() override {}
+    OvxDevice(const char* name) : mName(name) {
+#ifndef MULTI_CONTEXT
+        mContext = vxCreateContext();
+#endif
+    }
+    ~OvxDevice() override {
+        if (mContext != nullptr)
+        {
+            vxReleaseContext(&mContext);
+        }
+    }
 #if ANDROID_SDK_VERSION < 28
     Return<ErrorStatus> prepareModel(const Model& model,
 #else
@@ -82,6 +91,7 @@ public:
     // This will return only once the service shuts down.
     int run();
 protected:
+    vx_context mContext = nullptr;
     std::string mName;
 };
 
@@ -90,8 +100,8 @@ public:
     OvxPreparedModel(const Model& model)
           : // Make a copy of the model, as we need to preserve it.
             mModel(model) {}
-    ~OvxPreparedModel() override {mExecutor.deinitializeRunTimeInfo();}
-    bool initialize();
+    ~OvxPreparedModel() override {mExecutor->deinitializeRunTimeInfo();}
+    bool initialize(vx_context context);
     Return<ErrorStatus> execute(const Request& request,
                                 const sp<IExecutionCallback>& callback) override;
 
@@ -100,7 +110,7 @@ private:
 
     Model mModel;
     std::vector<VxRunTimePoolInfo> mPoolInfos;
-    OvxExecutor mExecutor;
+    sp<OvxExecutor> mExecutor = nullptr;
 };
 
 } // namespace ovx_driver

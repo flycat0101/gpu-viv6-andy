@@ -51,6 +51,8 @@ VX_INTERNAL_API void vxoGraph_PolluteIfInput(vx_graph graph, vx_reference target
 VX_INTERNAL_API vx_uint32 vxoGraph_GetNextNodeIndex(vx_graph graph, vx_uint32 nodeIndex);
 VX_INTERNAL_API vx_status vxoMultiGpu_FreeMemory(vx_node node);
 
+VX_INTERNAL_API vx_status vxoMultiGPU_SplitOperation(vx_node node, vxnne_operation srcOperation);
+
 EXTERN_C_END
 
 #endif /* __GC_VX_GRAPH_H__ */

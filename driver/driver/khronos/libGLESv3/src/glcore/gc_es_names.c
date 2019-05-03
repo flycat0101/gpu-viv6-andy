@@ -17,7 +17,7 @@
 ** The following four functions are generic ID management functions that
 ** are used to generate IDs for GenTextures, etc.
 */
-#define _GC_OBJ_ZONE __GLES3_ZONE_CORE
+#define _GC_OBJ_ZONE gcdZONE_ES30_CORE
 
 GLuint __glGenerateNames(__GLcontext *gc, __GLsharedObjectMachine *shared, GLsizei range)
 {

@@ -16,6 +16,8 @@
 #endif
 #include <gc_vx_common.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_OTHERS
+
 #define VX_TRACE_BUFFER_COUNT      2048
 
 static vx_bool vxTraceTargetStates[VX_TRACE_TARGET_COUNT];
@@ -71,16 +73,19 @@ VX_INTERNAL_API vx_ptr vxAllocate(vx_size size)
     gceSTATUS status;
     vx_ptr memory;
 
+    gcmHEADER_ARG("size=0x%lx", size);
+
     status = gcoOS_Allocate(gcvNULL, size, &memory);
 
     if (gcmIS_ERROR(status))
     {
         vxError("Failed to allocate enough memory");
+        gcmFOOTER_ARG("%d", status);
         return VX_NULL;
     }
 
     gcoOS_ZeroMemory(memory, size);
-
+    gcmFOOTER_ARG("%d", status);
     return memory;
 }
 
@@ -128,6 +133,8 @@ VX_INTERNAL_API vx_string vxStrDup(vx_const_string string)
 
 VX_INTERNAL_API vx_bool vxStrToLower(vx_const_string srcString, vx_string lowerString)
 {
+    gcmHEADER_ARG("srcString=%s, lowerString=%s", srcString, lowerString);
+
     if (srcString != VX_NULL && lowerString!= VX_NULL)
     {
         vx_uint32 i;
@@ -137,10 +144,11 @@ VX_INTERNAL_API vx_bool vxStrToLower(vx_const_string srcString, vx_string lowerS
         {
             lowerString[i] = (char)tolower(srcString[i]);
         }
-
+        gcmFOOTER_NO();
         return vx_true_e;
     }
 
+    gcmFOOTER_NO();
     return vx_false_e;
 }
 
@@ -239,21 +247,25 @@ VX_INTERNAL_API vx_module_handle vxLoadModule(vx_const_string name)
 {
     gceSTATUS           status;
     vx_module_handle    handle;
-
+    gcmHEADER_ARG("name=%s", name);
     vxmASSERT(name);
 
     gcmONERROR(gcoOS_LoadLibrary(gcvNULL, name, &handle));
 
+    gcmFOOTER_NO();
     return handle;
 
 OnError:
+    gcmFOOTER_NO();
     return VX_NULL_MODULE_HANDLE;
 }
 
 VX_INTERNAL_API void vxUnloadModule(vx_module_handle moduleHandle)
 {
+    gcmHEADER_ARG("moduleHandle=%p", moduleHandle);
     if (moduleHandle == (vx_module_handle)1)
     {
+        gcmFOOTER_NO();
         return;
     }
     else
@@ -262,6 +274,7 @@ VX_INTERNAL_API void vxUnloadModule(vx_module_handle moduleHandle)
 
         gcoOS_FreeLibrary(gcvNULL, moduleHandle);
     }
+    gcmFOOTER_NO();
 }
 
 vx_symbol_handle vxGetSymbol(vx_module_handle mod, vx_char *name)
@@ -324,17 +337,21 @@ VX_INTERNAL_API vx_float64 vxConvertPerfCountToMS(vx_uint64 count)
 
 VX_INTERNAL_API void vxoPerf_Initialize(vx_perf perf)
 {
+    gcmHEADER_ARG("perf=%p", perf);
     vxmASSERT(perf);
 
     vxZeroMemory(perf, sizeof(vx_perf_t));
 
     perf->min = UINT64_MAX;
+    gcmFOOTER_NO();
 }
 
 static vx_uint64 lastCount = 0;
 VX_INTERNAL_API void vxoPerf_Begin(vx_perf perf)
 {
+    gcmHEADER_ARG("perf=%p", perf);
     vxmASSERT(perf);
+
     if (lastCount == 0)
     {
         lastCount = vxGetPerfCount();
@@ -349,11 +366,13 @@ VX_INTERNAL_API void vxoPerf_Begin(vx_perf perf)
              perf->beg = cur;
         lastCount = perf->beg;
     }
+    gcmFOOTER_NO();
 }
 
 VX_INTERNAL_API void vxoPerf_End(vx_perf perf)
 {
     vx_uint64 cur;
+    gcmHEADER_ARG("perf=%p", perf);
     vxmASSERT(perf);
 
     cur = vxGetPerfCount();
@@ -367,6 +386,7 @@ VX_INTERNAL_API void vxoPerf_End(vx_perf perf)
     perf->num++;
     perf->avg = perf->sum / perf->num;
     perf->min = (perf->min < perf->tmp ? perf->min : perf->tmp);
+    gcmFOOTER_NO();
 }
 
 VX_INTERNAL_API void vxoPerf_Dump(vx_perf perf)
@@ -401,10 +421,14 @@ VX_INTERNAL_API void vxoPerf_Dump(vx_perf perf)
 
 VX_INTERNAL_API void vxoQueue_Initialize(vx_queue queue)
 {
+    gcmHEADER_ARG("queue=%p", queue);
     vxmASSERT(queue);
 
-    if (queue == VX_NULL) return;
-
+    if (queue == VX_NULL)
+    {
+        gcmFOOTER_NO();
+        return;
+    }
     vxZeroMemory(queue->data, sizeof(queue->data));
 
     vxCreateMutex(OUT &queue->lock);
@@ -419,10 +443,12 @@ VX_INTERNAL_API void vxoQueue_Initialize(vx_queue queue)
     vxCreateEvent(vx_true_e, OUT &queue->writeEvent);
 
     vxSetEvent(queue->writeEvent);
+    gcmFOOTER_NO();
 }
 
 VX_INTERNAL_API void vxoQueue_Deinitialize(vx_queue queue)
 {
+    gcmHEADER_ARG("queue=%p", queue);
     vxmASSERT(queue);
 
     if (queue == VX_NULL) return;
@@ -438,6 +464,7 @@ VX_INTERNAL_API void vxoQueue_Deinitialize(vx_queue queue)
 
     vxmASSERT(queue->lock);
     vxDestroyMutex(queue->lock);
+    gcmFOOTER_NO();
 }
 /* unused code
 VX_PRIVATE_API vx_queue vxoQueue_Create()
@@ -471,6 +498,7 @@ VX_PRIVATE_API void vxoQueue_Destroy(vx_queue_ptr queuePtr)
 */
 VX_INTERNAL_API void vxoQueue_Stop(vx_queue queue)
 {
+    gcmHEADER_ARG("queue=%p", queue);
     vxmASSERT(queue);
 
     if (queue == VX_NULL) return;
@@ -484,10 +512,13 @@ VX_INTERNAL_API void vxoQueue_Stop(vx_queue queue)
     vxSetEvent(queue->writeEvent);
 
     vxReleaseMutex(queue->lock);
+
+    gcmFOOTER_NO();
 }
 
 VX_INTERNAL_API vx_bool vxoQueue_WriteData(vx_queue queue, vx_value_set data)
 {
+    gcmHEADER_ARG("queue=%p, data=%p", queue, data);
     vxmASSERT(queue);
 
     while (vxWaitEvent(queue->writeEvent, gcvINFINITE))
@@ -499,7 +530,7 @@ VX_INTERNAL_API vx_bool vxoQueue_WriteData(vx_queue queue, vx_value_set data)
         if (queue->stopped)
         {
             vxReleaseMutex(queue->lock);
-
+            gcmFOOTER_NO();
             return vx_false_e;
         }
 
@@ -524,6 +555,7 @@ VX_INTERNAL_API vx_bool vxoQueue_WriteData(vx_queue queue, vx_value_set data)
         if (wrote) break;
     }
 
+    gcmFOOTER_NO();
     return vx_true_e;
 }
 
@@ -531,6 +563,7 @@ VX_INTERNAL_API vx_bool vxoQueue_ReadData(vx_queue queue, OUT vx_value_set_ptr d
 {
     vx_bool read = vx_false_e;
 
+    gcmHEADER_ARG("queue=%p, dataPtr=%p", queue, dataPtr);
     vxmASSERT(queue);
     vxmASSERT(dataPtr);
 
@@ -541,7 +574,7 @@ VX_INTERNAL_API vx_bool vxoQueue_ReadData(vx_queue queue, OUT vx_value_set_ptr d
         if (queue->stopped)
         {
             vxReleaseMutex(queue->lock);
-
+            gcmFOOTER_NO();
             return vx_false_e;
         }
 
@@ -567,7 +600,7 @@ VX_INTERNAL_API vx_bool vxoQueue_ReadData(vx_queue queue, OUT vx_value_set_ptr d
 
         if (read) break;
     }
-
+    gcmFOOTER_NO();
     return read;
 }
 

@@ -120,8 +120,6 @@ typedef struct _cl_object *     clsObject_PTR;
 /* Unique device vendor identifier, CCFOUR version of VIV */
 #define clvDEVICE_VENDOR_ID     ((gctUINT32) 0x00564956)
 
-#define _GC_OBJ_ZONE            gcvZONE_API_CL
-
 #define clmIS_ERROR(status)     (status <  CL_SUCCESS)
 #define clmNO_ERROR(status)     (status >= CL_SUCCESS)
 #define clmIS_SUCCESS(status)   (status == CL_SUCCESS)

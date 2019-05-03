@@ -266,6 +266,7 @@ gcoCL_WrapUserPhysicalMemory(
     IN gctUINT              Bytes,
     IN gctBOOL              VIVUnCached,
     OUT gctPOINTER *        Logical,
+    OUT gctUINT32   *       Address,
     OUT gcsSURF_NODE_PTR *  Node
     );
 /*******************************************************************************
@@ -778,5 +779,4 @@ gcoCL_ChooseBltEngine(
 #endif
 
 #endif /* __gc_hal_user_cl_h_ */
-
 

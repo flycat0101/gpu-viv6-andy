@@ -15,7 +15,7 @@
 #include "gc_chip_context.h"
 #include "gc_chip_shader.h"
 
-#define _GC_OBJ_ZONE __GLES3_ZONE_TRACE
+#define _GC_OBJ_ZONE gcdZONE_GL40_HASH
 
 
 /*******************************************************************************
@@ -424,19 +424,19 @@ gceSTATUS getHashedProgram(
 
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
     gcmTRACE_ZONE(
-        gcvLEVEL_VERBOSE, __GLES3_ZONE_HASH,
+        gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
         "[HASH] hash bucket = 0x%08X",
         bucket
         );
 
     gcmTRACE_ZONE(
-        gcvLEVEL_VERBOSE, __GLES3_ZONE_HASH,
+        gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
         "       table index = %d",
         index
         );
 
     gcmTRACE_ZONE(
-        gcvLEVEL_VERBOSE, __GLES3_ZONE_HASH,
+        gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
         "       number of collisions = %d",
         hashEntry->entryCount ? hashEntry->entryCount - 1 : 0
         );
@@ -472,7 +472,7 @@ gceSTATUS getHashedProgram(
                 /* Print statistics. */
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
                 gcmTRACE_ZONE(
-                    gcvLEVEL_VERBOSE, __GLES3_ZONE_HASH,
+                    gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
                     "       found on attempt: %d",
                     ++attempt
                     );
@@ -508,7 +508,7 @@ gceSTATUS getHashedProgram(
         {
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
             gcmTRACE_ZONE(
-                gcvLEVEL_VERBOSE, __GLES3_ZONE_HASH,
+                gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
                 "       deleting the least used entry (timestamp = %d).",
                 currEntry->program.timestamp
                 );
@@ -534,7 +534,7 @@ gceSTATUS getHashedProgram(
 
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
         gcmTRACE_ZONE(
-            gcvLEVEL_VERBOSE, __GLES3_ZONE_HASH,
+            gcvLEVEL_VERBOSE, _GC_OBJ_ZONE,
             "       created new entry (timestamp = %d).",
             currEntry->program.timestamp
             );

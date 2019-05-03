@@ -12,11 +12,12 @@
 
 
 #include "gc_vsc.h"
+#include "vir/lower/gc_vsc_vir_lower_common_func.h"
 
 #if gcdENABLE_3D
 
 /* Zone used for header/footer. */
-#define _GC_OBJ_ZONE    gcvZONE_COMPILER
+#define _GC_OBJ_ZONE    gcdZONE_COMPILER
 
 #include "vir/lower/gc_vsc_vir_ml_2_ll.h"
 #include "vir/lower/gc_vsc_vir_hl_2_ml.h"
@@ -1221,6 +1222,9 @@ _ConvUniformKind2Vir(
         case gcvUNIFORM_KIND_NUM_GROUPS:
             virUniformKind = VIR_UNIFORM_NUM_GROUPS;
             break;
+        case gcvUNIFORM_KIND_NUM_GROUPS_FOR_SINGLE_GPU:
+            virUniformKind = VIR_UNIFORM_NUM_GROUPS_FOR_SINGLE_GPU;
+            break;
         case gcvUNIFORM_KIND_GLOBAL_OFFSET:
             virUniformKind = VIR_UNIFORM_GLOBAL_OFFSET;
             break;
@@ -1251,11 +1255,13 @@ _ConvUniformKind2Vir(
         default:
             virUniformKind = VIR_UNIFORM_NORMAL;
         }
-        if (gcmIS_SUCCESS(gcoOS_StrNCmp(Uniform->name, "#num_groups", 11)))
+        if (Uniform->nameLength == 11 &&
+            gcmIS_SUCCESS(gcoOS_StrNCmp(Uniform->name, "#num_groups", 11)))
         {
             virUniformKind = VIR_UNIFORM_NUM_GROUPS;
         }
-        else if (gcmIS_SUCCESS(gcoOS_StrCmp(Uniform->name, "$ConstBorderValue")))
+        else if (Uniform->nameLength == 17 &&
+                 gcmIS_SUCCESS(gcoOS_StrCmp(Uniform->name, "$ConstBorderValue")))
         {
             virUniformKind = VIR_UNIFORM_CONST_BORDER_VALUE;
         }
@@ -9294,6 +9300,464 @@ _isPrevInstNotMul(
     return gcvTRUE;
 }
 
+static gctBOOL
+_conv_enable_to_swizzle(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Enable enable = VIR_Inst_GetEnable(Inst);
+    VIR_Swizzle swizzle = VIR_SWIZZLE_XYZW;
+    gctINT i, channel = 0;
+    VIR_Swizzle components[4] = {VIR_SWIZZLE_X, VIR_SWIZZLE_X, VIR_SWIZZLE_X, VIR_SWIZZLE_X};
+
+    for(i = 0; i < VIR_CHANNEL_COUNT; i++)
+    {
+        if(enable & (1 << i))
+        {
+            components[i] = VIR_Swizzle_GetChannel(swizzle, channel);
+            channel++;
+        }
+    }
+    swizzle = (components[0] << 0) | (components[1] << 2) | (components[2] << 4) | (components[3] << 6);
+    VIR_Operand_SetSwizzle(Opnd, swizzle);
+    return gcvTRUE;
+}
+
+static gctBOOL
+_conv_1st_enable_to_swizzle(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Enable enable = VIR_Inst_GetEnable(Inst);
+
+    if(enable & VIR_ENABLE_X)
+    {
+        VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_XXXX);
+        return gcvTRUE;
+    }
+    if(enable & VIR_ENABLE_Y)
+    {
+        VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_YYYY);
+        return gcvTRUE;
+    }
+    if(enable & VIR_ENABLE_Z)
+    {
+        VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_ZZZZ);
+        return gcvTRUE;
+    }
+    if(enable & VIR_ENABLE_W)
+    {
+        VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_WWWW);
+        return gcvTRUE;
+    }
+    gcmASSERT(0);
+    return gcvFALSE;
+}
+
+static gctBOOL
+_conv_2nd_enable_to_swizzle(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    switch(VIR_Inst_GetEnable(Inst))
+    {
+    case VIR_ENABLE_XY:
+    case VIR_ENABLE_XYZ:
+    case VIR_ENABLE_XYW:
+    case VIR_ENABLE_XYZW:
+        VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_YYYY);
+        break;
+
+    case VIR_ENABLE_XZ:
+    case VIR_ENABLE_XZW:
+    case VIR_ENABLE_YZ:
+    case VIR_ENABLE_YZW:
+        VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_ZZZZ);
+        break;
+
+    case VIR_ENABLE_XW:
+    case VIR_ENABLE_YW:
+    case VIR_ENABLE_ZW:
+        VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_WWWW);
+        break;
+
+    default:
+       gcmASSERT(0);
+       return gcvFALSE;
+    }
+    return gcvTRUE;
+}
+
+static gctBOOL
+_conv_3rd_enable_to_swizzle(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    switch(VIR_Inst_GetEnable(Inst))
+    {
+    case VIR_ENABLE_XYZ:
+    case VIR_ENABLE_XYZW:
+        VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_ZZZZ);
+        break;
+
+    case VIR_ENABLE_XYW:
+    case VIR_ENABLE_XZW :
+    case VIR_ENABLE_YZW :
+        VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_WWWW);
+        break;
+
+    default:
+        gcmASSERT(0);
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_conv_4th_enable_to_swizzle(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    if(VIR_Inst_GetEnable(Inst) == VIR_ENABLE_XYZW)
+    {
+        VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_WWWW);
+        return gcvTRUE;
+    }
+    gcmASSERT(0);
+    return gcvFALSE;
+}
+
+static gctBOOL
+_set_int_zero_enableXY(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand * dest = VIR_Inst_GetDest(Inst);
+    VIR_ScalarConstVal imm0;
+    imm0.iValue = 0;
+
+    VIR_Operand_SetImmediate(Opnd,
+        VIR_TYPE_INT32,
+        imm0);
+
+    VIR_Operand_SetEnable(dest, VIR_ENABLE_XY);
+    return gcvTRUE;
+}
+
+static gctBOOL
+_set_int_one_enableX(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand * dest = VIR_Inst_GetDest(Inst);
+    VIR_ScalarConstVal imm0;
+    imm0.iValue = 1;
+
+    VIR_Operand_SetImmediate(Opnd,
+        VIR_TYPE_INT32,
+        imm0);
+
+    VIR_Operand_SetEnable(dest, VIR_ENABLE_X);
+    return gcvTRUE;
+}
+
+static gctBOOL
+_set_int_one_enableXY(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand * dest = VIR_Inst_GetDest(Inst);
+    VIR_ScalarConstVal imm0;
+    imm0.iValue = 1;
+
+    VIR_Operand_SetImmediate(Opnd,
+        VIR_TYPE_INT32,
+        imm0);
+
+    VIR_Operand_SetEnable(dest, VIR_ENABLE_XY);
+    return gcvTRUE;
+}
+
+static gctBOOL
+_set_1st_enable(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Enable enable = VIR_Inst_GetEnable(Inst);
+
+    if(enable & VIR_ENABLE_X)
+    {
+        VIR_Operand_SetEnable(Opnd, VIR_ENABLE_X);
+        return gcvTRUE;
+    }
+    if(enable & VIR_ENABLE_Y)
+    {
+        VIR_Operand_SetEnable(Opnd, VIR_ENABLE_Y);
+        return gcvTRUE;
+    }
+    if(enable & VIR_ENABLE_Z)
+    {
+        VIR_Operand_SetEnable(Opnd, VIR_ENABLE_Z);
+        return gcvTRUE;
+    }
+    if(enable & VIR_ENABLE_W)
+    {
+        VIR_Operand_SetEnable(Opnd, VIR_ENABLE_W);
+        return gcvTRUE;
+    }
+    gcmASSERT(0);
+    return gcvFALSE;
+}
+
+static gctBOOL
+_set_2nd_enable(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    switch(VIR_Inst_GetEnable(Inst))
+    {
+    case VIR_ENABLE_XY:
+    case VIR_ENABLE_XYZ:
+    case VIR_ENABLE_XYW:
+    case VIR_ENABLE_XYZW:
+        VIR_Operand_SetEnable(Opnd, VIR_ENABLE_Y);
+        break;
+
+    case VIR_ENABLE_XZ:
+    case VIR_ENABLE_XZW:
+    case VIR_ENABLE_YZ:
+    case VIR_ENABLE_YZW:
+        VIR_Operand_SetEnable(Opnd, VIR_ENABLE_Z);
+        break;
+
+    case VIR_ENABLE_XW:
+    case VIR_ENABLE_YW:
+    case VIR_ENABLE_ZW:
+        VIR_Operand_SetEnable(Opnd, VIR_ENABLE_W);
+        break;
+
+    default:
+        gcmASSERT(0);
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_set_3rd_enable(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    switch(VIR_Inst_GetEnable(Inst))
+    {
+    case VIR_ENABLE_XYZ:
+    case VIR_ENABLE_XYZW:
+        VIR_Operand_SetEnable(Opnd, VIR_ENABLE_Z);
+        break;
+
+    case VIR_ENABLE_XYW:
+    case VIR_ENABLE_XZW:
+    case VIR_ENABLE_YZW:
+        VIR_Operand_SetEnable(Opnd, VIR_ENABLE_W);
+        break;
+
+    default:
+        gcmASSERT(0);
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_set_4th_enable(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    if(VIR_Inst_GetEnable(Inst) == VIR_ENABLE_XYZW)
+    {
+        VIR_Operand_SetEnable(Opnd, VIR_ENABLE_W);
+    }
+    else
+    {
+        gcmASSERT(0);
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_set_1st_enable_swizzle(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Enable enable = VIR_Inst_GetEnable(Inst);
+    VIR_Swizzle swizzle = VIR_Operand_GetSwizzle(Opnd);
+
+    if(enable & VIR_ENABLE_X)
+    {
+        swizzle = VIR_Swizzle_GetChannel(swizzle, 0);
+        swizzle = (swizzle << 0) | (swizzle << 2) | (swizzle << 4) | (swizzle << 6);
+        VIR_Operand_SetSwizzle(Opnd, swizzle);
+        return gcvTRUE;
+    }
+    if(enable & VIR_ENABLE_Y)
+    {
+        swizzle = VIR_Swizzle_GetChannel(swizzle, 1);
+        swizzle = (swizzle << 0) | (swizzle << 2) | (swizzle << 4) | (swizzle << 6);
+        VIR_Operand_SetSwizzle(Opnd, swizzle);
+        return gcvTRUE;
+    }
+    if(enable & VIR_ENABLE_Z)
+    {
+        swizzle = VIR_Swizzle_GetChannel(swizzle, 2);
+        swizzle = (swizzle << 0) | (swizzle << 2) | (swizzle << 4) | (swizzle << 6);
+        VIR_Operand_SetSwizzle(Opnd, swizzle);
+        return gcvTRUE;
+    }
+    if(enable & VIR_ENABLE_W)
+    {
+        swizzle = VIR_Swizzle_GetChannel(swizzle, 3);
+        swizzle = (swizzle << 0) | (swizzle << 2) | (swizzle << 4) | (swizzle << 6);
+        VIR_Operand_SetSwizzle(Opnd, swizzle);
+        return gcvTRUE;
+    }
+    gcmASSERT(0);
+    return gcvFALSE;
+}
+
+static gctBOOL
+_set_2nd_enable_swizzle(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Swizzle swizzle = VIR_Operand_GetSwizzle(Opnd);
+
+    switch(VIR_Inst_GetEnable(Inst))
+    {
+    case VIR_ENABLE_XY:
+    case VIR_ENABLE_XYZ:
+    case VIR_ENABLE_XYW:
+    case VIR_ENABLE_XYZW:
+        swizzle = VIR_Swizzle_GetChannel(swizzle, 1);
+        swizzle = (swizzle << 0) | (swizzle << 2) | (swizzle << 4) | (swizzle << 6);
+        VIR_Operand_SetSwizzle(Opnd, swizzle);
+        break;
+
+    case VIR_ENABLE_XZ:
+    case VIR_ENABLE_XZW:
+    case VIR_ENABLE_YZ:
+    case VIR_ENABLE_YZW:
+        swizzle = VIR_Swizzle_GetChannel(swizzle, 2);
+        swizzle = (swizzle << 0) | (swizzle << 2) | (swizzle << 4) | (swizzle << 6);
+        VIR_Operand_SetSwizzle(Opnd, swizzle);
+        break;
+
+    case VIR_ENABLE_XW:
+    case VIR_ENABLE_YW:
+    case VIR_ENABLE_ZW:
+        swizzle = VIR_Swizzle_GetChannel(swizzle, 3);
+        swizzle = (swizzle << 0) | (swizzle << 2) | (swizzle << 4) | (swizzle << 6);
+        VIR_Operand_SetSwizzle(Opnd, swizzle);
+        break;
+
+    default:
+       gcmASSERT(0);
+       return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_set_3rd_enable_swizzle(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Swizzle swizzle = VIR_Operand_GetSwizzle(Opnd);
+
+    switch(VIR_Inst_GetEnable(Inst))
+    {
+    case VIR_ENABLE_XYZ:
+    case VIR_ENABLE_XYZW:
+        swizzle = VIR_Swizzle_GetChannel(swizzle, 2);
+        swizzle = (swizzle << 0) | (swizzle << 2) | (swizzle << 4) | (swizzle << 6);
+        VIR_Operand_SetSwizzle(Opnd, swizzle);
+        break;
+
+    case VIR_ENABLE_XYW:
+    case VIR_ENABLE_XZW :
+    case VIR_ENABLE_YZW :
+        swizzle = VIR_Swizzle_GetChannel(swizzle, 3);
+        swizzle = (swizzle << 0) | (swizzle << 2) | (swizzle << 4) | (swizzle << 6);
+        VIR_Operand_SetSwizzle(Opnd, swizzle);
+        break;
+
+    default:
+       gcmASSERT(0);
+       return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_set_4th_enable_swizzle(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Swizzle swizzle = VIR_Operand_GetSwizzle(Opnd);
+
+    if(VIR_Inst_GetEnable(Inst) == VIR_ENABLE_XYZW)
+    {
+        swizzle = VIR_Swizzle_GetChannel(swizzle, 3);
+        swizzle = (swizzle << 0) | (swizzle << 2) | (swizzle << 4) | (swizzle << 6);
+        VIR_Operand_SetSwizzle(Opnd, swizzle);
+    }
+    else
+    {
+       gcmASSERT(0);
+       return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
 /*
 add      1, 2, 3
 store1   4, 1, 5
@@ -9733,6 +10197,160 @@ static VIR_Pattern _arctrigPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
+/*
+asin 1, 2
+    NEG         t1, 2
+    FMA         t2, 2, t1, imm(1.0)
+    SQRT        t3, t2
+    ARCTRIG     t4.xy, 2, t3, imm(1)
+    MUL         1, 2, t4.x
+*/
+
+static VIR_PatternMatchInst _asinPatInst0[] = {
+    { VIR_OP_ASIN, VIR_PATTERN_ANYCOND, 0, { 1, 2 }, { VIR_Lower_IsDstOneEnable }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _asinRepInst0[] = {
+    { VIR_OP_NEG, 0, 0, { -1, 2, 0, 0 }, { 0 } },
+    { VIR_OP_FMA, 0, 0, { -2, 2, -1, 0 }, { VIR_Lower_SetPrecisionBaseOnSrc0, 0, 0, VIR_Lower_SetOne } },
+    { VIR_OP_SQRT, 0, 0, { -3, -2, 0, 0 }, { 0 } },
+    { VIR_OP_ARCTRIG, 0, 0, { -4, -3, -3, 0 }, { VIR_Lower_SetPrecisionBaseOnSrc0, 0, 0, _set_int_one_enableXY } },
+    { VIR_OP_MUL, 0, 0, { 1, 2, -4, 0 }, { 0, 0, VIR_Lower_SetSwizzleX } },
+};
+
+static VIR_PatternMatchInst _asinPatInst1[] = {
+    { VIR_OP_ASIN, VIR_PATTERN_ANYCOND, 0, { 1, 2 }, { VIR_Lower_IsDstTwoEnables }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _asinRepInst1[] = {
+    { VIR_OP_NEG, 0, 0, { -1, 2, 0, 0 }, { 0 } },
+    { VIR_OP_FMA, 0, 0, { -2, 2, -1, 0 }, { VIR_Lower_SetPrecisionBaseOnSrc0, 0, 0, VIR_Lower_SetOne } },
+    { VIR_OP_SQRT, 0, 0, { -3, -2, 0, 0 }, { 0 } },
+    { VIR_OP_ARCTRIG, 0, 0, { -4, -3, -3, 0 }, { VIR_Lower_SetPrecisionBaseOnSrc0, _set_1st_enable_swizzle, _conv_1st_enable_to_swizzle, _set_int_one_enableX } },
+    { VIR_OP_ARCTRIG, 0, 0, { -5, -3, -3, 0 }, { VIR_Lower_SetPrecisionBaseOnSrc0, _set_2nd_enable_swizzle, _conv_2nd_enable_to_swizzle, _set_int_one_enableXY } },
+    { VIR_OP_MOV, 0, 0, { -4, -5, 0, 0 }, { VIR_Lower_SetEnableY, VIR_Lower_SetSwizzleX } },
+    { VIR_OP_MUL, 0, 0, { 1, 2, -4, 0 }, { 0, 0, _conv_enable_to_swizzle } },
+};
+
+static VIR_PatternMatchInst _asinPatInst2[] = {
+    { VIR_OP_ASIN, VIR_PATTERN_ANYCOND, 0, { 1, 2 }, { VIR_Lower_IsDstThreeEnables }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _asinRepInst2[] = {
+    { VIR_OP_NEG, 0, 0, { -1, 2, 0, 0 }, { 0 } },
+    { VIR_OP_FMA, 0, 0, { -2, 2, -1, 0 }, { VIR_Lower_SetPrecisionBaseOnSrc0, 0, 0, VIR_Lower_SetOne } },
+    { VIR_OP_SQRT, 0, 0, { -3, -2, 0, 0 }, { 0 } },
+    { VIR_OP_ARCTRIG, 0, 0, { -4, -3, -3, 0 }, { VIR_Lower_SetPrecisionBaseOnSrc0, _set_1st_enable_swizzle, _conv_1st_enable_to_swizzle, _set_int_one_enableX } },
+    { VIR_OP_ARCTRIG, 0, 0, { -5, -3, -3, 0 }, { VIR_Lower_SetPrecisionBaseOnSrc0, _set_2nd_enable_swizzle, _conv_2nd_enable_to_swizzle, _set_int_one_enableXY } },
+    { VIR_OP_ARCTRIG, 0, 0, { -6, -3, -3, 0 }, { VIR_Lower_SetPrecisionBaseOnSrc0, _set_3rd_enable_swizzle, _conv_3rd_enable_to_swizzle, _set_int_one_enableXY } },
+    { VIR_OP_MOV, 0, 0, { -4, -5, 0, 0 }, { VIR_Lower_SetEnableY, VIR_Lower_SetSwizzleX } },
+    { VIR_OP_MOV, 0, 0, { -4, -6, 0, 0 }, { VIR_Lower_SetEnableZ, VIR_Lower_SetSwizzleX } },
+    { VIR_OP_MUL, 0, 0, { 1, 2, -4, 0 }, { 0, 0, _conv_enable_to_swizzle } },
+};
+
+static VIR_PatternMatchInst _asinPatInst3[] = {
+    { VIR_OP_ASIN, VIR_PATTERN_ANYCOND, 0, { 1, 2 }, { VIR_Lower_IsDstFourEnables }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _asinRepInst3[] = {
+    { VIR_OP_NEG, 0, 0, { -1, 2, 0, 0 }, { 0 } },
+    { VIR_OP_FMA, 0, 0, { -2, 2, -1, 0 }, { VIR_Lower_SetPrecisionBaseOnSrc0, 0, 0, VIR_Lower_SetOne } },
+    { VIR_OP_SQRT, 0, 0, { -3, -2, 0, 0 }, { 0 } },
+    { VIR_OP_ARCTRIG, 0, 0, { -4, -3, -3, 0 }, { VIR_Lower_SetPrecisionBaseOnSrc0, _set_1st_enable_swizzle, _conv_1st_enable_to_swizzle, _set_int_zero_enableXY } },
+    { VIR_OP_ARCTRIG, 0, 0, { -5, -3, -3, 0 }, { VIR_Lower_SetPrecisionBaseOnSrc0, _set_2nd_enable_swizzle, _conv_2nd_enable_to_swizzle, _set_int_zero_enableXY } },
+    { VIR_OP_ARCTRIG, 0, 0, { -6, -3, -3, 0 }, { VIR_Lower_SetPrecisionBaseOnSrc0, _set_3rd_enable_swizzle, _conv_3rd_enable_to_swizzle, _set_int_zero_enableXY } },
+    { VIR_OP_ARCTRIG, 0, 0, { -7, -3, -3, 0 }, { VIR_Lower_SetPrecisionBaseOnSrc0, _set_4th_enable_swizzle, _conv_4th_enable_to_swizzle, _set_int_zero_enableXY } },
+    { VIR_OP_MOV, 0, 0, { -4, -5, 0, 0 }, { VIR_Lower_SetEnableY, VIR_Lower_SetSwizzleX } },
+    { VIR_OP_MOV, 0, 0, { -4, -6, 0, 0 }, { VIR_Lower_SetEnableZ, VIR_Lower_SetSwizzleX } },
+    { VIR_OP_MOV, 0, 0, { -4, -7, 0, 0 }, { VIR_Lower_SetEnableW, VIR_Lower_SetSwizzleX } },
+    { VIR_OP_MUL, 0, 0, { 1, 2, -4, 0 }, { 0, 0, _conv_enable_to_swizzle } },
+};
+
+static VIR_Pattern _asinPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_asin, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_asin, 1) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_asin, 2) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_asin, 3) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+/*
+acos 1, 2
+    NEG         t1, 2
+    FMA         t2, 2, t1, imm(1.0)
+    SQRT        t3, t2
+    ARCTRIG     t4.xy, 2, t3, imm(0)
+    FMA         1, t3, t4.x, t4.y
+*/
+
+static VIR_PatternMatchInst _acosPatInst0[] = {
+    { VIR_OP_ACOS, VIR_PATTERN_ANYCOND, 0, { 1, 2 }, { VIR_Lower_IsDstOneEnable }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _acosRepInst0[] = {
+    { VIR_OP_NEG, 0, 0, { -1, 2, 0, 0 }, { 0 } },
+    { VIR_OP_FMA, 0, 0, { -2, 2, -1, 0 }, { VIR_Lower_SetPrecisionBaseOnSrc0, 0, 0, VIR_Lower_SetOne } },
+    { VIR_OP_SQRT, 0, 0, { -3, -2, 0, 0 }, { 0 } },
+    { VIR_OP_ARCTRIG, 0, 0, { -4, 2, -3, 0 }, { VIR_Lower_SetHighp, 0, 0, _set_int_zero_enableXY } },
+    { VIR_OP_FMA, 0, 0, { 1, -3, -4, -4 }, { 0, 0, VIR_Lower_SetSwizzleX, VIR_Lower_SetSwizzleY } },
+};
+
+static VIR_PatternMatchInst _acosPatInst1[] = {
+    { VIR_OP_ACOS, VIR_PATTERN_ANYCOND, 0, { 1, 2 }, { VIR_Lower_IsDstTwoEnables }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _acosRepInst1[] = {
+    { VIR_OP_NEG, 0, 0, { -1, 2, 0, 0 }, { 0 } },
+    { VIR_OP_FMA, 0, 0, { -2, 2, -1, 0 }, { VIR_Lower_SetPrecisionBaseOnSrc0, 0, 0, VIR_Lower_SetOne } },
+    { VIR_OP_SQRT, 0, 0, { -3, -2, 0, 0 }, { 0 } },
+    { VIR_OP_ARCTRIG, 0, 0, { -4, 2, -3, 0 }, { VIR_Lower_SetHighp, _set_1st_enable_swizzle, _conv_1st_enable_to_swizzle, _set_int_zero_enableXY } },
+    { VIR_OP_ARCTRIG, 0, 0, { -5, 2, -3, 0 }, { VIR_Lower_SetHighp, _set_2nd_enable_swizzle, _conv_2nd_enable_to_swizzle, _set_int_zero_enableXY } },
+    { VIR_OP_FMA, 0, 0, { 1, -3, -4, -4 }, { _set_1st_enable, 0, VIR_Lower_SetSwizzleX, VIR_Lower_SetSwizzleY } },
+    { VIR_OP_FMA, 0, 0, { 1, -3, -5, -5 }, { _set_2nd_enable, 0, VIR_Lower_SetSwizzleX, VIR_Lower_SetSwizzleY } },
+};
+
+static VIR_PatternMatchInst _acosPatInst2[] = {
+    { VIR_OP_ACOS, VIR_PATTERN_ANYCOND, 0, { 1, 2 }, { VIR_Lower_IsDstThreeEnables }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _acosRepInst2[] = {
+    { VIR_OP_NEG, 0, 0, { -1, 2, 0, 0 }, { 0 } },
+    { VIR_OP_FMA, 0, 0, { -2, 2, -1, 0 }, { VIR_Lower_SetPrecisionBaseOnSrc0, 0, 0, VIR_Lower_SetOne } },
+    { VIR_OP_SQRT, 0, 0, { -3, -2, 0, 0 }, { 0 } },
+    { VIR_OP_ARCTRIG, 0, 0, { -4, 2, -3, 0 }, { VIR_Lower_SetHighp, _set_1st_enable_swizzle, _conv_1st_enable_to_swizzle, _set_int_zero_enableXY } },
+    { VIR_OP_ARCTRIG, 0, 0, { -5, 2, -3, 0 }, { VIR_Lower_SetHighp, _set_2nd_enable_swizzle, _conv_2nd_enable_to_swizzle, _set_int_zero_enableXY } },
+    { VIR_OP_ARCTRIG, 0, 0, { -6, 2, -3, 0 }, { VIR_Lower_SetHighp, _set_3rd_enable_swizzle, _conv_3rd_enable_to_swizzle, _set_int_zero_enableXY } },
+    { VIR_OP_FMA, 0, 0, { 1, -3, -4, -4 }, { _set_1st_enable, 0, VIR_Lower_SetSwizzleX, VIR_Lower_SetSwizzleY } },
+    { VIR_OP_FMA, 0, 0, { 1, -3, -5, -5 }, { _set_2nd_enable, 0, VIR_Lower_SetSwizzleX, VIR_Lower_SetSwizzleY } },
+    { VIR_OP_FMA, 0, 0, { 1, -3, -6, -6 }, { _set_3rd_enable, 0, VIR_Lower_SetSwizzleX, VIR_Lower_SetSwizzleY } },
+};
+
+static VIR_PatternMatchInst _acosPatInst3[] = {
+    { VIR_OP_ACOS, VIR_PATTERN_ANYCOND, 0, { 1, 2 }, { VIR_Lower_IsDstFourEnables }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _acosRepInst3[] = {
+    { VIR_OP_NEG, 0, 0, { -1, 2, 0, 0 }, { 0 } },
+    { VIR_OP_FMA, 0, 0, { -2, 2, -1, 0 }, { VIR_Lower_SetPrecisionBaseOnSrc0, 0, 0, VIR_Lower_SetOne } },
+    { VIR_OP_SQRT, 0, 0, { -3, -2, 0, 0 }, { 0 } },
+    { VIR_OP_ARCTRIG, 0, 0, { -4, 2, -3, 0 }, { VIR_Lower_SetHighp, _set_1st_enable_swizzle, _conv_1st_enable_to_swizzle, _set_int_zero_enableXY } },
+    { VIR_OP_ARCTRIG, 0, 0, { -5, 2, -3, 0 }, { VIR_Lower_SetHighp, _set_2nd_enable_swizzle, _conv_2nd_enable_to_swizzle, _set_int_zero_enableXY } },
+    { VIR_OP_ARCTRIG, 0, 0, { -6, 2, -3, 0 }, { VIR_Lower_SetHighp, _set_3rd_enable_swizzle, _conv_3rd_enable_to_swizzle, _set_int_zero_enableXY } },
+    { VIR_OP_ARCTRIG, 0, 0, { -7, 2, -3, 0 }, { VIR_Lower_SetHighp, _set_4th_enable_swizzle, _conv_4th_enable_to_swizzle, _set_int_zero_enableXY } },
+    { VIR_OP_FMA, 0, 0, { 1, -3, -4, -4 }, { _set_1st_enable, 0, VIR_Lower_SetSwizzleX, VIR_Lower_SetSwizzleY } },
+    { VIR_OP_FMA, 0, 0, { 1, -3, -5, -5 }, { _set_2nd_enable, 0, VIR_Lower_SetSwizzleX, VIR_Lower_SetSwizzleY } },
+    { VIR_OP_FMA, 0, 0, { 1, -3, -6, -6 }, { _set_3rd_enable, 0, VIR_Lower_SetSwizzleX, VIR_Lower_SetSwizzleY } },
+    { VIR_OP_FMA, 0, 0, { 1, -3, -7, -7 }, { _set_4th_enable, 0, VIR_Lower_SetSwizzleX, VIR_Lower_SetSwizzleY } },
+};
+
+static VIR_Pattern _acosPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_acos, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_acos, 1) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_acos, 2) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_acos, 3) },
+    { VIR_PATN_FLAG_NONE }
+};
+
 
 static gctBOOL
 _copy16ByteOrLess(
@@ -10050,6 +10668,10 @@ _GetgcSL2VirPatterns(
     {
     case VIR_OP_ADD:
         return _addPattern;
+    case VIR_OP_ACOS:
+        return _acosPattern;
+    case VIR_OP_ASIN:
+        return _asinPattern;
     case VIR_OP_ARCTRIG:
         return _arctrigPattern;
     case VIR_OP_MUL:

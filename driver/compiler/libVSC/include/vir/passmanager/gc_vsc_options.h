@@ -145,6 +145,7 @@ typedef struct _VSC_OPTN_LOOPOPTSOPTIONS
     gctINT32 totalUnrollingFactor;
     gctINT32 fullUnrollingFactor;
     gctINT32 partialUnrollingFactor;
+    gctINT32 licmFactor;
     gctUINT32 before_shader;
     gctUINT32 after_shader;
 } VSC_OPTN_LoopOptsOptions;
@@ -165,6 +166,8 @@ typedef struct _VSC_OPTN_LOOPOPTSOPTIONS
 #define VSC_OPTN_LoopOptsOptions_SetFullUnrollingFactor(option, f)      ((option)->fullUnrollingFactor = (f))
 #define VSC_OPTN_LoopOptsOptions_GetPartialUnrollingFactor(option)      ((option)->partialUnrollingFactor)
 #define VSC_OPTN_LoopOptsOptions_SetPartialUnrollingFactor(option, p)   ((option)->partialUnrollingFactor = (p))
+#define VSC_OPTN_LoopOptsOptions_GetLICMFactor(option)                  ((option)->licmFactor)
+#define VSC_OPTN_LoopOptsOptions_SetLICMFactor(option, p)               ((option)->licmFactor = (p))
 #define VSC_OPTN_LoopOptsOptions_GetTrace(option)                       VSC_OPTN_GetTrace(&(option)->optnBase)
 #define VSC_OPTN_LoopOptsOptions_SetTrace(option, t)                    VSC_OPTN_SetTrace(&(option)->optnBase, (t))
 
@@ -591,6 +594,7 @@ typedef struct _VSC_OPTN_PHOPTIONS
 #define VSC_OPTN_PHOptions_OPTS_LSHIFT_LS               0x80
 #define VSC_OPTN_PHOptions_OPTS_LOC_MEM                 0x100
 #define VSC_OPTN_PHOptions_OPTS_ADD_MEM_ADDR            0x200
+#define VSC_OPTN_PHOptions_OPTS_REDUNDANT_MOV_DEF       0x400
 
 #define VSC_OPTN_PHOptions_GetModifiers(option)         ((option)->modifiers)
 #define VSC_OPTN_PHOptions_SetModifiers(option, m)      ((option)->modifiers = (m))
@@ -841,8 +845,10 @@ typedef struct _VSC_OPTN_RAOPTIONS
 #define VSC_OPTN_RAOptions_GetOPTS(option)              ((option)->opts)
 #define VSC_OPTN_RAOptions_SetOPTS(option, s)           ((option)->opts = (s))
 
-#define VSC_OPTN_RAOptions_ALLOC_REG                      0x1
-#define VSC_OPTN_RAOptions_ALLOC_UNIFORM                  0x2
+#define VSC_OPTN_RAOptions_ALLOC_REG                    0x1
+#define VSC_OPTN_RAOptions_ALLOC_UNIFORM                0x2
+#define VSC_OPTN_RAOptions_MAX_LS_EXTENED_END_POINT     0x4
+#define VSC_OPTN_RAOptions_SPILL_DEST_OPT               0x8
 
 #define VSC_OPTN_RAOptions_GetTrace(option)             VSC_OPTN_GetTrace(&(option)->optnBase)
 #define VSC_OPTN_RAOptions_SetTrace(option, t)          VSC_OPTN_SetTrace(&(option)->optnBase, (t))

@@ -1,13 +1,13 @@
 __kernel void gpuFullyConnected_FP32Nobias(
-    __read_only image2d_array_t      input,
-    __read_only image2d_array_t      weights,
-    __write_only image2d_array_t     output)
+    __read_only image2d_t      input,
+    __read_only image2d_t      weights,
+    __write_only image2d_t     output)
 {
     int x = get_global_id(0);
     int y = get_global_id(1);
-    int4 coord_in    = (int4)(0, y, 0, 0);
-    int4 coord_wei   = (int4)(0, x, 0, 0);
-    int4 coord_out   = (int4)(x, y, 0, 0);
+    int2 coord_in    = (int2)(0, y);
+    int2 coord_wei   = (int2)(0, x);
+    int2 coord_out   = (int2)(x, y);
     int inputSize    = get_image_width(weights);
     float4 src0 = {0.0}, src1 = {0.0};
     float sum = 0;
@@ -27,17 +27,17 @@ __kernel void gpuFullyConnected_FP32Nobias(
 }
 
 __kernel void gpuFullyConnected_FP32(
-    __read_only image2d_array_t      input,
-    __read_only image2d_array_t      weights,
-    __read_only image2d_array_t      bias,
-    __write_only image2d_array_t     output)
+    __read_only image2d_t      input,
+    __read_only image2d_t      weights,
+    __read_only image2d_t      bias,
+    __write_only image2d_t     output)
 {
     int x = get_global_id(0);
     int y = get_global_id(1);
-    int4 coord_in    = (int4)(0, y, 0, 0);
-    int4 coord_wei   = (int4)(0, x, 0, 0);
-    int4 coord_bias  = (int4)(x, 0, 0, 0);
-    int4 coord_out   = (int4)(x, y, 0, 0);
+    int2 coord_in    = (int2)(0, y);
+    int2 coord_wei   = (int2)(0, x);
+    int2 coord_bias  = (int2)(x, 0);
+    int2 coord_out   = (int2)(x, y);
     int inputSize    = get_image_width(weights);
     float4 src0 = {0.0}, src1 = {0.0};
     float sum = 0;
@@ -60,21 +60,21 @@ __kernel void gpuFullyConnected_FP32(
 }
 
 __kernel void gpuFullyConnected_Quant8Nobias(
-    __read_only image2d_array_t      input,
-    __read_only image2d_array_t      weights,
+    __read_only image2d_t      input,
+    __read_only image2d_t      weights,
     float                            scaleIn,
     float                            scaleWeight,
     float                            scaleOut,
     int                              zpIn,
     int                              zpWeight,
     int                              zpOut,
-    __write_only image2d_array_t     output)
+    __write_only image2d_t     output)
 {
     int x = get_global_id(0);
     int y = get_global_id(1);
-    int4 coord_in    = (int4)(0, y, 0, 0);
-    int4 coord_wei   = (int4)(0, x, 0, 0);
-    int4 coord_out   = (int4)(x, y, 0, 0);
+    int2 coord_in    = (int2)(0, y);
+    int2 coord_wei   = (int2)(0, x);
+    int2 coord_out   = (int2)(x, y);
     int inputSize    = get_image_width(weights);
     float sum = 0, src0, src1;
     uint4 dst = {0}, tmp;
@@ -95,41 +95,43 @@ __kernel void gpuFullyConnected_Quant8Nobias(
 }
 
 __kernel void gpuFullyConnected_Quant8(
-    __read_only image2d_array_t      input,
-    __read_only image2d_array_t      weights,
-    __read_only image2d_array_t      bias,
+    __read_only image2d_t      input,
+    __read_only image2d_t      weights,
+    __read_only image2d_t      bias,
     float                            scaleIn,
     float                            scaleWeight,
     float                            scaleOut,
     int                              zpIn,
     int                              zpWeight,
     int                              zpOut,
-    __write_only image2d_array_t     output)
+    __write_only image2d_t     output)
 {
     int x = get_global_id(0);
     int y = get_global_id(1);
-    int4 coord_in    = (int4)(0, y, 0, 0);
-    int4 coord_wei   = (int4)(0, x, 0, 0);
-    int4 coord_bias  = (int4)(x, 0, 0, 0);
-    int4 coord_out   = (int4)(x, y, 0, 0);
+    int2 coord_in    = (int2)(0, y);
+    int2 coord_wei   = (int2)(0, x);
+    int2 coord_bias  = (int2)(x, 0);
+    int2 coord_out   = (int2)(x, y);
     int inputSize    = get_image_width(weights);
     float sum = 0, src0, src1;
-    uint4 dst = {0}, tmp;
+    uint4 dst = {0}, tmp0, tmp1;
+    int4 biasData;
 
-    tmp = convert_uint(read_imagei(bias, coord_bias));
-    sum = tmp.x * scaleIn * scaleWeight;
+    biasData = convert_int(read_imagei(bias, coord_bias));
+    sum = biasData.x;
 
     do
     {
-        tmp = read_imageui(input, coord_in);
-        src0 = (convert_int(tmp.x-zpIn))*scaleIn;
-        tmp = read_imageui(weights, coord_wei);
-        src1 = (convert_int(tmp.x-zpWeight))*scaleWeight;
-        sum += src0 * src1;
+        tmp0 = read_imageui(input, coord_in);
+        tmp1 = read_imageui(weights, coord_wei);
+
         coord_in.x++;
         coord_wei.x++;
+        src0 = (convert_int(tmp0.x - zpIn));
+        src1 = (convert_int(tmp1.x - zpWeight));
+        sum += src0 * src1;
     } while (coord_in.x < inputSize);
 
-    dst.x = floor(sum*scaleOut + zpOut + 0.5);
+    dst.x = floor(sum * scaleIn * scaleWeight * scaleOut + zpOut + 0.5);
     write_imageui(output, coord_out, dst);
 }

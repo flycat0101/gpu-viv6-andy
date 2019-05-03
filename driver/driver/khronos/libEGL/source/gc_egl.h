@@ -49,19 +49,6 @@
 extern "C" {
 #endif
 
-#define gcdZONE_EGL_API             (gcvZONE_API_EGL | (1 << 0))
-#define gcdZONE_EGL_SURFACE         (gcvZONE_API_EGL | (1 << 1))
-#define gcdZONE_EGL_CONTEXT         (gcvZONE_API_EGL | (1 << 2))
-#define gcdZONE_EGL_CONFIG          (gcvZONE_API_EGL | (1 << 3))
-#define gcdZONE_EGL_OS              (gcvZONE_API_EGL | (1 << 4))
-#define gcdZONE_EGL_IMAGE           (gcvZONE_API_EGL | (1 << 5))
-#define gcdZONE_EGL_SWAP            (gcvZONE_API_EGL | (1 << 6))
-#define gcdZONE_EGL_INIT            (gcvZONE_API_EGL | (1 << 7))
-#define gcdZONE_EGL_SYNC            (gcvZONE_API_EGL | (1 << 8))
-#define glvZONE_EGL_COMPOSE         (gcvZONE_API_EGL | (1 << 9))
-#define glvZONE_EGL_RENDER_THREAD   (gcvZONE_API_EGL | (1 << 10))
-
-
 typedef struct eglDisplay         * VEGLDisplay;
 typedef struct eglResObj          * VEGLResObj;
 typedef struct eglContext         * VEGLContext;
@@ -311,6 +298,12 @@ struct eglDisplay
     gctSIGNAL                   startSignal;
     gctSIGNAL                   stopSignal;
     gctPOINTER                  suspendMutex;
+
+#if defined(WL_EGL_PLATFORM) || defined(EGL_API_FB) || defined(__GBM__)
+    /* Control flag for swap worker on wayland platform. */
+    EGLint                      enableClient;
+    EGLint                      enableServer;
+#endif
 
     /* EGL Blob Cache Functions */
     EGLGetBlobFuncANDROID       blobCacheGet;

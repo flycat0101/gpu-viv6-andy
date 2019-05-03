@@ -38,7 +38,10 @@ DllMain(
             clgDispatchTable = NULL;
         }
 
-        if(clgDevices) gcmOS_SAFE_FREE(gcvNULL, clgDevices);
+        if(clgDevices)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, clgDevices);
+        }
 
         if(clgGlobalId)
         {
@@ -95,7 +98,10 @@ static void _ModuleDestructor(void)
         clgDispatchTable = NULL;
     }
 
-    if(clgDevices) gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, clgDevices));
+    if(clgDevices)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, clgDevices);
+    }
 
     if(clgGlobalId)
     {

@@ -13,6 +13,8 @@
 
 #include <gc_vx_common.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_MATRIX
+
 VX_INTERNAL_CALLBACK_API void vxoMatrix_Destructor(vx_reference ref)
 {
     vx_matrix matrix = (vx_matrix)ref;
@@ -22,7 +24,9 @@ VX_INTERNAL_CALLBACK_API void vxoMatrix_Destructor(vx_reference ref)
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseMatrix(vx_matrix *mat)
 {
+    gcmHEADER_ARG("mat=%p", mat);
     gcmDUMP_API("$VX vxReleaseMatrix: mat=%p", mat);
+    gcmFOOTER_NO();
     return vxoReference_Release((vx_reference_ptr)mat, VX_TYPE_MATRIX, VX_REF_EXTERNAL);
 }
 
@@ -31,10 +35,14 @@ VX_API_ENTRY vx_matrix VX_API_CALL vxCreateMatrix(vx_context context, vx_enum da
     vx_matrix   matrix;
     vx_size     dataSize;
 
+    gcmHEADER_ARG("context=%p, data_type=0x%x, columns=0x%lx, rows=0x%lx", context, data_type, columns, rows);
     gcmDUMP_API("$VX vxCreateMatrix: context=%p, data_type=0x%x, columns=0x%lx, rows=0x%lx", context, data_type, columns, rows);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     switch (data_type)
     {
         case VX_TYPE_INT8:
@@ -79,6 +87,7 @@ VX_API_ENTRY vx_matrix VX_API_CALL vxCreateMatrix(vx_context context, vx_enum da
 
         default:
             vxError("Invalid data type: %d", data_type);
+            gcmFOOTER_NO();
             return (vx_matrix)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_TYPE);
     }
 
@@ -87,13 +96,17 @@ VX_API_ENTRY vx_matrix VX_API_CALL vxCreateMatrix(vx_context context, vx_enum da
     if (columns == 0 || rows == 0)
     {
         vxError("Invalid columns x rows: %d x %d", columns, rows);
+        gcmFOOTER_NO();
         return (vx_matrix)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_DIMENSION);
     }
 
     matrix = (vx_matrix)vxoReference_Create(context, VX_TYPE_MATRIX, VX_REF_EXTERNAL, &context->base);
 
-    if (vxoReference_GetStatus((vx_reference)matrix) != VX_SUCCESS) return matrix;
-
+    if (vxoReference_GetStatus((vx_reference)matrix) != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("matrix=%p", matrix);
+        return matrix;
+    }
     matrix->dataType            = data_type;
     matrix->columns             = columns;
     matrix->rows                = rows;
@@ -107,6 +120,7 @@ VX_API_ENTRY vx_matrix VX_API_CALL vxCreateMatrix(vx_context context, vx_enum da
     matrix->origin.y = (vx_uint32)rows / 2;
     matrix->pattern = VX_PATTERN_OTHER;
 
+    gcmFOOTER_ARG("matrix=%p", matrix);
     return (vx_matrix)matrix;
 }
 
@@ -114,15 +128,19 @@ VX_API_ENTRY vx_matrix VX_API_CALL vxCreateMatrixFromPattern(vx_context context,
 {
     vx_matrix matrix;
 
+    gcmHEADER_ARG("context=%p, pattern=0x%x, columns=0x%lx, rows=0x%lx", context, pattern, columns, rows);
     gcmDUMP_API("$VX vxCreateMatrixFromPattern: context=%p, pattern=0x%x, columns=0x%lx, rows=0x%lx", context, pattern, columns, rows);
 
     if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_ARG("%d", 0);
         return 0;
-
+    }
     if ((columns > VX_INT_MAX_NONLINEAR_DIM) || (rows > VX_INT_MAX_NONLINEAR_DIM))
     {
         vxError("Invalid dimensions to matrix\n");
         vxAddLogEntry(&context->base, VX_ERROR_INVALID_DIMENSION, "Invalid dimensions to matrix\n");
+        gcmFOOTER_NO();
         return (vx_matrix)vxoError_GetErrorObject(context, VX_ERROR_INVALID_DIMENSION);
     }
 
@@ -167,16 +185,20 @@ VX_API_ENTRY vx_matrix VX_API_CALL vxCreateMatrixFromPattern(vx_context context,
         }
     }
 
+    gcmFOOTER_ARG("matrix=%p", matrix);
     return matrix;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryMatrix(vx_matrix matrix, vx_enum attribute, void *ptr, vx_size size)
 {
-
+    gcmHEADER_ARG("matrix=%p, attribute=0x%x, ptr=%p, size=0x%lx", matrix, attribute, ptr, size);
     gcmDUMP_API("$VX vxQueryMatrix: matrix=%p, attribute=0x%x, ptr=%p, size=0x%lx", matrix, attribute, ptr, size);
 
-    if (!vxoReference_IsValidAndSpecific(&matrix->base, VX_TYPE_MATRIX)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoReference_IsValidAndSpecific(&matrix->base, VX_TYPE_MATRIX))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     switch (attribute)
     {
         case VX_MATRIX_TYPE:
@@ -217,19 +239,30 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryMatrix(vx_matrix matrix, vx_enum attri
 
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
+            gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
             return VX_ERROR_NOT_SUPPORTED;
     }
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxReadMatrix(vx_matrix matrix, void *array)
 {
+    gcmHEADER_ARG("matrix=%p, array=%p", matrix, array);
     gcmDUMP_API("$VX vxReadMatrix: matrix=%p, array=%p", matrix, array);
 
-    if (!vxoReference_IsValidAndSpecific(&matrix->base, VX_TYPE_MATRIX)) return VX_ERROR_INVALID_REFERENCE;
+    if (!vxoReference_IsValidAndSpecific(&matrix->base, VX_TYPE_MATRIX))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
 
-    if (!vxoMemory_Allocate(matrix->base.context, &matrix->memory)) return VX_ERROR_NO_MEMORY;
+    if (!vxoMemory_Allocate(matrix->base.context, &matrix->memory))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_NO_MEMORY);
+        return VX_ERROR_NO_MEMORY;
+    }
 
     vxAcquireMutex(matrix->base.lock);
 
@@ -247,17 +280,25 @@ VX_API_ENTRY vx_status VX_API_CALL vxReadMatrix(vx_matrix matrix, void *array)
     /*remove reference count for v1.1(nonlinear)*/
     /*vxoReference_Increment(&matrix->base, VX_REF_EXTERNAL);*/
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxWriteMatrix(vx_matrix matrix, const void *array)
 {
+    gcmHEADER_ARG("matrix=%p, array=%p", matrix, array);
     gcmDUMP_API("$VX vxWriteMatrix: matrix=%p, array=%p", matrix, array);
 
-    if (!vxoReference_IsValidAndSpecific(&matrix->base, VX_TYPE_MATRIX)) return VX_ERROR_INVALID_REFERENCE;
-
-    if (!vxoMemory_Allocate(matrix->base.context, &matrix->memory)) return VX_ERROR_NO_MEMORY;
-
+    if (!vxoReference_IsValidAndSpecific(&matrix->base, VX_TYPE_MATRIX))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+    if (!vxoMemory_Allocate(matrix->base.context, &matrix->memory))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_NO_MEMORY);
+        return VX_ERROR_NO_MEMORY;
+    }
     vxAcquireMutex(matrix->base.lock);
 
     if (array != VX_NULL)
@@ -274,6 +315,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxWriteMatrix(vx_matrix matrix, const void *a
     /*remove reference count for v1.1(nonlinear)*/
     /*vxoReference_Decrement(&matrix->base, VX_REF_EXTERNAL);*/
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
@@ -281,6 +323,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyMatrix(vx_matrix matrix, void *ptr, vx_
 {
     vx_status status = VX_ERROR_INVALID_REFERENCE;
 
+    gcmHEADER_ARG("matrix=%p, ptr=%p, usage=0x%x, mem_type=0x%x", matrix, ptr, usage, mem_type);
     gcmDUMP_API("$VX vxCopyMatrix: matrix=%p, ptr=%p, usage=0x%x, mem_type=0x%x", matrix, ptr, usage, mem_type);
 
     if (vxoReference_IsValidAndSpecific(&matrix->base, VX_TYPE_MATRIX))
@@ -330,6 +373,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyMatrix(vx_matrix matrix, void *ptr, vx_
         vxError("Invalid reference for matrix\n");
     }
 
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -338,18 +382,26 @@ VX_API_ENTRY vx_matrix VX_API_CALL vxCreateVirtualMatrix(vx_graph graph, vx_enum
     vx_matrix matrix;
     vx_context context = vxoContext_GetFromReference((vx_reference)graph);
 
+    gcmHEADER_ARG("graph=%p, data_type=0x%x, columns=0x%lx, rows=0x%lx", graph, data_type, columns, rows);
     gcmDUMP_API("$VX vxCreateVirtualMatrix: graph=%p, data_type=0x%x, columns=0x%lx, rows=0x%lx", graph, data_type, columns, rows);
 
-    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_NULL;
-
+    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     matrix = vxCreateMatrix(context, data_type, columns, rows);
 
-    if (vxoReference_GetStatus((vx_reference)matrix) != VX_SUCCESS) return matrix;
-
+    if (vxoReference_GetStatus((vx_reference)matrix) != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("matrix=%p", matrix);
+        return matrix;
+    }
     matrix->base.scope        = (vx_reference)graph;
 
     matrix->base.isVirtual    = vx_true_e;
 
+    gcmFOOTER_ARG("matrix=%p", matrix);
     return matrix;
 }
 
@@ -363,10 +415,14 @@ VX_API_ENTRY vx_matrix VX_API_CALL vxCreateMatrixFromPatternAndOrigin(
 {
     vx_matrix matrix = vxCreateMatrixFromPattern(context, pattern, columns, rows);
 
+    gcmHEADER_ARG("context=%p, pattern=0x%x, columns=0x%lx, rows=0x%lx, origin_col=0x%lx, origin_row=0x%lx", context, pattern, columns, rows, origin_col, origin_row);
     gcmDUMP_API("$VX vxCreateMatrixFromPatternAndOrigin: context=%p, pattern=0x%x, columns=0x%lx, rows=0x%lx, origin_col=0x%lx, origin_row=0x%lx", context, pattern, columns, rows, origin_col, origin_row);
 
-    if (vxoReference_GetStatus((vx_reference)matrix) != VX_SUCCESS) return matrix;
-
+    if (vxoReference_GetStatus((vx_reference)matrix) != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("matrix=%p", matrix);
+        return matrix;
+    }
     if(origin_col < columns && origin_row < rows)
     {
         matrix->origin.x = (vx_uint32)origin_col;
@@ -379,6 +435,7 @@ VX_API_ENTRY vx_matrix VX_API_CALL vxCreateMatrixFromPatternAndOrigin(
         matrix = (vx_matrix)vxoError_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
     }
 
+    gcmFOOTER_ARG("matrix=%p", matrix);
     return matrix;
 }
 

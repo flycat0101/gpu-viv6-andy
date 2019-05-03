@@ -216,9 +216,9 @@ _DmaGetSGT(
 
     gceSTATUS status = gcvSTATUS_OK;
     gctSIZE_T offset = Offset & ~PAGE_MASK; /* Offset to the first page */
-    gctINT skipPages = Offset >> PAGE_SHIFT;     /* skipped pages */
-    gctINT numPages = (PAGE_ALIGN(Offset + Bytes) >> PAGE_SHIFT) - skipPages;
-    gctINT i;
+    gctSIZE_T skipPages = Offset >> PAGE_SHIFT;     /* skipped pages */
+    gctSIZE_T numPages = (PAGE_ALIGN(Offset + Bytes) >> PAGE_SHIFT) - skipPages;
+    gctSIZE_T i;
 
     gcmkASSERT(Offset + Bytes <= Mdl->numPages << PAGE_SHIFT);
 

@@ -13,6 +13,8 @@
 
 #include "gc_vgsh_precomp.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG3D_TESSELLATOR
+
 static const _VGTesstype   cosine[] =
 {
     0.707106781186548f,

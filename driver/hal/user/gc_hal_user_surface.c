@@ -19,7 +19,7 @@
 
 #include "gc_hal_user_precomp.h"
 
-#define _GC_OBJ_ZONE    gcvZONE_SURFACE
+#define _GC_OBJ_ZONE    gcdZONE_SURFACE
 
 /******************************************************************************\
 **************************** gcoSURF API Support Code **************************
@@ -116,7 +116,7 @@ gcoSURF_LockTileStatus(
 
         gcmGETHARDWAREADDRESS(Surface->tileStatusNode, address);
 
-        gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+        gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                       "Locked tile status 0x%x: physical=0x%08X logical=0x%x",
                       &Surface->tileStatusNode,
                       address,
@@ -167,7 +167,7 @@ gcoSURF_LockTileStatus(
 
         gcmGETHARDWAREADDRESS(Surface->hzTileStatusNode, address);
 
-        gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+        gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                       "Locked HZ tile status 0x%x: physical=0x%08X logical=0x%x",
                       &Surface->hzTileStatusNode,
                       address,
@@ -243,7 +243,7 @@ gcoSURF_LockHzBuffer(
 
         gcmGETHARDWAREADDRESS(Surface->hzNode, address);
 
-        gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+        gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                       "Locked HZ surface 0x%x: physical=0x%08X logical=0x%x",
                       &Surface->hzNode,
                       address,
@@ -556,7 +556,7 @@ gcoSURF_AllocateTileStatus(
         Surface->tileStatusFirstLock = gcvTRUE;
 
 
-        gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+        gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                       "Allocated tile status 0x%x: pool=%d size=%u",
                       &Surface->tileStatusNode,
                       Surface->tileStatusNode.pool,
@@ -594,7 +594,7 @@ gcoSURF_AllocateTileStatus(
             {
                 Surface->hzTileStatusFirstLock = gcvTRUE;
 
-                gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+                gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                               "Allocated HZ tile status 0x%x: pool=%d size=%u",
                               &Surface->hzTileStatusNode,
                               Surface->hzTileStatusNode.pool,
@@ -742,7 +742,7 @@ gcoSURF_AllocateHzBuffer(
 
         if (gcmIS_SUCCESS(status))
         {
-            gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+            gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                           "Allocated HZ surface 0x%x: pool=%d size=%u",
                           &Surface->hzNode,
                           Surface->hzNode.pool,
@@ -830,7 +830,7 @@ _Lock(
     Surface->node.physicalBottom =
         address + Surface->bottomBufferOffset;
 
-    gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+    gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                   "Locked surface 0x%x: physical=0x%08X logical=0x%x",
                   &Surface->node,
                   address,
@@ -914,7 +914,7 @@ _Unlock(
         }
     }
 
-    gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+    gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                   "Unlocked surface 0x%x",
                   &Surface->node);
 
@@ -926,7 +926,7 @@ _Unlock(
             gcoHARDWARE_Unlock(&Surface->hzNode,
                                gcvSURF_HIERARCHICAL_DEPTH));
 
-        gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+        gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                       "Unlocked HZ surface 0x%x",
                       &Surface->hzNode);
     }
@@ -938,7 +938,7 @@ _Unlock(
             gcoHARDWARE_Unlock(&Surface->tileStatusNode,
                                gcvSURF_TILE_STATUS));
 
-        gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+        gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                       "Unlocked tile status 0x%x",
                       &Surface->hzNode);
     }
@@ -950,7 +950,7 @@ _Unlock(
             gcoHARDWARE_Unlock(&Surface->hzTileStatusNode,
                                gcvSURF_TILE_STATUS));
 
-        gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+        gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                       "Unlocked HZ tile status 0x%x",
                       &Surface->hzNode);
     }
@@ -1052,7 +1052,7 @@ _FreeSurface(
         /* Mark the memory as freed. */
         Surface->node.pool = gcvPOOL_UNKNOWN;
 
-        gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+        gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                       "Freed surface 0x%x",
                       &Surface->node);
     }
@@ -1064,7 +1064,7 @@ _FreeSurface(
         gcmONERROR(
             gcsSURF_NODE_Destroy(&Surface->hzNode));
 
-        gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+        gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                       "Freed HZ surface 0x%x",
                       &Surface->hzNode);
     }
@@ -1075,7 +1075,7 @@ _FreeSurface(
         gcmONERROR(
             gcsSURF_NODE_Destroy(&Surface->tileStatusNode));
 
-        gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+        gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                       "Freed tile status 0x%x",
                       &Surface->tileStatusNode);
     }
@@ -1086,7 +1086,7 @@ _FreeSurface(
         gcmONERROR(
             gcsSURF_NODE_Destroy(&Surface->hzTileStatusNode));
 
-        gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+        gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                       "Freed HZ tile status 0x%x",
                       &Surface->hzTileStatusNode);
     }
@@ -2259,7 +2259,7 @@ _AllocateSurface(
             Pool
             ));
 
-        gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+        gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                       "Allocated surface 0x%x: pool=%d size=%dx%dx%d bytes=%u",
                       &Surface->node,
                       Surface->node.pool,
@@ -2476,7 +2476,7 @@ gcoSURF_Construct(
 
     surface->refCount = 1;
 
-    gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+    gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                   "Created gcoSURF 0x%x",
                   surface);
 
@@ -2598,7 +2598,7 @@ gcoSURF_Destroy(
     /* Free the gcoSURF object. */
     gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Surface));
 
-    gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+    gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                   "Destroyed gcoSURF 0x%x",
                   Surface);
 
@@ -5782,7 +5782,7 @@ _ClearRect(
     gcmASSERT(LayerIndex == 0 || (ClearArgs->flags & gcvCLEAR_COLOR));
 
     gcmGETHARDWAREADDRESS(surf->node, address);
-    gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+    gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                   "_ClearRect: Clearing surface 0x%x @ 0x%08X",
                   surf, address);
 
@@ -6183,7 +6183,7 @@ _ClearTileStatus(
         {
             gcmGETHARDWAREADDRESS(Surface->tileStatusNode, address);
 
-            gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
+            gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
                           "_ClearTileStatus: Clearing tile status 0x%x @ 0x%08X for"
                           "surface 0x%x",
                           Surface->tileStatusNode,
@@ -8136,9 +8136,10 @@ gcoSURF_Clear2D(
             ));
 
         /* Program the destination. */
-        gcmERR_BREAK(gco2D_SetTargetEx(
+         gcmERR_BREAK(gco2D_SetTarget64(
             engine,
             destAddress[0],
+            destMemory[0],
             DstSurface->stride,
             DstSurface->rotation,
             DstSurface->alignedW,
@@ -8241,9 +8242,10 @@ gcoSURF_Line(
             ));
 
         /* Program the destination. */
-        gcmERR_BREAK(gco2D_SetTargetEx(
+        gcmERR_BREAK(gco2D_SetTarget64(
             engine,
             destAddress[0],
+            destMemory[0],
             DstSurface->stride,
             DstSurface->rotation,
             DstSurface->alignedW,
@@ -8514,11 +8516,10 @@ gcoSURF_Blit(
                     stretchBlt = gcvTRUE;
                 }
 
-                gcmERR_BREAK(gco2D_SetColorSourceEx(
+                 gcmERR_BREAK(gco2D_SetColorSource64(
                     engine,
-                    useSoftEngine ?
-                        (gctUINT32)(gctUINTPTR_T)SrcSurface->node.logical
-                        : srcAddress[0],
+                    srcAddress[0],
+                    srcMemory[0],
                     SrcSurface->stride,
                     SrcSurface->format,
                     SrcSurface->rotation,
@@ -8543,11 +8544,10 @@ gcoSURF_Blit(
             destMemory
             ));
 
-        gcmERR_BREAK(gco2D_SetTargetEx(
+        gcmERR_BREAK(gco2D_SetTarget64(
             engine,
-            useSoftEngine ?
-                (gctUINT32)(gctUINTPTR_T)DstSurface->node.logical
-                : destAddress[0],
+            destAddress[0],
+            destMemory[0],
             DstSurface->stride,
             DstSurface->rotation,
             DstSurface->alignedW,
@@ -8564,6 +8564,7 @@ gcoSURF_Blit(
             gctUINT32 tileHeightMask;
             gctUINT32 maxHeight;
             gctUINT32 srcBaseAddress;
+            gctUINT8_PTR srcBaseMemory;
             gcsRECT srcSubRect;
             gcsRECT destSubRect;
             gcsRECT maskRect;
@@ -8651,10 +8652,13 @@ gcoSURF_Blit(
 
             /* Determine the initial source address. */
             srcBaseAddress
-                = (useSoftEngine ?
-                        (gctUINT32)(gctUINTPTR_T)SrcSurface->node.logical
-                        : srcAddress[0])
-                +   srcAlignedTop  * SrcSurface->stride
+                = srcAddress[0]
+                + srcAlignedTop  * SrcSurface->stride
+                + ((srcAlignedLeft * srcFormat[0]->bitsPerPixel) >> 3);
+
+            srcBaseMemory
+                = (gctUINT8_PTR)srcMemory[0]
+                + srcAlignedTop  * SrcSurface->stride
                 + ((srcAlignedLeft * srcFormat[0]->bitsPerPixel) >> 3);
 
             /* Set initial mask coordinates. */
@@ -8690,13 +8694,17 @@ gcoSURF_Blit(
                     ));
 
                 /* Configure masked source. */
-                gcmERR_BREAK(gco2D_SetMaskedSource(
+                 gcmERR_BREAK(gco2D_SetMaskedSource64(
                     engine,
                     srcBaseAddress,
+                    (gctPOINTER)srcBaseMemory,
                     SrcSurface->stride,
                     SrcSurface->format,
                     relativeSource,
-                    streamPack
+                    streamPack,
+                    gcvSURF_0_DEGREE,
+                    0,
+                    0
                     ));
 
                 /* Do the blit. */
@@ -8715,6 +8723,7 @@ gcoSURF_Blit(
 
                 /* Update the source address. */
                 srcBaseAddress += srcSubRect.bottom * SrcSurface->stride;
+                srcBaseMemory  += srcSubRect.bottom * SrcSurface->stride;
 
                 /* Update the line counter. */
                 lines2render -= srcSubRect.bottom;
@@ -8968,11 +8977,10 @@ gcoSURF_MonoBlit(
             destMemory
             ));
 
-        gcmERR_BREAK(gco2D_SetTargetEx(
+        gcmERR_BREAK(gco2D_SetTarget64(
             engine,
-            useSotfEngine ?
-                (gctUINT32)(gctUINTPTR_T)DstSurface->node.logical
-                : destAddress[0],
+            destAddress[0],
+            destMemory[0],
             DstSurface->stride,
             DstSurface->rotation,
             DstSurface->alignedW,
@@ -9579,9 +9587,10 @@ gcoSURF_FilterBlit(
                     engine,
                     &destSubRect));
 
-                gcmERR_BREAK(gco2D_SetColorSourceEx(
+                gcmERR_BREAK(gco2D_SetColorSource64(
                     engine,
                     srcAddress[0],
+                    srcMemory[0],
                     srcSurf->stride,
                     srcSurf->format,
                     srcSurf->rotation,
@@ -9597,9 +9606,10 @@ gcoSURF_FilterBlit(
                     &tempRect
                     ));
 
-                gcmERR_BREAK(gco2D_SetTargetEx(
+                gcmERR_BREAK(gco2D_SetTarget64(
                     engine,
                     destAddress[0],
+                    destMemory[0],
                     DstSurface->stride,
                     DstSurface->rotation,
                     DstSurface->alignedW,
@@ -10385,7 +10395,7 @@ gcoSURF_NODE_Cache(
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("Node=0x%x, Operation=%d, Bytes=%zu", Node, Operation, Bytes);
+    gcmHEADER_ARG("Node=0x%x, Operation=%d, Bytes=%u", Node, Operation, Bytes);
 
     if (Node->u.normal.cacheable == gcvFALSE)
     {
@@ -10466,7 +10476,7 @@ gcoSURF_NODE_CPUCacheOperation(
     gctPOINTER memory;
     gctBOOL locked = gcvFALSE;
 
-    gcmHEADER_ARG("Node=0x%x, Type=%u, Offset=%zu, Length=%zu, Operation=%d", Node, Type, Offset, Length, Operation);
+    gcmHEADER_ARG("Node=0x%x, Type=%u, Offset=%u, Length=%u, Operation=%d", Node, Type, Offset, Length, Operation);
 
     /* Lock the node. */
     gcmONERROR(gcoHARDWARE_Lock(Node, gcvNULL, &memory));
@@ -13821,7 +13831,7 @@ gcsSURF_NODE_Construct(
     };
 #endif
 
-    gcmHEADER_ARG("Node=%p, Bytes=%zu, Alignement=%d, Type=%d, Flag=%d, Pool=%d",
+    gcmHEADER_ARG("Node=%p, Bytes=%u, Alignement=%d, Type=%d, Flag=%d, Pool=%d",
                   Node, Bytes, Alignment, Type, Flag, Pool);
 
 #ifdef LINUX

@@ -13,6 +13,8 @@
 
 #include <gc_vx_common.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_TENSOR
+
 static vx_float32 Fp16toFp32(vx_int16 in)
 {
     vx_int32 t1;
@@ -96,6 +98,7 @@ vxoTensor_DataFormatIsSupported(
         case VX_TYPE_UINT32:
         case VX_TYPE_FLOAT16:
         case VX_TYPE_FLOAT32:
+        case VX_TYPE_INT64:
             return vx_true_e;
 
         default:
@@ -186,7 +189,8 @@ vxoTensor_GetDataSizeByFormat(
         case VX_TYPE_UINT32:
         case VX_TYPE_FLOAT32:
             return 4;
-
+        case VX_TYPE_INT64:
+            return 8;
         default:
             return 0;
     }
@@ -249,8 +253,13 @@ vxoTensor_MergeTwoViews(
 {
     vx_uint32 i;
 
-    if (viewA->dimCount != viewB->dimCount) return vx_false_e;
+    gcmHEADER_ARG("viewA=%p, viewB=%p, viewOut=%p", viewA, viewB, viewOut);
 
+    if (viewA->dimCount != viewB->dimCount)
+    {
+        gcmFOOTER_NO();
+        return vx_false_e;
+    }
     viewOut->dimCount = viewA->dimCount;
 
     for (i = 0; i < viewA->dimCount; i++)
@@ -265,6 +274,7 @@ vxoTensor_MergeTwoViews(
         viewOut->viewEnds[i] = 1;
     }
 
+    gcmFOOTER_NO();
     return vx_true_e;
 }
 
@@ -365,6 +375,8 @@ vxoTensor_Create(
     vx_tensor tensor = VX_NULL;
     vx_uint32 i, elementSize, uSizes[VX_CONTEXT_TENSOR_MAX_DIMENSION];
 
+    gcmHEADER_ARG("context=%p, tensor_create_params=%p, strides=%p, viewRegion=%p, tensorBuffer=%p, baseOffset=0x%x, tensorType=0x%x, kind=0x%x",
+        context, tensor_create_params, strides, viewRegion, tensorBuffer, baseOffset, tensorType, kind);
     if (tensor_create_params == VX_NULL) goto OnError;
 
     gcoOS_MemCopy(uSizes, tensor_create_params->sizes, VX_CONTEXT_TENSOR_MAX_DIMENSION * sizeof(vx_uint32));
@@ -425,20 +437,25 @@ vxoTensor_Create(
 
         for (i = 0; i < VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
         {
-            tensor->dims[i] = uSizes[i];
-            tensor->strides[i] = i ? uSizes[i-1] * tensor->strides[i-1] : elementSize;
+            tensor->dims[i] = viewRegion != VX_NULL ? viewRegion->viewEnds[i] - viewRegion->viewStarts[i] : uSizes[i];
+            tensor->strides[i] = strides != VX_NULL ? strides[i] : i ? uSizes[i-1] * tensor->strides[i-1] : elementSize;
 
-            tensor->tensorBuffer->memory.dims[0][i] = tensor->dims[i] = uSizes[i];
+            tensor->tensorBuffer->memory.dims[0][i] = tensor->dims[i] = viewRegion != VX_NULL ? viewRegion->viewEnds[i] - viewRegion->viewStarts[i] : uSizes[i];
             tensor->tensorBuffer->memory.strides[0][i] = tensor->strides[i] =
-                i ? uSizes[i-1] * tensor->tensorBuffer->memory.strides[0][i-1]: elementSize;
+                strides != VX_NULL ? strides[i] : i ? uSizes[i-1] * tensor->tensorBuffer->memory.strides[0][i-1]: elementSize;
 
-            tensor->viewRegion.viewStarts[i] = 0;
-            tensor->viewRegion.viewEnds[i] = uSizes[i];
+            tensor->viewRegion.viewStarts[i] = viewRegion != VX_NULL ? viewRegion->viewStarts[i] : 0;
+            tensor->viewRegion.viewEnds[i] = viewRegion != VX_NULL ? viewRegion->viewEnds[i] : uSizes[i];
         }
 
         tensor->tensorBuffer->valued        = vx_false_e;
-        tensor->tensorBuffer->precision     = VX_TENSOR_PRECISION_AUTO;
         tensor->tensorBuffer->data_lifetime = VX_TENSOR_LIFE_TIME_DYNAMIC;
+
+        /*it is used by nnapi and graph optimization*/
+        if(tensor->tensorBuffer->elementSize == 1 || tensor->tensorBuffer->elementSize == 2)
+            tensor->tensorBuffer->precision     = VX_TENSOR_PRECISION_AUTO;
+        else
+            tensor->tensorBuffer->precision     = VX_TENSOR_PRECISION_HIGH;
     }
     else if (tensorBuffer != VX_NULL)
     {
@@ -525,6 +542,7 @@ vxoTensor_Create(
 
     tensor->useInternalMem  = vx_true_e;
 
+    gcmFOOTER_NO();
     return tensor;
 
 OnError:
@@ -540,6 +558,7 @@ OnError:
         vxoReference_Release((vx_reference_ptr)&tensor, VX_TYPE_TENSOR, VX_REF_EXTERNAL);
     }
 
+    gcmFOOTER_NO();
     return VX_NULL;
 }
 
@@ -550,6 +569,7 @@ VX_PRIVATE_API vx_bool
     )
 {
     vx_uint32 i;
+    gcmHEADER_ARG("tensor=%p, view=%p", tensor, view);
 
     if(tensor->isViewed)
     {
@@ -572,10 +592,11 @@ VX_PRIVATE_API vx_bool
             vxError("The %dth view dim range [%d - %d] is beyond tensor orignal range [%d - %d]", i,
                 view->viewRegion.viewStarts[i], view->viewRegion.viewEnds[i],
                 tensor->viewRegion.viewStarts[i], tensor->viewRegion.viewEnds[i]);
+            gcmFOOTER_NO();
             return vx_false_e;
         }
     }
-
+    gcmFOOTER_NO();
     return vx_true_e;
 }
 
@@ -625,14 +646,23 @@ vxoTensor_CheckValidTensorAddressing(
     )
 {
     vx_uint32 i;
+    gcmHEADER_ARG("tensor=%p, addressing=%p", tensor, addressing);
 
-    if (!vxoTensor_IsValidTensor(tensor)) return vx_false_e;
-    if (!vxoTensor_IsValidAddressing(addressing)) return vx_false_e;
-
+    if (!vxoTensor_IsValidTensor(tensor))
+    {
+        gcmFOOTER_NO();
+        return vx_false_e;
+    }
+    if (!vxoTensor_IsValidAddressing(addressing))
+    {
+        gcmFOOTER_NO();
+        return vx_false_e;
+    }
     if (TENSOR_DIM_NUM(tensor) != addressing->dimCount)
     {
         vxError("The tensor dim %d is not equal to addressing dim %d",
                  TENSOR_DIM_NUM(tensor), addressing->dimCount);
+        gcmFOOTER_NO();
         return vx_false_e;
     }
 
@@ -642,10 +672,12 @@ vxoTensor_CheckValidTensorAddressing(
         {
             vxError("The %dth addressing dim size %d is beyond tensor orignal range %d",
                      i, addressing->dimSizesUser[i], TENSOR_VIEW_END_INDEX(tensor, i));
+            gcmFOOTER_NO();
             return vx_false_e;
         }
     }
 
+    gcmFOOTER_NO();
     return vx_true_e;
 }
 
@@ -656,13 +688,22 @@ vxoTensor_CheckValidViewAddressing(
     )
 {
     vx_uint32 i;
+    gcmHEADER_ARG("view=%p, addressing=%p", view, addressing);
 
-    if (!vxoTensor_IsValidView(view)) return vx_false_e;
-    if (!vxoTensor_IsValidAddressing(addressing)) return vx_false_e;
-
+    if (!vxoTensor_IsValidView(view))
+    {
+        gcmFOOTER_NO();
+        return vx_false_e;
+    }
+    if (!vxoTensor_IsValidAddressing(addressing))
+    {
+        gcmFOOTER_NO();
+        return vx_false_e;
+    }
     if (view->viewRegion.dimCount != addressing->dimCount)
     {
         vxError("The view dim %d is not equal to addressing dim %d", view->viewRegion.dimCount, addressing->dimCount);
+        gcmFOOTER_NO();
         return vx_false_e;
     }
 
@@ -672,10 +713,11 @@ vxoTensor_CheckValidViewAddressing(
         {
             vxError("The %dth addressing size %d is not equel to view range [%d - %d]",
                      i, addressing->dimSizesUser[i], view->viewRegion.viewStarts[i], view->viewRegion.viewEnds[i]);
+            gcmFOOTER_NO();
             return vx_false_e;
         }
     }
-
+    gcmFOOTER_NO();
     return vx_true_e;
 }
 
@@ -743,8 +785,13 @@ vxoTensor_LineCopyConvert(
 {
     vx_uint32 ssize, dsize;
 
-    if (!src || !dst || !count) return VX_ERROR_INVALID_PARAMETERS;
+    gcmHEADER_ARG("src=%p, dst=%p, srcType=0x%x, dstType=0x%x, count=0x%x", src, dst, srcType, dstType, count);
 
+    if (!src || !dst || !count)
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
     if (srcType == dstType)
     {
         ssize = vxoTensor_GetDataSizeByFormat(srcType);
@@ -769,13 +816,14 @@ vxoTensor_LineCopyConvert(
             }
             else
             {
+                gcmFOOTER_NO();
                 return VX_ERROR_NOT_SUPPORTED;
             }
             src += ssize;
             dst += dsize;
         }
     }
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -795,6 +843,7 @@ vxoTensor_CopyTensorPatchEx(
     vx_uint8_ptr srcs[VX_CONTEXT_TENSOR_MAX_DIMENSION], dsts[VX_CONTEXT_TENSOR_MAX_DIMENSION];
     vx_bool back = vx_false_e;
 
+    gcmHEADER_ARG("src=%p, dst=%p, curDim=0x%x, sizes=%p, srcStrides=%p, dstStrides=%p, srcType=0x%x, dstType=0x%x", src, dst, curDim, sizes, srcStrides, dstStrides, srcType, dstType);
     for (;;)
     {
         srcs[curDim] = src;
@@ -833,6 +882,7 @@ vxoTensor_CopyTensorPatchEx(
             }
         }
     }
+    gcmFOOTER_NO();
 }
 
 VX_PRIVATE_API vx_status
@@ -847,6 +897,7 @@ vxoTensor_CopyTensorPatch(
     vx_uint32 usrElemSize, totalSize;
     vx_tensor_buffer_s * dim;
     gctPOINTER logical;
+    gcmHEADER_ARG("tensor=%p, view=%p, user_addr=%p, user_ptr=%p, usage=0x%x", tensor, view, user_addr, user_ptr, usage);
 
     usrElemSize = user_addr->dimStridesUser[0];
     dim = tensor->tensorBuffer;
@@ -871,6 +922,7 @@ vxoTensor_CopyTensorPatch(
         }
         else
         {
+            gcmFOOTER_NO();
             return VX_ERROR_NOT_SUPPORTED;
         }
     }
@@ -890,8 +942,11 @@ vxoTensor_CopyTensorPatch(
         if (usrElemSize == dim->elementSize) usrDataFormat = TENSOR_DATA_TYPE(tensor);
         else if (usrElemSize == 4) usrDataFormat = VX_TYPE_FLOAT32;
         else if (usrElemSize == 2) usrDataFormat = VX_TYPE_FLOAT16;
-        else return VX_ERROR_NOT_SUPPORTED;
-
+        else
+        {
+            gcmFOOTER_NO();
+            return VX_ERROR_NOT_SUPPORTED;
+        }
         if (view != VX_NULL)
         {
             vxoTensor_MergeTwoViews(&tensor->viewRegion, &view->viewRegion, &viewMerged.viewRegion);
@@ -934,10 +989,12 @@ vxoTensor_CopyTensorPatch(
         }
         else
         {
+            gcmFOOTER_NO();
             return VX_ERROR_NOT_SUPPORTED;
         }
     }
 
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -959,6 +1016,8 @@ vxoTensor_CreateImageArray_11(
     vx_imagepatch_addressing_t addr;
     vx_image image;
     vx_bool finished = vx_false_e;
+
+    gcmHEADER_ARG("tensor=%p, rect=%p, array_size=0x%x, stride=0x%x, image_format=0x%x", tensor, rect, array_size, stride, image_format);
 
     context = GET_CONTEXT(tensor);
     if (!vxoContext_IsValid(context)) goto exit;
@@ -1010,7 +1069,12 @@ vxoTensor_CreateImageArray_11(
     finished = vx_true_e;
 
 exit:
-    if (!finished) return VX_NULL;
+    if (!finished)
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
+    gcmFOOTER_NO();
     return imageArray;
 }
 
@@ -1031,6 +1095,8 @@ vxoTensor_CreateImageArray(
     vx_imagepatch_addressing_t addr;
     vx_image image;
     vx_bool finished = vx_false_e;
+
+    gcmHEADER_ARG("tensor=%p, rect=%p, array_size=0x%x, stride=0x%x, image_format=0x%x", tensor, rect, array_size, stride, image_format);
 
     context = GET_CONTEXT(tensor);
     if (!vxoContext_IsValid(context)) goto exit;
@@ -1082,7 +1148,12 @@ vxoTensor_CreateImageArray(
     finished = vx_true_e;
 
 exit:
-    if (!finished) return VX_NULL;
+    if (!finished)
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
+    gcmFOOTER_NO();
     return imageArray;
 }
 
@@ -1100,6 +1171,7 @@ vxoTensor_CreateImageFromTensor(
     vx_uint32 physical;
     vx_imagepatch_addressing_t addr;
     vx_image image;
+    gcmHEADER_ARG("tensor=%p, width=0x%x, height=0x%x, format=0x%x", tensor, width, height, format);
 
     context = GET_CONTEXT(tensor);
     if (!vxoContext_IsValid(context)) goto exit;
@@ -1123,10 +1195,11 @@ vxoTensor_CreateImageFromTensor(
         image = vxoImage_CreateImageFromInternalHandle(context, format, &addr, (void**)&logical, &physical);
         if (vxoReference_GetStatus((vx_reference) image) != VX_SUCCESS) goto exit;
     }
-
+    gcmFOOTER_NO();
     return image;
 
 exit:
+    gcmFOOTER_NO();
     return VX_NULL;
 }
 
@@ -1142,6 +1215,8 @@ vxoTensor_FillDimBuffer(
     vx_uint64 omul = 1;
     vx_bool contiguous;
 
+    gcmHEADER_ARG("tensor=%p, dbuff=%p, bufsize=0x%x, dims=%p", tensor, dbuff, bufsize, dims);
+
     dsize = TENSOR_DIM_NUM(tensor);
 
     for (i = 0; i < dsize; i++)
@@ -1152,8 +1227,10 @@ vxoTensor_FillDimBuffer(
     contiguous = vxoTensor_IsContiguousMemory(tensor);
 
     /* only support tensor with contiguous memory to reshape now */
-    if ((vx_int32)bufsize > 0 && !contiguous && dsize != bufsize)
+    if ((vx_int32)bufsize > 0 && !contiguous && dsize != bufsize){
+        gcmFOOTER_NO();
         return vx_false_e;
+    }
 
     if ((vx_int32)bufsize == -1 || (bufsize == 1 && dbuff[0] == -1))
     {
@@ -1168,12 +1245,20 @@ vxoTensor_FillDimBuffer(
         {
             if (dbuff[i] == -1)
             {
-                if (pos >= 0) return vx_false_e;
+                if (pos >= 0)
+                {
+                    gcmFOOTER_NO();
+                    return vx_false_e;
+                }
                 pos = i;
             }
             else if (dbuff[i] == 0)
             {
-                if (i >= dsize) return vx_false_e;
+                if (i >= dsize)
+                {
+                    gcmFOOTER_NO();
+                    return vx_false_e;
+                }
                 dims[i] = TENSOR_VIEW_SIZE_INDEX(tensor, i);
                 nmul *= dims[i];
             }
@@ -1184,13 +1269,17 @@ vxoTensor_FillDimBuffer(
             }
         }
 
-        if (omul % nmul) return vx_false_e;
+        if (omul % nmul)
+        {
+            gcmFOOTER_NO();
+            return vx_false_e;
+        }
         if (pos >= 0)
         {
             dims[pos] = (vx_uint32)(omul / nmul);
         }
     }
-
+    gcmFOOTER_NO();
     return vx_true_e;
 }
 
@@ -1208,6 +1297,8 @@ vxCreateTensor_11(
     vx_tensor tensor;
     vx_tensor_create_params_t tensor_create_params;
 
+    gcmHEADER_ARG("context=%p, num_of_dims=0x%x, sizes=%p, data_format=0x%x, fixed_point_pos=0x%x",
+        context, num_of_dims, sizes, data_format, fixed_point_pos);
     gcmDUMP_API("$VX vxCreateTensor_11: context=%p, num_of_dims=0x%x, sizes=%p, data_format=0x%x, fixed_point_pos=0x%x",
         context, num_of_dims, sizes, data_format, fixed_point_pos);
 
@@ -1216,6 +1307,7 @@ vxCreateTensor_11(
     if (!vxoContext_IsValid(context))
     {
         vxError("%s[%d]: Context is invalid!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
@@ -1223,6 +1315,7 @@ vxCreateTensor_11(
     {
         vxError("%s[%d]: The tensor view dim num %d is out of range!\n", __FUNCTION__, __LINE__, num_of_dims);
         vxAddLogEntry(&context->base, VX_ERROR_INVALID_DIMENSION, "%s[%d]: The tensor view dim num %d is out of range!\n", __FUNCTION__, __LINE__, num_of_dims);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
@@ -1230,6 +1323,7 @@ vxCreateTensor_11(
     {
         vxError("%s[%d]: The tensor does not support data format %d", __FUNCTION__, __LINE__, data_format);
         vxAddLogEntry(&context->base, VX_ERROR_INVALID_FORMAT, "%s[%d]: The tensor does not support data format %d", __FUNCTION__, __LINE__, data_format);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
@@ -1250,6 +1344,7 @@ vxCreateTensor_11(
                 vx_false_e
                 );
 
+    gcmFOOTER_NO();
     return tensor;
 }
 
@@ -1266,21 +1361,29 @@ vxCreateTensorForNN11(
     vx_tensor tensor;
     vx_tensor_create_params_t tensor_create_params;
 
+    gcmHEADER_ARG("context=%p, num_of_dims=0x%x, sizes=%p, data_format=0x%x, fixed_point_pos=0x%x",
+        context, num_of_dims, sizes, data_format, fixed_point_pos);
     gcmDUMP_API("$VX vxCreateTensorForNN11: context=%p, num_of_dims=0x%x, sizes=%p, data_format=0x%x, fixed_point_pos=0x%x",
         context, num_of_dims, sizes, data_format, fixed_point_pos);
 
     vxmASSERT(sizes);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (num_of_dims > VX_CONTEXT_TENSOR_MAX_DIMENSION)
     {
         vxError("The tensor view dim num %d is out of range", num_of_dims);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
     if (!vxoTensor_DataFormatIsSupported(data_format))
     {
         vxError("The tensor does not support data format %d", data_format);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
@@ -1300,7 +1403,7 @@ vxCreateTensorForNN11(
                 &tensor_create_params,
                 vx_false_e
                 );
-
+    gcmFOOTER_NO();
     return tensor;
 }
 
@@ -1318,23 +1421,29 @@ vxCreateTensor(
     vx_uint32 i;
     vx_tensor_create_params_t tensor_create_params;
 
+    gcmHEADER_ARG("context=%p, number_of_dims=0x%lx, dims=%p, data_type=0x%x, fixed_point_position=0x%x",
+        context, number_of_dims, dims, data_type, fixed_point_position);
     gcmDUMP_API("$VX vxCreateTensor: context=%p, number_of_dims=0x%lx, dims=%p, data_type=0x%x, fixed_point_position=0x%x",
         context, number_of_dims, dims, data_type, fixed_point_position);
 
     vxmASSERT(dims);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context)) {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     gcmSAFECASTSIZET(num_of_dims, number_of_dims);
     if (num_of_dims > VX_CONTEXT_TENSOR_MAX_DIMENSION)
     {
         vxError("The tensor view dim num %d is out of range", num_of_dims);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
     if (!vxoTensor_DataFormatIsSupported(data_type))
     {
         vxError("The tensor does not support data format %d", data_type);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
@@ -1365,10 +1474,12 @@ vxCreateTensor(
                 &tensor_create_params,
                 vx_false_e
                 );
-    if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS) return VX_NULL;
-
+    if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS) {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     vxFree(dimensions);
-
+    gcmFOOTER_NO();
     return tensor;
 }
 
@@ -1381,12 +1492,16 @@ _CreateTensor2(
     )
 {
     vx_tensor tensor;
+    gcmHEADER_ARG("context=%p, tensor_create_params=%p, size_of_create_params=0x%lx, kind=0x%x", context, tensor_create_params, size_of_create_params, kind);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context)) {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (size_of_create_params != sizeof(vx_tensor_create_params_t))
     {
         vxError(" size_of_create_params doesn't match");
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -1395,12 +1510,14 @@ _CreateTensor2(
     if (tensor_create_params->num_of_dims > VX_CONTEXT_TENSOR_MAX_DIMENSION)
     {
         vxError("The tensor view dim num %d is out of range", tensor_create_params->num_of_dims);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
     if (!vxoTensor_DataFormatIsSupported(tensor_create_params->data_format))
     {
         vxError("The tensor does not support data format %d", tensor_create_params->data_format);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
@@ -1422,7 +1539,7 @@ _CreateTensor2(
                     vx_false_e
                     );
     }
-
+    gcmFOOTER_NO();
     return tensor;
 }
 
@@ -1464,22 +1581,31 @@ _CreateVirtualTensor(
 
     vx_tensor_create_params_t tensor_create_params;
 
+    gcmHEADER_ARG("graph=%p, num_of_dims=0x%x, sizes=%p, data_format=0x%x, fixed_point_pos=0x%x, kind=0x%x", graph, num_of_dims, sizes, data_format, fixed_point_pos, kind);
+
     vxmASSERT(sizes);
 
-    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_NULL;
-
+    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     context = GET_CONTEXT(graph);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
+    if (!vxoContext_IsValid(context)) {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (num_of_dims > VX_CONTEXT_TENSOR_MAX_DIMENSION)
     {
         vxError("The tensor view dim num %d is out of range", num_of_dims);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
     if (!vxoTensor_DataFormatIsSupported(data_format))
     {
         vxError("The tensor does not support data format %d", data_format);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
@@ -1511,7 +1637,7 @@ _CreateVirtualTensor(
                     vx_true_e
                     );
     }
-
+    gcmFOOTER_NO();
     return tensor;
 }
 
@@ -1556,6 +1682,9 @@ vxCreateVirtualTensor(
     vx_uint32 num_of_dims, i;
     vx_uint32 *dimSizes;
 
+    gcmHEADER_ARG("graph=%p, num_of_dims=0x%lx, dims=%p, data_type=0x%x, fixed_point_position=0x%x",
+        graph, number_of_dims, dims, data_type, fixed_point_position);
+
     gcmDUMP_API("$VX vxCreateVirtualTensor: graph=%p, num_of_dims=0x%lx, dims=%p, data_type=0x%x, fixed_point_position=0x%x",
         graph, number_of_dims, dims, data_type, fixed_point_position);
 
@@ -1563,20 +1692,27 @@ vxCreateVirtualTensor(
 
     gcmSAFECASTSIZET(num_of_dims, number_of_dims);
 
-    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_NULL;
-
+    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     context = GET_CONTEXT(graph);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
+    if (!vxoContext_IsValid(context)) {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (num_of_dims > VX_CONTEXT_TENSOR_MAX_DIMENSION)
     {
         vxError("The tensor view dim num %d is out of range", num_of_dims);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
     if (!vxoTensor_DataFormatIsSupported(data_type))
     {
         vxError("The tensor does not support data format %d", data_type);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
@@ -1600,12 +1736,16 @@ vxCreateVirtualTensor(
                 VX_REF_EXTERNAL
                 );
 
-    if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS) return VX_NULL;
-
+    if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     tensor->base.scope = (vx_reference)graph;
 
     vxFree(dimSizes);
 
+    gcmFOOTER_NO();
     return tensor;
 }
 
@@ -1619,11 +1759,17 @@ _CreateVirtualTensor2(
 {
     vx_tensor tensor;
 
-    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_NULL;
+    gcmHEADER_ARG("graph=%p, tensor_create_params=%p, size_of_create_params=0x%lx, kind=0x%x", graph, tensor_create_params, size_of_create_params, kind);
 
+    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (size_of_create_params != sizeof(vx_tensor_create_params_t))
     {
         vxError(" size_of_create_params doesn't match");
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -1632,12 +1778,14 @@ _CreateVirtualTensor2(
     if (tensor_create_params->num_of_dims > VX_CONTEXT_TENSOR_MAX_DIMENSION)
     {
         vxError("The tensor view dim num %d is out of range", tensor_create_params->num_of_dims);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
     if (!vxoTensor_DataFormatIsSupported(tensor_create_params->data_format))
     {
         vxError("The tensor does not support data format %d", tensor_create_params->data_format);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
@@ -1660,6 +1808,7 @@ _CreateVirtualTensor2(
                     );
     }
 
+    gcmFOOTER_NO();
     return tensor;
 }
 
@@ -1698,12 +1847,24 @@ _CreateTensorFromView(
     vx_tensor_view_s viewMerged;
     vx_tensor_create_params_t tensor_create_params;
 
-    if (!vxoTensor_CheckValidTensorView(tensor, view)) return VX_NULL;
-    if (!vxoTensor_ComputeViewOffset(tensor, view)) return VX_NULL;
+    gcmHEADER_ARG("tensor=%p, view=%p, kind=0x%x", tensor, view, kind);
 
+    if (!vxoTensor_CheckValidTensorView(tensor, view))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
+    if (!vxoTensor_ComputeViewOffset(tensor, view))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     context = GET_CONTEXT(tensor);
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     tensor_create_params.num_of_dims = TENSOR_DIM_NUM(tensor);
     tensor_create_params.sizes = TENSOR_SIZES(tensor);
     tensor_create_params.data_format = TENSOR_DATA_TYPE(tensor);
@@ -1731,8 +1892,13 @@ _CreateTensorFromView(
                     kind
                     );
 
-    if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS) return VX_NULL;
+    if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
 
+    gcmFOOTER_NO();
     return childTensor;
 }
 
@@ -1770,6 +1936,8 @@ vxCreateTensorFromView(
     vx_uint32 *view_array_start = NULL;
     vx_uint32 *view_array_end = NULL;
 
+    gcmHEADER_ARG("tensor=%p, num_of_dims=0x%lx, view_start=%p, view_end=%p",
+        tensor, num_of_dims, view_start, view_end);
     gcmDUMP_API("$VX vxCreateTensorFromView: tensor=%p, num_of_dims=0x%lx, view_start=%p, view_end=%p",
         tensor, num_of_dims, view_start, view_end);
     gcmSAFECASTSIZET(number_of_dims, num_of_dims);
@@ -1797,6 +1965,7 @@ vxCreateTensorFromView(
     vxFree(view_array_start);
     vxFree(view_array_end);
 
+    gcmFOOTER_NO();
     return childTensor;
 }
 
@@ -1820,6 +1989,8 @@ vxCreateTensorView(
     vx_tensor_view view;
     gctUINT8 i;
 
+    gcmHEADER_ARG("context=%p, view_array_start=%p, view_array_end=%p, numViewDimensions=0x%x",
+        context, view_array_start, view_array_end, numViewDimensions);
     gcmDUMP_API("$VX vxCreateTensorView: context=%p, view_array_start=%p, view_array_end=%p, numViewDimensions=0x%x",
         context, view_array_start, view_array_end, numViewDimensions);
 
@@ -1829,6 +2000,7 @@ vxCreateTensorView(
     if (!vxoContext_IsValid(context))
     {
         vxError("%s[%d]: Context is invalid!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
@@ -1837,6 +2009,7 @@ vxCreateTensorView(
         vxError("%s[%d]: The tensor view dim num %d is out of range!\n", __FUNCTION__, __LINE__, numViewDimensions);
         vxAddLogEntry(&context->base, VX_ERROR_INVALID_REFERENCE, "%s[%d]: The tensor view dim num %d is out of range!\n",
             __FUNCTION__, __LINE__, numViewDimensions);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
@@ -1846,6 +2019,7 @@ vxCreateTensorView(
     {
         vxError("%s[%d]: Get tensor_view reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&view->base, vxoReference_GetStatus((vx_reference)view), "%s[%d]: Get tensor_view reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
     for (i = 0; i < numViewDimensions; i++)
@@ -1856,6 +2030,7 @@ vxCreateTensorView(
                      __FUNCTION__, __LINE__, i, view_array_start[i], view_array_end[i]);
             vxAddLogEntry(&view->base, VX_ERROR_INVALID_VALUE, "%s[%d]: The %dth of view array start %d is smaller than end %d!\n",
                 __FUNCTION__, __LINE__, i, view_array_start[i], view_array_end[i]);
+            gcmFOOTER_NO();
             return VX_NULL;
         }
 
@@ -1865,6 +2040,7 @@ vxCreateTensorView(
 
     view->viewRegion.dimCount = numViewDimensions;
 
+    gcmFOOTER_NO();
     return view;
 }
 
@@ -1889,6 +2065,8 @@ vxCreateTensorAddressing(
     vx_tensor_addressing addressing;
     gctUINT8 i;
 
+    gcmHEADER_ARG("context=%p, addressing_array_dimension=%p, addressing_array_stride=%p, numViewDimensions=0x%x",
+        context, addressing_array_dimension, addressing_array_stride, numViewDimensions);
     gcmDUMP_API("$VX vxCreateTensorAddressing: context=%p, addressing_array_dimension=%p, addressing_array_stride=%p, numViewDimensions=0x%x",
         context, addressing_array_dimension, addressing_array_stride, numViewDimensions);
 
@@ -1898,6 +2076,7 @@ vxCreateTensorAddressing(
     if (!vxoContext_IsValid(context))
     {
         vxError("%s[%d]: Context is invalid!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
@@ -1905,6 +2084,7 @@ vxCreateTensorAddressing(
     {
         vxError("%s[%d]: The tensor addressing dim num %d is out of range", __FUNCTION__, __LINE__, numViewDimensions);
         vxAddLogEntry(&context->base, VX_ERROR_INVALID_DIMENSION, "%s[%d]: The tensor addressing dim num %d is out of range", __FUNCTION__, __LINE__, numViewDimensions);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
@@ -1914,6 +2094,7 @@ vxCreateTensorAddressing(
     {
         vxError("%s[%d]: Get tensor_addressing reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&addressing->base, vxoReference_GetStatus((vx_reference)addressing), "%s[%d]: Get tensor_addressing reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
@@ -1925,6 +2106,7 @@ vxCreateTensorAddressing(
 
     addressing->dimCount = numViewDimensions;
 
+    gcmFOOTER_NO();
     return addressing;
 }
 
@@ -1950,6 +2132,8 @@ vxCopyTensorPatch_11(
 {
     vx_status status;
 
+    gcmHEADER_ARG("tensor=%p, view=%p, user_addr=%p, user_ptr=%p, usage=0x%x, user_mem_type=0x%x",
+        tensor, view, user_addr, user_ptr, usage, user_mem_type);
     gcmDUMP_API("$VX vxCopyTensorPatch_11: tensor=%p, view=%p, user_addr=%p, user_ptr=%p, usage=0x%x, user_mem_type=0x%x",
         tensor, view, user_addr, user_ptr, usage, user_mem_type);
 
@@ -1959,6 +2143,7 @@ vxCopyTensorPatch_11(
         {
             vxError("%s[%d]: TensorView is invalid!\n", __FUNCTION__, __LINE__);
             vxAddLogEntry(&tensor->base, VX_ERROR_INVALID_REFERENCE, "%s[%d]: TensorView is invalid!\n", __FUNCTION__, __LINE__);
+            gcmFOOTER_NO();
             return VX_ERROR_INVALID_REFERENCE;
         }
 
@@ -1966,6 +2151,7 @@ vxCopyTensorPatch_11(
         {
             vxError("%s[%d]: ViewAddressing is invalid!\n", __FUNCTION__, __LINE__);
             vxAddLogEntry(&view->base, VX_ERROR_INVALID_REFERENCE, "%s[%d]: ViewAddressing is invalid!\n", __FUNCTION__, __LINE__);
+            gcmFOOTER_NO();
             return VX_ERROR_INVALID_REFERENCE;
         }
     }
@@ -1975,6 +2161,7 @@ vxCopyTensorPatch_11(
         {
             vxError("%s[%d]: TensorAddressing is invalid!\n", __FUNCTION__, __LINE__);
             vxAddLogEntry(&tensor->base, VX_ERROR_INVALID_REFERENCE, "%s[%d]: TensorAddressing is invalid!\n", __FUNCTION__, __LINE__);
+            gcmFOOTER_NO();
             return VX_ERROR_INVALID_REFERENCE;
         }
     }
@@ -1983,6 +2170,7 @@ vxCopyTensorPatch_11(
     {
         vxError("%s[%d]: The tensor is virtual tensor!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&tensor->base, VX_ERROR_OPTIMIZED_AWAY, "%s[%d]: The tensor is virtual tensor!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return VX_ERROR_OPTIMIZED_AWAY;
     }
 
@@ -1990,6 +2178,7 @@ vxCopyTensorPatch_11(
     {
         vxError("%s[%d]: The user_ptr parameter is NULL!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&tensor->base, VX_ERROR_INVALID_PARAMETERS, "%s[%d]: The user_ptr parameter is NULL!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
@@ -1997,6 +2186,88 @@ vxCopyTensorPatch_11(
     {
         vxError("%s[%d]: Allocate tensor memroy failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&tensor->base, VX_ERROR_NOT_ALLOCATED, "%s[%d]: Allocate tensor memroy failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
+        return VX_ERROR_NOT_ALLOCATED;
+    }
+
+    status = vxoTensor_CopyTensorPatch(tensor, view, user_addr, user_ptr, usage);
+
+#if gcdDUMP
+    if (usage == VX_WRITE_ONLY)
+    {
+        gctPOINTER logical;
+        vx_uint32 size, physical;
+        vxoTensor_GetTensorSize(tensor, &size);
+        vxoTensor_GetTensorViewMemory(tensor, &logical, &physical);
+
+        gcmDUMP(gcvNULL, "#[input]\n");
+        gcmDUMP_BUFFER(gcvNULL,
+                       gcvDUMP_BUFFER_MEMORY,
+                       physical,
+                       logical,
+                       0,
+                       size);
+    }
+#endif
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+/* vxCopyTensorPatchForNN11 is for back compatibility with spec 1.1, which is used in nn*/
+VX_API_ENTRY vx_status VX_API_CALL
+vxCopyTensorPatchForNN11(
+    vx_tensor tensor,
+    vx_tensor_view view,
+    vx_tensor_addressing user_addr,
+    void *user_ptr,
+    vx_enum usage,
+    vx_enum user_mem_type
+    )
+{
+    vx_status status;
+
+    gcmHEADER_ARG(" tensor=%p, view=%p, user_addr=%p, user_ptr=%p, usage=0x%x, user_mem_type=0x%x",
+        tensor, view, user_addr, user_ptr, usage, user_mem_type);
+    gcmDUMP_API("$VX vxCopyTensorPatchForNN11: tensor=%p, view=%p, user_addr=%p, user_ptr=%p, usage=0x%x, user_mem_type=0x%x",
+        tensor, view, user_addr, user_ptr, usage, user_mem_type);
+
+    if (view != VX_NULL)
+    {
+        if (!vxoTensor_CheckValidTensorView(tensor, view))
+        {
+            gcmFOOTER_NO();
+            return VX_ERROR_INVALID_REFERENCE;
+        }
+        if (!vxoTensor_CheckValidViewAddressing(view, user_addr))
+        {
+            gcmFOOTER_NO();
+            return VX_ERROR_INVALID_REFERENCE;
+        }
+    }
+    else
+    {
+        if (!vxoTensor_CheckValidTensorAddressing(tensor, user_addr))
+        {
+            gcmFOOTER_NO();
+            return VX_ERROR_INVALID_REFERENCE;
+        }
+    }
+
+    if (tensor->isVirtual)
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_OPTIMIZED_AWAY;
+    }
+
+    if (user_ptr == VX_NULL)
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
+
+    if (vxoTensor_AllocateMemory(tensor) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
         return VX_ERROR_NOT_ALLOCATED;
     }
 
@@ -2020,61 +2291,7 @@ vxCopyTensorPatch_11(
     }
 #endif
 
-    return status;
-}
-
-/* vxCopyTensorPatchForNN11 is for back compatibility with spec 1.1, which is used in nn*/
-VX_API_ENTRY vx_status VX_API_CALL
-vxCopyTensorPatchForNN11(
-    vx_tensor tensor,
-    vx_tensor_view view,
-    vx_tensor_addressing user_addr,
-    void *user_ptr,
-    vx_enum usage,
-    vx_enum user_mem_type
-    )
-{
-    vx_status status;
-
-    gcmDUMP_API("$VX vxCopyTensorPatchForNN11: tensor=%p, view=%p, user_addr=%p, user_ptr=%p, usage=0x%x, user_mem_type=0x%x",
-        tensor, view, user_addr, user_ptr, usage, user_mem_type);
-
-    if (view != VX_NULL)
-    {
-        if (!vxoTensor_CheckValidTensorView(tensor, view)) return VX_ERROR_INVALID_REFERENCE;
-        if (!vxoTensor_CheckValidViewAddressing(view, user_addr)) return VX_ERROR_INVALID_REFERENCE;
-    }
-    else
-    {
-        if (!vxoTensor_CheckValidTensorAddressing(tensor, user_addr)) return VX_ERROR_INVALID_REFERENCE;
-    }
-
-    if (tensor->isVirtual) return VX_ERROR_OPTIMIZED_AWAY;
-
-    if (user_ptr == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
-
-    if (vxoTensor_AllocateMemory(tensor) != VX_SUCCESS) return VX_ERROR_NOT_ALLOCATED;
-
-    status = vxoTensor_CopyTensorPatch(tensor, view, user_addr, user_ptr, usage);
-
-#if gcdDUMP
-    if (usage == VX_WRITE_ONLY)
-    {
-        gctPOINTER logical;
-        vx_uint32 size, physical;
-        vxoTensor_GetTensorSize(tensor, &size);
-        vxoTensor_GetTensorViewMemory(tensor, &logical, &physical);
-
-        gcmDUMP(gcvNULL, "#[input]\n");
-        gcmDUMP_BUFFER(gcvNULL,
-                       gcvDUMP_BUFFER_MEMORY,
-                       physical,
-                       logical,
-                       0,
-                       size);
-    }
-#endif
-
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -2099,18 +2316,23 @@ vxCopyTensorPatch(
     vx_size i;
     vx_uint32 num_of_dims;
 
+    gcmHEADER_ARG("tensor=%p, number_of_dims=0x%lx, view_start=%p, view_end=%p, user_stride=%p, user_ptr=%p, usage=0x%x,"\
+        " user_memory_type=0x%x", tensor, number_of_dims, view_start, view_end, user_stride, user_ptr, usage, user_memory_type);
+
     gcmDUMP_API("$VX vxCopyTensorPatch: tensor=%p, number_of_dims=0x%lx, view_start=%p, view_end=%p, user_stride=%p, user_ptr=%p, usage=0x%x,"\
         " user_memory_type=0x%x", tensor, number_of_dims, view_start, view_end, user_stride, user_ptr, usage, user_memory_type);
 
     /* bad parameters */
     if ((view_start == NULL) || (view_end == NULL) || (user_stride == NULL) || (user_ptr == NULL))
     {
+        gcmFOOTER_ARG("%d", status);
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
     /* bad references */
     if (vxoTensor_IsValidTensor(tensor) == vx_false_e)
     {
+        gcmFOOTER_ARG("%d", status);
         return VX_ERROR_INVALID_REFERENCE;
     }
 
@@ -2119,6 +2341,7 @@ vxCopyTensorPatch(
     {
         /* User tried to access a "virtual" tensor. */
         vxError("Can not access a virtual tensor\n");
+        gcmFOOTER_ARG("%d", status);
         return VX_ERROR_OPTIMIZED_AWAY;
     }
 
@@ -2127,6 +2350,7 @@ vxCopyTensorPatch(
         if (usage != VX_WRITE_ONLY || vxoTensor_AllocateMemory(tensor) != VX_SUCCESS)
         {
             vxError("Tensor memory was not allocated!\n");
+            gcmFOOTER_ARG("%d", status);
             return VX_ERROR_NOT_ALLOCATED;
         }
     }
@@ -2135,12 +2359,14 @@ vxCopyTensorPatch(
     if (tensor->dimCount < num_of_dims || num_of_dims ==0)
     {
         vxError("Invalid number of patch dimensions\n");
+        gcmFOOTER_ARG("%d", status);
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
     if (vxoTensor_CheckTensorViewSizes(tensor->dims, view_start, view_end, num_of_dims) != 0)
     {
         vxError("Invalid view\n");
+        gcmFOOTER_ARG("%d", status);
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
@@ -2194,6 +2420,7 @@ vxCopyTensorPatch(
     vxFree(addressing_array_stride);
     vxFree(addressing_array_dimension);
 
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -2308,12 +2535,23 @@ _ReshapeTensor(
     vx_context context = GET_CONTEXT(tensor);
     vx_tensor_create_params_t tensor_create_params;
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
+    gcmHEADER_ARG("tensor=%p, num_of_dims=%p, sizes=0x%x, kind=0x%x", tensor, num_of_dims, sizes, kind);
 
-    if (!vxoTensor_IsValidTensor(tensor)) return VX_NULL;
-
-    if (!vxoTensor_FillDimBuffer(tensor, num_of_dims, sizes, newDims))
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
         return VX_NULL;
+    }
+    if (!vxoTensor_IsValidTensor(tensor))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
+    if (!vxoTensor_FillDimBuffer(tensor, num_of_dims, sizes, newDims))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
 
     gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
     tensor_create_params.num_of_dims = sizes;
@@ -2335,6 +2573,7 @@ _ReshapeTensor(
         offset = vxoTensor_CalculateDimOffsetByStarts(tensor, TENSOR_VIEW_STARTS(tensor));
     }
 
+    gcmFOOTER_NO();
     return vxoTensor_Create(
                 context,
                 &tensor_create_params,
@@ -2376,11 +2615,13 @@ vxQueryTensor(
     vx_size size
     )
 {
+    gcmHEADER_ARG("tensor=%p, attribute=0x%x, ptr=%p, size=0x%lx", tensor, attribute, ptr, size);
     gcmDUMP_API("$VX vxQueryTensor: tensor=%p, attribute=0x%x, ptr=%p, size=0x%lx", tensor, attribute, ptr, size);
 
     if (!vxoTensor_IsValidTensor(tensor))
     {
         vxError("%s[%d]: Tensor is invalid!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return VX_ERROR_INVALID_REFERENCE;
     }
 
@@ -2397,6 +2638,7 @@ vxQueryTensor(
             {
                 vxError("%s[%d]: Tensor size is invalid!\n", __FUNCTION__, __LINE__);
                 vxAddLogEntry(&tensor->base, VX_ERROR_INVALID_PARAMETERS, "%s[%d]: Tensor size is invalid!\n", __FUNCTION__, __LINE__);
+                gcmFOOTER_NO();
                 return VX_ERROR_INVALID_PARAMETERS;
             }
             if (tensor->isViewed)
@@ -2458,9 +2700,10 @@ vxQueryTensor(
             vxError("The attribute parameter, %d, is not supported", attribute);
             vxAddLogEntry(&tensor->base, VX_ERROR_INVALID_PARAMETERS, "%s[%d]: The attribute parameter, \
                 %d, is not supported\n", __FUNCTION__, __LINE__, attribute);
+            gcmFOOTER_NO();
             return VX_ERROR_INVALID_PARAMETERS;
     }
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -2471,6 +2714,7 @@ vxoTensor_Destructor(
     )
 {
     vx_tensor tensor = (vx_tensor)ref;
+    gcmHEADER_ARG("ref=%p", ref);
 
     if (tensor->tensorBuffer != VX_NULL &&
         tensor->tensorBuffer->bufRefCount &&
@@ -2484,6 +2728,7 @@ vxoTensor_Destructor(
         vxFree(tensor->tensorBuffer);
         tensor->tensorBuffer = VX_NULL;
     }
+    gcmFOOTER_NO();
 }
 
 /*****************************/
@@ -2537,18 +2782,33 @@ vxoTensor_IsValidAddressing(
     )
 {
     vx_uint32 i;
+    gcmHEADER_ARG("addressing=%p", addressing);
 
-    if (addressing == VX_NULL) return vx_false_e;
-    if (!vxoReference_IsValidAndSpecific(&addressing->base, VX_TYPE_TENSOR_ADDRESS)) return vx_false_e;
-    if (!addressing->dimCount) return vx_false_e;
-
+    if (addressing == VX_NULL)
+    {
+        gcmFOOTER_NO();
+        return vx_false_e;
+    }
+    if (!vxoReference_IsValidAndSpecific(&addressing->base, VX_TYPE_TENSOR_ADDRESS))
+    {
+        gcmFOOTER_NO();
+        return vx_false_e;
+    }
+    if (!addressing->dimCount)
+    {
+        gcmFOOTER_NO();
+        return vx_false_e;
+    }
     for (i = 0; i < addressing->dimCount; i++)
     {
         if (!addressing->dimSizesUser[i] ||
             !addressing->dimStridesUser[i])
+        {
+            gcmFOOTER_NO();
             return vx_false_e;
+        }
     }
-
+    gcmFOOTER_NO();
     return vx_true_e;
 }
 
@@ -2560,13 +2820,17 @@ vxoTensor_GetTensorViewMemory(
     )
 {
     vx_status status;
+    gcmHEADER_ARG("tensor=%p, logical=%p, physical=%p", tensor, logical, physical);
 
     if (logical != VX_NULL) *logical = (vx_uint8_ptr)0;
     if (physical != VX_NULL) *physical = 0;
 
     status = vxoTensor_GetTensorBaseMemory(tensor, (vx_uint8_ptr*)logical, physical);
-    if (status != VX_SUCCESS) return status;
-
+    if (status != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
     if (tensor->isViewed)
     {
         vx_uint32 viewOffset = 0;
@@ -2589,7 +2853,7 @@ vxoTensor_GetTensorViewMemory(
         if (logical) *logical = (vx_uint8_ptr)*logical + viewOffset;
         if (physical) *physical = (vx_uint32)*physical + viewOffset;
     }
-
+    gcmFOOTER_ARG("%d", status);
     return VX_SUCCESS;
 }
 
@@ -2600,7 +2864,7 @@ vxoTensor_GetTensorViewOffset(
     )
 {
     vx_uint32 viewOffset = 0;
-
+    gcmHEADER_ARG("tensor=%p, offset=%p", tensor, offset);
     vxmASSERT(offset);
     if (tensor->isViewed)
     {
@@ -2622,7 +2886,7 @@ vxoTensor_GetTensorViewOffset(
     }
 
     *offset = viewOffset + tensor->baseAddressOffset;
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -2635,10 +2899,14 @@ vxoTensor_GetTensorBatchArrayViewMemory(
     )
 {
     vx_status status;
+    gcmHEADER_ARG("tensor=%p, batchIndex=0x%x, logical=%p, physical=%p", tensor, batchIndex, logical, physical);
 
     status = vxoTensor_GetTensorBatchArrayBaseMemory(tensor, batchIndex, logical, physical);
-    if (status != VX_SUCCESS) return status;
-
+    if (status != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
     if (tensor->isViewed)
     {
         vx_uint32 dimIndex = 0;
@@ -2660,7 +2928,7 @@ vxoTensor_GetTensorBatchArrayViewMemory(
         if (logical) *logical = (vx_uint8_ptr)*logical + viewOffset;
         if (physical) *physical = (vx_uint32)*physical + viewOffset;
     }
-
+    gcmFOOTER_ARG("%d", status);
     return VX_SUCCESS;
 }
 
@@ -2670,8 +2938,10 @@ vxoTensor_GetTensorElementCount(
     vx_uint32 *count
     )
 {
+    gcmHEADER_ARG("tensor=%p, count=%p", tensor, count);
     if (!vxoTensor_IsValidTensor(tensor))
     {
+        gcmFOOTER_NO();
         return VX_ERROR_INVALID_REFERENCE;
     }
 
@@ -2688,6 +2958,7 @@ vxoTensor_GetTensorElementCount(
         *count = elementCount;
     }
 
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -2699,15 +2970,19 @@ vxoTensor_GetTensorSize(
 {
     vx_status status;
     vx_uint32 elementCount;
+    gcmHEADER_ARG("tensor=%p, size=%p", tensor, size);
 
     status = vxoTensor_GetTensorElementCount(tensor, &elementCount);
-    if (status != VX_SUCCESS) return status;
-
+    if (status != VX_SUCCESS) {
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
     if (size != VX_NULL)
     {
         *size =  elementCount * TENSOR_DATA_SIZE(tensor);
     }
 
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -2717,24 +2992,33 @@ vxoTensor_GetTensorWholeElementCount(
     vx_uint32 *count
     )
 {
+    gcmHEADER_ARG("tensor=%p, count=%p", tensor, count);
     if (!vxoTensor_IsValidTensor(tensor))
     {
+        gcmFOOTER_NO();
         return VX_ERROR_INVALID_REFERENCE;
     }
 
     if(count != VX_NULL)
     {
-        vx_uint32 index;
         vx_uint32 elementCount = 1;
+        vx_uint32 dim_count = TENSOR_ORIG_DIM_NUM(tensor);
 
-        for(index = 0; index < TENSOR_ORIG_DIM_NUM(tensor); index++)
+        if (tensor->tensorBuffer->memory.strides[0][dim_count] > 0)
+            elementCount = tensor->tensorBuffer->memory.strides[0][dim_count];
+        else
         {
-            elementCount *= tensor->tensorBuffer->memory.dims[0][index];
+            vx_uint32 index;
+            for(index = 0; index < dim_count; index++)
+            {
+                elementCount *= tensor->tensorBuffer->memory.dims[0][index];
+            }
         }
 
         *count = elementCount;
     }
 
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -2767,19 +3051,23 @@ vxoTensor_GetTensorDimStride(
     )
 {
     vx_uint32 i;
+    gcmHEADER_ARG("tensor=%p, count=%p, sizes=%p, strides=%p", tensor, count, sizes, strides);
 
     if (!vxoTensor_IsValidTensor(tensor))
     {
+        gcmFOOTER_NO();
         return VX_ERROR_INVALID_REFERENCE;
     }
 
     if (!count || (sizes == VX_NULL && strides == VX_NULL))
     {
+        gcmFOOTER_NO();
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
     if (*count && *count > VX_CONTEXT_TENSOR_MAX_DIMENSION)
     {
+        gcmFOOTER_NO();
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
@@ -2808,6 +3096,7 @@ vxoTensor_GetTensorDimStride(
         vxMemCopy(strides, TENSOR_STRIDES(tensor), *count * sizeof(vx_uint32));
     }
 
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -2819,18 +3108,22 @@ vxoTensor_GetTensorViewRegion(
     vx_uint32 * ends
     )
 {
+    gcmHEADER_ARG("tensor=%p, count=0x%x, starts=%p, ends=%p", tensor, count, starts, ends);
     if (!vxoTensor_IsValidTensor(tensor))
     {
+        gcmFOOTER_NO();
         return VX_ERROR_INVALID_REFERENCE;
     }
 
     if (!count || (starts == VX_NULL && ends == VX_NULL))
     {
+        gcmFOOTER_NO();
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
     if (count > TENSOR_VIEW_DIM_NUM(tensor))
     {
+        gcmFOOTER_NO();
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
@@ -2843,6 +3136,7 @@ vxoTensor_GetTensorViewRegion(
         vxMemCopy(ends, TENSOR_VIEW_ENDS(tensor), count * sizeof(vx_uint32));
     }
 
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -2856,6 +3150,7 @@ _CreateTensor(
     )
 {
     vx_tensor tensor;
+    gcmHEADER_ARG("context=%p, graph=%p, tensor_create_params=%p, is_virtual=0x%x, kind=0x%x", context, graph, tensor_create_params, is_virtual, kind);
 
     tensor = vxoTensor_Create(
                 context,
@@ -2867,6 +3162,46 @@ _CreateTensor(
                 is_virtual ? VX_TENSOR_VIRTUAL : VX_TENSOR_NORMAL,
                 kind
                 );
+
+    if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS) {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
+    if (is_virtual)
+    {
+        tensor->base.scope = (vx_reference)graph;
+        TENSOR_GRAPH(tensor) = graph;
+        graph->virtTensorNum++;
+    }
+    gcmFOOTER_NO();
+    return tensor;
+}
+
+vx_tensor
+vxoTensor_CreateTensorExt(
+    vx_context context,
+    vx_graph graph,
+    const vx_tensor_create_params_t* tensor_create_params,
+    vx_uint32 * strides,
+    vx_view_region_s * viewRegion,
+    vx_tensor_buffer_s * tensorBuffer,
+    vx_bool is_virtual,
+    vx_reference_kind_e kind
+)
+{
+
+    vx_tensor tensor;
+
+    tensor = vxoTensor_Create(
+        context,
+        tensor_create_params,
+        strides,
+        viewRegion,
+        tensorBuffer,
+        0,
+        is_virtual ? VX_TENSOR_VIRTUAL : VX_TENSOR_NORMAL,
+        kind
+    );
 
     if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS) return VX_NULL;
 
@@ -2947,14 +3282,19 @@ _AllocateMemory(
     )
 {
     vx_status status = VX_SUCCESS;
+    gcmHEADER_ARG("tensor=%p, real=0x%x", tensor, real);
 
     if (!vxoTensor_IsValidTensor(tensor))
     {
+        gcmFOOTER_ARG("%d", status);
         return VX_ERROR_INVALID_REFERENCE;
     }
 
-    if (tensor->alloced) return VX_SUCCESS;
-
+    if (tensor->alloced)
+    {
+        gcmFOOTER_ARG("%d", status);
+        return VX_SUCCESS;
+    }
     if (vxoTensor_MemoryIsAllocated(tensor))
     {
         status = VX_SUCCESS;
@@ -2980,7 +3320,7 @@ _AllocateMemory(
     if (status == VX_SUCCESS) tensor->alloced = vx_true_e;
 
     /*tensor->tensorBuffer->valued = vx_true_e;*/
-
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -2999,14 +3339,19 @@ _ReleaseMemory(
     )
 {
     vx_status status = VX_SUCCESS;
+    gcmHEADER_ARG("tensor=%p, real=0x%x", tensor, real);
 
     if (!vxoTensor_IsValidTensor(tensor))
     {
+        gcmFOOTER_ARG("%d", status);
         return VX_ERROR_INVALID_REFERENCE;
     }
 
-    if (!tensor->alloced) return VX_SUCCESS;
-
+    if (!tensor->alloced)
+    {
+        gcmFOOTER_ARG("%d", status);
+        return VX_SUCCESS;
+    }
     if (real)
     {
         if (!tensor->isVirtual &&
@@ -3029,7 +3374,7 @@ _ReleaseMemory(
     {
         tensor->alloced = vx_false_e;
     }
-
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -3063,9 +3408,12 @@ vxoTensor_IsOverlap(
     vx_tensor tensor2
     )
 {
+    gcmHEADER_ARG("tensor1=%p, tensor2=%p", tensor1, tensor2);
+
     if (!vxoTensor_IsValidTensor(tensor1) ||
         !vxoTensor_IsValidTensor(tensor2))
     {
+        gcmFOOTER_NO();
         return vx_false_e;
     }
 
@@ -3078,13 +3426,17 @@ vxoTensor_IsOverlap(
         end1 = start1 + vxoTensor_CalculateMaxMemorySize(tensor1) - 1;
         start2 = tensor2->baseAddressOffset + vxoTensor_CalculateDimOffsetByStarts(tensor2, TENSOR_VIEW_STARTS(tensor2));
         end2 = start2 + vxoTensor_CalculateMaxMemorySize(tensor2) - 1;
-        if (end1 < start2 || end2 < start1) return vx_false_e;
-
+        if (end1 < start2 || end2 < start1)
+        {
+            gcmFOOTER_NO();
+            return vx_false_e;
+        }
         contiguous1 = vxoTensor_IsContiguousMemory(tensor1);
         contiguous2 = vxoTensor_IsContiguousMemory(tensor2);
 
         if (contiguous1 || contiguous2)
         {
+            gcmFOOTER_NO();
             return vx_true_e;
         }
         else
@@ -3128,12 +3480,14 @@ vxoTensor_IsOverlap(
                 if (view1.viewEnds[i] - 1 < view2.viewStarts[i] ||
                     view2.viewEnds[i] - 1 < view1.viewStarts[i])
                 {
+                    gcmFOOTER_NO();
                     return vx_false_e;
                 }
             }
 
             if (TENSOR_DIM_NUM(tensor1) == TENSOR_DIM_NUM(tensor2))
             {
+                gcmFOOTER_NO();
                 return vx_true_e;
             }
             else
@@ -3144,14 +3498,16 @@ vxoTensor_IsOverlap(
                     if ((TENSOR_DIM_NUM(tensor1) > TENSOR_DIM_NUM(tensor2) && view1.viewStarts[i]) ||
                         (TENSOR_DIM_NUM(tensor2) > TENSOR_DIM_NUM(tensor1) && view2.viewStarts[i]))
                     {
+                        gcmFOOTER_NO();
                         return vx_false_e;
                     }
                 }
+                gcmFOOTER_NO();
                 return vx_true_e;
             }
         }
     }
-
+    gcmFOOTER_NO();
     return vx_false_e;
 }
 
@@ -3174,6 +3530,7 @@ VX_INTERNAL_API void vxoTensor_FreeWrappedMemory(vx_tensor tensor)
 VX_INTERNAL_API vx_bool vxoTensro_WrapUserMemory(vx_tensor tensor)
 {
     vx_bool status = vx_false_e;
+    gcmHEADER_ARG("tensor=%p", tensor);
 
     status = vxoMemory_WrapUserMemory(tensor->base.context, &tensor->tensorBuffer->memory);
 
@@ -3200,6 +3557,7 @@ VX_INTERNAL_API vx_bool vxoTensro_WrapUserMemory(vx_tensor tensor)
         {
             goto OnError;
         }
+        gcmFOOTER_ARG("%d", status);
         return vx_true_e;
     }
     else
@@ -3208,6 +3566,7 @@ VX_INTERNAL_API vx_bool vxoTensro_WrapUserMemory(vx_tensor tensor)
         gcoOS_CacheFlush(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0],tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
     }
 
+    gcmFOOTER_ARG("%d", status);
     return vx_true_e;
 
 OnError:
@@ -3216,6 +3575,8 @@ OnError:
         vxDestroyMutex(tensor->tensorBuffer->memory.writeLocks[0]);
         tensor->tensorBuffer->memory.writeLocks[0]  = VX_NULL;
     }
+
+    gcmFOOTER_ARG("%d", status);
     return vx_false_e;
 }
 
@@ -3227,29 +3588,45 @@ VX_API_ENTRY vx_tensor VX_API_CALL vxCreateTensorFromHandle(
     vx_tensor   tensor = VX_NULL;
     vx_uint32 i;
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
+     gcmHEADER_ARG("context=%p, tensor_create_params=%p, size_of_create_params=0x%lx, addrs=%p, ptr=%p, import_type=0x%x",
+         context, tensor_create_params, size_of_create_params, addrs, ptr, import_type);
+     gcmDUMP_API("$VX vxCreateTensorFromHandle: context=%p, tensor_create_params=%p, size_of_create_params=0x%lx, addrs=%p, ptr=%p, import_type=0x%x",
+         context, tensor_create_params, size_of_create_params, addrs, ptr, import_type);
 
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (!vxoTensor_DataFormatIsSupported(tensor_create_params->data_format))
     {
         vxError("The tensor does not support data format %d", tensor_create_params->data_format);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
     if (!vxIsValidImportType(import_type))
     {
+        gcmFOOTER_NO();
         return (vx_tensor)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_FORMAT);
     }
 
-    if (ptr == VX_NULL) return (vx_tensor)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
-
+    if (ptr == VX_NULL)
+    {
+        gcmFOOTER_NO();
+        return (vx_tensor)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
+    }
     tensor = vxoTensor_CreateTensorEx(
                 context,
                 VX_NULL,
                 tensor_create_params,
                 vx_false_e
                 );
-    if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS) return tensor;
-
+    if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return tensor;
+    }
     if (import_type == VX_MEMORY_TYPE_HOST)
     {
         tensor->tensorBuffer->memory.wrapFlag  = gcvALLOC_FLAG_USERMEMORY;
@@ -3268,11 +3645,12 @@ VX_API_ENTRY vx_tensor VX_API_CALL vxCreateTensorFromHandle(
 
     if (!vxoTensro_WrapUserMemory(tensor)) goto OnError;
 
+    gcmFOOTER_NO();
     return tensor;
 
 OnError:
     vxReleaseTensor(&tensor);
-
+    gcmFOOTER_NO();
     return (vx_tensor)vxoContext_GetErrorObject(context, VX_ERROR_NO_RESOURCES);
 }
 
@@ -3280,6 +3658,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapTensorHandle(vx_tensor tensor, void* co
 {
     vx_status status = VX_SUCCESS;
 
+    gcmHEADER_ARG("tensor=%p, new_ptrs=%p, prev_ptrs=%p", tensor, new_ptrs, prev_ptrs);
     gcmDUMP_API("$VX vxSwapTensorHandle: tensor=%p, new_ptrs=%p, prev_ptrs=%p", tensor, new_ptrs, prev_ptrs);
 
     if (vxoTensor_IsValidTensor(tensor) == vx_true_e)
@@ -3320,12 +3699,15 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapTensorHandle(vx_tensor tensor, void* co
                 else
                 {
                     gctUINT32_PTR logical = 0;
+                    vx_uint32 size = 0;
 
                     if (tensor->tensorBuffer->memory.nodePtrs[0] != VX_NULL &&
                         tensor->tensorBuffer->memory.logicals[0] != tensor->tensorBuffer->memory.nodePtrs[0]->logical)
                     {
                         vxoTensor_ReleaseMemory(tensor);
                         tensor->tensorBuffer->memory.nodePtrs[0] = VX_NULL;
+                        vxoTensor_GetTensorSize(tensor, &size);
+                        tensor->tensorBuffer->memory.sizes[0] = size;
                     }
 
                     tensor->tensorBuffer->memory.logicals[0] = (vx_uint8_ptr)new_ptrs;
@@ -3333,7 +3715,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapTensorHandle(vx_tensor tensor, void* co
                     gcoVX_AllocateMemory((gctUINT32)tensor->tensorBuffer->memory.sizes[0], (gctPOINTER*)&logical,
                                 &tensor->tensorBuffer->memory.physicals[0],
                                 &tensor->tensorBuffer->memory.nodePtrs[0]);
-
+                    tensor->tensorBuffer->memory.allocated = vx_true_e;
                     gcoOS_MemCopy(tensor->tensorBuffer->memory.nodePtrs[0]->logical, tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.sizes[0]);
 
                 }
@@ -3346,16 +3728,21 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapTensorHandle(vx_tensor tensor, void* co
         status = VX_ERROR_INVALID_REFERENCE;
     }
 
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
 
 VX_API_ENTRY vx_status VX_API_CALL vxSetTensorAttribute(vx_tensor tensor, vx_enum attribute, const void *ptr, vx_size size)
 {
+    gcmHEADER_ARG("tensor=%p, attribute=0x%x, ptr=%p, size=0x%lx", tensor, attribute, ptr, size);
     gcmDUMP_API("$VX vxSetTensorAttribute: tensor=%p, attribute=0x%x, ptr=%p, size=0x%lx", tensor, attribute, ptr, size);
 
-    if (!vxoTensor_IsValidTensor(tensor)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoTensor_IsValidTensor(tensor))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     switch (attribute)
     {
         case VX_TENSOR_RANK:
@@ -3384,9 +3771,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetTensorAttribute(vx_tensor tensor, vx_enu
 
         default:
             vxError("The attribute parameter, %d([%d]), is not supported", attribute, __LINE__);
+            gcmFOOTER_NO();
             return VX_ERROR_NOT_SUPPORTED;
     }
 
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 

@@ -1,5 +1,5 @@
-copy cl_viv_vx_ext.h, left_gray.bmp, right_gray.bmp and vx_tutorial3 into the same direcotry
-
-execute vx_tutorial3 without extra parameters
-
-if everything goes well, a absdiff_out.bmp will be generated in the same direcotry
+vx_tutorial1 and vx_tutorial2 only using build-in nodes in OpenVX library, but in vx_tutorial3 shows how to use usr-define node in application based on OpenVX framework.
+This tutorial using two image as inputs, by default named left_gray.bmp and right_gray.bmp. And defined the kernel named vxcAbsDiff which calc the absolute different value between two input images and write output image.
+In this kernel, shows how to use EVIS instructions to accelerate , and also shows how to using read and write image instructions.
+The relevant validate functions are also introduced, shows how to verify the kernel parameters.
+NO arguments are required to run this program.

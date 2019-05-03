@@ -14,6 +14,11 @@
 #ifndef __gc_cl_common_h_
 #define __gc_cl_common_h_
 
+#ifndef gcdEMPTY_HEADER_FOOTER
+/* use empty header & footer for compiler FE and BE */
+#define gcdEMPTY_HEADER_FOOTER 1
+#endif
+
 #include "gc_hal.h"
 #include "gc_hal_user_debug.h"
 #include "gc_hal_user_os_memory.h"
@@ -28,7 +33,7 @@ typedef const char *    gctCONST_CHAR_PTR;
 #include "gc_cl_link_list.h"
 #include "gc_cl_hash_table.h"
 
-#define _GC_OBJ_ZONE    gcvZONE_COMPILER
+#define _GC_OBJ_ZONE    gcdZONE_COMPILER
 
 gctINT
 clFindLCM(

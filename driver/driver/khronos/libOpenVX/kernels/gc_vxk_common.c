@@ -13,6 +13,8 @@
 
 #include <gc_vxk_common.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_OTHERS
+
 VX_INTERNAL_API gctUINT64 gcfVX_PerfStart(vx_reference ref)
 {
     gctUINT64 start = 0;
@@ -460,7 +462,7 @@ gceSTATUS gcfVX_AllocateMemForImageFromHandle(vx_image image, vx_uint32 planeInd
         gctUINT32_PTR logical = 0;
 
         vxGetValidRegionImage(image, &rect);
-        size = vxComputeImagePatchSize(image, &rect, planeIndx);
+        size = vxComputeWholeImageSize(image, &rect, planeIndx);
 
         status = gcoVX_AllocateMemory((gctUINT32)size, (gctPOINTER*)&logical,
                                     &image->memory.physicals[planeIndx],
@@ -923,6 +925,7 @@ static gceSTATUS _SyncMemoryForOutPut(gcoVX_Kernel_Context *Context)
                 vx_rectangle_t rect;
                 vx_image image = (vx_image)object->obj;
 
+                if (!object->obj ) continue;
                 if(image->importType != VX_MEMORY_TYPE_HOST || image->useInternalMem == vx_false_e)
                     continue;
 
@@ -934,7 +937,7 @@ static gceSTATUS _SyncMemoryForOutPut(gcoVX_Kernel_Context *Context)
                     if (image->memory.nodePtrs[plane] != VX_NULL && image->memory.logicals[plane] != (image->memory.nodePtrs[plane]->logical + image->memory.offset[plane]))
                     {
                         vx_size size = 0;
-                        size = vxComputeImagePatchSize(image, &rect, plane);
+                        size = vxComputeWholeImageSize(image, &rect, plane);
                         /*Only copy different memory. For CTS GraphROI.Simple */
                         if (size > 0 && (abs((vx_int32)(gcmALL_TO_UINT32(image->memory.logicals[plane]) - gcmALL_TO_UINT32(image->memory.nodePtrs[plane]->logical))) > (vx_int32)size))
                             gcoOS_MemCopy(image->memory.logicals[plane], image->memory.nodePtrs[plane]->logical, size);

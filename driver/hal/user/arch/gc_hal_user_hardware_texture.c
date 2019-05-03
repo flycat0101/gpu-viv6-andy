@@ -108,7 +108,7 @@ static gctINT _GetTextureFormat(
 
     if (FormatInfo->txFormat == gcvINVALID_TEXTURE_FORMAT)
     {
-        gcmTRACE_ZONE(gcvLEVEL_WARNING, gcvZONE_TEXTURE,
+        gcmTRACE_ZONE(gcvLEVEL_WARNING, _GC_OBJ_ZONE,
                       "Unknown color format.");
 
         /* Format is not supported. */
@@ -911,7 +911,7 @@ static gctINT _GetYUVControl(
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)));
 
     default:
-        gcmTRACE_ZONE(gcvLEVEL_WARNING, gcvZONE_TEXTURE,
+        gcmTRACE_ZONE(gcvLEVEL_WARNING, _GC_OBJ_ZONE,
                       "Unknown yuv format.");
         break;
     }

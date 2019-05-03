@@ -15,8 +15,8 @@
 # Include common definitions.
 include $(AQROOT)/makefile.linux.def
 
-TARGET_NAME   := gbm_viv.so
-TARGET_SONAME := gbm_viv.so
+TARGET_NAME   := libgbm_viv.so
+TARGET_SONAME := libgbm_viv.so
 
 TARGET_MODULE := $(OBJ_DIR)/$(TARGET_NAME)
 

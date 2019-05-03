@@ -22,7 +22,7 @@
 
 #define NEW_READ_WRITE_IMAGE    1
 
-#define _GC_OBJ_ZONE    gcvZONE_COMPILER
+#define _GC_OBJ_ZONE    gcdZONE_COMPILER
 
 #if gcdENABLE_3D
 
@@ -133,11 +133,19 @@ _Enable2Swizzle(
 static gceSTATUS
 gcLoadTexFormatConvertLibrary(void)
 {
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcLockLoadLibrary();
+
 #if DX_SHADER
-    return gcLoadDXTexFormatConvertLibrary();
+    status = gcLoadDXTexFormatConvertLibrary();
 #else
-    return gcLoadESTexFormatConvertLibrary();
+    status = gcLoadESTexFormatConvertLibrary();
 #endif
+
+    gcUnLockLoadLibrary();
+
+    return status;
 }
 
 /* forward declarations */
@@ -4701,12 +4709,15 @@ gcLoadESTexFormatConvertLibrary(
             return gcvSTATUS_INVALID_ADDRESS;
         }
 
-        /* Get library source based on hardware capability. */
-        RecompilerShaderSource = _getRecompilerShaderSource();
-
-        if (!RecompilerShaderSource)
+        if (RecompilerShaderSource == gcvNULL)
         {
-            return gcvSTATUS_NOT_SUPPORTED;
+            /* Get library source based on hardware capability. */
+            RecompilerShaderSource = _getRecompilerShaderSource();
+
+            if (!RecompilerShaderSource)
+            {
+                return gcvSTATUS_NOT_SUPPORTED;
+            }
         }
 
         sourceSize = gcoOS_StrLen(RecompilerShaderSource, gcvNULL);
@@ -4760,12 +4771,24 @@ gcLoadESTexFormatConvertLibrary(
 
         gcmONERROR(gcSHADER_Load(library, buffer, bufferSize));
 #endif
+        if (log)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, log);
+        }
+
         gcTexFormatConvertLibrary = library;
         return gcvSTATUS_OK;
     }
+    else
+    {
+        return status;
+    }
 
 OnError:
-    gcmOS_SAFE_FREE(gcvNULL, RecompilerShaderSource);
+    if (RecompilerShaderSource)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, RecompilerShaderSource);
+    }
     if (log)
     {
         gcmOS_SAFE_FREE(gcvNULL, log);
@@ -6782,10 +6805,7 @@ _patchSampleMask(
         gctUINT lastInstruction;
         gcSHADER_INSTRUCTION_INDEX instrIndex;
 
-        if (gcTexFormatConvertLibrary == gcvNULL)
-        {
-            gcmONERROR(gcLoadTexFormatConvertLibrary());
-        }
+        gcmONERROR(gcLoadTexFormatConvertLibrary());
 
         /* insert NOPs to the end of main() */
         tempCodeIndex = _insertNOP2Main(Shader, 2);
@@ -6969,6 +6989,10 @@ gcLoadBlendLibrary(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gctSTRING log = gcvNULL;
+    gctBOOL locked = gcvFALSE;
+
+    gcmONERROR(gcLockLoadLibrary());
+    locked = gcvTRUE;
 
     if (gcBlendLibrary == gcvNULL)
     {
@@ -6979,6 +7003,8 @@ gcLoadBlendLibrary(
 
         if (gcGLSLCompiler == gcvNULL)
         {
+            locked = gcvFALSE;
+            gcUnLockLoadLibrary();
             return gcvSTATUS_INVALID_ADDRESS;
         }
 
@@ -7002,12 +7028,40 @@ gcLoadBlendLibrary(
             goto OnError;
         }
 
+        if (log)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, log);
+        }
+
         gcBlendLibrary = library;
+
+        locked = gcvFALSE;
+        gcUnLockLoadLibrary();
         return gcvSTATUS_OK;
+    }
+    else
+    {
+        locked = gcvFALSE;
+        gcUnLockLoadLibrary();
+        return status;
     }
 
 OnError:
-    gcmOS_SAFE_FREE(gcvNULL, BlendRecompilerShaderSource);
+    if (BlendRecompilerShaderSource)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, BlendRecompilerShaderSource);
+    }
+
+    if (log)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, log);
+    }
+
+    if (locked)
+    {
+        gcmVERIFY_OK(gcUnLockLoadLibrary());
+    }
+
     /* Return the status. */
     return status;
 }
@@ -7769,10 +7823,7 @@ _patchTexldFormatConversion(
         return status;
     }
 
-    if (gcTexFormatConvertLibrary == gcvNULL)
-    {
-        gcmONERROR(gcLoadTexFormatConvertLibrary());
-    }
+    gcmONERROR(gcLoadTexFormatConvertLibrary());
 
     gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
 
@@ -8004,11 +8055,7 @@ _patchOutputFormatConversion(
         return gcvSTATUS_OK;
 
     /* load format conversion library if is not loaded yet */
-    if (gcTexFormatConvertLibrary == gcvNULL)
-    {
-        gcmONERROR(gcLoadTexFormatConvertLibrary());
-    }
-
+    gcmONERROR(gcLoadTexFormatConvertLibrary());
 
     /* find the output variable's temp register index */
     for (i=0; i < Shader->outputCount; i++)
@@ -8091,10 +8138,7 @@ _patchDepthComparison(
     gcSL_INSTRUCTION  tempCode = gcvNULL;
     gctPOINTER pointer = gcvNULL;
 
-    if (gcTexFormatConvertLibrary == gcvNULL)
-    {
-        gcmONERROR(gcLoadTexFormatConvertLibrary());
-    }
+    gcmONERROR(gcLoadTexFormatConvertLibrary());
 
     gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
 

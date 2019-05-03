@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -50,7 +50,24 @@ CFLAGS += $(INCLUDE)
 ################################################################################
 # Supply necessary libraries.
 
-LIBS += -L$(VIVANTE_SDK_LIB) -l OpenVX -l OpenVXU -l CLC -l VSC
+ifeq ($(gcdSTATIC_LINK),1)
+  LIBS += $(VIVANTE_SDK_LIB)/libOpenVXU.a
+  LIBS += $(VIVANTE_SDK_LIB)/libOpenVX.a
+  LIBS += $(VIVANTE_SDK_LIB)/libCLC.a
+  LIBS += $(VIVANTE_SDK_LIB)/libLLVM_viv.a
+  LIBS += $(VIVANTE_SDK_LIB)/libclCompiler.a
+  LIBS += $(VIVANTE_SDK_LIB)/libclPreprocessor.a
+  LIBS += $(VIVANTE_SDK_LIB)/libclCommon.a
+  LIBS += $(VIVANTE_SDK_LIB)/libLLVM_viv.a
+  LIBS += $(VIVANTE_SDK_LIB)/libVSC.a
+  LIBS += $(VIVANTE_SDK_LIB)/libhalarchuser.a
+  LIBS += $(VIVANTE_SDK_LIB)/libhalosuser.a
+  LIBS += $(VIVANTE_SDK_LIB)/libGAL.a
+  LIBS += $(VIVANTE_SDK_LIB)/libhalarchuser.a
+  LIBS += $(VIVANTE_SDK_LIB)/libGAL.a
+else
+  LIBS += -L$(VIVANTE_SDK_LIB) -l OpenVX -l OpenVXU -l CLC -l VSC
+endif
 
 LIBS += -lm -lpthread -ldl
 ifeq ($(EGL_API_DRI), 1)

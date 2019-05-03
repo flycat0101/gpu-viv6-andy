@@ -14,16 +14,18 @@
 #include <gc_vx_common.h>
 #include <float.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_NODE
+
 VX_API_ENTRY vx_node VX_API_CALL vxColorConvertNode(vx_graph graph, vx_image input, vx_image output)
 {
     vx_reference parameters[] = {
         (vx_reference)input,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, output=%p", graph, input, output);
     gcmDUMP_API("$VX vxColorConvertNode: graph=%p, input=%p, output=%p", graph, input, output);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_COLOR_CONVERT, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -36,7 +38,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxChannelExtractNode(vx_graph graph, vx_image i
         VX_NULL,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, channelNum=0x%x output=%p", graph, input, channelNum, output);
     gcmDUMP_API("$VX vxChannelExtractNode: graph=%p, input=%p, channelNum=0x%x output=%p", graph, input, channelNum, output);
 
     scalar = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &channelNum);
@@ -45,17 +47,16 @@ VX_API_ENTRY vx_node VX_API_CALL vxChannelExtractNode(vx_graph graph, vx_image i
     {
         vxError("%s[%d]: Get Scale reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)scalar), "%s[%d]: Get Scale reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)scalar;
     }
 
     parameters[1] = (vx_reference)scalar;
 
-
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_CHANNEL_EXTRACT, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&scalar);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -69,10 +70,9 @@ VX_API_ENTRY vx_node VX_API_CALL vxChannelCombineNode(
        (vx_reference)plane3,
        (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, plane0=%p, plane1=%p, plane2=%p, plane3=%p, output=%p", graph, plane0, plane1, plane2, plane3, output);
     gcmDUMP_API("$VX vxChannelCombineNode: graph=%p, plane0=%p, plane1=%p, plane2=%p, plane3=%p, output=%p", graph, plane0, plane1, plane2, plane3, output);
-
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_CHANNEL_COMBINE, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -83,9 +83,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxSobel3x3Node(vx_graph graph, vx_image input, 
        (vx_reference)output_x,
        (vx_reference)output_y
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, output_x=%p, output_y=%p", graph, input, output_x, output_y);
     gcmDUMP_API("$VX vxSobel3x3Node: graph=%p, input=%p, output_x=%p, output_y=%p", graph, input, output_x, output_y);
 
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_SOBEL_3x3, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -96,11 +97,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxMagnitudeNode(vx_graph graph, vx_image grad_x
        (vx_reference)grad_y,
        (vx_reference)mag
     };
-
+    gcmHEADER_ARG(" graph=%p, grad_x=%p, grad_y=%p, mag=%p", graph, grad_x, grad_y, mag);
     gcmDUMP_API("$VX vxMagnitudeNode: graph=%p, grad_x=%p, grad_y=%p, mag=%p", graph, grad_x, grad_y, mag);
 
-
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_MAGNITUDE, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -111,11 +111,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxPhaseNode(vx_graph graph, vx_image grad_x, vx
        (vx_reference)grad_y,
        (vx_reference)orientation
     };
-
+    gcmHEADER_ARG("graph=%p, grad_x=%p, grad_y=%p, orientation=%p", graph, grad_x, grad_y, orientation);
     gcmDUMP_API("$VX vxPhaseNode: graph=%p, grad_x=%p, grad_y=%p, orientation=%p", graph, grad_x, grad_y, orientation);
 
-
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_PHASE, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -128,6 +127,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxScaleImageNode(vx_graph graph, vx_image src, 
         (vx_reference)dst,
         VX_NULL
     };
+    gcmHEADER_ARG("graph=%p, src=%p, dst=%p, type=0x%x", graph, src, dst, type);
     gcmDUMP_API("$VX vxScaleImageNode: graph=%p, src=%p, dst=%p, type=0x%x", graph, src, dst, type);
 
     scalar = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &type);
@@ -136,17 +136,16 @@ VX_API_ENTRY vx_node VX_API_CALL vxScaleImageNode(vx_graph graph, vx_image src, 
     {
         vxError("%s[%d]: Get ImageNode Scale reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)scalar), "%s[%d]: Get ImageNode Scale reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)scalar;
     }
 
     parameters[2] = (vx_reference)scalar;
 
-
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_SCALE_IMAGE, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&scalar);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -157,11 +156,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxTableLookupNode(vx_graph graph, vx_image inpu
         (vx_reference)lut,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, lut=%p, output=%p", graph, input, lut, output);
     gcmDUMP_API("$VX vxTableLookupNode: graph=%p, input=%p, lut=%p, output=%p", graph, input, lut, output);
 
-
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_TABLE_LOOKUP, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -171,10 +169,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxHistogramNode(vx_graph graph, vx_image input,
         (vx_reference)input,
         (vx_reference)distribution
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, distribution=%p", graph, input, distribution);
     gcmDUMP_API("$VX vxHistogramNode: graph=%p, input=%p, distribution=%p", graph, input, distribution);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_HISTOGRAM, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -184,10 +182,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxEqualizeHistNode(vx_graph graph, vx_image inp
         (vx_reference)input,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, output=%p", graph, input, output);
     gcmDUMP_API("$VX vxEqualizeHistNode: graph=%p, input=%p, output=%p", graph, input, output);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_EQUALIZE_HISTOGRAM, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -198,10 +196,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxAbsDiffNode(vx_graph graph, vx_image in1, vx_
        (vx_reference)in2,
        (vx_reference)out
     };
-
+    gcmHEADER_ARG("graph=%p, in1=%p, in2=%p, out=%p", graph, in1, in2, out);
     gcmDUMP_API("$VX vxAbsDiffNode: graph=%p, in1=%p, in2=%p, out=%p", graph, in1, in2, out);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_ABSDIFF, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -212,9 +210,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxMeanStdDevNode(vx_graph graph, vx_image input
        (vx_reference)mean,
        (vx_reference)stddev
     };
+    gcmHEADER_ARG("graph=%p, input=%p, mean=%p, stddev=%p", graph, input, mean, stddev);
     gcmDUMP_API("$VX vxMeanStdDevNode: graph=%p, input=%p, mean=%p, stddev=%p", graph, input, mean, stddev);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_MEAN_STDDEV, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -232,14 +231,23 @@ VX_API_ENTRY vx_node VX_API_CALL vxThresholdNode(vx_graph graph, vx_image input,
         NULL,
         (vx_reference)output
     };
+    gcmHEADER_ARG("graph=%p, input=%p, thesh=%p, output=%p", graph, input, thesh, output);
     gcmDUMP_API("$VX vxThresholdNode: graph=%p, input=%p, thesh=%p, output=%p", graph, input, thesh, output);
 
     true_false_value = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_UINT32, &value);
-    if (vxoReference_GetStatus((vx_reference)true_false_value) != VX_SUCCESS) return (vx_node)true_false_value;
+    if (vxoReference_GetStatus((vx_reference)true_false_value) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)true_false_value;
+    }
     parameters[2] = (vx_reference)true_false_value;
 
     upper_lower_value = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_UINT32, &value);
-    if (vxoReference_GetStatus((vx_reference)upper_lower_value) != VX_SUCCESS) return (vx_node)upper_lower_value;
+    if (vxoReference_GetStatus((vx_reference)upper_lower_value) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)upper_lower_value;
+    }
     parameters[3] = (vx_reference)upper_lower_value;
 
     type = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &value1);
@@ -247,6 +255,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxThresholdNode(vx_graph graph, vx_image input,
     {
         vxError("%s[%d]: Get type reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&type->base, vxoReference_GetStatus((vx_reference)type), "%s[%d]: Get type reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)type;
     }
     parameters[4] = (vx_reference)type;
@@ -255,6 +264,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxThresholdNode(vx_graph graph, vx_image input,
     vxReleaseScalar(&true_false_value);
     vxReleaseScalar(&upper_lower_value);
     vxReleaseScalar(&type);
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -264,10 +274,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxIntegralImageNode(vx_graph graph, vx_image in
         (vx_reference)input,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, output=%p", graph, input, output);
     gcmDUMP_API("$VX vxIntegralImageNode: graph=%p, input=%p, output=%p", graph, input, output);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_INTEGRAL_IMAGE, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -277,10 +287,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxErode3x3Node(vx_graph graph, vx_image input, 
         (vx_reference)input,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, output=%p", graph, input, output);
     gcmDUMP_API("$VX vxErode3x3Node: graph=%p, input=%p, output=%p", graph, input, output);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_ERODE_3x3, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -290,10 +300,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxDilate3x3Node(vx_graph graph, vx_image input,
         (vx_reference)input,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, output=%p", graph, input, output);
     gcmDUMP_API("$VX vxDilate3x3Node: graph=%p, input=%p, output=%p", graph, input, output);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_DILATE_3x3, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -303,10 +313,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxMedian3x3Node(vx_graph graph, vx_image input,
         (vx_reference)input,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, output=%p", graph, input, output);
     gcmDUMP_API("$VX vxMedian3x3Node: graph=%p, input=%p, output=%p", graph, input, output);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_MEDIAN_3x3, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -316,10 +326,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxBox3x3Node(vx_graph graph, vx_image input, vx
         (vx_reference)input,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, output=%p", graph, input, output);
     gcmDUMP_API("$VX vxBox3x3Node: graph=%p, input=%p, output=%p", graph, input, output);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_BOX_3x3, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -329,10 +339,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxGaussian3x3Node(vx_graph graph, vx_image inpu
         (vx_reference)input,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, output=%p", graph, input, output);
     gcmDUMP_API("$VX vxGaussian3x3Node: graph=%p, input=%p, output=%p", graph, input, output);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_GAUSSIAN_3x3, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -346,9 +356,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxNonLinearFilterNode(vx_graph graph, vx_enum f
         (vx_reference)mask,
         (vx_reference)output,
     };
-
+    gcmHEADER_ARG("graph=%p, function=%p, input=%p, mask=%p, output=%p", graph, function, input, mask, output);
     gcmDUMP_API("$VX vxNonLinearFilterNode: graph=%p, function=%p, input=%p, mask=%p, output=%p", graph, function, input, mask, output);
-
 
     node = vxoNode_CreateSpecific(graph,
         VX_KERNEL_NON_LINEAR_FILTER,
@@ -356,6 +365,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxNonLinearFilterNode(vx_graph graph, vx_enum f
         vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&func);
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -366,9 +376,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolveNode(vx_graph graph, vx_image input, 
         (vx_reference)conv,
         (vx_reference)output
     };
+    gcmHEADER_ARG("graph=%p, input=%p, conv=%p, output=%p", graph, input, conv, output);
     gcmDUMP_API("$VX vxConvolveNode: graph=%p, input=%p, conv=%p, output=%p", graph, input, conv, output);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_CUSTOM_CONVOLUTION, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -378,10 +389,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxGaussianPyramidNode(vx_graph graph, vx_image 
         (vx_reference)input,
         (vx_reference)gaussian
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, gaussian=%p", graph, input, gaussian);
     gcmDUMP_API("$VX vxGaussianPyramidNode: graph=%p, input=%p, gaussian=%p", graph, input, gaussian);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_GAUSSIAN_PYRAMID, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -391,10 +402,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxAccumulateImageNode(vx_graph graph, vx_image 
         (vx_reference)input,
         (vx_reference)accum
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, accum=%p", graph, input, accum);
     gcmDUMP_API("$VX vxAccumulateImageNode: graph=%p, input=%p, accum=%p", graph, input, accum);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_ACCUMULATE, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -405,10 +416,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxAccumulateWeightedImageNode(vx_graph graph, v
         (vx_reference)alpha,
         (vx_reference)accum
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, alpha=%p, accum=%p", graph, input, alpha, accum);
     gcmDUMP_API("$VX vxAccumulateWeightedImageNode: graph=%p, input=%p, alpha=%p, accum=%p", graph, input, alpha, accum);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_ACCUMULATE_WEIGHTED, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -419,10 +430,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxAccumulateSquareImageNode(vx_graph graph, vx_
         (vx_reference)scalar,
         (vx_reference)accum
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, scalar=%p, accum=%p", graph, input, scalar, accum);
     gcmDUMP_API("$VX vxAccumulateSquareImageNode: graph=%p, input=%p, scalar=%p, accum=%p", graph, input, scalar, accum);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_ACCUMULATE_SQUARE, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -441,11 +452,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxMinMaxLocNode(vx_graph graph,
         (vx_reference)minCount,
         (vx_reference)maxCount
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, minVal=%p, maxVal=%p, minLoc=%p, maxLoc=%p, minCount=%p, maxCount=%p", graph, input, minVal, maxVal, minLoc, maxLoc, minCount, maxCount);
     gcmDUMP_API("$VX vxMinMaxLocNode: graph=%p, input=%p, minVal=%p, maxVal=%p, minLoc=%p, maxLoc=%p, minCount=%p, maxCount=%p", graph, input, minVal, maxVal, minLoc, maxLoc, minCount, maxCount);
 
-
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_MINMAXLOC, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -460,7 +470,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvertDepthNode(
         VX_NULL,
         (vx_reference)shift
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, output=%p, policy=%p, shift=%p", graph, input, output, policy, shift);
     gcmDUMP_API("$VX vxConvertDepthNode: graph=%p, input=%p, output=%p, policy=%p, shift=%p", graph, input, output, policy, shift);
 
     scalar = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &policy);
@@ -469,17 +479,16 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvertDepthNode(
     {
         vxError("%s[%d]: Get Scale reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)scalar), "%s[%d]: Get Scale reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)scalar;
     }
 
     parameters[2] = (vx_reference)scalar;
 
-
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_CONVERTDEPTH, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&scalar);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -496,7 +505,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxCannyEdgeDetectorNode(
         VX_NULL,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, hyst=%p, gradient_size=0x%x, norm_type=0x%x, output=%p", graph, input, hyst, gradient_size, norm_type, output);
     gcmDUMP_API("$VX vxCannyEdgeDetectorNode: graph=%p, input=%p, hyst=%p, gradient_size=0x%x, norm_type=0x%x, output=%p", graph, input, hyst, gradient_size, norm_type, output);
 
     scalarGradientSize = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &gradient_size);
@@ -505,6 +514,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxCannyEdgeDetectorNode(
     {
         vxError("%s[%d]: Get scalarGradientSize reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)scalarGradientSize), "%s[%d]: Get scalarGradientSize reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)scalarGradientSize;
     }
 
@@ -516,19 +526,18 @@ VX_API_ENTRY vx_node VX_API_CALL vxCannyEdgeDetectorNode(
     {
         vxError("%s[%d]: Get scalarNormType reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)scalarNormType), "%s[%d]: Get scalarNormType reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)scalarNormType;
     }
 
     parameters[3] = (vx_reference)scalarNormType;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_CANNY_EDGE_DETECTOR, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&scalarGradientSize);
 
     vxReleaseScalar(&scalarNormType);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -539,10 +548,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxAndNode(vx_graph graph, vx_image in1, vx_imag
        (vx_reference)in2,
        (vx_reference)out
     };
-
+    gcmHEADER_ARG("graph=%p, in1=%p, in2=%p, out=%p", graph, in1, in2, out);
     gcmDUMP_API("$VX vxAndNode: graph=%p, in1=%p, in2=%p, out=%p", graph, in1, in2, out);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_AND, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -553,10 +562,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxOrNode(vx_graph graph, vx_image in1, vx_image
        (vx_reference)in2,
        (vx_reference)out
     };
-
+    gcmHEADER_ARG("graph=%p, in1=%p, in2=%p, out=%p", graph, in1, in2, out);
     gcmDUMP_API("$VX vxOrNode: graph=%p, in1=%p, in2=%p, out=%p", graph, in1, in2, out);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_OR, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -567,10 +576,9 @@ VX_API_ENTRY vx_node VX_API_CALL vxXorNode(vx_graph graph, vx_image in1, vx_imag
        (vx_reference)in2,
        (vx_reference)out
     };
-
+    gcmHEADER_ARG("graph=%p, in1=%p, in2=%p, out=%p", graph, in1, in2, out);
     gcmDUMP_API("$VX vxXorNode: graph=%p, in1=%p, in2=%p, out=%p", graph, in1, in2, out);
-
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_XOR, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -580,10 +588,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxNotNode(vx_graph graph, vx_image input, vx_im
        (vx_reference)input,
        (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, output=%p", graph, input, output);
     gcmDUMP_API("$VX vxNotNode: graph=%p, input=%p, output=%p", graph, input, output);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_NOT, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -599,7 +607,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxMultiplyNode(vx_graph graph, vx_image in1, vx
        VX_NULL,
        (vx_reference)out
     };
-
+    gcmHEADER_ARG("graph=%p, in1=%p, in2=%p, scale=%p, overflow_policy=0x%x, rounding_policy=0x%x, out=%p", graph, in1, in2, scale, overflow_policy, rounding_policy, out);
     gcmDUMP_API("$VX vxMultiplyNode: graph=%p, in1=%p, in2=%p, scale=%p, overflow_policy=0x%x, rounding_policy=0x%x, out=%p", graph, in1, in2, scale, overflow_policy, rounding_policy, out);
 
     scalarOverflowPolicy = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &overflow_policy);
@@ -608,6 +616,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxMultiplyNode(vx_graph graph, vx_image in1, vx
     {
         vxError("%s[%d]: Get scalarOverflowPolicy reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)scalarOverflowPolicy), "%s[%d]: Get scalarOverflowPolicy reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)scalarOverflowPolicy;
     }
 
@@ -619,19 +628,18 @@ VX_API_ENTRY vx_node VX_API_CALL vxMultiplyNode(vx_graph graph, vx_image in1, vx
     {
         vxError("%s[%d]: Get scalarRoundingPolicy reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)scalarRoundingPolicy), "%s[%d]: Get scalarRoundingPolicy reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)scalarRoundingPolicy;
     }
 
     parameters[4] = (vx_reference)scalarRoundingPolicy;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_MULTIPLY, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&scalarOverflowPolicy);
 
     vxReleaseScalar(&scalarRoundingPolicy);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -645,7 +653,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxAddNode(vx_graph graph, vx_image in1, vx_imag
        VX_NULL,
        (vx_reference)out
     };
-
+    gcmHEADER_ARG("graph=%p, in1=%p, in2=%p, policy=0x%x, out=%p", graph, in1, in2, policy, out);
     gcmDUMP_API("$VX vxAddNode: graph=%p, in1=%p, in2=%p, policy=0x%x, out=%p", graph, in1, in2, policy, out);
 
     scalarPolicy = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &policy);
@@ -654,16 +662,15 @@ VX_API_ENTRY vx_node VX_API_CALL vxAddNode(vx_graph graph, vx_image in1, vx_imag
     {
         vxError("%s[%d]: Get scalarPolicy reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)scalarPolicy), "%s[%d]: Get scalarPolicy reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)scalarPolicy;
     }
     parameters[2] = (vx_reference)scalarPolicy;
 
-
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_ADD, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&scalarPolicy);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -677,7 +684,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxSubtractNode(vx_graph graph, vx_image in1, vx
        VX_NULL,
        (vx_reference)out
     };
-
+    gcmHEADER_ARG("graph=%p, in1=%p, in2=%p, policy=0x%x, out=%p", graph, in1, in2, policy, out);
     gcmDUMP_API("$VX vxSubtractNode: graph=%p, in1=%p, in2=%p, policy=0x%x, out=%p", graph, in1, in2, policy, out);
 
     scalarPolicy = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &policy);
@@ -686,16 +693,15 @@ VX_API_ENTRY vx_node VX_API_CALL vxSubtractNode(vx_graph graph, vx_image in1, vx
     {
         vxError("%s[%d]: Get scalarPolicy reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)scalarPolicy), "%s[%d]: Get scalarPolicy reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)scalarPolicy;
     }
     parameters[2] = (vx_reference)scalarPolicy;
 
-
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_SUBTRACT, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&scalarPolicy);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -710,7 +716,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxWarpAffineNode(
         VX_NULL,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, matrix=%p, type=0x%x, output=%p", graph, input, matrix, type, output);
     gcmDUMP_API("$VX vxWarpAffineNode: graph=%p, input=%p, matrix=%p, type=0x%x, output=%p", graph, input, matrix, type, output);
 
     scalar = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &type);
@@ -719,17 +725,16 @@ VX_API_ENTRY vx_node VX_API_CALL vxWarpAffineNode(
     {
         vxError("%s[%d]: Get Scale reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)scalar), "%s[%d]: Get Scale reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)scalar;
     }
 
     parameters[2] = (vx_reference)scalar;
 
-
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_WARP_AFFINE, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&scalar);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -744,7 +749,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxWarpPerspectiveNode(
         VX_NULL,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, matrix=%p, type=0x%x, output=%p", graph, input, matrix, type, output);
     gcmDUMP_API("$VX vxWarpPerspectiveNode: graph=%p, input=%p, matrix=%p, type=0x%x, output=%p", graph, input, matrix, type, output);
 
     scalar = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &type);
@@ -753,17 +758,16 @@ VX_API_ENTRY vx_node VX_API_CALL vxWarpPerspectiveNode(
     {
         vxError("%s[%d]: Get Scale reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)scalar), "%s[%d]: Get Scale reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)scalar;
     }
 
     parameters[2] = (vx_reference)scalar;
 
-
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_WARP_PERSPECTIVE, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&scalar);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -783,7 +787,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxHarrisCornersNode(
         (vx_reference)corners,
         (vx_reference)num_corners
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, strength_thresh=%p, min_distance=%p, sensitivity=%p, gradient_size=0x%x, block_size=0x%x, corners=%p, num_corners=%p",
+        graph, input, strength_thresh, min_distance, sensitivity, gradient_size, block_size, corners, num_corners);
     gcmDUMP_API("$VX vxHarrisCornersNode: graph=%p, input=%p, strength_thresh=%p, min_distance=%p, sensitivity=%p, gradient_size=0x%x, block_size=0x%x, corners=%p, num_corners=%p",
         graph, input, strength_thresh, min_distance, sensitivity, gradient_size, block_size, corners, num_corners);
 
@@ -793,6 +798,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxHarrisCornersNode(
     {
         vxError("%s[%d]: Get scalarGradientSize reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)scalarGradientSize), "%s[%d]: Get scalarGradientSize reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)scalarGradientSize;
     }
 
@@ -804,19 +810,18 @@ VX_API_ENTRY vx_node VX_API_CALL vxHarrisCornersNode(
     {
         vxError("%s[%d]: Get scalarBlockSize reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)scalarBlockSize), "%s[%d]: Get scalarBlockSize reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)scalarBlockSize;
     }
 
     parameters[5] = (vx_reference)scalarBlockSize;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_HARRIS_CORNERS, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&scalarGradientSize);
 
     vxReleaseScalar(&scalarBlockSize);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -834,7 +839,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxFastCornersNode(
         (vx_reference)num_corners
     };
 
-
+    gcmHEADER_ARG("graph=%p, input=%p, strength_thresh=%p, nonmax_suppression=0x%x, corners=%p, num_corners=%p",
+        graph, input, strength_thresh, nonmax_suppression, corners, num_corners);
     gcmDUMP_API("$VX vxFastCornersNode: graph=%p, input=%p, strength_thresh=%p, nonmax_suppression=0x%x, corners=%p, num_corners=%p",
         graph, input, strength_thresh, nonmax_suppression, corners, num_corners);
 
@@ -844,17 +850,16 @@ VX_API_ENTRY vx_node VX_API_CALL vxFastCornersNode(
     {
         vxError("%s[%d]: Get scalarNonmaxSuppression reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)scalarNonmaxSuppression), "%s[%d]: Get scalarNonmaxSuppression reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)scalarNonmaxSuppression;
     }
 
     parameters[2] = (vx_reference)scalarNonmaxSuppression;
 
-
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_FAST_CORNERS, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&scalarNonmaxSuppression);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -877,31 +882,37 @@ VX_API_ENTRY vx_node VX_API_CALL vxOpticalFlowPyrLKNode(
         (vx_reference)use_initial_estimate,
         VX_NULL
     };
-
+    gcmHEADER_ARG("graph=%p, old_images=%p, new_images=%p, old_points=%p, new_points_estimates=%p, new_points=%p, termination=0x%x, epsilon=%p,"\
+        " num_iterations=%p, use_initial_estimate=%p, window_dimension=0x%lx", graph, old_images, new_images, old_points, new_points_estimates, new_points, termination,
+        epsilon, num_iterations, use_initial_estimate, window_dimension);
     gcmDUMP_API("$VX vxOpticalFlowPyrLKNode: graph=%p, old_images=%p, new_images=%p, old_points=%p, new_points_estimates=%p, new_points=%p, termination=0x%x, epsilon=%p,"\
         " num_iterations=%p, use_initial_estimate=%p, window_dimension=0x%lx", graph, old_images, new_images, old_points, new_points_estimates, new_points, termination,
         epsilon, num_iterations, use_initial_estimate, window_dimension);
 
     scalarTermination = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &termination);
 
-    if (vxoReference_GetStatus((vx_reference)scalarTermination) != VX_SUCCESS) return (vx_node)scalarTermination;
-
+    if (vxoReference_GetStatus((vx_reference)scalarTermination) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)scalarTermination;
+    }
     parameters[5] = (vx_reference)scalarTermination;
 
     scalarWindowDimension = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_SIZE, &window_dimension);
 
-    if (vxoReference_GetStatus((vx_reference)scalarWindowDimension) != VX_SUCCESS) return (vx_node)scalarWindowDimension;
-
+    if (vxoReference_GetStatus((vx_reference)scalarWindowDimension) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)scalarWindowDimension;
+    }
     parameters[9] = (vx_reference)scalarWindowDimension;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_OPTICAL_FLOW_PYR_LK, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&scalarTermination);
 
     vxReleaseScalar(&scalarWindowDimension);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -915,7 +926,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxRemapNode(vx_graph graph, vx_image input, vx_
         VX_NULL,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, table=%p, policy=0x%x, out=%p", graph, input, table, policy, output);
     gcmDUMP_API("$VX vxRemapNode: graph=%p, input=%p, table=%p, policy=0x%x, out=%p", graph, input, table, policy, output);
 
     scalarPolicy = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &policy);
@@ -924,17 +935,16 @@ VX_API_ENTRY vx_node VX_API_CALL vxRemapNode(vx_graph graph, vx_image input, vx_
     {
         vxError("%s[%d]: Get scalarPolicy reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)scalarPolicy), "%s[%d]: Get scalarPolicy reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)scalarPolicy;
     }
 
     parameters[2] = (vx_reference)scalarPolicy;
 
-
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_REMAP, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&scalarPolicy);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -947,20 +957,22 @@ VX_API_ENTRY vx_node VX_API_CALL vxHalfScaleGaussianNode(vx_graph graph, vx_imag
         (vx_reference)output,
         VX_NULL
     };
+    gcmHEADER_ARG("graph=%p, input=%p, output=%p, kernel_size=0x%x", graph, input, output, kernel_size);
     gcmDUMP_API("$VX vxHalfScaleGaussianNode: graph=%p, input=%p, output=%p, kernel_size=0x%x", graph, input, output, kernel_size);
 
     scalarKernelSize = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &kernel_size);
 
-    if (vxoReference_GetStatus((vx_reference)scalarKernelSize) != VX_SUCCESS) return (vx_node)scalarKernelSize;
-
+    if (vxoReference_GetStatus((vx_reference)scalarKernelSize) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)scalarKernelSize;
+    }
     parameters[2] = (vx_reference)scalarKernelSize;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_HALFSCALE_GAUSSIAN, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&scalarKernelSize);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -971,9 +983,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxLaplacianPyramidNode(vx_graph graph, vx_image
         (vx_reference)laplacian,
         (vx_reference)output
     };
+    gcmHEADER_ARG("graph=%p, input=%p, laplacian=%p, output=%p", graph, input, laplacian, output);
     gcmDUMP_API("$VX vxLaplacianPyramidNode: graph=%p, input=%p, laplacian=%p, output=%p", graph, input, laplacian, output);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_LAPLACIAN_PYRAMID, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -984,10 +997,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxLaplacianReconstructNode(vx_graph graph, vx_p
         (vx_reference)input,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, laplacian=%p, input=%p, output=%p", graph, laplacian, input, output);
     gcmDUMP_API("$VX vxLaplacianReconstructNode: graph=%p, laplacian=%p, input=%p, output=%p", graph, laplacian, input, output);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_LAPLACIAN_RECONSTRUCT, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -998,10 +1011,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxSgmNode(vx_graph graph, vx_image right_img, v
         (vx_reference)left_img,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, right_img=%p, left_img=%p, output=%p", graph, right_img, left_img, output);
     gcmDUMP_API("$VX vxSgmNode: graph=%p, right_img=%p, left_img=%p, output=%p", graph, right_img, left_img, output);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_SGM, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -1011,10 +1024,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxCensus3x3Node(vx_graph graph, vx_image src, v
         (vx_reference)src,
         (vx_reference)dst,
     };
-
+    gcmHEADER_ARG("graph=%p, src=%p, dst=%p", graph, src, dst);
     gcmDUMP_API("$VX vxCensus3x3Node: graph=%p, src=%p, dst=%p", graph, src, dst);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_CENSUS3x3, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -1052,6 +1065,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedReluLayer(
     VX_NULL,
     (vx_reference)outputs
     };
+    gcmHEADER_ARG("graph=%p, inputs=%p, weights_biases=%p, pad=0x%x, accumulator_bits=0x%x, overflow_policy=0x%x, rounding_policy=0x%x,"\
+        " down_scale_size_rounding=0x%x, enable_relu=0x%x, outputs=%p", graph, inputs, weights_biases, pad, accumulator_bits, overflow_policy, rounding_policy, down_scale_size_rounding, enable_relu, outputs);
     gcmDUMP_API("$VX vxFullyConnectedReluLayer: graph=%p, inputs=%p, weights_biases=%p, pad=0x%x, accumulator_bits=0x%x, overflow_policy=0x%x, rounding_policy=0x%x,"\
         " down_scale_size_rounding=0x%x, enable_relu=0x%x, outputs=%p", graph, inputs, weights_biases, pad, accumulator_bits, overflow_policy, rounding_policy, down_scale_size_rounding, enable_relu, outputs);
 
@@ -1062,6 +1077,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedReluLayer(
     {
         vxError("%s[%d]: Get pad_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pad_s), "%s[%d]: Get pad_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pad_s;
     }
 
@@ -1070,6 +1086,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedReluLayer(
     {
         vxError("%s[%d]: Get accumulator_bits_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)accumulator_bits_s), "%s[%d]: Get accumulator_bits_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)accumulator_bits_s;
     }
 
@@ -1078,6 +1095,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedReluLayer(
     {
         vxError("%s[%d]: Get overflow_policy_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)overflow_policy_s), "%s[%d]: Get overflow_policy_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)overflow_policy_s;
     }
 
@@ -1086,6 +1104,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedReluLayer(
     {
         vxError("%s[%d]: Get rounding_policy_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)rounding_policy_s), "%s[%d]: Get rounding_policy_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)rounding_policy_s;
     }
 
@@ -1094,6 +1113,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedReluLayer(
     {
         vxError("%s[%d]: Get down_scale_size_rounding_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)down_scale_size_rounding_s), "%s[%d]: Get down_scale_size_rounding_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)down_scale_size_rounding_s;
     }
 
@@ -1102,6 +1122,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedReluLayer(
     {
         vxError("%s[%d]: Get enable_relu_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)enable_relu_s), "%s[%d]: Get enable_relu_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)enable_relu_s;
     }
 
@@ -1112,7 +1133,6 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedReluLayer(
     parameters[6]  = (vx_reference)down_scale_size_rounding_s;
     parameters[7]  = (vx_reference)enable_relu_s;
 
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_FULLY_CONNECTED_RELU_LAYER, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&pad_s);
@@ -1121,7 +1141,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedReluLayer(
     vxReleaseScalar(&rounding_policy_s);
     vxReleaseScalar(&down_scale_size_rounding_s);
     vxReleaseScalar(&enable_relu_s);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -1147,7 +1167,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedLayer(
     VX_NULL,
     (vx_reference)outputs
     };
-
+    gcmHEADER_ARG("graph=%p, inputs=%p, weights=%p, biases=0x%x, overflow_policy=0x%x, rounding_policy=0x%x, outputs=%p",
+        graph, inputs, weights, biases, overflow_policy, rounding_policy, outputs);
     gcmDUMP_API("$VX vxFullyConnectedLayer: graph=%p, inputs=%p, weights=%p, biases=0x%x, overflow_policy=0x%x, rounding_policy=0x%x, outputs=%p",
         graph, inputs, weights, biases, overflow_policy, rounding_policy, outputs);
 
@@ -1160,6 +1181,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedLayer(
     {
         vxError("%s[%d]: Get overflow_policy_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)overflow_policy_s), "%s[%d]: Get overflow_policy_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)overflow_policy_s;
     }
 
@@ -1168,19 +1190,18 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedLayer(
     {
         vxError("%s[%d]: Get rounding_policy_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)rounding_policy_s), "%s[%d]: Get rounding_policy_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)rounding_policy_s;
     }
 
     parameters[3]  = (vx_reference)overflow_policy_s;
     parameters[4]  = (vx_reference)rounding_policy_s;
 
-
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_FULLY_CONNECTED_LAYER, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&overflow_policy_s);
     vxReleaseScalar(&rounding_policy_s);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -1217,7 +1238,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedLayer_11(
     VX_NULL,
     (vx_reference)outputs
     };
-
+    gcmHEADER_ARG("graph=%p, inputs=%p, weights=%p, biases=0x%x, pad=0x%x, accumulator_bits=0x%x, overflow_policy=0x%x, rounding_policy=0x%x, down_scale_size_rounding=0x%x, outputs=%p",
+        graph, inputs, weights, biases, pad, accumulator_bits, overflow_policy, rounding_policy, down_scale_size_rounding, outputs);
     gcmDUMP_API("$VX vxFullyConnectedLayer_11: graph=%p, inputs=%p, weights=%p, biases=0x%x, pad=0x%x, accumulator_bits=0x%x, overflow_policy=0x%x, rounding_policy=0x%x, down_scale_size_rounding=0x%x, outputs=%p",
         graph, inputs, weights, biases, pad, accumulator_bits, overflow_policy, rounding_policy, down_scale_size_rounding, outputs);
 
@@ -1230,6 +1252,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedLayer_11(
     {
         vxError("%s[%d]: Get pad_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pad_s), "%s[%d]: Get pad_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pad_s;
     }
 
@@ -1238,6 +1261,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedLayer_11(
     {
         vxError("%s[%d]: Get accumulator_bits_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)accumulator_bits_s), "%s[%d]: Get accumulator_bits_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)accumulator_bits_s;
     }
 
@@ -1246,6 +1270,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedLayer_11(
     {
         vxError("%s[%d]: Get overflow_policy_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)overflow_policy_s), "%s[%d]: Get overflow_policy_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)overflow_policy_s;
     }
 
@@ -1254,6 +1279,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedLayer_11(
     {
         vxError("%s[%d]: Get rounding_policy_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)rounding_policy_s), "%s[%d]: Get rounding_policy_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)rounding_policy_s;
     }
 
@@ -1262,6 +1288,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedLayer_11(
     {
         vxError("%s[%d]: Get down_scale_size_rounding_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)down_scale_size_rounding_s), "%s[%d]: Get down_scale_size_rounding_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)down_scale_size_rounding_s;
     }
 
@@ -1271,7 +1298,6 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedLayer_11(
     parameters[6]  = (vx_reference)rounding_policy_s;
     parameters[7]  = (vx_reference)down_scale_size_rounding_s;
 
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_FULLY_CONNECTED_LAYER, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&pad_s);
@@ -1279,7 +1305,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxFullyConnectedLayer_11(
     vxReleaseScalar(&overflow_policy_s);
     vxReleaseScalar(&rounding_policy_s);
     vxReleaseScalar(&down_scale_size_rounding_s);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -1330,7 +1356,9 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer(
     (vx_reference)outputs
     };
 
-
+    gcmHEADER_ARG("graph=%p, inputs=%p, weights_biases=%p, pad_x=0x%x, pad_y=0x%x, accumulator_bits=0x%x, overflow_policy=0x%x, rounding_policy=0x%x,"\
+        " down_scale_size_rounding=0x%x, enable_relu=0x%x, pool_type=0x%x, pool_size_x=0x%x, pool_size_y=0x%x, outputs=%p", graph, inputs, weights_biases, pad_x, pad_y, accumulator_bits,
+        overflow_policy, rounding_policy, down_scale_size_rounding, enable_relu, pool_type, pool_size_x, pool_size_y, outputs);
     gcmDUMP_API("$VX vxConvolutionReluPoolingLayer: graph=%p, inputs=%p, weights_biases=%p, pad_x=0x%x, pad_y=0x%x, accumulator_bits=0x%x, overflow_policy=0x%x, rounding_policy=0x%x,"\
         " down_scale_size_rounding=0x%x, enable_relu=0x%x, pool_type=0x%x, pool_size_x=0x%x, pool_size_y=0x%x, outputs=%p", graph, inputs, weights_biases, pad_x, pad_y, accumulator_bits,
         overflow_policy, rounding_policy, down_scale_size_rounding, enable_relu, pool_type, pool_size_x, pool_size_y, outputs);
@@ -1342,6 +1370,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer(
     {
         vxError("%s[%d]: Get pad_x_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pad_x_s), "%s[%d]: Get pad_x_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pad_x_s;
     }
 
@@ -1350,6 +1379,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer(
     {
         vxError("%s[%d]: Get pad_y_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pad_y_s), "%s[%d]: Get pad_y_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pad_y_s;
     }
 
@@ -1358,6 +1388,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer(
     {
         vxError("%s[%d]: Get accumulator_bits_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)accumulator_bits_s), "%s[%d]: Get accumulator_bits_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)accumulator_bits_s;
     }
 
@@ -1366,6 +1397,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer(
     {
         vxError("%s[%d]: Get overflow_policy_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)overflow_policy_s), "%s[%d]: Get overflow_policy_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)overflow_policy_s;
     }
 
@@ -1374,6 +1406,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer(
     {
         vxError("%s[%d]: Get rounding_policy_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)rounding_policy_s), "%s[%d]: Get rounding_policy_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)rounding_policy_s;
     }
 
@@ -1382,6 +1415,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer(
     {
         vxError("%s[%d]: Get down_scale_size_rounding_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)down_scale_size_rounding_s), "%s[%d]: Get down_scale_size_rounding_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)down_scale_size_rounding_s;
     }
 
@@ -1390,6 +1424,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer(
     {
         vxError("%s[%d]: Get enable_relu_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)enable_relu_s), "%s[%d]: Get enable_relu_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)enable_relu_s;
     }
 
@@ -1398,6 +1433,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer(
     {
         vxError("%s[%d]: Get pool_type_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_type_s), "%s[%d]: Get pool_type_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_type_s;
     }
 
@@ -1406,6 +1442,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer(
     {
         vxError("%s[%d]: Get pool_size_x_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_size_x_s), "%s[%d]: Get pool_size_x_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_size_x_s;
     }
 
@@ -1414,6 +1451,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer(
     {
         vxError("%s[%d]: Get pool_size_y_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_size_y_s), "%s[%d]: Get pool_size_y_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_size_y_s;
     }
 
@@ -1428,7 +1466,6 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer(
     parameters[10] = (vx_reference)pool_size_x_s;
     parameters[11] = (vx_reference)pool_size_y_s;
 
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_CONVOLUTION_RELU_POOLING_LAYER, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&pad_x_s);
@@ -1441,7 +1478,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer(
     vxReleaseScalar(&pool_type_s);
     vxReleaseScalar(&pool_size_x_s);
     vxReleaseScalar(&pool_size_y_s);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -1482,7 +1519,9 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluLayer(
     VX_NULL,
     (vx_reference)outputs
     };
-
+    gcmHEADER_ARG("graph=%p, inputs=%p, weights_biases=%p, pad_x=0x%x, pad_y=0x%x, accumulator_bits=0x%x, overflow_policy=0x%x, rounding_policy=0x%x,"\
+        " down_scale_size_rounding=0x%x, enable_relu=0x%x, outputs=%p", graph, inputs, weights_biases, pad_x, pad_y, accumulator_bits, overflow_policy, rounding_policy,
+        down_scale_size_rounding, enable_relu, outputs);
     gcmDUMP_API("$VX vxConvolutionReluLayer: graph=%p, inputs=%p, weights_biases=%p, pad_x=0x%x, pad_y=0x%x, accumulator_bits=0x%x, overflow_policy=0x%x, rounding_policy=0x%x,"\
         " down_scale_size_rounding=0x%x, enable_relu=0x%x, outputs=%p", graph, inputs, weights_biases, pad_x, pad_y, accumulator_bits, overflow_policy, rounding_policy,
         down_scale_size_rounding, enable_relu, outputs);
@@ -1494,6 +1533,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluLayer(
     {
         vxError("%s[%d]: Get pad_x_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pad_x_s), "%s[%d]: Get pad_x_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pad_x_s;
     }
 
@@ -1502,6 +1542,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluLayer(
     {
         vxError("%s[%d]: Get pad_y_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pad_y_s), "%s[%d]: Get pad_y_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pad_y_s;
     }
 
@@ -1510,6 +1551,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluLayer(
     {
         vxError("%s[%d]: Get accumulator_bits_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)accumulator_bits_s), "%s[%d]: Get accumulator_bits_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)accumulator_bits_s;
     }
 
@@ -1518,6 +1560,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluLayer(
     {
         vxError("%s[%d]: Get overflow_policy_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)overflow_policy_s), "%s[%d]: Get overflow_policy_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)overflow_policy_s;
     }
 
@@ -1526,6 +1569,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluLayer(
     {
         vxError("%s[%d]: Get rounding_policy_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)rounding_policy_s), "%s[%d]: Get rounding_policy_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)rounding_policy_s;
     }
 
@@ -1534,6 +1578,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluLayer(
     {
         vxError("%s[%d]: Get down_scale_size_rounding_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)down_scale_size_rounding_s), "%s[%d]: Get down_scale_size_rounding_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)down_scale_size_rounding_s;
     }
 
@@ -1542,6 +1587,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluLayer(
     {
         vxError("%s[%d]: Get enable_relu_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)enable_relu_s), "%s[%d]: Get enable_relu_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)enable_relu_s;
     }
 
@@ -1553,8 +1599,6 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluLayer(
     parameters[7]  = (vx_reference)down_scale_size_rounding_s;
     parameters[8]  = (vx_reference)enable_relu_s;
 
-
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_CONVOLUTION_RELU_LAYER, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&pad_x_s);
@@ -1564,7 +1608,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluLayer(
     vxReleaseScalar(&rounding_policy_s);
     vxReleaseScalar(&down_scale_size_rounding_s);
     vxReleaseScalar(&enable_relu_s);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -1614,6 +1658,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
         (vx_reference)outputs
     };
 
+    gcmHEADER_ARG("graph=%p, inputs=%p, weights_biases=%p, convolution_relu_pooling_params=%p, size_of_convolution_relu_pooling_params=0x%lx, outputs=%p",
+        graph, inputs, weights_biases, convolution_relu_pooling_params, size_of_convolution_relu_pooling_params, outputs);
     gcmDUMP_API("$VX vxConvolutionReluPoolingLayer2: graph=%p, inputs=%p, weights_biases=%p, convolution_relu_pooling_params=%p, size_of_convolution_relu_pooling_params=0x%lx, outputs=%p",
         graph, inputs, weights_biases, convolution_relu_pooling_params, size_of_convolution_relu_pooling_params, outputs);
 
@@ -1635,6 +1681,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     else if (size_of_convolution_relu_pooling_params != sizeof(vx_nn_convolution_relu_pooling_params_t))
     {
         vxError("Invalid parameter convolution_relu_pooling_params");
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -1645,6 +1692,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[2] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[2]), "%s[%d]: Get parameters[2] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[2];
     }
 
@@ -1653,6 +1701,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[3] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[3]), "%s[%d]: Get parameters[3] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[3];
     }
 
@@ -1661,6 +1710,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[4] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[4]), "%s[%d]: Get parameters[4] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[4];
     }
 
@@ -1669,6 +1719,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[5] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[5]), "%s[%d]: Get parameters[5] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[5];
     }
 
@@ -1677,6 +1728,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[6] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[6]), "%s[%d]: Get parameters[6] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[6];
     }
 
@@ -1685,6 +1737,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[7] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[7]), "%s[%d]: Get parameters[7] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[7];
     }
 
@@ -1693,6 +1746,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[8] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[8]), "%s[%d]: Get parameters[8] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[8];
     }
 
@@ -1701,6 +1755,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[9] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[9]), "%s[%d]: Get parameters[9] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[9];
     }
 
@@ -1709,6 +1764,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[10] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[10]), "%s[%d]: Get parameters[10] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[10];
     }
 
@@ -1717,6 +1773,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[11] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[11]), "%s[%d]: Get parameters[11] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[11];
     }
 
@@ -1725,6 +1782,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[12] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[12]), "%s[%d]: Get parameters[12] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[12];
     }
 
@@ -1733,6 +1791,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[13] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[13]), "%s[%d]: Get parameters[13] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[13];
     }
 
@@ -1741,6 +1800,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[14] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[14]), "%s[%d]: Get parameters[14] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[14];
     }
 
@@ -1749,6 +1809,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[15] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[15]), "%s[%d]: Get parameters[15] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[15];
     }
 
@@ -1757,6 +1818,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[16] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[16]), "%s[%d]: Get parameters[16] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[16];
     }
 
@@ -1767,6 +1829,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[18] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[18]), "%s[%d]: Get parameters[18] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[18];
     }
 
@@ -1775,6 +1838,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[19] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[19]), "%s[%d]: Get parameters[19] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[19];
     }
 
@@ -1783,6 +1847,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[20] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[20]), "%s[%d]: Get parameters[20] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[20];
     }
 
@@ -1791,6 +1856,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[21] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[21]), "%s[%d]: Get parameters[21] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[21];
     }
 
@@ -1799,9 +1865,9 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
     {
         vxError("%s[%d]: Get parameters[22] reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)parameters[22]), "%s[%d]: Get parameters[22] reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)parameters[22];
     }
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_CONVOLUTION_RELU_POOLING_LAYER2, parameters, vxmLENGTH_OF(parameters));
 
@@ -1818,7 +1884,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionReluPoolingLayer2(
 
         vxReleaseScalar((vx_scalar*)&parameters[i]);
     }
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -1853,6 +1919,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer_11(vx_graph graph,
     VX_NULL,
     (vx_reference)outputs
     };
+    gcmHEADER_ARG("graph=%p, inputs=%p, pool_type=0x%x, pool_size_x=0x%x, pool_size_y=0x%x, pool_pad_x=0x%x, pool_pad_y=0x%x, rounding=0x%x, outputs=%p",
+        graph, inputs, pool_type, pool_size_x, pool_size_y, pool_pad_x, pool_pad_y, rounding, outputs);
     gcmDUMP_API("$VX vxPoolingLayer_11: graph=%p, inputs=%p, pool_type=0x%x, pool_size_x=0x%x, pool_size_y=0x%x, pool_pad_x=0x%x, pool_pad_y=0x%x, rounding=0x%x, outputs=%p",
         graph, inputs, pool_type, pool_size_x, pool_size_y, pool_pad_x, pool_pad_y, rounding, outputs);
 
@@ -1863,6 +1931,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer_11(vx_graph graph,
     {
         vxError("%s[%d]: Get pool_type_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_type_s), "%s[%d]: Get pool_type_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_type_s;
     }
 
@@ -1871,6 +1940,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer_11(vx_graph graph,
     {
         vxError("%s[%d]: Get pool_size_x_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_size_x_s), "%s[%d]: Get pool_size_x_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_size_x_s;
     }
 
@@ -1879,6 +1949,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer_11(vx_graph graph,
     {
         vxError("%s[%d]: Get pool_size_y_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_size_y_s), "%s[%d]: Get pool_size_y_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_size_y_s;
     }
 
@@ -1887,6 +1958,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer_11(vx_graph graph,
     {
         vxError("%s[%d]: Get pool_pad_x_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_pad_x_s), "%s[%d]: Get pool_pad_x_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_pad_x_s;
     }
 
@@ -1895,6 +1967,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer_11(vx_graph graph,
     {
         vxError("%s[%d]: Get pool_pad_y_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_pad_y_s), "%s[%d]: Get pool_pad_y_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_pad_y_s;
     }
 
@@ -1903,6 +1976,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer_11(vx_graph graph,
     {
         vxError("%s[%d]: Get rounding_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)rounding_s), "%s[%d]: Get rounding_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)rounding_s;
     }
 
@@ -1913,8 +1987,6 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer_11(vx_graph graph,
     parameters[5]  = (vx_reference)pool_pad_y_s;
     parameters[6]  = (vx_reference)rounding_s;
 
-
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_POOLING_LAYER, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&pool_type_s);
@@ -1923,7 +1995,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer_11(vx_graph graph,
     vxReleaseScalar(&pool_pad_x_s);
     vxReleaseScalar(&pool_pad_y_s);
     vxReleaseScalar(&rounding_s);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -1964,6 +2036,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer(
     vx_uint32 pool_pad_x;
     vx_uint32 pool_pad_y;
 
+    gcmHEADER_ARG("graph=%p, inputs=%p, pooling_type=0x%x, pooling_size_x=0x%x, pooling_size_y=0x%x, pooling_padding_x=0x%x, pooling_padding_y=0x%x, rounding=0x%x, outputs=%p",
+        graph, inputs, pooling_type, pooling_size_x, pooling_size_y, pooling_padding_x, pooling_padding_y, rounding, outputs);
     gcmDUMP_API("$VX vxPoolingLayer: graph=%p, inputs=%p, pooling_type=0x%x, pooling_size_x=0x%x, pooling_size_y=0x%x, pooling_padding_x=0x%x, pooling_padding_y=0x%x, rounding=0x%x, outputs=%p",
         graph, inputs, pooling_type, pooling_size_x, pooling_size_y, pooling_padding_x, pooling_padding_y, rounding, outputs);
 
@@ -1979,6 +2053,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer(
     {
         vxError("%s[%d]: Get pool_type_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_type_s), "%s[%d]: Get pool_type_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_type_s;
     }
 
@@ -1987,6 +2062,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer(
     {
         vxError("%s[%d]: Get pool_size_x_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_size_x_s), "%s[%d]: Get pool_size_x_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_size_x_s;
     }
 
@@ -1995,6 +2071,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer(
     {
         vxError("%s[%d]: Get pool_size_y_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_size_y_s), "%s[%d]: Get pool_size_y_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_size_y_s;
     }
 
@@ -2003,6 +2080,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer(
     {
         vxError("%s[%d]: Get pool_pad_x_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_pad_x_s), "%s[%d]: Get pool_pad_x_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_pad_x_s;
     }
 
@@ -2011,6 +2089,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer(
     {
         vxError("%s[%d]: Get pool_pad_y_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_pad_y_s), "%s[%d]: Get pool_pad_y_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_pad_y_s;
     }
 
@@ -2019,6 +2098,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer(
     {
         vxError("%s[%d]: Get rounding_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)rounding_s), "%s[%d]: Get rounding_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)rounding_s;
     }
 
@@ -2029,8 +2109,6 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer(
     parameters[5]  = (vx_reference)pool_pad_y_s;
     parameters[6]  = (vx_reference)rounding_s;
 
-
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_POOLING_LAYER, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&pool_type_s);
@@ -2039,7 +2117,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer(
     vxReleaseScalar(&pool_pad_x_s);
     vxReleaseScalar(&pool_pad_y_s);
     vxReleaseScalar(&rounding_s);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -2076,11 +2154,14 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
 
     vx_uint32 i = 0;
 
+    gcmHEADER_ARG("graph=%p, inputs=%p, pooling_params=%p, size_of_pooling_params=0x%lx, outputs=%p",
+        graph, inputs, pooling_params, size_of_pooling_params, outputs);
     gcmDUMP_API("$VX vxPoolingLayer2: graph=%p, inputs=%p, pooling_params=%p, size_of_pooling_params=0x%lx, outputs=%p",
         graph, inputs, pooling_params, size_of_pooling_params, outputs);
 
     if (size_of_pooling_params != sizeof(vx_nn_pooling_params_t))
     {
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -2091,6 +2172,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
     {
         vxError("%s[%d]: Get pool_type_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_type_s), "%s[%d]: Get pool_type_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_type_s;
     }
 
@@ -2099,6 +2181,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
     {
         vxError("%s[%d]: Get pool_size_x_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_size_x_s), "%s[%d]: Get pool_size_x_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_size_x_s;
     }
 
@@ -2107,6 +2190,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
     {
         vxError("%s[%d]: Get pool_size_y_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_size_y_s), "%s[%d]: Get pool_size_y_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_size_y_s;
     }
 
@@ -2115,6 +2199,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
     {
         vxError("%s[%d]: Get pool_pad_x_left_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_pad_x_left_s), "%s[%d]: Get pool_pad_x_left_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_pad_x_left_s;
     }
 
@@ -2123,6 +2208,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
     {
         vxError("%s[%d]: Get pool_pad_x_right_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_pad_x_right_s), "%s[%d]: Get pool_pad_x_right_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_pad_x_right_s;
     }
 
@@ -2131,6 +2217,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
     {
         vxError("%s[%d]: Get pool_pad_y_top_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_pad_y_top_s), "%s[%d]: Get pool_pad_y_top_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_pad_y_top_s;
     }
 
@@ -2139,6 +2226,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
     {
         vxError("%s[%d]: Get pool_pad_y_bottom_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)pool_pad_y_bottom_s), "%s[%d]: Get pool_pad_y_bottom_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)pool_pad_y_bottom_s;
     }
 
@@ -2147,6 +2235,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
     {
         vxError("%s[%d]: Get rounding_s reference failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, vxoReference_GetStatus((vx_reference)rounding_s), "%s[%d]: Get rounding_s reference failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return (vx_node)rounding_s;
     }
 
@@ -2159,15 +2248,13 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
     parameters[7]  = (vx_reference)pool_pad_y_bottom_s;
     parameters[8]  = (vx_reference)rounding_s;
 
-
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_POOLING_LAYER2, parameters, vxmLENGTH_OF(parameters));
 
     for (i = 1; i < (gcmCOUNTOF(parameters) - 1); i ++)
     {
         vxReleaseScalar((vx_scalar*)&parameters[i]);
     }
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -2180,12 +2267,11 @@ VX_API_ENTRY vx_node VX_API_CALL vxSoftmaxLayer(vx_graph graph, vx_tensor inputs
     (vx_reference)inputs,
     (vx_reference)outputs,
     };
-
+    gcmHEADER_ARG("graph=%p, inputs=%p, outputs=%p", graph, inputs, outputs);
     gcmDUMP_API("$VX vxSoftmaxLayer: graph=%p, inputs=%p, outputs=%p", graph, inputs, outputs);
 
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_SOFTMAX_LAYER, parameters, vxmLENGTH_OF(parameters));
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -2213,8 +2299,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxNormalizationLayer_11(vx_graph graph,
          (vx_reference)beta_s,
          (vx_reference)outputs
     };
+    gcmHEADER_ARG("graph=%p, inputs=%p, type=0x%x, norm_size=0x%x, alpha=%f, beta=%f, outputs=%p", graph, inputs, type, norm_size, alpha, beta, outputs);
     gcmDUMP_API("$VX vxNormalizationLayer_11: graph=%p, inputs=%p, type=0x%x, norm_size=0x%x, alpha=%f, beta=%f, outputs=%p", graph, inputs, type, norm_size, alpha, beta, outputs);
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NORMALIZATION_LAYER, parameters, vxmLENGTH_OF(parameters));
 
@@ -2222,7 +2308,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxNormalizationLayer_11(vx_graph graph,
     vxReleaseScalar(&norm_size_s);
     vxReleaseScalar(&alpha_s);
     vxReleaseScalar(&beta_s);
-
+    gcmFOOTER_NO();
     return node;
 
 }
@@ -2251,6 +2337,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxNormalizationLayer(
          (vx_reference)beta_s,
          (vx_reference)outputs
     };
+    gcmHEADER_ARG("graph=%p, inputs=%p, type=0x%x, normalization_size=0x%lx, alpha=%f, beta=%f, outputs=%p", graph, inputs, type, normalization_size, alpha, beta, outputs);
     gcmDUMP_API("$VX vxNormalizationLayer: graph=%p, inputs=%p, type=0x%x, normalization_size=0x%lx, alpha=%f, beta=%f, outputs=%p", graph, inputs, type, normalization_size, alpha, beta, outputs);
 
     gcmSAFECASTSIZET(norm_size, normalization_size);
@@ -2262,7 +2349,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxNormalizationLayer(
     vxReleaseScalar(&norm_size_s);
     vxReleaseScalar(&alpha_s);
     vxReleaseScalar(&beta_s);
-
+    gcmFOOTER_NO();
     return node;
 
 }
@@ -2291,13 +2378,17 @@ VX_API_ENTRY vx_node VX_API_CALL vxActivationLayer(
     VX_NULL,
     (vx_reference)outputs
     };
+    gcmHEADER_ARG("graph=%p, inputs=%p, function=0x%x, a=%f, b=%f, outputs=%p", graph, inputs, function, a, b, outputs);
     gcmDUMP_API("$VX vxActivationLayer: graph=%p, inputs=%p, function=0x%x, a=%f, b=%f, outputs=%p", graph, inputs, function, a, b, outputs);
 
     context = vxGetContext((vx_reference)graph);
 
     func_s = vxCreateScalar(context, VX_TYPE_ENUM, &function);
-    if (vxoReference_GetStatus((vx_reference)func_s) != VX_SUCCESS) return (vx_node)func_s;
-
+    if (vxoReference_GetStatus((vx_reference)func_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)func_s;
+    }
     if(a > gcvMAXINT32)
         a_int = gcvMAXINT32;
     else if(a < (vx_int32)gcvMININT32)
@@ -2312,23 +2403,27 @@ VX_API_ENTRY vx_node VX_API_CALL vxActivationLayer(
     else
         b_int = (vx_int32)b;
     a_s = vxCreateScalar(context, VX_TYPE_INT32, &a_int);
-    if (vxoReference_GetStatus((vx_reference)a_s) != VX_SUCCESS) return (vx_node)a_s;
-
+    if (vxoReference_GetStatus((vx_reference)a_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)a_s;
+    }
     b_s = vxCreateScalar(context, VX_TYPE_INT32, &b_int);
-    if (vxoReference_GetStatus((vx_reference)b_s) != VX_SUCCESS) return (vx_node)b_s;
-
+    if (vxoReference_GetStatus((vx_reference)b_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)b_s;
+    }
     parameters[1]  = (vx_reference)func_s;
     parameters[2]  = (vx_reference)a_s;
     parameters[3]  = (vx_reference)b_s;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_ACTIVATION_LAYER, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&func_s);
     vxReleaseScalar(&a_s);
     vxReleaseScalar(&b_s);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -2355,23 +2450,32 @@ VX_API_ENTRY vx_node VX_API_CALL vxActivationLayer_11(
     VX_NULL,
     (vx_reference)outputs
     };
+    gcmHEADER_ARG("graph=%p, inputs=%p, func=0x%x, a=0x%x, b=0x%x, outputs=%p", graph, inputs, func, a, b, outputs);
     gcmDUMP_API("$VX vxActivationLayer_11: graph=%p, inputs=%p, func=0x%x, a=0x%x, b=0x%x, outputs=%p", graph, inputs, func, a, b, outputs);
 
     context = vxGetContext((vx_reference)graph);
 
     func_s = vxCreateScalar(context, VX_TYPE_ENUM, &func);
-    if (vxoReference_GetStatus((vx_reference)func_s) != VX_SUCCESS) return (vx_node)func_s;
-
+    if (vxoReference_GetStatus((vx_reference)func_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)func_s;
+    }
     a_s = vxCreateScalar(context, VX_TYPE_INT32, &a);
-    if (vxoReference_GetStatus((vx_reference)a_s) != VX_SUCCESS) return (vx_node)a_s;
-
+    if (vxoReference_GetStatus((vx_reference)a_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)a_s;
+    }
     b_s = vxCreateScalar(context, VX_TYPE_INT32, &b);
-    if (vxoReference_GetStatus((vx_reference)b_s) != VX_SUCCESS) return (vx_node)b_s;
-
+    if (vxoReference_GetStatus((vx_reference)b_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)b_s;
+    }
     parameters[1]  = (vx_reference)func_s;
     parameters[2]  = (vx_reference)a_s;
     parameters[3]  = (vx_reference)b_s;
-
 
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_ACTIVATION_LAYER, parameters, vxmLENGTH_OF(parameters));
@@ -2379,7 +2483,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxActivationLayer_11(
     vxReleaseScalar(&func_s);
     vxReleaseScalar(&a_s);
     vxReleaseScalar(&b_s);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -2392,7 +2496,6 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionLayer(
     vx_size size_of_convolution_params,
     vx_tensor outputs)
 {
-
     vx_context context;
     vx_node    node;
 
@@ -2437,6 +2540,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionLayer(
     VX_NULL,
     (vx_reference)outputs
     };
+    gcmHEADER_ARG("graph=%p, inputs=%p, weights=%p, biases=%p, convolution_params=%p, size_of_convolution_params=0x%lx, outputs=%p",
+        graph, inputs, weights, biases, convolution_params, size_of_convolution_params, outputs);
     gcmDUMP_API("$VX vxConvolutionLayer: graph=%p, inputs=%p, weights=%p, biases=%p, convolution_params=%p, size_of_convolution_params=0x%lx, outputs=%p",
         graph, inputs, weights, biases, convolution_params, size_of_convolution_params, outputs);
 
@@ -2445,17 +2550,29 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionLayer(
     context = vxGetContext((vx_reference)graph);
 
     padXScalar = vxCreateScalar(context, VX_TYPE_INT32, &convolution_params->padding_x);
-    if (vxoReference_GetStatus((vx_reference)padXScalar) != VX_SUCCESS) return (vx_node)padXScalar;
-
+    if (vxoReference_GetStatus((vx_reference)padXScalar) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)padXScalar;
+    }
     padYScalar = vxCreateScalar(context, VX_TYPE_INT32, &convolution_params->padding_y);
-    if (vxoReference_GetStatus((vx_reference)padYScalar) != VX_SUCCESS) return (vx_node)padYScalar;
-
+    if (vxoReference_GetStatus((vx_reference)padYScalar) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)padYScalar;
+    }
     dilationXScalar = vxCreateScalar(context, VX_TYPE_INT32, &convolution_params->dilation_x);
-    if (vxoReference_GetStatus((vx_reference)dilationXScalar) != VX_SUCCESS) return (vx_node)dilationXScalar;
-
+    if (vxoReference_GetStatus((vx_reference)dilationXScalar) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)dilationXScalar;
+    }
     dilationYScalar = vxCreateScalar(context, VX_TYPE_INT32, &convolution_params->dilation_y);
-    if (vxoReference_GetStatus((vx_reference)dilationYScalar) != VX_SUCCESS) return (vx_node)dilationYScalar;
-
+    if (vxoReference_GetStatus((vx_reference)dilationYScalar) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)dilationYScalar;
+    }
     if (size_of_convolution_params == sizeof(vx_nn_convolution_params_ext2_t))
     {
         vx_nn_convolution_params_ext2_t* param = (vx_nn_convolution_params_ext2_t*)convolution_params;
@@ -2484,32 +2601,59 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionLayer(
     }
 
     padXRightScalar = vxCreateScalar(context, VX_TYPE_INT32, &pad_x_right);
-    if (vxoReference_GetStatus((vx_reference)padXRightScalar) != VX_SUCCESS) return (vx_node)padXRightScalar;
-
+    if (vxoReference_GetStatus((vx_reference)padXRightScalar) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)padXRightScalar;
+    }
     padYBottomScalar = vxCreateScalar(context, VX_TYPE_INT32, &pad_y_bottom);
-    if (vxoReference_GetStatus((vx_reference)padYBottomScalar) != VX_SUCCESS) return (vx_node)padYBottomScalar;
-
+    if (vxoReference_GetStatus((vx_reference)padYBottomScalar) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)padYBottomScalar;
+    }
     padModeScalar = vxCreateScalar(context, VX_TYPE_ENUM, &padMode);
-    if (vxoReference_GetStatus((vx_reference)padModeScalar) != VX_SUCCESS) return (vx_node)padModeScalar;
-
+    if (vxoReference_GetStatus((vx_reference)padModeScalar) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)padModeScalar;
+    }
     strideXScalar = vxCreateScalar(context, VX_TYPE_INT32, &stride_x);
-    if (vxoReference_GetStatus((vx_reference)strideXScalar) != VX_SUCCESS) return (vx_node)strideXScalar;
-
+    if (vxoReference_GetStatus((vx_reference)strideXScalar) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)strideXScalar;
+    }
     strideYScalar = vxCreateScalar(context, VX_TYPE_INT32, &stride_y);
-    if (vxoReference_GetStatus((vx_reference)strideYScalar) != VX_SUCCESS) return (vx_node)strideYScalar;
-
+    if (vxoReference_GetStatus((vx_reference)strideYScalar) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)strideYScalar;
+    }
     depth_multiplier = vxCreateScalar(context, VX_TYPE_INT32, &depth_mul);
-    if (vxoReference_GetStatus((vx_reference)depth_multiplier) != VX_SUCCESS) return (vx_node)depth_multiplier;
-
+    if (vxoReference_GetStatus((vx_reference)depth_multiplier) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)depth_multiplier;
+    }
     downScaleSizeRoundingScalar = vxCreateScalar(context, VX_TYPE_INT32, &convolution_params->down_scale_size_rounding);
-    if (vxoReference_GetStatus((vx_reference)downScaleSizeRoundingScalar) != VX_SUCCESS) return (vx_node)downScaleSizeRoundingScalar;
-
+    if (vxoReference_GetStatus((vx_reference)downScaleSizeRoundingScalar) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)downScaleSizeRoundingScalar;
+    }
     overflowPolicyScalar = vxCreateScalar(context, VX_TYPE_UINT32, &convolution_params->overflow_policy);
-    if (vxoReference_GetStatus((vx_reference)overflowPolicyScalar) != VX_SUCCESS) return (vx_node)overflowPolicyScalar;
-
+    if (vxoReference_GetStatus((vx_reference)overflowPolicyScalar) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)overflowPolicyScalar;
+    }
     roundingPolicyScalar = vxCreateScalar(context, VX_TYPE_UINT32, &convolution_params->rounding_policy);
-    if (vxoReference_GetStatus((vx_reference)roundingPolicyScalar) != VX_SUCCESS) return (vx_node)roundingPolicyScalar;
-
+    if (vxoReference_GetStatus((vx_reference)roundingPolicyScalar) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)roundingPolicyScalar;
+    }
     parameters[3]  = (vx_reference)padXScalar;
     parameters[4]  = (vx_reference)padXRightScalar;
     parameters[5]  = (vx_reference)padYScalar;
@@ -2524,7 +2668,6 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionLayer(
     parameters[14]  = (vx_reference)downScaleSizeRoundingScalar;
     parameters[15]  = (vx_reference)overflowPolicyScalar;
     parameters[16]  = (vx_reference)roundingPolicyScalar;
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_CONVOLUTION_LAYER, parameters, vxmLENGTH_OF(parameters));
 
@@ -2545,7 +2688,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvolutionLayer(
     {
         vxReleaseScalar(&padValueScalar);
     }
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -2562,12 +2705,11 @@ VX_API_ENTRY vx_node VX_API_CALL vxConcat2Layer(
     (vx_reference)in1,
     (vx_reference)out
     };
-
+    gcmHEADER_ARG("graph=%p, in0=%p, in1=%p, out=%p", graph, in0, in1, out);
     gcmDUMP_API("$VX vxConcat2Layer: graph=%p, in0=%p, in1=%p, out=%p", graph, in0, in1, out);
 
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_CONCAT2_LAYER, parameters, vxmLENGTH_OF(parameters));
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -2589,18 +2731,21 @@ VX_API_ENTRY vx_node VX_API_CALL vxConcatIndefiniteLayer(
 
     vx_scalar axisSclar = VX_NULL;
 
+    gcmHEADER_ARG("graph=%p, in=%p, concat_params=%p, size_of_concat_params=0x%lx, out=%p", graph, in, concat_params, size_of_concat_params, out);
     gcmDUMP_API("$VX vxConcatIndefiniteLayer: graph=%p, in=%p, concat_params=%p, size_of_concat_params=0x%lx, out=%p", graph, in, concat_params, size_of_concat_params, out);
 
     axisSclar = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_UINT32, &concat_params->axis);
-    if (vxoReference_GetStatus((vx_reference)axisSclar) != VX_SUCCESS) return (vx_node)axisSclar;
-
+    if (vxoReference_GetStatus((vx_reference)axisSclar) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)axisSclar;
+    }
     parameters[1]  = (vx_reference)axisSclar;
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_CONCATINDEFINITE_LAYER, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&axisSclar);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -2623,21 +2768,22 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorAddNode(
     (vx_reference)out
     };
 
+    gcmHEADER_ARG("graph=%p, in1=%p, in2=%p, policy=0x%x, out=%p", graph, in1, in2, policy, out);
     gcmDUMP_API("$VX vxTensorAddNode: graph=%p, in1=%p, in2=%p, policy=0x%x, out=%p", graph, in1, in2, policy, out);
 
     context = vxGetContext((vx_reference)graph);
 
     policy_s = vxCreateScalar(context, VX_TYPE_ENUM, &policy);
-    if (vxoReference_GetStatus((vx_reference)policy_s) != VX_SUCCESS) return (vx_node)policy_s;
-
+    if (vxoReference_GetStatus((vx_reference)policy_s) != VX_SUCCESS) {
+        gcmFOOTER_NO();
+        return (vx_node)policy_s;
+    }
     parameters[2]  = (vx_reference)policy_s;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_TENSOR_ADD, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&policy_s);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -2664,25 +2810,26 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorMultiplyNode(
     VX_NULL,
     (vx_reference)out
     };
-
+    gcmHEADER_ARG("graph=%p, in1=%p, in2=%p, scale=%p, overflow_policy=0x%x, rounding_policy=0x%x, out=%p", graph, in1, in2, scale, overflow_policy, rounding_policy, out);
     gcmDUMP_API("$VX vxTensorMultiplyNode: graph=%p, in1=%p, in2=%p, scale=%p, overflow_policy=0x%x, rounding_policy=0x%x, out=%p", graph, in1, in2, scale, overflow_policy, rounding_policy, out);
 
     context = vxGetContext((vx_reference)graph);
 
     overflow_policy_s = vxCreateScalar(context, VX_TYPE_ENUM, &overflow_policy);
     rounding_policy_s = vxCreateScalar(context, VX_TYPE_ENUM, &rounding_policy);
-    if (vxoReference_GetStatus((vx_reference)overflow_policy_s) != VX_SUCCESS || vxoReference_GetStatus((vx_reference)overflow_policy_s) != VX_SUCCESS) return NULL;
-
+    if (vxoReference_GetStatus((vx_reference)overflow_policy_s) != VX_SUCCESS || vxoReference_GetStatus((vx_reference)overflow_policy_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return NULL;
+    }
     parameters[3]  = (vx_reference)overflow_policy_s;
     parameters[4]  = (vx_reference)rounding_policy_s;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_TENSOR_MULTIPLY, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&overflow_policy_s);
     vxReleaseScalar(&rounding_policy_s);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -2709,25 +2856,25 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorDivideNode(
     VX_NULL,
     (vx_reference)out
     };
-
+    gcmHEADER_ARG("graph=%p, in1=%p, in2=%p, scale=%p, overflow_policy=0x%x, rounding_policy=0x%x, out=%p", graph, in1, in2, scale, overflow_policy, rounding_policy, out);
     gcmDUMP_API("$VX vxTensorDivideNode: graph=%p, in1=%p, in2=%p, scale=%p, overflow_policy=0x%x, rounding_policy=0x%x, out=%p", graph, in1, in2, scale, overflow_policy, rounding_policy, out);
 
     context = vxGetContext((vx_reference)graph);
 
     overflow_policy_s = vxCreateScalar(context, VX_TYPE_ENUM, &overflow_policy);
     rounding_policy_s = vxCreateScalar(context, VX_TYPE_ENUM, &rounding_policy);
-    if (vxoReference_GetStatus((vx_reference)overflow_policy_s) != VX_SUCCESS || vxoReference_GetStatus((vx_reference)overflow_policy_s) != VX_SUCCESS) return NULL;
-
+    if (vxoReference_GetStatus((vx_reference)overflow_policy_s) != VX_SUCCESS || vxoReference_GetStatus((vx_reference)overflow_policy_s) != VX_SUCCESS) {
+        gcmFOOTER_NO();
+        return NULL;
+    }
     parameters[3]  = (vx_reference)overflow_policy_s;
     parameters[4]  = (vx_reference)rounding_policy_s;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_TENSOR_DIV, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&overflow_policy_s);
     vxReleaseScalar(&rounding_policy_s);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -2749,23 +2896,24 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorSubtractNode(
     VX_NULL,
     (vx_reference)out
     };
-
+    gcmHEADER_ARG("graph=%p, in1=%p, in2=%p, policy=0x%x, out=%p", graph, in1, in2, policy, out);
     gcmDUMP_API("$VX vxTensorSubtractNode: graph=%p, in1=%p, in2=%p, policy=0x%x, out=%p", graph, in1, in2, policy, out);
 
 
     context = vxGetContext((vx_reference)graph);
 
     policy_s = vxCreateScalar(context, VX_TYPE_ENUM, &policy);
-    if (vxoReference_GetStatus((vx_reference)policy_s) != VX_SUCCESS) return (vx_node)policy_s;
-
+    if (vxoReference_GetStatus((vx_reference)policy_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)policy_s;
+    }
     parameters[2]  = (vx_reference)policy_s;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_TENSOR_SUBTRACT, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&policy_s);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -2780,10 +2928,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorTableLookupNode(
         (vx_reference)lut,
         (vx_reference)out
     };
-
+    gcmHEADER_ARG("graph=%p, in1=%p, lut=%p, out=%p", graph, in1, lut, out);
     gcmDUMP_API("$VX vxTensorTableLookupNode: graph=%p, in1=%p, lut=%p, out=%p", graph, in1, lut, out);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_TENSOR_TABLE_LOOKUP, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -2809,24 +2957,33 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorTransposeNode_11(
     VX_NULL,
     (vx_reference)outputs
     };
-
+    gcmHEADER_ARG("graph=%p, inputs=%p, outputs=%p, dim1=0x%x, dim2=0x%x", graph, inputs, outputs, dim1, dim2);
     gcmDUMP_API("$VX vxTensorTransposeNode_11: graph=%p, inputs=%p, outputs=%p, dim1=0x%x, dim2=0x%x", graph, inputs, outputs, dim1, dim2);
 
     context = vxGetContext((vx_reference)graph);
 
     if (dim1 == dim2)
+    {
+        gcmFOOTER_NO();
         return VX_NULL;
-
+    }
     vxQueryTensor(inputs, VX_TENSOR_NUMBER_OF_DIMS, &nt, sizeof(nt));
-    if (dim1 >= nt || dim2 >= nt) return VX_NULL;
-
+    if (dim1 >= nt || dim2 >= nt)
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     vxoTensor_GetTensorDimStride(inputs, &nt, indims, VX_NULL);
     vxoTensor_GetTensorDimStride(outputs, &nt, outdims, VX_NULL);
-    if (indims[dim1] != outdims[dim2] || indims[dim2] != outdims[dim1]) return VX_NULL;
-
+    if (indims[dim1] != outdims[dim2] || indims[dim2] != outdims[dim1])
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     perm = vxCreateArray(context, VX_TYPE_UINT32, nt);
     if (!vxoArray_AllocateMemory(perm))
     {
+        gcmFOOTER_NO();
         return VX_NULL;
     }
     else
@@ -2839,18 +2996,19 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorTransposeNode_11(
     }
 
     pnum = vxCreateScalar(context, VX_TYPE_UINT32, &nt);
-    if (vxoReference_GetStatus((vx_reference)pnum) != VX_SUCCESS) return (vx_node)pnum;
-
+    if (vxoReference_GetStatus((vx_reference)pnum) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)pnum;
+    }
     parameters[1]  = (vx_reference)perm;
     parameters[2]  = (vx_reference)pnum;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_TENSOR_TRANSPOSE, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseArray(&perm);
     vxReleaseScalar(&pnum);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -2878,6 +3036,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorTransposeNode(
     (vx_reference)output
     };
 
+    gcmHEADER_ARG("graph=%p, inputs=%p, outputs=%p, dim1=0x%lx, dim2=0x%lx", graph, input, output, dimension1, dimension2);
     gcmDUMP_API("$VX vxTensorTransposeNode: graph=%p, inputs=%p, outputs=%p, dim1=0x%lx, dim2=0x%lx", graph, input, output, dimension1, dimension2);
 
     gcmSAFECASTSIZET(dim1, dimension1);
@@ -2886,16 +3045,23 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorTransposeNode(
     context = vxGetContext((vx_reference)graph);
 
     vxQueryTensor(input, VX_TENSOR_NUMBER_OF_DIMS, &nt, sizeof(nt));
-    if (dim1 >= nt || dim2 >= nt) return VX_NULL;
-
+    if (dim1 >= nt || dim2 >= nt)
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     vxoTensor_GetTensorDimStride(input, &nt, indims, VX_NULL);
     vxoTensor_GetTensorDimStride(output, &nt, outdims, VX_NULL);
-    if (indims[dim1] != outdims[dim2] || indims[dim2] != outdims[dim1]) return VX_NULL;
-
+    if (indims[dim1] != outdims[dim2] || indims[dim2] != outdims[dim1])
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if(nt == 2) nt = 3; /*fix the bug that shader implementation has error with dimensions=2*/
     perm = vxCreateArray(context, VX_TYPE_UINT32, nt);
     if (!vxoArray_AllocateMemory(perm))
     {
+        gcmFOOTER_NO();
         return VX_NULL;
     }
     else
@@ -2908,18 +3074,19 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorTransposeNode(
     }
 
     pnum = vxCreateScalar(context, VX_TYPE_UINT32, &nt);
-    if (vxoReference_GetStatus((vx_reference)pnum) != VX_SUCCESS) return (vx_node)pnum;
-
+    if (vxoReference_GetStatus((vx_reference)pnum) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)pnum;
+    }
     parameters[1]  = (vx_reference)perm;
     parameters[2]  = (vx_reference)pnum;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_TENSOR_TRANSPOSE, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseArray(&perm);
     vxReleaseScalar(&pnum);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -2946,6 +3113,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorPermuteNode(
     (vx_reference)outputs
     };
 
+    gcmHEADER_ARG("graph=%p, inputs=%p, outputs=%p, perm=%p, sizes_of_perm=0x%x", graph, inputs, outputs, perm, sizes_of_perm);
     gcmDUMP_API("$VX vxTensorPermuteNode: graph=%p, inputs=%p, outputs=%p, perm=%p, sizes_of_perm=0x%x", graph, inputs, outputs, perm, sizes_of_perm);
 
     context = vxGetContext((vx_reference)graph);
@@ -2955,14 +3123,17 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorPermuteNode(
     if (perm == VX_NULL)
         sizes_of_perm = nt;
     else if (sizes_of_perm > nt)
-        return VX_NULL;
-
+    {
+       gcmFOOTER_NO();
+       return VX_NULL;
+    }
     vxoTensor_GetTensorDimStride(inputs, &nt, indims, VX_NULL);
     vxoTensor_GetTensorDimStride(outputs, &nt, outdims, VX_NULL);
 
     perma = vxCreateArray(context, VX_TYPE_UINT32, nt);
     if (!vxoArray_AllocateMemory(perma))
     {
+        gcmFOOTER_NO();
         return VX_NULL;
     }
     else
@@ -2979,18 +3150,20 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorPermuteNode(
     }
 
     pnum = vxCreateScalar(context, VX_TYPE_UINT32, &sizes_of_perm);
-    if (vxoReference_GetStatus((vx_reference)pnum) != VX_SUCCESS) return (vx_node)pnum;
-
+    if (vxoReference_GetStatus((vx_reference)pnum) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)pnum;
+    }
     parameters[1]  = (vx_reference)perma;
     parameters[2]  = (vx_reference)pnum;
-
 
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_TENSOR_TRANSPOSE, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseArray(&perma);
     vxReleaseScalar(&pnum);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -3014,6 +3187,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorReduceSumNode(
     vx_scalar reduceDim = VX_NULL;
     vx_scalar keepDim = vxCreateScalar(context, VX_TYPE_BOOL, &keep_dim);
 
+    gcmHEADER_ARG("graph=%p, in=%p, out=%p, reduce_dim=%p, dim_size=0x%x, keep_dim=0x%x", graph, in, out, reduce_dim, dim_size, keep_dim);
     gcmDUMP_API("$VX vxTensorReduceSumNode: graph=%p, in=%p, out=%p, reduce_dim=%p, dim_size=0x%x, keep_dim=0x%x", graph, in, out, reduce_dim, dim_size, keep_dim);
 
     if (reduce_dim)
@@ -3023,6 +3197,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorReduceSumNode(
         if (*reduce_dim > dimNum)
         {
             vxError("Invalid parameter reduce_dim");
+            gcmFOOTER_NO();
             return VX_NULL;
         }
         reduceDim = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_UINT32, reduce_dim);
@@ -3038,13 +3213,12 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorReduceSumNode(
         if (inDim != outDim)
         {
             vxError("Invalid output dimension num");
+            gcmFOOTER_NO();
             return VX_NULL;
         }
     }
 
     parameters[3] = (vx_reference)keepDim;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_TENSOR_REDUCE_SUM, parameters, vxmLENGTH_OF(parameters));
 
@@ -3052,7 +3226,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorReduceSumNode(
         vxReleaseScalar(&reduceDim);
 
     vxReleaseScalar(&keepDim);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -3064,10 +3238,27 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorPadNode(vx_graph graph,
 {
     vx_context context = vxGetContext((vx_reference)graph);
     vx_node node = VX_NULL;
+    vx_bool shSupport = vx_false_e;
+    vx_scalar padConst = VX_NULL;
 
+    gcmHEADER_ARG("graph=%p, in=%p, out=%p, pad_params=%p, size_of_pad_params=0x%lx", graph, in, out, pad_params, size_of_pad_params);
     gcmDUMP_API("$VX vxTensorPadNode: graph=%p, in=%p, out=%p, pad_params=%p, size_of_pad_params=0x%lx", graph, in, out, pad_params, size_of_pad_params);
 
-    if (pad_params->numViewDimensions == 2)
+    if(context->evisNoInst.supportEVIS == vx_false_e)
+    {
+       if(TENSOR_RANK(out) == VX_TENSOR_RANK_CWHN)
+       {
+            if((TENSOR_VIEW_SIZE_INDEX(out, 0) == 1) && (TENSOR_VIEW_SIZE_INDEX(out, 3) == 1))
+                shSupport = vx_true_e;
+       }
+       else if(TENSOR_RANK(out) == VX_TENSOR_RANK_WHCN)
+       {
+            if((TENSOR_VIEW_SIZE_INDEX(out, 2) == 1) && (TENSOR_VIEW_SIZE_INDEX(out, 3) == 1))
+                shSupport = vx_true_e;
+       }
+    }
+
+    if ((pad_params->numViewDimensions == 2) || shSupport)
     {
         vx_reference parameters[] = {
             (vx_reference)in,
@@ -3080,29 +3271,32 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorPadNode(vx_graph graph,
             (vx_reference)pad_params->pad_const
         };
 
-
-
-
         vx_scalar padLeft = vxCreateScalar(context, VX_TYPE_UINT32, &pad_params->pad_front_array[0]);
         vx_scalar padRight = vxCreateScalar(context, VX_TYPE_UINT32, &pad_params->pad_back_array[0]);
         vx_scalar padTop = vxCreateScalar(context, VX_TYPE_UINT32, &pad_params->pad_front_array[1]);
         vx_scalar padBottom = vxCreateScalar(context, VX_TYPE_UINT32, &pad_params->pad_back_array[1]);
         vx_scalar padMode = vxCreateScalar(context, VX_TYPE_ENUM, &pad_params->pad_mode);
 
+        if(shSupport)
+        {
+            int value = 0;
+            padConst = vxCreateScalar(context, VX_TYPE_INT32, &value);
+            parameters[7] = (vx_reference)padConst;
+        }
+
         if (size_of_pad_params != sizeof(vx_nn_pad_params_t))
         {
             vxError(" size_of_pad_params doesn't match");
+            gcmFOOTER_NO();
             return NULL;
         }
-        vxmASSERT(pad_params->numViewDimensions == 2);
+        if(context->evisNoInst.supportEVIS) vxmASSERT(pad_params->numViewDimensions == 2);
 
         parameters[2] = (vx_reference)padLeft;
         parameters[3] = (vx_reference)padRight;
         parameters[4] = (vx_reference)padTop;
         parameters[5] = (vx_reference)padBottom;
         parameters[6] = (vx_reference)padMode;
-
-
 
         node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_TENSOR_PAD, parameters, vxmLENGTH_OF(parameters));
 
@@ -3151,7 +3345,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorPadNode(vx_graph graph,
         vxReleaseScalar(&padMode);
         vxReleaseTensor(&pad_dims);
     }
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -3172,18 +3366,20 @@ VX_API_ENTRY vx_node VX_API_CALL vxLeakyReluLayer(
 
     vx_scalar negative_slopes = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_FLOAT32, &negative_slope);
 
+    gcmHEADER_ARG("graph=%p, inputs=%p, negative_slope=%f, outputs=%p", graph, inputs, negative_slope, outputs);
     gcmDUMP_API("$VX vxLeakyReluLayer: graph=%p, inputs=%p, negative_slope=%f, outputs=%p", graph, inputs, negative_slope, outputs);
 
-    if (vxoReference_GetStatus((vx_reference)negative_slopes) != VX_SUCCESS) return (vx_node)negative_slopes;
-
+    if (vxoReference_GetStatus((vx_reference)negative_slopes) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)negative_slopes;
+    }
     parameters[1]  = (vx_reference)negative_slopes;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_LEAKY, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&negative_slopes);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -3202,11 +3398,12 @@ VX_API_ENTRY vx_node VX_API_CALL vxPReluLayer(
 
     vx_node node = VX_NULL;
 
+    gcmHEADER_ARG("graph=%p, inputs=%p, alpha=%p, outputs=%p", graph, inputs, alpha, outputs);
     gcmDUMP_API("$VX vxPReluLayer: graph=%p, inputs=%p, alpha=%p, outputs=%p", graph, inputs, alpha, outputs);
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_PRELU, parameters, vxmLENGTH_OF(parameters));
 
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -3235,23 +3432,25 @@ VX_API_ENTRY vx_node VX_API_CALL vxBatchNormalizationLayer(
     (vx_reference)input,
     (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, eps=%f, mean=%p, variance=%p, gamma=%p, beta=%p, input=%p, output=%p",
+         graph, eps, mean, variance, gamma, beta, input, output);
     gcmDUMP_API("$VX vxBatchNormalizationLayer: graph=%p, eps=%f, mean=%p, variance=%p, gamma=%p, beta=%p, input=%p, output=%p",
          graph, eps, mean, variance, gamma, beta, input, output);
 
     context = vxGetContext((vx_reference)graph);
 
     eps_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &eps);
-    if (vxoReference_GetStatus((vx_reference)eps_s) != VX_SUCCESS) return (vx_node)eps_s;
-
+    if (vxoReference_GetStatus((vx_reference)eps_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)eps_s;
+    }
     parameters[0]  = (vx_reference)eps_s;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_BATCH_NORM, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&eps_s);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -3290,6 +3489,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxRPNLayer(
         (vx_reference)score_output
     };
 
+    gcmHEADER_ARG("graph=%p, score=%p, bbox=%p, anchors=%p, img_info=%p, rpn_params=%p, size_of_rpn_params=0x%lx, roi_output=%p, score_output=%p",
+        graph, score, bbox, anchors, img_info, rpn_params, size_of_rpn_params, roi_output, score_output);
     gcmDUMP_API("$VX vxRPNLayer: graph=%p, score=%p, bbox=%p, anchors=%p, img_info=%p, rpn_params=%p, size_of_rpn_params=0x%lx, roi_output=%p, score_output=%p",
         graph, score, bbox, anchors, img_info, rpn_params, size_of_rpn_params, roi_output, score_output);
 
@@ -3308,27 +3509,40 @@ VX_API_ENTRY vx_node VX_API_CALL vxRPNLayer(
     context = vxGetContext((vx_reference)graph);
 
     feature_stride_s = vxCreateScalar(context, VX_TYPE_UINT32, &rpn_params->feature_stride);
-    if (vxoReference_GetStatus((vx_reference)feature_stride_s) != VX_SUCCESS) return (vx_node)feature_stride_s;
-
+    if (vxoReference_GetStatus((vx_reference)feature_stride_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)feature_stride_s;
+    }
     min_size_s = vxCreateScalar(context, VX_TYPE_UINT32, &rpn_params->min_size);
-    if (vxoReference_GetStatus((vx_reference)min_size_s) != VX_SUCCESS) return (vx_node)min_size_s;
-
+    if (vxoReference_GetStatus((vx_reference)min_size_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)min_size_s;
+    }
     pre_nms_topn_s = vxCreateScalar(context, VX_TYPE_UINT32, &rpn_params->pre_nms_topn);
-    if (vxoReference_GetStatus((vx_reference)pre_nms_topn_s) != VX_SUCCESS) return (vx_node)pre_nms_topn_s;
-
+    if (vxoReference_GetStatus((vx_reference)pre_nms_topn_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)pre_nms_topn_s;
+    }
     post_nms_topn_s = vxCreateScalar(context, VX_TYPE_UINT32, &rpn_params->post_nms_topn);
-    if (vxoReference_GetStatus((vx_reference)post_nms_topn_s) != VX_SUCCESS) return (vx_node)post_nms_topn_s;
-
+    if (vxoReference_GetStatus((vx_reference)post_nms_topn_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)post_nms_topn_s;
+    }
     nms_thresh_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &rpn_params->nms_thresh);
-    if (vxoReference_GetStatus((vx_reference)nms_thresh_s) != VX_SUCCESS) return (vx_node)nms_thresh_s;
-
+    if (vxoReference_GetStatus((vx_reference)nms_thresh_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)nms_thresh_s;
+    }
     parameters[4]  = (vx_reference)feature_stride_s;
     parameters[5]  = (vx_reference)min_size_s;
     parameters[6]  = (vx_reference)pre_nms_topn_s;
     parameters[7]  = (vx_reference)post_nms_topn_s;
     parameters[8]  = (vx_reference)nms_thresh_s;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_RPN, parameters, vxmLENGTH_OF(parameters));
 
@@ -3337,7 +3551,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxRPNLayer(
     vxReleaseScalar(&pre_nms_topn_s);
     vxReleaseScalar(&post_nms_topn_s);
     vxReleaseScalar(&nms_thresh_s);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -3350,13 +3564,15 @@ VX_API_ENTRY vx_node VX_API_CALL vxROIPoolingLayer(
     vx_tensor output_arr
     )
 {
-
+    gcmHEADER_ARG("graph=%p, input_data=%p, input_rois=%p, roi_pool_params=%p, size_of_roi_params=0x%lx, output_arr=%p",
+        graph, input_data, input_rois, roi_pool_params, size_of_roi_params, output_arr);
     gcmDUMP_API("$VX vxROIPoolingLayer: graph=%p, input_data=%p, input_rois=%p, roi_pool_params=%p, size_of_roi_params=0x%lx, output_arr=%p",
         graph, input_data, input_rois, roi_pool_params, size_of_roi_params, output_arr);
 
 
     if (size_of_roi_params != sizeof(vx_nn_roi_pool_params_ext_t))
     {
+        gcmFOOTER_NO();
         return VX_NULL;
     }
     else
@@ -3383,23 +3599,29 @@ VX_API_ENTRY vx_node VX_API_CALL vxROIPoolingLayer(
         vx_nn_roi_pool_params_ext_t * roi_pool_params_ext = (vx_nn_roi_pool_params_ext_t *)roi_pool_params;
 
         pool_types = vxCreateScalar(context, VX_TYPE_ENUM, &roi_pool_params_ext->khr.pool_type);
-        if (vxoReference_GetStatus((vx_reference)pool_types) != VX_SUCCESS) return (vx_node)pool_types;
-
+        if (vxoReference_GetStatus((vx_reference)pool_types) != VX_SUCCESS) {
+            gcmFOOTER_NO();
+            return (vx_node)pool_types;
+        }
         spatial_scales = vxCreateScalar(context, VX_TYPE_FLOAT32, &roi_pool_params_ext->spatial_scale);
-        if (vxoReference_GetStatus((vx_reference)spatial_scales) != VX_SUCCESS) return (vx_node)spatial_scales;
-
+        if (vxoReference_GetStatus((vx_reference)spatial_scales) != VX_SUCCESS) {
+            gcmFOOTER_NO();
+            return (vx_node)spatial_scales;
+        }
         pooled_heights = vxCreateScalar(context, VX_TYPE_INT32, &roi_pool_params_ext->pooled_height);
-        if (vxoReference_GetStatus((vx_reference)pooled_heights) != VX_SUCCESS) return (vx_node)pooled_heights;
-
+        if (vxoReference_GetStatus((vx_reference)pooled_heights) != VX_SUCCESS) {
+            gcmFOOTER_NO();
+            return (vx_node)pooled_heights;
+        }
         pooled_widths = vxCreateScalar(context, VX_TYPE_INT32, &roi_pool_params_ext->pooled_width);
-        if (vxoReference_GetStatus((vx_reference)pooled_widths) != VX_SUCCESS) return (vx_node)pooled_widths;
-
+        if (vxoReference_GetStatus((vx_reference)pooled_widths) != VX_SUCCESS) {
+            gcmFOOTER_NO();
+            return (vx_node)pooled_widths;
+        }
         parameters[2]  = (vx_reference)pool_types;
         parameters[3]  = (vx_reference)spatial_scales;
         parameters[4]  = (vx_reference)pooled_heights;
         parameters[5]  = (vx_reference)pooled_widths;
-
-
 
         node = vxoNode_CreateSpecific(graph, VX_KERNEL_ROI_POOLING_LAYER, parameters, vxmLENGTH_OF(parameters));
 
@@ -3408,6 +3630,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxROIPoolingLayer(
         vxReleaseScalar(&pooled_heights);
         vxReleaseScalar(&pooled_widths);
 
+        gcmFOOTER_NO();
         return node;
     }
 }
@@ -3429,18 +3652,19 @@ VX_API_ENTRY vx_node VX_API_CALL vxReorgLayer(
 
     vx_scalar strides = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_UINT32, &stride);
 
+    gcmHEADER_ARG("graph=%p, inputs=%p, stride=0x%x, outputs=%p", graph, inputs, stride, outputs);
     gcmDUMP_API("$VX vxReorgLayer: graph=%p, inputs=%p, stride=0x%x, outputs=%p", graph, inputs, stride, outputs);
 
-    if (vxoReference_GetStatus((vx_reference)strides) != VX_SUCCESS) return (vx_node)strides;
-
+    if (vxoReference_GetStatus((vx_reference)strides) != VX_SUCCESS) {
+        gcmFOOTER_NO();
+        return (vx_node)strides;
+    }
     parameters[1]  = (vx_reference)strides;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_REORG_LAYER, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&strides);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -3457,11 +3681,11 @@ VX_API_ENTRY vx_node VX_API_CALL vxL2NormalizeLayer(
 
     vx_node node = VX_NULL;
 
+    gcmHEADER_ARG("graph=%p, inputs=%p, outputs=%p", graph, inputs, outputs);
     gcmDUMP_API("$VX vxL2NormalizeLayer: graph=%p, inputs=%p, outputs=%p", graph, inputs, outputs);
 
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_L2NORMALIZE_LAYER, parameters, vxmLENGTH_OF(parameters));
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -3474,7 +3698,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxDeconvolutionLayer(
     vx_size size_of_deconv_params,
     vx_tensor outputs)
 {
-
+    gcmHEADER_ARG("graph=%p, inputs=%p, weights=%p, biases=%p, deconvolution_params=%p, size_of_deconv_params=0x%lx, outputs=%p",
+        graph, inputs, weights, biases, deconvolution_params, size_of_deconv_params, outputs);
     gcmDUMP_API("$VX vxDeconvolutionLayer: graph=%p, inputs=%p, weights=%p, biases=%p, deconvolution_params=%p, size_of_deconv_params=0x%lx, outputs=%p",
         graph, inputs, weights, biases, deconvolution_params, size_of_deconv_params, outputs);
 
@@ -3503,8 +3728,6 @@ VX_API_ENTRY vx_node VX_API_CALL vxDeconvolutionLayer(
             (vx_reference)outputs,
         };
 
-
-
         vxmCHECK_PRECISION(biases, VX_TENSOR_PRECISION_HIGH);
 
         vxmCHECK_LIFETIME(weights, VX_TENSOR_LIFE_TIME_STATIC);
@@ -3515,7 +3738,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxDeconvolutionLayer(
 
         for (i = 3; i < (gcmCOUNTOF(parameters) - 1); i ++)
             vxReleaseScalar((vx_scalar*)&parameters[i]);
-
+        gcmFOOTER_NO();
         return node;
     }
 }
@@ -3530,11 +3753,11 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorCopyNode(
         (vx_reference)src,
         (vx_reference)dst
     };
-
+    gcmHEADER_ARG("graph=%p, src=%p, dst=%p", graph, src, dst);
     gcmDUMP_API("$VX vxTensorCopyNode: graph=%p, src=%p, dst=%p", graph, src, dst);
 
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_TENSOR_COPY, parameters, vxmLENGTH_OF(parameters));
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -3567,6 +3790,11 @@ VX_API_ENTRY vx_node VX_API_CALL vxLstmUnitLayer(
         (vx_reference)lstm_params->cell2forget_weight,
         (vx_reference)lstm_params->cell2output_weight,
 
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
+
         (vx_reference)lstm_params->input_gate_bias,
         (vx_reference)lstm_params->forget_gate_bias,
         (vx_reference)lstm_params->cell_bias,
@@ -3589,6 +3817,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxLstmUnitLayer(
         (vx_reference)output
     };
 
+    gcmHEADER_ARG("graph=%p, input=%p, output_state_in=%p, cell_state_in=%p, lstm_params=%p, size_of_lstm_params=0x%lx, scratch=%p, output_state_out=%p, cell_state_out=%p, output=%p",
+        graph, input, output_state_in, cell_state_in, lstm_params, size_of_lstm_params, scratch, output_state_out, cell_state_out, output);
     gcmDUMP_API("$VX vxLstmUnitLayer: graph=%p, input=%p, output_state_in=%p, cell_state_in=%p, lstm_params=%p, size_of_lstm_params=0x%lx, scratch=%p, output_state_out=%p, cell_state_out=%p, output=%p",
         graph, input, output_state_in, cell_state_in, lstm_params, size_of_lstm_params, scratch, output_state_out, cell_state_out, output);
 
@@ -3599,11 +3829,17 @@ VX_API_ENTRY vx_node VX_API_CALL vxLstmUnitLayer(
     else if (size_of_lstm_params == sizeof(vx_nn_lstm_params_ext_t))
     {
         vx_nn_lstm_params_ext_t * lstm = (vx_nn_lstm_params_ext_t *)lstm_params;
-        parameters[21] = (vx_reference)lstm->forget_bias;
+        parameters[12] = (vx_reference)lstm->layernorm2input_weight,
+        parameters[13] = (vx_reference)lstm->layernorm2forget_weight,
+        parameters[14] = (vx_reference)lstm->layernorm2cell_weight,
+        parameters[15] = (vx_reference)lstm->layernorm2output_weight,
+
+        parameters[25] = (vx_reference)lstm->forget_bias;
     }
     else
     {
         vxError(" size_of_lstm_params doesn't match");
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -3613,10 +3849,9 @@ VX_API_ENTRY vx_node VX_API_CALL vxLstmUnitLayer(
     vxmCHECK_PRECISION(lstm_params->output_gate_bias, VX_TENSOR_PRECISION_HIGH);
     vxmCHECK_PRECISION(lstm_params->projection_bias, VX_TENSOR_PRECISION_HIGH);
 
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_LSTM_UNIT, parameters, vxmLENGTH_OF(parameters));
 
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -3650,6 +3885,11 @@ VX_API_ENTRY vx_node VX_API_CALL vxLstmLayer(
         (vx_reference)lstm_layer_params->lstm_param.cell2forget_weight,
         (vx_reference)lstm_layer_params->lstm_param.cell2output_weight,
 
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
+        VX_NULL,
+
         (vx_reference)lstm_layer_params->lstm_param.input_gate_bias,
         (vx_reference)lstm_layer_params->lstm_param.forget_gate_bias,
         (vx_reference)lstm_layer_params->lstm_param.cell_bias,
@@ -3668,6 +3908,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxLstmLayer(
         (vx_reference)output
     };
 
+    gcmHEADER_ARG("graph=%p, input=%p, static_input=%p, cont=%p, lstm_layer_params=%p, size_of_lstm_layer_params=0x%lx, output=%p",
+        graph, input, static_input, cont, lstm_layer_params, size_of_lstm_layer_params, output);
     gcmDUMP_API("$VX vxLstmUnitLayer: graph=%p, input=%p, static_input=%p, cont=%p, lstm_layer_params=%p, size_of_lstm_layer_params=0x%lx, output=%p",
         graph, input, static_input, cont, lstm_layer_params, size_of_lstm_layer_params, output);
 
@@ -3677,11 +3919,17 @@ VX_API_ENTRY vx_node VX_API_CALL vxLstmLayer(
     else if (size_of_lstm_layer_params == sizeof(vx_nn_lstm_layer_params_ext_t))
     {
         vx_nn_lstm_layer_params_ext_t * lstm = (vx_nn_lstm_layer_params_ext_t *)&lstm_layer_params->lstm_param;
-        parameters[21] = (vx_reference)lstm->lstm_param.forget_bias;
+        parameters[14] = (vx_reference)lstm->lstm_param.layernorm2input_weight,
+        parameters[15] = (vx_reference)lstm->lstm_param.layernorm2forget_weight,
+        parameters[16] = (vx_reference)lstm->lstm_param.layernorm2cell_weight,
+        parameters[17] = (vx_reference)lstm->lstm_param.layernorm2output_weight,
+
+        parameters[25] = (vx_reference)lstm->lstm_param.forget_bias;
     }
     else
     {
         vxError(" size_of_lstm_params doesn't match");
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -3691,13 +3939,12 @@ VX_API_ENTRY vx_node VX_API_CALL vxLstmLayer(
     vxmCHECK_PRECISION(lstm_layer_params->lstm_param.output_gate_bias, VX_TENSOR_PRECISION_HIGH);
     vxmCHECK_PRECISION(lstm_layer_params->lstm_param.projection_bias, VX_TENSOR_PRECISION_HIGH);
 
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_LSTM_LAYER, parameters, vxmLENGTH_OF(parameters));
 
 
     if (lstm_layer_params->lstm_layer_type > 0)
         vxReleaseScalar((vx_scalar*)&parameters[23]);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -3720,12 +3967,17 @@ VX_API_ENTRY vx_node VX_API_CALL vxReorgLayer2(
     vx_node node = VX_NULL;
     vx_scalar block_size = NULL, type = NULL;
 
+    gcmHEADER_ARG("graph=%p, input=%p, reorg_params=%p, size_of_reorg_params=0x%lx, output=%p",
+        graph, input, reorg_params, size_of_reorg_params, output);
     gcmDUMP_API("$VX vxReorgLayer2: graph=%p, input=%p, reorg_params=%p, size_of_reorg_params=0x%lx, output=%p",
         graph, input, reorg_params, size_of_reorg_params, output);
 
     type = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &reorg_params->type);
-    if (vxoReference_GetStatus((vx_reference)type) != VX_SUCCESS) return (vx_node)type;
-
+    if (vxoReference_GetStatus((vx_reference)type) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)type;
+    }
     parameters[2]  = (vx_reference)type;
 
     if (sizeof(vx_nn_reorg_params_ext_t) == size_of_reorg_params)
@@ -3739,13 +3991,11 @@ VX_API_ENTRY vx_node VX_API_CALL vxReorgLayer2(
         parameters[1] = (vx_reference)reorg_params->block_size;
     }
 
-
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_REORG2_LAYER, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&block_size);
     vxReleaseScalar(&type);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -3766,19 +4016,22 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorRoundingNode(
     vx_node node = VX_NULL;
     vx_scalar mode = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &rounding_params->mode);
 
+    gcmHEADER_ARG("graph=%p, input=%p, rounding_params=%p, size_of_rounding_params=0x%lx, output=%p",
+        graph, input, rounding_params, size_of_rounding_params, output);
     gcmDUMP_API("$VX vxTensorRoundingNode: graph=%p, input=%p, rounding_params=%p, size_of_rounding_params=0x%lx, output=%p",
         graph, input, rounding_params, size_of_rounding_params, output);
 
-    if (vxoReference_GetStatus((vx_reference)mode) != VX_SUCCESS) return (vx_node)mode;
-
+    if (vxoReference_GetStatus((vx_reference)mode) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)mode;
+    }
     parameters[1]  = (vx_reference)mode;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_TENSOR_ROUNDING, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&mode);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -3800,14 +4053,13 @@ VX_API_ENTRY vx_node VX_API_CALL vxHashTableLookupLayer(
     };
 
     vx_node node = VX_NULL;
-
+    gcmHEADER_ARG("graph=%p, input=%p, hashlut_params=%p, size_of_hashlut_params=0x%lx, hits=%p, output=%p",
+        graph, input, hashlut_params, size_of_hashlut_params, hits, output);
     gcmDUMP_API("$VX vxHashTableLookupLayer: graph=%p, input=%p, hashlut_params=%p, size_of_hashlut_params=0x%lx, hits=%p, output=%p",
         graph, input, hashlut_params, size_of_hashlut_params, hits, output);
 
-
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_HASH_LUT_LAYER, parameters, vxmLENGTH_OF(parameters));
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -3828,14 +4080,14 @@ VX_API_ENTRY vx_node VX_API_CALL vxLSHProjectionLayer(
     };
 
     vx_node node = VX_NULL;
-
+    gcmHEADER_ARG("graph=%p, input=%p, lshproj_params=%p, size_of_lshproj_params=0x%lx, output=%p",
+        graph, input, lshproj_params, size_of_lshproj_params, output);
     gcmDUMP_API("$VX vxLSHProjectionLayer: graph=%p, input=%p, lshproj_params=%p, size_of_lshproj_params=0x%lx, output=%p",
         graph, input, lshproj_params, size_of_lshproj_params, output);
 
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_LSH_PROJECTION_LAYER, parameters, vxmLENGTH_OF(parameters));
 
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -3852,10 +4104,12 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorReshapeNode(
         (vx_reference)reshape_params->dims,
         (vx_reference)output
     };
+    gcmHEADER_ARG("graph=%p, input=%p, reshape_params=%p, size_of_reshape_params=0x%lx, output=%p",
+        graph, input, reshape_params, size_of_reshape_params, output);
     gcmDUMP_API("$VX vxTensorReshapeNode: graph=%p, input=%p, reshape_params=%p, size_of_reshape_params=0x%lx, output=%p",
         graph, input, reshape_params, size_of_reshape_params, output);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_NN_TENSOR_RESHPE, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -3876,20 +4130,22 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorScaleNode(
     vx_node node = VX_NULL;
 
     vx_scalar type = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &scale_params->type);
-
+    gcmHEADER_ARG("graph=%p, input=%p, scale_params=%p, size_of_scale_params=0x%lx, output=%p",
+        graph, input, scale_params, size_of_scale_params, output);
     gcmDUMP_API("$VX vxTensorScaleNode: graph=%p, input=%p, scale_params=%p, size_of_scale_params=0x%lx, output=%p",
         graph, input, scale_params, size_of_scale_params, output);
 
-    if (vxoReference_GetStatus((vx_reference)type) != VX_SUCCESS) return (vx_node)type;
-
+    if (vxoReference_GetStatus((vx_reference)type) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)type;
+    }
     parameters[1]  = (vx_reference)type;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_TENSOR_SCALE, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&type);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -3915,13 +4171,15 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorReverse(
     vx_scalar axis[4] = {VX_NULL};
     vx_uint32 sizeOfAxis = 0;
     vx_uint32 i = 0;
-
+    gcmHEADER_ARG("graph=%p, inputs=%p, tensor_reverse_params=%p, size_of_tensor_reverse_params=0x%lx, outputs=%p",
+        graph, inputs, tensor_reverse_params, size_of_tensor_reverse_params, outputs);
     gcmDUMP_API("$VX vxTensorReverse: graph=%p, inputs=%p, tensor_reverse_params=%p, size_of_tensor_reverse_params=0x%lx, outputs=%p",
         graph, inputs, tensor_reverse_params, size_of_tensor_reverse_params, outputs);
 
     if (size_of_tensor_reverse_params != sizeof(vx_nn_tensor_reverse_params_t))
     {
         vxError("Invalid parameter convolution_relu_pooling_params");
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -3930,6 +4188,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorReverse(
     if (sizeOfAxis > 4)
     {
         vxError("Invalid parameter numberOfAxis, can't larger than 4");
+        gcmFOOTER_NO();
         return NULL;
     }
 
@@ -3946,6 +4205,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorReverse(
         else
         {
             vxError("Invalid parameter axis");
+            gcmFOOTER_NO();
             return NULL;
         }
     }
@@ -3957,7 +4217,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorReverse(
     {
         vxReleaseScalar(&axis[i]);
     }
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -3983,16 +4243,16 @@ VX_API_ENTRY vx_node VX_API_CALL vxRNNLayer(
 
     vx_node node = VX_NULL;
 
-
+    gcmHEADER_ARG("graph=%p, input=%p, rnn_params=%p, size_of_rnn_params=0x%lx, output=%p",
+        graph, input, rnn_params, size_of_rnn_params, output);
     gcmDUMP_API("$VX vxRNNLayer: graph=%p, input=%p, rnn_params=%p, size_of_rnn_params=0x%lx, output=%p",
         graph, input, rnn_params, size_of_rnn_params, output);
 
     vxmCHECK_PRECISION(rnn_params->bias, VX_TENSOR_PRECISION_HIGH);
 
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_RNN_LAYER, parameters, vxmLENGTH_OF(parameters));
 
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4013,21 +4273,23 @@ VX_API_ENTRY vx_node VX_API_CALL vxSoftmaxLayer2(
     vx_node node = VX_NULL;
 
     vx_scalar beta = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_FLOAT32, &softmax_params->beta);
-
+    gcmHEADER_ARG("graph=%p, input=%p, softmax_params=%p, size_of_softmax_params=0x%lx, output=%p",
+        graph, input, softmax_params, size_of_softmax_params, output);
     gcmDUMP_API("$VX vxSoftmaxLayer2: graph=%p, input=%p, softmax_params=%p, size_of_softmax_params=0x%lx, output=%p",
         graph, input, softmax_params, size_of_softmax_params, output);
 
 
-    if (vxoReference_GetStatus((vx_reference)beta) != VX_SUCCESS) return (vx_node)beta;
-
+    if (vxoReference_GetStatus((vx_reference)beta) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)beta;
+    }
     parameters[1]  = (vx_reference)beta;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_SOFTMAX2_LAYER, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&beta);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4053,16 +4315,16 @@ VX_API_ENTRY vx_node VX_API_CALL vxSVDFLayer(
     };
 
     vx_node node = VX_NULL;
-
+    gcmHEADER_ARG("graph=%p, input=%p, svdf_params=%p, size_of_svdf_params=0x%lx, output=%p",
+        graph, input, svdf_params, size_of_svdf_params, output);
     gcmDUMP_API("$VX vxSVDFLayer: graph=%p, input=%p, svdf_params=%p, size_of_svdf_params=0x%lx, output=%p",
         graph, input, svdf_params, size_of_svdf_params, output);
 
     vxmCHECK_PRECISION(svdf_params->bias, VX_TENSOR_PRECISION_HIGH);
 
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_SVDF_LAYER, parameters, vxmLENGTH_OF(parameters));
 
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4081,12 +4343,13 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorTableLookupNode2(
 
     vx_node node = VX_NULL;
 
+    gcmHEADER_ARG("graph=%p, input=%p, lut=%p, out=%p",
+        graph, in1, lut, out);
     gcmDUMP_API("$VX vxTensorTableLookupNode2: graph=%p, input=%p, lut=%p, out=%p",
         graph, in1, lut, out);
 
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_LUT2_LAYER, parameters, vxmLENGTH_OF(parameters));
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4113,30 +4376,45 @@ VX_API_ENTRY vx_node VX_API_CALL vxNormalizationLayer2(
 
     vx_scalar type = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &normalization_params->type);
 
+    gcmHEADER_ARG("graph=%p, inputs=%p, normalization_params=%p, size_of_normalization_param=0x%lx, outputs=%p",
+        graph, inputs, normalization_params, size_of_normalization_param, outputs);
     gcmDUMP_API("$VX vxNormalizationLayer2: graph=%p, inputs=%p, normalization_params=%p, size_of_normalization_param=0x%lx, outputs=%p",
         graph, inputs, normalization_params, size_of_normalization_param, outputs);
 
-    if (vxoReference_GetStatus((vx_reference)type) != VX_SUCCESS) return (vx_node)type;
-
+    if (vxoReference_GetStatus((vx_reference)type) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)type;
+    }
     norm_size = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_UINT32, &normalization_params->norm_size);
-    if (vxoReference_GetStatus((vx_reference)norm_size) != VX_SUCCESS) return (vx_node)norm_size;
-
+    if (vxoReference_GetStatus((vx_reference)norm_size) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)norm_size;
+    }
     alpha = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_FLOAT32, &normalization_params->alpha);
-    if (vxoReference_GetStatus((vx_reference)alpha) != VX_SUCCESS) return (vx_node)alpha;
-
+    if (vxoReference_GetStatus((vx_reference)alpha) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)alpha;
+    }
     beta = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_FLOAT32, &normalization_params->beta);
-    if (vxoReference_GetStatus((vx_reference)beta) != VX_SUCCESS) return (vx_node)beta;
-
+    if (vxoReference_GetStatus((vx_reference)beta) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)beta;
+    }
     bias = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_FLOAT32, &normalization_params->bias);
-    if (vxoReference_GetStatus((vx_reference)bias) != VX_SUCCESS) return (vx_node)bias;
-
+    if (vxoReference_GetStatus((vx_reference)bias) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)bias;
+    }
     parameters[1]  = (vx_reference)type;
     parameters[2]  = (vx_reference)norm_size;
     parameters[3]  = (vx_reference)alpha;
     parameters[4]  = (vx_reference)beta;
     parameters[5]  = (vx_reference)bias;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_NORMALIZATION_LAYER2, parameters, vxmLENGTH_OF(parameters));
 
@@ -4150,6 +4428,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxNormalizationLayer2(
 
     vxReleaseScalar(&bias);
 
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4177,13 +4456,15 @@ VX_API_ENTRY vx_node VX_API_CALL vxYUV2RGBScaleNode(
     vx_node node = VX_NULL;
     vx_context context = vxGetContext((vx_reference)graph);
 
-
+    gcmHEADER_ARG("graph=%p, input=%p, yuv2rgb_scale_params=%p, size_of_yuv2rgb_scale_param=0x%lx, output=%p",
+        graph, input, yuv2rgb_scale_params, size_of_yuv2rgb_scale_param, output);
     gcmDUMP_API("$VX vxYUV2RGBScaleNode: graph=%p, input=%p, yuv2rgb_scale_params=%p, size_of_yuv2rgb_scale_param=0x%lx, output=%p",
         graph, input, yuv2rgb_scale_params, size_of_yuv2rgb_scale_param, output);
 
     rect_a = vxCreateArray(context, VX_TYPE_UINT32, 4);
     if (!vxoArray_AllocateMemory(rect_a))
     {
+        gcmFOOTER_NO();
         return VX_NULL;
     }
     else
@@ -4196,27 +4477,41 @@ VX_API_ENTRY vx_node VX_API_CALL vxYUV2RGBScaleNode(
     }
 
     r_mean_s = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_FLOAT32, &yuv2rgb_scale_params->mean_r);
-    if (vxoReference_GetStatus((vx_reference)r_mean_s) != VX_SUCCESS) return (vx_node)r_mean_s;
-
+    if (vxoReference_GetStatus((vx_reference)r_mean_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)r_mean_s;
+    }
     g_mean_s = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_FLOAT32, &yuv2rgb_scale_params->mean_g);
-    if (vxoReference_GetStatus((vx_reference)g_mean_s) != VX_SUCCESS) return (vx_node)g_mean_s;
-
+    if (vxoReference_GetStatus((vx_reference)g_mean_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)g_mean_s;
+    }
     b_mean_s = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_FLOAT32, &yuv2rgb_scale_params->mean_b);
-    if (vxoReference_GetStatus((vx_reference)b_mean_s) != VX_SUCCESS) return (vx_node)b_mean_s;
-
+    if (vxoReference_GetStatus((vx_reference)b_mean_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)b_mean_s;
+    }
     rgb_scale_s = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_FLOAT32, &yuv2rgb_scale_params->scale_rgb);
-    if (vxoReference_GetStatus((vx_reference)rgb_scale_s) != VX_SUCCESS) return (vx_node)rgb_scale_s;
-
+    if (vxoReference_GetStatus((vx_reference)rgb_scale_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)rgb_scale_s;
+    }
     y_only_s = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_BOOL, &yuv2rgb_scale_params->y_only);
-    if (vxoReference_GetStatus((vx_reference)y_only_s) != VX_SUCCESS) return (vx_node)y_only_s;
-
+    if (vxoReference_GetStatus((vx_reference)y_only_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)y_only_s;
+    }
     parameters[1]  = (vx_reference)rect_a;
     parameters[2]  = (vx_reference)r_mean_s;
     parameters[3]  = (vx_reference)g_mean_s;
     parameters[4]  = (vx_reference)b_mean_s;
     parameters[5]  = (vx_reference)rgb_scale_s;
     parameters[6]  = (vx_reference)y_only_s;
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_YUV2RGB_SCALE, parameters, vxmLENGTH_OF(parameters));
 
@@ -4226,6 +4521,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxYUV2RGBScaleNode(
     vxReleaseScalar(&b_mean_s);
     vxReleaseScalar(&rgb_scale_s);
     vxReleaseScalar(&y_only_s);
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4247,11 +4543,14 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorTransposeNode2(
     vx_array perm = vxCreateArray(context, VX_TYPE_UINT32, transpose_params->dims_num);
     vx_scalar pnum = VX_NULL;
 
+    gcmHEADER_ARG("graph=%p, input=%p, transpose_params=%p, size_of_transpose_param=0x%lx, output=%p",
+        graph, inputs, transpose_params, size_of_transpose_param, outputs);
     gcmDUMP_API("$VX vxTensorTransposeNode2: graph=%p, input=%p, transpose_params=%p, size_of_transpose_param=0x%lx, output=%p",
         graph, inputs, transpose_params, size_of_transpose_param, outputs);
 
     if (!vxoArray_AllocateMemory(perm))
     {
+        gcmFOOTER_NO();
         return VX_NULL;
     }
     else
@@ -4260,18 +4559,19 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorTransposeNode2(
     }
 
     pnum = vxCreateScalar(context, VX_TYPE_UINT32, &transpose_params->dims_num);
-    if (vxoReference_GetStatus((vx_reference)pnum) != VX_SUCCESS) return (vx_node)pnum;
-
+    if (vxoReference_GetStatus((vx_reference)pnum) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)pnum;
+    }
     parameters[1] = (vx_reference)perm;
     parameters[2] = (vx_reference)pnum;
-
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_TENSOR_TRANSPOSE, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseArray(&perm);
     vxReleaseScalar(&pnum);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4292,18 +4592,22 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorMeanNode(
     vx_context context = vxGetContext((vx_reference)graph);
     vx_scalar keep_dims = vxCreateScalar(context, VX_TYPE_UINT32, &mean_params->keep_dims);
 
+    gcmHEADER_ARG("graph=%p, input=%p, mean_params=%p, size_of_mean_param=0x%lx, output=%p",
+        graph, inputs, mean_params, size_of_mean_param, outputs);
     gcmDUMP_API("$VX vxTensorMeanNode: graph=%p, input=%p, mean_params=%p, size_of_mean_param=0x%lx, output=%p",
         graph, inputs, mean_params, size_of_mean_param, outputs);
 
-    if (vxoReference_GetStatus((vx_reference)keep_dims) != VX_SUCCESS) return (vx_node)keep_dims;
-
+    if (vxoReference_GetStatus((vx_reference)keep_dims) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)keep_dims;
+    }
     parameters[2] = (vx_reference)keep_dims;
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_TENSOR_MEAN, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&keep_dims);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4321,13 +4625,13 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorSqueezeNode(
     };
     vx_node node = VX_NULL;
 
-
+    gcmHEADER_ARG("graph=%p, inputs=%p, squeeze_params=%p, size_of_squeeze_param=0x%lx, outputs=%p",
+        graph, inputs, squeeze_params, size_of_squeeze_param, outputs);
     gcmDUMP_API("$VX vxTensorSqueezeNode: graph=%p, inputs=%p, squeeze_params=%p, size_of_squeeze_param=0x%lx, outputs=%p",
         graph, inputs, squeeze_params, size_of_squeeze_param, outputs);
 
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_TENSOR_SQUEEZE, parameters, vxmLENGTH_OF(parameters));
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4351,30 +4655,39 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorStrideSliceNode(
     vx_node node = VX_NULL;
     vx_context context = vxGetContext((vx_reference)graph);
     vx_scalar begin_mask = VX_NULL, end_mask = VX_NULL, shrink_axis_mask = VX_NULL;
-
+    gcmHEADER_ARG("graph=%p, inputs=%p, stride_slice_params=%p, size_of_stride_slice_param=0x%lx, outputs=%p",
+        graph, inputs, stride_slice_params, size_of_stride_slice_param, outputs);
     gcmDUMP_API("$VX vxTensorStrideSliceNode: graph=%p, inputs=%p, stride_slice_params=%p, size_of_stride_slice_param=0x%lx, outputs=%p",
         graph, inputs, stride_slice_params, size_of_stride_slice_param, outputs);
 
     begin_mask = vxCreateScalar(context, VX_TYPE_UINT32, &stride_slice_params->begin_mask);
-    if (vxoReference_GetStatus((vx_reference)begin_mask) != VX_SUCCESS) return (vx_node)begin_mask;
-
+    if (vxoReference_GetStatus((vx_reference)begin_mask) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)begin_mask;
+    }
     end_mask = vxCreateScalar(context, VX_TYPE_UINT32, &stride_slice_params->end_mask);
-    if (vxoReference_GetStatus((vx_reference)end_mask) != VX_SUCCESS) return (vx_node)end_mask;
-
+    if (vxoReference_GetStatus((vx_reference)end_mask) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)end_mask;
+    }
     shrink_axis_mask = vxCreateScalar(context, VX_TYPE_UINT32, &stride_slice_params->shrink_axis_mask);
-    if (vxoReference_GetStatus((vx_reference)shrink_axis_mask) != VX_SUCCESS) return (vx_node)shrink_axis_mask;
-
+    if (vxoReference_GetStatus((vx_reference)shrink_axis_mask) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)shrink_axis_mask;
+    }
     parameters[4] = (vx_reference)begin_mask;
     parameters[5] = (vx_reference)end_mask;
     parameters[6] = (vx_reference)shrink_axis_mask;
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_TENSOR_STRIDE_SLICE, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&begin_mask);
     vxReleaseScalar(&end_mask);
     vxReleaseScalar(&shrink_axis_mask);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4401,7 +4714,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxGRUUnitLayer(
         (vx_reference)gru_params->connection_bias,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, inputs=%p, gru_params=%p, size_of_gru_params=0x%lx, outputs=%p",
+        graph, input, gru_params, size_of_gru_params, output);
     gcmDUMP_API("$VX vxGRUUnitLayer: graph=%p, inputs=%p, gru_params=%p, size_of_gru_params=0x%lx, outputs=%p",
         graph, input, gru_params, size_of_gru_params, output);
 
@@ -4413,12 +4727,12 @@ VX_API_ENTRY vx_node VX_API_CALL vxGRUUnitLayer(
     else
     {
         vxError(" size_of_gru_params doesn't match");
+        gcmFOOTER_NO();
         return NULL;
     }
 
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_GRU_UNIT_LAYER, parameters, vxmLENGTH_OF(parameters));
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4447,7 +4761,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxGRULayer(
         (vx_reference)gru_layer_params->connection_bias,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, inputs=%p, gru_layer_params=%p, size_of_gru_params=0x%lx, outputs=%p",
+        graph, input, gru_layer_params, size_of_gru_layer_params, output);
     gcmDUMP_API("$VX vxGRULayer: graph=%p, inputs=%p, gru_layer_params=%p, size_of_gru_params=0x%lx, outputs=%p",
         graph, input, gru_layer_params, size_of_gru_layer_params, output);
 
@@ -4457,12 +4772,12 @@ VX_API_ENTRY vx_node VX_API_CALL vxGRULayer(
     else
     {
         vxError(" size_of_gru_layer_params doesn't match");
+        gcmFOOTER_NO();
         return NULL;
     }
 
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_GRU_LAYER, parameters, vxmLENGTH_OF(parameters));
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4500,7 +4815,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvLSTMUnitLayer(
         (vx_reference)cell_state_out,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, output_state_in=%p, cell_state_in=%p, convlstm_params=%p, size_of_convlstm_params=0x%lx, output_state_out=%p, cell_state_out=%p, output=%p",
+            graph, input, output_state_in, cell_state_in, convlstm_params, size_of_convlstm_params, output_state_out, cell_state_out, output);
     gcmDUMP_API("$VX vxConvLSTMUnitLayer: graph=%p, input=%p, output_state_in=%p, cell_state_in=%p, convlstm_params=%p, size_of_convlstm_params=0x%lx, output_state_out=%p, cell_state_out=%p, output=%p",
             graph, input, output_state_in, cell_state_in, convlstm_params, size_of_convlstm_params, output_state_out, cell_state_out, output);
 
@@ -4511,16 +4827,16 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvLSTMUnitLayer(
     else
     {
         vxError(" size_of_lstm_params doesn't match");
+        gcmFOOTER_NO();
         return NULL;
     }
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_CONV_LSTM_UNIT_LAYER, parameters, vxmLENGTH_OF(parameters));
 
 
     if (parameters[16] != VX_NULL)
         vxReleaseScalar((vx_scalar*)&parameters[16]);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4555,7 +4871,8 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvLSTMLayer(
         (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &convlstm_layer_params->convlstm_param.forget_bias),
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, static_input=%p, cont=%p, convlstm_layer_params=%p, size_of_convlstm_layer_params=0x%lx, output=%p",
+            graph, input, static_input, cont, convlstm_layer_params, size_of_convlstm_layer_params, output);
     gcmDUMP_API("$VX vxConvLSTMLayer: graph=%p, input=%p, static_input=%p, cont=%p, convlstm_layer_params=%p, size_of_convlstm_layer_params=0x%lx, output=%p",
             graph, input, static_input, cont, convlstm_layer_params, size_of_convlstm_layer_params, output);
 
@@ -4565,12 +4882,12 @@ VX_API_ENTRY vx_node VX_API_CALL vxConvLSTMLayer(
     else
     {
         vxError(" size_of_lstm_params doesn't match");
+        gcmFOOTER_NO();
         return NULL;
     }
 
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_CONV_LSTM_LAYER, parameters, vxmLENGTH_OF(parameters));
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4581,9 +4898,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxMaxNode(vx_graph graph, vx_image in1, vx_imag
        (vx_reference)in2,
        (vx_reference)out
     };
-
+    gcmHEADER_ARG("graph=%p, in1=%p, in2=%p, out=%p", graph, in1, in2, out);
     gcmDUMP_API("$VX vxMaxNode: graph=%p, in1=%p, in2=%p, out=%p", graph, in1, in2, out);
 
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_MAX, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -4594,9 +4912,10 @@ vx_reference parameters[] = {
     (vx_reference)in2,
     (vx_reference)out
 };
+    gcmHEADER_ARG("graph=%p, in1=%p, in2=%p, out=%p", graph, in1, in2, out);
     gcmDUMP_API("$VX vxMinNode: graph=%p, in1=%p, in2=%p, out=%p", graph, in1, in2, out);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_MIN, parameters, vxmLENGTH_OF(parameters));
 }
 
@@ -4610,16 +4929,20 @@ VX_API_ENTRY vx_node VX_API_CALL vxNonMaxSuppressionNode(vx_graph graph, vx_imag
         (vx_reference)output
     };
     vx_node node = VX_NULL;
-
+    gcmHEADER_ARG("graph=%p, input=%p, mask=%p, win_size=0x%x, output=%p", graph, input, mask, win_size, output);
     gcmDUMP_API("$VX vxNonMaxSuppressionNode: graph=%p, input=%p, mask=%p, win_size=0x%x, output=%p", graph, input, mask, win_size, output);
 
     scalar_win_size = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &win_size);
-    if (vxoReference_GetStatus((vx_reference)scalar_win_size) != VX_SUCCESS) return (vx_node)scalar_win_size;
+    if (vxoReference_GetStatus((vx_reference)scalar_win_size) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)scalar_win_size;
+    }
     parameters[2] = (vx_reference)scalar_win_size;
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NON_MAX_SUPPRESSION, parameters, vxmLENGTH_OF(parameters));
     vxReleaseScalar(&scalar_win_size);
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4637,9 +4960,11 @@ VX_API_ENTRY vx_node VX_API_CALL vxScalarOperationNode(vx_graph graph, vx_enum o
                                            VX_KERNEL_SCALAR_OPERATION,
                                            params,
                                            vxmLENGTH_OF(params));
+    gcmHEADER_ARG("graph=%p, operation=0x%x, a=%p, b=%p, output=%p", graph, operation, a, b, output);
     gcmDUMP_API("$VX vxScalarOperationNode: graph=%p, operation=0x%x, a=%p, b=%p, output=%p", graph, operation, a, b, output);
 
     vxReleaseScalar(&op);
+    gcmFOOTER_NO();
     return node;
 
 }
@@ -4653,8 +4978,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxSelectNode(vx_graph graph, vx_scalar conditio
         (vx_reference)condition
     };
     vx_node node = VX_NULL;
+    gcmHEADER_ARG("graph=%p, condition=%p, true_value=%p, false_value=%p, output=%p", graph, condition, true_value, false_value, output);
     gcmDUMP_API("$VX vxSelectNode: graph=%p, condition=%p, true_value=%p, false_value=%p, output=%p", graph, condition, true_value, false_value, output);
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_SELECT, parameters, vxmLENGTH_OF(parameters));
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4668,15 +4995,20 @@ VX_API_ENTRY vx_node VX_API_CALL vxSelectNode(vx_graph graph, vx_scalar conditio
         (vx_reference)output
     };
     vx_node node = VX_NULL;
+    gcmHEADER_ARG("graph=%p, src=%p, templateImage=%p, matchingMethod=0x%x, output=%p", graph, src, templateImage, matchingMethod, output);
     gcmDUMP_API("$VX vxMatchTemplateNode: graph=%p, src=%p, templateImage=%p, matchingMethod=0x%x, output=%p", graph, src, templateImage, matchingMethod, output);
 
     scalar_matchingMethod = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &matchingMethod);
-    if (vxoReference_GetStatus((vx_reference)scalar_matchingMethod) != VX_SUCCESS) return (vx_node)scalar_matchingMethod;
+    if (vxoReference_GetStatus((vx_reference)scalar_matchingMethod) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)scalar_matchingMethod;
+    }
     parameters[2] = (vx_reference)scalar_matchingMethod;
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_MATCH_TEMPLATE, parameters, vxmLENGTH_OF(parameters));
     vxReleaseScalar(&scalar_matchingMethod);
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4690,20 +5022,28 @@ VX_API_ENTRY vx_node VX_API_CALL vxLBPNode(vx_graph graph, vx_image in, vx_enum 
         (vx_reference)out
     };
     vx_node node = VX_NULL;
-
+    gcmHEADER_ARG("graph=%p, in=%p, format=0x%x, kernel_size=0x%x, out=%p", graph, in, format, kernel_size, out);
     gcmDUMP_API("$VX vxLBPNode: graph=%p, in=%p, format=0x%x, kernel_size=0x%x, out=%p", graph, in, format, kernel_size, out);
     scalar_format = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &format);
-    if (vxoReference_GetStatus((vx_reference)scalar_format) != VX_SUCCESS) return (vx_node)scalar_format;
+    if (vxoReference_GetStatus((vx_reference)scalar_format) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)scalar_format;
+    }
     parameters[1] = (vx_reference)scalar_format;
 
     scalar_kernel_size = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT8, &kernel_size);
-    if (vxoReference_GetStatus((vx_reference)scalar_kernel_size) != VX_SUCCESS) return (vx_node)scalar_kernel_size;
+    if (vxoReference_GetStatus((vx_reference)scalar_kernel_size) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)scalar_kernel_size;
+    }
     parameters[2] = (vx_reference)scalar_kernel_size;
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_LBP, parameters, vxmLENGTH_OF(parameters));
     vxReleaseScalar(&scalar_format);
     vxReleaseScalar(&scalar_kernel_size);
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4721,19 +5061,31 @@ VX_API_ENTRY vx_node VX_API_CALL vxHOGCellsNode(vx_graph graph, vx_image input, 
         VX_NULL
     };
     vx_node node = VX_NULL;
-
+    gcmHEADER_ARG("graph=%p, input=%p, cell_width=0x%x, cell_height=0x%x, num_bins=0x%x, magnitudes=%p, bins=%p", graph, input, cell_width, cell_height, num_bins, magnitudes, bins);
     gcmDUMP_API("$VX vxHOGCellsNode: graph=%p, input=%p, cell_width=0x%x, cell_height=0x%x, num_bins=0x%x, magnitudes=%p, bins=%p", graph, input, cell_width, cell_height, num_bins, magnitudes, bins);
 
     scalar_cell_width = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &cell_width);
-    if (vxoReference_GetStatus((vx_reference)scalar_cell_width) != VX_SUCCESS) return (vx_node)scalar_cell_width;
+    if (vxoReference_GetStatus((vx_reference)scalar_cell_width) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)scalar_cell_width;
+    }
     parameters[1] = (vx_reference)scalar_cell_width;
 
     scalar_cell_height = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &cell_height);
-    if (vxoReference_GetStatus((vx_reference)scalar_cell_height) != VX_SUCCESS) return (vx_node)scalar_cell_height;
+    if (vxoReference_GetStatus((vx_reference)scalar_cell_height) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)scalar_cell_height;
+    }
     parameters[2] = (vx_reference)scalar_cell_height;
 
     scalar_num_bins = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &num_bins);
-    if (vxoReference_GetStatus((vx_reference)scalar_num_bins) != VX_SUCCESS) return (vx_node)scalar_num_bins;
+    if (vxoReference_GetStatus((vx_reference)scalar_num_bins) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)scalar_num_bins;
+    }
     parameters[3] = (vx_reference)scalar_num_bins;
 
     temp = 0;
@@ -4744,18 +5096,23 @@ VX_API_ENTRY vx_node VX_API_CALL vxHOGCellsNode(vx_graph graph, vx_image input, 
     }else if(type == VX_TYPE_INT8){
         temp = 1;
     }else{
+        gcmFOOTER_NO();
         return node;
     }
     scalar_data_type = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &temp);
-    if (vxoReference_GetStatus((vx_reference)scalar_data_type) != VX_SUCCESS) return (vx_node)scalar_data_type;
+    if (vxoReference_GetStatus((vx_reference)scalar_data_type) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)scalar_data_type;
+    }
     parameters[6] = (vx_reference)scalar_data_type;
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_HOG_CELLS, parameters, vxmLENGTH_OF(parameters));
     vxReleaseScalar(&scalar_cell_width);
     vxReleaseScalar(&scalar_cell_height);
     vxReleaseScalar(&scalar_num_bins);
     vxReleaseScalar(&scalar_data_type);
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4774,14 +5131,18 @@ VX_API_ENTRY vx_node VX_API_CALL vxHOGFeaturesNode(vx_graph graph, vx_image inpu
         VX_NULL,
     };
     vx_node node = VX_NULL;
-
+    gcmHEADER_ARG("graph=%p, input=%p, magnitudes=%p, bins=%p, params=%p, hog_param_size=0x%lx, features=%p", graph, input, magnitudes, bins, params, hog_param_size, features);
     gcmDUMP_API("$VX vxHOGFeaturesNode: graph=%p, input=%p, magnitudes=%p, bins=%p, params=%p, hog_param_size=0x%lx, features=%p", graph, input, magnitudes, bins, params, hog_param_size, features);
     hog_param = vxCreateArray(vxGetContext((vx_reference)graph), VX_TYPE_HOG_PARAMS, 1);
     vxAddArrayItems(hog_param, 1, params, hog_param_size*sizeof(vx_hog_t));
     parameters[3] = (vx_reference)hog_param;
 
     scalar_hog_param_size = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &hog_param_size);
-    if (vxoReference_GetStatus((vx_reference)scalar_hog_param_size) != VX_SUCCESS) return (vx_node)scalar_hog_param_size;
+    if (vxoReference_GetStatus((vx_reference)scalar_hog_param_size) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)scalar_hog_param_size;
+    }
     parameters[4] = (vx_reference)scalar_hog_param_size;
 
     temp = 1;
@@ -4792,17 +5153,22 @@ VX_API_ENTRY vx_node VX_API_CALL vxHOGFeaturesNode(vx_graph graph, vx_image inpu
     }else if(type == VX_TYPE_INT8){
         temp = 1;
     }else{
+        gcmFOOTER_NO();
         return node;
     }
     scalar_data_type = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &temp);
-    if (vxoReference_GetStatus((vx_reference)scalar_data_type) != VX_SUCCESS) return (vx_node)scalar_data_type;
+    if (vxoReference_GetStatus((vx_reference)scalar_data_type) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)scalar_data_type;
+    }
     parameters[6] = (vx_reference)scalar_data_type;
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_HOG_FEATURES, parameters, vxmLENGTH_OF(parameters));
     vxReleaseScalar(&scalar_hog_param_size);
     vxReleaseScalar(&scalar_data_type);
     vxReleaseArray(&hog_param);
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4817,16 +5183,16 @@ VX_API_ENTRY vx_node VX_API_CALL vxHoughLinesPNode(vx_graph graph, vx_image inpu
     };
     vx_node node = VX_NULL;
 
-
+    gcmHEADER_ARG("graph=%p, input=%p, params=%p, lines_array=%p, num_lines=%p", graph, input, params, lines_array, num_lines);
     gcmDUMP_API("$VX vxHoughLinesPNode: graph=%p, input=%p, params=%p, lines_array=%p, num_lines=%p", graph, input, params, lines_array, num_lines);
 
     params_hough_lines_array = vxCreateArray(vxGetContext((vx_reference)graph), VX_TYPE_HOUGH_LINES_PARAMS, 1);
     vxAddArrayItems(params_hough_lines_array, 1, params, sizeof(vx_hough_lines_p_t));
     parameters[1] = (vx_reference)params_hough_lines_array;
 
-
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_HOUGH_LINES_P, parameters, vxmLENGTH_OF(parameters));
     vxReleaseArray(&params_hough_lines_array);
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4843,13 +5209,14 @@ VX_API_ENTRY vx_node VX_API_CALL vxBilateralFilterNode(vx_graph graph, vx_tensor
         (vx_reference)dst,
     };
     vx_node node = VX_NULL;
-
+    gcmHEADER_ARG("graph=%p, src=%p, diameter=0x%x, sigmaSpace=%f, sigmaValues=%f, dst=%p", graph, src, diameter, sigmaSpace, sigmaValues, dst);
     gcmDUMP_API("$VX vxBilateralFilterNode: graph=%p, src=%p, diameter=0x%x, sigmaSpace=%f, sigmaValues=%f, dst=%p", graph, src, diameter, sigmaSpace, sigmaValues, dst);
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_BILATERAL_FILTER, parameters, vxmLENGTH_OF(parameters));
     vxReleaseScalar(&dia);
     vxReleaseScalar(&sSpa);
     vxReleaseScalar(&sVal);
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4864,12 +5231,12 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorConvertDepthNode(vx_graph graph, vx_ten
         (vx_reference)output,
     };
     vx_node node = VX_NULL;
-
+    gcmHEADER_ARG("graph=%p, input=%p, policy=0x%x, norm=%p, offset=%p, output=%p", graph, input, policy, norm, offset, output);
     gcmDUMP_API("$VX vxTensorConvertDepthNode: graph=%p, input=%p, policy=0x%x, norm=%p, offset=%p, output=%p", graph, input, policy, norm, offset, output);
-
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_TENSOR_CONVERT_DEPTH, parameters, vxmLENGTH_OF(parameters));
     vxReleaseScalar(&overflow_policy_sc);
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4891,13 +5258,15 @@ VX_API_ENTRY vx_node VX_API_CALL vxTensorMatrixMultiplyNode(vx_graph graph, vx_t
         (vx_reference)output,
     };
     vx_node node = VX_NULL;
-
+    gcmHEADER_ARG("graph=%p, input1=%p, input2=%p, input3=%p, matrix_multiply_params=%p, output=%p", graph, input1, input2, input3, matrix_multiply_params, output);
     gcmDUMP_API("$VX vxTensorMatrixMultiplyNode: graph=%p, input1=%p, input2=%p, input3=%p, matrix_multiply_params=%p, output=%p", graph, input1, input2, input3, matrix_multiply_params, output);
+
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_TENSOR_MATRIX_MULTIPLY, parameters, vxmLENGTH_OF(parameters));
 
     vxReleaseScalar(&transpose_src1);
     vxReleaseScalar(&transpose_src2);
     vxReleaseScalar(&transpose_src3);
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -4907,10 +5276,10 @@ VX_API_ENTRY vx_node VX_API_CALL vxCopyNode(vx_graph graph, vx_reference input, 
         (vx_reference)input,
         (vx_reference)output
     };
-
+    gcmHEADER_ARG("graph=%p, input=%p, output=%p", graph, input, output);
     gcmDUMP_API("$VX vxCopyNode: graph=%p, input=%p, output=%p", graph, input, output);
 
-
+    gcmFOOTER_NO();
     return vxoNode_CreateSpecific(graph, VX_KERNEL_COPY, parameters, vxmLENGTH_OF(parameters));
 }
 

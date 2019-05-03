@@ -843,7 +843,9 @@ _VSC_MC_GEN_GenOpcode(
     case VIR_OP_VX_SCATTER:
     case VIR_OP_VX_SCATTER_B:
         *BaseOpcode   = 0x45;
-        *ExternOpcode = 0x1F;
+        *ExternOpcode = (VIR_Inst_Store_Have_Dst(Inst) && Gen->pComCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti5) ?
+                        MC_AUXILIARY_OP_CODE_USC_SCATTER :
+                        0x1F;
         break;
     case VIR_OP_VX_ATOMIC_S:
     case VIR_OP_VX_ATOMIC_S_B:
@@ -1835,12 +1837,7 @@ _VSC_MC_GEN_GenOpndEnable(
             {
                 /* store instruction could have no dest (only the enable used), thus
                    its def could be not register allocated */
-                gcmASSERT(VIR_OPCODE_isMemSt(VIR_Inst_GetOpcode(Inst))      ||
-                          VIR_Inst_GetOpcode(Inst) == VIR_OP_STORE_ATTR     ||
-                          VIR_Inst_GetOpcode(Inst) == VIR_OP_IMG_STORE      ||
-                          VIR_Inst_GetOpcode(Inst) == VIR_OP_VX_IMG_STORE   ||
-                          VIR_Inst_GetOpcode(Inst) == VIR_OP_IMG_STORE_3D   ||
-                          VIR_Inst_GetOpcode(Inst) == VIR_OP_VX_IMG_STORE_3D);
+                gcmASSERT(VIR_OPCODE_hasStoreOperation(VIR_Inst_GetOpcode(Inst)));
             }
         }
     }

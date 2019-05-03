@@ -13,6 +13,9 @@
 
 #include "gc_vg_precomp.h"
 #include <string.h>
+
+#define _GC_OBJ_ZONE                gcdZONE_VG_STATE
+
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
 \******************************************************************************/
@@ -2522,7 +2525,7 @@ VG_API_CALL void VG_API_ENTRY vgSetf(
     vgmENTERAPI(vgSetf)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%04X, %.10ff);\n",
             __FUNCTION__,
             ParamType, Value
@@ -2544,7 +2547,7 @@ VG_API_CALL void VG_API_ENTRY vgSeti(
     vgmENTERAPI(vgSeti)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%04X, %d);\n",
             __FUNCTION__,
             ParamType, Value
@@ -2571,7 +2574,7 @@ VG_API_CALL void VG_API_ENTRY vgSetfv(
             );
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%04X, %d, Values);\n",
             __FUNCTION__,
             ParamType, Count
@@ -2598,7 +2601,7 @@ VG_API_CALL void VG_API_ENTRY vgSetiv(
             );
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%04X, %d, Values);\n",
             __FUNCTION__,
             ParamType, Count
@@ -2780,7 +2783,7 @@ VG_API_CALL void VG_API_ENTRY vgSetParameterf(
     vgmENTERAPI(vgSetParameterf)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%04X, %.10ff);\n",
             __FUNCTION__,
             Object, ParamType, Value
@@ -2808,7 +2811,7 @@ VG_API_CALL void VG_API_ENTRY vgSetParameteri(
     vgmENTERAPI(vgSetParameteri)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%04X, %d);\n",
             __FUNCTION__,
             Object, ParamType, Value
@@ -2841,7 +2844,7 @@ VG_API_CALL void VG_API_ENTRY vgSetParameterfv(
             );
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%04X, %d, Values);\n",
             __FUNCTION__,
             Object, ParamType, Count
@@ -2874,7 +2877,7 @@ VG_API_CALL void VG_API_ENTRY vgSetParameteriv(
             );
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%04X, %d, Values);\n",
             __FUNCTION__,
             Object, ParamType, Count

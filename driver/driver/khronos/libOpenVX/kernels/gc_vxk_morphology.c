@@ -92,14 +92,14 @@ vx_status _gcfVX_Morphology(vx_node node, gceVX_KERNEL kernel, vx_image src, vx_
 
     kernelContext->uniform_num             = 1;
 
-    if(bordermode->mode == VX_BORDER_CONSTANT)
+    if(bordermode->mode == VX_BORDER_CONSTANT || bordermode->mode == VX_BORDER_UNDEFINED)
     {
         vx_uint32 bin[4];
 
         bin[0] =
         bin[1] =
         bin[2] =
-        bin[3] = FORMAT_VALUE(bordermode->constant_value.U32);
+        bin[3] = FORMAT_VALUE((bordermode->mode == VX_BORDER_UNDEFINED) ? 0xcd : bordermode->constant_value.U32);
 
         gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, bin, sizeof(bin));
         kernelContext->uniforms[1].num = 4 * 4;

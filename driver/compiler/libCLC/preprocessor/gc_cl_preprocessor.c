@@ -14,6 +14,85 @@
 #include "gc_cl_preprocessor_int.h"
 #include <stdio.h>
 
+/*******************************************************************************
+**
+**    Header File Related Function
+**
+*/
+gceSTATUS
+ppoPREPROCESSOR_AddHeaderFilePathToList(
+    IN ppoPREPROCESSOR PP,
+    IN gctSTRING   Path
+    )
+{
+    gceSTATUS status = gcvSTATUS_INVALID_DATA;
+    ppoHEADERFILEPATH headerFilePathNode = gcvNULL;
+    ppoHEADERFILEPATH headerFilePathtemp = gcvNULL;
+
+    /* Verify the arguments. */
+    gcmASSERT(PP && Path);
+
+    status = cloCOMPILER_ZeroMemoryAllocate(
+                                            PP->compiler,
+                                            sizeof(struct _ppoHEADERFILEPATH),
+                                            (gctPOINTER *) &headerFilePathNode
+                                            );
+    if (gcmIS_ERROR(status))
+    {
+        return status;
+    }
+    headerFilePathNode->headerFilePath = Path;
+
+    if (PP->headerFilePathList)
+    {
+        headerFilePathtemp = PP->headerFilePathList;
+
+        while (headerFilePathtemp->base.node.next != gcvNULL)
+        {
+            headerFilePathtemp = (void*)headerFilePathtemp->base.node.next;
+        }
+        headerFilePathtemp->base.node.next = (void*)headerFilePathNode;
+        headerFilePathNode->base.node.prev = (void*)(headerFilePathtemp);
+        headerFilePathNode->base.node.next = gcvNULL;
+        headerFilePathtemp = headerFilePathNode;
+    }
+    else
+    {
+        PP->headerFilePathList = headerFilePathNode;
+    }
+
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+ppoPREPROCESSOR_FreeHeaderFilePathList(
+    IN ppoPREPROCESSOR PP
+    )
+{
+    gceSTATUS status = gcvSTATUS_INVALID_DATA;
+    ppoHEADERFILEPATH headerFilePathNode = gcvNULL;
+
+    if (PP && PP->headerFilePathList != gcvNULL)
+    {
+        /* Destroy header file path */
+        headerFilePathNode = PP->headerFilePathList;
+        while (headerFilePathNode != gcvNULL)
+        {
+            status = cloCOMPILER_Free(PP->compiler, headerFilePathNode->headerFilePath);
+            if (status != gcvSTATUS_OK) return status;
+            headerFilePathNode->headerFilePath = gcvNULL;
+            headerFilePathNode = (void*)headerFilePathNode->base.node.next;
+        }
+
+        /* Destroy headerFilePathList */
+        status = cloCOMPILER_Free(PP->compiler, PP->headerFilePathList);
+        if (status != gcvSTATUS_OK) return status;
+        PP->headerFilePathList = gcvNULL;
+    }
+
+    return gcvSTATUS_OK;
+}
+
 gceSTATUS ppoPREPROCESSOR_SetDebug(
     IN cloCOMPILER        Compiler,
     IN gctUINT            On
@@ -66,9 +145,12 @@ ppoPREPROCESSOR_PushOntoCurrentInputStreamOfPP (ppoPREPROCESSOR PP,
     return gcvSTATUS_OK;
 }
 
-
-
-
+#define _cldSaveLogFile 0
+#if _cldSaveLogFile
+static gctFILE    ppLogFile = gcvNULL;
+static gctINT     ppLineNumber = 0;
+static gctCHAR    ppLogBuffer[1024];
+#endif
 
 /*******************************************************************************
 **
@@ -80,7 +162,6 @@ ppoPREPROCESSOR_AddToOutputStreamOfPP(ppoPREPROCESSOR PP,
                                       ppoTOKEN Token)
 {
     ppoTOKEN ntoken = gcvNULL;
-
     gceSTATUS status = gcvSTATUS_INVALID_ARGUMENT;
 
     gcmASSERT(PP && Token);
@@ -120,6 +201,59 @@ ppoPREPROCESSOR_AddToOutputStreamOfPP(ppoPREPROCESSOR PP,
 
         PP->outputTokenStreamEnd = ntoken;
     }
+
+#if _cldSaveLogFile
+    /* TODO: need to refine the code */
+    if (ppLineNumber && ppLineNumber < PP->currentSourceFileLineNumber)
+    {
+        gcoOS_StrCatSafe(ppLogBuffer, 1024, "\n");
+
+        if (ntoken->hasLeadingWS)
+        {
+           status = gcoOS_StrCatSafe(ppLogBuffer, 1024, " ");
+           status = gcoOS_StrCatSafe(ppLogBuffer,
+                                       1024 - 1,
+                                       ntoken->poolString);
+        }
+        else
+        {
+           status = gcoOS_StrCatSafe(ppLogBuffer,
+                                        1024,
+                                        ntoken->poolString);
+        }
+
+        if (ntoken->hasTrailingControl)
+        {
+           status = gcoOS_StrCatSafe(ppLogBuffer, 1024, " ");
+        }
+        gcoOS_Open(gcvNULL, "viv_cl_pp.log", gcvFILE_APPENDTEXT, &ppLogFile);
+        gcoOS_Write(gcvNULL, ppLogFile, gcoOS_StrLen(ppLogBuffer, gcvNULL), ppLogBuffer);
+        gcoOS_Close(gcvNULL, ppLogFile);
+        gcoOS_ZeroMemory(ppLogBuffer, 1024);
+    }
+    else
+    {
+        if (ntoken->hasLeadingWS)
+        {
+           status = gcoOS_StrCatSafe(ppLogBuffer, 1024, " ");
+           status = gcoOS_StrCatSafe(ppLogBuffer,
+                                       1024 - 1,
+                                       ntoken->poolString);
+        }
+        else
+        {
+           status = gcoOS_StrCatSafe(ppLogBuffer,
+                                        1024,
+                                        ntoken->poolString);
+        }
+
+        if (ntoken->hasTrailingControl)
+        {
+           status = gcoOS_StrCatSafe(ppLogBuffer, 1024, " ");
+        }
+    }
+    ppLineNumber = PP->currentSourceFileLineNumber;
+#endif
 
     return gcvSTATUS_OK;
 }
@@ -211,11 +345,13 @@ ppoPREPROCESSOR_Construct_InitOperator(cloCOMPILER Compiler, ppoPREPROCESSOR    
 gceSTATUS
 ppoPREPROCESSOR_Construct(
 cloCOMPILER Compiler,
-ppoPREPROCESSOR    *PP
+ppoPREPROCESSOR    *PP,
+gctBOOL UseNewPP
 )
 {
 
     gceSTATUS status = gcvSTATUS_INVALID_DATA;
+    gctPOINTER pointer = gcvNULL;
 
     do
     {
@@ -236,13 +372,52 @@ ppoPREPROCESSOR    *PP
         (*PP)->base.node.next = gcvNULL;
         (*PP)->base.node.prev = gcvNULL;
         (*PP)->base.type = ppvOBJ_PREPROCESSOR;
+        (*PP)->useNewPP = UseNewPP;
 
+        if ((*PP)->useNewPP)
+        {
+            /* TODO: Construct extension string. */
+            /*_ConstructExtensionString(Compiler, PP);*/
 
+            /* Keywords. */
+            gcmONERROR(
+                cloCOMPILER_Allocate(
+                    Compiler,
+                    sizeof (struct _ppsKEYWORD),
+                    &pointer
+                    ));
+
+            (*PP)->keyword = pointer;
+
+            (*PP)->macroString = gcvNULL;
+            (*PP)->macroStringSize = 0;
+
+            gcmONERROR(
+                ppoPREPROCESSOR_Construct_InitKeyword(Compiler, PP));
+
+            /* Operators. */
+            gcmONERROR(
+                cloCOMPILER_Allocate(
+                    (*PP)->compiler,
+                    sizeof(gctSTRING*)*12,
+                    &pointer
+                    ) );
+            (*PP)->operators = pointer;
+
+            gcoOS_MemFill(
+                (*PP)->operators,
+                (gctUINT8)0,
+                sizeof(gctSTRING*)*12
+                );
+
+            gcmONERROR(
+                ppoPREPROCESSOR_Construct_InitOperator(Compiler, PP));
+        }
         return gcvSTATUS_OK;
-
     }
     while(gcvFALSE);
 
+OnError:
     cloCOMPILER_Report(Compiler,
                1,
                0,
@@ -642,6 +817,16 @@ ppoPREPROCESSOR_Construct_InitKeyword(cloCOMPILER        Compiler,
             "all",
             &((*PP)->keyword->all));
 
+        /*56    include        */
+        status = cloCOMPILER_AllocatePoolString((*PP)->compiler,
+            "include",
+            &((*PP)->keyword->include));
+
+        /*57    nul_str     */
+        status = cloCOMPILER_AllocatePoolString((*PP)->compiler,
+                                       "",
+                                       &((*PP)->keyword->nul_str));
+
         if (status != gcvSTATUS_OK) break;
 
         return gcvSTATUS_OK;
@@ -905,19 +1090,62 @@ ppoPREPROCESSOR_Destroy (ppoPREPROCESSOR PP)
 {
 
     gceSTATUS status = gcvSTATUS_INVALID_DATA;
-
     cloCOMPILER    compiler = gcvNULL;
-
+    gctUINT i;
 
     gcmASSERT(PP->base.type == ppvOBJ_PREPROCESSOR);
-
     compiler = PP->compiler;
 
     do
     {
-
         ppoPREPROCESSOR_Reset(PP);
 
+        if (PP->useNewPP)
+        {
+            if (PP->extensionString)
+            {
+                gcmONERROR(cloCOMPILER_Free(PP->compiler, (gctPOINTER)PP->extensionString));
+                PP->extensionString = gcvNULL;
+            }
+            if (PP->macroString)
+            {
+                gcmONERROR(cloCOMPILER_Free(PP->compiler, (gctPOINTER)PP->macroString));
+                PP->macroString = gcvNULL;
+            }
+            /*release operators of every level*/
+            i = 0;
+            while (PP->operators[i] != gcvNULL)
+            {
+                gcmONERROR(cloCOMPILER_Free(
+                    compiler,
+                    PP->operators[i]
+                    ));
+                i++;
+            }
+
+            gcmONERROR(cloCOMPILER_Free(
+                    compiler,
+                    PP->operators
+                    ));
+
+            /*total number of group of operator, is 12.*/
+            gcmASSERT(i == 11);
+
+            /*release output stream*/
+            gcmONERROR(ppoTOKEN_STREAM_Destroy(
+                PP,
+                PP->outputTokenStreamHead
+                ));
+
+            /*release keyword*/
+            gcmONERROR(cloCOMPILER_Free(
+                compiler,
+                PP->keyword
+                ));
+
+            /* release header file path list */
+            gcmONERROR(ppoPREPROCESSOR_FreeHeaderFilePathList(PP));
+        }
 
         /*PP*/
         status = cloCOMPILER_Free(compiler,
@@ -928,6 +1156,7 @@ ppoPREPROCESSOR_Destroy (ppoPREPROCESSOR PP)
     }
     while(gcvFALSE);
 
+OnError:
     cloCOMPILER_Report(compiler,
                0,
                0,
@@ -1102,28 +1331,22 @@ gceSTATUS    ppoPREPROCESSOR_Parse(cloPREPROCESSOR        PP,
                                   gctINT                *WriteInNumber)
 {
     gceSTATUS            status    = gcvSTATUS_INVALID_ARGUMENT;
-
     ppoTOKEN            ntoken    = gcvNULL;
-
     gctSIZE_T            len        = 0;
 
     /*legal argument?*/
-
     gcmASSERT(PP && PP->base.type == ppvOBJ_PREPROCESSOR);
 
-    *WriteInNumber = -1;
+    *WriteInNumber = 0;
 
     /*end of input?*/
-
     if(PP->inputStream == gcvNULL)
     {
-        *WriteInNumber = -1;
         return gcvSTATUS_OK;
     }
 
     do
     {
-
         if (PP->outputTokenStreamHead == gcvNULL)
         {
             status = PP->inputStream->GetToken(
@@ -1135,10 +1358,7 @@ gceSTATUS    ppoPREPROCESSOR_Parse(cloPREPROCESSOR        PP,
 
             if (ntoken->type == ppvTokenType_EOF)
             {
-                *WriteInNumber = -1;
-
                 status = ppoTOKEN_Destroy(PP, ntoken);
-
                 return status;
             }
 
@@ -1158,15 +1378,16 @@ gceSTATUS    ppoPREPROCESSOR_Parse(cloPREPROCESSOR        PP,
             if(PP->outputTokenStreamHead == gcvNULL)
             {
                 *WriteInNumber = -1;
-
                 return gcvSTATUS_OK;
             }
         }
 
         gcmASSERT( PP->outputTokenStreamHead != gcvNULL );
-        /*copy a string to *Buffer*.*/
 
+        /*copy a string to *Buffer*.*/
         len = gcoOS_StrLen(PP->outputTokenStreamHead->poolString, gcvNULL);
+        len += PP->outputTokenStreamHead->hasLeadingWS ? 1 : 0;
+        len += PP->outputTokenStreamHead->hasTrailingControl ? 1 : 0;
 
         if(len >= Max)
         {
@@ -1179,9 +1400,7 @@ gceSTATUS    ppoPREPROCESSOR_Parse(cloPREPROCESSOR        PP,
                 "max length : %u",
                 PP->outputTokenStreamHead->poolString,
                 Max);
-
             status = gcvSTATUS_INVALID_DATA;
-
             break;
         }
         else
@@ -1189,14 +1408,28 @@ gceSTATUS    ppoPREPROCESSOR_Parse(cloPREPROCESSOR        PP,
             *WriteInNumber = len;
         }
 
-        status = gcoOS_StrCopySafe(
-            Buffer, Max,
-            PP->outputTokenStreamHead->poolString
-            );
+        if (PP->outputTokenStreamHead->hasLeadingWS)
+        {
+           status = gcoOS_StrCopySafe(Buffer, Max, " ");
+           status = gcoOS_StrCatSafe(Buffer,
+                                       Max - 1,
+                                       PP->outputTokenStreamHead->poolString);
+        }
+        else
+        {
+           status = gcoOS_StrCopySafe(Buffer,
+                                        Max,
+                                        PP->outputTokenStreamHead->poolString);
+        }
+
+        if (PP->outputTokenStreamHead->hasTrailingControl)
+        {
+           status = gcoOS_StrCatSafe(Buffer, Max, " ");
+        }
+
         if (status != gcvSTATUS_OK) break;
 
         /*set position*/
-
         status = cloCOMPILER_SetCurrentStringNo(
             PP->compiler,
             (gctUINT)PP->outputTokenStreamHead->srcFileString
@@ -1210,15 +1443,15 @@ gceSTATUS    ppoPREPROCESSOR_Parse(cloPREPROCESSOR        PP,
             );
 
         if (status != gcvSTATUS_OK) break;
-        /*remove head*/
 
+        /*remove head*/
         if(PP->outputTokenStreamHead == PP->outputTokenStreamEnd)
         {
             status = ppoTOKEN_Destroy(
                 PP,
                 PP->outputTokenStreamHead
                 );
-        if (status != gcvSTATUS_OK) break;
+            if (status != gcvSTATUS_OK) break;
 
             PP->outputTokenStreamHead = PP->outputTokenStreamEnd = gcvNULL;
         }
@@ -1234,8 +1467,6 @@ gceSTATUS    ppoPREPROCESSOR_Parse(cloPREPROCESSOR        PP,
 
             PP->outputTokenStreamHead = prev;
         }
-
-
         return gcvSTATUS_OK;
     }
     while(gcvFALSE);
@@ -1270,23 +1501,44 @@ ppoPREPROCESSOR PP
     gceSTATUS status = gcvSTATUS_INVALID_DATA;
 
     do {
-       /* Free strings */
-       if (PP->ppedCount > 0) {
-        gctUINT i;
+        if (PP->useNewPP)
+        {
+            if(PP->strings)
+            {
+                status = cloCOMPILER_Free(PP->compiler, (gctPOINTER)PP->strings);
+                if (status != gcvSTATUS_OK) break;
+            }
 
-        for (i=0; i < PP->ppedCount; i++) {
-            gcmVERIFY_OK(gcoOS_Free(gcvNULL, PP->ppedStrings[i]));
+            PP->strings = gcvNULL;
+
+            /*lens*/
+            if(PP->lens)
+            {
+                status = cloCOMPILER_Free(PP->compiler, PP->lens);
+                if (status != gcvSTATUS_OK) break;
+            }
+
+            PP->lens = gcvNULL;
         }
-       }
-       PP->ppedCount = 0;
+        else
+        {
+            /* Free strings */
+            if (PP->ppedCount > 0) {
+                gctUINT i;
 
-       if(PP->ppedStrings) {
-        status = cloCOMPILER_Free(PP->compiler, (gctPOINTER)PP->ppedStrings);
-        if (status != gcvSTATUS_OK) break;
-       }
-       PP->ppedStrings = gcvNULL;
+                for (i=0; i < PP->ppedCount; i++) {
+                    gcmVERIFY_OK(gcoOS_Free(gcvNULL, PP->ppedStrings[i]));
+                }
+           }
+           PP->ppedCount = 0;
 
-/** KLC  do not free as these are not allocated ***/
+           if(PP->ppedStrings) {
+               status = cloCOMPILER_Free(PP->compiler, (gctPOINTER)PP->ppedStrings);
+               if (status != gcvSTATUS_OK) break;
+           }
+           PP->ppedStrings = gcvNULL;
+       }
+
         /*macro manager*/
         if(PP->macroManager)
         {
@@ -1303,13 +1555,21 @@ ppoPREPROCESSOR PP
         while(PP->inputStream)
         {
             ppoINPUT_STREAM tmp;
+            ppoBYTE_INPUT_STREAM tmpBis;
 
             tmp = PP->inputStream;
-
+            tmpBis = (ppoBYTE_INPUT_STREAM)tmp;
+            /* free the string from the header file, whose inputStringNumber has been set to -1 */
+            if (tmpBis->inputStringNumber == -1)
+            {
+                status = cloCOMPILER_Free(PP->compiler,
+                                          (gctPOINTER)tmpBis->src);
+            }
+            if (status != gcvSTATUS_OK) break;
             PP->inputStream = (ppoINPUT_STREAM)PP->inputStream->base.node.prev;
 
             status = cloCOMPILER_Free(PP->compiler,
-                          tmp);
+                                      tmp);
             if (status != gcvSTATUS_OK) break;
         }
 
@@ -1371,6 +1631,10 @@ ppoPREPROCESSOR PP
 
         PP->doWeInValidArea = gcvTRUE;
 
+        PP->toLineEnd = gcvFALSE;
+        PP->skipLine = -1;
+        PP->skipOPError = gcvFALSE;
+
         /*apiState*/
 
 
@@ -1388,6 +1652,744 @@ ppoPREPROCESSOR PP
     return status;
 }
 
+typedef gctCONST_STRING (*GETVALUE_FPTR)(void);
+
+typedef struct _clsPREDEFINED_MACRO
+{
+    gctSTRING        str;
+    gctSTRING        rplStr;
+    GETVALUE_FPTR    fptr;     /* function pointer to get the macro value string dynamically */
+    gctBOOL          checkFeature; /* If it is FALSE, then it is always enabled. */
+}
+clsPREDEFINED_MACRO;
+
+/* Some are copied from InitializePredefinedMacros in llvm pp.
+    TODO: any other predefined macros? */
+static clsPREDEFINED_MACRO _PredefinedMacros[] =
+{
+    {"__OPENCL_VERSION__", "110", gcvNULL, gcvFALSE},
+    {"CL_VERSION_1_0", "100", gcvNULL, gcvFALSE},
+    {"CL_VERSION_1_1", "110", gcvNULL, gcvFALSE},
+    {"CL_VERSION_1_2", "120", gcvNULL, gcvFALSE},
+    {"__OPENCL_C_VERSION__", "120", gcvNULL, gcvFALSE},
+    {"__IMAGE_SUPPORT__", "1", gcvNULL, gcvFALSE},
+    {"__ENDIAN_LITTLE__", "1", gcvNULL, gcvFALSE},
+    {"__kernel_exec(X, typen)", "__kernel __attribute__((work_group_size_hint(X, 1, 1))) \\\n__attribute__((vec_type_hint(typen)))", gcvNULL, gcvFALSE},
+};
+
+#define _cldMaxPredefinedMacroNameLen 64   /*Hard coded maximum predefined macro name length */
+#define _cldPredefinedMacroCount  (sizeof(_PredefinedMacros) / sizeof(clsPREDEFINED_MACRO))
+#define _cldMessageBufferLen  (_cldMaxPredefinedMacroNameLen + 64)
+
+static gceSTATUS
+ppoPREPROCESSOR_addMacroDef_Str(
+ppoPREPROCESSOR  PP,
+gctSTRING  MacroStr,
+gctSTRING  ValueStr
+)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctPOINTER pointer = gcvNULL;
+    gctSIZE_T length = 0;
+    gctSIZE_T bufSize = 0; /* initial size */
+    gctSIZE_T reqStrSize = 0;
+    gctBOOL needToRealloc = gcvFALSE;
+
+    length = 8 + gcoOS_StrLen(MacroStr, gcvNULL) + 1 + gcoOS_StrLen(ValueStr, gcvNULL) + 1 + 1;
+    if (PP->macroString)
+    {
+        reqStrSize = gcoOS_StrLen(PP->macroString, gcvNULL) + length;
+        bufSize = PP->macroStringSize;
+    }
+    else
+    {
+        reqStrSize = length;
+        bufSize = 1024; /* initial size */
+    }
+    if (reqStrSize > bufSize)
+    {
+        /* need to enlarge the size of macroStr to contain longer string. */
+        for (; bufSize < reqStrSize; bufSize = bufSize * 2)
+        {
+            /* do nothing */
+        }
+        needToRealloc = gcvTRUE;
+    }
+    if (PP->macroString == gcvNULL)
+    {
+        gcmONERROR(cloCOMPILER_Allocate(PP->compiler, bufSize, &pointer));
+        PP->macroString = pointer;
+        PP->macroString[0] = '\0';
+        PP->macroStringSize = bufSize;
+    }
+    else if (needToRealloc)
+    {
+        gctSTRING tempStr = PP->macroString;
+        gcmONERROR(cloCOMPILER_Allocate(PP->compiler, bufSize, &pointer));
+        PP->macroString = pointer;
+        PP->macroStringSize = bufSize;
+        gcoOS_MemCopy(PP->macroString, tempStr, gcoOS_StrLen(tempStr, gcvNULL) + 1);
+        cloCOMPILER_Free(PP->compiler, tempStr);
+    }
+
+    /* add "#define MacroStr ValueStr" to the macroString of PP */
+    gcoOS_StrCatSafe(PP->macroString, bufSize, "#define ");
+    gcoOS_StrCatSafe(PP->macroString, bufSize, MacroStr);
+    gcoOS_StrCatSafe(PP->macroString, bufSize, " ");
+    gcoOS_StrCatSafe(PP->macroString, bufSize, ValueStr);
+    gcoOS_StrCatSafe(PP->macroString, bufSize, "\n");
+OnError:
+    return status;
+}
+
+gceSTATUS
+ppoPREPROCESSOR_addMacroDef_Int(
+ppoPREPROCESSOR  PP,
+gctSTRING  MacroStr,
+gctSTRING  ValueStr
+)
+{
+    ppoMACRO_SYMBOL ms = gcvNULL;
+    gctSTRING msName   = gcvNULL;
+    gctCHAR messageBuffer[_cldMessageBufferLen];
+    gctUINT offset = 0;
+    gceSTATUS status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+    ppoTOKEN rplst = gcvNULL;
+    gctSTRING rplStr = gcvNULL;
+
+    gcmONERROR(cloCOMPILER_AllocatePoolString(PP->compiler,
+                                                MacroStr,
+                                                &msName));
+
+    if(ValueStr)
+    {
+        gcmONERROR(cloCOMPILER_AllocatePoolString(PP->compiler,
+                                                    ValueStr,
+                                                    &rplStr));
+
+        gcmONERROR(ppoTOKEN_Construct(PP, __FILE__, __LINE__, "Creat for CLC.", &rplst));
+        rplst->hideSet       = gcvNULL;
+        rplst->poolString    = rplStr;
+        rplst->type          = ppvTokenType_INT;
+    }
+    else
+    {
+        rplst = gcvNULL;
+    }
+
+    offset = 0;
+    gcoOS_PrintStrSafe(messageBuffer,
+                        gcmSIZEOF(messageBuffer),
+                        &offset,
+                        "ppoPREPROCESSOR_Construct :add %s into macro symbol.",
+                        msName);
+
+    gcmONERROR(ppoMACRO_SYMBOL_Construct(PP,
+                                        __FILE__,
+                                        __LINE__,
+                                            messageBuffer,
+                                            msName,
+                                            0,/*argc*/
+                                            gcvNULL,/*argv*/
+                                            rplst,/*replacement-list*/
+                                            &ms));
+
+    if (ms == gcvNULL)
+    {
+        gcmASSERT(ms);
+        gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
+    }
+
+    gcmONERROR(ppoMACRO_MANAGER_AddMacroSymbol(PP,
+                                                (PP)->macroManager,
+                                                ms));
+    return gcvSTATUS_OK;
+
+OnError:
+    gcmVERIFY_OK(cloCOMPILER_Report(
+        PP->compiler,
+        1,
+        0,
+        clvREPORT_FATAL_ERROR,
+        "Failed in preprocessing."));
+
+    return status;
+}
+
+#define _cldFILENAME_MAX       1024
+
+static gceSTATUS
+ppoPREPROCESSOR_SetSourceStrings_New(
+ppoPREPROCESSOR  PP,
+gctCONST_STRING* Strings,
+gctUINT          Count,
+gctCONST_STRING  Options
+)
+{
+    gceSTATUS status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+    gctINT i;
+    ppoINPUT_STREAM tmpbis = gcvNULL;
+    ppoBYTE_INPUT_STREAM tmpbisCreated = gcvNULL;
+    gctPOINTER pointer = gcvNULL;
+    gctSTRING fileNamePath = gcvNULL;
+
+    /*check argument*/
+    gcmASSERT(PP);
+    gcmASSERT(ppvOBJ_PREPROCESSOR == PP->base.type);
+    gcmASSERT(Strings);
+
+    gcmONERROR(ppoPREPROCESSOR_Reset(PP));
+
+    /*macro manager*/
+    gcmONERROR(ppoMACRO_MANAGER_Construct(PP,
+                               __FILE__,
+                               __LINE__,
+                               "ppoPREPROCESSOR_Construct : Create.",
+                               &((PP)->macroManager)));
+
+    /* pre-defined macros */
+    do
+    {
+        for(i = 0; i < (signed)_cldPredefinedMacroCount; i++)
+        {
+           gctSTRING valueStr;
+
+           if (_PredefinedMacros[i].checkFeature &&
+               gcoOS_StrStr(PP->extensionString, _PredefinedMacros[i].str, gcvNULL) == gcvSTATUS_FALSE)
+           {
+               continue;
+           }
+           valueStr = (gctSTRING) (_PredefinedMacros[i].fptr ? _PredefinedMacros[i].fptr()
+                                                : _PredefinedMacros[i].rplStr);
+           status = ppoPREPROCESSOR_addMacroDef_Str(PP, _PredefinedMacros[i].str, valueStr);
+        }
+    }
+    while(gcvFALSE);
+
+    /* Save current path "." to header file list */
+    status = cloCOMPILER_ZeroMemoryAllocate(
+                                    PP->compiler,
+                                    2,
+                                    (gctPOINTER *)&pointer
+                                    );
+    if (gcmIS_ERROR(status)) return status;
+    fileNamePath = (gctCHAR *)pointer;
+
+    gcmVERIFY_OK(gcoOS_StrCopySafe(fileNamePath, 2, "."));
+    ppoPREPROCESSOR_AddHeaderFilePathToList(PP, fileNamePath);
+    if (gcmIS_ERROR(status))
+    {
+        return status;
+    }
+
+    /* parse build options */
+    if (Options != gcvNULL) {
+        gctSTRING pos = gcvNULL;
+        gcoOS_StrStr(Options, "-", &pos);
+
+        while (pos)
+        {
+            pos++;
+            if (!pos)
+                break;
+
+            if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "I", 1))
+            {
+                gctUINT pathLen = 0;
+                gctSTRING path;
+                gctSTRING tmpPos;
+
+                pos += 1;
+                /* skip whitespace if any */
+                for(; pos && *pos != '\0'; pos++)
+                {
+                    if (*pos != ' ')
+                        break;
+                }
+                /* get the lengh of path string */
+                for(tmpPos = pos; tmpPos && *tmpPos != '\0'; tmpPos++)
+                {
+                    if (*tmpPos == ' ')
+                        break;
+                    pathLen++;
+                }
+
+                if (pathLen > _cldFILENAME_MAX)
+                {
+                    return gcvSTATUS_INVALID_DATA;
+                }
+
+                status = cloCOMPILER_ZeroMemoryAllocate(
+                                                        PP->compiler,
+                                                        pathLen + 1,
+                                                        &pointer
+                                                        );
+                if (gcmIS_ERROR(status))
+                {
+                    return status;
+                }
+                path = pointer;
+
+                gcoOS_StrCopySafe(path, pathLen + 1, pos);
+                ppoPREPROCESSOR_AddHeaderFilePathToList(PP, path);
+                if (gcmIS_ERROR(status))
+                {
+                    return status;
+                }
+                pos = tmpPos;
+            }
+            else if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "D", 1))
+            {
+                /* add macro definition */
+                gctSTRING valueStr = gcvNULL;
+                gctSTRING macroStr = gcvNULL;
+                gctBOOL hasVauleStr = gcvFALSE;
+                gctSIZE_T len;
+                gctINT j = 0;
+
+                pos++;
+                len = gcoOS_StrLen(pos, gcvNULL);
+                /* remove whitespaces if any */
+                for(; pos; pos++)
+                {
+                    if (*pos == ' ')
+                        continue;
+                    else
+                    {
+                        status = cloCOMPILER_ZeroMemoryAllocate(
+                                                                PP->compiler,
+                                                                len + 1,
+                                                                &pointer
+                                                                );
+                        if (gcmIS_ERROR(status))
+                        {
+                            return status;
+                        }
+                        macroStr = pointer;
+                        gcoOS_StrCopySafe(macroStr, len + 1, pos);
+                        break;
+                    }
+                }
+
+                /* get macro name string and value string */
+                for(i = 0; *(pos + i) != '\0'; i++)
+                {
+                    gctCHAR currentChar = *(pos + i);
+
+                    /* find next whitespace */
+                    if (currentChar == ' ')
+                    {
+                        if (hasVauleStr)
+                        {
+                            *(valueStr + i - j - 1) = '\0';
+                        }
+                        else
+                        {
+                            *(macroStr + i) = '\0';
+                        }
+                        break;
+                    }
+
+                    if (currentChar == '=')
+                    {
+                        hasVauleStr = gcvTRUE;
+                        j = i; /* save the index of "=" */
+                        *(macroStr + i) = '\0';
+                        len = gcoOS_StrLen(pos+i+1, gcvNULL);
+                        status = cloCOMPILER_ZeroMemoryAllocate(
+                                                                PP->compiler,
+                                                                len + 1,
+                                                                &pointer
+                                                                );
+                        if (gcmIS_ERROR(status))
+                        {
+                            return status;
+                        }
+                        valueStr = pointer;
+                        gcoOS_StrCopySafe(valueStr, len+1, pos+i+1);
+                    }
+                }
+
+                if (!hasVauleStr)
+                {
+                    status = ppoPREPROCESSOR_addMacroDef_Int(PP, macroStr, "1");
+                }
+                else
+                {
+                    status = ppoPREPROCESSOR_addMacroDef_Str(PP, macroStr, valueStr);
+                }
+                if(gcmIS_ERROR(status)) return status;
+
+                /* set pos to next word */
+                len = gcoOS_StrLen(macroStr, gcvNULL);
+                pos += len;
+                if (hasVauleStr)
+                {
+                    len = gcoOS_StrLen(valueStr, gcvNULL) + 1; /* consider the length of "=" too */
+                    pos += len;
+                }
+
+                if (macroStr)
+                {
+                    gcmVERIFY_OK(cloCOMPILER_Free(PP->compiler, macroStr));
+                    macroStr = gcvNULL;
+                }
+                if (hasVauleStr)
+                {
+                    gcmVERIFY_OK(cloCOMPILER_Free(PP->compiler, valueStr));
+                    valueStr = gcvNULL;
+                }
+
+            }
+            else if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "cl-viv-vx-extension", sizeof("cl-viv-vx-extension")-1))
+            {
+                char* env = gcvNULL;
+                status = cloCOMPILER_EnableExtension(PP->compiler,
+                                                     clvEXTENSION_VIV_VX,
+                                                     gcvTRUE);
+                if(gcmIS_ERROR(status)) return status;
+
+                status = ppoPREPROCESSOR_addMacroDef_Int(PP, "_VIV_VX_EXTENSION", "1");
+                if(gcmIS_ERROR(status)) return status;
+
+                /* Add <SDK_DIR> to header file search path */
+                gcoOS_GetEnv(gcvNULL, "VIVANTE_SDK_DIR", &env);
+                if(env)
+                {
+                    gctUINT len;
+                    gctSTRING path, path1;
+
+                    len = gcoOS_StrLen(env, gcvNULL);
+
+                    status = cloCOMPILER_ZeroMemoryAllocate(
+                                                            PP->compiler,
+                                                            _cldFILENAME_MAX,
+                                                            &pointer
+                                                            );
+                    if (gcmIS_ERROR(status))
+                    {
+                        return status;
+                    }
+                    path = pointer;
+                    gcoOS_StrCopySafe(path, len + 1, env);
+                    gcoOS_StrCatSafe(path, _cldFILENAME_MAX, "/include/CL/");
+
+                    status = ppoPREPROCESSOR_AddHeaderFilePathToList(PP, path);
+                    if (gcmIS_ERROR(status))
+                    {
+                        return status;
+                    }
+
+                    len = gcoOS_StrLen(env, gcvNULL);
+
+                    status = cloCOMPILER_ZeroMemoryAllocate(
+                                                            PP->compiler,
+                                                            _cldFILENAME_MAX,
+                                                            &pointer
+                                                            );
+                    if (gcmIS_ERROR(status))
+                    {
+                        return status;
+                    }
+                    path1 = pointer;
+                    gcoOS_StrCopySafe(path1, len + 1, env);
+                    gcoOS_StrCatSafe(path1, _cldFILENAME_MAX, "/inc/CL/");
+
+                    status = ppoPREPROCESSOR_AddHeaderFilePathToList(PP, path1);
+                    if (gcmIS_ERROR(status))
+                    {
+                        return status;
+                    }
+                }
+                pos += (sizeof("cl-viv-vx-extension")-1);
+            }
+            else if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "cl-fast-relaxed-math", sizeof("cl-fast-relaxed-math")-1))
+            {
+                status = cloCOMPILER_SetFpConfig(PP->compiler,
+                                                 cldFpFAST_RELAXED_MATH);
+                if(gcmIS_ERROR(status)) return status;
+                status = ppoPREPROCESSOR_addMacroDef_Int(PP, "__FAST_RELAXED_MATH__", "1");
+                if(gcmIS_ERROR(status)) return status;
+                pos += (sizeof("cl-fast-relaxed-math")-1);
+            }
+            else if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "cl-viv-gcsl-driver-image", sizeof("cl-viv-gcsl-driver-image")-1))
+            {
+                status = cloCOMPILER_SetGcslDriverImage(PP->compiler);
+                if(gcmIS_ERROR(status)) return status;
+                pos += (sizeof("cl-viv-gcsl-driver-image")-1);
+            }
+            else if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "cl-viv-packed-basic-type", sizeof("cl-viv-packed-basic-type")-1))
+            {
+                status = cloCOMPILER_SetBasicTypePacked(PP->compiler);
+                if(gcmIS_ERROR(status)) return status;
+                pos += (sizeof("cl-viv-packed-basic-type")-1);
+            }
+            else if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "cl-viv-longulong-patch", sizeof("cl-viv-longulong-patch")-1))
+            {
+                status = cloCOMPILER_SetLongUlongPatch(PP->compiler);
+                if(gcmIS_ERROR(status)) return status;
+                pos += (sizeof("cl-viv-longulong-patch")-1);
+            }
+            else if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "cl-finite-math-only", sizeof("cl-finite-math-only")-1))
+            {
+                status = cloCOMPILER_SetFpConfig(PP->compiler,
+                                                 cldFpFINITE_MATH_ONLY);
+                if(gcmIS_ERROR(status)) return status;
+                pos += (sizeof("cl-finite-math-only")-1);
+            }
+            else if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "cl-viv-vx-image-array-maxlevel=", sizeof("cl-viv-vx-image-array-maxlevel=")-1))
+            {
+                gctUINT len1 = 0, len2 = 0;
+                gctSTRING maxLevel;
+                gctSTRING temPos;
+                pos += 31;
+                for(; pos; pos++)
+                {
+                    if (*pos == ' ')
+                        continue;
+                    else
+                        len1 = gcoOS_StrLen(pos, gcvNULL);
+                    break;
+                }
+                temPos = pos;
+                for(; pos; pos++)
+                {
+                    if (*pos != ' ')
+                        continue;
+                    else
+                        len2 = gcoOS_StrLen(pos, gcvNULL);
+                    break;
+                }
+
+                status = cloCOMPILER_ZeroMemoryAllocate(
+                                                        PP->compiler,
+                                                        (len1-len2) + 1,
+                                                        &pointer
+                                                        );
+                if (gcmIS_ERROR(status))
+                {
+                    return status;
+                }
+                maxLevel = pointer;
+                gcoOS_StrCopySafe(maxLevel, (len1-len2) + 1, temPos);
+                status = cloCOMPILER_SetImageArrayMaxLevel(PP->compiler, maxLevel);
+                if(gcmIS_ERROR(status))
+                {
+                    cloCOMPILER_Report(PP->compiler,
+                                       0,
+                                       0,
+                                       clvREPORT_ERROR,
+                                       "unrecognized image array max level \"%s\" specified in option cl-viv-vx-image-array-maxlevel",
+                                       maxLevel);
+                    if (maxLevel)
+                    {
+                        gcmVERIFY_OK(cloCOMPILER_Free(PP->compiler, maxLevel));
+                        maxLevel = gcvNULL;
+                    }
+                    return gcvSTATUS_INTERFACE_ERROR;
+                }
+                if (maxLevel)
+                {
+                    gcmVERIFY_OK(cloCOMPILER_Free(PP->compiler, maxLevel));
+                    maxLevel = gcvNULL;
+                }
+            }
+            else if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "cl-finite-math-only", sizeof("cl-finite-math-only")-1))
+            {
+                status = cloCOMPILER_SetFpConfig(PP->compiler,
+                                                 cldFpFINITE_MATH_ONLY);
+                if(gcmIS_ERROR(status)) return status;
+                pos += (sizeof("cl-finite-math-only")-1);
+            }
+            else if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "cl-std=", sizeof("cl-std=")-1))
+            {
+                gctSIZE_T len1 = 0, len2 = 0;
+                gctSTRING languageVersion;
+                gctSTRING temPos;
+
+                /* Interception versionLanguage from option string */
+                pos += 7;
+                for(; pos; pos++)
+                {
+                    if (*pos == ' ')
+                        continue;
+                    else
+                        len1 = gcoOS_StrLen(pos, gcvNULL);
+                    break;
+                }
+                temPos = pos;
+                for(; pos; pos++)
+                {
+                    if (*pos != ' ')
+                        continue;
+                    else
+                        len2 = gcoOS_StrLen(pos, gcvNULL);
+                    break;
+                }
+
+                status = cloCOMPILER_ZeroMemoryAllocate(
+                                                        PP->compiler,
+                                                        (len1 - len2) + 1,
+                                                        &pointer
+                                                        );
+                if (gcmIS_ERROR(status))
+                {
+                    return status;
+                }
+                languageVersion = pointer;
+                gcoOS_StrCopySafe(languageVersion, (len1 - len2) + 1, temPos);
+
+                status = cloCOMPILER_SetLanguageVersion(PP->compiler, languageVersion);
+                if(gcmIS_ERROR(status))
+                {
+                    cloCOMPILER_Report(PP->compiler,
+                                       0,
+                                       0,
+                                       clvREPORT_ERROR,
+                                       "unrecognized language version \"%s\" specified in option cl-std",
+                                       languageVersion);
+                    if (languageVersion)
+                    {
+                        gcmVERIFY_OK(cloCOMPILER_Free(PP->compiler, languageVersion));
+                        languageVersion = gcvNULL;
+                    }
+                    return gcvSTATUS_INTERFACE_ERROR;
+                }
+
+                if (languageVersion)
+                {
+                    gcmVERIFY_OK(cloCOMPILER_Free(PP->compiler, languageVersion));
+                    languageVersion = gcvNULL;
+                }
+            }
+            else
+            {
+                /* skip other options */
+            }
+            gcoOS_StrStr(pos, "-", &pos);
+        }
+    }
+
+    /*count*/
+    PP->count = Count;
+
+    /*lens*/
+    gcmONERROR(cloCOMPILER_Allocate(
+        PP->compiler,
+        Count * sizeof(gctUINT),
+        &pointer
+        ));
+
+    PP->lens = pointer;
+
+    for (i = 0; i < (signed)Count; i++)
+    {
+        PP->lens[i] = (gctUINT) gcoOS_StrLen(Strings[i], gcvNULL);
+    }
+
+    /*strings*/
+    gcmONERROR(cloCOMPILER_Allocate(
+        PP->compiler,
+        Count * sizeof(gctCONST_STRING),
+        &pointer));
+
+    PP->strings = pointer;
+
+    /*strings[i]*/
+    for( i = 0; i < (signed)Count; i++ )
+    {
+        PP->strings[i] = Strings[i];
+    }
+
+    for( i = Count-1; i >= 0; --i )
+    {
+        if( PP->lens != 0 )
+        {
+            gcmONERROR(ppoBYTE_INPUT_STREAM_Construct(
+                PP,
+                gcvNULL,/*prev node*/
+                gcvNULL,/*next node*/
+                __FILE__,
+                __LINE__,
+                "ppoPREPROCESSOR_SetSourceStrings : Creat to init CPP input stream",
+                PP->strings[i],
+                i,/*file string number, used to report debug infomation.*/
+                PP->lens[i],
+                &tmpbisCreated
+                ));
+
+            tmpbis = (ppoINPUT_STREAM) tmpbisCreated;
+
+            if( gcvNULL == PP->inputStream )
+            {
+                PP->inputStream = tmpbis;
+                tmpbis->base.node.prev = gcvNULL;
+                tmpbis->base.node.next = gcvNULL;
+            }
+            else
+            {
+                ppoINPUT_STREAM tmp_is = PP->inputStream;
+                PP->inputStream = tmpbis;
+                tmpbis->base.node.prev = (void*)tmp_is;
+                tmpbis->base.node.next = (void*)gcvNULL;
+                tmp_is->base.node.next = (void*)tmpbis;
+            }/*if( gcvNULL == PP->inputStream )*/
+        }
+        else/*if( PP->lens > 0 )*/
+        {
+            gcmONERROR(ppoPREPROCESSOR_Report(
+                PP,
+                clvREPORT_WARN,
+                "file string : %u's length is zero",
+                i));
+        }/*if( PP->lens > 0 )*/
+    }/*for*/
+
+    if (PP->macroString)
+    {
+        gcmONERROR(ppoBYTE_INPUT_STREAM_Construct(
+                   PP,
+                   gcvNULL,/*prev node*/
+                   gcvNULL,/*next node*/
+                   __FILE__,
+                   __LINE__,
+                   "ppoPREPROCESSOR_SetSourceStrings : Creat to init CPP input stream",
+                   PP->macroString,
+                   -2, /* input string number is -2 for macroString */
+                   (gctUINT) gcoOS_StrLen(PP->macroString, gcvNULL),
+                   &tmpbisCreated
+                   ));
+
+        tmpbis = (ppoINPUT_STREAM) tmpbisCreated;
+
+        if( gcvNULL == PP->inputStream )
+        {
+            PP->inputStream = tmpbis;
+            tmpbis->base.node.prev = gcvNULL;
+            tmpbis->base.node.next = gcvNULL;
+        }
+        else
+        {
+            ppoINPUT_STREAM tmp_is = PP->inputStream;
+            PP->inputStream = tmpbis;
+            tmpbis->base.node.prev = (void*)tmp_is;
+            tmpbis->base.node.next = (void*)gcvNULL;
+            tmp_is->base.node.next = (void*)tmpbis;
+        }/*if( gcvNULL == PP->inputStream )*/
+    }
+
+    return gcvSTATUS_OK;
+
+OnError:
+    gcmVERIFY_OK(cloCOMPILER_Report(
+        PP->compiler,
+        1,
+        0,
+        clvREPORT_FATAL_ERROR,
+        "Failed in preprocessing."));
+
+    return status;
+}
 
 /*******************************************************************************
 **
@@ -1400,8 +2402,9 @@ ppoPREPROCESSOR PP
 gceSTATUS
 ppoPREPROCESSOR_SetSourceStrings(
 ppoPREPROCESSOR    PP,
-gctCONST_STRING* Strings,
-gctUINT    Count
+gctCONST_STRING*   Strings,
+gctUINT            Count,
+gctCONST_STRING    Options
 )
 {
     gceSTATUS status = gcvSTATUS_INVALID_ARGUMENT;
@@ -1412,6 +2415,11 @@ gctUINT    Count
     gcmASSERT(Strings);
 
     do {
+        if (PP->useNewPP)
+        {
+            ppoPREPROCESSOR_SetSourceStrings_New(PP, Strings, Count, Options);
+            return gcvSTATUS_OK;
+        }
         gcmONERROR(ppoPREPROCESSOR_Reset(PP));
 
         /*count*/
@@ -1419,7 +2427,7 @@ gctUINT    Count
         PP->lens = gcvNULL;
 
         /*strings*/
-                PP->strings = Strings;
+        PP->strings = Strings;
 
         PP->ppedCount = 0;
         gcmONERROR(cloCOMPILER_Allocate(PP->compiler,

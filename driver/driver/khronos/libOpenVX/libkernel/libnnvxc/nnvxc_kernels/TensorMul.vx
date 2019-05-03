@@ -259,3 +259,23 @@ TENSORMUL_Z(Fp16,  Fp16,  Fp16,  Warp,  RTE,    vxc_short8,  vxc_half8,   vxc_sh
 TENSORMUL_Z(Fp16,  Fp16,  Int8,  Warp,  RTE,    vxc_short8,  vxc_half8,   vxc_short8,  vxc_half8,   vxc_char16,  int4,         vxc_char16,  0)
 TENSORMUL_Z(Fp16,  Fp16,  Int16, Warp,  RTE,    vxc_short8,  vxc_half8,   vxc_short8,  vxc_half8,   vxc_short8,  int4,         vxc_short8,  0)
 TENSORMUL_Z(Fp16,  Fp16,  UInt8, Warp,  RTE,    vxc_short8,  vxc_half8,   vxc_short8,  vxc_half8,   vxc_uchar16, int4,         vxc_uchar16, 0)
+_viv_uniform VXC_512Bits uniI8MulI8Lo_2x8;
+_viv_uniform VXC_512Bits uniI8MulI8Hi_2x8;
+__kernel void vxcTensorEltwise_I8MulI8_2D(
+__read_only  image2d_array_t input0,
+__read_only  image2d_array_t input1,
+__write_only image2d_array_t output,
+global float * scale)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+
+    vxc_char16 src0, src1;
+    vxc_char16 dst;
+    VXC_ReadImage(src0, input0, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(src1, input1, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+
+    VXC_DP2x8(dst, src0, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniI8MulI8Lo_2x8);
+    VXC_DP2x8(dst, src0, src1, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniI8MulI8Hi_2x8);
+
+    VXC_WriteImage(output, coord, dst, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+}

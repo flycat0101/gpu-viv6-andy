@@ -94,6 +94,11 @@ _ppoTOKEN
 *ppoTOKEN,
 *ppoTOKEN_STREAM;
 
+/*8*/
+typedef struct
+_ppoHEADERFILEPATH
+*ppoHEADERFILEPATH;
+
 
 /******************************************************************************\
 |****************************** 1 : Base Object *******************************|
@@ -314,15 +319,15 @@ ppoINPUT_STREAM_Dump(
 /******************************************************************************\
 |*************************** 5 : Macro Symbol Object **************************|
 \******************************************************************************/
-
 struct _ppoMACRO_SYMBOL
 {
-    /*00*/    struct _ppoBASE        base;
-    /*01*/    gctSTRING            name;
-    /*02*/    gctINT                argc;
-    /*03*/    ppoTOKEN            argv;
-    /*04*/    ppoTOKEN            replacementList;
-    /*05*/    gctBOOL                undefined;
+    struct _ppoBASE         base;
+    gctSTRING               name;
+    gctINT                  argc;
+    ppoTOKEN                argv;
+    ppoTOKEN                replacementList;
+    gctBOOL                 undefined;
+    gctBOOL                 hasPara;
 };
 
 gceSTATUS
@@ -448,6 +453,8 @@ struct _ppsKEYWORD
     /*53    GL_ES    */    gctSTRING    gl_es;
     /*54    GL_        */    gctSTRING    gl_;
     /*55    all        */    gctSTRING    all;
+    /*56    include    */    gctSTRING    include;
+    /*57     nulstr    */    gctSTRING    nul_str;
 };
 
 /******************************************************************************\
@@ -483,34 +490,50 @@ struct _ppsKEYWORD
 /*R                             */
 struct _ppoPREPROCESSOR
 {
-    /*00 C*/    struct _ppoBASE                base;
-    /*01 C*/    cloCOMPILER                    compiler;
-    /*02*/    gctCONST_STRING*                strings;
-    /*03*/    gctUINT*                    lens;
-    /*04*/    gctUINT                        count;
-    /*05*/    gctBOOL                        otherStatementHasAlreadyAppeared;
-    /*06*/    gctBOOL                        versionStatementHasAlreadyAppeared;
-    /*07 SR*/    ppoMACRO_MANAGER            macroManager;
-    /*08*/    ppoINPUT_STREAM                inputStream;
-    /*09 C*/    ppsKEYWORD                    keyword;
-    /*10*/    gctINT                        currentSourceFileStringNumber;
-    /*11*/    gctINT                        currentSourceFileLineNumber;
-    /*12 C*/    gctSTRING**                    operators;
-    /*13*/    ppoTOKEN                    outputTokenStreamHead;
-    /*14*/    ppoTOKEN                    outputTokenStreamEnd;
-    /*15*/    ppoBYTE_INPUT_STREAM        lastGetcharPhase0IsFromThisBis;
-    /*16*/    gctBOOL                        iAmFollowingAComment;
-    /*17*/    gctBOOL                        doWeInValidArea;
-    /*18*/    gctBOOL                        dirty;
-    /*19*/    gctUINT                        version;
-    /*20*/    gctSTRING*                        ppedStrings;
-    /*21*/    gctUINT                        ppedCount;
+    struct _ppoBASE            base;
+    cloCOMPILER                compiler;
+    gctCONST_STRING*           strings;
+    gctUINT*                   lens;
+    gctUINT                    count;
+    gctBOOL                    otherStatementHasAlreadyAppeared;
+    gctBOOL                    versionStatementHasAlreadyAppeared;
+    ppoMACRO_MANAGER           macroManager;
+    ppoINPUT_STREAM            inputStream;
+    ppsKEYWORD                 keyword;
+    gctINT                     currentSourceFileStringNumber;
+    gctINT                     currentSourceFileLineNumber;
+    gctCHAR                    currentSourceFileStringName[1024];
+    gctSTRING**                operators;
+    ppoTOKEN                   outputTokenStreamHead;
+    ppoTOKEN                   outputTokenStreamEnd;
+    ppoBYTE_INPUT_STREAM       lastGetcharPhase0IsFromThisBis;
+    gctBOOL                    iAmFollowingAComment;
+    gctBOOL                    doWeInValidArea;
+    gctBOOL                    dirty;
+    gctUINT                    version;
+    gctSTRING*                 ppedStrings;
+    gctUINT                    ppedCount;
+    gctBOOL                    useNewPP;
+    gctSTRING                  extensionString;
+    ppoHEADERFILEPATH          headerFilePathList;
+    gctSTRING                  macroString;
+    gctSIZE_T                  macroStringSize;
+    gctBOOL                    toLineEnd;
+    gctINT                     skipLine;
+    gctBOOL                    nonpreprocessorStatementHasAlreadyAppeared;
+
+    /*
+    ** to skip undefined identifiers error,
+    ** such as: #if 1 || AA  and # if 0 && AA
+    */
+    gctBOOL                    skipOPError;
 };
 
 gceSTATUS
 ppoPREPROCESSOR_Construct(
-                          cloCOMPILER            Compiler,
-                          ppoPREPROCESSOR*    PP
+                          cloCOMPILER         Compiler,
+                          ppoPREPROCESSOR*    PP,
+                          gctBOOL             UseNewPP
                           );
 
 gceSTATUS
@@ -525,9 +548,10 @@ ppoPREPROCESSOR_Reset (
 
 gceSTATUS
 ppoPREPROCESSOR_SetSourceStrings(
-                                 ppoPREPROCESSOR        PP,
-                                 gctCONST_STRING*    Strings,
-                                 gctUINT            Count
+                                 ppoPREPROCESSOR    PP,
+                                 gctCONST_STRING*   Strings,
+                                 gctUINT            Count,
+                                 gctCONST_STRING    Options
                                  );
 
 gceSTATUS
@@ -616,11 +640,6 @@ ppoPREPROCESSOR_Line(
                      );
 
 gceSTATUS
-ppoPREPROCESSOR_Extension(
-                          ppoPREPROCESSOR PP
-                          );
-
-gceSTATUS
 ppoPREPROCESSOR_Error(
                       ppoPREPROCESSOR PP
                       );
@@ -637,6 +656,11 @@ ppoPREPROCESSOR_Undef(
 
 gceSTATUS
 ppoPREPROCESSOR_Define(
+                       ppoPREPROCESSOR PP
+                       );
+
+gceSTATUS
+ppoPREPROCESSOR_Include(
                        ppoPREPROCESSOR PP
                        );
 
@@ -724,6 +748,14 @@ ppoPREPROCESSOR_ToEOL(
                       );
 
 
+gceSTATUS
+ppoPREPROCESSOR_addMacroDef_Int(
+                                ppoPREPROCESSOR  PP,
+                                gctSTRING  MacroStr,
+                                gctSTRING  ValueStr
+                               );
+
+
 /*Alphabet Number, _*/
 gctBOOL
 ppoPREPROCESSOR_isalnum_(char c);
@@ -787,6 +819,7 @@ typedef enum
     ppvTokenType_PUNC,
     ppvTokenType_NL,
     ppvTokenType_WS,
+    ppvTokenType_NUL,
     ppvTokenType_NOT_IN_LEGAL_CHAR_SET
 }
 ppeTokenType;
@@ -799,6 +832,8 @@ struct _ppoTOKEN
     /*04*/    cltPOOL_STRING                poolString;
     /*05*/    gctINT                        srcFileString;
     /*06*/    gctINT                        srcFileLine;
+    /*07*/    gctBOOL                       hasLeadingWS;
+    /*08*/    gctBOOL                       hasTrailingControl;
 };
 
 gceSTATUS
@@ -835,13 +870,14 @@ ppoTOKEN_Colon(
 
 gceSTATUS
 ppoTOKEN_ColonTokenList(
-                        ppoPREPROCESSOR        PP,
-                        ppoTOKEN    SrcTLst,
-                        gctCONST_STRING        File,
-                        gctINT        Line,
-                        gctCONST_STRING        MoreInfo,
-                        ppoTOKEN*    ColonedHead);
-
+    IN ppoPREPROCESSOR      PP,
+    IN ppoTOKEN             SrcTLst,
+    IN gctCONST_STRING      File,
+    IN gctINT               Line,
+    IN gctCONST_STRING      MoreInfo,
+    IN ppoTOKEN*            ColonedHead,
+    IN ppoTOKEN             RefID
+    );
 
 gceSTATUS
 ppoTOKEN_Dump(
@@ -925,6 +961,28 @@ cloCOMPILER_SetVersion(
                        cloCOMPILER Compiler,
                        gctINT Line
                        );
+
+
+/******************************************************************************\
+|******************************  Header File Path  ****************************|
+\******************************************************************************/
+
+struct _ppoHEADERFILEPATH
+{
+    struct _ppoBASE     base;
+    gctSTRING headerFilePath;
+};
+
+gceSTATUS
+ppoPREPROCESSOR_AddHeaderFilePathToList(
+                                        ppoPREPROCESSOR PP,
+                                        gctSTRING   Path
+                                        );
+
+gceSTATUS
+ppoPREPROCESSOR_FreeHeaderFilePathList(
+                                       ppoPREPROCESSOR PP
+                                       );
 
 #include "gc_cl_macro_expand.h"
 

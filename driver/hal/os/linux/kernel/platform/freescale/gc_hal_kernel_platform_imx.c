@@ -1557,11 +1557,11 @@ int gckPLATFORM_Init(struct platform_driver *pdrv,
 #ifdef IMX_GPU_SUBSYSTEM
     if (of_find_compatible_node(NULL, NULL, "fsl,imx8-gpu-ss")) {
         use_imx_gpu_subsystem = 1;
-    }
 
-    if (of_find_compatible_node(NULL, NULL, "fsl,imx8x-gpu")) {
-        printk(KERN_ERR "Incorrect device-tree, please update dtb.");
-        return -EINVAL;
+        if (!of_find_compatible_node(NULL, NULL, "fsl,imx8-gpu")) {
+            printk(KERN_ERR "Incorrect device-tree, please update dtb.");
+            return -EINVAL;
+        }
     }
 #endif
 

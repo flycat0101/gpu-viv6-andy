@@ -1743,7 +1743,7 @@ __SpvSetAccessChainOffsetToOperand(
     }
 
     /* Do not set the relative address information for a memory address calculation. */
-    if (SPV_ID_SYM_IS_MEM_ADDR_CALC(ResultId))
+    if (SPV_ID_IS_MEM_ADDR_CALC(ResultId))
     {
         return;
     }
@@ -2573,6 +2573,42 @@ static VIR_ImageFormat __SpvImageFormatToVirImageFormat(SpvImageFormat format)
     return imageFormat;
 }
 
+VSC_ErrCode __SpvAddRedefinedSymbol(
+    gcSPV               spv,
+    VIR_Shader*         pVirShader,
+    VIR_SymbolKind      virSymbolKind,
+    VIR_StorageClass    virStorageClass,
+    VIR_Type*           pSymType,
+    VIR_SymId           symId,
+    VIR_SymId*          pNewSymId
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Symbol*         pSymbol = VIR_Shader_GetSymFromId(pVirShader, symId);
+    VIR_SymId           newSymId = VIR_INVALID_ID;
+    gctCHAR             name[256];
+    VIR_NameId          nameId = VIR_INVALID_ID;
+    gctUINT             offset = 0;
+
+    gcoOS_PrintStrSafe(name, 256, &offset, "%s_#dup%d", VIR_Shader_GetSymNameString(pVirShader, pSymbol), spv->resultId);
+    VIR_Shader_AddString(pVirShader, name, &nameId);
+
+    errCode = VIR_Shader_AddSymbol(pVirShader,
+                                   virSymbolKind,
+                                   nameId,
+                                   pSymType,
+                                   virStorageClass,
+                                   &newSymId);
+    if (errCode != VSC_ERR_NONE) return errCode;
+
+    if (pNewSymId)
+    {
+        *pNewSymId = newSymId;
+    }
+
+    return errCode;
+}
+
 static VIR_SymId __SpvAddIdSymbol(
     gcSPV spv,
     VIR_Shader * virShader,
@@ -2696,7 +2732,15 @@ static VIR_SymId __SpvAddIdSymbol(
 
     if(errCode == VSC_ERR_REDEFINITION && virSymbolKind == VIR_SYM_VARIABLE && virStorageClass == VIR_STORAGE_LOCAL)
     {
-        VIR_Shader_DuplicateVariablelFromSymId(virShader, symId, &symId);
+        errCode = __SpvAddRedefinedSymbol(spv,
+                                          virShader,
+                                          virSymbolKind,
+                                          virStorageClass,
+                                          virType,
+                                          symId,
+                                          &symId);
+        if (errCode != VSC_ERR_NONE) return errCode;
+
         sym = VIR_Shader_GetSymFromId(virShader, symId);
         gcmASSERT(sym);
         /* Need to set proper type. The local variable has name identical to others in different scope */
@@ -3302,7 +3346,7 @@ static VSC_ErrCode __SpvInsertInstruction2(gcSPV spv, VIR_Shader * virShader, VI
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
     VIR_Function * func;
     SpvId srcType = SPV_ID_SYM_SPV_TYPE(srcSpvID);
-    gctBOOL bIsMemAddrCalc = SPV_ID_SYM_IS_MEM_ADDR_CALC(srcSpvID);
+    gctBOOL bIsMemAddrCalc = SPV_ID_IS_MEM_ADDR_CALC(srcSpvID);
 
     if (bIsMemAddrCalc)
     {
@@ -4066,7 +4110,7 @@ VSC_ErrCode __SpvPreprocessInstruction(gcSPV spv, VIR_Shader * virShader)
     if (__SpvIsResultMemoryAddress(spv, virShader))
     {
         /* Mark the result as a memory address calcucation. */
-        SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->resultId) = gcvTRUE;
+        SPV_ID_IS_MEM_ADDR_CALC(spv->resultId) = gcvTRUE;
     }
 
     return virErrCode;
@@ -5568,7 +5612,7 @@ VSC_ErrCode __SpvEmitFunctionCall(gcSPV spv, VIR_Shader * virShader)
     virErrCode = VIR_Function_AddInstruction(
         spv->virFunction,
         VIR_OP_PARM,
-        SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->resultId) ? VIR_TYPE_UINT32 : SPV_ID_TYPE_VIR_TYPE_ID(spv->resultTypeId),
+        SPV_ID_IS_MEM_ADDR_CALC(spv->resultId) ? VIR_TYPE_UINT32 : SPV_ID_TYPE_VIR_TYPE_ID(spv->resultTypeId),
         &virInst);
 
     VIR_Inst_SetConditionOp(virInst, VIR_COP_ALWAYS);
@@ -5603,8 +5647,8 @@ VSC_ErrCode __SpvEmitFunctionCall(gcSPV spv, VIR_Shader * virShader)
             gcmASSERT(gcvFALSE);
         }
 
-        VIR_Operand_SetSwizzle(operand, SPV_ID_SYM_IS_MEM_ADDR_CALC(spvArgs) ? VIR_SWIZZLE_XXXX :__SpvID2Swizzle(spv, spvArgs));
-        VIR_Operand_SetTypeId(operand, SPV_ID_SYM_IS_MEM_ADDR_CALC(spvArgs) ? VIR_TYPE_UINT32 : SPV_ID_VIR_TYPE_ID(spvArgs));
+        VIR_Operand_SetSwizzle(operand, SPV_ID_IS_MEM_ADDR_CALC(spvArgs) ? VIR_SWIZZLE_XXXX :__SpvID2Swizzle(spv, spvArgs));
+        VIR_Operand_SetTypeId(operand, SPV_ID_IS_MEM_ADDR_CALC(spvArgs) ? VIR_TYPE_UINT32 : SPV_ID_VIR_TYPE_ID(spvArgs));
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
         VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -5614,10 +5658,10 @@ VSC_ErrCode __SpvEmitFunctionCall(gcSPV spv, VIR_Shader * virShader)
     {
         operand = parmOpnd->args[i - 1];
 
-        VIR_Operand_SetSwizzle(operand, SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->resultId) ? VIR_SWIZZLE_XXXX :__SpvID2Swizzle(spv, spv->resultId));
+        VIR_Operand_SetSwizzle(operand, SPV_ID_IS_MEM_ADDR_CALC(spv->resultId) ? VIR_SWIZZLE_XXXX :__SpvID2Swizzle(spv, spv->resultId));
         VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spv->resultId));
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetTypeId(operand, SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->resultId) ? VIR_TYPE_UINT32 : SPV_ID_VIR_TYPE_ID(spv->resultId));
+        VIR_Operand_SetTypeId(operand, SPV_ID_IS_MEM_ADDR_CALC(spv->resultId) ? VIR_TYPE_UINT32 : SPV_ID_VIR_TYPE_ID(spv->resultId));
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
         VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -5760,7 +5804,7 @@ VSC_ErrCode __SpvEmitFunctionParameter(gcSPV spv, VIR_Shader * virShader)
         nameId = SPV_ID_VIR_NAME_ID(spv->resultId);
     }
 
-    if (SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->resultId))
+    if (SPV_ID_IS_MEM_ADDR_CALC(spv->resultId))
     {
         virTypeId = VIR_TYPE_UINT32;
     }
@@ -6496,7 +6540,7 @@ VSC_ErrCode __SpvEmitFunction(gcSPV spv, VIR_Shader * virShader)
     VIR_Shader_AddFunction(virShader,
                            isKernel,
                            name,
-                           SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->resultId) ? VIR_TYPE_UINT32 : SPV_ID_VIR_TYPE_ID(retSpvType),
+                           SPV_ID_IS_MEM_ADDR_CALC(spv->resultId) ? VIR_TYPE_UINT32 : SPV_ID_VIR_TYPE_ID(retSpvType),
                            &virFunction);
 
     spv->virFunction = virFunction;
@@ -6519,7 +6563,7 @@ VSC_ErrCode __SpvEmitFunction(gcSPV spv, VIR_Shader * virShader)
         __SpvGenerateFuncReturnName(spv, name);
         VIR_Shader_AddString(virShader, spv->virName, &retValueNameId);
 
-        if (SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->resultId))
+        if (SPV_ID_IS_MEM_ADDR_CALC(spv->resultId))
         {
             virTypeId = VIR_TYPE_UINT32;
         }
@@ -6806,7 +6850,7 @@ VSC_ErrCode __SpvEmitAccessChain(gcSPV spv, VIR_Shader * virShader)
         __SpvCalculateMemoryAddress(spv, virShader, spv->resultId, src, baseSymbol, &virBaseTypeInfo, &virAcOffsetInfo);
 
         /* Mark this symbo as the memory address calculation. */
-        SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->resultId) = gcvTRUE;
+        SPV_ID_IS_MEM_ADDR_CALC(spv->resultId) = gcvTRUE;
 
         /* Set the accessChain information, for stride only? */
         SPV_SET_IDDESCRIPTOR_SPV_OFFSET(spv, spv->resultId, virAcOffsetInfo);
@@ -7041,7 +7085,7 @@ VSC_ErrCode __SpvEmitPhi(gcSPV spv, VIR_Shader * virShader)
 
     gcmEMIT_GET_ARGS();
 
-    if (SPV_ID_SYM_IS_MEM_ADDR_CALC(resultId))
+    if (SPV_ID_IS_MEM_ADDR_CALC(resultId))
     {
         dstVirTypeId = VIR_TYPE_UINT32;
     }
@@ -7061,7 +7105,7 @@ VSC_ErrCode __SpvEmitPhi(gcSPV spv, VIR_Shader * virShader)
     operand = VIR_Inst_GetDest(virInst);
     VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
     VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
-    VIR_Operand_SetEnable(operand, SPV_ID_SYM_IS_MEM_ADDR_CALC(resultId) ? VIR_ENABLE_X : virEnableMask);
+    VIR_Operand_SetEnable(operand, SPV_ID_IS_MEM_ADDR_CALC(resultId) ? VIR_ENABLE_X : virEnableMask);
     VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
     VIR_Operand_SetTypeId(operand, dstVirTypeId);
     VIR_Operand_SetSym(operand, dstVirSym);
@@ -7095,9 +7139,9 @@ VSC_ErrCode __SpvEmitPhi(gcSPV spv, VIR_Shader * virShader)
                 VIR_Symbol* sym = SPV_ID_VIR_SYM(spvOperand);
                 VIR_Operand_SetSym(newOperands, sym);
                 VIR_Operand_SetOpKind(newOperands, VIR_OPND_SYMBOL);
-                VIR_Operand_SetTypeId(newOperands, SPV_ID_SYM_IS_MEM_ADDR_CALC(spvOperand) ? VIR_TYPE_UINT32 : SPV_ID_VIR_TYPE_ID(resultTypeId));
+                VIR_Operand_SetTypeId(newOperands, SPV_ID_IS_MEM_ADDR_CALC(spvOperand) ? VIR_TYPE_UINT32 : SPV_ID_VIR_TYPE_ID(resultTypeId));
                 VIR_Operand_SetPrecision(newOperands, VIR_PRECISION_HIGH);
-                VIR_Operand_SetSwizzle(newOperands, SPV_ID_SYM_IS_MEM_ADDR_CALC(spvOperand) ? VIR_SWIZZLE_XXXX : virSwizzle);
+                VIR_Operand_SetSwizzle(newOperands, SPV_ID_IS_MEM_ADDR_CALC(spvOperand) ? VIR_SWIZZLE_XXXX : virSwizzle);
                 VIR_Operand_SetRoundMode(newOperands, VIR_ROUND_DEFAULT);
                 VIR_Operand_SetModifier(newOperands, VIR_MOD_NONE);
             }
@@ -8995,12 +9039,19 @@ VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
         }
 
         useLoadToAccessBlock =
-            __SpvUseLoadStoreToAccessBlock(spv, virShader, spv->operands[0]) || SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->operands[0]);
+            __SpvUseLoadStoreToAccessBlock(spv, virShader, spv->operands[0]) || SPV_ID_IS_MEM_ADDR_CALC(spv->operands[0]);
 
         /* Change MOV to LOAD/STORE if needed. */
         if (useLoadToAccessBlock)
         {
-            virOpcode = VIR_OP_LOAD;
+            if (VIR_TypeId_isPrimitive(dstVirTypeId) && VIR_GetTypeComponentType(dstVirTypeId) == VIR_TYPE_FLOAT16)
+            {
+                virOpcode = VIR_OP_LOAD_D;
+            }
+            else
+            {
+                virOpcode = VIR_OP_LOAD;
+            }
         }
 
         if (SPV_ID_SYM_PER_VERTEX(spv->operands[0]))
@@ -9144,7 +9195,7 @@ VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
         }
         else if (useLoadToAccessBlock)
         {
-            if (SPV_ID_SYM_IS_MEM_ADDR_CALC(spvOperand))
+            if (SPV_ID_IS_MEM_ADDR_CALC(spvOperand))
             {
                 VIR_Operand_SetSymbol(operand, spv->virFunction, VIR_Symbol_GetIndex(SPV_ID_VIR_SYM(spvOperand)));
                 VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
@@ -9416,12 +9467,19 @@ VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
         }
 
         useLoadToAccessBlock =
-            __SpvUseLoadStoreToAccessBlock(spv, virShader, spv->operands[0]) || SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->operands[0]);
+            __SpvUseLoadStoreToAccessBlock(spv, virShader, spv->operands[0]) || SPV_ID_IS_MEM_ADDR_CALC(spv->operands[0]);
 
         /* Change MOV to LOAD/STORE if needed. */
         if (useLoadToAccessBlock)
         {
-            virOpcode = VIR_OP_STORE;
+            if (VIR_TypeId_isPrimitive(dstVirTypeId) && VIR_GetTypeComponentType(dstVirTypeId) == VIR_TYPE_FLOAT16)
+            {
+                virOpcode = VIR_OP_STORE_D;
+            }
+            else
+            {
+                virOpcode = VIR_OP_STORE;
+            }
         }
 
         if (SPV_ID_SYM_PER_VERTEX(spv->operands[0]))
@@ -9561,7 +9619,7 @@ VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
             /* Set SOURCE0 by operands[0]. */
             spvOperand = spv->operands[0];
 
-            if (SPV_ID_SYM_IS_MEM_ADDR_CALC(spvOperand))
+            if (SPV_ID_IS_MEM_ADDR_CALC(spvOperand))
             {
                 /* Set the calculated memory address. */
                 operand = VIR_Inst_GetSource(virInst, 0);
@@ -9740,9 +9798,9 @@ VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
     SPV_ID_SYM_USED_STORE_AS_DEST(spv->operands[0]) = gcvTRUE;
 
     /* If the source is a memory address, mark the result as a memory address too. */
-    if (SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->operands[1]))
+    if (SPV_ID_IS_MEM_ADDR_CALC(spv->operands[1]))
     {
-        SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->operands[0]) = SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->operands[1]);
+        SPV_ID_IS_MEM_ADDR_CALC(spv->operands[0]) = SPV_ID_IS_MEM_ADDR_CALC(spv->operands[1]);
     }
 
     return virErrCode;
@@ -10107,7 +10165,7 @@ VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
 
             if (i == 0)
             {
-                if (SPV_ID_SYM_IS_MEM_ADDR_CALC(spvOperand))
+                if (SPV_ID_IS_MEM_ADDR_CALC(spvOperand))
                 {
                     /* Set the calculated memory address. */
                     VIR_Operand_SetSymbol(operand, spv->virFunction, VIR_Symbol_GetIndex(SPV_ID_VIR_SYM(spvOperand)));
@@ -10264,7 +10322,7 @@ VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
 
     VIR_Function_AddInstruction(spv->virFunction,
         virOpcode,
-        (hasDest && SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->resultId)) ? VIR_TYPE_UINT32 : dstVirTypeId,
+        (hasDest && SPV_ID_IS_MEM_ADDR_CALC(spv->resultId)) ? VIR_TYPE_UINT32 : dstVirTypeId,
         &virInst);
 
     VIR_Inst_SetConditionOp(virInst, __SpvOpCode2VIRCop(opCode));
@@ -10274,9 +10332,9 @@ VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
         operand = VIR_Inst_GetDest(virInst);
         VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
-        VIR_Operand_SetEnable(operand, SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->resultId) ? VIR_ENABLE_X : virEnableMask);
+        VIR_Operand_SetEnable(operand, SPV_ID_IS_MEM_ADDR_CALC(spv->resultId) ? VIR_ENABLE_X : virEnableMask);
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetTypeId(operand, SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->resultId) ? VIR_TYPE_UINT32 : dstVirTypeId);
+        VIR_Operand_SetTypeId(operand, SPV_ID_IS_MEM_ADDR_CALC(spv->resultId) ? VIR_TYPE_UINT32 : dstVirTypeId);
         VIR_Operand_SetSym(operand, dstVirSym);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
         __SpvSetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
@@ -10303,8 +10361,8 @@ VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
 
             VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spvOperand));
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetTypeId(operand, SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->operands[i]) ? VIR_TYPE_UINT32 : SPV_ID_VIR_TYPE_ID(resultTypeId));
-            VIR_Operand_SetSwizzle(operand, SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->operands[i]) ? VIR_SWIZZLE_XXXX : virSwizzle);
+            VIR_Operand_SetTypeId(operand, SPV_ID_IS_MEM_ADDR_CALC(spv->operands[i]) ? VIR_TYPE_UINT32 : SPV_ID_VIR_TYPE_ID(resultTypeId));
+            VIR_Operand_SetSwizzle(operand, SPV_ID_IS_MEM_ADDR_CALC(spv->operands[i]) ? VIR_SWIZZLE_XXXX : virSwizzle);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -10315,10 +10373,10 @@ VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
         {
             gcmASSERT(virOpndId < VIR_Inst_GetSrcNum(virInst));
             operand = virInst->src[virOpndId];
-            VIR_Operand_SetSwizzle(operand, SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->operands[i]) ? VIR_SWIZZLE_XXXX : virSwizzle);
+            VIR_Operand_SetSwizzle(operand, SPV_ID_IS_MEM_ADDR_CALC(spv->operands[i]) ? VIR_SWIZZLE_XXXX : virSwizzle);
             VIR_Operand_SetConstId(operand, SPV_ID_VIR_CONST_ID(spv->operands[i]));
             VIR_Operand_SetOpKind(operand, VIR_OPND_CONST);
-            VIR_Operand_SetTypeId(operand, SPV_ID_SYM_IS_MEM_ADDR_CALC(spv->operands[i]) ? VIR_TYPE_UINT32 : SPV_ID_VIR_TYPE_ID(spv->operands[i]));
+            VIR_Operand_SetTypeId(operand, SPV_ID_IS_MEM_ADDR_CALC(spv->operands[i]) ? VIR_TYPE_UINT32 : SPV_ID_VIR_TYPE_ID(spv->operands[i]));
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -10376,8 +10434,8 @@ VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
     SpvId               srcId = spv->operands[1];
     gctBOOL             sized = (spvOpCode == SpvOpCopyMemorySized);
     SpvMemoryAccessMask memoryAccessMask = SpvMemoryAccessMaskNone;
-    gctBOOL             isDstMemory = SPV_ID_SYM_IS_MEM_ADDR_CALC(targetId);
-    gctBOOL             isSrcMemory = SPV_ID_SYM_IS_MEM_ADDR_CALC(srcId);
+    gctBOOL             isDstMemory = SPV_ID_IS_MEM_ADDR_CALC(targetId);
+    gctBOOL             isSrcMemory = SPV_ID_IS_MEM_ADDR_CALC(srcId);
     VIR_Symbol         *dstBlockSym = gcvNULL;
     VIR_Symbol         *srcBlockSym = gcvNULL;
     VIR_SymId           dstSymId = VIR_INVALID_ID;
@@ -10450,8 +10508,14 @@ VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
         }
         else
         {
+            VIR_OpCode loadOpcode = VIR_OP_LOAD;
+
+            if (VIR_TypeId_isPrimitive(virDstTypeId) && VIR_GetTypeComponentType(virDstTypeId) == VIR_TYPE_FLOAT16)
+            {
+                loadOpcode = VIR_OP_LOAD_D;
+            }
             VIR_Function_AddInstruction(spv->virFunction,
-                                        VIR_OP_LOAD,
+                                        loadOpcode,
                                         virDstTypeId,
                                         &virInst);
             /* Set DEST. */
@@ -10490,8 +10554,14 @@ VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
         /* Write the data if need. */
         if (isDstMemory || dstBlockSym)
         {
+            VIR_OpCode storeOpcode = VIR_OP_STORE;
+
+            if (VIR_TypeId_isPrimitive(virDstTypeId) && VIR_GetTypeComponentType(virDstTypeId) == VIR_TYPE_FLOAT16)
+            {
+                storeOpcode = VIR_OP_STORE_D;
+            }
             VIR_Function_AddInstruction(spv->virFunction,
-                                        VIR_OP_STORE,
+                                        storeOpcode,
                                         virDstTypeId,
                                         &virInst);
             /* Set DEST. */
@@ -10540,8 +10610,14 @@ VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
     {
         if (isDstMemory || dstBlockSym)
         {
+            VIR_OpCode storeOpcode = VIR_OP_STORE;
+
+            if (VIR_TypeId_isPrimitive(virDstTypeId) && VIR_GetTypeComponentType(virDstTypeId) == VIR_TYPE_FLOAT16)
+            {
+                storeOpcode = VIR_OP_STORE_D;
+            }
             VIR_Function_AddInstruction(spv->virFunction,
-                                        VIR_OP_STORE,
+                                        storeOpcode,
                                         virDstTypeId,
                                         &virInst);
             /* Set DEST. */

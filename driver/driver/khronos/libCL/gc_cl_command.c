@@ -15,6 +15,7 @@
 #include <stdio.h>
 
 #define __NEXT_MSG_ID__     003013
+#define _GC_OBJ_ZONE        gcdZONE_CL_COMMAND
 
 /*****************************************************************************\
 |*                         Supporting functions                              *|

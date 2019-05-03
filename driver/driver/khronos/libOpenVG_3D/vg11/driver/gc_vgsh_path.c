@@ -13,6 +13,8 @@
 
 #include "gc_vgsh_precomp.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG3D_PATH
+
 #if USE_SCAN_LINE
 #include "gc_vgsh_scanline.h"
 #endif

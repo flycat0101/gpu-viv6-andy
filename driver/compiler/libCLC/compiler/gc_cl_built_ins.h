@@ -136,7 +136,7 @@ IN cloIR_CONSTANT * OperandConstants,
 OUT cloIR_CONSTANT * ResultConstant
 );
 
-clsNAME*
+gceSTATUS
 clGetPreScaleGlobalIDCode(
     IN cloCOMPILER Compiler,
     IN cloCODE_GENERATOR CodeGenerator,

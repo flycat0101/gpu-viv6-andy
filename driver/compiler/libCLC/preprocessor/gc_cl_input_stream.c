@@ -486,7 +486,7 @@ ppoPREPROCESSOR_ispunc(char c)
     return
         c == '.' || c == '+' || c == '-' || c == '/' || c == '*' || c == '%' || c == '<' || c == '>' || c == '[' || c == ']' ||
         c == '(' || c == ')' || c == '{' || c == '}' || c == '^' || c == '|' || c == '&' || c == '~' || c == '=' || c == '!' ||
-        c == ':' || c == ';' || c == ',' || c == '?'
+        c == ':' || c == ';' || c == ',' || c == '?' || c == '"' || c == '\''
         ||
         c == '#'
         ||
@@ -545,6 +545,51 @@ gceSTATUS ppoInfomationForBISRollBack_RollBackBISList(ppoPREPROCESSOR PP, ppoInf
 
 }
 
+/******************************************************************************\
+ Get previous character
+\******************************************************************************/
+char
+ppoBYTE_INPUT_STREAM_GetPrevChar(
+    IN      ppoPREPROCESSOR         PP,
+    IN      ppoBYTE_INPUT_STREAM    Bis
+    )
+{
+    if(Bis != gcvNULL && Bis->curpos > 0)
+    {
+        if (Bis->curpos < Bis->count)
+        {
+            return Bis->src[Bis->curpos - 1];
+        }
+        else if (Bis->curpos == Bis->count)
+        {
+            ppoBYTE_INPUT_STREAM prevBis = (ppoBYTE_INPUT_STREAM)(Bis->inputStream.base.node.prev);
+            ppoBYTE_INPUT_STREAM tempBis = Bis;
+            /* find current Bis */
+            while (prevBis)
+            {
+               if ((prevBis->curpos > 0 && prevBis->curpos < prevBis->count) ||
+                   (prevBis->curpos == 0 && tempBis->curpos == tempBis->count))
+                   break;
+               tempBis = prevBis;
+               prevBis = (ppoBYTE_INPUT_STREAM)(prevBis->inputStream.base.node.prev);
+            }
+
+            if (prevBis && prevBis->curpos > 0)
+                return prevBis->src[prevBis->curpos - 1];
+            else
+                return ppvCHAR_EOF;
+        }
+        else
+        {
+            return ppvCHAR_EOF;
+        }
+    }
+    else
+    {
+        return ppvCHAR_EOF;
+    }
+}
+
 gceSTATUS
 ppoBYTE_INPUT_STREAM_GetToken(
                               ppoPREPROCESSOR        PP,
@@ -553,18 +598,13 @@ ppoBYTE_INPUT_STREAM_GetToken(
                               gctBOOL                WhiteSpace)
 {
 
-    gceSTATUS                status    = gcvSTATUS_INVALID_ARGUMENT;
-
+    gceSTATUS               status    = gcvSTATUS_INVALID_ARGUMENT;
     ppoTOKEN                ntoken    = gcvNULL;
-
-    char                    c        = ppvCHAR_EOF;
-
-    gctINT                    cblen    = 0;
-
+    char                    c         = ppvCHAR_EOF;
+    char                    prevC     = ppvCHAR_EOF;
+    gctINT                  cblen     = 0;
     char                    cb[ppvMAX_PPTOKEN_CHAR_NUMBER+1];
-
     ppoBYTE_INPUT_STREAM    bis        = (ppoBYTE_INPUT_STREAM)*Is;
-
 
     gcmASSERT(
         bis
@@ -584,36 +624,45 @@ ppoBYTE_INPUT_STREAM_GetToken(
     /*reset ntoken's type*/
     ntoken->type = ppvTokenType_ERROR;
 
-    /*get first char.*/
+    prevC = ppoBYTE_INPUT_STREAM_GetPrevChar(PP,
+                                             bis);
 
+    if(ppoPREPROCESSOR_isnl(prevC)) {
+        ntoken->hasLeadingWS = gcvTRUE;
+    }
+
+    /*get first char.*/
     do
     {
         ppmCheckFuncOk(
             ppoBYTE_INPUT_STREAM_GetChar(PP, bis, &c)
             );
 
-        if(ppoPREPROCESSOR_isws(c) && WhiteSpace == gcvTRUE)
+        if(ppoPREPROCESSOR_isws(c))
         {
+            if(WhiteSpace == gcvTRUE) {
 
-            ntoken->type    = ppvTokenType_WS;
+              ntoken->type = ppvTokenType_WS;
 
-            ntoken->poolString        = PP->keyword->ws;
+              ntoken->poolString = PP->keyword->ws;
 
-            *Token            = ntoken;
+              *Token = ntoken;
 
-            (*Token)->inputStream.base.node.prev = gcvNULL;
+              (*Token)->inputStream.base.node.prev = gcvNULL;
 
-            (*Token)->inputStream.base.node.next = gcvNULL;
+              (*Token)->inputStream.base.node.next = gcvNULL;
 
-            return gcvSTATUS_OK;
+              return gcvSTATUS_OK;
+            }
 
+            ntoken->hasLeadingWS = gcvTRUE;
         }
 
         if(c == ppvCHAR_EOF)
         {
             ntoken->type = ppvTokenType_EOF;
 
-            ntoken->poolString  = PP->keyword->eof;
+            ntoken->poolString = PP->keyword->eof;
 
             *Token = ntoken;
 
@@ -650,11 +699,11 @@ ppoBYTE_INPUT_STREAM_GetToken(
 
         if(ppoPREPROCESSOR_isnl(c))
         {
-            ntoken->type    = ppvTokenType_NL;
+            ntoken->type = ppvTokenType_NL;
 
-            ntoken->poolString        = PP->keyword->newline;
+            ntoken->poolString = PP->keyword->newline;
 
-            *Token            = ntoken;
+            *Token = ntoken;
 
             (*Token)->inputStream.base.node.prev = gcvNULL;
 
@@ -1167,7 +1216,7 @@ ppoBYTE_INPUT_STREAM_GetToken(
                         }
                         else if(c == '/')
                         {
-                            /*commonet*/
+                            /*comment*/
                             gctBOOL legalenv = PP->doWeInValidArea;
                             PP->doWeInValidArea = gcvFALSE;/*accept not doWeInValidArea character.*/
 
@@ -1195,6 +1244,7 @@ ppoBYTE_INPUT_STREAM_GetToken(
                             *Token = ntoken;
                             (*Token)->inputStream.base.node.prev = gcvNULL;
                             (*Token)->inputStream.base.node.next = gcvNULL;
+                            PP->iAmFollowingAComment = gcvFALSE;
                             return gcvSTATUS_OK;
                         }
                     }

@@ -2006,6 +2006,25 @@ static VSC_ErrCode _VSC_PH_MergeAndAddResultInsts(
     return errCode;
 }
 
+static VSC_ErrCode _VSC_PH_MoveSingleInstBefore(
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VIR_Function*    func,
+    IN OUT VIR_Instruction* beforeMe,
+    IN OUT VIR_Instruction* inst
+    )
+{
+    return VIR_Pass_MoveInstructionBefore(func, beforeMe, inst, &VSC_PH_Peephole_GetCfgChanged(ph));
+}
+
+static VSC_ErrCode _VSC_PH_RemoveSingleInst(
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VIR_Function*    func,
+    IN OUT VIR_Instruction* inst
+    )
+{
+    return VIR_Pass_RemoveInstruction(func, inst, &VSC_PH_Peephole_GetCfgChanged(ph));
+}
+
 static VSC_ErrCode _VSC_PH_RemoveInst(
     IN OUT VSC_PH_Peephole* ph,
     IN OUT VIR_Instruction* inst
@@ -2098,7 +2117,7 @@ static VSC_ErrCode _VSC_PH_RemoveInst(
             VIR_LOG(dumper, "removed instrucion:\n");
             VIR_Inst_Dump(dumper, inst);
         }
-        VIR_Function_RemoveInstruction(func, inst);
+        _VSC_PH_RemoveSingleInst(ph, func, inst);
     }
     return errCode;
 }
@@ -2681,7 +2700,7 @@ static VSC_ErrCode _VSC_PH_GenerateLValueModifier(
         vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), inst, inst_dest_info.u1.virRegInfo.virReg,
                          1, inst_dest_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
         /* remove the input inst */
-        VIR_Function_RemoveInstruction(func, inst);
+        _VSC_PH_RemoveSingleInst(ph, func, inst);
         _VSC_PH_ResetHashTable(inst_usage_set);
     }
 
@@ -3082,7 +3101,7 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
                            1, inst_src0_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
         vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), inst, inst_dest_info.u1.virRegInfo.virReg,
                          1, inst_dest_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
-        VIR_Function_RemoveInstruction(func, inst);
+        _VSC_PH_RemoveSingleInst(ph, func, inst);
         _VSC_PH_ResetHashTable(def_inst_set);
     }
 
@@ -3728,7 +3747,7 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
             vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), mul, mul_dest_info.u1.virRegInfo.virReg,
                              1, mul_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
         }
-        VIR_Function_RemoveInstruction(func, mul);
+        _VSC_PH_RemoveSingleInst(ph, func, mul);
     }
     else
     {
@@ -4096,7 +4115,7 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
             vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), sqrt, sqrt_dest_info.u1.virRegInfo.virReg,
                              1, sqrt_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
         }
-        VIR_Function_RemoveInstruction(func, sqrt);
+        _VSC_PH_RemoveSingleInst(ph, func, sqrt);
     }
     else
     {
@@ -4478,7 +4497,7 @@ static VSC_ErrCode _VSC_PH_GenerateLShiftedLS(
             vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), lshift, lshift_dest_info.u1.virRegInfo.virReg,
                              1, lshift_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
 
-            VIR_Function_RemoveInstruction(func, lshift);
+            _VSC_PH_RemoveSingleInst(ph, func, lshift);
         }
     }
     else
@@ -4751,7 +4770,7 @@ static VSC_ErrCode _VSC_PH_GenerateLoadStore(
         /* We need to delete this ADD instruction when all usage instructions are matched. */
         if (bNeedToMatchAllUsageInst)
         {
-            errCode = VIR_Function_DeleteInstruction(VIR_Inst_GetFunction(pAddInst), pAddInst);
+            errCode = VIR_Pass_DeleteInstruction(VIR_Inst_GetFunction(pAddInst), pAddInst, &VSC_PH_Peephole_GetCfgChanged(ph));
             ON_ERROR(errCode, "Delete instruction error.");
         }
 
@@ -5222,7 +5241,7 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
             }
 
             /* delete the inst instruction */
-            VIR_Function_RemoveInstruction(func, inst);
+            _VSC_PH_RemoveSingleInst(ph, func, inst);
         }
         else
         {
@@ -5361,7 +5380,7 @@ static VSC_ErrCode _VSC_PH_MoveDefCode(
             */
             if (VIR_Inst_GetFunction(*defInst) == VIR_Inst_GetFunction(inst))
             {
-                VIR_Function_MoveInstructionBefore(VIR_Inst_GetFunction(*defInst), inst, *defInst);
+                _VSC_PH_MoveSingleInstBefore(ph, VIR_Inst_GetFunction(*defInst), inst, *defInst);
             }
             else
             {
@@ -5381,7 +5400,7 @@ static VSC_ErrCode _VSC_PH_MoveDefCode(
                 ON_ERROR(errCode, "Copy instruction");
 
                 /* Now we can remove this instruction. */
-                errCode = VIR_Function_RemoveInstruction(VIR_Inst_GetFunction(*defInst), *defInst);
+                errCode = _VSC_PH_RemoveSingleInst(ph, VIR_Inst_GetFunction(*defInst), *defInst);
                 ON_ERROR(errCode, "Remove instruction");
 
                 *defInst = newInst;
@@ -5594,6 +5613,69 @@ void _VSC_PH_Inst_DeleteDef(
         instEnable,
         VIR_HALF_CHANNEL_MASK_FULL,
         gcvNULL);
+}
+
+static void _VSC_PH_DeleteRedundantMOV(
+    IN OUT VSC_PH_Peephole* ph,
+    IN VIR_Instruction *pMovInst,
+    OUT gctBOOL    *changed)
+{
+    VIR_BB* bb = VSC_PH_Peephole_GetCurrBB(ph);
+    VIR_Instruction* nextInst = VIR_Inst_GetNext(pMovInst);
+    VIR_Operand *destOpnd = VIR_Inst_GetDest(pMovInst);
+    VIR_Operand *src0Opnd = VIR_Inst_GetSource(pMovInst, 0);
+    VIR_Enable destEnable = VIR_Operand_GetEnable(destOpnd);
+    VIR_Swizzle src0Swizzle = VIR_Operand_GetSwizzle(src0Opnd);
+    VIR_Symbol *destSym = VIR_Operand_GetSymbol(destOpnd);
+    VIR_Symbol *src0Sym = (VIR_Operand_isImm(src0Opnd) || VIR_Operand_isConst(src0Opnd)) ? gcvNULL: VIR_Operand_GetSymbol(src0Opnd);
+
+    while (nextInst && nextInst != BB_GET_END_INST(bb))
+    {
+        /* check if any defination to src0Sym or redefine dest by instruction not MOV */
+        VIR_Operand *nextDest = VIR_Inst_GetDest(nextInst);
+        if ((nextDest &&
+             ((VIR_Operand_GetSymbol(nextDest) == src0Sym) ||
+              (VIR_Inst_GetOpcode(nextInst) != VIR_OP_MOV && VIR_Operand_GetSymbol(nextDest) == destSym))) ||
+            VIR_Inst_GetOpcode(nextInst) == VIR_OP_EMIT ||
+            VIR_Inst_GetOpcode(nextInst) == VIR_OP_EMIT0)
+        {
+            break;
+        }
+        if (VIR_Inst_GetOpcode(nextInst) == VIR_OP_MOV &&
+            VIR_Operand_GetSymbol(VIR_Inst_GetDest(nextInst)) == destSym)
+        {
+            VIR_Operand *nextInstsrc0 = VIR_Inst_GetSource(nextInst, 0);
+            /* if src0opnd is imm, const, sym */
+            if ((VIR_Operand_GetEnable(VIR_Inst_GetDest(nextInst)) == destEnable) &&
+                (VIR_Operand_GetTypeId(VIR_Inst_GetDest(nextInst)) == VIR_Operand_GetTypeId(destOpnd)) &&
+                (VIR_Operand_GetSwizzle(nextInstsrc0) == src0Swizzle) &&
+                ((VIR_Operand_isImm(src0Opnd) &&
+                  VIR_Operand_isImm(nextInstsrc0) &&
+                  VIR_Operand_GetImmediateUint(src0Opnd) == VIR_Operand_GetImmediateUint(nextInstsrc0)) ||
+                 (VIR_Operand_isConst(src0Opnd) &&
+                  VIR_Operand_isConst(nextInstsrc0) &&
+                  VIR_Operand_GetConstId(src0Opnd) == VIR_Operand_GetConstId(nextInstsrc0)) ||
+                 (src0Sym && VIR_Operand_GetSymbol(nextInstsrc0) == src0Sym)))
+            {
+                /*change instruction to nop*/
+                _VSC_PH_Inst_DeleteUses(ph, nextInst, VIR_Inst_GetSrcNum(nextInst));
+                _VSC_PH_Inst_DeleteDef(ph, nextInst);
+                VIR_Function_ChangeInstToNop(VSC_PH_Peephole_GetCurrFunc(ph), nextInst);
+                VSC_PH_Peephole_SetCfgChanged(ph, gcvTRUE); /* invalid du infomation */
+                if (changed != gcvNULL)
+                {
+                    *changed = gcvTRUE;
+                }
+            }
+            else
+            {
+                /* dest is redefined by other value */
+                break;
+            }
+        }
+        nextInst = VIR_Inst_GetNext(nextInst);
+    }
+    return;
 }
 
 static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
@@ -6008,6 +6090,23 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
                 _VSC_PH_GenerateLoadStore(ph, inst, gcvNULL);
             }
             inst = pNextInst;
+        }
+    }
+
+    /* Delete redundant mov defination
+     * MOV  dest, t1
+     * MOV  dest, t1   <- delete this mov if no t1 def between two MOVs
+     */
+    if (VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetOPTS(options), VSC_OPTN_PHOptions_OPTS_REDUNDANT_MOV_DEF))
+    {
+        inst = BB_GET_START_INST(bb);
+        while (inst != BB_GET_END_INST(bb))
+        {
+            if (VIR_Inst_GetOpcode(inst) == VIR_OP_MOV)
+            {
+                _VSC_PH_DeleteRedundantMOV(ph, inst, gcvNULL);
+            }
+            inst = VIR_Inst_GetNext(inst);
         }
     }
 

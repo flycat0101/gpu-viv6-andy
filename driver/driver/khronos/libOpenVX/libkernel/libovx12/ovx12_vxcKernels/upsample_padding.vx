@@ -6,48 +6,50 @@ __kernel void upsample_padding_u8_to_u8
     __write_only image2d_t      dst_image
 )
 {
-    int2 coord = (int2)(get_global_id(0), get_global_id(1));
-    int2 coord_src = (int2)(0, 0);
-    uchar value;
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(1), get_global_id(1));
+    vxc_uchar16 src0, src1;
 
-    if (coord.y % 2 != 0 || coord.x % 2 != 0)
-    {
-        value = 0;
-    }
-    else
-    {
-        coord_src.x = coord.x / 2;
-        coord_src.y = coord.y / 2;
-        VXC_ReadImage(value, src_image, coord_src, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
-    }
+    VXC_ReadImage(src0, src_image, coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 
-    VXC_WriteImage(dst_image, coord, value, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+    coord.xyzw <<= 1;
+    coord.z ++;
+    src1 = 0;
+
+    VXC_WriteImage(dst_image, coord.xz, src1, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+
+    src0.s02468ace = src0.s01234567;
+    src0.s13579bdf = 0;
+
+    VXC_WriteImage(dst_image, coord.xy, src0, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
 }
 
+_viv_uniform VXC_512Bits uniInsertZeroLo_2x8;
+_viv_uniform VXC_512Bits uniInsertZeroHi_2x8;
 __kernel void upsample_padding_u8_to_s16
 (
     __read_only  image2d_t      src_image,
     __write_only image2d_t      dst_image
 )
 {
-    int2 coord = (int2)(get_global_id(0), get_global_id(1));
-    int2 coord_src = (int2)(0, 0);
-    short value;
-    uchar reg;
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(0), get_global_id(1));
 
-    if (coord.y % 2 != 0 || coord.x % 2 != 0)
-    {
-        value = 0;
-    }
-    else
-    {
-        coord_src.x = coord.x / 2;
-        coord_src.y = coord.y / 2;
-        VXC_ReadImage(reg, src_image, coord_src, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
-        value = (short)reg;
-    }
+    vxc_uchar16 src;
+    vxc_short8 src0, src1;
 
-    VXC_WriteImage(dst_image, coord, value, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(src, src_image, coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+    coord.xyzw <<= 1;
+    coord.zw += (int2)(8, 1);
+    src1 = 0;
+
+    VXC_WriteImage(dst_image, coord.xw, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_WriteImage(dst_image, coord.zw, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+    VXC_DP2x8(src0, src, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniInsertZeroLo_2x8);
+    VXC_DP2x8(src1, src, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniInsertZeroHi_2x8);
+
+    VXC_WriteImage(dst_image, coord.xy, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_WriteImage(dst_image, coord.zy, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
 
 __kernel void upsample_padding_s16_to_u8
@@ -56,24 +58,23 @@ __kernel void upsample_padding_s16_to_u8
     __write_only image2d_t      dst_image
 )
 {
-    int2 coord = (int2)(get_global_id(0), get_global_id(1));
-    int2 coord_src = (int2)(0, 0);
-    uchar value;
-    short reg;
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(0), get_global_id(1));
 
-    if (coord.y % 2 != 0 || coord.x % 2 != 0)
-    {
-        value = 0;
-    }
-    else
-    {
-        coord_src.x = coord.x / 2;
-        coord_src.y = coord.y / 2;
-        VXC_ReadImage(reg, src_image, coord_src, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
-        value = (uchar)reg;
-    }
+    vxc_short8 src0;
+    vxc_uchar16 src;
 
-    VXC_WriteImage(dst_image, coord, value, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(src0, src_image, coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+    coord.xyzw <<= 1;
+    coord.zw += (int2)(8, 1);
+    src = 0;
+
+    VXC_WriteImage(dst_image, coord.xw, src, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+
+    VXC_DP2x8(src, src0, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniInsertZeroLo_2x8);
+    VXC_DP2x8(src, src0, 0, VXC_MODIFIER(8, 15, 0, VXC_RM_TowardZero, 0), uniInsertZeroHi_2x8);
+
+    VXC_WriteImage(dst_image, coord.xy, src, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
 }
 
 __kernel void upsample_padding_s16_to_s16
@@ -82,20 +83,23 @@ __kernel void upsample_padding_s16_to_s16
     __write_only image2d_t      dst_image
 )
 {
-    int2 coord = (int2)(get_global_id(0), get_global_id(1));
-    int2 coord_src = (int2)(0, 0);
-    short value;
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(0), get_global_id(1));
 
-    if (coord.y % 2 != 0 || coord.x % 2 != 0)
-    {
-        value = 0;
-    }
-    else
-    {
-        coord_src.x = coord.x / 2;
-        coord_src.y = coord.y / 2;
-        VXC_ReadImage(value, src_image, coord_src, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
-    }
+    vxc_short8 src, src0, src1;
 
-    VXC_WriteImage(dst_image, coord, value, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(src, src_image, coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+    coord.xyzw <<= 1;
+    coord.zw += (int2)(8, 1);
+    src0 = 0;
+
+    VXC_WriteImage(dst_image, coord.xw, src0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_WriteImage(dst_image, coord.zw, src0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+    src0.s0246 = src.s0123;
+    src1.s0246 = src.s4567;
+    src1.s1357 = 0;
+
+    VXC_WriteImage(dst_image, coord.xy, src0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_WriteImage(dst_image, coord.zy, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }

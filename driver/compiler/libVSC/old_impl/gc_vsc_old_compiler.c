@@ -20,11 +20,13 @@
 #if gcdENABLE_3D
 
 /* Zone used for header/footer. */
-#define _GC_OBJ_ZONE    gcvZONE_COMPILER
+#define _GC_OBJ_ZONE    gcdZONE_COMPILER
 #define MAX_BLOCK_SIZE   0x20000     /* max block size 128 KB */
 #define MAX_BLOCK_NUM    1000
 
+#if (!VSC_LITE_BUILD)
 gctGLSLCompiler gcGLSLCompiler = gcvNULL;
+#endif
 gctCLCompiler gcCLCompiler = gcvNULL;
 
 extern gctUINT8
@@ -892,7 +894,9 @@ gcBLOCKTABLE_Destory(gcsBlockTable Tbl)
     /* free blocks */
     for (i = 0; i < Tbl->numOfBlocks; i++) {
         if (Tbl->blocks[i].data != gcvNULL)
+        {
             gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Tbl->blocks[i].data));
+        }
     }
 
     /* free the block list */
@@ -1086,6 +1090,7 @@ gcSHADER_CheckClipW(
 **      gctBOOL Enabled
 **          Pointer to enable/disable default UBO
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_SetDefaultUBO(
     IN gcSHADER Shader,
@@ -1356,6 +1361,7 @@ gcSHADER_GetCompilerVersion(
     gcmFOOTER_ARG("*CompilerVersion=0x%x", *CompilerVersion);
     return gcvSTATUS_OK;
 }
+#endif
 
 gctBOOL
 gcSHADER_IsESCompiler(
@@ -1381,6 +1387,7 @@ gcSHADER_IsOGLCompiler(
     return isOGLCompiler;
 }
 
+#if (!VSC_LITE_BUILD)
 gctBOOL
 gcSHADER_IsES11Compiler(
     IN gcSHADER Shader
@@ -1640,6 +1647,7 @@ gcSHADER_AddConstantMemorySize(
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
 }
+#endif
 
 /*******************************************************************************
 **  gcSHADER_GetConstantMemorySize
@@ -1691,6 +1699,7 @@ gcSHADER_GetConstantMemorySize(
 **      gctUINT32 PrivateMemorySize
 **          Private memory size in bytes
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_SetPrivateMemorySize(
     IN gcSHADER Shader,
@@ -1707,6 +1716,7 @@ gcSHADER_SetPrivateMemorySize(
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
 }
+#endif
 
 /*******************************************************************************
 **  gcSHADER_GetPrivateMemorySize
@@ -1752,6 +1762,7 @@ gcSHADER_GetPrivateMemorySize(
 **      gctUINT32 LocalMemorySize
 **          Local memory size in bytes
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_SetLocalMemorySize(
     IN gcSHADER Shader,
@@ -1768,6 +1779,7 @@ gcSHADER_SetLocalMemorySize(
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
 }
+#endif
 
 /*******************************************************************************
 **  gcSHADER_GetLocalMemorySize
@@ -1815,6 +1827,7 @@ gcSHADER_GetLocalMemorySize(
 **      gctUINT32 * WorkGroupSize
 **          Pointer to a variable receiving workGroupSize
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_GetWorkGroupSize(
     IN gcSHADER Shader,
@@ -1864,6 +1877,23 @@ gcSHADER_GetWorkGroupSize(
     /* Success. */
     gcmFOOTER_NO();
     return status;
+}
+
+gctINT
+gcSHADER_GetLtcCodeUniformIndex(
+    IN gcSHADER Shader,
+    IN gctUINT CodeIndex
+    )
+{
+    gctINT uniformIndex = -1;
+    gcSHADER_LIST list = gcvNULL;
+
+    if (gcSHADER_FindList(Shader, Shader->ltcCodeUniformMappingList, CodeIndex, &list))
+    {
+        uniformIndex = list->data0;
+    }
+
+    return uniformIndex;
 }
 
 /*******************************************************************************
@@ -1926,9 +1956,11 @@ gcSHADER_GetType(
     gcmFOOTER_ARG("*Type=%d", *Type);
     return gcvSTATUS_OK;
 }
+#endif
 
 static gctUINT _shaderId = 1;
 
+#if (!VSC_LITE_BUILD)
 gctUINT
 gcSHADER_NextId(void)
 {
@@ -1986,6 +2018,7 @@ gcSHADER_EndInst(
     Shader->lastInstruction++;
     return Shader->lastInstruction;
 }
+#endif
 
 /*******************************************************************************
 **  gcSHADER_Construct
@@ -2627,9 +2660,20 @@ _gcSHADER_Clean(
     /* Free Loadtime Optimization related data */
 
     /* LTC uniform index */
-    if (Shader->ltcCodeUniformIndex != gcvNULL)
+    if (Shader->ltcCodeUniformMappingList)
     {
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Shader->ltcCodeUniformIndex));
+        gcSHADER_LIST list, deleteList;
+
+        list = Shader->ltcCodeUniformMappingList;
+
+        while (list)
+        {
+            deleteList = list;
+            list = list->next;
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, deleteList));
+        }
+
+        Shader->ltcCodeUniformMappingList = gcvNULL;
     }
 
     /* LTC expressions */
@@ -2760,6 +2804,7 @@ gcSHADER_Destroy(
     return gcvSTATUS_OK;
 }
 
+#if (!VSC_LITE_BUILD)
 gctINT
 gcSHADER_GetOutputDefaultLocation(
     IN gcSHADER Shader
@@ -2778,6 +2823,7 @@ gcSHADER_GetOutputDefaultLocation(
 
     return defaultLocation;
 }
+#endif
 
 /** SHADER binary file header format: -
        Word 1:  gcmCC('S', 'H', 'D', 'R') shader binary file signature
@@ -2805,6 +2851,7 @@ static gctUINT32 _getShaderBinaryHeaderSize(gctUINT32 shaderVersion)
     }
 }
 
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_Copy(
     IN gcSHADER Shader,
@@ -3595,19 +3642,18 @@ gcSHADER_Copy(
     /* LTC expressions */
     Shader->ltcInstructionCount = Source->ltcInstructionCount;
 
+    if (Source->ltcCodeUniformMappingList)
+    {
+        gcSHADER_LIST list;
+
+        for (list = Source->ltcCodeUniformMappingList; list; list = list->next)
+        {
+            gcmONERROR(gcSHADER_InsertList(Shader, &Shader->ltcCodeUniformMappingList, list->index, list->data0, list->data1));
+        }
+    }
+
     if (Shader->ltcInstructionCount > 0)
     {
-        bytes = sizeof(*Shader->ltcCodeUniformIndex) * Shader->ltcInstructionCount;
-
-        /* Allocate memory for  ltcCodeUniformIndex inside the gcSHADER object. */
-        gcmONERROR(gcoOS_Allocate(gcvNULL,
-                                  bytes,
-                                  (gctPOINTER *) &Shader->ltcCodeUniformIndex));
-
-        /* Copy the ltcCodeUniformIndex. */
-        gcoOS_MemCopy(Shader->ltcCodeUniformIndex,
-                      Source->ltcCodeUniformIndex,
-                      bytes);
         bytes = sizeof(*Shader->ltcExpressions) * Shader->ltcInstructionCount;
         /* Allocate memory for  ltcExpressions inside the gcSHADER object. */
         gcmONERROR(gcoOS_Allocate(gcvNULL,
@@ -3693,6 +3739,7 @@ OnError:
     gcmFOOTER();
     return status;
 }
+#endif
 
 /*******************************************************************************
 **  gcSHADER_LoadHeader
@@ -3933,6 +3980,7 @@ gcSHADER_LoadHeader(
     return gcvSTATUS_OK;
 }
 
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcCopyKernel(
     IN gcSHADER Source,
@@ -4000,11 +4048,15 @@ gcCopyKernel(
     kernelBinary->_maxLocalTempRegCount = Source->_maxLocalTempRegCount;
 
 OnError:
-    if(pointer) gcmOS_SAFE_FREE(gcvNULL, pointer);
+    if(pointer)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pointer);
+    }
     *Res = kernelBinary;
     gcmFOOTER();
     return status;
 }
+#endif
 
 #define _gcd_OCL_BUFFER_MEMORY_ALIGNMENT   8
 #define _gcd_OCL_NUM_BUILTIN_ATTRIBUTES  4
@@ -4048,6 +4100,7 @@ struct _gcsBUILTIN_INDEX {
     VSC_HASH_TABLE *externVariableHT;
 };
 
+#if (!VSC_LITE_BUILD)
 static gctUINT
 _FindMaxUsedLabel(
     IN gcSHADER Shader,
@@ -4523,6 +4576,7 @@ OnError:
     gcmFOOTER();
     return status;
 }
+#endif
 
 #define _gcmEndInstruction(Shader) \
    do { \
@@ -4554,6 +4608,7 @@ OnError:
 **
 **      Nothing.
 */
+#if (!VSC_LITE_BUILD)
 static gceSTATUS
 _MergeOneKernel(
     IN gcSHADER To,
@@ -5399,6 +5454,7 @@ _UsedReservedTempReg(
     }
     return codeEnd;
 }
+#endif
 
 #if !DX_SHADER
 /*******************************************************************************
@@ -5424,6 +5480,7 @@ _UsedReservedTempReg(
 **            Pointer to a variable receiving the handle to the merged kernel
 **
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_MergeKernel(
     IN gctINT         KernelCount,
@@ -6363,7 +6420,7 @@ OnError:
     return status;
 }
 #endif
-
+#endif
 
 typedef struct _MappingInfo
 {
@@ -6382,6 +6439,7 @@ _MappingInfo;
  * to the table; otherwise, it must use some unseen variable (most
  * likely the global variable), mapping the global variable.
  */
+#if (!VSC_LITE_BUILD)
 static void
 _fixTempIndexByMappingTable(
     IN     _MappingInfo *   MI,
@@ -7476,6 +7534,7 @@ OnError:
     gcmFOOTER_ARG("*MergedKernel=0x%x", mergedKernel);
     return status;
 }
+#endif
 
 
 /* go through the kernel function body to mark any kernel function be
@@ -7523,6 +7582,7 @@ _markUsedKernelFunction(gcKERNEL_FUNCTION KernelFunction)
 **      nothing
 **
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_LoadKernel(
     IN gcSHADER Shader,
@@ -7828,8 +7888,9 @@ gcSHADER_Load(
     gctUINT32           shaderVersion;
 #if gcdUSE_WCLIP_PATCH
     gctUINT16           wclipListCount = 0;
-    struct _gcBINARY_LIST   binaryList;
 #endif
+    gctUINT16 ltcUniformMappingCount = 0;
+    struct _gcBINARY_LIST   binaryList;
     gctUINT32           allocBytes;
     gctINT32            hasNotStagesRelatedLinkError = 0;
     gcBINARY_TFBVarying binaryTfbVarying;
@@ -10129,38 +10190,28 @@ gcSHADER_Load(
         /*Shader->ltcInstructionCount = *(gctUINT *) curPos;*/
         gcoOS_MemCopy(&Shader->ltcInstructionCount, curPos, sizeof(gctUINT));
 
-        curPos += sizeof(Shader->ltcInstructionCount); /* points to ltcCodeUniformIndex */
+        curPos += sizeof(Shader->ltcInstructionCount); /* points to the next element */
         bytes -= sizeof(Shader->ltcInstructionCount);  /* remaining bytes */
-        binarySize = sizeof(*Shader->ltcCodeUniformIndex) * Shader->ltcInstructionCount;
 
-        if (binarySize > 0)
+        binarySize = sizeof(gctUINT16);
+        gcoOS_MemCopy(&ltcUniformMappingCount, curPos, sizeof(gctUINT16));
+        curPos += binarySize;
+        bytes -= binarySize;
+        while (ltcUniformMappingCount > 0)
         {
-            /* Allocate memory for  ltcCodeUniformIndex inside the gcSHADER object. */
-            status = gcoOS_Allocate(gcvNULL,
-                                   binarySize,
-                                   &pointer);
+            gctINT index, data0, data1;
+            gcoOS_MemCopy(&binaryList, curPos, sizeof(binaryList));
+            gcoOS_MemCopy(&index, (gctPOINTER)&binaryList.index, gcmSIZEOF(gctINT));
+            gcoOS_MemCopy(&data0, (gctPOINTER)&binaryList.data0, gcmSIZEOF(gctINT));
+            gcoOS_MemCopy(&data1, (gctPOINTER)&binaryList.data1, gcmSIZEOF(gctINT));
 
-            if (gcmIS_ERROR(status))
-            {
-                /* Roll back. */
-                Shader->ltcUniformCount = 0;
+            gcSHADER_InsertList(Shader, &Shader->ltcCodeUniformMappingList, index, data0, data1);
 
-                /* Error. */
-                gcmFATAL("gcSHADER_Load: gcoOS_Allocate failed status=%d(%s)", status, gcoOS_DebugStatus2Name(status));
-                gcmFOOTER();
-                return status;
-            }
-
-            gcoOS_MemCopy(pointer, curPos, binarySize);
-            Shader->ltcCodeUniformIndex = (gctINT *)pointer;
-        }
-        else
-        {
-            Shader->ltcCodeUniformIndex = gcvNULL;
+            curPos += gcmSIZEOF(struct _gcBINARY_LIST);
+            bytes  -= gcmSIZEOF(struct _gcBINARY_LIST);
+            ltcUniformMappingCount--;
         }
 
-        curPos += binarySize;                           /* points to ltcExpressions */
-        bytes -= binarySize;                            /* remaining bytes */
         binarySize = sizeof(*Shader->ltcExpressions) * Shader->ltcInstructionCount;
         if (binarySize > 0)
         {
@@ -10195,7 +10246,7 @@ gcSHADER_Load(
         Shader->ltcExpressions = gcvNULL;
         Shader->ltcUniformBegin = 0;
         Shader->ltcInstructionCount = 0;
-        Shader->ltcCodeUniformIndex = gcvNULL;
+        Shader->ltcCodeUniformMappingList = gcvNULL;
     }/* if */
 
     /* Source code string */
@@ -10384,8 +10435,9 @@ gcSHADER_Save(
 
 #if gcdUSE_WCLIP_PATCH
     gctUINT32   wclipListCount1 = 0, wclipListCount2 = 0;
-    gcSHADER_LIST list = gcvNULL;
 #endif
+    gctUINT16 ltcUniformMappingCount = 0;
+    gcSHADER_LIST list;
 
     gcmHEADER_ARG("Shader=0x%x Buffer=0x%x BufferSize=0x%x", Shader, Buffer, BufferSize);
 
@@ -10700,9 +10752,22 @@ gcSHADER_Save(
 
     bytes += sizeof(Shader->ltcUniformCount) +
              sizeof(Shader->ltcUniformBegin) +
-             sizeof(*Shader->ltcCodeUniformIndex) * Shader->ltcInstructionCount +
              sizeof(Shader->ltcInstructionCount) +
              sizeof(*Shader->ltcExpressions) * Shader->ltcInstructionCount;
+
+    /* LTC mapping list. */
+    bytes += gcmSIZEOF(gctUINT16);
+    if (Shader->ltcCodeUniformMappingList != gcvNULL)
+    {
+        list = Shader->ltcCodeUniformMappingList;
+
+        while (list)
+        {
+            ltcUniformMappingCount++;
+            list = list->next;
+            bytes += gcmSIZEOF(struct _gcBINARY_LIST);
+        }
+    }
 
     /* Source code string */
     bytes += sizeof(Shader->sourceLength) + Shader->sourceLength;
@@ -11525,9 +11590,28 @@ gcSHADER_Save(
     gcoOS_MemCopy(buffer, &Shader->ltcInstructionCount, sizeof(Shader->ltcInstructionCount));
     buffer += sizeof(Shader->ltcInstructionCount);
 
-    bytes = sizeof(*Shader->ltcCodeUniformIndex) * Shader->ltcInstructionCount;
-    if (bytes > 0) gcoOS_MemCopy(buffer, Shader->ltcCodeUniformIndex, bytes);
-    buffer += bytes;
+    /* ltc uniform mapping list. */
+    gcoOS_MemCopy(buffer, &ltcUniformMappingCount, sizeof(gctUINT16));
+    buffer += gcmSIZEOF(gctUINT16);
+    if (ltcUniformMappingCount > 0)
+    {
+        list = Shader->ltcCodeUniformMappingList;
+
+        while (list)
+        {
+            struct _gcBINARY_LIST binary_list;
+
+            gcoOS_MemCopy((gctPOINTER)&binary_list.index, (gctPOINTER)&list->index, sizeof(list->index));
+            gcoOS_MemCopy((gctPOINTER)&binary_list.data0, (gctPOINTER)&list->data0, sizeof(list->data0));
+            gcoOS_MemCopy((gctPOINTER)&binary_list.data1, (gctPOINTER)&list->data1, sizeof(list->data1));
+
+            gcoOS_MemCopy(buffer, &binary_list, sizeof(binary_list));
+
+            list = list->next;
+
+            buffer += gcmSIZEOF(struct _gcBINARY_LIST);
+        }
+    }
 
     /* LTC expressions */
     bytes = sizeof(*Shader->ltcExpressions) * Shader->ltcInstructionCount;
@@ -11609,6 +11693,7 @@ gcSHADER_Save(
     gcmFOOTER_ARG("*BufferSize=%lu", *BufferSize);
     return gcvSTATUS_OK;
 }
+#endif
 
 /*******************************************************************************
 **  gcSHADER_LoadEx
@@ -11798,6 +11883,8 @@ gcSHADER_LoadEx(
     gcBINARY_IMAGE_SAMPLER binaryImageSampler;
     gcsIMAGE_SAMPLER_PTR imageSampler;
     gctINT_PTR binaryPropertyValue;
+    gctUINT16 ltcUniformMappingCount = 0;
+    struct _gcBINARY_LIST   binaryList;
 
     gcSL_INSTRUCTION code;
     gctUINT8 *       curPos;
@@ -14424,7 +14511,7 @@ gcSHADER_LoadEx(
         Shader->constantMemoryBuffer = pointer;
         pointer = (gctUINT16 *) (constantMemorySize + 1);
         gcoOS_MemCopy(Shader->constantMemoryBuffer, pointer, Shader->constantMemorySize);
-        constantMemorySize = (gctUINT16 *) ((gctUINTPTR_T) constantMemorySize + gcmALIGN(Shader->constantMemorySize, 2));
+        constantMemorySize = (gctUINT16 *) ((gctUINTPTR_T) constantMemorySize + (gctUINT)gcmALIGN(Shader->constantMemorySize, 2));
         bytes -= gcmALIGN(Shader->constantMemorySize, 2);
     }
 
@@ -14563,38 +14650,28 @@ gcSHADER_LoadEx(
         /*Shader->ltcInstructionCount = *(gctUINT *) curPos;*/
         gcoOS_MemCopy(&Shader->ltcInstructionCount, curPos, sizeof(gctUINT));
 
-        curPos += sizeof(Shader->ltcInstructionCount); /* points to ltcCodeUniformIndex */
+        curPos += sizeof(Shader->ltcInstructionCount); /* points to next element */
         bytes -= sizeof(Shader->ltcInstructionCount);  /* remaining bytes */
-        binarySize = sizeof(*Shader->ltcCodeUniformIndex) * Shader->ltcInstructionCount;
 
-        if (binarySize > 0)
+        binarySize = sizeof(gctUINT16);
+        gcoOS_MemCopy(&ltcUniformMappingCount, curPos, sizeof(gctUINT16));
+        curPos += binarySize;
+        bytes -= binarySize;
+        while (ltcUniformMappingCount > 0)
         {
-            /* Allocate memory for  ltcCodeUniformIndex inside the gcSHADER object. */
-            status = gcoOS_Allocate(gcvNULL,
-                                   binarySize,
-                                   &pointer);
+            gctINT index, data0, data1;
+            gcoOS_MemCopy(&binaryList, curPos, sizeof(binaryList));
+            gcoOS_MemCopy(&index, (gctPOINTER)&binaryList.index, gcmSIZEOF(gctINT));
+            gcoOS_MemCopy(&data0, (gctPOINTER)&binaryList.data0, gcmSIZEOF(gctINT));
+            gcoOS_MemCopy(&data1, (gctPOINTER)&binaryList.data1, gcmSIZEOF(gctINT));
 
-            if (gcmIS_ERROR(status))
-            {
-                /* Roll back. */
-                Shader->ltcUniformCount = 0;
+            gcSHADER_InsertList(Shader, &Shader->ltcCodeUniformMappingList, index, data0, data1);
 
-                /* Error. */
-                gcmFATAL("gcSHADER_LoadEx: gcoOS_Allocate failed status=%d(%s)", status, gcoOS_DebugStatus2Name(status));
-                gcmFOOTER();
-                return status;
-            }
-
-            gcoOS_MemCopy(pointer, curPos, binarySize);
-            Shader->ltcCodeUniformIndex = (gctINT *)pointer;
-        }
-        else
-        {
-            Shader->ltcCodeUniformIndex = gcvNULL;
+            curPos += gcmSIZEOF(struct _gcBINARY_LIST);
+            bytes  -= gcmSIZEOF(struct _gcBINARY_LIST);
+            ltcUniformMappingCount--;
         }
 
-        curPos += binarySize;                           /* points to ltcExpressions */
-        bytes -= binarySize;                            /* remaining bytes */
         binarySize = sizeof(*Shader->ltcExpressions) * Shader->ltcInstructionCount;
         if (binarySize > 0)
         {
@@ -14625,7 +14702,7 @@ gcSHADER_LoadEx(
         Shader->ltcExpressions = gcvNULL;
         Shader->ltcUniformBegin = 0;
         Shader->ltcInstructionCount = 0;
-        Shader->ltcCodeUniformIndex = gcvNULL;
+        Shader->ltcCodeUniformMappingList = gcvNULL;
     } /* if */
 
     if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_CL12_VERSION)
@@ -14679,6 +14756,55 @@ gcSHADER_LoadEx(
             binarySize = gcmALIGN(Shader->typeNameBufferSize, 2);
             curPos += binarySize;
         }
+    }
+
+    /* Source code string */
+    {
+        /* curPos points to sourceLength */
+        bytes -= binarySize;                            /* remaining bytes */
+        /*Shader->sourceLength = *(gctUINT *)curPos;*/
+        gcoOS_MemCopy(&Shader->sourceLength, curPos, sizeof(Shader->sourceLength));
+        curPos += sizeof(Shader->sourceLength);
+        bytes  -= sizeof(Shader->sourceLength);         /* remaining bytes */
+
+        binarySize = Shader->sourceLength;              /* the NULL terminated string length */
+
+        if (binarySize > 0)
+        {
+            gctUINT    i;
+
+            /* Allocate memory for  ltcExpressions inside the gcSHADER object. */
+            status = gcoOS_Allocate(gcvNULL,
+                                   binarySize,
+                                   &pointer);
+
+            if (gcmIS_ERROR(status))
+            {
+                /* Roll back. */
+                Shader->sourceLength = 0;
+
+                /* Error. */
+                gcmFATAL("gcSHADER_LoadEx: gcoOS_Allocate failed status=%d(%s)", status, gcoOS_DebugStatus2Name(status));
+                gcmFOOTER();
+                return status;
+            }
+
+            gcoOS_MemCopy(pointer, curPos, binarySize);
+            Shader->source = (gctSTRING)pointer;
+            /* decode source string */
+            for (i = 0; i < binarySize; i++)
+            {
+                Shader->source[i] ^= SOURCE_ENCODE_CHAR;
+            }
+        }
+        else
+        {
+            Shader->source = gcvNULL;
+            Shader->sourceLength = 0;
+        }
+
+        /* curPos point to the next item. */
+        curPos += binarySize;
     }
 
     /* For debugInfo, at least have a gctBOOL */
@@ -14781,6 +14907,8 @@ gcSHADER_SaveEx(
     gctUINT32 variableCount = 0;
     gctUINT32 functionCount = 0;
     gctUINT32 kernelFunctionCount = 0;
+    gctUINT16 ltcUniformMappingCount = 0;
+    gcSHADER_LIST list;
     gctPOINTER ptr;
     gctBOOL   bHasLoadKernel = gcShaderHasLoadedKernel(Shader);
 
@@ -15087,15 +15215,36 @@ gcSHADER_SaveEx(
     /* Loadtime Optimization related data */
     bytes += sizeof(Shader->ltcUniformCount) +
              sizeof(Shader->ltcUniformBegin) +
-             sizeof(*Shader->ltcCodeUniformIndex) * Shader->ltcInstructionCount +
              sizeof(Shader->ltcInstructionCount) +
              sizeof(*Shader->ltcExpressions) * Shader->ltcInstructionCount;
+
+    /* LTC mapping list. */
+    bytes += gcmSIZEOF(gctUINT16);
+    if (Shader->ltcCodeUniformMappingList != gcvNULL)
+    {
+        list = Shader->ltcCodeUniformMappingList;
+
+        while (list)
+        {
+            ltcUniformMappingCount++;
+            list = list->next;
+            bytes += gcmSIZEOF(struct _gcBINARY_LIST);
+        }
+    }
 
     /* Type name buffer size. */
     bytes += sizeof(gctUINT);
 
     /* Type name buffer. */
     bytes += gcmALIGN(Shader->typeNameBufferSize, 2);
+
+    /* Source string */
+    bytes += sizeof(Shader->sourceLength);
+    if (Shader->debugInfo)
+    {
+        /* Source code string */
+        bytes += Shader->sourceLength;
+    }
 
     /* For debugInfo */
     vscDISaveDebugInfo((VSC_DIContext * )(Shader->debugInfo), gcvNULL, &bytes);
@@ -16020,9 +16169,28 @@ gcSHADER_SaveEx(
     gcoOS_MemCopy(buffer, &Shader->ltcInstructionCount, sizeof(gctUINT));
     buffer += sizeof(Shader->ltcInstructionCount);
 
-    bytes = sizeof(*Shader->ltcCodeUniformIndex) * Shader->ltcInstructionCount;
-    if (bytes > 0) gcoOS_MemCopy(buffer, Shader->ltcCodeUniformIndex, bytes);
-    buffer += bytes;
+    /* ltc uniform mapping list. */
+    gcoOS_MemCopy(buffer, &ltcUniformMappingCount, sizeof(gctUINT16));
+    buffer += gcmSIZEOF(gctUINT16);
+    if (ltcUniformMappingCount > 0)
+    {
+        list = Shader->ltcCodeUniformMappingList;
+
+        while (list)
+        {
+            struct _gcBINARY_LIST binary_list;
+
+            gcoOS_MemCopy((gctPOINTER)&binary_list.index, (gctPOINTER)&list->index, sizeof(list->index));
+            gcoOS_MemCopy((gctPOINTER)&binary_list.data0, (gctPOINTER)&list->data0, sizeof(list->data0));
+            gcoOS_MemCopy((gctPOINTER)&binary_list.data1, (gctPOINTER)&list->data1, sizeof(list->data1));
+
+            gcoOS_MemCopy(buffer, &binary_list, sizeof(binary_list));
+
+            list = list->next;
+
+            buffer += gcmSIZEOF(struct _gcBINARY_LIST);
+        }
+    }
 
     bytes = sizeof(*Shader->ltcExpressions) * Shader->ltcInstructionCount;
     if (bytes > 0) gcoOS_MemCopy(buffer, Shader->ltcExpressions, bytes);
@@ -16038,6 +16206,25 @@ gcSHADER_SaveEx(
         gcoOS_MemCopy(buffer, Shader->typeNameBuffer, Shader->typeNameBufferSize);
         buffer += gcmALIGN(Shader->typeNameBufferSize, 2);
     }
+
+    /* Source code string */
+    gcoOS_MemCopy(buffer, &Shader->sourceLength, sizeof(Shader->sourceLength));
+    buffer += sizeof(Shader->sourceLength);
+    if (Shader->debugInfo)
+    {
+        bytes = Shader->sourceLength;
+        if (bytes > 0)
+        {
+            gctUINT i;
+            gcoOS_MemCopy(buffer, Shader->source, bytes);
+            /* encode source string */
+            for (i = 0; i < bytes; i++)
+            {
+                buffer[i] ^= SOURCE_ENCODE_CHAR;
+            }
+        }
+    }
+    buffer += bytes;
 
     ptr = (gctPOINTER) buffer;
     vscDISaveDebugInfo((VSC_DIContext * )(Shader->debugInfo), &ptr, gcvNULL);
@@ -16063,6 +16250,7 @@ gcSHADER_SaveEx(
 **      gctUINT32 Length
 **          Array length of the location to add.  'Length' must be at least 1.
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_AddInputLocation(
     IN gcSHADER Shader,
@@ -16086,7 +16274,7 @@ gcSHADER_AddInputLocation(
 
         /* Allocate a new array of object pointers. */
         status = gcoOS_Allocate(gcvNULL,
-                                gcmSIZEOF(gcATTRIBUTE) * (Shader->inputLocationCount + Length + 9),
+                                gcmSIZEOF(gctINT) * (Shader->inputLocationCount + Length + 9),
                                 &pointer);
 
         if (gcmIS_ERROR(status))
@@ -16096,15 +16284,15 @@ gcSHADER_AddInputLocation(
             return status;
         }
 
-        locations = pointer;
+        locations = (gctINT *)pointer;
 
         if (Shader->inputLocations != gcvNULL)
         {
+            gcmASSERT(Shader->inputLocationCount != 0);
             /* Copy the current object pointers. */
             gcoOS_MemCopy(locations,
                           Shader->inputLocations,
-                          gcmSIZEOF(locations)
-                          * Shader->inputLocationCount);
+                          gcmSIZEOF(gctINT) * Shader->inputLocationCount);
 
             /* Free the current array of locations. */
             gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Shader->inputLocations));
@@ -16170,7 +16358,7 @@ gcSHADER_AddOutputLocation(
 
         /* Allocate a new array of object pointers. */
         status = gcoOS_Allocate(gcvNULL,
-                                gcmSIZEOF(gcATTRIBUTE) * (Shader->outputLocationCount + Length + 9),
+                                gcmSIZEOF(gctINT) * (Shader->outputLocationCount + Length + 9),
                                 &pointer);
 
         if (gcmIS_ERROR(status))
@@ -16180,15 +16368,15 @@ gcSHADER_AddOutputLocation(
             return status;
         }
 
-        locations = pointer;
+        locations = (gctINT *)pointer;
 
         if (Shader->outputLocations != gcvNULL)
         {
+            gcmASSERT(Shader->outputLocationCount != 0);
             /* Copy the current object pointers. */
             gcoOS_MemCopy(locations,
                           Shader->outputLocations,
-                          gcmSIZEOF(locations)
-                          * Shader->outputLocationCount);
+                          gcmSIZEOF(gctINT) * Shader->outputLocationCount);
 
             /* Free the current array of locations. */
             gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Shader->outputLocations));
@@ -16309,6 +16497,7 @@ gcSHADER_GetLocation(
     gcmFOOTER_ARG("*Location=%d", *Location);
     return gcvSTATUS_OK;
 }
+#endif
 
 /*******************************************************************************
 **  gcSHADER_GetBuiltinNameKind
@@ -16706,6 +16895,7 @@ OnError:
 **      gctUINT32 Count
 **          Array count to reallocate.  'Count' must be at least 1.
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_ReallocateAttributes(
     IN gcSHADER Shader,
@@ -17091,6 +17281,7 @@ gcSHADER_GetVertexInstIdInputIndex(
     gcmFOOTER_ARG("VertexInstIdInputIndex=%d", inputIndex);
     return inputIndex;
 }
+#endif
 
 /*******************************************************************************
 **  gcSHADER_GetAttributeCount
@@ -17127,6 +17318,7 @@ gcSHADER_GetAttributeCount(
     return gcvSTATUS_OK;
 }
 
+#if (!VSC_LITE_BUILD)
 static gceSTATUS
 _convertVariableToAttribute(
     IN gcSHADER         Shader,
@@ -17406,6 +17598,7 @@ gcSHADER_GetAttributeByName(
     gcmFOOTER_ARG("*Attribute=0x%x", *Attribute);
     return gcvSTATUS_OK;
 }
+#endif
 
 /*******************************************************************************
 **  gcSHADER_ReallocateUniforms
@@ -17487,6 +17680,7 @@ gcSHADER_ReallocateUniforms(
  * if found, return it in *Uniform
  * otherwise add the uniform to shader
  */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_FindAddUniform(
     IN gcSHADER Shader,
@@ -18740,6 +18934,7 @@ gcSHADER_AddStorageBlock(
     /* Success. */
     return gcvSTATUS_OK;
 }
+#endif
 
 /*******************************************************************************
 **  gcSHADER_ReallocateIoBlocks
@@ -18844,6 +19039,7 @@ gcSHADER_ReallocateIoBlocks(
 **            Pointer to a variable receiving the gcsIO_BLOCK object pointer.
 **
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_AddIoBlock(
     IN gcSHADER Shader,
@@ -19138,6 +19334,7 @@ gcSHADER_GetUniformVectorCountUsedInShader(
 
     return gcvSTATUS_OK;
 }
+#endif
 
 /*******************************************************************************
 **  gcSHADER_GetUniformCount
@@ -19196,6 +19393,7 @@ gcSHADER_GetUniformCount(
 **        gctUINT32 * Count
 **            Pointer to a variable receiving the number of samplers.
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_GetSamplerCount(
     IN gcSHADER Shader,
@@ -19635,6 +19833,7 @@ gcSHADER_GetUniformBlockUniformCount(
     gcmFOOTER_ARG("*Count=%lu", *Count);
     return gcvSTATUS_OK;
 }
+#endif
 
 static void
 _gcSHADER_UpdateStorageBlockVariableCount(
@@ -19853,6 +20052,7 @@ _gcSHADER_InitializeStorageBlockVariableInfo(
 **      gctUINT32 * Count
 **          Pointer to a variable receiving the number of variables in block.
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_GetIoBlockVariableCount(
     IN gcSHADER Shader,
@@ -19880,6 +20080,7 @@ gcSHADER_GetIoBlockVariableCount(
     gcmFOOTER_ARG("*Count=%lu", *Count);
     return gcvSTATUS_OK;
 }
+#endif
 
 /*******************************************************************************
 **  gcSHADER_GetStorageBlockVariableCount
@@ -19966,6 +20167,7 @@ gcSHADER_GetStorageBlockVariableCount(
 **          Top level array stride to be used on non top level variable
 **
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_SetStorageBlockTopLevelMemberArrayInfo(
     IN gcSHADER Shader,
@@ -20056,6 +20258,7 @@ gcSHADER_SetStorageBlockTopLevelMemberArrayInfo(
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
 }
+#endif
 
 /*******************************************************************************
 **  gcSHADER_GetStorageBlockVariable
@@ -20223,6 +20426,7 @@ gcSHADER_GetStorageBlock(
 **      gcVARIABLE * Variable
 **          Pointer to a variable receiving the gcVARIABLE object pointer.
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_GetIoBlockVariable(
     IN gcSHADER Shader,
@@ -20514,6 +20718,7 @@ gcSHADER_GetFunctionByHeadIndex(
     gcmFOOTER_ARG("*Function=0x%x", *Function);
     return status;
 }
+#endif
 
 /*******************************************************************************
 **  gcSHADER_GetKernelFunctionByHeadIndex
@@ -20865,6 +21070,7 @@ gcSHADER_GetUniformByName(
 **        gcUNIFORM * Uniform
 **            Pointer to a variable receiving the gcUNIFORM object pointer.
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_GetUniformByPhysicalAddress(
     IN gcSHADER Shader,
@@ -20905,6 +21111,7 @@ gcSHADER_GetUniformByPhysicalAddress(
     return gcvSTATUS_OK;
 }
 
+#endif
 
 /*******************************************************************************
 **                             gcSHADER_ComputeUniformPhysicalAddress
@@ -21040,6 +21247,7 @@ gcSHADER_GetUniformBlock(
 **      gcUNIFORM * Uniform
 **          Pointer to a variable receiving the gcUNIFORM object pointer.
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_GetUniformBlockUniform(
     IN gcSHADER Shader,
@@ -21777,6 +21985,7 @@ gcSHADER_AddOutputIndexed(
     gcmFOOTER_ARG("status=%d", gcvSTATUS_NAME_MISMATCH);
     return gcvSTATUS_NAME_MISMATCH;
 }
+#endif
 
 /*******************************************************************************
 **  gcOUTPUT_SetType
@@ -21828,6 +22037,7 @@ gcOUTPUT_SetType(
 **      gctUINT32 * Count
 **          Pointer to a variable receiving the number of outputs.
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_GetOutputCount(
     IN gcSHADER Shader,
@@ -22043,6 +22253,7 @@ gcSHADER_GetOutputIndexByOutput(
     gcmFOOTER_ARG("*Output=0x%x", *Output);
     return gcvSTATUS_OK;
 }
+#endif
 
 /*******************************************************************************
 **  gcSHADER_ReallocateVariables
@@ -22147,6 +22358,7 @@ gcSHADER_ReallocateVariables(
 **
 **      Nothing.
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_AddVariable(
     IN gcSHADER Shader,
@@ -22893,6 +23105,7 @@ gcSHADER_GetVariableCount(
     gcmFOOTER_ARG("*Count=%lu", *Count);
     return gcvSTATUS_OK;
 }
+#endif
 
 /*******************************************************************************
 **  gcSHADER_GetVariable
@@ -22934,6 +23147,7 @@ gcSHADER_GetVariable(
     return gcvSTATUS_OK;
 }
 
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_GetVariableByName(
     IN gcSHADER Shader,
@@ -26991,6 +27205,7 @@ gcSHADER_ExpandArraysOfArrays(
 
     return gcvSTATUS_OK;
 }
+#endif
 
 gctUINT
 gcSHADER_GetFunctionByCodeId(
@@ -27062,6 +27277,7 @@ gcSHADER_GetFunctionByFuncHead(
     return (gctUINT)-1;
 }
 
+#if (!VSC_LITE_BUILD)
 void
 gcSHADER_SetDebugInfo(
     IN gcSHADER             Shader,
@@ -27070,6 +27286,7 @@ gcSHADER_SetDebugInfo(
 {
     Shader->debugInfo = DebugInfoContext;
 }
+#endif
 
 gctPOINTER
 gcSHADER_GetDebugInfo(
@@ -27082,6 +27299,7 @@ gcSHADER_GetDebugInfo(
     return NULL;
 }
 
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_SetAttrLocationByDriver(
     IN gcSHADER             Shader,
@@ -27413,6 +27631,7 @@ gcSHADER_AnalyzeFunctions(
     gcmFOOTER_NO();
     return status;
 }
+#endif
 
 static gctBOOL
 ReadSource(
@@ -27759,6 +27978,7 @@ gcGetVIRCGKind(
     return virCGKind;
 }
 
+#if (!VSC_LITE_BUILD)
 gctBOOL
 gcUseFullNewLinker(
     IN gctBOOL              HasHalti2
@@ -27768,6 +27988,7 @@ gcUseFullNewLinker(
 
     return (virCGKind == VIRCG_FULL);
 }
+#endif
 
 void
 gcGetOptionFromEnv(
@@ -28994,6 +29215,30 @@ gcGetOptionFromEnv(
                 }
             }
 
+             /* CLC use new preprocessor:
+              *
+              *   VC_OPTION=-USECLNEWPP:0|1
+              *
+              */
+            gcoOS_StrStr(p, "-USECLNEWPP:", &pos);
+            if (pos)
+            {
+                gctINT value=-1;
+                pos += sizeof("-USECLNEWPP:") -1;
+                gcoOS_StrToInt(pos, &value);
+
+                if (value == 0)
+                {
+                    /* CLC use llvm preprocessor */
+                    Option->UseCLNewPP = gcvFALSE;
+                }
+                else if (value == 1)
+                {
+                    /* CLC use new preprocessor */
+                    Option->UseCLNewPP = gcvTRUE;
+                }
+            }
+
              /* Create default Uniform Block Object to encapsulate uniforms
               * This is done to enable the use of load instruction to get
               * the uniforms from memory
@@ -29163,6 +29408,7 @@ gcGetOptionFromEnv(
     return;
 } /* gcGetOptionFromEnv */
 
+#if (!VSC_LITE_BUILD)
 void gcOPT_SetFeature(gctUINT FBit)
 {
     gcmOPT_SetFeature(FBit);
@@ -29172,6 +29418,7 @@ void gcOPT_ResetFeature(gctUINT FBit)
 {
     gcmOPT_ResetFeature(FBit);
 }
+#endif
 
 /* convert the compiler flag to optimizer option:
  *  the ES1.1 driver calls gcLinkShader() without setting
@@ -29181,6 +29428,7 @@ void gcOPT_ResetFeature(gctUINT FBit)
  *
  *
  */
+#if (!VSC_LITE_BUILD)
 void
 gcSetOptimizerOption(
     IN gceSHADER_FLAGS Flags
@@ -29256,6 +29504,7 @@ gcGetDualFP16Mode(
 
     return dual16Mode;
 }
+#endif
 
 gcOPTIMIZER_OPTION *
 gcGetOptimizerOption(void)
@@ -29281,7 +29530,7 @@ gctBOOL gcDebugZoneLevelEnabled(
     gctUINT32 curDebugZone;
     gcoOS_GetDebugLevel(&curDebugLevel);
     gcoOS_GetDebugZone(Zone, &curDebugZone);
-    if ((Level > curDebugLevel) ||  !(curDebugZone & Zone & gcdZONE_MASK))
+    if ((Level > curDebugLevel) ||  !(curDebugZone & Zone & gcdZONE_ALL))
     {
       return gcvFALSE;
     }
@@ -29319,6 +29568,7 @@ gctBOOL gcDumpMachineCode(void)
 **
 **      Nothing.
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_SetOptimizationOption(
     IN gcSHADER Shader,
@@ -29540,6 +29790,7 @@ gcATTRIBUTE_GetPrecision(
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
 }
+#endif
 
 /*******************************************************************************
 **  _PredefinedName
@@ -29834,6 +30085,7 @@ gcATTRIBUTE_GetName(
 **          Pointer to a variable receiving the pointer to the name of the
 **          attribute.  'Name' can be gcvNULL in which case no name is returned.
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcATTRIBUTE_GetNameEx(
     IN gcSHADER Shader,
@@ -29913,6 +30165,7 @@ OnError:
     gcmFOOTER_NO();
     return status;
 }
+#endif
 
 /*******************************************************************************
 **  gcATTRIBUTE_IsEnabled
@@ -30264,6 +30517,7 @@ gcUNIFORM_SetFlags(
 **            Nothing.
 **
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcOUTPUT_SetLayoutQualifier(
     IN gcOUTPUT Output,
@@ -30322,6 +30576,7 @@ gcOUTPUT_GetLayoutQualifier(
     /* Success. */
     return gcvSTATUS_OK;
 }
+#endif
 
 /*******************************************************************************
 **  gcUNIFORM_GetName
@@ -30604,6 +30859,7 @@ gcUNIFORM_SetFormat(
 **
 **        Nothing.
 */
+#if (!VSC_LITE_BUILD)
 gctUINT
 gcUNIFORM_GetModelViewProjMatrix(
     IN gcUNIFORM Uniform
@@ -30619,6 +30875,7 @@ gcUNIFORM_GetModelViewProjMatrix(
     return 0;
 #endif
 }
+#endif
 
 #if !MIN_COMPILER
 /*******************************************************************************
@@ -30663,14 +30920,19 @@ gcUNIFORM_SetValue(
     gcTYPE_GetTypeInfo(Uniform->u.type, &columns, &rows, 0);
     rows *= gcmMIN((gctINT) Count, Uniform->arraySize);
 
-    /* Program the uniform. */
-    status = gcoSHADER_ProgramUniform(gcvNULL,
-                                      Uniform->address,
-                                      columns, rows,
-                                      (gctPOINTER) Value,
-                                      gcvFALSE,
-                                      gcvFALSE,
-                                      Uniform->shaderKind);
+    /* Bind the uniform. */
+    status = gcoSHADER_BindUniform(gcvNULL,
+                                   Uniform->address,
+                                   GetUniformPhysical(Uniform),
+                                   columns,
+                                   rows,
+                                   1,
+                                   gcvFALSE,
+                                   columns * 4,
+                                   4,
+                                   (gctPOINTER) Value,
+                                   gcvFALSE,
+                                   Uniform->shaderKind);
 
     gcmFOOTER();
     return status;
@@ -30679,6 +30941,7 @@ gcUNIFORM_SetValue(
 #endif
 }
 
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcUNIFORM_SetValue_Ex(
     IN gcUNIFORM Uniform,
@@ -30711,14 +30974,35 @@ gcUNIFORM_SetValue_Ex(
                                                &physicalAddress);
     }
 
-    /* Program the uniform. */
-    status = gcoSHADER_ProgramUniform(gcvNULL,
-                                      physicalAddress,
-                                      columns, rows,
-                                      (gctPOINTER) Value,
-                                      gcvFALSE,
-                                      gcvFALSE,
-                                      Uniform->shaderKind);
+    if (gcHWCaps.hwFeatureFlags.smallBatch &&
+        Hints->unifiedStatus.constCount != 0 &&
+        Hints->unifiedStatus.constantUnifiedMode != gcvUNIFORM_ALLOC_NONE_UNIFIED)
+    {
+        /* Bind the uniform. */
+        status = gcoSHADER_BindUniform(gcvNULL,
+                                       physicalAddress,
+                                       GetUniformPhysical(Uniform),
+                                       columns,
+                                       rows,
+                                       1,
+                                       gcvFALSE,
+                                       columns * 4,
+                                       4,
+                                       (gctPOINTER) Value,
+                                       gcvFALSE,
+                                       Uniform->shaderKind);
+    }
+    else
+    {
+        /* Program the uniform. */
+        status = gcoSHADER_ProgramUniform(gcvNULL,
+                                          physicalAddress,
+                                          columns, rows,
+                                          (gctPOINTER) Value,
+                                          gcvFALSE,
+                                          gcvFALSE,
+                                          Uniform->shaderKind);
+    }
 
     gcmFOOTER();
     return status;
@@ -30726,6 +31010,7 @@ gcUNIFORM_SetValue_Ex(
     return gcvSTATUS_OK;
 #endif
 }
+#endif
 
 /*******************************************************************************
 **  gcUNIFORM_SetValueF
@@ -30770,14 +31055,19 @@ gcUNIFORM_SetValueF(
     gcTYPE_GetTypeInfo(Uniform->u.type, &columns, &rows, 0);
     rows *= gcmMIN((gctINT) Count, Uniform->arraySize);
 
-    /* Program the uniform. */
-    status = gcoSHADER_ProgramUniform(gcvNULL,
-                                      Uniform->address,
-                                      columns, rows,
-                                      (gctPOINTER) Value,
-                                      gcvFALSE,
-                                      gcvFALSE,
-                                      Uniform->shaderKind);
+    /* Bind the uniform. */
+    status = gcoSHADER_BindUniform(gcvNULL,
+                                   Uniform->address,
+                                   GetUniformPhysical(Uniform),
+                                   columns,
+                                   rows,
+                                   1,
+                                   gcvFALSE,
+                                   columns * 4,
+                                   4,
+                                   (gctPOINTER) Value,
+                                   gcvFALSE,
+                                   Uniform->shaderKind);
 
     gcmFOOTER();
     return status;
@@ -30786,6 +31076,7 @@ gcUNIFORM_SetValueF(
 #endif
 }
 
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcUNIFORM_SetValueF_Ex(
     IN gcUNIFORM Uniform,
@@ -30818,14 +31109,35 @@ gcUNIFORM_SetValueF_Ex(
                                                &physicalAddress);
     }
 
-    /* Program the uniform. */
-    status = gcoSHADER_ProgramUniform(gcvNULL,
-                                      physicalAddress,
-                                      columns, rows,
-                                      (gctPOINTER) Value,
-                                      gcvFALSE,
-                                      gcvFALSE,
-                                      Uniform->shaderKind);
+    if (gcHWCaps.hwFeatureFlags.smallBatch &&
+        Hints->unifiedStatus.constCount != 0 &&
+        Hints->unifiedStatus.constantUnifiedMode != gcvUNIFORM_ALLOC_NONE_UNIFIED)
+    {
+        /* Bind the uniform. */
+        status = gcoSHADER_BindUniform(gcvNULL,
+                                       physicalAddress,
+                                       GetUniformPhysical(Uniform),
+                                       columns,
+                                       rows,
+                                       1,
+                                       gcvFALSE,
+                                       columns * 4,
+                                       4,
+                                       (gctPOINTER) Value,
+                                       gcvFALSE,
+                                       Uniform->shaderKind);
+    }
+    else
+    {
+        /* Program the uniform. */
+        status = gcoSHADER_ProgramUniform(gcvNULL,
+                                          physicalAddress,
+                                          columns, rows,
+                                          (gctPOINTER) Value,
+                                          gcvFALSE,
+                                          gcvFALSE,
+                                          Uniform->shaderKind);
+    }
 
     gcmFOOTER();
     return status;
@@ -30833,6 +31145,7 @@ gcUNIFORM_SetValueF_Ex(
     return gcvSTATUS_OK;
 #endif
 }
+#endif
 #endif /* MIN_COMPILER */
 
 /*******************************************************************************
@@ -30857,6 +31170,7 @@ gcUNIFORM_SetValueF_Ex(
 **          as an array, the array length will be 1.  'ArrayLength' can be gcvNULL,
 **          in which case no array length will be returned.
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcOUTPUT_GetType(
     IN gcOUTPUT Output,
@@ -31904,6 +32218,7 @@ gcFUNCTION_GetLabel(
     gcmFOOTER_ARG("*Label=%u", *Label);
     return gcvSTATUS_OK;
 }
+#endif
 
 /*******************************************************************************
 **  gcKERNEL_FUNCTION_GetName
@@ -31967,6 +32282,7 @@ gcKERNEL_FUNCTION_GetName(
 **      gctUINT32 Count
 **          Array count to reallocate.  'Count' must be at least 1.
 */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcKERNEL_FUNCTION_ReallocateUniformArguments(
     IN gcKERNEL_FUNCTION KernelFunction,
@@ -32326,6 +32642,7 @@ gcKERNEL_FUNCTION_ReallocateImageSamplers(
     gcmFOOTER_ARG("status=%d", gcvSTATUS_OK);
     return gcvSTATUS_OK;
 }
+#endif
 
 gceSTATUS
 gcKERNEL_FUNCTION_GetPropertyCount(
@@ -32500,6 +32817,7 @@ gcKERNEL_FUNCTION_ReallocateKernelFunctionProperties(
     return gcvSTATUS_OK;
 }
 
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcKERNEL_FUNCTION_AddKernelFunctionProperties(
         IN gcKERNEL_FUNCTION KernelFunction,
@@ -33366,7 +33684,9 @@ gcSHADER_GetTransformFeedbackVarying(
     gcmFOOTER_ARG("Name=%s *Length=%d *Type=%d *Size=%u", Name, gcmOPT_VALUE(Length), *Type, *Size);
     return gcvSTATUS_OK;
 }
+#endif
 
+#if (!VSC_LITE_BUILD)
 static gctUINT32
 _gcConvShaderTypeToBytes(
     IN gcSHADER_TYPE Type
@@ -33526,6 +33846,7 @@ gcSHADER_GetTransformFeedbackVaryingStrideSeparate(
     gcmFOOTER_ARG("*Stride=%u", *Stride);
     return gcvSTATUS_OK;
 }
+#endif
 
 static void
 _findBuiltinVariableTempIndex(
@@ -34061,6 +34382,7 @@ gcSHADER_CountCode(
     return status;
 }
 
+#if (!VSC_LITE_BUILD)
 gctBOOL
 gcSHADER_IsDual16Shader(
     IN  gcSHADER           Shader,
@@ -34156,6 +34478,7 @@ gcSHADER_ResetFlag(
 {
         Shader->flags  &= ~Flag;
 }
+#endif
 
 gcUNIFORM
 gcSHADER_GetUniformBySamplerIndex(
@@ -34194,6 +34517,7 @@ gcSHADER_GetUniformBySamplerIndex(
     return samplerUniform;
 }
 
+#if (!VSC_LITE_BUILD)
 static void
 _CheckCodeUniformUsage(
     IN OUT gcSHADER           Shader,
@@ -34498,6 +34822,7 @@ gcSHADER_CheckUniformUsage(
     gcmFOOTER();
     return status;
 }
+#endif
 
 gctUINT
 _getTempCount(
@@ -34596,6 +34921,7 @@ const gctCONST_STRING gcTexldFlavor[gceTF_COUNT] =
     "_fetch_ms_pcfproj", /* gceTF_FETCH_MS_PCFPROJ, */
 };
 
+#if (!VSC_LITE_BUILD)
 void
 gcSetGLSLCompiler(
     IN gctGLSLCompiler Compiler
@@ -34618,6 +34944,7 @@ gcGetPatchId(void)
 {
     return &gcPatchId;
 }
+#endif
 
 gcsHWCaps gcHWCaps;
 gcsHWCaps *
@@ -34626,6 +34953,7 @@ gcGetHWCaps(void)
     return &gcHWCaps;
 }
 
+#if (!VSC_LITE_BUILD)
 gcsGLSLCaps gcGLSLCaps;
 gcsGLSLCaps *
 gcGetGLSLCaps(void)
@@ -36483,7 +36811,7 @@ gcSHADER_InsertNOP2BeforeCode(
     for (i = 0; i < (gctINT)Shader->kernelFunctionCount; ++i)
     {
         if (Shader->kernelFunctions[i]->codeStart <= CodeIndex &&
-            Shader->kernelFunctions[i]->codeEnd >= CodeIndex &&
+            Shader->kernelFunctions[i]->codeEnd > CodeIndex &&
             Shader->kernelFunctions[i]->codeCount > 0)
         {
             Shader->kernelFunctions[i]->codeCount += AddCodeCount;
@@ -36789,6 +37117,7 @@ OnError:
     gcmFOOTER_NO();
     return status;
 }
+#endif
 
 gceSTATUS
 gcSHADER_InsertList(
@@ -36825,6 +37154,7 @@ OnError:
     return status;
 }
 
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_UpdateList(
     IN gcSHADER                    Shader,
@@ -37013,7 +37343,20 @@ OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
+#endif
 
+gctUINT32
+gcSHADER_GetHintSize(
+    void
+    )
+{
+    gcmHEADER();
+
+    gcmFOOTER_ARG("return=%d", gcmSIZEOF(struct _gcsHINT));
+    return gcmSIZEOF(struct _gcsHINT);
+}
+
+#if (!VSC_LITE_BUILD)
 gctBOOL
 gcIsSBUnsized(
     IN gcsSTORAGE_BLOCK  StorageBlock
@@ -37150,6 +37493,7 @@ gcHINTS_GetSamplerBaseOffset(
 
     return samplerBaseOffset;
 }
+#endif
 
 gceSTATUS
 gcFreeProgramState(
@@ -37225,6 +37569,7 @@ gcHINTS_Destroy(
     return status;
 }
 
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_SetEarlyFragTest(
     IN gcSHADER                    Shader,
@@ -37536,8 +37881,1417 @@ gcSHADER_Has64BitOperation(
     gcmFOOTER();
     return status;
 }
+#endif
+
+/* Save/Load shader video nodes. */
+#if (!VSC_LITE_BUILD)
+static gctUINT32
+_CaculateShaderVidNodesSize(
+    IN gcSHADER Shader,
+    IN gcsHINT_PTR Hints
+    )
+{
+    gctUINT32       sizeInByte = 0;
+    gctUINT         i;
+
+    if (Hints == gcvNULL)
+    {
+        return sizeInByte;
+    }
+
+    do
+    {
+        for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i++)
+        {
+            /* Inst video memory. */
+            sizeInByte += gcmSIZEOF(gctUINT32);
+            if (Hints->shaderVidNodes.instVidmemNode[i] != gcvNULL)
+            {
+                gcsSURF_NODE_PTR surfNode = (gcsSURF_NODE_PTR)Hints->shaderVidNodes.instVidmemNode[i];
+
+                sizeInByte += surfNode->size;
+            }
+
+            /* gpr spill memory. */
+            sizeInByte += gcmSIZEOF(gctUINT32);
+            if (Hints->shaderVidNodes.gprSpillVidmemNode[i] != gcvNULL)
+            {
+                gcsSURF_NODE_PTR surfNode = (gcsSURF_NODE_PTR)Hints->shaderVidNodes.gprSpillVidmemNode[i];
+
+                sizeInByte += surfNode->size;
+            }
+
+            /* cr spill memory. */
+            sizeInByte += gcmSIZEOF(gctUINT32);
+            if (Hints->shaderVidNodes.crSpillVidmemNode[i] != gcvNULL)
+            {
+                gcsSURF_NODE_PTR surfNode = (gcsSURF_NODE_PTR)Hints->shaderVidNodes.crSpillVidmemNode[i];
+
+                sizeInByte += surfNode->size;
+            }
+        }
+
+        /* shared memory. */
+        sizeInByte += gcmSIZEOF(gctUINT32);
+        if (Hints->shaderVidNodes.sharedMemVidMemNode)
+        {
+            gcsSURF_NODE_PTR surfNode = (gcsSURF_NODE_PTR)Hints->shaderVidNodes.sharedMemVidMemNode;
+
+            sizeInByte += surfNode->size;
+        }
+    } while (gcvFALSE);
+
+    return sizeInByte;
+}
+
+static gceSTATUS
+_SaveShaderVidNodes(
+    IN gcSHADER Shader,
+    IN gcsHINT_PTR Hints,
+    INOUT gctPOINTER Buffer
+    )
+{
+    gceSTATUS       status = gcvSTATUS_OK;
+    gctUINT8_PTR    buffer = (gctUINT8_PTR)Buffer;
+    gctUINT         i;
+
+    gcmASSERT(Hints);
+
+    do
+    {
+        gctPOINTER          memory = gcvNULL;
+        gctPOINTER          data = gcvNULL;
+        gctUINT32           sizeInByte = 0;
+
+        for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i++)
+        {
+            /* Inst video memory. */
+            memory = Hints->shaderVidNodes.instVidmemNode[i];
+            data = gcvNULL;
+            sizeInByte = 0;
+
+            /* Get the size. */
+            if (memory != gcvNULL)
+            {
+                sizeInByte += ((gcsSURF_NODE_PTR)memory)->size;
+                gcmERR_BREAK(gcoSURF_LockNode((gcsSURF_NODE_PTR)memory,
+                                              gcvNULL,
+                                              &data));
+
+                gcmASSERT(sizeInByte != 0);
+            }
+
+            /* Copy the size. */
+            gcoOS_MemCopy(buffer, &sizeInByte, gcmSIZEOF(gctUINT32));
+            buffer += gcmSIZEOF(gctUINT32);
+
+            /* Copy the data. */
+            if (sizeInByte != 0)
+            {
+                gcoOS_MemCopy(buffer, data, sizeInByte);
+                buffer += sizeInByte;
+                gcoSURF_UnLockNode((gcsSURF_NODE_PTR)memory, gcvSURF_ICACHE);
+            }
+
+            /* gpr spill memory. */
+            memory = Hints->shaderVidNodes.gprSpillVidmemNode[i];
+            data = gcvNULL;
+            sizeInByte = 0;
+
+            /* Get the size. */
+            if (memory != gcvNULL)
+            {
+                sizeInByte += ((gcsSURF_NODE_PTR)memory)->size;
+                gcmERR_BREAK(gcoSURF_LockNode((gcsSURF_NODE_PTR)memory,
+                                              gcvNULL,
+                                              &data));
+
+                gcmASSERT(sizeInByte != 0);
+            }
+
+            /* Copy the size. */
+            gcoOS_MemCopy(buffer, &sizeInByte, gcmSIZEOF(gctUINT32));
+            buffer += gcmSIZEOF(gctUINT32);
+
+            /* Copy the data. */
+            if (sizeInByte != 0)
+            {
+                gcoOS_MemCopy(buffer, data, sizeInByte);
+                buffer += sizeInByte;
+                gcoSURF_UnLockNode((gcsSURF_NODE_PTR)memory, gcvSURF_VERTEX);
+            }
+
+            /* cr spill memory. */
+            memory = Hints->shaderVidNodes.crSpillVidmemNode[i];
+            data = gcvNULL;
+            sizeInByte = 0;
+
+            /* Get the size. */
+            if (memory != gcvNULL)
+            {
+                sizeInByte += ((gcsSURF_NODE_PTR)memory)->size;
+                gcmERR_BREAK(gcoSURF_LockNode((gcsSURF_NODE_PTR)memory,
+                                              gcvNULL,
+                                              &data));
+
+                gcmASSERT(sizeInByte != 0);
+            }
+
+            /* Copy the size. */
+            gcoOS_MemCopy(buffer, &sizeInByte, gcmSIZEOF(gctUINT32));
+            buffer += gcmSIZEOF(gctUINT32);
+
+            /* Copy the data. */
+            if (sizeInByte != 0)
+            {
+                gcoOS_MemCopy(buffer, data, sizeInByte);
+                buffer += sizeInByte;
+                gcoSURF_UnLockNode((gcsSURF_NODE_PTR)memory, gcvSURF_VERTEX);
+            }
+        }
+
+        /* shared memory. */
+        memory = Hints->shaderVidNodes.sharedMemVidMemNode;
+        data = gcvNULL;
+        sizeInByte = 0;
+
+        /* Get the size. */
+        if (memory != gcvNULL)
+        {
+            sizeInByte += ((gcsSURF_NODE_PTR)memory)->size;
+            gcmERR_BREAK(gcoSURF_LockNode((gcsSURF_NODE_PTR)memory,
+                                          gcvNULL,
+                                          &data));
+
+            gcmASSERT(sizeInByte != 0);
+        }
+
+        /* Copy the size. */
+        gcoOS_MemCopy(buffer, &sizeInByte, gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Copy the data. */
+        if (sizeInByte != 0)
+        {
+            gcoOS_MemCopy(buffer, data, sizeInByte);
+            buffer += sizeInByte;
+            gcoSURF_UnLockNode((gcsSURF_NODE_PTR)memory, gcvSURF_VERTEX);
+        }
+    } while (gcvFALSE);
+
+    return status;
+}
+#endif
+
+static gceSTATUS
+_LoadShaderVidNodesAndFixup(
+    IN gcSHADER Shader,
+    IN gcsPROGRAM_STATE *ProgramState,
+    IN gctPOINTER Buffer
+    )
+{
+    gceSTATUS       status = gcvSTATUS_OK;
+    gctUINT8_PTR    buffer = (gctUINT8_PTR)Buffer;
+    gctUINT         i;
+    gcsHINT_PTR     Hints = ProgramState->hints;
+
+    gcmASSERT(Hints);
+
+    do
+    {
+        gctUINT32           sizeInByte = 0;
+        gctUINT32           physical = 0;
+        gctUINT32           *pPatchPoint = gcvNULL;
+
+        for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i++)
+        {
+            /* Inst video memory. */
+            sizeInByte = *(gctUINT32*)buffer;
+            physical = (gctUINT32)~0;
+            pPatchPoint = gcvNULL;
+
+            buffer += gcmSIZEOF(gctUINT32);
+
+            if (sizeInByte > 0)
+            {
+                gcoSHADER_AllocateVidMem(gcvNULL,
+                                         gcvSURF_ICACHE,
+                                         "video memory for loading CL kernel",
+                                         sizeInByte,
+                                         256,
+                                         (gctPOINTER *)&Hints->shaderVidNodes.instVidmemNode[i],
+                                         gcvNULL,
+                                         &physical,
+                                         buffer,
+                                         gcvFALSE);
+
+                gcmASSERT((gctUINT32)~0 != physical);
+                gcmASSERT(ProgramState->patchOffsetsInDW.instVidMemInStateBuffer[i] != 0);
+                gcmASSERT(ProgramState->patchOffsetsInDW.instVidMemInStateDelta[i] != 0);
+                pPatchPoint = (gctUINT32*)ProgramState->stateBuffer
+                            + ProgramState->patchOffsetsInDW.instVidMemInStateBuffer[i];
+                *pPatchPoint = physical;
+                pPatchPoint = ProgramState->stateDelta
+                            + ProgramState->patchOffsetsInDW.instVidMemInStateDelta[i];
+                *pPatchPoint = physical;
+            }
+
+            buffer += sizeInByte;
+
+            /* gpr spill memory. */
+            sizeInByte = *(gctUINT32*)buffer;
+            physical = (gctUINT32)~0;
+            pPatchPoint = gcvNULL;
+
+            buffer += gcmSIZEOF(gctUINT32);
+
+            if (sizeInByte > 0)
+            {
+                gcoSHADER_AllocateVidMem(gcvNULL,
+                                         gcvSURF_VERTEX,
+                                         "temp register spill memory",
+                                         sizeInByte,
+                                         256,
+                                         (gctPOINTER *)&Hints->shaderVidNodes.gprSpillVidmemNode[i],
+                                         gcvNULL,
+                                         &physical,
+                                         buffer,
+                                         gcvFALSE);
+
+                gcmASSERT((gctUINT32)~0 != physical);
+                gcmASSERT(ProgramState->patchOffsetsInDW.gprSpillVidMemInStateBuffer[i] != 0);
+                gcmASSERT(ProgramState->patchOffsetsInDW.gprSpillVidMemInStateDelta[i] != 0);
+                pPatchPoint = (gctUINT32*)ProgramState->stateBuffer
+                            + ProgramState->patchOffsetsInDW.gprSpillVidMemInStateBuffer[i];
+                *pPatchPoint = physical;
+                pPatchPoint = ProgramState->stateDelta
+                            + ProgramState->patchOffsetsInDW.gprSpillVidMemInStateDelta[i];
+                *pPatchPoint = physical;
+            }
+
+            buffer += sizeInByte;
+
+            /* cr spill memory. */
+            sizeInByte = *(gctUINT32*)buffer;
+            physical = (gctUINT32)~0;
+            pPatchPoint = gcvNULL;
+
+            buffer += gcmSIZEOF(gctUINT32);
+
+            if (sizeInByte > 0)
+            {
+                gcoSHADER_AllocateVidMem(gcvNULL,
+                                         gcvSURF_VERTEX,
+                                         "immediate constant spill memory",
+                                         sizeInByte,
+                                         256,
+                                         (gctPOINTER *)&Hints->shaderVidNodes.crSpillVidmemNode[i],
+                                         gcvNULL,
+                                         &physical,
+                                         buffer,
+                                         gcvFALSE);
+
+                gcmASSERT((gctUINT32)~0 != physical);
+                gcmASSERT(ProgramState->patchOffsetsInDW.crSpillVidMemInStateBuffer[i] != 0);
+                gcmASSERT(ProgramState->patchOffsetsInDW.crSpillVidMemInStateDelta[i] != 0);
+                pPatchPoint = (gctUINT32*)ProgramState->stateBuffer
+                            + ProgramState->patchOffsetsInDW.crSpillVidMemInStateBuffer[i];
+                *pPatchPoint = physical;
+                pPatchPoint = ProgramState->stateDelta
+                            + ProgramState->patchOffsetsInDW.crSpillVidMemInStateDelta[i];
+                *pPatchPoint = physical;
+            }
+
+            buffer += sizeInByte;
+        }
+
+        /* shared memory. */
+        sizeInByte = *(gctUINT32*)buffer;
+        physical = (gctUINT32)~0;
+        pPatchPoint = gcvNULL;
+
+        buffer += gcmSIZEOF(gctUINT32);
+
+        if (sizeInByte > 0)
+        {
+            gcoSHADER_AllocateVidMem(gcvNULL,
+                                     gcvSURF_VERTEX,
+                                     "shared memory",
+                                     sizeInByte,
+                                     256,
+                                     (gctPOINTER *)&Hints->shaderVidNodes.sharedMemVidMemNode,
+                                     gcvNULL,
+                                     &physical,
+                                     buffer,
+                                     gcvFALSE);
+
+            gcmASSERT((gctUINT32)~0 != physical);
+            gcmASSERT(ProgramState->patchOffsetsInDW.sharedMemVidMemInStateBuffer != 0);
+            gcmASSERT(ProgramState->patchOffsetsInDW.sharedMemVidMemInStateDelta != 0);
+            pPatchPoint = (gctUINT32*)ProgramState->stateBuffer
+                        + ProgramState->patchOffsetsInDW.sharedMemVidMemInStateBuffer;
+            *pPatchPoint = physical;
+            pPatchPoint = ProgramState->stateDelta
+                        + ProgramState->patchOffsetsInDW.sharedMemVidMemInStateDelta;
+            *pPatchPoint = physical;
+        }
+
+        buffer += sizeInByte;
+    } while (gcvFALSE);
+
+    return status;
+}
+
+/** Program binary file header format: -
+       Word 1:  gcmCC('P', 'R', 'G', 'M') Program binary file signature
+       Word 2:  ('\od' '\od' '\od' '\od') od = octal digits; program binary file version
+       Word 3:  ('\E' '\S' '\0' '\0') or Language type
+                ('C' 'L' '\0' '\0')
+       Word 4: ('\0' '\0' '\10' '\0') chip model  e.g. gc800
+       Wor5: ('\1' '\3' '\6' '\4') chip version e.g. 4.6.3_rc1
+       Word 6: size of program binary file in bytes excluding this header */
+#define _gcdProgramBinaryHeaderSize   (6 * 4)  /*Program binary file header size in bytes*/
+
+/*******************************************************************************
+**  _gcLoadProgramHeader
+**
+**  Load a shader proggram from a binary buffer.  The binary buffer is layed out
+**  as follows:
+**      // Six word header
+**      // Signature, must be 'S','H','D','R'.
+**      gctINT8             signature[4];
+**      gctUINT32           prgBinFileVersion;
+**      gctUINT32           laguage;
+**      gctUINT32           chipModel;
+**      gctUINT32           chipVersion;
+**      gctUINT32           binarySize;
+**
+**  INPUT:
+**
+**      gctPOINTER Buffer
+**          Pointer to a program binary buffer containing the program data to load.
+**
+**      gctSIZE_T BufferSize
+**          Number of bytes inside the binary buffer pointed to by 'Buffer'.
+**
+**  OUTPUT:
+**      gctUINT32 *Language
+**          the third word in the header containing Language type
+**
+*/
+static gceSTATUS
+_gcLoadProgramHeader(
+    IN gctPOINTER Buffer,
+    IN gctSIZE_T BufferSize,
+    OUT gctPOINTER Language
+    )
+{
+    gctUINT32 * signature;
+    gctSIZE_T bytes;
+    gctUINT32 *version;
+    gctUINT32 *language;
+    gctUINT32 *chipModel;
+    gctUINT32 *chipVersion;
+    gctUINT32 *size;
+    gctUINT8 *bytePtr;
+
+    gcmHEADER_ARG("Buffer=0x%x BufferSize=%lu",
+                  Buffer, BufferSize);
+
+    /* Verify the arguments. */
+    gcmDEBUG_VERIFY_ARGUMENT(Buffer != gcvNULL);
+    gcmDEBUG_VERIFY_ARGUMENT(BufferSize > 0);
+
+    /* Load the Header */
+    bytes = BufferSize;
+    if(bytes < _gcdProgramBinaryHeaderSize) {
+        /* Invalid file format */
+        gcoOS_Print("_gcLoadProgramHeader: Invalid program binary file format");
+        gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+        return gcvSTATUS_INVALID_DATA;
+    }
+
+    /* Verify the signature. */
+    signature = (gctUINT32 *) Buffer;
+    if (*signature != gcmCC('P', 'R', 'G', 'M')) {
+        /* Signature mismatch. */
+        gcoOS_Print("_gcLoadProgramHeader: Signature does not match with 'PRGM'");
+        gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+        return gcvSTATUS_INVALID_DATA;
+    }
+
+    /* Word 2: program binary file version # */
+    version = (gctUINT32 *) (signature + 1);
+    /* Need to make sure the program binary file's version is matched with current compiler version */
+    if(*version != gcdSL_SHADER_BINARY_FILE_VERSION) {
+        gctUINT8 *inputVerPtr, *curVerPtr;
+        gctUINT32 curVer[1] = {gcdSL_SHADER_BINARY_FILE_VERSION};
+
+        inputVerPtr = (gctUINT8 *) version;
+        curVerPtr = (gctUINT8 *) curVer;
+        gcoOS_Print("gcSHADER_LoadHeader: shader binary file's version of %u.%u.%u:%u "
+                 "is not compatible with current version %u.%u.%u:%u\n"
+                 "Please recompile source.",
+                 inputVerPtr[0], inputVerPtr[1], inputVerPtr[2], inputVerPtr[3],
+                 curVerPtr[0], curVerPtr[1], curVerPtr[2], curVerPtr[3]);
+        gcmFOOTER_ARG("status=%d", gcvSTATUS_VERSION_MISMATCH);
+        return gcvSTATUS_VERSION_MISMATCH;
+    }
+
+    /* Word 3: language type */
+    language = (gctUINT32 *) (version + 1);
+    bytePtr = (gctUINT8 *) language;
+
+    if((bytePtr[0] == 'E' && bytePtr[1] != 'S') ||
+       (bytePtr[0] == 'C' && bytePtr[1] != 'L') ||
+       (bytePtr[0] != 'E' && bytePtr[0] != 'C')) {
+       gcoOS_Print("_gcLoadProgramHeader: unrecognizable laguage type \"%c%c\"", bytePtr[0], bytePtr[1]);
+       gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+       return gcvSTATUS_INVALID_DATA;
+    }
+
+    /* Word 4: chip model */
+    chipModel = (gctUINT32 *) (language + 1);
+
+    /* Word 5: chip version */
+    chipVersion  = (gctUINT32 *) (chipModel + 1);
+
+    /* Word 6: size of program binary excluding header */
+    bytes -= _gcdProgramBinaryHeaderSize;
+    size = (gctUINT32 *) (chipVersion + 1);
+    if(bytes != *size) {
+        /* program binary size mismatch. */
+        gcoOS_Print("_gcLoadProgramHeader: program binary size %u does not match actual file size %u",
+                 bytes, *size);
+        gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+        return gcvSTATUS_INVALID_DATA;
+    }
+    /* Success. */
+    *(gctUINT32 *)Language = *language;
+    gcmFOOTER_ARG("*Language=%u", *language);
+    return gcvSTATUS_OK;
+}
+
+/*******************************************************************************
+**                                gcSaveProgram
+********************************************************************************
+**
+**  Save pre-compiled shaders and pre-linked programs to a binary file.
+**
+**  INPUT:
+**
+**      gcSHADER VertexShader
+**          Pointer to vertex shader object.
+**
+**      gcSHADER FragmentShader
+**          Pointer to fragment shader object.
+**
+**      gcsPROGRAM_STATE ProgramState
+**          Pointer to program state buffer.
+**
+**  OUTPUT:
+**
+**      gctPOINTER * Binary
+**          Pointer to a variable receiving the binary data to be saved.
+**
+**      gctUINT32 * BinarySize
+**          Pointer to a variable receiving the number of bytes inside 'Binary'.
+*/
+#if (!VSC_LITE_BUILD)
+gceSTATUS
+gcSaveProgram(
+    IN gcSHADER VertexShader,
+    IN gcSHADER FragmentShader,
+    IN gcsPROGRAM_STATE ProgramState,
+    OUT gctPOINTER * Binary,
+    OUT gctUINT32 * BinarySize
+    )
+{
+    gctUINT32 vertexShaderBytes;
+    gctUINT32 fragmentShaderBytes;
+    gctUINT32 bytes;
+    gctUINT32 hintSize = ProgramState.hints ? gcSHADER_GetHintSize() : 0;
+    gctUINT8_PTR bytePtr;
+    gctUINT32 bufferSize;
+    gctUINT8_PTR buffer = gcvNULL;
+    gceSTATUS status;
+
+    gcmHEADER_ARG("VertexShader=0x%x FragmentShader=0x%x ProgramBufferSize=%lu "
+                  "ProgramBuffer=0x%x Hints=0x%x",
+                  VertexShader, FragmentShader, ProgramState.stateBufferSize,
+                  ProgramState.stateBuffer, ProgramState.hints);
+
+    do
+    {
+        /* Get size of vertex shader bibary. */
+        gcmERR_BREAK(gcSHADER_Save(VertexShader,
+                                   gcvNULL,
+                                   &vertexShaderBytes));
+
+        /* Get size of fragment shader binary. */
+        gcmERR_BREAK(gcSHADER_Save(FragmentShader,
+                                   gcvNULL,
+                                   &fragmentShaderBytes));
+
+        /* Compute number of bytes required for binary buffer. */
+        bufferSize = _gcdProgramBinaryHeaderSize
+                     + gcmSIZEOF(gctUINT32) + gcmALIGN(vertexShaderBytes, 4)
+                     + gcmSIZEOF(gctUINT32) + gcmALIGN(fragmentShaderBytes, 4)
+                     + gcmSIZEOF(gctUINT32) + ProgramState.stateBufferSize
+                     + gcmSIZEOF(gctUINT32) + hintSize;
+
+        if (BinarySize)
+        {
+            *BinarySize = bufferSize;
+        }
+
+        if (Binary == gcvNULL)
+        {
+            gcmFOOTER_NO();
+            return gcvSTATUS_OK;
+        }
+
+        if (*Binary)
+        {
+            /* a buffer has been passed here */
+            /* Make sure the buffer is large enough. */
+            if(BinarySize)
+            {
+                if (*BinarySize < bufferSize)
+                {
+                    *BinarySize = bufferSize;
+                    gcmFOOTER_ARG("*BinarySize=%d status=%d",
+                                  *BinarySize, gcvSTATUS_BUFFER_TOO_SMALL);
+                    return gcvSTATUS_BUFFER_TOO_SMALL;
+                }
+           }
+        }
+        else
+        {
+            /* Allocate binary buffer. */
+            gcmERR_BREAK(gcoOS_Allocate(gcvNULL,
+                                        bufferSize,
+                                        Binary));
+        }
+
+        /* Cast binary buffer to UINT8 pointer for easy byte copying. */
+        buffer    = (gctUINT8_PTR) *Binary;
+
+        /* Word 1: program binary signature */
+        buffer[0] = 'P';
+        buffer[1] = 'R';
+        buffer[2] = 'G';
+        buffer[3] = 'M';
+        buffer += 4;
+
+        /* Word 2: binary file version # */
+        *(gctUINT32 *) buffer = gcdSL_PROGRAM_BINARY_FILE_VERSION;
+        buffer += sizeof(gctUINT32);
+
+        /* Word 3: language type */
+        *(gctUINT32 *) buffer = VertexShader->compilerVersion[0];
+        buffer += sizeof(gctUINT32);
+
+        /* Word 4: chip model */
+        *(gctUINT32 *) buffer = gcmCC('\0', '\0', '\0', '\0');
+        buffer += sizeof(gctUINT32);
+
+        /* Word 5: chip version */
+        *(gctUINT32 *) buffer = gcmCC('\1', gcvVERSION_PATCH, gcvVERSION_MINOR, gcvVERSION_MAJOR);
+        buffer += sizeof(gctUINT32);
+
+        /* Word 6: size of binary excluding header */
+        *(gctUINT32 *) buffer = bufferSize - _gcdProgramBinaryHeaderSize;
+        buffer += sizeof(gctUINT32);
+
+        /* Copy the size of the vertex shader binary. */
+        gcoOS_MemCopy(buffer,
+                      &vertexShaderBytes,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Save the vertex shader binary. */
+        gcmERR_BREAK(gcSHADER_Save(VertexShader,
+                                   buffer,
+                                   &vertexShaderBytes));
+        bytePtr = buffer + vertexShaderBytes;
+        buffer += gcmALIGN(vertexShaderBytes, 4);
+        while (bytePtr < buffer)
+        {
+            /* clear the alignment bytes to help file comparison when needed*/
+            *bytePtr++ = '\0';
+        }
+
+        /* Copy the size of the fragment shader binary. */
+        gcoOS_MemCopy(buffer,
+                      &fragmentShaderBytes,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Save the fragment shader binary. */
+        gcmERR_BREAK(gcSHADER_Save(FragmentShader,
+                                   buffer,
+                                   &fragmentShaderBytes));
+        bytePtr = buffer + fragmentShaderBytes;
+        buffer += gcmALIGN(fragmentShaderBytes, 4);
+        while (bytePtr < buffer)
+        {
+            /* clear the alignment bytes to help file comparison when needed*/
+            *bytePtr++ = '\0';
+        }
+
+        /* Copy the size of the state buffer. */
+        gcoOS_MemCopy(buffer,
+                      &ProgramState.stateBufferSize,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Copy the state buffer if needed. */
+        if (ProgramState.stateBufferSize > 0)
+        {
+            gcoOS_MemCopy(buffer,
+                          ProgramState.stateBuffer,
+                          ProgramState.stateBufferSize);
+        }
+        buffer += ProgramState.stateBufferSize;
+
+        /* Copy the size of the HINT structure. */
+        bytes = hintSize;
+        gcoOS_MemCopy(buffer,
+                      &bytes,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Copy the HINT structure if needed. */
+        if (bytes > 0)
+        {
+            gcoOS_MemCopy(buffer, ProgramState.hints, bytes);
+        }
+        buffer += bytes;
+
+        /* Assert we copied the right number of bytes */
+        gcmASSERT(buffer - *BinarySize == *Binary);
+
+        /* Success. */
+        gcmFOOTER_ARG("*Binary=0x%x *BinarySize=%ul", *Binary, *BinarySize);
+        return gcvSTATUS_OK;
+    }
+    while (gcvFALSE);
+
+    if (gcmIS_ERROR(status) && (buffer != gcvNULL))
+    {
+        /* Free binary buffer on error. */
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, *Binary));
+
+        /* Reset pointers on error. */
+        *Binary     = gcvNULL;
+        if (BinarySize)
+        {
+            *BinarySize = 0;
+        }
+    }
+
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+/*******************************************************************************
+**                                gcSaveCLSingleKernel
+********************************************************************************
+**
+**    Save pre-compiled shaders and pre-linked programs to a binary file.
+**
+**    INPUT:
+**
+**        gcSHADER KernelShader
+**            Pointer to vertex shader object.
+**
+**        gcsPROGRAM_STATE ProgramState
+**            Program state.
+**
+**    OUTPUT:
+**
+**        gctPOINTER * Binary
+**            Pointer to a variable receiving the binary data to be saved.
+**
+**        gctUINT32 * BinarySize
+**            Pointer to a variable receiving the number of bytes inside 'Binary'.
+*/
+gceSTATUS
+gcSaveCLSingleKernel(
+    IN gcSHADER KernelShader,
+    IN gcsPROGRAM_STATE ProgramState,
+    OUT gctPOINTER * Binary,
+    OUT gctUINT32 * BinarySize
+    )
+{
+    gctUINT32 kernelShaderBytes;
+    gctUINT32 bytes;
+    /*
+    ** Because there are some pointer variables within gcsHINT, the size with 32bit&64bit OS are different,
+    ** we can't save the whole structure, we need to exclude gcSHADER_VID_NODES.
+    */
+    gctUINT32 hintSize = ProgramState.hints ? gcmOFFSETOF(_gcsHINT, shaderVidNodes) : 0;
+    gctUINT32 vidNodesSize = _CaculateShaderVidNodesSize(KernelShader, ProgramState.hints);
+    gctUINT8_PTR bytePtr;
+    gctUINT32 bufferSize;
+    gctUINT8_PTR buffer = gcvNULL;
+    gceSTATUS status;
+
+    gcmHEADER_ARG("KernelShader=0x%x ProgramBufferSize=%lu "
+                  "ProgramBuffer=0x%x Hints=0x%x",
+                  KernelShader, ProgramState.stateBufferSize,
+                  ProgramState.stateBuffer, ProgramState.hints);
+
+    do
+    {
+        /* Get size of kernel shader bibary. */
+        gcmERR_BREAK(gcSHADER_SaveEx(KernelShader,
+                                    gcvNULL,
+                                    &kernelShaderBytes));
+
+        /* Compute number of bytes required for binary buffer. */
+        bufferSize = _gcdProgramBinaryHeaderSize
+                     + gcmSIZEOF(gctUINT32) + gcmALIGN(kernelShaderBytes, 4)
+                     + gcmSIZEOF(gctUINT32) + ProgramState.stateBufferSize
+                     + gcmSIZEOF(gctUINT32) + hintSize
+                     + gcmSIZEOF(gctUINT32) + ProgramState.stateDeltaSize
+                     + gcmSIZEOF(gctUINT32) + gcmSIZEOF(gcsPROGRAM_VidMemPatchOffset)
+                     + gcmSIZEOF(gctUINT32) + vidNodesSize;
+
+        if (BinarySize)
+        {
+            *BinarySize = bufferSize;
+        }
+
+        if (Binary == gcvNULL)
+        {
+            gcmFOOTER_NO();
+            return gcvSTATUS_OK;
+        }
+
+        if (*Binary)
+        {
+            /* a buffer has been passed here */
+            /* Make sure the buffer is large enough. */
+            if(BinarySize)
+            {
+                if (*BinarySize < bufferSize)
+                {
+                    *BinarySize = bufferSize;
+                    gcmFOOTER_ARG("*BinarySize=%d status=%d",
+                                  *BinarySize, gcvSTATUS_BUFFER_TOO_SMALL);
+                    return gcvSTATUS_BUFFER_TOO_SMALL;
+                }
+           }
+        }
+        else
+        {
+            /* Allocate binary buffer. */
+            gcmERR_BREAK(gcoOS_Allocate(gcvNULL,
+                                        bufferSize,
+                                        Binary));
+        }
+
+        /* Cast binary buffer to UINT8 pointer for easy byte copying. */
+        buffer    = (gctUINT8_PTR) *Binary;
+
+        /* Word 1: program binary signature */
+        buffer[0] = 'P';
+        buffer[1] = 'R';
+        buffer[2] = 'G';
+        buffer[3] = 'M';
+        buffer += 4;
+
+        /* Word 2: binary file version # */
+        *(gctUINT32 *) buffer = gcdSL_PROGRAM_BINARY_FILE_VERSION;
+        buffer += sizeof(gctUINT32);
+
+        /* Word 3: language type */
+        *(gctUINT32 *) buffer = KernelShader->compilerVersion[0];
+        buffer += sizeof(gctUINT32);
+
+        /* Word 4: chip model */
+        *(gctUINT32 *) buffer = gcmCC('\0', '\0', '\0', '\0');
+        buffer += sizeof(gctUINT32);
+
+        /* Word 5: chip version */
+        *(gctUINT32 *) buffer = gcmCC('\1', gcvVERSION_PATCH, gcvVERSION_MINOR, gcvVERSION_MAJOR);
+        buffer += sizeof(gctUINT32);
+
+        /* Word 6: size of binary excluding header */
+        *(gctUINT32 *) buffer = bufferSize - _gcdProgramBinaryHeaderSize;
+        buffer += sizeof(gctUINT32);
+
+        /* Copy the size of the vertex shader binary. */
+        gcoOS_MemCopy(buffer,
+                      &kernelShaderBytes,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Save the vertex shader binary. */
+        gcmERR_BREAK(gcSHADER_SaveEx(KernelShader,
+                                     buffer,
+                                     &kernelShaderBytes));
+        bytePtr = buffer + kernelShaderBytes;
+        buffer += gcmALIGN(kernelShaderBytes, 4);
+        while (bytePtr < buffer)
+        {
+            /* clear the alignment bytes to help file comparison when needed*/
+            *bytePtr++ = '\0';
+        }
+
+        /* Copy the size of the state buffer. */
+        gcoOS_MemCopy(buffer,
+                      &ProgramState.stateBufferSize,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Copy the state buffer if needed. */
+        if (ProgramState.stateBufferSize > 0)
+        {
+            gcoOS_MemCopy(buffer,
+                          ProgramState.stateBuffer,
+                          ProgramState.stateBufferSize);
+        }
+        buffer += ProgramState.stateBufferSize;
+
+        /* Copy the size of the HINT structure. */
+        bytes = hintSize;
+        gcoOS_MemCopy(buffer,
+                      &bytes,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Copy the HINT structure if needed. */
+        if (bytes > 0)
+        {
+            gcoOS_MemCopy(buffer, ProgramState.hints, bytes);
+        }
+        buffer += bytes;
+
+        /* Copy the size of the state delta. */
+        bytes = ProgramState.stateDeltaSize;
+        gcoOS_MemCopy(buffer,
+                      &bytes,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+        /* Copy the state delta */
+        if (ProgramState.stateDeltaSize)
+        {
+            gcoOS_MemCopy(buffer,
+                          ProgramState.stateDelta,
+                          ProgramState.stateDeltaSize);
+        }
+        buffer += ProgramState.stateDeltaSize;
+
+        /* Copy the size of patch offset */
+        bytes = gcmSIZEOF(gcsPROGRAM_VidMemPatchOffset);
+        gcoOS_MemCopy(buffer,
+                      &bytes,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+        /* Copy the patch offsets */
+        gcoOS_MemCopy(buffer,
+                      &ProgramState.patchOffsetsInDW,
+                      gcmSIZEOF(gcsPROGRAM_VidMemPatchOffset));
+        buffer += gcmSIZEOF(gcsPROGRAM_VidMemPatchOffset);
+
+        /* Copy the size of the video nodes. */
+        bytes = vidNodesSize;
+        gcoOS_MemCopy(buffer,
+                      &bytes,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Copy the video nodes if needed. */
+        if (bytes > 0)
+        {
+            gcmASSERT(ProgramState.hints);
+            gcmERR_BREAK(_SaveShaderVidNodes(KernelShader,
+                                             ProgramState.hints,
+                                             buffer));
+        }
+        buffer += bytes;
+
+        /* Assert we copied the right number of bytes */
+        gcmASSERT(buffer - *BinarySize == *Binary);
+
+        /* Success. */
+        gcmFOOTER_ARG("*Binary=0x%x *BinarySize=%ul", *Binary, *BinarySize);
+        return gcvSTATUS_OK;
+    }
+    while (gcvFALSE);
+
+    if (gcmIS_ERROR(status) && (buffer != gcvNULL))
+    {
+        /* Free binary buffer on error. */
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, *Binary));
+
+        /* Reset pointers on error. */
+        *Binary     = gcvNULL;
+        if (BinarySize)
+        {
+            *BinarySize = 0;
+        }
+    }
+
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+
+/*******************************************************************************
+**                                gcLoadProgram
+********************************************************************************
+**
+**    Load pre-compiled shaders and pre-linked programs from a binary file.
+**
+**    INPUT:
+**
+**        gctPOINTER Binary
+**            Pointer to the binary data loaded.
+**
+**        gctUINT32 BinarySize
+**            Number of bytes in 'Binary'.
+**
+**        gcSHADER VertexShader
+**            Pointer to a vertex shader object.
+**
+**        gcSHADER FragmentShader
+**            Pointer to a fragment shader object.
+**
+**    OUTPUT:
+**
+**        gcsPROGRAM_STATE *ProgramState
+**            Pointer to a variable receiving the program state.
+*/
+gceSTATUS
+gcLoadProgram(
+    IN gctPOINTER Binary,
+    IN gctUINT32 BinarySize,
+    OUT gcSHADER VertexShader,
+    OUT gcSHADER FragmentShader,
+    IN OUT gcsPROGRAM_STATE *ProgramState
+    )
+{
+    gcoOS os;
+    gctUINT32 bytes;
+    gctUINT8_PTR buffer;
+    gctUINT32 *bufferSize;
+    gctUINT32 alignBufferSize;
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT8 language[4];
+    gctPOINTER pointer;
+
+    gcmHEADER_ARG("Binary=0x%x BinarySize=%lu",
+                  Binary, BinarySize);
+
+    do {
+        if (ProgramState)
+        {
+            ProgramState->stateBuffer = gcvNULL;
+            ProgramState->stateBufferSize = 0;
+            ProgramState->hints = gcvNULL;
+        }
+
+        /* Extract the gcoOS object pointer. */
+        os = gcvNULL;
+
+        if (gcmGetOptimizerOption()->dumpBinToFile)
+        {
+#define _FILENAMEMAX 1024
+            gctCHAR fullFileName[_FILENAMEMAX+1];
+            gctCHAR fileName[64];
+            gctUINT offset = 0;
+            gctUINT64 time;
+
+            gcmERR_BREAK(vscGetTemporaryDir(fullFileName));
+#if _WIN32
+            gcmERR_BREAK(gcoOS_StrCatSafe(fullFileName, _FILENAMEMAX, "\\"));
+#else
+            gcmERR_BREAK(gcoOS_StrCatSafe(fullFileName, _FILENAMEMAX, "/"));
+#endif
+            gcoOS_GetTime(&time);
+            gcmERR_BREAK(gcoOS_PrintStrSafe(fileName, gcmSIZEOF(fileName), &offset, "viv_program_%lld.gcPGM", (gctUINT64)time));
+            gcmERR_BREAK(gcoOS_StrCatSafe(fullFileName, _FILENAMEMAX, fileName));
+            status = gcSHADER_WriteBufferToFile((gctSTRING)Binary, BinarySize, fullFileName);
+            if (status == gcvSTATUS_OK)
+            {
+                gcoOS_Print("gcLoadProgram: save the program binary to the file %s\n", fullFileName);
+            }
+        }
+
+        gcmERR_BREAK(_gcLoadProgramHeader(Binary, BinarySize, (gctPOINTER)language));
+
+        if (language[0] != 'E' || language[1] != 'S')
+        {
+           gcoOS_Print("gcLoadProgram: expect language type 'ES' instead of %c%c",
+                    language[0], language[1]);
+           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+           return gcvSTATUS_INVALID_DATA;
+        }
+
+        buffer = (gctUINT8 *)Binary + _gcdProgramBinaryHeaderSize;
+        bytes = BinarySize - _gcdProgramBinaryHeaderSize;
+
+        bufferSize = (gctUINT32 *) buffer;
+
+        if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+           /* Invalid vertex shader size. */
+           gcoOS_Print("gcLoadProgram: Invalid vertex shader size %u", bytes);
+           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+           return gcvSTATUS_INVALID_DATA;
+        }
+
+        bytes -=  sizeof(gctUINT32);
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Load vertex shader bibary. */
+        gcmERR_BREAK(gcSHADER_Load(VertexShader,
+                                   buffer,
+                                   *bufferSize));
+
+        alignBufferSize = gcmALIGN(*bufferSize, 4);
+        buffer += alignBufferSize;
+        bytes -=  alignBufferSize;
+        bufferSize = (gctUINT32 *) buffer;
+
+        if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+           /* Invalid fragment shader size. */
+           gcoOS_Print("gcLoadProgram: Invalid fragment shader size %u", bytes);
+           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+           return gcvSTATUS_INVALID_DATA;
+        }
+
+        bytes -=  sizeof(gctUINT32);
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Load fragment shader binary. */
+        gcmERR_BREAK(gcSHADER_Load(FragmentShader,
+                                   buffer,
+                                   *bufferSize));
+
+        alignBufferSize = gcmALIGN(*bufferSize, 4);
+        buffer += alignBufferSize;
+        bytes -=  alignBufferSize;
+        bufferSize = (gctUINT32 *) buffer;
+
+        if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+           /* Invalid program states size. */
+           gcoOS_Print("gcLoadProgram: Invalid program states size %u", bytes);
+           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+           return gcvSTATUS_INVALID_DATA;
+        }
+
+        bytes -=  gcmSIZEOF(gctUINT32);
+        buffer += gcmSIZEOF(gctUINT32);
+
+        if (ProgramState)
+        {
+            ProgramState->stateBufferSize = *bufferSize;
+        }
+
+        /* If this binary saves state buffer, then load it. */
+        if (ProgramState && *bufferSize > 0)
+        {
+            /* Allocate program states buffer. */
+            gcmERR_BREAK(gcoOS_Allocate(os, *bufferSize, &pointer));
+            ProgramState->stateBuffer= pointer;
+            gcoOS_MemCopy(ProgramState->stateBuffer, buffer, *bufferSize);
+        }
+
+        buffer += *bufferSize;
+        bytes -=  *bufferSize;
+        bufferSize = (gctUINT32 *) buffer;
+
+        if (bytes < sizeof(gctUINT32) ||
+            bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+           /* Invalid hint size. */
+           gcoOS_Print("gcLoadProgram: Invalid hints size %u", bytes);
+           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+           return gcvSTATUS_INVALID_DATA;
+        }
+
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* If this binary saves hints, then load it. */
+        if (ProgramState && *bufferSize > 0)
+        {
+          /* Allocate hint structure buffer. */
+          gcmERR_BREAK(gcoOS_Allocate(os,
+                                      gcSHADER_GetHintSize(),
+                                      &pointer));
+
+          ProgramState->hints = pointer;
+
+          /* Copy the HINT structure. */
+          gcoOS_MemCopy(ProgramState->hints, buffer, *bufferSize);
+        }
+
+        buffer += *bufferSize;
+
+        /* Assert we copied the right number of bytes */
+        gcmASSERT(buffer - BinarySize == Binary);
+
+        /* Success. */
+        gcmFOOTER_ARG("*ProgramBufferSize=%lu *ProgramBuffer=0x%x *Hints=0x%x",
+                      ProgramState ? ProgramState->stateBufferSize : 0,
+                      ProgramState ? ProgramState->stateBuffer : gcvNULL,
+                      ProgramState ? ProgramState->hints : gcvNULL);
+
+        return gcvSTATUS_OK;
+    }
+    while (gcvFALSE);
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+#endif
+
+/*******************************************************************************
+**                                gcLoadCLSingleKernel
+********************************************************************************
+**
+**    Load pre-compiled shaders and pre-linked programs from a binary file.
+**
+**    INPUT:
+**
+**        gctPOINTER Binary
+**            Pointer to the binary data loaded.
+**
+**        gctUINT32 BinarySize
+**            Number of bytes in 'Binary'.
+**
+**    OUTPUT:
+**
+**        gcSHADER KernelShader
+**            Pointer to a vertex shader object.
+**
+**        gcsPROGRAM_STATE *ProgramState
+**            Pointer to a variable receicing the program state.
+*/
+gceSTATUS
+gcLoadCLSingleKernel(
+    IN gctPOINTER Binary,
+    IN gctUINT32 BinarySize,
+    OUT gcSHADER KernelShader,
+    IN OUT gcsPROGRAM_STATE *ProgramState
+    )
+{
+    gcoOS os;
+    gctUINT32 bytes;
+    gctUINT8_PTR buffer;
+    gctUINT32 *bufferSize;
+    gctUINT32 alignBufferSize;
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT8 language[4];
+    gctPOINTER pointer;
+
+    gcmHEADER_ARG("Binary=0x%x BinarySize=%lu",
+                  Binary, BinarySize);
+
+    do {
+        if (ProgramState)
+        {
+            ProgramState->stateBuffer = gcvNULL;
+            ProgramState->stateBufferSize = 0;
+            ProgramState->hints = gcvNULL;
+        }
+
+        /* Extract the gcoOS object pointer. */
+        os = gcvNULL;
+
+        gcmERR_BREAK(_gcLoadProgramHeader(Binary, BinarySize, (gctPOINTER)language));
+
+        if (language[0] != 'C' || language[1] != 'L')
+        {
+            gcoOS_Print("gcLoadCLSingleKernel: expect language type 'CL' instead of %c%c",
+                    language[0], language[1]);
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
+        }
+
+        buffer = (gctUINT8 *)Binary + _gcdProgramBinaryHeaderSize;
+        bytes = BinarySize - _gcdProgramBinaryHeaderSize;
+
+        bufferSize = (gctUINT32 *) buffer;
+
+        if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+            /* Invalid kernel shader size. */
+            gcoOS_Print("gcLoadCLSingleKernel: Invalid kernel shader size %u", bytes);
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
+        }
+
+        bytes -=  sizeof(gctUINT32);
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Load kernel shader bibary. */
+        gcmERR_BREAK(gcSHADER_LoadEx(KernelShader,
+                                     buffer,
+                                     *bufferSize));
+
+        alignBufferSize = gcmALIGN(*bufferSize, 4);
+        buffer += alignBufferSize;
+        bytes -=  alignBufferSize;
+        bufferSize = (gctUINT32 *) buffer;
+
+        if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+            /* Invalid program states size. */
+            gcoOS_Print("gcLoadProgram: Invalid program states size %u", bytes);
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
+        }
+
+        bytes -=  gcmSIZEOF(gctUINT32);
+        buffer += gcmSIZEOF(gctUINT32);
+
+        if (ProgramState)
+        {
+            ProgramState->stateBufferSize = *bufferSize;
+        }
+
+        /* If this binary saves state buffer, then load it. */
+        if (ProgramState && *bufferSize > 0)
+        {
+            /* Allocate program states buffer. */
+            gcmERR_BREAK(gcoOS_Allocate(os, *bufferSize, &pointer));
+            ProgramState->stateBuffer = pointer;
+            gcoOS_MemCopy(ProgramState->stateBuffer, buffer, *bufferSize);
+        }
+
+        buffer += *bufferSize;
+        bytes -=  *bufferSize;
+        bufferSize = (gctUINT32 *) buffer;
+
+        if (bytes < sizeof(gctUINT32) ||
+            bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+            /* Invalid hint size. */
+            gcoOS_Print("gcLoadCLSingleKernel: Invalid hints size %u", bytes);
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
+        }
+
+        buffer += gcmSIZEOF(gctUINT32);
+        bytes -= gcmSIZEOF(gctUINT32);
+
+        /* If this binary saves hints, then load it. */
+        if (ProgramState && *bufferSize > 0)
+        {
+            /* Allocate hint structure buffer. */
+            gcmERR_BREAK(gcoOS_Allocate(os,
+                                        gcSHADER_GetHintSize(),
+                                        &pointer));
+
+            gcoOS_ZeroMemory(pointer, gcSHADER_GetHintSize());
+            ProgramState->hints = (gcsHINT_PTR)pointer;
+
+            /* Copy the HINT structure. */
+            gcoOS_MemCopy(ProgramState->hints, buffer, *bufferSize);
+        }
+
+        buffer += *bufferSize;
+        bytes -= *bufferSize;
+
+        /* Load state delta */
+        bufferSize = (gctUINT32 *) buffer;
+        if (bytes < sizeof(gctUINT32) ||
+            bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+            gcoOS_Print("gcLoadCLSingleKernel: Invalid state delta %u", bytes);
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
+        }
+        if (ProgramState)
+        {
+            ProgramState->stateDeltaSize = *bufferSize;
+        }
+        buffer += gcmSIZEOF(gctUINT32);
+        bytes -= gcmSIZEOF(gctUINT32);
+        if (ProgramState && (*bufferSize > 0))
+        {
+            /* Allocate program states delta. */
+            gcmERR_BREAK(gcoOS_Allocate(os, *bufferSize, &pointer));
+            ProgramState->stateDelta = pointer;
+            gcoOS_MemCopy(ProgramState->stateDelta, buffer, *bufferSize);
+        }
+        buffer += *bufferSize;
+        bytes -= *bufferSize;
+
+        /* Load patch offsets */
+        bufferSize = (gctUINT32 *)buffer;
+        if (bytes < sizeof(gctUINT32) ||
+            bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+            gcoOS_Print("gcLoadCLSingleKernel: Invalid patch offsets %u", bytes);
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
+        }
+        buffer += gcmSIZEOF(gctUINT32);
+        bytes -= gcmSIZEOF(gctUINT32);
+        if (ProgramState && (*bufferSize > 0))
+        {
+            gcoOS_MemCopy(&ProgramState->patchOffsetsInDW, buffer, *bufferSize);
+        }
+        buffer += *bufferSize;
+        bytes -= *bufferSize;
+
+        /* Load video nodes. */
+        bufferSize = (gctUINT32 *) buffer;
+        if (bytes < sizeof(gctUINT32) ||
+            bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+            /* Invalid video nodes. */
+            gcoOS_Print("gcLoadCLSingleKernel: Invalid video nodes %u", bytes);
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
+        }
+
+        buffer += gcmSIZEOF(gctUINT32);
+        bytes -= gcmSIZEOF(gctUINT32);
+
+        /* Load vide nodes. */
+        if (ProgramState && *bufferSize > 0)
+        {
+            gcmASSERT(ProgramState->hints);
+            /* Allocate hint structure buffer. */
+            gcmERR_BREAK(_LoadShaderVidNodesAndFixup(KernelShader,
+                                                     ProgramState,
+                                                     buffer));
+        }
+        buffer += *bufferSize;
+        bytes -= *bufferSize;
+
+
+        /* Assert we copied the right number of bytes */
+        gcmASSERT(buffer - BinarySize == Binary);
+
+        /* Success. */
+        gcmFOOTER_ARG("*stateBufferSize=%lu *stateBuffer=0x%x *Hints=0x%x stateDeltaSize=%lu *stateDelta=0x%x",
+                      ProgramState ? ProgramState->stateBufferSize : 0,
+                      ProgramState ? ProgramState->stateBuffer : gcvNULL,
+                      ProgramState ? ProgramState->hints : gcvNULL,
+                      ProgramState ? ProgramState->stateDeltaSize: gcvNULL,
+                      ProgramState ? ProgramState->stateDelta: gcvNULL);
+
+        return gcvSTATUS_OK;
+    }
+    while (gcvFALSE);
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
 
 #endif
 #endif
-
 

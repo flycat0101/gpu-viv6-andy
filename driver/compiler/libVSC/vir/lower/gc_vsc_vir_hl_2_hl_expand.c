@@ -4659,10 +4659,7 @@ static VSC_ErrCode _VIR_HL_Preprocess(
                 }
             }
 
-            if ((VIR_OPCODE_isMemSt(opcode) ||
-                 VIR_OPCODE_isImgSt(opcode) ||
-                 VIR_OPCODE_isAttrSt(opcode)) &&
-                 VIR_Inst_Store_Have_Dst(inst))
+            if (VIR_OPCODE_hasStoreOperation(opcode) && VIR_Inst_Store_Have_Dst(inst))
             {
                 if (VIR_Operand_GetOpKind(dest) == VIR_OPND_CONST)
                 {

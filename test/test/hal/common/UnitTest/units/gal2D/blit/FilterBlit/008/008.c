@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -105,6 +105,7 @@ gceSTATUS LoadYUV420(Test2D *t2d, const char *filename)
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT32 width, imageWidth;
     gctUINT32 height, imageHeight;
+    gctUINT32 alignedStride;
     gctUINT32 address[3] = {0, 0, 0};
     gctPOINTER memory[3] = {0, 0, 0};
     gctUINT32 sizeY, sizeUV;
@@ -136,17 +137,19 @@ gceSTATUS LoadYUV420(Test2D *t2d, const char *filename)
                 gcvSURF_I420, gcvPOOL_SYSTEM, &t2d->srcSurf));
 
     gcmONERROR(gcoSURF_Lock(t2d->srcSurf, address, memory));
+    gcmONERROR(gcoSURF_GetAlignedSize(
+            t2d->srcSurf,gcvNULL, gcvNULL, &alignedStride));
 
     t2d->srcPhyAddr = gcmALIGN(address[0], 64);
     t2d->srcLgcAddr = (gctPOINTER)((gctSIZE_T)memory[0] + (t2d->srcPhyAddr - address[0]));
     t2d->srcWidth   = imageWidth;
     t2d->srcHeight  = imageHeight;
-    t2d->srcStride  = imageWidth;
+    t2d->srcStride  = alignedStride;
     t2d->srcFormat  = gcvSURF_I420;
     gcmASSERT(!(imageWidth & 1));
-    t2d->srcVStride = t2d->srcUStride = imageWidth >> 1;
+    t2d->srcVStride = t2d->srcUStride = t2d->srcStride >> 1;
 
-    sizeY = t2d->srcWidth * t2d->srcHeight;
+    sizeY = t2d->srcStride * t2d->srcHeight;
     gcmASSERT(!(sizeY & 3));
     sizeUV = sizeY >> 2;
 

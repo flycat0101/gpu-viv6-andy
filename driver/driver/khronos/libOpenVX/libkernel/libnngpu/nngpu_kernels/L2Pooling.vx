@@ -25,7 +25,7 @@ __kernel void gpuL2Pooling_NoPadFP32
         }
     }
 
-    dst.x = sqrt(sum/count);
+    dst.x = sqrt(sum/convert_float(count));
     write_imagef(output, (int4)(x, y, z, 0), dst);
 }
 
@@ -61,7 +61,7 @@ __kernel void gpuL2Pooling_NoPadQuant8
         }
     }
 
-    sum = sqrt(sum/count);
+    sum = sqrt(sum/convert_float(count));
     dst.x = floor(sum*scaleOut + zpOut + 0.5);
     write_imageui(output, (int4)(x, y, z, 0), dst);
 }
@@ -95,7 +95,7 @@ __kernel void gpuL2Pooling_FP32
         }
     }
 
-    dst.x = sqrt(sum/count);
+    dst.x = sqrt(sum/convert_float(count));
     write_imagef(output, (int4)(x, y, z, 0), dst);
 }
 
@@ -133,7 +133,7 @@ __kernel void gpuL2Pooling_NoPadQuant8
         }
     }
 
-    sum = sqrt(sum/count);
+    sum = sqrt(sum/convert_float(count));
     dst.x = floor(sum*scaleOut + zpOut + 0.5);
     write_imageui(output, (int4)(x, y, z, 0), dst);
 }

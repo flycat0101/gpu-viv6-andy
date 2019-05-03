@@ -39,7 +39,7 @@ LDFLAGS := $(LFLAGS) -Wl,-z,defs
 # Supply necessary libraries.
 
 LDLIBS := -L$(SDK_DIR)/drivers -L$(AQROOT)/driver/gbm/backends/viv/$(OBJ_DIR) \
-          -l:gbm_viv.so
+          -lgbm_viv
 
 ################################################################################
 # Describe object files.

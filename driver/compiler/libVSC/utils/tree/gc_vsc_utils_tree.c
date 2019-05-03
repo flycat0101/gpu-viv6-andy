@@ -80,10 +80,20 @@ void vscTREE_Initialize(VSC_TREE* pTree, VSC_MM* pMM, gctUINT leafInitAllocCount
 
 void vscTREE_Finalize(VSC_TREE* pTree)
 {
+    gctUINT     origElementSize = pTree->leafNodeArray.elementSize;
+
+    if (origElementSize != sizeof(VSC_TREE_NODE*))
+    {
+        gcmASSERT(gcvFALSE);
+        origElementSize = sizeof(VSC_TREE_NODE*);
+    }
+
     TNLST_FINALIZE(&pTree->nodeList);
     pTree->nextNodeId = 0;
     pTree->pRootNode = gcvNULL;
     vscSRARR_Finalize(&pTree->leafNodeArray);
+    /* We can't set the elementSize to 0 because we may need to use this array again. */
+    pTree->leafNodeArray.elementSize = origElementSize;
     pTree->pMM = gcvNULL;
 }
 

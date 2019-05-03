@@ -14,7 +14,7 @@
 #include "gc_es_context.h"
 #include "gc_chip_context.h"
 
-#define _GC_OBJ_ZONE __GLES3_ZONE_SHADER
+#define _GC_OBJ_ZONE gcdZONE_ES30_SHADER
 
 #define MAX_ALIASED_ATTRIB_COUNT 2
 
@@ -9734,7 +9734,7 @@ gcChipFlushUniformBlock(
     gceSTATUS status = gcvSTATUS_OK;
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
 
-    gcmHEADER_ARG("gc=0x%x program=0x%x ub=0x%x bufObj=0x%x logical=%zu offset=%lu size=%lu",
+    gcmHEADER_ARG("gc=0x%x program=0x%x ub=0x%x bufObj=0x%x logical=%u offset=%lu size=%lu",
                    gc, program, ub, bufObj, logical, offset, size);
 
     /* Verify the arguments. */

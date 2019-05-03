@@ -14,6 +14,7 @@
 #include "gc_cl_precomp.h"
 
 #define __NEXT_MSG_ID__     002016
+#define _GC_OBJ_ZONE        gcdZONE_CL_CONTEXT
 
 
 gctINT clfRetainContext(
@@ -600,7 +601,6 @@ clReleaseContext(
     }
 
     clfONERROR(clfReleaseContext(Context));
-
     VCL_TRACE_API(ReleaseContext)(Context);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;

@@ -13,7 +13,7 @@
 
 #include "gc_glff_precomp.h"
 
-#define _GC_OBJ_ZONE    glvZONE_CLEAR
+#define _GC_OBJ_ZONE    gcdZONE_ES11_CLEAR
 
 /*******************************************************************************
 **

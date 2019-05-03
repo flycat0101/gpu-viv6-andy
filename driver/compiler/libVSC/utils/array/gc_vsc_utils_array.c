@@ -97,6 +97,11 @@ gctUINT vscSRARR_GetElementCount(VSC_SIMPLE_RESIZABLE_ARRAY* pArray)
 
 gctUINT vscSRARR_AddElement(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, void* pNewEle)
 {
+    if (pArray->elementSize == 0)
+    {
+        WARNING_REPORT(VSC_ERR_INVALID_DATA, "The element size of an array is 0, something is wrong!!!");
+    }
+
     _CheckElementSpace(pArray);
     memcpy((gctUINT8*)pArray->pElement + pArray->elementSize*pArray->elementCount,
            pNewEle, pArray->elementSize);

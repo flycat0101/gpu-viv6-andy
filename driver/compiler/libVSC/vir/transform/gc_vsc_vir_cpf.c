@@ -367,6 +367,7 @@ _VSC_CPF_InWorkList(
 static void
 _VSC_CPF_Init(
     IN OUT VSC_CPF          *pCPF,
+    IN gcePATCH_ID          patchId,
     IN VSC_HW_CONFIG        *pHwCfg,
     IN VIR_Shader           *pShader,
     IN VSC_OPTN_CPFOptions  *pOptions,
@@ -374,6 +375,7 @@ _VSC_CPF_Init(
     IN VSC_MM               *pMM
     )
 {
+    VSC_CPF_SetAppNameId(pCPF, patchId);
     VSC_CPF_SetShader(pCPF, pShader);
     VSC_CPF_SetHwCfg(pCPF, pHwCfg);
     VSC_CPF_SetOptions(pCPF, pOptions);
@@ -1051,7 +1053,8 @@ _VSC_CPF_isScalarConst(
             constId = VIR_Operand_GetConstValForUniform(pShader,
                                                         pOpnd,
                                                         uniformSym,
-                                                        uniform);
+                                                        uniform,
+                                                        opndOffset);
             pConst = VIR_Shader_GetConstFromId(pShader, constId);
             constVal->value = pConst->value.vecVal.u32Value[index];
             constVal->type = type;
@@ -1157,9 +1160,12 @@ _VSC_CPF_SetDestNotConst(
     if (regNo != VIR_INVALID_ID)
     {
         VIR_OperandInfo opndInfo;
-        gctUINT i;
+        gctUINT i, count;
         VIR_Operand_GetOperandInfo(pInst, dstOpnd, &opndInfo);
-
+        /* regNo start from the startVirReg */
+        count =  (opndInfo.u1.virRegInfo.virReg - opndInfo.u1.virRegInfo.startVirReg);
+        gcmASSERT(regNo >= count);
+        regNo -= count;
         for (i = 0; i < opndInfo.u1.virRegInfo.virRegCount; i++)
         {
             /* we change the const value key for non isIN one */
@@ -1534,7 +1540,7 @@ gctBOOL                 allConst
         VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
     {
         VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
-        VIR_LOG(pDumper, "[CPF] Fold Const LDARR\n");
+        VIR_LOG(pDumper, "[CPF] Fold Const STARR\n");
         VIR_Inst_Dump(pDumper, pInst);
         VIR_LOG_FLUSH(pDumper);
     }
@@ -3270,6 +3276,12 @@ _VSC_CPF_PerformOnShader(
     VIR_FuncIterator    func_iter;
     VIR_FunctionNode    *func_node  = gcvNULL;
     VSC_OPTN_CPFOptions *pOptions    = VSC_CPF_GetOptions(pCPF);
+    gctUINT             maxInstCount = VSC_CPF_MAX_INST_COUNT_GENERAL;
+
+    if (VSC_CPF_GetAppNameId(pCPF) == gcvPATCH_DEQP)
+    {
+        maxInstCount = VSC_CPF_MAX_INST_COUNT_DEQP;
+    }
 
     if(VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
         VSC_OPTN_CPFOptions_TRACE_INPUT))
@@ -3283,7 +3295,7 @@ _VSC_CPF_PerformOnShader(
     {
         VIR_Function    *func = func_node->function;
 
-        if (VIR_Function_GetInstCount(func) > VSC_CPF_MAX_INST_COUNT)
+        if (VIR_Function_GetInstCount(func) > maxInstCount)
         {
             continue;
         }
@@ -3354,7 +3366,13 @@ VSC_CPF_PerformOnShader(
     /* Renumber instruction ID. */
     VIR_Shader_RenumberInstId(shader);
 
-    _VSC_CPF_Init(&cpf, &(pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg), shader, options, dumper, pPassWorker->basePassWorker.pMM);
+    _VSC_CPF_Init(&cpf,
+                  pPassWorker->pCompilerParam->cfg.ctx.appNameId,
+                  &(pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg),
+                  shader,
+                  options,
+                  dumper,
+                  pPassWorker->basePassWorker.pMM);
     errCode = _VSC_CPF_PerformOnShader(&cpf);
     _VSC_CPF_Final(&cpf);
 
@@ -3374,7 +3392,7 @@ VSC_ErrCode VSC_CPF_PerformOnFunction(
 
     memset(&cpfOptions, 0, sizeof(VSC_OPTN_CPFOptions));
 
-    _VSC_CPF_Init(&cpf, pHwCfg, pShader, &cpfOptions, gcvNULL, pMM);
+    _VSC_CPF_Init(&cpf, gcvPATCH_INVALID, pHwCfg, pShader, &cpfOptions, gcvNULL, pMM);
 
     _VSC_CPF_PerformOnFunction(&cpf, pFunc);
 

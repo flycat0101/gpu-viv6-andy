@@ -15,6 +15,8 @@
 #include "gc_vgsh_dump.h"
 #include "gc_hal_user.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG3D_DUMP
+
 gctUINT32 ZoneMask;
 gctUINT32 DebugLevel;
 

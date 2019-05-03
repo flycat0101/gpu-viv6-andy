@@ -14,6 +14,8 @@
 #include "gc_vg_precomp.h"
 #include <string.h>
 
+#define _GC_OBJ_ZONE                gcdZONE_VG_MATRIX
+
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
 \******************************************************************************/
@@ -1581,7 +1583,7 @@ VG_API_CALL void VG_API_ENTRY vgLoadIdentity(
     vgmENTERAPI(vgLoadIdentity)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s();\n",
             __FUNCTION__
             );
@@ -1642,7 +1644,7 @@ VG_API_CALL void VG_API_ENTRY vgLoadInverseMatrix(
             );
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(Matrix);\n",
             __FUNCTION__
             );
@@ -1785,7 +1787,7 @@ VG_API_CALL void VG_API_ENTRY vgLoadMatrix(
             );
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(Matrix);\n",
             __FUNCTION__
             );
@@ -1851,7 +1853,7 @@ VG_API_CALL void VG_API_ENTRY vgGetMatrix(
     vgmENTERAPI(vgGetMatrix)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X);\n",
             __FUNCTION__,
             Matrix
@@ -1921,7 +1923,7 @@ VG_API_CALL void VG_API_ENTRY vgMultMatrix(
             );
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(Matrix);\n",
             __FUNCTION__
             );
@@ -2069,7 +2071,7 @@ VG_API_CALL void VG_API_ENTRY vgTranslate(
         vgsMATRIXCONTAINER_PTR matrix = Context->matrix;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(%.10ff, %.10ff);\n",
             __FUNCTION__,
             TranslateX, TranslateY
@@ -2145,7 +2147,7 @@ VG_API_CALL void VG_API_ENTRY vgScale(
         vgsMATRIXCONTAINER_PTR matrix = Context->matrix;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(%.10ff, %.10ff);\n",
             __FUNCTION__,
             ScaleX, ScaleY
@@ -2213,7 +2215,7 @@ VG_API_CALL void VG_API_ENTRY vgShear(
         vgsMATRIXCONTAINER_PTR matrix = Context->matrix;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(%.10ff, %.10ff);\n",
             __FUNCTION__,
             ShearX, ShearY
@@ -2309,7 +2311,7 @@ VG_API_CALL void VG_API_ENTRY vgRotate(
         VGfloat sinAngle = gcmSINF(radians);
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(%.10ff);\n",
             __FUNCTION__,
             Angle

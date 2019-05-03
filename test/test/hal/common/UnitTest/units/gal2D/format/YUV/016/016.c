@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -68,30 +68,30 @@ static gctCONST_STRING s_CaseDescription =
 "HW feature dependency: ";
 
 typedef struct Test2D {
-    GalTest     base;
-    GalRuntime  *runtime;
+    GalTest         base;
+    GalRuntime      *runtime;
 
     // destination surface
-    gcoSURF        dstSurf;
-    gceSURF_FORMAT    dstFormat;
-    gctUINT        dstWidth;
-    gctUINT        dstHeight;
-    gctINT        dstStride;
-    gctUINT32        dstPhyAddr;
-    gctPOINTER        dstLgcAddr;
+    gcoSURF         dstSurf;
+    gceSURF_FORMAT  dstFormat;
+    gctUINT         dstWidth;
+    gctUINT         dstHeight;
+    gctINT          dstStride;
+    gctUINT32       dstPhyAddr;
+    gctPOINTER      dstLgcAddr;
 
-    T2D_SURF_PTR        dstTemp;
+    T2D_SURF_PTR    dstTemp;
 
     //source surface
-    gcoSURF        srcSurf;
-    gceSURF_FORMAT    srcFormat;
-    gctUINT        srcWidth;
-    gctUINT        srcHeight;
-    gctINT        srcStride[3];
-    gctINT              srcStrideNum;
-    gctINT              srcAddressNum;
-    gctUINT32        srcPhyAddr[3];
-    gctPOINTER        srcLgcAddr[3];
+    gcoSURF         srcSurf;
+    gceSURF_FORMAT  srcFormat;
+    gctUINT         srcWidth;
+    gctUINT         srcHeight;
+    gctINT          srcStride[3];
+    gctINT          srcStrideNum;
+    gctINT          srcAddressNum;
+    gctUINT32       srcPhyAddr[3];
+    gctPOINTER      srcLgcAddr[3];
 
 } Test2D;
 
@@ -196,6 +196,9 @@ gceSURF_FORMAT sFormat[] =
 {
     gcvSURF_NV12,
     gcvSURF_NV21,
+    gcvSURF_YUY2,
+    gcvSURF_YV12,
+    gcvSURF_NV16,
 };
 
 static gceSURF_ROTATION sRots[] =

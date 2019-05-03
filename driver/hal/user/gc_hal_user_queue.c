@@ -22,7 +22,7 @@
 
 #if (gcdENABLE_3D || gcdENABLE_2D)
 /* Zone used for header/footer. */
-#define _GC_OBJ_ZONE    gcvZONE_BUFFER
+#define _GC_OBJ_ZONE    gcdZONE_BUFFER
 
 gceSTATUS
 gcoQUEUE_Construct(
@@ -220,7 +220,7 @@ gcoQUEUE_Free(
     if (Queue->tail)
     {
         Queue->tail->next = gcmPTR_TO_UINT64(Queue->freeList);
-        Queue->freeList = Queue->tail;
+        Queue->freeList = Queue->head;
 
         Queue->head = Queue->tail = gcvNULL;
     }

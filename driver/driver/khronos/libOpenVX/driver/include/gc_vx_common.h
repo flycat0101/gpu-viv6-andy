@@ -20,6 +20,7 @@
 #include <math.h>
 #include <stdarg.h>
 #include <time.h>
+#include <ctype.h>
 
 #if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__) || defined(__APPLE__) || defined(__CYGWIN__)
 #include <dlfcn.h>
@@ -70,6 +71,9 @@
 #include "gc_vxk_common.h"
 
 #include <gc_vx_profiler.h>
+#ifdef USE_LIB_NN_ARCH_PERF
+#include "nnArchPerf.h"
+#endif
 
 
 /*
@@ -169,7 +173,7 @@
 #define VX_MAX_CONVOLUTION_DIM              15
 #define VX_INT_MAX_NONLINEAR_DIM            9
 #define VX_MAX_OPTICAL_FLOW_WINDOW_DIM      9
-#define VX_MAX_PARAMETERS                   30
+#define VX_MAX_PARAMETERS                   48
 #define VX_MAX_NODES_IN_GRAPH               VX_MAX_NODE_COUNT
 #define VX_MAX_PLANES                       4
 #define VX_MAX_NODE_COUNT_ONE_BLOCK         16
@@ -199,6 +203,7 @@
 #define VX_MAX_MEM_REQUEST_INPUT            64
 #define VX_MAX_MEM_REQUEST_OUTPUT           32
 #define VX_MAX_MEM_PARAM                     2
+#define VX_KERNEL_PATTERN_BIT_SIZE          64
 
 /* Function macros */
 #ifndef vxmLENGTH_OF
@@ -244,6 +249,9 @@
 #define vxmIS_OUTPUT_OR_BIDIRECTION(d)      ((d) == VX_OUTPUT || (d) == VX_BIDIRECTIONAL)
 
 #define vxmIS_VALID_STATE(s)                ((s) == VX_PARAMETER_STATE_REQUIRED || (s) == VX_PARAMETER_STATE_OPTIONAL)
+
+/* Is d aligned to align? */
+#define vxmIS_ALIGNED(d, align)                    (!((d) & ((align) - 1)))
 
 #define vxmCHECK_PRECISION(tensor, precisions) \
         if ((tensor != VX_NULL) && (tensor->tensorBuffer->precision != precisions)) \
@@ -301,6 +309,13 @@
 
 #define VX_INVALID_VALUE  0xDEADDEAD
 
+#define vxmARCH_VIP_SRAM_SIZE \
+    ((context->nnConfig.customizedFeature.vipSRAMSize <= VX_VIP_SRAM_IMAGE_STREAM_SIZE) ? context->nnConfig.customizedFeature.vipSRAMSize : \
+    (context->nnConfig.customizedFeature.vipSRAMSize - VX_VIP_SRAM_IMAGE_STREAM_SIZE))
+
+#define vxmARCH_AXI_SRAM_SIZE \
+    (context->nnConfig.customizedFeature.axiSRAMSize)
+
 /*
 ** typedefs
 */
@@ -327,6 +342,8 @@ typedef vx_uint32 *                         vx_uint32_ptr;
 
 typedef vx_float32 *                        vx_float32_ptr;
 typedef vx_float64 *                        vx_float64_ptr;
+
+typedef vx_int64 *                          vx_int64_ptr;
 
 typedef const vx_uint8 *                    vx_const_uint8_ptr;
 
@@ -462,6 +479,8 @@ enum vx_kernel_internal_e
     VX_KERNEL_INTERNAL_TRANSPOSE_2D_TENSOR         = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x38,
 
     VX_KERNEL_INTERNAL_MULTIPLY_2D_MATRIXES        = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x39,
+
+    VX_KERNEL_INTERNAL_ROI_POOLING_RELU_LAYER      = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x3A,
 };
 
 
@@ -875,9 +894,6 @@ typedef struct _vx_tp_coomandInfo_s
     vx_int32  inImageBorderConst;
     vx_int32  aluInputPreshift;
     vx_int32  aluOutputPostshift;
-    vx_uint32 inAddressOffset;
-    vx_uint32 inAddressExOffset;
-    vx_uint32 outAddressOffset;
     vx_int32  noFlush;
 }
 vx_tp_coomandInfo_s;
@@ -1003,6 +1019,7 @@ typedef struct _vx_argument
     gctBOOL                 isMemObj;
     gctBOOL                 noBatch;
     gctBOOL                 isVivArray;
+    gctUINT32               components;
 }
 vx_argument_s;
 
@@ -1238,6 +1255,7 @@ typedef struct _vx_memory_map_s
 typedef struct _vx_reference_item
 {
     vx_reference                            ref;
+    struct _vx_reference_item *             prev;
     struct _vx_reference_item *             next;
 } vx_reference_item_s, *vx_reference_item;
 
@@ -1310,6 +1328,9 @@ typedef struct _vx_context
     /* vx_nn_config*                           config; */
     vx_nn_config                            nnConfig;
 
+    /* hw chip info */
+    vx_hw_chip_info                         hwChipInfo;
+
     vx_uint32                               cnnAvailableEventID;
 
     vxnne_kernel_shaders_s                  kernels[VXNNE_KERNEL_FIXED_COUNT + VXNNE_KERNEL_DYNAMIC_COUNT + 1];
@@ -1322,6 +1343,10 @@ typedef struct _vx_context
 
     vx_drv_option                           options;
 
+
+#ifdef USE_LIB_NN_ARCH_PERF
+    APMHandle                               apm;
+#endif
 
     vx_uint32                               allTensorNum;
 
@@ -1585,8 +1610,6 @@ typedef struct _vx_graph
     vx_uint32                              *commandBuffer;
     vx_uint32                               commandBufferSizeInByte;
 
-    vx_bool                                 hasPrintf;
-
     vxnne_execution_layer                   layer;
 
     vx_binary_save                          binarySave;
@@ -1625,10 +1648,12 @@ vx_bounds_e;
 
 enum
 {
-    VXNNE_MEM_POOL_TYPE_ORIG_DDR,
-    VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR,
-    VXNNE_MEM_POOL_TYPE_AXI_SRAM,
-    VXNNE_MEM_POOL_TYPE_VIP_SRAM,
+    VXNNE_MEM_POOL_TYPE_ORIG_DDR     = 0x0,
+    VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR  = 0x1,
+    VXNNE_MEM_POOL_TYPE_AXI_SRAM     = 0x2,
+    VXNNE_MEM_POOL_TYPE_VIP_SRAM     = 0x4,
+    VXNNE_MEM_POOL_TYPE_END          = 0x5, /* may change to 7 if second phase3 step */
+    VXNNE_MEM_POOL_TYPE_SRAM         = 0x2 | 0x4,
 };
 
 typedef struct _vx_memory_s
@@ -1641,7 +1666,30 @@ typedef struct _vx_memory_s
     vx_size                                 sizes[VX_MAX_PLANES];
 
     vx_bool                                 allocated;
+#define VXNNE_MEM_POOL_TYPE_SET_CACHE(t)       (t | 0x8000)
+#define VXNNE_MEM_POOL_TYPE_IS_CACHE(t)        (t & 0x8000)
+#define VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(t)   (t & 0x3FFF)
     vx_enum                                 allocType;
+#define  VXNNE_MEM_ALLOC_MUST_HAVE                  0    /* for default or swtiling */
+#define  VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1        1    /* for ab buffer */
+#define  VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_2        2    /* for ab buffer */
+#define  VXNNE_MEM_ALLOC_PRIORITY_TYPE_KIND         3
+#define  VXNNE_MEM_ALLOC_HIGHEST_PRIORITY           VXNNE_MEM_ALLOC_MUST_HAVE
+#define  VXNNE_MEM_ALLOC_LOWEST_PRIORITY            VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_2
+#define  MEM_PRIORITY_LEFT_LOWER_RIGHT(left, right)  (left > right ? vx_true_e : vx_false_e)
+#define  MEM_PRIORITY_LEFT_HIGHER_RIGHT(left, right)  (left < right ? vx_true_e : vx_false_e)
+#define  MEM_PRIORITY_DOWN_LEVEL(_p) ((_p) == VXNNE_MEM_ALLOC_LOWEST_PRIORITY ? (_p) : (_p+1))
+#define  MEM_PRIORITY_UP_LEVEL(_p)   ((_p) == VXNNE_MEM_ALLOC_HIGHEST_PRIORITY ? (_p) : (_p-1))
+#define  LOOP_MEM_PRIORITY_HIGH2LOWEST(_p, from) \
+             for (_p = from; _p <= VXNNE_MEM_ALLOC_LOWEST_PRIORITY; _p = MEM_PRIORITY_DOWN_LEVEL(_p))
+#define  LOOP_MEM_PRIORITY_LOWEST2HIGH(_p, to) \
+             for (_p = VXNNE_MEM_ALLOC_LOWEST_PRIORITY; _p >= to; _p = MEM_PRIORITY_UP_LEVEL(_p))
+    vx_enum                                 allocPriority;
+    vx_bool                                 allocPartial;
+
+#define VXNNE_MEM_ID_INIT_VALUE   0xFFFFFFFF
+    vx_uint32                               lastUseId;
+    vx_uint32                               firstUseId;
 
     vx_size                                 memOffset;
     vx_bool                                 memReverse;
@@ -1661,10 +1709,6 @@ typedef struct _vx_memory_s
 
     /* currently only for virtual buffer and virtual tensor memory allocation */
     vx_graph                                graph;
-
-#define VXNNE_MEM_ID_INIT_VALUE   0xFFFFFFFF
-    vx_uint32                               lastUseId;
-    vx_uint32                               firstUseId;
 }
 vx_memory_s;
 
@@ -1676,6 +1720,8 @@ typedef struct _vxnne_mem_request_s
     vx_memory   inputMemory[VX_MAX_MEM_REQUEST_INPUT];
     vx_uint32   outputCount;
     vx_memory   outputMemory[VX_MAX_MEM_REQUEST_OUTPUT];
+    vx_memory_s kernelCache;
+    vx_memory_s imageCache;
 }
 vxnne_mem_request_s;
 
@@ -1896,6 +1942,7 @@ typedef enum _vx_tp_cmd_type_e
     TP_TENSOR_COPY,
     TP_TENSOR_PAD,
     TP_LSTM_RESHUFFLE_INPUT,
+    TP_LSTM_STATE_OUT,
     TP_LSTM_RESHUFFLE_STATE_O,
     TP_CMD_NUM,
     TP_ROI_POOLING_STEP_1,
@@ -1910,17 +1957,6 @@ typedef enum _vx_tp_cmd_type_e
     TP_TENSOR_COUNT,
 }
 vx_tp_cmd_type_e;
-
-/*
- * LRN_ALGORITHM_TYPE_LRN2:
- *   b[xyz] = a[xyz] / power(shift + alpha * sum(square(a[xyi])), beta)
- *   i is from max(0, z - kernel / 2) to min(inImageZSize - 1, z + kernel / 2).
- */
-typedef enum _vx_lrn_algorithm_type {
-    LRN_ALGORITHM_TYPE_LRN,
-    LRN_ALGORITHM_TYPE_LRN2
-}
-vx_lrn_algorithm_type;
 
 typedef enum _vx_nn_feature_e
 {
@@ -1960,6 +1996,7 @@ typedef enum _vx_nn_feature_e
     VX_NN_FEATURE_SCALER,
     VX_NN_FEATURE_NN_DEPTHWISE_SUPPORT,
     VX_NN_FEATURE_VIP_DEC400,
+    VX_NN_FEATURE_SHADER,
 
     VX_NN_FEATURE_COUNT,
 }
@@ -1993,114 +2030,6 @@ enum
     VX_SWTILING_OPTION_AB     = 2,
     VX_SWTILING_OPTION_TILING = 3,
 };
-
-#pragma pack(push, 8)
-typedef struct _vx_general_info_s
-{
-    vx_uint32                                kx;
-    vx_uint32                                ky;
-    vx_uint32                                kz;
-    vx_uint32                                oinx;
-    vx_uint32                                oiny;
-    vx_uint32                                oinz;
-    vx_uint32                                inx;
-    vx_uint32                                iny;
-    vx_uint32                                inz;
-    vx_uint32                                outx;
-    vx_uint32                                outy;
-    vx_uint32                                outz;
-    vx_uint32                                stridex;
-    vx_uint32                                stridey;
-    vx_uint32                                dataSize;
-    vx_uint32                                poolingSize;
-    vx_uint32                                poolingStride;
-    vx_int32                                 xOffSet;
-    vx_int32                                 yOffSet;
-    vx_int32                                 inputDataFormat;
-    vx_int32                                 nnCores;
-    vx_int32                                 convOutFifoDepth;
-    vx_uint32                                kernelSize;
-    vx_uint32                                pix;
-    vx_uint32                                piy;
-    vx_uint32                                p3;
-    vx_uint32                                nextKY;/*the Y size of output subimage in AXI SRAM need it to add the subimage Y overlap*/
-    vx_int32                                 flush;
-}
-vx_general_info_s;
-
-typedef struct _vx_swtiling_info_s
-{
-    vx_uint8    srcBuf;
-    vx_uint8    dstBuf;
-    vx_uint8    kernelBuf;
-
-    vx_int32    cacheSpaceInKB;
-    vx_bool     calcNonFirstCmd;
-    vx_bool     isNonFirstComputeBottleNeck;
-
-    vx_float64  perfNonFirstCycleCount;
-    vx_float64  perfNonFirstKernelReadBandWidth;
-    vx_float64  perfNonFirstInImageReadBandWidth;
-    vx_float64  perfNonFirstReadBandWidth;
-    vx_float64  perfNonFirstWriteBandWidth;
-    vx_float64  perfNonFirstAXIReadBandWidth;
-    vx_float64  perfNonFirstAXIWriteBandWidth;
-
-    vx_uint32   origInX;
-    vx_uint32   origInY;
-    vx_uint32   origOutX;
-    vx_uint32   origOutY;
-    vx_uint32   origOutZ;
-
-    vx_enum     kernelCacheMode;
-    vx_enum     imageCacheMode;
-
-
-    vx_uint32   outImageStride;
-    vx_uint32   outImageSlice;
-}
-vx_swtiling_info_s;
-
-typedef struct _vx_performance_info_s
-{
-#define HALF_DONE 0x5
-    vx_uint8                                 calculated;
-    vx_uint32                                kernelsPerCore;
-    vx_uint32                                outImageTileXSize;
-    vx_uint32                                outImageTileYSize;
-    vx_uint32                                interleaveMode;
-    vx_uint32                                nnCoreCount;
-    vx_float64                               perfCycleCount;
-    vx_float64                               perfReadBandWidth;
-    vx_float64                               perfWriteBandWidth;
-    vx_float64                               perfAXIReadBandWidth;
-    vx_float64                               perfAXIWriteBandWidth;
-    vx_float64                               perfKernelReadBandWidth;
-    vx_float64                               perfInImageReadBandWidth;
-    vx_bool                                  isFirstComputeBottleNeck;
-}
-vx_performance_info_s;
-
-typedef struct _vx_arch_perf_s
-{
-    vx_general_info_s                        info;
-
-    vx_swtiling_info_s                       swTilingInfo;
-
-    vx_float64                               coefNonZeroRatio;
-    vx_float64                               coefCompressRatio;
-    vx_float64                               imageCompressRatio;
-    vx_float64                               imageNonZeroRatio;
-
-    vx_performance_info_s                    resultInfo;
-
-    vxnne_operator_e                         opType;
-    vxnne_operation_target_e                 opTarget;
-
-    vx_bool                                  calculated;
-}
-vx_arch_perf_s;
-#pragma pack(pop)
 
 typedef struct _vx_weights_biases_parameter_base_s
 {
@@ -2147,14 +2076,18 @@ typedef struct _vx_weights_biases_parameter_base_s
     vx_uint32                                memory_pad;
     vx_uint32                                memory_head_offset;
 
-    vx_uint8_ptr                             weightPtr;
-    vx_uint32_ptr                            biasPtr;
-
     vx_size                                  tpFcStreamTotalSize;
     vx_uint8_ptr                             zrlTpFcPtr;
 
     vx_tensor                                origWeight;
     vx_tensor                                origBias;
+    vx_tensor                                origAlpha;
+
+    /* need remove after mem optimization path is ok */
+    vx_uint8_ptr                             weightPtr;
+    vx_uint32_ptr                            biasPtr;
+
+    vx_uint8_ptr                             reshuffleWeightPtr;
 }
 vx_weights_biases_parameter_base_s;
 #define LOG_RUN_SIZE1 4    /*The 2nd set of run-length can have 1<<LOG_RUN_SIZE1 of run-length*/
@@ -2204,8 +2137,8 @@ vx_weights_biases_huffman_cfg_s, *vx_weights_biases_huffman_cfg;
 #define WB_BIAS_SCALE(wb)                      (wb)->wb_base->biasScale
 #define WB_MEM_HEAD_OFFSET(wb)                 (wb)->wb_base->memory_head_offset
 #define WB_MEM_PAD(wb)                         (wb)->wb_base->memory_pad
-#define WB_WEIGHT_DATA(wb)                     (wb)->wb_base->weightPtr
-#define WB_BIAS_DATA(wb)                       (wb)->wb_base->biasPtr
+#define WB_WEIGHT_TENSOR(wb)                   (wb)->wb_base->origWeight
+#define WB_BIAS_TENSOR(wb)                     (wb)->wb_base->origBias
 #define WB_TP_FC_ZRL(wb)                       (wb)->wb_base->zrlTpFcPtr
 
 #define WB_KERNEL_X(wb)                        (wb)->weights_sizes[0]
@@ -2267,6 +2200,7 @@ typedef struct _vx_weights_biases_slice_s
     vx_size                                  kernel_orig_size;
     vx_size                                  kernel_stream_size;
     vx_size                                  kernel_align_stream_size;
+    vx_size                                  kernel_stream_full_cache_size;
 
     vx_uint32                                non_zero_count;
     vx_uint32                                reserve_weight_count;

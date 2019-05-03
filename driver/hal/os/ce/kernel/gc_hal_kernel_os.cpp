@@ -5314,3 +5314,25 @@ gckOS_GetPolicyID(
     return gcvSTATUS_NOT_SUPPORTED;
 }
 
+gceSTATUS
+gckOS_RequestReservedMemory(
+    gckOS Os,
+    gctPHYS_ADDR_T Start,
+    gctSIZE_T Size,
+    const char * Name,
+    gctBOOL Requested,
+    gctPOINTER * MemoryHandle
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+void
+gckOS_ReleaseReservedMemory(
+    gckOS Os,
+    gctPOINTER MemoryHandle
+    )
+{
+    return;
+}
+

@@ -147,6 +147,13 @@ VIR_Lower_SetEnableX(
     );
 
 gctBOOL
+VIR_Lower_SetEnableXY(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
 VIR_Lower_SetEnableXAndIntType(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -294,6 +301,30 @@ VIR_Lower_GetBaseType(
 
 gctBOOL
 VIR_Lower_IsIntOpcode(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
+VIR_Lower_IsDstOneEnable(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
+VIR_Lower_IsDstTwoEnables(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
+VIR_Lower_IsDstThreeEnables(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
+VIR_Lower_IsDstFourEnables(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
     );
@@ -488,6 +519,30 @@ VIR_Lower_HasTexldModifier(
     );
 
 gctBOOL
+VIR_Lower_IsI2I(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
+VIR_Lower_SameSizeType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
+VIR_Lower_NotSameSizeType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
+VIR_Lower_SameType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
 VIR_Lower_label_set_jmp_n(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -606,6 +661,13 @@ VIR_Lower_GetTexModifierKind(
 
 gctBOOL
 VIR_Lower_SetLongUlongInstType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetPrecisionBaseOnSrc0(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
     IN VIR_Operand        *Opnd

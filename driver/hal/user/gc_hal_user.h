@@ -1152,6 +1152,13 @@ gcoHARDWARE_QueryNNConfig(
     IN gcoHARDWARE Hardware,
     OUT gctPOINTER Config
     );
+
+gceSTATUS
+gcoHARDWARE_QueryHwChipInfo(
+    IN  gcoHARDWARE  Hardware,
+    OUT gctUINT32   *customerID,
+    OUT gctUINT32   *ecoID
+    );
 #endif
 
 #if gcdENABLE_3D
@@ -2904,8 +2911,8 @@ typedef struct _vx_evis_no_inst_struct
     gctBOOL lerp7Output;
     gctBOOL accsq8Output;
     gctBOOL noBilinear;
-    gctBOOL isVX2;
-    gctBOOL supportEVIS;
+    gctBOOL isVX2;  /* it is for evis 2*/
+    gctBOOL supportEVIS; /* it is for evis 1 */
 }
 vx_evis_no_inst_s;
 
@@ -2918,6 +2925,13 @@ typedef struct _vx_nn_config
     gcsNN_DERIVED_FEATURE    derivedFeature;
 }
 vx_nn_config;
+
+typedef struct _vx_hw_chip_info
+{
+    gctUINT32                customerID;
+    gctUINT32                ecoID;
+}
+vx_hw_chip_info;
 
 typedef struct _vx_drv_option
 {
@@ -2957,8 +2971,8 @@ typedef struct _vx_drv_option
     gctFLOAT axiBusReadBWLimit;
     gctFLOAT axiBusWriteBWLimit;
     gctFLOAT axiBusTotalBWLimit;
-    gctUINT vipSRAMSizeInKB;
-    gctUINT axiSRAMSizeInKB;
+    gctUINT vipSRAMSize;
+    gctUINT axiSRAMSize;
     gctSTRING graphPerfLogFile;
     gctUINT nnZeroRunLen;
     gctINT  tpZeroRunLen;
@@ -2979,6 +2993,7 @@ typedef struct _vx_drv_option
     gctUINT nn1x1To1xN;
     gctUINT enableGraphTranform;
     gctUINT enableGraphWAR7;
+    gctUINT enableGraphPadConv;
     gctUINT enableGraphMerge;
     gctUINT enableGraphDump;
     gctUINT enableTransformNMConv;
@@ -2991,6 +3006,7 @@ typedef struct _vx_drv_option
     gctUINT enableGraphSwaplayer;
     gctUINT enableGraphReshapelayer;
     gctUINT enableGraphConcalayer;
+    gctUINT enableGraphMergeTranspose;
     gctUINT freqInMHZ;
     gctUINT axiClockFreqInMHZ;
     gctUINT maxSocOTNumber;
@@ -3001,13 +3017,148 @@ typedef struct _vx_drv_option
     gctUINT enableYUV2RGBScaler;
     gctUINT enableVIPDEC400;
     gctUINT enableCacheGraphBinary;
+    gctSTRING enableOpsDebugInfo;
+    gctUINT enableMemOptimization;
 }
 vx_drv_option;
+
+typedef union _vx_nn_cmd_split_info_union
+{
+    struct _vx_nn_general_cmd_split_info
+    {
+        gctUINT32 inImageXSize;
+        gctUINT32 inImageYSize;
+        gctUINT32 inImageAddress;
+        gctINT32  inImageXOffset;
+        gctINT32  inImageYOffset;
+
+        gctUINT32 outImageXSize;
+        gctUINT32 outImageYSize;
+        gctUINT32 outImageAddress;
+    }
+    vx_nn_general_cmd_split_info;
+
+    struct _vx_tp_general_cmd_split_info
+    {
+        gctUINT32 inImageXSize;
+        gctUINT32 inImageYSize;
+        gctUINT32 inImageZSize;
+        gctUINT32 inImageStride;
+        gctUINT32 inImageSlice;
+        gctINT32  inWindowXStart;
+        gctINT32  inWindowYStart;
+        gctUINT32 inWindowXEnd;
+        gctUINT32 inWindowYEnd;
+        gctUINT32 inImageBaseAddress;
+        gctUINT32 inTileListAddress;
+        gctUINT32 inTileXSize;
+        gctUINT32 inTileYSize;
+        gctUINT32 inTileXInc;
+        gctUINT32 inTileYInc;
+        gctUINT32 inTileSequence;
+
+        gctUINT32 outBaseAddress;
+        gctUINT32 outLoop1Reset;
+        gctUINT32 outLoop2Reset;
+        gctUINT32 outLoop3Reset;
+        gctUINT32 outLoop0Inc;
+        gctUINT32 outLoop1Inc;
+        gctUINT32 outLoop2Inc;
+        gctUINT32 outLoop3Inc;
+        gctUINT32 outLoop4Inc;
+        gctUINT32 outLoop5Inc;
+        gctUINT32 outLoop6Inc;
+        gctUINT32 outLoop0Count;
+        gctUINT32 outLoop1Count;
+        gctUINT32 outLoop2Count;
+        gctUINT32 outLoop3Count;
+        gctUINT32 outLoop4Count;
+        gctUINT32 outLoop5Count;
+
+        gctUINT32 aluReorderBitsUsed;
+        gctUINT32 aluReorderLoop2Mode;
+
+        gctUINT32 inImageCircularBufSize;
+        gctUINT32 inImageCircularBufEndAddrPlus1;
+        gctUINT32 outImageCircularBufSize;
+        gctUINT32 outImageCircularBufEndAddrPlus1;
+
+        gctUINT32 needReorder;
+        gctINT32  noFlush;
+        gctUINT32 last;
+    }
+    vx_tp_general_cmd_split_info;
+
+    struct _vx_tp_fc_cmd_split_info
+    {
+        gctUINT32 inImageXSize;
+        gctUINT32 inImageYSize;
+        gctUINT32 inImageZSize;
+        gctUINT32 inImageStride;
+        gctUINT32 inImageSlice;
+        gctINT32  inWindowXStart;
+        gctINT32  inWindowYStart;
+        gctUINT32 inWindowXEnd;
+        gctUINT32 inWindowYEnd;
+        gctUINT32 inImageBaseAddress;
+        gctUINT32 inTileListAddress;
+        gctUINT32 inTileXSize;
+        gctUINT32 inTileYSize;
+        gctUINT32 inTileXInc;
+        gctUINT32 inTileYInc;
+        gctUINT32 inTileSequence;
+
+        gctUINT32 outBaseAddress;
+        gctUINT32 outLoop1Reset;
+        gctUINT32 outLoop2Reset;
+        gctUINT32 outLoop3Reset;
+        gctUINT32 outLoop0Inc;
+        gctUINT32 outLoop1Inc;
+        gctUINT32 outLoop2Inc;
+        gctUINT32 outLoop3Inc;
+        gctUINT32 outLoop4Inc;
+        gctUINT32 outLoop5Inc;
+        gctUINT32 outLoop6Inc;
+        gctUINT32 outLoop0Count;
+        gctUINT32 outLoop1Count;
+        gctUINT32 outLoop2Count;
+        gctUINT32 outLoop3Count;
+        gctUINT32 outLoop4Count;
+        gctUINT32 outLoop5Count;
+
+        gctUINT32 aluReorderBitsUsed;
+        gctUINT32 aluReorderLoop2Mode;
+
+        gctUINT32 inImageCircularBufSize;
+        gctUINT32 inImageCircularBufEndAddrPlus1;
+        gctUINT32 outImageCircularBufSize;
+        gctUINT32 outImageCircularBufEndAddrPlus1;
+
+        gctUINT32 needReorder;
+        gctINT32  noFlush;
+        gctUINT32 last;
+
+        gctUINT32 aluHorzProcCount;
+        gctUINT32 aluVertProcCount;
+        gctUINT32 aluLoadPwlLUTAddress;
+    }
+    vx_tp_fc_cmd_split_info;
+}
+vx_nn_cmd_split_info_u;
 
 typedef union _vx_nn_cmd_info_union
 {
     struct _vx_nn_general_cmd_info
     {
+        gctUINT32 inImageXSize;
+        gctUINT32 inImageYSize;
+        gctUINT32 inImageAddress;
+        gctINT32  inImageXOffset;
+        gctINT32  inImageYOffset;
+        gctUINT32 outImageXSize;
+        gctUINT32 outImageYSize;
+        gctUINT32 outImageAddress;
+
         gctUINT32 kernelAddress;
         gctUINT32 kernelXSize;
         gctUINT32 kernelYSize;
@@ -3015,43 +3166,32 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32 kernelsPerCore;
         gctUINT32 pooling;
         gctUINT32 poolingXYSize;
-        gctUINT32 inImageXSize;
-        gctUINT32 inImageYSize;
-        gctINT32  inImageXOffset;
-        gctINT32  inImageYOffset;
-        gctUINT32 inImageAddress;
         gctUINT32 inImageXstride;
         gctUINT32 inImageYstride;
         gctUINT32 inImageCircularBufSize;
         gctUINT32 inImageCircularBufEndAddrPlus1;
-
-        gctUINT32 outImageXSize;
-        gctUINT32 outImageYSize;
         gctUINT32 outImageZSize;
         gctUINT32 outImageTileXSize;
         gctUINT32 outImageTileYSize;
-        gctUINT32 outImageAddress;
         gctUINT32 outImageXstride;
         gctUINT32 outImageYstride;
         gctUINT32 outImageCircularBufSize;
         gctUINT32 outImageCircularBufEndAddrPlus1;
-
         gctUINT32  roundingMode;
         gctUINT32  relu;
         gctINT32   nn_layer_flush;
         gctUINT32  postMultiplier;
         gctUINT32  postMultiplierBit6to1;
         gctUINT32  postMultiplierBit14to7;
+        gctUINT32  postMultiplierBit22to15;
         gctINT32   postShift;
         gctUINT32  postShiftBit6to5;
         gctUINT32  wSize;
         gctUINT8   kernelDataType;
         gctUINT8   inImageDataType;
         gctUINT8   outImageDataType;
-
         gctUINT32  coefZP;
         gctUINT32  outputZP;
-
         gctUINT8   brickMode;
         gctUINT32  brickDistance;
         /* for SRAM */
@@ -3066,13 +3206,8 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32 kernelDirectStreamFromVipSram;
         gctUINT32 imageStartAddress;
         gctUINT32 imageEndAddress;
-
-
-
-
         gctUINT32 inImageBorderMode;
         gctINT32  inImageBorderConst;
-
         gctUINT8  kernelDataTypeMsb;
         gctUINT8  inImageDataTypeMsb;
         gctUINT8  outImageDataTypeMsb;
@@ -3096,42 +3231,17 @@ typedef union _vx_nn_cmd_info_union
         gctINT32  inWindowYStart;
         gctUINT32 inWindowXEnd;
         gctUINT32 inWindowYEnd;
-        gctUINT32 inTileSequence;
-        gctUINT32 inTileListGlobalMem;
-        gctUINT32 inImageGlobalMem;
-        gctUINT32 aluI2FEnable;
-        gctUINT32 aluSquareEnable;
-        gctUINT32 aluHorzProcessing;
-        gctUINT32 aluHorzProcCount;
-        gctUINT32 aluHorzProcStride;
-        gctUINT32 aluVertProcessing;
-        gctUINT32 aluVertProcCount;
-        gctUINT32 aluVertProcStride;
-        gctUINT32 aluNmsEnable;
-        gctUINT32 aluPwlEnable;
-        gctUINT32 aluMultEnable;
-        gctUINT32 aluF2IEnable;
-        gctUINT32 aluLoadPwlLUT;
-        gctUINT32 aluLoadPwlLUTGlobalMem;
         gctUINT32 inImageBaseAddress;
         gctUINT32 inTileListAddress;
         gctUINT32 inTileXSize;
         gctUINT32 inTileYSize;
         gctUINT32 inTileXInc;
         gctUINT32 inTileYInc;
-        gctUINT32 aluLoadPwlLUTAddress;
-        gctUINT32 outTileSkipAtborder;
-        gctUINT32 outGlobalMem;
+        gctUINT32 inTileSequence;
+        gctUINT32 outBaseAddress;
         gctUINT32 outLoop1Reset;
         gctUINT32 outLoop2Reset;
         gctUINT32 outLoop3Reset;
-        gctUINT32 outBrickMode;
-        gctUINT32 aluZFilterMode;
-        gctUINT32 inWindowZStartOverfetch;
-        gctUINT32 inWindowZEndOverfetch;
-        gctUINT32 aluSquarePreshift;
-        gctUINT32 last;
-        gctUINT32 outBaseAddress;
         gctUINT32 outLoop0Inc;
         gctUINT32 outLoop1Inc;
         gctUINT32 outLoop2Inc;
@@ -3145,6 +3255,40 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32 outLoop3Count;
         gctUINT32 outLoop4Count;
         gctUINT32 outLoop5Count;
+        gctUINT32 aluReorderBitsUsed;
+        gctUINT32 aluReorderLoop2Mode;
+        gctUINT32 inImageCircularBufSize;
+        gctUINT32 inImageCircularBufEndAddrPlus1;
+        gctUINT32 outImageCircularBufSize;
+        gctUINT32 outImageCircularBufEndAddrPlus1;
+        gctUINT32 needReorder;
+        gctINT32  noFlush;
+        gctUINT32 last;
+        gctUINT32 aluHorzProcCount;
+        gctUINT32 aluVertProcCount;
+        gctUINT32 aluLoadPwlLUTAddress;
+        gctUINT32 inImageBorderMode;
+        gctUINT32 inTileListGlobalMem;
+        gctUINT32 inImageGlobalMem;
+        gctUINT32 aluI2FEnable;
+        gctUINT32 aluSquareEnable;
+        gctUINT32 aluHorzProcessing;
+        gctUINT32 aluHorzProcStride;
+        gctUINT32 aluVertProcessing;
+        gctUINT32 aluVertProcStride;
+        gctUINT32 aluNmsEnable;
+        gctUINT32 aluPwlEnable;
+        gctUINT32 aluMultEnable;
+        gctUINT32 aluF2IEnable;
+        gctUINT32 aluLoadPwlLUT;
+        gctUINT32 aluLoadPwlLUTGlobalMem;
+        gctUINT32 outTileSkipAtborder;
+        gctUINT32 outGlobalMem;
+        gctUINT32 outBrickMode;
+        gctUINT32 aluZFilterMode;
+        gctUINT32 inWindowZStartOverfetch;
+        gctUINT32 inWindowZEndOverfetch;
+        gctUINT32 aluSquarePreshift;
         gctUINT32 inImageDataType;
         gctUINT32 outImageDataType;
         gctUINT32 kernelDataType;
@@ -3153,27 +3297,14 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32 aluReluEnable;
         gctUINT32 floatRoundingMode;
         gctUINT32 integeroundingMode;
-        gctUINT32 aluReorderBitsUsed;
-        gctUINT32 aluReorderLoop2Mode;
-        gctUINT32 inImageBorderMode;
         gctINT32  inImageBorderConst;
         gctINT32  aluInputPreshift;
         gctINT32  aluOutputPostshift;
         gctINT32  aluOutputPostshiftBit6to5;
-        gctUINT32 inAddressOffset;
-        gctUINT32 inAddressExOffset;
-        gctUINT32 outAddressOffset;
-        gctINT32  noFlush;
-
         gctUINT32 coefZP;
         gctUINT32 inputZP;
         gctUINT32 outputZP;
         gctUINT32 aluOutputPostMultiplier;
-
-        gctUINT32 inImageCircularBufSize;
-        gctUINT32 inImageCircularBufEndAddrPlus1;
-        gctUINT32 outImageCircularBufSize;
-        gctUINT32 outImageCircularBufEndAddrPlus1;
     }
     vx_nn_tp_cmd_info;
 
@@ -3209,6 +3340,8 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32 scaleY;
         gctUINT16 inImageInitErrX;
         gctUINT16 inImageInitErrY;
+        gctUINT16 inImageInitIntErrX;
+        gctUINT16 inImageInitIntErrY;
         gctUINT8  yOnly;
         gctUINT8  outSigned;
         gctUINT8  postShift;
@@ -3221,6 +3354,12 @@ typedef union _vx_nn_cmd_info_union
         gctINT32  c6;
         gctINT32  c7;
         gctUINT32 outRequestCount;
+        gctINT16  minRClamp;
+        gctINT16  maxRClamp;
+        gctINT16  minGClamp;
+        gctINT16  maxGClamp;
+        gctINT16  minBClamp;
+        gctINT16  maxBClamp;
     }
     vx_yuv2rgb_scaler_cmd_info;
 }

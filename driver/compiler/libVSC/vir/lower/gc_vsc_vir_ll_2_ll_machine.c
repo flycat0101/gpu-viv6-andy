@@ -465,7 +465,6 @@ static VIR_Pattern _cospiPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
-
 static VIR_PatternMatchInst _logPatInst0[] = {
     { VIR_OP_PRE_LOG2, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _hasNEW_SIN_COS_LOG_DIV }, VIR_PATN_MATCH_FLAG_AND },
 };
@@ -477,6 +476,20 @@ static VIR_PatternReplaceInst _logRepInst0[] = {
 
 static VIR_Pattern _logPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_log, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+static VIR_PatternMatchInst _convPatInst0[] = {
+    { VIR_OP_CONVERT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { VIR_Lower_SameType }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _convRepInst0[] = {
+    { VIR_OP_MOV, -1, 0, { 1, 2, 0, 0 }, { 0 } }
+};
+
+
+static VIR_Pattern _convertPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_conv, 0) },
     { VIR_PATN_FLAG_NONE }
 };
 
@@ -500,6 +513,8 @@ _GetLowerPatternPhaseMachinePre(
         return _sinpiPattern;
     case VIR_OP_COSPI:
         return _cospiPattern;
+    case VIR_OP_CONVERT:
+        return _convertPattern;
     default:
         break;
     }

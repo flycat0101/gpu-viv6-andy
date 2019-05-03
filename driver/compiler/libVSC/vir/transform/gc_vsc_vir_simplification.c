@@ -84,6 +84,12 @@ gctBOOL _VSC_SIMP_DestSrc0Identical(
         gctUINT i;
         gctBOOL result;
 
+        /* We can't simply a MOV if src0 is ABS or NEG. */
+        if ((VIR_Operand_GetModifier(src0) & VIR_MOD_ABS) || (VIR_Operand_GetModifier(src0) & VIR_MOD_NEG))
+        {
+            return gcvFALSE;
+        }
+
         for(i = 0; i < VIR_CHANNEL_NUM; i++)
         {
             if(enable & (1 << i))

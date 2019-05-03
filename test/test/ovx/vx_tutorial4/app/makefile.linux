@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -33,7 +33,7 @@
 #############################################################################
 # Include common definitions.
 
-include $(AQROOT)/makefile.linux.def
+include ../../makefile.linux.def
 
 INCLUDE += -I $(VIVANTE_SDK_DIR)/include
 CFLAGS += $(INCLUDE)
@@ -59,9 +59,10 @@ TARGET_NAME = vx_tutorial4
 OBJECTS         =   $(OBJ_DIR)/main.o
 
 ################################################################################
-LIBS += -L $(VIVANTE_SDK_DIR)//drivers
+ifeq ($(gcdSTATIC_LINK), 1)
+LIBS += ../kernel/$(OBJ_DIR)/libtutorial4_kernel.a
+endif
 LIBS += -l dl -l pthread -l m -l stdc++
-LIBS += -l OpenVX -l OpenVXU
 
 ################################################################################
 # Define the macros used in common makefile.

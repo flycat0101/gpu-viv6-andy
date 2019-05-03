@@ -14,6 +14,7 @@
 #include "gc_cl_precomp.h"
 
 #define __NEXT_MSG_ID__     008019
+#define _GC_OBJ_ZONE        gcdZONE_CL_EVENT
 
 /*****************************************************************************\
 |*                         Supporting functions                              *|

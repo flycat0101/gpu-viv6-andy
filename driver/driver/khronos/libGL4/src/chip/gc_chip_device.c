@@ -25,7 +25,7 @@
 #include "wintogl.h"
 #endif
 
-#define _GC_OBJ_ZONE    __GLES3_ZONE_DEVICE
+#define _GC_OBJ_ZONE    gcdZONE_GL40_DEVICE
 
 __GLchipGlobal dpGlobalInfo;
 #if defined(_LINUX_) && defined(DRI_PIXMAPRENDER_GL)

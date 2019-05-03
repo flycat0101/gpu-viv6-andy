@@ -581,7 +581,7 @@ static void release_page_map(struct um_desc *um)
 {
     int i;
 
-    dma_unmap_sg(galcore_device, um->sgt.sgl, um->sgt.nents, DMA_TO_DEVICE);
+    dma_unmap_sg(galcore_device, um->sgt.sgl, um->sgt.nents, DMA_FROM_DEVICE);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION (3,6,0) \
     && (defined(ARCH_HAS_SG_CHAIN) || defined(CONFIG_ARCH_HAS_SG_CHAIN))

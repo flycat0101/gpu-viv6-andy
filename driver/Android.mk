@@ -97,7 +97,7 @@ VIVANTE_MAKEFILES += $(EGL_MAKEFILE)
 
 ifeq ($(VIVANTE_ENABLE_3D)_$(USE_VULKAN),1_1)
   VIVANTE_MAKEFILES += $(LOCAL_PATH)/compiler/libSPIRV/Android.mk \
-                       $(LOCAL_PATH)/driver/khronos/libVulkan10/Android.mk
+                       $(LOCAL_PATH)/driver/khronos/libVulkan11/Android.mk
 
   # Build hwvulkan for android-n and later
   ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 24),1)

@@ -71,6 +71,7 @@ static clsFAST_RELAXED_MATH_MAPPING _FastRelaxedMathMapping[] =
 
     /* Exponential Functions */
     {"powr",        "native_powr"},
+    {"pow",         "viv_native_pow"},
     {"exp",         "native_exp"},
     {"exp10",       "native_exp10"},
     {"log",         "native_log"},
@@ -285,6 +286,7 @@ clsBUILTIN_DATATYPE_INFO clBuiltinDataTypes[] =
 /* Last built-in data type: macro for first cldFirstBuiltinDataType defined in gc_cl_built_ins.h */
 #define cldLastBuiltinDataType    (T_VERY_FIRST_TERMINAL + _cldBuiltinDataTypeCount)
 static gctBOOL _IsBuiltinDataTypeInfoReady = gcvFALSE;
+static gctBOOL _IsBuiltinFunctionReady = gcvFALSE;
 
 static gceSTATUS _GenLog2_E_10Code(
     IN cloCOMPILER Compiler,
@@ -394,6 +396,7 @@ void
         *dataType++ = gcvNULL;
      }
    }
+   _IsBuiltinDataTypeInfoReady = gcvFALSE;
 
    /* Destroy builtin function info hash table */
    FOR_EACH_HASH_BUCKET(&_BuiltinFunctionInfoHash, bucket) {
@@ -410,7 +413,7 @@ void
          gcmONERROR(cloCOMPILER_Free(compiler, node1));
       }
    }
-
+   _IsBuiltinFunctionReady = gcvFALSE;
    cloCOMPILER_Destroy_General(compiler);
 OnError:
    return status;
@@ -916,7 +919,6 @@ clsBUILTIN_UNNAMED_VARIABLE;
 static clsBUILTIN_UNNAMED_VARIABLE _BuiltinUnnamedVariables[] = {
     {clvBUILTIN_NONE, clvQUALIFIER_NONE, clvQUALIFIER_NONE, 0, gcvFALSE, ""},
     {clvBUILTIN_GLOBAL_ID, clvQUALIFIER_ATTRIBUTE, clvQUALIFIER_NONE, T_UINT4, gcvFALSE, "#global_id"},
-    {clvBUILTIN_PRE_SCALE_GLOBAL_ID, clvQUALIFIER_NONE, clvQUALIFIER_NONE, T_UINT4, gcvFALSE, "#pre_scale_global_id"},
     {clvBUILTIN_LOCAL_ID, clvQUALIFIER_ATTRIBUTE, clvQUALIFIER_NONE, T_UINT4, gcvFALSE, "#local_id"},
     {clvBUILTIN_GROUP_ID, clvQUALIFIER_ATTRIBUTE, clvQUALIFIER_NONE, T_UINT4, gcvFALSE, "#group_id"},
     {clvBUILTIN_WORK_DIM, clvQUALIFIER_UNIFORM, clvQUALIFIER_NONE, T_UINT, gcvFALSE, "#work_dim"},
@@ -924,6 +926,7 @@ static clsBUILTIN_UNNAMED_VARIABLE _BuiltinUnnamedVariables[] = {
     {clvBUILTIN_GLOBAL_WORK_SCALE, clvQUALIFIER_UNIFORM, clvQUALIFIER_NONE, T_UINT4, gcvFALSE, "#global_work_scale"},
     {clvBUILTIN_LOCAL_SIZE, clvQUALIFIER_UNIFORM, clvQUALIFIER_NONE, T_UINT4, gcvFALSE, "#local_size"},
     {clvBUILTIN_NUM_GROUPS, clvQUALIFIER_UNIFORM, clvQUALIFIER_NONE, T_UINT4, gcvFALSE, "#num_groups"},
+    {clvBUILTIN_NUM_GROUPS_FOR_SINGLE_GPU, clvQUALIFIER_UNIFORM, clvQUALIFIER_NONE, T_UINT4, gcvFALSE, "#num_groups_single_gpu"},
     {clvBUILTIN_GLOBAL_OFFSET, clvQUALIFIER_UNIFORM, clvQUALIFIER_NONE, T_UINT4, gcvFALSE, "#global_offset"},
     {clvBUILTIN_LOCAL_ADDRESS_SPACE, clvQUALIFIER_UNIFORM, clvQUALIFIER_NONE, T_CHAR, gcvTRUE, _sldLocalStorageAddressName},
     {clvBUILTIN_PRIVATE_ADDRESS_SPACE, clvQUALIFIER_UNIFORM, clvQUALIFIER_NONE, T_CHAR, gcvTRUE, "#private_address"},
@@ -1552,7 +1555,7 @@ OUT gctCONST_STRING * ImplSymbol
    return gcvSTATUS_OK;
 }
 
-clsNAME*
+gceSTATUS
 clGetPreScaleGlobalIDCode(
     IN cloCOMPILER Compiler,
     IN cloCODE_GENERATOR CodeGenerator,
@@ -1560,7 +1563,6 @@ clGetPreScaleGlobalIDCode(
     )
 {
     gceSTATUS       status = gcvSTATUS_OK;
-    clsNAME*        pPreScaleGlobalId =_cldUnnamedVariable(clvBUILTIN_PRE_SCALE_GLOBAL_ID);
     clsNAME*        pGlobalId = _cldUnnamedVariable(clvBUILTIN_GLOBAL_ID);
     clsNAME*        pGlobalWorkScale = _cldUnnamedVariable(clvBUILTIN_GLOBAL_WORK_SCALE);
     clsROPERAND     globalIdOperand[1];
@@ -1568,22 +1570,12 @@ clGetPreScaleGlobalIDCode(
     clsIOPERAND     iOperand[1];
     gctUINT         i;
 
-    /* If we have already calculated the pre-scale-globalID, skip it. */
-    if (cloCOMPILER_HasCalculatePreScaleGlobalId(Compiler))
-    {
-        return pPreScaleGlobalId;
-    }
-
     /* Start to calculate the pre-scale-globalID. */
-    gcmONERROR(clsNAME_AllocLogicalRegs(Compiler,
-                                        CodeGenerator,
-                                        pPreScaleGlobalId));
-
     gcmONERROR(clsNAME_AllocLogicalRegs(Compiler,
                                         CodeGenerator,
                                         pGlobalId));
 
-    clsIOPERAND_Initialize(Compiler, iOperand, clmGenCodeDataType(T_UINT3), _cldUnnamedVariableRegs(clvBUILTIN_PRE_SCALE_GLOBAL_ID)->regIndex);
+    clsIOPERAND_Initialize(Compiler, iOperand, clmGenCodeDataType(T_UINT3), cldPreScaleGlobalIdRegIndex);
     clsROPERAND_InitializeReg(globalIdOperand, _cldUnnamedVariableRegs(clvBUILTIN_GLOBAL_ID));
 
     if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))
@@ -1639,10 +1631,8 @@ clGetPreScaleGlobalIDCode(
                                      globalIdOperand));
     }
 
-    gcmONERROR(cloCOMPILER_SetHasCalculatePreScaleGlobalId(Compiler));
-
 OnError:
-    return pPreScaleGlobalId;
+    return status;
 }
 
 #define clmHasPointerToAddressSpace(FuncName, AddrSpace, Has)  do { \
@@ -1674,7 +1664,6 @@ IN clsNAME *KernelFunc
 
    if(cloCOMPILER_IsPrivateMemoryNeeded(Compiler) ||
       cloCOMPILER_IsPrintfMemoryNeeded(Compiler)) {
-      clsNAME *globalId;
       clsNAME *globalSize;
       clsIOPERAND iOperand[1];
       clsROPERAND rOperand1[1];
@@ -1682,9 +1671,7 @@ IN clsNAME *KernelFunc
       clsROPERAND globalIdOperand[1];
       clsROPERAND globalSizeOperand[1];
 
-      globalId = clGetPreScaleGlobalIDCode(Compiler,
-                                           CodeGenerator,
-                                           KernelFunc);
+      clGetPreScaleGlobalIDCode(Compiler, CodeGenerator, KernelFunc);
 
 /* Compute base address offset:
    Z * I * J + Y * I + X
@@ -1692,8 +1679,11 @@ IN clsNAME *KernelFunc
          global size = (I, J, K)  */
 
 /* Compute: (Z, Y) * I */
-      clsROPERAND_InitializeReg(globalIdOperand,
-                                _cldUnnamedVariableRegs(clvBUILTIN_PRE_SCALE_GLOBAL_ID));
+      clsROPERAND_InitializeTempReg(Compiler,
+                                    globalIdOperand,
+                                    clvQUALIFIER_NONE,
+                                    clmGenCodeDataType(T_UINT3),
+                                    cldPreScaleGlobalIdRegIndex);
 
       clGetVectorROperandSlice(globalIdOperand,
                            1,
@@ -1896,13 +1886,13 @@ IN clsNAME *KernelFunc
                            1,
                            2,
                            rOperand1);
-      numGroups = _cldUnnamedVariable(clvBUILTIN_NUM_GROUPS);
+      numGroups = _cldUnnamedVariable(clvBUILTIN_NUM_GROUPS_FOR_SINGLE_GPU);
       gcmONERROR(clsNAME_AllocLogicalRegs(Compiler,
                                           CodeGenerator,
                                           numGroups));
 
       clsROPERAND_InitializeReg(numGroupsOperand,
-                                _cldUnnamedVariableRegs(clvBUILTIN_NUM_GROUPS));
+                                _cldUnnamedVariableRegs(clvBUILTIN_NUM_GROUPS_FOR_SINGLE_GPU));
 
       tempRegIndex = clNewLocalTempRegs(Compiler, 1);
       clsIOPERAND_Initialize(Compiler, iOperand, clmGenCodeDataType(T_UINT2), tempRegIndex);
@@ -4756,7 +4746,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     /* Exponential Functions */
     {"pow",             gcvTRUE,       gcvTRUE,        gcvNULL, _GenPowCode},
     {"half_powr",       gcvTRUE,       gcvTRUE,        gcvNULL, _GenPowrCode},
-    {"native_powr",     gcvTRUE,       gcvTRUE,        gcvNULL, _GenPowrCode},
+    {"native_powr",     gcvTRUE,       gcvTRUE,        gcvNULL, _GenNativePowrCode},
     {"powr",            gcvTRUE,       gcvTRUE,        gcvNULL, _GenPowrCode},
     {"pown",            gcvTRUE,       gcvTRUE,        gcvNULL, _GenPownCode},
     {"rootn",           gcvTRUE,       gcvTRUE,        gcvNULL, _GenRootnCode},
@@ -4905,42 +4895,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"erfc",            gcvTRUE,       gcvTRUE,        gcvNULL, _GenErfcCode},
     {"erf",             gcvTRUE,       gcvTRUE,        gcvNULL, _GenErfCode},
 
-    /* Exponential Functions */
-    {"pow",             gcvTRUE,       gcvTRUE,        gcvNULL, _GenPowCode},
-    {"half_powr",       gcvTRUE,       gcvTRUE,        gcvNULL, _GenPowrCode},
-    {"native_powr",     gcvTRUE,       gcvTRUE,        gcvNULL, _GenPowrCode},
-    {"powr",            gcvTRUE,       gcvTRUE,        gcvNULL, _GenPowrCode},
-    {"pown",            gcvTRUE,       gcvTRUE,        gcvNULL, _GenPownCode},
-    {"rootn",           gcvTRUE,       gcvTRUE,        gcvNULL, _GenRootnCode},
-    {"half_exp",        gcvTRUE,       gcvTRUE,        gcvNULL, _GenExpCode},
-    {"native_exp",      gcvTRUE,       gcvTRUE,        gcvNULL, _GenExpCode},
-    {"exp",             gcvTRUE,       gcvTRUE,        gcvNULL, _GenExpCode},
-    {"half_exp10",      gcvTRUE,       gcvTRUE,        gcvNULL, _GenExp10Code},
-    {"native_exp10",    gcvTRUE,       gcvTRUE,        gcvNULL, _GenExp10Code},
-    {"exp10",           gcvTRUE,       gcvTRUE,        gcvNULL, _GenExp10Code},
-    {"expm1",           gcvTRUE,       gcvTRUE,        gcvNULL, _GenExpm1Code},
-    {"half_log",        gcvTRUE,       gcvTRUE,        gcvNULL, _GenLogCode},
-    {"native_log",      gcvTRUE,       gcvTRUE,        gcvNULL, _GenLogCode},
-    {"log",             gcvTRUE,       gcvTRUE,        gcvNULL, _GenLogCode},
-    {"half_exp2",       gcvTRUE,       gcvFALSE,       gcvNULL, _GenExp2Code},
-    {"native_exp2",     gcvTRUE,       gcvFALSE,       gcvNULL, _GenExp2Code},
-    {"exp2",            gcvTRUE,       gcvFALSE,       gcvNULL, _GenExp2Code},
-    {"half_log2",       gcvTRUE,       gcvTRUE,        gcvNULL, _GenLog2Code},
-    {"native_log2",     gcvTRUE,       gcvTRUE,        gcvNULL, _GenLog2Code},
-    {"log2",            gcvTRUE,       gcvTRUE,        gcvNULL, _GenLog2Code},
-    {"half_log10",      gcvTRUE,       gcvTRUE,        gcvNULL, _GenLog10Code},
-    {"native_log10",    gcvTRUE,       gcvTRUE,        gcvNULL, _GenLog10Code},
-    {"log10",           gcvTRUE,       gcvTRUE,        gcvNULL, _GenLog10Code},
-    {"log1p",           gcvTRUE,       gcvTRUE,        gcvNULL, _GenLog1pCode},
-    {"half_sqrt",       gcvTRUE,       gcvFALSE,       _EvaluateSqrt,    _GenSqrtCode},
-    {"native_sqrt",     gcvTRUE,       gcvFALSE,       _EvaluateSqrt,    _GenSqrtCode},
-    {"sqrt",            gcvTRUE,       gcvTRUE,        _EvaluateSqrt,    _GenSqrtCode},
-    {"half_rsqrt",      gcvTRUE,       gcvFALSE,       _EvaluateInverseSqrt, _GenInverseSqrtCode},
-    {"native_rsqrt",    gcvTRUE,       gcvFALSE,       _EvaluateInverseSqrt, _GenInverseSqrtCode},
-    {"rsqrt",           gcvTRUE,       gcvFALSE,       _EvaluateInverseSqrt, _GenInverseSqrtCode},
-    {"half_recip",      gcvTRUE,       gcvTRUE,        gcvNULL, _GenNativeInverseCode},
-    {"native_recip",    gcvTRUE,       gcvTRUE,        gcvNULL, _GenNativeInverseCode},
-    {"reciprocal",      gcvTRUE,       gcvTRUE,        gcvNULL, _GenInverseCode},
+    /* vivante intrinsic Functions */
     {"add#",            gcvFALSE,       gcvFALSE,       gcvNULL, _GenAddSubMulCode},
     {"sub#",            gcvFALSE,       gcvFALSE,       gcvNULL, _GenAddSubMulCode},
     {"mul#",            gcvFALSE,       gcvFALSE,       gcvNULL, _GenAddSubMulCode},
@@ -5044,8 +4999,9 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
 
     /* Vivante Primitive Exponential Functions */
     {"viv_pow",             gcvFALSE,       gcvTRUE,        gcvNULL, _GenPowCode},
+    {"viv_native_pow",      gcvFALSE,       gcvTRUE,        gcvNULL, _GenNativePowCode},
     {"viv_half_powr",       gcvFALSE,       gcvTRUE,        gcvNULL, _GenPowrCode},
-    {"viv_native_powr",     gcvFALSE,       gcvTRUE,        gcvNULL, _GenPowrCode},
+    {"viv_native_powr",     gcvFALSE,       gcvTRUE,        gcvNULL, _GenNativePowrCode},
     {"viv_powr",            gcvFALSE,       gcvTRUE,        gcvNULL, _GenPowrCode},
     {"viv_pown",            gcvFALSE,       gcvTRUE,        gcvNULL, _GenPownCode},
     {"viv_rootn",           gcvFALSE,       gcvTRUE,        gcvNULL, _GenRootnCode},
@@ -5220,7 +5176,6 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
 #define _cldBuiltinFunctionCount \
     (sizeof(_BuiltinFunctionInfos) / sizeof(clsBUILTIN_FUNCTION_INFO))
 
-static gctBOOL _IsBuiltinFunctionReady = gcvFALSE;
 
 clsBUILTIN_FUNCTION_INFO *
 clGetBuiltinFunctionInfo(

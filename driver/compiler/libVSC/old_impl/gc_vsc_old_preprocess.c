@@ -15,6 +15,7 @@
 
 #if gcdENABLE_3D
 
+#if (!VSC_LITE_BUILD)
 static gctBOOL
 _hasUniformType(
     IN gcUNIFORM Uniform
@@ -658,6 +659,7 @@ _gcConvertTEXLD2MOV(
 OnError:
     return status;
 }
+#endif
 
 gceSTATUS
 _gcConvSamplerAssignForParameter(
@@ -697,6 +699,7 @@ _gcConvSamplerAssignForParameter(
     return gcvSTATUS_OK;
 }
 
+#if (!VSC_LITE_BUILD)
 static gctBOOL
 _gcIsCodeMainFunction(
     IN gcSHADER             Shader,
@@ -1791,7 +1794,6 @@ OnError:
     return status;
 }
 
-
 gceSTATUS
 gcSHADER_MergeCompileTimeInitializedUniforms(
     IN gcSHADER Shader,
@@ -1979,6 +1981,7 @@ _CreateTransformFeedbackStateUniform(
 OnError:
     return status;
 }
+#endif
 
 static gctINT
 _getFeedbackOutputSize(
@@ -2094,6 +2097,7 @@ OnError:
     return status;
 }
 
+#if (!VSC_LITE_BUILD)
 static gceSTATUS
 _CreatePatchUniform(
     IN  gcSHADER         Shader,
@@ -2191,6 +2195,7 @@ _CreatePatchUniform(
 OnError:
     return status;
 }
+#endif
 
 gcSL_FORMAT
 gcGetFormatFromType(
@@ -2515,6 +2520,7 @@ gcGetFormatFromType(
    if BufferBaseAddress is not NULL, then the base address is in the uniform,
    otherwise the base address is in temp register BufferBaseAddressTempIndex,
    return wrote bytes in Size */
+#if (!VSC_LITE_BUILD)
 gceSTATUS
 _generateFeedbackWrite(
     IN gcSHADER            VertexShader,
@@ -2665,7 +2671,6 @@ _findVexterInstIDTemp(
 
     return vertexInstIDVariable;
 }
-
 
 static gctINT
 _getVertexIDTemp(
@@ -3396,6 +3401,7 @@ gcDoPreprocess(
 OnError:
     return status;
 }
+#endif
 
 #endif
 

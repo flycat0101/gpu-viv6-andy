@@ -57,12 +57,24 @@ LOCAL_SRC_FILES := \
     driver/src/gc_vx_threshold.c \
     driver/src/gc_vx_gpu_layer.c
 
+# Operations
+LOCAL_SRC_FILES += \
+    driver/src/ops/gc_vx_op_fc.c \
+    driver/src/ops/gc_vx_op_debug.c \
+    driver/src/ops/gc_vx_op_tensor_copy.c
+
+# Layers
+LOCAL_SRC_FILES += \
+    driver/src/layers/gc_vx_layer_lstm.c
+
 # API
 LOCAL_SRC_FILES += \
     driver/src/gc_vx_interface.c \
     driver/src/gc_vx_nn_extension_interface.c \
     driver/src/gc_vx_internal_node_api.c \
     driver/src/gc_vx_nn_util.c \
+    driver/src/gc_vx_nn_command.c \
+    driver/src/gc_vx_lstm.c \
 
 # Kernel
 LOCAL_SRC_FILES += \
@@ -109,6 +121,7 @@ LOCAL_CFLAGS += \
 
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/driver/include \
+    $(LOCAL_PATH)/libarchmodel/include \
     $(LOCAL_PATH)/kernels \
     $(AQROOT)/sdk/inc \
     $(AQROOT)/hal/inc \
@@ -130,12 +143,15 @@ endif
 LOCAL_LDFLAGS := \
     -Wl,-z,defs
 
+LOCAL_STATIC_LIBRARIES += \
+    libarchmodel
+
 LOCAL_SHARED_LIBRARIES := \
     liblog \
     libdl \
     libcutils \
     libVSC \
-    libGAL
+    libGAL 
 
 LOCAL_MODULE         := libOpenVX
 LOCAL_MODULE_TAGS    := optional
@@ -273,4 +289,7 @@ include $(BUILD_SHARED_LIBRARY)
 
 include $(AQROOT)/copy_installed_module.mk
 endif
+
+# libarchmodel
+include $(AQROOT)/driver/khronos/libOpenVX/libarchmodel/Android.mk
 

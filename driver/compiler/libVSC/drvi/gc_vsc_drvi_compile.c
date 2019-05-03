@@ -499,6 +499,25 @@ gctPOINTER vscGetDebugInfo(IN SHADER_HANDLE    Shader)
     return NULL;
 }
 
+gctPOINTER vscDupDebugInfo(IN SHADER_HANDLE    Shader)
+{
+    VIR_Shader* pVirShader = (VIR_Shader*)Shader;
+    gctPOINTER ret = NULL;
+    if (Shader == NULL)
+        return NULL;
+
+    vscDICopyDebugInfo(pVirShader->debugInfo, &ret);
+
+    return ret;
+}
+
+gceSTATUS  vscDestroyDebugInfo(IN gctPOINTER DebugInfo)
+{
+    if (DebugInfo)
+        vscDIDestroyContext((VSC_DIContext *)DebugInfo);
+    return gcvSTATUS_OK;
+}
+
 gceSTATUS vscCopyShader(SHADER_HANDLE * hToShader, SHADER_HANDLE hFromShader)
 {
     gceSTATUS                     status = gcvSTATUS_OK;

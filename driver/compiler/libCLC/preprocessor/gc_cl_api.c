@@ -28,19 +28,19 @@ const char * clcVersion = "\n\0$VERSION$"
 
 gceSTATUS
 cloPREPROCESSOR_Construct(
-    IN    cloCOMPILER        Compiler,
+    IN  cloCOMPILER     Compiler,
+    IN  gctBOOL         UseNewPP,
     OUT cloPREPROCESSOR *Preprocessor
     )
 {
     gceSTATUS status = gcvSTATUS_INVALID_DATA;
 
     /* Verify the arguments. */
-
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
 
     gcmASSERT(Preprocessor);
 
-    status = ppoPREPROCESSOR_Construct(Compiler, (ppoPREPROCESSOR*)Preprocessor);
+    status = ppoPREPROCESSOR_Construct(Compiler, (ppoPREPROCESSOR*)Preprocessor, UseNewPP);
 
     return status;
 
@@ -90,11 +90,84 @@ cloPREPROCESSOR_Parse(
     gcmASSERT(StringCount > 0);
     gcmASSERT(Strings);
 
-    status = ppoPREPROCESSOR_SetSourceStrings(PP, Strings, StringCount);
-        if (status == gcvSTATUS_OK) {
+    status = ppoPREPROCESSOR_SetSourceStrings(PP, Strings, StringCount, Options);
+    if (status == gcvSTATUS_OK) {
         status = Clang_Preprocess(PP->compiler, PP->strings, PP->count, Options, PP->ppedStrings, &PP->ppedCount);
-        }
+    }
     return status;
+}
+
+gceSTATUS
+cloPREPROCESSOR_SetSourceStrings(
+    IN cloPREPROCESSOR Preprocessor,
+    IN gctUINT StringCount,
+    IN gctCONST_STRING Strings[],
+    IN gctCONST_STRING Options
+    )
+{
+    gceSTATUS           status  = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+    ppoPREPROCESSOR     PP      = (ppoPREPROCESSOR)Preprocessor;
+
+    /* Verify the arguments. */
+    gcmASSERT(PP && PP->base.type == ppvOBJ_PREPROCESSOR);
+    gcmASSERT(StringCount > 0);
+    gcmASSERT(Strings);
+
+    PP->useNewPP = gcvTRUE;
+    status = ppoPREPROCESSOR_SetSourceStrings(PP,
+                                              Strings,
+                                              StringCount,
+                                              Options);
+
+    return status;
+}
+
+gceSTATUS
+cloPREPROCESSOR_Parse_New(
+    IN      cloPREPROCESSOR     Preprocessor,
+    IN      gctINT              MaxSize,
+    IN      gctCONST_STRING     Options,
+    OUT     gctSTRING           Buffer,
+    OUT     gctINT              *ActualSize
+    )
+{
+    gceSTATUS status;
+
+    ppoPREPROCESSOR PP = Preprocessor;
+
+    /* Verify the arguments. */
+    gcmASSERT(PP);
+    gcmASSERT(Buffer);
+    gcmASSERT(ActualSize);
+
+    MaxSize--;/*for the trail white space.*/
+
+    MaxSize--;/*for the trail \0*/
+
+    if (MaxSize < ppvMAX_PPTOKEN_CHAR_NUMBER)
+    {
+        gcmVERIFY_OK(cloCOMPILER_Report(
+            PP->compiler,
+            1,
+            0,
+            clvREPORT_INTERNAL_ERROR,
+            "cloPREPROCESSOR_Parse : The output buffer is too small."
+            "please set to more than %d",
+            ppvMAX_PPTOKEN_CHAR_NUMBER + 2
+            ));
+
+        status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+        return status;
+    }
+
+    status = ppoPREPROCESSOR_Parse(PP, Buffer, MaxSize, ActualSize);
+
+    if(status != gcvSTATUS_OK)
+    {
+        return status;
+    }
+
+    return gcvSTATUS_OK;
 }
 
 /******************************************************************************* */

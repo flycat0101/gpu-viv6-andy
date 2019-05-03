@@ -5603,8 +5603,8 @@ gcoHARDWARE_AlignToTile(
         break;
     }
 
-    gcmTRACE(
-        gcvLEVEL_INFO,
+    gcmTRACE_ZONE(
+        gcvLEVEL_INFO, _GC_OBJ_ZONE,
         "%s: type=%x hint=%x format=%d => "
         "tiling=%x superTiled=%d alignment=%d,%d",
         __FUNCTION__,
@@ -6699,7 +6699,7 @@ gcoHARDWARE_QueryTileStatus(
     gceSTATUS status = gcvSTATUS_OK;
     gctBOOL is2BitPerTile;
 
-    gcmHEADER_ARG("Hardware=%p Surface=%p Bytes=%zu Size=%p "
+    gcmHEADER_ARG("Hardware=%p Surface=%p Bytes=%u Size=%p "
                   "Alignment=%p Filler=%p",
                   Hardware, Surface, Bytes, Size, Alignment, Filler);
 
@@ -7430,6 +7430,56 @@ gcoHARDWARE_QueryNNConfig(
 
 OnError:
     gcmFOOTER();
+    return status;
+}
+
+/*******************************************************************************
+**
+**  gcoHARDWARE_QueryHwChipInfo
+**
+**  Query hw chip information.
+**
+**  INPUT:
+**
+**      gcoHARDWARE Hardware
+**          Pointer to an gcoHARDWARE object.
+**
+**  OUTPUT:
+**
+**      gctUINT * customerID
+**          Pointer to customerID.
+**
+**      gctUINT * ecoID
+**          Pointer to ecoID.
+*/
+gceSTATUS
+gcoHARDWARE_QueryHwChipInfo(
+    IN  gcoHARDWARE  Hardware,
+    OUT gctUINT32   *customerID,
+    OUT gctUINT32   *ecoID
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Hardware=0x%x", Hardware);
+
+    gcmGETHARDWARE(Hardware);
+
+    if (customerID)
+    {
+        *customerID = Hardware->config->customerID;
+    }
+
+    if (ecoID)
+    {
+        *ecoID = Hardware->config->ecoID;
+    }
+
+OnError:
+    /* Success. */
+    gcmFOOTER_ARG("customerID=%u ecoID=%u ",
+                  gcmOPT_VALUE(customerID), gcmOPT_VALUE(ecoID));
+
     return status;
 }
 #endif

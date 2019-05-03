@@ -14,7 +14,7 @@
 #include "gc_es_context.h"
 #include "gc_chip_context.h"
 
-#define _GC_OBJ_ZONE    __GLES3_ZONE_STATE
+#define _GC_OBJ_ZONE    gcdZONE_ES30_STATE
 
 #if gcdFRAMEINFO_STATISTIC
 extern GLbitfield g_dbgDumpImagePerDraw;

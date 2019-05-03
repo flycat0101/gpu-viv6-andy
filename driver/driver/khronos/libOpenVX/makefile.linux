@@ -20,6 +20,7 @@ include ./makefile.linux.def
 ######################################################
 # Components of the project.
 
+ARCH_MODEL             := libarchmodel
 VX_VXU                 := utility
 VX_ENTRY               := driver/src
 ifeq ($(USE_VXC_BINARY),1)
@@ -29,9 +30,9 @@ VX_NNGPU_BINARY        := libkernel/libnngpu
 endif
 
 ifeq ($(USE_VXC_BINARY),1)
-LIB_VX := $(VX_NNVXC_BINARY) $(VX_ENTRY) $(VX_VXU)  $(VX_OVX12_VXC_BINARY) $(VX_NNGPU_BINARY)
+LIB_VX := $(ARCH_MODEL) $(VX_NNVXC_BINARY) $(VX_ENTRY) $(VX_VXU)  $(VX_OVX12_VXC_BINARY) $(VX_NNGPU_BINARY)
 else
-LIB_VX := $(VX_ENTRY) $(VX_VXU)
+LIB_VX := $(ARCH_MODEL) $(VX_ENTRY) $(VX_VXU)
 endif
 
 ######################################################
@@ -52,4 +53,5 @@ $(VX_ENTRY) : $(VX_NNVXC_BINARY)
 $(VX_ENTRY) : $(VX_OVX12_VXC_BINARY)
 $(VX_ENTRY) : $(VX_NNGPU_BINARY)
 endif
+$(VX_ENTRY) : $(ARCH_MODEL)
 $(VX_VXU): $(VX_ENTRY)

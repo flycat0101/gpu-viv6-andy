@@ -249,8 +249,9 @@ void VSC_OPTN_LoopOptsOptions_SetDefault(
                                      VSC_OPTN_LoopOptsOptions_OPTS_LOOP_INVARIANT |
                                      VSC_OPTN_LoopOptsOptions_OPTS_LOOP_UNROLLING);
     VSC_OPTN_LoopOptsOptions_SetFullUnrollingFactor(options, 16);
-    VSC_OPTN_LoopOptsOptions_SetTotalUnrollingFactor(options, 32);
+    VSC_OPTN_LoopOptsOptions_SetTotalUnrollingFactor(options, 64);
     VSC_OPTN_LoopOptsOptions_SetPartialUnrollingFactor(options, 4);
+    VSC_OPTN_LoopOptsOptions_SetLICMFactor(options, 16);
     VSC_OPTN_LoopOptsOptions_SetTrace(options, 0);
 
     VSC_OPTN_LoopOptsOptions_SetBeforeShader(options, gcvMAXUINT32);
@@ -288,13 +289,13 @@ void VSC_OPTN_LoopOptsOptions_GetOptionFromString(
         }
         else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "tof:", sizeof("tof:") - 1))
         {
-            gctINT32 fuf;
+            gctINT32 tof;
             gctUINT32 len;
 
-            str += sizeof("fuf:") - 1;
+            str += sizeof("tof:") - 1;
             len = _VSC_OPTN_GetSubOptionLength(str);
-            fuf = (gctINT32)vscSTR_StrToUint32(str, len);
-            VSC_OPTN_LoopOptsOptions_SetTotalUnrollingFactor(options, fuf);
+            tof = (gctINT32)vscSTR_StrToUint32(str, len);
+            VSC_OPTN_LoopOptsOptions_SetTotalUnrollingFactor(options, tof);
             str += len;
         }
         else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "fuf:", sizeof("fuf:") - 1))
@@ -317,6 +318,16 @@ void VSC_OPTN_LoopOptsOptions_GetOptionFromString(
             len = _VSC_OPTN_GetSubOptionLength(str);
             puf = (gctINT32)vscSTR_StrToUint32(str, len);
             VSC_OPTN_LoopOptsOptions_SetPartialUnrollingFactor(options, puf);
+            str += len;
+        }else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "licm:", sizeof("licm:") - 1))
+        {
+            gctINT32 licm;
+            gctUINT32 len;
+
+            str += sizeof("licm:") - 1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            licm = (gctINT32)vscSTR_StrToUint32(str, len);
+            VSC_OPTN_LoopOptsOptions_SetLICMFactor(options, licm);
             str += len;
         }
         else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "trace:", sizeof("trace:")-1))
@@ -735,7 +746,7 @@ void VSC_OPTN_ILOptions_GetOptionFromString(
         }
     }
 
-    if ((VSC_OPTN_ILOptions_GetInlineLevel(options) == VSC_OPTN_ILOptions_LEVEL1))
+    if (VSC_OPTN_ILOptions_GetInlineLevel(options) == VSC_OPTN_ILOptions_LEVEL1)
     {
         VSC_OPTN_ILOptions_SetSwitchOn(options, gcvTRUE);
     }
@@ -1852,7 +1863,13 @@ void VSC_OPTN_RAOptions_SetDefault(
     VSC_OPTN_RAOptions_SetSwitchOn(options, gcvFALSE);
     VSC_OPTN_RAOptions_SetHeuristics(options, 0xffffffff);
     VSC_OPTN_RAOptions_SetTrace(options, 0);
-    VSC_OPTN_RAOptions_SetOPTS(options, 0x3);
+    VSC_OPTN_RAOptions_SetOPTS(options, VSC_OPTN_RAOptions_ALLOC_REG                |
+                                        VSC_OPTN_RAOptions_ALLOC_UNIFORM            |
+                                        /*
+                                        ** By default, use MIN LS extened.
+                                        VSC_OPTN_RAOptions_MAX_LS_EXTENED_END_POINT |
+                                        */
+                                        VSC_OPTN_RAOptions_SPILL_DEST_OPT);
     VSC_OPTN_RAOptions_SetRegisterCount(options, 0);
     VSC_OPTN_RAOptions_SetRegWaterMark(options, 0);
     VSC_OPTN_RAOptions_SetSTBubbleSize(options, 8);

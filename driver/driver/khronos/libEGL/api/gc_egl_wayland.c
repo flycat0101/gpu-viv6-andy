@@ -41,7 +41,7 @@
 #define GC_WL_MAX_SWAP_INTERVAL     1
 #define GC_WL_MIN_SWAP_INTERVAL     0
 
-#define WL_EGL_NUM_BACKBUFFERS          6
+#define WL_EGL_NUM_BACKBUFFERS          3
 #define WL_EGL_MAX_NUM_BACKBUFFERS      8
 
 typedef struct __WLEGLBufferRec *__WLEGLBuffer;
@@ -1251,9 +1251,24 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
 
     if (egl_surface->swap_interval > 0)
     {
+        /*
+         * This is to block read & dispatch events in other threads, so that the
+         * callback is with correct queue and listener when 'done' event.
+         */
+        while (wl_display_prepare_read_queue(wl_dpy, commit_queue) == -1 && ret != -1)
+            ret = wl_display_dispatch_queue_pending(wl_dpy, commit_queue);
+
+        if (ret == -1)
+        {
+            /* fatal error, can not recover. */
+            goto out;
+        }
+
         egl_surface->frame_callback = wl_surface_frame(egl_surface->wrap_surface);
         wl_proxy_set_queue((struct wl_proxy *)egl_surface->frame_callback, commit_queue);
         wl_callback_add_listener(egl_surface->frame_callback, &__frame_callback_listener, buffer);
+
+        wl_display_cancel_read(wl_dpy);
     }
 
     /* buffer is queued to compositor. */
@@ -1286,9 +1301,23 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
      */
     if (egl_surface->frame_callback == NULL)
     {
+        /*
+         * This is to block read & dispatch events in other threads, so that the
+         * callback is with correct queue and listener when 'done' event.
+         */
+        while (wl_display_prepare_read_queue(wl_dpy, commit_queue) == -1 && ret != -1)
+            ret = wl_display_dispatch_queue_pending(wl_dpy, commit_queue);
+
+        if (ret == -1)
+        {
+            goto out;
+        }
+
         egl_surface->frame_callback = wl_display_sync(display->wrap_dpy);
         wl_proxy_set_queue((struct wl_proxy *)egl_surface->frame_callback, commit_queue);
         wl_callback_add_listener(egl_surface->frame_callback, &__frame_callback_listener, buffer);
+
+        wl_display_cancel_read(wl_dpy);
     }
 
     /* flush events. */
@@ -2037,8 +2066,19 @@ _SynchronousPost(
 {
     struct wl_egl_window *window = Surface->hwnd;
     __WLEGLSurface egl_surface = window->driver_private;
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
 
-    if (egl_surface->nr_buffers == 1)
+#if defined(WL_EGL_PLATFORM) || defined(EGL_API_FB) || defined(__GBM__)
+    if(Display->enableClient != -1)
+    {
+        return (Display->enableClient == 0);
+    }
+#endif
+
+    /* Get patch id. */
+    gcoHAL_GetPatchID(gcvNULL, &patchId);
+
+    if (egl_surface->nr_buffers == 1 || patchId == gcvPATCH_GTFES30)
     {
         return EGL_TRUE;
     }

@@ -146,6 +146,9 @@ typedef enum _gcePATCH_ID
     gcvPATCH_OPENCV_ATOMIC,
     gcvPATCH_WESTON,
     gcvPATCH_SKIA_SKQP,
+    gcvPATCH_SASCHAWILLEMS,
+    gcvPATCH_NATIVEHARDWARE_CTS,
+    gcvPATCH_OVX_CTS,
 
     gcvPATCH_COUNT
 } gcePATCH_ID;
@@ -303,5 +306,4 @@ gcoOS_DetectProgrameByEncryptedSymbols(
 #endif
 
 #endif /* __gc_hal_priv_h_ */
-
 

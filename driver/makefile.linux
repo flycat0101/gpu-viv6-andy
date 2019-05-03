@@ -201,7 +201,7 @@ endif # VIVANTE_ENABLE_3D
 ifeq ($(VIVANTE_ENABLE_3D),1)
 ifeq ($(USE_VULKAN),1)
 # libvulkan
-LIB_VULKAN          := $(AQROOT)/driver/khronos/libVulkan10
+LIB_VULKAN          := $(AQROOT)/driver/khronos/libVulkan11
 LIB_SPIRV           := $(AQROOT)/compiler/libSPIRV
 ifeq ($(LINUX_VSIMULATOR),0)
 LIB_LIST            += $(LIB_VULKAN) $(LIB_SPIRV)

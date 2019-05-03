@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -72,9 +72,9 @@ else
         LIBS += -lGLESv2 -lEGL -lm
     else
         LIBS += -l m -l pthread -l dl -lrt
-        LIBS += -L$(VIVANTE_SDK_LIB) -l EGL
+        LIBS += -L$(EGL_DIR)/$(OBJ_DIR) -l EGL
         LIBS += -L$(VIVANTE_SDK_LIB) -l GAL
-        LIBS += -L$(VIVANTE_SDK_LIB) -lGLESv2
+        LIBS += -L$(GLES2X_DIR)/$(OBJ_DIR) -lGLESv2
     endif
     ifeq ($(USE_VDK), 1)
         LIBS += -L$(VIVANTE_SDK_LIB) -l VDK

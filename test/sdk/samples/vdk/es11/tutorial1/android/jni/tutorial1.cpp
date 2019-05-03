@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -32,23 +32,19 @@
  *    * Draws a simpe triangle with basic vertex and pixel shaders.*/
 
 #include <nativehelper/jni.h>
+
 #define LOG_TAG "GL11_Tutorial1"
-#include <utils/Log.h>
+#include <android/log.h>
+#include <time.h>
 
-#if ANDROID_SDK_VERSION >= 16
-#   include <ui/ANativeObjectBase.h>
-
-#   undef LOGI
-#   undef LOGD
-#   undef LOGW
-#   undef LOGE
-#   define LOGI(...) ALOGI(__VA_ARGS__)
-#   define LOGD(...) ALOGD(__VA_ARGS__)
-#   define LOGW(...) ALOGW(__VA_ARGS__)
-#   define LOGE(...) ALOGE(__VA_ARGS__)
-#else
-#   include <ui/android_native_buffer.h>
-#endif
+#undef LOGI
+#undef LOGD
+#undef LOGW
+#undef LOGE
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 #include "tutorial1.h"
 

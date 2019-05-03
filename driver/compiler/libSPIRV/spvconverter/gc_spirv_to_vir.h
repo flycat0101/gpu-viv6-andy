@@ -16,7 +16,7 @@
 
 #define SPV_NEW_FUNCPARAM       1
 
-#define _GC_OBJ_ZONE    gcvZONE_COMPILER
+#define _GC_OBJ_ZONE    gcdZONE_COMPILER
 
 #define SPV_HAS_RESULT (spv->resultId != 0)
 
@@ -161,7 +161,6 @@
 #define SPV_ID_SYM_PER_PATCH(id) (spv->idDescriptor[id].u.sym.isPerPatch)
 #define SPV_ID_SYM_PER_VERTEX(id) (spv->idDescriptor[id].u.sym.isPerVertex)
 #define SPV_ID_SYM_IS_PUSH_CONST_UBO(id) (spv->idDescriptor[id].u.sym.isPushConstUBO)
-#define SPV_ID_SYM_IS_MEM_ADDR_CALC(id) (spv->idDescriptor[id].u.sym.isMemAddrCalc)
 #define SPV_ID_SYM_ATTACHMENT_FLAG(id) (spv->idDescriptor[id].u.sym.attachmentFlag)
 #define SPV_ID_SYM_STORAGE_CLASS(id) (spv->idDescriptor[id].u.sym.storageClass)
 
@@ -169,6 +168,7 @@
 #define SPV_ID_VIR_TYPE_ID(id) (spv->idDescriptor[id].virTypeId)
 #define SPV_ID_VIR_NAME_ID(id) (spv->idDescriptor[id].virNameId)
 #define SPV_ID_INITIALIZED(id) (spv->idDescriptor[id].initialized)
+#define SPV_ID_IS_MEM_ADDR_CALC(id) (spv->idDescriptor[id].isMemAddrCalc)
 #define SPV_ID_VIR_STD_SYM(id) ((VIR_Symbol *)VIR_Shader_GetSymFromId(virShader, SPV_ID_VIR_SYM_ID(id)))
 #define SPV_ID_VIR_CURRENT_FUNC_SYM(id) ((VIR_Symbol *)VIR_Function_GetSymFromId(spv->virFunction, SPV_ID_VIR_SYM_ID(id)))
 #define SPV_ID_VIR_FUNC_SYM(id) ((VIR_Symbol *)VIR_Function_GetSymFromId(SPV_ID_SYM_VIR_FUNC(id), SPV_ID_VIR_SYM_ID(id)))

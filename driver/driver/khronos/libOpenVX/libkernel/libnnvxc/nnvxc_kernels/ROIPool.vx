@@ -4,6 +4,7 @@ _viv_uniform float2 q_PoolWH;
 _viv_uniform int2 inputSize;
 _viv_uniform int offset;
 #define EPS        (0.000002f)
+_viv_uniform int minVal;
 _viv_uniform float scaleInt16toInt16;
 __kernel void roiPooling_generic_int16 (
     __read_only image2d_array_t   input,
@@ -81,6 +82,9 @@ __kernel void roiPooling_generic_int16 (
             float temp = convert_float(output_data);
             temp *= scaleInt16toInt16;
             output_data = convert_short_rte(temp);
+            short minData;
+            _viv_asm(COPY, minData, minVal, 4);
+            output_data = max(minData, output_data);
             VXC_WriteImage2DArray(output, coord_out, output_data, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
         }
         pwh.yw += 1;
@@ -245,6 +249,10 @@ __kernel void roiPooling_generic_uint8 (
             temp = temp - input_ZP;
             temp = temp * uint8Scale + output_ZP;
             output_data = convert_uchar_rte(temp);
+
+            unsigned char minData;
+            _viv_asm(COPY, minData, minVal, 4);
+            output_data = max(minData, output_data);
             VXC_WriteImage2DArray(output, coord_out, output_data, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
         }
         pwh.yw += 1;

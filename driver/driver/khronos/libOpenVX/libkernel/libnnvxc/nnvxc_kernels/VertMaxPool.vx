@@ -2,6 +2,7 @@
 #include "cl_viv_vx_ext.h"
 #define VERT_IMAGE_NUM        (4)
 #define VERT_REMAIN        (3)
+_viv_uniform int4 packedMinData;
 __kernel void vertMaxPool_20x16_6x6_int8(
     __read_only image2d_array_t    input,
     int        width,
@@ -30,6 +31,9 @@ __kernel void vertMaxPool_20x16_6x6_int8(
     VXC_ReadImage(lineC, input,  coord_in.xy, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 4, 0, VXC_RM_TowardZero, 0));
 
     int loopCnt = 0;
+    _viv_asm(COPY, maxLine, packedMinData, 16);
+    VXC_VertMax3_Integer(lineA, lineA, maxLine, maxLine, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0));
+
     do
     {
         VXC_ReadImage(lineD, input,  coord_in.xy, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 4, 0, VXC_RM_TowardZero, 0));
@@ -49,6 +53,9 @@ __kernel void vertMaxPool_20x16_6x6_int8(
         lineA = lineB;
         lineB = lineC;
         lineC = lineD;
+
+        _viv_asm(COPY, maxLine, packedMinData, 16);
+        VXC_VertMax3_Integer(lineA, lineA, maxLine, maxLine, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0));
 
         coord_out.yz -= 2;
         coord_out.x += width;
@@ -71,6 +78,9 @@ __kernel void vertMaxPool_20x16_6x6_int8(
     coord_out.x += width;
     //height = -1
     //1
+    _viv_asm(COPY, maxLine, packedMinData, 16);
+    VXC_VertMax3_Integer(lineB, lineB, maxLine, maxLine, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0));
+
     VXC_WriteImage(output, coord_out.xy, lineB, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0));
     //2
     VXC_VertMax3_Integer(maxLine, lineB, lineC, lineB, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0));
@@ -82,6 +92,8 @@ __kernel void vertMaxPool_20x16_6x6_int8(
     coord_out.x += width;
     //height = 0
     //1
+    _viv_asm(COPY, maxLine, packedMinData, 16);
+    VXC_VertMax3_Integer(lineC, lineC, maxLine, maxLine, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0));
     VXC_WriteImage(output, coord_out.xy, lineC, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0));
     VXC_WriteImage(output, coord_out.xz, lineC, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0));
     coord_out.yz += 2;
@@ -116,6 +128,9 @@ __kernel void vertMaxPool_20x16_6x6_fp16(
     VXC_ReadImage(lineC, input,  coord_in.xy, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 4, 0, VXC_RM_TowardZero, 0));
 
     int loopCnt = 0;
+    _viv_asm(COPY, maxLine, packedMinData, 16);
+    VXC_VertMax3_Integer(lineA, lineA, maxLine, maxLine, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0));
+
     do
     {
         VXC_ReadImage(lineD, input,  coord_in.xy, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 4, 0, VXC_RM_TowardZero, 0));
@@ -135,6 +150,9 @@ __kernel void vertMaxPool_20x16_6x6_fp16(
         lineA = lineB;
         lineB = lineC;
         lineC = lineD;
+
+        _viv_asm(COPY, maxLine, packedMinData, 16);
+        VXC_VertMax3_Integer(lineA, lineA, maxLine, maxLine, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0));
 
         coord_out.yz -= 2;
         coord_out.x += width;
@@ -157,6 +175,9 @@ __kernel void vertMaxPool_20x16_6x6_fp16(
     coord_out.x += width;
     //height = -1
     //1
+    _viv_asm(COPY, maxLine, packedMinData, 16);
+    VXC_VertMax3_Integer(lineB, lineB, maxLine, maxLine, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0));
+
     VXC_WriteImage(output, coord_out.xy, lineB, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0));
     //2
     VXC_VertMax3_Integer(maxLine, lineB, lineC, lineB, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0));
@@ -168,6 +189,8 @@ __kernel void vertMaxPool_20x16_6x6_fp16(
     coord_out.x += width;
     //height = 0
     //1
+    _viv_asm(COPY, maxLine, packedMinData, 16);
+    VXC_VertMax3_Integer(lineC, lineC, maxLine, maxLine, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0));
     VXC_WriteImage(output, coord_out.xy, lineC, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0));
     VXC_WriteImage(output, coord_out.xz, lineC, VXC_MODIFIER(0, 4, 0,VXC_RM_TowardZero, 0));
     coord_out.yz += 2;
@@ -208,6 +231,9 @@ __kernel void vertMaxPool_51x39_6x6_fp16 (
 
     int lid = get_local_id(0);
     int loopCnt = 0;
+
+    _viv_asm(COPY, maxLine, packedMinData, 16);
+    VXC_VertMax3_Integer(lineA, lineA, maxLine, maxLine, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
     do
     {
         VXC_ReadImage(lineG, input,  coord_in.xy, VXC_5BITOFFSET_XY(0, 6), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
@@ -263,6 +289,9 @@ __kernel void vertMaxPool_51x39_6x6_fp16 (
         lineE = lineF;
         lineF = lineG;
 
+        _viv_asm(COPY, maxLine, packedMinData, 16);
+        VXC_VertMax3_Integer(lineA, lineA, maxLine, maxLine, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+
         coord_out.xyzw = coord_out.xwww + (int4)(width, 0, 1, 0);
         coord_in.y ++;
         loopCnt ++;
@@ -311,6 +340,8 @@ __kernel void vertMaxPool_51x39_6x6_fp16 (
 
     //height = -4
     //1
+    _viv_asm(COPY, maxLine, packedMinData, 16);
+    VXC_VertMax3_Integer(lineB, lineB, maxLine, maxLine, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
     if(lid == 6)
         VXC_WriteImage(output, coord_out.xy, lineB, VXC_MODIFIER(0, 2, 0,VXC_RM_TowardZero, 0));
     else
@@ -346,6 +377,8 @@ __kernel void vertMaxPool_51x39_6x6_fp16 (
 
     //height = -3
     //1
+    _viv_asm(COPY, maxLine, packedMinData, 16);
+    VXC_VertMax3_Integer(lineC, lineC, maxLine, maxLine, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
     if(lid == 6)
         VXC_WriteImage(output, coord_out.xy, lineC, VXC_MODIFIER(0, 2, 0,VXC_RM_TowardZero, 0));
     else
@@ -375,6 +408,8 @@ __kernel void vertMaxPool_51x39_6x6_fp16 (
 
     //height = -2
     //1
+    _viv_asm(COPY, maxLine, packedMinData, 16);
+    VXC_VertMax3_Integer(lineD, lineD, maxLine, maxLine, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
     if(lid == 6)
         VXC_WriteImage(output, coord_out.xy, lineD, VXC_MODIFIER(0, 2, 0,VXC_RM_TowardZero, 0));
     else
@@ -397,6 +432,8 @@ __kernel void vertMaxPool_51x39_6x6_fp16 (
 
     //height = -1
     //1
+    _viv_asm(COPY, maxLine, packedMinData, 16);
+    VXC_VertMax3_Integer(lineE, lineE, maxLine, maxLine, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
     if(lid == 6)
         VXC_WriteImage(output, coord_out.xy, lineE, VXC_MODIFIER(0, 2, 0,VXC_RM_TowardZero, 0));
     else
@@ -413,6 +450,8 @@ __kernel void vertMaxPool_51x39_6x6_fp16 (
 
     //height = 0
     //1
+    _viv_asm(COPY, maxLine, packedMinData, 16);
+    VXC_VertMax3_Integer(lineF, lineF, maxLine, maxLine, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
     if(lid == 6)
         VXC_WriteImage(output, coord_out.xy, lineF, VXC_MODIFIER(0, 2, 0,VXC_RM_TowardZero, 0));
     else
@@ -452,6 +491,9 @@ __kernel void vertMaxPool_51x39_6x6_int8 (
 
     int lid = get_local_id(0);
     int loopCnt = 0;
+    _viv_asm(COPY, maxLine, packedMinData, 16);
+    VXC_VertMax3_Integer(lineA, lineA, maxLine, maxLine, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+
     do
     {
         VXC_ReadImage(lineG, input,  coord_in.xy, VXC_5BITOFFSET_XY(0, 6), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
@@ -507,6 +549,9 @@ __kernel void vertMaxPool_51x39_6x6_int8 (
         lineE = lineF;
         lineF = lineG;
 
+        _viv_asm(COPY, maxLine, packedMinData, 16);
+        VXC_VertMax3_Integer(lineA, lineA, maxLine, maxLine, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+
         coord_out.xyzw = coord_out.xwww + (int4)(width, 0, 1, 0);
         coord_in.y ++;
         loopCnt ++;
@@ -555,6 +600,8 @@ __kernel void vertMaxPool_51x39_6x6_int8 (
 
     //height = -4
     //1
+    _viv_asm(COPY, maxLine, packedMinData, 16);
+    VXC_VertMax3_Integer(lineB, lineB, maxLine, maxLine, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
     if(lid == 6)
         VXC_WriteImage(output, coord_out.xy, lineB, VXC_MODIFIER(0, 2, 0,VXC_RM_TowardZero, 0));
     else
@@ -590,6 +637,8 @@ __kernel void vertMaxPool_51x39_6x6_int8 (
 
     //height = -3
     //1
+    _viv_asm(COPY, maxLine, packedMinData, 16);
+    VXC_VertMax3_Integer(lineC, lineC, maxLine, maxLine, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
     if(lid == 6)
         VXC_WriteImage(output, coord_out.xy, lineC, VXC_MODIFIER(0, 2, 0,VXC_RM_TowardZero, 0));
     else
@@ -619,6 +668,8 @@ __kernel void vertMaxPool_51x39_6x6_int8 (
 
     //height = -2
     //1
+    _viv_asm(COPY, maxLine, packedMinData, 16);
+    VXC_VertMax3_Integer(lineD, lineD, maxLine, maxLine, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
     if(lid == 6)
         VXC_WriteImage(output, coord_out.xy, lineD, VXC_MODIFIER(0, 2, 0,VXC_RM_TowardZero, 0));
     else
@@ -641,6 +692,8 @@ __kernel void vertMaxPool_51x39_6x6_int8 (
 
     //height = -1
     //1
+    _viv_asm(COPY, maxLine, packedMinData, 16);
+    VXC_VertMax3_Integer(lineE, lineE, maxLine, maxLine, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
     if(lid == 6)
         VXC_WriteImage(output, coord_out.xy, lineE, VXC_MODIFIER(0, 2, 0,VXC_RM_TowardZero, 0));
     else
@@ -657,6 +710,8 @@ __kernel void vertMaxPool_51x39_6x6_int8 (
 
     //height = 0
     //1
+    _viv_asm(COPY, maxLine, packedMinData, 16);
+    VXC_VertMax3_Integer(lineF, lineF, maxLine, maxLine, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
     if(lid == 6)
         VXC_WriteImage(output, coord_out.xy, lineF, VXC_MODIFIER(0, 2, 0,VXC_RM_TowardZero, 0));
     else

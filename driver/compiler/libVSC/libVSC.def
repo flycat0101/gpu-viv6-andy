@@ -175,6 +175,7 @@ EXPORTS
     gcSHADER_GetPrivateMemorySize
     gcSHADER_GetLocalMemorySize
     gcSHADER_GetWorkGroupSize
+    gcSHADER_GetLtcCodeUniformIndex
     gcSHADER_GetType
     gcSHADER_LinkLibFunction
     gcSHADER_LinkBuiltinLibs
@@ -383,6 +384,8 @@ EXPORTS
     vscDestroyShader
     vscReferenceShader
     vscGetDebugInfo
+    vscDupDebugInfo
+    vscDestroyDebugInfo
     vscCopyShader
     vscSaveShaderToBinary
     vscQueryShaderBinarySize
@@ -442,9 +445,10 @@ EXPORTS
     vscDIAddSWLoc
     vscDIChangeUniformSWLoc
     vscDIGetVaribleLocByNameAndPC
-	vscDIStep
-	vscDIPushCallStack
-	vscDIPopCallStack
+    vscDIStep
+    vscDIPushCallStack
+    vscDIPopCallStack
+    vscDICopyDebugInfo
 
     vscERR_ReportError
     vscERR_ReportWarning

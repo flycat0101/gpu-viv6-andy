@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -50,7 +50,19 @@ CFLAGS += $(INCLUDE)
 
 # Specify Vivante library paths.
 ifeq ($(gcdSTATIC_LINK), 1)
-LIBS += $(VIVANTE_SDK_LIB)/libVIVANTE.a
+LIBS += $(SDK_LIB)/libOpenCL.a
+LIBS += $(SDK_LIB)/libCLC.a
+LIBS += $(SDK_LIB)/libLLVM_viv.a
+LIBS += $(SDK_LIB)/libclCompiler.a
+LIBS += $(SDK_LIB)/libclPreprocessor.a
+LIBS += $(SDK_LIB)/libclCommon.a
+LIBS += $(SDK_LIB)/libLLVM_viv.a
+LIBS += $(SDK_LIB)/libVSC.a
+LIBS += $(SDK_LIB)/libhalarchuser.a
+LIBS += $(SDK_LIB)/libhalosuser.a
+LIBS += $(SDK_LIB)/libGAL.a
+LIBS += $(SDK_LIB)/libhalarchuser.a
+LIBS += $(SDK_LIB)/libGAL.a
 LIBS +=  $(LIB_DIR)/libm.a
 LIBS +=  $(LIB_DIR)/libpthread.a
 LIBS +=  $(LIB_DIR)/libc.a

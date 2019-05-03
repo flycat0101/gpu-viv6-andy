@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -225,7 +225,6 @@ static void CDECL Destroy(Test2D *t2d)
 const gceFEATURE FeatureList[]=
 {
     gcvFEATURE_2D_TILING,
-    gcvFEATURE_2D_SUPER_TILE_VERSION,
 };
 
 static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)

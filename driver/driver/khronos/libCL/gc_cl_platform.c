@@ -14,6 +14,7 @@
 #include "gc_cl_precomp.h"
 
 #define __NEXT_MSG_ID__     000005
+#define _GC_OBJ_ZONE        gcdZONE_CL_PLATFORM
 
 static struct _cl_platform_id _platform =
 {
@@ -162,12 +163,22 @@ clfSetTraceMode(
             {
                 vclTraceMode = gcvTRACEMODE_LOGGER;
             }
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "3")))
+            {
+                vclTraceMode = gcvTRACEMODE_ALLZONE;
+            }
             else
             {
                 gcmPRINT("OCL: unsupported trace mode");
             }
 
             clfInitTracerDispatchTable();
+        }
+
+        if (vclTraceMode == gcvTRACEMODE_ALLZONE)
+        {
+            gcoOS_SetDebugLevel(gcvLEVEL_VERBOSE);
+            gcoOS_SetDebugZone(gcdZONE_ALL);
         }
 
         Once = gcvTRUE;

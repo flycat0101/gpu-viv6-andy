@@ -13,6 +13,8 @@
 
 #include <gc_vx_common.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_LUT
+
 VX_INTERNAL_CALLBACK_API void vxoLUT_Destructor(vx_reference ref)
 {
     vxoArray_Destructor(ref);
@@ -22,11 +24,14 @@ VX_PRIVATE_API vx_status gcoLUT_CopyArrayRangeInt(vx_array arr, vx_size start, v
 {
     vx_status status = VX_FAILURE;
 
+    gcmHEADER_ARG("arr=%p, start=0x%lx, end=0x%lx, stride=0x%lx, ptr=%p, usage=0x%x, mem_type=0x%x", arr, start, end, stride, ptr, usage, mem_type);
+
     /* bad parameters */
     if (((usage != VX_READ_ONLY) && (VX_WRITE_ONLY != usage)) ||
          (ptr == NULL) || (stride < arr->itemSize) ||
          (start >= end) || (end > arr->itemCount))
     {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
@@ -37,6 +42,7 @@ VX_PRIVATE_API vx_status gcoLUT_CopyArrayRangeInt(vx_array arr, vx_size start, v
         {
             /* User tried to access a "virtual" array. */
             vxError("Can not access a virtual array\n");
+            gcmFOOTER_ARG("%d", VX_ERROR_OPTIMIZED_AWAY);
             return VX_ERROR_OPTIMIZED_AWAY;
         }
         /* framework trying to access a virtual array, this is ok. */
@@ -47,6 +53,7 @@ VX_PRIVATE_API vx_status gcoLUT_CopyArrayRangeInt(vx_array arr, vx_size start, v
      */
     if (vxoArray_AllocateMemory(arr) == vx_false_e)
     {
+        gcmFOOTER_ARG("%d", VX_ERROR_NO_MEMORY);
         return VX_ERROR_NO_MEMORY;
     }
     {
@@ -113,6 +120,7 @@ VX_PRIVATE_API vx_status gcoLUT_CopyArrayRangeInt(vx_array arr, vx_size start, v
         }
     }
     }
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -271,11 +279,15 @@ VX_PRIVATE_API vx_status gcoLUT_MapArrayRangeInt(vx_array arr, vx_size start, vx
 {
     vx_status status = VX_FAILURE;
 
+    gcmHEADER_ARG("arr=%p, start=0x%lx, end=0x%lx, map_id=%p, stride=%p, ptr=%p, usage=0x%x, mem_type=0x%x, flags=0x%x",
+        arr, start, end, map_id, stride, ptr, usage, mem_type, flags);
+
     /* bad parameters */
     if ((usage < VX_READ_ONLY) || (VX_READ_AND_WRITE < usage) ||
         (ptr == NULL) || (stride == NULL) ||
         (start >= end) || (end > arr->itemCount))
     {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
@@ -286,6 +298,7 @@ VX_PRIVATE_API vx_status gcoLUT_MapArrayRangeInt(vx_array arr, vx_size start, vx
         {
             /* User tried to access a "virtual" array. */
             vxError("Can not access a virtual array\n");
+            gcmFOOTER_ARG("%d", VX_ERROR_OPTIMIZED_AWAY);
             return VX_ERROR_OPTIMIZED_AWAY;
         }
         /* framework trying to access a virtual array, this is ok. */
@@ -296,6 +309,7 @@ VX_PRIVATE_API vx_status gcoLUT_MapArrayRangeInt(vx_array arr, vx_size start, vx
      */
     if (vxoArray_AllocateMemory(arr) == vx_false_e)
     {
+        gcmFOOTER_ARG("%d", VX_ERROR_NO_MEMORY);
         return VX_ERROR_NO_MEMORY;
     }
 
@@ -319,12 +333,15 @@ VX_PRIVATE_API vx_status gcoLUT_MapArrayRangeInt(vx_array arr, vx_size start, vx
             status = VX_FAILURE;
         }
     }
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
 VX_PRIVATE_API vx_status gcoLUT_UnmapArrayRangeInt(vx_array arr, vx_map_id map_id)
 {
     vx_status status = VX_FAILURE;
+
+    gcmHEADER_ARG("arr=%p, map_id=0x%x", arr, map_id);
 
     /* determine if virtual before checking for memory */
     if (arr->base.isVirtual == vx_true_e)
@@ -333,6 +350,7 @@ VX_PRIVATE_API vx_status gcoLUT_UnmapArrayRangeInt(vx_array arr, vx_map_id map_i
         {
             /* User tried to access a "virtual" array. */
             vxError("Can not access a virtual array\n");
+            gcmFOOTER_ARG("%d", VX_ERROR_OPTIMIZED_AWAY);
             return VX_ERROR_OPTIMIZED_AWAY;
         }
         /* framework trying to access a virtual array, this is ok. */
@@ -342,6 +360,7 @@ VX_PRIVATE_API vx_status gcoLUT_UnmapArrayRangeInt(vx_array arr, vx_map_id map_i
     if (vxoContext_FindMemoryMap(arr->base.context, (vx_reference)arr, map_id) != vx_true_e)
     {
         vxError("Invalid parameters to unmap array range\n");
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
@@ -361,6 +380,7 @@ VX_PRIVATE_API vx_status gcoLUT_UnmapArrayRangeInt(vx_array arr, vx_map_id map_i
             status = VX_FAILURE;
         }
     }
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 #endif
@@ -369,10 +389,14 @@ VX_API_ENTRY vx_lut VX_API_CALL vxCreateLUT(vx_context context, vx_enum data_typ
 {
     vx_array lut;
 
+    gcmHEADER_ARG("context=%p, data_type=0x%x, count=0x%lx", context, data_type, count);
     gcmDUMP_API("$VX vxCreateLUT: context=%p, data_type=0x%x, count=0x%lx", context, data_type, count);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     switch (data_type)
     {
         case VX_TYPE_UINT8:
@@ -381,24 +405,31 @@ VX_API_ENTRY vx_lut VX_API_CALL vxCreateLUT(vx_context context, vx_enum data_typ
             break;
 
         default:
+            gcmFOOTER_NO();
             return (vx_lut)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_TYPE);
     }
 
     lut = vxoArray_Create(context, data_type, count, vx_false_e, VX_TYPE_LUT, vx_false_e);
 
-    if (vxoReference_GetStatus((vx_reference)lut) != VX_SUCCESS) return (vx_lut)lut;
-
+    if (vxoReference_GetStatus((vx_reference)lut) != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("lut=%p", lut);
+        return (vx_lut)lut;
+    }
     lut->itemCount = count;
 
     lut->offset       = (data_type == VX_TYPE_INT16)?((vx_uint32)(count/2)):0;
 
+    gcmFOOTER_ARG("lut=%p", lut);
     return (vx_lut)lut;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseLUT(vx_lut *lut)
 {
+    gcmHEADER_ARG("lut=%p", lut);
     gcmDUMP_API("$VX vxReleaseLUT: lut=%p", lut);
 
+    gcmFOOTER_NO();
     return vxoReference_Release((vx_reference_ptr)lut, VX_TYPE_LUT, VX_REF_EXTERNAL);
 }
 
@@ -406,10 +437,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryLUT(vx_lut lut, vx_enum attribute, voi
 {
     vx_array lutArray = (vx_array)lut;
 
+    gcmHEADER_ARG("lut=%p, attribute=0x%x, ptr=%p, size=0x%lx", lut, attribute, ptr, size);
     gcmDUMP_API("$VX vxQueryLUT: lut=%p, attribute=0x%x, ptr=%p, size=0x%lx", lut, attribute, ptr, size);
 
-    if (!vxoReference_IsValidAndSpecific(&lutArray->base, VX_TYPE_LUT)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoReference_IsValidAndSpecific(&lutArray->base, VX_TYPE_LUT))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     switch (attribute)
     {
         case VX_LUT_TYPE:
@@ -438,9 +473,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryLUT(vx_lut lut, vx_enum attribute, voi
 
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
+            gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
             return VX_ERROR_NOT_SUPPORTED;
     }
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
@@ -448,10 +485,15 @@ VX_API_ENTRY vx_status VX_API_CALL vxAccessLUT(vx_lut lut, void **ptr, vx_enum u
 {
     vx_array lutArray = (vx_array)lut;
 
+    gcmHEADER_ARG("lut=%p, ptr=%p, usage=0x%x", lut, ptr, usage);
     gcmDUMP_API("$VX vxAccessLUT: lut=%p, ptr=%p, usage=0x%x", lut, ptr, usage);
 
-    if (!vxoReference_IsValidAndSpecific(&lutArray->base, VX_TYPE_LUT)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoReference_IsValidAndSpecific(&lutArray->base, VX_TYPE_LUT))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+    gcmFOOTER_NO();
     return vxoArray_AccessRange(lutArray, 0, lutArray->itemCount, VX_NULL, ptr, usage);
 }
 
@@ -459,10 +501,16 @@ VX_API_ENTRY vx_status VX_API_CALL vxCommitLUT(vx_lut lut, const void *ptr)
 {
     vx_array lutArray = (vx_array)lut;
 
+    gcmHEADER_ARG("lut=%p, ptr=%p", lut, ptr);
     gcmDUMP_API("$VX vxCommitLUT: lut=%p, ptr=%p", lut, ptr);
 
-    if (!vxoReference_IsValidAndSpecific(&lutArray->base, VX_TYPE_LUT)) return VX_ERROR_INVALID_REFERENCE;
+    if (!vxoReference_IsValidAndSpecific(&lutArray->base, VX_TYPE_LUT))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
 
+    gcmFOOTER_NO();
     return vxoArray_CommitRange(lutArray, 0, lutArray->itemCount, (vx_ptr)ptr);
 }
 
@@ -471,6 +519,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyLUT(vx_lut l, void *user_ptr, vx_enum u
     vx_status status = VX_FAILURE;
     vx_lut_s *lut = (vx_lut_s *)l;
 
+    gcmHEADER_ARG("l=%p, user_ptr=%p, usage=0x%x, user_mem_type=0x%x", l, user_ptr, usage, user_mem_type);
     gcmDUMP_API("$VX vxCopyLUT: l=%p, user_ptr=%p, usage=0x%x, user_mem_type=0x%x", l, user_ptr, usage, user_mem_type);
     if (vxoReference_IsValidAndSpecific(&lut->base, VX_TYPE_LUT))
     {
@@ -481,6 +530,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyLUT(vx_lut l, void *user_ptr, vx_enum u
     {
         vxError("Not a valid object!\n");
     }
+
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -489,6 +540,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapLUT(vx_lut l, vx_map_id *map_id, void **
     vx_status status = VX_FAILURE;
     vx_lut_s *lut = (vx_lut_s *)l;
 
+    gcmHEADER_ARG("l=%p, map_id=%p, ptr=%p, usage=0x%x, mem_type=0x%x, flags=0x%x", l, map_id, ptr, usage, mem_type, flags);
     gcmDUMP_API("$VX vxMapLUT: l=%p, map_id=%p, ptr=%p, usage=0x%x, mem_type=0x%x, flags=0x%x", l, map_id, ptr, usage, mem_type, flags);
     if (vxoReference_IsValidAndSpecific(&lut->base, VX_TYPE_LUT))
     {
@@ -499,6 +551,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapLUT(vx_lut l, vx_map_id *map_id, void **
     {
         vxError("Not a valid object!\n");
     }
+
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -507,6 +561,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapLUT(vx_lut l, vx_map_id map_id)
     vx_status status = VX_FAILURE;
     vx_lut_s *lut = (vx_lut_s *)l;
 
+    gcmHEADER_ARG("l=%p, map_id=0x%x", l, map_id);
     gcmDUMP_API("$VX vxUnmapLUT: l=%p, map_id=0x%x", l, map_id);
 
     if (vxoReference_IsValidAndSpecific(&lut->base, VX_TYPE_LUT))
@@ -517,6 +572,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapLUT(vx_lut l, vx_map_id map_id)
     {
         vxError("Not a valid object!\n");
     }
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -525,18 +581,26 @@ VX_API_ENTRY vx_lut VX_API_CALL vxCreateVirtualLUT(vx_graph graph, vx_enum data_
     vx_array lut;
     vx_context context = vxoContext_GetFromReference((vx_reference)graph);
 
+    gcmHEADER_ARG("graph=%p, data_type=0x%x, count=0x%lx", graph, data_type, count);
     gcmDUMP_API("$VX vxCreateVirtualLUT: graph=%p, data_type=0x%x, count=0x%lx", graph, data_type, count);
 
-    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_NULL;
-
+    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     lut = (vx_array)vxCreateLUT(context, data_type, count);
 
-    if (vxoReference_GetStatus((vx_reference)lut) != VX_SUCCESS) return (vx_lut)lut;
-
+    if (vxoReference_GetStatus((vx_reference)lut) != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("lut=%p", lut);
+        return (vx_lut)lut;
+    }
     lut->base.scope        = (vx_reference)graph;
 
     lut->base.isVirtual    = vx_true_e;
 
+    gcmFOOTER_ARG("lut=%p", lut);
     return (vx_lut)lut;
 }
 

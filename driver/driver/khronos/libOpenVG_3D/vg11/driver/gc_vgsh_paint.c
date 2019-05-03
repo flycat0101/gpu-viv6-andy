@@ -13,6 +13,8 @@
 
 #include "gc_vgsh_precomp.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG3D_PAINT
+
 void _VGPaintCtor(gcoOS os, _VGPaint *paint)
 {
     _VGGradientStop      gs;

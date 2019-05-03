@@ -15,7 +15,7 @@
 #include "gc_es_device.h"
 #include "gc_es_object_inline.c"
 
-#define _GC_OBJ_ZONE __GLES3_ZONE_CORE
+#define _GC_OBJ_ZONE gcdZONE_ES30_CORE
 
 
 GLboolean __glDeleteQueryObj(__GLcontext *gc, __GLqueryObject *queryObj);

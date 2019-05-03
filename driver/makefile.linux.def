@@ -401,7 +401,13 @@ ifneq ($(VG_APPENDIX),)
   CFLAGS            += -D_VG_APPENDIX=$(VG_APPENDIX)
 endif
 
-CFLAGS              += -DgcdREGISTER_ACCESS_FROM_USER=1
+ifeq ($(REGISTER_READ_FROM_USER),1)
+CFLAGS              += -DgcdREGISTER_READ_FROM_USER=1
+endif
+
+ifeq ($(REGISTER_WRITE_FROM_USER),1)
+CFLAGS              += -DgcdREGISTER_WRITE_FROM_USER=1
+endif
 
 ifeq ($(FPGA_BUILD),1)
   CFLAGS            += -DgcdFPGA_BUILD=1

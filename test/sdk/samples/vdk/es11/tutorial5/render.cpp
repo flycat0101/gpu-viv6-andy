@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -35,6 +35,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
+#include <android/log.h>
 extern int width;
 extern int height;
 extern void *LoadTGA(FILE * File,GLenum * Format,GLsizei * Width,GLsizei * Height);

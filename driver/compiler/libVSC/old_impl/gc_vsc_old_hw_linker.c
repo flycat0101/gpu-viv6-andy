@@ -19862,7 +19862,7 @@ _GenerateStates(
 
                   if (Tree->shader->outputLocations[i] >= maxLoc)
                   {
-                     gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_COMPILER,
+                     gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_COMPILER,
                                    "Fragment output %d mapped to location greater than %d, location = %d",
                                    gcHWCaps.maxRenderTargetCount, i,
                                    Tree->shader->outputLocations[i]);
@@ -20133,7 +20133,7 @@ _GenerateStates(
                          break;
 
                       default:
-                         gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_COMPILER,
+                         gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_COMPILER,
                                        "Fragment output number %d is greater than 3", i);
 
                          status = gcvSTATUS_TOO_MANY_OUTPUT;
@@ -20315,7 +20315,7 @@ _GenerateStates(
                           break;
 
                       default:
-                          gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_COMPILER,
+                          gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_COMPILER,
                               "Fragment output number %d is greater than 3", i);
 
                           status = gcvSTATUS_TOO_MANY_OUTPUT;
@@ -23362,7 +23362,7 @@ _GenerateStates(
 
     if ((CodeGen->lastStateCommand != gcvNULL) && (numInstrStates > maxNumInstrStates) && (!CodeGen->useICache))
     {
-        gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_COMPILER,
+        gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_COMPILER,
             "Not enough instruction memory, need %d, have %d", numInstrStates, maxNumInstrStates);
         gcmUSER_DEBUG_ERROR_MSG(
             "Not enough instruction memory, need %d, have %d.\n", numInstrStates, maxNumInstrStates);
@@ -24167,6 +24167,8 @@ gcLINKTREE_GenerateStates(
 
     {
         gceMEMORY_ACCESS_FLAG memoryAccessFlag = gceMA_FLAG_NONE;
+        gceFLOW_CONTROL_FLAG flowControlFlag = gceFC_FLAG_NONE;
+        gceTEXLD_FLAG texldFlag = gceTEXLD_FLAG_NONE;
         gctBOOL     threadGroupSync = gcvFALSE;
         gctINT      stageIndex = 0;
 
@@ -24209,6 +24211,32 @@ gcLINKTREE_GenerateStates(
             memoryAccessFlag |= gceMA_FLAG_ATOMIC;
         }
 
+        if ((codeInfo.codeCounter[gcSL_JMP] != 0) ||
+            (codeInfo.codeCounter[gcSL_JMP_ANY] != 0))
+        {
+            flowControlFlag |= gceFC_FLAG_JMP;
+        }
+
+        if (codeInfo.codeCounter[gcSL_CALL] != 0)
+        {
+            flowControlFlag |= gceFC_FLAG_CALL;
+        }
+
+        if (codeInfo.codeCounter[gcSL_KILL] != 0)
+        {
+            flowControlFlag |= gceFC_FLAG_KILL;
+        }
+
+        if (codeInfo.codeCounter[gcSL_TEXLD] != 0       ||
+            codeInfo.codeCounter[gcSL_TEXLD_U] != 0     ||
+            codeInfo.codeCounter[gcSL_TEXLDPROJ] != 0   ||
+            codeInfo.codeCounter[gcSL_TEXLDPCF] != 0    ||
+            codeInfo.codeCounter[gcSL_TEXLODQ] != 0     ||
+            codeInfo.codeCounter[gcSL_TEXLDPCFPROJ] != 0)
+        {
+            texldFlag |= gceTEXLD_FLAG_TEXLD;
+        }
+
         if (codeInfo.codeCounter[gcSL_BARRIER] != 0)
         {
             threadGroupSync = gcvTRUE;
@@ -24234,6 +24262,13 @@ gcLINKTREE_GenerateStates(
         /* So far we won't generate any memory-access-related instruction for old CG. */
         hints->memoryAccessFlags[gcvSHADER_HIGH_LEVEL][stageIndex] = memoryAccessFlag;
         hints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][stageIndex] = memoryAccessFlag;
+
+        hints->flowControlFlags[gcvSHADER_HIGH_LEVEL][stageIndex] = flowControlFlag;
+        hints->flowControlFlags[gcvSHADER_MACHINE_LEVEL][stageIndex] = flowControlFlag;
+
+        hints->texldFlags[gcvSHADER_HIGH_LEVEL][stageIndex] = texldFlag;
+        hints->texldFlags[gcvSHADER_MACHINE_LEVEL][stageIndex] = texldFlag;
+
         hints->threadGroupSync = threadGroupSync;
         /* The shader invocation control function is only available in compute shaders for OGL,
             * or OCL */
@@ -24363,17 +24398,6 @@ OnError:
     return status;
 }
 #endif
-
-gctUINT32
-gcSHADER_GetHintSize(
-    void
-    )
-{
-    gcmHEADER();
-
-    gcmFOOTER_ARG("return=%d", gcmSIZEOF(struct _gcsHINT));
-    return gcmSIZEOF(struct _gcsHINT);
-}
 
 #if !DX_SHADER
 gctBOOL

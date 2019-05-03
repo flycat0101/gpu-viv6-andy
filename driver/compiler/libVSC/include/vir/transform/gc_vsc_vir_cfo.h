@@ -31,6 +31,7 @@ typedef struct VIR_CFO
     VSC_OPTN_CFOOptions* options;
     VIR_Dumper* dumper;
     VSC_MM* mm;
+    gctBOOL bInvalidCfg;
 } VIR_CFO;
 
 #define VIR_CFO_GetShader(lo)              ((lo)->shader)
@@ -43,6 +44,8 @@ typedef struct VIR_CFO
 #define VIR_CFO_SetDumper(lo, d)           ((lo)->dumper = (d))
 #define VIR_CFO_GetMM(lo)                  ((lo)->mm)
 #define VIR_CFO_SetMM(lo, m)               ((lo)->mm = (m))
+#define VIR_CFO_GetInvalidCfg(lo)          ((lo)->bInvalidCfg)
+#define VIR_CFO_SetInvalidCfg(lo, m)       ((lo)->bInvalidCfg = (m))
 
 void
 VIR_CFO_Init(

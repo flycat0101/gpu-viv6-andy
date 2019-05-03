@@ -34,7 +34,7 @@ GLvoid    __glBindProgramPipeline(__GLcontext *gc, GLuint pipeline);
 GLboolean __glDeleteProgramPipelineObj(__GLcontext *gc, __GLprogramPipelineObject *ppObj);
 extern GLvoid __glDispatchCompute(__GLcontext *gc);
 
-#define _GC_OBJ_ZONE __GLES3_ZONE_CORE
+#define _GC_OBJ_ZONE gcdZONE_GL40_CORE
 
 __GL_INLINE __GLSLStage __glGetShaderStage(GLenum type)
 {

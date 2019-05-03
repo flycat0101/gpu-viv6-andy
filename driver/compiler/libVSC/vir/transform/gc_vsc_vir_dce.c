@@ -671,15 +671,7 @@ _VSC_DCE_RemoveInstruction(
     IN VIR_Instruction  *inst
     )
 {
-    VIR_BASIC_BLOCK     *BB = VIR_Inst_GetBasicBlock(inst);
-
-    VIR_Function_RemoveInstruction(func, inst);
-
-    /* If there is no instruction within one BB, we need to rebuild CFG, otherwise CFG is wrong after DCE. */
-    if (BB && BB_GET_LENGTH(BB) == 0)
-    {
-        dce->rebuildCFG = gcvTRUE;
-    }
+    VIR_Pass_RemoveInstruction(func, inst, &dce->rebuildCFG);
 }
 
 static VIR_Instruction*

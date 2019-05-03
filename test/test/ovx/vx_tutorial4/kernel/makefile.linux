@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -36,8 +36,14 @@
 include $(AQROOT)/makefile.linux.def
 
 #############################################################################
-DYNAMIC = 1
-TARGET_NAME = libtutorial4_kernel.so
+ifeq ($(gcdSTATIC_LINK),1)
+  STATIC            := 1
+  TARGET_NAME = libtutorial4_kernel.a
+else
+  DYNAMIC = 1
+  TARGET_NAME = libtutorial4_kernel.so
+endif
+
 
 OBJECTS		= $(OBJ_DIR)/tutorial4_kernel.o \
 
@@ -46,14 +52,17 @@ OBJECTS		= $(OBJ_DIR)/tutorial4_kernel.o \
 
 INCLUDE += -I $(VIVANTE_SDK_DIR)/include
 CFLAGS += $(INCLUDE)
-CFLAGS += -fPIC -shared
+CFLAGS += -fPIC
 #LFLAGS += -Wl
 ################################################################################
 # Add extra library path.
 
-LIBS += -L $(VIVANTE_SDK_DIR)//drivers
-LIBS += -l dl -l pthread -l m -l stdc++
+ifeq ($(DYNAMIC),1)
+CFLAGS += -shared
+LIBS += -L $(VIVANTE_SDK_DIR)/drivers
 LIBS += -l OpenVX
+LIBS += -l dl -l pthread -l m
+endif
 
 ################################################################################
 # Add extra include path.

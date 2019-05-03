@@ -81,7 +81,7 @@
 **      gckCOMMAND Command
 **          gckCOMMAND object has been updated with a new command queue.
 */
-static gceSTATUS
+static gcmNOINLINE gceSTATUS
 _NewQueue(
     IN OUT gckCOMMAND Command,
     IN gctBOOL Stalled
@@ -173,7 +173,7 @@ OnError:
     return status;
 }
 
-static gceSTATUS
+static gcmNOINLINE gceSTATUS
 _IncrementCommitAtom(
     IN gckCOMMAND Command,
     IN gctBOOL Increment
@@ -234,7 +234,7 @@ OnError:
     return status;
 }
 
-static gceSTATUS
+static gcmNOINLINE gceSTATUS
 _CheckFlushMMU(
     IN gckCOMMAND Command,
     IN gckHARDWARE Hardware
@@ -348,7 +348,7 @@ OnError:
 }
 
 /* WaitLink FE only. */
-static gceSTATUS
+static gcmNOINLINE gceSTATUS
 _DummyDraw(
     IN gckCOMMAND Command
     )
@@ -420,6 +420,12 @@ _WaitPendingMcfeSema(
 
     nextFreePos = (Command->freePendingPos + 1) % count;
 
+    if (nextFreePos == Command->nextPendingPos)
+    {
+        /* No pendings. */
+        gcmkONERROR(gcvSTATUS_NOT_FOUND);
+    }
+
     while (nextFreePos != Command->nextPendingPos)
     {
         /* Timeout is infinite in the first to at least free one slot. */
@@ -455,35 +461,67 @@ OnError:
     return status;
 }
 
+static gctUINT32
+_GetFreeMcfeSemaNum(
+    gckCOMMAND Command
+    )
+{
+    gctUINT32 num = 0;
+
+    if (Command->nextSemaId <= Command->freeSemaId)
+    {
+        num = Command->freeSemaId - Command->nextSemaId;
+    }
+    else
+    {
+        num = Command->totalSemaId - Command->nextSemaId + Command->freeSemaId;
+    }
+
+    return num;
+}
+
 /*
  * Get next semaphore id in semaphore ring.
+ *
+ * There are semaMinThreshhold semaphores are reserved for system operations,
+ * such as _SyncToSystemChannel etc.
+ * The rest semaphores are regular ones.
  */
 static gcmINLINE gceSTATUS
 _GetNextMcfeSemaId(
     gckCOMMAND Command,
+    gctBOOL regularSema,
     gctUINT32 * SemaId
     )
 {
-    gctUINT32 semaId;
+    gctUINT32 freeSemaNum = 0;
+
     gceSTATUS status = gcvSTATUS_OK;
-
-    semaId = Command->nextSemaId;
-
-    if (++Command->nextSemaId == Command->totalSemaId)
-    {
-        Command->nextSemaId = 0;
-    }
 
     /*
      * See the comments in struct definition.
      * wait when run out of semaphores.
      */
-    if (semaId == Command->freeSemaId)
+    freeSemaNum = _GetFreeMcfeSemaNum(Command);
+
+    if ((regularSema && (freeSemaNum <= Command->semaMinThreshhold)) ||
+        (!regularSema && (freeSemaNum == 0)))
     {
-        status = _WaitPendingMcfeSema(Command);
+        gcmkONERROR(_WaitPendingMcfeSema(Command));
     }
 
-    *SemaId = semaId;
+    gcmkASSERT(Command->nextSemaId != Command->freeSemaId);
+
+    /* Output the semaphore ID. */
+    *SemaId = Command->nextSemaId;
+
+    /* Advance to next. */
+    if (++Command->nextSemaId == Command->totalSemaId)
+    {
+        Command->nextSemaId = 0;
+    }
+
+OnError:
     return status;
 }
 
@@ -496,22 +534,26 @@ _GetNextPendingPos(
     gctUINT32 * Pos
     )
 {
-    gctUINT32 pos = Command->nextPendingPos;
     gceSTATUS status = gcvSTATUS_OK;
 
+    /* Wait when out of pending ring. */
+    if (Command->nextPendingPos == Command->freePendingPos)
+    {
+        /* Run out of pending semaphore tracking ring. */
+        gcmkONERROR(_WaitPendingMcfeSema(Command));
+    }
+
+    gcmkASSERT(Command->nextPendingPos != Command->freePendingPos);
+
+    *Pos = Command->nextPendingPos;
+
+    /* Advance to next. */
     if (++Command->nextPendingPos == gcmCOUNTOF(Command->pendingSema))
     {
         Command->nextPendingPos = 0;
     }
 
-    /* Wait when out of pending ring. */
-    if (pos == Command->freePendingPos)
-    {
-        /* Run out of pending semaphore tracking ring. */
-        status = _WaitPendingMcfeSema(Command);
-    }
-
-    *Pos = pos;
+OnError:
     return status;
 }
 
@@ -561,7 +603,7 @@ _SyncToSystemChannel(
             }
 
             /* Get a free semaphore id. */
-            gcmkONERROR(_GetNextMcfeSemaId(Command, &id));
+            gcmkONERROR(_GetNextMcfeSemaId(Command, gcvFALSE, &id));
             semaId[semaCount++] = (gctUINT8)id;
 
             gcmkONERROR(gckCOMMAND_Reserve(Command, reqBytes, (gctPOINTER *)&buffer, &bytes));
@@ -580,19 +622,23 @@ _SyncToSystemChannel(
     {
         gctUINT32 pos = 0;
         gckEVENT eventObj = kernel->eventObj;
+        gctUINT32 bufferLen = 0;
 
         /* Query WaitSemaphore command size. */
         gckMCFE_WaitSemaphore(hardware, gcvNULL, 0, &reqBytes);
         reqBytes *= semaCount;
 
-        gcmkONERROR(gckCOMMAND_Reserve(Command, reqBytes, (gctPOINTER *)&buffer, &bytes));
+        gcmkONERROR(gckCOMMAND_Reserve(Command, reqBytes, (gctPOINTER *)&buffer, &bufferLen));
 
         for (i = 0; i < semaCount; i++)
         {
+            bytes = bufferLen;
+
             /* Wait semaphores executed in fixed system channel. */
             gckMCFE_WaitSemaphore(hardware, buffer, semaId[i], &bytes);
 
-            buffer += bytes;
+            buffer    += bytes;
+            bufferLen -= bytes;
         }
 
         gcmkONERROR(gckCOMMAND_ExecuteMultiChannel(Command, 0, 0, reqBytes));
@@ -608,6 +654,12 @@ _SyncToSystemChannel(
             eventObj,
             Command->pendingSema[pos].signal,
             gcvKERNEL_PIXEL
+            ));
+
+        gcmkONERROR(gckEVENT_Submit(
+            eventObj,
+            gcvTRUE,
+            gcvFALSE
             ));
     }
 
@@ -638,7 +690,7 @@ _SyncFromSystemChannel(
     }
 
     /* Get a semaphore. */
-    gcmkONERROR(_GetNextMcfeSemaId(Command, &id));
+    gcmkONERROR(_GetNextMcfeSemaId(Command, gcvFALSE, &id));
 
     /* Send the semaphore in system channel. */
     gckMCFE_SendSemaphore(hardware, gcvNULL, 0, &reqBytes);
@@ -726,7 +778,7 @@ _CheckFlushMcfeMMU(
     reqBytes += bytes;
 
     /* Get a semaphore. */
-    gcmkONERROR(_GetNextMcfeSemaId(Command, &id));
+    gcmkONERROR(_GetNextMcfeSemaId(Command, gcvFALSE, &id));
 
     /* Request command buffer for system channel. */
     gcmkONERROR(gckCOMMAND_Reserve(
@@ -854,7 +906,7 @@ _HandleMCFESemaphorePatch(
     gctUINT32 bytes = 8;
     gctUINT32 buffer[2];
     gctUINT8_PTR location;
-    gcsHAL_PATCH_MCFE_SEMAPHORE * patch = Patch;
+    gcsHAL_PATCH_MCFE_SEMAPHORE * patch = (gcsHAL_PATCH_MCFE_SEMAPHORE *)Patch;
 
     gcmkHEADER_ARG("Command=%p location=0x%x semaHandle=%d",
                    Command, patch->location, patch->semaHandle);
@@ -863,7 +915,14 @@ _HandleMCFESemaphorePatch(
 
     if (index < 0)
     {
-        gcmkONERROR(_GetNextMcfeSemaId(Command, &semaId));
+        status = _GetNextMcfeSemaId(Command, gcvTRUE, &semaId);
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmkONERROR(_SyncToSystemChannel(Command, Command->dirtyChannel));
+            gcmkONERROR(_GetNextMcfeSemaId(Command, gcvTRUE, &semaId));
+        }
+
         Command->semaHandleMap[semaId] = patch->semaHandle;
     }
     else
@@ -980,8 +1039,8 @@ _HandlePatchListSingle(
     gctPOINTER userPtr = gcvNULL;
     gctUINT32 index = 0;
     gctUINT32 count = 0;
-    gctUINT32 itemSize = _PatchItemSize[PatchList->type];
-    gctUINT32 batchCount = (gctUINT32)(sizeof(storage) / itemSize);
+    gctUINT32 itemSize = 0;
+    gctUINT32 batchCount = 0;
 
     static const PATCH_ITEM_HANDLER patchHandler[] =
     {
@@ -994,6 +1053,16 @@ _HandlePatchListSingle(
 
     gcmkHEADER_ARG("Command=%p CommandBuffer=%p PatchList=%p type=%d",
                    Command, CommandBuffer, PatchList, PatchList->type);
+
+    if (PatchList->type >= gcmCOUNTOF(_PatchItemSize) || PatchList->type >= gcmCOUNTOF(patchHandler))
+    {
+        /* Exceeds buffer max size. */
+        gcmkONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    itemSize = _PatchItemSize[PatchList->type];
+
+    batchCount = (gctUINT32)(sizeof(storage) / itemSize);
 
     handler = patchHandler[PatchList->type];
 
@@ -1087,7 +1156,7 @@ OnError:
     return status;
 }
 
-static gceSTATUS
+static gcmNOINLINE gceSTATUS
 _HandlePatchList(
     IN gckCOMMAND Command,
     IN gcsHAL_COMMAND_LOCATION * CommandBuffer,
@@ -1182,7 +1251,7 @@ OnError:
     return status;
 }
 
-static gceSTATUS
+static gcmNOINLINE gceSTATUS
 _WaitForAsyncCommandStamp(
     IN gckCOMMAND Command,
     IN gctUINT64 Stamp
@@ -1398,11 +1467,13 @@ gckCOMMAND_Construct(
     /* Query mcfe semaphore count. */
     if (FeType == gcvHW_FE_MULTI_CHANNEL)
     {
-        command->totalSemaId    = 128;
+        command->totalSemaId = 128;
 
         /* Empty sema id ring. */
         command->nextSemaId = 0;
         command->freeSemaId = command->totalSemaId - 1;
+
+        command->semaMinThreshhold = 16;
 
         /* Create signals. */
         for (i = 0; i < (gctINT)gcmCOUNTOF(command->pendingSema); i++)
@@ -1425,7 +1496,7 @@ gckCOMMAND_Construct(
             &pointer
             ));
 
-        command->semaHandleMap = pointer;
+        command->semaHandleMap = (gctUINT32 *)pointer;
 
         gcmkVERIFY_OK(gckOS_ZeroMemory(
             command->semaHandleMap,
@@ -2184,15 +2255,23 @@ _CommitWaitLinkOnce(
                          + CommandBuffer->startOffset;
 
 #ifdef __QNXNTO__
-    userCommandBufferLogical = (gctPOINTER) commandBufferLogical;
+    gcmkONERROR(gckVIDMEM_HANDLE_Lookup(
+        Command->kernel,
+        ProcessID,
+        CommandBuffer->videoMemNode,
+        &commandBufferVideoMem
+        ));
 
-    gcmkONERROR(gckOS_MapUserPointer(
-        Command->os,
-        userCommandBufferLogical,
-        0,
-        (gctPOINTER *)&commandBufferLogical));
+    gcmkONERROR(gckVIDMEM_NODE_LockCPU(
+        Command->kernel,
+        commandBufferVideoMem,
+        gcvFALSE,
+        gcvFALSE,
+        &userCommandBufferLogical
+        ));
 
-    userCommandBufferLogicalMapped = gcvTRUE;
+    commandBufferLogical = (gctUINT8_PTR)userCommandBufferLogical + CommandBuffer->startOffset;
+    userCommandBufferLogicalMapped =gcvTRUE;
 #endif
 
     commandBufferSize = CommandBuffer->size;
@@ -2766,15 +2845,16 @@ _CommitWaitLinkOnce(
     }
 
 #ifdef __QNXNTO__
-    if (userCommandBufferLogicalMapped)
+    if(userCommandBufferLogicalMapped)
     {
-        gcmkVERIFY_OK(gckOS_UnmapUserPointer(
-            Command->os,
-            userCommandBufferLogical,
-            0,
-            commandBufferLogical));
+        gcmkVERIFY_OK(gckVIDMEM_NODE_UnlockCPU(
+            Command->kernel,
+            commandBufferVideoMem,
+            ProcessID,
+            gcvFALSE
+            ));
 
-        userCommandBufferLogicalMapped = gcvFALSE;
+        userCommandBufferLogicalMapped =gcvFALSE;
     }
 #endif
 

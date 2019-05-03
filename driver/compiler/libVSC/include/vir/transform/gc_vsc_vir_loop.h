@@ -26,12 +26,16 @@ typedef struct VIR_LOOPOPTS
     VIR_DEF_USAGE_INFO* pDuInfo;
     VIR_Function* func;
     VIR_LoopInfoMgr* loopInfoMgr;
+    VSC_HASH_TABLE* processedLoopInfos;
     VSC_OPTN_LoopOptsOptions* options;
     VIR_Dumper* dumper;
     VSC_MM* mm;
     VSC_HW_CONFIG* pHwCfg;
     gctUINT allowedInstNumAfterUnroll;
+    gctUINT maxInvariantCodeMotionCount;
+    gctUINT curInvariantCodeMotionCount;
     gctBOOL hwsupportPerCompDepForLS;
+    gctBOOL outerLoopFirst;
 } VIR_LoopOpts;
 
 #define VIR_LoopOpts_GetShader(lo)                        ((lo)->shader)
@@ -42,6 +46,8 @@ typedef struct VIR_LOOPOPTS
 #define VIR_LoopOpts_SetFunc(lo, f)                       ((lo)->func = (f))
 #define VIR_LoopOpts_GetLoopInfoMgr(lo)                   ((lo)->loopInfoMgr)
 #define VIR_LoopOpts_SetLoopInfoMgr(lo, l)                ((lo)->loopInfoMgr = (l))
+#define VIR_LoopOpts_GetProcessedLoopInfos(lo)            ((lo)->processedLoopInfos)
+#define VIR_LoopOpts_SetProcessedLoopInfos(lo, l)         ((lo)->processedLoopInfos = (l))
 #define VIR_LoopOpts_GetOptions(lo)                       ((lo)->options)
 #define VIR_LoopOpts_SetOptions(lo, o)                    ((lo)->options = (o))
 #define VIR_LoopOpts_GetDumper(lo)                        ((lo)->dumper)
@@ -52,8 +58,14 @@ typedef struct VIR_LOOPOPTS
 #define VIR_LoopOpts_SetHwCfg(lo, m)                      ((lo)->pHwCfg = (m))
 #define VIR_LoopOpts_GetAllowedInstNumAfterUnroll(lo)     ((lo)->allowedInstNumAfterUnroll)
 #define VIR_LoopOpts_SetAllowedInstNumAfterUnroll(lo, n)  ((lo)->allowedInstNumAfterUnroll = (n))
+#define VIR_LoopOpts_GetMaxInvariantCodeMotionCount(lo)   ((lo)->maxInvariantCodeMotionCount)
+#define VIR_LoopOpts_SetMaxInvariantCodeMotionCount(lo, n)((lo)->maxInvariantCodeMotionCount = (n))
+#define VIR_LoopOpts_GetCurInvariantCodeMotionCount(lo)   ((lo)->curInvariantCodeMotionCount)
+#define VIR_LoopOpts_SetCurInvariantCodeMotionCount(lo, n)((lo)->curInvariantCodeMotionCount = (n))
 #define VIR_LoopOpts_HWsupportPerCompDepForLS(lo)         ((lo)->hwsupportPerCompDepForLS)
 #define VIR_LoopOpts_SetHWsupportPerCompDepForLS(lo, b)   ((lo)->hwsupportPerCompDepForLS = (b))
+#define VIR_LoopOpts_SetOuterLoopFirst(lo, b)             ((lo)->outerLoopFirst = (b))
+#define VIR_LoopOpts_GetOuterLoopFirst(lo)                ((lo)->outerLoopFirst)
 
 /* Loop DU. */
 typedef struct VIR_LoopDU
@@ -134,6 +146,7 @@ typedef struct VIR_LOOPUPBOUND
     VIR_Instruction*        cmpInst;
     VIR_Symbol*             upboundSym;
     gctUINT                 upboundSymChannel;
+    VIR_TypeId              upboundOpndTypeId;
     VIR_Const               upboundConst;
 } VIR_LoopUpbound;
 
@@ -146,6 +159,8 @@ typedef struct VIR_LOOPUPBOUND
 #define VIR_LoopUpbound_SetUpboundSym(lu, u)                ((lu)->upboundSym = (u))
 #define VIR_LoopUpbound_GetUpboundSymChannel(lu)            ((lu)->upboundSymChannel)
 #define VIR_LoopUpbound_SetUpboundSymChannel(lu, u)         ((lu)->upboundSymChannel = (u))
+#define VIR_LoopUpbound_GetUpboundOpndTypeId(lu)            ((lu)->upboundOpndTypeId)
+#define VIR_LoopUpbound_SetUpboundOpndTypeId(lu, u)         ((lu)->upboundOpndTypeId = (u))
 #define VIR_LoopUpbound_GetUpboundConst(lu)                 (&(lu)->upboundConst)
 #define VIR_LoopUpbound_IsConst(lu)                         ((lu)->upboundSym == gcvNULL)
 
@@ -201,6 +216,7 @@ typedef struct VIR_LOOPINFO
     VIR_IVMgr*              ivMgr;
     VIR_LoopUpbound*        upbound;
     VIR_LoopLowbound*       lowbound;
+    gctUINT                 moveInvariantCodeCount;
 } VIR_LoopInfo;
 
 #define VIR_LoopInfo_GetId(l)                       ((l)->id)
@@ -243,6 +259,8 @@ typedef struct VIR_LOOPINFO
 #define VIR_LoopInfo_SetUpbound(l, u)               ((l)->upbound = (u))
 #define VIR_LoopInfo_GetLowbound(l)                 ((l)->lowbound)
 #define VIR_LoopInfo_SetLowbound(l, u)              ((l)->lowbound = (u))
+#define VIR_LoopInfo_GetMoveInvariantCodeCount(l)   ((l)->moveInvariantCodeCount)
+#define VIR_LoopInfo_SetMoveInvariantCodeCount(l, u)((l)->moveInvariantCodeCount = (u))
 #define VIR_LoopInfo_GetOptions(l)                  VIR_LoopInfoMgr_GetOptions(VIR_LoopInfo_GetLoopInfoMgr(l))
 #define VIR_LoopInfo_GetDumper(l)                   VIR_LoopInfoMgr_GetDumper(VIR_LoopInfo_GetLoopInfoMgr(l))
 #define VIR_LoopInfo_GetMM(l)                       VIR_LoopInfoMgr_GetMM(VIR_LoopInfo_GetLoopInfoMgr(l))

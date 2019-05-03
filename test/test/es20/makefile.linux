@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -27,30 +27,52 @@
 
 
 ######################################################
-# Include global difinitions.
+#include global difinitions.
+#
 
 include $(AQROOT)/makefile.linux.def
 
 ######################################################
-# Components of the project.
+# vv_launcher
+VVLAUNCHER                := vv_launcher
 
-SHARECONTEXT := shareContext
-VVLAUNCHER	 := vv_launcher
+######################################################
+# vv_launcher
+TEX_LOD_BIAS              := texture_lod_bias
+
+######################################################
+# VTT test suite
+VTT_TEST_SUITE            := VTT
+
+######################################################
+# TexDirect Tests
+
+TEX_DIRECT_ES20	          := TexDirect
+TEX_DIRECT_MAP_ES20       := TexDirectMap
+TEX_DIRECT_TILED_MAP_ES20 := TexDirectTiledMap
+
+TEX_DIRECT_ES20_TEST      := $(TEX_DIRECT_ES20)
+TEX_DIRECT_ES20_TEST      += $(TEX_DIRECT_MAP_ES20)
+TEX_DIRECT_ES20_TEST      += $(TEX_DIRECT_TILED_MAP_ES20)
 
 
-ES20_TESTS   := $(SHARECONTEXT)
-ifeq ($(USE_VDK), 1)
-ES20_TESTS   += $(VVLAUNCHER)
-endif
+#Components of the project.
+ES20_TEST   := $(VVLAUNCHER)
+ES20_TEST   += $(TEX_LOD_BIAS)
+ES20_TEST   += $(VTT_TEST_SUITE)
+ES20_TEST   += $(TEX_DIRECT_ES20_TEST)
 
 ######################################################
 # Define the macros used in the common file.
 
-MODULES		:= $(ES20_TESTS)
-MAIN_MODULE	:= $(ES20_TESTS)
+MODULES		:= $(ES20_TEST)
+MAIN_MODULE	:= $(ES20_TEST)
 
 ######################################################
 # Include the common makefile.
 
 include $(AQROOT)/common.node
+
+######################################################
+# Define the denpendencies.
 

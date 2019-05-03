@@ -1400,6 +1400,16 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
                 }
             }
 
+            /* For a ES20 shader, invariant of varyings on VS and PS must match. */
+            if (VIR_Shader_IsES20Compiler(pLowerShader))
+            {
+                if (isSymInvariant(pOutputSym) != isSymInvariant(pAttrSym))
+                {
+                    errCode = VSC_ERR_VARYING_TYPE_MISMATCH;
+                    ON_ERROR(errCode, "Link Io between two shader stages");
+                }
+            }
+
             /* Insure reg count of input and ouput are same */
             if (thisAttrRegCount == thisOutputRegCount)
             {
@@ -1996,7 +2006,7 @@ static VSC_ErrCode _CheckInputAliasedLocation(VSC_BASE_LINKER_HELPER* pBaseLinkH
     gctBOOL                    bCheckComponentMap = VIR_Shader_IsVulkan(pShader);
 
     /* So far, check the per-vertex attributes for VX only. */
-    if (VIR_Shader_IsES11Compiler(pShader) && pShader->shaderKind == VIR_SHADER_VERTEX)
+    if (VIR_Shader_IsES20Compiler(pShader) && pShader->shaderKind == VIR_SHADER_VERTEX)
     {
         VIR_Shader_CreateAttributeAliasList(pShader);
         pAliasedArrayList = VIR_Shader_GetAttributeAliasList(pShader);

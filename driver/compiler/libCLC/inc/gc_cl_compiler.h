@@ -470,11 +470,6 @@ IN cloCOMPILER Compiler
 );
 
 gceSTATUS
-cloCOMPILER_SetHasCalculatePreScaleGlobalId(
-    IN cloCOMPILER Compiler
-    );
-
-gceSTATUS
 cloCOMPILER_SetGcslDriverImage(
 IN cloCOMPILER Compiler
 );

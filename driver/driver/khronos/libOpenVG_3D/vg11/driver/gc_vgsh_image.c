@@ -19,6 +19,8 @@
 
 #include "gc_egl_common.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG3D_IMAGE
+
 gctFLOAT gammaTrans(gctFLOAT c)
 {
     gcmHEADER_ARG("c=%f", c);

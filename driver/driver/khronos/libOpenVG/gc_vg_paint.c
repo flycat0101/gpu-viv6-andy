@@ -14,6 +14,8 @@
 #include "gc_vg_precomp.h"
 #include <string.h>
 
+#define _GC_OBJ_ZONE                gcdZONE_VG_PAINT
+
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
 \******************************************************************************/
@@ -2173,7 +2175,7 @@ VG_API_CALL VGPaint VG_API_ENTRY vgCreatePaint(
     vgmENTERAPI(vgCreatePaint)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s();\n",
             __FUNCTION__
             );
@@ -2186,7 +2188,7 @@ VG_API_CALL VGPaint VG_API_ENTRY vgCreatePaint(
         }
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s() = 0x%08X;\n",
             __FUNCTION__,
             paint
@@ -2225,7 +2227,7 @@ VG_API_CALL void VG_API_ENTRY vgDestroyPaint(
     vgmENTERAPI(vgDestroyPaint)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X);\n",
             __FUNCTION__,
             Paint
@@ -2300,7 +2302,7 @@ VG_API_CALL void VG_API_ENTRY vgSetPaint(
     vgmENTERAPI(vgSetPaint)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%04X);\n",
             __FUNCTION__,
             Paint, PaintModes
@@ -2410,7 +2412,7 @@ VG_API_CALL VGPaint VG_API_ENTRY vgGetPaint(
     vgmENTERAPI(vgGetPaint)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%04X);\n",
             __FUNCTION__,
             PaintMode
@@ -2477,7 +2479,7 @@ VG_API_CALL void VG_API_ENTRY vgSetColor(
         vgtFLOATVECTOR4 color;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%08X);\n",
             __FUNCTION__,
             Paint, RGBA
@@ -2608,7 +2610,7 @@ VG_API_CALL void VG_API_ENTRY vgPaintPattern(
     vgmENTERAPI(vgPaintPattern)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%08X);\n",
             __FUNCTION__,
             Paint, Pattern

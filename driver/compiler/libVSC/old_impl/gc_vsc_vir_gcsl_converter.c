@@ -15,7 +15,7 @@
 #if gcdENABLE_3D
 
 /* Zone used for header/footer. */
-#define _GC_OBJ_ZONE    gcvZONE_COMPILER
+#define _GC_OBJ_ZONE    gcdZONE_COMPILER
 
 #define SHADER_LASTINST(CONV) ((CONV)->Shader->lastInstruction)
 #define TEMP_REGISTER_COUNT (1)

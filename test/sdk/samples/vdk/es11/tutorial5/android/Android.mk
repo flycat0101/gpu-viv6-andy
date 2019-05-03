@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -42,6 +42,9 @@ ifdef TARGET_2ND_ARCH
   LOCAL_SRC_FILES := $(call all-subdir-java-files)
 
   LOCAL_JNI_SHARED_LIBRARIES := libgl11tutorial5_jni
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 23),1)
+  LOCAL_JNI_SHARED_LIBRARIES += libc++
+endif
   LOCAL_PACKAGE_NAME := GL11Tutorial5_android-64
   LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
   LOCAL_MULTILIB     := 64
@@ -53,7 +56,9 @@ ifdef TARGET_2ND_ARCH
   LOCAL_SRC_FILES := $(call all-subdir-java-files)
 
   LOCAL_JNI_SHARED_LIBRARIES := libgl11tutorial5_jni
-
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 23),1)
+  LOCAL_JNI_SHARED_LIBRARIES += libc++
+endif
   LOCAL_PACKAGE_NAME := GL11Tutorial5_android-32
   LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
   LOCAL_MULTILIB     := 32
@@ -65,7 +70,9 @@ ifdef TARGET_2ND_ARCH
   LOCAL_SRC_FILES := $(call all-subdir-java-files)
 
   LOCAL_JNI_SHARED_LIBRARIES := libgl11tutorial5_jni
-
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 23),1)
+  LOCAL_JNI_SHARED_LIBRARIES += libc++
+endif
   LOCAL_PACKAGE_NAME := GL11Tutorial5_android-multilib
   LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
   LOCAL_MULTILIB     := both
@@ -77,6 +84,9 @@ include $(CLEAR_VARS)
 
   LOCAL_SRC_FILES := $(call all-subdir-java-files)
   LOCAL_JNI_SHARED_LIBRARIES := libgl11tutorial5_jni
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 23),1)
+  LOCAL_JNI_SHARED_LIBRARIES += libc++
+endif
   LOCAL_PACKAGE_NAME := GL11Tutorial5_android
   LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
   include $(BUILD_PACKAGE)
@@ -92,22 +102,21 @@ include $(CLEAR_VARS)
 LOCAL_CFLAGS := -Werror -Wno-unused-parameter -DANDROID_SDK_VERSION=$(PLATFORM_SDK_VERSION) -DANDROID_JNI
 
 LOCAL_SRC_FILES:= \
- 				android/jni/tutorial5.cpp	\
-				android/jni/tga.cpp	\
-				render.cpp	\
-				font.cpp	\
+	android/jni/tutorial5.cpp	\
+	android/jni/tga.cpp	\
+	render.cpp	\
+	font.cpp	\
 
 LOCAL_C_INCLUDES := \
-			$(LOCAL_PATH)
+	$(LOCAL_PATH)
 
 LOCAL_SHARED_LIBRARIES := \
-	libutils \
 	libEGL \
 	libGLESv1_CM
 
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 18),1)
 LOCAL_SHARED_LIBRARIES += \
-        liblog
+	liblog
 endif
 
 LOCAL_MODULE := libgl11tutorial5_jni

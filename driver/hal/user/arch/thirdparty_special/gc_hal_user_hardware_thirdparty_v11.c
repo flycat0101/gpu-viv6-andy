@@ -13,7 +13,7 @@
 
 #include "gc_hal_user_hardware_precomp.h"
 
-#define _GC_OBJ_ZONE    gcvZONE_2D
+#define _GC_OBJ_ZONE    gcdZONE_2D
 
 #if gcdENABLE_2D
 gceSTATUS

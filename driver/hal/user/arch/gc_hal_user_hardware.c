@@ -1709,6 +1709,7 @@ Fill2DFeaturesByDatabase(
     Features[gcvFEATURE_2D_NO_COLORBRUSH_INDEX8] = database->REG_NoIndexPattern;
 
     Features[gcvFEATURE_2D_FC_SOURCE] = database->REG_DEEnhancements2;
+    Features[gcvFEATURE_2D_FAST_CLEAR] = database->DE_2D_FAST_CLEAR;
 
     if (chipModel > gcv520 && Features[gcvFEATURE_2D_FC_SOURCE])
     {
@@ -1781,6 +1782,10 @@ Fill2DFeaturesByDatabase(
         Features[gcvFEATURE_DEC_COMPRESSION_TILE_NV12_10BIT];
 
     Features[gcvFEATURE_2D_FC_SOURCE] |= Features[gcvFEATURE_DEC300_COMPRESSION];
+    /* FC_source(tilestatus compression) and Fast_Clear(tilestatus fastclear) are not supported at the same time
+       and are mutually exclusive in 2D. If it support Fast Clear, we disable the FC_SOURCE feature*/
+    if(Features[gcvFEATURE_2D_FAST_CLEAR])
+        Features[gcvFEATURE_2D_FC_SOURCE] = gcvFALSE;
 
     Features[gcvFEATURE_2D_OPF_YUV_OUTPUT] = database->REG_DualPipeOPF;
 
@@ -2819,6 +2824,9 @@ _FillInFeatureTable(
     Features[gcvFEATURE_OCB_COUNTER] = database->OCB_COUNTER;
     Features[gcvFEATURE_NN_ZXDP3_KERNEL_READ_CONFLICT_FIX] = database->NN_ZXDP3_KERNEL_READ_CONFLICT_FIX;
     Features[gcvFEATURE_NN_ASYNC_COPY_MERGE_FIX] = database->NN_ASYNC_COPY_MERGE_FIX;
+    Features[gcvFEATURE_XY_OFFSET_LIMITATION_FIX] = database->XY_OFFSET_LIMITATION_FIX;
+    Features[gcvFEATURE_USC_INVALIDATE_CACHE_LINE_FIX] = database->USC_INVALIDATE_CACHE_LINE_FIX;
+    Features[gcvFEATURE_LOW_EFFICIENCY_OF_ID_WRITE_IMGBUF_FIX] = database->LOW_EFFICIENCY_OF_ID_WRITE_IMGBUF_FIX;
 
     Features[gcvFEATURE_IMAGE_LS_NO_FULLMASK_FIX] = gcvFALSE;
     Features[gcvFEATURE_BLT_YUV_OUTPUT] = database->BLT_YUV_OUTPUT;
@@ -2847,6 +2855,14 @@ _FillInFeatureTable(
     Features[gcvFEATURE_TP_COEF_COMPRESSION_ENHANCEMENT] = database->TP_COEF_COMPRESSION_ENHANCEMENT;
     Features[gcvFEATURE_NN_DEPTHWISE_SUPPORT] = database->NN_DEPTHWISE_SUPPORT;
     Features[gcvFEATURE_IMAGE_NOT_PACKED_IN_SRAM_FIX] = database->IMAGE_NOT_PACKED_IN_SRAM_FIX;
+    Features[gcvFEATURE_IDLE_BEFORE_FLUSH_COMPLETE_FIX] = database->IDLE_BEFORE_FLUSH_COMPLETE_FIX;
+    Features[gcvFEATURE_NO_FLUSH_USC_FIX] = database->NO_FLUSH_USC_FIX;
+    Features[gcvFEATURE_COEF_DELTA_CORD_OVERFLOW_ZRL_8BIT_FIX] = database->COEF_DELTA_CORD_OVERFLOW_ZRL_8BIT_FIX;
+    Features[gcvFEATURE_KERNEL_PER_CORE_LESS_THAN_THIRD_COEF_BUFF_DEPTH_FIX] = database->KERNEL_PER_CORE_LESS_THAN_THIRD_COEF_BUFF_DEPTH_FIX;
+    Features[gcvFEATURE_NN_PER_CHANNEL_POST_MULTIPLY] = database->NN_PER_CHANNEL_POST_MULTIPLY;
+    Features[gcvFEATURE_NN_NO_Z_LOCATION_OFFSET] = database->NN_NO_Z_LOCATION_OFFSET;
+    Features[gcvFEATURE_NN_PRELU] = database->NN_PRELU;
+    Features[gcvFEATURE_NN_KERNEL_SIZE_WASTE_IN_PARTIAL_MODE_FIX] = database->KERNEL_SIZE_WASTE_IN_PARTIAL_MODE_FIX;
     Features[gcvFEATURE_VIP_DEC400] = database->VIP_DEC400;
 
     /*these chip don't have maxpointSize limit, so need fix */
@@ -3154,6 +3170,7 @@ if (smallBatch){    Config->vsConstBase  = 0xD000;
 #if gcdENABLE_3D && gcdUSE_VX
     /* real run environment. */
     Config->nnConfig.fixedFeature.vipCoreCount                   = featureDatabase->CoreCount;
+    Config->nnConfig.fixedFeature.shaderCoreCount                = featureDatabase->NumShaderCores;
     Config->nnConfig.fixedFeature.nnMadPerCore                   = featureDatabase->NNMadPerCore;
     Config->nnConfig.fixedFeature.nnCoreCount                    = featureDatabase->NNCoreCount;
     Config->nnConfig.fixedFeature.nnCoreCountInt8                = featureDatabase->NNCoreCount_INT8;
@@ -3178,8 +3195,8 @@ if (smallBatch){    Config->vsConstBase  = 0xD000;
     Config->nnConfig.fixedFeature.maxOTNumber                    = featureDatabase->MAX_OT_NUMBER;
     Config->nnConfig.fixedFeature.equivalentVipsramWidthInByte   = featureDatabase->EQUIVALENT_VIP_SRAM_WIDTH_INBYTE;
 
-    Config->nnConfig.customizedFeature.vipSRAMSizeInKB = featureDatabase->VIP_SRAM_SIZE;
-    Config->nnConfig.customizedFeature.axiSRAMSizeInKB = featureDatabase->AXI_SRAM_SIZE;
+    Config->nnConfig.customizedFeature.vipSRAMSize = featureDatabase->VIP_SRAM_SIZE;
+    Config->nnConfig.customizedFeature.axiSRAMSize = featureDatabase->AXI_SRAM_SIZE;
 #endif
 
     /* Return the status. */
@@ -3216,6 +3233,16 @@ static gceSTATUS
     config->ecoID                  = iface.u.QueryChipIdentity.ecoID;
     config->chipFlags              = iface.u.QueryChipIdentity.chipFlags;
     config->platformFlagBits       = iface.u.QueryChipIdentity.platformFlagBits;
+
+    /*hw chip features*/
+    config->chipFeatures           = iface.u.QueryChipIdentity.chipFeatures;
+    config->chipMinorFeatures      = iface.u.QueryChipIdentity.chipMinorFeatures;
+    config->chipMinorFeatures1     = iface.u.QueryChipIdentity.chipMinorFeatures1;
+    config->chipMinorFeatures2     = iface.u.QueryChipIdentity.chipMinorFeatures2;
+    config->chipMinorFeatures3     = iface.u.QueryChipIdentity.chipMinorFeatures3;
+    config->chipMinorFeatures4     = iface.u.QueryChipIdentity.chipMinorFeatures4;
+    config->chipMinorFeatures5     = iface.u.QueryChipIdentity.chipMinorFeatures5;
+    config->chipMinorFeatures6     = iface.u.QueryChipIdentity.chipMinorFeatures6;
 
     iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_QUERY_CHIP_OPTION;
@@ -4524,7 +4551,19 @@ _DetectProcess(
 #endif
             gcvFALSE
         },
-
+#if defined(ANDROID)
+        {
+            gcvPATCH_NATIVEHARDWARE_CTS,
+            "\x9e\x91\x9b\x8d\x90\x96\x9b\xd1\x97\x9e\x8d\x9b\x88\x9e\x8d\x9a\xd1\x91\x9e\x8b\x96\x89\x9a\x97\x9e\x8d\x9b\x88\x9e\x8d\x9a\xd1\x9c\x8b\x8c",
+            gcvFALSE
+        },
+#endif
+        {
+            gcvPATCH_OVX_CTS,
+            /*vx_test_conformance*/
+            "\x89\x87\xa0\x8b\x9a\x8c\x8b\xa0\x9c\x90\x91\x99\x90\x8d\x92\x9e\x91\x9c\x9a",
+            gcvFALSE,
+        },
     };
 
 #if defined(ANDROID)
@@ -6337,8 +6376,8 @@ gcoHARDWARE_ConstructEx(
     hardware->resolveAlignmentY = (hardware->multiPipeResolve)
                                 ? (4 * hardware->config->resolvePipes) : 4;
 
-    gcmTRACE(
-        gcvLEVEL_INFO,
+    gcmTRACE_ZONE(
+        gcvLEVEL_INFO, _GC_OBJ_ZONE,
         "%s: resolvePipes=%d multiPipeResolve=%d resolveAlignment=%d,%d",
         __FUNCTION__,
         hardware->config->resolvePipes,
@@ -7618,7 +7657,6 @@ gcoHARDWARE_McfeSubmitJob(
     IN gctPOINTER *Memory
     )
 {
-#ifdef GCREG_MCFE_STD_DESC_RING_BUF_START_ADDR_Address
     gcoCMDBUF reserve = gcvNULL;
     gctUINT32_PTR memory = gcvNULL;
 
@@ -7653,50 +7691,41 @@ gcoHARDWARE_McfeSubmitJob(
 
     /* SubmitJob is pared with the complete signal from FlushCache. */
     *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- MCFE_COMMAND_OPCODE) - (0 ?
- MCFE_COMMAND_OPCODE) + 1) == 32) ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
- MCFE_COMMAND_OPCODE) - (0 ?
- MCFE_COMMAND_OPCODE) + 1))))))) << (0 ?
- MCFE_COMMAND_OPCODE))) | (((gctUINT32) (MCFE_COMMAND_OPCODE_SUB_COMMAND & ((gctUINT32) ((((1 ?
- MCFE_COMMAND_OPCODE) - (0 ?
- MCFE_COMMAND_OPCODE) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- MCFE_COMMAND_OPCODE) - (0 ?
- MCFE_COMMAND_OPCODE) + 1))))))) << (0 ? MCFE_COMMAND_OPCODE)))
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x16 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- MCFE_COMMAND_SUB_OPCODE) - (0 ?
- MCFE_COMMAND_SUB_OPCODE) + 1) == 32) ?
+ 25:16) - (0 ?
+ 25:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
- MCFE_COMMAND_SUB_OPCODE) - (0 ?
- MCFE_COMMAND_SUB_OPCODE) + 1))))))) << (0 ?
- MCFE_COMMAND_SUB_OPCODE))) | (((gctUINT32) (MCFE_COMMAND_SUB_OPCODE_SUBMIT_JOB & ((gctUINT32) ((((1 ?
- MCFE_COMMAND_SUB_OPCODE) - (0 ?
- MCFE_COMMAND_SUB_OPCODE) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- MCFE_COMMAND_SUB_OPCODE) - (0 ?
- MCFE_COMMAND_SUB_OPCODE) + 1))))))) << (0 ? MCFE_COMMAND_SUB_OPCODE)));
+ 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ?
+ 25:16))) | (((gctUINT32) (0x001 & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ? 25:16)));
 
     *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- MCFE_COMMAND_OPCODE) - (0 ?
- MCFE_COMMAND_OPCODE) + 1) == 32) ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
- MCFE_COMMAND_OPCODE) - (0 ?
- MCFE_COMMAND_OPCODE) + 1))))))) << (0 ?
- MCFE_COMMAND_OPCODE))) | (((gctUINT32) (MCFE_COMMAND_OPCODE_NOP & ((gctUINT32) ((((1 ?
- MCFE_COMMAND_OPCODE) - (0 ?
- MCFE_COMMAND_OPCODE) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- MCFE_COMMAND_OPCODE) - (0 ?
- MCFE_COMMAND_OPCODE) + 1))))))) << (0 ? MCFE_COMMAND_OPCODE)));
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x03 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)));
 
 OnError:
     gcmFOOTER();
 
     return status;
-#else
-    return gcvSTATUS_NOT_SUPPORTED;
-#endif
 }
 #endif
 
@@ -10798,10 +10827,14 @@ _ConvertResolveFormat(
         case gcvSURF_A2B10G10R10:
 
             /* RS has decoding error for this hwFormat[i], which swapped RB channel, But PE is correct.
+            ** Some old chip such as gc7000nanoultra do not support this format.
             */
-            hwFormat[i] = 0x16;
-            flipRB[i]   = gcvTRUE;
-            break;
+            if(!(Hardware->config->chipModel == gcv600 && Hardware->config->chipRevision == 0x4653))
+            {
+                hwFormat[i] = 0x16;
+                flipRB[i]   = gcvTRUE;
+                break;
+            }
 
         /*
         ** we still keep tile status buffer for 1-layer faked formats.
@@ -16270,7 +16303,7 @@ OnError:
                 gcmVERIFY_OK(
                     gcoHARDWARE_DisableHardwareTileStatus(Hardware,
                                                           (srcSurf->type == gcvSURF_DEPTH) ?
-                                                                        gcvTILESTATUS_DEPTH : gcvTILESTATUS_COLOR,
+                                                          gcvTILESTATUS_DEPTH : gcvTILESTATUS_COLOR,
                                                           0));
             }
 
@@ -17329,7 +17362,7 @@ gcoHARDWARE_UnlockEx(
     if (Node->lockCounts[type][Engine] <= 0)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_WARNING, gcvZONE_SURFACE,
+            gcvLEVEL_WARNING, _GC_OBJ_ZONE,
             "gcoHARDWARE_Unlock: Node=0x%x; unlock called on an unlocked surface.",
             Node
             );
@@ -19432,8 +19465,8 @@ gcoHARDWARE_FlushPipe(
             gcvNULL,
             &channelId));
 
-        /* Flush SH L1 cache except for system channel (0). */
-        if (channelId != 0)
+        /* Just flush SH L1 cache in SH channel (id=1). */
+        if (channelId == 1)
         {
             gcmONERROR(gcoHARDWARE_LoadCtrlState(
                 Hardware,
@@ -23061,6 +23094,23 @@ gcoHARDWARE_EnableTileStatus(
             Hardware->PEDirty->colorConfigDirty = gcvTRUE;
         }
 
+    }
+
+    /*When change current rt tilestatus, the vmsaa maybe changed, need trigger flushTarget*/
+    if (Hardware->features[gcvFEATURE_VMSAA] &&
+        SurfView->surf->isMsaa &&
+        TileStatusAddress != 0 &&
+        anyTsEnableForMultiSlice)
+    {
+        SurfView->surf->vMsaa = gcvTRUE;
+
+        if (((Surface->type == gcvSURF_RENDER_TARGET && Surface == Hardware->PEStates->colorStates.target[RtIndex].surface) ||
+            (Surface->type == gcvSURF_DEPTH && Surface == Hardware->PEStates->depthStates.surface)) &&
+            Hardware->PEStates->colorStates.vMsaa != SurfView->surf->vMsaa)
+        {
+            Hardware->PEStates->colorStates.vMsaa = gcvTRUE;
+            Hardware->PEDirty->colorConfigDirty = gcvTRUE;
+        }
     }
 
     for (i = SurfView->firstSlice; i < (SurfView->firstSlice + SurfView->numSlices); i++)
@@ -27145,6 +27195,18 @@ gcmSETCTRLSTATE(stateDelta, reserve, memory, 0x0594, ((((gctUINT32) (0)) & ~(((g
                 0));
         }
 
+        /*When change current rt tilestatus, the vmsaa maybe changed, need trigger flushTarget*/
+        if (Surface->isMsaa && Hardware->features[gcvFEATURE_VMSAA])
+        {
+            Surface->vMsaa = gcvFALSE;
+
+            if (current && Hardware->PEStates->colorStates.vMsaa != Surface->vMsaa)
+            {
+                Hardware->PEStates->colorStates.vMsaa = gcvFALSE;
+                Hardware->PEDirty->colorConfigDirty = gcvTRUE;
+            }
+        }
+
         /* Disable the tile status for this surface. */
         for (i = SurfView->firstSlice; i < (SurfView->firstSlice + SurfView->numSlices); i++)
         {
@@ -27800,7 +27862,7 @@ gcoHARDWARE_WriteBuffer(
 {
     gceSTATUS status;
 
-    gcmHEADER_ARG("Hardware=0x%x Data=0x%x Bytes=%zu Aligned=%d",
+    gcmHEADER_ARG("Hardware=0x%x Data=0x%x Bytes=%u Aligned=%d",
                     Hardware, Data, Bytes, Aligned);
 
     gcmGETHARDWARE(Hardware);

@@ -13,17 +13,23 @@
 
 #include <gc_vx_common.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_DELAY
+
 VX_INTERNAL_API vx_delay vxoDelay_Create(vx_context context, vx_reference exemplar, vx_size count)
 {
     vx_delay  delay;
     vx_uint32 index;
 
+    gcmHEADER_ARG("context=%p, exemplar=%p, count=0x%lx", context, exemplar, count);
     vxmASSERT(context);
 
     delay = (vx_delay)vxoReference_Create(context, VX_TYPE_DELAY, VX_REF_EXTERNAL, &context->base);
 
-    if (vxoReference_GetStatus((vx_reference)delay) != VX_SUCCESS) return delay;
-
+    if (vxoReference_GetStatus((vx_reference)delay) != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("%p", delay);
+        return delay;
+    }
     delay->type             = exemplar->type;
     delay->count            = count;
     delay->index            = 0;
@@ -34,6 +40,7 @@ VX_INTERNAL_API vx_delay vxoDelay_Create(vx_context context, vx_reference exempl
 
     if (delay->paramListTable == VX_NULL || delay->refTable == VX_NULL)
     {
+        gcmFOOTER_NO();
         return (vx_delay)vxoContext_GetErrorObject(context, VX_ERROR_NO_MEMORY);
     }
 
@@ -123,11 +130,15 @@ VX_INTERNAL_API vx_delay vxoDelay_Create(vx_context context, vx_reference exempl
 
             default:
                 vxmASSERT(0);
+                gcmFOOTER_NO();
                 return (vx_delay)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_TYPE);
         }
 
-        if (vxoReference_GetStatus(ref) != VX_SUCCESS) return (vx_delay)ref;
-
+        if (vxoReference_GetStatus(ref) != VX_SUCCESS)
+        {
+            gcmFOOTER_ARG("%p", ref);
+            return (vx_delay)ref;
+        }
         ref->scope = (vx_reference)delay;
 
         vxoReference_InitializeForDelay(ref, delay, index);
@@ -175,6 +186,7 @@ VX_INTERNAL_API vx_delay vxoDelay_Create(vx_context context, vx_reference exempl
         }
     }
 
+    gcmFOOTER_ARG("%p", delay);
     return delay;
 }
 
@@ -216,6 +228,7 @@ VX_INTERNAL_API vx_bool vxoParameterValue_BindToDelay(vx_reference value, vx_nod
     vx_int32 paramListIndex;
     vx_delay_parameter param;
 
+    gcmHEADER_ARG("value=%p, node=%p, index=0x%x", value, node, index);
     vxmASSERT(value);
     vxmASSERT(node);
 
@@ -231,8 +244,11 @@ VX_INTERNAL_API vx_bool vxoParameterValue_BindToDelay(vx_reference value, vx_nod
 
         param->next = (vx_delay_parameter)vxAllocateAndZeroMemory(sizeof(vx_delay_parameter_s));
 
-        if (param->next == VX_NULL) return vx_false_e;
-
+        if (param->next == VX_NULL)
+        {
+            gcmFOOTER_ARG("%d", vx_false_e);
+            return vx_false_e;
+        }
         param = param->next;
     }
 
@@ -241,6 +257,7 @@ VX_INTERNAL_API vx_bool vxoParameterValue_BindToDelay(vx_reference value, vx_nod
 
     vxoReference_Increment(&delay->base, VX_REF_INTERNAL);
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
@@ -250,6 +267,7 @@ VX_INTERNAL_API vx_bool vxoParameterValue_UnbindFromDelay(vx_reference value, vx
     vx_uint32 paramListIndex;
     vx_delay_parameter param;
 
+    gcmHEADER_ARG("value=%p, node=%p, index=0x%x", value, node, index);
     vxmASSERT(value);
     vxmASSERT(node);
 
@@ -259,8 +277,11 @@ VX_INTERNAL_API vx_bool vxoParameterValue_UnbindFromDelay(vx_reference value, vx
 
     paramListIndex = (delay->index + delay->count - abs(value->delayIndex)) % (vx_int32)delay->count;
 
-    if (paramListIndex >= delay->count) return vx_false_e;
-
+    if (paramListIndex >= delay->count)
+    {
+        gcmFOOTER_ARG("%d", vx_false_e);
+        return vx_false_e;
+    }
     param = &delay->paramListTable[paramListIndex];
 
     if (param->node == node && param->index == index)
@@ -276,8 +297,11 @@ VX_INTERNAL_API vx_bool vxoParameterValue_UnbindFromDelay(vx_reference value, vx
 
             param = param->next;
 
-            if (param == VX_NULL) return vx_false_e;
-
+            if (param == VX_NULL)
+            {
+                gcmFOOTER_ARG("%d", vx_false_e);
+                return vx_false_e;
+            }
             if (param->node == node && param->index == index)
             {
                 prevParam->next = param->next;
@@ -289,23 +313,31 @@ VX_INTERNAL_API vx_bool vxoParameterValue_UnbindFromDelay(vx_reference value, vx
 
     vxoReference_Release((vx_reference_ptr)&delay, VX_TYPE_DELAY, VX_REF_INTERNAL);
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
 VX_API_ENTRY vx_delay VX_API_CALL vxCreateDelay(vx_context context, vx_reference exemplar, vx_size count)
 {
+    gcmHEADER_ARG("context=%p, exemplar=%p, count=0x%lx", context, exemplar, count);
     gcmDUMP_API("$VX vxCreateDelay: context=%p, exemplar=%p, count=0x%lx", context, exemplar, count);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (!vxoReference_IsValidAndNoncontext(exemplar))
     {
+        gcmFOOTER_NO();
         return (vx_delay)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_REFERENCE);
     }
 
     if (exemplar->type == (vx_type_e)VX_TYPE_TARGET)
+    {
+        gcmFOOTER_NO();
         return (vx_delay)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_TYPE);
-
+    }
     switch (exemplar->type)
     {
         case VX_TYPE_IMAGE:
@@ -328,18 +360,22 @@ VX_API_ENTRY vx_delay VX_API_CALL vxCreateDelay(vx_context context, vx_reference
         case VX_TYPE_PARAMETER:
         case VX_TYPE_REFERENCE:
         case VX_TYPE_DELAY:
+            gcmFOOTER_NO();
             return (vx_delay)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_TYPE);
 
         default:
             vxmASSERT(0);
+            gcmFOOTER_NO();
             return (vx_delay)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_TYPE);
     }
 
+    gcmFOOTER_NO();
     return vxoDelay_Create(context, exemplar, count);
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseDelay(vx_delay *d)
 {
+    gcmHEADER_ARG("d=%p", d);
     gcmDUMP_API("$VX vxReleaseDelay: d=%p", d);
 
     if (vxoReference_IsValidAndSpecific((vx_reference)(*d), VX_TYPE_DELAY) && ((*d)->type == VX_TYPE_PYRAMID) && ((*d)->pyramidTable != NULL))
@@ -353,26 +389,40 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseDelay(vx_delay *d)
         vxFree((*d)->pyramidTable);
     }
 
+    gcmFOOTER_NO();
     return vxoReference_Release((vx_reference_ptr)d, VX_TYPE_DELAY, VX_REF_EXTERNAL);
 }
 
 VX_API_ENTRY vx_reference VX_API_CALL vxGetReferenceFromDelay(vx_delay delay, vx_int32 index)
 {
+    gcmHEADER_ARG("delay=%p, index=0x%x", delay, index);
     gcmDUMP_API("$VX vxGetReferenceFromDelay: delay=%p, index=0x%x", delay, index);
 
-    if (!vxoReference_IsValidAndSpecific((vx_reference)delay, VX_TYPE_DELAY)) return VX_NULL;
+    if (!vxoReference_IsValidAndSpecific((vx_reference)delay, VX_TYPE_DELAY))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
+    if ((vx_uint32)abs(index) >= delay->count)
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
 
-    if ((vx_uint32)abs(index) >= delay->count) return VX_NULL;
-
+    gcmFOOTER_NO();
     return delay->refTable[(delay->index + abs(index)) % (vx_int32)delay->count];
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryDelay(vx_delay delay, vx_enum attribute, void *ptr, vx_size size)
 {
+    gcmHEADER_ARG("delay=%p, attribute=0x%x, ptr=%p, size=0x%lx", delay, attribute, ptr, size);
     gcmDUMP_API("$VX vxQueryDelay: delay=%p, attribute=0x%x, ptr=%p, size=0x%lx", delay, attribute, ptr, size);
 
-    if (!vxoReference_IsValidAndSpecific((vx_reference)delay, VX_TYPE_DELAY)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoReference_IsValidAndSpecific((vx_reference)delay, VX_TYPE_DELAY))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     switch (attribute)
     {
         case VX_DELAY_TYPE:
@@ -389,9 +439,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryDelay(vx_delay delay, vx_enum attribut
 
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
+            gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
             return VX_ERROR_NOT_SUPPORTED;
     }
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
@@ -399,10 +451,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxAgeDelay(vx_delay delay)
 {
     vx_uint32 index, refIndex;
 
+    gcmHEADER_ARG("delay=%p", delay);
     gcmDUMP_API("$VX vxAgeDelay: delay=%p", delay);
 
-    if (!vxoReference_IsValidAndSpecific((vx_reference)delay, VX_TYPE_DELAY)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoReference_IsValidAndSpecific((vx_reference)delay, VX_TYPE_DELAY))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     delay->index = (delay->index + 1) % (vx_uint32)delay->count;
 
     for (index = 0; index < delay->count; index++)
@@ -445,6 +501,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxAgeDelay(vx_delay delay)
             vxAgeDelay(delay->pyramidTable[index]);
     }
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
@@ -455,13 +512,20 @@ VX_API_ENTRY vx_status VX_API_CALL vxRegisterAutoAging(vx_graph graph, vx_delay 
     vx_bool isAlreadyRegistered = vx_false_e;
     vx_bool isRegisteredDelaysListFull = vx_true_e;
 
+    gcmHEADER_ARG("graph=%p, delay=%p", graph, delay);
     gcmDUMP_API("$VX vxRegisterAutoAging: graph=%p, delay=%p", graph, delay);
 
     if (vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH) == vx_false_e)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
         return VX_ERROR_INVALID_REFERENCE;
+    }
 
     if (vxoReference_IsValidAndSpecific((vx_reference)delay, VX_TYPE_DELAY) == vx_false_e)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
         return VX_ERROR_INVALID_REFERENCE;
+    }
 
     /* check if this particular delay is already registered in the graph */
     for (i = 0; i < VX_MAX_REF_COUNT; i++)
@@ -496,6 +560,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxRegisterAutoAging(vx_graph graph, vx_delay 
             status = VX_ERROR_INVALID_REFERENCE;
     }
 
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 

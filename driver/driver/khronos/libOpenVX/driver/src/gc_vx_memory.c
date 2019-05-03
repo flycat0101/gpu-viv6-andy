@@ -15,6 +15,8 @@
 #include <gc_hal_user_precomp.h>
 #include <gc_hal_vx.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_MEMORY
+
 VX_PRIVATE_API vx_bool _pool_get_memory(vx_memory_pool pool, vx_size size, vx_uint8_ptr* logical, vx_uint32_ptr physical, gcsSURF_NODE_PTR* node);
 VX_PRIVATE_API vx_bool _pool_put_memory(vx_memory_pool pool, gcsSURF_NODE_PTR node);
 
@@ -22,11 +24,15 @@ VX_PRIVATE_API vx_bool _AllocateMemory(vx_context context, vx_memory memory, vx_
 {
     vx_int32 planeIndex, dimIndex;
 
+    gcmHEADER_ARG("context=%p, memory=%p, virt=0x%x", context, memory, virt);
     vxmASSERT(context);
     vxmASSERT(memory);
 
-    if (memory->allocated) return vx_true_e;
-
+    if (memory->allocated)
+    {
+        gcmFOOTER_ARG("%d", vx_true_e);
+        return vx_true_e;
+    }
     memory->allocated = vx_true_e;
 
     for (planeIndex = 0; (vx_uint32) planeIndex < memory->planeCount; planeIndex++)
@@ -90,6 +96,7 @@ VX_PRIVATE_API vx_bool _AllocateMemory(vx_context context, vx_memory memory, vx_
 
     vxoMemory_Dump(memory);
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 
 ErrorExit:
@@ -115,6 +122,7 @@ ErrorExit:
 
     memory->allocated = vx_false_e;
 
+    gcmFOOTER_ARG("%d", vx_false_e);
     return vx_false_e;
 }
 
@@ -130,6 +138,7 @@ VX_INTERNAL_API vx_bool vxoMemory_AllocateEx(vx_context context, vx_memory memor
 
 VX_INTERNAL_API vx_bool vxoMemory_AllocateSize(vx_context context, vx_memory memory, vx_size size)
 {
+    gcmHEADER_ARG("context=%p, memory=%p, size=0x%lx", context, memory, size);
     vxmASSERT(size);
     vxmASSERT(memory);
 
@@ -138,18 +147,22 @@ VX_INTERNAL_API vx_bool vxoMemory_AllocateSize(vx_context context, vx_memory mem
     memory->dims[0][0] = (vx_int32)size;
     memory->strides[0][VX_DIM_CHANNEL] = 0;
 
+    gcmFOOTER_NO();
     return vxoMemory_Allocate(context, memory);
 }
 
 VX_PRIVATE_API vx_bool _FreeMemory(vx_context context, vx_memory memory, vx_bool virt)
 {
     vx_uint32 planeIndex;
-
+    gcmHEADER_ARG("context=%p, memory=%p, virt=0x%x", context, memory, virt);
     vxmASSERT(context);
     vxmASSERT(memory);
 
-    if (!memory->allocated) return vx_true_e;
-
+    if (!memory->allocated)
+    {
+        gcmFOOTER_ARG("%d", vx_true_e);
+        return vx_true_e;
+    }
     vxoMemory_Dump(memory);
 
     for (planeIndex = 0; planeIndex < memory->planeCount; planeIndex++)
@@ -181,6 +194,7 @@ VX_PRIVATE_API vx_bool _FreeMemory(vx_context context, vx_memory memory, vx_bool
 
     memory->allocated = vx_false_e;
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
@@ -198,11 +212,15 @@ VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory m
 {
     vx_int32 planeIndex, dimIndex;
 
+    gcmHEADER_ARG("context=%p, memory=%p", context, memory);
     vxmASSERT(context);
     vxmASSERT(memory);
 
-    if (memory->allocated) return vx_true_e;
-
+    if (memory->allocated)
+    {
+        gcmFOOTER_ARG("%d", vx_true_e);
+        return vx_true_e;
+    }
     memory->allocated = vx_true_e;
 
     for (planeIndex = 0; (vx_uint32) planeIndex < memory->planeCount; planeIndex++)
@@ -219,13 +237,8 @@ VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory m
             {
                 size = (gctUINT32)abs(memory->strides[planeIndex][VX_DIM_CHANNEL]);
             }
-
-            for (dimIndex = 0; (vx_uint32)dimIndex < memory->dimCount; dimIndex++)
-            {
-                memory->strides[planeIndex][dimIndex] = (gctUINT32)size;
-                size *= (gctUINT32)abs(memory->dims[planeIndex][dimIndex]);
-            }
-
+            dimIndex = 0;
+            size = memory->strides[planeIndex][VX_DIM_Y] * memory->dims[planeIndex][VX_DIM_Y];
             memory->sizes[planeIndex] = size;
         }
 
@@ -266,6 +279,7 @@ VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory m
 
     vxoMemory_Dump(memory);
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 
 ErrorExit:
@@ -295,6 +309,7 @@ ErrorExit:
 
     memory->allocated = vx_false_e;
 
+    gcmFOOTER_ARG("%d", vx_false_e);
     return vx_false_e;
 }
 
@@ -302,11 +317,15 @@ VX_INTERNAL_API vx_bool vxoMemory_FreeWrappedMemory(vx_context context, vx_memor
 {
     vx_uint32 planeIndex;
 
+    gcmHEADER_ARG("context=%p, memory=%p", context, memory);
     vxmASSERT(context);
     vxmASSERT(memory);
 
-    if (!memory->allocated) return vx_true_e;
-
+    if (!memory->allocated)
+    {
+        gcmFOOTER_ARG("%d", vx_true_e);
+        return vx_true_e;
+    }
     vxoMemory_Dump(memory);
 
     for (planeIndex = 0; planeIndex < memory->planeCount; planeIndex++)
@@ -336,12 +355,15 @@ VX_INTERNAL_API vx_bool vxoMemory_FreeWrappedMemory(vx_context context, vx_memor
 
     memory->allocated = vx_false_e;
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
 VX_INTERNAL_API void vxoMemory_Dump(vx_memory memory)
 {
     vx_uint32 planeIndex, dimIndex;
+
+    gcmHEADER_ARG("memory=%p", memory);
 
     if (memory == VX_NULL)
     {
@@ -382,6 +404,7 @@ VX_INTERNAL_API void vxoMemory_Dump(vx_memory memory)
 
         vxTrace(VX_TRACE_MEMORY, "</memory>");
     }
+    gcmFOOTER_NO();
 }
 
 VX_INTERNAL_API vx_size vxoMemory_ComputeSize(vx_memory memory, vx_uint32 planeIndex)
@@ -399,16 +422,21 @@ VX_INTERNAL_API vx_size vxoMemory_ComputeElementCount(vx_memory memory, vx_uint3
     vx_uint32 index;
     vx_uint32 elementCount = 1;
 
+    gcmHEADER_ARG("memory=%p, planeIndex=0x%x", memory, planeIndex);
     vxmASSERT(memory);
     vxmASSERT(planeIndex < memory->planeCount);
 
-    if (memory->dimCount == 0) return 0;
-
+    if (memory->dimCount == 0)
+    {
+        gcmFOOTER_ARG("%d", 0);
+        return 0;
+    }
     for (index = 0; index < memory->dimCount; index++)
     {
         elementCount *= memory->dims[planeIndex][index];
     }
 
+    gcmFOOTER_ARG("0x%x", elementCount);
     return elementCount;
 }
 
@@ -416,6 +444,7 @@ VX_INTERNAL_API vx_size vxoMemory_ComputeElementCount(vx_memory memory, vx_uint3
 /*****************************************************************************************************/
 VX_PRIVATE_API vx_memory_pool_item _pool_get_emtpy_item(vx_memory_pool pool)
 {
+    gcmHEADER_ARG("pool=%p", pool);
     if (pool->count >= VX_MAX_MEMPOOL_ITEM_NUM)
     {
         /* re-arrange to reserve more empty space in pool array */
@@ -429,6 +458,7 @@ VX_PRIVATE_API vx_memory_pool_item _pool_get_emtpy_item(vx_memory_pool pool)
 
         if (i == VX_MAX_MEMPOOL_ITEM_NUM)
         {
+            gcmFOOTER_NO();
             return VX_NULL;
         }
         else
@@ -467,6 +497,7 @@ VX_PRIVATE_API vx_memory_pool_item _pool_get_emtpy_item(vx_memory_pool pool)
     gcoOS_MemFill(&pool->pool[pool->count], 0, sizeof(vx_memory_pool_item_s));
     pool->pool[pool->count].index = pool->count;
     pool->count++;
+    gcmFOOTER_NO();
     return &pool->pool[pool->count-1];
 }
 
@@ -474,12 +505,14 @@ VX_PRIVATE_API vx_bool _pool_get_memory(vx_memory_pool pool, vx_size size, vx_ui
 {
     vx_memory_pool_item piptr = VX_NULL, fiptr, aiptr;
 
+    gcmHEADER_ARG("pool=%p, size=0x%x, logical=%p, physical=%p, node=%p", pool, size, logical, physical, node);
     vxmASSERT(size);
     vxmASSERT(node);
 
-    if (pool->locked)
+    if (pool->locked) {
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
-
+    }
     fiptr = pool->freeHead;
     aiptr = pool->allocHead;
 
@@ -495,6 +528,7 @@ VX_PRIVATE_API vx_bool _pool_get_memory(vx_memory_pool pool, vx_size size, vx_ui
     {
         if (!pool->memExpandMode)
         {
+            gcmFOOTER_ARG("%d", vx_false_e);
             return vx_false_e;
         }
         else
@@ -507,7 +541,10 @@ VX_PRIVATE_API vx_bool _pool_get_memory(vx_memory_pool pool, vx_size size, vx_ui
             else
             {
                 if ((piptr = _pool_get_emtpy_item(pool)) == VX_NULL)
+                {
+                    gcmFOOTER_ARG("%d", vx_false_e);
                     return vx_false_e;
+                }
                 pool->freeHead = piptr;
                 piptr->offset = pool->size;
                 pool->size += size;
@@ -526,7 +563,10 @@ VX_PRIVATE_API vx_bool _pool_get_memory(vx_memory_pool pool, vx_size size, vx_ui
         vx_memory_pool_item niptr;
 
         if ((niptr = _pool_get_emtpy_item(pool)) == VX_NULL)
+        {
+            gcmFOOTER_ARG("%d", vx_false_e);
             return vx_false_e;
+        }
 
         niptr->offset = fiptr->offset + size;
         niptr->size = fiptr->size - size;
@@ -577,6 +617,7 @@ VX_PRIVATE_API vx_bool _pool_get_memory(vx_memory_pool pool, vx_size size, vx_ui
         *node = (gcsSURF_NODE_PTR)fiptr;
     }
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
@@ -584,10 +625,14 @@ VX_PRIVATE_API vx_bool _pool_put_memory(vx_memory_pool pool, gcsSURF_NODE_PTR no
 {
     vx_memory_pool_item ciptr;
 
+    gcmHEADER_ARG("pool=%p, node=%p", pool, node);
     vxmASSERT(node);
 
-    if (pool->locked) return vx_true_e;
-
+    if (pool->locked)
+    {
+        gcmFOOTER_ARG("%d", vx_true_e);
+        return vx_true_e;
+    }
     ciptr = (vx_memory_pool_item)node;
 
     /* remove from allocated list */
@@ -679,11 +724,13 @@ VX_PRIVATE_API vx_bool _pool_put_memory(vx_memory_pool pool, gcsSURF_NODE_PTR no
         }
     }
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
 VX_INTERNAL_API vx_bool vxoMemoryPool_Deinitialize(vx_graph graph)
 {
+    gcmHEADER_ARG("graph=%p", graph);
     vxmASSERT(graph);
     vxmASSERT(graph->memoryPool);
 
@@ -695,6 +742,7 @@ VX_INTERNAL_API vx_bool vxoMemoryPool_Deinitialize(vx_graph graph)
     gcoOS_FreeMemory(gcvNULL, graph->memoryPool);
     graph->memoryPool = VX_NULL;
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
@@ -703,11 +751,15 @@ VX_INTERNAL_API vx_bool vxoMemoryPool_Initialize(vx_graph graph, vx_size size)
     gceSTATUS status;
     vx_memory_pool pointer = gcvNULL;
 
+    gcmHEADER_ARG("graph=%p, size=0x%lx", graph, size);
     vxmASSERT(graph);
 
     status = gcoOS_Allocate(gcvNULL, gcmSIZEOF(struct _vx_memory_pool_s), (gctPOINTER *)&pointer);
-    if (gcmIS_ERROR(status)) return vx_false_e;
-
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER_ARG("%d", vx_false_e);
+        return vx_false_e;
+    }
     gcoOS_MemFill(pointer, 0, gcmSIZEOF(struct _vx_memory_pool_s));
 
     if (size != 0)
@@ -719,6 +771,7 @@ VX_INTERNAL_API vx_bool vxoMemoryPool_Initialize(vx_graph graph, vx_size size)
         {
             vxoMemoryPool_Deinitialize(graph);
             if(pointer) gcoOS_Free(NULL, (gctPOINTER)pointer);
+            gcmFOOTER_ARG("%d", vx_false_e);
             return vx_false_e;
         }
         pointer->memExpandMode = vx_false_e;
@@ -736,6 +789,7 @@ VX_INTERNAL_API vx_bool vxoMemoryPool_Initialize(vx_graph graph, vx_size size)
 
     graph->memoryPool = pointer;
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
@@ -744,15 +798,32 @@ VX_INTERNAL_API vx_bool vxoMemoryPool_LockDown(vx_graph graph, vx_size size)
     gceSTATUS status;
     vx_memory_pool pool;
 
+    gcmHEADER_ARG("graph=%p, size=0x%lx", graph, size);
+
     vxmASSERT(graph);
     pool = graph->memoryPool;
     vxmASSERT(pool);
 
-    if (pool->locked) return vx_true_e;
-
-    if (!pool->memExpandMode) return vx_false_e;
-    if (pool->size && size) return vx_false_e;
-    if (!pool->size && !size) return vx_true_e;
+    if (pool->locked)
+    {
+        gcmFOOTER_ARG("%d", vx_true_e);
+        return vx_true_e;
+    }
+    if (!pool->memExpandMode)
+    {
+        gcmFOOTER_ARG("%d", vx_false_e);
+        return vx_false_e;
+    }
+    if (pool->size && size)
+    {
+        gcmFOOTER_ARG("%d", vx_false_e);
+        return vx_false_e;
+    }
+    if (!pool->size && !size)
+    {
+        gcmFOOTER_ARG("%d", vx_true_e);
+        return vx_true_e;
+    }
 
     size += pool->size + VX_MEMPOOL_RESERVE_MEM_SIZE;
     status = gcoVX_AllocateMemory((gctUINT32)size, (gctPOINTER*)&pool->logical,
@@ -760,12 +831,14 @@ VX_INTERNAL_API vx_bool vxoMemoryPool_LockDown(vx_graph graph, vx_size size)
     if (gcmIS_ERROR(status))
     {
         vxoMemoryPool_Deinitialize(graph);
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
     }
 
     pool->size = size;
     pool->locked = vx_true_e;
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
@@ -773,12 +846,17 @@ VX_INTERNAL_API vx_bool vxoMemoryPool_Reset(vx_graph graph, vx_bool freeMem)
 {
     vx_memory_pool pool;
 
+    gcmHEADER_ARG("graph=%p, freeMem=0x%x", graph, freeMem);
+
     vxmASSERT(graph);
     pool = graph->memoryPool;
     vxmASSERT(pool);
 
-    if (!pool->locked) return vx_false_e;
-
+    if (!pool->locked)
+    {
+        gcmFOOTER_ARG("%d", vx_false_e);
+        return vx_false_e;
+    }
     if (freeMem)
     {
         gcoVX_FreeMemory((gcsSURF_NODE_PTR)graph->memoryPool->nodePtr);
@@ -796,6 +874,7 @@ VX_INTERNAL_API vx_bool vxoMemoryPool_Reset(vx_graph graph, vx_bool freeMem)
     pool->memExpandMode = vx_false_e;
     pool->locked = vx_false_e;
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
@@ -880,17 +959,17 @@ vxoMemoryPool_InitStack(
     )
 {
     vx_status status = VX_SUCCESS;
+    vx_ptr buffer = VX_NULL;
 
-    status = gcoOS_Allocate(gcvNULL, gcmSIZEOF(vx_mempool_stack_item_s) * (count + 2), (gctPOINTER*)&stack->buffer);
-    if (gcmIS_ERROR(status)) return status;
+    buffer = vxAllocateAndZeroMemory(gcmSIZEOF(vx_mempool_stack_item_s) * (count + 2));
+    vxmONERROR_NULLPTR(buffer);
 
+    stack->buffer = (vx_mempool_stack_item)buffer;
     stack->count = count;
     stack->first = 0;
     stack->last = count + 1;
-    stack->buffer[stack->first].memory = stack->buffer[stack->last].memory = VX_NULL;
-    stack->buffer[stack->first].offset = stack->buffer[stack->last].offset = 0;
-    stack->buffer[stack->first].size   = stack->buffer[stack->last].size = 0;
 
+OnError:
     return status;
 }
 
@@ -901,7 +980,7 @@ vxoMemoryPool_DeInitStack(
 {
     if (stack->buffer != VX_NULL)
     {
-        gcoOS_FreeMemory(gcvNULL, stack->buffer);
+        vxFree(stack->buffer);
         stack->buffer = VX_NULL;
     }
 
@@ -981,15 +1060,58 @@ vxoMemoryPool_GetStackId(
 }
 
 VX_PRIVATE_API vx_status
+vxoMemoryPool_SetStackItemSizeByPos(
+    vx_mempool_stack stack,
+    vx_size          size,
+    vx_uint32        pos
+    )
+{
+    gcmASSERT(pos == stack->first || pos == stack->last);
+
+    stack->buffer[pos].size = size;
+    stack->buffer[pos].memory->sizes[1] = size;
+    if (stack->buffer[pos].memory->memReverse)
+    {
+        stack->buffer[pos].memory->memOffset = stack->buffer[pos].offset + size;
+    }
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status
+vxoMemoryPool_ResetStackItemByPos(
+    vx_mempool_stack stack,
+    vx_uint32        pos
+    )
+{
+    gcmASSERT(pos == stack->first || pos == stack->last);
+
+    if (pos == stack->first)
+    {
+        stack->first--;
+    }
+    else if (pos == stack->last)
+    {
+        stack->last++;
+    }
+    else
+    {
+        stack->buffer[pos].memory = VX_NULL;
+    }
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_uint32
 vxoMemoryPool_PushStack(
     vx_mempool_stack stack,
     vx_memory memory,
     vx_bool head
     )
 {
-    vx_uint32 pos;
-    vx_size size = memory->sizes[0];
-
+    vx_uint32 pos = 0;
+    vx_size size = memory->sizes[1];
+    gcmHEADER_ARG("stack=%p, memory=%p, head=0x%x", stack, memory, head);
     if (head)
     {
         stack->first++;
@@ -1010,8 +1132,8 @@ vxoMemoryPool_PushStack(
         memory->memOffset = stack->buffer[pos].offset + size;
         memory->memReverse = vx_true_e;
     }
-
-    return VX_SUCCESS;
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
+    return pos;
 }
 
 VX_PRIVATE_API vx_status
@@ -1020,6 +1142,7 @@ vxoMemoryPool_PopStack(
     vx_bool head
      )
 {
+    gcmHEADER_ARG("stack=%p, head=0x%x", stack, head);
     if (head)
     {
         if (stack->first)
@@ -1039,22 +1162,27 @@ vxoMemoryPool_PopStack(
         }
     }
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
 VX_PRIVATE_API vx_status
 vxoMemoryPool_RemoveFromStackById(
     vx_mempool_stack stack,
-    vx_uint32 op_id
+    vx_uint32 op_id,
+    vx_bool from_last
     )
 {
     vx_bool hstop = vx_false_e, tstop = vx_false_e;
+    gcmHEADER_ARG("stack=%p, op_id=0x%x", stack, op_id);
 
     do
     {
         vx_enum s = vxoMemoryPool_GetStackStatus(stack);
 
-        if ((s & VX_MEMPOOL_STACK_HAS_HEAD) && op_id > stack->buffer[stack->first].memory->lastUseId)
+        if ((s & VX_MEMPOOL_STACK_HAS_HEAD) &&
+            ((from_last && stack->buffer[stack->first].memory->lastUseId < op_id) ||
+             (!from_last && stack->buffer[stack->first].memory->firstUseId >= op_id)))
         {
             vxoMemoryPool_PopStack(stack, vx_true_e);
         }
@@ -1063,7 +1191,9 @@ vxoMemoryPool_RemoveFromStackById(
             hstop = vx_true_e;
         }
 
-        if ((s & VX_MEMPOOL_STACK_HAS_TAIL) && op_id > stack->buffer[stack->last].memory->lastUseId)
+        if ((s & VX_MEMPOOL_STACK_HAS_TAIL) &&
+            ((from_last && stack->buffer[stack->last].memory->lastUseId < op_id) ||
+             (!from_last && stack->buffer[stack->last].memory->firstUseId >= op_id)))
         {
             vxoMemoryPool_PopStack(stack, vx_false_e);
         }
@@ -1073,6 +1203,47 @@ vxoMemoryPool_RemoveFromStackById(
         }
     }
     while (!hstop || !tstop);
+
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status
+vxoMemoryPool_GetStackItemsByPriority(
+    vx_mempool_stack stack,
+    vx_enum          priority,
+    vx_memory        array[],
+    vx_uint32 *      acount
+    )
+{
+    vx_uint32 pos, count = 0;
+
+    if ((pos = stack->first) != 0)
+    {
+        do
+        {
+            if (stack->buffer[pos].memory->allocPriority == priority)
+            {
+                array[count++] = stack->buffer[pos].memory;
+            }
+        } while (--pos != 0);
+    }
+
+    if ((pos = stack->last) != stack->count+1)
+    {
+        do
+        {
+            if (stack->buffer[pos].memory->allocPriority == priority)
+            {
+                array[count++] = stack->buffer[pos].memory;
+            }
+        } while (++pos != stack->count+1);
+    }
+
+    if (acount != VX_NULL)
+    {
+        *acount = count;
+    }
 
     return VX_SUCCESS;
 }
@@ -1087,6 +1258,9 @@ vxoMemoryPool_AdjustAddress(
     vx_uint32 offset;
     vx_uint32 pbase = 0;
     vx_uint8_ptr lbase = VX_NULL;
+    vx_uint32 ntype = VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(memory->allocType);
+
+    gcmHEADER_ARG("graph=%p, memory=%p, all_size=0x%lx", graph, memory, all_size);
 
     if (memory->memReverse)
     {
@@ -1098,7 +1272,7 @@ vxoMemoryPool_AdjustAddress(
 
     if (memory->physicals[0] == 0)
     {
-        switch (memory->allocType)
+        switch (ntype)
         {
             case VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR:
                 if (graph->memoryPool != VX_NULL &&
@@ -1122,11 +1296,17 @@ vxoMemoryPool_AdjustAddress(
         }
 
         memory->physicals[0] = pbase + offset;
+
+        if (vxoContext_IsFeatureAvailable(graph->base.context, VX_NN_FEATURE_SWTILING_PHASE3) &&
+            ntype == VXNNE_MEM_POOL_TYPE_VIP_SRAM && VXNNE_MEM_POOL_TYPE_IS_CACHE(memory->allocType))
+        {
+            memory->physicals[0] -= graph->base.context->vipSRAM.physBase;
+        }
     }
 
     if (memory->logicals[0] == VX_NULL)
     {
-        switch (memory->allocType)
+        switch (ntype)
         {
             case VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR:
                 if (graph->memoryPool != VX_NULL &&
@@ -1151,9 +1331,15 @@ vxoMemoryPool_AdjustAddress(
 
         memory->logicals[0] = lbase + offset;
     }
-
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
+
+#define TYPE_SWAP(type, ma, mb) \
+    do \
+    { \
+        type tm; tm = ma; ma = mb; mb = tm; \
+    } while(0)
 
 VX_INTERNAL_API vx_status
 vxoMemoryPool_RequestList(
@@ -1162,20 +1348,32 @@ vxoMemoryPool_RequestList(
     vx_uint32           list_count,
     vx_uint32           start,
     vx_uint32           count,
-    vx_memory *         error_mem
+    vx_uint32           *max_sizes
     )
 {
-    vx_uint32 i, j, ii, tcount = 0;
-    vx_size size, msize = 0;
-    vx_mempool_stack_s stack;
+    vx_uint32 i, j, ii, s, tcount = 0, mcounts[VXNNE_MEM_POOL_TYPE_END] = {0};
+    vx_size size, msize[VXNNE_MEM_POOL_TYPE_END] = {0};
+    vx_size maxs[VXNNE_MEM_POOL_TYPE_END] = {0};
+    vx_memory * plists[VXNNE_MEM_POOL_TYPE_END] = {VX_NULL};
+    vx_mempool_stack_s stacks[VXNNE_MEM_POOL_TYPE_END];
     vx_enum sstate;
     vx_enum atype = VXNNE_MEM_POOL_TYPE_ORIG_DDR;
     vx_context context = graph->base.context;
     vx_status status = VX_SUCCESS;
 
+    gcmHEADER_ARG("graph=%p, list=%p, list_count=0x%x, start=0x%x, count=0x%x, max_sizes=%p",
+        graph, list, list_count, start, count, max_sizes);
     gcmASSERT(list_count >= start+count);
 
-    /* set last access id for each memory */
+    /* sort based on 1.firstUseId from late to early 2.priority from low to high 3.size from big to small */
+#define NEED_SWAP(pa, pb, fa, fb, sa, sb) \
+    (fa < fb || (fa == fb && MEM_PRIORITY_LEFT_HIGHER_RIGHT(pa, pb)) || (fa == fb && pa == pb && sa > sb))
+
+    maxs[VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR] = 0xFFFFFFFF;
+    maxs[VXNNE_MEM_POOL_TYPE_AXI_SRAM] = context->axiSRAM.size - context->axiSRAM.used;
+    maxs[VXNNE_MEM_POOL_TYPE_VIP_SRAM] = context->vipSRAM.size - context->vipSRAM.used;
+
+    /* set first/last access id for each memory */
     for (i = 0; i < list_count; i++)
     {
         for (j = 0; j < list[i].outputCount; j++)
@@ -1184,27 +1382,112 @@ vxoMemoryPool_RequestList(
             {
                 list[i].outputMemory[j]->firstUseId = i;
             }
+            list[i].outputMemory[j]->lastUseId = i;
+
+            if (i >= start && i < start + count)
+            {
+                vx_uint32 ntype = VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(list[i].outputMemory[j]->allocType);
+
+                if (ntype == VXNNE_MEM_POOL_TYPE_AXI_SRAM && !maxs[VXNNE_MEM_POOL_TYPE_AXI_SRAM])
+                {
+                    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE3))
+                    {
+                        list[i].outputMemory[j]->allocType = VXNNE_MEM_POOL_TYPE_IS_CACHE(list[i].outputMemory[j]->allocType) ?
+                                                             VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM) : VXNNE_MEM_POOL_TYPE_VIP_SRAM;
+                    }
+                    else
+                    {
+                        status = VX_INVALID_VALUE;
+                        goto exit;
+                    }
+                }
+                ntype = VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(list[i].outputMemory[j]->allocType);
+                if (ntype != VXNNE_MEM_POOL_TYPE_ORIG_DDR)
+                {
+                    tcount++;
+                    mcounts[ntype]++;
+                    list[i].outputMemory[j]->sizes[1] = list[i].outputMemory[j]->sizes[0];
+                }
+
+                atype |= ntype;
+                gcmASSERT(list[i].outputMemory[j]->allocPriority != VXNNE_MEM_ALLOC_MUST_HAVE ||
+                          list[i].outputMemory[j]->allocPartial == vx_false_e);
+            }
         }
 
         for (j = 0; j < list[i].inputCount; j++)
         {
+            if (list[i].inputMemory[j]->firstUseId == VXNNE_MEM_ID_INIT_VALUE)
+            {
+                list[i].inputMemory[j]->firstUseId = i;
+            }
             list[i].inputMemory[j]->lastUseId = i;
-        }
 
-        if (i >= start && i < start+count)
-        {
-            tcount += list[i].inputCount + list[i].outputCount;
+            if (i >= start && i < start + count)
+            {
+                vx_uint32 ntype = VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(list[i].inputMemory[j]->allocType);
+
+                if (ntype == VXNNE_MEM_POOL_TYPE_AXI_SRAM && maxs[VXNNE_MEM_POOL_TYPE_AXI_SRAM] == 0)
+                {
+                    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE3))
+                    {
+                        list[i].inputMemory[j]->allocType = VXNNE_MEM_POOL_TYPE_IS_CACHE(list[i].inputMemory[j]->allocType) ?
+                                                            VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM) : VXNNE_MEM_POOL_TYPE_VIP_SRAM;
+                    }
+                    else
+                    {
+                        status = VX_INVALID_VALUE;
+                        goto exit;
+                    }
+                }
+                ntype = VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(list[i].inputMemory[j]->allocType);
+                if (ntype != VXNNE_MEM_POOL_TYPE_ORIG_DDR)
+                {
+                    tcount++;
+                    mcounts[ntype]++;
+                    list[i].inputMemory[j]->sizes[1] = list[i].inputMemory[j]->sizes[0];
+                }
+
+                atype |= ntype;
+                gcmASSERT(list[i].inputMemory[j]->allocPriority != VXNNE_MEM_ALLOC_MUST_HAVE ||
+                          list[i].inputMemory[j]->allocPartial == vx_false_e);
+
+                /* sort input memory based on priority from high to low */
+                for (ii = j; ii > 0; ii--)
+                {
+                    if (MEM_PRIORITY_LEFT_LOWER_RIGHT(list[i].inputMemory[ii-1]->allocPriority,
+                                                      list[i].inputMemory[ii]->allocPriority))
+                    {
+                        TYPE_SWAP(vx_memory, list[i].inputMemory[ii-1], list[i].inputMemory[ii]);
+                    }
+                }
+            }
         }
     }
 
-    status = vxoMemoryPool_InitStack(&stack, tcount);
-    if (status != VX_SUCCESS) goto exit;
+    gcmASSERT(!((atype & VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR) && (atype & VXNNE_MEM_POOL_TYPE_SRAM)));
+
+    for (i = 0; i < VXNNE_MEM_POOL_TYPE_END; i++)
+    {
+        if (mcounts[i] == 0) continue;
+
+        status = gcoOS_Allocate(gcvNULL, gcmSIZEOF(vx_memory) * mcounts[i], (gctPOINTER*)&plists[i]);
+        if (gcmIS_ERROR(status)) goto exit;
+
+        status = vxoMemoryPool_InitStack(&stacks[i], mcounts[i]);
+        if (status != VX_SUCCESS) goto exit;
+    }
 
     /* calculate virtual buffer from first op to last op */
     for (i = start; i < start+count; i++)
     {
-        vxoMemoryPool_RemoveFromStackById(&stack, i);
+        for (s = 0; s < VXNNE_MEM_POOL_TYPE_END; s++)
+        {
+            if (mcounts[s] == 0) continue;
+            vxoMemoryPool_RemoveFromStackById(&stacks[s], i, vx_true_e);
+        }
 
+again:
         for (ii = 0; ii < 2; ii++)
         {
             tcount = ii == 0 ? list[i].outputCount : list[i].inputCount;
@@ -1212,50 +1495,55 @@ vxoMemoryPool_RequestList(
             for (j = 0; j < tcount; j++)
             {
                 vx_memory mem = ii == 0 ? list[i].outputMemory[j] : list[i].inputMemory[j];
+                vx_uint32 ntype = VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(mem->allocType);
 
-                if (mem->allocType == VXNNE_MEM_POOL_TYPE_ORIG_DDR) continue;
+                if (ntype == VXNNE_MEM_POOL_TYPE_ORIG_DDR) continue;
+
+                gcmASSERT(ntype  < VXNNE_MEM_POOL_TYPE_END);
+                gcmASSERT(mcounts[ntype] > 0);
 
                 if (mem->allocated == vx_false_e && i > mem->firstUseId)
                 {
                     status = VX_FAILURE;
                     goto exit;
                 }
-                else if (mem->allocated == vx_false_e)
+                else if (mem->allocated == vx_false_e && mem->sizes[1] != 0)
                 {
+                    vx_uint32 pos = 0;
                     vx_uint32 sid = mem->lastUseId;
-                    vx_uint32 hid = vxoMemoryPool_GetStackId(&stack, vx_true_e);
-                    vx_uint32 tid = vxoMemoryPool_GetStackId(&stack, vx_false_e);
+                    vx_uint32 hid = vxoMemoryPool_GetStackId(&stacks[ntype], vx_true_e);
+                    vx_uint32 tid = vxoMemoryPool_GetStackId(&stacks[ntype], vx_false_e);
 
-                    sstate = vxoMemoryPool_GetStackStatus(&stack);
+                    sstate = vxoMemoryPool_GetStackStatus(&stacks[ntype]);
 
                     gcmASSERT(mem->physicals[0] == 0);
 
                     if (sstate == VX_MEMPOOL_STACK_HAS_HEADTAIL)
                     {
-                        if ((tid > hid && sid > hid) || (hid > tid && sid <= tid))
+                        if ((tid > hid && sid > hid)  || (hid > tid && sid <= tid))
                         {
-                            vxoMemoryPool_PushStack(&stack, mem, vx_false_e);
+                            pos = vxoMemoryPool_PushStack(&stacks[ntype], mem, vx_false_e);
                         }
                         else
                         {
-                            vxoMemoryPool_PushStack(&stack, mem, vx_true_e);
+                            pos = vxoMemoryPool_PushStack(&stacks[ntype], mem, vx_true_e);
                         }
                     }
                     else if (sstate == VX_MEMPOOL_STACK_EMPTY)
                     {
-                        vxoMemoryPool_PushStack(&stack, mem, vx_true_e);
+                        pos = vxoMemoryPool_PushStack(&stacks[ntype], mem, vx_true_e);
                     }
                     else
                     {
                         if ((sstate == VX_MEMPOOL_STACK_HAS_HEAD && hid == i) ||
                             (sstate == VX_MEMPOOL_STACK_HAS_TAIL && tid == sid))
                         {
-                            vxoMemoryPool_PushStack(&stack, mem, vx_false_e);
+                            pos = vxoMemoryPool_PushStack(&stacks[ntype], mem, vx_false_e);
                         }
                         else if ((sstate == VX_MEMPOOL_STACK_HAS_TAIL && tid == i) ||
                                  (sstate == VX_MEMPOOL_STACK_HAS_HEAD && hid == sid))
                         {
-                            vxoMemoryPool_PushStack(&stack, mem, vx_true_e);
+                            pos = vxoMemoryPool_PushStack(&stacks[ntype], mem, vx_true_e);
                         }
                         else
                         {
@@ -1275,61 +1563,168 @@ vxoMemoryPool_RequestList(
 
                             if (sstate == VX_MEMPOOL_STACK_HAS_HEAD)
                             {
-                                if (sid > nid) vxoMemoryPool_PushStack(&stack, mem, vx_false_e);
-                                else vxoMemoryPool_PushStack(&stack, mem, vx_true_e);
+                                if (sid > nid)
+                                {
+                                    pos = vxoMemoryPool_PushStack(&stacks[ntype], mem, vx_false_e);
+                                }
+                                else
+                                {
+                                    pos = vxoMemoryPool_PushStack(&stacks[ntype], mem, vx_true_e);
+                                }
                             }
                             else
                             {
-                                if (sid > nid) vxoMemoryPool_PushStack(&stack, mem, vx_true_e);
-                                else vxoMemoryPool_PushStack(&stack, mem, vx_false_e);
+                                if (sid > nid)
+                                {
+                                    pos = vxoMemoryPool_PushStack(&stacks[ntype], mem, vx_true_e);
+                                }
+                                else
+                                {
+                                    pos = vxoMemoryPool_PushStack(&stacks[ntype], mem, vx_false_e);
+                                }
                             }
                         }
                     }
 
-                    mem->allocated = vx_true_e;
-                }
+                    gcmASSERT(pos != 0);
 
-                gcmASSERT(atype == VXNNE_MEM_POOL_TYPE_ORIG_DDR || atype == mem->allocType);
-                atype = mem->allocType;
+                    size = vxoMemoryPool_GetStackSize(&stacks[ntype]);
+
+                    if (size > maxs[ntype])
+                    {
+                        vx_uint32 k, pcounts[VXNNE_MEM_ALLOC_PRIORITY_TYPE_KIND] = {0}, acount = 0;
+                        vx_bool find = vx_false_e;
+                        vx_size dsize = size - maxs[ntype];
+                        vx_memory * plist = plists[ntype];
+
+                        if (mem->allocPartial && mem->sizes[1] > dsize)
+                        {
+                            vxoMemoryPool_SetStackItemSizeByPos(&stacks[ntype], mem->sizes[1]-dsize, pos);
+                            mem->allocated = vx_true_e;
+                            msize[ntype] = maxs[ntype];
+                            continue;
+                        }
+                        else if (mem->allocPriority != VXNNE_MEM_ALLOC_LOWEST_PRIORITY)
+                        {
+                            vx_uint32 kk;
+                            vx_enum p;
+                            vx_size asize = 0;
+
+                            LOOP_MEM_PRIORITY_LOWEST2HIGH(p, MEM_PRIORITY_DOWN_LEVEL(mem->allocPriority))
+                            {
+                                vx_memory * cplist = plist + acount;
+
+                                vxoMemoryPool_GetStackItemsByPriority(&stacks[ntype], p, cplist, &pcounts[p]);
+
+                                if (pcounts[p] != 0)
+                                {
+                                    for (k = 0; k < pcounts[p]; k++)
+                                    {
+                                        asize += cplist[k]->sizes[1];
+
+                                        /* sort current priority memory based on firstUseId from late to early */
+                                        for (kk = k; kk > 0; kk--)
+                                        {
+                                            if (NEED_SWAP(cplist[kk-1]->allocPriority, cplist[kk]->allocPriority,
+                                                          cplist[kk-1]->firstUseId, cplist[kk]->firstUseId,
+                                                          cplist[kk-1]->sizes[1], cplist[kk]->sizes[1]))
+                                            {
+                                                TYPE_SWAP(vx_memory, cplist[kk-1], cplist[kk]);
+                                            }
+                                        }
+                                    }
+
+                                    if (asize >= dsize)
+                                    {
+                                        find = vx_true_e;
+                                        break;
+                                    }
+
+                                    acount += pcounts[p];
+                                }
+                            }
+                        }
+
+                        if (find)
+                        {
+                            vx_uint32 fid;
+                            vx_size asize = 0;
+
+                            for (k = 0; k < acount; k++)
+                            {
+                                asize += plist[k]->sizes[1];
+                                plist[k]->allocated = vx_false_e;
+                                if (asize >= dsize)
+                                {
+                                    break;
+                                }
+                                else
+                                {
+                                    plist[k]->sizes[1] = 0;
+                                }
+                            }
+                            gcmASSERT(k < acount);
+
+                            fid = plist[k]->firstUseId;
+                            vxoMemoryPool_RemoveFromStackById(&stacks[ntype], fid, vx_false_e);
+
+                            if (plist[k]->allocPartial)
+                            {
+                                plist[k]->sizes[1] = asize - dsize;
+                            }
+                            else
+                            {
+                                plist[k]->sizes[1] = 0;
+                            }
+
+                            i = fid;
+                            goto again;
+                        }
+                        else if (mem->allocPriority != VXNNE_MEM_ALLOC_MUST_HAVE)
+                        {
+                            vxoMemoryPool_ResetStackItemByPos(&stacks[ntype], pos);
+                            continue;
+                        }
+                        else
+                        {
+                            status = VX_FAILURE;
+                            goto exit;
+                        }
+                    }
+                    else
+                    {
+                        if (size > msize[ntype]) msize[ntype] = size;
+                        mem->allocated = vx_true_e;
+                    }
+                }
             }
         }
+    }
 
-        size = vxoMemoryPool_GetStackSize(&stack);
-        if (size > msize) msize = size;
+    for (i = 0; i < VXNNE_MEM_POOL_TYPE_END; i++)
+    {
+        if (mcounts[i] == 0) continue;
 
-        if (atype == VXNNE_MEM_POOL_TYPE_AXI_SRAM && msize > context->axiSRAM.size)
+        vxoMemoryPool_RemoveFromStackById(&stacks[i], start+count, vx_true_e);
+
+        /* check if memory alloc/free is closure */
+        sstate = vxoMemoryPool_GetStackStatus(&stacks[i]);
+        if (sstate != VX_MEMPOOL_STACK_EMPTY)
         {
             status = VX_FAILURE;
             goto exit;
         }
-    }
 
-    vxoMemoryPool_RemoveFromStackById(&stack, start+count);
-
-    /* check if memory alloc/free is closure */
-    sstate = vxoMemoryPool_GetStackStatus(&stack);
-    if (sstate != VX_MEMPOOL_STACK_EMPTY)
-    {
-        if (error_mem != VX_NULL)
+        if (max_sizes != VX_NULL)
         {
-            if (sstate & VX_MEMPOOL_STACK_HAS_HEAD)
-            {
-                *error_mem = vxoMemoryPool_GetStackHeadTailMem(&stack, VX_MEMPOOL_STACK_HAS_HEAD);
-            }
-            else if (sstate & VX_MEMPOOL_STACK_HAS_TAIL)
-            {
-                *error_mem = vxoMemoryPool_GetStackHeadTailMem(&stack, VX_MEMPOOL_STACK_HAS_TAIL);
-            }
+            max_sizes[i] = (vx_uint32)msize[i];
         }
-
-        status = VX_FAILURE;
-        goto exit;
     }
 
     /* allocate virtual memory pool if necessary */
     if (atype == VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR)
     {
-        if (!context->options.memPoolSize && !vxoMemoryPool_LockDown(graph, msize))
+        if (!context->options.memPoolSize && !vxoMemoryPool_LockDown(graph, msize[atype]))
         {
             vxError("Can't allocate memory for virtual memory pool");
             status = VX_ERROR_NO_MEMORY;
@@ -1343,10 +1738,13 @@ vxoMemoryPool_RequestList(
         for (j = 0; j < list[i].outputCount; j++)
         {
             vx_memory outmem = list[i].outputMemory[j];
+            vx_uint32 ntype = VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(outmem->allocType);
 
-            if (outmem->allocType != VXNNE_MEM_POOL_TYPE_ORIG_DDR)
+            if (ntype != VXNNE_MEM_POOL_TYPE_ORIG_DDR && outmem->allocated)
             {
-                vxoMemoryPool_AdjustAddress(graph, outmem, msize);
+                vxoMemoryPool_AdjustAddress(graph, outmem, msize[ntype]);
+                outmem->allocPartial = outmem->sizes[1] == outmem->sizes[0] ? vx_false_e : vx_true_e;
+                outmem->sizes[0] = outmem->sizes[1];
                 outmem->allocated = vx_false_e;
             }
         }
@@ -1354,18 +1752,32 @@ vxoMemoryPool_RequestList(
         for (j = 0; j < list[i].inputCount; j++)
         {
             vx_memory inmem = list[i].inputMemory[j];
+            vx_uint32 ntype = VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(inmem->allocType);
 
-            if (inmem->allocType != VXNNE_MEM_POOL_TYPE_ORIG_DDR && inmem->allocated)
+            if (ntype != VXNNE_MEM_POOL_TYPE_ORIG_DDR && inmem->allocated)
             {
-                vxoMemoryPool_AdjustAddress(graph, inmem, msize);
+                vxoMemoryPool_AdjustAddress(graph, inmem, msize[ntype]);
+                inmem->allocPartial = inmem->sizes[1] == inmem->sizes[0] ? vx_false_e : vx_true_e;
+                inmem->sizes[0] = inmem->sizes[1];
                 inmem->allocated = vx_false_e;
             }
         }
     }
 
 exit:
-    vxoMemoryPool_DeInitStack(&stack);
+    for (i = 0; i < VXNNE_MEM_POOL_TYPE_END; i++)
+    {
+        if (mcounts[i] == 0) continue;
 
+        vxoMemoryPool_DeInitStack(&stacks[i]);
+
+        if (plists[i] != VX_NULL)
+        {
+            gcoOS_FreeMemory(gcvNULL, plists[i]);
+            plists[i] = VX_NULL;
+        }
+    }
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 

@@ -620,12 +620,22 @@ _SetTraceMode(
             {
                 veglTraceMode = gcvTRACEMODE_LOGGER;
             }
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "3")))
+            {
+                veglTraceMode = gcvTRACEMODE_ALLZONE;
+            }
             else
             {
                 gcmPRINT("EGL: unsupported trace mode");
             }
 
             veglInitTracerDispatchTable();
+        }
+
+        if (veglTraceMode == gcvTRACEMODE_ALLZONE)
+        {
+            gcoOS_SetDebugLevel(gcvLEVEL_VERBOSE);
+            gcoOS_SetDebugZone(gcdZONE_ALL);
         }
 
         if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_NO_MT", &veglNoMtEnvVar)) && veglNoMtEnvVar)
@@ -1331,6 +1341,43 @@ veglInitilizeDisplay(
                 enableMSAAx2 = gcvTRUE;
             }
         }
+
+#if defined(WL_EGL_PLATFORM) || defined(EGL_API_FB) || defined(__GBM__)
+        /* Use original swapworker control logic for client & server by default */
+        Display->enableClient = -1;
+        Display->enableServer = -1;
+
+        /*
+         * export WL_EGL_SYNC_SWAP=1          : disable all worker in both server/client
+         * export WL_EGL_SYNC_SWAP=0          : enable all worker in both server/client
+         * export WL_EGL_SYNC_SWAP=client     : disable client worker and enable server worker
+         * export WL_EGL_SYNC_SWAP=server     : disable server worker and enable client worker
+         */
+
+        if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "WL_EGL_SYNC_SWAP", &env)) && env)
+        {
+            if (gcmIS_SUCCESS(gcoOS_StrCmp(env, "1")))
+            {
+                Display->enableClient = 0;
+                Display->enableServer = 0;
+            }
+            else if(gcmIS_SUCCESS(gcoOS_StrCmp(env, "0")))
+            {
+                Display->enableClient = 1;
+                Display->enableServer = 1;
+            }
+            else if(gcmIS_SUCCESS(gcoOS_StrCmp(env, "server")))
+            {
+                Display->enableClient = 1;
+                Display->enableServer = 0;
+            }
+            else if(gcmIS_SUCCESS(gcoOS_StrCmp(env, "client")))
+            {
+                Display->enableClient = 0;
+                Display->enableServer = 1;
+            }
+        }
+#endif
 
         /* Count the number of valid configurations. */
         gcmASSERT(Display->configCount == 0);

@@ -15,7 +15,7 @@
 
 
 
-#define _GC_OBJ_ZONE glvZONE_MATRIX
+#define _GC_OBJ_ZONE gcdZONE_ES11_MATRIX
 
 
 
@@ -4015,7 +4015,7 @@ static void _Norm3F(
 
 #endif
 
-#define _GC_OBJ_ZONE    glvZONE_MATRIX
+#define _GC_OBJ_ZONE    gcdZONE_ES11_MATRIX
 
 
 
@@ -6573,7 +6573,7 @@ GL_API void GL_APIENTRY glPopMatrix(
 
 #undef  _GC_OBJ_ZONE
 
-#define _GC_OBJ_ZONE    glvZONE_EXTENTION
+#define _GC_OBJ_ZONE    gcdZONE_ES11_EXTENTION
 
 
 

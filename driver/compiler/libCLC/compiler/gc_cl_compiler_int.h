@@ -218,11 +218,6 @@ IN cloCOMPILER Compiler
 );
 
 gctBOOL
-cloCOMPILER_HasCalculatePreScaleGlobalId(
-    IN cloCOMPILER Compiler
-    );
-
-gctBOOL
 cloCOMPILER_IsGcslDriverImage(
 IN cloCOMPILER Compiler
 );

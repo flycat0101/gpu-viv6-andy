@@ -13,7 +13,7 @@
 
 #include "gc_glff_precomp.h"
 
-#define _GC_OBJ_ZONE glvZONE_TRACE
+#define _GC_OBJ_ZONE gcdZONE_ES11_TRACE
 
 
 /******************************************************************************\
@@ -801,7 +801,7 @@ GLboolean glfQueryMiscState(
 #ifdef _GC_OBJ_ZONE
 #undef _GC_OBJ_ZONE
 #endif
-#define _GC_OBJ_ZONE    glvZONE_FRAGMENT
+#define _GC_OBJ_ZONE    gcdZONE_ES11_FRAGMENT
 
 GL_API void GL_APIENTRY glColorMask(
     GLboolean Red,
@@ -937,7 +937,7 @@ GL_API void GL_APIENTRY glLogicOp(
 */
 
 #undef  _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE    glvZONE_CONTEXT
+#define _GC_OBJ_ZONE    gcdZONE_ES11_CONTEXT
 
 GL_API void GL_APIENTRY glHint(
     GLenum Target,
@@ -1007,7 +1007,7 @@ GL_API void GL_APIENTRY glHint(
 */
 
 #undef  _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE    glvZONE_CLEAR
+#define _GC_OBJ_ZONE    gcdZONE_ES11_CLEAR
 
 GL_API void GL_APIENTRY glClearColorx(
     GLclampx Red,

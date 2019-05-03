@@ -28,7 +28,7 @@
 #  endif
 #endif
 
-#define _GC_OBJ_ZONE    __GLES3_ZONE_FBO
+#define _GC_OBJ_ZONE    gcdZONE_GL40_FBO
 
 extern __GLformatInfo __glFormatInfoTable[];
 

@@ -13,7 +13,7 @@
 
 #include "gc_glff_precomp.h"
 
-#define _GC_OBJ_ZONE glvZONE_TRACE
+#define _GC_OBJ_ZONE gcdZONE_ES11_TRACE
 
 
 /******************************************************************************\
@@ -374,7 +374,7 @@ GLboolean glfQueryCullState(
 #ifdef _GC_OBJ_ZONE
 #undef _GC_OBJ_ZONE
 #endif
-#define _GC_OBJ_ZONE    glvZONE_LIGHT
+#define _GC_OBJ_ZONE    gcdZONE_ES11_LIGHT
 
 GL_API void GL_APIENTRY glFrontFace(
     GLenum Mode
@@ -413,7 +413,7 @@ GL_API void GL_APIENTRY glFrontFace(
 */
 
 #undef  _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE    glvZONE_POLIGON
+#define _GC_OBJ_ZONE    gcdZONE_ES11_POLIGON
 
 GL_API void GL_APIENTRY glCullFace(
     GLenum Mode

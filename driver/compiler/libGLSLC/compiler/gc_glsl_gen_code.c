@@ -2067,7 +2067,15 @@ _AllocLogicalRegOrArray(
            }
            else
            {
-               CodeGenerator->layoutLocation += (CodeGenerator->layoutLocation == -1 ? 0 : logicalRegCount);
+               /* do not assign a location to gl_FragDepth, as it's a special ouput mapped to r0.z always */
+               if(gcmIS_SUCCESS(gcoOS_StrCmp(Name->symbol, "gl_FragDepth")))
+               {
+                   layoutLocation = -1;
+               }
+               else
+               {
+                   CodeGenerator->layoutLocation += (CodeGenerator->layoutLocation == -1 ? 0 : logicalRegCount);
+               }
            }
 
            if (CreateVariable)
@@ -28434,7 +28442,8 @@ sloIR_POLYNARY_EXPR_GenCode(
         gcmASSERT(PolynaryExpr->funcName);
 
         /* generate a normal function call for intrinsic builtin functions */
-        if (slsFUNC_HAS_FLAG(&(PolynaryExpr->funcName->u.funcInfo), slvFUNC_IS_INTRINSIC))
+        if (slsFUNC_HAS_FLAG(&(PolynaryExpr->funcName->u.funcInfo), slvFUNC_IS_INTRINSIC) &&
+            !slsFUNC_HAS_FLAG(&(PolynaryExpr->funcName->u.funcInfo), slvFUNC_SKIP_AS_INTRINSIC))
         {
             status = sloIR_POLYNARY_EXPR_GenFuncCallCode(
                                                     Compiler,

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -2405,7 +2405,7 @@ case 33:
         fref = pow(fsrc[0],  foffset);
         {
             int diff = (*(int*)(&fref)) - (*(int*)(&fdst[0]));
-            if ( !(diff > 16 || diff < -16))
+            if ( !(diff > 64 || diff < -64))
             {
                 clmVERBOSE("test 25 passes.\n");
             }

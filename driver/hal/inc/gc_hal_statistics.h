@@ -90,4 +90,3 @@ gcfSTATISTICS_DisableDynamicEarlyZ (
 #endif /*__gc_hal_statistics_h_ */
 
 
-

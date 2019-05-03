@@ -17,6 +17,7 @@
 ** Misc
 */
 #define VX_IMPLEMENTATION_NAME          "Vivante"
+#define _GC_OBJ_ZONE            gcdZONE_VX_CONTEXT
 
 gceSTATUS gcLoadKernelCompiler(IN gcsHWCaps *HWCaps, IN gcePATCH_ID PatchId);
 gceSTATUS gcUnloadKernelCompiler(void);
@@ -251,8 +252,10 @@ VX_INTERNAL_API vx_bool vxDataType_IsStatic(vx_type_e type)
 /*
 ** Context APIs
 */
+#if gcdUSE_SINGLE_CONTEXT
 static vx_context   vxSingletonContext  = VX_NULL;
 static vx_mutex     vxContextGlobalLock = VX_NULL;
+#endif
 
 #if VX_USE_THREADPOOL
 VX_PRIVATE_API vx_bool vxNodeWorkerCallback(vx_threadpool_worker worker)
@@ -292,6 +295,7 @@ VX_PRIVATE_API vx_bool vxNodeWorkerCallback(vx_threadpool_worker worker)
 VX_PRIVATE_API vx_return_value vxGraphThreadRoutine(vx_ptr arg)
 {
     vx_processor processor = (vx_processor)arg;
+    gcmHEADER_ARG("arg=%p", arg);
     vxInfo("Created VX Thread: %08x\n", gcoOS_GetCurrentThreadID());
 
     while (processor->running)
@@ -317,6 +321,7 @@ VX_PRIVATE_API vx_return_value vxGraphThreadRoutine(vx_ptr arg)
         }
     }
     vxInfo("Exit VX Thread: %08x\n", gcoOS_GetCurrentThreadID());
+    gcmFOOTER_NO();
     return 0;
 }
 
@@ -336,11 +341,12 @@ VX_PRIVATE_API vx_bool vxoContext_CreateAllPredefinedErrorObjects(vx_context con
 VX_PRIVATE_API void vxoContext_FetchOptionsForTransferGraph(vx_context context, gctSTRING envctrl)
 {
     gctSTRING pos = gcvNULL;
-
+    gcmHEADER_ARG("context=%p, envctrl=%s", context, envctrl);
     if(gcoOS_StrStr(envctrl, "-closeAll", &pos) && pos)
     {
         context->options.enableGraphTranform = 0;
-        return ;
+        gcmFOOTER_NO();
+        return;
     }
 
     if(gcoOS_StrStr(envctrl, "-Merge:", &pos) && pos)
@@ -418,6 +424,20 @@ VX_PRIVATE_API void vxoContext_FetchOptionsForTransferGraph(vx_context context, 
     }
 
     pos = gcvNULL;
+    if(gcoOS_StrStr(envctrl, "-mergeTranspose:", &pos) && pos)
+    {
+        pos += sizeof("-mergeTranspose:") -1;
+        context->options.enableGraphMergeTranspose = atoi(pos);
+    }
+
+    pos = gcvNULL;
+    if(gcoOS_StrStr(envctrl, "-padConv:", &pos) && pos)
+    {
+        pos += sizeof("-padConv:") -1;
+        context->options.enableGraphPadConv = atoi(pos);
+    }
+
+    pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-WAR", &pos) && pos)
     {
         pos += sizeof("-WAR") -1;
@@ -436,6 +456,7 @@ VX_PRIVATE_API void vxoContext_FetchOptionsForTransferGraph(vx_context context, 
             }
         }
     }
+    gcmFOOTER_NO();
 }
 
 VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
@@ -468,6 +489,7 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
         "VIV_VX_ENABLE_TP_TENSOR_COPY",
         "VIV_VX_ENABLE_TP_TENSOR_PAD",
         "VIV_VX_ENABLE_TP_LSTM_RESHUFFLE_INPUT",
+        "VIV_VX_ENABLE_TP_LSTM_STATE_OUT",
         "VIV_VX_ENABLE_TP_LSTM_RESHUFFLE_STATE_O",
         "VIV_VX_ENABLE_TP_CMD_NUM",
         "VIV_VX_ENABLE_TP_ROI_POOLING_STEP_1",
@@ -479,6 +501,7 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
         "VIV_VX_ENABLE_TP_TENSOR_STRIDED_SLICE",
         "VIV_VX_ENABLE_TP_TENSOR_SVDF_MAP",
     };
+    gcmHEADER_ARG("context=%p", context);
 
     /* Enable driver TP path by default if HW has this feature */
     context->options.enableTP = 1;
@@ -630,16 +653,16 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
         context->options.axiBusTotalBWLimit = (gctFLOAT) atof(envctrl);
     }
     envctrl = gcvNULL;
-    context->options.vipSRAMSizeInKB = VX_INVALID_VALUE;
+    context->options.vipSRAMSize = VX_INVALID_VALUE;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_VIP_SRAM_SIZE", &envctrl)) && envctrl)
     {
-        context->options.vipSRAMSizeInKB = atoi(envctrl);
+        context->options.vipSRAMSize = atoi(envctrl);
     }
     envctrl = gcvNULL;
-    context->options.axiSRAMSizeInKB = VX_INVALID_VALUE;
+    context->options.axiSRAMSize = VX_INVALID_VALUE;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_AXI_SRAM_SIZE", &envctrl)) && envctrl)
     {
-        context->options.axiSRAMSizeInKB = atoi(envctrl);
+        context->options.axiSRAMSize = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
@@ -664,7 +687,7 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
     }
 
     envctrl = gcvNULL;
-    context->options.enableNonZeroBalance = 0;
+    context->options.enableNonZeroBalance = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_NON_ZERO_BALANCE", &envctrl)) && envctrl)
     {
         context->options.enableNonZeroBalance = atoi(envctrl);
@@ -697,7 +720,7 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
     context->options.vxcShaderSourcePath = gcvNULL;
     gcoOS_GetEnv(gcvNULL, "VX_SHADER_SOURCE_PATH", &context->options.vxcShaderSourcePath);
 
-    context->options.fcZMax = (1<<14) - 1;
+    context->options.fcZMax = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VIP_V7) ? (1<<20) - 1 : (1<<14) - 1;
 
     envctrl = gcvNULL;
     context->options.enableMemPool = 1;
@@ -883,14 +906,15 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
     context->options.enableGraphConvertBatchFC2NNConv = 1;
     context->options.enableGraphConvertAvgPool2Conv = 1;
     context->options.enableGraphConvertTensorAdd = 1;
-    context->options.enableGraphUnrollDWConv = 0;
+    context->options.enableGraphUnrollDWConv = 1;
     context->options.enableGraphConvertConv2Fc = 1;
     context->options.enableGraphSwaplayer = 1;
-    context->options.enableGraphReshapelayer = 1;
+    context->options.enableGraphReshapelayer = 0;
     context->options.enableGraphConcalayer = 0;
     context->options.enableTransformNMConv = 1;
-
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_GRAPH_TRANFORM", &envctrl)) && envctrl)
+    context->options.enableGraphMergeTranspose = 0;
+    context->options.enableGraphPadConv = 1;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_GRAPH_TRANSFORM", &envctrl)) && envctrl)
     {
         vxoContext_FetchOptionsForTransferGraph(context, envctrl);
     }
@@ -934,6 +958,18 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
         vxDebugLevel = atoi(envctrl);
     }
 
+
+    context->options.enableOpsDebugInfo = gcvNULL;
+    gcoOS_GetEnv(gcvNULL, "VIV_VX_OPS_DUMP_PATH", &context->options.enableOpsDebugInfo);
+
+    envctrl = gcvNULL;
+    context->options.enableMemOptimization = 1;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_MEM_OPTIMIZATION", &envctrl)) && envctrl)
+    {
+        context->options.enableMemOptimization = atoi(envctrl);
+    }
+
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
@@ -970,11 +1006,13 @@ VX_PRIVATE_API vx_status QuerySRAM(
 
     gcsSURF_NODE_PTR    node = VX_NULL;
     gctPOINTER          logical = VX_NULL;
-    gctUINT32           physical = 0;
+    gctUINT32           physical = 0xFFFFFFFF;
     gctUINT32           size = 0;
 
-    gctUINT32           customizedAxiSRAMSize = context->nnConfig.customizedFeature.axiSRAMSizeInKB * 1024;
-    gctUINT32           customizedVipSRAMSize = context->nnConfig.customizedFeature.vipSRAMSizeInKB * 1024;
+    gctUINT32           customizedAxiSRAMSize = context->nnConfig.customizedFeature.axiSRAMSize;
+    gctUINT32           customizedVipSRAMSize = context->nnConfig.customizedFeature.vipSRAMSize;
+    gcmHEADER_ARG("context=%p, type=%p, sRamPhysical=%p, sRamLogical=%p, sRamSize=%p, sRamNode=%p",
+        context, type, sRamPhysical, sRamLogical, sRamSize, sRamNode);
 
     status = gcoHAL_QuerySRAM(gcvNULL, type, &physical, &size);
     if (gcmIS_ERROR(status))
@@ -1051,6 +1089,7 @@ VX_PRIVATE_API vx_status QuerySRAM(
 
 
 OnError:
+    gcmFOOTER_ARG("%d", vxStatus);
     return vxStatus;
 }
 
@@ -1069,6 +1108,8 @@ VX_PRIVATE_API vx_status vxoContext_InitSRAM(
     gctPOINTER          vipSRAMLogical = VX_NULL;
     gctUINT32           vipSRAMPhysical = 0;
     gctUINT32           vipSRAMSize = 0;
+
+    gcmHEADER_ARG("context=%p", context);
 
     vxmONERROR(QuerySRAM(context, gcvSRAM_EXTERNAL0, &axiSRAMPhysical, &axiSRAMLogical, &axiSRAMSize, &axiSRAMNode));
     vxmONERROR(QuerySRAM(context, gcvSRAM_INTERNAL, &vipSRAMPhysical, &vipSRAMLogical, &vipSRAMSize, &vipSRAMNode));
@@ -1095,45 +1136,27 @@ VX_PRIVATE_API vx_status vxoContext_InitSRAM(
     }
 
 
-    if (axiSRAMSize == 0 && vipSRAMSize != 0 && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3))
-    {
-        /* currently split vip sram to 2 same size partion */
-
-        context->axiSRAM.size        = vipSRAMSize/2;
-        context->axiSRAM.logical     = gcvNULL;
-        context->axiSRAM.physical    = vipSRAMPhysical + vipSRAMSize/2;
-        context->axiSRAM.used        = 0;
-        context->axiSRAM.node        = vipSRAMNode;
-        vxmASSERT(!(context->axiSRAM.physical & (CACHE_ALIGNMENT_SIZE - 1)));
-
-        context->vipSRAM.size        = vipSRAMSize/2 - VX_VIP_SRAM_IMAGE_STREAM_SIZE;
-        context->vipSRAM.logical     = gcvNULL;
-        context->vipSRAM.physical    = VX_VIP_SRAM_IMAGE_STREAM_SIZE;
-        context->vipSRAM.used        = 0;
-        context->vipSRAM.node        = gcvNULL;
-    }
-    else if (vipSRAMSize != 0 && !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3))
+    if (axiSRAMSize != 0)
     {
         context->axiSRAM.size        = axiSRAMSize;
         context->axiSRAM.logical     = axiSRAMLogical;
         context->axiSRAM.physical    = axiSRAMPhysical;
         context->axiSRAM.used        = 0;
         context->axiSRAM.node        = axiSRAMNode;
-
-        /* reserve for image stream mode */
-        context->vipSRAM.size        = vipSRAMSize - VX_VIP_SRAM_IMAGE_STREAM_SIZE;
-        context->vipSRAM.logical     = gcvNULL;
-        context->vipSRAM.physical    = VX_VIP_SRAM_IMAGE_STREAM_SIZE;
-        context->vipSRAM.used        = 0;
-        context->vipSRAM.node        = gcvNULL;
     }
-    else
+    if (vipSRAMSize != 0)
     {
-        /* we can not handle*/
-        vxmASSERT(0);
+        context->vipSRAM.size        = (vipSRAMSize <= VX_VIP_SRAM_IMAGE_STREAM_SIZE) ? vipSRAMSize : (vipSRAMSize - VX_VIP_SRAM_IMAGE_STREAM_SIZE);
+        context->vipSRAM.logical     = gcvNULL;
+        context->vipSRAM.physBase    = vipSRAMPhysical;
+        context->vipSRAM.physical    = vipSRAMPhysical != 0xFFFFFFFF ?
+                                           vipSRAMPhysical + VX_VIP_SRAM_IMAGE_STREAM_SIZE : VX_VIP_SRAM_IMAGE_STREAM_SIZE;
+        context->vipSRAM.used        = 0;
+        context->vipSRAM.node        = vipSRAMNode;
     }
 
 OnError:
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -1143,6 +1166,7 @@ VX_PRIVATE_API vx_status vxoContext_CaptureInitState(
 {
     vx_status status = VX_SUCCESS;
     vx_uint32 i = 0;
+    gcmHEADER_ARG("context=%p", context);
 
     context->graphBinaryInitBuffer = (vx_ptr_ptr)vxAllocateAndZeroMemory(sizeof(vx_ptr) * context->deviceCount);
     vxmONERROR_NULLPTR(context->graphBinaryInitBuffer);
@@ -1160,23 +1184,29 @@ VX_PRIVATE_API vx_status vxoContext_CaptureInitState(
                             context->graphBinaryInitSize, context->deviceCount);
 
 OnError:
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
 VX_PRIVATE_API vx_context vxoContext_Create()
 {
     vx_context context = VX_NULL;
+    gcmHEADER_ARG("context=%p", context);
 
-    if (vxSingletonContext == VX_NULL)
+#if gcdUSE_SINGLE_CONTEXT
+    if (vxContextGlobalLock == VX_NULL)
     {
         vxCreateMutex(OUT &vxContextGlobalLock);
     }
 
     vxAcquireMutex(vxContextGlobalLock);
+#endif
 
     gcoVX_ZeroMemorySize();
 
+#if gcdUSE_SINGLE_CONTEXT
     if (vxSingletonContext == VX_NULL)
+#endif
     {
         gctSTRING  oldEnv = gcvNULL;
         gctCHAR    newEnv[128] = {0};
@@ -1234,6 +1264,8 @@ VX_PRIVATE_API vx_context vxoContext_Create()
 
         gcoVX_GetNNConfig(&context->nnConfig);
 
+        gcoVX_QueryHWChipInfo(&context->hwChipInfo);
+
         vxoContext_InitOptions(context);
 
         gcoHAL_GetProductName(gcvNULL, &productName, &context->pid);
@@ -1256,7 +1288,10 @@ VX_PRIVATE_API vx_context vxoContext_Create()
         gcoOS_StrCatSafe(newEnv, 128, " -CLVIRCG:1 -OCLPASS_KERNEL_STRUCT_ARG_BY_VALUE:1");
         gcoOS_SetEnv(gcvNULL, "VC_OPTION", newEnv);
 
+#if gcdUSE_SINGLE_CONTEXT
+
         vxSingletonContext = context;
+#endif
 
         gcoOS_GetEnv(gcvNULL, "VX_EXTENSION_LIBS", &oldEnv);
         if (oldEnv != NULL)
@@ -1269,6 +1304,7 @@ VX_PRIVATE_API vx_context vxoContext_Create()
 
         vxoContext_InitSRAM(context);
     }
+#if gcdUSE_SINGLE_CONTEXT
     else
     {
         context = vxSingletonContext;
@@ -1277,6 +1313,7 @@ VX_PRIVATE_API vx_context vxoContext_Create()
     }
 
     vxReleaseMutex(vxContextGlobalLock);
+#endif
 
 #if VIVANTE_PROFILER
     vxoProfiler_Initialize(context);
@@ -1286,11 +1323,13 @@ VX_PRIVATE_API vx_context vxoContext_Create()
     {
         vxoContext_CaptureInitState(context);
     }
-
+    gcmFOOTER_ARG("%p", context);
     return (vx_context)context;
 
 ErrorExit:
+#if gcdUSE_SINGLE_CONTEXT
     vxReleaseMutex(vxContextGlobalLock);
+#endif
 
     if (context != VX_NULL)
     {
@@ -1300,7 +1339,7 @@ ErrorExit:
         }
         vxFree(context);
     }
-
+    gcmFOOTER_NO();
     return VX_NULL;
 }
 
@@ -1321,6 +1360,7 @@ VX_INTERNAL_API vx_bool vxoContext_IsValid(vx_context context)
 VX_PRIVATE_API void vxoContext_ForceReleaseAllObjects(vx_context context)
 {
     vx_reference_item current;
+    gcmHEADER_ARG("context=%p", context);
 
     vxmASSERT(context);
 
@@ -1344,7 +1384,7 @@ VX_PRIVATE_API void vxoContext_ForceReleaseAllObjects(vx_context context)
 
             if (ref->type == VX_TYPE_ERROR)
             {
-                vxoReference_Release(&ref, ref->type, VX_REF_INTERNAL);
+                vxoReference_ReleaseEx(&ref, ref->type, VX_REF_INTERNAL, vx_true_e);
             }
 
             if (ref != VX_NULL)
@@ -1356,13 +1396,14 @@ VX_PRIVATE_API void vxoContext_ForceReleaseAllObjects(vx_context context)
 
                 if (vxoReference_GetExternalCount(ref) > 0)
                 {
-                    vxoReference_Release(&ref, ref->type, VX_REF_EXTERNAL);
+                    vxoReference_ReleaseEx(&ref, ref->type, VX_REF_EXTERNAL, vx_true_e);
                 }
             }
         }
 
         current = current->next;
     }
+    gcmFOOTER_NO();
 }
 
 gceSTATUS
@@ -1371,7 +1412,7 @@ gcfVX_UnloadCompiler(
     )
 {
     gceSTATUS   status = gcvSTATUS_OK;
-
+    gcmHEADER_ARG("context=%p", context);
     {
         if (context->unloadCompiler != gcvNULL)
         {
@@ -1387,6 +1428,7 @@ gcfVX_UnloadCompiler(
     }
 
 OnError:
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -1396,6 +1438,7 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
     vx_uint32 i, j;
     vx_reference_item next, current;
     vx_char* flag;
+    gcmHEADER_ARG("contextPtr=%p", contextPtr);
     gcoOS_GetEnv(gcvNULL, "ENABLE_TRACE_MEMORY", &flag);
     if (flag)
     {
@@ -1407,21 +1450,37 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
             vxInfo("Memory size = %d byte\n", size);
     }
 
-    if (contextPtr == VX_NULL) return VX_ERROR_INVALID_REFERENCE;
-
+    if (contextPtr == VX_NULL)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     context = *contextPtr;
     *contextPtr = VX_NULL;
 
-    if (context == VX_NULL) return VX_ERROR_INVALID_REFERENCE;
+    if (context == VX_NULL)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
 
-    if (vxContextGlobalLock == VX_NULL) return VX_FAILURE;
+#if gcdUSE_SINGLE_CONTEXT
+    if (vxContextGlobalLock == VX_NULL)
+    {
+        gcmFOOTER_ARG("%d", VX_FAILURE);
+        return VX_FAILURE;
+    }
     vxAcquireMutex(vxContextGlobalLock);
+#endif
 
     gcfVX_Flush(gcvTRUE);
 
     if (!vxoContext_IsValid(context))
     {
+#if gcdUSE_SINGLE_CONTEXT
         vxReleaseMutex(vxContextGlobalLock);
+#endif
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
         return VX_ERROR_INVALID_REFERENCE;
     }
 #if VIVANTE_PROFILER
@@ -1549,15 +1608,23 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
 
         context->base.signature = VX_REF_SIGNATURE_RELEASED;
 
+#ifdef USE_LIB_NN_ARCH_PERF
+        if (context->apm)
+            DestroyAPModel(context->apm);
+#endif
+
         vxFree(context);
 
+#if gcdUSE_SINGLE_CONTEXT
         /* Free the global resources */
         vxReleaseMutex(vxContextGlobalLock);
         vxDestroyMutex(vxContextGlobalLock);
         vxContextGlobalLock = VX_NULL;
 
         vxSingletonContext = VX_NULL;
+#endif
 
+        gcmFOOTER_ARG("%d", VX_SUCCESS);
         return VX_SUCCESS;
     }
     else
@@ -1565,8 +1632,12 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
         vxWarning("vxoContext_Release(): the context, %p, still has %u reference count(s) in total",
                     vxoReference_GetTotalCount(&context->base));
 
-        vxReleaseMutex(vxContextGlobalLock);
+#if gcdUSE_SINGLE_CONTEXT
 
+        vxReleaseMutex(vxContextGlobalLock);
+#endif
+
+        gcmFOOTER_ARG("%d", VX_SUCCESS);
         return VX_SUCCESS;
     }
 }
@@ -1574,7 +1645,7 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
 VX_INTERNAL_API vx_error vxoContext_GetErrorObject(vx_context context, vx_status status)
 {
     vx_reference_item current;
-
+    gcmHEADER_ARG("context=%p, status=0x%x", context, status);
     current = context->refListHead;
 
     while (current != VX_NULL)
@@ -1583,12 +1654,16 @@ VX_INTERNAL_API vx_error vxoContext_GetErrorObject(vx_context context, vx_status
         {
             vx_error error = (vx_error_s *)current->ref;
 
-            if (error->status == status) return error;
+            if (error->status == status)
+            {
+                gcmFOOTER_ARG("%p", error);
+                return error;
+            }
         }
 
         current = current->next;
     }
-
+    gcmFOOTER_NO();
     return VX_NULL;
 }
 
@@ -1604,6 +1679,7 @@ VX_INTERNAL_API vx_context vxoContext_GetFromReference(vx_reference ref)
 
 VX_INTERNAL_API vx_bool vxoContext_AddObject(vx_context context, vx_reference ref)
 {
+    gcmHEADER_ARG("context=%p, ref=%p", context, ref);
     vxmASSERT(context);
     vxmASSERT(ref);
 
@@ -1613,11 +1689,12 @@ VX_INTERNAL_API vx_bool vxoContext_AddObject(vx_context context, vx_reference re
         if (ritem == VX_NULL)
         {
             vxError("Fail to allocate memory");
+            gcmFOOTER_ARG("%d", vx_false_e);
             return vx_false_e;
         }
 
         ritem->ref = ref;
-        ritem->next = VX_NULL;
+        ritem->next = ritem->prev = VX_NULL;
 
         if (context->refListHead == VX_NULL && context->refListTail == VX_NULL)
         {
@@ -1625,20 +1702,24 @@ VX_INTERNAL_API vx_bool vxoContext_AddObject(vx_context context, vx_reference re
         }
         else if (context->refListTail != VX_NULL)
         {
+            ritem->prev = context->refListTail;
             context->refListTail->next = ritem;
             context->refListTail = ritem;
         }
         else
         {
             vxError("Context ref list error");
+            gcmFOOTER_ARG("%d", vx_false_e);
             return vx_false_e;
         }
 
         context->refTotalCount++;
+        gcmFOOTER_ARG("%d", vx_true_e);
+        return vx_true_e;
     }
     else
     {
-        vx_reference_item current = context->refListHead;
+        vx_reference_item current = context->refListTail;
 
         while (current != VX_NULL)
         {
@@ -1646,38 +1727,63 @@ VX_INTERNAL_API vx_bool vxoContext_AddObject(vx_context context, vx_reference re
             {
                 current->ref = ref;
                 context->refFreeCount--;
-                break;
+                gcmFOOTER_ARG("%d", vx_true_e);
+                return vx_true_e;
+            }
+
+            current = current->prev;
+        }
+    }
+    gcmFOOTER_ARG("%d", vx_true_e);
+    return vx_false_e;
+}
+
+VX_INTERNAL_API vx_bool vxoContext_RemoveObject(vx_context context, vx_reference ref, vx_bool order)
+{
+    vx_reference_item current;
+
+    gcmHEADER_ARG("context=%p, ref=%p", context, ref);
+
+    vxmASSERT(context);
+    vxmASSERT(ref);
+
+    if (order)
+    {
+        current = context->refListHead;
+
+        while (current != VX_NULL)
+        {
+            if (current->ref == ref)
+            {
+                current->ref = VX_NULL;
+                context->refFreeCount++;
+                gcmFOOTER_ARG("%d", vx_true_e);
+                return vx_true_e;
             }
 
             current = current->next;
         }
     }
-
-    return vx_true_e;
-}
-
-VX_INTERNAL_API vx_bool vxoContext_RemoveObject(vx_context context, vx_reference ref)
-{
-    vx_reference_item current;
-
-    vxmASSERT(context);
-    vxmASSERT(ref);
-
-    current = context->refListHead;
-
-    while (current != VX_NULL)
+    else
     {
-        if (current->ref == ref)
-        {
-            current->ref = VX_NULL;
-            context->refFreeCount++;
-            return vx_true_e;
-        }
+        current = context->refListTail;
 
-        current = current->next;
+        while (current != VX_NULL)
+        {
+            if (current->ref == ref)
+            {
+                current->ref = VX_NULL;
+                context->refFreeCount++;
+                gcmFOOTER_ARG("%d", vx_true_e);
+                return vx_true_e;
+            }
+
+            current = current->prev;
+        }
     }
 
     vxError("Can'targetIndex find the reference, %p, in the context, %p.", ref, context);
+    gcmFOOTER_ARG("%d", vx_false_e);
     return vx_false_e;
 }
 
@@ -1704,6 +1810,8 @@ VX_INTERNAL_API vx_status vxContext_LoadKernels(vx_context context, const vx_str
     vx_publish_kernels_f publish = NULL;
     vx_status            status;
 
+    gcmHEADER_ARG("context=%p, module=%s", context, module);
+
     vxmASSERT(module);
 
     if (isFullModuleName(module))
@@ -1715,13 +1823,17 @@ VX_INTERNAL_API vx_status vxContext_LoadKernels(vx_context context, const vx_str
         gcoOS_PrintStrSafe(moduleName, VX_MAX_PATH, &offset, VX_MODULE_NAME("%s"), module);
     }
 
-    if (!vxoContext_IsValid(context)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     for (i = 0; i < context->moduleCount; i++)
     {
         if (context->moduleTable[i].handle != VX_NULL
             && vxIsSameString(module, context->moduleTable[i].name, VX_MAX_PATH))
         {
+            gcmFOOTER_ARG("%d", VX_SUCCESS);
             return VX_SUCCESS;
         }
     }
@@ -1735,6 +1847,7 @@ VX_INTERNAL_API vx_status vxContext_LoadKernels(vx_context context, const vx_str
             if (context->moduleTable[i].handle == VX_NULL)
             {
                 vxError("Failed to load module: \"%s\"", moduleName);
+                gcmFOOTER_ARG("%d", VX_FAILURE);
                 return VX_FAILURE;
             }
 
@@ -1746,6 +1859,7 @@ VX_INTERNAL_API vx_status vxContext_LoadKernels(vx_context context, const vx_str
                 vxError("Failed to load symbol vxPublishKernels\n");
                 vxUnloadModule(context->moduleTable[i].handle);
                 context->moduleTable[i].handle = NULL;
+                gcmFOOTER_ARG("%d", VX_ERROR_NO_RESOURCES);
                 return VX_ERROR_NO_RESOURCES;
             }
 
@@ -1755,16 +1869,17 @@ VX_INTERNAL_API vx_status vxContext_LoadKernels(vx_context context, const vx_str
                 vxError("Failed to publish kernels in module\n");
                 vxUnloadModule(context->moduleTable[i].handle);
                 context->moduleTable[i].handle = NULL;
+                gcmFOOTER_ARG("%d", VX_ERROR_NO_RESOURCES);
                 return VX_ERROR_NO_RESOURCES;
             }
 
             vxStrCopySafe(context->moduleTable[i].name, VX_MAX_PATH, module);
             context->moduleCount++;
-
+            gcmFOOTER_ARG("%d", VX_SUCCESS);
             return VX_SUCCESS;
         }
     }
-
+    gcmFOOTER_ARG("%d", VX_ERROR_NO_RESOURCES);
     return VX_ERROR_NO_RESOURCES;
 }
 
@@ -1799,7 +1914,8 @@ VX_INTERNAL_API vx_bool vxoContext_AddAccessor(
         vx_context context, vx_size size, vx_enum usage, vx_ptr ptr, vx_reference ref, OUT vx_uint32_ptr indexPtr, vx_ptr extraDataPtr)
 {
     vx_uint32 index;
-
+    gcmHEADER_ARG("context=%p, size=0x%lx, usage=0x%x, ptr=%p, ref=%p, indexPtr=%p, extraDataPtr=%p",
+        context, size, usage, ptr, ref, indexPtr, extraDataPtr);
     vxmASSERT(context);
     vxmASSERT(indexPtr);
 
@@ -1811,8 +1927,11 @@ VX_INTERNAL_API vx_bool vxoContext_AddAccessor(
         {
             ptr = vxAllocate(size);
 
-            if (ptr == VX_NULL) return vx_false_e;
-
+            if (ptr == VX_NULL)
+            {
+                gcmFOOTER_ARG("%d", vx_false_e);
+                return vx_false_e;
+            }
             context->accessorTable[index].allocated = vx_true_e;
         }
         else
@@ -1827,15 +1946,18 @@ VX_INTERNAL_API vx_bool vxoContext_AddAccessor(
         context->accessorTable[index].extraDataPtr = extraDataPtr;
 
         *indexPtr = index;
+        gcmFOOTER_ARG("%d", vx_true_e);
         return vx_true_e;
     }
 
     *indexPtr = 0;
+    gcmFOOTER_ARG("%d", vx_false_e);
     return vx_false_e;
 }
 
 VX_INTERNAL_API void vxoContext_RemoveAccessor(vx_context context, vx_uint32 index)
 {
+    gcmHEADER_ARG("context=%p, index=0x%x", context, index);
     vxmASSERT(context);
     vxmASSERT(index < vxmLENGTH_OF(context->accessorTable));
 
@@ -1846,11 +1968,14 @@ VX_INTERNAL_API void vxoContext_RemoveAccessor(vx_context context, vx_uint32 ind
     vxZeroMemory(&context->accessorTable[index], sizeof(vx_accessor_s));
 
     context->accessorTable[index].used = vx_false_e;
+    gcmFOOTER_NO();
 }
 
 VX_INTERNAL_API vx_bool vxoContext_SearchAccessor(vx_context context, vx_ptr ptr, OUT vx_uint32_ptr indexPtr)
 {
     vx_uint32 index;
+
+    gcmHEADER_ARG("context=%p, ptr=%p, indexPtr=%p", context, ptr, indexPtr);
 
     vxmASSERT(context);
     vxmASSERT(indexPtr);
@@ -1862,11 +1987,13 @@ VX_INTERNAL_API vx_bool vxoContext_SearchAccessor(vx_context context, vx_ptr ptr
         if (context->accessorTable[index].ptr == ptr)
         {
             *indexPtr = index;
+            gcmFOOTER_ARG("%d", vx_true_e);
             return vx_true_e;
         }
     }
 
     *indexPtr = 0;
+    gcmFOOTER_ARG("%d", vx_false_e);
     return vx_false_e;
 }
 
@@ -1895,11 +2022,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetContextAttribute(vx_context context, vx_
 {
     vx_border_t * borderMode;
     vx_enum * immediateBorderModePolicy;
-
+    gcmHEADER_ARG("context=%p, attribute=0x%x ptr=%p size=0x%lx", context, attribute, ptr, size);
     gcmDUMP_API("$VX vxSetContextAttribute: context=%p, attribute=0x%x ptr=%p size=0x%lx", context, attribute, ptr, size);
 
-    if (!vxoContext_IsValid(context)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     switch (attribute)
     {
         case VX_CONTEXT_IMMEDIATE_BORDER:
@@ -1911,6 +2041,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetContextAttribute(vx_context context, vx_
             {
                 vxError("%s[%d]: BorderMode is invalid!\n", __FUNCTION__, __LINE__);
                 vxAddLogEntry(&context->base, VX_ERROR_INVALID_VALUE, "%s[%d]: BorderMode is invalid!\n", __FUNCTION__, __LINE__);
+                gcmFOOTER_ARG("%d", VX_ERROR_INVALID_VALUE);
                 return VX_ERROR_INVALID_VALUE;
             }
 
@@ -1926,6 +2057,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetContextAttribute(vx_context context, vx_
             {
                 vxError("%s[%d]: BorderModePolicy is invalid!\n", __FUNCTION__, __LINE__);
                 vxAddLogEntry(&context->base, VX_ERROR_INVALID_VALUE, "%s[%d]: BorderModePolicy is invalid!\n", __FUNCTION__, __LINE__);
+                gcmFOOTER_ARG("%d", VX_ERROR_INVALID_VALUE);
                 return VX_ERROR_INVALID_VALUE;
             }
 
@@ -1936,9 +2068,10 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetContextAttribute(vx_context context, vx_
             vxError("%s[%d]: The attribute parameter, %d, is not supported!\n", __FUNCTION__, __LINE__, attribute);
             vxAddLogEntry(&context->base, VX_ERROR_NOT_SUPPORTED, "%s[%d]: \
                 The attribute parameter, %d, is not supported!\n", __FUNCTION__, __LINE__, attribute);
+            gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
             return VX_ERROR_NOT_SUPPORTED;
     }
-
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
@@ -1967,6 +2100,7 @@ VX_PRIVATE_API void vxoContext_GetUniqueKernelTable(vx_context context, OUT vx_k
     vx_uint32 targetIndex, kernelndex;
     vx_uint32 uniqueKernelIndex;
     vx_uint32 uniqueKernelTableSize = 0u;
+    gcmHEADER_ARG("context=%p, uniqueKernelTable=%p", context, uniqueKernelTable);
 
     vxmASSERT(context);
     vxmASSERT(uniqueKernelTable);
@@ -1998,14 +2132,19 @@ VX_PRIVATE_API void vxoContext_GetUniqueKernelTable(vx_context context, OUT vx_k
             uniqueKernelTableSize++;
         }
     }
+    gcmFOOTER_NO();
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryContext(vx_context context, vx_enum attribute, void *ptr, vx_size size)
 {
+    gcmHEADER_ARG("context=%p, attribute=0x%x, ptr=%p, size=0x%lx", context, attribute, ptr, size);
     gcmDUMP_API("$VX vxQueryContext: context=%p, attribute=0x%x, ptr=%p, size=0x%lx", context, attribute, ptr, size);
 
-    if (!vxoContext_IsValid(context)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     switch (attribute)
     {
         case VX_CONTEXT_VENDOR_ID:
@@ -2047,6 +2186,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryContext(vx_context context, vx_enum at
             {
                 vxError("%s[%d]: size > VX_MAX_IMPLEMENTATION_NAME || ptr == VX_NULL !\n", __FUNCTION__, __LINE__);
                 vxAddLogEntry(&context->base, VX_ERROR_INVALID_PARAMETERS, "%s[%d]: size > VX_MAX_IMPLEMENTATION_NAME || ptr == VX_NULL !\n", __FUNCTION__, __LINE__);
+                gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
                 return VX_ERROR_INVALID_PARAMETERS;
             }
 
@@ -2064,6 +2204,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryContext(vx_context context, vx_enum at
             {
                 vxError("%s[%d]: size >= sizeof(extensions) || ptr == VX_NULL !\n", __FUNCTION__, __LINE__);
                 vxAddLogEntry(&context->base, VX_ERROR_INVALID_PARAMETERS, "%s[%d]: size >= sizeof(extensions) || ptr == VX_NULL !\n", __FUNCTION__, __LINE__);
+                gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
                 return VX_ERROR_INVALID_PARAMETERS;
             }
 
@@ -2108,6 +2249,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryContext(vx_context context, vx_enum at
                     || ptr == VX_NULL !\n", __FUNCTION__, __LINE__);
                 vxAddLogEntry(&context->base, VX_ERROR_INVALID_PARAMETERS, "%s[%d]: size != (context->uniqueKernelCount * sizeof(vx_kernel_info_t)) \
                     || ptr == VX_NULL !\n", __FUNCTION__, __LINE__);
+                gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
                 return VX_ERROR_INVALID_PARAMETERS;
             }
 
@@ -2139,19 +2281,23 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryContext(vx_context context, vx_enum at
         default:
             vxError("%s[%d]: The attribute parameter, %d, is not supported!\n", __FUNCTION__, __LINE__, attribute);
             vxAddLogEntry(&context->base, VX_ERROR_NOT_SUPPORTED, "%s[%d]: The attribute parameter, %d, is not supported!\n", __FUNCTION__, __LINE__, attribute);
+            gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
             return VX_ERROR_NOT_SUPPORTED;
     }
-
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxHint(vx_reference reference, vx_enum hint, const void* data, vx_size data_size)
 {
-
+    gcmHEADER_ARG("reference=%p, hint=0x%x, data=%p, data_size=0x%lx", reference, hint, data, data_size);
     gcmDUMP_API("$VX vxHint: reference=%p, hint=0x%x, data=%p, data_size=0x%lx", reference, hint, data, data_size);
 
     if (!vxoContext_IsValid((vx_context)reference) && !vxoReference_IsValidAndNoncontext(reference))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
         return VX_ERROR_INVALID_REFERENCE;
+    }
 
     switch (hint)
     {
@@ -2167,22 +2313,26 @@ VX_API_ENTRY vx_status VX_API_CALL vxHint(vx_reference reference, vx_enum hint, 
 
         default:
             vxError("The hint parameter, %d, is not supported", hint);
+            gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
             return VX_ERROR_NOT_SUPPORTED;
     }
-
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxDirective(vx_reference reference, vx_enum directive)
 {
     vx_context context;
-
+    gcmHEADER_ARG("reference=%p, directive=0x%x", reference, directive);
     gcmDUMP_API("$VX vxDirective: reference=%p, directive=0x%x", reference, directive);
 
     /*if (!vxoContext_IsValid(reference->context)) return VX_ERROR_INVALID_REFERENCE;*/
 
-    if (!vxoReference_IsValid(reference)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoReference_IsValid(reference))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     context = ((reference->type == VX_TYPE_CONTEXT))?((vx_context)reference):(reference->context);
 
     switch (directive)
@@ -2199,57 +2349,69 @@ VX_API_ENTRY vx_status VX_API_CALL vxDirective(vx_reference reference, vx_enum d
             if (reference->type == VX_TYPE_CONTEXT)
                 context->options.enableCNNPerf = 0;
             else
+            {
+                gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
                 return VX_ERROR_NOT_SUPPORTED;
-
+            }
             break;
         case VX_DIRECTIVE_ENABLE_PERFORMANCE:
             if (reference->type == VX_TYPE_CONTEXT)
                 context->options.enableCNNPerf = 1;
             else
+            {
+                gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
                 return VX_ERROR_NOT_SUPPORTED;
+            }
             break;
 
         default:
             vxError("The directive parameter, %d, is not supported", directive);
+            gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
             return VX_ERROR_NOT_SUPPORTED;
     }
-
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
 VX_API_ENTRY vx_enum VX_API_CALL vxRegisterUserStruct(vx_context context, vx_size size)
 {
     vx_uint32 i;
-
+    gcmHEADER_ARG("context=%p, size=0x%lx", context, size);
     gcmDUMP_API("$VX vxRegisterUserStruct: context=%p, size=0x%lx", context, size);
 
-    if (!vxoContext_IsValid(context) || size == 0) return VX_TYPE_INVALID;
-
+    if (!vxoContext_IsValid(context) || size == 0) {
+        gcmFOOTER_ARG("%d", VX_TYPE_INVALID);
+        return VX_TYPE_INVALID;
+    }
     for (i = 0; i < VX_MAX_USER_STRUCT_COUNT; i++)
     {
         if (context->userStructTable[i].type == VX_TYPE_INVALID)
         {
             context->userStructTable[i].size = size;
-
+            gcmFOOTER_NO();
             return context->userStructTable[i].type = VX_TYPE_USER_STRUCT_START + i;
         }
     }
-
+    gcmFOOTER_ARG("%d", VX_TYPE_INVALID);
     return VX_TYPE_INVALID;
 }
 
 static vx_target_s* vxoContext_FindTargetByString(vx_context context, const char* targetString)
 {
     vx_uint32 index = 0;
+    gcmHEADER_ARG("context=%p, targetString=%s", context, targetString);
+
     for (index = 0; index < context->targetCount; index++)
     {
         vx_uint32 targetIndex = context->targetPriorityTable[index];
         vx_target_s *target = &context->targetTable[targetIndex];
         if (vxoTarget_MatchTargetNameWithString(target->name, targetString) == vx_true_e)
         {
+            gcmFOOTER_ARG("%p", target);
             return target;
         }
     }
+    gcmFOOTER_NO();
     /* indicate 'not found' state */
     return (vx_target_s*)NULL;
 }
@@ -2258,11 +2420,13 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetImmediateModeTarget(vx_context context, 
 {
     vx_status status = VX_ERROR_INVALID_REFERENCE;
     vx_target_s* target = NULL;
-
+    gcmHEADER_ARG("context=%p, target_enum=0x%x, target_string=%s", context, target_enum, target_string);
     gcmDUMP_API("$VX vxSetImmediateModeTarget: context=%p, target_enum=0x%x, target_string=%s", context, target_enum, target_string);
 
-    if (!vxoContext_IsValid(context)) return VX_TYPE_INVALID;
-
+    if (!vxoContext_IsValid(context)) {
+        gcmFOOTER_ARG("%d", VX_TYPE_INVALID);
+        return VX_TYPE_INVALID;
+    }
 
     switch (target_enum)
     {
@@ -2289,7 +2453,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetImmediateModeTarget(vx_context context, 
             status = VX_ERROR_NOT_SUPPORTED;
             break;
     }
-
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -2381,6 +2545,8 @@ VX_INTERNAL_API vx_bool vxoContext_MemoryMap(
 {
     vx_uint32 id;
     vx_bool worked = vx_false_e;
+    gcmHEADER_ARG("context=%p, ref=%p, size=0x%lx, usage=0x%x, mem_type=0x%x, flags=0x%x, extra_data=%p, ptr=%p, map_id=%p",
+        context, ref, size, usage, mem_type, flags, extra_data, ptr, map_id);
 
     /* lock the table for modification */
     if (vx_true_e == vxAcquireMutex(context->memoryMapsLock))
@@ -2463,7 +2629,7 @@ VX_INTERNAL_API vx_bool vxoContext_MemoryMap(
     }
     else
         worked = vx_false_e;
-
+    gcmFOOTER_ARG("%d", worked);
     return worked;
 } /* vxoContext_MemoryMap() */
 
@@ -2476,7 +2642,7 @@ VX_INTERNAL_API vx_bool vxoContext_FindMemoryMap(
 {
     vx_bool found = vx_false_e;
     vx_uint32 id = (vx_uint32)map_id;
-
+    gcmHEADER_ARG("context=%p, ref=%p, map_id=0x%x", context, ref, map_id);
     /* check index range */
     if (id < vxmLENGTH_OF(context->memoryMaps))
     {
@@ -2492,7 +2658,7 @@ VX_INTERNAL_API vx_bool vxoContext_FindMemoryMap(
             vxReleaseMutex(context->memoryMapsLock);
         }
     }
-
+    gcmFOOTER_ARG("%d", found);
     return found;
 } /* vxoContext_FindMemoryMap() */
 
@@ -2532,6 +2698,7 @@ VX_INTERNAL_API void vxoContext_MemoryUnmap(vx_context context, vx_map_id m_id)
 VX_INTERNAL_API void vxoContext_MemoryUnmap(vx_context context, vx_map_id m_id)
 {
     vx_uint32 map_id = (vx_uint32)m_id;
+    gcmHEADER_ARG("context=%p, m_id=0x%x", context, m_id);
 
     /* lock the table for modification */
     if (vx_true_e == vxAcquireMutex(context->memoryMapsLock))
@@ -2562,7 +2729,7 @@ VX_INTERNAL_API void vxoContext_MemoryUnmap(vx_context context, vx_map_id m_id)
     }
     else
         vxError("vxAcquireMutex() failed!\n");
-
+    gcmFOOTER_NO();
     return;
 } /* vxoContext_MemoryUnmap() */
 #endif
@@ -2571,6 +2738,9 @@ VX_INTERNAL_API vx_bool vxoContext_IsFeatureAvailable(vx_context context, vx_nn_
 {
     switch (feature)
     {
+    case VX_NN_FEATURE_SHADER:
+        return (context->nnConfig.fixedFeature.shaderCoreCount && context->options.enableShader) ? vx_true_e : vx_false_e;
+
     case VX_NN_FEATURE_TP:
         return (context->nnConfig.fixedFeature.tpCoreCount && context->options.enableTP) ? vx_true_e : vx_false_e;
 
@@ -2636,7 +2806,7 @@ VX_INTERNAL_API vx_bool vxoContext_IsFeatureAvailable(vx_context context, vx_nn_
         return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_INTERLEAVE8) && context->options.enableInterleave8) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_SRAM:
-        return ((context->nnConfig.customizedFeature.vipSRAMSizeInKB > 0) && context->options.enableSRAM) ? vx_true_e : vx_false_e;
+        return ((context->nnConfig.customizedFeature.vipSRAMSize > 0) && context->options.enableSRAM) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_BORDER_MODE:
         return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_BORDER_MODE) && context->options.enableBorderMode) ? vx_true_e : vx_false_e;
@@ -2656,7 +2826,7 @@ VX_INTERNAL_API vx_bool vxoContext_IsFeatureAvailable(vx_context context, vx_nn_
     case VX_NN_FEATURE_SWTILING_PHASE1:
         return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1)
              && (context->options.enableSwtilingPhase1 != VX_SWTILING_OPTION_OFF)
-             && (context->nnConfig.customizedFeature.axiSRAMSizeInKB > 0 || gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3))
+             && (context->nnConfig.customizedFeature.axiSRAMSize > 0 || gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3))
              && gcoHAL_GetOption(gcvNULL, gcvOPTION_OVX_ENABLE_NN_STRIDE)) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_SWTILING_PHASE2:
@@ -2706,7 +2876,7 @@ VX_INTERNAL_API vx_bool vxoContext_IsFeatureAvailable(vx_context context, vx_nn_
 VX_API_ENTRY vx_status VX_API_CALL vxAllocateUserKernelId(vx_context context, vx_enum * pKernelEnumId)
 {
     vx_status status = VX_ERROR_INVALID_REFERENCE;
-
+    gcmHEADER_ARG("context=%p, pKernelEnumId=%p", context, pKernelEnumId);
     gcmDUMP_API("$VX vxAllocateUserKernelId: context=%p, pKernelEnumId=%p", context, pKernelEnumId);
 
     if ((vxoContext_IsValid(context) == vx_true_e) && pKernelEnumId)
@@ -2715,16 +2885,18 @@ VX_API_ENTRY vx_status VX_API_CALL vxAllocateUserKernelId(vx_context context, vx
         if(context->NextDynamicUserKernelID <= VX_KERNEL_MASK)
         {
             *pKernelEnumId = VX_KERNEL_BASE(VX_ID_USER,0) + context->NextDynamicUserKernelID++;
+            gcmFOOTER_ARG("%d", VX_SUCCESS);
             status = VX_SUCCESS;
         }
     }
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxAllocateUserKernelLibraryId(vx_context context, vx_enum * pLibraryId)
 {
     vx_status status = VX_ERROR_INVALID_REFERENCE;
-
+    gcmHEADER_ARG("context=%p, pLibraryId=%p", context, pLibraryId);
     gcmDUMP_API("$VX vxAllocateUserKernelLibraryId: context=%p, pLibraryId=%p", context, pLibraryId);
 
     if ((vxoContext_IsValid(context) == vx_true_e) && pLibraryId)
@@ -2733,9 +2905,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxAllocateUserKernelLibraryId(vx_context cont
         if(context->NextDynamicUserLibraryID <= VX_LIBRARY(VX_LIBRARY_MASK))
         {
             *pLibraryId = context->NextDynamicUserLibraryID++;
+            gcmFOOTER_ARG("%d", VX_SUCCESS);
             status = VX_SUCCESS;
         }
     }
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -2754,5 +2928,40 @@ VX_INTERNAL_API vx_int32 vxoContext_GetUserStructIndex(vx_context context, vx_en
     if(i == VX_MAX_USER_STRUCT_COUNT) i = -1;
 
     return i;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL vxQueryHardwareCaps(
+    vx_context                          context,
+    const vx_hardware_caps_params_t   * hardware_caps_params,
+    vx_size                             size_of_hardware_caps_param
+    )
+{
+    gcmHEADER_ARG("context=%p, hardware_caps_params=%p, size_of_hardware_caps_param=0x%lx",
+        context, hardware_caps_params, size_of_hardware_caps_param);
+    gcmDUMP_API("$VX vxQueryHardwareCaps: context=%p, hardware_caps_params=0x%x, size_of_hardware_caps_param=0x%lx", context, hardware_caps_params, size_of_hardware_caps_param);
+
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+
+    if (size_of_hardware_caps_param == sizeof(vx_hardware_caps_params_t))
+    {
+        vx_hardware_caps_params_t* hwCapsParams = (vx_hardware_caps_params_t*)hardware_caps_params;
+
+        hwCapsParams->customerID = context->hwChipInfo.customerID;
+        hwCapsParams->ecoID = context->hwChipInfo.ecoID;
+        hwCapsParams->evis1 = context->evisNoInst.supportEVIS && (!context->evisNoInst.isVX2);
+        hwCapsParams->evis2 = context->evisNoInst.isVX2;
+    }
+    else
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
+
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
+    return VX_SUCCESS;
 }
 

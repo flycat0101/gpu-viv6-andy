@@ -16,6 +16,8 @@
 #include <math.h>
 #include "gc_hal_base.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG_STROKE
+
 /*******************************************************************************
 **                      Stroke Conversion Algorithm Control
 *******************************************************************************/

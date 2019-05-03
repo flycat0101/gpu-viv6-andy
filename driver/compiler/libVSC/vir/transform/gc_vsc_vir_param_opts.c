@@ -32,6 +32,7 @@ void VSC_PARAM_optimization_Init(
     VSC_PARAM_optimization_SetThreshold(po, options->longArrayThreshold);
     VSC_PARAM_optimization_SetOptions(po, options);
     VSC_PARAM_optimization_SetDuInfo(po, duInfo);
+    VSC_PARAM_optimization_SetCfgChanged(po, gcvFALSE);
 }
 
 void VSC_PARAM_optimization_Final(
@@ -356,7 +357,7 @@ VSC_ErrCode _VSC_SIMP_OptimizeParamInCallee(
                         VIR_LOG_FLUSH(paramOptimizer->dumper);
                     }
 
-                    VIR_Function_RemoveInstruction(currentFunc, inst);
+                    VIR_Pass_RemoveInstruction(currentFunc, inst, &VSC_PARAM_optimization_GetCfgChanged(paramOptimizer));
                     inst = loadInst;
                 }
             }
@@ -397,7 +398,7 @@ VSC_ErrCode _VSC_SIMP_OptimizeParamInCallee(
                         mulSrc0 = VIR_Inst_GetSource(inst, VIR_Operand_Src0);
 
                         /*remove MOVA inst.*/
-                        VIR_Function_RemoveInstruction(currentFunc, inst);
+                        VIR_Pass_RemoveInstruction(currentFunc, inst, &VSC_PARAM_optimization_GetCfgChanged(paramOptimizer));
                         break;
                     }
                 }
@@ -478,7 +479,7 @@ VSC_ErrCode _VSC_SIMP_OptimizeParamInCallee(
                     VIR_LOG_FLUSH(paramOptimizer->dumper);
                 }
 
-                VIR_Function_RemoveInstruction(currentFunc, inst);
+                VIR_Pass_RemoveInstruction(currentFunc, inst, &VSC_PARAM_optimization_GetCfgChanged(paramOptimizer));
                 inst = loadInst;
             }
             break;
@@ -620,7 +621,7 @@ VSC_ErrCode _VSC_SIMP_OptimizeCaller(
                         madSrc1 = VIR_Inst_GetSource(inst, VIR_Operand_Src0);
 
                         /*remove MOVA inst.*/
-                        VIR_Function_RemoveInstruction(callerFunc, inst);
+                        VIR_Pass_RemoveInstruction(callerFunc, inst, &VSC_PARAM_optimization_GetCfgChanged(paramOptimizer));
                         break;
                     }
                 }
@@ -717,8 +718,7 @@ VSC_ErrCode _VSC_SIMP_OptimizeCaller(
                     VIR_LOG_FLUSH(paramOptimizer->dumper);
                 }
 
-
-                VIR_Function_RemoveInstruction(callerFunc, inst);
+                VIR_Pass_RemoveInstruction(callerFunc, inst, &VSC_PARAM_optimization_GetCfgChanged(paramOptimizer));
                 inst = storeInst;
                 break;
              }
@@ -758,7 +758,7 @@ VSC_ErrCode _VSC_SIMP_OptimizeCaller(
                         madSrc1 = VIR_Inst_GetSource(inst, VIR_Operand_Src0);
 
                         /*remove MOVA inst.*/
-                        VIR_Function_RemoveInstruction(callerFunc, inst);
+                        VIR_Pass_RemoveInstruction(callerFunc, inst, &VSC_PARAM_optimization_GetCfgChanged(paramOptimizer));
                         break;
                     }
                 }
@@ -847,8 +847,7 @@ VSC_ErrCode _VSC_SIMP_OptimizeCaller(
                     VIR_LOG_FLUSH(paramOptimizer->dumper);
                 }
 
-
-                VIR_Function_RemoveInstruction(callerFunc, inst);
+                VIR_Pass_RemoveInstruction(callerFunc, inst, &VSC_PARAM_optimization_GetCfgChanged(paramOptimizer));
                 inst = loadInst;
                 break;
              }
@@ -1006,7 +1005,7 @@ VSC_ErrCode _VSC_SIMP_OptimizeCaller(
                         VIR_Operand_SetSwizzle(VIR_Inst_GetSource(storeInst, VIR_Operand_Src2),
                                                 VIR_TypeId_Conv2Swizzle(VIR_Operand_GetTypeId(val)));
                     }
-                    VIR_Function_RemoveInstruction(callerFunc, inst);
+                    VIR_Pass_RemoveInstruction(callerFunc, inst, &VSC_PARAM_optimization_GetCfgChanged(paramOptimizer));
                     inst = nextInst;
                 }
                 else
@@ -1060,7 +1059,7 @@ VSC_ErrCode _VSC_SIMP_OptimizeCaller(
                     && destVregIndex < (currentParameter->regStartIndex + currentParameter->paramArraySize)
                     && src0VregIndex == spillMemVRegIndex)
                 {
-                    VIR_Function_RemoveInstruction(callerFunc, inst);
+                    VIR_Pass_RemoveInstruction(callerFunc, inst, &VSC_PARAM_optimization_GetCfgChanged(paramOptimizer));
                     inst = nextInst;
                 }
                 else
@@ -1875,6 +1874,8 @@ VSC_ErrCode VSC_PARAM_Optimization_PerformOnShader(
     VSC_PARAM_optimization_Init(&paramOptimizer, shader, candidateFuncs, longSizeArguments, argMmPtr, pDumper, paramOptsOptions, duInfo);
     errCode = VIR_PARAM_Optimization_PerformOnShader(pPassWorker, &paramOptimizer);
     VSC_PARAM_optimization_Final(&paramOptimizer);
+
+    pPassWorker->pResDestroyReq->s.bInvalidateCfg = VSC_PARAM_optimization_GetCfgChanged(&paramOptimizer);
 
     if (VSC_UTILS_MASK(VSC_OPTN_ParamOptOptions_GetTrace(paramOptsOptions), VSC_OPTN_ParamOptOptions_TRACE_OUTPUT_SHADER) ||
         VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(shader), VIR_Shader_GetId(shader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))

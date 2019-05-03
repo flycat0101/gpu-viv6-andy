@@ -747,24 +747,6 @@ enum
 #define __GLES_PRINT(...)
 #endif
 
-
-#define __GLES3_ZONE_TRACE               (gcvZONE_API_ES30 | (1 << 0))
-#define __GLES3_ZONE_BUFFER              (gcvZONE_API_ES30 | (1 << 1))
-#define __GLES3_ZONE_CLEAR               (gcvZONE_API_ES30 | (1 << 2))
-#define __GLES3_ZONE_CODEC               (gcvZONE_API_ES30 | (1 << 3))
-#define __GLES3_ZONE_CONTEXT             (gcvZONE_API_ES30 | (1 << 4))
-#define __GLES3_ZONE_DEPTH               (gcvZONE_API_ES30 | (1 << 5))
-#define __GLES3_ZONE_DEVICE              (gcvZONE_API_ES30 | (1 << 6))
-#define __GLES3_ZONE_DRAW                (gcvZONE_API_ES30 | (1 << 7))
-#define __GLES3_ZONE_FBO                 (gcvZONE_API_ES30 | (1 << 8))
-#define __GLES3_ZONE_PIXEL               (gcvZONE_API_ES30 | (1 << 9))
-#define __GLES3_ZONE_SHADER              (gcvZONE_API_ES30 | (1 << 10))
-#define __GLES3_ZONE_STATE               (gcvZONE_API_ES30 | (1 << 11))
-#define __GLES3_ZONE_TEXTURE             (gcvZONE_API_ES30 | (1 << 12))
-#define __GLES3_ZONE_UTILS               (gcvZONE_API_ES30 | (1 << 13))
-#define __GLES3_ZONE_PROFILER            (gcvZONE_API_ES30 | (1 << 14))
-#define __GLES3_ZONE_CORE                (gcvZONE_API_ES30 | (1 << 15))
-
 #define __GLES_MAX_FILENAME_LEN 256
 
 

@@ -13,22 +13,29 @@
 
 #include <gc_vx_common.h>
 #include <gc_hal_vx.h>
+
+#define _GC_OBJ_ZONE            gcdZONE_VX_NODE
+
 VX_PRIVATE_API vx_node vxoNode_CreateGeneric(vx_graph graph, vx_kernel kernel)
 {
     vx_uint32 i;
     vx_node node;
+    static vx_uint32 nodeID = 0;
 
+    gcmHEADER_ARG("graph=%p, kernel=%p", graph, kernel);
     vxmASSERT(graph);
 
     if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH))
     {
         vxError("The graph, %p, is invalid", graph);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
     if (!vxoReference_IsValidAndSpecific(&kernel->base, VX_TYPE_KERNEL))
     {
         vxError("The kernel, %p, is invalid", kernel);
+        gcmFOOTER_NO();
         return (vx_node)vxoContext_GetErrorObject(graph->base.context, VX_ERROR_INVALID_REFERENCE);
     }
 
@@ -44,7 +51,7 @@ VX_PRIVATE_API vx_node vxoNode_CreateGeneric(vx_graph graph, vx_kernel kernel)
         vxReleaseMutex(graph->base.lock);
 
         vxError("Too many nodes");
-
+        gcmFOOTER_NO();
         return (vx_node)vxoContext_GetErrorObject(graph->base.context, VX_ERROR_NO_RESOURCES);
     }
 
@@ -53,7 +60,7 @@ VX_PRIVATE_API vx_node vxoNode_CreateGeneric(vx_graph graph, vx_kernel kernel)
     if (vxoReference_GetStatus((vx_reference)node) != VX_SUCCESS)
     {
         vxReleaseMutex(graph->base.lock);
-
+        gcmFOOTER_NO();
         return node;
     }
 
@@ -77,6 +84,8 @@ VX_PRIVATE_API vx_node vxoNode_CreateGeneric(vx_graph graph, vx_kernel kernel)
     /* Add the node ref from the graph */
     vxoReference_Increment(&node->base, VX_REF_INTERNAL);
 
+    node->nodeID = nodeID++;
+
     graph->nodeCount++;
 
     vxoPerf_Initialize(&graph->nodeTable[i]->perf);
@@ -90,7 +99,7 @@ VX_PRIVATE_API vx_node vxoNode_CreateGeneric(vx_graph graph, vx_kernel kernel)
     vxReleaseMutex(graph->base.lock);
 
     vxoNode_Dump(node);
-
+    gcmFOOTER_NO();
     return node;
 }
 
@@ -100,24 +109,32 @@ VX_INTERNAL_API vx_node vxoNode_CreateSpecific(
     vx_kernel   kernel;
     vx_node     node;
     vx_uint32   index;
-    static vx_uint32 nodeID = 0;
+
+    gcmHEADER_ARG("graph=%p, kernelEnum=0x%x, parameters=%p, paramCount=0x%x", graph, kernelEnum, parameters, paramCount);
 
     if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH))
     {
         vxError("The graph, %p, is invalid", graph);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
     kernel = vxoKernel_GetByEnum(graph->base.context, kernelEnum);
 
-    if (vxoReference_GetStatus((vx_reference)kernel) != VX_SUCCESS) return (vx_node)kernel;
-
+    if (vxoReference_GetStatus((vx_reference)kernel) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)kernel;
+    }
     node = vxoNode_CreateGeneric(graph, kernel);
 
     node->numParameters = paramCount;
 
-    if (vxoReference_GetStatus((vx_reference)node) != VX_SUCCESS) return node;
-
+    if (vxoReference_GetStatus((vx_reference)node) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return node;
+    }
     for (index = 0; index < paramCount; index++)
     {
         vx_status status = vxoNode_SetParameter(node, index, parameters[index]);
@@ -125,19 +142,22 @@ VX_INTERNAL_API vx_node vxoNode_CreateSpecific(
         if (status != VX_SUCCESS)
         {
             vxoNode_Release(&node);
+            gcmFOOTER_NO();
             return (vx_node)vxoContext_GetErrorObject(graph->base.context, status);
         }
     }
 
-    node->nodeID = nodeID++;
     vxoKernel_ExternalRelease(&kernel);
-
+    gcmFOOTER_NO();
     return node;
 }
 
 VX_INTERNAL_API vx_bool vxoNode_CheckF32Support(vx_node node)
 {
-    return vx_false_e;
+    return
+        !(node->base.context->nnConfig.fixedFeature.nnCoreCount > 0 ||
+            node->base.context->nnConfig.fixedFeature.tpCoreCount > 0 ||
+            node->base.context->evisNoInst.supportEVIS);
 }
 
 VX_INTERNAL_API vx_status vxoNode_ConvertDims(vx_uint32_ptr dims, vx_uint32_ptr org_dims, vx_uint32 count, vx_bool dimsto4)
@@ -190,9 +210,13 @@ VX_INTERNAL_API vx_bool vxoNode_Adapter(vx_graph graph, vx_node node, vx_uint32 
     vx_context context = vxGetContext((vx_reference)graph);
     vx_reference ref = node->paramTable[index];
     vx_tensor tensor = VX_NULL;
+    gcmHEADER_ARG("graph=%p, node=%p, index=0x%x", graph, node, index);
 
     if (ref == VX_NULL || node->kernel->enumeration == VX_KERNEL_INTERNAL_ADAPTER)
+    {
+        gcmFOOTER_NO();
         return vx_false_e;
+    }
 
     if (ref->type == VX_TYPE_OBJECT_ARRAY)
     {
@@ -212,12 +236,14 @@ VX_INTERNAL_API vx_bool vxoNode_Adapter(vx_graph graph, vx_node node, vx_uint32 
         {
             vx_enum format = TENSOR_DATA_TYPE(tensor);
 
-            if ((TENSOR_RANK(tensor) == VX_TENSOR_RANK_CWHN) || ((format == VX_TYPE_FLOAT32) && !vxoNode_CheckF32Support(node)))
+           vx_bool only_support_f32 = vxoNode_CheckF32Support(node);
+
+            if ((TENSOR_RANK(tensor) == VX_TENSOR_RANK_CWHN) || ((format == VX_TYPE_FLOAT32) && !only_support_f32))
             {
                 vx_uint32 dims[VX_CONTEXT_TENSOR_MAX_DIMENSION] = { 0 };
                 vx_enum rank = VX_TENSOR_RANK_WHCN;
 
-                vx_tensor_create_params_t param = { tensor->dimCount, tensor->dims, VX_TYPE_FLOAT16};
+                vx_tensor_create_params_t param = { tensor->dimCount, tensor->dims, VX_TYPE_FLOAT32};
                 vx_tensor virt_tensor = VX_NULL;
                 vx_enum type = VX_ADAPTER_F32_TO_F16;
                 vx_node convert = VX_NULL;
@@ -228,6 +254,9 @@ VX_INTERNAL_API vx_bool vxoNode_Adapter(vx_graph graph, vx_node node, vx_uint32 
                 };
                 vx_bool instatic = node->kernel->signature.isStaticTable[index] ||
                                    TENSOR_DATA_LIFETIME(tensor) == VX_TENSOR_LIFE_TIME_STATIC ? vx_true_e : vx_false_e;
+
+                if(!vxoNode_CheckF32Support(node))
+                    param.data_format = VX_TYPE_FLOAT16;
 
                 if (format == VX_TYPE_UINT8)
                 {
@@ -258,7 +287,7 @@ VX_INTERNAL_API vx_bool vxoNode_Adapter(vx_graph graph, vx_node node, vx_uint32 
 
                         vxSetTensorAttribute(virt_tensor, VX_TENSOR_RANK, &rank, sizeof(vx_enum));
                     }
-                    else if ((format == VX_TYPE_FLOAT32) && (TENSOR_PRECISION(tensor) == VX_TENSOR_PRECISION_AUTO))
+                    else if ((format == VX_TYPE_FLOAT32) && (TENSOR_PRECISION(tensor) == VX_TENSOR_PRECISION_AUTO) && !only_support_f32)
                     {
                         type = VX_ADAPTER_F32_TO_F16;
 
@@ -268,8 +297,10 @@ VX_INTERNAL_API vx_bool vxoNode_Adapter(vx_graph graph, vx_node node, vx_uint32 
                         vxSetTensorAttribute(virt_tensor, VX_TENSOR_RANK, &TENSOR_RANK(tensor), sizeof(vx_enum));
                     }
                     else
+                    {
+                        gcmFOOTER_NO();
                         return vx_false_e;
-
+                    }
                     vxSetTensorAttribute(virt_tensor, VX_TENSOR_LIFETIME, &TENSOR_DATA_LIFETIME(tensor), sizeof(vx_enum));
 
 
@@ -294,16 +325,17 @@ VX_INTERNAL_API vx_bool vxoNode_Adapter(vx_graph graph, vx_node node, vx_uint32 
 
                         vxSetTensorAttribute(virt_tensor, VX_TENSOR_RANK, &rank, sizeof(vx_enum));
                     }
-                    else if (format == VX_TYPE_FLOAT32 && (TENSOR_PRECISION(tensor) == VX_TENSOR_PRECISION_AUTO))
+                    else if (format == VX_TYPE_FLOAT32 && (TENSOR_PRECISION(tensor) == VX_TENSOR_PRECISION_AUTO) && !only_support_f32)
                     {
                         type = VX_ADAPTER_F16_TO_F32;
                         virt_tensor = vxoTensor_CreateVirtualTensor2(graph, &param, sizeof(vx_tensor_create_params_t));
 
                         vxSetTensorAttribute(virt_tensor, VX_TENSOR_RANK, &TENSOR_RANK(tensor), sizeof(vx_enum));
                     }
-                    else
+                    else{
+                        gcmFOOTER_NO();
                         return vx_false_e;
-
+                    }
                     vxSetTensorAttribute(virt_tensor, VX_TENSOR_LIFETIME, &TENSOR_DATA_LIFETIME(tensor), sizeof(vx_enum));
 
                     parameters[0] = (vx_reference)virt_tensor;
@@ -334,6 +366,7 @@ VX_INTERNAL_API vx_bool vxoNode_Adapter(vx_graph graph, vx_node node, vx_uint32 
                     convert = vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_ADAPTER, parameters, vxmLENGTH_OF(parameters));
                     if (vxoReference_GetStatus((vx_reference)convert) != VX_SUCCESS)
                     {
+                        gcmFOOTER_NO();
                         return vx_false_e;
                     }
                 }
@@ -344,16 +377,20 @@ VX_INTERNAL_API vx_bool vxoNode_Adapter(vx_graph graph, vx_node node, vx_uint32 
                 if (ref->type == VX_TYPE_OBJECT_ARRAY)
                 {
                     ((vx_object_array)ref)->itemsTable[i] = (vx_reference)virt_tensor;
+                    vxoReference_Increment(&virt_tensor->base, VX_REF_INTERNAL);
                 }
                 else
                     vxoNode_SetParameter(node, index, (vx_reference)virt_tensor);
 
-                vxoTensor_ReleaseTensor(&virt_tensor);
+                if(virt_tensor != VX_NULL)
+                    vxoTensor_ReleaseTensor(&virt_tensor);
+
                 vxReleaseScalar((vx_scalar*)&parameters[1]);
                 opt = vx_true_e;
             }
         }
     }
+    gcmFOOTER_NO();
     return opt;
 }
 
@@ -381,7 +418,7 @@ VX_INTERNAL_CALLBACK_API void vxoNode_Destructor(vx_reference ref)
     vx_uint32 i;
     vx_node node = (vx_node)ref;
     vx_status status;
-
+    gcmHEADER_ARG("ref=%p", ref);
     vxmASSERT(vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE));
     vxmASSERT(node->kernel);
 
@@ -481,19 +518,24 @@ VX_INTERNAL_CALLBACK_API void vxoNode_Destructor(vx_reference ref)
 
         gcoOS_Free(gcvNULL, node->uniforms);
     }
+    gcmFOOTER_NO();
 }
 
 VX_INTERNAL_API void vxoNode_RemoveFromGraph(vx_node_ptr nodePtr)
 {
     vx_node node;
     vx_graph graph;
+    gcmHEADER_ARG("nodePtr=%p", nodePtr);
 
     vxmASSERT(nodePtr);
 
     node = *nodePtr;
 
-    if (node == VX_NULL) return;
-
+    if (node == VX_NULL)
+    {
+        gcmFOOTER_NO();
+        return;
+    }
     if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) goto Exit;
 
     graph = node->graph;
@@ -535,7 +577,7 @@ VX_INTERNAL_API void vxoNode_RemoveFromGraph(vx_node_ptr nodePtr)
             /* Release the internal ref count of the node from the graph */
             vxoReference_Release((vx_reference_ptr)&node, VX_TYPE_NODE, VX_REF_INTERNAL);
         }
-
+        gcmFOOTER_NO();
         return;
     }
 
@@ -548,20 +590,31 @@ VX_PRIVATE_API vx_status vxoNode_Remove(vx_node *nodePtr)
     vx_status status = VX_FAILURE;
     vx_node node;
 
-    if (nodePtr == VX_NULL) return status;
+    gcmHEADER_ARG("nodePtr=%p", nodePtr);
 
+    if (nodePtr == VX_NULL) {
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
     node = *nodePtr;
 
     *nodePtr = VX_NULL;
 
-    if (node == VX_NULL) return status;
-
-    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) return status;
-
+    if (node == VX_NULL)
+    {
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
+    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE))
+    {
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
     vxoNode_RemoveFromGraph(&node);
 
     status = vxoReference_Release((vx_reference_ptr)&node, VX_TYPE_NODE, VX_REF_EXTERNAL);
 
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -571,27 +624,47 @@ VX_PRIVATE_API vx_status vxoNode_Remove(vx_node *nodePtr)
 VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx_reference value)
 {
     vx_type_e type;
+    gcmHEADER_ARG("node=%p, index=0x%x, value=%p", node, index, value);
 
-    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) return VX_ERROR_INVALID_REFERENCE;
-
-    if (node->kernel == VX_NULL) return VX_ERROR_INVALID_NODE;
-
+    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+    if (node->kernel == VX_NULL)
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_NODE;
+    }
     if (index >= node->kernel->signature.paramCount || index >= VX_MAX_PARAMETERS)
     {
+        gcmFOOTER_NO();
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
     if (node->kernel->signature.stateTable[index] == VX_PARAMETER_STATE_OPTIONAL)
     {
-        if (value == VX_NULL) return VX_SUCCESS;
+        if (value == VX_NULL)
+        {
+            gcmFOOTER_NO();
+            return VX_SUCCESS;
+        }
     }
     else
     {
-        if (value == VX_NULL) return VX_ERROR_INVALID_REFERENCE;
+        if (value == VX_NULL)
+        {
+
+            gcmFOOTER_NO();
+            return VX_ERROR_INVALID_REFERENCE;
+
+        }
     }
-
-    if (!vxoReference_IsValidAndNoncontext((vx_reference_s *)value)) return VX_ERROR_INVALID_VALUE;
-
+    if (!vxoReference_IsValidAndNoncontext((vx_reference_s *)value))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_VALUE;
+    }
     type = vxoReference_GetType(value);
 
     if (node->kernel->signature.dataTypeTable[index] != type)
@@ -600,6 +673,7 @@ VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx
         {
             if (!VX_TYPE_IS_DATA_OBJECT(type))
             {
+                gcmFOOTER_NO();
                 return VX_ERROR_INVALID_TYPE;
             }
         }
@@ -609,17 +683,20 @@ VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx
 
             if (node->kernel->signature.dataTypeTable[index] != dataType)
             {
+                gcmFOOTER_NO();
                 return VX_ERROR_INVALID_TYPE;
             }
         }
         else
         {
+            gcmFOOTER_NO();
             return VX_ERROR_INVALID_TYPE;
         }
     }
 
     if (node->graph->verified &&
-        (node->numParents || node->kernel->signature.directionTable[index] != VX_INPUT || !node->kernel->kernelShader))
+        (node->kernel->signature.directionTable[index] != VX_INPUT || !node->kernel->kernelShader) &&
+        (node->kernel->enumeration != VX_KERNEL_IMPORT_FROM_FILE))
     {
         /* Only VXC header node support change INPUT parameters without re-verify */
         node->graph->reverify = vx_true_e;
@@ -628,14 +705,22 @@ VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx
 
     if (node->paramTable[index] != VX_NULL && node->paramTable[index]->delay != VX_NULL)
     {
-        if (!vxoParameterValue_UnbindFromDelay(node->paramTable[index], node, index)) return VX_ERROR_INVALID_REFERENCE;
-    }
+        if (!vxoParameterValue_UnbindFromDelay(node->paramTable[index], node, index))
+        {
+            gcmFOOTER_NO();
+            return VX_ERROR_INVALID_REFERENCE;
 
+        }
+    }
     if (value->delay != VX_NULL)
     {
-        if (!vxoParameterValue_BindToDelay(value, node, index)) return VX_ERROR_INVALID_REFERENCE;
-    }
+        if (!vxoParameterValue_BindToDelay(value, node, index))
+        {
+            gcmFOOTER_NO();
+            return VX_ERROR_INVALID_REFERENCE;
 
+        }
+    }
     if (node->paramTable[index] != VX_NULL)
     {
         vxoReference_Release(&node->paramTable[index], node->paramTable[index]->type, VX_REF_INTERNAL);
@@ -709,32 +794,57 @@ VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx
         }
     }
 
+    /* update binary graph node parameters to support multiple input/output buffers
+       this is for importing binary graph */
+    if (node->kernel->enumeration == VX_KERNEL_IMPORT_FROM_FILE)
+    {
+        vxoGraphBinary_SetParameter(node, index);
+    }
+
+    /* update binary graph input/output table if user set parameter again
+      this is for generating binary graph */
+    if (1 == node->base.context->options.enableSaveBinary)
+    {
+        vxoGraphBinary_UpdataIOPhsicalTable(node, index);
+    }
+
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 
 OnError:
+    gcmFOOTER_ARG("%d", VX_ERROR_NO_RESOURCES);
     return VX_ERROR_NO_RESOURCES;
 }
 
 VX_INTERNAL_API vx_parameter vxoNode_GetParameter(vx_node node, vx_uint32 index)
 {
     vx_parameter parameter;
+    gcmHEADER_ARG("node=%p, index=0x%x", node, index);
 
-    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) return VX_NULL;
-
+    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (node->kernel == VX_NULL)
     {
+        gcmFOOTER_NO();
         return (vx_parameter)vxoContext_GetErrorObject(node->base.context, VX_ERROR_INVALID_NODE);
     }
 
     if (index >= VX_MAX_PARAMETERS || index >= node->kernel->signature.paramCount)
     {
+        gcmFOOTER_NO();
         return (vx_parameter)vxoContext_GetErrorObject(node->base.context, VX_ERROR_INVALID_PARAMETERS);
     }
 
     parameter = (vx_parameter)vxoReference_Create(node->base.context, VX_TYPE_PARAMETER, VX_REF_EXTERNAL, &node->base);
 
-    if (vxoReference_GetStatus((vx_reference)parameter) != VX_SUCCESS) return parameter;
-
+    if (vxoReference_GetStatus((vx_reference)parameter) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return parameter;
+    }
     parameter->index    = index;
 
     parameter->node     = node;
@@ -745,13 +855,19 @@ VX_INTERNAL_API vx_parameter vxoNode_GetParameter(vx_node node, vx_uint32 index)
     /* Add the ref count of the kernel from the parameter */
     vxoReference_Increment(&parameter->kernel->base, VX_REF_INTERNAL);
 
+    gcmFOOTER_NO();
     return parameter;
 }
 
 VX_INTERNAL_API vx_status vxoNode_SetChildGraph(vx_node node, vx_graph graph)
 {
-    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) return VX_ERROR_INVALID_NODE;
+    gcmHEADER_ARG("node=%p, graph=%p", node, graph);
 
+    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_NODE;
+    }
     if (graph == VX_NULL)
     {
         if (node->childGraph != VX_NULL)
@@ -768,11 +884,15 @@ VX_INTERNAL_API vx_status vxoNode_SetChildGraph(vx_node node, vx_graph graph)
         vx_uint32 paramIndex;
         vx_signature signature1 = &node->kernel->signature;
 
-        if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_ERROR_INVALID_GRAPH;
-
+        if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH))
+        {
+            gcmFOOTER_NO();
+            return VX_ERROR_INVALID_GRAPH;
+        }
         if (graph->paramCount == 0)
         {
             vxError("The child graph %p has no parameter", graph);
+            gcmFOOTER_NO();
             return VX_ERROR_INVALID_GRAPH;
         }
 
@@ -798,6 +918,7 @@ VX_INTERNAL_API vx_status vxoNode_SetChildGraph(vx_node node, vx_graph graph)
                 {
                     vxError("No.%d parameter of the child graph %p does not match the parameter of node %p",
                             paramIndex, graph, node);
+                    gcmFOOTER_NO();
                     return VX_ERROR_INVALID_GRAPH;
                 }
             }
@@ -815,7 +936,7 @@ VX_INTERNAL_API vx_status vxoNode_SetChildGraph(vx_node node, vx_graph graph)
 
         vxoReference_Increment(&graph->base, VX_REF_INTERNAL);
     }
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -829,7 +950,7 @@ VX_INTERNAL_API vx_graph vxoNode_GetChildGraph(vx_node node)
 VX_PRIVATE_API void vxoNode_SetVirtualAccessible(vx_node node, vx_bool accessible)
 {
     vx_uint32 paramIndex;
-
+    gcmHEADER_ARG("node=%p, accessible=0x%x", node, accessible);
     vxmASSERT(node);
 
     for (paramIndex = 0; paramIndex < node->kernel->signature.paramCount; paramIndex++)
@@ -840,6 +961,7 @@ VX_PRIVATE_API void vxoNode_SetVirtualAccessible(vx_node node, vx_bool accessibl
 
         if (paramRef->isVirtual) paramRef->accessible = accessible;
     }
+    gcmFOOTER_NO();
 }
 
 VX_INTERNAL_API void vxoNode_EnableVirtualAccessible(vx_node node)
@@ -857,15 +979,20 @@ VX_INTERNAL_API vx_status vxoNode_Record(vx_node node)
     gctPOINTER CmdBuffer = NULL;
     gctUINT32  CmdSizeBytes = 0;
     gceSTATUS gcStatus = gcvSTATUS_OK;
+    gcmHEADER_ARG("node=%p", node);
 
     if (!node->kernelAttributes.isAllGPU)
+    {
+        gcmFOOTER_NO();
         return VX_ERROR_NOT_IMPLEMENTED;
-
+    }
     gcStatus = gcoVX_Commit(gcvFALSE, gcvFALSE, &CmdBuffer, &CmdSizeBytes);
 
     if (gcStatus != gcvSTATUS_OK)
+    {
+        gcmFOOTER_NO();
         return VX_FAILURE;
-
+    }
     if (CmdSizeBytes > 0 && CmdBuffer)
     {
         if (node->cmdBuffer && (node->cmdSizeBytes < CmdSizeBytes))
@@ -888,7 +1015,7 @@ VX_INTERNAL_API vx_status vxoNode_Record(vx_node node)
     /*gcStatus = gcoVX_Commit(gcvFALSE, gcvFALSE, NULL, NULL);
     if (gcStatus != gcvSTATUS_OK)
         return VX_FAILURE;*/
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -896,13 +1023,19 @@ VX_INTERNAL_API vx_status vxoNode_Record(vx_node node)
 VX_INTERNAL_API vx_status vxoNode_Replay(vx_node node)
 {
     gceSTATUS gcStatus = gcvSTATUS_OK;
+    gcmHEADER_ARG("node=%p", node);
 
-    if (!node->kernelAttributes.isAllGPU)
+    if (!node->kernelAttributes.isAllGPU){
 
+        gcmFOOTER_NO();
         return VX_ERROR_NOT_IMPLEMENTED;
+    }
 
     if ((node->cmdBuffer == NULL) || (node->cmdSizeBytes == 0))
+    {
+        gcmFOOTER_NO();
         return VX_FAILURE;
+    }
 
     vxoPerf_Begin(&node->perf);
 
@@ -910,6 +1043,7 @@ VX_INTERNAL_API vx_status vxoNode_Replay(vx_node node)
 
     if (gcStatus != gcvSTATUS_OK)
     {
+        gcmFOOTER_NO();
         return VX_FAILURE;
     }
 
@@ -917,7 +1051,10 @@ VX_INTERNAL_API vx_status vxoNode_Replay(vx_node node)
 
 
     if (gcStatus != gcvSTATUS_OK)
+    {
+        gcmFOOTER_NO();
         return VX_FAILURE;
+    }
 
 #if gcdDUMP
     vxoDumpOutput(node, node->paramTable, node->kernel->signature.paramCount);
@@ -926,7 +1063,7 @@ VX_INTERNAL_API vx_status vxoNode_Replay(vx_node node)
     node->executed = vx_true_e;
     node->status = VX_SUCCESS;
     vxoPerf_End(&node->perf);
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -936,6 +1073,7 @@ VX_INTERNAL_API vx_status vxoNode_Release(vx_node_ptr nodePtr)
 {
     gctUINT32 gpuCount = 1;
     vx_status status = VX_SUCCESS;
+    gcmHEADER_ARG("nodePtr=%p", nodePtr);
 
     gcoVX_GetHWConfigGpuCount(&gpuCount);
     if (gpuCount > 1)
@@ -944,6 +1082,8 @@ VX_INTERNAL_API vx_status vxoNode_Release(vx_node_ptr nodePtr)
         status |= vxoMultiGpu_FreeMemory(*nodePtr);
     }
     status |= vxoReference_Release((vx_reference_ptr)nodePtr, VX_TYPE_NODE, VX_REF_EXTERNAL);
+
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -984,10 +1124,14 @@ VX_API_ENTRY vx_node VX_API_CALL vxCreateGenericNode(vx_graph graph, vx_kernel k
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryNode(vx_node node, vx_enum attribute, void *ptr, vx_size size)
 {
+    gcmHEADER_ARG("node=%p, attribute=0x%x, size=0x%lx", node, attribute, size);
     gcmDUMP_API("$VX vxQueryNode: node=%p, attribute=0x%x, size=0x%lx", node, attribute, size);
 
-    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     switch (attribute)
     {
         case VX_NODE_PERFORMANCE:
@@ -1077,23 +1221,27 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryNode(vx_node node, vx_enum attribute, 
 
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
+            gcmFOOTER_NO();
             return VX_ERROR_NOT_SUPPORTED;
     }
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxSetNodeAttribute(vx_node node, vx_enum attribute, const void *ptr, vx_size size)
 {
+    gcmHEADER_ARG("node=%p, attribute=0x%x, ptr=%p, size=0x%lx", node, attribute, ptr, size);
     gcmDUMP_API("$VX vxSetNodeAttribute: node=%p, attribute=0x%x, ptr=%p, size=0x%lx", node, attribute, ptr, size);
 
     if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE))
     {
+        gcmFOOTER_NO();
         return VX_ERROR_INVALID_REFERENCE;
     }
 
     if (node->graph->verified == vx_true_e)
     {
+        gcmFOOTER_NO();
         return VX_ERROR_NOT_SUPPORTED;
     }
 
@@ -1102,7 +1250,10 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetNodeAttribute(vx_node node, vx_enum attr
         case VX_NODE_LOCAL_DATA_SIZE:
 
             if (!node->localDataChangeIsEnabled)
+            {
+                gcmFOOTER_NO();
                 return VX_ERROR_NOT_SUPPORTED;
+            }
 
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
@@ -1114,8 +1265,10 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetNodeAttribute(vx_node node, vx_enum attr
         case VX_NODE_LOCAL_DATA_PTR:
 
             if (!node->localDataChangeIsEnabled)
+            {
+                gcmFOOTER_NO();
                 return VX_ERROR_NOT_SUPPORTED;
-
+            }
             vxmVALIDATE_PARAMETERS(ptr, size, vx_ptr, 0x3);
 
             node->kernelAttributes.localDataPtr = *(vx_ptr *)ptr;
@@ -1130,6 +1283,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetNodeAttribute(vx_node node, vx_enum attr
 #ifdef OPENVX_KHR_TILING
             if (node->kernelAttributes.borderMode.mode == VX_BORDER_MODE_SELF)
             {
+                gcmFOOTER_NO();
                 return VX_ERROR_INVALID_VALUE;
             }
 #endif
@@ -1146,9 +1300,10 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetNodeAttribute(vx_node node, vx_enum attr
 
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
+            gcmFOOTER_NO();
             return VX_ERROR_NOT_SUPPORTED;
     }
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -1159,13 +1314,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxReplicateNode(vx_graph graph, vx_node first
     vx_uint32 numParams = 0;
     vx_size   num_of_replicas = 0;
     vx_status status = VX_SUCCESS;
-
+    gcmHEADER_ARG("graph=%p, first_node=%p, replicate=%p, number_of_parameters=0x%x", graph, first_node, replicate, number_of_parameters);
     gcmDUMP_API("$VX vxReplicateNode: graph=%p, first_node=%p, replicate=%p, number_of_parameters=0x%x", graph, first_node, replicate, number_of_parameters);
 
     if (vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH) != vx_true_e)
     {
         vxError("Graph %p was invalid!\n", graph);
         vxAddLogEntry((vx_reference)graph, VX_ERROR_INVALID_REFERENCE, "Graph %p as invalid!\n", graph);
+        gcmFOOTER_NO();
         return VX_ERROR_INVALID_REFERENCE;
     }
 
@@ -1173,25 +1329,36 @@ VX_API_ENTRY vx_status VX_API_CALL vxReplicateNode(vx_graph graph, vx_node first
     {
         vxError("Node %p was invalid!\n", first_node);
         vxAddLogEntry((vx_reference)first_node, VX_ERROR_INVALID_REFERENCE, "Node %p as invalid!\n", first_node);
+        gcmFOOTER_NO();
         return VX_ERROR_INVALID_REFERENCE;
     }
 
     if (first_node->graph != graph)
+    {
+        gcmFOOTER_NO();
         return VX_FAILURE;
+    }
 
     if (replicate == NULL)
+    {
+        gcmFOOTER_NO();
         return VX_ERROR_INVALID_PARAMETERS;
-
+    }
     /* validate replicated params */
     status = vxQueryNode(first_node, VX_NODE_PARAMETERS, &numParams, sizeof(numParams));
     if (VX_SUCCESS == status)
     {
         if (numParams != number_of_parameters)
+        {
+            gcmFOOTER_ARG("%d", status);
             return VX_ERROR_INVALID_PARAMETERS;
+        }
     }
     else
+    {
+        gcmFOOTER_ARG("%d", status);
         return status;
-
+    }
     for (p = 0; p < number_of_parameters; p++)
     {
         vx_parameter param = 0;
@@ -1209,8 +1376,10 @@ VX_API_ENTRY vx_status VX_API_CALL vxReplicateNode(vx_graph graph, vx_node first
 
 
         if (replicate[p] == vx_false_e && (dir == VX_OUTPUT || dir == VX_BIDIRECTIONAL))
+        {
+            gcmFOOTER_NO();
             return VX_FAILURE;
-
+        }
         if (replicate[p] == vx_true_e)
         {
             if (vxoReference_IsValidAndSpecific(ref, (vx_type_e)type) == vx_true_e)
@@ -1228,16 +1397,24 @@ VX_API_ENTRY vx_status VX_API_CALL vxReplicateNode(vx_graph graph, vx_node first
                     vxQueryObjectArray(object_array, VX_OBJECT_ARRAY_NUMITEMS, &levels, sizeof(vx_size));
                 }
                 else
+                {
+                    gcmFOOTER_NO();
                     return VX_FAILURE;
-
+                }
                 if (num_of_replicas == 0)
                     num_of_replicas = levels;
 
                 if (num_of_replicas != 0 && levels != num_of_replicas)
+                {
+                    gcmFOOTER_NO();
                     return VX_FAILURE;
+                }
             }
             else
+            {
+                gcmFOOTER_NO();
                 return VX_FAILURE;
+            }
         }
 
         vxReleaseReference(&ref);
@@ -1251,7 +1428,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxReplicateNode(vx_graph graph, vx_node first
     {
         first_node->replicated_flags[n] = replicate[n];
     }
-
+    gcmFOOTER_NO();
     return status;
 }
 
@@ -1270,6 +1447,7 @@ VX_API_ENTRY vx_status  VX_API_CALL vxRemoveNode(vx_node *node)
 
 VX_API_ENTRY vx_status VX_API_CALL vxAssignNodeCallback(vx_node node, vx_nodecomplete_f callback)
 {
+    gcmHEADER_ARG("node=%p, callback=0x%x", node, callback);
     gcmDUMP_API("$VX vxAssignNodeCallback: node=%p, callback=0x%x", node, callback);
 
     if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) return VX_ERROR_INVALID_REFERENCE;
@@ -1278,10 +1456,12 @@ VX_API_ENTRY vx_status VX_API_CALL vxAssignNodeCallback(vx_node node, vx_nodecom
     {
         vxError("Can't re-assign the existing callback, %p, of the node, %p, to the new one, %p",
                 node->completeCallback, node, callback);
+        gcmFOOTER_NO();
         return VX_ERROR_NOT_SUPPORTED;
     }
 
     node->completeCallback = callback;
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -1317,10 +1497,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxChooseKernelVariant(vx_node node, vx_char v
     vx_status   status;
     vx_uint32   kernelIndex;
 
+    gcmHEADER_ARG("node=%p, variantName=%s", node, variantName);
     gcmDUMP_API("$VX vxChooseKernelVariant: node=%p, variantName=%s", node, variantName);
 
-    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     target = &node->base.context->targetTable[node->targetIndex];
 
     gcoOS_StrDup(gcvNULL, node->kernel->name, &kernelName);
@@ -1332,14 +1516,17 @@ VX_API_ENTRY vx_status VX_API_CALL vxChooseKernelVariant(vx_node node, vx_char v
 
     gcoOS_Free(gcvNULL, kernelName);
 
-    if (status != VX_SUCCESS) return status;
-
+    if (status != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
     vxoReference_Decrement(&node->kernel->base, VX_REF_INTERNAL);
 
     node->kernel = &target->kernelTable[kernelIndex];
 
     vxoReference_Increment(&node->kernel->base, VX_REF_INTERNAL);
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 #endif
@@ -1351,10 +1538,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetNodeTarget(vx_node node, vx_enum target_
     vx_status status = VX_ERROR_INVALID_REFERENCE;
     vx_uint32 index, targetIndex = 0;
 
+    gcmHEADER_ARG("node=%p, target_enum=0x%x, target_string=%s", node, target_enum, target_string);
     gcmDUMP_API("$VX vxSetNodeTarget: node=%p, target_enum=0x%x, target_string=%s", node, target_enum, target_string);
 
-    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) return VX_ERROR_INVALID_NODE;
-
+    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE))
+    {
+        gcmFOOTER_ARG("%d", status);
+        return VX_ERROR_INVALID_NODE;
+    }
     context = vxGetContext((vx_reference)node);
 
     for (index = 0; index < context->targetCount; index++)
@@ -1398,7 +1589,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetNodeTarget(vx_node node, vx_enum target_
     {
         status = VX_ERROR_NOT_SUPPORTED;
     }
-
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -1508,65 +1699,18 @@ VX_INTERNAL_API void vxoNode_getInfoFromFCNode(vx_node FCnode, vx_uint32 *pad, v
         *rounding = (vx_uint32)SCALAR_VALUE(FCnode->paramTable[6], u32);
         *down_scale_round = (vx_uint32)SCALAR_VALUE(FCnode->paramTable[7], u32);
     }
-}
-
-VX_INTERNAL_API vx_node vxoNode_TransferFC2FCRelu(vx_node FCnode)
-{
-    vx_node     FCReluNode = VX_NULL;
-    vx_uint32   pad;
-    vx_uint8    acc;
-    vx_uint32   rounding, overflow, down_scale_round;
-    vx_tensor   input = (vx_tensor)FCnode->paramTable[0];
-    vx_tensor   weight = (vx_tensor)FCnode->paramTable[1];
-    vx_tensor   bias   = (vx_tensor)FCnode->paramTable[2];
-    vx_tensor   output = (vx_tensor)FCnode->paramTable[FCnode->numParameters - 1];
-
-    vxoNode_getInfoFromFCNode(FCnode, &pad, &acc, &rounding, &overflow, &down_scale_round);
+    else if(FCnode->kernel->enumeration == VX_KERNEL_NN_FULLY_CONNECTED_RELU_LAYER)
     {
-        vx_uint32 padValue = 0;
-        vx_scalar padConst = vxCreateScalar(((vx_reference)FCnode)->context, VX_TYPE_UINT32, &padValue);
-        vx_nn_convolution_relu_pooling_params_ext2_t params = {
-                {
-                        { 0, 0,
-                          pad, pad, pad, pad, acc, overflow,
-                          rounding, down_scale_round,
-                          vx_false_e, 0, 0, 0, VX_PAD_CONSTANT, padConst},
-                        1, 1
-                },
-                0,
-                TENSOR_RANK(input),
-                TENSOR_DATA_TYPE(output)
-        };
-
-        vx_weights_biases_parameter_optimizations_t opt = { -1, TENSOR_DATA_TYPE(output), TENSOR_TF_ZEROPOINT(input)};
-
-        vx_weights_biases_parameter weights_biases = vxCreateWeightsBiasesParameterFromTensors2(
-            VX_NN_FULLYCONNECTED_LAYER,
-            TENSOR_DIM_NUM(weight),
-            TENSOR_SIZES(input),
-            TENSOR_SIZES(output),
-            TENSOR_SIZES(output),
-            params.convert_dst_format,
-            (vx_nn_convolution_relu_pooling_params)&params,
-            sizeof(vx_nn_convolution_relu_pooling_params_ext2_t),
-            &opt,
-            weight,
-            bias);
-
-        FCReluNode = vxFullyConnectedReluLayer(FCnode->graph, input, weights_biases,
-            pad,
-            acc,
-            overflow,
-            rounding,
-            down_scale_round,
-            vx_false_e,
-            output
-        );
-
-        vxReleaseScalar(&padConst);
-        vxReleaseWeightsBiasesParameter(&weights_biases);
+        *pad = (vx_uint32)SCALAR_VALUE(FCnode->paramTable[2], u32);
+        *acc = (vx_uint8)SCALAR_VALUE(FCnode->paramTable[3], u8);
+        *overflow = (vx_uint32)SCALAR_VALUE(FCnode->paramTable[4], u32);
+        *rounding = (vx_uint32)SCALAR_VALUE(FCnode->paramTable[5], u32);
+        *down_scale_round = (vx_uint32)SCALAR_VALUE(FCnode->paramTable[6], u32);
     }
-    return FCReluNode;
+    else{
+        vxError("it is not fc node");
+        assert(0);
+    }
 }
 
 VX_INTERNAL_API vx_status vxoNode_setTensorVxcOptimize(vx_node node)

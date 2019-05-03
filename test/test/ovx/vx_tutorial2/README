@@ -1,5 +1,4 @@
-store test_gray.bmp and vx_tutorial2 in the same directory
-
-go to that directory and execute vx_tutiral2 without any parameters
-
-if everything goes well, a test_out.bmp will be generated in current folder
+This case is very similar to the vx_tutorial1, the only difference is that more than one node(five node) are added in the graph.
+The five node are Gaussian3x3 -> Sobel3x3 -> Magniude -> ConvertDepth -> Threshold .
+The input image will be processed in accordance with this algorithm sequence.
+NO arguments are required to run this program.

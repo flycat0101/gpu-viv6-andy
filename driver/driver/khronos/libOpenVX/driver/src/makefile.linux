@@ -29,6 +29,7 @@ INCLUDE += -I$(AQROOT)/compiler/libVSC/include
 
 INCLUDE += -I../include
 INCLUDE += -I../../kernels
+INCLUDE += -I../../libarchmodel/include
 
 ifeq ($(gcdSTATIC_LINK), 1)
 STATIC=1
@@ -77,12 +78,24 @@ OBJECTS         =  \
                     $(OBJ_DIR)/gc_vx_binary.o   \
                     $(OBJ_DIR)/gc_vx_gpu_layer.o   \
 
+# Operations
+OBJECTS         +=    \
+                    $(OBJ_DIR)/gc_vx_op_fc.o \
+                    $(OBJ_DIR)/gc_vx_op_debug.o \
+                    $(OBJ_DIR)/gc_vx_op_tensor_copy.o
+
+# Layers
+OBJECTS         +=    \
+                    $(OBJ_DIR)/gc_vx_layer_lstm.o
+
 # API
 OBJECTS         +=    \
                     $(OBJ_DIR)/gc_vx_interface.o \
                     $(OBJ_DIR)/gc_vx_nn_extension_interface.o \
                     $(OBJ_DIR)/gc_vx_internal_node_api.o \
                     $(OBJ_DIR)/gc_vx_nn_util.o \
+                    $(OBJ_DIR)/gc_vx_lstm.o \
+                    $(OBJ_DIR)/gc_vx_nn_command.o   \
 
 # Kernels
 OBJECTS         +=  \
@@ -122,11 +135,10 @@ vpath %.c
 
 LIBS += -L $(SDK_DIR)/drivers
 LIBS += -L $(AQROOT)/hal/user/$(OBJ_DIR)
-
 LIBS += -lVSC -lGAL
 
 
-VPATH = ../../kernels
+VPATH = ops:layers:../../kernels
 
 ifeq ($(USE_VXC_BINARY),1)
 INCLUDE += -I$(AQROOT)/driver/khronos/libOpenVX/libkernel/libnnvxc
@@ -136,6 +148,7 @@ endif
 
 CFLAGS += $(INCLUDE)
 
+LIBS += $(AQROOT)/driver/khronos/libOpenVX/libarchmodel/$(OBJ_DIR)/libarchmodel.a
 LIBS += -l dl -l pthread -lm
 
 ################################################################################

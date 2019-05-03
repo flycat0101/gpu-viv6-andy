@@ -47,7 +47,7 @@ VX_INTERNAL_API vx_context vxoContext_GetFromReference(vx_reference ref);
 
 VX_INTERNAL_API vx_bool vxoContext_AddObject(vx_context context, vx_reference ref);
 
-VX_INTERNAL_API vx_bool vxoContext_RemoveObject(vx_context context, vx_reference ref);
+VX_INTERNAL_API vx_bool vxoContext_RemoveObject(vx_context context, vx_reference ref, vx_bool order);
 
 VX_INTERNAL_API vx_status vxContext_LoadKernels(vx_context context, const vx_string module);
 

@@ -60,7 +60,7 @@
         __GL_ERROR_EXIT(GL_INVALID_ENUM);                   \
     }
 
-#define _GC_OBJ_ZONE __GLES3_ZONE_CORE
+#define _GC_OBJ_ZONE gcdZONE_ES30_CORE
 
 GLvoid __glInitBufferObject(__GLcontext *gc, __GLbufferObject *bufObj, GLuint name)
 {

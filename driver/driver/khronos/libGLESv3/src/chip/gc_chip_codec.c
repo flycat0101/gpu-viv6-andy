@@ -14,7 +14,7 @@
 #include "gc_es_context.h"
 #include "gc_chip_context.h"
 
-#define _GC_OBJ_ZONE    __GLES3_ZONE_CODEC
+#define _GC_OBJ_ZONE    gcdZONE_ES30_CODEC
 
 /*************************************************************************
 **

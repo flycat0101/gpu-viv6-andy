@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -48,7 +48,6 @@ HAL_TEST        := $(HAL_TEST_DIR)
 HAL_UNIT_TEST   := $(AQROOT)/test/hal/common/UnitTest
 GFX_TEST        := $(GFX_TEST_DIR)
 VVLAUNCHER      := $(VVLAUNCHER_DIR)
-SHARECONEXTES20 := $(AQROOT)/test/es20/shareContext
 OVX_TEST         := $(AQROOT)/test/ovx
 ifneq ($(VIVANTE_NO_VG),1)
 TIGER           := $(AQROOT)/test/vg11/tiger
@@ -82,7 +81,7 @@ APP_OCL11_LIST  := $(CL11_TEST)
 else
 APP_OCL11_LIST  :=
 endif
-APP_VDK_LIST    += $(VDK_TEST) $(TIGER) $(VVLAUNCHER) $(SHARECONEXTES20)
+APP_VDK_LIST    += $(VDK_TEST) $(TIGER) $(VVLAUNCHER)
 APP_OVX_LIST    := $(OVX_TEST)
 
 APP_LIST        :=
@@ -170,7 +169,6 @@ tutorial:   $(TUTORIAL)
 else
 vdktest:    $(VDK_TEST)
 vv_launcher: $(VVLAUNCHER)
-shareContext: $(SHARECONEXTES20)
 endif
 
 ifeq ($(USE_OPENCL), 1)

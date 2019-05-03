@@ -986,9 +986,13 @@ typedef struct SHADER_EXECUTABLE_NATIVE_HINTS
         gctUINT                                          bLinkProgramPipeline : 1;
 
         /* What kind of memory access operations shader native holds, see SHADER_EDH_MEM_ACCESS_HINT */
-        gctUINT                                          memoryAccessHint : 6;
+        gctUINT                                          memoryAccessHint  : 6;
 
-        gctUINT                                          reserved         : 23;
+        gctUINT                                          flowControlHint   : 3;
+
+        gctUINT                                          texldHint         : 1;
+
+        gctUINT                                          reserved          : 19;
     } globalStates;
 
     union
@@ -1084,7 +1088,7 @@ typedef enum UNIFIED_RF_ALLOC_STRATEGY
 }
 UNIFIED_RF_ALLOC_STRATEGY;
 
-/* Shder mem access hints for executable-derived-hints */
+/* Shader mem access hints for executable-derived-hints */
 typedef enum SHADER_EDH_MEM_ACCESS_HINT
 {
     SHADER_EDH_MEM_ACCESS_HINT_NONE               = 0x0000,
@@ -1110,6 +1114,26 @@ typedef enum SHADER_EDH_MEM_ACCESS_HINT
 /* Note: 1. must sync with VIR_MemoryAccessFlag !!!
  *       2. make sure it fits in bits in SHADER_EXECUTABLE_DERIVED_HINTS::memoryAccessHint */
 }SHADER_EDH_MEM_ACCESS_HINT;
+
+/* Shader flow control hints for executable-derived-hints */
+typedef enum SHADER_EDH_FLOW_CONTROL_HINT
+{
+    SHADER_EDH_FLOW_CONTROL_HINT_NONE             = 0x0000,
+    SHADER_EDH_FLOW_CONTROL_HINT_JMP              = 0x0001,
+    SHADER_EDH_FLOW_CONTROL_HINT_CALL             = 0x0002,
+    SHADER_EDH_FLOW_CONTROL_HINT_KILL             = 0x0004,
+/* Note: 1. must sync with VIR_FlowControlFlag !!!
+ *       2. make sure it fits in bits in SHADER_EXECUTABLE_DERIVED_HINTS::flowControlHint */
+}SHADER_EDH_FLOW_CONTROL_HINT;
+
+/* Shader texture hints for executable-derived-hints */
+typedef enum SHADER_EDH_TEXLD_HINT
+{
+    SHADER_EDH_TEXLD_HINT_NONE             = 0x0000,
+    SHADER_EDH_TEXLD_HINT_TEXLD            = 0x0001,
+/* Note: 1. must sync with VIR_TexldFlag !!!
+ *       2. make sure it fits in bits in SHADER_EXECUTABLE_DERIVED_HINTS::texldHint */
+}SHADER_EDH_TEXLD_HINT;
 
 /* For these hints, we can retrieve them by analyzing machine code on the fly, but it will
    hurt perf, so collect them by analyzing (derived) directly from compiler. */
@@ -1143,6 +1167,12 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
         /* What kind of memory access operations shader holds, see SHADER_EDH_MEM_ACCESS_HINT */
         gctUINT                   memoryAccessHint                : 8;
 
+        /* What kind of flow control operations shader holds, see SHADER_EDH_FLOW_CONTROL_HINT */
+        gctUINT                   flowControlHint                 : 3;
+
+        /* What kind of texld operations shader holds, see SHADER_EDH_TEXLD_HINT */
+        gctUINT                   texldHint                       : 1;
+
         /* First HW reg and its channel that will be used to store addresses
            of USC for each vertex when executing hs/ds/gs. */
         gctUINT                   hwStartRegNoForUSCAddrs         : 4;
@@ -1159,7 +1189,7 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
         /* Whether enable robust out-of-bounds check for memory access . */
         gctUINT                   bEnableRobustCheck              : 1;
 
-        gctUINT                   reserved                        : 6;
+        gctUINT                   reserved                        : 2;
 
         gctUINT                   gprSpillSize;  /* the byte count of register spill mem to be
                                                   * allocated by driver in MultiGPU mode*/

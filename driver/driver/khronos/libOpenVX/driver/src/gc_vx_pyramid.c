@@ -13,6 +13,8 @@
 
 #include <gc_vx_common.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_PYRAMID
+
 const vx_float32 vxOrbScales[4] = {
     0.5f,
     VX_SCALE_PYRAMID_ORB,
@@ -24,6 +26,8 @@ VX_INTERNAL_API vx_status vxoPyramid_Initialize(
         vx_pyramid pyramid, vx_size levelCount, vx_float32 scale,
         vx_uint32 width, vx_uint32 height, vx_df_image format)
 {
+    gcmHEADER_ARG("pyramid=%p, levelCount=0x%lx, scale=%f, width=0x%x, height=0x%x, format=%p",
+        pyramid, levelCount, scale, width, height, format);
     vxmASSERT(pyramid);
 
     if (pyramid->levels == VX_NULL)
@@ -32,7 +36,10 @@ VX_INTERNAL_API vx_status vxoPyramid_Initialize(
         pyramid->scale      = scale;
         pyramid->levels     = (vx_image_ptr)vxAllocateAndZeroMemory(levelCount * sizeof(vx_image));
 
-        if (pyramid->levels == VX_NULL) return VX_ERROR_NO_MEMORY;
+        if (pyramid->levels == VX_NULL) {
+            gcmFOOTER_NO();
+            return VX_ERROR_NO_MEMORY;
+        }
     }
 
     pyramid->width  = width;
@@ -56,8 +63,11 @@ VX_INTERNAL_API vx_status vxoPyramid_Initialize(
 
                 status = vxoReference_GetStatus((vx_reference)image);
 
-                if (status != VX_SUCCESS) return status;
-
+                if (status != VX_SUCCESS)
+                {
+                    gcmFOOTER_ARG("%d", status);
+                    return status;
+                }
                 pyramid->levels[levelIndex] = image;
 
                 vxoReference_Increment((vx_reference)pyramid->levels[levelIndex], VX_REF_INTERNAL);
@@ -87,7 +97,7 @@ VX_INTERNAL_API vx_status vxoPyramid_Initialize(
             }
         }
     }
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -97,23 +107,33 @@ VX_PRIVATE_API vx_pyramid vxoPyramid_Create(
 {
     vx_pyramid  pyramid;
     vx_status   status;
+    gcmHEADER_ARG("context=%p, levels=0x%x, scale=%f, width=0x%x, height=0x%x, format=%p, isVirtual=0x%x",
+        context, levels, scale, width, height, format, isVirtual);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (scale != VX_SCALE_PYRAMID_HALF && scale != VX_SCALE_PYRAMID_ORB)
     {
+        gcmFOOTER_NO();
         return (vx_pyramid)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
     }
 
     if (levels == 0 || levels > 8)
     {
+        gcmFOOTER_NO();
         return (vx_pyramid)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
     }
 
     pyramid = (vx_pyramid)vxoReference_Create(context, VX_TYPE_PYRAMID, VX_REF_EXTERNAL, &context->base);
 
-    if (vxoReference_GetStatus((vx_reference)pyramid) != VX_SUCCESS) return pyramid;
-
+    if (vxoReference_GetStatus((vx_reference)pyramid) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return pyramid;
+    }
     pyramid->base.isVirtual = isVirtual;
 
     status = vxoPyramid_Initialize(pyramid, levels, scale, width, height, format);
@@ -121,7 +141,7 @@ VX_PRIVATE_API vx_pyramid vxoPyramid_Create(
     if (status != VX_SUCCESS)
     {
         vxReleasePyramid(&pyramid);
-
+        gcmFOOTER_NO();
         return (vx_pyramid)vxoContext_GetErrorObject(context, status);
     }
 
@@ -151,44 +171,60 @@ VX_API_ENTRY vx_pyramid VX_API_CALL vxCreateVirtualPyramid(
         vx_graph graph, vx_size levels, vx_float32 scale, vx_uint32 width, vx_uint32 height, vx_df_image format)
 {
     vx_pyramid pyramid;
-
+    gcmHEADER_ARG("graph=%p, levels=0x%lx, scale=%f, width=0x%x, height=0x%x, format=0x%x",
+        graph, levels, scale, width, height, format);
     gcmDUMP_API("$VX vxCreateVirtualPyramid: graph=%p, levels=0x%lx, scale=%f, width=0x%x, height=0x%x, format=0x%x",
         graph, levels, scale, width, height, format);
 
-    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_NULL;
-
+    if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     pyramid = vxoPyramid_Create(graph->base.context, levels, scale, width, height, format, vx_true_e);
 
-    if (vxoReference_GetStatus((vx_reference)pyramid) != VX_SUCCESS) return pyramid;
-
+    if (vxoReference_GetStatus((vx_reference)pyramid) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return pyramid;
+    }
     pyramid->base.scope = (vx_reference)graph;
-
+    gcmFOOTER_NO();
     return pyramid;
 }
 
 VX_API_ENTRY vx_pyramid VX_API_CALL vxCreatePyramid(
         vx_context context, vx_size levels, vx_float32 scale, vx_uint32 width, vx_uint32 height, vx_df_image format)
 {
-
+    gcmHEADER_ARG("context=%p, levels=0x%lx, scale=%f, width=0x%x, height=0x%x, format=0x%x",
+        context, levels, scale, width, height, format);
     gcmDUMP_API("$VX vxCreatePyramid: context=%p, levels=0x%lx, scale=%f, width=0x%x, height=0x%x, format=0x%x",
         context, levels, scale, width, height, format);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (width == 0 || height == 0 || format == VX_DF_IMAGE_VIRT)
     {
+        gcmFOOTER_NO();
         return (vx_pyramid)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
     }
-
+    gcmFOOTER_NO();
     return vxoPyramid_Create(context, levels, scale, width, height, format, vx_false_e);
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryPyramid(vx_pyramid pyramid, vx_enum attribute, void *ptr, vx_size size)
 {
+    gcmHEADER_ARG("pyramid=%p, attribute=0x%x, ptr=%p, size=0x%lx", pyramid, attribute, ptr, size);
     gcmDUMP_API("$VX vxQueryPyramid: pyramid=%p, attribute=0x%x, ptr=%p, size=0x%lx", pyramid, attribute, ptr, size);
 
-    if (!vxoReference_IsValidAndSpecific(&pyramid->base, VX_TYPE_PYRAMID)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoReference_IsValidAndSpecific(&pyramid->base, VX_TYPE_PYRAMID))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     switch (attribute)
     {
         case VX_PYRAMID_LEVELS:
@@ -225,7 +261,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryPyramid(vx_pyramid pyramid, vx_enum at
             vxError("The attribute parameter, %d, is not supported", attribute);
             return VX_ERROR_NOT_SUPPORTED;
     }
-
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 
@@ -233,19 +269,24 @@ VX_API_ENTRY vx_image VX_API_CALL vxGetPyramidLevel(vx_pyramid pyramid, vx_uint3
 {
     vx_image image;
 
+    gcmHEADER_ARG("pyramid=%p, index=0x%x", pyramid, index);
     gcmDUMP_API("$VX vxGetPyramidLevel: pyramid=%p, index=0x%x", pyramid, index);
 
-    if (!vxoReference_IsValidAndSpecific(&pyramid->base, VX_TYPE_PYRAMID)) return VX_NULL;
-
+    if (!vxoReference_IsValidAndSpecific(&pyramid->base, VX_TYPE_PYRAMID))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (index >= pyramid->levelCount)
     {
+        gcmFOOTER_NO();
         return (vx_image)vxoContext_GetErrorObject(pyramid->base.context, VX_ERROR_INVALID_PARAMETERS);
     }
 
     image = pyramid->levels[index];
 
     vxoReference_Increment(&image->base, VX_REF_EXTERNAL);
-
+    gcmFOOTER_NO();
     return image;
 }
 

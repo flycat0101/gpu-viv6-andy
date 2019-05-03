@@ -52,6 +52,9 @@ VX_INTERNAL_API vx_uint32 vxoReference_GetTotalCount(vx_reference ref);
 VX_INTERNAL_API vx_status vxoReference_Release(
         INOUT vx_reference_ptr refPtr, vx_type_e type, vx_reference_kind_e kind);
 
+VX_INTERNAL_API vx_status vxoReference_ReleaseEx(
+        INOUT vx_reference_ptr refPtr, vx_type_e type, vx_reference_kind_e kind, vx_bool order);
+
 VX_INTERNAL_API void vxoReference_IncrementWriteCount(vx_reference ref);
 
 VX_INTERNAL_API void vxoReference_IncrementReadCount(vx_reference ref);

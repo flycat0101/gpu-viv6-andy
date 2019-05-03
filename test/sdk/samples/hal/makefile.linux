@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -26,6 +26,7 @@
 ##############################################################################
 
 
+
 #
 # This file is a part of Vivante software stack build environment for Linux.
 # It defines the rules necessary to build Vivante SDK HAL samples.
@@ -40,9 +41,19 @@ include $(AQROOT)/makefile.linux.def
 ######################################################
 # Components of the project.
 
+BUILD_DIR_LIST += ./tvui
+BUILD_DIR_LIST += ./maskedblit
+BUILD_DIR_LIST += ./memcpy_bench
+
 TVUI	:= tvui
+MASKEDBLIT := maskedblit
+ENDIANNESS_TEST := endianness
+MEMCPY_BENCH := memcpy_bench
 
 HAL_TEST	:= $(TVUI)
+HAL_TEST	+= $(MASKEDBLIT)
+HAL_TEST    += $(ENDIANNESS_TEST)
+HAL_TEST    += $(MEMCPY_BENCH)
 
 ######################################################
 # Define the macros used in the common file.

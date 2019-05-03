@@ -262,6 +262,17 @@ VIR_Lower_SetEnableX(
 }
 
 gctBOOL
+VIR_Lower_SetEnableXY(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_XY);
+    return gcvTRUE;
+}
+
+gctBOOL
 VIR_Lower_SetEnableXAndIntType(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -777,6 +788,52 @@ VIR_Lower_IsIntOpcode(
     return gcvFALSE;
 }
 
+/* Count the number of enables using the 4bit VIR_ENABLE_* as indexing to table */
+static gctUINT
+_enableCount[16] = { 0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
+
+gctBOOL
+VIR_Lower_IsDstOneEnable(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_Enable enable = VIR_Inst_GetEnable(Inst);
+
+    return _enableCount[enable] == 1;
+}
+
+gctBOOL
+VIR_Lower_IsDstTwoEnables(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_Enable enable = VIR_Inst_GetEnable(Inst);
+
+    return _enableCount[enable] == 2;
+}
+
+gctBOOL
+VIR_Lower_IsDstThreeEnables(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_Enable enable = VIR_Inst_GetEnable(Inst);
+
+    return _enableCount[enable] == 3;
+}
+
+gctBOOL
+VIR_Lower_IsDstFourEnables(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return VIR_Inst_GetEnable(Inst) == VIR_ENABLE_XYZW;
+}
+
 gctBOOL
 VIR_Lower_IsDstBool(
     IN VIR_PatternContext *Context,
@@ -1062,6 +1119,65 @@ VIR_Lower_HasTexldModifier(
 }
 
 gctBOOL
+VIR_Lower_IsI2I(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_PrimitiveTypeId baseTy0 = VIR_Lower_GetBaseType(Context->shader, VIR_Inst_GetDest(Inst));
+    VIR_PrimitiveTypeId baseTy1 = VIR_Lower_GetBaseType(Context->shader, VIR_Inst_GetSource(Inst, 0));
+
+    if ((VIR_GetTypeFlag(baseTy0) & VIR_TYFLAG_ISINTEGER) &&
+        (VIR_GetTypeFlag(baseTy1) & VIR_TYFLAG_ISINTEGER))
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
+gctBOOL
+VIR_Lower_SameSizeType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return !VIR_Lower_NotSameSizeType(Context, Inst);
+}
+
+gctBOOL
+VIR_Lower_NotSameSizeType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_TypeId dstTyId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst)));
+    VIR_TypeId srcTyId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetSource(Inst, 0)));
+
+    return (VIR_GetTypeSize(dstTyId) != VIR_GetTypeSize(srcTyId))
+        || (VIR_Operand_GetRoundMode(VIR_Inst_GetSource(Inst, 0)) != VIR_ROUND_DEFAULT)
+        || (VIR_Operand_GetModifier(VIR_Inst_GetSource(Inst, 0)) != VIR_MOD_NONE)
+        || (VIR_Operand_GetModifier(VIR_Inst_GetDest(Inst)) != VIR_MOD_NONE);
+}
+
+gctBOOL
+VIR_Lower_SameType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    gctBOOL result = gcvFALSE;
+
+    result = (VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst)))
+              == VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetSource(Inst, 0)))) &&
+             VIR_Operand_GetRoundMode(VIR_Inst_GetSource(Inst, 0)) == VIR_ROUND_DEFAULT        &&
+             VIR_Operand_GetModifier(VIR_Inst_GetSource(Inst, 0)) == VIR_MOD_NONE              &&
+             VIR_Operand_GetModifier(VIR_Inst_GetDest(Inst)) == VIR_MOD_NONE;
+
+    return result;
+}
+
+gctBOOL
 VIR_Lower_label_set_jmp_n(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -1318,6 +1434,18 @@ VIR_Lower_SetEnableBaseOnSrc1(
 {
     _SetEnableBaseOnSrc(Context, Inst, VIR_Inst_GetSource(Inst, 1), Opnd);
 
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetPrecisionBaseOnSrc0(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand* src0 = VIR_Inst_GetSource(Inst, 0);
+    VIR_Operand_SetPrecision(Opnd, VIR_Operand_GetPrecision(src0));
     return gcvTRUE;
 }
 

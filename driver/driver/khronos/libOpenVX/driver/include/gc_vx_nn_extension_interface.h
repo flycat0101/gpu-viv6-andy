@@ -648,6 +648,35 @@ vx_kernel_description_s internalkernel_NNROIPoolLayer = {
     vxoNNROIPoolLayer_Deinitializer
 };
 
+static vx_param_description_s nn_ROIPoolReluLayer_params[] = {
+    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
+    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e}
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_NNROIPoolReluLayer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoNNROIPoolReluLayer_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoNNROIPoolReluLayer_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoNNROIPoolReluLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoNNROIPoolReluLayer_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+
+vx_kernel_description_s internalkernel_NNROIPoolReluLayer = {
+    VX_KERNEL_INTERNAL_ROI_POOLING_RELU_LAYER,
+    "vivante.nn.roipoolrelu.layer",
+    vxoInternalKernel_NNROIPoolReluLayer,
+    nn_ROIPoolReluLayer_params, vxmLENGTH_OF(nn_ROIPoolReluLayer_params),
+    VX_NULL,
+    vxoNNROIPoolReluLayer_ValidateInput,
+    vxoNNROIPoolReluLayer_ValidateOutput,
+    vxoNNROIPoolReluLayer_Initializer,
+    vxoNNROIPoolReluLayer_Deinitializer
+};
+
 static vx_param_description_s nn_Concat2Layer_params[] = {
     {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
     {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
@@ -880,114 +909,6 @@ vx_kernel_description_s internalkernel_NNTensorReverse = {
     vxoNNTensorReverse_Deinitializer
 };
 
-static vx_param_description_s nn_LSTMUnit_params[] = {
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e}
-};
-
-VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_NN_LSTMUnit(vx_node node, const vx_reference *parameters, vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMUnit_ValidateInput(vx_node node, vx_uint32 index);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMUnit_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMUnit_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMUnit_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
-
-vx_kernel_description_s internalkernel_NN_LSTMUnit = {
-    VX_KERNEL_NN_LSTM_UNIT,
-    "vivante.nn.lstm.unit",
-    vxoBaseKernel_NN_LSTMUnit,
-    nn_LSTMUnit_params, vxmLENGTH_OF(nn_LSTMUnit_params),
-    VX_NULL,
-    vxoNN_LSTMUnit_ValidateInput,
-    vxoNN_LSTMUnit_ValidateOutput,
-    vxoNN_LSTMUnit_Initializer,
-    vxoNN_LSTMUnit_Deinitializer
-};
-
-static vx_param_description_s nn_LSTMLayer_params[] = {
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_true_e},
-
-    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e}
-};
-
-VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_NN_LSTMLayer(vx_node node, const vx_reference *parameters, vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMLayer_ValidateInput(vx_node node, vx_uint32 index);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMLayer_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMLayer_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
-
-vx_kernel_description_s internalkernel_NN_LSTMLayer = {
-    VX_KERNEL_NN_LSTM_LAYER,
-    "vivante.nn.lstm.layer",
-    vxoBaseKernel_NN_LSTMLayer,
-    nn_LSTMLayer_params, vxmLENGTH_OF(nn_LSTMLayer_params),
-    VX_NULL,
-    vxoNN_LSTMLayer_ValidateInput,
-    vxoNN_LSTMLayer_ValidateOutput,
-    vxoNN_LSTMLayer_Initializer,
-    vxoNN_LSTMLayer_Deinitializer
-};
 
 static vx_param_description_s nn_reorg2_params[] = {
     {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
@@ -1130,32 +1051,6 @@ vx_kernel_description_s internalkernel_NNTensorScale = {
 };
 
 
-static vx_param_description_s nn_rnnlayer_params[] = {
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e}
-};
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRNNLayer(vx_node node, const vx_reference *parameters, vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoRNNLayer_ValidateInput(vx_node node, vx_uint32 index);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoRNNLayer_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoRNNLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoRNNLayer_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
-vx_kernel_description_s internalkernel_NNRNNLayer = {
-    VX_KERNEL_NN_RNN_LAYER,
-    "vivante.nn.rnnlayer.layer",
-    vxoNNRNNLayer,
-    nn_rnnlayer_params, vxmLENGTH_OF(nn_rnnlayer_params),
-    VX_NULL,
-    vxoRNNLayer_ValidateInput,
-    vxoRNNLayer_ValidateOutput,
-    vxoRNNLayer_Initializer,
-    vxoRNNLayer_Deinitializer
-};
 
 
 static vx_param_description_s nn_softmaxlayer2_params[] = {
@@ -1181,33 +1076,6 @@ vx_kernel_description_s internalkernel_NNSoftmaxLayer2 = {
 };
 
 
-static vx_param_description_s nn_svdflayer_params[] = {
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e}
-};
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNNSVDFLayer(vx_node node, const vx_reference *parameters, vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_ValidateInput(vx_node node, vx_uint32 index);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
-vx_kernel_description_s internalkernel_NNSVDFLayer = {
-    VX_KERNEL_NN_SVDF_LAYER,
-    "vivante.nn.svdflayer.layer",
-    vxoNNSVDFLayer,
-    nn_svdflayer_params, vxmLENGTH_OF(nn_svdflayer_params),
-    VX_NULL,
-    vxoSVDFLayer_ValidateInput,
-    vxoSVDFLayer_ValidateOutput,
-    vxoSVDFLayer_Initializer,
-    vxoSVDFLayer_Deinitializer
-};
 
 
 static vx_param_description_s nn_lut2_params[] = {
@@ -1409,186 +1277,18 @@ vx_kernel_description_s internalkernel_NNTensorStrideSlice = {
     vxoNNTensorStrideSlice_Deinitializer
 };
 
-static vx_param_description_s nn_GRUUnit_params[] = {
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-};
-
-VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_NN_GRUUnit(vx_node node, const vx_reference *parameters, vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_GRUUnit_ValidateInput(vx_node node, vx_uint32 index);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_GRUUnit_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_GRUUnit_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_GRUUnit_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
-
-vx_kernel_description_s internalkernel_NN_GRUUnit = {
-    VX_KERNEL_NN_GRU_UNIT_LAYER,
-    "vivante.nn.gru.unit",
-    vxoBaseKernel_NN_GRUUnit,
-    nn_GRUUnit_params, vxmLENGTH_OF(nn_GRUUnit_params),
-    VX_NULL,
-    vxoNN_GRUUnit_ValidateInput,
-    vxoNN_GRUUnit_ValidateOutput,
-    vxoNN_GRUUnit_Initializer,
-    vxoNN_GRUUnit_Deinitializer
-};
-
-static vx_param_description_s nn_GRULayer_params[] = {
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-};
-
-VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_NN_GRULayer(vx_node node, const vx_reference *parameters, vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_GRULayer_ValidateInput(vx_node node, vx_uint32 index);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_GRULayer_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_GRULayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_GRULayer_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
-
-vx_kernel_description_s internalkernel_NN_GRULayer = {
-    VX_KERNEL_NN_GRU_LAYER,
-    "vivante.nn.gru.layer",
-    vxoBaseKernel_NN_GRULayer,
-    nn_GRULayer_params, vxmLENGTH_OF(nn_GRULayer_params),
-    VX_NULL,
-    vxoNN_GRULayer_ValidateInput,
-    vxoNN_GRULayer_ValidateOutput,
-    vxoNN_GRULayer_Initializer,
-    vxoNN_GRULayer_Deinitializer
-};
-
-static vx_param_description_s nn_ConvLSTMUnit_params[] = {
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_true_e},
-
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_true_e},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_true_e},
-
-    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-};
-
-VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_NN_ConvLSTMUnit(vx_node node, const vx_reference *parameters, vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_ConvLSTMUnit_ValidateInput(vx_node node, vx_uint32 index);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_ConvLSTMUnit_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_ConvLSTMUnit_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_ConvLSTMUnit_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
-
-vx_kernel_description_s internalkernel_NN_ConvLSTMUnit = {
-    VX_KERNEL_NN_CONV_LSTM_UNIT_LAYER,
-    "vivante.nn.convlstm.unit",
-    vxoBaseKernel_NN_ConvLSTMUnit,
-    nn_ConvLSTMUnit_params, vxmLENGTH_OF(nn_ConvLSTMUnit_params),
-    VX_NULL,
-    vxoNN_ConvLSTMUnit_ValidateInput,
-    vxoNN_ConvLSTMUnit_ValidateOutput,
-    vxoNN_ConvLSTMUnit_Initializer,
-    vxoNN_ConvLSTMUnit_Deinitializer
-};
-
-static vx_param_description_s nn_ConvLSTMLayer_params[] = {
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
-
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_true_e},
-    {VX_INPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_OPTIONAL, vx_true_e},
-
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_true_e},
-    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_OPTIONAL, vx_true_e},
-
-    {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e},
-};
-
-VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_NN_ConvLSTMLayer(vx_node node, const vx_reference *parameters, vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_ConvLSTMLayer_ValidateInput(vx_node node, vx_uint32 index);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_ConvLSTMLayer_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_ConvLSTMLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_ConvLSTMLayer_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
-
-vx_kernel_description_s internalkernel_NN_ConvLSTMLayer = {
-    VX_KERNEL_NN_CONV_LSTM_LAYER,
-    "vivante.nn.convlstm.layer",
-    vxoBaseKernel_NN_ConvLSTMLayer,
-    nn_ConvLSTMLayer_params, vxmLENGTH_OF(nn_ConvLSTMLayer_params),
-    VX_NULL,
-    vxoNN_ConvLSTMLayer_ValidateInput,
-    vxoNN_ConvLSTMLayer_ValidateOutput,
-    vxoNN_ConvLSTMLayer_Initializer,
-    vxoNN_ConvLSTMLayer_Deinitializer
-};
+VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromTensorsPRelu(
+    vx_enum     layer_type,
+    vx_uint32 * inputs_dims,
+    vx_uint32 * convolution_outputs_dims,
+    vx_uint32 * pool_outputs_dims,
+    const vx_nn_convolution_relu_pooling_params convolution_relu_pooling_params,
+    vx_size size_of_convolution_relu_pooling_params,
+    vx_weights_biases_parameter_optimizations_t *optimizations,
+    vx_size size_of_optimizations,
+    vx_tensor   weights,
+    vx_tensor   biases,
+    vx_tensor   alpha);
 
 #endif
 

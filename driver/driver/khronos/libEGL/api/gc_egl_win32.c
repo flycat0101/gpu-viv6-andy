@@ -325,7 +325,7 @@ _CreateWindowBuffers(
                     Info->bufferList = buffer;
                 }
 
-                gcmTRACE(gcvLEVEL_INFO,
+                gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_EGL_API,
                          "%s(%d): buffer[%d]: yoffset=%-4d physical=%x",
                          __FUNCTION__, __LINE__,
                          i, alignedHeight * i, physical);
@@ -391,7 +391,7 @@ _CreateWindowBuffers(
                 Info->bufferList = buffer;
             }
 
-            gcmTRACE(gcvLEVEL_INFO,
+            gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_EGL_API,
                      "%s(%d): buffer[%d]: surface=%p",
                      __FUNCTION__, __LINE__,
                      i, buffer->surface);
@@ -1065,7 +1065,7 @@ _BindWindow(
 #endif
     }
 
-    gcmTRACE(gcvLEVEL_INFO,
+    gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_EGL_API,
              "%s(%d): winChanged=%d format=%d type=%x EGLConfig=%d%d%d%d "
              " renderMode=%d",
              __FUNCTION__, __LINE__,

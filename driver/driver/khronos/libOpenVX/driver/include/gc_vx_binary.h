@@ -14,14 +14,11 @@
 #ifndef __GC_VX_BINARY_H__
 #define __GC_VX_BINARY_H__
 
-#include <VX/vx_types.h>
-#include <gc_vx_common.h>
-
 #define SH_COMMAND_ALIGN_SIZE             256
 #define VX_MAX_LAYER_NAME_LENGTH          64
 #define VX_MAX_NAME_LEGTH                 64
 #define NN_MAX_DIMENSION                  4
-#define VX_MAX_NN_INOUT_PARAM_COUNT       256
+#define VX_MAX_NN_INOUT_PARAM_COUNT       1024
 #define VX_MAX_SH_OPERATION_STATE_SIZE    0xE00
 #define VX_MAX_NNTP_OPERATION_STATE_SIZE  0x200
 #define VX_MAX_INITIALIZE_COMMAND_SIZE    0xC00
@@ -51,6 +48,15 @@ enum
 
 enum
 {
+    VX_BINARY_BUFFER_TYPE_TENSOR = 0, /* A tensor data type of buffer data */
+    VX_BINARY_BUFFER_TYPE_IMAGE  = 1, /* A image data type of buffer data */
+    VX_BINARY_BUFFER_TYPE_ARRAY  = 2, /* A array data type of buffer data */
+    VX_BINARY_BUFFER_TYPE_SCALAR = 3, /* A scalar data type of buffer data */
+    VX_BINARY_BUFFER_TYPE_MAX,
+};
+
+enum
+{
     VX_BINARY_BUFFER_QUANT_FORMAT_NONE  = 0, /* Not quantized format */
     VX_BINARY_BUFFER_QUANT_FORMAT_DFP   = 1, /* The data is quantized with dynamic fixed point */
     VX_BINARY_BUFFER_QUANT_FORMAT_ASYMM = 2, /* The data is quantized with TF asymmetric format */
@@ -66,7 +72,15 @@ enum
     VX_BINARY_SOURCE_MISC_DYNAMIC_GENERIC = 5, /* variable length of buffer not any of above */
     VX_BINARY_SOURCE_MISC_DYNAMIC_INPUT   = 6, /* source is misc dynamic input data */
     VX_BINARY_SOURCE_MISC_DYNAMIC_OUTPUT  = 7, /* source is misc dynamic output data */
+    VX_BINARY_SOURCE_VIP_SRAM             = 8, /* VIP SRAM memory */
     VX_BINARY_SOURCE_MAX,
+};
+
+enum
+{
+    VX_BINARY_LOAD_STATUS_NONE = 0, /* not binary */
+    VX_BINARY_LOAD_STATUS_INIT = 1, /* binary init */
+    VX_BINARY_LOAD_STATUS_RUN = 2, /* binary running */
 };
 
 typedef enum _vx_binary_operation_target_e
@@ -267,12 +281,22 @@ typedef struct _vx_binary_input_output_info_s
     vx_uint32                               dimCount;
     vx_uint32                               dims[NN_MAX_DIMENSION];
     vx_enum                                 dataFormat;
+    vx_enum                                 dataType;
     vx_enum                                 quantFormat;
     vx_int32                                fixedPointPos;
     vx_float32                              tfScale;
     vx_int32                                tfZeroPoint;
 }
 vx_binary_input_output_info_s;
+
+typedef struct _vx_binary_input_node_info_s
+{
+    vx_node                                 node;
+    vx_uint32                               inputPhysical[VX_MAX_NN_INOUT_PARAM_COUNT];
+    vx_uint32                               paramIndex[VX_MAX_NN_INOUT_PARAM_COUNT];
+    vx_uint32                               count;
+}
+vx_binary_input_node_info_s;
 
 typedef struct _vx_binary_save_s
 {
@@ -339,6 +363,20 @@ typedef struct _vx_binary_save_s
     vx_uint32                                currLoadingDataOffset;
 
     vx_char                                  binaryFileName[256];
+
+    vx_binary_input_node_info_s              inputNode[VX_MAX_NN_INOUT_PARAM_COUNT];
+    vx_uint32                                inputNodeCount;
+
+    vx_uint32                                savedOperationCount;
+
+    vx_binary_header_s                       headerInfo;
+    vx_binary_entrance_info_s                entrancesInfo;
+    vx_uint32                                entryTablePos;
+
+    vx_reference                             inputTableRef[VX_MAX_NN_INOUT_PARAM_COUNT];
+    vx_reference                             outputTableRef[VX_MAX_NN_INOUT_PARAM_COUNT];
+    vx_uint32                                inputTableRefCount;
+    vx_uint32                                outputTableRefCount;
 }
 vx_binary_save_s, *vx_binary_save;
 
@@ -363,6 +401,14 @@ typedef struct _vx_binary_entry
     vx_uint32                               offset;
     vx_uint32                               size;
 } vx_binary_entry_s;
+
+typedef struct _vx_binary_io_patch_info
+{
+    vx_uint32                               count;
+    vx_uint32                               number;
+    vx_uint32                               **references;  /* The address of references in the command buffer. */
+    vx_uint32                               *offsets;     /* The offset to the buffer base for each command. */
+} vx_binary_io_patch_info_s;
 
 typedef struct _vx_binary_fixed
 {
@@ -411,9 +457,15 @@ typedef struct _vx_binary_loader
     vx_uint32                               nPdEntries;
 
     gctPOINTER                              binaryBuffer; /* read binary file buffer */
+    gctFILE                                 dFile;/* binary file descriptor */
 
     vx_binary_nn_layer_dump_s               *nnlayerDump;
     vx_uint32                               nnLayerDumpCount;
+
+    vx_binary_io_patch_info_s               *inputPatch;
+    vx_binary_io_patch_info_s               *outputPatch;
+
+    vx_uint32                               status;
 } vx_binary_loader_s;
 
 typedef struct _vx_binary_reader
@@ -426,8 +478,8 @@ typedef struct _vx_binary_reader
 } vx_binary_reader_s;
 
 /* graph binary functions */
-VX_INTERNAL_API vx_uint32 vxoGraphBinary_ConvertToOVXFormat(
-    vx_uint32 format
+VX_INTERNAL_API vx_enum vxoGraphBinary_ConvertToOVXDataType(
+    vx_enum dataType
     );
 
 VX_INTERNAL_API vx_status vxoGraphBinary_GenerateStatesBuffer(
@@ -446,9 +498,23 @@ VX_INTERNAL_API vx_status vxoGraphBinary_NNLayerDump(
 
 VX_INTERNAL_API vx_status vxoGraphBinary_LoadFile(
     vx_context context,
-    vx_binary_loader_s *binLoad,
+    vx_binary_loader_s **binLoad,
     gctCONST_STRING fileName
     );
+
+VX_INTERNAL_API vx_bool vxoGraphBinary_HasBinaryInGraph(
+    vx_graph graph
+);
+
+VX_INTERNAL_API vx_status vxoGraphBinary_SetParameter(
+    vx_node node,
+    vx_uint32 index
+    );
+
+VX_INTERNAL_API vx_status vxoGraphBinary_UpdataIOPhsicalTable(
+    vx_node node,
+    vx_uint32 index
+);
 
 VX_INTERNAL_API vx_status vxoGraphBinary_ReleaseFile(
     vx_binary_loader_s *binLoad
@@ -490,7 +556,12 @@ VX_INTERNAL_API vx_status vxoGraphBinary_ReSaveInputAndPatchTable(
     vx_graph graph
     );
 
+
 VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
+    vx_graph graph
+    );
+
+VX_INTERNAL_API vx_status vxoGraphBinary_GetGraphInputOutput(
     vx_graph graph
     );
 
@@ -502,6 +573,9 @@ VX_INTERNAL_API vx_status vxoGraphBinary_ReSaveNNTPInformation(
     );
 
 VX_INTERNAL_API void vxoGraphBinary_CacheOrImport(
+    vx_graph graph
+    );
+VX_INTERNAL_API void vxoGraphBinary_ReleaseCache(
     vx_graph graph
     );
 

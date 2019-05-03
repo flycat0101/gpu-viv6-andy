@@ -13,6 +13,8 @@
 
 #include "gc_vg_precomp.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG_MASK
+
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
 \******************************************************************************/
@@ -524,7 +526,7 @@ VG_API_CALL VGMaskLayer VG_API_ENTRY vgCreateMaskLayer(
         vgsIMAGE_PTR maskImage;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(%d, %d);\n",
             __FUNCTION__,
             Width, Height
@@ -573,7 +575,7 @@ VG_API_CALL VGMaskLayer VG_API_ENTRY vgCreateMaskLayer(
             ));
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s() = ;\n",
             __FUNCTION__,
             maskLayer
@@ -623,7 +625,7 @@ VG_API_CALL void VG_API_ENTRY vgDestroyMaskLayer(
     vgmENTERAPI(vgDestroyMaskLayer)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X);\n",
             __FUNCTION__,
             MaskLayer
@@ -691,7 +693,7 @@ VG_API_CALL void VG_API_ENTRY vgFillMaskLayer(
         vgtBYTEVECTOR4 byteColor;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, %d, %d, %d, %d, %.10ff);\n",
             __FUNCTION__,
             MaskLayer, X, Y, Width, Height, Value
@@ -827,7 +829,7 @@ VG_API_CALL void VG_API_ENTRY vgMask(
         vgsIMAGE_PTR source = gcvNULL;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%04X, %d, %d, %d, %d);\n",
             __FUNCTION__,
             Mask, X, Y, Width, Height
@@ -971,7 +973,7 @@ VG_API_CALL void VG_API_ENTRY vgRenderToMask(
         vgsPATH_PTR path;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, 0x%08X, 0x%04X);\n",
             __FUNCTION__,
             Path, PaintModes, Operation
@@ -1056,7 +1058,7 @@ VG_API_CALL void VG_API_ENTRY vgCopyMask(
         vgsMASK_PTR maskLayer;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, %d, %d, %d, %d, %d, %d);\n",
             __FUNCTION__,
             MaskLayer,
@@ -1140,7 +1142,7 @@ VG_API_CALL void VG_API_ENTRY vgClear(
         vgmADVANCE_CLEAR_COUNT(Context);
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(%d, %d, %d, %d);\n",
             __FUNCTION__,
             X, Y, Width, Height

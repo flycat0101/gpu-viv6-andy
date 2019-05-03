@@ -13,6 +13,8 @@
 
 #include <gc_vx_common.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_OBJARRAY
+
 VX_INTERNAL_CALLBACK_API vx_bool vxoOA_IsValidObjectArray(vx_object_array array)
 {
     vx_size i = 0u;
@@ -59,6 +61,8 @@ VX_INTERNAL_CALLBACK_API vx_status vxoOA_InitObjectArrayInt(vx_object_array arr,
     vx_size lut_count = 0;
     vx_enum threshold_type = VX_TYPE_UINT8, threshold_data_type = VX_TYPE_UINT8;
 
+    gcmHEADER_ARG("arr=%p, exemplar=%p, num_items=0x%lx", arr, exemplar, num_items);
+
     if (is_virtual)
     {
         vx_graph graph = (vx_graph)arr->base.scope;
@@ -90,7 +94,10 @@ VX_INTERNAL_CALLBACK_API vx_status vxoOA_InitObjectArrayInt(vx_object_array arr,
         }
 
         if (status != VX_SUCCESS)
+        {
+            gcmFOOTER_ARG("%d", status);
             return status;
+        }
 
         for (i = 0u; i < num_items; i++)
         {
@@ -126,7 +133,7 @@ VX_INTERNAL_CALLBACK_API vx_status vxoOA_InitObjectArrayInt(vx_object_array arr,
                 {
                     vxoReference_Release(&(arr->itemsTable[j]), (vx_type_e)item_type, VX_REF_EXTERNAL);
                 }
-
+                gcmFOOTER_ARG("%d", status);
                 return VX_ERROR_NO_RESOURCES;
             }
         }
@@ -194,9 +201,10 @@ VX_INTERNAL_CALLBACK_API vx_status vxoOA_InitObjectArrayInt(vx_object_array arr,
                 break;
         }
 
-        if (status != VX_SUCCESS)
+        if (status != VX_SUCCESS){
+            gcmFOOTER_ARG("%d", status);
             return status;
-
+        }
         for (i = 0u; i < num_items; i++)
         {
             vx_reference ref = NULL;
@@ -249,7 +257,7 @@ VX_INTERNAL_CALLBACK_API vx_status vxoOA_InitObjectArrayInt(vx_object_array arr,
                 {
                     vxoReference_Release(&(arr->itemsTable[j]), (vx_type_e)item_type, VX_REF_EXTERNAL);
                 }
-
+                gcmFOOTER_ARG("%d", status);
                 return VX_ERROR_NO_RESOURCES;
             }
         }
@@ -258,14 +266,16 @@ VX_INTERNAL_CALLBACK_API vx_status vxoOA_InitObjectArrayInt(vx_object_array arr,
     arr->itemType = item_type;
     arr->itemCount = num_items;
 
+    gcmFOOTER_ARG("%d", status);
     return VX_SUCCESS;
 }
 
 VX_INTERNAL_CALLBACK_API vx_object_array vxoOA_CreateObjectArrayInt(vx_reference scope, vx_reference exemplar, vx_size count, vx_bool is_virtual)
 {
     vx_context context = scope->context ? scope->context : (vx_context)scope;
-
     vx_object_array arr = (vx_object_array)vxoReference_Create(context, VX_TYPE_OBJECT_ARRAY, VX_REF_EXTERNAL, scope);
+    gcmHEADER_ARG("scope=%p, exemplar=%p, count=0x%lx, is_virtual=0x%x", scope, exemplar, count, is_virtual);
+
     if (vxGetStatus((vx_reference)arr) == VX_SUCCESS && arr->base.type == VX_TYPE_OBJECT_ARRAY)
     {
         arr->base.scope = scope;
@@ -277,6 +287,7 @@ VX_INTERNAL_CALLBACK_API vx_object_array vxoOA_CreateObjectArrayInt(vx_reference
             arr = (vx_object_array)vxoError_GetErrorObject(context, VX_ERROR_NO_MEMORY);
         }
     }
+    gcmFOOTER_NO();
     return arr;
 }
 
@@ -320,6 +331,8 @@ VX_INTERNAL_CALLBACK_API vx_object_array vxoOA_CreateObjectArrayEmpty(vx_referen
 
     vx_object_array arr = (vx_object_array)vxoReference_Create(context, VX_TYPE_OBJECT_ARRAY, VX_REF_EXTERNAL, scope);
 
+    gcmHEADER_ARG("scope=%p, item_type=0x%x, count=0x%lx", scope, item_type, count);
+
     if (vxGetStatus((vx_reference)arr) == VX_SUCCESS && arr->base.type == VX_TYPE_OBJECT_ARRAY)
     {
         arr->base.scope = scope;
@@ -345,6 +358,7 @@ VX_INTERNAL_CALLBACK_API vx_object_array vxoOA_CreateObjectArrayEmpty(vx_referen
         arr->itemCount = 0;
     }
 
+    gcmFOOTER_NO();
     return arr;
 }
 
@@ -391,7 +405,7 @@ VX_INTERNAL_CALLBACK_API vx_bool vxoOA_SetObjectArrayItem(vx_object_array arr, v
 VX_API_ENTRY vx_object_array VX_API_CALL vxCreateObjectArray(vx_context context, vx_reference exemplar, vx_size count)
 {
     vx_object_array arr = NULL;
-
+    gcmHEADER_ARG("context=%p, exemplar=%p, count=0x%lx", context, exemplar, count);
     gcmDUMP_API("$VX vxCreateObjectArray: context=%p, exemplar=%p, count=0x%lx", context, exemplar, count);
 
     if (vxoContext_IsValid(context) == vx_true_e)
@@ -412,14 +426,14 @@ VX_API_ENTRY vx_object_array VX_API_CALL vxCreateObjectArray(vx_context context,
             arr = (vx_object_array)vxoError_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
         }
     }
-
+    gcmFOOTER_NO();
     return arr;
 }
 
 VX_API_ENTRY vx_object_array VX_API_CALL vxCreateVirtualObjectArray(vx_graph graph, vx_reference exemplar, vx_size count)
 {
     vx_object_array arr = NULL;
-
+    gcmHEADER_ARG("graph=%p, exemplar=%p, count=0x%lx", graph, exemplar, count);
     gcmDUMP_API("$VX vxCreateVirtualObjectArray: graph=%p, exemplar=%p, count=0x%lx", graph, exemplar, count);
 
     if (vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH) == vx_true_e)
@@ -440,7 +454,7 @@ VX_API_ENTRY vx_object_array VX_API_CALL vxCreateVirtualObjectArray(vx_graph gra
             arr = (vx_object_array)vxoError_GetErrorObject(graph->base.context, VX_ERROR_INVALID_PARAMETERS);
         }
     }
-
+    gcmFOOTER_NO();
     return arr;
 }
 
@@ -455,7 +469,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseObjectArray(vx_object_array *arr)
 VX_API_ENTRY vx_status VX_API_CALL vxQueryObjectArray(vx_object_array arr, vx_enum attribute, void *ptr, vx_size size)
 {
     vx_status status = VX_ERROR_INVALID_REFERENCE;
-
+    gcmHEADER_ARG("arr=%p, attribute=0x%x, ptr=%p, size=0x%lx", arr, attribute, ptr, size);
     gcmDUMP_API("$VX vxQueryObjectArray: arr=%p, attribute=0x%x, ptr=%p, size=0x%lx", arr, attribute, ptr, size);
 
     if (vxoOA_IsValidObjectArray(arr) == vx_true_e)
@@ -479,14 +493,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryObjectArray(vx_object_array arr, vx_en
                 break;
         }
     }
-
+    gcmFOOTER_NO();
     return status;
 }
 
 VX_API_ENTRY vx_reference VX_API_CALL vxGetObjectArrayItem(vx_object_array arr, vx_uint32 index)
 {
     vx_reference item = NULL;
-
+    gcmHEADER_ARG("arr=%p, index=0x%x", arr, index);
     gcmDUMP_API("$VX vxGetObjectArrayItem: arr=%p, index=0x%x", arr, index);
 
     if (vxoOA_IsValidObjectArray(arr) == vx_true_e)
@@ -502,13 +516,14 @@ VX_API_ENTRY vx_reference VX_API_CALL vxGetObjectArrayItem(vx_object_array arr, 
         }
     }
 
+    gcmFOOTER_NO();
     return item;
 }
 
 VX_API_ENTRY vx_object_array VX_API_CALL vxCreateTensorObjectArray(vx_context context, vx_uint32 count, vx_tensor* tensor)
 {
     vx_object_array arr = VX_NULL;
-
+    gcmHEADER_ARG("context=%p, count=0x%x, tensor=%p", context, count, tensor);
     gcmDUMP_API("$VX vxCreateTensorObjectArray: context=%p, count=0x%x, tensor=%p", context, count, tensor);
 
     if (vxoContext_IsValid(context) == vx_true_e)
@@ -528,6 +543,7 @@ VX_API_ENTRY vx_object_array VX_API_CALL vxCreateTensorObjectArray(vx_context co
     else
         vxError("vxCreateTensorObjectArray: Invalid context");
 
+    gcmFOOTER_NO();
     return arr;
 }
 

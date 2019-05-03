@@ -94,38 +94,6 @@ _isHWNotSupportJmpAny(
 }
 
 static gctBOOL
-_sameType(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst
-    )
-{
-    gctBOOL result = gcvFALSE;
-
-    result = (VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst)))
-              == VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetSource(Inst, 0)))) &&
-             VIR_Operand_GetRoundMode(VIR_Inst_GetSource(Inst, 0)) == VIR_ROUND_DEFAULT        &&
-             VIR_Operand_GetModifier(VIR_Inst_GetSource(Inst, 0)) == VIR_MOD_NONE              &&
-             VIR_Operand_GetModifier(VIR_Inst_GetDest(Inst)) == VIR_MOD_NONE;
-
-    return result;
-}
-
-static gctBOOL
-_notSameSizeType(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst
-    )
-{
-    VIR_TypeId dstTyId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst)));
-    VIR_TypeId srcTyId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetSource(Inst, 0)));
-
-    return (VIR_GetTypeSize(dstTyId) != VIR_GetTypeSize(srcTyId))
-        || (VIR_Operand_GetRoundMode(VIR_Inst_GetSource(Inst, 0)) != VIR_ROUND_DEFAULT)
-        || (VIR_Operand_GetModifier(VIR_Inst_GetSource(Inst, 0)) != VIR_MOD_NONE)
-        || (VIR_Operand_GetModifier(VIR_Inst_GetDest(Inst)) != VIR_MOD_NONE);
-}
-
-static gctBOOL
 _isTypeEqualTo(
     IN VIR_Operand *Opnd,
     IN VIR_TyFlag   TyFlag
@@ -193,16 +161,6 @@ _hasSHEnhancements2(
     }
 
     return gcvFALSE;
-}
-
-static gctBOOL
-_isI2I(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst
-    )
-{
-    return _isTypeEqualTo(VIR_Inst_GetDest(Inst), VIR_TYFLAG_ISINTEGER) &&
-        _isTypeEqualTo(VIR_Inst_GetSource(Inst, 0), VIR_TYFLAG_ISINTEGER);
 }
 
 static gctBOOL
@@ -483,7 +441,7 @@ static VIR_Pattern _selectPattern[] = {
 };
 
 static VIR_PatternMatchInst _convPatInst0[] = {
-    { VIR_OP_CONVERT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _sameType }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_CONVERT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { VIR_Lower_SameType }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _convRepInst0[] = {
@@ -515,7 +473,7 @@ static VIR_PatternReplaceInst _convRepInst3[] = {
 };
 
 static VIR_PatternMatchInst _convPatInst4[] = {
-    { VIR_OP_CONVERT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isI2I, _hasSHEnhancements2, _notSameSizeType }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_CONVERT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { VIR_Lower_IsI2I, _hasSHEnhancements2, VIR_Lower_NotSameSizeType }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _convRepInst4[] = {
@@ -523,7 +481,7 @@ static VIR_PatternReplaceInst _convRepInst4[] = {
 };
 
 static VIR_PatternMatchInst _convPatInst5[] = {
-    { VIR_OP_CONVERT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isI2I }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_CONVERT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { VIR_Lower_IsI2I }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _convRepInst5[] = {

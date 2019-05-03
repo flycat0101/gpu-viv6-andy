@@ -1,5 +1,3 @@
-store test_gray.bmp and vx_tutorial1 in the same directory
-
-go to that directory and execute vx_tutiral1 without any parameters
-
-if everything goes well, a test_sobel_golden.bmp will be generated in current folder
+The simplest case based on OpenVX framework, which use test_gray.bmp as input image and test_sobel.bmp as output image by default.
+this case using only one node in graph, which processing sobel3x3 algorithm on input image.
+NO arguments are required to run this program.

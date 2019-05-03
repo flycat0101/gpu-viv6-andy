@@ -13,26 +13,34 @@
 
 #include <gc_vx_common.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_ARRAY
+
 VX_PRIVATE_API vx_size vxoArray_GetItemSize(vx_context context, vx_enum itemType)
 {
     vx_uint32 i;
     vx_size size;
 
+    gcmHEADER_ARG("context=%p, itemType=0x%x", context, itemType);
     vxmASSERT(context);
 
     size = vxDataType_GetSize(itemType);
 
-    if (size != 0) return size;
-
+    if (size != 0)
+    {
+        gcmFOOTER_ARG("0x%lx", size);
+        return size;
+    }
     /* The data type should be user structs */
     for (i = 0; i < VX_MAX_USER_STRUCT_COUNT; i++)
     {
         if (context->userStructTable[i].type == itemType)
         {
+            gcmFOOTER_NO();
             return context->userStructTable[i].size;
         }
     }
 
+    gcmFOOTER_NO();
     return 0;
 }
 
@@ -43,20 +51,23 @@ VX_PRIVATE_API vx_bool vxoArray_IsValidItemType(vx_context context, vx_enum item
 
 VX_PRIVATE_API vx_bool vxoArray_IsValid(vx_array array)
 {
+    gcmHEADER_ARG("array=%p", array);
     if (!vxoReference_IsValidAndSpecific(&array->base, VX_TYPE_ARRAY))
     {
         vxError("%s[%d]: Array reference is invalid!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&array->base, VX_ERROR_INVALID_REFERENCE, "%s[%d]: Array reference is invalid!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_ARG("%d", vx_false_e);
         return vx_false_e;
     }
 
+    gcmFOOTER_NO();
     return vxoArray_IsValidItemType(array->base.context, array->itemType);
 }
 
 VX_PRIVATE_API void vxoArray_InitializeMemory(vx_array array)
 {
     vx_uint32 i;
-
+    gcmHEADER_ARG("array=%p", array);
     array->memory.planeCount    = 1;
     array->memory.dimCount      = 2;
     array->memory.dims[0][0]    = (int32_t)array->itemSize;
@@ -66,10 +77,12 @@ VX_PRIVATE_API void vxoArray_InitializeMemory(vx_array array)
     {
         array->memory.sizes[i] = 0;
     }
+    gcmFOOTER_NO();
 }
 
 VX_INTERNAL_API void vxoArray_Dump(vx_array array)
 {
+    gcmHEADER_ARG("array=%p", array);
     if (array == VX_NULL)
     {
         vxTrace(VX_TRACE_ARRAY, "<array>null</array>\n");
@@ -87,20 +100,25 @@ VX_INTERNAL_API void vxoArray_Dump(vx_array array)
                 "</array>",
                 array, array->itemType, array->itemSize, array->itemCount, array->capacity);
     }
+    gcmFOOTER_NO();
 }
 
 VX_INTERNAL_API vx_array vxoArray_Create(
     vx_context context, vx_enum itemType, vx_size capacity, vx_bool isVirtual, vx_enum type, vx_bool isVivArray)
 {
     vx_array array;
-
+    gcmHEADER_ARG("context=%p, itemType=0x%x, capacity=0x%lx, isVirtual=0x%x, type=0x%x, isVivArray=0x%x",
+        context, itemType, capacity, isVirtual, type, isVivArray);
     vxmASSERT(context);
     vxmASSERT(type == VX_TYPE_ARRAY || type == VX_TYPE_LUT);
 
     array = (vx_array)vxoReference_Create(context, type, VX_REF_EXTERNAL, &context->base);;
 
-    if (vxoReference_GetStatus((vx_reference)array) != VX_SUCCESS) return array;
-
+    if (vxoReference_GetStatus((vx_reference)array) != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("array=%p", array);
+        return array;
+    }
     array->itemType         = itemType;
     array->itemSize         = vxoArray_GetItemSize(context, itemType);
     array->capacity         = capacity;
@@ -109,6 +127,7 @@ VX_INTERNAL_API vx_array vxoArray_Create(
 
     vxoArray_InitializeMemory(array);
 
+    gcmFOOTER_ARG("array=%p", array);
     return array;
 }
 
@@ -122,6 +141,7 @@ VX_INTERNAL_API void vxoArray_Destroy(vx_array* array)
 VX_INTERNAL_CALLBACK_API void vxoArray_Destructor(vx_reference ref)
 {
     vx_array array = (vx_array)ref;
+    gcmHEADER_ARG("ref=%p", ref);
 
     vxoMemory_Free(array->base.context, &array->memory);
 
@@ -129,16 +149,24 @@ VX_INTERNAL_CALLBACK_API void vxoArray_Destructor(vx_reference ref)
     {
         gcoVX_FreeMemory(array->memAllocInfo.node);
     }
+    gcmFOOTER_NO();
 }
 
 VX_INTERNAL_API vx_bool vxoArray_InitializeAsVirtual(vx_array array, vx_enum itemType, vx_size capacity)
 {
+    gcmHEADER_ARG("array=%p, itemType=0x%x, capacity=0x%lx", array, itemType, capacity);
     vxmASSERT(array);
 
-    if (!vxoArray_IsValidItemType(array->base.context, itemType)) return vx_false_e;
-
-    if (array->itemType != VX_TYPE_INVALID && array->itemType != itemType) return vx_false_e;
-
+    if (!vxoArray_IsValidItemType(array->base.context, itemType))
+    {
+        gcmFOOTER_ARG("%d", vx_false_e);
+        return vx_false_e;
+    }
+    if (array->itemType != VX_TYPE_INVALID && array->itemType != itemType)
+    {
+        gcmFOOTER_ARG("%d", vx_false_e);
+        return vx_false_e;
+    }
     array->itemType = itemType;
     array->itemSize = vxoArray_GetItemSize(array->base.context, itemType);
 
@@ -146,22 +174,34 @@ VX_INTERNAL_API vx_bool vxoArray_InitializeAsVirtual(vx_array array, vx_enum ite
 
     vxoArray_InitializeMemory(array);
 
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
 VX_INTERNAL_API vx_bool vxoArray_CheckItemTypeAndCapacity(vx_array array, vx_enum itemType, vx_size capacity)
 {
+    gcmHEADER_ARG("array=%p, itemType=0x%x, capacity=0x%lx", array, itemType, capacity);
     vxmASSERT(array);
 
-    if (!vxoArray_IsValidItemType(array->base.context, itemType)) return vx_false_e;
-
-    if (array->itemType != itemType) return vx_false_e;
-
+    if (!vxoArray_IsValidItemType(array->base.context, itemType))
+    {
+        gcmFOOTER_ARG("%d", vx_false_e);
+        return vx_false_e;
+    }
+    if (array->itemType != itemType)
+    {
+        gcmFOOTER_ARG("%d", vx_false_e);
+        return vx_false_e;
+    }
     if (capacity > 0)
     {
-        if (capacity > array->capacity) return vx_false_e;
+        if (capacity > array->capacity)
+        {
+            gcmFOOTER_ARG("%d", vx_false_e);
+            return vx_false_e;
+        }
     }
-
+    gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
 }
 
@@ -192,27 +232,43 @@ VX_INTERNAL_API vx_bool vxoArray_FreeMemoryEx(vx_array array)
 VX_INTERNAL_API vx_status vxoArray_AccessRange(
         vx_array array, vx_size start, vx_size end, vx_size* pStride, vx_ptr_ptr ptrPtr, vx_enum usage)
 {
-
+    gcmHEADER_ARG("array=%p, start=0x%lx, end=0x%lx, pStride=%p, ptrPtr=%p, usage=0x%x", array, start, end, pStride, ptrPtr, usage);
     vxmASSERT(array);
 
-    if (usage < VX_READ_ONLY || VX_READ_AND_WRITE < usage) return VX_ERROR_INVALID_PARAMETERS;
-
-    if (ptrPtr == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
-
-    if (start >= end || end > array->itemCount) return VX_ERROR_INVALID_PARAMETERS;
-
+    if (usage < VX_READ_ONLY || VX_READ_AND_WRITE < usage)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
+    if (ptrPtr == VX_NULL)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
+    if (start >= end || end > array->itemCount)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
     if (array->base.isVirtual && !array->base.accessible)
     {
         vxError("The virtual array, %p, is unaccessible", array);
+        gcmFOOTER_ARG("%d", VX_ERROR_OPTIMIZED_AWAY);
         return VX_ERROR_OPTIMIZED_AWAY;
     }
 
-    if (!vxoArray_AllocateMemory(array)) return VX_ERROR_NO_MEMORY;
-
+    if (!vxoArray_AllocateMemory(array))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_NO_MEMORY);
+        return VX_ERROR_NO_MEMORY;
+    }
     if (*ptrPtr == VX_NULL && (usage == VX_WRITE_ONLY || usage == VX_READ_AND_WRITE))
     {
-        if (!vxAcquireMutex(array->memory.writeLocks[0])) return VX_ERROR_NO_RESOURCES;
-
+        if (!vxAcquireMutex(array->memory.writeLocks[0]))
+        {
+            gcmFOOTER_ARG("%d", VX_ERROR_NO_RESOURCES);
+            return VX_ERROR_NO_RESOURCES;
+        }
         *ptrPtr = &array->memory.logicals[0][start * array->itemSize];
     }
     else
@@ -232,6 +288,7 @@ VX_INTERNAL_API vx_status vxoArray_AccessRange(
 
         if (!vxoContext_AddAccessor(array->base.context, size, usage, *ptrPtr, &array->base, OUT &index, strideSave))
         {
+            gcmFOOTER_ARG("%d", VX_ERROR_NO_MEMORY);
             return VX_ERROR_NO_MEMORY;
         }
 
@@ -239,7 +296,11 @@ VX_INTERNAL_API vx_status vxoArray_AccessRange(
 
         if (usage == VX_WRITE_ONLY || usage == VX_READ_AND_WRITE)
         {
-            if (!vxAcquireMutex(array->memory.writeLocks[0])) return VX_ERROR_NO_RESOURCES;
+            if (!vxAcquireMutex(array->memory.writeLocks[0]))
+            {
+                gcmFOOTER_ARG("%d", VX_ERROR_NO_RESOURCES);
+                return VX_ERROR_NO_RESOURCES;
+            }
         }
 
         if (usage != VX_WRITE_ONLY)
@@ -267,6 +328,7 @@ VX_INTERNAL_API vx_status vxoArray_AccessRange(
 
     vxoReference_Increment(&array->base, VX_REF_EXTERNAL);
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
@@ -275,15 +337,25 @@ VX_INTERNAL_API vx_status vxoArray_CommitRange(vx_array array, vx_size start, vx
     vx_uint32 index;
     vx_bool foundAccessor;
 
+    gcmHEADER_ARG("array=%p, start=0x%lx, end=0x%lx, ptr=%p", array, start, end, ptr);
     vxmASSERT(array);
 
-    if (ptr == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
+    if (ptr == VX_NULL)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
 
-    if (start > end || end > array->itemCount) return VX_ERROR_INVALID_PARAMETERS;
+    if (start > end || end > array->itemCount)
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
 
     if (array->base.isVirtual && !array->base.accessible)
     {
         vxError("The virtual array, %p, is unaccessible", array);
+        gcmFOOTER_ARG("%d", VX_ERROR_OPTIMIZED_AWAY);
         return VX_ERROR_OPTIMIZED_AWAY;
     }
 
@@ -348,19 +420,21 @@ VX_INTERNAL_API vx_status vxoArray_CommitRange(vx_array array, vx_size start, vx
     }
 
     vxoReference_Decrement(&array->base, VX_REF_EXTERNAL);
-
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
 VX_INTERNAL_API vx_status vxoArray_CopyArrayRangeInt(vx_array arr, vx_size start, vx_size end, vx_size stride, void *ptr, vx_enum usage, vx_enum mem_type)
 {
     vx_status status = VX_FAILURE;
+    gcmHEADER_ARG("arr=%p, start=0x%lx, end=0x%lx, stride=0x%lx, ptr=%p, usage=0x%x, mem_type=0x%x", arr, start, end, stride, ptr, usage, mem_type);
 
     /* bad parameters */
     if (((usage != VX_READ_ONLY) && (VX_WRITE_ONLY != usage)) ||
          (ptr == NULL) || (stride < arr->itemSize) ||
          (start >= end) || (end > arr->itemCount))
     {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
@@ -371,6 +445,7 @@ VX_INTERNAL_API vx_status vxoArray_CopyArrayRangeInt(vx_array arr, vx_size start
         {
             /* User tried to access a "virtual" array. */
             vxError("Can not access a virtual array\n");
+            gcmFOOTER_ARG("%d", VX_ERROR_OPTIMIZED_AWAY);
             return VX_ERROR_OPTIMIZED_AWAY;
         }
         /* framework trying to access a virtual array, this is ok. */
@@ -381,6 +456,7 @@ VX_INTERNAL_API vx_status vxoArray_CopyArrayRangeInt(vx_array arr, vx_size start
      */
     if (vxoArray_AllocateMemory(arr) == vx_false_e)
     {
+        gcmFOOTER_ARG("%d", VX_ERROR_NO_MEMORY);
         return VX_ERROR_NO_MEMORY;
     }
     {
@@ -448,6 +524,7 @@ VX_INTERNAL_API vx_status vxoArray_CopyArrayRangeInt(vx_array arr, vx_size start
         }
     }
     }
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -605,12 +682,14 @@ VX_INTERNAL_API vx_status vxoArray_MapArrayRangeInt(vx_array arr, vx_size start,
                              void **ptr, vx_enum usage, vx_enum mem_type, vx_uint32 flags)
 {
     vx_status status = VX_FAILURE;
+    gcmHEADER_ARG("arr=%p, start=0x%lx, end=0x%lx, map_id=%p, stride=%p, ptr=%p, usage=0x%x, mem_type=0x%x, flags=0x%x", arr, start, end, map_id, stride, ptr, usage, mem_type, flags);
 
     /* bad parameters */
     if ((usage < VX_READ_ONLY) || (VX_READ_AND_WRITE < usage) ||
         (ptr == NULL) || (stride == NULL) ||
         (start >= end) || (end > arr->itemCount))
     {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
@@ -621,6 +700,7 @@ VX_INTERNAL_API vx_status vxoArray_MapArrayRangeInt(vx_array arr, vx_size start,
         {
             /* User tried to access a "virtual" array. */
             vxError("Can not access a virtual array\n");
+            gcmFOOTER_ARG("%d", VX_ERROR_OPTIMIZED_AWAY);
             return VX_ERROR_OPTIMIZED_AWAY;
         }
         /* framework trying to access a virtual array, this is ok. */
@@ -631,6 +711,7 @@ VX_INTERNAL_API vx_status vxoArray_MapArrayRangeInt(vx_array arr, vx_size start,
      */
     if (vxoArray_AllocateMemory(arr) == vx_false_e)
     {
+        gcmFOOTER_ARG("%d", VX_ERROR_NO_MEMORY);
         return VX_ERROR_NO_MEMORY;
     }
 
@@ -654,12 +735,15 @@ VX_INTERNAL_API vx_status vxoArray_MapArrayRangeInt(vx_array arr, vx_size start,
             status = VX_FAILURE;
         }
     }
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
 VX_INTERNAL_API vx_status vxoArray_UnmapArrayRangeInt(vx_array arr, vx_map_id map_id)
 {
     vx_status status = VX_FAILURE;
+
+    gcmHEADER_ARG("arr=%p, map_id=0x%x", arr, map_id);
 
     /* determine if virtual before checking for memory */
     if (arr->base.isVirtual == vx_true_e)
@@ -668,6 +752,7 @@ VX_INTERNAL_API vx_status vxoArray_UnmapArrayRangeInt(vx_array arr, vx_map_id ma
         {
             /* User tried to access a "virtual" array. */
             vxError("Can not access a virtual array\n");
+            gcmFOOTER_ARG("%d", VX_ERROR_OPTIMIZED_AWAY);
             return VX_ERROR_OPTIMIZED_AWAY;
         }
         /* framework trying to access a virtual array, this is ok. */
@@ -677,6 +762,7 @@ VX_INTERNAL_API vx_status vxoArray_UnmapArrayRangeInt(vx_array arr, vx_map_id ma
     if (vxoContext_FindMemoryMap(arr->base.context, (vx_reference)arr, map_id) != vx_true_e)
     {
         vxError("Invalid parameters to unmap array range\n");
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
@@ -696,21 +782,29 @@ VX_INTERNAL_API vx_status vxoArray_UnmapArrayRangeInt(vx_array arr, vx_map_id ma
             status = VX_FAILURE;
         }
     }
+
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 #endif
 
 VX_API_ENTRY vx_array VX_API_CALL vxCreateArray(vx_context context, vx_enum itemType, vx_size capacity)
 {
+    gcmHEADER_ARG("context=%p, itemType=0x%x, capacity=0x%lx", context, itemType, capacity);
     gcmDUMP_API("$VX vxCreateArray: context=%p, itemType=0x%x, capacity=0x%lx", context, itemType, capacity);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     if (!vxoArray_IsValidItemType(context, itemType) || (capacity <= 0))
     {
+        gcmFOOTER_NO();
         return (vx_array)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
     }
 
+    gcmFOOTER_NO();
     return (vx_array)vxoArray_Create(context, itemType, capacity, vx_false_e, VX_TYPE_ARRAY, vx_false_e);
 }
 
@@ -718,12 +812,14 @@ VX_API_ENTRY vx_array VX_API_CALL vxCreateVirtualArray(vx_graph graph, vx_enum i
 {
     vx_array array;
 
+    gcmHEADER_ARG("graph=%p, itemType=0x%x, capacity=0x%lx", graph, itemType, capacity);
     gcmDUMP_API("$VX vxCreateVirtualArray: graph=%p, itemType=0x%x, capacity=0x%lx", graph, itemType, capacity);
 
     if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH))
     {
         vxError("%s[%d]: Reference is invalid!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&graph->base, VX_ERROR_INVALID_REFERENCE, "%s[%d]: Reference is invalid!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_NO();
         return VX_NULL;
     }
 
@@ -731,33 +827,44 @@ VX_API_ENTRY vx_array VX_API_CALL vxCreateVirtualArray(vx_graph graph, vx_enum i
     {
         if (!vxoArray_IsValidItemType(graph->base.context, itemType))
         {
+            gcmFOOTER_NO();
             return (vx_array)vxoContext_GetErrorObject(graph->base.context, VX_ERROR_INVALID_PARAMETERS);
         }
     }
 
     array = vxoArray_Create(graph->base.context, itemType, capacity, vx_true_e, VX_TYPE_ARRAY, vx_false_e);
 
-    if (vxoReference_GetStatus((vx_reference)array) != VX_SUCCESS) return array;
+    if (vxoReference_GetStatus((vx_reference)array) != VX_SUCCESS)
+    {
+        gcmFOOTER_ARG("array=%p", array);
+        return array;
+    }
 
     array->base.scope = (vx_reference)graph;
 
+    gcmFOOTER_ARG("array=%p", array);
     return array;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseArray(vx_array *array)
 {
+    gcmHEADER_ARG("array=%p", array);
     gcmDUMP_API("$VX vxReleaseArray: array=%p", array);
 
+    gcmFOOTER_NO();
     return vxoReference_Release((vx_reference_ptr)array, VX_TYPE_ARRAY, VX_REF_EXTERNAL);
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryArray(vx_array array, vx_enum attribute, void *ptr, vx_size size)
 {
-
+    gcmHEADER_ARG("array=%p, attribute=0x%lx, ptr=%p, size=0x%lx", array, attribute, ptr, size);
     gcmDUMP_API("$VX vxQueryArray: array=%p, attribute=0x%lx, ptr=%p, size=0x%lx", array, attribute, ptr, size);
 
-    if (!vxoArray_IsValid(array)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoArray_IsValid(array))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     switch (attribute)
     {
         case VX_ARRAY_ITEMTYPE:
@@ -788,18 +895,24 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryArray(vx_array array, vx_enum attribut
             vxError("%s[%d]: The attribute parameter, %d, is not supported", __FUNCTION__, __LINE__, attribute);
             vxAddLogEntry(&array->base, VX_ERROR_NOT_SUPPORTED, "%s[%d]: The attribute parameter, %d, is not supported!\n",
                 __FUNCTION__, __LINE__, attribute);
+            gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
             return VX_ERROR_NOT_SUPPORTED;
     }
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxSetArrayAttribute(vx_array array, vx_enum attribute, void *ptr, vx_size size)
 {
+    gcmHEADER_ARG("array=%p, attribute=0x%x, ptr=%p, size=0x%lx", array, attribute, ptr, size);
     gcmDUMP_API("$VX vxSetArrayAttribute: array=%p, attribute=0x%x, ptr=%p, size=0x%lx", array, attribute, ptr, size);
 
-    if (!vxoArray_IsValid(array)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoArray_IsValid(array))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     switch (attribute)
     {
         case VX_ARRAY_ITEMTYPE:
@@ -830,9 +943,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetArrayAttribute(vx_array array, vx_enum a
             vxError("%s[%d]: The attribute parameter, %d, is not supported", __FUNCTION__, __LINE__, attribute);
             vxAddLogEntry(&array->base, VX_ERROR_NOT_SUPPORTED, "%s[%d]: The attribute parameter, %d, is not supported!\n",
                 __FUNCTION__, __LINE__, attribute);
+            gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
             return VX_ERROR_NOT_SUPPORTED;
     }
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
@@ -841,14 +956,19 @@ VX_API_ENTRY vx_status VX_API_CALL vxAddArrayItems(vx_array array, vx_size count
     vx_size         destOffset;
     vx_uint8_ptr    destPtr;
 
+    gcmHEADER_ARG("array=%p, count=0x%lx, ptr=%p, stride=0x%lx", array, count, ptr, stride);
     gcmDUMP_API("$VX vxAddArrayItems: array=%p, count=0x%lx, ptr=%p, stride=0x%lx", array, count, ptr, stride);
 
-    if (!vxoArray_IsValid(array)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoArray_IsValid(array))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     if (count <= 0)
     {
         vxError("%s[%d]: Array count <= 0 !\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&array->base, VX_ERROR_INVALID_PARAMETERS, "%s[%d]: Array count <= 0 !\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
@@ -856,6 +976,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxAddArrayItems(vx_array array, vx_size count
     {
         vxError("%s[%d]: Parameter ptr is NULL!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&array->base, VX_ERROR_INVALID_PARAMETERS, "%s[%d]: Parameter ptr is NULL!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
@@ -863,6 +984,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxAddArrayItems(vx_array array, vx_size count
     {
         vxError("%s[%d]: Parameter stride is invalid!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&array->base, VX_ERROR_INVALID_PARAMETERS, "%s[%d]: Parameter stride is invalid!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
@@ -870,6 +992,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxAddArrayItems(vx_array array, vx_size count
     {
         vxError("%s[%d]: Parameter itemCount is invalid!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&array->base, VX_ERROR_INVALID_PARAMETERS, "%s[%d]: Parameter itemCount is invalid!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
@@ -877,6 +1000,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxAddArrayItems(vx_array array, vx_size count
     {
         vxError("%s[%d]: Allocate array memory failed!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&array->base, VX_ERROR_INVALID_PARAMETERS, "%s[%d]: Allocate array memory failed!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_ARG("%d", VX_ERROR_NO_MEMORY);
         return VX_ERROR_NO_MEMORY;
     }
 
@@ -902,19 +1026,26 @@ VX_API_ENTRY vx_status VX_API_CALL vxAddArrayItems(vx_array array, vx_size count
 
     vxoReference_IncrementWriteCount(&array->base);
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxTruncateArray(vx_array array, vx_size new_num_items)
 {
+    gcmHEADER_ARG("array=%p, new_num_items=0x%lx", array, new_num_items);
     gcmDUMP_API("$VX vxTruncateArray: array=%p, new_num_items=0x%lx", array, new_num_items);
 
-    if (!vxoArray_IsValid(array)) return VX_ERROR_INVALID_REFERENCE;
+    if (!vxoArray_IsValid(array))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
 
     if (new_num_items > array->itemCount)
     {
         vxError("%s[%d]: Parameter itemCount is invalid!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&array->base, VX_ERROR_INVALID_PARAMETERS, "%s[%d]: Parameter itemCount is invalid!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
@@ -922,6 +1053,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxTruncateArray(vx_array array, vx_size new_n
 
     vxoReference_IncrementWriteCount(&array->base);
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
@@ -930,15 +1062,20 @@ VX_API_ENTRY vx_status VX_API_CALL vxAccessArrayRange(
 {
     vx_status status;
 
+    gcmHEADER_ARG("array=%p, start=0x%lx, end=0x%lx, stride=%p, ptr=%p, usage=0x%x", array, start, end, stride, ptr, usage);
     gcmDUMP_API("$VX vxAccessArrayRange: array=%p, start=0x%lx, end=0x%lx, stride=%p, ptr=%p, usage=0x%x",
         array, start, end, stride, ptr, usage);
 
-    if (!vxoArray_IsValid(array)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoArray_IsValid(array))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     if (stride == VX_NULL)
     {
         vxError("%s[%d]: Parameter stride is invalid!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&array->base, VX_ERROR_INVALID_PARAMETERS, "%s[%d]: Parameter stride is invalid!\n", __FUNCTION__, __LINE__);
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
@@ -949,15 +1086,22 @@ VX_API_ENTRY vx_status VX_API_CALL vxAccessArrayRange(
 
     status = vxoArray_AccessRange(array, start, end, stride, ptr, usage);
 
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxCommitArrayRange(vx_array array, vx_size start, vx_size end, const void *ptr)
 {
+    gcmHEADER_ARG("array=%p, start=0x%lx, end=0x%lx, ptr=%p", array, start, end, ptr);
     gcmDUMP_API("$VX vxCommitArrayRange: array=%p, start=0x%lx, end=0x%lx, ptr=%p", array, start, end, ptr);
 
-    if (!vxoArray_IsValid(array)) return VX_ERROR_INVALID_REFERENCE;
+    if (!vxoArray_IsValid(array))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
 
+    gcmFOOTER_NO();
     return vxoArray_CommitRange(array, start, end, (vx_ptr)ptr);
 }
 
@@ -965,14 +1109,18 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyArrayRange(vx_array arr, vx_size start,
                                                     void *ptr, vx_enum usage, vx_enum mem_type)
 {
     vx_status status = VX_FAILURE;
-
+    gcmHEADER_ARG("arr=%p, start=0x%lx, end=0x%lx, stride=0x%lx, ptr=%p, usage=0x%x, mem_type=0x%x",
+        arr, start, end, stride, ptr, usage, mem_type);
     gcmDUMP_API("$VX vxCopyArrayRange: arr=%p, start=0x%lx, end=0x%lx, stride=0x%lx, ptr=%p, usage=0x%x, mem_type=0x%x",
         arr, start, end, stride, ptr, usage, mem_type);
 
-    if (!vxoArray_IsValid(arr)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoArray_IsValid(arr))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     status = vxoArray_CopyArrayRangeInt(arr, start, end, stride, ptr, usage, mem_type);
-
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
@@ -980,27 +1128,36 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapArrayRange(vx_array arr, vx_size start, 
                                                    void **ptr, vx_enum usage, vx_enum mem_type, vx_uint32 flags)
 {
     vx_status status = VX_FAILURE;
-
+    gcmHEADER_ARG("arr=%p, start=0x%lx, end=0x%lx, map_id=%p, stride=%p, ptr=%p, usage=0x%x, mem_type=0x%x, flags=0x%x",
+        arr, start, end, map_id, stride, ptr, usage, mem_type, flags);
     gcmDUMP_API("$VX vxMapArrayRange: arr=%p, start=0x%lx, end=0x%lx, map_id=%p, stride=%p, ptr=%p, usage=0x%x, mem_type=0x%x, flags=0x%x",
         arr, start, end, map_id, stride, ptr, usage, mem_type, flags);
 
-    if (!vxoArray_IsValid(arr)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoArray_IsValid(arr))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     status = vxoArray_MapArrayRangeInt(arr, start, end, map_id, stride, ptr, usage, mem_type, flags);
 
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxUnmapArrayRange(vx_array arr, vx_map_id map_id)
 {
     vx_status status = VX_FAILURE;
-
+    gcmHEADER_ARG("arr=%p, map_id=%p", arr, map_id);
     gcmDUMP_API("$VX vxUnmapArrayRange: arr=%p, map_id=%p", arr, map_id);
 
-    if (!vxoArray_IsValid(arr)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoArray_IsValid(arr))
+    {
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     status = vxoArray_UnmapArrayRangeInt(arr, map_id);
 
+    gcmFOOTER_ARG("%d", status);
     return status;
 }
 

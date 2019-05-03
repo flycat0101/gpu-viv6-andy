@@ -15,7 +15,7 @@
 #include "gc_es_device.h"
 #include "gc_es_object_inline.c"
 
-#define _GC_OBJ_ZONE __GLES3_ZONE_CORE
+#define _GC_OBJ_ZONE gcdZONE_GL40_CORE
 
 #ifdef OPENGL40
 
@@ -64,6 +64,12 @@ GLvoid __glConvertResult(__GLcontext *gc, GLint fromType, const GLvoid *rawdata,
                 ((GLfloat *)result)[i] = ((const GLfloat *)rawdata)[i];
             }
             break;
+        case __GL_FLOAT64:
+            for (i=0; i < size; i++)
+            {
+                ((GLdouble *)result)[i] = ((const GLfloat *)rawdata)[i];
+            }
+            break;
         case __GL_INT32:
             for (i=0; i < size; i++)
             {
@@ -98,6 +104,12 @@ GLvoid __glConvertResult(__GLcontext *gc, GLint fromType, const GLvoid *rawdata,
                 ((GLfloat *)result)[i] = ((const GLfloat *)rawdata)[i];
             }
             break;
+        case __GL_FLOAT64:
+            for (i=0; i < size; i++)
+            {
+                ((GLdouble *)result)[i] = ((const GLfloat *)rawdata)[i];
+            }
+            break;
         case __GL_INT32:
             for (i=0; i < size; i++)
             {
@@ -126,6 +138,12 @@ GLvoid __glConvertResult(__GLcontext *gc, GLint fromType, const GLvoid *rawdata,
             for (i=0; i < size; i++)
             {
                 ((GLfloat *)result)[i] = (GLfloat)(((const GLint *)rawdata)[i]);
+            }
+            break;
+        case __GL_FLOAT64:
+            for (i=0; i < size; i++)
+            {
+                ((GLdouble *)result)[i] = (GLdouble)(((const GLint *)rawdata)[i]);
             }
             break;
         case __GL_INT32:
@@ -158,6 +176,12 @@ GLvoid __glConvertResult(__GLcontext *gc, GLint fromType, const GLvoid *rawdata,
                 ((GLfloat *)result)[i] = (GLfloat)(((const GLint64 *)rawdata)[i]);
             }
             break;
+        case __GL_FLOAT64:
+            for (i=0; i < size; i++)
+            {
+                ((GLdouble *)result)[i] = (GLdouble)(((const GLint64 *)rawdata)[i]);
+            }
+            break;
         case __GL_INT32:
             for (i=0; i < size; i++)
             {
@@ -186,6 +210,12 @@ GLvoid __glConvertResult(__GLcontext *gc, GLint fromType, const GLvoid *rawdata,
             for (i=0; i < size; i++)
             {
                 ((GLfloat *)result)[i] = ((const GLboolean *)rawdata)[i];
+            }
+            break;
+        case __GL_FLOAT64:
+            for (i=0; i < size; i++)
+            {
+                ((GLdouble *)result)[i] = ((const GLboolean *)rawdata)[i];
             }
             break;
         case __GL_INT32:
@@ -2091,6 +2121,17 @@ GLvoid GL_APIENTRY __glim_GetFloatv(__GLcontext *gc, GLenum pname, GLfloat* para
 
     __GL_FOOTER();
 }
+
+GLvoid GL_APIENTRY __glim_GetDoublev(__GLcontext *gc, GLenum pname, GLdouble *params)
+{
+    __GL_HEADER();
+
+    __glDoGet(gc, pname, params, __GL_FLOAT32, "glGetDoublev");
+
+    __GL_FOOTER();
+
+}
+
 
 GLvoid GL_APIENTRY __glim_GetIntegerv(__GLcontext *gc, GLenum pname, GLint* params)
 {

@@ -17,7 +17,7 @@
 
 #if gcdNULL_DRIVER < 2
 
-#define _GC_OBJ_ZONE            gcvZONE_INDEX
+#define _GC_OBJ_ZONE            gcdZONE_INDEX
 
 /******************************************************************************\
 ********************************** Structures **********************************
@@ -905,7 +905,7 @@ gcoINDEX_UploadOffset(
 {
     gceSTATUS status;
 
-    gcmHEADER_ARG("Index=0x%x Offset=%zu Buffer=0x%x Bytes=%lu",
+    gcmHEADER_ARG("Index=0x%x Offset=%u Buffer=0x%x Bytes=%lu",
                   Index, Offset, Buffer, Bytes);
 
     /* Verify the arguments. */
@@ -1966,7 +1966,7 @@ gcoINDEX_UploadDynamicEx(
         status = gcoOS_WaitSignal(gcvNULL, dynamic->signal, 0);
         if (status == gcvSTATUS_TIMEOUT)
         {
-            gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_INDEX,
+            gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_INDEX,
                           "Waiting for index buffer 0x%x",
                           dynamic);
 
@@ -2173,7 +2173,7 @@ gcoINDEX_UploadDynamicEx2(
             {
                 if (Index->dynamicAllocatedCount == Index->dynamicCount)
                 {
-                    gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_INDEX,
+                    gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_INDEX,
                         "Waiting for index buffer 0x%x",
                         dynamic);
 

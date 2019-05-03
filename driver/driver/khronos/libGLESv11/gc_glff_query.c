@@ -13,7 +13,7 @@
 
 #include "gc_glff_precomp.h"
 
-#define _GC_OBJ_ZONE glvZONE_TRACE
+#define _GC_OBJ_ZONE gcdZONE_ES11_TRACE
 
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
@@ -189,7 +189,7 @@ GL_API GLenum GL_APIENTRY glGetError(
 #ifdef _GC_OBJ_ZONE
 #undef _GC_OBJ_ZONE
 #endif
-#define _GC_OBJ_ZONE    glvZONE_QUERY
+#define _GC_OBJ_ZONE    gcdZONE_ES11_QUERY
 
 GL_API void GL_APIENTRY glGetBooleanv(
     GLenum Value,

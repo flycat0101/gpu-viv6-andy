@@ -25,7 +25,7 @@ gctUINT64 endTimeusec = 0;
 gctUINT64 deltaValue = 0;
 #endif
 
-#define _GC_OBJ_ZONE    gcvZONE_VG
+#define _GC_OBJ_ZONE    gcdZONE_VG
 
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
@@ -1746,7 +1746,7 @@ gcoVG_SetScissor(
     gceSTATUS status, last;
     gctUINT8_PTR bits = gcvNULL;
 
-    gcmHEADER_ARG("Vg=0x%x RectangleCount=%zu  Rectangles=0x%x",
+    gcmHEADER_ARG("Vg=0x%x RectangleCount=%u  Rectangles=0x%x",
         Vg, RectangleCount, Rectangles);
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Vg, gcvOBJ_VG);

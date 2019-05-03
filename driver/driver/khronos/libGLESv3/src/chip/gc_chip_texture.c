@@ -28,7 +28,7 @@
 #endif
 
 
-#define _GC_OBJ_ZONE    __GLES3_ZONE_TEXTURE
+#define _GC_OBJ_ZONE    gcdZONE_ES30_TEXTURE
 
 gceTEXTURE_TYPE __glChipTexTargetToHAL[] =
 {
@@ -1458,8 +1458,8 @@ gcChipInitializeTempBitmap(
             if (Format != gcvSURF_UNKNOWN)
             {
                 /* Round up the size. */
-                width  = gcmALIGN(Width,  256);
-                height = gcmALIGN(Height, 256);
+                width  = (gctUINT)gcmALIGN(Width,  256);
+                height = (gctUINT)gcmALIGN(Height, 256);
 
                 /* Allocate a new surface. */
                 gcmONERROR(gcoSURF_Construct(chipCtx->hal,
@@ -5715,6 +5715,9 @@ __glChipEglImageTargetTexture2DOES(
     __GLmipMapLevel *mipmap = &texObj->faceMipmap[0][0];
     __GLchipMipmapInfo *chipMipLevel = &texInfo->mipLevels[0];
     gcsSURF_VIEW texView = {gcvNULL, 0, 1};
+#if defined(ANDROID)
+    __GLchipFmtPatch patchCase = __GL_CHIP_FMT_PATCH_NONE;
+#endif
 
     gcmHEADER_ARG("gc=0x%x texObj=0x%x target=0x%04x eglImage=0x%x", gc, texObj, target, eglImage);
 
@@ -5739,8 +5742,17 @@ __glChipEglImageTargetTexture2DOES(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+#if defined(ANDROID)
+    if ((chipCtx->patchId == gcvPATCH_NATIVEHARDWARE_CTS) &&
+        (mipmap->formatInfo->dataType == GL_HALF_FLOAT) &&
+        (chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4653))
+    {
+        patchCase = __GL_CHIP_FMT_PATCH_CASE3;
+    }
+    chipMipLevel->formatMapInfo = gcChipGetFormatMapInfo(gc, mipmap->formatInfo->drvFormat, patchCase);
+#else
     chipMipLevel->formatMapInfo = gcChipGetFormatMapInfo(gc, mipmap->formatInfo->drvFormat, __GL_CHIP_FMT_PATCH_NONE);
-
+#endif
     /* Validate the format. */
     switch (srcFormat)
     {

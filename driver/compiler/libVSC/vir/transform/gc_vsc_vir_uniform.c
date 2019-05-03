@@ -4057,7 +4057,7 @@ VSC_ErrCode VSC_UF_UtilizeAuxUBO(
                 }
                 return errCode;
             }
-            if(VIR_Shader_GetClientApiVersion(shader) < gcvAPI_OPENGL_ES20)
+            if (VIR_Shader_IsES11Compiler(shader) && !hwCfg->hwFeatureFlags.hasUniformB0)
             {
                 if(VSC_OPTN_UF_AUBOOptions_GetTrace(options))
                 {

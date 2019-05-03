@@ -102,6 +102,12 @@ extern "C" {
 #   error "gcmINLINE: Platform could not be determined"
 #endif
 
+#if defined(CONFIG_KASAN)
+#   define gcmNOINLINE noinline
+#else
+#   define gcmNOINLINE
+#endif
+
 /* Possible debug flags. */
 #define gcdDEBUG_NONE           0
 #define gcdDEBUG_ALL            (1 << 0)
@@ -209,6 +215,7 @@ typedef gctUINT32               gctTRACE;
 #define gcvMAXUINT64            0xffffffffffffffff
 #define gcvMINUINT64            0x0
 #define gcvMAXUINTPTR_T         (~(gctUINTPTR_T)0)
+#define gcvMAXSIZE_T            ((gctSIZE_T)(-1))
 
 typedef float                   gctFLOAT;
 typedef signed int              gctFIXED_POINT;
@@ -963,8 +970,9 @@ typedef enum _gceTRACEMODE
     gcvTRACEMODE_NONE     = 0,
     gcvTRACEMODE_FULL     = 1,
     gcvTRACEMODE_LOGGER   = 2,
-    gcvTRACEMODE_PRE      = 3,
-    gcvTRACEMODE_POST     = 4,
+    gcvTRACEMODE_ALLZONE  = 3,
+    gcvTRACEMODE_PRE      = 4,
+    gcvTRACEMODE_POST     = 5,
 } gceTRACEMODE;
 
 typedef struct _gcsLISTHEAD * gcsLISTHEAD_PTR;
@@ -1102,5 +1110,4 @@ gcsHAL_PATCH_VIDMEM_TIMESTAMP;
 #endif
 
 #endif /* __gc_hal_types_h_ */
-
 

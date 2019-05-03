@@ -50,7 +50,8 @@ __kernel void vxcSvdf_fp16(
     float tmpSum, tmpData0, tmpData1;
     half tmpOut;
     vxc_short4 result;
-
+    short stride_s = (short)stride;
+    short index_s = 0;
     for(int r = 0; r < rankVal; r++)
     {
         float activation = 0.0f;
@@ -80,11 +81,15 @@ __kernel void vxcSvdf_fp16(
         coord_weight.x = 0;
         int offset = idx * memory_size;
         int index = 0;
+
         for(int i = 0; i < memory_size_minus1; ++i)
         {
             index = offset + i;
-            coord_bias.x = index % stride;
-            coord_bias.y = index / stride;
+            index_s = (short)(index);
+            //coord_bias.x = index % stride;
+            //coord_bias.y = index / stride;
+            coord_bias.x = (index_s % stride_s);
+            coord_bias.y = (index_s / stride_s);
             VXC_ReadImage(tmpVal0, recurrent, coord_weight, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
             VXC_ReadImage(tmpVal1, state_in, coord_bias.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
             coord_weight.x++;
@@ -164,7 +169,8 @@ __kernel void vxcSvdf_fp16_biasFp32(
     float tmpSum, tmpData0, tmpData1;
     half tmpOut;
     vxc_short4 result;
-
+    short stride_s = (short)stride;
+    short index_s = 0;
     for(int r = 0; r < rankVal; r++)
     {
         float activation = 0.0f;
@@ -197,8 +203,11 @@ __kernel void vxcSvdf_fp16_biasFp32(
         for(int i = 0; i < memory_size_minus1; ++i)
         {
             index = offset + i;
-            coord_bias.x = index % stride;
-            coord_bias.y = index / stride;
+            index_s = (short)index;
+            //coord_bias.x = index % stride;
+            //coord_bias.y = index / stride;
+            coord_bias.x = (index_s % stride_s);
+            coord_bias.y = (index_s / stride_s);
             VXC_ReadImage(tmpVal0, recurrent, coord_weight, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
             VXC_ReadImage(tmpVal1, state_in, coord_bias.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
             coord_weight.x++;

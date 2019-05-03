@@ -13,6 +13,8 @@
 
 #include "gc_vg_precomp.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG_TEXT
+
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
 \******************************************************************************/
@@ -603,7 +605,7 @@ VG_API_CALL VGFont VG_API_ENTRY vgCreateFont(
     vgmENTERAPI(vgCreateFont)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(%d);\n",
             __FUNCTION__,
             GlyphCapacityHint
@@ -635,7 +637,7 @@ VG_API_CALL VGFont VG_API_ENTRY vgCreateFont(
         }
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s() = 0x%08X;\n",
             __FUNCTION__,
             font
@@ -674,7 +676,7 @@ VG_API_CALL void VG_API_ENTRY vgDestroyFont(
     vgmENTERAPI(vgDestroyFont)
     {
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X);\n",
             __FUNCTION__,
             Font
@@ -771,7 +773,7 @@ VG_API_CALL void VG_API_ENTRY vgSetGlyphToPath(
             );
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, %d, 0x%08X, %d, GlyphOrigin, Escapement);\n",
             __FUNCTION__,
             Font, GlyphIndex, Path, IsHinted
@@ -912,7 +914,7 @@ VG_API_CALL void VG_API_ENTRY vgSetGlyphToImage(
             );
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, %d, 0x%08X, GlyphOrigin, Escapement);\n",
             __FUNCTION__,
             Font, GlyphIndex, Image
@@ -1038,7 +1040,7 @@ VG_API_CALL void VG_API_ENTRY vgClearGlyph(
         VGint index;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, %d);\n",
             __FUNCTION__,
             Font, GlyphIndex
@@ -1257,7 +1259,7 @@ VG_API_CALL void VG_API_ENTRY vgDrawGlyphs(
         VGint i;
 
         gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
             "%s(0x%08X, %d, GlyphIndices, AdjustmentsX, AdjustmentsY, 0x%04X, %d);\n",
             __FUNCTION__,
             Font, GlyphCount, PaintModes, AllowAutoHinting

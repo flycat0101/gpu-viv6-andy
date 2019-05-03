@@ -14,7 +14,6 @@
 #ifndef _GC_VX_NN_UTIL_H_
 #define _GC_VX_NN_UTIL_H_
 
-
 #define F16_EXPONENT_BITS 0x1F
 #define F16_EXPONENT_BIAS 15
 
@@ -82,6 +81,50 @@ typedef enum
 }
 vx_op_type;
 
+typedef struct _vx_arch_model_bw_cost_s
+{
+    vx_float64 cost;
+    vx_float64 tile0;
+    vx_float64 tile0VZGroup0;
+    vx_float64 vzGroup0;
+    vx_float64 residual; /*for write bw*/
+}
+vx_arch_model_bw_cost_s;
+
+typedef struct _vx_arch_model_cycle_cost_s
+{
+    vx_float64 cost;
+    vx_float64 tile0VZGroup0;
+    vx_float64 tile0ResetVZGroup;
+    vx_float64 resetTileVZGroup0;
+    vx_float64 resetTileResetVZGroup;
+}
+vx_arch_model_cycle_cost_s;
+
+typedef struct _vx_arch_model_cost_s
+{
+    vx_arch_model_bw_cost_s readBW;
+    vx_arch_model_bw_cost_s writeBW;
+    vx_arch_model_cycle_cost_s readCycle;
+    vx_arch_model_cycle_cost_s writeCycle;
+} vx_arch_model_cost_s;
+
+typedef enum _vx_arch_model_nn_cost_type
+{
+    ARCH_MODEL_DDR_COST = 0,
+    ARCH_MODEL_VIP_SRAM_COST,
+    ARCH_MODEL_AXI_SRAM_COST,
+    ARCH_MODEL_AXI_BUS_COST,
+    ARCH_MODEL_DDR_KERNEL_COST,
+    ARCH_MODEL_DDR_IN_IMAGE_COST,
+}
+vx_arch_model_nn_cost_type;
+
+#define NUMBER_OF_NN_COST_TYPE 6
+
+
+
+void calculateSplitSize(vx_uint32 whole_size, vx_uint32 split_num, vx_uint32 split_size_array[], vx_uint32 split_offset_array[]);
 vx_uint8 Fp32toUint8(vx_float32 val, vx_int32 zeroPoint, vx_float32 scale, vx_int32 roundMode);
 vx_float32 Uint8toFp32(vx_uint8 val, vx_int32 zeroPoint, vx_float32 scale);
 vx_float32 Fp16toFp32(const vx_uint16 in);
@@ -115,15 +158,6 @@ vx_uint32 vxnneAlignWithStride(vx_uint32 inputSize, vx_uint32 stride);
 
 vx_int32 vxnneGetTypeSize(vx_type_e format);
 
-void vxnneSRAMGetkernelPattenField(
-    vx_uint32 vipSRAMSizeInKB,
-    vx_uint32 kernelStreamSize,
-    vx_uint32_ptr kernelCacheStartAddress,
-    vx_uint32_ptr kernelCachingMode,
-    vx_uint32_ptr kernelPatternLow32Bits,
-    vx_uint32_ptr kernelPatternHigh32Bits,
-    vx_uint32_ptr kernelPatternMsb
-    );
 vx_uint32 vxnneGetOneNumber(vx_uint32 value);
 vx_float32 vxnneGetData(vx_type_e format, vx_int32 index, vx_uint8_ptr data, vx_int8 fixPointPos);
 vx_status vxnneSaveData(vx_type_e format, vx_int32 index, vx_float64 data, vx_ptr dst_data, vx_int8 fixedPointPos, vx_enum roundMode);
@@ -134,9 +168,6 @@ vx_status vxnneSaveDataExt(vx_type_e format, vx_enum quant_format, vx_int32 inde
 vx_int32 vxoNNExternsionConvlutionRound(vx_float32 in, vx_enum round_type);
 void reshuffleData(vx_nn_reshuffle_s *src, vx_uint32 strideStepX, vx_uint32 strideStepY, vx_nn_reshuffle_s *dst);
 void initUndefinedHardwareConfig(vx_context context);
-vx_status calculateArchPerf(vx_context context, vxnne_layer layer, vxnne_operation operation, vx_arch_perf perf, vx_weights_biases_parameter wb, vxnne_operation_target_e op_target, vxnne_operator_e op_type);
-void calculateArchPerfFromTensor(vx_context context, vxnne_layer layer, vx_arch_perf perf, vx_tensor input, vx_weights_biases_parameter wb, vx_tensor output, vx_op_param conv_cmd, vxnne_operation_target_e op_target, vxnne_operator_e op_type);
-vx_status showArchPerformance(vx_context context, vxnne_layer layer, vxnne_operation op, vx_arch_perf perf);
 vx_bool WeightBiasBufferAllocate(vx_context context, vx_weights_biases_parameter weight_bias, vx_size size);
 void writeBits(uint32_t **buffer, vx_uint32 *bitOffset, vx_uint32 data, vx_uint32 dataBits);
 void replaceBits(uint32_t **buffer, vx_uint32 *bitOffset, vx_uint32 data, vx_uint32 dataBits);
@@ -169,6 +200,8 @@ vx_weights_biases_parameter _createWeightsBiasesParameterFromTensors(
     vx_enum     rank_mode,
     vx_tensor   weights,
     vx_tensor   biases,
+    vx_tensor   alpha,
+    vx_bool     do_prelu,
     vx_bool     do_1xN
     );
 vx_weights_biases_parameter _createWeightsBiasesParameterFromParams(
@@ -229,28 +262,25 @@ vx_bool vxoWeightsBiasesParameter_IsValid(
 vx_int32 getHwPoolingType(vx_enum poolingType);
 vx_int32 getHWRoundingMode(vx_nn_round_mode_e roundingMode, vx_enum dataFormat, vx_bool isTP);
 vx_int32 getHWBorderMode(vx_enum padMode, gceVX_ACCELERATOR_TYPE accelerator);
-void fillInCmdNNBuffer(
-    vxnne_operation              operation,
-    vx_tensor                    inputs,
-    vx_weights_biases_parameter  weights_biases,
-    vx_tensor                    outputs,
-    vx_bool                      isFullyConnectedLayer,
-    vx_uint32                    batch_index,
-    vx_uint32                    slice_index,
-    vxnne_command_buffer         commandBuffer
+vx_float32 vxnneConvertDynamicFixPointValueToFloat32(
+    vx_float32 value,
+    vx_int8 fixedPointPos
     );
-void fillInCmdTPBuffer(
-    vxnne_operation              operation,
-    vx_tensor                    inputs,
-    vx_tensor                    outputs,
-    vx_tp_value_cmd              tp_values,
-    vx_uint32                    batch_index,
-    vx_bool                      multi_tp,
-    vx_uint32                    tp_index,
-    vx_uint32                    cmd_size,
-    vx_bool                      last,
-    vxnne_command_buffer         commandBuffer
+
+VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
+    vx_context                   context,
+    vx_node                      node,
+    vxnne_operation_command      operation_command,
+    vxnne_tensor_info            input,
+    vxnne_tensor_info            output,
+    vxnne_operation_target_e     target,
+    vx_op_param                  parameter,
+    vxnne_command_buffer         command_buffer
     );
+
+#if gcdDUMP
+void dumpNNCommandInfo(vx_uint32 sliceIndex, vx_uint32 sliceNum, vx_nn_cmd_info_u *info, vxnne_operation_command operationCommand);
+#endif
 
 void vxoNNExternsionDoReshuffle(
     vx_uint32 batchIndex,
@@ -414,6 +444,42 @@ vx_bool vxnneIsTPSupportFormat(
     vx_tensor inputTensor,
     vx_weights_biases_parameter wb,
     vx_tensor outputTensor);
+
+void vxnneGetIrreducibleFraction(
+    vx_float32 ratio,
+    vx_uint32 *numerationPtr,
+    vx_uint32 *denominatorPtr);
+
+void vxnneGetKernelPatternBits(
+    vx_uint32 oneNum,
+    vx_uint32 zeroNum,
+    vx_uint64 *kernelPatternBitPtr);
+
+void calculateArchPerfFromWB(
+    vx_context context,
+    vx_arch_perf perf,
+    vx_weights_biases_parameter wb,
+    vx_uint32 orig_input_dims[],
+    vx_uint32 output_dims[],
+    vx_int32* offsets,
+    vx_int32 flush,
+    vx_uint8 src_buf,
+    vx_uint8 dst_buf,
+    vx_uint8 kernel_buf,
+    vx_int32 cached_space,
+    vxnne_operation_target_e op_target,
+    vxnne_operator_e op_type);
+
+vx_uint8 MemPoolTypeToPerfType(
+    vx_enum memPoolType);
+
+void vxoWeightsBiases_Reshuffle(
+    vx_weights_biases_parameter_base wb_base
+    );
+
+void vxoWeightsBiases_Clear(
+    vx_weights_biases_parameter wb
+    );
 
 #endif
 

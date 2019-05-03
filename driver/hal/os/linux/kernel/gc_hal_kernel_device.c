@@ -89,6 +89,9 @@ int gc_info_show(struct seq_file* m, void* data)
     gctUINT32 productID = 0;
     gctUINT32 ecoID = 0;
 
+    if (!device)
+        return -ENXIO;
+
     for (i = 0; i < gcdMAX_GPU_COUNT; i++)
     {
         if (device->kernels[i])
@@ -130,6 +133,9 @@ int gc_clients_show(struct seq_file* m, void* data)
     gcsDATABASE_PTR database;
     gctINT i, pid;
     char name[24];
+
+    if (!kernel)
+        return -ENXIO;
 
     seq_printf(m, "%-8s%s\n", "PID", "NAME");
     seq_printf(m, "------------------------\n");
@@ -174,6 +180,9 @@ int gc_meminfo_show(struct seq_file* m, void* data)
 
     gcsDATABASE_COUNTERS virtualCounter = {0, 0, 0};
     gcsDATABASE_COUNTERS nonPagedCounter = {0, 0, 0};
+
+    if (!kernel)
+        return -ENXIO;
 
     status = gckKERNEL_GetVideoMemoryPool(kernel, gcvPOOL_SYSTEM, &memory);
 
@@ -606,6 +615,9 @@ gc_db_show(struct seq_file *m, void *data)
     gckGALDEVICE device = node->device;
     gckKERNEL kernel = _GetValidKernel(device);
 
+    if (!kernel)
+        return -ENXIO;
+
     /* Acquire the database mutex. */
     gcmkVERIFY_OK(
         gckOS_AcquireMutex(kernel->os, kernel->db->dbMutex, gcvINFINITE));
@@ -642,7 +654,14 @@ gc_version_show(struct seq_file *m, void *data)
 {
     gcsINFO_NODE *node = m->private;
     gckGALDEVICE device = node->device;
-    gcsPLATFORM * platform = device->platform;
+    gcsPLATFORM * platform = gcvNULL;
+
+    if (!device)
+        return -ENXIO;
+
+    platform = device->platform;
+    if (!platform)
+        return -ENXIO;
 
     seq_printf(m, "%s built at %s\n",  gcvVERSION_STRING, HOST);
 
@@ -710,6 +729,9 @@ gc_idle_show(struct seq_file *m, void *data)
     gctUINT64 idle;
     gctUINT64 suspend;
 
+    if (!kernel)
+        return -ENXIO;
+
     gckHARDWARE_QueryStateTimer(kernel->hardware, &on, &off, &idle, &suspend);
 
     /* Idle time since last call */
@@ -759,6 +781,10 @@ gc_dump_trigger_show(struct seq_file *m, void *data)
     {
         kernel = device->kernels[dumpCore];
     }
+
+    if (!kernel)
+        return -ENXIO;
+
 #endif
 
     seq_printf(m, gcdDEBUG_FS_WARN);
@@ -854,6 +880,9 @@ static int gc_vidmem_show(struct seq_file *m, void *unused)
 
     gckKERNEL kernel = _GetValidKernel(device);
 
+    if (!kernel)
+        return -ENXIO;
+
     if (dumpProcess == 0)
     {
         /* Acquire the database mutex. */
@@ -934,6 +963,9 @@ static int gc_clk_show(struct seq_file* m, void* data)
     gckGALDEVICE device = node->device;
     gctUINT i;
     gceSTATUS status;
+
+    if (!device)
+        return -ENXIO;
 
     for (i = gcvCORE_MAJOR; i < gcvCORE_COUNT; i++)
     {
@@ -1479,8 +1511,6 @@ gckGALDEVICE_Construct(
 #endif
     }
 
-    gcmkONERROR(_DebugfsInit(device));
-
     for (i = 0; i < gcvCORE_COUNT; i++)
     {
         device->irqLines[i]                  = Args->irqs[i];
@@ -1788,6 +1818,8 @@ gckGALDEVICE_Construct(
         device->contiguousPhysName = gcmPTR_TO_NAME(device->contiguousPhysical);
     }
 
+    gcmkONERROR(_DebugfsInit(device));
+
     /* Return pointer to the device. */
     *Device = galDevice = device;
 
@@ -1824,14 +1856,14 @@ gceSTATUS
 gckGALDEVICE_Destroy(
     gckGALDEVICE Device)
 {
-    gctINT i;
+    gctINT i, j = 0;
     gckKERNEL kernel = gcvNULL;
 
     gcmkHEADER_ARG("Device=%p", Device);
 
     if (Device != gcvNULL)
     {
-        /* Grab the first availiable kernel */
+        /* Grab the first available kernel */
         for (i = 0; i < gcdMAX_GPU_COUNT; i++)
         {
             if (Device->kernels[i])
@@ -1857,6 +1889,39 @@ gckGALDEVICE_Destroy(
             {
                 gcmRELEASE_NAME(Device->contiguousPhysName);
                 Device->contiguousPhysName = 0;
+            }
+        }
+
+        /* Destroy per-core SRAM heap. */
+        if (Device->args.sRAMMode)
+        {
+            for (i = 0; i <= gcvCORE_3D_MAX; i++)
+            {
+                kernel = Device->kernels[i];
+
+                if (kernel && kernel->sRAMNonExclusive)
+                {
+                    for (j = gcvSRAM_EXTERNAL0; j < gcvSRAM_COUNT; j++)
+                    {
+                        if (kernel->sRAMPhysical[j] != gcvNULL)
+                        {
+                            /* Release reserved SRAM memory. */
+                            gckOS_ReleaseReservedMemory(
+                                Device->os,
+                                kernel->sRAMPhysical[j]
+                                );
+
+                            kernel->sRAMPhysical[j] = gcvNULL;
+                        }
+
+                        if (kernel->sRAMVideoMem[j] != gcvNULL)
+                        {
+                            /* Destroy the SRAM contiguous heap. */
+                            gcmkVERIFY_OK(gckVIDMEM_Destroy(kernel->sRAMVideoMem[j]));
+                            kernel->sRAMVideoMem[j] = gcvNULL;
+                        }
+                    }
+                }
             }
         }
 

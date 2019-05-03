@@ -503,6 +503,46 @@ _EvaluateAcos(
     );
 
 gceSTATUS
+_GenAcosCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    );
+
+gceSTATUS
+_GenAcoshCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    );
+
+gceSTATUS
+_GenAsinCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    );
+
+gceSTATUS
+_GenAtanCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    );
+
+gceSTATUS
 _EvaluateAtan(
     IN sloCOMPILER Compiler,
     IN gctUINT OperandCount,
@@ -574,6 +614,16 @@ _EvaluateAsinh(
 
 gceSTATUS
 _GenAsinhCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    );
+
+gceSTATUS
+_GenAcoshCode(
     IN sloCOMPILER Compiler,
     IN sloCODE_GENERATOR CodeGenerator,
     IN sloIR_POLYNARY_EXPR PolynaryExpr,
@@ -2090,6 +2140,18 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_INTEGER_MIX,     "mix", _EvaluateMix, _GenMixCode, T_BVEC3,     3, {T_BVEC3,       T_BVEC3,    T_BVEC3}, {0}, {0}},
     {slvEXTENSION_INTEGER_MIX,     "mix", _EvaluateMix, _GenMixCode, T_BVEC4,     3, {T_BVEC4,       T_BVEC4,    T_BVEC4}, {0}, {0}},
 
+    {slvEXTENSION_HALTI5_WITH_FMA_SUPPORT,     "acos",   _EvaluateAcos,   _GenAcosCode,   T_FLOAT,    1, {T_FLOAT}, {0}},
+    {slvEXTENSION_HALTI5_WITH_FMA_SUPPORT,     "acos",   _EvaluateAcos,   _GenAcosCode,   T_VEC2,     1, {T_VEC2}, {0}},
+    {slvEXTENSION_HALTI5_WITH_FMA_SUPPORT,     "acos",   _EvaluateAcos,   _GenAcosCode,   T_VEC3,     1, {T_VEC3}, {0}},
+    {slvEXTENSION_HALTI5_WITH_FMA_SUPPORT,     "acos",   _EvaluateAcos,   _GenAcosCode,   T_VEC4,     1, {T_VEC4}, {0}},
+    {slvEXTENSION_HALTI5_WITH_FMA_SUPPORT,     "acosh",  _EvaluateAcosh,  _GenAcoshCode,  T_FLOAT,    1, {T_FLOAT}, {0}},
+    {slvEXTENSION_HALTI5_WITH_FMA_SUPPORT,     "acosh",  _EvaluateAcosh,  _GenAcoshCode,  T_VEC2,     1, {T_VEC2}, {0}},
+    {slvEXTENSION_HALTI5_WITH_FMA_SUPPORT,     "acosh",  _EvaluateAcosh,  _GenAcoshCode,  T_VEC3,     1, {T_VEC3}, {0}},
+    {slvEXTENSION_HALTI5_WITH_FMA_SUPPORT,     "acosh",  _EvaluateAcosh,  _GenAcoshCode,  T_VEC4,     1, {T_VEC4}, {0}},
+    {slvEXTENSION_HALTI5_WITH_FMA_SUPPORT,     "asin",   _EvaluateAsin,   _GenAsinCode,   T_FLOAT,    1, {T_FLOAT}, {0}},
+    {slvEXTENSION_HALTI5_WITH_FMA_SUPPORT,     "asin",   _EvaluateAsin,   _GenAsinCode,   T_VEC2,     1, {T_VEC2}, {0}},
+    {slvEXTENSION_HALTI5_WITH_FMA_SUPPORT,     "asin",   _EvaluateAsin,   _GenAsinCode,   T_VEC3,     1, {T_VEC3}, {0}},
+    {slvEXTENSION_HALTI5_WITH_FMA_SUPPORT,     "asin",   _EvaluateAsin,   _GenAsinCode,   T_VEC4,     1, {T_VEC4}, {0}},
     {slvEXTENSION_NONE,     "step", _EvaluateStep, _GenStepCode, T_FLOAT,    2, {T_FLOAT,        T_FLOAT}, {0}, {0}, TREAT_F_AS_I},
     {slvEXTENSION_NONE,     "step", _EvaluateStep, _GenStepCode, T_VEC2,     2, {T_VEC2,         T_VEC2}, {0}, {0}, TREAT_F_AS_I},
     {slvEXTENSION_NONE,     "step", _EvaluateStep, _GenStepCode, T_VEC3,     2, {T_VEC3,         T_VEC3}, {0}, {0}, TREAT_F_AS_I},
@@ -2826,51 +2888,50 @@ slsINTRINSIC_BUILTIN_FUNCTION;
 
 static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
 {
-    {slvEXTENSION_NONE,     "tan", _EvaluateTan, gcvNULL,                  T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_tan_1", {0}, {0}},
-    {slvEXTENSION_NONE,     "tan", _EvaluateTan, gcvNULL,                  T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_tan_2", {0}, {0}},
-    {slvEXTENSION_NONE,     "tan", _EvaluateTan, gcvNULL,                  T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_tan_3", {0}, {0}},
-    {slvEXTENSION_NONE,     "tan", _EvaluateTan, gcvNULL,                  T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_tan_4", {0}, {0}},
+    {slvEXTENSION_NONE,     "tan", _EvaluateTan, gcvNULL,             T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_tan_1", {0}, {0}},
+    {slvEXTENSION_NONE,     "tan", _EvaluateTan, gcvNULL,             T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_tan_2", {0}, {0}},
+    {slvEXTENSION_NONE,     "tan", _EvaluateTan, gcvNULL,             T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_tan_3", {0}, {0}},
+    {slvEXTENSION_NONE,     "tan", _EvaluateTan, gcvNULL,             T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_tan_4", {0}, {0}},
 
-    {slvEXTENSION_NONE,     "asin", _EvaluateAsin, gcvNULL,                 T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_asin_float", {0}, {0}},
-    {slvEXTENSION_NONE,     "asin", _EvaluateAsin, gcvNULL,                 T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_asin_vec2", {0}, {0}},
-    {slvEXTENSION_NONE,     "asin", _EvaluateAsin, gcvNULL,                 T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_asin_vec3", {0}, {0}},
-    {slvEXTENSION_NONE,     "asin", _EvaluateAsin, gcvNULL,                 T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_asin_vec4", {0}, {0}},
+    {slvEXTENSION_NONE,     "asin", _EvaluateAsin, gcvNULL,           T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_asin_float", {0}, {0}, slFuncCheckForAtrigAsIntrinsic},
+    {slvEXTENSION_NONE,     "asin", _EvaluateAsin, gcvNULL,           T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_asin_vec2", {0}, {0}, slFuncCheckForAtrigAsIntrinsic},
+    {slvEXTENSION_NONE,     "asin", _EvaluateAsin, gcvNULL,           T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_asin_vec3", {0}, {0}, slFuncCheckForAtrigAsIntrinsic},
+    {slvEXTENSION_NONE,     "asin", _EvaluateAsin, gcvNULL,           T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_asin_vec4", {0}, {0}, slFuncCheckForAtrigAsIntrinsic},
 
-    {slvEXTENSION_NONE,     "acos", _EvaluateAcos, gcvNULL,                 T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_acos_float", {0}, {0}},
-    {slvEXTENSION_NONE,     "acos", _EvaluateAcos, gcvNULL,                 T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_acos_vec2", {0}, {0}},
-    {slvEXTENSION_NONE,     "acos", _EvaluateAcos, gcvNULL,                 T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_acos_vec3", {0}, {0}},
-    {slvEXTENSION_NONE,     "acos", _EvaluateAcos, gcvNULL,                 T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_acos_vec4", {0}, {0}},
+    {slvEXTENSION_NONE,     "acos", _EvaluateAcos, gcvNULL,           T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_acos_float", {0}, {0}, slFuncCheckForAtrigAsIntrinsic},
+    {slvEXTENSION_NONE,     "acos", _EvaluateAcos, gcvNULL,           T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_acos_vec2", {0}, {0}, slFuncCheckForAtrigAsIntrinsic},
+    {slvEXTENSION_NONE,     "acos", _EvaluateAcos, gcvNULL,           T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_acos_vec3", {0}, {0}, slFuncCheckForAtrigAsIntrinsic},
+    {slvEXTENSION_NONE,     "acos", _EvaluateAcos, gcvNULL,           T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_acos_vec4", {0}, {0}, slFuncCheckForAtrigAsIntrinsic},
+    {slvEXTENSION_NONE,     "acosh", _EvaluateAcosh, gcvNULL,         T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_acosh_1", {0}, {0}, slFuncCheckForAtrigAsIntrinsic},
+    {slvEXTENSION_NONE,     "acosh", _EvaluateAcosh, gcvNULL,         T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_acosh_2", {0}, {0}, slFuncCheckForAtrigAsIntrinsic},
+    {slvEXTENSION_NONE,     "acosh", _EvaluateAcosh, gcvNULL,         T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_acosh_3", {0}, {0}, slFuncCheckForAtrigAsIntrinsic},
+    {slvEXTENSION_NONE,     "acosh", _EvaluateAcosh, gcvNULL,         T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_acosh_4", {0}, {0}, slFuncCheckForAtrigAsIntrinsic},
 
-    {slvEXTENSION_NONE,     "acosh", _EvaluateAcosh, gcvNULL,                T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_acosh_1", {0}, {0}},
-    {slvEXTENSION_NONE,     "acosh", _EvaluateAcosh, gcvNULL,                T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_acosh_2", {0}, {0}},
-    {slvEXTENSION_NONE,     "acosh", _EvaluateAcosh, gcvNULL,                T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_acosh_3", {0}, {0}},
-    {slvEXTENSION_NONE,     "acosh", _EvaluateAcosh, gcvNULL,                T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_acosh_4", {0}, {0}},
+    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,           T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_atan_float", {0}, {0}},
+    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,           T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_atan_vec2", {0}, {0}},
+    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,           T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_atan_vec3", {0}, {0}},
+    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,           T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_atan_vec4", {0}, {0}},
 
-    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_atan_float", {0}, {0}},
-    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_atan_vec2", {0}, {0}},
-    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_atan_vec3", {0}, {0}},
-    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_atan_vec4", {0}, {0}},
-
-    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_FLOAT,    ANY,  2, {T_FLOAT, T_FLOAT}, {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_atan2_float", {0}, {0}},
-    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_VEC2,     ANY,  2, {T_VEC2, T_VEC2}, {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_atan2_vec2", {0}, {0}},
-    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_VEC3,     ANY,  2, {T_VEC3, T_VEC3}, {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_atan2_vec3", {0}, {0}},
-    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_VEC4,     ANY,  2, {T_VEC4, T_VEC4}, {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_atan2_vec4", {0}, {0}},
+    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,           T_FLOAT,    ANY,  2, {T_FLOAT, T_FLOAT}, {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_atan2_float", {0}, {0}},
+    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,           T_VEC2,     ANY,  2, {T_VEC2, T_VEC2}, {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_atan2_vec2", {0}, {0}},
+    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,           T_VEC3,     ANY,  2, {T_VEC3, T_VEC3}, {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_atan2_vec3", {0}, {0}},
+    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,           T_VEC4,     ANY,  2, {T_VEC4, T_VEC4}, {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_atan2_vec4", {0}, {0}},
 #if MIX_AS_INTRINCIS
     /* genFType mix (genFType x, genFType y, float a); */
-    {slvEXTENSION_NONE,     "mix", _EvaluateMix, gcvNULL,                 T_FLOAT,     ANY, 3, {T_FLOAT, T_FLOAT, T_FLOAT}, {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_mix_float", {0}, {0}},
-    {slvEXTENSION_NONE,     "mix", _EvaluateMix, gcvNULL,                 T_VEC2,      ANY, 3, {T_VEC2, T_VEC2, T_FLOAT}, {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_mix_vec2", {0}, {0}},
-    {slvEXTENSION_NONE,     "mix", _EvaluateMix, gcvNULL,                 T_VEC3,      ANY, 3, {T_VEC3, T_VEC3, T_FLOAT}, {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_mix_vec3", {0}, {0}},
-    {slvEXTENSION_NONE,     "mix", _EvaluateMix, gcvNULL,                 T_VEC4,      ANY, 3, {T_VEC4, T_VEC4, T_FLOAT}, {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_mix_vec4", {0}, {0}},
+    {slvEXTENSION_NONE,     "mix", _EvaluateMix, gcvNULL,             T_FLOAT,     ANY, 3, {T_FLOAT, T_FLOAT, T_FLOAT}, {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_mix_float", {0}, {0}},
+    {slvEXTENSION_NONE,     "mix", _EvaluateMix, gcvNULL,             T_VEC2,      ANY, 3, {T_VEC2, T_VEC2, T_FLOAT}, {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_mix_vec2", {0}, {0}},
+    {slvEXTENSION_NONE,     "mix", _EvaluateMix, gcvNULL,             T_VEC3,      ANY, 3, {T_VEC3, T_VEC3, T_FLOAT}, {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_mix_vec3", {0}, {0}},
+    {slvEXTENSION_NONE,     "mix", _EvaluateMix, gcvNULL,             T_VEC4,      ANY, 3, {T_VEC4, T_VEC4, T_FLOAT}, {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_mix_vec4", {0}, {0}},
     /* genFType mix (genFType x, genFType y, genFType a); */
-    {slvEXTENSION_NONE,     "mix", _EvaluateMix, gcvNULL,                 T_VEC2,      ANY, 3, {T_VEC2, T_VEC2, T_VEC2}, {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_mix_vec2_vec2", {0}, {0}},
-    {slvEXTENSION_NONE,     "mix", _EvaluateMix, gcvNULL,                 T_VEC3,      ANY, 3, {T_VEC3, T_VEC3, T_VEC3}, {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_mix_vec3_vec3", {0}, {0}},
-    {slvEXTENSION_NONE,     "mix", _EvaluateMix, gcvNULL,                 T_VEC4,      ANY, 3, {T_VEC4, T_VEC4, T_VEC4}, {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_mix_vec4_vec4", {0}, {0}},
+    {slvEXTENSION_NONE,     "mix", _EvaluateMix, gcvNULL,             T_VEC2,      ANY, 3, {T_VEC2, T_VEC2, T_VEC2}, {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_mix_vec2_vec2", {0}, {0}},
+    {slvEXTENSION_NONE,     "mix", _EvaluateMix, gcvNULL,             T_VEC3,      ANY, 3, {T_VEC3, T_VEC3, T_VEC3}, {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_mix_vec3_vec3", {0}, {0}},
+    {slvEXTENSION_NONE,     "mix", _EvaluateMix, gcvNULL,             T_VEC4,      ANY, 3, {T_VEC4, T_VEC4, T_VEC4}, {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_mix_vec4_vec4", {0}, {0}},
 #endif
 
-    {slvEXTENSION_HALTI,    "round", _EvaluateRound, gcvNULL,                 T_FLOAT,  ANY,   1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_round_float", {0}, {0}},
-    {slvEXTENSION_HALTI,    "round", _EvaluateRound, gcvNULL,                 T_VEC2,   ANY,   1, {T_VEC2},  {_IN}, {ANY},gceINTRIN_source, "_viv_round_vec2", {0}, {0}},
-    {slvEXTENSION_HALTI,    "round", _EvaluateRound, gcvNULL,                 T_VEC3,   ANY,   1, {T_VEC3},  {_IN}, {ANY},gceINTRIN_source, "_viv_round_vec3", {0}, {0}},
-    {slvEXTENSION_HALTI,    "round", _EvaluateRound, gcvNULL,                 T_VEC4,   ANY,   1, {T_VEC4},  {_IN}, {ANY},gceINTRIN_source, "_viv_round_vec4", {0}, {0}},
+    {slvEXTENSION_HALTI,    "round", _EvaluateRound, gcvNULL,         T_FLOAT,  ANY,   1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_round_float", {0}, {0}},
+    {slvEXTENSION_HALTI,    "round", _EvaluateRound, gcvNULL,         T_VEC2,   ANY,   1, {T_VEC2},  {_IN}, {ANY},gceINTRIN_source, "_viv_round_vec2", {0}, {0}},
+    {slvEXTENSION_HALTI,    "round", _EvaluateRound, gcvNULL,         T_VEC3,   ANY,   1, {T_VEC3},  {_IN}, {ANY},gceINTRIN_source, "_viv_round_vec3", {0}, {0}},
+    {slvEXTENSION_HALTI,    "round", _EvaluateRound, gcvNULL,         T_VEC4,   ANY,   1, {T_VEC4},  {_IN}, {ANY},gceINTRIN_source, "_viv_round_vec4", {0}, {0}},
     {slvEXTENSION_DOUBLE_DATA_TYPE,    "round", _EvaluateRound, gcvNULL,                 T_DOUBLE,  ANY,   1, {T_DOUBLE}, {_IN}, {ANY},gceINTRIN_source, "_viv_round_float", {0}, {0}},
     {slvEXTENSION_DOUBLE_DATA_TYPE,    "round", _EvaluateRound, gcvNULL,                 T_DVEC2,   ANY,   1, {T_DVEC2},  {_IN}, {ANY},gceINTRIN_source, "_viv_round_vec2", {0}, {0}},
     {slvEXTENSION_DOUBLE_DATA_TYPE,    "round", _EvaluateRound, gcvNULL,                 T_DVEC3,   ANY,   1, {T_DVEC3},  {_IN}, {ANY},gceINTRIN_source, "_viv_round_vec3", {0}, {0}},

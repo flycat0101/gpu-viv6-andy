@@ -13,6 +13,8 @@
 
 #include "gc_vgsh_precomp.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG3D_MASK
+
 void _VGMaskLayerCtor(gcoOS os, _VGMaskLayer *maskLayer)
 {
     gcmHEADER_ARG("os=0x%x maskLayer=0x%x",

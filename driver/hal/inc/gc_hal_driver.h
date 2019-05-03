@@ -40,111 +40,182 @@ extern "C" {
 
 typedef enum _gceHAL_COMMAND_CODES
 {
-    /* Chip independent commands. */
-    gcvHAL_CHIP_INFO,
-    gcvHAL_VERSION,
-    gcvHAL_SET_TIMEOUT,
+    /*************** Common ***************/
 
-    gcvHAL_QUERY_VIDEO_MEMORY,
+    /* Chip info: count, type and so on. */
+    gcvHAL_CHIP_INFO,
+
+    /* HAL driver version. */
+    gcvHAL_VERSION,
+
+    /* Query chip id and options. */
     gcvHAL_QUERY_CHIP_IDENTITY,
     gcvHAL_QUERY_CHIP_OPTION,
+
+    /* Query chip frequency, used by CL. */
     gcvHAL_QUERY_CHIP_FREQUENCY,
 
-    gcvHAL_ALLOCATE_NON_PAGED_MEMORY,
-    gcvHAL_FREE_NON_PAGED_MEMORY,
+    /* Query system pool video memory, used by CL. */
+    gcvHAL_QUERY_VIDEO_MEMORY,
 
-    gcvHAL_ALLOCATE_LINEAR_VIDEO_MEMORY, /* No alignment. */
+    /* Memory management. */
+    gcvHAL_ALLOCATE_LINEAR_VIDEO_MEMORY,
     gcvHAL_WRAP_USER_MEMORY,
     gcvHAL_RELEASE_VIDEO_MEMORY,
-
     gcvHAL_LOCK_VIDEO_MEMORY,
     gcvHAL_UNLOCK_VIDEO_MEMORY,
     gcvHAL_BOTTOM_HALF_UNLOCK_VIDEO_MEMORY,
-
-    gcvHAL_EXPORT_VIDEO_MEMORY,
-    gcvHAL_NAME_VIDEO_MEMORY,
-    gcvHAL_IMPORT_VIDEO_MEMORY,
-
     gcvHAL_MAP_MEMORY,
     gcvHAL_UNMAP_MEMORY,
 
+    /* Cache operations. */
     gcvHAL_CACHE,
 
+    /* HAL user attach and detach. */
     gcvHAL_ATTACH,
     gcvHAL_DETACH,
 
+    /* Event commit. */
     gcvHAL_EVENT_COMMIT,
-    gcvHAL_COMMIT,
-    gcvHAL_COMMIT_DONE,
 
+    /* User command commit. */
+    gcvHAL_COMMIT,
+
+    /* Set hardware timeout, used by CL. */
+    gcvHAL_SET_TIMEOUT,
+
+    /* User signal operations. */
     gcvHAL_USER_SIGNAL,
+
+    /* Event signal, commit stall. */
     gcvHAL_SIGNAL,
 
-    gcvHAL_WRITE_DATA,
-    gcvHAL_READ_REGISTER,
-    gcvHAL_WRITE_REGISTER,
-    gcvHAL_READ_REGISTER_EX,
-    gcvHAL_WRITE_REGISTER_EX,
-
-    gcvHAL_GET_PROFILE_SETTING,
+    /* Profile related. */
     gcvHAL_SET_PROFILE_SETTING,
     gcvHAL_READ_PROFILER_REGISTER_SETTING,
     gcvHAL_READ_ALL_PROFILE_REGISTERS_PART1,
     gcvHAL_READ_ALL_PROFILE_REGISTERS_PART2,
-    gcvHAL_PROFILE_REGISTERS_2D,
 
-    gcvHAL_SET_POWER_MANAGEMENT_STATE,
-    gcvHAL_QUERY_POWER_MANAGEMENT_STATE,
+    /* Query process database info when debug trace and proflie. */
+    gcvHAL_DATABASE,
+
+    /* Power managment enable/disable. */
     gcvHAL_CONFIG_POWER_MANAGEMENT,
 
+    /* Debug/dump feature. */
+    gcvHAL_DEBUG_DUMP,
+
+    /*************** Common end ***************/
+
+    /*************** GPU only ***************/
+    /* Register operations, 2D only. */
+    gcvHAL_READ_REGISTER,
+    gcvHAL_WRITE_REGISTER,
+    gcvHAL_PROFILE_REGISTERS_2D,
+
+    /* Get base address for old mmu. */
     gcvHAL_GET_BASE_ADDRESS,
 
-    gcvHAL_SET_IDLE, /* reserved */
-    gcvHAL_RESET, /* Reset, reserved. */
+    /* Read frame database, 3D only. */
+    gcvHAL_GET_FRAME_INFO,
 
-    /* Debug/dump feature. */
-    gcvHAL_SET_DEBUG_LEVEL_ZONE,
-    gcvHAL_DEBUG_DUMP,
+    /* Set video memory meta data. */
+    gcvHAL_SET_VIDEO_MEMORY_METADATA,
+
+    /* Query command buffer, VG only. */
+    gcvHAL_QUERY_COMMAND_BUFFER,
+
+    /* Reset time stamp. */
+    gcvHAL_QUERY_RESET_TIME_STAMP,
+
+    /* Create native fence. */
+    gcvHAL_CREATE_NATIVE_FENCE,
+
+    /* Wait native fence. */
+    gcvHAL_WAIT_NATIVE_FENCE,
+
+    /* Wait until GPU finishes access to a resource. */
+    gcvHAL_WAIT_FENCE,
+
+    /* Video memory node operations. */
+    gcvHAL_EXPORT_VIDEO_MEMORY,
+    gcvHAL_NAME_VIDEO_MEMORY,
+    gcvHAL_IMPORT_VIDEO_MEMORY,
+
+    /* Mutex Operation. */
+    gcvHAL_DEVICE_MUTEX,
+    /*************** GPU only end ***************/
+
+    /*************** DEC only ***************/
+    /* DEC200 test. */
+    gcvHAL_DEC200_TEST,
+
+    /* DEC300 related operations. */
+    gcvHAL_DEC300_READ,
+    gcvHAL_DEC300_WRITE,
+    gcvHAL_DEC300_FLUSH,
+    gcvHAL_DEC300_FLUSH_WAIT,
+    /*************** DEC only end ***************/
+
+    /*************** OS specific ***************/
+
+    /* Android gralloc: shared buffer operations. */
+    gcvHAL_SHBUF,
+
+    /* Android gralloc: get graphic buffer fd. */
+    gcvHAL_GET_GRAPHIC_BUFFER_FD,
+
+    /* Vsimulator only. */
     gcvHAL_UPDATE_DEBUG_CALLBACK,
+
+    /* Non paged memory management backup compatibility, windows, qnx. */
+    gcvHAL_ALLOCATE_NON_PAGED_MEMORY,
+    gcvHAL_FREE_NON_PAGED_MEMORY,
+
+    /* Write user data, windows only. */
+    gcvHAL_WRITE_DATA,
+
+    /*************** OS specific end ***************/
+
+    /*************** Reserved ***************/
+    gcvHAL_SET_IDLE,
+    gcvHAL_RESET,
+
+    /* Command commit done, kernel event only. */
+    gcvHAL_COMMIT_DONE,
+
+    /* Get video memory file description. */
+    gcvHAL_GET_VIDEO_MEMORY_FD,
+
+    /* Get profile setting. */
+    gcvHAL_GET_PROFILE_SETTING,
+
+    /* Read/Write register ex. */
+    gcvHAL_READ_REGISTER_EX,
+    gcvHAL_WRITE_REGISTER_EX,
+
+    /* Power managment state. */
+    gcvHAL_SET_POWER_MANAGEMENT_STATE,
+    gcvHAL_QUERY_POWER_MANAGEMENT_STATE,
+
+    /* Set debug level. */
+    gcvHAL_SET_DEBUG_LEVEL_ZONE,
+
+    /* Dump info. */
     gcvHAL_DUMP_GPU_STATE,
     gcvHAL_DUMP_EVENT,
     gcvHAL_DUMP_GPU_PROFILE,
 
+    /* Timer. */
     gcvHAL_TIMESTAMP,
-    gcvHAL_DATABASE,
-
-    gcvHAL_GET_FRAME_INFO,
-    gcvHAL_QUERY_COMMAND_BUFFER,
 
     /* FSCALE_VAL. */
     gcvHAL_SET_FSCALE_VALUE,
     gcvHAL_GET_FSCALE_VALUE,
 
-    /* Reset time stamp. */
-    gcvHAL_QUERY_RESET_TIME_STAMP,
-
-    gcvHAL_CREATE_NATIVE_FENCE,
-    gcvHAL_WAIT_NATIVE_FENCE,
-    gcvHAL_SHBUF,
-    gcvHAL_GET_GRAPHIC_BUFFER_FD,
-    gcvHAL_SET_VIDEO_MEMORY_METADATA,
-    gcvHAL_GET_VIDEO_MEMORY_FD,
-
     /* Destory MMU. */
     gcvHAL_DESTROY_MMU,
-
-    /* Wait until GPU finishes access to a resource. */
-    gcvHAL_WAIT_FENCE,
-
-    /* Mutex Operation. */
-    gcvHAL_DEVICE_MUTEX,
-
-    gcvHAL_DEC200_TEST,
-
-    gcvHAL_DEC300_READ,
-    gcvHAL_DEC300_WRITE,
-    gcvHAL_DEC300_FLUSH,
-    gcvHAL_DEC300_FLUSH_WAIT,
+    /*************** Reserved end ***************/
 }
 gceHAL_COMMAND_CODES;
 
@@ -231,7 +302,6 @@ typedef struct _gcsHAL_QUERY_CHIP_IDENTITY
     /* Chip date. */
     gctUINT32                   chipDate;
 
-#if gcdENABLE_VG
     /* Supported feature fields. */
     gctUINT32                   chipFeatures;
 
@@ -255,7 +325,6 @@ typedef struct _gcsHAL_QUERY_CHIP_IDENTITY
 
     /* Supported minor feature 6 fields. */
     gctUINT32                   chipMinorFeatures6;
-#endif
 
     /* Number of streams supported. */
     gctUINT32                   streamCount;
@@ -1292,5 +1361,4 @@ gcsHAL_INTERFACE;
 #endif
 
 #endif /* __gc_hal_driver_h_ */
-
 

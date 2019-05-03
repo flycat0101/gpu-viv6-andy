@@ -13,7 +13,7 @@
 
 #include "gc_glff_precomp.h"
 
-#define _GC_OBJ_ZONE glvZONE_SHADER
+#define _GC_OBJ_ZONE gcdZONE_ES11_SHADER
 
 
 /*******************************************************************************
@@ -5934,6 +5934,7 @@ gceSTATUS glfGenerateVSFixedFunction(
                 gcSHADER_TYPE_VERTEX,
                 &vsControl.i->shader
                 ));
+            gcmONERROR(gcSHADER_SetClientApiVersion(vsControl.i->shader, gcvAPI_OPENGL_ES11));
         }
 
         /* Determine the number of color outputs. */

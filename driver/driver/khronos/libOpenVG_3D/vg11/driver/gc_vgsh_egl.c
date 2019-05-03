@@ -14,6 +14,8 @@
 #include "gc_vgsh_precomp.h"
 #include "gc_egl_common.h"
 
+#define _GC_OBJ_ZONE                gcdZONE_VG3D_EGL
+
 static void * (* veglGetCurVG11CtxFunc)(EGLenum) = gcvNULL;
 
 #if VIVANTE_PROFILER
@@ -364,7 +366,7 @@ veglSetContext(
 
     gcmHEADER_ARG("Context=0x%x Draw=0x%x Read=0x%x Depth=0x%x", Context, Draw, Read, Depth);
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
-    gcoOS_SetDebugZone(gcvZONE_NONE);
+    gcoOS_SetDebugZone(gcdZONE_NONE);
 #endif
 
     do
@@ -988,7 +990,9 @@ veglCreateImageParentImage(
 
     /* Free temporary resources. */
     if (vgimages != gcvNULL)
+    {
         gcmVERIFY_OK(gcmOS_SAFE_FREE(context->os, vgimages));
+    }
 
     gcmFOOTER_ARG("return=0x%x", EGL_SUCCESS);
     return EGL_SUCCESS;

@@ -3349,6 +3349,9 @@ clsNAME *ParamName
    case    clvBUILTIN_NUM_GROUPS:
       return gcvUNIFORM_KIND_NUM_GROUPS;
 
+   case    clvBUILTIN_NUM_GROUPS_FOR_SINGLE_GPU:
+      return gcvUNIFORM_KIND_NUM_GROUPS_FOR_SINGLE_GPU;
+
    case    clvBUILTIN_GLOBAL_OFFSET:
       return gcvUNIFORM_KIND_GLOBAL_OFFSET;
 

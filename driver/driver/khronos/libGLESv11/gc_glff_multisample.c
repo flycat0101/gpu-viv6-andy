@@ -13,7 +13,7 @@
 
 #include "gc_glff_precomp.h"
 
-#define _GC_OBJ_ZONE glvZONE_TRACE
+#define _GC_OBJ_ZONE gcdZONE_ES11_TRACE
 
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
@@ -159,7 +159,7 @@ GLboolean glfQueryMultisampleState(
 #ifdef _GC_OBJ_ZONE
 #undef _GC_OBJ_ZONE
 #endif
-#define _GC_OBJ_ZONE    glvZONE_FRAGMENT
+#define _GC_OBJ_ZONE    gcdZONE_ES11_FRAGMENT
 
 GL_API void GL_APIENTRY glSampleCoverage(
     GLclampf Value,

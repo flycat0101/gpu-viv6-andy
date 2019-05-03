@@ -2730,9 +2730,9 @@ slsNAME_SPACE_Search(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     gcmASSERT(NameSpace);
 
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "NameSpace=%x", NameSpace);
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "*Symbol=%s", gcmOPT_STRING(Symbol));
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "Name=%x", gcmOPT_POINTER(Name));
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "NameSpace=%x", NameSpace);
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "*Symbol=%s", gcmOPT_STRING(Symbol));
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "Name=%x", gcmOPT_POINTER(Name));
 
     FOR_EACH_DLINK_NODE(&NameSpace->names, slsNAME, name)
     {
@@ -2818,9 +2818,9 @@ _SearchBuiltinVariable(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     gcmASSERT(NameSpace);
 
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "NameSpace=%x", NameSpace);
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "*Symbol=%s", gcmOPT_STRING(Symbol));
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "Name=%x", gcmOPT_POINTER(Name));
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "NameSpace=%x", NameSpace);
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "*Symbol=%s", gcmOPT_STRING(Symbol));
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_COMPILER, "Name=%x", gcmOPT_POINTER(Name));
 
     FOR_EACH_DLINK_NODE(&NameSpace->names, slsNAME, name)
     {

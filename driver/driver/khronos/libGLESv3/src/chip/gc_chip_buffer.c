@@ -14,7 +14,7 @@
 #include "gc_es_context.h"
 #include "gc_chip_context.h"
 
-#define _GC_OBJ_ZONE    __GLES3_ZONE_BUFFER
+#define _GC_OBJ_ZONE    gcdZONE_ES30_BUFFER
 
 static GLint MSAASample0 = 0;
 static GLint MSAASamples[4] = {0};
@@ -369,7 +369,7 @@ gcChipInitFormatMapInfo(
         return gcvSTATUS_OK;
     }
 
-    if (chipCtx->patchId == gcvPATCH_GTFES30 &&
+    if ((chipCtx->patchId == gcvPATCH_GTFES30 || chipCtx->patchId == gcvPATCH_NATIVEHARDWARE_CTS)&&
         !chipCtx->chipFeature.hwFeature.hasHalfFloatPipe)
     {
         halfFloatTableSize = gcmCOUNTOF(patchHalfFloatFormats);

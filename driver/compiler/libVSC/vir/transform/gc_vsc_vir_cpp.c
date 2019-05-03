@@ -43,6 +43,7 @@ static VSC_CPP_Usage* _VSC_CPP_NewUsage(
 
 static void VSC_CPP_Init(
     IN OUT VSC_CPP_CopyPropagation  *cpp,
+    IN gcePATCH_ID                  patchId,
     IN VIR_Shader                   *shader,
     IN VIR_DEF_USAGE_INFO           *du_info,
     IN VSC_OPTN_CPPOptions          *options,
@@ -51,6 +52,7 @@ static void VSC_CPP_Init(
     IN VSC_MM                       *pMM
     )
 {
+    VSC_CPP_SetAppNameId(cpp, patchId);
     VSC_CPP_SetShader(cpp, shader);
     VSC_CPP_SetCurrBB(cpp, gcvNULL);
     VSC_CPP_SetDUInfo(cpp, du_info);
@@ -60,6 +62,7 @@ static void VSC_CPP_Init(
     VSC_CPP_SetFWOptCount(cpp, 0);
     VSC_CPP_SetBWOptCount(cpp, 0);
     VSC_CPP_SetMM(cpp, pMM);
+    VSC_CPP_SetInvalidCfg(cpp, gcvFALSE);
 }
 
 static void VSC_CPP_Final(
@@ -221,7 +224,7 @@ static VSC_ErrCode _VSC_CPP_RemoveDefInst(
     }
 
     /* remove MOV */
-    errCode = VIR_Function_DeleteInstruction(func, defInst);
+    errCode = VIR_Pass_DeleteInstruction(func, defInst, &VSC_CPP_GetInvalidCfg(cpp));
 
     return errCode;
 }
@@ -2042,7 +2045,7 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
             VIR_Inst_Dump(dumper, inst);
             VIR_LOG_FLUSH(dumper);
         }
-        VIR_Function_DeleteInstruction(func, inst);
+        VIR_Pass_DeleteInstruction(func, inst, &VSC_CPP_GetInvalidCfg(cpp));
 
         vscHTBL_Reset(inst_usage_set);
     }
@@ -2216,7 +2219,7 @@ VSC_ErrCode VSC_CPP_PerformOnShader(
         cppPassData = *(VSC_CPP_PASS_DATA*)pPassWorker->basePassWorker.pPassSpecificData;
     }
 
-    VSC_CPP_Init(&cpp, shader, pPassWorker->pDuInfo, cpp_options, &cppPassData,
+    VSC_CPP_Init(&cpp, pPassWorker->pCompilerParam->cfg.ctx.appNameId, shader, pPassWorker->pDuInfo, cpp_options, &cppPassData,
                  pPassWorker->basePassWorker.pDumper, pPassWorker->basePassWorker.pMM);
 
     /* don't perform global CPP when the cfg has too many nodes*/
@@ -2225,9 +2228,15 @@ VSC_ErrCode VSC_CPP_PerformOnShader(
         func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
     {
         VIR_Function    *func = func_node->function;
+        gctUINT         maxInstCount = VSC_CPP_MAX_INST_COUNT_GENERAL;
+
+        if (VSC_CPP_GetAppNameId(&cpp) == gcvPATCH_DEQP)
+        {
+            maxInstCount = VSC_CPP_MAX_INST_COUNT_DEQP;
+        }
 
         if (VIR_Function_GetCFG(func)->dgGraph.nodeList.info.count > 1000 ||
-            VIR_Function_GetInstCount(func) > 3400)
+            VIR_Function_GetInstCount(func) > maxInstCount)
         {
             VSC_CPP_SetGlobalCPP(&cpp, gcvFALSE);
             break;
@@ -2246,6 +2255,11 @@ VSC_ErrCode VSC_CPP_PerformOnShader(
         {
             break;
         }
+    }
+
+    if (VSC_CPP_GetInvalidCfg(&cpp))
+    {
+        pPassWorker->pResDestroyReq->s.bInvalidateCfg = gcvTRUE;
     }
 
     if ((VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(VSC_CPP_GetOptions(&cpp)),

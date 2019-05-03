@@ -14,7 +14,7 @@
 #include "gc_es_context.h"
 #include "gc_chip_context.h"
 
-#define _GC_OBJ_ZONE    __GLES3_ZONE_TRACE
+#define _GC_OBJ_ZONE    gcdZONE_ES30_TRACE
 
 static const GLfixed sinx_table[1024] =
 {

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -174,12 +174,12 @@ private:
         float checkResult4;
 
         for (int i = 0; i < _numElements; ++i) {
-                checkResult1 = (*(unsigned int *)&(_goldStandard[i].r) + 4);
-                checkResult2 = (*(unsigned int *)&(_goldStandard[i].r) - 4);
+                checkResult1 = (*(unsigned int *)&(_goldStandard[i].r) + 256);
+                checkResult2 = (*(unsigned int *)&(_goldStandard[i].r) - 256);
                 checkResult3 = fabsf(*( float *) &checkResult1);
                 checkResult4 = fabsf(*( float *) &checkResult2);
-                if ((fabsf(_result[i].r) > checkResult3 || fabsf(_result[i].r) < checkResult4) && !isnan(_goldStandard[i].r) && !isinf(_goldStandard[i].r)){
-                    std::cout << "  c:" << _goldStandard[i].r << " ocl:" << _result[i].r << std::endl;
+         if ((fabsf(_result[i].r) > checkResult3 || fabsf(_result[i].r) < checkResult4) && !isnan(_goldStandard[i].r) && !isinf(_goldStandard[i].r) &&  !isnan(_result[i].r) && !isinf(_result[i].r)){
+                    std::cout << "  x: " << (float)_inputA[i].a << "  y: " << i << "  c:" << _goldStandard[i].r << " ocl:" << _result[i].r << std::endl;
                     return false;
                 }
         }
@@ -222,7 +222,7 @@ int power_union_scalar_3(void)
 
         std::vector<cl::Device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
 
-        
+
         const char* clProgramSource = kernel_power_union_scalar_3;//oclLoadProgSource("multiply.cl", "", &szKernelLength);
         if (clProgramSource == 0) {
             std::cerr << "OpenCL program not found." << std::endl;
@@ -254,6 +254,7 @@ int power_union_scalar_3(void)
                 cnt = 0;
             }
             std::cout << "RUN " << i + 1<< ": " << (control ? "PASSED" : "FAILED!") << std::endl;
+            control = true;
         }
         power_union_scalar_3.TearDown();
     }

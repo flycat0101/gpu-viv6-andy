@@ -512,11 +512,11 @@ _DestroySurfaceObjects(
 
         for (i = 0; i < EGL_WORKER_COUNT; i++)
         {
-            if (Surface->damage[i].numRects != 0)
+            if (Surface->damage[Surface->curDamage].numRects != 0)
             {
-                gcmOS_SAFE_FREE(gcvNULL, Surface->damage[i].rects);
-                Surface->damage[i].numRects = 0;
-                Surface->damage[i].maxNumRects = 0;
+                gcmOS_SAFE_FREE(gcvNULL, Surface->damage[Surface->curDamage].rects);
+                Surface->damage[Surface->curDamage].numRects = 0;
+                Surface->damage[Surface->curDamage].maxNumRects = 0;
             }
         }
 
@@ -2510,7 +2510,7 @@ eglCreatePbufferFromClientBuffer(
     /* Create shortcuts to objects. */
     eglConfig  = VEGL_CONFIG(&dpy->config[(EGLint)(intptr_t)Config - 1]);
 
-    if (buftype != EGL_OPENVG_IMAGE)
+    if ((buftype != EGL_OPENVG_IMAGE) || !(eglConfig->renderableType & EGL_OPENVG_BIT))
     {
         veglSetEGLerror(thread,  EGL_BAD_PARAMETER);;
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);

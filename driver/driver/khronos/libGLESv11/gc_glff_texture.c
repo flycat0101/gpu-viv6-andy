@@ -12,7 +12,7 @@
 
 
 #include "gc_glff_precomp.h"
-#define _GC_OBJ_ZONE    glvZONE_TEXTURE
+#define _GC_OBJ_ZONE    gcdZONE_ES11_TEXTURE
 
 #if defined(ANDROID)
 #if ANDROID_SDK_VERSION >= 16
@@ -9377,7 +9377,7 @@ GL_API void GL_APIENTRY glCompressedTexSubImage2D(
 */
 
 #undef  _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE    glvZONE_EXTENTION
+#define _GC_OBJ_ZONE    gcdZONE_ES11_EXTENTION
 
 GL_API void GL_APIENTRY glDrawTexsOES(
     GLshort Xs,
@@ -9617,7 +9617,7 @@ GL_API void GL_APIENTRY glDrawTexxvOES(
 \******************************************************************************/
 
 #undef  _GC_OBJ_ZONE
-#define _GC_OBJ_ZONE    glvZONE_TEXTURE
+#define _GC_OBJ_ZONE    gcdZONE_ES11_TEXTURE
 
 EGLenum
 glfBindTexImage(

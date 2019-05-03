@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -42,6 +42,10 @@ ifdef TARGET_2ND_ARCH
   LOCAL_SRC_FILES := $(call all-subdir-java-files)
 
   LOCAL_JNI_SHARED_LIBRARIES := libgl2sample3_jni
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 23),1)
+  LOCAL_JNI_SHARED_LIBRARIES += libc++
+endif
+
   LOCAL_PACKAGE_NAME := GL2Sample3_android-64
   LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
   LOCAL_MULTILIB     := 64
@@ -53,6 +57,9 @@ ifdef TARGET_2ND_ARCH
   LOCAL_SRC_FILES := $(call all-subdir-java-files)
 
   LOCAL_JNI_SHARED_LIBRARIES := libgl2sample3_jni
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 23),1)
+  LOCAL_JNI_SHARED_LIBRARIES += libc++
+endif
 
   LOCAL_PACKAGE_NAME := GL2Sample3_android-32
   LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
@@ -65,6 +72,9 @@ ifdef TARGET_2ND_ARCH
   LOCAL_SRC_FILES := $(call all-subdir-java-files)
 
   LOCAL_JNI_SHARED_LIBRARIES := libgl2sample3_jni
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 23),1)
+  LOCAL_JNI_SHARED_LIBRARIES += libc++
+endif
 
   LOCAL_PACKAGE_NAME := GL2Sample3_android-multilib
   LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
@@ -77,6 +87,10 @@ include $(CLEAR_VARS)
 
   LOCAL_SRC_FILES := $(call all-subdir-java-files)
   LOCAL_JNI_SHARED_LIBRARIES := libgl2sample3_jni
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 23),1)
+  LOCAL_JNI_SHARED_LIBRARIES += libc++
+endif
+
   LOCAL_PACKAGE_NAME := GL2Sample3_android
   LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
   include $(BUILD_PACKAGE)
@@ -92,24 +106,23 @@ include $(CLEAR_VARS)
 LOCAL_CFLAGS := -Werror -Wno-unused-parameter -Wno-strict-aliasing -DANDROID_SDK_VERSION=$(PLATFORM_SDK_VERSION)
 
 LOCAL_SRC_FILES:= 	 \
-					android/jni/sample3.cpp \
-					snake.c \
-					snake_main.c \
-					../Common/vdk_sample_common.c
+	android/jni/sample3.cpp \
+	snake.c \
+	snake_main.c \
+	../Common/vdk_sample_common.c
 
 LOCAL_C_INCLUDES := $(LOCAL_PATH) \
 					$(LOCAL_PATH)/../Common \
 #LOCAL_SRC_FILES:=  gl_code.cpp
 
 LOCAL_SHARED_LIBRARIES := \
-	libutils \
 	libEGL \
 	libGLESv2
 
 #LOCAL_STATIC_LIBRAIES := libvdk_sample_common libsphere
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 18),1)
 LOCAL_SHARED_LIBRARIES += \
-        liblog
+	liblog
 endif
 
 LOCAL_MODULE := libgl2sample3_jni

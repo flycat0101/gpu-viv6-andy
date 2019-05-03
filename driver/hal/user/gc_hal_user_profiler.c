@@ -16,7 +16,7 @@
 */
 #include "gc_hal_user_precomp.h"
 
-#define _GC_OBJ_ZONE            gcvZONE_HAL
+#define _GC_OBJ_ZONE            gcdZONE_PROFILER
 
 #if gcdENABLE_3D
 #if VIVANTE_PROFILER

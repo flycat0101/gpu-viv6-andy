@@ -15,6 +15,8 @@
 #include <gc_hal_user_precomp.h>
 #include <gc_hal_vx.h>
 
+#define _GC_OBJ_ZONE            gcdZONE_VX_PROGRAM
+
 #if gcdSTATIC_LINK
 
 gceSTATUS
@@ -47,6 +49,8 @@ static gceSTATUS _UpdateCompileOption(gctSTRING *options)
     gceSTATUS status;
     gctPOINTER pointer = gcvNULL;
 
+    gcmHEADER_ARG("options=%p", options);
+
     extraOptionLength = gcoOS_StrLen(" -cl-viv-gcsl-driver-image", gcvNULL);
 
     if (*options)
@@ -71,6 +75,7 @@ static gceSTATUS _UpdateCompileOption(gctSTRING *options)
     *options = (gctSTRING)pointer;
 
 OnError:
+    gcmFOOTER_NO();
     return status;
 
 }
@@ -105,14 +110,21 @@ VX_API_ENTRY vx_program VX_API_CALL vxCreateProgramWithSource(
     gctSTRING   source;
     gctUINT     i;
 
+    gcmHEADER_ARG("context=%p, count=0x%x, strings=%p, lengths=%p", context, count, strings, lengths);
     gcmDUMP_API("$VX vxCreateProgramWithSource: context=%p, count=0x%x, strings=%p, lengths=%p", context, count, strings, lengths);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     program = (vx_program)vxoReference_Create(context, (vx_type_e)VX_TYPE_PROGRAM, VX_REF_EXTERNAL, &context->base);
 
-    if (vxoReference_GetStatus((vx_reference)program) != VX_SUCCESS) return program;
-
+    if (vxoReference_GetStatus((vx_reference)program) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return program;
+    }
 
 
     if (count == 0 || strings == gcvNULL)
@@ -168,13 +180,13 @@ VX_API_ENTRY vx_program VX_API_CALL vxCreateProgramWithSource(
 
     gcoOS_Free(gcvNULL, sizes);
 
-
+    gcmFOOTER_NO();
     return program;
 
 OnError:
     if (sizes) gcoOS_Free(gcvNULL, sizes);
     vxReleaseProgram(&program);
-
+    gcmFOOTER_NO();
     return VX_NULL;
 }
 
@@ -186,14 +198,21 @@ VX_API_ENTRY vx_program VX_API_CALL vxCreateProgramWithBinary(
     gcSHADER    shaderBinary;
     gctUINT32   *pBinary = (gctUINT32*)binary;
 
+    gcmHEADER_ARG("context=%p, binary=%p, size=0x%lx", context, binary, size);
     gcmDUMP_API("$VX vxCreateProgramWithBinary: context=%p, binary=%p, size=0x%lx", context, binary, size);
 
-    if (!vxoContext_IsValid(context)) return VX_NULL;
-
+    if (!vxoContext_IsValid(context))
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
+    }
     program = (vx_program)vxoReference_Create(context, (vx_type_e)VX_TYPE_PROGRAM, VX_REF_EXTERNAL, &context->base);
 
-    if (vxoReference_GetStatus((vx_reference)program) != VX_SUCCESS) return program;
-
+    if (vxoReference_GetStatus((vx_reference)program) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return program;
+    }
     gcQueryShaderCompilerHwCfg(gcvNULL, gcGetHWCaps());
 
     if ((*pBinary == FULL_PROGRAM_BINARY_SIG_1) &&  (*(pBinary+1) == FULL_PROGRAM_BINARY_SIG_2))
@@ -215,12 +234,12 @@ VX_API_ENTRY vx_program VX_API_CALL vxCreateProgramWithBinary(
         program->binary = (gctUINT8_PTR) shaderBinary;
         program->binarySize = (gctUINT)size;
     }
-
+    gcmFOOTER_NO();
     return program;
 
 OnError:
     vxReleaseProgram(&program);
-
+    gcmFOOTER_NO();
     return VX_NULL;
 }
 
@@ -297,10 +316,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxBuildProgram(vx_program program, vx_const_s
     gceSTATUS           status = gcvSTATUS_OK;
     vx_status           vStatus = VX_FAILURE;
 
+    gcmHEADER_ARG("program=%p, options=%s", program, options);
     gcmDUMP_API("$VX vxBuildProgram: program=%p, options=%s", program, options);
 
-    if (!vxoReference_IsValidAndSpecific(&program->base, (vx_type_e)VX_TYPE_PROGRAM)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoReference_IsValidAndSpecific(&program->base, (vx_type_e)VX_TYPE_PROGRAM))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     if ((program->binary != gcvNULL) && (program->source != gcvNULL))
     {
         /* This program was built before
@@ -381,15 +404,20 @@ OnError:
         program->buildStatus = (vStatus == VX_SUCCESS) ? VX_BUILD_SUCCESS : VX_BUILD_ERROR;
     }
 
+    gcmFOOTER_NO();
     return vStatus;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryProgram(vx_program program, vx_enum attribute, void *ptr, vx_size size)
 {
+    gcmHEADER_ARG("program=%p, attribute=0x%x, ptr=%p, size=0x%lx", program, attribute, ptr, size);
     gcmDUMP_API("$VX vxQueryProgram: program=%p, attribute=0x%x, ptr=%p, size=0x%lx", program, attribute, ptr, size);
 
-    if (!vxoReference_IsValidAndSpecific(&program->base, (vx_type_e)VX_TYPE_PROGRAM)) return VX_ERROR_INVALID_REFERENCE;
-
+    if (!vxoReference_IsValidAndSpecific(&program->base, (vx_type_e)VX_TYPE_PROGRAM))
+    {
+        gcmFOOTER_NO();
+        return VX_ERROR_INVALID_REFERENCE;
+    }
     switch (attribute)
     {
         case VX_PROGRAM_ATTRIBUTE_BUILD_LOG:
@@ -399,9 +427,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryProgram(vx_program program, vx_enum at
 
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
+            gcmFOOTER_NO();
             return VX_ERROR_NOT_SUPPORTED;
     }
 
+    gcmFOOTER_NO();
     return VX_SUCCESS;
 }
 

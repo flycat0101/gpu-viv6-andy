@@ -17,6 +17,8 @@
 #include <stdlib.h>
 #include <pthread.h>
 
+#define _GC_OBJ_ZONE                gcdZONE_VG_MAIN
+
 static pthread_key_t tlsKey = 0;
 
 static void _GlobalDestructor(
