@@ -12981,13 +12981,23 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyAllNodesByTarget(vx_graph graph)
 #if !gcdSTATIC_LINK
 
 #if defined(_WINDOWS)
-#define NNVXC_LIB_NAME "libNNVXCBinary.dll"
-#define OVX12_VXC_LIB_NAME "libOvx12VXCBinary.dll"
-#define NNGPU_LIB_NAME "libNNGPUBinary.dll"
+#define NNVXC_LIB_EVIS_NAME "libNNVXCBinary-evis.dll"
+#define NNVXC_LIB_EVIS2_NAME "libNNVXCBinary-evis2.dll"
+#define OVX12_VXC_LIB_EVIS_NAME "libOvx12VXCBinary-evis.dll"
+#define OVX12_VXC_LIB_EVIS2_NAME "libOvx12VXCBinary-evis2.dll"
+#define NNGPU_LIB_EVIS2_NAME "libNNGPUBinary-evis2.dll"
+#define NNGPU_LIB_EVIS_NAME "libNNGPUBinary-evis.dll"
+#define NNGPU_LIB_LITE_NAME "libNNGPUBinary-lite.dll"
+#define NNGPU_LIB_ULITE_NAME "libNNGPUBinary-ulite.dll"
 #else
-#define NNVXC_LIB_NAME "libNNVXCBinary.so"
-#define OVX12_VXC_LIB_NAME "libOvx12VXCBinary.so"
-#define NNGPU_LIB_NAME "libNNGPUBinary.so"
+#define NNVXC_LIB_EVIS_NAME "libNNVXCBinary-evis.so"
+#define NNVXC_LIB_EVIS2_NAME "libNNVXCBinary-evis2.so"
+#define OVX12_VXC_LIB_EVIS_NAME "libOvx12VXCBinary-evis.so"
+#define OVX12_VXC_LIB_EVIS2_NAME "libOvx12VXCBinary-evis2.so"
+#define NNGPU_LIB_EVIS2_NAME "libNNGPUBinary-evis2.so"
+#define NNGPU_LIB_EVIS_NAME "libNNGPUBinary-evis.so"
+#define NNGPU_LIB_LITE_NAME "libNNGPUBinary-lite.so"
+#define NNGPU_LIB_ULITE_NAME "libNNGPUBinary-ulite.so"
 #endif
 
 #if defined(__QNX__)
@@ -13049,14 +13059,46 @@ VX_INTERNAL_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph)
     if (vx_false_e == vxoBinaryGraph_HasBinaryInGraph(graph))
     {
         gceSTATUS status = gcvSTATUS_OK;
-        status = gcoOS_LoadLibrary(gcvNULL, NNVXC_LIB_NAME, &context->globalData->libNNVXCKernelHandle);
-        if(status != gcvSTATUS_OK) vxError("Can't open libNNVXCBinary!\n");
 
-        status = gcoOS_LoadLibrary(gcvNULL, OVX12_VXC_LIB_NAME, &context->globalData->libOvx12VXCBinaryHandle);
-        if(status != gcvSTATUS_OK) vxError("Can't open libOvx12VXCBinary!\n");
+        if (graph->base.context->evisNoInst.isVX2)
+        {
+            status = gcoOS_LoadLibrary(gcvNULL, NNVXC_LIB_EVIS2_NAME, &context->globalData->libNNVXCKernelHandle);
+            if(status != gcvSTATUS_OK) vxError("Can't open libNNVXCBinary-evis2!\n");
 
-        status = gcoOS_LoadLibrary(gcvNULL, NNGPU_LIB_NAME, &context->globalData->libNNGPUKernelHandle);
-        if(status != gcvSTATUS_OK) vxError("Can't open libNNGPUBinary!\n");
+            status = gcoOS_LoadLibrary(gcvNULL, OVX12_VXC_LIB_EVIS2_NAME, &context->globalData->libOvx12VXCBinaryHandle);
+            if(status != gcvSTATUS_OK) vxError("Can't open libOvx12VXCBinary-evis2!\n");
+
+            status = gcoOS_LoadLibrary(gcvNULL, NNGPU_LIB_EVIS2_NAME, &context->globalData->libNNGPUKernelHandle);
+            if(status != gcvSTATUS_OK) vxError("Can't open libNNGPUBinary-evis2!\n");
+        }
+        else if (graph->base.context->evisNoInst.supportEVIS)
+        {
+            status = gcoOS_LoadLibrary(gcvNULL, NNVXC_LIB_EVIS_NAME, &context->globalData->libNNVXCKernelHandle);
+            if(status != gcvSTATUS_OK) vxError("Can't open libNNVXCBinary-evis!\n");
+
+            status = gcoOS_LoadLibrary(gcvNULL, OVX12_VXC_LIB_EVIS_NAME, &context->globalData->libOvx12VXCBinaryHandle);
+            if(status != gcvSTATUS_OK) vxError("Can't open libOvx12VXCBinary-evis!\n");
+        }
+
+        if (graph->base.context->nnConfig.fixedFeature.shaderCoreCount == 8)
+        {
+            status = gcoOS_LoadLibrary(gcvNULL, NNGPU_LIB_EVIS_NAME, &context->globalData->libNNGPUKernelHandle);
+            if(status != gcvSTATUS_OK) vxError("Can't open libNNGPUBinary-evis!\n");
+        }
+        else if (graph->base.context->nnConfig.fixedFeature.shaderCoreCount == 4)
+        {
+            status = gcoOS_LoadLibrary(gcvNULL, NNGPU_LIB_LITE_NAME, &context->globalData->libNNGPUKernelHandle);
+            if(status != gcvSTATUS_OK) vxError("Can't open libNNGPUBinary-lite!\n");
+        }
+        else if (graph->base.context->nnConfig.fixedFeature.shaderCoreCount == 2)
+        {
+            status = gcoOS_LoadLibrary(gcvNULL, NNGPU_LIB_ULITE_NAME, &context->globalData->libNNGPUKernelHandle);
+            if(status != gcvSTATUS_OK) vxError("Can't open libNNGPUBinary-ulite!\n");
+        }
+        else
+        {
+            vxError("Can't support one shaderCoreCount!\n");
+        }
     }
 #endif
 #endif

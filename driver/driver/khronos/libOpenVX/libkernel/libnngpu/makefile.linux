@@ -11,55 +11,26 @@
 ##############################################################################
 
 
-#
-# Driver part of OpenVX.
-#
-
-#############################################################################
-# Include common definitions.
+######################################################
+# Include global difinitions.
 
 include $(AQROOT)/makefile.linux.def
-include ../../makefile.linux.def
 
-#INCLUDE += -I../include
+######################################################
+# Components of the project.
 
-ifeq ($(gcdSTATIC_LINK), 1)
-STATIC=1
-TARGET_NAME = libNNGPUBinary.a
-else
-DYNAMIC = 1
-TARGET_NAME = libNNGPUBinary.so
+ifeq ($(USE_VXC_BINARY),1)
+LIB_VX := gc7000xsvx gc7000lite gc7000ulite vip8000nanosi
 endif
 
-#############################################################################
-# Objects.
+######################################################
+# Define the macros used in the common file.
 
-# Core
-OBJECTS         =  \
-                    $(OBJ_DIR)/nngpu_binary_interface.o \
+MODULES     := $(LIB_VX)
+MAIN_MODULE := $(LIB_VX)
 
-################################################################################
-
-INCLUDE += -I./${GPU_CONFIG}
-CFLAGS += $(INCLUDE)
-
-################################################################################
-# Add extra include path.
-
-################################################################################
-# Define the macros used in common makefile.
-
-# installation directory
-INSTALL_DIR := $(SDK_DIR)/drivers
-
-################################################################################
+######################################################
 # Include the common makefile.
 
-include $(AQROOT)/common.target
+include $(AQROOT)/common.node
 
-################################################################################
-# Extra installation.
-install: $(TARGET_OUTPUT) extra_install
-
-.PHONY: extra_install
-extra_install: $(TARGET_OUTPUT)
