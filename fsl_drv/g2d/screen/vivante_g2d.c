@@ -53,7 +53,7 @@
 
 #include <assert.h>
 
-#include <imx8_common_wfd_g2d.h>
+#include <WF/private/imx8_common_wfd_g2d.h>
 
 /* XXX Move to sys/slogcodes.h */
 #ifndef _SLOGC_GRAPHICS_WINMGR
@@ -436,7 +436,29 @@ vivante_ctx_fini(win_blit_ctx_t ctx)
 static int
 update_g2d_surface(vivante_handle_t *handle) {
 
-	switch (handle->NativeImage->format) {
+        switch (GET_TILING_MODE(handle->NativeImage->format)) {
+        case WFD_FORMAT_IMX8X_TILING_MODE_LINEAR:
+            handle->G2DSurfaceEx.tiling = G2D_LINEAR;
+            break;
+        case WFD_FORMAT_IMX8X_TILING_MODE_VIVANTE_TILED:
+            handle->G2DSurfaceEx.tiling = G2D_TILED;
+            break;
+        case WFD_FORMAT_IMX8X_TILING_MODE_VIVANTE_SUPER_TILED:
+            handle->G2DSurfaceEx.tiling = G2D_SUPERTILED;
+            break;
+        case WFD_FORMAT_IMX8X_TILING_MODE_AMPHION_TILED:
+            handle->G2DSurfaceEx.tiling = G2D_AMPHION_TILED;
+            break;
+        case WFD_FORMAT_IMX8X_TILING_MODE_AMPHION_INTERLACED:
+            handle->G2DSurfaceEx.tiling = G2D_AMPHION_INTERLACED;
+            break;
+        default:
+            error("%s: unknown tiling format - 0x%X!", __FUNCTION__, GET_TILING_MODE(handle->NativeImage->format));
+            return -1;
+            break;
+        }
+
+	switch (WIN_FORMAT(handle->NativeImage->format)) {
 	case SCREEN_FORMAT_BYTE:
 		// gcvSURF_L8 - NOTES not BYTE format supported by g2d??
 		G2D_FORMAT_NOT_SUPPORTED(BYTE);
@@ -528,6 +550,8 @@ update_g2d_surface(vivante_handle_t *handle) {
 	}
 
 	/* Update planes part of the g2d surface */
+        handle->G2DSurfaceEx.base.planes[0] = handle->NativeImage->paddr;
+
 	switch (handle->G2DSurfaceEx.base.format) {
 	case G2D_RGB565:
 	case G2D_RGB888:
@@ -801,12 +825,6 @@ vivante_alloc(win_blit_ctx_t ctx, win_image_t *img)
         return NULL;
     }
 
-    enum wfd_imx8_tiling_mode tiling_mode = GET_TILING_MODE(img->format);
-    if (!is_valid_tiling_mode(tiling_mode)) {
-        error("%s: Unsupported tiling mode: 0x%#x", __FUNCTION__, tiling_mode);
-        return NULL;
-    }
-
     pthread_mutex_lock(&blt_ctx->mutex);
 
     if (blt_ctx->tls_errno != EOK) {
@@ -824,35 +842,6 @@ vivante_alloc(win_blit_ctx_t ctx, win_image_t *img)
 
     handle->NativeImage = img;
     handle->MappingInfo = NULL;
-    handle->G2DSurfaceEx.base.planes[0] = handle->NativeImage->paddr;
-
-    switch (tiling_mode) {
-    case WFD_FORMAT_IMX8X_TILING_MODE_LINEAR:
-        handle->G2DSurfaceEx.tiling = G2D_LINEAR;
-        break;
-    case WFD_FORMAT_IMX8X_TILING_MODE_VIVANTE_TILED:
-        handle->G2DSurfaceEx.tiling = G2D_TILED;
-        break;
-    case WFD_FORMAT_IMX8X_TILING_MODE_VIVANTE_SUPER_TILED:
-        handle->G2DSurfaceEx.tiling = G2D_SUPERTILED;
-        break;
-    case WFD_FORMAT_IMX8X_TILING_MODE_AMPHION_TILED:
-        handle->G2DSurfaceEx.tiling = G2D_AMPHION_TILED;
-        break;
-    case WFD_FORMAT_IMX8X_TILING_MODE_AMPHION_INTERLACED:
-        handle->G2DSurfaceEx.tiling = G2D_AMPHION_INTERLACED;
-        break;
-    default:
-        free(handle);
-        pthread_mutex_unlock(&blt_ctx->mutex);
-        error("%s: unknown tiling format!", __FUNCTION__);
-        return NULL;
-    }
-
-    /* once we have the tiling info, we can knock the tiling
-     * bits out of the format - until detiling support is added for hardware.
-     */
-    handle->NativeImage->format = WIN_FORMAT(handle->NativeImage->format);
 
     pthread_mutex_unlock(&blt_ctx->mutex);
 
@@ -874,6 +863,7 @@ vivante_free(win_blit_ctx_t ctx, win_handle_t hnd)
 
     pthread_mutex_lock(&blt_ctx->mutex);
     free(handle);
+
     pthread_mutex_unlock(&blt_ctx->mutex);
 }
 
@@ -928,7 +918,7 @@ vivante_blit( win_blit_ctx_t ctx, win_handle_t src, win_handle_t dst, const win_
     if( 1 || !blt_ctx->multisource ) {
         /* no multi-source caps -- use as is */
         int rc = blit( ctx, src, dst, args );
-	
+
     if( blt_ctx->print_stats > 1 ) {
 		printbuff("src post",((vivante_handle_t*)src)->NativeImage);
 		printbuff("dst post",((vivante_handle_t*)dst)->NativeImage);	

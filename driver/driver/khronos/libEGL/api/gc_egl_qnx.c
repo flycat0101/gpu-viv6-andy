@@ -19,6 +19,8 @@
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <sys/queue.h>
+#include <sys/slog.h>
+#include <sys/slogcodes.h>
 
 #include <stdlib.h>
 #include <sys/time.h>
@@ -30,7 +32,10 @@
 #include <errno.h>
 #include <semaphore.h>
 #include <screen/screen.h>
+#include <screen/iomsg.h>
 #include <KHR/khronos_utils.h>
+#include <WF/wfd.h>
+#include <WF/wfdext.h>
 
 #include "gc_egl_platform.h"
 
@@ -40,6 +45,7 @@ typedef int             PlatformDisplayType;
 typedef screen_window_t PlatformWindowType;
 typedef screen_pixmap_t PlatformPixmapType;
 
+#define LOGERR(x, ...)       slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "EGL ERROR [%s,%d]: " x, __FUNCTION__, __LINE__, ##__VA_ARGS__)
 
 static gceSTATUS
 qnx_GetScreenWindowBufferAddress(
@@ -55,12 +61,14 @@ qnx_GetScreenWindowBufferAddress(
     if (screen_get_buffer_property_pv(ScreenBuffer, SCREEN_PROPERTY_POINTER, Logical))
     {
         /* Failed to get logical address. */
+        LOGERR("Failed to obtain SCREEN_PROPERTY_POINTER property.");
         return  gcvSTATUS_INVALID_ARGUMENT;
     }
 
     /* Whether or not it is physically contiguous. */
     if (screen_get_buffer_property_iv(ScreenBuffer, SCREEN_PROPERTY_PHYSICALLY_CONTIGUOUS, &contiguous))
     {
+        LOGERR("Failed to obtain SCREEN_PROPERTY_PHYSICALLY_CONTIGUOUS property.");
         return  gcvSTATUS_INVALID_ARGUMENT;
     }
 
@@ -70,6 +78,7 @@ qnx_GetScreenWindowBufferAddress(
         if (screen_get_buffer_property_llv(ScreenBuffer, SCREEN_PROPERTY_PHYSICAL_ADDRESS, &paddr))
         {
             /* Failed to get physical address. */
+            LOGERR("Failed to obtain SCREEN_PROPERTY_PHYSICAL_ADDRESS property.");
             return  gcvSTATUS_INVALID_ARGUMENT;
         }
     }
@@ -97,7 +106,7 @@ _ConvertWindowFormat(
 
     gcmHEADER_ARG("ScreenFormat=%d.", ScreenFormat);
 
-    switch (ScreenFormat)
+    switch (WFD_BASE_FORMAT(ScreenFormat))
     {
         case SCREEN_FORMAT_BYTE:
             bpp = 8;
@@ -281,9 +290,14 @@ qnx_GetDisplayInfoEx(
         goto OnError;
     }
 
-    rc = screen_get_window_property_iv((screen_window_t)Window, SCREEN_PROPERTY_RENDER_BUFFER_COUNT, &nbufs);
+    rc = screen_get_window_property_iv(Window, SCREEN_PROPERTY_RENDER_BUFFER_COUNT, &nbufs);
     if (rc || nbufs < 1)
     {
+        if (rc) {
+            LOGERR("Failed to obtain SCREEN_PROPERTY_RENDER_BUFFER_COUNT property.");
+        } else {
+            LOGERR("Invalid number of SCREEN_PROPERTY_RENDER_BUFFER_COUNT property - %d.", nbufs);
+        }
         status = gcvSTATUS_INVALID_ARGUMENT;
         goto OnError;
     }
@@ -291,14 +305,16 @@ qnx_GetDisplayInfoEx(
     render_bufs = malloc(nbufs * sizeof(screen_buffer_t));
     if (render_bufs == NULL)
     {
+        LOGERR("Failed to allocate memory.");
         status = gcvSTATUS_OUT_OF_MEMORY;
         goto OnError;
     }
     else
     {
-        rc = screen_get_window_property_pv((screen_window_t)Window, SCREEN_PROPERTY_RENDER_BUFFERS, (void**)render_bufs);
+        rc = screen_get_window_property_pv(Window, SCREEN_PROPERTY_RENDER_BUFFERS, (void**)render_bufs);
         if (rc)
         {
+            LOGERR("Failed to obtain SCREEN_PROPERTY_RENDER_BUFFERS property.");
             free(render_bufs);
             render_bufs = NULL;
             status = gcvSTATUS_INTERFACE_ERROR;
@@ -316,6 +332,7 @@ qnx_GetDisplayInfoEx(
     rc = screen_get_buffer_property_iv(buf, SCREEN_PROPERTY_BUFFER_SIZE, size);
     if (rc)
     {
+        LOGERR("Failed to obtain SCREEN_PROPERTY_BUFFER_SIZE property.");
         status = gcvSTATUS_INVALID_ARGUMENT;
         goto OnError;
     }
@@ -327,6 +344,7 @@ qnx_GetDisplayInfoEx(
     rc = screen_get_buffer_property_iv(buf, SCREEN_PROPERTY_STRIDE, &stride);
     if (rc)
     {
+        LOGERR("Failed to obtain SCREEN_PROPERTY_STRIDE property.");
         status = gcvSTATUS_INVALID_ARGUMENT;
         goto OnError;
     }
@@ -337,6 +355,7 @@ qnx_GetDisplayInfoEx(
     rc = screen_get_buffer_property_pv(buf, SCREEN_PROPERTY_POINTER, &pointer);
     if (rc)
     {
+        LOGERR("Failed to obtain SCREEN_PROPERTY_POINTER property.");
         status = gcvSTATUS_INVALID_ARGUMENT;
         goto OnError;
     }
@@ -347,6 +366,7 @@ qnx_GetDisplayInfoEx(
     rc = screen_get_buffer_property_iv(buf, SCREEN_PROPERTY_PHYSICALLY_CONTIGUOUS, &contiguous);
     if (rc)
     {
+        LOGERR("Failed to obtain SCREEN_PROPERTY_PHYSICALLY_CONTIGUOUS property.");
         status = gcvSTATUS_INVALID_ARGUMENT;
         goto OnError;
     }
@@ -357,6 +377,7 @@ qnx_GetDisplayInfoEx(
         rc = screen_get_buffer_property_llv(buf, SCREEN_PROPERTY_PHYSICAL_ADDRESS, &paddr);
         if (rc)
         {
+            LOGERR("Failed to obtain SCREEN_PROPERTY_PHYSICAL_ADDRESS property.");
             status = gcvSTATUS_INVALID_ARGUMENT;
             goto OnError;
         }
@@ -412,21 +433,6 @@ qnx_GetDisplayBackbuffer(
 }
 
 gceSTATUS
-qnx_CancelDisplayBackbuffer(
-    IN PlatformDisplayType Display,
-    IN PlatformWindowType Window,
-    IN gctPOINTER Context,
-    IN gcoSURF Surface,
-    IN gctUINT Offset,
-    IN gctINT X,
-    IN gctINT Y
-    )
-{
-    gcmPRINT("%s: TODO", __func__);
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
 qnx_SetSwapInterval(
     IN PlatformWindowType Window,
     IN gctINT Interval
@@ -457,7 +463,7 @@ qnx_GetSwapInterval(
 gceSTATUS
 qnx_DisplayBufferRegions(
     IN PlatformDisplayType Display,
-    IN PlatformWindowType Window,
+    IN VEGLSurface Surface,
     screen_buffer_t buf,
     IN gctINT NumRects,
     IN gctINT_PTR Rects
@@ -465,12 +471,32 @@ qnx_DisplayBufferRegions(
 {
 
     int rc;
+    int nbufs, post_flags = 0;
+    PlatformWindowType Window = (PlatformWindowType) Surface->hwnd;
+
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("Display=0x%x Window=0x%x NumRects=%d", Display, Window, NumRects);
 
-    rc = screen_post_window((screen_window_t)Window, buf, NumRects, Rects, 0);
+    if (Surface->renderMode != VEGL_INDIRECT_RENDERING) {
+        /* For direct rendering, make sure there is at least one free buffer after screen_post_window call */
+        rc = screen_get_window_property_iv(Window, SCREEN_PROPERTY_RENDER_BUFFER_COUNT, &nbufs);
+        if (rc) {
+            LOGERR("Failed to obtain SCREEN_PROPERTY_RENDER_BUFFER_COUNT property.");
+            goto OnError;
+        }
+        if (nbufs <= 2) {
+            /* If there are only two render buffers available in the window, need to block the swap worker thread
+             * until the display is updated. This is to ensure there is always one free render buffer available
+             * in the direct rendering mode.
+             * TODO: Once better api is available, update this part.
+             */
+            post_flags = SCREEN_WAIT_IDLE;
+        }
+    }
+    rc = screen_post_window(Window, buf, NumRects, Rects, post_flags);
     if (rc) {
+        LOGERR("Failed to post window buffer.");
         goto OnError;
     }
 
@@ -502,7 +528,7 @@ qnx_DestroyDisplay(
 gceSTATUS
 qnx_GetWindowInfoEx(
     IN PlatformDisplayType Display,
-    IN PlatformWindowType Window,
+    IN VEGLSurface Surface,
     OUT gctINT * X,
     OUT gctINT * Y,
     OUT gctINT * Width,
@@ -510,11 +536,17 @@ qnx_GetWindowInfoEx(
     OUT gctINT * BitsPerPixel,
     OUT gctUINT * Offset,
     OUT gceSURF_FORMAT * Format,
-    OUT gceSURF_TYPE * Type
+    OUT gceSURF_TYPE * SurfType,
+    OUT EGLint * RenderMode
     )
 {
-    gctINT rc, size[2], format;
+    gctINT rc;
     gceSTATUS status = gcvSTATUS_OK;
+    int num_of_buffers = 0;
+    screen_buffer_t buffersArray[5];
+    screen_buffer_t *buffers = buffersArray;
+    win_image_t *img;
+    screen_window_t Window  = (screen_window_t) Surface->hwnd;
 
     gcmHEADER_ARG("Display=0x%x Window=0x%x", Display, Window);
 
@@ -534,34 +566,52 @@ qnx_GetWindowInfoEx(
         *Y = 0;
     }
 
-    if ((Width != gcvNULL) || (Height != gcvNULL))
-    {
-        rc = screen_get_window_property_iv((screen_window_t)Window, SCREEN_PROPERTY_BUFFER_SIZE, size);
-        if (rc)
-        {
+    /* The WFD driver setups the window buffer based on the usage flag. If there is no read/write usage flag,
+     * it will setup the buffer for supertiled format and stores the information into the buffer native image structure.
+     * This is why I need to work with the window buffers properties. */
+    rc = screen_get_window_property_iv(Window, SCREEN_PROPERTY_BUFFER_COUNT, &num_of_buffers);
+    if (rc || (num_of_buffers < 1)) {
+        if (rc) {
+            LOGERR("Failed to obtain SCREEN_PROPERTY_BUFFER_COUNT property.");
+        } else {
+            LOGERR("Invalid number of SCREEN_PROPERTY_BUFFER_COUNT property - %d.", num_of_buffers);
+        }
+        goto OnError;
+    }
+
+    /* Allocate memory for all render buffers, if the statically allocated array is not enough */
+    if (num_of_buffers > (sizeof(buffersArray)/sizeof(screen_buffer_t))) {
+        buffers = calloc(num_of_buffers, sizeof(screen_buffer_t));
+        if (buffers == NULL) {
+            LOGERR("Failed to allocate memory.");
             goto OnError;
         }
+    }
 
-        if (Width != gcvNULL)
-        {
-            *Width = size[0];
-        }
+    rc = screen_get_window_property_pv(Window, SCREEN_PROPERTY_BUFFERS, (void**)buffers);
+    if (rc) {
+        LOGERR("Failed to obtain SCREEN_PROPERTY_BUFFERS property.");
+        goto OnError;
+    }
 
-        if (Height != gcvNULL)
-        {
-            *Height = size[1];
-        }
+    rc = screen_get_buffer_property_pv(buffers[0], SCREEN_PROPERTY_NATIVE_IMAGE, (void**)&img);
+    if (rc) {
+        LOGERR("Failed to obtain SCREEN_PROPERTY_NATIVE_IMAGE property.");
+        goto OnError;
+    }
+
+
+    if (Width != gcvNULL) {
+        *Width = img->width;
+    }
+
+    if (Height != gcvNULL) {
+        *Height = img->height;
     }
 
     if ((BitsPerPixel != gcvNULL) || (Format != gcvNULL))
     {
-        rc = screen_get_window_property_iv(Window, SCREEN_PROPERTY_FORMAT, &format);
-        if (rc)
-        {
-            goto OnError;
-        }
-
-        gcmONERROR(_ConvertWindowFormat(format, BitsPerPixel, Format));
+        gcmONERROR(_ConvertWindowFormat(img->format, BitsPerPixel, Format));
     }
 
     if (Offset != gcvNULL)
@@ -569,17 +619,83 @@ qnx_GetWindowInfoEx(
         *Offset = 0;
     }
 
-    if (Type != gcvNULL)
-    {
-        *Type = gcvSURF_BITMAP;
+    if ((RenderMode != NULL) || (SurfType != NULL)) {
+        EGLint renderMode = VEGL_INDIRECT_RENDERING;
+        gceSURF_TYPE surfaceType = gcvSURF_BITMAP;
+
+        switch (WFD_FORMAT_IMX8X_TILING_MODE(img->format)) {
+        case WFD_FORMAT_IMX8X_TILING_MODE_LINEAR:
+            /* For linear buffer, use indirect rendering. GPU will do the resolve */
+            renderMode = VEGL_INDIRECT_RENDERING;
+            surfaceType = gcvSURF_BITMAP;
+            break;
+        case WFD_FORMAT_IMX8X_TILING_MODE_VIVANTE_TILED:
+        case WFD_FORMAT_IMX8X_TILING_MODE_VIVANTE_SUPER_TILED:
+            renderMode = VEGL_DIRECT_RENDERING_NOFC;
+            surfaceType = gcvSURF_RENDER_TARGET_NO_TILE_STATUS;
+
+            /* Fall back to indirect mode for specific cases */
+            if (num_of_buffers != 3) {
+                /* In case there are only two back buffers, need to fall back to indirect rendering, since having only two backbuffers means
+                 * I need to wait for gpu to finish working before I can return from eglSwapBuffers with a new backbuffer
+                 * In case there are more than 3 backbuffers, need to use indirect rendering to avoid choppy output in time aware applications
+                 * (e.g. glmark2)
+                 * TODO: update this part once better Screen api is available. */
+                renderMode = VEGL_INDIRECT_RENDERING;
+            } else if (Surface->config.samples > 1) {
+                /* Can not support MSAA. */
+                renderMode = VEGL_INDIRECT_RENDERING;
+            } else {
+                /* Check window format. */
+                switch (WFD_BASE_FORMAT(img->format)) {
+                case SCREEN_FORMAT_RGBA8888:
+                case SCREEN_FORMAT_RGBX8888:
+                case SCREEN_FORMAT_RGBA4444:
+                case SCREEN_FORMAT_RGBX4444:
+                case SCREEN_FORMAT_RGB565:
+                    break;
+                default:
+                    renderMode = VEGL_INDIRECT_RENDERING;
+                    break;
+                }
+            }
+            if (renderMode != VEGL_INDIRECT_RENDERING &&
+                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TILE_FILLER)) {
+                /* Enable fast clear if gpu supports it */
+                renderMode = VEGL_DIRECT_RENDERING_FCFILL;
+                surfaceType = gcvSURF_RENDER_TARGET_NO_COMPRESSION;
+            }
+
+            break;
+        default:
+            /* Other format extensions not supported (Amphion VPU) */
+            LOGERR("Invalid tiling format of the native window buffer - 0x%X", WFD_FORMAT_IMX8X_TILING_MODE(img->format));
+            status = gcvSTATUS_INVALID_ARGUMENT;
+            goto OnError;
+            break;
+        }
+
+        if (RenderMode != NULL) {
+            *RenderMode = renderMode;
+        }
+        if (SurfType != NULL) {
+            *SurfType = surfaceType;
+        }
     }
 
+    if (buffers != buffersArray) {
+        /* If it was necessary to dynamically allocate memory for buffers array, free it now */
+        free(buffers);
+    }
     /* Success. */
     gcmFOOTER_NO();
     return status;
 
 OnError:
     status = gcvSTATUS_INVALID_ARGUMENT;
+    if (buffers != buffersArray) {
+        free(buffers);
+    }
     gcmFOOTER();
     return status;
 }
@@ -647,6 +763,7 @@ qnx_GetPixmapInfo(
         rc = screen_get_pixmap_property_iv(Pixmap, SCREEN_PROPERTY_BUFFER_SIZE, size);
         if (rc)
         {
+            LOGERR("Failed to obtain SCREEN_PROPERTY_BUFFER_SIZE property.");
             goto OnError;
         }
 
@@ -666,6 +783,7 @@ qnx_GetPixmapInfo(
         rc = screen_get_pixmap_property_iv(Pixmap, SCREEN_PROPERTY_FORMAT, &format);
         if (rc)
         {
+            LOGERR("Failed to obtain SCREEN_PROPERTY_FORMAT property.");
             goto OnError;
         }
 
@@ -675,6 +793,7 @@ qnx_GetPixmapInfo(
     rc = screen_get_pixmap_property_pv(Pixmap, SCREEN_PROPERTY_RENDER_BUFFERS, (void **) &buf);
     if (rc)
     {
+        LOGERR("Failed to obtain SCREEN_PROPERTY_RENDER_BUFFERS property.");
         goto OnError;
     }
 
@@ -683,6 +802,7 @@ qnx_GetPixmapInfo(
         rc = screen_get_buffer_property_iv(buf[0], SCREEN_PROPERTY_STRIDE, (int *) Stride);
         if (rc)
         {
+            LOGERR("Failed to obtain SCREEN_PROPERTY_STRIDE property.");
             goto OnError;
         }
     }
@@ -692,6 +812,7 @@ qnx_GetPixmapInfo(
         rc = screen_get_buffer_property_pv(buf[0], SCREEN_PROPERTY_POINTER, (void **) Bits);
         if (rc)
         {
+            LOGERR("Failed to obtain SCREEN_PROPERTY_POINTER property.");
             goto OnError;
         }
     }
@@ -796,33 +917,6 @@ qnx_GetNativeVisualId(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS
-qnx_GetWindowInfo(
-    IN PlatformDisplayType Display,
-    IN PlatformWindowType Window,
-    OUT gctINT * X,
-    OUT gctINT * Y,
-    OUT gctINT * Width,
-    OUT gctINT * Height,
-    OUT gctINT * BitsPerPixel,
-    OUT gctUINT * Offset
-    )
-{
-    if (gcmIS_ERROR(qnx_GetWindowInfoEx(
-                          Display,
-                          Window,
-                          X, Y,
-                          (gctINT_PTR) Width, (gctINT_PTR) Height,
-                          (gctINT_PTR) BitsPerPixel,
-                          (gctUINT_PTR) Offset,
-                          gcvNULL,
-                          gcvNULL)))
-    {
-        return gcvSTATUS_INVALID_ARGUMENT;
-    }
-
-    return gcvSTATUS_OK;
-}
 
 gceSTATUS
 qnx_DrawImageEx(
@@ -902,6 +996,7 @@ qnx_GetPixmapInfoEx(
         rc = screen_get_pixmap_property_iv(Pixmap, SCREEN_PROPERTY_FORMAT, &format);
         if (rc)
         {
+            LOGERR("Failed to obtain SCREEN_PROPERTY_FORMAT property.");
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
 
@@ -1164,6 +1259,16 @@ _SetSwapInterval(
 /******************************************************************************/
 /* Window. */
 
+/* The enum defines states of a window buffer.
+ * It is used to manage buffer handling in the direct rendering mode.
+ */
+enum eglNativeBufferState
+{
+    BUFFER_FREE = 0,         /* Buffer is available for gpu */
+    BUFFER_ASSIGNED,         /* Buffer from the pool has been assigned as a backbuffer. */
+    BUFFER_POSTED,           /* When gpu finish rendering/resolving into the buffer, swap worker will post the buffer */
+};
+
 typedef struct eglNativeBuffer * VEGLNativeBuffer;
 
 struct eglNativeBuffer
@@ -1174,6 +1279,7 @@ struct eglNativeBuffer
 
     /* QNX only. */
     gctPOINTER          logical;
+    enum eglNativeBufferState state;    /* Status of the buffer in direct rendering mode */
 
     /* Buffer lock. */
     gctSIGNAL           lock;
@@ -1209,6 +1315,7 @@ struct eglWindowInfo
     /* Window back buffer list, wrappers or temporary surface objects. */
     VEGLNativeBuffer    bufferList;
     gctPOINTER          bufferListMutex;
+    gctSIGNAL           bufferReleased;      /* Used to signal there was a buffer released by display driver, which can be assigned as a back buffer */
 
     /* Information obtained by qnx_GetDisplayInfoEx2. */
     gctPOINTER          logical;
@@ -1236,25 +1343,31 @@ struct eglWindowInfo
  */
 static gceSTATUS
 _CreateWindowBuffers(
-    void * Window,
-    VEGLWindowInfo Info
+    PlatformWindowType Window,
+    IN VEGLSurface Surface
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
     VEGLNativeBuffer buffer;
-    screen_buffer_t *bufs;
+    screen_buffer_t *bufs = NULL;
     int num_of_buffers = 0, i, rc;
     gctPOINTER pointer;
+    VEGLWindowInfo Info = Surface->winInfo;
 
     /* Valid Window?  */
     if (Window == gcvNULL)
     {
         return gcvSTATUS_INVALID_ARGUMENT;
     }
+
     /* Get number of buffers assigned to the window */
-    rc = screen_get_window_property_iv((screen_window_t)Window, SCREEN_PROPERTY_BUFFER_COUNT, &num_of_buffers);
-    if (rc || (num_of_buffers < 1))
-    {
+    rc = screen_get_window_property_iv(Window, SCREEN_PROPERTY_BUFFER_COUNT, &num_of_buffers);
+    if (rc || (num_of_buffers < 1)) {
+        if (rc) {
+            LOGERR("Failed to obtain SCREEN_PROPERTY_BUFFER_COUNT property.");
+        } else {
+            LOGERR("Invalid number of SCREEN_PROPERTY_BUFFER_COUNT property - %d.", num_of_buffers);
+        }
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
@@ -1266,9 +1379,11 @@ _CreateWindowBuffers(
     gcoOS_ZeroMemory(pointer, num_of_buffers * sizeof(screen_buffer_t));
     bufs = pointer;
 
-    rc = screen_get_window_property_pv((screen_window_t)Window, SCREEN_PROPERTY_BUFFERS, (void**)bufs);
+    rc = screen_get_window_property_pv(Window, SCREEN_PROPERTY_BUFFERS, (void**)bufs);
     if (rc)
     {
+        LOGERR("Failed to obtain SCREEN_PROPERTY_BUFFERS property.");
+        gcoOS_Free(gcvNULL, pointer);
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
@@ -1293,7 +1408,7 @@ _CreateWindowBuffers(
         status = gcoSURF_Construct(gcvNULL,
                                    Info->width,
                                    Info->height, 1,
-                                   gcvSURF_BITMAP,
+                                   Info->type,
                                    Info->format,
                                    gcvPOOL_USER,
                                    &buffer->surface);
@@ -1305,14 +1420,16 @@ _CreateWindowBuffers(
             goto OnError;
         }
 
-        /* Map the memory. */
-        status = gcoSURF_MapUserSurface(buffer->surface, Info->stride, pointer, physical);
+        /* Set the underlying framebuffer surface. */
+        gcmONERROR(gcoSURF_SetBuffer(buffer->surface, Info->type, Info->format, Info->stride, pointer, physical));
+        gcmONERROR(gcoSURF_SetWindow(buffer->surface, 0, 0, Info->width, Info->height));
+        if (Surface->renderMode != VEGL_INDIRECT_RENDERING) {
+            gcmVERIFY_OK(gcoSURF_SetFlags(buffer->surface, gcvSURF_FLAG_CONTENT_YINVERTED, gcvTRUE));
 
-        if (gcmIS_ERROR(status))
-        {
-            gcmVERIFY_OK(gcoSURF_Destroy(buffer->surface));
-            gcmOS_SAFE_FREE(gcvNULL, buffer);
-            goto OnError;
+            if (!(Info->type & gcvSURF_NO_TILE_STATUS)) {
+                /* Append tile status to this surface */
+                gcmVERIFY_OK(gcoSURF_AppendTileStatus(buffer->surface));
+            }
         }
 
         /* New buffer. */
@@ -1349,7 +1466,7 @@ _CreateWindowBuffers(
         gcoOS_ReleaseMutex(gcvNULL, Info->bufferListMutex);
 
     }
-
+    gcoOS_Free(gcvNULL, bufs);
     return status;
 
 OnError:
@@ -1388,13 +1505,17 @@ OnError:
     /* Commit accumulated commands. */
     gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
 
+    if (bufs) {
+        gcoOS_Free(gcvNULL, bufs);
+    }
+
     return status;
 }
 
 static void
 _FreeWindowBuffers(
     VEGLSurface Surface,
-    void * Window,
+    PlatformWindowType Window,
     VEGLWindowInfo Info
     )
 {
@@ -1453,7 +1574,7 @@ static
 EGLBoolean
 _QueryWindowInfo(
     IN VEGLDisplay Display,
-    IN void * Window,
+    IN VEGLSurface Surface,
     IN VEGLWindowInfo Info
     )
 {
@@ -1464,16 +1585,18 @@ _QueryWindowInfo(
     gceSURF_FORMAT format;
     gceSURF_TYPE type;
     gctINT bitsPerPixel;
+    void * Window  = Surface->hwnd;
 
     /* Get Window info. */
     status = qnx_GetWindowInfoEx((PlatformDisplayType)gcmPTR2INT32(Display->hdc),
-                                   (PlatformWindowType) Window,
+                                   Surface,
                                    gcvNULL, gcvNULL,
                                    &width, &height,
                                    &bitsPerPixel,
                                    gcvNULL,
                                    &format,
-                                   &type);
+                                   &type,
+                                   &Surface->renderMode);
 
     if (gcmIS_ERROR(status))
     {
@@ -1544,7 +1667,7 @@ _ConnectWindow(
 {
     gceSTATUS status;
     VEGLWindowInfo info = gcvNULL;
-    void * win = Window;
+    PlatformWindowType win = (PlatformWindowType) Window;
     gctPOINTER pointer;
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
@@ -1560,8 +1683,7 @@ _ConnectWindow(
     info = pointer;
 
     /* Query window information. */
-    if (_QueryWindowInfo(Display, Window, info) == EGL_FALSE)
-    {
+    if (_QueryWindowInfo(Display, Surface, info) == EGL_FALSE) {
         /* Bad native window. */
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
@@ -1570,24 +1692,31 @@ _ConnectWindow(
     gcmONERROR(gcoOS_CreateMutex(gcvNULL, &info->bufferListMutex));
 
     /* Create window drawable? */
-    qnx_CreateDrawable(Display->localInfo, (PlatformWindowType)win);
-
-    /* Create window buffers to represent window native bufers. */
-    gcmONERROR(_CreateWindowBuffers(Window, info));
+    qnx_CreateDrawable(Display->localInfo, win);
 
     /* Save window info structure. */
     Surface->winInfo = info;
+
+    /* Create window buffers to represent window native bufers. */
+    gcmONERROR(_CreateWindowBuffers(win, Surface));
+
+    /* Create signal for the back buffer list */
+    gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvTRUE, &info->bufferReleased));
+    gcmVERIFY_OK(gcoOS_Signal(gcvNULL, info->bufferReleased, gcvFALSE));
+
     return EGL_TRUE;
 
 OnError:
     if (info)
     {
-        if (info->bufferListMutex)
-        {
+        if (info->bufferListMutex) {
             gcoOS_DeleteMutex(gcvNULL, info->bufferListMutex);
             info->bufferListMutex = gcvNULL;
         }
-
+        if (info->bufferReleased) {
+            gcoOS_DestroySignal(gcvNULL, info->bufferReleased);
+            info->bufferReleased = NULL;
+        }
         gcmOS_SAFE_FREE(gcvNULL, info);
         Surface->winInfo = gcvNULL;
     }
@@ -1614,6 +1743,10 @@ _DisconnectWindow(
     /* Delete the mutex. */
     gcoOS_DeleteMutex(gcvNULL, info->bufferListMutex);
     info->bufferListMutex = gcvNULL;
+
+    /* Delete the signal */
+    gcoOS_DestroySignal(gcvNULL, info->bufferReleased);
+    info->bufferReleased = NULL;
 
     qnx_DestroyDrawable(Display->localInfo, (PlatformWindowType)win);
 
@@ -1645,13 +1778,14 @@ _BindWindow(
     gceSURF_TYPE type     = gcvSURF_UNKNOWN;
 
     status = qnx_GetWindowInfoEx((PlatformDisplayType)gcmPTR2INT32(Display->hdc),
-                                   (PlatformWindowType) win,
+                                   Surface,
                                    gcvNULL, gcvNULL,
                                    &width, &height,
                                    gcvNULL,
                                    gcvNULL,
                                    &format,
-                                   &type);
+                                   &type,
+                                   &renderMode);
 
     if (gcmIS_ERROR(status))
     {
@@ -1688,58 +1822,15 @@ _BindWindow(
             /* Window type is changed. */
             winChanged = EGL_TRUE;
         }
-
-        if (winChanged)
-        {
-            /* Query window info again in case other parameters chagned. */
-            _QueryWindowInfo(Display, win, info);
-
-            /* Recreate window buffers. */
-            _FreeWindowBuffers(Surface, win, info);
-            gcmONERROR(_CreateWindowBuffers(win, info));
-        }
     }
-    else
-    {
-#if gcdENABLE_3D
-        if ((renderMode == VEGL_INDIRECT_RENDERING) &&
-            ((type != gcvSURF_BITMAP) || (info->type != gcvSURF_BITMAP)))
-        {
-            /* Only linear supported in this case. */
-            status = qnx_SetWindowFormat((PlatformDisplayType)gcmPTR2INT32(Display->hdc),
-                                           (PlatformWindowType) win,
-                                           gcvSURF_BITMAP,
-                                           format);
 
-            if (gcmIS_ERROR(status))
-            {
-                /* Can not support non-bitmap. */
-                return EGL_FALSE;
-            }
+    if (winChanged) {
+        /* Query window info again in case other parameters chagned. */
+        _QueryWindowInfo(Display, Surface, info);
 
-            /* Window type is changed. */
-            winChanged = EGL_TRUE;
-        }
-
-        if (winChanged)
-        {
-            /* Query window info again in case other parameters chagned. */
-            _QueryWindowInfo(Display, win, info);
-
-            if ((renderMode == VEGL_DIRECT_RENDERING_FCFILL) &&
-                (info->type == gcvSURF_RENDER_TARGET_NO_TILE_STATUS))
-            {
-                /* Special for FC-FILL mode: tile status is required. */
-                info->type = gcvSURF_RENDER_TARGET_NO_COMPRESSION;
-            }
-
-            /* Recreate window buffers. */
-            _FreeWindowBuffers(Surface, win, info);
-            gcmONERROR(_CreateWindowBuffers(win, info));
-        }
-
-
-#endif
+        /* Recreate window buffers. */
+        _FreeWindowBuffers(Surface, win, info);
+        gcmONERROR(_CreateWindowBuffers(win, Surface));
     }
 
     gcmTRACE(gcvLEVEL_INFO,
@@ -1784,20 +1875,18 @@ _GetWindowSize(
     gctINT height;
     gceSURF_TYPE   type;
 
-    /* Get shortcut. */
-    void * win = Surface->hwnd;
-
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
     gcmASSERT(Surface->winInfo);
 
     status = qnx_GetWindowInfoEx((PlatformDisplayType)gcmPTR2INT32(Display->hdc),
-                                   (PlatformWindowType) win,
+                                   Surface,
                                    gcvNULL, gcvNULL,
                                    &width, &height,
                                    gcvNULL,
                                    gcvNULL,
                                    gcvNULL,
-                                   &type);
+                                   gcvNULL,
+                                   gcvNULL);
 
     (void) type;
 
@@ -1813,6 +1902,81 @@ _GetWindowSize(
     return EGL_TRUE;
 }
 
+static inline EGLBoolean
+qnx_isBufferInArray(screen_buffer_t buffer, screen_buffer_t *buffers, int count) {
+    do {
+        count--;
+        if (buffers[count] == buffer) {
+            return EGL_TRUE;
+        }
+    } while (count > 0);
+    return EGL_FALSE;
+}
+
+static EGLBoolean
+qnx_UpdateBufferStatus(VEGLWindowInfo info, PlatformWindowType win) {
+    int rc, num_bufs = 0;
+    VEGLNativeBuffer tmpBuffer;
+    VEGLNativeBuffer tmpFreeBuffer = NULL;
+    screen_buffer_t buffersArray[5];
+    screen_buffer_t *buffers = buffersArray;
+
+    rc = screen_get_window_property_iv((PlatformWindowType) win, SCREEN_PROPERTY_RENDER_BUFFER_COUNT, &num_bufs);
+    if (rc) {
+        LOGERR("Failed to obtain SCREEN_PROPERTY_RENDER_BUFFER_COUNT property.");
+        return EGL_FALSE;
+    } else if (num_bufs < 1) {
+        /* No render buffer free */
+        return EGL_TRUE;
+    }
+
+    /* Allocate memory for all render buffers, if the statically allocated array is not enough */
+    if (num_bufs > (sizeof(buffersArray)/sizeof(screen_buffer_t))) {
+        buffers = calloc(num_bufs, sizeof(screen_buffer_t));
+        if (buffers == NULL) {
+            LOGERR("Failed to allocate memory.");
+            return EGL_FALSE;
+        }
+    }
+
+    rc = screen_get_window_property_pv((PlatformWindowType) win, SCREEN_PROPERTY_RENDER_BUFFERS, (void **)buffers);
+    if (rc) {
+        LOGERR("Failed to obtain SCREEN_PROPERTY_RENDER_BUFFERS property.");
+        if (buffers != buffersArray) {
+            /* If it was necessary to dynamically allocate memory for buffers array, free it now */
+            free(buffers);
+        }
+        return EGL_FALSE;
+    }
+
+    /* Need to search through the circular list of backbuffers and update status
+     * from BUFFER_POSTED to BUFFER_FREE if the buffer is in the list
+     * returned by SCREEN_PROPERTY_RENDER_BUFFERS.
+     */
+    tmpBuffer = info->bufferList;
+    do {
+        if((tmpBuffer->state == BUFFER_POSTED) &&
+            qnx_isBufferInArray(tmpBuffer->context, buffers, num_bufs)) {
+            tmpBuffer->state = BUFFER_FREE;  /* Mark the buffer as free */
+        }
+        if((tmpFreeBuffer == NULL) && (tmpBuffer->state == BUFFER_FREE)) {
+            tmpFreeBuffer = tmpBuffer;       /* Remember the pointer to the first free buffer */
+        }
+        tmpBuffer = tmpBuffer->next;
+    } while(tmpBuffer != info->bufferList);
+
+    /* Make sure the bufferList points to a free buffer */
+    if ((info->bufferList != BUFFER_FREE) && (tmpFreeBuffer != NULL)) {
+        info->bufferList = tmpFreeBuffer;
+    }
+
+    /* If it was necessary to dynamically allocate memory for buffers array, free it now */
+    if (buffers != buffersArray) {
+        free(buffers);
+    }
+    return EGL_TRUE;
+}
+
 static EGLBoolean
 _GetWindowBackBuffer(
     IN VEGLDisplay Display,
@@ -1825,14 +1989,39 @@ _GetWindowBackBuffer(
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
     gcmASSERT(info);
+    gcmASSERT(win != gcvNULL);
 
     /* Return the surface object. */
     VEGLNativeBuffer buffer;
 
-    gcoOS_AcquireMutex(gcvNULL, info->bufferListMutex, gcvINFINITE);
 
+    for (;;) {
+        gcoOS_AcquireMutex(gcvNULL, info->bufferListMutex, gcvINFINITE);
 
-    buffer = info->bufferList;
+        buffer = info->bufferList;
+
+        if (Surface->renderMode == VEGL_INDIRECT_RENDERING) {
+            /* In the indirect mode, the back buffer is assigned at the beginning of eglSwapBuffers.
+             * The resolve from internal surface to this buffer is done after commit worker is assigned.
+             * Thus, I can always expect the backbuffer was already released by the display driver, as veglGetWorker
+             * will block..
+             */
+            break;
+        } else if (buffer->state != BUFFER_FREE) {
+            gcoOS_Signal(gcvNULL, info->bufferReleased, gcvFALSE);
+            gcoOS_ReleaseMutex(gcvNULL, info->bufferListMutex);
+            status = gcoOS_WaitSignal(gcvNULL, info->bufferReleased, 5000);
+            if (status == gcvSTATUS_TIMEOUT) {
+                /* No signal for 5s, no buffer has been released by display, failed to obtain back buffer */
+                LOGERR("Timeout when waiting for display to release a window buffer");
+                return EGL_FALSE;
+            }
+        } else {
+            buffer->state = BUFFER_ASSIGNED;
+            break;
+        }
+    }
+
     BackBuffer->surface  = buffer->surface;
     BackBuffer->context  = buffer;
     BackBuffer->origin.x = 0;
@@ -1840,6 +2029,7 @@ _GetWindowBackBuffer(
     BackBuffer->flip     = gcvTRUE;
 
     info->bufferList = buffer->next;
+
     gcoOS_ReleaseMutex(gcvNULL, info->bufferListMutex);
 
     if (buffer->lock != gcvNULL)
@@ -1849,7 +2039,6 @@ _GetWindowBackBuffer(
         for (;;)
         {
             status = gcoOS_WaitSignal(gcvNULL, buffer->lock, 5000);
-
             if (status == gcvSTATUS_TIMEOUT)
             {
                 gcmPRINT("Wait for buffer lock timeout");
@@ -1897,7 +2086,7 @@ _PostWindowBackBuffer(
         buffer = (VEGLNativeBuffer) BackBuffer->context;
         screen_buf = (screen_buffer_t)buffer->context;
         status = qnx_DisplayBufferRegions((PlatformDisplayType)gcmPTR2INT32(Display->hdc),
-                                            (PlatformWindowType) win,
+                                            Surface,
                                             screen_buf,
                                             Region->numRects,
                                             Region->rects);
@@ -1905,6 +2094,18 @@ _PostWindowBackBuffer(
         if (gcmIS_ERROR(status))
         {
             return EGL_FALSE;
+        }
+
+        if (Surface->renderMode != VEGL_INDIRECT_RENDERING) {
+            /* Update the status of render buffers */
+            gcoOS_AcquireMutex(gcvNULL, info->bufferListMutex, gcvINFINITE);
+            /* Mark the buffer as posted */
+            buffer->state = BUFFER_POSTED;
+            /* Update buffer status according to the SCREEN_PROPERTY_RENDER_BUFFERS property of the window */
+            qnx_UpdateBufferStatus(info, win);
+            /* Signal a render buffer has been released by display  */
+            gcmVERIFY_OK(gcoOS_Signal(gcvNULL, info->bufferReleased, gcvTRUE));
+            gcoOS_ReleaseMutex(gcvNULL, info->bufferListMutex);
         }
 
         if (buffer->lock != gcvNULL)
@@ -2003,27 +2204,37 @@ _CancelWindowBackBuffer(
     IN struct eglBackBuffer * BackBuffer
     )
 {
-    void * win = Surface->hwnd;
     VEGLWindowInfo info = Surface->winInfo;
-    gcoSURF surface;
-    gceSTATUS status = gcvSTATUS_OK;
+    VEGLNativeBuffer buffer;
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
     gcmASSERT(info);
 
-    surface = info->wrapFB ? gcvNULL : BackBuffer->surface;
+    if (BackBuffer == NULL) {
+        /* Nothing to cancel */
+        return EGL_TRUE;
+    }
 
-    status = qnx_CancelDisplayBackbuffer((PlatformDisplayType)gcmPTR2INT32(Display->hdc),
-                                           (PlatformWindowType) win,
-                                           BackBuffer->context,
-                                           surface,
-                                           0,
-                                           BackBuffer->origin.x,
-                                           BackBuffer->origin.y);
+    buffer = BackBuffer->context;
+    if (buffer == NULL) {
+        /* Nothing to cancel */
+        return EGL_TRUE;
+    }
 
-    if (gcmIS_ERROR(status))
-    {
-        return EGL_FALSE;
+    if (Surface->renderMode != VEGL_INDIRECT_RENDERING) {
+        gcoOS_AcquireMutex(gcvNULL, info->bufferListMutex, gcvINFINITE);
+        if (buffer->state == BUFFER_ASSIGNED) {
+            /* The buffer assigned to direct render got cancelled, make it free again. */
+            buffer->state = BUFFER_FREE;
+        }
+
+        if (info->bufferList->state == BUFFER_FREE) {
+            if (info->bufferList->prev == buffer) {
+                /* Roll back the pointer to put it to the top of the list */
+                info->bufferList = buffer;
+            }
+        }
+        gcoOS_ReleaseMutex(gcvNULL, info->bufferListMutex);
     }
 
     return EGL_TRUE;
