@@ -1904,6 +1904,50 @@ void vxnneLSTM_VectorBatchVectorCwiseProductAccumulate(vx_type_e vec_format, vx_
     }
 }
 
+void vxnneLSTM_VectorBatchVectorCwiseProduct(vx_type_e vec_format, vx_type_e batch_format, vx_type_e result_format, vx_uint8* vector,
+    vx_int32 v_size, vx_int8 vec_fixPointPos,
+    vx_uint8* batch_vector,
+    vx_int32 n_batch, vx_int8 batch_fixPointPos,
+    vx_uint8* result, vx_int8 result_fixPointPos) {
+    vx_int32 v = 0, b = 0;
+    vx_float32 data = 0.f;
+    for (b = 0; b < n_batch; b++)
+    {
+        for (v = 0; v < v_size; v++)
+        {
+            /**result++ = vector[v] * *batch_vector++;*/
+            data = vxnneGetData(vec_format, v, vector, vec_fixPointPos) * vxnneGetData(batch_format, 0, batch_vector, batch_fixPointPos);
+            vxnneSaveData(result_format, 0, data, result, result_fixPointPos, VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING);
+            batch_vector += vxnneGetTypeSize(batch_format);
+            result       += vxnneGetTypeSize(result_format);
+        }
+    }
+}
+
+void vxnneLSTM_VectorBatchVectorAdd(vx_type_e vec_format, vx_type_e batch_format, vx_uint8* vector, vx_int8 vec_fpp, vx_int32 v_size, vx_int32 n_batch,
+    vx_uint8* batch_vector, vx_int8 batch_fpp) {
+    vx_float32 data = 0.f;
+    vx_int32 i = 0, b = 0;
+
+    for (b = 0; b < n_batch; b++) {
+        for (i = 0; i < v_size; ++i) {
+            /*batch_vector[i] += vector[i];*/
+            data = vxnneGetData(batch_format, i, batch_vector, batch_fpp);
+            data += vxnneGetData(vec_format, i, vector, vec_fpp);
+            vxnneSaveData(batch_format, i, data, batch_vector, batch_fpp, VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING);
+        }
+        batch_vector += v_size * vxnneGetTypeSize(batch_format);
+    }
+}
+
+void vxnneLSTM_ZeroVector(vx_type_e vec_format, vx_uint8* vector, vx_int8 vec_fpp, vx_int32 v_size) {
+    vx_int32 i = 0;
+     for (i = 0; i < v_size; ++i) {
+         /*vector[i] = 0;*/
+         vxnneSaveData(vec_format, i, 0, vector, vec_fpp, VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING);
+     }
+}
+
 void vxnneLSTM_VectorBatchVectorAssign(vx_type_e vec_format, vx_type_e bat_format, const vx_uint8* vector, vx_int32 v_size, vx_int8 vec_fixPointPos,
     vx_int32 n_batch, vx_uint8* batch_vector, vx_int8 batch_fixPointPos) {
     vx_int32 b = 0;
@@ -1919,6 +1963,28 @@ void vxnneLSTM_VectorBatchVectorAssign(vx_type_e vec_format, vx_type_e bat_forma
             for (i = 0; i < v_size; i++)
             {
                 data = vxnneGetDataExt(vec_format, 0, i, (vx_uint8*)vector, vec_fixPointPos, 0, 0.f);
+                vxnneSaveData(bat_format, b * v_size + i, data, batch_vector, batch_fixPointPos, VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING);
+            }
+        }
+    }
+}
+
+void vxnneLSTM_VectorVectorAssign(vx_type_e vec_format, vx_type_e bat_format, const vx_uint8* vector, vx_int32 v_size, vx_int8 vec_fixPointPos,
+    vx_int32 n_batch, vx_uint8* batch_vector, vx_int8 batch_fixPointPos) {
+    vx_int32 b = 0;
+    vx_int32 item_size = vxnneGetTypeSize(vec_format);
+
+    if (vec_format == bat_format)
+        memcpy(batch_vector, vector, v_size * n_batch * item_size);
+    else
+    {
+        for (b = 0; b < n_batch; b++)
+        {
+            vx_int32 i = 0;
+            vx_float32 data = 0.f;
+            for (i = 0; i < v_size; i++)
+            {
+                data = vxnneGetDataExt(vec_format, 0, i + b * v_size, (vx_uint8*)vector, vec_fixPointPos, 0, 0.f);
                 vxnneSaveData(bat_format, b * v_size + i, data, batch_vector, batch_fixPointPos, VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING);
             }
         }
@@ -2050,6 +2116,47 @@ void vxnneLSTM_ClipVector(vx_type_e vec_format, vx_type_e result_format, vx_uint
     }
 }
 
+void vxnneLSTM_MeanStddevNormalization(vx_type_e in_format, vx_type_e out_format, vx_uint8* input_vector, vx_int8 in_fpp,
+    vx_int32 v_size, vx_int32 n_batch, vx_float32 normalization_epsilon, vx_uint8* output_vector, vx_int8 out_fpp)
+{
+    vx_int32 batch = 0, i = 0;
+    vx_float32 mean = .0f, stddev_inv = .0f, variance = .0f, input_d = .0f;
+
+    for (batch = 0; batch < n_batch; ++batch)
+    {
+        vx_float32 sum = 0.0f;
+        vx_float32 sum_sq = 0.0f;
+        for (i = 0; i < v_size; ++i)
+        {
+            input_d = vxnneGetData(in_format, i, input_vector, in_fpp);
+            sum += input_d;
+            sum_sq += input_d * input_d;
+        }
+
+        mean = sum / v_size;
+        stddev_inv = 0.0f;
+        variance = sum_sq / v_size - mean * mean;
+
+        if (variance == 0)
+        {
+            stddev_inv = (vx_float32)(1.0f / sqrt(normalization_epsilon));
+        }
+        else
+        {
+            stddev_inv = (vx_float32)(1.0f / sqrt(variance));
+        }
+
+        for (i = 0; i < v_size; ++i)
+        {
+            input_d = vxnneGetData(in_format, i, input_vector, in_fpp);
+            /*output_vector[i] = (input_d - mean) * stddev_inv;*/
+            vxnneSaveData(out_format, i, (input_d - mean) * stddev_inv, output_vector, out_fpp, VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING);
+        }
+        input_vector += v_size * vxnneGetTypeSize(in_format);
+        output_vector += v_size * vxnneGetTypeSize(out_format);
+    }
+}
+
 vx_status vxnneExecuteSW_LSTMUnit(struct _vxnne_operation_s *operation)
 {
     vxnne_lstm_unit_sw_operation lstmUnitOperation = (vxnne_lstm_unit_sw_operation)operation;
@@ -2065,6 +2172,11 @@ vx_status vxnneExecuteSW_LSTMUnit(struct _vxnne_operation_s *operation)
     vx_tensor recurrent2forget_weight = (vx_tensor)lstmUnitOperation->recurrent2forget_weight;
     vx_tensor recurrent2cell_weight = (vx_tensor)lstmUnitOperation->recurrent2cell_weight;
     vx_tensor recurrent2output_weight = (vx_tensor)lstmUnitOperation->recurrent2output_weight;
+
+    vx_tensor layernorm2input_weight = (vx_tensor)lstmUnitOperation->layernorm2input_weight;
+    vx_tensor layernorm2forget_weight = (vx_tensor)lstmUnitOperation->layernorm2forget_weight;
+    vx_tensor layernorm2cell_weight = (vx_tensor)lstmUnitOperation->layernorm2cell_weight;
+    vx_tensor layernorm2output_weight = (vx_tensor)lstmUnitOperation->layernorm2output_weight;
 
     vx_tensor cell2input_weight = (vx_tensor)lstmUnitOperation->cell2input_weight;
     vx_tensor cell2forget_weight = (vx_tensor)lstmUnitOperation->cell2forget_weight;
@@ -2098,6 +2210,8 @@ vx_status vxnneExecuteSW_LSTMUnit(struct _vxnne_operation_s *operation)
     vx_bool enable_proj_weight = (projection_weight != VX_NULL) ? vx_true_e : vx_false_e;
     vx_bool enable_proj_bias = (projection_bias != VX_NULL) ? vx_true_e : vx_false_e;
 
+    vx_bool enable_layer_norm = (layernorm2forget_weight != VX_NULL) ? vx_true_e : vx_false_e;
+
     vx_uint32 cell = TENSOR_SIZE_INDEX(input2forget_weight, 1);
     vx_uint32 batch = TENSOR_SIZE_INDEX(input, 1);
     vx_uint32 input_count = TENSOR_SIZE_INDEX(input, 0);
@@ -2110,16 +2224,18 @@ vx_status vxnneExecuteSW_LSTMUnit(struct _vxnne_operation_s *operation)
     vx_int32 item_size = vxnneGetTypeSize(input_format);
 
     vx_int8 scratch_fpos = 0;
-    vx_type_e scratch_format = VX_TYPE_FLOAT32;
+    vx_type_e scratch_format = (vx_type_e)TENSOR_DATA_TYPE(scratch);/* VX_TYPE_FLOAT32;*/
     vx_int32 scratch_item_size = vxnneGetTypeSize(scratch_format);
 
     vx_uint8_ptr input_base = VX_NULL, input_gate_bias_base = VX_NULL, forget_gate_bias_base = VX_NULL, cell_bias_base = VX_NULL, output_gate_bias_base = VX_NULL;
     vx_uint8_ptr input2input_weight_base = VX_NULL, input2cell_weight_base = VX_NULL, input2forget_weight_base = VX_NULL, input2output_weight_base = VX_NULL;
     vx_uint8_ptr recurrent2input_weight_base = VX_NULL, recurrent2cell_weight_base = VX_NULL, recurrent2forget_weight_base = VX_NULL, recurrent2output_weight_base = VX_NULL;
     vx_uint8_ptr cell2input_weight_base = VX_NULL, cell2forget_weight_base = VX_NULL, cell2output_weight_base = VX_NULL;
+    vx_uint8_ptr layernorm2input_weight_base = VX_NULL, layernorm2cell_weight_base = VX_NULL, layernorm2forget_weight_base = VX_NULL, layernorm2output_weight_base = VX_NULL;
     vx_uint8_ptr cell_state_in_base = VX_NULL, output_state_in_base = VX_NULL, output_state_out_base = VX_NULL, cell_state_out_base = VX_NULL, output_base = VX_NULL;
     vx_uint8_ptr projection_weight_base = VX_NULL, projection_bias_base = VX_NULL;
     vx_uint8_ptr cell_state_base = VX_NULL;
+    vx_float32 normalization_epsilon = 1e-8f;
 
     vxoTensor_GetTensorViewMemory(scratch, (vx_ptr_ptr)&scatch_ptr, VX_NULL);
     vxoTensor_GetTensorViewMemory(input, (vx_ptr_ptr)&input_base, VX_NULL);
@@ -2133,6 +2249,14 @@ vx_status vxnneExecuteSW_LSTMUnit(struct _vxnne_operation_s *operation)
     vxoTensor_GetTensorViewMemory(recurrent2cell_weight, (vx_ptr_ptr)&recurrent2cell_weight_base, VX_NULL);
     vxoTensor_GetTensorViewMemory(recurrent2forget_weight, (vx_ptr_ptr)&recurrent2forget_weight_base, VX_NULL);
     vxoTensor_GetTensorViewMemory(recurrent2output_weight, (vx_ptr_ptr)&recurrent2output_weight_base, VX_NULL);
+
+    if (enable_layer_norm)
+    {
+        vxoTensor_GetTensorViewMemory(layernorm2input_weight, (vx_ptr_ptr)&layernorm2input_weight_base, VX_NULL);
+        vxoTensor_GetTensorViewMemory(layernorm2cell_weight, (vx_ptr_ptr)&layernorm2cell_weight_base, VX_NULL);
+        vxoTensor_GetTensorViewMemory(layernorm2forget_weight, (vx_ptr_ptr)&layernorm2forget_weight_base, VX_NULL);
+        vxoTensor_GetTensorViewMemory(layernorm2output_weight, (vx_ptr_ptr)&layernorm2output_weight_base, VX_NULL);
+    }
 
     vxoTensor_GetTensorViewMemory(cell2input_weight, (vx_ptr_ptr)&cell2input_weight_base, VX_NULL);
     vxoTensor_GetTensorViewMemory(cell2forget_weight, (vx_ptr_ptr)&cell2forget_weight_base, VX_NULL);
@@ -2175,40 +2299,58 @@ vx_status vxnneExecuteSW_LSTMUnit(struct _vxnne_operation_s *operation)
         scatch_output_ptr = scatch_cell_ptr + cell * batch * item_size;
     }
 
+    if (!enable_layer_norm)
+    {
+
     /* Initialize scratch buffers with bias. Bias_i,c,f,g*/
-    if (!enable_cifg)
+        if (!enable_cifg && input_gate_bias)
         vxnneLSTM_VectorBatchVectorAssign((vx_type_e)TENSOR_DATA_TYPE(input_gate_bias), input_format, input_gate_bias_base,
             cell, TENSOR_POS(input_gate_bias), batch, (vx_uint8_ptr)scatch_input_ptr, TENSOR_POS(scratch));
+        if (cell_bias)
 
     vxnneLSTM_VectorBatchVectorAssign((vx_type_e)TENSOR_DATA_TYPE(cell_bias), input_format, cell_bias_base,
-        cell, TENSOR_POS(input_gate_bias), batch, (vx_uint8_ptr)scatch_cell_ptr, TENSOR_POS(scratch));
+                cell, TENSOR_POS(cell_bias), batch, (vx_uint8_ptr)scatch_cell_ptr, TENSOR_POS(scratch));
+
+        if (output_gate_bias)
     vxnneLSTM_VectorBatchVectorAssign((vx_type_e)TENSOR_DATA_TYPE(forget_gate_bias), input_format, forget_gate_bias_base,
-        cell, TENSOR_POS(input_gate_bias), batch, (vx_uint8_ptr)scatch_forget_ptr, TENSOR_POS(scratch));
+                cell, TENSOR_POS(forget_gate_bias), batch, (vx_uint8_ptr)scatch_forget_ptr, TENSOR_POS(scratch));
+
+        if (output_gate_bias)
     vxnneLSTM_VectorBatchVectorAssign((vx_type_e)TENSOR_DATA_TYPE(output_gate_bias), input_format, output_gate_bias_base,
-        cell, TENSOR_POS(input_gate_bias), batch, (vx_uint8_ptr)scatch_output_ptr, TENSOR_POS(scratch));
+                cell, TENSOR_POS(output_gate_bias), batch, (vx_uint8_ptr)scatch_output_ptr, TENSOR_POS(scratch));
+    }
+    else
+    {
+        if (!enable_cifg)
+            vxnneLSTM_ZeroVector((vx_type_e)TENSOR_DATA_TYPE(scratch), (vx_uint8_ptr)scatch_input_ptr, TENSOR_POS(scratch), cell * batch);
+
+        vxnneLSTM_ZeroVector((vx_type_e)TENSOR_DATA_TYPE(scratch), (vx_uint8_ptr)scatch_cell_ptr, TENSOR_POS(scratch), cell * batch);
+        vxnneLSTM_ZeroVector((vx_type_e)TENSOR_DATA_TYPE(scratch), (vx_uint8_ptr)scatch_forget_ptr, TENSOR_POS(scratch), cell * batch);
+        vxnneLSTM_ZeroVector((vx_type_e)TENSOR_DATA_TYPE(scratch), (vx_uint8_ptr)scatch_output_ptr, TENSOR_POS(scratch), cell * batch);
+    }
 
     /* For each batch and cell: compute input_weight * input. W_x_i,c,f,o * input*/
     if (!enable_cifg)
-        vxnneLSTM_MatrixBatchVectorMultiplyAccumulate(input_format, (vx_type_e)TENSOR_DATA_TYPE(input2input_weight), VX_TYPE_FLOAT32, input2input_weight_base,
+        vxnneLSTM_MatrixBatchVectorMultiplyAccumulate(input_format, (vx_type_e)TENSOR_DATA_TYPE(input2input_weight), scratch_format, input2input_weight_base,
             cell, input_count, TENSOR_POS(input2input_weight), input_base, batch, TENSOR_POS(input), (vx_uint8_ptr)scatch_input_ptr, TENSOR_POS(scratch), /*result_stride=*/1);
 
-    vxnneLSTM_MatrixBatchVectorMultiplyAccumulate(input_format, (vx_type_e)TENSOR_DATA_TYPE(input2cell_weight), VX_TYPE_FLOAT32, input2cell_weight_base,
+    vxnneLSTM_MatrixBatchVectorMultiplyAccumulate(input_format, (vx_type_e)TENSOR_DATA_TYPE(input2cell_weight), scratch_format, input2cell_weight_base,
         cell, input_count, TENSOR_POS(input2cell_weight), input_base, batch, TENSOR_POS(input), (vx_uint8_ptr)scatch_cell_ptr, TENSOR_POS(scratch), /*result_stride=*/1);
-    vxnneLSTM_MatrixBatchVectorMultiplyAccumulate(input_format, (vx_type_e)TENSOR_DATA_TYPE(input2forget_weight), VX_TYPE_FLOAT32, input2forget_weight_base,
+    vxnneLSTM_MatrixBatchVectorMultiplyAccumulate(input_format, (vx_type_e)TENSOR_DATA_TYPE(input2forget_weight), scratch_format, input2forget_weight_base,
         cell, input_count, TENSOR_POS(input2forget_weight), input_base, batch, TENSOR_POS(input), (vx_uint8_ptr)scatch_forget_ptr, TENSOR_POS(scratch), /*result_stride=*/1);
-    vxnneLSTM_MatrixBatchVectorMultiplyAccumulate(input_format, (vx_type_e)TENSOR_DATA_TYPE(input2output_weight), VX_TYPE_FLOAT32, input2output_weight_base,
+    vxnneLSTM_MatrixBatchVectorMultiplyAccumulate(input_format, (vx_type_e)TENSOR_DATA_TYPE(input2output_weight), scratch_format, input2output_weight_base,
         cell, input_count, TENSOR_POS(input2output_weight), input_base, batch, TENSOR_POS(input), (vx_uint8_ptr)scatch_output_ptr, TENSOR_POS(scratch), /*result_stride=*/1);
 
     /* For each batch and cell: compute recurrent_weight * output_state_in. W_h_i,c,f,o * h_t-1*/
     if (!enable_cifg)
-        vxnneLSTM_MatrixBatchVectorMultiplyAccumulate((vx_type_e)TENSOR_DATA_TYPE(output_state_in), (vx_type_e)TENSOR_DATA_TYPE(recurrent2input_weight), VX_TYPE_FLOAT32, recurrent2input_weight_base,
+        vxnneLSTM_MatrixBatchVectorMultiplyAccumulate((vx_type_e)TENSOR_DATA_TYPE(output_state_in), (vx_type_e)TENSOR_DATA_TYPE(recurrent2input_weight), scratch_format, recurrent2input_weight_base,
             cell, output_count, TENSOR_POS(recurrent2input_weight), output_state_in_base, batch, TENSOR_POS(output_state_in), (vx_uint8_ptr)scatch_input_ptr, TENSOR_POS(scratch), /*result_stride=*/1);
 
-    vxnneLSTM_MatrixBatchVectorMultiplyAccumulate((vx_type_e)TENSOR_DATA_TYPE(output_state_in), (vx_type_e)TENSOR_DATA_TYPE(recurrent2cell_weight), VX_TYPE_FLOAT32, recurrent2cell_weight_base,
+    vxnneLSTM_MatrixBatchVectorMultiplyAccumulate((vx_type_e)TENSOR_DATA_TYPE(output_state_in), (vx_type_e)TENSOR_DATA_TYPE(recurrent2cell_weight), scratch_format, recurrent2cell_weight_base,
         cell, output_count, TENSOR_POS(recurrent2cell_weight), output_state_in_base, batch, TENSOR_POS(output_state_in), (vx_uint8_ptr)scatch_cell_ptr, TENSOR_POS(scratch), /*result_stride=*/1);
-    vxnneLSTM_MatrixBatchVectorMultiplyAccumulate((vx_type_e)TENSOR_DATA_TYPE(output_state_in), (vx_type_e)TENSOR_DATA_TYPE(recurrent2forget_weight), VX_TYPE_FLOAT32, recurrent2forget_weight_base,
+    vxnneLSTM_MatrixBatchVectorMultiplyAccumulate((vx_type_e)TENSOR_DATA_TYPE(output_state_in), (vx_type_e)TENSOR_DATA_TYPE(recurrent2forget_weight), scratch_format, recurrent2forget_weight_base,
         cell, output_count, TENSOR_POS(recurrent2forget_weight), output_state_in_base, batch, TENSOR_POS(output_state_in), (vx_uint8_ptr)scatch_forget_ptr, TENSOR_POS(scratch), /*result_stride=*/1);
-    vxnneLSTM_MatrixBatchVectorMultiplyAccumulate((vx_type_e)TENSOR_DATA_TYPE(output_state_in), (vx_type_e)TENSOR_DATA_TYPE(recurrent2output_weight), VX_TYPE_FLOAT32, recurrent2output_weight_base,
+    vxnneLSTM_MatrixBatchVectorMultiplyAccumulate((vx_type_e)TENSOR_DATA_TYPE(output_state_in), (vx_type_e)TENSOR_DATA_TYPE(recurrent2output_weight), scratch_format, recurrent2output_weight_base,
         cell, output_count, TENSOR_POS(recurrent2output_weight), output_state_in_base, batch, TENSOR_POS(output_state_in), (vx_uint8_ptr)scatch_output_ptr, TENSOR_POS(scratch), /*result_stride=*/1);
 
     /* For each batch and cell: update input gate. */
@@ -2217,6 +2359,16 @@ vx_status vxnneExecuteSW_LSTMUnit(struct _vxnne_operation_s *operation)
         if (enable_peephole)
             vxnneLSTM_VectorBatchVectorCwiseProductAccumulate((vx_type_e)TENSOR_DATA_TYPE(cell2input_weight), (vx_type_e)TENSOR_DATA_TYPE(cell_state_in), scratch_format, cell2input_weight_base,
                 cell, TENSOR_POS(cell2input_weight), cell_state_in_base, batch, TENSOR_POS(cell_state_in), (vx_uint8_ptr)scatch_input_ptr, scratch_fpos);
+
+        if (enable_layer_norm)
+        {
+            vxnneLSTM_MeanStddevNormalization(scratch_format, scratch_format, scatch_input_ptr, TENSOR_POS(scratch), cell, batch, normalization_epsilon, scatch_input_ptr, TENSOR_POS(scratch));
+
+            vxnneLSTM_VectorBatchVectorCwiseProduct((vx_type_e)TENSOR_DATA_TYPE(layernorm2input_weight), scratch_format, scratch_format, layernorm2input_weight_base,
+                cell, TENSOR_POS(layernorm2input_weight), scatch_input_ptr, batch, scratch_fpos, (vx_uint8_ptr)scatch_input_ptr, scratch_fpos);
+
+            vxnneLSTM_VectorBatchVectorAdd((vx_type_e)TENSOR_DATA_TYPE(input_gate_bias), scratch_format, input_gate_bias_base, TENSOR_POS(input_gate_bias), cell, batch, (vx_uint8_ptr)scatch_input_ptr, scratch_fpos);
+        }
 
         /*i_t = sigmoid(W_x_i * input + W_h_i * h_t-1 + Bias_i)*/
         vxnneLSTM_SigmoidToVector(scratch_format, scratch_format, (vx_uint8_ptr)scatch_input_ptr, cell * batch, scratch_fpos, (vx_uint8_ptr)scatch_input_ptr, scratch_fpos);
@@ -2227,11 +2379,31 @@ vx_status vxnneExecuteSW_LSTMUnit(struct _vxnne_operation_s *operation)
         vxnneLSTM_VectorBatchVectorCwiseProductAccumulate((vx_type_e)TENSOR_DATA_TYPE(cell2forget_weight), (vx_type_e)TENSOR_DATA_TYPE(cell_state_in), scratch_format, cell2forget_weight_base,
             cell, TENSOR_POS(cell2forget_weight), cell_state_in_base, batch, TENSOR_POS(cell_state_in), (vx_uint8_ptr)scatch_forget_ptr, scratch_fpos);
 
+    if (enable_layer_norm)
+    {
+        vxnneLSTM_MeanStddevNormalization(scratch_format, scratch_format, scatch_forget_ptr, TENSOR_POS(scratch), cell, batch, normalization_epsilon, scatch_forget_ptr, TENSOR_POS(scratch));
+
+        vxnneLSTM_VectorBatchVectorCwiseProduct((vx_type_e)TENSOR_DATA_TYPE(layernorm2forget_weight), scratch_format, scratch_format, layernorm2forget_weight_base,
+            cell, TENSOR_POS(layernorm2forget_weight), scatch_forget_ptr, batch, scratch_fpos, (vx_uint8_ptr)scatch_forget_ptr, scratch_fpos);
+
+        vxnneLSTM_VectorBatchVectorAdd((vx_type_e)TENSOR_DATA_TYPE(forget_gate_bias), scratch_format, forget_gate_bias_base, TENSOR_POS(forget_gate_bias), cell, batch, (vx_uint8_ptr)scatch_forget_ptr, scratch_fpos);
+    }
+
     if (forget_bias != 0)
         vxnneLSTM_BiasVector(scratch_format, scratch_format, (vx_uint8_ptr)scatch_forget_ptr, cell * batch, forget_bias, scratch_fpos, (vx_uint8_ptr)scatch_forget_ptr, scratch_fpos);
 
     /*f_t = sigmoid(W_x_f * input + W_h_f * h_t-1 + Bias_f)*/
     vxnneLSTM_SigmoidToVector(scratch_format, scratch_format, (vx_uint8_ptr)scatch_forget_ptr, cell * batch, scratch_fpos, (vx_uint8_ptr)scatch_forget_ptr, scratch_fpos);
+
+    if (enable_layer_norm)
+    {
+        vxnneLSTM_MeanStddevNormalization(scratch_format, scratch_format, scatch_cell_ptr, TENSOR_POS(scratch), cell, batch, normalization_epsilon, scatch_cell_ptr, TENSOR_POS(scratch));
+
+        vxnneLSTM_VectorBatchVectorCwiseProduct((vx_type_e)TENSOR_DATA_TYPE(layernorm2cell_weight), scratch_format, scratch_format, layernorm2cell_weight_base,
+            cell, TENSOR_POS(layernorm2cell_weight), scatch_cell_ptr, batch, scratch_fpos, (vx_uint8_ptr)scatch_cell_ptr, scratch_fpos);
+
+        vxnneLSTM_VectorBatchVectorAdd((vx_type_e)TENSOR_DATA_TYPE(cell_bias), scratch_format, cell_bias_base, TENSOR_POS(cell_bias), cell, batch, (vx_uint8_ptr)scatch_cell_ptr, scratch_fpos);
+    }
 
     /* For each batch and cell: update the cell. cell_state_out = f_t * c_t-1 = (sigmoid(W_x_f * input + W_h_f * h_t-1 + Bias_f) * c_t-1*/
     vxnneLSTM_VectorVectorCwiseProduct(scratch_format, (vx_type_e)TENSOR_DATA_TYPE(cell_state_in), scratch_format, (vx_uint8_ptr)scatch_forget_ptr, cell_state_in_base,
@@ -2258,8 +2430,18 @@ vx_status vxnneExecuteSW_LSTMUnit(struct _vxnne_operation_s *operation)
 
     /* For each batch and cell: update the output gate. */
     if (enable_peephole)
-        vxnneLSTM_VectorBatchVectorCwiseProductAccumulate((vx_type_e)TENSOR_DATA_TYPE(cell2forget_weight), scratch_format, scratch_format, cell2output_weight_base,
+        vxnneLSTM_VectorBatchVectorCwiseProductAccumulate((vx_type_e)TENSOR_DATA_TYPE(cell2output_weight), scratch_format, scratch_format, cell2output_weight_base,
             cell, TENSOR_POS(cell2output_weight), cell_state_base, batch, scratch_fpos, (vx_uint8_ptr)scatch_output_ptr, scratch_fpos);
+
+    if (enable_layer_norm)
+    {
+        vxnneLSTM_MeanStddevNormalization(scratch_format, scratch_format, scatch_output_ptr, TENSOR_POS(scratch), cell, batch, normalization_epsilon, scatch_output_ptr, TENSOR_POS(scratch));
+
+        vxnneLSTM_VectorBatchVectorCwiseProduct((vx_type_e)TENSOR_DATA_TYPE(layernorm2output_weight), scratch_format, scratch_format, layernorm2output_weight_base,
+            cell, TENSOR_POS(layernorm2output_weight), scatch_output_ptr, batch, scratch_fpos, (vx_uint8_ptr)scatch_output_ptr, scratch_fpos);
+
+        vxnneLSTM_VectorBatchVectorAdd((vx_type_e)TENSOR_DATA_TYPE(output_gate_bias), scratch_format, output_gate_bias_base, TENSOR_POS(output_gate_bias), cell, batch, (vx_uint8_ptr)scatch_output_ptr, scratch_fpos);
+    }
 
     /*o_t = sigmoid(W_x_o * input + W_h_o * h_t-1 + Bias_o)*/
     vxnneLSTM_SigmoidToVector(scratch_format, scratch_format, (vx_uint8_ptr)scatch_output_ptr, cell * batch, scratch_fpos, (vx_uint8_ptr)scatch_output_ptr, scratch_fpos);
@@ -2268,7 +2450,7 @@ vx_status vxnneExecuteSW_LSTMUnit(struct _vxnne_operation_s *operation)
     vxnneLSTM_ActivationToVector(scratch_format, scratch_format, cell_state_base,
         cell * batch, activation, scratch_fpos, (vx_uint8_ptr)scatch_cell_ptr, scratch_fpos);
 
-    vxnneLSTM_VectorBatchVectorAssign(scratch_format, (vx_type_e)TENSOR_DATA_TYPE(cell_state_out), cell_state_base,
+    vxnneLSTM_VectorVectorAssign(scratch_format, (vx_type_e)TENSOR_DATA_TYPE(cell_state_out), cell_state_base,
         cell, scratch_fpos, batch, (vx_uint8_ptr)cell_state_out_base, TENSOR_POS(cell_state_out));
 
     /*o_t = c_t * o_t = tanh(cell_state_out) * sigmoid(W_x_o * input + W_h_o * h_t-1 + Bias_o)*/
@@ -2281,17 +2463,17 @@ vx_status vxnneExecuteSW_LSTMUnit(struct _vxnne_operation_s *operation)
             vxnneLSTM_VectorBatchVectorAssign((vx_type_e)TENSOR_DATA_TYPE(projection_bias), input_format, projection_bias_base,
                 output_count, TENSOR_POS(projection_bias), batch, projection_bias_base, TENSOR_POS(projection_bias));
         else
-            memset((vx_float32_ptr)output_base, 0, output_count * batch * item_size);
+            memset((vx_float32_ptr)output_state_out_base, 0, output_count * batch * item_size);
 
-        vxnneLSTM_MatrixBatchVectorMultiplyAccumulate((vx_type_e)TENSOR_DATA_TYPE(projection_weight), scratch_format, (vx_type_e)TENSOR_DATA_TYPE(output), projection_weight_base,
-            output_count, cell, TENSOR_POS(projection_weight), (vx_uint8_ptr)scatch_output_ptr, batch, scratch_fpos, output_base, TENSOR_POS(output), 1);
+        vxnneLSTM_MatrixBatchVectorMultiplyAccumulate((vx_type_e)TENSOR_DATA_TYPE(projection_weight), scratch_format, (vx_type_e)TENSOR_DATA_TYPE(output_state_out), projection_weight_base,
+            output_count, cell, TENSOR_POS(projection_weight), (vx_uint8_ptr)scatch_output_ptr, batch, scratch_fpos, output_state_out_base, TENSOR_POS(output_state_out), 1);
 
         if (proj_clip > 0.0f)
-            vxnneLSTM_ClipVector((vx_type_e)TENSOR_DATA_TYPE(output), (vx_type_e)TENSOR_DATA_TYPE(output), output_base,
-                output_count * batch, TENSOR_POS(output), proj_clip, output_base, TENSOR_POS(output));
+            vxnneLSTM_ClipVector((vx_type_e)TENSOR_DATA_TYPE(output_state_out), (vx_type_e)TENSOR_DATA_TYPE(output_state_out), output_state_out_base,
+                output_count * batch, TENSOR_POS(output_state_out), proj_clip, output_state_out_base, TENSOR_POS(output_state_out));
     }
     else
-        vxnneLSTM_VectorBatchVectorAssign(scratch_format, (vx_type_e)TENSOR_DATA_TYPE(output_state_out), scatch_output_ptr,
+        vxnneLSTM_VectorVectorAssign(scratch_format, (vx_type_e)TENSOR_DATA_TYPE(output_state_out), scatch_output_ptr,
             output_count, scratch_fpos, batch, (vx_uint8_ptr)output_state_out_base, TENSOR_POS(output_state_out));
 
 
@@ -4184,6 +4366,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMUnit_Initializer(vx_node node, co
             lstmUnitNode->lstm_unit_operation.cell2forget_weight = cell2forget_weight;
             lstmUnitNode->lstm_unit_operation.cell2output_weight = cell2output_weight;
 
+            lstmUnitNode->lstm_unit_operation.layernorm2input_weight  = layernorm2input_weight;
+            lstmUnitNode->lstm_unit_operation.layernorm2forget_weight = layernorm2forget_weight;
+            lstmUnitNode->lstm_unit_operation.layernorm2cell_weight   = layernorm2cell_weight;
+            lstmUnitNode->lstm_unit_operation.layernorm2output_weight = layernorm2output_weight;
+
             lstmUnitNode->lstm_unit_operation.input_gate_bias = input_gate_bias;
             lstmUnitNode->lstm_unit_operation.forget_gate_bias = forget_gate_bias;
             lstmUnitNode->lstm_unit_operation.cell_bias = cell_bias;
@@ -4206,7 +4393,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMUnit_Initializer(vx_node node, co
 
             vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
 
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)input2cell_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)input2input_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
             vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)input2forget_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
             vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)input2cell_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
             vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)input2output_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
@@ -4215,6 +4402,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMUnit_Initializer(vx_node node, co
             vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)recurrent2forget_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
             vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)recurrent2cell_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
             vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)recurrent2output_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
+
+            vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)layernorm2input_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)layernorm2forget_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)layernorm2cell_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)layernorm2output_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
 
             vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell2input_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
             vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell2forget_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
