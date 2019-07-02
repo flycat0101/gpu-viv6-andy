@@ -89,6 +89,7 @@ VkResult __vk_AllocateHwFence(
     uint32_t i, index, shift;
     VkResult result = VK_SUCCESS;
 
+    gcoOS_AcquireMutex(gcvNULL, devCtx->fenceMutex, gcvINFINITE);
     for (i = 0; i < __VK_MAX_FENCE_COUNT; i++)
     {
         if (++devCtx->lastFenceIndex >= __VK_MAX_FENCE_COUNT)
@@ -108,10 +109,11 @@ VkResult __vk_AllocateHwFence(
         }
     }
 
+OnError:
+    gcoOS_ReleaseMutex(gcvNULL, devCtx->fenceMutex);
+
     if (i >= __VK_MAX_FENCE_COUNT)
         result = VK_ERROR_OUT_OF_DEVICE_MEMORY;
-
-OnError:
 
     return result;
 }
@@ -127,9 +129,10 @@ void __vk_FreeHwFence(
     index = fenceIndex / 32;
     shift = fenceIndex % 32;
 
+    gcoOS_AcquireMutex(gcvNULL, devCtx->fenceMutex, gcvINFINITE);
     devCtx->fenceInUse[index] &= ~(1 << shift);
     devCtx->fenceCount--;
-
+    gcoOS_ReleaseMutex(gcvNULL, devCtx->fenceMutex);
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateFence(

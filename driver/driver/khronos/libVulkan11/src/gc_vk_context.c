@@ -391,6 +391,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
 
     devCtx->lastFenceIndex = (uint32_t)-1;
     devCtx->fenceCount = 0;
+    __VK_ONERROR(gcoOS_CreateMutex(gcvNULL, &devCtx->fenceMutex));
 
     /* Lock the phyDev->mutex */
     __VK_ONERROR(gcoOS_AcquireMutex(gcvNULL, phyDev->mutex, gcvINFINITE));
@@ -510,6 +511,9 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyDevice(
 
                 __vk_DestroyBuffer((VkDevice)(uintptr_t)devCtx, devCtx->fenceBuffer, gcvNULL);
             }
+
+            __VK_ASSERT(devCtx->fenceMutex);
+            gcoOS_DeleteMutex(gcvNULL, devCtx->fenceMutex);
 
             __vk_DestroyDeviceQueues(devCtx);
 

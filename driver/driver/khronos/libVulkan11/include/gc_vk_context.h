@@ -119,6 +119,7 @@ struct __vkDevContextRec
     __vkDevQueue *devQueues[__VK_PDEV_QUEUEFAMILY_MAX];
     uint32_t queueCount[__VK_PDEV_QUEUEFAMILY_MAX];
 
+    gctPOINTER fenceMutex;
     uint32_t fenceInUse[__VK_MAX_FENCE_COUNT / 32];
     uint32_t lastFenceIndex;
     uint32_t fenceCount;
