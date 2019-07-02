@@ -192,7 +192,7 @@ ppoPREPROCESSOR_AddToOutputStreamOfPP(
             gcmVERIFY_OK(gcoOS_StrCatSafe(PP->logBuffer,
                                           _cldBUFFER_MAX,
                                           ntoken->poolString));
-            PP->logCurrentSize = PP->logCurrentSize + len + 1;
+            PP->logCurrentSize = PP->logCurrentSize + (gctUINT)len + 1;
 
             if (ntoken->hasTrailingControl)
             {
@@ -211,7 +211,7 @@ ppoPREPROCESSOR_AddToOutputStreamOfPP(
             status = gcoOS_StrCatSafe(PP->logBuffer,
                                       _cldBUFFER_MAX,
                                       ntoken->poolString);
-            PP->logCurrentSize = PP->logCurrentSize + len + 1;
+            PP->logCurrentSize = PP->logCurrentSize + (gctUINT)len + 1;
 
             if (ntoken->hasTrailingControl)
             {
