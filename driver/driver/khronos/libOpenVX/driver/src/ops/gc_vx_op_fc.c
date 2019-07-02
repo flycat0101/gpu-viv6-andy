@@ -15,6 +15,16 @@
 #include <ops/gc_vx_op_tensor_copy.h>
 #include <gc_vx_nn_util.h>
 
+extern vx_tensor _createTensor(vx_graph graph, vx_bool is_virtual,
+    vx_uint32 num_of_dims, vx_uint32 * sizes, vx_enum data_format, vx_enum quant_format,
+    vx_int8 fixed_point_pos,
+    vx_float32 scale, vx_int32 zeroPoint);
+extern vx_tensor _createSimilarTensor(vx_graph graph, vx_bool is_virtual, vx_uint32 num_of_dims, vx_uint32 * sizes, vx_tensor tensor);
+
+extern vx_status vxnneExecuteSWConvolution(vxnne_operation operation);
+
+extern vx_status vxnneExecuteSWTensorTranspose(struct _vxnne_operation_s *operation);
+
 extern vx_status vxnneGetAlignStrides(vx_tensor tensor, vx_uint32_ptr strides, vx_bool align64);
 extern vx_status vxnneOperation_TP_Deinitialize(vxnne_operation_s *operation);
 extern vx_status vxnneOperation_AddReference(
@@ -34,7 +44,37 @@ vxoTensor_CreateTensorExt(
     vx_reference_kind_e kind
 );
 
+vx_status vxoFC_NN_Trans_Initialize(
+    vxnne_tp_operation operation_tp,
+    vxnne_shader_operation operation_sh,
+    vxnne_tensor_trans_operation operation_sw,
+    vxnne_layer layer,
+    vx_tensor inputs,
+    vx_uint32 batch_count,
+    vx_border_t* border_mode,
+    vx_tensor outputs,
+    vx_uint32_ptr op_index
+    );
+
 #define IMG_MAX_WIDTH 65536
+
+vx_status vxoFCOperation_TransposeTensor(vx_tensor weights, vx_tensor weight_conv, vx_uint32* perm, vx_uint32 pnum)
+{
+    vx_status status = VX_SUCCESS;
+
+    vx_uint8_ptr inaddr, outaddr;
+    vx_uint32 dims[VX_CONTEXT_TENSOR_MAX_DIMENSION], strides[VX_CONTEXT_TENSOR_MAX_DIMENSION], tstrides[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+
+    vxoTensor_GetTensorViewMemory(weights, (gctPOINTER*)&inaddr, VX_NULL);
+    vxoTensor_GetTensorViewMemory(weight_conv, (gctPOINTER*)&outaddr, VX_NULL);
+
+    vxoTensor_GetTensorDimStride(weights, &pnum, dims, strides);
+    vxoTensor_GetTensorDimStride(weight_conv, &pnum, VX_NULL, tstrides);
+
+    _TransposeTensor(inaddr, outaddr,TENSOR_DATA_SIZE(weights), dims, strides, tstrides, perm, pnum - 1);
+
+    return status;
+}
 
 VX_PRIVATE_API vx_status _GetBatchAndInOutCountOfFC(
     vx_tensor inputs,
@@ -246,71 +286,14 @@ vx_status vxoFCOperation_Initialize(
     vx_tensor aligned_tensor = VX_NULL;
     vx_tensor tp_fc_inputs = VX_NULL;
 
+    vx_bool support_1xn = (width % 2 == 0)?vx_true_e:vx_false_e;
+
     if ((!weights_biases || !*weights_biases) &&
         (!weights || !biases))
     {
         vxmONERROR(VX_ERROR_INVALID_PARAMETERS);
     }
 
-    if (weights_biases && *weights_biases)
-    {
-        wb = *weights_biases;
-
-        weights = wb->wb_base->origWeight;
-        biases = wb->wb_base->origBias;
-
-
-    }
-    else if (!weights_biases || !*weights_biases)
-    {
-        if (TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE)
-        {
-            vxZeroMemory(&wb_opt, gcmSIZEOF(wb_opt));
-            wb_opt.inputZeroPoint = TENSOR_TF_ZEROPOINT(inputs);
-            wb_opt.zrl = -1;
-            wb_opt.outputFormat = TENSOR_DATA_TYPE(outputs);
-
-            opt = &wb_opt;
-        }
-
-        wb = _createWeightsBiasesParameterFromTensors(context,
-                                                      VX_NN_FULLYCONNECTED_LAYER,
-                                                      inputs->dims, /* inputs_dims */
-                                                      inputs->dimCount,
-                                                      outputs->dimCount,
-                                                      0,
-                                                      0,
-                                                      0,
-                                                      0,
-                                                      0, /* pooling_size_x */
-                                                      0, /* pooling_size_y */
-                                                      0,
-                                                      0,
-                                                      VX_NN_DS_SIZE_ROUNDING_FLOOR,
-                                                      outputs->dims, /* convolution_outputs_dims */
-                                                      outputs->dims, /* pool_outputs_dims */
-                                                      opt, /*optimizations,*/
-                                                      TENSOR_DATA_TYPE(weights),
-                                                      0,
-                                                      VX_TENSOR_RANK_WHCN,
-                                                      weights,
-                                                      biases,
-                                                      VX_NULL,
-                                                      vx_false_e,
-                                                      vx_false_e);
-
-        if (!wb)
-        {
-            vxmONERROR(VX_ERROR_NO_RESOURCES);
-        }
-
-        operation->weights_biases = wb;
-
-        if (weights_biases)
-        {
-            *weights_biases = wb;
-        }
-    }
 
     weight_dataformat = TENSOR_DATA_TYPE(weights);
     bias_dataformat = TENSOR_DATA_TYPE(biases);
@@ -328,16 +311,14 @@ vx_status vxoFCOperation_Initialize(
     enable_shader = (supportDataFormat0 || supportDataFormat1 || supportDataFormat2 || supportDataFormat3) && (inputDims < IMG_MAX_WIDTH);
 
     /* Choose the accelerator. */
-    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_SINGLE_FC) &&
-        vxnneIsTPSupportFormat(context, inputs, wb, outputs) &&
-        wb->use_tp_fc)
-    {
-        target = VXNNE_OPERATION_TARGET_TP;
-    }
-    else if (vxnneIsNNSupportFormat(context, inputs, wb, outputs) &&
-             !wb->use_tp_fc)
+    if (vxnneIsNNSupportFormat(context, inputs, VX_NULL, outputs) && batch_count > 1 && support_1xn)
     {
         target = VXNNE_OPERATION_TARGET_NN;
+    }
+    else if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_SINGLE_FC) &&
+        vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs))
+    {
+        target = VXNNE_OPERATION_TARGET_TP;
     }
     else if (enable_shader && vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SHADER) && 0)
     {
@@ -415,6 +396,67 @@ vx_status vxoFCOperation_Initialize(
                                                            op_index));
         }
 
+        if (wb == VX_NULL)
+        {
+            if (weights_biases && *weights_biases)
+            {
+                wb = *weights_biases;
+
+                weights = wb->wb_base->origWeight;
+                biases = wb->wb_base->origBias;
+            }
+            else if (!weights_biases || !*weights_biases)
+            {
+                if (TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE)
+                {
+                    vxZeroMemory(&wb_opt, gcmSIZEOF(wb_opt));
+                    wb_opt.inputZeroPoint = TENSOR_TF_ZEROPOINT(inputs);
+                    wb_opt.zrl = -1;
+                    wb_opt.outputFormat = TENSOR_DATA_TYPE(outputs);
+
+                    opt = &wb_opt;
+                }
+
+                wb = _createWeightsBiasesParameterFromTensors(context,
+                                                              VX_NN_FULLYCONNECTED_LAYER,
+                                                              inputs->dims, /* inputs_dims */
+                                                              inputs->dimCount,
+                                                              outputs->dimCount,
+                                                              0,
+                                                              0,
+                                                              0,
+                                                              0,
+                                                              0, /* pooling_size_x */
+                                                              0, /* pooling_size_y */
+                                                              0,
+                                                              0,
+                                                              VX_NN_DS_SIZE_ROUNDING_FLOOR,
+                                                              outputs->dims, /* convolution_outputs_dims */
+                                                              outputs->dims, /* pool_outputs_dims */
+                                                              opt, /*optimizations,*/
+                                                              TENSOR_DATA_TYPE(outputs),
+                                                              0,
+                                                              VX_TENSOR_RANK_WHCN,
+                                                              weights,
+                                                              biases,
+                                                              VX_NULL,
+                                                              vx_false_e,
+                                                              vx_false_e);
+
+                if (!wb)
+                {
+                    vxmONERROR(VX_ERROR_NO_RESOURCES);
+                }
+
+                operation->weights_biases = wb;
+
+                if (weights_biases)
+                {
+                    *weights_biases = wb;
+                }
+            }
+        }
+
         vxmONERROR(vxoFCOperationTP_Initialize(&operation->tp_operation,
                                                &operation->aux_tp_operation,
                                                layer,
@@ -429,16 +471,144 @@ vx_status vxoFCOperation_Initialize(
         break;
 
     case VXNNE_OPERATION_TARGET_NN:
-        vxmONERROR(vxoFCOperationNN_Initialize(&operation->nn_operation,
-                                               layer,
-                                               inputs,
-                                               batch_count,
-                                               wb,
-                                               overflow_policy,
-                                               rounding_policy,
-                                               enable_relu,
-                                               outputs,
-                                               op_index));
+    {
+        vx_uint32 trans_sizes[][4] = {
+            {TENSOR_SIZE_INDEX(inputs, 0)/2, 2, TENSOR_SIZE_INDEX(inputs, 1), 1}, /* reshape: 1312x378 => 656x2x378x1  */
+            {TENSOR_SIZE_INDEX(inputs, 1), 2, TENSOR_SIZE_INDEX(inputs, 0)/2, 1}, /* input  : 1312x378 => 378x2x656x1  */
+            {TENSOR_SIZE_INDEX(outputs, 1), 1, TENSOR_SIZE_INDEX(outputs, 0), 1}, /* output : 4096x378 <= 378x1x4096x1 */
+            {TENSOR_SIZE_INDEX(outputs, 0), 1, TENSOR_SIZE_INDEX(outputs, 1), 1}, /* output : 378x1x4096x1 => 4096x1x378x1 */
+        };
+
+        vx_tensor input_reshape = vxoTensor_ReshapeTensor(inputs, (vx_int32_ptr)trans_sizes[0], gcmCOUNTOF(trans_sizes[0]));
+        vx_tensor input_trans   = _createSimilarTensor(layer->node->graph, vx_false_e, gcmCOUNTOF(trans_sizes[1]), trans_sizes[1], inputs);
+        vx_tensor output_trans  = _createSimilarTensor(layer->node->graph, vx_false_e, gcmCOUNTOF(trans_sizes[2]), trans_sizes[2], outputs);
+        vx_tensor outputs_reshape = vxoTensor_ReshapeTensor(outputs, (vx_int32_ptr)trans_sizes[3], gcmCOUNTOF(trans_sizes[3]));
+
+        vxmONERROR(vxoTensor_AllocateMemory(input_trans));
+        vxmONERROR(vxoTensor_AllocateMemory(output_trans));
+
+        layer->temp_tensors[layer->num_temp_tensors++] = input_reshape;
+        layer->temp_tensors[layer->num_temp_tensors++] = outputs_reshape;
+        layer->temp_tensors[layer->num_temp_tensors++] = input_trans;
+        layer->temp_tensors[layer->num_temp_tensors++] = output_trans;
+
+        if (wb == VX_NULL)
+        {
+
+            vx_uint32 pnum = 4;
+            vx_int32 zdp_size = 2;
+            vx_uint32 perm[] = {1, 0, 2, 3}; /* transpose weights dim[0] and dim[1] */
+            vx_int32 weight_sizes[][4] = {
+                {gcmALIGN_NP2(TENSOR_SIZE_INDEX(weights, 0), zdp_size)/zdp_size, zdp_size, TENSOR_SIZE_INDEX(weights, 1), 1}, /* reshape: 90x400 => 45x2x400x1*/
+                {zdp_size, gcmALIGN_NP2(TENSOR_SIZE_INDEX(weights, 0), zdp_size)/zdp_size, TENSOR_SIZE_INDEX(weights, 1), 1}, /* trans  : 45x2x400x1 => 2x45x400x1*/
+                {1, zdp_size, gcmALIGN_NP2(TENSOR_SIZE_INDEX(weights, 0), zdp_size)/zdp_size, TENSOR_SIZE_INDEX(weights, 1)}, /* reshape: 2x45x400x1 => 1x2x45x400*/
+            };
+
+            vx_tensor _weights_pre      = vxoTensor_ReshapeTensor(weights, weight_sizes[0], gcmCOUNTOF(weight_sizes[0]));
+            vx_tensor _weights_trans    = _createSimilarTensor(layer->node->graph, vx_false_e, gcmCOUNTOF(weight_sizes[1]), (vx_uint32_ptr)weight_sizes[1], weights);
+            vx_tensor _weights          = vxoTensor_ReshapeTensor(_weights_trans, weight_sizes[2], gcmCOUNTOF(weight_sizes[2]));
+
+            layer->temp_tensors[layer->num_temp_tensors++] = _weights_pre;
+            layer->temp_tensors[layer->num_temp_tensors++] = _weights;
+            layer->temp_tensors[layer->num_temp_tensors++] = _weights_trans;
+
+            vxmONERROR(vxoTensor_AllocateMemory(_weights_trans));
+
+            vxmONERROR(vxoFCOperation_TransposeTensor(_weights_pre, _weights_trans, perm, pnum));
+
+            if (weights_biases && *weights_biases)
+            {
+                wb = *weights_biases;
+
+                weights = wb->wb_base->origWeight;
+                biases = wb->wb_base->origBias;
+            }
+            else if (!weights_biases || !*weights_biases)
+            {
+                if (TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE)
+                {
+                    vxZeroMemory(&wb_opt, gcmSIZEOF(wb_opt));
+                    wb_opt.inputZeroPoint = TENSOR_TF_ZEROPOINT(input_trans);
+                    wb_opt.zrl = -1;
+                    wb_opt.outputFormat = TENSOR_DATA_TYPE(output_trans);
+
+                    opt = &wb_opt;
+                }
+
+                wb = _createWeightsBiasesParameterFromTensors(context,
+                                                              VX_NN_CONVOLUTION_LAYER,
+                                                              input_trans->dims, /* inputs_dims */
+                                                              input_trans->dimCount,
+                                                              output_trans->dimCount,
+                                                              0,
+                                                              0,
+                                                              0,
+                                                              0,
+                                                              0, /* pooling_size_x */
+                                                              0, /* pooling_size_y */
+                                                              0,
+                                                              0,
+                                                              VX_NN_DS_SIZE_ROUNDING_FLOOR,
+                                                              output_trans->dims, /* convolution_outputs_dims */
+                                                              output_trans->dims, /* pool_outputs_dims */
+                                                              opt, /*optimizations,*/
+                                                              TENSOR_DATA_TYPE(output_trans),
+                                                              0,
+                                                              VX_TENSOR_RANK_WHCN,
+                                                              _weights,
+                                                              biases,
+                                                              VX_NULL,
+                                                              vx_false_e,
+                                                              vx_false_e);
+
+                if (!wb)
+                {
+                    vxmONERROR(VX_ERROR_NO_RESOURCES);
+                }
+
+                operation->weights_biases = wb;
+
+                if (weights_biases)
+                {
+                    *weights_biases = wb;
+                }
+            }
+        }
+
+        if (wb)
+        {
+            vxmONERROR(vxoFC_NN_Trans_Initialize(&operation->nn_trans_tp_operation[0],
+                                                    &operation->nn_trans_sh_operation[0],
+                                                    &operation->nn_trans_sw_operation[0],
+                                                    layer,
+                                                    input_reshape,
+                                                    1/*batch_count*/,
+                                                    &node->kernelAttributes.borderMode,
+                                                    input_trans,
+                                                    op_index));
+            vxmONERROR(vxoFCOperationNN_Initialize(&operation->nn_operation,
+                                                    &operation->nn_operation_sw,
+                                                    layer,
+                                                    input_trans,
+                                                    1/*batch_count*/,
+                                                    wb,
+                                                    overflow_policy,
+                                                    rounding_policy,
+                                                    enable_relu,
+                                                    output_trans,
+                                                    op_index));
+
+            vxmONERROR(vxoFC_NN_Trans_Initialize(&operation->nn_trans_tp_operation[1],
+                                                    &operation->nn_trans_sh_operation[1],
+                                                    &operation->nn_trans_sw_operation[1],
+                                                    layer,
+                                                    output_trans,
+                                                    1/*batch_count*/,
+                                                    &node->kernelAttributes.borderMode,
+                                                    outputs_reshape,
+                                                    op_index));
+        }
+    }
         break;
 
     case VXNNE_OPERATION_TARGET_SH:
@@ -681,8 +851,153 @@ OnError:
     return status;
 }
 
+vx_status vxoFC_NN_Trans_Initialize(
+    vxnne_tp_operation operation_tp,
+    vxnne_shader_operation operation_sh,
+    vxnne_tensor_trans_operation operation_sw,
+    vxnne_layer layer,
+    vx_tensor inputs,
+    vx_uint32 batch_count,
+    vx_border_t* border_mode,
+    vx_tensor outputs,
+    vx_uint32_ptr op_index
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_context context = vxGetContext((vx_reference)inputs);
+    vx_int32 batch = batch_count;
+    vx_uint32 _sizes[] = {4, 1, 1, 1};
+    vx_tensor perm = _createTensor(layer->node->graph, vx_false_e, 4, _sizes, VX_TYPE_INT32, VX_QUANT_DYNAMIC_FIXED_POINT, 0, 1.0f, 0);
+    vx_uint32_ptr ptr_base = VX_NULL;
+    vx_bool enable_sw = vx_false_e;
+
+    layer->temp_tensors[layer->num_temp_tensors++] = perm;
+
+    vxmONERROR(vxoTensor_AllocateMemory(perm));
+
+    vxmONERROR(vxoTensor_GetTensorViewMemory(perm, (gctPOINTER*)&ptr_base, VX_NULL));
+    ptr_base[0] = 2;
+    ptr_base[1] = 1;
+    ptr_base[2] = 0;
+    ptr_base[3] = 3;
+
+    if (enable_sw)
+    {
+        vx_array perm = vxCreateArray(context, VX_TYPE_UINT32, 4);
+        vx_scalar pnum = vxCreateScalar(context, VX_TYPE_INT32, &TENSOR_DIM_NUM(inputs));
+
+        vxoArray_AllocateMemory(perm);
+
+        memcpy(perm->memory.logicals[0], ptr_base, 4 * sizeof(vx_int32));
+
+        vxnneOperation_Initialize(&operation_sw->base,
+                                  layer,
+                                  VXNNE_OPERATION_TARGET_SW,
+                                  VXNNE_OPERATOR_TENSOR_TRANS,
+                                  vxnneExecuteSWTensorTranspose,
+                                  VX_NULL,
+                                  batch_count,
+                                  0);
+
+        vxnneLayer_SetOperation(
+            layer,
+            &operation_sw->base,
+            (*op_index) ++);
+
+        operation_sw->input   = inputs;
+        operation_sw->perm    = perm;
+        operation_sw->pnum    = pnum;
+        operation_sw->output  = outputs;
+
+        vxnneOperation_AddReference(&operation_sw->base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&operation_sw->base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+    }
+    else if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP) && 0)
+    {
+        vxnne_tp_operation tp_op = (vxnne_tp_operation)operation_tp;
+        vx_op_param_s conv = { 0 };
+        vx_tp_value_cmd values;
+        vx_uint32 dnum = 4;
+
+        vxmONERROR(vxnneOperation_Initialize(&tp_op->base,
+            layer,
+            VXNNE_OPERATION_TARGET_TP,
+            VXNNE_OPERATOR_TENSOR_TRANS,
+            VX_NULL,
+            vxnneOperation_TP_Deinitialize,
+            batch,
+            0));
+
+        vxmONERROR(vxnneLayer_SetOperation(
+            layer,
+            &tp_op->base,
+            (*op_index) ++));
+
+        tp_op->input = inputs;
+        tp_op->output = outputs;
+
+        vxmONERROR(vxnneOperation_AddReference(&tp_op->base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&tp_op->base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+        memset(&conv, 0, sizeof(vx_op_param_s));
+        conv.pad_x_left = 0;
+        conv.pad_y_top = 0;
+        conv.pool_size_x = 0;
+        conv.pool_size_y = 0;
+        conv.pool_stride = 1;
+        conv.enable_relu = vx_false_e;
+        conv.conv_rounding_type = 0;
+        conv.pad_mode = VX_PAD_CONSTANT;
+        conv.pad_const = 0;
+        conv.tpType = TP_TRANSPOSE;
+        conv.other_ref = (vx_reference)inputs;
+        conv.data_buff = gcvNULL;
+
+        conv.tp_value = (vx_tp_value_cmd)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
+        values = (vx_tp_value_cmd)conv.tp_value;
+        values->u32[0] = dnum;
+        values->p8[0] = (vx_uint8_ptr)vxAllocateAndZeroMemory(sizeof(vx_uint32) * dnum);
+        vxMemCopy(values->p8[0], ptr_base, sizeof(vx_uint32) * dnum);
+
+        vxMemCopy(&tp_op->base.parameter, &conv, sizeof(vx_op_param_s));
+    }
+    else
+    {
+        vxnne_shader_operation sh_op = (vxnne_shader_operation)operation_sh;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
+
+        shaderExecutable = vxnneTensorTransposeShaderExecutable(context, VXNNE_KERNEL_TENSOR_TRANSPOSE, border_mode, inputs, ptr_base, 3, outputs);
+        if (!shaderExecutable)
+        {
+            status = VX_FAILURE;
+            goto OnError;
+        }
+
+        vxmONERROR(vxnneShaderOperation_Initialize(sh_op,
+            layer,
+            VXNNE_OPERATOR_TENSOR_TRANS,
+            batch,
+            shaderExecutable));
+
+        if (status != VX_SUCCESS)
+            goto OnError;
+
+        vxmONERROR(vxnneOperation_AddReference(&sh_op->base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&sh_op->base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+        vxmONERROR(vxnneLayer_SetOperation(
+            layer,
+            &sh_op->base,
+            (*op_index) ++));
+    }
+
+OnError:
+    return status;
+}
+
 vx_status vxoFCOperationNN_Initialize(
     vxnne_convolution_relu_pooling_operation operation,
+    vxnne_convolution_operation operation_sw,
     vxnne_layer layer,
     vx_tensor inputs,
     vx_uint32 batch_count,
@@ -699,109 +1014,119 @@ vx_status vxoFCOperationNN_Initialize(
     vx_op_param op_param = VX_NULL;
     vx_uint32 input_unit_count, output_unit_count;
     vx_tensor fc_inputs = inputs, fc_outputs = outputs;
-    vx_int32 sizes[4];
+    vx_bool enable_sw_convolution = vx_false_e;
 
     if (!op_index)
     {
         vxmONERROR(VX_ERROR_INVALID_PARAMETERS);
     }
 
-    vxmONERROR(vxnneOperation_Initialize(&operation->base,
-                                         layer,
-                                         VXNNE_OPERATION_TARGET_NN,
-                                         VXNNE_OPERATOR_FULLYCONNECTED,
-                                         VX_NULL,
-                                         VX_NULL,
-                                         batch_count,
-                                         NNE_COMMAND_SIZE * weights_biases->slice_num));
-
-    op_param = &operation->base.parameter;
-
-    op_param->pad_x_left = 0;
-    op_param->pad_y_top = 0;
-    op_param->pad_x_right = 0;
-    op_param->pad_y_bottom = 0;
-    op_param->pad_mode = VX_PAD_CONSTANT;
-    op_param->pad_const = 0;
-    op_param->pool_type = VIV_NN_POOLING_NON;
-    op_param->pool_size_x = 0;
-    op_param->pool_size_y = 0;
-    op_param->pool_stride = 1;
-    op_param->enable_relu = enable_relu;
-    op_param->conv_rounding_type = rounding_policy;
-
-    /*
-     * Dimension layouts.
-     *      weights_biases:     [1 x 1 x #IFM x #OFM]
-     *      inputs (reshaped):  [1 x 1 x #IFM x #batch]
-     *      outputs (reshaped): [1 x 1 x #OFM x #batch]
-     */
-    vxmONERROR(_GetBatchAndInOutCountOfFC(inputs,
-                                          outputs,
-                                          &batch_count,
-                                          &input_unit_count,
-                                          &output_unit_count));
-
-    if (input_unit_count != weights_biases->weights_sizes[2] ||
-        output_unit_count != weights_biases->weights_sizes[3])
+    if (enable_sw_convolution)
     {
-        vxmONERROR(VX_ERROR_INVALID_DIMENSION);
-    }
+        vx_context context = vxGetContext((vx_reference)layer->node);
+        vx_int32  pad = 0;
+        vx_int32  dilation = 0;
+        vx_int32  stride = 1;
+        vx_enum downScaleSizeRoundingValue = VX_NN_DS_SIZE_ROUNDING_FLOOR;
+        vx_scalar padXLeft = vxCreateScalar(context, VX_TYPE_INT32, &pad);
+        vx_scalar padXRight = vxCreateScalar(context, VX_TYPE_INT32, &pad);
+        vx_scalar padYTop = vxCreateScalar(context, VX_TYPE_INT32, &pad);
+        vx_scalar padYBottom = vxCreateScalar(context, VX_TYPE_INT32, &pad);
+        vx_scalar strideX = vxCreateScalar(context, VX_TYPE_INT32, &stride);
+        vx_scalar strideY = vxCreateScalar(context, VX_TYPE_INT32, &stride);
+        vx_scalar dilationX = vxCreateScalar(context, VX_TYPE_INT32, &dilation);
+        vx_scalar dilationY = vxCreateScalar(context, VX_TYPE_INT32, &dilation);
+        vx_scalar downScaleSizeRounding = vxCreateScalar(context, VX_TYPE_INT32, &downScaleSizeRoundingValue);
+        vxnneOperation_Initialize(&operation_sw->base,
+            layer,
+            VXNNE_OPERATION_TARGET_SW,
+            VXNNE_OPERATOR_CONVOLUTION,
+            vxnneExecuteSWConvolution,
+            VX_NULL,
+            batch_count,
+            0);
 
-    if (TENSOR_VIEW_SIZE_INDEX(inputs, 0) != 1 ||
-        TENSOR_VIEW_SIZE_INDEX(inputs, 1) != 1)
+        vxnneLayer_SetOperation(
+            layer,
+            &operation_sw->base,
+            (*op_index)++);
+
+        operation_sw->inputs = fc_inputs;
+        operation_sw->weights = weights_biases->wb_base->origWeight;
+        operation_sw->biases = weights_biases->wb_base->origBias;
+        operation_sw->padX = padXLeft;
+        operation_sw->padXRight = padXRight;
+        operation_sw->padY = padYTop;
+        operation_sw->padYBottom = padYBottom;
+        operation_sw->strideX = strideX;
+        operation_sw->strideY = strideY;
+        operation_sw->dilationX = dilationX;
+        operation_sw->dilationY = dilationY;
+        operation_sw->downScaleSizeRounding = downScaleSizeRounding;
+        operation_sw->outputs = fc_outputs;
+
+        vxnneOperation_AddReference(&operation_sw->base, (vx_reference)fc_inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&operation_sw->base, (vx_reference)weights_biases->wb_base->origWeight, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&operation_sw->base, (vx_reference)weights_biases->wb_base->origBias, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&operation_sw->base, (vx_reference)fc_outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+    }
+    else
     {
-        /* Reshape inputs to [1 x 1 x #IFM x #batch]. */
-        sizes[0] = 1;
-        sizes[1] = 1;
-        sizes[2] = input_unit_count;
-        sizes[3] = batch_count;
 
-        fc_inputs = vxoTensor_ReshapeTensor(inputs, sizes, 4);
+        vxmONERROR(vxnneOperation_Initialize(&operation->base,
+                                             layer,
+                                             VXNNE_OPERATION_TARGET_NN,
+                                             VXNNE_OPERATOR_FULLYCONNECTED,
+                                             VX_NULL,
+                                             VX_NULL,
+                                             batch_count,
+                                             NNE_COMMAND_SIZE * weights_biases->slice_num));
 
-        if (!fc_inputs)
-        {
-            vxmONERROR(VX_ERROR_NO_RESOURCES);
-        }
+        op_param = &operation->base.parameter;
 
-        layer->temp_tensors[layer->num_temp_tensors++] = fc_inputs;
+        op_param->pad_x_left = 0;
+        op_param->pad_y_top = 0;
+        op_param->pad_x_right = 0;
+        op_param->pad_y_bottom = 0;
+        op_param->pad_mode = VX_PAD_CONSTANT;
+        op_param->pad_const = 0;
+        op_param->pool_type = VIV_NN_POOLING_NON;
+        op_param->pool_size_x = 0;
+        op_param->pool_size_y = 0;
+        op_param->pool_stride = 1;
+        op_param->enable_relu = enable_relu;
+        op_param->conv_rounding_type = rounding_policy;
+
+        /*
+         * Dimension layouts.
+         *      weights_biases:     [1 x 1 x #IFM x #OFM]
+         *      inputs (reshaped):  [1 x 1 x #IFM x #batch]
+         *      outputs (reshaped): [1 x 1 x #OFM x #batch]
+         */
+        vxmONERROR(_GetBatchAndInOutCountOfFC(inputs,
+                                              outputs,
+                                              &batch_count,
+                                              &input_unit_count,
+                                              &output_unit_count));
+
+
+        operation->inputs = fc_inputs;
+        operation->outputs = fc_outputs;
+        operation->weights_biases = weights_biases;
+        operation->pad_x_left = 0;
+        operation->pad_x_right = 0;
+        operation->pad_y_top = 0;
+        operation->pad_y_bottom = 0;
+        operation->down_scale_size_rounding = rounding_policy;
+        operation->enable_relu = enable_relu;
+
+        vxmONERROR(vxnneLayer_SetOperation(layer,
+                                           &operation->base,
+                                           (*op_index)++));
+
+        vxnneOperation_AddReference(&operation->base, (vx_reference)fc_inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&operation->base, (vx_reference)fc_outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
     }
-
-    if (TENSOR_VIEW_SIZE_INDEX(outputs, 0) != 1 ||
-        TENSOR_VIEW_SIZE_INDEX(outputs, 1) != 1)
-    {
-        /* Reshape outputs to [1 x 1 x #OFM x #batch]. */
-        sizes[0] = 1;
-        sizes[1] = 1;
-        sizes[2] = output_unit_count;
-        sizes[3] = batch_count;
-
-        fc_outputs = vxoTensor_ReshapeTensor(outputs, sizes, 4);
-
-        if (!fc_outputs)
-        {
-            vxmONERROR(VX_ERROR_NO_RESOURCES);
-        }
-
-        layer->temp_tensors[layer->num_temp_tensors++] = fc_outputs;
-    }
-
-    operation->inputs = fc_inputs;
-    operation->outputs = fc_outputs;
-    operation->weights_biases = weights_biases;
-    operation->pad_x_left = 0;
-    operation->pad_x_right = 0;
-    operation->pad_y_top = 0;
-    operation->pad_y_bottom = 0;
-    operation->down_scale_size_rounding = rounding_policy;
-    operation->enable_relu = enable_relu;
-
-    vxmONERROR(vxnneLayer_SetOperation(layer,
-                                       &operation->base,
-                                       (*op_index)++));
-
-    vxnneOperation_AddReference(&operation->base, (vx_reference)fc_inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
-    vxnneOperation_AddReference(&operation->base, (vx_reference)fc_outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
 OnError:
     return status;

@@ -36,6 +36,40 @@ extern vx_status vxoNNFullyConnectedLayerInitializer(
     vx_int32_ptr count,
     vx_tensor outputs);
 
+vx_tensor _createTensor(vx_graph graph, vx_bool is_virtual,
+    vx_uint32 num_of_dims, vx_uint32 * sizes, vx_enum data_format, vx_enum quant_format,
+    vx_int8 fixed_point_pos,
+    vx_float32 scale, vx_int32 zeroPoint)
+{
+    vx_tensor_create_params_t params = { num_of_dims, sizes, data_format, quant_format};
+    vx_tensor tensor = VX_NULL;
+
+    if (quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        params.quant_data.dfp.fixed_point_pos = fixed_point_pos;
+    }
+    else
+    {
+        params.quant_data.affine.scale = scale;
+        params.quant_data.affine.zeroPoint = zeroPoint;
+    }
+
+    if (is_virtual)
+        tensor = vxoTensor_CreateVirtualTensor2(graph, &params, sizeof(vx_tensor_create_params_t));
+    else
+        tensor = vxoTensor_CreateTensor2(vxGetContext((vx_reference)graph), &params, sizeof(vx_tensor_create_params_t));
+
+    return tensor;
+}
+
+vx_tensor _createSimilarTensor(vx_graph graph, vx_bool is_virtual, vx_uint32 num_of_dims, vx_uint32 * sizes, vx_tensor tensor)
+{
+    return _createTensor(graph, is_virtual, num_of_dims, sizes,
+        TENSOR_DATA_TYPE(tensor), TENSOR_QUANT_TYPE(tensor),
+        TENSOR_POS(tensor),
+        TENSOR_TF_SCALE(tensor), TENSOR_TF_ZEROPOINT(tensor));
+}
+
 
 /***************************************************************************************************************************
 *                                                 RNN

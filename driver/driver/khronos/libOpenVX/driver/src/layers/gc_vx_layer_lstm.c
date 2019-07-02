@@ -15,6 +15,132 @@
 #include <gc_vx_nn_util.h>
 #include <ops/gc_vx_op_fc.h>
 
+#define NEW_CREATE_API 1
+
+#define FORCE_INTERNAL_FORMAT VX_TYPE_INVALID
+
+extern vx_tensor _createSimilarTensor(vx_graph graph, vx_bool is_virtual, vx_uint32 num_of_dims, vx_uint32 * sizes, vx_tensor tensor);
+extern vx_tensor _createTensor(vx_graph graph, vx_bool is_virtual,
+    vx_uint32 num_of_dims, vx_uint32 * sizes, vx_enum data_format, vx_enum quant_format,
+    vx_int8 fixed_point_pos,
+    vx_float32 scale, vx_int32 zeroPoint);
+
+#define LSTM_FC_OUTPUT_SUB_FL_DFP16     (16)
+#define LSTM_FC_OUTPUT_SUB_FL_DFP8      (8)
+#define LSTM_FC_OUTPUT_ASYM_U8_FL       (10)
+
+vx_status vxoFC_GetConfigFromEnv(vx_enum* force_format, vx_int8_ptr force_dfb, vx_int32* force_zp, vx_float32* force_scale)
+{
+    vx_uint32 f = 0;
+    gctSTRING env = VX_NULL;
+
+    gcoOS_GetEnv(gcvNULL, "LSTM_CONV_INTER_FORMAT", &env);
+    if (env != VX_NULL && force_format != VX_NULL)
+    {
+    gctSTRING formatNameTable[] = { "int16", "int8", "qauant8", "f16", "f32" };
+    vx_enum formatTable[] = { VX_TYPE_INT16, VX_TYPE_INT8, VX_TYPE_UINT8, VX_TYPE_FLOAT16, VX_TYPE_FLOAT32 };
+
+        for (f = 0; f < (vx_uint32)gcmCOUNTOF(formatNameTable); f++)
+        {
+            if (gcoOS_StrStr(env, formatNameTable[f], VX_NULL))
+            {
+                *force_format = formatTable[f];
+                break;
+            }
+        }
+    }
+
+    if ((*force_format == VX_TYPE_INT16) || (*force_format == VX_TYPE_INT8))
+    {
+        gcoOS_GetEnv(gcvNULL, "LSTM_CONV_DFB", &env);
+        if (env != NULL && force_dfb != VX_NULL)*force_dfb = (vx_int8)atoi(env);
+    }
+    else if (*force_format == VX_TYPE_UINT8)
+    {
+        gcoOS_GetEnv(gcvNULL, "LSTM_CONV_ZP", &env);
+        if (env != NULL && force_zp != VX_NULL)*force_zp = atoi(env);
+
+        gcoOS_GetEnv(gcvNULL, "LSTM_CONV_SCALE", &env);
+        if (env != NULL && force_scale != VX_NULL)*force_scale = (vx_float32)atof(env);
+    }
+
+    return VX_SUCCESS;
+}
+
+ vx_tensor _createInteranlTensor(vx_graph graph, vx_enum force_f, vx_bool is_virtual,
+    vx_uint32 num_of_dims, vx_uint32 * sizes, vx_enum data_format, vx_enum quant_format,
+    vx_int8 fixed_point_pos,
+    vx_float32 scale, vx_int32 zeroPoint)
+ {
+     vx_tensor tensor           = VX_NULL;
+
+     vx_enum _data_format       = data_format;
+     vx_enum _quant_format      = quant_format;
+     vx_int8 _fixed_point_pos   = fixed_point_pos;
+     vx_float32 _scale          = scale;
+     vx_int32 _zeroPoint        = zeroPoint;
+
+     vx_enum format = data_format;
+
+    vx_enum force_format = force_f;
+
+    vxoFC_GetConfigFromEnv(&force_format, &_fixed_point_pos, &_zeroPoint, &_scale);
+
+     if (force_format != VX_TYPE_INVALID && force_format != data_format)
+     {
+         if (quant_format != VX_QUANT_NONE)
+         {
+            /* quant to float */
+             if (force_format == VX_TYPE_FLOAT16)
+                _quant_format = VX_QUANT_NONE;
+            /* u8 to int16 */
+             else if (force_format == VX_TYPE_INT16 && data_format == VX_TYPE_UINT8)
+                _quant_format = VX_QUANT_DYNAMIC_FIXED_POINT;
+         }
+     }
+
+     switch(_quant_format)
+     {
+     case VX_QUANT_NONE:
+         _data_format       = VX_TYPE_FLOAT16;
+         _quant_format      = VX_QUANT_NONE;
+         _fixed_point_pos   = 0;
+         _scale             = 1.f;
+         _zeroPoint         = 0;
+         break;
+     case VX_QUANT_DYNAMIC_FIXED_POINT:
+     {
+         _scale             = 1.f;
+         _zeroPoint         = 0;
+         switch(format)
+         {
+         case VX_TYPE_INT16:
+             /* fixed_point_pos = TENSOR_POS(bias) */
+            _fixed_point_pos    = fixed_point_pos - LSTM_FC_OUTPUT_SUB_FL_DFP16;
+             break;
+         case VX_TYPE_INT8:
+             /* fixed_point_pos = TENSOR_POS(bias) */
+            _fixed_point_pos    = fixed_point_pos - LSTM_FC_OUTPUT_SUB_FL_DFP8;
+             break;
+         case VX_TYPE_UINT8:
+            _data_format        = VX_TYPE_INT16;
+            _fixed_point_pos    = LSTM_FC_OUTPUT_ASYM_U8_FL;
+             break;
+         default:
+             break;
+         }
+     }
+     break;
+     case VX_QUANT_AFFINE_SCALE:
+     default:
+         _fixed_point_pos = 0;
+         break;
+     }
+
+    tensor = _createTensor(graph, is_virtual, num_of_dims, sizes, _data_format, _quant_format, _fixed_point_pos, _scale, _zeroPoint);
+     return tensor;
+ }
+
 extern vx_status vxnneExecuteSWLstmPreProcessConcat(vx_tensor* inputs, vx_uint32 input_num, vx_tensor output);
 extern vx_status vxnneExecuteSWHiddenUnitOut_LSTMLayer(struct _vxnne_operation_s *operation);
 extern vx_status vxnneOperation_AddReference(
@@ -220,21 +346,7 @@ VX_PRIVATE_API vx_bool _IsSameType(
     vx_tensor dst
     )
 {
-    vx_bool result = vx_false_e;
-
-    result = _IsSameDataType(src, dst);
-
-    if (result)
-    {
-        if (TENSOR_DATA_TYPE(src) != VX_TYPE_FLOAT16 &&
-            TENSOR_DATA_TYPE(src) != VX_TYPE_FLOAT32 &&
-            !_IsSameQuantType(src, dst))
-        {
-            result = vx_false_e;
-        }
-    }
-
-    return result;
+    return (_IsSameDataType(src, dst) && _IsSameQuantType(src, dst));
 }
 
 vx_status vxoLSTMLayer_Create(
@@ -346,6 +458,8 @@ vx_status vxoLSTMLayer_Initialize(
     vxnne_lstm_hidden_unit hidden_units = VX_NULL;
     vxnne_layer layer = &lstm_layer->base;
     vx_uint32 op_num = time_steps * 4 + 3;
+
+    vx_enum force_format = (TENSOR_DATA_TYPE(inputs) == VX_TYPE_UINT8) ?VX_TYPE_INT16:FORCE_INTERNAL_FORMAT;
 
     if (input_dim_num < 3 || output_dim_num < 3)
     {
@@ -469,6 +583,8 @@ vx_status vxoLSTMLayer_Initialize(
     sizes[1] = batch * time_steps;
     dim_num = 2;
 
+#if !NEW_CREATE_API
+
     vxZeroMemory(&tensor_params, gcmSIZEOF(vx_tensor_create_params_t));
     tensor_params.num_of_dims = dim_num;
     tensor_params.sizes = sizes;
@@ -476,6 +592,19 @@ vx_status vxoLSTMLayer_Initialize(
     tensor_params.quant_format = VX_QUANT_NONE;
 
     input_fc_output = vxoTensor_CreateTensor(context, node->graph, &tensor_params, vx_true_e);
+#else
+    input_fc_output = _createInteranlTensor(node->graph,
+                                            force_format,
+                                            vx_true_e,
+                                            dim_num,
+                                            sizes,
+                                            TENSOR_DATA_TYPE(inputs),
+                                            TENSOR_QUANT_TYPE(inputs),
+                                            TENSOR_POS(bias),
+                                            TENSOR_TF_SCALE(bias),
+                                            TENSOR_TF_ZEROPOINT(bias));
+#endif
+
     layer->temp_tensors[layer->num_temp_tensors++] = input_fc_output;
 
     vxmONERROR(_ReshapeLSTMTensor4FC(inputs, &input_fc_input));
@@ -548,12 +677,26 @@ vx_status vxoLSTMLayer_Initialize(
 
     /* Use high precision (FP16) intermediate tensor. */
     vxZeroMemory(&tensor_params, gcmSIZEOF(vx_tensor_create_params_t));
+
+#if !NEW_CREATE_API
     tensor_params.num_of_dims = dim_num;
     tensor_params.sizes = sizes;
     tensor_params.data_format = VX_TYPE_FLOAT16;
     tensor_params.quant_format = VX_QUANT_NONE;
 
     recurrent_fc_output = vxoTensor_CreateTensor(context, node->graph, &tensor_params, vx_true_e);
+#else
+    recurrent_fc_output = _createInteranlTensor(node->graph,
+                                                force_format,
+                                                vx_true_e,
+                                                dim_num,
+                                                sizes,
+                                                TENSOR_DATA_TYPE(outputs),
+                                                TENSOR_QUANT_TYPE(outputs),
+                                                TENSOR_POS(bias),
+                                                TENSOR_TF_SCALE(bias),
+                                                TENSOR_TF_ZEROPOINT(bias));
+#endif
 
     layer->temp_tensors[layer->num_temp_tensors++] = recurrent_fc_output;
 
@@ -626,10 +769,22 @@ vx_status vxoLSTMLayer_Initialize(
                                                                                 output_sub_tensors[0],
                                                                                 NULL, NULL, NULL);
         }
-        else
+        else if (TENSOR_DATA_TYPE(input_fc_sub_tensors[0]) == VX_TYPE_FLOAT16)
         {
             shaderExecutable = vxnneGetLSTMUnitHiddenOutExtShaderExecutable(context,
                                                                          VXNNE_KERNEL_TENSOR_LSTMUNIT_HIDDENOUT_EXT,
+                                                                         &node->kernelAttributes.borderMode,
+                                                                         vx_false_e,
+                                                                         input_fc_sub_tensors[0],
+                                                                         forget_biases_value,
+                                                                         cell_state,
+                                                                         output_sub_tensors[0],
+                                                                         NULL, NULL, NULL);
+        }
+        else
+        {
+            shaderExecutable = vxnneGetLSTMUnitHiddenOutShaderExecutable(context,
+                                                                         VXNNE_KERNEL_TENSOR_LSTMUNIT_HIDDENOUT,
                                                                          &node->kernelAttributes.borderMode,
                                                                          vx_false_e,
                                                                          input_fc_sub_tensors[0],
@@ -885,10 +1040,24 @@ vx_status vxoLSTMLayer_Initialize(
                                                                                     NULL,
                                                                                     hidden_sub_tensors[i]);
             }
-            else
+            else if (TENSOR_DATA_TYPE(input_fc_sub_tensors[i]) == VX_TYPE_FLOAT16)
             {
                 shaderExecutable = vxnneGetLSTMUnitHiddenOutExtShaderExecutable(context,
                                                                              VXNNE_KERNEL_TENSOR_LSTMUNIT_HIDDENOUT_EXT,
+                                                                             &node->kernelAttributes.borderMode,
+                                                                             vx_false_e,
+                                                                             input_fc_sub_tensors[i],
+                                                                             forget_biases_value,
+                                                                             cell_state,
+                                                                             output_sub_tensors[i],
+                                                                             NULL,
+                                                                             NULL,
+                                                                             hidden_sub_tensors[i]);
+            }
+            else
+            {
+                shaderExecutable = vxnneGetLSTMUnitHiddenOutShaderExecutable(context,
+                                                                             VXNNE_KERNEL_TENSOR_LSTMUNIT_HIDDENOUT,
                                                                              &node->kernelAttributes.borderMode,
                                                                              vx_false_e,
                                                                              input_fc_sub_tensors[i],

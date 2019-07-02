@@ -2132,6 +2132,12 @@ typedef struct _vxnne_lstm_unit_sw_operation_s
     vx_tensor                        cell2forget_weight;                  /*!< \brief Optional */
     vx_tensor                        cell2output_weight;                  /*!< \brief Optional */
 
+    /* Layer norm weight tensors of size: {n_cell}*/
+    vx_tensor                        layernorm2input_weight;              /*!< \brief Optional */
+    vx_tensor                        layernorm2forget_weight;             /*!< \brief  */
+    vx_tensor                        layernorm2cell_weight;               /*!< \brief  */
+    vx_tensor                        layernorm2output_weight;             /*!< \brief  */
+
     /* Gates bias tensors of size: {n_cell}*/
     vx_tensor                        input_gate_bias;                     /*!< \brief Optional */
     vx_tensor                        forget_gate_bias;                    /*!< \brief  */
@@ -2188,7 +2194,14 @@ typedef struct _vxnne_fc_operation_s {
     vxnne_tp_operation_s aux_tp_operation;
     vxnne_tp_operation_s copy_tp_operation;
     vxnne_tensor_copy_sw_operation_s copy_sw_operation;
+
+    vxnne_tp_operation_s nn_trans_tp_operation[2];                /* transpose tp operation for NN FC */
+    vxnne_shader_operation_s nn_trans_sh_operation[2];            /* transpose sh operation for NN FC */
+    vxnne_tensor_trans_operation_s nn_trans_sw_operation[2];      /* transpose sh operation for NN FC */
+
     vxnne_convolution_relu_pooling_operation_s nn_operation;
+    vxnne_convolution_operation_s nn_operation_sw;                /* NN fc sw operation */
+
     vxnne_shader_operation_s sh_operation;
     vxnne_fully_connected_sw_operation_s sw_operation;
     vx_weights_biases_parameter weights_biases;

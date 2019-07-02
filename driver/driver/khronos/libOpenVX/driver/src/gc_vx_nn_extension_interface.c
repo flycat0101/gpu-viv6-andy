@@ -11428,7 +11428,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_ValidateOutput(vx_node nod
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxnneExecuteSWTensorTranspose(struct _vxnne_operation_s *operation)
+vx_status vxnneExecuteSWTensorTranspose(struct _vxnne_operation_s *operation)
 {
     vxnne_tensor_trans_operation transOperation = (vxnne_tensor_trans_operation)operation;
 

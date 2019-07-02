@@ -3005,7 +3005,7 @@ vxoTensor_GetTensorWholeElementCount(
         vx_uint32 dim_count = TENSOR_ORIG_DIM_NUM(tensor);
 
         if (tensor->tensorBuffer->memory.strides[0][dim_count] > 0)
-            elementCount = tensor->tensorBuffer->memory.strides[0][dim_count];
+            elementCount = tensor->tensorBuffer->memory.strides[0][dim_count]/tensor->tensorBuffer->memory.strides[0][0];
         else
         {
             vx_uint32 index;
