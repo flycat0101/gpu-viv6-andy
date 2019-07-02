@@ -10451,7 +10451,7 @@ VkResult halti5_setMultiGpuSync(
  ~0U : (~(~0U << ((1 ? 27:24) - (0 ? 27:24) + 1))))))) << (0 ? 27:24)))
             );
 
-        gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", ChipIDs[1]);
+        gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", coreIDs[1]);
 
         /* Stall core0 at a semaphore token from core1 */
         *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -10516,7 +10516,7 @@ VkResult halti5_setMultiGpuSync(
  27:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 27:24) - (0 ? 27:24) + 1))))))) << (0 ? 27:24)));
 
-        gcmDUMP(gcvNULL, "#[chip.stall 0x%04X]", ChipIDs[0]);
+        gcmDUMP(gcvNULL, "#[chip.stall 0x%04X]", coreIDs[0]);
 
         for (coreIdx = 1; coreIdx < coreCount - 1; coreIdx++)
         {
@@ -10548,7 +10548,7 @@ VkResult halti5_setMultiGpuSync(
  ~0U : (~(~0U << ((1 ?
  23:20) - (0 ?
  23:20) + 1))))))) << (0 ?
- 23:20))) | (((gctUINT32) ((gctUINT32) (coreIDs[coreIdx-1]) & ((gctUINT32) ((((1 ?
+ 23:20))) | (((gctUINT32) ((gctUINT32) (coreIDs[coreIdx - 1]) & ((gctUINT32) ((((1 ?
  23:20) - (0 ?
  23:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 23:20) - (0 ? 23:20) + 1))))))) << (0 ? 23:20)))
@@ -10583,7 +10583,7 @@ VkResult halti5_setMultiGpuSync(
  27:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 27:24) - (0 ? 27:24) + 1))))))) << (0 ? 27:24)));
 
-            gcmDUMP(gcvNULL, "#[chip.stall 0x%04X]", ChipIDs[coreIdx]);
+            gcmDUMP(gcvNULL, "#[chip.stall 0x%04X]", coreIDs[coreIdx]);
 
             /* Send a semaphore token from corei to corei+1. */
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E02, VK_FALSE,
@@ -10633,13 +10633,13 @@ VkResult halti5_setMultiGpuSync(
  ~0U : (~(~0U << ((1 ?
  27:24) - (0 ?
  27:24) + 1))))))) << (0 ?
- 27:24))) | (((gctUINT32) ((gctUINT32) (coreIDs[coreIdx+1]) & ((gctUINT32) ((((1 ?
+ 27:24))) | (((gctUINT32) ((gctUINT32) (coreIDs[coreIdx + 1]) & ((gctUINT32) ((((1 ?
  27:24) - (0 ?
  27:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 27:24) - (0 ? 27:24) + 1))))))) << (0 ? 27:24)))
                 );
 
-            gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", ChipIDs[coreIdx+1]);
+            gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", coreIDs[coreIdx + 1]);
 
             /* Stall corei at a semaphore token from corei+1 */
             *pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -10669,7 +10669,7 @@ VkResult halti5_setMultiGpuSync(
  ~0U : (~(~0U << ((1 ?
  23:20) - (0 ?
  23:20) + 1))))))) << (0 ?
- 23:20))) | (((gctUINT32) ((gctUINT32) (coreIDs[coreIdx+1]) & ((gctUINT32) ((((1 ?
+ 23:20))) | (((gctUINT32) ((gctUINT32) (coreIDs[coreIdx + 1]) & ((gctUINT32) ((((1 ?
  23:20) - (0 ?
  23:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 23:20) - (0 ? 23:20) + 1))))))) << (0 ? 23:20)))
@@ -10754,13 +10754,13 @@ VkResult halti5_setMultiGpuSync(
  ~0U : (~(~0U << ((1 ?
  27:24) - (0 ?
  27:24) + 1))))))) << (0 ?
- 27:24))) | (((gctUINT32) ((gctUINT32) (coreIDs[coreIdx-1]) & ((gctUINT32) ((((1 ?
+ 27:24))) | (((gctUINT32) ((gctUINT32) (coreIDs[coreIdx - 1]) & ((gctUINT32) ((((1 ?
  27:24) - (0 ?
  27:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 27:24) - (0 ? 27:24) + 1))))))) << (0 ? 27:24)))
                 );
 
-            gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", coreIDs[coreIdx-1]);
+            gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", coreIDs[coreIdx - 1]);
 
         }
 
@@ -10822,12 +10822,12 @@ VkResult halti5_setMultiGpuSync(
  ~0U : (~(~0U << ((1 ?
  27:24) - (0 ?
  27:24) + 1))))))) << (0 ?
- 27:24))) | (((gctUINT32) ((gctUINT32) (coreIDs[coreCount -1]) & ((gctUINT32) ((((1 ?
+ 27:24))) | (((gctUINT32) ((gctUINT32) (coreIDs[coreCount - 1]) & ((gctUINT32) ((((1 ?
  27:24) - (0 ?
  27:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 27:24) - (0 ? 27:24) + 1))))))) << (0 ? 27:24)));
 
-        gcmDUMP(gcvNULL, "#[chip.stall 0x%04X]", ChipIDs[GPUCount - 1]);
+        gcmDUMP(gcvNULL, "#[chip.stall 0x%04X]", coreIDs[GPUCount - 1]);
 
         /* Send a semaphore token from last core to pre core. */
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E02, VK_FALSE,
@@ -10847,7 +10847,7 @@ VkResult halti5_setMultiGpuSync(
  ~0U : (~(~0U << ((1 ?
  23:20) - (0 ?
  23:20) + 1))))))) << (0 ?
- 23:20))) | (((gctUINT32) ((gctUINT32) (coreIDs[coreCount -1]) & ((gctUINT32) ((((1 ?
+ 23:20))) | (((gctUINT32) ((gctUINT32) (coreIDs[coreCount - 1]) & ((gctUINT32) ((((1 ?
  23:20) - (0 ?
  23:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 23:20) - (0 ? 23:20) + 1))))))) << (0 ? 23:20)))
