@@ -1009,7 +1009,7 @@ static VkResult __vki_CreateSurfNode(
 
     node->u.normal.node = iface.u.AllocateLinearVideoMemory.node;
     node->pool          = iface.u.AllocateLinearVideoMemory.pool;
-    node->size          = iface.u.AllocateLinearVideoMemory.bytes;
+    node->size          = (gctSIZE_T)iface.u.AllocateLinearVideoMemory.bytes;
 
     node->physical2     = ~0U;
     node->physical3     = ~0U;
