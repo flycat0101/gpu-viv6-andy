@@ -2201,6 +2201,7 @@ typedef struct _vx_weights_biases_slice_s
     vx_size                                  kernel_stream_size;
     vx_size                                  kernel_align_stream_size;
     vx_size                                  kernel_stream_full_cache_size;
+    vx_size                                  kernel_max_stream_size_percore;
 
     vx_uint32                                non_zero_count;
     vx_uint32                                reserve_weight_count;
