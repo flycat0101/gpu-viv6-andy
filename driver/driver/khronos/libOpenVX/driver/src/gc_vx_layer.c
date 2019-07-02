@@ -20877,6 +20877,50 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "biasFlg", 1, &biasFlg);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "input_depth", 1, &input_depth);
     }
+    else if(inputFormat == VX_TYPE_INT16)
+    {
+        vx_uint32 widthIter = kernel_width / 8;
+        vx_uint32 widthRes = kernel_width % 8;
+
+        vx_uint32 uniI16MulAccumtoI32_16x1[16] = {
+            0x00005555, // TCfg
+            0x00000000, // ASelt
+            0x76543210, 0x00000000, // ABin
+            0x00005555, // BSelt
+            0x76543210, 0x00000000, // BBin
+            0x00000600, // AccumType, ConstantType, and PostShift
+            0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+        };
+        vx_uint32 uniI16MulAccumNtoI32_16x1[16] = {
+            0x00005555, // TCfg
+            0x00000000, // ASelt
+            0x76543210, 0x00000000, // ABin
+            0x00005555, // BSelt
+            0x76543210, 0x00000000, // BBin
+            0x00000600, // AccumType, ConstantType, and PostShift
+            0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+        };
+
+        vx_uint32 uniConfigMulAccN[8] = {0x00005555, 0x00000001, 0x00000005 ,0x00000015, 0x00000055, 0x00000155, 0x00000555, 0x00001555};
+        vx_uint32 uniConfigMulAccPosiN[8] = {0x76543210, 0x00000000, 0x00000010, 0x00000210 ,0x00003210, 0x00043210, 0x00543210, 0x06543210};
+        uniI16MulAccumNtoI32_16x1[0] = uniConfigMulAccN[widthRes];
+        uniI16MulAccumNtoI32_16x1[4] = uniConfigMulAccN[widthRes];
+        uniI16MulAccumNtoI32_16x1[2] = uniConfigMulAccPosiN[widthRes];
+        uniI16MulAccumNtoI32_16x1[5] = uniConfigMulAccPosiN[widthRes];
+
+        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_i16i16", borderMode);
+        if (!shaderExecutable) goto OnError;
+
+        status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniI16MulAccumtoI32_16x1", 1, uniI16MulAccumtoI32_16x1);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniI16MulAccumNtoI32_16x1", 1, uniI16MulAccumNtoI32_16x1);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inWtScale", 1, &inWtScale);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "biasScale", 1, &bias_scale);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outScale", 1, &out_scale);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "widthIter", 1, &widthIter);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "widthRes", 1, &widthRes);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "biasFlg", 1, &biasFlg);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "input_depth", 1, &input_depth);
+    }
 
     status = vxnneShaderExecutable_GetMaxWorkGroupSize(shaderExecutable, &maxWorkGroupSize);
     if (status != VX_SUCCESS) goto OnError;
