@@ -3681,7 +3681,7 @@ static VSC_ErrCode _FindInstsToVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectori
                                                    VIR_Shader* pShader,
                                                    VIR_BASIC_BLOCK* pBasicBlock,
                                                    VSC_SIMPLE_RESIZABLE_ARRAY* pInstArray,
-                                                   gctUINT seedInstIndex,
+                                                   gctUINT* pSeedInstIndex,
                                                    VIR_DEF_USAGE_INFO* pDuInfo,
                                                    VIR_OPND_VECTORIZE_CALLBACKS* pOvCallbacks,
                                                    VSC_MM* pMM)
@@ -3690,11 +3690,16 @@ static VSC_ErrCode _FindInstsToVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectori
     VIR_Instruction*           pSeedInst;
     VIR_Instruction*           pInst;
     gctBOOL                    bVectorizeSucc;
-    gctUINT                    i;
+    gctUINT                    i, seedInstIndex = 0;
     VIR_OPND_VECTORIZE_MODE    ovMode;
     VIR_OPND_VECTORIZED_INFO   opndVectorizedInfoArray[VIR_MAX_SRC_NUM + 1]; /* dst + srcs, index 0 is dst, and other indices are srcs */
 
     memset(opndVectorizedInfoArray, 0, sizeof(VIR_OPND_VECTORIZED_INFO)*(VIR_MAX_SRC_NUM + 1));
+
+    if (pSeedInstIndex)
+    {
+        seedInstIndex = *pSeedInstIndex;
+    }
 
     /* Get the seed inst. */
     pSeedInst = *(VIR_Instruction**)vscSRARR_GetElement(pInstArray, seedInstIndex);
@@ -3730,6 +3735,7 @@ static VSC_ErrCode _FindInstsToVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectori
                 {
                     vscSRARR_AddElementToSpecifiedIndex(pInstArray, &pSeedInst, i);
                     vscSRARR_RemoveElementByIndex(pInstArray, seedInstIndex);
+                    seedInstIndex = i - 1;
                 }
             }
             else
@@ -3750,6 +3756,11 @@ OnError:
         {
             vscMM_Free(pMM, opndVectorizedInfoArray[i].vectorizedInfo.ppVectorizedVirRegArray);
         }
+    }
+
+    if (pSeedInstIndex)
+    {
+        *pSeedInstIndex = seedInstIndex;
     }
 
     return errCode;
@@ -3856,7 +3867,7 @@ static VSC_ErrCode _DoVectorizationOnBasicBlock(VIR_VECTORIZER_INFO* pVectorizer
             {
                 /* Try to find all vectorization possibilities of inst-array. */
                 errCode = _FindInstsToVectorizeToSeedInst(pVectorizerInfo, pShader, pBasicBlock,
-                                                          pInstArray, k, pDuInfo, pOvCallbacks, pMM);
+                                                          pInstArray, &k, pDuInfo, pOvCallbacks, pMM);
                 ON_ERROR(errCode, "Find Insts to vectorize to seed inst");
             }
         }
