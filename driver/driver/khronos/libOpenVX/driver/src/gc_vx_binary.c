@@ -29,6 +29,12 @@
 #define LOAD_WHOLE_BINARY_TO_BUFFER  0
 #define _GC_OBJ_ZONE            gcdZONE_VX_BINARY
 
+extern vx_status vxnneOperation_AddReference(
+    vxnne_operation_s*            operation,
+    vx_reference                  reference,
+    vxnne_operation_reference_e   refType
+    );
+
 static void openReader(
     vx_binary_reader_s *reader,
     void *data,
@@ -2341,6 +2347,111 @@ OnError:
     return status;
 }
 
+VX_PRIVATE_API vx_status vxnneImportKernelOperation_Execute(
+    vxnne_operation operation
+    )
+{
+    vx_node node = operation->layer->node;
+    vx_status status = VX_SUCCESS;
+
+    gcmHEADER_ARG("operation=%p", operation);
+
+    if (node->kernel->function)
+    {
+        vxmONERROR(node->kernel->function(node,
+                                          node->paramTable,
+                                          node->kernel->signature.paramCount));
+    }
+
+OnError:
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+VX_INTERNAL_API vx_status vxoGraphBinary_WrapNBGKernel(
+    vx_node node,
+    vx_binary_loader_s *binLoad
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint32 i = 0;
+    vx_uint32 operationIndex = 0;
+    vxnne_nbg_layer NBGLayer = VX_NULL;
+
+    gcmHEADER_ARG("node=%p, binLoad=%p", node, binLoad);
+    if ((node == VX_NULL) || (binLoad == VX_NULL))
+    {
+        vxError("node or binLoad is NULL, in deinitialize memory\n");
+        vxmONERROR(VX_ERROR_NOT_ALLOCATED);
+    }
+
+    /* destroy the existing layer */
+    if (node->layer)
+    {
+        vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
+    }
+
+    NBGLayer = (vxnne_nbg_layer)vxAllocateAndZeroMemory(gcmSIZEOF(vxnne_nbg_layer_s));
+    if (NBGLayer == VX_NULL)
+    {
+        vxError("fail to allocate memory for import kernel layer\n");
+        vxmONERROR(VX_ERROR_INVALID_VALUE);
+    }
+
+    vxnneLayer_Initialize(&NBGLayer->base,
+                          "network_binary_graph",
+                          node,
+                          gcmCOUNTOF(NBGLayer->operations),
+                          NBGLayer->operations,
+                          VX_NULL);
+
+    vxmONERROR(vxnneOperation_Initialize(&NBGLayer->NBGOperation.base,
+                                         &NBGLayer->base,
+                                         VXNNE_OPERATION_TARGET_SW,
+                                         VXNNE_OPERATOR_NBG,
+                                         vxnneImportKernelOperation_Execute,
+                                         VX_NULL,
+                                         1,
+                                         0));
+
+     for (i = 0; i < node->kernel->signature.paramCount; i++)
+     {
+         if (node->kernel->signature.directionTable[i] == VX_INPUT &&
+             (node->kernel->signature.isStaticTable[i] == vx_false_e ||
+              (node->kernel->signature.dataTypeTable[i] == VX_TYPE_TENSOR &&
+               TENSOR_DATA_LIFETIME((vx_tensor)(node->paramTable[i])) == VX_TENSOR_LIFE_TIME_DYNAMIC)))
+         {
+             vxnneOperation_AddReference(&NBGLayer->NBGOperation.base,
+                                         node->paramTable[i], VXNNE_OPERATION_REFENRENCE_INPUT);
+         }
+         else if (node->kernel->signature.directionTable[i] == VX_OUTPUT)
+         {
+             vxnneOperation_AddReference(&NBGLayer->NBGOperation.base,
+                                        node->paramTable[i], VXNNE_OPERATION_REFENRENCE_OUTPUT);
+         }
+     }
+
+     vxnneLayer_SetOperation(&NBGLayer->base,
+                             &NBGLayer->NBGOperation.base,
+                             operationIndex++);
+
+     node->layer = &NBGLayer->base;
+     gcmFOOTER_ARG("%d", status);
+
+     return VX_SUCCESS;
+
+OnError:
+    vxError("fail to initial memory in generate states buffer\n");
+    if (NBGLayer)
+    {
+        gcoOS_Free(gcvNULL, NBGLayer);
+        NBGLayer = VX_NULL;
+    }
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
 VX_INTERNAL_API vx_status vxoGraphBinary_GenerateStatesBuffer(
     vx_node node,
     vx_binary_loader_s *binLoad
@@ -2486,6 +2597,12 @@ VX_INTERNAL_API vx_status vxoGraphBinary_ReleaseStatesBuffer(
     {
         gcmONERROR(gcoVX_FreeMemory(node->binLoadMem->pool.nodePtr));
         node->binLoadMem->pool.nodePtr= VX_NULL;
+    }
+
+    if (node->layer)
+    {
+        vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
 OnError:
@@ -7739,7 +7856,7 @@ VX_INTERNAL_API void vxoGraphBinary_CacheOrImport(
     gceSTATUS mcfeEnabled = (gcvSTATUS_TRUE == gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MCFE));
     gcmHEADER_ARG("graph=%p", graph);
 
-    /* get env for nn pai path */
+    /* get env for nn api path */
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_CACHE_GRAPH_BINARY", &envctrl)) && envctrl)
     {
         context->options.enableCacheGraphBinary = atoi(envctrl);

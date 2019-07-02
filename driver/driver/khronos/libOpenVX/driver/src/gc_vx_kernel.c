@@ -5926,6 +5926,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoImportKernelFromFile_Initializer(vx_node
 
     /* use loading data to generate states buffer for nn/tp/sh */
     vxmONERROR(vxoGraphBinary_GenerateStatesBuffer(node, binaryLoad));
+
+    vxmONERROR(vxoGraphBinary_WrapNBGKernel(node, binaryLoad));
+
     gcmFOOTER_ARG("%d", status);
     return status;
 

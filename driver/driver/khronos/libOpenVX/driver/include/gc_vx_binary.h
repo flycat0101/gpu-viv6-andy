@@ -427,6 +427,20 @@ typedef struct _vx_binary_fixed
     vx_binary_entry_s                       patchDataTable;
 } vx_binary_fixed_s;
 
+typedef struct _vxnne_nbg_operation_s
+{
+    vxnne_operation_s base;
+}
+vxnne_nbg_operation_s, *vxnne_nbg_operation;
+
+typedef struct _vxnne_nbg_layer_s
+{
+    vxnne_layer_s                            base;
+    vxnne_operation                          operations[1];
+    vxnne_nbg_operation_s                    NBGOperation;
+}
+vxnne_nbg_layer_s, *vxnne_nbg_layer;
+
 typedef struct _vx_binary_loader
 {
     vx_kernel                               kernel;
@@ -478,6 +492,11 @@ typedef struct _vx_binary_reader
 } vx_binary_reader_s;
 
 /* graph binary functions */
+VX_INTERNAL_API vx_status vxoGraphBinary_WrapNBGKernel(
+    vx_node node,
+    vx_binary_loader_s *binLoad
+    );
+
 VX_INTERNAL_API vx_enum vxoGraphBinary_ConvertToOVXDataType(
     vx_enum dataType
     );
