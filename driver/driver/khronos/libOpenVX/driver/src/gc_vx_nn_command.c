@@ -184,7 +184,7 @@ VX_PRIVATE_API void _checkSramOverflow(
 
     printf("maxSizeOfCore %d\n", maxSizeOfCore);
 
-    for (i = 0; i != info->vx_nn_general_cmd_info.kernelPatternMsb+1; i++)
+    for (i = 0; i != (info->vx_nn_general_cmd_info.kernelPatternMsb+1); i++)
     {
         oneNumOfPattern += (kernelFullPattern >> i) & 1;
     }
@@ -197,7 +197,7 @@ VX_PRIVATE_API void _checkSramOverflow(
     sramDataUnitNum1Core = patternLoopCount * oneNumOfPattern;
     dataUnitLastLoop    = dataUnitNum - patternLoopCount * (info->vx_nn_general_cmd_info.kernelPatternMsb + 1);
 
-    for (i = 0; i != info->vx_nn_general_cmd_info.kernelPatternMsb+1, dataUnitLastLoop != 0; i++)
+    for (i = 0; i != (info->vx_nn_general_cmd_info.kernelPatternMsb+1), dataUnitLastLoop != 0; i++)
     {
         dataUnitLastLoop--;
         if ((kernelFullPattern >> i) & 1)
@@ -209,7 +209,11 @@ VX_PRIVATE_API void _checkSramOverflow(
     sramDataUnitNum1Core += sramDataUnitNumLastLoop;
 
     cacheSizeNeeded = sramDataUnitNum1Core * dataUnitByte * decoderWorkNum;
-    vxmASSERT(cacheSizeAllocated >= cacheSizeNeeded);
+
+    if (cacheSizeAllocated < cacheSizeNeeded)
+    {
+        vxmASSERT(0);
+    }
 }
 
 VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNSplitCommandInfo(
