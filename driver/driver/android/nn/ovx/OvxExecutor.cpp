@@ -1260,7 +1260,10 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
         case OperationType::LSTM:
             {
             vx_int32 index = 0;
-            vx_nn_lstm_params_t params;
+            vx_nn_lstm_params_ext_t params;
+
+            memset(&params, 0, sizeof(vx_nn_lstm_params_ext_t));
+            vx_bool enable_layernorm = ins.size() > 23 ? vx_true_e: vx_false_e;
 
             index = 0;
             vx_tensor input = (vx_tensor)mReferenceInfos[ins[0]].ref;
@@ -1282,54 +1285,64 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
             convertScalar2Tensor(&mReferenceInfos[ins[22]]);
 
             /* 1 ~ 4 */
-            params.input2input_weight = (mReferenceInfos[ins[1]].lifetime != OperandLifeTime::NO_VALUE) ? (vx_tensor)mReferenceInfos[ins[1]].ref : nullptr;
+            params.base.input2input_weight = (mReferenceInfos[ins[1]].lifetime != OperandLifeTime::NO_VALUE) ? (vx_tensor)mReferenceInfos[ins[1]].ref : nullptr;
             index ++;
-            params.input2forget_weight = (vx_tensor)mReferenceInfos[ins[2]].ref;
-            params.input2cell_weight = (vx_tensor)mReferenceInfos[ins[3]].ref;
-            params.input2output_weight = (vx_tensor)mReferenceInfos[ins[4]].ref;
+            params.base.input2forget_weight = (vx_tensor)mReferenceInfos[ins[2]].ref;
+            params.base.input2cell_weight = (vx_tensor)mReferenceInfos[ins[3]].ref;
+            params.base.input2output_weight = (vx_tensor)mReferenceInfos[ins[4]].ref;
 
             /* 5 ~ 8 */
-            params.recurrent2input_weight = (vx_tensor)mReferenceInfos[ins[5]].ref;
-            params.recurrent2forget_weight = (vx_tensor)mReferenceInfos[ins[6]].ref;
-            params.recurrent2cell_weight = (vx_tensor)mReferenceInfos[ins[7]].ref;
-            params.recurrent2output_weight = (vx_tensor)mReferenceInfos[ins[8]].ref;
+            params.base.recurrent2input_weight = (vx_tensor)mReferenceInfos[ins[5]].ref;
+            params.base.recurrent2forget_weight = (vx_tensor)mReferenceInfos[ins[6]].ref;
+            params.base.recurrent2cell_weight = (vx_tensor)mReferenceInfos[ins[7]].ref;
+            params.base.recurrent2output_weight = (vx_tensor)mReferenceInfos[ins[8]].ref;
 
             /* 9 ~ 11 */
-            params.cell2input_weight = (sizeOfData(mReferenceInfos[ins[9]].type, mReferenceInfos[ins[9]].dimensions) > 0) ? (vx_tensor)mReferenceInfos[ins[9]].ref : nullptr;
+            params.base.cell2input_weight = (sizeOfData(mReferenceInfos[ins[9]].type, mReferenceInfos[ins[9]].dimensions) > 0) ? (vx_tensor)mReferenceInfos[ins[9]].ref : nullptr;
             index++;
-            params.cell2forget_weight = (sizeOfData(mReferenceInfos[ins[10]].type, mReferenceInfos[ins[10]].dimensions) > 0) ? (vx_tensor)mReferenceInfos[ins[10]].ref : nullptr;
+            params.base.cell2forget_weight = (sizeOfData(mReferenceInfos[ins[10]].type, mReferenceInfos[ins[10]].dimensions) > 0) ? (vx_tensor)mReferenceInfos[ins[10]].ref : nullptr;
             index++;
-            params.cell2output_weight = (sizeOfData(mReferenceInfos[ins[11]].type, mReferenceInfos[ins[11]].dimensions) > 0) ? (vx_tensor)mReferenceInfos[ins[11]].ref : nullptr;
+            params.base.cell2output_weight = (sizeOfData(mReferenceInfos[ins[11]].type, mReferenceInfos[ins[11]].dimensions) > 0) ? (vx_tensor)mReferenceInfos[ins[11]].ref : nullptr;
             index++;
 
             /* 12 ~ 15 */
-            params.input_gate_bias = (sizeOfData(mReferenceInfos[ins[12]].type, mReferenceInfos[ins[12]].dimensions) > 0) ? (vx_tensor)mReferenceInfos[ins[12]].ref : nullptr;
+            params.base.input_gate_bias = (sizeOfData(mReferenceInfos[ins[12]].type, mReferenceInfos[ins[12]].dimensions) > 0) ? (vx_tensor)mReferenceInfos[ins[12]].ref : nullptr;
             index++;
-            params.forget_gate_bias = (vx_tensor)mReferenceInfos[ins[13]].ref;
-            params.cell_bias = (vx_tensor)mReferenceInfos[ins[14]].ref;
-            params.output_gate_bias = (vx_tensor)mReferenceInfos[ins[15]].ref;
+            params.base.forget_gate_bias = (vx_tensor)mReferenceInfos[ins[13]].ref;
+            params.base.cell_bias = (vx_tensor)mReferenceInfos[ins[14]].ref;
+            params.base.output_gate_bias = (vx_tensor)mReferenceInfos[ins[15]].ref;
 
             /* 16 ~ 17 */
-            params.projection_weight = (sizeOfData(mReferenceInfos[ins[16]].type, mReferenceInfos[ins[16]].dimensions) > 0)  ? (vx_tensor)mReferenceInfos[ins[16]].ref : nullptr;
+            params.base.projection_weight = (sizeOfData(mReferenceInfos[ins[16]].type, mReferenceInfos[ins[16]].dimensions) > 0)  ? (vx_tensor)mReferenceInfos[ins[16]].ref : nullptr;
             index++;
-            params.projection_bias = (sizeOfData(mReferenceInfos[ins[17]].type, mReferenceInfos[ins[17]].dimensions) > 0)  ? (vx_tensor)mReferenceInfos[ins[17]].ref : nullptr;
+            params.base.projection_bias = (sizeOfData(mReferenceInfos[ins[17]].type, mReferenceInfos[ins[17]].dimensions) > 0)  ? (vx_tensor)mReferenceInfos[ins[17]].ref : nullptr;
             index++;
 
             /* 18 ~ 19 */
             const VxRunTimeReferenceInfo&  output_state_in = mReferenceInfos[ins[18]];
             const VxRunTimeReferenceInfo&  cell_state_in = mReferenceInfos[ins[19]];
             /* 20 ~ 22 */
-            params.activation = (sizeOfData(mReferenceInfos[ins[20]].type, mReferenceInfos[ins[20]].dimensions) > 0)  ? (vx_tensor)mReferenceInfos[ins[20]].ref : nullptr;
+            params.base.activation = (sizeOfData(mReferenceInfos[ins[20]].type, mReferenceInfos[ins[20]].dimensions) > 0)  ? (vx_tensor)mReferenceInfos[ins[20]].ref : nullptr;
             index++;
-            params.cell_clip = (sizeOfData(mReferenceInfos[ins[21]].type, mReferenceInfos[ins[21]].dimensions) > 0)  ? (vx_tensor)mReferenceInfos[ins[21]].ref : nullptr;
+            params.base.cell_clip = (sizeOfData(mReferenceInfos[ins[21]].type, mReferenceInfos[ins[21]].dimensions) > 0)  ? (vx_tensor)mReferenceInfos[ins[21]].ref : nullptr;
             index++;
-            params.proj_clip = params.projection_weight == nullptr ? nullptr:(vx_tensor)mReferenceInfos[ins[22]].ref;
+            params.base.proj_clip = params.base.projection_weight == nullptr ? nullptr:(vx_tensor)mReferenceInfos[ins[22]].ref;
 
-            if (params.input2input_weight == nullptr || (params.cell2input_weight == nullptr && params.cell2output_weight != nullptr))
+            if (enable_layernorm)
             {
-                params.input2input_weight = nullptr;
-                params.recurrent2input_weight = nullptr;
-                params.input_gate_bias = nullptr;
+                /* 23 ~ 26 */
+                params.layernorm2input_weight = (vx_tensor)mReferenceInfos[ins[23]].ref;
+                params.layernorm2forget_weight = (vx_tensor)mReferenceInfos[ins[24]].ref;
+                params.layernorm2cell_weight = (vx_tensor)mReferenceInfos[ins[25]].ref;
+                params.layernorm2output_weight = (vx_tensor)mReferenceInfos[ins[26]].ref;
+
+            }
+
+            if (params.base.input2input_weight == nullptr || (params.base.cell2input_weight == nullptr && params.base.cell2output_weight != nullptr))
+            {
+                params.base.input2input_weight = nullptr;
+                params.base.recurrent2input_weight = nullptr;
+                params.base.input_gate_bias = nullptr;
             }
 
              if (mGraph)
@@ -1338,8 +1351,8 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
                     input,
                     (vx_tensor)output_state_in.ref,
                     (vx_tensor)cell_state_in.ref,
-                    &params,
-                    sizeof(params),
+                    (vx_nn_lstm_params_t*)&params,
+                    (enable_layernorm?sizeof(vx_nn_lstm_params_ext_t):sizeof(vx_nn_lstm_params_t)),
                     (vx_tensor)mReferenceInfos[outs[0]].ref,
                     (vx_tensor)mReferenceInfos[outs[1]].ref,
                     (vx_tensor)mReferenceInfos[outs[2]].ref,
