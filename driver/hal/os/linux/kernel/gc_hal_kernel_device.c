@@ -1231,7 +1231,7 @@ _SetupContiguousVidMem(
 
     if (Args->showArgs)
     {
-        gcmkPRINT("Galcore Info: ContiguousBase=0x%llx ContiguousSize=0x%x\n", device->contiguousBase, (gctUINT32)device->contiguousSize);
+        gcmkPRINT("Galcore Info: ContiguousBase=0x%llx ContiguousSize=0x%zx\n", device->contiguousBase, device->contiguousSize);
     }
 
 OnError:
