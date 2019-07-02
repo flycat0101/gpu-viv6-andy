@@ -9616,7 +9616,14 @@ _PmSetPowerOffDirection(
         gcmkONERROR(_PmClockControl(Hardware, gcvPOWER_OFF));
 
         /* Power off, clock off. */
-        gcmkONERROR(_PmClockOff(Hardware, gcvFALSE));
+        if(_IsHardwareMatch(Hardware, gcv600, 0x4653))
+        {
+            gcmkONERROR(_PmClockOff(Hardware, gcvTRUE));
+        }
+        else
+        {
+            gcmkONERROR(_PmClockOff(Hardware, gcvFALSE));
+        }
         break;
 
     default:
