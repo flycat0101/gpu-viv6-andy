@@ -586,6 +586,7 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                     {
                         gcmASSERT(movSrcInfo.isImmVal);
                         VIR_Operand_SetSwizzle(newSrc, VIR_SWIZZLE_XXXX);
+                        VIR_Operand_SetTypeId(newSrc, VIR_GetTypeComponentType(VIR_Operand_GetTypeId(newSrc)));
                     }
 
                     /* Replace the source. */
