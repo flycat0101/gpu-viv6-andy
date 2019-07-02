@@ -5802,6 +5802,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer_Initializer(vx_node node, c
     vx_bool    useShadeExe                = vx_false_e;
     vx_bool    enable_format              = vx_false_e;
     vx_bool    enable_tf_quantize         = vx_false_e;
+    vx_bool    enable_float32             = vx_false_e;
     vx_uint32  batchCount                 = TENSOR_SIZE_INDEX(inputs, 3);
     vx_float32 beta                       = 1.0;
     vxnne_softmax_layer  softmaxLayer = VX_NULL;
@@ -5850,11 +5851,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer_Initializer(vx_node node, c
             goto exit;
     }
 
-    enable_format = (((inputFormat == VX_TYPE_INT8 ||  inputFormat == VX_TYPE_FLOAT16) && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32)) || (inputFormat == VX_TYPE_INT16 && (outputFormat == VX_TYPE_INT16 || outputFormat == VX_TYPE_FLOAT16))
+    enable_float32 = (vx_bool)(outputFormat == VX_TYPE_FLOAT32 && ((width % 4 == 0) || ((width * height < IMG_MAX_WIDTH) && ((width * height % 4 == 0) || dims < 3)) || dims == 1));
+    enable_format = (((inputFormat == VX_TYPE_INT8 ||  inputFormat == VX_TYPE_FLOAT16) && (outputFormat == VX_TYPE_FLOAT16 || enable_float32)) || (inputFormat == VX_TYPE_INT16 && (outputFormat == VX_TYPE_INT16 || outputFormat == VX_TYPE_FLOAT16))
                      || (inputFormat == VX_TYPE_INT8 &&  outputFormat == VX_TYPE_INT8));
-    enable_tf_quantize = ((inputFormat == VX_TYPE_UINT8) && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32 || outputFormat == VX_TYPE_UINT8));
+    enable_tf_quantize = ((inputFormat == VX_TYPE_UINT8) && (outputFormat == VX_TYPE_FLOAT16 || enable_float32 || outputFormat == VX_TYPE_UINT8));
     /* Current the SH layer only process 3D tensor*/
-    useShadeExe  = ((enable_format || enable_tf_quantize) && ((width * height < IMG_MAX_WIDTH) || (dims == 2 && width < IMG_MAX_WIDTH && height < IMG_MAX_WIDTH)));
+    useShadeExe  = (enable_format || enable_tf_quantize);
 
    if(useShadeExe && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
    {

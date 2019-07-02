@@ -10128,7 +10128,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
     vxnne_shader_executable shaderExecutable = VX_NULL;
     vxnne_kernel_shaders        kernel;
 
-    vx_kernel_execution_parameters_t execution_parameters = {2, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    vx_kernel_execution_parameters_t execution_parameters = {2, {0, 0, 0}, {1, 1, 1}, {0, 0, 0}, {0, 0, 0}};
     vx_reference parameters[2]     = {(vx_reference)input, (vx_reference)output};
     vx_enum      inputFormat       = TENSOR_DATA_TYPE(input);
     vx_enum      outputFormat      = TENSOR_DATA_TYPE(output);
@@ -10148,8 +10148,8 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
     vx_float32   scaleIn           = 1.0f;
     vx_uint32    inputWidth        = depth / 4 * 4;
     vx_uint32    inputWidthRemain4 = depth % 4;
-    vx_uint32    itemCount         = width * height;
-    vx_uint32    itemDepth         = depth;
+    vx_uint32    itemCount         = useImage2DFlag ? width * height : width;
+    vx_uint32    itemDepth         = useImage2DFlag ? depth : height;
     vx_int32     fp16_isFp16       = 0;
     vx_float32   logE              = (vx_float32)(log10(exp(1.0f)) / log10(2.0f));
     vx_int32     sizes[4]           = {itemCount, itemDepth, 1, batch};
@@ -10407,8 +10407,16 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
 
             if (outputFormat == VX_TYPE_FLOAT16)
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16toFp16_channel2", borderMode);
-                if (!shaderExecutable) goto OnError;
+                if (useImage2DFlag)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16toFp16_channel2_2D", borderMode);
+                    if (!shaderExecutable) goto OnError;
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16toFp16_channel2", borderMode);
+                    if (!shaderExecutable) goto OnError;
+                }
             }
 
             status   = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSubMax2FP32_Lo", 1, uniSubMax2FP32_Lo);
@@ -10419,7 +10427,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
 
         }
         execution_parameters.globalWorkScale[0]  = 8;
-        execution_parameters.globalWorkScale[1]  = 2;
+        execution_parameters.globalWorkScale[1]  = useImage2DFlag ? 2 : 1;
         execution_parameters.globalWorkSize[0]   = gcmALIGN((itemCount + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
         execution_parameters.globalWorkSize[1]   = (itemDepth + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
     }
@@ -10476,7 +10484,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
 
             if (outputFormat == VX_TYPE_INT8)
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Int8toInt8", borderMode);
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I8toI8", borderMode);
                 vxmONERROR_NULLPTR(shaderExecutable);
 
                 status = vxnneShaderExecutable_SetUniform(shaderExecutable, "output_Scale", 1, &scaleOut);
@@ -10743,21 +10751,33 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
 
         if (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16toFp16", borderMode);
+            if (useImage2DFlag)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16toFp16_2D", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16toFp16", borderMode);
             vxmONERROR_NULLPTR(shaderExecutable);
         }
-        if (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT32)
+        else if (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT32)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16toFp32", borderMode);
+            if (useImage2DFlag)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16toFp32_2D", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16toFp32", borderMode);
             vxmONERROR_NULLPTR(shaderExecutable);
         }
         else if (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Int8toFp16", borderMode);
+            if (useImage2DFlag)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Int8toFp16_2D", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Int8toFp16", borderMode);
             vxmONERROR_NULLPTR(shaderExecutable);
         }
         else if (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT32)
         {
+            if (useImage2DFlag)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Int8toFp32_2D", borderMode);
+            else
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Int8toFp32", borderMode);
             vxmONERROR_NULLPTR(shaderExecutable);
         }
@@ -10775,7 +10795,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
         execution_parameters.globalWorkScale[0]  = 8;
         execution_parameters.globalWorkScale[1]  = 1;
         execution_parameters.globalWorkSize[0]   = gcmALIGN((itemCount + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
-        execution_parameters.globalWorkSize[1]   = 1;
+        execution_parameters.globalWorkSize[1]   = useImage2DFlag ? 1 : height;
     }
     else if (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
     {
@@ -10808,7 +10828,10 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
             0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
         };
 
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Int8toInt8_2d", borderMode);
+        if (useImage2DFlag)
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Int8toInt8_2D", borderMode);
+        else
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Int8toInt8", borderMode);
         vxmONERROR_NULLPTR(shaderExecutable);
 
         status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniGetSubLoInt8toFp32_4x4", 1, uniGetSubLoInt8toFp32_4x4);
@@ -10823,7 +10846,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
         execution_parameters.globalWorkScale[0]  = 8;
         execution_parameters.globalWorkScale[1]  = 1;
         execution_parameters.globalWorkSize[0]   = gcmALIGN((itemCount + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
-        execution_parameters.globalWorkSize[1]   = 1;
+        execution_parameters.globalWorkSize[1]   = useImage2DFlag ? 1 : height;
     }
     else if (inputFormat == VX_TYPE_UINT8 && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32 || outputFormat == VX_TYPE_UINT8))
     {
@@ -10836,7 +10859,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
         vx_uint32 uniSubMaxLo_4x4[16] = {
             0x0b0b0b0b, // TCfg
             0x04040404, // ASelt
-            0x00010000, 0x00030002, // ABin
+            0x00110000, 0x00330022, // ABin
             0x08080808, // BSelt
             0x00000000, 0x00000000, // BBin
             0x00007400, // AccumType, ConstantType, and PostShift
@@ -10845,7 +10868,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
         vx_uint32 uniSubMaxHi_4x4[16] = {
             0x0b0b0b0b, // TCfg
             0x04040404, // ASelt
-            0x00050004, 0x00070006, // ABin
+            0x00550044, 0x00770066, // ABin
             0x08080808, // BSelt
             0x00000000, 0x00000000, // BBin
             0x00007700, // AccumType, ConstantType, and PostShift
@@ -10870,7 +10893,10 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
             0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
         };
 
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_UInt8_WxHxC", borderMode);
+        if (useImage2DFlag)
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_UInt8_WxHxC_2D", borderMode);
+        else
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_UInt8_WxHxC", borderMode);
         vxmONERROR_NULLPTR(shaderExecutable);
 
         status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSubMaxLo_4x4", 1, uniSubMaxLo_4x4);
@@ -10891,7 +10917,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
         execution_parameters.globalWorkScale[0]  = 8;
         execution_parameters.globalWorkScale[1]  = 1;
         execution_parameters.globalWorkSize[0]   = gcmALIGN((itemCount + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
-        execution_parameters.globalWorkSize[1]   = 1;
+        execution_parameters.globalWorkSize[1]   = useImage2DFlag ? 1 : height;
     }
     else if (inputFormat == VX_TYPE_INT16 && (outputFormat == VX_TYPE_INT16 || outputFormat == VX_TYPE_FLOAT16))
     {
@@ -10935,7 +10961,10 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
             0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00 // Constant
         };
 
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Int16to16Bits", borderMode);
+        if (useImage2DFlag)
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Int16to16Bits_2D", borderMode);
+        else
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Int16to16Bits", borderMode);
         vxmONERROR_NULLPTR(shaderExecutable);
 
         status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSubMaxLo_4x4", 1, uniSubMaxLo_4x4);
@@ -10952,7 +10981,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
         execution_parameters.globalWorkScale[0]  = 8;
         execution_parameters.globalWorkScale[1]  = 1;
         execution_parameters.globalWorkSize[0]   = gcmALIGN((itemCount + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
-        execution_parameters.globalWorkSize[1]   = 1;
+        execution_parameters.globalWorkSize[1]   = useImage2DFlag ? 1 : height;
     }
 
     vxmONERROR(vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 2));
