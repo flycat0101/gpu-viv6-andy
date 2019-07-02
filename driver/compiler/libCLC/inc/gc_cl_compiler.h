@@ -284,6 +284,12 @@ cloCOMPILER_SetCurrentFileName(
     IN gctSTRING Text
     );
 
+gceSTATUS
+cloCOMPILER_SetIsMainFile(
+    IN cloCOMPILER Compiler,
+    IN gctBOOL     isMainFile
+    );
+
 /* Get the current line no */
 gctUINT
 cloCOMPILER_GetCurrentLineNo(

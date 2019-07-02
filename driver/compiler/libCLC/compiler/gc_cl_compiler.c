@@ -3580,6 +3580,18 @@ IN gctUINT StringNo
     return gcvSTATUS_OK;
 }
 
+gceSTATUS
+cloCOMPILER_SetIsMainFile(
+IN cloCOMPILER Compiler,
+IN gctBOOL     isMainFile
+)
+{
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+    Compiler->context.mainFile = isMainFile;
+    return gcvSTATUS_OK;
+}
+
 gctUINT
 cloCOMPILER_GetCurrentLineNo(
 IN cloCOMPILER Compiler
@@ -4802,7 +4814,6 @@ IN clsNAME * Variable
                               parent,
                               Variable->symbol,
                               (Compiler->context.mainFile ? 0 : 1),
-                              /*Variable->fileNo,*/
                               Variable->lineNo,
                               Variable->lineNo,
                               Variable->stringNo

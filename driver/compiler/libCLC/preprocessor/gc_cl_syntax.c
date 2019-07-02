@@ -133,7 +133,7 @@ gceSTATUS
 ppoPREPROCESSOR_Group(ppoPREPROCESSOR PP,
                       ppeIFSECTION_TYPE    IfSectionType)
 {
-        ppoTOKEN                ntoken = gcvNULL;
+    ppoTOKEN                ntoken = gcvNULL;
     ppoTOKEN                ntoken2 = gcvNULL;
     gceSTATUS               status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
 

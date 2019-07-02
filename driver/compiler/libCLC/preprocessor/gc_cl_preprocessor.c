@@ -1473,6 +1473,15 @@ gceSTATUS    ppoPREPROCESSOR_Parse(cloPREPROCESSOR        PP,
                                         PP->outputTokenStreamHead->poolString);
         }
 
+        if (PP->outputTokenStreamHead->srcFileString == 0)
+        {
+            cloCOMPILER_SetIsMainFile(PP->compiler, gcvTRUE);
+        }
+        else
+        {
+            cloCOMPILER_SetIsMainFile(PP->compiler, gcvFALSE);
+        }
+
         if (PP->outputTokenStreamHead->hasTrailingControl)
         {
            status = gcoOS_StrCatSafe(Buffer, Max, " ");
