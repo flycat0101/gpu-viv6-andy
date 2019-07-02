@@ -5789,6 +5789,7 @@ GLvoid configStream(__GLcontext* gc)
         for(elementIdx = 0; elementIdx < stream->numElements; elementIdx++)
         {
             __GLvertexElement* element = NULL;
+            gceATTRIB_SCHEME scheme = gcvATTRIB_SCHEME_KEEP;
             element = &(stream->streamElement[elementIdx]);
             /* Get internal format and component size. */
             switch (element->type)
@@ -5836,6 +5837,13 @@ GLvoid configStream(__GLcontext* gc)
             case GL_BYTE:
                 format = gcvVERTEX_BYTE;
                 componentSize = sizeof(GLbyte);
+                break;
+
+           case GL_DOUBLE:
+                format = gcvVERTEX_DOUBLE;
+                chipCtx->anyAttibConverted = gcvTRUE;
+                scheme = gcvATTRIB_SCHEME_DOUBLE_TO_FLOAT;
+                componentSize = sizeof(GLdouble);
                 break;
 
             default:
@@ -5913,6 +5921,7 @@ GLvoid configStream(__GLcontext* gc)
                                           : (element->size * componentSize);
             /* if it is VBO, this is offset from VBO stream buffer */
             vertexPtr->pointer    = (GLbyte *)stream->streamAddr + element->offset;
+            vertexPtr->convertScheme = scheme;
             if (stream->privPtrAddr && (*stream->privPtrAddr)) {
                 bufInfo = *(__GLchipVertexBufferInfo **)(stream->privPtrAddr);
                 vertexPtr->stream     = bufInfo->bufObj;
