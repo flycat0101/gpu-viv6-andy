@@ -3504,6 +3504,11 @@ _DetectProcess(
             "\x98\x8f\x8a\xbd\x9a\x91\x9c\x97",
             gcvFALSE
         },
+        {
+            gcvPATCH_ANTUTU3DBench,
+            "\x9c\x90\x92\xd1\x9e\x91\x8b\x8a\x8b\x8a\xd1\x9d\x9a\x91\x9c\x97\x92\x9e\x8d\x94\xd1\x99\x8a\x93\x93",
+            gcvFALSE
+        },
 #if defined(ANDROID)
         {
             gcvPATCH_SMARTBENCH,

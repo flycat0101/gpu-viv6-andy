@@ -136,6 +136,7 @@ typedef enum _gcePATCH_ID
     gcvPATCH_SILICONSTUDIOGPUMARK,
     gcvPATCH_LEANBACKSCROLLING,
     gcvPATCH_ANTUTU6X, /* Antutu 6.x */
+    gcvPATCH_ANTUTU3DBench,
     gcvPATCH_CAR_CHASE,
     gcvPATCH_ANDROID_BROWSER,
     gcvPATCH_COMPUTBENCH_CL, /* ComputBench 1.5 */

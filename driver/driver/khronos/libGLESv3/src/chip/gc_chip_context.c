@@ -1125,6 +1125,9 @@ __glChipGetDeviceConstants(
     gceCHIPMODEL chipModel;
     gctUINT32 chipRevision;
     gctBOOL isEs31;
+#if defined(ANDROID)
+    gctSTRING esVersion = gcvNULL;
+#endif
 
     gcmHEADER_ARG("gc=0x%x constants=0x%x", gc, constants);
 
@@ -1168,6 +1171,14 @@ __glChipGetDeviceConstants(
             && (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.opengles.version", &esVersion)) &&
             esVersion && gcmIS_SUCCESS(gcoOS_StrCmp(esVersion, "131072"))))
             )
+        {
+            gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION20);
+            constants->GLSLVersion = __GL_GLSL_VERSION20;
+            constants->majorVersion = 2;
+        }
+        else if (((patchId == gcvPATCH_ANTUTU6X) || (patchId == gcvPATCH_ANTUTU3DBench))
+            && (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.opengles.version", &esVersion)) &&
+            esVersion && gcmIS_SUCCESS(gcoOS_StrCmp(esVersion, "131072"))))
         {
             gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION20);
             constants->GLSLVersion = __GL_GLSL_VERSION20;

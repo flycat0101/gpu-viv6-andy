@@ -1231,6 +1231,12 @@ eglCreateContext(
         gctUINT32 chipRevision;
         EGLenum renderableType = eglConfig->renderableType;
 
+#if defined(ANDROID)
+        gctSTRING esVersion = gcvNULL;
+        gcePATCH_ID patchId = gcvPATCH_INVALID;
+        gcmVERIFY_OK(gcoHAL_GetPatchID(gcvNULL, &patchId));
+#endif
+
         switch (major)
         {
         case 1:
@@ -1261,7 +1267,14 @@ eglCreateContext(
                 match = (minor >= 0 && minor <= 1) ? EGL_TRUE : EGL_FALSE;
             }
             /* Halti0 HW support ES30 only */
+#if defined(ANDROID)
+            else if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI0) &&
+                    !(((patchId == gcvPATCH_ANTUTU6X) || (patchId == gcvPATCH_ANTUTU3DBench))
+                    && (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.opengles.version", &esVersion)) &&
+                    esVersion && gcmIS_SUCCESS(gcoOS_StrCmp(esVersion, "131072")))))
+#else
             else if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI0))
+#endif
             {
                 match = (minor == 0) ? EGL_TRUE : EGL_FALSE;
             }
