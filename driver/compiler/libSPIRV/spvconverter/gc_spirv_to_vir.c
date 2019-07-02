@@ -1297,7 +1297,9 @@ static VSC_ErrCode __SpvFillVirSymWithSymSpv(gcSPV spv, VIR_Symbol * sym, VIR_Sh
         VIR_Symbol_SetTyQualifier(sym, VIR_TYQUAL_CONST);
         VIR_Symbol_SetLayoutQualifier(sym, VIR_LAYQUAL_NONE);
         VIR_Symbol_SetLocation(sym,  symSpv->location);
+        VIR_Symbol_SetOneLayoutQualifier(sym, VIR_LAYQUAL_LOCATION);
         VIR_Symbol_SetComponent(sym,  symSpv->component);
+        VIR_Symbol_SetOneLayoutQualifier(sym, VIR_LAYQUAL_COMPONENT);
         VIR_Symbol_SetFlag(sym, symFlag);
         break;
 
@@ -1306,7 +1308,9 @@ static VSC_ErrCode __SpvFillVirSymWithSymSpv(gcSPV spv, VIR_Symbol * sym, VIR_Sh
         VIR_Symbol_SetPrecision(sym, symSpv->virPrecision);
         VIR_Symbol_SetLayoutQualifier(sym, VIR_LAYQUAL_NONE);
         VIR_Symbol_SetLocation(sym,  symSpv->location);
+        VIR_Symbol_SetOneLayoutQualifier(sym, VIR_LAYQUAL_LOCATION);
         VIR_Symbol_SetComponent(sym,  symSpv->component);
+        VIR_Symbol_SetOneLayoutQualifier(sym, VIR_LAYQUAL_COMPONENT);
         VIR_Symbol_SetFlag(sym, symFlag);
         break;
 
