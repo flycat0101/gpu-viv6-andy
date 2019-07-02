@@ -3597,7 +3597,7 @@ VkResult halti5_copyImage(
         /*Change srcFormat to be same as dstFormat for CmdCopyImage() */
         srcFormat = dstFormat;
 
-        /*src is compressed image, dest is uncompressed image*/
+        /*for 64bit, src is compressed image, dest is uncompressed image*/
         if ((dstRes->isImage && (!dstRes->u.img.pImage->formatInfo.compressed)) &&
             (srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed))
         {
@@ -3616,11 +3616,35 @@ VkResult halti5_copyImage(
         /* Fake 1 layer 128 bpp format as double widthed 64bpp */
         if (g_vkFormatInfoTable[dstFormat].bitsPerBlock == 128 && g_vkFormatInfoTable[dstFormat].partCount == 1)
         {
-            srcFormat = dstFormat = VK_FORMAT_R16G16B16A16_UINT;
-            srcOffset.x *= 2;
-            dstOffset.x *= 2;
-            srcExtent.width  *= 2;
-            dstExtent.width  *= 2;
+            /*src is uncompressed image, dst is compressed image*/
+            if ((srcRes->isImage && (!srcRes->u.img.pImage->formatInfo.compressed)) &&
+                (dstRes->isImage && dstRes->u.img.pImage->formatInfo.compressed) && !oldPath)
+            {
+                fmtInfo = &g_vkFormatInfoTable[srcFormat];
+                rect = fmtInfo->blockSize;
+                dstRes->u.img.offset.x = gcmALIGN_NP2(dstOffset.x - rect.width + 1, rect.width) >> 1;
+                dstRes->u.img.extent.width *= (rect.width >> 1);
+                dstRes->u.img.extent.height *= rect.height;
+            }
+            else if(oldPath)
+            {
+                srcFormat = dstFormat = VK_FORMAT_R16G16B16A16_UINT;
+                srcOffset.x *= 2;
+                dstOffset.x *= 2;
+                srcExtent.width  *= 2;
+                dstExtent.width  *= 2;
+            }
+        }
+        else if (g_vkFormatInfoTable[dstFormat].bitsPerBlock == 128 && g_vkFormatInfoTable[dstFormat].partCount == 2)
+        {
+            /*src is compressed image, dst is uncompressed image*/
+            if (srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed)
+            {
+                fmtInfo = &g_vkFormatInfoTable[srcRes->u.img.pImage->formatInfo.residentImgFormat];
+                rect = fmtInfo->blockSize;
+                dstRes->u.img.extent.width /= rect.width;
+                dstRes->u.img.extent.height /= rect.height;
+            }
         }
 
         if (g_vkFormatInfoTable[dstFormat].bitsPerBlock >= 64 &&
