@@ -1685,12 +1685,17 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeWithChildNodes(vx_node node)
         (nodeCount < MAX_MERGE_OPS) && (next != NULL);
         nodeCount++)
     {
-        if((opType == OP_CONVOLUTION_RELU_POOLING) ||
-            (opType == OP_FULLYCONNECTED_RELU)      ||
-            (opType == OP_ROIPOOL_RELU)             ||
-            (next->numChildren != 1)                ||
-            (next->merged == vx_true_e)
-          )
+        /*check whether to finish*/
+        for(i = 0; i < featuresNum; i++)
+        {
+            if(opType & features[i][0])
+            {
+                if(opType == (features[i][0] | features[i][1]))
+                    goto merge;
+            }
+        }
+
+        if((next->numChildren != 1) || (next->merged == vx_true_e) )
             break;
 
         nodeIndex = next->childNodes[0];
