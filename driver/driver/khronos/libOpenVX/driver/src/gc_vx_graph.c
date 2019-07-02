@@ -8816,7 +8816,9 @@ VX_PRIVATE_API vx_status vxoGraph_ProcessInternal(vx_graph graph)
         vx_node node = graph->nodeTable[graph->allNodeIndexTable[0]];
         vx_target target = &graph->base.context->targetTable[node->targetIndex];
 
+        vxoNode_EnableVirtualAccessible(node);
         action = target->funcs.processLayer(target, &graph->layer->base);
+        vxoNode_DisableVirtualAccessible(node);
     }
     else
     {

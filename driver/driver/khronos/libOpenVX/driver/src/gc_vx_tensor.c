@@ -2166,7 +2166,7 @@ vxCopyTensorPatch_11(
         }
     }
 
-    if (tensor->isVirtual)
+    if (tensor->base.isVirtual && tensor->base.accessible == vx_false_e)
     {
         vxError("%s[%d]: The tensor is virtual tensor!\n", __FUNCTION__, __LINE__);
         vxAddLogEntry(&tensor->base, VX_ERROR_OPTIMIZED_AWAY, "%s[%d]: The tensor is virtual tensor!\n", __FUNCTION__, __LINE__);
