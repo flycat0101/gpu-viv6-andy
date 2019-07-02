@@ -3104,7 +3104,7 @@ gckMMU_SetupPerHardware(
     gctUINT j = 0;
     gceSTATUS status;
     gckKERNEL kernel = Hardware->kernel;
-    gctSIZE_T pageSize = 0;
+    gctUINT32 pageSize = 0;
 
     gcmkHEADER_ARG("Mmu=0x%x Hardware=0x%x", Mmu, Hardware);
 
@@ -3115,7 +3115,7 @@ gckMMU_SetupPerHardware(
         gcmkONERROR(gcvSTATUS_OK);
     }
 
-    gckOS_GetPageSize(Mmu->os, &pageSize);
+    gckOS_GetPageSize(Mmu->os, (gctSIZE_T *)&pageSize);
 
     if (!Mmu->sRAMMapped)
     {
@@ -3165,11 +3165,11 @@ gckMMU_SetupPerHardware(
                  * Reserve the internal SRAM range in first reserved MMU mtlb,
                  * when CPU physical base address is not specified.
                  */
-                Device->sRAMBaseAddresses[i][gcvSRAM_INTERNAL] = Device->sRAMCPUBases[i][gcvSRAM_INTERNAL]
-                                                               = (i == 0) ? pageSize :
+                Device->sRAMBaseAddresses[i][gcvSRAM_INTERNAL] = (i == 0) ? pageSize :
                                                                  Device->sRAMBaseAddresses[i - 1][gcvSRAM_INTERNAL] +
                                                                  gcmALIGN(Device->sRAMSizes[i - 1][gcvSRAM_INTERNAL], pageSize);
 
+                Device->sRAMCPUBases[i][gcvSRAM_INTERNAL] = Device->sRAMBaseAddresses[i][gcvSRAM_INTERNAL];
             }
 
             /* Map all the axi SRAMs in MMU table. */
