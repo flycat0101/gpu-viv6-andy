@@ -1374,7 +1374,7 @@ gceSTATUS    ppoPREPROCESSOR_Parse(cloPREPROCESSOR        PP,
         /* flush the remaining log buffer to file and close the file */
         if (gcmOPT_DUMP_FELOG())
         {
-            if (PP->logBuffer && PP->logBuffer[0] != '\0')
+            if (PP->logBuffer[0] != '\0')
                 ppoWriteBufferToFile(PP);
             if (PP->ppLogFile)
             {
@@ -1401,7 +1401,7 @@ gceSTATUS    ppoPREPROCESSOR_Parse(cloPREPROCESSOR        PP,
                 /* flush the remaining log buffer to file and close the file */
                 if (gcmOPT_DUMP_FELOG())
                 {
-                    if (PP->logBuffer && PP->logBuffer[0] != '\0')
+                    if (PP->logBuffer[0] != '\0')
                         ppoWriteBufferToFile(PP);
                     if (PP->ppLogFile)
                     {
