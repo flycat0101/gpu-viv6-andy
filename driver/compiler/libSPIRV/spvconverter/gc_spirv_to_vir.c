@@ -6531,12 +6531,36 @@ VSC_ErrCode __SpvEmitFunction(gcSPV spv, VIR_Shader * virShader)
     }
     else
     {
+        gctBOOL bGenerateNameWithId = gcvFALSE;
+
         funcNameId = SPV_ID_VIR_NAME_ID(spv->resultId);
-        if (funcNameId == VIR_INVALID_ID)
+        bGenerateNameWithId = (funcNameId == VIR_INVALID_ID);
+
+        if (!bGenerateNameWithId)
+        {
+            name = VIR_Shader_GetStringFromId(virShader, funcNameId);
+
+            /*
+            ** In spir-v binary, "main" can be used for some other non-entry-point functions, in this case, we need to rename this function.
+            **
+            **  OpEntryPoint GLCompute 1 "main" 2
+            **  OpName 3  "main"
+            **        3:            9  OpFunction None 10     --> rename it to main_3
+            **         ......
+            **        1:            9  OpFunction None 10
+            */
+            if ((gcoOS_StrCmp(name, "main") == gcvSTATUS_OK))
+            {
+                bGenerateNameWithId = gcvTRUE;
+            }
+        }
+
+        if (bGenerateNameWithId)
         {
             __SpvGenerateFuncName(spv, spv->resultId);
             VIR_Shader_AddString(virShader, spv->virName, &funcNameId);
         }
+
         name = VIR_Shader_GetStringFromId(virShader, funcNameId);
     }
 
