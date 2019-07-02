@@ -20560,6 +20560,13 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
     vx_float32    biasScale                  = TENSOR_TF_SCALE(biases);
     vx_uint32     outputZP                   = TENSOR_TF_ZEROPOINT(outputs);
     vx_float32    outputScale                = TENSOR_TF_SCALE(outputs);
+    vx_int8       input_fractionLengthValue  = TENSOR_POS(inputs);
+    vx_int8       weight_fractionLengthValue = TENSOR_POS(weights);
+    vx_int8       output_fractionLengthValue = TENSOR_POS(outputs);
+    vx_int8       bias_fractionLengthValue   = TENSOR_POS(biases);
+    vx_float32    in_scale, wt_scale, bias_scale, out_scale;
+    vx_float32    inWtScale;
+    vx_int32      biasFlg = 0;
 
     vx_scalar     kernel_widths              = vxCreateScalar(context, VX_TYPE_INT32, &kernel_width);
     vx_scalar     kernel_heights             = vxCreateScalar(context, VX_TYPE_INT32, &kernel_height);
@@ -20586,6 +20593,40 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
         stride = vxoNNExternsionConvlutionRound((vx_float32)(input_width + padLeftv + padRightv - kernel_width) / (output_width - 1), downScaleSizeRounding->value->e);
     strides = vxCreateScalar(context, VX_TYPE_INT32, &stride);
 
+    if (input_fractionLengthValue >= 0)
+    {
+        in_scale = 1.0f / (vx_float32) (1 << input_fractionLengthValue);
+    }
+    else
+    {
+        in_scale = (vx_float32) (1 << -input_fractionLengthValue);
+    }
+    if (weight_fractionLengthValue >= 0)
+    {
+        wt_scale = 1.0f / (vx_float32) (1 << weight_fractionLengthValue);
+    }
+    else
+    {
+        wt_scale = (vx_float32) (1 << -weight_fractionLengthValue);
+    }
+    if (bias_fractionLengthValue >= 0)
+    {
+        bias_scale = 1.0f / (vx_float32) (1 << bias_fractionLengthValue);
+    }
+    else
+    {
+        bias_scale = (vx_float32) (1 << -bias_fractionLengthValue);
+    }
+    if (output_fractionLengthValue >= 0)
+    {
+        out_scale = (vx_float32) (1 << output_fractionLengthValue);
+    }
+    else
+    {
+        out_scale = 1.0f / (vx_float32) (1 << -output_fractionLengthValue);
+    }
+    inWtScale = in_scale * wt_scale;
+
     if (biases != VX_NULL)
     {
         vx_uint32 bias_dims = TENSOR_DIM_NUM(biases);
@@ -20594,14 +20635,15 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
 
         bias_dims = (bias_dims == 1) ? 2 : bias_dims;
         reBiases  = vxoTensor_ReshapeTensor(biases, reSize, bias_dims);
+        biasFlg = 1;
     }
 
     sizes[0] = kernel_width * kernel_height;
     sizes[1] = TENSOR_VIEW_SIZE_INDEX(weights, 2);
-
     reWeights = vxoTensor_ReshapeTensor(weights, sizes, 2);
 
-    parameters[1] = (vx_reference)reWeights;
+    if(inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_UINT8)
+        parameters[1] = (vx_reference)reWeights;
     parameters[2] = (vx_reference)reBiases;
     parameters[4] = (vx_reference)kernel_widths;
     parameters[5] = (vx_reference)kernel_heights;
@@ -20612,6 +20654,11 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
         borderMode->constant_value.S16 = 0;
     else if (inputFormat == VX_TYPE_UINT8)
         borderMode->constant_value.U8 = (vx_uint8)inputZP;
+    else
+    {
+        borderMode->constant_value.S16 = 0;
+        borderMode->constant_value.U8 = 0;
+    }
 
     kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
 
@@ -20649,6 +20696,7 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
         vxReleaseProgram(&program);
     }
 
+    if(inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_UINT8)
     {
         vx_int32 x_len_4x       = kernel_width / 4;
         vx_int32 x_len_remain   = kernel_width % 4;
@@ -20736,6 +20784,74 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outZP", 1, &outZP);
 
         if (status != VX_SUCCESS) goto OnError;
+    }
+    else if(inputFormat == VX_TYPE_INT8)
+    {
+        vx_uint32 widthIter = kernel_width / 16;
+        vx_uint32 widthRes = kernel_width % 16;
+
+        vx_uint32 uniI8MulAccumtoI32_16x1[16] = {
+            0x55555555, // TCfg
+            0x00000000, // ASelt
+            0x76543210, 0xfedcba98, // ABin
+            0x55555555, // BSelt
+            0x76543210, 0xfedcba98, // BBin
+            0x00000600, // AccumType, ConstantType, and PostShift
+            0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+        };
+        vx_uint32 uniI8MulAccumNtoI32_16x1[16] = {
+            0x55555555, // TCfg
+            0x00000000, // ASelt
+            0x76543210, 0xfedcba98, // ABin
+            0x55555555, // BSelt
+            0x76543210, 0xfedcba98, // BBin
+            0x00000600, // AccumType, ConstantType, and PostShift
+            0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+        };
+        vx_uint32 uniConfigMulAccN[16] = {0x55555555, 0x00000001, 0x00000005 ,0x00000015, 0x00000055, 0x00000155, 0x00000555, 0x00001555,
+                                            0x00005555, 0x00015555, 0x00055555 ,0x00155555, 0x00555555, 0x01555555, 0x05555555, 0x15555555};
+        vx_uint32 uniConfigMulAccPosiN[8] = {0x76543210, 0x00000000, 0x00000010, 0x00000210 ,0x00003210, 0x00043210, 0x00543210, 0x06543210};
+        vx_uint32 uniConfigMulAccPosiN1[8] = {0xfedcba98, 0x00000008, 0x00000098, 0x00000a98 ,0x0000ba98, 0x000cba98, 0x00dcba98, 0x0edcba98};
+        {
+            vx_uint32 res = widthRes % 8;
+            uniI8MulAccumNtoI32_16x1[0] = uniConfigMulAccN[widthRes];
+            uniI8MulAccumNtoI32_16x1[4] = uniConfigMulAccN[widthRes];
+
+            if(widthRes <= 8)
+            {
+                uniI8MulAccumNtoI32_16x1[2] = uniConfigMulAccPosiN[res];
+                uniI8MulAccumNtoI32_16x1[3] = 0x00000000;
+                uniI8MulAccumNtoI32_16x1[5] = uniConfigMulAccPosiN[res];
+                uniI8MulAccumNtoI32_16x1[6] = 0x00000000;
+            }
+            else
+            {
+                uniI8MulAccumNtoI32_16x1[2] = 0x76543210;
+                uniI8MulAccumNtoI32_16x1[3] = uniConfigMulAccPosiN1[res];
+                uniI8MulAccumNtoI32_16x1[5] = 0x76543210;
+                uniI8MulAccumNtoI32_16x1[6] = uniConfigMulAccPosiN1[res];
+            }
+        }
+        if (padLeftv == 0 && padRightv == 0)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_i8i8_nopad", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
+        else
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_i8i8", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
+
+        status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniI8MulAccumtoI32_16x1", 1, uniI8MulAccumtoI32_16x1);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniI8MulAccumNtoI32_16x1", 1, uniI8MulAccumNtoI32_16x1);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inWtScale", 1, &inWtScale);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "biasScale", 1, &bias_scale);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outScale", 1, &out_scale);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "widthIter", 1, &widthIter);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "widthRes", 1, &widthRes);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "biasFlg", 1, &biasFlg);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "input_depth", 1, &input_depth);
     }
 
     status = vxnneShaderExecutable_GetMaxWorkGroupSize(shaderExecutable, &maxWorkGroupSize);
