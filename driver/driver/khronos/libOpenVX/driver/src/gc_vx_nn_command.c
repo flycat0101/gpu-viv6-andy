@@ -4529,7 +4529,10 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
 
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) &&
         (hasInputQuant || hasOutputQuant || hasWQuant) &&
-        (hasWQuant || inZP != outZP || inScale != outScale))
+        ((tp_type == TP_SINGLE_FC ||
+          tp_type == TP_ACTIVATION ||
+          tp_type == TP_ROI_POOLING_STEP_1) ||
+         (inZP != outZP || inScale != outScale)))
     {
         vx_float32 scale;
         vx_uint32 uintScale, tmpMultiply;
