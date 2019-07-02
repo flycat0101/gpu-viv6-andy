@@ -622,7 +622,7 @@ struct _gckKERNEL
     gctUINT32                   sRAMIndex;
     gckVIDMEM                   sRAMVideoMem[gcvSRAM_COUNT];
     gctPHYS_ADDR                sRAMPhysical[gcvSRAM_COUNT];
-    gctUINT32                   sRAMBaseAddress[gcvSRAM_COUNT];
+    gctUINT32                   sRAMBaseAddresses[gcvSRAM_COUNT];
     gctUINT32                   sRAMSizes[gcvSRAM_COUNT];
     /* SRAM mode. */
     gctUINT32                   sRAMNonExclusive;
@@ -1387,7 +1387,7 @@ typedef struct _gcsDEVICE
 
     gctUINT64                   sRAMBases[gcvCORE_COUNT][gcvSRAM_COUNT];
     gctUINT32                   sRAMSizes[gcvCORE_COUNT][gcvSRAM_COUNT];
-    gctUINT32                   sRAMBaseAddress[gcvCORE_COUNT][gcvSRAM_COUNT];
+    gctUINT32                   sRAMBaseAddresses[gcvCORE_COUNT][gcvSRAM_COUNT];
 
     /* Mutex to make sure stuck dump for multiple cores doesn't interleave. */
     gctPOINTER                  stuckDumpMutex;

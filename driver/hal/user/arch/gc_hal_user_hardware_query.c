@@ -7393,7 +7393,7 @@ gcoHARDWARE_QuerySRAM(
     if ((Type >= gcvSRAM_INTERNAL) && (Type < gcvSRAM_COUNT))
     {
         if (Base)
-            *Base = Hardware->options.sRAMBaseAddress[Type];
+            *Base = Hardware->options.sRAMBaseAddresses[Type];
 
         if (Size)
             *Size = Hardware->config->sRAMSizes[Type];

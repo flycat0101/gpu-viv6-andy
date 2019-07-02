@@ -3099,7 +3099,6 @@ gckMMU_SetupPerHardware(
 {
     gctBOOL needMapInternalSRAM = gcvFALSE;
     gctPHYS_ADDR_T reservedBase = gcvINVALID_PHYSICAL_ADDRESS;
-    gctPHYS_ADDR_T extSRAMBase = gcvINVALID_PHYSICAL_ADDRESS;
     gctUINT32 reservedSize = 0;
     gctUINT i = 0;
     gctUINT j = 0;
@@ -3138,7 +3137,7 @@ gckMMU_SetupPerHardware(
                  * It can be specified if not conflict with existing mapping.
                  */
 
-                Device->sRAMBaseAddress[i][gcvSRAM_INTERNAL] = 0;
+                Device->sRAMBaseAddresses[i][gcvSRAM_INTERNAL] = 0;
 
                 gcmkONERROR(gckOS_CPUPhysicalToGPUPhysical(
                     Mmu->os,
@@ -3152,8 +3151,10 @@ gckMMU_SetupPerHardware(
                     reservedSize,
                     gcvTRUE,
                     gcvTRUE,
-                    &Device->sRAMBaseAddress[i][gcvSRAM_INTERNAL]
+                    &Device->sRAMBaseAddresses[i][gcvSRAM_INTERNAL]
                     ));
+
+                Device->sRAMBases[i][j] = reservedBase;
             }
 
             /* Map all the axi SRAMs in MMU table. */
@@ -3169,21 +3170,21 @@ gckMMU_SetupPerHardware(
                         Device->sRAMSizes[i][j]
                         );
 
-                    Device->sRAMBaseAddress[i][j] = 0;
+                    Device->sRAMBaseAddresses[i][j] = 0;
 
                     gcmkONERROR(gckOS_CPUPhysicalToGPUPhysical(
                         Mmu->os,
                         Device->sRAMBases[i][j],
-                        &extSRAMBase
+                        &Device->sRAMBases[i][j]
                         ));
 
                     gcmkONERROR(_FillFlatMapping(
                         Mmu,
-                        extSRAMBase,
+                        Device->sRAMBases[i][j],
                         Device->sRAMSizes[i][j],
                         gcvFALSE,
                         gcvTRUE,
-                        &Device->sRAMBaseAddress[i][j]
+                        &Device->sRAMBaseAddresses[i][j]
                         ));
                 }
             }
@@ -3198,17 +3199,20 @@ gckMMU_SetupPerHardware(
         if (Device->sRAMSizes[Hardware->core][i] &&
            (Device->sRAMBases[Hardware->core][i] != gcvINVALID_PHYSICAL_ADDRESS))
         {
-            kernel->sRAMBaseAddress[i] = Hardware->options.sRAMBaseAddress[i]
-                                       = Device->sRAMBaseAddress[Hardware->core][i];
+            kernel->sRAMBaseAddresses[i] = Hardware->options.sRAMBaseAddresses[i]
+                                         = Device->sRAMBaseAddresses[Hardware->core][i];
 
-            kernel->sRAMSizes[i] = Device->sRAMSizes[Hardware->core][i];
+            kernel->sRAMSizes[i] = Hardware->options.sRAMSizes[i]
+                                 = Device->sRAMSizes[Hardware->core][i];
+
+            Hardware->options.sRAMPhysicalBases[i] = Device->sRAMBases[Hardware->core][i];
 
             gcmkPRINT("Galcore Info: MMU mapped core %d SRAM[%d] hardware address=0x%x size=0x%x",
-            Hardware->core,
-            i,
-            kernel->sRAMBaseAddress[i],
-            kernel->sRAMSizes[i]
-            );
+                Hardware->core,
+                i,
+                kernel->sRAMBaseAddresses[i],
+                kernel->sRAMSizes[i]
+                );
         }
     }
 

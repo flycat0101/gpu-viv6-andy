@@ -1825,7 +1825,8 @@ _SetHardwareOptions(
 
     for (i = 0; i < gcvSRAM_COUNT; i++)
     {
-        options->sRAMBaseAddress[i] = gcvINVALID_ADDRESS;
+        options->sRAMBaseAddresses[i] = gcvINVALID_ADDRESS;
+        options->sRAMPhysicalBases[i] = gcvINVALID_PHYSICAL_ADDRESS;
     }
 
     options->secureMode = gcvSECURE_NONE;

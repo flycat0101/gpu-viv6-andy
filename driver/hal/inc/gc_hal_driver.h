@@ -362,7 +362,7 @@ typedef struct _gcsHAL_QUERY_CHIP_IDENTITY
     /* Customer ID. */
     gctUINT32                   customerID;
 
-    /* SRAM physical addresses and sizes. */
+    /* CPU view physical address and size of SRAMs. */
     gctUINT64                   sRAMBases[gcvSRAM_COUNT];
     gctUINT32                   sRAMSizes[gcvSRAM_COUNT];
 
@@ -386,7 +386,14 @@ typedef struct _gcsHAL_QUERY_CHIP_OPTIONS
     gctUINT32                   uscL1CacheRatio;
     gctUINT32                   uscAttribCacheRatio;
     gctUINT32                   userClusterMask;
-    gctUINT32                   sRAMBaseAddress[gcvSRAM_COUNT];
+
+    /* GPU/VIP virtual address of SRAMs. */
+    gctUINT32                   sRAMBaseAddresses[gcvSRAM_COUNT];
+    /* SRAMs size. */
+    gctUINT32                   sRAMSizes[gcvSRAM_COUNT];
+    /* GPU/VIP view physical address of SRAMs. */
+    gctPHYS_ADDR_T              sRAMPhysicalBases[gcvSRAM_COUNT];
+
     gceSECURE_MODE              secureMode;
 
 }
