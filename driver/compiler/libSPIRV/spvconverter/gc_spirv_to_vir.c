@@ -8569,6 +8569,10 @@ VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
             }
             break;
 
+        case VIR_OP_TEXLDPCF:
+            intrinsickKind = VIR_IK_texldpcf;
+            break;
+
         case VIR_OP_TEXLDPROJ:
             intrinsickKind = VIR_IK_texld_proj;
             break;
@@ -8582,7 +8586,13 @@ VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
             break;
 
         default:
+            gcmASSERT(gcvFALSE);
             break;
+        }
+
+        if (intrinsickKind == VIR_IK_NONE)
+        {
+            gcmASSERT(gcvFALSE);
         }
 
         virOpcode = VIR_OP_INTRINSIC;
