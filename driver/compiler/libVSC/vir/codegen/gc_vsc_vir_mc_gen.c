@@ -2840,7 +2840,7 @@ static void _NegMcSrc(VSC_MC_CODEC_SRC *McSrc, VIR_Operand * Opnd)
                 case VIR_TYPE_UINT16_P4:
                 case VIR_TYPE_UINT16_P8:
                     si = -(gctINT16)((McSrc->u.imm.immData.si) & 0xFFFF);
-                    McSrc->u.imm.immData.ui =  (McSrc->u.imm.immData.si & 0xFFFF);
+                    McSrc->u.imm.immData.ui =  (si & 0xFFFF);
                     break;
                 default:
                     gcmASSERT(gcvFALSE);
