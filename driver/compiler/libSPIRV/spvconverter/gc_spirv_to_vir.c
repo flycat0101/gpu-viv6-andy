@@ -10307,12 +10307,14 @@ VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
     VIR_Enable virEnableMask;
     gctBOOL hasDest;
     gctBOOL isWorkGroup = gcvFALSE;
-    gctBOOL bIsUCompare = gcvFALSE, bIsSCompare = gcvFALSE;
+    gctBOOL bSourceUnsignedInteger = gcvFALSE, bSourceSignedInteger = gcvFALSE;
+    gctBOOL bDestUnsignedInteger = gcvFALSE, bDestSignedInteger = gcvFALSE;
     gctUINT virOpndId = 0;
 
     /* map spvopcode to vir opcode, if not support, add more inst */
     virOpcode = SPV_OPCODE_2_VIR_OPCODE(spv->opCode);
 
+    /* For some opcodes, the type of dest/source is fixed, it is unsigned integer or signed integer, we need to update them. */
     if ((__SpvGetOpcodeClassClassFromOpCode(opCode) == OpClassRelationalLogical) &&
         (InstructionDesc[opCode].virOpCode == VIR_OP_NOP))
     {
@@ -10323,17 +10325,28 @@ VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
             opCode == SpvOpULessThan            ||
             opCode == SpvOpULessThanEqual)
         {
-            bIsUCompare = gcvTRUE;
+            bSourceUnsignedInteger = gcvTRUE;
         }
         else if (opCode == SpvOpSGreaterThan         ||
                  opCode == SpvOpSGreaterThanEqual    ||
                  opCode == SpvOpSLessThan            ||
                  opCode == SpvOpSLessThanEqual)
         {
-            bIsSCompare = gcvTRUE;
+            bSourceSignedInteger = gcvTRUE;
         }
     }
+    if (opCode == SpvOpBitFieldSExtract)
+    {
+        bDestSignedInteger = gcvTRUE;
+        bSourceSignedInteger = gcvTRUE;
+    }
+    else if (opCode == SpvOpBitFieldUExtract)
+    {
+        bDestUnsignedInteger = gcvTRUE;
+        bSourceUnsignedInteger = gcvTRUE;
+    }
 
+    /* Program the dest. */
     hasDest = VIR_OPCODE_hasDest(virOpcode);
 
     if (spv->resultId)
@@ -10400,6 +10413,15 @@ VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetSym(operand, dstVirSym);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
         __SpvSetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
+
+        if (bDestUnsignedInteger)
+        {
+            VIR_Operand_SetTypeId(operand, VIR_TypeId_ConvertIntegerType(virShader, VIR_Operand_GetTypeId(operand), gcvTRUE));
+        }
+        else if (bDestSignedInteger)
+        {
+            VIR_Operand_SetTypeId(operand, VIR_TypeId_ConvertIntegerType(virShader, VIR_Operand_GetTypeId(operand), gcvFALSE));
+        }
     }
 
     virOpndId = 0;
@@ -10453,11 +10475,11 @@ VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
 
         if (operand != gcvNULL)
         {
-            if (bIsUCompare)
+            if (bSourceUnsignedInteger)
             {
                 VIR_Operand_SetTypeId(operand, VIR_TypeId_ConvertIntegerType(virShader, VIR_Operand_GetTypeId(operand), gcvTRUE));
             }
-            else if (bIsSCompare)
+            else if (bSourceSignedInteger)
             {
                 VIR_Operand_SetTypeId(operand, VIR_TypeId_ConvertIntegerType(virShader, VIR_Operand_GetTypeId(operand), gcvFALSE));
             }
