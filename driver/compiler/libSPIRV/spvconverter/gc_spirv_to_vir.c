@@ -4427,6 +4427,7 @@ VSC_ErrCode __SpvEmitType(gcSPV spv, VIR_Shader * virShader)
             }
             else
             {
+                gcmASSERT(SPV_ID_TYPE(spv->operands[1]) == SPV_ID_TYPE_CONST);
                 arrayLength = SPV_ID_VIR_CONST(spv->operands[1]).scalarVal.uValue;
             }
 
@@ -5070,40 +5071,6 @@ static SpvId __SpvFindIdFromConstValue(gcSPV spv, gctUINT value)
     return targetId;
 }
 
-static VSC_ErrCode __SpvFoldingSpecConstantOp(gcSPV spv, VIR_Shader * virShader)
-{
-    VSC_ErrCode virErrCode = VSC_ERR_NONE;
-    SpvId resultTypeId = spv->resultTypeId;
-    SpvOp opCode = spv->opCode;
-
-    gcmASSERT(SPV_ID_TYPE(resultTypeId) == SPV_ID_TYPE_TYPE);
-
-    if (SPV_ID_TYPE_IS_INTEGER(resultTypeId))
-    {
-        int leftOperand = SPV_ID_VIR_CONST(spv->operands[0]).scalarVal.iValue;
-        int rightOperand = SPV_ID_VIR_CONST(spv->operands[1]).scalarVal.iValue;
-        int retValue = 0;
-
-        switch (opCode)
-        {
-        case SpvOpIAdd:     retValue = leftOperand + rightOperand; break;
-        default: gcmASSERT(gcvFALSE); break;
-        }
-
-        spv->operands[0] = retValue;
-        spv->operandSize = 1;
-    }
-    else
-    {
-        gcmASSERT(gcvFALSE);
-    }
-
-    spv->opCode = SpvOpConstant;
-    __SpvEmitConstant(spv, virShader);
-
-    return virErrCode;
-}
-
 VSC_ErrCode __SpvEmitSpecConstantOp(gcSPV spv, VIR_Shader * virShader)
 {
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
@@ -5127,10 +5094,12 @@ VSC_ErrCode __SpvEmitSpecConstantOp(gcSPV spv, VIR_Shader * virShader)
     switch (spv->opCode)
     {
     case SpvOpIAdd:
+    case SpvOpIMul:
+    case SpvOpCompositeExtract:
         __SpvFoldingSpecConstantOp(spv, virShader);
         break;
+
     case SpvOpISub:
-    case SpvOpIMul:
     case SpvOpFAdd:
     case SpvOpFSub:
     case SpvOpFMul:
@@ -5179,10 +5148,6 @@ VSC_ErrCode __SpvEmitSpecConstantOp(gcSPV spv, VIR_Shader * virShader)
 
     case SpvOpVectorShuffle:
         __SpvEmitVectorShuffle(spv, virShader);
-        break;
-
-    case SpvOpCompositeExtract:
-        __SpvEmitCompositeExtract(spv, virShader);
         break;
 
     case SpvOpCompositeInsert:
@@ -7215,7 +7180,7 @@ VSC_ErrCode __SpvEmitCompositeExtract(gcSPV spv, VIR_Shader * virShader)
 
     gcmEMIT_GET_ARGS();
 
-    /* If the composite is a matrix, then it must be a variable. */
+    /* If the composite is a vector, then it must be a variable. */
     if (SPV_ID_TYPE_IS_VECTOR(spvTypeId))
     {
         VIR_Function_AddInstruction(spv->virFunction,
@@ -13360,6 +13325,7 @@ gcSPV_Decode(
 
     if ((!info->isLibraryShader || gcmGetOptimizerOption()->includeLib) && !disableIRDump && gcmGetOptimizerOption()->dumpShaderSource)
     {
+        __SpvDumpSpecConstant(Spv->specInfo);
         __SpvDumpSpriv(info->binary, info->sizeInByte);
     }
 

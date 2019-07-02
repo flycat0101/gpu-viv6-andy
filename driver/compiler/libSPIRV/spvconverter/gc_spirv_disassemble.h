@@ -17,6 +17,7 @@
 #include "gc_spirv_types.h"
 #include "gc_hal_user_precomp.h"
 #include "vulkan/spirv.h"
+#include "vulkan/vulkan_core.h"
 
 gceSTATUS __SpvDumpValidator(
     gctUINT * stream,
@@ -28,6 +29,9 @@ gceSTATUS __SpvDumpLine(
     SpvOp opCode,
     gctUINT * stream,
     gctUINT numOperands);
+
+gceSTATUS __SpvDumpSpecConstant(
+    VkSpecializationInfo        *specInfo);
 
 gceSTATUS __SpvDumpSpriv(
     gctUINT * stream,

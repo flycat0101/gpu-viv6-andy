@@ -23,6 +23,7 @@ ifndef FIXED_ARCH_TYPE
 LOCAL_SRC_FILES := \
 	spvconverter/gc_spirv_mempool.c \
 	spvconverter/gc_spirv_to_vir.c \
+	spvconverter/gc_spirv_spec_constant_op.c \
 	spvconverter/gc_spriv_disassmble.c
 
 LOCAL_CFLAGS := \

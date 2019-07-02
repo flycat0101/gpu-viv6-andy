@@ -533,6 +533,9 @@ typedef enum
     SpvOffsetType_PER_VERTEX,
 }SpvOffsetType;
 
+/* spec constant op holding. */
+VSC_ErrCode __SpvFoldingSpecConstantOp(gcSPV spv, VIR_Shader * virShader);
+
 /* Pre-process instruction. */
 VSC_ErrCode __SpvPreprocessInstruction(gcSPV spv, VIR_Shader * virShader);
 /* Post-process instruction. */

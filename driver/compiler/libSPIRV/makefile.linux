@@ -43,6 +43,7 @@ ifndef FIXED_ARCH_TYPE
 OBJECTS := \
     $(OBJ_DIR)/gc_spirv_mempool.o \
     $(OBJ_DIR)/gc_spirv_to_vir.o \
+	$(OBJ_DIR)/gc_spirv_spec_constant_op.o \
     $(OBJ_DIR)/gc_spriv_disassmble.o
 
 vpath %.c spvconverter

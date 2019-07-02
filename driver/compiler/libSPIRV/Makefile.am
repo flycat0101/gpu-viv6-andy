@@ -16,6 +16,7 @@ lib_LTLIBRARIES = libSPIRV_viv.la
 libSPIRV_viv_la_SOURCES = \
     spvconverter/gc_spirv_mempool.c \
     spvconverter/gc_spirv_to_vir.c \
+	spvconverter/gc_spirv_spec_constant_op.c \
     spvconverter/gc_spriv_disassmble.c
 
 AM_CPPFLAGS = \

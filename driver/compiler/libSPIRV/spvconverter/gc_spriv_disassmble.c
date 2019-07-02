@@ -1604,6 +1604,53 @@ OnError:
     return status;
 }
 
+gceSTATUS __SpvDumpSpecConstant(
+    VkSpecializationInfo        *specInfo)
+{
+    gctUINT         i;
+    gctUINT8        *data;
+    gctCHAR         line[SPV_DUMP_MAX_SIZE] = { 0 };
+    gctUINT         offset = 0;
+
+    if (specInfo == gcvNULL || specInfo->mapEntryCount == 0)
+    {
+        return gcvSTATUS_OK;
+    }
+
+    data = (gctUINT8 *)specInfo->pData;
+
+    for (i = 0; i < specInfo->mapEntryCount; i++)
+    {
+        VkSpecializationMapEntry    *mapEntry = (VkSpecializationMapEntry *)(&specInfo->pMapEntries[i]);
+        gctUINT8                    *specData = data + mapEntry->offset;
+        gctUINT32                   constValue = 0;
+        gctINT32                    size = (gctINT32)mapEntry->size;
+
+        gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "SpecId(%d): ", mapEntry->constantID);
+
+        while (size > 0)
+        {
+            if (size >= 4)
+            {
+                gcoOS_MemCopy(&constValue, specData, 4);
+                size -= 4;
+            }
+            else
+            {
+                gcoOS_MemCopy(&constValue, specData, size);
+                size = 0;
+            }
+
+            gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "0x%x ", constValue);
+        }
+        gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "\n");
+    }
+
+    spvPRINT("%s", line);
+
+    return gcvSTATUS_OK;
+}
+
 gceSTATUS __SpvDumpSpriv(
     gctUINT * stream,
     gctUINT sizeInByte)
