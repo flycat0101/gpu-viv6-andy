@@ -14420,7 +14420,7 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
             {
                 /* multi TP path */
                 vx_uint32 snum = (filterCount + TP_FC_Z_MAX - 1) / TP_FC_Z_MAX;
-                i = snum % coreCount ? gcmALIGN(snum, coreCount) : snum;
+                i = snum % coreCount ? gcmALIGN_NP2(snum, coreCount) : snum;
                 calculateSplitSize(filterCount, i, zArray, VX_NULL);
             }
             else
