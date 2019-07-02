@@ -525,6 +525,7 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __vk_GetDeviceProcAddr(
     const char* pName
     )
 {
+    uint32_t i;
     /* Skip invalid names first */
     if (!pName || pName[0] != 'v' || pName[1] != 'k' || pName[2] == '\0')
     {
@@ -555,13 +556,82 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __vk_GetDeviceProcAddr(
     if (strcmp(pName, "vkGetPhysicalDeviceExternalBufferProperties") == 0) return VK_NULL_HANDLE;
     if (strcmp(pName, "vkGetPhysicalDeviceExternalFenceProperties") == 0) return VK_NULL_HANDLE;
     if (strcmp(pName, "vkGetPhysicalDeviceExternalSemaphoreProperties") == 0) return VK_NULL_HANDLE;
-    if (strcmp(pName, "vkTrimCommandPoolKHR") == 0) return VK_NULL_HANDLE;
     if (strcmp(pName, "vkCreateSamplerYcbcrConversionKHR") == 0) return VK_NULL_HANDLE;
-    if (strcmp(pName, "vkCreateSwapchainKHR") == 0) return VK_NULL_HANDLE;
-    if (strcmp(pName, "vkGetImageSparseMemoryRequirements2KHR") == 0) return VK_NULL_HANDLE;
-    if (strcmp(pName, "vkBindBufferMemory2KHR") == 0) return VK_NULL_HANDLE;
-    if (strcmp(pName, "vkGetBufferMemoryRequirements2KHR") == 0) return VK_NULL_HANDLE;
-    if (strcmp(pName, "vkGetImageMemoryRequirements2KHR") == 0) return VK_NULL_HANDLE;
+
+    for (i = 0; i < g_DeviceExtensionsCount; i++)
+    {
+        if (strcmp(g_DeviceExtensions[i].extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0)
+        {
+             if (!g_EnabledExtensions[i].bEnabled)
+             {
+                 if (strcmp(pName, "vkCreateSwapchainKHR") == 0)return VK_NULL_HANDLE;
+                 if (strcmp(pName, "vkDestroySwapchainKHR") == 0)return VK_NULL_HANDLE;
+                 if (strcmp(pName, "vkGetSwapchainImagesKHR") == 0)return VK_NULL_HANDLE;
+                 if (strcmp(pName, "vkAcquireNextImageKHR") == 0)return VK_NULL_HANDLE;
+                 if (strcmp(pName, "vkQueuePresentKHR") == 0)return VK_NULL_HANDLE;
+                 if (strcmp(pName, "vkGetDeviceGroupPresentCapabilitiesKHR") == 0)return VK_NULL_HANDLE;
+                 if (strcmp(pName, "vkGetDeviceGroupSurfacePresentModesKHR") == 0)return VK_NULL_HANDLE;
+                 if (strcmp(pName, "vkGetPhysicalDevicePresentRectanglesKHR") == 0)return VK_NULL_HANDLE;
+                 if (strcmp(pName, "vkAcquireNextImage2KHR") == 0)return VK_NULL_HANDLE;
+             }
+             continue;
+        }
+        if (strcmp(g_DeviceExtensions[i].extensionName, VK_KHR_MAINTENANCE1_EXTENSION_NAME) == 0)
+        {
+            if (!g_EnabledExtensions[i].bEnabled)
+             {
+                 if (strcmp(pName, "vkTrimCommandPoolKHR") == 0)return VK_NULL_HANDLE;
+             }
+            continue;
+        }
+        if (strcmp(g_DeviceExtensions[i].extensionName, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME) == 0)
+        {
+            if (!g_EnabledExtensions[i].bEnabled)
+             {
+                 if (strcmp(pName, "vkGetImageSparseMemoryRequirements2KHR") == 0)return VK_NULL_HANDLE;
+                 if (strcmp(pName, "vkGetBufferMemoryRequirements2KHR") == 0)return VK_NULL_HANDLE;
+                 if (strcmp(pName, "vkGetImageMemoryRequirements2KHR") == 0)return VK_NULL_HANDLE;
+             }
+            continue;
+        }
+        if (strcmp(g_DeviceExtensions[i].extensionName, VK_KHR_BIND_MEMORY_2_EXTENSION_NAME) == 0)
+        {
+            if (!g_EnabledExtensions[i].bEnabled)
+             {
+                 if (strcmp(pName, "vkBindBufferMemory2KHR") == 0)return VK_NULL_HANDLE;
+                 if (strcmp(pName, "vkBindImageMemory2KHR") == 0)return VK_NULL_HANDLE;
+             }
+            continue;
+        }
+        if (strcmp(g_DeviceExtensions[i].extensionName, VK_KHR_DESCRIPTOR_UPDATE_TEMPLATE_EXTENSION_NAME) == 0)
+        {
+            if (!g_EnabledExtensions[i].bEnabled)
+             {
+                 if (strcmp(pName, "vkCreateDescriptorUpdateTemplateKHR") == 0)return VK_NULL_HANDLE;
+                 if (strcmp(pName, "vkDestroyDescriptorUpdateTemplateKHR") == 0)return VK_NULL_HANDLE;
+                 if (strcmp(pName, "vkUpdateDescriptorSetWithTemplateKHR") == 0)return VK_NULL_HANDLE;
+             }
+            continue;
+        }
+        if (strcmp(g_DeviceExtensions[i].extensionName, VK_KHR_DEVICE_GROUP_EXTENSION_NAME) == 0)
+        {
+            if (!g_EnabledExtensions[i].bEnabled)
+             {
+                 if (strcmp(pName, "vkGetDeviceGroupPeerMemoryFeaturesKHR") == 0)return VK_NULL_HANDLE;
+                 if (strcmp(pName, "vkCmdSetDeviceMaskKHR") == 0)return VK_NULL_HANDLE;
+                 if (strcmp(pName, "vkCmdDispatchBaseKHR") == 0)return VK_NULL_HANDLE;
+             }
+            continue;
+        }
+        if (strcmp(g_DeviceExtensions[i].extensionName, VK_KHR_MAINTENANCE3_EXTENSION_NAME) == 0)
+        {
+            if (!g_EnabledExtensions[i].bEnabled)
+             {
+                 if (strcmp(pName, "vkGetDescriptorSetLayoutSupportKHR") == 0)return VK_NULL_HANDLE;
+             }
+            continue;
+        }
+    }
 
     return __vk_GetApiProcAddr(pName);
 }
