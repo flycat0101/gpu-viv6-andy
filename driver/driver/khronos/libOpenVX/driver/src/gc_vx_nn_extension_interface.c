@@ -23254,7 +23254,7 @@ vx_status vxnneAdapter_SWCWHN2WHCN(
 
     vx_uint32 batch = 0, in_h = 0, in_w = 0;
     vx_float32 data = .0f;
-    vx_int32 in_item_size = vxnneGetTypeSize(input_format);
+    /*vx_int32 in_item_size = vxnneGetTypeSize(input_format); */
 
     /**************************************************************************************************
      *       C W H N                                      W H C N
@@ -23288,11 +23288,12 @@ vx_status vxnneAdapter_SWCWHN2WHCN(
                     vx_int32 in_index = in_w + in_h * input_width * input_depth + input_batch_index;
                     vx_int32 out_index = (out_w + out_h * output_width) + out_d * output_width * output_height + output_batch_index;
 
-                    if (in_item_size == vxnneGetTypeSize(output_format))
+                    /*comment the direct copy, because of dst's quantized parameter may be different from src's*/
+                    /*if (in_item_size == vxnneGetTypeSize(output_format))
                     {
                         memcpy(output_ptr + out_index * in_item_size, input_ptr + in_index * in_item_size, in_item_size);
                     }
-                    else
+                    else*/
                     {
                         data = vxnneGetDataExt(input_format, input_quant_type, in_index, input_ptr, in_fixpoint, in_tf_zp, in_tf_scale);
 
@@ -23388,7 +23389,7 @@ vx_status vxnneAdapter_WHCN2CWHN(struct _vxnne_operation_s *operation)
     vx_uint32 output_width = TENSOR_SIZE_INDEX(outputs, 2);  /* W */
     vx_uint32 output_depth = TENSOR_SIZE_INDEX(outputs, 3);  /* C */
 
-    vx_int32 item_size = vxnneGetTypeSize((vx_type_e)TENSOR_DATA_TYPE(outputs));
+    /*vx_int32 item_size = vxnneGetTypeSize((vx_type_e)TENSOR_DATA_TYPE(outputs));*/
 
     vx_uint32 batch = 0, in_h = 0, in_w = 0, in_d = 0;
     vx_float32 data = .0f;
@@ -23440,11 +23441,12 @@ vx_status vxnneAdapter_WHCN2CWHN(struct _vxnne_operation_s *operation)
 
                     vx_int32 out_index = out_w + in_d + out_h * output_width * input_depth + output_batch_index;
 
-                    if (item_size == vxnneGetTypeSize((vx_type_e)TENSOR_DATA_TYPE(inputs)))
+                    /*comment the direct copy, because of dst's quantized parameter may be different from src's*/
+                    /*if (item_size == vxnneGetTypeSize((vx_type_e)TENSOR_DATA_TYPE(inputs)))
                     {
                         memcpy(outputBase + out_index * item_size, inputBase + in_index * item_size, item_size);
                     }
-                    else
+                    else*/
                     {
 
                         data = vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(inputs), TENSOR_QUANT_TYPE(inputs), in_index, inputBase, TENSOR_POS(inputs), TENSOR_TF_ZEROPOINT(inputs), TENSOR_TF_SCALE(inputs));
