@@ -982,6 +982,8 @@ _configTPBrickMode(
 }
 
 #define TP_MAX_XYSIZE (0x1<<16)
+#define MULTI_TP_RESHUFFLE_SIZE 100
+
 enum
 {
     TP_SPLIT_Z_DIRECTION,
@@ -1034,6 +1036,18 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
     switch (tpType)
     {
         case TP_RESHUFFLE:
+        {
+            /* if inputXSize, inputYSize and inputZSize is too small, not split */
+            if (mult && (inputXSize * inputYSize * inputZSize) > MULTI_TP_RESHUFFLE_SIZE)
+            {
+                slice = gcoMATH_MIN(inputZSize, core);
+            }
+            else
+            {
+                slice = 1;
+            }
+            break;
+        }
         case TP_MAX_POOLING:
         case TP_TENSOR_PAD:
         {
