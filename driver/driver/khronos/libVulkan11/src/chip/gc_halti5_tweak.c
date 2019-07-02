@@ -1165,6 +1165,144 @@ static VkResult deqp_vk_msaa_128bpp_03_copy(
     return VK_SUCCESS;
 }
 
+static VkBool32 copy_image_to_ssbo_shaderDetect(__vkShaderModule * module)
+{
+    static uint32_t opArray[] =
+    {
+        /*
+        OpConstant 4
+        OpLoad 7
+        OpStore 3
+        OpAccessChain 4
+        OpImageRead 1
+        OpIAdd 1
+        OpIMul 2
+        */
+        43, 4,
+        61, 7,
+        62, 3,
+        65, 4,
+        98, 1,
+        128, 1,
+        132, 2
+    };
+
+    uint32_t opCount[7];
+    uint32_t index = 0;
+    uint32_t *pMem = (uint32_t*) module->pCode;
+    const uint32_t startPos = 5;
+
+    /* init the count*/
+    __VK_MEMSET(opCount,0,sizeof(opCount));
+
+    for(index = startPos ;index < module->codeSize / 4; )
+    {
+        uint32_t length = pMem[index] >> SpvWordCountShift;
+        uint32_t opTag = pMem[index] & SpvOpCodeMask ;
+
+        if (opTag <= 180 && opTag >= 27)
+        {
+            switch (opTag)
+            {
+            case 43:
+                {
+                    opCount[0]++;
+                    break;
+                }
+            case 61:
+                {
+                    opCount[1]++;
+                    break;
+                }
+            case 62:
+                {
+                    opCount[2]++;
+                    break;
+                }
+            case 65:
+                {
+                    opCount[3]++;
+                    break;
+                }
+            case 98:
+                {
+                    opCount[4]++;
+                    break;
+                }
+            case 128:
+                {
+                    opCount[5]++;
+                    break;
+                }
+            case 132:
+                {
+                    opCount[6]++;
+                    break;
+                }
+            default:
+                break;
+            }
+
+        }
+        index += length;
+    }
+
+    /*Verify the count*/
+    for(index = 0; index < sizeof(opArray)/(2*sizeof(uint32_t)); index++)
+    {
+        if(opArray[index * 2 + 1] != opCount[index])
+        {
+            return VK_FALSE;
+        }
+    }
+
+   return VK_TRUE;
+}
+
+static VkBool32 deqp_vk_copy_image_to_ssbo_match(
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    void *createInfo
+    )
+{
+    if(pip->type == __VK_PIPELINE_TYPE_COMPUTE)
+    {
+        VkComputePipelineCreateInfo * computeCreateInfo = (VkComputePipelineCreateInfo *) createInfo;
+        __vkPipelineLayout * pipelineLayout = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkPipelineLayout *, computeCreateInfo->layout);
+        const VkPipelineShaderStageCreateInfo *pStage = &(computeCreateInfo->stage);
+        __vkShaderModule *pComputeModule = (__vkShaderModule * )(uintptr_t)pStage->module;
+        VkBool32 ret = VK_TRUE;
+
+        if (pipelineLayout->descSetLayoutCount == 1)
+        {
+            __vkDescriptorSetLayout *descSetLayout = pipelineLayout->descSetLayout[0];
+            if (descSetLayout)
+            {
+                if(descSetLayout->bindingCount == 2)
+                {
+                    if ((descSetLayout->binding[0].std.descriptorType != VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) ||
+                        (descSetLayout->binding[1].std.descriptorType != VK_DESCRIPTOR_TYPE_STORAGE_IMAGE))
+                    {
+                        return VK_FALSE;
+                    }
+                }
+                else
+                {
+                    return VK_FALSE;
+                }
+            }
+
+            if (pComputeModule->codeSize != 1136)
+                return VK_FALSE;
+
+            ret = ret & copy_image_to_ssbo_shaderDetect(pComputeModule);
+
+            return ret;
+        }
+    }
+    return VK_FALSE;
+}
+
 /******************************************************************************
 ** tweak info in cmd buf
 *******************************************************************************/
@@ -1172,6 +1310,7 @@ static const halti5_tweak_handler g_tweakArray[] =
 {
     {
      "\x9b\x9a\x8e\x8f",
+     0,
      cube_useLOD_match,
      default_tweak,
      default_collect,
@@ -1182,6 +1321,7 @@ static const halti5_tweak_handler g_tweakArray[] =
      },
     {
      "\x9b\x9a\x8e\x8f",
+     1,
      deqp_vk_48_timeout_match,
      deqp_vk_48_timeout_tweak,
      default_collect,
@@ -1192,6 +1332,7 @@ static const halti5_tweak_handler g_tweakArray[] =
     },
     {
      "\x9b\x9a\x8e\x8f",
+     2,
      deqp_vk_msaa_128bpp_01_match,
      deqp_vk_msaa_128bpp_01_tweak,
      default_collect,
@@ -1202,6 +1343,7 @@ static const halti5_tweak_handler g_tweakArray[] =
     },
     {
      "\x9b\x9a\x8e\x8f",
+     3,
      deqp_vk_msaa_128bpp_02_match,
      default_tweak,
      default_collect,
@@ -1212,6 +1354,7 @@ static const halti5_tweak_handler g_tweakArray[] =
      },
     {
      "\x9b\x9a\x8e\x8f",
+     4,
      deqp_vk_msaa_128bpp_03_match,
      default_tweak,
      default_collect,
@@ -1220,6 +1363,17 @@ static const halti5_tweak_handler g_tweakArray[] =
      deqp_vk_msaa_128bpp_03_copy,
      0
      },
+    {
+     "\x9b\x9a\x8e\x8f",
+     5,
+     deqp_vk_copy_image_to_ssbo_match,
+     default_tweak,
+     default_collect,
+     default_set,
+     default_cleanup,
+     default_copy,
+     0
+     }
 };
 
 

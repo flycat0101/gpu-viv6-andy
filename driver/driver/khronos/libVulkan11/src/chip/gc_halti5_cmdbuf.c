@@ -2631,14 +2631,20 @@ VkResult halti5_dispatch(
     uint32_t chipRevision = phyDev->phyDevConfig.chipRevision;
     VkBool32 txClearPendingFix = devCtx->database->TX_CLEAR_PENDING_FIX;
     uint32_t stall = 0;
+    halti5_tweak_handler *tweakHandler = chipCmptPipeline->chipPipeline.tweakHandler;
 
     __VK_ASSERT(cmdBuf->curScrachBufIndex == 0);
 
     if (chipModel == gcv7000 && chipRevision == 0x6009)
     {
         needWorkaround = VK_TRUE;
+        if (tweakHandler && tweakHandler->index == 5)
+        {
+            needWorkaround = VK_FALSE;
+        }
     }
 
+    /*do the sw workaround for the HW bug: TX interface clear pending bug(bug#2008)*/
     if ((!txClearPendingFix) && needWorkaround && (hints->workGrpSize.x == 1) &&
         (hints->workGrpSize.y == 1) && (hints->workGrpSize.z == 1) && (!hints->useLocalId) &&
         (hints->localMemSizeInByte == 0) && (!hints->useGroupId) && (!hints->useGPRSpill[gcvPROGRAM_STAGE_COMPUTE]) &&
@@ -2685,7 +2691,7 @@ VkResult halti5_dispatch(
         doWorkaround = VK_TRUE;
     }
 
-    if (chipCmptPipeline->chipPipeline.tweakHandler)
+    if (tweakHandler)
     {
         __VK_MEMZERO(&cmdParams, sizeof(cmdParams));
         cmdParams.compute.indirectCompute = VK_FALSE;

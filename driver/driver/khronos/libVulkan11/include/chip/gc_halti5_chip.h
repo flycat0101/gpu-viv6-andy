@@ -472,6 +472,7 @@ typedef struct halti5_vscprogram_blit
 typedef struct halti5_tweak_handler
 {
     const char reversedName[__VK_MAX_NAME_LENGTH];
+    uint32_t index;
 
     VkBool32 (* match)(
         __vkDevContext *devCtx,
