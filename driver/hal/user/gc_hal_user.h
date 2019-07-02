@@ -3002,6 +3002,7 @@ typedef struct _vx_drv_option
     gctUINT enableGraphOptimizationToTest;
     gctUINT enableGraphConvertBatchFC2NNConv;
     gctUINT enableGraphConvertTensorAdd;
+    gctUINT enableGraphEltwiseOpShape;
     gctUINT enableGraphConvertConv2Fc;
     gctUINT enableGraphSwaplayer;
     gctUINT enableGraphReshapelayer;

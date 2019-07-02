@@ -17,6 +17,8 @@
 
 EXTERN_C_BEGIN
 
+#define VIV_TENSOR_MAX_WIDTH 65536
+
 #define ENABLE_GRAPH_WAR7_16x16 1
 
 #define CONVERT_CONV_TYPE(type) {\
@@ -102,6 +104,7 @@ typedef enum _node_op_type_e
     OP_TRANSPOSE                = 0x1<<11,
     OP_ROIPOOL                  = 0x1<<12,
     OP_CONVOLUTION_PAD          = 0x1<<13,
+    OP_ELTWISE_ASMD             = 0x1<<14, /*broadcast add/sub/mul/div*/
     OP_CONVOLUTION_RELU         = OP_CONVOLUTION | OP_RELU,
     OP_FULLYCONNECTED_RELU      = OP_FULLYCONNECTED | OP_RELU,
     OP_CONVOLUTION_POOLING      = OP_CONVOLUTION | OP_POOLING,

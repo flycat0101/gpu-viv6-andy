@@ -323,17 +323,23 @@ VX_INTERNAL_API vx_enum vxoGraph_getKernelType(vx_node node)
             vx_tensor input1 = (vx_tensor)node->paramTable[1];
             vx_tensor output = (vx_tensor)node->paramTable[node->numParameters - 1];
             vx_uint32 i = 0;
-            if(TENSOR_DIM_NUM(input0) != TENSOR_DIM_NUM(input1))
-                break;
-            for(i = 0; i < TENSOR_DIM_NUM(input0); i++)
+
+            for(i = 0; i < TENSOR_DIM_NUM(output); i++)
+            {
                 if(TENSOR_SIZE_INDEX(input0, i) != TENSOR_SIZE_INDEX(input1, i))
                 {
-                    gcmFOOTER_ARG("%d", OP_INVALID);
-                    return OP_INVALID;
+                    gcmFOOTER_ARG("%d", OP_ELTWISE_ASMD);
+                    return OP_ELTWISE_ASMD;
                 }
+            }
 
-            if(TENSOR_DATA_TYPE(input0) != TENSOR_DATA_TYPE(input1))
-                break;
+            if((TENSOR_DATA_TYPE(input0) != TENSOR_DATA_TYPE(input1) ) ||
+                (TENSOR_DIM_NUM(input0) != TENSOR_DIM_NUM(input1)     )
+              )
+            {
+                gcmFOOTER_ARG("%d", OP_ELTWISE_ASMD);
+                return OP_ELTWISE_ASMD;
+            }
 
             switch (TENSOR_DATA_TYPE(input0))
             {
@@ -4000,6 +4006,187 @@ VX_INTERNAL_API vx_status vxoGraph_Optimization_padConv(vx_graph graph)
     return VX_SUCCESS;
 }
 
+VX_PRIVATE_API vx_status vxoGraph_Optimization_EltwiseTensorShapeOpt(vx_tensor input0, vx_tensor input1, vx_tensor output, vx_uint32 sizes0[VX_CONTEXT_TENSOR_MAX_DIMENSION], vx_uint32 sizes1[VX_CONTEXT_TENSOR_MAX_DIMENSION], vx_uint32 sizes2[VX_CONTEXT_TENSOR_MAX_DIMENSION], vx_uint32 *dim_num)
+{
+    vx_status status            = VX_SUCCESS;
+
+    vx_uint32 i                 = 0;
+    vx_uint32 cnt               = 0;
+    vx_uint32 element_count0    = 0;
+    vx_uint32 element_count1    = 0;
+    vx_uint32 element_count2    = 0;
+    vx_uint32 dims              = 0;
+    vx_bool   enable_broadcast  = vx_false_e;
+    vx_bool   enable_broadcast1 = vx_false_e;
+
+    vxoTensor_GetTensorElementCount(input0, &element_count0);
+    vxoTensor_GetTensorElementCount(input1, &element_count1);
+    vxoTensor_GetTensorElementCount(output, &element_count2);
+
+    if (element_count0 == 1 || element_count1 == 1)
+    {
+        enable_broadcast1 = vx_true_e;
+    }
+
+    for (i = 0; i < TENSOR_DIM_NUM(output); i++)
+    {
+        vx_uint32 size0 = TENSOR_DIM_NUM(input0) > i ? TENSOR_VIEW_SIZE_INDEX(input0, i) : 1;
+        vx_uint32 size1 = TENSOR_DIM_NUM(input1) > i ? TENSOR_VIEW_SIZE_INDEX(input1, i) : 1;
+
+        if (size0 != size1)
+        {
+            enable_broadcast = vx_true_e;
+            break;
+        }
+    }
+
+    /*************step 1:init tensor shape*****************/
+    for (i = 0; i < VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
+    {
+        sizes0[i] = 1;
+        sizes1[i] = 1;
+        sizes2[i] = 1;
+    }
+
+    /*************step 2:squeeze tensor shape*****************/
+    for (i = 0; i < TENSOR_DIM_NUM(output); i++)
+    {
+        vx_uint32 sz0 = TENSOR_DIM_NUM(input0) > i ? TENSOR_VIEW_SIZE_INDEX(input0, i) : 1;
+        vx_uint32 sz1 = TENSOR_DIM_NUM(input1) > i ? TENSOR_VIEW_SIZE_INDEX(input1, i) : 1;
+        vx_uint32 sz2 = TENSOR_DIM_NUM(output) > i ? TENSOR_VIEW_SIZE_INDEX(output, i) : 1;
+
+        if (sz0 == sz1 && sz0 == 1)
+        {
+            continue;
+        }
+        else
+        {
+            sizes0[cnt] = sz0;
+            sizes1[cnt] = sz1;
+            sizes2[cnt] = sz2;
+
+            cnt ++;
+            dims ++;
+        }
+    }
+
+    /*************step 3:reshape tensor shape*****************/
+    if (enable_broadcast == vx_false_e || enable_broadcast1)
+    {
+        if ((sizes2[0] * sizes2[1] < VIV_TENSOR_MAX_WIDTH ) && sizes2[2] < VIV_TENSOR_MAX_WIDTH && dims > 1)
+        {
+            sizes0[0] = sizes0[0] * sizes0[1];
+            sizes1[0] = sizes1[0] * sizes1[1];
+            sizes2[0] = sizes2[0] * sizes2[1];
+
+            for (i = 1; i < dims - 1; i++)
+            {
+                sizes0[i] = sizes0[i + 1];
+                sizes1[i] = sizes1[i + 1];
+                sizes2[i] = sizes2[i + 1];
+            }
+
+            sizes0[dims - 1] = 1;
+            sizes1[dims - 1] = 1;
+            sizes2[dims - 1] = 1;
+        }
+        else
+        {
+            vx_uint32 w0 = sizes0[0];
+            vx_uint32 h0 = sizes0[1];
+            vx_uint32 c0 = sizes0[2];
+            vx_uint32 w1 = sizes1[0];
+            vx_uint32 h1 = sizes1[1];
+            vx_uint32 c1 = sizes1[2];
+            vx_uint32 w2 = sizes2[0];
+            vx_uint32 h2 = sizes2[1];
+            vx_uint32 c2 = sizes2[2];
+
+
+            sizes0[0]   = gcmMAX(gcmMAX(w0, h0), c0);
+            sizes0[1]   = gcmMAX(gcmMIN(w0, h0), gcmMIN(gcmMAX(w0, h0), c0));
+            sizes0[2]   = gcmMIN(gcmMIN(w0, h0), c0);
+
+            sizes1[0]   = gcmMAX(gcmMAX(w1, h1), c1);
+            sizes1[1]   = gcmMAX(gcmMIN(w1, h1), gcmMIN(gcmMAX(w1, h1), c1));
+            sizes1[2]   = gcmMIN(gcmMIN(w1, h1), c1);
+
+            sizes2[0]   = gcmMAX(gcmMAX(w2, h2), c2);
+            sizes2[1]   = gcmMAX(gcmMIN(w2, h2), gcmMIN(gcmMAX(w2, h2), c2));
+            sizes2[2]   = gcmMIN(gcmMIN(w2, h2), c2);
+        }
+    }
+    else
+    {
+        if (dims == TENSOR_DIM_NUM(output))
+            status = VX_FAILURE;
+    }
+
+    if (status == VX_SUCCESS)
+        *dim_num = gcmMAX(dims, 1);
+
+    return status;
+}
+
+/*optimization for element-wise op*/
+VX_INTERNAL_API vx_status vxoGraph_Optimization_eltwiseOp(vx_graph graph)
+{
+    vx_int32 nodeIndex;
+    vx_int32 nodeCount = graph->nodeCount;
+    vx_node* nodeTable = graph->nodeTable;
+    gcmHEADER_ARG("graph=%p", graph);
+    vxmASSERT(graph);
+
+    for (nodeIndex = 0; nodeIndex < nodeCount; nodeIndex++)
+    {
+        vx_node node = nodeTable[nodeIndex];
+
+        if(vxoGraph_getKernelType(node) == OP_ELTWISE_ASMD || vxoGraph_getKernelType(node) == OP_ADD_SUB)
+        {
+            vx_status status = VX_SUCCESS;
+            vx_tensor tensorIn[2]   = {(vx_tensor)node->paramTable[0], (vx_tensor)node->paramTable[1]};
+            vx_tensor output        = (vx_tensor)node->paramTable[node->numParameters - 1];
+            vx_uint32 inDims0[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+            vx_uint32 inDims1[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+            vx_uint32 outDims[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+            vx_uint32 dimcnt = 0;
+
+            /*for no-NN chip, add can be optimzed with this feature, or do NN optimization*/
+            if(vxoGraph_getKernelType(node) == OP_ADD_SUB && vxoGraphOptimization_nnHalSupport((vx_tensor)node->paramTable[0]))
+            {
+                continue;
+            }
+
+            status = vxoGraph_Optimization_EltwiseTensorShapeOpt(tensorIn[0], tensorIn[1], output, inDims0, inDims1, outDims, &dimcnt);
+
+            if (status == VX_SUCCESS)
+            {
+                vx_tensor newinput0 = vxoTensor_ReshapeTensor(tensorIn[0], (vx_int32*)inDims0, dimcnt);
+                vx_tensor newinput1 = vxoTensor_ReshapeTensor(tensorIn[1], (vx_int32*)inDims1, dimcnt);
+                vx_tensor newoutput = vxoTensor_ReshapeTensor(output, (vx_int32*)outDims, dimcnt);
+                CHECK_NULL(newinput0);
+                CHECK_NULL(newinput1);
+                CHECK_NULL(newoutput);
+
+                CHECK_STATUS(vxoNode_SetParameter(node, 0, (vx_reference)newinput0) );
+                CHECK_STATUS(vxoNode_SetParameter(node, 1, (vx_reference)newinput1) );
+                CHECK_STATUS(vxoNode_SetParameter(node, node->numParameters - 1, (vx_reference)newoutput) );
+
+                CHECK_STATUS(vxoTensor_ReleaseTensor(&newinput0) );
+                CHECK_STATUS(vxoTensor_ReleaseTensor(&newinput1) );
+                CHECK_STATUS(vxoTensor_ReleaseTensor(&newoutput) );
+            }
+
+        }/*if(vxoGraph_getKernelType(node) == OP_ADD_SUB)*/
+    }/*for (nodeIndex = 0; nodeIndex < nodeCount; nodeIndex++)*/
+
+    REBUILD_TOPOLOGY_GRAPH();
+    OPTIMIZATION_RESLUT();
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
+    return VX_SUCCESS;
+}
+
+
 VX_INTERNAL_API vx_status vxoGraph_Optimization(vx_graph graph)
 {
     vx_status status = VX_SUCCESS;
@@ -4021,6 +4208,9 @@ VX_INTERNAL_API vx_status vxoGraph_Optimization(vx_graph graph)
 
         if(context->options.enableTransformNMConv && !vxoGraphOptimization_isV8((vx_reference)graph))
             vxoGraph_Optimization_transformConvNxM(graph);
+
+        if(context->options.enableGraphEltwiseOpShape)
+            vxoGraph_Optimization_eltwiseOp(graph);
 
         if(context->options.enableGraphConvertTensorAdd)
             vxoGraph_Optimization_TensorAdd2Conv(graph);
@@ -4061,6 +4251,7 @@ VX_INTERNAL_API vx_status vxoGraph_Optimization(vx_graph graph)
 
     if(context->options.enableGraphDump)
         vxmONERROR(vxoGraph_Optimization_dumpTopology(graph, "final_graph_topology.json"));
+
 OnError:
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;

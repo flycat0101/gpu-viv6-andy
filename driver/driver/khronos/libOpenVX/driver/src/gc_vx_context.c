@@ -390,6 +390,14 @@ VX_PRIVATE_API void vxoContext_FetchOptionsForTransferGraph(vx_context context, 
     }
 
     pos = gcvNULL;
+    if(gcoOS_StrStr(envctrl, "-eltwiseOp:", &pos) && pos)
+    {
+        pos += sizeof("-eltwiseOp:") -1;
+        context->options.enableGraphEltwiseOpShape = atoi(pos);
+    }
+
+
+    pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-swap:", &pos) && pos)
     {
         pos += sizeof("-swap:") -1;
@@ -906,6 +914,7 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
     context->options.enableGraphConvertBatchFC2NNConv = 1;
     context->options.enableGraphConvertAvgPool2Conv = 1;
     context->options.enableGraphConvertTensorAdd = 1;
+    context->options.enableGraphEltwiseOpShape = 1;
     context->options.enableGraphUnrollDWConv = 1;
     context->options.enableGraphConvertConv2Fc = 1;
     context->options.enableGraphSwaplayer = 1;
