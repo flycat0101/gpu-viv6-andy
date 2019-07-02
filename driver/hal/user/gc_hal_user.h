@@ -5002,7 +5002,9 @@ gcoHARDWARE_QuerySRAM(
     IN gcoHARDWARE Hardware,
     IN gceSRAM  Type,
     OUT gctUINT32 *Base,
-    OUT gctUINT32 *Size
+    OUT gctUINT32 *Size,
+    OUT gctPHYS_ADDR_T *gpuPhysical,
+    OUT gctPHYS_ADDR_T *cpuPhysical
     );
 
 /******************************************************************************

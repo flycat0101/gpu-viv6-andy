@@ -7382,7 +7382,9 @@ gcoHARDWARE_QuerySRAM(
     IN gcoHARDWARE Hardware,
     IN gceSRAM  Type,
     OUT gctUINT32 *Base,
-    OUT gctUINT32 *Size
+    OUT gctUINT32 *Size,
+    OUT gctPHYS_ADDR_T *gpuPhysical,
+    OUT gctPHYS_ADDR_T *cpuPhysical
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -7397,6 +7399,16 @@ gcoHARDWARE_QuerySRAM(
 
         if (Size)
             *Size = Hardware->config->sRAMSizes[Type];
+
+        if (gpuPhysical)
+        {
+            *gpuPhysical = Hardware->options.sRAMPhysicalBases[Type];
+        }
+
+        if (cpuPhysical)
+        {
+            *cpuPhysical = Hardware->options.sRAMCPUPhysicalBases[Type];
+        }
     }
     else
     {

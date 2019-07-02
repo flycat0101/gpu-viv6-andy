@@ -1037,6 +1037,8 @@ VX_PRIVATE_API vx_status QuerySRAM(
     gceSRAM             type,
     gctUINT32*          sRamPhysical,
     gctPOINTER*         sRamLogical,
+    gctUINT32*          sRamGpuPhysical,
+    gctPHYS_ADDR_T*     sRamCpuPhysical,
     gctUINT32*          sRamSize,
     gcsSURF_NODE_PTR*   sRamNode
     )
@@ -1048,13 +1050,15 @@ VX_PRIVATE_API vx_status QuerySRAM(
     gctPOINTER          logical = VX_NULL;
     gctUINT32           physical = 0xFFFFFFFF;
     gctUINT32           size = 0;
+    gctPHYS_ADDR_T      gpuPhysical = ~0ull;
+    gctPHYS_ADDR_T      cpuPhysical = ~0ull;
 
     gctUINT32           customizedAxiSRAMSize = context->nnConfig.customizedFeature.axiSRAMSize;
     gctUINT32           customizedVipSRAMSize = context->nnConfig.customizedFeature.vipSRAMSize;
     gcmHEADER_ARG("context=%p, type=%p, sRamPhysical=%p, sRamLogical=%p, sRamSize=%p, sRamNode=%p",
         context, type, sRamPhysical, sRamLogical, sRamSize, sRamNode);
 
-    status = gcoHAL_QuerySRAM(gcvNULL, type, &physical, &size);
+    status = gcoHAL_QuerySRAM(gcvNULL, type, &physical, &size, &gpuPhysical, &cpuPhysical);
     if (gcmIS_ERROR(status))
     {
         vxStatus = VX_FAILURE;
@@ -1076,6 +1080,8 @@ VX_PRIVATE_API vx_status QuerySRAM(
                     goto OnError;
                 }
 
+                gpuPhysical = 0;
+                cpuPhysical = 0;
             }
             else
             {
@@ -1106,13 +1112,10 @@ VX_PRIVATE_API vx_status QuerySRAM(
                     vxStatus = VX_ERROR_NO_MEMORY;
                     goto OnError;
                 }
-
             }
         }
         else
         {
-            physical = 0xFFFFFFFF;
-            size = 0;
             vxStatus = VX_ERROR_INVALID_VALUE;
             goto OnError;
         }
@@ -1120,6 +1123,7 @@ VX_PRIVATE_API vx_status QuerySRAM(
     else
     {
         vxStatus = VX_ERROR_INVALID_VALUE;
+        goto OnError;
     }
 
     *sRamPhysical = physical;
@@ -1127,6 +1131,8 @@ VX_PRIVATE_API vx_status QuerySRAM(
     *sRamSize = size;
     *sRamNode = node;
 
+    if (sRamGpuPhysical) *sRamGpuPhysical = (gctUINT32)gpuPhysical;
+    if (sRamCpuPhysical) *sRamCpuPhysical = cpuPhysical;
 
 OnError:
     gcmFOOTER_ARG("%d", vxStatus);
@@ -1141,21 +1147,22 @@ VX_PRIVATE_API vx_status vxoContext_InitSRAM(
     vx_status           status = VX_SUCCESS;
     gcsSURF_NODE_PTR    axiSRAMNode = VX_NULL;
     gctPOINTER          axiSRAMLogical = VX_NULL;
-    gctUINT32           axiSRAMPhysical = 0;
+    gctUINT32           axiSRAMPhysical = ~0ul;
     gctUINT32           axiSRAMSize = 0;
+    gctUINT32           axiSRAMGpuPhysical = ~0ul;
 
     gcsSURF_NODE_PTR    vipSRAMNode = VX_NULL;
     gctPOINTER          vipSRAMLogical = VX_NULL;
-    gctUINT32           vipSRAMPhysical = 0;
+    gctUINT32           vipSRAMPhysical = ~0ul;
     gctUINT32           vipSRAMSize = 0;
 
     gcmHEADER_ARG("context=%p", context);
 
-    vxmONERROR(QuerySRAM(context, gcvSRAM_EXTERNAL0, &axiSRAMPhysical, &axiSRAMLogical, &axiSRAMSize, &axiSRAMNode));
-    vxmONERROR(QuerySRAM(context, gcvSRAM_INTERNAL, &vipSRAMPhysical, &vipSRAMLogical, &vipSRAMSize, &vipSRAMNode));
+    vxmONERROR(QuerySRAM(context, gcvSRAM_EXTERNAL0, &axiSRAMPhysical, &axiSRAMLogical, &axiSRAMGpuPhysical, gcvNULL, &axiSRAMSize, &axiSRAMNode));
+    vxmONERROR(QuerySRAM(context, gcvSRAM_INTERNAL, &vipSRAMPhysical, &vipSRAMLogical, gcvNULL, gcvNULL, &vipSRAMSize, &vipSRAMNode));
 
     vxmASSERT(vipSRAMSize != 0);
-    vxmASSERT(axiSRAMSize == 0 || axiSRAMPhysical != 0xFFFFFFFF);
+    vxmASSERT(axiSRAMSize == 0 || (axiSRAMPhysical != ~0ul && axiSRAMGpuPhysical != ~0ul));
 
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3))
     {
@@ -1167,7 +1174,15 @@ VX_PRIVATE_API vx_status vxoContext_InitSRAM(
     {
         if (axiSRAMSize != 0)
         {
-            gcmVERIFY_OK(gcoVX_SetRemapAddress(axiSRAMPhysical, axiSRAMPhysical + axiSRAMSize, gcvVX_OCB_REMAP));
+            if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_XYDP0))
+            {
+                /* v8 */
+                gcmVERIFY_OK(gcoVX_SetRemapAddress(axiSRAMPhysical, axiSRAMPhysical + axiSRAMSize, gcvVX_OCB_REMAP));
+            }
+            else
+            {
+                gcmVERIFY_OK(gcoVX_SetRemapAddress(axiSRAMGpuPhysical, axiSRAMGpuPhysical + axiSRAMSize, gcvVX_OCB_REMAP));
+            }
         }
         else
         {

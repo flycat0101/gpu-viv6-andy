@@ -687,7 +687,9 @@ gcoHAL_QuerySRAM(
     IN gcoHAL Hal,
     IN gceSRAM Type,
     OUT gctUINT32 *Base,
-    OUT gctUINT32 *Size
+    OUT gctUINT32 *Size,
+    OUT gctPHYS_ADDR_T *gpuPhysical,
+    OUT gctPHYS_ADDR_T *cpuPhysical
     );
 
 #ifdef LINUX
