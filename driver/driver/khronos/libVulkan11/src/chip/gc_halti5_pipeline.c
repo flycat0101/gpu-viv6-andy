@@ -5531,7 +5531,7 @@ static VkResult halti5_pip_build_gfxshaders(
             __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(decodeInfo, &hShaderArray[shaderType]))
                                         ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
 
-            halti5_helper_createVscShaderResLayout(pip, chipPipeline->vscResLayout, shaderType, &vscShaderResLayout);
+            __VK_ONERROR(halti5_helper_createVscShaderResLayout(pip, chipPipeline->vscResLayout, shaderType, &vscShaderResLayout));
             vscCompileParams.hShader = hShaderArray[shaderType];
             vscCompileParams.pShResourceLayout = &vscShaderResLayout;
             __VK_ONERROR((gcvSTATUS_OK == vscCompileShader(&vscCompileParams, gcvNULL))
@@ -6036,7 +6036,7 @@ static VkResult halti5_pip_build_computeshader(
         __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(&decodeInfo, &virShader))
                                     ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
 
-        halti5_helper_createVscShaderResLayout(pip, chipPipeline->vscResLayout, VSC_SHADER_STAGE_CS, &vscShaderResLayout);
+        __VK_ONERROR(halti5_helper_createVscShaderResLayout(pip, chipPipeline->vscResLayout, VSC_SHADER_STAGE_CS, &vscShaderResLayout));
         vscCompileParams.hShader = virShader;
         vscCompileParams.pShResourceLayout = &vscShaderResLayout;
         __VK_ONERROR((gcvSTATUS_OK == vscCompileShader(&vscCompileParams, gcvNULL))
