@@ -1382,7 +1382,6 @@ VX_PRIVATE_API vx_context vxoContext_Create()
                 vxError("VX_EXTENSION_LIBS = %s, but load library failed!", oldEnv);
             }
         }
-
         vxoContext_InitSRAM(context);
     }
 #if gcdUSE_SINGLE_CONTEXT
