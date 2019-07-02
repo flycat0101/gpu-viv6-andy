@@ -80,6 +80,23 @@ static int cmpfunc(
     return -1;
 }
 
+static VkBaseInStructure* get_object_by_type(VkBaseInStructure* pObj, VkStructureType types)
+{
+    while (pObj)
+    {
+        if (pObj->sType == types)
+        {
+            return pObj;
+        }
+        else
+        {
+            pObj = (VkBaseInStructure*)pObj->pNext;
+        }
+    }
+
+    return gcvNULL;
+}
+
 VkResult halti5_helper_convert_VertexAttribDesc(
     __vkDevContext *devCtx,
     uint32_t count,
@@ -5358,6 +5375,18 @@ static VkResult halti5_pip_build_gfxshaders(
             decodeInfo->tcsInputVertices = info->pTessellationState ? info->pTessellationState->patchControlPoints : 0;
             decodeInfo->funcCtx = shaderModule->funcTable;
             decodeInfo->subPass = pip->subPass;
+
+            if (shaderType == VSC_SHADER_STAGE_HS || shaderType == VSC_SHADER_STAGE_DS)
+            {
+                VkPipelineTessellationDomainOriginStateCreateInfo *domain = (VkPipelineTessellationDomainOriginStateCreateInfo*)get_object_by_type(
+                                                                                 (VkBaseInStructure*)info->pTessellationState,
+                                                                                 VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_DOMAIN_ORIGIN_STATE_CREATE_INFO
+                                                                                 );
+                if (domain != gcvNULL && domain->domainOrigin == VK_TESSELLATION_DOMAIN_ORIGIN_LOWER_LEFT)
+                {
+                    decodeInfo->specFlag = SPV_SPECFLAG_LOWER_LEFT_DOMAIN;
+                }
+            }
 
             if (shaderType == VSC_SHADER_STAGE_PS)
             {
