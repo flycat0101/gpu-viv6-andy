@@ -2205,12 +2205,14 @@ gctCONST_STRING  Options
                 temPos = pos;
                 for(; pos; pos++)
                 {
-                    if (*pos != ' ')
+                    if (*pos == '\0' || *pos == '-')
+                        break;
+                    else if (*pos != ' ')
                         continue;
                     else
-                        len2 = gcoOS_StrLen(pos, gcvNULL);
-                    break;
+                        break;
                 }
+                len2 = gcoOS_StrLen(pos, gcvNULL);
 
                 status = cloCOMPILER_ZeroMemoryAllocate(
                                                         PP->compiler,
@@ -2254,7 +2256,9 @@ gctCONST_STRING  Options
             }
             else if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "cl-std=", sizeof("cl-std=")-1))
             {
+                gctSIZE_T len1 = 0, len2 = 0;
                 gctSTRING languageVersion;
+                gctSTRING temPos;
 
                 /* Interception versionLanguage from option string */
                 pos += 7;
@@ -2263,12 +2267,24 @@ gctCONST_STRING  Options
                     if (*pos == ' ')
                         continue;
                     else
+                        len1 = gcoOS_StrLen(pos, gcvNULL);
+                    break;
+                }
+                temPos = pos;
+                for(; pos; pos++)
+                {
+                    if (*pos == '\0' || *pos == '-')
+                        break;
+                    else if (*pos != ' ')
+                        continue;
+                    else
                         break;
                 }
+                len2 = gcoOS_StrLen(pos, gcvNULL);
 
                 status = cloCOMPILER_ZeroMemoryAllocate(
                                                         PP->compiler,
-                                                        6,
+                                                        (len1 - len2) + 1,
                                                         &pointer
                                                         );
                 if (gcmIS_ERROR(status))
@@ -2276,7 +2292,7 @@ gctCONST_STRING  Options
                     return status;
                 }
                 languageVersion = pointer;
-                gcoOS_StrCopySafe(languageVersion, 6, pos);
+                gcoOS_StrCopySafe(languageVersion, (len1 - len2) + 1, temPos);
 
                 status = cloCOMPILER_SetLanguageVersion(PP->compiler, languageVersion);
                 if(gcmIS_ERROR(status))
@@ -2300,7 +2316,6 @@ gctCONST_STRING  Options
                     gcmVERIFY_OK(cloCOMPILER_Free(PP->compiler, languageVersion));
                     languageVersion = gcvNULL;
                 }
-                pos += 5;
             }
             else
             {
