@@ -6053,6 +6053,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_ValidateOutput(vx_node node
     return VX_SUCCESS;
 }
 
+#define INPUT_SIZE_ALIGN_4  (4)
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status  status                     = VX_SUCCESS;
@@ -6063,6 +6064,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, c
     vx_enum    inputFormat             = TENSOR_DATA_TYPE(src);
     vx_enum    outputFormat            = TENSOR_DATA_TYPE(dst);
     vx_bool    shExe_flag              = vx_false_e;
+    vx_bool    enable_dataConv2F32     = vx_false_e;
+    vx_uint32  convtF32_Sizes[4]       = {1, 1, 1, 1};
+    vx_uint32  convtF32_Dims           = 2;
     vxnne_tensor_copy  copyNode        = VX_NULL;
     vx_context context                 = vxGetContext((vx_reference)node);
 
@@ -6103,11 +6107,79 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, c
 
         if(context->evisNoInst.supportEVIS)
         {
+            if (inputFormat != VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+            {
+                vx_uint32 input_size[4] = {width0, height0, depth0, batch0};
+
+                if (src_elementCount < IMG_MAX_WIDTH)
+                {
+                    enable_dataConv2F32 = vx_true_e;
+                    convtF32_Sizes[0]   = src_elementCount;
+                }
+                else if ((width0 % INPUT_SIZE_ALIGN_4 == 0) ||
+                    (height0 % INPUT_SIZE_ALIGN_4 == 0) ||
+                    (depth0 % INPUT_SIZE_ALIGN_4 == 0) ||
+                    (batch0 % INPUT_SIZE_ALIGN_4 == 0))
+                {
+                    vx_uint32 i = 0;
+                    vx_uint32 j = 0;
+                    vx_uint32 sz0 = 0;
+                    vx_uint32 sz1 = 0;
+                    vx_uint32 sz2 = 0;
+
+                    for (i = 0; i < dimCount0; i++)
+                    {
+                        vx_uint32 shapeSz[3] = {1};
+                        vx_uint32 swp = input_size[i];
+                        input_size[i] = input_size[0];
+                        input_size[0] = swp;
+
+                        if (input_size[0] % INPUT_SIZE_ALIGN_4 != 0)
+                            continue;
+
+                        sz0 = input_size[0] * input_size[1] * input_size[2];
+                        sz1 = input_size[0] * input_size[1] * input_size[3];
+                        sz2 = input_size[0] * input_size[2] * input_size[3];
+
+                        shapeSz[0] = gcmMAX(gcmMAX(sz0, sz1), sz2);
+                        shapeSz[1] = gcmMAX(gcmMIN(sz0, sz1), gcmMIN(gcmMAX(sz0, sz1), sz2));
+                        shapeSz[2] = gcmMIN(gcmMIN(sz0, sz1), sz2);
+
+                        for (j = 0; j < 3; j++)
+                        {
+                            if (shapeSz[j] < IMG_MAX_WIDTH)
+                            {
+                                enable_dataConv2F32 = vx_true_e;
+                                convtF32_Sizes[0]   = shapeSz[j];
+                                convtF32_Sizes[1]   = src_elementCount / shapeSz[j];
+
+                                break;
+                            }
+                        }
+
+                        if (enable_dataConv2F32 == vx_false_e && input_size[0] < IMG_MAX_WIDTH)
+                        {
+                            enable_dataConv2F32 = vx_true_e;
+
+                            convtF32_Sizes[0]   = input_size[0];
+                            convtF32_Sizes[1]   = input_size[1];
+                            convtF32_Sizes[2]   = input_size[2] * input_size[3];
+
+                            convtF32_Dims = dimCount0;
+                            break;
+                        }
+                        else
+                            break;
+                    }
+                }
+            }
+
             shExe_flag = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
                                  || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
                                  || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
                                  || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
-                                 || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16))
+                                 || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
+                                 || enable_dataConv2F32)
                                  && src_elementCount == dst_elementCount);
         }
         else
@@ -6182,19 +6254,27 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, c
             vx_tensor output     = NULL;
             vx_int32   sizes[4]  = {0};
 
-            sizes[0]   = gcmMAX(gcmMAX(width0, height0), depth0);
-            sizes[1]   = gcmMAX(gcmMIN(width0, height0), gcmMIN(gcmMAX(width0, height0), depth0));
-            sizes[2]   = gcmMIN(gcmMIN(width0, height0), depth0) * batch0;
-            sizes[3]   = 1;
+            if (enable_dataConv2F32)
+            {
+                input     = vxoTensor_ReshapeTensor(src, (vx_int32*)convtF32_Sizes, convtF32_Dims);
+                output     = vxoTensor_ReshapeTensor(dst, (vx_int32*)convtF32_Sizes, convtF32_Dims);
+            }
+            else
+            {
+                sizes[0]   = gcmMAX(gcmMAX(width0, height0), depth0);
+                sizes[1]   = gcmMAX(gcmMIN(width0, height0), gcmMIN(gcmMAX(width0, height0), depth0));
+                sizes[2]   = gcmMIN(gcmMIN(width0, height0), depth0) * batch0;
+                sizes[3]   = 1;
 
-            input     = vxoTensor_ReshapeTensor(src, sizes, dimCount0);
+                input     = vxoTensor_ReshapeTensor(src, sizes, dimCount0);
 
-            sizes[0]   = gcmMAX(gcmMAX(width1, height1), depth1);
-            sizes[1]   = gcmMAX(gcmMIN(width1, height1), gcmMIN(gcmMAX(width1, height1), depth1));
-            sizes[2]   = gcmMIN(gcmMIN(width1, height1), depth1) * batch1;
-            sizes[3]   = 1;
+                sizes[0]   = gcmMAX(gcmMAX(width1, height1), depth1);
+                sizes[1]   = gcmMAX(gcmMIN(width1, height1), gcmMIN(gcmMAX(width1, height1), depth1));
+                sizes[2]   = gcmMIN(gcmMIN(width1, height1), depth1) * batch1;
+                sizes[3]   = 1;
 
-            output     = vxoTensor_ReshapeTensor(dst, sizes, dimCount1);
+                output     = vxoTensor_ReshapeTensor(dst, sizes, dimCount1);
+            }
 
             if(node->base.context->evisNoInst.supportEVIS)
             {
@@ -23538,7 +23618,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoAdapter_ValidateOutput(vx_node node, vx_
     return VX_SUCCESS;
 }
 
-#define INPUT_SIZE_ALIGN_4  (4)
 VX_PRIVATE_API vx_status VX_CALLBACK vxoAdapter_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status                      = VX_SUCCESS;
