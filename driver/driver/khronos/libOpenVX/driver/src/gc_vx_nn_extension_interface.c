@@ -7780,7 +7780,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalization_Initializer(vx_node node, 
     isuint8_flag       = (vx_bool)((acrossmap_flag && norm_config[0] && dataformat_flag[2])
         || (acrossmap_flag && norm_config[1] && dataformat_flag[2])
         || (acrossmap_flag && norm_config[2] && dataformat_flag[2]));
-    generic_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[0]) || (sammap_flag && dataformat_flag[3]));
+    generic_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[0]) || (sammap_flag && dataformat_flag[3])
+                                    || (dataformat_flag[1]));
     norm_shader_flag   = (vx_bool)((sammap_flag && norm_config[0] && dataformat_flag[0])
         || (acrossmap_flag && norm_config[0] && dataformat_flag[0])
         || (acrossmap_flag && norm_config[1] && dataformat_flag[0])
@@ -7923,7 +7924,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalizationLayer2_Initializer(vx_node 
     isuint8_flag       = (vx_bool)((acrossmap_flag && norm_config[0] && dataformat_flag[2])
         || (acrossmap_flag && norm_config[1] && dataformat_flag[2])
         || (acrossmap_flag && norm_config[2] && dataformat_flag[2]));
-    generic_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[0]) || (sammap_flag && dataformat_flag[3]));
+    generic_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[0]) || (sammap_flag && dataformat_flag[3])
+                                    || (dataformat_flag[1]));
     norm_shader_flag   = (vx_bool)((sammap_flag && norm_config[0] && dataformat_flag[0])
         || (acrossmap_flag && norm_config[0] && dataformat_flag[0])
         || (acrossmap_flag && norm_config[1] && dataformat_flag[0])
