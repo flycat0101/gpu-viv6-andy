@@ -2102,8 +2102,6 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
                 TENSOR_DATA_TYPE(opInfo.output),
                 TENSOR_STRIDE_INDEX(opInfo.output, 2)));
 
-            vxoWeightsBiases_Clear(convOperation->weights_biases);
-
             outImageTileX  = convOperation->resultInfo.outImageTileXSize;
             outImageTileY  = convOperation->resultInfo.outImageTileYSize;
             interleaveMode = convOperation->resultInfo.interleaveMode;
@@ -2484,6 +2482,18 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
             }
 
             goto OnError;
+        }
+        else if (block->segments[i].type == VXNNE_SEGMENT_TYPE_AB)
+        {
+            vx_uint32 j = 0;
+            for (j = 0; j < block->segments[i].count; j++)
+            {
+                if (graph->layer->operations[j + block->segments[i].start]->target == VXNNE_OPERATION_TARGET_NN)
+                {
+                    vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[j + block->segments[i].start];
+                    vxoWeightsBiases_Clear(convOperation->weights_biases);
+                }
+            }
         }
 
         /* temp solution for wb's reshuffleWeightPtr free, need remove it when solve reference count issue */
