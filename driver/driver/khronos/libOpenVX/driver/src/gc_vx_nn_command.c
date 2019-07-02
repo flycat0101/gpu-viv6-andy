@@ -4487,6 +4487,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluReluEnable       = 0;
             info->vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : (inFormat != outFormat ? 1 : 0));
             info->vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : (((inFormat != outFormat) && (outFormat != VX_TYPE_FLOAT16)) ? 1 : 0));
+            info->vx_nn_tp_cmd_info.aluInputPreshift    = 0;
+            info->vx_nn_tp_cmd_info.aluOutputPostshift  = ((inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0) - ((outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? outFPP : 0);
             break;
         }
 
