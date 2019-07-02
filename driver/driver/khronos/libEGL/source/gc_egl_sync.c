@@ -751,7 +751,7 @@ veglWaitSync(
         thread->error = EGL_BAD_PARAMETER;
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
-
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
 #if defined(WL_EGL_PLATFORM) || defined(EGL_API_WL)
     status = gcoOS_WaitNativeFence(gcvNULL, sync->fenceFD, 2000);
 
@@ -764,7 +764,7 @@ veglWaitSync(
         status = gcoOS_WaitNativeFence(gcvNULL, sync->fenceFD, gcvINFINITE);
     }
 #endif
-
+#endif
     /* Commit accumulated commands. */
     gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
 

@@ -2047,9 +2047,14 @@ _SwapBuffersRegion(
             }
             thread->pendingSignal = gcvNULL;
         }
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
         else if ((platform->platform == EGL_PLATFORM_GBM_VIV || platform->platform == EGL_PLATFORM_WAYLAND_VIV)
                   && (!synchronous)
                   && (!(platform->flags & EGL_PLATFORM_FLAG_GBM_ASYNC)))
+#else
+        else if ((platform->platform == EGL_PLATFORM_GBM_VIV) && (!synchronous) &&
+         (!(platform->flags & EGL_PLATFORM_FLAG_GBM_ASYNC)))
+#endif
         {
             /* Using android native fence sync. */
             if (!platform->postWindowBackBufferFence(dpy, draw,
