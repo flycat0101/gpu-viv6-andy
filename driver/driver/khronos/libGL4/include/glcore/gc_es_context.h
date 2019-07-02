@@ -1309,7 +1309,7 @@ extern GLvoid __glSetError(__GLcontext *gc, GLenum code);
 
 __GL_INLINE __GLcontext * __glGetGLcontext(GLvoid)
 {
-    gcsDRIVER_TLS_PTR tls;
+    gcsDRIVER_TLS_PTR tls = NULL;
     gcoOS_GetDriverTLS(gcvTLS_KEY_OPENGL, &tls);
     return (__GLcontext *) tls;
 }
