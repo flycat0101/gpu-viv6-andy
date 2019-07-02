@@ -172,14 +172,14 @@ ppoPREPROCESSOR_MacroExpand(
 
     for (i = 0; i < ms->argc; i++)
     {
-        if (headtail[i * ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG] == headtail[i *ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG + 1])
+        if (expanded_headtail[i * ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG] == expanded_headtail[i *ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG + 1])
         {
-            gcmONERROR(ppoTOKEN_Destroy(PP, headtail[i *ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG + 1]));
+            gcmONERROR(ppoTOKEN_Destroy(PP, expanded_headtail[i *ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG + 1]));
         }
         else
         {
-            ppoTOKEN ntoken = (ppoTOKEN)(headtail[i *ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG + 1]->inputStream.base.node.next);
-            ppoTOKEN nhead = headtail[i *ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG + 1];
+            ppoTOKEN ntoken = (ppoTOKEN)(expanded_headtail[i *ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG + 1]->inputStream.base.node.next);
+            ppoTOKEN nhead = expanded_headtail[i *ppvMAX_MACRO_EXPANDED_TOKEN_PER_ARG + 1];
 
             while(nhead)
             {
