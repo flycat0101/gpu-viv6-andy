@@ -11728,6 +11728,10 @@ VkResult halti5_updateDescriptorSet(
                         patchInfos[entryIdx].patchStages = binding->std.stageFlags;
                         patchInfos[entryIdx].patchFormat = chipImgv->patchFormat;
                         patchInfos[entryIdx].viewType = imgv->createInfo.viewType;
+                        if (curRegion.sampler == descSet->size.sampler)
+                        {
+                            samplers = (__vkSampler **)(descSet->samplers);
+                        }
                         if (samplers[0])
                         {
                             patchInfos[entryIdx].compareOp = samplers[0]->createInfo.compareOp;
