@@ -4967,7 +4967,7 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
 
             index = psOutputCount;
 
-            switch (index)
+            switch (ioIdx)
             {
             case 0:
                 psColorOutputState = ((((gctUINT32) (psColorOutputState)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
