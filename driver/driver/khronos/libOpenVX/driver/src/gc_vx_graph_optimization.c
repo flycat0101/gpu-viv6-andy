@@ -106,9 +106,8 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_copyConstData2tensor(void *data, v
 VX_INTERNAL_API vx_bool vxoGraphOptimization_avgPool(vx_uint32 input, vx_uint32 output, vx_uint32 *pad, vx_uint32 kernel, vx_uint32 stride)
 {
     vx_uint32 tmp = (input + pad[0] + pad[1] -kernel);
-    if(tmp % kernel != 0)
-        return vx_false_e;
-    if(tmp / kernel != output)
+
+    if(tmp % stride != 0)
         return vx_false_e;
 
     return vx_true_e;
