@@ -254,8 +254,8 @@ VX_INTERNAL_API vx_bool vxDataType_IsStatic(vx_type_e type)
 */
 #if gcdUSE_SINGLE_CONTEXT
 static vx_context   vxSingletonContext  = VX_NULL;
-static vx_mutex     vxContextGlobalLock = VX_NULL;
 #endif
+static vx_mutex     vxContextGlobalLock = VX_NULL;
 
 #if VX_USE_THREADPOOL
 VX_PRIVATE_API vx_bool vxNodeWorkerCallback(vx_threadpool_worker worker)
@@ -1248,14 +1248,14 @@ VX_PRIVATE_API vx_context vxoContext_Create()
     vx_context context = VX_NULL;
     gcmHEADER_ARG("context=%p", context);
 
-#if gcdUSE_SINGLE_CONTEXT
+
     if (vxContextGlobalLock == VX_NULL)
     {
         vxCreateMutex(OUT &vxContextGlobalLock);
     }
 
     vxAcquireMutex(vxContextGlobalLock);
-#endif
+
 
     gcoVX_ZeroMemorySize();
 
@@ -1272,6 +1272,8 @@ VX_PRIVATE_API vx_context vxoContext_Create()
         context = (vx_context)vxAllocate(sizeof(vx_context_s));
 
         if (context == VX_NULL) goto ErrorExit;
+
+        memset(context, 0, sizeof(vx_context_s));
 
         vxoReference_Initialize(&context->base, VX_NULL, VX_TYPE_CONTEXT, VX_NULL);
 
@@ -1367,9 +1369,9 @@ VX_PRIVATE_API vx_context vxoContext_Create()
 
         vxoReference_Increment(&context->base, VX_REF_EXTERNAL);
     }
+#endif
 
     vxReleaseMutex(vxContextGlobalLock);
-#endif
 
 #if VIVANTE_PROFILER
     vxoProfiler_Initialize(context);
@@ -1383,9 +1385,9 @@ VX_PRIVATE_API vx_context vxoContext_Create()
     return (vx_context)context;
 
 ErrorExit:
-#if gcdUSE_SINGLE_CONTEXT
+
     vxReleaseMutex(vxContextGlobalLock);
-#endif
+
 
     if (context != VX_NULL)
     {
@@ -1520,22 +1522,21 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
         return VX_ERROR_INVALID_REFERENCE;
     }
 
-#if gcdUSE_SINGLE_CONTEXT
+
     if (vxContextGlobalLock == VX_NULL)
     {
         gcmFOOTER_ARG("%d", VX_FAILURE);
         return VX_FAILURE;
     }
     vxAcquireMutex(vxContextGlobalLock);
-#endif
+
 
     gcfVX_Flush(gcvTRUE);
 
     if (!vxoContext_IsValid(context))
     {
-#if gcdUSE_SINGLE_CONTEXT
         vxReleaseMutex(vxContextGlobalLock);
-#endif
+
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_REFERENCE);
         return VX_ERROR_INVALID_REFERENCE;
     }
@@ -1671,9 +1672,9 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
 
         vxFree(context);
 
-#if gcdUSE_SINGLE_CONTEXT
         /* Free the global resources */
         vxReleaseMutex(vxContextGlobalLock);
+#if gcdUSE_SINGLE_CONTEXT
         vxDestroyMutex(vxContextGlobalLock);
         vxContextGlobalLock = VX_NULL;
 
@@ -1688,10 +1689,8 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
         vxWarning("vxoContext_Release(): the context, %p, still has %u reference count(s) in total",
                     vxoReference_GetTotalCount(&context->base));
 
-#if gcdUSE_SINGLE_CONTEXT
 
         vxReleaseMutex(vxContextGlobalLock);
-#endif
 
         gcmFOOTER_ARG("%d", VX_SUCCESS);
         return VX_SUCCESS;

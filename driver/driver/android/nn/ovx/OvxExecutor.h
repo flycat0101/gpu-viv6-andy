@@ -167,6 +167,8 @@ private:
     vx_tensor creatVirtualTensorByParam(vx_graph graph, vx_uint32 dimNum, vx_uint32 *dims, OperandType type, vx_float32 scale = 1.0f, int32_t zp = 0);
     vx_tensor creatVirtualTensorFromRTF(vx_graph graph, const VxRunTimeReferenceInfo &info);
 
+    vx_tensor creatTensorByParam(vx_context context, vx_uint32 dimNum, vx_uint32 *dims, OperandType type, vx_float32 scale, int32_t zp);
+
     void initalizeEnv();
     vx_status convertScalar2Tensor(VxRunTimeReferenceInfo* info);
 
