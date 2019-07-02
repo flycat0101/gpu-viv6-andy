@@ -13,7 +13,7 @@
 
 #include "gc_vk_precomp.h"
 
-#define __VK_SCRATCH_BUFFER_SIZE        32
+#define __VK_SCRATCH_BUFFER_SIZE        128
 
 #if (defined(DEBUG)||defined(_DEBUG))
 static VkBool32 g_dbgForceCacheFlushAndStallPerDraw = VK_FALSE;
