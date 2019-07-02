@@ -1116,6 +1116,7 @@ void initUndefinedHardwareConfig(vx_context context)
     context->nnConfig.unifiedFeature.conv1x1HalfPerformance = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_CONV1x1_PERF_FIX) ? 0 : 1;
     context->nnConfig.unifiedFeature.cacheLineModeDisabled = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_CACHELINE_MODE_PERF_FIX) ? 0 : 1;
     context->nnConfig.unifiedFeature.per3DTileBubbleFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER3DTILE_BUBBLE_FIX) ? 1 : 0;
+    context->nnConfig.unifiedFeature.lowEfficiencyOfIDWriteImgBufFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_LOW_EFFICIENCY_OF_ID_WRITE_IMGBUF_FIX) ? 1 : 0;
     context->nnConfig.unifiedFeature.tpReOrderFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_REORDER_FIX) ? 1 : 0;
     context->nnConfig.unifiedFeature.zdp3NoCompressFix = ((vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3) || vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6))
                                                           && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_ZDP3_NO_COMPRESS_FIX)) ? 1 : 0;

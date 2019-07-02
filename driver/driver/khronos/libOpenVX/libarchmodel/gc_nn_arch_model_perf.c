@@ -357,9 +357,12 @@ vx_status showArchPerformance(
         vxInfo("NumShaderCores: %d\n",
             context->nnConfig.fixedFeature.shaderCoreCount
             );
+
+        vxInfo("LOW_EFFICIENCY_OF_ID_WRITE_IMGBUF_FIX: %d\n",
+            context->nnConfig.unifiedFeature.lowEfficiencyOfIDWriteImgBufFix
+            );
+
         vxInfo("\n");
-
-
         gOrigShowType = (vx_int8)context->options.collectPerfType;
     }
 

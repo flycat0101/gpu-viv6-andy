@@ -197,6 +197,7 @@ typedef struct _gcsNN_UNIFIED_FEATURE
     gctUINT  axiSramOnlySWTiling : 1;
     gctUINT  imageNotPackedInSram : 1;
     gctUINT  coefDeltaCordOverFlowZRL8BitFix : 1;
+    gctUINT  lowEfficiencyOfIDWriteImgBufFix : 1;
     gctUINT  xyOffsetLimitationFix : 1;
 } gcsNN_UNIFIED_FEATURE;
 
