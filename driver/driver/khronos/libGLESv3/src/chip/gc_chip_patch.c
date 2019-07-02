@@ -18078,6 +18078,35 @@ gcChipPatchDEQP_DepthComponentFix(
     patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment20Shaders);
 }
 
+static void
+gcChipPatchSKQP_R8(
+    __GLcontext *gc,
+    __GLprogramObject *progObj,
+    const gctCHAR **patchedSrcs,
+    gctINT* index
+    )
+{
+    static gldREPLACE_SHADERS fragmentShaders[] =
+    {
+        {
+            gcvTRUE,
+            "\x98\xf4\xab\xed\x9f\xfe\x99\xda\xb5\xd9\xb6\xc4\xf9\x9e\xf2\xad"
+            "\xeb\x99\xf8\x9f\xdc\xb3\xdf\xb0\xc2\xec\x9b\xec\x9b\xec\xd7"
+            ,
+            "\x98\xf4\xab\xed\x9f\xfe\x99\xda\xb5\xd9\xb6\xc4\xf9\x8f\xea\x89"
+            "\xbd\x95\xf2\x9e\xc1\x87\xf5\x94\xf3\xb0\xdf\xb3\xdc\xae\x80\xf7"
+            "\xdb\xeb\xc5\xf5\xd9\xe9\xc7\xf7\xdb\xea\xc4\xf4\xdd\xe6"
+        },
+        {gcvFALSE, gcvNULL, gcvNULL}
+    };
+
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragmentShaders);
+}
+
 #define GLchipPatch_Shader          0x1
 #define GLchipPatch_Hardware        0x2
 
@@ -32506,6 +32535,28 @@ static __GLchipPatch gcChipPatches[] =
         gcChipPatchDEQP_DepthComponentFix,
     },
 
+    {
+        GC_CHIP_PATCH_SKQP_R8,
+        "8mm board does not support R8 format as RT",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+            gcvNULL,    /* VS */
+            gcvNULL,    /* TCS */
+            gcvNULL,    /* TES */
+            gcvNULL,    /* GS  */
+
+            /* FS */
+            "\x98\xf4\xab\xed\x9f\xfe\x99\xda\xb5\xd9\xb6\xc4\xf9\x9e\xf2\xad"
+            "\xeb\x99\xf8\x9f\xdc\xb3\xdf\xb0\xc2\xec\x9b\xec\x9b\xec\xd7"
+             ,
+            gcvNULL,    /* CS  */
+        },
+
+        gcChipPatchSKQP_R8,
+    },
+
     {GC_CHIP_PATCH_LAST, gcvNULL, 0, gcvFALSE, {gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL}, gcvNULL}
 };
 
@@ -32843,6 +32894,11 @@ gcChipGetPatchConditionTb(
         chipCtx->chipFeature.hwFeature.hasTxSwizzle)
     {
         chipCtx->doPatchCondition[GC_CHIP_PATCH_DEQP_DEPTHCOMPONENT_ES2] = GL_FALSE;
+    }
+
+    if (!((chipCtx->patchId == gcvPATCH_SKIA_SKQP) && (chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4653)))
+    {
+        chipCtx->doPatchCondition[GC_CHIP_PATCH_SKQP_R8] = GL_FALSE;
     }
 
     return;

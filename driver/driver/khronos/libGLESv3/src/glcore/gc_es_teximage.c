@@ -1434,6 +1434,16 @@ static GLboolean __glCheckTexCopyImgFmt(__GLcontext *gc, __GLtextureObject * tex
     case GL_RGB9_E5:
         __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
         break;
+    case GL_RED:
+        if (1 <= rtFormatInfo->redSize && rtFormatInfo->redSize <= 8)
+        {
+            texFormatInfo = __glGetFormatInfo(GL_R8);
+        }
+        else
+        {
+            __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+        }
+        break;
     default:
         texFormatInfo = __glGetFormatInfo(internalFormat);
         break;

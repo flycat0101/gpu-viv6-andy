@@ -3219,12 +3219,23 @@ gcChipNeedRecompile(
     {
         if (chipCtx->needRTRecompile)
         {
+            gceCHIPMODEL chipModel;
+            gctUINT32 chipRevision;
+            gcePATCH_ID patchID = gcvPATCH_INVALID;
+
+            gcoHAL_GetPatchID(gcvNULL, &patchID);
+            gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL);
+
             for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
             {
                 if (pgKeyState->staticKey->rtPatchFmt[i] != gcvSURF_UNKNOWN)
                 {
-                    pgStateKey->staticKey->rtPatchFmt[i] = pgKeyState->staticKey->rtPatchFmt[i];
-                    pgStateKeyMask->s.hasRtPatchFmt = 1;
+                    if (!((pgKeyState->staticKey->rtPatchFmt[i] == gcvSURF_R8_1_X8R8G8B8) &&
+                        (chipModel == gcv600 && chipRevision == 0x4653 && patchID == gcvPATCH_SKIA_SKQP)))
+                    {
+                        pgStateKey->staticKey->rtPatchFmt[i] = pgKeyState->staticKey->rtPatchFmt[i];
+                        pgStateKeyMask->s.hasRtPatchFmt = 1;
+                    }
                 }
 
                 if (pgKeyState->staticKey->removeAlpha[i])
