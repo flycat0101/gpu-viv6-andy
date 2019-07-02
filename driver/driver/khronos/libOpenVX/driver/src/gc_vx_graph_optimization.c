@@ -524,12 +524,6 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_updateTensorInGraph(vx_node curren
 
     gcmHEADER_ARG("currentNode=%p, oldTensor=%p, subtensor=%p, subTensorSize=0x%x", currentNode, oldTensor, newTensor, tensorSize);
 
-    if(tensorSize != currentNode->numParents)
-    {
-        vxInfo("do not update tensor in graph because maybe tensor view exists\n");
-        return VX_FAILURE;
-    }
-
     for (i = 0; i < tensorSize; i++)
     {
         for (j = 0; j < currentNode->numParents; j++)
