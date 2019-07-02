@@ -1446,6 +1446,7 @@ vx_status vxnneOperation_TP_Deinitialize(vxnne_operation_s *operation)
         operation->parameter.tp_value = VX_NULL;
     }
 
+    vxnneOperation_Deinitialize(operation);
     return VX_SUCCESS;
 }
 
@@ -1478,6 +1479,7 @@ vx_status vxnneOperation_ConvolutionReluPooling_Deinitialize(vxnne_operation_s *
         vxReleaseWeightsBiasesParameter(&op->swtWeightBiases);
     }
 
+    vxnneOperation_Deinitialize(operation);
     return VX_SUCCESS;
 }
 
@@ -1490,6 +1492,7 @@ vx_status vxnneOperation_DeConvoulutionNNE_Deinitialize(vxnne_operation_s *opera
         vxReleaseWeightsBiasesParameter(&op->weights_biases);
     }
 
+    vxnneOperation_Deinitialize(operation);
     return VX_SUCCESS;
 }
 
@@ -8129,6 +8132,7 @@ vx_status vxnnePoolingOperation_Deinitialize(vxnne_operation_s *operation)
         vxReleaseWeightsBiasesParameter(&pooling_operation->weights_biases);
     }
 
+    vxnneOperation_Deinitialize(operation);
     return VX_SUCCESS;
 }
 

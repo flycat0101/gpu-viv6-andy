@@ -500,12 +500,6 @@ vx_status showArchPerformance(
         perf->opType == VXNNE_OPERATOR_DEPTH_WISE_CONV ||
         perf->opType == VXNNE_OPERATOR_FULLYCONNECTED)
     {
-        vx_int32 coreIndex;
-        for (coreIndex = 0; coreIndex < perf->info.nnCores; coreIndex++)
-        {
-            vxInfo("maxPerCorePerVZGroupNonZeroRatios[%d]: %.15f\n", coreIndex, perf->maxPerCorePerVZGroupNonZeroRatios[coreIndex]);
-        }
-        vxInfo("maxPerCoreCompressionRatio: %.15f\n", perf->maxPerCoreCompressionRatio);
         vxInfo("coefNonZeroRatio: %.15f\ncoefCompression: %.15f\nimageCompression: %.15f\nimageNonZeroRatio: %.15f\n\n",
                  perf->coefNonZeroRatio,
                  perf->coefCompressRatio,
@@ -513,11 +507,6 @@ vx_status showArchPerformance(
                  perf->imageNonZeroRatio
                 );
 
-        for (coreIndex = 0; coreIndex < perf->info.nnCores; coreIndex++)
-        {
-            vxInfo("maxPerCorePerVZGroupNonZeroRatios[%d]_llu: %llu\n", coreIndex, *(vx_uint64 *)&perf->maxPerCorePerVZGroupNonZeroRatios[coreIndex]);
-        }
-        vxInfo("maxPerCoreCompressionRatio__llu: %llu\n", *(vx_uint64 *)&perf->maxPerCoreCompressionRatio);
         vxInfo("coefNonZeroRatio__llu: %llu\ncoefCompression_llu: %llu\nimageCompression_llu: %llu\nimageNonZeroRatio_llu: %llu\n\n",
                  *(vx_uint64 *)&perf->coefNonZeroRatio,
                  *(vx_uint64 *)&perf->coefCompressRatio,
@@ -2550,12 +2539,6 @@ vx_status calculateArchPerf(
         {
             if (wb != VX_NULL)
             {
-                vx_uint32 coreIndex = 0;
-                vxmASSERT(numCores <= VIV_MAX_NN_CORE_COUNT);
-                for (coreIndex = 0; wb->max_per_core_per_vzgroup_nzr && coreIndex < numCores; coreIndex++)
-                {
-                    perf->maxPerCorePerVZGroupNonZeroRatios[coreIndex] = wb->max_per_core_per_vzgroup_nzr[coreIndex];
-                }
                 perf->maxPerCoreCompressionRatio = wb->max_per_core_compression_ratio;
                 perf->coefNonZeroRatio  = WB_NON_ZERO_RATIO(wb);
                 perf->coefCompressRatio = WB_COMPRESS_RATIO(wb);

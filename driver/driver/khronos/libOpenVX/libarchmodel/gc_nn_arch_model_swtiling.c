@@ -3434,6 +3434,6 @@ error:
     if (yArray) vxFree(yArray);
     if (zArray) vxFree(zArray);
     if (sArray) vxFree(sArray);
-    deInitArchModelInfo(archModel, count);
+    deInitArchModelInfo(archModel, graph->layer->base.num_operations);
     return vxStatus;
 }
