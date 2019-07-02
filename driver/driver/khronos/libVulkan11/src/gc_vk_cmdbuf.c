@@ -2227,7 +2227,7 @@ OnError:
     __VK_ASSERT(0);
 }
 
-VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyBufferToImage
+ void  __vk_CmdCopyBufferToImage_helper
     (VkCommandBuffer commandBuffer,
     VkBuffer srcBuffer,
     VkImage dstImage,
@@ -2315,6 +2315,146 @@ OnError:
     __VK_ASSERT(0);
 }
 
+ void vk_CmdCopyBufferToCompatileImage(VkCommandBuffer commandBuffer,
+                                        VkBuffer srcBuffer,
+                                        VkImage dstImage,
+                                        VkImageLayout dstImageLayout,
+                                        uint32_t regionCount,
+                                        const VkBufferImageCopy* pRegions)
+ {
+    __vkImage *_dstImage = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage   *, dstImage);
+    uint32_t ir, il;
+    __vkDevContext *devCtx = ((__vkCommandBuffer*)commandBuffer)->devCtx;
+    __vkBuffer *pSrcBuf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, srcBuffer);
+    __vkImage *pDstImg = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage  *, dstImage);
+    __vkImage *shadowImg = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage  *, pDstImg->shadowImage);
+    VkResult result = VK_SUCCESS;
+    VkExtent2D  blockSize;
+
+    __vkImage fakedIamge;
+
+    __VK_ASSERT(_dstImage->shadowImage);
+    /*because we aways used shadow as orignal format ,so the origanl image  createinfo should be dealwith */
+    __vk_CmdCopyBufferToImage_helper(commandBuffer,srcBuffer, _dstImage->shadowImage, dstImageLayout, regionCount, pRegions);
+
+
+    __VK_MEMCOPY(&fakedIamge, pDstImg, sizeof(__vkImage));
+    pDstImg = &fakedIamge;
+
+    {
+        blockSize = shadowImg->formatInfo.blockSize;
+        if (shadowImg->formatInfo.bitsPerBlock == 128)
+        {
+            pDstImg->createInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+        }
+        else
+        {
+            pDstImg->createInfo.format = VK_FORMAT_R16G16B16A16_UINT;
+        }
+    }
+
+    for (ir = 0; ir < regionCount; ir++)
+    {
+        const __vkFormatInfo *fmtInfo;
+        __vkBlitRes srcRes, dstRes;
+        uint32_t srcWidth, srcHeight, srcSliceBytes;
+        uint32_t dstLayers;
+
+        srcRes.isImage = VK_FALSE;
+        srcRes.u.buf.pBuffer = pSrcBuf;
+        srcRes.u.buf.offset = pRegions[ir].bufferOffset;
+        srcRes.u.buf.rowLength = pRegions[ir].bufferRowLength / blockSize.width;
+        srcRes.u.buf.imgHeight = pRegions[ir].bufferImageHeight / blockSize.height;
+
+        dstRes.isImage = VK_TRUE;
+        dstRes.u.img.pImage = pDstImg;
+        dstRes.u.img.subRes.aspectMask = pRegions[ir].imageSubresource.aspectMask;
+        dstRes.u.img.subRes.mipLevel = pRegions[ir].imageSubresource.mipLevel;
+        dstRes.u.img.offset = pRegions[ir].imageOffset;
+        dstRes.u.img.extent = pRegions[ir].imageExtent;
+
+        dstRes.u.img.offset.x /= blockSize.width; /*offset is always multiple of blockSize*/
+        dstRes.u.img.offset.y /= blockSize.height;
+
+        dstRes.u.img.extent.width = gcmALIGN(dstRes.u.img.extent.width, blockSize.width) / blockSize.width; /*extend may not muliple of blcokSize*/
+        dstRes.u.img.extent.height = gcmALIGN(dstRes.u.img.extent.height, blockSize.height) / blockSize.height;
+
+        if (pDstImg->createInfo.imageType == VK_IMAGE_TYPE_3D)
+        {
+            /* According to vulkan spec, for 3D image, baseArrayLayer = 0, arrayLayers =1.
+            ** But for HW, 3D Image arrangement is the same as 2D Array. So we also use baseArrayLayer and arrayLayers.
+            */
+            dstRes.u.img.subRes.arrayLayer = pRegions[ir].imageOffset.z;
+            dstLayers = pRegions[ir].imageExtent.depth;
+            dstRes.u.img.extent.depth = 1;
+        }
+        else
+        {
+            dstRes.u.img.subRes.arrayLayer = pRegions[ir].imageSubresource.baseArrayLayer;
+            dstLayers = pRegions[ir].imageSubresource.layerCount;
+        }
+
+        fmtInfo = &pDstImg->formatInfo;
+        srcWidth  = (srcRes.u.buf.rowLength != 0)   ? srcRes.u.buf.rowLength   : dstRes.u.img.extent.width ;
+        srcHeight = (srcRes.u.buf.imgHeight != 0) ? srcRes.u.buf.imgHeight : dstRes.u.img.extent.height ;
+        srcWidth = gcmALIGN_NP2(srcWidth, fmtInfo->blockSize.width);
+        srcHeight = gcmALIGN_NP2(srcHeight, fmtInfo->blockSize.height);
+        srcSliceBytes = ((srcWidth / fmtInfo->blockSize.width) * fmtInfo->bitsPerBlock / 8) * (srcHeight / fmtInfo->blockSize.height);
+
+        if (dstRes.u.img.subRes.aspectMask == VK_IMAGE_ASPECT_STENCIL_BIT)
+        {
+            /*for stencil copy, the bitsPerBlock should be 8*/
+            __VK_ASSERT(pDstImg->createInfo.format == VK_FORMAT_S8_UINT || pDstImg->createInfo.format == VK_FORMAT_D24_UNORM_S8_UINT);
+            srcSliceBytes = ((srcWidth / fmtInfo->blockSize.width) * 8 / 8) * (srcHeight / fmtInfo->blockSize.height);
+        }
+
+        for (il = 0; il < dstLayers; il++)
+        {
+            __VK_ONERROR(devCtx->chipFuncs->CopyImage(
+                commandBuffer,
+                &srcRes,
+                &dstRes,
+                VK_FALSE,
+                VK_FILTER_NEAREST
+                ));
+#if __VK_RESOURCE_INFO
+            __vk_utils_insertCopyCmdRes(commandBuffer, &srcRes, &dstRes);
+#endif
+            srcRes.u.buf.offset += srcSliceBytes;
+            dstRes.u.img.subRes.arrayLayer++;
+        }
+    }
+
+    return;
+
+OnError:
+
+    __VK_ASSERT(0);
+
+
+ }
+
+VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyBufferToImage
+    (VkCommandBuffer commandBuffer,
+    VkBuffer srcBuffer,
+    VkImage dstImage,
+    VkImageLayout dstImageLayout,
+    uint32_t regionCount,
+    const VkBufferImageCopy* pRegions
+    )
+{
+     __vkImage *_dstImage = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage   *, dstImage);
+
+    if (_dstImage->shadowImage)
+    {
+          vk_CmdCopyBufferToCompatileImage(commandBuffer,srcBuffer, dstImage, dstImageLayout, regionCount, pRegions);
+    }
+    else
+    {
+        __vk_CmdCopyBufferToImage_helper(commandBuffer, srcBuffer, dstImage, dstImageLayout, regionCount, pRegions);
+    }
+}
+
 VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImageToBuffer(
     VkCommandBuffer commandBuffer,
     VkImage srcImage,
@@ -2337,6 +2477,10 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImageToBuffer(
         {
             return;
         }
+    }
+    if (pSrcImg->shadowImage)
+    {
+        pSrcImg = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage   *, pSrcImg->shadowImage);
     }
 
     for (ir = 0; ir < regionCount; ir++)

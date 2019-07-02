@@ -2276,7 +2276,43 @@ OnError:
 #endif
 #endif
 
+VkResult __vkCreateShadowImage(
+    VkDevice device,
+    __vkImage *image
+    )
+{
+    VkResult result = VK_SUCCESS;
+    __vkImage *img = image;
+    __vkImage *shadowImage;
+    VkImageCreateInfo imgCreateInfo;
+    VkMemoryRequirements imgMemReq;
+    VkDeviceMemory shadowMemory;
 
+    VkMemoryAllocateInfo memAllocInfo = {
+        VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        gcvNULL,
+        0,
+        0
+    };
+
+    __VK_MEMCOPY(&imgCreateInfo, &img->createInfo, sizeof(VkImageCreateInfo));
+    imgCreateInfo.flags &= ~VK_IMAGE_CREATE_BLOCK_TEXEL_VIEW_COMPATIBLE_BIT;
+
+    __vk_CreateImage(device, &imgCreateInfo, VK_NULL_HANDLE, &img->shadowImage);
+
+    __vk_GetImageMemoryRequirements(device, img->shadowImage, &imgMemReq);
+
+    memAllocInfo.allocationSize = imgMemReq.size;
+    __VK_ONERROR(__vk_AllocateMemory(device, &memAllocInfo, gcvNULL, &shadowMemory));
+    __VK_ONERROR(__vk_BindImageMemory(device, img->shadowImage, shadowMemory, 0));
+
+    shadowImage = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, img->shadowImage);
+    shadowImage->residentMemory = VK_TRUE;
+
+OnError:
+    __VK_ASSERT(result == VK_SUCCESS);
+    return result;
+}
 VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
     VkDevice device,
     const VkImageCreateInfo* pCreateInfo,
@@ -2300,7 +2336,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
         gctUINT width, height, depth;
         VkBool32 enableCC;
         uint32_t residentFormat;
-        VkBool32 isCompatiable128BppImage = VK_FALSE;
+        VkBool32 isCompatiableBppImage = VK_FALSE;
         VkExtent2D compressedBlockSize = {1, 1};
         __VK_ONERROR(__vk_CreateObject(devCtx, __VK_OBJECT_IMAGE, sizeof(__vkImage), (__vkObject**)&img));
 
@@ -2425,20 +2461,29 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
 
         /*for 128 bpp compatiable image, create with 2 layer format in driver*/
         if ((img->createInfo.flags & VK_IMAGE_CREATE_BLOCK_TEXEL_VIEW_COMPATIBLE_BIT) &&
-            img->formatInfo.compressed && img->formatInfo.bitsPerBlock == 128)
+            img->formatInfo.compressed && img->formatInfo.bitsPerBlock <= 128)
         {
-            isCompatiable128BppImage = VK_TRUE;
+            isCompatiableBppImage = VK_TRUE;
             compressedBlockSize = img->formatInfo.blockSize;
 
-            img->formatInfo = g_vkFormatInfoTable[__VK_FORMAT_R32G32B32A32_SFLOAT_2_R32G32_SFLOAT];
-            __vkGetAlign(devCtx, &img->formatInfo, pCreateInfo->tiling, &alignX, &alignY, &img->hAlignment, &img->halTiling);
+            if (img->formatInfo.bitsPerBlock == 128)
+            {
+                img->formatInfo = g_vkFormatInfoTable[__VK_FORMAT_R32G32B32A32_SFLOAT_2_R32G32_SFLOAT];
+                __vkGetAlign(devCtx, &img->formatInfo, pCreateInfo->tiling, &alignX, &alignY, &img->hAlignment, &img->halTiling);
+            }
+            else
+            {
+                img->formatInfo = g_vkFormatInfoTable[VK_FORMAT_R16G16B16A16_UINT];
+               __vkGetAlign(devCtx, &img->formatInfo, pCreateInfo->tiling, &alignX, &alignY, &img->hAlignment, &img->halTiling);
+
+            }
         }
 
         for (level = 0; level < pCreateInfo->mipLevels; ++level)
         {
             __vkImageLevel *pLevel = &img->pImgLevels[level];
 
-            if (isCompatiable128BppImage)
+            if (isCompatiableBppImage)
             {
                 uint32_t compatiableWidth, compatiableHeight;
 
@@ -2486,6 +2531,11 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
         img->memory = gcvNULL;
         img->memOffset = 0;
         img->shadowImage = VK_NULL_HANDLE;
+
+        if (isCompatiableBppImage)
+        {
+            __vkCreateShadowImage(device, img);
+        }
 
 #if defined(ANDROID) && (ANDROID_SDK_VERSION >= 24)
         if (pCreateInfo->pNext != NULL)

@@ -2611,6 +2611,8 @@ VkResult halti5_dispatch(
     __vkPhysicalDevice *phyDev = devCtx->pPhyDevice;
     uint32_t chipModel = phyDev->phyDevConfig.chipModel;
     uint32_t chipRevision = phyDev->phyDevConfig.chipRevision;
+    VkBool32 txClearPendingFix = devCtx->database->TX_CLEAR_PENDING_FIX;
+    uint32_t stall = 0;
 
     __VK_ASSERT(cmdBuf->curScrachBufIndex == 0);
 
@@ -2619,10 +2621,10 @@ VkResult halti5_dispatch(
         needWorkaround = VK_TRUE;
     }
 
-    if (needWorkaround &&(hints->workGrpSize.x == 1) && (hints->workGrpSize.y == 1) && (hints->workGrpSize.z == 1) &&
-       (!(hints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_COMPUTE] & gceMA_FLAG_BARRIER)) &&
-       (hints->localMemSizeInByte == 0) && (!hints->useLocalId) && (!hints->useGroupId) &&
-       (!hints->useGPRSpill[gcvPROGRAM_STAGE_COMPUTE]) && (x == y))
+    if ((!txClearPendingFix) && needWorkaround && (hints->workGrpSize.x == 1) &&
+        (hints->workGrpSize.y == 1) && (hints->workGrpSize.z == 1) && (!hints->useLocalId) &&
+        (hints->localMemSizeInByte == 0) && (!hints->useGroupId) && (!hints->useGPRSpill[gcvPROGRAM_STAGE_COMPUTE]) &&
+        (x == y) && (!(hints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_COMPUTE] & gceMA_FLAG_BARRIER)))
     {
         uint32_t globalSize[2];
         uint32_t preferSize[2] = {0};
@@ -2717,6 +2719,41 @@ VkResult halti5_dispatch(
     __VK_DEBUG_ONLY(if (!g_dbgSkipDraw) {)
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0248, VK_FALSE, 0xBADABEEB);
     __VK_DEBUG_ONLY(})
+
+    stall = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
+                   | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) (0x07 & ((gctUINT32) ((((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)));
+
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E02, VK_FALSE, stall);
+    *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)));*(*&pCmdBuffer)++ = (stall);
+;
+
 
     if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
     {
@@ -5564,8 +5601,16 @@ static VkResult halti5_syncShadowImage(
     VkResult result = VK_SUCCESS;
     __vkDevContext *devCtx = ((__vkCommandBuffer *)commandBuffer)->devCtx;
     __vkBlitRes pSrcRes, pDstRes;
-    __vkImage* shadowImage = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, image->shadowImage);
-    __vkImageLevel pSrcLevel = image->pImgLevels[subresourceRange.baseMipLevel];
+    __vkImage fakedIamge;
+    __vkImage* shadowImage ;
+    __vkImageLevel  pSrcLevel, pDstLevel ;
+
+    __VK_MEMCOPY(&fakedIamge, image, sizeof(__vkImage));
+    image = &fakedIamge;
+    image->createInfo.format = image->formatInfo.residentImgFormat;
+
+    shadowImage = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, image->shadowImage);
+    pSrcLevel = image->pImgLevels[subresourceRange.baseMipLevel];
 
     pSrcRes.isImage = VK_TRUE;
     pSrcRes.u.img.pImage = image;
@@ -5578,6 +5623,14 @@ static VkResult halti5_syncShadowImage(
     pSrcRes.u.img.extent.height = pSrcLevel.requestH;
     pSrcRes.u.img.extent.depth = pSrcLevel.requestD;
     __VK_MEMCOPY(&pDstRes, &pSrcRes, sizeof(__vkBlitRes));
+    pDstLevel = shadowImage->pImgLevels[subresourceRange.baseMipLevel];
+    pDstRes.u.img.offset.x = 0;
+    pDstRes.u.img.offset.y = 0;
+    pDstRes.u.img.offset.z = 0;
+    pDstRes.u.img.extent.width = pDstLevel.alignedW;
+    pDstRes.u.img.extent.height = pDstLevel.alignedW;
+    pDstRes.u.img.extent.depth = pDstLevel.requestD;
+
     pDstRes.u.img.pImage = shadowImage;
 
     __VK_ONERROR(devCtx->chipFuncs->CopyImage(
@@ -8965,8 +9018,7 @@ VkResult halti5_bindDescriptors(
          srcAccessMask |= pImageMemoryBarriers[i].srcAccessMask;
          dstAccessMask |= pImageMemoryBarriers[i].dstAccessMask;
 
-         if ((dstAccessMask & VK_ACCESS_SHADER_READ_BIT) &&
-             pImageMemoryBarriers[i].image)
+         if (dstAccessMask && pImageMemoryBarriers[i].image)
          {
             __vkImage* img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, pImageMemoryBarriers[i].image);
             if (img->shadowImage)
@@ -9389,8 +9441,7 @@ VkResult halti5_bindDescriptors(
         for (i = 0; i < imageMemoryBarrierCount; i++)
         {
 
-            if ((dstAccessMask & VK_ACCESS_SHADER_READ_BIT) &&
-                pImageMemoryBarriers[i].image)
+            if (pImageMemoryBarriers[i].image)
             {
                 __vkImage* img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, pImageMemoryBarriers[i].image);
                 if (img->shadowImage)

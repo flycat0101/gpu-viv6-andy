@@ -6523,6 +6523,7 @@ VkResult halti5_patch_pipeline(
     SHADER_HANDLE hShaderArrayCopy[VSC_MAX_SHADER_STAGE_COUNT];
     VkBool32 newInstance = VK_FALSE;
     struct _gcsHINT *vscHints = VK_NULL_HANDLE;
+    VkBool32 txClearPendingFix = devCtx->database->TX_CLEAR_PENDING_FIX;
 
     __VK_SET_ALLOCATIONCB(&pip->memCb);
     __VK_MEMZERO(hShaderArrayCopy, sizeof(hShaderArrayCopy));
@@ -6756,7 +6757,7 @@ VkResult halti5_patch_pipeline(
 
     vscHints = &vscProgInstance->hwStates.hints;
 
-    if (vscHints)
+    if (vscHints && (!txClearPendingFix))
     {
         for (j = 0; j < gcvPROGRAM_STAGE_LAST; j++)
         {

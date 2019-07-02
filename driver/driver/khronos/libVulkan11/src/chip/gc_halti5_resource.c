@@ -1025,44 +1025,6 @@ VkResult __vkComputeClearVal(
     return result;
 }
 
-VkResult __vkCreateShadowImage(
-    VkDevice device,
-    __vkImageView *imageView
-    )
-{
-    VkResult result = VK_SUCCESS;
-    __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imageView->createInfo.image);
-    __vkImage *shadowImage;
-    VkImageCreateInfo imgCreateInfo;
-    VkMemoryRequirements imgMemReq;
-    VkDeviceMemory shadowMemory;
-
-    VkMemoryAllocateInfo memAllocInfo = {
-        VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        gcvNULL,
-        0,
-        0
-    };
-
-    __VK_MEMCOPY(&imgCreateInfo, &img->createInfo, sizeof(VkImageCreateInfo));
-    imgCreateInfo.flags &= ~VK_IMAGE_CREATE_BLOCK_TEXEL_VIEW_COMPATIBLE_BIT;
-
-    __vk_CreateImage(device, &imgCreateInfo, VK_NULL_HANDLE, &img->shadowImage);
-
-    __vk_GetImageMemoryRequirements(device, img->shadowImage, &imgMemReq);
-
-    memAllocInfo.allocationSize = imgMemReq.size;
-    __VK_ONERROR(__vk_AllocateMemory(device, &memAllocInfo, gcvNULL, &shadowMemory));
-    __VK_ONERROR(__vk_BindImageMemory(device, img->shadowImage, shadowMemory, 0));
-
-    shadowImage = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, img->shadowImage);
-    shadowImage->residentMemory = VK_TRUE;
-
-OnError:
-    __VK_ASSERT(result == VK_SUCCESS);
-    return result;
-}
-
 VkResult halti5_helper_convertHwBltDesc(
     VkBool32 isSource,
     uint32_t vkFormat,
@@ -3421,7 +3383,7 @@ VkResult halti5_copyImage(
 #endif
         if (devCtx->database->CACHE128B256BPERLINE)
         {
-            if(srcImg->halTiling == gcvSUPERTILED)
+            if (srcImg->halTiling == gcvSUPERTILED)
             {
                 srcTileConfigEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:21) - (0 ?
@@ -3676,17 +3638,31 @@ VkResult halti5_copyImage(
             fmtInfo = &g_vkFormatInfoTable[dstFormat];
             rect = fmtInfo->blockSize;
 
-            dstTiling = 0x0;
-            dstSuperTile = 0x0;
-            dstTileConfigEx = 0;
-            srcOffset.x = gcmALIGN_NP2(srcOffset.x - rect.width  + 1, rect.width);
-            srcOffset.y = gcmALIGN_NP2(srcOffset.y - rect.height + 1, rect.height);
-            dstOffset.x = gcmALIGN_NP2(dstOffset.x - rect.width  + 1, rect.width);
-            dstOffset.y = gcmALIGN_NP2(dstOffset.y - rect.height + 1, rect.height);
-            srcExtent.width  = gcmALIGN_NP2(srcExtent.width, rect.width)  / rect.width;
-            srcExtent.height = gcmALIGN_NP2(srcExtent.height, rect.height) / rect.height;
-            dstExtent.width  = gcmALIGN_NP2(dstExtent.width, rect.width)  / rect.width;
-            dstExtent.height = gcmALIGN_NP2(dstExtent.height, rect.height) / rect.height;
+            /*dst is compressed or dst is buffer/src iscompressed*/
+            if (dstRes->isImage && dstRes->u.img.pImage->formatInfo.compressed || (!dstRes->isImage && (srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed)))
+            {
+                dstTiling = 0x0;
+                dstSuperTile = 0x0;
+                dstTileConfigEx = 0;
+
+                dstOffset.x = gcmALIGN_NP2(dstOffset.x - rect.width  + 1, rect.width) / rect.width;
+                dstOffset.y = gcmALIGN_NP2(dstOffset.y - rect.height + 1, rect.height)/ rect.height;
+
+                dstExtent.width  = gcmALIGN_NP2(dstExtent.width, rect.width)  / rect.width;
+                dstExtent.height = gcmALIGN_NP2(dstExtent.height, rect.height) / rect.height;
+            }
+            /*src is compressed or src is buffer/dst iscompressed*/
+            if (srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed || (!srcRes->isImage && (dstRes->isImage && dstRes->u.img.pImage->formatInfo.compressed)));
+            {
+                dstTiling = 0x0;
+                dstSuperTile = 0x0;
+                dstTileConfigEx = 0;
+
+                srcOffset.x = gcmALIGN_NP2(srcOffset.x - rect.width + 1, rect.width) / rect.width;
+                srcOffset.y = gcmALIGN_NP2(srcOffset.y - rect.height + 1, rect.height) / rect.height;
+                srcExtent.width = gcmALIGN_NP2(srcExtent.width, rect.width) / rect.width;
+                srcExtent.height = gcmALIGN_NP2(srcExtent.height, rect.height) / rect.height;
+            }
 
             if (dstBltDesc.pixelSize == 128)
             {
@@ -6359,7 +6335,7 @@ VkResult halti5_helper_convertHwTxDesc(
     if (imgv)
     {
         img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imgv->createInfo.image);
-        if (img->shadowImage)
+        if (img->shadowImage && imgv->formatInfo->compressed)
         {
             img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, img->shadowImage);
         }
@@ -6389,32 +6365,6 @@ VkResult halti5_helper_convertHwTxDesc(
         resourceMemory = img->memory;
         offsetInResourceMemory = img->memOffset;
         tiling = img->halTiling;
-
-        if ((img->createInfo.flags & VK_IMAGE_CREATE_BLOCK_TEXEL_VIEW_COMPATIBLE_BIT) &&
-            !residentFormatInfo->compressed && img->formatInfo.bitsPerBlock < 128)
-        {
-            const __vkFormatInfo *formatInfo = &g_vkFormatInfoTable[img->createInfo.format];
-            VkExtent2D rect = formatInfo->blockSize;
-            static __vkImageLevel fakedImageLevel = {0};
-            uint32_t width, height, depth;
-
-            tiling = gcvLINEAR;
-
-            width  = baseLevel->requestW;
-            height = baseLevel->requestH;
-            depth = baseLevel->requestD;
-
-            width  = gcmALIGN_NP2(width, rect.width ) / rect.width * img->sampleInfo.x;
-            height = gcmALIGN_NP2(height, rect.height) / rect.height * img->sampleInfo.y;
-
-            fakedImageLevel.requestW = width;
-            fakedImageLevel.requestH = height;
-            fakedImageLevel.requestD = depth;
-            fakedImageLevel.allocedW = width  * img->sampleInfo.x;
-            fakedImageLevel.allocedH = height * img->sampleInfo.y;
-            fakedImageLevel.stride = baseLevel->stride;
-            baseLevel = &fakedImageLevel;
-        }
 
         componentMapping = &imgv->createInfo.components;
         viewType = imgv->createInfo.viewType;
@@ -7132,22 +7082,6 @@ VkResult halti5_helper_convertHwImgDesc(
             tmpResidentImgFormat = imgv->createInfo.format;
         }
 
-        if (img->createInfo.flags & VK_IMAGE_CREATE_BLOCK_TEXEL_VIEW_COMPATIBLE_BIT &&
-            !imgv->formatInfo->compressed && img->formatInfo.bitsPerBlock < 128)
-        {
-            VkExtent2D rect = img->formatInfo.blockSize;
-
-            tiling = gcvLINEAR;
-
-            width  = baseLevel->requestW;
-            height = baseLevel->requestH;
-            width  = gcmALIGN_NP2(width, rect.width ) / rect.width;
-            height = gcmALIGN_NP2(height, rect.height) / rect.height;
-            stride = (uint32_t)baseLevel->stride;
-            extraPart = (residentFormatInfo->partCount > 1);
-            partSize = (uint32_t)baseLevel->partSize;
-        }
-        else
         {
             width  = userSize ? userSize->width  : baseLevel->requestW;
             height = userSize ? userSize->height : baseLevel->requestH;
@@ -10808,11 +10742,6 @@ VkResult halti5_createImageView(
         if (!imgv->formatInfo->compressed)
         {
             chipImgv->isCompatiableImage = VK_TRUE;
-        }
-
-        if (imgv->formatInfo->compressed && img->formatInfo.bitsPerBlock == 128)
-        {
-            __vkCreateShadowImage(device, imgv);
         }
     }
 
