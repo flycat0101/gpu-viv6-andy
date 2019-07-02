@@ -59,7 +59,15 @@ public:
 #ifndef MULTI_CONTEXT
         mContext = vxCreateContext();
 #endif
-        pthread_mutex_init(&mMutex, nullptr);
+        pthread_mutexattr_t attr;
+
+        pthread_mutexattr_init(&attr);
+
+        pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+
+        pthread_mutex_init(&mMutex, &attr);
+
+        pthread_mutexattr_destroy(&attr);
     }
     ~OvxDevice() override {
 

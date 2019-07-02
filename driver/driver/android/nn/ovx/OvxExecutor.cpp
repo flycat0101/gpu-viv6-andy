@@ -2407,6 +2407,11 @@ int OvxExecutor::run(const Model& model, const Request& request,
         LOG(INFO)<<"time of copying  device to host: "<<(t3 - t2) * 1000<<"ms\n";
         }
 
+    if (*mContext != nullptr && *mContext != mPreContext)
+    {
+        mPreContext = *mContext;
+    }
+
 
     return ANEURALNETWORKS_NO_ERROR;
 }
@@ -2518,17 +2523,17 @@ bool OvxExecutor::deinitializeRunTimeInfo() {
         }
     }
 
-    if (mGraph)
+    if (mGraph && (mPreContext == vxGetContext((vx_reference)mGraph)))
     {
         vxReleaseGraph(&mGraph);
         mGraph = nullptr;
     }
 
 #ifdef MULTI_CONTEXT
-    if (*mContext)
+    if (mPreContext)
     {
-        vxReleaseContext(mContext);
-        *mContext = nullptr;
+        vxReleaseContext(&mPreContext);
+        mPreContext = nullptr;
     }
 #endif
 

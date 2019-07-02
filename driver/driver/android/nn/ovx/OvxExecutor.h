@@ -172,6 +172,8 @@ private:
 
     vx_context* mContext = nullptr;
 
+    vx_context mPreContext = nullptr;
+
     vx_graph mGraph = nullptr;
 
     pthread_mutex_t* mMutex = nullptr;
