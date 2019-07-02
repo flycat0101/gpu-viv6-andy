@@ -1328,7 +1328,7 @@ VX_INTERNAL_API vx_node vxoGraphOptimization_transformConv(vx_node convNode, vx_
     CHECK_NULL(wb);
 
     if(depth_multiplier == 1)
-        node = vxConvolutionReluLayer(convNode->graph, input, wb, pad[0], pad[2], 0, overflow_policy, rounding_policy, down_scale_size_rounding, vx_false_e, output);
+        node = vxConvolutionReluLayer(convNode->graph, input, wb, pad[0], pad[2], 0, overflow_policy, rounding_policy, down_scale_size_rounding, enable_relu, output);
     else
         node = vxConvolutionReluPoolingLayer2(convNode->graph, input, wb, (vx_nn_convolution_relu_pooling_params)&wb_params,
             sizeof(wb_params), output);
