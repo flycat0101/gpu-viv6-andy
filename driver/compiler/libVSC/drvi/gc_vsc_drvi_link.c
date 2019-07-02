@@ -804,13 +804,24 @@ static gctBOOL _IsFakeSGV(VIR_Shader* pUpperShader, VIR_Shader* pLowerShader,
 }
 
 static gctBOOL _IsFakeSIV(VIR_Shader* pUpperShader, VIR_Shader* pLowerShader,
-                          VIR_NameId outputBuiltinName, gctBOOL bCalcllSlotOrHwCompIdx)
+                           VIR_Symbol* pOutputSym, gctBOOL bCalcllSlotOrHwCompIdx)
 {
+    VIR_NameId outputBuiltinName = VIR_Symbol_GetName(pOutputSym);
     if (outputBuiltinName == VIR_NAME_POSITION || outputBuiltinName == VIR_NAME_POINT_SIZE)
     {
         /* gl_Position and gl_PointSize (gl_out) for outputs of shader that is not linked
            to PS are faked builtins because they are not actually needed by RA FFU */
         if (pLowerShader->shaderKind != VIR_SHADER_FRAGMENT)
+        {
+            return gcvTRUE;
+        }
+        /* if gl_PointSize is never defined in vertex shader, treat it as faked
+         * TODO::another check is if driver is not drawing a point, gl_PointSize is faked (it need recompilation)
+         */
+        if (outputBuiltinName == VIR_NAME_POINT_SIZE &&
+            pUpperShader->shaderKind == VIR_SHADER_VERTEX &&
+            (!isSymStaticallyUsed(pOutputSym)) &&
+            (!isSymHasDef(pOutputSym)))
         {
             return gcvTRUE;
         }
@@ -994,7 +1005,7 @@ static VSC_ErrCode _LinkSVIoBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBase
 
         if (VIR_Shader_IsNameBuiltIn(pUpperShader, VIR_Symbol_GetName(pOutputSym))
             &&
-            !_IsFakeSIV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pOutputSym),
+            !_IsFakeSIV(pUpperShader, pLowerShader, pOutputSym,
                         (fslStage == FSL_STAGE_LL_SLOT_CALC)))
         {
             /* Mark this output used */
@@ -1057,7 +1068,7 @@ static VSC_ErrCode _LinkSVIoBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBase
 
         if (VIR_Shader_IsNameBuiltIn(pUpperShader, VIR_Symbol_GetName(pOutputSym))
             &&
-            !_IsFakeSIV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pOutputSym),
+            !_IsFakeSIV(pUpperShader, pLowerShader, pOutputSym,
                         (fslStage == FSL_STAGE_LL_SLOT_CALC)))
         {
             /* Mark this output used */
@@ -3078,7 +3089,7 @@ static void _CollectVectorizableIoPairs(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
                 pSoIoPairArray[*pSoPairArraySize].pAttrSym = gcvNULL;
 
                 if ((VIR_Shader_IsNameBuiltIn(pUpperShader, VIR_Symbol_GetName(pOutputSym)) &&
-                     !_IsFakeSIV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pOutputSym), gcvTRUE)) ||
+                     !_IsFakeSIV(pUpperShader, pLowerShader, pOutputSym, gcvTRUE)) ||
                      pSoSym != pOutputSym ||
                      VIR_Symbol_GetVirIoRegCount(pUpperShader, pOutputSym) > 1)
                 {
@@ -4242,7 +4253,7 @@ static VSC_ErrCode _CalcIoHwCompIndexBetweenTwoShaderStagesPerExeObj(VSC_BASE_LI
 
                 /* Skip SIV now */
                 if (VIR_Shader_IsNameBuiltIn(pUpperShader, VIR_Symbol_GetName(pOutputSym)) &&
-                    !_IsFakeSIV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pOutputSym), gcvTRUE))
+                    !_IsFakeSIV(pUpperShader, pLowerShader, pOutputSym, gcvTRUE))
                 {
                     continue;
                 }
@@ -4278,7 +4289,7 @@ static VSC_ErrCode _CalcIoHwCompIndexBetweenTwoShaderStagesPerExeObj(VSC_BASE_LI
 
             /* Skip SIV now */
             if (VIR_Shader_IsNameBuiltIn(pUpperShader, VIR_Symbol_GetName(pOutputSym)) &&
-                !_IsFakeSIV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pOutputSym), gcvTRUE))
+                !_IsFakeSIV(pUpperShader, pLowerShader, pOutputSym, gcvTRUE))
             {
                 continue;
             }
@@ -4321,7 +4332,7 @@ static VSC_ErrCode _CalcIoHwCompIndexBetweenTwoShaderStagesPerExeObj(VSC_BASE_LI
 
         /* Only consider SIVs */
         if (!(VIR_Shader_IsNameBuiltIn(pUpperShader, VIR_Symbol_GetName(pOutputSym)) &&
-              !_IsFakeSIV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pOutputSym), gcvTRUE)))
+              !_IsFakeSIV(pUpperShader, pLowerShader, pOutputSym, gcvTRUE)))
         {
             continue;
         }

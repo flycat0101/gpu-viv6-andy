@@ -7516,8 +7516,10 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
     /*
     ** Check if there is any no-assignment output.
     ** Right now only check gl_PointSize for GS to fix dEQP-VK.glsl.builtin.function.common.abs.float_highp_geometry.
+    *  Another check gl_PointSize in vertex shader if it has define or not
     */
-    if (VIR_Shader_GetKind(pShader) == VIR_SHADER_GEOMETRY)
+    if (VIR_Shader_GetKind(pShader) == VIR_SHADER_GEOMETRY ||
+        VIR_Shader_GetKind(pShader) == VIR_SHADER_VERTEX)
     {
         VIR_OutputIdList*       pOutputList = VIR_Shader_GetOutputs(pShader);
         gctUINT                 outputCount = VIR_IdList_Count(pOutputList);
@@ -7533,8 +7535,13 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
             {
                 defIdx = vscVIR_FindFirstDefIndex(pDuInfo, VIR_Symbol_GetVregIndex(pSym));
 
-                if (VIR_INVALID_DEF_INDEX != defIdx)
+                if (VIR_INVALID_DEF_INDEX != defIdx || VIR_Shader_GetKind(pShader) == VIR_SHADER_VERTEX)
                 {
+                    /* if vertex shader, do nothing except set hasDef flag */
+                    if (defIdx != VIR_INVALID_DEF_INDEX)
+                    {
+                        VIR_Symbol_SetFlag(pSym, VIR_SYMFLAG_HASDEF);
+                    }
                     continue;
                 }
 

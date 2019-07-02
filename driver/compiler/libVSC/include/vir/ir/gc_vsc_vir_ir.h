@@ -2966,6 +2966,7 @@ typedef enum VIR_SYMFLAG
     /* input/output flags */
     VIR_SYMFLAG_ISCENTROID                      = 0x00020000,
     VIR_SYMFLAG_ISSAMPLE                        = 0x00040000,
+    VIR_SYMFLAG_HASDEF                          = 0x20000000, /* output gl_PointSize has Def in vertex shader */
 
     /* input attribute flags */
     VIR_SYMFLAG_ISTEXTURE                       = 0x00080000,
@@ -3059,6 +3060,7 @@ typedef enum VIR_SYMFLAGEXT
 
 #define isSymDefinedByEVIS(sym)                 (((sym)->flags & VIR_SYMFLAG_DEFINED_BY_EVIS) != 0)
 
+#define isSymHasDef(sym)                        (((sym)->flags & VIR_SYMFLAG_HASDEF) != 0)
 /* function flags */
 #define isSymKernelFunction(sym)                (VIR_Symbol_isFunction(sym) && ((sym)->flags & VIR_SYMFLAG_ISKERNEL) != 0)
 #define isSymMainFunction(sym)                  (VIR_Symbol_isFunction(sym) && ((sym)->flags & VIR_SYMFLAG_ISMAIN) != 0)
