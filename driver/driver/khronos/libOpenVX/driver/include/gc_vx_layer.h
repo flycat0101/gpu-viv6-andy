@@ -2606,6 +2606,11 @@ vx_status vxoWeightsBiases_Compress(
     vx_int32                         z_offset
     );
 
+vx_status vxoWeightsBiases_Decompress(
+    vx_context                       context,
+    vx_weights_biases_parameter      wb
+    );
+
 vx_status vxnneOperation_Initialize(
     vxnne_operation_s               *operation,
     vxnne_layer                     layer,

@@ -2466,6 +2466,18 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
                     }
                     vxInfo("=======================================================================\n");
                 }
+                else
+                {
+                    vxmASSERT(block->segments[i].type == VXNNE_SEGMENT_TYPE_AB);
+                    for (j = 0; j < block->segments[i].count; j++)
+                    {
+                        if (graph->layer->operations[j + block->segments[i].start]->target == VXNNE_OPERATION_TARGET_NN)
+                        {
+                            vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[j + block->segments[i].start];
+                            vxoWeightsBiases_Decompress(graph->base.context, convOperation->weights_biases);
+                        }
+                    }
+                }
             }
 
             goto OnError;

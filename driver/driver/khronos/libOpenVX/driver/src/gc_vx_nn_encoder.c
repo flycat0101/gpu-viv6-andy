@@ -13759,6 +13759,30 @@ exit:
     return status;
 }
 
+vx_status vxoWeightsBiases_Decompress(
+    vx_context                       context,
+    vx_weights_biases_parameter      wb
+    )
+{
+    vx_uint32 index;
+
+    for (index = 0; index < wb->slice_num; index++)
+    {
+        wb->slice_array[index].memory_offset = 0;
+        wb->slice_array[index].memory_size = 0;
+    }
+
+    if (wb->memory.nodePtrs[0] != VX_NULL)
+    {
+        vxoMemory_Free(wb->base.context, &wb->memory);
+    }
+
+    wb->memory.allocated = vx_false_e;
+    wb->memory_size = 0;
+
+    return VX_SUCCESS;
+}
+
 VX_INTERNAL_CALLBACK_API void vxoWeightsBiases_Destructor(vx_reference ref)
 {
     vx_weights_biases_parameter wb = (vx_weights_biases_parameter)ref;
