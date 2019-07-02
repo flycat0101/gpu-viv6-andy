@@ -87,7 +87,8 @@ EXTERN_C_BEGIN
 #define GET_HW_FEATURE_PAD_BIT_SIZE(ref)        (((vx_reference)(ref) )->context->nnConfig.fixedFeature.nnInImageOffsetBits)
 #define GET_HW_FEATURE_MAD_PER_CORE(ref)        (((vx_reference)(ref) )->context->nnConfig.fixedFeature.nnMadPerCore)
 #define GET_HW_FEATURE_DWCONV(ref)              (((vx_reference)(ref) )->context->nnConfig.customizedFeature.depthWiseSupport)
-
+#define GET_HW_FEATURE_NN_CNT(ref)              (((vx_reference)(ref) )->context->nnConfig.fixedFeature.nnCoreCount)
+#define GET_HW_FEATURE_TP_CNT(ref)              (((vx_reference)(ref) )->context->nnConfig.fixedFeature.nnCoreCount)
 
 typedef enum _node_op_type_e
 {
@@ -107,6 +108,8 @@ typedef enum _node_op_type_e
     OP_ROIPOOL                  = 0x1<<12,
     OP_CONVOLUTION_PAD          = 0x1<<13,
     OP_ELTWISE_ASMD             = 0x1<<14, /*broadcast add/sub/mul/div*/
+    OP_RELU1                    = 0x1<<15,
+    OP_RELU6                    = 0x1<<16,
     OP_CONVOLUTION_RELU         = OP_CONVOLUTION | OP_RELU,
     OP_FULLYCONNECTED_RELU      = OP_FULLYCONNECTED | OP_RELU,
     OP_CONVOLUTION_POOLING      = OP_CONVOLUTION | OP_POOLING,

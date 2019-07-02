@@ -223,6 +223,10 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
         {
             if(SCALAR_VALUE(node->paramTable[1], u32) == VX_NN_ACTIVATION_RELU)
                 nodeOpType = OP_RELU;
+            else if(SCALAR_VALUE(node->paramTable[1], u32) == VX_NN_ACTIVATION_RELU1)
+                nodeOpType = OP_RELU1;
+            else if(SCALAR_VALUE(node->paramTable[1], u32) == VX_NN_ACTIVATION_RELU6)
+                nodeOpType = OP_RELU6;
             break;
         }
     case VX_KERNEL_NN_POOLING_LAYER2:
@@ -4215,7 +4219,47 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_eltwiseOp(vx_graph graph)
     return VX_SUCCESS;
 }
 
+/*
+the feautre: replace previous node's output with relu's output and
+this feature is only valid for quantized data type
+*/
+VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
+{
+    vx_int32 nodeIndex;
+    vx_int32 nodeCount = graph->nodeCount;
+    vx_node* nodeTable = graph->nodeTable;
 
+    gcmHEADER_ARG("graph=%p", graph);
+    vxmASSERT(graph);
+
+    for (nodeIndex = 0; nodeIndex < nodeCount; nodeIndex++)
+    {
+        vx_node node = nodeTable[nodeIndex];
+        vx_enum nodeType =  vxoGraphOptimization_getKernelType(node);
+
+        if(node->merged)    continue;
+
+        if((nodeType == OP_RELU || nodeType == OP_RELU1 || nodeType == OP_RELU6) &&
+            node->numParents == 1
+            )
+        {
+            vx_enum dataType = TENSOR_DATA_TYPE((vx_tensor)node->paramTable[0]);
+            if(dataType == VX_TYPE_INT8 || dataType == VX_TYPE_UINT8 || dataType == VX_TYPE_UINT16 || dataType == VX_TYPE_INT16)
+            {
+                vxoGraphOptimization_updateTensorInGraph(node, (vx_tensor *)node->paramTable,
+                    (vx_tensor*)(node->paramTable + node->numParameters - 1),
+                    1);
+                node->merged = vx_true_e;
+            }
+        }
+    }
+
+    REMOVE_MERGED_NODE_FROM_GRAPH();
+    REBUILD_TOPOLOGY_GRAPH();
+    OPTIMIZATION_RESLUT();
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
+    return VX_SUCCESS;
+}
 VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
 {
     vx_status status = VX_SUCCESS;
@@ -4234,6 +4278,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
 
         if(context->options.enableGraphMergeTranspose)
             vxoGraphOptimization_multiTranspose(graph);
+
+        if(context->options.enableGraphDeleteRelu)
+            vxoGraphOptimization_deleteRelu(graph);
 
         if(context->options.enableGraphConvertTensorAdd)
             vxoGraphOptimization_TensorAdd2Conv(graph);

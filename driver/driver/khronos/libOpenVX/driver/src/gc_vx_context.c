@@ -446,6 +446,13 @@ VX_PRIVATE_API void vxoContext_FetchOptionsForTransferGraph(vx_context context, 
     }
 
     pos = gcvNULL;
+    if(gcoOS_StrStr(envctrl, "-deleteRelu:", &pos) && pos)
+    {
+        pos += sizeof("-deleteRelu:") - 1;
+        context->options.enableGraphDeleteRelu = atoi(pos);
+    }
+
+    pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-WAR", &pos) && pos)
     {
         pos += sizeof("-WAR") -1;
@@ -940,6 +947,7 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
     context->options.enableTransformNMConv = 1;
     context->options.enableGraphMergeTranspose = 0;
     context->options.enableGraphPadConv = 1;
+    context->options.enableGraphDeleteRelu = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_GRAPH_TRANSFORM", &envctrl)) && envctrl)
     {
         vxoContext_FetchOptionsForTransferGraph(context, envctrl);
