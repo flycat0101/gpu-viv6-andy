@@ -4470,7 +4470,10 @@ static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(VSC_PEP_GEN_HELPER* pPepG
             }
         }
 
-        gcmASSERT(pTextureEntry != gcvNULL);
+        if (pTextureEntry == gcvNULL)
+        {
+            gcmASSERT(gcvFALSE);
+        }
 
         pCombTsEntry->sampledImageIndexInStorageTable = i;
     }
