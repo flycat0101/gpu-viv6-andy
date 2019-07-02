@@ -1905,22 +1905,45 @@ _AllocateInterfaceBlock(
         /* Generate block member if needed. */
         if (GenerateBlockMember)
         {
-            errCode = _SplitStructVariable(Shader,
-                                           symbol,
-                                           symbol,
-                                           blockMemberSymbolKind,
-                                           blockMemberStorageClass,
-                                           mixName,
-                                           baseType,
-                                           blockIndex,
-                                           SymFlag,
-                                           gcvFALSE,
-                                           AllocMemberSym,
-                                           AllocMemberReg,
-                                           &upcomingRegCount,
-                                           (location == -1) ? gcvNULL : &location,
-                                           &firstElementId,
-                                           IdList);
+            if (VIR_Type_isStruct(baseType))
+            {
+                errCode = _SplitStructVariable(Shader,
+                                               symbol,
+                                               symbol,
+                                               blockMemberSymbolKind,
+                                               blockMemberStorageClass,
+                                               mixName,
+                                               baseType,
+                                               blockIndex,
+                                               SymFlag,
+                                               gcvFALSE,
+                                               AllocMemberSym,
+                                               AllocMemberReg,
+                                               &upcomingRegCount,
+                                               (location == -1) ? gcvNULL : &location,
+                                               &firstElementId,
+                                               IdList);
+            }
+            else
+            {
+                gcoOS_StrCatSafe(mixName, __MAX_SYM_NAME_LENGTH__, "_element0");
+
+                errCode = _AddGeneralVariable(Shader,
+                                              symbol,
+                                              symbol,
+                                              baseType,
+                                              blockMemberSymbolKind,
+                                              blockMemberStorageClass,
+                                              blockIndex,
+                                              SymFlag,
+                                              AllocMemberSym,
+                                              AllocMemberReg,
+                                              &upcomingRegCount,
+                                              mixName,
+                                              (location == -1) ? gcvNULL : &location,
+                                              &firstElementId,
+                                              IdList);
+            }
             CHECK_ERROR(errCode, "VIR_Shader_AddSymbol failed");
 
             if (AllocMemberReg)

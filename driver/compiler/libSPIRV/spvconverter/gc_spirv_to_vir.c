@@ -4924,83 +4924,12 @@ VSC_ErrCode __SpvEmitVariable(gcSPV spv, VIR_Shader * virShader)
     /* There is initializer existed, generate instructions to initialize this variable. */
     if (spv->operandSize == 2)
     {
-        SpvId               initId = spv->operands[1];
-        SpvId               baseTypeId = spv->resultTypeId;
-        VIR_ConstId         constId = VIR_INVALID_ID;
-        VIR_Instruction    *virInst = gcvNULL;
-        VIR_Symbol         *initSymbol = gcvNULL;
-        VIR_Operand        *operand = gcvNULL;
-        VIR_Enable          virEnable;
-        VIR_Swizzle         virSwizzle;
-        VIR_OpCode          virOpcode = VIR_OP_MOV;
-        VIR_TypeId          virTypeId = SPV_ID_VIR_TYPE_ID(spv->resultId);
+        spv->operands[0] = spv->resultId;
+        spv->opCode = SpvOpStore;
 
-        while (SPV_ID_TYPE_IS_POINTER(baseTypeId))
-        {
-            baseTypeId = SPV_ID_TYPE_POINTER_OBJECT_SPV_TYPE(baseTypeId);
-        }
-
-        virEnable = __SpvGenEnable(spv, VIR_Shader_GetTypeFromId(virShader, virTypeId), baseTypeId);
-        virSwizzle = __SpvID2Swizzle(spv, initId);
-
-        /* If this variable is a scalar/vector, then the initializer is a constant. */
-        if (SPV_ID_TYPE_IS_SCALAR(baseTypeId)    ||
-            SPV_ID_TYPE_IS_BOOLEAN(baseTypeId)   ||
-            SPV_ID_TYPE_IS_VECTOR(baseTypeId))
-        {
-            gcmASSERT(SPV_ID_TYPE(initId) == SPV_ID_TYPE_CONST);
-            constId = SPV_ID_VIR_CONST_ID(initId);
-        }
-        /* The initialize is a variable. */
-        else
-        {
-            initSymbol = SPV_ID_VIR_STD_SYM(initId);
-        }
-
-        /* Insert a MOV instruction. */
-        virErrCode = VIR_Function_AddInstruction(spv->virFunction,
-                                                 virOpcode,
-                                                 virTypeId,
-                                                 &virInst);
-        ON_ERROR(virErrCode, "VIR_Function_AddInstruction");
-
-        /* Set DEST. */
-        operand = VIR_Inst_GetDest(virInst);
-        VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
-        VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
-        VIR_Operand_SetEnable(operand, virEnable);
-        VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetTypeId(operand, virTypeId);
-        VIR_Operand_SetSym(operand, sym);
-
-        /* Set SOURCE0. */
-        operand = VIR_Inst_GetSource(virInst, 0);
-        if (constId != VIR_INVALID_ID)
-        {
-            VIR_Operand_SetSwizzle(operand, virSwizzle);
-            VIR_Operand_SetConstId(operand, constId);
-            VIR_Operand_SetOpKind(operand, VIR_OPND_CONST);
-            VIR_Operand_SetTypeId(operand, virTypeId);
-            VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
-            VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
-            VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
-        }
-        else
-        {
-            VIR_Operand_SetSwizzle(operand, virSwizzle);
-            VIR_Operand_SetSym(operand, initSymbol);
-            VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetTypeId(operand, virTypeId);
-            VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
-            VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
-            VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
-        }
-
-        /* if this is parameter, record */
-        SPV_ID_SYM_USED_STORE_AS_DEST(spv->resultId) = gcvTRUE;
+        __SpvEmitStore(spv, virShader);
     }
 
-OnError:
     return virErrCode;
 }
 
