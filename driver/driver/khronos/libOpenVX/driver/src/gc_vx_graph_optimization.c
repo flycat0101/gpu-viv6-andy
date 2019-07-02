@@ -4210,11 +4210,11 @@ VX_INTERNAL_API vx_status vxoGraph_Optimization(vx_graph graph)
         if(context->options.enableTransformNMConv && !vxoGraphOptimization_isV8((vx_reference)graph))
             vxoGraph_Optimization_transformConvNxM(graph);
 
-        if(context->options.enableGraphEltwiseOpShape)
-            vxoGraph_Optimization_eltwiseOp(graph);
-
         if(context->options.enableGraphConvertTensorAdd)
             vxoGraph_Optimization_TensorAdd2Conv(graph);
+
+        if(context->options.enableGraphEltwiseOpShape)
+            vxoGraph_Optimization_eltwiseOp(graph);
 
         if(context->options.enableGraphConvertAvgPool2Conv)
             vxoGraph_Optimization_ConvertAvgPool2Conv(graph);
