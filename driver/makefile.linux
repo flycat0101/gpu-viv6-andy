@@ -119,7 +119,9 @@ LIB_GLSLC           := $(AQROOT)/compiler/libGLSLC
 LIB_VSC             := $(AQROOT)/compiler/libVSC
 LIB_VSC_Lite             := $(AQROOT)/compiler/libVSC_Lite
 LIB_LIST            += $(LIB_VSC)
+ifeq ($(USE_VSC_LITE),1)
 LIB_LIST            += $(LIB_VSC_Lite)
+endif
 ifeq ($(LINUX_VSIMULATOR),0)
 LIB_LIST            += $(LIB_GLES11) $(LIB_GLES2X) $(LIB_GLSLC)
 endif
