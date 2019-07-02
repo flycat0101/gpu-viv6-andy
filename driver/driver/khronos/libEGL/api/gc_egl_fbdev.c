@@ -1696,7 +1696,7 @@ fbdev_GetDisplayInfoEx2(
     gceSTATUS status = fbdev_GetDisplayInfoEx(Display, Window, DisplayInfoSize, DisplayInfo);
     if (gcmIS_SUCCESS(status))
     {
-        if ((DisplayInfo->logical == gcvNULL) || (DisplayInfo->physical == ~0U))
+        if ((DisplayInfo->logical == gcvNULL) || (DisplayInfo->physical == ~0U) || (DisplayInfo->physical == 0))
         {
             /* No offset. */
             status = gcvSTATUS_NOT_SUPPORTED;
