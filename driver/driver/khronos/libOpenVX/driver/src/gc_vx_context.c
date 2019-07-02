@@ -942,7 +942,7 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
     context->options.enableGraphUnrollDWConv = 1;
     context->options.enableGraphConvertConv2Fc = 1;
     context->options.enableGraphSwaplayer = 1;
-    context->options.enableGraphReshapelayer = 0;
+    context->options.enableGraphReshapelayer = 1;
     context->options.enableGraphConcalayer = 0;
     context->options.enableTransformNMConv = 1;
     context->options.enableGraphMergeTranspose = 0;

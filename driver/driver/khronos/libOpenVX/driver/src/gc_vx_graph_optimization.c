@@ -1869,10 +1869,16 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_DispelConcat(vx_graph graph)
     return VX_SUCCESS;
 }
 
-VX_INTERNAL_API vx_status vxoGraphOptimization_DispelReshape(vx_graph graph)
+/*
+repalce the output of reshape's previos node with reshape's output,
+it is only valid for non-branch part.
+*/
+VX_INTERNAL_API vx_status vxoGraphOptimization_DeleteReshape(vx_graph graph)
 {
     vx_int32 nodeIndex;
+    vx_uint32 index = 0;
     vx_int32 nodeCount = graph->nodeCount;
+    vx_node *nodeTable = graph->nodeTable;
 
     gcmHEADER_ARG("graph=%p", graph);
     vxmASSERT(graph);
@@ -1882,40 +1888,25 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_DispelReshape(vx_graph graph)
         vx_node node = graph->nodeTable[nodeIndex];
         vx_enum opType = vxoGraphOptimization_getKernelType(node);
 
-        if (opType != OP_RESHAPE) continue;
-        if (node->numChildren == 0) continue;
-
+        if (opType == OP_RESHAPE && node->numParents == 1 && nodeTable[node->parentNodes[0]]->numChildren == 1)
         {
-            vx_uint32 i = 0, j = 0;
-            vx_node *nodeTable = graph->nodeTable;
+            vx_tensor reshapeIn = (vx_tensor)node->paramTable[0];
+            vx_tensor reshapeOut = (vx_tensor)node->paramTable[node->numParameters - 1];
+            vx_node pNode = nodeTable[node->parentNodes[0]];
 
-            vx_tensor tensorIn          = (vx_tensor)node->paramTable[0];
-            vx_tensor orginOutputTensor = (vx_tensor)node->paramTable[2];
-            vx_tensor newOuputTensor    = vxoTensor_ReshapeTensor(tensorIn, (int32_t *)TENSOR_SIZES(orginOutputTensor), TENSOR_DIM_NUM(orginOutputTensor));
-            newOuputTensor->reshape     = orginOutputTensor;
-
-            for(i = 0; i < node->numChildren; i++)
+            if(vxoGraphOptimization_matchTensorInNode(pNode, reshapeIn, &index) )
             {
-                vx_node child = nodeTable[node->childNodes[i]];
-                for(j = 0; j < child->numParameters; j++)
-                {
-                    if(vxoReference_HasWriteDependency((vx_reference)orginOutputTensor, child->paramTable[j]))
-                    {
-                        vxoNode_SetParameter(child, j, (vx_reference)newOuputTensor);
-                        break;
-                    }
-                }
+                vxoGraphOptimization_updateTensorInNode(&pNode, index, reshapeOut);
             }
-
-            vxoTensor_ReleaseTensor(&newOuputTensor);
-            node->merged = vx_true_e;
         }
     }
 
     REMOVE_MERGED_NODE_FROM_GRAPH();
     REBUILD_TOPOLOGY_GRAPH();
     OPTIMIZATION_RESLUT();
+
     gcmFOOTER_ARG("%d", VX_SUCCESS);
+
     return VX_SUCCESS;
 }
 
@@ -4318,7 +4309,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
             vxmONERROR(vxoGraphOptimization_DispelConcat(graph));
 
         if(context->options.enableGraphReshapelayer)
-            vxmONERROR(vxoGraphOptimization_DispelReshape(graph));
+            vxmONERROR(vxoGraphOptimization_DeleteReshape(graph));
 
         if(context->options.enableGraphWAR7)
             vxmONERROR(vxoGraphOptimization_WAR7(graph));
