@@ -17078,6 +17078,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(v
                                                      shaderExecutable);
             if (status != VX_SUCCESS) goto exit;
 
+            if (batchCount > 1)
+            {
+                vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NO_BATCH_BIT);
+                vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NO_BATCH_BIT);
+            }
+
             vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
             vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT);
             vxnneOperation_AddReference(&depthwiseConvolutionLayer->depthwise_convolution_sh_operation.base, (vx_reference)biases, VXNNE_OPERATION_REFENRENCE_INPUT);
