@@ -1398,7 +1398,7 @@ gctSTRING gcLibConvF32ToF16_Funcs =
 "float _viv_convF32ToF16_float(float x, int roundingMode)\n"
 "{\n"
 "   float result;\n"
-"   if (x != 0.0 && !isnan(x) && !isinf(x))\n"
+"   if (x != 0.0 && x != -0.0 && !isnan(x) && !isinf(x))\n"
 "   {\n"
 "       highp uint bits = floatBitsToUint(x);\n"
 "       highp uint sign16 = (bits >> 16u) & 0x00008000u;\n"
