@@ -163,7 +163,6 @@ clGetDeviceIDs(
 
             version11 = ((clgDefaultDevice->deviceInfo.chipModel == gcv1500 && clgDefaultDevice->deviceInfo.chipRevision == 0x5246) ||
                     (clgDefaultDevice->deviceInfo.chipModel == gcv2000 && clgDefaultDevice->deviceInfo.chipRevision == 0x5108) ||
-                    (clgDefaultDevice->deviceInfo.chipModel == gcv3000 && clgDefaultDevice->deviceInfo.chipRevision == 0x5451) ||
                     (clgDefaultDevice->deviceInfo.chipModel == gcv3000 && clgDefaultDevice->deviceInfo.chipRevision == 0x5513));
             if (version11)
             {
