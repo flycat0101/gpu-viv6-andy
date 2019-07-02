@@ -1467,14 +1467,28 @@ VX_PRIVATE_API vx_status GetMemoryRequestList(
 
         for(j = 0; j < memRequest[k].inputCount; j++)
         {
-            memRequest[k].inputMemory[j] = &(((vx_tensor)graph->layer->operations[i]->inputs[j])->tensorBuffer->memory);
+            if (graph->layer->operations[i]->inputs[j]->type == VX_TYPE_IMAGE)
+            {
+                memRequest[k].inputMemory[j] = &(((vx_image)graph->layer->operations[i]->inputs[j])->memory);
+            }
+            else
+            {
+                memRequest[k].inputMemory[j] = &(((vx_tensor)graph->layer->operations[i]->inputs[j])->tensorBuffer->memory);
+            }
         }
 
         memRequest[k].outputCount = graph->layer->operations[i]->outputsNum;
 
         for(j = 0; j < memRequest[k].outputCount; j++)
         {
-            memRequest[k].outputMemory[j] = &(((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory);
+            if (graph->layer->operations[i]->outputs[j]->type == VX_TYPE_IMAGE)
+            {
+                memRequest[k].outputMemory[j] = &(((vx_image)graph->layer->operations[i]->outputs[j])->memory);
+            }
+            else
+            {
+                memRequest[k].outputMemory[j] = &(((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory);
+            }
         }
     }
 
