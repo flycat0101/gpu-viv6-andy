@@ -188,7 +188,15 @@ VX_PRIVATE_API void _checkSramOverflow(
     }
 
     cacheSizeAllocated  = (info->vx_nn_general_cmd_info.kernelCacheEndAddress - info->vx_nn_general_cmd_info.kernelCacheStartAddress);
-    decoderWorkNum      = gcmMIN(info->vx_nn_general_cmd_info.outImageZSize, coreCountUsed) + 1;
+    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP0))
+    {
+        /* v8 hw has post process, treate as one more core. */
+        decoderWorkNum      = gcmMIN(info->vx_nn_general_cmd_info.outImageZSize, coreCountUsed) + 1;
+    }
+    else
+    {
+        decoderWorkNum      = gcmMIN(info->vx_nn_general_cmd_info.outImageZSize, coreCountUsed);
+    }
     dataUnitNum         = maxSizeOfCore / dataUnitByte;
 
     patternLoopCount    = dataUnitNum / (info->vx_nn_general_cmd_info.kernelPatternMsb + 1); /* full loop count */
