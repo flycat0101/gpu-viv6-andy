@@ -22864,11 +22864,13 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
         parameters[2] = (vx_reference)dst;
     }
 
-    if (useImage2DFlag)
+    if (useImage2DFlag && enable_2d_inst)
     {
         vx_int8  input0_fl  = TENSOR_POS(input0);
         vx_int8  input1_fl  = TENSOR_POS(input1);
         vx_int32 sizes[4]   = {width * height, depth, 1, batch};
+
+        dims = gcmMAX(dims, 2);
 
         wksizes[0] = width * height;
         wksizes[1] = depth;
@@ -23219,6 +23221,7 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
                 strcat(kernelName, "_Warp_Z_func" );
                 break;
             default:
+                strcat(kernelName, "_Sat_Z_func" );
                 break;
             }
         }
@@ -23233,6 +23236,7 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
                 strcat(kernelName, "_Warp_func" );
                 break;
             default:
+                strcat(kernelName, "_Sat_func" );
                 break;
             }
         }
