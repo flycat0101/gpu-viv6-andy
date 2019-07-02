@@ -19583,6 +19583,9 @@ VX_PRIVATE_API vx_status vxnneOperation_ExecuteYUVScalerCommand(vx_node node, vx
         SCOperation.y_init_error = inputInitErrors[i];
         SCOperation.y_init_int_error = inputInitIntErrors[i];
 
+        SCOperation.base.gpuId = i;
+        SCOperation.base.mGpuSync = i == splitCount - 1 ? vx_true_e : vx_false_e;
+
         operation->execute((vxnne_operation)&SCOperation);
     }
 
