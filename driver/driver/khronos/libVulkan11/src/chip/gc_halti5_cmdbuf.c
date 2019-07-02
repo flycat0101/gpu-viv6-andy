@@ -5740,7 +5740,7 @@ void halti5_helper_setSamplerStates(
 
     if (imgv)
     {
-        VkFormatProperties* pFormatProperties = &g_vkFormatInfoTable[imgv->formatInfo->residentImgFormat].formatProperties;
+        VkFormatProperties* pFormatProperties = &__vk_GetVkFormatInfo((VkFormat) imgv->formatInfo->residentImgFormat)->formatProperties;
         __vkImage* img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, imgv->createInfo.image);
         VkFormatFeatureFlags formatFeatureFlags = (img->createInfo.tiling == VK_IMAGE_TILING_LINEAR)
                                                 ? pFormatProperties->linearTilingFeatures

@@ -2296,7 +2296,7 @@ OnError:
             dstLayers = pRegions[ir].imageSubresource.layerCount;
         }
 
-        fmtInfo = &g_vkFormatInfoTable[pDstImg->createInfo.format];
+        fmtInfo = __vk_GetVkFormatInfo(pDstImg->createInfo.format);
         srcWidth  = (pRegions[ir].bufferRowLength != 0)   ? pRegions[ir].bufferRowLength   : pRegions[ir].imageExtent.width;
         srcHeight = (pRegions[ir].bufferImageHeight != 0) ? pRegions[ir].bufferImageHeight : pRegions[ir].imageExtent.height;
         srcWidth = gcmALIGN_NP2(srcWidth, fmtInfo->blockSize.width);
@@ -2539,7 +2539,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImageToBuffer(
             srcLayers = pRegions[ir].imageSubresource.layerCount;
         }
 
-        fmtInfo = &g_vkFormatInfoTable[pSrcImg->createInfo.format];
+        fmtInfo = __vk_GetVkFormatInfo(pSrcImg->createInfo.format);
         dstWidth  = (pRegions[ir].bufferRowLength != 0)   ? pRegions[ir].bufferRowLength   : pRegions[ir].imageExtent.width;
         dstHeight = (pRegions[ir].bufferImageHeight != 0) ? pRegions[ir].bufferImageHeight : pRegions[ir].imageExtent.height;
         dstWidth = gcmALIGN_NP2(dstWidth, fmtInfo->blockSize.width);

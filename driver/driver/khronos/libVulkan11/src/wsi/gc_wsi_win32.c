@@ -337,7 +337,7 @@ static VkResult __vki_PresentSwapChainImage(
 
     VkResult result = VK_SUCCESS;
 
-    bytePerPixel = g_vkFormatInfoTable[pSrcImg->createInfo.format].bitsPerBlock / 8;
+    bytePerPixel = __vk_GetVkFormatInfo(pSrcImg->createInfo.format)->bitsPerBlock / 8;
 
     __VK_MEMZERO(&srcRes, sizeof(srcRes));
     srcRes.isImage = VK_TRUE;

@@ -1252,7 +1252,7 @@ static VkResult __vki_InitializePhysicalDevice(
 
         for (fmt = VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK; fmt < VK_FORMAT_EAC_R11G11_SNORM_BLOCK; ++fmt)
         {
-            __VK_MEMZERO(&g_vkFormatInfoTable[fmt].formatProperties, sizeof(VkFormatProperties));
+            __VK_MEMZERO(&__vk_GetVkFormatInfo((VkFormat) fmt)->formatProperties, sizeof(VkFormatProperties));
         }
     }
 
@@ -1262,21 +1262,21 @@ static VkResult __vki_InitializePhysicalDevice(
 
         for (fmt = VK_FORMAT_ASTC_4x4_UNORM_BLOCK; fmt <= VK_FORMAT_ASTC_12x12_SRGB_BLOCK; ++fmt)
         {
-            __VK_MEMZERO(&g_vkFormatInfoTable[fmt].formatProperties, sizeof(VkFormatProperties));
+            __VK_MEMZERO(&__vk_GetVkFormatInfo((VkFormat) fmt)->formatProperties, sizeof(VkFormatProperties));
         }
     }
 
     if (!phyDev->phyDevConfig.database->REG_Halti5 && phyDev->phyDevConfig.database->REG_Halti3)
     {
-        g_vkFormatInfoTable[VK_FORMAT_R8_UNORM].residentImgFormat = __VK_FORMAT_R8_1_X8R8G8B8;
+        __vk_GetVkFormatInfo(VK_FORMAT_R8_UNORM)->residentImgFormat = __VK_FORMAT_R8_1_X8R8G8B8;
     }
 
     if (phyDev->phyDevConfig.database->PE_A8B8G8R8)
     {
-        g_vkFormatInfoTable[VK_FORMAT_R8G8B8A8_UNORM].residentImgFormat = VK_FORMAT_R8G8B8A8_UNORM;
-        g_vkFormatInfoTable[VK_FORMAT_R8G8B8A8_SRGB].residentImgFormat = VK_FORMAT_R8G8B8A8_SRGB;
-        g_vkFormatInfoTable[VK_FORMAT_A8B8G8R8_UNORM_PACK32].residentImgFormat = VK_FORMAT_A8B8G8R8_UNORM_PACK32;
-        g_vkFormatInfoTable[VK_FORMAT_A8B8G8R8_SRGB_PACK32].residentImgFormat = VK_FORMAT_A8B8G8R8_SRGB_PACK32;
+        __vk_GetVkFormatInfo(VK_FORMAT_R8G8B8A8_UNORM)->residentImgFormat = VK_FORMAT_R8G8B8A8_UNORM;
+        __vk_GetVkFormatInfo(VK_FORMAT_R8G8B8A8_SRGB)->residentImgFormat = VK_FORMAT_R8G8B8A8_SRGB;
+        __vk_GetVkFormatInfo(VK_FORMAT_A8B8G8R8_UNORM_PACK32)->residentImgFormat = VK_FORMAT_A8B8G8R8_UNORM_PACK32;
+        __vk_GetVkFormatInfo(VK_FORMAT_A8B8G8R8_SRGB_PACK32)->residentImgFormat = VK_FORMAT_A8B8G8R8_SRGB_PACK32;
     }
 
     return VK_SUCCESS;
@@ -1477,7 +1477,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceFormatProperties(
 {
     if (format <= VK_FORMAT_END_RANGE)
     {
-        *pFormatProperties = g_vkFormatInfoTable[format].formatProperties;
+        *pFormatProperties = __vk_GetVkFormatInfo((VkFormat) format)->formatProperties;
     }
 }
 
@@ -1494,7 +1494,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_GetPhysicalDeviceImageFormatProperties(
     VkResult ret = VK_SUCCESS;
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     uint32_t maxDim = phyDev->phyDevConfig.database->REG_Texture8K ? 8192 : 2048;
-    __vkFormatInfo *formatInfo = &g_vkFormatInfoTable[format];
+    __vkFormatInfo *formatInfo = __vk_GetVkFormatInfo(format);
     VkFormatFeatureFlags formatFeatures = (tiling == VK_IMAGE_TILING_LINEAR)
                                         ? formatInfo->formatProperties.linearTilingFeatures
                                         : formatInfo->formatProperties.optimalTilingFeatures;
@@ -1847,7 +1847,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceFormatProperties2(
     {
         pFormatProperties->sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
         pFormatProperties->pNext = VK_NULL_HANDLE;
-        pFormatProperties->formatProperties = g_vkFormatInfoTable[format].formatProperties;
+        pFormatProperties->formatProperties = __vk_GetVkFormatInfo(format)->formatProperties;
     }
 }
 
@@ -1864,13 +1864,16 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_GetPhysicalDeviceImageFormatProperties2(
     VkImageUsageFlags usage = pImageFormatInfo->usage;
     VkImageType type = pImageFormatInfo->type;
     VkImageCreateFlags flags = pImageFormatInfo->flags;
-    __vkFormatInfo *formatInfo = &g_vkFormatInfoTable[format];
-    VkFormatFeatureFlags formatFeatures = (tiling == VK_IMAGE_TILING_LINEAR)
-                                        ? formatInfo->formatProperties.linearTilingFeatures
-                                        : formatInfo->formatProperties.optimalTilingFeatures;
+    __vkFormatInfo *formatInfo = VK_NULL_HANDLE;
+    VkFormatFeatureFlags formatFeatures = VK_NULL_HANDLE;
     VkPhysicalDeviceExternalImageFormatInfo * externalInfo = (VkPhysicalDeviceExternalImageFormatInfo *)pImageFormatInfo->pNext;
     VkExternalImageFormatProperties * extImgFormatProp = (VkExternalImageFormatProperties *)pImageFormatProperties->pNext;
     VkExternalMemoryProperties * extMemProp = &extImgFormatProp->externalMemoryProperties;
+
+    formatInfo = __vk_GetVkFormatInfo(format);
+    formatFeatures = (tiling == VK_IMAGE_TILING_LINEAR)
+                                        ? formatInfo->formatProperties.linearTilingFeatures
+                                        : formatInfo->formatProperties.optimalTilingFeatures;
 
     if (formatFeatures == 0)
     {

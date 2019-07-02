@@ -849,6 +849,139 @@ __vkFormatInfo g_vkFormatInfoTable[] =
     0}},
 };
 
+__vkFormatInfo g_vkFormatInfoTable1000156[] =
+{
+    /*   VK_FORMAT_G8B8G8R8_422_UNORM, */
+    {__VK_FMT_CATEGORY_UNORM, VK_TRUE, {2, 1}, 32, 1, VK_FORMAT_G8B8G8R8_422_UNORM,
+    {0, 0, 0}},
+    /*   VK_FORMAT_B8G8R8G8_422_UNORM, */
+    {__VK_FMT_CATEGORY_UNORM, VK_TRUE, {2, 1}, 32, 1, VK_FORMAT_B8G8R8G8_422_UNORM,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 32, 1, VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM,
+    {__VK_FORMAT_SAMPLE_IMAGE_FEATURES | VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT,
+     __VK_FORMAT_SAMPLE_IMAGE_FEATURES | VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT,
+     0}},
+    /*   VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 32, 1, VK_FORMAT_G8_B8R8_2PLANE_420_UNORM,
+    {__VK_FORMAT_SAMPLE_IMAGE_FEATURES | VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT,
+     __VK_FORMAT_SAMPLE_IMAGE_FEATURES | VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT,
+     0}},
+    /*   VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 32, 1, VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G8_B8R8_2PLANE_422_UNORM, */
+    {__VK_FMT_CATEGORY_UNORM, VK_TRUE, {2, 1}, 32, 1, VK_FORMAT_G8_B8R8_2PLANE_422_UNORM,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G8_B8_R8_3PLANE_444_UNORM, */
+    {__VK_FMT_CATEGORY_UNORM, VK_TRUE, {1, 1}, 24, 1, VK_FORMAT_G8_B8_R8_3PLANE_444_UNORM,
+    {0, 0, 0}},
+    /*   VK_FORMAT_R10X6_UNORM_PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {1, 1}, 16, 1, VK_FORMAT_R10X6_UNORM_PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_R10X6G10X6_UNORM_2PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {1, 1}, 32, 1, VK_FORMAT_R10X6G10X6_UNORM_2PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_R10X6G10X6B10X6A10X6_UNORM_4PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {1, 1}, 64, 1, VK_FORMAT_R10X6G10X6B10X6A10X6_UNORM_4PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G10X6B10X6G10X6R10X6_422_UNORM_4PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_TRUE, {2, 1}, 64, 1, VK_FORMAT_G10X6B10X6G10X6R10X6_422_UNORM_4PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_B10X6G10X6R10X6G10X6_422_UNORM_4PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_TRUE, {2, 1}, 64, 1, VK_FORMAT_B10X6G10X6R10X6G10X6_422_UNORM_4PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 48, 1, VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 48, 1, VK_FORMAT_G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {1, 1}, 48, 1, VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 48, 1, VK_FORMAT_G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {1, 1}, 48, 1, VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_R12X4_UNORM_PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {1, 1}, 16, 1, VK_FORMAT_R12X4_UNORM_PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_R12X4G12X4_UNORM_2PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {1, 1}, 32, 1, VK_FORMAT_R12X4G12X4_UNORM_2PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_R12X4G12X4B12X4A12X4_UNORM_4PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {1, 1}, 64, 1, VK_FORMAT_R12X4G12X4B12X4A12X4_UNORM_4PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G12X4B12X4G12X4R12X4_422_UNORM_4PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_TRUE, {2, 1}, 64, 1, VK_FORMAT_G12X4B12X4G12X4R12X4_422_UNORM_4PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_B12X4G12X4R12X4G12X4_422_UNORM_4PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_TRUE, {2, 1}, 64, 1, VK_FORMAT_B12X4G12X4R12X4G12X4_422_UNORM_4PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 48, 1, VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 48, 1, VK_FORMAT_G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 48, 1, VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 48, 1, VK_FORMAT_G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {1, 1}, 48, 1, VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G16B16G16R16_422_UNORM, */
+    {__VK_FMT_CATEGORY_UNORM, VK_TRUE, {2, 1}, 64, 1, VK_FORMAT_G16B16G16R16_422_UNORM,
+    {0, 0, 0}},
+    /*   VK_FORMAT_B16G16R16G16_422_UNORM, */
+    {__VK_FMT_CATEGORY_UNORM, VK_TRUE, {2, 1}, 64, 1, VK_FORMAT_B16G16R16G16_422_UNORM,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G16_B16_R16_3PLANE_420_UNORM, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 64, 1, VK_FORMAT_G16_B16_R16_3PLANE_420_UNORM,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G16_B16R16_2PLANE_420_UNORM, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 64, 1, VK_FORMAT_G16_B16R16_2PLANE_420_UNORM,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G16_B16_R16_3PLANE_422_UNORM, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 64, 1, VK_FORMAT_G16_B16_R16_3PLANE_422_UNORM,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G16_B16R16_2PLANE_422_UNORM, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {2, 1}, 64, 1, VK_FORMAT_G16_B16R16_2PLANE_422_UNORM,
+    {0, 0, 0}},
+    /*   VK_FORMAT_G16_B16_R16_3PLANE_444_UNORM, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {1, 1}, 48, 1, VK_FORMAT_G16_B16_R16_3PLANE_444_UNORM,
+    {0, 0, 0}},
+    /*   VK_FORMAT_PVRTC1_2BPP_UNORM_BLOCK_IMG, */
+    {__VK_FMT_CATEGORY_UNORM, VK_FALSE, {1, 1}, 48, 1, VK_FORMAT_PVRTC1_2BPP_UNORM_BLOCK_IMG,
+    {0, 0, 0}}
+};
+
+__vkFormatInfo * __vk_GetVkFormatInfo(
+    VkFormat vkFormat
+    )
+{
+    uint32_t formatIndex = vkFormat / 1000;
+
+    if (formatIndex == 0)
+    {
+         return &g_vkFormatInfoTable[vkFormat];
+    }
+    else if (formatIndex == 1000156)
+    {
+         return &g_vkFormatInfoTable1000156[vkFormat - 1000156000];
+    }
+    else
+    {
+        return &g_vkFormatInfoTable[VK_FORMAT_UNDEFINED];
+    }
+}
+
 static VkResult __vki_CreateSurfNode(
     __vkDevContext *devCtx,
     gcsSURF_NODE_PTR node,
@@ -2136,7 +2269,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateBufferView(
         gcoOS_MemCopy(&bfv->createInfo, pCreateInfo, gcmSIZEOF(VkBufferViewCreateInfo));
         bfv->devCtx = devCtx;
         bfv->memCb = __VK_ALLOCATIONCB;
-        bfv->formatInfo = g_vkFormatInfoTable[pCreateInfo->format];
+        bfv->formatInfo = *__vk_GetVkFormatInfo(pCreateInfo->format);
         /* buffer view must keep original layout of create format */
         bfv->formatInfo.residentImgFormat = pCreateInfo->format;
         __VK_ASSERT(bfv->formatInfo.partCount == 1);
@@ -2359,14 +2492,14 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
         if (((pCreateInfo->usage & (~(VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT))) == 0)
             && (pCreateInfo->tiling == VK_IMAGE_TILING_LINEAR))
         {
-            img->formatInfo = g_vkFormatInfoTable[pCreateInfo->format];
+            img->formatInfo = *__vk_GetVkFormatInfo(pCreateInfo->format);
             img->formatInfo.residentImgFormat = pCreateInfo->format;
             __VK_ASSERT(img->formatInfo.partCount == 1);
         }
         else
         {
-            residentFormat = g_vkFormatInfoTable[pCreateInfo->format].residentImgFormat;
-            img->formatInfo = g_vkFormatInfoTable[residentFormat];
+            residentFormat = __vk_GetVkFormatInfo(pCreateInfo->format)->residentImgFormat;
+            img->formatInfo = *__vk_GetVkFormatInfo((VkFormat) residentFormat);
         }
 
         if (img->formatInfo.residentImgFormat == VK_FORMAT_UNDEFINED)
@@ -2403,7 +2536,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
                 __VK_ASSERT(!"invalid format!");
                 break;
             }
-            img->formatInfo = g_vkFormatInfoTable[fakedFormat];
+            img->formatInfo = *__vk_GetVkFormatInfo((VkFormat) fakedFormat);
         }
 
         __vkGetAlign(devCtx, &img->formatInfo, pCreateInfo->tiling, &alignX, &alignY, &img->hAlignment, &img->halTiling);
@@ -2479,12 +2612,12 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
 
             if (img->formatInfo.bitsPerBlock == 128)
             {
-                img->formatInfo = g_vkFormatInfoTable[__VK_FORMAT_R32G32B32A32_SFLOAT_2_R32G32_SFLOAT];
+                img->formatInfo = *__vk_GetVkFormatInfo((VkFormat) __VK_FORMAT_R32G32B32A32_SFLOAT_2_R32G32_SFLOAT);
                 __vkGetAlign(devCtx, &img->formatInfo, pCreateInfo->tiling, &alignX, &alignY, &img->hAlignment, &img->halTiling);
             }
             else
             {
-                img->formatInfo = g_vkFormatInfoTable[VK_FORMAT_R16G16B16A16_UINT];
+                img->formatInfo = *__vk_GetVkFormatInfo(VK_FORMAT_R16G16B16A16_UINT);
                __vkGetAlign(devCtx, &img->formatInfo, pCreateInfo->tiling, &alignX, &alignY, &img->hAlignment, &img->halTiling);
 
             }
@@ -2633,7 +2766,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImageView(
     VkResult result = VK_SUCCESS;
     __vkDevContext *devCtx = (__vkDevContext*)device;
     __vkImageView *imv = VK_NULL_HANDLE;
-    uint32_t residentFormat = g_vkFormatInfoTable[pCreateInfo->format].residentImgFormat;
+    uint32_t residentFormat = __vk_GetVkFormatInfo(pCreateInfo->format)->residentImgFormat;
     /* Set the allocator to the parent allocator or API defined allocator if valid */
     __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
 
@@ -2642,7 +2775,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImageView(
 
         imv->devCtx = devCtx;
         imv->memCb = __VK_ALLOCATIONCB;
-        imv->formatInfo = &g_vkFormatInfoTable[residentFormat];
+        imv->formatInfo = __vk_GetVkFormatInfo((VkFormat) residentFormat);
 
         gcoOS_MemCopy(&imv->createInfo, pCreateInfo, gcmSIZEOF(VkImageViewCreateInfo));
 

@@ -1153,7 +1153,7 @@ VkResult halti3_program_copy_src_img(
         tmpBufView.createInfo.offset = srcRes->u.buf.offset;
         tmpBufView.createInfo.range = VK_WHOLE_SIZE;
 
-        tmpBufView.formatInfo = g_vkFormatInfoTable[params->srcFormat];
+        tmpBufView.formatInfo = *__vk_GetVkFormatInfo((VkFormat) params->srcFormat);
 
         bufView = &tmpBufView;
 
@@ -1167,7 +1167,7 @@ VkResult halti3_program_copy_src_img(
                  ? params->srcFormat
                  : pDstImg->createInfo.format;
 
-        fmtInfo = &g_vkFormatInfoTable[imgFormat];
+        fmtInfo = __vk_GetVkFormatInfo((VkFormat) imgFormat);
 
         if (params->rawCopy && fmtInfo->compressed)
         {
@@ -1393,7 +1393,7 @@ VkResult halti3_program_copy_dst_img(
         tmpBufView.createInfo.offset = dstRes->u.buf.offset;
         tmpBufView.createInfo.range = VK_WHOLE_SIZE;
 
-        tmpBufView.formatInfo = g_vkFormatInfoTable[params->dstFormat];
+        tmpBufView.formatInfo = *__vk_GetVkFormatInfo((VkFormat) params->dstFormat);
 
         bufView = &tmpBufView;
 
@@ -1481,7 +1481,7 @@ VkResult halti3_program_blit_buffer_src(
         tmpBufView.createInfo.offset = srcRes->u.buf.offset;
         tmpBufView.createInfo.range = VK_WHOLE_SIZE;
 
-        tmpBufView.formatInfo = g_vkFormatInfoTable[VK_FORMAT_R8_SINT];
+        tmpBufView.formatInfo = *__vk_GetVkFormatInfo(VK_FORMAT_R8_SINT);
         tmpBufView.formatInfo.residentImgFormat = VK_FORMAT_R8_SINT;
         bufView = &tmpBufView;
 
@@ -1543,7 +1543,7 @@ VkResult halti3_program_blit_buffer_dst(
         tmpBufView.createInfo.offset = dstRes->u.buf.offset;
         tmpBufView.createInfo.range = VK_WHOLE_SIZE;
 
-        tmpBufView.formatInfo = g_vkFormatInfoTable[VK_FORMAT_R8_SINT];
+        tmpBufView.formatInfo = *__vk_GetVkFormatInfo(VK_FORMAT_R8_SINT);
         tmpBufView.formatInfo.residentImgFormat = VK_FORMAT_R8_SINT;
         bufView = &tmpBufView;
 

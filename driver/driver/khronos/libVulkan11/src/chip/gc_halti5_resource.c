@@ -2251,7 +2251,7 @@ VkResult halti5_helper_convertHwBltDesc(
  11:9) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 11:9) - (0 ? 11:9) + 1))))))) << (0 ? 11:9))), VK_FALSE},
     };
-    bitsPerPixel = g_vkFormatInfoTable[vkFormat].bitsPerBlock / g_vkFormatInfoTable[vkFormat].partCount;
+    bitsPerPixel = __vk_GetVkFormatInfo((VkFormat) vkFormat)->bitsPerBlock / __vk_GetVkFormatInfo((VkFormat) vkFormat)->partCount;
     hwBltDesc->pixelSize = bitsPerPixel;
 
     __VK_ASSERT(hwBltDesc);
@@ -2416,8 +2416,8 @@ VkResult halti5_helper_convertHwBltDesc(
         }
     }
 
-    if (g_vkFormatInfoTable[vkFormat].category == __VK_FMT_CATEGORY_UINT ||
-        g_vkFormatInfoTable[vkFormat].category == __VK_FMT_CATEGORY_SINT)
+    if (__vk_GetVkFormatInfo((VkFormat) vkFormat)->category == __VK_FMT_CATEGORY_UINT ||
+        __vk_GetVkFormatInfo((VkFormat) vkFormat)->category == __VK_FMT_CATEGORY_SINT)
     {
         downsampleMode = gcvMSAA_DOWNSAMPLE_SAMPLE;
     }
@@ -3441,7 +3441,7 @@ VkResult halti5_copyImage(
         srcCacheMode = 0x0;
 
         srcFormat = dstImg->createInfo.format;
-        fmtInfo = &g_vkFormatInfoTable[srcFormat];
+        fmtInfo = __vk_GetVkFormatInfo((VkFormat) srcFormat);
         srcParts = fmtInfo->partCount;
         srcPartSize = (uint32_t)(srcBuf->memReq.size);
         srcWidth  = srcRes->u.buf.rowLength != 0 ? srcRes->u.buf.rowLength : dstRes->u.img.extent.width;
@@ -3579,7 +3579,7 @@ VkResult halti5_copyImage(
             }
         }
 
-        fmtInfo = &g_vkFormatInfoTable[dstFormat];
+        fmtInfo = __vk_GetVkFormatInfo((VkFormat) dstFormat);
         dstParts = fmtInfo->partCount;
         dstPartSize = (uint32_t)(dstBuf->memReq.size);
         dstWidth  = dstRes->u.buf.rowLength != 0 ? dstRes->u.buf.rowLength : srcRes->u.img.extent.width;
@@ -3592,7 +3592,7 @@ VkResult halti5_copyImage(
     {
         VkExtent2D rect;
         const __vkFormatInfo *fmtInfo;
-        fmtInfo = &g_vkFormatInfoTable[srcFormat];
+        fmtInfo = __vk_GetVkFormatInfo((VkFormat) srcFormat);
         rect = fmtInfo->blockSize;
         /*Change srcFormat to be same as dstFormat for CmdCopyImage() */
         srcFormat = dstFormat;
@@ -3600,7 +3600,7 @@ VkResult halti5_copyImage(
         /*for 64bit, src is compressed image, dest is uncompressed image*/
         if ((dstRes->isImage && (!dstRes->u.img.pImage->formatInfo.compressed)) &&
             (srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed) &&
-            g_vkFormatInfoTable[dstFormat].bitsPerBlock == 64)
+            __vk_GetVkFormatInfo((VkFormat) dstFormat)->bitsPerBlock == 64)
         {
             srcTiling = 0x0;
             srcSuperTile = 0x0;
@@ -3615,13 +3615,13 @@ VkResult halti5_copyImage(
         }
 
         /* Fake 1 layer 128 bpp format as double widthed 64bpp */
-        if (g_vkFormatInfoTable[dstFormat].bitsPerBlock == 128 && g_vkFormatInfoTable[dstFormat].partCount == 1)
+        if (__vk_GetVkFormatInfo((VkFormat) dstFormat)->bitsPerBlock == 128 && __vk_GetVkFormatInfo((VkFormat) dstFormat)->partCount == 1)
         {
             /*src is uncompressed image, dst is compressed image*/
             if ((srcRes->isImage && (!srcRes->u.img.pImage->formatInfo.compressed)) &&
                 (dstRes->isImage && dstRes->u.img.pImage->formatInfo.compressed) && !oldPath)
             {
-                fmtInfo = &g_vkFormatInfoTable[srcFormat];
+                fmtInfo = __vk_GetVkFormatInfo((VkFormat) srcFormat);
                 rect = fmtInfo->blockSize;
                 dstRes->u.img.offset.x = gcmALIGN_NP2(dstOffset.x - rect.width + 1, rect.width) >> 1;
                 dstRes->u.img.extent.width *= (rect.width >> 1);
@@ -3636,19 +3636,19 @@ VkResult halti5_copyImage(
                 dstExtent.width  *= 2;
             }
         }
-        else if (g_vkFormatInfoTable[dstFormat].bitsPerBlock == 128 && g_vkFormatInfoTable[dstFormat].partCount == 2)
+        else if (__vk_GetVkFormatInfo((VkFormat) dstFormat)->bitsPerBlock == 128 && __vk_GetVkFormatInfo((VkFormat) dstFormat)->partCount == 2)
         {
             /*src is compressed image, dst is uncompressed image*/
             if (srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed)
             {
-                fmtInfo = &g_vkFormatInfoTable[srcRes->u.img.pImage->formatInfo.residentImgFormat];
+                fmtInfo = __vk_GetVkFormatInfo((VkFormat) srcRes->u.img.pImage->formatInfo.residentImgFormat);
                 rect = fmtInfo->blockSize;
                 dstRes->u.img.extent.width /= rect.width;
                 dstRes->u.img.extent.height /= rect.height;
             }
         }
 
-        if (g_vkFormatInfoTable[dstFormat].bitsPerBlock >= 64 &&
+        if (__vk_GetVkFormatInfo((VkFormat) dstFormat)->bitsPerBlock >= 64 &&
             srcMsaa != dstMsaa)
         {
             useComputeBlit = VK_TRUE;
@@ -3681,7 +3681,7 @@ VkResult halti5_copyImage(
         {
             VkExtent2D rect;
             const __vkFormatInfo *fmtInfo;
-            fmtInfo = &g_vkFormatInfoTable[dstFormat];
+            fmtInfo = __vk_GetVkFormatInfo((VkFormat) dstFormat);
             rect = fmtInfo->blockSize;
 
             /*src is compressed image, dest is compressed image*/

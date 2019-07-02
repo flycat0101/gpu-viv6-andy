@@ -218,7 +218,7 @@ static VkResult halti5_program_blit_src_tex(
         params->srcSize.height = pSrcLevel->requestH * pSrcImg->sampleInfo.y;
         params->srcSize.depth  = pSrcLevel->requestD;
 
-        fmtInfo = &g_vkFormatInfoTable[pSrcImg->formatInfo.residentImgFormat];
+        fmtInfo = __vk_GetVkFormatInfo((VkFormat) pSrcImg->formatInfo.residentImgFormat);
         txStride = (uint32_t)pSrcLevel->stride;
         txSliceSize = (uint32_t)pSrcLevel->sliceSize;
 
@@ -254,7 +254,7 @@ static VkResult halti5_program_blit_src_tex(
                  ? params->srcFormat
                  : pDstImg->createInfo.format;
 
-        fmtInfo = &g_vkFormatInfoTable[txFormat];
+        fmtInfo = __vk_GetVkFormatInfo((VkFormat) txFormat);
         alignWidth = gcmALIGN_NP2(params->srcSize.width, fmtInfo->blockSize.width);
         txStride = (alignWidth / fmtInfo->blockSize.width) * fmtInfo->bitsPerBlock / 8;
         txSliceSize = (params->srcSize.height / fmtInfo->blockSize.height) * txStride;
@@ -276,7 +276,7 @@ static VkResult halti5_program_blit_src_tex(
     else
     {
         __vkImage *pSrcImg = srcRes->u.img.pImage;
-        params->dstSRGB = g_vkFormatInfoTable[pSrcImg->createInfo.format].category == __VK_FMT_CATEGORY_SRGB;
+        params->dstSRGB = __vk_GetVkFormatInfo(pSrcImg->createInfo.format)->category == __VK_FMT_CATEGORY_SRGB;
     }
 
     if (params->rawCopy)
@@ -999,7 +999,7 @@ static VkResult halti5_program_blit_dst_img(
         tmpBufView.createInfo.format = pSrcImg->createInfo.format;
         tmpBufView.createInfo.offset = dstRes->u.buf.offset;
         tmpBufView.createInfo.range = VK_WHOLE_SIZE;
-        tmpBufView.formatInfo = g_vkFormatInfoTable[params->dstFormat];
+        tmpBufView.formatInfo = *__vk_GetVkFormatInfo((VkFormat) params->dstFormat);
 
         switch (tmpBufView.formatInfo.residentImgFormat)
         {
@@ -1175,7 +1175,7 @@ VkResult halti5_program_clear_dst_img(
         tmpBufView.createInfo.offset = dstRes->u.buf.offset;
         tmpBufView.createInfo.range = VK_WHOLE_SIZE;
 
-        tmpBufView.formatInfo = g_vkFormatInfoTable[VK_FORMAT_R32_UINT];
+        tmpBufView.formatInfo = *__vk_GetVkFormatInfo(VK_FORMAT_R32_UINT);
         tmpBufView.formatInfo.residentImgFormat = VK_FORMAT_R32_UINT;
         bufView = &tmpBufView;
 
@@ -1252,7 +1252,7 @@ VkResult halti5_program_copy_src_oq_query_pool(
         tmpBufView.createInfo.offset = srcRes->u.buf.offset;
         tmpBufView.createInfo.range = VK_WHOLE_SIZE;
 
-        tmpBufView.formatInfo = g_vkFormatInfoTable[VK_FORMAT_R32_UINT];
+        tmpBufView.formatInfo = *__vk_GetVkFormatInfo(VK_FORMAT_R32_UINT);
         tmpBufView.formatInfo.residentImgFormat = VK_FORMAT_R32_UINT;
         bufView = &tmpBufView;
 
@@ -1316,7 +1316,7 @@ VkResult halti5_program_copy_dst_oq_query_pool(
         tmpBufView.createInfo.offset = dstRes->u.buf.offset;
         tmpBufView.createInfo.range = VK_WHOLE_SIZE;
 
-        tmpBufView.formatInfo = g_vkFormatInfoTable[VK_FORMAT_R32_UINT];
+        tmpBufView.formatInfo = *__vk_GetVkFormatInfo(VK_FORMAT_R32_UINT);
         tmpBufView.formatInfo.residentImgFormat = VK_FORMAT_R32_UINT;
         bufView = &tmpBufView;
 
@@ -1507,11 +1507,11 @@ static VkResult halti5_program_copy_src_img(
         switch (pSrcImg->formatInfo.bitsPerBlock)
         {
         case 128:
-            __VK_MEMCOPY(&tmpFormatInfo, &g_vkFormatInfoTable[VK_FORMAT_R16G16B16A16_UINT], sizeof(tmpFormatInfo));
+            __VK_MEMCOPY(&tmpFormatInfo, __vk_GetVkFormatInfo(VK_FORMAT_R16G16B16A16_UINT), sizeof(tmpFormatInfo));
             break;
         case 64:
             if (pSrcImg->formatInfo.partCount == 2)
-                __VK_MEMCOPY(&tmpFormatInfo, &g_vkFormatInfoTable[VK_FORMAT_R8G8B8A8_UINT], sizeof(tmpFormatInfo));
+                __VK_MEMCOPY(&tmpFormatInfo, __vk_GetVkFormatInfo(VK_FORMAT_R8G8B8A8_UINT), sizeof(tmpFormatInfo));
             break;
         default:
             /* Not support other bpp currently */
@@ -1561,7 +1561,7 @@ static VkResult halti5_program_copy_src_img(
             /* Dst must be 2 part faked format here. */
             if (pDstImg->formatInfo.partCount == 2)
             {
-                tmpBufView.formatInfo = g_vkFormatInfoTable[VK_FORMAT_R16G16B16A16_UINT];
+                tmpBufView.formatInfo = *__vk_GetVkFormatInfo(VK_FORMAT_R16G16B16A16_UINT);
             }
             break;
         default:
@@ -1666,12 +1666,12 @@ static VkResult halti5_program_copy_dst_img(
         switch (pDstImg->formatInfo.bitsPerBlock)
         {
         case 128:
-            __VK_MEMCOPY(&tmpFormatInfo, &g_vkFormatInfoTable[VK_FORMAT_R16G16B16A16_UINT], sizeof(tmpFormatInfo));
+            __VK_MEMCOPY(&tmpFormatInfo, __vk_GetVkFormatInfo(VK_FORMAT_R16G16B16A16_UINT), sizeof(tmpFormatInfo));
             break;
         case 64:
             if (pSrcImg->formatInfo.partCount == 2)
             {
-                __VK_MEMCOPY(&tmpFormatInfo, &g_vkFormatInfoTable[VK_FORMAT_R8G8B8A8_UINT], sizeof(tmpFormatInfo));
+                __VK_MEMCOPY(&tmpFormatInfo, __vk_GetVkFormatInfo(VK_FORMAT_R8G8B8A8_UINT), sizeof(tmpFormatInfo));
             }
             break;
         default:
@@ -1747,14 +1747,14 @@ static VkResult halti5_program_copy_dst_img(
             /* Dst must be 2 part faked format here. */
             if (pSrcImg->formatInfo.partCount == 2)
             {
-                tmpBufView.formatInfo = g_vkFormatInfoTable[VK_FORMAT_R16G16B16A16_UINT];
+                tmpBufView.formatInfo = *__vk_GetVkFormatInfo(VK_FORMAT_R16G16B16A16_UINT);
             }
             break;
         case 64:
             /* Dst must be 2 part faked format here. */
             if (pSrcImg->formatInfo.partCount == 2)
             {
-                tmpBufView.formatInfo = g_vkFormatInfoTable[VK_FORMAT_R8G8B8A8_UINT];
+                tmpBufView.formatInfo = *__vk_GetVkFormatInfo(VK_FORMAT_R8G8B8A8_UINT);
             }
             break;
         default:
@@ -2150,7 +2150,7 @@ static uint32_t halti5_detect_blit_kind(
         pDstImg = dstRes->u.img.pImage;
 
         srcFormat = pDstImg->createInfo.format;
-        fmtInfo = &g_vkFormatInfoTable[srcFormat];
+        fmtInfo = __vk_GetVkFormatInfo((VkFormat) srcFormat);
         srcParts = fmtInfo->partCount;
         srcCategory = fmtInfo->category;
         srcType = pDstImg->createInfo.imageType;
@@ -2196,7 +2196,7 @@ static uint32_t halti5_detect_blit_kind(
         pSrcImg = srcRes->u.img.pImage;
 
         dstFormat = pSrcImg->createInfo.format;
-        fmtInfo = &g_vkFormatInfoTable[dstFormat];
+        fmtInfo = __vk_GetVkFormatInfo((VkFormat) dstFormat);
         dstParts = fmtInfo->partCount;
         dstCategory = fmtInfo->category;
         dstMsaa = VK_FALSE;
@@ -2244,7 +2244,7 @@ static uint32_t halti5_detect_blit_kind(
         )
        )
     {
-        fmtInfo = &g_vkFormatInfoTable[dstFormat];
+        fmtInfo = __vk_GetVkFormatInfo((VkFormat) dstFormat);
 
         /* Int type do not have data conversion */
         switch (fmtInfo->bitsPerBlock)

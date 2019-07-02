@@ -138,8 +138,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateRenderPass(
         desc->finalLayout = pCreateInfo->pAttachments[i].finalLayout;
         desc->initialLayout = pCreateInfo->pAttachments[i].initialLayout;
         desc->sampleCount = pCreateInfo->pAttachments[i].samples;
-        residentFormat = g_vkFormatInfoTable[desc->format].residentImgFormat;
-        desc->formatInfo = &g_vkFormatInfoTable[residentFormat];
+        residentFormat = __vk_GetVkFormatInfo(desc->format)->residentImgFormat;
+        desc->formatInfo = __vk_GetVkFormatInfo((VkFormat) residentFormat);
 
         if (desc->sampleCount == 4 && desc->formatInfo->bitsPerBlock == 64 &&
             !devCtx->database->CACHE128B256BPERLINE)
@@ -168,7 +168,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateRenderPass(
                 __VK_ASSERT(!"invalid format!");
                 break;
             }
-            desc->formatInfo = &g_vkFormatInfoTable[residentFormat];
+            desc->formatInfo = __vk_GetVkFormatInfo((VkFormat) residentFormat);
         }
 
         switch (desc->format)

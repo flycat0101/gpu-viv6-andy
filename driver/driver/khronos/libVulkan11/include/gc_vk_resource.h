@@ -288,7 +288,9 @@ enum
 #define __VK_MAX_IMAGE_LAYERS 512
 #define __VK_MAX_PARTS        2
 
-extern __vkFormatInfo g_vkFormatInfoTable[];
+__vkFormatInfo * __vk_GetVkFormatInfo(
+    VkFormat vkFormat
+    );
 
 typedef enum __VkMemoryImportType
 {

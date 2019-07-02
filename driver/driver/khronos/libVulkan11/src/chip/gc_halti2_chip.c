@@ -517,7 +517,7 @@ static VkResult halti2_helper_convertHwRsDesc(
         {VK_FORMAT_A8B8G8R8_SRGB_PACK32, 0x06, VK_TRUE},
         {VK_FORMAT_A8B8G8R8_UNORM_PACK32, 0x06, VK_TRUE},
     };
-    bitsPerPixel = g_vkFormatInfoTable[vkFormat].bitsPerBlock / g_vkFormatInfoTable[vkFormat].partCount;
+    bitsPerPixel = __vk_GetVkFormatInfo((VkFormat) vkFormat)->bitsPerBlock / __vk_GetVkFormatInfo((VkFormat) vkFormat)->partCount;
 
     __VK_ASSERT(hwRsDesc);
     hwRsDesc->pixelSize = bitsPerPixel;
@@ -1117,7 +1117,7 @@ VkResult halti2_copyImageWithRS(
         srcMsaa      = VK_FALSE;
 
         srcFormat = dstImg->createInfo.format;
-        fmtInfo = &g_vkFormatInfoTable[srcFormat];
+        fmtInfo = __vk_GetVkFormatInfo((VkFormat) srcFormat);
         srcParts = fmtInfo->partCount;
         srcWidth = srcRes->u.buf.rowLength != 0 ? srcRes->u.buf.rowLength : dstRes->u.img.extent.width;
         srcWidth = gcmALIGN_NP2(srcWidth, fmtInfo->blockSize.width);
@@ -1174,7 +1174,7 @@ VkResult halti2_copyImageWithRS(
         dstMsaa      = VK_FALSE;
 
         dstFormat = srcImg->createInfo.format;
-        fmtInfo = &g_vkFormatInfoTable[dstFormat];
+        fmtInfo = __vk_GetVkFormatInfo((VkFormat) dstFormat);
         dstParts = fmtInfo->partCount;
         dstWidth  = dstRes->u.buf.rowLength != 0 ? dstRes->u.buf.rowLength : srcRes->u.img.extent.width;
         dstWidth = gcmALIGN_NP2(dstWidth, fmtInfo->blockSize.width);
@@ -1211,7 +1211,7 @@ VkResult halti2_copyImageWithRS(
 
             VkExtent2D rect;
             const __vkFormatInfo *fmtInfo;
-            fmtInfo = &g_vkFormatInfoTable[dstFormat];
+            fmtInfo = __vk_GetVkFormatInfo((VkFormat) dstFormat);
             rect = fmtInfo->blockSize;
 
             dstTiling = 0x0;
@@ -1238,8 +1238,8 @@ VkResult halti2_copyImageWithRS(
             }
         }
 
-        if (g_vkFormatInfoTable[srcFormat].bitsPerBlock == 8 ||
-            g_vkFormatInfoTable[dstFormat].bitsPerBlock == 8)
+        if (__vk_GetVkFormatInfo((VkFormat) srcFormat)->bitsPerBlock == 8 ||
+            __vk_GetVkFormatInfo((VkFormat) dstFormat)->bitsPerBlock == 8)
         {
             alignWidth = 32;
             alignHeight = 8;
@@ -1253,7 +1253,7 @@ VkResult halti2_copyImageWithRS(
         if (!useComputeBlit)
         {
             if (srcTiling == 0x0 &&
-                g_vkFormatInfoTable[srcFormat].bitsPerBlock == 8)
+                __vk_GetVkFormatInfo((VkFormat) srcFormat)->bitsPerBlock == 8)
             {
                 useComputeBlit = VK_TRUE;
             }
@@ -2806,7 +2806,7 @@ VkResult halti2_program_blit_src_tex(
         params->flushTex = VK_TRUE;
 
         txFormat = pDstImg->createInfo.format;
-        fmtInfo = &g_vkFormatInfoTable[txFormat];
+        fmtInfo = __vk_GetVkFormatInfo((VkFormat) txFormat);
         alignWidth = gcmALIGN_NP2(params->srcSize.width, fmtInfo->blockSize.width);
         txStride = (alignWidth / fmtInfo->blockSize.width) * fmtInfo->bitsPerBlock / 8;
         txSliceSize = (params->srcSize.height / fmtInfo->blockSize.height) * txStride;
