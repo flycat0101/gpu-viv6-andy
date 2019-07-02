@@ -199,12 +199,14 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
 VX_INTERNAL_API vx_status vxnneModifyNNLastNoflushBit(
     vx_context                   context,
     vxnne_command_buffer         command_buffer,
+    vxnne_operation              operation,
     vx_uint8                     value
     );
 
 VX_INTERNAL_API vx_status vxnneModifyTPLastNoflushBit(
     vx_context                   context,
     vxnne_command_buffer         command_buffer,
+    vxnne_operation              operation,
     vx_uint8                     value
     );
 

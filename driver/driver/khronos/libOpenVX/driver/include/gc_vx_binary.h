@@ -23,6 +23,7 @@
 #define VX_MAX_NNTP_OPERATION_STATE_SIZE  0x200
 #define VX_MAX_INITIALIZE_COMMAND_SIZE    0xC00
 #define VX_MAX_SC_OPERATION_STATE_SIZE    0x400
+#define VX_MAX_WAIT_STATE_SIZE            0x200
 
 enum
 {
@@ -386,6 +387,16 @@ typedef struct _vx_binary_save_s
     vx_reference                             outputTableRef[VX_MAX_NN_INOUT_PARAM_COUNT];
     vx_uint32                                inputTableRefCount;
     vx_uint32                                outputTableRefCount;
+
+    vx_uint32                                *NNTPDataCmdPhysical;
+    vx_uint32                                *NNTPDataOffset;
+    vx_uint32                                NNTPDataCount;
+
+    vx_uint8                                 waitCommands[VX_MAX_WAIT_STATE_SIZE];
+    vx_uint32                                waitCommandsSize;
+
+    vx_uint8                                 endCommands[VX_MAX_INITIALIZE_COMMAND_SIZE];
+    vx_uint32                                endCommandsSize;
 }
 vx_binary_save_s, *vx_binary_save;
 
@@ -586,6 +597,13 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveScalerOperation(
     gctUINT32 stateSize
     );
 
+VX_INTERNAL_API vx_status vxoGraphBinary_ReSaveNNTPCommand(
+    vxnne_operation operation,
+    vx_uint32 cmdPhysical,
+    vx_uint32 offset,
+    vx_uint32 value
+    );
+
 VX_INTERNAL_API vx_status vxoGraphBinary_ReSaveInputAndPatchTable(
     vx_graph graph
     );
@@ -599,7 +617,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_GetGraphInputOutput(
     vx_graph graph
     );
 
-VX_INTERNAL_API vx_status vxoGraphBinary_ReSaveNNTPInformation(
+VX_INTERNAL_API vx_status vxoGraphBinary_SaveNNTPStates(
     vx_node node,
     vx_uint32 cmdPhysical,
     gctUINT8 *captureBuffer,

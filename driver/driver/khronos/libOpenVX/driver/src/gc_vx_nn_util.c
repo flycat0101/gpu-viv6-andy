@@ -1709,11 +1709,22 @@ vx_status vxnneCommandBuffer_ExecuteCommands(
 
         if (node->graph->binarySave)
         {
-            status = gcfVX_CaptureState(captureBuffer,
+            vx_binary_save binarySave = node->graph->binarySave;
+            if ((0 == i) && (binarySave->waitCommandsSize > 0))
+            {
+                /* append wait commands */
+                vxMemCopy(captureBuffer, binarySave->waitCommands, binarySave->waitCommandsSize);
+            }
+            status = gcfVX_CaptureState(captureBuffer + binarySave->waitCommandsSize,
                                         VX_MAX_NNTP_OPERATION_STATE_SIZE,
                                         &actualSize,
                                         gcvTRUE,
                                         gcvFALSE);
+            if (status != VX_SUCCESS)
+            {
+                vxError("failed to capture nn/tp commands\n");
+                vxmASSERT(0);
+            }
         }
 
         status = gcfVX_Accel(commandBuffer->physical + i * commandSize, type,
@@ -1726,16 +1737,20 @@ vx_status vxnneCommandBuffer_ExecuteCommands(
         if (node->graph->binarySave)
         {
             vx_uint32 cmdPhysical = (vx_uint32)(commandBuffer->physical + i * commandSize);
+            vx_binary_save binarySave = node->graph->binarySave;
 
             status = gcfVX_CaptureState(gcvNULL, 0, &actualSize, gcvFALSE, gcvFALSE);
             if (status != VX_SUCCESS)
             {
+                vxError("failed to capture nn/tp commands end\n");
                 vxmASSERT(0);
             }
-            vxoGraphBinary_ReSaveNNTPInformation(node,
-                                                cmdPhysical,
-                                                captureBuffer,
-                                                (vx_uint32)actualSize);
+
+            vxoGraphBinary_SaveNNTPStates(node,
+                                          cmdPhysical,
+                                          captureBuffer,
+                                          (vx_uint32)actualSize + binarySave->waitCommandsSize);
+            binarySave->waitCommandsSize = 0;
         }
     }
 

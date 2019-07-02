@@ -320,8 +320,7 @@ static vx_uint32 getStateSize(
     {
         /* bypass INIT & SW operation */
         if ((binaryLoad->operations[i].operationType != VX_BINARY_OPERATION_TYPE_INIT) &&
-            (binaryLoad->operations[i].operationType != VX_BINARY_OPERATION_TYPE_SW) &&
-            (binaryLoad->operations[i].operationType != VX_BINARY_OPERATION_TYPE_END))
+            (binaryLoad->operations[i].operationType != VX_BINARY_OPERATION_TYPE_SW))
         {
             size += binaryLoad->LCDT[binaryLoad->operations[i].stateLCDTIndex].size;
         }
@@ -2398,6 +2397,11 @@ VX_PRIVATE_API vx_status binaryGenerateStatesBuffer(
 
             case VX_BINARY_OPERATION_TYPE_END:
             {
+                vx_binary_entry_s *lcdtDate = VX_NULL;
+                lcdtDate = &binLoad->LCDT[operation->stateLCDTIndex];
+                vxMemCopy((vx_ptr)states, (vx_const_ptr)((vx_uint8 *)binLoad->LCD.logical+ lcdtDate->offset),
+                          (vx_size)lcdtDate->size);
+                states += lcdtDate->size;
                 gcmDUMP(gcvNULL, "#[info: END command in the binary]");
                 gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_MEMORY, binLoad->LCD.physical,
                             binLoad->LCD.logical, binLoad->LCDT[operation->stateLCDTIndex].offset,
@@ -4022,6 +4026,18 @@ VX_PRIVATE_API vx_status vxoGraphBinary_unInitial(
         binarySave->operationOffset = VX_NULL;
     }
 
+    if (binarySave->NNTPDataOffset != VX_NULL)
+    {
+        vxFree((vx_ptr)binarySave->NNTPDataOffset);
+        binarySave->NNTPDataOffset = VX_NULL;
+    }
+
+    if (binarySave->NNTPDataCmdPhysical != VX_NULL)
+    {
+        vxFree((vx_ptr)binarySave->NNTPDataCmdPhysical);
+        binarySave->NNTPDataCmdPhysical = VX_NULL;
+    }
+
     gcoOS_Flush(gcvNULL, binarySave->binarySaveFile);
     gcmVERIFY_OK(gcoOS_Close(gcvNULL, binarySave->binarySaveFile));
     binarySave->binarySaveFile = VX_NULL;
@@ -5405,6 +5421,10 @@ VX_INTERNAL_API void vxoGraphBinary_SaveTPNNOperation(
     /*4. save nn/tp instruction */
     if (cmdType == VX_BINARY_OPERATION_TYPE_NN)
     {
+        binarySave->NNTPDataCmdPhysical[binarySave->NNTPDataCount] = cmdPhysicalAddress;
+        binarySave->NNTPDataOffset[binarySave->NNTPDataCount] = binarySave->currNNOperationOffset;
+        binarySave->NNTPDataCount++;
+
         gcoOS_MemCopy(nnOperationInfo.nnCmd, cmdLogicalAddress, cmdSize);
         gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
                     binarySave->currNNOperationOffset, gcvFILE_SEEK_SET);
@@ -5417,6 +5437,10 @@ VX_INTERNAL_API void vxoGraphBinary_SaveTPNNOperation(
     }
     else if (cmdType == VX_BINARY_OPERATION_TYPE_TP)
     {
+        binarySave->NNTPDataCmdPhysical[binarySave->NNTPDataCount] = cmdPhysicalAddress;
+        binarySave->NNTPDataOffset[binarySave->NNTPDataCount] = binarySave->currTPOperationOffset;
+        binarySave->NNTPDataCount++;
+
         gcoOS_MemCopy(&tpOperationInfo.tpCmd, cmdLogicalAddress, cmdSize);
         gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
                     binarySave->currTPOperationOffset, gcvFILE_SEEK_SET);
@@ -5479,7 +5503,62 @@ OnError:
 
 }
 
-VX_INTERNAL_API vx_status vxoGraphBinary_ReSaveNNTPInformation(
+/* re-write nn/tp command buffer in offset bytes location */
+VX_INTERNAL_API vx_status vxoGraphBinary_ReSaveNNTPCommand(
+    vxnne_operation operation,
+    vx_uint32 cmdPhysical,
+    vx_uint32 offset,
+    vx_uint32 value
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_node node = operation->layer->node;
+    vx_binary_save_s *binarySave = node->graph->binarySave;
+    vx_uint32 i = 0;
+    vx_uint32 index = 0;
+    vx_uint32 location = 0;
+    gcmHEADER_ARG("operation=%p, offset=0x%x, value=0x%x", operation, offset, value);
+
+    if (!binarySave)
+    {
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
+
+    for (i = 0; i < binarySave->NNTPDataCount; i++)
+    {
+        if (binarySave->NNTPDataCmdPhysical[i] == 0)
+        {
+            continue;
+        }
+        else if (cmdPhysical == binarySave->NNTPDataCmdPhysical[i])
+        {
+            index = i;
+            break;
+        }
+    }
+    if (index >= binarySave->NNTPDataCount)
+    {
+        vxError("%s[%d]: can't search this operation in NNTPDataCmdPhysical\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_ERROR_INVALID_VALUE);
+    }
+
+    location = binarySave->NNTPDataOffset[index] + offset;
+    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile, location, gcvFILE_SEEK_SET);
+    gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_uint32), &value);
+
+OnError:
+    if ((node->base.context->options.enableSaveBinary == 0) && (status != VX_SUCCESS))
+    {
+        status = VX_SUCCESS;
+        gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
+        vxoGraphBinary_unInitial(node->graph);
+    }
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+VX_INTERNAL_API vx_status vxoGraphBinary_SaveNNTPStates(
     vx_node node,
     vx_uint32 cmdPhysical,
     gctUINT8 *stateBuffer,
@@ -6721,6 +6800,28 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
                         (gctPOINTER*)&binarySave->patchNNTPCmdOffset)))
         {
             vxError("fail to allocate memory for patchNNTPCmdOffset\n");
+            vxmONERROR(VX_ERROR_NO_MEMORY);
+        }
+
+        if (binarySave->NNTPDataCmdPhysical != VX_NULL)
+        {
+            vxFree((vx_ptr)binarySave->NNTPDataCmdPhysical);
+        }
+        binarySave->NNTPDataCmdPhysical = (vx_uint32*)vxAllocateAndZeroMemory((binarySave->tpOperationCount + binarySave->nnOperationCount) * sizeof(vx_uint32) );
+        if (binarySave->NNTPDataCmdPhysical == VX_NULL)
+        {
+            vxError("fail to allocate memory for NNTPDataCmdPhysical\n");
+            vxmONERROR(VX_ERROR_NO_MEMORY);
+        }
+
+        if (binarySave->NNTPDataOffset != VX_NULL)
+        {
+            vxFree((vx_ptr)binarySave->NNTPDataOffset);
+        }
+        binarySave->NNTPDataOffset = (vx_uint32*)vxAllocateAndZeroMemory((binarySave->tpOperationCount + binarySave->nnOperationCount) * sizeof(vx_uint32));
+        if (binarySave->NNTPDataOffset == VX_NULL)
+        {
+            vxError("fail to allocate memory for NNTPDataOffset\n");
             vxmONERROR(VX_ERROR_NO_MEMORY);
         }
     }

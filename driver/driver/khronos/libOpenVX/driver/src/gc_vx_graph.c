@@ -5656,11 +5656,11 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsAfter(vx_graph graph)
 
         if (operation->target == VXNNE_OPERATION_TARGET_NN)
         {
-            vxnneModifyNNLastNoflushBit(graph->base.context, &layer->opIndices[i].commandBuffer, i != layer->opIndicesNum - 1 ? 1 : 0);
+            vxnneModifyNNLastNoflushBit(graph->base.context, &layer->opIndices[i].commandBuffer, operation, i != layer->opIndicesNum - 1 ? 1 : 0);
         }
         else if (operation->target == VXNNE_OPERATION_TARGET_TP)
         {
-            vxnneModifyTPLastNoflushBit(graph->base.context, &layer->opIndices[i].commandBuffer, i != layer->opIndicesNum - 1 ? 1 : 0);
+            vxnneModifyTPLastNoflushBit(graph->base.context, &layer->opIndices[i].commandBuffer, operation, i != layer->opIndicesNum - 1 ? 1 : 0);
         }
     }
 
@@ -5865,7 +5865,7 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsAfter(vx_graph graph)
                         break;
                 }
 
-                vxnneModifyTPLastNoflushBit(graph->base.context, &layer->opIndices[flushTPPos].commandBuffer, 0);
+                vxnneModifyTPLastNoflushBit(graph->base.context, &layer->opIndices[flushTPPos].commandBuffer, operation, 0);
                 vxInfo("TP flush %2d\n", operation->absoluteOperationID);
                 nnTPFlushed = tpTPFlushed = vx_false_e;
                 flushedTPOp = operation;
@@ -5923,7 +5923,7 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsAfter(vx_graph graph)
                     break;
             }
 
-            vxnneModifyNNLastNoflushBit(graph->base.context, &layer->opIndices[flushNNPos].commandBuffer, 0);
+            vxnneModifyNNLastNoflushBit(graph->base.context, &layer->opIndices[flushNNPos].commandBuffer, operation, 0);
             vxInfo("NN flush %2d\n", operation->absoluteOperationID);
             tpNNFlushed = vx_false_e;
             flushedNNOp = operation;
@@ -9501,24 +9501,29 @@ OnError:
 VX_PRIVATE_API void vxoGraph_EndProcess(vx_graph graph)
 {
     vx_uint32 i, j;
-    gctUINT8 captureBuffer[VX_MAX_INITIALIZE_COMMAND_SIZE] = {0};
-    gctUINT32 actualSize = 0;
 
     gcmHEADER_ARG("graph=%p", graph);
     vxmASSERT(graph);
 
-    if (graph->binarySave)
-    {
-        gcfVX_CaptureState(captureBuffer,
-                            VX_MAX_INITIALIZE_COMMAND_SIZE,
-                            &actualSize,
-                            gcvTRUE,
-                            gcvFALSE);
-    }
-
     if (!graph->isChildGraph)
     {
         gcfVX_Flush(gcvTRUE);
+    }
+
+    if ((graph->binarySave) && (!graph->isChildGraph))
+    {
+        vx_status status = VX_SUCCESS;
+        status = gcfVX_CaptureState(gcvNULL, 0, &graph->binarySave->endCommandsSize, gcvFALSE, gcvFALSE);
+        if (status != VX_SUCCESS)
+        {
+            vxError("fail to capture end operation for generating binary graph\n");
+        }
+        if (graph->binarySave->endCommandsSize > 0)
+        {
+            vxoGraphBinary_SaveEndOperation(graph,
+                                            (vx_uint8_ptr)graph->binarySave->endCommands,
+                                            (vx_uint32)graph->binarySave->endCommandsSize);
+        }
     }
 
     /*copy data from gpu buffer to cpu buffer in the end*/
@@ -9572,22 +9577,6 @@ VX_PRIVATE_API void vxoGraph_EndProcess(vx_graph graph)
         }
     }
 
-    if (graph->binarySave)
-    {
-        vx_status status = VX_SUCCESS;
-        status = gcfVX_CaptureState(gcvNULL, 0, &actualSize, gcvFALSE, gcvFALSE);
-        if (status != VX_SUCCESS)
-        {
-            vxError("fail to capture end operation for generating binary graph\n");
-        }
-        vxoGraphBinary_SaveEndOperation(graph,
-                                        (vx_uint8_ptr)captureBuffer,
-                                        (vx_uint32)actualSize);
-
-        /* close binary graph file */
-        vxoGraphBinary_ReSaveInputAndPatchTable(graph);
-    }
-
 #if gcdDUMP
     {
         vx_uint32 i, j;
@@ -9636,6 +9625,12 @@ VX_PRIVATE_API void vxoGraph_EndProcess(vx_graph graph)
     {
         vxoPerf_End(&graph->perf);
         vxoPerf_Dump(&graph->perf);
+    }
+
+    if (graph->binarySave)
+    {
+        /* close binary graph file */
+        vxoGraphBinary_ReSaveInputAndPatchTable(graph);
     }
 
     vxoGraph_ClearAllVisitedFlags(graph);

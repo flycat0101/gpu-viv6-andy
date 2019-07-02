@@ -4982,6 +4982,7 @@ OnError:
 VX_INTERNAL_API vx_status vxnneModifyNNLastNoflushBit(
     vx_context                   context,
     vxnne_command_buffer         command_buffer,
+    vxnne_operation              operation,
     vx_uint8                     value
     )
 {
@@ -4999,12 +5000,15 @@ VX_INTERNAL_API vx_status vxnneModifyNNLastNoflushBit(
 
     *((vx_uint32_ptr)ptr + 3) = data;
 
+    vxoGraphBinary_ReSaveNNTPCommand(operation, command_buffer->physical, 3 * sizeof(vx_uint32), data);
+
     return VX_SUCCESS;
 }
 
 VX_INTERNAL_API vx_status vxnneModifyTPLastNoflushBit(
     vx_context                   context,
     vxnne_command_buffer         command_buffer,
+    vxnne_operation              operation,
     vx_uint8                     value
     )
 {
@@ -5021,6 +5025,8 @@ VX_INTERNAL_API vx_status vxnneModifyTPLastNoflushBit(
     }
 
     *((vx_uint32_ptr)ptr + 12) = data;
+
+    vxoGraphBinary_ReSaveNNTPCommand(operation, command_buffer->physical, 12 * sizeof(vx_uint32), data);
 
     return VX_SUCCESS;
 }

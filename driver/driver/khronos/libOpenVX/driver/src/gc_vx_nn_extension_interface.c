@@ -1619,9 +1619,14 @@ VX_PRIVATE_API vx_status vxnneShaderOperation_Execute(vxnne_operation_s *operati
     if (graph->binarySave)
     {
         gctPOINTER pointer;
+        vx_binary_save binarySave = graph->binarySave;
         vxmONERROR(gcoOS_Allocate(gcvNULL, VX_MAX_SH_OPERATION_STATE_SIZE, (gctPOINTER *)&pointer));
         stateBuffer = (gctUINT8_PTR)pointer;
-        status = gcfVX_CaptureState(stateBuffer,
+        if (binarySave->waitCommandsSize > 0) {
+            /* append wait commands */
+            vxMemCopy(stateBuffer, binarySave->waitCommands, binarySave->waitCommandsSize);
+        }
+        status = gcfVX_CaptureState(stateBuffer + binarySave->waitCommandsSize,
                                     VX_MAX_SH_OPERATION_STATE_SIZE,
                                     gcvNULL,
                                     gcvTRUE, gcvFALSE);
@@ -1638,6 +1643,7 @@ VX_PRIVATE_API vx_status vxnneShaderOperation_Execute(vxnne_operation_s *operati
         vx_node node = shaderOperation->base.layer->node;
         vx_reference *shParams = VX_NULL;
         gctUINT32 actualSize = 0;
+        vx_binary_save binarySave = graph->binarySave;
 
         status = gcfVX_CaptureState(gcvNULL, 0, &actualSize, gcvFALSE, gcvFALSE);
         if (actualSize <= 0)
@@ -1657,8 +1663,9 @@ VX_PRIVATE_API vx_status vxnneShaderOperation_Execute(vxnne_operation_s *operati
         vxmONERROR(vxoGraphBinary_SaveShaderOperation(node, &shaderOperation->base, kernelShader,
                                                     shParams,
                                                     shaderOperation->shaderExecutable->paramNum,
-                                                    stateBuffer, actualSize,
+                                                    stateBuffer, actualSize + binarySave->waitCommandsSize,
                                                     operation->currBatchIndex));
+        binarySave->waitCommandsSize = 0;
     }
 
 OnError:
@@ -19600,6 +19607,7 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
     vxnne_execution_layer   executionLayer = (vxnne_execution_layer)layer;
     vxnne_operation         operation;
     vxnne_operation_target_e operationTarget;
+    vx_graph graph = executionLayer->graph;
 
     vxnneMultiChannel_GetCurrentChannel(&operationTarget);
 
@@ -19617,6 +19625,26 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
 
         if (vxoContext_IsFeatureAvailable(executionLayer->graph->base.context, VX_NN_TP_PARALLEL))
         {
+            gctUINT32 actualSize = 0;
+            vx_status status = VX_SUCCESS;
+            if (graph->binarySave)
+            {
+                graph->binarySave->waitCommandsSize = 0;
+                if ((operation->engineSync.waitCnt > 0) && (i > 0))
+                {
+                    status = gcfVX_CaptureState(graph->binarySave->waitCommands,
+                                                VX_MAX_WAIT_STATE_SIZE,
+                                                &actualSize,
+                                                gcvTRUE,
+                                                gcvFALSE);
+                    if (status != VX_SUCCESS)
+                    {
+                        vxError("failed to capture wait commands\n");
+                        vxmASSERT(0);
+                    }
+                }
+            }
+
             /* th/nn/sh parallel wait event ID */
             if (i > 0)
             {
@@ -19625,6 +19653,17 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
                     gcoVX_WaitNNEvent(operation->engineSync.waitId[j]);
                     wait = vx_true_e;
                 }
+            }
+
+            if ((graph->binarySave) && (operation->engineSync.waitCnt > 0) && (i > 0))
+            {
+                status = gcfVX_CaptureState(gcvNULL, 0, &actualSize, gcvFALSE, gcvFALSE);
+                if (status != VX_SUCCESS)
+                {
+                    vxError("failed to capture wait commands end\n");
+                    vxmASSERT(0);
+                }
+                graph->binarySave->waitCommandsSize = (vx_uint32)actualSize;
             }
 
             if (operation->target == VXNNE_OPERATION_TARGET_NN)
@@ -19732,6 +19771,15 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
 
         }
 #endif
+    }
+
+    if (graph->binarySave)
+    {
+        gcfVX_CaptureState(graph->binarySave->endCommands,
+                            VX_MAX_INITIALIZE_COMMAND_SIZE,
+                            &graph->binarySave->endCommandsSize,
+                            gcvTRUE,
+                            gcvFALSE);
     }
 
     if (vxoContext_IsFeatureAvailable(executionLayer->graph->base.context, VX_NN_TP_PARALLEL) &&
