@@ -415,6 +415,14 @@ typedef struct _vx_tensor_create_params_t
             vx_float32      scale;       /*!< \brief Scale vaule for the quantized value */
             vx_int32        zeroPoint;  /*!< \brief  A 32 bit integer, in range [0, 255] */
         } affine;
+
+        struct {
+            vx_uint32       channelDim; /*!< \brief a 32 bit unsigned integer indicating channel dimension */
+            vx_uint32       scaleCount; /*!< \brief the size of the scale array, must be equal to size[channelDim] */
+            vx_float32 *    scales; /*!< \brief an array of positive 32 bit floating point value. The size of the scales array must be equal to size[channelDim] */
+            vx_uint32       zeroPointCount; /*!< \brief the size of the zero point array, must be equal to 0 or size[channelDim] */
+            vx_int32 *      zeroPoint;  /*!< \brief  A 32 bit integer, in range [0, 255] */
+        } affinePerChannel;
      }
      quant_data;
 } vx_tensor_create_params_t;
