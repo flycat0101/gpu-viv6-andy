@@ -16,6 +16,8 @@
 
 #define _GC_OBJ_ZONE            gcdZONE_VX_GRAPH
 
+static vx_uint32 optPhase = 1;
+
 VX_INTERNAL_API vx_uint32 vxoGraphOptimization_computeFinalKernelSize(vx_uint32 kernelsize, vx_uint32 stride)
 {
     vx_uint32 alignedWidth = ((kernelsize % stride == 0) ? kernelsize : (kernelsize + (stride - kernelsize % stride)));
@@ -1897,6 +1899,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_DeleteReshape(vx_graph graph)
             if(vxoGraphOptimization_matchTensorInNode(pNode, reshapeIn, &index) )
             {
                 vxoGraphOptimization_updateTensorInNode(&pNode, index, reshapeOut);
+                node->merged = vx_true_e;
             }
         }
     }
@@ -4352,6 +4355,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
 {
     vx_status status = VX_SUCCESS;
     vx_context context = vxGetContext((vx_reference)graph );
+
 
     gcmHEADER_ARG("graph=%p", graph);
 

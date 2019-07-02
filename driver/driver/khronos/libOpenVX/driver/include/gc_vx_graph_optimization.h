@@ -52,7 +52,7 @@ EXTERN_C_BEGIN
     {\
         char logName[100] = {0};\
         const char *ptr = __FUNCTION__ + sizeof("vxoGraphOptimization_") - 1;\
-        sprintf(logName,"%s_%s_%s", "after",ptr,"graph.json");    \
+        sprintf(logName,"%s_%d_%s_%s", "after", optPhase++, ptr,"graph.json");    \
         vxoGraphOptimization_dumpTopology(graph, logName);\
     }\
 }
