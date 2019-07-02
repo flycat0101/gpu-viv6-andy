@@ -71,6 +71,7 @@ void _VIR_CG_UniformColorMap_Init(
 static void _VIR_CG_ConfigSamplers(
     IN VIR_Shader       *pShader,
     IN VSC_HW_CONFIG    *pHwConfig,
+    IN gctBOOL          bHasResLayout,
     OUT gctINT          *maxSampler,
     OUT gctINT          *sampler,
     OUT gctBOOL         *allocateSamplerReverse
@@ -84,7 +85,7 @@ static void _VIR_CG_ConfigSamplers(
     if (VIR_Shader_isPackUnifiedSampler(pShader))
     {
         samplerRegNoBase = VIR_Shader_GetSamplerBaseOffset(pShader);
-        VIR_Shader_CalcSamplerCount(pShader, &samplerCount);
+        VIR_Shader_CalcSamplerCount(pShader, bHasResLayout, &samplerCount);
 
         gcmASSERT(samplerRegNoBase != -1);
 
@@ -1927,7 +1928,7 @@ VSC_ErrCode VIR_CG_MapUniforms(
         &codeGenUniformBase);
 
     /* Config sampler setting. */
-    _VIR_CG_ConfigSamplers(pShader, pHwConfig, &maxSampler, &sampler, &allocateSamplerReverse);
+    _VIR_CG_ConfigSamplers(pShader, pHwConfig, gcvFALSE, &maxSampler, &sampler, &allocateSamplerReverse);
 
     /* set the handleDefaultUBO flag */
     _VIR_CG_isUBOSupported(pShader, pHwConfig, &handleDefaultUBO, &unblockUniformBlock);
@@ -2371,7 +2372,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
         &codeGenUniformBase);
 
     /* config the sampler setting */
-    _VIR_CG_ConfigSamplers(pShader, pHwConfig, &maxSampler, &sampler, &allocateSamplerReverse);
+    _VIR_CG_ConfigSamplers(pShader, pHwConfig, gcvTRUE, &maxSampler, &sampler, &allocateSamplerReverse);
 
     /* set the handleDefaultUBO flag */
     _VIR_CG_isUBOSupported(pShader, pHwConfig, &handleDefaultUBO, &unblockUniformBlock);

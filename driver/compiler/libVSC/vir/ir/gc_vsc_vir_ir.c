@@ -17452,6 +17452,7 @@ VIR_OpCode_EvaluateOneChannelConstant(
 VSC_ErrCode
 VIR_Shader_CalcSamplerCount(
     IN      VIR_Shader *         Shader,
+    IN gctBOOL                   bHasResLayout,
     IN OUT  gctINT*              SamplerCount
     )
 {
@@ -17484,7 +17485,13 @@ VIR_Shader_CalcSamplerCount(
             !isSymUniformUsedInTextureSize(sym) &&
             !isSymUniformUsedInLTC(sym))
         {
-            continue;
+            /* We can't skip a texture which is from the resource layout. */
+            if (!bHasResLayout
+                ||
+                (VIR_Symbol_GetDescriptorSet(sym) == -1 && VIR_Symbol_GetBinding(sym) == -1))
+            {
+                continue;
+            }
         }
 
         symType = VIR_Symbol_GetType(sym);

@@ -4766,10 +4766,17 @@ static VSC_ErrCode _CalcSamplerBaseOffset(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelp
     VSC_HW_CONFIG*             pHwCfg = pPgLinkHelper->baseHelper.pHwCfg;
     gctINT                     samplerBaseOffset, samplerCount, maxSamplerCount = 0;
     gctUINT                    stageIdx;
+    gctBOOL                    bHasResLayout = gcvFALSE;
 
     if (!(pPgLinkHelper->pgPassMnger.pPgmLinkerParam->cfg.cFlags & VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC))
     {
         return errCode;
+    }
+
+    if (pPgLinkHelper->pgPassMnger.pPgmLinkerParam->pPgResourceLayout &&
+        pPgLinkHelper->pgPassMnger.pPgmLinkerParam->pPgResourceLayout->resourceSetCount)
+    {
+        bHasResLayout = gcvTRUE;
     }
 
     samplerBaseOffset = pHwCfg->maxHwNativeTotalSamplerCount;
@@ -4791,6 +4798,7 @@ static VSC_ErrCode _CalcSamplerBaseOffset(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelp
             VSC_CheckUniformUsage(pShader);
 
             errCode = VIR_Shader_CalcSamplerCount(pShader,
+                                                  bHasResLayout,
                                                   &samplerCount);
             ON_ERROR(errCode, "Calc sampler Count");
 

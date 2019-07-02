@@ -7407,6 +7407,7 @@ VIR_OpCode_EvaluateOneChannelConstant(
 VSC_ErrCode
 VIR_Shader_CalcSamplerCount(
     IN      VIR_Shader *         Shader,
+    IN gctBOOL                   bHasResLayout,
     IN OUT  gctINT*              SamplerCount
     );
 
