@@ -15512,7 +15512,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     || (inputFormat == VX_TYPE_INT8  && weightFormat == VX_TYPE_INT8  && biasFormat == VX_TYPE_INT32 && outputFormat != VX_TYPE_FLOAT32)
                     || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT16)
                     || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT64 && outputFormat == VX_TYPE_INT16)
-                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8));
+                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat != VX_TYPE_FLOAT32));
             }
             else
             {
