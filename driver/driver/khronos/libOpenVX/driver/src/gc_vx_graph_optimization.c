@@ -481,7 +481,8 @@ VX_PRIVATE_API vx_bool vxoGraphOptimization_matchTensorInNode(vx_node node, vx_t
     {
         if(vxoReference_HasWriteDependency(node->paramTable[k], (vx_reference)tensor))
         {
-            *index = k;
+            if(index != VX_NULL)
+                *index = k;
             return vx_true_e;
         }
     }
@@ -514,7 +515,7 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_updateTensorInGraph(vx_node curren
         for (j = 0; j < currentNode->numParents; j++)
         {
             vx_node parent = nodeTable[currentNode->parentNodes[j]];
-            if(vxoReference_HasWriteDependency((vx_reference)oldTensor[i], parent->paramTable[parent->numParameters - 1]))
+            if(vxoGraphOptimization_matchTensorInNode(parent,oldTensor[i], VX_NULL))
             {
                 vx_uint32 index = 0;
                 for(k = 0; k <parent->numChildren; k++)
@@ -590,10 +591,24 @@ VX_INTERNAL_API void vxoGraphOptimization_fillDims2paramters(vx_char *buf, vx_ui
 VX_PRIVATE_API void vxoGraphOptimization_stroeNodeInOutInfo(vxcJSON *paramters, vx_node node)
 {
     vx_char buf[100] = {0};
-    vxoGraphOptimization_fillDims2paramters(buf, 100, TENSOR_SIZES((vx_tensor)node->paramTable[0]), TENSOR_DIM_NUM((vx_tensor)node->paramTable[0]), "input_dims", paramters);
-    vxoGraphOptimization_fillDims2paramters(buf, 100, TENSOR_SIZES((vx_tensor)node->paramTable[node->numParameters - 1]),
-        TENSOR_DIM_NUM((vx_tensor)node->paramTable[node->numParameters - 1]),
-        "output_dims", paramters);
+    vx_uint32 i = 0;
+    vx_reference ref = NULL;
+    for(i = 0; i < node->numParameters; i++)
+    {
+        ref = node->paramTable[i];
+        if(ref->type == VX_TYPE_TENSOR && node->kernel->signature.directionTable[i] == VX_INPUT)
+        {
+            vxoGraphOptimization_fillDims2paramters(buf, 100, TENSOR_SIZES((vx_tensor)ref),
+                TENSOR_DIM_NUM((vx_tensor)ref), "input_dims", paramters);
+        }
+        else if(ref->type == VX_TYPE_TENSOR && node->kernel->signature.directionTable[i] == VX_OUTPUT)
+        {
+            vxoGraphOptimization_fillDims2paramters(buf, 100, TENSOR_SIZES((vx_tensor)ref),
+                        TENSOR_DIM_NUM((vx_tensor)ref), "output_dims", paramters);
+        }
+    }
+
+
 }
 
 VX_INTERNAL_API void vxoGraphOptimization_stroeNodeDims2paramter(vxcJSON *paramters, vx_node node)
