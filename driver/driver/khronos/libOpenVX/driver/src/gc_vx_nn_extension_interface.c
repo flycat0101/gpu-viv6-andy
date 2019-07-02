@@ -16292,12 +16292,25 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(inputs);
                 }
 
-                tensor2Row = vxoTensor_CreateTensor(node->base.context, node->graph, &tensor_create_params, vx_true_e);
-                if (tensor2Row == VX_NULL)
+                if (enableAlign4)
                 {
-                    vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
-                    status = VX_ERROR_NO_MEMORY;
-                    goto exit;
+                    tensor2Row = vxoTensor_CreateTensor(node->base.context, node->graph, &tensor_create_params, vx_false_e);
+                    if (tensor2Row == VX_NULL || vxoTensor_AllocateMemory(tensor2Row) != VX_SUCCESS)
+                    {
+                        vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
+                        status = VX_ERROR_NO_MEMORY;
+                        goto exit;
+                    }
+                }
+                else
+                {
+                    tensor2Row = vxoTensor_CreateTensor(node->base.context, node->graph, &tensor_create_params, vx_true_e);
+                    if (tensor2Row == VX_NULL)
+                    {
+                        vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
+                        status = VX_ERROR_NO_MEMORY;
+                        goto exit;
+                    }
                 }
 
                 if(node->base.context->evisNoInst.supportEVIS)
