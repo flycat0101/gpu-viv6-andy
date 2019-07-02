@@ -27794,6 +27794,9 @@ vxnne_shader_executable vxnneGetTensorTRShaderExecutable(
         case VX_NN_ACTIVATION_SOFTRELU:
             sprintf(kernelName, "_softRelu");
             break;
+        case VX_NN_ACTIVATION_SQUARE:
+            sprintf(kernelName, "_square");
+            break;
         default:
             vxError("Can't support this function type!\n");
             goto OnError;

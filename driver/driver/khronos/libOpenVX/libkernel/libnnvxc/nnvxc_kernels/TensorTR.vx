@@ -58,6 +58,11 @@ float4 softRelu_(float4 x)
     return x * rlogE;
 }
 
+float4 square_(float4 x)
+{
+    return x * x;
+}
+
 _viv_uniform float inputScale;
 _viv_uniform float inputTail;
 _viv_uniform float outputScale;
@@ -186,6 +191,17 @@ TENSOR_TRANSCENDENTAL(softRelu, U8,  U8,  vxc_uchar8, vxc_uchar8, int4,  vxc_uch
 TENSOR_TRANSCENDENTAL(softRelu, U8,  F16, vxc_uchar8, vxc_uchar8, half4, vxc_half8,  vxc_short8)
 TENSOR_TRANSCENDENTAL(softRelu, I16, I16, vxc_short8, vxc_short8, int4,  vxc_short8, vxc_short8)
 TENSOR_TRANSCENDENTAL(softRelu, I16, F16, vxc_short8, vxc_short8, half4, vxc_half8,  vxc_short8)
+//SQUARE
+TENSOR_TRANSCENDENTAL(square, F16, F16, vxc_short8, vxc_half8,  half4, vxc_half8,  vxc_short8)
+TENSOR_TRANSCENDENTAL(square, F16, I8,  vxc_short8, vxc_half8,  int4,  vxc_char8,  vxc_char8)
+TENSOR_TRANSCENDENTAL(square, F16, U8,  vxc_short8, vxc_half8,  int4,  vxc_uchar8, vxc_uchar8)
+TENSOR_TRANSCENDENTAL(square, F16, I16, vxc_short8, vxc_half8,  int4,  vxc_short8, vxc_short8)
+TENSOR_TRANSCENDENTAL(square, I8,  I8,  vxc_char8,  vxc_char8,  int4,  vxc_char8,  vxc_char8)
+TENSOR_TRANSCENDENTAL(square, I8,  F16, vxc_char8,  vxc_char8,  half4, vxc_half8,  vxc_short8)
+TENSOR_TRANSCENDENTAL(square, U8,  U8,  vxc_uchar8, vxc_uchar8, int4,  vxc_uchar8, vxc_uchar8)
+TENSOR_TRANSCENDENTAL(square, U8,  F16, vxc_uchar8, vxc_uchar8, half4, vxc_half8,  vxc_short8)
+TENSOR_TRANSCENDENTAL(square, I16, I16, vxc_short8, vxc_short8, int4,  vxc_short8, vxc_short8)
+TENSOR_TRANSCENDENTAL(square, I16, F16, vxc_short8, vxc_short8, half4, vxc_half8,  vxc_short8)
 
 #define TENSOR_TRANSCENDENTAL_2D(funcName, src_type_name, dst_type_name, src_type, src_copy_type, convert_type, dst_type, dst_copy_type) \
     __kernel void vxTensorTR_##funcName##_##src_type_name##to##dst_type_name##_2D( \
@@ -307,3 +323,14 @@ TENSOR_TRANSCENDENTAL_2D(softRelu, U8,  U8,  vxc_uchar8, vxc_uchar8, int4,  vxc_
 TENSOR_TRANSCENDENTAL_2D(softRelu, U8,  F16, vxc_uchar8, vxc_uchar8, half4, vxc_half8,  vxc_short8)
 TENSOR_TRANSCENDENTAL_2D(softRelu, I16, I16, vxc_short8, vxc_short8, int4,  vxc_short8, vxc_short8)
 TENSOR_TRANSCENDENTAL_2D(softRelu, I16, F16, vxc_short8, vxc_short8, half4, vxc_half8,  vxc_short8)
+//SQUARE
+TENSOR_TRANSCENDENTAL_2D(square, F16, F16, vxc_short8, vxc_half8,  half4, vxc_half8,  vxc_short8)
+TENSOR_TRANSCENDENTAL_2D(square, F16, I8,  vxc_short8, vxc_half8,  int4,  vxc_char8,  vxc_char8)
+TENSOR_TRANSCENDENTAL_2D(square, F16, U8,  vxc_short8, vxc_half8,  int4,  vxc_uchar8, vxc_uchar8)
+TENSOR_TRANSCENDENTAL_2D(square, F16, I16, vxc_short8, vxc_half8,  int4,  vxc_short8, vxc_short8)
+TENSOR_TRANSCENDENTAL_2D(square, I8,  I8,  vxc_char8,  vxc_char8,  int4,  vxc_char8,  vxc_char8)
+TENSOR_TRANSCENDENTAL_2D(square, I8,  F16, vxc_char8,  vxc_char8,  half4, vxc_half8,  vxc_short8)
+TENSOR_TRANSCENDENTAL_2D(square, U8,  U8,  vxc_uchar8, vxc_uchar8, int4,  vxc_uchar8, vxc_uchar8)
+TENSOR_TRANSCENDENTAL_2D(square, U8,  F16, vxc_uchar8, vxc_uchar8, half4, vxc_half8,  vxc_short8)
+TENSOR_TRANSCENDENTAL_2D(square, I16, I16, vxc_short8, vxc_short8, int4,  vxc_short8, vxc_short8)
+TENSOR_TRANSCENDENTAL_2D(square, I16, F16, vxc_short8, vxc_short8, half4, vxc_half8,  vxc_short8)

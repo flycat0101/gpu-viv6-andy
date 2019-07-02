@@ -9166,6 +9166,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
                                             /*func_v == VX_NN_ACTIVATION_SIN ||*/
                                             func_v == VX_NN_ACTIVATION_SOFTRELU ||
                                             func_v == VX_NN_ACTIVATION_LOGISTIC ||
+                                            func_v == VX_NN_ACTIVATION_SQUARE ||
                                             func_v == VX_NN_ACTIVATION_HYPERBOLIC_TAN));
     }
     else
