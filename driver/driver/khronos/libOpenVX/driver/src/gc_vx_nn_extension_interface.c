@@ -23626,6 +23626,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoAdapter_Initializer(vx_node node, const 
             {
                 enable_dataConvert = vx_true_e;
             }
+            else
+            {
+                enable_dataFormat = vx_false_e;
+            }
         }
     }
     else
