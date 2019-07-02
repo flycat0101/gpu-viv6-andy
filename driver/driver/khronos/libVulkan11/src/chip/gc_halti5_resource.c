@@ -11732,9 +11732,10 @@ VkResult halti5_updateDescriptorSet(
                         {
                             samplers = (__vkSampler **)(descSet->samplers);
                         }
-                        if (samplers[0])
+                        if (samplers != VK_NULL_HANDLE)
                         {
-                            patchInfos[entryIdx].compareOp = samplers[0]->createInfo.compareOp;
+                            if (samplers[0] != VK_NULL_HANDLE)
+                                patchInfos[entryIdx].compareOp = samplers[0]->createInfo.compareOp;
                         }
                         patchInfos[entryIdx].swizzles[0] = __vkConvertSwizzle(imgv->createInfo.components.r, SWIZZLE_RED);
                         patchInfos[entryIdx].swizzles[1] = __vkConvertSwizzle(imgv->createInfo.components.g, SWIZZLE_GREEN);
