@@ -2728,6 +2728,28 @@ _ReplaceOperandSymbol(
     return errCode;
 }
 
+static VSC_ErrCode
+_ReplaceInstSymbol(
+    IN  VIR_Shader              *Shader,
+    IN  VIR_Function            *Func,
+    IN  VIR_Instruction         *Inst
+    )
+{
+    VSC_ErrCode                  errCode  = VSC_ERR_NONE;
+    gctUINT                      i;
+
+    errCode = _ReplaceOperandSymbol(Shader, Func, VIR_Inst_GetDest(Inst));
+    CHECK_ERROR(errCode, "_ReplaceOperandSymbol failed.");
+
+    for (i = 0; i < VIR_Inst_GetSrcNum(Inst); i++)
+    {
+        errCode = _ReplaceOperandSymbol(Shader, Func, VIR_Inst_GetSource(Inst, i));
+        CHECK_ERROR(errCode, "_ReplaceOperandSymbol failed.");
+    }
+
+    return errCode;
+}
+
 static VSC_ErrCode _VIR_HL_Process_Functions(
     IN  VIR_Shader              *Shader
     )
@@ -2862,7 +2884,6 @@ static VSC_ErrCode _VIR_HL_Sym_Replace(
     VSC_ErrCode                  errCode  = VSC_ERR_NONE;
     VIR_FuncIterator             func_iter;
     VIR_FunctionNode            *func_node;
-    gctUINT                      i;
 
     /*-------------------I: Update symbols-------------------*/
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(Shader));
@@ -2876,14 +2897,8 @@ static VSC_ErrCode _VIR_HL_Sym_Replace(
 
         for(; inst != gcvNULL; inst = VIR_Inst_GetNext(inst))
         {
-            errCode = _ReplaceOperandSymbol(Shader, func, VIR_Inst_GetDest(inst));
-            CHECK_ERROR(errCode, "_ReplaceOperandSymbol failed.");
-
-            for (i = 0; i < VIR_Inst_GetSrcNum(inst); i++)
-            {
-                errCode = _ReplaceOperandSymbol(Shader, func, VIR_Inst_GetSource(inst, i));
-                CHECK_ERROR(errCode, "_ReplaceOperandSymbol failed.");
-            }
+            errCode = _ReplaceInstSymbol(Shader, func, inst);
+            CHECK_ERROR(errCode, "_ReplaceInstSymbol failed.");
         }
     }
 
@@ -4379,6 +4394,8 @@ _SplitArrayMemoryAssignment(
             VIR_Operand_SetSwizzle(newOperand, VIR_Enable_2_Swizzle_WShift(enable));
             VIR_Operand_SetRelIndexingImmed(newOperand, destRegOffset);
         }
+
+        errCode = _ReplaceInstSymbol(Shader, Func, newInst);
     }
     return errCode;
 }
@@ -4409,6 +4426,7 @@ _SplitStructMemoryAssignment(
     VIR_Id                       fieldId;
     VIR_Type                    *fieldType;
     VIR_TypeId                   fieldTypeId;
+    VIR_FieldInfo               *fieldInfo = gcvNULL;
     VIR_Enable                   enable;
     gctUINT                      destRegOffset = 0;
     gctUINT                      i;
@@ -4430,6 +4448,7 @@ _SplitStructMemoryAssignment(
     {
         fieldId= VIR_IdList_GetId(VIR_Type_GetFields(Type), i);
         fieldSymbol = VIR_Shader_GetSymFromId(Shader, fieldId);
+        fieldInfo = VIR_Symbol_GetFieldInfo(fieldSymbol);
         fieldType = VIR_Symbol_GetType(fieldSymbol);
         fieldTypeId = VIR_Type_GetIndex(fieldType);
 
@@ -4486,6 +4505,11 @@ _SplitStructMemoryAssignment(
         newOperand = VIR_Inst_GetSource(newInst, 0);
         VIR_Operand_Copy(newOperand, BaseAddr);
 
+        if (VIR_Type_isMatrix(fieldType))
+        {
+            VIR_Operand_SetMatrixStride(newOperand, VIR_FieldInfo_GetMatrixStride(fieldInfo));
+        }
+
         /* Use the updated offset.*/
         newOperand = VIR_Inst_GetSource(newInst, 1);
         if (bOrigOffsetImm)
@@ -4509,6 +4533,8 @@ _SplitStructMemoryAssignment(
         }
 
         destRegOffset += VIR_Type_GetRegCount(Shader, fieldType, gcvFALSE);
+
+        errCode = _ReplaceInstSymbol(Shader, Func, newInst);
     }
 
     return errCode;
@@ -4615,7 +4641,8 @@ static VSC_ErrCode _VIR_HL_Preprocess(
          func_node = VIR_FuncIterator_Next(&func_iter))
     {
         VIR_Function            *func = func_node->function;
-        VIR_Instruction         *inst = func->instList.pHead;
+        VIR_Instruction         *inst = VIR_Function_GetInstStart(func);
+        VIR_Instruction         *prevInst = gcvNULL;
         VIR_Operand             *dest;
         VIR_Type                *destType;
         VIR_Operand             *srcOpnd;
@@ -4630,6 +4657,7 @@ static VSC_ErrCode _VIR_HL_Preprocess(
 
         for(; inst != gcvNULL; inst = VIR_Inst_GetNext(inst))
         {
+            prevInst = VIR_Inst_GetPrev(inst);
             useMatrix = compositeRegAssignment = aggregateMemoryAssignment = gcvFALSE;
             opcode = VIR_Inst_GetOpcode(inst);
 
@@ -4732,6 +4760,11 @@ static VSC_ErrCode _VIR_HL_Preprocess(
                                                           func,
                                                           inst);
                 CHECK_ERROR(errCode, "_SplitAggregateMemoryAssignment failed.");
+
+                if (prevInst != gcvNULL)
+                {
+                    inst = prevInst;
+                }
                 continue;
             }
 
