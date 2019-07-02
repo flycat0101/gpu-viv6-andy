@@ -11963,6 +11963,18 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
         __SpvSetCapability(spv, SPV_NEXT_WORD);
         break;
 
+    case SpvOpModuleProcessed:
+        {
+            gctCHAR*        pModuleProcessString = gcvNULL;
+            VIR_NameId      nameId;
+
+            __SpvDecodeString(spv, &pModuleProcessString);
+            VIR_Shader_AddString(virShader, pModuleProcessString, &nameId);
+            VIR_IdList_Add(VIR_Shader_GetModuleProcesses(virShader), nameId);
+
+            break;
+        }
+
     default:
         if (!spv->setClientVersion)
         {

@@ -2062,6 +2062,10 @@ VIR_Shader_Construct0(
         errCode = VIR_IdList_Init(&Shader->pmp.mmWrapper, 32, &idList);
         CHECK_ERROR(errCode, "InitIdList");
 
+        idList = &Shader->moduleProcesses;
+        errCode = VIR_IdList_Init(&Shader->pmp.mmWrapper, 32, &idList);
+        CHECK_ERROR(errCode, "InitIdList");
+
         vscBILST_Initialize(&Shader->functions, gcvFALSE);
 
         vscBILST_Initialize(&Shader->kernelFunctions, gcvFALSE);

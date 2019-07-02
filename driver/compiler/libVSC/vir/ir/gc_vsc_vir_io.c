@@ -1475,6 +1475,9 @@ VIR_IO_writeShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     errCode = VIR_IO_writeIdList(buf, &pShader->ioBlocks);
     ON_ERROR(errCode, "Fail to write ioBlocks id list.");
 
+    errCode = VIR_IO_writeIdList(buf, &pShader->moduleProcesses);
+    ON_ERROR(errCode, "Fail to write module process id list.");
+
     /* LTC info */
     VIR_IO_writeInt(buf, pShader->ltcUniformCount);
     if (pShader->ltcUniformCount)
@@ -3218,6 +3221,9 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader, gctUINT message
     errCode = VIR_IO_readIdList(buf, &pShader->ioBlocks);
     ON_ERROR(errCode, "Fail to read ioBlocks id list.");
 
+    errCode = VIR_IO_readIdList(buf, &pShader->moduleProcesses);
+    ON_ERROR(errCode, "Fail to read module process id list.");
+
     /* LTC info */
     ON_ERROR0(VIR_IO_readInt(buf, &pShader->ltcUniformCount));
     if (pShader->ltcUniformCount)
@@ -4816,6 +4822,9 @@ VIR_Shader_Copy(
 
     errCode = VIR_CopyIdList(&context, &Shader->ioBlocks, &Source->ioBlocks);
     ON_ERROR(errCode, "Fail to copy ioBlocks id list.");
+
+    errCode = VIR_CopyIdList(&context, &Shader->moduleProcesses, &Source->moduleProcesses);
+    ON_ERROR(errCode, "Fail to copy module process id list.");
 
     errCode = VIR_CopyStringTable(&context, &Shader->stringTable, &Source->stringTable);
     ON_ERROR(errCode, "Fail to copy string table.");

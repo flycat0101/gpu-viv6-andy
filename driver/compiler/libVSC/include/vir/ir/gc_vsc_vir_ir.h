@@ -101,6 +101,7 @@ typedef VIR_AttributeIdList  VIR_InputIdList;   /* input aliased as attribute */
 typedef VIR_IdList      VIR_OutputIdList;
 typedef VIR_IdList      VIR_BufferIdList;
 typedef VIR_IdList      VIR_VirRegIdList;     /* temp register id list */
+typedef VIR_IdList      VIR_StringList;
 
 typedef struct _VIR_VALUELIST VIR_ValueList;
 
@@ -902,6 +903,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Shader_GetUniformBlocks(Shader)         (&((Shader)->uniformBlocks))
 #define VIR_Shader_GetSSBlocks(Shader)              (&((Shader)->storageBlocks))
 #define VIR_Shader_GetIOBlocks(Shader)              (&((Shader)->ioBlocks))
+#define VIR_Shader_GetModuleProcesses(Shader)       (&((Shader)->moduleProcesses))
 #define VIR_Shader_GetFunctions(Shader)             ((VIR_FunctionList*)&((Shader)->functions))
 #define VIR_Shader_GetFunctionCount(Shader)         (vscBILST_GetNodeCount(&(Shader)->functions))
 #define VIR_Shader_GetCurrentFunction(Shader)       ((Shader)->currentFunction)
@@ -5074,6 +5076,9 @@ struct _VIR_SHADER
 
     /* ES 3.1 ext: IO block object */
     VIR_IOBIdList       ioBlocks;
+
+    /* Vulkan: OpModuleProcessed */
+    VIR_StringList      moduleProcesses;
 
     gctINT *            loadUsers;
 
