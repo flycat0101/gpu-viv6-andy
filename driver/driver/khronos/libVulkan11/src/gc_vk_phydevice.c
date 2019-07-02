@@ -1190,6 +1190,7 @@ static void __vki_InitializeExtPhysicalDevicePorperties(
     {
         phyDev->phyDevSubProp.supportedStages = VK_SHADER_STAGE_COMPUTE_BIT;
     }
+
     if (phyDev->queueProp[__VK_PDEV_QUEUEFAMILY_GENERAL].queueFlags &
         (VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT))
     {
@@ -1213,6 +1214,27 @@ static VkResult __vki_InitializePhysicalDevice(
 
     set_loader_magic_value(phyDev);
     phyDev->sType = __VK_OBJECT_TYPE_PHYSICAL_DEVICE;
+
+    /* Initialize VkPhysicalDeviceQueueProperties here */
+    phyDev->queueFamilyCount = __VK_PDEV_QUEUEFAMILY_GENERAL + 1;
+
+    phyDev->queueProp[__VK_PDEV_QUEUEFAMILY_GENERAL].queueCount = 1;
+    phyDev->queueProp[__VK_PDEV_QUEUEFAMILY_GENERAL].queueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_TRANSFER_BIT | VK_QUEUE_COMPUTE_BIT;
+    phyDev->queueProp[__VK_PDEV_QUEUEFAMILY_GENERAL].timestampValidBits = 0;
+    phyDev->queueProp[__VK_PDEV_QUEUEFAMILY_GENERAL].minImageTransferGranularity.width  = 1;
+    phyDev->queueProp[__VK_PDEV_QUEUEFAMILY_GENERAL].minImageTransferGranularity.height = 1;
+    phyDev->queueProp[__VK_PDEV_QUEUEFAMILY_GENERAL].minImageTransferGranularity.depth  = 1;
+    phyDev->queuePresentSupported[__VK_PDEV_QUEUEFAMILY_GENERAL] = VK_TRUE;
+
+    /* Initialize VkPhysicalDeviceMemoryProperties here */
+    phyDev->phyDevMemProp.memoryHeapCount = 1;
+    phyDev->phyDevMemProp.memoryHeaps[0].flags = VK_MEMORY_HEAP_DEVICE_LOCAL_BIT;
+    phyDev->phyDevMemProp.memoryHeaps[0].size = 0x30000000;
+    phyDev->phyDevMemProp.memoryTypeCount = 1;
+    phyDev->phyDevMemProp.memoryTypes[0].heapIndex = 0;
+    phyDev->phyDevMemProp.memoryTypes[0].propertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT |
+                                                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 
     /* Initialize VkPhysicalDeviceFeatures here */
     __vki_InitializePhysicalDeviceFeatures(physicalDevice);
@@ -1256,29 +1278,6 @@ static VkResult __vki_InitializePhysicalDevice(
         g_vkFormatInfoTable[VK_FORMAT_A8B8G8R8_UNORM_PACK32].residentImgFormat = VK_FORMAT_A8B8G8R8_UNORM_PACK32;
         g_vkFormatInfoTable[VK_FORMAT_A8B8G8R8_SRGB_PACK32].residentImgFormat = VK_FORMAT_A8B8G8R8_SRGB_PACK32;
     }
-
-    /* Initialize VkPhysicalDeviceMemoryProperties here */
-    phyDev->phyDevMemProp.memoryHeapCount = 1;
-    phyDev->phyDevMemProp.memoryHeaps[0].flags = VK_MEMORY_HEAP_DEVICE_LOCAL_BIT;
-    phyDev->phyDevMemProp.memoryHeaps[0].size = 0x30000000;
-    phyDev->phyDevMemProp.memoryTypeCount = 1;
-    phyDev->phyDevMemProp.memoryTypes[0].heapIndex = 0;
-    phyDev->phyDevMemProp.memoryTypes[0].propertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT |
-                                                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-
-    /* Initialize VkPhysicalDeviceQueueProperties here */
-
-    /* Only support general queue at this moment */
-    phyDev->queueFamilyCount = __VK_PDEV_QUEUEFAMILY_GENERAL + 1;
-
-    phyDev->queueProp[__VK_PDEV_QUEUEFAMILY_GENERAL].queueCount = 1;
-    phyDev->queueProp[__VK_PDEV_QUEUEFAMILY_GENERAL].queueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_TRANSFER_BIT | VK_QUEUE_COMPUTE_BIT;
-    phyDev->queueProp[__VK_PDEV_QUEUEFAMILY_GENERAL].timestampValidBits = 0;
-    phyDev->queueProp[__VK_PDEV_QUEUEFAMILY_GENERAL].minImageTransferGranularity.width  = 1;
-    phyDev->queueProp[__VK_PDEV_QUEUEFAMILY_GENERAL].minImageTransferGranularity.height = 1;
-    phyDev->queueProp[__VK_PDEV_QUEUEFAMILY_GENERAL].minImageTransferGranularity.depth  = 1;
-    phyDev->queuePresentSupported[__VK_PDEV_QUEUEFAMILY_GENERAL] = VK_TRUE;
 
     return VK_SUCCESS;
 }
