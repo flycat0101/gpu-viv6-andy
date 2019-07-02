@@ -4254,7 +4254,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
             vx_tensor   reluIn      = (vx_tensor)node->paramTable[0];
             vx_tensor   reluOut     = (vx_tensor)node->paramTable[node->numParameters - 1];
             vx_enum     dataType    = TENSOR_DATA_TYPE(reluIn);
-            vx_int32    zp          = TENSOR_TF_ZEROPOINT(reluOut);
+            vx_int32    zp          = 0;    /*it is required to be in range [0, 255]*/
             vx_float32  scale       = TENSOR_TF_SCALE(reluOut);
             vx_float32  max         = scale * (255-zp);
             vx_float32  min         = scale * -zp;
@@ -4264,26 +4264,24 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
             {
             case OP_RELU:
              {
-                 min = min < 0.0f ? 0.0f : min;
+                 min = 0;
                  scale = (max - min)/ 255;
-                 zp = (vx_int32)gcmMAX(0, min/scale);
                 break;
              }
             case OP_RELU1:
              {
                 max = max > 1.0f ? 1.0f : max;
-                min = min < -1.0f ? -1.0f : min;
+                min = min < -1.0f ? -1.0f : gcmMIN(0, min);
 
                 scale = (max - min)/255;
-                zp = (vx_int32) ((max - min)/2 / scale );
+                zp = (vx_int32) ((0 -min)/ scale );
                 break;
             }
             case OP_RELU6:
                 {
                     max = max > 6.0f ? 6.0f : max;
-                    min = min < 0.0f ? 0.0f : min;
+                    min = 0;
                     scale = (max - min) / 255;
-                    zp = (vx_int32)gcmMAX(0, min/scale);
                     break;
                 }
             default:
