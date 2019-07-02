@@ -5851,10 +5851,18 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer_Initializer(vx_node node, c
             goto exit;
     }
 
-    enable_float32 = (vx_bool)(outputFormat == VX_TYPE_FLOAT32 && ((width % 4 == 0) || ((width * height < IMG_MAX_WIDTH) && ((width * height % 4 == 0) || dims < 3)) || dims == 1));
-    enable_format = (((inputFormat == VX_TYPE_INT8 ||  inputFormat == VX_TYPE_FLOAT16) && (outputFormat == VX_TYPE_FLOAT16 || enable_float32)) || (inputFormat == VX_TYPE_INT16 && (outputFormat == VX_TYPE_INT16 || outputFormat == VX_TYPE_FLOAT16))
-                     || (inputFormat == VX_TYPE_INT8 &&  outputFormat == VX_TYPE_INT8));
-    enable_tf_quantize = ((inputFormat == VX_TYPE_UINT8) && (outputFormat == VX_TYPE_FLOAT16 || enable_float32 || outputFormat == VX_TYPE_UINT8));
+    if(node->base.context->evisNoInst.supportEVIS)
+    {
+        enable_float32 = (vx_bool)(outputFormat == VX_TYPE_FLOAT32 && ((width % 4 == 0) || ((width * height < IMG_MAX_WIDTH) && ((width * height % 4 == 0) || dims < 3)) || dims == 1));
+        enable_format = (((inputFormat == VX_TYPE_INT8 ||  inputFormat == VX_TYPE_FLOAT16) && (outputFormat == VX_TYPE_FLOAT16 || enable_float32)) || (inputFormat == VX_TYPE_INT16 && (outputFormat == VX_TYPE_INT16 || outputFormat == VX_TYPE_FLOAT16))
+                         || (inputFormat == VX_TYPE_INT8 &&  outputFormat == VX_TYPE_INT8));
+        enable_tf_quantize = ((inputFormat == VX_TYPE_UINT8) && (outputFormat == VX_TYPE_FLOAT16 || enable_float32 || outputFormat == VX_TYPE_UINT8));
+    }
+    else
+    {
+        enable_format = ((inputFormat == VX_TYPE_FLOAT32 ||  inputFormat == VX_TYPE_FLOAT16) && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32));
+        enable_tf_quantize = ((inputFormat == VX_TYPE_UINT8) && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32 || outputFormat == VX_TYPE_UINT8));
+    }
     /* Current the SH layer only process 3D tensor*/
     useShadeExe  = (enable_format || enable_tf_quantize);
 
@@ -5862,16 +5870,32 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer_Initializer(vx_node node, c
    {
         vxnne_shader_executable shaderExecutable;
 
-        shaderExecutable = vxnneGetSoftmaxShaderExecutable(node->base.context, VXNNE_KERNEL_SOFTMAX, &node->kernelAttributes.borderMode, dims, inputs, beta, outputs);
+        if (dims == 2) batchCount = 1;
 
-        if (!shaderExecutable)
+        if(node->base.context->evisNoInst.supportEVIS)
         {
-            status = VX_FAILURE;
-            goto exit;
-        }
+            shaderExecutable = vxnneGetSoftmaxShaderExecutable(node->base.context, VXNNE_KERNEL_SOFTMAX, &node->kernelAttributes.borderMode, dims, inputs, beta, outputs);
 
-        if (dims == 2)
-            batchCount = 1;
+            if (!shaderExecutable)
+            {
+                status = VX_FAILURE;
+                goto exit;
+            }
+        }
+        else
+        {
+            vx_scalar beta_s = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &beta);
+
+            shaderExecutable = vxnneGetGPUSoftmaxShaderExecutable(node->base.context, VXNNE_KERNEL_SOFTMAX, &node->kernelAttributes.borderMode, beta_s, inputs, outputs);
+
+            if (beta_s) vxReleaseScalar(&beta_s);
+
+            if (!shaderExecutable)
+            {
+                status = VX_FAILURE;
+                goto exit;
+            }
+        }
 
         status = vxnneShaderOperation_Initialize(&softmaxLayer->softmax_SHoperation,
             &softmaxLayer->base,
@@ -22859,7 +22883,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer2_Initializer(vx_node node, 
     vx_uint32  dims                       = TENSOR_DIM_NUM(inputs);
     vx_uint32  width                      = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
     vx_uint32  height                     = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
-    vx_uint32  depth                      = TENSOR_VIEW_SIZE_INDEX(inputs, 2);
     vx_uint32  idx                        = 0;
     vx_uint32  numTmpTensor               = 0;
     vxnne_softmax2_layer  softmax2Layer   = VX_NULL;
@@ -22932,49 +22955,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer2_Initializer(vx_node node, 
         }
         else
         {
-            vx_tensor tmpInput = VX_NULL;
-            vx_uint32 sizes[4] = {1, 1, 1, 1};
-            vx_tensor_create_params_t tensor_create_params;
-
-            if(dims == 4)
-            {
-                sizes[0] = width;
-                sizes[1] = height;
-                sizes[2] = depth;
-                sizes[3] = batchCount;
-            }
-            else
-            {
-                sizes[0] = width;
-                sizes[1] = height;
-                batchCount = height;
-            }
-
-            gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
-            tensor_create_params.num_of_dims = dims;
-            tensor_create_params.sizes = sizes;
-            tensor_create_params.data_format = TENSOR_DATA_TYPE(inputs);
-            tensor_create_params.quant_format = TENSOR_QUANT_TYPE(inputs);
-            if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
-            {
-                tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(inputs);
-            }
-            else if(tensor_create_params.quant_format == VX_QUANT_AFFINE_SCALE)
-            {
-                tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(inputs);
-                tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(inputs);
-            }
-
-            tmpInput = vxoTensor_CreateTensor(node->base.context, node->graph, &tensor_create_params, vx_true_e);
-            if (tmpInput == VX_NULL)
-            {
-                vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
-                status = VX_ERROR_NO_MEMORY;
-                goto exit;
-            }
-
-            /* compute exponent value for each element */
-            shaderExecutable = vxnneGetGPUSoftmaxShaderExecutable(node->base.context, VXNNE_KERNEL_SOFTMAX, &node->kernelAttributes.borderMode, beta, inputs, tmpInput);
+            shaderExecutable = vxnneGetGPUSoftmaxShaderExecutable(node->base.context, VXNNE_KERNEL_SOFTMAX, &node->kernelAttributes.borderMode, beta, inputs, outputs);
             if (!shaderExecutable)
             {
                 status = VX_FAILURE;
@@ -22989,35 +22970,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer2_Initializer(vx_node node, 
             if (status != VX_SUCCESS) goto exit;
 
             vxnneOperation_AddReference(&softmax2Layer->softmax2_SHoperation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&softmax2Layer->softmax2_SHoperation.base, (vx_reference)tmpInput, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+            vxnneOperation_AddReference(&softmax2Layer->softmax2_SHoperation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
             vxnneLayer_SetOperation(
                 &softmax2Layer->base,
                 &softmax2Layer->softmax2_SHoperation.base,
                 idx++);
-
-            /* tensor div*/
-            shaderExecutable = vxnneGetGPUTensorReduceDivShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_DIV, &node->kernelAttributes.borderMode, tmpInput, outputs);
-            if (!shaderExecutable)
-            {
-                status = VX_FAILURE;
-                goto exit;
-            }
-
-            status = vxnneShaderOperation_Initialize(&softmax2Layer->softmax2_SHTensorDivoperation,
-                &softmax2Layer->base,
-                VXNNE_OPERATOR_TENSOR_DIV,
-                batchCount,
-                shaderExecutable);
-            if (status != VX_SUCCESS) goto exit;
-
-            vxnneOperation_AddReference(&softmax2Layer->softmax2_SHTensorDivoperation.base, (vx_reference)tmpInput, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&softmax2Layer->softmax2_SHTensorDivoperation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
-            vxnneLayer_SetOperation(
-                &softmax2Layer->base,
-                &softmax2Layer->softmax2_SHTensorDivoperation.base,
-                idx++);
-
-            softmax2Layer->base.temp_tensors[numTmpTensor++] = tmpInput;
         }
     }
     else

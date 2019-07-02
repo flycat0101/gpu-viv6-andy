@@ -4375,15 +4375,24 @@ vxnne_shader_executable vxnneGetGPUSoftmaxShaderExecutable(
     vx_enum      inputFormat        = TENSOR_DATA_TYPE(input);
     vx_uint32    in_width           = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32    in_height          = TENSOR_VIEW_SIZE_INDEX(input, 1);
-    vx_uint32    depth              = TENSOR_VIEW_SIZE_INDEX(input, 2);
+    vx_enum      outputFormat       = TENSOR_DATA_TYPE(output);
     vx_float32   betaValue          = beta->value->f32;
     vx_float32   scaleValue         = (vx_float32)((log10(exp(1.0f)) / log10(2.0f))*betaValue);
-    char        *programSources = NULL;
-    vx_scalar    scale_s            = vxCreateScalar(context, VX_TYPE_FLOAT32, &scaleValue);
-    vx_scalar scaleIn = NULL;
-    vx_scalar zpIn = NULL;
+    vx_enum      output_qnt_type    = TENSOR_QUANT_TYPE(output);
+    vx_float32   scaleOutValue      = 1.0f;
+    vx_float32   zpOutValue         = 0.0f;
+    char        *programSources     = NULL;
+    vx_scalar    scale_s            = NULL;
+    vx_scalar    scaleout           = NULL;
+    vx_scalar    zpOut              = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
+
+    if (output_qnt_type == VX_QUANT_AFFINE_SCALE)
+    {
+        scaleOutValue = 1.0f / TENSOR_TF_SCALE(output);
+        zpOutValue    = (vx_float32)TENSOR_TF_ZEROPOINT(output);
+    }
 
     borderMode->mode = VX_BORDER_REPLICATE;
     kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
@@ -4423,7 +4432,10 @@ vxnne_shader_executable vxnneGetGPUSoftmaxShaderExecutable(
 
     if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32)
     {
-        vx_reference parameters[3] = {(vx_reference)input, (vx_reference)scale_s, (vx_reference)output};
+        vx_reference parameters[3] = {(vx_reference)input, (vx_reference)NULL, (vx_reference)output};
+
+        scale_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &scaleValue);
+        parameters[1] = (vx_reference)scale_s;
 
         if(inDims == 2)
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Dim2FP32", borderMode);
@@ -4437,19 +4449,33 @@ vxnne_shader_executable vxnneGetGPUSoftmaxShaderExecutable(
     else if (inputFormat == VX_TYPE_UINT8)
     {
         vx_float32 scaleInValue = TENSOR_TF_SCALE(input);
-        vx_int32 zpInValue = TENSOR_TF_ZEROPOINT(input);
-        vx_reference parameters[5] = {(vx_reference)input, (vx_reference)scale_s,
+        vx_reference parameters[5] = {(vx_reference)input, (vx_reference)NULL,
                                         (vx_reference)NULL, (vx_reference)NULL, (vx_reference)output};
 
-        scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &scaleInValue);
-        zpIn = vxCreateScalar(context, VX_TYPE_INT32, &zpInValue);
-        parameters[2] = (vx_reference)scaleIn;
-        parameters[3] = (vx_reference)zpIn;
+        scaleValue *= scaleInValue;
+        scale_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &scaleValue);
+        parameters[1] = (vx_reference)scale_s;
+
+        scaleout = vxCreateScalar(context, VX_TYPE_FLOAT32, &scaleOutValue);
+        zpOut = vxCreateScalar(context, VX_TYPE_INT32, &zpOutValue);
+        parameters[2] = (vx_reference)scaleout;
+        parameters[3] = (vx_reference)zpOut;
 
         if(inDims == 2)
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Dim2Quant8", borderMode);
+        {
+            if (outputFormat == VX_TYPE_UINT8)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Dim2Quant8", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Dim2Quant8toFloat", borderMode);
+        }
         else
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
+        {
+            if (outputFormat == VX_TYPE_UINT8)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8toFloat", borderMode);
+        }
+
         if (!shaderExecutable)
         {
             goto OnError;
@@ -4459,33 +4485,33 @@ vxnne_shader_executable vxnneGetGPUSoftmaxShaderExecutable(
         if (status != VX_SUCCESS) goto OnError;
     }
 
-    if(inDims == 4)
+    if(inDims > 2)
     {
         execution_parameters.globalWorkSize[0]   = in_width;
         execution_parameters.globalWorkSize[1]   = in_height;
-        execution_parameters.globalWorkSize[2]   = depth;
+        execution_parameters.globalWorkSize[2]   = 1;
     }
     else
     {
-        execution_parameters.globalWorkSize[0]   = in_width;
+        execution_parameters.globalWorkSize[0]   = in_height;
     }
 
     status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
     if (status != VX_SUCCESS) goto OnError;
 
-    if(scale_s) vxReleaseScalar(&scale_s);
-    if(scaleIn) vxReleaseScalar(&scaleIn);
-    if(zpIn) vxReleaseScalar(&zpIn);
+    if (scale_s) vxReleaseScalar(&scale_s);
+    if (scaleout) vxReleaseScalar(&scaleout);
+    if (zpOut) vxReleaseScalar(&zpOut);
 
     gcmFOOTER_ARG("%p", shaderExecutable);
     return shaderExecutable;
 
 OnError:
-    if(scaleIn) vxReleaseScalar(&scaleIn);
-    if(zpIn) vxReleaseScalar(&zpIn);
+    if (scaleout) vxReleaseScalar(&scaleout);
+    if (zpOut) vxReleaseScalar(&zpOut);
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
-    if(scale_s) vxReleaseScalar(&scale_s);
+    if (scale_s) vxReleaseScalar(&scale_s);
     if (programSources)
     {
         vxFree(programSources);
