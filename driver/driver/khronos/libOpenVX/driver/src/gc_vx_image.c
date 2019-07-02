@@ -102,8 +102,8 @@ VX_INTERNAL_API vx_uint32 vxComputePlaneOffset(vx_image image, vx_uint32 x, vx_u
     vxmASSERT(image);
     vxmASSERT(planeIndex < image->memory.planeCount);
 
-    return  x * image->memory.strides[planeIndex][VX_DIM_X] / image->scales[planeIndex][VX_DIM_X]
-            + y * image->memory.strides[planeIndex][VX_DIM_Y] / image->scales[planeIndex][VX_DIM_Y];
+    return  x / image->scales[planeIndex][VX_DIM_X] * image->memory.strides[planeIndex][VX_DIM_X]
+            + y / image->scales[planeIndex][VX_DIM_Y] * image->memory.strides[planeIndex][VX_DIM_Y];
 }
 
 VX_PRIVATE_API vx_uint32 vxComputePatchRangeSize(vx_uint32 patchRange, const vx_imagepatch_addressing_t *patchAddr)

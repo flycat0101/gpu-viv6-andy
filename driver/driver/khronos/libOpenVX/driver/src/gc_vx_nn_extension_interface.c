@@ -19578,7 +19578,8 @@ VX_PRIVATE_API vx_status vxnneOperation_ExecuteYUVScalerCommand(vx_node node, vx
 
     /* for X */
     splitCount = 1;
-    vxmONERROR(vxnneComputeYUV2RGBInputParameter(outputWidth, scaleOp->x_scale, &splitCount,
+    vxmONERROR(vxnneComputeYUV2RGBInputParameter(outputWidth, scaleOp->x_scale, rect.start_x,
+                                                 &splitCount,
                                                  outputStarts, outputSizes,
                                                  inputStarts, inputSizes,
                                                  inputInitErrors, inputInitIntErrors));
@@ -19597,16 +19598,11 @@ VX_PRIVATE_API vx_status vxnneOperation_ExecuteYUVScalerCommand(vx_node node, vx
     {
         splitCount = 1;
     }
-    vxmONERROR(vxnneComputeYUV2RGBInputParameter(outputHeight, scaleOp->y_scale, &splitCount,
+    vxmONERROR(vxnneComputeYUV2RGBInputParameter(outputHeight, scaleOp->y_scale, rect.start_y,
+                                                 &splitCount,
                                                  outputStarts, outputSizes,
                                                  inputStarts, inputSizes,
                                                  inputInitErrors, inputInitIntErrors));
-
-    if (imageInputHeight < (inputStarts[splitCount - 1] + inputSizes[splitCount - 1]))
-    {
-        vxError("ERROR: invalid input image size.\n");
-        vxmASSERT(0);
-    }
 
     for (i = 0; i < splitCount; i++)
     {
@@ -22081,6 +22077,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorScale_Deinitializer(vx_node node, 
 vx_status vxnneComputeYUV2RGBInputParameter(
     vx_uint32 outputSize,
     vx_uint32 scale,
+    vx_uint32 inputStart,
     vx_uint32 * splitNum,
     vx_uint32 * outputStarts,
     vx_uint32 * outputSizes,
@@ -22090,46 +22087,36 @@ vx_status vxnneComputeYUV2RGBInputParameter(
     vx_uint16 * inputInitIntErrors
     )
 {
-    vx_uint32 num = outputSize < *splitNum ? outputSize : *splitNum;
-    vx_uint32 i, offset, inputSize;
+    vx_uint32 num, i, offset, inputSize;
 
     inputSize = (vx_uint32)((vx_float32)(outputSize * scale) / (1 << 15) + 0.5f);
-    offset = abs(((vx_int32)scale >> 1) - (1 << 14));
+    offset = gcmMAX(0, ((vx_int32)scale >> 1) - (1 << 14));
 
-    if (num > 1)
+    num = gcmMIN(gcmMIN(inputSize, outputSize), *splitNum);
+
+    calculateSplitSize(outputSize, num, outputSizes, outputStarts);
+
+    for (i = 0; i < num; i++)
     {
-        calculateSplitSize(outputSize, num, outputSizes, outputStarts);
-
-        for (i = 0; i < num; i++)
+        inputStarts[i] = (vx_uint16)inputStart + (vx_uint16)((offset & 0xFFFF8000) >> 15);
+        if (inputStarts[i] & 0x1)
         {
-            inputStarts[i] = (vx_uint16)((offset & 0xFFF8000) >> 15);
-            if (inputStarts[i] & 0x1)
-            {
-                inputStarts[i]--;
-                inputInitIntErrors[i] = 0x1;
-            }
-            else
-            {
-                inputInitIntErrors[i] = 0x0;
-            }
-            if (i > 0)
-            {
-                inputSizes[i-1] = inputStarts[i] - inputStarts[i-1];
-            }
-            inputInitErrors[i] = (vx_uint16)(offset & 0x7FFF);
-            offset += scale * outputSizes[i];
+            inputStarts[i]--;
+            inputInitIntErrors[i] = 0x1;
         }
-        inputSizes[i-1] = inputSize - inputStarts[i-1];
+        else
+        {
+            inputInitIntErrors[i] = 0x0;
+        }
+        if (i > 0)
+        {
+            inputSizes[i-1] = gcmMAX(1, inputStarts[i] - inputStarts[i-1]);
+        }
+        inputInitErrors[i] = (vx_uint16)(offset & 0x7FFF);
+        offset += scale * outputSizes[i];
     }
-    else
-    {
-        outputStarts[0] = 0;
-        outputSizes[0] = outputSize;
-        inputStarts[0] = 0;
-        inputSizes[0] = inputSize;
-        inputInitErrors[0] = (vx_uint16)(offset & 0x7FFF);
-        inputInitIntErrors[0] = (vx_uint16)((offset & 0xFFF8000) >> 15);
-    }
+
+    inputSizes[i-1] = inputStart + inputSize - inputStarts[i-1];
 
     *splitNum = num;
 
@@ -22507,8 +22494,8 @@ vx_status vxnneExecuteSCYUV2RGBScale(struct _vxnne_operation_s *operation)
     info.vx_yuv2rgb_scaler_cmd_info.inImageBaseU     = input_address_u;
     info.vx_yuv2rgb_scaler_cmd_info.inImageBaseV     = input_address_v;
 
-    info.vx_yuv2rgb_scaler_cmd_info.inRectX          = 0;//(vx_uint16)rect.start_x;
-    info.vx_yuv2rgb_scaler_cmd_info.inRectY          = 0;//(vx_uint16)rect.start_y;
+    info.vx_yuv2rgb_scaler_cmd_info.inRectX          = (vx_uint16)rect.start_x;
+    info.vx_yuv2rgb_scaler_cmd_info.inRectY          = (vx_uint16)rect.start_y;
 
     info.vx_yuv2rgb_scaler_cmd_info.inRectWidth      = (vx_uint16)input_rect_width;
     info.vx_yuv2rgb_scaler_cmd_info.inRectHeight     = (vx_uint16)input_rect_height;

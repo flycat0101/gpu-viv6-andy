@@ -3483,6 +3483,7 @@ vx_status vxnneWrapUserNode(
 vx_status vxnneComputeYUV2RGBInputParameter(
     vx_uint32 outputSize,
     vx_uint32 scale,
+    vx_uint32 inputStart,
     vx_uint32 * splitNum,
     vx_uint32 * outputStarts,
     vx_uint32 * outputSizes,
