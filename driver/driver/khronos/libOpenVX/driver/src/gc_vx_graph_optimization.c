@@ -503,6 +503,12 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_updateTensorInGraph(vx_node curren
 
     gcmHEADER_ARG("currentNode=%p, oldTensor=%p, subtensor=%p, subTensorSize=0x%x", currentNode, oldTensor, newTensor, tensorSize);
 
+    if(tensorSize != currentNode->numParents)
+    {
+        vxInfo("do not update tensor in graph because maybe tensor view exists\n");
+        return VX_FAILURE;
+    }
+
     for (i = 0; i < tensorSize; i++)
     {
         for (j = 0; j < currentNode->numParents; j++)
@@ -2367,7 +2373,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertAvgPool2Conv(vx_graph grap
                     )
                     continue;
 
-                if(TENSOR_SIZE_INDEX(input, 2) * TENSOR_SIZE_INDEX(input, 2) > 100000)
+                if(TENSOR_SIZE_INDEX(input, 2)  > 1024)
                     continue;
 
                 if(weight_dims[0]>3 || weight_dims[1] > 3)
@@ -3786,16 +3792,21 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_multiTranspose_mergeTransposes(vx_
             sync = vx_false_e;
     }
 
-    vxMemCopy(((vx_array)transposeNodes[0]->paramTable[1])->memory.logicals[0], finalParam, sizeof(vx_uint32) * dimNum);
-    vxoNode_SetParameter(transposeNodes[0],transposeNodes[0]->numParameters - 1, (vx_reference)finalout);
-
-    for(i = sync? 0: 1; i < nodeCnt; i++)
-        transposeNodes[i]->merged = vx_true_e;
-
     if(sync)
     {
-        vxoGraphOptimization_updateTensorInGraph(transposeNodes[0], &input, &finalout, 1);
+        if(VX_SUCCESS != vxoGraphOptimization_updateTensorInGraph(transposeNodes[0], &input, &finalout, 1))
+            goto error;
+        transposeNodes[0]->merged = vx_true_e;
     }
+    else
+    {
+        vxMemCopy(((vx_array)transposeNodes[0]->paramTable[1])->memory.logicals[0], finalParam, sizeof(vx_uint32) * dimNum);
+        vxoNode_SetParameter(transposeNodes[0],transposeNodes[0]->numParameters - 1, (vx_reference)finalout);
+    }
+
+    for(i = 1; i < nodeCnt; i++)
+        transposeNodes[i]->merged = vx_true_e;
+
 error:
     vxFree(finalParam);
 
@@ -3820,19 +3831,120 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_multiTranspose(vx_graph graph)
         if(node->merged)
             continue;
 
-        while(vxoGraphOptimization_getKernelType(node) == OP_TRANSPOSE && transposeCnt < 6)
+        if(vxoGraphOptimization_getKernelType(node) != OP_TRANSPOSE)
+            continue;
+
+        /*find the first Trospose Node*/
+        while(node->numParents == 1)
         {
-            transposeNodes[transposeCnt++] = node;
-            if(node->numChildren > 1)
+            if(vxoGraphOptimization_getKernelType(nodeTable[node->parentNodes[0]]) != OP_TRANSPOSE ||
+                nodeTable[node->parentNodes[0]]->merged == vx_true_e)
                 break;
-            node = nodeTable[node->childNodes[0]];
+
+            node = nodeTable[node->parentNodes[0]];
         }
 
-        if(transposeCnt > 1)
+
+        if(node->numChildren > 1)
         {
-            vxoGraphOptimization_multiTranspose_mergeTransposes(transposeNodes, transposeCnt);
+            vx_uint32 i = 0, childTcnt = 0, invalidChild = 0;
+            vx_uint32 dimNum = TENSOR_DIM_NUM((vx_tensor)node->paramTable[0]);
+            vx_uint32 transposeDims[6] = {0xff};
+            vx_uint32 *sameTranspose = (vx_uint32 *)vxAllocateAndZeroMemory(sizeof(vx_uint32) * node->numChildren);
+
+            /*find the same transpose node*/
+            for(i = 0; i < node->numChildren; i++)
+            {
+                if(vxoGraphOptimization_getKernelType(nodeTable[node->childNodes[i]]) == OP_TRANSPOSE)
+                {
+                    if(transposeDims[0] == 0xff)
+                    {
+                        vxMemCopy(transposeDims, ((vx_array)nodeTable[node->childNodes[i]]->paramTable[1])->memory.logicals[0],
+                            sizeof(vx_uint32) * dimNum);
+
+                        sameTranspose[childTcnt++] = node->childNodes[i];
+                    }
+                    else
+                    {
+                        vx_uint32 j = 0;
+                        vx_uint32 *ptr = (vx_uint32 *)((vx_array)nodeTable[node->childNodes[i]]->paramTable[1])->memory.logicals[0];
+                        for(j = 0; j < dimNum; j++)
+                        {
+                            if(transposeDims[j] != ptr[j])
+                                break;
+                        }
+
+                        if(j == dimNum)
+                            sameTranspose[childTcnt++] = node->childNodes[i];
+                    }
+                }
+            }
+
+            /*reduce all of the same nodes to one, just reverse the first child node*/
+            {
+                vx_tensor finalTensor = VX_NULL;
+                for(i = 0; i < childTcnt; i++)
+                {
+                    vx_node child = nodeTable[sameTranspose[i]];
+                    if(finalTensor == VX_NULL)
+                        finalTensor = (vx_tensor)child->paramTable[child->numParameters- 1];
+
+                    if(child->numChildren== 0)
+                        finalTensor = (vx_tensor)child->paramTable[child->numParameters- 1];
+                }
+
+                /*TODO: how to choice the reversed node and delete rest of nodes*/
+                for(i = 0; i < childTcnt; i++)
+                {
+                    vx_uint32 index = 0;
+                    vx_node child = nodeTable[sameTranspose[i]];
+                    if(child->numChildren)
+                    {
+                        vx_node graphchild = nodeTable[child->childNodes[0]];
+                        if(graphchild->numParents > 1)
+                        {
+                            invalidChild ++;
+                            continue;
+                        }
+
+                        if(vxoGraphOptimization_matchTensorInNode(graphchild, (vx_tensor)child->paramTable[child->numParameters - 1], &index))
+                            vxoGraphOptimization_updateTensorInNode(&graphchild, index, finalTensor);
+
+                        if(i != 0)
+                            child->merged = vx_true_e;
+                    }
+                }
+            }
+
+            if(!invalidChild)
+            {
+                transposeNodes[0] = node;
+                transposeNodes[1] = nodeTable[sameTranspose[0]];
+                transposeCnt = 2;
+                vxoGraphOptimization_multiTranspose_mergeTransposes(transposeNodes, transposeCnt);
+            }
+        }/*if(node->numChildren > 1)*/
+        else
+        {
+            /*for one branch case*/
+            while(vxoGraphOptimization_getKernelType(node) == OP_TRANSPOSE && transposeCnt < 6)
+            {
+                transposeNodes[transposeCnt++] = node;
+                if(node->numChildren > 1)
+                    break;
+                node = nodeTable[node->childNodes[0]];
+
+                if(node->numParents > 1 || node->merged)
+                    break;
+            }
+
+            if(transposeCnt > 1)
+            {
+                vxoGraphOptimization_multiTranspose_mergeTransposes(transposeNodes, transposeCnt);
+            }
         }
     }
+
     REMOVE_MERGED_NODE_FROM_GRAPH();
     REBUILD_TOPOLOGY_GRAPH();
     OPTIMIZATION_RESLUT();
@@ -4368,9 +4480,6 @@ VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
         if(context->options.enableGraphDump)
             vxmONERROR(vxoGraphOptimization_dumpTopology(graph, "before_optimization_topology.json"));
 
-        if(context->options.enableGraphMergeTranspose)
-            vxoGraphOptimization_multiTranspose(graph);
-
         if(context->options.enableGraphConvertTensorAdd)
             vxoGraphOptimization_TensorAdd2Conv(graph);
 
@@ -4403,6 +4512,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
 
         if(context->options.enableGraphConvertBatchFC2NNConv)
             vxmONERROR(vxoGraphOptimization_ConvertBatchFCtoConv(graph) );
+
+        if(context->options.enableGraphMergeTranspose)
+            vxoGraphOptimization_multiTranspose(graph);
 
         if(context->options.enableGraphConcalayer)
             vxmONERROR(vxoGraphOptimization_DispelConcat(graph));
