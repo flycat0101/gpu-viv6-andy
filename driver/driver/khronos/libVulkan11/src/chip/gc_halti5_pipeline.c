@@ -1422,6 +1422,11 @@ static void halti5_helper_GetPsOutputSetting(
         uint32_t hwRtIndex;
         VkBool32 is16BitStorage = VK_FALSE;
 
+        if (subPass->color_attachment_index[i] == VK_ATTACHMENT_UNUSED)
+        {
+            continue;
+        }
+
         attachmentDesc = &rdp->attachments[subPass->color_attachment_index[i]];
         is16BitStorage = (fragOutTable[i].resEntryBit & VSC_RES_ENTRY_BIT_16BIT) != 0;
         __VK_VERIFY_OK(halti5_helper_convertHwPEDesc(devCtx, attachmentDesc->formatInfo->residentImgFormat, is16BitStorage, &hwPEDesc));
@@ -2451,6 +2456,7 @@ static VkResult halti5_pip_emit_rt(
     uint32_t regDepthConfig = 0, regRAControl = 0;
     VkBool32 hasDsSurface = (subPass->dsAttachIndex != VK_ATTACHMENT_UNUSED) ? VK_TRUE : VK_FALSE;
     uint32_t i;
+    VkBool32 rtEnabled = gcvFALSE;
 
     depthOnly = (subPass->colorCount == 0);
     /* ps shader is not necessary to be excuted */
@@ -2479,7 +2485,11 @@ static VkResult halti5_pip_emit_rt(
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x052F, VK_FALSE,
         chipGfxPipeline->singlePEpipe ? 0x1 : 0x0);
 
-    if (!subPass->colorCount)
+    for (i = 0; i < subPass->colorCount; i++)
+    {
+        rtEnabled |= subPass->color_attachment_index[i] != VK_ATTACHMENT_UNUSED;
+    }
+    if (!rtEnabled)
     {
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x050B, VK_FALSE,
                     (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -2521,7 +2531,7 @@ static VkResult halti5_pip_emit_rt(
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x038D, VK_FALSE, chipGfxPipeline->raControlEx);
 
     /* step 2: rt programming */
-    for (i = 0; i < subPass->colorCount; i++)
+    for (i = 0; blendInfo != NULL && i < subPass->colorCount; i++)
     {
         const VkPipelineColorBlendAttachmentState *blendAttach = blendInfo->pAttachments;
         VkColorComponentFlags colorMask;
@@ -2703,7 +2713,7 @@ static VkResult halti5_pip_emit_rt(
     }
 
     /* step 3: depth programming */
-    if (dsInfo)
+    if (dsInfo && subPass->dsAttachIndex != VK_ATTACHMENT_UNUSED)
     {
         __vkAttachmentDesc *attachMent;
         chipGfxPipeline->earlyZ = VK_TRUE;
@@ -3175,7 +3185,7 @@ static VkResult halti5_pip_emit_rt(
  19:19) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 19:19) - (0 ? 19:19) + 1))))))) << (0 ? 19:19))));
 
-    if (dsInfo)
+    if (dsInfo && subPass->dsAttachIndex != VK_ATTACHMENT_UNUSED)
     {
         gcuFLOAT_UINT32 depthNormalize = {0};
         uint32_t dsVkFormat = __VK_FORMAT_D24_UNORM_S8_UINT_PACKED32;
@@ -4496,8 +4506,6 @@ static VkResult halti5_pip_build_prepare(
     VkBool32 anyBlendEnabled = VK_FALSE;
     halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
 
-    __VK_ASSERT(subPass->colorCount <= pip->blendAttachmentCount);
-
     if (info->pColorBlendState)
     {
         const VkPipelineColorBlendAttachmentState *blendAttachments = info->pColorBlendState->pAttachments;
@@ -4505,7 +4513,13 @@ static VkResult halti5_pip_build_prepare(
 
         for (i = 0; i < subPass->colorCount; i++)
         {
-            const __vkFormatInfo *attachFmtInfo = rdp->attachments[subPass->color_attachment_index[i]].formatInfo;
+            const __vkFormatInfo *attachFmtInfo;
+            if (subPass->color_attachment_index[i] == VK_ATTACHMENT_UNUSED)
+            {
+                continue;
+            }
+
+            attachFmtInfo = rdp->attachments[subPass->color_attachment_index[i]].formatInfo;
             if ((blendAttachments[i].colorWriteMask != 0x0) && allColorWriteOff)
             {
                 allColorWriteOff = VK_FALSE;

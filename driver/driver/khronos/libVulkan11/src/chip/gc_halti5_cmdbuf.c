@@ -5043,6 +5043,12 @@ VkResult halti5_setRenderTargets(
         halti5_imageView *chipImgv;
         uint32_t hwRtIndex ;
         uint32_t partIndex = 0;
+
+        if (subPass->color_attachment_index[i] == VK_ATTACHMENT_UNUSED)
+        {
+            continue;
+        }
+
         __VK_ASSERT(subPass->colorCount == pip->blendAttachmentCount);
 
         rtImageView = fb->imageViews[subPass->color_attachment_index[i]];
