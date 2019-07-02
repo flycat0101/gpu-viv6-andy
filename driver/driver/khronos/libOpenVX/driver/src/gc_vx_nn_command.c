@@ -4527,97 +4527,97 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
         info->vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
     }
 
-    if ((tp_type != TP_RESHUFFLE && tp_type != TP_TRANSPOSE && tp_type != TP_REVERSE && tp_type != TP_REORG && tp_type != TP_REORG_DEPTH2SPACE && tp_type != TP_REORG_SPACE2DEPTH && tp_type != TP_BRICK && tp_type != TP_UPSAMPLE && tp_type != TP_UPSAMPLE_CLIP && tp_type != TP_TENSOR_COPY && tp_type != TP_TENSOR_SQUEEZE) || (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) && (hasInputQuant || hasOutputQuant || hasWQuant) && (inZP != outZP || inScale != outScale)))
+    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) &&
+        (hasInputQuant || hasOutputQuant || hasWQuant) &&
+        (hasWQuant || inZP != outZP || inScale != outScale))
     {
-        if (hasInputQuant || hasOutputQuant || hasWQuant)
+        vx_float32 scale;
+        vx_uint32 uintScale, tmpMultiply;
+        vx_int32 exp;
+        vx_int8 tmpPostShift;
+        vx_weights_biases_parameter weights_biases = VX_NULL;
+
+        /* Regular the input or output quant scale value in case it is not TF quant format. */
+        if (!hasOutputQuant)
         {
-            vx_float32 scale;
-            vx_uint32 uintScale, tmpMultiply;
-            vx_int32 exp;
-            vx_int8 tmpPostShift;
-            vx_weights_biases_parameter weights_biases = VX_NULL;
+            outScale = (outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? vxnneConvertDynamicFixPointValueToFloat32(1.0f, outFPP) : 1.0f;
+        }
 
-            /* Regular the input or output quant scale value in case it is not TF quant format. */
-            if (!hasOutputQuant)
-            {
-                outScale = (outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? vxnneConvertDynamicFixPointValueToFloat32(1.0f, outFPP) : 1.0f;
-            }
-            else if (!hasInputQuant)
-            {
-                inScale = (inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? vxnneConvertDynamicFixPointValueToFloat32(1.0f, inFPP) : 1.0f;
-            }
+        if (!hasInputQuant)
+        {
+            inScale = (inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? vxnneConvertDynamicFixPointValueToFloat32(1.0f, inFPP) : 1.0f;
+        }
 
-            if (tp_type == TP_SINGLE_FC && other_tensor != VX_NULL)
-            {
-                vx_float32 wScale = 0.0f;
+        if (tp_type == TP_SINGLE_FC && other_tensor != VX_NULL)
+        {
+            vx_float32 wScale = 0.0f;
 
-                weights_biases = (vx_weights_biases_parameter) other_tensor;
+            weights_biases = (vx_weights_biases_parameter) other_tensor;
 
-                if (hasWQuant)
-                {
-                    wScale = WB_WEIGHT_SCALE(weights_biases);
-                }
-                else
-                {
-                    wScale = (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_QUANT_DYNAMIC_FIXED_POINT) ? vxnneConvertDynamicFixPointValueToFloat32(1.0f, WB_WEIGHT_FPP(weights_biases)) : 1.0f;
-                }
-                scale = inScale * wScale / outScale;
-            }
-            else if ((tp_type == TP_ACTIVATION) &&
-                    (value_cmd_ptr->e32[0] != VX_NN_ACTIVATION_RELU) &&
-                    (value_cmd_ptr->e32[0] != VX_NN_ACTIVATION_LEAKYRELU) &&
-                    (value_cmd_ptr->e32[0] != VX_NN_ACTIVATION_LEAKYRELU_MAX_POOLING))
+            if (hasWQuant)
             {
-                scale = 1.0f / outScale;
-            }
-            else if (tp_type == TP_ROI_POOLING_STEP_1)
-            {
-                /* Scaling is handled in VPooling, so no scaling in HPooling. */
-                scale = 1.0f;
+                wScale = WB_WEIGHT_SCALE(weights_biases);
             }
             else
             {
-                scale = inScale / outScale;
+                wScale = (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_QUANT_DYNAMIC_FIXED_POINT) ? vxnneConvertDynamicFixPointValueToFloat32(1.0f, WB_WEIGHT_FPP(weights_biases)) : 1.0f;
             }
-            uintScale = *((vx_uint32*)(&scale));
-            /* RTNE */
-            if (uintScale & 0x80)
-            {
-                if ((uintScale & 0x7F) || (uintScale & 0x100))
-                {
-                    uintScale += 0x100;
-                }
-            }
-            tmpMultiply = (uintScale & 0x7FFFFF) >> 8; /* postMultiply is high 15-bit of Scale's mantissa */
-            exp = (uintScale & 0x7F800000) >> 23; /* postShift is Scale's exp */
-
-            tmpPostShift = (vx_int8)(127 - exp);
-            info->vx_nn_tp_cmd_info.aluOutputPostshift = tmpPostShift & 0x1F;
-            tmpPostShift = tmpPostShift >> 5;
-            info->vx_nn_tp_cmd_info.aluOutputPostshiftBit6to5 = tmpPostShift & 3;
-
-            info->vx_nn_tp_cmd_info.aluOutputPostMultiplier = tmpMultiply;
-            info->vx_nn_tp_cmd_info.coefZP = weights_biases == VX_NULL ? 0 : WB_WEIGHT_ZP(weights_biases);
-            if (tp_type == TP_ROI_POOLING_STEP_1)
-            {
-                /* Zero point is handled in VPooling, so no zero point in HPooling. */
-                info->vx_nn_tp_cmd_info.inputZP = 0;
-                info->vx_nn_tp_cmd_info.outputZP = 0;
-            }
-            else
-            {
-                info->vx_nn_tp_cmd_info.inputZP  = hasInputQuant ? inZP : 0;
-                info->vx_nn_tp_cmd_info.outputZP = hasOutputQuant ? outZP : 0;
-            }
+            scale = inScale * wScale / outScale;
+        }
+        else if ((tp_type == TP_ACTIVATION) &&
+                 (value_cmd_ptr->e32[0] != VX_NN_ACTIVATION_RELU) &&
+                 (value_cmd_ptr->e32[0] != VX_NN_ACTIVATION_LEAKYRELU) &&
+                 (value_cmd_ptr->e32[0] != VX_NN_ACTIVATION_LEAKYRELU_MAX_POOLING))
+        {
+            scale = 1.0f / outScale;
+        }
+        else if (tp_type == TP_ROI_POOLING_STEP_1)
+        {
+            /* Scaling is handled in VPooling, so no scaling in HPooling. */
+            scale = 1.0f;
         }
         else
         {
-            vx_int8 tmpPostShift = (vx_int8) info->vx_nn_tp_cmd_info.aluOutputPostshift;
-            info->vx_nn_tp_cmd_info.aluOutputPostshift = tmpPostShift & 0x1F;
-            tmpPostShift = tmpPostShift >> 5;
-            info->vx_nn_tp_cmd_info.aluOutputPostshiftBit6to5 = tmpPostShift & 3;
-            info->vx_nn_tp_cmd_info.aluOutputPostMultiplier = 0;
+            scale = inScale / outScale;
         }
+        uintScale = *((vx_uint32*)(&scale));
+        /* RTNE */
+        if (uintScale & 0x80)
+        {
+            if ((uintScale & 0x7F) || (uintScale & 0x100))
+            {
+                uintScale += 0x100;
+            }
+        }
+        tmpMultiply = (uintScale & 0x7FFFFF) >> 8; /* postMultiply is high 15-bit of Scale's mantissa */
+        exp = (uintScale & 0x7F800000) >> 23; /* postShift is Scale's exp */
+
+        tmpPostShift = (vx_int8)(127 - exp);
+        info->vx_nn_tp_cmd_info.aluOutputPostshift = tmpPostShift & 0x1F;
+        tmpPostShift = tmpPostShift >> 5;
+        info->vx_nn_tp_cmd_info.aluOutputPostshiftBit6to5 = tmpPostShift & 3;
+
+        info->vx_nn_tp_cmd_info.aluOutputPostMultiplier = tmpMultiply;
+        info->vx_nn_tp_cmd_info.coefZP = weights_biases == VX_NULL ? 0 : WB_WEIGHT_ZP(weights_biases);
+        if (tp_type == TP_ROI_POOLING_STEP_1)
+        {
+            /* Zero point is handled in VPooling, so no zero point in HPooling. */
+            info->vx_nn_tp_cmd_info.inputZP = 0;
+            info->vx_nn_tp_cmd_info.outputZP = 0;
+        }
+        else
+        {
+            info->vx_nn_tp_cmd_info.inputZP  = hasInputQuant ? inZP : 0;
+            info->vx_nn_tp_cmd_info.outputZP = hasOutputQuant ? outZP : 0;
+        }
+    }
+    else
+    {
+        vx_int8 tmpPostShift = (vx_int8) info->vx_nn_tp_cmd_info.aluOutputPostshift;
+        info->vx_nn_tp_cmd_info.aluOutputPostshift = tmpPostShift & 0x1F;
+        tmpPostShift = tmpPostShift >> 5;
+        info->vx_nn_tp_cmd_info.aluOutputPostshiftBit6to5 = tmpPostShift & 3;
+        info->vx_nn_tp_cmd_info.aluOutputPostMultiplier = 0;
     }
 
     info->vx_nn_tp_cmd_info.inImageDataType = getHWDataFormat(inFormat);
