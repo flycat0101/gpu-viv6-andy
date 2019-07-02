@@ -4,13 +4,13 @@ _viv_uniform VXC_512Bits uniPackedShort4Data_4x4;
 _viv_uniform float spatial_scale;
 _viv_uniform float2 poolingHVInc_coef;
 _viv_uniform int offset;
-_viv_uniform int eachTPSize;
-_viv_uniform int rois_num_sub1;
+_viv_uniform int slice;
 __kernel void roipooling_rect2roilist_fp16(
     __read_only image2d_array_t   rois,
+    __read_only image2d_t   split_end,
     __write_only image2d_array_t  roiList)
 {
-    int2 coord = (int2)(offset, get_global_id(1));
+    int4 coord = (int4)(offset, get_global_id(1), 0, 0);
     vxc_ushort8 vec;
     vxc_half8   rect_half;
     vxc_float4  roi_rect;
@@ -19,8 +19,20 @@ __kernel void roipooling_rect2roilist_fp16(
     _viv_asm(COPY, rect_half, vec, 16);
     int2 coord_out = (int2)(coord.y << 2, 0);
     short lastFlag = 0;
-    if (coord.y == rois_num_sub1 || (coord.y != 0 && ((coord.y + 1) % eachTPSize == 0)))
-        lastFlag = 1;
+    int idx = 0;
+    do
+    {
+        uint end_pos;
+
+        end_pos = read_imageui(split_end, coord.zw).x;
+        coord.z ++;
+        if (coord.y == end_pos)
+        {
+            lastFlag = 1;
+            break;
+        }
+    } while (coord.z < slice);
+
     VXC_DP4x4(roi_rect, rect_half, rect_half, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniFp16toFp32_4x4);
     roi_rect *= spatial_scale;
     roi_rect += 0.5f;
@@ -37,5 +49,4 @@ __kernel void roipooling_rect2roilist_fp16(
     //vxc_uint2 dst;
     VXC_DP4x4(dst0, roilist_data, lastFlag, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniPackedShort4Data_4x4);
     VXC_WriteImage(roiList, coord_out, dst0, VXC_MODIFIER(0, 3, 0,VXC_RM_TowardZero, 0));
-    VXC_DP4x4(dst0, roilist_data, lastFlag, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniPackedShort4Data_4x4);
 }

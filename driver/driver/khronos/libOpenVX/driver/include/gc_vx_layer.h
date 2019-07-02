@@ -3278,7 +3278,8 @@ vxnne_shader_executable vxnneROIRect2ROIListShaderExecutable(
     vx_uint32               poolWidth,
     vx_uint32               poolHeight,
     vx_float32              spatial_scale,
-    vx_uint32               tpCoreCount,
+    vx_uint32               slice,
+    vx_tensor               split_end,
     vx_tensor               roiList);
 
 vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(

@@ -20282,7 +20282,8 @@ vxnne_shader_executable vxnneROIRect2ROIListShaderExecutable(
     vx_uint32               poolWidth,
     vx_uint32               poolHeight,
     vx_float32              spatial_scale,
-    vx_uint32               tpCoreCount,
+    vx_uint32               slice,
+    vx_tensor               split_end,
     vx_tensor               roiList)
 {
 #if !gcdUSE_VXC_BINARY
@@ -20295,12 +20296,13 @@ vxnne_shader_executable vxnneROIRect2ROIListShaderExecutable(
     char *programSources = NULL;
 
     vx_kernel_execution_parameters_t execution_parameters = {2, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-    vx_reference parameters[2]     = {(vx_reference)input, (vx_reference)roiList};
+    vx_reference parameters[3]     = {(vx_reference)input, (vx_reference)split_end, (vx_reference)roiList};
     vx_uint32    batch0            = 1;
     vx_uint32    src_dims          = TENSOR_DIM_NUM(input) == 1 ? 2 : TENSOR_DIM_NUM(input);
     vx_enum      inputFormat       = TENSOR_DATA_TYPE(input);
     vx_tensor    input_rs          = NULL;
     vx_tensor    roiList_rs        = NULL;
+    vx_tensor    split_rs          = NULL;
     vx_int32     src_sizes[4]      = {rois_stride, rois_num, 1, batch0};
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p",
@@ -20311,6 +20313,16 @@ vxnne_shader_executable vxnneROIRect2ROIListShaderExecutable(
     input_rs      = vxoTensor_ReshapeTensor(input, src_sizes, src_dims);
     parameters[0] = (vx_reference)input_rs;
 
+    if (TENSOR_DIM_NUM(split_end) == 1)
+    {
+        vx_uint32 w             = TENSOR_VIEW_SIZE_INDEX(split_end, 0);
+        vx_int32  sizes[4]      = {w, 1, 1, 1};
+        vx_uint32 dims = 2;
+
+        split_rs = vxoTensor_ReshapeTensor(split_end, sizes, dims);
+        parameters[1] = (vx_reference)split_rs;
+    }
+
     if (TENSOR_DIM_NUM(roiList) == 1)
     {
         vx_uint32 w             = TENSOR_VIEW_SIZE_INDEX(roiList, 0);
@@ -20318,7 +20330,7 @@ vxnne_shader_executable vxnneROIRect2ROIListShaderExecutable(
         vx_uint32 dims = 2;
 
         roiList_rs = vxoTensor_ReshapeTensor(roiList, sizes, dims);
-        parameters[1] = (vx_reference)roiList_rs;
+        parameters[2] = (vx_reference)roiList_rs;
     }
 
     kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
@@ -20351,7 +20363,7 @@ vxnne_shader_executable vxnneROIRect2ROIListShaderExecutable(
         status = vxBuildProgram(program, "-cl-viv-vx-extension");
         if (status != VX_SUCCESS) goto OnError;
 
-        kernel = vxnneAddKernelShadersInProgram(context, "roipooling", program, 2, kernelEnum);
+        kernel = vxnneAddKernelShadersInProgram(context, "roipooling", program, 3, kernelEnum);
         if (!kernel) goto OnError;
 
         vxReleaseProgram(&program);
@@ -20361,8 +20373,6 @@ vxnne_shader_executable vxnneROIRect2ROIListShaderExecutable(
     {
         vx_float32  poolingHVInc_coef[2]    = {(vx_float32)256.0f / poolWidth, (vx_float32)256.0f / poolHeight};
         vx_int32    offset                  = rois_stride == 5 ? 1 : 0;
-        vx_int32    rois_num_sub1           = rois_num - 1;
-        vx_uint32   eachTPSize              = tpCoreCount >= rois_num ? 1 : (vx_uint32)((vx_float32)rois_num / tpCoreCount + 0.5f);
         vx_uint32 uniFp16toFp32_4x4[16] = {
             0x01010101, // TCfg
             0x00000000, // ASelt
@@ -20391,8 +20401,7 @@ vxnne_shader_executable vxnneROIRect2ROIListShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "poolingHVInc_coef", 1, poolingHVInc_coef);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "spatial_scale", 1, &spatial_scale);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "offset", 1, &offset);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "rois_num_sub1", 1, &rois_num_sub1);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "eachTPSize", 1, &eachTPSize);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "slice", 1, &slice);
         if (status != VX_SUCCESS) goto OnError;
 
         execution_parameters.globalWorkScale[0]  = 1;
@@ -20401,13 +20410,14 @@ vxnne_shader_executable vxnneROIRect2ROIListShaderExecutable(
         execution_parameters.globalWorkSize[1]   = gcmALIGN((rois_num  + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1], SHADER_THREAD_COUNT);
     }
 
-    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 2);
+    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 3);
     if (status != VX_SUCCESS) goto OnError;
 
     status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
     if (status != VX_SUCCESS) goto OnError;
 
     if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
+    if (split_rs) vxoTensor_ReleaseTensor(&split_rs);
     if (roiList_rs) vxoTensor_ReleaseTensor(&roiList_rs);
 
     gcmFOOTER_ARG("%p", shaderExecutable);
@@ -20416,6 +20426,7 @@ vxnne_shader_executable vxnneROIRect2ROIListShaderExecutable(
 OnError:
     if (program) vxReleaseProgram(&program);
     if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
+    if (split_rs) vxoTensor_ReleaseTensor(&split_rs);
     if (roiList_rs) vxoTensor_ReleaseTensor(&roiList_rs);
 
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);

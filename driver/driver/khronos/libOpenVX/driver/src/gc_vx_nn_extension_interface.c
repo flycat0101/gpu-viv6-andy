@@ -7369,6 +7369,15 @@ VX_PRIVATE_API vx_tensor vxnneAllocateTPROIListBuffer(vx_context context, vx_nod
     return _AllocateTPLUTorListBuffer(context, node, size, type);
 }
 
+VX_PRIVATE_API void vxnneInitROITensorFromBuffer(vx_tensor tensor, void* buffer, vx_uint32 element_size)
+{
+    vx_uint8_ptr data_ptr;
+
+    vxoTensor_GetTensorViewMemory(tensor, (gctPOINTER *)&data_ptr, VX_NULL);
+
+    vxMemCopy(data_ptr, buffer, element_size);
+}
+
 VX_PRIVATE_API vx_status vxoLRNOperationTP_Initialize(
     vxnne_tp_operation operation,
     vxnne_layer layer,
@@ -14143,7 +14152,24 @@ VX_PRIVATE_API vx_status vxnneROIPoolLayer_Initializer(
             vx_op_param_s conv = {0};
             vx_tensor tmpTensor = VX_NULL;
             vx_tensor list = VX_NULL;
+            vx_tensor split_end = VX_NULL;
             vx_tensor_create_params_t tensor_create_params;
+            vx_uint32 core = context->nnConfig.fixedFeature.tpCoreCount;
+            vx_bool mult = context->options.enableMultiTP && core > 1;
+            vx_uint32 slice = !mult ? 1 : gcmMIN(TENSOR_VIEW_SIZE_INDEX(outputs, 3), core);
+            vx_uint32 roi_size = TENSOR_VIEW_SIZE_INDEX(outputs, 3);
+            vx_uint32 split_size_array[TP_TENSOR_COUNT] = {0};
+            vx_uint32 split_offset_array[TP_TENSOR_COUNT] = {0};
+            vx_uint32 splitEnds[TP_TENSOR_COUNT] = {0};
+            vx_uint32 i = 0;
+
+            calculateSplitSize(roi_size, slice, split_size_array, split_offset_array);
+
+            splitEnds[0] = split_size_array[0] - 1;
+            for (i = 1; i < slice; i++)
+            {
+                splitEnds[i] = splitEnds[i - 1] + split_size_array[i];
+            }
 
             status = vxnneOperation_Initialize(&roipoolLayer->roipool_tp_operation[0].base,
                                                 &roipoolLayer->base,
@@ -14238,9 +14264,17 @@ VX_PRIVATE_API vx_status vxnneROIPoolLayer_Initializer(
                 status = VX_ERROR_NO_MEMORY;
                 goto exit;
             }
+            /* Prepare Split end list. */
+            split_end = vxnneAllocateTPROIListBuffer(context, node, slice, VX_TYPE_UINT32);
+            if (split_end == VX_NULL)
+            {
+                status = VX_ERROR_NO_MEMORY;
+                goto exit;
+            }
 
-            shaderExecutable = vxnneROIRect2ROIListShaderExecutable(node->base.context, VXNNE_KERNEL_ROIRECT2ROILIST, &node->kernelAttributes.borderMode, input_rois, roi_stride, rois_num, pool_width, pool_height, spatial_scale, context->nnConfig.fixedFeature.tpCoreCount, list);
+            vxnneInitROITensorFromBuffer(split_end, splitEnds, slice * sizeof(vx_uint32));
 
+            shaderExecutable = vxnneROIRect2ROIListShaderExecutable(node->base.context, VXNNE_KERNEL_ROIRECT2ROILIST, &node->kernelAttributes.borderMode, input_rois, roi_stride, rois_num, pool_width, pool_height, spatial_scale, slice, split_end, list);
             if (!shaderExecutable)
             {
                 status = VX_FAILURE;
@@ -14254,6 +14288,7 @@ VX_PRIVATE_API vx_status vxnneROIPoolLayer_Initializer(
                 shaderExecutable);
 
             vxnneOperation_AddReference(&roipoolLayer->tensorROIPoolSH.base, (vx_reference)input_rois, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&roipoolLayer->tensorROIPoolSH.base, (vx_reference)split_end, VXNNE_OPERATION_REFENRENCE_INPUT);
             vxnneOperation_AddReference(&roipoolLayer->tensorROIPoolSH.base, (vx_reference)list, VXNNE_OPERATION_REFENRENCE_OUTPUT);
             vxnneLayer_SetOperation(
                 &roipoolLayer->base,
@@ -14291,8 +14326,9 @@ VX_PRIVATE_API vx_status vxnneROIPoolLayer_Initializer(
             vxnneOperation_AddReference(&roipoolLayer->roipool_tp_operation[1].base, (vx_reference)list, VXNNE_OPERATION_REFENRENCE_INPUT);
             vxnneOperation_AddReference(&roipoolLayer->roipool_tp_operation[1].base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
-            roipoolLayer->base.num_temp_tensors = 1;
+            roipoolLayer->base.num_temp_tensors = 2;
             roipoolLayer->base.temp_tensors[0] = tmpTensor;
+            roipoolLayer->base.temp_tensors[1] = split_end;
             node->layer = &roipoolLayer->base;
         }
         else
