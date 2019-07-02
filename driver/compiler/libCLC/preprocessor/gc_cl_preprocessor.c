@@ -145,12 +145,43 @@ ppoPREPROCESSOR_PushOntoCurrentInputStreamOfPP (ppoPREPROCESSOR PP,
     return gcvSTATUS_OK;
 }
 
-#define _cldSaveLogFile 0
-#if _cldSaveLogFile
-static gctFILE    ppLogFile = gcvNULL;
-static gctINT     ppLineNumber = 0;
-static gctCHAR    ppLogBuffer[1024];
+gceSTATUS
+ppoWriteBufferToFile(IN ppoPREPROCESSOR PP)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    if (PP->ppLogFile == gcvNULL)
+    {
+#define _FILENAMEMAX 1024
+        gctCHAR fullFileName[_FILENAMEMAX+1];
+        gctCHAR fileName[64];
+        gctUINT offset = 0;
+        gctUINT64 time;
+
+        gcmVERIFY_OK(vscGetTemporaryDir(fullFileName));
+#if _WIN32
+        gcmVERIFY_OK(gcoOS_StrCatSafe(fullFileName, _FILENAMEMAX, "\\"));
+#else
+        gcmVERIFY_OK(gcoOS_StrCatSafe(fullFileName, _FILENAMEMAX, "/"));
 #endif
+        gcoOS_GetTime(&time);
+        gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName, gcmSIZEOF(fileName), &offset, "viv_cl_%lld.log", (gctUINT64)time));
+        gcmVERIFY_OK(gcoOS_StrCatSafe(fullFileName, _FILENAMEMAX, fileName));
+        gcmVERIFY_OK(gcoOS_Open(gcvNULL, fullFileName, gcvFILE_APPENDTEXT, &PP->ppLogFile));
+        if (PP->ppLogFile == gcvNULL)
+        {
+            gcoOS_ZeroMemory(PP->logBuffer, 1024);
+            PP->logCurrentSize = 0;
+            return gcvSTATUS_INVALID_DATA;
+        }
+    }
+
+    gcoOS_Write(gcvNULL, PP->ppLogFile, gcoOS_StrLen(PP->logBuffer, gcvNULL), PP->logBuffer);
+    gcoOS_ZeroMemory(PP->logBuffer, 1024);
+    PP->logCurrentSize = 0;
+
+    return status;
+}
 
 /*******************************************************************************
 **
@@ -163,6 +194,7 @@ ppoPREPROCESSOR_AddToOutputStreamOfPP(ppoPREPROCESSOR PP,
 {
     ppoTOKEN ntoken = gcvNULL;
     gceSTATUS status = gcvSTATUS_INVALID_ARGUMENT;
+    gctSIZE_T len = 0;
 
     gcmASSERT(PP && Token);
 
@@ -202,58 +234,55 @@ ppoPREPROCESSOR_AddToOutputStreamOfPP(ppoPREPROCESSOR PP,
         PP->outputTokenStreamEnd = ntoken;
     }
 
-#if _cldSaveLogFile
-    /* TODO: need to refine the code */
-    if (ppLineNumber && ppLineNumber < PP->currentSourceFileLineNumber)
+    if (gcmOPT_DUMP_FELOG())
     {
-        gcoOS_StrCatSafe(ppLogBuffer, 1024, "\n");
-
-        if (ntoken->hasLeadingWS)
+        gcoOS_StrLen(ntoken->poolString, &len);
+        if (((PP->logCurrentSize + len) > (_cldBUFFER_MAX - 5)))
         {
-           status = gcoOS_StrCatSafe(ppLogBuffer, 1024, " ");
-           status = gcoOS_StrCatSafe(ppLogBuffer,
-                                       1024 - 1,
-                                       ntoken->poolString);
+            ppoWriteBufferToFile(PP);
+        }
+
+        if (PP->ppLineNumber && PP->ppLineNumber < PP->currentSourceFileLineNumber)
+        {
+            gcoOS_StrCatSafe(PP->logBuffer, _cldBUFFER_MAX, "\n");
+            if (ntoken->hasLeadingWS)
+            {
+                gcmVERIFY_OK(gcoOS_StrCatSafe(PP->logBuffer, _cldBUFFER_MAX, " "));
+                PP->logCurrentSize = PP->logCurrentSize + 2;
+            }
+
+            gcmVERIFY_OK(gcoOS_StrCatSafe(PP->logBuffer,
+                                          _cldBUFFER_MAX,
+                                          ntoken->poolString));
+            PP->logCurrentSize = PP->logCurrentSize + len + 1;
+
+            if (ntoken->hasTrailingControl)
+            {
+                gcmVERIFY_OK(gcoOS_StrCatSafe(PP->logBuffer, _cldBUFFER_MAX, " "));
+                PP->logCurrentSize = PP->logCurrentSize + 2;
+            }
         }
         else
         {
-           status = gcoOS_StrCatSafe(ppLogBuffer,
-                                        1024,
-                                        ntoken->poolString);
-        }
+            if (ntoken->hasLeadingWS)
+            {
+                gcmVERIFY_OK(gcoOS_StrCatSafe(PP->logBuffer, _cldBUFFER_MAX, " "));
+                PP->logCurrentSize = PP->logCurrentSize + 2;
+            }
 
-        if (ntoken->hasTrailingControl)
-        {
-           status = gcoOS_StrCatSafe(ppLogBuffer, 1024, " ");
-        }
-        gcoOS_Open(gcvNULL, "viv_cl_pp.log", gcvFILE_APPENDTEXT, &ppLogFile);
-        gcoOS_Write(gcvNULL, ppLogFile, gcoOS_StrLen(ppLogBuffer, gcvNULL), ppLogBuffer);
-        gcoOS_Close(gcvNULL, ppLogFile);
-        gcoOS_ZeroMemory(ppLogBuffer, 1024);
-    }
-    else
-    {
-        if (ntoken->hasLeadingWS)
-        {
-           status = gcoOS_StrCatSafe(ppLogBuffer, 1024, " ");
-           status = gcoOS_StrCatSafe(ppLogBuffer,
-                                       1024 - 1,
-                                       ntoken->poolString);
-        }
-        else
-        {
-           status = gcoOS_StrCatSafe(ppLogBuffer,
-                                        1024,
-                                        ntoken->poolString);
-        }
+            status = gcoOS_StrCatSafe(PP->logBuffer,
+                                      _cldBUFFER_MAX,
+                                      ntoken->poolString);
+            PP->logCurrentSize = PP->logCurrentSize + len + 1;
 
-        if (ntoken->hasTrailingControl)
-        {
-           status = gcoOS_StrCatSafe(ppLogBuffer, 1024, " ");
+            if (ntoken->hasTrailingControl)
+            {
+                gcmVERIFY_OK(gcoOS_StrCatSafe(PP->logBuffer, _cldBUFFER_MAX, " "));
+                PP->logCurrentSize = PP->logCurrentSize + 2;
+            }
         }
+        PP->ppLineNumber = PP->currentSourceFileLineNumber;
     }
-    ppLineNumber = PP->currentSourceFileLineNumber;
-#endif
 
     return gcvSTATUS_OK;
 }
@@ -1342,6 +1371,17 @@ gceSTATUS    ppoPREPROCESSOR_Parse(cloPREPROCESSOR        PP,
     /*end of input?*/
     if(PP->inputStream == gcvNULL)
     {
+        /* flush the remaining log buffer to file and close the file */
+        if (gcmOPT_DUMP_FELOG())
+        {
+            if (PP->logBuffer && PP->logBuffer[0] != '\0')
+                ppoWriteBufferToFile(PP);
+            if (PP->ppLogFile)
+            {
+                gcoOS_Close(gcvNULL, PP->ppLogFile);
+                PP->ppLogFile = gcvNULL;
+            }
+        }
         return gcvSTATUS_OK;
     }
 
@@ -1358,6 +1398,17 @@ gceSTATUS    ppoPREPROCESSOR_Parse(cloPREPROCESSOR        PP,
 
             if (ntoken->type == ppvTokenType_EOF)
             {
+                /* flush the remaining log buffer to file and close the file */
+                if (gcmOPT_DUMP_FELOG())
+                {
+                    if (PP->logBuffer && PP->logBuffer[0] != '\0')
+                        ppoWriteBufferToFile(PP);
+                    if (PP->ppLogFile)
+                    {
+                        gcoOS_Close(gcvNULL, PP->ppLogFile);
+                        PP->ppLogFile = gcvNULL;
+                    }
+                }
                 status = ppoTOKEN_Destroy(PP, ntoken);
                 return status;
             }

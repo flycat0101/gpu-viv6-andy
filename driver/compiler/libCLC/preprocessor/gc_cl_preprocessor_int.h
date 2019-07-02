@@ -46,6 +46,8 @@
 #define ppmSTATE_3_PARSED        3
 #define ppmSTATE_4_DESTROIED    4
 
+#define _cldBUFFER_MAX        1024
+
 /******************************************************************************\
 |********************************** Typedefs **********************************|
 \******************************************************************************/
@@ -521,6 +523,10 @@ struct _ppoPREPROCESSOR
     gctBOOL                    toLineEnd;
     gctINT                     skipLine;
     gctBOOL                    nonpreprocessorStatementHasAlreadyAppeared;
+    gctCHAR                    logBuffer[_cldBUFFER_MAX];
+    gctFILE                    ppLogFile;
+    gctINT                     ppLineNumber;
+    gctUINT                    logCurrentSize;
 
     /*
     ** to skip undefined identifiers error,
@@ -983,6 +989,9 @@ gceSTATUS
 ppoPREPROCESSOR_FreeHeaderFilePathList(
                                        ppoPREPROCESSOR PP
                                        );
+
+gceSTATUS
+ppoWriteBufferToFile(ppoPREPROCESSOR PP);
 
 #include "gc_cl_macro_expand.h"
 
