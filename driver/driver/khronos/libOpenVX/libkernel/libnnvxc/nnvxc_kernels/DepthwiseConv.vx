@@ -231,7 +231,7 @@ __kernel void vxcDepthwiseConv_U8kernelWidthGT5(
 
             if (x_len_5x)
             {
-                for (coord_in.x = inxStart; coord_in.x < (inxEnd - 5); )
+                for (coord_in.x = inxStart; coord_in.x <= (inxEnd - 5); )
                 {
                     VXC_ReadImage(weval, weight, coord_wei, 0, VXC_MODIFIER(0, 4, 0, VXC_RM_TowardZero, 0));
                     VXC_ReadImage2DArray(inval, input, coord_in, 0, VXC_MODIFIER(0, 4, 0, VXC_RM_TowardZero, 0));
@@ -418,8 +418,8 @@ __kernel void vxcDepthwiseConv_i16i16(
     int padTop,
     __write_only image2d_array_t output)
 {
-    int gidx = get_global_id(0) - padLeft;
-    int gidy = get_global_id(1) - padTop;
+    int gidx = get_global_id(0) * stride - padLeft;
+    int gidy = get_global_id(1) * stride - padTop;
     int gidz = get_global_id(2);
     int inz = (short)gidz / (short)channel_multiplier;
     int4 coord = (int4)(gidx, gidy, inz, 0);
