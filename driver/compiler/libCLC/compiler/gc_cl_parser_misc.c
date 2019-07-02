@@ -3324,14 +3324,16 @@ IN cloIR_EXPR Operand
         return gcvNULL;
     }
 
-    if (clmDECL_IsHalfType(&Operand->decl)) {
-        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                        Operator->lineNo,
-                                        Operator->stringNo,
-                                        clvREPORT_ERROR,
-                                        "operand of type half not supported in unary operator '%s'",
-                                        _GetBinaryOperatorName(Operator->u.operator)));
-        return gcvNULL;
+    if (clmDECL_IsHalfType(&Operand->decl) && Operator->u.operator != '&') {
+        if(!cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_CL_KHR_FP16)) {
+            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                            Operator->lineNo,
+                                            Operator->stringNo,
+                                            clvREPORT_ERROR,
+                                            "operand of type half not supported in unary operator '%s'",
+                                            _GetBinaryOperatorName(Operator->u.operator)));
+            return gcvNULL;
+        }
     }
 
     switch (Operator->u.operator) {
@@ -5420,6 +5422,17 @@ IN cloIR_EXPR Operand
       return expr;
   }
   else {
+      if((decl->dataType->type == T_HALF ||
+         Operand->decl.dataType->type == T_HALF) &&
+         !clmDECL_IsPointerType(decl) &&
+         !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX | clvEXTENSION_CL_KHR_FP16)) {
+           gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                           Operand->base.lineNo,
+                                           Operand->base.stringNo,
+                                           clvREPORT_ERROR,
+                                           "explicit cast of half type not allowed"));
+           return gcvNULL;
+      }
       return _CreateCastExpr(Compiler, decl, Operand);
   }
 }
@@ -6503,13 +6516,15 @@ IN cloIR_EXPR RightOperand
 
     if (clmDECL_IsHalfType(&LeftOperand->decl) ||
         clmDECL_IsHalfType(&RightOperand->decl)) {
-        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                        Operator->lineNo,
-                                        Operator->stringNo,
-                                        clvREPORT_ERROR,
-                                        "operands of type half not supported in binary operator '%s'",
-                                        _GetBinaryOperatorName(Operator->u.operator)));
-        return gcvNULL;
+        if(!cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_CL_KHR_FP16)) {
+            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                            Operator->lineNo,
+                                            Operator->stringNo,
+                                            clvREPORT_ERROR,
+                                            "operands of type half not supported in binary operator '%s'",
+                                            _GetBinaryOperatorName(Operator->u.operator)));
+            return gcvNULL;
+        }
     }
 
     switch (Operator->u.operator) {
@@ -6969,12 +6984,14 @@ clParseSelectionExpr(
     if (clmDECL_IsHalfType(&CondExpr->decl) ||
         clmDECL_IsHalfType(&TrueOperand->decl) ||
         clmDECL_IsHalfType(&FalseOperand->decl)) {
-        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                        CondExpr->base.lineNo,
-                                        CondExpr->base.stringNo,
-                                        clvREPORT_ERROR,
-                                        "operands of type half not allowed in ternery operator '?:'"));
-        return gcvNULL;
+        if(!cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_CL_KHR_FP16)) {
+            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                            CondExpr->base.lineNo,
+                                            CondExpr->base.stringNo,
+                                            clvREPORT_ERROR,
+                                            "operands of type half not allowed in ternery operator '?:'"));
+            return gcvNULL;
+        }
     }
 
     /* Check error */
@@ -7180,6 +7197,18 @@ _CheckAssignmentExpr(
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
+    if((LeftOperand->decl.dataType->type == T_HALF ||
+        RightOperand->decl.dataType->type == T_HALF) &&
+       !clmDECL_IsPointerType(&LeftOperand->decl) &&
+       !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX | clvEXTENSION_CL_KHR_FP16) &&
+       !clsDECL_IsEqual(&LeftOperand->decl, &RightOperand->decl)) {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                        LeftOperand->base.lineNo,
+                                        LeftOperand->base.stringNo,
+                                        clvREPORT_ERROR,
+                                        "implicit conversion of half type not allowed"));
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
     return gcvSTATUS_OK;
 }
 
@@ -8475,6 +8504,20 @@ IN clsLexToken * Identifier
                         Identifier->u.identifier.name));
         return gcvSTATUS_INVALID_ARGUMENT;
     }
+    if(declPtr->dataType->type == T_HALF) {
+        if(!cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX | clvEXTENSION_CL_KHR_FP16)) {
+            if((clmDECL_IsHalfType(declPtr) || clmDECL_IsArray(declPtr)) &&
+                !Identifier->u.identifier.ptrDscr) {
+                gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                                Identifier->lineNo,
+                                                Identifier->stringNo,
+                                                clvREPORT_ERROR,
+                                                "variable '%s' cannot have half type",
+                                                Identifier->u.identifier.name));
+                return gcvSTATUS_INVALID_ARGUMENT;
+            }
+        }
+    }
 
     if (notTypeDef &&
         clmDECL_IsStructOrUnion(declPtr) &&
@@ -8606,6 +8649,21 @@ IN cloIR_EXPR ArrayLengthExpr
                         "variable '%s' cannot have image type",
                         Identifier->u.identifier.name));
         return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    if(declPtr->dataType->type == T_HALF) {
+        if(!cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX | clvEXTENSION_CL_KHR_FP16)) {
+            if((clmDECL_IsHalfType(declPtr) || clmDECL_IsArray(declPtr)) &&
+                !Identifier->u.identifier.ptrDscr) {
+                gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                                Identifier->lineNo,
+                                                Identifier->stringNo,
+                                                clvREPORT_ERROR,
+                                                "variable '%s' cannot have half type",
+                                                Identifier->u.identifier.name));
+                return gcvSTATUS_INVALID_ARGUMENT;
+            }
+        }
     }
 
     if (clmDECL_IsStructOrUnion(declPtr) && declPtr->dataType->u.fieldSpace->scopeName->isBuiltin)  {

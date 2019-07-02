@@ -1275,6 +1275,19 @@ _VSC_MC_GEN_GetInstType(
     }
 }
 
+static gctBOOL
+_IsDestTypeFP16(
+    IN VIR_Instruction *Inst
+    )
+{
+    VIR_Operand *dest = VIR_Inst_GetDest(Inst);
+    VIR_TypeId typeId;
+    gcmASSERT(dest);
+
+    typeId = VIR_Operand_GetTypeId(dest);
+    return VIR_Shader_GetBuiltInTypes(typeId)->componentType == VIR_TYPE_FLOAT16;
+}
+
 static gctUINT
 _VSC_MC_GEN_GenInstType(
     IN VSC_MCGen       *Gen,
@@ -1385,6 +1398,16 @@ _VSC_MC_GEN_GenInstType(
     case VIR_OP_STORE:
     case VIR_OP_STORE_S:
     case VIR_OP_STORE_L:
+        gcmASSERT(VIR_OPCODE_useSrc2AsInstType(opcode));
+        if(_IsDestTypeFP16(Inst))
+        {
+            return _VSC_MC_GEN_GetInstType(Gen, Inst, VIR_Inst_GetDest(Inst));
+        }
+        else
+        {
+            return _VSC_MC_GEN_GetInstType(Gen, Inst, VIR_Inst_GetSource(Inst, 2));
+        }
+
     case VIR_OP_STORE_ATTR:
     case VIR_OP_IMG_STORE:
     case VIR_OP_VX_IMG_STORE:

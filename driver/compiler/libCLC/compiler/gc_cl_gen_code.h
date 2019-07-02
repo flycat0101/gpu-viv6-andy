@@ -284,6 +284,10 @@ typedef enum _cleOPCODE
     clvOPCODE_LOAD,
     clvOPCODE_STORE,
     clvOPCODE_STORE1,
+    clvOPCODE_STORE1_RTE,
+    clvOPCODE_STORE1_RTZ,
+    clvOPCODE_STORE1_RTP,
+    clvOPCODE_STORE1_RTN,
 
     clvOPCODE_ANY,
     clvOPCODE_ALL,
@@ -1145,6 +1149,7 @@ clGenStoreCode(
 IN cloCOMPILER Compiler,
 IN gctUINT LineNo,
 IN gctUINT StringNo,
+IN cleOPCODE Opcode,
 IN clsROPERAND *ROperand,
 IN clsLOPERAND *LOperand,
 IN clsGEN_CODE_DATA_TYPE ResType,

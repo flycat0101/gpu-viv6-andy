@@ -147,12 +147,12 @@ static clsKEYWORD KeywordTable[] =
     {"global",               T_GLOBAL,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"goto",                 T_GOTO,                 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"half",                 T_HALF,                 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"half16",               T_HALF16,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"half2",                T_HALF2,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"half3",                T_HALF3,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"half16",               T_HALF16,               0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX | clvEXTENSION_CL_KHR_FP16},
+    {"half2",                T_HALF2,                0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX | clvEXTENSION_CL_KHR_FP16},
+    {"half3",                T_HALF3,                0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX | clvEXTENSION_CL_KHR_FP16},
     {"half32",               T_HALF32,               0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"half4",                T_HALF4,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"half8",                T_HALF8,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"half4",                T_HALF4,                0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX | clvEXTENSION_CL_KHR_FP16},
+    {"half8",                T_HALF8,                0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX | clvEXTENSION_CL_KHR_FP16},
     {"if",                   T_IF,                   0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"image1d_array_t",      T_IMAGE1D_ARRAY_T,      0,    clvCL_12, clvEXTENSION_NONE},
     {"image1d_buffer_t",     T_IMAGE1D_BUFFER_T,     0,    clvCL_12, clvEXTENSION_NONE},
@@ -400,7 +400,9 @@ OUT clsKEYWORD **Keyword
     FOR_EACH_DLINK_NODE(bucket, clsKEYWORD_NODE, node) {
         if (gcmIS_SUCCESS(gcoOS_StrCmp(node->keyword.symbol, Symbol))) {
             *Keyword = &(node->keyword);
-            if (node->keyword.languageVersion | _CL_LanguageVersion)
+            if ((node->keyword.languageVersion & _CL_LanguageVersion) &&
+                (node->keyword.extension == clvEXTENSION_NONE ||
+                (node->keyword.extension & _CL_LanguageExtension)))
             {
                 return node->keyword.token;
             }

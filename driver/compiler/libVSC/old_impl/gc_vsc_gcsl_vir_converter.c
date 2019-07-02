@@ -8983,8 +8983,20 @@ _fix_src_type_to_dest_type(
     )
 {
     {
-        gcmASSERT(VIR_Inst_GetDest(Inst));
-        VIR_Operand_SetTypeId(Opnd, VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst)));
+        VIR_Operand *dest;
+        VIR_TypeId typeId;
+        VIR_BuiltinTypeInfo * typeInfo;
+
+        dest = VIR_Inst_GetDest(Inst);
+        gcmASSERT(dest);
+
+        typeId = VIR_Operand_GetTypeId(dest);
+        typeInfo = VIR_Shader_GetBuiltInTypes(typeId);
+
+        if(typeInfo->componentType != VIR_TYPE_FLOAT16)
+        {
+            VIR_Operand_SetTypeId(Opnd, typeId);
+        }
     }
     return gcvTRUE;
 }
@@ -9066,7 +9078,7 @@ static VIR_PatternMatchInst _storePatInst1[] = {
 };
 
 static VIR_PatternReplaceInst _storeRepInst1[] = {
-    { VIR_OP_STORE, -1, 0, { 1, 2, 0, 3 }, { int_zero_2, _normalize_src2_swiz, 0, _fix_src_type_to_dest_type} },};
+    { VIR_OP_STORE, -1, VIR_PATN_FLAG_COPY_ROUNDING_MODE, { 1, 2, 0, 3 }, { int_zero_2, _normalize_src2_swiz, 0, _fix_src_type_to_dest_type} },};
 
 static VIR_PatternMatchInst _storePatInst2[] = {
     { MERGE_OPCODE(VIR_OP_STARR, EXTERN_IMG_STORE), VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isOCL_VXMode }, VIR_PATN_MATCH_FLAG_OR },

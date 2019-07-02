@@ -286,6 +286,10 @@ static gctBOOL _IsOpcodeComponentWise[] =
     /* clvOPCODE_LOAD */ gcvFALSE,
     /* clvOPCODE_STORE */ gcvFALSE,
     /* clvOPCODE_STORE1 */ gcvFALSE,
+    /* clvOPCODE_STORE1_RTE */ gcvFALSE,
+    /* clvOPCODE_STORE1_RTZ */ gcvFALSE,
+    /* clvOPCODE_STORE1_RTP */ gcvFALSE,
+    /* clvOPCODE_STORE1_RTN */ gcvFALSE,
 
     /* clvOPCODE_ANY */ gcvTRUE,
     /* clvOPCODE_ALL */ gcvTRUE,
@@ -1539,6 +1543,10 @@ clGetOpcodeName(
     case clvOPCODE_LOAD:               return "load";
     case clvOPCODE_STORE:              return "store";
     case clvOPCODE_STORE1:             return "store1";
+    case clvOPCODE_STORE1_RTE:         return "store1_rte";
+    case clvOPCODE_STORE1_RTZ:         return "store1_rtz";
+    case clvOPCODE_STORE1_RTP:         return "store1_rtp";
+    case clvOPCODE_STORE1_RTN:         return "store1_rtn";
 
     case clvOPCODE_ANY:                return "any";
     case clvOPCODE_ALL:                return "all";
@@ -2322,6 +2330,7 @@ _AssignStructOrUnionInMemory(
          status = clGenStoreCode(Compiler,
                                  LineNo,
                                  StringNo,
+                                 clvOPCODE_STORE1,
                                  Rhs->rOperands + *CurOperand,
                                  LOperand,
                                  Rhs->dataTypes[*CurOperand].def,
@@ -24973,6 +24982,7 @@ cloIR_UNARY_EXPR_GenIncOrDecCode(
            gcmONERROR(clGenStoreCode(Compiler,
                                      UnaryExpr->exprBase.base.lineNo,
                                      UnaryExpr->exprBase.base.stringNo,
+                                     clvOPCODE_STORE1,
                                      intermROperand,
                                      operandParameters->lOperands,
                                      operandParameters->dataTypes[0].def,
@@ -24982,6 +24992,7 @@ cloIR_UNARY_EXPR_GenIncOrDecCode(
             gcmONERROR(clGenStoreCode(Compiler,
                                       UnaryExpr->exprBase.base.lineNo,
                                       UnaryExpr->exprBase.base.stringNo,
+                                      clvOPCODE_STORE1,
                                       intermROperand,
                                       operandParameters->lOperands,
                                       operandParameters->dataTypes[0].def,
@@ -28899,6 +28910,7 @@ clGenStoreCode(
 IN cloCOMPILER Compiler,
 IN gctUINT LineNo,
 IN gctUINT StringNo,
+IN cleOPCODE Opcode,
 IN clsROPERAND *ROperand,
 IN clsLOPERAND *LOperand,
 IN clsGEN_CODE_DATA_TYPE ResType,
@@ -28961,7 +28973,10 @@ IN clsROPERAND *Offset
   else {
      *columnROperand = *ROperand;
   }
-  columnROperand->dataType = resType;
+
+  if(clmGEN_CODE_elementType_GET(ResType) != clvTYPE_HALF) {
+      columnROperand->dataType = resType;
+  }
 
   incr= 0;
   newOffset = gcvNULL;
@@ -28998,6 +29013,7 @@ IN clsROPERAND *Offset
      }
      else clsLOPERAND_InitializeUsingROperand(lOperand, columnROperand);
 
+     lOperand->dataType = resType;
      status = _ConvLOperandToSuperTarget(Compiler,
                                          lOperand,
                                          &superTarget,
@@ -29052,7 +29068,7 @@ IN clsROPERAND *Offset
          status = clEmitCode2(Compiler,
                               LineNo,
                               StringNo,
-                              clvOPCODE_STORE1,
+                              Opcode,
                               superTarget.targets + j,
                               addressSource,
                               superSource1.sources + j);
@@ -29109,7 +29125,7 @@ IN clsROPERAND *Offset
               status = clEmitCode2(Compiler,
                                    LineNo,
                                    StringNo,
-                                   clvOPCODE_STORE1,
+                                   Opcode,
                                    dummyTarget,
                                    addressSource,
                                    zeroSource);
@@ -29136,6 +29152,7 @@ clGenStoreCode(
 IN cloCOMPILER Compiler,
 IN gctUINT LineNo,
 IN gctUINT StringNo,
+IN cleOPCODE Opcode,
 IN clsROPERAND *ROperand,
 IN clsLOPERAND *LOperand,
 IN clsGEN_CODE_DATA_TYPE ResType,
@@ -29300,6 +29317,7 @@ clGenStoreCode(
 IN cloCOMPILER Compiler,
 IN gctUINT LineNo,
 IN gctUINT StringNo,
+IN cleOPCODE Opcode,
 IN clsROPERAND *ROperand,
 IN clsLOPERAND *LOperand,
 IN clsGEN_CODE_DATA_TYPE ResType,
@@ -29600,14 +29618,15 @@ IN clsCOMPONENT_SELECTION *ComponentSelection
   incr= 0;
   do {
      if(!columnROperand->isReg) { /*constant*/
-       clsLOPERAND constantOperand[1];
-       clsCOMPONENT_SELECTION reversedComponentSelection;
+        clsLOPERAND constantOperand[1];
+        clsCOMPONENT_SELECTION reversedComponentSelection;
 
         status = _GenConstantAssignCode(Compiler,
                                         LineNo,
                                         StringNo,
                                         columnROperand,
-                                        resType,
+                                        clmGEN_CODE_elementType_GET(resType) == clvTYPE_HALF ?
+                                        resType : columnROperand->dataType,
                                         constantOperand);
         if(gcmIS_ERROR(status)) return status;
 
@@ -30289,6 +30308,7 @@ errorHandling:
                           gcmONERROR(clGenStoreCode(Compiler,
                                                     BinaryExpr->exprBase.base.lineNo,
                                                     BinaryExpr->exprBase.base.stringNo,
+                                                    clvOPCODE_STORE1,
                                                     rightParameters.rOperands + i,
                                                     lOperand,
                                                     leftParameters.dataTypes[i].def,
@@ -30323,6 +30343,7 @@ errorHandling:
                       gcmONERROR(clGenStoreCode(Compiler,
                                                 BinaryExpr->exprBase.base.lineNo,
                                                 BinaryExpr->exprBase.base.stringNo,
+                                                clvOPCODE_STORE1,
                                                 rightParameters.rOperands + i,
                                                 leftParameters.lOperands + i,
                                                 leftParameters.dataTypes[i].def,
@@ -30440,6 +30461,7 @@ errorHandling:
                      gcmONERROR(clGenStoreCode(Compiler,
                                                BinaryExpr->exprBase.base.lineNo,
                                                BinaryExpr->exprBase.base.stringNo,
+                                               clvOPCODE_STORE1,
                                                rightParameters.rOperands + i,
                                                lOperand,
                                                rightParameters.dataTypes[i].def,
@@ -30706,6 +30728,7 @@ cloIR_BINARY_EXPR_GenArithmeticAssignCode(
            gcmONERROR(clGenStoreCode(Compiler,
                                      BinaryExpr->exprBase.base.lineNo,
                                      BinaryExpr->exprBase.base.stringNo,
+                                     clvOPCODE_STORE1,
                                      intermROperand,
                                      leftParameters.lOperands,
                                      leftParameters.dataTypes[0].def,
@@ -30715,6 +30738,7 @@ cloIR_BINARY_EXPR_GenArithmeticAssignCode(
            gcmONERROR(clGenStoreCode(Compiler,
                                          BinaryExpr->exprBase.base.lineNo,
                                          BinaryExpr->exprBase.base.stringNo,
+                                         clvOPCODE_STORE1,
                                          intermROperand,
                                          leftParameters.lOperands,
                                          leftParameters.dataTypes[0].def,
@@ -30812,6 +30836,7 @@ cloIR_BINARY_EXPR_GenArithmeticAssignCode(
                   gcmONERROR(clGenStoreCode(Compiler,
                                             BinaryExpr->exprBase.base.lineNo,
                                             BinaryExpr->exprBase.base.stringNo,
+                                            clvOPCODE_STORE1,
                                             intermROperand,
                                             leftParameters.lOperands + i,
                                             leftParameters.dataTypes[i].def,
@@ -30822,6 +30847,7 @@ cloIR_BINARY_EXPR_GenArithmeticAssignCode(
              gcmONERROR(clGenStoreCode(Compiler,
                                            BinaryExpr->exprBase.base.lineNo,
                                            BinaryExpr->exprBase.base.stringNo,
+                                           clvOPCODE_STORE1,
                                            intermROperand,
                                            leftParameters.lOperands + i,
                                            leftParameters.dataTypes[i].def,
@@ -31041,6 +31067,7 @@ cloIR_BINARY_EXPR_GenShiftAssignCode(
                 gcmONERROR(clGenStoreCode(Compiler,
                                           BinaryExpr->exprBase.base.lineNo,
                                           BinaryExpr->exprBase.base.stringNo,
+                                          clvOPCODE_STORE1,
                                           intermROperand,
                                           leftParameters.lOperands + i,
                                           leftParameters.dataTypes[i].def,
@@ -31051,6 +31078,7 @@ cloIR_BINARY_EXPR_GenShiftAssignCode(
            gcmONERROR(clGenStoreCode(Compiler,
                                          BinaryExpr->exprBase.base.lineNo,
                                          BinaryExpr->exprBase.base.stringNo,
+                                         clvOPCODE_STORE1,
                                          intermROperand,
                                          leftParameters.lOperands + i,
                                          leftParameters.dataTypes[i].def,
@@ -31248,6 +31276,7 @@ cloIR_BINARY_EXPR_GenBitwiseAssignCode(
                 gcmONERROR(clGenStoreCode(Compiler,
                                           BinaryExpr->exprBase.base.lineNo,
                                           BinaryExpr->exprBase.base.stringNo,
+                                          clvOPCODE_STORE1,
                                           intermROperand,
                                           leftParameters.lOperands + i,
                                           leftParameters.dataTypes[i].def,
@@ -31258,6 +31287,7 @@ cloIR_BINARY_EXPR_GenBitwiseAssignCode(
            gcmONERROR(clGenStoreCode(Compiler,
                                          BinaryExpr->exprBase.base.lineNo,
                                          BinaryExpr->exprBase.base.stringNo,
+                                         clvOPCODE_STORE1,
                                          intermROperand,
                                          leftParameters.lOperands + i,
                                          leftParameters.dataTypes[i].def,

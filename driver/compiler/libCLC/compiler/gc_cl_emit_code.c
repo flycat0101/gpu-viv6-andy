@@ -4357,6 +4357,10 @@ _ConvOpcode(
     case clvOPCODE_STORE:            return gcSL_STORE;
 #if cldUseSTORE1
     case clvOPCODE_STORE1:           return gcSL_STORE1;
+    case clvOPCODE_STORE1_RTE:       return gcSL_STORE1;
+    case clvOPCODE_STORE1_RTZ:       return gcSL_STORE1;
+    case clvOPCODE_STORE1_RTP:       return gcSL_STORE1;
+    case clvOPCODE_STORE1_RTN:       return gcSL_STORE1;
 #endif
 
     case clvOPCODE_TEXTURE_LOAD:     return gcSL_TEXLD;
@@ -8432,56 +8436,62 @@ _EmitCodeImpl2(
     {
         gcSHADER binary;
 
+        gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
         /* need to set the instruction modifiers first before emitting the instruction */
-        if (clmIsOpcodeConv(Opcode) && Opcode != clvOPCODE_CONV) {
-            gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
+        switch(Opcode) {
+        case clvOPCODE_STORE1_RTE:
+            gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTNE);
+            break;
 
-            /*update the opcode modifiers */
-            switch(Opcode) {
-            case clvOPCODE_CONV_SAT_RTE:
-                gcSHADER_AddSaturation(binary, gcSL_SATURATE);
-                /* fall through */
-            case clvOPCODE_CONV_RTE:
-                gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTNE);
-                break;
+        case clvOPCODE_STORE1_RTZ:
+            gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTZ);
+            break;
 
-            case clvOPCODE_CONV_SAT_RTZ:
-                gcSHADER_AddSaturation(binary, gcSL_SATURATE);
-                /* fall through */
-            case clvOPCODE_CONV_RTZ:
-                gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTZ);
-                break;
+        case clvOPCODE_STORE1_RTP:
+            gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTP);
+            break;
 
-            case clvOPCODE_CONV_SAT_RTN:
-                gcSHADER_AddSaturation(binary, gcSL_SATURATE);
-                /* fall through */
-            case clvOPCODE_CONV_RTN:
-                gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTN);
-                break;
+        case clvOPCODE_STORE1_RTN:
+            gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTN);
+            break;
 
-            case clvOPCODE_CONV_SAT_RTP:
-                gcSHADER_AddSaturation(binary, gcSL_SATURATE);
-                /* fall through */
-            case clvOPCODE_CONV_RTP:
-                gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTP);
-                break;
+        case clvOPCODE_CONV_SAT_RTE:
+            gcSHADER_AddSaturation(binary, gcSL_SATURATE);
+            /* fall through */
+        case clvOPCODE_CONV_RTE:
+            gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTNE);
+            break;
 
-            case clvOPCODE_CONV_SAT:
-                gcSHADER_AddSaturation(binary, gcSL_SATURATE);
-                break;
+        case clvOPCODE_CONV_SAT_RTZ:
+            gcSHADER_AddSaturation(binary, gcSL_SATURATE);
+            /* fall through */
+        case clvOPCODE_CONV_RTZ:
+            gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTZ);
+            break;
 
-            default:
-                gcmASSERT(0);
-                break;
-            }
-        }
-        else if(Opcode == clvOPCODE_IMAGE_READ_3D ||
-                 Opcode == clvOPCODE_IMAGE_READ ||
-                 Opcode == clvOPCODE_IMAGE_WRITE_3D ||
-                 Opcode == clvOPCODE_IMAGE_WRITE ||
-                 Opcode == clvOPCODE_IMAGE_SAMPLER)
-        {
-            gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
+        case clvOPCODE_CONV_SAT_RTN:
+            gcSHADER_AddSaturation(binary, gcSL_SATURATE);
+            /* fall through */
+        case clvOPCODE_CONV_RTN:
+            gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTN);
+            break;
+
+        case clvOPCODE_CONV_SAT_RTP:
+            gcSHADER_AddSaturation(binary, gcSL_SATURATE);
+            /* fall through */
+        case clvOPCODE_CONV_RTP:
+            gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTP);
+            break;
+
+        case clvOPCODE_CONV_SAT:
+            gcSHADER_AddSaturation(binary, gcSL_SATURATE);
+            break;
+
+        case clvOPCODE_IMAGE_READ_3D:
+        case clvOPCODE_IMAGE_READ:
+        case clvOPCODE_IMAGE_WRITE_3D:
+        case clvOPCODE_IMAGE_WRITE:
+        case clvOPCODE_IMAGE_SAMPLER:
             if(clmIsElementTypeFloating(Target->dataType.elementType))
             {
                 /* according to OCL spec: set default rounding mode for floating point tpye to RTE */
@@ -8491,16 +8501,19 @@ _EmitCodeImpl2(
             {
                 gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTZ);
             }
+            break;
+
+        default:
+            break;
         }
 
-        status = _EmitCode(
-                        Compiler,
-                        LineNo,
-                        StringNo,
-                        _ConvOpcode(Opcode),
-                        Target,
-                        &newSource0,
-                        &newSource1);
+        status = _EmitCode(Compiler,
+                           LineNo,
+                           StringNo,
+                           _ConvOpcode(Opcode),
+                           Target,
+                           &newSource0,
+                           &newSource1);
 
         if (gcmIS_ERROR(status)) return status;
     }

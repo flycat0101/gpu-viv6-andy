@@ -52,16 +52,19 @@ static char *extension_w_atomic = "cl_khr_byte_addressable_store "
                                   "cl_khr_global_int32_extended_atomics "
                                   "cl_khr_local_int32_base_atomics "
                                   "cl_khr_local_int32_extended_atomics "
-                                  "cl_khr_gl_sharing ";
+                                  "cl_khr_gl_sharing "
+                                  "cl_khr_fp16 ";
 
 static char *extension_without_atomic = "cl_khr_byte_addressable_store "
-                                        "cl_khr_gl_sharing ";
+                                        "cl_khr_gl_sharing "
+                                        "cl_khr_fp16 ";
+
 static char *extension_w_atomic_wo_glsharing = "cl_khr_byte_addressable_store "
                                   "cl_khr_global_int32_base_atomics "
                                   "cl_khr_global_int32_extended_atomics "
                                   "cl_khr_local_int32_base_atomics "
-                                  "cl_khr_local_int32_extended_atomics ";
-
+                                  "cl_khr_local_int32_extended_atomics "
+                                  "cl_khr_fp16 ";
 
 cl_device_id clgDefaultDevice = gcvNULL;
 clsDeviceId_PTR clgDevices = gcvNULL;

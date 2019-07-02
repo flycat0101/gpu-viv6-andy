@@ -120,12 +120,19 @@ static clsBUILTIN_FUNCTION    VectorBuiltinFunctions[] =
     {clvEXTENSION_NONE,    "vload8",          T_UCHAR8, 2, {T_SIZE_T, T_UCHAR}, {0, 1}, {1, 0}, 1},
     {clvEXTENSION_NONE,    "vload16",         T_UCHAR16, 2, {T_SIZE_T, T_UCHAR}, {0, 1}, {1, 0}, 1},
 
-    {clvEXTENSION_NONE,    "vload_half",       T_FLOAT, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
-    {clvEXTENSION_NONE,    "vload_half2",      T_FLOAT2, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
-    {clvEXTENSION_NONE,    "vload_half3",      T_FLOAT3, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
-    {clvEXTENSION_NONE,    "vload_half4",      T_FLOAT4, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
-    {clvEXTENSION_NONE,    "vload_half8",      T_FLOAT8, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
-    {clvEXTENSION_NONE,    "vload_half16",     T_FLOAT16, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
+    {clvEXTENSION_NONE,    "vload_half",      T_FLOAT, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
+    {clvEXTENSION_NONE,    "vload_half2",     T_FLOAT2, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
+    {clvEXTENSION_NONE,    "vload_half3",     T_FLOAT3, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
+    {clvEXTENSION_NONE,    "vload_half4",     T_FLOAT4, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
+    {clvEXTENSION_NONE,    "vload_half8",     T_FLOAT8, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
+    {clvEXTENSION_NONE,    "vload_half16",    T_FLOAT16, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
+
+    {clvEXTENSION_NONE,    "vloada_half",     T_FLOAT, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
+    {clvEXTENSION_NONE,    "vloada_half2",    T_FLOAT2, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
+    {clvEXTENSION_NONE,    "vloada_half3",    T_FLOAT3, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
+    {clvEXTENSION_NONE,    "vloada_half4",    T_FLOAT4, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
+    {clvEXTENSION_NONE,    "vloada_half8",    T_FLOAT8, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
+    {clvEXTENSION_NONE,    "vloada_half16",   T_FLOAT16, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
 
     {clvEXTENSION_NONE,    "vstore2",          T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_FLOAT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
     {clvEXTENSION_NONE,    "vstore3",          T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_FLOAT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
@@ -193,6 +200,69 @@ static clsBUILTIN_FUNCTION    VectorBuiltinFunctions[] =
     {clvEXTENSION_NONE,    "vstore_half4",     T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
     {clvEXTENSION_NONE,    "vstore_half8",     T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
     {clvEXTENSION_NONE,    "vstore_half16",    T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_NONE,    "vstore_half_rte",      T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half2_rte",     T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half3_rte",     T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half4_rte",     T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half8_rte",     T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half16_rte",    T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_NONE,    "vstore_half_rtz",      T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half2_rtz",     T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half3_rtz",     T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half4_rtz",     T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half8_rtz",     T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half16_rtz",    T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_NONE,    "vstore_half_rtp",      T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half2_rtp",     T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half3_rtp",     T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half4_rtp",     T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half8_rtp",     T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half16_rtp",    T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_NONE,    "vstore_half_rtn",      T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half2_rtn",     T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half3_rtn",     T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half4_rtn",     T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half8_rtn",     T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstore_half16_rtn",    T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_NONE,    "vstorea_half",     T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half2",    T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half3",    T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half4",    T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half8",    T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half16",   T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_NONE,    "vstorea_half_rte",     T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half2_rte",    T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half3_rte",    T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half4_rte",    T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half8_rte",    T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half16_rte",   T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_NONE,    "vstorea_half_rtz",     T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half2_rtz",    T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half3_rtz",    T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half4_rtz",    T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half8_rtz",    T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half16_rtz",   T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_NONE,    "vstorea_half_rtp",     T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half2_rtp",    T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half3_rtp",    T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half4_rtp",    T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half8_rtp",    T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half16_rtp",   T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_NONE,    "vstorea_half_rtn",     T_VOID, 3, {T_FLOAT, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half2_rtn",    T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half3_rtn",    T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half4_rtn",    T_VOID, 3, {T_FLOAT4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half8_rtn",    T_VOID, 3, {T_FLOAT8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_NONE,    "vstorea_half16_rtn",   T_VOID, 3, {T_FLOAT16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
 
     {clvEXTENSION_NONE,    "viv_getlonglo",    T_UINT, 1, {T_LONG}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "viv_getlonglo2",   T_UINT2, 1, {T_LONG2}, {0}, {0}, 1},
@@ -1021,6 +1091,7 @@ _GenVstoreCode(
     status = clGenStoreCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
+                                clvOPCODE_STORE1,
                                 &OperandsParameters[0].rOperands[0],
                                 lOperand,
                                 OperandsParameters[0].rOperands[0].dataType,
@@ -1043,8 +1114,8 @@ _GenVloadHalfCode(
     gceSTATUS status;
     clsROPERAND scaledIndex[1];
     clsIOPERAND iOperand[1];
-        clsROPERAND operandBuffer[1];
-        clsROPERAND *rOperand;
+    clsROPERAND operandBuffer[1];
+    clsROPERAND *rOperand;
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
@@ -1062,7 +1133,7 @@ _GenVloadHalfCode(
                                          gcGetAddressableUnitSize(iOperand->dataType),
                                          gcvTRUE,
                                          scaledIndex);
-        if (gcmIS_ERROR(status)) return status;
+    if (gcmIS_ERROR(status)) return status;
 
     rOperand = &OperandsParameters[1].rOperands[0];
     if(!clIsIntegerZero(&OperandsParameters[1].dataTypes[0].byteOffset)) { /* byte offset is non-zero */
@@ -1104,10 +1175,11 @@ _GenVloadHalfCode(
 }
 
 static gceSTATUS
-_GenVstoreHalfCode(
+_GenVstoreHalfWithRoundingCode(
     IN cloCOMPILER Compiler,
     IN cloCODE_GENERATOR CodeGenerator,
     IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN cleOPCODE Opcode,
     IN gctUINT OperandCount,
     IN clsGEN_CODE_PARAMETERS * OperandsParameters,
     IN clsIOPERAND * IOperand
@@ -1117,8 +1189,8 @@ _GenVstoreHalfCode(
     clsLOPERAND lOperand[1];
     clsROPERAND scaledIndex[1];
     clsROPERAND rOperand[1];
-        clsROPERAND operandBuffer[1];
-        clsROPERAND *addrOperand;
+    clsROPERAND operandBuffer[1];
+    clsROPERAND *addrOperand;
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
@@ -1169,6 +1241,259 @@ _GenVstoreHalfCode(
     status = clGenStoreCode(Compiler,
                             PolynaryExpr->exprBase.base.lineNo,
                             PolynaryExpr->exprBase.base.stringNo,
+                            Opcode,
+                            &OperandsParameters[0].rOperands[0],
+                            lOperand,
+                            /* Use half-float as the data type. */
+                            rOperand->dataType,
+                            scaledIndex);
+    if (gcmIS_ERROR(status)) return status;
+
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS
+_GenVstoreHalfCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    return  _GenVstoreHalfWithRoundingCode(Compiler,
+                                           CodeGenerator,
+                                           PolynaryExpr,
+                                           clvOPCODE_STORE1,
+                                           OperandCount,
+                                           OperandsParameters,
+                                           IOperand);
+}
+
+static gceSTATUS
+_GenVstoreHalfRteCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    return  _GenVstoreHalfWithRoundingCode(Compiler,
+                                           CodeGenerator,
+                                           PolynaryExpr,
+                                           clvOPCODE_STORE1_RTE,
+                                           OperandCount,
+                                           OperandsParameters,
+                                           IOperand);
+}
+
+static gceSTATUS
+_GenVstoreHalfRtzCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    return  _GenVstoreHalfWithRoundingCode(Compiler,
+                                           CodeGenerator,
+                                           PolynaryExpr,
+                                           clvOPCODE_STORE1_RTZ,
+                                           OperandCount,
+                                           OperandsParameters,
+                                           IOperand);
+}
+
+static gceSTATUS
+_GenVstoreHalfRtpCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    return  _GenVstoreHalfWithRoundingCode(Compiler,
+                                           CodeGenerator,
+                                           PolynaryExpr,
+                                           clvOPCODE_STORE1_RTP,
+                                           OperandCount,
+                                           OperandsParameters,
+                                           IOperand);
+}
+
+static gceSTATUS
+_GenVstoreHalfRtnCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    return  _GenVstoreHalfWithRoundingCode(Compiler,
+                                           CodeGenerator,
+                                           PolynaryExpr,
+                                           clvOPCODE_STORE1_RTN,
+                                           OperandCount,
+                                           OperandsParameters,
+                                           IOperand);
+}
+
+static gceSTATUS
+_GenVloadaHalfCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    gceSTATUS status;
+    clsROPERAND scaledIndex[1];
+    clsIOPERAND iOperand[1];
+    clsROPERAND operandBuffer[1];
+    clsROPERAND *rOperand;
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+    clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 2);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand);
+
+    iOperand[0] = *IOperand;
+    iOperand->dataType.elementType = clvTYPE_HALF;
+    if(clmGEN_CODE_vectorSize_GET(iOperand->dataType) == 3) {
+        clmGEN_CODE_vectorSize_SET(iOperand->dataType, 4);
+    }
+    status = clGenScaledIndexOperand(Compiler,
+                                         PolynaryExpr->exprBase.base.lineNo,
+                                         PolynaryExpr->exprBase.base.stringNo,
+                                         &OperandsParameters[0].rOperands[0],
+                                         gcGetAddressableUnitSize(iOperand->dataType),
+                                         gcvTRUE,
+                                         scaledIndex);
+    if (gcmIS_ERROR(status)) return status;
+
+    rOperand = &OperandsParameters[1].rOperands[0];
+    if(!clIsIntegerZero(&OperandsParameters[1].dataTypes[0].byteOffset)) { /* byte offset is non-zero */
+       if(!scaledIndex->isReg) { /*index is a constant */
+          status = clUpdateAddressOffset(Compiler,
+                                         PolynaryExpr->exprBase.base.lineNo,
+                                         PolynaryExpr->exprBase.base.stringNo,
+                                         clGetIntegerValue(scaledIndex),
+                                         &OperandsParameters[1].dataTypes[0].byteOffset,
+                                         scaledIndex);
+          if (gcmIS_ERROR(status)) return status;
+       }
+       else {
+          clsIOPERAND intermIOperand[1];
+
+          clsIOPERAND_New(Compiler, intermIOperand, clmGenCodeDataType(T_INT));
+          status = clGenGenericCode2(Compiler,
+                                     PolynaryExpr->exprBase.base.lineNo,
+                                     PolynaryExpr->exprBase.base.stringNo,
+                                     clvOPCODE_ADD,
+                                     intermIOperand,
+                                     rOperand,
+                                     &OperandsParameters[1].dataTypes[0].byteOffset);
+          if (gcmIS_ERROR(status)) return status;
+          clsROPERAND_InitializeUsingIOperand(operandBuffer, intermIOperand);
+          rOperand = operandBuffer;
+       }
+    }
+    status = clGenGenericCode2(Compiler,
+                               PolynaryExpr->exprBase.base.lineNo,
+                               PolynaryExpr->exprBase.base.stringNo,
+                               clvOPCODE_LOAD,
+                               iOperand,
+                               rOperand,
+                               scaledIndex);
+    if (gcmIS_ERROR(status)) return status;
+
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS
+_GenVstoreaHalfWithRoundingCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN cleOPCODE Opcode,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    gceSTATUS status;
+    clsLOPERAND lOperand[1];
+    clsROPERAND scaledIndex[1];
+    clsROPERAND rOperand[1];
+    clsROPERAND operandBuffer[1];
+    clsROPERAND *addrOperand;
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+    clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 3);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand == gcvNULL);
+
+    rOperand[0] = OperandsParameters[0].rOperands[0];
+    rOperand->dataType.elementType = clvTYPE_HALF;
+    if(clmGEN_CODE_vectorSize_GET(rOperand->dataType) == 3) {
+        clmGEN_CODE_vectorSize_SET(rOperand->dataType, 4);
+    }
+    status = clGenScaledIndexOperand(Compiler,
+                                         PolynaryExpr->exprBase.base.lineNo,
+                                         PolynaryExpr->exprBase.base.stringNo,
+                                         &OperandsParameters[1].rOperands[0],
+                                         gcGetAddressableUnitSize(rOperand->dataType),
+                                         gcvTRUE,
+                                         scaledIndex);
+    if (gcmIS_ERROR(status)) return status;
+
+    addrOperand = &OperandsParameters[2].rOperands[0];
+    if(!clIsIntegerZero(&OperandsParameters[2].dataTypes[0].byteOffset)) { /* byte offset is non-zero */
+       if(!scaledIndex->isReg) { /*index is a constant */
+          status = clUpdateAddressOffset(Compiler,
+                                         PolynaryExpr->exprBase.base.lineNo,
+                                         PolynaryExpr->exprBase.base.stringNo,
+                                         clGetIntegerValue(scaledIndex),
+                                         &OperandsParameters[2].dataTypes[0].byteOffset,
+                                         scaledIndex);
+          if (gcmIS_ERROR(status)) return status;
+       }
+       else {
+          clsIOPERAND intermIOperand[1];
+
+          clsIOPERAND_New(Compiler, intermIOperand, clmGenCodeDataType(T_INT));
+          status = clGenGenericCode2(Compiler,
+                                     PolynaryExpr->exprBase.base.lineNo,
+                                     PolynaryExpr->exprBase.base.stringNo,
+                                     clvOPCODE_ADD,
+                                     intermIOperand,
+                                     addrOperand,
+                                     &OperandsParameters[2].dataTypes[0].byteOffset);
+          if (gcmIS_ERROR(status)) return status;
+          clsROPERAND_InitializeUsingIOperand(operandBuffer, intermIOperand);
+          addrOperand = operandBuffer;
+       }
+    }
+    clsLOPERAND_InitializeUsingROperand(lOperand, addrOperand);
+    status = clGenStoreCode(Compiler,
+                            PolynaryExpr->exprBase.base.lineNo,
+                            PolynaryExpr->exprBase.base.stringNo,
+                            Opcode,
                             rOperand,
                             lOperand,
                             /* Use half-float as the data type. */
@@ -1177,6 +1502,101 @@ _GenVstoreHalfCode(
     if (gcmIS_ERROR(status)) return status;
 
     return gcvSTATUS_OK;
+}
+
+static gceSTATUS
+_GenVstoreaHalfCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    return  _GenVstoreaHalfWithRoundingCode(Compiler,
+                                            CodeGenerator,
+                                            PolynaryExpr,
+                                            clvOPCODE_STORE1,
+                                            OperandCount,
+                                            OperandsParameters,
+                                            IOperand);
+}
+
+static gceSTATUS
+_GenVstoreaHalfRteCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    return  _GenVstoreaHalfWithRoundingCode(Compiler,
+                                            CodeGenerator,
+                                            PolynaryExpr,
+                                            clvOPCODE_STORE1_RTE,
+                                            OperandCount,
+                                            OperandsParameters,
+                                            IOperand);
+}
+
+static gceSTATUS
+_GenVstoreaHalfRtzCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    return  _GenVstoreaHalfWithRoundingCode(Compiler,
+                                            CodeGenerator,
+                                            PolynaryExpr,
+                                            clvOPCODE_STORE1_RTZ,
+                                            OperandCount,
+                                            OperandsParameters,
+                                            IOperand);
+}
+
+static gceSTATUS
+_GenVstoreaHalfRtpCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    return  _GenVstoreaHalfWithRoundingCode(Compiler,
+                                            CodeGenerator,
+                                            PolynaryExpr,
+                                            clvOPCODE_STORE1_RTP,
+                                            OperandCount,
+                                            OperandsParameters,
+                                            IOperand);
+}
+
+static gceSTATUS
+_GenVstoreaHalfRtnCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    return  _GenVstoreaHalfWithRoundingCode(Compiler,
+                                            CodeGenerator,
+                                            PolynaryExpr,
+                                            clvOPCODE_STORE1_RTN,
+                                            OperandCount,
+                                            OperandsParameters,
+                                            IOperand);
 }
 
 static gceSTATUS

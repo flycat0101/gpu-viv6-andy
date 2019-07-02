@@ -25,6 +25,7 @@ extern "C" {
 #endif
 
 #define cldSupportOpenCLAtomicExtension 1
+#define cldSupportOpenCLKhrFP16Extension  1
 
 /* floating point capability */
 #define cldFpDENORM                                (1 << 0)
@@ -444,6 +445,8 @@ typedef enum _cleEXTENSION
     clvEXTENSION_VIV_BITFIELD                = 0x00000008,
 
     clvEXTENSION_VIV_CMPLX                   = 0x00000010,
+
+    clvEXTENSION_CL_KHR_FP16                 = 0x00000020,
 
     clvEXTENSION_ALL                        = clvEXTENSION_STANDARD_DERIVATIVES
 }
