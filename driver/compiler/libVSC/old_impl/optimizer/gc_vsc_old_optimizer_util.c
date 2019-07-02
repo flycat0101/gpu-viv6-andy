@@ -5024,6 +5024,12 @@ _AddFunctionInputDefine(
     {
         gctUINT index = usage->index;
 
+        /* Input has been handled before. */
+        if (usage->direction == gcvFUNCTION_INPUT || usage->direction == gcvFUNCTION_INOUT)
+        {
+            continue;
+        }
+
         gcmERR_RETURN(_SetTempDefineInput(Optimizer,
                                 &TempDefineArray[index],
                                 tempArray[index].usage,
