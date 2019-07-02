@@ -20080,7 +20080,7 @@ vxnne_shader_executable vxnneGetResizeNearestNeighborShaderExecutable(
             status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniPackEvenData_2x8", 1, uniPackEvenData_2x8);
             if (status != VX_SUCCESS) goto OnError;
         }
-        else if (scale_factor[0] == 0.5f)
+        else if (scale_factor[0] == 0.5f && scale_factor[1] == 0.5f)
         {
             if ((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16))
             {
