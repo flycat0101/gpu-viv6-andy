@@ -1830,7 +1830,7 @@ VX_PRIVATE_API vx_status GetSWTilingCollection(
     vxnne_segment_collection tilingCollection)
 {
     vx_uint32 i = 0, num = 0;
-    vx_bool terminator;
+    vx_bool terminator, subI;
     vxnne_operation_info_s opInfo1, opInfo2;
 
     gcmHEADER_ARG("graph=%p, start=0x%x, count=0x%x, tilingCollection=%p", graph, start, count, tilingCollection);
@@ -1840,11 +1840,12 @@ VX_PRIVATE_API vx_status GetSWTilingCollection(
     for(i = start; i <= start + count; i++)
     {
         terminator = vx_false_e;
+        subI       = vx_false_e;
 
         if ((i == start + count) ||
             !SupportSWTiling(graph->base.context, graph->layer->operations[i]) ||
-            graph->layer->operations[i]->parentOpNum > 1 ||
-            graph->layer->operations[i]->childOpNum > 1)
+            (graph->layer->operations[i]->parentOpNum > 1  && i != start) ||
+            (graph->layer->operations[i]->childOpNum > 1 && i == start) )
         {
             terminator = vx_true_e;
         }
@@ -1861,6 +1862,14 @@ VX_PRIVATE_API vx_status GetSWTilingCollection(
             if (opInfo1.input != opInfo2.output)
             {
                 terminator = vx_true_e;
+                subI       = vx_true_e;
+            }
+            else if (graph->layer->operations[i]->childOpNum > 1)
+            {
+                i++;
+                num++;
+                terminator = vx_true_e;
+                subI       = vx_true_e;
             }
         }
 
@@ -1882,7 +1891,8 @@ VX_PRIVATE_API vx_status GetSWTilingCollection(
                 }
 
             }
-            else if (num == 1)
+
+            if (subI)
             {
                 i--;
             }
