@@ -6507,6 +6507,10 @@ vxnne_shader_executable vxnneGetGPUTensorCropShaderExecutable(
     vx_reference  parameters[2]         = {(vx_reference)input, (vx_reference)output};
     vx_enum       input_format          = TENSOR_DATA_TYPE(input);
     vx_enum       output_format         = TENSOR_DATA_TYPE(output);
+    vx_uint32     dims                  = TENSOR_DIM_NUM(output);
+    vx_uint32     width                 = TENSOR_VIEW_SIZE_INDEX(output, 0);
+    vx_uint32     height                = dims > 1 ? TENSOR_VIEW_SIZE_INDEX(output, 1) : 1;
+    vx_uint32     depth                 = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(output, 2) : 1;
     vx_tensor     src                   = NULL;
     vx_tensor     dst                   = NULL;
     char *programSources = NULL;
@@ -6591,9 +6595,9 @@ vxnne_shader_executable vxnneGetGPUTensorCropShaderExecutable(
     execution_parameters.globalWorkOffset[0] = start[0];
     execution_parameters.globalWorkOffset[1] = start[1];
     execution_parameters.globalWorkOffset[2] = start[2];
-    execution_parameters.globalWorkSize[0]   = stop[0];
-    execution_parameters.globalWorkSize[1]   = stop[1];
-    execution_parameters.globalWorkSize[2]   = stop[2];
+    execution_parameters.globalWorkSize[0]   = width;
+    execution_parameters.globalWorkSize[1]   = height;
+    execution_parameters.globalWorkSize[2]   = depth;
 
     status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 2);
     if (status != VX_SUCCESS) goto OnError;
@@ -6653,6 +6657,10 @@ vxnne_shader_executable vxnneGetGPUTensorStridedSliceShaderExecutable(
     vx_scalar     strideX               = vxCreateScalar(context, VX_TYPE_INT32, &stride[0]);
     vx_scalar     strideY               = vxCreateScalar(context, VX_TYPE_INT32, &stride[1]);
     vx_scalar     strideZ               = vxCreateScalar(context, VX_TYPE_INT32, &stride[2]);
+    vx_uint32     dims                  = TENSOR_DIM_NUM(output);
+    vx_uint32     width                 = TENSOR_VIEW_SIZE_INDEX(output, 0);
+    vx_uint32     height                = dims > 1 ? TENSOR_VIEW_SIZE_INDEX(output, 1) : 1;
+    vx_uint32     depth                 = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(output, 2) : 1;
     vx_reference  parameters[8]         = {(vx_reference)input, (vx_reference)output, (vx_reference)offsetX, (vx_reference)offsetY, (vx_reference)offsetZ, (vx_reference)strideX, (vx_reference)strideY, (vx_reference)strideZ};
     char *programSources = NULL;
 
@@ -6732,9 +6740,9 @@ vxnne_shader_executable vxnneGetGPUTensorStridedSliceShaderExecutable(
         goto OnError;
     }
 
-    execution_parameters.globalWorkSize[0]   = stop[0];
-    execution_parameters.globalWorkSize[1]   = stop[1];
-    execution_parameters.globalWorkSize[2]   = stop[2];
+    execution_parameters.globalWorkSize[0]   = width;
+    execution_parameters.globalWorkSize[1]   = height;
+    execution_parameters.globalWorkSize[2]   = depth;
 
     status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 8);
     if (status != VX_SUCCESS) goto OnError;
