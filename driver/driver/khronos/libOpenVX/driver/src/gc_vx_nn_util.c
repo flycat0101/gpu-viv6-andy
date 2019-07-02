@@ -2062,6 +2062,12 @@ vx_status vxnneCommandBuffer_ExecuteCommands(
     {
         gctUINT8  captureBuffer[VX_MAX_NNTP_OPERATION_STATE_SIZE] = {0};
         gctUINT32 actualSize = 0;
+        vx_bool needMultiGpuSync = vx_false_e;
+
+        if ((vx_true_e == sync) && (i == (commandBuffer->commandCount - 1)))
+        {
+            needMultiGpuSync = vx_true_e;
+        }
 
         if (node->graph->binarySave)
         {
@@ -2073,7 +2079,7 @@ vx_status vxnneCommandBuffer_ExecuteCommands(
         }
 
         status = gcfVX_Accel(commandBuffer->physical + i * commandSize, type,
-                             commandBuffer->eventID[i], 0, (gctUINT32)gpuId, (gctBOOL)sync);
+                             commandBuffer->eventID[i], 0, (gctUINT32)gpuId, (gctBOOL)needMultiGpuSync);
         if (status != VX_SUCCESS)
         {
             break;
