@@ -417,6 +417,11 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
             nodeOpType =  OP_ELTWISE_ASMD;
             break;
         }
+    case VX_KERNEL_NN_PRELU:
+        {
+            nodeOpType = OP_PRELU;
+            break;
+        }
     default:
         break;
     }
@@ -591,24 +596,24 @@ VX_INTERNAL_API void vxoGraphOptimization_fillDims2paramters(vx_char *buf, vx_ui
 VX_PRIVATE_API void vxoGraphOptimization_stroeNodeInOutInfo(vxcJSON *paramters, vx_node node)
 {
     vx_char buf[100] = {0};
-    vx_uint32 i = 0;
+    vx_uint32 i = 0, inCnt = 0, outCnt = 0;
     vx_reference ref = NULL;
     for(i = 0; i < node->numParameters; i++)
     {
         ref = node->paramTable[i];
-        if(ref->type == VX_TYPE_TENSOR && node->kernel->signature.directionTable[i] == VX_INPUT)
+        if(ref->type == VX_TYPE_TENSOR && node->kernel->signature.directionTable[i] == VX_INPUT && inCnt == 0)
         {
+            inCnt++;
             vxoGraphOptimization_fillDims2paramters(buf, 100, TENSOR_SIZES((vx_tensor)ref),
-                TENSOR_DIM_NUM((vx_tensor)ref), "input_dims", paramters);
+                TENSOR_DIM_NUM((vx_tensor)ref), "input dims:", paramters);
         }
-        else if(ref->type == VX_TYPE_TENSOR && node->kernel->signature.directionTable[i] == VX_OUTPUT)
+        else if(ref->type == VX_TYPE_TENSOR && node->kernel->signature.directionTable[i] == VX_OUTPUT && outCnt == 0)
         {
+            outCnt++;
             vxoGraphOptimization_fillDims2paramters(buf, 100, TENSOR_SIZES((vx_tensor)ref),
-                        TENSOR_DIM_NUM((vx_tensor)ref), "output_dims", paramters);
+                        TENSOR_DIM_NUM((vx_tensor)ref), "output dims:", paramters);
         }
     }
-
-
 }
 
 VX_INTERNAL_API void vxoGraphOptimization_stroeNodeDims2paramter(vxcJSON *paramters, vx_node node)
@@ -804,6 +809,15 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_stroeNodeDetail2json(vx_node node
     case VX_KERNEL_ROI_POOLING_LAYER:
         sprintf(opName, "%s", "ROIPooling");
         break;
+    case VX_KERNEL_NN_PRELU:
+        {
+            vx_tensor alpha = (vx_tensor)node->paramTable[1];
+            float data = vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(alpha), TENSOR_QUANT_TYPE(alpha), 0,
+                TENSOR_LOGICAL_ADDR(alpha), TENSOR_POS(alpha), TENSOR_TF_ZEROPOINT(alpha), TENSOR_TF_SCALE(alpha));
+            sprintf(opName, "%s", "prelu");
+            vxoJson_AddNumberToObject(paramters, "alpha", data);
+            break;
+        }
     default:
         sprintf(opName, "%s", node->kernel->name);
         break;
@@ -1300,22 +1314,46 @@ VX_PRIVATE_API  void vxoGraphOptimization_MergeConvolutionNodes_GetParmFromConvR
                                         TENSOR_TF_ZEROPOINT((vx_tensor)convNode->paramTable[0]);
 }
 
+extern VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromTensorsPRelu(
+    vx_enum     layer_type,
+    vx_uint32 * inputs_dims,
+    vx_uint32 * convolution_outputs_dims,
+    vx_uint32 * pool_outputs_dims,
+    const vx_nn_convolution_relu_pooling_params convolution_relu_pooling_params,
+    vx_size size_of_convolution_relu_pooling_params,
+    vx_weights_biases_parameter_optimizations_t *optimizations,
+    vx_size size_of_optimizations,
+    vx_tensor   weights,
+    vx_tensor   biases,
+    vx_tensor   alpha);
+
 VX_INTERNAL_API  vx_weights_biases_parameter vxoGraphOptimization_CreateWBParameter(vx_enum  layer_type,
                                                                                      vx_nn_convolution_relu_pooling_params_t *wb_params,
                                                                                      vx_uint32 sizeOfParms,
                                                                                      vx_tensor input, vx_tensor convOutput,vx_tensor finalOutput,
-                                                                                     vx_tensor weight, vx_tensor bias)
+                                                                                     vx_tensor weight, vx_tensor bias, vx_tensor prelu_alpha)
 
 {
-
+    vx_weights_biases_parameter wb = VX_NULL;
     vx_weights_biases_parameter_optimizations_ext_t opt = {-1, TENSOR_DATA_TYPE(finalOutput),
         TENSOR_TF_ZEROPOINT(input), TENSOR_DIM_NUM(input), TENSOR_DIM_NUM(finalOutput) };
-    vx_weights_biases_parameter wb = vxCreateWeightsBiasesParameterFromTensors3(
-        layer_type,
-        TENSOR_SIZES(input), TENSOR_SIZES(convOutput), TENSOR_SIZES(finalOutput),
-        (vx_nn_convolution_relu_pooling_params_t *)wb_params, sizeOfParms,
+    if(VX_NULL != prelu_alpha)
+    {
+        wb = vxoCreateWeightsBiasesParameterFromTensorsPRelu(layer_type,
+            TENSOR_SIZES(input), TENSOR_SIZES(convOutput), TENSOR_SIZES(finalOutput),
+            (vx_nn_convolution_relu_pooling_params_t *)wb_params, sizeOfParms,
         (vx_weights_biases_parameter_optimizations_t *)&opt, sizeof(opt),
-        weight, bias);
+        weight, bias, prelu_alpha);
+    }
+    else
+    {
+        wb = vxCreateWeightsBiasesParameterFromTensors3(
+            layer_type,
+            TENSOR_SIZES(input), TENSOR_SIZES(convOutput), TENSOR_SIZES(finalOutput),
+            (vx_nn_convolution_relu_pooling_params_t *)wb_params, sizeOfParms,
+            (vx_weights_biases_parameter_optimizations_t *)&opt, sizeof(opt),
+            weight, bias);
+    }
 
     CHECK_NULL(wb);
 
@@ -1328,7 +1366,8 @@ VX_INTERNAL_API vx_node vxoGraphOptimization_transformConv(vx_node convNode, vx_
                                                                vx_uint8 accumulator_bits, vx_uint32 pool_size[2], vx_uint32 pad_const,
                                                                vx_enum pool_type, vx_enum pad_mode,
                                                                vx_enum overflow_policy, vx_enum rounding_policy,
-                                                               vx_enum down_scale_size_rounding, vx_uint32 depth_multiplier)
+                                                               vx_enum down_scale_size_rounding, vx_uint32 depth_multiplier,
+                                                               vx_tensor prelu_alpha)
 {
     vx_node node;
     vx_context context = vxGetContext((vx_reference)convNode);
@@ -1351,7 +1390,7 @@ VX_INTERNAL_API vx_node vxoGraphOptimization_transformConv(vx_node convNode, vx_
         VX_NN_CONVOLUTION_LAYER,
         (vx_nn_convolution_relu_pooling_params_t *)&wb_params,
         sizeof(wb_params),
-        input, (vx_tensor)convNode->paramTable[convNode->numParameters - 1], output, weight, bias);
+        input, (vx_tensor)convNode->paramTable[convNode->numParameters - 1], output, weight, bias, prelu_alpha);
     CHECK_NULL(wb);
 
     if(depth_multiplier == 1)
@@ -1397,6 +1436,8 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
     vx_uint32   lastNode                    = 0;
     vx_bool     int16_check                 = vx_false_e;
 
+    vx_tensor   prelu_alpha                 = VX_NULL;
+
     gcmHEADER_ARG("nodes=%p, nodeCount=0x%x", nodes, nodeCount);
     inputTensor = (vx_tensor)nodes[0]->paramTable[0];
     convOutputTensor = (vx_tensor)nodes[0]->paramTable[nodes[0]->numParameters - 1];
@@ -1430,6 +1471,17 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
                     lastNodeOutputIndex = PARAM_RELU_OUTPUT_INDEX;
                     lastNode = i;
                     reluOutputTensor = (vx_tensor)nodes[i]->paramTable[PARAM_RELU_OUTPUT_INDEX];
+                    break;
+                }
+            case VX_KERNEL_NN_PRELU:
+                {
+                    if(!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU))
+                        break;
+
+                    prelu_alpha = (vx_tensor) nodes[i]->paramTable[1];
+                    lastNodeOutputIndex = nodes[i]->numParameters - 1;
+                    reluOutputTensor = (vx_tensor)nodes[i]->paramTable[lastNodeOutputIndex];
+                    lastNode = i;
                     break;
                 }
             case VX_KERNEL_NN_POOLING_LAYER2:{
@@ -1488,7 +1540,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
                                                     dilation, stride, pad,accumulator_bits,
                                                     pool_size, pad_const, pool_type, pad_mode,
                                                     overflow_policy, rounding_policy,
-                                                    down_scale_size_rounding, depth_multiplier);
+                                                    down_scale_size_rounding, depth_multiplier, prelu_alpha);
     CHECK_NULL(newNode);
     vxReleaseNode(&newNode);
 
@@ -1539,7 +1591,7 @@ VX_INTERNAL_API vx_node vxoGraphOptimization_TransferFC2FCRelu(vx_node FCnode)
                                             VX_NN_FULLYCONNECTED_LAYER,
                                             (vx_nn_convolution_relu_pooling_params_t *)&params,
                                             sizeof(params),
-                                            input, output, output, weight, bias);
+                                            input, output, output, weight, bias, VX_NULL);
         CHECK_NULL(wb);
         FCReluNode = vxFullyConnectedReluLayer(FCnode->graph, input, wb,
             pad,
@@ -1652,6 +1704,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeWithChildNodes(vx_node node)
     vx_enum opType = OP_INVALID;
     vx_enum currNodeType;
     vx_enum features[][2] = {
+        {OP_CONVOLUTION, OP_PRELU},
         {OP_CONVOLUTION, OP_RELU | OP_POOLING}, /*conv + relu + pool = convrelupool*/
         {OP_FULLYCONNECTED, OP_RELU}, /*fc + relu = fcRelu*/
         {OP_ROIPOOL, OP_RELU}                /*roipool + relu = roipoolrelu*/
@@ -1716,10 +1769,13 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeWithChildNodes(vx_node node)
             {
                 if((currNodeType & (allFeatures ^ features[i][0])) != 0)
                     goto merge;
-                if((currNodeType & features[i][1]) == 0 )
-                    goto merge;
+                if((currNodeType & features[i][1]) != 0 )
+                    break;
             }
         }
+        /*for the node that will be merged, the above for loop should break. or it must goto merge*/
+        if(i == featuresNum)
+            goto merge;
 
         opType |= currNodeType;
         mergedNodes[nodeCount] = next;
@@ -2214,7 +2270,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertBatchFCtoConv(vx_graph gra
                                     VX_KERNEL_NN_FULLY_CONNECTED_RELU_LAYER,
                                     (vx_nn_convolution_relu_pooling_params_t *)&params,
                                     sizeof(params),
-                                    convInputTensor, convOutputTensor, convOutputTensor, weight, orgBias);
+                                    convInputTensor, convOutputTensor, convOutputTensor, weight, orgBias, VX_NULL);
 
                 vx_node newNode = vxConvolutionReluPoolingLayer2(graph, convInputTensor, weights_biases,
                     (vx_nn_convolution_relu_pooling_params_t *)&params, sizeof(params),convOutputTensor);
@@ -3047,7 +3103,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_splitMaxpFromCRL2(vx_graph graph)
                                                         VX_NN_CONVOLUTION_LAYER,
                                                         (vx_nn_convolution_relu_pooling_params_t *)&wb_params,
                                                         sizeof(wb_params),
-                                                        convInTensor, convOutTensor, convOutTensor, weight, bias);
+                                                        convInTensor, convOutTensor, convOutTensor, weight, bias, VX_NULL);
                     CHECK_NULL(wb);
 
                     {
