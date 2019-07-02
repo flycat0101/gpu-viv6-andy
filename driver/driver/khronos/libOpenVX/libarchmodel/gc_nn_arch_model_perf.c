@@ -28,10 +28,20 @@ static vx_uint32 _kernel_size_in_pixel_by_arch_perf(
     vx_float64 coefCompressionRatio = perf->coefCompressRatio;
     if (opType == VXNNE_OPERATOR_DEPTH_WISE_CONV)
     {
-        return (vx_uint32)(perf->info.kx
+        if (full_chache_kernel_head_fix)
+        {
+            return (vx_uint32)(perf->info.kx
                       * perf->info.ky
                       * perf->info.outz
                       * coefCompressionRatio + 0.5f);
+        }
+        else
+        {
+            return (vx_uint32)(perf->info.kx
+                      * perf->info.ky
+                      * ceilf((vx_float32)perf->info.outz / perf->info.nnCores) * perf->info.nnCores
+                      * coefCompressionRatio + 0.5f);
+        }
     }
 
     if (opTarget != VXNNE_OPERATION_TARGET_TP || opType == VXNNE_OPERATOR_FULLYCONNECTED)

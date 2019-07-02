@@ -662,10 +662,20 @@ static vx_uint32 _kernel_size_in_pixel(struct _archModelInfo *archModel, vx_int3
 
     if (opInfo->op == VXNNE_OPERATOR_DEPTH_WISE_CONV)
     {
-        return (vx_uint32)(opInfo->kx
+        if (full_chache_kernel_head_fix)
+        {
+            return (vx_uint32)(opInfo->kx
                       * opInfo->ky
                       * opInfo->oz
                       * coefCompressionRatio + 0.5f);
+        }
+        else
+        {
+            return (vx_uint32)(opInfo->kx
+                      * opInfo->ky
+                      * ceilf((vx_float32)opInfo->oz / cores) * cores
+                      * coefCompressionRatio + 0.5f);
+        }
     }
 
     if (opInfo->target != VXNNE_OPERATION_TARGET_TP || opInfo->op == VXNNE_OPERATOR_FULLYCONNECTED)
@@ -2874,7 +2884,7 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                 opInfo[count]->op      = operation->operatorType;
                 opInfo[count]->target  = operation->target;
                 opInfo[count]->psize   = operation->parameter.pool_size_x;
-                opInfo[count]->pstride = operation->parameter.pool_stride;
+                opInfo[count]->pstride = gcmMAX(1, operation->parameter.pool_stride);
                 opInfo[count]->input_data_format = TENSOR_DATA_TYPE(tpOp->input);
                 opInfo[count]->xpad    = tpOp->base.parameter.pad_x_left;
                 opInfo[count]->ypad    = tpOp->base.parameter.pad_y_top;
