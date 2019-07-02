@@ -2775,18 +2775,22 @@ IN gctBOOL IsConst
 
 static void
 _GetGenTypeCandidateType(
-IN clsDECL *GenTypeDecl,
+IN clsNAME *GenTypeParam,
 IN clsDECL *RefDecl,
 IN OUT clsDECL *CandidateType
 )
 {
+   clsDECL *genTypeDecl;
    cltELEMENT_TYPE elementType;
 
+   gcmASSERT(GenTypeParam);
+
+   genTypeDecl = &GenTypeParam->decl;
    if(_clmDATA_TYPE_IsValidGenType(RefDecl->dataType)) {
        _clmDATA_TYPE_InitializeGenType(CandidateType->dataType, RefDecl->dataType);
    }
 
-   switch(GenTypeDecl->dataType->elementType) {
+   switch(genTypeDecl->dataType->elementType) {
    case clvTYPE_SIU_GEN:
         if(!clmDECL_IsIntegerType(RefDecl)) {
            elementType = clvTYPE_UINT;
@@ -2843,7 +2847,9 @@ IN OUT clsDECL *CandidateType
         break;
 
    case clvTYPE_F_GEN:
-        if(!clmDECL_IsFloat(RefDecl) || RefDecl->dataType->elementType == clvTYPE_HALF) {
+        if(!clmDECL_IsFloat(RefDecl) ||
+           (RefDecl->dataType->elementType == clvTYPE_HALF &&
+            GenTypeParam->u.variableInfo.builtinSpecific.s.isConvertibleType)) {
            _clmInitGenType(clvTYPE_FLOAT,
                            clmDATA_TYPE_vectorSize_NOCHECK_GET(RefDecl->dataType),
                            CandidateType->dataType);
@@ -2851,7 +2857,8 @@ IN OUT clsDECL *CandidateType
         break;
 
    case clvTYPE_GEN:
-        if(RefDecl->dataType->elementType == clvTYPE_HALF) {
+        if(RefDecl->dataType->elementType == clvTYPE_HALF &&
+           GenTypeParam->u.variableInfo.builtinSpecific.s.isConvertibleType) {
            _clmInitGenType(clvTYPE_FLOAT,
                            clmDATA_TYPE_vectorSize_NOCHECK_GET(RefDecl->dataType),
                            CandidateType->dataType);
@@ -2894,7 +2901,8 @@ IN OUT clsNAME **RefParamName
   paramDecl = &ParamName->decl;
   rDecl = &Argument->decl;
   if (rDecl->dataType->elementType == clvTYPE_HALF &&
-      !clmDECL_IsPointerType(rDecl) && !clmDECL_IsArray(rDecl)) {
+      !clmDECL_IsPointerType(rDecl) && !clmDECL_IsArray(rDecl) &&
+      ParamName->u.variableInfo.builtinSpecific.s.isConvertibleType) {
       gctINT resultType;
       resultType = clGetVectorTerminalToken(clvTYPE_FLOAT,
                                             clmDATA_TYPE_vectorSize_GET(rDecl->dataType));
@@ -2952,7 +2960,7 @@ IN OUT clsNAME **RefParamName
   clmDECL_Initialize(lDecl, dataType, &paramDecl->array, paramDecl->ptrDscr, gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
   if(clmDECL_IsGenType(paramDecl)) {
      if(refDataType == gcvNULL) {
-        _GetGenTypeCandidateType(paramDecl,
+        _GetGenTypeCandidateType(ParamName,
                                  rDecl,
                                  lDecl);
         updateRefDataType = gcvTRUE;
