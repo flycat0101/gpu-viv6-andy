@@ -5918,8 +5918,8 @@ vxnne_shader_executable vxnneGetGPUSpace2BatchShaderExecutable(
     parameters[1] = (vx_reference)blockw;
     parameters[2] = (vx_reference)blockh;
 
-    padX = vxCreateScalar(context, VX_TYPE_INT32, &padList[2]);
-    padY = vxCreateScalar(context, VX_TYPE_INT32, &padList[0]);
+    padX = vxCreateScalar(context, VX_TYPE_INT32, &padList[0]);
+    padY = vxCreateScalar(context, VX_TYPE_INT32, &padList[2]);
     parameters[5] = (vx_reference)padX;
     parameters[6] = (vx_reference)padY;
 
@@ -5950,8 +5950,8 @@ vxnne_shader_executable vxnneGetGPUSpace2BatchShaderExecutable(
         parameters[0]    = (vx_reference)input_rs;
     }
 
-    execution_parameters.globalWorkSize[0]   = input_width+padList[3]+padList[2];
-    execution_parameters.globalWorkSize[1]   = input_height+padList[1]+padList[0];
+    execution_parameters.globalWorkSize[0]   = input_width+padList[0]+padList[1];
+    execution_parameters.globalWorkSize[1]   = input_height+padList[2]+padList[3];
     execution_parameters.globalWorkSize[2]   = input_dimz;
 
     kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
