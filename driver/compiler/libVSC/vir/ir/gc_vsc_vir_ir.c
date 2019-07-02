@@ -173,6 +173,10 @@ VIR_NameId  VIR_NAME_UNKNOWN,
     VIR_NAME_BOUNDING_BOX, /* gl_BoundingBox */
     VIR_NAME_LAST_FRAG_DATA, /* gl_LastFragData */
     VIR_NAME_CLUSTER_ID, /* #cluster_id */
+    VIR_NAME_SUBGROUP_NUM, /* gl_NumSubgroups */
+    VIR_NAME_SUBGROUP_SIZE, /* gl_SubgroupSize */
+    VIR_NAME_SUBGROUP_ID, /* gl_SubgroupID */
+    VIR_NAME_SUBGROUP_INVOCATION_ID, /* gl_SubgroupInvocationID */
     VIR_NAME_BUILTIN_LAST;
 
 VIR_BuiltinTypeInfo VIR_builtinTypes[] =
@@ -1624,8 +1628,12 @@ static void
     _add_name(VIR_NAME_GLOBAL_INVOCATION_ID, "gl_GlobalInvocationID");
     _add_name(VIR_NAME_LOCALINVOCATIONINDEX, "gl_LocalInvocationIndex");
     _add_name(VIR_NAME_CLUSTER_ID, "#cluster_id");
+    _add_name(VIR_NAME_SUBGROUP_NUM, "gl_NumSubgroups");
+    _add_name(VIR_NAME_SUBGROUP_SIZE, "gl_SubgroupSize");
+    _add_name(VIR_NAME_SUBGROUP_ID, "gl_SubgroupID");
+    _add_name(VIR_NAME_SUBGROUP_INVOCATION_ID, "gl_SubgroupInvocationID");
 
-    VIR_NAME_BUILTIN_LAST = VIR_NAME_CLUSTER_ID + sizeof("#cluster_id");
+    VIR_NAME_BUILTIN_LAST = VIR_NAME_SUBGROUP_INVOCATION_ID + sizeof("gl_SubgroupInvocationID");
 }
 
 static void
@@ -1685,9 +1693,13 @@ _initOpenGLBuiltinNames(VIR_Shader * Shader, VIR_StringTable *StrTable)
     _add_name(VIR_NAME_BOUNDING_BOX, "gl_BoundingBox");
     _add_name(VIR_NAME_LAST_FRAG_DATA, "gl_LastFragData");
     _add_name(VIR_NAME_CLUSTER_ID, "#cluster_id");
+    _add_name(VIR_NAME_SUBGROUP_NUM, "gl_NumSubgroups");
+    _add_name(VIR_NAME_SUBGROUP_SIZE, "gl_SubgroupSize");
+    _add_name(VIR_NAME_SUBGROUP_ID, "gl_SubgroupID");
+    _add_name(VIR_NAME_SUBGROUP_INVOCATION_ID, "gl_SubgroupInvocationID");
 
     /* WARNING!!! change builtin_last if add new name !!! */
-    VIR_NAME_BUILTIN_LAST = VIR_NAME_CLUSTER_ID + sizeof("#cluster_id");
+    VIR_NAME_BUILTIN_LAST = VIR_NAME_SUBGROUP_INVOCATION_ID + sizeof("gl_SubgroupInvocationID");
 }
 #undef _add_name
 

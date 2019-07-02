@@ -2339,6 +2339,10 @@ extern VIR_NameId   VIR_NAME_UNKNOWN,
                     VIR_NAME_IN_CLIP_DISTANCE, /* gl_in.gl_ClipDistance */
                     VIR_NAME_IN_CULL_DISTANCE, /* gl_in.gl_CullDistance */
                     VIR_NAME_CLUSTER_ID, /* #cluster_id */
+                    VIR_NAME_SUBGROUP_NUM, /* gl_NumSubgroups */
+                    VIR_NAME_SUBGROUP_SIZE, /* gl_SubgroupSize */
+                    VIR_NAME_SUBGROUP_ID, /* gl_SubgroupID */
+                    VIR_NAME_SUBGROUP_INVOCATION_ID, /* gl_SubgroupInvocationID */
                     VIR_NAME_BUILTIN_LAST;
 
 typedef enum _VIR_ROUNDMODE
@@ -2954,9 +2958,7 @@ typedef enum VIR_SYMFLAG
     VIR_SYMFLAG_ALWAYSUSED                      = 0x01000000, /* set the attribute always used so the
                                                                    * recompilation wouldn't remove this
                                                                    * attribute later */
-    VIR_SYMFLAG_UNUSED                          = 0x02000000, /* set the attribute always used so the
-                                                                   * recompilation wouldn't remove this
-                                                                   * attribute later */
+    VIR_SYMFLAG_UNUSED                          = 0x02000000, /* set the attribute as unused. */
     VIR_SYMFLAG_POINTSPRITE_TC                  = 0x04000000,
 
     VIR_SYMFLAG_VECTORIZED_OUT                  = 0x08000000, /* This input/output has been vectorized into

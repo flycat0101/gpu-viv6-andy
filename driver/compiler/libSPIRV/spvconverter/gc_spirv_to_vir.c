@@ -95,12 +95,12 @@ static gctCHAR * SpvBuiltInName [] =
     "", /* SpvBuiltInGlobalOffset = 33, */
     "", /* SpvBuiltInGlobalLinearId = 34, */
     "", /* SpvBuiltInWorkgroupLinearId = 35, */
-    "", /* SpvBuiltInSubgroupSize = 36, */
+    "gl_SubgroupSize", /* SpvBuiltInSubgroupSize = 36, */
     "", /* SpvBuiltInSubgroupMaxSize = 37, */
-    "", /* SpvBuiltInNumSubgroups = 38, */
+    "gl_NumSubgroups", /* SpvBuiltInNumSubgroups = 38, */
     "", /* SpvBuiltInNumEnqueuedSubgroups = 39, */
-    "", /* SpvBuiltInSubgroupId = 40, */
-    "", /* SpvBuiltInSubgroupLocalInvocationId = 41, */
+    "gl_SubgroupID", /* SpvBuiltInSubgroupId = 40, */
+    "gl_SubgroupInvocationID", /* SpvBuiltInSubgroupLocalInvocationId = 41, */
     "gl_VertexIndex", /* SpvBuiltInVertexIndex = 42, */
     "gl_InstanceIndex", /* SpvBuiltInInstanceIndex = 43, */
 };
