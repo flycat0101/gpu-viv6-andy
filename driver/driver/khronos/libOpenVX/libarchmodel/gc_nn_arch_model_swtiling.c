@@ -1829,6 +1829,13 @@ static void _split_segment(
                 split_array[split_pos] = 1;
                 continue;
             }
+
+            if (archModel->opInfoArray[split_pos]->target == VXNNE_OPERATION_TARGET_SH || archModel->opInfoArray[split_pos]->target == VXNNE_OPERATION_TARGET_SW)
+            {
+                split_array[split_pos] = 1;
+                continue;
+            }
+
             size1 = _kernel_size_in_pixel(archModel, split_pos, archModel->opInfoArray[split_pos]->nnCores, fullCacheKernelHeadFix);
             size2 = _kernel_size_in_pixel(archModel, split_pos - 1, archModel->opInfoArray[split_pos - 1]->nnCores, fullCacheKernelHeadFix);
             outbufNeeded = _outbuf_needed_ex(archModel, split_pos - 1, split_pos, NULL, NULL, NULL);
@@ -3071,6 +3078,15 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                 else
                     opInfo[count]->nnCores = context->nnConfig.fixedFeature.nnCoreCount;
 
+                count++;
+            }
+            else
+            {
+                opInfo[count]->node    = node;
+                opInfo[count]->opt     = operation;
+                opInfo[count]->op      = operation->operatorType;
+                opInfo[count]->target  = operation->target;
+                operation->segIndex = count;
                 count++;
             }
         }
