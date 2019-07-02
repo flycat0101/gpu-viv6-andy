@@ -7938,115 +7938,132 @@ VX_PRIVATE_API vx_status vxoGraphBinary_SetInputOutput(
     }
 
     /* set input for node */
-    for (i = 0; i < binaryLoad->fixed.header.inputCount; i++)
+    if (graph->inputCount && graph->inputs)
     {
-        vx_binary_input_output_info_s *input = &binaryLoad->inputs[i];
-        for (j = 0; j < inputNum; j++)
+        for (i = 0; i < graph->inputCount; i++)
         {
-            vx_bool dupFlag = vx_false_e;
-            if ((input->dataType == VX_BINARY_BUFFER_TYPE_TENSOR) && (inputTable[j]->type == VX_TYPE_TENSOR))
-            {
-                vx_tensor tensor = (vx_tensor)inputTable[j];
-                vx_int32 *dims = TENSOR_ORIG_SIZES(tensor);
-                vx_uint32 dimCount = TENSOR_ORIG_DIM_NUM(tensor);
-                for (k = 0; k < ioNum; k++)
-                {
-                    if ((TENSOR_PHYSICAL_ADDR(tensor) == ioPhysical[k]) && (TENSOR_PHYSICAL_ADDR(tensor)))
-                    {
-                        dupFlag = vx_true_e;
-                        break;
-                    }
-                }
-                if ((input->dataFormat == vxoGraphBinary_ConvertToBinaryBufferFormat(TENSOR_DATA_TYPE(tensor))) &&
-                    (input->dimCount == dimCount) && (input->quantFormat == TENSOR_QUANT_TYPE(tensor)) &&
-                    ((vx_int32)input->dims[0] == dims[0]) && ((vx_int32)input->dims[1] == dims[1]) &&
-                    ((vx_int32)input->dims[2] == dims[2]) && ((vx_int32)input->dims[3] == dims[3]) &&
-                    (dupFlag == vx_false_e))
-                {
-                    vxSetParameterByIndex(node, i, inputTable[j]);
-                    node->numParameters++;
-                    ioPhysical[ioNum++] = TENSOR_PHYSICAL_ADDR(tensor);
-                    break;
-                }
-            }
-            else if ((input->dataType == VX_BINARY_BUFFER_TYPE_SCALAR) && (inputTable[j]->type == VX_TYPE_SCALAR))
-            {
-                vx_scalar scalar = (vx_scalar)inputTable[j];
-                for (k = 0; k < ioNum; k++)
-                {
-                    if (scalar->physical == ioPhysical[k])
-                    {
-                        dupFlag = vx_true_e;
-                        break;
-                    }
-                }
-                if ((input->dataFormat == vxoGraphBinary_ConvertToBinaryBufferFormat(VX_TYPE_INT8)) &&
-                    (input->dims[0] == vxoScalar_GetTypeSize(scalar)) &&
-                    (input->dims[1] == 1) &&
-                    (dupFlag == vx_false_e))
-                {
-                    vxSetParameterByIndex(node, i, inputTable[j]);
-                    node->numParameters++;
-                    ioPhysical[ioNum++] = scalar->physical;
-                    break;
-                }
-            }
-            else if ((input->dataType == VX_BINARY_BUFFER_TYPE_IMAGE) && (inputTable[j]->type == VX_TYPE_IMAGE))
-            {
-                vx_image image = (vx_image)inputTable[j];
-                gcoVX_Kernel_Context kernelContext; /* not useful, just fulfill the interface */
-                gcsVX_IMAGE_INFO imageInfo;
-                vx_df_image format;
+            vxSetParameterByIndex(node, i, graph->inputs[i]);
+            node->numParameters++;
+        }
 
-                INITIALIZE_STRUCT(imageInfo);
-                gcoOS_MemFill((gctPOINTER*)(&kernelContext), 0, sizeof(gcoVX_Kernel_Context));
-                gcfVX_GetImageInfo(&kernelContext, image, &imageInfo, 1);
-                vxQueryImage(image, VX_IMAGE_FORMAT, &format, sizeof(format));
-
-                for (k = 0; k < ioNum; k++)
+        if (graph->inputCount != binaryLoad->fixed.header.inputCount)
+        {
+            vxError("%s[%d]: graph binary no output error, %d\n", __FUNCTION__, __LINE__, graph->inputCount);
+            vxmONERROR(VX_FAILURE);
+        }
+    }
+    else
+    {
+        for (i = 0; i < binaryLoad->fixed.header.inputCount; i++)
+        {
+            vx_binary_input_output_info_s *input = &binaryLoad->inputs[i];
+            for (j = 0; j < inputNum; j++)
+            {
+                vx_bool dupFlag = vx_false_e;
+                if ((input->dataType == VX_BINARY_BUFFER_TYPE_TENSOR) && (inputTable[j]->type == VX_TYPE_TENSOR))
                 {
-                    if (image->memory.physicals[0] == ioPhysical[k])
+                    vx_tensor tensor = (vx_tensor)inputTable[j];
+                    vx_int32 *dims = TENSOR_ORIG_SIZES(tensor);
+                    vx_uint32 dimCount = TENSOR_ORIG_DIM_NUM(tensor);
+                    for (k = 0; k < ioNum; k++)
                     {
-                        dupFlag = vx_true_e;
-                        break;
+                        if ((TENSOR_PHYSICAL_ADDR(tensor) == ioPhysical[k]) && (TENSOR_PHYSICAL_ADDR(tensor)))
+                        {
+                            dupFlag = vx_true_e;
+                            break;
+                        }
                     }
-                }
-
-                if (1 == image->planeCount)
-                {
-                    if ((input->dimCount == 2) && (input->dataFormat ==  vxoGraphBinary_ConvertToBinaryBufferFormat((vx_uint32)format)) &&
-                        (input->dims[0] == imageInfo.width) && (input->dims[1] == imageInfo.height) && (input->dims[2] == 1) &&
-                        (input->quantFormat  == VX_BINARY_BUFFER_QUANT_FORMAT_NONE) &&
+                    if ((input->dataFormat == vxoGraphBinary_ConvertToBinaryBufferFormat(TENSOR_DATA_TYPE(tensor))) &&
+                        (input->dimCount == dimCount) && (input->quantFormat == TENSOR_QUANT_TYPE(tensor)) &&
+                        ((vx_int32)input->dims[0] == dims[0]) && ((vx_int32)input->dims[1] == dims[1]) &&
+                        ((vx_int32)input->dims[2] == dims[2]) && ((vx_int32)input->dims[3] == dims[3]) &&
                         (dupFlag == vx_false_e))
                     {
                         vxSetParameterByIndex(node, i, inputTable[j]);
                         node->numParameters++;
-                        ioPhysical[ioNum++] = image->memory.physicals[0];
+                        ioPhysical[ioNum++] = TENSOR_PHYSICAL_ADDR(tensor);
                         break;
                     }
                 }
-                else if (3 == image->planeCount)
+                else if ((input->dataType == VX_BINARY_BUFFER_TYPE_SCALAR) && (inputTable[j]->type == VX_TYPE_SCALAR))
                 {
-                    if ((input->dimCount == 3) && (input->dataFormat ==  vxoGraphBinary_ConvertToBinaryBufferFormat((vx_uint32)format)) &&
-                        (input->dims[0] == imageInfo.width) && (input->dims[1] == imageInfo.height) &&
-                        (input->quantFormat  == VX_BINARY_BUFFER_QUANT_FORMAT_NONE) &&
+                    vx_scalar scalar = (vx_scalar)inputTable[j];
+                    for (k = 0; k < ioNum; k++)
+                    {
+                        if (scalar->physical == ioPhysical[k])
+                        {
+                            dupFlag = vx_true_e;
+                            break;
+                        }
+                    }
+                    if ((input->dataFormat == vxoGraphBinary_ConvertToBinaryBufferFormat(VX_TYPE_INT8)) &&
+                        (input->dims[0] == vxoScalar_GetTypeSize(scalar)) &&
+                        (input->dims[1] == 1) &&
                         (dupFlag == vx_false_e))
                     {
                         vxSetParameterByIndex(node, i, inputTable[j]);
                         node->numParameters++;
-                        ioPhysical[ioNum++] = image->memory.physicals[0];
+                        ioPhysical[ioNum++] = scalar->physical;
                         break;
+                    }
+                }
+                else if ((input->dataType == VX_BINARY_BUFFER_TYPE_IMAGE) && (inputTable[j]->type == VX_TYPE_IMAGE))
+                {
+                    vx_image image = (vx_image)inputTable[j];
+                    gcoVX_Kernel_Context kernelContext; /* not useful, just fulfill the interface */
+                    gcsVX_IMAGE_INFO imageInfo;
+                    vx_df_image format;
+
+                    INITIALIZE_STRUCT(imageInfo);
+                    gcoOS_MemFill((gctPOINTER*)(&kernelContext), 0, sizeof(gcoVX_Kernel_Context));
+                    gcfVX_GetImageInfo(&kernelContext, image, &imageInfo, 1);
+                    vxQueryImage(image, VX_IMAGE_FORMAT, &format, sizeof(format));
+
+                    for (k = 0; k < ioNum; k++)
+                    {
+                        if (image->memory.physicals[0] == ioPhysical[k])
+                        {
+                            dupFlag = vx_true_e;
+                            break;
+                        }
+                    }
+
+                    if (1 == image->planeCount)
+                    {
+                        if ((input->dimCount == 2) && (input->dataFormat ==  vxoGraphBinary_ConvertToBinaryBufferFormat((vx_uint32)format)) &&
+                            (input->dims[0] == imageInfo.width) && (input->dims[1] == imageInfo.height) && (input->dims[2] == 1) &&
+                            (input->quantFormat  == VX_BINARY_BUFFER_QUANT_FORMAT_NONE) &&
+                            (dupFlag == vx_false_e))
+                        {
+                            vxSetParameterByIndex(node, i, inputTable[j]);
+                            node->numParameters++;
+                            ioPhysical[ioNum++] = image->memory.physicals[0];
+                            break;
+                        }
+                    }
+                    else if (3 == image->planeCount)
+                    {
+                        if ((input->dimCount == 3) && (input->dataFormat ==  vxoGraphBinary_ConvertToBinaryBufferFormat((vx_uint32)format)) &&
+                            (input->dims[0] == imageInfo.width) && (input->dims[1] == imageInfo.height) &&
+                            (input->quantFormat  == VX_BINARY_BUFFER_QUANT_FORMAT_NONE) &&
+                            (dupFlag == vx_false_e))
+                        {
+                            vxSetParameterByIndex(node, i, inputTable[j]);
+                            node->numParameters++;
+                            ioPhysical[ioNum++] = image->memory.physicals[0];
+                            break;
+                        }
                     }
                 }
             }
         }
-    }
 
-    if (node->numParameters != binaryLoad->fixed.header.inputCount)
-    {
-        vxError("%s[%d]: error: graph binary no input numParameters: %d\n",
-                __FUNCTION__, __LINE__, node->numParameters);
-        vxmONERROR(VX_FAILURE);
+        if (node->numParameters != binaryLoad->fixed.header.inputCount)
+        {
+            vxError("%s[%d]: error: graph binary no input numParameters: %d\n",
+                    __FUNCTION__, __LINE__, node->numParameters);
+            vxmONERROR(VX_FAILURE);
+        }
     }
 
     for (i = 0; i < ioNum; i++)
@@ -8056,95 +8073,112 @@ VX_PRIVATE_API vx_status vxoGraphBinary_SetInputOutput(
     ioNum = 0;
 
     /* set output for node */
-    for (i = 0; i < binaryLoad->fixed.header.outputCount; i++)
+    if (graph->outputCount && graph->outputs)
     {
-        vx_binary_input_output_info_s *output = &binaryLoad->outputs[i];
-        for (j = 0; j < outputNum; j++)
+        for (i = 0; i < graph->outputCount; i++)
         {
-            vx_bool dupFlag = vx_false_e;
-            if ((output->dataType == VX_BINARY_BUFFER_TYPE_TENSOR) && (outputTable[j]->type == VX_TYPE_TENSOR))
-            {
-                vx_tensor tensor = (vx_tensor)outputTable[j];
-                vx_int32 *dims = TENSOR_ORIG_SIZES(tensor);
-                vx_uint32 dimCount = TENSOR_ORIG_DIM_NUM(tensor);
-                for (k = 0; k < ioNum; k++)
-                {
-                    if ((TENSOR_PHYSICAL_ADDR(tensor) == ioPhysical[k]) && (TENSOR_PHYSICAL_ADDR(tensor)))
-                    {
-                        dupFlag = vx_true_e;
-                        break;
-                    }
-                }
-                if ((output->dataFormat == vxoGraphBinary_ConvertToBinaryBufferFormat(TENSOR_DATA_TYPE(tensor))) &&
-                    (output->dimCount == dimCount) && (output->quantFormat == TENSOR_QUANT_TYPE(tensor)) &&
-                    ((vx_int32)output->dims[0] == dims[0]) && ((vx_int32)output->dims[1] == dims[1]) &&
-                    ((vx_int32)output->dims[2] == dims[2]) && ((vx_int32)output->dims[3] == dims[3]) &&
-                    (dupFlag == vx_false_e))
-                {
-                    vxSetParameterByIndex(node, binaryLoad->fixed.header.inputCount + i, outputTable[j]);
-                    node->numParameters++;
-                    ioPhysical[ioNum++] = TENSOR_PHYSICAL_ADDR(tensor);
-                    break;
-                }
-            }
-            else if ((output->dataType == VX_BINARY_BUFFER_TYPE_IMAGE) && (inputTable[j]->type == VX_TYPE_IMAGE))
-            {
-                vx_image image = (vx_image)inputTable[j];
-                gcoVX_Kernel_Context kernelContext; /* not useful, just fulfill the interface */
-                gcsVX_IMAGE_INFO imageInfo;
-                vx_df_image format;
+            vxSetParameterByIndex(node, binaryLoad->fixed.header.inputCount + i, graph->outputs[i]);
+            node->numParameters++;
+        }
 
-                INITIALIZE_STRUCT(imageInfo);
-                gcoOS_MemFill((gctPOINTER*)(&kernelContext), 0, sizeof(gcoVX_Kernel_Context));
-                gcfVX_GetImageInfo(&kernelContext, image, &imageInfo, 1);
-                vxQueryImage(image, VX_IMAGE_FORMAT, &format, sizeof(format));
-
-                for (k = 0; k < ioNum; k++)
+        if (graph->outputCount != binaryLoad->fixed.header.outputCount)
+        {
+            vxError("%s[%d]: graph binary no output error, %d\n", __FUNCTION__, __LINE__, graph->outputCount);
+            vxmONERROR(VX_FAILURE);
+        }
+    }
+    else
+    {
+        for (i = 0; i < binaryLoad->fixed.header.outputCount; i++)
+        {
+            vx_binary_input_output_info_s *output = &binaryLoad->outputs[i];
+            for (j = 0; j < outputNum; j++)
+            {
+                vx_bool dupFlag = vx_false_e;
+                if ((output->dataType == VX_BINARY_BUFFER_TYPE_TENSOR) && (outputTable[j]->type == VX_TYPE_TENSOR))
                 {
-                    if (image->memory.physicals[0] == ioPhysical[k])
+                    vx_tensor tensor = (vx_tensor)outputTable[j];
+                    vx_int32 *dims = TENSOR_ORIG_SIZES(tensor);
+                    vx_uint32 dimCount = TENSOR_ORIG_DIM_NUM(tensor);
+                    for (k = 0; k < ioNum; k++)
                     {
-                        dupFlag = vx_true_e;
-                        break;
+                        if ((TENSOR_PHYSICAL_ADDR(tensor) == ioPhysical[k]) && (TENSOR_PHYSICAL_ADDR(tensor)))
+                        {
+                            dupFlag = vx_true_e;
+                            break;
+                        }
                     }
-                }
-                if (1 == image->planeCount)
-                {
-                    if ((output->dimCount == 2) && (output->dataFormat ==  vxoGraphBinary_ConvertToBinaryBufferFormat((vx_uint32)format)) &&
-                        (output->dims[0] == imageInfo.width) && (output->dims[1] == imageInfo.height) &&
-                        (output->quantFormat  == VX_BINARY_BUFFER_QUANT_FORMAT_NONE) &&
+                    if ((output->dataFormat == vxoGraphBinary_ConvertToBinaryBufferFormat(TENSOR_DATA_TYPE(tensor))) &&
+                        (output->dimCount == dimCount) && (output->quantFormat == TENSOR_QUANT_TYPE(tensor)) &&
+                        ((vx_int32)output->dims[0] == dims[0]) && ((vx_int32)output->dims[1] == dims[1]) &&
+                        ((vx_int32)output->dims[2] == dims[2]) && ((vx_int32)output->dims[3] == dims[3]) &&
                         (dupFlag == vx_false_e))
                     {
                         vxSetParameterByIndex(node, binaryLoad->fixed.header.inputCount + i, outputTable[j]);
                         node->numParameters++;
-                        ioPhysical[ioNum++] = image->memory.physicals[0];
+                        ioPhysical[ioNum++] = TENSOR_PHYSICAL_ADDR(tensor);
                         break;
                     }
                 }
-                else if (3 == image->planeCount)
+                else if ((output->dataType == VX_BINARY_BUFFER_TYPE_IMAGE) && (inputTable[j]->type == VX_TYPE_IMAGE))
                 {
-                    if ((output->dimCount == 3) && (output->dataFormat ==  vxoGraphBinary_ConvertToBinaryBufferFormat((vx_uint32)format)) &&
-                        (output->dims[0] == imageInfo.width) && (output->dims[1] == imageInfo.height) &&
-                        (output->quantFormat  == VX_BINARY_BUFFER_QUANT_FORMAT_NONE) &&
-                        (dupFlag == vx_false_e))
+                    vx_image image = (vx_image)inputTable[j];
+                    gcoVX_Kernel_Context kernelContext; /* not useful, just fulfill the interface */
+                    gcsVX_IMAGE_INFO imageInfo;
+                    vx_df_image format;
+
+                    INITIALIZE_STRUCT(imageInfo);
+                    gcoOS_MemFill((gctPOINTER*)(&kernelContext), 0, sizeof(gcoVX_Kernel_Context));
+                    gcfVX_GetImageInfo(&kernelContext, image, &imageInfo, 1);
+                    vxQueryImage(image, VX_IMAGE_FORMAT, &format, sizeof(format));
+
+                    for (k = 0; k < ioNum; k++)
                     {
-                        vxSetParameterByIndex(node, binaryLoad->fixed.header.inputCount + i, outputTable[j]);
-                        node->numParameters++;
-                        ioPhysical[ioNum++] = image->memory.physicals[0];
-                        break;
+                        if (image->memory.physicals[0] == ioPhysical[k])
+                        {
+                            dupFlag = vx_true_e;
+                            break;
+                        }
+                    }
+                    if (1 == image->planeCount)
+                    {
+                        if ((output->dimCount == 2) && (output->dataFormat ==  vxoGraphBinary_ConvertToBinaryBufferFormat((vx_uint32)format)) &&
+                            (output->dims[0] == imageInfo.width) && (output->dims[1] == imageInfo.height) &&
+                            (output->quantFormat  == VX_BINARY_BUFFER_QUANT_FORMAT_NONE) &&
+                            (dupFlag == vx_false_e))
+                        {
+                            vxSetParameterByIndex(node, binaryLoad->fixed.header.inputCount + i, outputTable[j]);
+                            node->numParameters++;
+                            ioPhysical[ioNum++] = image->memory.physicals[0];
+                            break;
+                        }
+                    }
+                    else if (3 == image->planeCount)
+                    {
+                        if ((output->dimCount == 3) && (output->dataFormat ==  vxoGraphBinary_ConvertToBinaryBufferFormat((vx_uint32)format)) &&
+                            (output->dims[0] == imageInfo.width) && (output->dims[1] == imageInfo.height) &&
+                            (output->quantFormat  == VX_BINARY_BUFFER_QUANT_FORMAT_NONE) &&
+                            (dupFlag == vx_false_e))
+                        {
+                            vxSetParameterByIndex(node, binaryLoad->fixed.header.inputCount + i, outputTable[j]);
+                            node->numParameters++;
+                            ioPhysical[ioNum++] = image->memory.physicals[0];
+                            break;
+                        }
                     }
                 }
-            }
-            else
-            {
-                vxError("graph binary cann't support this data type as output, %d\n", inputTable[j]->type);
-                vxmONERROR(VX_FAILURE);
+                else
+                {
+                    vxError("graph binary cann't support this data type as output, %d\n", inputTable[j]->type);
+                    vxmONERROR(VX_FAILURE);
+                }
             }
         }
     }
 
     if (node->numParameters != (binaryLoad->fixed.header.inputCount + binaryLoad->fixed.header.outputCount))
     {
-        vxError("%s[%d]: graph binary no output error\n", __FUNCTION__, __LINE__, node->numParameters);
+        vxError("%s[%d]: graph binary no output error, %d\n", __FUNCTION__, __LINE__, node->numParameters);
         vxmONERROR(VX_FAILURE);
     }
 
