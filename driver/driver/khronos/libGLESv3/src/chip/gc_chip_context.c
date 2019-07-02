@@ -225,7 +225,6 @@ gcChipInitDevicePipeline(
     gc->dp.compressedTexImage3D = __glChipCompressedTexImage3D;
     gc->dp.compressedTexSubImage3D = __glChipCompressedTexSubImage3D;
     gc->dp.generateMipmaps = __glChipGenerateMipMap;
-    gc->dp.getTexImage = __glChipGetTexImage;
 
     gc->dp.copyTexBegin = __glChipCopyTexBegin;
     gc->dp.copyTexValidateState = __glChipCopyTexValidateState;

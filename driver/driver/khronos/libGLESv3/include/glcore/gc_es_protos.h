@@ -439,5 +439,4 @@ extern GLvoid GL_APIENTRY __gles_MultiDrawArraysIndirectEXT(__GLcontext *gc, GLe
 extern GLvoid GL_APIENTRY __gles_MultiDrawElementsIndirectEXT(__GLcontext *gc, GLenum mode, GLenum type, const void *indirect, GLsizei drawcount, GLsizei stride);
 #endif
 
-extern GLvoid GL_APIENTRY __gles_GetTexImage(__GLcontext *gc, GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels);
 #endif /* __gc_es_protos_h__ */

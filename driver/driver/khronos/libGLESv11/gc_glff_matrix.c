@@ -337,7 +337,7 @@ void glfConvertToVivanteMatrix(
 
 
 
-    if (Context->chipModel >= gcv1000 || Context->chipModel == gcv880 || (Context->chipModel == 0x900 && Context->chipRevision == 0x5250))
+    if (Context->chipModel >= gcv1000 || Context->chipModel == gcv880 || (Context->chipModel == gcv900 && Context->chipRevision == 0x5250))
 
     {
 

@@ -8321,11 +8321,6 @@ GLvoid GL_APIENTRY __glesProfile_MultiDrawElementsIndirectEXT(__GLcontext *gc, G
 }
 #endif
 
-GLvoid GL_APIENTRY __glesProfile_GetTexImage(__GLcontext *gc, GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels)
-{
-    __gles_GetTexImage(gc, target, level, format, type, pixels);
-}
-
 
 /* GLES API Profiler function dispatch table */
 

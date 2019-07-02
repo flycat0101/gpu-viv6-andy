@@ -331,7 +331,6 @@ EXPORTS
         glSampleMaski
         glGetTexLevelParameteriv
         glGetTexLevelParameterfv
-        glGetTexImage
         glBindVertexBuffer
         glVertexAttribFormat
         glVertexAttribIFormat

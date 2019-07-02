@@ -3365,8 +3365,6 @@ typedef void (GL_APIENTRY PFNGLDEVELOPERSTUBSVIVPROC)(GLboolean Enable);
 #define GL_TEXTURE_PROTECTED_VIV 0x81DA
 #endif
 
-GL_APICALL void GL_APIENTRY glGetTexImage( GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels);
-
 #ifdef __cplusplus
 }
 #endif
