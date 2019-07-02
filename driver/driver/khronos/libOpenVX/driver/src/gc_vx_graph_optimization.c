@@ -4462,6 +4462,13 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
     vx_int32 nodeCount = graph->nodeCount;
     vx_node* nodeTable = graph->nodeTable;
 
+    /* all of the nodes here, would not do this feature, because they do not accept the change for quantize attribute*/
+    vx_enum blacklist[] = {
+        VX_KERNEL_TENSOR_TRANSPOSE,
+        VX_KERNEL_INTERNAL_ADAPTER,
+        VX_KERNEL_NN_REORG2_LAYER
+    };
+
     gcmHEADER_ARG("graph=%p", graph);
     vxmASSERT(graph);
 
@@ -4477,6 +4484,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
             nodeTable[node->parentNodes[0]]->numChildren == 1
             )
         {
+            vx_uint32   i           = 0;
             vx_tensor   reluIn      = (vx_tensor)node->paramTable[0];
             vx_tensor   reluOut     = (vx_tensor)node->paramTable[node->numParameters - 1];
             vx_node     child       = nodeTable[node->childNodes[0]];
@@ -4493,10 +4501,12 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
                 continue;
 
             /*add blacklist, in which nodes do not requantize data*/
-            if(child->kernel->enumeration == VX_KERNEL_INTERNAL_ADAPTER ||
-                parent->kernel->enumeration == VX_KERNEL_INTERNAL_ADAPTER||
-                child->kernel->enumeration == VX_KERNEL_TENSOR_TRANSPOSE ||
-                parent->kernel->enumeration == VX_KERNEL_TENSOR_TRANSPOSE )
+            for(i = 0; i < sizeof(blacklist)/sizeof(blacklist[0]); i++)
+            {
+                if(child->kernel->enumeration == blacklist[i] || parent->kernel->enumeration == blacklist[i])
+                    break;
+            }
+            if(i != sizeof(blacklist)/sizeof(blacklist[0]))
                 continue;
 
             /*update the quantized teensor is saturated as relu-type*/
