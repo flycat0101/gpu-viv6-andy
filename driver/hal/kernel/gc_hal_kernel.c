@@ -5148,8 +5148,9 @@ gckDEVICE_Construct(
         /* Initialize device SRAM. */
         for (j = 0; j < gcvSRAM_COUNT; j++)
         {
-            device->sRAMBases[i][j] = gcvINVALID_PHYSICAL_ADDRESS;
-            device->sRAMSizes[i][j] = 0;
+            device->sRAMCPUBases[i][j] = gcvINVALID_PHYSICAL_ADDRESS;
+            device->sRAMBases[i][j]    = gcvINVALID_PHYSICAL_ADDRESS;
+            device->sRAMSizes[i][j]    = 0;
         }
     }
 

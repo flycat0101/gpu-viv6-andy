@@ -3119,7 +3119,7 @@ gckMMU_SetupPerHardware(
         /* Map all the SRAMs in MMU table. */
         for (i = 0; i < gcvCORE_COUNT; i++)
         {
-            reservedBase = Device->sRAMBases[i][gcvSRAM_INTERNAL];
+            reservedBase = Device->sRAMCPUBases[i][gcvSRAM_INTERNAL];
             reservedSize = Device->sRAMSizes[i][gcvSRAM_INTERNAL];
             needMapInternalSRAM = reservedSize && (reservedBase != gcvINVALID_PHYSICAL_ADDRESS);
 
@@ -3161,12 +3161,12 @@ gckMMU_SetupPerHardware(
             for (j = gcvSRAM_EXTERNAL0; j < gcvSRAM_COUNT; j++)
             {
                 if (Device->sRAMSizes[i][j] &&
-                   (Device->sRAMBases[i][j] != gcvINVALID_PHYSICAL_ADDRESS))
+                   (Device->sRAMCPUBases[i][j] != gcvINVALID_PHYSICAL_ADDRESS))
                 {
-                    gcmkPRINT("Galcore Info: MMU mapped core %d SRAM[%d] base=0x%llx size=0x%x",
+                    gcmkPRINT("Galcore Info: MMU mapped core %d SRAM[%d] CPU base=0x%llx size=0x%x",
                         i,
                         j,
-                        Device->sRAMBases[i][j],
+                        Device->sRAMCPUBases[i][j],
                         Device->sRAMSizes[i][j]
                         );
 
@@ -3174,7 +3174,7 @@ gckMMU_SetupPerHardware(
 
                     gcmkONERROR(gckOS_CPUPhysicalToGPUPhysical(
                         Mmu->os,
-                        Device->sRAMBases[i][j],
+                        Device->sRAMCPUBases[i][j],
                         &Device->sRAMBases[i][j]
                         ));
 
@@ -3205,9 +3205,10 @@ gckMMU_SetupPerHardware(
             kernel->sRAMSizes[i] = Hardware->options.sRAMSizes[i]
                                  = Device->sRAMSizes[Hardware->core][i];
 
+            Hardware->options.sRAMCPUPhysicalBases[i] = Device->sRAMCPUBases[Hardware->core][i];
             Hardware->options.sRAMPhysicalBases[i] = Device->sRAMBases[Hardware->core][i];
 
-            gcmkPRINT("Galcore Info: MMU mapped core %d SRAM[%d] hardware address=0x%x size=0x%x",
+            gcmkPRINT("Galcore Info: MMU mapped core %d SRAM[%d] hardware virtual address=0x%x size=0x%x",
                 Hardware->core,
                 i,
                 kernel->sRAMBaseAddresses[i],

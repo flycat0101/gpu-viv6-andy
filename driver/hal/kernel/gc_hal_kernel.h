@@ -1385,8 +1385,13 @@ typedef struct _gcsDEVICE
     /* Same hardware type shares one MMU. */
     gckMMU                      mmus[gcvHARDWARE_NUM_TYPES];
 
+    /* CPU view physical address of SRAMs. */
+    gctUINT64                   sRAMCPUBases[gcvCORE_COUNT][gcvSRAM_COUNT];
+    /* GPU/VIP view physical address of SRAMs. */
     gctUINT64                   sRAMBases[gcvCORE_COUNT][gcvSRAM_COUNT];
+    /* SRAMs size. */
     gctUINT32                   sRAMSizes[gcvCORE_COUNT][gcvSRAM_COUNT];
+    /* GPU/VIP virtual address of SRAMs. */
     gctUINT32                   sRAMBaseAddresses[gcvCORE_COUNT][gcvSRAM_COUNT];
 
     /* Mutex to make sure stuck dump for multiple cores doesn't interleave. */

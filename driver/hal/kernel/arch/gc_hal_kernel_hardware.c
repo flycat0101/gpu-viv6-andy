@@ -342,11 +342,11 @@ _IdentifyHardwareByDatabase(
 
     gckOS_QueryOption(Hardware->os, "sRAMMode", (gctUINT64 *)&Hardware->sRAMNonExclusive);
 
-    if (gcmIS_SUCCESS(gckOS_QueryOption(Hardware->os, "sRAMBases", Device->sRAMBases[0])))
+    if (gcmIS_SUCCESS(gckOS_QueryOption(Hardware->os, "sRAMBases", Device->sRAMCPUBases[0])))
     {
         gckOS_MemCopy(
             Identity->sRAMBases,
-            Device->sRAMBases[Core],
+            Device->sRAMCPUBases[Core],
             sizeof(gctUINT64) * gcvSRAM_COUNT
             );
     }

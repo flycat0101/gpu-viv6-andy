@@ -435,6 +435,8 @@ typedef struct _gcsHAL_QUERY_CHIP_OPTIONS
     gctUINT32                   sRAMSizes[gcvSRAM_COUNT];
     /* GPU/VIP view physical address of SRAMs. */
     gctPHYS_ADDR_T              sRAMPhysicalBases[gcvSRAM_COUNT];
+    /* CPU view physical address of SRAMs. */
+    gctPHYS_ADDR_T              sRAMCPUPhysicalBases[gcvSRAM_COUNT];
 
     gceSECURE_MODE              secureMode;
 
