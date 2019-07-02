@@ -6824,6 +6824,176 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoGradientMxN_F16_ValidateOutput(vx_node n
     return VX_SUCCESS;
 }
 
+#if defined(__QNX__)
+vx_status vxoAlterRectangle(vx_rectangle_t *rect,
+                           vx_int32 dsx,
+                           vx_int32 dsy,
+                           vx_int32 dex,
+                           vx_int32 dey)
+{
+    if (rect)
+    {
+        rect->start_x += dsx;
+        rect->start_y += dsy;
+        rect->end_x += dex;
+        rect->end_y += dey;
+        return VX_SUCCESS;
+    }
+    return VX_ERROR_INVALID_REFERENCE;
+}
+
+static vx_float32 Fp16toFp32(const vx_int16 in)
+{
+    vx_int32 t1;
+    vx_int32 t2;
+    vx_int32 t3;
+    vx_float32 out;
+
+    t1 = in & 0x7fff;                       // Non-sign bits
+    t2 = in & 0x8000;                       // Sign bit
+    t3 = in & 0x7c00;                       // Exponent
+
+    t1 <<= 13;                              // Align mantissa on MSB
+    t2 <<= 16;                              // Shift sign bit into position
+
+    t1 += 0x38000000;                       // Adjust bias
+
+    t1 = (t3 == 0 ? 0 : t1);                // Denormals-as-zero
+
+    t1 |= t2;                               // Re-insert sign bit
+
+    *((uint32_t*)&out) = t1;
+
+    return out;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_HarrisScore(vx_node node, const vx_reference *parameters, vx_uint32 num)
+{
+    vx_status status = VX_FAILURE;
+    gcfVX_Flush(gcvTRUE);
+
+    if (NULL != node && NULL != parameters && num == 7)
+    {
+        vx_image  grad_x      = (vx_image)parameters[0];
+        vx_image  grad_y      = (vx_image)parameters[1];
+        vx_scalar sensitivity = (vx_scalar)parameters[2];
+        vx_scalar grad_s      = (vx_scalar)parameters[3];
+        vx_scalar winds       = (vx_scalar)parameters[4];
+        vx_image  dst         = (vx_image)parameters[6];
+        vx_scalar shift       = (vx_scalar)parameters[5];
+
+        vx_float32 k = 0.0f;
+        vx_uint32 block_size = 0;
+        vx_uint32 grad_size = 0;
+        vx_rectangle_t rect;
+
+        status = vxGetValidRegionImage(grad_x, &rect);
+
+        status |= vxCopyScalar(grad_s, &grad_size, VX_READ_ONLY, VX_MEMORY_TYPE_HOST);
+        status |= vxCopyScalar(winds, &block_size, VX_READ_ONLY, VX_MEMORY_TYPE_HOST);
+        status |= vxCopyScalar(sensitivity, &k, VX_READ_ONLY, VX_MEMORY_TYPE_HOST);
+
+        if (status == VX_SUCCESS)
+        {
+            vx_int32 x;
+            vx_int32 y;
+            vx_int32 i;
+            vx_int32 j;
+            void* gx_base = NULL;
+            void* gy_base = NULL;
+            void* dst_base = NULL;
+            vx_imagepatch_addressing_t gx_addr  = VX_IMAGEPATCH_ADDR_INIT;
+            vx_imagepatch_addressing_t gy_addr  = VX_IMAGEPATCH_ADDR_INIT;
+            vx_imagepatch_addressing_t dst_addr = VX_IMAGEPATCH_ADDR_INIT;
+            vx_map_id grad_x_map_id = 0;
+            vx_map_id grad_y_map_id = 0;
+            vx_map_id dst_map_id = 0;
+            vx_border_t borders = { VX_BORDER_UNDEFINED, { { 0 } } };
+
+            status |= vxMapImagePatch(grad_x, &rect, 0, &grad_x_map_id, &gx_addr, &gx_base, VX_READ_ONLY, VX_MEMORY_TYPE_HOST, VX_NOGAP_X);
+            status |= vxMapImagePatch(grad_y, &rect, 0, &grad_y_map_id, &gy_addr, &gy_base, VX_READ_ONLY, VX_MEMORY_TYPE_HOST, VX_NOGAP_X);
+            status |= vxMapImagePatch(dst, &rect, 0, &dst_map_id, &dst_addr, &dst_base, VX_WRITE_ONLY, VX_MEMORY_TYPE_HOST, VX_NOGAP_X);
+
+            status |= vxQueryNode(node, VX_NODE_BORDER, &borders, sizeof(borders));
+
+            if (VX_SUCCESS == status)
+            {
+                /* implement other Harris Corners border modes */
+                if (borders.mode == VX_BORDER_UNDEFINED)
+                {
+                    vx_float32 temp = (vx_float32)((1 << (grad_size - 1)) * block_size * 255);
+                    //vx_float32 scale = (vx_float32)1.0 / ((1 << (grad_size - 1)) * (vx_float32)block_size * 255.0);
+                    vx_float32 scale = (vx_float32)1.0 / temp;
+
+                    vx_int32 b  = (block_size / 2) + 1;
+                    vx_int32 b2 = (block_size / 2);
+                    {
+                        if(shift->value->f32 >= 1.0f)
+                            scale *= (1 << (gctINT32)shift->value->f32);
+                        else if (shift->value->f32 > 0.0f)
+                            scale *= shift->value->f32;
+                    }
+                    vxoAlterRectangle(&rect, b, b, -b, -b);
+
+                    for (y = b; (y < (vx_int32)(gx_addr.dim_y - b)); y++)
+                    {
+                        for (x = b; x < (vx_int32)(gx_addr.dim_x - b); x++)
+                        {
+                            vx_float32 sum_ix2   = 0.0;
+                            vx_float32 sum_iy2   = 0.0;
+                            vx_float32 sum_ixy   = 0.0;
+                            vx_float32 det_A     = 0.0;
+                            vx_float32 trace_A   = 0.0;
+                            vx_float32 ktrace_A2 = 0.0;
+                            vx_float32 M_c       = 0.0;
+
+                            vx_float32* pmc = vxFormatImagePatchAddress2d(dst_base, x, y, &dst_addr);
+
+                            for (j = -b2; j <= b2; j++)
+                            {
+                                for (i = -b2; i <= b2; i++)
+                                {
+                                    //vx_float32* pgx = (vx_float32*)vxFormatImagePatchAddress2d(gx_base, x + i, y + j, &gx_addr);
+                                    //vx_float32* pgy = (vx_float32*)vxFormatImagePatchAddress2d(gy_base, x + i, y + j, &gy_addr);
+                                    vx_int16* pgx = vxFormatImagePatchAddress2d(gx_base, x + i, y + j, &gx_addr);
+                                    vx_int16* pgy = vxFormatImagePatchAddress2d(gy_base, x + i, y + j, &gy_addr);
+
+                                    vx_float32 gx = (vx_float32)Fp16toFp32((* pgx));
+                                    vx_float32 gy = (vx_float32)Fp16toFp32((* pgy));
+                                    //vx_float32 gx = (*pgx);
+                                    //vx_float32 gy = (*pgy);
+
+                                    sum_ix2 += gx * gx * scale * scale;
+                                    sum_iy2 += gy * gy * scale * scale;
+                                    sum_ixy += gx * gy * scale * scale;
+                                }
+                            }
+
+                            det_A = (sum_ix2 * sum_iy2) - (sum_ixy * sum_ixy);
+                            trace_A = sum_ix2 + sum_iy2;
+                            ktrace_A2 = (k * (trace_A * trace_A));
+
+                            M_c = det_A - ktrace_A2;
+
+                            *pmc = (vx_float32)M_c;
+                        }
+                    }
+                }
+                else
+                {
+                    status = VX_ERROR_NOT_IMPLEMENTED;
+                }
+            }
+
+            status |= vxUnmapImagePatch(grad_x, grad_x_map_id);
+            status |= vxUnmapImagePatch(grad_y, grad_y_map_id);
+            status |= vxUnmapImagePatch(dst, dst_map_id);
+        }
+    } // if ptrs non NULL
+
+    return status;
+}
+#else
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_HarrisScore(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image         grad_x   = VX_NULL;
@@ -6863,6 +7033,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_HarrisScore(vx_node node,
      gcmFOOTER_ARG("%d", VX_FAILURE);
      return VX_FAILURE;
 }
+#endif
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoHarrisScore_ValidateInput(vx_node node, vx_uint32 index)
 {
