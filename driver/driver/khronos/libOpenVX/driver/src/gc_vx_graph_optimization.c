@@ -3448,20 +3448,6 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_transformConvNxM(vx_graph graph)
                     &depth_multiplier, &pad_mode, &pad_const);
 
              {
-                 /*update pad parameter*/
-                 vx_uint32 totalPad = gcmABS((vx_int32)TENSOR_SIZE_INDEX(weightNxM, 0) - (vx_int32)TENSOR_SIZE_INDEX(weightNxM, 1));
-                 if(TENSOR_SIZE_INDEX(weightNxM, 0) > TENSOR_SIZE_INDEX(weightNxM, 1))
-                 {
-                     pad[2] += totalPad/2;
-                     pad[3] += (totalPad + 1)/2;
-                 }
-                 else
-                 {
-                     pad[0] += totalPad /2;
-                     pad[1] += (totalPad + 1)/2;
-                 }
-             }
-             {
             vx_scalar padconst = vxCreateScalar(context, VX_TYPE_UINT32, (void *)&pad_const);
             vx_nn_convolution_params_ext2_t params = {
             {
