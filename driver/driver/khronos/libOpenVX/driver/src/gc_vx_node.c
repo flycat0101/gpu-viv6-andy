@@ -723,7 +723,11 @@ VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx
     }
     if (node->paramTable[index] != VX_NULL)
     {
+        char name_tmp[VX_MAX_REFERENCE_NAME];
+        strcpy(name_tmp, ((vx_reference)node->paramTable[index])->name);
         vxoReference_Release(&node->paramTable[index], node->paramTable[index]->type, VX_REF_INTERNAL);
+        strcpy(value->name, name_tmp);
+        vxmASSERT(strlen(name_tmp) < VX_MAX_REFERENCE_NAME);
     }
 
     /* Add the internal ref count of value from the node */
