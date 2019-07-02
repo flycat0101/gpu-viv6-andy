@@ -368,9 +368,10 @@ vx_status copyConstData2Tensor(vx_tensor &tensor , vx_uint8 *dataPtr, vx_enum re
     return VX_SUCCESS;
 }
 
+#if !HIGH_PRECISION_COMPUTE
+
 void convertTensorFormatFromFp322Fp16(vx_graph graph, const Operand &operand, VxRunTimeReferenceInfo & to)
 {
-#if !HIGH_PRECISION_COMPUTE
     if( !((operand.lifetime == OperandLifeTime::CONSTANT_REFERENCE ||  operand.lifetime == OperandLifeTime::CONSTANT_COPY) &&
          (operand.type == OperandType::TENSOR_FLOAT32 )
          ) )
@@ -409,8 +410,14 @@ void convertTensorFormatFromFp322Fp16(vx_graph graph, const Operand &operand, Vx
 
     vxReleaseTensor(&tensor);
     to.ref = (vx_reference)tensorFp16;
-#endif
+
+    if (orgData)
+        free(orgData);
+
+    if formattedData
+        free(formattedData);
 }
+#endif
 
 void convertRankAndFormat(vx_graph graph, const Operand &operand, VxRunTimeReferenceInfo & to, bool convertSNForFC = vx_false_e)
 {
@@ -547,6 +554,9 @@ void convertRankAndFormat(vx_graph graph, const Operand &operand, VxRunTimeRefer
             if(formattedData != orgData)
                 free(formattedData);
         }
+
+        if(orgData)
+            free(orgData);
     }
     return ;
 }
@@ -729,15 +739,15 @@ vx_status OvxExecutor::convertAllOperandsToRefences(const std::vector<VxRunTimeP
             {
             case OperandType::FLOAT32:
                 info.buffer = getPointer(operand, poolInfos);
-                ref = (vx_reference)vxCreateScalar(mContext, VX_TYPE_FLOAT32, info.buffer);
+                ref = (vx_reference)vxCreateScalar(*mContext, VX_TYPE_FLOAT32, info.buffer);
                 break;
             case OperandType::INT32:
                 info.buffer = getPointer(operand, poolInfos);
-                ref = (vx_reference)vxCreateScalar(mContext, VX_TYPE_INT32, (vx_int32*)info.buffer);
+                ref = (vx_reference)vxCreateScalar(*mContext, VX_TYPE_INT32, (vx_int32*)info.buffer);
                 break;
             case OperandType::UINT32:
                 info.buffer = getPointer(operand, poolInfos);
-                ref = (vx_reference)vxCreateScalar(mContext, VX_TYPE_UINT32, info.buffer);
+                ref = (vx_reference)vxCreateScalar(*mContext, VX_TYPE_UINT32, info.buffer);
                 break;
             case OperandType::TENSOR_FLOAT32:
             {
@@ -747,7 +757,7 @@ vx_status OvxExecutor::convertAllOperandsToRefences(const std::vector<VxRunTimeP
 
                 if ((operand.lifetime == OperandLifeTime::MODEL_INPUT) || (operand.lifetime == OperandLifeTime::MODEL_OUTPUT))
                 {
-                    ref = (vx_reference)vxCreateTensor(mContext, operand.dimensions.size(), operand.dimensions.data(), format, 0);
+                    ref = (vx_reference)vxCreateTensor(*mContext, operand.dimensions.size(), operand.dimensions.data(), format, 0);
                 }
                 else if (operand.lifetime == OperandLifeTime::TEMPORARY_VARIABLE)
                 {
@@ -765,12 +775,12 @@ vx_status OvxExecutor::convertAllOperandsToRefences(const std::vector<VxRunTimeP
                     std::vector<vx_uint32> stride = getStrideFromDims(VX_TYPE_FLOAT32, operand.dimensions.data(), operand.dimensions.size());
 
                     /*
-                    vx_tensor_addressing addr = vxCreateTensorAddressing(mContext, operand.dimensions.data(), stride.data(), operand.dimensions.size());
-                    ref = (vx_reference)vxCreateTensorFromHandle(mContext, &param, sizeof(vx_tensor_create_params_t), addr, info.buffer, VX_MEMORY_TYPE_HOST);
+                    vx_tensor_addressing addr = vxCreateTensorAddressing(*mContext, operand.dimensions.data(), stride.data(), operand.dimensions.size());
+                    ref = (vx_reference)vxCreateTensorFromHandle(*mContext, &param, sizeof(vx_tensor_create_params_t), addr, info.buffer, VX_MEMORY_TYPE_HOST);
                     vxReleaseTensorAddressing(&addr);
                     */
 
-                    ref = (vx_reference)vxCreateTensor2(mContext, &param, sizeof(vx_tensor_create_params_t));
+                    ref = (vx_reference)vxCreateTensor2(*mContext, &param, sizeof(vx_tensor_create_params_t));
                     copyConstData2Tensor((vx_tensor &)ref, info.buffer, VX_WRITE_ONLY);
 
                 }
@@ -801,7 +811,7 @@ vx_status OvxExecutor::convertAllOperandsToRefences(const std::vector<VxRunTimeP
 
                 if ((operand.lifetime == OperandLifeTime::MODEL_INPUT) || (operand.lifetime == OperandLifeTime::MODEL_OUTPUT))
                 {
-                    ref = (vx_reference)vxCreateTensor2(mContext, &param, sizeof(vx_tensor_create_params_t));
+                    ref = (vx_reference)vxCreateTensor2(*mContext, &param, sizeof(vx_tensor_create_params_t));
                 }
                 else if(operand.lifetime == OperandLifeTime::TEMPORARY_VARIABLE)
                 {
@@ -813,10 +823,10 @@ vx_status OvxExecutor::convertAllOperandsToRefences(const std::vector<VxRunTimeP
                     value = vx_true_e;
                     lifetime = VX_TENSOR_LIFE_TIME_STATIC;
                     /*
-                    vx_tensor_addressing addr = vxCreateTensorAddressing(mContext, operand.dimensions.data(), getStrideFromDims(VX_TYPE_INT32, operand.dimensions.data(), operand.dimensions.size()).data(), operand.dimensions.size());
-                    ref = (vx_reference)vxCreateTensorFromHandle(mContext, &param, sizeof(vx_tensor_create_params_t), addr, info.buffer, VX_MEMORY_TYPE_HOST);
+                    vx_tensor_addressing addr = vxCreateTensorAddressing(*mContext, operand.dimensions.data(), getStrideFromDims(VX_TYPE_INT32, operand.dimensions.data(), operand.dimensions.size()).data(), operand.dimensions.size());
+                    ref = (vx_reference)vxCreateTensorFromHandle(*mContext, &param, sizeof(vx_tensor_create_params_t), addr, info.buffer, VX_MEMORY_TYPE_HOST);
                     */
-                    ref = (vx_reference)vxCreateTensor2(mContext, &param, sizeof(vx_tensor_create_params_t));
+                    ref = (vx_reference)vxCreateTensor2(*mContext, &param, sizeof(vx_tensor_create_params_t));
                     copyConstData2Tensor((vx_tensor &)ref, info.buffer, VX_WRITE_ONLY);
                 }
 
@@ -842,7 +852,7 @@ vx_status OvxExecutor::convertAllOperandsToRefences(const std::vector<VxRunTimeP
 
                 if ((operand.lifetime == OperandLifeTime::MODEL_INPUT) || (operand.lifetime == OperandLifeTime::MODEL_OUTPUT))
                 {
-                    ref = (vx_reference)vxCreateTensor2(mContext, &param, sizeof(vx_tensor_create_params_t));
+                    ref = (vx_reference)vxCreateTensor2(*mContext, &param, sizeof(vx_tensor_create_params_t));
                 }
                 else if (operand.lifetime == OperandLifeTime::TEMPORARY_VARIABLE)
                 {
@@ -855,10 +865,10 @@ vx_status OvxExecutor::convertAllOperandsToRefences(const std::vector<VxRunTimeP
                     lifetime = VX_TENSOR_LIFE_TIME_STATIC;
 
                     /*
-                    vx_tensor_addressing addr = vxCreateTensorAddressing(mContext, operand.dimensions.data(), getStrideFromDims(VX_TYPE_UINT8, operand.dimensions.data(), operand.dimensions.size()).data(), operand.dimensions.size());
-                    ref = (vx_reference)vxCreateTensorFromHandle(mContext, &param, sizeof(vx_tensor_create_params_t), addr, info.buffer, VX_MEMORY_TYPE_HOST);
+                    vx_tensor_addressing addr = vxCreateTensorAddressing(*mContext, operand.dimensions.data(), getStrideFromDims(VX_TYPE_UINT8, operand.dimensions.data(), operand.dimensions.size()).data(), operand.dimensions.size());
+                    ref = (vx_reference)vxCreateTensorFromHandle(*mContext, &param, sizeof(vx_tensor_create_params_t), addr, info.buffer, VX_MEMORY_TYPE_HOST);
                     */
-                    ref = (vx_reference)vxCreateTensor2(mContext, &param, sizeof(vx_tensor_create_params_t));
+                    ref = (vx_reference)vxCreateTensor2(*mContext, &param, sizeof(vx_tensor_create_params_t));
                     copyConstData2Tensor((vx_tensor &)ref, info.buffer, VX_WRITE_ONLY);
                 }
 
@@ -967,10 +977,10 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
 {
     vx_status status = VX_SUCCESS;
 
-    if (mContext == nullptr)
+    if (*mContext == nullptr)
         LOG(ERROR)<<" ----------- Context is NULL ----------- ";
 
-    mGraph = vxCreateGraph(mContext);
+    mGraph = vxCreateGraph(*mContext);
     convertAllOperandsToRefences(poolInfos, VX_TYPE_FLOAT32);
     /*Convert all operaion to corresponding node*/
     const vx_int32 operation_count = mModel->operations.size();
@@ -1071,7 +1081,7 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
             const VxRunTimeReferenceInfo& out = mReferenceInfos[outs[0]];
 
             vx_float32 s = 1.0f;
-            vx_scalar scale = vxCreateScalar(mContext, VX_TYPE_FLOAT32, &s);
+            vx_scalar scale = vxCreateScalar(*mContext, VX_TYPE_FLOAT32, &s);
             VxReferenceInfo ref_info = {(vx_reference)scale, VX_TYPE_SCALAR};
             operation_info.refs.push_back(ref_info);
 
@@ -1436,6 +1446,9 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
                     LOG(ERROR) << "Create vxConcatIndefiniteLayer failed!";
                 }
 
+                if (objectArray)
+                    vxReleaseObjectArray(&objectArray);
+
 
             }
             break;
@@ -1546,7 +1559,9 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
                 vxSetTensorAttribute((vx_tensor)bias.ref, VX_TENSOR_PRECISION, &precision, sizeof(vx_enum));
 
                 {
+#if !HIGH_PRECISION_COMPUTE
                     convertTensorFormatFromFp322Fp16(mGraph, mModel->operands[ins[1]], weights);
+#endif
                     convertRankAndFormat(mGraph, mModel->operands[ins[2]], bias, true);
                 }
 
@@ -1667,7 +1682,7 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
                 vxReleaseScalar((vx_scalar*)&type.ref);
 
                 vx_tensor_create_params_t param0 = { 1, size, VX_TYPE_INT32, 0, {{0}}};
-                type.ref = (vx_reference)vxCreateTensor2(mContext, &param0, sizeof(vx_tensor_create_params_t));
+                type.ref = (vx_reference)vxCreateTensor2(*mContext, &param0, sizeof(vx_tensor_create_params_t));
                 VX_CHECK_ERROR(vxGetStatus((vx_reference)type.ref));
 
                 copyConstData2Tensor( (vx_tensor & )type.ref, (vx_uint8 *)&t, VX_WRITE_ONLY);
@@ -1682,6 +1697,9 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
             {
                 LOG(ERROR) << "Create vxLSHProjectionLayer failed!";
             }
+
+            if (type.type == OperandType::INT32 && type.ref)
+                vxReleaseTensor((vx_tensor*)&type.ref);
 
         }
             break;
@@ -1779,6 +1797,9 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
                 {
                     LOG(ERROR) << "Create vxPoolingLayer2 failed!";
                 }
+
+                if (activation > 0 && o)
+                    vxReleaseTensor(&o);
 
             }
             break;
@@ -2306,7 +2327,7 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
     return status;
 }
 
-int OvxExecutor::initalize(vx_context context, const Model* model, std::vector<VxRunTimePoolInfo>* poolInfos)
+int OvxExecutor::initalize(vx_context* context, pthread_mutex_t* mutex, const Model* model, std::vector<VxRunTimePoolInfo>* poolInfos)
 {
 
     if (mModel == nullptr)
@@ -2314,30 +2335,25 @@ int OvxExecutor::initalize(vx_context context, const Model* model, std::vector<V
     else
         LOG(ERROR) << "mModel is not null!";
 
-    if (context != nullptr)
+    setRunTimePoolInfosFromHidlMemories(poolInfos, mModel->pools);
+
+    mMutex = mutex;
+
+    pthread_mutex_lock(mMutex);
+
+    mContext = context;
+
+    *mContext = vxCreateContext();
+
+    pthread_mutex_unlock(mMutex);
+
+    getGraph(poolInfos);
+
+    if(vxVerifyGraph(mGraph) != VX_SUCCESS)
     {
-
-        mContext = context;
-#ifdef MULTI_CONTEXT
+        LOG(ERROR)<<"verify graph fail";
+        nnAssert(0);
     }
-    else
-    {
-        mContext = vxCreateContext();
-    }
-#endif
-
-        getGraph(poolInfos);
-
-        if(vxVerifyGraph(mGraph) != VX_SUCCESS)
-        {
-            LOG(ERROR)<<"verify graph fail";
-            nnAssert(0);
-        }
-#ifndef MULTI_CONTEXT
-    }
-    else
-        LOG(ERROR) << "mContext is not null!";
-#endif
 
    /* initalizeEnv();*/
     return ANEURALNETWORKS_NO_ERROR;
@@ -2391,9 +2407,6 @@ int OvxExecutor::run(const Model& model, const Request& request,
         LOG(INFO)<<"time of copying  device to host: "<<(t3 - t2) * 1000<<"ms\n";
         }
 
-    /* Backup current context */
-    mPreContext = mContext;
-    mContext = nullptr;
 
     return ANEURALNETWORKS_NO_ERROR;
 }
@@ -2464,6 +2477,8 @@ bool OvxExecutor::initializeRunTimeInfo(const std::vector<VxRunTimePoolInfo>& re
 
 bool OvxExecutor::deinitializeRunTimeInfo() {
 
+    pthread_mutex_lock(mMutex);
+
     for (VxOperationInfo info : mOperationInfos)
     {
         if (info.node)vxReleaseNode((vx_node*)&info.node);
@@ -2510,12 +2525,14 @@ bool OvxExecutor::deinitializeRunTimeInfo() {
     }
 
 #ifdef MULTI_CONTEXT
-    if (mPreContext)
+    if (*mContext)
     {
-        vxReleaseContext(&mPreContext);
-        mPreContext = nullptr;
+        vxReleaseContext(mContext);
+        *mContext = nullptr;
     }
 #endif
+
+    pthread_mutex_unlock(mMutex);
 
 
     return true;

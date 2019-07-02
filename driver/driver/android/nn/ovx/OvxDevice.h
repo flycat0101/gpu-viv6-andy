@@ -30,13 +30,13 @@
 #ifndef ANDROID_ML_NN_SAMPLE_DRIVER_SAMPLE_DRIVER_H
 #define ANDROID_ML_NN_SAMPLE_DRIVER_SAMPLE_DRIVER_H
 
-//#include "CpuExecutor.h"
 #include "OvxExecutor.h"
 #include "HalInterfaces.h"
 #include "NeuralNetworks.h"
 #if ANDROID_SDK_VERSION > 27
 #include "ValidateHal.h"
 #endif
+#include <pthread.h>
 
 #include "VX/vx.h"
 
@@ -59,12 +59,20 @@ public:
 #ifndef MULTI_CONTEXT
         mContext = vxCreateContext();
 #endif
+        pthread_mutex_init(&mMutex, nullptr);
     }
     ~OvxDevice() override {
+
+        pthread_mutex_lock(&mMutex);
+
         if (mContext != nullptr)
         {
             vxReleaseContext(&mContext);
         }
+
+        pthread_mutex_unlock(&mMutex);
+
+        pthread_mutex_destroy(&mMutex);
     }
 #if ANDROID_SDK_VERSION < 28
     Return<ErrorStatus> prepareModel(const Model& model,
@@ -92,6 +100,9 @@ public:
     int run();
 protected:
     vx_context mContext = nullptr;
+
+    pthread_mutex_t mMutex;
+
     std::string mName;
 };
 
@@ -101,7 +112,7 @@ public:
           : // Make a copy of the model, as we need to preserve it.
             mModel(model) {}
     ~OvxPreparedModel() override {mExecutor->deinitializeRunTimeInfo();}
-    bool initialize(vx_context context);
+    bool initialize(vx_context* context, pthread_mutex_t* mutex);
     Return<ErrorStatus> execute(const Request& request,
                                 const sp<IExecutionCallback>& callback) override;
 

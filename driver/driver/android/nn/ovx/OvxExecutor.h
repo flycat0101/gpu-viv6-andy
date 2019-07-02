@@ -22,6 +22,8 @@
 #include <algorithm>
 #include <vector>
 
+#include <pthread.h>
+
 #include <VX/vx.h>
 #include <VX/vx_api.h>
 #include <VX/vx_khr_cnn.h>
@@ -143,7 +145,7 @@ public:
     int run(const Model& model, const Request& request,
         const std::vector<VxRunTimePoolInfo>& requestPoolInfos);
 
-    int initalize(vx_context context, const Model* model, std::vector<VxRunTimePoolInfo>* poolInfos);
+    int initalize(vx_context* context, pthread_mutex_t* mutex, const Model* model, std::vector<VxRunTimePoolInfo>* poolInfos);
 
     bool deinitializeRunTimeInfo();
 
@@ -168,11 +170,11 @@ private:
     void initalizeEnv();
     vx_status convertScalar2Tensor(VxRunTimeReferenceInfo* info);
 
-    vx_context mContext = nullptr;
-
-    vx_context mPreContext = nullptr;
+    vx_context* mContext = nullptr;
 
     vx_graph mGraph = nullptr;
+
+    pthread_mutex_t* mMutex = nullptr;
 
     bool initializeRunTimeInfo(const std::vector<VxRunTimePoolInfo>& requestPoolInfos);
 
