@@ -2606,23 +2606,32 @@ VkResult halti5_dispatch(
     VkResult result;
     __vkDrawComputeCmdParams cmdParams;
     __vkDevContext *devCtx = cmdBuf->devCtx;
+    VkBool32 needWorkaround = VK_FALSE;
+    VkBool32 doWorkaround = VK_FALSE;
+    __vkPhysicalDevice *phyDev = devCtx->pPhyDevice;
+    uint32_t chipModel = phyDev->phyDevConfig.chipModel;
+    uint32_t chipRevision = phyDev->phyDevConfig.chipRevision;
 
     __VK_ASSERT(cmdBuf->curScrachBufIndex == 0);
 
-    if ((hints->workGrpSize.x == 1) && (hints->workGrpSize.y == 1) && (hints->workGrpSize.z == 1) &&
+    if (chipModel == gcv7000 && chipRevision == 0x6009)
+    {
+        needWorkaround = VK_TRUE;
+    }
+
+    if (needWorkaround &&(hints->workGrpSize.x == 1) && (hints->workGrpSize.y == 1) && (hints->workGrpSize.z == 1) &&
        (!(hints->memoryAccessFlags[gcvSHADER_MACHINE_LEVEL][gcvPROGRAM_STAGE_COMPUTE] & gceMA_FLAG_BARRIER)) &&
        (hints->localMemSizeInByte == 0) && (!hints->useLocalId) && (!hints->useGroupId) &&
        (!hints->useGPRSpill[gcvPROGRAM_STAGE_COMPUTE]) && (x == y))
     {
-        uint32_t globalSize[3];
-        uint32_t preferSize[3] = {0};
+        uint32_t globalSize[2];
+        uint32_t preferSize[2] = {0};
         uint32_t i, j;
 
         globalSize[0] = x;
         globalSize[1] = y;
-        globalSize[2] = z;
 
-        for (i = 0; i < 3; i++)
+        for (i = 0; i < 2; i++)
         {
             VkBool32 isFound = VK_FALSE;
             if (globalSize[i] > 4)
@@ -2653,7 +2662,7 @@ VkResult halti5_dispatch(
 
         hints->workGrpSize.x = preferSize[0];
         hints->workGrpSize.y = preferSize[1];
-        hints->workGrpSize.z = preferSize[2];
+        doWorkaround = VK_TRUE;
     }
 
     if (chipCmptPipeline->chipPipeline.tweakHandler)
@@ -2727,6 +2736,14 @@ VkResult halti5_dispatch(
 
         halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
     }
+
+    if (needWorkaround && doWorkaround)
+    {
+        hints->workGrpSize.x = 1;
+        hints->workGrpSize.y = 1;
+        hints->workGrpSize.z = 1;
+    }
+
     cmdBuf->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
 
     __VK_ASSERT(cmdBuf->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);
