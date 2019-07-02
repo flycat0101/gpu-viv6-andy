@@ -48,28 +48,11 @@ OBJECTS	:=	$(OBJS)
 A		:=	$(CLC_DIR)/compiler/$(OBJ_DIR)/libclCompiler.a
 A		+=	$(CLC_DIR)/preprocessor/$(OBJ_DIR)/libclPreprocessor.a
 A		+=	$(CLC_DIR)/common/$(OBJ_DIR)/libclCommon.a
-#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/FrontendTool/$(OBJ_DIR)/libclangFrontendTool.a
-#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/Frontend/$(OBJ_DIR)/libclangFrontend.a
-#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/Basic/$(OBJ_DIR)/libclangBasic.a
-#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/Driver/$(OBJ_DIR)/libclangDriver.a
-#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/Lex/$(OBJ_DIR)/libclangLex.a
-#A		+=	$(CLC_DIR)/llvm/lib/Support/$(OBJ_DIR)/libllvmSupport.a
-#A		+=	$(CLC_DIR)/llvm/lib/System/$(OBJ_DIR)/libllvmSystem.a
-#A		+=	$(CLC_DIR)/llvm/lib/VMCore/$(OBJ_DIR)/libllvmVMCore.a
-#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/FrontendTool/$(OBJ_DIR)/libclangFrontendTool.a
-#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/Frontend/$(OBJ_DIR)/libclangFrontend.a
-#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/Basic/$(OBJ_DIR)/libclangBasic.a
-#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/Driver/$(OBJ_DIR)/libclangDriver.a
-#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/Lex/$(OBJ_DIR)/libclangLex.a
-#A		+=	$(CLC_DIR)/llvm/lib/Support/$(OBJ_DIR)/libllvmSupport.a
-#A		+=	$(CLC_DIR)/llvm/lib/System/$(OBJ_DIR)/libllvmSystem.a
-#A		+=	$(CLC_DIR)/llvm/lib/VMCore/$(OBJ_DIR)/libllvmVMCore.a
 
 LIBS	+=	$(A)
 
 LIBS	+=	-L$(CLC_DIR)/../libVSC/$(OBJ_DIR) -lVSC
 LIBS	+=	-L$(GAL_DIR)/user/$(OBJ_DIR) -lGAL
-LIBS    +=	-L$(CLC_DIR)/llvm/$(OBJ_DIR) -lLLVM_viv
 
 LIBS	+=	-lm -lpthread -ldl
 

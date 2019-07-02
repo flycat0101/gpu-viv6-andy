@@ -19,13 +19,12 @@ include ./makefile.linux.def
 ######################################################
 # Components of the project.
 
-CLC_LLVM			:= llvm
 CLC_COMMON			:= common
 CLC_COMPILER		:= compiler
 CLC_PREPROCESSOR	:= preprocessor
 CLC_ENTRY			:= entry
 
-LIB_CLC	:= $(CLC_COMMON) $(CLC_COMPILER) $(CLC_PREPROCESSOR) $(CLC_LLVM)  $(CLC_ENTRY)
+LIB_CLC	:= $(CLC_COMMON) $(CLC_COMPILER) $(CLC_PREPROCESSOR) $(CLC_ENTRY)
 
 ######################################################
 # Define the macros used in the common file.
@@ -41,5 +40,4 @@ include $(AQROOT)/common.node
 ######################################################
 # Define the denpendencies.
 
-$(CLC_LLVM): $(CLC_COMMON) $(CLC_COMPILER) $(CLC_PREPROCESSOR)
-$(CLC_ENTRY): $(CLC_LLVM)
+$(CLC_ENTRY): $(CLC_COMMON) $(CLC_COMPILER) $(CLC_PREPROCESSOR)
