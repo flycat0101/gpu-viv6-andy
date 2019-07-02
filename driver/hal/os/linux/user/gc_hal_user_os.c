@@ -2436,7 +2436,7 @@ gcoOS_AllocateMemory(
     )
 {
     gceSTATUS status;
-    gctPOINTER memory;
+    gctPOINTER memory = gcvNULL;
 
     gcmHEADER_ARG("Bytes=%lu", Bytes);
 
@@ -2507,6 +2507,13 @@ gcoOS_AllocateMemory(
     return gcvSTATUS_OK;
 
 OnError:
+#if VIVANTE_PROFILER_SYSTEM_MEMORY
+    if (memory)
+    {
+        free(memory);
+    }
+#endif
+
     /* Return the status. */
     gcmFOOTER();
     return status;

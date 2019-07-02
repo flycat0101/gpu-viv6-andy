@@ -5089,6 +5089,43 @@ static gcsHARDWARE_ExeFuncs _Funcs =
 
 #if (gcdENABLE_3D || gcdENABLE_2D)
 static gceSTATUS
+_DestroyDelta(
+    IN gcsSTATE_DELTA_PTR delta
+)
+{
+    gctUINT_PTR mapEntryIndex = gcmUINT64_TO_PTR(delta->mapEntryIndex);
+    gctUINT_PTR mapEntryID = gcmUINT64_TO_PTR(delta->mapEntryID);
+    gcsSTATE_DELTA_RECORD_PTR recordArray = gcmUINT64_TO_PTR(delta->recordArray);
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER();
+
+    /* Free map index array. */
+    if (mapEntryIndex != gcvNULL)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE_SHARED_MEMORY(gcvNULL, mapEntryIndex));
+    }
+
+    /* Allocate map ID array. */
+    if (mapEntryID != gcvNULL)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE_SHARED_MEMORY(gcvNULL, mapEntryID));
+    }
+
+    /* Free state record array. */
+    if (recordArray != gcvNULL)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE_SHARED_MEMORY(gcvNULL, recordArray));
+    }
+
+OnError:
+
+    /* Return the status. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS
 _AllocateDelta(
     IN gcoHARDWARE Hardware,
     OUT gcsSTATE_DELTA_PTR * Delta
@@ -5163,45 +5200,16 @@ _AllocateDelta(
     return status;
 
 OnError:
+    if (delta)
+    {
+        _DestroyDelta(delta);
+
+        /* Free state delta. */
+        gcmOS_SAFE_FREE_SHARED_MEMORY(gcvNULL, delta);
+    }
+
     gcmFOOTER_NO();
     return status;
-}
-
-static gceSTATUS
-_DestroyDelta(
-    IN gcsSTATE_DELTA_PTR delta
-)
-{
-    gctUINT_PTR mapEntryIndex = gcmUINT64_TO_PTR(delta->mapEntryIndex);
-    gctUINT_PTR mapEntryID = gcmUINT64_TO_PTR(delta->mapEntryID);
-    gcsSTATE_DELTA_RECORD_PTR recordArray = gcmUINT64_TO_PTR(delta->recordArray);
-    gceSTATUS status = gcvSTATUS_OK;
-
-    gcmHEADER();
-
-    /* Free map index array. */
-    if (mapEntryIndex != gcvNULL)
-    {
-        gcmONERROR(gcmOS_SAFE_FREE_SHARED_MEMORY(gcvNULL, mapEntryIndex));
-    }
-
-    /* Allocate map ID array. */
-    if (mapEntryID != gcvNULL)
-    {
-        gcmONERROR(gcmOS_SAFE_FREE_SHARED_MEMORY(gcvNULL, mapEntryID));
-    }
-
-    /* Free state record array. */
-    if (recordArray != gcvNULL)
-    {
-        gcmONERROR(gcmOS_SAFE_FREE_SHARED_MEMORY(gcvNULL, recordArray));
-    }
-
-OnError:
-
-    /* Return the status. */
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
 }
 
 static gceSTATUS
