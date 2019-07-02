@@ -724,10 +724,23 @@ static VkResult deqp_vk_msaa_128bpp_01_tweak(
     __vkShaderModule *pPsShaderModule = 0;
     uint32_t i;
     uint32_t *pCode;
-    VkBool32 bMatch = gcvFALSE;
+    VkBool32 bMatch = VK_FALSE;
+    VkBool32 bFound = VK_FALSE;
     __VK_SET_ALLOCATIONCB(&devCtx->memCb);
 
-    pPsShaderModule = (__vkShaderModule * )(uintptr_t)(graphicCreateInfo->pStages[1].module);
+    for (i = 0; i < graphicCreateInfo->stageCount; i++)
+    {
+        if (graphicCreateInfo->pStages[i].stage == VK_SHADER_STAGE_FRAGMENT_BIT)
+        {
+            bFound = VK_TRUE;
+            break;
+        }
+    }
+
+    if (!bFound)
+        return VK_SUCCESS;
+
+    pPsShaderModule = (__vkShaderModule * )(uintptr_t)(graphicCreateInfo->pStages[i].module);
 
     /* Modify FS spirv binary. */
     pCode = (uint32_t*)pPsShaderModule->pCode;
