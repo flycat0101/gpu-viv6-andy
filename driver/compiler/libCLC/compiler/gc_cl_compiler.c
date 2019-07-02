@@ -1985,6 +1985,8 @@ IN gctBOOL Enable
     else {
         Compiler->context.extensions &= ~Extension;
     }
+    clScanInitLanguageVersion(Compiler->langVersion,
+                              Compiler->context.extensions);
     return gcvSTATUS_OK;
 }
 
