@@ -389,6 +389,12 @@ VX_INTERNAL_API vx_enum vxoGraph_getKernelType(vx_node node)
             nodeOpType = OP_ROIPOOL;
             break;
         }
+    case VX_KERNEL_TENSOR_MULTIPLY:
+    case VX_KERNEL_NN_TENSOR_DIV:
+        {
+            nodeOpType =  OP_ELTWISE_ASMD;
+            break;
+        }
     default:
         break;
     }
