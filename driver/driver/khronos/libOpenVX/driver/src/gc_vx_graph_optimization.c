@@ -1204,6 +1204,33 @@ VX_INTERNAL_API vx_bool vxoGraph_Optimization_isSameShapeTensor(vx_tensor tensor
     return vx_true_e;
 }
 
+VX_PRIVATE_API vx_status vxoGraph_Optimization_replaceOldTensorBynewTensorWithOldShape(vx_node *currentNode, vx_uint32 idex, vx_tensor newTensor)
+{
+    vx_uint32 i = 0;
+    vx_tensor oldTensor = (vx_tensor)(*currentNode)->paramTable[idex];
+    vx_tensor replaceTensor = newTensor;
+    gcmHEADER_ARG("currentNode=%p, idex=0x%x, newTensor=%p", currentNode, idex, newTensor);
+
+    for(i = 0; i < TENSOR_DIM_NUM(oldTensor); i++)
+    {
+        if(TENSOR_SIZE_INDEX(oldTensor, i) != TENSOR_SIZE_INDEX(newTensor, i))
+            break;
+    }
+
+    if(i != TENSOR_DIM_NUM(oldTensor))
+    {
+        replaceTensor = vxReshapeTensor(newTensor, (vx_int32 *)TENSOR_SIZES(oldTensor), TENSOR_DIM_NUM(oldTensor));
+    }
+
+    vxoNode_SetParameter(*currentNode, idex, (vx_reference)replaceTensor);
+
+    if(replaceTensor != newTensor)
+        vxReleaseTensor(&replaceTensor);
+
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
+    return VX_SUCCESS;
+}
+
 VX_INTERNAL_API vx_status vxoGraph_MergeConvolutionNodes(vx_node nodes[], vx_uint32 nodeCount)
 {
     vx_node newNode = VX_NULL;
@@ -1418,13 +1445,13 @@ VX_INTERNAL_API vx_status vxoGraph_MergeFullyConnectedNodes(vx_node nodes[], vx_
         newNodeflag = vx_true_e;
     }
 
+    /*replace fc's output with relu's output, but reshape it as fc's output*/
     if(nodeCount >1)
     {
-        vx_reference tmp = nodes[0]->paramTable[PARAM_FULLYCONNECTED_RELU_OUTPUT_INDEX];
-        SCALAR_VALUE(nodes[0]->paramTable[PARAM_FULLYCONNECTED_RELU_ENABLE_RELU_INDEX], b) = vx_true_e;
+        vx_tensor reluOut = (vx_tensor)nodes[1]->paramTable[PARAM_RELU_OUTPUT_INDEX];
+        vxoGraph_Optimization_replaceOldTensorBynewTensorWithOldShape(nodes, PARAM_FULLYCONNECTED_RELU_OUTPUT_INDEX, reluOut);
 
-        nodes[0]->paramTable[PARAM_FULLYCONNECTED_RELU_OUTPUT_INDEX] = nodes[1]->paramTable[PARAM_RELU_OUTPUT_INDEX];
-        nodes[1]->paramTable[PARAM_RELU_OUTPUT_INDEX] = tmp;
+        SCALAR_VALUE(nodes[0]->paramTable[PARAM_FULLYCONNECTED_RELU_ENABLE_RELU_INDEX], b) = vx_true_e;
         nodes[1]->merged = vx_true_e;
     }
 
@@ -1646,33 +1673,6 @@ VX_INTERNAL_API vx_status vxoGraph_ConcatTensors(vx_context context, vx_tensor* 
         tensorsSub[i] = vxCreateTensorFromView(tensorPool, (vx_size)dimCount, viewStart, viewEnd);   CHECK_NULL(tensorsSub[i]);
         prevEnd = viewEnd[concatAxis];
     }
-    gcmFOOTER_ARG("%d", VX_SUCCESS);
-    return VX_SUCCESS;
-}
-
-VX_PRIVATE_API vx_status vxoGraph_Optimization_replaceOldTensorBynewTensorWithOldShape(vx_node *currentNode, vx_uint32 idex, vx_tensor newTensor)
-{
-    vx_uint32 i = 0;
-    vx_tensor oldTensor = (vx_tensor)(*currentNode)->paramTable[idex];
-    vx_tensor replaceTensor = newTensor;
-    gcmHEADER_ARG("currentNode=%p, idex=0x%x, newTensor=%p", currentNode, idex, newTensor);
-
-    for(i = 0; i < TENSOR_DIM_NUM(oldTensor); i++)
-    {
-        if(TENSOR_SIZE_INDEX(oldTensor, i) != TENSOR_SIZE_INDEX(newTensor, i))
-            break;
-    }
-
-    if(i != TENSOR_DIM_NUM(oldTensor))
-    {
-        replaceTensor = vxReshapeTensor(newTensor, (vx_int32 *)TENSOR_SIZES(oldTensor), TENSOR_DIM_NUM(oldTensor));
-    }
-
-    vxoNode_SetParameter(*currentNode, idex, (vx_reference)replaceTensor);
-
-    if(replaceTensor != newTensor)
-        vxReleaseTensor(&replaceTensor);
-
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
