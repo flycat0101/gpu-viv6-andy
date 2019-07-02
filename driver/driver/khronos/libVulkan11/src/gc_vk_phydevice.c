@@ -1260,7 +1260,7 @@ static VkResult __vki_InitializePhysicalDevice(
     {
         uint32_t fmt;
 
-        for (fmt = VK_FORMAT_ASTC_4x4_UNORM_BLOCK; fmt < VK_FORMAT_ASTC_12x12_SRGB_BLOCK; ++fmt)
+        for (fmt = VK_FORMAT_ASTC_4x4_UNORM_BLOCK; fmt <= VK_FORMAT_ASTC_12x12_SRGB_BLOCK; ++fmt)
         {
             __VK_MEMZERO(&g_vkFormatInfoTable[fmt].formatProperties, sizeof(VkFormatProperties));
         }
