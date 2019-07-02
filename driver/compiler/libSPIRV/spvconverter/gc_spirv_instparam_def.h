@@ -926,7 +926,7 @@
         { OperandId, OperandId, OperandId, OperandImageOperands, OperandVariableIds },
         { "Sampled Image", "Coordinate", "Dref", "Optional Image Operands", "" },
         { gcvNULL },
-        VIR_OP_TEXLD, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        VIR_OP_TEXLDPCF, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* SpvOpImageSampleDrefExplicitLod = 90 */
@@ -937,7 +937,7 @@
         { OperandId, OperandId, OperandId, OperandImageOperands, OperandVariableIds },
         { "Sampled Image", "Coordinate", "Dref", "Optional Image Operands", "" },
         { gcvNULL },
-        VIR_OP_TEXLD, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        VIR_OP_TEXLDPCF, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* SpvOpImageSampleProjImplicitLod = 91 */
@@ -970,7 +970,7 @@
         { OperandId, OperandId, OperandId, OperandImageOperands, OperandVariableIds },
         { "Sampled Image", "Coordinate", "Dref", "Optional Image Operands", "" },
         { gcvNULL },
-        VIR_OP_TEXLDPROJ, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        VIR_OP_TEXLDPCFPROJ, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* SpvOpImageSampleProjDrefExplicitLod = 94 */
@@ -981,7 +981,7 @@
         { OperandId, OperandId, OperandId, OperandImageOperands, OperandVariableIds },
         { "Sampled Image", "Coordinate", "Dref", "Optional Image Operands", "" },
         { gcvNULL },
-        VIR_OP_TEXLDPROJ, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        VIR_OP_TEXLDPCFPROJ, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* SpvOpImageFetch = 95 */
