@@ -259,13 +259,6 @@ VX_INTERNAL_API vx_enum vxoGraph_getKernelType(vx_node node)
                 vx_enum roundMode = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_ROUND_MODE_INDEX], u32);
                 if(TENSOR_DATA_TYPE(input) != TENSOR_DATA_TYPE(output))
                     break;
-                if(kernelx > 15 || kernely > 15)
-                    break;
-                if(kernely != kernelx &&
-                    ((kernelx > 1 && kernely != 1) || (kernely > 1 && kernelx != 1) )
-                   )
-                    break;
-
                 if(roundMode == VX_NN_DS_SIZE_ROUNDING_FLOOR)
                 {
                     nodeOpType = OP_AVG_POOL;
@@ -2290,34 +2283,7 @@ VX_INTERNAL_API vx_status vxoGraph_Optimization_ConvertAvgPool2Conv(vx_graph gra
     vx_node* nodeTable = graph->nodeTable;
     gcmHEADER_ARG("graph=%p", graph);
     vxmASSERT(graph);
-    /*
-    the avg_pool node could be converted to conv, if statisfying either of the below condition:
-    a. AvgPool rounding mode is FLOOR.
-    b. AvgPool rounding mode is ceil, and output = input + 2 * pad - kernel) /stride & is interger.
 
-    besides that, datat type intput and output must be same.
-
-    convert steps:
-    1. identify avgpool that statify the condition.
-    2. create weight:
-        size:[kernel_x, kernel_y, 1, input_channels]
-        data: 1.0f/(kernel_x * kernel_y)
-
-        fp16:
-            convert FP32 to fp16
-
-        uint8:
-            parameter:
-                scale:  data/255
-                zp:     0
-            quantize data:  int(data / scale + zp).
-
-        int8:
-            fl: min(12, 8 - ceil(log2(data) + 1 ))
-            quantized data: int(data^fl)
-
-    4. depthwise convolution
-    */
     for (nodeIndex = 0; nodeIndex < nodeCount; nodeIndex++)
     {
         vx_node node = nodeTable[nodeIndex];
@@ -2343,18 +2309,34 @@ VX_INTERNAL_API vx_status vxoGraph_Optimization_ConvertAvgPool2Conv(vx_graph gra
 
             stride_x = stride_x == 0? 1: stride_x;
             stride_y = stride_y == 0? 1: stride_y;
-            if(TENSOR_SIZE_INDEX(input, 2) * TENSOR_SIZE_INDEX(input, 2) > 100000)
-                continue;
-
-            if(weight_dims[0]>3 || weight_dims[1] > 3)
-                continue;
 
             if(!vxoGraphOptimization_nnHalSupport(input))
                 continue;
 
-            if((weight_dims[0] * weight_dims[1] * weight_dims[2] == 1) || (kernel_x != kernel_y) )
-                continue;
+            /*V8 support depwiseConv hardware feature*/
+            if(vxoGraphOptimization_isV8((vx_reference)input))
+            {
+                vx_uint32 actual_x = stride_x > 1? vxoGraphOptimization_computeFinalKernelSize(kernel_x, stride_x) : kernel_x;
+                vx_uint32 actual_y = stride_y > 1? vxoGraphOptimization_computeFinalKernelSize(kernel_y, stride_y): kernel_y;
+                if(actual_x > 15 || actual_y>15)
+                    continue;
+            }
+            else
+            {
+                if(kernel_y != kernel_x &&
+                    ((kernel_x > 1 && kernel_y != 1) || (kernel_y > 1 && kernel_x != 1) )
+                    )
+                    continue;
 
+                if(TENSOR_SIZE_INDEX(input, 2) * TENSOR_SIZE_INDEX(input, 2) > 100000)
+                    continue;
+
+                if(weight_dims[0]>3 || weight_dims[1] > 3)
+                    continue;
+
+                if((weight_dims[0] * weight_dims[1] * weight_dims[2] == 1))
+                    continue;
+            }
             weight = vxoGraph_Optimization_ConvertAvgPool2Conv_createWeight(input, weight_dims);
 
             {
