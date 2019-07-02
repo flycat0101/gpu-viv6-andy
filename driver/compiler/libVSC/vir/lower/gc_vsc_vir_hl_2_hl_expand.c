@@ -90,7 +90,7 @@ _EvaluateLocation(
 {
     gctINT                       location = *Location;
 
-    location += 1;
+    location += VIR_Symbol_GetVirIoRegCount(Shader, Symbol);
 
     *Location = location;
 
@@ -237,11 +237,11 @@ _AddGeneralVariable(
         if (Location)
         {
             _EvaluateLocation(Shader,
-                Symbol,
-                Type,
-                VariableKind,
-                StorageClass,
-                Location);
+                              Symbol,
+                              Type,
+                              VariableKind,
+                              StorageClass,
+                              Location);
         }
         VIR_Symbol_SetPrecision(sym, VIR_Symbol_GetPrecision(Symbol));
 
