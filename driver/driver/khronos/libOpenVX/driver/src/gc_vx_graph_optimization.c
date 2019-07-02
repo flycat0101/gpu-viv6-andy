@@ -4165,6 +4165,9 @@ VX_INTERNAL_API vx_status vxoGraph_Optimization_eltwiseOp(vx_graph graph)
                 CHECK_NULL(newinput0);
                 CHECK_NULL(newinput1);
                 CHECK_NULL(newoutput);
+                newinput0->reshape = tensorIn[0];
+                newinput1->reshape = tensorIn[1];
+                newoutput->reshape = output;
 
                 CHECK_STATUS(vxoNode_SetParameter(node, 0, (vx_reference)newinput0) );
                 CHECK_STATUS(vxoNode_SetParameter(node, 1, (vx_reference)newinput1) );
