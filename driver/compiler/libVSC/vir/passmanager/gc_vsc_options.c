@@ -3868,11 +3868,27 @@ void VSC_OPTN_Options_MergeVCEnvOption(
     }
 
     {
-        if (gcmOPT_EnableDebug())
+        /* turn off most opts when debugging mode is turned on */
+        if (gcmOPT_EnableDebugMode())
         {
             VSC_OPTN_ISOptions_SetSwitchOn(VSC_OPTN_Options_GetISOptions(options, 0), gcvFALSE);
             VSC_OPTN_ISOptions_SetSwitchOn(VSC_OPTN_Options_GetISOptions(options, 1), gcvFALSE);
+            VSC_OPTN_SCPPOptions_SetSwitchOn(VSC_OPTN_Options_GetSCPPOptions(options, 0), gcvFALSE);
             VSC_OPTN_LoopOptsOptions_SetSwitchOn(VSC_OPTN_Options_GetLoopOptsOptions(options, 0), gcvFALSE);
+            VSC_OPTN_CFOOptions_SetSwitchOn(VSC_OPTN_Options_GetCFOOptions(options, 0), gcvFALSE);
+            VSC_OPTN_CFOOptions_SetSwitchOn(VSC_OPTN_Options_GetCFOOptions(options, 1), gcvFALSE);
+            VSC_OPTN_ILOptions_SetSwitchOn(VSC_OPTN_Options_GetInlinerOptions(options, 0), gcvFALSE);
+            VSC_OPTN_SCLOptions_SetSwitchOn(VSC_OPTN_Options_GetSCLOptions(options, 0), gcvFALSE);
+            VSC_OPTN_PHOptions_SetSwitchOn(VSC_OPTN_Options_GetPHOptions(options, 0), gcvFALSE);
+            VSC_OPTN_SIMPOptions_SetSwitchOn(VSC_OPTN_Options_GetSIMPOptions(options, 0), gcvFALSE);
+            VSC_OPTN_CPPOptions_SetSwitchOn(VSC_OPTN_Options_GetCPPOptions(options, 0), gcvFALSE);
+            VSC_OPTN_CPPOptions_SetSwitchOn(VSC_OPTN_Options_GetCPPOptions(options, 1), gcvFALSE);
+            VSC_OPTN_CPFOptions_SetSwitchOn(VSC_OPTN_Options_GetCPFOptions(options, 0), gcvFALSE);
+            VSC_OPTN_VECOptions_SetSwitchOn(VSC_OPTN_Options_GetVECOptions(options, 0), gcvFALSE);
+            VSC_OPTN_LCSEOptions_SetSwitchOn(VSC_OPTN_Options_GetLCSEOptions(options, 0), gcvFALSE);
+            VSC_OPTN_DCEOptions_SetSwitchOn(VSC_OPTN_Options_GetDCEOptions(options, 0), gcvFALSE);
+            VSC_OPTN_DCEOptions_SetSwitchOn(VSC_OPTN_Options_GetDCEOptions(options, 1), gcvFALSE);
+            VSC_OPTN_DUAL16Options_SetSwitchOn(VSC_OPTN_Options_GetDUAL16Options(options, 0), gcvFALSE);
         }
     }
 }

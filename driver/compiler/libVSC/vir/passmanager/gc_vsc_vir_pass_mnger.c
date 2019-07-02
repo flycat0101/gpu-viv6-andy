@@ -46,8 +46,12 @@ void vscInitializeOptions(VSC_OPTN_Options* pOptions,
     /* Set the options by compile flags. */
     VSC_OPTN_Options_SetOptionsByCompileFlags(pOptions, cFlags);
 
-    /* Set the options by Optflags. */
-    VSC_OPTN_Options_SetOptionsByOptFlags(pOptions, optFlags);
+    /* Set the options by Optflags, only when the opt level is not default, */
+    /* to avoid overriding the opt level env var */
+    if (optLevel == 2)
+    {
+        VSC_OPTN_Options_SetOptionsByOptFlags(pOptions, optFlags);
+    }
 
     /* Set some special options, e.g. SW/HW limitations. */
     VSC_OPTN_Options_SetSpecialOptions(pOptions, pHwCfg);

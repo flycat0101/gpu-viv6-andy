@@ -1729,6 +1729,7 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_EnableDebug()        (gcmGetOptimizerOption()->enableDebug > 0)
 #define gcmOPT_EnableDebugDump()    (gcmGetOptimizerOption()->enableDebug > 1)
 #define gcmOPT_EnableDebugDumpALL() (gcmGetOptimizerOption()->enableDebug > 2)
+#define gcmOPT_EnableDebugMode()    (gcmGetOptimizerOption()->enableDebug == 4)
 #define gcmOPT_INLINERKIND()        (gcmGetOptimizerOption()->inlinerKind)
 #define gcmOPT_INLINELEVEL()        (gcmGetOptimizerOption()->inlineLevel)
 #define gcmOPT_SetINLINELEVEL(v)    (gcmGetOptimizerOptionVariable()->inlineLevel = (v))

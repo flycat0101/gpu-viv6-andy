@@ -28451,7 +28451,7 @@ gcGetOptionFromEnv(
 
              /* debug option:
 
-                VC_OPTION=-DEBUG:0|1
+                VC_OPTION=-DEBUG:0|1|2|3|4
 
             */
             gcoOS_StrStr(p, "-DEBUG:", &pos);
@@ -28480,6 +28480,11 @@ gcGetOptionFromEnv(
                 {
                     /* enable debug and detail debug dump */
                     Option->enableDebug = 3;
+                }
+                else if (value == 4)
+                {
+                    /* enable debug mode. Most opts will be turned off in this mode. */
+                    Option->enableDebug = 4;
                 }
             }
             /* Replace specified shader's source code with the contents in

@@ -382,9 +382,9 @@ VIR_CFO_PerformOnFunction(
             globalChanged |= localChanged;
         }
 
-        if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetOpts(options), VSC_OPTN_CFOOptions_OPTS_GEN_SELECT))
+        if(VSC_UTILS_MASK(VSC_OPTN_CFOOptions_GetOpts(options), VSC_OPTN_CFOOptions_OPTS_GEN_SELECT))
         {
-            if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(options), VSC_OPTN_CFOOptions_TRACE_GEN_SELECT_INPUT))
+            if(VSC_UTILS_MASK(VSC_OPTN_CFOOptions_GetTrace(options), VSC_OPTN_CFOOptions_TRACE_GEN_SELECT_INPUT))
             {
                 VIR_Dumper* dumper = VIR_CFO_GetDumper(cfo);
                 VIR_LOG(dumper, "select generation starts for function\n");
@@ -392,7 +392,7 @@ VIR_CFO_PerformOnFunction(
                 VIR_Function_Dump(dumper, func);
             }
             _VIR_CFO_PerformSelectGenerationOnFunction(cfo, func, &localChanged);
-            if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(options), VSC_OPTN_CFOOptions_TRACE_GEN_SELECT_OUTPUT))
+            if(VSC_UTILS_MASK(VSC_OPTN_CFOOptions_GetTrace(options), VSC_OPTN_CFOOptions_TRACE_GEN_SELECT_OUTPUT))
             {
                 VIR_Dumper* dumper = VIR_CFO_GetDumper(cfo);
                 VIR_LOG(dumper, "select generation ends for function\n");
