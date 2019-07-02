@@ -1922,6 +1922,7 @@ static VSC_ErrCode _ProgramVS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     /* Program gpr spill */
     if (pVsSEP->exeHints.derivedHints.globalStates.bGprSpilled)
     {
+        pStatesPgmer->pHints->useGPRSpill[gcvPROGRAM_STAGE_VERTEX] = gcvTRUE;
         errCode = _ProgramVsGprSpill(pShHwInfo, pStatesPgmer);
         ON_ERROR(errCode, "Program VS grp spill");
     }
@@ -2650,6 +2651,7 @@ static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     /* Program gpr spill */
     if (pHsSEP->exeHints.derivedHints.globalStates.bGprSpilled)
     {
+        pStatesPgmer->pHints->useGPRSpill[gcvPROGRAM_STAGE_TCS] = gcvTRUE;
         errCode = _ProgramHsGprSpill(pShHwInfo, pStatesPgmer);
         ON_ERROR(errCode, "Program HS grp spill");
     }
@@ -3172,6 +3174,7 @@ static VSC_ErrCode _ProgramDS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     /* Program gpr spill */
     if (pDsSEP->exeHints.derivedHints.globalStates.bGprSpilled)
     {
+        pStatesPgmer->pHints->useGPRSpill[gcvPROGRAM_STAGE_TES] = gcvTRUE;
         errCode = _ProgramDsGprSpill(pShHwInfo, pStatesPgmer);
         ON_ERROR(errCode, "Program DS grp spill");
     }
@@ -3897,6 +3900,7 @@ static VSC_ErrCode _ProgramGS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     /* Program gpr spill */
     if (pGsSEP->exeHints.derivedHints.globalStates.bGprSpilled)
     {
+        pStatesPgmer->pHints->useGPRSpill[gcvPROGRAM_STAGE_GEOMETRY] = gcvTRUE;
         errCode = _ProgramGsGprSpill(pShHwInfo, pStatesPgmer);
         ON_ERROR(errCode, "Program GS grp spill");
     }
@@ -7168,6 +7172,7 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     /* Program gpr spill */
     if (pPsSEP->exeHints.derivedHints.globalStates.bGprSpilled)
     {
+        pStatesPgmer->pHints->useGPRSpill[gcvPROGRAM_STAGE_FRAGMENT] = gcvTRUE;
         errCode = _ProgramPsGprSpill(pShHwInfo, pStatesPgmer);
         ON_ERROR(errCode, "Program PS grp spill");
     }
@@ -7436,6 +7441,8 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
     pStatesPgmer->pHints->workGrpSize.y = pGpsSEP->exeHints.nativeHints.prvStates.gps.threadGrpDimY;
     pStatesPgmer->pHints->workGrpSize.z = pGpsSEP->exeHints.nativeHints.prvStates.gps.threadGrpDimZ;
     pStatesPgmer->pHints->threadGroupSync = pGpsSEP->exeHints.derivedHints.prvStates.gps.bThreadGroupSync;
+    pStatesPgmer->pHints->useGroupId = (pGpsSEP->inputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_THREADGROUPID].ioIndexMask != 0);
+    pStatesPgmer->pHints->useLocalId = (pGpsSEP->inputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_THREADIDINGROUP].ioIndexMask != 0);
 
     _ProgramSamplerCountInfo(pShHwInfo, pStatesPgmer, gcvFALSE);
 
@@ -7589,6 +7596,14 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
         /* Program gpr spill */
         if (pGpsSEP->exeHints.derivedHints.globalStates.bGprSpilled)
         {
+            if ((SHADER_CLIENT)DECODE_SHADER_CLIENT(pShHwInfo->pSEP->shVersionType) == gcvPROGRAM_STAGE_OPENCL)
+            {
+                pStatesPgmer->pHints->useGPRSpill[gcvPROGRAM_STAGE_OPENCL] = gcvTRUE;
+            }
+            else
+            {
+                pStatesPgmer->pHints->useGPRSpill[gcvPROGRAM_STAGE_COMPUTE] = gcvTRUE;
+            }
             /* Do not program the reg spill memory when multi-GPU is enabled, let driver programs it. */
             if (!pGpsSEP->exeHints.derivedHints.globalStates.bEnableMultiGPU)
             {
@@ -7660,6 +7675,14 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
         /* Program gpr spill */
         if (pGpsSEP->exeHints.derivedHints.globalStates.bGprSpilled)
         {
+            if ((SHADER_CLIENT)DECODE_SHADER_CLIENT(pShHwInfo->pSEP->shVersionType) == gcvPROGRAM_STAGE_OPENCL)
+            {
+                pStatesPgmer->pHints->useGPRSpill[gcvPROGRAM_STAGE_OPENCL] = gcvTRUE;
+            }
+            else
+            {
+                pStatesPgmer->pHints->useGPRSpill[gcvPROGRAM_STAGE_COMPUTE] = gcvTRUE;
+            }
             /* Do not program the reg spill memory when multi-GPU is enabled, let driver programs it. */
             if (!pGpsSEP->exeHints.derivedHints.globalStates.bEnableMultiGPU)
             {

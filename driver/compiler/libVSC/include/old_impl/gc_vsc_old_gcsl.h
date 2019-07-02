@@ -113,11 +113,12 @@ BEGIN_EXTERN_C()
 /* bump up version to 1.29 for new header with chipModel and chpRevision on 03/19/2019 */
 /* bump up version to 1.30 for saving source string on 03/26/2019 */
 /* bump up version to 1.31 for saving some flags in hints on 04/17/2019 */
+/* bump up version to 1.32 for saving some flags in hints on 04/25/2019 */
 
 /* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 31)
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 32)
 
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 31)
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 32)
 
 typedef union _gcsValue
 {

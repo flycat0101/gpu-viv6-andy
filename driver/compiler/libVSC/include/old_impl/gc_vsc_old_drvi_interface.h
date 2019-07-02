@@ -725,6 +725,8 @@ struct _gcsHINT
     gctBOOL     strictWClipMatch      : 2; /* Strict WClip match. */
     gctBOOL     WChannelEqualToZ      : 2;
 #endif
+    gctBOOL     useGroupId            : 2;
+    gctBOOL     useLocalId            : 2;
     /* flag if the shader uses gl_FragCoord, gl_FrontFacing, gl_PointCoord */
     gctCHAR     useFragCoord[4];
     gctCHAR     usePointCoord[4];
@@ -805,6 +807,10 @@ struct _gcsHINT
     /* Concurrent workGroupCount. */
     gctUINT16   workGroupCount;
 
+    /* Sampler Base offset. */
+    gctBOOL     useGPRSpill[gcvPROGRAM_STAGE_LAST];
+
+    /* shaderVidNodes should always be the LAST filed in hits. */
     /* SURF Node for memory that is used in shader. */
     gcSHADER_VID_NODES shaderVidNodes;
 };
