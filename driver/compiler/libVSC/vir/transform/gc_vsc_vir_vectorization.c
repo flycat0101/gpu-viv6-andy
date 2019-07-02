@@ -131,7 +131,7 @@ typedef struct VIR_OPND_VECTORIZE_CALLBACKS
 static gctBOOL _CheckSymsVectorizability(VIR_Shader* pShader, VIR_Symbol** ppSymArray, gctUINT symCount)
 {
     gctUINT           i, compCount = 0;
-
+    gctINT            location = VIR_Symbol_GetLocation(ppSymArray[0]);
     for (i = 0; i < symCount; i ++)
     {
         if (i > 0)
@@ -142,7 +142,13 @@ static gctBOOL _CheckSymsVectorizability(VIR_Shader* pShader, VIR_Symbol** ppSym
             }
         }
 
-        compCount += VIR_GetTypeComponents(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(ppSymArray[i])));
+        /* add compCount only if the locations are same of two symbols
+         * multi locations may be added to same ppSymArray because some of them are array and covers multi locations
+         */
+        if (location == VIR_Symbol_GetLocation(ppSymArray[i]))
+        {
+            compCount += VIR_GetTypeComponents(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(ppSymArray[i])));
+        }
     }
 
     if (compCount > VIR_CHANNEL_COUNT)
@@ -241,11 +247,20 @@ static VIR_Type* _GetVectorizedSymType(VIR_Shader* pShader, VIR_Symbol** ppSymAr
 {
     gctUINT           i, compCount = 0, rowsCount;
     VIR_TypeId        compType, newTypeId = VIR_TYPE_UNKNOWN;
+    gctINT            arrayLen = -1;
 
     if (bComponentPack)
     {
         /* Since the component is sorted, just get the last symbol. */
         VIR_Symbol_GetStartAndEndComponentForIO(ppSymArray[symCount - 1], gcvFALSE, gcvNULL, &compCount);
+        /* if vectorizedSym list are scalar and array, get array length to construct array type */
+        for (i = 0; i < symCount; i++)
+        {
+            if (VIR_Type_isArray(VIR_Symbol_GetType(ppSymArray[i])))
+            {
+                arrayLen = VIR_Type_GetArrayLength(VIR_Symbol_GetType(ppSymArray[i]));
+            }
+        }
     }
     else
     {
@@ -262,9 +277,7 @@ static VIR_Type* _GetVectorizedSymType(VIR_Shader* pShader, VIR_Symbol** ppSymAr
                                                        compType,
                                                        compCount,
                                                        rowsCount,
-                                                       VIR_Type_isArray(VIR_Symbol_GetType(ppSymArray[0])) ?
-                                                       VIR_Type_GetArrayLength(VIR_Symbol_GetType(ppSymArray[0])) :
-                                                       -1);
+                                                       arrayLen);
 
     return VIR_Shader_GetTypeFromId(pShader, newTypeId);
 }
@@ -526,6 +539,7 @@ static gctBOOL _CheckSymOfOpndIsInIoVectorizedInfos(VIR_Shader* pShader,
     gctBOOL                   bFoundSym = gcvFALSE;
     VIR_IO_VECTORIZED_INFO*   pVectorizedInfo;
     VIR_Symbol*               pOpndSym;
+    gctUINT                   locationOffset = 0;
 
     pOpndSym = VIR_Operand_GetSymbol(pOpnd);
 
@@ -547,10 +561,18 @@ static gctBOOL _CheckSymOfOpndIsInIoVectorizedInfos(VIR_Shader* pShader,
                 if (pOpndSym->u2.varSymId == VIR_Symbol_GetIndex(pVectorizedInfo->pIoPacket->pSymIo[j]))
                 {
                     VIR_Symbol * var = VIR_Shader_GetSymFromId(pShader, pOpndSym->u2.varSymId);
+                    if (pIoVectorizedInfo->pIoPacket->bComponentPack &&
+                        VIR_Layout_HasComponent(VIR_Symbol_GetLayout(var)) &&
+                        (VIR_Symbol_GetLocation(var) >= (gctINT) pVectorizedInfo->pIoPacket->vectorizedLocation))
+                    {
+                        /* consider location offset if multi locations in same pIoPacket */
+                        locationOffset = VIR_Symbol_GetLocation(var) - pVectorizedInfo->pIoPacket->vectorizedLocation;
+                        gcmASSERT(locationOffset < 4);
+                    }
                     gcmASSERT(pVectorizedInfo->pIoPacket->bOutput);
 
                     newSymId = pVectorizedInfo->vectorizedInfo.
-                                     ppVectorizedVirRegArray[pOpndSym->u1.vregIndex - var->u2.tempIndex]->index;
+                                     ppVectorizedVirRegArray[pOpndSym->u1.vregIndex - var->u2.tempIndex + locationOffset]->index;
                     if (pVectorizedInfo->pIoPacket->bComponentPack)
                     {
                         VIR_Symbol_GetStartAndEndComponentForIO(pVectorizedInfo->pIoPacket->pSymIo[j], gcvFALSE, &channelShift, gcvNULL);
@@ -3938,6 +3960,7 @@ OnError:
 gctBOOL vscVIR_CheckTwoSymsVectorizability(VIR_Shader* pShader, VIR_Symbol* pSym1, VIR_Symbol* pSym2)
 {
     gctSTRING strSymName1, strSymName2, strTemp1, strTemp2;
+    gctBOOL   checkFragmentOutput = gcvFALSE;
 
     /* Storage-class must be same */
     if (VIR_Symbol_GetStorageClass(pSym1) != VIR_Symbol_GetStorageClass(pSym2))
@@ -3967,11 +3990,21 @@ gctBOOL vscVIR_CheckTwoSymsVectorizability(VIR_Shader* pShader, VIR_Symbol* pSym
     if (VIR_Type_isArray(VIR_Symbol_GetType(pSym1)) !=
         VIR_Type_isArray(VIR_Symbol_GetType(pSym2)))
     {
-        return gcvFALSE;
+        /* support fragment shader output vectorization if
+         * they are scalar and array types */
+        if (!VIR_Shader_IsFS(pShader) ||
+            !VIR_Symbol_isOutput(pSym1) || !VIR_Symbol_isOutput(pSym2))
+        {
+            return gcvFALSE;
+        }
+        else
+        {
+            checkFragmentOutput = gcvTRUE;
+        }
     }
 
     /* If arrayed, array size must be equal */
-    if (VIR_Type_isArray(VIR_Symbol_GetType(pSym1)))
+    if (VIR_Type_isArray(VIR_Symbol_GetType(pSym1)) && VIR_Type_isArray(VIR_Symbol_GetType(pSym2)))
     {
         if (VIR_Type_GetArrayLength(VIR_Symbol_GetType(pSym1)) !=
             VIR_Type_GetArrayLength(VIR_Symbol_GetType(pSym2)))
@@ -3981,8 +4014,8 @@ gctBOOL vscVIR_CheckTwoSymsVectorizability(VIR_Shader* pShader, VIR_Symbol* pSym
     }
 
     /* Primitive type must have same row and component type */
-    if ((VIR_GetTypeRows(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pSym1))) !=
-         VIR_GetTypeRows(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pSym2)))) ||
+    if ((!checkFragmentOutput &&(VIR_GetTypeRows(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pSym1))) !=
+         VIR_GetTypeRows(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pSym2))))) ||
         (VIR_GetTypeComponentType(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pSym1))) !=
          VIR_GetTypeComponentType(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pSym2)))) ||
          VIR_TypeId_isPacked(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pSym1))) ||

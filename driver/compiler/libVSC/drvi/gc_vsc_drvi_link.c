@@ -862,6 +862,33 @@ static gctBOOL _IsFakeSIV(VIR_Shader* pUpperShader, VIR_Shader* pLowerShader,
     return gcvFALSE;
 }
 
+/* check or set IoLocationMask according to last argument */
+static gctBOOL _CheckIoLocationMask(
+    VIR_Symbol      *pVirIoSym,
+    VSC_BIT_VECTOR  *locationMask,
+    gctUINT         location,
+    gctBOOL         setLocationMask)
+{
+    gctUINT   j, startComponent = 0, endComponent = 0;
+    gctBOOL   hasComponentQualifier = VIR_Symbol_GetStartAndEndComponentForIO(pVirIoSym, gcvTRUE, &startComponent, &endComponent);
+    VSC_ErrCode   errCode = VSC_ERR_NONE;
+    /* Check if there is any component overlap. */
+    for (j = startComponent; j < endComponent; j++)
+    {
+        if (vscBV_TestBit(locationMask, location * VIR_CHANNEL_NUM + j))
+        {
+            errCode = VSC_ERR_LOCATION_ALIASED;
+            ON_ERROR(errCode, "Check aliased location and component");
+        }
+        if (setLocationMask)
+        {
+            vscBV_SetBit(locationMask, location * VIR_CHANNEL_NUM + j);
+        }
+    }
+OnError:
+    return hasComponentQualifier;
+}
+
 static VSC_ErrCode _CheckIoAliasedLocationPerExeObj(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
                                                     VIR_Shader* pShader,
                                                     VIR_IdList* pVirIoIdLsts,
@@ -874,6 +901,7 @@ static VSC_ErrCode _CheckIoAliasedLocationPerExeObj(VSC_BASE_LINKER_HELPER* pBas
     VIR_Symbol*                pVirIoSym;
     gctUINT                    i, virIo, thisVirIoRegCount, location;
     gctUINT                    virIoCount = VIR_IdList_Count(pVirIoIdLsts);
+    VSC_BIT_VECTOR             visitedIoIdx;
 
     if (!pAliasListArray)
     {
@@ -882,10 +910,24 @@ static VSC_ErrCode _CheckIoAliasedLocationPerExeObj(VSC_BASE_LINKER_HELPER* pBas
         ** so we need to make the locationMask per-component.
         */
         vscBV_Initialize(&locationMask, pBaseLinkHelper->pMM, MAX_SHADER_IO_NUM * VIR_CHANNEL_NUM);
+        if (pComponentMapListArray)
+        {
+            vscBV_Initialize(&visitedIoIdx, pBaseLinkHelper->pMM, virIoCount);
+        }
     }
 
     for (virIo = 0; virIo < virIoCount; virIo ++)
     {
+        /* if virIo has been dealt because of previous output is array and use same location, skip it */
+        if (!pAliasListArray && pComponentMapListArray && vscBV_TestBit(&visitedIoIdx, virIo))
+        {
+            continue;
+        }
+        if (!pAliasListArray && pComponentMapListArray)
+        {
+            vscBV_SetBit(&visitedIoIdx, virIo);
+        }
+
         pVirIoSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pVirIoIdLsts, virIo));
 
         /* we could have not enabled attributes/outputs */
@@ -925,27 +967,45 @@ static VSC_ErrCode _CheckIoAliasedLocationPerExeObj(VSC_BASE_LINKER_HELPER* pBas
                 }
                 else
                 {
-                    gctUINT         j, startComponent = 0, endComponent = 0;
-                    gctBOOL         hasComponentQualifier;
-
-                    hasComponentQualifier = VIR_Symbol_GetStartAndEndComponentForIO(pVirIoSym, gcvTRUE, &startComponent, &endComponent);
-
-                    /* Check if there is any component overlap. */
-                    for (j = startComponent; j < endComponent; j++)
-                    {
-                        if (vscBV_TestBit(&locationMask, i * VIR_CHANNEL_NUM + j))
-                        {
-                            errCode = VSC_ERR_LOCATION_ALIASED;
-                            ON_ERROR(errCode, "Check aliased location");
-                        }
-
-                        vscBV_SetBit(&locationMask, i * VIR_CHANNEL_NUM + j);
-                    }
+                    gctBOOL    hasComponentQualifier;
+                    hasComponentQualifier = _CheckIoLocationMask(pVirIoSym, &locationMask, i, gcvTRUE);
 
                     /* Save the component qualifier. */
                     if (hasComponentQualifier && pComponentMapListArray)
                     {
                         VIR_IdList_Add(&pComponentMapListArray[i], VIR_Symbol_GetIndex(pVirIoSym));
+
+                        /* if current output is array, the location covers a range[location, location+thisVirIoRegCount)
+                         * check next outputs if has same location and add the symbol to this list
+                         * an example from vulkan-1.1 glsl.440.linkage.varying.component.frag_out.two_vec4
+                         * layout(location = 0, component = 0) out float dEQP_FragColor_0_0;
+                         * layout(location = 0, component = 1) out vec3  dEQP_FragColor_0_1[2];
+                         * layout(location = 1, component = 0) out float dEQP_FragColor_1_0;
+                         * 3 output symbols are added to pComponentMapListArray[0] since second array output covers location [0,1]
+                         */
+                        if (thisVirIoRegCount > 1)
+                        {
+                            gctUINT next;
+                            for (next = virIo + 1; next < virIoCount; next++)
+                            {
+                                VIR_Symbol* pNextVirIoSym;
+                                gctUINT nextlocation;
+                                gctBOOL nextHasComonentQualifer;
+                                if (vscBV_TestBit(&visitedIoIdx, next))
+                                {
+                                    continue;
+                                }
+                                pNextVirIoSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pVirIoIdLsts, next));
+                                nextlocation = VIR_Symbol_GetLocation(pNextVirIoSym);
+                                nextHasComonentQualifer = _CheckIoLocationMask(pNextVirIoSym, &locationMask, nextlocation, gcvFALSE); /* check only */
+                                if (nextHasComonentQualifer && (nextlocation > i && (nextlocation < (location + thisVirIoRegCount))))
+                                {
+                                    VIR_IdList_Add(&pComponentMapListArray[i], VIR_Symbol_GetIndex(pNextVirIoSym));
+                                    vscBV_SetBit(&visitedIoIdx, next);
+                                    _CheckIoLocationMask(pNextVirIoSym, &locationMask, nextlocation, gcvTRUE); /* set locationMask */
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -958,6 +1018,10 @@ OnError:
     if (!pAliasListArray)
     {
         vscBV_Finalize(&locationMask);
+        if (pComponentMapListArray)
+        {
+            vscBV_Finalize(&visitedIoIdx);
+        }
     }
 
     return errCode;
@@ -3517,6 +3581,31 @@ OnError:
     return errCode;
 }
 
+static gctBOOL _IsRedundantIOSymList(VIR_Shader *pShader,
+                                     VIR_IdList* pIdList,
+                                     gctINT curr)
+{
+    gctINT prev = curr - 1;
+    VIR_IdList* pList = &pIdList[prev];
+    VIR_IdList* cList = &pIdList[curr];
+    gctINT plen = VIR_IdList_Count(pList);
+    gctINT clen = VIR_IdList_Count(cList);
+    gctINT i;
+    if (plen != clen)
+    {
+        return gcvFALSE;
+    }
+    for (i = 0; i < clen; i++)
+    {
+        /* check symbolId is same in two lists */
+        if (VIR_IdList_GetId(pList, i) != VIR_IdList_GetId(cList, i))
+        {
+            return gcvFALSE;
+        }
+    }
+    return gcvTRUE;
+}
+
 static VSC_ErrCode _FindIoVectorizablePacketsForSingleShader(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
                                                              VIR_Shader* pCurrentShader,
                                                              VIR_IdList* pIdList,
@@ -3534,7 +3623,15 @@ static VSC_ErrCode _FindIoVectorizablePacketsForSingleShader(VSC_BASE_LINKER_HEL
     for (i = 0; i < MAX_SHADER_IO_NUM; i++)
     {
         pList = &pIdList[i];
-        if (VIR_IdList_Count(pList) > 1)
+        if (VIR_IdList_Count(pList) > 1 &&
+            /* for the vectorized io which original are array with same lengths, redundant symbol list in
+               outputComponentMapList[location] and outputComponentMapList[location+virioRegCount-1]
+               float[2]  hp out  #spv_id21 ==> temp(279 - 280) common_flags:< enabled statically_used >;
+               float[2]  hp out  #spv_id30 ==> temp(281 - 282) common_flags:< enabled statically_used >;
+               float[2]  hp out  #spv_id35 ==> temp(283 - 284) common_flags:< enabled statically_used >;
+               float[2]  hp out  #spv_id39 ==> temp(285 - 286) common_flags:< enabled statically_used >;
+             */
+            (i == 0 || !_IsRedundantIOSymList(pCurrentShader, pIdList, i)))
         {
             numOfPackets++;
         }
@@ -3553,7 +3650,8 @@ static VSC_ErrCode _FindIoVectorizablePacketsForSingleShader(VSC_BASE_LINKER_HEL
     {
         pList = &pIdList[i];
         ioCount = VIR_IdList_Count(pList);
-        if (ioCount <= 1)
+        if (ioCount <= 1 ||
+            (i > 0 && _IsRedundantIOSymList(pCurrentShader, pIdList, i)))
         {
             continue;
         }
