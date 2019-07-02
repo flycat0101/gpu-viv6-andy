@@ -2236,7 +2236,6 @@ _SynchronousPost(
 {
     struct wl_egl_window *window = Surface->hwnd;
     __WLEGLSurface egl_surface = window->driver_private;
-    gcePATCH_ID patchId = gcvPATCH_INVALID;
 
 #if defined(WL_EGL_PLATFORM) || defined(EGL_API_FB) || defined(__GBM__)
     if(Display->enableClient != -1)
@@ -2245,10 +2244,8 @@ _SynchronousPost(
     }
 #endif
 
-    /* Get patch id. */
-    gcoHAL_GetPatchID(gcvNULL, &patchId);
 
-    if (egl_surface->nr_buffers == 1 || patchId == gcvPATCH_GTFES30)
+    if (egl_surface->nr_buffers == 1)
     {
         return EGL_TRUE;
     }

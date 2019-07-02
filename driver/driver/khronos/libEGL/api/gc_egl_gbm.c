@@ -2678,10 +2678,6 @@ _SynchronousPost(
 {
     void * win = Surface->hwnd;
     struct gbm_viv_surface* surf = ((struct gbm_viv_surface*) win);
-    gcePATCH_ID patchId = gcvPATCH_INVALID;
-
-    /* Get patch id. */
-    gcoHAL_GetPatchID(gcvNULL, &patchId);
 
 #if defined(WL_EGL_PLATFORM) || defined(EGL_API_FB) || defined(__GBM__)
     if(Display->enableServer != -1)
@@ -2689,11 +2685,6 @@ _SynchronousPost(
         return (Display->enableServer == 0);
     }
 #endif
-
-    if(patchId == gcvPATCH_GTFES30)
-    {
-        return EGL_TRUE;
-    }
 
     if (surf->sync_post &&
         !(gbmPlatform.flags & EGL_PLATFORM_FLAG_GBM_ASYNC))
