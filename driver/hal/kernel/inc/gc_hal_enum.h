@@ -99,6 +99,7 @@ typedef enum _gceCHIPMODEL
     gcv6400 = 0x6400,
     gcv7000 = 0x7000,
     gcv7400 = 0x7400,
+    gcv8000 = 0x8000,
 }
 gceCHIPMODEL;
 
