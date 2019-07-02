@@ -648,12 +648,14 @@ vxnne_shader_executable vxnneGetReorgShaderExecutable(
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, stride=%p, outc=%p, output=%p", context, kernelEnum, borderMode, input, stride, outc, output);
 
-    if ((inputFormat != VX_TYPE_FLOAT16 && inputFormat != VX_TYPE_INT8 && inputFormat != VX_TYPE_UINT8)
-        || (outputFormat != VX_TYPE_FLOAT16 && outputFormat != VX_TYPE_INT8 && outputFormat != VX_TYPE_UINT8))
+    if(!(((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT8) && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_INT8))
+                                                    || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                                                    || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)))
     {
         vxError("input or output's format is not support");
         goto OnError;
     }
+
     if (div_fractionLengthValue >= 0)
     {
         div_scale = (vx_float32) (1 << div_fractionLengthValue);
@@ -744,6 +746,51 @@ vxnne_shader_executable vxnneGetReorgShaderExecutable(
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_for0str2Fp16toInt8", borderMode);
             if (!shaderExecutable) goto OnError;
             status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "UniFp16xFp16toS8_dp2x8", 1, UniFp16xFp16toS8_dp2x8);
+            if (status != VX_SUCCESS) goto OnError;
+        }
+        status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "UniPackFP16even_2x8", 1, UniPackFP16even_2x8);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "UniPackFP16odd_2x8", 1, UniPackFP16odd_2x8);
+        if (status != VX_SUCCESS) goto OnError;
+    }
+    else if (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
+    {
+        vx_uint32 UniPackFP16even_2x8[16] = {
+            0x11111111, // TCfg
+            0x11110000, // ASelt
+            0x06040200, 0x06040200, // ABin
+            0x22222222, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000100, // AccumType, ConstantType, and PostShift
+            0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00 // Constant
+        };
+        vx_uint32 UniPackFP16odd_2x8[16] = {
+            0x11111111, // TCfg
+            0x11110000, // ASelt
+            0x07050301, 0x07050301, // ABin
+            0x22222222, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000100, // AccumType, ConstantType, and PostShift
+            0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00 // Constant
+        };
+        vx_uint32 uniMulInt16andFp16_2x8[16] = {
+            0x11111111, // TCfg
+            0x00000000, // ASelt
+            0x03020100, 0x07060504, // ABin
+            0x11111111, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000600, // AccumType, ConstantType, and PostShift
+            0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+        };
+        if (div_fractionLengthValue == 0)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_for0str2Fp16toFp16", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
+        else
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_for0str2Int16toInt16_gen", borderMode);
+            if (!shaderExecutable) goto OnError;
+            status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniMulInt16andFp16_2x8", 1, uniMulInt16andFp16_2x8);
             if (status != VX_SUCCESS) goto OnError;
         }
         status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "UniPackFP16even_2x8", 1, UniPackFP16even_2x8);
