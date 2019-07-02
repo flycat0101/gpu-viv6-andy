@@ -6661,7 +6661,7 @@ _addAttrToShader(
     INOUT  gcATTRIBUTE *Attr)
 {
     gctUINT     currIndex;
-    gcATTRIBUTE attr;
+    gcATTRIBUTE attr = gcvNULL;
     gctPOINTER pointer;
     gctUINT32 length;
     gctUINT32 bytes;
