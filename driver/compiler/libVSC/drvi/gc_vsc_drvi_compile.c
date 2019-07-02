@@ -41,6 +41,9 @@
 #include "vir/codegen/gc_vsc_vir_ep_gen.h"
 #include "vir/codegen/gc_vsc_vir_ep_back_patch.h"
 #include "vir/linker/gc_vsc_vir_linker.h"
+#if defined(LINUX) && !defined(ANDROID)
+#include <unistd.h>
+#endif
 
 
 gceSTATUS vscCreatePrivateData(VSC_CORE_SYS_CONTEXT* pCoreSysCtx, VSC_PRIV_DATA_HANDLE* phOutPrivData, gctBOOL bForOCL)
@@ -1642,7 +1645,6 @@ gceSTATUS vscGetTemporaryDir(
 #if defined(LINUX) && !defined(ANDROID)
     if (!TmpDir)
     {
-#include <unistd.h>
         int ret = access("/tmp", R_OK | W_OK);
         if (ret == 0)
         {
