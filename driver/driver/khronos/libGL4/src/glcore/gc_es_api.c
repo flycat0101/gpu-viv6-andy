@@ -5457,6 +5457,39 @@ GLvoid GL_APIENTRY __GL_APINAME(GetQueryIndexediv)(GLenum target, GLuint index, 
     gc->pEntryDispatch->GetQueryIndexediv(gc, target, index, pname, params);
 }
 
+GLvoid GLAPIENTRY __GL_APINAME(ColorTable)( GLenum target, GLenum internalformat, GLsizei width, GLenum format, GLenum type, const GLvoid *table ){}
+GLvoid GLAPIENTRY __GL_APINAME(ColorTableParameteriv)(GLenum target, GLenum pname, const GLint *params){}
+GLvoid GLAPIENTRY __GL_APINAME(ColorTableParameterfv)(GLenum target, GLenum pname, const GLfloat *params){}
+GLvoid GLAPIENTRY __GL_APINAME(CopyColorTable)( GLenum target, GLenum internalformat, GLint x, GLint y, GLsizei width ){}
+GLvoid GLAPIENTRY __GL_APINAME(GetColorTable)( GLenum target, GLenum format,  GLenum type, GLvoid *table ){}
+GLvoid GLAPIENTRY __GL_APINAME(GetColorTableParameterfv)( GLenum target, GLenum pname, GLfloat *params ){}
+GLvoid GLAPIENTRY __GL_APINAME(GetColorTableParameteriv)( GLenum target, GLenum pname,  GLint *params ){}
+GLvoid GLAPIENTRY __GL_APINAME(ColorSubTable)( GLenum target, GLsizei start, GLsizei count, GLenum format, GLenum type, const GLvoid *data ){}
+GLvoid GLAPIENTRY __GL_APINAME(CopyColorSubTable)( GLenum target, GLsizei start, GLint x, GLint y, GLsizei width ){}
+GLvoid GLAPIENTRY __GL_APINAME(ConvolutionFilter1D)( GLenum target, GLenum internalformat, GLsizei width, GLenum format, GLenum type, const GLvoid *image ){}
+GLvoid GLAPIENTRY __GL_APINAME(ConvolutionFilter2D)( GLenum target, GLenum internalformat, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *image ){}
+GLvoid GLAPIENTRY __GL_APINAME(ConvolutionParameterf)( GLenum target, GLenum pname, GLfloat params ){}
+GLvoid GLAPIENTRY __GL_APINAME(ConvolutionParameterfv)( GLenum target, GLenum pname, const GLfloat *params ){}
+GLvoid GLAPIENTRY __GL_APINAME(ConvolutionParameteri)( GLenum target, GLenum pname, GLint params ){}
+GLvoid GLAPIENTRY __GL_APINAME(ConvolutionParameteriv)( GLenum target, GLenum pname, const GLint *params ){}
+GLvoid GLAPIENTRY __GL_APINAME(CopyConvolutionFilter1D)( GLenum target, GLenum internalformat, GLint x, GLint y, GLsizei width ){}
+GLvoid GLAPIENTRY __GL_APINAME(CopyConvolutionFilter2D)( GLenum target, GLenum internalformat, GLint x, GLint y, GLsizei width, GLsizei height){}
+GLvoid GLAPIENTRY __GL_APINAME(GetConvolutionFilter)( GLenum target, GLenum format, GLenum type, GLvoid *image ){}
+GLvoid GLAPIENTRY __GL_APINAME(GetConvolutionParameterfv)( GLenum target, GLenum pname, GLfloat *params ){}
+GLvoid GLAPIENTRY __GL_APINAME(GetConvolutionParameteriv)( GLenum target, GLenum pname, GLint *params ){}
+GLvoid GLAPIENTRY __GL_APINAME(SeparableFilter2D)( GLenum target, GLenum internalformat, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *row, const GLvoid *column ){}
+GLvoid GLAPIENTRY __GL_APINAME(GetSeparableFilter)( GLenum target, GLenum format, GLenum type, GLvoid *row, GLvoid *column, GLvoid *span ){}
+GLvoid GLAPIENTRY __GL_APINAME(Histogram)( GLenum target, GLsizei width, GLenum internalformat, GLboolean sink ){}
+GLvoid GLAPIENTRY __GL_APINAME(ResetHistogram)( GLenum target ){}
+GLvoid GLAPIENTRY __GL_APINAME(GetHistogram)( GLenum target, GLboolean reset, GLenum format, GLenum type, GLvoid *values ){}
+GLvoid GLAPIENTRY __GL_APINAME(GetHistogramParameterfv)( GLenum target, GLenum pname, GLfloat *params ){}
+GLvoid GLAPIENTRY __GL_APINAME(GetHistogramParameteriv)( GLenum target, GLenum pname, GLint *params ){}
+GLvoid GLAPIENTRY __GL_APINAME(Minmax)( GLenum target, GLenum internalformat, GLboolean sink ){}
+GLvoid GLAPIENTRY __GL_APINAME(ResetMinmax)( GLenum target ){}
+GLvoid GLAPIENTRY __GL_APINAME(GetMinmax)( GLenum target, GLboolean reset, GLenum format, GLenum types, GLvoid *values ){}
+GLvoid GLAPIENTRY __GL_APINAME(GetMinmaxParameterfv)( GLenum target, GLenum pname,  GLfloat *params ){}
+GLvoid GLAPIENTRY __GL_APINAME(GetMinmaxParameteriv)( GLenum target, GLenum pname, GLint *params ){}
+
 
 /*********************************************
 **
