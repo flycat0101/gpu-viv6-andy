@@ -4478,6 +4478,45 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
+
+VX_INTERNAL_API vx_status vxoGraphOptimization_deleteSqueeze(vx_graph graph)
+{
+    vx_int32 nodeIndex;
+    vx_int32 nodeCount = graph->nodeCount;
+    vx_node* nodeTable = graph->nodeTable;
+
+    gcmHEADER_ARG("graph=%p", graph);
+    vxmASSERT(graph);
+
+    for (nodeIndex = 0; nodeIndex < nodeCount; nodeIndex++)
+    {
+        vx_node node = nodeTable[nodeIndex];
+        if(node->merged)    continue;
+
+        if(node->kernel->enumeration == VX_KERNEL_NN_TENSOR_SQUEEZE && node->numChildren == 1)
+        {
+            vx_uint32 index = 0;
+            vx_node child = nodeTable[node->childNodes[0]];
+            vx_tensor in  = (vx_tensor)node->paramTable[0];
+            vx_tensor out = (vx_tensor)node->paramTable[node->numParameters - 1];
+
+            if(child->numParents > 1)
+                continue;
+
+            if(vxoGraphOptimization_matchTensorInNode(child, out, &index))
+                vxoGraphOptimization_updateTensorInNode(&child, index, in);
+
+            node->merged = vx_true_e;
+        }
+    }
+
+    REMOVE_MERGED_NODE_FROM_GRAPH();
+    REBUILD_TOPOLOGY_GRAPH();
+    OPTIMIZATION_RESLUT();
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
+    return VX_SUCCESS;
+}
+
 VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
 {
     vx_status status = VX_SUCCESS;
@@ -4521,6 +4560,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
 
         if(context->options.enableGraphMerge)
             vxmONERROR(vxoGraphOptimization_LayerMerge(graph));
+
+        if(context->options.enableGraphDeleteSqueeze)
+            vxoGraphOptimization_deleteSqueeze(graph);
 
         if(context->options.enableGraphDeleteRelu)
             vxoGraphOptimization_deleteRelu(graph);

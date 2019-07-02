@@ -453,6 +453,13 @@ VX_PRIVATE_API void vxoContext_FetchOptionsForTransferGraph(vx_context context, 
     }
 
     pos = gcvNULL;
+    if(gcoOS_StrStr(envctrl, "-deleteSqueeze:", &pos) && pos)
+    {
+        pos += sizeof("-deleteSqueeze:") - 1;
+        context->options.enableGraphDeleteSqueeze = atoi(pos);
+    }
+
+    pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-WAR", &pos) && pos)
     {
         pos += sizeof("-WAR") -1;
@@ -948,6 +955,7 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
     context->options.enableGraphMergeTranspose = 0;
     context->options.enableGraphPadConv = 1;
     context->options.enableGraphDeleteRelu = 1;
+    context->options.enableGraphDeleteSqueeze = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_GRAPH_TRANSFORM", &envctrl)) && envctrl)
     {
         vxoContext_FetchOptionsForTransferGraph(context, envctrl);

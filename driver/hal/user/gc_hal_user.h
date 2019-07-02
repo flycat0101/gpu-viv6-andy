@@ -3009,6 +3009,7 @@ typedef struct _vx_drv_option
     gctUINT enableGraphConcalayer;
     gctUINT enableGraphMergeTranspose;
     gctUINT enableGraphDeleteRelu;
+    gctUINT enableGraphDeleteSqueeze;
     gctUINT freqInMHZ;
     gctUINT axiClockFreqInMHZ;
     gctUINT maxSocOTNumber;
