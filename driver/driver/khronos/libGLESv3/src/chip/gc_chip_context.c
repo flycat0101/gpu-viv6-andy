@@ -1153,14 +1153,26 @@ __glChipGetDeviceConstants(
         if (patchId == gcvPATCH_ANTUTU6X)
         {
             gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION20);
+            constants->GLSLVersion = __GL_GLSL_VERSION20;
+            constants->majorVersion = 2;
+            constants->minorVersion = 0;
         }
+#if defined(ANDROID)
+        else if (patchId == gcePATCH_ANDROID_CTS_GRAPHICS_GLVERSION && (chipModel == gcv3000 && chipRevision == 0x5450))
+        {
+            gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION30);
+            constants->GLSLVersion =__GL_GLSL_VERSION30;
+            constants->majorVersion = 3;
+            constants->minorVersion = 0;
+        }
+#endif
         else
         {
             gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION31);
+            constants->GLSLVersion =__GL_GLSL_VERSION31;
+            constants->majorVersion = 3;
+            constants->minorVersion = 1;
         }
-        constants->GLSLVersion =__GL_GLSL_VERSION31;
-        constants->majorVersion = 3;
-        constants->minorVersion = 1;
     }
     else if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI0))
     {
@@ -1216,7 +1228,6 @@ __glChipGetDeviceConstants(
     gcoOS_StrCatSafe(constants->version, __GL_MAX_VERSION_LEN, gcvVERSION_STRING);
 
     isEs31 = (constants->majorVersion >= 3) && (constants->minorVersion >= 1);
-
 
     constants->maxTextureArraySize  = __GL_MAX_HW_ARRAY_SIZE;
     constants->maxTextureDepthSize  = __GL_MAX_HW_DEPTH_SIZE;
@@ -1440,7 +1451,7 @@ __glChipGetDeviceConstants(
         if ((gc->apiVersion == __GL_API_VERSION_ES30 && gcdPROC_IS_WEBGL(patchId)) &&
             ((chipModel == gcv880 && chipRevision == 0x5106) ||
             (chipModel == gcv2000 && chipRevision == 0x5108) ||
-            (chipModel == gcv2000 && chipRevision == 0xFFFF5450)))
+            (chipModel == gcv3000 && chipRevision == 0x5450)))
         {
             minVertUniforms = 128;
             minFragUniforms = 16;
