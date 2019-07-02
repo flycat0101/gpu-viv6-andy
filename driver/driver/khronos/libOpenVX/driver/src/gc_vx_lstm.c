@@ -2546,10 +2546,10 @@ VX_PRIVATE_API vx_status vxoNNSWLSTMConv_ReshuffleWeightBias(vx_tensor input2inp
     vx_int32 output_size = TENSOR_SIZE_INDEX(recurrent2forget_weights, 0);
     vx_int32 depth = 4;
     vx_int32 i = 0, j = 0, d = 0;
-    vx_tensor input_weights[] = { input2input_weights, input2cell_weights, input2forget_weights, input2output_weights };
-    vx_tensor recurrent_weights[] = { recurrent2input_weights, recurrent2cell_weights, recurrent2forget_weights, recurrent2output_weights };
-    /*vx_tensor cell_weights[] = {cell2input_weights, cell2forget_weights, cell2output_weights};*/
-    vx_tensor input_biases[] = { input_bias, cell_bias, forget_bias, output_bias };
+    vx_tensor input_weights[] = { input2input_weights, input2forget_weights, input2cell_weights, input2output_weights };
+    vx_tensor recurrent_weights[] = { recurrent2input_weights, recurrent2forget_weights, recurrent2cell_weights, recurrent2output_weights };
+
+    vx_tensor input_biases[] = { input_bias, forget_bias, cell_bias, output_bias };
     vx_uint8_ptr weights_conv_base = VX_NULL, biases_conv_base = VX_NULL;
 
     vxoTensor_AllocateMemory(weights_conv);
@@ -3328,7 +3328,7 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
             conv.pad_mode = VX_PAD_CONSTANT;
             conv.pad_const = 0;
 
-            lstmUnitNode->lstm_tp_fc_operation.base.parameter.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(weights_biases->slice_num * sizeof(vx_tp_value_cmd_s));
+            conv.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(weights_biases->slice_num * sizeof(vx_tp_value_cmd_s));
 
             if (kzgroup == 1)
             {
@@ -3337,13 +3337,13 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
                 conv.other_ref = (vx_reference)weights_biases;
                 conv.data_buff = gcvNULL;
 
-                if (lstmUnitNode->lstm_tp_fc_operation.base.parameter.tp_value != VX_NULL)
+                if (conv.tp_value != VX_NULL)
                 {
                     for (s = 0; s < weights_biases->slice_num; s++)
                     {
                         values.u32[0] = kzgroup;
                         values.u32[1] = zoffset;
-                        memcpy(&lstmUnitNode->lstm_tp_fc_operation.base.parameter.tp_value[s], &values, sizeof(vx_tp_value_cmd_s));
+                        memcpy(&conv.tp_value[s], &values, sizeof(vx_tp_value_cmd_s));
                         zoffset += weights_biases->slice_array[s].z_count;
                     }
                 }
