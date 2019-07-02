@@ -28033,6 +28033,12 @@ gcGetOptionFromEnv(
                         Option->dumpFELog            = gcvTRUE;
                         pos += sizeof("FE") -1;
                     }
+                    else if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "PPEDSTR2FILE", sizeof("PPEDSTR2FILE")-1))
+                    {
+                        /* dump FE Preprocessed string to file */
+                        Option->dumpPPedStr2File = gcvTRUE;
+                        pos += sizeof("PPEDSTR2FILE") -1;
+                    }
                     else if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "IR", sizeof("IR")-1))
                     {
                         /* dump incoming and final IR */

@@ -234,7 +234,7 @@ ppoPREPROCESSOR_AddToOutputStreamOfPP(ppoPREPROCESSOR PP,
         PP->outputTokenStreamEnd = ntoken;
     }
 
-    if (gcmOPT_DUMP_FELOG())
+    if (gcmOPT_DUMP_PPEDSTR2FILE())
     {
         gcoOS_StrLen(ntoken->poolString, &len);
         if (((PP->logCurrentSize + len) > (_cldBUFFER_MAX - 5)))
@@ -1372,7 +1372,7 @@ gceSTATUS    ppoPREPROCESSOR_Parse(cloPREPROCESSOR        PP,
     if(PP->inputStream == gcvNULL)
     {
         /* flush the remaining log buffer to file and close the file */
-        if (gcmOPT_DUMP_FELOG())
+        if (gcmOPT_DUMP_PPEDSTR2FILE())
         {
             if (PP->logBuffer[0] != '\0')
                 ppoWriteBufferToFile(PP);
@@ -1399,7 +1399,7 @@ gceSTATUS    ppoPREPROCESSOR_Parse(cloPREPROCESSOR        PP,
             if (ntoken->type == ppvTokenType_EOF)
             {
                 /* flush the remaining log buffer to file and close the file */
-                if (gcmOPT_DUMP_FELOG())
+                if (gcmOPT_DUMP_PPEDSTR2FILE())
                 {
                     if (PP->logBuffer[0] != '\0')
                         ppoWriteBufferToFile(PP);

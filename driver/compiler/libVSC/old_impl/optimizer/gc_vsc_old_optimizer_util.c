@@ -45,6 +45,7 @@ gcOPTIMIZER_OPTION theOptimizerOption =
     gcvFALSE, /* HTP:  dump hash table performance */
     gcvFALSE, /* IR:   dump BE final IR */
     gcvFALSE, /* LOG:  dump FE log file in case of compiler error */
+    gcvFALSE, /* PPEDSTR2FILE: dump FE preprocessed string to file */
     gcvFALSE, /* BIN2FILE: dump program binary to file when calling gcLoadProgram */
     gcvFALSE, /* UNIFORM: dump uniform value when setting uniform */
     gcvFALSE, /* SPIRV: dump VIR shader convert from SPIRV */

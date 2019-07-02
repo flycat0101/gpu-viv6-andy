@@ -1262,6 +1262,7 @@ typedef struct _gcOPTIMIZER_OPTION
     gctBOOL     dumpBEVerbose;         /* dump BE tree and optimization detail */
     gctBOOL     dumpBEFinalIR;         /* dump BE final IR */
     gctBOOL     dumpFELog;             /* dump FE log file in case of compiler error */
+    gctBOOL     dumpPPedStr2File;      /* dump FE preprocessed string to file */
     gctBOOL     dumpUniform;           /* dump uniform value when setting uniform */
     gctBOOL     dumpSpirvIR;           /* dump VIR shader convert from SPIRV */
     gctBOOL     dumpSpirvToFile;       /* dump SPRIV to file */
@@ -1702,6 +1703,7 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_DUMP_FINAL_IR()          (gcmGetOptimizerOption()->dumpBEFinalIR != 0)
 #define gcmOPT_DUMP_UNIFORM()           (gcmGetOptimizerOption()->dumpUniform != 0)
 #define gcmOPT_DUMP_FELOG()             (gcmGetOptimizerOption()->dumpFELog != 0)
+#define gcmOPT_DUMP_PPEDSTR2FILE()      (gcmGetOptimizerOption()->dumpPPedStr2File != 0)
 
 #define gcmOPT_SET_DUMP_SHADER_SRC(v)   (gcmGetOptimizerOption()->dumpShaderSource = (v)
 
