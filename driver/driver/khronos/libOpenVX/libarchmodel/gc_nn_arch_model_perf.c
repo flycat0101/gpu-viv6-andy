@@ -648,7 +648,7 @@ static vx_float64 _calcUnalignedBW(vx_float64 size, vx_float64 ppc)
 
 static vx_uint32 _calcNumOfKernel(vx_uint32 tile_x, vx_uint32 tile_y, vx_uint32 z, vx_uint32 accu_buf_depth, vx_uint32 cores, vx_uint32 interleave_mode, vx_uint32 zdp, vx_uint32 kx, vx_uint32 ky, vx_bool isV8, vx_uint32 data_size, vx_uint32 lanes_per_conv, vx_bool isDepthWise, vx_bool kernel_per_core_lt_one_third_coef_fix, vx_uint32 pooling_stride)
 {
-    vx_uint32 numKernel;
+    vx_uint32 numKernel, numOfVZGroup;
 
     numKernel = (vx_uint32)(accu_buf_depth * interleave_mode / tile_y);
 
@@ -675,6 +675,9 @@ static vx_uint32 _calcNumOfKernel(vx_uint32 tile_x, vx_uint32 tile_y, vx_uint32 
 #define ZDP_LOOP_COUNT 3
         numKernel = (vx_uint32)(gcmMIN(numKernel, (vx_uint32)((2 * accu_buf_depth * ZDP_LOOP_COUNT / 3) / 3)));
     }
+
+    numOfVZGroup = (vx_uint32)ceilf(1.0f * z / (numKernel * cores));
+    numKernel = (vx_uint32)ceilf(1.0f * z / (numOfVZGroup * cores));
     return (vx_uint32)numKernel;
 }
 
