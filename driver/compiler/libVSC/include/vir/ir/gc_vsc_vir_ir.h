@@ -6302,6 +6302,19 @@ VIR_Symbol_GetStartAndEndComponentForIO(
     OUT gctUINT*            pEndComponent
     );
 
+VIR_Uniform*
+VIR_Symbol_GetHwMappingSeparateSamplerUniform(
+    IN VSC_SHADER_RESOURCE_LAYOUT*  pResLayout,
+    IN VIR_Shader*                  pShader,
+    IN VIR_Symbol*                  pSym
+    );
+
+VIR_Symbol*
+VIR_Symbol_GetHwMappingSeparateSampler(
+    IN VIR_Shader*          pShader,
+    IN VIR_Symbol*          pSym
+    );
+
 VIR_Symbol*
 VIR_Symbol_GetSeparateSampler(
     IN VIR_Shader*          pShader,

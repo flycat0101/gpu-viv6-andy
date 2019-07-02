@@ -2216,6 +2216,37 @@ static void _VIR_CG_AssignPushConstUniform(
     }
 }
 
+static void
+_VIR_CG_AllocateSampledImage(
+    IN VIR_Shader*                  pShader,
+    IN VSC_SHADER_RESOURCE_LAYOUT*  pResLayout,
+    IN VIR_Symbol*                  pSampledImage,
+    IN VIR_Uniform*                 pUniform
+    )
+{
+    VIR_Symbol*                     pSeparateSamplerSym;
+    VIR_Uniform*                    pSeparateSamplerUniform;
+    gctINT                          index = VIR_Symbol_GetSamplerIdxRange(pSampledImage);
+
+    gcmASSERT(index >= 0);
+
+    pSeparateSamplerUniform = VIR_Symbol_GetHwMappingSeparateSamplerUniform(pResLayout, pShader, pSampledImage);
+
+    if (pSeparateSamplerUniform == gcvNULL)
+    {
+        pSeparateSamplerSym = VIR_Symbol_GetSeparateSampler(pShader, pSampledImage);
+        gcmASSERT(pSeparateSamplerSym != gcvNULL);
+        pSeparateSamplerUniform = VIR_Symbol_GetUniformPointer(pShader, pSeparateSamplerSym);
+    }
+
+    /* Get the address from the separate sampler. */
+    pUniform->swizzle  = pSeparateSamplerUniform->swizzle;
+    pUniform->physical = pSeparateSamplerUniform->physical + index;
+    pUniform->address  = pSeparateSamplerUniform->address;
+
+    return;
+}
+
 /* allocate the uniform based on the shader resource layout */
 VSC_ErrCode VIR_CG_MapUniformsWithLayout(
     IN VIR_Shader                   *pShader,
@@ -2804,18 +2835,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
         }
         else if (VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_SAMPLED_IMAGE)
         {
-            VIR_Symbol*     pSeparateSamplerSym = VIR_Symbol_GetSeparateSampler(pShader, sym);
-            VIR_Uniform*    pSeparateSamplerUniform = VIR_Symbol_GetUniformPointer(pShader, pSeparateSamplerSym);
-            gctINT          index = VIR_Symbol_GetSamplerIdxRange(sym);
-
-            if (index < 0)
-            {
-                gcmASSERT(gcvFALSE);
-            }
-
-            symUniform->swizzle  = pSeparateSamplerUniform->swizzle;
-            symUniform->physical = pSeparateSamplerUniform->physical + index;
-            symUniform->address  = pSeparateSamplerUniform->address;
+            _VIR_CG_AllocateSampledImage(pShader, pResLayout, sym, symUniform);
 
             continue;
         }

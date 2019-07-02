@@ -9707,6 +9707,115 @@ VIR_Symbol_GetStartAndEndComponentForIO(
     return VIR_Layout_HasComponent(VIR_Symbol_GetLayout(pSym));
 }
 
+VIR_Uniform*
+VIR_Symbol_GetHwMappingSeparateSamplerUniform(
+    IN VSC_SHADER_RESOURCE_LAYOUT*  pResLayout,
+    IN VIR_Shader*                  pShader,
+    IN VIR_Symbol*                  pSym
+    )
+{
+    VIR_SHADER_RESOURCE_ALLOC_LAYOUT*   pResAllocLayout = &pShader->shaderResAllocLayout;
+    VIR_Symbol*                         pSeparateSamplerSym = VIR_Symbol_GetSeparateSampler(pShader, pSym);
+    VIR_Symbol*                         pSeparateImageSym = VIR_Symbol_GetSeparateImage(pShader, pSym);
+
+    if (pSeparateSamplerSym == gcvNULL || pSeparateImageSym == gcvNULL)
+    {
+        return gcvNULL;
+    }
+
+    gcmASSERT(pResAllocLayout || pResLayout);
+
+    /*
+    ** When the separate sampler and the separate image come from two different resources, and both resources are
+    ** COMBINED_IMAGE_SAMPLER, we need to remap the sampler index based on the binding&set of the separate image.
+    */
+    if (VIR_Symbol_GetBinding(pSeparateSamplerSym) != VIR_Symbol_GetBinding(pSeparateImageSym)
+        ||
+        VIR_Symbol_GetDescriptorSet(pSeparateSamplerSym) != VIR_Symbol_GetDescriptorSet(pSeparateImageSym))
+    {
+        gctUINT32                   i, imageArraySize = 1, resCount, resEntryCount;
+        VSC_SHADER_RESOURCE_BINDING imageBinding ={ VSC_SHADER_RESOURCE_TYPE_SAMPLER, 0, 0, 0 }, resBinding;
+        VIR_Type*                   pType;
+        VIR_UniformKind             uniformKind;
+        VIR_Uniform*                pUniformArray[2] = { gcvNULL, gcvNULL };
+
+        pType = VIR_Symbol_GetType(pSeparateImageSym);
+        if (VIR_Type_isArray(pType))
+        {
+            imageArraySize = VIR_Type_GetArrayLength(pType);
+        }
+
+        if (pResLayout)
+        {
+            resEntryCount = pResLayout->resourceBindingCount;
+        }
+        else
+        {
+            resEntryCount = pResAllocLayout->resAllocEntryCount;
+        }
+
+        /* Find the resource bindings. */
+        for (i = 0; i < resEntryCount; i++)
+        {
+            if (pResLayout)
+            {
+                resBinding = pResLayout->pResBindings[i];
+            }
+            else
+            {
+                resBinding = pResAllocLayout->pResAllocEntries[i].resBinding;
+            }
+
+
+            if (resBinding.binding == VIR_Symbol_GetBinding(pSeparateImageSym)    &&
+                resBinding.set == VIR_Symbol_GetDescriptorSet(pSeparateImageSym)  &&
+                resBinding.arraySize == imageArraySize)
+            {
+                imageBinding = resBinding;
+                break;
+            }
+        }
+
+        gcmASSERT(i < resEntryCount);
+
+        /* For the other resources, like SAMPLED_IMAGE, we have already handled them in function "_CollectCompilerGeneatedCombinedSampler". */
+        if (imageBinding.type == VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER)
+        {
+            uniformKind = VIR_Resouce_ResType2UniformKind(imageBinding.type);
+            resCount = VIR_Resouce_FindResUniform(pShader, uniformKind, &imageBinding, VIR_FIND_RES_MODE_RES_ONLY, pUniformArray);
+
+            if (resCount == 0)
+            {
+                gcmASSERT(gcvFALSE);
+            }
+
+            return pUniformArray[0];
+        }
+    }
+
+    return gcvNULL;
+}
+
+VIR_Symbol*
+VIR_Symbol_GetHwMappingSeparateSampler(
+    IN VIR_Shader*                  pShader,
+    IN VIR_Symbol*                  pSym
+    )
+{
+    VIR_Uniform*                        pHwSeparateSamplerUniform;
+
+    pHwSeparateSamplerUniform = VIR_Symbol_GetHwMappingSeparateSamplerUniform(gcvNULL, pShader, pSym);
+
+    if (pHwSeparateSamplerUniform)
+    {
+        return VIR_Shader_GetSymFromId(pShader, VIR_Uniform_GetSymID(pHwSeparateSamplerUniform));
+    }
+    else
+    {
+        return VIR_Symbol_GetSeparateSampler(pShader, pSym);
+    }
+}
+
 VIR_Symbol*
 VIR_Symbol_GetSeparateSampler(
     IN VIR_Shader*          pShader,

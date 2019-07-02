@@ -3420,7 +3420,7 @@ static VSC_ErrCode _AddExtraSamplerArray(SHADER_PRIV_SAMPLER_ENTRY*** pppExtraSa
                 }
                 else if (!matched && bCheckSeparateSampler)
                 {
-                    pSeparateSamplerSym = VIR_Symbol_GetSeparateSampler(pShader, pVirUniformSymParent);
+                    pSeparateSamplerSym = VIR_Symbol_GetHwMappingSeparateSampler(pShader, pVirUniformSymParent);
                     if (pSeparateSamplerSym != gcvNULL)
                     {
                         if (VIR_Symbol_GetDescriptorSet(pSeparateSamplerSym) == pResBinding->set &&
