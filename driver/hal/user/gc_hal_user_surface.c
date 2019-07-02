@@ -6514,12 +6514,19 @@ _Clear(
 
     gcoSURF surf = SurfView->surf;
 
+    gceCHIPMODEL chipModel;
+    gctUINT32 chipRevision;
+    gcePATCH_ID patchID = gcvPATCH_INVALID;
+
     gcmHEADER_ARG("SurfView=0x%x ClearArg=0x%x LayerIndex=%d",
                    SurfView, ClearArgs, LayerIndex);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(surf, gcvOBJ_SURF);
     gcmVERIFY_ARGUMENT(ClearArgs != gcvNULL);
+
+    gcoHAL_GetPatchID(gcvNULL, &patchID);
+    gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL);
 
     /* Lock the surface. */
     gcmONERROR(gcoSURF_Lock(surf, gcvNULL, surfAddr));
@@ -6577,7 +6584,8 @@ _Clear(
                 break;
             }
 
-            if (gcoSURF_IsRenderable(surf) == gcvSTATUS_OK)
+            if ((gcoSURF_IsRenderable(surf) == gcvSTATUS_OK) &&
+                (!(patchID == gcvPATCH_SKIA_SKQP && chipModel == gcv600 && chipRevision == 0x4653)))
             {
                 /* 4. Try 3D draw clear.
                  * Resolve clear will need to decompress and disable tile status
