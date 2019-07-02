@@ -770,15 +770,12 @@ _ProfilerCallback(
 
 EGLBoolean
 veglBindAPI(
+    VEGLThreadData thread,
     EGLenum api
     )
 {
-    VEGLThreadData thread;
-
     gcmHEADER_ARG("api=0x%04x", api);
 
-    /* Get thread data. */
-    thread = veglGetThreadData();
     if (thread == gcvNULL)
     {
         gcmTRACE(
@@ -886,12 +883,16 @@ eglBindAPI(
     )
 {
     EGLenum ret;
+    VEGLThreadData thread;
 
     VEGL_TRACE_API(BindAPI)(api);
 
     gcmDUMP_API("${EGL eglBindAPI 0x%08X}", api);
 
-    ret = veglBindAPI(api);
+    /* Get thread data. */
+    thread = veglGetThreadData();
+
+    ret = veglBindAPI(thread, api);
 
     return ret;
 }
@@ -1659,6 +1660,7 @@ _DestroyContext(
 
     /* Execute events accumulated in the buffer if any. */
     gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
+    veglBindAPI(Thread, EGL_OPENGL_ES_API);
 
     /* Free the eglContext structure. */
     gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Context));
@@ -2620,7 +2622,7 @@ veglReleaseThread(
 
     if (Thread->esContext != gcvNULL)
     {
-        veglBindAPI(EGL_OPENGL_ES_API);
+        veglBindAPI(Thread, EGL_OPENGL_ES_API);
 
         /* Unbind the context. */
         veglMakeCurrent(Thread->esContext->display,
@@ -2634,7 +2636,7 @@ veglReleaseThread(
 
     if (Thread->vgContext != gcvNULL)
     {
-        veglBindAPI(EGL_OPENVG_API);
+        veglBindAPI(Thread, EGL_OPENVG_API);
 
         /* Unbind the context. */
         veglMakeCurrent(Thread->vgContext->display,
@@ -2648,7 +2650,7 @@ veglReleaseThread(
 
     if (Thread->glContext != gcvNULL)
     {
-        veglBindAPI(EGL_OPENGL_API);
+        veglBindAPI(Thread, EGL_OPENGL_API);
 
         /* Unbind the context. */
         veglMakeCurrent(Thread->glContext->display,
@@ -2663,7 +2665,7 @@ veglReleaseThread(
     Thread->context = gcvNULL;
 
     /* Set API to EGL_OPENGL_ES_API */
-    veglBindAPI(EGL_OPENGL_ES_API);
+    veglBindAPI(Thread, EGL_OPENGL_ES_API);
 
     /* Success. */
     gcmFOOTER_ARG("%d", EGL_TRUE);
@@ -3051,6 +3053,7 @@ eglWaitGL(
 {
     EGLenum api;
     EGLBoolean result;
+    VEGLThreadData thread;
 
     gcmHEADER();
 
@@ -3059,11 +3062,11 @@ eglWaitGL(
 
     /* Backwards compatibility. */
     api = veglQueryAPI();
-    veglBindAPI(EGL_OPENGL_ES_API);
+    veglBindAPI(thread, EGL_OPENGL_ES_API);
 
     result = veglWaitClient();
 
-    veglBindAPI(api);
+    veglBindAPI(thread, api);
 
     gcmFOOTER_ARG("%d", result);
     return result;
