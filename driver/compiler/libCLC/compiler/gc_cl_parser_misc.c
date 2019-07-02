@@ -393,7 +393,7 @@ IN cloIR_EXPR Operand
    if(!slmSLINK_LIST_IsEmpty(Operand->decl.ptrDscr) ||
       clmDECL_IsStructOrUnion(&Operand->decl) ||
       clmDECL_IsArray(&Operand->decl)) { /*create operand[0] */
-        cloIR_BINARY_EXPR arrayElem0;
+        cloIR_EXPR arrayElem0;
         clsDECL indexDecl;
         cloIR_CONSTANT arrayIndex;
         cluCONSTANT_VALUE  value;
@@ -432,7 +432,7 @@ IN cloIR_EXPR Operand
                                              &arrayIndex->exprBase,
                                              &arrayElem0);
         if (gcmIS_ERROR(status)) return gcvNULL;
-        return &arrayElem0->exprBase;
+        return arrayElem0;
    }
    return gcvNULL;
 }
@@ -530,10 +530,10 @@ IN clsLexToken * Identifier
                                                  expr,
                                                  gcvNULL,
                                                  gcvNULL,
-                                                 &unaryExpr);
+                                                 &expr);
              if (gcmIS_ERROR(status)) return gcvNULL;
+             unaryExpr = (cloIR_UNARY_EXPR)&expr->base;
              unaryExpr->u.generated = name;
-             expr = &unaryExpr->exprBase;
              status = clParseSetOperandAddressed(Compiler,
                                                  expr);
              if (gcmIS_ERROR(status)) return gcvNULL;
@@ -1423,6 +1423,7 @@ IN cloIR_EXPR RightOperand
     gceSTATUS  status;
     cloIR_CONSTANT resultConstant;
     cloIR_BINARY_EXPR binaryExpr;
+    cloIR_EXPR resExpr;
 
     if (LeftOperand == gcvNULL || RightOperand == gcvNULL) return gcvNULL;
 
@@ -1477,8 +1478,6 @@ IN cloIR_EXPR RightOperand
         }
         /* Create the binary expression */
         if(clmIR_EXPR_IsBinaryType(LeftOperand, clvBINARY_SUBSCRIPT)) {
-            cloIR_BINARY_EXPR  subscriptExpr;
-
             binaryExpr = (cloIR_BINARY_EXPR) &LeftOperand->base;
             status = cloIR_BINARY_EXPR_Construct(Compiler,
                                                  LeftOperand->base.lineNo,
@@ -1486,14 +1485,15 @@ IN cloIR_EXPR RightOperand
                                                  clvBINARY_MULTI_DIM_SUBSCRIPT,
                                                  binaryExpr->rightOperand,
                                                  RightOperand,
-                                                 &subscriptExpr);
+                                                 &resExpr);
             if (gcmIS_ERROR(status)) return gcvNULL;
 
-            binaryExpr->rightOperand = &subscriptExpr->exprBase;
+            binaryExpr->rightOperand = resExpr;
             status = cloCOMPILER_CreateElementDecl(Compiler,
                                                    &binaryExpr->exprBase.decl,
                                                    &binaryExpr->exprBase.decl);
             if (gcmIS_ERROR(status)) return gcvNULL;
+            resExpr = &binaryExpr->exprBase;
         }
         else {
             status = cloIR_BINARY_EXPR_Construct(Compiler,
@@ -1502,7 +1502,7 @@ IN cloIR_EXPR RightOperand
                                                  clvBINARY_SUBSCRIPT,
                                                  LeftOperand,
                                                  RightOperand,
-                                                 &binaryExpr);
+                                                 &resExpr);
             if (gcmIS_ERROR(status)) return gcvNULL;
         }
     }
@@ -1513,11 +1513,11 @@ IN cloIR_EXPR RightOperand
                                              clvBINARY_SUBSCRIPT,
                                              LeftOperand,
                                              RightOperand,
-                                             &binaryExpr);
+                                             &resExpr);
         if (gcmIS_ERROR(status)) return gcvNULL;
     }
 
-
+    binaryExpr = (cloIR_BINARY_EXPR) &resExpr->base;
 /* Reset resulting expression's access qualifier to none according to following criterion */
     if(binaryExpr->exprBase.decl.dataType->addrSpaceQualifier != clvQUALIFIER_CONSTANT &&
        cloIR_OBJECT_GetType(&LeftOperand->base) != clvIR_CONSTANT &&
@@ -1536,7 +1536,7 @@ IN cloIR_EXPR RightOperand
                       "<SUBSCRIPT_EXPR line=\"%d\" string=\"%d\" />",
                       LeftOperand->base.lineNo,
                       LeftOperand->base.stringNo));
-    return &binaryExpr->exprBase;
+    return resExpr;
 }
 
 static gceSTATUS
@@ -2655,6 +2655,7 @@ IN clsLexToken * FieldSelection
     clsCOMPONENT_SELECTION    componentSelection;
     cloIR_CONSTANT    resultConstant;
     cloIR_UNARY_EXPR unaryExpr;
+    cloIR_EXPR resExpr = gcvNULL;
 
     gcmASSERT(FieldSelection);
 
@@ -2727,7 +2728,7 @@ IN clsLexToken * FieldSelection
                         Operand,
                         fieldName,
                         &componentSelection,
-                        &unaryExpr);
+                        &resExpr);
     if (gcmIS_ERROR(status)) return gcvNULL;
 
     if(fieldName && clmDECL_IsArray(&fieldName->decl)) {
@@ -2736,7 +2737,7 @@ IN clsLexToken * FieldSelection
 
           /* Create the expression &A[0] for A being an array*/
           expr =  _EvaluateIndirectionExpr(Compiler,
-                                           &unaryExpr->exprBase);
+                                           resExpr);
           gcmASSERT(expr);
           status = cloIR_UNARY_EXPR_Construct(Compiler,
                                               Operand->base.lineNo,
@@ -2745,11 +2746,12 @@ IN clsLexToken * FieldSelection
                                               expr,
                                               gcvNULL,
                                               gcvNULL,
-                                              &unaryExpr);
+                                              &resExpr);
           if (gcmIS_ERROR(status)) return gcvNULL;
+          unaryExpr = (cloIR_UNARY_EXPR)&resExpr->base;
           unaryExpr->u.generated = fieldName;
           status = clParseSetOperandAddressed(Compiler,
-                                              &unaryExpr->exprBase);
+                                              resExpr);
           if (gcmIS_ERROR(status)) return gcvNULL;
        }
     }
@@ -2762,7 +2764,7 @@ IN clsLexToken * FieldSelection
                       Operand->base.lineNo,
                       Operand->base.stringNo,
                       FieldSelection->u.fieldSelection));
-    return &unaryExpr->exprBase;
+    return resExpr;
 }
 
 cloIR_EXPR
@@ -2776,7 +2778,7 @@ IN clsLexToken * FieldSelection
    cleUNARY_EXPR_TYPE exprType;
    clsNAME *fieldName = gcvNULL;
    clsCOMPONENT_SELECTION componentSelection;
-   cloIR_UNARY_EXPR unaryExpr;
+   cloIR_EXPR resExpr;
    cloIR_EXPR derefExpr;
    clsLexToken token[1];
 
@@ -2832,7 +2834,7 @@ IN clsLexToken * FieldSelection
                                        derefExpr,
                                        fieldName,
                                        &componentSelection,
-                                       &unaryExpr);
+                                       &resExpr);
    if (gcmIS_ERROR(status)) return gcvNULL;
    gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                                  clvDUMP_PARSER,
@@ -2842,7 +2844,7 @@ IN clsLexToken * FieldSelection
                                  Operand->base.lineNo,
                                  Operand->base.stringNo,
                                  FieldSelection->u.fieldSelection));
-   return &unaryExpr->exprBase;
+   return resExpr;
 }
 
 gceSTATUS
@@ -2882,9 +2884,9 @@ IN cloIR_EXPR Operand
 )
 {
     gceSTATUS    status;
-    gctUINT        lineNo;
-    gctUINT        stringNo;
-    cloIR_UNARY_EXPR  unaryExpr;
+    gctUINT      lineNo;
+    gctUINT      stringNo;
+    cloIR_EXPR   resExpr;
 
     if (Operand == gcvNULL) return gcvNULL;
 
@@ -2916,13 +2918,13 @@ IN cloIR_EXPR Operand
                         Operand,
                         gcvNULL,
                         gcvNULL,
-                        &unaryExpr);
+                        &resExpr);
     if (gcmIS_ERROR(status)) return gcvNULL;
 
     status = clParseSetOperandDirty(Compiler,
-                                        Operand,
-                                        gcvNULL);
-        if (gcmIS_ERROR(status)) return gcvNULL;
+                                    Operand,
+                                    gcvNULL);
+    if (gcmIS_ERROR(status)) return gcvNULL;
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                     clvDUMP_PARSER,
@@ -2930,7 +2932,7 @@ IN cloIR_EXPR Operand
                     clGetIRUnaryExprTypeName(ExprType),
                     lineNo,
                     stringNo));
-    return &unaryExpr->exprBase;
+    return resExpr;
 }
 
 static gceSTATUS
@@ -3309,6 +3311,7 @@ IN cloIR_EXPR Operand
     cleUNARY_EXPR_TYPE exprType = clvUNARY_NEG;
     cloIR_CONSTANT  resultConstant;
     cloIR_UNARY_EXPR  unaryExpr;
+    cloIR_EXPR  resExpr;
 
     gcmASSERT(Operator);
 
@@ -3382,6 +3385,14 @@ IN cloIR_EXPR Operand
         break;
 
     case '&':
+        if(cloIR_OBJECT_GetType(&Operand->base) == clvIR_UNARY_EXPR)
+        {
+            cloIR_UNARY_EXPR unaryExpr = (cloIR_UNARY_EXPR) &Operand->base;
+            if(unaryExpr->type == clvUNARY_NULL) {
+                Operand = unaryExpr->operand;
+                gcmASSERT(Operand);
+            }
+        }
         status = _CheckAddrExpr(Compiler, Operand);
         if (gcmIS_ERROR(status)) return gcvNULL;
         if(cloIR_OBJECT_GetType(&Operand->base) == clvIR_UNARY_EXPR) {
@@ -3396,9 +3407,9 @@ IN cloIR_EXPR Operand
                                                     operand,
                                                     gcvNULL,
                                                     gcvNULL,
-                                                    &unaryExpr);
+                                                    &resExpr);
                 if (gcmIS_ERROR(status)) return gcvNULL;
-                return &unaryExpr->exprBase;
+                return resExpr;
             }
             else if(unaryExpr->type == clvUNARY_ADDR &&
                     unaryExpr->u.generated) {
@@ -3434,13 +3445,14 @@ IN cloIR_EXPR Operand
                                                     expr,
                                                     gcvNULL,
                                                     gcvNULL,
-                                                    &unaryExpr);
+                                                    &resExpr);
                 if (gcmIS_ERROR(status)) return gcvNULL;
+                unaryExpr = (cloIR_UNARY_EXPR) &resExpr->base;
                 unaryExpr->u.generated = constantExpr->variable;
                 status = clsNAME_SetVariableAddressed(Compiler,
                                                       constantExpr->variable);
                 if (gcmIS_ERROR(status)) return gcvNULL;
-                return &unaryExpr->exprBase;
+                return resExpr;
             }
         }
 
@@ -3478,8 +3490,9 @@ IN cloIR_EXPR Operand
                                         Operand,
                                         gcvNULL,
                                         gcvNULL,
-                                        &unaryExpr);
+                                        &resExpr);
     if (gcmIS_ERROR(status)) return gcvNULL;
+    unaryExpr = (cloIR_UNARY_EXPR) &resExpr->base;
 
 /* Reset resulting expression's access qualifier to none according to following criterion
    if operator is an indirection
@@ -3502,7 +3515,7 @@ IN cloIR_EXPR Operand
                                   Operator->u.operator,
                                   Operator->lineNo,
                                   Operator->stringNo));
-    return &unaryExpr->exprBase;
+    return resExpr;
 }
 
 clsDECL
@@ -6175,7 +6188,7 @@ IN OUT cloIR_EXPR *ArrayPointerExpr
 {
     gceSTATUS status;
     cloIR_EXPR expr;
-    cloIR_UNARY_EXPR unaryExpr;
+    cloIR_EXPR resExpr;
 
     /* Create the expression &A[0] for A being an array*/
     expr =  _EvaluateIndirectionExpr(Compiler, ArrayOperand);
@@ -6187,14 +6200,14 @@ IN OUT cloIR_EXPR *ArrayPointerExpr
                                         expr,
                                         gcvNULL,
                                         gcvNULL,
-                                        &unaryExpr);
+                                        &resExpr);
     if (gcmIS_ERROR(status)) return status;
 
     status = clParseSetOperandAddressed(Compiler,
                                         ArrayOperand);
     if (gcmIS_ERROR(status)) return status;
 
-    *ArrayPointerExpr = &unaryExpr->exprBase;
+    *ArrayPointerExpr = resExpr;
     return status;
 }
 
@@ -6498,7 +6511,7 @@ IN cloIR_EXPR RightOperand
     gceSTATUS        status;
     cleBINARY_EXPR_TYPE    exprType = (cleBINARY_EXPR_TYPE) 0;
     cloIR_CONSTANT        resultConstant;
-    cloIR_BINARY_EXPR    binaryExpr;
+    cloIR_EXPR    resExpr;
 
     gcmASSERT(Operator);
     if (LeftOperand == gcvNULL || RightOperand == gcvNULL) return gcvNULL;
@@ -6726,7 +6739,7 @@ IN cloIR_EXPR RightOperand
                          exprType,
                          LeftOperand,
                          RightOperand,
-                         &binaryExpr);
+                         &resExpr);
     if (gcmIS_ERROR(status)) return gcvNULL;
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
@@ -6735,7 +6748,7 @@ IN cloIR_EXPR RightOperand
                       _GetBinaryOperatorName(Operator->u.operator),
                       LeftOperand->base.lineNo,
                       LeftOperand->base.stringNo));
-    return &binaryExpr->exprBase;
+    return resExpr;
 }
 
 cloIR_EXPR
@@ -6789,7 +6802,7 @@ IN cloIR_EXPR RightOperand
 
     if(isBinarySequence) {
        cloIR_CONSTANT    resultConstant;
-       cloIR_BINARY_EXPR    binaryExpr;
+       cloIR_EXPR    resExpr;
 
        status = _CheckSequenceExpr(Compiler,
                                    LeftOperand,
@@ -6798,15 +6811,15 @@ IN cloIR_EXPR RightOperand
        /* Constant calculation */
        if (_clmExprIsConstantForEval(LeftOperand) &&
            _clmExprIsConstantForEval(RightOperand)) {
-        status = cloIR_BINARY_EXPR_Evaluate(Compiler,
-                                            clvBINARY_SEQUENCE,
-                                            (cloIR_CONSTANT)LeftOperand,
-                                            (cloIR_CONSTANT)RightOperand,
-                                            gcvNULL,
-                                            &resultConstant);
+           status = cloIR_BINARY_EXPR_Evaluate(Compiler,
+                                               clvBINARY_SEQUENCE,
+                                               (cloIR_CONSTANT)LeftOperand,
+                                               (cloIR_CONSTANT)RightOperand,
+                                               gcvNULL,
+                                               &resultConstant);
 
-        if (gcmIS_ERROR(status)) return gcvNULL;
-        return &resultConstant->exprBase;
+           if (gcmIS_ERROR(status)) return gcvNULL;
+           return &resultConstant->exprBase;
        }
 
        /* Create binary expression */
@@ -6816,7 +6829,7 @@ IN cloIR_EXPR RightOperand
                                             clvBINARY_SEQUENCE,
                                             LeftOperand,
                                             RightOperand,
-                                            &binaryExpr);
+                                            &resExpr);
        if (gcmIS_ERROR(status)) return gcvNULL;
 
        gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
@@ -6825,7 +6838,7 @@ IN cloIR_EXPR RightOperand
                                      _GetBinaryOperatorName(Operator->u.operator),
                                      LeftOperand->base.lineNo,
                                      LeftOperand->base.stringNo));
-       return &binaryExpr->exprBase;
+       return resExpr;
     }
     else return clParseTypeCastArgument(Compiler, LeftOperand, RightOperand);
 }
@@ -7740,11 +7753,22 @@ IN cloIR_EXPR RightOperand
 {
     gceSTATUS        status;
     cleBINARY_EXPR_TYPE    exprType = (cleBINARY_EXPR_TYPE) 0;
-    cloIR_BINARY_EXPR    binaryExpr;
+    cloIR_EXPR    resExpr;
+    cloIR_EXPR    leftOperand;
 
     gcmASSERT(Operator);
 
     if (LeftOperand == gcvNULL || RightOperand == gcvNULL) return gcvNULL;
+
+    leftOperand = LeftOperand;
+    if(cloIR_OBJECT_GetType(&leftOperand->base) == clvIR_UNARY_EXPR)
+    {
+       cloIR_UNARY_EXPR unaryExpr = (cloIR_UNARY_EXPR) &leftOperand->base;
+       if(unaryExpr->type == clvUNARY_NULL) {
+          leftOperand = unaryExpr->operand;
+          gcmASSERT(leftOperand);
+       }
+    }
 
     switch (Operator->u.operator) {
     case T_LEFT_ASSIGN:
@@ -7762,36 +7786,36 @@ IN cloIR_EXPR RightOperand
 
         status = _CheckLogicalAssignmentExpr(Compiler,
                              Operator,
-                             LeftOperand,
+                             leftOperand,
                              RightOperand);
         if (gcmIS_ERROR(status)) return gcvNULL;
-            status = clParseSetOperandDirty(Compiler,
-                                                LeftOperand,
-                                                RightOperand);
-                if (gcmIS_ERROR(status)) return gcvNULL;
+        status = clParseSetOperandDirty(Compiler,
+                                        leftOperand,
+                                        RightOperand);
+        if (gcmIS_ERROR(status)) return gcvNULL;
 
         break;
 
     case '=':
         exprType = clvBINARY_ASSIGN;
         status = _CheckAssignmentExpr(Compiler,
-                                      LeftOperand,
+                                      leftOperand,
                                       RightOperand);
         if (gcmIS_ERROR(status)) return gcvNULL;
         if (_IsLeftAndRightOperandIdentical(Compiler,
-                                            LeftOperand,
+                                            leftOperand,
                                             RightOperand)) {
-           return LeftOperand;
+           return leftOperand;
         }
 
         /*Check if left operand is a pointer and right operand is constant array:
           if so, create a constant variable for the right operand */
         status = clParseSetOperandDirty(Compiler,
-                                        LeftOperand,
+                                        leftOperand,
                                         RightOperand);
         if (gcmIS_ERROR(status)) return gcvNULL;
 
-        if(clmDECL_IsPointerType(&LeftOperand->decl)
+        if(clmDECL_IsPointerType(&leftOperand->decl)
                && cloIR_OBJECT_GetType(&RightOperand->base) == clvIR_CONSTANT) {
            if(((cloIR_CONSTANT)RightOperand)->valueCount > 1) {
                cloIR_EXPR constVariableExpr;
@@ -7802,12 +7826,12 @@ IN cloIR_EXPR RightOperand
                RightOperand = constVariableExpr;
            }
         }
-        else if(clmDECL_IsUnderlyingStructOrUnion(&LeftOperand->decl) &&
-                (clGetOperandCountForRegAlloc(&LeftOperand->decl) > _clmMaxOperandCountToUseMemory(&LeftOperand->decl) ||
-                 LeftOperand->decl.dataType->u.fieldSpace->scopeName->u.typeInfo.hasUnionFields)) {
+        else if(clmDECL_IsUnderlyingStructOrUnion(&leftOperand->decl) &&
+                (clGetOperandCountForRegAlloc(&leftOperand->decl) > _clmMaxOperandCountToUseMemory(&leftOperand->decl) ||
+                 leftOperand->decl.dataType->u.fieldSpace->scopeName->u.typeInfo.hasUnionFields)) {
            gcmASSERT(clmDECL_IsUnderlyingStructOrUnion(&RightOperand->decl));
            status = clParseSetOperandAddressed(Compiler,
-                                               LeftOperand);
+                                               leftOperand);
            if (gcmIS_ERROR(status)) return gcvNULL;
            status = clParseSetOperandAddressed(Compiler,
                                                RightOperand);
@@ -7822,7 +7846,7 @@ IN cloIR_EXPR RightOperand
     case T_MOD_ASSIGN:
         status = _CheckArithmeticAssignmentExpr(Compiler,
                             Operator,
-                            LeftOperand,
+                            leftOperand,
                             RightOperand);
         if (gcmIS_ERROR(status)) return gcvNULL;
         switch (Operator->u.operator) {
@@ -7832,7 +7856,7 @@ IN cloIR_EXPR RightOperand
 
         case T_DIV_ASSIGN:
             if((clmDECL_IsFloatingType(&RightOperand->decl) ||
-               clmDECL_IsFloatingType(&LeftOperand->decl)) &&
+               clmDECL_IsFloatingType(&leftOperand->decl)) &&
                _clmExprIsConstantForEval(RightOperand)) {
                 cloIR_CONSTANT constantOne;
                 cloIR_CONSTANT resultConstant;
@@ -7878,12 +7902,12 @@ IN cloIR_EXPR RightOperand
 
     /* Create binary expression */
     status = cloIR_BINARY_EXPR_Construct(Compiler,
-                         LeftOperand->base.lineNo,
-                         LeftOperand->base.stringNo,
+                         leftOperand->base.lineNo,
+                         leftOperand->base.stringNo,
                          exprType,
-                         LeftOperand,
+                         leftOperand,
                          RightOperand,
-                         &binaryExpr);
+                         &resExpr);
     if (gcmIS_ERROR(status)) {
         return gcvNULL;
     }
@@ -7892,9 +7916,9 @@ IN cloIR_EXPR RightOperand
                       clvDUMP_PARSER,
                       "<BINARY_EXPR type=\"%s\" line=\"%d\" string=\"%d\" />",
                       _GetBinaryOperatorName(Operator->u.operator),
-                      LeftOperand->base.lineNo,
-                      LeftOperand->base.stringNo));
-    return &binaryExpr->exprBase;
+                      leftOperand->base.lineNo,
+                      leftOperand->base.stringNo));
+    return resExpr;
 }
 
 #undef TESTCL
@@ -9054,7 +9078,7 @@ IN cloIR_EXPR InitExpr
 )
 {
   gceSTATUS status;
-  cloIR_BINARY_EXPR binaryExpr;
+  cloIR_EXPR resExpr;
   gcmASSERT(InitExpr);
 
   if(!Designation) return InitExpr;
@@ -9072,9 +9096,9 @@ IN cloIR_EXPR InitExpr
                                        clvBINARY_ASSIGN,
                                        Designation->lhs,
                                        InitExpr,
-                                       &binaryExpr);
+                                       &resExpr);
   if (gcmIS_ERROR(status)) return gcvNULL;
-  return &binaryExpr->exprBase;
+  return resExpr;
 }
 
 cloIR_EXPR
@@ -9296,6 +9320,7 @@ IN cluCONSTANT_VALUE *ToValues
    switch(ToType) {
    case clvTYPE_FLOAT:
    case clvTYPE_HALF_PACKED:
+   case clvTYPE_HALF:
      switch(SourceType) {
      case clvTYPE_UINT:
      case clvTYPE_UCHAR:
@@ -9357,6 +9382,7 @@ default:
 
    case clvTYPE_INT:
      switch(SourceType) {
+     case clvTYPE_HALF:
      case clvTYPE_FLOAT:
      case clvTYPE_HALF_PACKED:
         for(i=0; i < ValueCount; i++) {
@@ -9934,7 +9960,7 @@ IN cloIR_EXPR InitExpr
 {
   gceSTATUS status;
   cloIR_EXPR lhs;
-  cloIR_BINARY_EXPR binaryExpr;
+  cloIR_EXPR resExpr;
   cloIR_BASE    initStatement;
   cloIR_CONSTANT constant = gcvNULL;
   cloIR_TYPECAST_ARGS typeCastArgs;
@@ -10319,10 +10345,10 @@ AssignLhs:
                                          clvBINARY_ASSIGN,
                                          lhs,
                                          initExpr,
-                                         &binaryExpr);
+                                         &resExpr);
     if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
 
-    initStatement = &binaryExpr->exprBase.base;
+    initStatement = &resExpr->base;
 
     if (DeclOrDeclListPtr->initStatements != gcvNULL) {
        gcmVERIFY_OK(cloIR_SET_AddMember(Compiler,

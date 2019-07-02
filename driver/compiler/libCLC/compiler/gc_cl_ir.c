@@ -468,8 +468,10 @@ IN clsDECL * RDecl
           return gcvTRUE;
       }
   }
-  else if(clmDECL_IsPackedGenType(LDecl) &&
-     clmIsElementTypePacked(RDecl->dataType->elementType)) {
+  else if((clmDECL_IsPackedGenType(LDecl) &&
+      clmIsElementTypePacked(RDecl->dataType->elementType)) ||
+      (clmDECL_IsFloatingType(RDecl) && clmDECL_IsFloatingType(LDecl) &&
+       (RDecl->dataType->elementType == clvTYPE_HALF || LDecl->dataType->elementType == clvTYPE_HALF))) {
       sameType = gcvTRUE;
   }
 
@@ -2841,7 +2843,7 @@ IN OUT clsDECL *CandidateType
         break;
 
    case clvTYPE_F_GEN:
-        if(!clmDECL_IsFloat(RefDecl)) {
+        if(!clmDECL_IsFloat(RefDecl) || RefDecl->dataType->elementType == clvTYPE_HALF) {
            _clmInitGenType(clvTYPE_FLOAT,
                            clmDATA_TYPE_vectorSize_NOCHECK_GET(RefDecl->dataType),
                            CandidateType->dataType);
@@ -2849,6 +2851,13 @@ IN OUT clsDECL *CandidateType
         break;
 
    case clvTYPE_GEN:
+        if(RefDecl->dataType->elementType == clvTYPE_HALF) {
+           _clmInitGenType(clvTYPE_FLOAT,
+                           clmDATA_TYPE_vectorSize_NOCHECK_GET(RefDecl->dataType),
+                           CandidateType->dataType);
+        }
+        break;
+
    default:
         break;
    }
@@ -2862,9 +2871,11 @@ IN cloIR_EXPR Argument,
 IN OUT clsNAME **RefParamName
 )
 {
+  gceSTATUS status = gcvSTATUS_OK;
   clsDECL lDecl[1];
   clsDECL *paramDecl;
   clsDECL *rDecl;
+  clsDECL refDecl[1];
   clsDATA_TYPE dataType[1];
   clsDATA_TYPE *refDataType = gcvNULL;
   cltELEMENT_TYPE refElementType = clvTYPE_VOID;
@@ -2882,6 +2893,23 @@ IN OUT clsNAME **RefParamName
   }
   paramDecl = &ParamName->decl;
   rDecl = &Argument->decl;
+  if (rDecl->dataType->elementType == clvTYPE_HALF &&
+      !clmDECL_IsPointerType(rDecl) && !clmDECL_IsArray(rDecl)) {
+      gctINT resultType;
+      resultType = clGetVectorTerminalToken(clvTYPE_FLOAT,
+                                            clmDATA_TYPE_vectorSize_GET(rDecl->dataType));
+
+      if(resultType) {
+          status = cloCOMPILER_CreateDecl(Compiler,
+                                          resultType,
+                                          rDecl->dataType->u.generic,
+                                          rDecl->dataType->accessQualifier,
+                                          rDecl->dataType->addrSpaceQualifier,
+                                          refDecl);
+          if (gcmIS_ERROR(status)) return status;
+          rDecl = refDecl;
+      }
+  }
   if(clmDECL_IsScalar(rDecl) &&
      (clmDECL_IsScalar(paramDecl) || !ParamName->u.variableInfo.builtinSpecific.s.hasGenType)) {
       ParamName->u.variableInfo.effectiveDecl = ParamName->decl;
@@ -3199,6 +3227,10 @@ IN OUT clsNAME **RefParamName
   }
   else if(clmIsElementTypeImageGeneric(paramDecl->dataType->elementType) &&
      clmIsElementTypeImage(rDecl->dataType->elementType)) {
+      sameType = gcvTRUE;
+  }
+  else if(clmIsElementTypeFloating(paramDecl->dataType->elementType) &&
+     rDecl->dataType->elementType == clvTYPE_HALF) {
       sameType = gcvTRUE;
   }
 
@@ -3751,7 +3783,7 @@ IN OUT cloIR_POLYNARY_EXPR FuncCall
           cloIR_CONSTANT constant;
           cloIR_EXPR leftOperand;
           cloIR_EXPR rightOperand;
-          cloIR_BINARY_EXPR binaryExpr;
+          cloIR_EXPR resExpr;
 
           if(variableName->u.variableInfo.isInitializedWithExtendedVectorConstant &&
              !variableName->u.variableInfo.alias->u.variableInfo.isDirty) {
@@ -3776,8 +3808,6 @@ IN OUT cloIR_POLYNARY_EXPR FuncCall
                                               &variable));
           leftOperand = &variable->exprBase;
           if(!clmDECL_IsPointerType(&variableName->u.variableInfo.alias->decl)) {
-              cloIR_UNARY_EXPR unaryExpr;
-
               gcmONERROR(cloIR_UNARY_EXPR_Construct(Compiler,
                                                     FuncCall->exprBase.base.lineNo,
                                                     FuncCall->exprBase.base.stringNo,
@@ -3785,8 +3815,7 @@ IN OUT cloIR_POLYNARY_EXPR FuncCall
                                                     leftOperand,
                                                     gcvNULL,
                                                     gcvNULL,
-                                                    &unaryExpr));
-              leftOperand = &unaryExpr->exprBase;
+                                                    &leftOperand));
           }
 
           gcmONERROR(clConstructScalarIntegerConstant(Compiler,
@@ -3803,11 +3832,11 @@ IN OUT cloIR_POLYNARY_EXPR FuncCall
                                                  clvBINARY_ADD,
                                                  leftOperand,
                                                  rightOperand,
-                                                 &binaryExpr));
+                                                 &resExpr));
 
           gcmONERROR(cloIR_SET_AddMember(Compiler,
                                          argumentSet,
-                                         &binaryExpr->exprBase.base));
+                                         &resExpr->base));
           argumentCount++;
        }
        else if(++argumentCount != operandCount) {
@@ -9578,7 +9607,8 @@ IN cleUNARY_EXPR_TYPE Type,
 IN cloIR_EXPR Operand,
 IN clsNAME * FieldName,
 IN clsCOMPONENT_SELECTION * ComponentSelection,
-OUT clsDECL * Decl
+OUT clsDECL * Decl,
+OUT cloIR_UNARY_EXPR *ModifierExpr
 )
 {
     gceSTATUS status;
@@ -9604,6 +9634,53 @@ OUT clsDECL * Decl
                                        &FieldName->decl,
                                        Decl);
         if (gcmIS_ERROR(status)) return status;
+
+        if (Decl->dataType->elementType == clvTYPE_HALF &&
+            !clmDECL_IsPointerType(Decl) && !clmDECL_IsArray(Decl)) {
+            gctBOOL addNullExpr = gcvFALSE;
+            clsNAME *variable;
+
+            if(cloIR_OBJECT_GetType(&Operand->base) == clvIR_BINARY_EXPR) {
+                cloIR_BINARY_EXPR binaryExpr = (cloIR_BINARY_EXPR) &Operand->base;
+                if(binaryExpr->type == clvBINARY_SUBSCRIPT &&
+                   clmDECL_IsPointerType(&binaryExpr->leftOperand->decl)) {
+                    addNullExpr = gcvTRUE;
+                }
+                else {
+                    variable = clParseFindLeafName(Compiler, Operand);
+                    if(variable && clmGEN_CODE_checkVariableForMemory(variable)) {
+                        addNullExpr = gcvTRUE;
+                    }
+                }
+            }
+            else {
+                variable = clParseFindLeafName(Compiler, Operand);
+                if(variable && clmGEN_CODE_checkVariableForMemory(variable)) {
+                    addNullExpr = gcvTRUE;
+                }
+            }
+            if(addNullExpr) {
+                gctINT resultType;
+                resultType = clGetVectorTerminalToken(clvTYPE_FLOAT,
+                                                      clmDATA_TYPE_vectorSize_GET(Decl->dataType));
+                if(resultType) {
+                    clsDECL decl[1];
+                    status = cloCOMPILER_CreateDecl(Compiler,
+                                                    resultType,
+                                                    Decl->dataType->u.generic,
+                                                    Decl->dataType->accessQualifier,
+                                                    Decl->dataType->addrSpaceQualifier,
+                                                    decl);
+                    if (gcmIS_ERROR(status)) return status;
+                    status = cloIR_NULL_EXPR_Construct(Compiler,
+                                                       Operand->base.lineNo,
+                                                       Operand->base.stringNo,
+                                                       decl,
+                                                       ModifierExpr);
+                    if (gcmIS_ERROR(status)) return status;
+                }
+            }
+        }
         break;
 
     case clvUNARY_COMPONENT_SELECTION:
@@ -9702,6 +9779,31 @@ OUT clsDECL * Decl
                                                &Operand->decl,
                                                Decl);
         if (gcmIS_ERROR(status)) return status;
+        if (Decl->dataType->elementType == clvTYPE_HALF &&
+            !clmDECL_IsPointerType(Decl) && !clmDECL_IsArray(Decl)) {
+            gctINT resultType;
+
+            resultType = clGetVectorTerminalToken(clvTYPE_FLOAT,
+                                                  clmDATA_TYPE_vectorSize_GET(Decl->dataType));
+
+            if(resultType) {
+                clsDECL decl[1];
+
+                status = cloCOMPILER_CreateDecl(Compiler,
+                                                resultType,
+                                                Decl->dataType->u.generic,
+                                                Decl->dataType->accessQualifier,
+                                                Decl->dataType->addrSpaceQualifier,
+                                                decl);
+                if (gcmIS_ERROR(status)) return status;
+                status = cloIR_NULL_EXPR_Construct(Compiler,
+                                                   Operand->base.lineNo,
+                                                   Operand->base.stringNo,
+                                                   decl,
+                                                   ModifierExpr);
+                if (gcmIS_ERROR(status)) return status;
+            }
+        }
         break;
 
     default: gcmASSERT(0);
@@ -9771,27 +9873,29 @@ IN cleUNARY_EXPR_TYPE Type,
 IN cloIR_EXPR Operand,
 IN clsNAME *FieldName,
 IN clsCOMPONENT_SELECTION *ComponentSelection,
-OUT cloIR_UNARY_EXPR *UnaryExpr
+OUT cloIR_EXPR *ResExpr
 )
 {
     gceSTATUS  status = gcvSTATUS_OK;
     cloIR_UNARY_EXPR unaryExpr;
     clsDECL decl;
+    cloIR_UNARY_EXPR modifierExpr = gcvNULL;
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
     gcmASSERT(Operand);
-    gcmASSERT(UnaryExpr);
+    gcmASSERT(ResExpr);
 
     do {
         gctPOINTER pointer;
 
         status = _GetUnaryExprDecl(Compiler,
-                       Type,
-                       Operand,
-                       FieldName,
-                       ComponentSelection,
-                       &decl);
+                                   Type,
+                                   Operand,
+                                   FieldName,
+                                   ComponentSelection,
+                                   &decl,
+                                   &modifierExpr);
         if (gcmIS_ERROR(status)) break;
         gcmASSERT(decl.dataType);
 
@@ -9823,12 +9927,18 @@ OUT cloIR_UNARY_EXPR *UnaryExpr
             break;
         }
 
-        *UnaryExpr = unaryExpr;
+        if(modifierExpr) {
+            modifierExpr->operand = &unaryExpr->exprBase;
+            *ResExpr = &modifierExpr->exprBase;
+        }
+        else {
+            *ResExpr = &unaryExpr->exprBase;
+        }
 
         return gcvSTATUS_OK;
     } while (gcvFALSE);
 
-    *UnaryExpr = gcvNULL;
+    *ResExpr = gcvNULL;
     return status;
 }
 
@@ -10464,7 +10574,8 @@ _GetBinaryExprDecl(
     IN cleBINARY_EXPR_TYPE Type,
     IN cloIR_EXPR LeftOperand,
     IN cloIR_EXPR RightOperand,
-    OUT clsDECL *Decl
+    OUT clsDECL *Decl,
+    OUT cloIR_UNARY_EXPR *ModifierExpr
     )
 {
     gceSTATUS status;
@@ -10483,6 +10594,39 @@ _GetBinaryExprDecl(
                                                &LeftOperand->decl,
                                                Decl);
         if (gcmIS_ERROR(status)) return status;
+        if (Decl->dataType->elementType == clvTYPE_HALF &&
+            !clmDECL_IsPointerType(Decl) && !clmDECL_IsArray(Decl)) {
+            gctBOOL addNullExpr = gcvFALSE;
+
+            if(clmDECL_IsPointerType(&LeftOperand->decl)) addNullExpr = gcvTRUE;
+            else {
+               clsNAME *variable;
+               variable = clParseFindLeafName(Compiler,
+                                              LeftOperand);
+               if(variable && clmGEN_CODE_checkVariableForMemory(variable)) addNullExpr = gcvTRUE;
+            }
+            if(addNullExpr) {
+                gctINT resultType;
+                resultType = clGetVectorTerminalToken(clvTYPE_FLOAT,
+                                                      clmDATA_TYPE_vectorSize_GET(Decl->dataType));
+                if(resultType) {
+                    clsDECL decl[1];
+                    status = cloCOMPILER_CreateDecl(Compiler,
+                                                    resultType,
+                                                    Decl->dataType->u.generic,
+                                                    Decl->dataType->accessQualifier,
+                                                    Decl->dataType->addrSpaceQualifier,
+                                                    decl);
+                    if (gcmIS_ERROR(status)) return status;
+                    status = cloIR_NULL_EXPR_Construct(Compiler,
+                                                       LeftOperand->base.lineNo,
+                                                       LeftOperand->base.stringNo,
+                                                       decl,
+                                                       ModifierExpr);
+                    if (gcmIS_ERROR(status)) return status;
+                }
+            }
+        }
         break;
 
     case clvBINARY_ADD:
@@ -10665,32 +10809,34 @@ IN gctUINT StringNo,
 IN cleBINARY_EXPR_TYPE Type,
 IN cloIR_EXPR LeftOperand,
 IN cloIR_EXPR RightOperand,
-OUT cloIR_BINARY_EXPR *BinaryExpr
+OUT cloIR_EXPR *ResExpr
 )
 {
    gceSTATUS status;
    clsDECL decl;
    cloIR_BINARY_EXPR  binaryExpr;
+   cloIR_UNARY_EXPR modifierExpr = gcvNULL;
 
    /* Verify the arguments. */
    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
    gcmASSERT(LeftOperand);
    gcmASSERT(RightOperand);
-   gcmASSERT(BinaryExpr);
+   gcmASSERT(ResExpr);
 
    do {
-        gctPOINTER pointer;
+    gctPOINTER pointer;
 
-        clmDECL_Initialize(&decl, gcvNULL, (clsARRAY *)0, gcvNULL, gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
-        status = _GetBinaryExprDecl(Compiler,
-                                    Type,
-                                    LeftOperand,
-                                    RightOperand,
-                                    &decl);
+    clmDECL_Initialize(&decl, gcvNULL, (clsARRAY *)0, gcvNULL, gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
+    status = _GetBinaryExprDecl(Compiler,
+                                Type,
+                                LeftOperand,
+                                RightOperand,
+                                &decl,
+                                &modifierExpr);
 
-        if (gcmIS_ERROR(status)) break;
+    if (gcmIS_ERROR(status)) break;
 
-        gcmASSERT(decl.dataType);
+    gcmASSERT(decl.dataType);
 
     if(clmDECL_IsFloatingType(&decl)) {
        clSetFloatOpsUsed(Compiler, Type);
@@ -10712,11 +10858,17 @@ OUT cloIR_BINARY_EXPR *BinaryExpr
     status = cloIR_BINARY_EXPR_ImplicitTypeConv(Compiler,
                                                 binaryExpr);
 
-    *BinaryExpr = binaryExpr;
+    if(modifierExpr) {
+        modifierExpr->operand = &binaryExpr->exprBase;
+        *ResExpr = &modifierExpr->exprBase;
+    }
+    else {
+        *ResExpr = &binaryExpr->exprBase;
+    }
     return gcvSTATUS_OK;
    } while (gcvFALSE);
 
-   *BinaryExpr = gcvNULL;
+   *ResExpr = gcvNULL;
    return status;
 }
 

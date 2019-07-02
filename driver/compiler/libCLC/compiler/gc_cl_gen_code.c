@@ -15478,9 +15478,8 @@ IN OUT clsGEN_CODE_PARAMETERS *RightParameters
                                                 binaryExpr->type,
                                                 operand1,
                                                 operand2,
-                                                &binaryExpr);
+                                                ResExpr);
            if (gcmIS_ERROR(status)) return status;
-           *ResExpr = &binaryExpr->exprBase;
        }
        else {
            gcmASSERT(selectionExpr);
@@ -15520,6 +15519,9 @@ IN OUT clsGEN_CODE_PARAMETERS *ToParameters
    for (i = 0; i < FromParameters->operandCount; i++) {
        fromElementType = clmGEN_CODE_elementType_GET(FromParameters->dataTypes[i].def);
        toElementType = clmGEN_CODE_elementType_GET(ToParameters->dataTypes[i].def);
+
+       if(clmIsElementTypeFloating(fromElementType) && clmIsElementTypeFloating(toElementType) &&
+          (fromElementType == clvTYPE_HALF || toElementType == clvTYPE_HALF)) continue;
 
        if(fromElementType == toElementType ||
           (clmIsElementTypePackedGenType(fromElementType) &&
@@ -25422,6 +25424,67 @@ cloIR_UNARY_EXPR_GenAddrCode(
 }
 
 gceSTATUS
+cloIR_UNARY_EXPR_GenNullCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_UNARY_EXPR UnaryExpr,
+    IN OUT clsGEN_CODE_PARAMETERS * Parameters
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    clsGEN_CODE_PARAMETERS    operandParameters;
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+    clmVERIFY_OBJECT(CodeGenerator, clvOBJ_CODE_GENERATOR);
+    clmVERIFY_IR_OBJECT(UnaryExpr, clvIR_UNARY_EXPR);
+    gcmASSERT(UnaryExpr->type == clvUNARY_NULL);
+    gcmASSERT(Parameters);
+
+    if(!UnaryExpr->operand) return status;
+
+    /* Generate the code of the operand */
+    clsGEN_CODE_PARAMETERS_Initialize(&operandParameters, Parameters->needLOperand, Parameters->needROperand);
+
+    operandParameters.hint = Parameters->hint;
+    gcmONERROR(cloIR_OBJECT_Accept(Compiler,
+                     &UnaryExpr->operand->base,
+                     &CodeGenerator->visitor,
+                     &operandParameters));
+
+    if(operandParameters.hint & clvGEN_DEREF_CODE) {
+        Parameters->hint |= clvGEN_DEREF_CODE;
+    }
+
+    if(!clmDECL_IsPointerType(&UnaryExpr->exprBase.decl) && Parameters->needROperand) {
+       operandParameters.dataTypes[0].def =
+       operandParameters.rOperands[0].dataType = _ConvElementDataType(&UnaryExpr->exprBase.decl);
+    }
+    clsGEN_CODE_PARAMETERS_MoveOperands(Parameters,
+                                        &operandParameters);
+
+    if(Parameters->needROperand &&
+      Parameters->hasIOperand) {
+      gceSTATUS status;
+
+      gcmASSERT(Parameters->operandCount == 1);
+      _clmAssignROperandToPreallocatedTempReg(Compiler,
+                          Parameters,
+                          &Parameters->rOperands[0],
+                          status,
+                          UnaryExpr->exprBase.base.lineNo,
+                          UnaryExpr->exprBase.base.stringNo
+                          );
+      if(gcmIS_ERROR(status)) return status;
+    }
+
+OnError:
+    clsGEN_CODE_PARAMETERS_Finalize(&operandParameters);
+
+    return status;
+}
+
+gceSTATUS
 cloIR_UNARY_EXPR_GenCastCode(
     IN cloCOMPILER Compiler,
     IN cloCODE_GENERATOR CodeGenerator,
@@ -25655,11 +25718,11 @@ OUT cloIR_POLYNARY_EXPR *FuncCall
                                                          binaryExpr->leftOperand,
                                                          gcvNULL,
                                                          gcvNULL,
-                                                         &unaryExpr));
+                                                         &pointerExpr));
                    pointerExpr = _CastPointerExprToComponentPointerExpr(Compiler,
                                                                         Expr->base.lineNo,
                                                                         Expr->base.stringNo,
-                                                                        &unaryExpr->exprBase);
+                                                                        pointerExpr);
                    offsetExpr = binaryExpr->rightOperand;
                }
            }
@@ -25685,11 +25748,11 @@ OUT cloIR_POLYNARY_EXPR *FuncCall
                                                  Expr,
                                                  gcvNULL,
                                                  gcvNULL,
-                                                 &unaryExpr));
+                                                 &pointerExpr));
            pointerExpr = _CastPointerExprToComponentPointerExpr(Compiler,
                                                                 Expr->base.lineNo,
                                                                 Expr->base.stringNo,
-                                                                &unaryExpr->exprBase);
+                                                                pointerExpr);
            gcmONERROR(clConstructScalarIntegerConstant(Compiler,
                                                        Expr->base.lineNo,
                                                        Expr->base.stringNo,
@@ -25857,11 +25920,11 @@ OUT cloIR_POLYNARY_EXPR *FuncCall
                                                  leftExpr,
                                                  gcvNULL,
                                                  gcvNULL,
-                                                 &unaryExpr));
+                                                 &pointerExpr));
            pointerExpr = _CastPointerExprToComponentPointerExpr(Compiler,
                                                                 leftExpr->base.lineNo,
                                                                 leftExpr->base.stringNo,
-                                                                &unaryExpr->exprBase);
+                                                                pointerExpr);
            gcmONERROR(clConstructScalarIntegerConstant(Compiler,
                                                        Expr->base.lineNo,
                                                        Expr->base.stringNo,
@@ -25932,7 +25995,6 @@ IN gctINT Scale
        cloIR_CONSTANT scaleOperand;
        gctINT argument;
        cleBINARY_EXPR_TYPE exprType;
-       cloIR_BINARY_EXPR binaryExpr;
 
        argument = _ConvValueToPowerOfTwo(Scale);
        if(argument == 0) {
@@ -25961,9 +26023,8 @@ IN gctINT Scale
                                                 exprType,
                                                 IndexExpr,
                                                 &scaleOperand->exprBase,
-                                                &binaryExpr);
+                                                &expr);
            if (gcmIS_ERROR(status)) return gcvNULL;
-           expr = &binaryExpr->exprBase;
        }
     }
 
@@ -26085,11 +26146,11 @@ OUT cloIR_POLYNARY_EXPR *FuncCall
                                                  Expr,
                                                  gcvNULL,
                                                  gcvNULL,
-                                                 &unaryExpr));
+                                                 &pointerExpr));
            pointerExpr = _CastPointerExprToComponentPointerExpr(Compiler,
                                                                 Expr->base.lineNo,
                                                                 Expr->base.stringNo,
-                                                                &unaryExpr->exprBase);
+                                                                pointerExpr);
            gcmONERROR(clConstructScalarIntegerConstant(Compiler,
                                                        Expr->base.lineNo,
                                                        Expr->base.stringNo,
@@ -26274,11 +26335,11 @@ OUT cloIR_POLYNARY_EXPR *FuncCall
                                                  leftExpr,
                                                  gcvNULL,
                                                  gcvNULL,
-                                                 &unaryExpr));
+                                                 &pointerExpr));
            pointerExpr = _CastPointerExprToComponentPointerExpr(Compiler,
                                                                 leftExpr->base.lineNo,
                                                                 leftExpr->base.stringNo,
-                                                                &unaryExpr->exprBase);
+                                                                pointerExpr);
            gcmONERROR(clConstructScalarIntegerConstant(Compiler,
                                                        Expr->base.lineNo,
                                                        Expr->base.stringNo,
@@ -26555,6 +26616,12 @@ cloIR_UNARY_EXPR_GenCode(
 
     case clvUNARY_CAST:
         return cloIR_UNARY_EXPR_GenCastCode(Compiler,
+                                            CodeGenerator,
+                                            UnaryExpr,
+                                            Parameters);
+
+    case clvUNARY_NULL:
+        return cloIR_UNARY_EXPR_GenNullCode(Compiler,
                                             CodeGenerator,
                                             UnaryExpr,
                                             Parameters);
@@ -28986,7 +29053,10 @@ IN clsROPERAND *Offset
      clsLOPERAND lOperand[1];
      clsCOMPONENT_SELECTION reversedComponentSelection;
 
-     if(!columnROperand->isReg) { /*constant*/
+     if(!columnROperand->isReg ||
+        (clmGEN_CODE_IsScalarDataType(columnROperand->dataType) &&
+         clmGEN_CODE_IsVectorDataType(resType)))
+     { /*constant or scalar */
          gctREG_INDEX constantReg;
 
          constantReg = clNewTempRegs(Compiler,

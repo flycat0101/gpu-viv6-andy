@@ -2186,7 +2186,7 @@ IN cleUNARY_EXPR_TYPE Type,
 IN cloIR_EXPR Operand,
 IN clsNAME * FieldName,        /* Only for the field selection */
 IN clsCOMPONENT_SELECTION * ComponentSelection,    /* Only for the component selection */
-OUT cloIR_UNARY_EXPR * UnaryExpr
+OUT cloIR_EXPR * UnaryExpr
 );
 
 gceSTATUS
@@ -2296,7 +2296,7 @@ cloIR_BINARY_EXPR_Construct(
     IN cleBINARY_EXPR_TYPE Type,
     IN cloIR_EXPR LeftOperand,
     IN cloIR_EXPR RightOperand,
-    OUT cloIR_BINARY_EXPR * BinaryExpr
+    OUT cloIR_EXPR * BinaryExpr
     );
 
 gceSTATUS
