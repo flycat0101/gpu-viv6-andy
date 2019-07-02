@@ -5847,7 +5847,7 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
         borderMode->mode = VX_BORDER_CONSTANT;
         borderMode->constant_value.S16 = 0;
     }
-    else if (input_format == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
+    else if (TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE)
     {
         borderMode->mode = VX_BORDER_CONSTANT;
         borderMode->constant_value.U8 = (vx_uint8)input_ZP;
