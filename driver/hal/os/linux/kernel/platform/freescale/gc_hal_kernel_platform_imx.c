@@ -513,8 +513,14 @@ static ssize_t gpu_govern_store(struct device_driver *dev, const char *buf, size
         if (clk_core != NULL && clk_shader != NULL &&
             core_freq != 0 && shader_freq != 0)
         {
+#ifdef CONFIG_PM
+            pm_runtime_get_sync(priv->pmdev[core]);
+#endif
             clk_set_rate(clk_core, core_freq);
             clk_set_rate(clk_shader, shader_freq);
+#ifdef CONFIG_PM
+            pm_runtime_put_sync(priv->pmdev[core]);
+#endif
         }
     }
 
