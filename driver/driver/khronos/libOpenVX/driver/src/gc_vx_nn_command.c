@@ -687,9 +687,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
 
         vxmASSERT(!(info->vx_nn_general_cmd_info.imageStartAddress & (CACHE_ALIGNMENT_SIZE - 1)));
         vxmASSERT(!(info->vx_nn_general_cmd_info.imageEndAddress & (CACHE_ALIGNMENT_SIZE - 1)));
-        vxmASSERT(!(info->vx_nn_general_cmd_info.kernelAddress & (CACHE_ALIGNMENT_SIZE - 1)));
         vxmASSERT(!(info->vx_nn_general_cmd_info.kernelCacheStartAddress & (CACHE_ALIGNMENT_SIZE - 1)));
-        vxmASSERT(!(info->vx_nn_general_cmd_info.kernelCacheStartAddress & (CACHE_ALIGNMENT_SIZE - 1)));
+        vxmASSERT(!(info->vx_nn_general_cmd_info.kernelCacheEndAddress & (CACHE_ALIGNMENT_SIZE - 1)));
     }
 
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_BORDER_MODE))

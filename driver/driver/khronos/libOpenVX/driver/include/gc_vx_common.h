@@ -198,7 +198,7 @@
 #define NN_IMAGE_ZSIZE_MAX                  16383
 
 #define NN_KS_PARTIAL_CACHE_DATA_UNIT          0
-#define CACHE_ALIGNMENT_SIZE                64
+#define CACHE_ALIGNMENT_SIZE                128
 
 #define VX_MAX_MEM_REQUEST_INPUT            64
 #define VX_MAX_MEM_REQUEST_OUTPUT           32
