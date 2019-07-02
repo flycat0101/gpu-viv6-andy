@@ -467,6 +467,23 @@ VX_PRIVATE_API void vxoContext_FetchOptionsForTransferGraph(vx_context context, 
     gcmFOOTER_NO();
 }
 
+vx_status gcoVX_ForceTpCoreCount(vx_context context)
+{
+
+    if(context->options.tpCoreCount <= context->nnConfig.fixedFeature.tpCoreCount)
+        context->nnConfig.fixedFeature.tpCoreCount = context->options.tpCoreCount;
+    else
+        vxInfo("\nWARNING: VIV_VX_TP_CORE_COUNT(%d) beyound HW configure(%d)\n", context->options.tpCoreCount, context->nnConfig.fixedFeature.tpCoreCount);
+
+    if(context->options.tpLiteCoreCount <= context->nnConfig.fixedFeature.tpliteCoreCount)
+        context->nnConfig.fixedFeature.tpliteCoreCount = context->options.tpLiteCoreCount;
+    else
+        vxInfo("\nWARNING: VIV_VX_TPLITE_CORE_COUNT(%d) beyound HW configure(%d)\n", context->options.tpLiteCoreCount, context->nnConfig.fixedFeature.tpliteCoreCount);
+
+    return VX_SUCCESS;
+
+}
+
 VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
 {
     gctSTRING envctrl = gcvNULL;
@@ -978,6 +995,20 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
         context->options.enableMemOptimization = atoi(envctrl);
     }
 
+    envctrl = gcvNULL;
+    context->options.tpCoreCount = context->nnConfig.fixedFeature.tpCoreCount;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_TP_CORE_COUNT", &envctrl)) && envctrl)
+    {
+        context->options.tpCoreCount = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
+    context->options.tpLiteCoreCount = context->nnConfig.fixedFeature.tpliteCoreCount;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_TPLITE_CORE_COUNT", &envctrl)) && envctrl)
+    {
+        context->options.tpLiteCoreCount = atoi(envctrl);
+    }
+
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
@@ -1276,6 +1307,7 @@ VX_PRIVATE_API vx_context vxoContext_Create()
         gcoVX_QueryHWChipInfo(&context->hwChipInfo);
 
         vxoContext_InitOptions(context);
+        gcoVX_ForceTpCoreCount(context);
 
         gcoHAL_GetProductName(gcvNULL, &productName, &context->pid);
         initUndefinedHardwareConfig(context);

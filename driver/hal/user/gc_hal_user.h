@@ -3020,6 +3020,8 @@ typedef struct _vx_drv_option
     gctUINT enableCacheGraphBinary;
     gctSTRING enableOpsDebugInfo;
     gctUINT enableMemOptimization;
+    gctUINT tpCoreCount;
+    gctUINT tpLiteCoreCount;
 }
 vx_drv_option;
 
