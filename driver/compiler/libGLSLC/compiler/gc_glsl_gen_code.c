@@ -1456,6 +1456,7 @@ _AllocLogicalRegOrArray(
     gctBOOL                 isPrecise = gcvFALSE;
     sleSHADER_TYPE          shaderType;
     gcSHADER                binary = gcvNULL;
+    gcePATCH_ID             patchId = sloCOMPILER_GetPatchID(Compiler);
 
     gcmHEADER_ARG("Compiler=0x%x CodeGenerator=0x%x Name=0x%x Symbol=%s "
                   "DataType=0x%x",
@@ -1874,7 +1875,8 @@ _AllocLogicalRegOrArray(
         if (slsQUALIFIERS_HAS_FLAG(&DataType->qualifiers, slvQUALIFIERS_FLAG_INVARIANT)
             ||
             /* Only ES20 can allow a input be a candidate for invariance. */
-            (sloCOMPILER_GetOutputInvariant(Compiler) && sloCOMPILER_IsES20Version(Compiler)))
+            /* WebGL CTS and ESCTS expects different results, just enable it for WebGL CTS only. */
+            (gcdPROC_IS_WEBGL(patchId) && sloCOMPILER_GetOutputInvariant(Compiler) && sloCOMPILER_IsES20Version(Compiler)))
         {
             isInvariant = gcvTRUE;
         }
