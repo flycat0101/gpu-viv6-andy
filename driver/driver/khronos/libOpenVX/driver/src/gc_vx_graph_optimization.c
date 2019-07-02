@@ -395,6 +395,121 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
     return nodeOpType;
 }
 
+VX_INTERNAL_API vx_bool vxoGraphOptimization_isSameShapeTensor(vx_tensor tensor1, vx_tensor tensor2)
+{
+    vx_uint32 i = 0;
+    vxmASSERT(tensor1 != NULL && tensor2 != NULL);
+
+    if(TENSOR_DIM_NUM(tensor1) != TENSOR_DIM_NUM(tensor2))
+        return vx_false_e;
+
+    for(i = 0; i < TENSOR_DIM_NUM(tensor1); i++)
+    {
+        if(TENSOR_SIZE_INDEX(tensor1,i) != TENSOR_SIZE_INDEX(tensor2, i))
+            return vx_false_e;
+    }
+
+    return vx_true_e;
+}
+
+VX_PRIVATE_API vx_tensor vxoGraphOptimization_reshapeTensorAsOld(vx_tensor oldTensor, vx_tensor newTensor)
+{
+    vx_tensor tmpTensor = newTensor;
+    if(!vxoGraphOptimization_isSameShapeTensor(oldTensor, newTensor))
+    {
+        tmpTensor = vxReshapeTensor(newTensor, (vx_int32 *)TENSOR_SIZES(oldTensor), TENSOR_DIM_NUM(oldTensor));
+    }
+
+    return tmpTensor;
+}
+
+VX_PRIVATE_API vx_status vxoGraphOptimization_updateTensorInNode(vx_node *currentNode, vx_uint32 idex, vx_tensor newTensor)
+{
+    vx_tensor oldTensor = (vx_tensor)(*currentNode)->paramTable[idex];
+    vx_tensor replaceTensor = newTensor;
+    gcmHEADER_ARG("currentNode=%p, idex=0x%x, newTensor=%p", currentNode, idex, newTensor);
+
+    replaceTensor = vxoGraphOptimization_reshapeTensorAsOld(oldTensor, newTensor);
+
+    vxoNode_SetParameter(*currentNode, idex, (vx_reference)replaceTensor);
+
+    if(replaceTensor != newTensor)
+        vxReleaseTensor(&replaceTensor);
+
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
+    return VX_SUCCESS;
+}
+
+/*
+    find the related tensor's position in node's paramTable, and return it with index.
+    if return false, it do not find the related tensor's index.
+*/
+VX_PRIVATE_API vx_bool vxoGraphOptimization_matchTensorInNode(vx_node node, vx_tensor tensor, vx_uint32 *index)
+{
+    vx_uint32 k = 0;
+    for(k = 0; k < node->numParameters; k++)
+    {
+        if(vxoReference_HasWriteDependency(node->paramTable[k], (vx_reference)tensor))
+        {
+            *index = k;
+            return vx_true_e;
+        }
+    }
+
+    return vx_false_e;
+}
+
+/*
+    traverse all of nodes that is related to currentNode in the whole graph,
+and update their oldTensor with newTensor.
+    first to update all of twins node and then parents node.
+*/
+VX_PRIVATE_API vx_status vxoGraphOptimization_updateTensorInGraph(vx_node currentNode, vx_tensor *oldTensor,
+                                                                                vx_tensor *newTensor, vx_uint32 tensorSize)
+{
+    vx_uint32 i = 0, j = 0, k = 0;
+    vx_graph graph = currentNode->graph;
+    vx_node *nodeTable = graph->nodeTable;
+
+    gcmHEADER_ARG("currentNode=%p, oldTensor=%p, subtensor=%p, subTensorSize=0x%x", currentNode, oldTensor, newTensor, tensorSize);
+
+    for (i = 0; i < tensorSize; i++)
+    {
+        for (j = 0; j < currentNode->numParents; j++)
+        {
+            vx_node parent = nodeTable[currentNode->parentNodes[j]];
+            if(vxoReference_HasWriteDependency((vx_reference)oldTensor[i], parent->paramTable[parent->numParameters - 1]))
+            {
+                vx_uint32 index = 0;
+                for(k = 0; k <parent->numChildren; k++)
+                {
+                    vx_node twinsNode = nodeTable[parent->childNodes[k]];
+                    if(twinsNode == currentNode)
+                        continue;
+
+                    if(vxoGraphOptimization_matchTensorInNode(twinsNode, oldTensor[i], &index))
+                    {
+                        vxoGraphOptimization_updateTensorInNode(&twinsNode, index, newTensor[i]);
+                    }
+                }
+
+                /*find valid parent*/
+                if(parent->merged)
+                {
+                    parent = parent->replacedBy;
+                }
+
+                if(vxoGraphOptimization_matchTensorInNode(parent, oldTensor[i], &index))
+                {
+                    vxoGraphOptimization_updateTensorInNode(&parent, index, newTensor[i]);
+                    break;
+                }
+            }
+        }
+    }
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
+    return VX_SUCCESS;
+}
 
 VX_INTERNAL_API vx_uint32* vxoGraphOptimization_kernelSize(vx_node convNode)
 {
@@ -1132,7 +1247,7 @@ VX_PRIVATE_API  void vxoGraphOptimization_MergeConvolutionNodes_GetParmFromConvR
                                         TENSOR_TF_ZEROPOINT((vx_tensor)convNode->paramTable[0]);
 }
 
-VX_INTERNAL_API  vx_weights_biases_parameter vxoGraphOptimization_CreateWBParameter(vx_node convNode, vx_enum  layer_type,
+VX_INTERNAL_API  vx_weights_biases_parameter vxoGraphOptimization_CreateWBParameter(vx_enum  layer_type,
                                                                                      vx_nn_convolution_relu_pooling_params_t *wb_params,
                                                                                      vx_uint32 sizeOfParms,
                                                                                      vx_tensor input, vx_tensor convOutput,vx_tensor finalOutput,
@@ -1179,7 +1294,7 @@ VX_INTERNAL_API vx_node vxoGraphOptimization_transformConv(vx_node convNode, vx_
         depth_multiplier, VX_TENSOR_RANK_WHCN, TENSOR_DATA_TYPE(output)
     };
 
-    vx_weights_biases_parameter wb = vxoGraphOptimization_CreateWBParameter(convNode,
+    vx_weights_biases_parameter wb = vxoGraphOptimization_CreateWBParameter(
         VX_NN_CONVOLUTION_LAYER,
         (vx_nn_convolution_relu_pooling_params_t *)&wb_params,
         sizeof(wb_params),
@@ -1196,50 +1311,6 @@ VX_INTERNAL_API vx_node vxoGraphOptimization_transformConv(vx_node convNode, vx_
     vxReleaseScalar(&vxPadConst);
 
     return node;
-}
-
-VX_INTERNAL_API vx_bool vxoGraphOptimization_isSameShapeTensor(vx_tensor tensor1, vx_tensor tensor2)
-{
-    vx_uint32 i = 0;
-    vxmASSERT(tensor1 != NULL && tensor2 != NULL);
-
-    if(TENSOR_DIM_NUM(tensor1) != TENSOR_DIM_NUM(tensor2))
-        return vx_false_e;
-
-    for(i = 0; i < TENSOR_DIM_NUM(tensor1); i++)
-    {
-        if(TENSOR_SIZE_INDEX(tensor1,i) != TENSOR_SIZE_INDEX(tensor2, i))
-            return vx_false_e;
-    }
-
-    return vx_true_e;
-}
-
-VX_PRIVATE_API vx_status vxoGraphOptimization_replaceOldTensorBynewTensorWithOldShape(vx_node *currentNode, vx_uint32 idex, vx_tensor newTensor)
-{
-    vx_uint32 i = 0;
-    vx_tensor oldTensor = (vx_tensor)(*currentNode)->paramTable[idex];
-    vx_tensor replaceTensor = newTensor;
-    gcmHEADER_ARG("currentNode=%p, idex=0x%x, newTensor=%p", currentNode, idex, newTensor);
-
-    for(i = 0; i < TENSOR_DIM_NUM(oldTensor); i++)
-    {
-        if(TENSOR_SIZE_INDEX(oldTensor, i) != TENSOR_SIZE_INDEX(newTensor, i))
-            break;
-    }
-
-    if(i != TENSOR_DIM_NUM(oldTensor))
-    {
-        replaceTensor = vxReshapeTensor(newTensor, (vx_int32 *)TENSOR_SIZES(oldTensor), TENSOR_DIM_NUM(oldTensor));
-    }
-
-    vxoNode_SetParameter(*currentNode, idex, (vx_reference)replaceTensor);
-
-    if(replaceTensor != newTensor)
-        vxReleaseTensor(&replaceTensor);
-
-    gcmFOOTER_ARG("%d", VX_SUCCESS);
-    return VX_SUCCESS;
 }
 
 VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nodes[], vx_uint32 nodeCount)
@@ -1411,7 +1482,7 @@ VX_INTERNAL_API vx_node vxoGraphOptimization_TransferFC2FCRelu(vx_node FCnode)
         };
 
 
-        vx_weights_biases_parameter wb = vxoGraphOptimization_CreateWBParameter(FCnode,
+        vx_weights_biases_parameter wb = vxoGraphOptimization_CreateWBParameter(
                                             VX_NN_FULLYCONNECTED_LAYER,
                                             (vx_nn_convolution_relu_pooling_params_t *)&params,
                                             sizeof(params),
@@ -1460,7 +1531,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeFullyConnectedNodes(vx_node 
     if(nodeCount >1)
     {
         vx_tensor reluOut = (vx_tensor)nodes[1]->paramTable[PARAM_RELU_OUTPUT_INDEX];
-        vxoGraphOptimization_replaceOldTensorBynewTensorWithOldShape(nodes, PARAM_FULLYCONNECTED_RELU_OUTPUT_INDEX, reluOut);
+        vxoGraphOptimization_updateTensorInNode(nodes, PARAM_FULLYCONNECTED_RELU_OUTPUT_INDEX, reluOut);
 
         SCALAR_VALUE(nodes[0]->paramTable[PARAM_FULLYCONNECTED_RELU_ENABLE_RELU_INDEX], b) = vx_true_e;
         nodes[1]->merged = vx_true_e;
@@ -1688,66 +1759,6 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConcatTensors(vx_context context,
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_bool vxoGraphOptimization_matchTensorInNode(vx_node node, vx_tensor tensor, vx_uint32 *index)
-{
-    vx_uint32 k = 0;
-    for(k = 0; k < node->numParameters; k++)
-    {
-        if(vxoReference_HasWriteDependency(node->paramTable[k], (vx_reference)tensor))
-        {
-            vxoGraphOptimization_replaceOldTensorBynewTensorWithOldShape(&node, k, tensor);
-            *index = k;
-            return vx_true_e;
-        }
-    }
-
-    return vx_false_e;
-}
-
-VX_PRIVATE_API vx_status vxoGraphOptimization_replaceParentTensorWithSubtensor(vx_node currentNode, vx_tensor *oldTensor,
-                                                                                vx_tensor *subtensor, vx_uint32 subTensorSize)
-{
-    vx_uint32 i = 0, j = 0, k = 0;
-    vx_graph graph = currentNode->graph;
-    vx_node *nodeTable = graph->nodeTable;
-
-    gcmHEADER_ARG("currentNode=%p, oldTensor=%p, subtensor=%p, subTensorSize=0x%x", currentNode, oldTensor, subtensor, subTensorSize);
-
-    for (i = 0; i < subTensorSize; i++)
-    {
-        for (j = 0; j < currentNode->numParents; j++)
-        {
-            vx_node parent = nodeTable[currentNode->parentNodes[j]];
-            if(vxoReference_HasWriteDependency((vx_reference)oldTensor[i], parent->paramTable[parent->numParameters - 1]))
-            {
-                /*set paramter of twins node of current node*/
-                vx_uint32 index = 0;
-                for(k = 0; k <parent->numChildren; k++)
-                {
-                    vx_node twinsNode = nodeTable[parent->childNodes[k]];
-                    if(twinsNode == currentNode)
-                        continue;
-
-                    if(vxoGraphOptimization_matchTensorInNode(twinsNode, oldTensor[i], &index))
-                        vxoGraphOptimization_replaceOldTensorBynewTensorWithOldShape(&twinsNode, index, subtensor[i]);
-                }
-
-                /*set valid parent node's paramter of current node*/
-                if(parent->merged)
-                {
-                    parent = parent->replacedBy;
-                }
-
-                if(vxoGraphOptimization_matchTensorInNode(parent, oldTensor[i], &index))
-                    vxoGraphOptimization_replaceOldTensorBynewTensorWithOldShape(&parent, index, subtensor[i]);
-                break;
-            }
-        }
-    }
-    gcmFOOTER_ARG("%d", VX_SUCCESS);
-    return VX_SUCCESS;
-}
-
 VX_INTERNAL_API vx_status vxoGraphOptimization_dispelConcatNode(vx_node node)
 {
     vx_graph    graph = node->graph;
@@ -1782,7 +1793,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_dispelConcatNode(vx_node node)
     CHECK_NULL(tensorsSub);
 
     vxoGraphOptimization_ConcatTensors(vxGetContext((vx_reference)graph), tensorsIn, numTensor, concatAxis, tensorsSub, tensorOut);
-    vxoGraphOptimization_replaceParentTensorWithSubtensor(node,tensorsIn, tensorsSub, numTensor);
+    vxoGraphOptimization_updateTensorInGraph(node,tensorsIn, tensorsSub, numTensor);
 
     {
         vx_uint32 i = 0;
@@ -2144,7 +2155,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertBatchFCtoConv(vx_graph gra
             TENSOR_DATA_LIFETIME(weight) = VX_TENSOR_LIFE_TIME_STATIC;
 
             {
-                vx_weights_biases_parameter weights_biases = vxoGraphOptimization_CreateWBParameter(node,
+                vx_weights_biases_parameter weights_biases = vxoGraphOptimization_CreateWBParameter(
                                     VX_KERNEL_NN_FULLY_CONNECTED_RELU_LAYER,
                                     (vx_nn_convolution_relu_pooling_params_t *)&params,
                                     sizeof(params),
@@ -2809,7 +2820,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_TensorAdd2Conv(vx_graph graph)
                     TENSOR_TF_SCALE(tensorSub[i]) = TENSOR_TF_SCALE(tensorIn[i]);
                     TENSOR_TF_ZEROPOINT(tensorSub[i]) = TENSOR_TF_ZEROPOINT(tensorIn[i]);
                 }
-                vxoGraphOptimization_replaceParentTensorWithSubtensor(node,tensorIn, tensorSub, 2);
+                vxoGraphOptimization_updateTensorInGraph(node,tensorIn, tensorSub, 2);
             }
             {
                 /* get the convolution input and output*/
@@ -2977,7 +2988,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_splitMaxpFromCRL2(vx_graph graph)
                         0, VX_TENSOR_RANK_WHCN, TENSOR_DATA_TYPE(convOutTensor)
                     };
 
-                     vx_weights_biases_parameter wb = vxoGraphOptimization_CreateWBParameter(node,
+                     vx_weights_biases_parameter wb = vxoGraphOptimization_CreateWBParameter(
                                                         VX_NN_CONVOLUTION_LAYER,
                                                         (vx_nn_convolution_relu_pooling_params_t *)&wb_params,
                                                         sizeof(wb_params),
@@ -3739,7 +3750,7 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_multiTranspose_mergeTransposes(vx_
 
     if(sync)
     {
-        vxoGraphOptimization_replaceParentTensorWithSubtensor(transposeNodes[0], &input, &finalout, 1);
+        vxoGraphOptimization_updateTensorInGraph(transposeNodes[0], &input, &finalout, 1);
     }
 error:
     vxFree(finalParam);
@@ -3890,27 +3901,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_convertFp32Tensor(vx_graph graph)
                     /*traverse all of child nodes for itme2*/
                     if(node->kernel->signature.directionTable[paramIndex] == VX_INPUT && vxoTensor_IsVirtualTensor(tensor32))
                     {
-                        vx_uint32 parentIdx = 0, twinsIdx = 0, tensorIdx = 0;
-                        for(parentIdx = 0; parentIdx < node->numParents; parentIdx++)
-                        {
-                            vx_node parentNode = graph->nodeTable[node->parentNodes[parentIdx]];
-                            for(twinsIdx = 0; twinsIdx < parentNode->numChildren; twinsIdx++)
-                            {
-                                vx_node twinsNode = graph->nodeTable[parentNode->childNodes[twinsIdx]];
-
-                                if(twinsNode == node) continue;
-
-                                if(vxoGraphOptimization_matchTensorInNode(twinsNode, tensor32, &tensorIdx))
-                                {
-                                    vxoGraphOptimization_replaceOldTensorBynewTensorWithOldShape(&twinsNode, tensorIdx, tensor16);
-                                }
-                            }
-                            if(vxoGraphOptimization_matchTensorInNode(parentNode, tensor32, &tensorIdx))
-                            {
-                                vxoGraphOptimization_replaceOldTensorBynewTensorWithOldShape(&parentNode, tensorIdx, tensor16);
-                                break;
-                            }
-                        }
+                        vxoGraphOptimization_updateTensorInGraph(node, &tensor32, &tensor16,1);
                     }
                     /*replace fp32 tensor with fp16 tensor*/
                     if(node->paramTable[paramIndex]->type == VX_TYPE_OBJECT_ARRAY)
