@@ -6054,6 +6054,7 @@ void fillinKernelBufferHuffman(
     vx_uint32 dummyStage[3] = {0};
     vx_uint32 dummyBitLength[3] = {0};
     vx_bool setDummy = vx_false_e;
+    vx_bool hasKernelFullCacheInterleaveFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FULLCACHE_KERNEL_INTERLEAVE_FIX);
 
     if (weight_format == VX_TYPE_INT16)
         biasBitSize = NN_INTEGER_BIAS_BITS_VIP_V7_INT16;
@@ -6587,6 +6588,13 @@ void fillinKernelBufferHuffman(
     }
     vxmASSERT(reorderStreamAllCount == reorderStreamCheckCount); /*Check if the data count is the same*/
     wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount);
+
+    if (!hasKernelFullCacheInterleaveFix)
+    {
+        /*if did't fix full cache interleave fix, full cache size also need use align size*/
+        wb->slice_array[index].kernel_stream_full_cache_size = wb->slice_array[index].kernel_align_stream_size;
+    }
+
 exit:
     if (reorderStream)
         vxFree(reorderStream);
@@ -7928,6 +7936,7 @@ void fillinKernelBufferV8Huffman(
     vx_bool hasNNPerFilterPostMultiply = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_POST_MULTIPLY);
     vx_bool hasNNPreLU = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU);
     vx_bool hasZDP3 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3);
+    vx_bool hasKernelFullCacheInterleaveFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FULLCACHE_KERNEL_INTERLEAVE_FIX);
     vx_uint32 dpAmount = hasZDP3 ? 3 : 1;
     vx_uint32 zDPLoopCount = 3;
     vx_uint32 linesInImageBuffer = dpAmount * zDPLoopCount;
@@ -8720,6 +8729,12 @@ void fillinKernelBufferV8Huffman(
         maxKernelStreamSizePerCore = kernelStreamSize;
     /*Per HW, post processing stream size is needed in SRAM, when partial mode, need be noted as one core*/
     wb->slice_array[index].kernel_align_stream_size = (vx_size)(maxKernelStreamSizePerCore * (usedCoreCount + 1));
+
+    if (!hasKernelFullCacheInterleaveFix)
+    {
+        /*if did't fix full cache interleave fix, full cache size also need use align size*/
+        wb->slice_array[index].kernel_stream_full_cache_size = wb->slice_array[index].kernel_align_stream_size;
+    }
 
 exit:
     if (coefSum)
@@ -10772,6 +10787,7 @@ void fillinKernelBuffer(
     vx_uint32 usedCoreCount      = (filterTotalCount > nnCoreCount) ? nnCoreCount : filterTotalCount;
     vx_uint32 maxKernelStreamSizePerCore = 0;
     vx_float64* nonZeroRatioPerCorePerVZG = 0;
+    vx_bool hasKernelFullCacheInterleaveFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FULLCACHE_KERNEL_INTERLEAVE_FIX);
 
     typedef struct _gcVXWeightsMinusZP
     {
@@ -11380,6 +11396,12 @@ void fillinKernelBuffer(
 
     wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount);
 
+    if (!hasKernelFullCacheInterleaveFix)
+    {
+        /*if did't fix full cache interleave fix, full cache size also need use align size*/
+        wb->slice_array[index].kernel_stream_full_cache_size = wb->slice_array[index].kernel_align_stream_size;
+    }
+
     if (z_offset > 0)
         wb->orgZOffsetValue = z_offset;
     else if (outputSize > 0)
@@ -11472,6 +11494,7 @@ void fillinDepthWiseKernelBuffer(
     vx_bool hasXYDP9 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP9);
     vx_bool hasXYDP6 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP6);
     vx_bool biasAtEnd = vx_false_e;
+    vx_bool hasKernelFullCacheInterleaveFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FULLCACHE_KERNEL_INTERLEAVE_FIX);
 
     typedef struct _gcVXWeightsMinusZP
     {
@@ -11730,6 +11753,12 @@ void fillinDepthWiseKernelBuffer(
 
     wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * nnCoreCount);
 
+    if (!hasKernelFullCacheInterleaveFix)
+    {
+        /*if did't fix full cache interleave fix, full cache size also need use align size*/
+        wb->slice_array[index].kernel_stream_full_cache_size = wb->slice_array[index].kernel_align_stream_size;
+    }
+
     if (z_offset > 0)
         wb->orgZOffsetValue = z_offset;
     else if (outputSize > 0)
@@ -11817,6 +11846,7 @@ void fillinKernelBufferBalance(
     vx_float32 varianceFL32 = 0;
     vx_uint32 variance = 0;
     vx_bool reorder = vx_false_e;
+    vx_bool hasKernelFullCacheInterleaveFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FULLCACHE_KERNEL_INTERLEAVE_FIX);
 
     typedef struct _gcVXWeightsMinusZP
     {
@@ -12608,6 +12638,12 @@ void fillinKernelBufferBalance(
     }
 
     wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount);
+
+    if (!hasKernelFullCacheInterleaveFix)
+    {
+        /*if did't fix full cache interleave fix, full cache size also need use align size*/
+        wb->slice_array[index].kernel_stream_full_cache_size = wb->slice_array[index].kernel_align_stream_size;
+    }
 
     if (z_offset > 0)
         wb->orgZOffsetValue = z_offset;
