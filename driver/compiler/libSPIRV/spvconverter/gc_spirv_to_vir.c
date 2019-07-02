@@ -11749,6 +11749,18 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
                     break;
 
                 case SpvExecutionModeVertexOrderCw:
+                    if (spv->spvSpecFlag & SPV_SPECFLAG_LOWER_LEFT_DOMAIN)
+                    {
+                        if (spv->entryExeMode == SpvExecutionModelTessellationEvaluation)
+                        {
+                            virShader->shaderLayout.tes.tessOrdering = VIR_TESS_ORDER_CCW;
+                        }
+                        else if (spv->entryExeMode == SpvExecutionModelTessellationControl)
+                        {
+                            virShader->shaderLayout.tcs.tessOrdering = VIR_TESS_ORDER_CCW;
+                        }
+                        break;
+                    }
                     if (spv->entryExeMode == SpvExecutionModelTessellationEvaluation)
                     {
                         virShader->shaderLayout.tes.tessOrdering = VIR_TESS_ORDER_CW;
@@ -11760,6 +11772,18 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
                     break;
 
                 case SpvExecutionModeVertexOrderCcw:
+                    if (spv->spvSpecFlag & SPV_SPECFLAG_LOWER_LEFT_DOMAIN)
+                    {
+                        if (spv->entryExeMode == SpvExecutionModelTessellationEvaluation)
+                        {
+                            virShader->shaderLayout.tes.tessOrdering = VIR_TESS_ORDER_CW;
+                        }
+                        else if (spv->entryExeMode == SpvExecutionModelTessellationControl)
+                        {
+                            virShader->shaderLayout.tcs.tessOrdering = VIR_TESS_ORDER_CW;
+                        }
+                        break;
+                    }
                     if (spv->entryExeMode == SpvExecutionModelTessellationEvaluation)
                     {
                         virShader->shaderLayout.tes.tessOrdering = VIR_TESS_ORDER_CCW;
