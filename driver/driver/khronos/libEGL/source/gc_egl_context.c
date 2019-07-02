@@ -1660,7 +1660,6 @@ _DestroyContext(
 
     /* Execute events accumulated in the buffer if any. */
     gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
-    veglBindAPI(Thread, EGL_OPENGL_ES_API);
 
     /* Free the eglContext structure. */
     gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Context));
