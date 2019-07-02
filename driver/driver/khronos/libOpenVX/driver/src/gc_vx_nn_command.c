@@ -142,6 +142,76 @@ VX_PRIVATE_API vx_int8 getHWDataFormat(vx_enum dataFormat)
     return -1;
 }
 
+VX_PRIVATE_API void _checkSramOverflow(
+    vx_context context,
+    vx_weights_biases_parameter wb,
+    vx_nn_cmd_info_u * info,
+    vx_uint32 dataUnitByte
+    )
+{
+
+    vx_uint32 oneNumOfPattern = 0;
+    vx_uint32 cacheSizeNeeded;
+    vx_uint32 cacheSizeAllocated;
+    vx_uint32 decoderWorkNum;
+    vx_uint32 dataUnitNum;
+    vx_uint32 patternLoopCount;
+    vx_uint32 sramDataUnitNum1Core;
+    vx_uint32 dataUnitLastLoop;
+    vx_uint32 sramDataUnitNumLastLoop = 0;
+    vx_uint32 i;
+    vx_uint32 coreCountUsed = context->nnConfig.fixedFeature.nnCoreCount;
+    vx_uint32 maxSizeOfCore;
+    vx_uint64 kernelFullPattern = ((vx_uint64)info->vx_nn_general_cmd_info.kernelPatternHigh32Bits << 32) | info->vx_nn_general_cmd_info.kernelPatternLow32Bits;
+
+    switch (WB_WEIGHT_DATA_FORMAT(wb))
+    {
+    case VX_TYPE_INT16:
+        coreCountUsed = context->nnConfig.fixedFeature.nnCoreCountInt16;
+        break;
+    case VX_TYPE_UINT8:
+    case VX_TYPE_INT8:
+        coreCountUsed = context->nnConfig.fixedFeature.nnCoreCountInt8;
+        break;
+    case VX_TYPE_FLOAT16:
+        coreCountUsed = context->nnConfig.fixedFeature.nnCoreCountFloat16;
+        break;
+    default:
+        break;
+    }
+
+    maxSizeOfCore = wb->slice_array[0].kernel_max_stream_size_percore;
+
+    printf("maxSizeOfCore %d\n", maxSizeOfCore);
+
+    for (i = 0; i != info->vx_nn_general_cmd_info.kernelPatternMsb+1; i++)
+    {
+        oneNumOfPattern += (kernelFullPattern >> i) & 1;
+    }
+
+    cacheSizeAllocated  = (info->vx_nn_general_cmd_info.kernelCacheEndAddress - info->vx_nn_general_cmd_info.kernelCacheStartAddress);
+    decoderWorkNum      = gcmMIN(info->vx_nn_general_cmd_info.outImageZSize, coreCountUsed) + 1;
+    dataUnitNum         = maxSizeOfCore / dataUnitByte;
+
+    patternLoopCount    = dataUnitNum / (info->vx_nn_general_cmd_info.kernelPatternMsb + 1); /* full loop count */
+    sramDataUnitNum1Core = patternLoopCount * oneNumOfPattern;
+    dataUnitLastLoop    = dataUnitNum - patternLoopCount * (info->vx_nn_general_cmd_info.kernelPatternMsb + 1);
+
+    for (i = 0; i != info->vx_nn_general_cmd_info.kernelPatternMsb+1, dataUnitLastLoop != 0; i++)
+    {
+        dataUnitLastLoop--;
+        if ((kernelFullPattern >> i) & 1)
+        {
+            sramDataUnitNumLastLoop += 1;
+        }
+    }
+
+    sramDataUnitNum1Core += sramDataUnitNumLastLoop;
+
+    cacheSizeNeeded = sramDataUnitNum1Core * dataUnitByte * decoderWorkNum;
+    vxmASSERT(cacheSizeAllocated >= cacheSizeNeeded);
+}
+
 VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNSplitCommandInfo(
     vx_context                   context,
     vxnne_tensor_info            input,
