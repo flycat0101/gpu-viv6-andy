@@ -180,9 +180,7 @@ VX_PRIVATE_API void _checkSramOverflow(
         break;
     }
 
-    maxSizeOfCore = wb->slice_array[0].kernel_max_stream_size_percore;
-
-    printf("maxSizeOfCore %d\n", maxSizeOfCore);
+    maxSizeOfCore = (vx_uint32)wb->slice_array[0].kernel_max_stream_size_percore;
 
     for (i = 0; i != (info->vx_nn_general_cmd_info.kernelPatternMsb+1); i++)
     {
