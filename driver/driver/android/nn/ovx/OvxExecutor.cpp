@@ -946,8 +946,8 @@ vx_tensor OvxExecutor::creatVirtualTensorFromRTF(vx_graph graph, const VxRunTime
     vx_uint32 whcnDim[4] = {1,1,1,1};
     if(info.dimensions.size() == 2)
     {
-        whcnDim[2] = info.dimensions[1];
-        whcnDim[3] = info.dimensions[0];
+        whcnDim[0] = info.dimensions[1];
+        whcnDim[1] = info.dimensions[0];
     }
     else if(info.dimensions.size() == 3)
     {
@@ -964,7 +964,7 @@ vx_tensor OvxExecutor::creatVirtualTensorFromRTF(vx_graph graph, const VxRunTime
         whcnDim[3] = info.dimensions[0];
     }
 
-    tensor = creatVirtualTensorByParam(graph, 4, whcnDim, info.type, info.scale, info.zeroPoint);
+    tensor = creatVirtualTensorByParam(graph, info.dimensions.size(), whcnDim, info.type, info.scale, info.zeroPoint);
     if (tensor == NULL)
     {
         LOG(ERROR)<<"fail to creat tensor";
