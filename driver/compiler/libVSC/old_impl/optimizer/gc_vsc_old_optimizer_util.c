@@ -399,7 +399,7 @@ gcOPTIMIZER_OPTION theOptimizerOption =
      *
      *   VC_OPTION=-USECLNEWPP:0|1
      */
-    gcvFALSE, /* UseCLNewPreprocessor; */
+    gcvTRUE, /* UseCLNewPreprocessor; */
 
     /* Enable register pack in old compiler:
      *   VC_OPTION=-PACKREG:0|1
