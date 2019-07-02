@@ -611,6 +611,9 @@ VX_PRIVATE_API void vxoGraphOptimization_stroeNodeInOutInfo(vxcJSON *paramters, 
     for(i = 0; i < node->numParameters; i++)
     {
         ref = node->paramTable[i];
+        if(ref == NULL)
+            continue;
+
         if(ref->type == VX_TYPE_TENSOR && node->kernel->signature.directionTable[i] == VX_INPUT && inCnt == 0)
         {
             inCnt++;
