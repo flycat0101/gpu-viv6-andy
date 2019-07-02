@@ -4259,6 +4259,10 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
             vx_float32  max         = scale * (255-zp);
             vx_float32  min         = scale * -zp;
 
+            if(dataType != VX_TYPE_UINT8 && dataType != VX_TYPE_UINT16)
+                continue;
+            if(TENSOR_QUANT_TYPE(reluOut) != VX_QUANT_AFFINE_SCALE)
+                continue;
             /*update the quantized teensor is saturated as relu-type*/
             switch (nodeType)
             {
@@ -4288,50 +4292,46 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
                 break;
             }
 
-            if(dataType == VX_TYPE_INT8 || dataType == VX_TYPE_UINT8 || dataType == VX_TYPE_UINT16 || dataType == VX_TYPE_INT16)
+            /*if quantization attribute is changed, and then the child's input has to be update.
+                what's more, if the child node is conv node, the bias's scale has to be updated so that
+                bais's scale = input's scale * weight's scale, which is required*/
+            if(node->numChildren && (TENSOR_TF_SCALE(reluOut) != scale || TENSOR_TF_ZEROPOINT(reluIn) != zp))
             {
-                /*if quantization attribute is changed, and then the child's input has to be update.
-                 what's more, if the child node is conv node, the bias's scale has to be updated so that
-                 bais's scale = input's scale * weight's scale, which is required*/
-                if(node->numChildren && (TENSOR_TF_SCALE(reluOut) != scale || TENSOR_TF_ZEROPOINT(reluIn) != zp))
+                vx_node child = nodeTable[node->childNodes[0]];
+                vx_tensor weight = NULL, bias = NULL;
+                TENSOR_TF_SCALE(reluOut) = scale;
+                TENSOR_TF_ZEROPOINT(reluOut) = zp;
+
+                vxoGraphOptimization_updateTensorInNode(&child, 0, reluOut);
+                if(child->kernel->enumeration == VX_KERNEL_CONVOLUTION_LAYER)
                 {
-                    vx_node child = nodeTable[node->childNodes[0]];
-                    vx_tensor weight = NULL, bias = NULL;
-                    TENSOR_TF_SCALE(reluOut) = scale;
-                    TENSOR_TF_ZEROPOINT(reluOut) = zp;
-
-                    vxoGraphOptimization_updateTensorInNode(&child, 0, reluOut);
-                    if(child->kernel->enumeration == VX_KERNEL_CONVOLUTION_LAYER)
-                    {
-                        weight  = (vx_tensor)node->paramTable[1];
-                        bias    = (vx_tensor)node->paramTable[1];
-                    }else if(child->kernel->enumeration == VX_KERNEL_NN_CONVOLUTION_RELU_POOLING_LAYER2 ||
-                        child->kernel->enumeration == VX_KERNEL_NN_CONVOLUTION_RELU_LAYER)
-                    {
-                        vx_weights_biases_parameter wb = (vx_weights_biases_parameter)node->paramTable[1];
-
-                        weight  = wb->wb_base->origWeight;
-                        bias    = wb->wb_base->origBias;
-
-                        wb->wb_base->biasScale = scale * TENSOR_TF_SCALE(weight);
-                        wb->wb_base->inputZP = TENSOR_TF_ZEROPOINT(reluOut);
-
-
-                    }
-
-                    if(bias)
-                    {
-                        TENSOR_TF_SCALE(bias) = TENSOR_TF_SCALE(reluOut) * TENSOR_TF_SCALE(weight);
-                    }
-                }else
+                    weight  = (vx_tensor)node->paramTable[1];
+                    bias    = (vx_tensor)node->paramTable[1];
+                }else if(child->kernel->enumeration == VX_KERNEL_NN_CONVOLUTION_RELU_POOLING_LAYER2 ||
+                    child->kernel->enumeration == VX_KERNEL_NN_CONVOLUTION_RELU_LAYER)
                 {
-                    TENSOR_TF_SCALE(reluOut) = scale;
-                    TENSOR_TF_ZEROPOINT(reluOut) = zp;
+                    vx_weights_biases_parameter wb = (vx_weights_biases_parameter)child->paramTable[1];
+
+                    weight  = wb->wb_base->origWeight;
+                    bias    = wb->wb_base->origBias;
+
+                    wb->wb_base->biasScale = scale * TENSOR_TF_SCALE(weight);
+                    wb->wb_base->inputZP = TENSOR_TF_ZEROPOINT(reluOut);
                 }
 
-                vxoGraphOptimization_updateTensorInGraph(node, &reluIn, &reluOut, 1);
-                node->merged = vx_true_e;
+                if(bias)
+                {
+                    TENSOR_TF_SCALE(bias) = TENSOR_TF_SCALE(reluOut) * TENSOR_TF_SCALE(weight);
+                }
+            }else
+            {
+                TENSOR_TF_SCALE(reluOut) = scale;
+                TENSOR_TF_ZEROPOINT(reluOut) = zp;
             }
+
+            vxoGraphOptimization_updateTensorInGraph(node, &reluIn, &reluOut, 1);
+            node->merged = vx_true_e;
+
         }
     }
 
