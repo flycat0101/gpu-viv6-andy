@@ -985,7 +985,7 @@ __vkFormatInfo * __vk_GetVkFormatInfo(
 static VkResult __vki_CreateSurfNode(
     __vkDevContext *devCtx,
     gcsSURF_NODE_PTR node,
-    uint32_t bytes,
+    gctSIZE_T bytes,
     uint32_t alignment,
     gceSURF_TYPE surfType,
     uint32_t flag,
@@ -1009,7 +1009,7 @@ static VkResult __vki_CreateSurfNode(
 
     node->u.normal.node = iface.u.AllocateLinearVideoMemory.node;
     node->pool          = iface.u.AllocateLinearVideoMemory.pool;
-    node->size          = (gctSIZE_T)iface.u.AllocateLinearVideoMemory.bytes;
+    node->size          = iface.u.AllocateLinearVideoMemory.bytes;
 
     node->physical2     = ~0U;
     node->physical3     = ~0U;
@@ -1666,7 +1666,7 @@ VkResult __vki_AllocateTileStatus(
     VkResult result = VK_SUCCESS;
     uint32_t i = 0;
     uint32_t j = 0;
-    uint32_t totalBytes = 0;
+    gctSIZE_T totalBytes = 0;
     int32_t compressedFormat = -1;
 
     __VK_SET_ALLOCATIONCB(&img->memCb);
@@ -1772,7 +1772,7 @@ VkResult __vki_AllocateTileStatus(
             }
             else
             {
-                totalBytes = (uint32_t)(is2BitPerTile ? (img->memory->node.size >> 8) : (img->memory->node.size >> 7));
+                totalBytes = (is2BitPerTile ? (img->memory->node.size >> 8) : (img->memory->node.size >> 7));
                 if (img->sampleInfo.product > 1)
                 {
                     __VK_ASSERT(is2BitPerTile);

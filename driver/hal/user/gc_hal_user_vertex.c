@@ -2246,14 +2246,15 @@ gcoSTREAM_Flush(
 gceSTATUS
 gcoSTREAM_SetAttribute(
     IN gcoSTREAM Stream,
-    IN gctUINT Offset,
+    IN gctSIZE_T Offset,
     IN gctUINT Bytes,
     IN gctUINT Stride,
     IN gctUINT Divisor,
     IN OUT gcsSTREAM_SUBSTREAM_PTR * SubStream
     )
 {
-    gctUINT end, sub;
+    gctSIZE_T end;
+    gctUINT sub;
     gcsSTREAM_SUBSTREAM_PTR subPtr;
     gceSTATUS status;
 
@@ -4294,8 +4295,8 @@ gcoSTREAM_MergeStreams(
 
                 if(pack)
                 {
-                    mergeStride[index] = Streams[i].stream->subStreams[sortMap[j]].end
-                        - Streams[i].stream->subStreams[sortMap[j]].start;
+                    mergeStride[index] = (gctUINT)(Streams[i].stream->subStreams[sortMap[j]].end
+                        - Streams[i].stream->subStreams[sortMap[j]].start);
                 }
                 else
                 {
@@ -4360,7 +4361,7 @@ gcoSTREAM_MergeStreams(
 
                     if(pack)
                     {
-                        mergeStride[index] = sub->end - sub->start;
+                        mergeStride[index] = (gctUINT)(sub->end - sub->start);
                     }
                     else
                     {
@@ -4477,8 +4478,7 @@ gcoSTREAM_MergeStreams(
                 )
                 {
                     /* Adjust offset of the attribute. */
-                    attribute->offset = attribute->offset - sub->start
-                                      + sub->minStart;
+                    attribute->offset = attribute->offset - (gctUINT)(sub->start - sub->minStart);
                     break;
                 }
             }
@@ -4726,7 +4726,7 @@ gceSTATUS gcoVERTEX_Bind(
 
 gceSTATUS gcoSTREAM_SetAttribute(
     IN gcoSTREAM Stream,
-    IN gctUINT Offset,
+    IN gctSIZE_T Offset,
     IN gctUINT Bytes,
     IN gctUINT Stride,
     IN gctUINT Divisor,

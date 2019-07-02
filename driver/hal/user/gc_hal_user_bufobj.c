@@ -31,8 +31,8 @@ typedef struct _gcoBUFOBJ_INDEX
 {
     gctUINT32       minIndex;
     gctUINT32       maxIndex;
-    gctUINT32        count;
-    gctUINT32        offset;
+    gctUINT32       count;
+    gctSIZE_T       offset;
 
 } gcoBUFOBJ_INDEX, * gcoBUFOBJ_INDEX_PTR;
 
@@ -166,7 +166,7 @@ gcoBUFOBJ_Construct(
                               gcmSIZEOF(struct _gcoBUFOBJ),
                               &pointer));
 
-    bufobj = pointer;
+    bufobj = (gcoBUFOBJ)pointer;
 
     /* Initialize the gcoBUFOBJ object. */
     bufobj->object.type = gcvOBJ_BUFOBJ;
@@ -1151,13 +1151,13 @@ gceSTATUS
 gcoBUFOBJ_IndexBind (
     IN gcoBUFOBJ Index,
     IN gceINDEX_TYPE Type,
-    IN gctUINT32 Offset,
+    IN gctSIZE_T Offset,
     IN gctSIZE_T Count
     )
 {
+    gctUINT32 startAddress, endAddress;
     gceSTATUS status;
     gctUINT32 address;
-    gctUINT32 endAddress;
     gctUINT32 bufSize;
 
     gcmHEADER_ARG("Index=0x%x Type=%d Offset=%u", Index, Type, Offset);
@@ -1171,14 +1171,14 @@ gcoBUFOBJ_IndexBind (
 
     endAddress = address + bufSize  - 1;
 
-    /* Add offset */
-    address += Offset;
+    /* Add offset which is limited within 4GB range */
+    startAddress = address + (gctUINT32)Offset;
 
 #if gcdENABLE_KERNEL_FENCE
     gcoHARDWARE_SetHWSlot(gcvNULL, gcvENGINE_RENDER, gcvHWSLOT_INDEX, Index->memory.u.normal.node, 0);
 #endif
     /* Program index */
-    gcmONERROR(gcoHARDWARE_BindIndex(gcvNULL, address, endAddress, Type, (Count * 3)));
+    gcmONERROR(gcoHARDWARE_BindIndex(gcvNULL, startAddress, endAddress, Type, (Count * 3)));
 
 OnError:
     /* Return the status. */
@@ -1220,7 +1220,7 @@ gceSTATUS
 gcoBUFOBJ_IndexGetRange(
     IN gcoBUFOBJ Index,
     IN gceINDEX_TYPE Type,
-    IN gctUINT32 Offset,
+    IN gctSIZE_T Offset,
     IN gctUINT32 Count,
     OUT gctUINT32 * MinimumIndex,
     OUT gctUINT32 * MaximumIndex
@@ -1255,7 +1255,7 @@ gcoBUFOBJ_IndexGetRange(
     if ((indexNode->maxIndex == 0) || (indexNode->minIndex == ~0U) || (indexNode->count != Count) || (indexNode->offset != Offset))
     {
         /* Lock the bufobj buffer. */
-        gcmONERROR(gcoHARDWARE_Lock(&Index->memory, gcvNULL, (gctPOINTER)&data));
+        gcmONERROR(gcoHARDWARE_Lock(&Index->memory, gcvNULL, (gctPOINTER *)&data));
 
         /* Index is locked */
         indexLocked = gcvTRUE;
@@ -1669,7 +1669,7 @@ gceSTATUS
 gcoBUFOBJ_IndexBind (
     IN gcoBUFOBJ Index,
     IN gceINDEX_TYPE Type,
-    IN gctUINT32 Offset,
+    IN gctSIZE_T Offset,
     IN gctSIZE_T Count
     )
 {
@@ -1680,7 +1680,7 @@ gceSTATUS
 gcoBUFOBJ_IndexGetRange(
     IN gcoBUFOBJ Index,
     IN gceINDEX_TYPE Type,
-    IN gctUINT32 Offset,
+    IN gctSIZE_T Offset,
     IN gctUINT32 Count,
     OUT gctUINT32 * MinimumIndex,
     OUT gctUINT32 * MaximumIndex

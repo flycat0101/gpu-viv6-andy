@@ -1116,7 +1116,7 @@ gcoVERTEXARRAY_StreamBind_Ex(
 
             /* Set stream attribute. */
             gcmONERROR(gcoSTREAM_SetAttribute(streamPtr->stream,
-                                              gcmPTR2INT32(vertexPtr->pointer),
+                                              gcmPTR2SIZE(vertexPtr->pointer),
                                               attributePtr->bytes,
                                               vertexPtr->stride,
                                               vertexPtr->divisor,
@@ -1260,7 +1260,7 @@ gcoVERTEXARRAY_StreamBind_Ex(
             /* Get the index range. */
             gcmONERROR(gcoINDEX_GetIndexRange(IndexInfo->u.es11.indexBuffer,
                                               IndexInfo->indexType,
-                                              gcmPTR2INT32(IndexInfo->indexMemory),
+                                              gcmPTR2SIZE(IndexInfo->indexMemory),
                                               count32,
                                               &minIndex, &maxIndex));
 
@@ -2081,7 +2081,7 @@ gcoVERTEXARRAY_IndexBind(
         /* Bind the index buffer to the hardware. */
         gcmONERROR(gcoBUFOBJ_IndexBind(IndexInfo->u.es30.indexBuffer,
                                        IndexInfo->indexType,
-                                       gcmPTR2INT32(IndexInfo->indexMemory),
+                                       gcmPTR2SIZE(IndexInfo->indexMemory),
                                        count32));
     }
     /* Test if there are client indices. */
@@ -2438,7 +2438,7 @@ gcoVERTEXARRAY_StreamBind(
             /* Get the index range. */
             gcmONERROR(gcoBUFOBJ_IndexGetRange(IndexInfo->u.es30.indexBuffer,
                                                IndexInfo->indexType,
-                                               gcmPTR2INT32(IndexInfo->indexMemory),
+                                               gcmPTR2SIZE(IndexInfo->indexMemory),
                                                count32,
                                                &minIndex,
                                                &maxIndex));

@@ -4486,12 +4486,12 @@ typedef struct _gcsSTREAM_SUBSTREAM *  gcsSTREAM_SUBSTREAM_PTR;
 struct _gcsSTREAM_SUBSTREAM
 {
     /* Current range for the sub-stream. */
-    gctUINT                                 start;
-    gctUINT                                 end;
+    gctSIZE_T                               start;
+    gctSIZE_T                               end;
 
     /* Maximum range of the window for the sub-stream. */
-    gctUINT                                 minStart;
-    gctUINT                                 maxEnd;
+    gctSIZE_T                               minStart;
+    gctSIZE_T                               maxEnd;
 
     /* Stride for the sub-stream. */
     gctUINT                                 stride;
@@ -4628,7 +4628,7 @@ struct _gcsVERTEXARRAY_BUFOBJ
 gceSTATUS
 gcoSTREAM_SetAttribute(
     IN gcoSTREAM Stream,
-    IN gctUINT Offset,
+    IN gctSIZE_T Offset,
     IN gctUINT Bytes,
     IN gctUINT Stride,
     IN gctUINT Divisor,

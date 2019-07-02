@@ -34,7 +34,7 @@
 /* Index buffer range information. */
 typedef struct _gcsINDEXRANGE
 {
-    gctUINT32                   offset;
+    gctSIZE_T                   offset;
     gctUINT32                   count;
     gctUINT32                   minIndex;
     gctUINT32                   maxIndex;
@@ -1152,7 +1152,7 @@ gceSTATUS
 gcoINDEX_GetIndexRange(
     IN gcoINDEX Index,
     IN gceINDEX_TYPE Type,
-    IN gctUINT32 Offset,
+    IN gctSIZE_T Offset,
     IN gctUINT32 Count,
     OUT gctUINT32 * MinimumIndex,
     OUT gctUINT32 * MaximumIndex
@@ -2462,7 +2462,7 @@ gceSTATUS gcoINDEX_QueryCaps(
 gceSTATUS gcoINDEX_GetIndexRange(
     IN gcoINDEX Index,
     IN gceINDEX_TYPE Type,
-    IN gctUINT32 Offset,
+    IN gctSIZE_T Offset,
     IN gctUINT32 Count,
     OUT gctUINT32 * MinimumIndex,
     OUT gctUINT32 * MaximumIndex

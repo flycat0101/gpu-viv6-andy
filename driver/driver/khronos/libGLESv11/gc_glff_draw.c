@@ -2918,7 +2918,7 @@ GL_API void GL_APIENTRY glDrawElements(
                     case GL_UNSIGNED_BYTE:
                         gcoINDEX_GetIndexRange(object->index,
                                                gcvINDEX_8,
-                                               (gctUINT32) (gctUINTPTR_T) Indices,
+                                               gcmPTR2SIZE(Indices),
                                                Count,
                                                (gctUINT32_PTR) &min,
                                                (gctUINT32_PTR) &max);
@@ -2927,7 +2927,7 @@ GL_API void GL_APIENTRY glDrawElements(
                     case GL_UNSIGNED_SHORT:
                         gcoINDEX_GetIndexRange(object->index,
                                                gcvINDEX_16,
-                                               (gctUINT32) (gctUINTPTR_T) Indices,
+                                               gcmPTR2SIZE(Indices),
                                                Count,
                                                (gctUINT32_PTR) &min,
                                                (gctUINT32_PTR) &max);
@@ -2936,7 +2936,7 @@ GL_API void GL_APIENTRY glDrawElements(
                     case GL_UNSIGNED_INT:
                         gcoINDEX_GetIndexRange(object->index,
                                                gcvINDEX_32,
-                                               (gctUINT32) (gctUINTPTR_T) Indices,
+                                               gcmPTR2SIZE(Indices),
                                                Count,
                                                (gctUINT32_PTR) &min,
                                                (gctUINT32_PTR) &max);
@@ -3640,7 +3640,7 @@ static gceSTATUS _GetArrayRange(
         status = gcoINDEX_GetIndexRange(
             object->index,
             IndexType,
-            gcmPTR2INT32(IndexBuffer),
+            gcmPTR2SIZE(IndexBuffer),
             IndexCount,
             &minIndex,
             &maxIndex

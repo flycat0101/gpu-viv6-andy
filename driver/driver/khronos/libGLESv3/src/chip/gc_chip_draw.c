@@ -2716,7 +2716,7 @@ gcChipPatch32BitIndices(
     {
         gcmONERROR(gcoBUFOBJ_IndexGetRange(instantDraw->indexBuffer,
                                            gcvINDEX_32,
-                                           gcmPTR2INT32(instantDraw->indexMemory),
+                                           gcmPTR2SIZE(instantDraw->indexMemory),
                                            (gctUINT32)instantDraw->count,
                                            &min,
                                            &max));
