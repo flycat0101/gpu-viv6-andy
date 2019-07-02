@@ -3969,6 +3969,115 @@ _SplitMatrixLoadStore(
 }
 
 static VSC_ErrCode
+_SplitMatrixAttrLoadStore(
+    IN  VIR_Shader*             pShader,
+    IN  VIR_Function*           pFunc,
+    IN  VIR_Instruction*        pInst
+    )
+{
+    VSC_ErrCode                 errCode  = VSC_ERR_NONE;
+    VIR_OpCode                  opCode = VIR_Inst_GetOpcode(pInst);
+    gctBOOL                     bIsAttrLoad = (opCode == VIR_OP_ATTR_LD);
+    VIR_Instruction*            pNewInst = gcvNULL;
+    VIR_Operand*                pNewOpnd = gcvNULL;
+    VIR_Operand*                pOrigOpnd = gcvNULL;
+    VIR_Operand*                pOrigOffsetOpnd = bIsAttrLoad ? VIR_Inst_GetSource(pInst, 2) : VIR_Inst_GetSource(pInst, 1);
+    VIR_TypeId                  matrixTypeId = VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst));
+    VIR_TypeId                  rowTypeId = VIR_GetTypeRowType(matrixTypeId);
+    VIR_VirRegId                regId;
+    VIR_SymId                   regSymId = VIR_INVALID_ID;
+    gctUINT                     rowCount = VIR_GetTypeRows(matrixTypeId);
+    gctUINT                     i, j;
+
+    /* Allocate a new reg to save the offset. */
+    regId = VIR_Shader_NewVirRegId(pShader, 1);
+    errCode = VIR_Shader_AddSymbol(pShader,
+                                   VIR_SYM_VIRREG,
+                                   regId,
+                                   VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT32),
+                                   VIR_STORAGE_UNKNOWN,
+                                   &regSymId);
+    CHECK_ERROR(errCode, "VIR_Shader_AddSymbol failed.");
+
+    for (i = 0; i < rowCount; i++)
+    {
+        /* Insert a ADD to update the offset. */
+        errCode = VIR_Function_AddInstructionBefore(pFunc,
+                                                    VIR_OP_ADD,
+                                                    VIR_TYPE_UINT32,
+                                                    pInst,
+                                                    gcvTRUE,
+                                                    &pNewInst);
+        CHECK_ERROR(errCode, "VIR_Function_AddInstructionBefore failed.");
+
+        /* Set DEST. */
+        pNewOpnd = VIR_Inst_GetDest(pNewInst);
+        VIR_Operand_SetSymbol(pNewOpnd, pFunc, regSymId);
+        VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_X);
+
+        /* Set SOURCE0. */
+        pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
+        VIR_Operand_Copy(pNewOpnd, pOrigOffsetOpnd);
+
+        /* Set SOURCE1. */
+        pNewOpnd = VIR_Inst_GetSource(pNewInst, 1);
+        VIR_Operand_SetImmediateUint(pNewOpnd, i);
+
+        /* Spilt matrix to row. */
+        errCode = VIR_Function_AddInstructionBefore(pFunc,
+                                                    opCode,
+                                                    rowTypeId,
+                                                    pInst,
+                                                    gcvTRUE,
+                                                    &pNewInst);
+        CHECK_ERROR(errCode, "VIR_Function_AddInstructionBefore failed.");
+
+        /* Set DEST. */
+        pNewOpnd = VIR_Inst_GetDest(pNewInst);
+        errCode = _ConvMatrixOperandToVectorOperand(pShader,
+                                                    pFunc,
+                                                    VIR_Inst_GetDest(pInst),
+                                                    gcvTRUE,
+                                                    i,
+                                                    &pNewOpnd);
+        CHECK_ERROR(errCode, "_ConvMatrixOperandToVectorOperand failed.");
+
+        for (j = 0; j < VIR_Inst_GetSrcNum(pInst); j++)
+        {
+            pNewOpnd = VIR_Inst_GetSource(pNewInst, j);
+            pOrigOpnd = VIR_Inst_GetSource(pInst, j);
+            if (VIR_Type_isMatrix(VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetTypeId(pOrigOpnd))))
+            {
+                errCode = _ConvMatrixOperandToVectorOperand(pShader,
+                                                            pFunc,
+                                                            pOrigOpnd,
+                                                            gcvFALSE,
+                                                            i,
+                                                            &pNewOpnd);
+                CHECK_ERROR(errCode, "_ConvMatrixOperandToVectorOperand failed.");
+            }
+            else if ((bIsAttrLoad && j == 2) || (!bIsAttrLoad && j == 1))
+            {
+                VIR_Operand_SetSymbol(pNewOpnd, pFunc, regSymId);
+                VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XXXX);
+            }
+            else
+            {
+                VIR_Operand_Copy(pNewOpnd, pOrigOpnd);
+            }
+        }
+    }
+
+    /* Change current MOV to NOP. */
+    VIR_Inst_SetOpcode(pInst, VIR_OP_NOP);
+    VIR_Inst_SetConditionOp(pInst, VIR_COP_ALWAYS);
+    VIR_Inst_SetSrcNum(pInst, 0);
+    VIR_Inst_SetDest(pInst, gcvNULL);
+
+    return errCode;
+};
+
+static VSC_ErrCode
 _SplitIntrinsicMatrix(
     IN  VIR_Shader              *Shader,
     IN  VIR_Function            *Func,
@@ -4077,6 +4186,14 @@ _SplitMatrixRelatedInst(
                                         Func,
                                         Inst);
         CHECK_ERROR(errCode, "_SplitMatrixLoadStore failed.");
+        break;
+
+    case VIR_OP_ATTR_LD:
+    case VIR_OP_ATTR_ST:
+        errCode = _SplitMatrixAttrLoadStore(Shader,
+                                            Func,
+                                            Inst);
+        CHECK_ERROR(errCode, "_SplitMatrixAttrLoadStore failed.");
         break;
 
     case VIR_OP_INTRINSIC:
