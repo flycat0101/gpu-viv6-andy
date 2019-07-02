@@ -27775,7 +27775,7 @@ vxnne_shader_executable vxnneGetTensorTRShaderExecutable(
     vx_int8       dstFixPointPos        = 0;
     vx_int32      inputZP               = 0;
     vx_float32    inputScale            = 1.0f;
-    vx_int32      outputZP              = 0;
+    vx_float32    outputZP              = 0;
     vx_float32    outputScale           = 1.0f;
     vx_float32    logE                  = (vx_float32)(log10(exp(1.0f)) / log10(2.0f));
     vx_float32    rlogE                 = (vx_float32)(log10(2.0f)) / (vx_float32)log10(exp(1.0f));
@@ -27834,7 +27834,7 @@ vxnne_shader_executable vxnneGetTensorTRShaderExecutable(
     }
     else if (output_qnt_type == VX_QUANT_AFFINE_SCALE)
     {
-        outputZP = TENSOR_TF_ZEROPOINT(outputs);
+        outputZP = (vx_float32)TENSOR_TF_ZEROPOINT(outputs);
         outputScale = 1.0f / TENSOR_TF_SCALE(outputs);
     }
 
