@@ -22836,6 +22836,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer2_Initializer(vx_node node, 
     vx_bool    useShadeExe                = vx_false_e;
     vx_bool    enable_format              = vx_false_e;
     vx_bool    enable_tf_quantize         = vx_false_e;
+    vx_bool    enable_float32             = vx_false_e;
     vx_uint32  batchCount                 = TENSOR_SIZE_INDEX(inputs, 3);
     vx_enum    srcFormat                  = TENSOR_DATA_TYPE(inputs);
     vx_enum    dstFormat                  = TENSOR_DATA_TYPE(outputs);
@@ -22872,16 +22873,19 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer2_Initializer(vx_node node, 
 
     if(node->base.context->evisNoInst.supportEVIS)
     {
-        enable_format = (((srcFormat == VX_TYPE_INT8 ||  srcFormat == VX_TYPE_FLOAT16) && (dstFormat == VX_TYPE_FLOAT16 || dstFormat == VX_TYPE_FLOAT32)) || (srcFormat == VX_TYPE_INT16 && (dstFormat == VX_TYPE_INT16 || dstFormat == VX_TYPE_FLOAT16))
+        enable_float32 = (vx_bool)(dstFormat == VX_TYPE_FLOAT32 && ((width % 4 == 0) || ((width * height < IMG_MAX_WIDTH) && ((width * height % 4 == 0) || dims < 3)) || dims == 1));
+        enable_format = (((srcFormat == VX_TYPE_INT8 ||  srcFormat == VX_TYPE_FLOAT16) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32)) || (srcFormat == VX_TYPE_INT16 && (dstFormat == VX_TYPE_INT16 || dstFormat == VX_TYPE_FLOAT16))
                          || (srcFormat == VX_TYPE_INT8 &&  dstFormat == VX_TYPE_INT8));
+        enable_tf_quantize = ((srcFormat == VX_TYPE_UINT8) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32 || dstFormat == VX_TYPE_UINT8));
     }
     else
     {
         enable_format = ((srcFormat == VX_TYPE_FLOAT32 ||  srcFormat == VX_TYPE_FLOAT16) && (dstFormat == VX_TYPE_FLOAT16 || dstFormat == VX_TYPE_FLOAT32));
+        enable_tf_quantize = ((srcFormat == VX_TYPE_UINT8) && (dstFormat == VX_TYPE_FLOAT16 || dstFormat == VX_TYPE_FLOAT32 || dstFormat == VX_TYPE_UINT8));
     }
-    enable_tf_quantize = ((srcFormat == VX_TYPE_UINT8) && (dstFormat == VX_TYPE_FLOAT16 || dstFormat == VX_TYPE_FLOAT32 || dstFormat == VX_TYPE_UINT8));
+
     /* Current the SH layer only process 3D tensor*/
-    useShadeExe  = ((enable_format || enable_tf_quantize) && ((width * height < IMG_MAX_WIDTH) || (dims == 2 && width < IMG_MAX_WIDTH && height < IMG_MAX_WIDTH)));
+    useShadeExe  = (enable_format || enable_tf_quantize);
 
     if(useShadeExe && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
     {
