@@ -193,7 +193,7 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
 
                 if(SCALAR_VALUE(node->paramTable[PARAM_CONV_DEPTH_MULTIPLIER_INDEX], u32) == 0)
                 {
-                    if(weightX == weightY || /*weightX == 1 ) ||  tempically pad 1xN to NxN kernel because of terrible arch*/
+                    if(weightX == weightY || weightX == 1  ||  /*tempically pad 1xN to NxN kernel because of terrible arch*/
                         vxoGraphOptimization_isV8((vx_reference)weight))
                     {
                         nodeOpType = OP_CONVOLUTION;
@@ -3361,6 +3361,21 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_transformConvNxM(vx_graph graph)
                     &overflow_policy,
                     &rounding_policy, &down_scale_size_rounding,
                     &depth_multiplier, &pad_mode, &pad_const);
+
+             {
+                 /*update pad parameter*/
+                 vx_uint32 totalPad = gcmABS((vx_int32)TENSOR_SIZE_INDEX(weightNxM, 0) - (vx_int32)TENSOR_SIZE_INDEX(weightNxM, 1));
+                 if(TENSOR_SIZE_INDEX(weightNxM, 0) > TENSOR_SIZE_INDEX(weightNxM, 1))
+                 {
+                     pad[2] += totalPad/2;
+                     pad[3] += (totalPad + 1)/2;
+                 }
+                 else
+                 {
+                     pad[0] += totalPad /2;
+                     pad[1] += (totalPad + 1)/2;
+                 }
+             }
              {
             vx_scalar padconst = vxCreateScalar(context, VX_TYPE_UINT32, (void *)&pad_const);
             vx_nn_convolution_params_ext2_t params = {
