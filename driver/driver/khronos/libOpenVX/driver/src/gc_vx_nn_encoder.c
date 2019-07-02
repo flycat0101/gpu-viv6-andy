@@ -8759,6 +8759,1246 @@ exit:
     return;
 }
 
+
+
+void reorderKernelBufferV8MergeDW1x1(
+    vx_context context,
+    vx_uint32 weight_x,
+    vx_uint32 weight_y,
+    vx_uint32 slice_count_dw,
+    vx_uint32 z_count_dw,
+    vx_uint32 slice_count_1x1,
+    vx_uint32 z_count_1x1,
+    vx_uint32 filters_per_core,
+    vx_uint32 skip_value_dw,
+    vx_uint32 skip_value_1x1,
+    vx_enum  weight_format,
+    vx_uint8_ptr reorder_stream,
+    vx_uint8_ptr weight_base_ptr_dw,
+    vx_uint8_ptr weight_base_ptr_1x1,
+    vx_uint32 nn_core_count_1x1,
+    vx_uint32* reoder_stream_count_per_core,
+    vx_uint32* non_coef_index,
+    vx_uint32* limit_zrl_Index
+    )
+{
+    vx_uint32 nnCoreCount1x1        = nn_core_count_1x1;
+    vx_uint32 filterTotalCount1x1   = z_count_1x1;
+    vx_uint32 totalFilterPerCore1x1 = filterTotalCount1x1 / nnCoreCount1x1;
+    vx_uint32 oddFilterPerCore1x1   = filterTotalCount1x1 % nnCoreCount1x1;
+    vx_uint32 filterCount           = filters_per_core; /* filter count every group */
+    vx_uint32 batchSize             = nnCoreCount1x1 * filterCount;
+    vx_uint32 groupCount            = (filterTotalCount1x1 + batchSize - 1) / batchSize;
+
+    vx_uint32 weightCountDW         = weight_x * weight_y;
+    vx_uint32 weightX1x1            = 1;
+    vx_uint32 weightY1x1            = 1;
+    vx_uint32 weightCount1x1        = weightX1x1 * weightY1x1;
+    vx_uint32 weightSize            = (vx_uint32)vxDataType_GetSize((vx_type_e)weight_format);
+    vx_uint32 weightBitSize         = weightSize * 8;
+
+    vx_uint32 filterSliceSizeDW     = weightCountDW * weightSize;
+    vx_uint32 filterSizeDW          = weightCountDW * weightSize * slice_count_dw;
+    vx_uint32 filterSliceSize1x1    = weightCount1x1 * weightSize;
+    vx_uint32 filterSize1x1         = weightCount1x1 * weightSize * slice_count_1x1;
+    vx_uint8* kernelBufferInt8Ptr   = reorder_stream;
+    vx_uint16* kernelBufferInt16Ptr = (vx_uint16*)reorder_stream;
+
+    vx_uint32 coreIndex;
+    vx_uint32 limitIndex = 0;
+    vx_uint32 filterIndex;
+    vx_uint32 k, sk;
+    vx_uint32 kSize;
+    vx_uint32 weightXIndex, weightYIndex, weightZIndex;
+
+    vx_bool hasZDP3 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3);
+    vx_uint32 dpAmount = hasZDP3 ? 3 : 1;
+    vx_uint32 zDPLoopCount = 3;
+    vx_uint32 linesInImageBuffer = dpAmount * zDPLoopCount;
+
+    vx_uint32 nonCoefIndex = 0, idx = 0, elementIndex = 0;
+
+    for (coreIndex = 0; coreIndex < nnCoreCount1x1 + 1; coreIndex++)
+    {
+        if (coreIndex == 0)
+        {
+            /* depth-wise part */
+            vx_uint32 coef = 0;
+            vx_uint8_ptr realKernelDataPtr = VX_NULL;
+            reoder_stream_count_per_core[coreIndex] = 0;
+
+            /* Save kernels per core*/
+            if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
+            {
+                *((vx_uint16 *)kernelBufferInt8Ptr) = (vx_uint16)z_count_dw;
+                kernelBufferInt8Ptr += 2;
+            }
+            else
+            {
+                *kernelBufferInt16Ptr = (vx_uint16)z_count_dw;
+                kernelBufferInt16Ptr ++;
+            }
+            reoder_stream_count_per_core[coreIndex] += (16 / weightBitSize);
+
+            for (idx = 0; idx < (16 / weightBitSize); idx++)
+            {
+                non_coef_index[nonCoefIndex++] = elementIndex++;
+            }
+
+            for (filterIndex = 0; filterIndex < z_count_dw; filterIndex++)
+            {
+                for (k = 0; k < weightCountDW * slice_count_dw; k += linesInImageBuffer)
+                {
+                    kSize = gcmMIN((weightCountDW * slice_count_dw - k), linesInImageBuffer);
+
+                    for (sk = 0; sk < linesInImageBuffer; sk++)
+                    {
+                        weightZIndex = (k + sk) / weightCountDW;
+                        weightYIndex = (k + sk) % weightCountDW;
+                        weightYIndex /= weight_x;
+                        weightXIndex = weight_x;
+                        /*Packl 0 in the last dp group*/
+                        if (sk >= kSize)
+                            coef = skip_value_dw;
+                        else
+                        {
+                            realKernelDataPtr = weight_base_ptr_dw + filterIndex * filterSizeDW +
+                                filterSliceSizeDW * weightZIndex +
+                                (weightYIndex * weight_x + weightXIndex) * weightSize;
+
+                            if (weight_format == VX_TYPE_INT8)
+                                coef = *((vx_int8 *)realKernelDataPtr);
+                            else if (weight_format == VX_TYPE_UINT8)
+                                coef = *((vx_uint8 *)realKernelDataPtr);
+                            else
+                                coef = *((vx_uint16 *)realKernelDataPtr);
+                        }
+                        if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
+                        {
+                            vx_int8 newCoef = ((vx_int32)coef - (vx_int32)skip_value_dw) & 0xFF;
+                            *kernelBufferInt8Ptr = (vx_uint8)newCoef;
+                            kernelBufferInt8Ptr++;
+                        }
+                        else
+                        {
+                            if (weight_format == VX_TYPE_FLOAT16)
+                                coef = (coef & 0x7fff) * 2 + coef/(1<<15);
+
+                            *kernelBufferInt16Ptr = (vx_uint16)coef;
+                            kernelBufferInt16Ptr++;
+                        }
+                        reoder_stream_count_per_core[coreIndex]++;
+                        if (weightXIndex == 0 && weightYIndex == 0 && weightZIndex == 0)
+                            limit_zrl_Index[limitIndex++] = elementIndex;
+                        elementIndex++;
+                    }
+                }
+            }
+        }
+        else
+        {
+            /* 1x1 part*/
+            vx_uint32 coreFilterCount = ((coreIndex - 1) < oddFilterPerCore1x1) ? totalFilterPerCore1x1 + 1 : totalFilterPerCore1x1;
+            vx_uint32 groupIndex;
+            vx_uint32 coef = 0;
+            vx_uint8_ptr realKernelDataPtr = VX_NULL;
+            reoder_stream_count_per_core[coreIndex] = 0;
+
+            if (coreFilterCount > 0)
+            {
+                /* Save kernels per core*/
+                if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
+                {
+                    *((vx_uint16 *)kernelBufferInt8Ptr) = (vx_uint16)coreFilterCount;
+                    kernelBufferInt8Ptr += 2;
+                }
+                else
+                {
+                    *kernelBufferInt16Ptr = (vx_uint16)coreFilterCount;
+                    kernelBufferInt16Ptr ++;
+                }
+                reoder_stream_count_per_core[coreIndex] += (16 / weightBitSize);
+
+                for (idx = 0; idx < (16 / weightBitSize); idx++)
+                {
+                    non_coef_index[nonCoefIndex++] = elementIndex++;
+                }
+            }
+
+            for (groupIndex = 0; groupIndex < groupCount; groupIndex++)
+            {
+                vx_uint32 actualFilterCount = (groupIndex == groupCount - 1) ? (coreFilterCount - groupIndex * filterCount) : filterCount;
+                vx_uint32 filterStart, filterEnd;
+
+                if ((groupIndex == groupCount - 1)
+                    && ((coreIndex - 1) >= (filterTotalCount1x1 % nnCoreCount1x1)))
+                {
+                    filterStart = groupIndex * nnCoreCount1x1 * filterCount
+                                + (filterTotalCount1x1 % nnCoreCount1x1) * (actualFilterCount + 1)
+                                + ((coreIndex - 1) - (filterTotalCount1x1 % nnCoreCount1x1)) * actualFilterCount;
+                }
+                else
+                {
+                    filterStart = groupIndex * nnCoreCount1x1 * filterCount + (coreIndex - 1) * actualFilterCount;
+                }
+                filterEnd = filterStart + actualFilterCount - 1;
+
+                for (k = 0; k < weightCount1x1 * slice_count_1x1; k += linesInImageBuffer)
+                {
+                    vx_uint32 maxKCount = ((weightCount1x1 * slice_count_1x1) % linesInImageBuffer == 0) ? (weightCount1x1 * slice_count_1x1 / linesInImageBuffer) : (weightCount1x1 * slice_count_1x1 / linesInImageBuffer + 1);
+                    kSize = gcmMIN((weightCount1x1 * slice_count_1x1 - k), linesInImageBuffer);
+
+                    for (filterIndex = filterStart; filterIndex <= filterEnd; filterIndex++)
+                    {
+                        for (sk = 0; sk < linesInImageBuffer; sk++)
+                        {
+                            weightZIndex = (k + sk) / weightCount1x1;
+                            weightYIndex = (k + sk) % weightCount1x1;
+                            weightYIndex /= weightX1x1;
+                            weightXIndex = weightX1x1;
+                            /*Packl 0 in the last dp group*/
+                            if (sk >= kSize)
+                                coef = skip_value_1x1;
+                            else
+                            {
+                                realKernelDataPtr = weight_base_ptr_1x1 + filterIndex * filterSize1x1 +
+                                    filterSliceSize1x1 * weightZIndex +
+                                    (weightYIndex * weightX1x1 + weightXIndex) * weightSize;
+
+                                if (weight_format == VX_TYPE_INT8)
+                                    coef = *((vx_int8 *)realKernelDataPtr);
+                                else if (weight_format == VX_TYPE_UINT8)
+                                    coef = *((vx_uint8 *)realKernelDataPtr);
+                                else
+                                    coef = *((vx_uint16 *)realKernelDataPtr);
+                            }
+
+                            if (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8)
+                            {
+                                vx_int8 newCoef = ((vx_int32)coef - (vx_int32)skip_value_1x1) & 0xFF;
+                                *kernelBufferInt8Ptr = (vx_uint8)newCoef;
+                                kernelBufferInt8Ptr++;
+                            }
+                            else
+                            {
+                                if (weight_format == VX_TYPE_FLOAT16)
+                                    coef = (coef & 0x7fff) * 2 + coef/(1<<15);
+
+                                *kernelBufferInt16Ptr = (vx_uint16)coef;
+                                kernelBufferInt16Ptr++;
+                            }
+                            reoder_stream_count_per_core[coreIndex]++;
+
+                            if (k == (maxKCount - 1) * linesInImageBuffer && sk == linesInImageBuffer - 1)
+                                limit_zrl_Index[limitIndex++] = elementIndex;
+
+                            elementIndex++;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    vxmASSERT(limitIndex == (z_count_dw + z_count_1x1));
+}
+
+void fillinKernelBufferV8MergeDW1x1(
+    vx_context context,
+    vx_weights_biases_parameter wb,
+    vx_uint32 weight_x,
+    vx_uint32 weight_y,
+    vx_uint32 slice_count_dw,
+    vx_uint32 z_count_dw,
+    vx_uint32 slice_count_1x1,
+    vx_uint32 z_count_1x1,
+    vx_uint32 filters_per_core,
+    vx_enum  weight_format,
+    vx_enum  bias_format,
+    vx_int32 input_zp_dw,
+    vx_int32 input_zp_1x1,
+    vx_int32 coef_zp_dw,
+    vx_int32 coef_zp_1x1,
+    vx_uint32 output_final_x,
+    vx_uint32 output_final_y,
+    vx_int32 z_offset,
+    vx_uint32 output_size,
+    vx_uint8_ptr wb_base_ptr,
+    vx_uint8_ptr weight_base_ptr_dw,
+    vx_uint8_ptr weight_base_ptr_1x1,
+    vx_uint32* bias_base_ptr_dw,
+    vx_uint32* bias_base_ptr_1x1,
+    vx_uint32 index
+    )
+{
+
+    vx_uint32 nnCoreCount = (weight_format == VX_TYPE_INT16) ?
+                  context->nnConfig.fixedFeature.nnCoreCountInt16 : (weight_format == VX_TYPE_FLOAT16) ?
+                      context->nnConfig.fixedFeature.nnCoreCountFloat16 : context->nnConfig.fixedFeature.nnCoreCount;
+
+    vx_uint32 invSizeOrder[MAX_SIZE_HISTO_COUNT] = {0};
+    vx_int32 coef = 0, tmp = 0, prev = 0;
+
+    vx_uint32 filterTotalCountDW  = z_count_dw;
+    vx_uint32 filterTotalCount1x1 = z_count_1x1;
+    vx_uint32 usedCoreCount1x1    = (filterTotalCount1x1 > (nnCoreCount - 1)) ? (nnCoreCount - 1) : filterTotalCount1x1;
+    vx_uint32 weightCountDW       = weight_x * weight_y;
+    vx_uint32 weightX1x1          = 1;
+    vx_uint32 weightY1x1          = 1;
+    vx_uint32 weightCount1x1      = weightX1x1 * weightY1x1;
+    vx_uint32 weightSize          = (vx_uint32)vxDataType_GetSize((vx_type_e)weight_format);
+    vx_uint32 weightBitSize       = weightSize * 8;
+    vx_uint32 biasBitSize         = (weight_format == VX_TYPE_INT16) ? NN_INTEGER_BIAS_BITS_VIP_V7_INT16 : NN_INTEGER_BIAS_BITS_VIP_V7;
+
+    vx_uint32 filterSizeDW        = weightCountDW * weightSize * slice_count_dw;
+    vx_uint32 filterSize1x1       = weightCountDW * weightSize * slice_count_dw;
+    vx_uint32* kernelBufferPtr    = (vx_uint32*)wb_base_ptr;
+
+    vx_uint32* kernelStreamSizePtr = VX_NULL;
+    vx_uint32 kernelStreamSize = 0;
+    vx_uint32 alignedOffset      = ((vx_uint32)(gctUINTPTR_T)kernelBufferPtr) & 0x3F;
+    vx_uint8_ptr kernelDataPtr   = VX_NULL;
+    vx_uint8_ptr kernelStreamBasePtr   = VX_NULL;
+    vx_uint32 streamSizeBitOffset = 0;
+    vx_uint32 maxKernelStreamSizePerCore = 0;
+
+    vx_uint32 coreIndex;
+    vx_uint32 i;
+
+    vx_uint32 bit16Flag = (weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_UINT8) ? 0 : 1;
+    vx_uint32 bitOffset = 0;
+
+    vx_uint32 reorderStreamSize = 0;
+    vx_uint32 reorderStreamAllCount = 0;
+    vx_uint32 reorderStreamCheckCount = 0;
+    vx_uint32* reorderStreamPerCoreCount = VX_NULL;
+    vx_uint32 filterIndex = 0;
+
+    vx_uint8* reorderStream = VX_NULL;
+    vx_uint32 runSet2Bits = 1;
+    CodeSymbol codeSymbol[THROUGHPUT * 3];
+
+    vx_bool hasNoBias = vx_false_e;
+    vx_bool hasNoZOffset = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_NO_Z_LOCATION_OFFSET);
+    vx_bool hasZDP3 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3);
+    vx_bool hasKernelFullCacheInterleaveFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FULLCACHE_KERNEL_INTERLEAVE_FIX);
+    vx_uint32 dpAmount = hasZDP3 ? 3 : 1;
+    vx_uint32 zDPLoopCount = 3;
+    vx_uint32 linesInImageBuffer = dpAmount * zDPLoopCount;
+    vx_uint32 numOfInImageBufferDW = (vx_uint32)gcoMATH_Ceiling((vx_float32)(weightCountDW * slice_count_dw) / (vx_float32)linesInImageBuffer);
+    vx_uint32 numOfInImageBuffer1x1 = (vx_uint32)gcoMATH_Ceiling((vx_float32)(weightCount1x1 * slice_count_1x1) / (vx_float32)linesInImageBuffer);
+
+    vx_uint32 dummyStage[3] = {0};
+    vx_uint32 dummyBitLength[3] = {0};
+    vx_bool setDummy = vx_false_e;
+
+    vx_uint32 nonCoefCount = 0;
+    vx_uint32 totalCountIdx = 0;
+    vx_uint32 nonCoefCountIdx = 0;
+    vx_uint32* nonCoefIndex = VX_NULL;
+
+    vx_int32* coefSumDW = VX_NULL;
+    vx_int32* coefSum1x1 = VX_NULL;
+    vx_uint32* realVzIndex = VX_NULL;
+    vx_uint32* limitZRLIndex = VX_NULL;
+    vx_uint32 limitZRLCountIdx = 0;
+
+    typedef struct _gcVXWeightsMinusZP
+    {
+        vx_int32 sum;
+        vx_uint32 filterIdx;
+    }gcVXWeightsMinusZP;
+    gcVXWeightsMinusZP *weightsMinusZPDW = VX_NULL;
+    gcVXWeightsMinusZP *weightsMinusZP1x1 = VX_NULL;
+
+    if (weight_format == VX_TYPE_INT16 || weight_format == VX_TYPE_UINT8)
+    {
+        vx_uint32 sliceIndex, weightXIndex, weightYIndex;
+        vx_uint32 filterSliceSizeDW = weight_x * weight_y * weightSize;
+        vx_uint32 filterSliceSize1x1 = weightX1x1 * weightY1x1 * weightSize;
+
+        coefSumDW = (vx_int32*)vxAllocateAndZeroMemory(filterTotalCountDW * sizeof(vx_int32));
+        if (!coefSumDW)
+        {
+            vxError("fillinKernelBufferV8Merge: OUT OF MEMORY");
+            goto exit;
+        }
+
+        coefSum1x1 = (vx_int32*)vxAllocateAndZeroMemory(filterTotalCount1x1 * sizeof(vx_int32));
+        if (!coefSum1x1)
+        {
+            vxError("fillinKernelBufferV8Merge: OUT OF MEMORY");
+            goto exit;
+        }
+
+        /*Calc depth-wise sum((coef[i] - coefZP) * InZP) */
+        if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) &&
+            input_zp_dw != 0 &&
+            wb->wb_base->weights_quant_format == VX_QUANT_AFFINE_SCALE &&
+            weight_format == VX_TYPE_UINT8)
+        {
+            weightsMinusZPDW = (gcVXWeightsMinusZP*)vxAllocateAndZeroMemory(filterTotalCountDW * sizeof(gcVXWeightsMinusZP));
+
+            if (!weightsMinusZPDW)
+            {
+                vxError("fillinKernelBufferV8Merge: OUT OF MEMORY");
+                goto exit;
+            }
+        }
+
+        for (filterIndex = 0; filterIndex < filterTotalCountDW; filterIndex++)
+        {
+            if (weightsMinusZPDW != VX_NULL)
+            {
+                weightsMinusZPDW[filterIndex].filterIdx = filterIndex;
+                weightsMinusZPDW[filterIndex].sum = 0;
+            }
+            for (sliceIndex = 0; sliceIndex < slice_count_dw; sliceIndex++)
+            {
+                /* add one slice data every filter */
+                kernelDataPtr = weight_base_ptr_dw + filterIndex * filterSizeDW + filterSliceSizeDW * sliceIndex;
+
+                for (weightYIndex = 0; weightYIndex < weight_y; weightYIndex++)
+                {
+                    for (weightXIndex = 0; weightXIndex < weight_x; weightXIndex++)
+                    {
+                        vx_int32 weight = 0;
+                        if (weight_format == VX_TYPE_UINT8)
+                        {
+                            weight = *((vx_uint8 *)kernelDataPtr);
+                            coefSumDW[filterIndex] += (weight - coef_zp_dw);
+                        }
+                        else
+                        {
+                            weight = *((vx_int16 *)kernelDataPtr);
+                            coefSumDW[filterIndex] += weight;
+                        }
+                        kernelDataPtr = kernelDataPtr + weightSize;
+
+                        if (weightsMinusZPDW != VX_NULL)
+                        {
+                            /*Calc sum((coef[i] - coefZP) * InZP) */
+                            weightsMinusZPDW[filterIndex].sum += (weight - coef_zp_dw) * input_zp_dw;
+                        }
+                    }
+                }
+            }
+        }
+
+
+        /*Calc 1x1 conv sum((coef[i] - coefZP) * InZP) */
+        if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) &&
+            input_zp_1x1 != 0 &&
+            wb->wb_base->weights_quant_format == VX_QUANT_AFFINE_SCALE &&
+            weight_format == VX_TYPE_UINT8)
+        {
+            weightsMinusZP1x1 = (gcVXWeightsMinusZP*)vxAllocateAndZeroMemory(filterTotalCountDW * sizeof(gcVXWeightsMinusZP));
+
+            if (!weightsMinusZP1x1)
+            {
+                vxError("fillinKernelBufferV8Merge: OUT OF MEMORY");
+                goto exit;
+            }
+        }
+
+        for (filterIndex = 0; filterIndex < filterTotalCount1x1; filterIndex++)
+        {
+            if (weightsMinusZP1x1 != VX_NULL)
+            {
+                weightsMinusZP1x1[filterIndex].filterIdx = filterIndex;
+                weightsMinusZP1x1[filterIndex].sum = 0;
+            }
+            for (sliceIndex = 0; sliceIndex < slice_count_1x1; sliceIndex++)
+            {
+                /* add one slice data every filter */
+                kernelDataPtr = weight_base_ptr_1x1 + filterIndex * filterSize1x1 + filterSliceSize1x1 * sliceIndex;
+
+                for (weightYIndex = 0; weightYIndex < weight_y; weightYIndex++)
+                {
+                    for (weightXIndex = 0; weightXIndex < weight_x; weightXIndex++)
+                    {
+                        vx_int32 weight = 0;
+                        if (weight_format == VX_TYPE_UINT8)
+                        {
+                            weight = *((vx_uint8 *)kernelDataPtr);
+                            coefSum1x1[filterIndex] += (weight - coef_zp_1x1);
+                        }
+                        else
+                        {
+                            weight = *((vx_int16 *)kernelDataPtr);
+                            coefSum1x1[filterIndex] += weight;
+                        }
+                        kernelDataPtr = kernelDataPtr + weightSize;
+
+                        if (weightsMinusZP1x1 != VX_NULL)
+                        {
+                            /*Calc sum((coef[i] - coefZP) * InZP) */
+                            weightsMinusZP1x1[filterIndex].sum += (weight - coef_zp_1x1) * input_zp_1x1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    reorderStreamAllCount = (numOfInImageBufferDW * linesInImageBuffer * filterTotalCountDW)
+        + (16 / weightBitSize) /*filterPerCore need 16 bit for DW*/
+        + (numOfInImageBuffer1x1 * linesInImageBuffer * filterTotalCount1x1)
+        + (usedCoreCount1x1 * (16 / weightBitSize));/*filterPerCore need 16 bit * nnCoreCount */
+
+    reorderStreamSize = reorderStreamAllCount * weightSize;
+
+    reorderStream = (vx_uint8 *)vxAllocateAndZeroMemory(reorderStreamSize);
+
+    if (!reorderStream)
+    {
+        vxError("fillinKernelBufferV8Merge: OUT OF MEMORY");
+        goto exit;
+    }
+
+    reorderStreamPerCoreCount = (vx_uint32 *)vxAllocateAndZeroMemory(nnCoreCount * sizeof(vx_uint32));
+    if (!reorderStreamPerCoreCount)
+    {
+        vxError("fillinKernelBufferV8Merge: OUT OF MEMORY");
+        goto exit;
+    }
+
+    nonCoefCount = (usedCoreCount1x1 + 1) * (16 / weightBitSize);
+
+    nonCoefIndex = (vx_uint32 *)vxAllocateAndZeroMemory(nonCoefCount * sizeof(vx_uint32));
+    if (!nonCoefIndex)
+    {
+        vxError("fillinKernelBufferV8Merge: OUT OF MEMORY");
+        goto exit;
+    }
+
+    limitZRLIndex = (vx_uint32 *)vxAllocateAndZeroMemory((filterTotalCountDW + filterTotalCount1x1) * sizeof(vx_uint32));
+    if (!limitZRLIndex)
+    {
+        vxError("fillinKernelBufferV8Merge: OUT OF MEMORY");
+        goto exit;
+    }
+
+    reorderKernelBufferV8MergeDW1x1(context, weight_x, weight_y, slice_count_dw, z_count_dw, slice_count_1x1, z_count_1x1, filters_per_core, coef_zp_dw, coef_zp_1x1,
+                                    weight_format, reorderStream, weight_base_ptr_dw, weight_base_ptr_1x1, usedCoreCount1x1, reorderStreamPerCoreCount, nonCoefIndex, limitZRLIndex);
+
+    analysisKernelStreamForHuffman(context, wb, 0, nnCoreCount, reorderStream, reorderStreamSize, reorderStreamPerCoreCount, invSizeOrder, nonCoefIndex, nonCoefCount, limitZRLIndex, (filterTotalCountDW + filterTotalCount1x1), index);
+
+    /* Write huffman header*/
+    writeBits(&kernelBufferPtr, &bitOffset, wb->huffmanConfig[index].preEncode, 1);
+    writeBits(&kernelBufferPtr, &bitOffset, wb->huffmanConfig[index].bit16Flag, 1);
+    writeBits(&kernelBufferPtr, &bitOffset, wb->huffmanConfig[index].fp16Flag, 1);
+    writeBits(&kernelBufferPtr, &bitOffset, wb->huffmanConfig[index].reserved, 1);
+    writeBits(&kernelBufferPtr, &bitOffset, wb->huffmanConfig[index].version, 4);
+    writeBits(&kernelBufferPtr, &bitOffset, wb->huffmanConfig[index].runLenTableSize, 8);
+
+    for(i = 0; i < MAX_RUNLEN_SIZE; i++)
+    {
+        writeBits(&kernelBufferPtr, &bitOffset, wb->huffmanConfig[index].runLenTable[i], 8);
+    }
+    for(i = 0; i < LOG_RUN_SIZE1; i++)
+    {
+        writeBits(&kernelBufferPtr, &bitOffset, wb->huffmanConfig[index].mapToHuffman[i], 8);
+    }
+    writeBits(&kernelBufferPtr, &bitOffset, wb->huffmanConfig[index].avgBias, 16);
+    writeBits(&kernelBufferPtr, &bitOffset, 0, 16); /*reserved, must zero*/
+
+    kernelStreamSizePtr = kernelBufferPtr;
+    streamSizeBitOffset = bitOffset;
+    for (coreIndex = 0; coreIndex < nnCoreCount; coreIndex++)
+    {
+        writeBits(&kernelBufferPtr, &bitOffset, kernelStreamSize, 32);
+    }
+    /*align to 64 byte*/
+    packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
+    wb->slice_array[index].kernel_stream_full_cache_size = 0;
+
+    for (i = 0; i < THROUGHPUT * 3; i++)
+    {
+        codeSymbol[i].stageCode[0] = codeSymbol[i].stageCode[1] = codeSymbol[i].stageCode[2] = 0;
+        codeSymbol[i].bitLength[0] = codeSymbol[i].bitLength[1] = codeSymbol[i].bitLength[2] = 0;
+    }
+
+    while(((numBestRuns-SET_1_SIZE)>>runSet2Bits) > 1)
+    {
+        runSet2Bits++;
+    }
+
+    kernelDataPtr = reorderStream;
+    wb->max_per_core_compression_ratio = 0;
+
+    for (coreIndex = 0; coreIndex < nnCoreCount; coreIndex++)
+    {
+
+        vx_uint32 x = 0x0;
+        vx_int32 pos = 0x0;
+        vx_int32 run = 0x0;
+        vx_uint32 dataSizeOfCore = reorderStreamPerCoreCount[coreIndex];
+        vx_uint32 dataRemainingOfCore = dataSizeOfCore;
+        vx_int32 size = 0;
+        vx_int32 code = 0;
+        vx_int32 coef16 = 0;
+        vx_int32 k = 0, j = 0, m = 0;
+        vx_bool isCoef;
+        vx_bool isLimitZRL;
+        vx_float64 compressionRatio = 0;
+        /* update position of each core's beginning of compressed kernel*/
+        kernelStreamBasePtr = (vx_uint8*)kernelBufferPtr;
+        reorderStreamCheckCount += reorderStreamPerCoreCount[coreIndex];
+
+        memset(codeSymbol, 0, sizeof(CodeSymbol));
+        memset(dummyStage, 0, (sizeof(vx_uint32) * 3));
+        memset(dummyBitLength, 0, (sizeof(vx_uint32) * 3));
+        setDummy = vx_false_e;
+
+        while(dataRemainingOfCore --)
+        {
+
+            pos = (x) % (3*THROUGHPUT);
+
+            if (weight_format == VX_TYPE_INT8)
+                coef = *((vx_int8 *)kernelDataPtr);
+            else if (weight_format == VX_TYPE_UINT8)
+                coef = *((vx_uint8 *)kernelDataPtr);
+            else if (weight_format == VX_TYPE_INT16 ||
+                weight_format == VX_TYPE_FLOAT16)
+                coef16 = *((vx_int16 *)kernelDataPtr);
+            else
+            {
+                /*Other format not suppoted now*/
+                vxmASSERT(0);
+            }
+            kernelDataPtr += weightSize;
+
+            if (totalCountIdx == nonCoefIndex[nonCoefCountIdx] &&
+                nonCoefCountIdx < nonCoefCount)
+            {
+                isCoef = vx_false_e;
+                nonCoefCountIdx++;
+            }
+            else
+                isCoef = vx_true_e;
+
+            if (limitZRLIndex != VX_NULL &&
+                totalCountIdx == limitZRLIndex[limitZRLCountIdx] &&
+                limitZRLCountIdx < (filterTotalCountDW + filterTotalCount1x1))
+            {
+                isLimitZRL = vx_true_e;
+                limitZRLCountIdx++;
+            }
+            else
+                isLimitZRL = vx_false_e;
+
+            totalCountIdx++;
+
+            if (bit16Flag == 0)
+            {
+
+                coef = (coef - wb->huffmanConfig[index].avgBias) & 0xFF;
+                if (wb->huffmanConfig[index].preEncode)
+                {
+                    tmp = coef;
+                    coef = (coef - prev) & 0xFF;
+                    prev = tmp;
+                }
+            }
+            else
+            {
+
+                if (wb->huffmanConfig[index].fp16Flag)
+                {
+                    coef16 = (coef16 & 0x7FFF) * 2 + coef16 / (1<<15);
+                }
+                coef16 -= wb->huffmanConfig[index].avgBias;
+                if (wb->huffmanConfig[index].runLenTableSize == 0x0)
+                    coef = (coef16 >> 8) & 0xFF; /*Non RZL*/
+                else
+                    coef = coef16 & 0xFFFF; /*RZL path*/
+            }
+
+            if (wb->huffmanConfig[index].runLenTableSize == 0x0) /* non RZL*/
+            {
+                if (!setDummy)
+                {
+                    /*Set dummy all to 0,
+                    in nonZRL path 8-bit, 0 belong to group0, -1~0, residue bit length is 1, residue code = 0*/
+                    size = 0;
+                    k = invSizeOrder[size];
+                    code = huffCode[k];
+
+                    dummyStage[0] = code & 0x07;
+                    dummyBitLength[0] = 3;
+
+                    if (sizeCodeLen[k] > 3)
+                    {
+                        dummyStage[1] = code >> 3;
+                        dummyBitLength[1] = 2;
+                    }
+
+                    dummyStage[2] = 0;
+                    if (size == 0) size = 1; /*Size = 0 mean 0&0xff, needs 1 bit actually*/
+                    if (sizeCodeLen[k]%2 == 0)
+                    {
+                        dummyBitLength[2] = size - 1;
+                    }
+                    else
+                    {
+                        dummyBitLength[2] = size;
+                    }
+
+                    if (wb->huffmanConfig[index].bit16Flag)
+                    {/*pack the raw data of the lower 8 bits*/
+
+                        dummyBitLength[2] += 8;
+                    }
+                    setDummy = vx_true_e;
+                }
+
+                tmp = (coef & 0x80)? (coef ^ 0xff): coef;
+                for (size = 0; size<7; size++)
+                {
+                    if (tmp<(1<<size))
+                        break;
+                }
+                k = invSizeOrder[size];
+                code = huffCode[k];
+
+                if (sizeCodeLen[k]%2 == 0)/*huffCode length = 2 or 4, pack 1 bit to 3 or 5*/
+                    code |= ((coef>>7)<<(sizeCodeLen[k]) );
+                codeSymbol[pos].stageCode[0] = code & 0x07;
+                codeSymbol[pos].bitLength[0] = 3;
+
+                if (sizeCodeLen[k] > 3)
+                {
+                    codeSymbol[pos].stageCode[1] = code >> 3;
+                    codeSymbol[pos].bitLength[1] = 2;
+                }
+
+                codeSymbol[pos].stageCode[2] = tmp &((1<<size) - 1 );
+                if (size == 0) size = 1; /*Size = 0 mean 0&0xff, needs 1 bit actually*/
+                if (sizeCodeLen[k]%2 == 0)
+                {
+                    codeSymbol[pos].bitLength[2] = size - 1;
+                }
+                else
+                {
+                    codeSymbol[pos].stageCode[2] <<= 1;
+                    codeSymbol[pos].stageCode[2] |= (coef>>7); /*The sign bit*/
+                    codeSymbol[pos].bitLength[2] = size;
+                }
+
+                if (wb->huffmanConfig[index].bit16Flag)
+                {/*pack the raw data of the lower 8 bits*/
+
+                    codeSymbol[pos].stageCode[2] = codeSymbol[x%(3*THROUGHPUT)].stageCode[2]* 256 + (coef16 &0xff);
+                    codeSymbol[pos].bitLength[2] += 8;
+                }
+                OutputAt(x, &kernelBufferPtr, &bitOffset, codeSymbol);
+                x++; /*counter*/
+            }
+            else /* RZL enable*/
+            {
+                if (!setDummy)
+                {
+                    /*Set dummy all to 0,
+                    in ZRL path 8-bit, 0 belong to group7, -128~127, residue bit length is 8, residue code = 0*/
+                    size = 7;
+                    j = invSizeOrder[size];
+                    code = huffCode[j];
+
+                    dummyStage[0] = code & 0x07;
+                    dummyBitLength[0] = 3;
+
+                    if (sizeCodeLen[j] > 3)
+                    {
+                        dummyStage[1] = code >> 3;
+                        dummyBitLength[1] = 2;
+                    }
+
+                    if (size == 7)
+                    {
+                        size = 8;
+                    }
+
+                    if (sizeCodeLen[j] % 2 == 0)
+                    {
+                        dummyStage[2] = 0;  /*last bit was coded*/
+                        dummyBitLength[2] = size - 1;
+                    }
+                    else
+                    {
+                        dummyStage[2] = 0;
+                        dummyBitLength[2] = size;
+                    }
+                    if (wb->huffmanConfig[index].bit16Flag)
+                    {
+                        dummyStage[2] = 0;
+                        dummyBitLength[2] += 8;
+                    }
+
+                    setDummy = vx_true_e;
+                }
+
+                if (coef == 0 && isCoef && !isLimitZRL)
+                {
+                    run++;
+                    if (dataRemainingOfCore != 0)
+                    {
+                        continue;
+                    }
+                }
+                if (coef || (dataRemainingOfCore == 0) || !isCoef || isLimitZRL) /* if last pixel, force process run zeros*/
+                {
+                    /* process run zeros*/
+                    while(run)
+                    {
+                        for (j = numBestRuns - 1; j>=0; j--)
+                        {
+                            if (run >= bestRunsSorted[j] + 1)
+                            {
+                                k = run / (bestRunsSorted[j] + 1);
+                                run %= (bestRunsSorted[j] + 1);
+                                break;
+                            }
+                        }
+                        if (j >= 0)
+                        {
+                            vx_int32 n = bestRunsSorted[j];
+                            size = 8;
+                            for (m = 0; m<SET_1_SIZE; m++)
+                            {
+                                if (best2Runs[m] == n)
+                                {
+                                    size = 0;
+                                    break;
+                                }
+                            }
+                            if (size == 8)
+                            {
+                                for (m = 0; m<numBestRuns - SET_1_SIZE; m++)
+                                    if (outBest2Run[m] == n)
+                                        break;
+
+                            }
+                            j = invSizeOrder[size];
+                            while(k--){/*k of the runs*/
+                                code = huffCode[j];
+                                if (sizeCodeLen[j] % 2 == 0)/*huffCode length = 2 or 4, pack 1 bit to 3 or 5*/
+                                    code |= ((m&1)<<(sizeCodeLen[j]) );
+                                codeSymbol[pos].stageCode[0] = code & 0x07;
+                                codeSymbol[pos].bitLength[0] = 3;
+
+                                if (sizeCodeLen[j] > 3)
+                                {
+                                    codeSymbol[pos].stageCode[1] = code >> 3;
+                                    codeSymbol[pos].bitLength[1] = 2;
+                                }
+                                if (size == 0 )
+                                {/*The m already code*/
+                                    codeSymbol[pos].bitLength[2] = (sizeCodeLen[j]%2 == 0) ? 0:1;
+                                    codeSymbol[pos].stageCode[2] = m; /*If (sizeCodeLen[j]%2 == 0), should be m/2, but 0 bit output, doesn't matter*/
+                                }
+                                else if (sizeCodeLen[j]%2 == 0)
+                                {
+                                    codeSymbol[pos].stageCode[2] = m/2;
+                                    codeSymbol[pos].bitLength[2] = runSet2Bits - 1;
+                                }
+                                else
+                                {
+                                    codeSymbol[pos].stageCode[2] = m;
+                                    codeSymbol[pos].bitLength[2] = runSet2Bits;
+                                }
+
+                                OutputAt(x, &kernelBufferPtr, &bitOffset, codeSymbol);
+                                x++;
+                                /* update pos*/
+                                pos = (x) % (3*THROUGHPUT);
+                            }
+                        }
+                    }
+                    /*process current pixel*/
+                    if (coef)
+                    {
+                        vx_int8 ch;
+                        coef>>=(wb->huffmanConfig[index].bit16Flag * 8);
+                        if(coef<0x80)
+                            coef+=wb->huffmanConfig[index].bit16Flag; /*Since we have to encode zero (run-length only handle 16-bits zero, 8 bit zero should use Size code*/
+                        ch = (vx_int8)coef;
+                        coef = abs(ch);
+                        m = coef*2 + (ch<0?1:0);
+                        for (j = 6; j>=0; j--)
+                        {
+                            if (coef>=(1<<j))
+                            {
+                                break;
+                            }
+                        }
+                        size = j+1;
+                        if (invSizeOrder[size]==8)
+                        { /*The minimum freq, we out the raw data*/
+                            size = 7;
+                        }
+                        if (size == 7)
+                        {
+                            m = ch&0xff;
+                            if(wb->huffmanConfig[index].bit16Flag)
+                                m = (coef16 >> 8) & 0xff;
+                        }
+
+                        j = invSizeOrder[size];
+                        code = huffCode[j];
+                        if (sizeCodeLen[j]%2 == 0)/*huffCode length = 2 or 4, pack 1 bit to 3 or 5*/
+                            code |= ((m&1) << (sizeCodeLen[j]));
+                        codeSymbol[pos].stageCode[0] = code & 0x07;
+                        codeSymbol[pos].bitLength[0] = 3;
+
+                        if (sizeCodeLen[j] > 3)
+                        {
+                            codeSymbol[pos].stageCode[1] = code >> 3;
+                            codeSymbol[pos].bitLength[1] = 2;
+                        }
+
+                        if (size == 7)
+                        {
+                            size = 8;
+                        }
+                        /*Size = 0 mean 0&0xff, needs 1 bit actually*/
+                        if (size == 0)
+                            size = 1;
+                        if (sizeCodeLen[j]%2 == 0)
+                        {
+                            codeSymbol[pos].stageCode[2] = m/2;  /*last bit was coded*/
+                            codeSymbol[pos].bitLength[2] = size - 1;
+                        }
+                        else
+                        {
+                            codeSymbol[pos].stageCode[2] = m;
+                            codeSymbol[pos].bitLength[2] = size;
+                        }
+                        if (wb->huffmanConfig[index].bit16Flag)
+                        {
+                            codeSymbol[pos].stageCode[2] = codeSymbol[x%(3*THROUGHPUT)].stageCode[2]* 256 + (coef16 & 0xff);
+                            codeSymbol[pos].bitLength[2] += 8;
+                        }
+                        OutputAt(x, &kernelBufferPtr, &bitOffset, codeSymbol);
+                        x++; /*counter*/
+                    }
+                    else if (!isCoef || (dataRemainingOfCore != 0x0) || isLimitZRL)
+                    {
+                        /*those non-coef count like bias, num_of_vz & z_offset couldn't skip by zero-run as HW requres,
+                        need also encode those 0 to huffman code,
+                        in ZRL path 8-bit, 0 belong to group7, -128~127, residue bit length is 8, residue code = 0*/
+                        size = 7;
+                        j = invSizeOrder[size];
+                        code = huffCode[j];
+
+                        codeSymbol[pos].stageCode[0] = code & 0x07;
+                        codeSymbol[pos].bitLength[0] = 3;
+
+                        if (sizeCodeLen[j] > 3)
+                        {
+                            codeSymbol[pos].stageCode[1] = code >> 3;
+                            codeSymbol[pos].bitLength[1] = 2;
+                        }
+
+                        if (size == 7)
+                        {
+                            size = 8;
+                        }
+
+                        if (sizeCodeLen[j] % 2 == 0)
+                        {
+                            codeSymbol[pos].stageCode[2] = 0;  /*last bit was coded*/
+                            codeSymbol[pos].bitLength[2] = size - 1;
+                        }
+                        else
+                        {
+                            codeSymbol[pos].stageCode[2] = 0;
+                            codeSymbol[pos].bitLength[2] = size;
+                        }
+                        if (wb->huffmanConfig[index].bit16Flag)
+                        {
+                            codeSymbol[pos].stageCode[2] = codeSymbol[x%(3*THROUGHPUT)].stageCode[2]* 256 + (coef16 & 0xff);
+                            codeSymbol[pos].bitLength[2] += 8;
+                        }
+                        OutputAt(x, &kernelBufferPtr, &bitOffset, codeSymbol);
+                        x++; /*counter*/
+                    }
+                }
+            }
+
+            if(dataRemainingOfCore == 0)
+            {
+                vx_uint32 dummyCount = (x & 0x1)? 5: 4;
+                /*Hit the end bitsteam of core, add dummy stage process the next*/
+                vxmASSERT(setDummy == vx_true_e);
+                addDummy(x, &kernelBufferPtr, &bitOffset, codeSymbol, dummyCount, dummyStage, dummyBitLength);
+                break;
+            }
+        }
+
+        /* Go back to update kernelStreamSize. */
+        kernelStreamSize = (vx_uint32)((vx_uint8 *)kernelBufferPtr - kernelStreamBasePtr);
+        writeBits(&kernelStreamSizePtr, &streamSizeBitOffset, kernelStreamSize*8 + bitOffset, 32);
+
+        /* pad 0 at the end of core*/
+        packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
+        kernelStreamSize = (vx_uint32)((vx_uint8 *)kernelBufferPtr - kernelStreamBasePtr);
+        /*With RTL bug fix, full cache mode size needn't using maxSize * coreCount*/
+        wb->slice_array[index].kernel_stream_full_cache_size += kernelStreamSize;
+
+        if (maxKernelStreamSizePerCore < kernelStreamSize)
+            maxKernelStreamSizePerCore = kernelStreamSize;
+
+        compressionRatio = (vx_float64)kernelStreamSize / (vx_float64)(dataSizeOfCore * weightSize);
+        if (wb->max_per_core_compression_ratio < compressionRatio)
+            wb->max_per_core_compression_ratio = compressionRatio;
+
+        prev = 0;
+    }
+    vxmASSERT(reorderStreamAllCount == reorderStreamCheckCount); /*Check if the data count is the same*/
+
+    /*Add non compressed biases & Z_OFFSET & perFilterPostMul & perFilterPostShift after huffman bit stream*/
+    kernelStreamBasePtr = (vx_uint8*)kernelBufferPtr;
+    for (filterIndex = 0; filterIndex < filterTotalCountDW; filterIndex++)
+    {
+
+        if (!hasNoBias)
+        {
+            vx_uint32 biasData = 0;
+            vx_int64 bias64 = 0;
+            vx_uint32 realFilterIndex;
+
+            if (context->options.enableNonZeroBalance &&
+                !hasNoZOffset &&
+                !wb->wb_base->hw_depth_wise &&
+                realVzIndex != VX_NULL)
+                realFilterIndex = realVzIndex[filterIndex];
+            else
+                realFilterIndex = filterIndex;
+
+            if (bias_base_ptr_dw)
+            {
+                if(bias_format == VX_TYPE_INT64)
+                    bias64 = *(((vx_int64 *)bias_base_ptr_dw) + filterIndex);
+                else
+                    biasData = *(bias_base_ptr_dw + realFilterIndex);
+            }
+            else
+                biasData = 0;
+
+            /* NewBias = sum((Coef[i] - CoefZP) * - InZP) + Bias*/
+            if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT)
+                && input_zp_dw != 0
+                && weight_format == VX_TYPE_UINT8)
+            {
+                biasData -= weightsMinusZPDW[realFilterIndex].sum;
+            }
+
+            if (weight_format == VX_TYPE_UINT8)
+                biasData += coefSumDW[realFilterIndex] * 128;
+
+            if (weight_format == VX_TYPE_INT16)
+            {
+                vx_int64 sum64 = 0;
+                vx_int32 bias32;
+                vx_int16 bias16;
+
+                if (bias_format != VX_TYPE_INT64)
+                {
+                    if ((vx_int32)biasData < 0)
+                    {
+                        bias64 = ~0;
+                        bias64 = (bias64 >> 32) << 32;
+                        bias64 = bias64 | (vx_int64)biasData;
+                    }
+                    else
+                        bias64 = (vx_int64)biasData;
+                }
+
+                if (coefSumDW[realFilterIndex] < 0)
+                {
+                    sum64 = ~0;
+                    sum64 = (sum64 >> 32) << 32;
+                    sum64 = sum64 | (vx_int64)coefSumDW[realFilterIndex];
+                }
+                else
+                    sum64 = (vx_int64)coefSumDW[realFilterIndex];
+
+                bias64 += sum64 * 128;
+                bias32 = (vx_int32)bias64;
+                writeBits(&kernelBufferPtr, &bitOffset, bias32, 32);
+                bias16 = (vx_int16)(bias64 >> 32);
+                writeBits(&kernelBufferPtr, &bitOffset, (vx_int32)bias16, 16);
+            }
+            else
+                writeBits(&kernelBufferPtr, &bitOffset, biasData, biasBitSize);
+        }
+
+        if (!hasNoZOffset)
+        {
+            vx_uint32 offsetValue;
+            vx_uint32 realFilterIndex;
+
+            if (context->options.enableNonZeroBalance &&
+                !wb->wb_base->hw_depth_wise &&
+                realVzIndex != VX_NULL)
+                realFilterIndex = realVzIndex[filterIndex];
+            else
+                realFilterIndex = filterIndex;
+
+            if (z_offset > 0)
+                offsetValue = (vx_uint32)z_offset * realFilterIndex;
+            else if (output_size > 0)
+                offsetValue = output_final_x * output_final_y * output_size * realFilterIndex;
+            else
+                offsetValue = output_final_x * output_final_y * weightSize * realFilterIndex;
+
+            writeBits(&kernelBufferPtr, &bitOffset, offsetValue, NN_Z_POSITION_OFFSET_BITS_VIP_V7);
+        }
+
+    }
+
+    for (filterIndex = 0; filterIndex < filterTotalCount1x1; filterIndex++)
+    {
+
+        if (!hasNoBias)
+        {
+            vx_uint32 biasData = 0;
+            vx_int64 bias64 = 0;
+            vx_uint32 realFilterIndex;
+
+            if (context->options.enableNonZeroBalance &&
+                !hasNoZOffset &&
+                !wb->wb_base->hw_depth_wise &&
+                realVzIndex != VX_NULL)
+                realFilterIndex = realVzIndex[filterIndex];
+            else
+                realFilterIndex = filterIndex;
+
+            if (bias_base_ptr_1x1)
+            {
+                if(bias_format == VX_TYPE_INT64)
+                    bias64 = *(((vx_int64 *)bias_base_ptr_1x1) + filterIndex);
+                else
+                    biasData = *(bias_base_ptr_1x1 + realFilterIndex);
+            }
+            else
+                biasData = 0;
+
+            /* NewBias = sum((Coef[i] - CoefZP) * - InZP) + Bias*/
+            if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT)
+                && input_zp_1x1 != 0
+                && weight_format == VX_TYPE_UINT8)
+            {
+                biasData -= weightsMinusZP1x1[realFilterIndex].sum;
+            }
+
+            if (weight_format == VX_TYPE_UINT8)
+                biasData += coefSum1x1[realFilterIndex] * 128;
+
+            if (weight_format == VX_TYPE_INT16)
+            {
+                vx_int64 sum64 = 0;
+                vx_int32 bias32;
+                vx_int16 bias16;
+
+                if (bias_format != VX_TYPE_INT64)
+                {
+                    if ((vx_int32)biasData < 0)
+                    {
+                        bias64 = ~0;
+                        bias64 = (bias64 >> 32) << 32;
+                        bias64 = bias64 | (vx_int64)biasData;
+                    }
+                    else
+                        bias64 = (vx_int64)biasData;
+                }
+
+                if (coefSum1x1[realFilterIndex] < 0)
+                {
+                    sum64 = ~0;
+                    sum64 = (sum64 >> 32) << 32;
+                    sum64 = sum64 | (vx_int64)coefSum1x1[realFilterIndex];
+                }
+                else
+                    sum64 = (vx_int64)coefSum1x1[realFilterIndex];
+
+                bias64 += sum64 * 128;
+                bias32 = (vx_int32)bias64;
+                writeBits(&kernelBufferPtr, &bitOffset, bias32, 32);
+                bias16 = (vx_int16)(bias64 >> 32);
+                writeBits(&kernelBufferPtr, &bitOffset, (vx_int32)bias16, 16);
+            }
+            else
+                writeBits(&kernelBufferPtr, &bitOffset, biasData, biasBitSize);
+        }
+
+        if (!hasNoZOffset)
+        {
+            vx_uint32 offsetValue;
+            vx_uint32 realFilterIndex;
+
+            if (context->options.enableNonZeroBalance &&
+                !wb->wb_base->hw_depth_wise &&
+                realVzIndex != VX_NULL)
+                realFilterIndex = realVzIndex[filterIndex];
+            else
+                realFilterIndex = filterIndex;
+
+            if (z_offset > 0)
+                offsetValue = (vx_uint32)z_offset * realFilterIndex;
+            else if (output_size > 0)
+                offsetValue = output_final_x * output_final_y * output_size * realFilterIndex;
+            else
+                offsetValue = output_final_x * output_final_y * weightSize * realFilterIndex;
+
+            writeBits(&kernelBufferPtr, &bitOffset, offsetValue, NN_Z_POSITION_OFFSET_BITS_VIP_V7);
+        }
+
+    }
+
+    /*Also align to 64 byte for post processing stream*/
+    packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
+    kernelStreamSize = (vx_uint32)((vx_uint8 *)kernelBufferPtr - kernelStreamBasePtr);
+    wb->slice_array[index].kernel_stream_full_cache_size += kernelStreamSize;
+
+    if (maxKernelStreamSizePerCore < kernelStreamSize)
+        maxKernelStreamSizePerCore = kernelStreamSize;
+    /*Per HW, post processing stream size is needed in SRAM, when partial mode, need be noted as one core*/
+    wb->slice_array[index].kernel_align_stream_size = (vx_size)(maxKernelStreamSizePerCore * ((usedCoreCount1x1 + 1) + 1));
+
+    if (!hasKernelFullCacheInterleaveFix)
+    {
+        /*if did't fix full cache interleave fix, full cache size also need use align size*/
+        wb->slice_array[index].kernel_stream_full_cache_size = wb->slice_array[index].kernel_align_stream_size;
+    }
+
+    wb->slice_array[index].kernel_max_stream_size_percore = maxKernelStreamSizePerCore;
+
+exit:
+    if (coefSumDW)
+        vxFree(coefSumDW);
+    if (weightsMinusZPDW)
+        vxFree(weightsMinusZPDW);
+    if (coefSum1x1)
+        vxFree(coefSum1x1);
+    if (weightsMinusZP1x1)
+        vxFree(weightsMinusZP1x1);
+    if (reorderStream)
+        vxFree(reorderStream);
+    if (reorderStreamPerCoreCount)
+        vxFree(reorderStreamPerCoreCount);
+    if (nonCoefIndex)
+        vxFree(nonCoefIndex);
+    if (realVzIndex)
+        vxFree(realVzIndex);
+    if (limitZRLIndex)
+        vxFree(limitZRLIndex);
+
+    return;
+}
+
+
 #define DUMP_TP_ENC 0
 
 void reorderTPKernelBufferHuffman(
