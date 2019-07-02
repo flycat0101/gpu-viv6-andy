@@ -1121,6 +1121,7 @@ gcoVX_FlushCache(
     IN gctBOOL      FlushPSSHL1Cache,
     IN gctBOOL      FlushNNL1Cache,
     IN gctBOOL      FlushTPL1Cache,
+    IN gctBOOL      FlushSHL1Cache,
     IN gctBOOL      Stall
     )
 {
@@ -1130,7 +1131,7 @@ gcoVX_FlushCache(
 
     gcmASSERT(gcoVX_VerifyHardware());
     /* Flush the shader cache. */
-    gcmONERROR(gcoHARDWAREVX_FlushCache(gcvNULL, InvalidateICache, FlushPSSHL1Cache, FlushNNL1Cache, FlushTPL1Cache));
+    gcmONERROR(gcoHARDWAREVX_FlushCache(gcvNULL, InvalidateICache, FlushPSSHL1Cache, FlushNNL1Cache, FlushTPL1Cache, FlushSHL1Cache));
 
     if (Stall)
     {

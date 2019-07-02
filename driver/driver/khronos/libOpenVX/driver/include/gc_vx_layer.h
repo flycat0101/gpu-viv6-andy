@@ -425,6 +425,7 @@ typedef struct _vx_engines_sync_s
     vx_uint32 eventId[32];
     vx_uint32 eventCnt;
     vx_uint32 waitId[32];
+    vx_uint32 waitTarget[32];
     vx_uint32 waitCnt;
 }
 vx_engines_sync_s, *vx_engines_sync;
@@ -484,13 +485,13 @@ typedef struct _vxnne_operation_s
     vx_uint32                       childLayerNum;
     vx_uint32                       segIndex;
 
-    vx_uint32                       opDepth;
-
     vx_uint32                       absoluteOperationID;
     vx_uint32                       gpuId;
     vx_bool                         mGpuSync;
     struct _vxnne_operation_s*      mGpuNext;
 
+    vx_uint32                       opDepth;
+    vx_uint32                       opSequence;
     vx_engines_sync_s               engineSync;
 }
 vxnne_operation_s, *vxnne_operation;

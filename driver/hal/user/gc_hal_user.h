@@ -3625,7 +3625,8 @@ gcoHARDWAREVX_FlushCache(
     IN gctBOOL              InvalidateICache,
     IN gctBOOL              FlushPSSHL1Cache,
     IN gctBOOL              FlushNNL1Cache,
-    IN gctBOOL              FlushTPL1Cache
+    IN gctBOOL              FlushTPL1Cache,
+    IN gctBOOL              FlushSHL1Cache
     );
 
 

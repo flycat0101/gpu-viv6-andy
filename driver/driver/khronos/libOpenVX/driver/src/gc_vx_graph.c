@@ -5073,16 +5073,23 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph
     vxnne_operation list[VX_MAX_NODE_COUNT] = {VX_NULL};
     vx_uint32 e, p = 0, i, j, k, count = 0, ecount = 0, wDepth = 0, head, tail = 0, start;
     vx_uint32 ecounts[MAX_PARALLEL_OUTPUT_NUMBER];
-    vxnne_operation operation;
-    vxnne_operation entrys[MAX_PARALLEL_OUTPUT_NUMBER];
+    vxnne_operation operation, entrys[MAX_PARALLEL_OUTPUT_NUMBER];
 
-    for (i = layer->base.num_operations - 1; (vx_int32)i >= 0; i--)
+    for (i = 0; i < layer->base.num_operations; i++)
     {
         operation = layer->operations[i];
 
         if (operation->childOpNum == 0)
         {
-            entrys[ecount++] = operation;
+            for (j = ecount-1; (vx_int32)j >= 0; j--)
+            {
+                if (operation->absoluteOperationID > entrys[j]->absoluteOperationID)
+                    break;
+                else
+                    entrys[j+1] = entrys[j];
+            }
+            entrys[j+1] = operation;
+            ecount++;
             operation->opDepth = 1;
             count++;
         }
@@ -5165,6 +5172,15 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph
                     }
                     else if (parent->opDepth > operation->opDepth + 1)
                     {
+                        vx_uint32 minChildDepth = 0xFFFF;
+                        for (j = 0; j < operation->parentOpNum; j++)
+                        {
+                            if (operation->parentOps[j]->opDepth < minChildDepth)
+                                minChildDepth = operation->parentOps[j]->opDepth;
+                        }
+                        if (minChildDepth == operation->opDepth + 1)
+                            continue;
+
                         for (j = 0; j <= tail; j++)
                         {
                             if (list[p+j] == operation)
@@ -5229,6 +5245,7 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph
         for (;;)
         {
             vx_uint32 cDepth = list[p+head]->opDepth;
+            vx_uint32 nextOpSeq = start == count - 1 ? count : layer->operations[start+1]->opSequence;
 
             for (i = head; i < ecounts[e]; i++)
             {
@@ -5248,7 +5265,7 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph
 
                 for (j = head; j < i; j++)
                 {
-                    vx_uint32 paDepth = 0xFFFF;
+                    vx_uint32 paDepth = 0xFFFF, chOpDelta = 0xFFFF;
                     operation = list[p+j];
 
                     for (k = 0; k < operation->parentOpNum; k++)
@@ -5256,18 +5273,28 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph
                         if (operation->parentOps[k]->opDepth < paDepth)
                             paDepth = operation->parentOps[k]->opDepth;
                     }
+                    for (k = 0; k < operation->childOpNum; k++)
+                    {
+                        vx_uint32 delta = abs((vx_int32)(operation->childOps[k]->opSequence - nextOpSeq));
+                        chOpDelta = gcmMIN(delta, chOpDelta);
+                    }
 
                     if (operation->target == VXNNE_OPERATION_TARGET_SH)
                     {
                         for (k = shCount - 1; (vx_int32)k >= 0; k--)
                         {
-                            vx_uint32 m, tpaDepth = 0xFFFF;
+                            vx_uint32 m, tpaDepth = 0xFFFF, tchOpDelta = 0xFFFF;
                             for (m = 0; m < tmpSHOps[k]->parentOpNum; m++)
                             {
                                 if (tmpSHOps[k]->parentOps[m]->opDepth < tpaDepth)
                                     tpaDepth = tmpSHOps[k]->parentOps[m]->opDepth;
                             }
-                            if (operation->parentOpNum != 0 && (!tmpSHOps[k]->parentOpNum || tpaDepth < paDepth))
+                            for (m = 0; m < tmpSHOps[k]->childOpNum; m++)
+                            {
+                                vx_uint32 delta = abs((vx_int32)(tmpSHOps[k]->childOps[m]->opSequence - nextOpSeq));
+                                tchOpDelta = gcmMIN(delta, tchOpDelta);
+                            }
+                            if ((operation->parentOpNum != 0 && (!tmpSHOps[k]->parentOpNum || tpaDepth < paDepth)) || chOpDelta > tchOpDelta)
                             {
                                 tmpSHOps[k+1] = tmpSHOps[k];
                             }
@@ -5284,13 +5311,18 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph
                     {
                         for (k = swCount - 1; (vx_int32)k >= 0; k--)
                         {
-                            vx_uint32 m, tpaDepth = 0xFFFF;
-                            for (m = 0; m < tmpSHOps[k]->parentOpNum; m++)
+                            vx_uint32 m, tpaDepth = 0xFFFF, tchOpDelta = 0xFFFF;
+                            for (m = 0; m < tmpSWOps[k]->parentOpNum; m++)
                             {
-                                if (tmpSHOps[k]->parentOps[m]->opDepth < tpaDepth)
-                                    tpaDepth = tmpSHOps[k]->parentOps[m]->opDepth;
+                                if (tmpSWOps[k]->parentOps[m]->opDepth < tpaDepth)
+                                    tpaDepth = tmpSWOps[k]->parentOps[m]->opDepth;
                             }
-                            if (operation->parentOpNum != 0 && (!tmpSHOps[k]->parentOpNum || tpaDepth < paDepth))
+                            for (m = 0; m < tmpSWOps[k]->childOpNum; m++)
+                            {
+                                vx_uint32 delta = abs((vx_int32)(tmpSWOps[k]->childOps[m]->opSequence - nextOpSeq));
+                                tchOpDelta = gcmMIN(delta, tchOpDelta);
+                            }
+                            if ((operation->parentOpNum != 0 && (!tmpSWOps[k]->parentOpNum || tpaDepth < paDepth)) || chOpDelta > tchOpDelta)
                             {
                                 tmpSWOps[k+1] = tmpSWOps[k];
                             }
@@ -5309,13 +5341,18 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph
                         {
                             for (k = l - 1; (vx_int32)k >= 0; k--)
                             {
-                                vx_uint32 m, tpaDepth = 0xFFFF;
+                                vx_uint32 m, tpaDepth = 0xFFFF, tchOpDelta = 0xFFFF;
                                 for (m = 0; m < tmpNNTPOps[k]->parentOpNum; m++)
                                 {
                                     if (tmpNNTPOps[k]->parentOps[m]->opDepth < tpaDepth)
                                         tpaDepth = tmpNNTPOps[k]->parentOps[m]->opDepth;
                                 }
-                                if (operation->parentOpNum != 0 && (!tmpNNTPOps[k]->parentOpNum || tpaDepth < paDepth))
+                                for (m = 0; m < tmpNNTPOps[k]->childOpNum; m++)
+                                {
+                                    vx_uint32 delta = abs((vx_int32)(tmpNNTPOps[k]->childOps[m]->opSequence - nextOpSeq));
+                                    tchOpDelta = gcmMIN(delta, tchOpDelta);
+                                }
+                                if ((operation->parentOpNum != 0 && (!tmpNNTPOps[k]->parentOpNum || tpaDepth < paDepth)) || chOpDelta > tchOpDelta)
                                 {
                                     tmpNNTPOps[k+1] = tmpNNTPOps[k];
                                 }
@@ -5331,13 +5368,18 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph
                         {
                             for (k = r; k < MAX_OP_NUMBER_ONE_LAYER; k++)
                             {
-                                vx_uint32 m, tpaDepth = 0xFFFF;
+                                vx_uint32 m, tpaDepth = 0xFFFF, tchOpDelta = 0xFFFF;
                                 for (m = 0; m < tmpNNTPOps[k]->parentOpNum; m++)
                                 {
                                     if (tmpNNTPOps[k]->parentOps[m]->opDepth < tpaDepth)
                                         tpaDepth = tmpNNTPOps[k]->parentOps[m]->opDepth;
                                 }
-                                if (operation->parentOpNum != 0 && (!tmpNNTPOps[k]->parentOpNum || tpaDepth < paDepth))
+                                for (m = 0; m < tmpNNTPOps[k]->childOpNum; m++)
+                                {
+                                    vx_uint32 delta = abs((vx_int32)(tmpNNTPOps[k]->childOps[m]->opSequence - nextOpSeq));
+                                    tchOpDelta = gcmMIN(delta, tchOpDelta);
+                                }
+                                if ((operation->parentOpNum != 0 && (!tmpNNTPOps[k]->parentOpNum || tpaDepth < paDepth)) || chOpDelta > tchOpDelta)
                                 {
                                     tmpNNTPOps[k-1] = tmpNNTPOps[k];
                                 }
@@ -5359,6 +5401,7 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph
                 {
                     if (p == 0)
                     {
+                        tmpSWOps[j]->opSequence = start;
                         layer->operations[start--] = tmpSWOps[j];
                     }
                     else
@@ -5371,9 +5414,11 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph
                             }
                             else
                             {
+                                layer->operations[k]->opSequence = layer->operations[k+1]->opSequence;
                                 layer->operations[k] = layer->operations[k+1];
                             }
                         }
+                        tmpSWOps[j]->opSequence = k;
                         layer->operations[k] = tmpSWOps[j];
                         start--;
                     }
@@ -5384,6 +5429,7 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph
                 {
                     if (p == 0)
                     {
+                        tmpSHOps[j]->opSequence = start;
                         layer->operations[start--] = tmpSHOps[j];
                     }
                     else
@@ -5396,9 +5442,11 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph
                             }
                             else
                             {
+                                layer->operations[k]->opSequence = layer->operations[k+1]->opSequence;
                                 layer->operations[k] = layer->operations[k+1];
                             }
                         }
+                        tmpSHOps[j]->opSequence = k;
                         layer->operations[k] = tmpSHOps[j];
                         start--;
                     }
@@ -5406,16 +5454,35 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph
 
                 /* put NN/TP op with reverse sequence */
                 l--;
-                for (; nntpCount > 0;)
+                if (p == 0)
                 {
-                    if ((vx_int32)l >= 0)
+                    start -= nntpCount - 1;
+
+                    j = 0;
+                    k = MAX_OP_NUMBER_ONE_LAYER - 1;
+                    for (; ((vx_int32)l >= 0 && j <= l) || k >= r; )
                     {
-                        if (p == 0)
+                        /* TP */
+                        if (k >= r)
                         {
-                            layer->operations[start--] = tmpNNTPOps[l--];
-                            nntpCount--;
+                            tmpNNTPOps[k]->opSequence = start;
+                            layer->operations[start++] = tmpNNTPOps[k--];
                         }
-                        else
+                        /* NN */
+                        if ((vx_int32)l >= 0 && j <= l)
+                        {
+                            tmpNNTPOps[j]->opSequence = start;
+                            layer->operations[start++] = tmpNNTPOps[j++];
+                        }
+                    }
+
+                    start -= nntpCount + 1;
+                }
+                else
+                {
+                    for (; nntpCount > 0;)
+                    {
+                        if ((vx_int32)l >= 0)
                         {
                             for (k = start; k < count - 1; k++)
                             {
@@ -5428,21 +5495,16 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph
                                 }
                                 else
                                 {
+                                    layer->operations[k]->opSequence = layer->operations[k+1]->opSequence;
                                     layer->operations[k] = layer->operations[k+1];
                                 }
                             }
+                            tmpNNTPOps[l]->opSequence = k;
                             layer->operations[k] = tmpNNTPOps[l];
                             start--;
-                        }
-                    }
-                    if (r < MAX_OP_NUMBER_ONE_LAYER)
-                    {
-                        if (p == 0)
-                        {
-                            layer->operations[start--] = tmpNNTPOps[r++];
                             nntpCount--;
                         }
-                        else
+                        if (r < MAX_OP_NUMBER_ONE_LAYER)
                         {
                             for (k = start; k < count - 1; k++)
                             {
@@ -5455,11 +5517,14 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph
                                 }
                                 else
                                 {
+                                    layer->operations[k]->opSequence = layer->operations[k+1]->opSequence;
                                     layer->operations[k] = layer->operations[k+1];
                                 }
                             }
+                            tmpNNTPOps[r]->opSequence = k;
                             layer->operations[k] = tmpNNTPOps[r];
                             start--;
+                            nntpCount--;
                         }
                     }
                 }
@@ -5468,6 +5533,7 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph
             {
                 if (p == 0)
                 {
+                    list[p+head]->opSequence = start;
                     layer->operations[start--] = list[p+head];
                 }
                 else
@@ -5483,9 +5549,11 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph
                         }
                         else
                         {
+                            layer->operations[j]->opSequence = layer->operations[j+1]->opSequence;
                             layer->operations[j] = layer->operations[j+1];
                         }
                     }
+                    list[p+head]->opSequence = j;
                     layer->operations[j] = list[p+head];
                     start--;
                 }
@@ -5503,12 +5571,47 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph
     return VX_SUCCESS;
 }
 
+#define APPEND_NEW_OP_EVENT(oldOP, newOP) \
+do \
+{ \
+    vx_uint32 jj; \
+    vx_uint32 eventIDT = newOP->engineSync.eventId[newOP->engineSync.eventCnt-1]; \
+    if (newOP->target == VXNNE_OPERATION_TARGET_SH || newOP->target == VXNNE_OPERATION_TARGET_SW) break; \
+    for (jj = oldOP->engineSync.waitCnt - 1; (vx_int32)jj >= 0; jj--) \
+    { \
+        if ((eventIDT < oldOP->engineSync.waitId[jj] && abs((vx_int32)(eventIDT - oldOP->engineSync.waitId[jj])) < 20) || \
+            (eventIDT > oldOP->engineSync.waitId[jj] && abs((vx_int32)(eventIDT - oldOP->engineSync.waitId[jj])) > 20)) \
+        { \
+            oldOP->engineSync.waitId[jj+1] = oldOP->engineSync.waitId[jj]; \
+            oldOP->engineSync.waitTarget[jj+1] = oldOP->engineSync.waitTarget[jj]; \
+        } \
+        else \
+            break; \
+    } \
+    if ((vx_int32)jj < 0 || oldOP->engineSync.waitId[jj] != eventIDT) \
+    { \
+        oldOP->engineSync.waitId[jj+1] = eventIDT; \
+        oldOP->engineSync.waitTarget[jj+1] = newOP->target; \
+        oldOP->engineSync.waitCnt++; \
+    } \
+    else \
+    { \
+        for (jj++; jj < oldOP->engineSync.waitCnt; jj++) \
+        { \
+            oldOP->engineSync.waitId[jj] = oldOP->engineSync.waitId[jj+1]; \
+            oldOP->engineSync.waitTarget[jj] = oldOP->engineSync.waitTarget[jj+1]; \
+        } \
+    } \
+} while(0)
+
 VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsAfter(vx_graph graph)
 {
-    vx_uint32 i = 0, j = 0, start = 0;
+    vx_uint32 i = 0, j = 0, k, start = 0;
     vxnne_execution_layer layer = graph->layer;
     vx_uint32 eventId = 1;
-    vxnne_operation prevNNOp = VX_NULL, prevTPOp[2] = {VX_NULL};
+    vx_uint32 flushOpFlag[VX_MAX_NODE_COUNT] = {0}, flushNNPos = 0xFFFF, flushTPPos = 0xFFFF;
+    vxnne_operation prevNNOp = VX_NULL, flushedNNOp = VX_NULL, flushedTPOp = VX_NULL;
+    vx_bool nnTPFlushed = vx_false_e, tpTPFlushed = vx_false_e, tpNNFlushed = vx_false_e;
 
     vxmASSERT(layer->base.num_operations == layer->opIndicesNum);
 
@@ -5525,14 +5628,46 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsAfter(vx_graph graph)
                 operation->engineSync.eventId[j] = 31;
             }
             operation->engineSync.eventId[operation->engineSync.eventCnt - 1] = eventId;
+
             eventId = eventId >= 30 ? 1 : eventId + 1;
+        }
+    }
+
+    for (i = layer->opIndicesNum - 1; (vx_int32)i >= 0; i--)
+    {
+        vxnne_operation operation = layer->operations[layer->opIndices[i].operationID];
+
+        if (operation->target == VXNNE_OPERATION_TARGET_NN)
+        {
+            for (j = 0; j < operation->parentOpNum; j++)
+            {
+                vxnne_operation operationPA = operation->parentOps[j];
+                flushOpFlag[operationPA->absoluteOperationID] = i+1;
+            }
+        }
+        else if (flushOpFlag[operation->absoluteOperationID] && operation->target != VXNNE_OPERATION_TARGET_TP && operation->target != VXNNE_OPERATION_TARGET_NN)
+        {
+            for (j = 0; j < operation->parentOpNum; j++)
+            {
+                vxnne_operation operationPA = operation->parentOps[j];
+                flushOpFlag[operationPA->absoluteOperationID] = flushOpFlag[operation->absoluteOperationID];
+            }
+        }
+
+        if (operation->target == VXNNE_OPERATION_TARGET_NN)
+        {
+            vxnneModifyNNLastNoflushBit(graph->base.context, &layer->opIndices[i].commandBuffer, i != layer->opIndicesNum - 1 ? 1 : 0);
+        }
+        else if (operation->target == VXNNE_OPERATION_TARGET_TP)
+        {
+            vxnneModifyTPLastNoflushBit(graph->base.context, &layer->opIndices[i].commandBuffer, i != layer->opIndicesNum - 1 ? 1 : 0);
         }
     }
 
     for (;;)
     {
-        vx_bool hasSH = vx_false_e, hasNNChild = vx_false_e;
         vx_uint32 cDepth = layer->operations[layer->opIndices[start].operationID]->opDepth;
+        vx_bool hasSH = vx_false_e;
 
         for (i = start; i < layer->opIndicesNum; i++)
         {
@@ -5541,92 +5676,70 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsAfter(vx_graph graph)
             if (operation->opDepth != cDepth)
                 break;
 
-            if (operation->target == VXNNE_OPERATION_TARGET_NN || operation->target == VXNNE_OPERATION_TARGET_TP)
+            if (operation->target != VXNNE_OPERATION_TARGET_SH)
             {
-                vx_bool sameNNPa = vx_false_e;
-                vx_bool sameTPPa = vx_false_e;
+                vx_uint32 lastParentNN = 0, lastParentTP = 0;
 
                 for (j = 0; j < operation->parentOpNum; j++)
                 {
                     vxnne_operation operationPa = operation->parentOps[j];
-                    if (operationPa->target != VXNNE_OPERATION_TARGET_SH && operationPa->target != VXNNE_OPERATION_TARGET_SW)
+                    if (operationPa->engineSync.eventCnt > 0)
                     {
-                        operation->engineSync.waitId[operation->engineSync.waitCnt++] = operationPa->engineSync.eventId[operationPa->engineSync.eventCnt-1];
-                    }
-                    if (prevNNOp != VX_NULL && prevNNOp == operationPa)
-                    {
-                        sameNNPa = vx_true_e;
-                    }
-                    if ((prevTPOp[0] != VX_NULL && prevTPOp[0] == operationPa) ||
-                        (prevTPOp[1] != VX_NULL && prevTPOp[1] == operationPa))
-                    {
-                        sameTPPa = vx_true_e;
+                        vx_uint32 parentID = operationPa->engineSync.eventId[operationPa->engineSync.eventCnt-1];
+                        APPEND_NEW_OP_EVENT(operation, operationPa);
+                        if (operationPa->target == VXNNE_OPERATION_TARGET_NN && parentID > lastParentNN)
+                            lastParentNN = parentID;
+                        else if (operationPa->target == VXNNE_OPERATION_TARGET_TP && parentID > lastParentTP)
+                            lastParentTP = parentID;
                     }
                 }
 
                 if (operation->target == VXNNE_OPERATION_TARGET_NN)
                 {
                     /* NN op must wait for previous NN op */
-                    if (prevNNOp != VX_NULL && !sameNNPa)
+                    if (prevNNOp != VX_NULL && prevNNOp->engineSync.eventId[prevNNOp->engineSync.eventCnt-1] > lastParentNN)
                     {
-                        operation->engineSync.waitId[operation->engineSync.waitCnt++] = prevNNOp->engineSync.eventId[prevNNOp->engineSync.eventCnt-1];
+                        APPEND_NEW_OP_EVENT(operation, prevNNOp);
                     }
                     prevNNOp = operation;
 
-                    /* NN op must wait for last flush TP op */
-                    if (prevTPOp[0] != VX_NULL)
+                    /* NN op must wait for previous layer flushed TP op */
+                    if (!nnTPFlushed && flushedTPOp != VX_NULL)
                     {
-                        if (!sameTPPa)
-                        {
-                            operation->engineSync.waitId[operation->engineSync.waitCnt++] = prevTPOp[0]->engineSync.eventId[prevTPOp[0]->engineSync.eventCnt-1];
-                        }
-                        prevTPOp[0] = VX_NULL;
+                        if (flushedTPOp->engineSync.eventId[flushedTPOp->engineSync.eventCnt-1] > lastParentTP)
+                            APPEND_NEW_OP_EVENT(operation, flushedTPOp);
+                        nnTPFlushed = vx_true_e;
                     }
 
-                    if (i == layer->opIndicesNum - 1)
+                    if (flushOpFlag[operation->absoluteOperationID])
                     {
-                        /* flush last NN op */
-                        vxnneModifyNNLastNoflushBit(graph->base.context, &layer->opIndices[i].commandBuffer, 0);
-                    }
-                    else
-                    {
-                        vxnneModifyNNLastNoflushBit(graph->base.context, &layer->opIndices[i].commandBuffer, 1);
+                        flushNNPos = i;
                     }
                 }
-                else
+                else if (operation->target == VXNNE_OPERATION_TARGET_TP)
                 {
-                    /* TP op must wait for last flush TP op in previous layer */
-                    if (prevTPOp[1] != VX_NULL)
+                    /* TP op must wait for previous layer flushed NN op */
+                    if (!tpNNFlushed && flushedNNOp != VX_NULL)
                     {
-                        if (!sameTPPa)
-                        {
-                            operation->engineSync.waitId[operation->engineSync.waitCnt++] = prevTPOp[1]->engineSync.eventId[prevTPOp[1]->engineSync.eventCnt-1];
-                        }
-                        prevTPOp[1] = VX_NULL;
+                        if (flushedNNOp->engineSync.eventId[flushedNNOp->engineSync.eventCnt-1] > lastParentTP)
+                            APPEND_NEW_OP_EVENT(operation, flushedNNOp);
+                        tpNNFlushed = vx_true_e;
+                    }
+                    /* TP op must wait for previous layer flushed TP op */
+                    if (!tpTPFlushed && flushedTPOp != VX_NULL)
+                    {
+                        if (flushedTPOp->engineSync.eventId[flushedTPOp->engineSync.eventCnt-1] > lastParentTP)
+                            APPEND_NEW_OP_EVENT(operation, flushedTPOp);
+                        tpTPFlushed = vx_true_e;
                     }
 
-                    if (i == layer->opIndicesNum - 1)
+                    if (flushOpFlag[operation->absoluteOperationID])
                     {
-                        /* flush last TP op */
-                        vxnneModifyTPLastNoflushBit(graph->base.context, &layer->opIndices[i].commandBuffer, 0);
-                    }
-                    else
-                    {
-                        vxnneModifyTPLastNoflushBit(graph->base.context, &layer->opIndices[i].commandBuffer, 1);
-                    }
-
-                    for (j = 0; j < operation->childOpNum; j++)
-                    {
-                        vxnne_operation operationCh = operation->childOps[j];
-                        if (operationCh->target == VXNNE_OPERATION_TARGET_NN)
-                        {
-                            hasNNChild = vx_true_e;
-                            break;
-                        }
+                        flushTPPos = i;
                     }
                 }
             }
-            else if (operation->target == VXNNE_OPERATION_TARGET_SH)
+            else /* SH operation */
             {
                 if (hasSH || i == 0)
                 {
@@ -5634,9 +5747,7 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsAfter(vx_graph graph)
                 }
                 else
                 {
-                    vx_uint32 k, lastNNPos = 0;
                     vx_uint32 pDepth = layer->operations[layer->opIndices[start-1].operationID]->opDepth;
-                    vxnne_operation prevOp, lastNNOp = VX_NULL;
 
                     for (j = start - 1; (vx_int32)j >= 0; j--)
                     {
@@ -5649,64 +5760,25 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsAfter(vx_graph graph)
                     /* wait for all operations in previous layer if previous layer has no SH ops */
                     for (k = j + 1; k < start; k++)
                     {
-                        prevOp = layer->operations[layer->opIndices[k].operationID];
+                        vxnne_operation prevOp = layer->operations[layer->opIndices[k].operationID];
                         if (prevOp->target != VXNNE_OPERATION_TARGET_SW)
                         {
-                            if (prevOp->target == VXNNE_OPERATION_TARGET_NN)
-                            {
-                                lastNNPos = operation->engineSync.waitCnt;
-                                lastNNOp = prevOp;
-                            }
-                            else
-                            {
-                                operation->engineSync.waitId[operation->engineSync.waitCnt++] = prevOp->engineSync.eventId[prevOp->engineSync.eventCnt-1];
-                            }
+                            APPEND_NEW_OP_EVENT(operation, prevOp);
                         }
                     }
 
-                    /* wait for all previous non-sh operations in same layer */
+                    /* wait for all previous non-sh ops in same layer */
                     for (j = start; j < i; j++)
                     {
-                        prevOp = layer->operations[layer->opIndices[j].operationID];
+                        vxnne_operation prevOp = layer->operations[layer->opIndices[j].operationID];
                         if (prevOp->target != VXNNE_OPERATION_TARGET_SW)
                         {
-                            if (prevOp->target == VXNNE_OPERATION_TARGET_NN)
-                            {
-                                lastNNPos = operation->engineSync.waitCnt;
-                                lastNNOp = prevOp;
-                            }
-                            else
-                            {
-                                operation->engineSync.waitId[operation->engineSync.waitCnt++] = prevOp->engineSync.eventId[prevOp->engineSync.eventCnt-1];
-                            }
+                            APPEND_NEW_OP_EVENT(operation, prevOp);
                         }
                     }
 
-                    if (lastNNOp != VX_NULL)
-                    {
-                        for (j = operation->engineSync.waitCnt; j > lastNNPos; j--)
-                        {
-                            operation->engineSync.waitId[j] = operation->engineSync.waitId[j-1];
-                        }
-                        operation->engineSync.waitId[j] = lastNNOp->engineSync.eventId[lastNNOp->engineSync.eventCnt-1];
-                        operation->engineSync.waitCnt++;
-                    }
-
+                    nnTPFlushed = tpTPFlushed = tpNNFlushed = vx_true_e;
                     hasSH = vx_true_e;
-                }
-
-                prevNNOp = VX_NULL;
-                prevTPOp[0] = prevTPOp[1] = VX_NULL;
-            }
-            else /* TARGET_SW */
-            {
-                for (j = 0; j < operation->parentOpNum; j++)
-                {
-                    vxnne_operation operationPa = operation->parentOps[j];
-                    if (operationPa->target != VXNNE_OPERATION_TARGET_SH && operationPa->target != VXNNE_OPERATION_TARGET_SW)
-                    {
-                        operation->engineSync.waitId[operation->engineSync.waitCnt++] = operationPa->engineSync.eventId[operationPa->engineSync.eventCnt-1];
-                    }
                 }
             }
         }
@@ -5714,25 +5786,154 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsAfter(vx_graph graph)
         if (i >= layer->opIndicesNum)
             break;
 
-        prevTPOp[0] = prevTPOp[1] = VX_NULL;
-        if (hasNNChild)
+        if (flushTPPos != 0xFFFF)
         {
-            for (j = i - 1; (vx_int32)j >= 0; j--)
+            vx_bool needFlush = vx_true_e;
+            vx_uint32 lastWaitNN = 0;
+            vxnne_operation operation = layer->operations[layer->opIndices[flushTPPos].operationID];
+            vxnne_operation prevOp = VX_NULL;
+
+            if (flushOpFlag[operation->absoluteOperationID] != 0xFFFF)
             {
-                vxnne_operation op = layer->operations[layer->opIndices[j].operationID];
-
-                if (op->opDepth != cDepth)
-                    break;
-
-                if (op->target == VXNNE_OPERATION_TARGET_TP)
+                /* check if this TP op can no-flush if next layer last TP flush op is before NN op */
+                vx_uint32 nDepth = layer->operations[layer->opIndices[i].operationID]->opDepth;
+                vxnne_operation firstNNOp = layer->operations[layer->opIndices[flushOpFlag[operation->absoluteOperationID]-1].operationID];
+                vxnne_operation lastTPOp = VX_NULL;
+                for (j = i; j < layer->opIndicesNum; j++)
                 {
-                    /* flush last TP op in this layer for its child NN op */
-                    vxnneModifyTPLastNoflushBit(graph->base.context, &layer->opIndices[j].commandBuffer, 0);
-                    prevTPOp[0] = prevTPOp[1] = op;
-                    break;
+                    vxnne_operation op = layer->operations[layer->opIndices[j].operationID];
+                    if (op->opDepth != nDepth)
+                        break;
+                    if (op->target == VXNNE_OPERATION_TARGET_TP && flushOpFlag[op->absoluteOperationID])
+                    {
+                        lastTPOp = op;
+                    }
+                    else if (op->target == VXNNE_OPERATION_TARGET_NN &&
+                             op->engineSync.eventId[op->engineSync.eventCnt-1] >= firstNNOp->engineSync.eventId[firstNNOp->engineSync.eventCnt-1])
+                    {
+                        break;
+                    }
+                }
+                if (lastTPOp != VX_NULL &&
+                    lastTPOp->engineSync.eventId[lastTPOp->engineSync.eventCnt-1] < firstNNOp->engineSync.eventId[firstNNOp->engineSync.eventCnt-1])
+                {
+                    /* must flush next time */
+                    flushOpFlag[lastTPOp->absoluteOperationID] = 0xFFFF;
+                    needFlush = vx_false_e;
                 }
             }
+
+            if (needFlush)
+            {
+                /* this flushed TP op must wait for previous NN op */
+                for (j = flushTPPos - 1; (vx_int32)j >= 0; j--)
+                {
+                    prevOp = layer->operations[layer->opIndices[j].operationID];
+                    if (prevOp->target == VXNNE_OPERATION_TARGET_NN)
+                    {
+                        break;
+                    }
+                    else if (prevOp->target == VXNNE_OPERATION_TARGET_TP)
+                    {
+                        for (k = 0; k < prevOp->engineSync.waitCnt; k++)
+                        {
+                            if (prevOp->engineSync.waitTarget[k] == VXNNE_OPERATION_TARGET_NN && prevOp->engineSync.waitId[k] > lastWaitNN)
+                                lastWaitNN = prevOp->engineSync.waitId[k];
+                        }
+                    }
+                    else if (prevOp->target == VXNNE_OPERATION_TARGET_SH)
+                        break;
+                }
+                if (prevOp != VX_NULL && prevOp->target == VXNNE_OPERATION_TARGET_NN &&
+                    prevOp->engineSync.eventId[prevOp->engineSync.eventCnt-1] > lastWaitNN)
+                {
+                    APPEND_NEW_OP_EVENT(operation, prevOp);
+                }
+
+                /* first NN op in same layer must wait for this flush TP op */
+                for (j = flushTPPos + 1; j < layer->opIndicesNum; j++)
+                {
+                    vxnne_operation nextOp = layer->operations[layer->opIndices[j].operationID];
+                    if (nextOp->opDepth != cDepth)
+                        break;
+                    if (nextOp->target == VXNNE_OPERATION_TARGET_NN)
+                    {
+                        APPEND_NEW_OP_EVENT(nextOp, operation);
+                        break;
+                    }
+                    else if (nextOp->target == VXNNE_OPERATION_TARGET_SH)
+                        break;
+                }
+
+                vxnneModifyTPLastNoflushBit(graph->base.context, &layer->opIndices[flushTPPos].commandBuffer, 0);
+                vxInfo("TP flush %2d\n", operation->absoluteOperationID);
+                nnTPFlushed = tpTPFlushed = vx_false_e;
+                flushedTPOp = operation;
+            }
+            else
+            {
+                flushedTPOp = VX_NULL;
+            }
+            flushTPPos = 0xFFFF;
         }
+
+        if (flushNNPos != 0xFFFF)
+        {
+            vx_uint32 lastWaitNN = 0;
+            vxnne_operation operation = layer->operations[layer->opIndices[flushNNPos].operationID];
+            vxnne_operation prevOp = VX_NULL;
+
+            /* this flushed NN op must wait for previous TP op */
+            for (j = flushNNPos - 1; (vx_int32)j >= 0; j--)
+            {
+                prevOp = layer->operations[layer->opIndices[j].operationID];
+                if (prevOp->target == VXNNE_OPERATION_TARGET_TP)
+                {
+                    break;
+                }
+                else if (prevOp->target == VXNNE_OPERATION_TARGET_NN)
+                {
+                    for (k = 0; k < prevOp->engineSync.waitCnt; k++)
+                    {
+                        if (prevOp->engineSync.waitTarget[k] == VXNNE_OPERATION_TARGET_NN && prevOp->engineSync.waitId[k] > lastWaitNN)
+                            lastWaitNN = prevOp->engineSync.waitId[k];
+                    }
+                }
+                else if (prevOp->target == VXNNE_OPERATION_TARGET_SH)
+                    break;
+            }
+            if (prevOp != VX_NULL && prevOp->target == VXNNE_OPERATION_TARGET_TP &&
+                prevOp->engineSync.eventId[prevOp->engineSync.eventCnt-1] > lastWaitNN)
+            {
+                APPEND_NEW_OP_EVENT(operation, prevOp);
+            }
+
+            /* first TP op in same layer must wait for this flush NN op */
+            for (j = flushNNPos + 1; j < layer->opIndicesNum; j++)
+            {
+                vxnne_operation nextOp = layer->operations[layer->opIndices[j].operationID];
+                if (nextOp->opDepth != cDepth)
+                    break;
+                if (nextOp->target == VXNNE_OPERATION_TARGET_TP)
+                {
+                    APPEND_NEW_OP_EVENT(nextOp, operation);
+                    break;
+                }
+                else if (nextOp->target == VXNNE_OPERATION_TARGET_SH)
+                    break;
+            }
+
+            vxnneModifyNNLastNoflushBit(graph->base.context, &layer->opIndices[flushNNPos].commandBuffer, 0);
+            vxInfo("NN flush %2d\n", operation->absoluteOperationID);
+            tpNNFlushed = vx_false_e;
+            flushedNNOp = operation;
+        }
+        else
+        {
+            flushedNNOp = VX_NULL;
+        }
+
+        flushNNPos = 0xFFFF;
 
         start = i;
     }
@@ -9040,7 +9241,7 @@ VX_PRIVATE_API vx_status vxoGraph_ProcessOptimized(vx_graph graph)
 
 #if gcdVX_OPTIMIZER > 2
     /* Flush ICache and PSSHL1 cache without stall. */
-    gcoVX_FlushCache(vx_true_e, vx_true_e, vx_false_e, vx_false_e, vx_false_e);
+    gcoVX_FlushCache(vx_true_e, vx_true_e, vx_false_e, vx_false_e, vx_false_e, vx_false_e);
 #endif
     vxoPerf_Begin(&graph->perf);
 
@@ -9060,7 +9261,7 @@ VX_PRIVATE_API vx_status vxoGraph_ProcessOptimized(vx_graph graph)
         {
 #if gcdVX_OPTIMIZER > 2
             /* Flush PSSHL1 cache with stall for cpu to work on the data. */
-            gcoVX_FlushCache(vx_false_e, vx_true_e, vx_true_e, vx_false_e, vx_false_e);
+            gcoVX_FlushCache(vx_false_e, vx_true_e, vx_true_e, vx_false_e, vx_false_e, vx_false_e);
 #endif
             node = graph->optimizedNodeTable[batch->startIndex];
             target = &graph->base.context->targetTable[node->targetIndex];
@@ -9190,7 +9391,7 @@ VX_PRIVATE_API vx_status vxoGraph_ProcessOptimized(vx_graph graph)
             {
 #if gcdVX_OPTIMIZER > 2
                 /* Flush PSSHL1 cache with stall for callback. */
-                gcoVX_FlushCache(vx_false_e, vx_true_e, vx_true_e, vx_false_e, vx_false_e);
+                gcoVX_FlushCache(vx_false_e, vx_true_e, vx_true_e, vx_false_e, vx_false_e, vx_false_e);
 #endif
                 action = node->completeCallback(node);
             }
@@ -9213,7 +9414,7 @@ VX_PRIVATE_API vx_status vxoGraph_ProcessOptimized(vx_graph graph)
     {
 #if gcdVX_OPTIMIZER > 2
         /* Flush PSSHL1 cache without stall. */
-        gcoVX_FlushCache(vx_false_e, vx_true_e, vx_false_e, vx_false_e, vx_false_e);
+        gcoVX_FlushCache(vx_false_e, vx_true_e, vx_false_e, vx_false_e, vx_false_e, vx_false_e);
 #endif
         gcfVX_Flush(gcvTRUE);
         graph->dirty = vx_false_e;

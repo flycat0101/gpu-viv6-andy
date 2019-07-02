@@ -250,6 +250,7 @@ gcoVX_FlushCache(
     IN gctBOOL      FlushPSSHL1Cache,
     IN gctBOOL      FlushNNL1Cache,
     IN gctBOOL      FlushTPL1Cache,
+    IN gctBOOL      FlushSHL1Cache,
     IN gctBOOL      Stall
     );
 

@@ -41123,7 +41123,8 @@ gcoHARDWAREVX_FlushCache(
     IN gctBOOL              InvalidateICache,
     IN gctBOOL              FlushPSSHL1Cache,
     IN gctBOOL              FlushNNL1Cache,
-    IN gctBOOL              FlushTPL1Cache
+    IN gctBOOL              FlushTPL1Cache,
+    IN gctBOOL              FlushSHL1Cache
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -41229,6 +41230,25 @@ gcoHARDWAREVX_FlushCache(
             gcmONERROR(gcoHARDWARE_McfeSubmitJob(Hardware, gcvNULL));
         }
     }
+
+    if (FlushSHL1Cache)
+    {
+        gcmONERROR(gcoHARDWARE_LoadCtrlState(
+            Hardware,
+            0x0380C,
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1))))))) << (0 ?
+ 5:5))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ? 5:5)))
+            ));
+    }
+
 
 OnError:
     /* Return the status */

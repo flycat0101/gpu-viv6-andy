@@ -3215,7 +3215,8 @@ if (smallBatch){    Config->vsConstBase  = 0xD000;
             Hardware->options.enableSwtilingPhase1 = atoi(envctrl);
         }
 
-        if (Config->chipModel == gcv8000 && Config->chipRevision == 0x7120 && Config->customerID == 0x80)
+        if (Config->chipModel == 0x8000 && Config->chipRevision == 0x7120 &&
+            (Config->customerID == 0x80 || Config->customerID == 0x92))
         {
             Config->parallelNoFix = 1;
         }
