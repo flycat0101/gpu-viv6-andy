@@ -2794,7 +2794,9 @@ gcfVX_CreateShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], gctBOOL
     gceSTATUS       status;
     gcsPROGRAM_STATE programState = {0};
     gctSIZE_T       strLen = 0;
+#if (!VSC_LITE_BUILD)
     gctUINT32       gpuCount;
+#endif
     gcKERNEL_FUNCTION   kernelFunction;
     vx_shader           kernel = gcvNULL;
     gctUINT             maxComputeUnits, threadCount, maxDeviceWorkGroupSize;
@@ -2822,7 +2824,9 @@ gcfVX_CreateShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], gctBOOL
     pointer = gcvNULL;
 
     /* Load kernel binary uniforms with the given kernel name */
+#if (!VSC_LITE_BUILD)
     gcmONERROR(gcSHADER_LoadKernel(kernelBinary, name));
+#endif
 
     /* Set the required work group size. */
     gcmONERROR(gcSHADER_GetKernelFunctionByName(kernelBinary, name, &kernelFunction));
@@ -2842,7 +2846,7 @@ gcfVX_CreateShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], gctBOOL
 
     /* Assume all dead code is removed by optimizer. */
     flags = gcvSHADER_RESOURCE_USAGE /*| gcvSHADER_DEAD_CODE */ | gcvSHADER_OPTIMIZER;
-
+#if (!VSC_LITE_BUILD)
     gcSetCLCompiler(program->base.context->compileKernel);
 
     if (constBorder)
@@ -2868,7 +2872,7 @@ gcfVX_CreateShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], gctBOOL
     {
         gcOPT_ResetFeature(FB_ENABLE_CONST_BORDER);
     }
-
+#endif
     /* Copy kernel name */
     strLen = gcoOS_StrLen(name, gcvNULL) + 1;
     gcmONERROR(gcoOS_Allocate(gcvNULL, strLen, &pointer));

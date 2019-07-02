@@ -365,8 +365,9 @@ VX_API_ENTRY vx_status VX_API_CALL vxBuildProgram(vx_program program, vx_const_s
     {
 
         gcmONERROR(_UpdateCompileOption(&program->buildOptions));
+#if (!VSC_LITE_BUILD)
         vscSetDriverVIRPath(gcvFALSE);  /* change to true if vx driver changed to program with VIR shader */
-
+#endif
         status = (*program->base.context->compileKernel) (
                                         gcvNULL,
                                         0,

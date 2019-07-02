@@ -1665,7 +1665,9 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
         }
 
         /* Destroy vir intrinsic library. */
+#if (!VSC_LITE_BUILD)
         vscFreeVirIntrinsicLib();
+#endif
 
         gcfVX_UnloadCompiler(context);
 
