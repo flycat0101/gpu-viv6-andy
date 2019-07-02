@@ -1606,6 +1606,44 @@ VIR_ReadIntrinsicLib(
 }
 #endif  /* CompileIntrinsicLibfromSrc */
 
+static gctBOOL
+_HasIntrinsicCall(
+    IN VIR_Shader                   *pShader
+    )
+{
+    gctBOOL ret = gcvFALSE;
+    VIR_FuncIterator        func_iter;
+    VIR_FunctionNode        *func_node;
+    VIR_Function            *func;
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+
+    for (func_node = VIR_FuncIterator_First(&func_iter);
+         func_node != gcvNULL;
+         func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_InstIterator            inst_iter;
+        VIR_Instruction             *inst;
+
+        func = func_node->function;
+
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             inst != gcvNULL;
+             inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            if (VIR_Inst_GetOpcode(inst) == VIR_OP_INTRINSIC ||
+                VIR_Inst_GetOpcode(inst) == VIR_OP_EXTCALL)
+            {
+                ret = gcvTRUE;
+                break;
+            }
+        }
+    }
+
+    return ret;
+}
+
 VSC_ErrCode
 VIR_GetIntrinsicLib(
     IN VSC_HW_CONFIG            *pHwCfg,
@@ -7118,13 +7156,17 @@ VIR_LinkInternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
         }
 
         {
-            errCode = VIR_GetIntrinsicLib(pHwCfg,
-                                          &pPrivData->pmp.mmWrapper,
-                                          (pPassWorker->pCompilerParam->cfg.ctx.clientAPI == gcvAPI_OPENCL),
-                                          VIR_Shader_IsGraphics(pShader),
-                                          gcvFALSE,
-                                          &pIntrinsicLib);
-            CHECK_ERROR(errCode, "VIR_GetIntrinsicLib failed.");
+            gctBOOL forOCL = (pPassWorker->pCompilerParam->cfg.ctx.clientAPI == gcvAPI_OPENCL);
+            if (forOCL && (gcmOPT_oclPackedBasicType() || _HasIntrinsicCall(pShader)))
+            {
+                errCode = VIR_GetIntrinsicLib(pHwCfg,
+                                              &pPrivData->pmp.mmWrapper,
+                                              forOCL,
+                                              VIR_Shader_IsGraphics(pShader),
+                                              gcvFALSE,
+                                              &pIntrinsicLib);
+                CHECK_ERROR(errCode, "VIR_GetIntrinsicLib failed.");
+            }
         }
     }
 
