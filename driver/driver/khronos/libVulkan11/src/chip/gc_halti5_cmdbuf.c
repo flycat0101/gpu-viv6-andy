@@ -10835,7 +10835,7 @@ VkResult halti5_setMultiGpuSync(
  27:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 27:24) - (0 ? 27:24) + 1))))))) << (0 ? 27:24)));
 
-        gcmDUMP(gcvNULL, "#[chip.stall 0x%04X]", coreIDs[GPUCount - 1]);
+        gcmDUMP(gcvNULL, "#[chip.stall 0x%04X]", coreIDs[coreCount - 1]);
 
         /* Send a semaphore token from last core to pre core. */
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E02, VK_FALSE,

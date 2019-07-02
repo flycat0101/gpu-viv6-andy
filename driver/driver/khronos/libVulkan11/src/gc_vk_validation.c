@@ -996,11 +996,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_FlushMappedMemoryRanges(VkDevice device, 
             result = __VK_ERROR_INVALID_HANDLE;
             goto vk_Exit;
         }
-        if (pMemRange->size != VK_WHOLE_SIZE && pMemRange->offset + pMemRange->size > pMem->allocInfo.allocationSize)
-        {
-            result = __VK_ERROR_INVALID_VALUE;
-            goto vk_Exit;
-        }
     }
 
     result = __vk_FlushMappedMemoryRanges(device, memRangeCount, pMemRanges);
