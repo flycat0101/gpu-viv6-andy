@@ -1238,7 +1238,7 @@ static void _subimage_segment_cost(
 
             axiSramSpaceSize = axiSramOnlySWTiling ? axiSramSpaceSize : 0;
             vipSramSpaceSize = vipSramSpaceSize - kernelBufNeeded;
-            sramLeft = gcmMAX( axiSramSpaceSize - kernelBufNeeded, vipSramSpaceSize);
+            sramLeft = (vx_uint32)gcmMAX((vx_int32)(axiSramSpaceSize - kernelBufNeeded), (vx_int32)vipSramSpaceSize);
             for (i = starti; i <= endi; i++)
             {
                 vx_float64 cost_cycle = 0;
@@ -1771,7 +1771,7 @@ static void _split_segment(
                     split_array[split_pos] = 1;
                     continue;
                 }
-                if (upStreamLayer != 0)
+
                 {
                     if (archModel->opInfoArray[upStreamLayer]->downStreamLayerCount > 1)
                     {
@@ -1787,6 +1787,11 @@ static void _split_segment(
                         }
                     }
                 }
+            }
+            else
+            {
+                split_array[split_pos] = 1;
+                continue;
             }
 
             if ((archModel->opInfoArray[split_pos]->target == VXNNE_OPERATION_TARGET_TP && archModel->opInfoArray[split_pos]->op == VXNNE_OPERATOR_FULLYCONNECTED) ||
@@ -3148,7 +3153,7 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                 }
 
                 opInfo[i]->dbuf = SW_TILING_FROM_DDR;
-                if (opInfo[i]->upStreamLayerCount > 0)
+                if (opInfo[i]->downStreamLayerCount > 0)
                 {
                     vx_int32 downlayer = -1;
                     getDownstreamLayer(archModel, i, 0, &downlayer);
