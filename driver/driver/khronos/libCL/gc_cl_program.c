@@ -105,6 +105,7 @@ gctINT
         Program->objectType = clvOBJECT_UNKNOWN;
 
         if (Program->buildOptions) gcoOS_Free(gcvNULL, Program->buildOptions);
+        if (Program->origbuildOptions) gcoOS_Free(gcvNULL, Program->origbuildOptions);
         if (Program->linkOptions) gcoOS_Free(gcvNULL, Program->linkOptions);
         if (Program->compileOptions) gcoOS_Free(gcvNULL, Program->compileOptions);
         if (Program->buildLog) gcoOS_Free(gcvNULL, Program->buildLog);
@@ -204,6 +205,7 @@ clCreateProgramWithSource(
     program->binarySize      = 0;
     program->binary          = gcvNULL;
     program->buildOptions    = gcvNULL;
+    program->origbuildOptions= gcvNULL;
     program->buildLog        = gcvNULL;
     program->buildStatus     = CL_BUILD_NONE;
 
@@ -356,6 +358,7 @@ clCreateProgramWithBinary(
     program->source          = gcvNULL;
     program->binarySize      = Lengths[0];
     program->buildOptions    = gcvNULL;
+    program->origbuildOptions= gcvNULL;
     program->buildLog        = gcvNULL;
     program->buildStatus     = CL_BUILD_NONE;
 
@@ -674,10 +677,12 @@ clBuildProgram(
         gcSHADER_Destroy((gcSHADER)Program->binary);
 
         if (Program->buildOptions) gcoOS_Free(gcvNULL, Program->buildOptions);
+        if (Program->origbuildOptions) gcoOS_Free(gcvNULL, Program->origbuildOptions);
         if (Program->buildLog) gcoOS_Free(gcvNULL, Program->buildLog);
 
         Program->binary          = gcvNULL;
         Program->buildOptions    = gcvNULL;
+        Program->origbuildOptions= gcvNULL;
         Program->buildLog        = gcvNULL;
         Program->buildStatus     = CL_BUILD_NONE;
     }
@@ -686,6 +691,8 @@ clBuildProgram(
     if (Options)
     {
         length = gcoOS_StrLen(Options, gcvNULL) + 1;
+
+        /* Allocate memory for the used build options. */
         status = gcoOS_Allocate(gcvNULL, length, &pointer);
         if (gcmIS_ERROR(status))
         {
@@ -695,10 +702,22 @@ clBuildProgram(
         }
         gcoOS_StrCopySafe((gctSTRING)pointer, length, Options);
         Program->buildOptions = (gctSTRING) pointer;
+
+        /* Allocate memory for the original build options. */
+        status = gcoOS_Allocate(gcvNULL, length, &pointer);
+        if (gcmIS_ERROR(status))
+        {
+            gcmUSER_DEBUG_ERROR_MSG(
+                "OCL-006013: (clBuildProgram) Run out of memory.\n");
+            clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+        }
+        gcoOS_StrCopySafe((gctSTRING)pointer, length, Options);
+        Program->origbuildOptions = (gctSTRING) pointer;
     }
     else
     {
         Program->buildOptions = gcvNULL;
+        Program->origbuildOptions = gcvNULL;
     }
 
     Program->buildStatus = CL_BUILD_IN_PROGRESS;
@@ -1031,6 +1050,7 @@ clLinkProgram(
     program->binarySize      = 0;
     program->binary          = gcvNULL;
     program->buildOptions    = gcvNULL;
+    program->origbuildOptions= gcvNULL;
     program->buildLog        = gcvNULL;
     program->buildStatus     = CL_BUILD_NONE;
 
@@ -1452,10 +1472,10 @@ clGetProgramBuildInfo(
         break;
 
     case CL_PROGRAM_BUILD_OPTIONS:
-        if (Program->buildOptions != gcvNULL)
+        if (Program->origbuildOptions != gcvNULL)
         {
-            retParamSize = gcoOS_StrLen(Program->buildOptions, gcvNULL) + 1;
-            retParamPtr = Program->buildOptions;
+            retParamSize = gcoOS_StrLen(Program->origbuildOptions, gcvNULL) + 1;
+            retParamPtr = Program->origbuildOptions;
         }
         else
         {

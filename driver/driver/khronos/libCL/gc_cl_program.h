@@ -38,7 +38,10 @@ typedef struct _cl_program
     gctSTRING               source;
     gctUINT                 binarySize;
     gctUINT8_PTR            binary;
+    /* This is the real options that compiler uses it to build the kernel. */
     gctSTRING               buildOptions;
+    /* This is the original options that sent by user. */
+    gctSTRING               origbuildOptions;
     gctSTRING               linkOptions;
     gctSTRING               compileOptions;
     gctSTRING               buildLog;
