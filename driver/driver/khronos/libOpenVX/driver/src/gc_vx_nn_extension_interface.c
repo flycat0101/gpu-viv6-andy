@@ -9111,6 +9111,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
     vx_bool   support_dataType[3]         = {vx_false_e, vx_false_e, vx_false_e};
     vx_bool   enable_tf_quantize          = vx_false_e;
     vx_bool   shExe_flag                  = vx_false_e;
+    vx_bool   enable_tensorABS_SHExe      = vx_false_e;
     vx_uint32 input_width   = TENSOR_SIZE_INDEX(inputs, 0);
     vx_uint32 input_height  = TENSOR_SIZE_INDEX(inputs, 1);
     vx_uint32 img2DSize = input_width * input_height;
@@ -9145,6 +9146,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
         support_dataType[0] = (vx_bool)(((inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_FLOAT16) && (outputFormat == VX_TYPE_INT8 || outputFormat == VX_TYPE_FLOAT16)) || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16));
         support_dataType[1] = (vx_bool)((inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8) || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16));
         support_dataType[2] = (vx_bool)((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
+
+        enable_tensorABS_SHExe = (vx_bool)(inputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32 && func_v == VX_NN_ACTIVATION_ABS);
     }
     else
     {
@@ -9170,6 +9173,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
                            (func_v == VX_NN_ACTIVATION_RSQRT && support_dataType[1]) ||
                            (func_v == VX_NN_ACTIVATION_RELU1 && support_dataType[1]) ||
                            (func_v == VX_NN_ACTIVATION_RELU6 && support_dataType[1]) ||
+                           enable_tensorABS_SHExe ||
                            enable_tf_quantize);
 
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_ACTIVATION) &&
@@ -9260,7 +9264,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
 
         if(node->base.context->evisNoInst.supportEVIS)
         {
-            if (enable_tf_quantize)
+            if (enable_tensorABS_SHExe)
+                shaderExecutable = vxnneGetTensorAbsShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_ABS, &node->kernelAttributes.borderMode, inputs, outputs);
+            else if (enable_tf_quantize)
                 shaderExecutable = vxnneGetActivation_UInt8ShaderExecutable(node->base.context, VXNNE_KERNEL_ACTIVATION_UINT8, &node->kernelAttributes.borderMode, func_v, inputs, minVal, maxVal, outputs);
             else
                 shaderExecutable = vxnneGetActivationShaderExecutable(node->base.context, VXNNE_KERNEL_ACTIVATION, &node->kernelAttributes.borderMode, func_v, inputs, minVal, maxVal, outputs);
