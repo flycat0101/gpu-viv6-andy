@@ -439,7 +439,6 @@ typedef struct _gcsHAL_QUERY_CHIP_OPTIONS
     gctPHYS_ADDR_T              sRAMCPUPhysicalBases[gcvSRAM_COUNT];
 
     gceSECURE_MODE              secureMode;
-
     gctBOOL                     enableNNTPParallel;
     gctUINT                     enableSwtilingPhase1;
 }

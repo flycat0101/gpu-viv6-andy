@@ -573,12 +573,12 @@ gcoHARDWAREVX_SetImageInfo(
         switch(Info->border)
         {
         case gcvVX_BORDER_MODE_UNDEFINED:
+        case gcvVX_BORDER_MODE_CONSTANT:
             border = 0x0;
             break;
         case gcvVX_BORDER_MODE_REPLACEMENT:
             border = 0x3;
             break;
-        case gcvVX_BORDER_MODE_CONSTANT:
         default:
             border = 0x1;
             break;
@@ -37036,7 +37036,17 @@ gcoHARDWAREVX_ProgrammeNNEngine(
  30:30))) | (((gctUINT32) ((gctUINT32) ((info->inImageYOffset >> 4) & 0x1) & ((gctUINT32) ((((1 ?
  30:30) - (0 ?
  30:30) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)));
+ ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)))
+                            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) | (((gctUINT32) ((gctUINT32) (info->slowOutput) & ((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 28:28) - (0 ? 28:28) + 1))))))) << (0 ? 28:28)));
 
     /*25:0*/
      *(*Instruction)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?

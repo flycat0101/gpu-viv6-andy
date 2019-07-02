@@ -1075,6 +1075,31 @@ OnError:
 }
 
 gceSTATUS
+gcoVX_QueryHWChipInfo(
+    IN OUT vx_hw_chip_info * HwChipInfo
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("HwChipInfo=%p", HwChipInfo);
+
+    if (HwChipInfo != gcvNULL)
+    {
+        gcmONERROR(gcoHARDWARE_QueryHwChipInfo(gcvNULL,
+            &HwChipInfo->customerID,
+            &HwChipInfo->ecoID));
+    }
+    else
+    {
+        status = gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
 gcoVX_WaitNNEvent(
     gctUINT32 EventId
     )

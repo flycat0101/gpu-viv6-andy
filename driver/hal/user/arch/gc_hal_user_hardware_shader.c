@@ -591,12 +591,17 @@ _StallHw(
                                                     gcvNULL));
         }
 
-        gcmONERROR(
-            gcoHARDWARE_Semaphore(Hardware,
-                                  gcvWHERE_COMMAND,
-                                  gcvWHERE_PIXEL,
-                                  gcvHOW_SEMAPHORE_STALL,
-                                  gcvNULL));
+        if (Hardware->features[gcvFEATURE_SNAPPAGE_CMD] &&
+            Hardware->features[gcvFEATURE_SNAPPAGE_CMD_FIX])
+        {
+            gcmONERROR(
+                gcoHARDWARE_Semaphore(Hardware,
+                                      gcvWHERE_COMMAND,
+                                      gcvWHERE_PIXEL,
+                                      gcvHOW_SEMAPHORE_STALL,
+                                      gcvNULL));
+        }
+
 
         gcmONERROR(
             gcoHARDWARE_SnapPages(
