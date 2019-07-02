@@ -1064,7 +1064,6 @@ VSC_OCLImgLibKind vscGetOCLImgLibKindForHWCfg(
     return VSC_OCLImgLibKind_UseLoadStore;
 }
 
-/* this is for test only, compile the library from the OCL FE and GCSL->VIR converter */
 static VSC_ErrCode
 _CreateCLIntrinsicLib(
     IN VSC_HW_CONFIG            *pHwCfg,
@@ -7172,13 +7171,16 @@ VIR_LinkInternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
             }
             else
             {
-                errCode = VIR_GetIntrinsicLib(pHwCfg,
-                                              &pPrivData->pmp.mmWrapper,
-                                              gcvFALSE,
-                                              VIR_Shader_IsGraphics(pShader),
-                                              gcvFALSE,
-                                              &pIntrinsicLib);
-                CHECK_ERROR(errCode, "VIR_GetIntrinsicLib failed.");
+                if (_HasIntrinsicCall(pShader))
+                {
+                    errCode = VIR_GetIntrinsicLib(pHwCfg,
+                                                  &pPrivData->pmp.mmWrapper,
+                                                  gcvFALSE,
+                                                  VIR_Shader_IsGraphics(pShader),
+                                                  gcvFALSE,
+                                                  &pIntrinsicLib);
+                    CHECK_ERROR(errCode, "VIR_GetIntrinsicLib failed.");
+                }
             }
         }
     }
