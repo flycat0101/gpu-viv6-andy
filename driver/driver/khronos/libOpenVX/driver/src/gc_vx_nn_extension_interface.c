@@ -17241,7 +17241,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNReorgLayer_Initializer(vx_node node, c
     vx_context context                    = vxGetContext((vx_reference)node);
 
     vxnne_reorg_layer  reorgLayer         = VX_NULL;
-    vx_bool            dataFormat_flag    = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT8) && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_INT8));
+    vx_bool            dataFormat_flag    = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT8) && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_INT8))
+                                                    || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
     /* destroy the existing layer */
     if (node->layer)
     {
