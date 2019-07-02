@@ -8144,6 +8144,42 @@ static VIR_Pattern _convPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
+static gctBOOL
+supportCMP_single_value_jmp_2_succ2_resCondOp(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    gcmASSERT(Inst->_opcode == VIR_OP_JMPC || Inst->_opcode == VIR_OP_JMP_ANY);
+    return supportCMP(Context, Inst) &&
+           all_source_single_value(Context, Inst) &&
+           jmp_2_succ(Context, Inst, 2) &&
+           VIR_ConditionOp_Reversable(VIR_Inst_GetConditionOp(Inst));
+}
+
+static gctBOOL
+notDual16Req(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return !VIR_Lower_MatchDual16Req(Context, VIR_Inst_GetDest(Inst), VIR_Inst_GetSource(VIR_Inst_GetPrev(Inst), 0));
+}
+
+/*
+** In LL2MC lower, we may use CMP&SELECT to replace CMOV, but if src2 of CMOV is just the dest of CMOV, it may cause un-def usage
+** and cause some issues in RA/LV, so we just disable CMOV for those cases that may be changed to CMP&SELECT.
+** The best solution is analyze the DU and add an initialization for this CMOV if needed, right now we just change CMOV back to JMP.
+*/
+static VIR_PatternMatchInst _jmpcPatInst0[] = {
+    { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_HasHalti4, supportCMP_single_value_jmp_2_succ2_resCondOp }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 5, 0, 0 }, { notDual16Req }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _jmpcRepInst0[] = {
+    { VIR_OP_CMOV, -1, 0, { 4, 2, 3, 5 }, { VIR_Lower_ReverseCondOp } }
+};
 
 static VIR_PatternMatchInst _jmpcPatInst1[] = {
     { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { all_source_float, all_source_single_value, jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_AND },
@@ -8319,6 +8355,7 @@ static VIR_PatternReplaceInst _jmpcRepInst12[] = {
 };
 
 static VIR_Pattern _jmpcPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_jmpc, 0) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_jmpc, 1) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_jmpc, 2) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_jmpc, 3) },

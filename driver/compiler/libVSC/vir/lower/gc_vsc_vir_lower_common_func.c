@@ -1532,3 +1532,30 @@ VIR_Lower_GetTexModifierKind(
     return (VIR_TexModifier_Flag)VIR_Operand_GetTexModifierFlag(Opnd);
 }
 
+gctBOOL
+VIR_Lower_MatchDual16Req(
+    IN VIR_PatternContext *Context,
+    IN VIR_Operand        *DestOpnd,
+    IN VIR_Operand        *SrcOpnd
+    )
+{
+    VIR_TypeId ty0 = VIR_Operand_GetTypeId(DestOpnd);
+    VIR_TypeId ty1 = VIR_Operand_GetTypeId(SrcOpnd);
+
+    if (Context->shader->shaderKind != VIR_SHADER_FRAGMENT)
+    {
+        return gcvFALSE;
+    }
+
+    /* if dest and src0 are same type */
+    if(((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISFLOAT) &&
+        (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISFLOAT)) ||
+       ((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISINTEGER) &&
+        (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISINTEGER)))
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+

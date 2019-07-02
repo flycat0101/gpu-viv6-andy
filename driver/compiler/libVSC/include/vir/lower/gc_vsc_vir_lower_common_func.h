@@ -715,6 +715,13 @@ VIR_Lower_ChangeOperandByOffset(
     IN gctUINT           rowOffset
     );
 
+gctBOOL
+VIR_Lower_MatchDual16Req(
+    IN VIR_PatternContext *Context,
+    IN VIR_Operand        *DestOpnd,
+    IN VIR_Operand        *SrcOpnd
+    );
+
 END_EXTERN_C()
 #endif
 
