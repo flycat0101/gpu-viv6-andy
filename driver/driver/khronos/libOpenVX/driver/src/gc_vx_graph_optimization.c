@@ -4151,12 +4151,6 @@ VX_INTERNAL_API vx_status vxoGraph_Optimization_eltwiseOp(vx_graph graph)
             vx_uint32 outDims[VX_CONTEXT_TENSOR_MAX_DIMENSION];
             vx_uint32 dimcnt = 0;
 
-            /*for no-NN chip, add can be optimzed with this feature, or do NN optimization*/
-            if(vxoGraph_getKernelType(node) == OP_ADD_SUB && vxoGraphOptimization_nnHalSupport((vx_tensor)node->paramTable[0]))
-            {
-                continue;
-            }
-
             status = vxoGraph_Optimization_EltwiseTensorShapeOpt(tensorIn[0], tensorIn[1], output, inDims0, inDims1, outDims, &dimcnt);
 
             if (status == VX_SUCCESS)
