@@ -4832,6 +4832,8 @@ IN clsNAME * Variable
                      tag == VSC_DI_TAG_PARAMETER)
             {
                 ptr->u.variable.type = type;
+                if (clmDECL_IsPointerType(&(Variable->decl)))
+                    ptr->u.variable.type.isPointer = gcvTRUE;
             }
             else if (tag == VSC_DI_TAG_CONSTANT)
             {

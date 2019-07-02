@@ -95,6 +95,7 @@ typedef struct _VSC_DI_TYPE{
     gctINT  type;
     VSC_DI_ARRAY_DESC array;
     gctBOOL primitiveType;
+    gctBOOL isPointer;
 }VSC_DI_TYPE;
 
 struct _VSC_DIE

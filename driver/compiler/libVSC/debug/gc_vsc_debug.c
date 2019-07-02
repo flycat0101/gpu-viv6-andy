@@ -826,9 +826,9 @@ void vscDIDumpDIE(VSC_DIContext * context, gctUINT16 id, gctUINT shift, gctUINT 
                 die->tag == VSC_DI_TAG_PARAMETER)
             {
                 gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
-                   "id = %d tag = %s parent = %d line (%d,%d,%d) name = \"%s\", type(%d, %d)\n",
+                   "id = %d tag = %s parent = %d line (%d,%d,%d) name = \"%s\", type(%d, %d, %d, %d, %d)\n",
                    die->id, _GetTagNameStr(context, die->tag),die->parent, die->fileNo, die->lineNo, die->colNo, _GetNameStr(context,die->name),
-                   die->u.variable.type.primitiveType, die->u.variable.type.type);
+                   die->u.variable.type.primitiveType, die->u.variable.type.isPointer, die->u.variable.type.type, die->u.variable.type.array.numDim, die->u.variable.type.array.length[0]);
 
                 gcmPRINT(context->tmpLog);
 
