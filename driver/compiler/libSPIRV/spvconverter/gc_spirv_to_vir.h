@@ -476,6 +476,7 @@ typedef struct
     gctCHAR * name;
     gctBOOL noUse;
     VIR_SymFlag virSymFlag;
+    VIR_SymFlagExt virSymFlagExt;
 
     VIR_Precision virPrecision;
     gctINT location;

@@ -1919,7 +1919,7 @@ gcDump_Shader(
                                    i,
                                    gcmATTRIBUTE_isCentroid(attribute) ? "centroid " : gcmATTRIBUTE_isSample(attribute) ? "sample " : "",
                                    gcmATTRIBUTE_isPerPatch(attribute) ? "patch " : gcmATTRIBUTE_isPerVertexArray(attribute) ? "PerVertexArray " : "",
-                                   (attribute->shaderMode == gcSHADER_SHADER_FLAT) ? "flat" : "smooth",
+                                   (attribute->shaderMode == gcSHADER_SHADER_FLAT) ? "flat " : ((attribute->shaderMode == gcSHADER_SHADER_NOPERSPECTIVE) ? "noperspective " : "smooth "),
                                    GetPrecisionName_(attribute->precision),
                                    gcmType_Name(attribute->type)));
 
@@ -2281,7 +2281,7 @@ gcDump_Shader(
                                    i,
                                    gcmOUTPUT_isCentroid(output) ? "centroid " : gcmOUTPUT_isSample(output) ? "sample " : "",
                                    gcmOUTPUT_isPerPatch(output) ? "patch " : gcmOUTPUT_isPerVertexArray(output) ? "PerVertexArray " : "",
-                                   (output->shaderMode == gcSHADER_SHADER_FLAT) ? "flat " : "smooth ",
+                                   (output->shaderMode == gcSHADER_SHADER_FLAT) ? "flat " : ((output->shaderMode == gcSHADER_SHADER_NOPERSPECTIVE) ? "noperspective " : "smooth "),
                                    GetPrecisionName_(output->precision),
                                    typeName, output->arraySize));
             }
@@ -2293,7 +2293,7 @@ gcDump_Shader(
                                    i,
                                    gcmOUTPUT_isCentroid(output) ? "centroid " : gcmOUTPUT_isSample(output) ? "sample " : "",
                                    gcmOUTPUT_isPerPatch(output) ? "patch " : gcmOUTPUT_isPerVertexArray(output) ? "PerVertexArray " : "",
-                                   (output->shaderMode == gcSHADER_SHADER_FLAT) ? "flat " : "smooth ",
+                                   (output->shaderMode == gcSHADER_SHADER_FLAT) ? "flat " : ((output->shaderMode == gcSHADER_SHADER_NOPERSPECTIVE) ? "noperspective " : "smooth "),
                                    GetPrecisionName_(output->precision),
                                    typeName));
             }

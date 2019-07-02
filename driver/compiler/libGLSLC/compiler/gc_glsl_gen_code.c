@@ -1507,15 +1507,19 @@ _AllocLogicalRegOrArray(
 
     logicalRegCount = (gctUINT)slsDATA_TYPE_GetLogicalCountForAnArray(DataType);
 
-    if ((Name->dataType->qualifiers.interpolation & slvINTERPOLATION_QUALIFIER_FLAT) ||
+    if ((Name->dataType->qualifiers.interpolation == slvINTERPOLATION_QUALIFIER_FLAT) ||
         gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "#Layer")) ||
         gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "#PrimitiveID")))
     {
         shaderMode = gcSHADER_SHADER_FLAT;
     }
-    else if (Name->dataType->qualifiers.interpolation & slvINTERPOLATION_QUALIFIER_SMOOTH)
+    else if (Name->dataType->qualifiers.interpolation == slvINTERPOLATION_QUALIFIER_SMOOTH)
     {
         shaderMode = gcSHADER_SHADER_SMOOTH;
+    }
+    else if (Name->dataType->qualifiers.interpolation == slvINTERPOLATION_QUALIFIER_NOPERSPECTIVE)
+    {
+        shaderMode = gcSHADER_SHADER_NOPERSPECTIVE;
     }
     else
     {

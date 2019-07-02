@@ -2897,6 +2897,7 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
                     VIR_ConstId         constId = VIR_INVALID_ID;
 
                     VIR_Symbol_SetFlags(newVarSym, VIR_Symbol_GetFlags(libSym));
+                    VIR_Symbol_SetFlagsExt(newVarSym, VIR_Symbol_GetFlagsExt(libSym));
 
                     if (VIR_Type_isArray(pLibSymType))
                     {

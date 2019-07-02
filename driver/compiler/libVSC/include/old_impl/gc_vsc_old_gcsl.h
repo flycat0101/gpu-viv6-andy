@@ -1141,6 +1141,7 @@ typedef enum _gcSHADER_SHADERMODE
     gcSHADER_SHADER_DEFAULT             = 0x00,
     gcSHADER_SHADER_SMOOTH              = 0x00,
     gcSHADER_SHADER_FLAT                = 0x01,
+    gcSHADER_SHADER_NOPERSPECTIVE       = 0x02,
 }
 gcSHADER_SHADERMODE;
 

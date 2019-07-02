@@ -354,6 +354,28 @@ static VSC_ErrCode _CreateIoVectorizedInfoFromIoPacket(VIR_Shader* pShader,
     VIR_Symbol_SetPrecision(pNewSym, VIR_Symbol_GetPrecision(pIoPacket->pSymIo[0]));
     pNewSym->u2.tempIndex = firstVirRegNo;
 
+    /* Set the interpolation qualifier. */
+    if (VIR_Symbol_isInputOrOutput(pNewSym))
+    {
+        if (isSymCentroid(pIoPacket->pSymIo[0]))
+        {
+            VIR_Symbol_SetFlag(pNewSym, VIR_SYMFLAG_ISCENTROID);
+        }
+        else if (isSymSample(pIoPacket->pSymIo[0]))
+        {
+            VIR_Symbol_SetFlag(pNewSym, VIR_SYMFLAG_ISSAMPLE);
+        }
+
+        if (isSymFlat(pIoPacket->pSymIo[0]))
+        {
+            VIR_Symbol_SetFlag(pNewSym, VIR_SYMFLAG_FLAT);
+        }
+        else if (isSymNoperspective(pIoPacket->pSymIo[0]))
+        {
+            VIR_Symbol_SetFlagExt(pNewSym, VIR_SYMFLAGEXT_NOPERSPECTIVE);
+        }
+    }
+
     for (i = 0; i < pIoPacket->realCount; i ++)
     {
         pNewSym->flags |= pIoPacket->pSymIo[i]->flags;
@@ -4008,7 +4030,8 @@ gctBOOL vscVIR_CheckTwoSymsVectorizability(VIR_Shader* pShader, VIR_Symbol* pSym
         /* For IO syms, interpolation mode must be equal */
         if ((isSymCentroid(pSym1) != isSymCentroid(pSym2)) ||
             (isSymSample(pSym1) != isSymSample(pSym2)) ||
-            (isSymFlat(pSym1) != isSymFlat(pSym2)))
+            (isSymFlat(pSym1) != isSymFlat(pSym2)) ||
+            (isSymNoperspective(pSym1) != isSymNoperspective(pSym2)))
         {
             return gcvFALSE;
         }

@@ -1186,6 +1186,7 @@ static VSC_ErrCode __SpvFillVirSymWithSymSpv(gcSPV spv, VIR_Symbol * sym, VIR_Sh
     VIR_Uniform * virUniform;
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
     VIR_SymFlag symFlag = symSpv->virSymFlag;
+    VIR_SymFlagExt symFlagExt = symSpv->virSymFlagExt;
 
     switch(symSpv->spvStorage)
     {
@@ -1347,6 +1348,8 @@ static VSC_ErrCode __SpvFillVirSymWithSymSpv(gcSPV spv, VIR_Symbol * sym, VIR_Sh
     {
         VIR_Symbol_ClrFlag(sym, VIR_SYMFLAG_SKIP_NAME_CHECK);
     }
+
+    VIR_Symbol_SetFlagsExt(sym, symFlagExt);
 
     return virErrCode;
 }
@@ -2860,6 +2863,19 @@ static VIR_SymFlag __SpvConvDecoratorToSymFlag(SpvConvDecorationData *Decoration
     return symFlag;
 }
 
+static VIR_SymFlagExt __SpvConvDecoratorToSymFlagExt(SpvConvDecorationData *DecorationData)
+{
+    VIR_SymFlagExt symFlagExt = VIR_SYMFLAGEXT_NONE;;
+
+    /* Check interpolation qualifier. */
+    if (DecorationData->interpolationQualifier == SPV_INTERPOLATION_NOPERSPECTIVE)
+    {
+        symFlagExt |= VIR_SYMFLAGEXT_NOPERSPECTIVE;
+    }
+
+    return symFlagExt;
+}
+
 static VIR_LayoutQual __SpvConvDecoratorToSymLayout(SpvConvDecorationData *DecorationData)
 {
     VIR_LayoutQual layout = VIR_LAYQUAL_NONE;
@@ -3079,6 +3095,7 @@ static VSC_ErrCode __SpvConvDecoratorToVIR(
         {
             /* Convert the decoration to symbol flag. */
             symSpv->virSymFlag |= __SpvConvDecoratorToSymFlag(decorationData);
+            symSpv->virSymFlagExt |= __SpvConvDecoratorToSymFlagExt(decorationData);
 
             /* Convert the decoration to symbol layout. */
             symSpv->virLayoutQual |= __SpvConvDecoratorToSymLayout(decorationData);
@@ -3234,6 +3251,7 @@ static VSC_ErrCode __SpvConvDecoratorToVIR(
 
             /* Save the flag/layout qualifier/location into symbol. */
             VIR_Symbol_SetFlag(symbol, VIR_Symbol_GetFlags(symbol) | __SpvConvDecoratorToSymFlag(decorationData));
+            VIR_Symbol_SetFlagsExt(symbol, VIR_Symbol_GetFlagsExt(symbol) | __SpvConvDecoratorToSymFlagExt(decorationData));
             VIR_Symbol_SetLayoutQualifier(symbol,
                 VIR_Symbol_GetLayoutQualifier(symbol) | __SpvConvDecoratorToSymLayout(decorationData));
             VIR_Symbol_SetLocation(symbol, SPV_SET_VALID_VALUE(decorationData->location, location, -1));

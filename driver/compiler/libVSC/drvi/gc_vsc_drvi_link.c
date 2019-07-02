@@ -1386,7 +1386,7 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
 
             if (bCheckInterpolation)
             {
-                if (isSymFlat(pAttrSym) != isSymFlat(pOutputSym))
+                if ((isSymFlat(pAttrSym) != isSymFlat(pOutputSym)) || (isSymNoperspective(pAttrSym) != isSymNoperspective(pOutputSym)))
                 {
                     errCode = VSC_ERR_VARYING_TYPE_MISMATCH;
                     ON_ERROR(errCode, "Link Io between two shader stages");
@@ -2498,7 +2498,7 @@ static VSC_ErrCode _LinkIOBlockBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pB
 
             if (bCheckInterpolation)
             {
-                if (isSymFlat(pOutputSym) != isSymFlat(pInputSym))
+                if ((isSymFlat(pInputSym) != isSymFlat(pOutputSym)) || (isSymNoperspective(pInputSym) != isSymNoperspective(pOutputSym)))
                 {
                     errCode = VSC_ERR_VARYING_TYPE_MISMATCH;
                     ON_ERROR(errCode, "Link IO blocks between two shader stages");

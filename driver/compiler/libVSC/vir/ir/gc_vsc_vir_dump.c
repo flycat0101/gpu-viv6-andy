@@ -1220,10 +1220,15 @@ _DumpSymbol(
             VIR_Shader_IsCL(Dumper->Shader) ? "" : symbol_precision[VIR_Symbol_GetPrecision(Sym)],
             isSymPrecise(Sym) ? "precise " : ""));
 
-        if(VIR_SYMFLAG_FLAT & VIR_Symbol_GetFlags(Sym))
+        if (isSymFlat(Sym))
         {
             VERIFY_OK(
                 VIR_LOG(Dumper, "flat "));
+        }
+        else if (isSymNoperspective(Sym))
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "noperspective "));
         }
 
         switch(VIR_Symbol_GetKind(Sym))
@@ -1490,6 +1495,11 @@ VIR_Symbol_Dump(
         if (isSymFlat(Sym))
         {
             VERIFY_OK(VIR_LOG(Dumper, " flat"));
+        }
+        else if (isSymNoperspective(Sym))
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, " noperspective"));
         }
         if (isSymInvariant(Sym))
         {

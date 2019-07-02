@@ -1185,7 +1185,9 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Symbol_GetHIHwRegId(Sym)    ((VIR_HwRegId)(Sym)->_HIhwRegId)
 #define VIR_Symbol_GetHIHwShift(Sym)    ((Sym)->_HIhwShift)
 #define VIR_Symbol_GetFlags(Sym)        ((Sym)->flags)
+#define VIR_Symbol_GetFlagsExt(Sym)     ((Sym)->flagsExt)
 #define VIR_Symbol_HasFlag(Sym, f)      (((Sym)->flags & (f)) != 0)
+#define VIR_Symbol_HasFlagExt(Sym, f)   (((Sym)->flagsExt & (f)) != 0)
 #define VIR_Symbol_GetIndex(Sym)        ((Sym)->index)
 #define VIR_Symbol_GetIOBlockIndex(Sym) ((Sym)->ioBlockIndex)
 /* return NULL if it is local variable */
@@ -1332,7 +1334,10 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Symbol_SetFixedTypeId(Sym, Val) do {(Sym)->fixedTypeId =  (Val); } while (0)
 #define VIR_Symbol_SetFlags(Sym, Val)       do {(Sym)->flags = (Val); } while (0)
 #define VIR_Symbol_SetFlag(Sym, Val)        do {(Sym)->flags |= (Val); } while (0)
+#define VIR_Symbol_SetFlagsExt(Sym, Val)    do {(Sym)->flagsExt = (Val); } while (0)
+#define VIR_Symbol_SetFlagExt(Sym, Val)     do {(Sym)->flagsExt |= (Val); } while (0)
 #define VIR_Symbol_ClrFlag(Sym, Val)        do {(Sym)->flags &= ~(Val); } while (0)
+#define VIR_Symbol_ClrFlagExt(Sym, Val)     do {(Sym)->flagsExt &= ~(Val); } while (0)
 #define VIR_Symbol_SetIndex(Sym, Val)       do {(Sym)->index = (Val); } while (0)
 #define VIR_Symbol_SetIOBlockIndex(Sym, Val)    do {(Sym)->ioBlockIndex = (Val); } while (0)
 #define VIR_Symbol_SetVirRegVariable(Sym, Var)  do {(Sym)->u2.variable = (Var); } while (0)
@@ -2983,9 +2988,17 @@ typedef enum VIR_SYMFLAG
 
 } VIR_SymFlag;
 
+typedef enum VIR_SYMFLAGEXT
+{
+    /* General flags */
+    VIR_SYMFLAGEXT_NONE                         = 0x00000000, /* no flag */
+    VIR_SYMFLAGEXT_NOPERSPECTIVE                = 0x00000001, /* noperspective */
+} VIR_SymFlagExt;
+
 #define isSymEnabled(sym)                       (((sym)->flags & VIR_SYMFLAG_ENABLED) != 0)
 #define isSymInactive(sym)                      (((sym)->flags & VIR_SYMFLAG_INACTIVE) != 0)
 #define isSymFlat(sym)                          (((sym)->flags & VIR_SYMFLAG_FLAT) != 0)
+#define isSymNoperspective(sym)                 (((sym)->flagsExt & VIR_SYMFLAGEXT_NOPERSPECTIVE) != 0)
 #define isSymInvariant(sym)                     (((sym)->flags & VIR_SYMFLAG_INVARIANT) != 0)
 #define isSymField(sym)                         (((sym)->flags & VIR_SYMFLAG_IS_FIELD) != 0)
 #define isSymLocal(sym)                         (((sym)->flags & VIR_SYMFLAG_LOCAL) != 0)
@@ -3084,6 +3097,8 @@ struct _VIR_SYMBOL
     VIR_TypeId          fixedTypeId;          /* The fixed typeId of the symbol, for the output variable only. */
 
     VIR_SymFlag         flags;
+
+    VIR_SymFlagExt      flagsExt;
 
     VIR_SymId           index;          /* index of this entry in symtab */
 

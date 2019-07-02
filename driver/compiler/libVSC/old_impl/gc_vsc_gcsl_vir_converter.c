@@ -4529,6 +4529,10 @@ _ConvShaderOutput2Vir(
                         ? VIR_SYMFLAG_ISSAMPLE
                         : 0);
 
+    sym->flagsExt = (Output->shaderMode == gcSHADER_SHADER_NOPERSPECTIVE
+                        ? VIR_SYMFLAGEXT_NOPERSPECTIVE
+                        : VIR_SYMFLAGEXT_NONE);
+
     {
         /* set layout info */
         VIR_Symbol_SetLayoutQualifier(sym, VIR_LAYQUAL_NONE);
@@ -4716,6 +4720,10 @@ _ConvShaderAttribute2Vir(
                     (gcmATTRIBUTE_isLocSetByDriver(Attribute)
                         ? VIR_SYMFLAG_LOC_SET_BY_DRIVER
                         : 0);
+
+    sym->flagsExt = (Attribute->shaderMode == gcSHADER_SHADER_NOPERSPECTIVE
+                        ? VIR_SYMFLAGEXT_NOPERSPECTIVE
+                        : VIR_SYMFLAGEXT_NONE);
 
     if (sym->flags & VIR_SYMFLAG_ALWAYSUSED)
     {

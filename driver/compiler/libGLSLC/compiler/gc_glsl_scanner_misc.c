@@ -342,7 +342,7 @@ static slsKEYWORD KeywordTable_GL[] =
     {"mediump",                T_MEDIUM_PRECISION, T_MEDIUM_PRECISION, T_MEDIUM_PRECISION, slvEXTENSION_HALTI},
     {"namespace",              T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
     {"noinline",               T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
-    {"noperspective",          T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_SMOOTH, slvEXTENSION_HALTI},
+    {"noperspective",          T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_NOPERSPECTIVE, slvEXTENSION_HALTI},
     {"out",                    T_OUT, T_OUT, T_OUT, slvEXTENSION_HALTI},
     {"output",                 T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
     {"packed",                 T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, T_RESERVED_KEYWORD, slvEXTENSION_HALTI},
@@ -685,6 +685,11 @@ slScanIdentifier(
 
         case T_FLAT:
             Token->u.qualifiers.interpolation = slvINTERPOLATION_QUALIFIER_FLAT;
+            Token->u.qualifiers.flags = slvQUALIFIERS_FLAG_INTERPOLATION;
+            break;
+
+        case T_NOPERSPECTIVE:
+            Token->u.qualifiers.interpolation = slvINTERPOLATION_QUALIFIER_NOPERSPECTIVE;
             Token->u.qualifiers.flags = slvQUALIFIERS_FLAG_INTERPOLATION;
             break;
 

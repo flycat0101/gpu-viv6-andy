@@ -1095,6 +1095,7 @@ VIR_IO_writeSymbol(VIR_Shader_IOBuffer *Buf, VIR_Symbol* pSymbol)
     ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetTypeId(pSymbol)));
     ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetFixedTypeId(pSymbol)));
     ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetFlags(pSymbol)));
+    ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetFlagsExt(pSymbol)));
     ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetIndex(pSymbol)));
     ON_ERROR0(VIR_IO_writeUint(Buf, VIR_Symbol_GetIOBlockIndex(pSymbol)));
 
@@ -2853,6 +2854,8 @@ VIR_IO_readSymbol(VIR_Shader_IOBuffer *Buf, VIR_Symbol* pSymbol)
     VIR_Symbol_SetFixedTypeId(pSymbol, (VIR_TypeId)uVal);
     ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
     VIR_Symbol_SetFlags(pSymbol, (VIR_SymFlag)uVal);
+    ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
+    VIR_Symbol_SetFlagsExt(pSymbol, (VIR_SymFlagExt)uVal);
     ON_ERROR0(VIR_IO_readUint(Buf, &uVal));
     VIR_Symbol_SetIndex(pSymbol, uVal);
     ON_ERROR0(VIR_IO_readUint(Buf, &uVal));

@@ -566,9 +566,9 @@ static void _FillIoRegChannel(VIR_Shader* pShader,
 
     pThisIoChannelMapping->flag.bActiveWithinShader = gcvTRUE;
     pThisIoChannelMapping->flag.bDeclared = gcvFALSE;
-    pThisIoChannelMapping->flag.bConstInterpolate = ((VIR_SYMFLAG_FLAT & VIR_Symbol_GetFlags(pVirIoSym)) != 0);
+    pThisIoChannelMapping->flag.bConstInterpolate = isSymFlat(pVirIoSym);
     pThisIoChannelMapping->flag.bStreamOutToBuffer = bStreamOut;
-    pThisIoChannelMapping->flag.bPerspectiveCorrection = !pThisIoChannelMapping->flag.bConstInterpolate; /* Need to refine */
+    pThisIoChannelMapping->flag.bPerspectiveCorrection = !pThisIoChannelMapping->flag.bConstInterpolate && !isSymNoperspective(pVirIoSym);
     pThisIoChannelMapping->flag.bSampleFrequency = isSymSample(pVirIoSym);
     pThisIoChannelMapping->flag.bCentroidInterpolate = isSymCentroid(pVirIoSym);
     pThisIoChannelMapping->flag.bHighPrecisionOnDual16 = bHighPrecisionOnDual16;
