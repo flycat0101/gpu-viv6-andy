@@ -230,7 +230,7 @@ VX_INTERNAL_API vx_enum vxoGraph_getKernelType(vx_node node)
             {
                 vx_uint32 poolx = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_SIZE_X_INDEX], u32);
                 vx_uint32 pooly = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_SIZE_Y_INDEX], u32);
-                if(poolx == pooly && pad[0]== 0 && pad[2]== 0  && pad[1]== 0 && pad[3]== 0 &&
+                if(poolx == pooly && pad[0]== 0 && pad[2]== 0  &&
                     (poolx == 2 || (poolx == 3 &&  !vxoGraphOptimization_isV8((vx_reference)node)) )
                   )
                 {
@@ -245,6 +245,8 @@ VX_INTERNAL_API vx_enum vxoGraph_getKernelType(vx_node node)
                     else if((TENSOR_DATA_TYPE(input) == VX_TYPE_FLOAT32 ||TENSOR_DATA_TYPE(input) == VX_TYPE_FLOAT16) &&
                         (input_w > 32 || input_h > 32) &&
                         poolx == 3)
+                        break;
+                    else if((TENSOR_SIZE_INDEX(input, 0) > GET_HW_FEATURE_MAD_PER_CORE(input) ) && (poolx == 3) )
                         break;
 
                     if(stride_x == 2 && stride_y == 2)
@@ -1275,14 +1277,6 @@ VX_INTERNAL_API vx_status vxoGraph_MergeConvolutionNodes(vx_node nodes[], vx_uin
                     break;
                 if(!vxoGraph_Optimization_isSameShapeTensor(convOutputTensor, maxpInput))
                     break;
-
-                if(SCALAR_VALUE(nodes[i]->paramTable[PARAM_POOLING_POOL_SIZE_X_INDEX], u32) == 3)
-                {
-                    vx_uint32 interleave = (TENSOR_SIZE_INDEX(convOutputTensor,0) < GET_HW_FEATURE_ACCUM_BUf_SIZE(convOutputTensor) / 4) ? 4 :
-                                            ((TENSOR_SIZE_INDEX(convOutputTensor,0) < GET_HW_FEATURE_ACCUM_BUf_SIZE(convOutputTensor) / 2) ? 2: 1);
-                    if((TENSOR_SIZE_INDEX(convOutputTensor,1)/interleave) > GET_HW_FEATURE_INPUT_BUF_SIZE(convOutputTensor) )
-                        break;
-                }
 
                 for(idx = 0; idx < TENSOR_DIM_NUM(maxpInput); idx ++)
                     if(TENSOR_SIZE_INDEX(maxpInput, i) != TENSOR_SIZE_INDEX(convOutputTensor, i))

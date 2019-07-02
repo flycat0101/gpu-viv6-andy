@@ -85,6 +85,7 @@ EXTERN_C_BEGIN
 #define GET_HW_FEATURE_ACCUM_BUf_SIZE(ref)      (((vx_reference)(ref) )->context->nnConfig.fixedFeature.nnAccumBufferDepth)
 #define GET_HW_FEATURE_INPUT_BUF_SIZE(ref)    (((vx_reference)(ref) )->context->nnConfig.fixedFeature.nnInputBufferDepth)
 #define GET_HW_FEATURE_PAD_BIT_SIZE(ref)    (((vx_reference)(ref) )->context->nnConfig.fixedFeature.nnInImageOffsetBits)
+#define GET_HW_FEATURE_MAD_PER_CORE(ref)    (((vx_reference)(ref) )->context->nnConfig.fixedFeature.nnMadPerCore)
 
 
 typedef enum _node_op_type_e
