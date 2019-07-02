@@ -783,7 +783,6 @@ __kernel void vxcSoftmax_Int16_1x1xN(
     __write_only image2d_array_t  output)
 {
     int4 coord = (int4)(16, get_global_id(0), 0, 0);
-    vxc_half8 scale;
 
     vxc_short8 img_val0, img_val1, img_val2, img_val3;
     vxc_short8 val = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0);
@@ -867,8 +866,9 @@ __kernel void vxcSoftmax_Int16_1x1xN(
             vxc_half4 dst1;
             _viv_asm(CONV, dst0, prob);
             VXC_DP4x4(dst1, dst0, dst0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniExtractHalf4_4x4);
-            _viv_asm(COPY, img_val0, dst1, 8);
-            VXC_WriteImage(output, coord.xy, img_val0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+            vxc_short4 dst;
+            _viv_asm(COPY, dst, dst1, 8);
+            VXC_WriteImage(output, coord.xy, dst, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
             coord.x += 4;
         }
     }
