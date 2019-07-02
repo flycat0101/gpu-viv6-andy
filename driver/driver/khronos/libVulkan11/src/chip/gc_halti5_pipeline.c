@@ -4583,6 +4583,36 @@ static VkResult halti5_pip_build_prepare(
     return VK_SUCCESS;
 }
 
+static VkResult halti5_pip_build_check(
+    __vkDevContext *devCtx,
+    __vkPipeline *pip
+    )
+{
+     uint32_t i = 0;
+
+    /*check the valid descriptorsetLayout*/
+    if (pip->pipelineLayout)
+    {
+        uint32_t descSetLayoutCount = pip->pipelineLayout->descSetLayoutCount;
+        uint32_t realCount = descSetLayoutCount;
+        for (i = 0; i < descSetLayoutCount; i++)
+        {
+            __vkDescriptorSetLayout *descSetLayout = pip->pipelineLayout->descSetLayout[i];
+            if (descSetLayout->validFlag != 0xff)
+            {
+                realCount--;
+                if ((i+1) < descSetLayoutCount)
+                {
+                    pip->pipelineLayout->descSetLayout[i] = pip->pipelineLayout->descSetLayout[i+1];
+                }
+            }
+        }
+        pip->pipelineLayout->descSetLayoutCount = realCount;
+    }
+
+    return VK_SUCCESS;
+}
+
 static void halti5_helper_destroyVscResLayout(
     __vkPipeline *pip
     )
@@ -5825,6 +5855,8 @@ VkResult halti5_createGraphicsPipeline(
 
     pip->chipPriv = chipGfxPipeline;
 
+    __VK_ONERROR(halti5_pip_build_check(devCtx, pip));
+
     __VK_ONERROR(halti5_pip_tweak(devCtx, pip, (void *)info));
 
     __VK_ONERROR(halti5_pip_build_prepare(devCtx, pip, info));
@@ -6449,6 +6481,8 @@ VkResult halti5_createComputePipeline(
     __VK_MEMZERO(chipCmptPipeline, sizeof(halti5_computePipeline));
 
     pip->chipPriv = chipCmptPipeline;
+
+    __VK_ONERROR(halti5_pip_build_check(devCtx, pip));
 
     __VK_ONERROR(halti5_pip_tweak(devCtx, pip, (void *)info));
 

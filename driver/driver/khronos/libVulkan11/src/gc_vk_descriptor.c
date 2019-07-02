@@ -768,6 +768,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDescriptorSetLayout(
     /* Initialize __vkDescriptorSetLayout specific data fields here */
     dsl->bindingCount = pCreateInfo->bindingCount;
     dsl->dynamicDescriptorCount = 0;
+    dsl->validFlag = 0xff;
 
     if (dsl->bindingCount)
     {
