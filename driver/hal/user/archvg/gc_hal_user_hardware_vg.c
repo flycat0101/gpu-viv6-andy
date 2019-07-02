@@ -821,7 +821,6 @@ _SetSampler(
 #if gcdVG_ONLY
             || (Image->format == gcvSURF_AYUY2)
 #endif
-
             )
         {
             gctUINT32 address1[3] = {0};
@@ -841,12 +840,13 @@ _SetSampler(
                 ));
             gcoSURF_Unlock(Image, NULL);
         }
-        else if ((Image->format == gcvSURF_YV12)
 #if gcdVG_ONLY
-                 || (Image->format == gcvSURF_ANV12)
-                 || (Image->format == gcvSURF_YV16)
+        else if ((Image->format == gcvSURF_YV12)
+              || (Image->format == gcvSURF_ANV12)
+              || (Image->format == gcvSURF_YV16))
+#else
+        else if (Image->format == gcvSURF_YV12)
 #endif
-                )
         {
             gctUINT32 address1[3] = {0};
             gctUINT8  isYV = 0;
