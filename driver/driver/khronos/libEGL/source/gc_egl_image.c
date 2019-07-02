@@ -1359,12 +1359,12 @@ _CreateImageDMABuf(
     if (!modifier0)
     {
         /* Check Modifier.*/
-        for (i = 0; i < 4; ++i)
+        for (i = 1; i < 4; ++i)
         {
-            EGLuint64KHR modifier = modifierLO[i] | (modifierHI[i] < 32);
+            EGLuint64KHR modifier = modifierLO[i] | (((EGLuint64KHR)modifierHI[i]) << 32);
 
-            if (modifier0 != modifier ||
-                !(modifierLO[i] != 0 && modifierHI[i] != 0))
+            if (modifier0 != modifier &&
+                (modifierLO[i] != 0 || modifierHI[i] != 0))
             {
                 veglSetEGLerror(Thread, EGL_BAD_PARAMETER);
                 return EGL_NO_IMAGE;
