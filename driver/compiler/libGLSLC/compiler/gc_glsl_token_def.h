@@ -155,50 +155,51 @@
      T_CENTROID = 390,
      T_FLAT = 391,
      T_SMOOTH = 392,
-     T_LAYOUT = 393,
-     T_UNIFORM_BLOCK = 394,
-     T_IDENTIFIER = 395,
-     T_TYPE_NAME = 396,
-     T_FLOATCONSTANT = 397,
-     T_INTCONSTANT = 398,
-     T_BOOLCONSTANT = 399,
-     T_UINTCONSTANT = 400,
-     T_FIELD_SELECTION = 401,
-     T_LEFT_OP = 402,
-     T_RIGHT_OP = 403,
-     T_INC_OP = 404,
-     T_DEC_OP = 405,
-     T_LE_OP = 406,
-     T_GE_OP = 407,
-     T_EQ_OP = 408,
-     T_NE_OP = 409,
-     T_AND_OP = 410,
-     T_OR_OP = 411,
-     T_XOR_OP = 412,
-     T_MUL_ASSIGN = 413,
-     T_DIV_ASSIGN = 414,
-     T_ADD_ASSIGN = 415,
-     T_MOD_ASSIGN = 416,
-     T_LEFT_ASSIGN = 417,
-     T_RIGHT_ASSIGN = 418,
-     T_AND_ASSIGN = 419,
-     T_XOR_ASSIGN = 420,
-     T_OR_ASSIGN = 421,
-     T_SUB_ASSIGN = 422,
-     T_LENGTH_METHOD = 423,
-     T_INVARIANT = 424,
-     T_HIGH_PRECISION = 425,
-     T_MEDIUM_PRECISION = 426,
-     T_LOW_PRECISION = 427,
-     T_PRECISION = 428,
-     T_PRECISE = 429,
-     T_COHERENT = 430,
-     T_VOLATILE = 431,
-     T_RESTRICT = 432,
-     T_READONLY = 433,
-     T_WRITEONLY = 434,
-     T_VIV_ASM = 435,
-     T_ASM_OPND_BRACKET = 436
+     T_NOPERSPECTIVE = 393,
+     T_LAYOUT = 394,
+     T_UNIFORM_BLOCK = 395,
+     T_IDENTIFIER = 396,
+     T_TYPE_NAME = 397,
+     T_FLOATCONSTANT = 398,
+     T_INTCONSTANT = 399,
+     T_BOOLCONSTANT = 400,
+     T_UINTCONSTANT = 401,
+     T_FIELD_SELECTION = 402,
+     T_LEFT_OP = 403,
+     T_RIGHT_OP = 404,
+     T_INC_OP = 405,
+     T_DEC_OP = 406,
+     T_LE_OP = 407,
+     T_GE_OP = 408,
+     T_EQ_OP = 409,
+     T_NE_OP = 410,
+     T_AND_OP = 411,
+     T_OR_OP = 412,
+     T_XOR_OP = 413,
+     T_MUL_ASSIGN = 414,
+     T_DIV_ASSIGN = 415,
+     T_ADD_ASSIGN = 416,
+     T_MOD_ASSIGN = 417,
+     T_LEFT_ASSIGN = 418,
+     T_RIGHT_ASSIGN = 419,
+     T_AND_ASSIGN = 420,
+     T_XOR_ASSIGN = 421,
+     T_OR_ASSIGN = 422,
+     T_SUB_ASSIGN = 423,
+     T_LENGTH_METHOD = 424,
+     T_INVARIANT = 425,
+     T_HIGH_PRECISION = 426,
+     T_MEDIUM_PRECISION = 427,
+     T_LOW_PRECISION = 428,
+     T_PRECISION = 429,
+     T_PRECISE = 430,
+     T_COHERENT = 431,
+     T_VOLATILE = 432,
+     T_RESTRICT = 433,
+     T_READONLY = 434,
+     T_WRITEONLY = 435,
+     T_VIV_ASM = 436,
+     T_ASM_OPND_BRACKET = 437
    };
 #endif
 #define T_ATTRIBUTE 258
@@ -336,50 +337,51 @@
 #define T_CENTROID 390
 #define T_FLAT 391
 #define T_SMOOTH 392
-#define T_LAYOUT 393
-#define T_UNIFORM_BLOCK 394
-#define T_IDENTIFIER 395
-#define T_TYPE_NAME 396
-#define T_FLOATCONSTANT 397
-#define T_INTCONSTANT 398
-#define T_BOOLCONSTANT 399
-#define T_UINTCONSTANT 400
-#define T_FIELD_SELECTION 401
-#define T_LEFT_OP 402
-#define T_RIGHT_OP 403
-#define T_INC_OP 404
-#define T_DEC_OP 405
-#define T_LE_OP 406
-#define T_GE_OP 407
-#define T_EQ_OP 408
-#define T_NE_OP 409
-#define T_AND_OP 410
-#define T_OR_OP 411
-#define T_XOR_OP 412
-#define T_MUL_ASSIGN 413
-#define T_DIV_ASSIGN 414
-#define T_ADD_ASSIGN 415
-#define T_MOD_ASSIGN 416
-#define T_LEFT_ASSIGN 417
-#define T_RIGHT_ASSIGN 418
-#define T_AND_ASSIGN 419
-#define T_XOR_ASSIGN 420
-#define T_OR_ASSIGN 421
-#define T_SUB_ASSIGN 422
-#define T_LENGTH_METHOD 423
-#define T_INVARIANT 424
-#define T_HIGH_PRECISION 425
-#define T_MEDIUM_PRECISION 426
-#define T_LOW_PRECISION 427
-#define T_PRECISION 428
-#define T_PRECISE 429
-#define T_COHERENT 430
-#define T_VOLATILE 431
-#define T_RESTRICT 432
-#define T_READONLY 433
-#define T_WRITEONLY 434
-#define T_VIV_ASM 435
-#define T_ASM_OPND_BRACKET 436
+#define T_NOPERSPECTIVE 393
+#define T_LAYOUT 394
+#define T_UNIFORM_BLOCK 395
+#define T_IDENTIFIER 396
+#define T_TYPE_NAME 397
+#define T_FLOATCONSTANT 398
+#define T_INTCONSTANT 399
+#define T_BOOLCONSTANT 400
+#define T_UINTCONSTANT 401
+#define T_FIELD_SELECTION 402
+#define T_LEFT_OP 403
+#define T_RIGHT_OP 404
+#define T_INC_OP 405
+#define T_DEC_OP 406
+#define T_LE_OP 407
+#define T_GE_OP 408
+#define T_EQ_OP 409
+#define T_NE_OP 410
+#define T_AND_OP 411
+#define T_OR_OP 412
+#define T_XOR_OP 413
+#define T_MUL_ASSIGN 414
+#define T_DIV_ASSIGN 415
+#define T_ADD_ASSIGN 416
+#define T_MOD_ASSIGN 417
+#define T_LEFT_ASSIGN 418
+#define T_RIGHT_ASSIGN 419
+#define T_AND_ASSIGN 420
+#define T_XOR_ASSIGN 421
+#define T_OR_ASSIGN 422
+#define T_SUB_ASSIGN 423
+#define T_LENGTH_METHOD 424
+#define T_INVARIANT 425
+#define T_HIGH_PRECISION 426
+#define T_MEDIUM_PRECISION 427
+#define T_LOW_PRECISION 428
+#define T_PRECISION 429
+#define T_PRECISE 430
+#define T_COHERENT 431
+#define T_VOLATILE 432
+#define T_RESTRICT 433
+#define T_READONLY 434
+#define T_WRITEONLY 435
+#define T_VIV_ASM 436
+#define T_ASM_OPND_BRACKET 437
 
 
 
@@ -423,8 +425,8 @@ typedef union YYSTYPE {
 
     slsASM_MODIFIERS            asmModifiers;
 } YYSTYPE;
-/* Line 1248 of yacc.c.  */
-#line 436 "gc_glsl_token_def.h"
+/* Line 1275 of yacc.c.  */
+#line 439 "gc_glsl_token_def.h"
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
 # define YYSTYPE_IS_TRIVIAL 1
