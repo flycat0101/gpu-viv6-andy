@@ -991,6 +991,7 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchNN(
     gctPOINTER tensorLogical  = gcvNULL;
     vx_uint32 tensorPhysical  = 0;
     vx_tensor tensor = VX_NULL;
+    vx_graph graph = node->graph;
 
     gcmHEADER_ARG("node=%p, NNData=%p, commandBuf=%p, statesBuf=%p, operation=%p, binLoad=%p, stateSize=%p",
         node, NNData, commandBuf, statesBuf, operation, binLoad, stateSize);
@@ -1036,12 +1037,21 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchNN(
                     /*Patch input. */
                     if (ioIndex >= 0)
                     {
-                        vx_reference ref = parameters[ioIndex];
+                        vx_reference ref = VX_NULL;
+                        if (graph->inputCount && graph->inputs)
+                        {
+                            ref = graph->inputs[ioIndex];
+                        }
+                        else
+                        {
+                            ref = parameters[ioIndex];
+                        }
+
                         if (ref->type == VX_TYPE_TENSOR)
                         {
                             vx_int32 *dims = VX_NULL;
                             vx_uint32 dimCount = 0;
-                            tensor = (vx_tensor)parameters[ioIndex];
+                            tensor = (vx_tensor)ref;
                             dims = TENSOR_ORIG_SIZES(tensor);
                             dimCount = TENSOR_ORIG_DIM_NUM(tensor);
                             for (j = 0; j < dimCount; j++)
@@ -1092,12 +1102,21 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchNN(
                     if (ioIndex >= 0)
                     {
                         vx_uint32 outIndex = ioIndex + binLoad->fixed.header.inputCount;
-                        vx_reference ref = parameters[outIndex];
+                        vx_reference ref = VX_NULL;
+                        if (graph->outputCount && graph->outputs)
+                        {
+                            ref = graph->outputs[ioIndex];
+                        }
+                        else
+                        {
+                            ref = parameters[outIndex];
+                        }
+
                         if (ref->type == VX_TYPE_TENSOR)
                         {
                             vx_int32 *dims = VX_NULL;
                             vx_uint32 dimCount = 0;
-                            tensor = (vx_tensor)parameters[outIndex]; /* get output tensor*/
+                            tensor = (vx_tensor)ref; /* get output tensor*/
                             dims = TENSOR_ORIG_SIZES(tensor);
                             dimCount = TENSOR_ORIG_DIM_NUM(tensor);
                             for (j = 0; j < dimCount; j++)
@@ -1311,6 +1330,7 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchTP(
     gctPOINTER tensorLogical  = gcvNULL;
     vx_uint32 tensorPhysical  = 0;
     vx_tensor tensor = VX_NULL;
+    vx_graph graph = node->graph;
     gcmHEADER_ARG("node=%p, TPData=%p, commandBuf=%p, statesBuf=%p, operation=%p, binLoad=%p, stateSize=%p",
         node, TPData, commandBuf, statesBuf, operation, binLoad, stateSize);
 
@@ -1353,12 +1373,21 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchTP(
                     /* patch input*/
                     if (ioIndex >= 0)
                     {
-                        vx_reference ref = parameters[ioIndex];
+                        vx_reference ref = VX_NULL;
+                        if (graph->inputCount && graph->inputs)
+                        {
+                            ref = graph->inputs[ioIndex];
+                        }
+                        else
+                        {
+                            ref = parameters[ioIndex];
+                        }
+
                         if (ref->type == VX_TYPE_TENSOR)
                         {
                             vx_int32 *dims = VX_NULL;
                             vx_uint32 dimCount = 0;
-                            tensor = (vx_tensor)parameters[ioIndex];
+                            tensor = (vx_tensor)ref;
                             dims = TENSOR_ORIG_SIZES(tensor);
                             dimCount = TENSOR_ORIG_DIM_NUM(tensor);
                             for (j = 0; j < dimCount; j++)
@@ -1410,12 +1439,21 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchTP(
                     if (ioIndex >= 0)
                     {
                         vx_uint32   outIndex = ioIndex + binLoad->fixed.header.inputCount;
-                        vx_reference ref = parameters[outIndex];
+                        vx_reference ref = VX_NULL;
+                        if (graph->outputCount && graph->outputs)
+                        {
+                            ref = graph->outputs[ioIndex];
+                        }
+                        else
+                        {
+                            ref = parameters[outIndex];
+                        }
+
                         if (ref->type == VX_TYPE_TENSOR)
                         {
                             vx_int32 *dims = VX_NULL;
                             vx_uint32 dimCount = 0;
-                            tensor = (vx_tensor)parameters[outIndex]; /* get output tensor*/
+                            tensor = (vx_tensor)ref; /* get output tensor*/
                             dims = TENSOR_ORIG_SIZES(tensor);
                             dimCount = TENSOR_ORIG_DIM_NUM(tensor);
                             for (j = 0; j < dimCount; j++)
@@ -1621,6 +1659,7 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSH(
     gctPOINTER tensorLogical  = gcvNULL;
     vx_uint32 tensorPhysical  = 0;
     vx_tensor tensor = VX_NULL;
+    vx_graph graph = node->graph;
 
     gcmHEADER_ARG("node=%p, SHDate=%p, SHCommand=%p, SHStates=%p, operation=%p, binLoad=%p, cmdBufSize=%p, stateSize=%p",
         node, SHDate, SHCommand, SHStates, operation, binLoad, cmdBufSize, stateSize);
@@ -1669,7 +1708,15 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSH(
                 if (ioIndex >= 0)
                 {
                     vx_uint32 number = binLoad->inputPatch[ioIndex].number;
-                    vx_reference ref = parameters[ioIndex];
+                    vx_reference ref = VX_NULL;
+                    if (graph->inputCount && graph->inputs)
+                    {
+                        ref = graph->inputs[ioIndex];
+                    }
+                    else
+                    {
+                        ref = parameters[ioIndex];
+                    }
 
                     memAddr = (vx_uint32 *) (SHStates + shPatchData->offset);
                     binLoad->inputPatch[ioIndex].offsets[number] = *memAddr - shPatchData->originalBaseAddress;
@@ -1678,7 +1725,7 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSH(
 
                     if (ref->type == VX_TYPE_SCALAR)
                     {
-                        vx_scalar scalar =  (vx_scalar)parameters[ioIndex];
+                        vx_scalar scalar =  (vx_scalar)ref;
                         if ((kernel->signature.directionTable[ioIndex] == VX_INPUT) &&
                             (vxoScalar_GetTypeSize(scalar) == binLoad->inputs[ioIndex].dims[0]))
                         {
@@ -1694,7 +1741,7 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSH(
                     {
                         vx_int32 *dims = VX_NULL;
                         vx_uint32 dimCount = 0;
-                        tensor = (vx_tensor)parameters[ioIndex];
+                        tensor = (vx_tensor)ref;
                         dims = TENSOR_ORIG_SIZES(tensor);
                         dimCount = TENSOR_ORIG_DIM_NUM(tensor);
                         for (j = 0; j < dimCount; j++)
@@ -1720,7 +1767,7 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSH(
                     }
                     else if (ref->type == VX_TYPE_IMAGE)
                     {
-                        vx_image image = (vx_image)parameters[ioIndex];
+                        vx_image image = (vx_image)ref;
                         gcoVX_Kernel_Context kernelContext; /* not useful, just fulfill the interface */
                         gcsVX_IMAGE_INFO imageInfo;
                         INITIALIZE_STRUCT(imageInfo);
@@ -1742,7 +1789,7 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSH(
                     }
                     else if (ref->type == VX_TYPE_ARRAY)
                     {
-                        vx_array array = (vx_array)parameters[ioIndex];
+                        vx_array array = (vx_array)ref;
                         if (kernel->signature.directionTable[ioIndex] == VX_INPUT)
                         {
                             *memAddr = (*memAddr - shPatchData->originalBaseAddress) + array->memory.physicals[0];
@@ -1773,8 +1820,15 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSH(
                 {
                     vx_uint32 number = binLoad->outputPatch[ioIndex].number;
                     vx_uint32 outIndex = ioIndex + binLoad->fixed.header.inputCount;
-                    vx_reference ref = parameters[outIndex];
-
+                    vx_reference ref = VX_NULL;
+                    if (graph->outputCount && graph->outputs)
+                    {
+                        ref = graph->outputs[ioIndex];
+                    }
+                    else
+                    {
+                        ref = parameters[outIndex];
+                    }
                     memAddr = (vx_uint32 *) (SHStates + shPatchData->offset);
                     binLoad->outputPatch[ioIndex].offsets[number] = *memAddr - shPatchData->originalBaseAddress;
                     binLoad->outputPatch[ioIndex].references[number] = memAddr;
@@ -1784,7 +1838,7 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSH(
                     {
                         vx_int32 *dims = VX_NULL;
                         vx_uint32 dimCount = 0;
-                        tensor = (vx_tensor)parameters[outIndex]; /* get output tensor*/
+                        tensor = (vx_tensor)ref; /* get output tensor*/
                         dims = TENSOR_ORIG_SIZES(tensor);
                         dimCount = TENSOR_ORIG_DIM_NUM(tensor);
 
@@ -1811,7 +1865,7 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSH(
                     }
                     else if (ref->type == VX_TYPE_IMAGE)
                     {
-                        vx_image image = (vx_image)parameters[outIndex];
+                        vx_image image = (vx_image)ref;
                         gcoVX_Kernel_Context kernelContext; /* not useful, just fulfill the interface */
                         gcsVX_IMAGE_INFO imageInfo;
                         INITIALIZE_STRUCT(imageInfo);
@@ -1833,7 +1887,7 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSH(
                     }
                     else if (ref->type == VX_TYPE_ARRAY)
                     {
-                        vx_array array = (vx_array)parameters[ioIndex];
+                        vx_array array = (vx_array)ref;
                         if (kernel->signature.directionTable[outIndex] == VX_OUTPUT)
                         {
                             *memAddr = (*memAddr - shPatchData->originalBaseAddress) + array->memory.physicals[0];
@@ -2007,6 +2061,7 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSC(
     vx_int32 lcdtIndex = 0;
     vx_uint32 *memAddr = VX_NULL;
     vx_uint32 inputImagePlane = 0;
+    vx_graph graph = node->graph;
     gcmHEADER_ARG("node=%p, SCStates=%p, operation=%p, binLoad=%p, stateSize=%p", node, SCStates, operation, binLoad, stateSize);
 
     /* copy SC states*/
@@ -2032,8 +2087,16 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSC(
                 {
                     if (ioIndex >= 0)
                     {
-                        vx_reference ref = parameters[ioIndex];
+                        vx_reference ref = VX_NULL;
                         vx_uint32 number = binLoad->inputPatch[ioIndex].number;
+                        if (graph->inputCount && graph->inputs)
+                        {
+                            ref = graph->inputs[ioIndex];
+                        }
+                        else
+                        {
+                            ref = parameters[ioIndex];
+                        }
 
                         memAddr = (vx_uint32 *) (SCStates + scPatchData->offset);
                         binLoad->inputPatch[ioIndex].offsets[number] = *memAddr - scPatchData->originalBaseAddress;
@@ -2042,7 +2105,7 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSC(
 
                         if (ref->type == VX_TYPE_IMAGE)
                         {
-                            vx_image image = (vx_image)parameters[ioIndex];
+                            vx_image image = (vx_image)ref;
                             gcoVX_Kernel_Context kernelContext; /* not useful, just fulfill the interface */
                             gcsVX_IMAGE_INFO imageInfo;
                             INITIALIZE_STRUCT(imageInfo);
@@ -2087,9 +2150,17 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSC(
                     if (ioIndex >= 0)
                     {
                         vx_uint32 outIndex = ioIndex + binLoad->fixed.header.inputCount;
-                        vx_reference ref = parameters[outIndex];
                         vx_uint8_ptr tensorLogical = VX_NULL;
                         vx_uint32 number = binLoad->outputPatch[ioIndex].number;
+                        vx_reference ref = VX_NULL;
+                        if (graph->outputCount && graph->outputs)
+                        {
+                            ref = graph->outputs[ioIndex];
+                        }
+                        else
+                        {
+                            ref = parameters[outIndex];
+                        }
 
                         if (ref->type == VX_TYPE_TENSOR)
                         {
@@ -2097,7 +2168,7 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSC(
                             vx_uint32 dimCount = 0;
                             vx_uint32 outputPhyddr = 0;
 
-                            tensor = (vx_tensor)parameters[outIndex]; /* get output tensor*/
+                            tensor = (vx_tensor)ref; /* get output tensor*/
                             dims = TENSOR_ORIG_SIZES(tensor);
                             dimCount = TENSOR_ORIG_DIM_NUM(tensor);
 
