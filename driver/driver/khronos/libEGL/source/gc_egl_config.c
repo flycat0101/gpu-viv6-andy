@@ -75,6 +75,9 @@ veglParseAttributes(
     Configuration->transparentRedValue    = EGL_DONT_CARE;
     Configuration->transparentGreenValue  = EGL_DONT_CARE;
     Configuration->transparentBlueValue   = EGL_DONT_CARE;
+#if defined(ANDROID)
+    Configuration->supportFBTarget   = EGL_DONT_CARE;
+#endif
 
     /* Parse the attribute list. */
     do
@@ -333,6 +336,15 @@ veglParseAttributes(
             }
             Configuration->maxSwapInterval = value;
             break;
+
+#if defined(ANDROID)
+        case EGL_ANDROID_framebuffer_target:
+            gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_EGL_CONFIG,
+                          "%s: EGL_ANDROID_framebuffer_target=%d",
+                          __FUNCTION__, value);
+            Configuration->supportFBTarget = value;
+            break;
+#endif
 
         case EGL_LUMINANCE_SIZE:
             gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_EGL_CONFIG,
@@ -1177,6 +1189,18 @@ eglChooseConfig(
             continue;
         }
 
+#if defined(ANDROID)
+        if ((criteria.supportFBTarget != (EGLint) EGL_DONT_CARE)
+        &&  (criteria.supportFBTarget != configuration->supportFBTarget)
+        )
+        {
+            /* Criterium doesn't match. */
+            gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_EGL_CONFIG,
+                          "  rejected on EGL_ANDROID_framebuffer_target config.");
+            continue;
+        }
+#endif
+
         if (criteria.transparentType != (EGLenum) EGL_DONT_CARE)
         {
             if (criteria.transparentType != configuration->transparentType)
@@ -1465,6 +1489,12 @@ eglGetConfigAttrib(
     case EGL_MAX_SWAP_INTERVAL:
         *value = eglConfig->maxSwapInterval;
         break;
+
+#if defined(ANDROID)
+    case EGL_ANDROID_framebuffer_target:
+        *value = eglConfig->supportFBTarget;
+        break;
+#endif
 
     case EGL_LUMINANCE_SIZE:
         *value = eglConfig->luminanceSize;

@@ -311,6 +311,11 @@ struct eglDisplay
 
     /* Sentinel for a list of active workers that are queued up. */
     struct eglWorkerInfo        workerSentinel;
+
+#if defined(ANDROID)
+    /* Bool for EGL_ANDROID_framebuffer_target */
+    gctBOOL                     supportFBTarget;
+#endif
 };
 
 struct eglConfig
@@ -353,6 +358,11 @@ struct eglConfig
     EGLBoolean                  swizzleRB;
     /* EGL_ANDROID_recordable extension. */
     EGLBoolean                  recordableConfig;
+
+#if defined(ANDROID)
+    /* Bool for EGL_ANDROID_framebuffer_target */
+    gctBOOL                     supportFBTarget;
+#endif
 };
 
 enum _VEGL_DIRECT_RENDERING_MODE

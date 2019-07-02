@@ -372,7 +372,10 @@ _FillIn(
 
     config->configCaveat = EGL_NONE;
     config->minSwapInterval = Display->minSwapInterval;
-    config->maxSwapInterval = Display->maxSwapInterval;;
+    config->maxSwapInterval = Display->maxSwapInterval;
+#if defined(ANDROID)
+    config->supportFBTarget = Display->supportFBTarget;
+#endif
 
     config->level                 = 0;
     config->transparentType       = EGL_NONE;
@@ -1008,6 +1011,10 @@ veglGetPlatformDisplay(
             display->minSwapInterval = 0;
             display->maxSwapInterval = 1;
         }
+
+#if defined(ANDROID)
+        display->supportFBTarget = gcvTRUE;
+#endif
 
         /* create access mutext to lock display */
         gcmVERIFY_OK(gcoOS_CreateMutex(gcvNULL, &display->accessMutex));
