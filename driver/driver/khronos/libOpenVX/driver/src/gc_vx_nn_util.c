@@ -3738,7 +3738,7 @@ vx_status vxnneCalculateConvTilingParam(
     vx_uint32                                 vipSize
     )
 {
-    vx_uint32 i, minKPK=0xFFFFFFFF, imode = 0;
+    vx_uint32 i, minKPK=0xFFFFFFFF, imode = 0, maxTileHeight = 0;
     vx_arch_perf_s perf;
 
     for (i = 0; i < count; i++)
@@ -3777,10 +3777,11 @@ vx_status vxnneCalculateConvTilingParam(
         info[i].tilingParam.outImageTileYSize = perf.resultInfo.outImageTileYSize;
         info[i].tilingParam.interleaveMode    = perf.resultInfo.interleaveMode;
         info[i].tilingParam.nnCoreCount       = perf.resultInfo.nnCoreCount;
-        if (perf.resultInfo.kernelsPerCore < minKPK)
+        if (maxTileHeight < info[i].output.height)
         {
             minKPK = perf.resultInfo.kernelsPerCore;
             imode = perf.resultInfo.interleaveMode;
+            maxTileHeight = info[i].output.height;
         }
     }
 
