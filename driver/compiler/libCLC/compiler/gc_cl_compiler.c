@@ -2659,8 +2659,6 @@ cloCOMPILER_MakeCurrent(
 #ifndef CL_SCAN_NO_PREPROCESSOR
     if (Compiler->context.useNewPP)
     {
-        /* This message is for testing now, will remove it later */
-        gcmPRINT("INFO: New preprocessor is used.\n");
         status = cloPREPROCESSOR_SetSourceStrings(
                                             Compiler->preprocessor,
                                             StringCount,
