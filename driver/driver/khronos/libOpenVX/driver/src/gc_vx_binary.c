@@ -1897,6 +1897,22 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSH(
                             vxmONERROR(VX_ERROR_INVALID_FORMAT);
                         }
                     }
+                    else if (ref->type == VX_TYPE_SCALAR)
+                    {
+                        vx_scalar scalar =  (vx_scalar)ref;
+                        vx_uint32 size = vxoScalar_GetTypeSize(scalar);
+                        vx_uint32 dim = (vx_uint32)binLoad->outputs[ioIndex].dims[0];
+                        if ((kernel->signature.directionTable[outIndex] == VX_OUTPUT) &&
+                            (size == dim))
+                        {
+                            *memAddr = (*memAddr - shPatchData->originalBaseAddress) + scalar->physical;
+                        }
+                        else
+                        {
+                            vxError("sh patch output failed, please check your output scalar data format\n");
+                            vxmONERROR(VX_ERROR_INVALID_FORMAT);
+                        }
+                    }
                     else
                     {
                         vxError("sh patch output failed, doesn't support this format : %d\n", ref->type);
@@ -3615,6 +3631,11 @@ VX_PRIVATE_API vx_status vxoGraphBinary_RefineInputOutput(
                 vx_scalar scalar = (vx_scalar)ref;
                 binarySave->inputPhysicalEntry[i] = scalar->physical;
             }
+            else
+            {
+                vxError("%s[%d]: input can't support this data type: %d \n",
+                    __FUNCTION__, __LINE__, ref->type);
+            }
         }
         /* clean other data*/
         for (i = graph->inputCount; i < VX_MAX_NN_INOUT_PARAM_COUNT; i++)
@@ -3667,6 +3688,11 @@ VX_PRIVATE_API vx_status vxoGraphBinary_RefineInputOutput(
             {
                 vx_scalar scalar = (vx_scalar)ref;
                 binarySave->outputPhysicalEntry[i] = scalar->physical;
+            }
+            else
+            {
+                vxError("%s[%d]: output can't support this data type: %d \n",
+                    __FUNCTION__, __LINE__, ref->type);
             }
         }
         /* clean other data*/
@@ -3937,6 +3963,15 @@ VX_PRIVATE_API vx_status vxoGraphBinary_InputsOutputs(
                 {
                     continue;
                 }
+            }
+            else if (paramRef->type == VX_TYPE_SCALAR)
+            {
+                if (node->kernel->signature.stateTable[paramIndex] != VX_PARAMETER_STATE_OPTIONAL)
+                {
+                    /* scalar is graph output*/
+                    outputTable[outNum++] = paramRef;
+                }
+                continue;
             }
             else
             {
@@ -6221,6 +6256,43 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
                     continue;
                 }
             }
+            else if (paramRef->type == VX_TYPE_SCALAR)
+            {
+                if (node->kernel->signature.stateTable[paramIndex] != VX_PARAMETER_STATE_OPTIONAL)
+                {
+                    /* scalar is graph input*/
+                    vx_scalar scalar = (vx_scalar)paramRef;
+                    vx_uint32 index = 0;
+                    if (0 != graph->base.context->options.enableSaveBinary)
+                    {
+                        for (i = 0; i < binarySave->outputTableRefCount; i++)
+                        {
+                            vx_reference outputRef = binarySave->outputTableRef[i];
+                            if (paramRef == outputRef)
+                            {
+                                binarySave->outputEntry[i] = paramRef;
+                                index = i;
+                                binarySave->outputParamCount++;
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {   /* cache binary graph */
+                        index = binarySave->outputParamCount;
+                        binarySave->outputEntry[index] = paramRef;
+                        binarySave->outputParamCount++;
+                    }
+
+                    if (i >= binarySave->outputTableRefCount)
+                    {
+                        vxError("generate binary graph output not match for scale....\n");
+                    }
+
+                    binarySave->outputPhysicalEntry[index] = scalar->physical;
+                }
+                continue;
+            }
             else
             {
                continue;
@@ -7113,6 +7185,23 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
                 outputInfo.dataType      = VX_BINARY_BUFFER_TYPE_ARRAY;
                 outputInfo.quantFormat   = VX_BINARY_BUFFER_QUANT_FORMAT_NONE;
                 outputInfo.dims[0]       = (vx_uint32)array->capacity;
+                outputInfo.dims[1]       = 1;
+                outputInfo.dims[2]       = 1;
+                outputInfo.dims[3]       = 1;
+                outputInfo.fixedPointPos = 0;
+                outputInfo.tfScale       = 0;
+                outputInfo.tfZeroPoint   = 0;
+            }
+            else if (ref->type == VX_TYPE_SCALAR)
+            {
+                /* the buffer size of scalar equal to dims[0] * dims[1] * dims[2] * dims[3] * sizeof(int8)
+                   set all scalar data format to int8, application used dims to calculator buffer size */
+                vx_scalar scalar = (vx_scalar)ref;
+                outputInfo.dimCount      = 1;
+                outputInfo.dataFormat    = vxoGraphBinary_ConvertToBinaryBufferFormat(VX_TYPE_INT8);
+                outputInfo.dataType      = VX_BINARY_BUFFER_TYPE_SCALAR;
+                outputInfo.quantFormat   = VX_BINARY_BUFFER_QUANT_FORMAT_NONE;
+                outputInfo.dims[0]       = vxoScalar_GetTypeSize(scalar);
                 outputInfo.dims[1]       = 1;
                 outputInfo.dims[2]       = 1;
                 outputInfo.dims[3]       = 1;

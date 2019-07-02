@@ -7212,14 +7212,6 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyAllNodeParameters(vx_graph graph)
         vx_meta_format metaFormat = VX_NULL;
         vx_node node = graph->nodeTable[nodeIndex];
 
-        /* graph binary kernel sanity check*/
-        if ((node->kernel->enumeration == VX_KERNEL_IMPORT_FROM_FILE) && (nodeIndex > 0))
-        {
-            vxError("binary kernel only one node in graph, nodeCount: %d\n", graph->nodeCount);
-            gcmFOOTER_ARG("%d", VX_ERROR_NOT_SUPPORTED);
-            return VX_ERROR_NOT_SUPPORTED;
-        }
-
         /* Check if all required parametes are supplied */
         for (paramIndex = 0; paramIndex < node->kernel->signature.paramCount; paramIndex++)
         {
@@ -7348,8 +7340,12 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyAllNodeParameters(vx_graph graph)
             {
                 vx_status validationStatus;
                 vx_reference paramRef = node->paramTable[paramIndex];
-                    vx_reference vRef = node->paramTable[paramIndex];
+                vx_reference vRef = node->paramTable[paramIndex];
 
+                if (node->kernel->enumeration == VX_KERNEL_IMPORT_FROM_FILE)
+                {
+                    break;
+                }
 
                 if (paramRef == VX_NULL) continue;
 
