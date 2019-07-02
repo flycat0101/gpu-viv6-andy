@@ -3059,6 +3059,7 @@ eglWaitGL(
 
     gcmDUMP_API("${EGL eglWaitGL}");
     VEGL_TRACE_API(WaitGL)();
+    thread = veglGetThreadData();
 
     /* Backwards compatibility. */
     api = veglQueryAPI();
