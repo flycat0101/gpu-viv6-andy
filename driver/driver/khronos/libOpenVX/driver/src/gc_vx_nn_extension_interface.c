@@ -24269,7 +24269,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConcatIndefiniteLayer_Initializer(vx_n
     vx_uint32  i                = 0;
     vx_uint32  dimCount         = TENSOR_VIEW_DIM_NUM(output_s);
     vx_uint32  itemCount        = (vx_uint32)input_s->itemCount;
-    vx_uint32  batchCount       = TENSOR_SIZE_INDEX(output_s, 3);
+    vx_uint32  batchCount       = dimCount > 3 ? TENSOR_SIZE_INDEX(output_s, 3) : 1;
     vx_uint32  operationCount   = 1;
     vx_uint32  opIdx            = 0;
     vx_uint32  operationIndex   = 0;
@@ -24293,7 +24293,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConcatIndefiniteLayer_Initializer(vx_n
 
             enable_SHExe = (vx_bool)(TENSOR_DATA_TYPE(input) != VX_TYPE_FLOAT32 && enable_SHExe);
         }
-        enable_SHExe = enable_SHExe && (_Is_concat_on_highest_dimension(output_s, axis) || axis < 4);
+        enable_SHExe = enable_SHExe && (_Is_concat_on_highest_dimension(output_s, axis) || (axis < 3 && batchCount == 1));
     }
     else
     {
@@ -24492,6 +24492,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConcatIndefiniteLayer_Initializer(vx_n
             vx_uint32 new_sizes[4]              = {w, h, c, n};
             vx_uint32 dims_idx[4]               = {0, 1, 2, 3};
             vx_uint32 perm_array[4]             = {0, 1, 2, 3};
+
+            dimCount = dimCount < 4 ? dimCount : dimCount - 1;
 
             perm_array[axis]            = dims_idx[dimCount - 1];
             perm_array[dimCount - 1]    = dims_idx[axis];
