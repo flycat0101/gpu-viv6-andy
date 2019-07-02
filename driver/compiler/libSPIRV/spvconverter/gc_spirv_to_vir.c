@@ -10335,7 +10335,12 @@ VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
             bSourceSignedInteger = gcvTRUE;
         }
     }
-    if (opCode == SpvOpBitFieldSExtract)
+    if (opCode == SpvOpBitFieldSExtract         ||
+        /*
+        ** Although that spir-v spec doesn't descripte that the type of BASE must be a signed integer,
+        ** vulkan CTS does treat it as a signed integer, so we do the same conversion to make it happy.
+        */
+        opCode == SpvOpShiftRightArithmetic)
     {
         bDestSignedInteger = gcvTRUE;
         bSourceSignedInteger = gcvTRUE;
