@@ -22647,7 +22647,7 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
     vxnne_shader_executable shaderExecutable = VX_NULL;
     vxnne_kernel_shaders        kernel;
 
-    vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {1, 1, 1}, {0, 0, 0}, {0, 0, 0}};
     vx_reference  parameters[4]         = {(vx_reference)input0, (vx_reference)input1, (vx_reference)output, (vx_reference)NULL};
     vx_enum       policyEnum            = convertPolicy->value->e;
     vx_uint32     dims                  = TENSOR_DIM_NUM(output);
@@ -23096,6 +23096,7 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
         else
             execution_parameters.globalWorkScale[0]  = 8;
         execution_parameters.globalWorkScale[1]  = 1;
+        execution_parameters.globalWorkScale[2]  = 1;
     }
     else
     {
@@ -23251,14 +23252,12 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
         else
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtact8Bin_2x8", 1, uniExtact8Bin_2x8);
         if (status != VX_SUCCESS) goto OnError;
+
+        execution_parameters.globalWorkScale[0]  = 8;
+        execution_parameters.globalWorkScale[1]  = 1;
+        execution_parameters.globalWorkScale[2]  = 1;
     }
 
-    execution_parameters.globalWorkOffset[0] = 0;
-    execution_parameters.globalWorkOffset[1] = 0;
-    execution_parameters.globalWorkOffset[2] = 0;
-    execution_parameters.globalWorkScale[0]  = 8;
-    execution_parameters.globalWorkScale[1]  = 1;
-    execution_parameters.globalWorkScale[2]  = 1;
     execution_parameters.globalWorkSize[0]   = gcmALIGN((wksizes[0] + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
     execution_parameters.globalWorkSize[1]   = (wksizes[1] + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
     execution_parameters.globalWorkSize[2]   = wksizes[2];
