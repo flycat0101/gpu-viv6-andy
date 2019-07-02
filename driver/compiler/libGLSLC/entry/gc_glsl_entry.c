@@ -502,14 +502,6 @@ gcCompileShader(
                 dumpOption &=~slvDUMP_CODE_GENERATOR;
             }
 
-            if (shader_.clientApiVersion == gcvAPI_OPENGL)
-            {
-                /* set default language version as 110 */
-                gcmONERROR(sloCOMPILER_SetLanguageVersion(compiler,
-                                                          110,
-                                                          gcvTRUE));
-            }
-
             gcmONERROR(sloCOMPILER_Compile(compiler,
                                            optOption,
                                            dumpOption,

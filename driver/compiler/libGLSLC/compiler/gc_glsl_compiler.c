@@ -1238,6 +1238,12 @@ sloCOMPILER_Compile(
     Compiler->context.dumpOptions           = DumpOptions;
     Compiler->context.scannerState          = slvSCANNER_NORMAL;
 
+    /* For OGL, set default language version as 110 first. */
+    if (sloCOMPILER_GetClientApiVersion(Compiler) == gcvAPI_OPENGL)
+    {
+        sloCOMPILER_SetLanguageVersion(Compiler, 110, gcvTRUE);
+    }
+
     /* Check if HW has HALTI5 and FMA support */
     if(GetHWHasHalti5() && GetHWHasFmaSupport())
     {

@@ -3960,7 +3960,7 @@ _RemapTempIndexForExpandFunction(
                                               -1,
                                               -1,
                                               &varIndex));
-            i += GetVariableKnownArraySize(variable) - 1;
+            i += GetVariableKnownArraySize(variable) * gcmType_Rows(variable->u.type) - 1;
         }
     }
 
