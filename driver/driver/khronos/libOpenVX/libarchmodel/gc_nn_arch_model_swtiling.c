@@ -660,6 +660,14 @@ static vx_uint32 _kernel_size_in_pixel(struct _archModelInfo *archModel, vx_int3
         coefCompressionRatio = WB_COMPRESS_RATIO(opInfo->weight_bias);
     }
 
+    if (opInfo->op == VXNNE_OPERATOR_DEPTH_WISE_CONV)
+    {
+        return (vx_uint32)(opInfo->kx
+                      * opInfo->ky
+                      * opInfo->oz
+                      * coefCompressionRatio + 0.5f);
+    }
+
     if (opInfo->target != VXNNE_OPERATION_TARGET_TP || opInfo->op == VXNNE_OPERATOR_FULLYCONNECTED)
     {
         if (full_chache_kernel_head_fix)
@@ -805,7 +813,7 @@ static vx_bool _calc_y_subimage(
 
     for (i = segment_first; i <= segment_last - 1; i++)
     {
-        vx_uint32 termAIn, termBIn;
+        vx_int32 termAIn, termBIn;
         if (archModel->opInfoArray[i + 1]->target != VXNNE_OPERATION_TARGET_TP ||
             (archModel->opInfoArray[i + 1]->op == VXNNE_OPERATOR_FULLYCONNECTED))
         {
@@ -850,6 +858,20 @@ static vx_bool _calc_y_subimage(
     {
         m = (vx_int32)((axi_sram_left - termB) / termA);
     }
+
+    {
+       vx_int32 min_m = (vx_int32)(192 / archModel->opInfoArray[segment_last]->pix);
+       if (m > 0)
+       {
+           vx_int32 temp_m = m;
+           while (((archModel->opInfoArray[segment_last]->piy % temp_m) > 0) && (temp_m > min_m))
+           {
+               temp_m = temp_m - 1;
+           }
+           m = (temp_m == min_m) ? gcmMAX(m, temp_m) : temp_m;
+       }
+    }
+
 #if ENABLE_ARCH_MODEL_DUMP
     vxInfo("M=%d\n", m);
 #endif
@@ -1373,9 +1395,6 @@ static void _subimage_segment_cost(
 
                             cost_cycle += c;
                             cost_bw += archModel->opInfoArray[j]->perf.resultInfo.perfReadBandWidth + archModel->opInfoArray[j]->perf.resultInfo.perfWriteBandWidth;
-#if ENABLE_ARCH_MODEL_DUMP
-                            vxInfo("calc_cost(%d, %d)(%d): %.7f, readBW: %.7f, writeBW: %.7f\n", segment_first + 1, segment_last + 1, j + 1, c, archModel->opInfoArray[j]->perf.resultInfo.perfReadBandWidth, archModel->opInfoArray[j]->perf.resultInfo.perfWriteBandWidth);
-#endif
                         }
                         else
                         {

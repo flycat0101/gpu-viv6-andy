@@ -26,6 +26,14 @@ static vx_uint32 _kernel_size_in_pixel_by_arch_perf(
     vx_bool full_chache_kernel_head_fix)
 {
     vx_float64 coefCompressionRatio = perf->coefCompressRatio;
+    if (opType == VXNNE_OPERATOR_DEPTH_WISE_CONV)
+    {
+        return (vx_uint32)(perf->info.kx
+                      * perf->info.ky
+                      * perf->info.outz
+                      * coefCompressionRatio + 0.5f);
+    }
+
     if (opTarget != VXNNE_OPERATION_TARGET_TP || opType == VXNNE_OPERATOR_FULLYCONNECTED)
     {
         if (coefCompressionRatio)
@@ -204,8 +212,8 @@ static void _calcArchModelCacheMode(vx_context context, vx_arch_perf perf, vx_in
 
 
 static vx_int8 gOrigShowType = -1;
-static const vx_char *archModelVersion = "ARCHCTS@211217";
-static const vx_char *SWTilingVersion = "0.120-";
+static const vx_char *archModelVersion = "ARCHCTS@211781";
+static const vx_char *SWTilingVersion = "ARCHCTS@211781";
 vx_status showArchPerformance(
     vx_context context,
     vxnne_layer layer,
@@ -358,6 +366,10 @@ vx_status showArchPerformance(
             context->nnConfig.fixedFeature.shaderCoreCount
             );
 
+        vxInfo("KERNEL_PER_CORE_LESS_THAN_THIRD_COEF_BUFF_DEPTH_FIX: %d\n",
+            context->nnConfig.unifiedFeature.kernelPerCoreLTOneThirdCoefFix
+            );
+
         vxInfo("LOW_EFFICIENCY_OF_ID_WRITE_IMGBUF_FIX: %d\n",
             context->nnConfig.unifiedFeature.lowEfficiencyOfIDWriteImgBufFix
             );
@@ -422,10 +434,6 @@ vx_status showArchPerformance(
     {
         vxInfo("NumUsedNNCores: %d\nConvOutFIFODepth: %d\n\n", perf->info.nnCores, perf->info.convOutFifoDepth);
     }
-
-        vxInfo("KERNEL_PER_CORE_LESS_THAN_THIRD_COEF_BUFF_DEPTH_FIX: %d\n",
-            context->nnConfig.unifiedFeature.kernelPerCoreLTOneThirdCoefFix
-            );
 
     if (perf->opType == VXNNE_OPERATOR_CONVOLUTION
         || perf->opType == VXNNE_OPERATOR_DEPTH_WISE_CONV
@@ -2006,7 +2014,14 @@ static vx_float64 _calcNNCycleCountBandWidth(
     vxmASSERT((cycleCost->tile0VZGroup0 >= -0.1) && (cycleCost->tile0ResetVZGroup >= -0.1) && (cycleCost->resetTileVZGroup0 >= -0.1) && (cycleCost->resetTileResetVZGroup >= -0.1));
 
     imageRepeatedSingleRead = _calcTile3DImageSingleReadRepeated(z, kernel_per_core, cores, is_depth_wise);
-    kernelDecodeCycleCount = refined_non_zero_ratio * kx * ky * kz * z * _calcKernel4DSingleReadRepeated(tile_x, tile_y, x, y) / (cores * coef_decode_perf);
+    if (is_depth_wise)
+    {
+        kernelDecodeCycleCount = refined_non_zero_ratio * kx * ky * z * _calcKernel4DSingleReadRepeated(tile_x, tile_y, x, y) / (cores * coef_decode_perf);
+    }
+    else
+    {
+        kernelDecodeCycleCount = refined_non_zero_ratio * kx * ky * kz * z * _calcKernel4DSingleReadRepeated(tile_x, tile_y, x, y) / (cores * coef_decode_perf);
+    }
     cycleCost = &kernelDecodeCycleCost;
     cycleCost->cost = kernelDecodeCycleCount;
     cycleCost->tile0VZGroup0 = kernelDecodeCycleCount * (1.0f * tile_x / x) * (1.0f * tile_y / y) * gcmMIN((1.0f * kernel_per_core * cores / z), 1.0f);
