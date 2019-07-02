@@ -716,8 +716,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_stroeNodeDetail2json(vx_node node
         vxoGraphOptimization_stroeNodeDims2paramter(paramters, node);
         vxoJson_AddBoolToObject(paramters, "has_relu", SCALAR_VALUE(node->paramTable[7],b) == vx_true_e);
         break;
-    case VX_KERNEL_SOFTMAX_LAYER:
     case VX_KERNEL_NN_SOFTMAX2_LAYER:
+        vxoJson_AddNumberToObject(paramters, "beta", SCALAR_VALUE(node->paramTable[1],f32));
+    case VX_KERNEL_SOFTMAX_LAYER:
         sprintf(opName, "%s", "softmax");
         break;
     case VX_KERNEL_TENSOR_TRANSPOSE:
@@ -814,6 +815,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_storeNodeInfo(vx_node node, vxcJS
     return VX_SUCCESS;
 }
 
+/*store all of nodes into json*/
 VX_INTERNAL_API char * vxoGraphOptimization_getJsonStyleInfo(vx_graph graph)
 {
     vxcJSON   *topology = NULL;
@@ -2202,7 +2204,7 @@ VX_INTERNAL_API vx_tensor vxoGraphOptimization_ConvertAvgPool2Conv_createWeight(
     vx_tensor   weight = VX_NULL;
     vx_uint32   weight_size = weight_dims[0] * weight_dims[1] * weight_dims[2];
     vx_int16    quantizedData = 0;
-    float fill_data = 1.0f / (weight_dims[0]* weight_dims[1]);
+    double fill_data = 1.0 / (weight_dims[0]* weight_dims[1]);
 
     vx_context context = vxGetContext((vx_reference)input);
 
@@ -2217,7 +2219,7 @@ VX_INTERNAL_API vx_tensor vxoGraphOptimization_ConvertAvgPool2Conv_createWeight(
     if(TENSOR_DATA_TYPE(input) == VX_TYPE_UINT8 || TENSOR_DATA_TYPE(input) == VX_TYPE_UINT16)
     {
         parm.quant_format = VX_QUANT_AFFINE_SCALE;
-        parm.quant_data.affine.scale = fill_data/255.0f;
+        parm.quant_data.affine.scale = (vx_float32)(fill_data/255.0f);
         parm.quant_data.affine.zeroPoint = 0;
     }
     else if(TENSOR_DATA_TYPE(input) == VX_TYPE_INT8 || TENSOR_DATA_TYPE(input) == VX_TYPE_INT16)
@@ -2226,9 +2228,9 @@ VX_INTERNAL_API vx_tensor vxoGraphOptimization_ConvertAvgPool2Conv_createWeight(
         parm.quant_format = VX_QUANT_DYNAMIC_FIXED_POINT;
 
         if((square & (square - 1) ) == 0)
-            parm.quant_data.dfp.fixed_point_pos = -1 * (vx_int8)log((float)fill_data);
+            parm.quant_data.dfp.fixed_point_pos = -1 * (vx_int8)gcoMATH_Log2(fill_data);
         else
-            parm.quant_data.dfp.fixed_point_pos = (vx_int8) gcmMIN(12, 8 - ceilf((float)log(fill_data) + 1));
+            parm.quant_data.dfp.fixed_point_pos = (vx_int8) gcmMIN(12, 8 - ceilf((float)gcoMATH_Log2(fill_data) + 1));
     }
     else if(TENSOR_DATA_TYPE(input) == VX_TYPE_FLOAT16 || TENSOR_DATA_TYPE(input) == VX_TYPE_FLOAT16)
     {
@@ -2250,18 +2252,18 @@ VX_INTERNAL_API vx_tensor vxoGraphOptimization_ConvertAvgPool2Conv_createWeight(
     else
     {
         if(TENSOR_DATA_TYPE(input) == VX_TYPE_FLOAT16)
-            quantizedData = Fp32toFp16(fill_data);
+            quantizedData = Fp32toFp16((vx_float32)fill_data);
         else
         {
             vx_int8 fl= TENSOR_POS(weight);
 
             if(fl > 0 )
             {
-                quantizedData = (vx_int16)(fill_data * (1 << fl));
+                quantizedData = (vx_int16)roundRTNE(fill_data * (1 << fl));
             }
             else
             {
-                quantizedData = (vx_int16)(fill_data / (1 << (-fl) ));
+                quantizedData = (vx_int16)roundRTNE(fill_data / (1 << (-fl)));
             }
         }
     }
