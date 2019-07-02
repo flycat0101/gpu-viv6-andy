@@ -68,8 +68,10 @@ static const int formatXlate[] =
     HAL_PIXEL_FORMAT_YCbCr_422_SP,  gcvSURF_NV16,
     HAL_PIXEL_FORMAT_YCrCb_420_SP,  gcvSURF_NV21,
     HAL_PIXEL_FORMAT_YCbCr_422_I,   gcvSURF_YUY2,
+#if ANDROID_SDK_VERSION <= 23
     HAL_PIXEL_FORMAT_YCbCr_422_P,   gcvSURF_UNKNOWN, /* Not support. */
     HAL_PIXEL_FORMAT_YCbCr_420_SP,  gcvSURF_NV12,
+#endif
 #endif
     0 /* Terminator. */
 };
