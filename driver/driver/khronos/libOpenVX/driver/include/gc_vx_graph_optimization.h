@@ -53,7 +53,7 @@ EXTERN_C_BEGIN
         char logName[100] = {0};\
         const char *ptr = __FUNCTION__ + sizeof("vxoGraph_Optimization_") - 1;\
         sprintf(logName,"%s_%s_%s", "after",ptr,"graph.json");    \
-        vxoGraph_Optimization_dumpTopology(graph, logName);\
+        vxoGraphOptimization_dumpTopology(graph, logName);\
     }\
 }
 
@@ -218,11 +218,11 @@ typedef enum _param_concat2_index_e
 
 typedef vx_status (*perpareQuantizedWeightAndBiasFunc) (vx_tensor *weight, vx_tensor *bias, vx_tensor tensorIn[2], vx_uint32 coreNum, vx_int32 factor);
 
-extern vx_status vxnneAdapter_Tensor_FormatConvert(vx_tensor inputs, vx_tensor outputs);
+VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node);
 
-VX_INTERNAL_API vx_enum vxoGraph_getKernelType(vx_node node);
+VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph);
 
-VX_INTERNAL_API vx_status vxoGraph_Optimization(vx_graph graph);
+extern VX_INTERNAL_API vx_status vxnneAdapter_Tensor_FormatConvert(vx_tensor inputs, vx_tensor outputs);
 
 EXTERN_C_END
 

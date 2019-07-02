@@ -8187,7 +8187,7 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyGraph(vx_graph graph)
 
     vxmONERROR(vxoGraphBinary_GetGraphInputOutput(graph));
 
-    vxmONERROR(vxoGraph_Optimization(graph));
+    vxmONERROR(vxoGraphOptimization(graph));
 
     vxmONERROR(vxoGraph_DetectCycle(graph));;
 

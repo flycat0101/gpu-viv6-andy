@@ -1625,7 +1625,7 @@ VX_INTERNAL_API vx_bool vxoNode_HasCPUfunction(vx_node node)
 VX_INTERNAL_API vx_bool vxoNode_IsConvNode(vx_node node)
 {
     vx_bool isConv = vx_false_e;
-    vx_enum nodeType = vxoGraph_getKernelType(node);
+    vx_enum nodeType = vxoGraphOptimization_getKernelType(node);
     if(nodeType & OP_CONVOLUTION )
     {
         isConv = vx_true_e;
@@ -1637,7 +1637,7 @@ VX_INTERNAL_API vx_bool vxoNode_IsConvNode(vx_node node)
 VX_INTERNAL_API vx_bool vxoNode_IsFCNode(vx_node node)
 {
     vx_bool isFC = vx_false_e;
-    vx_enum nodeType = vxoGraph_getKernelType(node);
+    vx_enum nodeType = vxoGraphOptimization_getKernelType(node);
     if(nodeType & OP_FULLYCONNECTED)
     {
         isFC = vx_true_e;
