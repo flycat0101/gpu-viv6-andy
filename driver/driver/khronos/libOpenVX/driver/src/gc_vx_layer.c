@@ -27581,7 +27581,7 @@ vxnne_shader_executable vxnneGetTensorTRShaderExecutable(
         /* register an shader kernel */
 #if gcdUSE_VXC_BINARY
         vx_uint32 len;
-        void * ptr = getVXCKernelInfo(context, TensorAbs, &len);
+        void * ptr = getVXCKernelInfo(context, TensorTR, &len);
         program = vxCreateProgramWithBinary(context, ptr, len);
 #else
         char path[_vxcFILENAME_MAX];
