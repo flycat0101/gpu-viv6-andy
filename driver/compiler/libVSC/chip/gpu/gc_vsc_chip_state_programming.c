@@ -7596,7 +7596,7 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
         /* Program gpr spill */
         if (pGpsSEP->exeHints.derivedHints.globalStates.bGprSpilled)
         {
-            if ((SHADER_CLIENT)DECODE_SHADER_CLIENT(pShHwInfo->pSEP->shVersionType) == gcvPROGRAM_STAGE_OPENCL)
+            if (DECODE_SHADER_CLIENT(pGpsSEP->shVersionType) == SHADER_CLIENT_CL)
             {
                 pStatesPgmer->pHints->useGPRSpill[gcvPROGRAM_STAGE_OPENCL] = gcvTRUE;
             }
@@ -7675,7 +7675,7 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
         /* Program gpr spill */
         if (pGpsSEP->exeHints.derivedHints.globalStates.bGprSpilled)
         {
-            if ((SHADER_CLIENT)DECODE_SHADER_CLIENT(pShHwInfo->pSEP->shVersionType) == gcvPROGRAM_STAGE_OPENCL)
+            if (DECODE_SHADER_CLIENT(pGpsSEP->shVersionType) == SHADER_CLIENT_CL)
             {
                 pStatesPgmer->pHints->useGPRSpill[gcvPROGRAM_STAGE_OPENCL] = gcvTRUE;
             }
