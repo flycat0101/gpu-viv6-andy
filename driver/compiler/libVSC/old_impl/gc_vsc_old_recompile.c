@@ -5175,30 +5175,7 @@ gcLoadCLPatchLibrary(
                 ""
             },
             {
-                gcLibCL_ReadImage_Header_Str,
-                gcLibCL_ReadImage_Common_Func_Str,
-                gcLibCL_ReadImage_With_IMGLD_Funcs,
-                gcLibCL_ReadImage_With_TEXLDU_Funcs,
-                gcLibCL_ReadImage_With_V55_TEXLDU_Funcs,
-                gcLibCL_ReadImage_With_TEXLD_Funcs,
-                gcLibCL_WriteImage_With_IMGST_Funcs,
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
+                gcvNULL,
             },
 #if _SUPPORT_LONG_ULONG_DATA_TYPE
             CL_LONG_ULONG_FUNCS
@@ -5219,6 +5196,13 @@ gcLoadCLPatchLibrary(
         for (j = 0; j < CL_LIB_COUNT; j++)
         {
             if(gcCLPatchLibrary[j]) continue; /* loaded already */
+
+            /* Skip the empty library. */
+            if (CLPatchLib[j][0] == gcvNULL)
+            {
+                continue;
+            }
+
             stringNum = sizeof(CLPatchLib[j]) / sizeof(gctSTRING);
             patchLen = stringNum;
             for (i = 0; i < stringNum; i++)
@@ -9302,6 +9286,10 @@ _patchReadImage(
             /* Construct read image function. */
             for (j = 0; j < CL_LIB_COUNT; j++)
             {
+                if (gcCLPatchLibrary[j] == gcvNULL)
+                {
+                    continue;
+                }
                 status = _createReadImageFunction(
                                         Shader,
                                         gcCLPatchLibrary[j],
@@ -9400,6 +9388,10 @@ _patchWriteImage(
             /* Construct write image function. */
             for (j = 0; j < CL_LIB_COUNT; j++)
             {
+                if (gcCLPatchLibrary[j] == gcvNULL)
+                {
+                    continue;
+                }
                 status = _createWriteImageFunction(
                                     Shader,
                                     gcCLPatchLibrary[j],
