@@ -14,5 +14,5 @@
 LIST=COMPONENTS
 ENABLE_VG ?= 0
 
-EARLY_DIRS=halkernel halarchkernel halarchkernel_vg galcore halosuser halarchuser halarchuser_vg gal vsc egl vdk gles11 gles20sc gles30 llvm clc cl vg11 vg11_vg archmodel vx
+EARLY_DIRS=halkernel halarchkernel halarchkernel_vg galcore halosuser halarchuser halarchuser_vg gal vsc egl vdk gles11 gles20sc gles30 clc cl vg11 vg11_vg archmodel vx
 include recurse.mk
