@@ -1504,8 +1504,6 @@ ppoBYTE_INPUT_STREAM_GetChar_Phase_2(
 
     gceSTATUS status = gcvSTATUS_INVALID_DATA;
 
-    gctBOOL  i_am_following_a_comment = PP->iAmFollowingAComment;
-
     ppmCheckFuncOk(
         ppoBYTE_INPUT_STREAM_GetChar_Phase_1(
         PP,
@@ -1527,22 +1525,8 @@ ppoBYTE_INPUT_STREAM_GetChar_Phase_2(
 
         if(c2 == '\n')
         {
-            if(gcvTRUE == i_am_following_a_comment)
-            {
-                *Pc = '\n';
-
-                ppoPREPROCESSOR_Report(
-                    PP,
-                    clvREPORT_WARN,
-                    "single-line comment contains line-continuation character,"
-                    " ignore the line-continuation character");
-
-                return    gcvSTATUS_OK;
-            }
-            else
-            {
-                return ppoBYTE_INPUT_STREAM_GetChar_Phase_1(PP,    Bis, Pc);
-            }
+            /* for bug#23624, allow the line-continuation character after "//" */
+            return ppoBYTE_INPUT_STREAM_GetChar_Phase_1(PP,    Bis, Pc);
         }
         else
         {
