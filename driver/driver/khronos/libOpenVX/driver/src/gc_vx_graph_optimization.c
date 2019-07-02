@@ -424,12 +424,21 @@ VX_INTERNAL_API vx_uint32* vxoGraph_Optimization_kernelSize(vx_node convNode)
     return kernelSize;
 }
 
-VX_INTERNAL_API void vxoGraph_Optimization_fillDims2paramters(vx_char *buf, vx_uint32 bufLen, vx_uint32 dims[], vx_char *paramterName, vxcJSON *paramters)
+VX_INTERNAL_API void vxoGraph_Optimization_fillDims2paramters(vx_char *buf, vx_uint32 bufLen, vx_uint32 dims[], vx_uint32 dimNum, vx_char *paramterName, vxcJSON *paramters)
 {
+    vx_uint32 i = 0;
     gcmHEADER_ARG("buf=%s, bufLen=0x%x, dims=%p, paramterName=%s, paramters=%p", buf, bufLen, dims, paramterName, paramters);
 
     memset(buf, 0, sizeof(vx_char)*bufLen);
-    sprintf(buf, "%d x %d x %d x %d", dims[0], dims[1], dims[2], dims[3]);
+    for(i = 0; i < dimNum; i++)
+    {
+        sprintf(buf + strlen(buf), "%d", dims[i]);
+        if(i != dimNum -1)
+        {
+            sprintf(buf + strlen(buf), " x ");
+        }
+    }
+    /*sprintf(buf, "%d x %d x %d x %d", dims[0], dims[1], dims[2], dims[3]);     */
     vxoJson_AddStringToObject(paramters, paramterName, buf);
 
     gcmFOOTER_NO();
@@ -438,8 +447,10 @@ VX_INTERNAL_API void vxoGraph_Optimization_fillDims2paramters(vx_char *buf, vx_u
 VX_PRIVATE_API void vxoGraph_Optimization_stroeNodeInOutInfo(vxcJSON *paramters, vx_node node)
 {
     vx_char buf[100] = {0};
-    vxoGraph_Optimization_fillDims2paramters(buf, 100, ((vx_tensor)node->paramTable[0])->dims, "input_dims(whcn)", paramters);
-    vxoGraph_Optimization_fillDims2paramters(buf, 100, ((vx_tensor)node->paramTable[node->numParameters - 1])->dims, "output_dims(whcn)", paramters);
+    vxoGraph_Optimization_fillDims2paramters(buf, 100, TENSOR_SIZES((vx_tensor)node->paramTable[0]), TENSOR_DIM_NUM((vx_tensor)node->paramTable[0]), "input_dims", paramters);
+    vxoGraph_Optimization_fillDims2paramters(buf, 100, TENSOR_SIZES((vx_tensor)node->paramTable[node->numParameters - 1]),
+        TENSOR_DIM_NUM((vx_tensor)node->paramTable[node->numParameters - 1]),
+        "output_dims", paramters);
 }
 
 VX_INTERNAL_API void vxoGraph_Optimization_stroeNodeDims2paramter(vxcJSON *paramters, vx_node node)
@@ -448,6 +459,7 @@ VX_INTERNAL_API void vxoGraph_Optimization_stroeNodeDims2paramter(vxcJSON *param
 
     vx_char buf[100] = {0};
     vx_uint32   *dims = NULL;
+    vx_uint32 dimNum = 0;
 
     gcmHEADER_ARG("paramters=%p, node=%p", paramters, node);
 
@@ -457,7 +469,8 @@ VX_INTERNAL_API void vxoGraph_Optimization_stroeNodeDims2paramter(vxcJSON *param
     case VX_KERNEL_FULLY_CONNECTED_LAYER:
     case VX_KERNEL_NN_FULLY_CONNECTED_LAYER:
         {
-            dims = ((vx_tensor)node->paramTable[1])->dims;
+            dims = TENSOR_SIZES((vx_tensor)node->paramTable[1]);
+            dimNum = TENSOR_DIM_NUM((vx_tensor)node->paramTable[1]);
         }
         break;
     case VX_KERNEL_NN_CONVOLUTION_RELU_LAYER:
@@ -465,14 +478,15 @@ VX_INTERNAL_API void vxoGraph_Optimization_stroeNodeDims2paramter(vxcJSON *param
     case VX_KERNEL_NN_CONVOLUTION_RELU_POOLING_LAYER2:
     case VX_KERNEL_NN_FULLY_CONNECTED_RELU_LAYER:
         {
-            dims = ((vx_weights_biases_parameter)node->paramTable[1])->wb_base->origWeight->dims;
+            dims = TENSOR_SIZES(((vx_weights_biases_parameter)node->paramTable[1])->wb_base->origWeight);
+            dimNum = TENSOR_DIM_NUM(((vx_weights_biases_parameter)node->paramTable[1])->wb_base->origWeight);
         }
         break;
     default:
         break;
     }
 
-    vxoGraph_Optimization_fillDims2paramters(buf, 100, dims, "filter_dims", paramters);
+    vxoGraph_Optimization_fillDims2paramters(buf, 100, dims, dimNum, "filter_dims", paramters);
     gcmFOOTER_NO();
     return;
 }
@@ -484,6 +498,7 @@ VX_INTERNAL_API vx_status vxoGraph_Optimization_stroeNodeDetail2json(vx_node nod
 
     gcmHEADER_ARG("node=%p, layer=%p, paramters=%p", node, layer, paramters);
 
+    vxoGraph_Optimization_stroeNodeInOutInfo(paramters, node);
     switch(nodeType)
     {
     case VX_KERNEL_CONVOLUTION_LAYER:
@@ -554,8 +569,12 @@ VX_INTERNAL_API vx_status vxoGraph_Optimization_stroeNodeDetail2json(vx_node nod
         {
             vx_char buf[100] = {0};
 
-            vxoGraph_Optimization_fillDims2paramters(buf, 100, ((vx_tensor)node->paramTable[0])->dims, "input_dims(whcn)", paramters);
-            vxoGraph_Optimization_fillDims2paramters(buf, 100, ((vx_tensor)node->paramTable[node->numParameters - 1])->dims, "output_dims(whcn)", paramters);
+            vxoGraph_Optimization_fillDims2paramters(buf, 100, TENSOR_SIZES((vx_tensor)node->paramTable[0]),
+                TENSOR_DIM_NUM((vx_tensor)node->paramTable[0]),
+                "input_dims(whcn)", paramters);
+            vxoGraph_Optimization_fillDims2paramters(buf, 100, TENSOR_SIZES((vx_tensor)node->paramTable[node->numParameters - 1]),
+                TENSOR_DIM_NUM((vx_tensor)node->paramTable[node->numParameters - 1]),
+                "output_dims(whcn)", paramters);
         }
         vxoJson_AddNumberToObject(paramters, "ksize_w", SCALAR_VALUE(node->paramTable[2], u32));
         vxoJson_AddNumberToObject(paramters, "ksize_h", SCALAR_VALUE(node->paramTable[3], u32));
@@ -630,7 +649,7 @@ VX_INTERNAL_API vx_status vxoGraph_Optimization_stroeNodeDetail2json(vx_node nod
         sprintf(opName, "%s", node->kernel->name);
         break;
     }
-    vxoGraph_Optimization_stroeNodeInOutInfo(paramters, node);
+
     vxoJson_AddStringToObject(layer, "op", opName);
 
     gcmFOOTER_ARG("%d", VX_SUCCESS);
