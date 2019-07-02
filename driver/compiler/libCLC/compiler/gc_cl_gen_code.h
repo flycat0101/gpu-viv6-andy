@@ -1463,7 +1463,9 @@ typedef struct _clsGEN_CODE_PARAMETERS
     clsGEN_CODE_PARAMETER_DATA_TYPE *dataTypes;
     clsLOPERAND *    lOperands;
     clsROPERAND *    rOperands;
+    /* elementIndex and parentType should be used together. */
     clsROPERAND *   elementIndex;
+    clsDECL         parentDataType;
     clsIOPERAND    iOperand[1];
     cloIR_CONSTANT constantArray; /* corresponds to hint of clvGEN_ARRAY_OF_CONSTANTS */
 }
@@ -1528,6 +1530,7 @@ struct _clsGEN_CODE_PARAMETERS;
         if ((parameters)->elementIndex != gcvNULL) { \
             gcmVERIFY_OK(cloCOMPILER_Free(Compiler, (parameters)->elementIndex)); \
         } \
+        gcoOS_ZeroMemory(&(parameters)->parentDataType, gcmSIZEOF(clsDECL)); \
     } \
     while (gcvFALSE)
 
@@ -1538,10 +1541,12 @@ struct _clsGEN_CODE_PARAMETERS;
         (parameters0)->rOperands= (parameters1)->rOperands; \
         (parameters0)->operandCount = (parameters1)->operandCount; \
         (parameters0)->elementIndex = (parameters1)->elementIndex; \
+        (parameters0)->parentDataType = (parameters1)->parentDataType; \
         (parameters1)->dataTypes= gcvNULL; \
         (parameters1)->lOperands= gcvNULL; \
         (parameters1)->rOperands= gcvNULL; \
         (parameters1)->elementIndex= gcvNULL; \
+        gcoOS_ZeroMemory(&(parameters1)->parentDataType, gcmSIZEOF(clsDECL)); \
     } \
     while (gcvFALSE)
 
