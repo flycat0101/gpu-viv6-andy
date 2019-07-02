@@ -1238,6 +1238,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
     gceSTATUS status = gcvSTATUS_OK;
     __vkDeviceMemory *dvm = gcvNULL;
     __vkDevContext *devCtx = (__vkDevContext*)device;
+    gctSIZE_T size = 0u;
 
     do {
         /* Set the allocator to the parent allocator or API defined allocator if valid */
@@ -1255,18 +1256,28 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
         /* Vulkan need guarantee maximum alignment (256) for all usage. */
         dvm->align  = 256;
         dvm->size   = (gctSIZE_T)pAllocateInfo->allocationSize;
+        size        = dvm->size;
+
+        if (devCtx->enabledFeatures.robustBufferAccess &&
+            !devCtx->database->ROBUSTNESS)
+        {
+            size = __VK_ALIGN(size, 4096);
+        }
+
         gcoOS_MemCopy(&dvm->allocInfo, pAllocateInfo, gcmSIZEOF(VkMemoryAllocateInfo));
 
-        __VK_ERR_BREAK(__vki_CreateSurfNode(devCtx, &dvm->node, (uint32_t)dvm->size, dvm->align, gcvSURF_TYPE_UNKNOWN,
+        __VK_ERR_BREAK(__vki_CreateSurfNode(devCtx, &dvm->node, size, dvm->align, gcvSURF_TYPE_UNKNOWN,
                                             gcvALLOC_FLAG_NONE, gcvPOOL_DEFAULT));
 
         __VK_ERR_BREAK(__vki_LockSurfNode(devCtx, &dvm->node, &dvm->devAddr, &dvm->hostAddr));
 
-        if (devCtx->enabledFeatures.robustBufferAccess &&
+        if ((devCtx->enabledFeatures.robustBufferAccess &&
+            !devCtx->database->ROBUSTNESS) ||
+            (devCtx->enabledFeatures.robustBufferAccess &&
             devCtx->database->ROBUSTNESS &&
-            !devCtx->database->SH_ROBUSTNESS_FIX)
+            !devCtx->database->SH_ROBUSTNESS_FIX) )
         {
-            __VK_MEMZERO(dvm->hostAddr, dvm->size);
+            __VK_MEMZERO(dvm->hostAddr, size);
         }
 
 #if gcdDUMP
