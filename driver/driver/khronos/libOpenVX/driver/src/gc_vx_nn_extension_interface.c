@@ -4980,8 +4980,8 @@ VX_PRIVATE_API vx_status vxnneConvolutionReluPoolingInitializer(
                 padConst,
                 convolutionReluPoolingLayer->convolution_operation.outputs);
     }
-    vxnneOperation_AddReference(&convolutionReluPoolingLayer->convolution_operation.base, (vx_reference)interTensor, VXNNE_OPERATION_REFENRENCE_INPUT);
-    vxnneOperation_AddReference(&convolutionReluPoolingLayer->convolution_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+    vxnneOperation_AddReference(&convolutionReluPoolingLayer->convolution_operation.base, (vx_reference)convolutionReluPoolingLayer->convolution_operation.inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+    vxnneOperation_AddReference(&convolutionReluPoolingLayer->convolution_operation.base, (vx_reference)convolutionReluPoolingLayer->convolution_operation.outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
 
 
