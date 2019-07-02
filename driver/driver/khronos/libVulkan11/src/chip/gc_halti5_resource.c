@@ -3639,7 +3639,8 @@ VkResult halti5_copyImage(
             rect = fmtInfo->blockSize;
 
             /*dst is compressed or dst is buffer/src iscompressed*/
-            if (dstRes->isImage && dstRes->u.img.pImage->formatInfo.compressed || (!dstRes->isImage && (srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed)))
+            if ((dstRes->isImage && dstRes->u.img.pImage->formatInfo.compressed) ||
+                (!dstRes->isImage && (srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed)))
             {
                 dstTiling = 0x0;
                 dstSuperTile = 0x0;
@@ -3652,7 +3653,8 @@ VkResult halti5_copyImage(
                 dstExtent.height = gcmALIGN_NP2(dstExtent.height, rect.height) / rect.height;
             }
             /*src is compressed or src is buffer/dst iscompressed*/
-            if (srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed || (!srcRes->isImage && (dstRes->isImage && dstRes->u.img.pImage->formatInfo.compressed)));
+            if ((srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed) ||
+                (!srcRes->isImage && (dstRes->isImage && dstRes->u.img.pImage->formatInfo.compressed)))
             {
                 dstTiling = 0x0;
                 dstSuperTile = 0x0;
