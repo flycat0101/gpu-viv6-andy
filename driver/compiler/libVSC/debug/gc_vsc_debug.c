@@ -1446,6 +1446,53 @@ void vscDIPopCallStack(
     }
 }
 
+int vscDIGetCallStackDepth(
+    void * ptr
+    )
+{
+    VSC_DIContext * context = (VSC_DIContext *)ptr;
+
+    if (context == gcvNULL)
+        return 0;
+    return context->callDepth;
+}
+
+void vscDIGetStackFrameInfo(
+    void * ptr,
+    int frameId,
+    unsigned int * functionId,
+    unsigned int * callerPc,
+    char * functionName,
+    unsigned int nameLength,
+    char * fileName, /* not used currently */
+    char * fullName, /* not used currently */
+    unsigned int fileNameLength /* not used currently */
+    )
+{
+    VSC_DIContext * context = (VSC_DIContext *)ptr;
+    VSC_DIE * die;
+
+    if (context == gcvNULL)
+        return;
+
+    if (frameId > context->callDepth)
+        return;
+
+    die = context->callStack[frameId].die;
+
+    if (!die || die->tag != VSC_DI_TAG_SUBPROGRAM)
+        return;
+
+    if (functionId)
+        *functionId = (unsigned int) die->id;
+
+    if (callerPc)
+        *callerPc = context->callStack[frameId].nextPC - 1;
+
+    if (functionName)
+        gcoOS_StrCopySafe(functionName, nameLength, _GetNameStr(context, die->name));
+}
+
 int vscDIGetSrcLineByPC(void * ptr, unsigned int pc, unsigned int * line)
 {
     gctUINT i;

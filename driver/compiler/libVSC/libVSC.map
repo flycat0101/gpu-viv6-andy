@@ -444,6 +444,8 @@
     vscDIPushCallStack;
     vscDIPopCallStack;
     vscDICopyDebugInfo;
+    vscDIGetCallStackDepth;
+    vscDIGetStackFrameInfo;
 
     VIR_GetSymFromId;
     VIR_Shader_AddFunction;

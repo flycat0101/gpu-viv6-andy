@@ -103,5 +103,21 @@ void vscDIPopCallStack(
     unsigned int currentPC
     );
 
+int vscDIGetCallStackDepth(
+    void * ptr
+    );
+
+void vscDIGetStackFrameInfo(
+    void * ptr,
+    int frameId,
+    unsigned int * functionId,
+    unsigned int * callerPc,
+    char * functionName,
+    unsigned int nameLength,
+    char * fileName, /* not used currently */
+    char * fullName, /* not used currently */
+    unsigned int fileNameLength /* not used currently */
+    );
+
 #endif
 

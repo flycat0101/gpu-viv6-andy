@@ -451,6 +451,8 @@ EXPORTS
     vscDIPushCallStack
     vscDIPopCallStack
     vscDICopyDebugInfo
+    vscDIGetCallStackDepth
+    vscDIGetStackFrameInfo
 
     vscERR_ReportError
     vscERR_ReportWarning
