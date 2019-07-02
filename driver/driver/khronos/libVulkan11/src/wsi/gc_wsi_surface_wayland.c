@@ -33,6 +33,7 @@
 
 typedef struct __vkWaylandSwapchainKHRRec   __vkWaylandSwapchainKHR;
 typedef struct __vkWaylandImageBufferRec    __vkWaylandImageBuffer;
+static VkExtent2D VIV_EXTENT = (VkExtent2D){-1, -1};
 
 /*
  * A VkSwapchainKHR object (a.k.a. swapchain) provides the ability to present
@@ -274,7 +275,7 @@ static VkResult waylandGetPhysicalDeviceSurfaceCapabilities(
     pSurfaceCapabilities->maxImageCount           = 8;
     pSurfaceCapabilities->currentExtent           = (VkExtent2D){1024, 768};
     pSurfaceCapabilities->minImageExtent          = (VkExtent2D){1, 1};
-    pSurfaceCapabilities->maxImageExtent          = (VkExtent2D){4096, 4096};
+    pSurfaceCapabilities->maxImageExtent          = VIV_EXTENT;
     pSurfaceCapabilities->maxImageArrayLayers     = 1;
     pSurfaceCapabilities->supportedTransforms     = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
     pSurfaceCapabilities->currentTransform        = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
@@ -1144,6 +1145,8 @@ static VkResult waylandCreateSwapchain(
     sc->compositeAlpha      = pCreateInfo->compositeAlpha;
     sc->presentMode         = pCreateInfo->presentMode;
     sc->clipped             = pCreateInfo->clipped;
+
+    VIV_EXTENT = pCreateInfo->imageExtent;
 
     /* reigister wayland globals. */
     sc->wl_queue    = wl_display_create_queue(surf->display);

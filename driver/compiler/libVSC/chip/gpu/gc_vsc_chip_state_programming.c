@@ -4676,7 +4676,7 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     gctBOOL                    bHalfAttribute = gcvFALSE, bForceSampleFreq = gcvFALSE;
     gctBOOL                    bHasSampleFreqInput = gcvFALSE, bHighPOnDual16 = gcvFALSE;
     gctBOOL                    bHasCentroidInput = gcvFALSE;
-    gctINT                     output2RTIndex[MAX_HW_PS_COLOR_OUTPUTS];
+    gctINT                     output2RTIndex[gcdMAX_DRAW_BUFFERS];
     gctUINT                    firstValidIoChannel, hpInputCount = 0, startHwRegForNonPosInputs = NOT_ASSIGNED;
     SHADER_IO_CHANNEL_MAPPING* pThisIoChannelMapping;
     gctINT                     ptCoordStartComponent = -1, rtArrayStartComponent = -1, primIdStartComponent = -1;
@@ -4702,7 +4702,7 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     memset(&psInputType[0], 0 /*0x0*/,
            sizeof(gctCHAR)*MAX_HW_IO_COUNT * CHANNEL_NUM);
 
-    for (i = 0; i < MAX_HW_PS_COLOR_OUTPUTS; ++i)
+    for (i = 0; i < gcdMAX_DRAW_BUFFERS; ++i)
     {
         output2RTIndex[i] = -1;
     }
@@ -4967,7 +4967,7 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
 
             index = psOutputCount;
 
-            switch (ioIdx)
+            switch (index)
             {
             case 0:
                 psColorOutputState = ((((gctUINT32) (psColorOutputState)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
