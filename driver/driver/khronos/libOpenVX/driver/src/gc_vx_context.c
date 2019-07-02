@@ -1028,8 +1028,8 @@ VX_PRIVATE_API vx_status QuerySRAM(
             if (physical == 0xFFFFFFFF)
             {
                 /* on Cmodel */
-                size = customizedAxiSRAMSize;
-                status = gcoVX_AllocateMemoryEx(&size, gcvSURF_VERTEX, 256, &physical, &logical, &node);
+                gctUINT32 tempSize = size = customizedAxiSRAMSize;
+                status = gcoVX_AllocateMemoryEx(&tempSize, gcvSURF_VERTEX, 256, &physical, &logical, &node);
                 if (gcmIS_ERROR(status))
                 {
                     vxStatus = VX_ERROR_NO_MEMORY;
