@@ -311,6 +311,10 @@ typedef struct _vx_binary_save_s
     vx_uint32                                inputInPatchedIndex[VX_MAX_NN_INOUT_PARAM_COUNT];
     vx_uint32                                inputInPatchedNum;
     vx_binary_input_output_info_s            inputInfo[VX_MAX_NN_INOUT_PARAM_COUNT];
+
+    vx_reference                             inputEntry[VX_MAX_NN_INOUT_PARAM_COUNT];
+    vx_reference                             outputEntry[VX_MAX_NN_INOUT_PARAM_COUNT];
+
     struct
     {
         vx_uint32                            size;

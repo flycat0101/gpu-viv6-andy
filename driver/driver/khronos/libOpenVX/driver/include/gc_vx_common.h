@@ -1581,6 +1581,11 @@ typedef struct _vx_graph
     vx_uint32                               headTensorCount;
     vx_graph_parameter_s*                   headTensorCountTable;
 
+    vx_uint32                               inputCount;
+    vx_reference                            *inputs;
+    vx_uint32                               outputCount;
+    vx_reference                            *outputs;
+
     vx_bool                                 serialize;
 
     vx_mutex                                scheduleLock;

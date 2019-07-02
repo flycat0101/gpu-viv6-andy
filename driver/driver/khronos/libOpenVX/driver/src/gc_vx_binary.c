@@ -3213,6 +3213,13 @@ VX_PRIVATE_API vx_bool vxoGraphBinary_ScaleIsNetworkInput(
 
     gcmHEADER_ARG("graph=%p, node=%p, operation=%p", graph, node, operation);
 
+    /* bypass if user set input via API */
+    if (graph->inputCount)
+    {
+        gcmFOOTER_ARG("%d", isInput);
+        return vx_true_e;
+    }
+
     if (operation->target != VXNNE_OPERATION_TARGET_SH)
     {
         gcmFOOTER_ARG("%d", isInput);
@@ -3456,6 +3463,131 @@ VX_PRIVATE_API vx_uint32 vxoGraphBinary_CalculateNNSliceCount(
     commandCount = xcount * ycount;
 
     return commandCount;
+}
+
+VX_PRIVATE_API vx_status vxoGraphBinary_RefineInputOutput(
+    vx_graph graph,
+    vx_uint32 *inputCount,
+    vx_uint32 *outputCount
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint32 i = 0;
+    vx_uint32 j = 0;
+    vx_uint32 inCount = *inputCount;
+    vx_uint32 outCount = *outputCount;
+    vx_reference ref = VX_NULL;
+    vx_binary_save_s *binarySave = graph->binarySave;
+    gcmHEADER_ARG("graph=%p", graph);
+
+    if (graph->inputCount && graph->inputs)
+    {
+        /* sanity check, just for debugging info */
+        for (i = 0; i < graph->inputCount; i++)
+        {
+            for (j = 0; j < inCount; j++)
+            {
+                if (graph->inputs[i] == binarySave->inputEntry[j])
+                {
+                    break;
+                }
+            }
+            if (j == inCount)
+            {
+                vxError("%s[%d]: can't search this input ref in inputEntry, index: %d \n",
+                    __FUNCTION__, __LINE__, i);
+            }
+        }
+
+        *inputCount = graph->inputCount;
+
+        for (i = 0; i < graph->inputCount; i++)
+        {
+            ref = graph->inputs[i];
+            binarySave->inputEntry[i] = ref;
+            if (ref->type == VX_TYPE_TENSOR)
+            {
+                vx_tensor tensor = (vx_tensor)ref;
+                binarySave->inputPhysicalEntry[i] = TENSOR_PHYSICAL_ADDR(tensor);
+            }
+            else if (ref->type == VX_TYPE_IMAGE)
+            {
+                vx_image image = (vx_image)ref;
+                binarySave->inputPhysicalEntry[i] = image->memory.physicals[0];/*Y channel*/
+            }
+            else if (ref->type == VX_TYPE_ARRAY)
+            {
+                vx_array array = (vx_array)ref;
+                binarySave->inputPhysicalEntry[i] = array->memory.physicals[0];
+            }
+            else if (ref->type == VX_TYPE_SCALAR)
+            {
+                vx_scalar scalar = (vx_scalar)ref;
+                binarySave->inputPhysicalEntry[i] = scalar->physical;
+            }
+        }
+        /* clean other data*/
+        for (i = graph->inputCount; i < VX_MAX_NN_INOUT_PARAM_COUNT; i++)
+        {
+            binarySave->inputPhysicalEntry[i] = 0;
+        }
+    }
+
+    if (graph->outputCount && graph->outputs)
+    {
+        /* sanity check, just for debugging info */
+        for (i = 0; i < graph->outputCount; i++)
+        {
+            for (j = 0; j < outCount; j++)
+            {
+                if (graph->outputs[i] == binarySave->outputEntry[j])
+                {
+                    break;
+                }
+            }
+            if (j == outCount)
+            {
+                vxError("%s[%d]: can't search this output ref in outputEntry, index: %d \n",
+                    __FUNCTION__, __LINE__, i);
+            }
+        }
+
+        *outputCount = graph->outputCount;
+
+        for (i = 0; i < graph->outputCount; i++)
+        {
+            ref = graph->outputs[i];
+            binarySave->outputEntry[i] = ref;
+            if (ref->type == VX_TYPE_TENSOR)
+            {
+                vx_tensor tensor = (vx_tensor)ref;
+                binarySave->outputPhysicalEntry[i] = TENSOR_PHYSICAL_ADDR(tensor);
+            }
+            else if (ref->type == VX_TYPE_IMAGE)
+            {
+                vx_image image = (vx_image)ref;
+                binarySave->outputPhysicalEntry[i] = image->memory.physicals[0];/*Y channel*/
+            }
+            else if (ref->type == VX_TYPE_ARRAY)
+            {
+                vx_array array = (vx_array)ref;
+                binarySave->outputPhysicalEntry[i] = array->memory.physicals[0];
+            }
+            else if (ref->type == VX_TYPE_SCALAR)
+            {
+                vx_scalar scalar = (vx_scalar)ref;
+                binarySave->outputPhysicalEntry[i] = scalar->physical;
+            }
+        }
+        /* clean other data*/
+        for (i = graph->outputCount; i < VX_MAX_NN_INOUT_PARAM_COUNT; i++)
+        {
+            binarySave->outputPhysicalEntry[i] = 0;
+        }
+    }
+
+    gcmFOOTER_ARG("%d", status);
+    return status;
 }
 
 VX_PRIVATE_API vx_status vxoGraphBinary_Initialize(
@@ -5311,7 +5443,8 @@ VX_INTERNAL_API vx_status vxoGraphBinary_ReSaveInputAndPatchTable(
         loopNum++;
     }
 
-    if (reWrite)
+    /* r-write input table. bypass this re-write if user set inputTable by vxIdentifyGraphInputsAndOutputs() */
+    if (reWrite && (graph->inputCount != 0))
     {
         /* re-write whole input entry table */
         gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
@@ -5457,8 +5590,6 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
     vx_uint32 currPos = 0, operationPos = 0;
     vx_context context = graph->base.context;
     vx_uint32 nodeIndex = 0;
-    vx_reference inputEntry[VX_MAX_NN_INOUT_PARAM_COUNT];
-    vx_reference outputEntry[VX_MAX_NN_INOUT_PARAM_COUNT];
     vxnne_execution_layer   executionLayer = (vxnne_execution_layer)graph->layer;
     vx_kernel_execution_parameters_t **shaderParam = VX_NULL;
     vx_uint32 *shOperationID = VX_NULL;
@@ -5553,7 +5684,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
                             vx_reference inputRef = binarySave->inputTableRef[i];
                             if (paramRef == inputRef)
                             {
-                                inputEntry[i] = paramRef;
+                                binarySave->inputEntry[i] = paramRef;
                                 index = i;
                                 binarySave->inputParamCount++;
                                 break;
@@ -5563,7 +5694,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
                     else
                     {   /* cache binary graph */
                         index = binarySave->inputParamCount;
-                        inputEntry[index] = paramRef;
+                        binarySave->inputEntry[index] = paramRef;
                         binarySave->inputParamCount++;
                     }
 
@@ -5659,7 +5790,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
                         vx_reference inputRef = binarySave->inputTableRef[i];
                         if (paramRef == inputRef)
                         {
-                            inputEntry[i] = paramRef;
+                            binarySave->inputEntry[i] = paramRef;
                             index = i;
                             binarySave->inputParamCount++;
                             break;
@@ -5670,7 +5801,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
                             vx_tensor tensorTable = (vx_tensor)inputRef;
                             if (tensor->reshape == tensorTable)
                             {
-                                inputEntry[i] = paramRef;
+                                binarySave->inputEntry[i] = paramRef;
                                 index = i;
                                 binarySave->inputParamCount++;
                                 break;
@@ -5687,7 +5818,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
                 {
                     /* cache binary graph */
                     index = binarySave->inputParamCount;
-                    inputEntry[index] = paramRef;
+                    binarySave->inputEntry[index] = paramRef;
                     binarySave->inputParamCount++;
                 }
 
@@ -5825,7 +5956,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
                         vx_reference outputRef = binarySave->outputTableRef[i];
                         if (paramRef == outputRef)
                         {
-                            outputEntry[i] = paramRef;
+                            binarySave->outputEntry[i] = paramRef;
                             index = i;
                             binarySave->outputParamCount++;
                             break;
@@ -5836,7 +5967,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
                             vx_tensor tensorTable = (vx_tensor)outputRef;
                             if (tensor->reshape == tensorTable)
                             {
-                                outputEntry[i] = paramRef;
+                                binarySave->outputEntry[i] = paramRef;
                                 index = i;
                                 binarySave->outputParamCount++;
                                 break;
@@ -5853,7 +5984,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
                 {
                     /* cache binary graph */
                     index = binarySave->outputParamCount;
-                    outputEntry[index] = paramRef;
+                    binarySave->outputEntry[index] = paramRef;
                     binarySave->outputParamCount++;
                 }
 
@@ -6403,6 +6534,9 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
     gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_binary_entrance_info_s), &binarySave->entrancesInfo);
     currPos += sizeof(vx_binary_entrance_info_s);
 
+    /* refine input/output of graph if user call api vxIdentifyGraphInputsAndOutputs() */
+    vxoGraphBinary_RefineInputOutput(graph, &inputCount, &outputCount);
+
     /* save network input info */
     inputInfoArray = graph->binarySave->inputInfo;
     for (i = 0; i < inputCount; i++)
@@ -6410,10 +6544,10 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
         if (0 != binarySave->inputPhysicalEntry[i])
         {
             vx_binary_input_output_info_s *inputInfo = &inputInfoArray[binarySave->headerInfo.inputCount];
-            vx_reference ref = inputEntry[i];
+            vx_reference ref = binarySave->inputEntry[i];
             if (ref->type == VX_TYPE_TENSOR)
             {
-                vx_tensor tensor = (vx_tensor)inputEntry[i];
+                vx_tensor tensor = (vx_tensor)ref;
                 vx_int32 *dims = TENSOR_ORIG_SIZES(tensor);
                 inputInfo->dimCount = TENSOR_ORIG_DIM_NUM(tensor);
                 inputInfo->dataType = VX_BINARY_BUFFER_TYPE_TENSOR;
@@ -6428,7 +6562,8 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
                 vxmASSERT(NN_MAX_DIMENSION >= inputInfo->dimCount);
                 for (k = i + 1; k < inputCount; k++)
                 {
-                    if (binarySave->inputPhysicalEntry[i] == binarySave->inputPhysicalEntry[k])
+                    if ((binarySave->inputPhysicalEntry[i] == binarySave->inputPhysicalEntry[k]) &&
+                        (graph->inputCount != 0))
                     {
                         /* 1. a tensor used by multiple nodes as input resource.
                            2. use vxReshapeTensor to reshape a tensor, and then the tensor be used to node input.
@@ -6561,7 +6696,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
            for (j = i; j < inputCount; j++)
            {
                binarySave->inputPhysicalEntry[j] = binarySave->inputPhysicalEntry[j + 1];
-               inputEntry[j] = inputEntry[j + 1];
+               binarySave->inputEntry[j] = binarySave->inputEntry[j + 1];
            }
            i -= 1;
         }
@@ -6594,7 +6729,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
            for (j = i; j < outputCount; j++)
            {
                binarySave->outputPhysicalEntry[j] = binarySave->outputPhysicalEntry[j + 1];
-               outputEntry[j] = outputEntry[j + 1];
+               binarySave->outputEntry[j] = binarySave->outputEntry[j + 1];
            }
            i -= 1;
        }
@@ -6606,11 +6741,11 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
     {
         if (0 != binarySave->outputPhysicalEntry[i])
         {
-            vx_reference ref = outputEntry[i];
+            vx_reference ref = binarySave->outputEntry[i];
             INITIALIZE_STRUCT(outputInfo);
             if (ref->type == VX_TYPE_TENSOR)
             {
-                vx_tensor tensor = (vx_tensor)outputEntry[i];
+                vx_tensor tensor = (vx_tensor)ref;
                 vx_int32 *dims = TENSOR_ORIG_SIZES(tensor);
                 outputInfo.dimCount = TENSOR_ORIG_DIM_NUM(tensor);
                 for (j = 0; j < outputInfo.dimCount; j++)
@@ -6625,7 +6760,8 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
                 vxmASSERT(NN_MAX_DIMENSION >= outputInfo.dimCount);
                 for (k = i + 1; k < outputCount; k++)
                 {
-                    if (binarySave->outputPhysicalEntry[i] == binarySave->outputPhysicalEntry[k])
+                    if ((binarySave->outputPhysicalEntry[i] == binarySave->outputPhysicalEntry[k]) &&
+                        (graph->outputCount != 0))
                     {
                         /* 1. a tensor used by multiple nodes as output resource.
                            2. use vxReshapeTensor to reshape a tensor, and then the tensor be used to node output.

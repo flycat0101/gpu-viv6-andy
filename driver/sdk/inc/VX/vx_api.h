@@ -1141,6 +1141,21 @@ VX_API_ENTRY vx_parameter VX_API_CALL vxGetGraphParameterByIndex(vx_graph graph,
  */
 VX_API_ENTRY vx_bool VX_API_CALL vxIsGraphVerified(vx_graph graph);
 
+/*! \brief Specify the inputs and outputs of graph explicitly.
+ * \param [in] graph The graph.
+ * \param [in] num_of_inputs Number of input reference.
+ * \param [in] inputs The array of input reference.
+ * \param [in] num_of_outputs Number of output reference.
+ * \param [in] ouputs The array of output reference.
+ * \return A <tt>\ref vx_status</tt> value.
+ * \ingroup group_graph
+ */
+VX_API_ENTRY vx_status VX_API_CALL vxIdentifyGraphInputsAndOutputs(vx_graph graph,
+                                                                   vx_uint32 num_of_inputs,
+                                                                   vx_reference *inputs,
+                                                                   vx_uint32 num_of_outputs,
+                                                                   vx_reference *outputs);
+
 /*==============================================================================
  NODE
  =============================================================================*/

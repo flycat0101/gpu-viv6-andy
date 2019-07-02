@@ -124,6 +124,22 @@ VX_INTERNAL_CALLBACK_API void vxoGraph_Destructor(vx_reference ref)
     {
        gcoVX_RestoreContext(savedHardware, savedHardwareType, savedCoreIndex);
     }
+
+    /* Release the array. */
+    if (graph->inputs)
+    {
+        vxFree(graph->inputs);
+        graph->inputs = VX_NULL;
+        graph->inputCount = 0;
+    }
+
+    if (graph->outputs)
+    {
+        vxFree(graph->outputs);
+        graph->outputs = VX_NULL;
+        graph->outputCount = 0;
+    }
+
     gcmFOOTER_NO();
 }
 
@@ -9213,6 +9229,75 @@ VX_INTERNAL_API vx_status vxoGraph_SetParameter(vx_graph graph, vx_uint32 index,
     return VX_SUCCESS;
 }
 
+VX_INTERNAL_API vx_status
+vxoGraph_IdentifyInputsAndOutputs(
+    vx_graph graph,
+    vx_uint32 num_of_inputs,
+    vx_reference *inputs,
+    vx_uint32 num_of_outputs,
+    vx_reference *outputs
+    )
+{
+    vx_status status = VX_SUCCESS;
+
+    vx_reference *input_refs = VX_NULL;
+    vx_reference *output_refs = VX_NULL;
+    vx_uint32 i;
+
+    if (!num_of_inputs || !inputs || !num_of_outputs || !outputs)
+    {
+        vxmONERROR(VX_ERROR_INVALID_PARAMETERS);
+    }
+
+    input_refs = (vx_reference *)vxAllocateAndZeroMemory(num_of_inputs * gcmSIZEOF(vx_reference));
+    vxmONERROR_NULLPTR(input_refs);
+
+    for (i = 0; i < num_of_inputs; i++)
+    {
+        input_refs[i] = inputs[i];
+    }
+
+    output_refs = (vx_reference *)vxAllocateAndZeroMemory(num_of_outputs * gcmSIZEOF(vx_reference));
+    vxmONERROR_NULLPTR(output_refs);
+
+    for (i = 0; i < num_of_outputs; i++)
+    {
+        output_refs[i] = outputs[i];
+    }
+
+    if (graph->inputs)
+    {
+        vxFree(graph->inputs);
+        graph->inputs = VX_NULL;
+    }
+
+    if (graph->outputs)
+    {
+        vxFree(graph->outputs);
+        graph->outputs = VX_NULL;
+    }
+
+    graph->inputCount = num_of_inputs;
+    graph->inputs = input_refs;
+    graph->outputCount = num_of_outputs;
+    graph->outputs = output_refs;
+
+    return status;
+
+OnError:
+    if (input_refs)
+    {
+        vxFree(input_refs);
+    }
+
+    if (output_refs)
+    {
+        vxFree(output_refs);
+    }
+
+    return status;
+}
+
 VX_API_ENTRY vx_status VX_API_CALL vxSetGraphParameterByIndex(vx_graph graph, vx_uint32 index, vx_reference value)
 {
     gcmHEADER_ARG("graph=%p, index=0x%x, value=%p", graph, index, value);
@@ -9247,6 +9332,32 @@ VX_API_ENTRY vx_bool VX_API_CALL vxIsGraphVerified(vx_graph graph)
 
     gcmFOOTER_NO();
     return graph->verified;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL
+vxIdentifyGraphInputsAndOutputs(
+    vx_graph graph,
+    vx_uint32 num_of_inputs,
+    vx_reference *inputs,
+    vx_uint32 num_of_outputs,
+    vx_reference *outputs
+    )
+{
+    vx_status status = VX_SUCCESS;
+
+    gcmHEADER_ARG("graph=%p, num_of_inputs=%u, inputs=%p, num_of_outputs=%u, outputs=%p",
+                  graph, num_of_inputs, inputs, outputs, outputs);
+    gcmDUMP_API("$VX vxIdentifyGraphInputsAndOutputs: graph=%p, num_of_inputs=%u, inputs=%p, num_of_outputs=%u, outputs=%p",
+                graph, num_of_inputs, inputs, outputs, outputs);
+
+    status =  vxoGraph_IdentifyInputsAndOutputs(graph,
+                                                num_of_inputs,
+                                                inputs,
+                                                num_of_outputs,
+                                                outputs);
+    gcmFOOTER_NO();
+
+    return status;
 }
 
 
