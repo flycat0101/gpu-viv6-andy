@@ -2200,8 +2200,18 @@ VX_INTERNAL_API vx_tensor vxoGraph_Optimization_ConvertAvgPool2Conv_createWeight
     }
     else if(TENSOR_DATA_TYPE(input) == VX_TYPE_INT8 || TENSOR_DATA_TYPE(input) == VX_TYPE_INT16)
     {
+        vx_uint32 square = weight_dims[0] * weight_dims[1];
         parm.quant_format = VX_QUANT_DYNAMIC_FIXED_POINT;
-        parm.quant_data.dfp.fixed_point_pos = (vx_int8) gcmMIN(12, 8 - ceilf((float)log(fill_data) + 1));
+
+        if((square & (square - 1) ) == 0)
+            parm.quant_data.dfp.fixed_point_pos = -1 * (vx_int8)log((float)fill_data);
+        else
+            parm.quant_data.dfp.fixed_point_pos = (vx_int8) gcmMIN(12, 8 - ceilf((float)log(fill_data) + 1));
+    }
+    else if(TENSOR_DATA_TYPE(input) == VX_TYPE_FLOAT16 || TENSOR_DATA_TYPE(input) == VX_TYPE_FLOAT16)
+    {
+        parm.quant_format = 0;
+        parm.quant_data.dfp.fixed_point_pos = 0;
     }
     else
     {
@@ -2229,7 +2239,7 @@ VX_INTERNAL_API vx_tensor vxoGraph_Optimization_ConvertAvgPool2Conv_createWeight
             }
             else
             {
-                quantizedData = (vx_int16)(fill_data / (1 << fl));
+                quantizedData = (vx_int16)(fill_data / (1 << (-fl) ));
             }
         }
     }
