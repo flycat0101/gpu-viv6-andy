@@ -56,6 +56,8 @@ static clsBUILTIN_FUNCTION CommonBuiltinFunctions[] =
     {clvEXTENSION_NONE,     "mix",    T_FLOAT2,  3, {T_FLOAT2,  T_FLOAT2,  T_FLOAT2}, {0}, {0}, 1},
     {clvEXTENSION_NONE,     "mix",    T_FLOAT3,  3, {T_FLOAT3,  T_FLOAT3,  T_FLOAT3}, {0}, {0}, 1},
     {clvEXTENSION_NONE,     "mix",    T_FLOAT4,  3, {T_FLOAT4,  T_FLOAT4,  T_FLOAT4}, {0}, {0}, 1},
+    {clvEXTENSION_NONE,     "mix",    T_FLOAT8,   3, {T_FLOAT8,  T_FLOAT8,  T_FLOAT8}, {0}, {0}, 1},
+    {clvEXTENSION_NONE,     "mix",    T_FLOAT16,  3, {T_FLOAT16,  T_FLOAT16,  T_FLOAT16}, {0}, {0}, 1},
 
     /* Angle and Trigonometry Functions */
     {clvEXTENSION_NONE,     "radians",              T_FLOAT,    1, {T_FLOAT}, {0}, {0}, 1},
