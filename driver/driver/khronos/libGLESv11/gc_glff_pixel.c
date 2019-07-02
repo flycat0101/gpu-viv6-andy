@@ -604,7 +604,7 @@ GL_API void GL_APIENTRY glReadPixels(
 
             /* Set the user buffer to the surface. */
             status = gcoSURF_MapUserSurface(
-                        dstView.surf, context->packAlignment, Pixels, gcvINVALID_ADDRESS
+                        dstView.surf, context->packAlignment, Pixels, gcvINVALID_PHYSICAL_ADDRESS
                         );
 
             if(status != gcvSTATUS_OK)

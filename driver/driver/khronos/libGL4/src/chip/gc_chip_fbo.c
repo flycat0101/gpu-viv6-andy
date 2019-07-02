@@ -2487,7 +2487,7 @@ __glChipEglImageTargetRenderbufferStorageOES(
         gcmONERROR(gcoSURF_MapUserSurface(chipRBO->surface,
                                           (gctUINT)stride,
                                           address,
-                                          gcvINVALID_ADDRESS));
+                                          gcvINVALID_PHYSICAL_ADDRESS));
     }
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);

@@ -4357,6 +4357,7 @@ __glChipTexDirectVIVMap(
 {
     __GLchipContext     *chipCtx = CHIP_CTXINFO(gc);
     __GLchipTextureInfo *texInfo = (__GLchipTextureInfo *)texObj->privateData;
+    gctPHYS_ADDR_T physAddr = gcvINVALID_PHYSICAL_ADDRESS;
 
     gctBOOL sourceYuv = gcvFALSE;
     gctBOOL planarYuv = gcvFALSE;
@@ -4557,8 +4558,13 @@ __glChipTexDirectVIVMap(
     gcmONERROR(gcoSURF_Construct(
         chipCtx->hal, width, height, 1, type, sourceFormat, gcvPOOL_USER, &texInfo->direct.source));
 
+    if (*physical != gcvINVALID_ADDRESS)
+    {
+        physAddr = (gctPHYS_ADDR_T)*physical;
+    }
+
     /* Set the user buffer to the surface. */
-    gcmONERROR(gcoSURF_MapUserSurface(texInfo->direct.source, 0, (GLvoid *) *logical, *physical));
+    gcmONERROR(gcoSURF_MapUserSurface(texInfo->direct.source, 0, (GLvoid *) *logical, physAddr));
 
     gcmONERROR(gcoSURF_Lock(texInfo->direct.source, gcvNULL, gcvNULL));
 

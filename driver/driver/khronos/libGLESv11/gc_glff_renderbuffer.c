@@ -1311,7 +1311,7 @@ GL_API void GL_APIENTRY glEGLImageTargetRenderbufferStorageOES(
 
             status = gcoSURF_MapUserSurface(
                 context->renderBuffer->surface,
-                0, attributes.pixel, gcvINVALID_ADDRESS
+                0, attributes.pixel, gcvINVALID_PHYSICAL_ADDRESS
                 );
 
             if (gcmIS_ERROR(status))

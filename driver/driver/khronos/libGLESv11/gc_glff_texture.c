@@ -10314,6 +10314,7 @@ GL_API void GL_APIENTRY glTexDirectVIVMap(
         glsTEXTURESAMPLER_PTR sampler;
         glsTEXTUREWRAPPER_PTR texture;
         gctINT32 tileWidth, tileHeight;
+        gctPHYS_ADDR_T physAddr = gcvINVALID_PHYSICAL_ADDRESS;
 
         /***********************************************************************
         ** Validate parameters.
@@ -10531,12 +10532,17 @@ GL_API void GL_APIENTRY glTexDirectVIVMap(
             break;
         }
 
+        if (*Physical != gcvINVALID_ADDRESS)
+        {
+            physAddr = (gctPHYS_ADDR_T)*Physical;
+        }
+
         /* Set the user buffer to the surface. */
         gcmERR_BREAK(gcoSURF_MapUserSurface(
             texture->direct.source,
             0,
             (GLvoid*)(*Logical),
-            *Physical
+            physAddr
             ));
 
         gcmERR_BREAK(gcoSURF_Lock(
@@ -10679,6 +10685,7 @@ GL_API void GL_APIENTRY glTexDirectTiledMapVIV(
         glsTEXTURESAMPLER_PTR sampler;
         glsTEXTUREWRAPPER_PTR texture;
         gctINT32 tileWidth, tileHeight;
+        gctPHYS_ADDR_T physAddr = gcvINVALID_PHYSICAL_ADDRESS;
 
         /***********************************************************************
         ** Validate parameters.
@@ -10838,12 +10845,17 @@ GL_API void GL_APIENTRY glTexDirectTiledMapVIV(
             break;
         }
 
+        if (*Physical != gcvINVALID_ADDRESS)
+        {
+            physAddr = (gctPHYS_ADDR_T)*Physical;
+        }
+
         /* Set the user buffer to the surface. */
         gcmERR_BREAK(gcoSURF_MapUserSurface(
             texture->direct.source,
             0,
             (GLvoid*)(*Logical),
-            *Physical
+            physAddr
             ));
 
         if (sourceYuv)
