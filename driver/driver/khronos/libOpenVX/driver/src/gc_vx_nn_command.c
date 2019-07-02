@@ -4957,3 +4957,49 @@ OnError:
     return status;
 }
 
+VX_INTERNAL_API vx_status vxnneModifyNNLastNoflushBit(
+    vx_context                   context,
+    vxnne_command_buffer         command_buffer,
+    vx_uint8                     value
+    )
+{
+    vx_uint8_ptr ptr = (vx_uint8_ptr)command_buffer->logical + NNE_COMMAND_SIZE * (command_buffer->commandCount - 1);
+    vx_uint32 data = *((vx_uint32_ptr)ptr + 3);
+
+    if (value == 0)
+    {
+        data &= ~(0x1 << 3);
+    }
+    else
+    {
+        data |= 0x1 << 3;
+    }
+
+    *((vx_uint32_ptr)ptr + 3) = data;
+
+    return VX_SUCCESS;
+}
+
+VX_INTERNAL_API vx_status vxnneModifyTPLastNoflushBit(
+    vx_context                   context,
+    vxnne_command_buffer         command_buffer,
+    vx_uint8                     value
+    )
+{
+    vx_uint8_ptr ptr = (vx_uint8_ptr)command_buffer->logical + TP_COMMAND_SIZE * (command_buffer->commandCount - 1);
+    vx_uint32 data = *((vx_uint32_ptr)ptr + 12);
+
+    if (value == 0)
+    {
+        data &= ~(0x1 << 30);
+    }
+    else
+    {
+        data |= 0x1 << 30;
+    }
+
+    *((vx_uint32_ptr)ptr + 12) = data;
+
+    return VX_SUCCESS;
+}
+

@@ -205,7 +205,8 @@ gcoVX_TriggerAccelerator(
     IN gctUINT32              EventId,
     IN gctBOOL                waitEvent,
     IN gctUINT32              gpuId,
-    IN gctBOOL                sync
+    IN gctBOOL                sync,
+    IN gctUINT32              syncEventID
     );
 
 gceSTATUS
@@ -231,11 +232,6 @@ gcoVX_QueryDeviceCount(
 gceSTATUS
 gcoVX_GetNNConfig(
     IN OUT gctPOINTER Config
-    );
-
-gceSTATUS
-gcoVX_QueryHWChipInfo(
-    IN OUT vx_hw_chip_info * HwChipInfo
     );
 
 gceSTATUS

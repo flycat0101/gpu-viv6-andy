@@ -591,17 +591,12 @@ _StallHw(
                                                     gcvNULL));
         }
 
-        if (Hardware->features[gcvFEATURE_SNAPPAGE_CMD] &&
-            Hardware->features[gcvFEATURE_SNAPPAGE_CMD_FIX])
-        {
-            gcmONERROR(
-                gcoHARDWARE_Semaphore(Hardware,
-                                      gcvWHERE_COMMAND,
-                                      gcvWHERE_PIXEL,
-                                      gcvHOW_SEMAPHORE_STALL,
-                                      gcvNULL));
-        }
-
+        gcmONERROR(
+            gcoHARDWARE_Semaphore(Hardware,
+                                  gcvWHERE_COMMAND,
+                                  gcvWHERE_PIXEL,
+                                  gcvHOW_SEMAPHORE_STALL,
+                                  gcvNULL));
 
         gcmONERROR(
             gcoHARDWARE_SnapPages(
@@ -2219,10 +2214,12 @@ gcoHARDWARE_InvokeThreadWalkerCL(
     if (!Hardware->features[gcvFEATURE_MCFE])
     {
         /* Flush the Shader L1 cache. */
-        gcmONERROR(gcoHARDWARE_LoadCtrlState(
-            Hardware,
-            0x0380C,
-                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        if (!Hardware->config->parallelBug || !Hardware->options.enableNNTPParallel || Hardware->options.enableSwtilingPhase1)
+        {
+            gcmONERROR(gcoHARDWARE_LoadCtrlState(
+                Hardware,
+                0x0380C,
+                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:5) - (0 ?
  5:5) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2232,8 +2229,8 @@ gcoHARDWARE_InvokeThreadWalkerCL(
  5:5) - (0 ?
  5:5) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ? 5:5)))
-              | (Hardware->features[gcvFEATURE_MULTI_CLUSTER] ?
-                 ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                  | (Hardware->features[gcvFEATURE_MULTI_CLUSTER] ?
+                     ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  4:4) - (0 ?
  4:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2243,7 +2240,7 @@ gcoHARDWARE_InvokeThreadWalkerCL(
  4:4) - (0 ?
  4:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ? 4:4))) :
-                 ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                     ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:2) - (0 ?
  2:2) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2253,7 +2250,46 @@ gcoHARDWARE_InvokeThreadWalkerCL(
  2:2) - (0 ?
  2:2) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ? 2:2))))
-            ));
+                ));
+        }
+        else
+        {
+            gcmONERROR(gcoHARDWARE_LoadCtrlState(
+                Hardware,
+                0x0380C,
+                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1))))))) << (0 ?
+ 5:5))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ? 5:5)))
+                  | (Hardware->features[gcvFEATURE_MULTI_CLUSTER] ?
+                     ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:4) - (0 ?
+ 4:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 4:4) - (0 ?
+ 4:4) + 1))))))) << (0 ?
+ 4:4))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 4:4) - (0 ?
+ 4:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ? 4:4))) :
+                     ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:2) - (0 ?
+ 2:2) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 2:2) - (0 ?
+ 2:2) + 1))))))) << (0 ?
+ 2:2))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 2:2) - (0 ?
+ 2:2) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ? 2:2))))
+                ));
+        }
 
         /* ICACHE need be invalidate when if the core is compute only and in combineMode */
         if(Hardware->features[gcvFEATURE_COMPUTE_ONLY] )
@@ -2291,9 +2327,11 @@ gcoHARDWARE_InvokeThreadWalkerCL(
     else
     {
         /* Flush the Shader L1 cache. */
-        gcmONERROR(gcoHARDWARE_LoadCtrlState(
-            Hardware,
-            0x0380C, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        if (!Hardware->config->parallelBug || !Hardware->options.enableNNTPParallel || Hardware->options.enableSwtilingPhase1)
+        {
+            gcmONERROR(gcoHARDWARE_LoadCtrlState(
+                Hardware,
+                0x0380C, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:5) - (0 ?
  5:5) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2303,7 +2341,24 @@ gcoHARDWARE_InvokeThreadWalkerCL(
  5:5) - (0 ?
  5:5) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ? 5:5)))
-            ));
+                ));
+        }
+        else
+        {
+            gcmONERROR(gcoHARDWARE_LoadCtrlState(
+                Hardware,
+                0x0380C, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1))))))) << (0 ?
+ 5:5))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ? 5:5)))
+                ));
+        }
 
         /* Invalidate Shader Icache. */
         if (gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_HALTI5))

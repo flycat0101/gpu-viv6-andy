@@ -150,7 +150,8 @@ vx_status gcfVX_Accel(
     IN gctUINT32                EventId,
     IN gctBOOL                  waitEvent,
     IN gctUINT32                gpuId,
-    IN gctBOOL                  sync
+    IN gctBOOL                  sync,
+    IN gctUINT32                syncEventID
     );
 
 vx_status

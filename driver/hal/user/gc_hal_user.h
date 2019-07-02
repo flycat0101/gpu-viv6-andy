@@ -3015,6 +3015,7 @@ typedef struct _vx_drv_option
     gctUINT enableHuffmanEnhancement;
     gctUINT enableTPHuffman;
     gctUINT enableMultiVIPCombined;
+    gctUINT enableNNTPParallel;
     gctUINT enableVectorPrune;
     gctUINT enableYUV2RGBScaler;
     gctUINT enableVIPDEC400;
@@ -3562,7 +3563,8 @@ gcoHARDWAREVX_TriggerAccelerator(
     IN gctUINT32                EventId,
     IN gctBOOL                  waitEvent,
     IN gctUINT32                gpuId,
-    IN gctBOOL                  sync
+    IN gctBOOL                  sync,
+    IN gctUINT32                syncEventID
 );
 
 gceSTATUS

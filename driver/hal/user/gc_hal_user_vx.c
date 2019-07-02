@@ -888,7 +888,8 @@ gcoVX_TriggerAccelerator(
     IN gctUINT32              EventId,
     IN gctBOOL                waitEvent,
     IN gctUINT32              gpuId,
-    IN gctBOOL                sync
+    IN gctBOOL                sync,
+    IN gctUINT32              syncEventID
     )
 {
     gceSTATUS status;
@@ -896,7 +897,7 @@ gcoVX_TriggerAccelerator(
     gcmHEADER_ARG("Cmd Address=%d", CmdAddress);
 
     gcmASSERT(gcoVX_VerifyHardware());
-    gcmONERROR(gcoHARDWAREVX_TriggerAccelerator(gcvNULL, CmdAddress, Type, EventId, waitEvent, gpuId, sync));
+    gcmONERROR(gcoHARDWAREVX_TriggerAccelerator(gcvNULL, CmdAddress, Type, EventId, waitEvent, gpuId, sync, syncEventID));
 
 OnError:
 
@@ -1067,31 +1068,6 @@ gcoVX_GetNNConfig(
     gcmHEADER_ARG("Config=%p", Config);
 
     gcmONERROR(gcoHARDWARE_QueryNNConfig(gcvNULL, Config));
-
-OnError:
-    gcmFOOTER();
-    return status;
-}
-
-gceSTATUS
-gcoVX_QueryHWChipInfo(
-    IN OUT vx_hw_chip_info * HwChipInfo
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-
-    gcmHEADER_ARG("HwChipInfo=%p", HwChipInfo);
-
-    if (HwChipInfo != gcvNULL)
-    {
-        gcmONERROR(gcoHARDWARE_QueryHwChipInfo(gcvNULL,
-            &HwChipInfo->customerID,
-            &HwChipInfo->ecoID));
-    }
-    else
-    {
-        status = gcvSTATUS_INVALID_ARGUMENT;
-    }
 
 OnError:
     gcmFOOTER();

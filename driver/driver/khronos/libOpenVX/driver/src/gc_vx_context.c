@@ -961,6 +961,13 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
     }
 
     envctrl = gcvNULL;
+    context->options.enableNNTPParallel = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_NNTP_PARALLEL", &envctrl)) && envctrl)
+    {
+        context->options.enableNNTPParallel = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
     context->options.enableYUV2RGBScaler = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_YUV2RGB_SCALER", &envctrl)) && envctrl)
     {
@@ -2932,6 +2939,9 @@ VX_INTERNAL_API vx_bool vxoContext_IsFeatureAvailable(vx_context context, vx_nn_
 
     case VX_NN_FEATURE_VIP_DEC400:
         return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_VIP_DEC400) && context->options.enableVIPDEC400) ? vx_true_e : vx_false_e;
+
+    case VX_NN_TP_PARALLEL:
+        return (!context->options.enableSwtilingPhase1 && context->options.enableNNTPParallel) ? vx_true_e : vx_false_e;
 
     default:
         return vx_false_e;

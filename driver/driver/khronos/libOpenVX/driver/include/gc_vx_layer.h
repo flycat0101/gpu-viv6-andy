@@ -327,7 +327,7 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_FIXED_COUNT,
 };
 
-#define VXNNE_KERNEL_DYNAMIC_COUNT 128
+#define VXNNE_KERNEL_DYNAMIC_COUNT 1024
 
 typedef enum _vxnne_user_node_type_e
 {
@@ -419,6 +419,15 @@ typedef struct _vx_sw_tiling_param_s
 }
 vx_sw_tiling_param_s, *vx_sw_tiling_param;
 
+typedef struct _vx_engines_sync_s
+{
+    vx_uint32 eventId[32];
+    vx_uint32 eventCnt;
+    vx_uint32 waitId[32];
+    vx_uint32 waitCnt;
+}
+vx_engines_sync_s, *vx_engines_sync;
+
 typedef struct _vxnne_operation_s
 {
     vxnne_layer                     layer;
@@ -474,10 +483,14 @@ typedef struct _vxnne_operation_s
     vx_uint32                       childLayerNum;
     vx_uint32                       segIndex;
 
+    vx_uint32                       opDepth;
+
     vx_uint32                       absoluteOperationID;
     vx_uint32                       gpuId;
     vx_bool                         mGpuSync;
     struct _vxnne_operation_s*      mGpuNext;
+
+    vx_engines_sync_s               engineSync;
 }
 vxnne_operation_s, *vxnne_operation;
 
@@ -2473,7 +2486,8 @@ vx_status vxnneCommandBuffer_ExecuteCommands(
     vxnne_command_buffer    commandBuffer,
     gceVX_ACCELERATOR_TYPE  type,
     vx_uint32               gpuId,
-    vx_bool                 sync
+    vx_bool                 sync,
+    vx_uint32               syncEventID[]
     );
 
 vx_status vxnneSRAM_Allocate(

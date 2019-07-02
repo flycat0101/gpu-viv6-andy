@@ -637,6 +637,76 @@ VX_INTERNAL_API void vxoGraph_GenerateAllNodeIndexTable(vx_graph graph)
 }
 #endif
 
+VX_INTERNAL_API void vxoGraph_GenerateAllNodeIndexTableEx(vx_graph graph)
+{
+    vx_uint32 i;
+    vx_uint32 list[VX_MAX_NODE_COUNT] = {0};
+    vx_uint32 head = 0, tail = 0;
+
+    for (i = 0; i < graph->nodeCount; i++)
+    {
+        vx_node node = graph->nodeTable[i];
+        if (node->numChildren == 0)
+        {
+            break;
+        }
+    }
+
+    list[tail] = i;
+
+    for (;;)
+    {
+        vx_node node;
+
+        if (head > tail) break;
+
+        node = graph->nodeTable[list[head]];
+        head++;
+        if (node == VX_NULL) continue;
+        if (node->numParents == 0) continue;
+
+        for (i = node->numParents - 1; (vx_int32)i >= node->numParents / 2; i--)
+        {
+            vx_uint32 j;
+            vx_bool dup = vx_false_e;
+
+            for (j = 0; j <= tail; j++)
+            {
+                if (graph->nodeTable[list[j]] == graph->nodeTable[node->parentNodes[i]])
+                {
+                    dup = vx_true_e;
+                    break;
+                }
+            }
+            if (dup) break;
+
+            tail++;
+            list[tail] = node->parentNodes[i];
+
+            for (j = 0; j <= tail; j++)
+            {
+                if (graph->nodeTable[list[j]] == graph->nodeTable[node->parentNodes[node->numParents - i - 1]])
+                {
+                    dup = vx_true_e;
+                    break;
+                }
+            }
+            if (dup) break;
+
+            tail++;
+            list[tail] = node->parentNodes[node->numParents - i - 1];
+        }
+    }
+
+    vxmASSERT(tail == graph->nodeCount-1);
+
+    head = 0;
+    for (i = tail; (vx_int32)i >= 0; i--)
+    {
+        graph->allNodeIndexTable[head++] = list[i];
+    }
+}
+
 VX_INTERNAL_API void vxoGraph_GenerateOpParentChild(vx_graph graph)
 {
     struct _paramNodeItemEx
@@ -5071,6 +5141,680 @@ OnError:
     return status;
 }
 
+VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph)
+{
+#define MAX_PARALLEL_OUTPUT_NUMBER 36
+    vxnne_execution_layer layer = graph->layer;
+    vxnne_operation list[VX_MAX_NODE_COUNT] = {VX_NULL};
+    vx_uint32 e, p = 0, i, j, k, count = 0, ecount = 0, wDepth = 0, head, tail = 0, start;
+    vx_uint32 ecounts[MAX_PARALLEL_OUTPUT_NUMBER];
+    vxnne_operation operation;
+    vxnne_operation entrys[MAX_PARALLEL_OUTPUT_NUMBER];
+
+    for (i = layer->base.num_operations - 1; (vx_int32)i >= 0; i--)
+    {
+        operation = layer->operations[i];
+
+        if (operation->childOpNum == 0)
+        {
+            entrys[ecount++] = operation;
+            operation->opDepth = 1;
+            count++;
+        }
+    }
+
+    vxmASSERT(ecount <= MAX_PARALLEL_OUTPUT_NUMBER);
+
+    for (e = 0; e < ecount; e++)
+    {
+        if (list[p] == VX_NULL)
+        {
+            list[p] = entrys[e];
+        }
+
+        head = 0;
+        tail = 0;
+
+        for (;;)
+        {
+            if (head > tail) break;
+
+            operation = list[p+head];
+            head++;
+
+            for (i = 0; i < operation->parentOpNum; i++)
+            {
+                vxnne_operation parent = operation->parentOps[i];
+
+                if (parent->opDepth != 0)
+                {
+                    if (parent->opDepth < operation->opDepth + 1)
+                    {
+                        vxnne_operation op;
+                        vxnne_operation list2[VX_MAX_NODE_COUNT] = {0};
+                        vx_uint32 head2 = 0, tail2 = 0;
+
+                        /* update op depth to max and adjust its list position */
+                        parent->opDepth = operation->opDepth + 1;
+                        wDepth = gcmMAX(wDepth, parent->opDepth);
+                        list2[tail2] = parent;
+                        for (;;)
+                        {
+                            vx_uint32 chDepth = 0;
+                            if (head2 > tail2) break;
+                            op = list2[head2];
+                            for (j = 0; j < op->childOpNum; j++)
+                            {
+                                if (op->childOps[j]->opDepth > chDepth)
+                                    chDepth = op->childOps[j]->opDepth;
+                            }
+                            op->opDepth = chDepth + 1;
+                            wDepth = gcmMAX(wDepth, op->opDepth);
+                            head2++;
+                            for (j = 0; j <= tail; j++)
+                            {
+                                if (list[p+j] == op)
+                                    break;
+                            }
+                            vxmASSERT(j <= tail);
+
+                            for (k = j; k < tail; k++)
+                            {
+                                if (list[p+k+1]->opDepth > op->opDepth)
+                                    break;
+                                list[p+k] = list[p+k+1];
+                            }
+                            list[p+k] = op;
+
+                            if (j < head && k > head)
+                                head--;
+
+                            for (j = 0; j < op->parentOpNum; j++)
+                            {
+                                vxnne_operation pa = op->parentOps[j];
+                                if (!pa->opDepth)
+                                    continue;
+                                list2[++tail2] = pa;
+                            }
+                        }
+                    }
+                    else if (parent->opDepth > operation->opDepth + 1)
+                    {
+                        for (j = 0; j <= tail; j++)
+                        {
+                            if (list[p+j] == operation)
+                                break;
+                        }
+                        vxmASSERT(j <= tail);
+
+                        operation->opDepth = parent->opDepth - 1;
+                        for (k = j; k < tail; k++)
+                        {
+                            if (list[p+k+1]->opDepth >= operation->opDepth)
+                                break;
+                            list[p+k] = list[p+k+1];
+                        }
+                        list[p+k] = operation;
+                    }
+                    continue;
+                }
+                else
+                {
+                    parent->opDepth = operation->opDepth + 1;
+                    wDepth = gcmMAX(wDepth, parent->opDepth);
+
+                    for (j = tail; (vx_int32)j >= 0; j--)
+                    {
+                        if (parent->opDepth >= list[p+j]->opDepth)
+                            break;
+                    }
+
+                    /* put same depth ops together */
+                    if (j < tail)
+                    {
+                        for (k = tail; k > j; k--)
+                        {
+                            list[p+k+1] = list[p+k];
+                        }
+                        tail++;
+                        list[p+k+1] = parent;
+                    }
+                    else
+                    {
+                        tail++;
+                        list[p+tail] = parent;
+                    }
+                    count++;
+                }
+            }
+        }
+
+        ecounts[e] = tail + 1;
+        p += ecounts[e];
+    }
+
+    vxmASSERT(count == layer->base.num_operations);
+
+    p = 0;
+    start = count - 1;
+    for (e = 0; e < ecount; e++)
+    {
+        /* now sequence is from bottom to top */
+        head = 0;
+        for (;;)
+        {
+            vx_uint32 cDepth = list[p+head]->opDepth;
+
+            for (i = head; i < ecounts[e]; i++)
+            {
+                vx_uint32 tDepth = list[p+i]->opDepth;
+                if (tDepth != cDepth)
+                    break;
+            }
+
+            /* adjust same depth ops sequence */
+            if (i - head > 1)
+            {
+#define MAX_OP_NUMBER_ONE_LAYER 128
+                vx_uint32 swCount = 0, shCount = 0, nntpCount = 0, l = 0, r = MAX_OP_NUMBER_ONE_LAYER;
+                vxnne_operation tmpNNTPOps[MAX_OP_NUMBER_ONE_LAYER] = {VX_NULL};
+                vxnne_operation tmpSHOps[MAX_OP_NUMBER_ONE_LAYER] = {VX_NULL};
+                vxnne_operation tmpSWOps[MAX_OP_NUMBER_ONE_LAYER/2] = {VX_NULL};
+
+                for (j = head; j < i; j++)
+                {
+                    vx_uint32 paDepth = 0xFFFF;
+                    operation = list[p+j];
+
+                    for (k = 0; k < operation->parentOpNum; k++)
+                    {
+                        if (operation->parentOps[k]->opDepth < paDepth)
+                            paDepth = operation->parentOps[k]->opDepth;
+                    }
+
+                    if (operation->target == VXNNE_OPERATION_TARGET_SH)
+                    {
+                        for (k = shCount - 1; (vx_int32)k >= 0; k--)
+                        {
+                            vx_uint32 m, tpaDepth = 0xFFFF;
+                            for (m = 0; m < tmpSHOps[k]->parentOpNum; m++)
+                            {
+                                if (tmpSHOps[k]->parentOps[m]->opDepth < tpaDepth)
+                                    tpaDepth = tmpSHOps[k]->parentOps[m]->opDepth;
+                            }
+                            if (operation->parentOpNum != 0 && (!tmpSHOps[k]->parentOpNum || tpaDepth < paDepth))
+                            {
+                                tmpSHOps[k+1] = tmpSHOps[k];
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+                        tmpSHOps[k+1] = operation;
+                        shCount++;
+                        vxmASSERT(shCount <= MAX_OP_NUMBER_ONE_LAYER);
+                    }
+                    else if (operation->target == VXNNE_OPERATION_TARGET_SW)
+                    {
+                        for (k = swCount - 1; (vx_int32)k >= 0; k--)
+                        {
+                            vx_uint32 m, tpaDepth = 0xFFFF;
+                            for (m = 0; m < tmpSHOps[k]->parentOpNum; m++)
+                            {
+                                if (tmpSHOps[k]->parentOps[m]->opDepth < tpaDepth)
+                                    tpaDepth = tmpSHOps[k]->parentOps[m]->opDepth;
+                            }
+                            if (operation->parentOpNum != 0 && (!tmpSHOps[k]->parentOpNum || tpaDepth < paDepth))
+                            {
+                                tmpSWOps[k+1] = tmpSWOps[k];
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+                        tmpSWOps[k+1] = operation;
+                        swCount++;
+                        vxmASSERT(swCount <= MAX_OP_NUMBER_ONE_LAYER / 2);
+                    }
+                    else
+                    {
+                        if (operation->target == VXNNE_OPERATION_TARGET_NN)
+                        {
+                            for (k = l - 1; (vx_int32)k >= 0; k--)
+                            {
+                                vx_uint32 m, tpaDepth = 0xFFFF;
+                                for (m = 0; m < tmpNNTPOps[k]->parentOpNum; m++)
+                                {
+                                    if (tmpNNTPOps[k]->parentOps[m]->opDepth < tpaDepth)
+                                        tpaDepth = tmpNNTPOps[k]->parentOps[m]->opDepth;
+                                }
+                                if (operation->parentOpNum != 0 && (!tmpNNTPOps[k]->parentOpNum || tpaDepth < paDepth))
+                                {
+                                    tmpNNTPOps[k+1] = tmpNNTPOps[k];
+                                }
+                                else
+                                {
+                                    break;
+                                }
+                            }
+                            tmpNNTPOps[k+1] = operation;
+                            l++;
+                        }
+                        else /* TP */
+                        {
+                            for (k = r; k < MAX_OP_NUMBER_ONE_LAYER; k++)
+                            {
+                                vx_uint32 m, tpaDepth = 0xFFFF;
+                                for (m = 0; m < tmpNNTPOps[k]->parentOpNum; m++)
+                                {
+                                    if (tmpNNTPOps[k]->parentOps[m]->opDepth < tpaDepth)
+                                        tpaDepth = tmpNNTPOps[k]->parentOps[m]->opDepth;
+                                }
+                                if (operation->parentOpNum != 0 && (!tmpNNTPOps[k]->parentOpNum || tpaDepth < paDepth))
+                                {
+                                    tmpNNTPOps[k-1] = tmpNNTPOps[k];
+                                }
+                                else
+                                {
+                                    break;
+                                }
+                            }
+                            tmpNNTPOps[k-1] = operation;
+                            r--;
+                        }
+                        nntpCount++;
+                        vxmASSERT(nntpCount <= MAX_OP_NUMBER_ONE_LAYER);
+                    }
+                }
+
+                /* put SW op with reverse sequence */
+                for (j = 0; j < swCount; j++)
+                {
+                    if (p == 0)
+                    {
+                        layer->operations[start--] = tmpSWOps[j];
+                    }
+                    else
+                    {
+                        for (k = start; k < count - 1; k++)
+                        {
+                            if (tmpSWOps[j]->opDepth > layer->operations[k+1]->opDepth)
+                            {
+                                break;
+                            }
+                            else
+                            {
+                                layer->operations[k] = layer->operations[k+1];
+                            }
+                        }
+                        layer->operations[k] = tmpSWOps[j];
+                        start--;
+                    }
+                }
+
+                /* put SH op with reverse sequence */
+                for (j = shCount - 1; (vx_int32)j >= 0; j--)
+                {
+                    if (p == 0)
+                    {
+                        layer->operations[start--] = tmpSHOps[j];
+                    }
+                    else
+                    {
+                        for (k = start; k < count - 1; k++)
+                        {
+                            if (tmpSHOps[j]->opDepth > layer->operations[k+1]->opDepth)
+                            {
+                                break;
+                            }
+                            else
+                            {
+                                layer->operations[k] = layer->operations[k+1];
+                            }
+                        }
+                        layer->operations[k] = tmpSHOps[j];
+                        start--;
+                    }
+                }
+
+                /* put NN/TP op with reverse sequence */
+                l--;
+                for (; nntpCount > 0;)
+                {
+                    if ((vx_int32)l >= 0)
+                    {
+                        if (p == 0)
+                        {
+                            layer->operations[start--] = tmpNNTPOps[l--];
+                            nntpCount--;
+                        }
+                        else
+                        {
+                            for (k = start; k < count - 1; k++)
+                            {
+                                if ((tmpNNTPOps[l]->opDepth > layer->operations[k+1]->opDepth) ||
+                                    (tmpNNTPOps[l]->target != VXNNE_OPERATION_TARGET_SH &&
+                                     tmpNNTPOps[l]->opDepth == layer->operations[k+1]->opDepth &&
+                                     layer->operations[k+1]->target == VXNNE_OPERATION_TARGET_SH))
+                                {
+                                    break;
+                                }
+                                else
+                                {
+                                    layer->operations[k] = layer->operations[k+1];
+                                }
+                            }
+                            layer->operations[k] = tmpNNTPOps[l];
+                            start--;
+                        }
+                    }
+                    if (r < MAX_OP_NUMBER_ONE_LAYER)
+                    {
+                        if (p == 0)
+                        {
+                            layer->operations[start--] = tmpNNTPOps[r++];
+                            nntpCount--;
+                        }
+                        else
+                        {
+                            for (k = start; k < count - 1; k++)
+                            {
+                                if ((tmpNNTPOps[r]->opDepth > layer->operations[k+1]->opDepth) ||
+                                    (tmpNNTPOps[r]->target != VXNNE_OPERATION_TARGET_SH &&
+                                     tmpNNTPOps[r]->opDepth == layer->operations[k+1]->opDepth &&
+                                     layer->operations[k+1]->target == VXNNE_OPERATION_TARGET_SH))
+                                {
+                                    break;
+                                }
+                                else
+                                {
+                                    layer->operations[k] = layer->operations[k+1];
+                                }
+                            }
+                            layer->operations[k] = tmpNNTPOps[r];
+                            start--;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                if (p == 0)
+                {
+                    layer->operations[start--] = list[p+head];
+                }
+                else
+                {
+                    for (j = start; j < count - 1; j++)
+                    {
+                        if ((list[p+head]->opDepth > layer->operations[j+1]->opDepth ||
+                            (list[p+head]->target != VXNNE_OPERATION_TARGET_SH &&
+                             list[p+head]->opDepth == layer->operations[j+1]->opDepth &&
+                             layer->operations[j+1]->target == VXNNE_OPERATION_TARGET_SH)))
+                        {
+                            break;
+                        }
+                        else
+                        {
+                            layer->operations[j] = layer->operations[j+1];
+                        }
+                    }
+                    layer->operations[j] = list[p+head];
+                    start--;
+                }
+            }
+
+            head = i;
+
+            if (head >= ecounts[e])
+                break;
+        }
+
+        p += ecounts[e];
+    }
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsAfter(vx_graph graph)
+{
+    vx_uint32 i = 0, j = 0, start = 0;
+    vxnne_execution_layer layer = graph->layer;
+    vx_uint32 eventId = 1;
+    vxnne_operation prevNNOp = VX_NULL, prevTPOp[2] = {VX_NULL};
+
+    vxmASSERT(layer->base.num_operations == layer->opIndicesNum);
+
+    for (i = 0; i < layer->opIndicesNum; i++)
+    {
+        vxnne_operation operation = layer->operations[layer->opIndices[i].operationID];
+
+        if (layer->opIndices[i].commandBuffer.commandCount > 0)
+        {
+            operation->engineSync.eventCnt = layer->opIndices[i].commandBuffer.commandCount;
+
+            for (j = 0; j < layer->opIndices[i].commandBuffer.commandCount - 1; j++)
+            {
+                operation->engineSync.eventId[j] = 31;
+            }
+            operation->engineSync.eventId[operation->engineSync.eventCnt - 1] = eventId;
+            eventId = eventId >= 30 ? 1 : eventId + 1;
+        }
+    }
+
+    for (;;)
+    {
+        vx_bool hasSH = vx_false_e, hasNNChild = vx_false_e;
+        vx_uint32 cDepth = layer->operations[layer->opIndices[start].operationID]->opDepth;
+
+        for (i = start; i < layer->opIndicesNum; i++)
+        {
+            vxnne_operation operation = layer->operations[layer->opIndices[i].operationID];
+
+            if (operation->opDepth != cDepth)
+                break;
+
+            if (operation->target == VXNNE_OPERATION_TARGET_NN || operation->target == VXNNE_OPERATION_TARGET_TP)
+            {
+                vx_bool sameNNPa = vx_false_e;
+                vx_bool sameTPPa = vx_false_e;
+
+                for (j = 0; j < operation->parentOpNum; j++)
+                {
+                    vxnne_operation operationPa = operation->parentOps[j];
+                    if (operationPa->target != VXNNE_OPERATION_TARGET_SH && operationPa->target != VXNNE_OPERATION_TARGET_SW)
+                    {
+                        operation->engineSync.waitId[operation->engineSync.waitCnt++] = operationPa->engineSync.eventId[operationPa->engineSync.eventCnt-1];
+                    }
+                    if (prevNNOp != VX_NULL && prevNNOp == operationPa)
+                    {
+                        sameNNPa = vx_true_e;
+                    }
+                    if ((prevTPOp[0] != VX_NULL && prevTPOp[0] == operationPa) ||
+                        (prevTPOp[1] != VX_NULL && prevTPOp[1] == operationPa))
+                    {
+                        sameTPPa = vx_true_e;
+                    }
+                }
+
+                if (operation->target == VXNNE_OPERATION_TARGET_NN)
+                {
+                    /* NN op must wait for previous NN op */
+                    if (prevNNOp != VX_NULL && !sameNNPa)
+                    {
+                        operation->engineSync.waitId[operation->engineSync.waitCnt++] = prevNNOp->engineSync.eventId[prevNNOp->engineSync.eventCnt-1];
+                    }
+                    prevNNOp = operation;
+
+                    /* NN op must wait for last flush TP op */
+                    if (prevTPOp[0] != VX_NULL)
+                    {
+                        if (!sameTPPa)
+                        {
+                            operation->engineSync.waitId[operation->engineSync.waitCnt++] = prevTPOp[0]->engineSync.eventId[prevTPOp[0]->engineSync.eventCnt-1];
+                        }
+                        prevTPOp[0] = VX_NULL;
+                    }
+
+                    if (i == layer->opIndicesNum - 1)
+                    {
+                        /* flush last NN op */
+                        vxnneModifyNNLastNoflushBit(graph->base.context, &layer->opIndices[i].commandBuffer, 0);
+                    }
+                    else
+                    {
+                        vxnneModifyNNLastNoflushBit(graph->base.context, &layer->opIndices[i].commandBuffer, 1);
+                    }
+                }
+                else
+                {
+                    /* TP op must wait for last flush TP op in previous layer */
+                    if (prevTPOp[1] != VX_NULL)
+                    {
+                        if (!sameTPPa)
+                        {
+                            operation->engineSync.waitId[operation->engineSync.waitCnt++] = prevTPOp[1]->engineSync.eventId[prevTPOp[1]->engineSync.eventCnt-1];
+                        }
+                        prevTPOp[1] = VX_NULL;
+                    }
+
+                    if (i == layer->opIndicesNum - 1)
+                    {
+                        /* flush last TP op */
+                        vxnneModifyTPLastNoflushBit(graph->base.context, &layer->opIndices[i].commandBuffer, 0);
+                    }
+                    else
+                    {
+                        vxnneModifyTPLastNoflushBit(graph->base.context, &layer->opIndices[i].commandBuffer, 1);
+                    }
+
+                    for (j = 0; j < operation->childOpNum; j++)
+                    {
+                        vxnne_operation operationCh = operation->childOps[j];
+                        if (operationCh->target == VXNNE_OPERATION_TARGET_NN)
+                        {
+                            hasNNChild = vx_true_e;
+                            break;
+                        }
+                    }
+                }
+            }
+            else if (operation->target == VXNNE_OPERATION_TARGET_SH)
+            {
+                if (hasSH || i == 0)
+                {
+                    operation->engineSync.waitCnt = 0;
+                }
+                else
+                {
+                    vx_uint32 k, lastNNPos = 0;
+                    vx_uint32 pDepth = layer->operations[layer->opIndices[start-1].operationID]->opDepth;
+                    vxnne_operation prevOp, lastNNOp = VX_NULL;
+
+                    for (j = start - 1; (vx_int32)j >= 0; j--)
+                    {
+                        if (layer->operations[layer->opIndices[j].operationID]->opDepth != pDepth)
+                            break;
+                        if (layer->operations[layer->opIndices[j].operationID]->target == VXNNE_OPERATION_TARGET_SH)
+                            break;
+                    }
+
+                    /* wait for all operations in previous layer if previous layer has no SH ops */
+                    for (k = j + 1; k < start; k++)
+                    {
+                        prevOp = layer->operations[layer->opIndices[k].operationID];
+                        if (prevOp->target != VXNNE_OPERATION_TARGET_SW)
+                        {
+                            if (prevOp->target == VXNNE_OPERATION_TARGET_NN)
+                            {
+                                lastNNPos = operation->engineSync.waitCnt;
+                                lastNNOp = prevOp;
+                            }
+                            else
+                            {
+                                operation->engineSync.waitId[operation->engineSync.waitCnt++] = prevOp->engineSync.eventId[prevOp->engineSync.eventCnt-1];
+                            }
+                        }
+                    }
+
+                    /* wait for all previous non-sh operations in same layer */
+                    for (j = start; j < i; j++)
+                    {
+                        prevOp = layer->operations[layer->opIndices[j].operationID];
+                        if (prevOp->target != VXNNE_OPERATION_TARGET_SW)
+                        {
+                            if (prevOp->target == VXNNE_OPERATION_TARGET_NN)
+                            {
+                                lastNNPos = operation->engineSync.waitCnt;
+                                lastNNOp = prevOp;
+                            }
+                            else
+                            {
+                                operation->engineSync.waitId[operation->engineSync.waitCnt++] = prevOp->engineSync.eventId[prevOp->engineSync.eventCnt-1];
+                            }
+                        }
+                    }
+
+                    if (lastNNOp != VX_NULL)
+                    {
+                        for (j = operation->engineSync.waitCnt; j > lastNNPos; j--)
+                        {
+                            operation->engineSync.waitId[j] = operation->engineSync.waitId[j-1];
+                        }
+                        operation->engineSync.waitId[j] = lastNNOp->engineSync.eventId[lastNNOp->engineSync.eventCnt-1];
+                        operation->engineSync.waitCnt++;
+                    }
+
+                    hasSH = vx_true_e;
+                }
+
+                prevNNOp = VX_NULL;
+                prevTPOp[0] = prevTPOp[1] = VX_NULL;
+            }
+            else /* TARGET_SW */
+            {
+                for (j = 0; j < operation->parentOpNum; j++)
+                {
+                    vxnne_operation operationPa = operation->parentOps[j];
+                    if (operationPa->target != VXNNE_OPERATION_TARGET_SH && operationPa->target != VXNNE_OPERATION_TARGET_SW)
+                    {
+                        operation->engineSync.waitId[operation->engineSync.waitCnt++] = operationPa->engineSync.eventId[operationPa->engineSync.eventCnt-1];
+                    }
+                }
+            }
+        }
+
+        if (i >= layer->opIndicesNum)
+            break;
+
+        prevTPOp[0] = prevTPOp[1] = VX_NULL;
+        if (hasNNChild)
+        {
+            for (j = i - 1; (vx_int32)j >= 0; j--)
+            {
+                vxnne_operation op = layer->operations[layer->opIndices[j].operationID];
+
+                if (op->opDepth != cDepth)
+                    break;
+
+                if (op->target == VXNNE_OPERATION_TARGET_TP)
+                {
+                    /* flush last TP op in this layer for its child NN op */
+                    vxnneModifyTPLastNoflushBit(graph->base.context, &layer->opIndices[j].commandBuffer, 0);
+                    prevTPOp[0] = prevTPOp[1] = op;
+                    break;
+                }
+            }
+        }
+
+        start = i;
+    }
+
+    return VX_SUCCESS;
+}
+
 VX_INTERNAL_API void vxoGraph_GenerateOperationTable(vx_graph graph)
 {
     vxnne_execution_layer layer = VX_NULL;
@@ -8262,6 +9006,11 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyGraph(vx_graph graph)
     {
         vxoGraph_GenerateOpParentChild(graph);
 
+        if (vxoContext_IsFeatureAvailable(graph->base.context, VX_NN_TP_PARALLEL))
+        {
+            vxoGraphParallel_AnalyzeOperationsBefore(graph);
+        }
+
         if (graph->base.context->options.collectPerfType == COLLECT_PERF_ESTIMATE)
         {
             vxoGraph_PredictPerf(graph);
@@ -8274,6 +9023,11 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyGraph(vx_graph graph)
         vxmONERROR(vxoGraphBinary_SaveBinaryEntrance(graph));
 
         vxmONERROR(vxnneExecutionLayer_GenerateCommands(graph->base.context, &graph->layer->base));
+
+        if (vxoContext_IsFeatureAvailable(graph->base.context, VX_NN_TP_PARALLEL))
+        {
+            vxoGraphParallel_AnalyzeOperationsAfter(graph);
+        }
 
         vxoGraph_VerifyOperationSync(graph);
     }
@@ -8713,6 +9467,11 @@ VX_PRIVATE_API void vxoGraph_EndProcess(vx_graph graph)
         }
     }
 #endif
+
+    if (vxoContext_IsFeatureAvailable(graph->base.context, VX_NN_TP_PARALLEL))
+    {
+        gcfVX_Flush(gcvTRUE);
+    }
 
     vxoGraph_ProcessKernelPrint(graph);
 

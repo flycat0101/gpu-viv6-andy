@@ -1682,7 +1682,8 @@ vx_status vxnneCommandBuffer_ExecuteCommands(
     vxnne_command_buffer        commandBuffer,
     gceVX_ACCELERATOR_TYPE      type,
     vx_uint32                   gpuId,
-    vx_bool                     sync
+    vx_bool                     sync,
+    vx_uint32                   syncEventID[]
     )
 {
     vx_uint32 i = 0;
@@ -1710,7 +1711,7 @@ vx_status vxnneCommandBuffer_ExecuteCommands(
         }
 
         status = gcfVX_Accel(commandBuffer->physical + i * commandSize, type,
-                             commandBuffer->eventID[i], 0, (gctUINT32)gpuId, (gctBOOL)needMultiGpuSync);
+                             commandBuffer->eventID[i], 0, (gctUINT32)gpuId, (gctBOOL)needMultiGpuSync, syncEventID[i]);
         if (status != VX_SUCCESS)
         {
             break;
@@ -1744,14 +1745,16 @@ vx_status vxnneOperation_ExecuteCommands(vxnne_operation operation, vxnne_comman
         return vxnneCommandBuffer_ExecuteCommands(node, commandBuffer,
                                                   gcvVX_ACCELERATOR_TP,
                                                   operation->gpuId,
-                                                  operation->mGpuSync);
+                                                  operation->mGpuSync,
+                                                  operation->engineSync.eventId);
     }
     else
     {
         return vxnneCommandBuffer_ExecuteCommands(node, commandBuffer,
                                                   gcvVX_ACCELERATOR_NN,
                                                   operation->gpuId,
-                                                  operation->mGpuSync);
+                                                  operation->mGpuSync,
+                                                  operation->engineSync.eventId);
     }
 }
 

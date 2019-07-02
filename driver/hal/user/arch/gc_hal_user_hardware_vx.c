@@ -573,12 +573,12 @@ gcoHARDWAREVX_SetImageInfo(
         switch(Info->border)
         {
         case gcvVX_BORDER_MODE_UNDEFINED:
-        case gcvVX_BORDER_MODE_CONSTANT:
             border = 0x0;
             break;
         case gcvVX_BORDER_MODE_REPLACEMENT:
             border = 0x3;
             break;
+        case gcvVX_BORDER_MODE_CONSTANT:
         default:
             border = 0x1;
             break;
@@ -1940,10 +1940,12 @@ gcoHARDWAREVX_InvokeThreadWalker(
     }
 #else
     /* Flush the Shader L1 cache. */
-    gcmONERROR(gcoHARDWARE_LoadCtrlState(
-        Hardware,
-        0x0380C,
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    if (!Hardware->config->parallelBug || !Hardware->options.enableNNTPParallel || Hardware->options.enableSwtilingPhase1)
+    {
+        gcmONERROR(gcoHARDWARE_LoadCtrlState(
+            Hardware,
+            0x0380C,
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:5) - (0 ?
  5:5) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1953,7 +1955,25 @@ gcoHARDWAREVX_InvokeThreadWalker(
  5:5) - (0 ?
  5:5) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ? 5:5)))
-        ));
+            ));
+    }
+    else
+    {
+        gcmONERROR(gcoHARDWARE_LoadCtrlState(
+            Hardware,
+            0x0380C,
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1))))))) << (0 ?
+ 5:5))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ? 5:5)))
+            ));
+    }
 
     if (Hardware->features[gcvFEATURE_MCFE])
     {
@@ -35480,7 +35500,8 @@ gcoHARDWAREVX_TriggerAccelerator(
     IN gctUINT32                EventId,
     IN gctBOOL                  waitEvent,
     IN gctUINT32                gpuId,
-    IN gctBOOL                  sync
+    IN gctBOOL                  sync,
+    IN gctUINT32                syncEventID
 )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -35534,7 +35555,14 @@ gcoHARDWAREVX_TriggerAccelerator(
                          gcoHAL_GetOption(gcvNULL, gcvOPTION_OVX_ENABLE_NN_STRIDE);
         disableSWTiling = enableNNStride ? 0 : 1;
 
-        smallBatch = Hardware->features[gcvFEATURE_NN_SMALLBATCH_PHASE1] ? 0x0 : 0x1;
+        if (!Hardware->config->parallelBug)
+        {
+            smallBatch = Hardware->features[gcvFEATURE_NN_SMALLBATCH_PHASE1] ? 0x0 : 0x1;
+        }
+        else
+        {
+            smallBatch = 0x0;
+        }
 
         NNconfig |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:2) - (0 ?
@@ -36016,7 +36044,85 @@ gcoHARDWAREVX_TriggerAccelerator(
 
         }
 #endif
-        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+
+        if (syncEventID != 0)
+        {
+            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ?
+ 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ?
+ 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ?
+ 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ?
+ 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (triggerRegAddr[Type]) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, triggerRegAddr[Type], ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:6) - (0 ?
+ 31:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:6) - (0 ?
+ 31:6) + 1))))))) << (0 ?
+ 31:6))) | (((gctUINT32) ((gctUINT32) ((CmdAddress >> 6)) & ((gctUINT32) ((((1 ?
+ 31:6) - (0 ?
+ 31:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:6) - (0 ?
+ 31:6) + 1))))))) << (0 ?
+ 31:6))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) ((gctUINT32) (syncEventID) & ((gctUINT32) ((((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0))));    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+        }
+        else
+        {
+            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -36089,9 +36195,9 @@ gcoHARDWAREVX_TriggerAccelerator(
 };
 
 
-        if (EventId == 0 || waitEvent)
-        {
-            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+            if (EventId == 0 || waitEvent)
+            {
+                {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -36143,6 +36249,7 @@ gcoHARDWAREVX_TriggerAccelerator(
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
+            }
         }
     }
     else
@@ -36929,17 +37036,7 @@ gcoHARDWAREVX_ProgrammeNNEngine(
  30:30))) | (((gctUINT32) ((gctUINT32) ((info->inImageYOffset >> 4) & 0x1) & ((gctUINT32) ((((1 ?
  30:30) - (0 ?
  30:30) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)))
-                            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 28:28) - (0 ?
- 28:28) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 28:28) - (0 ?
- 28:28) + 1))))))) << (0 ?
- 28:28))) | (((gctUINT32) ((gctUINT32) (info->slowOutput) & ((gctUINT32) ((((1 ?
- 28:28) - (0 ?
- 28:28) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 28:28) - (0 ? 28:28) + 1))))))) << (0 ? 28:28)));
+ ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)));
 
     /*25:0*/
      *(*Instruction)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?

@@ -1063,7 +1063,8 @@ vx_status gcfVX_Accel(
     IN gctUINT32                EventId,
     IN gctBOOL                  waitEvent,
     IN gctUINT32                gpuId,
-    IN gctBOOL                  sync
+    IN gctBOOL                  sync,
+    IN gctUINT32                syncEventID
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -1071,7 +1072,7 @@ vx_status gcfVX_Accel(
     gcmHEADER_ARG("CmdAddress=0x%x Type=%d EventId=%d waitEvent=%d", CmdAddress, Type, EventId, waitEvent);
 
     gcmASSERT(gcoVX_VerifyHardware());
-    gcmONERROR(gcoVX_TriggerAccelerator(CmdAddress, Type, EventId, waitEvent, gpuId, sync));
+    gcmONERROR(gcoVX_TriggerAccelerator(CmdAddress, Type, EventId, waitEvent, gpuId, sync, syncEventID));
 
 OnError:
     gcmFOOTER_ARG("%d", status);

@@ -19780,7 +19780,7 @@ OnError:
 
 vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
 {
-    vx_uint32               i;
+    vx_uint32               i = 0, j = 0;
     vx_status               status = VX_SUCCESS;
     vxnne_execution_layer   executionLayer = (vxnne_execution_layer)layer;
     vxnne_operation         operation;
@@ -19792,12 +19792,54 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
     {
         gctUINT64 operatorStart = 0;
         vx_uint32 opertorExcuteTime = 0;
+        vx_bool wait = vx_false_e;
 
         operation = executionLayer->operations[executionLayer->opIndices[i].operationID];
 
         vxnneMultiChannel_SetCurrentChannel(operation->target);
 
         vxnneMultiChannel_ApplySyncMode(executionLayer->opIndices[i].waitMode, executionLayer->opIndices[i].semaWaitHandle);
+
+        if (vxoContext_IsFeatureAvailable(executionLayer->graph->base.context, VX_NN_TP_PARALLEL))
+        {
+            /* th/nn/sh parallel wait event ID */
+            if (i > 0)
+            {
+                for (j = 0; j < operation->engineSync.waitCnt; j++)
+                {
+                    gcoVX_WaitNNEvent(operation->engineSync.waitId[j]);
+                    wait = vx_true_e;
+                }
+            }
+
+            if (operation->target == VXNNE_OPERATION_TARGET_NN)
+            {
+                vxInfo("NN eventId: %2d waitId: ", operation->engineSync.eventId[0]);
+            }
+            else if (operation->target == VXNNE_OPERATION_TARGET_TP)
+            {
+                vxInfo("TP eventId: ");
+                for (j = 0; j < operation->engineSync.eventCnt; j++)
+                {
+                    vxInfo("%2d ", operation->engineSync.eventId[j]);
+                }
+                vxInfo("waitId: ");
+            }
+            else if (operation->target == VXNNE_OPERATION_TARGET_SH)
+            {
+                vxInfo("SH eventId: %2d waitId: ", operation->engineSync.eventId[0]);
+            }
+
+            for (j = 0; j < operation->engineSync.waitCnt; j++)
+            {
+                vxInfo("%2d ", operation->engineSync.waitId[j]);
+            }
+            if (!wait)
+            {
+                vxInfo("Skip");
+            }
+            vxInfo("\n");
+        }
 
         vxnneBatch_SetCurrentBatchArray(operation, executionLayer->opIndices[i].batchID);
 
