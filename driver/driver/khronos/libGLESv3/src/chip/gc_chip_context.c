@@ -1222,8 +1222,16 @@ __glChipGetDeviceConstants(
     constants->maxTextureDepthSize  = __GL_MAX_HW_DEPTH_SIZE;
 
     constants->lineWidthMin = 1.0f;
-    constants->lineWidthMax = (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_WIDE_LINE) &&
-                               gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_WIDELINE_HELPER_FIX)) ? 16.0f : 1.0f;
+    if ((chipModel == gcv880 && chipRevision == 0x5106) ||
+        (chipModel == gcv2000 && chipRevision == 0x5108))
+    {
+        constants->lineWidthMax = gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_WIDE_LINE) ? 16.0f : 1.0f;
+    }
+    else
+    {
+        constants->lineWidthMax = (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_WIDE_LINE) &&
+                                   gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_WIDELINE_HELPER_FIX)) ? 16.0f : 1.0f;
+    }
 
     constants->numberofQueryCounterBits = __GL_QUERY_COUNTER_BITS;
 
