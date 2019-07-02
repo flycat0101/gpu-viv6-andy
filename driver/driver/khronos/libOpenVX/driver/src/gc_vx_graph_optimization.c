@@ -2228,7 +2228,7 @@ VX_INTERNAL_API vx_tensor vxoGraphOptimization_ConvertAvgPool2Conv_createWeight(
     vx_tensor   weight = VX_NULL;
     vx_uint32   weight_size = weight_dims[0] * weight_dims[1] * weight_dims[2];
     vx_int16    quantizedData = 0;
-    double fill_data = 1.0 / (weight_dims[0]* weight_dims[1]);
+    vx_float32 fill_data = 1.0f / (weight_dims[0]* weight_dims[1]);
 
     vx_context context = vxGetContext((vx_reference)input);
 
@@ -2243,7 +2243,7 @@ VX_INTERNAL_API vx_tensor vxoGraphOptimization_ConvertAvgPool2Conv_createWeight(
     if(TENSOR_DATA_TYPE(input) == VX_TYPE_UINT8 || TENSOR_DATA_TYPE(input) == VX_TYPE_UINT16)
     {
         parm.quant_format = VX_QUANT_AFFINE_SCALE;
-        parm.quant_data.affine.scale = (vx_float32)(fill_data/255.0f);
+        parm.quant_data.affine.scale = (fill_data/255.0f);
         parm.quant_data.affine.zeroPoint = 0;
     }
     else if(TENSOR_DATA_TYPE(input) == VX_TYPE_INT8 || TENSOR_DATA_TYPE(input) == VX_TYPE_INT16)
@@ -2276,18 +2276,18 @@ VX_INTERNAL_API vx_tensor vxoGraphOptimization_ConvertAvgPool2Conv_createWeight(
     else
     {
         if(TENSOR_DATA_TYPE(input) == VX_TYPE_FLOAT16)
-            quantizedData = Fp32toFp16((vx_float32)fill_data);
+            quantizedData = Fp32toFp16(fill_data);
         else
         {
             vx_int8 fl= TENSOR_POS(weight);
 
             if(fl > 0 )
             {
-                quantizedData = (vx_int16)roundRTNE(fill_data * (1 << fl));
+                quantizedData = (vx_int16)roundRTNE((vx_float64)fill_data * (1 << fl));
             }
             else
             {
-                quantizedData = (vx_int16)roundRTNE(fill_data / (1 << (-fl)));
+                quantizedData = (vx_int16)roundRTNE((vx_float64)fill_data / (1 << (-fl)));
             }
         }
     }
