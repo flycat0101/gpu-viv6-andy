@@ -3197,6 +3197,9 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32  outputZP;
         gctUINT8   brickMode;
         gctUINT32  brickDistance;
+
+        gctUINT8   slowOutput;
+
         /* for SRAM */
         gctUINT32 imageCachingMode;
         gctUINT32 kernelCachingMode;

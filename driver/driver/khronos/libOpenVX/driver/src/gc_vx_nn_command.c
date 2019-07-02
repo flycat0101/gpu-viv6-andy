@@ -538,6 +538,15 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
         info->vx_nn_general_cmd_info.postShift = 0;
     }
 
+    if (isV8)
+    {
+        /*This bit to select if the output sequence should run at full speed or if it should be limited so that it does one accum buffer read every 3 cycles
+        For V8, default enable it unless write to DDR is the bottleneck*/
+        info->vx_nn_general_cmd_info.slowOutput = 1;
+    }
+    else
+        info->vx_nn_general_cmd_info.slowOutput = 0;
+
 #if NN_WSZIE_REG
     info->vx_nn_general_cmd_info.wSize = 1;
 #endif
