@@ -1871,7 +1871,10 @@ _AllocLogicalRegOrArray(
     case slvSTORAGE_QUALIFIER_VARYING_IN:
     case slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER:
 
-        if (slsQUALIFIERS_HAS_FLAG(&DataType->qualifiers, slvQUALIFIERS_FLAG_INVARIANT))
+        if (slsQUALIFIERS_HAS_FLAG(&DataType->qualifiers, slvQUALIFIERS_FLAG_INVARIANT)
+            ||
+            /* Only ES20 can allow a input be a candidate for invariance. */
+            (sloCOMPILER_GetOutputInvariant(Compiler) && sloCOMPILER_IsES20Version(Compiler)))
         {
             isInvariant = gcvTRUE;
         }
