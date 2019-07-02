@@ -1640,13 +1640,14 @@ gceSTATUS vscGetTemporaryDir(
                     &TmpDir);
     }
 #if defined(LINUX) && !defined(ANDROID)
-    if (!TmpDir) {
-        FILE *fp = fopen("/tmp", "r+");
-        if (fp != gcvNULL)
+    if (!TmpDir)
+    {
+#include <unistd.h>
+        int ret = access("/tmp", R_OK | W_OK);
+        if (ret == 0)
         {
             /* /tmp is exist, readable and writable, use it as temp directory */
             TmpDir = "/tmp";
-            fclose(fp);
         }
     }
 #endif
