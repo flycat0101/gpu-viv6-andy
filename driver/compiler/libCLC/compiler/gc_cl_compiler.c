@@ -37,7 +37,12 @@ struct _cloCOMPILER
 #if __USE_VSC_MP__
     VSC_PRIMARY_MEM_POOL        generalPMP;
     VSC_PRIMARY_MEM_POOL        privatePMP;
-    VSC_PRIMARY_MEM_POOL       *currentPMP;
+    VSC_MM                     *currentMmWrapper;
+#elif __USE_VSC_BMS__
+    VSC_PRIMARY_MEM_POOL        generalPMP;
+    VSC_PRIMARY_MEM_POOL        sharedPMP;
+    VSC_BUDDY_MEM_SYS           scratchMemPool;
+    VSC_MM                     *currentMmWrapper;
 #else
     slsDLINK_LIST    memoryPool;
     slsDLINK_LIST    generalMemoryPool;
@@ -71,7 +76,7 @@ struct _cloCOMPILER
         clsNAME_SPACE *  globalSpace;
         clsNAME_SPACE *  currentSpace;
         clsNAME          *unnamedVariables[cldNumBuiltinVariables];
-#if !__USE_VSC_MP__
+#if !(__USE_VSC_MP__ || __USE_VSC_BMS__)
         slsSLINK_LIST    *namePools;
         clsNAME_POOL     *curNamePool;
         gctUINT          namePoolSize;
@@ -180,7 +185,7 @@ cloCOMPILER_Construct(
     gcmASSERT(Compiler);
 
     do {
-#if __USE_VSC_MP__
+#if (__USE_VSC_MP__ || __USE_VSC_BMS__)
         VSC_PRIMARY_MEM_POOL    generalPMP;
 #else
         slsDLINK_LIST           generalMemoryPool;
@@ -193,7 +198,7 @@ cloCOMPILER_Construct(
         clsNAME_SPACE *         generalBuiltinSpace;
 
         /* Copy the general parts into the temp variables. */
-#if __USE_VSC_MP__
+#if (__USE_VSC_MP__ || __USE_VSC_BMS__)
         gcoOS_MemCopy(&generalPMP, &compiler->generalPMP, gcmSIZEOF(VSC_PRIMARY_MEM_POOL));
 #else
         gcoOS_MemCopy(&generalMemoryPool, &compiler->generalMemoryPool, gcmSIZEOF(slsDLINK_LIST));
@@ -208,7 +213,7 @@ cloCOMPILER_Construct(
         gcoOS_ZeroMemory(compiler, gcmSIZEOF(struct _cloCOMPILER));
 
         /* Copy back the general parts. */
-#if __USE_VSC_MP__
+#if (__USE_VSC_MP__ || __USE_VSC_BMS__)
         gcoOS_MemCopy(&compiler->generalPMP, &generalPMP, gcmSIZEOF(VSC_PRIMARY_MEM_POOL));
 #else
         gcoOS_MemCopy(&compiler->generalMemoryPool, &generalMemoryPool, gcmSIZEOF(slsDLINK_LIST));
@@ -231,7 +236,11 @@ cloCOMPILER_Construct(
 
 #if __USE_VSC_MP__
         vscPMP_Intialize(&compiler->privatePMP, gcvNULL, __VSC_PRIVATE_SIZE__, sizeof(void *), __ENABLE_VSC_MP_POOL__);
-        compiler->currentPMP = &compiler->privatePMP;
+        compiler->currentMmWrapper = &compiler->privatePMP.mmWrapper;
+#elif __USE_VSC_BMS__
+        vscPMP_Intialize(&compiler->sharedPMP, gcvNULL, __VSC_PRIVATE_SIZE__, sizeof(void *), gcvTRUE);
+        vscBMS_Initialize(&compiler->scratchMemPool, &compiler->sharedPMP);
+        compiler->currentMmWrapper = &compiler->scratchMemPool.mmWrapper;
 #else
         slsDLINK_LIST_Initialize(&compiler->memoryPool);
 #endif
@@ -300,7 +309,7 @@ cloCOMPILER_Construct(
         slmSLINK_LIST_Initialize(compiler->context.designationScope);
         slmSLINK_LIST_Initialize(compiler->context.parserState);
         slmSLINK_LIST_Initialize(compiler->context.constantVariables);
-#if !__USE_VSC_MP__
+#if !(__USE_VSC_MP__ || __USE_VSC_BMS__)
         slmSLINK_LIST_Initialize(compiler->context.namePools);
         compiler->context.namePoolSize = 0;
         compiler->context.curNamePool = gcvNULL;
@@ -421,9 +430,9 @@ cloCOMPILER_Construct_General(
             if(gcmIS_ERROR(status)) return status;
         }
 
-#if __USE_VSC_MP__
+#if (__USE_VSC_MP__ ||__USE_VSC_BMS__)
         vscPMP_Intialize(&compiler->generalPMP, gcvNULL, __VSC_GENERAL_MP_SIZE__, sizeof(void *), __ENABLE_VSC_MP_POOL__);
-        compiler->currentPMP = &compiler->generalPMP;
+        compiler->currentMmWrapper = &compiler->generalPMP.mmWrapper;
 #else
         slsDLINK_LIST_Initialize(&compiler->generalMemoryPool);
         slmSLINK_LIST_Initialize(compiler->context.generalNamePools);
@@ -455,8 +464,8 @@ cloCOMPILER_Construct_General(
         /* Load the built-ins */
         status = cloCOMPILER_LoadGeneralBuiltIns(compiler);
         if (gcmIS_ERROR(status)) return status;
-#if __USE_VSC_MP__
-        compiler->currentPMP = gcvNULL;
+#if (__USE_VSC_MP__ || __USE_VSC_BMS__)
+        compiler->currentMmWrapper = gcvNULL;
 #endif
 
         *Compiler = compiler;
@@ -652,7 +661,7 @@ cloCOMPILER_Destroy(
        gcmVERIFY_OK(cloCOMPILER_Free(Compiler, builtin));
     }
 
-#if !__USE_VSC_MP__
+#if !(__USE_VSC_MP__ || __USE_VSC_BMS__)
     /* Destroy name pool list */
     while (!slmSLINK_LIST_IsEmpty(Compiler->context.namePools)) {
        clsNAME_POOL *namePool;
@@ -683,8 +692,12 @@ cloCOMPILER_Destroy(
     }
 
 #if __USE_VSC_MP__
-    gcmASSERT(Compiler->currentPMP == &Compiler->privatePMP);
+    gcmASSERT(Compiler->currentMmWrapper == &Compiler->privatePMP.mmWrapper);
     vscPMP_Finalize(&Compiler->privatePMP);
+#elif __USE_VSC_BMS__
+    gcmASSERT(Compiler->currentMmWrapper == &Compiler->scratchMemPool.mmWrapper);
+    vscBMS_Finalize(&Compiler->scratchMemPool, gcvFALSE);
+    vscPMP_Finalize(&Compiler->sharedPMP);
 #else
     /* Empty the memory pool */
     gcmVERIFY_OK(cloCOMPILER_EmptyMemoryPool(Compiler));
@@ -721,15 +734,15 @@ cloCOMPILER_Destroy_General(
 {
     slsDLINK_LIST *    poolStringBucket;
     clsPOOL_STRING_NODE *    poolStringNode;
-#if !__USE_VSC_MP__
+#if !(__USE_VSC_MP__ || __USE_VSC_BMS__)
     slsDLINK_NODE *    node;
 #endif
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
 
-#if __USE_VSC_MP__
-    Compiler->currentPMP = &Compiler->generalPMP;
+#if (__USE_VSC_MP__ || __USE_VSC_BMS__)
+    Compiler->currentMmWrapper = &Compiler->generalPMP.mmWrapper;
 #endif
 
     /* Destroy general built-in name space */
@@ -737,7 +750,7 @@ cloCOMPILER_Destroy_General(
         gcmVERIFY_OK(clsNAME_SPACE_Destroy(Compiler, Compiler->context.generalBuiltinSpace));
     }
 
-#if !__USE_VSC_MP__
+#if !(__USE_VSC_MP__ || __USE_VSC_BMS__)
     /* Destroy general name pool list */
     while (!slmSLINK_LIST_IsEmpty(Compiler->context.generalNamePools)) {
        clsNAME_POOL *namePool;
@@ -758,7 +771,7 @@ cloCOMPILER_Destroy_General(
         }
     }
 
-#if __USE_VSC_MP__
+#if (__USE_VSC_MP__ || __USE_VSC_BMS__)
     vscPMP_Finalize(&Compiler->generalPMP);
 #else
     /* Empty the memory pool */
@@ -2181,30 +2194,6 @@ IN ...
     return status;
 }
 
-gceSTATUS
-cloCOMPILER_SetCurrentPMP(
-IN cloCOMPILER  Compiler,
-IN VSC_PRIMARY_MEM_POOL *CurrentPMP
-)
-{
-#if __USE_VSC_MP__
-    Compiler->currentPMP = CurrentPMP;
-#endif
-    return gcvSTATUS_OK;
-}
-
-VSC_PRIMARY_MEM_POOL *
-cloCOMPILER_SetGeneralPMP(
-IN cloCOMPILER  Compiler
-)
-{
-    VSC_PRIMARY_MEM_POOL *currentPMP = gcvNULL;
-#if __USE_VSC_MP__
-    currentPMP = Compiler->currentPMP;
-    Compiler->currentPMP = &Compiler->generalPMP;
-#endif
-    return currentPMP;
-}
 
 gceSTATUS
 cloCOMPILER_Allocate(
@@ -2214,7 +2203,7 @@ OUT gctPOINTER * Memory
 )
 {
     gceSTATUS    status = gcvSTATUS_OK;
-#if !__USE_VSC_MP__
+#if !(__USE_VSC_MP__ || __USE_VSC_BMS__)
     gctSIZE_T    bytes;
     slsDLINK_NODE * node;
 #else
@@ -2224,8 +2213,8 @@ OUT gctPOINTER * Memory
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
 
-#if __USE_VSC_MP__
-    pointer = vscMM_Alloc(&Compiler->currentPMP->mmWrapper, (gctUINT)Bytes);
+#if (__USE_VSC_MP__ || __USE_VSC_BMS__)
+    pointer = vscMM_Alloc(Compiler->currentMmWrapper, (gctUINT)Bytes);
     if (!pointer) {
         gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                         0,
@@ -2251,7 +2240,7 @@ OUT gctPOINTER * Memory
     }
 #endif
 
-#if __USE_VSC_MP__
+#if (__USE_VSC_MP__ || __USE_VSC_BMS__)
     if (Memory)
     {
         *Memory = pointer;
@@ -2300,15 +2289,15 @@ IN cloCOMPILER Compiler,
 IN gctPOINTER Memory
 )
 {
-#if !__USE_VSC_MP__
+#if !(__USE_VSC_MP__ || __USE_VSC_BMS__)
     slsDLINK_NODE * node;
 #endif
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
 
-#if __USE_VSC_MP__
-    vscMM_Free(&Compiler->currentPMP->mmWrapper, Memory);
+#if (__USE_VSC_MP__ || __USE_VSC_BMS__)
+    vscMM_Free(Compiler->currentMmWrapper, Memory);
     return gcvSTATUS_OK;
 #else
     node = (slsDLINK_NODE *)Memory - 1;
@@ -2320,7 +2309,7 @@ IN gctPOINTER Memory
 #endif
 }
 
-#if !__USE_VSC_MP__
+#if !(__USE_VSC_MP__ || __USE_VSC_BMS__)
 #define _cldNAME_POOL_SIZE 2048
 
 /* Allocate name for the compiler */
@@ -2401,7 +2390,7 @@ IN cloCOMPILER Compiler,
 IN gctPOINTER Memory
 )
 {
-#if !__USE_VSC_MP__
+#if !(__USE_VSC_MP__ || __USE_VSC_BMS__)
     slsDLINK_NODE *    node;
 
     /* Verify the arguments. */
@@ -2420,7 +2409,7 @@ cloCOMPILER_EmptyMemoryPool(
 IN cloCOMPILER Compiler
 )
 {
-#if !__USE_VSC_MP__
+#if !(__USE_VSC_MP__ || __USE_VSC_BMS__)
     slsDLINK_NODE *    node;
 
     /* Verify the arguments. */

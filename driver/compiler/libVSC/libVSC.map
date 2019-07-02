@@ -407,6 +407,8 @@
 
     vscPMP_Intialize;
     vscPMP_Finalize;
+    vscBMS_Initialize;
+    vscBMS_Finalize;
     vscMM_Alloc;
     vscMM_Free;
 

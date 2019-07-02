@@ -1743,7 +1743,7 @@ OUT clsNAME **Name
 
     do {
         gctPOINTER pointer;
-#if __USE_VSC_MP__
+#if (__USE_VSC_MP__ || __USE_VSC_BMS__)
         status = cloCOMPILER_ZeroMemoryAllocate(Compiler,
                                                 (gctSIZE_T)sizeof(clsNAME),
                                                 (gctPOINTER *) &pointer);
@@ -1934,7 +1934,7 @@ IN clsNAME *Name
     _clFreePtrDscr(Compiler, Name->decl.ptrDscr);
 
     /* do not free name here */
-#if __USE_VSC_MP__
+#if (__USE_VSC_MP__ || __USE_VSC_BMS__)
     gcmVERIFY_OK(cloCOMPILER_Free(Compiler, Name));
 #endif
 
