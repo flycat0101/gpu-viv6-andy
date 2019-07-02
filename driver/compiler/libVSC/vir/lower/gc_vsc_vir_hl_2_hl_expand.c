@@ -4970,7 +4970,7 @@ static VSC_ErrCode _VIR_HL_FindAllUniformsWithinResourceLayout(
         VIR_Uniform*                    pUniformArray[2] = { gcvNULL, gcvNULL };
         VIR_UniformKind                 uniformKind = VIR_Resouce_ResType2UniformKind(resBinding.type);
 
-        resCount = VIR_Resouce_FindResUniform(pShader, uniformKind, &resBinding, pUniformArray);
+        resCount = VIR_Resouce_FindResUniform(pShader, uniformKind, &resBinding, VIR_FIND_RES_MODE_ALL_UNIFORM, pUniformArray);
 
         for (j = 0; j < resCount; j++)
         {

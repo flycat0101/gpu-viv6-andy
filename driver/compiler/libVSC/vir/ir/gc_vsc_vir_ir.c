@@ -6452,6 +6452,11 @@ VIR_Uniform_AlwaysAlloc(
         alwaysAlloc = gcvTRUE;
     }
 
+    if (isSymUniformWithResLayout(pUniformSym))
+    {
+        alwaysAlloc = gcvTRUE;
+    }
+
     return alwaysAlloc;
 }
 
@@ -8517,7 +8522,8 @@ VIR_Shader_AddSymbolContents(
                         uniform->u.samplerOrImageAttr.levelBaseSize = VIR_INVALID_ID;
                         uniform->u.samplerOrImageAttr.levelsSamples = VIR_INVALID_ID;
                         uniform->u.samplerOrImageAttr.extraImageLayer = VIR_INVALID_ID;
-                        uniform->u.samplerOrImageAttr.texelBufferToImageSymId   = NOT_ASSIGNED;
+                        uniform->u.samplerOrImageAttr.texelBufferToImageSymId   = VIR_INVALID_ID;
+                        uniform->u.samplerOrImageAttr.sampledImageSymId   = VIR_INVALID_ID;
                     }
                 }
                 else
@@ -8526,7 +8532,8 @@ VIR_Shader_AddSymbolContents(
                     uniform->u.samplerOrImageAttr.levelBaseSize = VIR_INVALID_ID;
                     uniform->u.samplerOrImageAttr.levelsSamples = VIR_INVALID_ID;
                     uniform->u.samplerOrImageAttr.extraImageLayer = VIR_INVALID_ID;
-                    uniform->u.samplerOrImageAttr.texelBufferToImageSymId   = NOT_ASSIGNED;
+                    uniform->u.samplerOrImageAttr.texelBufferToImageSymId   = VIR_INVALID_ID;
+                    uniform->u.samplerOrImageAttr.sampledImageSymId   = VIR_INVALID_ID;
                 }
                 uniform->auxAddrSymId = VIR_INVALID_ID;
                 if (PresetId == VIR_INVALID_ID)
@@ -17600,7 +17607,7 @@ VIR_Shader_CalcSamplerCount(
             !isSymUniformUsedInTextureSize(sym) &&
             !isSymUniformUsedInLTC(sym) &&
             /* We can't skip a texture which is from the resource layout. */
-            !isSymUniformWithResLayout(sym))
+            !VIR_Uniform_AlwaysAlloc(Shader, sym))
         {
             continue;
         }
@@ -18432,6 +18439,7 @@ VIR_Resouce_FindResUniform(
     IN VIR_Shader*                  pShader,
     IN VIR_UniformKind              uniformKind,
     IN VSC_SHADER_RESOURCE_BINDING* pResBinding,
+    IN VIR_FIND_RES_MODE            findResMode,
     INOUT VIR_Uniform**             ppUniformArray
     )
 {
@@ -18466,6 +18474,22 @@ VIR_Resouce_FindResUniform(
             VIR_Symbol_GetUniformKind(sym) != uniformKind)
         {
             continue;
+        }
+
+        /* Skip unnecessary uniforms. */
+        if (findResMode == VIR_FIND_RES_MODE_RES_ONLY)
+        {
+            if (!isSymUniformWithResLayout(sym))
+            {
+                continue;
+            }
+        }
+        else if (findResMode == VIR_FIND_RES_MODE_COMPILE_GEN_ONLY)
+        {
+            if (isSymUniformWithResLayout(sym))
+            {
+                continue;
+            }
         }
 
         if (VIR_Type_GetKind(symType) == VIR_TY_ARRAY)

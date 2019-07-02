@@ -3755,7 +3755,7 @@ _UpdateOperandParameterForIntrinsicCall(
                 extraLayer = VIR_Symbol_GetImage(extraLayerSym);
                 extraLayer->u.samplerOrImageAttr.parentSamplerSymId = image->sym;
                 extraLayer->u.samplerOrImageAttr.arrayIdxInParent = NOT_ASSIGNED;
-                extraLayer->u.samplerOrImageAttr.texelBufferToImageSymId = NOT_ASSIGNED;
+                extraLayer->u.samplerOrImageAttr.texelBufferToImageSymId = VIR_INVALID_ID;
             }
 
             /* New a operand with this extra image layer.  */
@@ -5452,7 +5452,7 @@ _AddExtraSampler(
         extraLayer = VIR_Symbol_GetSampler(extraLayerSym);
         extraLayer->u.samplerOrImageAttr.parentSamplerSymId = sampler->sym;
         extraLayer->u.samplerOrImageAttr.arrayIdxInParent = arrayIndex;
-        extraLayer->u.samplerOrImageAttr.texelBufferToImageSymId = NOT_ASSIGNED;
+        extraLayer->u.samplerOrImageAttr.texelBufferToImageSymId = VIR_INVALID_ID;
     }
 
     /* New a operand with this extra image layer.  */
@@ -6312,7 +6312,7 @@ _AddTexelBufferToImage(
     VIR_Symbol          *pTexelBufferToImageSym = gcvNULL;
     VIR_Uniform         *pTexelBufferToImage = gcvNULL;
 
-    if (texelBufferToImageSymId == NOT_ASSIGNED)
+    if (texelBufferToImageSymId == VIR_INVALID_ID)
     {
         VIR_NameId      nameId;
         gctCHAR         name[128] = "#";
@@ -6403,7 +6403,7 @@ _InsertCallTexldImg(
     /* MOV arg2, TexelBufferToImage2D */
     errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
     ON_ERROR(errCode, "_InsertCallTexldImg");
-    gcmASSERT(pSamplerUniform->u.samplerOrImageAttr.texelBufferToImageSymId != NOT_ASSIGNED);
+    gcmASSERT(pSamplerUniform->u.samplerOrImageAttr.texelBufferToImageSymId != VIR_INVALID_ID);
     VIR_Operand_SetSymbol(VIR_Inst_GetSource(newInst, 0),
                           pFunc,
                           pSamplerUniform->u.samplerOrImageAttr.texelBufferToImageSymId);

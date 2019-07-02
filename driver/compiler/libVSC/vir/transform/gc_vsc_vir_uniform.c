@@ -3996,6 +3996,7 @@ static void _CheckPerShaderReservation(IN VSC_AllShaders           *all_shaders,
                         if (VIR_Resouce_FindResUniform(shader,
                                                        VIR_Resouce_ResType2UniformKind(resBinding.type),
                                                        &resBinding,
+                                                       VIR_FIND_RES_MODE_ALL_UNIFORM,
                                                        gcvNULL) == 0)
                         {
                             newReservedCount = VSC_UF_AUBO_GetPerShRsvedCount(aubo, i) + resBinding.arraySize;

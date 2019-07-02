@@ -6525,11 +6525,6 @@ static VkResult halti5_helper_setDescSetCombinedImageSampler(
         samplerEntry = &progResourceSet->combinedSampTexTable.pCombTsEntries[entryIdx];
         if (descriptorBinding->std.binding == samplerEntry->combTsBinding.binding)
         {
-            sampledImageIndex = samplerEntry->sampledImageIndexInStorageTable;
-            if (sampledImageIndex != -1)
-            {
-                texEntry = &progResourceSet->separatedTexTable.pTextureEntries[sampledImageIndex];
-            }
             break;
         }
     }
@@ -6543,13 +6538,6 @@ static VkResult halti5_helper_setDescSetCombinedImageSampler(
     __VK_ASSERT(samplerEntry->combTsBinding.set == descSetIndex);
     __VK_ASSERT(samplerEntry->combTsBinding.arraySize == descriptorBinding->std.descriptorCount);
 
-    if (texEntry)
-    {
-        __VK_ASSERT(texEntry->texBinding.set == descSetIndex);
-        __VK_ASSERT(texEntry->texBinding.arraySize == descriptorBinding->std.descriptorCount);
-        __VK_ASSERT(texEntry->activeStageMask == samplerEntry->activeStageMask);
-    }
-
     activeStageMask = samplerEntry->activeStageMask;
     while (activeStageMask)
     {
@@ -6559,6 +6547,15 @@ static VkResult halti5_helper_setDescSetCombinedImageSampler(
                                      || (stageIdx < VSC_SHADER_STAGE_PS)) ? 0 : 1;
             SHADER_SAMPLER_SLOT_MAPPING *hwMapping = &samplerEntry->hwMappings[stageIdx].samplerMapping;
             uint32_t hwSamplerNo = hwMapping->hwSamplerSlot + hints->samplerBaseOffset[stageIdx];
+
+            sampledImageIndex = samplerEntry->sampledImageIndexInStorageTable[stageIdx];
+            if ((uint32_t)sampledImageIndex != NOT_ASSIGNED)
+            {
+                texEntry = &progResourceSet->separatedTexTable.pTextureEntries[sampledImageIndex];
+                __VK_ASSERT(texEntry->texBinding.set == descSetIndex);
+                __VK_ASSERT(texEntry->texBinding.arraySize == descriptorBinding->std.descriptorCount);
+                __VK_ASSERT(texEntry->activeStageMask == samplerEntry->activeStageMask);
+            }
 
             for (arrayIdx = 0; arrayIdx < descriptorBinding->std.descriptorCount; arrayIdx++)
             {

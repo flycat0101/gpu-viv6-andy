@@ -1960,7 +1960,8 @@ VSC_ErrCode VIR_CG_MapUniforms(
             if (!isSymUniformUsedInShader(sym) &&
                 !isSymUniformUsedInTextureSize(sym) &&
                 /* If this texture is treated as a const, it can be used in LTC. */
-                !isSymUniformUsedInLTC(sym))
+                !isSymUniformUsedInLTC(sym) &&
+                !VIR_Uniform_AlwaysAlloc(pShader, sym))
             {
                 VIR_Uniform_SetPhysical(symUniform, -1);
                 VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_INACTIVE);
@@ -2294,7 +2295,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
         **      separate sampler and sampled image shader variables.
         ** So we may get two uniforms for a resource descriptorSet/binding pair.
         */
-        resCount = VIR_Resouce_FindResUniform(pShader, uniformKind, &resBinding, pUniformArray);
+        resCount = VIR_Resouce_FindResUniform(pShader, uniformKind, &resBinding, VIR_FIND_RES_MODE_RES_ONLY, pUniformArray);
 
         /* allocate even if it does not appear in the shader */
         if (resCount == 0)
@@ -2340,11 +2341,11 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
             {
             case VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER:
             {
-                gctBOOL bIsSampledImage = (j == 1);
+                gctBOOL bIsSeparateImage = (j == 1);
 
-                if (bIsSampledImage)
+                if (bIsSeparateImage)
                 {
-                    /* For a sampled image, we need to allocate a image uniform for it, and we may also need to allocate a sampler for it. */
+                    /* For a separate image, we need to allocate a image uniform for it, and we may also need to allocate a sampler for it. */
                     gcmASSERT(VIR_Uniform_IsImageCanBeSampled(pUniform));
 
                     if (!pHwConfig->hwFeatureFlags.supportSeparatedTex)
@@ -2414,7 +2415,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                 }
                 gcmASSERT(uniformSize <= resBinding.arraySize);
 
-                if (!bIsSampledImage)
+                if (!bIsSeparateImage)
                 {
                     pResAllocLayout->pResAllocEntries[i].bUse = gcvTRUE;
                     pResAllocLayout->pResAllocEntries[i].hwRegNo = pUniform->physical;
@@ -2583,7 +2584,35 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
 
             case VSC_SHADER_RESOURCE_TYPE_SAMPLER:
                 /* no need to assign hw reg */
-                pResAllocLayout->pResAllocEntries[i].hwRegNo = NOT_ASSIGNED;
+                if (pUniform->u.samplerOrImageAttr.sampledImageSymId != VIR_INVALID_ID)
+                {
+                    /* sampler allocation */
+                    retValue = _VIR_CG_MapSamplerUniforms(pShader,
+                                                          pHwConfig,
+                                                          pUniform,
+                                                          &uniformColorMap,
+                                                          codeGenUniformBase,
+                                                          handleDefaultUBO,
+                                                          unblockUniformBlock,
+                                                          allocateSamplerReverse,
+                                                          gcvTRUE, /* always allocate */
+                                                          maxSampler,
+                                                          pMM,
+                                                          &uniformSize,
+                                                          &sampler);
+                    ON_ERROR(retValue, "Failed to Allocate Uniform");
+
+                    gcmASSERT(uniformSize <= resBinding.arraySize);
+
+                    pResAllocLayout->pResAllocEntries[i].bUse = gcvTRUE;
+                    pResAllocLayout->pResAllocEntries[i].hwRegNo = pUniform->physical;
+                    pResAllocLayout->pResAllocEntries[i].hwRegRange = uniformSize;
+                    pResAllocLayout->pResAllocEntries[i].swizzle = pUniform->swizzle;
+                }
+                else
+                {
+                    pResAllocLayout->pResAllocEntries[i].hwRegNo = NOT_ASSIGNED;
+                }
                 break;
 
             case VSC_SHADER_RESOURCE_TYPE_SAMPLED_IMAGE:
@@ -2734,6 +2763,11 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
             continue;
         }
 
+        if (isSymUniformWithResLayout(sym))
+        {
+            continue;
+        }
+
         if (!isSymUniformUsedInShader(sym) &&
             !isSymUniformUsedInLTC(sym) &&
             !isSymUniformImplicitlyUsed(sym) &&
@@ -2765,6 +2799,17 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
             symUniform->swizzle  = pParentUniform->swizzle;
             symUniform->physical = pParentUniform->physical;
             symUniform->address  = pParentUniform->address;
+
+            continue;
+        }
+        else if (VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_SAMPLED_IMAGE)
+        {
+            VIR_Symbol*     pSeparateSamplerSym = VIR_Symbol_GetSeparateSampler(pShader, sym);
+            VIR_Uniform*    pSeparateSamplerUniform = VIR_Symbol_GetUniformPointer(pShader, pSeparateSamplerSym);
+
+            symUniform->swizzle  = pSeparateSamplerUniform->swizzle;
+            symUniform->physical = pSeparateSamplerUniform->physical;
+            symUniform->address  = pSeparateSamplerUniform->address;
 
             continue;
         }
@@ -3042,7 +3087,8 @@ VSC_ErrCode VIR_CG_Unified_MapUniforms(
                     if (!isSymUniformUsedInShader(sym) &&
                         !isSymUniformUsedInTextureSize(sym) &&
                         /* If this texture is treated as a const, it can be used in LTC. */
-                        !isSymUniformUsedInLTC(sym))
+                        !isSymUniformUsedInLTC(sym) &&
+                        !VIR_Uniform_AlwaysAlloc(pShader, sym))
                     {
                         VIR_Uniform_SetPhysical(symUniform, -1);
                         VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_INACTIVE);
@@ -3182,7 +3228,8 @@ VSC_ErrCode VIR_CG_Unified_MapUniforms(
                 if (!isSymUniformUsedInShader(sym) &&
                     !isSymUniformUsedInTextureSize(sym) &&
                     /* If this texture is treated as a const, it can be used in LTC. */
-                    !isSymUniformUsedInLTC(sym))
+                    !isSymUniformUsedInLTC(sym) &&
+                    !VIR_Uniform_AlwaysAlloc(pShader, sym))
                 {
                     VIR_Uniform_SetPhysical(symUniform, -1);
                     VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_INACTIVE);

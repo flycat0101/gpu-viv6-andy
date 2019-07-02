@@ -4302,6 +4302,9 @@ struct _VIR_UNIFORM
             */
             VIR_SymId       texelBufferToImageSymId;
 
+            /* The sampled image symbol ID. */
+            VIR_SymId       sampledImageSymId;
+
             /*
             ** VIV:TODO:
             ** If parent is an array, which array index in parent, we use this for link lib entry.
@@ -7927,11 +7930,19 @@ VIR_Resouce_ResType2UniformKind(
     IN VSC_SHADER_RESOURCE_TYPE    resType
     );
 
+typedef enum _VIR_FIND_RES_MODE
+{
+    VIR_FIND_RES_MODE_RES_ONLY          = 0,
+    VIR_FIND_RES_MODE_COMPILE_GEN_ONLY  = 1,
+    VIR_FIND_RES_MODE_ALL_UNIFORM       = 2,
+} VIR_FIND_RES_MODE;
+
 gctUINT
 VIR_Resouce_FindResUniform(
     IN VIR_Shader*                  pShader,
     IN VIR_UniformKind              uniformKind,
     IN VSC_SHADER_RESOURCE_BINDING* pResBinding,
+    IN VIR_FIND_RES_MODE            findResMode,
     INOUT VIR_Uniform**             ppUniformArray
     );
 

@@ -1369,7 +1369,10 @@ _vscEP_Buffer_SaveVKCombinedTextureSamplerEntry(
     }
 
     /* Save the sampled image index. */
-    VSC_IO_writeUint(pIoBuf, pCombTsEntry->sampledImageIndexInStorageTable);
+    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
+    {
+        VSC_IO_writeUint(pIoBuf, pCombTsEntry->sampledImageIndexInStorageTable[i]);
+    }
 }
 
 /* Save Vulkan combined texture-sampler table. */
@@ -4145,7 +4148,10 @@ _vscEP_Buffer_LoadVKCombinedTextureSamplerEntry(
     }
 
     /* Load the sampled image index. */
-    VSC_IO_readUint(pIoBuf, &pCombTsEntry->sampledImageIndexInStorageTable);
+    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
+    {
+        VSC_IO_readUint(pIoBuf, &pCombTsEntry->sampledImageIndexInStorageTable[i]);
+    }
 
 OnError:
     return errCode;

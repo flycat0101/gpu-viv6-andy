@@ -588,7 +588,7 @@ typedef struct PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY
     PROG_VK_COMBINED_TEXTURE_SAMPLER_HW_MAPPING hwMappings[VSC_MAX_SHADER_STAGE_COUNT];
 
     /* The sampled image is saved in the storage table, save the index. */
-    gctUINT                                     sampledImageIndexInStorageTable;
+    gctUINT                                     sampledImageIndexInStorageTable[VSC_MAX_SHADER_STAGE_COUNT];
 }
 PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY;
 

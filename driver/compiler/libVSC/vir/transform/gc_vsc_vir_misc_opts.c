@@ -4966,7 +4966,7 @@ vscVIR_ConvertVirtualInstructions(
                         VIR_Symbol_SetTyQualifier(sym, VIR_TYQUAL_CONST);
                         lodMinMaxUniform->u.samplerOrImageAttr.parentSamplerSymId = VIR_Uniform_GetSymID(samplerUniform);
                         lodMinMaxUniform->u.samplerOrImageAttr.arrayIdxInParent = NOT_ASSIGNED;
-                        lodMinMaxUniform->u.samplerOrImageAttr.texelBufferToImageSymId = NOT_ASSIGNED;
+                        lodMinMaxUniform->u.samplerOrImageAttr.texelBufferToImageSymId = VIR_INVALID_ID;
                     }
                     VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
                     VIR_Inst_SetSrcNum(inst, 1);
@@ -5057,7 +5057,7 @@ vscVIR_ConvertVirtualInstructions(
                         VIR_Symbol_SetTyQualifier(sym, VIR_TYQUAL_CONST);
                         levelBaseSizeUniform->u.samplerOrImageAttr.parentSamplerSymId = VIR_Uniform_GetSymID(samplerOrImageUniform);
                         levelBaseSizeUniform->u.samplerOrImageAttr.arrayIdxInParent = NOT_ASSIGNED;
-                        levelBaseSizeUniform->u.samplerOrImageAttr.texelBufferToImageSymId = NOT_ASSIGNED;
+                        levelBaseSizeUniform->u.samplerOrImageAttr.texelBufferToImageSymId = VIR_INVALID_ID;
                     }
                     VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
                     VIR_Inst_SetSrcNum(inst, 1);
@@ -5148,7 +5148,7 @@ vscVIR_ConvertVirtualInstructions(
                         VIR_Symbol_SetTyQualifier(sym, VIR_TYQUAL_CONST);
                         levelsSamplesUniform->u.samplerOrImageAttr.parentSamplerSymId = VIR_Uniform_GetSymID(samplerOrImageUniform);
                         levelsSamplesUniform->u.samplerOrImageAttr.arrayIdxInParent = NOT_ASSIGNED;
-                        levelsSamplesUniform->u.samplerOrImageAttr.texelBufferToImageSymId = NOT_ASSIGNED;
+                        levelsSamplesUniform->u.samplerOrImageAttr.texelBufferToImageSymId = VIR_INVALID_ID;
                     }
                     VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
                     VIR_Inst_SetSrcNum(inst, 1);
@@ -11116,9 +11116,9 @@ _GenCombinedSamplerOpnd(
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_Symbol  *pSymbol = gcvNULL;
-    VIR_Uniform *pUniform = gcvNULL;
+    VIR_Uniform *pUniform = gcvNULL, *pSeparateImageUniform = gcvNULL, *pSeparateSamplerUniform = gcvNULL;
     VIR_Id      id ;
-    VIR_Symbol  *uniformSym = gcvNULL, *origSym = gcvNULL;
+    VIR_Symbol  *uniformSym = gcvNULL, *separateImage = gcvNULL, *separateSampler = gcvNULL;
     gctUINT i;
 
     if (!VIR_Operand_isSymbol(pOpnd) && !VIR_Operand_isVirReg(pOpnd))
@@ -11182,14 +11182,25 @@ _GenCombinedSamplerOpnd(
         VIR_Symbol_SetImgIdxRange(uniformSym, VIR_Symbol_GetImgIdxRange(pSymbol));
         VIR_Symbol_SetUniformKind(uniformSym, VIR_UNIFORM_SAMPLED_IMAGE);
 
-        /* clear the flag */
-        origSym = VIR_Symbol_GetSeparateSampler(pShader, pSymbol);
-        VIR_Symbol_ClrFlag(origSym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
-        origSym = VIR_Symbol_GetSeparateImage(pShader, pSymbol);
-        VIR_Symbol_ClrFlag(origSym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
-
         pUniform = VIR_Symbol_GetSampler(uniformSym);
         pUniform->index = VIR_IdList_Count(VIR_Shader_GetUniforms(pShader)) - 1;
+
+        /* Get the separate sampler/image. */
+        separateSampler = VIR_Symbol_GetSeparateSampler(pShader, pSymbol);
+        separateImage = VIR_Symbol_GetSeparateImage(pShader, pSymbol);
+
+        gcmASSERT(separateSampler && separateImage);
+
+        pSeparateSamplerUniform = VIR_Symbol_GetUniformPointer(pShader, separateSampler);
+        pSeparateImageUniform = VIR_Symbol_GetUniformPointer(pShader, separateImage);
+
+        /* clear the flag */
+        VIR_Symbol_ClrFlag(separateSampler, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
+        VIR_Symbol_ClrFlag(separateImage, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
+
+        /* Save the sampledImage symbol ID. */
+        pSeparateSamplerUniform->u.samplerOrImageAttr.sampledImageSymId = id;
+        pSeparateImageUniform->u.samplerOrImageAttr.sampledImageSymId = id;
     }
 
     VIR_Operand_SetSym(pOpnd, VIR_Shader_GetSymFromId(pShader, pUniform->sym));

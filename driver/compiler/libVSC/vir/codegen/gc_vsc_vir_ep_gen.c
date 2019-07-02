@@ -1544,7 +1544,7 @@ static VSC_ErrCode _CollectSamplerMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper
         if (!isSymUniformUsedInShader(pVirUniformSym) &&
             !isSymUniformUsedInTextureSize(pVirUniformSym) &&
             !isSymUniformUsedInLTC(pVirUniformSym) &&
-            !isSymUniformWithResLayout(pVirUniformSym))
+            !VIR_Uniform_AlwaysAlloc(pShader, pVirUniformSym))
         {
             continue;
         }
@@ -4431,7 +4431,7 @@ static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(VSC_PEP_GEN_HELPER* pPepG
                               pShader,
                               pSep,
                               gcvFALSE,
-                              gcvFALSE,
+                              gcvTRUE,
                               -1,
                               1,
                               0);
@@ -4476,11 +4476,11 @@ static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(VSC_PEP_GEN_HELPER* pPepG
             gcmASSERT(gcvFALSE);
         }
 
-        pCombTsEntry->sampledImageIndexInStorageTable = i;
+        pCombTsEntry->sampledImageIndexInStorageTable[stageIdx] = i;
     }
     else
     {
-        pCombTsEntry->sampledImageIndexInStorageTable = NOT_ASSIGNED;
+        pCombTsEntry->sampledImageIndexInStorageTable[stageIdx] = NOT_ASSIGNED;
     }
 
     return VSC_ERR_NONE;
