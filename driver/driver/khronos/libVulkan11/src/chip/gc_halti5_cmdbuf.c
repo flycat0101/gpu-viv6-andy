@@ -688,6 +688,24 @@ static VkResult halti5_draw_validate(
     return result;
 }
 
+static __vkDescriptorSetLayoutBinding* find_binding(
+    __vkDescriptorSetLayoutBinding *bindings,
+    uint32_t count,
+    uint32_t binding
+    )
+{
+    uint32_t i;
+    for (i = 0; i < count; i++)
+    {
+        if (bindings[i].std.binding == binding)
+        {
+            return bindings + i;
+        }
+    }
+
+    return gcvNULL;
+}
+
 VkResult halti5_draw(
     VkCommandBuffer commandBuffer,
     uint32_t vertexCount,
@@ -6118,7 +6136,8 @@ static VkResult halti5_helper_setDescSetSeperateImage(
                     uint32_t samplerEnd, texEnd;
                     VSC_SHADER_RESOURCE_BINDING *vscSamplerBinding = privCombinedMapping->samplerSubBinding.pResBinding;
                     __vkDescriptorSet *samplerDescSet = descSetInfo->descSets[vscSamplerBinding->set];
-                    __vkDescriptorSetLayoutBinding *samplerBinding = &samplerDescSet->descSetLayout->binding[vscSamplerBinding->binding];
+                    __vkDescriptorSetLayoutBinding *samplerBinding = find_binding(samplerDescSet->descSetLayout->binding, samplerDescSet->descSetLayout->bindingCount, vscSamplerBinding->binding);
+                    __VK_ASSERT(samplerBinding != gcvNULL);
 
                     samplerEnd = privCombinedMapping->samplerSubBinding.startIdxOfSubArray +
                                  privCombinedMapping->samplerSubBinding.subArraySize;
@@ -6368,7 +6387,8 @@ static VkResult halti5_helper_setDescSetSeperateSampler(
                     uint32_t samplerEnd, texEnd;
                     VSC_SHADER_RESOURCE_BINDING *vscTexBinding = privCombinedMapping->texSubBinding.pResBinding;
                     __vkDescriptorSet *texDescSet = descSetInfo->descSets[vscTexBinding->set];
-                    __vkDescriptorSetLayoutBinding *texBinding = &texDescSet->descSetLayout->binding[vscTexBinding->binding];
+                    __vkDescriptorSetLayoutBinding *texBinding = find_binding(texDescSet->descSetLayout->binding, texDescSet->descSetLayout->bindingCount, vscTexBinding->binding);
+                    __VK_ASSERT(texBinding != gcvNULL);
 
                     samplerEnd = privCombinedMapping->samplerSubBinding.startIdxOfSubArray +
                                  privCombinedMapping->samplerSubBinding.subArraySize;
