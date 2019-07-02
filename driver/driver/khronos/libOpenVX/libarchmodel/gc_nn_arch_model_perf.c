@@ -1878,7 +1878,7 @@ static vx_float64 _calcNNCycleCountBandWidth(
                 tmp_internal_write_bw_limit = tmp_internal_write_bw_limit / 2;
             }
 
-            slowInternalWriteBWLimit = gcmMIN(internal_write_bw_limit, (vx_float32)lanes_per_conv / zdpLoopCount);
+            slowInternalWriteBWLimit = gcmMIN(tmp_internal_write_bw_limit, (vx_float32)lanes_per_conv / zdpLoopCount);
             slowInternalWriteCycleCount = ceilf((vx_float32)tile_x * tile_y / slowInternalWriteBWLimit) * ceilf((vx_float32)x / tile_x) * ceilf((vx_float32)y / tile_y) * z * (data_size * data_size) / (8 * 8);
             slowCompCycleCount = computeCycleCount + ceilf((vx_float32)tile_x * tile_y / lanes_per_conv) * ceilf((vx_float32)x / tile_x) * ceilf((vx_float32)y / tile_y) * ceilf((vx_float32)z / cores) * (data_size * data_size) / (8 * 8);
             if (slowInternalWriteCycleCount > slowCompCycleCount)
@@ -2059,7 +2059,7 @@ static vx_float64 _calcNNCycleCountBandWidth(
     { \
         result.type = gcmMAX(gcmMAX(gcmMAX(computeCycleCost.type, kernelDecodeCycleCost.type), arbCycleCost.type), xBarCycleCost.type); \
         result.type = gcmMAX(gcmMAX(gcmMAX(nnCost[ARCH_MODEL_DDR_KERNEL_COST].readCycle.type, nnCost[ARCH_MODEL_DDR_IN_IMAGE_COST].readCycle.type), nnCost[ARCH_MODEL_DDR_COST].readCycle.type), nnCycleCost.type); \
-        result.type = gcmMAX(gcmMAX(gcmMAX(gcmMAX(nnCycleCost.type, nnCost[ARCH_MODEL_DDR_COST].readCycle.type), nnCost[ARCH_MODEL_AXI_SRAM_COST].readCycle.type), nnCost[ARCH_MODEL_AXI_SRAM_COST].readCycle.type), nnCost[ARCH_MODEL_VIP_SRAM_COST].readCycle.type); \
+        result.type = gcmMAX(gcmMAX(gcmMAX(gcmMAX(nnCycleCost.type, nnCost[ARCH_MODEL_DDR_COST].readCycle.type), nnCost[ARCH_MODEL_AXI_SRAM_COST].readCycle.type), nnCost[ARCH_MODEL_AXI_BUS_COST].readCycle.type), nnCost[ARCH_MODEL_VIP_SRAM_COST].readCycle.type); \
         result.type = gcmMAX(gcmMAX(gcmMAX(gcmMAX(nnCycleCost.type, nnCost[ARCH_MODEL_DDR_COST].writeCycle.type), nnCost[ARCH_MODEL_AXI_SRAM_COST].writeCycle.type), nnCost[ARCH_MODEL_AXI_BUS_COST].writeCycle.type), nnCost[ARCH_MODEL_VIP_SRAM_COST].writeCycle.type); \
         result.type = gcmMAX(gcmMAX(gcmMAX(nnCycleCost.type, ddrTotalCycleCost.type), axiTotalCycleCost.type), axiBusTotalCycleCost.type); \
         result.type = gcmMAX(nnCycleCost.type, internalWriteCycleCost.type); \
@@ -3312,7 +3312,8 @@ VX_INTERNAL_API void calculateArchPerfFromTiling(
 
     kernelXSize = wb != VX_NULL && op_type != VXNNE_OPERATOR_RESHUFFLE ? WB_KERNEL_X(wb) : 1;
     kernelYSize = wb != VX_NULL && op_type != VXNNE_OPERATOR_RESHUFFLE ? WB_KERNEL_Y(wb) : 1;
-    kernelZSize = wb != VX_NULL ? WB_KERNEL_Z(wb) : input_tiling->depth;
+    kernelZSize = wb != VX_NULL ? ((op_type == VXNNE_OPERATOR_DEPTH_WISE_CONV && wb->wb_base->hw_depth_wise) ? wb->weights_sizes[3] : WB_KERNEL_Z(wb))
+                                : input_tiling->depth;
 
     xOffSet = (-1) * conv_cmd->pad_x_left;
     yOffSet = (-1) * conv_cmd->pad_y_top;
@@ -3467,7 +3468,7 @@ VX_INTERNAL_API void calculateArchPerfFromWB(
 
     kernelXSize = WB_KERNEL_X(wb);
     kernelYSize = WB_KERNEL_Y(wb);
-    kernelZSize = WB_KERNEL_Z(wb);
+    kernelZSize = (op_type == VXNNE_OPERATOR_DEPTH_WISE_CONV && wb->wb_base->hw_depth_wise) ? wb->weights_sizes[3] : WB_KERNEL_Z(wb);
     poolingSize = gcmMAX(1, WB_POOLING_SIZE_X(wb));
     poolingStride = WB_POOLING_SIZE_X(wb) ? 2 : 1;
     xOffSet = offsets == VX_NULL ? WB_STRIDE_X(wb) > 1 ? 0 : ((-1) * WB_PAD_LEFT(wb)) : offsets[0];

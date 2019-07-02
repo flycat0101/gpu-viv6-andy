@@ -2747,7 +2747,7 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                 opInfo[count]->weight_bias = wb;
                 opInfo[count]->kx = wb->weights_sizes[0];
                 opInfo[count]->ky = wb->weights_sizes[1];
-                opInfo[count]->kz = wb->weights_sizes[2];
+                opInfo[count]->kz = (operation->operatorType == VXNNE_OPERATOR_DEPTH_WISE_CONV && wb->wb_base->hw_depth_wise) ? wb->weights_sizes[3] : wb->weights_sizes[2];
                 opInfo[count]->oz = TENSOR_VIEW_SIZE_INDEX(convOp->outputs, 2);
                 opInfo[count]->siz = opInfo[count]->oz;
                 opInfo[count]->inx = TENSOR_VIEW_SIZE_INDEX(convOp->orig_inputs, 0);
