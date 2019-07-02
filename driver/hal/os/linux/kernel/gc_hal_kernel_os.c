@@ -6905,8 +6905,7 @@ gckOS_WaitNativeFence(
     {
         struct dma_fence *f = fences[i];
 
-        if (f->context != timeline->context &&
-            !dma_fence_is_signaled(f))
+        if(!dma_fence_is_signaled(fence))
         {
             signed long ret;
             ret = dma_fence_wait_timeout(f, 1, timeout);

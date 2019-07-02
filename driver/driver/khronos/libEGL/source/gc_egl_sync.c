@@ -752,6 +752,19 @@ veglWaitSync(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+#if defined(WL_EGL_PLATFORM) || defined(EGL_API_WL)
+    status = gcoOS_WaitNativeFence(gcvNULL, sync->fenceFD, 2000);
+
+    if (status == gcvSTATUS_TIMEOUT)
+    {
+        /* Print a warning. */
+        gcmPRINT("%s: Warning: wait for fence fd=%d", __func__, sync->fenceFD);
+
+        /* Wait for ever. */
+        status = gcoOS_WaitNativeFence(gcvNULL, sync->fenceFD, gcvINFINITE);
+    }
+#endif
+
     /* Commit accumulated commands. */
     gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
 

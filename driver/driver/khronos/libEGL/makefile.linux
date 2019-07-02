@@ -222,7 +222,8 @@ ifeq ($(EGL_API_WL),1)
   OBJECTS += $(OBJ_DIR)/gc_egl_wayland.o \
              $(OBJ_DIR)/wayland-egl.o \
              $(OBJ_DIR)/gc_egl_wayland_server.o \
-             $(OBJ_DIR)/wayland-viv-protocol.o
+             $(OBJ_DIR)/wayland-viv-protocol.o \
+             $(OBJ_DIR)/linux-explicit-synchronization-unstable-v1-protocol.o
 endif
 
 ifeq ($(EGL_API_GBM),1)
