@@ -1963,13 +1963,9 @@ gcChipCopyTexImage(
                                                         height))
            )
         {
-            gceSURF_COLOR_SPACE srcColorSpace;
-
             gceTEXTURE_FACE halFace = (__GL_TEXTURE_CUBEMAP_INDEX == texObj->targetIndex)
                                     ? gcvFACE_POSITIVE_X + face
                                     : gcvFACE_NONE;
-
-            gcmONERROR(gcoSURF_GetColorSpace(srcView.surf, &srcColorSpace));
 
             /* Upload the texture. */
             gcmONERROR(gcoTEXTURE_Upload(texInfo->object,
@@ -1981,7 +1977,7 @@ gcChipCopyTexImage(
                                          chipCtx->tempLastLine,
                                          chipCtx->tempStride,
                                          chipCtx->tempFormat,
-                                         srcColorSpace));
+                                         chipCtx->tempBitmap->colorSpace));
             if (gcmIS_SUCCESS(status))
             {
                 /* Done with shader. */
@@ -2435,7 +2431,7 @@ gcChipCopyTexSubImage(
                                             chipCtx->tempLastLine,
                                             chipCtx->tempStride,
                                             chipCtx->tempFormat,
-                                            gcvSURF_COLOR_SPACE_LINEAR,
+                                            chipCtx->tempBitmap->colorSpace,
                                             gcvINVALID_ADDRESS));
 
             if (gcmIS_SUCCESS(status))
