@@ -3698,49 +3698,109 @@ VX_API_ENTRY vx_node VX_API_CALL vxDeconvolutionLayer(
     vx_size size_of_deconv_params,
     vx_tensor outputs)
 {
+    vx_node node = VX_NULL;
+    vx_uint32 i = 0;
+    vx_uint32 stride_x, stride_y;
+    vx_int32 channel_group;
+    vx_enum overflow_policy, rounding_policy, down_scale_size_rounding;
+    vx_size pad_x, pad_x_right, pad_y, pad_y_bottom, a_x, a_y;
+
+    vx_reference parameters[] = {
+    (vx_reference)inputs,
+    (vx_reference)weights,
+    (vx_reference)biases,
+    (vx_reference)VX_NULL,
+    (vx_reference)VX_NULL,
+    (vx_reference)VX_NULL,
+    (vx_reference)VX_NULL,
+    (vx_reference)VX_NULL,
+    (vx_reference)VX_NULL,
+    (vx_reference)VX_NULL,
+    (vx_reference)VX_NULL,
+    (vx_reference)VX_NULL,
+    (vx_reference)VX_NULL,
+    (vx_reference)VX_NULL,
+    (vx_reference)VX_NULL,
+    (vx_reference)outputs,
+    };
+
     gcmHEADER_ARG("graph=%p, inputs=%p, weights=%p, biases=%p, deconvolution_params=%p, size_of_deconv_params=0x%lx, outputs=%p",
         graph, inputs, weights, biases, deconvolution_params, size_of_deconv_params, outputs);
     gcmDUMP_API("$VX vxDeconvolutionLayer: graph=%p, inputs=%p, weights=%p, biases=%p, deconvolution_params=%p, size_of_deconv_params=0x%lx, outputs=%p",
         graph, inputs, weights, biases, deconvolution_params, size_of_deconv_params, outputs);
 
-    if (size_of_deconv_params != sizeof(vx_nn_deconvolution_params_ext_t))
+    if (size_of_deconv_params == sizeof(vx_nn_deconvolution_params_ext_t))
     {
-        return NULL;
+        vx_nn_deconvolution_params_ext_t *deconvolution_params_ext = (vx_nn_deconvolution_params_ext_t *)deconvolution_params;
+        pad_x = deconvolution_params_ext->khr.padding_x;
+        pad_x_right = deconvolution_params_ext->padding_x_right;
+        pad_y = deconvolution_params_ext->khr.padding_y;
+        pad_y_bottom = deconvolution_params_ext->padding_y_bottom;
+        overflow_policy = deconvolution_params_ext->khr.overflow_policy;
+        rounding_policy = deconvolution_params_ext->khr.rounding_policy;
+        a_x = deconvolution_params_ext->khr.a_x;
+        a_y = deconvolution_params_ext->khr.a_y;
+        channel_group = deconvolution_params_ext->channel_group;
+    }
+    else if (size_of_deconv_params == sizeof(vx_nn_deconvolution_params_ext2_t))
+    {
+        vx_nn_deconvolution_params_ext2_t *deconvolution_params_ext2 = (vx_nn_deconvolution_params_ext2_t *)deconvolution_params;
+        pad_x = deconvolution_params_ext2->ext.khr.padding_x;
+        pad_x_right = deconvolution_params_ext2->ext.padding_x_right;
+        pad_y = deconvolution_params_ext2->ext.khr.padding_y;
+        pad_y_bottom = deconvolution_params_ext2->ext.padding_y_bottom;
+        overflow_policy = deconvolution_params_ext2->ext.khr.overflow_policy;
+        rounding_policy = deconvolution_params_ext2->ext.khr.rounding_policy;
+        a_x = deconvolution_params_ext2->ext.khr.a_x;
+        a_y = deconvolution_params_ext2->ext.khr.a_y;
+        channel_group = deconvolution_params_ext2->ext.channel_group;
+        stride_x = deconvolution_params_ext2->stride_x;
+        stride_y = deconvolution_params_ext2->stride_y;
+        down_scale_size_rounding = deconvolution_params_ext2->down_scale_size_rounding;
     }
     else
     {
-        vx_node node = VX_NULL;
-        vx_uint32 i = 0;
-        vx_nn_deconvolution_params_ext_t *deconvolution_params_ext = (vx_nn_deconvolution_params_ext_t *)deconvolution_params;
-        vx_reference parameters[] = {
-            (vx_reference)inputs,
-            (vx_reference)weights,
-            (vx_reference)biases,
-            (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &deconvolution_params_ext->khr.padding_x),
-            (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &deconvolution_params_ext->padding_x_right),
-            (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &deconvolution_params_ext->khr.padding_y),
-            (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &deconvolution_params_ext->padding_y_bottom),
-            (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &deconvolution_params_ext->khr.overflow_policy),
-            (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &deconvolution_params_ext->khr.rounding_policy),
-            (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_SIZE, &deconvolution_params_ext->khr.a_x),
-            (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_SIZE, &deconvolution_params_ext->khr.a_y),
-            (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &deconvolution_params_ext->channel_group),
-            (vx_reference)outputs,
-        };
-
-        vxmCHECK_PRECISION(biases, VX_TENSOR_PRECISION_HIGH);
-
-        vxmCHECK_LIFETIME(weights, VX_TENSOR_LIFE_TIME_STATIC);
-
-        vxmCHECK_LIFETIME(biases, VX_TENSOR_LIFE_TIME_STATIC);
-
-        node = vxoNode_CreateSpecific(graph, VX_KERNEL_DECONVOLUTION_LAYER, parameters, vxmLENGTH_OF(parameters));
-
-        for (i = 3; i < (gcmCOUNTOF(parameters) - 1); i ++)
-            vxReleaseScalar((vx_scalar*)&parameters[i]);
+        vxError("Invalid parameter deconvolution_params\n");
         gcmFOOTER_NO();
-        return node;
+        return NULL;
     }
+
+    parameters[3] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_SIZE, &pad_x);
+    parameters[4] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_SIZE, &pad_x_right);
+    parameters[5] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_SIZE, &pad_y);
+    parameters[6] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_SIZE, &pad_y_bottom);
+    parameters[7] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &overflow_policy);
+    parameters[8] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &rounding_policy);
+    parameters[9] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_SIZE, &a_x);
+    parameters[10] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_SIZE, &a_y);
+    parameters[11] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, &channel_group);
+
+    if (size_of_deconv_params == sizeof(vx_nn_deconvolution_params_ext2_t))
+    {
+        parameters[12] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_UINT32, &stride_x);
+        parameters[13] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_UINT32, &stride_y);
+        parameters[14] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_ENUM, &down_scale_size_rounding);
+    }
+
+    vxmCHECK_PRECISION(biases, VX_TENSOR_PRECISION_HIGH);
+
+    vxmCHECK_LIFETIME(weights, VX_TENSOR_LIFE_TIME_STATIC);
+
+    vxmCHECK_LIFETIME(biases, VX_TENSOR_LIFE_TIME_STATIC);
+
+    node = vxoNode_CreateSpecific(graph, VX_KERNEL_DECONVOLUTION_LAYER, parameters, vxmLENGTH_OF(parameters));
+
+    for (i = 3; i < (gcmCOUNTOF(parameters) - 1); i ++)
+    {
+        if ((size_of_deconv_params == sizeof(vx_nn_deconvolution_params_ext_t)) &&
+            ((i > 11) && (i < 15)))
+        {
+            continue;
+        }
+        vxReleaseScalar((vx_scalar*)&parameters[i]);
+    }
+    gcmFOOTER_NO();
+    return node;
 }
 
 VX_API_ENTRY vx_node VX_API_CALL vxTensorCopyNode(

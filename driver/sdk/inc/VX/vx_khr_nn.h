@@ -574,6 +574,14 @@ typedef struct _vx_nn_deconvolution_params_ext_t
     vx_scalar pad_const;                     /*!< \brief  The pad const value if setting pad mode to const, the const value is base value, not quantized value. */
 } vx_nn_deconvolution_params_ext_t;
 
+typedef struct _vx_nn_deconvolution_params_ext2_t
+{
+    vx_nn_deconvolution_params_ext_t ext;    /*!< \brief Deconvolution extension structure head */
+    vx_uint32 stride_x;                      /*!< \brief  skip x jump for down scale.  */
+    vx_uint32 stride_y;                      /*!< \brief  skip y jump for down scale.  */
+    vx_enum down_scale_size_rounding;        /*!< \brief Rounding method for calculating output dimensions. See <tt>\ref vx_nn_rounding_type_e</tt> */
+} vx_nn_deconvolution_params_ext2_t;
+
 /*! \brief Input parameters for ROI pooling operation.
  * \ingroup group_cnn
  */

@@ -18454,7 +18454,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
     vx_scalar  a_x                        = (vx_scalar)parameters[9];
     vx_scalar  a_y                        = (vx_scalar)parameters[10];
     vx_scalar  group                      = (vx_scalar)parameters[11];
-    vx_tensor  outputs                    = (vx_tensor)parameters[12];
+    vx_scalar  stride_w_s                 = (vx_scalar)parameters[12];
+    vx_scalar  stride_h_s                 = (vx_scalar)parameters[13];
+    vx_tensor  outputs                    = (vx_tensor)parameters[num - 1];
     gcoNNDeConv_Mode deconvolution_mode   = /* gcoNNE_DECONV_MODE_SW; gcoNNE_DECONV_MODE_SW1; */ gcoNNE_DECONV_MODE_NNE_TP;
     vx_uint32  batchCount                 = TENSOR_SIZE_INDEX(inputs, 3);
     vx_bool depthwise = vx_false_e;
@@ -18474,8 +18476,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
     vx_int32 kernel_size_x = TENSOR_SIZE_INDEX(weights, 0);
     vx_int32 kernel_size_y = TENSOR_SIZE_INDEX(weights, 1);
     /* de-covolution*/
-    vx_int32 stride_w = (vx_int32)vxnneRound((out_w - kernel_size_x - a_x->value->n32 + pad_x + pad_x_right) * 1.0f / (in_w - 1), VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING);
-    vx_int32 stride_h = (vx_int32)vxnneRound((out_h - kernel_size_y - a_y->value->n32 + pad_y + pad_y_bottom) * 1.0f / (in_h - 1), VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING);
+    vx_int32 stride_w = (stride_w_s != VX_NULL) ? (stride_w_s->value->n32) : (vx_int32)vxnneRound((out_w - kernel_size_x - a_x->value->n32 + pad_x + pad_x_right) * 1.0f / (in_w - 1), VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING);
+    vx_int32 stride_h = (stride_h_s != VX_NULL) ? (stride_h_s->value->n32) : (vx_int32)vxnneRound((out_h - kernel_size_y - a_y->value->n32 + pad_y + pad_y_bottom) * 1.0f / (in_h - 1), VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING);
 
     vx_int32 kernel_reshuffle_width = gcmALIGN_NP2(kernel_size_x, stride_w)/stride_w, kernel_reshuffle_height = gcmALIGN_NP2(kernel_size_y, stride_h)/stride_h;
     vx_int32 kernel_reshuffle_pad_x_right = (in_w - 1) * stride_w - (out_w + gcmMAX(pad_x, pad_x_right) - kernel_reshuffle_width * stride_w);
