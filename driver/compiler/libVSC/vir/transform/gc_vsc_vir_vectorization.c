@@ -3720,6 +3720,17 @@ static VSC_ErrCode _FindInstsToVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectori
             {
                 /* If inst has been vectorized into seed, then remove it from inst-array */
                 vscSRARR_RemoveElementByIndex(pInstArray, i);
+
+                /*
+                ** There is a implicit requirement that all instructions in the pInstArray is in-order,
+                ** which means that the pSeedInst must be in front of the pInst.
+                ** So when we vectorize the instruction from the pSeedInst, we need to re-order them.
+                */
+                if (ovMode == VIR_OPND_VECTORIZE_MODE_FROM_SEED_INST)
+                {
+                    vscSRARR_AddElementToSpecifiedIndex(pInstArray, &pSeedInst, i);
+                    vscSRARR_RemoveElementByIndex(pInstArray, seedInstIndex);
+                }
             }
             else
             {

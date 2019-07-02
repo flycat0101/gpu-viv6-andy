@@ -108,6 +108,49 @@ gctUINT vscSRARR_AddElement(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, void* pNewEle)
     return pArray->elementCount ++;
 }
 
+gctUINT vscSRARR_AddElementToSpecifiedIndex(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, void* pNewEle, gctINT index)
+{
+    gctUINT i, j;
+
+    if (index < 0)
+    {
+        WARNING_REPORT(VSC_ERR_INVALID_DATA, "The index is negative, something is wrong!!!");
+        index = (gctINT)pArray->elementCount;
+    }
+
+    if (index > (gctINT)pArray->elementCount)
+    {
+        WARNING_REPORT(VSC_ERR_INVALID_DATA, "The index is larger than the element count, something is wrong!!!");
+        index = (gctINT)pArray->elementCount;
+    }
+
+    /* When the index is the element count, just append a new element. */
+    if (index == (gctINT)pArray->elementCount)
+    {
+        return vscSRARR_AddElement(pArray, pNewEle);
+    }
+
+    if (pArray->elementSize == 0)
+    {
+        WARNING_REPORT(VSC_ERR_INVALID_DATA, "The element size of an array is 0, something is wrong!!!");
+    }
+
+    _CheckElementSpace(pArray);
+
+    for (i = pArray->elementCount - 1; i >= (gctUINT)index; i--)
+    {
+        for (j = 0; j < pArray->elementSize; j++)
+        {
+            *((gctUINT8*)pArray->pElement + pArray->elementSize * (i + 1) + j) =
+                *((gctUINT8*)pArray->pElement + pArray->elementSize * i + j);
+        }
+    }
+
+    memcpy((gctUINT8*)pArray->pElement + pArray->elementSize * index, pNewEle, pArray->elementSize);
+
+    return pArray->elementCount ++;
+}
+
 void* vscSRARR_GetNextEmpty(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, gctUINT *pIndex)
 {
     _CheckElementSpace(pArray);
