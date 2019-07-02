@@ -25817,17 +25817,24 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorStrideSlice_Initializer(vx_node 
         vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_stride_slice_tp_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
         conv.tpType = TP_TENSOR_STRIDED_SLICE;
-        conv.other_ref      = (vx_reference)input;
-
-        conv.pad_x_left     = (vx_uint32)VX_GET_DATA_FROM_TENSOR(begin_dims, 0);
-        conv.pad_x_right    = TENSOR_DIM_NUM(begin_dims) > 1 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(begin_dims, 1):0;
-        conv.pad_y_top      = (vx_uint32)VX_GET_DATA_FROM_TENSOR(end_dims, 0);
-        conv.pad_y_bottom   = TENSOR_DIM_NUM(end_dims) > 1 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(end_dims, 1):0;
-
-        conv.pad_w_front    = (vx_uint32)VX_GET_DATA_FROM_TENSOR(stride_dims, 0); /* stride x*/
-        conv.pad_w_back     = TENSOR_DIM_NUM(stride_dims) > 1 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(stride_dims, 1):1; /* stride y*/
-
+        conv.other_ref = (vx_reference)input;
         conv.data_buff = gcvNULL;
+
+        conv.tp_value = (vx_tp_value_cmd)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
+        /*
+         * u32[0]: begin_dims[0]
+         * u32[1]: begin_dims[1]
+         * u32[2]: end_dims[0]
+         * u32[3]: end_dims[1]
+         * u32[4]: stride_dims[0]
+         * u32[5]: stride_dims[1]
+         */
+        conv.tp_value->u32[0] = (vx_uint32)VX_GET_DATA_FROM_TENSOR(begin_dims, 0);
+        conv.tp_value->u32[1] = TENSOR_VIEW_SIZE_INDEX(begin_dims, 0) > 1 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(begin_dims, 1) : 0;
+        conv.tp_value->u32[2] = (vx_uint32)VX_GET_DATA_FROM_TENSOR(end_dims, 0);
+        conv.tp_value->u32[3] = TENSOR_VIEW_SIZE_INDEX(end_dims, 0) > 1 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(end_dims, 1) : 0;
+        conv.tp_value->u32[4] = (vx_uint32)VX_GET_DATA_FROM_TENSOR(stride_dims, 0); /* stride x*/
+        conv.tp_value->u32[5] = TENSOR_VIEW_SIZE_INDEX(stride_dims, 0) > 1 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(stride_dims, 1) : 1; /* stride y*/
 
         memcpy(&tensor_stride_slice_layer->tensor_stride_slice_tp_operation.base.parameter, &conv, sizeof(vx_op_param_s));
     }
