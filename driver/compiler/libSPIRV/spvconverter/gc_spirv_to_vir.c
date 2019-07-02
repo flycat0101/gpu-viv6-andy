@@ -2552,7 +2552,7 @@ static VIR_ImageFormat __SpvImageFormatToVirImageFormat(SpvImageFormat format)
     case SpvImageFormatR8:              imageFormat = VIR_IMAGE_FORMAT_R8; break;
     case SpvImageFormatRg32ui:          imageFormat = VIR_IMAGE_FORMAT_RG32UI; break;
     case SpvImageFormatRg8ui:           imageFormat = VIR_IMAGE_FORMAT_RG8UI; break;
-    case SpvImageFormatR16ui:           imageFormat = VIR_IMAGE_FORMAT_RG16UI; break;
+    case SpvImageFormatR16ui:           imageFormat = VIR_IMAGE_FORMAT_R16UI; break;
     case SpvImageFormatR8ui:            imageFormat = VIR_IMAGE_FORMAT_R8UI; break;
 
     case SpvImageFormatR11fG11fB10f:
