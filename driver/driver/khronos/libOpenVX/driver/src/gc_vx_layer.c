@@ -22674,7 +22674,9 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
     vx_bool       enable_broadcast      = vx_false_e;
     vx_bool       enable_broadcast_Z    = vx_false_e;
     vx_bool       useImage2DFlag        = (vx_bool)((width * height < IMG_MAX_WIDTH) && depth < IMG_MAX_WIDTH);
+    vx_bool       enable_2d_inst        = vx_false_e;
     vx_bool       enable_data_type      = vx_false_e;
+    vx_uint32     wksizes[3]            = {width, height, depth};
     vx_tensor     input0_rs             = NULL;
     vx_tensor     input1_rs             = NULL;
     vx_tensor     output_rs             = NULL;
@@ -22702,7 +22704,7 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
     enable_data_type = ((input0_format == VX_TYPE_INT8 && (input1_format == VX_TYPE_INT8 || input1_format == VX_TYPE_FLOAT16) && output_format == VX_TYPE_INT8) || (input0_format == VX_TYPE_INT16 && input1_format == VX_TYPE_INT16 && output_format == VX_TYPE_INT16));
 
 
-    useImage2DFlag = (vx_bool)(useImage2DFlag && (!enable_broadcast) && (operation == VX_TENSOR_OP_ADD) && enable_data_type && (policyEnum == VX_CONVERT_POLICY_SATURATE)) ;
+    enable_2d_inst = (vx_bool)((useImage2DFlag || (depth == 1)) && (!enable_broadcast) && (operation == VX_TENSOR_OP_ADD) && enable_data_type && (policyEnum == VX_CONVERT_POLICY_SATURATE)) ;
 
     borderMode->mode = VX_BORDER_REPLICATE;
 
@@ -22868,6 +22870,10 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
         vx_int8  input1_fl  = TENSOR_POS(input1);
         vx_int32 sizes[4]   = {width * height, depth, 1, batch};
 
+        wksizes[0] = width * height;
+        wksizes[1] = depth;
+        wksizes[2] = 1;
+
         if (((input0_fl >= input1_fl) && TENSOR_QUANT_TYPE(input0) == TENSOR_QUANT_TYPE(input1)) || (input0_format != input1_format))
         {
             input0_rs = vxoTensor_ReshapeTensor(input0, sizes, dims);
@@ -22946,7 +22952,7 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
         vxReleaseProgram(&program);
     }
 
-    if (useImage2DFlag)
+    if (enable_2d_inst)
     {
         vx_int8 fla = TENSOR_POS(input0_rs);
         vx_int8 flb = TENSOR_POS(input1_rs);
@@ -23247,26 +23253,15 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
         if (status != VX_SUCCESS) goto OnError;
     }
 
-    if (useImage2DFlag)
-    {
-        execution_parameters.workDim             = 2;
-        execution_parameters.globalWorkOffset[0] = 0;
-        execution_parameters.globalWorkOffset[1] = 0;
-        execution_parameters.globalWorkSize[0]   = gcmALIGN((width * height  + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
-        execution_parameters.globalWorkSize[1]   = (depth + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
-    }
-    else
-    {
-        execution_parameters.globalWorkOffset[0] = 0;
-        execution_parameters.globalWorkOffset[1] = 0;
-        execution_parameters.globalWorkOffset[2] = 0;
-        execution_parameters.globalWorkScale[0]  = 8;
-        execution_parameters.globalWorkScale[1]  = 1;
-        execution_parameters.globalWorkScale[2]  = 1;
-        execution_parameters.globalWorkSize[0]   = gcmALIGN((width  + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
-        execution_parameters.globalWorkSize[1]   = (height + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
-        execution_parameters.globalWorkSize[2]   = depth;
-    }
+    execution_parameters.globalWorkOffset[0] = 0;
+    execution_parameters.globalWorkOffset[1] = 0;
+    execution_parameters.globalWorkOffset[2] = 0;
+    execution_parameters.globalWorkScale[0]  = 8;
+    execution_parameters.globalWorkScale[1]  = 1;
+    execution_parameters.globalWorkScale[2]  = 1;
+    execution_parameters.globalWorkSize[0]   = gcmALIGN((wksizes[0] + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
+    execution_parameters.globalWorkSize[1]   = (wksizes[1] + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
+    execution_parameters.globalWorkSize[2]   = wksizes[2];
 
     status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, paramNum);
     if (status != VX_SUCCESS) goto OnError;
