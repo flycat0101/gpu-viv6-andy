@@ -4221,7 +4221,8 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_eltwiseOp(vx_graph graph)
 
 /*
 the feautre: replace previous node's output with relu's output and
-this feature is only valid for quantized data type
+this feature is only valid for quantized data type and do not merge
+for branch.
 */
 VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
 {
@@ -4240,7 +4241,8 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
         if(node->merged)    continue;
 
         if((nodeType == OP_RELU || nodeType == OP_RELU1 || nodeType == OP_RELU6) &&
-            node->numParents == 1
+            node->numParents == 1 &&
+            nodeTable[node->parentNodes[0]]->numChildren == 1
             )
         {
             vx_enum dataType = TENSOR_DATA_TYPE((vx_tensor)node->paramTable[0]);
