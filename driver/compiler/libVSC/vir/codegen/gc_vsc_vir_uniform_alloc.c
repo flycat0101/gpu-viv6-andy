@@ -2889,7 +2889,10 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
             */
             if (VIR_Symbol_GetBinding(sym) == NOT_ASSIGNED          &&
                 VIR_Symbol_GetDescriptorSet(sym) == NOT_ASSIGNED    &&
-                (VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_UNIFORM_BLOCK_ADDRESS || VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_STORAGE_BLOCK_ADDRESS))
+                (!_VIG_CG_IsUniformPushConst(pShader, sym, VIR_Symbol_GetType(sym), gcvNULL)) &&
+                (VIR_Uniform_GetPhysical(symUniform) == -1) &&
+                (VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_UNIFORM_BLOCK_ADDRESS ||
+                 VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_STORAGE_BLOCK_ADDRESS))
             {
                 vscHTBL_DirectSet(pUnbindUniformHash, (void *)sym, gcvNULL);
 
@@ -3092,6 +3095,8 @@ DEF_QUERY_PASS_PROP(VIR_RA_PerformUniformAlloc)
     pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
     pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_RA;
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+
+    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
 }
 
 DEF_SH_NECESSITY_CHECK(VIR_RA_PerformUniformAlloc)
