@@ -20669,6 +20669,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoReOrg2_Initializer(vx_node node, const v
 
     /* Choose acceleration path. */
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP) &&
+        vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs) &&
         !vxmIS_ERROR(_GetTPReorgCmdType(type, &tp_cmd_type)))
     {
         target = VXNNE_OPERATION_TARGET_TP;
