@@ -53,7 +53,7 @@
 ##############################################################################
 
 
-AQROOT=$(CURDIR)
+AQROOT=$(PWD)
 AQARCH=$(AQROOT)/arch/XAQ2
 
 include $(AQROOT)/config

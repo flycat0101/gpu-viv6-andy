@@ -107,6 +107,10 @@ void * GetBinaryPtr(nnvxc_kernel_enum type, unsigned int* len)
             *len = VXC_BIN_LSTMUNITLAYERNORMSTATEOUT_LEN;
             return vxcBinLSTMUnitLayerNormStateOut;
     
+        case TensorAbs:
+            *len = VXC_BIN_TENSORABS_LEN;
+            return vxcBinTensorAbs;
+    
         case ActivationSoftRelu:
             *len = VXC_BIN_ACTIVATIONSOFTRELU_LEN;
             return vxcBinActivationSoftRelu;
@@ -170,6 +174,10 @@ void * GetBinaryPtr(nnvxc_kernel_enum type, unsigned int* len)
         case MaxPooling:
             *len = VXC_BIN_MAXPOOLING_LEN;
             return vxcBinMaxPooling;
+    
+        case TensorMulSatRTE:
+            *len = VXC_BIN_TENSORMULSATRTE_LEN;
+            return vxcBinTensorMulSatRTE;
     
         case LSTMUnitProjection:
             *len = VXC_BIN_LSTMUNITPROJECTION_LEN;
@@ -246,6 +254,10 @@ void * GetBinaryPtr(nnvxc_kernel_enum type, unsigned int* len)
         case TensorCrop:
             *len = VXC_BIN_TENSORCROP_LEN;
             return vxcBinTensorCrop;
+    
+        case TensorTR:
+            *len = VXC_BIN_TENSORTR_LEN;
+            return vxcBinTensorTR;
     
         case Gemm:
             *len = VXC_BIN_GEMM_LEN;
