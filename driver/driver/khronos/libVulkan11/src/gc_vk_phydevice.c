@@ -998,7 +998,7 @@ static void __vki_InitializePhysicalDevicePorperties(
     }
 
     /* FS */
-    phyDev->phyDevProp.limits.maxFragmentInputComponents                      = (maxVaryings + 1) * 4;
+    phyDev->phyDevProp.limits.maxFragmentInputComponents                      = maxVaryings * 4;
     phyDev->phyDevProp.limits.maxFragmentOutputAttachments                    = __VK_MAX_RENDER_TARGETS;
     phyDev->phyDevProp.limits.maxFragmentDualSrcAttachments                   = 0;
     phyDev->phyDevProp.limits.maxFragmentCombinedOutputResources              = __VK_MAX_RENDER_TARGETS;
