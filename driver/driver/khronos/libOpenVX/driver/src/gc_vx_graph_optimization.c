@@ -1629,9 +1629,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeWithChildNodes(vx_node node)
     vx_enum opType = OP_INVALID;
     vx_enum currNodeType;
     vx_enum features[][2] = {
-        OP_CONVOLUTION, OP_RELU | OP_POOLING, /*conv + relu + pool = convrelupool*/
-        OP_FULLYCONNECTED, OP_RELU, /*fc + relu = fcRelu*/
-        OP_ROIPOOL, OP_RELU, /*roipool + relu = roipoolrelu*/
+        {OP_CONVOLUTION, OP_RELU | OP_POOLING}, /*conv + relu + pool = convrelupool*/
+        {OP_FULLYCONNECTED, OP_RELU}, /*fc + relu = fcRelu*/
+        {OP_ROIPOOL, OP_RELU}                /*roipool + relu = roipoolrelu*/
     };
 
     vx_enum allFeatures = 0;
