@@ -367,7 +367,8 @@ static VkResult __vki_PresentSwapChainImage(
             &srcRes,
             &dstRes,
             VK_FALSE,
-            VK_FILTER_NEAREST
+            VK_FILTER_NEAREST,
+            VK_TRUE
             ));
 
         srcRes.u.img.subRes.arrayLayer++;

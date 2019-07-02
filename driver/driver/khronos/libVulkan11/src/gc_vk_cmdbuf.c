@@ -1354,7 +1354,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdResolveImage(
                 &srcRes,
                 &dstRes,
                 VK_FALSE,
-                VK_FILTER_NEAREST
+                VK_FILTER_NEAREST,
+                VK_TRUE
                 ));
 
 #if __VK_RESOURCE_INFO
@@ -1909,7 +1910,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
                             &srcRes,
                             &srcTmpRes,
                             VK_FALSE,
-                            VK_FILTER_NEAREST
+                            VK_FILTER_NEAREST,
+                            VK_TRUE
                             ));
 #if __VK_RESOURCE_INFO
                         __vk_utils_insertCopyCmdRes(commandBuffer, &srcRes, &srcTmpRes);
@@ -1957,14 +1959,29 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
                     }
                 }
 
-                if (!pSrcImage->formatInfo.compressed && !pDstImage->formatInfo.compressed)
+                if (pSrcImage->formatInfo.compressed || pDstImage->formatInfo.compressed)
                 {
                     __VK_ERR_BREAK(devCtx->chipFuncs->CopyImage(
                         commandBuffer,
                         pSrcRes,
                         pDstRes,
                         VK_TRUE,
-                        VK_FILTER_NEAREST
+                        VK_FILTER_NEAREST,
+                        VK_FALSE
+                        ));
+#if __VK_RESOURCE_INFO
+                    __vk_utils_insertCopyCmdRes(commandBuffer, pSrcRes, pDstRes);
+#endif
+                }
+                else
+                {
+                     __VK_ERR_BREAK(devCtx->chipFuncs->CopyImage(
+                        commandBuffer,
+                        pSrcRes,
+                        pDstRes,
+                        VK_TRUE,
+                        VK_FILTER_NEAREST,
+                        VK_TRUE
                         ));
 #if __VK_RESOURCE_INFO
                     __vk_utils_insertCopyCmdRes(commandBuffer, pSrcRes, pDstRes);
@@ -1988,7 +2005,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
                         pDstRes,
                         &dstRes,
                         VK_FALSE,
-                        VK_FILTER_NEAREST
+                        VK_FILTER_NEAREST,
+                        VK_TRUE
                         ));
 #if __VK_RESOURCE_INFO
                     __vk_utils_insertCopyCmdRes(commandBuffer, pDstRes, &dstRes);
@@ -2178,7 +2196,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBlitImage(
                     &srcRes,
                     &dstRes,
                     VK_FALSE,
-                    filter
+                    filter,
+                    VK_TRUE
                     ));
 
 #if __VK_RESOURCE_INFO
@@ -2298,7 +2317,8 @@ OnError:
                 &srcRes,
                 &dstRes,
                 VK_FALSE,
-                VK_FILTER_NEAREST
+                VK_FILTER_NEAREST,
+                VK_TRUE
                 ));
 #if __VK_RESOURCE_INFO
             __vk_utils_insertCopyCmdRes(commandBuffer, &srcRes, &dstRes);
@@ -2415,7 +2435,8 @@ OnError:
                 &srcRes,
                 &dstRes,
                 VK_FALSE,
-                VK_FILTER_NEAREST
+                VK_FILTER_NEAREST,
+                VK_TRUE
                 ));
 #if __VK_RESOURCE_INFO
             __vk_utils_insertCopyCmdRes(commandBuffer, &srcRes, &dstRes);
@@ -2539,7 +2560,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImageToBuffer(
                 &srcRes,
                 &dstRes,
                 VK_FALSE,
-                VK_FILTER_NEAREST
+                VK_FILTER_NEAREST,
+                VK_TRUE
                 ));
 #if __VK_RESOURCE_INFO
             __vk_utils_insertCopyCmdRes(commandBuffer, &srcRes, &dstRes);

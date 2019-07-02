@@ -5662,7 +5662,8 @@ static VkResult halti5_syncShadowImage(
         &pSrcRes,
         &pDstRes,
         VK_TRUE,
-        VK_FILTER_NEAREST
+        VK_FILTER_NEAREST,
+        VK_TRUE
         ));
 
 OnError:

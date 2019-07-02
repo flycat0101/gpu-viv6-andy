@@ -3285,7 +3285,8 @@ VkResult halti5_copyImage(
     __vkBlitRes *srcRes,
     __vkBlitRes *dstRes,
     VkBool32 rawCopy,
-    VkFilter filter
+    VkFilter filter,
+    VkBool32 oldPath
     )
 {
     HwBLTDesc srcBltDesc = {0}, dstBltDesc = {0};
@@ -3589,8 +3590,28 @@ VkResult halti5_copyImage(
 
     if (rawCopy)
     {
-        /* Change srcFormat to be same as dstFormat for CmdCopyImage() */
+        VkExtent2D rect;
+        const __vkFormatInfo *fmtInfo;
+        fmtInfo = &g_vkFormatInfoTable[srcFormat];
+        rect = fmtInfo->blockSize;
+        /*Change srcFormat to be same as dstFormat for CmdCopyImage() */
         srcFormat = dstFormat;
+
+        /*src is compressed image, dest is uncompressed image*/
+        if ((dstRes->isImage && (!dstRes->u.img.pImage->formatInfo.compressed)) &&
+            (srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed))
+        {
+            srcTiling = 0x0;
+            srcSuperTile = 0x0;
+            srcTileConfigEx = 0;
+
+            srcOffset.x = gcmALIGN_NP2(srcOffset.x - rect.width + 1, rect.width) / rect.width;
+            srcOffset.y = gcmALIGN_NP2(srcOffset.y - rect.height + 1, rect.height) / rect.height;
+            srcExtent.width = gcmALIGN_NP2(srcExtent.width, rect.width) / rect.width;
+            srcExtent.height = gcmALIGN_NP2(srcExtent.height, rect.height) / rect.height;
+            dstExtent.width = gcmALIGN_NP2(dstExtent.width, rect.width) / rect.width;
+            dstExtent.height = gcmALIGN_NP2(dstExtent.height, rect.height) / rect.height;
+        }
 
         /* Fake 1 layer 128 bpp format as double widthed 64bpp */
         if (g_vkFormatInfoTable[dstFormat].bitsPerBlock == 128 && g_vkFormatInfoTable[dstFormat].partCount == 1)
@@ -3638,32 +3659,65 @@ VkResult halti5_copyImage(
             fmtInfo = &g_vkFormatInfoTable[dstFormat];
             rect = fmtInfo->blockSize;
 
-            /*dst is compressed or dst is buffer/src iscompressed*/
-            if ((dstRes->isImage && dstRes->u.img.pImage->formatInfo.compressed) ||
-                (!dstRes->isImage && (srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed)))
+            /*src is compressed image, dest is compressed image*/
+            if ((dstRes->isImage && dstRes->u.img.pImage->formatInfo.compressed) &&
+                (srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed))
             {
                 dstTiling = 0x0;
                 dstSuperTile = 0x0;
                 dstTileConfigEx = 0;
+                srcTiling = 0x0;
+                srcSuperTile = 0x0;
+                srcTileConfigEx = 0;
 
                 dstOffset.x = gcmALIGN_NP2(dstOffset.x - rect.width  + 1, rect.width) / rect.width;
                 dstOffset.y = gcmALIGN_NP2(dstOffset.y - rect.height + 1, rect.height)/ rect.height;
-
                 dstExtent.width  = gcmALIGN_NP2(dstExtent.width, rect.width)  / rect.width;
                 dstExtent.height = gcmALIGN_NP2(dstExtent.height, rect.height) / rect.height;
-            }
-            /*src is compressed or src is buffer/dst iscompressed*/
-            if ((srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed) ||
-                (!srcRes->isImage && (dstRes->isImage && dstRes->u.img.pImage->formatInfo.compressed)))
-            {
-                dstTiling = 0x0;
-                dstSuperTile = 0x0;
-                dstTileConfigEx = 0;
 
                 srcOffset.x = gcmALIGN_NP2(srcOffset.x - rect.width + 1, rect.width) / rect.width;
                 srcOffset.y = gcmALIGN_NP2(srcOffset.y - rect.height + 1, rect.height) / rect.height;
                 srcExtent.width = gcmALIGN_NP2(srcExtent.width, rect.width) / rect.width;
                 srcExtent.height = gcmALIGN_NP2(srcExtent.height, rect.height) / rect.height;
+            }/*src is uncompressed image, dest is compressed image and not form sync shadowimage*/
+            else if ((dstRes->isImage && dstRes->u.img.pImage->formatInfo.compressed) &&
+                     (srcRes->isImage && (!srcRes->u.img.pImage->formatInfo.compressed)) && !oldPath)
+            {
+                dstTiling = 0x0;
+                dstSuperTile = 0x0;
+                dstTileConfigEx = 0;
+                dstOffset.x = gcmALIGN_NP2(dstOffset.x - rect.width + 1, rect.width) / rect.width;
+                dstOffset.y = gcmALIGN_NP2(dstOffset.y - rect.height + 1, rect.height) / rect.height;
+            }
+            else
+            {
+                /*dst is compressed or dst is buffer/src iscompressed*/
+                if ((dstRes->isImage && dstRes->u.img.pImage->formatInfo.compressed) ||
+                    (!dstRes->isImage && (srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed)))
+                {
+                    dstTiling = 0x0;
+                    dstSuperTile = 0x0;
+                    dstTileConfigEx = 0;
+
+                    dstOffset.x = gcmALIGN_NP2(dstOffset.x - rect.width  + 1, rect.width) / rect.width;
+                    dstOffset.y = gcmALIGN_NP2(dstOffset.y - rect.height + 1, rect.height)/ rect.height;
+                    dstExtent.width  = gcmALIGN_NP2(dstExtent.width, rect.width)  / rect.width;
+                    dstExtent.height = gcmALIGN_NP2(dstExtent.height, rect.height) / rect.height;
+                }
+                /*src is compressed or src is buffer/dst iscompressed*/
+                if ((srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed) ||
+                    (!srcRes->isImage && (dstRes->isImage && dstRes->u.img.pImage->formatInfo.compressed)))
+                {
+                    dstTiling = 0x0;
+                    dstSuperTile = 0x0;
+                    srcTiling = 0x0;
+                    dstTileConfigEx = 0;
+
+                    srcOffset.x = gcmALIGN_NP2(srcOffset.x - rect.width + 1, rect.width) / rect.width;
+                    srcOffset.y = gcmALIGN_NP2(srcOffset.y - rect.height + 1, rect.height) / rect.height;
+                    srcExtent.width = gcmALIGN_NP2(srcExtent.width, rect.width) / rect.width;
+                    srcExtent.height = gcmALIGN_NP2(srcExtent.height, rect.height) / rect.height;
+                }
             }
 
             if (dstBltDesc.pixelSize == 128)

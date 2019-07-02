@@ -824,7 +824,8 @@ VkResult halti5_copyImage(
     __vkBlitRes *srcRes,
     __vkBlitRes *dstRes,
     VkBool32 rawCopy,
-    VkFilter filter
+    VkFilter filter,
+    VkBool32 oldPath
     );
 
 VkResult halti5_fillBuffer(
@@ -1382,7 +1383,8 @@ VkResult halti2_copyImageWithRS(
     __vkBlitRes *srcRes,
     __vkBlitRes *dstRes,
     VkBool32 rawCopy,
-    VkFilter filter
+    VkFilter filter,
+    VkBool32 oldPath
     );
 
 void halti2_helper_convertHwSampler(

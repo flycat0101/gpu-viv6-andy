@@ -22,7 +22,7 @@ typedef struct __vkChipFuncTableRec
     VkResult (*CreateComputePipeline)(VkDevice device, const VkComputePipelineCreateInfo *info, VkPipeline pipeline);
     VkResult (*DestroyPipeline)(VkDevice device, VkPipeline pipeline);
     VkResult (*ClearImage)(VkCommandBuffer cmdBuf, VkImage image, VkImageSubresource *subResource, VkClearValue *clearValue, VkRect2D *rect);
-    VkResult (*CopyImage)(VkCommandBuffer cmdBuf, __vkBlitRes *srcRes, __vkBlitRes *dstRes, VkBool32 rawCopy, VkFilter filter);
+    VkResult (*CopyImage)(VkCommandBuffer cmdBuf, __vkBlitRes *srcRes, __vkBlitRes *dstRes, VkBool32 rawCopy, VkFilter filter, VkBool32 oldPath);
     VkResult (*FillBuffer)(VkCommandBuffer cmdBuf, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data);
     VkResult (*CopyBuffer)(VkCommandBuffer cmdBuf, __vkBlitRes *srcRes, __vkBlitRes *dstRes, uint64_t copySize);
     VkResult (*UpdateBuffer)(VkCommandBuffer cmdBuf, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize size, const uint32_t* pData);

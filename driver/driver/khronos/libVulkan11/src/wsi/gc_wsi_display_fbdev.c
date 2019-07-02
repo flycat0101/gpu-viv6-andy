@@ -1125,7 +1125,8 @@ static VkResult __GenPresentCommand(
         &srcRes,
         &dstRes,
         VK_FALSE,
-        VK_FILTER_NEAREST
+        VK_FILTER_NEAREST,
+        VK_TRUE
         ));
 
     __VK_ONERROR(__vk_EndCommandBuffer(sc->cmdBuf));

@@ -1036,7 +1036,8 @@ VkResult halti2_copyImageWithRS(
     __vkBlitRes *srcRes,
     __vkBlitRes *dstRes,
     VkBool32 rawCopy,
-    VkFilter filter
+    VkFilter filter,
+    VkBool32 oldPath
     )
 {
     HwRsDesc srcRsDesc = {0}, dstRsDesc = {0};
