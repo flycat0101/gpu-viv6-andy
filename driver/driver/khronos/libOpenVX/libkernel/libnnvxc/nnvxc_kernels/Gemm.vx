@@ -512,9 +512,9 @@ __kernel void gemm_int16
     vxc_short8 src0, src1, src2, src3;
 #endif
     vxc_short8 wData;
-    int4 sum = 0;
-    int4 dst;
-    dst = read_imagei(bias, coord_in.yw);
+    float4 sum = 0;
+    float4 dst;
+    dst = convert_float4(read_imagei(bias, coord_in.yw));
     dst = dst.xxxx;
 
     do
@@ -552,11 +552,11 @@ __kernel void gemm_int16
         dst = dst > 0 ? dst : 0;
 #endif
 
-    float4 temp;
-    temp = convert_float4(dst) * in_scale;
-    _viv_asm(CONV_RTE, dst, temp);
+    int4 result;
+    dst = dst * in_scale;
+    _viv_asm(CONV_RTE, result, dst);
     vxc_short4 val;
-    VXC_DP2x8(val, dst, dst, VXC_MODIFIER(0, 3, 0, VXC_RM_ToNearestEven, 1), uniExtractInteger_2x8);
+    VXC_DP2x8(val, result, result, VXC_MODIFIER(0, 3, 0, VXC_RM_ToNearestEven, 1), uniExtractInteger_2x8);
 
     VXC_WriteImage(output, coord_in.zy, val, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
 }
@@ -576,9 +576,9 @@ __kernel void gemm_Tensor_int16
     vxc_short8 src0, src1, src2, src3;
 
     vxc_short8 wData;
-    int4 sum = 0;
-    int4 dst;
-    dst = read_imagei(bias, coord.yw);
+    float4 sum = 0;
+    float4 dst;
+    dst = convert_float4(read_imagei(bias, coord.yw));
     dst = dst.xxxx;
 
     do
@@ -601,11 +601,11 @@ __kernel void gemm_Tensor_int16
         dst = dst > 0 ? dst : 0;
 #endif
 
-    float4 temp;
-    temp = convert_float4(dst) * in_scale;
-    _viv_asm(CONV_RTE, dst, temp);
+    int4 result;
+    dst = dst * in_scale;
+    _viv_asm(CONV_RTE, result, dst);
     vxc_short4 val;
-    VXC_DP2x8(val, dst, dst, VXC_MODIFIER(0, 3, 0, VXC_RM_ToNearestEven, 1), uniExtractInteger_2x8);
+    VXC_DP2x8(val, result, result, VXC_MODIFIER(0, 3, 0, VXC_RM_ToNearestEven, 1), uniExtractInteger_2x8);
 
     coord    = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
     VXC_WriteImage2DArray(output, coord, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
@@ -866,17 +866,18 @@ __kernel void gemm_Tensor_fp16_4x
 
     half4 v;
     _viv_asm(CONV, v, dst);
-    _viv_asm(COPY, vect0, v, 16);
-    vect0.s0123 = vect0.s0246;
+    vxc_short8 result;
+    _viv_asm(COPY, result, v, 16);
+    result.s0123 = result.s0246;
 
     //coord    = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
-    VXC_WriteImage2DArray(output, coord, vect0, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+    VXC_WriteImage2DArray(output, coord, result, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
     coord.z ++;
-    VXC_WriteImage2DArray(output, coord, vect0, VXC_MODIFIER(1, 1, 0, VXC_RM_TowardZero, 0));
+    VXC_WriteImage2DArray(output, coord, result, VXC_MODIFIER(1, 1, 0, VXC_RM_TowardZero, 0));
     coord.z ++;
-    VXC_WriteImage2DArray(output, coord, vect0, VXC_MODIFIER(2, 2, 0, VXC_RM_TowardZero, 0));
+    VXC_WriteImage2DArray(output, coord, result, VXC_MODIFIER(2, 2, 0, VXC_RM_TowardZero, 0));
     coord.z ++;
-    VXC_WriteImage2DArray(output, coord, vect0, VXC_MODIFIER(3, 3, 0, VXC_RM_TowardZero, 0));
+    VXC_WriteImage2DArray(output, coord, result, VXC_MODIFIER(3, 3, 0, VXC_RM_TowardZero, 0));
 }
 
 __kernel void gemm_Tensor_int16_4x
@@ -893,10 +894,10 @@ __kernel void gemm_Tensor_int16_4x
 
     vxc_short8 src0;
     vxc_short8 w0Data, w1Data, w2Data, w3Data;
-    int4 sum;
-    int4 dst;
+    float4 sum;
+    float4 dst;
 
-    dst = read_imagei(bias, coord.zw);
+    dst = convert_float4(read_imagei(bias, coord.zw));
 
     do
     {
@@ -923,11 +924,11 @@ __kernel void gemm_Tensor_int16_4x
         dst = dst > 0 ? dst : 0;
 #endif
 
-    float4 temp;
-    temp = convert_float4(dst) * in_scale;
-    _viv_asm(CONV_RTE, dst, temp);
+    int4 result;
+    dst = dst * in_scale;
+    _viv_asm(CONV_RTE, result, dst);
     vxc_short4 val;
-    VXC_DP2x8(val, dst, dst, VXC_MODIFIER(0, 3, 0, VXC_RM_ToNearestEven, 1), uniExtractInteger_2x8);
+    VXC_DP2x8(val, result, result, VXC_MODIFIER(0, 3, 0, VXC_RM_ToNearestEven, 1), uniExtractInteger_2x8);
 
     //coord    = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
     VXC_WriteImage2DArray(output, coord, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
