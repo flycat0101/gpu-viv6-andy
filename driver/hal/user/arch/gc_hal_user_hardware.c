@@ -2864,6 +2864,7 @@ _FillInFeatureTable(
     Features[gcvFEATURE_NN_NO_Z_LOCATION_OFFSET] = database->NN_NO_Z_LOCATION_OFFSET;
     Features[gcvFEATURE_NN_PRELU] = database->NN_PRELU;
     Features[gcvFEATURE_NN_KERNEL_SIZE_WASTE_IN_PARTIAL_MODE_FIX] = database->KERNEL_SIZE_WASTE_IN_PARTIAL_MODE_FIX;
+    Features[gcvFEATURE_OCB_REMAP_PHYSICAL_ADDRESS] = database->OCB_REMAP_PHYSICAL_ADDRESS;
     Features[gcvFEATURE_VIP_DEC400] = database->VIP_DEC400;
 
     /*these chip don't have maxpointSize limit, so need fix */
