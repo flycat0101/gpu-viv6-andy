@@ -1,440 +1,778 @@
-
 #include "cl_viv_vx_ext.h"
 
+
+_viv_uniform VXC_512Bits uniU8SubZP_MulM_PStoF16Lo_2x8;
+_viv_uniform VXC_512Bits uniU8SubZP_MulM_PStoF16Hi_2x8;
+_viv_uniform VXC_512Bits uniF16MulF16_2x8;
+_viv_uniform int inputZP;
+_viv_uniform int outputZP;
+_viv_uniform VXC_512Bits uniS16AddZP_2x8;
+__kernel void vxLeakyRelu_U8toU8_2d
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
+{
+    vxc_uchar16 src0, dst;
+    vxc_short8  vec0, vec1, vec2;
+    vxc_half8   param_h, src2, src3;
+    vxc_half16  src;
+    vxc_short8  const1 = (vxc_short8)(0x3c00, 0x3c00, 0x3c00, 0x3c00, 0x3c00, 0x3c00, 0x3c00, 0x3c00);
+
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    VXC_ReadImage(src0, input, coord, 0, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, vec0, alpha_hlf, 4);
+
+    vxc_uchar16 input_ZP;
+    _viv_asm(COPY, input_ZP, inputZP, 4);
+    VXC_DP2x8(src2, src0, input_ZP, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniU8SubZP_MulM_PStoF16Lo_2x8);
+    VXC_DP2x8(src3, src0, input_ZP, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniU8SubZP_MulM_PStoF16Hi_2x8);
+
+    vec0 = vec0.s00000000;
+    _viv_asm(COPY, vec1, src2, 16);
+    vec2 = vec1 >= 0 ? const1 : vec0;
+    _viv_asm(COPY, param_h, vec2, 16);
+    VXC_DP2x8(vec2, src2, param_h, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniF16MulF16_2x8);
+    _viv_asm(COPY, src0, outputZP, 16);
+    VXC_DP2x8(dst, vec2, src0, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniS16AddZP_2x8);
+
+    _viv_asm(COPY, vec1, src3, 16);
+    vec2 = vec1 >= 0 ? const1 : vec0;
+    _viv_asm(COPY, param_h, vec2, 16);
+    VXC_DP2x8(vec2, src3, param_h, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniF16MulF16_2x8);
+    VXC_DP2x8(dst, vec2, src0, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniS16AddZP_2x8);
+
+    VXC_WriteImage(output, coord, dst, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+}
+
+
+__kernel void vxLeakyRelu_U8toF16_2d
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
+{
+    vxc_uchar16 src0, dst;
+    vxc_short8  vec0, vec1, vec2;
+    vxc_half8   param_h, src2, src3;
+    vxc_half16  src;
+    vxc_short8  const1 = (vxc_short8)(0x3c00, 0x3c00, 0x3c00, 0x3c00, 0x3c00, 0x3c00, 0x3c00, 0x3c00);
+
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(0), get_global_id(1));
+    VXC_ReadImage(src0, input, coord.xy, 0, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, vec0, alpha_hlf, 4);
+
+    coord.z += 8;
+
+    vxc_uchar16 input_ZP;
+    _viv_asm(COPY, input_ZP, inputZP, 4);
+    VXC_DP2x8(src2, src0, input_ZP, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniU8SubZP_MulM_PStoF16Lo_2x8);
+    VXC_DP2x8(src3, src0, input_ZP, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniU8SubZP_MulM_PStoF16Hi_2x8);
+
+    vec0 = vec0.s00000000;
+    _viv_asm(COPY, vec1, src2, 16);
+    vec2 = vec1 >= 0 ? const1 : vec0;
+    _viv_asm(COPY, param_h, vec2, 16);
+    VXC_DP2x8(src2, src2, param_h, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniF16MulF16_2x8);
+    _viv_asm(COPY, vec2, src2, 16);
+    VXC_WriteImage(output, coord.xy, vec2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+    _viv_asm(COPY, vec1, src3, 16);
+    vec2 = vec1 >= 0 ? const1 : vec0;
+    _viv_asm(COPY, param_h, vec2, 16);
+    VXC_DP2x8(src3, src3, param_h, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniF16MulF16_2x8);
+    _viv_asm(COPY, vec2, src3, 16);
+
+    VXC_WriteImage(output, coord.zy, vec2, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+}
+
+_viv_uniform VXC_512Bits uniConvertInt32toUint8_2x8;
+_viv_uniform VXC_512Bits uniConvertUint8SubZpToFp32_4x4;
+_viv_uniform VXC_512Bits uniConvertSecUint8SubZpToFp32_4x4;
+
+_viv_uniform float inputScale;
+_viv_uniform float outputScale;
+_viv_uniform float scale_inOut_u8;
+
+__kernel void vxLeakyRelu_U8toU8
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_para = (int4)(coord.z, 0, 0, 0);
+
+    vxc_uchar16 img_s16;
+    vxc_short8 para_s16;
+    half paraHlf;
+    float paraFp;
+    vxc_uchar8 outval;
+    vxc_float4 imgData0, imgData1;
+    vxc_float4 tmpOut0, tmpOut1;
+    vxc_int4 tmpVal0, tmpVal1;
+
+    VXC_ReadImage2DArray(img_s16, input, coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, para_s16, alpha_hlf, 4);
+
+    short zp = inputZP;
+
+    VXC_DP4x4(imgData0, img_s16, zp, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertUint8SubZpToFp32_4x4);
+    VXC_DP4x4(imgData1, img_s16, zp, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertSecUint8SubZpToFp32_4x4);
+
+    _viv_asm(COPY, paraHlf, para_s16, 2);
+    _viv_asm(CONV, paraFp, paraHlf);
+    imgData0 *= scale_inOut_u8;
+    imgData1 *= scale_inOut_u8;
+
+    vxc_float4 maxData0 = imgData0 > 0 ? imgData0 : 0.0;
+    vxc_float4 maxData1 = imgData1 > 0 ? imgData1 : 0.0;
+    vxc_float4 minData0 = imgData0 < 0 ? imgData0 : 0.0;
+    vxc_float4 minData1 = imgData1 < 0 ? imgData1 : 0.0;
+    tmpOut0 = maxData0 + paraFp * minData0;
+    tmpOut1 = maxData1 + paraFp * minData1;
+
+    tmpVal0 = convert_int4_rte(tmpOut0 + outputZP);
+    tmpVal1 = convert_int4_rte(tmpOut1 + outputZP);
+
+    VXC_DP2x8(outval, tmpVal0, tmpVal1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), uniConvertInt32toUint8_2x8);
+    VXC_WriteImage2DArray(output, coord, outval, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void vxLeakyRelu_U8toF16
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_para = (int4)(coord.z, 0, 0, 0);
+
+    vxc_uchar16 img_s16;
+    vxc_short8 para_s16;
+    half paraHlf;
+    float paraFp;
+    vxc_short8 outval;
+    vxc_float4 imgData0, imgData1;
+    float4 tmpOut0, tmpOut1;
+    half4 tmpVal0, tmpVal1;
+
+    VXC_ReadImage2DArray(img_s16, input, coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, para_s16, alpha_hlf, 4);
+
+    short zp = inputZP;
+
+    VXC_DP4x4(imgData0, img_s16, zp, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertUint8SubZpToFp32_4x4);
+    VXC_DP4x4(imgData1, img_s16, zp, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertSecUint8SubZpToFp32_4x4);
+
+    _viv_asm(COPY, paraHlf, para_s16, 4);
+    _viv_asm(CONV, paraFp, paraHlf);
+    imgData0 *= inputScale;
+    imgData1 *= inputScale;
+
+    vxc_float4 maxData0 = imgData0 > 0 ? imgData0 : 0.0;
+    vxc_float4 maxData1 = imgData1 > 0 ? imgData1 : 0.0;
+    vxc_float4 minData0 = imgData0 < 0 ? imgData0 : 0.0;
+    vxc_float4 minData1 = imgData1 < 0 ? imgData1 : 0.0;
+    tmpOut0 = maxData0 + paraFp * minData0;
+    tmpOut1 = maxData1 + paraFp * minData1;
+
+    _viv_asm(CONV, tmpVal0, tmpOut0);
+    _viv_asm(CONV, tmpVal1, tmpOut1);
+    VXC_DP2x8(outval, tmpVal0, tmpVal1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvertInt32toUint8_2x8);
+    VXC_WriteImage2DArray(output, coord, outval, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+}
+
+
+_viv_uniform VXC_512Bits uniLeakyReluInt8Lo_2x8b;
+_viv_uniform VXC_512Bits uniLeakyReluInt8Hi_2x8b;
+_viv_uniform VXC_512Bits uniLeakyReluInt16_2x8b;
+_viv_uniform VXC_512Bits uniLeakyReluInt8_2x8;
+_viv_uniform VXC_512Bits uniLeakyReluInt16_4x4;
+_viv_uniform VXC_512Bits uniMergeMultiplier_2x8;
+_viv_uniform int multiplier;
+#if (VX_VERSION==2)
+__kernel void vxLeakyRelu_I8toI8_opt
+(
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+
+    vxc_char16 in, dst;
+    vxc_char32 src;
+    vxc_short8 para_s16;
+    vxc_half8 paraHlf;
+    VXC_ReadImage(in, input, coord.xy, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, para_s16, alpha_hlf, 4);
+    _viv_asm(COPY, paraHlf, para_s16, 4);
+    src.hi = max(in, 0);
+    src.lo = min(in, 0);
+
+    VXC_DP2x8_b(dst, src.hi, src.lo, paraHlf, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniLeakyReluInt8Lo_2x8b);
+    VXC_DP2x8_b(dst, src.hi, src.lo, paraHlf, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniLeakyReluInt8Hi_2x8b);
+    VXC_WriteImage(output, coord, dst, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void vxLeakyRelu_I8toI8_opt1
+(
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+
+    vxc_char16 in, dst;
+    vxc_char32 src;
+    vxc_short8 para_s16;
+    vxc_half8 paraHlf;
+    VXC_ReadImage(in, input, coord.xy, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, para_s16, alpha_hlf, 4);
+    _viv_asm(COPY, paraHlf, para_s16, 4);
+    src.hi = max(in, 0);
+    src.lo = min(in, 0);
+
+    unsigned short src2;
+    _viv_asm(COPY, src2, multiplier, 4);
+    VXC_DP2x8(paraHlf, paraHlf, src2, VXC_MODIFIER(0, 1, 0, VXC_RM_TowardZero, 0), uniMergeMultiplier_2x8);
+    VXC_DP2x8_b(dst, src.hi, src.lo, paraHlf, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniLeakyReluInt8Lo_2x8b);
+    VXC_DP2x8_b(dst, src.hi, src.lo, paraHlf, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniLeakyReluInt8Hi_2x8b);
+    VXC_WriteImage(output, coord, dst, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void vxLeakyRelu_I16toI16_opt
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+
+    vxc_short8 in, dst;
+    vxc_short16 src;
+    vxc_short8 para_s16;
+    vxc_half8 paraHlf;
+    VXC_ReadImage(in, input, coord.xy, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, para_s16, alpha_hlf, 4);
+    _viv_asm(COPY, paraHlf, para_s16, 4);
+    src.hi = max(in, 0);
+    src.lo = min(in, 0);
+    VXC_DP2x8_b(dst, src.hi, src.lo, paraHlf, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniLeakyReluInt16_2x8b);
+    VXC_WriteImage(output, coord, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void vxLeakyRelu_I16toI16_opt1
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+
+    vxc_short8 in, dst;
+    vxc_short16 src;
+    vxc_short8 para_s16;
+    vxc_half8 paraHlf;
+    VXC_ReadImage(in, input, coord.xy, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, para_s16, alpha_hlf, 4);
+    _viv_asm(COPY, paraHlf, para_s16, 4);
+    src.hi = max(in, 0);
+    src.lo = min(in, 0);
+
+    unsigned short src2;
+    _viv_asm(COPY, src2, multiplier, 4);
+    VXC_DP2x8(paraHlf, paraHlf, src2, VXC_MODIFIER(0, 1, 0, VXC_RM_TowardZero, 0), uniMergeMultiplier_2x8);
+    VXC_DP2x8_b(dst, src.hi, src.lo, paraHlf, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniLeakyReluInt16_2x8b);
+    VXC_WriteImage(output, coord, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+}
+
+#else
+__kernel void vxLeakyRelu_I8toI8_opt
+(
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    vxc_char16 in, dst;
+    vxc_char16 src0, src1, src;
+    vxc_short8 para_s16;
+    vxc_half8 paraHlf;
+    VXC_ReadImage(in, input, coord.xy, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, para_s16, alpha_hlf, 4);
+    _viv_asm(COPY, paraHlf, para_s16, 4);
+    src0 = max(in, 0);
+    src1 = min(in, 0);
+    _viv_asm(COPY, src, src0, 16);
+    src.s89abcdef = src1.s01234567;
+    VXC_DP2x8(dst, src, paraHlf, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniLeakyReluInt8_2x8);
+    _viv_asm(COPY, src, src1, 16);
+    src.s01234567 = src0.s89abcdef;
+    VXC_DP2x8(dst, src, paraHlf, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniLeakyReluInt8_2x8);
+    VXC_WriteImage(output, coord, dst, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void vxLeakyRelu_I16toI16_opt
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    vxc_short8 in, dst;
+    vxc_short8 src0, src1, src;
+    vxc_short8 para_s16;
+    vxc_half8 paraHlf;
+    VXC_ReadImage(in, input, coord.xy, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, para_s16, alpha_hlf, 4);
+    _viv_asm(COPY, paraHlf, para_s16, 4);
+    src0 = max(in, 0);
+    src1 = min(in, 0);
+    _viv_asm(COPY, src, src0, 16);
+    src.s4567 = src1.s0123;
+    VXC_DP4x4(dst, src, paraHlf, VXC_MODIFIER(0, 3, 0, VXC_RM_ToNearestEven, 1), uniLeakyReluInt16_4x4);
+    _viv_asm(COPY, src, src1, 16);
+    src.s0123 = src0.s4567;
+    VXC_DP4x4(dst, src, paraHlf, VXC_MODIFIER(4, 7, 0, VXC_RM_ToNearestEven, 1), uniLeakyReluInt16_4x4);
+    VXC_WriteImage(output, coord, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+}
+#endif
+
+_viv_uniform VXC_512Bits uniConvertInt8FstFp32_4x4;
+_viv_uniform VXC_512Bits uniConvertInt8SecFp32_4x4;
+_viv_uniform VXC_512Bits uniConvertInt8TrdFp32_4x4;
+_viv_uniform VXC_512Bits uniConvertInt8ForFp32_4x4;
+_viv_uniform float scale_inOut;
+__kernel void vxLeakyRelu_I8toI8
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_para = (int4)(coord.z, 0, 0, 0);
+
+    vxc_char16 img_c16;
+    vxc_short8 para_s16;
+    vxc_char16 outval;
+    vxc_float4 imgData0, imgData1, imgData2, imgData3;
+    vxc_float4 tmpOut0, tmpOut1, tmpOut2, tmpOut3;
+    vxc_int4 tmpVal0, tmpVal1;
+
+    VXC_ReadImage2DArray(img_c16, input, coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+
+    VXC_DP4x4(imgData0, img_c16, img_c16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertInt8FstFp32_4x4);
+    VXC_DP4x4(imgData1, img_c16, img_c16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertInt8SecFp32_4x4);
+    VXC_DP4x4(imgData2, img_c16, img_c16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertInt8TrdFp32_4x4);
+    VXC_DP4x4(imgData3, img_c16, img_c16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertInt8ForFp32_4x4);
+
+    imgData0 *= scale_inOut;
+    imgData1 *= scale_inOut;
+    imgData2 *= scale_inOut;
+    imgData3 *= scale_inOut;
+
+    vxc_float4 maxData0 = imgData0 > 0 ? imgData0 : 0.0;
+    vxc_float4 maxData1 = imgData1 > 0 ? imgData1 : 0.0;
+    vxc_float4 minData0 = imgData0 < 0 ? imgData0 : 0.0;
+    vxc_float4 minData1 = imgData1 < 0 ? imgData1 : 0.0;
+    tmpOut0 = maxData0 + alpha * minData0;
+    tmpOut1 = maxData1 + alpha * minData1;
+    tmpVal0 = convert_int4_rte(tmpOut0);
+    tmpVal1 = convert_int4_rte(tmpOut1);
+    VXC_DP2x8(outval, tmpVal0, tmpVal1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), uniConvertInt32toUint8_2x8);
+
+    maxData0 = imgData2 > 0 ? imgData2 : 0.0;
+    maxData1 = imgData3 > 0 ? imgData3 : 0.0;
+    minData0 = imgData2 < 0 ? imgData2 : 0.0;
+    minData1 = imgData3 < 0 ? imgData3 : 0.0;
+    tmpOut0 = maxData0 + alpha * minData0;
+    tmpOut1 = maxData1 + alpha * minData1;
+    tmpVal0 = convert_int4_rte(tmpOut0);
+    tmpVal1 = convert_int4_rte(tmpOut1);
+    VXC_DP2x8(outval, tmpVal0, tmpVal1, VXC_MODIFIER(8, 15, 0, VXC_RM_TowardZero, 1), uniConvertInt32toUint8_2x8);
+
+    VXC_WriteImage2DArray(output, coord, outval, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+}
+
+_viv_uniform VXC_512Bits UniS8xFp16_dp2x8;
 _viv_uniform VXC_512Bits UniFP16Mul_dp2x8;
-_viv_uniform VXC_512Bits UniS8xFp16toFp16_dp2x8;
-_viv_uniform float in_scale;
-_viv_uniform float out_scale;
-__kernel void vxcLeakyRelu_Fp16toFp16Tensor(
-    __read_only image2d_array_t   input,
-    float   alpha,
-    __write_only image2d_array_t   output)
+__kernel void vxLeakyRelu_I8toF16
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
 {
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_para = (int4)(coord.z, 0, 0, 0);
 
-    half alpha_fp16;
-    vxc_short8 img_s16;
-    vxc_half8 img_fp16, val_fp16;
+    vxc_char8 img1_s8;
+    vxc_short8 para_s16;
+    vxc_half8 img_fp16, para_fp16, val_fp16;
+    half inscale_fp16;
+
+    VXC_ReadImage2DArray(img1_s8, input, coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, para_s16, alpha_hlf, 4);
+
+    _viv_asm(CONV, inscale_fp16, inputScale);
+    _viv_asm(COPY, para_fp16, para_s16, 16);
+
+    VXC_DP2x8(img_fp16, img1_s8, inscale_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), UniS8xFp16_dp2x8);
+    VXC_DP2x8(val_fp16, img_fp16, para_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniFP16Mul_dp2x8);
+    VXC_Clamp_Half(img_fp16, img_fp16, val_fp16, img_fp16, VXC_MODIFIER_CLAMP(0, 7, 0, 0));
+    _viv_asm(COPY, para_s16, img_fp16, 16);
+    VXC_WriteImage2DArray(output, coord, para_s16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void vxLeakyRelu_I8toF16_2d
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+
+    vxc_char8 img1_s8;
+    vxc_short8 para_s16;
+    vxc_half8 img_fp16, para_fp16, val_fp16;
+    half inscale_fp16;
+
+    VXC_ReadImage(img1_s8, input, coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, para_s16, alpha_hlf, 4);
+
+    _viv_asm(CONV, inscale_fp16, inputScale);
+    _viv_asm(COPY, para_fp16, para_s16, 16);
+
+    VXC_DP2x8(img_fp16, img1_s8, inscale_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), UniS8xFp16_dp2x8);
+    VXC_DP2x8(val_fp16, img_fp16, para_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniFP16Mul_dp2x8);
+    VXC_Clamp_Half(img_fp16, img_fp16, val_fp16, img_fp16, VXC_MODIFIER_CLAMP(0, 7, 0, 0));
+    _viv_asm(COPY, para_s16, img_fp16, 16);
+    VXC_WriteImage(output, coord, para_s16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+}
+
+_viv_uniform VXC_512Bits uniConvertDirInt16Fp32_4x4;
+_viv_uniform VXC_512Bits uniConvertEndInt16Fp32_4x4;
+__kernel void vxLeakyRelu_I16toI16
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_para = (int4)(coord.z, 0, 0, 0);
+
+    vxc_short8 img_s16, para_s16;
+    half paraHlf;
+    float paraFp;
+    vxc_short8 outval;
+    vxc_float4 imgData0, imgData1;
+    vxc_float4 tmpOut0, tmpOut1;
+    vxc_int4 tmpVal0, tmpVal1;
 
     VXC_ReadImage2DArray(img_s16, input, coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    _viv_asm(CONV, alpha_fp16, alpha);
-    _viv_asm(COPY, img_fp16, img_s16, 16);
-    VXC_DP2x8(val_fp16, img_fp16, alpha_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniFP16Mul_dp2x8);
-    VXC_Clamp_Half(img_fp16, img_fp16, val_fp16, img_fp16, VXC_MODIFIER_CLAMP(0, 7, 0, 0));
-    _viv_asm(COPY, img_s16, img_fp16, 16);
-    VXC_WriteImage2DArray(output, coord, img_s16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, para_s16, alpha_hlf, 4);
+
+    VXC_DP4x4(imgData0, img_s16, img_s16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertDirInt16Fp32_4x4);
+    VXC_DP4x4(imgData1, img_s16, img_s16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertEndInt16Fp32_4x4);
+
+    _viv_asm(COPY, paraHlf, para_s16, 2);
+    _viv_asm(CONV, paraFp, paraHlf);
+    imgData0 *= scale_inOut;
+    imgData1 *= scale_inOut;
+
+    vxc_float4 maxData0 = imgData0 > 0 ? imgData0 : 0.0;
+    vxc_float4 maxData1 = imgData1 > 0 ? imgData1 : 0.0;
+    vxc_float4 minData0 = imgData0 < 0 ? imgData0 : 0.0;
+    vxc_float4 minData1 = imgData1 < 0 ? imgData1 : 0.0;
+    tmpOut0 = maxData0 + paraFp * minData0;
+    tmpOut1 = maxData1 + paraFp * minData1;
+
+    tmpVal0 = convert_int4_rte(tmpOut0);
+    tmpVal1 = convert_int4_rte(tmpOut1);
+
+    VXC_DP2x8(outval, tmpVal0, tmpVal1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), uniConvertInt32toUint8_2x8);
+    VXC_WriteImage2DArray(output, coord, outval, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
-__kernel void vxcLeakyRelu_Fp16toInt8Tensor(
-    __read_only image2d_array_t   input,
-    float   alpha,
-    __write_only image2d_array_t   output)
+
+__kernel void vxLeakyRelu_I16toF16
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
 {
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_para = (int4)(coord.z, 0, 0, 0);
 
-    half alpha_fp16, scale_fp16;
-    vxc_short8 img_s16;
-    vxc_half8 img_fp16, val_fp16;
-    vxc_char8 val_s8;
+    vxc_short8 img_s16, para_s16;
+    half paraHlf;
+    float paraFp;
+    vxc_short8 outval;
+    vxc_float4 imgData0, imgData1;
+    vxc_float4 tmpOut0, tmpOut1;
+    half4 tmpVal0, tmpVal1;
 
     VXC_ReadImage2DArray(img_s16, input, coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    _viv_asm(CONV, alpha_fp16, alpha);
-    _viv_asm(COPY, img_fp16, img_s16, 16);
-    VXC_DP2x8(val_fp16, img_fp16, alpha_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniFP16Mul_dp2x8);
-    VXC_Clamp_Half(img_fp16, img_fp16, val_fp16, img_fp16, VXC_MODIFIER_CLAMP(0, 7, 0, 0));
-    _viv_asm(CONV, scale_fp16, out_scale);
-    VXC_DP2x8(val_s8, img_fp16, scale_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), UniFP16Mul_dp2x8);
-    VXC_WriteImage2DArray(output, coord, val_s8, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, para_s16, alpha_hlf, 4);
+
+    VXC_DP4x4(imgData0, img_s16, img_s16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertDirInt16Fp32_4x4);
+    VXC_DP4x4(imgData1, img_s16, img_s16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertEndInt16Fp32_4x4);
+
+    _viv_asm(COPY, paraHlf, para_s16, 2);
+    _viv_asm(CONV, paraFp, paraHlf);
+    imgData0 *= inputScale;
+    imgData1 *= inputScale;
+
+    vxc_float4 maxData0 = imgData0 > 0 ? imgData0 : 0.0;
+    vxc_float4 maxData1 = imgData1 > 0 ? imgData1 : 0.0;
+    vxc_float4 minData0 = imgData0 < 0 ? imgData0 : 0.0;
+    vxc_float4 minData1 = imgData1 < 0 ? imgData1 : 0.0;
+    tmpOut0 = maxData0 + paraFp * minData0;
+    tmpOut1 = maxData1 + paraFp * minData1;
+
+    _viv_asm(CONV, tmpVal0, tmpOut0);
+    _viv_asm(CONV, tmpVal1, tmpOut1);
+    VXC_DP2x8(outval, tmpVal0, tmpVal1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvertInt32toUint8_2x8);
+    VXC_WriteImage2DArray(output, coord, outval, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
-__kernel void vxcLeakyRelu_Fp16toFp16Image(
-    __read_only image2d_array_t   input,
-    float   alpha,
-    __write_only image2d_array_t   output)
+
+__kernel void vxLeakyRelu_F16toF16_2d
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
 {
     int2 coord = (int2)(get_global_id(0), get_global_id(1));
 
-    half alpha_fp16;
-    vxc_short8 img_s16;
-    vxc_half8 img_fp16, val_fp16;
+    vxc_short8 img1_s16, para_s16, val_s16;
+    vxc_half8 img_fp16, para_fp16, val_fp16;
 
-    VXC_ReadImage(img_s16, input, coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    _viv_asm(CONV, alpha_fp16, alpha);
-    _viv_asm(COPY, img_fp16, img_s16, 16);
-    VXC_DP2x8(val_fp16, img_fp16, alpha_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniFP16Mul_dp2x8);
-    VXC_Clamp_Half(img_fp16, img_fp16, val_fp16, img_fp16, VXC_MODIFIER_CLAMP(0, 7, 0, 0));
-    _viv_asm(COPY, img_s16, img_fp16, 16);
-    VXC_WriteImage(output, coord, img_s16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-}
-__kernel void vxcLeakyRelu_Fp16toInt8Image(
-    __read_only image2d_array_t   input,
-    float   alpha,
-    __write_only image2d_array_t   output)
-{
-    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    VXC_ReadImage(img1_s16, input, coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, para_s16, alpha_hlf, 4);
 
-    half alpha_fp16,scale_fp16;
-    vxc_short8 img_s16;
-    vxc_half8 img_fp16, val_fp16;
-    vxc_char8 val_s8;
-
-    VXC_ReadImage(img_s16, input, coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    _viv_asm(CONV, alpha_fp16, alpha);
-    _viv_asm(COPY, img_fp16, img_s16, 16);
-    VXC_DP2x8(val_fp16, img_fp16, alpha_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniFP16Mul_dp2x8);
-    VXC_Clamp_Half(img_fp16, img_fp16, val_fp16, img_fp16, VXC_MODIFIER_CLAMP(0, 7, 0, 0));
-    _viv_asm(CONV, scale_fp16, out_scale);
-    VXC_DP2x8(val_s8, img_fp16, scale_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), UniFP16Mul_dp2x8);
-    VXC_WriteImage(output, coord, val_s8, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-}
-__kernel void vxcLeakyRelu_Int8toFp16Tensor(
-    __read_only image2d_array_t   input,
-    float   alpha,
-    __write_only image2d_array_t   output)
-{
-    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
-
-    vxc_char8 img_s8;
-    vxc_half8 img_fp16, val_fp16;
-    half scale_fp16, alpha_fp16;
-    vxc_short8 val_s16;
-
-    VXC_ReadImage2DArray(img_s8, input, coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    _viv_asm(CONV, scale_fp16, in_scale);
-    _viv_asm(CONV, alpha_fp16, alpha);
-
-    VXC_DP2x8(img_fp16, img_s8, scale_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), UniS8xFp16toFp16_dp2x8);
-    VXC_DP2x8(val_fp16, img_fp16, alpha_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniFP16Mul_dp2x8);
-    VXC_Clamp_Half(img_fp16, img_fp16, val_fp16, img_fp16, VXC_MODIFIER_CLAMP(0, 7, 0, 0));
-    _viv_asm(COPY, val_s16, img_fp16, 16);
-    VXC_WriteImage2DArray(output, coord, val_s16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-}
-__kernel void vxcLeakyRelu_Int8toInt8Tensor(
-    __read_only image2d_array_t   input,
-    float   alpha,
-    __write_only image2d_array_t   output)
-{
-    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
-
-    vxc_char8 img_s8;
-    vxc_half8 img_fp16, val_fp16;
-    half scale_fp16, alpha_fp16;
-
-    VXC_ReadImage2DArray(img_s8, input, coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    _viv_asm(CONV, scale_fp16, in_scale);
-    _viv_asm(CONV, alpha_fp16, alpha);
-
-    VXC_DP2x8(img_fp16, img_s8, scale_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), UniS8xFp16toFp16_dp2x8);
-    VXC_DP2x8(val_fp16, img_fp16, alpha_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniFP16Mul_dp2x8);
-    VXC_Clamp_Half(img_fp16, img_fp16, val_fp16, img_fp16, VXC_MODIFIER_CLAMP(0, 7, 0, 0));
-    _viv_asm(CONV, scale_fp16, out_scale);
-    VXC_DP2x8(img_s8, img_fp16, scale_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), UniFP16Mul_dp2x8);
-    VXC_WriteImage2DArray(output, coord, img_s8, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-}
-__kernel void vxcLeakyRelu_Int8toFp16Image(
-    __read_only image2d_array_t    input,
-    float    alpha,
-    __write_only image2d_array_t    output)
-{
-    int2 coord = (int2)(get_global_id(0), get_global_id(1));
-
-    vxc_char8 img_s8;
-    vxc_half8 img_fp16, val_fp16;
-    half scale_fp16, alpha_fp16;
-    vxc_short8 val_s16;
-
-    VXC_ReadImage(img_s8, input, coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    _viv_asm(CONV, scale_fp16, in_scale);
-    _viv_asm(CONV, alpha_fp16, alpha);
-
-    VXC_DP2x8(img_fp16, img_s8, scale_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), UniS8xFp16toFp16_dp2x8);
-    VXC_DP2x8(val_fp16, img_fp16, alpha_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniFP16Mul_dp2x8);
-    VXC_Clamp_Half(img_fp16, img_fp16, val_fp16, img_fp16, VXC_MODIFIER_CLAMP(0, 7, 0, 0));
-    _viv_asm(COPY, val_s16, img_fp16, 16);
+    _viv_asm(COPY, para_fp16, para_s16, 16);
+    _viv_asm(COPY, img_fp16, img1_s16, 16);
+    VXC_DP2x8(val_fp16, img_fp16, para_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniFP16Mul_dp2x8);
+    vxc_short8 mulData;
+    _viv_asm(COPY, mulData, val_fp16, 16);
+    val_s16 = img1_s16 > 0 ? img1_s16 : mulData;
     VXC_WriteImage(output, coord, val_s16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
-__kernel void vxcLeakyRelu_Int8toInt8Image(
-    __read_only image2d_array_t    input,
-    float    alpha,
-    __write_only image2d_array_t    output)
-{
-    int2 coord = (int2)(get_global_id(0), get_global_id(1));
 
-    vxc_char8 img_s8;
-    vxc_half8 img_fp16, val_fp16;
-    half scale_fp16, alpha_fp16;
-
-    VXC_ReadImage(img_s8, input, coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    _viv_asm(CONV, scale_fp16, in_scale);
-    _viv_asm(CONV, alpha_fp16, alpha);
-
-    VXC_DP2x8(img_fp16, img_s8, scale_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), UniS8xFp16toFp16_dp2x8);
-    VXC_DP2x8(val_fp16, img_fp16, alpha_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniFP16Mul_dp2x8);
-    VXC_Clamp_Half(img_fp16, img_fp16, val_fp16, img_fp16, VXC_MODIFIER_CLAMP(0, 7, 0, 0));
-    _viv_asm(CONV, scale_fp16, out_scale);
-    VXC_DP2x8(img_s8, img_fp16, scale_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), UniFP16Mul_dp2x8);
-    VXC_WriteImage(output, coord, img_s8, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-}
-_viv_uniform float scaleInt16toInt16_In;
-_viv_uniform float scaleInt16toInt16_Out;
-_viv_uniform VXC_512Bits UniInt16toFloat4Lo_4x4;
-_viv_uniform VXC_512Bits UniInt16toFloat4Hi_4x4;
-_viv_uniform VXC_512Bits uniExtact16Bit_2x8;
-vxc_float4 _leakyRelu_func(vxc_float4 x, float alpha)
-{
-    vxc_float4 y;
-    y = alpha * x;
-    return x > 0 ? x : y;
-}
-__kernel void vxcLeakyRelu_Int16 (
-    __read_only image2d_array_t   input,
-    float   alpha,
-    __write_only image2d_array_t  output)
+__kernel void vxLeakyRelu_F16toF16
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
 {
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
-    vxc_short8 src0, src1, src2, src3;
-    vxc_float4 vec0, vec1;
-    VXC_ReadImage2DArray(src0, input,  coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage2DArray(src1, input,  coord, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage2DArray(src2, input,  coord, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage2DArray(src3, input,  coord, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    int4 coord_para = (int4)(coord.z, 0, 0, 0);
 
-    VXC_DP4x4(vec0, src0, src0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniInt16toFloat4Lo_4x4);
-    VXC_DP4x4(vec1, src0, src0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniInt16toFloat4Hi_4x4);
-    vec0 *= scaleInt16toInt16_In;
-    vec1 *= scaleInt16toInt16_In;
-    vec0 = _leakyRelu_func(vec0, alpha) * scaleInt16toInt16_Out;
-    vec1 = _leakyRelu_func(vec1, alpha) * scaleInt16toInt16_Out;
-    int4 dst0, dst1;
-    dst0 = convert_int4_rte(vec0);
-    dst1 = convert_int4_rte(vec1);
-    VXC_DP2x8(src0, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact16Bit_2x8);
-    VXC_WriteImage2DArray(output, coord, src0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
-    coord.y ++;
+    vxc_short8 img1_s16, para_s16, val_s16;
+    vxc_half8 img_fp16, para_fp16, val_fp16;
 
-    VXC_DP4x4(vec0, src1, src1, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniInt16toFloat4Lo_4x4);
-    VXC_DP4x4(vec1, src1, src1, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniInt16toFloat4Hi_4x4);
-    vec0 *= scaleInt16toInt16_In;
-    vec1 *= scaleInt16toInt16_In;
-    vec0 = _leakyRelu_func(vec0, alpha) * scaleInt16toInt16_Out;
-    vec1 = _leakyRelu_func(vec1, alpha) * scaleInt16toInt16_Out;
-    dst0 = convert_int4_rte(vec0);
-    dst1 = convert_int4_rte(vec1);
-    VXC_DP2x8(src0, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact16Bit_2x8);
-    VXC_WriteImage2DArray(output, coord, src0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
-    coord.y ++;
+    VXC_ReadImage2DArray(img1_s16, input, coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, para_s16, alpha_hlf, 4);
 
-    VXC_DP4x4(vec0, src2, src2, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniInt16toFloat4Lo_4x4);
-    VXC_DP4x4(vec1, src2, src2, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniInt16toFloat4Hi_4x4);
-    vec0 *= scaleInt16toInt16_In;
-    vec1 *= scaleInt16toInt16_In;
-    vec0 = _leakyRelu_func(vec0, alpha) * scaleInt16toInt16_Out;
-    vec1 = _leakyRelu_func(vec1, alpha) * scaleInt16toInt16_Out;
-    dst0 = convert_int4_rte(vec0);
-    dst1 = convert_int4_rte(vec1);
-    VXC_DP2x8(src0, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact16Bit_2x8);
-    VXC_WriteImage2DArray(output, coord, src0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
-    coord.y ++;
-
-    VXC_DP4x4(vec0, src3, src3, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniInt16toFloat4Lo_4x4);
-    VXC_DP4x4(vec1, src3, src3, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniInt16toFloat4Hi_4x4);
-    vec0 *= scaleInt16toInt16_In;
-    vec1 *= scaleInt16toInt16_In;
-    vec0 = _leakyRelu_func(vec0, alpha) * scaleInt16toInt16_Out;
-    vec1 = _leakyRelu_func(vec1, alpha) * scaleInt16toInt16_Out;
-    dst0 = convert_int4_rte(vec0);
-    dst1 = convert_int4_rte(vec1);
-    VXC_DP2x8(src0, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact16Bit_2x8);
-    VXC_WriteImage2DArray(output, coord, src0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, para_fp16, para_s16, 16);
+    _viv_asm(COPY, img_fp16, img1_s16, 16);
+    VXC_DP2x8(val_fp16, img_fp16, para_fp16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniFP16Mul_dp2x8);
+    vxc_short8 mulData;
+    _viv_asm(COPY, mulData, val_fp16, 16);
+    val_s16 = img1_s16 > 0 ? img1_s16 : mulData;
+    VXC_WriteImage2DArray(output, coord, val_s16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
-__kernel void vxcLeakyRelu_Int16_2D (
-    __read_only image2d_array_t   input,
-    float   alpha,
-    __write_only image2d_array_t  output)
+
+__kernel void vxLeakyRelu_F16toI8
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
 {
-    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(1), get_global_id(1));
+    int gidx = get_global_id(0);
+    int gidy = get_global_id(1);
+    int gidz = get_global_id(2);
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_para = (int4)(coord.z, 0, 0, 0);
 
-    vxc_short8 src0, src1, src2, src3, min, max;
-    vxc_float4 vec0, vec1;
-    VXC_ReadImage(src0, input,  coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage(src1, input,  coord.xy, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage(src2, input,  coord.xy, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage(src3, input,  coord.xy, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    coord.zw += (int2)(1, 2);
+    vxc_short8 img_s16, para_s16;
+    vxc_half8 img_fp16;
+    half paraHlf;
+    float paraFp;
+    vxc_float4 p4;
+    vxc_char16 outval;
+    vxc_float4 imgData0, imgData1;
+    vxc_float4 tmpOut0, tmpOut1;
+    vxc_int4 tmpVal0, tmpVal1;
 
-    VXC_DP4x4(vec0, src0, src0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniInt16toFloat4Lo_4x4);
-    VXC_DP4x4(vec1, src0, src0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniInt16toFloat4Hi_4x4);
-    vec0 *= scaleInt16toInt16_In;
-    vec1 *= scaleInt16toInt16_In;
-    vec0 = _leakyRelu_func(vec0, alpha) * scaleInt16toInt16_Out;
-    vec1 = _leakyRelu_func(vec1, alpha) * scaleInt16toInt16_Out;
-    int4 dst0, dst1;
-    dst0 = convert_int4_rte(vec0);
-    dst1 = convert_int4_rte(vec1);
-    VXC_DP2x8(src0, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact16Bit_2x8);
-    VXC_WriteImage(output, coord.xy, src0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
-    coord.y += 3;
+    VXC_ReadImage2DArray(img_s16, input, coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, para_s16, alpha_hlf, 4);
 
-    VXC_DP4x4(vec0, src1, src1, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniInt16toFloat4Lo_4x4);
-    VXC_DP4x4(vec1, src1, src1, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniInt16toFloat4Hi_4x4);
-    vec0 *= scaleInt16toInt16_In;
-    vec1 *= scaleInt16toInt16_In;
-    vec0 = _leakyRelu_func(vec0, alpha) * scaleInt16toInt16_Out;
-    vec1 = _leakyRelu_func(vec1, alpha) * scaleInt16toInt16_Out;
-    dst0 = convert_int4_rte(vec0);
-    dst1 = convert_int4_rte(vec1);
-    VXC_DP2x8(src0, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact16Bit_2x8);
-    VXC_WriteImage(output, coord.xz, src0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, img_fp16, img_s16, 16);
+    VXC_DP4x4(imgData0, img_fp16, img_fp16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertDirInt16Fp32_4x4);
+    VXC_DP4x4(imgData1, img_fp16, img_fp16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertEndInt16Fp32_4x4);
 
-    VXC_DP4x4(vec0, src2, src2, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniInt16toFloat4Lo_4x4);
-    VXC_DP4x4(vec1, src2, src2, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniInt16toFloat4Hi_4x4);
-    vec0 *= scaleInt16toInt16_In;
-    vec1 *= scaleInt16toInt16_In;
-    vec0 = _leakyRelu_func(vec0, alpha) * scaleInt16toInt16_Out;
-    vec1 = _leakyRelu_func(vec1, alpha) * scaleInt16toInt16_Out;
-    dst0 = convert_int4_rte(vec0);
-    dst1 = convert_int4_rte(vec1);
-    VXC_DP2x8(src0, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact16Bit_2x8);
-    VXC_WriteImage(output, coord.xw, src0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, paraHlf, para_s16, 2);
+    _viv_asm(CONV, paraFp, paraHlf);
 
-    VXC_DP4x4(vec0, src3, src3, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniInt16toFloat4Lo_4x4);
-    VXC_DP4x4(vec1, src3, src3, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), UniInt16toFloat4Hi_4x4);
-    vec0 *= scaleInt16toInt16_In;
-    vec1 *= scaleInt16toInt16_In;
-    vec0 = _leakyRelu_func(vec0, alpha) * scaleInt16toInt16_Out;
-    vec1 = _leakyRelu_func(vec1, alpha) * scaleInt16toInt16_Out;
-    dst0 = convert_int4_rte(vec0);
-    dst1 = convert_int4_rte(vec1);
-    VXC_DP2x8(src0, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact16Bit_2x8);
-    VXC_WriteImage(output, coord.xy, src0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    vxc_float4 maxData0 = imgData0 > 0 ? imgData0 : 0.0;
+    vxc_float4 maxData1 = imgData1 > 0 ? imgData1 : 0.0;
+    vxc_float4 minData0 = imgData0 < 0 ? imgData0 : 0.0;
+    vxc_float4 minData1 = imgData1 < 0 ? imgData1 : 0.0;
+    tmpOut0 = maxData0 + paraFp * minData0;
+    tmpOut1 = maxData1 + paraFp * minData1;
+    tmpOut0 *= outputScale;
+    tmpOut1 *= outputScale;
+
+    tmpVal0 = convert_int4_rte(tmpOut0);
+    tmpVal1 = convert_int4_rte(tmpOut1);
+
+    VXC_DP2x8(outval, tmpVal0, tmpVal1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), uniConvertInt32toUint8_2x8);
+    VXC_WriteImage2DArray(output, coord, outval, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
-_viv_uniform VXC_512Bits uniUInt8toFp32Part0_4x4;
-_viv_uniform VXC_512Bits uniUInt8toFp32Part1_4x4;
-_viv_uniform VXC_512Bits uniExtact8Bit_2x8;
-_viv_uniform float uint8scale_In;
-_viv_uniform float uint8qscale_Out;
-_viv_uniform int   uint8ZP_In;
-_viv_uniform float uint8ZP_Out;
-__kernel void vxcLeakyRelu_UInt8 (
-    __read_only image2d_array_t   input,
-    float   alpha,
-    __write_only image2d_array_t  output)
+
+__kernel void vxLeakyRelu_F16toU8
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
 {
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
-    vxc_uchar8 src0, src1, src2, src3;
-    vxc_float4 vec0, vec1;
-    VXC_ReadImage2DArray(src0, input,  coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage2DArray(src1, input,  coord, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage2DArray(src2, input,  coord, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage2DArray(src3, input,  coord, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    int4 coord_para = (int4)(coord.z, 0, 0, 0);
 
-    vxc_uchar8 zeroPoint;
-    _viv_asm(COPY, zeroPoint, uint8ZP_In, 4);
-    VXC_DP4x4(vec0, src0, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), uniUInt8toFp32Part0_4x4);
-    VXC_DP4x4(vec1, src0, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), uniUInt8toFp32Part1_4x4);
-    vec0 *= uint8scale_In;
-    vec1 *= uint8scale_In;
-    vec0 = _leakyRelu_func(vec0, alpha) * uint8qscale_Out + uint8ZP_Out;
-    vec1 = _leakyRelu_func(vec1, alpha) * uint8qscale_Out + uint8ZP_Out;
-    int4 dst0, dst1;
-    dst0 = convert_int4_rte(vec0);
-    dst1 = convert_int4_rte(vec1);
-    VXC_DP2x8(src0, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact8Bit_2x8);
-    VXC_WriteImage2DArray(output, coord, src0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
-    coord.y ++;
+    vxc_short8 img_s16, para_s16;
+    vxc_half8 img_fp16;
+    half paraHlf;
+    float paraFp;
+    vxc_uchar8 outval;
+    vxc_float4 imgData0, imgData1;
+    vxc_float4 tmpOut0, tmpOut1;
+    vxc_int4 tmpVal0, tmpVal1;
 
-    VXC_DP4x4(vec0, src1, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), uniUInt8toFp32Part0_4x4);
-    VXC_DP4x4(vec1, src1, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), uniUInt8toFp32Part1_4x4);
-    vec0 *= uint8scale_In;
-    vec1 *= uint8scale_In;
-    vec0 = _leakyRelu_func(vec0, alpha) * uint8qscale_Out + uint8ZP_Out;
-    vec1 = _leakyRelu_func(vec1, alpha) * uint8qscale_Out + uint8ZP_Out;
-    dst0 = convert_int4_rte(vec0);
-    dst1 = convert_int4_rte(vec1);
-    VXC_DP2x8(src0, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact8Bit_2x8);
-    VXC_WriteImage2DArray(output, coord, src0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
-    coord.y ++;
+    VXC_ReadImage2DArray(img_s16, input, coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, para_s16, alpha_hlf, 4);
 
-    VXC_DP4x4(vec0, src2, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), uniUInt8toFp32Part0_4x4);
-    VXC_DP4x4(vec1, src2, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), uniUInt8toFp32Part1_4x4);
-    vec0 *= uint8scale_In;
-    vec1 *= uint8scale_In;
-    vec0 = _leakyRelu_func(vec0, alpha) * uint8qscale_Out + uint8ZP_Out;
-    vec1 = _leakyRelu_func(vec1, alpha) * uint8qscale_Out + uint8ZP_Out;
-    dst0 = convert_int4_rte(vec0);
-    dst1 = convert_int4_rte(vec1);
-    VXC_DP2x8(src0, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact8Bit_2x8);
-    VXC_WriteImage2DArray(output, coord, src0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
-    coord.y ++;
+    _viv_asm(COPY, img_fp16, img_s16, 16);
+    VXC_DP4x4(imgData0, img_fp16, img_fp16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertDirInt16Fp32_4x4);
+    VXC_DP4x4(imgData1, img_fp16, img_fp16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertEndInt16Fp32_4x4);
 
-    VXC_DP4x4(vec0, src3, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), uniUInt8toFp32Part0_4x4);
-    VXC_DP4x4(vec1, src3, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), uniUInt8toFp32Part1_4x4);
-    vec0 *= uint8scale_In;
-    vec1 *= uint8scale_In;
-    vec0 = _leakyRelu_func(vec0, alpha) * uint8qscale_Out + uint8ZP_Out;
-    vec1 = _leakyRelu_func(vec1, alpha) * uint8qscale_Out + uint8ZP_Out;
-    dst0 = convert_int4_rte(vec0);
-    dst1 = convert_int4_rte(vec1);
-    VXC_DP2x8(src0, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact8Bit_2x8);
-    VXC_WriteImage2DArray(output, coord, src0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, paraHlf, para_s16, 2);
+    _viv_asm(CONV, paraFp, paraHlf);
+
+    vxc_float4 maxData0 = imgData0 > 0 ? imgData0 : 0.0;
+    vxc_float4 maxData1 = imgData1 > 0 ? imgData1 : 0.0;
+    vxc_float4 minData0 = imgData0 < 0 ? imgData0 : 0.0;
+    vxc_float4 minData1 = imgData1 < 0 ? imgData1 : 0.0;
+    tmpOut0 = maxData0 + paraFp * minData0;
+    tmpOut1 = maxData1 + paraFp * minData1;
+
+    tmpVal0 = convert_int4_rte(tmpOut0 * outputScale + outputZP);
+    tmpVal1 = convert_int4_rte(tmpOut1 * outputScale + outputZP);
+    VXC_DP2x8(outval, tmpVal0, tmpVal1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), uniConvertInt32toUint8_2x8);
+    VXC_WriteImage2DArray(output, coord, outval, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
-__kernel void vxcLeakyRelu_UInt8_2D (
-    __read_only image2d_array_t   input,
-    float   alpha,
-    __write_only image2d_array_t  output)
+
+__kernel void vxLeakyRelu_F16toI16
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
 {
-    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(1), get_global_id(1));
-    vxc_uchar8 src0, src1, src2, src3;
-    vxc_float4 vec0, vec1;
-    VXC_ReadImage(src0, input,  coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage(src1, input,  coord.xy, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage(src2, input,  coord.xy, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage(src3, input,  coord.xy, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
-    coord.zw += (int2)(1, 2);
+    int gidx = get_global_id(0);
+    int gidy = get_global_id(1);
+    int gidz = get_global_id(2);
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_para = (int4)(coord.z, 0, 0, 0);
 
-    vxc_uchar8 zeroPoint;
-    _viv_asm(COPY, zeroPoint, uint8ZP_In, 4);
-    VXC_DP4x4(vec0, src0, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), uniUInt8toFp32Part0_4x4);
-    VXC_DP4x4(vec1, src0, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), uniUInt8toFp32Part1_4x4);
-    vec0 *= uint8scale_In;
-    vec1 *= uint8scale_In;
-    vec0 = _leakyRelu_func(vec0, alpha) * uint8qscale_Out + uint8ZP_Out;
-    vec1 = _leakyRelu_func(vec1, alpha) * uint8qscale_Out + uint8ZP_Out;
-    int4 dst0, dst1;
-    dst0 = convert_int4_rte(vec0);
-    dst1 = convert_int4_rte(vec1);
-    VXC_DP2x8(src0, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact8Bit_2x8);
-    VXC_WriteImage(output, coord.xy, src0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
-    coord.y += 3;
+    vxc_short8 img_s16, para_s16;
+    vxc_half8 img_fp16;
+    half paraHlf;
+    float paraFp;
+    vxc_float4 p4;
+    vxc_short8 outval;
+    vxc_float4 imgData0, imgData1;
+    vxc_float4 tmpOut0, tmpOut1;
+    vxc_int4 tmpVal0, tmpVal1;
 
-    VXC_DP4x4(vec0, src1, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), uniUInt8toFp32Part0_4x4);
-    VXC_DP4x4(vec1, src1, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), uniUInt8toFp32Part1_4x4);
-    vec0 *= uint8scale_In;
-    vec1 *= uint8scale_In;
-    vec0 = _leakyRelu_func(vec0, alpha) * uint8qscale_Out + uint8ZP_Out;
-    vec1 = _leakyRelu_func(vec1, alpha) * uint8qscale_Out + uint8ZP_Out;
-    dst0 = convert_int4_rte(vec0);
-    dst1 = convert_int4_rte(vec1);
-    VXC_DP2x8(src0, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact8Bit_2x8);
-    VXC_WriteImage(output, coord.xz, src0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(img_s16, input, coord, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    half alpha_hlf;
+    _viv_asm(CONV, alpha_hlf, alpha);
+    _viv_asm(COPY, para_s16, alpha_hlf, 4);
 
-    VXC_DP4x4(vec0, src2, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), uniUInt8toFp32Part0_4x4);
-    VXC_DP4x4(vec1, src2, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), uniUInt8toFp32Part1_4x4);
-    vec0 *= uint8scale_In;
-    vec1 *= uint8scale_In;
-    vec0 = _leakyRelu_func(vec0, alpha) * uint8qscale_Out + uint8ZP_Out;
-    vec1 = _leakyRelu_func(vec1, alpha) * uint8qscale_Out + uint8ZP_Out;
-    dst0 = convert_int4_rte(vec0);
-    dst1 = convert_int4_rte(vec1);
-    VXC_DP2x8(src0, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact8Bit_2x8);
-    VXC_WriteImage(output, coord.xw, src0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, img_fp16, img_s16, 16);
+    VXC_DP4x4(imgData0, img_fp16, img_fp16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertDirInt16Fp32_4x4);
+    VXC_DP4x4(imgData1, img_fp16, img_fp16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertEndInt16Fp32_4x4);
 
-    VXC_DP4x4(vec0, src3, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), uniUInt8toFp32Part0_4x4);
-    VXC_DP4x4(vec1, src3, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardInf, 0), uniUInt8toFp32Part1_4x4);
-    vec0 *= uint8scale_In;
-    vec1 *= uint8scale_In;
-    vec0 = _leakyRelu_func(vec0, alpha) * uint8qscale_Out + uint8ZP_Out;
-    vec1 = _leakyRelu_func(vec1, alpha) * uint8qscale_Out + uint8ZP_Out;
-    dst0 = convert_int4_rte(vec0);
-    dst1 = convert_int4_rte(vec1);
-    VXC_DP2x8(src0, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact8Bit_2x8);
-    VXC_WriteImage(output, coord.xy, src0, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, paraHlf, para_s16, 2);
+    _viv_asm(CONV, paraFp, paraHlf);
+
+    vxc_float4 maxData0 = imgData0 > 0 ? imgData0 : 0.0;
+    vxc_float4 maxData1 = imgData1 > 0 ? imgData1 : 0.0;
+    vxc_float4 minData0 = imgData0 < 0 ? imgData0 : 0.0;
+    vxc_float4 minData1 = imgData1 < 0 ? imgData1 : 0.0;
+    tmpOut0 = maxData0 + paraFp * minData0;
+    tmpOut1 = maxData1 + paraFp * minData1;
+    tmpOut0 *= outputScale;
+    tmpOut1 *= outputScale;
+
+    tmpVal0 = convert_int4_rte(tmpOut0);
+    tmpVal1 = convert_int4_rte(tmpOut1);
+
+    VXC_DP2x8(outval, tmpVal0, tmpVal1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), uniConvertInt32toUint8_2x8);
+    VXC_WriteImage2DArray(output, coord, outval, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }

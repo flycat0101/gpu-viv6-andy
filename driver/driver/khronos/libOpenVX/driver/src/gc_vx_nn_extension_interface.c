@@ -9429,8 +9429,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNLeakyReluLayer_Initializer(vx_node nod
     vx_tensor inputs                     = (vx_tensor)parameters[0];
     vx_scalar negative_slopes            = (vx_scalar)parameters[1];
     vx_tensor outputs                    = (vx_tensor)parameters[2];
-    vx_enum   inputFormat                = TENSOR_DATA_TYPE(inputs);
-    vx_enum   outputFormat               = TENSOR_DATA_TYPE(outputs);
+    vx_enum   srcFormat                  = TENSOR_DATA_TYPE(inputs);
+    vx_enum   dstFormat                  = TENSOR_DATA_TYPE(outputs);
     vx_uint32 batchCount                 = TENSOR_SIZE_INDEX(inputs, 3);
     vx_bool   shExe_flag                 = vx_false_e;
 
@@ -9460,9 +9460,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNLeakyReluLayer_Initializer(vx_node nod
                           activationLayer->operations,
                           vxnneLayer_Deinitialize);
 
-    shExe_flag  = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT8) && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_INT8))
-                          ||(inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
-                          ||(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
+    shExe_flag  = (vx_bool)((srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
+                          || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_FLOAT16)
+                          || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_INT8)
+                          || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_FLOAT16)
+                          || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_INT16)
+                          || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_FLOAT16)
+                          || (srcFormat == VX_TYPE_FLOAT16 && dstFormat != VX_TYPE_FLOAT32));
 
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_ACTIVATION) &&
         vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs) &&
