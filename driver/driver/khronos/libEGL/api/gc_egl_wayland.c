@@ -73,6 +73,7 @@ typedef struct __WLEGLSurfaceRec
     int nr_buffers;
     __WLEGLBuffer buffers;
     int next;
+    int enable_tile_status;
 
     int indequeue;
 
@@ -1010,6 +1011,7 @@ __wl_egl_surface_create(struct wl_egl_window *window)
     egl_surface->swap_interval = 1;
     egl_surface->frame_callback = gcvNULL;
     egl_surface->client_fence_fd = -1;
+    egl_surface->enable_tile_status = 1;
 
     pthread_mutex_init(&egl_surface->commit_mutex, NULL);
 
@@ -1341,9 +1343,12 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
     surface = buffer->info.surface;
 
 #if gcdENABLE_3D
-    wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
-        !surface->tileStatusDisabled[0], surface->compressed,
-        surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
+    if (egl_surface->enable_tile_status)
+    {
+        wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
+            !surface->tileStatusDisabled[0], surface->compressed,
+            surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
+    }
 #else
     wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf, 0, 0, 0, 0, 0);
 #endif
@@ -1447,9 +1452,12 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
 
     surface = buffer->info.surface;
 #if gcdENABLE_3D
-    wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
-        !surface->tileStatusDisabled[0], surface->compressed,
-        surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
+    if(egl_surface->enable_tile_status)
+    {
+        wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf,
+            !surface->tileStatusDisabled[0], surface->compressed,
+            surface->dirty[0], surface->fcValue[0], surface->fcValueUpper[0]);
+    }
 #else
     wl_viv_enable_tile_status(display->wl_viv, buffer->wl_buf, 0, 0, 0, 0, 0);
 #endif
@@ -1956,11 +1964,13 @@ _BindWindow(
             if (texMode >= VEGL_DIRECT_RENDERING_FC_NOCC)
             {
                 renderMode = VEGL_DIRECT_RENDERING_FC_NOCC;
+                egl_surface->enable_tile_status = 1;
             }
 
             if (texMode == VEGL_DIRECT_RENDERING)
             {
                 renderMode = VEGL_DIRECT_RENDERING;
+                egl_surface->enable_tile_status = 1;
             }
 #    endif
         }
