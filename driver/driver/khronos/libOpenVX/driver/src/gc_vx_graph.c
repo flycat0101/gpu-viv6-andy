@@ -7105,7 +7105,7 @@ VX_PRIVATE_API vx_status vxoGraph_AdapterFindParams(vx_graph graph, vx_internal_
 
             if (tensor != VX_NULL)
             {
-                if (vxoGraph_OptCheckDependency(graph, node, param, node->kernel->signature.directionTable[j]))
+                if (vxoGraph_OptCheckDependency(graph, node, (vx_reference)tensor, node->kernel->signature.directionTable[j]))
                 {
                      vx_parameter p;
                     if (TENSOR_RANK(tensor) == VX_TENSOR_RANK_SN || (TENSOR_RANK(tensor) == VX_TENSOR_RANK_CWHN && tensor->dimCount != 4))
