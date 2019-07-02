@@ -725,6 +725,19 @@ VkResult __vk_QueueCommit(
             uint8_t *dumpLogical;
             uint32_t dumpBytes;
 
+            if (iface.u.Commit.contextSwitched)
+            {
+                /* Dump current context buffer. */
+                gcmDUMP_BUFFER(gcvNULL,
+                               gcvDUMP_BUFFER_CONTEXT,
+                               devCtx->context[devCtx->option->affinityCoreID],
+                               devCtx->contextLogical[devCtx->currentContext],
+                               0,
+                               devCtx->contextBytes);
+
+                /* Advance to next context buffer. */
+                devCtx->currentContext = (devCtx->currentContext + 1) % gcdCONTEXT_BUFFER_COUNT;
+            }
 
             dumpLogical = (gctUINT8_PTR) gcmUINT64_TO_PTR(commandBuffer->logical)
                         + commandBuffer->startOffset

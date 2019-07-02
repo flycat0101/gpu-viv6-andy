@@ -2375,7 +2375,8 @@ _Commit(
                                        subCommit,
                                        ProcessId,
                                        Commit->shared,
-                                       &Commit->commitStamp);
+                                       &Commit->commitStamp,
+                                       &Commit->contextSwitched);
 
             if (status != gcvSTATUS_INTERRUPTED)
             {

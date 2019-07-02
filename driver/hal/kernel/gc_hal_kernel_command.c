@@ -2174,7 +2174,8 @@ _CommitWaitLinkOnce(
     IN gcsHAL_COMMAND_LOCATION * CommandBuffer,
     IN gcsSTATE_DELTA_PTR StateDelta,
     IN gctUINT32 ProcessID,
-    IN gctBOOL Shared
+    IN gctBOOL Shared,
+    INOUT gctBOOL *contextSwitched
     )
 {
     gceSTATUS status;
@@ -2445,6 +2446,11 @@ _CommitWaitLinkOnce(
 
         /* Update the current context. */
         Command->currContext = Context;
+
+        if (contextSwitched)
+        {
+            *contextSwitched = gcvTRUE;
+        }
 
 #if gcdDUMP_IN_KERNEL
         contextDumpLogical = entryLogical;
@@ -3196,8 +3202,8 @@ OnError:
 **          Current process ID.
 **
 **  OUTPUT:
-**
-**      Nothing.
+**      gctBOOL *contextSwitched
+**          pass context Switch flag to upper
 */
 gceSTATUS
 gckCOMMAND_Commit(
@@ -3205,7 +3211,8 @@ gckCOMMAND_Commit(
     IN gcsHAL_SUBCOMMIT * SubCommit,
     IN gctUINT32 ProcessId,
     IN gctBOOL Shared,
-    OUT gctUINT64_PTR CommitStamp
+    OUT gctUINT64_PTR CommitStamp,
+    INOUT gctBOOL *contextSwitched
     )
 {
     gceSTATUS status;
@@ -3274,7 +3281,8 @@ gckCOMMAND_Commit(
                                          cmdLoc,
                                          delta,
                                          ProcessId,
-                                         Shared);
+                                         Shared,
+                                         contextSwitched);
         }
         else if (Command->feType == gcvHW_FE_MULTI_CHANNEL)
         {

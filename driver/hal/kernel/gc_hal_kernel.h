@@ -2169,7 +2169,8 @@ gckCOMMAND_Commit(
     IN gcsHAL_SUBCOMMIT * SubCommit,
     IN gctUINT32 ProcessId,
     IN gctBOOL Shared,
-    OUT gctUINT64_PTR CommitStamp
+    OUT gctUINT64_PTR CommitStamp,
+    INOUT gctBOOL *contextSwitched
     );
 
 /* Reserve space in the command buffer. */

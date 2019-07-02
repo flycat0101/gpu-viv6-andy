@@ -787,6 +787,8 @@ typedef struct _gcsHAL_COMMIT
 
     gctBOOL                     shared;
 
+    gctBOOL                     contextSwitched;
+
     /* Commit stamp of this commit. */
     OUT gctUINT64               commitStamp;
 }
