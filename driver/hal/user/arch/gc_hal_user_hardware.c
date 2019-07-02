@@ -3199,6 +3199,7 @@ if (smallBatch){    Config->vsConstBase  = 0xD000;
     Config->nnConfig.customizedFeature.vipSRAMSize = featureDatabase->VIP_SRAM_SIZE;
     Config->nnConfig.customizedFeature.axiSRAMSize = featureDatabase->AXI_SRAM_SIZE;
 
+#ifndef __QNXNTO__
     {
         gctSTRING envctrl = gcvNULL;
 
@@ -3218,6 +3219,8 @@ if (smallBatch){    Config->vsConstBase  = 0xD000;
             Config->parallelBug = 1;
         }
     }
+#endif
+
 #endif
 
     /* Return the status. */
