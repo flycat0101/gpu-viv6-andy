@@ -25843,7 +25843,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorStrideSlice_Initializer(vx_node 
         conv.tp_value->u32[0] = (vx_uint32)VX_GET_DATA_FROM_TENSOR(begin_dims, 0);
         conv.tp_value->u32[1] = TENSOR_VIEW_SIZE_INDEX(begin_dims, 0) > 1 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(begin_dims, 1) : 0;
         conv.tp_value->u32[2] = (vx_uint32)VX_GET_DATA_FROM_TENSOR(end_dims, 0);
-        conv.tp_value->u32[3] = TENSOR_VIEW_SIZE_INDEX(end_dims, 0) > 1 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(end_dims, 1) : 0;
+        conv.tp_value->u32[3] = TENSOR_VIEW_SIZE_INDEX(end_dims, 0) > 1 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(end_dims, 1) : 1;
         conv.tp_value->u32[4] = (vx_uint32)VX_GET_DATA_FROM_TENSOR(stride_dims, 0); /* stride x*/
         conv.tp_value->u32[5] = TENSOR_VIEW_SIZE_INDEX(stride_dims, 0) > 1 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(stride_dims, 1) : 1; /* stride y*/
 
