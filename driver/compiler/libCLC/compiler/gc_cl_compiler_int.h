@@ -22,7 +22,7 @@
 /*#define CL_SCAN_NO_ACTION*/
 /*#define CL_SCAN_NO_PREPROCESSOR*/
 
-#define __USE_VSC_MP__              0
+#define __USE_VSC_MP__              1
 
 typedef    gctUINT            gctLABEL;
 
