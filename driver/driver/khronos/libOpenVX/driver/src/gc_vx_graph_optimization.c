@@ -1624,9 +1624,23 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeWithChildNodes(vx_node node)
     vx_uint32 nodeIndex = 0;
     vx_enum opType = OP_INVALID;
     vx_enum currNodeType;
+    vx_enum features[][2] = {
+        OP_CONVOLUTION, OP_RELU | OP_POOLING, /*conv + relu + pool = convrelupool*/
+        OP_FULLYCONNECTED, OP_RELU, /*fc + relu = fcRelu*/
+        OP_ROIPOOL, OP_RELU, /*roipool + relu = roipoolrelu*/
+    };
+
+    vx_enum allFeatures = 0;
+    vx_uint32 featuresNum = sizeof(features)/(2 * sizeof(vx_enum));
+    vx_uint32 i = 0;
 
     gcmHEADER_ARG("node=%p", node);
     vxmASSERT(node);
+
+    for(i = 0; i < featuresNum; i++)
+    {
+        allFeatures |= features[i][0];
+    }
 
     /* find the head node for merging, convolution or FC. */
     if(!vxoNode_IsConvNode(node) && !vxoNode_IsFCNode(node) && vxoGraphOptimization_getKernelType(node) != OP_ROIPOOL)
@@ -1663,32 +1677,23 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeWithChildNodes(vx_node node)
         if(opType & currNodeType)
             break;
 
-        if((opType & OP_CONVOLUTION) &&
-              (((currNodeType & (OP_RELU | OP_POOLING))  == 0) ||
-                ((currNodeType & (OP_FULLYCONNECTED | OP_ROIPOOL)) != 0)
-              )
-          )
-            break;
-
-        if((opType & OP_FULLYCONNECTED) &&
-            (
-                ((currNodeType & OP_RELU)== 0) || ((currNodeType & (OP_CONVOLUTION | OP_ROIPOOL)) != 0)
-            )
-          )
-            break;
-
-        if((opType & OP_ROIPOOL) &&
-            (
-                ((currNodeType & OP_RELU) == 0) ||
-                ((currNodeType & (OP_CONVOLUTION | OP_FULLYCONNECTED)) != 0)
-            )
-          )
-            break;
+        /*only do one feature per time, check the merge condition*/
+        for(i = 0; i < featuresNum; i++)
+        {
+            if(opType & features[i][0])
+            {
+                if((currNodeType & (allFeatures ^ features[i][0])) != 0)
+                    goto merge;
+                if((currNodeType & features[i][1]) == 0 )
+                    goto merge;
+            }
+        }
 
         opType |= currNodeType;
         mergedNodes[nodeCount] = next;
     }
 
+merge:
     /* merging Convolution or FC */
     if(opType & OP_CONVOLUTION)
     {
