@@ -2355,7 +2355,11 @@ void syncIfNeed(Model model, std::vector<VxRunTimeReferenceInfo> infos)
         vx_int32 item_size = (info.type == OperandType::TENSOR_QUANT8_ASYMM)?sizeof(vx_uint8):sizeof(vx_float32);
         vx_int32 count = sizeOfData(info.type, info.dimensions)/item_size;
 
-        memcpy(info.original, info.buffer, count * item_size);
+        /*Maybe we can not get tensor's internal memory address*/
+        if(info.buffer)
+            memcpy(info.original, info.buffer, count * item_size);
+        else
+            copyConstData2Tensor( (vx_tensor &)info.ref , info.original, VX_READ_ONLY);
 
     }
 }
