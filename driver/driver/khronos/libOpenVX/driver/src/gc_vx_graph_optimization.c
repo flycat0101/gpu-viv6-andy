@@ -230,12 +230,12 @@ VX_INTERNAL_API vx_enum vxoGraph_getKernelType(vx_node node)
             {
                 vx_uint32 poolx = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_SIZE_X_INDEX], u32);
                 vx_uint32 pooly = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_SIZE_Y_INDEX], u32);
-                if(poolx == pooly && pad[0]== 0 && pad[2]== 0  &&
+                if(poolx == pooly && pad[0]== 0 && pad[2]== 0  && pad[1]== 0 && pad[3]== 0 &&
                     (poolx == 2 || (poolx == 3 &&  !vxoGraphOptimization_isV8((vx_reference)node)) )
                   )
                 {
-                    if((input_w - kernelx + pad[0] + pad[2]) % stride_x != 0 ||
-                        (input_h - kernely + pad[1] + pad[3]) % stride_y != 0 )
+                    if((input_w - kernelx + pad[0] + pad[1]) % stride_x != 0 ||
+                        (input_h - kernely + pad[2] + pad[3]) % stride_y != 0 )
                         break;
                     else if(((TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE && TENSOR_DATA_TYPE(input) == VX_TYPE_UINT8) ||
                                (TENSOR_QUANT_TYPE(input) == VX_QUANT_DYNAMIC_FIXED_POINT && TENSOR_DATA_TYPE(input) == VX_TYPE_INT8)) &&
