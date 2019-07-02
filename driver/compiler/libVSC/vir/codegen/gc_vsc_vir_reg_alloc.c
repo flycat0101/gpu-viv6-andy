@@ -6255,8 +6255,10 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
     else if (pShader->shaderKind == VIR_SHADER_FRAGMENT &&
              VIR_RA_LS_GetHwCfg(pRA)->hwFeatureFlags.hasHalti5)
     {
-        /* skip .z in make color if sampleMaskId use .w */
-        gctUINT channels = ((pShader->sampleMaskIdRegStart == 0) && (pShader->sampleMaskIdChannelStart == CHANNEL_W))? 0xA : 0xF;
+        /* skip .z in make color if sampleMaskId use .w (if sampleMaskID use .w, means shader has .depth which uses r0.z)
+         * if sampleMaskId use .z, keep .w unused for other special attributes usage, like gl_layer
+         */
+        gctUINT channels = ((pShader->sampleMaskIdRegStart == 0) && (pShader->sampleMaskIdChannelStart == CHANNEL_W))? 0xB : 0x7;
         _VIR_RA_LS_SetUsedColor(pRA, VIR_RA_HWREG_GR, 0,
             (pShader->sampleMaskIdRegStart == 0 && VIR_Shader_PS_NeedSampleMaskId(pShader)) ? channels : 0x3);
         _VIR_RA_MakeColor(0, 0, &LRColor);
