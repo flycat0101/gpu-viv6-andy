@@ -10250,7 +10250,7 @@ gcSHADER_CompileBuiltinLibrary(
         }
     }
 
-    if (gcSHADER_DumpCodeGenVerbose(*Binary))
+    if (gcSHADER_DumpCodeGenVerbose(*Binary) && gcmGetOptimizerOption()->includeLib)
     {
         gcOpt_Dump(gcvNULL, "Library Shader", gcvNULL, *Binary);
     }

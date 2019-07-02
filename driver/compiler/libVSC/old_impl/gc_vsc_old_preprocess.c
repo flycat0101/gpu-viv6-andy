@@ -1824,6 +1824,7 @@ gcSHADER_LinkBuiltinLibs(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT   i;
+    gctBOOL   isChanged = gcvFALSE;
 
     for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i ++)
     {
@@ -1860,6 +1861,8 @@ gcSHADER_LinkBuiltinLibs(
 
             /* after patch successfully, reset the flag */
             SetShaderNeedPatchForCentroid(Shaders[i], gcvFALSE);
+
+            isChanged = gcvTRUE;
         }
 
         if (GetShaderHasIntrinsicBuiltin(Shaders[i]))
@@ -1895,6 +1898,8 @@ gcSHADER_LinkBuiltinLibs(
             {
                 gcSHADER_MergeCompileTimeInitializedUniforms(Shaders[i], libBinary);
             }
+
+            isChanged = gcvTRUE;
         }
         if (Shaders[i]->type == gcSHADER_TYPE_CL &&
             gcmOPT_oclInt64InVIR() && gcShaderHasInt64(Shaders[i]))
@@ -1902,6 +1907,8 @@ gcSHADER_LinkBuiltinLibs(
             gcmONERROR(gcSHADER_PatchInt64(Shaders[i]));
 
             gcShaderClrHasInt64(Shaders[i]);
+
+            isChanged = gcvTRUE;
         }
 #endif
 
@@ -1920,13 +1927,18 @@ gcSHADER_LinkBuiltinLibs(
 
             /* after linking successfully, reset the flag */
             ClearShaderOutputBlends(Shaders[i]);
+
+            isChanged = gcvTRUE;
         }
 
         /* After link all built-in functions, analyze them. */
         gcmONERROR(gcSHADER_AnalyzeFunctions(Shaders[i], gcvFALSE));
         if (gcSHADER_DumpCodeGenVerbose(Shaders[i]))
         {
-            gcDump_Shader(gcvNULL, "Shader after LinkBuiltinLibs ", gcvNULL, Shaders[i], gcvTRUE);
+            if (isChanged)
+                gcDump_Shader(gcvNULL, "Shader after LinkBuiltinLibs ", gcvNULL, Shaders[i], gcvTRUE);
+            else
+                gcmPRINT("Shader (id:%d) after LinkBuiltinLibs: No Change\n", Shaders[i]->_id);
         }
     }
 
