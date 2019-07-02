@@ -4059,6 +4059,8 @@ VX_INTERNAL_API vx_status vxoGraph_Optimization(vx_graph graph)
     if(vxoGraphOptimization_isV8((vx_reference)graph))
         vxoGraph_Optimization_splitMaxpFromCRL2(graph);
 
+    if(context->options.enableGraphDump)
+        vxmONERROR(vxoGraph_Optimization_dumpTopology(graph, "final_graph_topology.json"));
 OnError:
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
