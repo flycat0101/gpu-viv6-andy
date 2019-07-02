@@ -835,6 +835,15 @@ VIR_Lower_IsDstFourEnables(
 }
 
 gctBOOL
+VIR_Lower_IsDstMoreThanOneEnable(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return !VIR_Lower_IsDstOneEnable(Context, Inst);
+}
+
+gctBOOL
 VIR_Lower_IsDstBool(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -1468,6 +1477,29 @@ VIR_Lower_SetHighp(
     }
 
     VIR_Operand_SetPrecision(Opnd, VIR_PRECISION_HIGH);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_ReverseCondOp(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_ConditionOp condOp = VIR_Inst_GetConditionOp(Inst);
+    VIR_Inst_SetConditionOp(Inst, VIR_ConditionOp_Reverse(condOp));
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_ResetCondOp(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Inst_SetConditionOp(Inst, VIR_COP_ALWAYS);
     return gcvTRUE;
 }
 

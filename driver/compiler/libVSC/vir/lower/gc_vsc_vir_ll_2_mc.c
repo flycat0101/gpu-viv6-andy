@@ -58,16 +58,12 @@ _dual16Req(
 }
 
 static gctBOOL
-_setIntegerType(
+_hasNotHalti4OrDual16Req(
     IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
+    IN VIR_Instruction    *Inst
     )
 {
-    VIR_Operand_SetTypeId(Opnd, VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_INT32,
-        VIR_GetTypeComponents(VIR_Lower_GetBaseType(Context->shader, Opnd)), 1));
-
-    return gcvTRUE;
+    return VIR_Lower_HasNoHalti4(Context, Inst) || _dual16Req(Context, Inst);
 }
 
 static gctBOOL
@@ -359,27 +355,38 @@ _shouldSetHelper(
     return gcvTRUE;
 }
 
-/* cmov.cond    dst, src0, src1, src2 */
-    /* cmp.cond         dst0, src0, src1*/
-    /* select.selmsb    dst, dst0, src1, src2  */
+/*
+** Since CMOV is a conditional write, when we convert it to the instruction pair CMP&SELECT,
+** the src2 of SELECT may not have any DEFs, which cause some issues in RA/LV.
+** The best solution is analyze the DU and add an initialization for this CMOV if needed, right now we just change CMOV back to JMP.
+** And CMOV is a component-select instruction, but BARNCH is not, so before using BRANCH to replace CMOV, we need to expand CMOV first.
+*/
 static VIR_PatternMatchInst _cmovPatInst0[] = {
-    { VIR_OP_CMOV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_HasNoHalti4, _dual16Req }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_CMOV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { _hasNotHalti4OrDual16Req, VIR_Lower_IsDstMoreThanOneEnable }, VIR_PATN_MATCH_FLAG_AND },
 };
 
-/* CMP, if dest.type is not float,
-   dest = cond_op(src0, src1) ? 0xFFFFFFFF: 0,
-   thus, we can use SELMSB condition for select.
-   Using SELMSB, we can resolve the issue that select has one instruction type to control
-   comparison and implicit converstion */
+
 static VIR_PatternReplaceInst _cmovRepInst0[] = {
-    { VIR_OP_COMPARE, -1, 0, { -1, 2, 3, 0 }, { _setIntegerType } },
-    { VIR_OP_CSELECT, VIR_COP_SELMSB, 0, {  1, -1, 4, 1 }, { 0 } }
+    { VIR_OP_CMOV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _cmovPatInst1[] = {
+    { VIR_OP_CMOV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { _hasNotHalti4OrDual16Req }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+
+static VIR_PatternReplaceInst _cmovRepInst1[] = {
+    { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 0, 2, 3, 0 }, { VIR_Lower_ReverseCondOp } },
+    { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 1, 4 }, { VIR_Lower_ResetCondOp } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg2, VIR_Lower_ResetCondOp } },
 };
 
 static VIR_Pattern _cmovPattern[] = {
-    { VIR_PATN_FLAG_NONE, CODEPATTERN(_cmov, 0) },
+    { VIR_PATN_FLAG_EXPAND_COMPONENT_INLINE | VIR_PATN_FLAG_EXPAND_MODE_COMPONENT_O2O | VIR_PATN_FLAG_RECURSIVE_SCAN, CODEPATTERN(_cmov, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_cmov, 1) },
     { VIR_PATN_FLAG_NONE }
 };
+
 
 static VIR_PatternMatchInst _madPatInst0[] = {
     { VIR_OP_MAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsIntOpcode, VIR_Lower_IsDstInt16, VIR_Lower_HasNoHalti4 }, VIR_PATN_MATCH_FLAG_AND },

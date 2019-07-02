@@ -8504,18 +8504,6 @@ static VIR_PatternReplaceInst _cmpRepInst1[] = {
     { VIR_OP_SELECT, -1, 0, { 6, 2, 3, 7 }, { 0 } },
 };
 
-static gctBOOL
-reverseCondOp(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    VIR_ConditionOp condOp = VIR_Inst_GetConditionOp(Inst);
-    VIR_Inst_SetConditionOp(Inst, VIR_ConditionOp_Reverse(condOp));
-    return gcvTRUE;
-}
-
 static VIR_PatternMatchInst _cmpPatInst2[] = {
     { VIR_OP_COMPARE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_RSHIFT, VIR_PATTERN_ANYCOND, 0, { 4, 1, 5, 0 }, { 0, 0, _isSrc1ConstInteger31 }, VIR_PATN_MATCH_FLAG_OR },
@@ -8524,7 +8512,7 @@ static VIR_PatternMatchInst _cmpPatInst2[] = {
 };
 
 static VIR_PatternReplaceInst _cmpRepInst2[] = {
-    { VIR_OP_SELECT, -1, 0, { 6, 3, 2, 3 }, { reverseCondOp } },
+    { VIR_OP_SELECT, -1, 0, { 6, 3, 2, 3 }, { VIR_Lower_ReverseCondOp } },
 };
 
 static VIR_Pattern _cmpPattern[] = {

@@ -3752,18 +3752,6 @@ no_source(
 }
 
 static gctBOOL
-reverseCondOp(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    VIR_ConditionOp condOp = VIR_Inst_GetConditionOp(Inst);
-    VIR_Inst_SetConditionOp(Inst, VIR_ConditionOp_Reverse(condOp));
-    return gcvTRUE;
-}
-
-static gctBOOL
 setCondOpCompareWithZero(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -8177,7 +8165,7 @@ static VIR_PatternMatchInst _jmpcPatInst0[] = {
 };
 
 static VIR_PatternReplaceInst _jmpcRepInst0[] = {
-    { VIR_OP_CMOV, -1, 0, { 4, 2, 3, 5 }, { reverseCondOp } }
+    { VIR_OP_CMOV, -1, 0, { 4, 2, 3, 5 }, { VIR_Lower_ReverseCondOp } }
 };
 
 static VIR_PatternMatchInst _jmpcPatInst1[] = {
@@ -8190,7 +8178,7 @@ static VIR_PatternMatchInst _jmpcPatInst1[] = {
 };
 
 static VIR_PatternReplaceInst _jmpcRepInst1[] = {
-    { VIR_OP_SET, -1, 0, { 4, 2, 3, }, { reverseCondOp } },
+    { VIR_OP_SET, -1, 0, { 4, 2, 3, }, { VIR_Lower_ReverseCondOp } },
 };
 
 static VIR_PatternMatchInst _jmpcPatInst2[] = {
@@ -8216,7 +8204,7 @@ static VIR_PatternMatchInst _jmpcPatInst3[] = {
 };
 
 static VIR_PatternReplaceInst _jmpcRepInst3[] = {
-    { VIR_OP_CMP, -1, 0, {  4, 2, 3, 0 }, { reverseCondOp, 0, 0, VIR_Lower_SetIntOne } },
+    { VIR_OP_CMP, -1, 0, {  4, 2, 3, 0 }, { VIR_Lower_ReverseCondOp, 0, 0, VIR_Lower_SetIntOne } },
 };
 
 static VIR_PatternMatchInst _jmpcPatInst4[] = {
@@ -8299,7 +8287,7 @@ static VIR_PatternMatchInst _jmpcPatInst9[] = {
 };
 
 static VIR_PatternReplaceInst _jmpcRepInst9[] = {
-    { VIR_OP_KILL, -1, 0, { 0, 2, 3, 0 }, { reverseCondOp } }
+    { VIR_OP_KILL, -1, 0, { 0, 2, 3, 0 }, { VIR_Lower_ReverseCondOp } }
 };
 
 /* JMPC.ne          #sh_383, bool hp  temp(4272).hp.x, bool false
@@ -8350,7 +8338,7 @@ static VIR_PatternMatchInst _jmpcPatInst12[] = {
 };
 
 static VIR_PatternReplaceInst _jmpcRepInst12[] = {
-    { VIR_OP_JMPC, -1, 0, { 4, 2, 3, 0 }, { reverseCondOp } }
+    { VIR_OP_JMPC, -1, 0, { 4, 2, 3, 0 }, { VIR_Lower_ReverseCondOp } }
 };
 
 static VIR_Pattern _jmpcPattern[] = {

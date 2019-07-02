@@ -330,6 +330,12 @@ VIR_Lower_IsDstFourEnables(
     );
 
 gctBOOL
+VIR_Lower_IsDstMoreThanOneEnable(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
 VIR_Lower_IsDstBool(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -675,6 +681,20 @@ VIR_Lower_SetPrecisionBaseOnSrc0(
 
 gctBOOL
 VIR_Lower_SetHighp(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_ReverseCondOp(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_ResetCondOp(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
     IN VIR_Operand        *Opnd
