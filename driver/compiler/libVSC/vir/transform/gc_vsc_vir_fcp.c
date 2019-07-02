@@ -1936,18 +1936,6 @@ _changeConvDataType(IN VIR_Instruction    *Inst)
     }
 }
 
-DEF_QUERY_PASS_PROP(vscVIR_PostCGCleanup)
-{
-    pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
-
-    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
-}
-
-DEF_SH_NECESSITY_CHECK(vscVIR_PostCGCleanup)
-{
-    return gcvTRUE;
-}
-
 static VSC_ErrCode _SetResOpBitsForSampler(VIR_Shader *pShader,
                                            VIR_Instruction* texldInst,
                                            VIR_Instruction* InstGetSamplerIdx)
@@ -2094,13 +2082,15 @@ VSC_ErrCode _markUSCUnallocFlag(
 }
 
 static gctBOOL
-_IsSrc0Float16(
+_IsOperandFloat16(
     IN VIR_Shader*          pShader,
-    IN VIR_Instruction*     pInst
+    IN VIR_Instruction*     pInst,
+    IN gctBOOL              bDst,
+    IN gctUINT32            srcIndex
     )
 {
-    VIR_Operand*            pSrc0Opnd = VIR_Inst_GetSource(pInst, 0);
-    VIR_TypeId              typeId = VIR_Operand_GetTypeId(pSrc0Opnd);
+    VIR_Operand*            pOpnd = bDst ?  VIR_Inst_GetDest(pInst) : VIR_Inst_GetSource(pInst, srcIndex);
+    VIR_TypeId              typeId = VIR_Operand_GetTypeId(pOpnd);
     VIR_TypeId              componentTypeId = VIR_GetTypeComponentType(typeId);
 
     if (VIR_Shader_isDual16Mode(pShader) &&
@@ -2230,6 +2220,115 @@ _VIR_FCP_UpdateEnableSwizzleInHighpVec2Dual16(
     }
 
 }
+
+static VSC_ErrCode
+_VIR_FCP_ModifyFP16Instruction(
+    IN VIR_Shader*      pShader,
+    IN VIR_Function*    pFunc,
+    IN VIR_Instruction* pInst,
+    INOUT gctBOOL*      pChanged
+    )
+{
+    VSC_ErrCode         status = VSC_ERR_NONE;
+    VIR_OpCode          opCode = VIR_Inst_GetOpcode(pInst);
+    gctBOOL             bChanged = gcvFALSE;
+
+    /*
+    ** Because HW can't support MOV.f16, we need to convert it to CONV.f16 or MOV.uint16/MOV.int16 based on the dest type.
+    */
+    if (opCode == VIR_OP_MOV && _IsOperandFloat16(pShader, pInst, gcvFALSE, 0))
+    {
+        VIR_Operand*    pDst = VIR_Inst_GetDest(pInst);
+        VIR_TypeId      dstTypeId = VIR_Operand_GetTypeId(pDst);
+        VIR_TypeId      dstCompTypeId = VIR_GetTypeComponentType(dstTypeId);
+        VIR_Operand*    pSrc0 = VIR_Inst_GetSource(pInst, 0);
+        VIR_TypeId      src0TypeId = VIR_Operand_GetTypeId(pSrc0);
+        VIR_TypeId      src0CompTypeId = VIR_TYPE_FLOAT16;
+
+        /* If dest and source have the same type, just change MOV to CONV. */
+        if (dstCompTypeId == VIR_TYPE_FLOAT16)
+        {
+            VIR_Operand*    pNewOpnd = gcvNULL;
+            VIR_Inst_SetOpcode(pInst, VIR_OP_CONV);
+
+            VIR_Function_NewOperand(pFunc, &pNewOpnd);
+            VIR_Inst_SetSrcNum(pInst, 2);
+            VIR_Inst_SetSource(pInst, 1, pNewOpnd);
+
+            VIR_Operand_SetImmediateUint(pNewOpnd, 0x1);
+        }
+        else
+        {
+            if (VIR_TypeId_isFloat(dstCompTypeId))
+            {
+                src0CompTypeId = VIR_TYPE_UINT16;
+            }
+            else if (VIR_TypeId_isUnSignedInteger(dstCompTypeId))
+            {
+                src0CompTypeId = VIR_TYPE_UINT16;
+            }
+            else
+            {
+                src0CompTypeId = VIR_TYPE_INT16;
+            }
+        }
+        src0TypeId = VIR_TypeId_ComposeNonOpaqueType(src0CompTypeId,
+                                                     VIR_GetTypeComponents(src0TypeId),
+                                                     1);
+        VIR_Operand_SetTypeId(pSrc0, src0TypeId);
+
+        bChanged = gcvTRUE;
+    }
+    /* Change STORE_ATTR.fp16 to STORE_ATTR.uint16. */
+    else if (VIR_OPCODE_isAttrSt(opCode) && _IsOperandFloat16(pShader, pInst, gcvFALSE, 2))
+    {
+        VIR_Operand*    pDst = VIR_Inst_GetDest(pInst);
+        VIR_TypeId      dstTypeId = VIR_Operand_GetTypeId(pDst);
+        VIR_Operand*    pSrc2 = VIR_Inst_GetSource(pInst, 2);
+        VIR_TypeId      src2TypeId = VIR_Operand_GetTypeId(pSrc2);
+
+        dstTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_UINT16,
+                                                    VIR_GetTypeComponents(dstTypeId),
+                                                    1);
+        src2TypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_UINT16,
+                                                     VIR_GetTypeComponents(src2TypeId),
+                                                     1);
+        VIR_Operand_SetTypeId(pDst, dstTypeId);
+        VIR_Operand_SetTypeId(pSrc2, src2TypeId);
+        bChanged = gcvTRUE;
+    }
+    else if (VIR_OPCODE_isAttrLd(opCode) && _IsOperandFloat16(pShader, pInst, gcvTRUE, 0))
+    {
+        VIR_Operand*    pDst = VIR_Inst_GetDest(pInst);
+        VIR_TypeId      dstTypeId = VIR_Operand_GetTypeId(pDst);
+
+        dstTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_UINT16,
+                                                    VIR_GetTypeComponents(dstTypeId),
+                                                    1);
+        VIR_Operand_SetTypeId(pDst, dstTypeId);
+        bChanged = gcvTRUE;
+    }
+
+    if (pChanged)
+    {
+        *pChanged = bChanged;
+    }
+
+    return status;
+}
+
+DEF_QUERY_PASS_PROP(vscVIR_PostCGCleanup)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
+
+    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
+}
+
+DEF_SH_NECESSITY_CHECK(vscVIR_PostCGCleanup)
+{
+    return gcvTRUE;
+}
+
 /*********************************************
 * vscVIR_PostCGCleanup
 * After register allocation, perform
@@ -2264,6 +2363,7 @@ VSC_ErrCode vscVIR_PostCGCleanup(
              inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
             gctBOOL bGenInst = gcvFALSE;
+            gctBOOL bFP16Changed = gcvFALSE;
 
             if (VIR_Shader_isDual16Mode(pShader))
             {
@@ -2287,49 +2387,12 @@ VSC_ErrCode vscVIR_PostCGCleanup(
                 }
             }
 
-            /*
-            ** Because HW can't support MOV.f16, we need to convert it to CONV.f16 or MOV.uint16/MOV.int16 based on the dest type.
-            */
-            if (VIR_Inst_GetOpcode(inst) == VIR_OP_MOV && _IsSrc0Float16(pShader, inst))
+            /* Modify FP16 instructions which HW can't native support. */
+            status = _VIR_FCP_ModifyFP16Instruction(pShader, func, inst, &bFP16Changed);
+            ON_ERROR(status, "Convert single temp 256 source.");
+            if (bFP16Changed)
             {
-                VIR_Operand*    pDst = VIR_Inst_GetDest(inst);
-                VIR_TypeId      dstTypeId = VIR_Operand_GetTypeId(pDst);
-                VIR_TypeId      dstCompTypeId = VIR_GetTypeComponentType(dstTypeId);
-                VIR_Operand*    pSrc0 = VIR_Inst_GetSource(inst, 0);
-                VIR_TypeId      src0TypeId = VIR_Operand_GetTypeId(pSrc0);
-                VIR_TypeId      src0CompTypeId = VIR_TYPE_FLOAT16;
-
-                /* If dest and source have the same type, just change MOV to CONV. */
-                if (dstCompTypeId == VIR_TYPE_FLOAT16)
-                {
-                    VIR_Operand*    pNewOpnd = gcvNULL;
-                    VIR_Inst_SetOpcode(inst, VIR_OP_CONV);
-
-                    VIR_Function_NewOperand(func, &pNewOpnd);
-                    VIR_Inst_SetSrcNum(inst, 2);
-                    VIR_Inst_SetSource(inst, 1, pNewOpnd);
-
-                    VIR_Operand_SetImmediateUint(pNewOpnd, 0x1);
-                }
-                else
-                {
-                    if (VIR_TypeId_isFloat(dstCompTypeId))
-                    {
-                        src0CompTypeId = VIR_TYPE_UINT16;
-                    }
-                    else if (VIR_TypeId_isUnSignedInteger(dstCompTypeId))
-                    {
-                        src0CompTypeId = VIR_TYPE_UINT16;
-                    }
-                    else
-                    {
-                        src0CompTypeId = VIR_TYPE_INT16;
-                    }
-                }
-                src0TypeId = VIR_TypeId_ComposeNonOpaqueType(src0CompTypeId,
-                                                             VIR_GetTypeComponents(src0TypeId),
-                                                             1);
-                VIR_Operand_SetTypeId(pSrc0, src0TypeId);
+                WARNING_REPORT(VSC_ERR_INVALID_DATA, "Modify some FP16 instructions, be careful.");
             }
 
             if (VIR_Inst_GetOpcode(inst) == VIR_OP_GET_SAMPLER_IDX)
@@ -2368,6 +2431,7 @@ VSC_ErrCode vscVIR_PostCGCleanup(
         VIR_LOG_FLUSH(pDumper);
     }
 
+OnError:
     return status;
 }
 
