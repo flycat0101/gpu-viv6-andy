@@ -1354,7 +1354,7 @@ _CreateImageDMABuf(
     }
 
     /* Seems like we can't support different plane with different modifiers.*/
-    modifier0 = modifierLO[0] | (modifierHI[0] < 32);
+    modifier0 = modifierLO[0] | (((EGLuint64KHR)modifierHI[0]) << 32);
 
     if (!modifier0)
     {
