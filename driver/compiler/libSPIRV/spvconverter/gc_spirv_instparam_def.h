@@ -2041,7 +2041,7 @@
         { OperandId, OperandId, },
         { "'Base'", "'Shift'", },
         { gcvNULL },
-        VIR_OP_RSHIFT, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        VIR_OP_LOGICAL_RSHIFT, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* SpvOpShiftRightArithmetic = 195 */

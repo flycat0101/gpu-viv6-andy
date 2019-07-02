@@ -53,8 +53,9 @@
 /* 0.0.1.30 Add some flags in VIR_Shader and hints 04/17/2019 */
 /* 0.0.1.31 Save module processes in VIR_Shader and hints 05/24/2019 */
 /* 0.0.1.32 Add extension flag in VIR_Symbol 05/27/2019 */
-#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 32)
-#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 32)
+/* 0.0.1.33 Add a new opcode LOGICAL_RSHIFT 05/28/2019 */
+#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 33)
+#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 33)
 
 #if !defined(gcdTARGETHOST_BIGENDIAN)
 #define gcdTARGETHOST_BIGENDIAN 0  /* default host little endian, to change the

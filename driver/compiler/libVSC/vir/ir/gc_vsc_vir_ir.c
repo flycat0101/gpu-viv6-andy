@@ -8104,6 +8104,82 @@ VIR_TypeId_ConvertSamplerTypeToImageType(
     return imageType;
 }
 
+VIR_TypeId
+VIR_TypeId_ConvertIntegerType(
+    IN VIR_Shader*      pShader,
+    IN VIR_TypeId       origTypeId,
+    IN gctBOOL          bSignedToUnsigned
+    )
+{
+    VIR_TypeId          newTypeId = VIR_TYPE_UNKNOWN;
+    VIR_TypeId          newCompTypeId = VIR_TYPE_UNKNOWN;
+    VIR_TypeId          origCompTypeId = VIR_GetTypeComponentType(origTypeId);
+    gctUINT32           componentCount = VIR_GetTypeComponents(origTypeId);
+    gctUINT32           rowCount = VIR_GetTypeRows(origTypeId);
+
+    gcmASSERT(VIR_TypeId_isPrimitive(origTypeId));
+
+    if ((bSignedToUnsigned && VIR_TypeId_isUnSignedInteger(origTypeId))
+        ||
+        (!bSignedToUnsigned && VIR_TypeId_isSignedInteger(origTypeId)))
+    {
+        return origTypeId;
+    }
+
+    if (bSignedToUnsigned)
+    {
+        gcmASSERT(VIR_TypeId_isSignedInteger(origTypeId));
+
+        switch (origCompTypeId)
+        {
+        case VIR_TYPE_INT64:
+            newCompTypeId = VIR_TYPE_UINT64;
+            break;
+        case VIR_TYPE_INT32:
+            newCompTypeId = VIR_TYPE_UINT32;
+            break;
+        case VIR_TYPE_INT16:
+            newCompTypeId = VIR_TYPE_UINT16;
+            break;
+        case VIR_TYPE_INT8:
+            newCompTypeId = VIR_TYPE_UINT8;
+            break;
+        default:
+            gcmASSERT(gcvFALSE);
+            newCompTypeId = origCompTypeId;
+            break;
+        }
+    }
+    else
+    {
+        gcmASSERT(VIR_TypeId_isUnSignedInteger(origTypeId));
+
+        switch (origCompTypeId)
+        {
+        case VIR_TYPE_UINT64:
+            newCompTypeId = VIR_TYPE_INT64;
+            break;
+        case VIR_TYPE_UINT32:
+            newCompTypeId = VIR_TYPE_INT32;
+            break;
+        case VIR_TYPE_UINT16:
+            newCompTypeId = VIR_TYPE_INT16;
+            break;
+        case VIR_TYPE_UINT8:
+            newCompTypeId = VIR_TYPE_INT8;
+            break;
+        default:
+            gcmASSERT(gcvFALSE);
+            newCompTypeId = origCompTypeId;
+            break;
+        }
+    }
+
+    newTypeId = VIR_TypeId_ComposeNonOpaqueType(newCompTypeId, componentCount, rowCount);
+
+    return newTypeId;
+}
+
 /* symbol tables */
 /* find the symbol by nameId or constId and its kind, kind should not be field,
 * virtual register, return NULL if symbol is not found */

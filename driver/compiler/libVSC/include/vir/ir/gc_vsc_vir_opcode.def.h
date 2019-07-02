@@ -414,10 +414,12 @@
     VIR_OPINFO(XOR_BITWISE, 2, HasDest|Componentwise|Expr|EPFromHighest, 1, AL),
     /* bitwise not: NOT_BITWISE dest, src0 */
     VIR_OPINFO(NOT_BITWISE, 1, HasDest|Componentwise|Expr|EPFromHighest, 1, AL),
-    /* left shift: LSHIFT dest, src0, src1 */
+    /* arithmetic left shift: LSHIFT dest, src0, src1 */
     VIR_OPINFO(LSHIFT, 2, HasDest|Componentwise|Expr|EPFromS0, 1, AL),
-    /* right shift: RSHIFT dest, src0, src1  */
+    /* arithmetic right shift: RSHIFT dest, src0, src1  */
     VIR_OPINFO(RSHIFT, 2, HasDest|Componentwise|Expr|EPFromS0, 1, AL),
+    /* logical right shift: RSHIFT dest, src0, src1  */
+    VIR_OPINFO(LOGICAL_RSHIFT, 2, HasDest|Componentwise|Expr|EPFromS0, 1, ML),
     /* rotate bits: ROTATE dest, src0, src1 */
     VIR_OPINFO(ROTATE, 2, HasDest|Componentwise|Expr|EPFromS0, 1, AL),
 

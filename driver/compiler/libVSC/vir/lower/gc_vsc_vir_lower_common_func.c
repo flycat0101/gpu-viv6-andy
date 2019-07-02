@@ -1503,6 +1503,22 @@ VIR_Lower_ResetCondOp(
     return gcvTRUE;
 }
 
+gctBOOL
+VIR_Lower_ChangeSignedIntegerToUnsignedInteger(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_TypeId  opndTypeId = VIR_Operand_GetTypeId(Opnd);
+
+    opndTypeId = VIR_TypeId_ConvertIntegerType(Context->shader, opndTypeId, gcvTRUE);
+    VIR_Operand_SetTypeId(Opnd, opndTypeId);
+
+    return gcvTRUE;
+}
+
+
 VIR_TexModifier_Flag
 VIR_Lower_GetTexModifierKind(
     IN VIR_Operand        *Opnd

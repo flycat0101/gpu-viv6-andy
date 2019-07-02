@@ -700,6 +700,13 @@ VIR_Lower_ResetCondOp(
     IN VIR_Operand        *Opnd
     );
 
+gctBOOL
+VIR_Lower_ChangeSignedIntegerToUnsignedInteger(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
 VSC_ErrCode
 VIR_Lower_ChangeOperandByOffset(
     IN VIR_PatternContext *Context,

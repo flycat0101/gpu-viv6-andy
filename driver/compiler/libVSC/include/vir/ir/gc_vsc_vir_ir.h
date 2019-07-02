@@ -6048,6 +6048,13 @@ VIR_TypeId_ConvertSamplerTypeToImageType(
     IN VIR_TypeId       SamplerType
     );
 
+VIR_TypeId
+VIR_TypeId_ConvertIntegerType(
+    IN VIR_Shader*      pShader,
+    IN VIR_TypeId       origType,
+    IN gctBOOL          bSignedToUnsigned
+    );
+
 /* shader symbols */
 
 /* return NULL if symbol is not found */

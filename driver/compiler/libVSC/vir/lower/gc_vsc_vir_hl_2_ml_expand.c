@@ -2176,6 +2176,20 @@ static VIR_Pattern _texldpcfPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
+/* Change logical right shift to arithmetic right shift. */
+static VIR_PatternMatchInst _logicalRightShiftPatInst0[] = {
+    { VIR_OP_LOGICAL_RSHIFT, 0, 0, { 1, 2, 3, 0 }, { gcvNULL }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _logicalRightShiftRepInst0[] = {
+    { VIR_OP_RSHIFT, 0, 0, { 1, 2, 3, 0 }, { VIR_Lower_ChangeSignedIntegerToUnsignedInteger, VIR_Lower_ChangeSignedIntegerToUnsignedInteger, VIR_Lower_ChangeSignedIntegerToUnsignedInteger } },
+};
+
+static VIR_Pattern _logicalRightShiftPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_logicalRightShift, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
 static VIR_Pattern*
 _GetHL2MLPatternPhaseExpand(
     IN  VIR_PatternContext * Context,
@@ -2211,6 +2225,9 @@ _GetHL2MLPatternPhaseExpand(
 
     case VIR_OP_TEXLDPCF:
         return _texldpcfPattern;
+
+    case VIR_OP_LOGICAL_RSHIFT:
+        return _logicalRightShiftPattern;
 
     default:
         break;
