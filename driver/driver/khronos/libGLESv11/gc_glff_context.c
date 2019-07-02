@@ -831,6 +831,7 @@ glfDestroyContext(
 
     /* Destroy the context object. */
     gcmCHECK_STATUS(gcmOS_SAFE_FREE(gcvNULL, context));
+    gcoOS_SetDriverTLS(gcvTLS_KEY_OPENGL_ES, (gcsDRIVER_TLS *)gcvNULL);
 
     /* Assert if error. */
     if (gcmIS_ERROR(status))

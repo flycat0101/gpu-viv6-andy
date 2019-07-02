@@ -1538,6 +1538,7 @@ GLboolean __glDestroyContext(GLvoid *context)
     }
 
     (*gc->imports.free)(gc, gc);
+    gcoOS_SetDriverTLS(gcvTLS_KEY_OPENGL, (gcsDRIVER_TLS_PTR)gcvNULL);
 
     return retVal;
 }

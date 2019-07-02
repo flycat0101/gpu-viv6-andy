@@ -187,6 +187,7 @@ gco3D_Destroy(
     )
 {
     gctINT index;
+    gcsTLS_PTR tls;
     gcmHEADER_ARG("Engine=0x%x", Engine);
 
     /* Verify the arguments. */
@@ -217,7 +218,10 @@ gco3D_Destroy(
     }
 
     /* Free Hardware Object */
+    gcoOS_GetTLS(&tls);
     gcmVERIFY_OK(gcoHARDWARE_Destroy(Engine->hardware, gcvFALSE));
+    tls->defaultHardware    = gcvNULL;
+    tls->currentHardware    = gcvNULL;
 
     /* Free the gco3D object. */
     gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Engine));
