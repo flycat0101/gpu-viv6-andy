@@ -613,6 +613,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
             vx_uint32 dataUnitByte = 64;
             vx_uint32 zeroNum = 0;
             vx_uint32 oneNum = 0;
+            vx_uint32 vipSramNeedSize = 0;
 
             vxmASSERT(kernelStreamAlignSize - conv_cmd_ptr->kernelCacheSize > 0);
 
@@ -645,6 +646,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
 
             info->vx_nn_general_cmd_info.kernelCacheStartAddress = conv_cmd_ptr->kernelCacheStart;
 
+
             info->vx_nn_general_cmd_info.kernelCacheEndAddress =
                 info->vx_nn_general_cmd_info.kernelCacheStartAddress +
                 ((vx_uint32)gcoMATH_Ceiling((vx_float32)WB_CONV_STREAM_ALIGN_SIZE(weights_biases) /
@@ -663,8 +665,25 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
                 info->vx_nn_general_cmd_info.kernelCacheEndAddress = info->vx_nn_general_cmd_info.kernelCacheStartAddress + kernelCacheSizeInSram;
             }
 
+            vipSramNeedSize = (kernelStreamAlignSize / (dataUnitByte * (info->vx_nn_general_cmd_info.kernelPatternMsb + 1))) *
+                (dataUnitByte * (vxnneGetOneNumber(info->vx_nn_general_cmd_info.kernelPatternLow32Bits) +
+                                 vxnneGetOneNumber(info->vx_nn_general_cmd_info.kernelPatternHigh32Bits)));
+
             vxmASSERT(info->vx_nn_general_cmd_info.kernelCacheEndAddress > info->vx_nn_general_cmd_info.kernelCacheStartAddress);
             vxmASSERT(((info->vx_nn_general_cmd_info.kernelCacheEndAddress - info->vx_nn_general_cmd_info.kernelCacheStartAddress) % dataUnitByte) == 0);
+
+            if (vipSramNeedSize > conv_cmd_ptr->kernelCacheSize)
+            {
+                conv_cmd_ptr->kernelCacheMode = VXNNE_SRAM_CACHE_MODE_NONE;
+
+                info->vx_nn_general_cmd_info.kernelCachingMode = 0;
+                info->vx_nn_general_cmd_info.partialCacheDataUnit = 0;
+                info->vx_nn_general_cmd_info.kernelPatternMsb = 0;
+                info->vx_nn_general_cmd_info.kernelPatternLow32Bits = 0;
+                info->vx_nn_general_cmd_info.kernelPatternHigh32Bits = 0;
+                info->vx_nn_general_cmd_info.kernelCacheStartAddress = 0;
+                info->vx_nn_general_cmd_info.kernelCacheEndAddress = 0;
+            }
         }
         else
         {
