@@ -126,7 +126,7 @@ vx_arch_model_nn_cost_type;
 
 
 
-void calculateSplitSize(vx_uint32 whole_size, vx_uint32 split_num, vx_uint32 split_size_array[], vx_uint32 split_offset_array[]);
+void calculateSplitSize(vx_uint32 whole_size, vx_uint32 split_num, vx_uint32* split_size_array, vx_uint32* split_offset_array);
 vx_uint8 Fp32toUint8(vx_float32 val, vx_int32 zeroPoint, vx_float32 scale, vx_int32 roundMode);
 vx_float32 Uint8toFp32(vx_uint8 val, vx_int32 zeroPoint, vx_float32 scale);
 vx_float32 Fp16toFp32(const vx_uint16 in);

@@ -13179,36 +13179,9 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
             if (context->options.enableMultiTP && filterCount >= 2 * coreCount)
             {
                 /* multi TP path */
-                vx_uint32 max = gcmALIGN(filterCount, coreCount) / coreCount;
-                for (;;)
-                {
-                    if (max >= TP_FC_Z_MAX && filterCount >= TP_FC_Z_MAX)
-                    {
-                        if (i < MAX_ZGROUP_COUNT)
-                            zArray[i] = TP_FC_Z_MAX;
-                        filterCount -= TP_FC_Z_MAX;
-                        i++;
-                    }
-                    else if (filterCount)
-                    {
-                        vx_uint32 filterPerCoreBase, extraFilters;
-
-                        coreCount = gcmMIN(coreCount, filterCount);
-                        filterPerCoreBase  = filterCount / coreCount;
-                        extraFilters = filterCount % coreCount;
-
-                        for (j = 0; j < coreCount; j++)
-                        {
-                            if (i < MAX_ZGROUP_COUNT)
-                                zArray[i] = j < extraFilters ? filterPerCoreBase + 1 : filterPerCoreBase;
-                            filterCount -= zArray[i];
-                            i++;
-                        }
-
-                        break;
-                    }
-                    else break;
-                }
+                vx_uint32 snum = (filterCount + TP_FC_Z_MAX - 1) / TP_FC_Z_MAX;
+                i = snum % coreCount ? gcmALIGN(snum, coreCount) : snum;
+                calculateSplitSize(filterCount, i, zArray, VX_NULL);
             }
             else
             {

@@ -147,16 +147,18 @@ vx_float64 _copysign(vx_float64 number, vx_float64 sign)
 VX_INTERNAL_API void calculateSplitSize(
     vx_uint32                    whole_size,
     vx_uint32                    split_num,
-    vx_uint32                    split_size_array[],
-    vx_uint32                    split_offset_array[]
+    vx_uint32 *                  split_size_array,
+    vx_uint32 *                  split_offset_array
     )
 {
     split_num = gcmMIN(whole_size, split_num);
 
     if (split_num <= 1)
     {
-        split_size_array[0] = whole_size;
-        split_offset_array[0] = 0;
+        if (split_size_array != VX_NULL)
+            split_size_array[0] = whole_size;
+        if (split_offset_array != VX_NULL)
+            split_offset_array[0] = 0;
     }
     else
     {
@@ -166,8 +168,12 @@ VX_INTERNAL_API void calculateSplitSize(
 
         for (i = 0; i < split_num; i++)
         {
-            split_size_array[i] = i < remain ? quot + 1 : quot;
-            split_offset_array[i] = i < remain ? i * split_size_array[i] : remain * (quot + 1) + (i - remain) * split_size_array[i];
+            if (split_size_array != VX_NULL)
+            {
+                split_size_array[i] = i < remain ? quot + 1 : quot;
+                if (split_offset_array != VX_NULL)
+                    split_offset_array[i] = i < remain ? i * split_size_array[i] : remain * (quot + 1) + (i - remain) * split_size_array[i];
+            }
         }
     }
 }
