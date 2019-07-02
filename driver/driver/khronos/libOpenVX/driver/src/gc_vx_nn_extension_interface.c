@@ -22726,7 +22726,18 @@ vx_status vxnneExecuteSCYUV2RGBScale(struct _vxnne_operation_s *operation)
     info.vx_yuv2rgb_scaler_cmd_info.maxBClamp        = max_b_clamp;
 
     /*Per HW suggestion, default set 32*/
-    info.vx_yuv2rgb_scaler_cmd_info.outRequestCount  = 32;
+    {
+        gctSTRING envctrl = gcvNULL;
+        if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "SCALER_OUTSTANDING_REQUEST", &envctrl)) && envctrl)
+        {
+            info.vx_yuv2rgb_scaler_cmd_info.outRequestCount = atoi(envctrl);
+        }
+        else
+        {
+            info.vx_yuv2rgb_scaler_cmd_info.outRequestCount  = 32;
+        }
+        vxInfo("YUV2RGB scaler outstanding request is %d\n", info.vx_yuv2rgb_scaler_cmd_info.outRequestCount);
+    }
 
     if (graph->binarySave)
     {
