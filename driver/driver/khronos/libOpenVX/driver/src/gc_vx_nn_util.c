@@ -1867,6 +1867,7 @@ VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateNNCommands(
     inputInfo.physical.circularBufEndAddrPlus1 = input->circularBufEndAddrPlus1;
     inputInfo.brickMode        = vx_false_e;
     inputInfo.memoryPhysicalBase = input->memoryPhysicalBase;
+    inputInfo.memoryLogicalBase  = input->memoryLogicalBase;
     inputInfo.memorySize         = input->memorySize;
 
     /* fix the base address here, only for DDR  */
@@ -2072,6 +2073,7 @@ VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateTPCommands(
     inputInfo.circleBufferSize   = input->circleBufferSize;
     inputInfo.sRAM               = input->sRAM;
     inputInfo.memoryPhysicalBase = input->memoryPhysicalBase;
+    inputInfo.memoryLogicalBase  = input->memoryLogicalBase;
     inputInfo.memorySize         = input->memorySize;
     inputInfo.physical.start     = input->physical;
 

@@ -548,6 +548,7 @@ typedef struct _vxnne_tiling_rect_s
     gctPOINTER  logicalBase;
     vx_uint32   memoryPhysicalBase;
     vx_uint32   memorySize;
+    gctPOINTER  memoryLogicalBase;
 }vxnne_tiling_rect_s, *vxnne_tiling_rect;
 
 typedef struct _vxnne_operation_command_s *vxnne_operation_command;
@@ -689,6 +690,7 @@ typedef struct _vxnne_tensor_info_s
     gctBOOL          sRAM;
     vx_uint32        memoryPhysicalBase;
     vx_uint32        memorySize;
+    gctPOINTER       memoryLogicalBase;
 
     vx_enum          dataFormat;
     vx_enum          roundingMode;

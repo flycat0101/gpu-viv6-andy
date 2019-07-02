@@ -4766,7 +4766,7 @@ VX_INTERNAL_API void vxoGraphBinary_SaveTPNNOperation(
             LCDTindex   = vxoGraphBinary_GetLCDTIndexForTempTensor(node->graph, input->memoryPhysicalBase, &lcdSize);
             if (-1 == LCDTindex)
             {
-                LCDTindex = (vx_int32)vxoGraphBinary_SaveLoadingConfigData(node->graph, VX_NULL, input->memorySize);
+                LCDTindex = (vx_int32)vxoGraphBinary_SaveLoadingConfigData(node->graph, input->memoryLogicalBase, input->memorySize);
                 binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].tensorPhysical = input->memoryPhysicalBase;
                 binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].LCDTIndex = LCDTindex;
                 binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].size = input->memorySize;
@@ -6070,7 +6070,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
             }
             else if (vxoMemory_GetType(&input->tensorBuffer->memory) == VXNNE_MEM_POOL_TYPE_ORIG_DDR)
             {
-                vx_int32 entryIndex;
+                vx_int32 entryIndex = 0;
                 vx_uint32 globalWSize = 0;
 
                 operationCommand->inputTile.memoryPhysicalBase = TENSOR_PHYSICAL_ADDR(input);
@@ -6084,6 +6084,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
                     vxnne_operation shOperation = VX_NULL;
                     vx_tensor shOutput = VX_NULL;
 
+                    operationCommand->inputTile.memoryLogicalBase = TENSOR_LOGICAL_ADDR(input);
                     binarySave->loadingDataCount += 1;
                     binarySave->patchCount += 1;
 
@@ -6153,7 +6154,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
             }
             else if (vxoMemory_GetType(&output->tensorBuffer->memory) == VXNNE_MEM_POOL_TYPE_ORIG_DDR)
             {
-                vx_int32 entryIndex;
+                vx_int32 entryIndex = 0;
 
                 operationCommand->outputTile.memoryPhysicalBase = TENSOR_PHYSICAL_ADDR(output);
                 entryIndex = vxoGraphBinary_GetIndexOfInputOutputEntry(binarySave->outputPhysicalEntry,
@@ -6165,6 +6166,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
                 {
                     binarySave->loadingDataCount += 1;
                     binarySave->patchCount += 1;
+                    operationCommand->outputTile.memoryLogicalBase = TENSOR_LOGICAL_ADDR(output);
                 }
             }
             else
