@@ -14109,24 +14109,7 @@ vx_weights_biases_parameter _createWeightsBiasesParameterFromTensors(
         }
     }
 
-    if ((layer_type == VX_NN_FULLYCONNECTED_LAYER || (weightDims[0] == 1 && weightDims[1] == 1)) &&
-        inputs_dims[0] != 1 && inputs_dims[1] == 1 &&
-        vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3) &&
-        pooling_size_x <= 1 &&
-        !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_ZDP3_NO_COMPRESS_FIX))
-    {
-        vx_uint32 fitN = calcFit1xN(context, weightDims[2], inputs_dims[0], inputs_dims[1]);
-        /* Need reshape input[x, 1, kz] --> [x, fitN, kz/fitN] */
-        /* Need reshape weight[1, 1, kz, vz] --> [1, fitN, kz/fitN, vz] */
-        weightDims[1] = fitN;
-        weightDims[2] /= fitN;
-
-        inputDims[1] = fitN;
-        inputDims[2] /= fitN;
-
-        isOrigNNBatchFc = vx_true_e;
-    }
-    else if ((vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3) || vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6)) &&
+    if ((vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3) || vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6)) &&
         weightDims[0] == 1 &&
         weightDims[1] == 1 &&
         (pad_x_left == 0 && pad_x_right == 0 && pad_y_top == 0 && pad_y_bottom == 0) &&
