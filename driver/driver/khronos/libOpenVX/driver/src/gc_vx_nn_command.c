@@ -1199,6 +1199,7 @@ void _fill_TP_RESHUFFLE_Command(
     vx_uint32 i;
     vx_weights_biases_parameter weights_biases;
     vx_uint32 strideXSize, strideYSize, outStrideSliceSize, outSliceSize;
+    vx_uint32 inXSizeTmp, outSize;
     DEFINE_TP_GENERAL_PARAMETER();
 
     weights_biases = (vx_weights_biases_parameter)other_tensor;
@@ -1207,21 +1208,39 @@ void _fill_TP_RESHUFFLE_Command(
     outStrideSliceSize = strideXSize * strideYSize;
     outSliceSize = outZStride / outputElemSize;
 
+    inXSizeTmp = outXSize * strideXSize;
+
     for (i = 0; i < split_count; i++)
     {
-        vx_uint32 inXSizeTmp = outXSize * strideXSize;
+        info_array[i].vx_tp_general_cmd_split_info.needReorder = vx_false_e;
+
         if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_REORDER) &&
             inXSizeTmp <= context->nnConfig.fixedFeature.tpReorderInImageSize)
         {
-            if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REORDER_FIX))
+            vx_bool disableTPReorder = vx_false_e;
+
+            /* Viv: 1948. */
+            if (parameter->pad_x_left || parameter->pad_y_top)
             {
-                info_array[i].vx_tp_general_cmd_split_info.needReorder = vx_true_e;
+                outSize = outXSize * outYSize * strideXSize * strideYSize * split_sizes[i];
+                if (!((outSize - 1) % 3))
+                {
+                    disableTPReorder = vx_true_e;
+                }
             }
-            else if (inXSizeTmp <= inXSize + parameter->pad_x_left ||
-                     inXSize + parameter->pad_x_left - inXSizeTmp < strideXSize)
+
+            if (!disableTPReorder)
             {
-                inXSize = inXSizeTmp;
-                info_array[i].vx_tp_general_cmd_split_info.needReorder = vx_true_e;
+                if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REORDER_FIX))
+                {
+                    info_array[i].vx_tp_general_cmd_split_info.needReorder = vx_true_e;
+                }
+                else if (inXSizeTmp <= inXSize + parameter->pad_x_left ||
+                         inXSize + parameter->pad_x_left - inXSizeTmp < strideXSize)
+                {
+                    inXSize = inXSizeTmp;
+                    info_array[i].vx_tp_general_cmd_split_info.needReorder = vx_true_e;
+                }
             }
         }
 
