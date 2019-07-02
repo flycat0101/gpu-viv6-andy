@@ -3278,15 +3278,19 @@ gcoOS_Read(
     if (ByteRead != gcvNULL)
     {
         *ByteRead = (gctSIZE_T) byteRead;
+    }
+
+    if (byteRead == ByteCount || ((byteRead < ByteCount) && fseek((FILE *)File, 0, SEEK_END) == 0))
+    {
         /* Success. */
-        gcmFOOTER_ARG("*ByteRead=%lu", gcmOPT_VALUE(ByteRead));
+        gcmFOOTER_NO();
         return gcvSTATUS_OK;
     }
     else
     {
-        /* Failure. */
-        gcmFOOTER_ARG("%d", gcvSTATUS_TRUE);
-        return gcvSTATUS_TRUE;
+        /* Error */
+        gcmFOOTER_NO();
+        return gcvSTATUS_GENERIC_IO;
     }
 }
 
@@ -4577,7 +4581,11 @@ gcoOS_StrCatSafe(
     gcmDEBUG_VERIFY_ARGUMENT(Source != gcvNULL);
 
     /* Find the end of the destination. */
-    n = strlen(Destination);
+#ifdef __USE_XOPEN2K8
+    n = (gctSIZE_T)strnlen(Destination, DestinationSize);
+#else
+    n = (gctSIZE_T)strlen(Destination);
+#endif
     if (n + 1 < DestinationSize)
     {
         /* Append the string but don't overflow the destination buffer. */
@@ -4593,8 +4601,8 @@ gcoOS_StrCatSafe(
     else
     {
         /* Failure */
-        gcmFOOTER_ARG("%d", gcvSTATUS_TRUE);
-        return gcvSTATUS_TRUE;
+        gcmFOOTER_NO();
+        return gcvSTATUS_DATA_TOO_LARGE;
     }
 }
 
