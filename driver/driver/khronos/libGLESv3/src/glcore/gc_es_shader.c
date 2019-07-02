@@ -966,6 +966,34 @@ GLvoid GL_APIENTRY __gles_LinkProgram(__GLcontext *gc,  GLuint program)
         }
     }
 
+    /* Exception handling for too many varyings of xfb GL_INTERLEAVED_ATTRIBS buffermode*/
+    if(programObject->xfbVaryingNum > gc->constants.shaderCaps.maxXfbInterleavedComponents && programObject->xfbMode == GL_INTERLEAVED_ATTRIBS){
+        strncpy(programObject->programInfo.infoLog, "too many varyings for xfb GL_INTERLEAVED_ATTRIBS buffermode", __GLSL_LOG_INFO_SIZE);
+        programObject->programInfo.linkedStatus = GL_FALSE;
+        __GL_EXIT();
+    }
+
+    /* Exception handling for too many varyings of xfb GL_SEPARATE_ATTRIBS buffermode*/
+    if(programObject->xfbVaryingNum > gc->constants.shaderCaps.maxXfbSeparateComponents && programObject->xfbMode == GL_SEPARATE_ATTRIBS){
+        strncpy(programObject->programInfo.infoLog, "too many varyings for xfb GL_SEPARATE_ATTRIBS buffermode", __GLSL_LOG_INFO_SIZE);
+        programObject->programInfo.linkedStatus = GL_FALSE;
+        __GL_EXIT();
+    }
+
+    /* Exception handling for repeated varying of xfb*/
+    if(programObject->xfbVaryingNum > 1){
+        GLuint i,j;
+        for(i = 0; i < programObject->xfbVaryingNum; i++){
+            for(j = i + 1; j < programObject->xfbVaryingNum; j++){
+                if(!strcmp(programObject->ppXfbVaryingNames[i], programObject->ppXfbVaryingNames[j])){
+                    strncpy(programObject->programInfo.infoLog, "repeated varying of xfb", __GLSL_LOG_INFO_SIZE);
+                    programObject->programInfo.linkedStatus = GL_FALSE;
+                    __GL_EXIT();
+                }
+            }
+        }
+    }
+
     programObject->programInfo.codeSeq++;
     programObject->programInfo.linkedStatus = (*gc->dp.linkProgram)(gc, programObject);
 
