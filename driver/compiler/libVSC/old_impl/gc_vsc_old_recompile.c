@@ -12113,12 +12113,12 @@ _LinkImageLibFuc(
     gcUNIFORM uniform = gcvNULL, extraUniform = gcvNULL;
     gctUINT32 i, j, movIndex = 0, callIndex = 0, index_constVal = 0;
     gcFUNCTION  imgLibFunc = Function;
+    gctPOINTER pointer = gcvNULL;
 
     for (i = 0; i < codeCount; i++)
     {
         gctSIZE_T length = 0;
         gctUINT offset = 0;
-        gctPOINTER pointer = gcvNULL;
         gctSTRING formatLibName = gcvNULL;
         gctBOOL extraArg = gcvFALSE;
 
@@ -12476,6 +12476,11 @@ _LinkImageLibFuc(
     }
 
 OnError:
+    if (pointer != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pointer);
+    }
+
     return status;
 }
 
