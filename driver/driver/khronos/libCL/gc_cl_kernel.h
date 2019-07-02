@@ -177,6 +177,8 @@ typedef struct _cl_kernel
     gctPOINTER              cacheMutex;
 
     SHADER_HANDLE           shaderHandle;
+
+    gctPOINTER              linkedDebugInfo;
 }
 clsKernel;
 

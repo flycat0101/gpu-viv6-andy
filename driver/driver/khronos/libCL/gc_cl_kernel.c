@@ -6863,6 +6863,7 @@ clCreateKernel(
     kernel->patchNeeded       = gcvTRUE;    /* Force to check patch instructions for the moment. May hurt compiler performance. */
     kernel->masterInstance.binary     = gcvNULL;
     kernel->isPatched         = gcvFALSE;
+    kernel->linkedDebugInfo   = gcvNULL;
 
     /* Create a reference count object and set it to 1. */
     clmONERROR(gcoOS_AtomConstruct(gcvNULL, &kernel->referenceCount),
