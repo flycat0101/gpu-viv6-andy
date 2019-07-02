@@ -234,16 +234,15 @@ static vx_status readAxiSram(
     )
 {
     vx_status status = VX_SUCCESS;
-    vx_uint32 aligSize = gcmALIGN(reader->binLoad->context->axiSRAM.size, 64);
     gcmHEADER_ARG("reader=%p, axiTable=%p", reader, axiTable);
 
     axiTable->sramBase = readuInt(reader, 1);
     axiTable->sramSize = readuInt(reader, 1);
 
-    if (gcmALIGN(axiTable->sramSize, 64) != aligSize)
+    if (axiTable->sramSize != reader->binLoad->context->axiSRAM.size)
     {
-        vxError("%s[%d]: binary sramSize: 0x%dx, context size: 0x%dx, context aligSize: 0x%x\n",
-            __FUNCTION__, __LINE__, axiTable->sramSize, reader->binLoad->context->axiSRAM.size, aligSize);
+        vxError("%s[%d]: binary sramSize: 0x%x, context size: 0x%x\n",
+            __FUNCTION__, __LINE__, axiTable->sramSize, reader->binLoad->context->axiSRAM.size);
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -934,6 +933,31 @@ OnError:
     return status;
 }
 
+VX_PRIVATE_API vx_status vxoGraphBinary_GetNetworkNameAndRank(
+    vx_binary_save_s *binarySave
+    )
+{
+    vx_char networkName[VX_MAX_NAME_LEGTH] = "dummy_network_name";
+    vx_char *env = VX_NULL;
+
+    gcoOS_GetEnv(gcvNULL, "VIV_VX_NBG_NAME", &env);
+    if (env != VX_NULL)
+    {
+        gcoOS_StrCopySafe(networkName, VX_MAX_NAME_LEGTH, env);
+    }
+
+    env = VX_NULL;
+    gcoOS_GetEnv(gcvNULL, "VIV_VX_NBG_INPUT_RANK", &env);
+    if (env != VX_NULL)
+    {
+        gcoOS_StrCatSafe(networkName, VX_MAX_NAME_LEGTH, "_");
+        gcoOS_StrCatSafe(networkName, VX_MAX_NAME_LEGTH, env);
+    }
+
+    gcoOS_StrCopySafe(binarySave->headerInfo.networkName, VX_MAX_NAME_LEGTH, networkName);
+    return VX_SUCCESS;
+}
+
 VX_PRIVATE_API vx_status vxoGraphBinary_patchNN(
     vx_node node,
     vx_binary_nn_operation_info_s *NNData,
@@ -1252,31 +1276,6 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchNN(
 OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
-}
-
-VX_PRIVATE_API vx_status vxoGraphBinary_GetNetworkNameAndRank(
-    vx_binary_save_s *binarySave
-    )
-{
-    vx_char networkName[VX_MAX_NAME_LEGTH] = "dummy_network_name";
-    vx_char *env = VX_NULL;
-
-    gcoOS_GetEnv(gcvNULL, "VIV_VX_NBG_NAME", &env);
-    if (env != VX_NULL)
-    {
-        gcoOS_StrCopySafe(networkName, VX_MAX_NAME_LEGTH, env);
-    }
-
-    env = VX_NULL;
-    gcoOS_GetEnv(gcvNULL, "VIV_VX_NBG_INPUT_RANK", &env);
-    if (env != VX_NULL)
-    {
-        gcoOS_StrCatSafe(networkName, VX_MAX_NAME_LEGTH, "_");
-        gcoOS_StrCatSafe(networkName, VX_MAX_NAME_LEGTH, env);
-    }
-
-    gcoOS_StrCopySafe(binarySave->headerInfo.networkName, VX_MAX_NAME_LEGTH, networkName);
-    return VX_SUCCESS;
 }
 
 VX_PRIVATE_API vx_status vxoGraphBinary_patchTP(
@@ -3103,7 +3102,8 @@ VX_PRIVATE_API vx_bool vxoGraphBinary_ScaleIsNetworkInput(
         return vx_true_e;
     }
 
-    if (VXNNE_OPERATOR_TENSOR_MUL == operation->operatorType)
+    if ((VXNNE_OPERATOR_TENSOR_MUL == operation->operatorType) ||
+        (VXNNE_OPERATOR_TENSOR_DIV == operation->operatorType))
     {
         for (i = 0; i < graph->headNodeCount; i++)
         {
@@ -5268,8 +5268,9 @@ VX_INTERNAL_API vx_status vxoGraphBinary_GetGraphInputOutput(
 
     gcmHEADER_ARG("graph=%p", graph);
 
-    if (0 == graph->base.context->options.enableSaveBinary)
-    {
+    if ((0 == graph->base.context->options.enableSaveBinary) ||
+        (1 == graph->base.context->options.enableCacheGraphBinary))
+    {   /* bypass this function if in cache binary graph */
         gcmFOOTER_ARG("%d", VX_SUCCESS);
         return VX_SUCCESS;
     }
@@ -7395,7 +7396,6 @@ VX_PRIVATE_API vx_bool vxoGraphBinary_RemoveOneFile(
 {
     gctFILE *pF = VX_NULL;
     gcmHEADER_ARG("binaryFile=%p", binaryFile);
-
     gcoOS_Open(gcvNULL, binaryFile, gcvFILE_READ, (gctFILE *)&pF);
     if (pF != VX_NULL)
     {
@@ -7419,6 +7419,8 @@ VX_PRIVATE_API vx_status vxoGraphBinary_SetInputOutput(
     vx_uint32 inputNum = 0, outputNum = 0;
     vx_uint32 i = 0, j = 0, k = 0;
     vx_uint32 ioNum = 0;
+
+    gcmHEADER_ARG("graph=%p", graph);
 
     vxmONERROR(vxoGraphBinary_InputsOutputs(graph, inputTable, &inputNum, outputTable, &outputNum));
     if ((inputNum == 0) || (outputNum == 0))
@@ -7639,6 +7641,7 @@ VX_PRIVATE_API vx_status vxoGraphBinary_SetInputOutput(
     }
 
 OnError:
+    gcmFOOTER_ARG("status=%d", status);
     return status;
 }
 
@@ -7707,6 +7710,7 @@ VX_INTERNAL_API void vxoGraphBinary_CacheOrImport(
     gcsHASH_MD5CTX md5Ctx;
     vx_uint8 md5digest[KEY_LENGTH_BYTE];
     gctSTRING envctrl = gcvNULL;
+    gceSTATUS mcfeEnabled = (gcvSTATUS_TRUE == gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MCFE));
     gcmHEADER_ARG("graph=%p", graph);
 
     /* get env for nn pai path */
@@ -7717,21 +7721,19 @@ VX_INTERNAL_API void vxoGraphBinary_CacheOrImport(
 
     if ((graph->base.context->options.enableSaveBinary) ||
         (graph->base.context->options.enableNNLayerDump) ||
+        (graph->base.context->options.enableCNNPerf) ||
+         mcfeEnabled ||
         (0 == graph->base.context->options.enableCacheGraphBinary))
     {
         gcmFOOTER_NO();
         return;
     }
 
-    for (i = 0; i < graph->nodeCount; i++)
+    if (vx_true_e == vxoGraphBinary_HasBinaryInGraph(graph))
     {
-        vx_node node = graph->nodeTable[i];
         /* bypass the network if it import from binary graph */
-        if (node->kernel->enumeration == VX_KERNEL_IMPORT_FROM_FILE)
-        {
-            gcmFOOTER_NO();
-            return;
-        }
+        gcmFOOTER_NO();
+        return;
     }
 
     INITIALIZE_STRUCT(md5Ctx);
@@ -7805,6 +7807,12 @@ VX_INTERNAL_API void vxoGraphBinary_CacheOrImport(
     for (i = 0; i < nodeCount; i++)
     {
         vxoNode_RemoveFromGraph(&nodeTable[0]);
+    }
+
+    /* sanity check */
+    if ((vx_false_e == vxoGraphBinary_HasBinaryInGraph(graph)) || (graph->nodeCount > 1))
+    {
+        vxError("%s[%d]: remove node fail: %d\n", __FUNCTION__, __LINE__, graph->nodeCount);
     }
 
     if (toplogyInfo != VX_NULL)
