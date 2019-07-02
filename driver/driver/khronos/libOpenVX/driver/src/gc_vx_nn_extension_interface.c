@@ -23960,6 +23960,84 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoAdapter_Deinitializer(vx_node node, cons
     return VX_SUCCESS;
 }
 
+
+VX_PRIVATE_API vx_bool _IsSameDataType(
+    vx_tensor src,
+    vx_tensor dst
+    )
+{
+    return (TENSOR_DATA_TYPE(src) == TENSOR_DATA_TYPE(dst));
+}
+
+VX_PRIVATE_API vx_bool _IsSameQuantType(
+    vx_tensor src,
+    vx_tensor dst
+    )
+{
+    vx_bool result = vx_false_e;
+
+    if (TENSOR_QUANT_TYPE(src) == TENSOR_QUANT_TYPE(dst))
+    {
+        switch (TENSOR_QUANT_TYPE(src))
+        {
+        case VX_QUANT_NONE:
+            result = vx_true_e;
+            break;
+
+        case VX_QUANT_DYNAMIC_FIXED_POINT:
+            if (TENSOR_POS(src) == TENSOR_POS(dst))
+            {
+                result = vx_true_e;
+            }
+            break;
+
+        case VX_QUANT_AFFINE_SCALE:
+            if (TENSOR_TF_SCALE(src) == TENSOR_TF_SCALE(dst) &&
+                TENSOR_TF_ZEROPOINT(src) == TENSOR_TF_ZEROPOINT(dst))
+            {
+                result = vx_true_e;
+            }
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    return result;
+}
+
+VX_PRIVATE_API vx_bool _IsSameType(
+    vx_tensor src,
+    vx_tensor dst
+    )
+{
+    return (_IsSameDataType(src, dst) && _IsSameQuantType(src, dst));
+}
+
+VX_PRIVATE_API vx_bool _Is_concat_on_highest_dimension(
+    vx_tensor tensor,
+    vx_uint32 axis
+    )
+{
+    vx_uint32 dim       = TENSOR_DIM_NUM(tensor);
+    vx_bool   result    = vx_true_e;
+    vx_uint32 i         = 0;
+
+    if(axis == dim - 1)
+    {
+        return result;
+    }
+
+    for (i = axis + 1; i < dim; i++)
+    {
+        if (TENSOR_VIEW_SIZE_INDEX(tensor, i) != 1)
+            return vx_false_e;
+    }
+
+    return result;
+}
+
 vx_status vxnneExecuteSWConcatIndefinite(struct _vxnne_operation_s *operation)
 {
     vx_status status = VX_SUCCESS;
@@ -24052,7 +24130,7 @@ vx_status vxnneExecuteSWConcatIndefinite(struct _vxnne_operation_s *operation)
          */
         for (m = 0; m < count; m++)
         {
-            if (TENSOR_DATA_TYPE(input) == TENSOR_DATA_TYPE(output))
+            if (_IsSameType(input, output))
             {
                 memcpy(pOutputBuf + (output_slice * m + offset) * TENSOR_DATA_SIZE(input), pInputBuf + input_slice * m * TENSOR_DATA_SIZE(input), input_slice * TENSOR_DATA_SIZE(input));
             }
@@ -24172,7 +24250,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConcatIndefiniteLayer_Initializer(vx_n
 
             enable_SHExe = (vx_bool)(TENSOR_DATA_TYPE(input) != VX_TYPE_FLOAT32 && enable_SHExe);
         }
-        enable_SHExe = enable_SHExe && ((dimCount - 1) == axis || ((dimCount - 1) > axis && dimCount < 4));
+        enable_SHExe = enable_SHExe && (_Is_concat_on_highest_dimension(output_s, axis) || axis < 4);
     }
     else
     {
@@ -24303,7 +24381,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConcatIndefiniteLayer_Initializer(vx_n
         else
             gcoOS_ZeroMemory(concatNLayer->concat_sh_unit_operation, sizeof(vxnne_shader_operation_s) * operationCount);
 
-        if ((dimCount - 1) == axis)
+        if (_Is_concat_on_highest_dimension(output_s, axis))
         {
             for (i = 0; i < axis; i ++)
             {
