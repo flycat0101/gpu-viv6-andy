@@ -806,6 +806,7 @@ typedef struct _gcsHINT
 
     /* Concurrent workGroupCount. */
     gctUINT16   workGroupCount;
+    gctCHAR     reserved[4];
 
     /* Sampler Base offset. */
     gctBOOL     useGPRSpill[gcvPROGRAM_STAGE_LAST];
