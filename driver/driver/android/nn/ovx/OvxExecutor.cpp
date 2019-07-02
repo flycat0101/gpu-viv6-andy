@@ -17,6 +17,7 @@
 #include "NeuralNetworks.h"
 
 #include <sys/mman.h>
+#include <sys/system_properties.h>
 
 #define NN_TENSOR_MAX_DIMENSION 4
 
@@ -2355,7 +2356,7 @@ int OvxExecutor::initalize(vx_context* context, pthread_mutex_t* mutex, const Mo
         nnAssert(0);
     }
 
-   /* initalizeEnv();*/
+    initalizeEnv();
     return ANEURALNETWORKS_NO_ERROR;
 }
 
@@ -2402,9 +2403,9 @@ int OvxExecutor::run(const Model& model, const Request& request,
     double t3 = getTime();
 
     if(preformaceDebug){
-        LOG(INFO)<<"time of copying  host to device: "<<(t1 - t0) * 1000<<"ms\n";
-        LOG(INFO)<<"time of processing graph: "<<(t2 - t1) * 1000<<"ms\n";
-        LOG(INFO)<<"time of copying  device to host: "<<(t3 - t2) * 1000<<"ms\n";
+        LOG(INFO)<<"time of copying  host to device: "<<(t1 - t0) * 1000<<"ms";
+        LOG(INFO)<<"time of processing graph: "<<(t2 - t1) * 1000<<"ms";
+        LOG(INFO)<<"time of copying  device to host: "<<(t3 - t2) * 1000<<"ms";
         }
 
     if (*mContext != nullptr && *mContext != mPreContext)
@@ -2418,10 +2419,16 @@ int OvxExecutor::run(const Model& model, const Request& request,
 
 void OvxExecutor::initalizeEnv()
 {
-    char *env =  getenv("GET_PREF");
-    LOG(ERROR)<<"get env for pref:"<<env<<"\n";
-    if(env)
-        preformaceDebug = vx_true_e;
+    char env[100] = {0};
+    int ireturn = __system_property_get("GET_PROCESS_TIME", env);
+    if(ireturn)
+    {
+        preformaceDebug = atoi(env);
+    }
+    else
+    {
+        LOG(INFO)<<"can not fetch \"GET_PROCESS_TIME\", so do not print process time";
+    }
 
 }
 
