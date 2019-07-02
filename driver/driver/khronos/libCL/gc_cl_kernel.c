@@ -2381,6 +2381,8 @@ clfCalcLocalWorkSize(
     gctINT              status = CL_SUCCESS;
     size_t              i,j;
     size_t              preferredWorkGroupSize;
+    size_t              *WidthLeave  = gcvNULL;
+    size_t              *HeightLeave = gcvNULL;
 
     gcmHEADER_ARG("Kernel=0x%x", Kernel);
     switch (WorkDim)
@@ -2408,8 +2410,6 @@ clfCalcLocalWorkSize(
         break;
     case 2:
         {
-            size_t *WidthLeave;
-            size_t *HeightLeave;
             gctINT WidthGroupSize=Kernel->preferredWorkGroupSizeMultiple;
             gctINT HeightGroupSize=Kernel->preferredWorkGroupSizeMultiple;
             size_t TotalLeave = 0xCfffffff;
@@ -2519,7 +2519,9 @@ clfCalcLocalWorkSize(
                 }
             }
             gcoOS_Free(gcvNULL, (gctPOINTER)WidthLeave);
+            WidthLeave = gcvNULL;
             gcoOS_Free(gcvNULL, (gctPOINTER)HeightLeave);
+            HeightLeave = gcvNULL;
         }
         break;
     case 3:
@@ -2530,6 +2532,14 @@ clfCalcLocalWorkSize(
     }
 
 OnError:
+    if (WidthLeave != gcvNULL)
+    {
+        gcoOS_Free(gcvNULL, (gctPOINTER)WidthLeave);
+    }
+    if (HeightLeave != gcvNULL)
+    {
+        gcoOS_Free(gcvNULL, (gctPOINTER)HeightLeave);
+    }
     gcmFOOTER_ARG("%d", status);
     return status;
 }
