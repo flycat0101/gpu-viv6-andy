@@ -1362,7 +1362,7 @@ ppoBYTE_INPUT_STREAM_GetChar_Phase_0(
 
         PP->lastGetcharPhase0IsFromThisBis = Bis;
 
-        if(*Pc == '\n')
+        if((*Pc == '\n') && (Bis->inputStringNumber >= 0))
         {
             PP->currentSourceFileLineNumber++;
         }
@@ -1415,7 +1415,7 @@ ppoBYTE_INPUT_STREAM_UnGetChar_Phase_0(IN    ppoPREPROCESSOR PP)
 
     --(bis->curpos);
 
-    if(bis->src[bis->curpos] == '\n')
+    if((bis->src[bis->curpos] == '\n') && (bis->inputStringNumber >= 0))
     {
         --(PP->currentSourceFileLineNumber);
     }
