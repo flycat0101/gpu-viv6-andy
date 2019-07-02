@@ -6185,7 +6185,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceDisplayPropertiesKHR(VkP
         goto vk_Exit;
     }
 
-    __vk_GetPhysicalDeviceDisplayPropertiesKHR(physicalDevice, pPropertyCount, pProperties);
+    result = __vk_GetPhysicalDeviceDisplayPropertiesKHR(physicalDevice, pPropertyCount, pProperties);
 
 vk_Exit:
     __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
@@ -6212,7 +6212,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceDisplayPlanePropertiesKH
         goto vk_Exit;
     }
 
-    __vk_GetPhysicalDeviceDisplayPlanePropertiesKHR(physicalDevice, pPropertyCount, pProperties);
+    result = __vk_GetPhysicalDeviceDisplayPlanePropertiesKHR(physicalDevice, pPropertyCount, pProperties);
 
 vk_Exit:
     __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
@@ -6239,7 +6239,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetDisplayPlaneSupportedDisplaysKHR(VkPhy
         goto vk_Exit;
     }
 
-    __vk_GetDisplayPlaneSupportedDisplaysKHR(physicalDevice, planeIndex, pDisplayCount, pDisplays);
+    result = __vk_GetDisplayPlaneSupportedDisplaysKHR(physicalDevice, planeIndex, pDisplayCount, pDisplays);
 
 vk_Exit:
     __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
@@ -6272,7 +6272,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetDisplayModePropertiesKHR(VkPhysicalDev
         goto vk_Exit;
     }
 
-    __vk_GetDisplayModePropertiesKHR(physicalDevice, display, pPropertyCount, pProperties);
+    result = __vk_GetDisplayModePropertiesKHR(physicalDevice, display, pPropertyCount, pProperties);
 
 vk_Exit:
     __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
