@@ -2488,6 +2488,66 @@ static VkResult halti5_pip_emit_rt(
     uint32_t i;
     VkBool32 rtEnabled = gcvFALSE;
 
+    static const gctINT32 s_xlateDepthCompare[] =
+    {
+        /* VK_COMPARE_OP_NEVER */
+        0x0,
+        /* VK_COMPARE_OP_LESS */
+        0x1,
+        /* VK_COMPARE_OP_EQUAL */
+        0x2,
+        /* VK_COMPARE_OP_LESS_OR_EQUAL */
+        0x3,
+        /* VK_COMPARE_OP_GREATER */
+        0x4,
+        /* VK_COMPARE_OP_NOT_EQUAL */
+        0x5,
+        /* VK_COMPARE_OP_GREATER_OR_EQUAL */
+        0x6,
+        /* VK_COMPARE_OP_ALWAYS */
+        0x7,
+    };
+
+    static const gctINT8 s_xlateStencilCompare[] =
+    {
+        /* VK_COMPARE_OP_NEVER */
+        0x0,
+        /* VK_COMPARE_OP_LESS */
+        0x1,
+        /* VK_COMPARE_OP_EQUAL */
+        0x2,
+        /* VK_COMPARE_OP_LESS_OR_EQUAL */
+        0x3,
+        /* VK_COMPARE_OP_GREATER */
+        0x4,
+        /* VK_COMPARE_OP_NOT_EQUAL */
+        0x5,
+        /* VK_COMPARE_OP_GREATER_OR_EQUAL */
+        0x6,
+        /* VK_COMPARE_OP_ALWAYS */
+        0x7
+    };
+
+    static const gctUINT8 s_xlateStencilOperation[] =
+    {
+        /* VK_STENCIL_OP_KEEP */
+        0x0,
+        /* VK_STENCIL_OP_ZERO */
+        0x1,
+        /* VK_STENCIL_OP_REPLACE */
+        0x2,
+        /* VK_STENCIL_OP_INCREMENT_AND_CLAMP */
+        0x3,
+        /* VK_STENCIL_OP_DECREMENT_AND_CLAMP */
+        0x4,
+        /* VK_STENCIL_OP_INVERT */
+        0x5,
+        /* VK_STENCIL_OP_INCREMENT_AND_WRAP */
+        0x6,
+        /* VK_STENCIL_OP_DECREMENT_AND_WRAP */
+        0x7,
+    };
+
     depthOnly = (subPass->colorCount == 0);
     /* ps shader is not necessary to be excuted */
     depthOnly &= (!(hints->hasKill
@@ -3228,66 +3288,6 @@ static VkResult halti5_pip_emit_rt(
         uint32_t dsVkFormat = __VK_FORMAT_D24_UNORM_S8_UINT_PACKED32;
         uint32_t stencilFormat = 0x0;
 
-        static const gctINT32 s_xlateDepthCompare[] =
-        {
-            /* VK_COMPARE_OP_NEVER */
-            0x0,
-            /* VK_COMPARE_OP_LESS */
-            0x1,
-           /* VK_COMPARE_OP_EQUAL */
-            0x2,
-            /* VK_COMPARE_OP_LESS_OR_EQUAL */
-            0x3,
-            /* VK_COMPARE_OP_GREATER */
-            0x4,
-            /* VK_COMPARE_OP_NOT_EQUAL */
-            0x5,
-            /* VK_COMPARE_OP_GREATER_OR_EQUAL */
-            0x6,
-            /* VK_COMPARE_OP_ALWAYS */
-            0x7,
-        };
-
-        static const gctINT8 s_xlateStencilCompare[] =
-        {
-            /* VK_COMPARE_OP_NEVER */
-            0x0,
-            /* VK_COMPARE_OP_LESS */
-            0x1,
-            /* VK_COMPARE_OP_EQUAL */
-            0x2,
-            /* VK_COMPARE_OP_LESS_OR_EQUAL */
-            0x3,
-            /* VK_COMPARE_OP_GREATER */
-            0x4,
-            /* VK_COMPARE_OP_NOT_EQUAL */
-            0x5,
-            /* VK_COMPARE_OP_GREATER_OR_EQUAL */
-            0x6,
-            /* VK_COMPARE_OP_ALWAYS */
-            0x7
-        };
-
-        static const gctUINT8 s_xlateStencilOperation[] =
-        {
-            /* VK_STENCIL_OP_KEEP */
-            0x0,
-            /* VK_STENCIL_OP_ZERO */
-            0x1,
-            /* VK_STENCIL_OP_REPLACE */
-            0x2,
-            /* VK_STENCIL_OP_INCREMENT_AND_CLAMP */
-            0x3,
-            /* VK_STENCIL_OP_DECREMENT_AND_CLAMP */
-            0x4,
-            /* VK_STENCIL_OP_INVERT */
-            0x5,
-            /* VK_STENCIL_OP_INCREMENT_AND_WRAP */
-            0x6,
-            /* VK_STENCIL_OP_DECREMENT_AND_WRAP */
-            0x7,
-        };
-
         regDepthConfig &= (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:12) - (0 ?
  12:12) + 1) == 32) ?
@@ -3848,6 +3848,28 @@ static VkResult halti5_pip_emit_rt(
  1:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ? 1:0)))
             );
+        regDepthConfig &= (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:8) - (0 ?
+ 10:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 10:8) - (0 ?
+ 10:8) + 1))))))) << (0 ?
+ 10:8))) | (((gctUINT32) ((gctUINT32) (s_xlateDepthCompare[chipGfxPipeline->depthCompareOp]) & ((gctUINT32) ((((1 ?
+ 10:8) - (0 ?
+ 10:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 10:8) - (0 ?
+ 10:8) + 1))))))) << (0 ?
+ 10:8))) &((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 11:11) - (0 ?
+ 11:11) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 11:11) - (0 ?
+ 11:11) + 1))))))) << (0 ?
+ 11:11))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 11:11) - (0 ?
+ 11:11) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 11:11) - (0 ? 11:11) + 1))))))) << (0 ? 11:11))));
     }
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0500, VK_FALSE, regDepthConfig);
