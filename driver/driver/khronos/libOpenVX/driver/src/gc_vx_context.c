@@ -1155,13 +1155,13 @@ VX_PRIVATE_API vx_status vxoContext_InitSRAM(
     vx_status           status = VX_SUCCESS;
     gcsSURF_NODE_PTR    axiSRAMNode = VX_NULL;
     gctPOINTER          axiSRAMLogical = VX_NULL;
-    gctUINT32           axiSRAMPhysical = ~0ul;
+    gctUINT32           axiSRAMPhysical = ~0u;
     gctUINT32           axiSRAMSize = 0;
-    gctUINT32           axiSRAMGpuPhysical = ~0ul;
+    gctUINT32           axiSRAMGpuPhysical = ~0u;
 
     gcsSURF_NODE_PTR    vipSRAMNode = VX_NULL;
     gctPOINTER          vipSRAMLogical = VX_NULL;
-    gctUINT32           vipSRAMPhysical = ~0ul;
+    gctUINT32           vipSRAMPhysical = ~0u;
     gctUINT32           vipSRAMSize = 0;
 
     gcmHEADER_ARG("context=%p", context);
@@ -1170,7 +1170,7 @@ VX_PRIVATE_API vx_status vxoContext_InitSRAM(
     vxmONERROR(QuerySRAM(context, gcvSRAM_INTERNAL, &vipSRAMPhysical, &vipSRAMLogical, gcvNULL, gcvNULL, &vipSRAMSize, &vipSRAMNode));
 
     vxmASSERT(vipSRAMSize != 0);
-    vxmASSERT(axiSRAMSize == 0 || (axiSRAMPhysical != ~0ul && axiSRAMGpuPhysical != ~0ul));
+    vxmASSERT(axiSRAMSize == 0 || (axiSRAMPhysical != ~0u && axiSRAMGpuPhysical != ~0u));
 
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3))
     {
