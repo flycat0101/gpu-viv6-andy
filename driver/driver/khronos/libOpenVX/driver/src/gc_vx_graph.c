@@ -3888,45 +3888,61 @@ VX_PRIVATE_API vx_status vxoMultiGPU_ComputeInputSize(
     vx_uint32 gpuCount
     )
  {
-     vx_uint32 inputY = 0, outputY = 0;
-     vx_int32 diff = 0;
-     vx_uint32 count = gpuCount;
-     vx_uint32 splitCount = 0;
-     vxnne_convolution_relu_pooling_operation convOp = (vxnne_convolution_relu_pooling_operation)operation;
-     vxnne_operation_info_s opInfo;
-     vx_status status = VX_SUCCESS;
+    vx_uint32 inputY = 0, outputY = 0;
+    vx_int32 diff = 0, sum = 1;
+    vx_uint32 count = gpuCount;
+    vx_uint32 splitCount = 0;
+    vxnne_convolution_relu_pooling_operation convOp = (vxnne_convolution_relu_pooling_operation)operation;
+    vxnne_operation_info_s opInfo;
+    vx_status status = VX_SUCCESS;
 
-     gcmHEADER_ARG("operation=%p, gpuCount=0x%x", operation, gpuCount);
-     vxmASSERT(VXNNE_OPERATOR_CONVOLUTION == operation->operatorType);
-     vxmASSERT(gpuCount > 1);
+    gcmHEADER_ARG("operation=%p, gpuCount=0x%x", operation, gpuCount);
+    vxmASSERT(VXNNE_OPERATOR_CONVOLUTION == operation->operatorType);
+    vxmASSERT(gpuCount > 1);
 
-     INITIALIZE_STRUCT(opInfo);
-     outputY = TENSOR_VIEW_SIZE_INDEX(convOp->outputs, 1); /* Y Axis*/
-     vxnneOperation_GetInfo(operation, &opInfo);
+    INITIALIZE_STRUCT(opInfo);
+    outputY = TENSOR_VIEW_SIZE_INDEX(convOp->outputs, 1); /* Y Axis*/
+    vxnneOperation_GetInfo(operation, &opInfo);
 
-     while (count >= 2)
-     {
-         vxmONERROR(vxoMultiGPU_ComputeInputSize(opInfo.opType,
-                                             outputY / count,
-                                             opInfo.kernelY,
-                                             opInfo.poolSizeY,
-                                             opInfo.poolStrideY,
-                                             opInfo.reshuffStrideY,
-                                             &inputY
-                                             ));
-         diff = (vx_int32)inputY - (vx_int32)operation->parameter.pad_y_bottom;
-         if (((outputY / count) == 0) || (diff <= 1) ||
-             (inputY <= (opInfo.kernelY + opInfo.poolSizeY)))
-         {
+    while (count >= 2)
+    {
+        vxmONERROR(vxoMultiGPU_ComputeInputSize(opInfo.opType,
+                                     outputY / count,
+                                     opInfo.kernelY,
+                                     opInfo.poolSizeY,
+                                     opInfo.poolStrideY,
+                                     opInfo.reshuffStrideY,
+                                     &inputY
+                                     ));
+        diff = (vx_int32)inputY - (vx_int32)operation->parameter.pad_y_bottom * 2;
+        if (opInfo.poolStrideY > 0)
+        {
+            diff = diff / opInfo.poolStrideY;
+            sum = opInfo.poolStrideY;
+        }
+        if (opInfo.poolSizeY > 0)
+        {
+            diff = diff / opInfo.poolSizeY;
+            sum = opInfo.poolSizeY * sum;
+        }
+
+        if (((outputY / count) == 0) || (diff <= (vx_int32)opInfo.kernelY) ||
+        (inputY <= (opInfo.kernelY + sum)))
+        {
             /* this CONV operation doesn't support split on Y-axis */
-            count--;
-         }
-         else
-         {
+            count -= 2;
+        }
+        else
+        {
             splitCount = count;
             break;
-         }
-     }
+        }
+    }
+
+    if (count < gpuCount)
+    {
+        splitCount = 0;
+    }
 
 OnError:
     gcmFOOTER_ARG("splitCount=0x%x", splitCount);
