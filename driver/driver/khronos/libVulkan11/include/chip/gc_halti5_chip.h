@@ -1496,3 +1496,4 @@ int32_t halti5_convertLocationToRenderIndex(
 
 #endif /* __gc_halti5_chip_h__ */
 
+

@@ -115,3 +115,4 @@ VkResult __vk_RemoveObject(__vkDevContext *devCtx, __vkObjectIndex index, __vkOb
 
 #endif /* __gc_vk_object_h__ */
 
+

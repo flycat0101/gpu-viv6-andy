@@ -343,3 +343,4 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_ImportMemory(
 
 #endif /* __gc_vk_resource_h__ */
 
+

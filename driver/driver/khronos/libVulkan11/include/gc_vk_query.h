@@ -35,3 +35,4 @@ typedef struct __vkQueryPoolRec
 } __vkQueryPool;
 #endif /* __gc_vk_query_h__ */
 
+

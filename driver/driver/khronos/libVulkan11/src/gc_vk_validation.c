@@ -4563,6 +4563,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdWaitEvents(VkCommandBuffer commandBuffer, 
     __VK_LOG_API("(tid=%p): vkCmdWaitEvents(%p, %u, %p, %u, %u, %u, %p, %u, %p, %u, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, eventCount, pEvents, srcStageMask, destStageMask, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
 
 
+
     /* API validation logic that can be skipped at runtime */
     if (!cmb || cmb->obj.sType != __VK_OBJECT_INDEX_TO_TYPE(__VK_OBJECT_COMMAND_BUFFER))
     {
@@ -4609,6 +4610,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdPipelineBarrier(VkCommandBuffer commandBuf
     VkResult result = VK_SUCCESS;
 
     __VK_LOG_API("(tid=%p): vkCmdPipelineBarrier(%p, %u, %u, %u, %u, %p, %u, %p, %u, %p)", gcoOS_GetCurrentThreadID(), commandBuffer, srcStageMask, destStageMask, dependencyFlags, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
+
 
 
     /* API validation logic that can be skipped at runtime */
@@ -6825,5 +6827,6 @@ __vkDispatchTable __vkValidEntryFuncTable = {
 #endif
     __VK_ICD_API_ENTRIES(__vkICDValid_)
 };
+
 
 

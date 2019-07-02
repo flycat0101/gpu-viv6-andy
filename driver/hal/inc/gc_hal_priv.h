@@ -308,3 +308,4 @@ gcoOS_DetectProgrameByEncryptedSymbols(
 
 #endif /* __gc_hal_priv_h_ */
 
+

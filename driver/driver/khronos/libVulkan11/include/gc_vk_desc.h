@@ -144,3 +144,4 @@ typedef struct __VkDescriptorUpdateTemplateRec
 
 #endif /* __gc_vk_desc_h__ */
 
+

@@ -10,7 +10,6 @@
 #
 ##############################################################################
 
-
 #
 # Driver part of OpenVX.
 #
@@ -142,7 +141,6 @@ LIBS += -lVSC_Lite -lGAL
 else
 LIBS += -lVSC -lGAL
 endif
-
 
 VPATH = ops:layers:../../kernels
 

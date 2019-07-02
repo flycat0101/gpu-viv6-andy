@@ -58,3 +58,4 @@ extern "C" {
 
 #endif /* __gc_vk_os_h__ */
 
+

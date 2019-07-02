@@ -1106,3 +1106,4 @@ gcsHAL_PATCH_VIDMEM_TIMESTAMP;
 
 #endif /* __gc_hal_types_h_ */
 
+

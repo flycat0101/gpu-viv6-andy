@@ -86,3 +86,4 @@ typedef struct VkBool3D {
 
 #endif /* __gc_vk_types_h__ */
 
+

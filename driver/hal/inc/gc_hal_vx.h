@@ -357,3 +357,4 @@ gceSTATUS gcoVX_GetEvisNoInstFeatureCap(
 #endif
 #endif /* __gc_hal_user_vx_h_ */
 
+

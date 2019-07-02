@@ -1063,3 +1063,4 @@ gco2D_NatureRotateTranslation(
 
 #endif /* __gc_hal_raster_h_ */
 
+

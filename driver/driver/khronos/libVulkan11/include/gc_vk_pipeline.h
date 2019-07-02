@@ -244,3 +244,4 @@ typedef struct __vkSplitPatchListParamsRec
 
 #endif /* __gc_vk_pipeline_h__ */
 
+

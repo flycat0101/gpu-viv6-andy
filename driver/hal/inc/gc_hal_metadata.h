@@ -76,3 +76,4 @@ typedef struct _VIV_VIDMEM_METADATA
 
 #endif /* __gc_hal_kernel_metadata_h_ */
 
+

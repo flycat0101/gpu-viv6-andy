@@ -49,8 +49,10 @@ typedef struct __vkChipFuncTableRec
     VkResult (*BindDescritptors)(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint, uint32_t firstSet, uint32_t setCount);
     void (*PipelineBarrier)(VkCommandBuffer commandBuffer, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags destStageMask, VkDependencyFlags dependencyFlags, uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers, uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers);
 
+
     void (*SetEvent)(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask, VkBool32 signal);
     void (*WaitEvents)(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent* pEvents, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags destStageMask, uint32_t memoryBarrierCount, const VkMemoryBarrier* pMemoryBarriers, uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers);
+
 
     VkResult (*AllocateCommandBuffer)(VkDevice device, VkCommandBuffer commandBuffer);
     VkResult (*FreeCommandBuffer)(VkDevice device, VkCommandBuffer commandBuffer);
@@ -63,4 +65,5 @@ typedef struct __vkChipFuncTableRec
 } __vkChipFuncTable;
 
 #endif /* __gc_vk_chip_h__ */
+
 

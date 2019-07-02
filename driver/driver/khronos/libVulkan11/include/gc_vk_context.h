@@ -272,3 +272,4 @@ extern VkResult __vk_SetSemaphore(VkDevice device, VkSemaphore semaphore, VkBool
 
 #endif /* __gc_vk_context_h__ */
 
+

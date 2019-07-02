@@ -133,3 +133,4 @@ VkResult __vk_DeviceControl(
 
 #endif /* __gc_vk_core_h__ */
 
+

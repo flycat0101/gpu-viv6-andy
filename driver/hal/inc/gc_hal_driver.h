@@ -1374,3 +1374,4 @@ gcsHAL_INTERFACE;
 
 #endif /* __gc_hal_driver_h_ */
 
+
