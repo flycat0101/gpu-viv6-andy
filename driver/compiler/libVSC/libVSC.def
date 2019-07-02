@@ -527,6 +527,7 @@ EXPORTS
 	VIR_Type_CalcByteOffset
     VIR_TypeId_Conv2Enable
     VIR_TypeId_ComposeNonOpaqueType
+    VIR_TypeId_ConvertIntegerType
     VIR_Enable_2_Swizzle_WShift
     VIR_Swizzle_SwizzleWShiftEnable
     VIR_Swizzle_GenSwizzleByComponentCount

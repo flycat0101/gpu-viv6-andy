@@ -10301,12 +10301,13 @@ VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
     VIR_TypeId dstVirTypeId = VIR_TYPE_UNKNOWN;
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
     VIR_SymId virSymId;
-    VIR_Operand * operand;
+    VIR_Operand * operand = gcvNULL;
     VIR_Instruction * virInst;
     VIR_Swizzle virSwizzle;
     VIR_Enable virEnableMask;
     gctBOOL hasDest;
     gctBOOL isWorkGroup = gcvFALSE;
+    gctBOOL bIsUCompare = gcvFALSE, bIsSCompare = gcvFALSE;
     gctUINT virOpndId = 0;
 
     /* map spvopcode to vir opcode, if not support, add more inst */
@@ -10316,6 +10317,21 @@ VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
         (InstructionDesc[opCode].virOpCode == VIR_OP_NOP))
     {
         virOpcode = VIR_OP_COMPARE;
+
+        if (opCode == SpvOpUGreaterThan         ||
+            opCode == SpvOpUGreaterThanEqual    ||
+            opCode == SpvOpULessThan            ||
+            opCode == SpvOpULessThanEqual)
+        {
+            bIsUCompare = gcvTRUE;
+        }
+        else if (opCode == SpvOpSGreaterThan         ||
+                 opCode == SpvOpSGreaterThanEqual    ||
+                 opCode == SpvOpSLessThan            ||
+                 opCode == SpvOpSLessThanEqual)
+        {
+            bIsSCompare = gcvTRUE;
+        }
     }
 
     hasDest = VIR_OPCODE_hasDest(virOpcode);
@@ -10431,8 +10447,22 @@ VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
         }
         else
         {
+            operand = gcvNULL;
             gcmASSERT(0);
         }
+
+        if (operand != gcvNULL)
+        {
+            if (bIsUCompare)
+            {
+                VIR_Operand_SetTypeId(operand, VIR_TypeId_ConvertIntegerType(virShader, VIR_Operand_GetTypeId(operand), gcvTRUE));
+            }
+            else if (bIsSCompare)
+            {
+                VIR_Operand_SetTypeId(operand, VIR_TypeId_ConvertIntegerType(virShader, VIR_Operand_GetTypeId(operand), gcvFALSE));
+            }
+        }
+
         virOpndId++;
     }
 
