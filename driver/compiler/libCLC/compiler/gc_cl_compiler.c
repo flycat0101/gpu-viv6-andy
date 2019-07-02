@@ -694,10 +694,12 @@ cloCOMPILER_Destroy(
 #if __USE_VSC_MP__
     gcmASSERT(Compiler->currentMmWrapper == &Compiler->privatePMP.mmWrapper);
     vscPMP_Finalize(&Compiler->privatePMP);
+    Compiler->currentMmWrapper = &Compiler->generalPMP.mmWrapper;
 #elif __USE_VSC_BMS__
     gcmASSERT(Compiler->currentMmWrapper == &Compiler->scratchMemPool.mmWrapper);
     vscBMS_Finalize(&Compiler->scratchMemPool, gcvFALSE);
     vscPMP_Finalize(&Compiler->sharedPMP);
+    Compiler->currentMmWrapper = &Compiler->generalPMP.mmWrapper;
 #else
     /* Empty the memory pool */
     gcmVERIFY_OK(cloCOMPILER_EmptyMemoryPool(Compiler));
