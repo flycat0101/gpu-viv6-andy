@@ -2023,6 +2023,7 @@ _SwapBuffersRegion(
 #else
         if ((platform->platform == EGL_PLATFORM_GBM_VIV) && thread->pendingSignal)
         {
+#ifndef gcdUSE_ZWP_SYNCHRONIZATION
             gcsHAL_INTERFACE iface;
             /* Submit the sync point. */
             iface.command            = gcvHAL_SIGNAL;
@@ -2034,6 +2035,7 @@ _SwapBuffersRegion(
 
             /* Send event. */
             gcoHAL_ScheduleEvent(gcvNULL, &iface);
+#endif
             /* Commit-stall. */
             gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
             /* Post back buffer. */
