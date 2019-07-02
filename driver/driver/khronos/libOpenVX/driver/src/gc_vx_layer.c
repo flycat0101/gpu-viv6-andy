@@ -22954,9 +22954,9 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
 
     if (enable_2d_inst)
     {
-        vx_int8 fla = TENSOR_POS(input0_rs);
-        vx_int8 flb = TENSOR_POS(input1_rs);
-        vx_int8 flc = TENSOR_POS(output_rs);
+        vx_int8 fla = TENSOR_POS((vx_tensor)parameters[0]);
+        vx_int8 flb = TENSOR_POS((vx_tensor)parameters[1]);
+        vx_int8 flc = TENSOR_POS((vx_tensor)parameters[2]);
         vx_uint32 uniInt8AddInt8Lo_2x8[16] = {
             0x55555555, // TCfg
             0x44444444, // ASelt
