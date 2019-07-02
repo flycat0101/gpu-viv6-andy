@@ -9703,7 +9703,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPReluLayer_Initializer(vx_node node, c
 
         status = vxnneShaderOperation_Initialize(&pReluLayer->prelu_sh_operation,
                                         &pReluLayer->base,
-                                        VXNNE_OPERATOR_ACTIVATION,
+                                        VXNNE_OPERATOR_PRELU,
                                         batchCount,
                                         shaderExecutable);
 
@@ -9717,6 +9717,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPReluLayer_Initializer(vx_node node, c
             &pReluLayer->base,
             &pReluLayer->prelu_sh_operation.base,
             0);
+
+        if (batchCount > 1)
+        {
+            vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NO_BATCH_BIT);
+        }
     }
     else
     {
