@@ -109,7 +109,7 @@ static int yyfprintf(FILE *file, const char * msg, ...)
                     T_ARRAY4_OF_IVEC2 T_TYPE_MATCH_CALLBACK0 T_TYPE_MATCH_CALLBACK1 T_TYPE_MATCH_CALLBACK2
 
 %token<token>		T_SWITCH T_CASE T_DEFAULT
-					T_CENTROID T_FLAT T_SMOOTH
+					T_CENTROID T_FLAT T_SMOOTH T_NOPERSPECTIVE
 					T_LAYOUT
 					T_UNIFORM_BLOCK
 
@@ -679,6 +679,8 @@ interpolation_qualifier :
 	T_SMOOTH
 		{ $$ = $1; }
 	| T_FLAT
+		{ $$ = $1; }
+    | T_NOPERSPECTIVE
 		{ $$ = $1; }
 	;
 
