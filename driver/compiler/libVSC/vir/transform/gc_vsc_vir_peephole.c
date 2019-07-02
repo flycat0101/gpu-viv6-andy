@@ -4224,7 +4224,6 @@ static VSC_ErrCode _VSC_PH_GenerateLShiftedLS(
     lshift_src0_swizzle = VIR_Operand_GetSwizzle(lshift_src0);
     lshift_src0_enable = VIR_Swizzle_2_Enable(lshift_src0_swizzle);
 
-    ls_set = vscHTBL_Create(VSC_PH_Peephole_GetMM(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512);
     ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512),
              "Failed to initialize Hashtable");
     ls_set = VSC_PH_Peephole_WorkSet(ph);
