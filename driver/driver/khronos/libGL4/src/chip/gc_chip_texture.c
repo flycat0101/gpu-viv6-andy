@@ -7288,7 +7288,7 @@ gcChipInitializeSampler(
             setAlphaScale(chipCtx, sampler, &tes->alphaScale, glvFLOAT);
 
             /* right now if one of them is enabled, texture gen will be enabled. */
-            sampler->genEnable = (es->texGen[0] || (es->texGen[1] << 1) || (es->texGen[2] << 2) || (es->texGen[3] << 3));
+            sampler->genEnable = (es->texGen[0] | (es->texGen[1] << 1) | (es->texGen[2] << 2) | (es->texGen[3] << 3));
             /* Update the hash key. */
             glmSETHASH_4BITS(hashTexCoordGenEnable, sampler->genEnable, i);
 
