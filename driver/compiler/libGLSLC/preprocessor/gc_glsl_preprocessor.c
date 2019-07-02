@@ -85,6 +85,44 @@ ppoPREPROCESSOR_PushOntoCurrentInputStreamOfPP(
     return gcvSTATUS_OK;
 }
 
+gceSTATUS
+ppoWriteBufferToFile(IN ppoPREPROCESSOR PP)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    if (PP->ppLogFile == gcvNULL)
+    {
+#define _FILENAMEMAX 1024
+        gctCHAR fullFileName[_FILENAMEMAX+1];
+        gctCHAR fileName[64];
+        gctUINT offset = 0;
+        gctUINT64 time;
+
+        gcmVERIFY_OK(vscGetTemporaryDir(fullFileName));
+#if _WIN32
+        gcmVERIFY_OK(gcoOS_StrCatSafe(fullFileName, _FILENAMEMAX, "\\"));
+#else
+        gcmVERIFY_OK(gcoOS_StrCatSafe(fullFileName, _FILENAMEMAX, "/"));
+#endif
+        gcoOS_GetTime(&time);
+        gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName, gcmSIZEOF(fileName), &offset, "viv_gl_%lld.log", (gctUINT64)time));
+        gcmVERIFY_OK(gcoOS_StrCatSafe(fullFileName, _FILENAMEMAX, fileName));
+        gcmVERIFY_OK(gcoOS_Open(gcvNULL, fullFileName, gcvFILE_APPENDTEXT, &PP->ppLogFile));
+        if (PP->ppLogFile == gcvNULL)
+        {
+            gcoOS_ZeroMemory(PP->logBuffer, 1024);
+            PP->logCurrentSize = 0;
+            return gcvSTATUS_INVALID_DATA;
+        }
+    }
+
+    gcoOS_Write(gcvNULL, PP->ppLogFile, gcoOS_StrLen(PP->logBuffer, gcvNULL), PP->logBuffer);
+    gcoOS_ZeroMemory(PP->logBuffer, 1024);
+    PP->logCurrentSize = 0;
+
+    return status;
+}
+
 /*******************************************************************************
 **
 **  ppoPREPROCESSOR_AddToOutputStreamOfPP
@@ -98,6 +136,7 @@ ppoPREPROCESSOR_AddToOutputStreamOfPP(
 {
     gceSTATUS status;
     ppoTOKEN ntoken = gcvNULL;
+    gctSIZE_T len = 0;
 
     gcmHEADER_ARG("PP=0x%x Token=0x%x",
                   PP, Token);
@@ -131,6 +170,56 @@ ppoPREPROCESSOR_AddToOutputStreamOfPP(
         ntoken->inputStream.base.node.prev = gcvNULL;
         PP->outputTokenStreamEnd->inputStream.base.node.prev = (void*)ntoken;
         PP->outputTokenStreamEnd = ntoken;
+    }
+
+    if (gcmOPT_DUMP_FELOG())
+    {
+        gcoOS_StrLen(ntoken->poolString, &len);
+        if (((PP->logCurrentSize + len) > (_cldBUFFER_MAX - 5)))
+        {
+            ppoWriteBufferToFile(PP);
+        }
+
+        if (PP->ppLineNumber && PP->ppLineNumber < PP->currentSourceFileLineNumber)
+        {
+            gcoOS_StrCatSafe(PP->logBuffer, _cldBUFFER_MAX, "\n");
+            if (ntoken->hasLeadingWS)
+            {
+                gcmVERIFY_OK(gcoOS_StrCatSafe(PP->logBuffer, _cldBUFFER_MAX, " "));
+                PP->logCurrentSize = PP->logCurrentSize + 2;
+            }
+
+            gcmVERIFY_OK(gcoOS_StrCatSafe(PP->logBuffer,
+                                          _cldBUFFER_MAX,
+                                          ntoken->poolString));
+            PP->logCurrentSize = PP->logCurrentSize + len + 1;
+
+            if (ntoken->hasTrailingControl)
+            {
+                gcmVERIFY_OK(gcoOS_StrCatSafe(PP->logBuffer, _cldBUFFER_MAX, " "));
+                PP->logCurrentSize = PP->logCurrentSize + 2;
+            }
+        }
+        else
+        {
+            if (ntoken->hasLeadingWS)
+            {
+                gcmVERIFY_OK(gcoOS_StrCatSafe(PP->logBuffer, _cldBUFFER_MAX, " "));
+                PP->logCurrentSize = PP->logCurrentSize + 2;
+            }
+
+            status = gcoOS_StrCatSafe(PP->logBuffer,
+                                      _cldBUFFER_MAX,
+                                      ntoken->poolString);
+            PP->logCurrentSize = PP->logCurrentSize + len + 1;
+
+            if (ntoken->hasTrailingControl)
+            {
+                gcmVERIFY_OK(gcoOS_StrCatSafe(PP->logBuffer, _cldBUFFER_MAX, " "));
+                PP->logCurrentSize = PP->logCurrentSize + 2;
+            }
+        }
+        PP->ppLineNumber = PP->currentSourceFileLineNumber;
     }
 
     gcmFOOTER_NO();
@@ -1168,6 +1257,17 @@ ppoPREPROCESSOR_Parse(
     /*end of input?*/
     if (PP->inputStream == gcvNULL)
     {
+        /* flush the remaining log buffer to file and close the file */
+        if (gcmOPT_DUMP_FELOG())
+        {
+            if (PP->logBuffer[0] != '\0')
+                ppoWriteBufferToFile(PP);
+            if (PP->ppLogFile)
+            {
+                gcoOS_Close(gcvNULL, PP->ppLogFile);
+                PP->ppLogFile = gcvNULL;
+            }
+        }
         gcmFOOTER_ARG("*WriteInNumber=%d", *WriteInNumber);
         return gcvSTATUS_OK;
     }
@@ -1182,6 +1282,17 @@ ppoPREPROCESSOR_Parse(
 
         if (ntoken->type == ppvTokenType_EOF)
         {
+            /* flush the remaining log buffer to file and close the file */
+            if (gcmOPT_DUMP_FELOG())
+            {
+                if (PP->logBuffer[0] != '\0')
+                    ppoWriteBufferToFile(PP);
+                if (PP->ppLogFile)
+                {
+                    gcoOS_Close(gcvNULL, PP->ppLogFile);
+                    PP->ppLogFile = gcvNULL;
+                }
+            }
             /* End of File. */
             gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
             gcmFOOTER_ARG("*WriteInNumber=%d", gcmOPT_VALUE(WriteInNumber) );
