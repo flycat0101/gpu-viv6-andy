@@ -5838,10 +5838,9 @@ VX_INTERNAL_API vx_status vxoShader_GetUniformSize(vx_shader shader, vx_char * n
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoImportKernelFromFile(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
-    gceSTATUS   status = gcvSTATUS_OK;
-    vx_kernel   kernel = node->kernel;
-    vx_binary_loader_s  *binaryLoad = (vx_binary_loader_s*)kernel->base.reserved;
-    vx_uint32  maxSize = gcmALIGN_BASE(gcdCMD_BUFFER_SIZE, 64);
+    vx_status status = VX_SUCCESS;
+    vx_kernel kernel = node->kernel;
+    vx_binary_loader_s *binaryLoad = (vx_binary_loader_s*)kernel->base.reserved;
 
     gcmHEADER_ARG("node=%p, parameters=%p, num=0x%x", node, parameters, num);
 
@@ -5850,54 +5849,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoImportKernelFromFile(vx_node node, const
         gcmFOOTER_ARG("%d", VX_ERROR_NOT_IMPLEMENTED);
         return VX_ERROR_NOT_IMPLEMENTED;
     }
-    if (node->base.context->options.enableNNLayerDump)
-    {
-        vxoGraphBinary_NNLayerDump(node, binaryLoad);
-    }
-    else
-    {
-        if (maxSize == gcdCMD_BUFFER_SIZE)
-        {
-            maxSize = maxSize - 0x800;
-        }
 
-        if (node->binLoadMem->statesSize > maxSize)
-        {
-            vx_uint32  size = 0, replayedSize = 0, i = 0;
-            vx_uint32  statesSize = node->binLoadMem->statesSize;
-            vx_uint8_ptr buffer = (vx_uint8_ptr)node->binLoadMem->statesBuff;
-            vx_binary_operation_info_s *operation = VX_NULL;
-
-            for (i = 0; i < binaryLoad->nOperations; i++)
-            {
-                operation = &binaryLoad->operations[i];
-                if ((operation->operationType == VX_BINARY_OPERATION_TYPE_INIT) ||
-                    (operation->operationType == VX_BINARY_OPERATION_TYPE_NONE) ||
-                    (operation->operationType == VX_BINARY_OPERATION_TYPE_SW))
-                {
-                    continue;
-                }
-
-                size += binaryLoad->LCDT[operation->stateLCDTIndex].size;
-                if (size > maxSize)
-                {
-                    statesSize = size - binaryLoad->LCDT[operation->stateLCDTIndex].size;
-                    gcmONERROR(gcoVX_Replay((gctPOINTER)(buffer + replayedSize), statesSize));
-                    replayedSize += statesSize;
-                    size = binaryLoad->LCDT[operation->stateLCDTIndex].size;
-                }
-            }
-            gcmONERROR(gcoVX_Replay((gctPOINTER)(buffer + replayedSize), size));
-        }
-        else
-        {
-            gcmONERROR(gcoVX_Replay((gctPOINTER)node->binLoadMem->statesBuff, node->binLoadMem->statesSize));
-        }
-    }
+    vxmONERROR(vxoGraphBinary_Run(node, binaryLoad));
 
 OnError:
     gcmFOOTER_ARG("%d", status);
-    return gcmIS_SUCCESS(status) ? VX_SUCCESS : VX_FAILURE;
+    return status;
 }
 VX_PRIVATE_API vx_status VX_CALLBACK vxoImportKernelFromFile_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {

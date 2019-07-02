@@ -2234,13 +2234,10 @@ VX_INTERNAL_API vx_status vxnneOperationCommand_GenerateCommands(
         if (node->graph->binarySave)
         {
             vx_binary_save binarySave = node->graph->binarySave;
-            if ((operation->target == VXNNE_OPERATION_TARGET_SH) || (operation->target == VXNNE_OPERATION_TARGET_SC))
-            {
-                binarySave->operationCmdPhysical[binarySave->currOperationIndex] = gcmPTR_TO_UINT64(operation);
-                binarySave->operationOffset[binarySave->currOperationIndex] = binarySave->currOperationOffset;
-                binarySave->currOperationIndex++;
-                binarySave->currOperationOffset += sizeof(vx_binary_operation_info_s);
-            }
+            binarySave->operationCmdPhysical[binarySave->currOperationIndex] = gcmPTR_TO_UINT64(operation);
+            binarySave->operationOffset[binarySave->currOperationIndex] = binarySave->currOperationOffset;
+            binarySave->currOperationIndex++;
+            binarySave->currOperationOffset += sizeof(vx_binary_operation_info_s);
         }
 
         if (context->options.collectPerfType == COLLECT_PERF_RUN)

@@ -11878,6 +11878,8 @@ vx_status vxnneExecuteSWRPN(struct _vxnne_operation_s *operation)
 
     vx_bool input_stage,output_stage;
 
+    vxoGraphBinary_SaveSWOperation(operation);
+
     if(score_height != bbox_height || score_width != bbox_width)
     {
         vxError("parameter error: score_H[%u] != bbox_H[%u] || score_W[%u] != bbox_W[%u]\n",

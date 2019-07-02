@@ -79,10 +79,33 @@ enum
 
 enum
 {
+    VX_BINARY_DATA_FORMAT_FP32   = 0, /* A float type of buffer data */
+    VX_BINARY_DATA_FORMAT_FP16   = 1, /* A half float type of buffer data */
+    VX_BINARY_DATA_FORMAT_FP64   = 2, /* A double float type of  data */
+    VX_BINARY_DATA_FORMAT_UINT8  = 3, /* A 8 bit unsigned integer type of buffer data */
+    VX_BINARY_DATA_FORMAT_INT8   = 4, /* A 8 bit signed integer type of buffer data */
+    VX_BINARY_DATA_FORMAT_UINT16 = 5, /* A 16 bit unsigned integer type of buffer data */
+    VX_BINARY_DATA_FORMAT_INT16  = 6, /* A 16 signed integer type of buffer data */
+    VX_BINARY_DATA_FORMAT_CHAR   = 7, /* A char type of  data */
+    VX_BINARY_DATA_FORMAT_INT32  = 8, /* A 32 bit signed integer type of  data */
+    VX_BINARY_DATA_FORMAT_UINT32 = 9, /* A 32 bit unsigned integer type of  data */
+    VX_BINARY_DATA_FORMAT_INT64  = 10,/* A 64 bit signed integer type of  data */
+    VX_BINARY_DATA_FORMAT_UINT64 = 11,/* A 64 bit unsigned integer type of  data */
+};
+
+enum
+{
     VX_BINARY_LOAD_STATUS_NONE = 0, /* not binary */
     VX_BINARY_LOAD_STATUS_INIT = 1, /* binary init */
     VX_BINARY_LOAD_STATUS_RUN = 2, /* binary running */
 };
+
+typedef enum _vx_binary_sw_operation_type_e
+{
+    VX_BINARY_SW_OPERATION_NONE        = 0,
+    VX_BINARY_SW_OPERATION_RPN         = 1,
+}
+vx_binary_sw_operation_type_e;
 
 typedef enum _vx_binary_operation_target_e
 {
@@ -97,18 +120,66 @@ typedef enum _vx_binary_operation_target_e
 }
 vx_binary_operation_target_e;
 
-typedef struct _vx_binary_nn_layer_dump_s
+typedef struct _vx_binary_segment_base_s
 {
+    vx_uint32           segmentType;
+}
+vx_binary_segment_base_s;
+
+/**************CPU Operation Layer Define Start**********/
+typedef struct _vx_binary_layer_buffer_s
+{
+    vx_uint8_ptr                            buffer;
+    vx_uint32                               dimCount;
+    vx_uint32                               dims[NN_MAX_DIMENSION];
+    vx_enum                                 dataFormat;
+    vx_enum                                 dataType;
+    vx_enum                                 quantFormat;
+    vx_int32                                fixPointZeroPoint;
+    vx_float32                              tfScale;
+}
+vx_binary_layer_buffer_s, *vx_binary_layer_buffer;
+
+typedef struct _vx_binary_nn_layer_RPN_s
+{
+    vx_binary_segment_base_s                base;
+
+    vx_binary_layer_buffer_s                score;
+    vx_binary_layer_buffer_s                bbox;
+    vx_binary_layer_buffer_s                anchor;
+    vx_binary_layer_buffer_s                img_info;
+    vx_binary_layer_buffer_s                roi_output;
+    vx_binary_layer_buffer_s                score_output;
+    vx_binary_layer_buffer_s                feature_stride;
+    vx_binary_layer_buffer_s                min_size;
+    vx_binary_layer_buffer_s                pre_nms_topn;
+    vx_binary_layer_buffer_s                post_nms_topn;
+    vx_binary_layer_buffer_s                nms_thresh;
+}
+vx_binary_nn_layer_RPN_s;
+
+
+
+/**************CPU Operation Layer Define End**********/
+
+typedef struct _vx_binary_segment_s
+{
+    vx_binary_segment_base_s                *base;
+
     vx_uint32                               statesStartPos;
     vx_uint32                               statesSize;
+    vx_uint32                               startOperationIndex;
+    vx_uint32                               endOperationIndex;
 
     vx_uint32                               layerId;
+    vx_bool                                 isSWSegment;
 
+    /* nn layer dump */
     vx_uint8_ptr                            outputlogical[VX_MAX_OPERTAION_INPUTS_OUTPUTS];
     vx_uint32                               outputSize[VX_MAX_OPERTAION_INPUTS_OUTPUTS];
     vx_uint32                               outputCount;
 }
-vx_binary_nn_layer_dump_s;
+vx_binary_segment_s;
 
 typedef struct _vx_binary_header_s
 {
@@ -208,6 +279,20 @@ typedef struct _vx_binary_patch_table_entrance
 }
 vx_binary_patch_table_entrance_s;
 
+typedef struct _vx_binary_layer_parameter_entrance_s
+{
+    vx_uint32                               layerParamOffset;
+    vx_uint32                               layerParamBytes;
+}
+vx_binary_layer_parameter_entrance_s;
+
+typedef struct _vx_binary_sw_operation_table_entrance
+{
+    vx_uint32                               swOperationDataOffset;
+    vx_uint32                               swOperationDataBytes;
+}
+vx_binary_sw_operation_table_entrance_s;
+
 typedef struct _vx_binary_entrance_info_s
 {
     vx_binary_input_table_entrance_s          inputEntr;
@@ -220,6 +305,8 @@ typedef struct _vx_binary_entrance_info_s
     vx_binary_tf_operation_table_entrance_s   tpOperationsEntr;
     vx_binary_sh_operation_table_entrance_s   shOperationsEntr;
     vx_binary_patch_table_entrance_s          patchsEntr;
+    vx_binary_layer_parameter_entrance_s      layerParamEntr;
+    vx_binary_sw_operation_table_entrance_s   swOperationsEntr;
 }
 vx_binary_entrance_info_s;
 
@@ -260,6 +347,12 @@ typedef struct _vx_binary_sh_operation_info_s
 }
 vx_binary_sh_operation_info_s;
 
+typedef struct _vx_binary_sw_operation_info_s
+{
+    vx_uint32                              swOperationType;
+}
+vx_binary_sw_operation_info_s;
+
 typedef struct _vx_binary_patch_info_s
 {
     vx_uint32                              type;
@@ -290,6 +383,22 @@ typedef struct _vx_binary_input_output_info_s
     vx_int32                                tfZeroPoint;
 }
 vx_binary_input_output_info_s;
+
+typedef struct _vx_binary_layer_parameter_s
+{
+    vx_char                                 paramName[16];
+    vx_uint32                               dimCount;
+    vx_uint32                               dims[NN_MAX_DIMENSION];
+    vx_enum                                 dataFormat;
+    vx_enum                                 dataType;
+    vx_enum                                 quantFormat;
+    vx_int32                                fixPointZeroPoint;
+    vx_float32                              tfScale;
+    vx_int32                                index;
+    vx_uint32                               addressOffset;
+    vx_uint32                               sourceType;
+}
+vx_binary_layer_parameter_s;
 
 typedef struct _vx_binary_input_node_info_s
 {
@@ -353,6 +462,11 @@ typedef struct _vx_binary_save_s
     /* scaler operation data info */
     vx_uint32                                scOperationCount;
     vx_uint32                                scOperationOffset;
+    /* sw operation data info */
+    vx_uint32                                swOperationCount;
+    vx_uint32                                swOperationOffset;
+    vx_uint32                                currSWOperationIndex;
+    vx_uint32                                currSWOperationOffset;
 
     /* patch data info */
     vx_uint32                                patchCount;
@@ -371,6 +485,11 @@ typedef struct _vx_binary_save_s
     vx_uint32                                loadingDataCount;
     vx_uint32                                loadingDataStartOffset;
     vx_uint32                                currLoadingDataOffset;
+
+    /* layer parameters table */
+    vx_uint32                                layerParamCount;
+    vx_uint32                                currLayerParamOffset;
+    vx_uint32                                currLayerParamIndex;
 
     vx_char                                  binaryFileName[256];
 
@@ -445,6 +564,8 @@ typedef struct _vx_binary_fixed
     vx_binary_entry_s                       inputTable;
     vx_binary_entry_s                       outputTable;
     vx_binary_entry_s                       patchDataTable;
+    vx_binary_entry_s                       layerParamTable;
+    vx_binary_entry_s                       swOpDataTable;
 } vx_binary_fixed_s;
 
 typedef struct _vxnne_nbg_operation_s
@@ -471,7 +592,7 @@ typedef struct _vx_binary_loader
     /* Dynamic data part of the bin. */
     vx_binary_input_output_info_s           *inputs;
     vx_binary_input_output_info_s           *outputs;
-    vx_binary_layers_info_s                 *layers;
+    vx_binary_layers_info_s                 *layersInfo;
     vx_binary_entry_s                       *LCDT;
     vx_binary_allocation_s                  LCD;
     vx_binary_nn_operation_info_s           *nnOpsData;
@@ -479,22 +600,26 @@ typedef struct _vx_binary_loader
     vx_binary_sh_operation_info_s           *shOpsData;
     vx_binary_patch_info_s                  *patchData;
     vx_binary_operation_info_s              *operations;
+    vx_binary_layer_parameter_s             *layerParam;
+    vx_binary_sw_operation_info_s           *swOpsData;
 
     vx_uint32                               nInputs;
     vx_uint32                               nOutputs;
-    vx_uint32                               nLayers;
+    vx_uint32                               nLayersInfo;
     vx_uint32                               nOperations;
     vx_uint32                               nLCDT;
     vx_uint32                               nNnOps;
     vx_uint32                               nTpOps;
     vx_uint32                               nShOps;
+    vx_uint32                               nSwOps;
     vx_uint32                               nPdEntries;
+    vx_uint32                               nlayerParam;
 
     gctPOINTER                              binaryBuffer; /* read binary file buffer */
     gctFILE                                 dFile;/* binary file descriptor */
 
-    vx_binary_nn_layer_dump_s               *nnlayerDump;
-    vx_uint32                               nnLayerDumpCount;
+    vx_binary_segment_s                     *segments;
+    vx_uint32                               segmentsCount;
 
     vx_binary_io_patch_info_s               *inputPatch;
     vx_binary_io_patch_info_s               *outputPatch;
@@ -530,7 +655,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_ReleaseStatesBuffer(
     vx_node node
     );
 
-VX_INTERNAL_API vx_status vxoGraphBinary_NNLayerDump(
+VX_INTERNAL_API vx_status vxoGraphBinary_Run(
     vx_node node,
     vx_binary_loader_s *binLoad
     );
@@ -589,6 +714,10 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveEndOperation(
     vx_graph graph,
     vx_uint8_ptr stateBuffer,
     vx_uint32 stateSize
+    );
+
+VX_INTERNAL_API vx_status vxoGraphBinary_SaveSWOperation(
+    vxnne_operation operation
     );
 
 VX_INTERNAL_API vx_status vxoGraphBinary_SaveScalerOperation(

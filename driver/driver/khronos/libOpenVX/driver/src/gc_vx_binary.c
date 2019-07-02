@@ -35,6 +35,462 @@ extern vx_status vxnneOperation_AddReference(
     vxnne_operation_reference_e   refType
     );
 
+VX_PRIVATE_API vx_type_e vxoGraphBinary_ConvertToOVXDataFormat(
+    vx_uint32 format,
+    vx_uint32 type
+    )
+{
+    vx_enum ret = VX_TYPE_UINT8;
+    switch (format)
+    {
+        case VX_BINARY_DATA_FORMAT_FP16:
+            ret = VX_TYPE_FLOAT16;
+            break;
+        case VX_BINARY_DATA_FORMAT_FP32:
+            if (type == VX_BINARY_BUFFER_TYPE_IMAGE)
+            {
+                ret = VX_DF_IMAGE_F32;
+            }
+            else
+            {
+                ret = VX_TYPE_FLOAT32;
+            }
+            break;
+        case VX_BINARY_DATA_FORMAT_UINT32:
+            ret = VX_DF_IMAGE_U32;
+            break;
+        case VX_BINARY_DATA_FORMAT_INT32:
+            ret = VX_DF_IMAGE_S32;
+            break;
+        case VX_BINARY_DATA_FORMAT_UINT8:
+            if (type == VX_BINARY_BUFFER_TYPE_IMAGE)
+            {
+                ret = VX_DF_IMAGE_U8;
+            }
+            else
+            {
+                ret = VX_TYPE_UINT8;
+            }
+            break;
+        case VX_BINARY_DATA_FORMAT_INT8:
+            ret = VX_TYPE_INT8;
+            break;
+        case VX_BINARY_DATA_FORMAT_UINT16:
+            if (type == VX_BINARY_BUFFER_TYPE_IMAGE)
+            {
+                ret = VX_DF_IMAGE_U16;
+            }
+            else
+            {
+                ret = VX_TYPE_UINT16;
+            }
+            break;
+        case VX_BINARY_DATA_FORMAT_INT16:
+            if (type == VX_BINARY_BUFFER_TYPE_IMAGE)
+            {
+                ret = VX_DF_IMAGE_S16;
+            }
+            else
+            {
+                ret = VX_TYPE_INT16;
+            }
+            break;
+        case VX_BINARY_DATA_FORMAT_CHAR:
+            ret = VX_TYPE_CHAR;
+            break;
+        case VX_BINARY_DATA_FORMAT_FP64:
+            ret = VX_TYPE_FLOAT64;
+            break;
+        case VX_BINARY_DATA_FORMAT_INT64:
+            ret = VX_TYPE_INT64;
+            break;
+        case VX_BINARY_DATA_FORMAT_UINT64:
+            ret = VX_TYPE_UINT64;
+            break;
+        default:
+            ret = VX_TYPE_UINT8;
+            break;
+    }
+
+    return ret;
+}
+
+
+/****************SW Operation Implement Start**********************/
+
+static vx_status do_RPNLayer(
+    vx_binary_segment_s *segment
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_binary_nn_layer_RPN_s *rpnLayer = (vx_binary_nn_layer_RPN_s*)segment->base;
+
+    vx_uint32 feat_stride   = *((vx_uint32*)rpnLayer->feature_stride.buffer);
+    vx_uint32 min_size      = *((vx_uint32*)rpnLayer->min_size.buffer);
+    vx_uint32 pre_nms_topn  = *((vx_uint32*)rpnLayer->pre_nms_topn.buffer);
+    vx_uint32 post_nms_topn = *((vx_uint32*)rpnLayer->post_nms_topn.buffer);
+    vx_float32 nms_thresh   = *((vx_float32*)rpnLayer->nms_thresh.buffer);
+
+    vx_uint32 score_channel = rpnLayer->score.dims[2];
+    vx_uint32 score_height  = rpnLayer->score.dims[1];
+    vx_uint32 score_width   = rpnLayer->score.dims[0];
+    vx_uint32 score_count   = score_width * score_height * score_channel/2; /*14 x 14 x (2x42) -> 17901 x 2 */
+
+    vx_uint32 bbox_height   = rpnLayer->bbox.dims[1];
+    vx_uint32 bbox_width    = rpnLayer->bbox.dims[0];
+
+    vx_uint32 anchor_count  = rpnLayer->anchor.dims[3]; /* anchor batch = anchor number */
+
+    vx_type_e in_score_format   = vxoGraphBinary_ConvertToOVXDataFormat(rpnLayer->score.dataFormat, rpnLayer->score.dataType);
+    vx_type_e in_bbox_format    = vxoGraphBinary_ConvertToOVXDataFormat(rpnLayer->bbox.dataFormat, rpnLayer->bbox.dataType);
+    vx_type_e in_anchor_format  = vxoGraphBinary_ConvertToOVXDataFormat(rpnLayer->anchor.dataFormat, rpnLayer->anchor.dataType);
+    vx_type_e in_img_format     = vxoGraphBinary_ConvertToOVXDataFormat(rpnLayer->img_info.dataFormat, rpnLayer->img_info.dataType);
+    vx_type_e out_roi_format    = vxoGraphBinary_ConvertToOVXDataFormat(rpnLayer->roi_output.dataFormat, rpnLayer->roi_output.dataType);
+    vx_int8 in_score_fp         = (vx_int8)rpnLayer->score.fixPointZeroPoint;
+    vx_int8 in_bbox_fp          = (vx_int8)rpnLayer->bbox.fixPointZeroPoint;
+    vx_int8 in_anchor_fp        = (vx_int8)rpnLayer->anchor.fixPointZeroPoint;
+    vx_int8 in_img_fp           = (vx_int8)rpnLayer->img_info.fixPointZeroPoint;
+    vx_int8 out_roi_fp          = (vx_int8)rpnLayer->roi_output.fixPointZeroPoint;
+    vx_enum in_score_quant_format   = rpnLayer->score.quantFormat;
+    vx_enum in_bbox_quant_format    = rpnLayer->bbox.quantFormat;
+    vx_enum in_anchor_quant_format  = rpnLayer->anchor.quantFormat;
+    vx_enum in_img_quant_format     = rpnLayer->img_info.quantFormat;
+    vx_enum out_roi_quant_format    = rpnLayer->roi_output.quantFormat;
+    vx_int32 in_score_zp            = rpnLayer->score.fixPointZeroPoint;
+    vx_int32 in_bbox_zp             = rpnLayer->bbox.fixPointZeroPoint;
+    vx_int32 in_anchor_zp           = rpnLayer->anchor.fixPointZeroPoint;
+    vx_int32 in_img_zp              = rpnLayer->img_info.fixPointZeroPoint;
+    vx_int32 out_roi_zp             = rpnLayer->roi_output.fixPointZeroPoint;
+    vx_float32 in_score_scale       = rpnLayer->score.tfScale;
+    vx_float32 in_bbox_scale        = rpnLayer->bbox.tfScale;
+    vx_float32 in_anchor_scale      = rpnLayer->anchor.tfScale;
+    vx_float32 in_img_scale         = rpnLayer->img_info.tfScale;
+    vx_float32 out_roi_scale        = rpnLayer->roi_output.tfScale;
+    vx_enum out_roi_rMode           = VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING;
+
+    vx_uint32 proposal_width, proposal_height, proposal_area, proposal_count;
+    vx_float32 img_W,img_H,img_scale_H,img_scale_W;
+    vx_float32 min_box_H,min_box_W;
+    vx_uint8_ptr score_data,bbox_data,img_data,anchor_data,out_roi_data;
+    vx_float32_ptr score_buffer = NULL, foreground_score = NULL;
+    vx_float32_ptr proposals    = NULL, p_proposals = NULL;
+    vx_uint32_ptr roi_indices   = NULL;
+    vx_uint32 i = 0, w = 0, h = 0, k = 0;
+    vx_uint32 real_roi = 0;
+
+    vx_type_e out_score_format = 0;
+    vx_int8 out_score_fp = 0;
+    vx_enum out_score_quant_format = 0;
+    vx_int32 out_score_zp = 0;
+    vx_float32 out_score_scale = 0;
+    vx_enum out_score_rMode = 0;
+    vx_uint8_ptr out_score_data = NULL;
+
+    if(score_height != bbox_height || score_width != bbox_width)
+    {
+        vxError("parameter error: score_H[%u] != bbox_H[%u] || score_W[%u] != bbox_W[%u]\n",
+            score_height, bbox_height, score_width, bbox_width);
+        return VX_FAILURE;
+    }
+
+    proposal_width  = score_width;
+    proposal_height = score_height;
+    proposal_area   = proposal_width * proposal_height;
+    proposal_count  = proposal_area * anchor_count;
+
+    score_buffer    = (vx_float32_ptr)vxAllocateAndZeroMemory((score_count * 2) * sizeof(vx_float32)); /* foreground + background */
+    proposals       = (vx_float32_ptr)vxAllocateAndZeroMemory((proposal_count * 5) * sizeof(vx_float32)); /* 5: score,x1,y1,x2,y2 */
+    roi_indices     = (vx_uint32_ptr)vxAllocateAndZeroMemory(post_nms_topn * sizeof(vx_uint32));
+
+    score_data = rpnLayer->score.buffer;
+    bbox_data = rpnLayer->bbox.buffer;
+    img_data = rpnLayer->img_info.buffer;
+    anchor_data = rpnLayer->anchor.buffer;
+    out_roi_data = rpnLayer->roi_output.buffer;
+
+    out_score_format = vxoGraphBinary_ConvertToOVXDataFormat(rpnLayer->score_output.dataFormat, rpnLayer->score_output.dataType);
+    out_score_fp = (vx_int8)rpnLayer->score_output.fixPointZeroPoint;
+    out_score_quant_format = rpnLayer->score_output.quantFormat;
+    out_score_zp = rpnLayer->score_output.fixPointZeroPoint;
+    out_score_scale = rpnLayer->score_output.tfScale;
+    out_score_rMode = VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING;
+    out_score_data = rpnLayer->score_output.buffer;
+
+
+    img_W       = (vx_float32)vxnneGetDataExt(in_img_format, in_img_quant_format, 0, (vx_uint8_ptr)img_data, in_img_fp, in_img_zp, in_img_scale);
+    img_H       = (vx_float32)vxnneGetDataExt(in_img_format, in_img_quant_format, 1, (vx_uint8_ptr)img_data, in_img_fp, in_img_zp, in_img_scale);
+    img_scale_W = (vx_float32)vxnneGetDataExt(in_img_format, in_img_quant_format, 2, (vx_uint8_ptr)img_data, in_img_fp, in_img_zp, in_img_scale);
+    img_scale_H = (vx_float32)vxnneGetDataExt(in_img_format, in_img_quant_format, 3, (vx_uint8_ptr)img_data, in_img_fp, in_img_zp, in_img_scale);
+    min_box_W   = min_size * img_scale_W;
+    min_box_H   = min_size * img_scale_H;
+
+    /*
+        1. prepare the score softmax
+          1.1 resharp score data
+          1.2 softmax the score data
+          1.3 resharp score data back
+    */
+    for (i = 0; i < score_count; i++)
+    {
+        vx_float32 score0 = (vx_float32)vxnneGetDataExt(in_score_format, in_score_quant_format, i, (vx_uint8_ptr)score_data, in_score_fp, in_score_zp, in_score_scale);
+        vx_float32 score1 = (vx_float32)vxnneGetDataExt(in_score_format, in_score_quant_format, i + score_count, (vx_uint8_ptr)score_data, in_score_fp, in_score_zp, in_score_scale);
+        vx_float32 sum = 0.0f, max = gcmMAX(score0, score1);
+
+        score0 -= max;
+        score1 -= max;
+
+        score0 = expf(score0);
+        score1 = expf(score1);
+        sum = score0 + score1;
+
+        /*
+            score_buffer:
+                0 ~ score_count:                Background scores
+                score_count ~ score_count*2:    Foreground scores
+        */
+        score_buffer[i] = score0 / sum;
+        score_buffer[i + score_count] = score1 / sum;
+    }
+    foreground_score = score_buffer + score_count;
+
+    /*
+        2. fill proposal
+          2.1 bbox regression
+          2.2 filter out too small boxes
+          2.3 fill score and bbox into proposal buffer
+    */
+    p_proposals = proposals;
+    for(h=0; h<proposal_height; h++)
+    {
+        for(w=0; w<proposal_width; w++)
+        {
+            vx_uint32 x = w * feat_stride;
+            vx_uint32 y = h * feat_stride;
+            vx_uint32 offset    = h * proposal_width + w;
+            vx_uint8_ptr p_box  = bbox_data + offset * vxnneGetTypeSize(in_bbox_format);
+            vx_float32 *p_score = foreground_score + offset;
+
+            for(k=0; k<anchor_count; k++)
+            {
+                vx_float32 dx = vxnneGetDataExt(in_bbox_format, in_bbox_quant_format, (k*4+0)*proposal_area, (vx_uint8_ptr)p_box, in_bbox_fp, in_bbox_zp, in_bbox_scale);
+                vx_float32 dy = vxnneGetDataExt(in_bbox_format, in_bbox_quant_format, (k*4+1)*proposal_area, (vx_uint8_ptr)p_box, in_bbox_fp, in_bbox_zp, in_bbox_scale);
+                vx_float32 d_log_w = vxnneGetDataExt(in_bbox_format, in_bbox_quant_format, (k*4+2)*proposal_area, (vx_uint8_ptr)p_box, in_bbox_fp, in_bbox_zp, in_bbox_scale);
+                vx_float32 d_log_h = vxnneGetDataExt(in_bbox_format, in_bbox_quant_format, (k*4+3)*proposal_area, (vx_uint8_ptr)p_box, in_bbox_fp, in_bbox_zp, in_bbox_scale);
+
+                p_proposals[0] = x + vxnneGetDataExt(in_anchor_format, in_anchor_quant_format, (k*4+0), (vx_uint8_ptr)anchor_data, in_anchor_fp, in_anchor_zp, in_anchor_scale);
+                p_proposals[1] = y + vxnneGetDataExt(in_anchor_format, in_anchor_quant_format, (k*4+1), (vx_uint8_ptr)anchor_data, in_anchor_fp, in_anchor_zp, in_anchor_scale);
+                p_proposals[2] = x + vxnneGetDataExt(in_anchor_format, in_anchor_quant_format, (k*4+2), (vx_uint8_ptr)anchor_data, in_anchor_fp, in_anchor_zp, in_anchor_scale);
+                p_proposals[3] = y + vxnneGetDataExt(in_anchor_format, in_anchor_quant_format, (k*4+3), (vx_uint8_ptr)anchor_data, in_anchor_fp, in_anchor_zp, in_anchor_scale);
+
+                p_proposals[4] = vx_nn_rpn_transform_box(
+                                    p_proposals,
+                                    dx, dy,
+                                    d_log_w, d_log_h,
+                                    img_W, img_H,
+                                    min_box_W, min_box_H
+                                  ) * p_score[k * proposal_area];
+                p_proposals += 5;
+            }
+        }
+    }
+
+    /* 3. Sort the proposal buffer */
+    vx_nn_rpn_qsort_box(proposals, 0, proposal_count-1, pre_nms_topn);
+
+    /* 4. NMS */
+    vx_nn_rpn_nms_cpu(pre_nms_topn, proposals, roi_indices, &real_roi, 0, nms_thresh, post_nms_topn);
+
+    /* 5. Retrieve the rois, output proposal buffer to roi_output & score_output */
+    for(i = 0; i < real_roi; i++)
+    {
+        vx_float32 item_index = 0.0f; /* item_index = input score batch, but we only supported single batch */
+        p_proposals = proposals + roi_indices[i] * 5;
+
+        /* Copy proposals coordinate(x1, y1, x2, y2) to roi output tensor */
+        vxnneSaveDataExt((vx_type_e)out_roi_format, out_roi_quant_format, (i * 5 + 0), item_index, (vx_uint8_ptr)out_roi_data, out_roi_fp, out_roi_zp, out_roi_scale, out_roi_rMode);
+        vxnneSaveDataExt((vx_type_e)out_roi_format, out_roi_quant_format, (i * 5 + 1), p_proposals[0], (vx_uint8_ptr)out_roi_data, out_roi_fp, out_roi_zp, out_roi_scale, out_roi_rMode);
+        vxnneSaveDataExt((vx_type_e)out_roi_format, out_roi_quant_format, (i * 5 + 2), p_proposals[1], (vx_uint8_ptr)out_roi_data, out_roi_fp, out_roi_zp, out_roi_scale, out_roi_rMode);
+        vxnneSaveDataExt((vx_type_e)out_roi_format, out_roi_quant_format, (i * 5 + 3), p_proposals[2], (vx_uint8_ptr)out_roi_data, out_roi_fp, out_roi_zp, out_roi_scale, out_roi_rMode);
+        vxnneSaveDataExt((vx_type_e)out_roi_format, out_roi_quant_format, (i * 5 + 4), p_proposals[3], (vx_uint8_ptr)out_roi_data, out_roi_fp, out_roi_zp, out_roi_scale, out_roi_rMode);
+
+        /* Copy proposals score to score output tensor */
+        vxnneSaveDataExt(out_score_format, out_score_quant_format, i, p_proposals[4], (vx_uint8_ptr)out_score_data, out_score_fp, out_score_zp, out_score_scale, out_score_rMode);
+    }
+
+    if(score_buffer) vxFree(score_buffer);
+    if(proposals) vxFree(proposals);
+    if(roi_indices) vxFree(roi_indices);
+
+    return status;
+}
+
+/****************SW Operation Implement End**********************/
+
+VX_PRIVATE_API vx_status vxoGraphBinary_PaserSWLayerParameter(
+    vx_node node,
+    vx_binary_loader_s *binLoad,
+    vx_binary_layer_parameter_s *layerParam,
+    vx_binary_layer_buffer layerBuffer
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint32 i = 0;
+    vx_reference *parameters = node->paramTable;
+
+    switch (layerParam->sourceType)
+    {
+        case VX_BINARY_SOURCE_INPUT:
+        {
+            gctPOINTER tensorLogical  = gcvNULL;
+            vx_uint32 tensorPhysical  = 0;
+            vx_int32 inIndex = layerParam->index;
+            vx_reference ref = parameters[inIndex];
+            if (ref->type == VX_TYPE_TENSOR)
+            {
+                vx_tensor tensor = (vx_tensor)ref;
+                if (!tensor->tensorBuffer->memory.allocated)
+                {
+                    vxmONERROR(vxoTensor_AllocateMemory(tensor));
+                }
+                vxoTensor_GetTensorBatchArrayViewMemory(tensor, 0, &tensorLogical, &tensorPhysical);
+                layerBuffer->buffer = (vx_uint8_ptr)tensorLogical;
+            }
+        }
+        break;
+
+        case VX_BINARY_SOURCE_OUTPUT:
+        {
+            gctPOINTER tensorLogical  = gcvNULL;
+            vx_uint32 tensorPhysical  = 0;
+            vx_uint32 outIndex = layerParam->index + binLoad->fixed.header.inputCount;
+            vx_reference ref = parameters[outIndex];
+            if (ref->type == VX_TYPE_TENSOR)
+            {
+                vx_tensor tensor = (vx_tensor)ref;
+                if (!tensor->tensorBuffer->memory.allocated)
+                {
+                    vxmONERROR(vxoTensor_AllocateMemory(tensor));
+                }
+                vxoTensor_GetTensorBatchArrayViewMemory(tensor, 0, &tensorLogical, &tensorPhysical);
+                layerBuffer->buffer = (vx_uint8_ptr)tensorLogical;
+            }
+        }
+        break;
+
+        case VX_BINARY_SOURCE_MEMORY_POOL:
+        {
+            layerBuffer->buffer = node->binLoadMem->pool.logical + layerParam->addressOffset;
+        }
+        break;
+
+        case VX_BINARY_SOURCE_MISC_DYNAMIC_GENERIC:
+        case VX_BINARY_SOURCE_MISC_DYNAMIC_INPUT:
+        case VX_BINARY_SOURCE_MISC_DYNAMIC_OUTPUT:
+        {
+            vx_int32 index = layerParam->index;
+            layerBuffer->buffer = binLoad->LCD.logical + binLoad->LCDT[index].offset + layerParam->addressOffset;
+        }
+        break;
+
+        default:
+        {
+            vxError("%s[%d]: not support this source type: %d\n", __FUNCTION__, __LINE__, layerParam->sourceType);
+        }
+        break;
+    }
+
+    layerBuffer->dimCount = layerParam->dimCount;
+    layerBuffer->dataFormat = layerParam->dataFormat;
+    layerBuffer->dataType = layerParam->dataType;
+    layerBuffer->quantFormat = layerParam->quantFormat;
+    layerBuffer->fixPointZeroPoint = layerParam->fixPointZeroPoint;
+    layerBuffer->tfScale = layerParam->tfScale;
+    for (i = 0; i < layerParam->dimCount; i++)
+    {
+        layerBuffer->dims[i] = layerParam->dims[i];
+    }
+
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoGraphBinary_patchSWRPN(
+    vx_node node,
+    vx_binary_sw_operation_info_s *swOpData,
+    vx_binary_operation_info_s *operation,
+    vx_binary_loader_s *binLoad,
+    vx_binary_segment_s *segment
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint32 i = 0;
+    vx_binary_layer_parameter_s *layerParam = VX_NULL;
+    vx_binary_nn_layer_RPN_s *rpnLayer = VX_NULL;
+
+    rpnLayer = (vx_binary_nn_layer_RPN_s*)vxAllocateAndZeroMemory(sizeof(vx_binary_nn_layer_RPN_s));
+
+    for (i = 0; i < operation->counterOfPatches; i++)
+    {
+        layerParam = &binLoad->layerParam[operation->indexOfFirstPatch + i];
+
+        if (gcoOS_StrCmp(layerParam->paramName, "score") == 0)
+        {
+            vxoGraphBinary_PaserSWLayerParameter(node, binLoad, layerParam, &rpnLayer->score);
+        }
+        else if (gcoOS_StrCmp(layerParam->paramName, "bbox") == 0)
+        {
+            vxoGraphBinary_PaserSWLayerParameter(node, binLoad, layerParam, &rpnLayer->bbox);
+        }
+        else if (gcoOS_StrCmp(layerParam->paramName, "anchor") == 0)
+        {
+            vxoGraphBinary_PaserSWLayerParameter(node, binLoad, layerParam, &rpnLayer->anchor);
+        }
+        else if (gcoOS_StrCmp(layerParam->paramName, "img_info") == 0)
+        {
+            vxoGraphBinary_PaserSWLayerParameter(node, binLoad, layerParam, &rpnLayer->img_info);
+        }
+        else if (gcoOS_StrCmp(layerParam->paramName, "roi_output") == 0)
+        {
+            vxoGraphBinary_PaserSWLayerParameter(node, binLoad, layerParam, &rpnLayer->roi_output);
+        }
+        else if (gcoOS_StrCmp(layerParam->paramName, "score_output") == 0)
+        {
+            vxoGraphBinary_PaserSWLayerParameter(node, binLoad, layerParam, &rpnLayer->score_output);
+        }
+        else if (gcoOS_StrCmp(layerParam->paramName, "feature_stride") == 0)
+        {
+            vxoGraphBinary_PaserSWLayerParameter(node, binLoad, layerParam, &rpnLayer->feature_stride);
+        }
+        else if (gcoOS_StrCmp(layerParam->paramName, "min_size") == 0)
+        {
+            vxoGraphBinary_PaserSWLayerParameter(node, binLoad, layerParam, &rpnLayer->min_size);
+        }
+        else if (gcoOS_StrCmp(layerParam->paramName, "pre_nms_topn") == 0)
+        {
+            vxoGraphBinary_PaserSWLayerParameter(node, binLoad, layerParam, &rpnLayer->pre_nms_topn);
+        }
+        else if (gcoOS_StrCmp(layerParam->paramName, "post_nms_topn") == 0)
+        {
+            vxoGraphBinary_PaserSWLayerParameter(node, binLoad, layerParam, &rpnLayer->post_nms_topn);
+        }
+        else if (gcoOS_StrCmp(layerParam->paramName, "nms_thresh") == 0)
+        {
+            vxoGraphBinary_PaserSWLayerParameter(node, binLoad, layerParam, &rpnLayer->nms_thresh);
+        }
+        else
+        {
+            vxError("%s[%d]: can't match layer parameter\n", __FUNCTION__, __LINE__);
+        }
+    }
+
+    rpnLayer->base.segmentType = swOpData->swOperationType;
+    segment->base = &rpnLayer->base;
+
+    return status;
+}
+
+/****************SW Operation Implement End**********************/
+
 static void openReader(
     vx_binary_reader_s *reader,
     void *data,
@@ -287,6 +743,8 @@ static vx_status readBinFixed(
     readBinEntry(reader, &binaryLoad->fixed.tpOpDataTable);
     readBinEntry(reader, &binaryLoad->fixed.shOpDataTable);
     readBinEntry(reader, &binaryLoad->fixed.patchDataTable);
+    readBinEntry(reader, &binaryLoad->fixed.layerParamTable);
+    readBinEntry(reader, &binaryLoad->fixed.swOpDataTable);
 
 OnError:
     return status;
@@ -358,8 +816,8 @@ static vx_status readBinDynamic(
     if (binLoad->fixed.layerTable.size > 0)
     {
         vxmONERROR(readerLocate(reader, binLoad->fixed.layerTable.offset));
-        binLoad->layers = (vx_binary_layers_info_s *)(reader->currentData);
-        binLoad->nLayers = binLoad->fixed.layerTable.size / sizeof(vx_binary_layers_info_s);
+        binLoad->layersInfo = (vx_binary_layers_info_s *)(reader->currentData);
+        binLoad->nLayersInfo = binLoad->fixed.layerTable.size / sizeof(vx_binary_layers_info_s);
     }
 
     /* Operation data entries*/
@@ -410,16 +868,33 @@ static vx_status readBinDynamic(
         binLoad->nPdEntries = binLoad->fixed.patchDataTable.size / sizeof(vx_binary_patch_info_s);
     }
 
-    /*allocate all LCD alignment buffer(sates + ks + lut + shcmd)*/
-    if (gcmIS_ERROR(gcoVX_AllocateMemory(binLoad->fixed.LCD.size, (gctPOINTER*)&binLoad->LCD.logical,
-                                        &binLoad->LCD.physical, &binLoad->LCD.nodePtr)))
+    /* layer parameter data entries*/
+    if (binLoad->fixed.layerParamTable.size > 0)
     {
-        vxError("%s[%d]: fail to allocate memory for lcd %d\n", __FUNCTION__, __LINE__);
-        vxmONERROR(VX_ERROR_NO_MEMORY);
+        vxmONERROR(readerLocate(reader, binLoad->fixed.layerParamTable.offset));
+        binLoad->layerParam = (vx_binary_layer_parameter_s *)(reader->currentData);
+        binLoad->nlayerParam = binLoad->fixed.layerParamTable.size / sizeof(vx_binary_layer_parameter_s);
     }
 
+    /* SW op data entries*/
+    if (binLoad->fixed.swOpDataTable.size > 0)
+    {
+        vxmONERROR(readerLocate(reader, binLoad->fixed.swOpDataTable.offset));
+        binLoad->swOpsData = (vx_binary_sw_operation_info_s *)(reader->currentData);
+        binLoad->nSwOps = binLoad->fixed.swOpDataTable.size / sizeof(vx_binary_sw_operation_info_s);
+    }
+
+    /* load LCD */
     if (binLoad->fixed.LCD.size > 0)
     {
+        /*allocate all LCD alignment buffer(sates + ks + lut + shcmd)*/
+        if (gcmIS_ERROR(gcoVX_AllocateMemory(binLoad->fixed.LCD.size, (gctPOINTER*)&binLoad->LCD.logical,
+                                            &binLoad->LCD.physical, &binLoad->LCD.nodePtr)))
+        {
+            vxError("%s[%d]: fail to allocate memory for lcd %d\n", __FUNCTION__, __LINE__);
+            vxmONERROR(VX_ERROR_NO_MEMORY);
+        }
+
         #if LOAD_WHOLE_BINARY_TO_BUFFER
         /*copy LCD data to GPU memory*/
         vxmONERROR(readerLocate(reader, binLoad->fixed.LCD.offset));
@@ -440,6 +915,11 @@ static vx_status readBinDynamic(
             binLoad->dFile = VX_NULL;
         }
         #endif
+    }
+    else
+    {
+        vxError("%s[%d]: lcd size if 0, error\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_FAILURE);
     }
 
     if (binLoad->nOperations < 1)
@@ -578,6 +1058,39 @@ VX_PRIVATE_API gctSIZE_T loadBinaryWhole(
     return readSize;
 }
 
+/*
+aculater layer count in import binary graph mode.
+this is for nn layer dump or sw operation
+*/
+VX_PRIVATE_API vx_uint32 vxoGraphBinary_GetLayerCount(
+    vx_binary_loader_s *binLoad
+    )
+{
+    vx_uint32 layerCount = 0;
+    vx_uint32 swOPCount = 0;
+    vx_uint32 i = 0;
+    vx_binary_operation_info_s *operation = VX_NULL;
+
+    if ((binLoad->context->options.enableNNLayerDump) && (binLoad->nOperations > 0))
+    {
+        layerCount = binLoad->nOperations;/* a operation is layer for nn layer dump feature */
+    }
+    else
+    {
+        for (i = 0; i < binLoad->nOperations; i++)
+        {
+            operation = &binLoad->operations[i];
+            if (VX_BINARY_OPERATION_TYPE_SW == operation->operationType)
+            {
+                swOPCount++;
+            }
+        }
+        layerCount = swOPCount * 2 + 1;
+    }
+
+    return layerCount;
+}
+
 VX_PRIVATE_API vx_status vxoGraphBinary_DumpFile(
     vx_char *layerName,
     vx_uint32 layerId,
@@ -613,7 +1126,28 @@ VX_PRIVATE_API vx_status vxoGraphBinary_DumpFile(
     return status;
 }
 
-VX_INTERNAL_API vx_status vxoGraphBinary_NNLayerDump(
+VX_PRIVATE_API vx_bool vxoGraphBinary_IsSWOperationInBinary(
+    vx_binary_loader_s *binLoad
+    )
+{
+    vx_uint32 i = 0;
+    vx_bool isSW = vx_false_e;
+    vx_binary_segment_s *segment = VX_NULL;
+
+    for (i = 0; i < binLoad->segmentsCount; i++)
+    {
+        segment = &binLoad->segments[i];
+        if ((segment != VX_NULL) && (segment->isSWSegment == vx_true_e))
+        {
+            isSW = vx_true_e;
+            break;
+        }
+    }
+
+    return isSW;
+}
+
+VX_PRIVATE_API vx_status vxoGraphBinary_NNLayerDump(
     vx_node node,
     vx_binary_loader_s *binLoad
     )
@@ -624,9 +1158,8 @@ VX_INTERNAL_API vx_status vxoGraphBinary_NNLayerDump(
     gctPOINTER layerStatesBufferBase = VX_NULL;
     vx_uint8_ptr nodeStatesBuff = (vx_uint8_ptr)node->binLoadMem->statesBuff;
     vx_binary_operation_info_s *operation = VX_NULL;
-    vx_binary_nn_layer_dump_s *nnLayerDump = VX_NULL;
+    vx_binary_segment_s *segment = VX_NULL;
     vx_binary_layers_info_s *layer = VX_NULL;
-    vx_uint32 operationCount = 1;
 
     gcmHEADER_ARG("node=%p, binLoad=%p", node, binLoad);
 
@@ -641,8 +1174,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_NNLayerDump(
         vx_uint32 dumpCount = 0;
         vx_uint32 layerLastOpindex = 0;
 
-        layer = &binLoad->layers[index];
-        operationCount = layer->operationCount;
+        layer = &binLoad->layersInfo[index];
         layerStatesBuffer = (vx_uint8_ptr)layerStatesBufferBase;
 
         /* get this layer command */
@@ -658,22 +1190,22 @@ VX_INTERNAL_API vx_status vxoGraphBinary_NNLayerDump(
 
             if (operation->layerId == index)
             {
-                nnLayerDump = &binLoad->nnlayerDump[i];
-                vxMemCopy((gctPOINTER)layerStatesBuffer, (vx_ptr)(nodeStatesBuff + nnLayerDump->statesStartPos), nnLayerDump->statesSize);
-                layerStatesBuffer += nnLayerDump->statesSize;
-                layerStatesSize += nnLayerDump->statesSize;
+                segment = &binLoad->segments[i];
+                vxMemCopy((gctPOINTER)layerStatesBuffer, (vx_ptr)(nodeStatesBuff + segment->statesStartPos), segment->statesSize);
+                layerStatesBuffer += segment->statesSize;
+                layerStatesSize += segment->statesSize;
 
                 layerLastOpindex = i;
             }
         }
 
         /* get this layer outputs */
-        nnLayerDump = &binLoad->nnlayerDump[layerLastOpindex];
-        for (i = 0; i < nnLayerDump->outputCount; i++)
+        segment = &binLoad->segments[layerLastOpindex];
+        for (i = 0; i < segment->outputCount; i++)
         {
             for (j = 0; j < dumpCount; j++)
             {
-                if (dumpLogical[j] == nnLayerDump->outputlogical[i])
+                if (dumpLogical[j] == segment->outputlogical[i])
                 {
                     break;
                 }
@@ -681,8 +1213,8 @@ VX_INTERNAL_API vx_status vxoGraphBinary_NNLayerDump(
 
             if (j == dumpCount)
             {
-                dumpLogical[dumpCount] = nnLayerDump->outputlogical[i];
-                dumpSize[dumpCount] = nnLayerDump->outputSize[i];
+                dumpLogical[dumpCount] = segment->outputlogical[i];
+                dumpSize[dumpCount] = segment->outputSize[i];
                 dumpCount++;
             }
         }
@@ -705,6 +1237,138 @@ OnError:
     vxFree(layerStatesBufferBase);
     gcmFOOTER_NO();
     return gcmIS_SUCCESS(status) ? VX_SUCCESS : VX_FAILURE;
+}
+
+VX_PRIVATE_API vx_status vxoGraphBinary_SubmitCommand(
+    gctPOINTER statesBuff,
+    vx_uint32 statesSize,
+    vx_binary_loader_s *binLoad,
+    vx_uint32 startOPIndex,
+    vx_uint32 endOPIndex
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint32 maxSize = gcmALIGN_BASE(gcdCMD_BUFFER_SIZE, 64);
+
+    gcmHEADER_ARG("statesBuff=%p, binLoad=%p, statesSize=%d", statesBuff, binLoad, statesSize);
+    if (maxSize == gcdCMD_BUFFER_SIZE)
+    {
+        maxSize = maxSize - 0x800;
+    }
+
+    if (statesSize > maxSize)
+    {
+        vx_uint32  size = 0, replayedSize = 0, i = 0;
+        vx_uint32  replaySize = statesSize;
+        vx_uint8_ptr buffer = (vx_uint8_ptr)statesBuff;
+        vx_binary_operation_info_s *operation = VX_NULL;
+
+        for (i = startOPIndex; i < endOPIndex; i++)
+        {
+            operation = &binLoad->operations[i];
+            if ((operation->operationType == VX_BINARY_OPERATION_TYPE_INIT) ||
+                (operation->operationType == VX_BINARY_OPERATION_TYPE_NONE) ||
+                (operation->operationType == VX_BINARY_OPERATION_TYPE_SW) ||
+                (operation->operationType == VX_BINARY_OPERATION_TYPE_END))
+            {
+                continue;
+            }
+
+            size += binLoad->LCDT[operation->stateLCDTIndex].size;
+            if (size > maxSize)
+            {
+                replaySize = size - binLoad->LCDT[operation->stateLCDTIndex].size;
+                gcmONERROR(gcoVX_Replay((gctPOINTER)(buffer + replayedSize), replaySize));
+                replayedSize += replaySize;
+                size = binLoad->LCDT[operation->stateLCDTIndex].size;
+            }
+        }
+        gcmONERROR(gcoVX_Replay((gctPOINTER)(buffer + replayedSize), size));
+    }
+    else
+    {
+        gcmONERROR(gcoVX_Replay(statesBuff, statesSize));
+    }
+
+OnError:
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoGraphBinary_RunOpearation(
+    vx_node node,
+    vx_binary_loader_s *binLoad
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint32 segmentIndex = 0;
+    vx_binary_segment_s *segment = VX_NULL;
+    vx_uint8_ptr statesBuff = (vx_uint8_ptr)node->binLoadMem->statesBuff;
+
+    gcmHEADER_ARG("node=%p, binLoad=%p", node, binLoad);
+    for (segmentIndex = 0; segmentIndex < binLoad->segmentsCount; segmentIndex++)
+    {
+        segment = &binLoad->segments[segmentIndex];
+
+        if (vx_true_e == segment->isSWSegment)
+        {
+            gcfVX_Flush(gcvTRUE);
+
+            switch (segment->base->segmentType)
+            {
+                case VX_BINARY_SW_OPERATION_RPN:
+                {
+                    do_RPNLayer(segment);
+                }
+                break;
+
+                default:
+                    break;
+            }
+        }
+        else if (segment->statesSize > 0)
+        {
+            vx_uint8_ptr buffer = statesBuff + segment->statesStartPos;
+            vxmONERROR(vxoGraphBinary_SubmitCommand(buffer, segment->statesSize, binLoad,
+                              segment->startOperationIndex, segment->endOperationIndex));
+        }
+        else
+        {
+            vxError("%s[%d]: can't run operation\n", __FUNCTION__, __LINE__);
+        }
+    }
+
+OnError:
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+VX_INTERNAL_API vx_status vxoGraphBinary_Run(
+    vx_node node,
+    vx_binary_loader_s *binLoad
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_bool isSW = vxoGraphBinary_IsSWOperationInBinary(binLoad);
+
+    gcmHEADER_ARG("node=%p, binLoad=%p", node, binLoad);
+    if (node->base.context->options.enableNNLayerDump)
+    {
+        vxoGraphBinary_NNLayerDump(node, binLoad);
+    }
+    else if (vx_true_e == isSW)
+    {
+        vxmONERROR(vxoGraphBinary_RunOpearation(node, binLoad));
+    }
+    else
+    {
+        vxmONERROR(vxoGraphBinary_SubmitCommand(node->binLoadMem->statesBuff,
+                    node->binLoadMem->statesSize, binLoad, 0, binLoad->nOperations));
+    }
+
+OnError:
+    gcmFOOTER_NO();
+    return status;
 }
 
 VX_INTERNAL_API vx_bool vxoGraphBinary_HasBinaryInGraph(
@@ -971,7 +1635,8 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchNN(
     vx_uint8 *statesBuf,
     vx_binary_operation_info_s *operation,
     vx_binary_loader_s *binLoad,
-    vx_uint32 *stateSize
+    vx_uint32 *stateSize,
+    vx_binary_segment_s *segment
     )
 {
     vx_status status = VX_SUCCESS;
@@ -1152,14 +1817,14 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchNN(
                             vxmONERROR(VX_ERROR_INVALID_FORMAT);
                         }
 
-                        if (binLoad->context->options.enableNNLayerDump)
+                        if ((binLoad->context->options.enableNNLayerDump) && (segment != VX_NULL))
                         {
                             vx_size tensorSize = 0;
-                            vx_uint32 outputCount = binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputCount;
+                            vx_uint32 outputCount = segment->outputCount;
                             vxoTensor_GetTensorWholeSize(tensor, &tensorSize);
-                            binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputlogical[outputCount] = (vx_uint8_ptr)tensorLogical;
-                            binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputSize[outputCount] = (vx_uint32)tensorSize;
-                            binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputCount++;
+                            segment->outputlogical[outputCount] = (vx_uint8_ptr)tensorLogical;
+                            segment->outputSize[outputCount] = (vx_uint32)tensorSize;
+                            segment->outputCount++;
                         }
                     }
                     else
@@ -1273,15 +1938,15 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchNN(
                     *memAddr = binLoad->LCD.physical + binLoad->LCDT[nnPatchData->index].offset
                                + (*memAddr - nnPatchData->originalBaseAddress);
 
-                    if (binLoad->context->options.enableNNLayerDump)
+                    if ((binLoad->context->options.enableNNLayerDump) && (segment != VX_NULL))
                     {
-                        vx_uint32 outputCount = binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputCount;
+                        vx_uint32 outputCount = segment->outputCount;
                         vx_uint32 outputSize = binLoad->LCDT[nnPatchData->index].size;
                         vx_uint8_ptr outputlogical = binLoad->LCD.logical + binLoad->LCDT[nnPatchData->index].offset;/* base address to dump */
 
-                        binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputlogical[outputCount] = outputlogical;
-                        binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputSize[outputCount] = outputSize;
-                        binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputCount++;
+                        segment->outputlogical[outputCount] = outputlogical;
+                        segment->outputSize[outputCount] = outputSize;
+                        segment->outputCount++;
                     }
                 }
                 break;
@@ -1310,7 +1975,8 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchTP(
     vx_uint8 *statesBuf,
     vx_binary_operation_info_s *operation,
     vx_binary_loader_s *binLoad,
-    vx_uint32 *stateSize
+    vx_uint32 *stateSize,
+    vx_binary_segment_s *segment
     )
 {
     vx_binary_patch_info_s *tpPatchData = VX_NULL;
@@ -1489,14 +2155,14 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchTP(
                             vxmONERROR(VX_ERROR_INVALID_FORMAT);
                         }
 
-                        if (binLoad->context->options.enableNNLayerDump)
+                        if ((binLoad->context->options.enableNNLayerDump) && (segment != VX_NULL))
                         {
                             vx_size tensorSize = 0;
-                            vx_uint32 outputCount = binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputCount;
+                            vx_uint32 outputCount = segment->outputCount;
                             vxoTensor_GetTensorWholeSize(tensor, &tensorSize);
-                            binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputlogical[outputCount] = (vx_uint8_ptr)tensorLogical;
-                            binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputSize[outputCount] = (vx_uint32)tensorSize;
-                            binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputCount++;
+                            segment->outputlogical[outputCount] = (vx_uint8_ptr)tensorLogical;
+                            segment->outputSize[outputCount] = (vx_uint32)tensorSize;
+                            segment->outputCount++;
                         }
                     }
                     else
@@ -1604,15 +2270,15 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchTP(
                     *memAddr = binLoad->LCD.physical + binLoad->LCDT[tpPatchData->index].offset
                                + (*memAddr - tpPatchData->originalBaseAddress);
 
-                    if (binLoad->context->options.enableNNLayerDump)
+                    if ((binLoad->context->options.enableNNLayerDump) && (segment != VX_NULL))
                     {
-                        vx_uint32 outputCount = binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputCount;
+                        vx_uint32 outputCount = segment->outputCount;
                         vx_uint32 outputSize = binLoad->LCDT[tpPatchData->index].size;
                         vx_uint8_ptr outputlogical = binLoad->LCD.logical + binLoad->LCDT[tpPatchData->index].offset;/* base address to dump*/
 
-                        binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputlogical[outputCount] = outputlogical;
-                        binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputSize[outputCount] = outputSize;
-                        binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputCount++;
+                        segment->outputlogical[outputCount] = outputlogical;
+                        segment->outputSize[outputCount] = outputSize;
+                        segment->outputCount++;
                     }
                 }
                 break;
@@ -1642,7 +2308,8 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSH(
     vx_binary_operation_info_s *operation,
     vx_binary_loader_s *binLoad,
     vx_uint32 *cmdBufSize,
-    vx_uint32 *stateSize
+    vx_uint32 *stateSize,
+    vx_binary_segment_s *segment
     )
 {
     vx_binary_patch_info_s *shPatchData = VX_NULL;
@@ -1919,14 +2586,14 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSH(
                         vxmONERROR(VX_ERROR_INVALID_FORMAT);
                     }
 
-                    if (binLoad->context->options.enableNNLayerDump)
+                    if ((binLoad->context->options.enableNNLayerDump) && (segment != VX_NULL))
                     {
                         vx_size tensorSize = 0;
-                        vx_uint32 outputCount = binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputCount;
+                        vx_uint32 outputCount = segment->outputCount;
                         vxoTensor_GetTensorWholeSize(tensor, &tensorSize);
-                        binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputlogical[outputCount] = (vx_uint8_ptr)tensorLogical;
-                        binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputSize[outputCount] = (vx_uint32)tensorSize;
-                        binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputCount++;
+                        segment->outputlogical[outputCount] = (vx_uint8_ptr)tensorLogical;
+                        segment->outputSize[outputCount] = (vx_uint32)tensorSize;
+                        segment->outputCount++;
                     }
                 }
                 else
@@ -2026,15 +2693,15 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSH(
                 memAddr = (vx_uint32 *)(SHStates + shPatchData->offset);
                 *memAddr = binLoad->LCD.physical + binLoad->LCDT[lcdtIndex].offset + (*memAddr - shPatchData->originalBaseAddress);
 
-                if (binLoad->context->options.enableNNLayerDump)
+                if ((binLoad->context->options.enableNNLayerDump) && (segment != VX_NULL))
                 {
-                    vx_uint32 outputCount = binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputCount;
+                    vx_uint32 outputCount = segment->outputCount;
                     vx_uint32 outputSize = binLoad->LCDT[shPatchData->index].size;
                     vx_uint8_ptr outputlogical = binLoad->LCD.logical + binLoad->LCDT[shPatchData->index].offset; /* base address to dump */
 
-                    binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputlogical[outputCount] = outputlogical;
-                    binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputSize[outputCount] = outputSize;
-                    binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputCount++;
+                    segment->outputlogical[outputCount] = outputlogical;
+                    segment->outputSize[outputCount] = outputSize;
+                    segment->outputCount++;
                 }
             }
             break;
@@ -2061,7 +2728,8 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSC(
     vx_uint8 *SCStates,
     vx_binary_operation_info_s *operation,
     vx_binary_loader_s *binLoad,
-    vx_uint32 *stateSize
+    vx_uint32 *stateSize,
+    vx_binary_segment_s *segment
     )
 {
     vx_status status = VX_SUCCESS;
@@ -2219,14 +2887,14 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSC(
                             vxmONERROR(VX_FAILURE);
                         }
 
-                        if (binLoad->context->options.enableNNLayerDump)
+                        if ((binLoad->context->options.enableNNLayerDump) && (segment != VX_NULL))
                         {
                             vx_size tensorSize = 0;
-                            vx_uint32 outputCount = binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputCount;
+                            vx_uint32 outputCount = segment->outputCount;
                             vxoTensor_GetTensorWholeSize(tensor, &tensorSize);
-                            binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputlogical[outputCount] = (vx_uint8_ptr)tensorLogical;
-                            binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputSize[outputCount] = (vx_uint32)tensorSize;
-                            binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputCount++;
+                            segment->outputlogical[outputCount] = (vx_uint8_ptr)tensorLogical;
+                            segment->outputSize[outputCount] = (vx_uint32)tensorSize;
+                            segment->outputCount++;
                         }
                     }
                     else
@@ -2251,15 +2919,15 @@ VX_PRIVATE_API vx_status vxoGraphBinary_patchSC(
                     memAddr = (vx_uint32 *)(SCStates + scPatchData->offset);
                     *memAddr = binLoad->LCD.physical + binLoad->LCDT[lcdtIndex].offset + (*memAddr - scPatchData->originalBaseAddress);
 
-                    if (binLoad->context->options.enableNNLayerDump)
+                    if ((binLoad->context->options.enableNNLayerDump) && (segment != VX_NULL))
                     {
-                        vx_uint32 outputCount = binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputCount;
+                        vx_uint32 outputCount = segment->outputCount;
                         vx_uint32 outputSize = binLoad->LCDT[scPatchData->index].size;
                         vx_uint8_ptr outputlogical = binLoad->LCD.logical + binLoad->LCDT[scPatchData->index].offset; /* base address to dump */
 
-                        binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputlogical[outputCount] = outputlogical;
-                        binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputSize[outputCount] = outputSize;
-                        binLoad->nnlayerDump[binLoad->nnLayerDumpCount].outputCount++;
+                        segment->outputlogical[outputCount] = outputlogical;
+                        segment->outputSize[outputCount] = outputSize;
+                        segment->outputCount++;
                     }
                 }
                 break;
@@ -2317,6 +2985,36 @@ OnError:
     return status;
 }
 
+
+VX_PRIVATE_API vx_status vxoGraphBinary_patchSW(
+    vx_node node,
+    vx_binary_sw_operation_info_s *swOpData,
+    vx_binary_operation_info_s *operation,
+    vx_binary_loader_s *binLoad,
+    vx_binary_segment_s *segment
+    )
+{
+    vx_status status = VX_SUCCESS;
+
+    switch (swOpData->swOperationType)
+    {
+        case VX_BINARY_SW_OPERATION_RPN:
+        {
+            vxmONERROR(vxoGraphBinary_patchSWRPN(node, swOpData, operation, binLoad, segment));
+        }
+        break;
+
+        default:
+        {
+            vxError("%s[%d]: not support this sw operation : %d\n", __FUNCTION__, __LINE__, swOpData->swOperationType);
+        }
+        break;
+    }
+
+OnError:
+    return status;
+}
+
 VX_PRIVATE_API vx_status binaryGenerateStatesBuffer(
     vx_node node,
     vx_binary_loader_s *binLoad
@@ -2326,6 +3024,8 @@ VX_PRIVATE_API vx_status binaryGenerateStatesBuffer(
     vx_binary_nn_operation_info_s *nnOPData = VX_NULL;
     vx_binary_tp_operation_info_s *tpOPData = VX_NULL;
     vx_binary_sh_operation_info_s *shOPData = VX_NULL;
+    vx_binary_sw_operation_info_s *swOpData = VX_NULL;
+    vx_binary_segment_s *segment = VX_NULL;
     vx_uint8 *nntpCommands = VX_NULL;
     vx_uint8 *shCommands = VX_NULL;
     vx_uint8 *states = VX_NULL;
@@ -2333,6 +3033,13 @@ VX_PRIVATE_API vx_status binaryGenerateStatesBuffer(
     vx_uint32 cmdbufSize = 0;
     vx_uint32 opStateSize = 0;
     vx_uint32 i = 0;
+    vx_uint32 layerIndex = 0;
+    vx_uint32 totalStatesSize = 0;
+    vx_uint32 preLayerId = 0;
+    vx_uint32 endStatesPos = 0;
+    vx_uint32 preSegmentStatesPos = 0;
+    vx_uint32 sumSegmentStatesSize = 0;
+    vx_uint32 startOPIndex = 0;
     gcmHEADER_ARG("node=%p, binLoad=%p", node, binLoad);
 
     nntpCommands = (vx_uint8 *)node->binLoadMem->nntpCmdBuff.logical;
@@ -2344,6 +3051,13 @@ VX_PRIVATE_API vx_status binaryGenerateStatesBuffer(
         operation = &binLoad->operations[i];
         opStateSize = 0;
 
+        if (binLoad->context->options.enableNNLayerDump)
+        {
+            segment = &binLoad->segments[layerIndex];
+            vxmASSERT(layerIndex < binLoad->segmentsCount);
+            layerIndex++;
+        }
+
         switch (operation->operationType)
         {
             case VX_BINARY_OPERATION_TYPE_NN:
@@ -2351,7 +3065,7 @@ VX_PRIVATE_API vx_status binaryGenerateStatesBuffer(
                 nnOPData = &binLoad->nnOpsData[operation->operationIndex];
                 vxmONERROR(vxoGraphBinary_patchNN(node, nnOPData, nntpCommands,
                                           states, operation, binLoad,
-                                          &opStateSize));
+                                          &opStateSize, segment));
                 gcmDUMP(gcvNULL, "#[info: NN command in the binary]");
                 gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_MEMORY, node->binLoadMem->nntpCmdBuff.physical,
                                 node->binLoadMem->nntpCmdBuff.logical,
@@ -2367,7 +3081,7 @@ VX_PRIVATE_API vx_status binaryGenerateStatesBuffer(
                 tpOPData = &binLoad->tpOpsData[operation->operationIndex];
                 vxmONERROR(vxoGraphBinary_patchTP(node, tpOPData, nntpCommands,
                                           states, operation, binLoad,
-                                          &opStateSize));
+                                          &opStateSize, segment));
                 gcmDUMP(gcvNULL, "#[info: TP command in the binary]");
                 gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_MEMORY, node->binLoadMem->nntpCmdBuff.physical,
                                 node->binLoadMem->nntpCmdBuff.logical,
@@ -2383,7 +3097,7 @@ VX_PRIVATE_API vx_status binaryGenerateStatesBuffer(
                 shOPData = &binLoad->shOpsData[operation->operationIndex];
                 vxmONERROR(vxoGraphBinary_patchSH(node, shOPData, shCommands,
                                           states, operation, binLoad,
-                                          &cmdbufSize, &opStateSize));
+                                          &cmdbufSize, &opStateSize, segment));
                 gcmDUMP(gcvNULL, "#[info: SH instructions in the binary]");
                 gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_MEMORY, node->binLoadMem->shCmdBuff.physical,
                                 node->binLoadMem->shCmdBuff.logical,
@@ -2396,7 +3110,7 @@ VX_PRIVATE_API vx_status binaryGenerateStatesBuffer(
 
             case VX_BINARY_OPERATION_TYPE_SC:
             {
-                vxmONERROR(vxoGraphBinary_patchSC(node, states, operation, binLoad, &opStateSize));
+                vxmONERROR(vxoGraphBinary_patchSC(node, states, operation, binLoad, &opStateSize, segment));
                 states += opStateSize;
             }
             break;
@@ -2408,6 +3122,39 @@ VX_PRIVATE_API vx_status binaryGenerateStatesBuffer(
                             binLoad->LCD.logical, binLoad->LCDT[operation->stateLCDTIndex].offset,
                             gcmALIGN(binLoad->LCDT[operation->stateLCDTIndex].size, 64));
                 /* ignore INIT operation */
+            }
+            break;
+
+            case VX_BINARY_OPERATION_TYPE_SW:
+            {
+                /*1. gpu segment */
+                segment = &binLoad->segments[layerIndex];
+                segment->statesStartPos = preSegmentStatesPos;
+                segment->statesSize = sumSegmentStatesSize;
+                segment->layerId = preLayerId;
+                segment->isSWSegment = vx_false_e;
+                segment->startOperationIndex = startOPIndex;
+                segment->endOperationIndex = i + 1;
+
+                startOPIndex = i;
+                endStatesPos = segment->statesStartPos + segment->statesSize;
+                preSegmentStatesPos += sumSegmentStatesSize;
+                sumSegmentStatesSize = 0;
+                opStateSize = 0;
+                layerIndex++;
+
+                /*2. cpu segment */
+                swOpData = &binLoad->swOpsData[operation->operationIndex];
+                vxmASSERT(layerIndex < binLoad->segmentsCount);
+                segment = &binLoad->segments[layerIndex];
+                segment->isSWSegment = vx_true_e;
+                segment->layerId = operation->layerId;
+                segment->startOperationIndex = i;
+                segment->endOperationIndex = i;
+
+                layerIndex++;
+
+                vxmONERROR(vxoGraphBinary_patchSW(node, swOpData, operation, binLoad, segment));
             }
             break;
 
@@ -2426,7 +3173,6 @@ VX_PRIVATE_API vx_status binaryGenerateStatesBuffer(
             }
             break;
 
-            case VX_BINARY_OPERATION_TYPE_SW:
             default:
             {
                 vxError("no implement operation type: %d\n", operation->operationType);
@@ -2437,11 +3183,30 @@ VX_PRIVATE_API vx_status binaryGenerateStatesBuffer(
         if (binLoad->context->options.enableNNLayerDump)
         {
             vx_uint32 statesStartPos = gcmPTR2INT32(states - (vx_uint8 *)node->binLoadMem->statesBuff) - opStateSize;
-            binLoad->nnlayerDump[binLoad->nnLayerDumpCount].statesStartPos = statesStartPos;
-            binLoad->nnlayerDump[binLoad->nnLayerDumpCount].statesSize = opStateSize;
-            binLoad->nnlayerDump[binLoad->nnLayerDumpCount].layerId = operation->layerId;
-            binLoad->nnLayerDumpCount++;
+            segment->statesStartPos = statesStartPos;
+            segment->statesSize = opStateSize;
+            segment->layerId = operation->layerId;
         }
+        else
+        {
+            totalStatesSize += opStateSize;
+            sumSegmentStatesSize += opStateSize;
+            preLayerId = operation->layerId;
+        }
+    }
+
+    if ((endStatesPos != 0) && (totalStatesSize > endStatesPos))
+    {
+        /* for gpu segment with SW operation in binary */
+        segment = &binLoad->segments[layerIndex];
+        segment->statesStartPos = endStatesPos ;
+        segment->statesSize = totalStatesSize - endStatesPos;
+        segment->layerId = preLayerId;
+        segment->isSWSegment = vx_false_e;
+        segment->startOperationIndex = startOPIndex;
+        segment->endOperationIndex = i + 1;
+
+        vxmASSERT(sumSegmentStatesSize == (totalStatesSize - endStatesPos));
     }
 
 OnError:
@@ -2828,11 +3593,11 @@ VX_INTERNAL_API vx_status vxoGraphBinary_LoadFile(
         }
     }
 
-    /* allocate memory for NN layer dump */
-    if ((binLoad->context->options.enableNNLayerDump) && (binLoad->nOperations > 0))
+    /* allocate memory for NN layer dump or SW operation */
+    binLoad->segmentsCount = vxoGraphBinary_GetLayerCount(binLoad);
+    if (binLoad->segmentsCount > 0)
     {
-        binLoad->nnlayerDump = (vx_binary_nn_layer_dump_s*)vxAllocateAndZeroMemory(binLoad->nOperations * sizeof(vx_binary_nn_layer_dump_s));
-        binLoad->nnLayerDumpCount = 0;
+        binLoad->segments = (vx_binary_segment_s*)vxAllocateAndZeroMemory(binLoad->segmentsCount * sizeof(vx_binary_segment_s));
     }
 
     gcmFOOTER_ARG("%d", VX_SUCCESS);
@@ -2862,6 +3627,34 @@ VX_INTERNAL_API vx_status vxoGraphBinary_ReleaseFile(
         vxError("network is NULL, in release binary\n");
         gcmFOOTER_ARG("%d", VX_ERROR_NOT_ALLOCATED);
         return VX_ERROR_NOT_ALLOCATED;
+    }
+
+    /* free SW operation segment object */
+    if (binLoad != VX_NULL)
+    {
+        for (i= 0 ; i < binLoad->segmentsCount; i++)
+        {
+            vx_binary_segment_s *segment = &binLoad->segments[i];
+            if ((segment != VX_NULL) && (segment->isSWSegment == vx_true_e) && (segment->base != VX_NULL))
+            {
+                switch (segment->base->segmentType)
+                {
+                    case VX_BINARY_SW_OPERATION_RPN:
+                    {
+                        vx_binary_nn_layer_RPN_s *rpnLayer = (vx_binary_nn_layer_RPN_s*)segment->base;
+                        gcoOS_Free(gcvNULL, (gctPOINTER)rpnLayer);
+                    }
+                    break;
+
+                    default:
+                    {
+                        vxError("%s[%d]: not release this sw operation : %d\n",
+                            __FUNCTION__, __LINE__, segment->base->segmentType);
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     for (i = 0; i < binLoad->fixed.header.inputCount; i++)
@@ -2900,8 +3693,8 @@ VX_INTERNAL_API vx_status vxoGraphBinary_ReleaseFile(
 
     if ((binLoad->context->options.enableNNLayerDump) && (binLoad->nOperations > 0))
     {
-        vxFree((vx_ptr)binLoad->nnlayerDump);
-        binLoad->nnlayerDump = VX_NULL;
+        vxFree((vx_ptr)binLoad->segments);
+        binLoad->segments = VX_NULL;
     }
 
     if (binLoad->binaryBuffer != VX_NULL)
@@ -3054,6 +3847,65 @@ VX_PRIVATE_API vx_enum vxoGraphBinary_ConvertToBinaryBufferFormat(
             break;
         default:
             ret = VX_BINARY_BUFFER_FORMAT_UINT8;
+            break;
+    }
+
+    return ret;
+}
+
+VX_PRIVATE_API vx_enum vxoGraphBinary_ConvertToBinaryDataFormat(
+    vx_uint32 format
+    )
+{
+    vx_enum ret = VX_BINARY_DATA_FORMAT_UINT8;
+    switch (format)
+    {
+        case VX_TYPE_FLOAT16:
+            ret = VX_BINARY_DATA_FORMAT_FP16;
+            break;
+        case VX_TYPE_FLOAT32:
+            ret = VX_BINARY_DATA_FORMAT_FP32;
+            break;
+        case VX_DF_IMAGE_U32:
+            ret = VX_BINARY_DATA_FORMAT_UINT32;
+            break;
+        case VX_DF_IMAGE_S32:
+            ret = VX_BINARY_DATA_FORMAT_INT32;
+            break;
+        case VX_DF_IMAGE_F32:
+            ret = VX_BINARY_DATA_FORMAT_FP32;
+            break;
+        case VX_TYPE_UINT8:
+            ret = VX_BINARY_DATA_FORMAT_UINT8;
+            break;
+        case VX_DF_IMAGE_U8:
+            ret = VX_BINARY_DATA_FORMAT_UINT8;
+            break;
+        case VX_TYPE_INT8:
+            ret = VX_BINARY_DATA_FORMAT_INT8;
+            break;
+        case VX_TYPE_UINT16:
+        case VX_DF_IMAGE_U16:
+            ret = VX_BINARY_DATA_FORMAT_UINT16;
+            break;
+        case VX_TYPE_INT16:
+        case VX_DF_IMAGE_S16:
+            ret = VX_BINARY_DATA_FORMAT_INT16;
+            break;
+        case VX_TYPE_CHAR:
+            ret = VX_BINARY_DATA_FORMAT_CHAR;
+            break;
+        case VX_TYPE_FLOAT64:
+            ret = VX_BINARY_DATA_FORMAT_FP64;
+            break;
+        case VX_TYPE_INT64:
+            ret = VX_BINARY_DATA_FORMAT_INT64;
+            break;
+        case VX_TYPE_UINT64:
+            ret = VX_BINARY_DATA_FORMAT_UINT64;
+            break;
+        default:
+            ret = VX_BINARY_DATA_FORMAT_UINT8;
             break;
     }
 
@@ -4083,6 +4935,388 @@ VX_PRIVATE_API vx_status vxoGraphBinary_unInitial(
     vxInfo("network binary graph file has been closed\n");
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_bool vxoGraphBinary_isSupportSWOperation(
+    vxnne_operation operation
+    )
+{
+    vx_bool isSupport = vx_false_e;
+
+    if (operation->layer->num_operations != 1)
+    {
+        return isSupport;
+    }
+
+    if (VXNNE_OPERATOR_RPN == operation->operatorType)
+    {
+        isSupport = vx_true_e;
+    }
+
+    return isSupport;
+}
+
+VX_PRIVATE_API vx_uint32 vxoGraphBinary_SaveLayerParamTable(
+    vx_graph graph,
+    void *layerParam
+    )
+{
+    vx_uint32 index = 0;
+    vx_binary_save binarySave = graph->binarySave;
+    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
+                graph->binarySave->currLayerParamOffset, gcvFILE_SEEK_SET);
+    gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_binary_layer_parameter_s), layerParam);
+
+    graph->binarySave->currLayerParamOffset += sizeof(vx_binary_layer_parameter_s);
+    index = graph->binarySave->currLayerParamIndex++;
+
+    return index;
+}
+
+VX_PRIVATE_API vx_status vxoGraphBinary_SaveSWOperationInfo(
+    vx_graph graph,
+    vx_uint32 operationType
+)
+{
+    vx_binary_sw_operation_info_s swOperationInfo;
+    vx_binary_save binarySave = graph->binarySave;
+
+    swOperationInfo.swOperationType = operationType;
+    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
+                binarySave->currSWOperationOffset, gcvFILE_SEEK_SET);
+    gcoOS_Write(gcvNULL, binarySave->binarySaveFile,
+                sizeof(vx_binary_sw_operation_info_s), &swOperationInfo);
+    binarySave->currSWOperationOffset += sizeof(vx_binary_sw_operation_info_s);
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_uint32 vxoGraphBinary_SaveOperationTableForSW(
+    vx_graph graph,
+    vxnne_operation operation,
+    vx_uint32 firstIndex,
+    vx_uint32 paramCount
+    )
+{
+    vx_binary_operation_info_s operationInfo;
+    vx_binary_save binarySave = graph->binarySave;
+    vx_node node = operation->layer->node;
+    vx_uint32 index = 0, layerId = 0;
+    vx_status status = VX_SUCCESS;
+
+    INITIALIZE_STRUCT(operationInfo);
+    /* find layer id */
+    for (index = 0; index < graph->nodeCount; index++)
+    {
+        vx_node nodeTmp = graph->nodeTable[graph->allNodeIndexTable[index]];
+        if (node == nodeTmp)
+        {
+            layerId = index;
+            break;
+        }
+    }
+    if (index == graph->nodeCount)
+    {
+        vxError("%s[%d]: fail to get layer ID in save operation table\n", __FUNCTION__, __LINE__);
+    }
+    operationInfo.indexOfFirstPatch = firstIndex;
+    operationInfo.counterOfPatches = paramCount;
+    operationInfo.layerId = layerId;
+    operationInfo.operationType = VX_BINARY_OPERATION_TYPE_SW;
+    operationInfo.operationIndex = binarySave->currSWOperationIndex++;
+    operationInfo.stateLCDTIndex = 0xFFFF;
+
+    /* find operation location */
+    for (index = 0; index < binarySave->operationCount; index++)
+    {
+        if ((binarySave->operationCmdPhysical[index] == 0) || \
+            (binarySave->swOperationOffset >= binarySave->operationOffset[index]))
+        {
+            continue;
+        }
+        else if (gcmPTR_TO_UINT64(operation) == binarySave->operationCmdPhysical[index])
+        {
+            break;
+        }
+    }
+
+    if (index >= binarySave->operationCount)
+    {
+        vxError("error: fail to save operation, index: %d, opCount: %d\n",
+            index, binarySave->operationCount);
+        vxmONERROR(VX_ERROR_INVALID_VALUE);
+    }
+
+    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
+                binarySave->operationOffset[index], gcvFILE_SEEK_SET);
+    gcoOS_Write(gcvNULL, binarySave->binarySaveFile,
+                sizeof(vx_binary_operation_info_s), &operationInfo);
+    binarySave->swOperationOffset = binarySave->operationOffset[index];
+
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_uint32 vxoGraphBinary_GetSourceType(
+    vx_graph graph,
+    vxnne_operation operation,
+    vx_enum allocType,
+    vx_uint32 wholeSize,
+    vx_uint32 basePhysical,
+    vx_uint8_ptr baseLogical,
+    vx_int32 *index
+)
+{
+    vx_binary_save binarySave = graph->binarySave;
+    vx_uint32 sourceType = 0;
+    *index = -1;
+
+    if (allocType == VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR)
+    {
+        sourceType = VX_BINARY_SOURCE_MEMORY_POOL;
+    }
+    else if (allocType == VXNNE_MEM_POOL_TYPE_ORIG_DDR)
+    {
+        vx_int32 entryIndex = -1, LCDTindex = -1;
+
+        entryIndex = vxoGraphBinary_GetIndexOfInputOutputEntry(binarySave->inputPhysicalEntry, basePhysical);
+        if (-1 == entryIndex)
+        {
+            entryIndex = vxoGraphBinary_GetIndexOfInputOutputEntry(binarySave->outputPhysicalEntry, basePhysical);
+            if (-1 == entryIndex)
+            {
+                vx_uint32 lcdSize = 0;
+
+                LCDTindex = vxoGraphBinary_GetLCDTIndexForTempTensor(graph, basePhysical, &lcdSize);
+                if (-1 == LCDTindex)
+                {
+                    LCDTindex = (vx_int32)vxoGraphBinary_SaveLoadingConfigData(graph, baseLogical, wholeSize);
+                    binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].tensorPhysical = basePhysical;
+                    binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].LCDTIndex = LCDTindex;
+                    binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].size  = wholeSize;
+                    binarySave->numberOfTempTensorInfo++;
+                    vxmASSERT(binarySave->numberOfTempTensorInfo < VX_MAX_TEMP_TENSORS);
+                }
+                else
+                {
+                    if (wholeSize > lcdSize)
+                    {
+                        vxError("error: fail to save tensor to lcd, LCDTindex: %d, lcdSize: %d, tensorSize: %d\n",
+                                LCDTindex, lcdSize, wholeSize);
+                        vxmASSERT(0);
+                    }
+                }
+                sourceType = vxoGraphBinary_GetMiscDynamicSourceType(operation, basePhysical);
+                *index = LCDTindex;
+            }
+            else
+            {
+                sourceType  = VX_BINARY_SOURCE_OUTPUT;
+                *index = entryIndex;
+            }
+        }
+        else
+        {
+            sourceType  = VX_BINARY_SOURCE_INPUT;
+            *index = entryIndex;
+        }
+    }
+
+    if (VX_BINARY_SOURCE_INPUT == sourceType)
+    {
+        binarySave->inputInPatchedBinOffset[binarySave->inputInPatchedNum] = 0xFFFF;
+        binarySave->inputInPatchedPhysical[binarySave->inputInPatchedNum] = basePhysical;
+        binarySave->inputInPatchedIndex[binarySave->inputInPatchedNum] = 0xFFFF;
+        binarySave->inputInPatchedNum++;
+    }
+
+    return sourceType;
+}
+
+VX_PRIVATE_API vx_uint32 vxoGraphBinary_SaveTensorToLayerParamTable(
+    vx_graph graph,
+    vxnne_operation operation,
+    vx_tensor tensor,
+    vx_char *paramName
+    )
+{
+    vx_binary_layer_parameter_s layerParam;
+    vx_size tensorSize = 0;
+    vx_status status = VX_SUCCESS;
+    vx_uint32 wholeSize = 0, index = 0;
+    gctPOINTER viewLogical;
+    vx_uint32 viewPhysical;
+    vx_uint8_ptr baseLogical = TENSOR_LOGICAL_ADDR(tensor);
+    vx_uint32 basePhysical = TENSOR_PHYSICAL_ADDR(tensor);
+    vx_enum allocType = vxoMemory_GetType(&tensor->tensorBuffer->memory);
+    vxoTensor_GetTensorViewMemory(tensor, &viewLogical, &viewPhysical);
+
+    vxoTensor_GetTensorWholeSize(tensor, &tensorSize);
+    wholeSize = (vx_uint32)tensorSize;
+
+    INITIALIZE_STRUCT(layerParam);
+
+    vxmONERROR(vxQueryTensor(tensor, VX_TENSOR_DIMS, layerParam.dims,
+                             sizeof(layerParam.dims)));
+    vxmONERROR(vxQueryTensor(tensor, VX_TENSOR_NUMBER_OF_DIMS, &layerParam.dimCount,
+                             sizeof(layerParam.dimCount)));
+
+    vxMemCopy((vx_ptr)layerParam.paramName, (vx_const_ptr)paramName, sizeof(layerParam.paramName));
+    layerParam.dataFormat = vxoGraphBinary_ConvertToBinaryDataFormat(TENSOR_DATA_TYPE(tensor));
+    layerParam.dataType = VX_BINARY_BUFFER_TYPE_TENSOR;
+    layerParam.quantFormat = TENSOR_QUANT_TYPE(tensor);
+    if (VX_QUANT_DYNAMIC_FIXED_POINT == TENSOR_QUANT_TYPE(tensor))
+    {
+        layerParam.fixPointZeroPoint = TENSOR_POS(tensor);
+    }
+    else
+    {
+        layerParam.tfScale = TENSOR_TF_SCALE(tensor);
+        layerParam.fixPointZeroPoint = TENSOR_TF_ZEROPOINT(tensor);
+    }
+
+    layerParam.sourceType = vxoGraphBinary_GetSourceType(graph, operation, allocType,
+                                                wholeSize, basePhysical, baseLogical, &layerParam.index);
+
+    if (layerParam.sourceType == VX_BINARY_SOURCE_MEMORY_POOL)
+    {
+        layerParam.addressOffset = viewPhysical - graph->memoryPool->physical;
+    }
+    else
+    {
+        layerParam.addressOffset = viewPhysical - basePhysical;
+    }
+
+    index = vxoGraphBinary_SaveLayerParamTable(graph, &layerParam);
+
+OnError:
+    return index;
+}
+
+VX_PRIVATE_API vx_uint32 vxoGraphBinary_SaveScalarToLayerParamTable(
+    vx_graph graph,
+    vxnne_operation operation,
+    vx_scalar scalar,
+    vx_char *paramName
+)
+{
+    vx_binary_layer_parameter_s layerParam;
+    vx_uint32 index = 0;
+    vx_uint32 physical = scalar->physical;
+    vx_uint32 size = vxoScalar_GetTypeSize(scalar);
+
+    vxMemCopy((vx_ptr)layerParam.paramName, (vx_const_ptr)paramName, sizeof(layerParam.paramName));
+    layerParam.dataFormat = vxoGraphBinary_ConvertToBinaryDataFormat(scalar->dataType);
+    layerParam.dataType = VX_BINARY_BUFFER_TYPE_SCALAR;
+    layerParam.quantFormat = 0;
+    layerParam.fixPointZeroPoint = 0;
+    layerParam.tfScale = 0;
+    layerParam.addressOffset = 0;
+    layerParam.dimCount = 1;
+    layerParam.dims[0] = size;
+    layerParam.sourceType = vxoGraphBinary_GetSourceType(graph, operation, VXNNE_MEM_POOL_TYPE_ORIG_DDR,
+                                                        size, physical, (vx_uint8_ptr)scalar->value, &layerParam.index);
+
+    index = vxoGraphBinary_SaveLayerParamTable(graph, &layerParam);
+
+    return index;
+}
+
+VX_PRIVATE_API vx_status vxoGraphBinary_SaveSWRPN(
+    vxnne_operation operation
+)
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint32 indexOfFirst = 0, paramCount = 0;
+    vx_graph graph = operation->layer->node->graph;
+    vxnne_tensor_rpn_operation rpnOperation = (vxnne_tensor_rpn_operation)operation;
+    vx_tensor score = rpnOperation->score;
+    vx_tensor bbox = rpnOperation->bbox;
+    vx_tensor anchor = rpnOperation->anchors;
+    vx_tensor img_info = rpnOperation->img_info;
+    vx_tensor roi_output = rpnOperation->roi_output;
+    vx_tensor score_output = rpnOperation->score_output;
+
+    vx_scalar feature_stride = rpnOperation->feature_stride;
+    vx_scalar min_size = rpnOperation->min_size;
+    vx_scalar pre_nms_topn = rpnOperation->pre_nms_topn;
+    vx_scalar post_nms_topn = rpnOperation->post_nms_topn;
+    vx_scalar nms_thresh = rpnOperation->nms_thresh;
+    gcmHEADER_ARG("operation=%p", operation);
+
+    indexOfFirst = vxoGraphBinary_SaveTensorToLayerParamTable(graph, operation, score, "score");
+    paramCount++;
+
+    vxoGraphBinary_SaveTensorToLayerParamTable(graph, operation, bbox, "bbox");
+    paramCount++;
+
+    vxoGraphBinary_SaveTensorToLayerParamTable(graph, operation, anchor, "anchor");
+    paramCount++;
+
+    vxoGraphBinary_SaveTensorToLayerParamTable(graph, operation, img_info, "img_info");
+    paramCount++;
+
+    vxoGraphBinary_SaveTensorToLayerParamTable(graph, operation, roi_output, "roi_output");
+    paramCount++;
+
+    vxoGraphBinary_SaveTensorToLayerParamTable(graph, operation, score_output, "score_output");
+    paramCount++;
+
+    vxoGraphBinary_SaveScalarToLayerParamTable(graph, operation, feature_stride, "feature_stride");
+    paramCount++;
+
+    vxoGraphBinary_SaveScalarToLayerParamTable(graph, operation, min_size, "min_size");
+    paramCount++;
+
+    vxoGraphBinary_SaveScalarToLayerParamTable(graph, operation, pre_nms_topn, "pre_nms_topn");
+    paramCount++;
+
+    vxoGraphBinary_SaveScalarToLayerParamTable(graph, operation, post_nms_topn, "post_nms_topn");
+    paramCount++;
+
+    vxoGraphBinary_SaveScalarToLayerParamTable(graph, operation, nms_thresh, "nms_thresh");
+    paramCount++;
+
+    vxoGraphBinary_SaveOperationTableForSW(graph, operation, indexOfFirst, paramCount);
+
+    /*5. save SW operation data */
+    vxoGraphBinary_SaveSWOperationInfo(graph, VX_BINARY_SW_OPERATION_RPN);
+
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+VX_INTERNAL_API vx_status vxoGraphBinary_SaveSWOperation(
+    vxnne_operation operation
+)
+{
+    vx_context context = operation->layer->node->base.context;
+    vx_status status = VX_SUCCESS;
+    gcmHEADER_ARG("operation=%p", operation);
+
+    if (0 == context->options.enableSaveBinary)
+    {
+        gcmFOOTER_ARG("%d", VX_SUCCESS);
+        return VX_SUCCESS;
+    }
+
+    switch (operation->operatorType)
+    {
+        case VXNNE_OPERATOR_RPN:
+            vxmONERROR(vxoGraphBinary_SaveSWRPN(operation));
+            break;
+
+        default:
+            vxError("not implement this SW layer in binary graph. operator type: %d\n", operation->operatorType);
+            break;
+    }
+
+    gcmFOOTER_ARG("%d", status);
+    return status;
+OnError:
+    vxError("%s[%d]: fail to save SW layer\n", __FUNCTION__, __LINE__);
+    gcmFOOTER_ARG("%d", status);
+    return status;
 }
 
 VX_PRIVATE_API vx_status vxoGraphBinary_SaveInitialOperation(
@@ -6389,6 +7623,10 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
     inputCount = binarySave->inputParamCount;
     for (i = 0; i < inputCount - 1; i++)
     {
+        if (graph->inputCount && graph->inputs)
+        {
+            break;
+        }
         if (0 != binarySave->inputPhysicalEntry[i])
         {
             for (j = 0; j < i; j++)
@@ -6419,6 +7657,10 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
     outputCount = binarySave->outputParamCount;
     for (i = 0; i < outputCount - 1; i++)
     {
+        if (graph->outputCount && graph->outputs)
+        {
+            break;
+        }
         if (0 != binarySave->outputPhysicalEntry[i])
         {
             for (j = 0; j < i; j++)
@@ -6794,10 +8036,27 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
             }
             vxmASSERT(image->planeCount);
         }
+        else if (operationTarget == VX_BINARY_OPERATION_TYPE_SW)
+        {
+            vx_node node = operation->layer->node;
+            vx_bool isSupport = vxoGraphBinary_isSupportSWOperation(operation);
+            if (!isSupport)
+            {
+                vxError("fail to generate binary, because not support this software operation\n");
+                vxmASSERT(0);
+                vxmONERROR(VX_ERROR_NOT_SUPPORTED);
+            }
+
+            binarySave->swOperationCount++;
+
+            binarySave->loadingDataCount += node->kernel->signature.paramCount;
+
+            binarySave->layerParamCount += node->kernel->signature.paramCount;
+        }
         else
         {
             /* For now, we don't support SW operations in graph binary */
-            vxError("fail to generate binary with software operation in the network\n");
+            vxError("fail to generate binary, not support this operation target\n");
             vxmASSERT(0);
             vxmONERROR(VX_ERROR_NOT_SUPPORTED);
         }
@@ -6818,6 +8077,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
                                 + binarySave->shOperationCount
                                 + binarySave->scOperationCount
                                 + binarySave->initOperationCount
+                                + binarySave->swOperationCount
                                 + binarySave->endOperationCount;
 
     if (0 == binarySave->operationCount)
@@ -7330,6 +8590,12 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
     binarySave->currPatchOffset = currPos;
 
     currPos += binarySave->patchCount * sizeof(vx_binary_patch_info_s);
+    binarySave->currLayerParamOffset = currPos;
+
+    currPos += binarySave->layerParamCount * sizeof(vx_binary_layer_parameter_s);
+    binarySave->currSWOperationOffset = currPos;
+
+    currPos += binarySave->swOperationCount * sizeof(vx_binary_sw_operation_info_s);
     binarySave->currLoadingDataTableOffset = currPos;
 
     currPos += binarySave->loadingDataCount * sizeof(vx_binary_loadingdata_table_info_s);
@@ -7341,7 +8607,7 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
     binarySave->headerInfo.magic[1]= 'P';
     binarySave->headerInfo.magic[2]= 'M';
     binarySave->headerInfo.magic[3]= 'N';
-    binarySave->headerInfo.version = 0x00010001;
+    binarySave->headerInfo.version = 0x00010002;
     binarySave->headerInfo.target = context->pid;
     binarySave->headerInfo.layerCount     = graph->nodeCount;
     binarySave->headerInfo.operationCount = binarySave->operationCount;
@@ -7383,8 +8649,16 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
                                                                     + binarySave->entrancesInfo.shOperationsEntr.shaderOperationDataBytes;
     binarySave->entrancesInfo.patchsEntr.patchDataBytes           = binarySave->patchCount * sizeof(vx_binary_patch_info_s);
 
-    binarySave->entrancesInfo.loadingConfigDataTableEntr.loadingConfigDataTableOffset = binarySave->entrancesInfo.patchsEntr.patchDataOffset
-                                                                                        + binarySave->entrancesInfo.patchsEntr.patchDataBytes;
+    binarySave->entrancesInfo.layerParamEntr.layerParamOffset = binarySave->entrancesInfo.patchsEntr.patchDataOffset
+                                                                + binarySave->entrancesInfo.patchsEntr.patchDataBytes;
+    binarySave->entrancesInfo.layerParamEntr.layerParamBytes = binarySave->layerParamCount * sizeof(vx_binary_layer_parameter_s);
+
+    binarySave->entrancesInfo.swOperationsEntr.swOperationDataOffset = binarySave->entrancesInfo.layerParamEntr.layerParamOffset
+                                                                        + binarySave->entrancesInfo.layerParamEntr.layerParamBytes;
+    binarySave->entrancesInfo.swOperationsEntr.swOperationDataBytes = binarySave->swOperationCount * sizeof(vx_binary_sw_operation_info_s);
+
+    binarySave->entrancesInfo.loadingConfigDataTableEntr.loadingConfigDataTableOffset = binarySave->entrancesInfo.swOperationsEntr.swOperationDataOffset
+                                                                                        + binarySave->entrancesInfo.swOperationsEntr.swOperationDataBytes;
     binarySave->entrancesInfo.loadingConfigDataTableEntr.loadingConfigDataTableBytes  = binarySave->loadingDataCount * sizeof(vx_binary_loadingdata_table_info_s);
 
     binarySave->entrancesInfo.loadingConfigDataEntr.loadingConfigDataOffset = gcmALIGN((binarySave->entrancesInfo.loadingConfigDataTableEntr.loadingConfigDataTableOffset
