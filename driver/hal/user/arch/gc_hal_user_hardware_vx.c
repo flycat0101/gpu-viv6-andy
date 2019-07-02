@@ -1940,7 +1940,7 @@ gcoHARDWAREVX_InvokeThreadWalker(
     }
 #else
     /* Flush the Shader L1 cache. */
-    if (!Hardware->config->parallelBug || !Hardware->options.enableNNTPParallel || Hardware->options.enableSwtilingPhase1)
+    if (!Hardware->config->parallelNoFix || !Hardware->options.enableNNTPParallel || Hardware->options.enableSwtilingPhase1)
     {
         gcmONERROR(gcoHARDWARE_LoadCtrlState(
             Hardware,
@@ -35555,7 +35555,7 @@ gcoHARDWAREVX_TriggerAccelerator(
                          gcoHAL_GetOption(gcvNULL, gcvOPTION_OVX_ENABLE_NN_STRIDE);
         disableSWTiling = enableNNStride ? 0 : 1;
 
-        if (!Hardware->config->parallelBug)
+        if (!Hardware->config->parallelNoFix)
         {
             smallBatch = Hardware->features[gcvFEATURE_NN_SMALLBATCH_PHASE1] ? 0x0 : 0x1;
         }

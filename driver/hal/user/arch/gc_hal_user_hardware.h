@@ -327,7 +327,7 @@ typedef struct _gcsHARDWARE_CONFIG
     vx_nn_config                nnConfig;
     vx_hw_chip_info             hwChipInfo;
 #endif
-    gctBOOL                     parallelBug;
+    gctBOOL                     parallelNoFix;
 }
 gcsHARDWARE_CONFIG;
 

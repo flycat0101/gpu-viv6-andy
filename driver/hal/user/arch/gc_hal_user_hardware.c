@@ -3216,7 +3216,7 @@ if (smallBatch){    Config->vsConstBase  = 0xD000;
 
         if (Config->chipModel == 0x8000 && Config->chipRevision == 0x7120 && Config->customerID == 0x80)
         {
-            Config->parallelBug = 1;
+            Config->parallelNoFix = 1;
         }
     }
 #endif
@@ -19562,7 +19562,7 @@ gcoHARDWARE_FlushPipe(
     else
     {
         /* Flush Z and Color caches. */
-        if (!Hardware->config->parallelBug || !Hardware->options.enableNNTPParallel || Hardware->options.enableSwtilingPhase1)
+        if (!Hardware->config->parallelNoFix || !Hardware->options.enableNNTPParallel || Hardware->options.enableSwtilingPhase1)
         {
             flush = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?

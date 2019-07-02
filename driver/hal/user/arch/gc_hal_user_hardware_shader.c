@@ -2219,7 +2219,7 @@ gcoHARDWARE_InvokeThreadWalkerCL(
     if (!Hardware->features[gcvFEATURE_MCFE])
     {
         /* Flush the Shader L1 cache. */
-        if (!Hardware->config->parallelBug || !Hardware->options.enableNNTPParallel || Hardware->options.enableSwtilingPhase1)
+        if (!Hardware->config->parallelNoFix || !Hardware->options.enableNNTPParallel || Hardware->options.enableSwtilingPhase1)
         {
             gcmONERROR(gcoHARDWARE_LoadCtrlState(
                 Hardware,
@@ -2332,7 +2332,7 @@ gcoHARDWARE_InvokeThreadWalkerCL(
     else
     {
         /* Flush the Shader L1 cache. */
-        if (!Hardware->config->parallelBug || !Hardware->options.enableNNTPParallel || Hardware->options.enableSwtilingPhase1)
+        if (!Hardware->config->parallelNoFix || !Hardware->options.enableNNTPParallel || Hardware->options.enableSwtilingPhase1)
         {
             gcmONERROR(gcoHARDWARE_LoadCtrlState(
                 Hardware,
