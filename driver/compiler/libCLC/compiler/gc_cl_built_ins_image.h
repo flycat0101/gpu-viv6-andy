@@ -8062,7 +8062,7 @@ _GenGetImageWidthCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
-    if (_OCL_USE_INTRINSIC_FOR_IMAGE) {
+    if (_OCL_USE_INTRINSIC_FOR_IMAGE && !cloCOMPILER_IsGcslDriverImage(Compiler)) {
         clsLOPERAND lOperand[1];
 
         clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
@@ -8125,7 +8125,7 @@ _GenGetImageHeightCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
-    if (_OCL_USE_INTRINSIC_FOR_IMAGE) {
+    if (_OCL_USE_INTRINSIC_FOR_IMAGE && !cloCOMPILER_IsGcslDriverImage(Compiler)) {
         clsLOPERAND lOperand[1];
 
         clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
@@ -8187,7 +8187,7 @@ _GenGetImageDepthCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
-    if (_OCL_USE_INTRINSIC_FOR_IMAGE) {
+    if (_OCL_USE_INTRINSIC_FOR_IMAGE && !cloCOMPILER_IsGcslDriverImage(Compiler)) {
         clsLOPERAND lOperand[1];
 
         clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
@@ -8238,7 +8238,7 @@ _GenGetImageChannelDataTypeCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
-    if (_OCL_USE_INTRINSIC_FOR_IMAGE) {
+    if (_OCL_USE_INTRINSIC_FOR_IMAGE && !cloCOMPILER_IsGcslDriverImage(Compiler)) {
         clsLOPERAND lOperand[1];
 
         clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
@@ -8300,7 +8300,7 @@ _GenGetImageChannelOrderCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
-    if (_OCL_USE_INTRINSIC_FOR_IMAGE) {
+    if (_OCL_USE_INTRINSIC_FOR_IMAGE && !cloCOMPILER_IsGcslDriverImage(Compiler)) {
         clsLOPERAND lOperand[1];
 
         clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
@@ -8362,7 +8362,7 @@ _GenGetImageDimCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
-    if (_OCL_USE_INTRINSIC_FOR_IMAGE) {
+    if (_OCL_USE_INTRINSIC_FOR_IMAGE && !cloCOMPILER_IsGcslDriverImage(Compiler)) {
         clsLOPERAND lOperand[1];
 
         clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
@@ -8439,7 +8439,7 @@ _GenGetImageArrayCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
-    if (_OCL_USE_INTRINSIC_FOR_IMAGE) {
+    if (_OCL_USE_INTRINSIC_FOR_IMAGE && !cloCOMPILER_IsGcslDriverImage(Compiler)) {
         clsLOPERAND lOperand[1];
 
         clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);

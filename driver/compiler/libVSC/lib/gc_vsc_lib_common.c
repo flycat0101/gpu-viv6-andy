@@ -1739,7 +1739,7 @@ gcSHADER_InitClBuiltinLibrary(
                 __BUILTIN_SHADER_LENGTH__, builtinLib[i]);
         }
 
-        if (!_OCL_USE_INTRINSIC_FOR_IMAGE)
+        if (!_OCL_USE_INTRINSIC_FOR_IMAGE || gcShaderHasVivGcslDriverImage(Shader))
         {
             if (useImgInst)
             {
