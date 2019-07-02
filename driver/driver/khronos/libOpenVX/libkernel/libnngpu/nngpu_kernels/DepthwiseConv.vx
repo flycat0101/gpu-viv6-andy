@@ -89,7 +89,7 @@ __kernel void gpuDepthwiseConv_Quant8(
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int4 coord_wei = (int4)(0, 0, z, 0);
     float sum = 0;
-    uint4 dst = {0}, tmp = {0};
+    uint4 dst = {0}, tmp0 = {0}, tmp1 = {0};
     int4 biasData;
     float pixel = 0.0, weightValue = 0.0;
 
@@ -104,12 +104,12 @@ __kernel void gpuDepthwiseConv_Quant8(
         {
             for (coord_in.x = inxStart; coord_in.x < inxEnd; coord_in.x++)
             {
-                tmp = read_imageui(input, coord_in);
-                tmp = read_imageui(weight, coord_wei);
+                tmp0 = read_imageui(input, coord_in);
+                tmp1 = read_imageui(weight, coord_wei);
                 coord_wei.x++;
 
-                pixel = convert_float(convert_int(tmp.x-zpIn));
-                weightValue = convert_float(convert_int(tmp.x-zpWeight));
+                pixel = convert_float(convert_int(tmp0.x-zpIn));
+                weightValue = convert_float(convert_int(tmp1.x-zpWeight));
                 sum += (pixel * weightValue);
             }
             coord_wei.x = 0;
