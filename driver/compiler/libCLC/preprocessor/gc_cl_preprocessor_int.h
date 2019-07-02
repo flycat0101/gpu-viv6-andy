@@ -393,6 +393,12 @@ ppoMACRO_MANAGER_Dump(
                       ppoPREPROCESSOR        PP,
                       ppoMACRO_MANAGER        MM);
 
+gceSTATUS
+ppoMACRO_MANAGER_DestroyMacroSymbol(
+                                    ppoPREPROCESSOR      PP,
+                                    ppoMACRO_MANAGER     Macm,
+                                    ppoMACRO_SYMBOL      Ms);
+
 
 /******************************************************************************\
 |*************************** 6 : PP Object **************************|

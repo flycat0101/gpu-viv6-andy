@@ -1799,6 +1799,11 @@ ppoPREPROCESSOR_Undef(ppoPREPROCESSOR PP)
 
     ms->undefined = gcvTRUE;
 
+    ppoMACRO_MANAGER_DestroyMacroSymbol(
+            PP,
+            PP->macroManager,
+            ms);
+
     ppmCheckFuncOk(
         ppoTOKEN_Destroy(PP, ntoken)
         );
@@ -2053,7 +2058,7 @@ ppoPREPROCESSOR_Define(ppoPREPROCESSOR PP)
         ppoMACRO_MANAGER_GetMacroSymbol(PP, PP->macroManager, name, &ms)
         );
 
-    if (ms != gcvNULL)
+    if (ms != gcvNULL && ms->undefined == gcvFALSE)
     {
         redefined = gcvTRUE;
     }
@@ -2151,7 +2156,16 @@ ppoPREPROCESSOR_Define(ppoPREPROCESSOR PP)
             return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
         }
 
+        ms->undefined = gcvFALSE;
         return gcvSTATUS_OK;
+    }
+
+    if (ms && ms->undefined)
+    {
+        ppoMACRO_MANAGER_DestroyMacroSymbol(
+            PP,
+            PP->macroManager,
+            ms);
     }
 
     /*make ms*/
