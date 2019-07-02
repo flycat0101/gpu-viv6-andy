@@ -862,16 +862,19 @@ static gctBOOL _IsFakeSIV(VIR_Shader* pUpperShader, VIR_Shader* pLowerShader,
     return gcvFALSE;
 }
 
-/* check or set IoLocationMask according to last argument */
-static gctBOOL _CheckIoLocationMask(
+/* check or set IoLocationMask according to 4th argument */
+static VSC_ErrCode _CheckIoLocationMask(
     VIR_Symbol      *pVirIoSym,
     VSC_BIT_VECTOR  *locationMask,
     gctUINT         location,
-    gctBOOL         setLocationMask)
+    gctBOOL         setLocationMask,
+    gctBOOL         *hasComponentQualifier
+    )
 {
     gctUINT   j, startComponent = 0, endComponent = 0;
-    gctBOOL   hasComponentQualifier = VIR_Symbol_GetStartAndEndComponentForIO(pVirIoSym, gcvTRUE, &startComponent, &endComponent);
     VSC_ErrCode   errCode = VSC_ERR_NONE;
+    *hasComponentQualifier = VIR_Symbol_GetStartAndEndComponentForIO(pVirIoSym, gcvTRUE, &startComponent, &endComponent);
+
     /* Check if there is any component overlap. */
     for (j = startComponent; j < endComponent; j++)
     {
@@ -886,7 +889,7 @@ static gctBOOL _CheckIoLocationMask(
         }
     }
 OnError:
-    return hasComponentQualifier;
+    return errCode;
 }
 
 static VSC_ErrCode _CheckIoAliasedLocationPerExeObj(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
@@ -968,7 +971,8 @@ static VSC_ErrCode _CheckIoAliasedLocationPerExeObj(VSC_BASE_LINKER_HELPER* pBas
                 else
                 {
                     gctBOOL    hasComponentQualifier;
-                    hasComponentQualifier = _CheckIoLocationMask(pVirIoSym, &locationMask, i, gcvTRUE);
+                    errCode = _CheckIoLocationMask(pVirIoSym, &locationMask, i, gcvTRUE, &hasComponentQualifier);
+                    ON_ERROR(errCode, "Check aliased location");
 
                     /* Save the component qualifier. */
                     if (hasComponentQualifier && pComponentMapListArray)
@@ -997,12 +1001,14 @@ static VSC_ErrCode _CheckIoAliasedLocationPerExeObj(VSC_BASE_LINKER_HELPER* pBas
                                 }
                                 pNextVirIoSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pVirIoIdLsts, next));
                                 nextlocation = VIR_Symbol_GetLocation(pNextVirIoSym);
-                                nextHasComonentQualifer = _CheckIoLocationMask(pNextVirIoSym, &locationMask, nextlocation, gcvFALSE); /* check only */
+                                errCode = _CheckIoLocationMask(pNextVirIoSym, &locationMask, nextlocation, gcvFALSE, &nextHasComonentQualifer); /* check only */
+                                ON_ERROR(errCode, "Check aliased location");
                                 if (nextHasComonentQualifer && (nextlocation > i && (nextlocation < (location + thisVirIoRegCount))))
                                 {
                                     VIR_IdList_Add(&pComponentMapListArray[i], VIR_Symbol_GetIndex(pNextVirIoSym));
                                     vscBV_SetBit(&visitedIoIdx, next);
-                                    _CheckIoLocationMask(pNextVirIoSym, &locationMask, nextlocation, gcvTRUE); /* set locationMask */
+                                    errCode = _CheckIoLocationMask(pNextVirIoSym, &locationMask, nextlocation, gcvTRUE, &nextHasComonentQualifer); /* set locationMask */
+                                    ON_ERROR(errCode, "Check aliased location");
                                 }
                             }
                         }
