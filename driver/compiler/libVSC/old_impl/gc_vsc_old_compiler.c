@@ -6704,7 +6704,13 @@ _addAttrToShader(
     attr->index = (gctUINT16)currIndex;
     *Attr = attr;
 
+    return status;
+
 OnError:
+    if (attr != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, attr);
+    }
     return status;
 }
 
@@ -17814,7 +17820,7 @@ gcSHADER_AddUniform(
 
         if (gcmIS_ERROR(status))
         {
-            gcmOS_SAFE_FREE(gcvNULL, pointer);
+            gcmOS_SAFE_FREE(gcvNULL, uniform);
 
             /* Error. */
             gcmFOOTER();

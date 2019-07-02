@@ -11546,11 +11546,15 @@ static VSC_ErrCode _vscVIR_ReplaceAtomWithExtCall(
         VIR_Inst_SetOpcode(pInst, VIR_OP_EXTCALL);
         VIR_Inst_SetSrcNum(pInst, 2);
 
-        gcoOS_Free(gcvNULL, libFuncName);
+        gcmOS_SAFE_FREE(gcvNULL, libFuncName);
 
         return errCode;
     }
 OnError:
+    if (libFuncName != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, libFuncName);
+    }
     return errCode;
 }
 

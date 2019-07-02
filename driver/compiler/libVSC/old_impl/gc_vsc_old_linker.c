@@ -13476,6 +13476,7 @@ gcLinkTreeThruVirShaders(
     gctUINT32                   *stateDelta = gcvNULL;
     gcsHINT_PTR                 hints = gcvNULL;
     VSC_CORE_SYS_CONTEXT        coreSysCtx;
+    VSC_HW_PIPELINE_SHADERS_STATES hwPgStates = {0};
 
     coreSysCtx.hwCfg = gcHWCaps;
     coreSysCtx.hPrivData = gcvNULL;
@@ -13681,8 +13682,6 @@ gcLinkTreeThruVirShaders(
 
         if (ProgramState)
         {
-            VSC_HW_PIPELINE_SHADERS_STATES hwPgStates = {0};
-
             if (clKernel)
             {
                 vscCreatePrivateData(&coreSysCtx,
@@ -13812,7 +13811,6 @@ gcLinkTreeThruVirShaders(
             hwPgStates.stateBufferSize = 0;
             gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, hwPgStates.pStateDelta));
             hwPgStates.stateDeltaSize = 0;
-
         }
         else
         {
@@ -13926,6 +13924,15 @@ OnError:
     if (coreSysCtx.hPrivData)
     {
         vscDestroyPrivateData(&coreSysCtx, coreSysCtx.hPrivData);
+    }
+
+    if (hwPgStates.pStateBuffer)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, hwPgStates.pStateBuffer);
+    }
+    if (hwPgStates.pStateDelta)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, hwPgStates.pStateDelta);
     }
 
     /* Return the status. */
