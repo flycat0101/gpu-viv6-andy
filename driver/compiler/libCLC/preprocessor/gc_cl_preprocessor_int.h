@@ -529,7 +529,6 @@ struct _ppoPREPROCESSOR
     gctUINT                    version;
     gctSTRING*                 ppedStrings;
     gctUINT                    ppedCount;
-    gctBOOL                    useNewPP;
     gctSTRING                  extensionString;
     ppoHEADERFILEPATH          headerFilePathList;
     gctSTRING                  macroString;
@@ -552,8 +551,7 @@ struct _ppoPREPROCESSOR
 gceSTATUS
 ppoPREPROCESSOR_Construct(
                           cloCOMPILER         Compiler,
-                          ppoPREPROCESSOR*    PP,
-                          gctBOOL             UseNewPP
+                          ppoPREPROCESSOR*    PP
                           );
 
 gceSTATUS

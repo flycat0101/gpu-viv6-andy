@@ -374,8 +374,7 @@ ppoPREPROCESSOR_Construct_InitOperator(cloCOMPILER Compiler, ppoPREPROCESSOR    
 gceSTATUS
 ppoPREPROCESSOR_Construct(
 cloCOMPILER Compiler,
-ppoPREPROCESSOR    *PP,
-gctBOOL UseNewPP
+ppoPREPROCESSOR    *PP
 )
 {
 
@@ -386,13 +385,13 @@ gctBOOL UseNewPP
     {
         /*preprocessor*/
         status = cloCOMPILER_Allocate(Compiler,
-                          sizeof(struct _ppoPREPROCESSOR),
-                          (gctPOINTER *)PP);
+                            sizeof(struct _ppoPREPROCESSOR),
+                            (gctPOINTER *)PP);
         if (status != gcvSTATUS_OK) break;
 
         gcoOS_MemFill(*PP,
-                      0,/*set value*/
-                      sizeof(struct _ppoPREPROCESSOR));
+                        0,/*set value*/
+                        sizeof(struct _ppoPREPROCESSOR));
         (*PP)->compiler = Compiler;
 
         (*PP)->base.file = __FILE__;
@@ -401,48 +400,45 @@ gctBOOL UseNewPP
         (*PP)->base.node.next = gcvNULL;
         (*PP)->base.node.prev = gcvNULL;
         (*PP)->base.type = ppvOBJ_PREPROCESSOR;
-        (*PP)->useNewPP = UseNewPP;
 
-        if ((*PP)->useNewPP)
-        {
-            /* TODO: Construct extension string. */
-            /*_ConstructExtensionString(Compiler, PP);*/
+        /* TODO: Construct extension string. */
+        /*_ConstructExtensionString(Compiler, PP);*/
 
-            /* Keywords. */
-            gcmONERROR(
-                cloCOMPILER_Allocate(
-                    Compiler,
-                    sizeof (struct _ppsKEYWORD),
-                    &pointer
-                    ));
+        /* Keywords. */
+        gcmONERROR(
+            cloCOMPILER_Allocate(
+                Compiler,
+                sizeof (struct _ppsKEYWORD),
+                &pointer
+                ));
 
-            (*PP)->keyword = pointer;
+        (*PP)->keyword = pointer;
 
-            (*PP)->macroString = gcvNULL;
-            (*PP)->macroStringSize = 0;
+        (*PP)->macroString = gcvNULL;
+        (*PP)->macroStringSize = 0;
 
-            gcmONERROR(
-                ppoPREPROCESSOR_Construct_InitKeyword(Compiler, PP));
+        gcmONERROR(
+            ppoPREPROCESSOR_Construct_InitKeyword(Compiler, PP));
 
-            /* Operators. */
-            gcmONERROR(
-                cloCOMPILER_Allocate(
-                    (*PP)->compiler,
-                    sizeof(gctSTRING*)*12,
-                    &pointer
-                    ) );
-            (*PP)->operators = pointer;
+        /* Operators. */
+        gcmONERROR(
+            cloCOMPILER_Allocate(
+                (*PP)->compiler,
+                sizeof(gctSTRING*)*12,
+                &pointer
+                ) );
+        (*PP)->operators = pointer;
 
-            gcoOS_MemFill(
-                (*PP)->operators,
-                (gctUINT8)0,
-                sizeof(gctSTRING*)*12
-                );
+        gcoOS_MemFill(
+            (*PP)->operators,
+            (gctUINT8)0,
+            sizeof(gctSTRING*)*12
+            );
 
-            gcmONERROR(
-                ppoPREPROCESSOR_Construct_InitOperator(Compiler, PP));
-        }
-        return gcvSTATUS_OK;
+        gcmONERROR(
+            ppoPREPROCESSOR_Construct_InitOperator(Compiler, PP));
+
+        return status;
     }
     while(gcvFALSE);
 
@@ -1129,52 +1125,49 @@ ppoPREPROCESSOR_Destroy (ppoPREPROCESSOR PP)
     {
         ppoPREPROCESSOR_Reset(PP);
 
-        if (PP->useNewPP)
+        if (PP->extensionString)
         {
-            if (PP->extensionString)
-            {
-                gcmONERROR(cloCOMPILER_Free(PP->compiler, (gctPOINTER)PP->extensionString));
-                PP->extensionString = gcvNULL;
-            }
-            if (PP->macroString)
-            {
-                gcmONERROR(cloCOMPILER_Free(PP->compiler, (gctPOINTER)PP->macroString));
-                PP->macroString = gcvNULL;
-            }
-            /*release operators of every level*/
-            i = 0;
-            while (PP->operators[i] != gcvNULL)
-            {
-                gcmONERROR(cloCOMPILER_Free(
-                    compiler,
-                    PP->operators[i]
-                    ));
-                i++;
-            }
-
-            gcmONERROR(cloCOMPILER_Free(
-                    compiler,
-                    PP->operators
-                    ));
-
-            /*total number of group of operator, is 12.*/
-            gcmASSERT(i == 11);
-
-            /*release output stream*/
-            gcmONERROR(ppoTOKEN_STREAM_Destroy(
-                PP,
-                PP->outputTokenStreamHead
-                ));
-
-            /*release keyword*/
+            gcmONERROR(cloCOMPILER_Free(PP->compiler, (gctPOINTER)PP->extensionString));
+            PP->extensionString = gcvNULL;
+        }
+        if (PP->macroString)
+        {
+            gcmONERROR(cloCOMPILER_Free(PP->compiler, (gctPOINTER)PP->macroString));
+            PP->macroString = gcvNULL;
+        }
+        /*release operators of every level*/
+        i = 0;
+        while (PP->operators[i] != gcvNULL)
+        {
             gcmONERROR(cloCOMPILER_Free(
                 compiler,
-                PP->keyword
+                PP->operators[i]
+                ));
+            i++;
+        }
+
+        gcmONERROR(cloCOMPILER_Free(
+                compiler,
+                PP->operators
                 ));
 
-            /* release header file path list */
-            gcmONERROR(ppoPREPROCESSOR_FreeHeaderFilePathList(PP));
-        }
+        /*total number of group of operator, is 12.*/
+        gcmASSERT(i == 11);
+
+        /*release output stream*/
+        gcmONERROR(ppoTOKEN_STREAM_Destroy(
+            PP,
+            PP->outputTokenStreamHead
+            ));
+
+        /*release keyword*/
+        gcmONERROR(cloCOMPILER_Free(
+            compiler,
+            PP->keyword
+            ));
+
+        /* release header file path list */
+        gcmONERROR(ppoPREPROCESSOR_FreeHeaderFilePathList(PP));
 
         /*PP*/
         status = cloCOMPILER_Free(compiler,
@@ -1561,43 +1554,22 @@ ppoPREPROCESSOR PP
     gceSTATUS status = gcvSTATUS_INVALID_DATA;
 
     do {
-        if (PP->useNewPP)
+        if(PP->strings)
         {
-            if(PP->strings)
-            {
-                status = cloCOMPILER_Free(PP->compiler, (gctPOINTER)PP->strings);
-                if (status != gcvSTATUS_OK) break;
-            }
-
-            PP->strings = gcvNULL;
-
-            /*lens*/
-            if(PP->lens)
-            {
-                status = cloCOMPILER_Free(PP->compiler, PP->lens);
-                if (status != gcvSTATUS_OK) break;
-            }
-
-            PP->lens = gcvNULL;
+            status = cloCOMPILER_Free(PP->compiler, (gctPOINTER)PP->strings);
+            if (status != gcvSTATUS_OK) break;
         }
-        else
+
+        PP->strings = gcvNULL;
+
+        /*lens*/
+        if(PP->lens)
         {
-            /* Free strings */
-            if (PP->ppedCount > 0) {
-                gctUINT i;
+            status = cloCOMPILER_Free(PP->compiler, PP->lens);
+            if (status != gcvSTATUS_OK) break;
+        }
 
-                for (i=0; i < PP->ppedCount; i++) {
-                    gcmVERIFY_OK(gcoOS_Free(gcvNULL, PP->ppedStrings[i]));
-                }
-           }
-           PP->ppedCount = 0;
-
-           if(PP->ppedStrings) {
-               status = cloCOMPILER_Free(PP->compiler, (gctPOINTER)PP->ppedStrings);
-               if (status != gcvSTATUS_OK) break;
-           }
-           PP->ppedStrings = gcvNULL;
-       }
+        PP->lens = gcvNULL;
 
         /*macro manager*/
         if(PP->macroManager)
@@ -2478,32 +2450,9 @@ gctCONST_STRING    Options
     gcmASSERT(ppvOBJ_PREPROCESSOR == PP->base.type);
     gcmASSERT(Strings);
 
-    do {
-        if (PP->useNewPP)
-        {
-            ppoPREPROCESSOR_SetSourceStrings_New(PP, Strings, Count, Options);
-            return gcvSTATUS_OK;
-        }
-        gcmONERROR(ppoPREPROCESSOR_Reset(PP));
+    gcmONERROR(ppoPREPROCESSOR_SetSourceStrings_New(PP, Strings, Count, Options));
+    return gcvSTATUS_OK;
 
-        /*count*/
-        PP->count = Count;
-        PP->lens = gcvNULL;
-
-        /*strings*/
-        PP->strings = Strings;
-
-        PP->ppedCount = 0;
-        gcmONERROR(cloCOMPILER_Allocate(PP->compiler,
-                            sizeof(gctSTRING*)*Count,
-                            (void*)&PP->ppedStrings));
-
-        gcoOS_MemFill(PP->ppedStrings,
-                         (gctUINT8)0,
-                         sizeof(gctSTRING*)*Count);
-        return gcvSTATUS_OK;
-    }
-    while(gcvFALSE);
 OnError:
     cloCOMPILER_Report(PP->compiler,
                1,

@@ -29,7 +29,6 @@ const char * clcVersion = "\n\0$VERSION$"
 gceSTATUS
 cloPREPROCESSOR_Construct(
     IN  cloCOMPILER     Compiler,
-    IN  gctBOOL         UseNewPP,
     OUT cloPREPROCESSOR *Preprocessor
     )
 {
@@ -40,7 +39,7 @@ cloPREPROCESSOR_Construct(
 
     gcmASSERT(Preprocessor);
 
-    status = ppoPREPROCESSOR_Construct(Compiler, (ppoPREPROCESSOR*)Preprocessor, UseNewPP);
+    status = ppoPREPROCESSOR_Construct(Compiler, (ppoPREPROCESSOR*)Preprocessor);
 
     return status;
 
@@ -68,35 +67,6 @@ cloPREPROCESSOR_Destroy(
     return status;
 }
 
-extern gceSTATUS Clang_Preprocess(cloCOMPILER Compiler, gctCONST_STRING* strings, gctUINT count, gctCONST_STRING Options,
-                                  char ** ppedStrings, gctUINT* ppedCount);
-
-gceSTATUS
-cloPREPROCESSOR_Parse(
-    IN cloPREPROCESSOR Preprocessor,
-    IN gctUINT StringCount,
-    IN gctCONST_STRING Strings[],
-    IN gctCONST_STRING Options
-    )
-{
-    gceSTATUS        status    = gcvSTATUS_INVALID_ARGUMENT;
-    ppoPREPROCESSOR        PP= (ppoPREPROCESSOR)Preprocessor;
-
-    /*gcmHEADER_ARG("Preprocessor=0x%x StringCount=%u Strings[]=0x%x",
-                  Preprocessor, StringCount, Strings);*/
-
-    /* Verify the arguments. */
-    gcmASSERT(PP && PP->base.type == ppvOBJ_PREPROCESSOR);
-    gcmASSERT(StringCount > 0);
-    gcmASSERT(Strings);
-
-    status = ppoPREPROCESSOR_SetSourceStrings(PP, Strings, StringCount, Options);
-    if (status == gcvSTATUS_OK) {
-        status = Clang_Preprocess(PP->compiler, PP->strings, PP->count, Options, PP->ppedStrings, &PP->ppedCount);
-    }
-    return status;
-}
-
 gceSTATUS
 cloPREPROCESSOR_SetSourceStrings(
     IN cloPREPROCESSOR Preprocessor,
@@ -113,7 +83,6 @@ cloPREPROCESSOR_SetSourceStrings(
     gcmASSERT(StringCount > 0);
     gcmASSERT(Strings);
 
-    PP->useNewPP = gcvTRUE;
     status = ppoPREPROCESSOR_SetSourceStrings(PP,
                                               Strings,
                                               StringCount,

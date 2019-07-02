@@ -21,7 +21,6 @@ typedef struct    _ppoPREPROCESSOR*    cloPREPROCESSOR;
 gceSTATUS
 cloPREPROCESSOR_Construct(
     IN cloCOMPILER Compiler,
-    IN gctBOOL UseNewPP,
     OUT cloPREPROCESSOR * PP
     );
 
@@ -38,14 +37,6 @@ cloPREPROCESSOR_SetSourceStrings(
     IN gctCONST_STRING Strings[],
     IN gctCONST_STRING Options
 );
-
-gceSTATUS
-cloPREPROCESSOR_Parse(
-    IN cloPREPROCESSOR PP,
-    IN gctUINT StringCount,
-    IN gctCONST_STRING Strings[],
-    IN gctCONST_STRING Options
-    );
 
 gceSTATUS
 cloPREPROCESSOR_Parse_New(

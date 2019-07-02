@@ -117,7 +117,6 @@ struct _cloCOMPILER
         gctBOOL          longUlongPatch;
         VSC_DIContext *  debugInfo;
         gctBOOL          mainFile;
-        gctBOOL          useNewPP;
     } context;
     cloPREPROCESSOR      preprocessor;
     cloCODE_EMITTER      codeEmitter;
@@ -271,8 +270,6 @@ cloCOMPILER_Construct(
         compiler->context.hasFloatOpsAux = 0;
         compiler->context.fpConfig = cldFpFAST_RELAXED_MATH;
         compiler->context.allowExternSymbols = gcvFALSE;
-        /* query the VC option and set this flag accordingly */
-        compiler->context.useNewPP = gcmOPT_UseCLNewPreprocessor();
 
         patchId = *gcGetPatchId();
 
@@ -377,7 +374,7 @@ cloCOMPILER_Construct(
 
 #ifndef CL_SCAN_NO_PREPROCESSOR
         /* Create the preprocessor */
-        status = cloPREPROCESSOR_Construct(compiler, compiler->context.useNewPP, &compiler->preprocessor);
+        status = cloPREPROCESSOR_Construct(compiler, &compiler->preprocessor);
         if (gcmIS_ERROR(status)) break;
 #endif
 
@@ -2659,29 +2656,17 @@ cloCOMPILER_MakeCurrent(
 
     CurrentCompiler    = Compiler;
 #ifndef CL_SCAN_NO_PREPROCESSOR
-    if (Compiler->context.useNewPP)
-    {
-        status = cloPREPROCESSOR_SetSourceStrings(
-                                            Compiler->preprocessor,
-                                            StringCount,
-                                            Strings,
-                                            Options);
-        if (gcmIS_ERROR(status))         return status;
-    }
-    else
-    {
-        cloPREPROCESSOR   PP= cloCOMPILER_GetPreprocessor(Compiler);
 
-        status = cloPREPROCESSOR_Parse(PP,
-                                       StringCount,
-                                       Strings,
-                                       Options);
-        if (gcmIS_ERROR(status)) return status;
-        status = cloPREPROCESSOR_GetPPedInfo(PP,
-                                             (gctCONST_STRING **) &CurrentCompiler->context.strings,
-                                             &CurrentCompiler->context.stringCount);
-        if (gcmIS_ERROR(status)) return status;
+    status = cloPREPROCESSOR_SetSourceStrings(
+                                        Compiler->preprocessor,
+                                        StringCount,
+                                        Strings,
+                                        Options);
+    if (gcmIS_ERROR(status))
+    {
+        return status;
     }
+
 #else
     CurrentCompiler->context.stringCount    = StringCount;
     CurrentCompiler->context.strings    = Strings;
@@ -2705,35 +2690,23 @@ IN gctINT MaxSize,
 OUT gctSTRING Buffer
 )
 {
-    gctINT ch;
     gceSTATUS   status;
     gctINT      actualSize;
 
     gcmASSERT(CurrentCompiler);
-    if (CurrentCompiler->context.useNewPP)
+
+    status = cloPREPROCESSOR_Parse_New(
+                                CurrentCompiler->preprocessor,
+                                MaxSize,
+                                gcvNULL,
+                                Buffer,
+                                &actualSize);
+
+    if (gcmIS_ERROR(status))
     {
-        status = cloPREPROCESSOR_Parse_New(
-                                    CurrentCompiler->preprocessor,
-                                    MaxSize,
-                                    gcvNULL,
-                                    Buffer,
-                                    &actualSize);
-
-        if (gcmIS_ERROR(status))
-        {
-            return 0;
-        }
-        return actualSize;
+        return 0;
     }
-    else
-    {
-        gcmVERIFY_OK(cloCOMPILER_GetChar(CurrentCompiler, &ch));
-
-        if (ch == T_EOF) return 0;
-
-        Buffer[0] = (gctCHAR)ch;
-        return 1;
-    }
+    return actualSize;
 
 }
 
