@@ -5486,11 +5486,13 @@ _texldInstMod(
     {
     case VIR_RES_OP_TYPE_TEXLD_BIAS:
     case VIR_RES_OP_TYPE_TEXLDP_BIAS:
+    case VIR_RES_OP_TYPE_TEXLD_BIAS_PCF:
         retValue = TEXLDMOD_BIAS;
         break;
 
     case VIR_RES_OP_TYPE_TEXLD_LOD:
     case VIR_RES_OP_TYPE_TEXLDP_LOD:
+    case VIR_RES_OP_TYPE_TEXLD_LOD_PCF:
         retValue = TEXLDMOD_LOD;
         break;
 

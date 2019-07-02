@@ -3160,8 +3160,17 @@ VSC_RES_OP_BIT _VirResOpType2DrviResOpBit(gctUINT resOpType)
     case VIR_RES_OP_TYPE_TEXLD_BIAS:
         return VSC_RES_OP_BIT_TEXLD_BIAS;
 
+    case VIR_RES_OP_TYPE_TEXLD_PCF:
+        return VSC_RES_OP_BIT_TEXLD_PCF;
+
     case VIR_RES_OP_TYPE_TEXLD_LOD:
         return VSC_RES_OP_BIT_TEXLD_LOD;
+
+    case VIR_RES_OP_TYPE_TEXLD_BIAS_PCF:
+        return VSC_RES_OP_BIT_TEXLD_BIAS_PCF;
+
+    case VIR_RES_OP_TYPE_TEXLD_LOD_PCF:
+        return VSC_RES_OP_BIT_TEXLD_LOD_PCF;
 
     case VIR_RES_OP_TYPE_TEXLD_GRAD:
         return VSC_RES_OP_BIT_TEXLD_GRAD;

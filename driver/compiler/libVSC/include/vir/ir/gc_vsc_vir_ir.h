@@ -4031,8 +4031,11 @@ typedef enum _VIR_RES_OP_TYPE
     VIR_RES_OP_TYPE_GATHER          = 11,
     VIR_RES_OP_TYPE_GATHER_PCF      = 12,
     VIR_RES_OP_TYPE_LODQ            = 13,
+    VIR_RES_OP_TYPE_TEXLD_PCF       = 14,
+    VIR_RES_OP_TYPE_TEXLD_BIAS_PCF  = 15,
+    VIR_RES_OP_TYPE_TEXLD_LOD_PCF   = 16,
 
-    VIR_RES_OP_TYPE_COUNT           = VIR_RES_OP_TYPE_LODQ + 1,
+    VIR_RES_OP_TYPE_COUNT           = VIR_RES_OP_TYPE_TEXLD_LOD_PCF + 1,
 }VIR_RES_OP_TYPE;
 
 /* must be the same order as VSC_BI_LIST_NODE */

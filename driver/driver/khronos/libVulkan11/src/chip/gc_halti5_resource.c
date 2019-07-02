@@ -11540,7 +11540,7 @@ const char * halti5_helper_patchFuc(
             HALTI5_PATCH_TX_GATHER_PCF,
             0,
             "_inputgather_pcf_D32SFLOAT",
-            VSC_RES_OP_BIT_GATHER_PCF,
+            VSC_RES_OP_BIT_GATHER_PCF | VSC_RES_OP_BIT_TEXLD_BIAS_PCF,
             0,
             VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHERPCF_D32F
         },
@@ -11728,6 +11728,10 @@ VkResult halti5_updateDescriptorSet(
                         patchInfos[entryIdx].patchStages = binding->std.stageFlags;
                         patchInfos[entryIdx].patchFormat = chipImgv->patchFormat;
                         patchInfos[entryIdx].viewType = imgv->createInfo.viewType;
+                        if (samplers[0])
+                        {
+                            patchInfos[entryIdx].compareOp = samplers[0]->createInfo.compareOp;
+                        }
                         patchInfos[entryIdx].swizzles[0] = __vkConvertSwizzle(imgv->createInfo.components.r, SWIZZLE_RED);
                         patchInfos[entryIdx].swizzles[1] = __vkConvertSwizzle(imgv->createInfo.components.g, SWIZZLE_GREEN);
                         patchInfos[entryIdx].swizzles[2] = __vkConvertSwizzle(imgv->createInfo.components.b, SWIZZLE_BLUE);

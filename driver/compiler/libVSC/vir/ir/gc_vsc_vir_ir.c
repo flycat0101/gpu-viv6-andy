@@ -806,6 +806,10 @@ _CheckTexldParam(
             resOpType = VIR_RES_OP_TYPE_TEXLD_BIAS;
             break;
 
+        case VIR_RES_OP_TYPE_TEXLD_PCF:
+            resOpType = VIR_RES_OP_TYPE_TEXLD_BIAS_PCF;
+            break;
+
         case VIR_RES_OP_TYPE_TEXLDP:
             resOpType = VIR_RES_OP_TYPE_TEXLDP_BIAS;
             break;
@@ -820,6 +824,10 @@ _CheckTexldParam(
         {
         case VIR_RES_OP_TYPE_TEXLD:
             resOpType = VIR_RES_OP_TYPE_TEXLD_LOD;
+            break;
+
+        case VIR_RES_OP_TYPE_TEXLD_PCF:
+            resOpType = VIR_RES_OP_TYPE_TEXLD_LOD_PCF;
             break;
 
         case VIR_RES_OP_TYPE_TEXLDP:
@@ -910,21 +918,30 @@ VIR_Inst_UpdateResOpType(
         {
         case VIR_OP_TEXLD:
         case VIR_OP_TEXLD_U:
-        case VIR_OP_TEXLDPCF:
             resOpType = VIR_RES_OP_TYPE_TEXLD;
             break;
 
+        case VIR_OP_TEXLDPCF:
+            resOpType = VIR_RES_OP_TYPE_TEXLD_PCF;
+            break;
+
         case VIR_OP_TEXLD_BIAS:
-        case VIR_OP_TEXLD_BIAS_PCF:
         case VIR_OP_TEXLD_U_BIAS:
             resOpType = VIR_RES_OP_TYPE_TEXLD_BIAS;
             break;
 
+        case VIR_OP_TEXLD_BIAS_PCF:
+            resOpType = VIR_RES_OP_TYPE_TEXLD_BIAS_PCF;
+            break;
+
         case VIR_OP_TEXLDL:
         case VIR_OP_TEXLD_LOD:
-        case VIR_OP_TEXLD_LOD_PCF:
         case VIR_OP_TEXLD_U_LOD:
             resOpType = VIR_RES_OP_TYPE_TEXLD_LOD;
+            break;
+
+        case VIR_OP_TEXLD_LOD_PCF:
+            resOpType = VIR_RES_OP_TYPE_TEXLD_LOD_PCF;
             break;
 
         case VIR_OP_TEXLDPROJ:

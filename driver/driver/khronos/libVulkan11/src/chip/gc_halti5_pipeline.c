@@ -4986,7 +4986,7 @@ static void halti5_pip_build_patchKeyMask(
                             {
                                 patchKey |= HALTI5_PATCH_TX_GATHER_BIT;
                             }
-                            if (*pResOp & VSC_RES_OP_BIT_GATHER_PCF)
+                            if (*pResOp & (VSC_RES_OP_BIT_GATHER_PCF | VSC_RES_OP_BIT_TEXLD_BIAS_PCF))
                             {
                                 patchKey |= HALTI5_PATCH_TX_GATHER_PCF_BIT;
                             }
@@ -5036,7 +5036,7 @@ static void halti5_pip_build_patchKeyMask(
                             {
                                 patchKey |= HALTI5_PATCH_TX_GATHER_BIT;
                             }
-                            if (*pResOp & VSC_RES_OP_BIT_GATHER_PCF)
+                            if (*pResOp & (VSC_RES_OP_BIT_GATHER_PCF | VSC_RES_OP_BIT_TEXLD_BIAS_PCF))
                             {
                                 patchKey |= HALTI5_PATCH_TX_GATHER_PCF_BIT;
                             }
@@ -5084,7 +5084,7 @@ static void halti5_pip_build_patchKeyMask(
                             {
                                 patchKey |= HALTI5_PATCH_TX_GATHER_BIT;
                             }
-                            if (*pResOp & VSC_RES_OP_BIT_GATHER_PCF)
+                            if (*pResOp & (VSC_RES_OP_BIT_GATHER_PCF | VSC_RES_OP_BIT_TEXLD_BIAS_PCF))
                             {
                                 patchKey |= HALTI5_PATCH_TX_GATHER_PCF_BIT;
                             }
@@ -5133,7 +5133,7 @@ static void halti5_pip_build_patchKeyMask(
                                 {
                                     patchKey |= HALTI5_PATCH_TX_GATHER_BIT;
                                 }
-                                if (*pResOp & VSC_RES_OP_BIT_GATHER_PCF)
+                                if (*pResOp & (VSC_RES_OP_BIT_GATHER_PCF | VSC_RES_OP_BIT_TEXLD_BIAS_PCF))
                                 {
                                     patchKey |= HALTI5_PATCH_TX_GATHER_PCF_BIT;
                                 }
