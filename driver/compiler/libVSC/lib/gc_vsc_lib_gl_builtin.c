@@ -9098,7 +9098,7 @@ gctSTRING gcLibImageStore_2D_float_rg16f =
 gctSTRING gcLibImageStore_2D_float_r16f =
 "void _viv_image_store_image_2d_r16f(highp uvec4 img_desc, ivec2 p, vec4 data)\n"
 "{\n"
-"   vec2 result;\n"
+"   float result;\n"
 "   ivec3 p1;\n"
 "   p1.xy = p;\n"
 "   p1.z = 0;\n"
@@ -9259,7 +9259,7 @@ gctSTRING gcLibImageStore_2D_float_rgba8_snorm =
 gctSTRING gcLibImageStore_2D_float_rg8 =
 "void _viv_image_store_image_2d_rg8(highp uvec4 img_desc, ivec2 p, vec4 data)\n"
 "{\n"
-"   vec4 result;\n"
+"   vec2 result;\n"
 "   ivec3 p1;\n"
 "   p1.xy = p;\n"
 "   p1.z = 0;\n"
@@ -9366,7 +9366,7 @@ gctSTRING gcLibImageStore_2D_int_rgba8i =
 gctSTRING gcLibImageStore_2D_int_rg8i =
 "void _viv_image_store_iimage_2d_rg8i(highp uvec4 img_desc, ivec2 p, ivec4 data)\n"
 "{\n"
-"   ivec4 result;\n"
+"   ivec2 result;\n"
 "   uvec4 img_desc_u = img_desc;\n"
 "   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc_u, p);\n"
 "   uint address = addrRet.y;\n"
@@ -9460,7 +9460,7 @@ gctSTRING gcLibImageStore_2D_uint_rgba8ui =
 gctSTRING gcLibImageStore_2D_uint_rg8ui =
 "void _viv_image_store_uimage_2d_rg8ui(highp uvec4 img_desc, ivec2 p, uvec4 data)\n"
 "{\n"
-"   uvec4 result;\n"
+"   uvec2 result;\n"
 "   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
 "   uint address = addrRet.y;\n"
 "   if (addrRet.x == 0u) {\n"
