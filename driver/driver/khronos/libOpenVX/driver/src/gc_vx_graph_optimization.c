@@ -30,6 +30,18 @@ VX_INTERNAL_API vx_bool vxoGraphOptimization_isV8(vx_reference ref)
     return (vx_bool)(context->nnConfig.derivedFeature.nnXYDPX  == 0 || context->nnConfig.derivedFeature.nnXYDPY  == 0);
 }
 
+VX_INTERNAL_API vx_bool vxoGraphOptimization_dwConvHalSupport(vx_tensor inputTensor)
+{
+    if(!vxoGraphOptimization_isV8((vx_reference)inputTensor))
+        return vx_false_e;
+    if(GET_HW_FEATURE_DWCONV(inputTensor) == 0)
+        return vx_false_e;
+    if(TENSOR_DATA_TYPE(inputTensor) == VX_TYPE_INT16 || TENSOR_DATA_TYPE(inputTensor) == VX_TYPE_UINT16)
+        return vx_false_e;
+
+    return vx_true_e;
+}
+
 VX_INTERNAL_API vx_bool vxoGraphOptimization_nnHalSupport(vx_tensor inputTensor)
 {
     vx_bool     nnSupportFormat  = vx_false_e;
@@ -179,19 +191,31 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                     }
                 }
 
-                if(SCALAR_VALUE(node->paramTable[PARAM_CONV_DEPTH_MULTIPLIER_INDEX], u32) == 0 ||
-                   (node->base.context->nnConfig.customizedFeature.depthWiseSupport != 0 &&
-                    SCALAR_VALUE(node->paramTable[PARAM_CONV_DEPTH_MULTIPLIER_INDEX], u32) == 1)
-                    )
+                if(SCALAR_VALUE(node->paramTable[PARAM_CONV_DEPTH_MULTIPLIER_INDEX], u32) == 0)
                 {
                     if(weightX == weightY || /*weightX == 1 ) ||  tempically pad 1xN to NxN kernel because of terrible arch*/
                         vxoGraphOptimization_isV8((vx_reference)weight))
+                    {
                         nodeOpType = OP_CONVOLUTION;
+                    }
                     else if(vxoGraphOptimization_nnHalSupport(weight) && (strideX == 1) && (strideY == 1) )
+                    {
                         nodeOpType = OP_CONVOLUTION_NxM;
+                    }
+
                  }
                 else
-                    nodeOpType = OP_CONVOLUTION_DW;
+                {
+                    if(SCALAR_VALUE(node->paramTable[PARAM_CONV_DEPTH_MULTIPLIER_INDEX], u32) == 1 &&
+                        vxoGraphOptimization_dwConvHalSupport(weight))
+                    {
+                        nodeOpType = OP_CONVOLUTION;
+                    }
+                    else
+                    {
+                        nodeOpType = OP_CONVOLUTION_DW;/*unroll dewiseconv*/
+                    }
+                }
             }
             break;
         }
@@ -2326,7 +2350,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertAvgPool2Conv(vx_graph grap
                 continue;
 
             /*V8 support depwiseConv hardware feature*/
-            if(vxoGraphOptimization_isV8((vx_reference)input))
+            if(vxoGraphOptimization_dwConvHalSupport(input))
             {
                 vx_uint32 actual_x = stride_x > 1? vxoGraphOptimization_computeFinalKernelSize(kernel_x, stride_x) : kernel_x;
                 vx_uint32 actual_y = stride_y > 1? vxoGraphOptimization_computeFinalKernelSize(kernel_y, stride_y): kernel_y;
@@ -3614,7 +3638,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_unrollDWConv(vx_graph graph)
                     &rounding_policy, &down_scale_size_rounding,
                     &depth_mult, &pad_mode, &pad_const);
 
-            if(graph->base.context->nnConfig.customizedFeature.depthWiseSupport != 0 && depth_mult == 1)
+            if(vxoGraphOptimization_dwConvHalSupport(input) && depth_mult == 1)
                 continue;
 
             if(!vxoGraphOptimization_nnHalSupport(dwweight))
@@ -4206,9 +4230,6 @@ VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
         if(context->options.enableGraphMergeTranspose)
             vxoGraphOptimization_multiTranspose(graph);
 
-        if(context->options.enableTransformNMConv && !vxoGraphOptimization_isV8((vx_reference)graph))
-            vxoGraphOptimization_transformConvNxM(graph);
-
         if(context->options.enableGraphConvertTensorAdd)
             vxoGraphOptimization_TensorAdd2Conv(graph);
 
@@ -4223,6 +4244,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
 
         if(context->options.enableGraphConvertConv2Fc)
             vxoGraphOptimization_conv2fc(graph);
+
+        if(context->options.enableTransformNMConv && !vxoGraphOptimization_isV8((vx_reference)graph))
+            vxoGraphOptimization_transformConvNxM(graph);
 
         if(context->options.enableGraphSwaplayer)
             vxmONERROR(vxoGraphOptimization_LayerSwaping(graph));

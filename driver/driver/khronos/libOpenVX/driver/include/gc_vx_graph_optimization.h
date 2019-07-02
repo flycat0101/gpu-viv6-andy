@@ -83,9 +83,10 @@ EXTERN_C_BEGIN
 #define GET_TENSOR_BATCH(tensor) (TENSOR_DIM_NUM(tensor) == 2 ? TENSOR_SIZE_INDEX(tensor, 1) : TENSOR_SIZE_INDEX(tensor,3))
 
 #define GET_HW_FEATURE_ACCUM_BUf_SIZE(ref)      (((vx_reference)(ref) )->context->nnConfig.fixedFeature.nnAccumBufferDepth)
-#define GET_HW_FEATURE_INPUT_BUF_SIZE(ref)    (((vx_reference)(ref) )->context->nnConfig.fixedFeature.nnInputBufferDepth)
-#define GET_HW_FEATURE_PAD_BIT_SIZE(ref)    (((vx_reference)(ref) )->context->nnConfig.fixedFeature.nnInImageOffsetBits)
-#define GET_HW_FEATURE_MAD_PER_CORE(ref)    (((vx_reference)(ref) )->context->nnConfig.fixedFeature.nnMadPerCore)
+#define GET_HW_FEATURE_INPUT_BUF_SIZE(ref)      (((vx_reference)(ref) )->context->nnConfig.fixedFeature.nnInputBufferDepth)
+#define GET_HW_FEATURE_PAD_BIT_SIZE(ref)        (((vx_reference)(ref) )->context->nnConfig.fixedFeature.nnInImageOffsetBits)
+#define GET_HW_FEATURE_MAD_PER_CORE(ref)        (((vx_reference)(ref) )->context->nnConfig.fixedFeature.nnMadPerCore)
+#define GET_HW_FEATURE_DWCONV(ref)              (((vx_reference)(ref) )->context->nnConfig.customizedFeature.depthWiseSupport)
 
 
 typedef enum _node_op_type_e
