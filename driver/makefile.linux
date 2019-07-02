@@ -112,12 +112,14 @@ endif # VIVANTE_ENABLE_3D or VIVANTE_ENABLE_VG
 
 
 ifeq ($(VIVANTE_ENABLE_3D),1)
-# libGLESv1, libGLESv2, libGLSLC, libVSC
+# libGLESv1, libGLESv2, libGLSLC, libVSC, libVSC_Lite
 LIB_GLES11          := $(AQROOT)/driver/khronos/libGLESv11
 LIB_GLES2X          := $(AQROOT)/driver/khronos/libGLESv3
 LIB_GLSLC           := $(AQROOT)/compiler/libGLSLC
 LIB_VSC             := $(AQROOT)/compiler/libVSC
+LIB_VSC_Lite             := $(AQROOT)/compiler/libVSC_Lite
 LIB_LIST            += $(LIB_VSC)
+LIB_LIST            += $(LIB_VSC_Lite)
 ifeq ($(LINUX_VSIMULATOR),0)
 LIB_LIST            += $(LIB_GLES11) $(LIB_GLES2X) $(LIB_GLSLC)
 endif
@@ -126,12 +128,14 @@ $(LIB_GLES11):      $(LIB_GAL) $(LIB_VSC)
 $(LIB_GLES2X):      $(LIB_GAL) $(LIB_VSC) $(LIB_GLSLC)
 $(LIB_GLSLC):       $(LIB_GAL) $(LIB_VSC)
 $(LIB_VSC):         $(LIB_GAL)
+$(LIB_VSC_Lite):         $(LIB_GAL)
 
 .PHONY: oes11_drv gles11 oes2x_drv gles2x glslc vsc
 oes11_drv gles11:   $(LIB_GLES11)
 oes2x_drv gles2x:   $(LIB_GLES2X)
 glslc:              $(LIB_GLSLC)
 vsc:                $(LIB_VSC)
+vsc_lite:           $(LIB_VSC_Lite)
 
 drivers:            $(LIB_EGL) $(LIB_GLES11) $(LIB_GLES2X)
 endif # VIVANTE_ENABLE_3D

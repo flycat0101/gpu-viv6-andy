@@ -77,6 +77,8 @@ GPU_CONFIG          ?= default
 USE_VXC_BINARY      ?= 0
 USE_NN_ADAPTER      ?= 0
 
+USE_VSC_LITE        ?= 0
+
 USE_STATIC_STDCxx   ?= 0
 
 ################################################################
@@ -475,6 +477,7 @@ GLES2X_DIR          := $(AQROOT)/driver/khronos/libGLESv3
 
 GLSLC_DIR           := $(AQROOT)/compiler/libGLSLC
 VSC_DIR             := $(AQROOT)/compiler/libVSC
+VSC_Lite_DIR        := $(AQROOT)/compiler/libVSC_Lite
 
 VULKAN_DIR          := $(AQROOT)/driver/khronos/libVulkan10
 SPIRV_DIR           := $(AQROOT)/compiler/libSPIRV
