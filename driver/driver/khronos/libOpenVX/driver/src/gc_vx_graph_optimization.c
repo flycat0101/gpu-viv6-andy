@@ -104,6 +104,7 @@ VX_INTERNAL_API vx_uint32 vxoGraphOptimization_getTensorSize(vx_tensor org)
     for(i = 0; i < TENSOR_DIM_NUM(org); i++)
         size *= TENSOR_SIZE_INDEX(org, i);
 
+    gcmFOOTER_ARG("%d", size);
     return size * TENSOR_DATA_SIZE(org);
 }
 
