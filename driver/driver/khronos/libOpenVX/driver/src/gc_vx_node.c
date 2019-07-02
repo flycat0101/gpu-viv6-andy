@@ -695,10 +695,10 @@ VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx
     }
 
     if (node->graph->verified &&
-        (node->kernel->signature.directionTable[index] != VX_INPUT || !node->kernel->kernelShader) &&
+        ((node->numParents && node->numChildren) || !node->kernel->kernelShader) &&
         (node->kernel->enumeration != VX_KERNEL_IMPORT_FROM_FILE))
     {
-        /* Only VXC header node support change INPUT parameters without re-verify */
+        /* Only VXC header/tail node support change parameters without re-verify */
         node->graph->reverify = vx_true_e;
         node->graph->verified = vx_false_e;
     }
