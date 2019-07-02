@@ -96,7 +96,11 @@ IN cloCOMPILER Compiler
 gctCONST_STRING *
 clScanInitIndexToKeywordTableEntries(void);
 
-
+void
+clScanInitLanguageVersion(
+IN gctUINT32 LanguageVersion,
+IN cleEXTENSION Extension
+);
 
 gctINT
 clScanBoolConstant(
