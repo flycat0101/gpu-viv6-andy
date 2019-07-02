@@ -4247,7 +4247,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
         if(node->merged)    continue;
 
         if((nodeType == OP_RELU || nodeType == OP_RELU1 || nodeType == OP_RELU6) &&
-            node->numParents == 1 &&
+            node->numParents == 1 && node->numChildren == 1 &&
             nodeTable[node->parentNodes[0]]->numChildren == 1
             )
         {
@@ -4256,7 +4256,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
             vx_node     child       = nodeTable[node->childNodes[0]];
             vx_node     parent      = nodeTable[node->parentNodes[0]];
             vx_enum     dataType    = TENSOR_DATA_TYPE(reluIn);
-            vx_int32    zp          = 0;    /*it is required to be in range [0, 255]*/
+            vx_int32    zp          = TENSOR_TF_ZEROPOINT(reluOut);    /*it is required to be in range [0, 255]*/
             vx_float32  scale       = TENSOR_TF_SCALE(reluOut);
             vx_float32  max         = scale * (255-zp);
             vx_float32  min         = scale * -zp;
@@ -4279,6 +4279,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
             case OP_RELU:
              {
                  min = 0;
+                 zp = 0;
                  scale = (max - min)/ 255;
                 break;
              }
@@ -4295,6 +4296,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
                 {
                     max = max > 6.0f ? 6.0f : max;
                     min = 0;
+                    zp = 0;
                     scale = (max - min) / 255;
                     break;
                 }
@@ -4305,7 +4307,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
             /*if quantization attribute is changed, and then the child's input has to be update.
                 what's more, if the child node is conv node, the bias's scale has to be updated so that
                 bais's scale = input's scale * weight's scale, which is required*/
-            if(node->numChildren && (TENSOR_TF_SCALE(reluOut) != scale || TENSOR_TF_ZEROPOINT(reluIn) != zp))
+            if(TENSOR_TF_SCALE(reluOut) != scale || TENSOR_TF_ZEROPOINT(reluOut) != zp)
             {
                 vx_tensor weight = NULL, bias = NULL;
                 TENSOR_TF_SCALE(reluOut) = scale;
@@ -4332,10 +4334,6 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
                 {
                     TENSOR_TF_SCALE(bias) = TENSOR_TF_SCALE(reluOut) * TENSOR_TF_SCALE(weight);
                 }
-            }else
-            {
-                TENSOR_TF_SCALE(reluOut) = scale;
-                TENSOR_TF_ZEROPOINT(reluOut) = zp;
             }
 
             vxoGraphOptimization_updateTensorInGraph(node, &reluIn, &reluOut, 1);
