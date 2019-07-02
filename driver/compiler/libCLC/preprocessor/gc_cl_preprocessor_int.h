@@ -101,6 +101,14 @@ typedef struct
 _ppoHEADERFILEPATH
 *ppoHEADERFILEPATH;
 
+typedef enum _ppeIFSECTION_TYPE
+{
+    ppvIFSECTION_NONE       = 0,
+    ppvIFSECTION_IF         = 1,
+    ppvIFSECTION_ELSE       = 2,
+    ppvIFSECTION_ELIF       = 3,
+    ppvIFSECTION_ENDIF      = 4
+}ppeIFSECTION_TYPE;
 
 /******************************************************************************\
 |****************************** 1 : Base Object *******************************|
@@ -612,7 +620,8 @@ ppoPREPROCESSOR_PassEmptyLine(
 
 gceSTATUS
 ppoPREPROCESSOR_Group(
-                      ppoPREPROCESSOR PP
+                      ppoPREPROCESSOR PP,
+                      ppeIFSECTION_TYPE    IfSectionType
                       );
 
 gceSTATUS
@@ -622,7 +631,8 @@ ppoPREPROCESSOR_GroupPart(
 
 gceSTATUS
 ppoPREPROCESSOR_IfSection(
-                          ppoPREPROCESSOR PP
+                          ppoPREPROCESSOR PP,
+                          ppoTOKEN        CurrentToken
                           );
 
 gceSTATUS
@@ -638,7 +648,8 @@ ppoPREPROCESSOR_TextLine(
 
 gceSTATUS
 ppoPREPROCESSOR_ControlLine(
-                            ppoPREPROCESSOR PP
+                            ppoPREPROCESSOR PP,
+                            ppoTOKEN        CurrentToken
                             );
 
 gceSTATUS
@@ -727,10 +738,13 @@ ppoPREPROCESSOR_GuardTokenOfThisLevel(
 
 gceSTATUS
 ppoPREPROCESSOR_Eval(
-                     ppoPREPROCESSOR    PP,
-                     gctSTRING        OptGuarder,
-                     gctINT            Level,
-                     gctINT*            Result);
+    IN ppoPREPROCESSOR      PP,
+    IN gctSTRING            OptGuarder,
+    IN gctINT               Level,
+    IN gctBOOL              EvaluateLine,
+    IN gctBOOL*             MeetStringNum,
+    IN gctINT*              Result
+    );
 
 gceSTATUS
 ppoPREPROCESSOR_EvalInt(

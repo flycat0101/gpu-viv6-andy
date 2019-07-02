@@ -29,7 +29,7 @@ ppoPREPROCESSOR_GuardTokenOfThisLevel(
                                       gctINT                Level,
                                       gctBOOL*            Result)
 {
-    gceSTATUS status = gcvSTATUS_INVALID_ARGUMENT;
+    gceSTATUS status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
 
     gcmASSERT(
         PP
@@ -54,7 +54,7 @@ ppoPREPROCESSOR_GuardTokenOfThisLevel(
     {
         --Level;
 
-        ppmCheckFuncOk(
+        gcmONERROR(
             ppoPREPROCESSOR_IsOpTokenInThisLevel(
             PP,
             Token,
@@ -74,6 +74,9 @@ ppoPREPROCESSOR_GuardTokenOfThisLevel(
     gcmASSERT( gcvFALSE == *Result );
 
     return gcvSTATUS_OK;
+
+OnError:
+    return status;
 }
 
 
@@ -163,7 +166,7 @@ gceSTATUS  ppoPREPROCESSOR_EvalInt(
                 "The input token's type inputStream int but the poolString contains"
                 "some digit not number:%c.",
                 traveler[0]);
-            return gcvSTATUS_INVALID_DATA;
+            return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
         }
         *Result    = (traveler[0] - '0');
         return gcvSTATUS_OK;
@@ -182,12 +185,11 @@ gceSTATUS  ppoPREPROCESSOR_EvalInt(
             clvREPORT_ERROR,
             "%s can not be eval out.",
             Token->poolString);
-        return gcvSTATUS_INVALID_DATA;
+        return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
     }
     if(temp_bool)
     {
         /*hex*/
-        w = 0;
         while(len >= 3)
         {
             gctINT    tmp = 0;
@@ -198,7 +200,7 @@ gceSTATUS  ppoPREPROCESSOR_EvalInt(
                     "eval_int : The input token's type inputStream int but \
                     the poolString contains some digit not hex number:%c.",
                     traveler[len-1]);
-                return gcvSTATUS_INVALID_DATA;
+                return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
             }
             if(ppoPREPROCESSOR_isnum(traveler[len-1]))
             {
@@ -219,7 +221,7 @@ gceSTATUS  ppoPREPROCESSOR_EvalInt(
                     "eval_int : The input token's type inputStream int but \
                     the poolString contains some digit not hex number:%c.",
                     traveler[len-1]);
-                return gcvSTATUS_INVALID_DATA;
+                return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
             }
             (*Result) = (*Result) + (tmp * (gctINT)ppoPREPROCESSOR_Pow((int)16, w));
             ++w;
@@ -230,7 +232,6 @@ gceSTATUS  ppoPREPROCESSOR_EvalInt(
     if(Token->poolString[0] == '0')
     {
         /*oct*/
-        w = 0;
         while(len >= 2)
         {
             if(!ppoPREPROCESSOR_isoctnum(traveler[len-1])){
@@ -240,7 +241,7 @@ gceSTATUS  ppoPREPROCESSOR_EvalInt(
                     "eval_int : The input token's type inputStream \
                     int but the poolString contains some digit not\
                     oct number:%c.", traveler[len-1]);
-                return gcvSTATUS_INVALID_ARGUMENT;
+                return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
             }
             (*Result) = (*Result) + ((traveler[len-1] - '0') * (gctINT)ppoPREPROCESSOR_Pow((int)8, w));
             ++w;
@@ -256,7 +257,7 @@ gceSTATUS  ppoPREPROCESSOR_EvalInt(
                 clvREPORT_INTERNAL_ERROR,
                 "eval_int : The input token's type inputStream int but the \
                 poolString contains some digit not number:%c.", traveler[len-1]);
-            return gcvSTATUS_INVALID_ARGUMENT;
+            return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
         }
         (*Result) = (*Result) + ((traveler[len-1] - '0') * (gctINT)ppoPREPROCESSOR_Pow((int)10, w));
         ++w;
@@ -289,7 +290,7 @@ gceSTATUS    ppoPREPROCESSOR_Eval_GetToken_FILE_LINE_VERSION_GL_ES(
 
     char        numberbuffer [128];
 
-    gceSTATUS status = gcvSTATUS_INVALID_DATA;
+    gceSTATUS status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
 
     gcoOS_MemFill(numberbuffer, 0, 128);
 
@@ -301,25 +302,19 @@ gceSTATUS    ppoPREPROCESSOR_Eval_GetToken_FILE_LINE_VERSION_GL_ES(
     {
         token_cons_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute __FILE__";
 
-        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d\0", PP->currentSourceFileStringNumber);
+        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", PP->currentSourceFileStringNumber);
     }
     else if(Token->poolString == PP->keyword->_line_)
     {
         token_cons_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute __LINE__";
 
-        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d\0", PP->currentSourceFileLineNumber);
+        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", PP->currentSourceFileLineNumber);
     }
     else if(Token->poolString == PP->keyword->_version_)
     {
         token_cons_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute __VERSION__";
 
-        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d\0", PP->version);
-    }
-    else if(Token->poolString == PP->keyword->gl_es)
-    {
-        token_cons_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute GL_ES";
-
-        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d\0", 1);
+        gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", PP->version);
     }
     else
     {
@@ -328,9 +323,9 @@ gceSTATUS    ppoPREPROCESSOR_Eval_GetToken_FILE_LINE_VERSION_GL_ES(
         return gcvSTATUS_OK;
     }
 
-    status = ppoTOKEN_Construct(PP, __FILE__, __LINE__, token_cons_str,    &newtoken); ppmCheckOK();
+    gcmONERROR(ppoTOKEN_Construct(PP, __FILE__, __LINE__, token_cons_str,    &newtoken));
 
-    status = cloCOMPILER_AllocatePoolString(PP->compiler, numberbuffer,    &(newtoken->poolString)); ppmCheckOK();
+    gcmONERROR(cloCOMPILER_AllocatePoolString(PP->compiler, numberbuffer,    &(newtoken->poolString)));
 
     newtoken->hideSet        = gcvNULL;
 
@@ -343,6 +338,13 @@ gceSTATUS    ppoPREPROCESSOR_Eval_GetToken_FILE_LINE_VERSION_GL_ES(
     *Out = newtoken;
 
     return gcvSTATUS_OK;
+OnError:
+    if (newtoken != gcvNULL)
+    {
+        gcmVERIFY_OK(ppoTOKEN_Destroy(PP, newtoken));
+        newtoken = gcvNULL;
+    }
+    return status;
 }
 gceSTATUS    ppoPREPROCESSOR_Eval_GetToken(
     ppoPREPROCESSOR    PP,
@@ -350,7 +352,7 @@ gceSTATUS    ppoPREPROCESSOR_Eval_GetToken(
     gctBOOL            ICareWhiteSpace
     )
 {
-    gceSTATUS    status  =   gcvSTATUS_INVALID_DATA;
+    gceSTATUS    status  =   gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
 
     ppoTOKEN    token    =    gcvNULL;
 
@@ -366,13 +368,13 @@ gceSTATUS    ppoPREPROCESSOR_Eval_GetToken(
 
     ppoTOKEN expanded_end    =    gcvNULL;
 
-    status = PP->inputStream->GetToken(PP, &(PP->inputStream), &token, !ppvICareWhiteSpace); ppmCheckOK();
+    gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &token, !ppvICareWhiteSpace));
 
     /* If this token is from a macro, it may be a NUL, we need to skip it. */
     while (token->type == ppvTokenType_NUL)
     {
         status = ppoTOKEN_Destroy(PP, token);
-        status = PP->inputStream->GetToken(PP, &(PP->inputStream), &token, !ppvICareWhiteSpace); ppmCheckOK();
+        gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &token, !ppvICareWhiteSpace));
     }
 
     if(token->type != ppvTokenType_ID || token->poolString == PP->keyword->defined)
@@ -381,20 +383,27 @@ gceSTATUS    ppoPREPROCESSOR_Eval_GetToken(
         return gcvSTATUS_OK;
     }
 
-    status = ppoPREPROCESSOR_Eval_GetToken_FILE_LINE_VERSION_GL_ES(PP, token,Token, &is_predefined);
-
-    ppmCheckOK();
+    gcmONERROR(ppoPREPROCESSOR_Eval_GetToken_FILE_LINE_VERSION_GL_ES(PP, token,Token, &is_predefined));
 
     if (is_predefined == gcvTRUE)
     {
-        return ppoTOKEN_Destroy(PP, token);
+        status = ppoTOKEN_Destroy(PP, token);
+        token = gcvNULL;
+
+        if (gcmIS_SUCCESS(status))
+        {
+            return gcvSTATUS_OK;
+        }
+        else
+        {
+            return status;
+        }
     }
     /*Try to expand this ID.*/
-    status = ppoHIDE_SET_LIST_ContainSelf(PP, token, &token_contain_self);
 
-    status = ppoMACRO_MANAGER_GetMacroSymbol(PP, PP->macroManager, token->poolString, &ms);
+    gcmONERROR(ppoHIDE_SET_LIST_ContainSelf(PP, token, &token_contain_self));
 
-    ppmCheckOK();
+    gcmONERROR(ppoMACRO_MANAGER_GetMacroSymbol(PP, PP->macroManager, token->poolString, &ms));
 
     if (gcvTRUE == token_contain_self || gcvNULL == ms )
     {
@@ -402,18 +411,17 @@ gceSTATUS    ppoPREPROCESSOR_Eval_GetToken(
         return gcvSTATUS_OK;
     }
 
-    status = ppoINPUT_STREAM_UnGetToken(PP,&(PP->inputStream), token); ppmCheckOK();
+    gcmONERROR(ppoINPUT_STREAM_UnGetToken(PP,&(PP->inputStream), token));
 
-    ppmCheckFuncOk(ppoTOKEN_Destroy(PP, token));
+    gcmONERROR(ppoTOKEN_Destroy(PP, token));
+    token = gcvNULL;
 
-    status = ppoPREPROCESSOR_MacroExpand(
+    gcmONERROR(ppoPREPROCESSOR_MacroExpand(
         PP,
         &(PP->inputStream),
         &expanded_head,
         &expanded_end,
-        &is_there_any_expanation_happened_internal);
-
-    ppmCheckOK();
+        &is_there_any_expanation_happened_internal));
 
     /*both null or both not null*/
     gcmASSERT(
@@ -425,7 +433,11 @@ gceSTATUS    ppoPREPROCESSOR_Eval_GetToken(
 
     if(expanded_head == gcvNULL)
     {
-        return ppoPREPROCESSOR_Eval_GetToken(PP, Token, ICareWhiteSpace);
+        gcmONERROR(ppoPREPROCESSOR_Eval_GetToken(PP, Token, ICareWhiteSpace));
+        if (gcmIS_SUCCESS(status))
+        {
+            return gcvSTATUS_OK;
+        }
     }
 
     if (gcvTRUE == is_there_any_expanation_happened_internal && expanded_head != gcvNULL)
@@ -440,13 +452,61 @@ gceSTATUS    ppoPREPROCESSOR_Eval_GetToken(
 
         expanded_head->inputStream.base.node.next = gcvNULL;
 
-
-        return ppoPREPROCESSOR_Eval_GetToken(PP, Token, ICareWhiteSpace);
+        gcmONERROR(ppoPREPROCESSOR_Eval_GetToken(PP, Token, ICareWhiteSpace));
+        if (gcmIS_SUCCESS(status))
+        {
+            return gcvSTATUS_OK;
+        }
     }
 
     *Token = expanded_head;
 
     return gcvSTATUS_OK;
+
+OnError:
+    if (token != gcvNULL)
+    {
+        gcmVERIFY_OK(ppoTOKEN_Destroy(PP, token));
+        token = gcvNULL;
+    }
+    return status;
+}
+
+gceSTATUS
+ppoPREPROCESSOR_Eval_Case_Left_Para(
+                                    ppoPREPROCESSOR    PP,
+                                    gctBOOL            EvaluateLine,
+                                    gctBOOL            *MeetStringNum,
+                                    gctINT*            Result
+                                    )
+{
+    gceSTATUS status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+
+    ppoTOKEN token = gcvNULL;
+
+    gcmHEADER_ARG("PP=0x%x Result=0x%x", PP, Result);
+
+    gcmONERROR(ppoPREPROCESSOR_Eval(PP, PP->keyword->rpara, 0, EvaluateLine, MeetStringNum, Result));
+
+    /*( expression*/
+    gcmONERROR(ppoPREPROCESSOR_Eval_GetToken(PP, &token, !ppvICareWhiteSpace));
+
+    if(token->poolString != PP->keyword->rpara)
+    {
+        ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR, ") inputStream expected.");
+        status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+        gcmFOOTER();
+        return status;
+    }
+
+    gcmONERROR(ppoTOKEN_Destroy(PP, token));
+
+    gcmFOOTER_ARG("*Result=%d", *Result);
+    return gcvSTATUS_OK;
+
+OnError:
+    gcmFOOTER();
+    return status;
 }
 
 /*******************************************************************************
@@ -459,53 +519,69 @@ gceSTATUS    ppoPREPROCESSOR_Eval_GetToken(
 gceSTATUS
 ppoPREPROCESSOR_Eval_Case_Basic_Level(
                                       ppoPREPROCESSOR    PP,
-                                      ppoTOKEN            Token,
+                                      ppoTOKEN           Token,
+                                      gctBOOL            EvaluateLine,
+                                      gctBOOL            *MeetStringNum,
                                       gctINT*            Result
                                       )
 {
+    if ((Token->type == ppvTokenType_ID)
+    &&  gcmIS_SUCCESS(gcoOS_StrCmp(Token->poolString, "GL_FRAGMENT_PRECISION_HIGH"))
+    )
+    {
+        *Result = 1;
+        return gcvSTATUS_OK;
+    }
+    else if(Token->poolString == PP->keyword->lpara)
+    {
+        /*(*/
+        return ppoPREPROCESSOR_Eval_Case_Left_Para(PP, EvaluateLine, MeetStringNum, Result);
+    }
+
     if(Token->type != ppvTokenType_INT)
     {
-        /* Treat undefined ID as zero */
-        *Result = 0;
-        return gcvSTATUS_OK;
+        if((!PP->skipOPError) ||
+           (PP->skipOPError && Token->type != ppvTokenType_ID))
+        {
+            if (Token->type == ppvTokenType_ID)
+            {
+                *Result = 0;
+                return gcvSTATUS_OK;
+            }
+            else
+            {
+                ppoPREPROCESSOR_Report(
+                    PP,
+                    clvREPORT_ERROR,
+                    "Integer is expected."
+                    );
+            }
+
+            return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+        }
+        else
+        {
+            /*
+            ** skip undefined identifiers error such as: #if 1 || AA  and # if 0 && AA
+            */
+            *Result = 1;
+            PP->skipOPError = gcvFALSE;
+            return gcvSTATUS_OK;
+        }
     }
 
     return ppoPREPROCESSOR_EvalInt(PP, Token, Result);
 }
 
 gceSTATUS
-ppoPREPROCESSOR_Eval_Case_Left_Para(
-                                    ppoPREPROCESSOR    PP,
-                                    gctINT*            Result
-                                    )
-{
-    gceSTATUS status = gcvSTATUS_INVALID_DATA;
-
-    ppoTOKEN token = gcvNULL;
-
-    status = ppoPREPROCESSOR_Eval(PP, PP->keyword->rpara, 0, Result);
-    if (status != gcvSTATUS_OK) return status;
-
-    /*( expression*/
-    status = ppoPREPROCESSOR_Eval_GetToken(PP, &token, !ppvICareWhiteSpace);
-    if (status != gcvSTATUS_OK) return status;
-
-    if(token->poolString != PP->keyword->rpara)
-    {
-        ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR, ") inputStream expected.");
-        return gcvSTATUS_INVALID_ARGUMENT;
-    }
-
-    return ppoTOKEN_Destroy(PP, token);
-}
-
-gceSTATUS
 ppoPREPROCESSOR_Eval_Case_Unary_Op(
-    ppoPREPROCESSOR    PP,
-                                   gctSTRING        OptGuarder,
-                                   gctINT            Level,
+                                   ppoPREPROCESSOR    PP,
+                                   gctSTRING          OptGuarder,
+                                   gctINT             Level,
                                    gctINT*            Result,
-                                   ppoTOKEN            Token
+                                   gctBOOL            EvaluateLine,
+                                   gctBOOL            *MeetStringNum,
+                                   ppoTOKEN           Token
                                    )
 {
     gceSTATUS status;
@@ -513,6 +589,9 @@ ppoPREPROCESSOR_Eval_Case_Unary_Op(
     gctBOOL is_token_in_this_level;
 
     gctINT result = 0;
+
+    gcmHEADER_ARG("PP=0x%x OptGuarder=0x%x Level=%d Result=0x%x Token=0x%x",
+                  PP, OptGuarder, Level, Result, Token);
 
     status = ppoPREPROCESSOR_IsOpTokenInThisLevel(PP, Token, Level, &is_token_in_this_level); ppmCheckOK();
 
@@ -525,25 +604,28 @@ ppoPREPROCESSOR_Eval_Case_Unary_Op(
 
             status = ppoPREPROCESSOR_Defined(PP, &id); ppmCheckOK();
             if (id == PP->keyword->_file_
-                ||    id == PP->keyword->_line_)
+                ||    id == PP->keyword->_line_
+                ||    id == PP->keyword->_version_)
             {
-                *Result = 1;
+                    *Result = 1;
 
+                gcmFOOTER_ARG("*Result=%d", *Result);
                 return gcvSTATUS_OK;
             }
             else
             {
                 status = ppoMACRO_MANAGER_GetMacroSymbol(PP, PP->macroManager, id, &ms); ppmCheckOK();
 
-                if ( ms == gcvNULL ||  ms->undefined )
+                if ( ms == gcvNULL )
                 {
                     *Result = gcvFALSE;
                 }
                 else
                 {
-                    *Result = gcvTRUE;
+                    *Result    = gcvTRUE;
                 }
 
+                gcmFOOTER_ARG("*Result=%d", *Result);
                 return gcvSTATUS_OK;
             }
         }
@@ -551,7 +633,7 @@ ppoPREPROCESSOR_Eval_Case_Unary_Op(
         {
             /*other unary op.*/
 
-            status = ppoPREPROCESSOR_Eval(PP, OptGuarder, Level, &result); ppmCheckOK();
+            status = ppoPREPROCESSOR_Eval(PP, OptGuarder, Level, EvaluateLine, MeetStringNum, &result); ppmCheckOK();
 
             if (Token->poolString == PP->keyword->positive)
             {
@@ -572,8 +654,11 @@ ppoPREPROCESSOR_Eval_Case_Unary_Op(
             else
             {
                 ppoPREPROCESSOR_Report(PP,clvREPORT_INTERNAL_ERROR, "The op inputStream not one of ~,!,+,-.");
-                return gcvSTATUS_INVALID_DATA;
+                status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+                gcmFOOTER();
+                return status;
             }
+            gcmFOOTER_ARG("*Result=%d", *Result);
             return gcvSTATUS_OK;
         }
     }
@@ -582,38 +667,55 @@ ppoPREPROCESSOR_Eval_Case_Unary_Op(
         /*there is not a unary op, should be a expression*/
         status = ppoINPUT_STREAM_UnGetToken(PP, &(PP->inputStream), Token); ppmCheckOK();
 
-        return ppoPREPROCESSOR_Eval(PP, OptGuarder, Level+1, Result);
+        status = ppoPREPROCESSOR_Eval(PP, OptGuarder, Level+1, EvaluateLine, MeetStringNum, Result);
+        gcmFOOTER();
+        return status;
     }
 }
 
 gceSTATUS
 ppoPREPROCESSOR_Eval_Binary_Op(
                                ppoPREPROCESSOR    PP,
-                               gctSTRING        OptGuarder,
-                               gctINT            Level,
+                               gctSTRING          OptGuarder,
+                               gctINT             Level,
                                gctINT*            Result,
-                               ppoTOKEN            Token
+                               gctBOOL            EvaluateLine,
+                               gctBOOL            *MeetStringNum,
+                               ppoTOKEN           Token
                                )
 {
-    gceSTATUS status = gcvSTATUS_INVALID_DATA;
+    gceSTATUS status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
 
     gctINT result = 0;
 
     gctBOOL is_token_in_this_level = gcvFALSE;
 
+    gcmHEADER_ARG("PP=0x%x OptGuarder=0x%x Level=%d Result=0x%x Token=0x%x",
+                  PP, OptGuarder, Level, Result, Token);
+
     status = ppoINPUT_STREAM_UnGetToken(PP,&(PP->inputStream), Token); ppmCheckOK();
 
-    status = ppoPREPROCESSOR_Eval(PP, OptGuarder, Level+1, &result); ppmCheckOK();
+    status = ppoPREPROCESSOR_Eval(PP, OptGuarder, Level+1, EvaluateLine, MeetStringNum, &result); ppmCheckOK();
 
     *Result    = result;
 
-    ppoPREPROCESSOR_Eval_GetToken(PP, &Token, !ppvICareWhiteSpace); ppmCheckOK();
+    status = ppoPREPROCESSOR_Eval_GetToken(PP, &Token, !ppvICareWhiteSpace); ppmCheckOK();
 
     ppoPREPROCESSOR_IsOpTokenInThisLevel(PP, Token, Level, &is_token_in_this_level);
 
     while(is_token_in_this_level)/*shift-reduce?*/
     {
-        status = ppoPREPROCESSOR_Eval(PP, OptGuarder, Level+1, &result); ppmCheckOK();
+        /*
+        ** set skipOPError = gcvTRUE to skip undefined identifiers error,
+        ** such as: #if 1 || AA  and # if 0 && AA
+        */
+        if((Token->poolString == PP->keyword->lor && *Result != 0) ||
+           (Token->poolString == PP->keyword->land && *Result == 0) )
+        {
+            PP->skipOPError = gcvTRUE;
+        }
+
+        status = ppoPREPROCESSOR_Eval(PP, OptGuarder, Level+1, EvaluateLine, MeetStringNum, &result); ppmCheckOK();
 
         if(Token->poolString == PP->keyword->lor)
         {
@@ -701,7 +803,8 @@ ppoPREPROCESSOR_Eval_Binary_Op(
             if(result == 0)
             {
                 ppoPREPROCESSOR_Report(PP, clvREPORT_ERROR, "Can not divided by 0");
-                return gcvSTATUS_INVALID_DATA;
+                                gcmFOOTER_NO();
+                return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
             }
             *Result = ( (*Result) / (result) );
         }
@@ -711,14 +814,16 @@ ppoPREPROCESSOR_Eval_Binary_Op(
             if(result == 0)
             {
                 ppoPREPROCESSOR_Report(PP, clvREPORT_ERROR, "Can mod with 0");
-                return gcvSTATUS_INVALID_DATA;
+                                gcmFOOTER_NO();
+                return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
             }
             *Result = ( (*Result) % (result) );
         }
         else
         {
             ppoPREPROCESSOR_Report(PP, clvREPORT_INTERNAL_ERROR, "ppoPREPROCESSOR_PPeval : Here should be a op above.");
-            return gcvSTATUS_INVALID_ARGUMENT;
+                        gcmFOOTER_NO();
+            return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
         }
 
         status = ppoTOKEN_Destroy(PP, Token); ppmCheckOK();
@@ -733,74 +838,110 @@ ppoPREPROCESSOR_Eval_Binary_Op(
 
     status = ppoINPUT_STREAM_UnGetToken(PP, &(PP->inputStream), Token); ppmCheckOK();
 
-    return ppoTOKEN_Destroy(PP, Token);
+    status = ppoTOKEN_Destroy(PP, Token);
+
+    if (gcmIS_SUCCESS(status))
+    {
+        gcmFOOTER_ARG("*Result=%d", *Result);
+        return gcvSTATUS_OK;
+    }
+    else
+    {
+        gcmFOOTER();
+        return status;
+    }
 }
 
 gceSTATUS
 ppoPREPROCESSOR_Eval(
                      ppoPREPROCESSOR    PP,
-                     gctSTRING        OptGuarder,
-                     gctINT            Level,
+                     gctSTRING          OptGuarder,
+                     gctINT             Level,
+                     gctBOOL            EvaluateLine,
+                     gctBOOL            *MeetStringNum,
                      gctINT*            Result
                      )
 {
-    gceSTATUS    status            =    gcvSTATUS_INVALID_ARGUMENT;
+    gceSTATUS    status            =    gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
 
     ppoTOKEN    token            =    gcvNULL;
 
+    gcmHEADER_ARG("PP=0x%x OptGuarder=0x%x Level=%d Result=0x%x",
+                  PP, OptGuarder, Level, Result);
+
     gcmASSERT(PP && 0 <= Level && Level <= 11);
 
-    if (gcvFALSE == PP->doWeInValidArea) return ppoPREPROCESSOR_ToEOL(PP);
+    if (gcvFALSE == PP->doWeInValidArea)
+    {
+        status = ppoPREPROCESSOR_ToEOL(PP);
+        gcmFOOTER();
+        return status;
+    }
 
     status = ppoPREPROCESSOR_Eval_GetToken(PP, &token, !ppvICareWhiteSpace);
 
     ppmCheckOK();
 
-    if (token->poolString == PP->keyword->lpara)
+    if(PP->operators[Level] == gcvNULL)
     {
-        /*(*/
-        status = ppoPREPROCESSOR_Eval_Case_Left_Para(PP, Result);
+        /*Basicest Level.*/
+
+        status = ppoPREPROCESSOR_Eval_Case_Basic_Level(PP, token, EvaluateLine, MeetStringNum, Result);
 
         ppmCheckOK();
-    }
-    else
-    {
-        /*Not (*/
-        if(PP->operators[Level] == gcvNULL)
+
+        status = ppoTOKEN_Destroy(PP, token);
+        if (gcmIS_SUCCESS(status))
         {
-            /*Basicest Level.*/
+            gcmFOOTER_NO();
+            return gcvSTATUS_OK;
+        }
+        else
+        {
+            gcmFOOTER();
+            return status;
+        }
+    }
 
-            status = ppoPREPROCESSOR_Eval_Case_Basic_Level(PP, token, Result);
-
+    /*This inputStream not the last Level.*/
+    do
+    {
+        if( PP->operators[Level][0] == gcmINT2PTR(1) )
+        {
+            status = ppoPREPROCESSOR_Eval_Case_Unary_Op(PP,
+                                                        OptGuarder,
+                                                        Level,
+                                                        Result,
+                                                        EvaluateLine,
+                                                        MeetStringNum,
+                                                        token);
             ppmCheckOK();
-
-            return ppoTOKEN_Destroy(PP, token);
+        }
+        else if ( PP->operators[Level][0] == gcmINT2PTR(2) )
+        {
+            status = ppoPREPROCESSOR_Eval_Binary_Op(PP,
+                                                    OptGuarder,
+                                                    Level,
+                                                    Result,
+                                                    EvaluateLine,
+                                                    MeetStringNum,
+                                                    token);
+            ppmCheckOK();
+        }
+        else
+        {
+            ppoPREPROCESSOR_Report(
+                PP,
+                clvREPORT_INTERNAL_ERROR,
+                "The op should be either unary or binary.");
+            status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+            gcmFOOTER();
+            return status;
         }
 
-        /*This inputStream not the last Level.*/
-        do
-        {
-            if( PP->operators[Level][0] == (void*)1 )
-            {
-                status = ppoPREPROCESSOR_Eval_Case_Unary_Op(PP, OptGuarder, Level, Result, token); ppmCheckOK();
-            }
-            else if ( PP->operators[Level][0] == (void*)2 )
-            {
-                status = ppoPREPROCESSOR_Eval_Binary_Op(PP, OptGuarder, Level, Result, token); ppmCheckOK();
-            }
-            else
-            {
-                ppoPREPROCESSOR_Report(
-                    PP,
-                    clvREPORT_INTERNAL_ERROR,
-                    "The op should be either unary or binary.");
-                return gcvSTATUS_INVALID_ARGUMENT;
-            }
+    }while(gcvFALSE);
 
-        }while(gcvFALSE);
-    }/*Finish of Not (*/
-
-    ppoTOKEN_Destroy(PP, token);
+    status = ppoTOKEN_Destroy(PP, token); ppmCheckOK();
 
     status = ppoPREPROCESSOR_Eval_GetToken(PP, &token, !ppvICareWhiteSpace); ppmCheckOK();
 
@@ -812,22 +953,48 @@ ppoPREPROCESSOR_Eval(
 
         if(!legal_token_apprear)
         {
-            if(token->poolString == PP->keyword->newline)
+            if (EvaluateLine &&
+                OptGuarder == PP->keyword->newline)
+
             {
-                ppoPREPROCESSOR_Report(PP, clvREPORT_ERROR, "Not expected token('NewLine') in  expression.");
+                if (MeetStringNum)
+                {
+                    *MeetStringNum = gcvTRUE;
+                }
+                status = ppoINPUT_STREAM_UnGetToken(PP, &(PP->inputStream), token); ppmCheckOK();
+
+                gcmFOOTER_NO();
+                return gcvSTATUS_OK;
             }
             else
             {
-                ppoPREPROCESSOR_Report(PP, clvREPORT_ERROR, "Not expected token('%s') in  expression.", token->poolString);
+                if(token->poolString == PP->keyword->newline)
+                {
+                    ppoPREPROCESSOR_Report(PP, clvREPORT_ERROR, "Not expected token('NewLine') in  expression.");
+                }
+                else
+                {
+                    ppoPREPROCESSOR_Report(PP, clvREPORT_ERROR, "Not expected token('%s') in  expression.", token->poolString);
+                }
+                gcmFOOTER_NO();
+                return cloCOMPILER_Free(PP->compiler, token);
             }
-            return cloCOMPILER_Free(PP->compiler, token);
         }
     }
     while(gcvFALSE);
 
     status = ppoINPUT_STREAM_UnGetToken(PP, &(PP->inputStream), token); ppmCheckOK();
 
-    return ppoTOKEN_Destroy(PP, token);
-
+    status = ppoTOKEN_Destroy(PP, token);
+    if (gcmIS_SUCCESS(status))
+    {
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+    else
+    {
+        gcmFOOTER();
+        return status;
+    }
 }
 
