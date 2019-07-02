@@ -1549,9 +1549,9 @@ VIR_Symbol_Dump(
         {
             VERIFY_OK(VIR_LOG(Dumper, " unused"));
         }
-        if (isSymHasDef(Sym))
+        if (isSymUnDef(Sym))
         {
-            VERIFY_OK(VIR_LOG(Dumper, " hasDef"));
+            VERIFY_OK(VIR_LOG(Dumper, " unDef"));
         }
         VERIFY_OK(VIR_LOG(Dumper, " >"));
     }

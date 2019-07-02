@@ -821,7 +821,7 @@ static gctBOOL _IsFakeSIV(VIR_Shader* pUpperShader, VIR_Shader* pLowerShader,
         if (outputBuiltinName == VIR_NAME_POINT_SIZE &&
             pUpperShader->shaderKind == VIR_SHADER_VERTEX &&
             (!isSymStaticallyUsed(pOutputSym)) &&
-            (!isSymHasDef(pOutputSym)))
+            (isSymUnDef(pOutputSym)))
         {
             return gcvTRUE;
         }

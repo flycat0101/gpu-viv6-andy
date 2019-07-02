@@ -7535,13 +7535,21 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
             {
                 defIdx = vscVIR_FindFirstDefIndex(pDuInfo, VIR_Symbol_GetVregIndex(pSym));
 
-                if (VIR_INVALID_DEF_INDEX != defIdx || VIR_Shader_GetKind(pShader) == VIR_SHADER_VERTEX)
+                if (VIR_Shader_GetKind(pShader) == VIR_SHADER_VERTEX)
                 {
-                    /* if vertex shader, do nothing except set hasDef flag */
-                    if (defIdx != VIR_INVALID_DEF_INDEX)
+                    /* if vertex shader, do nothing except set UNDef flag */
+                    if (VIR_INVALID_DEF_INDEX == defIdx)
                     {
-                        VIR_Symbol_SetFlag(pSym, VIR_SYMFLAG_HASDEF);
+                        VIR_Symbol_SetFlag(pSym, VIR_SYMFLAG_UNDEF);
                     }
+                    else
+                    {
+                        VIR_Symbol_ClrFlag(pSym, VIR_SYMFLAG_UNDEF);
+                    }
+                    continue;
+                }
+                if (VIR_INVALID_DEF_INDEX != defIdx)
+                {
                     continue;
                 }
 
