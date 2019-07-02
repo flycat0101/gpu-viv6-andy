@@ -2725,7 +2725,7 @@ vx_status calculateArchPerf(
                                         axiWTBandWidth = outBandWidth.axi_write_bandwidth;
                                         isComputeBottleNeck = outBandWidth.is_compute_bottle_neck;
                                     }
-                                    /*else*/
+                                    else
 #endif
                                     {
                                         newCycleCount = _calcNNCycleCountBandWidth(
@@ -2799,17 +2799,6 @@ vx_status calculateArchPerf(
                                                                 &axiWTBandWidth,
                                                                 &isComputeBottleNeck);
                                     }
-#ifdef USE_LIB_NN_ARCH_PERF
-                                    if (context->apm)
-                                    vxmASSERT((ddrKernelReadBandWidth == outBandWidth.ddr_kernel_read_bandwidth)
-                                        && (ddrInImageReadBandWidth == outBandWidth.ddr_in_image_read_bandwidth)
-                                        && (ddrRDBandWidth == outBandWidth.ddr_read_bandwidth)
-                                        && (ddrWTBandWidth == outBandWidth.ddr_write_bandwidth)
-                                        && (axiRDBandWidth == outBandWidth.axi_read_bandwidth)
-                                        && (axiWTBandWidth == outBandWidth.axi_write_bandwidth)
-                                        && (isComputeBottleNeck == (vx_bool)outBandWidth.is_compute_bottle_neck));
-
-#endif
                                     curCost.cycle = (vx_uint64)(newCycleCount + 0.5f);
                                     curCost.bw = (vx_uint64)(newRDBandWidth + 0.5f) + (vx_uint64)(newWTBandWidth + 0.5f);
                                     if (!initMinCost || _cur_cost_u64_is_more_better(&minCost, &curCost))
@@ -2901,7 +2890,7 @@ vx_status calculateArchPerf(
                         axiWTBandWidth = outBandWidth.axi_write_bandwidth;
                         isComputeBottleNeck = outBandWidth.is_compute_bottle_neck;
                     }
-                    /*else*/
+                    else
 #endif
                     {
                         perf->resultInfo.perfCycleCount = _calcNNCycleCountBandWidth(
@@ -2984,17 +2973,6 @@ vx_status calculateArchPerf(
                     perf->resultInfo.perfAXIReadBandWidth = axiRDBandWidth;
                     perf->resultInfo.perfAXIWriteBandWidth = axiWTBandWidth;
                     perf->resultInfo.isFirstComputeBottleNeck = isComputeBottleNeck;
-#ifdef USE_LIB_NN_ARCH_PERF
-                    if (context->apm)
-                    vxmASSERT((ddrKernelReadBandWidth == outBandWidth.ddr_kernel_read_bandwidth)
-                        && (ddrInImageReadBandWidth == outBandWidth.ddr_in_image_read_bandwidth)
-                        && (ddrRDBandWidth == outBandWidth.ddr_read_bandwidth)
-                        && (ddrWTBandWidth == outBandWidth.ddr_write_bandwidth)
-                        && (axiRDBandWidth == outBandWidth.axi_read_bandwidth)
-                        && (axiWTBandWidth == outBandWidth.axi_write_bandwidth)
-                        && (perf->resultInfo.perfCycleCount == outBandWidth.cycle_count)
-                        && (isComputeBottleNeck == (vx_bool)outBandWidth.is_compute_bottle_neck));
-#endif
                 }
             }
             else
@@ -3050,7 +3028,7 @@ vx_status calculateArchPerf(
                     axiRDBandWidth = outBandWidth.axi_read_bandwidth;
                     axiWTBandWidth = outBandWidth.axi_write_bandwidth;
                 }
-                /*else*/
+                else
 #endif
                 {
                     newCycleCount = _calcTPCycleCountCore(op_type, inXSize, inYSize, outZSize, kernelZSize,
@@ -3085,16 +3063,6 @@ vx_status calculateArchPerf(
                 perf->resultInfo.perfWriteBandWidth    = ddrWTBandWidth;
                 perf->resultInfo.perfAXIReadBandWidth  = axiRDBandWidth;
                 perf->resultInfo.perfAXIWriteBandWidth = axiWTBandWidth;
-#ifdef USE_LIB_NN_ARCH_PERF
-                if (context->apm)
-                vxmASSERT((ddrKernelReadBandWidth == outBandWidth.ddr_kernel_read_bandwidth)
-                    && (ddrInImageReadBandWidth == outBandWidth.ddr_in_image_read_bandwidth)
-                    && (ddrRDBandWidth == outBandWidth.ddr_read_bandwidth)
-                    && (ddrWTBandWidth == outBandWidth.ddr_write_bandwidth)
-                    && (axiRDBandWidth == outBandWidth.axi_read_bandwidth)
-                    && (axiWTBandWidth == outBandWidth.axi_write_bandwidth)
-                    && (newCycleCount == outBandWidth.cycle_count));
-#endif
             }
         }
 
@@ -3164,7 +3132,7 @@ vx_status calculateArchPerf(
                 axiWTBandWidth = outBandWidth.axi_write_bandwidth;
                 isComputeBottleNeck = outBandWidth.is_compute_bottle_neck;
             }
-            /*else*/
+            else
 #endif
             {
                 perf->swTilingInfo.perfNonFirstCycleCount = _calcNNCycleCountBandWidth(
@@ -3247,17 +3215,6 @@ vx_status calculateArchPerf(
             perf->swTilingInfo.perfNonFirstAXIReadBandWidth = axiRDBandWidth;
             perf->swTilingInfo.perfNonFirstAXIWriteBandWidth = axiWTBandWidth;
             perf->swTilingInfo.isNonFirstComputeBottleNeck = isComputeBottleNeck;
-#ifdef USE_LIB_NN_ARCH_PERF
-            if (context->apm)
-            vxmASSERT((ddrKernelReadBandWidth == outBandWidth.ddr_kernel_read_bandwidth)
-                && (ddrInImageReadBandWidth == outBandWidth.ddr_in_image_read_bandwidth)
-                && (ddrRDBandWidth == outBandWidth.ddr_read_bandwidth)
-                && (ddrWTBandWidth == outBandWidth.ddr_write_bandwidth)
-                && (axiRDBandWidth == outBandWidth.axi_read_bandwidth)
-                && (axiWTBandWidth == outBandWidth.axi_write_bandwidth)
-                && (perf->swTilingInfo.perfNonFirstCycleCount == outBandWidth.cycle_count)
-                && (isComputeBottleNeck == (vx_bool)outBandWidth.is_compute_bottle_neck));
-#endif
         }
 
         perf->calculated = vx_true_e;
