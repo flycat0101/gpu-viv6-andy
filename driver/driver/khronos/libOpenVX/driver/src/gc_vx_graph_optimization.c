@@ -4253,6 +4253,8 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
         {
             vx_tensor   reluIn      = (vx_tensor)node->paramTable[0];
             vx_tensor   reluOut     = (vx_tensor)node->paramTable[node->numParameters - 1];
+            vx_node     child       = nodeTable[node->childNodes[0]];
+            vx_node     parent      = nodeTable[node->parentNodes[0]];
             vx_enum     dataType    = TENSOR_DATA_TYPE(reluIn);
             vx_int32    zp          = 0;    /*it is required to be in range [0, 255]*/
             vx_float32  scale       = TENSOR_TF_SCALE(reluOut);
@@ -4263,6 +4265,14 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
                 continue;
             if(TENSOR_QUANT_TYPE(reluOut) != VX_QUANT_AFFINE_SCALE)
                 continue;
+
+            /*add blacklist, in which nodes do not requantize data*/
+            if(child->kernel->enumeration == VX_KERNEL_INTERNAL_ADAPTER ||
+                parent->kernel->enumeration == VX_KERNEL_INTERNAL_ADAPTER||
+                child->kernel->enumeration == VX_KERNEL_TENSOR_TRANSPOSE ||
+                parent->kernel->enumeration == VX_KERNEL_TENSOR_TRANSPOSE )
+                continue;
+
             /*update the quantized teensor is saturated as relu-type*/
             switch (nodeType)
             {
@@ -4297,7 +4307,6 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
                 bais's scale = input's scale * weight's scale, which is required*/
             if(node->numChildren && (TENSOR_TF_SCALE(reluOut) != scale || TENSOR_TF_ZEROPOINT(reluIn) != zp))
             {
-                vx_node child = nodeTable[node->childNodes[0]];
                 vx_tensor weight = NULL, bias = NULL;
                 TENSOR_TF_SCALE(reluOut) = scale;
                 TENSOR_TF_ZEROPOINT(reluOut) = zp;
