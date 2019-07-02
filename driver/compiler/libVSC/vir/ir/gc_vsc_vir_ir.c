@@ -6691,6 +6691,7 @@ VIR_Type_CalcByteOffset(
     {
         switch (VIR_GetTypeType(baseTypeId))
         {
+        /* FP32 matrix. */
         case VIR_TYPE_FLOAT_2X2:
             if (isSTD140)
             {
@@ -6876,6 +6877,43 @@ VIR_Type_CalcByteOffset(
             {
                 alignment = 16;
             }
+            break;
+
+        /* FP16 matrix. */
+        case VIR_TYPE_FLOAT16_2X2:
+            alignment = 4;
+            break;
+
+        case VIR_TYPE_FLOAT16_2X3:
+            alignment = 8;
+            break;
+
+        case VIR_TYPE_FLOAT16_2X4:
+            alignment = 8;
+            break;
+
+        case VIR_TYPE_FLOAT16_3X2:
+            alignment = 4;
+            break;
+
+        case VIR_TYPE_FLOAT16_3X3:
+            alignment = 8;
+            break;
+
+        case VIR_TYPE_FLOAT16_3X4:
+            alignment = 8;
+            break;
+
+        case VIR_TYPE_FLOAT16_4X2:
+            alignment = 4;
+            break;
+
+        case VIR_TYPE_FLOAT16_4X3:
+            alignment = 8;
+            break;
+
+        case VIR_TYPE_FLOAT16_4X4:
+            alignment = 8;
             break;
 
         default:
@@ -14835,7 +14873,7 @@ VIR_Operand_EvaluateOffsetByAccessChain(
     VIR_Operand            *vectorArrayOperand[4] = {gcvNULL, gcvNULL, gcvNULL, gcvNULL};
     gctINT                  arrayStride = 0, matrixStride = 0;
     gctUINT                 i, stride = 0, totalConstantOffset = 0, fieldOffset = 0;
-    gctUINT                 perChannelDataSize = __PER_CHANNEL_DATA_MEMORY_SIZE__, offset = 0;
+    gctUINT                 perChannelDataSize, offset = 0;
     gctCHAR                 name[32], arrayName[32];
     gctBOOL                 isBaseAllConstantIndex = gcvTRUE;
     gctBOOL                 treatPushConstAsMemory = gcvFALSE;
@@ -14923,6 +14961,8 @@ VIR_Operand_EvaluateOffsetByAccessChain(
         */
         else if (isTypeVector)
         {
+            perChannelDataSize = VIR_GetTypeSize(VIR_GetTypeComponentType(VIR_Type_GetIndex(type)));
+
             if (baseTypeInfo.bIsBaseVarMemory)
             {
                 if (AccessChainType[i] == VIR_SYM_CONST)

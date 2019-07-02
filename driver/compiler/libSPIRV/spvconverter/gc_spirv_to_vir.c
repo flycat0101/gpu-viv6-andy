@@ -3593,20 +3593,36 @@ static const VIR_TypeId virVector[] =
     VIR_TYPE_FLOAT16_X32,
 };
 
-static const VIR_TypeId virMat[] =
+static const VIR_TypeId virMat[2][9] =
 {
-    /* col = 2 */
-    VIR_TYPE_FLOAT_2X2,
-    VIR_TYPE_FLOAT_2X3,
-    VIR_TYPE_FLOAT_2X4,
-    /* col = 3 */
-    VIR_TYPE_FLOAT_3X2,
-    VIR_TYPE_FLOAT_3X3,
-    VIR_TYPE_FLOAT_3X4,
-    /* col = 4 */
-    VIR_TYPE_FLOAT_4X2,
-    VIR_TYPE_FLOAT_4X3,
-    VIR_TYPE_FLOAT_4X4,
+    {
+        /* col = 2 */
+        VIR_TYPE_FLOAT16_2X2,
+        VIR_TYPE_FLOAT16_2X3,
+        VIR_TYPE_FLOAT16_2X4,
+        /* col = 3 */
+        VIR_TYPE_FLOAT16_3X2,
+        VIR_TYPE_FLOAT16_3X3,
+        VIR_TYPE_FLOAT16_3X4,
+        /* col = 4 */
+        VIR_TYPE_FLOAT16_4X2,
+        VIR_TYPE_FLOAT16_4X3,
+        VIR_TYPE_FLOAT16_4X4,
+    },
+    {
+        /* col = 2 */
+        VIR_TYPE_FLOAT_2X2,
+        VIR_TYPE_FLOAT_2X3,
+        VIR_TYPE_FLOAT_2X4,
+        /* col = 3 */
+        VIR_TYPE_FLOAT_3X2,
+        VIR_TYPE_FLOAT_3X3,
+        VIR_TYPE_FLOAT_3X4,
+        /* col = 4 */
+        VIR_TYPE_FLOAT_4X2,
+        VIR_TYPE_FLOAT_4X3,
+        VIR_TYPE_FLOAT_4X4,
+    },
 };
 
 #define SPV_GEN_IMAGE_TYPE_MAGIC(dim, type, depth, arrayed, ms, sampled) \
@@ -4239,16 +4255,33 @@ VSC_ErrCode __SpvEmitType(gcSPV spv, VIR_Shader * virShader)
         break;
 
     case SpvOpTypeMatrix:
-        SPV_ID_TYPE_MAT_COL_TYPE(spv->resultId) = spv->operands[0];
-        SPV_ID_TYPE_MAT_COL_COUNT(spv->resultId) = spv->operands[1];
+        {
+            SpvId componentType = SPV_ID_TYPE_VEC_COMP_TYPE(spv->operands[0]);
+            gctUINT matrixIndex;
 
-        virTypeId = virMat[(SPV_ID_TYPE_MAT_COL_COUNT(spv->resultId) - 2 )* 3
-                        + SPV_ID_TYPE_VEC_COMP_NUM(SPV_ID_TYPE_MAT_COL_TYPE(spv->resultId)) - 2];
+            gcmASSERT(SPV_ID_TYPE_IS_FLOAT(componentType));
 
-        SPV_ID_TYPE_IS_MATRIX(spv->resultId) = gcvTRUE;
+            if (SPV_ID_TYPE_FLOAT_WIDTH(componentType) == 16)
+            {
+                matrixIndex = 0;
+            }
+            else
+            {
+                gcmASSERT(SPV_ID_TYPE_FLOAT_WIDTH(componentType) == 32);
+                matrixIndex = 1;
+            }
 
-        SPV_ID_TYPE_HAS_8BIT_TYPE(spv->resultId) = SPV_ID_TYPE_HAS_8BIT_TYPE(spv->operands[0]);
-        SPV_ID_TYPE_HAS_16BIT_TYPE(spv->resultId) = SPV_ID_TYPE_HAS_16BIT_TYPE(spv->operands[0]);
+            SPV_ID_TYPE_MAT_COL_TYPE(spv->resultId) = spv->operands[0];
+            SPV_ID_TYPE_MAT_COL_COUNT(spv->resultId) = spv->operands[1];
+
+            virTypeId = virMat[matrixIndex][(SPV_ID_TYPE_MAT_COL_COUNT(spv->resultId) - 2 )* 3
+                            + SPV_ID_TYPE_VEC_COMP_NUM(SPV_ID_TYPE_MAT_COL_TYPE(spv->resultId)) - 2];
+
+            SPV_ID_TYPE_IS_MATRIX(spv->resultId) = gcvTRUE;
+
+            SPV_ID_TYPE_HAS_8BIT_TYPE(spv->resultId) = SPV_ID_TYPE_HAS_8BIT_TYPE(spv->operands[0]);
+            SPV_ID_TYPE_HAS_16BIT_TYPE(spv->resultId) = SPV_ID_TYPE_HAS_16BIT_TYPE(spv->operands[0]);
+        }
         break;
 
     case SpvOpTypeStruct:
