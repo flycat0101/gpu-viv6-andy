@@ -4805,6 +4805,34 @@ static VSC_ErrCode _VIR_HL_Preprocess(
     return errCode;
 }
 
+static VSC_ErrCode _VIR_HL_FindAllUniformsWithinResourceLayout(
+    IN  VSC_SHADER_RESOURCE_LAYOUT*     pResLayout,
+    IN  VIR_Shader*                     pShader
+    )
+{
+    VSC_ErrCode                         errCode = VSC_ERR_NONE;
+    gctUINT                             i, j, resCount;
+
+    for (i = 0; i < pResLayout->resourceBindingCount; i++)
+    {
+        VSC_SHADER_RESOURCE_BINDING     resBinding = pResLayout->pResBindings[i];
+        VIR_Symbol*                     pUniformSym;
+        VIR_Uniform*                    pUniformArray[2] = { gcvNULL, gcvNULL };
+        VIR_UniformKind                 uniformKind = VIR_Resouce_ResType2UniformKind(resBinding.type);
+
+        resCount = VIR_Resouce_FindResUniform(pShader, uniformKind, &resBinding, pUniformArray);
+
+        for (j = 0; j < resCount; j++)
+        {
+            pUniformSym = VIR_Shader_GetSymFromId(pShader, VIR_Uniform_GetSymID(pUniformArray[j]));
+
+            VIR_Symbol_SetFlagExt(pUniformSym, VIR_SYMUNIFORMFLAGEXT_WITHIN_IN_RES_LAYOUT);
+        }
+
+    }
+    return errCode;
+}
+
 DEF_QUERY_PASS_PROP(VIR_Lower_HighLevel_To_HighLevel_Expand)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_HL;
@@ -4836,6 +4864,7 @@ VIR_Lower_HighLevel_To_HighLevel_Expand(
     VSC_ErrCode                  errCode  = VSC_ERR_NONE;
     VIR_PatternHL2HLContext      context;
     VIR_Shader*                  shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VSC_SHADER_RESOURCE_LAYOUT*  pResourceLayout = pPassWorker->pCompilerParam->pShResourceLayout;
     VSC_MM                      *pmm = pPassWorker->basePassWorker.pMM;
     VSC_HW_CONFIG               *pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
 
@@ -4871,6 +4900,13 @@ VIR_Lower_HighLevel_To_HighLevel_Expand(
     /* Destroy some symbols if needed. */
     errCode = _VIR_HL_Sym_Delete(shader);
     CHECK_ERROR(errCode, "_VIR_HL_Sym_Delete failed.");
+
+    /* Find all uniforms within the resource layout. */
+    if (pResourceLayout != gcvNULL && pResourceLayout->pResBindings)
+    {
+        errCode = _VIR_HL_FindAllUniformsWithinResourceLayout(pResourceLayout, shader);
+        CHECK_ERROR(errCode, "_VIR_HL_FindAllUniformsWithinResourceLayout failed.");
+    }
 
     /* Renumber instruction ID. */
     VIR_Shader_RenumberInstId(shader);

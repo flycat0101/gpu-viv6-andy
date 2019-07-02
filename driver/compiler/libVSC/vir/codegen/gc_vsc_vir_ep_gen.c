@@ -1543,7 +1543,8 @@ static VSC_ErrCode _CollectSamplerMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper
         /* If this texture is not used on shader, we can skip it. */
         if (!isSymUniformUsedInShader(pVirUniformSym) &&
             !isSymUniformUsedInTextureSize(pVirUniformSym) &&
-            !isSymUniformUsedInLTC(pVirUniformSym))
+            !isSymUniformUsedInLTC(pVirUniformSym) &&
+            !isSymUniformWithResLayout(pVirUniformSym))
         {
             continue;
         }

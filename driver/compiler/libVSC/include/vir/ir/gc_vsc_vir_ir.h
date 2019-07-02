@@ -2993,6 +2993,9 @@ typedef enum VIR_SYMFLAGEXT
     /* General flags */
     VIR_SYMFLAGEXT_NONE                         = 0x00000000, /* no flag */
     VIR_SYMFLAGEXT_NOPERSPECTIVE                = 0x00000001, /* noperspective */
+
+    /* Uniform flags. */
+    VIR_SYMUNIFORMFLAGEXT_WITHIN_IN_RES_LAYOUT  = 0x00001000, /* within the resource layout. */
 } VIR_SymFlagExt;
 
 #define isSymEnabled(sym)                       (((sym)->flags & VIR_SYMFLAG_ENABLED) != 0)
@@ -3032,6 +3035,7 @@ typedef enum VIR_SYMFLAGEXT
 #define isSymUniformAtomicCounter(u)            (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_ATOMIC_COUNTER) != 0)
 #define isSymUniformTreatSamplerAsConst(u)      (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_TREAT_SAMPLER_AS_CONST) != 0)
 #define isSymUniformTreatImageAsSampler(u)      (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_TREAT_IMAGE_AS_SAMPLER) != 0)
+#define isSymUniformWithResLayout(u)            (VIR_Symbol_UseUniform(u) && ((u)->flagsExt & VIR_SYMUNIFORMFLAGEXT_WITHIN_IN_RES_LAYOUT) != 0)
 
 #define isSymCentroid(sym)                      (((sym)->flags & VIR_SYMFLAG_ISCENTROID) != 0)
 #define isSymSample(sym)                        (((sym)->flags & VIR_SYMFLAG_ISSAMPLE) != 0)
@@ -7429,7 +7433,6 @@ VIR_OpCode_EvaluateOneChannelConstant(
 VSC_ErrCode
 VIR_Shader_CalcSamplerCount(
     IN      VIR_Shader *         Shader,
-    IN gctBOOL                   bHasResLayout,
     IN OUT  gctINT*              SamplerCount
     );
 
@@ -7904,6 +7907,20 @@ VIR_Pass_MoveInstructionBefore(
     IN VIR_Instruction* pBeforeMe,
     IN VIR_Instruction* pInst,
     INOUT gctBOOL*      pInvalidCFG
+    );
+
+/* resource type to uniform kind */
+VIR_UniformKind
+VIR_Resouce_ResType2UniformKind(
+    IN VSC_SHADER_RESOURCE_TYPE    resType
+    );
+
+gctUINT
+VIR_Resouce_FindResUniform(
+    IN VIR_Shader*                  pShader,
+    IN VIR_UniformKind              uniformKind,
+    IN VSC_SHADER_RESOURCE_BINDING* pResBinding,
+    INOUT VIR_Uniform**             ppUniformArray
     );
 
 END_EXTERN_C()

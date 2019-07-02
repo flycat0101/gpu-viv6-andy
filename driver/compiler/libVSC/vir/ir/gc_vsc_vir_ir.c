@@ -17528,7 +17528,6 @@ VIR_OpCode_EvaluateOneChannelConstant(
 VSC_ErrCode
 VIR_Shader_CalcSamplerCount(
     IN      VIR_Shader *         Shader,
-    IN gctBOOL                   bHasResLayout,
     IN OUT  gctINT*              SamplerCount
     )
 {
@@ -17559,15 +17558,11 @@ VIR_Shader_CalcSamplerCount(
         /* If this texture is not used on shader, we can skip it. */
         if (!isSymUniformUsedInShader(sym) &&
             !isSymUniformUsedInTextureSize(sym) &&
-            !isSymUniformUsedInLTC(sym))
-        {
+            !isSymUniformUsedInLTC(sym) &&
             /* We can't skip a texture which is from the resource layout. */
-            if (!bHasResLayout
-                ||
-                (VIR_Symbol_GetDescriptorSet(sym) == -1 && VIR_Symbol_GetBinding(sym) == -1))
-            {
-                continue;
-            }
+            !isSymUniformWithResLayout(sym))
+        {
+            continue;
         }
 
         symType = VIR_Symbol_GetType(sym);
@@ -18355,4 +18350,137 @@ VIR_Pass_MoveInstructionBefore(
 
     return errCode;
 }
+
+VIR_UniformKind
+VIR_Resouce_ResType2UniformKind(
+    IN VSC_SHADER_RESOURCE_TYPE    resType
+    )
+{
+    VIR_UniformKind uniformKind = VIR_UNIFORM_NORMAL;
+
+    switch(resType)
+    {
+    case VSC_SHADER_RESOURCE_TYPE_SAMPLER:
+    case VSC_SHADER_RESOURCE_TYPE_UNIFORM_TEXEL_BUFFER:
+    case VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER:
+    case VSC_SHADER_RESOURCE_TYPE_SAMPLED_IMAGE:
+    case VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE:
+    case VSC_SHADER_RESOURCE_TYPE_STORAGE_TEXEL_BUFFER:
+    case VSC_SHADER_RESOURCE_TYPE_INPUT_ATTACHMENT:
+        uniformKind = VIR_UNIFORM_NORMAL;
+        break;
+
+    case VSC_SHADER_RESOURCE_TYPE_UNIFORM_BUFFER:
+    case VSC_SHADER_RESOURCE_TYPE_UNIFORM_BUFFER_DYNAMIC:
+        uniformKind = VIR_UNIFORM_UNIFORM_BLOCK_ADDRESS;
+        break;
+
+    case VSC_SHADER_RESOURCE_TYPE_STORAGE_BUFFER:
+    case VSC_SHADER_RESOURCE_TYPE_STORAGE_BUFFER_DYNAMIC:
+        uniformKind = VIR_UNIFORM_STORAGE_BLOCK_ADDRESS;
+        break;
+
+    default:
+        break;
+    }
+
+    return uniformKind;
+}
+
+gctUINT
+VIR_Resouce_FindResUniform(
+    IN VIR_Shader*                  pShader,
+    IN VIR_UniformKind              uniformKind,
+    IN VSC_SHADER_RESOURCE_BINDING* pResBinding,
+    INOUT VIR_Uniform**             ppUniformArray
+    )
+{
+    VIR_Uniform*    pRetUniform[2] = { gcvNULL, gcvNULL };
+    gctUINT         setNo = pResBinding->set;
+    gctUINT         binding = pResBinding->binding;
+    gctUINT         arraySize = pResBinding->arraySize;
+    gctUINT         i, uniformCount = 0;
+    gctBOOL         bGoThroughAllUniforms = gcvFALSE;
+
+    if (pResBinding->type == VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER)
+    {
+        bGoThroughAllUniforms = gcvTRUE;
+    }
+
+    for (i = 0; i < (gctINT) VIR_IdList_Count(&pShader->uniforms); ++i)
+    {
+        VIR_Id      id  = VIR_IdList_GetId(&pShader->uniforms, i);
+        VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, id);
+        VIR_Uniform *symUniform = gcvNULL;
+        VIR_Type    *symType = VIR_Symbol_GetType(sym);
+        gctUINT     thisArraySize;
+
+        if (VIR_Type_GetKind(symType) == VIR_TY_STRUCT)
+        {
+            continue;
+        }
+
+        symUniform = VIR_Symbol_GetUniformPointer(pShader, sym);
+
+        if (symUniform == gcvNULL ||
+            VIR_Symbol_GetUniformKind(sym) != uniformKind)
+        {
+            continue;
+        }
+
+        if (VIR_Type_GetKind(symType) == VIR_TY_ARRAY)
+        {
+            thisArraySize = VIR_Type_GetArrayLength(symType);
+        }
+        else
+        {
+            thisArraySize = 1;
+        }
+
+        if (VIR_Symbol_GetDescriptorSet(sym) == setNo &&
+            VIR_Symbol_GetBinding(sym) == binding &&
+            thisArraySize == arraySize)
+        {
+            gcmASSERT(uniformCount < 2);
+            pRetUniform[uniformCount] = symUniform;
+            uniformCount++;
+
+            if (!bGoThroughAllUniforms)
+            {
+                break;
+            }
+            if (uniformCount == 2)
+            {
+                break;
+            }
+        }
+    }
+
+    /*
+    ** Make sure that:
+    ** the first element is the SAMPLER variable and the second element is the SAMPLED IMAGE variable.
+    */
+    if (pResBinding->type == VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER)
+    {
+        if (uniformCount == 2)
+        {
+            if (VIR_Symbol_isImage(VIR_Shader_GetSymFromId(pShader, VIR_Uniform_GetSymID(pRetUniform[0]))))
+            {
+                VIR_Uniform* tempUniform = pRetUniform[0];
+
+                pRetUniform[0] = pRetUniform[1];
+                pRetUniform[1] = tempUniform;
+            }
+        }
+    }
+
+    if (ppUniformArray)
+    {
+        ppUniformArray[0] = pRetUniform[0];
+        ppUniformArray[1] = pRetUniform[1];
+    }
+
+    return uniformCount;
+}
+
 

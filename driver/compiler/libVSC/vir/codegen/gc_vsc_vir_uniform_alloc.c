@@ -71,7 +71,6 @@ void _VIR_CG_UniformColorMap_Init(
 static void _VIR_CG_ConfigSamplers(
     IN VIR_Shader       *pShader,
     IN VSC_HW_CONFIG    *pHwConfig,
-    IN gctBOOL          bHasResLayout,
     OUT gctINT          *maxSampler,
     OUT gctINT          *sampler,
     OUT gctBOOL         *allocateSamplerReverse
@@ -85,7 +84,7 @@ static void _VIR_CG_ConfigSamplers(
     if (VIR_Shader_isPackUnifiedSampler(pShader))
     {
         samplerRegNoBase = VIR_Shader_GetSamplerBaseOffset(pShader);
-        VIR_Shader_CalcSamplerCount(pShader, bHasResLayout, &samplerCount);
+        VIR_Shader_CalcSamplerCount(pShader, &samplerCount);
 
         gcmASSERT(samplerRegNoBase != -1);
 
@@ -1928,7 +1927,7 @@ VSC_ErrCode VIR_CG_MapUniforms(
         &codeGenUniformBase);
 
     /* Config sampler setting. */
-    _VIR_CG_ConfigSamplers(pShader, pHwConfig, gcvFALSE, &maxSampler, &sampler, &allocateSamplerReverse);
+    _VIR_CG_ConfigSamplers(pShader, pHwConfig, &maxSampler, &sampler, &allocateSamplerReverse);
 
     /* set the handleDefaultUBO flag */
     _VIR_CG_isUBOSupported(pShader, pHwConfig, &handleDefaultUBO, &unblockUniformBlock);
@@ -2031,101 +2030,6 @@ OnError:
     vscBV_Finalize(&uniformColorMap.usedColor);
 
     return retValue;
-}
-
-gctUINT _VIR_CG_FindResUniform(
-    IN VIR_Shader*                  pShader,
-    IN VIR_UniformKind              uniformKind,
-    IN VSC_SHADER_RESOURCE_BINDING* pResBinding,
-    INOUT VIR_Uniform**             ppUniformArray
-    )
-{
-    VIR_Uniform*    pRetUniform[2] = { gcvNULL, gcvNULL };
-    gctUINT         setNo = pResBinding->set;
-    gctUINT         binding = pResBinding->binding;
-    gctUINT         arraySize = pResBinding->arraySize;
-    gctUINT         i, uniformCount = 0;
-    gctBOOL         bGoThroughAllUniforms = gcvFALSE;
-
-    if (pResBinding->type == VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER)
-    {
-        bGoThroughAllUniforms = gcvTRUE;
-    }
-
-    for (i = 0; i < (gctINT) VIR_IdList_Count(&pShader->uniforms); ++i)
-    {
-        VIR_Id      id  = VIR_IdList_GetId(&pShader->uniforms, i);
-        VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, id);
-        VIR_Uniform *symUniform = gcvNULL;
-        VIR_Type    *symType = VIR_Symbol_GetType(sym);
-        gctUINT     thisArraySize;
-
-        if (VIR_Type_GetKind(symType) == VIR_TY_STRUCT)
-        {
-            continue;
-        }
-
-        symUniform = VIR_Symbol_GetUniformPointer(pShader, sym);
-
-        if (symUniform == gcvNULL ||
-            VIR_Symbol_GetUniformKind(sym) != uniformKind)
-        {
-            continue;
-        }
-
-        if (VIR_Type_GetKind(symType) == VIR_TY_ARRAY)
-        {
-            thisArraySize = VIR_Type_GetArrayLength(symType);
-        }
-        else
-        {
-            thisArraySize = 1;
-        }
-
-        if (VIR_Symbol_GetDescriptorSet(sym) == setNo &&
-            VIR_Symbol_GetBinding(sym) == binding &&
-            thisArraySize == arraySize)
-        {
-            gcmASSERT(uniformCount < 2);
-            pRetUniform[uniformCount] = symUniform;
-            uniformCount++;
-
-            if (!bGoThroughAllUniforms)
-            {
-                break;
-            }
-            if (uniformCount == 2)
-            {
-                break;
-            }
-        }
-    }
-
-    /*
-    ** Make sure that:
-    ** the first element is the SAMPLER variable and the second element is the SAMPLED IMAGE variable.
-    */
-    if (pResBinding->type == VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER)
-    {
-        if (uniformCount == 2)
-        {
-            if (VIR_Symbol_isImage(VIR_Shader_GetSymFromId(pShader, VIR_Uniform_GetSymID(pRetUniform[0]))))
-            {
-                VIR_Uniform* tempUniform = pRetUniform[0];
-
-                pRetUniform[0] = pRetUniform[1];
-                pRetUniform[1] = tempUniform;
-            }
-        }
-    }
-
-    if (ppUniformArray)
-    {
-        ppUniformArray[0] = pRetUniform[0];
-        ppUniformArray[1] = pRetUniform[1];
-    }
-
-    return uniformCount;
 }
 
 static gctBOOL _VIG_CG_IsUniformPushConst(
@@ -2311,41 +2215,6 @@ static void _VIR_CG_AssignPushConstUniform(
     }
 }
 
-/* resource type to uniform kind */
-VIR_UniformKind _VIR_CG_ResType2UniformKind(
-    VSC_SHADER_RESOURCE_TYPE    resType)
-{
-    VIR_UniformKind uniformKind = VIR_UNIFORM_NORMAL;
-
-    switch(resType)
-    {
-    case VSC_SHADER_RESOURCE_TYPE_SAMPLER:
-    case VSC_SHADER_RESOURCE_TYPE_UNIFORM_TEXEL_BUFFER:
-    case VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER:
-    case VSC_SHADER_RESOURCE_TYPE_SAMPLED_IMAGE:
-    case VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE:
-    case VSC_SHADER_RESOURCE_TYPE_STORAGE_TEXEL_BUFFER:
-    case VSC_SHADER_RESOURCE_TYPE_INPUT_ATTACHMENT:
-        uniformKind = VIR_UNIFORM_NORMAL;
-        break;
-
-    case VSC_SHADER_RESOURCE_TYPE_UNIFORM_BUFFER:
-    case VSC_SHADER_RESOURCE_TYPE_UNIFORM_BUFFER_DYNAMIC:
-        uniformKind = VIR_UNIFORM_UNIFORM_BLOCK_ADDRESS;
-        break;
-
-    case VSC_SHADER_RESOURCE_TYPE_STORAGE_BUFFER:
-    case VSC_SHADER_RESOURCE_TYPE_STORAGE_BUFFER_DYNAMIC:
-        uniformKind = VIR_UNIFORM_STORAGE_BLOCK_ADDRESS;
-        break;
-
-    default:
-        break;
-    }
-
-    return uniformKind;
-}
-
 /* allocate the uniform based on the shader resource layout */
 VSC_ErrCode VIR_CG_MapUniformsWithLayout(
     IN VIR_Shader                   *pShader,
@@ -2372,7 +2241,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
         &codeGenUniformBase);
 
     /* config the sampler setting */
-    _VIR_CG_ConfigSamplers(pShader, pHwConfig, gcvTRUE, &maxSampler, &sampler, &allocateSamplerReverse);
+    _VIR_CG_ConfigSamplers(pShader, pHwConfig, &maxSampler, &sampler, &allocateSamplerReverse);
 
     /* set the handleDefaultUBO flag */
     _VIR_CG_isUBOSupported(pShader, pHwConfig, &handleDefaultUBO, &unblockUniformBlock);
@@ -2412,7 +2281,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
     {
         VSC_SHADER_RESOURCE_BINDING resBinding = pResLayout->pResBindings[i];
         VIR_Uniform*    pUniformArray[2] = { gcvNULL, gcvNULL };
-        VIR_UniformKind uniformKind = _VIR_CG_ResType2UniformKind(resBinding.type);
+        VIR_UniformKind uniformKind = VIR_Resouce_ResType2UniformKind(resBinding.type);
         VIR_Symbol      *pSym = gcvNULL;
         gctUINT         uniformSize = 0;
         gctUINT         j, resCount = 0;
@@ -2425,7 +2294,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
         **      separate sampler and sampled image shader variables.
         ** So we may get two uniforms for a resource descriptorSet/binding pair.
         */
-        resCount = _VIR_CG_FindResUniform(pShader, uniformKind, &resBinding, pUniformArray);
+        resCount = VIR_Resouce_FindResUniform(pShader, uniformKind, &resBinding, pUniformArray);
 
         /* allocate even if it does not appear in the shader */
         if (resCount == 0)
