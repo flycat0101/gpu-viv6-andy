@@ -1698,10 +1698,10 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
 
         /* Free the global resources */
         vxReleaseMutex(vxContextGlobalLock);
+#if gcdUSE_SINGLE_CONTEXT
         vxDestroyMutex(vxContextGlobalLock);
         vxContextGlobalLock = VX_NULL;
 
-#if gcdUSE_SINGLE_CONTEXT
         vxSingletonContext = VX_NULL;
 #endif
 
