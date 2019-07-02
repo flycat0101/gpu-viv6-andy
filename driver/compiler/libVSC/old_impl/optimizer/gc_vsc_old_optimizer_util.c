@@ -2246,6 +2246,11 @@ gcOpt_BuildTempArray(
         }
         Optimizer->tempCount = tempCount;
     }
+    else
+    {
+        tempArray = Optimizer->tempArray;
+    }
+
     /* Set function for function arguments. */
     for (i = 0; i < Optimizer->functionCount; i++)
     {
