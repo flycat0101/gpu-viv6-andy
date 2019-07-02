@@ -2252,6 +2252,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
     IN VIR_Shader                   *pShader,
     IN VSC_HW_CONFIG                *pHwConfig,
     IN VSC_SHADER_RESOURCE_LAYOUT   *pResLayout,
+    IN VSC_HASH_TABLE               *pUnbindUniformHash,
     IN VSC_MM                       *pMM
     )
 {
@@ -2880,10 +2881,208 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                 ON_ERROR(retValue, "Failed to Allocate Uniform");
             }
         }
+        else
+        {
+            /*
+            ** If a user-defined ubo/sbo is used in shader but not within the resource layout,
+            ** we need to mark it as unused and remove all its usages in the shader.
+            */
+            if (VIR_Symbol_GetBinding(sym) == NOT_ASSIGNED          &&
+                VIR_Symbol_GetDescriptorSet(sym) == NOT_ASSIGNED    &&
+                (VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_UNIFORM_BLOCK_ADDRESS || VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_STORAGE_BLOCK_ADDRESS))
+            {
+                vscHTBL_DirectSet(pUnbindUniformHash, (void *)sym, gcvNULL);
+
+                VIR_Symbol_ClrFlag(sym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
+                VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_INACTIVE);
+            }
+        }
     }
 
 OnError:
     vscBV_Finalize(&uniformColorMap.usedColor);
+
+    return retValue;
+}
+
+static gctBOOL
+VIR_CG_CheckUnBindUniformRelated(
+    IN VIR_DEF_USAGE_INFO*          pDuInfo,
+    IN VIR_Shader*                  pShader,
+    IN VSC_HASH_TABLE*              pUnbindUniformHash,
+    IN VIR_Instruction*             pInst,
+    IN VIR_Operand*                 pOpnd,
+    IN VIR_Symbol*                  pSymbol
+    )
+{
+    gctBOOL                         bFound = gcvFALSE;
+
+    /*
+    ** Check if this symbol is in the hash table first, if it is not in the table,
+    ** Check if any its DEF is in the hash table.
+    */
+    if (vscHTBL_TestAndGet(pUnbindUniformHash, (void *)pSymbol, gcvNULL))
+    {
+        bFound = gcvTRUE;
+    }
+    else
+    {
+        VIR_GENERAL_UD_ITERATOR     udIter;
+        VIR_DEF*                    pDef;
+
+        vscVIR_InitGeneralUdIterator(&udIter, pDuInfo, pInst, pOpnd, gcvFALSE, gcvFALSE);
+        for (pDef = vscVIR_GeneralUdIterator_First(&udIter);
+             pDef != gcvNULL;
+             pDef = vscVIR_GeneralUdIterator_Next(&udIter))
+        {
+            VIR_Instruction*        pDefInst = pDef->defKey.pDefInst;
+            gctUINT                 i;
+            VIR_Operand*            pSrcOpnd = gcvNULL;
+            VIR_Symbol*             pSrcOpndSym = gcvNULL;
+
+            gcmASSERT(pDefInst);
+
+            if (VIR_IS_IMPLICIT_DEF_INST(pDefInst))
+            {
+                continue;
+            }
+
+            for (i = 0; i < VIR_Inst_GetSrcNum(pDefInst); i++)
+            {
+                pSrcOpnd = VIR_Inst_GetSource(pDefInst, i);
+                if (!VIR_Operand_isSymbol(pSrcOpnd))
+                {
+                    continue;
+                }
+                pSrcOpndSym = VIR_Operand_GetSymbol(pSrcOpnd);
+
+                bFound = VIR_CG_CheckUnBindUniformRelated(pDuInfo,
+                                                          pShader,
+                                                          pUnbindUniformHash,
+                                                          pDefInst,
+                                                          pSrcOpnd,
+                                                          pSrcOpndSym);
+                if (bFound)
+                {
+                    vscHTBL_DirectSet(pUnbindUniformHash, (void *)pSrcOpndSym, gcvNULL);
+                    break;
+                }
+            }
+
+            if (bFound)
+            {
+                vscHTBL_DirectSet(pUnbindUniformHash, (void *)pSymbol, gcvNULL);
+                break;
+            }
+        }
+    }
+
+    return bFound;
+}
+
+/* Remove all instructions that related to a unbind sbo/ubo. */
+static VSC_ErrCode
+VIR_CG_RemoveInstRelatedToUnbindRes(
+    IN VIR_DEF_USAGE_INFO*          pDuInfo,
+    IN VIR_Shader*                  pShader,
+    IN VSC_HASH_TABLE*              pUnbindUniformHash,
+    INOUT gctBOOL*                  pChanged
+    )
+{
+    VSC_ErrCode                     retValue = VSC_ERR_NONE;
+    gctBOOL                         bChanged = gcvFALSE;
+    VIR_FuncIterator                func_iter;
+    VIR_FunctionNode*               pFuncNode;
+
+    /* No unbind resource, just return. */
+    if (HTBL_GET_ITEM_COUNT(pUnbindUniformHash) == 0)
+    {
+        return retValue;
+    }
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for (pFuncNode = VIR_FuncIterator_First(&func_iter);
+         pFuncNode != gcvNULL;
+         pFuncNode = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_Function*               pFunc = pFuncNode->function;
+        VIR_InstIterator            inst_iter;
+        VIR_Instruction*            pInst;
+        VIR_Operand*                pAddrOpnd = gcvNULL;
+        VIR_Symbol*                 pAddrSym = gcvNULL;
+        VIR_OpCode                  opCode;
+        gctBOOL                     bFound = gcvFALSE;
+
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(pFunc));
+        for (pInst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             pInst != gcvNULL;
+             pInst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            opCode = VIR_Inst_GetOpcode(pInst);
+            bFound = gcvFALSE;
+
+            /* Check LOAD/STORE only. */
+            if (!VIR_OPCODE_isGlobalMemLd(opCode) && !VIR_OPCODE_isGlobalMemSt(opCode))
+            {
+                continue;
+            }
+
+            pAddrOpnd = VIR_Inst_GetSource(pInst, 0);
+            if (!VIR_Operand_isSymbol(pAddrOpnd))
+            {
+                continue;
+            }
+            pAddrSym = VIR_Operand_GetSymbol(pAddrOpnd);
+
+            /* Check if the address symbol is within the hash table. */
+            bFound = VIR_CG_CheckUnBindUniformRelated(pDuInfo,
+                                                      pShader,
+                                                      pUnbindUniformHash,
+                                                      pInst,
+                                                      pAddrOpnd,
+                                                      pAddrSym);
+            if (!bFound)
+            {
+                continue;
+            }
+
+            /* Change the instruction:
+            **      1. Change STORE to NOP.
+            **      2. Change LOAD to MOV 0.
+            */
+            if (VIR_OPCODE_isGlobalMemLd(opCode))
+            {
+                VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
+                VIR_Inst_SetSrcNum(pInst, 1);
+                if (VIR_TypeId_isFloat(VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst))))
+                {
+                    VIR_Operand_SetImmediateFloat(pAddrOpnd, 0.0f);
+                }
+                else if (VIR_TypeId_isUnSignedInteger(VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst))))
+                {
+                    VIR_Operand_SetImmediateUint(pAddrOpnd, 0);
+                }
+                else
+                {
+                    VIR_Operand_SetImmediateInt(pAddrOpnd, 0);
+                }
+            }
+            else
+            {
+                gcmASSERT(VIR_OPCODE_isGlobalMemSt(opCode));
+
+                VIR_Function_ChangeInstToNop(pFunc, pInst);
+
+            }
+
+            bChanged = gcvTRUE;
+        }
+    }
+
+    if (pChanged)
+    {
+        *pChanged = bChanged;
+    }
 
     return retValue;
 }
@@ -2909,6 +3108,7 @@ VSC_ErrCode VIR_RA_PerformUniformAlloc(
     VSC_OPTN_RAOptions                *pOption = (VSC_OPTN_RAOptions*)pPassWorker->basePassWorker.pBaseOption;
     VSC_MM                            *pMM = pPassWorker->basePassWorker.pMM;
     VSC_SHADER_RESOURCE_LAYOUT        *pShResourceLayout = pPassWorker->pCompilerParam->pShResourceLayout;
+    VSC_HASH_TABLE                    *pUnbindUniformHash = gcvNULL;
     gctBOOL                           allocUniform = gcvFALSE;
 
     if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetOPTS(pOption),
@@ -2920,13 +3120,30 @@ VSC_ErrCode VIR_RA_PerformUniformAlloc(
 
             if (pShResourceLayout)
             {
-                retValue = VIR_CG_MapUniformsWithLayout(pShader, pHwCfg, pShResourceLayout, pMM);
-                CHECK_ERROR(retValue, "VIR_CG_MapUniformsWithLayout");
+                gctBOOL                 bChanged = gcvFALSE;
+                VIR_DEF_USAGE_INFO*     pDuInfo = pPassWorker->pDuInfo;
+
+                pUnbindUniformHash = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 8);
+                retValue = VIR_CG_MapUniformsWithLayout(pShader, pHwCfg, pShResourceLayout, pUnbindUniformHash, pMM);
+                ON_ERROR(retValue, "VIR_CG_MapUniformsWithLayout");
+
+                /*
+                ** If a user-defined ubo/sbo is used in shader but not within the resource layout,
+                ** we need to mark it as unused and remove all its usages in the shader.
+                */
+                retValue = VIR_CG_RemoveInstRelatedToUnbindRes(pDuInfo, pShader, pUnbindUniformHash, &bChanged);
+                ON_ERROR(retValue, "VIR_CG_RemoveInstRelatedToUnbindRes");
+
+                /* We have removed some instructions without updating DU, so we need to mark DU as invalidated. */
+                if (bChanged)
+                {
+                    pPassWorker->pResDestroyReq->s.bInvalidateDu = gcvTRUE;
+                }
             }
             else
             {
                 retValue = VIR_CG_MapUniforms(pShader, pHwCfg, pMM);
-                CHECK_ERROR(retValue, "VIR_CG_MapUniforms");
+                ON_ERROR(retValue, "VIR_CG_MapUniforms");
             }
 
             /* set const register allocated to shader */
@@ -2940,6 +3157,12 @@ VSC_ErrCode VIR_RA_PerformUniformAlloc(
         {
             VIR_Shader_Dump(gcvNULL, "After Uniform allocation", pShader, gcvTRUE);
         }
+    }
+
+OnError:
+    if (pUnbindUniformHash)
+    {
+        vscHTBL_Destroy(pUnbindUniformHash);
     }
 
     return retValue;
