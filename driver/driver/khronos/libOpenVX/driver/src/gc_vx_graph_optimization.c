@@ -4606,7 +4606,6 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
              {
                  min = 0;
                  zp = 0;
-                 scale = (max - min)/ 255;
                 break;
              }
             case OP_RELU1:
