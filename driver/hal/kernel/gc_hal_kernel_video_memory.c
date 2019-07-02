@@ -3588,10 +3588,10 @@ gckVIDMEM_NODE_LockCPU(
                                               vidMemBlock->physical,
                                               node->VirtualChunk.offset,
                                               node->VirtualChunk.bytes,
-                                              &logical));
+                                              &node->VirtualChunk.kvaddr));
             }
 
-            node->VirtualChunk.kvaddr = logical;
+            logical = node->VirtualChunk.kvaddr;
         }
     }
     else
