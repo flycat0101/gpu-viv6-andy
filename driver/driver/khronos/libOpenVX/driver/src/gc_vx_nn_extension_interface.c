@@ -25483,7 +25483,7 @@ VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_getStartStopStride(vx_tensor inp
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_getReverseAxis(vx_int32 start[4], vx_int32 stop[4], vx_int32 stride[4], vx_uint32 reverseAxis[4], vx_uint32 *numOfAxis)
+VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_getReverseAxis(vx_int32 start[4], vx_int32 stop[4], vx_int32 stride[4], vx_uint32 reverseAxis[4], vx_uint32 *numOfAxis, vx_uint32 *tensor_size)
 {
     vx_uint32 i   = 0;
     vx_uint32 idx = 0;
@@ -25494,9 +25494,8 @@ VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_getReverseAxis(vx_int32 start[4]
 
         if (stride[i] < 0)
         {
-            vx_uint32 start_axis    = stop[i] + 1;
-            vx_uint32 stop_axis     = start[i] + 1;
-
+            vx_uint32 start_axis    = tensor_size[i] - start[i] - 1;
+            vx_uint32 stop_axis     = tensor_size[i] - stop[i] - 2;
 
             stride[i]   = abs(stride[i]);
             start[i]    = start_axis;
@@ -25744,6 +25743,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorStrideSlice_Initializer(vx_node 
     vx_uint32 reverseAxis[4]        = {0xcdcd};
     vx_uint32 numOfAxis             = 0;
     vx_uint32 opIdx                 = 0;
+    vx_uint32 input_size[4]         = {0};
+    vx_uint32 i                     = 0;
     vx_bool   enable_sh_crop        = vx_false_e;
     vx_bool   enable_sh_reverse     = vx_false_e;
     vx_bool   shExe_flag            = vx_false_e;
@@ -25774,12 +25775,17 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorStrideSlice_Initializer(vx_node 
         tensor_stride_slice_layer->operations,
         VX_NULL);
 
+    for (i = 0; i < TENSOR_DIM_NUM(input); i++)
+    {
+        input_size[i] = TENSOR_VIEW_SIZE_INDEX(input, i);
+    }
+
     vxoNNTensorStrideSlice_getStartStopStride(input, begin_dims, end_dims, stride_dims, begin_mask, end_mask, shrink_axis_mask, start, stop, stride);
 
     enable_sh_crop = (vx_bool)(!checkOutputTensorDoAlu(input, output) && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[1]) && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[2]) && gcoMATH_Absolute((vx_float32)stride[0]) == 1 && TENSOR_DIM_NUM(input) < 4);
 
 
-    vxoNNTensorStrideSlice_getReverseAxis(start, stop, stride, reverseAxis, &numOfAxis);
+    vxoNNTensorStrideSlice_getReverseAxis(start, stop, stride, reverseAxis, &numOfAxis, input_size);
 
     enable_sh_reverse    = (vx_bool)(numOfAxis > 0 && numOfAxis < 4);
 
@@ -25853,111 +25859,36 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorStrideSlice_Initializer(vx_node 
             vx_uint32 dims     = TENSOR_DIM_NUM(output);
             vx_uint32 idx      = 0;
             vx_tensor_create_params_t tensor_create_params;
+            vx_context context = vxGetContext((vx_reference)node);
 
             for (idx = 0; idx < dims; idx++)
             {
-                sizes[idx] = TENSOR_VIEW_SIZE_INDEX(output, idx);
+                sizes[idx] = TENSOR_VIEW_SIZE_INDEX(input, idx);
             }
 
             gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
             tensor_create_params.num_of_dims = dims;
             tensor_create_params.sizes = sizes;
-            tensor_create_params.data_format = TENSOR_DATA_TYPE(output);
-            tensor_create_params.quant_format = TENSOR_QUANT_TYPE(output);
+            tensor_create_params.data_format = TENSOR_DATA_TYPE(input);
+            tensor_create_params.quant_format = TENSOR_QUANT_TYPE(input);
             if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
             {
-                tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(output);
+                tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(input);
             }
             else
             {
-                tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(output);
-                tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(output);
+                tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(input);
+                tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(input);
             }
 
             tmpTensor = vxoTensor_CreateTensor(node->base.context, node->graph, &tensor_create_params, vx_true_e);
 
             tensor_stride_slice_layer->base.temp_tensors[0]  = tmpTensor;
             tensor_stride_slice_layer->base.num_temp_tensors = 1;
-        }
-        else
-        {
-            tmpTensor = output;
-        }
 
-        if (enable_sh_crop)
-        {
-            if(node->base.context->evisNoInst.supportEVIS)
-            {
-                shaderExecutable = vxnneGetTensorCropShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_CROP, &node->kernelAttributes.borderMode, start, stop, input, tmpTensor);
-            }
-            else
-            {
-                shaderExecutable = vxnneGetGPUTensorCropShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_CROP, &node->kernelAttributes.borderMode, start, stop, input, tmpTensor);
-            }
-
-            if (!shaderExecutable)
-            {
-                status = VX_FAILURE;
-                goto exit;
-            }
-            status = vxnneShaderOperation_Initialize(&tensor_stride_slice_layer->tensor_crop_sh_operation,
-                &tensor_stride_slice_layer->base,
-                VXNNE_OPERATOR_TENSOR_STRIDE_SLICE,
-                batchCount,
-                shaderExecutable);
-
-            if (status != VX_SUCCESS)
-                goto exit;
-
-            vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_crop_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_crop_sh_operation.base, (vx_reference)tmpTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT);
-
-            vxnneLayer_SetOperation(
-                &tensor_stride_slice_layer->base,
-                &tensor_stride_slice_layer->tensor_crop_sh_operation.base,
-                opIdx++);
-        }
-        else
-        {
-            if(node->base.context->evisNoInst.supportEVIS)
-            {
-                shaderExecutable = vxnneGetTensorStridedSliceShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_STRIDE_SLICE, &node->kernelAttributes.borderMode, start, stop, stride, input, tmpTensor);
-            }
-            else
-            {
-                shaderExecutable = vxnneGetGPUTensorStridedSliceShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_STRIDE_SLICE, &node->kernelAttributes.borderMode, start, stop, stride, input, tmpTensor);
-            }
-
-            if (!shaderExecutable)
-            {
-                status = VX_FAILURE;
-                goto exit;
-            }
-            status = vxnneShaderOperation_Initialize(&tensor_stride_slice_layer->tensor_stride_slice_sh_operation,
-                &tensor_stride_slice_layer->base,
-                VXNNE_OPERATOR_TENSOR_STRIDE_SLICE,
-                batchCount,
-                shaderExecutable);
-
-            if (status != VX_SUCCESS)
-                goto exit;
-
-            vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_stride_slice_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_stride_slice_sh_operation.base, (vx_reference)tmpTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT);
-
-            vxnneLayer_SetOperation(
-                &tensor_stride_slice_layer->base,
-                &tensor_stride_slice_layer->tensor_stride_slice_sh_operation.base,
-                opIdx++);
-        }
-
-        if (enable_sh_reverse)
-        {
-            vx_context context = vxGetContext((vx_reference)node);
-            vx_uint32  i       = 0;
 
             if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_REVERSE) &&
-                vxnneIsTPSupportFormat(context, tmpTensor, VX_NULL, output))
+                vxnneIsTPSupportFormat(context, input, VX_NULL, tmpTensor))
             {
                 vx_op_param_s conv = {0};
                 vx_int32 axis[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
@@ -25977,11 +25908,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorStrideSlice_Initializer(vx_node 
                     0);
                 if (status != VX_SUCCESS) goto exit;
                 vxnneLayer_SetOperation(&tensor_stride_slice_layer->base, &tensor_stride_slice_layer->tensor_reverse_tp_operation.base, opIdx++);
-                tensor_stride_slice_layer->tensor_reverse_tp_operation.input  = tmpTensor;
-                tensor_stride_slice_layer->tensor_reverse_tp_operation.output = output;
+                tensor_stride_slice_layer->tensor_reverse_tp_operation.input  = input;
+                tensor_stride_slice_layer->tensor_reverse_tp_operation.output = tmpTensor;
 
-                vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_reverse_tp_operation.base, (vx_reference)tmpTensor, VXNNE_OPERATION_REFENRENCE_INPUT);
-                vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_reverse_tp_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+                vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_reverse_tp_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
+                vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_reverse_tp_operation.base, (vx_reference)tmpTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
                 conv.pad_x_left = 0;
                 conv.pad_y_top = 0;
@@ -26007,12 +25938,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorStrideSlice_Initializer(vx_node 
                 if(node->base.context->evisNoInst.supportEVIS)
                 {
                     shaderExecutable = vxnneGetReverseShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_REVERSE, &node->kernelAttributes.borderMode,
-                        tmpTensor, output, numOfAxis, reverseAxis);
+                        input, tmpTensor, numOfAxis, reverseAxis);
                 }
                 else
                 {
                     shaderExecutable = vxnneGetGPUReverseShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_REVERSE, &node->kernelAttributes.borderMode,
-                        tmpTensor, output, numOfAxis, reverseAxis);
+                        input, tmpTensor, numOfAxis, reverseAxis);
                 }
 
                 if (!shaderExecutable)
@@ -26029,14 +25960,85 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorStrideSlice_Initializer(vx_node 
                 if (status != VX_SUCCESS)
                     goto exit;
 
-                vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_reverse_sh_operation.base, (vx_reference)tmpTensor, VXNNE_OPERATION_REFENRENCE_INPUT);
-                vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_reverse_sh_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+                vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_reverse_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
+                vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_reverse_sh_operation.base, (vx_reference)tmpTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
                 vxnneLayer_SetOperation(
                     &tensor_stride_slice_layer->base,
                     &tensor_stride_slice_layer->tensor_reverse_sh_operation.base,
                     opIdx++);
             }
+        }
+        else
+        {
+            tmpTensor = input;
+        }
+
+        if (enable_sh_crop)
+        {
+            if(node->base.context->evisNoInst.supportEVIS)
+            {
+                shaderExecutable = vxnneGetTensorCropShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_CROP, &node->kernelAttributes.borderMode, start, stop, tmpTensor, output);
+            }
+            else
+            {
+                shaderExecutable = vxnneGetGPUTensorCropShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_CROP, &node->kernelAttributes.borderMode, start, stop, tmpTensor, output);
+            }
+
+            if (!shaderExecutable)
+            {
+                status = VX_FAILURE;
+                goto exit;
+            }
+            status = vxnneShaderOperation_Initialize(&tensor_stride_slice_layer->tensor_crop_sh_operation,
+                &tensor_stride_slice_layer->base,
+                VXNNE_OPERATOR_TENSOR_STRIDE_SLICE,
+                batchCount,
+                shaderExecutable);
+
+            if (status != VX_SUCCESS)
+                goto exit;
+
+            vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_crop_sh_operation.base, (vx_reference)tmpTensor, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_crop_sh_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+            vxnneLayer_SetOperation(
+                &tensor_stride_slice_layer->base,
+                &tensor_stride_slice_layer->tensor_crop_sh_operation.base,
+                opIdx++);
+        }
+        else
+        {
+            if(node->base.context->evisNoInst.supportEVIS)
+            {
+                shaderExecutable = vxnneGetTensorStridedSliceShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_STRIDE_SLICE, &node->kernelAttributes.borderMode, start, stop, stride, tmpTensor, output);
+            }
+            else
+            {
+                shaderExecutable = vxnneGetGPUTensorStridedSliceShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_STRIDE_SLICE, &node->kernelAttributes.borderMode, start, stop, stride, tmpTensor, output);
+            }
+
+            if (!shaderExecutable)
+            {
+                status = VX_FAILURE;
+                goto exit;
+            }
+            status = vxnneShaderOperation_Initialize(&tensor_stride_slice_layer->tensor_stride_slice_sh_operation,
+                &tensor_stride_slice_layer->base,
+                VXNNE_OPERATOR_TENSOR_STRIDE_SLICE,
+                batchCount,
+                shaderExecutable);
+
+            if (status != VX_SUCCESS)
+                goto exit;
+
+            vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_stride_slice_sh_operation.base, (vx_reference)tmpTensor, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_stride_slice_sh_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+            vxnneLayer_SetOperation(
+                &tensor_stride_slice_layer->base,
+                &tensor_stride_slice_layer->tensor_stride_slice_sh_operation.base,
+                opIdx++);
         }
     }
     else
