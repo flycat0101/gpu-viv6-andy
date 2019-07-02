@@ -7157,11 +7157,24 @@ VIR_LinkInternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
 
         {
             gctBOOL forOCL = (pPassWorker->pCompilerParam->cfg.ctx.clientAPI == gcvAPI_OPENCL);
-            if (forOCL && (gcmOPT_oclPackedBasicType() || _HasIntrinsicCall(pShader)))
+            if (forOCL)
+            {
+                if (gcmOPT_oclPackedBasicType() || _HasIntrinsicCall(pShader))
+                {
+                    errCode = VIR_GetIntrinsicLib(pHwCfg,
+                                                  &pPrivData->pmp.mmWrapper,
+                                                  gcvTRUE,
+                                                  VIR_Shader_IsGraphics(pShader),
+                                                  gcvFALSE,
+                                                  &pIntrinsicLib);
+                    CHECK_ERROR(errCode, "VIR_GetIntrinsicLib failed.");
+                }
+            }
+            else
             {
                 errCode = VIR_GetIntrinsicLib(pHwCfg,
                                               &pPrivData->pmp.mmWrapper,
-                                              forOCL,
+                                              gcvFALSE,
                                               VIR_Shader_IsGraphics(pShader),
                                               gcvFALSE,
                                               &pIntrinsicLib);
