@@ -3599,7 +3599,8 @@ VkResult halti5_copyImage(
 
         /*for 64bit, src is compressed image, dest is uncompressed image*/
         if ((dstRes->isImage && (!dstRes->u.img.pImage->formatInfo.compressed)) &&
-            (srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed))
+            (srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed) &&
+            g_vkFormatInfoTable[dstFormat].bitsPerBlock == 64)
         {
             srcTiling = 0x0;
             srcSuperTile = 0x0;
