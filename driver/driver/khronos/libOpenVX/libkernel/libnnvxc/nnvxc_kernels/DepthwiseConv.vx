@@ -284,8 +284,8 @@ __kernel void vxcDepthwiseConv_i8i8_nopad(
     int padTop,
     __write_only image2d_array_t output)
 {
-    int gidx = get_global_id(0);
-    int gidy = get_global_id(1);
+    int gidx = get_global_id(0) * stride;
+    int gidy = get_global_id(1) * stride;
     int gidz = get_global_id(2);
     int inz = (short)gidz / (short)channel_multiplier;
     int4 coord = (int4)(gidx, gidy, inz, 0);
@@ -335,7 +335,7 @@ __kernel void vxcDepthwiseConv_i8i8_nopad(
     }
     sum *= outScale;
     char dst = convert_char_sat_rte(sum);
-    coord = (int4)(gidx, gidy, gidz, 0);
+    coord = (int4)(get_global_id(0), get_global_id(1), gidz, 0);
     VXC_WriteImage2DArray(output, coord, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
 }
 
@@ -351,8 +351,8 @@ __kernel void vxcDepthwiseConv_i8i8(
     int padTop,
     __write_only image2d_array_t output)
 {
-    int gidx = get_global_id(0) - padLeft;
-    int gidy = get_global_id(1) - padTop;
+    int gidx = get_global_id(0) * stride - padLeft;
+    int gidy = get_global_id(1) * stride - padTop;
     int gidz = get_global_id(2);
     int inz = (short)gidz / (short)channel_multiplier;
     int4 coord = (int4)(gidx, gidy, inz, 0);
