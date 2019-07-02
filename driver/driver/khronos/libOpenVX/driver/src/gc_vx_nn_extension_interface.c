@@ -2538,6 +2538,63 @@ vx_status vxnneExecuteSWTensorCopy(struct _vxnne_operation_s *operation)
     return VX_SUCCESS;
 }
 
+/* Greatest Common Divisor*/
+VX_PRIVATE_API vx_bool vxoGetDataDivisors(vx_uint32 input_value, vx_uint32 *divisors, vx_uint32 gcd)
+{
+    vx_uint32 i                 = 0;
+
+    for (i = gcmMIN(input_value, IMG_MAX_WIDTH - 1); i > 0; i --)
+    {
+        if ((i % gcd == 0) && (input_value % i == 0))
+        {
+            *divisors = i;
+
+            return vx_true_e;
+        }
+    }
+
+    return vx_false_e;
+}
+
+VX_PRIVATE_API vx_bool vxoElementOptimization_GetTensorShape(vx_tensor input, vx_uint32 sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION], vx_uint32 * num_of_dims)
+{
+    vx_status status            = VX_SUCCESS;
+    vx_uint32 element_count     = 0;
+    vx_uint32 i                 = 0;
+
+    status = vxoTensor_GetTensorElementCount(input, &element_count);
+    if (status != VX_SUCCESS) return vx_false_e;
+
+    for (i = 0; i < VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
+    {
+        sizes[i] = 1;
+    }
+
+    if (element_count < IMG_MAX_WIDTH)
+    {
+        sizes[0] = element_count;
+
+        *num_of_dims = 2;
+    }
+    else
+    {
+        vx_uint32 divisors = 1;
+        for (i = 0; i < 2; i++)
+        {
+            divisors = 1;
+            vxoGetDataDivisors(element_count, &divisors, 1);
+
+            sizes[i] = divisors;
+            element_count = element_count / divisors;
+        }
+
+        sizes[2] = element_count;
+        *num_of_dims = 3;
+    }
+
+    return vx_true_e;
+}
+
 vx_status CPUTensorReverse(vx_tensor src, vx_tensor dst, vx_uint32 axis)
 {
     vx_type_e srcFormat = (vx_type_e)TENSOR_DATA_TYPE(src);
@@ -6068,8 +6125,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, c
     vx_enum    outputFormat            = TENSOR_DATA_TYPE(dst);
     vx_bool    shExe_flag              = vx_false_e;
     vx_bool    enable_dataConv2F32     = vx_false_e;
-    vx_uint32  convtF32_Sizes[4]       = {1, 1, 1, 1};
-    vx_uint32  convtF32_Dims           = 2;
+    vx_uint32  reshpTensor_Sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+    vx_uint32  reshpTensor_Dims           = 2;
     vxnne_tensor_copy  copyNode        = VX_NULL;
     vx_context context                 = vxGetContext((vx_reference)node);
 
@@ -6083,110 +6140,56 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, c
     {
         vx_uint32 src_elementCount = 0;
         vx_uint32 dst_elementCount = 0;
-        vx_uint32 dimCount0        = 0;
-        vx_uint32 width0           = 0;
-        vx_uint32 height0          = 0;
-        vx_uint32 depth0           = 0;
-        vx_uint32 batch0           = 0;
-        vx_uint32 dimCount1        = 0;
-        vx_uint32 width1           = 0;
-        vx_uint32 height1          = 0;
-        vx_uint32 depth1           = 0;
-        vx_uint32 batch1           = 0;
 
-        dimCount0    = TENSOR_VIEW_DIM_NUM(src);
-        width0       = TENSOR_VIEW_SIZE_INDEX(src, 0);
-        height0      = (dimCount0 > 1) ? TENSOR_VIEW_SIZE_INDEX(src, 1) : 1;
-        depth0       = (dimCount0 > 2) ? TENSOR_VIEW_SIZE_INDEX(src, 2) : 1;
-        batch0       = (dimCount0 > 3) ? TENSOR_VIEW_SIZE_INDEX(src, 3) : 1;
-        src_elementCount = width0 * height0 * depth0 * batch0;
-
-        dimCount1    = TENSOR_VIEW_DIM_NUM(dst);
-        width1       = TENSOR_VIEW_SIZE_INDEX(dst, 0);
-        height1      = (dimCount1 > 1) ? TENSOR_VIEW_SIZE_INDEX(dst, 1) : 1;
-        depth1       = (dimCount1 > 2) ? TENSOR_VIEW_SIZE_INDEX(dst, 2) : 1;
-        batch1       = (dimCount1 > 3) ? TENSOR_VIEW_SIZE_INDEX(dst, 3) : 1;
-        dst_elementCount = width1 * height1 * depth1 * batch1;
+        status = vxoTensor_GetTensorElementCount(src, &src_elementCount);
+        status = vxoTensor_GetTensorElementCount(dst, &dst_elementCount);
 
         if(context->evisNoInst.supportEVIS)
         {
-            if (inputFormat != VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+            if (src_elementCount < IMG_MAX_WIDTH)
             {
-                vx_uint32 input_size[4] = {width0, height0, depth0, batch0};
+                reshpTensor_Sizes[0]   = src_elementCount;
+                reshpTensor_Sizes[1]   = 1;
+                reshpTensor_Dims = 2;
 
-                if (src_elementCount < IMG_MAX_WIDTH)
-                {
+                if (inputFormat != VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
                     enable_dataConv2F32 = vx_true_e;
-                    convtF32_Sizes[0]   = src_elementCount;
-                }
-                else if ((width0 % INPUT_SIZE_ALIGN_4 == 0) ||
-                    (height0 % INPUT_SIZE_ALIGN_4 == 0) ||
-                    (depth0 % INPUT_SIZE_ALIGN_4 == 0) ||
-                    (batch0 % INPUT_SIZE_ALIGN_4 == 0))
-                {
-                    vx_uint32 i = 0;
-                    vx_uint32 j = 0;
-                    vx_uint32 sz0 = 0;
-                    vx_uint32 sz1 = 0;
-                    vx_uint32 sz2 = 0;
+            }
+            else
+            {
+                vx_uint32 gcd = outputFormat == VX_TYPE_FLOAT32 ? 4 : 1;
+                vx_uint32 divisors = 1;
+                vx_uint32 element_count = src_elementCount;
 
-                    for (i = 0; i < dimCount0; i++)
-                    {
-                        vx_uint32 shapeSz[3] = {1};
-                        vx_uint32 swp = input_size[i];
-                        input_size[i] = input_size[0];
-                        input_size[0] = swp;
+                vxoGetDataDivisors(element_count, &divisors, gcd);
+                reshpTensor_Sizes[0] = divisors;
+                element_count = element_count / divisors;
+                vxoGetDataDivisors(element_count, &divisors, 1);
+                reshpTensor_Sizes[1] = divisors;
+                element_count = element_count / divisors;
+                reshpTensor_Sizes[2] = element_count;
+                reshpTensor_Dims = 3;
 
-                        if (input_size[0] % INPUT_SIZE_ALIGN_4 != 0)
-                            continue;
-
-                        sz0 = input_size[0] * input_size[1] * input_size[2];
-                        sz1 = input_size[0] * input_size[1] * input_size[3];
-                        sz2 = input_size[0] * input_size[2] * input_size[3];
-
-                        shapeSz[0] = gcmMAX(gcmMAX(sz0, sz1), sz2);
-                        shapeSz[1] = gcmMAX(gcmMIN(sz0, sz1), gcmMIN(gcmMAX(sz0, sz1), sz2));
-                        shapeSz[2] = gcmMIN(gcmMIN(sz0, sz1), sz2);
-
-                        for (j = 0; j < 3; j++)
-                        {
-                            if (shapeSz[j] < IMG_MAX_WIDTH)
-                            {
-                                enable_dataConv2F32 = vx_true_e;
-                                convtF32_Sizes[0]   = shapeSz[j];
-                                convtF32_Sizes[1]   = src_elementCount / shapeSz[j];
-
-                                break;
-                            }
-                        }
-
-                        if (enable_dataConv2F32 == vx_false_e && input_size[0] < IMG_MAX_WIDTH)
-                        {
-                            enable_dataConv2F32 = vx_true_e;
-
-                            convtF32_Sizes[0]   = input_size[0];
-                            convtF32_Sizes[1]   = input_size[1];
-                            convtF32_Sizes[2]   = input_size[2] * input_size[3];
-
-                            convtF32_Dims = dimCount0;
-                            break;
-                        }
-                        else
-                            break;
-                    }
-                }
+                if (inputFormat != VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32
+                    && (reshpTensor_Sizes[0] % INPUT_SIZE_ALIGN_4 == 0))
+                    enable_dataConv2F32 = vx_true_e;
             }
 
             shExe_flag = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
                                  || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
                                  || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
+                                 || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16)
+                                 || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT16)
                                  || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                                 || (inputFormat == VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32)
                                  || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
                                  || enable_dataConv2F32)
                                  && src_elementCount == dst_elementCount);
         }
         else
         {
+            vxoElementOptimization_GetTensorShape(src, reshpTensor_Sizes, &reshpTensor_Dims);
+
             shExe_flag = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
                                  || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
                                  || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
@@ -6249,83 +6252,64 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, c
                 0);
         }
         else
-
-        if (shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)) )
         {
-            vxnne_shader_executable shaderExecutable;
-            vx_tensor input      = NULL;
-            vx_tensor output     = NULL;
-            vx_int32   sizes[4]  = {0};
-
-            if (enable_dataConv2F32)
+            if (shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)) )
             {
-                input     = vxoTensor_ReshapeTensor(src, (vx_int32*)convtF32_Sizes, convtF32_Dims);
-                output     = vxoTensor_ReshapeTensor(dst, (vx_int32*)convtF32_Sizes, convtF32_Dims);
+                vxnne_shader_executable shaderExecutable;
+                vx_tensor input      = NULL;
+                vx_tensor output     = NULL;
+
+                input     = vxoTensor_ReshapeTensor(src, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+                output     = vxoTensor_ReshapeTensor(dst, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+
+                if(node->base.context->evisNoInst.supportEVIS)
+                {
+                    shaderExecutable = vxnneTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
+                }
+                else
+                {
+                    shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
+                }
+
+                if (input) vxoTensor_ReleaseTensor(&input);
+                if (output) vxoTensor_ReleaseTensor(&output);
+
+                if (!shaderExecutable)
+                {
+                    status = VX_FAILURE;
+                    goto exit;
+                }
+                status = vxnneShaderOperation_Initialize(&copyNode->tensor_copy_sh_operation,
+                    &copyNode->base,
+                    VXNNE_OPERATOR_CONVERT_FORMAT,
+                    1, /*batchCount is 1 after reshape tensor object*/
+                    shaderExecutable);
+
+                if (status != VX_SUCCESS)
+                    goto exit;
+
+                vxnneOperation_AddReference(&copyNode->tensor_copy_sh_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT);
+                vxnneOperation_AddReference(&copyNode->tensor_copy_sh_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+                vxnneLayer_SetOperation(&copyNode->base, &copyNode->tensor_copy_sh_operation.base, 0);
             }
             else
             {
-                sizes[0]   = gcmMAX(gcmMAX(width0, height0), depth0);
-                sizes[1]   = gcmMAX(gcmMIN(width0, height0), gcmMIN(gcmMAX(width0, height0), depth0));
-                sizes[2]   = gcmMIN(gcmMIN(width0, height0), depth0) * batch0;
-                sizes[3]   = 1;
+                vxnneOperation_Initialize(&copyNode->tensor_copy_operation.base,
+                    &copyNode->base,
+                    VXNNE_OPERATION_TARGET_SW,
+                    VXNNE_OPERATOR_TENSOR_COPY,
+                    vxnneExecuteSWTensorCopy,
+                    VX_NULL,
+                    batchCount,
+                    0);
+                vxnneLayer_SetOperation(&copyNode->base, &copyNode->tensor_copy_operation.base, 0);
 
-                input     = vxoTensor_ReshapeTensor(src, sizes, dimCount0);
+                copyNode->tensor_copy_operation.src           = src;
+                copyNode->tensor_copy_operation.dst           = dst;
 
-                sizes[0]   = gcmMAX(gcmMAX(width1, height1), depth1);
-                sizes[1]   = gcmMAX(gcmMIN(width1, height1), gcmMIN(gcmMAX(width1, height1), depth1));
-                sizes[2]   = gcmMIN(gcmMIN(width1, height1), depth1) * batch1;
-                sizes[3]   = 1;
-
-                output     = vxoTensor_ReshapeTensor(dst, sizes, dimCount1);
+                vxnneOperation_AddReference(&copyNode->tensor_copy_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT);
+                vxnneOperation_AddReference(&copyNode->tensor_copy_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT);
             }
-
-            if(node->base.context->evisNoInst.supportEVIS)
-            {
-                shaderExecutable = vxnneTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
-            }
-            else
-            {
-                shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
-            }
-
-            if (input) vxoTensor_ReleaseTensor(&input);
-            if (output) vxoTensor_ReleaseTensor(&output);
-
-            if (!shaderExecutable)
-            {
-                status = VX_FAILURE;
-                goto exit;
-            }
-            status = vxnneShaderOperation_Initialize(&copyNode->tensor_copy_sh_operation,
-                &copyNode->base,
-                VXNNE_OPERATOR_CONVERT_FORMAT,
-                1, /*batchCount is 1 after reshape tensor object*/
-                shaderExecutable);
-
-            if (status != VX_SUCCESS)
-                goto exit;
-
-            vxnneOperation_AddReference(&copyNode->tensor_copy_sh_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&copyNode->tensor_copy_sh_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT);
-            vxnneLayer_SetOperation(&copyNode->base, &copyNode->tensor_copy_sh_operation.base, 0);
-        }
-        else
-        {
-            vxnneOperation_Initialize(&copyNode->tensor_copy_operation.base,
-                &copyNode->base,
-                VXNNE_OPERATION_TARGET_SW,
-                VXNNE_OPERATOR_TENSOR_COPY,
-                vxnneExecuteSWTensorCopy,
-                VX_NULL,
-                batchCount,
-                0);
-            vxnneLayer_SetOperation(&copyNode->base, &copyNode->tensor_copy_operation.base, 0);
-
-            copyNode->tensor_copy_operation.src           = src;
-            copyNode->tensor_copy_operation.dst           = dst;
-
-            vxnneOperation_AddReference(&copyNode->tensor_copy_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&copyNode->tensor_copy_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT);
         }
 
         node->layer = &copyNode->base;
@@ -10447,29 +10431,27 @@ vx_status vxnneExecuteSWTensorAdd(vxnne_operation operation)
     vx_tensor input1 = eltwiseOperation->input0;
     vx_tensor input2 = eltwiseOperation->input1;
     vx_tensor output = eltwiseOperation->output;
-    vx_uint32 dim1 = input1->viewRegion.dimCount;
-    vx_uint32 dim2 = input2->viewRegion.dimCount;
+    vx_uint32 dims   = TENSOR_DIM_NUM(output);
 
-    if (dim1 == dim2)
     {
-        vx_enum overflow = eltwiseOperation->policy->value->e;
         vx_uint8_ptr input1base, input2base, outputbase;
-        vx_enum format = TENSOR_DATA_TYPE(input1);
-        vx_uint32 i, numCount=1;
+        vx_uint32 i, numCount = 1;
 
         vxoTensor_GetTensorViewMemory(input1, (gctPOINTER*)&input1base, VX_NULL);
         vxoTensor_GetTensorViewMemory(input2, (gctPOINTER*)&input2base, VX_NULL);
         vxoTensor_GetTensorViewMemory(output, (gctPOINTER*)&outputbase, VX_NULL);
 
-        for(i = 0; i < dim1; i++)
+        for (i = 0; i < dims; i++)
         {
             numCount *= output->dims[i];
         }
 
-        for(i = 0; i < numCount; i++)
+        for (i = 0; i < numCount; i++)
         {
             vx_uint32 in1offset, in2offset, outoffset;
             vx_int8_ptr in1, in2, out;
+            vx_status status = VX_SUCCESS;
+            vx_float32 in1Data_fl32, in2Data_fl32;
 
             in1offset = getExpandTensorOffset(i, input1, output->dims);
             in2offset = getExpandTensorOffset(i, input2, output->dims);
@@ -10479,62 +10461,14 @@ vx_status vxnneExecuteSWTensorAdd(vxnne_operation operation)
             in2 = (vx_int8_ptr)input2base + in2offset;
             out = (vx_int8_ptr)outputbase + outoffset;
 
-            if(format == VX_TYPE_INT16)
-            {
-                vx_int16 in1Data = *(vx_int16*)in1;
-                vx_int16 in2Data = *(vx_int16*)in2;
-                vx_int16 * outData = (vx_int16*)out;
-                vx_int32 tmp = in1Data + in2Data;
-
-                if(overflow == VX_CONVERT_POLICY_WRAP)
-                {
-                    outData[0] = (vx_int16)(vx_uint16)tmp;
-                }
-                else
-                {
-                    outData[0] = (vx_int16)gcmCLAMP(tmp, INT16_MIN, INT16_MAX);
-                }
-            }
-            else if(format == VX_TYPE_INT8)
-            {
-                vx_int8 in1Data = *(vx_int8*)in1;
-                vx_int8 in2Data = *(vx_int8*)in2;
-                vx_int8 * outData = (vx_int8*)out;
-
-                int32_t tmp = in1Data + in2Data;
-                if(overflow == VX_CONVERT_POLICY_WRAP)
-                {
-                    outData[0] = (vx_int8)(vx_uint8)tmp;
-                }
-                else
-                {
-                    outData[0] = (vx_int8)gcmCLAMP(tmp, INT8_MIN, INT8_MAX);
-                }
-            }
-            else if(format == VX_TYPE_UINT8)
-            {
-                vx_uint8 in1Data = *(vx_uint8*)in1;
-                vx_uint8 in2Data = *(vx_uint8*)in2;
-                vx_uint8 * outData = (vx_uint8*)out;
-
-                int32_t tmp = in1Data + in2Data;
-                if(overflow == VX_CONVERT_POLICY_WRAP)
-                {
-                    outData[0] = (vx_uint8)tmp;
-                }
-                else
-                {
-                    outData[0] = (vx_uint8)gcmCLAMP(tmp, 0, UINT8_MAX);
-                }
-            }
-            else
-            {
-                vxError("Invalid data type!\n");
-            }
+            in1Data_fl32 = vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(input1), TENSOR_QUANT_TYPE(input1), 0, (vx_uint8_ptr)in1,
+                TENSOR_POS(input1), TENSOR_TF_ZEROPOINT(input1), TENSOR_TF_SCALE(input1));
+            in2Data_fl32 = vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(input2), TENSOR_QUANT_TYPE(input2), 0, (vx_uint8_ptr)in2,
+                TENSOR_POS(input2), TENSOR_TF_ZEROPOINT(input2), TENSOR_TF_SCALE(input2));
+            status = vxnneSaveDataExt((vx_type_e)TENSOR_DATA_TYPE(output), TENSOR_QUANT_TYPE(output), 0, in1Data_fl32 + in2Data_fl32, (vx_uint8_ptr)out,
+                TENSOR_POS(output), TENSOR_TF_ZEROPOINT(output), TENSOR_TF_SCALE(output), TENSOR_ROUNDING_MODE(output));
         }
     }
-    else
-        vxError("Difference dim\n");
 
     return VX_SUCCESS;
 }
@@ -10552,13 +10486,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorAdd_Initializer(vx_node node, co
     vx_type_e input0Format          = TENSOR_DATA_TYPE(input0);
     vx_type_e input1Format          = TENSOR_DATA_TYPE(input1);
     vx_type_e outputFormat          = TENSOR_DATA_TYPE(output);
-    vx_uint32 input0Dims            = TENSOR_DIM_NUM(input0);
-    vx_uint32 input1Dims            = TENSOR_DIM_NUM(input1);
 
     vx_bool   format_flag           = vx_false_e;
     vx_bool   shExe_flag            = vx_true_e;
     vx_bool   swExe_flag            = vx_false_e;
     vx_bool   enable_2d_tensor      = vx_false_e;
+    vx_enum   policyEnum            = policy->value->e;
+    vx_uint32 depth                 = (TENSOR_DIM_NUM(output) > 2) ? TENSOR_VIEW_SIZE_INDEX(output, 2) : 1;
     vx_uint32 batchCount0           = (TENSOR_SIZE_INDEX(input0, 3) == 0) ? 1 : TENSOR_SIZE_INDEX(input0, 3);
     vx_uint32 batchCount1           = (TENSOR_SIZE_INDEX(input1, 3) == 0) ? 1 : TENSOR_SIZE_INDEX(input1, 3);
     vx_uint32 batchCount            = (TENSOR_SIZE_INDEX(output, 3) == 0) ? 1 : TENSOR_SIZE_INDEX(output, 3);
@@ -10592,7 +10526,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorAdd_Initializer(vx_node node, co
     if(context->evisNoInst.supportEVIS)
     {
         format_flag = (vx_bool)((input0Format != VX_TYPE_FLOAT32) && (input1Format != VX_TYPE_FLOAT32) && (outputFormat != VX_TYPE_FLOAT32));
-        enable_2d_tensor = (vx_bool)(input0Dims < 3 && input1Dims < 3 && input0Format == VX_TYPE_FLOAT16 && (input1Format == VX_TYPE_FLOAT16 || input1Format == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT16);
+        enable_2d_tensor = (vx_bool)(depth == 1 && ((input0Format == VX_TYPE_FLOAT16 && (input1Format == VX_TYPE_FLOAT16 || input1Format == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT16) || format_flag) && policyEnum == VX_CONVERT_POLICY_SATURATE);
     }
     else
     {
@@ -10659,7 +10593,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorAdd_Initializer(vx_node node, co
         {
             if (enable_2d_tensor)
             {
-                shaderExecutable = vxnneGetTensor2DAddShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_2D_ADD, &node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, output);
+                shaderExecutable = vxnneGetTensor2DAddShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_2D_ADD, &node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_ADD, output);
             }
             else
             {
@@ -10789,21 +10723,17 @@ vx_status vxnneExecuteSWTensorSub(vxnne_operation operation)
     vx_tensor input1 = eltwiseOperation->input0;
     vx_tensor input2 = eltwiseOperation->input1;
     vx_tensor output = eltwiseOperation->output;
-    vx_uint32 dim1 = input1->viewRegion.dimCount;
-    vx_uint32 dim2 = input2->viewRegion.dimCount;
+    vx_uint32 dims   = TENSOR_DIM_NUM(output);
 
-    if (dim1 == dim2)
     {
-        vx_enum overflow = eltwiseOperation->policy->value->e;
         vx_uint8_ptr input1base, input2base, outputbase;
-        vx_enum format = TENSOR_DATA_TYPE(input1);
         vx_uint32 i, numCount=1;
 
         vxoTensor_GetTensorViewMemory(input1, (gctPOINTER*)&input1base, VX_NULL);
         vxoTensor_GetTensorViewMemory(input2, (gctPOINTER*)&input2base, VX_NULL);
         vxoTensor_GetTensorViewMemory(output, (gctPOINTER*)&outputbase, VX_NULL);
 
-        for(i = 0; i < dim1; i++)
+        for(i = 0; i < dims; i++)
         {
             numCount *= output->dims[i];
         }
@@ -10821,62 +10751,17 @@ vx_status vxnneExecuteSWTensorSub(vxnne_operation operation)
             in2 = (vx_int8_ptr)input2base + in2offset;
             out = (vx_int8_ptr)outputbase + outoffset;
 
-            if(format == VX_TYPE_INT16)
             {
-                vx_int16 in1Data = *(vx_int16*)in1;
-                vx_int16 in2Data = *(vx_int16*)in2;
-                vx_int16 * outData = (vx_int16*)out;
-                vx_int32 tmp = in1Data - in2Data;
-
-                if(overflow == VX_CONVERT_POLICY_WRAP)
-                {
-                    outData[0] = (vx_int16)(vx_uint16)tmp;
-                }
-                else
-                {
-                    outData[0] = (vx_int16)gcmCLAMP(tmp, INT16_MIN, INT16_MAX);
-                }
-            }
-            else if(format == VX_TYPE_INT8)
-            {
-                vx_int8 in1Data = *(vx_int8*)in1;
-                vx_int8 in2Data = *(vx_int8*)in2;
-                vx_int8 * outData = (vx_int8*)out;
-
-                int32_t tmp = in1Data - in2Data;
-                if(overflow == VX_CONVERT_POLICY_WRAP)
-                {
-                    outData[0] = (vx_int8)(vx_uint8)tmp;
-                }
-                else
-                {
-                    outData[0] = (vx_int8)gcmCLAMP(tmp, INT8_MIN, INT8_MAX);
-                }
-            }
-            else if(format == VX_TYPE_UINT8)
-            {
-                vx_uint8 in1Data = *(vx_uint8*)in1;
-                vx_uint8 in2Data = *(vx_uint8*)in2;
-                vx_uint8 * outData = (vx_uint8*)out;
-
-                int32_t tmp = in1Data - in2Data;
-                if(overflow == VX_CONVERT_POLICY_WRAP)
-                {
-                    outData[0] = (vx_uint8)tmp;
-                }
-                else
-                {
-                    outData[0] = (vx_uint8)gcmCLAMP(tmp, 0, UINT8_MAX);
-                }
-            }
-            else
-            {
-                vxError("Invalid data type!\n");
+                vx_status status = VX_SUCCESS;
+                vx_float32 in1Data_fl32 = vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(input1), TENSOR_QUANT_TYPE(input1), 0, (vx_uint8_ptr)in1,
+                    TENSOR_POS(input1), TENSOR_TF_ZEROPOINT(input1), TENSOR_TF_SCALE(input1));
+                vx_float32 in2Data_fl32 = vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(input2), TENSOR_QUANT_TYPE(input2), 0, (vx_uint8_ptr)in2,
+                    TENSOR_POS(input2), TENSOR_TF_ZEROPOINT(input2), TENSOR_TF_SCALE(input2));
+                status = vxnneSaveDataExt((vx_type_e)TENSOR_DATA_TYPE(output), TENSOR_QUANT_TYPE(output), 0, in1Data_fl32 - in2Data_fl32, (vx_uint8_ptr)out,
+                    TENSOR_POS(output), TENSOR_TF_ZEROPOINT(output), TENSOR_TF_SCALE(output), TENSOR_ROUNDING_MODE(output));
             }
         }
     }
-    else
-        vxError("Difference dim\n");
 
     return VX_SUCCESS;
 }
@@ -10894,9 +10779,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorSub_Initializer(vx_node node, co
     vx_type_e input1Format = TENSOR_DATA_TYPE(input1);
     vx_type_e outputFormat = TENSOR_DATA_TYPE(output);
 
-    vx_bool shExe_flag   = vx_true_e;
-    vx_bool swExe_flag   = vx_false_e;
-    vx_uint32 batchCount0 = (TENSOR_SIZE_INDEX(input0, 3) == 0) ? 1 : TENSOR_SIZE_INDEX(input0, 3);
+    vx_bool   format_flag           = vx_false_e;
+    vx_bool   shExe_flag            = vx_true_e;
+    vx_bool   swExe_flag            = vx_false_e;
+    vx_bool   enable_2d_tensor      = vx_false_e;
+    vx_enum   policyEnum            = policy->value->e;
+    vx_uint32 depth                 = (TENSOR_DIM_NUM(output) > 2) ? TENSOR_VIEW_SIZE_INDEX(output, 2) : 1;
+    vx_uint32 batchCount0           = (TENSOR_SIZE_INDEX(input0, 3) == 0) ? 1 : TENSOR_SIZE_INDEX(input0, 3);
     vx_uint32 batchCount1 = (TENSOR_SIZE_INDEX(input1, 3) == 0) ? 1 : TENSOR_SIZE_INDEX(input1, 3);
     vx_uint32 batchCount = (TENSOR_SIZE_INDEX(output, 3) == 0) ? 1 : TENSOR_SIZE_INDEX(output, 3);
 
@@ -10929,7 +10818,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorSub_Initializer(vx_node node, co
                           VX_NULL);
 
     if(node->base.context->evisNoInst.supportEVIS)
-        shExe_flag = (vx_bool)((input0Format != VX_TYPE_FLOAT32) && (input1Format != VX_TYPE_FLOAT32) && (outputFormat != VX_TYPE_FLOAT32));
+    {
+        format_flag = (vx_bool)((input0Format != VX_TYPE_FLOAT32) && (input1Format != VX_TYPE_FLOAT32) && (outputFormat != VX_TYPE_FLOAT32));
+        enable_2d_tensor = (vx_bool)(depth == 1 && format_flag && policyEnum == VX_CONVERT_POLICY_SATURATE);
+        shExe_flag = format_flag  || enable_2d_tensor;
+    }
     else
         shExe_flag = vx_true_e;
 
@@ -10938,7 +10831,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorSub_Initializer(vx_node node, co
         vxnne_shader_executable shaderExecutable;
         if(node->base.context->evisNoInst.supportEVIS)
         {
-            shaderExecutable = vxnneGetTensorAddShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_ELTWISE, &node->kernelAttributes.borderMode, input0, input1, NULL, policy, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_SUB, output);
+            if (enable_2d_tensor)
+                shaderExecutable = vxnneGetTensor2DAddShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_2D_ADD, &node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_SUB, output);
+            else
+                shaderExecutable = vxnneGetTensorAddShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_ELTWISE, &node->kernelAttributes.borderMode, input0, input1, NULL, policy, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_SUB, output);
         }
         else
         {
@@ -11083,31 +10979,27 @@ vx_status vxnneExecuteSWTensorMul(vxnne_operation operation)
     vx_tensor input1 = eltwiseOperation->input0;
     vx_tensor input2 = eltwiseOperation->input1;
     vx_tensor output = eltwiseOperation->output;
-    vx_uint32 dim1 = input1->viewRegion.dimCount;
-    vx_uint32 dim2 = input2->viewRegion.dimCount;
+    vx_uint32 dims   = TENSOR_DIM_NUM(output);
 
-    if (dim1 == dim2)
     {
-        vx_enum overflow = eltwiseOperation->overflow->value->e;
-        vx_enum rounding = eltwiseOperation->rounding->value->e;
-        vx_float32 scale = eltwiseOperation->scale->value->f32;
         vx_uint8_ptr input1base, input2base, outputbase;
-        vx_enum format = TENSOR_DATA_TYPE(input1);
-        vx_uint32 i, numCount=1;
+        vx_uint32 i, numCount = 1;
 
         vxoTensor_GetTensorViewMemory(input1, (gctPOINTER*)&input1base, VX_NULL);
         vxoTensor_GetTensorViewMemory(input2, (gctPOINTER*)&input2base, VX_NULL);
         vxoTensor_GetTensorViewMemory(output, (gctPOINTER*)&outputbase, VX_NULL);
 
-        for(i = 0; i < dim1; i++)
+        for (i = 0; i < dims; i++)
         {
             numCount *= output->dims[i];
         }
 
-        for(i = 0; i < numCount; i++)
+        for (i = 0; i < numCount; i++)
         {
             vx_uint32 in1offset, in2offset, outoffset;
             vx_int8_ptr in1, in2, out;
+            vx_status status = VX_SUCCESS;
+            vx_float32 in1Data_fl32, in2Data_fl32;
 
             in1offset = getExpandTensorOffset(i, input1, output->dims);
             in2offset = getExpandTensorOffset(i, input2, output->dims);
@@ -11117,91 +11009,14 @@ vx_status vxnneExecuteSWTensorMul(vxnne_operation operation)
             in2 = (vx_int8_ptr)input2base + in2offset;
             out = (vx_int8_ptr)outputbase + outoffset;
 
-            if(format == VX_TYPE_INT16)
-            {
-                vx_int16 in1Data = *(vx_int16*)in1;
-                vx_int16 in2Data = *(vx_int16*)in2;
-                vx_int16 * outData = (vx_int16*)out;
-                double tmp = 0.0;
-
-                if(rounding == VX_ROUND_POLICY_TO_NEAREST_EVEN)
-                {
-                    tmp = roundDouble(in1Data * in2Data * (double)scale / 0x100);
-                }
-                else
-                {
-                    tmp = (double)(in1Data * in2Data * (double)scale / 0x100);
-                }
-
-                if(overflow == VX_CONVERT_POLICY_WRAP)
-                {
-                    //outData[0] = (vx_int16)(vx_uint16)tmp;
-                    outData[0] = trunc_to_int16((int_fast32_t)tmp);
-                }
-                else
-                {
-                    outData[0] = (vx_int16)gcmCLAMP(tmp, INT16_MIN, INT16_MAX);
-                }
-            }
-            else if(format == VX_TYPE_INT8)
-            {
-                vx_int8 in1Data = *(vx_int8*)in1;
-                vx_int8 in2Data = *(vx_int8*)in2;
-                vx_int8 * outData = (vx_int8*)out;
-                vx_float32 tmp = 0.0;
-
-                if(rounding == VX_ROUND_POLICY_TO_NEAREST_EVEN)
-                {
-                    tmp = roundFloat(in1Data * in2Data * (vx_float32)scale);
-                }
-                else
-                {
-                    tmp = (vx_float32)(in1Data * in2Data * (vx_float32)scale);
-                }
-
-                if(overflow == VX_CONVERT_POLICY_WRAP)
-                {
-                    //outData[0] = (vx_int8)(vx_uint8)tmp;
-                    outData[0] = trunc_to_int8((int_fast32_t)tmp);
-                }
-                else
-                {
-                    outData[0] = (vx_int8)gcmCLAMP(tmp, INT8_MIN, INT8_MAX);
-                }
-            }
-            else if(format == VX_TYPE_UINT8)
-            {
-                vx_uint8 in1Data = *(vx_uint8*)in1;
-                vx_uint8 in2Data = *(vx_uint8*)in2;
-                vx_uint8 * outData = (vx_uint8*)out;
-                vx_float32 tmp = 0.0;
-
-                if(rounding == VX_ROUND_POLICY_TO_NEAREST_EVEN)
-                {
-                    tmp = roundFloat(in1Data * in2Data * (vx_float32)scale);
-                }
-                else
-                {
-                    tmp = (vx_float32)(in1Data * in2Data * (vx_float32)scale);
-                }
-
-                if(overflow == VX_CONVERT_POLICY_WRAP)
-                {
-                    outData[0] = (vx_uint8)tmp;
-                }
-                else
-                {
-                    outData[0] = (vx_uint8)gcmCLAMP(tmp, 0, UINT8_MAX);
-                }
-            }
-            else
-            {
-                vxError("Invalid data type!\n");
-            }
+            in1Data_fl32 = vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(input1), TENSOR_QUANT_TYPE(input1), 0, (vx_uint8_ptr)in1,
+                TENSOR_POS(input1), TENSOR_TF_ZEROPOINT(input1), TENSOR_TF_SCALE(input1));
+            in2Data_fl32 = vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(input2), TENSOR_QUANT_TYPE(input2), 0, (vx_uint8_ptr)in2,
+                TENSOR_POS(input2), TENSOR_TF_ZEROPOINT(input2), TENSOR_TF_SCALE(input2));
+            status = vxnneSaveDataExt((vx_type_e)TENSOR_DATA_TYPE(output), TENSOR_QUANT_TYPE(output), 0, in1Data_fl32 * in2Data_fl32, (vx_uint8_ptr)out,
+                TENSOR_POS(output), TENSOR_TF_ZEROPOINT(output), TENSOR_TF_SCALE(output), TENSOR_ROUNDING_MODE(output));
         }
     }
-    else
-        vxError("Difference dim\n");
 
     return VX_SUCCESS;
 }
@@ -11266,13 +11081,23 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMul_Initializer(vx_node node, co
 
         if(node->base.context->evisNoInst.supportEVIS)
         {
+            vx_enum    policyEnum   = policy->value->e;
+            vx_enum    roundingEnum = rounding->value->e;
+            vx_float32 scale_val    = scale->value->f32;
+
             if ((vxDataType_GetSize(input1Format) == 1 && vxDataType_GetSize(input0Format) == 2) || (input1Format == VX_TYPE_INT16 && input0Format == VX_TYPE_FLOAT16))
             {
-                shaderExecutable = vxnneGetTensorMulShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MUL, &node->kernelAttributes.borderMode, input1, input0, scale, policy, rounding, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_MUL, output);
+                if (roundingEnum == VX_ROUND_POLICY_TO_NEAREST_EVEN && policyEnum == VX_CONVERT_POLICY_SATURATE && scale_val == 1.0f)
+                    shaderExecutable = vxnneGetTensorMulSatRTEShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MUL_SAT_RTE, &node->kernelAttributes.borderMode, input1, input0, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_MUL, output);
+                else
+                    shaderExecutable = vxnneGetTensorMulShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MUL, &node->kernelAttributes.borderMode, input1, input0, scale, policy, rounding, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_MUL, output);
             }
             else
             {
-                shaderExecutable = vxnneGetTensorMulShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MUL, &node->kernelAttributes.borderMode, input0, input1, scale, policy, rounding, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_MUL, output);
+                if (roundingEnum == VX_ROUND_POLICY_TO_NEAREST_EVEN && policyEnum == VX_CONVERT_POLICY_SATURATE && scale_val == 1.0f)
+                    shaderExecutable = vxnneGetTensorMulSatRTEShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MUL_SAT_RTE, &node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_MUL, output);
+                else
+                    shaderExecutable = vxnneGetTensorMulShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MUL, &node->kernelAttributes.borderMode, input0, input1, scale, policy, rounding, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_MUL, output);
             }
         }
         else
@@ -11748,31 +11573,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_Initializer(vx_node node, 
             vxnne_shader_executable shaderExecutable;
             vx_tensor src          = NULL;
             vx_tensor dst          = NULL;
-            vx_int32   sizes[4]    = {0};
-            vx_uint32 dimCount0    = TENSOR_VIEW_DIM_NUM(input);
-            vx_uint32 width0       = TENSOR_VIEW_SIZE_INDEX(input, 0);
-            vx_uint32 height0      = (dimCount0 > 1) ? TENSOR_VIEW_SIZE_INDEX(input, 1) : 1;
-            vx_uint32 depth0       = (dimCount0 > 2) ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
-            vx_uint32 batch0       = (dimCount0 > 3) ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
-            vx_uint32 dimCount1    = TENSOR_VIEW_DIM_NUM(output);
-            vx_uint32 width1       = TENSOR_VIEW_SIZE_INDEX(output, 0);
-            vx_uint32 height1      = (dimCount1 > 1) ? TENSOR_VIEW_SIZE_INDEX(output, 1) : 1;
-            vx_uint32 depth1       = (dimCount1 > 2) ? TENSOR_VIEW_SIZE_INDEX(output, 2) : 1;
-            vx_uint32 batch1       = (dimCount1 > 3) ? TENSOR_VIEW_SIZE_INDEX(output, 3) : 1;
+            vx_uint32 sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+            vx_uint32 dims = 0;
 
-            sizes[0]   = gcmMAX(gcmMAX(width0, height0), depth0);
-            sizes[1]   = gcmMAX(gcmMIN(width0, height0), gcmMIN(gcmMAX(width0, height0), depth0));
-            sizes[2]   = gcmMIN(gcmMIN(width0, height0), depth0) * batch0;
-            sizes[3]   = 1;
+            vxoElementOptimization_GetTensorShape(input, sizes, &dims);
 
-            src     = vxoTensor_ReshapeTensor(input, sizes, dimCount0);
-
-            sizes[0]   = gcmMAX(gcmMAX(width1, height1), depth1);
-            sizes[1]   = gcmMAX(gcmMIN(width1, height1), gcmMIN(gcmMAX(width1, height1), depth1));
-            sizes[2]   = gcmMIN(gcmMIN(width1, height1), depth1) * batch1;
-            sizes[3]   = 1;
-
-            dst     = vxoTensor_ReshapeTensor(output, sizes, dimCount1);
+            src     = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
+            dst     = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
 
             if(node->base.context->evisNoInst.supportEVIS)
             {
@@ -21800,21 +21607,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoReshape_Initializer(vx_node node, const 
         vxnne_shader_executable shaderExecutable;
         vx_tensor input      = NULL;
         vx_tensor output     = NULL;
-        vx_int32   sizes[4]  = {0};
+        vx_uint32 sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+        vx_uint32 dims = 0;
 
-        sizes[0]   = gcmMAX(gcmMAX(width0, height0), depth0);
-        sizes[1]   = gcmMAX(gcmMIN(width0, height0), gcmMIN(gcmMAX(width0, height0), depth0));
-        sizes[2]   = gcmMIN(gcmMIN(width0, height0), depth0) * batch0;
-        sizes[3]   = 1;
+        vxoElementOptimization_GetTensorShape(inputs, sizes, &dims);
 
-        input     = vxoTensor_ReshapeTensor(inputs, sizes, dimCount0);
-
-        sizes[0]   = gcmMAX(gcmMAX(width1, height1), depth1);
-        sizes[1]   = gcmMAX(gcmMIN(width1, height1), gcmMIN(gcmMAX(width1, height1), depth1));
-        sizes[2]   = gcmMIN(gcmMIN(width1, height1), depth1) * batch1;
-        sizes[3]   = 1;
-
-        output     = vxoTensor_ReshapeTensor(outputs, sizes, dimCount1);
+        input     = vxoTensor_ReshapeTensor(inputs, (vx_int32*)sizes, dims);
+        output     = vxoTensor_ReshapeTensor(outputs, (vx_int32*)sizes, dims);
 
         if(node->base.context->evisNoInst.supportEVIS)
         {
@@ -24147,61 +23946,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoAdapter_Deinitializer(vx_node node, cons
     return VX_SUCCESS;
 }
 
-
-VX_PRIVATE_API vx_bool _IsSameDataType(
-    vx_tensor src,
-    vx_tensor dst
-    )
-{
-    return (TENSOR_DATA_TYPE(src) == TENSOR_DATA_TYPE(dst));
-}
-
-VX_PRIVATE_API vx_bool _IsSameQuantType(
-    vx_tensor src,
-    vx_tensor dst
-    )
-{
-    vx_bool result = vx_false_e;
-
-    if (TENSOR_QUANT_TYPE(src) == TENSOR_QUANT_TYPE(dst))
-    {
-        switch (TENSOR_QUANT_TYPE(src))
-        {
-        case VX_QUANT_NONE:
-            result = vx_true_e;
-            break;
-
-        case VX_QUANT_DYNAMIC_FIXED_POINT:
-            if (TENSOR_POS(src) == TENSOR_POS(dst))
-            {
-                result = vx_true_e;
-            }
-            break;
-
-        case VX_QUANT_AFFINE_SCALE:
-            if (TENSOR_TF_SCALE(src) == TENSOR_TF_SCALE(dst) &&
-                TENSOR_TF_ZEROPOINT(src) == TENSOR_TF_ZEROPOINT(dst))
-            {
-                result = vx_true_e;
-            }
-            break;
-
-        default:
-            break;
-        }
-    }
-
-    return result;
-}
-
-VX_PRIVATE_API vx_bool _IsSameType(
-    vx_tensor src,
-    vx_tensor dst
-    )
-{
-    return (_IsSameDataType(src, dst) && _IsSameQuantType(src, dst));
-}
-
 VX_PRIVATE_API vx_bool _Is_concat_on_highest_dimension(
     vx_tensor tensor,
     vx_uint32 axis
@@ -26519,21 +26263,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorSqueeze_Initializer(vx_node node
             vxnne_shader_executable shaderExecutable;
             vx_tensor  src          = NULL;
             vx_tensor  dst          = NULL;
-            vx_uint32  dimCount     = TENSOR_VIEW_DIM_NUM(input);
-            vx_uint32  width        = TENSOR_VIEW_SIZE_INDEX(input, 0);
-            vx_uint32  height       = (dimCount > 1) ? TENSOR_VIEW_SIZE_INDEX(input, 1) : 1;
-            vx_uint32  depth        = (dimCount > 2) ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
-            vx_uint32  batch        = (dimCount > 3) ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
-            vx_int32   sizes[4]   = {0};
+            vx_uint32 sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+            vx_uint32 dims = 0;
 
-            dimCount   = dimCount > 1 ? dimCount : 2;
-            sizes[0]   = gcmMAX(gcmMAX(width, height), depth);
-            sizes[1]   = gcmMAX(gcmMIN(width, height), gcmMIN(gcmMAX(width, height), depth));
-            sizes[2]   = gcmMIN(gcmMIN(width, height), depth) * batch;
-            sizes[3]   = 1;
+            vxoElementOptimization_GetTensorShape(input, sizes, &dims);
 
-            src        = vxoTensor_ReshapeTensor(input, sizes, dimCount);
-            dst        = vxoTensor_ReshapeTensor(output, sizes, dimCount);
+            src        = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
+            dst        = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
 
             tensor_squeeze_layer->base.temp_tensors[0]  = src;
             tensor_squeeze_layer->base.temp_tensors[1]  = dst;

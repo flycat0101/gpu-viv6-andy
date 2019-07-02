@@ -411,6 +411,21 @@ void vxoWeightsBiases_Clear(
     vx_weights_biases_parameter wb
     );
 
+vx_bool _IsSameDataType(
+    vx_tensor src,
+    vx_tensor dst
+    );
+
+vx_bool _IsSameQuantType(
+    vx_tensor src,
+    vx_tensor dst
+    );
+
+vx_bool _IsSameType(
+    vx_tensor src,
+    vx_tensor dst
+    );
+
 #endif
 
 

@@ -3588,60 +3588,6 @@ OnError:
     return status;
 }
 
-VX_PRIVATE_API vx_bool _IsSameDataType(
-    vx_tensor src,
-    vx_tensor dst
-    )
-{
-    return (TENSOR_DATA_TYPE(src) == TENSOR_DATA_TYPE(dst));
-}
-
-VX_PRIVATE_API vx_bool _IsSameQuantType(
-    vx_tensor src,
-    vx_tensor dst
-    )
-{
-    vx_bool result = vx_false_e;
-
-    if (TENSOR_QUANT_TYPE(src) == TENSOR_QUANT_TYPE(dst))
-    {
-        switch (TENSOR_QUANT_TYPE(src))
-        {
-        case VX_QUANT_NONE:
-            result = vx_true_e;
-            break;
-
-        case VX_QUANT_DYNAMIC_FIXED_POINT:
-            if (TENSOR_POS(src) == TENSOR_POS(dst))
-            {
-                result = vx_true_e;
-            }
-            break;
-
-        case VX_QUANT_AFFINE_SCALE:
-            if (TENSOR_TF_SCALE(src) == TENSOR_TF_SCALE(dst) &&
-                TENSOR_TF_ZEROPOINT(src) == TENSOR_TF_ZEROPOINT(dst))
-            {
-                result = vx_true_e;
-            }
-            break;
-
-        default:
-            break;
-        }
-    }
-
-    return result;
-}
-
-VX_PRIVATE_API vx_bool _IsSameType(
-    vx_tensor src,
-    vx_tensor dst
-    )
-{
-    return (_IsSameDataType(src, dst) && _IsSameQuantType(src, dst));
-}
-
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMUnit_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status  status = VX_SUCCESS;
