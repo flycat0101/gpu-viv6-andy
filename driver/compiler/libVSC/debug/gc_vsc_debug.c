@@ -1475,6 +1475,9 @@ void vscDIGetStackFrameInfo(
     if (context == gcvNULL)
         return;
 
+    /* Per communication with IDE team, this is to skip frame0 which is main function */
+    frameId++;
+
     if (frameId > context->callDepth)
         return;
 
