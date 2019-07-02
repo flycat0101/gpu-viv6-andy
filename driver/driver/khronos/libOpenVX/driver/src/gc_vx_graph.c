@@ -3995,11 +3995,6 @@ VX_PRIVATE_API vx_status vxoMultiGPU_ComputeInputSize(
         }
     }
 
-    if (count < gpuCount)
-    {
-        splitCount = 0;
-    }
-
 OnError:
     gcmFOOTER_ARG("splitCount=0x%x", splitCount);
     return splitCount;
