@@ -4723,19 +4723,29 @@ static VSC_ErrCode _VSC_PH_GenerateLoadStore(
             VIR_Operand_Copy(pBaseOpnd, pAddSrc0Opnd);
             if (addSrc0Info.isVreg)
             {
+                VIR_GENERAL_UD_ITERATOR udIter;
+                VIR_DEF*                pDef = gcvNULL;
+
                 newSwizzle = VIR_Enable_GetMappingSwizzle(addEnable, VIR_Operand_GetSwizzle(pAddSrc0Opnd));
                 VIR_Operand_SetSwizzle(pBaseOpnd, newSwizzle);
 
-                vscVIR_AddNewUsageToDef(pDuInfo,
-                                        VIR_ANY_DEF_INST,
-                                        pUsageInst,
-                                        pBaseOpnd,
-                                        gcvFALSE,
-                                        addSrc0Info.u1.virRegInfo.virReg,
-                                        1,
-                                        VIR_Swizzle_2_Enable(newSwizzle),
-                                        VIR_HALF_CHANNEL_MASK_FULL,
-                                        gcvNULL);
+                vscVIR_InitGeneralUdIterator(&udIter, pDuInfo, pAddInst, pAddSrc0Opnd, gcvFALSE, gcvFALSE);
+
+                for (pDef = vscVIR_GeneralUdIterator_First(&udIter);
+                     pDef != gcvNULL;
+                     pDef = vscVIR_GeneralUdIterator_Next(&udIter))
+                {
+                    vscVIR_AddNewUsageToDef(pDuInfo,
+                                            pDef->defKey.pDefInst,
+                                            pUsageInst,
+                                            pBaseOpnd,
+                                            gcvFALSE,
+                                            addSrc0Info.u1.virRegInfo.virReg,
+                                            1,
+                                            VIR_Swizzle_2_Enable(newSwizzle),
+                                            VIR_HALF_CHANNEL_MASK_FULL,
+                                            gcvNULL);
+                }
             }
 
             /* Update the offset if it is an immeidate. */
@@ -4749,19 +4759,29 @@ static VSC_ErrCode _VSC_PH_GenerateLoadStore(
                 VIR_Operand_Copy(pOffsetOpnd, pAddSrc1Opnd);
                 if (addSrc1Info.isVreg)
                 {
+                    VIR_GENERAL_UD_ITERATOR udIter;
+                    VIR_DEF*                pDef = gcvNULL;
+
                     newSwizzle = VIR_Enable_GetMappingSwizzle(addEnable, VIR_Operand_GetSwizzle(pAddSrc1Opnd));
                     VIR_Operand_SetSwizzle(pBaseOpnd, newSwizzle);
 
-                    vscVIR_AddNewUsageToDef(pDuInfo,
-                                            VIR_ANY_DEF_INST,
-                                            pUsageInst,
-                                            pOffsetOpnd,
-                                            gcvFALSE,
-                                            addSrc1Info.u1.virRegInfo.virReg,
-                                            1,
-                                            VIR_Swizzle_2_Enable(newSwizzle),
-                                            VIR_HALF_CHANNEL_MASK_FULL,
-                                            gcvNULL);
+                    vscVIR_InitGeneralUdIterator(&udIter, pDuInfo, pAddInst, pAddSrc1Opnd, gcvFALSE, gcvFALSE);
+
+                    for (pDef = vscVIR_GeneralUdIterator_First(&udIter);
+                         pDef != gcvNULL;
+                         pDef = vscVIR_GeneralUdIterator_Next(&udIter))
+                    {
+                        vscVIR_AddNewUsageToDef(pDuInfo,
+                                                pDef->defKey.pDefInst,
+                                                pUsageInst,
+                                                pOffsetOpnd,
+                                                gcvFALSE,
+                                                addSrc1Info.u1.virRegInfo.virReg,
+                                                1,
+                                                VIR_Swizzle_2_Enable(newSwizzle),
+                                                VIR_HALF_CHANNEL_MASK_FULL,
+                                                gcvNULL);
+                    }
                 }
             }
         }
