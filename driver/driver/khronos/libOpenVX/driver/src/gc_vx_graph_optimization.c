@@ -4279,9 +4279,6 @@ VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
         if(context->options.enableGraphMergeTranspose)
             vxoGraphOptimization_multiTranspose(graph);
 
-        if(context->options.enableGraphDeleteRelu)
-            vxoGraphOptimization_deleteRelu(graph);
-
         if(context->options.enableGraphConvertTensorAdd)
             vxoGraphOptimization_TensorAdd2Conv(graph);
 
@@ -4308,6 +4305,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
 
         if(context->options.enableGraphMerge)
             vxmONERROR(vxoGraphOptimization_LayerMerge(graph));
+
+        if(context->options.enableGraphDeleteRelu)
+            vxoGraphOptimization_deleteRelu(graph);
 
         if(context->options.enableGraphConvertBatchFC2NNConv)
             vxmONERROR(vxoGraphOptimization_ConvertBatchFCtoConv(graph) );
