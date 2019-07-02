@@ -828,13 +828,14 @@ VX_PRIVATE_API vx_uint32  GetEsitimateWBSize(
 {
     vx_enum weightFormat = weightsBiases->wb_base->weights_data_format;
     vx_enum biasFormat = weightsBiases->wb_base->biases_data_format;
+    vx_float64 EstimateRatio = (1.25f-1.05f) * (1.0f - WB_COMPRESS_RATIO(weightsBiases)) / (1.0f - 0.02f) + 1.05f;
 
     vx_uint32 weightSize = weightsBiases->weights_sizes[0] * weightsBiases->weights_sizes[1] * weightsBiases->weights_sizes[2] *
                            weightsBiases->weights_sizes[3] * vxnneGetTypeSize((vx_type_e)weightFormat);
 
     vx_uint32 biasSize   = weightsBiases->weights_sizes[3] * vxnneGetTypeSize((vx_type_e)biasFormat);
 
-    return (vx_uint32)((weightSize + biasSize) * WB_COMPRESS_RATIO(weightsBiases) * 1.05f + 0.5f);
+    return (vx_uint32)((weightSize + biasSize) * EstimateRatio + 0.5f);
 
 }
 
