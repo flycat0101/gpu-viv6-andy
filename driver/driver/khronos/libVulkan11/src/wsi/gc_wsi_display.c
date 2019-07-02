@@ -102,7 +102,17 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_GetPhysicalDeviceDisplayPlanePropertiesKHR(
     uint32_t*                                   pPropertyCount,
     VkDisplayPlanePropertiesKHR*                pProperties)
 {
+    VkResult result = VK_SUCCESS;
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
+
+    /*if there is no display, we should try to create it firstly*/
+    if (phyDev->numberOfDisplays == 0)
+    {
+        result = __vkInitializePhysicalDeviceDisplays(phyDev);
+
+        if (result != VK_SUCCESS)
+            return result;
+    }
 
     if (pProperties)
     {
