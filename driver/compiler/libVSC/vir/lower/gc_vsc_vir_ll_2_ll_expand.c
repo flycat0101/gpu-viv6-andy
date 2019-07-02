@@ -3548,20 +3548,6 @@ jmp_2_succ4(
      return jmp_2_succ(Context, Inst, 4);
 }
 
-
-static gctBOOL
-supportCMP_single_value_jmp_2_succ2_resCondOp(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst
-    )
-{
-    gcmASSERT(Inst->_opcode == VIR_OP_JMPC || Inst->_opcode == VIR_OP_JMP_ANY);
-    return supportCMP(Context, Inst) &&
-           all_source_single_value(Context, Inst) &&
-           jmp_2_succ(Context, Inst, 2) &&
-           VIR_ConditionOp_Reversable(VIR_Inst_GetConditionOp(Inst));
-}
-
 static gctBOOL
 jmp_2_succ2_resCondOp_float(
     IN VIR_PatternContext *Context,
@@ -8158,15 +8144,6 @@ static VIR_Pattern _convPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
-static VIR_PatternMatchInst _jmpcPatInst0[] = {
-    { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { supportCMP_single_value_jmp_2_succ2_resCondOp }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 5, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 6, 0, 0, 0 }, { label_only_one_jmp }, VIR_PATN_MATCH_FLAG_OR },
-};
-
-static VIR_PatternReplaceInst _jmpcRepInst0[] = {
-    { VIR_OP_CMOV, -1, 0, { 4, 2, 3, 5 }, { VIR_Lower_ReverseCondOp } }
-};
 
 static VIR_PatternMatchInst _jmpcPatInst1[] = {
     { VIR_OP_JMPC, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { all_source_float, all_source_single_value, jmp_2_succ3 }, VIR_PATN_MATCH_FLAG_AND },
@@ -8342,7 +8319,6 @@ static VIR_PatternReplaceInst _jmpcRepInst12[] = {
 };
 
 static VIR_Pattern _jmpcPattern[] = {
-    { VIR_PATN_FLAG_NONE, CODEPATTERN(_jmpc, 0) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_jmpc, 1) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_jmpc, 2) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_jmpc, 3) },
