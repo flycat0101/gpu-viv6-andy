@@ -61,7 +61,7 @@ int flushToZero() {
 #if defined( __i386__ ) || defined( __x86_64__ ) || defined( __e2k__ ) || defined(_MSC_VER)
     _mm_setcsr(_mm_getcsr() | 0x8040);
     return 1;
-#elif defined( __arm__ )
+#elif defined( __arm__ ) || defined ( __aarch64__ )
     return 1;
 #elif defined( __PPC__ )
     fpu_control_t flags = 0;

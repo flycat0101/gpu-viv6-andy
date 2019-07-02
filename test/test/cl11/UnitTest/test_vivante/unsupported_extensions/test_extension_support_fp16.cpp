@@ -42,116 +42,116 @@ const char *kernel_test_fp16 =  "#pragma OPENCL EXTENSION cl_khr_fp16 : enable\n
 
 int test_fp16(cl_device_id device, cl_context context, cl_command_queue queue, int num_elements, int &total,  int &passed, int &fail)
 {
-    cl_mem streams;
-    cl_program program;
-    cl_kernel kernel;
-    size_t threads[1];
-    char kernel_code_int[512];
-    const char *constkernelint;
-    cl_uchar *output_h;
+   cl_mem streams;
+   cl_program program;
+   cl_kernel kernel;
+   size_t threads[1];
+   char kernel_code_int[512];
+   const char *constkernelint;
+   cl_uchar *output_h;
 
-    int err;
-    int passCount = 0;
-    int typeIndex = 0;
+   int err;
+   int passCount = 0;
+   int typeIndex = 0;
 
-    const char    *types[] = {
-        "", "2", "4", "8", "16"
-    };
+   const char    *types[] = {
+       "", "2", "4", "8", "16"
+   };
 
 
-    for(int t=1; t<17; t*=2)
-    {
-        printf("\n\nTESTING HALF FLOAT%s: \n", types[typeIndex]);
+   for(int t=1; t<17; t*=2)
+   {
+       printf("\n\nTESTING HALF FLOAT%s: \n", types[typeIndex]);
 
-        size_t length = sizeof(cl_uchar) * num_elements * t;
-        output_h = (cl_uchar*)malloc(length);
+       size_t length = sizeof(cl_uchar) * num_elements * t;
+       output_h = (cl_uchar*)malloc(length);
 
-        streams = clCreateBuffer(context, CL_MEM_READ_WRITE, length, NULL, NULL);
-        if (!streams)
-        {
-            printf("clCreateBuffer failed\n");
-            free(output_h);
-            return -1;
-        }
+       streams = clCreateBuffer(context, CL_MEM_READ_WRITE, length, NULL, NULL);
+       if (!streams)
+       {
+           printf("clCreateBuffer failed\n");
+           free(output_h);
+           return -1;
+       }
 
-        sprintf(kernel_code_int, kernel_test_fp16, types[typeIndex], types[typeIndex], types[typeIndex], types[typeIndex]);
-        constkernelint = kernel_code_int;
-        if(is_extension_available(device, "cl_khr_fp16"))
-        {
-            err = create_kernel(context, &program, &kernel, 1, &constkernelint, "test_fp16" );
-            if (err)
-            {
-                printf("Kernel compilation error using half float as a type.\n");
-                printf("\n!!Kernel build not successful.\n");
-                if(streams) clReleaseMemObject(streams);
-                if(kernel) clReleaseKernel(kernel);
-                if(program) clReleaseProgram(program);
-                if(output_h) free(output_h);
-                return -1;
-            }
-        }
-        else
-        {
-            if(streams) clReleaseMemObject(streams);
-            if(kernel) clReleaseKernel(kernel);
-            if(program) clReleaseProgram(program);
-            if(output_h) free(output_h);
+       sprintf(kernel_code_int, kernel_test_fp16, types[typeIndex], types[typeIndex], types[typeIndex], types[typeIndex]);
+       constkernelint = kernel_code_int;
+       if(is_extension_available(device, "cl_khr_fp16"))
+       {
+           err = create_kernel(context, &program, &kernel, 1, &constkernelint, "test_fp16" );
+           if (err)
+           {
+               printf("Kernel compilation error using half float as a type.\n");
+               printf("\n!!Kernel build not successful.\n");
+               if(streams) clReleaseMemObject(streams);
+               if(kernel) clReleaseKernel(kernel);
+               if(program) clReleaseProgram(program);
+               if(output_h) free(output_h);
+               return -1;
+           }
+       }
+       else
+       {
+           if(streams) clReleaseMemObject(streams);
+           if(kernel) clReleaseKernel(kernel);
+           if(program) clReleaseProgram(program);
+           if(output_h) free(output_h);
 
-            passCount++;
+           passCount++;
 
-            printf("--------------------------------------------------------\n");
-            printf("cl_khr_fp16 extension is not supported.!!\n");
-            printf("half%s passed\n", types[typeIndex]);
-            return 0;
-        }
+           printf("--------------------------------------------------------\n");
+           printf("cl_khr_fp16 extension is not supported.!!\n");
+           printf("half%s passed\n", types[typeIndex]);
+           return 0;
+       }
+       err = clSetKernelArg(kernel, 0, sizeof streams, &streams);
+       if (err != CL_SUCCESS)
+       {
+           printf("clSetKernelArgs failed\n");
+           if(streams) clReleaseMemObject(streams);
+           if(kernel) clReleaseKernel(kernel);
+           if(program) clReleaseProgram(program);
+           if(output_h) free(output_h);
+           return -1;
+       }
+       threads[0] = (unsigned int)num_elements;
+       err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, threads, NULL, 0, NULL, NULL);
+       if (err != CL_SUCCESS)
+       {
+           printf("clEnqueueNDRangeKernel failed\n");
+           if(streams) clReleaseMemObject(streams);
+           if(kernel) clReleaseKernel(kernel);
+           if(program) clReleaseProgram(program);
+           if(output_h) free(output_h);
+           return -1;
+       }
+       err = clEnqueueReadBuffer(queue, streams, CL_TRUE, 0, length, output_h, 0, NULL, NULL);
+       if (err != CL_SUCCESS)
+       {
+           printf("clReadArray failed\n");
+           if(streams) clReleaseMemObject(streams);
+           if(kernel) clReleaseKernel(kernel);
+           if(program) clReleaseProgram(program);
+           if(output_h) free(output_h);
+           return -1;
+       }
 
-        err  = clSetKernelArg(kernel, 0, sizeof streams, &streams);
-        if (err != CL_SUCCESS)
-        {
-            printf("clSetKernelArgs failed\n");
-            if(streams) clReleaseMemObject(streams);
-            if(kernel) clReleaseKernel(kernel);
-            if(program) clReleaseProgram(program);
-            if(output_h) free(output_h);
-            return -1;
-        }
-        threads[0] = (unsigned int)num_elements;
-        err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, threads, NULL, 0, NULL, NULL);
-        if (err != CL_SUCCESS)
-        {
-            printf("clEnqueueNDRangeKernel failed\n");
-            if(streams) clReleaseMemObject(streams);
-            if(kernel) clReleaseKernel(kernel);
-            if(program) clReleaseProgram(program);
-            if(output_h) free(output_h);
-            return -1;
-        }
-        err = clEnqueueReadBuffer(queue, streams, CL_TRUE, 0, length, output_h, 0, NULL, NULL);
-        if (err != CL_SUCCESS)
-        {
-            printf("clReadArray failed\n");
-            if(streams) clReleaseMemObject(streams);
-            if(kernel) clReleaseKernel(kernel);
-            if(program) clReleaseProgram(program);
-            if(output_h) free(output_h);
-            return -1;
-        }
+       if(streams) clReleaseMemObject(streams);
+       if(kernel) clReleaseKernel(kernel);
+       if(program) clReleaseProgram(program);
+       if(output_h) free(output_h);
 
-        if(streams) clReleaseMemObject(streams);
-        if(kernel) clReleaseKernel(kernel);
-        if(program) clReleaseProgram(program);
-        if(output_h) free(output_h);
+       typeIndex++;
+       passCount++;
 
-        typeIndex++;
+   }
 
-    }
+   printf("--------------------------------------------------------\n");
+   printf("cl_khr_fp16 tests:\n");
+   //printf("%d / %d internal tests passed.\n",passCount, typeIndex);
+   total += typeIndex;
+   passed += passCount;
+   fail += typeIndex-passCount;
 
-    printf("--------------------------------------------------------\n");
-    printf("cl_khr_fp16 tests:\n");
-    //printf("%d / %d internal tests passed.\n",passCount, typeIndex);
-    total += typeIndex;
-    passed += passCount;
-    fail += typeIndex-passCount;
-
-    return 0;
+   return 0;
 }

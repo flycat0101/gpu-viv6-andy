@@ -36,28 +36,28 @@ const char *kernel_test_fp16_func_math_1arg =  "#pragma OPENCL EXTENSION cl_khr_
 "__kernel void test_fp16_func_math1(__global %s *out_val, __global %s *input_val)\n"
 "{\n"
 "int  gid = get_global_id(0);\n"
-"out_val[gid] = %s(input_val);\n"
+"out_val[gid] = %s(input_val[gid]);\n"
 "}\n";
 
 const char *kernel_test_fp16_func_math_2arg =  "#pragma OPENCL EXTENSION cl_khr_fp16 : enable\n"
 "__kernel void test_fp16_func_math2(__global %s *out_val, __global %s *input_A, __global %s *input_B)\n"
 "{\n"
 "int  gid = get_global_id(0);\n"
-"out_val[gid] = %s(input_A, input_B);\n"
+"out_val[gid] = %s(input_A[gid], input_B[gid]);\n"
 "}\n";
 
 const char *kernel_test_fp16_func_math_3arg =  "#pragma OPENCL EXTENSION cl_khr_fp16 : enable\n"
 "__kernel void test_fp16_func_math3(__global %s *out_val, __global %s *input_A, __global %s *input_B, __global %s *input_C)\n"
 "{\n"
 "int  gid = get_global_id(0);\n"
-"out_val[gid] = %s(input_A, input_B, input_C);\n"
+"out_val[gid] = %s(input_A[gid], input_B[gid], input_C[gid]);\n"
 "}\n";
 
 const char *kernel_test_fp16_func_math4 = "#pragma OPENCL EXTENSION cl_khr_fp16 : enable\n"
 "__kernel void test_fp16_func_math4(__global %s *out_val, __global %s *input_A, %s %s *input_B)\n"
 "{\n"
 "int  gid = get_global_id(0);\n"
-"out_val[gid] = %s(input_A, &input_B);\n"
+"out_val[gid] = %s(input_A[gid], input_B);\n"
 "}\n";
 
 
@@ -104,7 +104,6 @@ int test_fp16_func_math_1arg(cl_device_id device, cl_context context, cl_command
         "expm1",
         "fabs",
         "floor",
-        "ilogb",
         "log",
         "log2",
         "log10",
@@ -126,27 +125,19 @@ int test_fp16_func_math_1arg(cl_device_id device, cl_context context, cl_command
         "degrees",
         "radians",
         "sign",
-        /* geometric functions */
-        "length",
-        "normalize",
-        /* relational functions */
-        "isfinite",
-        "isinf",
-        "isnan",
-        "isnormal",
-        "signbit"
     };
+    int type_count = sizeof(types)/ sizeof(char *);
+    int func_count = sizeof(func_name)/ sizeof(char *);
+    int total_count = func_count * type_count;
 
     for(int t=1; t<17; t*=2)
     {
-
         size_t length = sizeof(cl_half) * num_elements * t;
         input_h = (cl_half*)malloc(length);
         output_h = (cl_half*)malloc(length);
 
-        for(int index = 0; index < 50; index++)
+        for(int index = 0; index < func_count; index++)
         {
-
             printf("%s with gentype %s TESTING STARTED:\n", func_name[index], types[typeIndex]);
             printf("--------------------------------------------------");
 
@@ -154,8 +145,8 @@ int test_fp16_func_math_1arg(cl_device_id device, cl_context context, cl_command
             if (!streams[0])
             {
                 printf("clCreateBuffer #1 failed\n");
-                if(input_h) free(input_h);
-                if(output_h) free(output_h);
+                                if(input_h) free(input_h);
+                                if(output_h) free(output_h);
                 return -1;
             }
 
@@ -164,8 +155,8 @@ int test_fp16_func_math_1arg(cl_device_id device, cl_context context, cl_command
             {
                 printf("clCreateBuffer #2 failed\n");
                 if(streams[0]) clReleaseMemObject(streams[0]);
-                if(input_h) free(input_h);
-                if(output_h) free(output_h);
+                                if(input_h) free(input_h);
+                                if(output_h) free(output_h);
                 return -1;
             }
 
@@ -205,32 +196,43 @@ int test_fp16_func_math_1arg(cl_device_id device, cl_context context, cl_command
                 return 0;
             }
 
-            err  = clSetKernelArg(kernel, 0, sizeof streams, &streams);
-            if (err != CL_SUCCESS)
-            {
-                printf("clSetKernelArgs failed\n");
-                if(streams[0]) clReleaseMemObject(streams[0]);
-                if(streams[1]) clReleaseMemObject(streams[1]);
-                if(kernel) clReleaseKernel(kernel);
-                if(program) clReleaseProgram(program);
-                if(input_h) free(input_h);
-                if(output_h) free(output_h);
-                return -1;
-            }
-
-            threads[0] = (unsigned int)num_elements;
-            err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, threads, NULL, 0, NULL, NULL);
-            if (err != CL_SUCCESS)
-            {
-                printf("clEnqueueNDRangeKernel failed\n");
-                if(streams[0]) clReleaseMemObject(streams[0]);
-                if(streams[1]) clReleaseMemObject(streams[1]);
-                if(kernel) clReleaseKernel(kernel);
-                if(program) clReleaseProgram(program);
-                if(input_h) free(input_h);
-                if(output_h) free(output_h);
-                return -1;
-            }
+       err = clSetKernelArg(kernel, 0, sizeof streams[0], &streams[0]);
+       if (err != CL_SUCCESS)
+       {
+           printf("clSetKernelArgs failed\n");
+           if(streams[0]) clReleaseMemObject(streams[0]);
+           if(streams[1]) clReleaseMemObject(streams[1]);
+           if(kernel) clReleaseKernel(kernel);
+           if(program) clReleaseProgram(program);
+           if(input_h) free(input_h);
+           if(output_h) free(output_h);
+           return -1;
+       }
+       err = clSetKernelArg(kernel, 1, sizeof streams[1], &streams[1]);
+       if (err != CL_SUCCESS)
+       {
+           printf("clSetKernelArgs failed\n");
+           if(streams[0]) clReleaseMemObject(streams[0]);
+           if(streams[1]) clReleaseMemObject(streams[1]);
+           if(kernel) clReleaseKernel(kernel);
+           if(program) clReleaseProgram(program);
+           if(input_h) free(input_h);
+           if(output_h) free(output_h);
+           return -1;
+       }
+       threads[0] = (unsigned int)num_elements;
+       err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, threads, NULL, 0, NULL, NULL);
+       if (err != CL_SUCCESS)
+       {
+           printf("clEnqueueNDRangeKernel failed\n");
+           if(streams[0]) clReleaseMemObject(streams[0]);
+           if(streams[1]) clReleaseMemObject(streams[1]);
+           if(kernel) clReleaseKernel(kernel);
+           if(program) clReleaseProgram(program);
+           if(input_h) free(input_h);
+           if(output_h) free(output_h);
+       return -1;
+       }
 
             err = clEnqueueReadBuffer(queue, streams[0], CL_TRUE, 0, length, output_h, 0, NULL, NULL);
             if (err != CL_SUCCESS)
@@ -263,6 +265,7 @@ int test_fp16_func_math_1arg(cl_device_id device, cl_context context, cl_command
             if(streams[1]) clReleaseMemObject(streams[1]);
             if(kernel) clReleaseKernel(kernel);
             if(program) clReleaseProgram(program);
+            passCount++;
         }
 
         printf("%s TESTING FOR ALL FUNCTIONS FINISHED.\n", types[typeIndex]);
@@ -275,9 +278,9 @@ int test_fp16_func_math_1arg(cl_device_id device, cl_context context, cl_command
     }
 
     //printf("%d / 250 internal tests passed.\n\n", passCount);
-    total += 250;
+    total += total_count;
     passed += passCount;
-    fail += 250-passCount;
+    fail += total_count-passCount;
 
     return 0;
 }
@@ -316,20 +319,11 @@ int test_fp16_func_math_2arg(cl_device_id device, cl_context context, cl_command
         "max",
         "min",
         "step",
-        /* geometric functions */
-        "dot",
-        "distance",
-        /* relational functions */
-        "isequal",
-        "isnotequal",
-        "isgreater",
-        "isgreaterequal",
-        "isless",
-        "islessequal",
-        "islessgreater",
-        "isordered",
-        "isunordered"
     };
+    int type_count = sizeof(types)/ sizeof(char *);
+    int func_count = sizeof(func_name)/ sizeof(char *);
+
+    int total_count = func_count * type_count;
 
     for(int t=1; t<17; t*=2)
     {
@@ -339,7 +333,7 @@ int test_fp16_func_math_2arg(cl_device_id device, cl_context context, cl_command
         input_B = (cl_half*)malloc(length);
         output_h = (cl_half*)malloc(length);
 
-        for(int index = 0; index < 24; index++)
+        for(int index = 0; index < func_count; index++)
         {
 
             printf("%s with gentype %s TESTING STARTED:\n", func_name[index], types[typeIndex]);
@@ -418,20 +412,48 @@ int test_fp16_func_math_2arg(cl_device_id device, cl_context context, cl_command
 
                 return 0;
             }
-            err  = clSetKernelArg(kernel, 0, sizeof(streams), &streams);
-            if (err != CL_SUCCESS)
-            {
-                printf("clSetKernelArgs failed\n");
-                if(streams[0]) clReleaseMemObject(streams[0]);
-                if(streams[1]) clReleaseMemObject(streams[1]);
-                if(streams[2]) clReleaseMemObject(streams[2]);
-                if(program) clReleaseProgram(program);
-                if(kernel) clReleaseKernel(kernel);
-                if(input_A) free(input_A);
-                if(input_B) free(input_B);
-                if(output_h) free(output_h);
-                return -1;
-            }
+        err  = clSetKernelArg(kernel, 0, sizeof(streams[0]), &streams[0]);
+        if (err != CL_SUCCESS)
+        {
+            printf("clSetKernelArgs failed\n");
+            if(streams[0]) clReleaseMemObject(streams[0]);
+                        if(streams[1]) clReleaseMemObject(streams[1]);
+                        if(streams[2]) clReleaseMemObject(streams[2]);
+                        if(program) clReleaseProgram(program);
+                        if(kernel) clReleaseKernel(kernel);
+                        if(input_A) free(input_A);
+                        if(input_B) free(input_B);
+            if(output_h) free(output_h);
+            return -1;
+        }
+        err  = clSetKernelArg(kernel, 1, sizeof(streams[1]), &streams[1]);
+        if (err != CL_SUCCESS)
+        {
+            printf("clSetKernelArgs failed\n");
+            if(streams[0]) clReleaseMemObject(streams[0]);
+                        if(streams[1]) clReleaseMemObject(streams[1]);
+                        if(streams[2]) clReleaseMemObject(streams[2]);
+                        if(program) clReleaseProgram(program);
+                        if(kernel) clReleaseKernel(kernel);
+                        if(input_A) free(input_A);
+                        if(input_B) free(input_B);
+            if(output_h) free(output_h);
+            return -1;
+        }
+        err  = clSetKernelArg(kernel, 2, sizeof(streams[2]), &streams[2]);
+        if (err != CL_SUCCESS)
+        {
+            printf("clSetKernelArgs failed\n");
+            if(streams[0]) clReleaseMemObject(streams[0]);
+                        if(streams[1]) clReleaseMemObject(streams[1]);
+                        if(streams[2]) clReleaseMemObject(streams[2]);
+                        if(program) clReleaseProgram(program);
+                        if(kernel) clReleaseKernel(kernel);
+                        if(input_A) free(input_A);
+                        if(input_B) free(input_B);
+            if(output_h) free(output_h);
+            return -1;
+        }
 
             threads[0] = (unsigned int)num_elements;
             err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, threads, NULL, 0, NULL, NULL);
@@ -501,6 +523,7 @@ int test_fp16_func_math_2arg(cl_device_id device, cl_context context, cl_command
             if(streams[2]) clReleaseMemObject(streams[2]);
             if(program) clReleaseProgram(program);
             if(kernel) clReleaseKernel(kernel);
+            passCount++;
         }
 
         printf("%s TESTING FOR ALL FUNCTIONS FINISHED.\n", types[typeIndex]);
@@ -514,9 +537,9 @@ int test_fp16_func_math_2arg(cl_device_id device, cl_context context, cl_command
     }
 
     //printf("%d / 120 internal tests passed.\n\n", passCount);
-    total += 120;
+    total += total_count;
     passed += passCount;
-    fail += 120-passCount;
+    fail += total_count-passCount;
 
     return 0;
 }
@@ -541,7 +564,6 @@ int test_fp16_func_math_3arg(cl_device_id device, cl_context context, cl_command
 
     const char *func_name[] = {
         /* math functions */
-        "fma",
         "mad",
         /* common functions */
         "clamp",
@@ -553,6 +575,10 @@ int test_fp16_func_math_3arg(cl_device_id device, cl_context context, cl_command
         "bitselect"
     };
 
+    int type_count = sizeof(types)/ sizeof(char *);
+    int func_count = sizeof(func_name)/ sizeof(char *);
+    int total_count = func_count * type_count;
+
     for(int t=1; t<17; t*=2)
     {
 
@@ -562,7 +588,7 @@ int test_fp16_func_math_3arg(cl_device_id device, cl_context context, cl_command
         input_C = (cl_half*)malloc(length);
         output_h = (cl_half*)malloc(length);
 
-        for(int index = 0; index < 6; index++)
+        for(int index = 0; index < func_count; index++)
         {
 
             printf("%s with gentype %s TESTING STARTED:\n", func_name[index], types[typeIndex]);
@@ -637,7 +663,7 @@ int test_fp16_func_math_3arg(cl_device_id device, cl_context context, cl_command
                     if(kernel) clReleaseKernel(kernel);
                     if(input_A) free(input_A);
                     if(input_B) free(input_B);
-                    if(input_C) free(output_h);
+                    if(input_C) free(input_C);
                     if(output_h)free(output_h);
                     return -1;
                 }
@@ -647,11 +673,12 @@ int test_fp16_func_math_3arg(cl_device_id device, cl_context context, cl_command
                 if(streams[0]) clReleaseMemObject(streams[0]);
                 if(streams[1]) clReleaseMemObject(streams[1]);
                 if(streams[2]) clReleaseMemObject(streams[2]);
+                if(streams[3]) clReleaseMemObject(streams[3]);
                 if(program) clReleaseProgram(program);
                 if(kernel) clReleaseKernel(kernel);
                 if(input_A) free(input_A);
                 if(input_B) free(input_B);
-                if(input_C) free(output_h);
+                if(input_C) free(input_C);
                 if(output_h)free(output_h);
 
                 passCount++;
@@ -663,18 +690,70 @@ int test_fp16_func_math_3arg(cl_device_id device, cl_context context, cl_command
                 return 0;
             }
 
-            err  = clSetKernelArg(kernel, 0, sizeof streams, &streams);
+            err  = clSetKernelArg(kernel, 0, sizeof streams[0], &streams[0]);
             if (err != CL_SUCCESS)
             {
                 printf("clSetKernelArgs failed\n");
                 if(streams[0]) clReleaseMemObject(streams[0]);
                 if(streams[1]) clReleaseMemObject(streams[1]);
                 if(streams[2]) clReleaseMemObject(streams[2]);
+                if(streams[3]) clReleaseMemObject(streams[3]);
                 if(program) clReleaseProgram(program);
                 if(kernel) clReleaseKernel(kernel);
                 if(input_A) free(input_A);
                 if(input_B) free(input_B);
-                if(input_C) free(output_h);
+                if(input_C) free(input_C);
+                if(output_h)free(output_h);
+                return -1;
+            }
+
+            err  = clSetKernelArg(kernel, 1, sizeof streams[1], &streams[1]);
+            if (err != CL_SUCCESS)
+            {
+                printf("clSetKernelArgs failed\n");
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(streams[2]) clReleaseMemObject(streams[2]);
+                if(streams[3]) clReleaseMemObject(streams[3]);
+                if(program) clReleaseProgram(program);
+                if(kernel) clReleaseKernel(kernel);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(input_C) free(input_C);
+                if(output_h)free(output_h);
+                return -1;
+            }
+
+            err  = clSetKernelArg(kernel, 2, sizeof streams[2], &streams[2]);
+            if (err != CL_SUCCESS)
+            {
+                printf("clSetKernelArgs failed\n");
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(streams[2]) clReleaseMemObject(streams[2]);
+                if(streams[3]) clReleaseMemObject(streams[3]);
+                if(program) clReleaseProgram(program);
+                if(kernel) clReleaseKernel(kernel);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(input_C) free(input_C);
+                if(output_h)free(output_h);
+                return -1;
+            }
+
+            err  = clSetKernelArg(kernel, 3, sizeof streams[3], &streams[3]);
+            if (err != CL_SUCCESS)
+            {
+                printf("clSetKernelArgs failed\n");
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(streams[2]) clReleaseMemObject(streams[2]);
+                if(streams[3]) clReleaseMemObject(streams[3]);
+                if(program) clReleaseProgram(program);
+                if(kernel) clReleaseKernel(kernel);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(input_C) free(input_C);
                 if(output_h)free(output_h);
                 return -1;
             }
@@ -687,11 +766,12 @@ int test_fp16_func_math_3arg(cl_device_id device, cl_context context, cl_command
                 if(streams[0]) clReleaseMemObject(streams[0]);
                 if(streams[1]) clReleaseMemObject(streams[1]);
                 if(streams[2]) clReleaseMemObject(streams[2]);
+                if(streams[3]) clReleaseMemObject(streams[3]);
                 if(program) clReleaseProgram(program);
                 if(kernel) clReleaseKernel(kernel);
                 if(input_A) free(input_A);
                 if(input_B) free(input_B);
-                if(input_C) free(output_h);
+                if(input_C) free(input_C);
                 if(output_h)free(output_h);
                 return -1;
             }
@@ -703,11 +783,12 @@ int test_fp16_func_math_3arg(cl_device_id device, cl_context context, cl_command
                 if(streams[0]) clReleaseMemObject(streams[0]);
                 if(streams[1]) clReleaseMemObject(streams[1]);
                 if(streams[2]) clReleaseMemObject(streams[2]);
+                if(streams[3]) clReleaseMemObject(streams[3]);
                 if(program) clReleaseProgram(program);
                 if(kernel) clReleaseKernel(kernel);
                 if(input_A) free(input_A);
                 if(input_B) free(input_B);
-                if(input_C) free(output_h);
+                if(input_C) free(input_C);
                 if(output_h)free(output_h);
                 return -1;
             }
@@ -720,11 +801,12 @@ int test_fp16_func_math_3arg(cl_device_id device, cl_context context, cl_command
                 if(streams[0]) clReleaseMemObject(streams[0]);
                 if(streams[1]) clReleaseMemObject(streams[1]);
                 if(streams[2]) clReleaseMemObject(streams[2]);
+                if(streams[3]) clReleaseMemObject(streams[3]);
                 if(program) clReleaseProgram(program);
                 if(kernel) clReleaseKernel(kernel);
                 if(input_A) free(input_A);
                 if(input_B) free(input_B);
-                if(input_C) free(output_h);
+                if(input_C) free(input_C);
                 if(output_h)free(output_h);
                 return -1;
             }
@@ -737,11 +819,12 @@ int test_fp16_func_math_3arg(cl_device_id device, cl_context context, cl_command
                 if(streams[0]) clReleaseMemObject(streams[0]);
                 if(streams[1]) clReleaseMemObject(streams[1]);
                 if(streams[2]) clReleaseMemObject(streams[2]);
+                if(streams[3]) clReleaseMemObject(streams[3]);
                 if(program) clReleaseProgram(program);
                 if(kernel) clReleaseKernel(kernel);
                 if(input_A) free(input_A);
                 if(input_B) free(input_B);
-                if(input_C) free(output_h);
+                if(input_C) free(input_C);
                 if(output_h)free(output_h);
                 return -1;
             }
@@ -754,11 +837,12 @@ int test_fp16_func_math_3arg(cl_device_id device, cl_context context, cl_command
                 if(streams[0]) clReleaseMemObject(streams[0]);
                 if(streams[1]) clReleaseMemObject(streams[1]);
                 if(streams[2]) clReleaseMemObject(streams[2]);
+                if(streams[3]) clReleaseMemObject(streams[3]);
                 if(program) clReleaseProgram(program);
                 if(kernel) clReleaseKernel(kernel);
                 if(input_A) free(input_A);
                 if(input_B) free(input_B);
-                if(input_C) free(output_h);
+                if(input_C) free(input_C);
                 if(output_h)free(output_h);
                 return -1;
             }
@@ -766,8 +850,10 @@ int test_fp16_func_math_3arg(cl_device_id device, cl_context context, cl_command
             if(streams[0]) clReleaseMemObject(streams[0]);
             if(streams[1]) clReleaseMemObject(streams[1]);
             if(streams[2]) clReleaseMemObject(streams[2]);
+            if(streams[3]) clReleaseMemObject(streams[3]);
             if(program) clReleaseProgram(program);
             if(kernel) clReleaseKernel(kernel);
+            passCount++;
 
         }
 
@@ -778,15 +864,15 @@ int test_fp16_func_math_3arg(cl_device_id device, cl_context context, cl_command
 
         if(input_A) free(input_A);
         if(input_B) free(input_B);
-        if(input_C) free(output_h);
+        if(input_C) free(input_C);
         if(output_h)free(output_h);
 
     }
 
     //printf("%d / 30 internal tests passed.\n\n", passCount);
-    total += 30;
+    total += total_count;
     passed += passCount;
-    fail += 30-passCount;
+    fail += total_count-passCount;
 
     return 0;
 }
@@ -814,18 +900,17 @@ int test_fp16_func_math4(cl_device_id device, cl_context context, cl_command_que
     const char *func_name[] = {
         "frexp",
         "lgamma_r",
-        "mad",
-        "remquo",
-        "modf",
-        "fract",
-        "sincos"
     };
 
     const char *qualifier_name[] = {
         "__global",
         "__local",
-        "__private"
     };
+
+    int type_count = sizeof(types)/ sizeof(char *);
+    int func_count = sizeof(func_name)/ sizeof(char *);
+    int qualifier_count = sizeof(qualifier_name)/ sizeof(char *);
+    int total_count = func_count * type_count * qualifier_count;
 
     for(int t=1; t<17; t*=2)
     {
@@ -835,19 +920,11 @@ int test_fp16_func_math4(cl_device_id device, cl_context context, cl_command_que
         input_B = (cl_half*)malloc(length);
         output_h = (cl_half*)malloc(length);
 
-        for(int index = 0; index < 7; index++)
+        for(int index = 0; index < func_count; index++)
         {
-
-            for(int qualIndex = 0; qualIndex < 3; qualIndex++)
+            for(int qualIndex = 0; qualIndex < qualifier_count; qualIndex++)
             {
-                if(index < 4)
-                {
-                    printf("%s with gentype %s TESTING STARTED:\n", func_name[index], intTypes[typeIndex]);
-                }
-                else
-                {
-                    printf("%s with gentype %s TESTING STARTED:\n", func_name[index], types[typeIndex]);
-                }
+                printf("%s with gentype %s TESTING STARTED:\n", func_name[index], intTypes[typeIndex]);
 
                 printf("--------------------------------------------------");
 
@@ -884,15 +961,7 @@ int test_fp16_func_math4(cl_device_id device, cl_context context, cl_command_que
                     return -1;
                 }
 
-                if(index < 4)
-                {
-                    sprintf(kernel_code_int, kernel_test_fp16_func_math4, types[typeIndex], types[typeIndex], qualifier_name[qualIndex], intTypes[typeIndex], func_name[index]);
-                }
-                else
-                {
-                    sprintf(kernel_code_int, kernel_test_fp16_func_math4, types[typeIndex], types[typeIndex], qualifier_name[qualIndex], types[typeIndex], func_name[index]);
-                }
-
+                sprintf(kernel_code_int, kernel_test_fp16_func_math4, types[typeIndex], types[typeIndex], qualifier_name[qualIndex], intTypes[typeIndex], func_name[index]);
                 constkernelint = kernel_code_int;
 
                 if(is_extension_available(device, "cl_khr_fp16"))
@@ -929,7 +998,37 @@ int test_fp16_func_math4(cl_device_id device, cl_context context, cl_command_que
                     return 0;
                 }
 
-                err  = clSetKernelArg(kernel, 0, sizeof streams, &streams);
+                err  = clSetKernelArg(kernel, 0, sizeof streams[0], &streams[0]);
+                if (err != CL_SUCCESS)
+                {
+                    printf("clSetKernelArgs failed\n");
+                    if(streams[0]) clReleaseMemObject(streams[0]);
+                    if(streams[1]) clReleaseMemObject(streams[1]);
+                    if(streams[2]) clReleaseMemObject(streams[2]);
+                    if(program) clReleaseProgram(program);
+                    if(kernel) clReleaseKernel(kernel);
+                    if(input_A) free(input_A);
+                    if(input_B) free(input_B);
+                    if(output_h) free(output_h);
+                    return -1;
+                }
+
+                err  = clSetKernelArg(kernel, 1, sizeof streams[1], &streams[1]);
+                if (err != CL_SUCCESS)
+                {
+                    printf("clSetKernelArgs failed\n");
+                    if(streams[0]) clReleaseMemObject(streams[0]);
+                    if(streams[1]) clReleaseMemObject(streams[1]);
+                    if(streams[2]) clReleaseMemObject(streams[2]);
+                    if(program) clReleaseProgram(program);
+                    if(kernel) clReleaseKernel(kernel);
+                    if(input_A) free(input_A);
+                    if(input_B) free(input_B);
+                    if(output_h) free(output_h);
+                    return -1;
+                }
+
+                err  = clSetKernelArg(kernel, 2, sizeof streams[2], &streams[2]);
                 if (err != CL_SUCCESS)
                 {
                     printf("clSetKernelArgs failed\n");
@@ -1006,6 +1105,7 @@ int test_fp16_func_math4(cl_device_id device, cl_context context, cl_command_que
                     if(output_h) free(output_h);
                     return -1;
                 }
+                passCount++;
             }
 
             if(streams[0]) clReleaseMemObject(streams[0]);
@@ -1026,9 +1126,9 @@ int test_fp16_func_math4(cl_device_id device, cl_context context, cl_command_que
     }
 
     //printf("%d / 105 internal tests passed.\n\n", passCount);
-    total += 105;
+    total += total_count;
     passed += passCount;
-    fail += 105-passCount;
+    fail += total_count-passCount;
 
     return 0;
 }
