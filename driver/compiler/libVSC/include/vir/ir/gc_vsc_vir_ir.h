@@ -7884,11 +7884,13 @@ VSC_ErrCode
 VIR_Copy_FixOperand(VIR_CopyContext *Ctx, VIR_Operand* pOperand);
 
 VSC_ErrCode
-VirShader_GenInvocationIndex(
+VIR_Shader_GenInvocationIndex(
     IN  VIR_Shader              *Shader,
     IN  VIR_Function            *pFunc,
     IN  VIR_Symbol              *VariableSym,
-    IN  VIR_Instruction         *insertBeforeInst);
+    IN  VIR_Instruction         *insertBeforeInst,
+    IN  gctBOOL                 bUpdateSlot
+    );
 
 #define SHDR_SIG    gcmCC('S', 'H', 'D', 'R')
 #define ENDS_SIG    gcmCC('E', 'N', 'D', 'S')

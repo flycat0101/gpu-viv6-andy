@@ -18088,11 +18088,12 @@ gctBOOL VirSHADER_DumpCodeGenVerbose(void * Shader)
 }
 
 VSC_ErrCode
-VirShader_GenInvocationIndex(
+VIR_Shader_GenInvocationIndex(
     IN  VIR_Shader              *Shader,
     IN  VIR_Function            *pFunc,
     IN  VIR_Symbol              *VariableSym,
-    IN  VIR_Instruction         *insertBeforeInst
+    IN  VIR_Instruction         *insertBeforeInst,
+    IN  gctBOOL                 bUpdateSlot
     )
 {
     VSC_ErrCode     errCode  = VSC_ERR_NONE;
@@ -18113,7 +18114,7 @@ VirShader_GenInvocationIndex(
     gcmASSERT(VIR_Symbol_GetName(VariableSym) == VIR_NAME_LOCALINVOCATIONINDEX ||
               (gcoOS_StrCmp(VIR_Shader_GetSymNameString(Shader, VariableSym), glLocalInvIndexStrName) == gcvSTATUS_OK));
 
-    /* VirShader_GenInvocationIndex also be called for atomic patch function,
+    /* VIR_Shader_GenInvocationIndex also be called for atomic patch function,
      * temp varialbe "glLocalinvocationIndex" which storageClass is VIR_STORAGE_UNKNOWN
      * is used to represent gl_LocalInvocationIndex
      */
@@ -18125,16 +18126,24 @@ VirShader_GenInvocationIndex(
     }
 
     /* create a temp for invocation index */
-    regId = VIR_Shader_NewVirRegId(Shader, 1);
-    errCode = VIR_Shader_AddSymbol(Shader,
-                VIR_SYM_VIRREG,
-                regId,
-                VIR_Shader_GetTypeFromId(Shader, VIR_TYPE_UINT32),
-                VIR_STORAGE_UNKNOWN,
-                &IndexSymId);
-    VIR_Symbol_ClrFlag(VariableSym, VIR_SYMFLAG_ENABLED | VIR_SYMFLAG_STATICALLY_USED);
-    VIR_Symbol_SetFlag(VariableSym, VIR_SYMFLAG_UNUSED);
-    VIR_Symbol_SetVariableVregIndex(VariableSym, regId);
+    if (bUpdateSlot)
+    {
+        VIR_Symbol  *pVregSym = VIR_Shader_FindSymbolByTempIndex(Shader, VIR_Symbol_GetVariableVregIndex(VariableSym));
+        IndexSymId = VIR_Symbol_GetIndex(pVregSym);
+    }
+    else
+    {
+        regId = VIR_Shader_NewVirRegId(Shader, 1);
+        errCode = VIR_Shader_AddSymbol(Shader,
+                    VIR_SYM_VIRREG,
+                    regId,
+                    VIR_Shader_GetTypeFromId(Shader, VIR_TYPE_UINT32),
+                    VIR_STORAGE_UNKNOWN,
+                    &IndexSymId);
+        VIR_Symbol_ClrFlag(VariableSym, VIR_SYMFLAG_ENABLED | VIR_SYMFLAG_STATICALLY_USED);
+        VIR_Symbol_SetFlag(VariableSym, VIR_SYMFLAG_UNUSED);
+        VIR_Symbol_SetVariableVregIndex(VariableSym, regId);
+    }
 
     /* add an attribute if not found - LocalInvocationID */
     for (i = 0;  i< VIR_IdList_Count(attIdList); i++)
@@ -18149,6 +18158,33 @@ VirShader_GenInvocationIndex(
 
     if (i == VIR_IdList_Count(attIdList))
     {
+        gctUINT                     nextAttrLlSlot = 0;
+
+        if (bUpdateSlot)
+        {
+            VIR_AttributeIdList*    pAttrIdLsts = VIR_Shader_GetAttributes(Shader);
+            gctUINT                 attrCount = VIR_IdList_Count(pAttrIdLsts);
+            gctUINT                 attrIdx;
+
+            for (attrIdx = 0; attrIdx < attrCount; attrIdx ++)
+            {
+                VIR_SymId       attrSymId = VIR_IdList_GetId(pAttrIdLsts, attrIdx);
+                VIR_Symbol      *pAttrSym = VIR_Shader_GetSymFromId(Shader, attrSymId);
+                gctUINT         thisOutputRegCount;
+
+                if (!isSymUnused(pAttrSym) && !isSymVectorizedOut(pAttrSym))
+                {
+                    gcmASSERT(VIR_Symbol_GetFirstSlot(pAttrSym) != NOT_ASSIGNED);
+
+                    thisOutputRegCount = VIR_Symbol_GetVirIoRegCount(Shader, pAttrSym);
+                    if (nextAttrLlSlot < (VIR_Symbol_GetFirstSlot(pAttrSym) + thisOutputRegCount))
+                    {
+                        nextAttrLlSlot = VIR_Symbol_GetFirstSlot(pAttrSym) + thisOutputRegCount;
+                    }
+                }
+            }
+        }
+
         errCode = VIR_Shader_AddSymbol(Shader,
                                        VIR_SYM_VARIABLE,
                                        VIR_NAME_LOCAL_INVOCATION_ID,
@@ -18169,7 +18205,14 @@ VirShader_GenInvocationIndex(
                     &tmpSymId);
 
         VIR_Symbol_SetVariableVregIndex(newVarSym, regId);
+        VIR_Symbol_SetIndexRange(newVarSym, regId + 1);
         VIR_Symbol_SetVregVariable(VIR_Shader_GetSymFromId(Shader, tmpSymId), newVarSym);
+        VIR_Symbol_SetIndexRange(VIR_Shader_GetSymFromId(Shader, tmpSymId), regId + 1);
+
+        if (bUpdateSlot)
+        {
+            VIR_Symbol_SetFirstSlot(newVarSym, nextAttrLlSlot);
+        }
     }
 
     /* Compute local invocation index :

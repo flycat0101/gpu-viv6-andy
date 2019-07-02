@@ -6526,7 +6526,7 @@ _GenGLInvocationIndexForAtomicPatch(
             sym = VIR_Operand_GetSymbol(src0);
             if (gcoOS_StrCmp(VIR_Shader_GetSymNameString(pShader, sym), glLocalInvIndexStrName) == gcvSTATUS_OK)
             {
-                VirShader_GenInvocationIndex(pShader, pFunc, sym, pInst);
+                VIR_Shader_GenInvocationIndex(pShader, pFunc, sym, pInst, gcvFALSE);
                 break;
             }
 
