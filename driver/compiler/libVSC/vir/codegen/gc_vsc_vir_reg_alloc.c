@@ -64,7 +64,8 @@
 **  For a UINT8_X4, we allocate 16 bytes, but only use the first 4 bytes.
 **  For a UINT_X4, we allocate 16 bytes, and use all of them.
 */
-#define __DEFAULT_TEMP_REGISTER_SIZE_IN_BYTE__ 16
+#define __DEFAULT_TEMP_REGISTER_SIZE_IN_BYTE__          16
+#define __MAX_TEMP_REGISTER_COMPONENT_SIZE_IN_BYTE__    4
 
 /* end mark for the live range list, used in sorting live ranges
    and ending the active live range list */
@@ -7677,6 +7678,30 @@ _VIR_RA_LS_ComputeOpndShift(
 }
 
 static gctUINT
+_VIR_RA_LS_ComputeHwRegComponentSize(
+    VIR_Shader*         pShader,
+    VIR_TypeId          typeId
+    )
+{
+    gctUINT             compSize = 1;
+    VIR_Type*           pCompType;
+
+    pCompType = VIR_Shader_GetTypeFromId(pShader, VIR_GetTypeComponentType(typeId));
+    compSize = VIR_Type_GetSize(pCompType);
+
+    /*
+    ** The maximum size of a one HW register componenet is 4,
+    ** for those vir registers whose component size is larger than 4, e.g. uint, long,
+    ** we use multiple HW componenets to descripte them, but here we need to use the HW componenet size.
+    */
+    compSize = vscMIN(compSize, __MAX_TEMP_REGISTER_COMPONENT_SIZE_IN_BYTE__);
+
+    gcmASSERT(compSize != 0);
+
+    return compSize;
+}
+
+static gctUINT
 _VIR_RA_LS_ComputeSpillOffset(
     VIR_RA_LS           *pRA,
     VIR_Operand         *pOpnd,
@@ -7685,11 +7710,7 @@ _VIR_RA_LS_ComputeSpillOffset(
 {
     VIR_Symbol  *opndSym = VIR_Operand_GetSymbol(pOpnd);
     gctUINT     spillOffset = 0, swizzleOffset = 0, constOffset = 0;
-    VIR_Type   *compType;
-    gctUINT     compSize = 4;
-
-    compType = VIR_Shader_GetTypeFromId(pRA->pShader, VIR_GetTypeComponentType(VIR_Symbol_GetTypeId(opndSym)));
-    compSize = VIR_Type_GetSize(compType);
+    gctUINT     compSize = _VIR_RA_LS_ComputeHwRegComponentSize(pRA->pShader, VIR_Symbol_GetTypeId(opndSym));
 
     /* load/store destinationMask has "shift", e.g.,
        store.yz base, offset, data (similar to store.xy) ==>
@@ -8144,8 +8165,6 @@ _VIR_RA_LS_InsertFill(
     gctBOOL             bSaveInSpillDataRegister = gcvFALSE;
 
     VIR_Symbol          *opndSym = VIR_Operand_GetSymbol(pOpnd);
-    VIR_Type            *opndSymType;
-    VIR_Type            *dataOpndType;
     gctUINT              opndSymTypeSize, dataOpndTypeSize;
 
     /*
@@ -8252,11 +8271,8 @@ _VIR_RA_LS_InsertFill(
     ** Since we use the symbol's type to compute the offset and use the SRC2's type as the InstType,
     ** if the type size of SRC2 is larger than the symbol's, some data may be abandoned.
     */
-    opndSymType = VIR_Shader_GetTypeFromId(pShader, VIR_GetTypeComponentType(VIR_Symbol_GetTypeId(opndSym)));
-    opndSymTypeSize = VIR_Type_GetSize(opndSymType);
-
-    dataOpndType = VIR_Shader_GetTypeFromId(pShader, VIR_GetTypeComponentType(VIR_Operand_GetTypeId(newOpnd)));
-    dataOpndTypeSize = VIR_Type_GetSize(dataOpndType);
+    opndSymTypeSize = _VIR_RA_LS_ComputeHwRegComponentSize(pShader, VIR_Symbol_GetTypeId(opndSym));
+    dataOpndTypeSize = _VIR_RA_LS_ComputeHwRegComponentSize(pShader, VIR_Operand_GetTypeId(newOpnd));
 
     if (dataOpndTypeSize > opndSymTypeSize)
     {
