@@ -1640,6 +1640,10 @@ ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
             {
                 Extension = clvEXTENSION_ALL;
             }
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_khr_fp16")))
+            {
+                Extension = clvEXTENSION_CL_KHR_FP16;
+            }
             else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "CL_VIV_asm")))
             {
                 Extension = clvEXTENSION_VASM;
@@ -1671,6 +1675,10 @@ ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
 
             if (Extension == clvEXTENSION_ALL)
             {
+                gcmVERIFY_OK(cloCOMPILER_EnableExtension(
+                        PP->compiler,
+                        clvEXTENSION_CL_KHR_FP16,
+                        Enable));
                 gcmVERIFY_OK(cloCOMPILER_EnableExtension(
                         PP->compiler,
                         clvEXTENSION_VASM,

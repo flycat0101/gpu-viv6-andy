@@ -485,6 +485,17 @@ cloCOMPILER_IsLoadingBuiltin(
 cloCOMPILER *
 gcGetKernelCompiler(void);
 
+void
+clScanInitLanguageVersion(
+IN gctUINT32 LanguageVersion,
+IN cleEXTENSION Extension
+);
+
+cleEXTENSION
+cloCOMPILER_GetExtension(
+IN cloCOMPILER Compiler
+);
+
 #ifdef __cplusplus
 }
 #endif

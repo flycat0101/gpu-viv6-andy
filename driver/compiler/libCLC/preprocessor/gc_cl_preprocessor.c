@@ -1423,6 +1423,8 @@ gceSTATUS    ppoPREPROCESSOR_Parse(cloPREPROCESSOR        PP,
             if (status != gcvSTATUS_OK) break;
 
             status = ppoPREPROCESSOR_PreprocessingFile(PP);
+            clScanInitLanguageVersion(cloCOMPILER_GetLanguageVersion(PP->compiler),
+                              cloCOMPILER_GetExtension(PP->compiler));
 
             if (status != gcvSTATUS_OK) break;
 

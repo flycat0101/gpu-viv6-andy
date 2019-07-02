@@ -228,11 +228,6 @@ cloCOMPILER_ExtensionEnabled(
     IN cleEXTENSION Extension
     );
 
-cleEXTENSION
-cloCOMPILER_GetExtension(
-IN cloCOMPILER Compiler
-);
-
 gceSTATUS
 cloCOMPILER_AddLog(
     IN cloCOMPILER Compiler,
