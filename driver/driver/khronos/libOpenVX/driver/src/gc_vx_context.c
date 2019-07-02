@@ -1211,7 +1211,7 @@ VX_PRIVATE_API vx_status vxoContext_InitSRAM(
     {
         context->vipSRAM.size        = (vipSRAMSize <= VX_VIP_SRAM_IMAGE_STREAM_SIZE) ? vipSRAMSize : (vipSRAMSize - VX_VIP_SRAM_IMAGE_STREAM_SIZE);
         context->vipSRAM.logical     = gcvNULL;
-        context->vipSRAM.physBase    = vipSRAMPhysical;
+        context->vipSRAM.physBase    = vipSRAMPhysical != 0xFFFFFFFF ? vipSRAMPhysical : 0;
         context->vipSRAM.physical    = vipSRAMPhysical != 0xFFFFFFFF ?
                                            vipSRAMPhysical + VX_VIP_SRAM_IMAGE_STREAM_SIZE : VX_VIP_SRAM_IMAGE_STREAM_SIZE;
         context->vipSRAM.used        = 0;

@@ -1297,8 +1297,7 @@ vxoMemoryPool_AdjustAddress(
 
         memory->physicals[0] = pbase + offset;
 
-        if (vxoContext_IsFeatureAvailable(graph->base.context, VX_NN_FEATURE_SWTILING_PHASE3) &&
-            ntype == VXNNE_MEM_POOL_TYPE_VIP_SRAM && VXNNE_MEM_POOL_TYPE_IS_CACHE(memory->allocType))
+        if (ntype == VXNNE_MEM_POOL_TYPE_VIP_SRAM && VXNNE_MEM_POOL_TYPE_IS_CACHE(memory->allocType))
         {
             memory->physicals[0] -= graph->base.context->vipSRAM.physBase;
         }
@@ -1390,17 +1389,11 @@ vxoMemoryPool_RequestList(
 
                 if (ntype == VXNNE_MEM_POOL_TYPE_AXI_SRAM && !maxs[VXNNE_MEM_POOL_TYPE_AXI_SRAM])
                 {
-                    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE3))
-                    {
-                        list[i].outputMemory[j]->allocType = VXNNE_MEM_POOL_TYPE_IS_CACHE(list[i].outputMemory[j]->allocType) ?
-                                                             VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM) : VXNNE_MEM_POOL_TYPE_VIP_SRAM;
-                    }
-                    else
-                    {
-                        status = VX_INVALID_VALUE;
-                        goto exit;
-                    }
+                    vxmASSERT(0);
+                    status = VX_INVALID_VALUE;
+                    goto exit;
                 }
+
                 ntype = VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(list[i].outputMemory[j]->allocType);
                 if (ntype != VXNNE_MEM_POOL_TYPE_ORIG_DDR)
                 {
@@ -1429,16 +1422,9 @@ vxoMemoryPool_RequestList(
 
                 if (ntype == VXNNE_MEM_POOL_TYPE_AXI_SRAM && maxs[VXNNE_MEM_POOL_TYPE_AXI_SRAM] == 0)
                 {
-                    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE3))
-                    {
-                        list[i].inputMemory[j]->allocType = VXNNE_MEM_POOL_TYPE_IS_CACHE(list[i].inputMemory[j]->allocType) ?
-                                                            VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM) : VXNNE_MEM_POOL_TYPE_VIP_SRAM;
-                    }
-                    else
-                    {
-                        status = VX_INVALID_VALUE;
-                        goto exit;
-                    }
+                    vxmASSERT(0);
+                    status = VX_INVALID_VALUE;
+                    goto exit;
                 }
                 ntype = VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(list[i].inputMemory[j]->allocType);
                 if (ntype != VXNNE_MEM_POOL_TYPE_ORIG_DDR)
