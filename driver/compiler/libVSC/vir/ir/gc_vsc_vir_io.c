@@ -3840,6 +3840,7 @@ VIR_CopyFunction(VIR_CopyContext *Ctx, VIR_Function* pToFunction, VIR_Function* 
     Copy_Field(pToFunction, pFromFunction, maxCallDepth);
     Copy_Field(pToFunction, pFromFunction, tempIndexStart);
     Copy_Field(pToFunction, pFromFunction, tempIndexCount);
+    Copy_Field(pToFunction, pFromFunction, die);
 
     ON_ERROR0(VIR_CopySymTable(Ctx, &pToFunction->symTable, &pFromFunction->symTable));
     ON_ERROR0(VIR_CopyLabelTable(Ctx, &pToFunction->labelTable, &pFromFunction->labelTable));
