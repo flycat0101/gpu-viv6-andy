@@ -623,7 +623,7 @@ typedef struct _gcWORK_GROUP_SIZE
     gctUINT       z;
 }gcWORK_GROUP_SIZE;
 
-struct _gcsHINT
+typedef struct _gcsHINT
 {
     /* fields for the program */
     gctUINT32   elementCount;       /* Element count. */
@@ -813,7 +813,7 @@ struct _gcsHINT
     /* shaderVidNodes should always be the LAST filed in hits. */
     /* SURF Node for memory that is used in shader. */
     gcSHADER_VID_NODES shaderVidNodes;
-};
+}gcsHINT;
 
 #define gcsHINT_isCLShader(Hint)            ((Hint)->clShader)
 #define gcsHINT_GetShaderMode(Hint)         ((Hint)->shaderMode)

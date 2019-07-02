@@ -20,10 +20,11 @@
 
 BEGIN_EXTERN_C()
 
+/* always set SHADER_64BITMODE to 0 to unify 32bit and 64bit shader binaries */
 #if (PTRDIFF_MAX  == INT32_MAX)
 #define SHADER_64BITMODE  0
 #else
-#define SHADER_64BITMODE  1
+#define SHADER_64BITMODE  0
 #endif
 
 #if gcdRENDER_QUALITY_CHECK

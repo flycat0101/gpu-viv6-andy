@@ -24,6 +24,10 @@
 #define MAX_BLOCK_SIZE   0x20000     /* max block size 128 KB */
 #define MAX_BLOCK_NUM    1000
 
+/* To make 32bit and 64bit platforms save the exact same shader binary,
+   we need to make sure this struct size is same in different platforms */
+char _check_gcsHINT_size[(sizeof(gcsHINT) % 8) == 0 ? 1 : -1];
+
 #if (!VSC_LITE_BUILD)
 gctGLSLCompiler gcGLSLCompiler = gcvNULL;
 #endif
