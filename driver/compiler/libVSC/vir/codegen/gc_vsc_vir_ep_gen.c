@@ -4477,6 +4477,10 @@ static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(VSC_PEP_GEN_HELPER* pPepG
 
         pCombTsEntry->sampledImageIndexInStorageTable = i;
     }
+    else
+    {
+        pCombTsEntry->sampledImageIndexInStorageTable = NOT_ASSIGNED;
+    }
 
     return VSC_ERR_NONE;
 }
