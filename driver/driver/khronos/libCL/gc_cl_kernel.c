@@ -1218,9 +1218,9 @@ clfLoadKernelArgValues(
         /*gcoOS_MemCopy(Arg->data, GlobalWorkSize, gcmSIZEOF(size_t) * 3);*/
         gctUINT32 globalWorkSize[3];
 
-        globalWorkSize[0] = GlobalWorkSize[0];
-        globalWorkSize[1] = GlobalWorkSize[1];
-        globalWorkSize[2] = GlobalWorkSize[2];
+        globalWorkSize[0] = GlobalWorkSize[0] ? GlobalWorkSize[0] : 1;
+        globalWorkSize[1] = GlobalWorkSize[1] ? GlobalWorkSize[1] : 1;
+        globalWorkSize[2] = GlobalWorkSize[2] ? GlobalWorkSize[2] : 1;
         gcoOS_MemCopy(Arg->data, globalWorkSize, gcmSIZEOF(gctUINT32) * 3);
 
         clmONERROR(clfSetUniformValue(Arg->uniform,
@@ -1234,9 +1234,9 @@ clfLoadKernelArgValues(
         /*gcoOS_MemCopy(Arg->data, LocalWorkSize, gcmSIZEOF(size_t) * 3);*/
         gctUINT32 localWorkSize[3];
 
-        localWorkSize[0] = LocalWorkSize[0];
-        localWorkSize[1] = LocalWorkSize[1];
-        localWorkSize[2] = LocalWorkSize[2];
+        localWorkSize[0] = LocalWorkSize[0] ? LocalWorkSize[0] : 1;
+        localWorkSize[1] = LocalWorkSize[1] ? LocalWorkSize[1] : 1;
+        localWorkSize[2] = LocalWorkSize[2] ? LocalWorkSize[2] : 1;
         gcoOS_MemCopy(Arg->data, localWorkSize, gcmSIZEOF(gctUINT32) * 3);
 
         clmONERROR(clfSetUniformValue(Arg->uniform,
