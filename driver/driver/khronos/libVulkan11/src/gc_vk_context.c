@@ -50,7 +50,7 @@ const char *__vkProcInfoTable[] =
 };
 
 PFN_vkVoidFunction __vk_GetApiProcAddr(
-    const char *procName
+    const char *pName
     )
 {
     const char *apiName;
@@ -58,13 +58,29 @@ PFN_vkVoidFunction __vk_GetApiProcAddr(
     PFN_vkVoidFunction *table = (PFN_vkVoidFunction *)&__vkApiDispatchTable;
 
     /* Skip invalid names first */
-    if (!procName || procName[0] != 'v' || procName[1] != 'k' || procName[2] == '\0')
+    if (!pName || pName[0] != 'v' || pName[1] != 'k' || pName[2] == '\0')
     {
         return VK_NULL_HANDLE;
     }
 
+    if (strcmp(pName, "vkBindBufferMemory2KHR") == 0) pName = "vkBindBufferMemory2";
+    if (strcmp(pName, "vkBindImageMemory2KHR") == 0) pName = "vkBindImageMemory2";
+    if (strcmp(pName, "vkCreateDescriptorUpdateTemplateKHR") == 0) pName = "vkCreateDescriptorUpdateTemplate";
+    if (strcmp(pName, "vkGetBufferMemoryRequirements2KHR") == 0) pName = "vkGetBufferMemoryRequirements2";
+    if (strcmp(pName, "vkTrimCommandPoolKHR") == 0) pName = "vkTrimCommandPool";
+    if (strcmp(pName, "vkCmdSetDeviceMaskKHR") == 0) pName = "vkCmdSetDeviceMask";
+    if (strcmp(pName, "vkCmdDispatchBaseKHR") == 0) pName = "vkCmdDispatchBase";
+    if (strcmp(pName, "vkDestroyDescriptorUpdateTemplateKHR") == 0) pName = "vkDestroyDescriptorUpdateTemplate";
+    if (strcmp(pName, "vkUpdateDescriptorSetWithTemplateKHR") == 0) pName = "vkUpdateDescriptorSetWithTemplate";
+    if (strcmp(pName, "vkGetImageMemoryRequirements2KHR") == 0) pName = "vkGetImageMemoryRequirements2";
+    if (strcmp(pName, "vkGetDeviceGroupPeerMemoryFeaturesKHR") == 0) pName = "vkGetDeviceGroupPeerMemoryFeatures";
+    if (strcmp(pName, "vkCreateSamplerYcbcrConversionKHR") == 0) pName = "vkCreateSamplerYcbcrConversion";
+    if (strcmp(pName, "vkDestroySamplerYcbcrConversionKHR") == 0) pName = "vkDestroySamplerYcbcrConversion";
+    if (strcmp(pName, "vkGetDescriptorSetLayoutSupportKHR") == 0) pName = "vkGetDescriptorSetLayoutSupport";
+    if (strcmp(pName, "vkGetImageSparseMemoryRequirements2KHR") == 0) pName = "vkGetImageSparseMemoryRequirements2";
+
     /* Skip the first two characters "vk" of procName */
-    apiName = procName + 2;
+    apiName = pName + 2;
 
     /* Find API function's offset in __vkProcInfoTable[] table */
     for (i = 0; i < __VK_TABLE_SIZE(__vkProcInfoTable); ++i)
@@ -515,22 +531,6 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __vk_GetDeviceProcAddr(
         return VK_NULL_HANDLE;
     }
 
-    if (strcmp(pName, "vkBindBufferMemory2KHR") == 0) pName = "vkBindBufferMemory2";
-    if (strcmp(pName, "vkBindImageMemory2KHR") == 0) pName = "vkBindImageMemory2";
-    if (strcmp(pName, "vkCreateDescriptorUpdateTemplateKHR") == 0) pName = "vkCreateDescriptorUpdateTemplate";
-    if (strcmp(pName, "vkGetBufferMemoryRequirements2KHR") == 0) pName = "vkGetBufferMemoryRequirements2";
-    if (strcmp(pName, "vkTrimCommandPoolKHR") == 0) pName = "vkTrimCommandPool";
-    if (strcmp(pName, "vkCmdSetDeviceMaskKHR") == 0) pName = "vkCmdSetDeviceMask";
-    if (strcmp(pName, "vkCmdDispatchBaseKHR") == 0) pName = "vkCmdDispatchBase";
-    if (strcmp(pName, "vkDestroyDescriptorUpdateTemplateKHR") == 0) pName = "vkDestroyDescriptorUpdateTemplate";
-    if (strcmp(pName, "vkUpdateDescriptorSetWithTemplateKHR") == 0) pName = "vkUpdateDescriptorSetWithTemplate";
-    if (strcmp(pName, "vkGetImageMemoryRequirements2KHR") == 0) pName = "vkGetImageMemoryRequirements2";
-    if (strcmp(pName, "vkGetDeviceGroupPeerMemoryFeaturesKHR") == 0) pName = "vkGetDeviceGroupPeerMemoryFeatures";
-    if (strcmp(pName, "vkCreateSamplerYcbcrConversionKHR") == 0) pName = "vkCreateSamplerYcbcrConversion";
-    if (strcmp(pName, "vkDestroySamplerYcbcrConversionKHR") == 0) pName = "vkDestroySamplerYcbcrConversion";
-    if (strcmp(pName, "vkGetDescriptorSetLayoutSupportKHR") == 0) pName = "vkGetDescriptorSetLayoutSupport";
-    if (strcmp(pName, "vkGetImageSparseMemoryRequirements2KHR") == 0) pName = "vkGetImageSparseMemoryRequirements2";
-
     if (strcmp(pName, "vkDestroyInstance") == 0) return VK_NULL_HANDLE;
     if (strcmp(pName, "vkEnumeratePhysicalDevices") == 0) return VK_NULL_HANDLE;
     if (strcmp(pName, "vkEnumeratePhysicalDeviceGroups") == 0) return VK_NULL_HANDLE;
@@ -545,6 +545,23 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __vk_GetDeviceProcAddr(
     if (strcmp(pName, "vkEnumerateDeviceExtensionProperties") == 0) return VK_NULL_HANDLE;
     if (strcmp(pName, "vkEnumerateDeviceLayerProperties") == 0) return VK_NULL_HANDLE;
     if (strcmp(pName, "vkGetPhysicalDeviceSparseImageFormatProperties") == 0) return VK_NULL_HANDLE;
+    if (strcmp(pName, "vkGetPhysicalDeviceFeatures2") == 0) return VK_NULL_HANDLE;
+    if (strcmp(pName, "vkGetPhysicalDeviceProperties2") == 0) return VK_NULL_HANDLE;
+    if (strcmp(pName, "vkGetPhysicalDeviceFormatProperties2") == 0) return VK_NULL_HANDLE;
+    if (strcmp(pName, "vkGetPhysicalDeviceImageFormatProperties2") == 0) return VK_NULL_HANDLE;
+    if (strcmp(pName, "vkGetPhysicalDeviceQueueFamilyProperties2") == 0) return VK_NULL_HANDLE;
+    if (strcmp(pName, "vkGetPhysicalDeviceMemoryProperties2") == 0) return VK_NULL_HANDLE;
+    if (strcmp(pName, "vkGetPhysicalDeviceSparseImageFormatProperties2") == 0) return VK_NULL_HANDLE;
+    if (strcmp(pName, "vkGetPhysicalDeviceExternalBufferProperties") == 0) return VK_NULL_HANDLE;
+    if (strcmp(pName, "vkGetPhysicalDeviceExternalFenceProperties") == 0) return VK_NULL_HANDLE;
+    if (strcmp(pName, "vkGetPhysicalDeviceExternalSemaphoreProperties") == 0) return VK_NULL_HANDLE;
+    if (strcmp(pName, "vkTrimCommandPoolKHR") == 0) return VK_NULL_HANDLE;
+    if (strcmp(pName, "vkCreateSamplerYcbcrConversionKHR") == 0) return VK_NULL_HANDLE;
+    if (strcmp(pName, "vkCreateSwapchainKHR") == 0) return VK_NULL_HANDLE;
+    if (strcmp(pName, "vkGetImageSparseMemoryRequirements2KHR") == 0) return VK_NULL_HANDLE;
+    if (strcmp(pName, "vkBindBufferMemory2KHR") == 0) return VK_NULL_HANDLE;
+    if (strcmp(pName, "vkGetBufferMemoryRequirements2KHR") == 0) return VK_NULL_HANDLE;
+    if (strcmp(pName, "vkGetImageMemoryRequirements2KHR") == 0) return VK_NULL_HANDLE;
 
     return __vk_GetApiProcAddr(pName);
 }
