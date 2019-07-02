@@ -914,6 +914,7 @@ gctSTRING __SpvOpcodeToString(SpvOp opCode)
     case 330: return "OpModuleProcessed";
     case 331: return "OpExecutionModeId";
     case 332: return "OpDecorateId";
+    case 333: return "OpGroupNonUniformElect";
 
     default:
         return "Unsupported opcode";
@@ -929,7 +930,7 @@ gceSTATUS __SpvDumpCheckOpCode(SpvOp opCode)
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    if (opCode < SpvOpNop || opCode > SpvOpImageSparseRead)
+    if (opCode < SpvOpNop || opCode > SpvOpGroupNonUniformElect)
         status = gcvSTATUS_INVALID_ARGUMENT;
 
     return status;

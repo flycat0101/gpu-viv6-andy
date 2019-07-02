@@ -10196,6 +10196,378 @@ OnError:
     return errCode;
 }
 
+typedef VSC_ErrCode
+(*UPDATE_SUBGROUP_VARIABLE_FUNC)(
+    VIR_DEF_USAGE_INFO*     pDuInfo,
+    VIR_Shader*             pShader,
+    VIR_Instruction*        pInst,
+    VIR_Operand*            pSrcOpnd,
+    VIR_Symbol*             pSrcSym,
+    void*                   pPrivateData
+    );
+
+typedef struct _UPDATE_SUBGROUP_VARIABLE_INFO
+{
+    VIR_Symbol*                     pVariableSym;
+    UPDATE_SUBGROUP_VARIABLE_FUNC   updateFunc;
+    void*                           pPrivateData;
+} UPDATE_SUBGROUP_VARIABLE_INFO;
+
+static VSC_ErrCode
+_UpdateSubGroupSize(
+    VIR_DEF_USAGE_INFO*     pDuInfo,
+    VIR_Shader*             pShader,
+    VIR_Instruction*        pInst,
+    VIR_Operand*            pSrcOpnd,
+    VIR_Symbol*             pSrcSym,
+    void*                   pPrivateData
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+
+    /* Delete usage. */
+    vscVIR_DeleteUsage(pDuInfo,
+                       VIR_INPUT_DEF_INST,
+                       pInst,
+                       pSrcOpnd,
+                       gcvFALSE,
+                       VIR_Symbol_GetVariableVregIndex(pSrcSym),
+                       1,
+                       VIR_ENABLE_X,
+                       VIR_HALF_CHANNEL_MASK_FULL,
+                       gcvNULL);
+
+    VIR_Operand_SetImmediateUint(pSrcOpnd, 1);
+
+    return errCode;
+}
+
+static VSC_ErrCode
+_UpdateSubGroupNum(
+    VIR_DEF_USAGE_INFO*     pDuInfo,
+    VIR_Shader*             pShader,
+    VIR_Instruction*        pInst,
+    VIR_Operand*            pSrcOpnd,
+    VIR_Symbol*             pSrcSym,
+    void*                   pPrivateData
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+
+    /* Delete usage. */
+    vscVIR_DeleteUsage(pDuInfo,
+                       VIR_INPUT_DEF_INST,
+                       pInst,
+                       pSrcOpnd,
+                       gcvFALSE,
+                       VIR_Symbol_GetVariableVregIndex(pSrcSym),
+                       1,
+                       VIR_ENABLE_X,
+                       VIR_HALF_CHANNEL_MASK_FULL,
+                       gcvNULL);
+
+    VIR_Operand_SetImmediateUint(pSrcOpnd, VIR_Shader_GetWorkGroupSize(pShader));
+
+    return errCode;
+}
+
+static VSC_ErrCode
+_UpdateSubGroupId(
+    VIR_DEF_USAGE_INFO*     pDuInfo,
+    VIR_Shader*             pShader,
+    VIR_Instruction*        pInst,
+    VIR_Operand*            pSrcOpnd,
+    VIR_Symbol*             pSrcSym,
+    void*                   pPrivateData
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_Symbol*             pLocalInvocationId = (VIR_Symbol*)pPrivateData;
+
+    /* Delete usage. */
+    vscVIR_DeleteUsage(pDuInfo,
+                       VIR_INPUT_DEF_INST,
+                       pInst,
+                       pSrcOpnd,
+                       gcvFALSE,
+                       VIR_Symbol_GetVariableVregIndex(pSrcSym),
+                       1,
+                       VIR_ENABLE_X,
+                       VIR_HALF_CHANNEL_MASK_FULL,
+                       gcvNULL);
+
+    VIR_Operand_SetSymbol(pSrcOpnd, VIR_Inst_GetFunction(pInst), VIR_Symbol_GetIndex(pLocalInvocationId));
+
+    /* Add new usage. */
+    vscVIR_AddNewUsageToDef(pDuInfo,
+                            VIR_INPUT_DEF_INST,
+                            pInst,
+                            pSrcOpnd,
+                            gcvFALSE,
+                            VIR_Symbol_GetVariableVregIndex(pLocalInvocationId),
+                            1,
+                            VIR_ENABLE_X,
+                            VIR_HALF_CHANNEL_MASK_FULL,
+                            gcvNULL);
+    return errCode;
+}
+
+static VSC_ErrCode
+_UpdateSubGroupInvocationId(
+    VIR_DEF_USAGE_INFO*     pDuInfo,
+    VIR_Shader*             pShader,
+    VIR_Instruction*        pInst,
+    VIR_Operand*            pSrcOpnd,
+    VIR_Symbol*             pSrcSym,
+    void*                   pPrivateData
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+
+    /* Delete usage. */
+    vscVIR_DeleteUsage(pDuInfo,
+                       VIR_INPUT_DEF_INST,
+                       pInst,
+                       pSrcOpnd,
+                       gcvFALSE,
+                       VIR_Symbol_GetVariableVregIndex(pSrcSym),
+                       1,
+                       VIR_ENABLE_X,
+                       VIR_HALF_CHANNEL_MASK_FULL,
+                       gcvNULL);
+
+    VIR_Operand_SetImmediateUint(pSrcOpnd, 0);
+
+    return errCode;
+}
+
+static VSC_ErrCode
+_CollectSubGroupVariables(
+    VSC_SH_PASS_WORKER*     pPassWorker,
+    UPDATE_SUBGROUP_VARIABLE_INFO* psubGroupVariableInfo
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_Shader*             pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_Symbol*             pSubGroupSizeSym = gcvNULL;
+    VIR_Symbol*             pSubGroupNumSym = gcvNULL;
+    VIR_Symbol*             pSubGroupIdSym = gcvNULL;
+    VIR_Symbol*             pSubGroupInvocationIdSym = gcvNULL;
+
+
+    /* Find all variables. */
+    pSubGroupSizeSym = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_SUBGROUP_SIZE);
+    pSubGroupNumSym = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_SUBGROUP_NUM);
+    pSubGroupIdSym = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_SUBGROUP_ID);
+    pSubGroupInvocationIdSym = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_SUBGROUP_INVOCATION_ID);
+
+    if (!(pSubGroupSizeSym || pSubGroupNumSym || pSubGroupIdSym || pSubGroupInvocationIdSym))
+    {
+        return errCode;
+    }
+
+    /*
+    **
+    **    gl_SubgroupSize           --->    1
+    **    gl_NumSubgroups           --->    gl_workGroupSize
+    **    gl_SubgroupID             --->    gl_LocalInvocationID
+    **    gl_SubgroupInvocationID   --->    0
+    */
+
+    psubGroupVariableInfo[0].pVariableSym = pSubGroupSizeSym;
+    psubGroupVariableInfo[0].updateFunc = _UpdateSubGroupSize;
+
+    psubGroupVariableInfo[1].pVariableSym = pSubGroupNumSym;
+    psubGroupVariableInfo[1].updateFunc = _UpdateSubGroupNum;
+
+    psubGroupVariableInfo[2].pVariableSym = pSubGroupIdSym;
+    psubGroupVariableInfo[2].updateFunc = _UpdateSubGroupId;
+    if (pSubGroupIdSym !=  gcvNULL)
+    {
+        VIR_Symbol*         pLocalInvocationId = gcvNULL;
+
+        pLocalInvocationId = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_LOCALINVOCATIONINDEX);
+
+        if (pLocalInvocationId == gcvNULL)
+        {
+            VIR_AttributeIdList*pAttrIdLsts = VIR_Shader_GetAttributes(pShader);
+            gctUINT             attrCount = VIR_IdList_Count(pAttrIdLsts);
+            gctUINT             attrIdx;
+            gctUINT             nextAttrLlSlot = 0;
+            VIR_VirRegId        outRegId;
+            VIR_SymId           outRegSymId;
+
+            for (attrIdx = 0; attrIdx < attrCount; attrIdx ++)
+            {
+                VIR_SymId       attrSymId = VIR_IdList_GetId(pAttrIdLsts, attrIdx);
+                VIR_Symbol      *pAttrSym = VIR_Shader_GetSymFromId(pShader, attrSymId);
+                gctUINT         thisOutputRegCount;
+
+                if (!isSymUnused(pAttrSym) && !isSymVectorizedOut(pAttrSym))
+                {
+                    gcmASSERT(VIR_Symbol_GetFirstSlot(pAttrSym) != NOT_ASSIGNED);
+
+                    thisOutputRegCount = VIR_Symbol_GetVirIoRegCount(pShader, pAttrSym);
+                    if (nextAttrLlSlot < (VIR_Symbol_GetFirstSlot(pAttrSym) + thisOutputRegCount))
+                    {
+                        nextAttrLlSlot = VIR_Symbol_GetFirstSlot(pAttrSym) + thisOutputRegCount;
+                    }
+                }
+            }
+
+            pLocalInvocationId = VIR_Shader_AddBuiltinAttribute(pShader,
+                                                                VIR_TYPE_UINT32,
+                                                                gcvFALSE,
+                                                                VIR_NAME_LOCALINVOCATIONINDEX);
+            outRegId = VIR_Shader_NewVirRegId(pShader, 1);
+            VIR_Shader_AddSymbol(pShader,
+                                 VIR_SYM_VIRREG,
+                                 outRegId,
+                                 VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X4),
+                                 VIR_STORAGE_UNKNOWN,
+                                 &outRegSymId);
+
+            VIR_Symbol_SetVariableVregIndex(pLocalInvocationId, outRegId);
+            VIR_Symbol_SetVregVariable(VIR_Shader_GetSymFromId(pShader, outRegSymId), pLocalInvocationId);
+            VIR_Symbol_SetIndexRange(pLocalInvocationId, outRegId + 1);
+            VIR_Symbol_SetIndexRange(VIR_Shader_GetSymFromId(pShader, outRegSymId), outRegId + 1);
+            VIR_Symbol_SetFirstSlot(pLocalInvocationId, nextAttrLlSlot);
+        }
+
+        psubGroupVariableInfo[2].pPrivateData = pLocalInvocationId;
+    }
+
+    psubGroupVariableInfo[3].pVariableSym = pSubGroupInvocationIdSym;
+    psubGroupVariableInfo[3].updateFunc = _UpdateSubGroupInvocationId;
+
+    return errCode;
+}
+
+static VSC_ErrCode
+_UpdateSubGroup(
+    VSC_SH_PASS_WORKER*     pPassWorker,
+    UPDATE_SUBGROUP_VARIABLE_INFO* psubGroupVariableInfo,
+    gctBOOL*                pChanged
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_DEF_USAGE_INFO*     pDuInfo = pPassWorker->pDuInfo;
+    VIR_Shader*             pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_FuncIterator        func_iter;
+    VIR_FunctionNode*       pFunc_node;
+    gctBOOL                 bChanged = gcvFALSE;
+    gctUINT                 i;
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for (pFunc_node = VIR_FuncIterator_First(&func_iter);
+         pFunc_node != gcvNULL;
+         pFunc_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_InstIterator        inst_iter;
+        VIR_Function*           pFunc = pFunc_node->function;
+        VIR_Instruction*        pInst = gcvNULL;
+
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(pFunc));
+        for (pInst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             pInst != gcvNULL;
+             pInst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            VIR_OpCode          opCode = VIR_Inst_GetOpcode(pInst);
+            VIR_Operand*        pOpnd;
+            VIR_SrcOperand_Iterator srcOpndIter;
+
+            if (VIR_OPCODE_isNonUniform(opCode))
+            {
+                /* Always return TRUE for NONUNIFORM_ELECT. */
+                if (opCode == VIR_OP_NONUNIFORM_ELECT)
+                {
+                    VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
+                    VIR_Inst_SetSrcNum(pInst, 1);
+                    VIR_Function_NewOperand(pFunc, &pOpnd);
+                    VIR_Operand_SetImmediateBoolean(pOpnd, 1);
+                    VIR_Inst_SetSource(pInst, 0, pOpnd);
+
+                    bChanged = gcvTRUE;
+                    continue;
+                }
+            }
+
+            /* Find if any operand using subGroup variables and replace them */
+            VIR_SrcOperand_Iterator_Init(pInst, &srcOpndIter);
+
+            for (pOpnd = VIR_SrcOperand_Iterator_First(&srcOpndIter);
+                 pOpnd != gcvNULL;
+                 pOpnd = VIR_SrcOperand_Iterator_Next(&srcOpndIter))
+            {
+                if (!VIR_Operand_isSymbol(pOpnd))
+                {
+                    continue;
+                }
+
+                for (i = 0; i < 4; i++)
+                {
+                    if (psubGroupVariableInfo[i].pVariableSym != gcvNULL && VIR_Operand_GetSymbol(pOpnd) == psubGroupVariableInfo[i].pVariableSym)
+                    {
+                        (psubGroupVariableInfo[i].updateFunc)(pDuInfo,
+                                                             pShader,
+                                                             pInst,
+                                                             pOpnd,
+                                                             VIR_Operand_GetSymbol(pOpnd),
+                                                             psubGroupVariableInfo[i].pPrivateData);
+                        bChanged = gcvTRUE;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /* Mark all variables as unused. */
+    for (i = 0; i < 4; i++)
+    {
+        if (psubGroupVariableInfo[i].pVariableSym != gcvNULL)
+        {
+            VIR_Symbol_SetFlag(psubGroupVariableInfo[i].pVariableSym, VIR_SYMFLAG_UNUSED);
+        }
+    }
+
+    if (pChanged)
+    {
+        *pChanged = bChanged;
+    }
+
+    return errCode;
+}
+
+static VSC_ErrCode
+_UpdateSubGroupOperations(
+    VSC_SH_PASS_WORKER*     pPassWorker,
+    gctBOOL*                pChanged
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    gctBOOL                 bChanged = gcvFALSE;
+    UPDATE_SUBGROUP_VARIABLE_INFO subGroupVariableInfo[4];
+
+    gcoOS_ZeroMemory(subGroupVariableInfo, gcmSIZEOF(UPDATE_SUBGROUP_VARIABLE_INFO) * 4);
+
+    /* I: Collect subgroup variables. */
+    errCode = _CollectSubGroupVariables(pPassWorker, subGroupVariableInfo);
+    ON_ERROR(errCode, "Collect subgroup variables.");
+
+    /* II: Update subgroup variables/instructions. */
+    errCode = _UpdateSubGroup(pPassWorker, subGroupVariableInfo, &bChanged);
+    ON_ERROR(errCode, "Update subgroup.");
+
+    if (pChanged)
+    {
+        *pChanged = bChanged;
+    }
+
+OnError:
+    return errCode;
+}
+
 DEF_QUERY_PASS_PROP(vscVIR_PreprocessMCShader)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_MC;
@@ -10234,6 +10606,12 @@ VSC_ErrCode vscVIR_PreprocessMCShader(VSC_SH_PASS_WORKER* pPassWorker)
         VIR_Shader_IsCL(pShader))
     {
         _UpdateWorkGroupIdForMultiGPU(pPassWorker, &bChanged);
+    }
+
+    /* Handle subgroup-related variables/instructions. */
+    if (VIR_Shader_IsVulkan(pShader) && VIR_Shader_IsGlCompute(pShader))
+    {
+        _UpdateSubGroupOperations(pPassWorker, &bChanged);
     }
 
     if (bChanged &&

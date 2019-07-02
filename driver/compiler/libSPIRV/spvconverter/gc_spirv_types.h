@@ -23,7 +23,7 @@
 
 /* max number of opcode define in spirv.h, it change, so anytime change spirv.h,
    make sure change this accordingly*/
-#define SPV_MAX_OPCODE_NUM                          333
+#define SPV_MAX_OPCODE_NUM                          334
 
 /* switch could have a lot of cases. */
 /*
@@ -64,6 +64,7 @@ enum SpvOpcodeClass {
     OpClassGroup,
     OpClassDeviceSideEnqueue,
     OpClassPipe,
+    OpClassNonUniform,
 
     OpClassCount,
     OpClassMissing

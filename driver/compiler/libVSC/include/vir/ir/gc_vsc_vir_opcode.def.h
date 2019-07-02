@@ -1432,6 +1432,10 @@
                                                                *                         <src1.x, -I(src1.y)>
                                                                */
 
+    /* Non uniform instructions. */
+    VIR_OPINFO(NONUNIFORM_ELECT, 0, HasDest, 1, NM), /* Result is true only in the active invocation with the lowest id in the group. */
+
+    /* Max Opcode. */
     VIR_OPINFO(MAXOPCODE, 0, NoDest, 0, NU),
 
 #undef HasDest

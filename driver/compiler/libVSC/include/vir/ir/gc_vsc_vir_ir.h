@@ -534,6 +534,9 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
      (Opcode) == VIR_OP_IMADLO0         ||      \
      (Opcode) == VIR_OP_IMADLO1)
 
+#define VIR_OPCODE_isNonUniform(Opcode)         \
+    ((Opcode) == VIR_OP_NONUNIFORM_ELECT)
+
 #define VIR_SymTable_MaxValidId(SymTable)   BT_GET_MAX_VALID_ID(SymTable)
 
 #define VIR_Function_GetLastInstId(Func)    ((Func)->_lastInstId)

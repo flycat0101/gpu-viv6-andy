@@ -3456,4 +3456,15 @@
         { "Target", "Decoration", "See Decoration"},
         { gcvNULL },
         VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+    },
+
+    /* SpvOpGroupNonUniformElect = 333 */
+    {
+        gcvTRUE, gcvTRUE, gcvTRUE, OpClassNonUniform,
+        __SpvEmitInstructions,
+        1,
+        { OperandScope },
+        { "Scope" },
+        { gcvNULL },
+        VIR_OP_NONUNIFORM_ELECT, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     }
