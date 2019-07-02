@@ -579,5 +579,6 @@ VSC_ErrCode __SpvEmitReturnValue(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitNop(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitIntrisicFunction(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitUnsupported(gcSPV spv, VIR_Shader * virShader);
+VSC_ErrCode __SpvEmitLoopMerge(gcSPV spv, VIR_Shader * virShader);
 
 #endif /* __gc_spirv_to_vir_h_ */

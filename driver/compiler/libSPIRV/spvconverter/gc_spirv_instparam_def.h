@@ -2544,9 +2544,9 @@
     /* SpvOpLoopMerge = 246 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassFlowControl,
-        __SpvEmitNop,
+        __SpvEmitLoopMerge,
         3,
-        { OperandId, OperandId, OperandLoop },
+        { OperandId, OperandId, OperandVariableIds },
         { "'Merge Block'", "Continue Target", "", },
         { gcvNULL },
         VIR_OP_NOP, VIR_TYPE_UNKNOWN, VIR_MOD_NONE

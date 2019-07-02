@@ -10850,6 +10850,11 @@ VSC_ErrCode __SpvEmitUnsupported(gcSPV spv, VIR_Shader * virShader)
     return VSC_ERR_NONE;
 }
 
+VSC_ErrCode __SpvEmitLoopMerge(gcSPV spv, VIR_Shader * virShader)
+{
+    return VSC_ERR_NONE;
+}
+
 VSC_ErrCode __SpvEmitName(gcSPV spv, VIR_Shader * virShader)
 {
     gctUINT i = 0;
