@@ -2459,7 +2459,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertAvgPool2Conv(vx_graph grap
                     )
                     continue;
 
-                if(TENSOR_SIZE_INDEX(input, 2)  > 1024)
+                if(TENSOR_SIZE_INDEX(input, 2) * TENSOR_SIZE_INDEX(input, 2) > 100000)
                     continue;
 
                 if(weight_dims[0]>3 || weight_dims[1] > 3)
