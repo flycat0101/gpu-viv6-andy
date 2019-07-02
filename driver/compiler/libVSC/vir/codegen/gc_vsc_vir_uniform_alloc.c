@@ -2806,9 +2806,15 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
         {
             VIR_Symbol*     pSeparateSamplerSym = VIR_Symbol_GetSeparateSampler(pShader, sym);
             VIR_Uniform*    pSeparateSamplerUniform = VIR_Symbol_GetUniformPointer(pShader, pSeparateSamplerSym);
+            gctINT          index = VIR_Symbol_GetSamplerIdxRange(sym);
+
+            if (index < 0)
+            {
+                gcmASSERT(gcvFALSE);
+            }
 
             symUniform->swizzle  = pSeparateSamplerUniform->swizzle;
-            symUniform->physical = pSeparateSamplerUniform->physical;
+            symUniform->physical = pSeparateSamplerUniform->physical + index;
             symUniform->address  = pSeparateSamplerUniform->address;
 
             continue;
