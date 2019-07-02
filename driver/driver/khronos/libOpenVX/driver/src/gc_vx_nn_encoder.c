@@ -6595,6 +6595,8 @@ void fillinKernelBufferHuffman(
         wb->slice_array[index].kernel_stream_full_cache_size = wb->slice_array[index].kernel_align_stream_size;
     }
 
+    wb->slice_array[index].kernel_max_stream_size_percore = maxKernelStreamSizePerCore;
+
 exit:
     if (reorderStream)
         vxFree(reorderStream);
@@ -8735,6 +8737,8 @@ void fillinKernelBufferV8Huffman(
         /*if did't fix full cache interleave fix, full cache size also need use align size*/
         wb->slice_array[index].kernel_stream_full_cache_size = wb->slice_array[index].kernel_align_stream_size;
     }
+
+    wb->slice_array[index].kernel_max_stream_size_percore = maxKernelStreamSizePerCore;
 
 exit:
     if (coefSum)
@@ -11402,6 +11406,8 @@ void fillinKernelBuffer(
         wb->slice_array[index].kernel_stream_full_cache_size = wb->slice_array[index].kernel_align_stream_size;
     }
 
+    wb->slice_array[index].kernel_max_stream_size_percore = maxKernelStreamSizePerCore;
+
     if (z_offset > 0)
         wb->orgZOffsetValue = z_offset;
     else if (outputSize > 0)
@@ -11758,6 +11764,8 @@ void fillinDepthWiseKernelBuffer(
         /*if did't fix full cache interleave fix, full cache size also need use align size*/
         wb->slice_array[index].kernel_stream_full_cache_size = wb->slice_array[index].kernel_align_stream_size;
     }
+
+    wb->slice_array[index].kernel_max_stream_size_percore = maxKernelStreamSizePerCore;
 
     if (z_offset > 0)
         wb->orgZOffsetValue = z_offset;
@@ -12644,6 +12652,8 @@ void fillinKernelBufferBalance(
         /*if did't fix full cache interleave fix, full cache size also need use align size*/
         wb->slice_array[index].kernel_stream_full_cache_size = wb->slice_array[index].kernel_align_stream_size;
     }
+
+    wb->slice_array[index].kernel_max_stream_size_percore = maxKernelStreamSizePerCore;
 
     if (z_offset > 0)
         wb->orgZOffsetValue = z_offset;

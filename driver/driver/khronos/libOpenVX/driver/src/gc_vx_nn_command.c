@@ -684,6 +684,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
                 info->vx_nn_general_cmd_info.kernelCacheStartAddress = 0;
                 info->vx_nn_general_cmd_info.kernelCacheEndAddress = 0;
             }
+
+            _checkSramOverflow(context, weights_biases, info, dataUnitByte);
         }
         else
         {
