@@ -2525,7 +2525,8 @@ const GLubyte * GL_APIENTRY __glim_GetString(__GLcontext *gc, GLenum name)
         return (GLubyte*)gc->constants.version;
     case GL_SHADING_LANGUAGE_VERSION:
         return (GLubyte*)gc->constants.GLSLVersion;
-
+    case GL_EXTENSIONS:
+        return (GLubyte*)gc->constants.extensions;
     default:
         __GL_ERROR_RET_VAL(GL_INVALID_ENUM, gcvNULL);
     }
