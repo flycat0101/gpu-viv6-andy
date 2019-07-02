@@ -277,7 +277,7 @@ vx_status vxoFCOperation_Initialize(
     vx_uint32 width = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
     vx_uint32 height = (dims > 1) ? TENSOR_VIEW_SIZE_INDEX(inputs, 1) : 1;
     vx_uint32 depth = (dims > 2) ? TENSOR_VIEW_SIZE_INDEX(inputs, 2) : 1;
-    vx_uint32 inputDims = width * height * depth;
+    vx_uint32 inputDims = dims > 2 ? width * height * depth : width;
     vxnne_operation_target_e target = VXNNE_OPERATION_TARGET_NONE;
     vx_weights_biases_parameter wb = VX_NULL;
     vx_weights_biases_parameter_optimizations_t wb_opt;
@@ -320,7 +320,7 @@ vx_status vxoFCOperation_Initialize(
     {
         target = VXNNE_OPERATION_TARGET_TP;
     }
-    else if (enable_shader && vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SHADER) && 0)
+    else if (enable_shader && vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SHADER))
     {
         target = VXNNE_OPERATION_TARGET_SH;
     }
@@ -1156,6 +1156,8 @@ vx_status vxoFCOperationSH_Initialize(
     {
         activation = VX_NN_ACTIVATION_RELU;
     }
+
+    if (TENSOR_DIM_NUM(inputs) < 3) batch_count = 1;
 
     shaderExecutable = vxnneGetFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_FULLYCONNECTED, &node->kernelAttributes.borderMode, inputs, weights, biases, activation, outputs);
     if (!shaderExecutable)
