@@ -3348,11 +3348,27 @@ VX_PRIVATE_API vx_status vxoGraphBinary_Initialize(
 {
     vx_binary_save binarySave = VX_NULL;
     vx_status status = VX_SUCCESS;
+    vx_char *networkBinaryPath = VX_NULL;
     gcmHEADER_ARG("graph=%p, fileName=%s", graph, fileName);
     if (graph == VX_NULL)
     {
         vxError("%s[%d]: graph is NULL\n", __FUNCTION__, __LINE__);
         vxmONERROR(VX_ERROR_INVALID_VALUE);
+    }
+
+    /* get save binary file path */
+    gcoOS_GetEnv(gcvNULL, "VIV_VX_SAVE_NETWORK_BINARY_PATH", &networkBinaryPath);
+    /* sanity check for networkBinaryPath */
+    if (networkBinaryPath != VX_NULL)
+    {
+        gctSTRING special = VX_NULL;
+        gcoOS_StrFindReverse(networkBinaryPath, '.', &special);
+        if (special == VX_NULL)
+        {
+            networkBinaryPath = VX_NULL;
+            vxError("please export VIV_VX_SAVE_NETWORK_BINARY_PATH= has . suffix filename path\n");
+            vxError("genereate network binary graph default filename\n");
+        }
     }
 
     if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(vx_binary_save_s), (gctPOINTER*)&graph->binarySave)))
@@ -3371,28 +3387,35 @@ VX_PRIVATE_API vx_status vxoGraphBinary_Initialize(
         /* save graph binary for VIPlite*/
         char dumpFile[BINARY_FILE_NAME_MAX_SIZE];
         vx_uint32 offset = 0;
-        if (graph->graphID == 0)
+        if (networkBinaryPath == VX_NULL)
         {
-            gcmVERIFY_OK(gcoOS_PrintStrSafe(
-                                            dumpFile,
-                                            gcmSIZEOF(dumpFile),
-                                            &offset,
-                                            "network_binary_pid-%d_tid-%d.nb",
-                                            gcmALL_TO_UINT32(gcoOS_GetCurrentProcessID()),
-                                            gcmALL_TO_UINT32(gcoOS_GetCurrentThreadID())
-                                            ));
+            if (graph->graphID == 0)
+            {
+                gcmVERIFY_OK(gcoOS_PrintStrSafe(
+                                                dumpFile,
+                                                gcmSIZEOF(dumpFile),
+                                                &offset,
+                                                "network_binary_pid-%d_tid-%d.nb",
+                                                gcmALL_TO_UINT32(gcoOS_GetCurrentProcessID()),
+                                                gcmALL_TO_UINT32(gcoOS_GetCurrentThreadID())
+                                                ));
+            }
+            else
+            {
+                gcmVERIFY_OK(gcoOS_PrintStrSafe(
+                                                dumpFile,
+                                                gcmSIZEOF(dumpFile),
+                                                &offset,
+                                                "network_binary_pid-%d_tid-%d_%d.nb",
+                                                gcmALL_TO_UINT32(gcoOS_GetCurrentProcessID()),
+                                                gcmALL_TO_UINT32(gcoOS_GetCurrentThreadID()),
+                                                graph->graphID
+                                                ));
+            }
         }
         else
         {
-            gcmVERIFY_OK(gcoOS_PrintStrSafe(
-                                            dumpFile,
-                                            gcmSIZEOF(dumpFile),
-                                            &offset,
-                                            "network_binary_pid-%d_tid-%d_%d.nb",
-                                            gcmALL_TO_UINT32(gcoOS_GetCurrentProcessID()),
-                                            gcmALL_TO_UINT32(gcoOS_GetCurrentThreadID()),
-                                            graph->graphID
-                                            ));
+            gcoOS_StrCopySafe(dumpFile, BINARY_FILE_NAME_MAX_SIZE, networkBinaryPath);
         }
 
         /* Open tga file for write. */
@@ -3412,6 +3435,7 @@ VX_PRIVATE_API vx_status vxoGraphBinary_Initialize(
         vxError("%s[%d]: binary Save File is NLL\n", __FUNCTION__, __LINE__);
         vxmONERROR(VX_FAILURE);
     }
+    vxInfo("network binary graph file has been opened\n");
 
 OnError:
     gcmFOOTER_ARG("%d", status);
@@ -3669,6 +3693,8 @@ VX_PRIVATE_API vx_status vxoGraphBinary_unInitial(
 
     gcmVERIFY_OK(gcoOS_Free(gcvNULL, (gctPOINTER)graph->binarySave));
     graph->binarySave = VX_NULL;
+
+    vxInfo("network binary graph file has been closed\n");
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
