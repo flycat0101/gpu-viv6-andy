@@ -9112,9 +9112,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
     vx_bool   enable_tf_quantize          = vx_false_e;
     vx_bool   shExe_flag                  = vx_false_e;
     vx_bool   enable_tensorABS_SHExe      = vx_false_e;
-    vx_uint32 input_width   = TENSOR_SIZE_INDEX(inputs, 0);
-    vx_uint32 input_height  = TENSOR_SIZE_INDEX(inputs, 1);
-    vx_uint32 img2DSize = input_width * input_height;
+    vx_bool   enable_tensorTR_SHExe       = vx_false_e;
+    vx_uint32 input_width                 = TENSOR_SIZE_INDEX(inputs, 0);
+    vx_uint32 input_height                = TENSOR_SIZE_INDEX(inputs, 1);
+    vx_uint32 img2DSize                   = input_width * input_height;
     vxnne_activation_layer  activationLayer = gcvNULL;
 
     /* destroy the existing layer */
@@ -9148,6 +9149,15 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
         support_dataType[2] = (vx_bool)((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
 
         enable_tensorABS_SHExe = (vx_bool)(inputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32 && func_v == VX_NN_ACTIVATION_ABS);
+        enable_tensorTR_SHExe  = (vx_bool)(inputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32 &&
+                                           (func_v == VX_NN_ACTIVATION_SQRT  ||
+                                            func_v == VX_NN_ACTIVATION_RSQRT ||
+                                            /*func_v == VX_NN_ACTIVATION_EXP ||*/
+                                            /*func_v == VX_NN_ACTIVATION_LOG ||*/
+                                            /*func_v == VX_NN_ACTIVATION_SIN ||*/
+                                            func_v == VX_NN_ACTIVATION_SOFTRELU ||
+                                            func_v == VX_NN_ACTIVATION_LOGISTIC ||
+                                            func_v == VX_NN_ACTIVATION_HYPERBOLIC_TAN));
     }
     else
     {
@@ -9157,23 +9167,15 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
     }
 
     enable_tf_quantize = (vx_bool)((func_v == VX_NN_ACTIVATION_RELU && support_dataType[2]) ||
-                                    (func_v == VX_NN_ACTIVATION_LOGISTIC && support_dataType[2]) ||
-                                    (func_v == VX_NN_ACTIVATION_HYPERBOLIC_TAN && support_dataType[2]) ||
-                                    (func_v == VX_NN_ACTIVATION_SQRT && support_dataType[2]) ||
-                                    (func_v == VX_NN_ACTIVATION_RSQRT && support_dataType[2]) ||
-                                    (func_v == VX_NN_ACTIVATION_SOFTRELU && support_dataType[2]) ||
                                     (func_v == VX_NN_ACTIVATION_RELU1 && support_dataType[2]) ||
                                     (func_v == VX_NN_ACTIVATION_BRELU && support_dataType[2]) ||
                                     (func_v == VX_NN_ACTIVATION_RELU6 && support_dataType[2]));
 
     shExe_flag = (vx_bool)((func_v == VX_NN_ACTIVATION_RELU && support_dataType[0]) ||
-                           (func_v == VX_NN_ACTIVATION_LOGISTIC && support_dataType[1]) ||
-                           (func_v == VX_NN_ACTIVATION_HYPERBOLIC_TAN && support_dataType[1]) ||
-                           (func_v == VX_NN_ACTIVATION_SQRT && support_dataType[1]) ||
-                           (func_v == VX_NN_ACTIVATION_RSQRT && support_dataType[1]) ||
                            (func_v == VX_NN_ACTIVATION_RELU1 && support_dataType[1]) ||
                            (func_v == VX_NN_ACTIVATION_RELU6 && support_dataType[1]) ||
                            enable_tensorABS_SHExe ||
+                           enable_tensorTR_SHExe  ||
                            enable_tf_quantize);
 
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_ACTIVATION) &&
@@ -9266,6 +9268,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
         {
             if (enable_tensorABS_SHExe)
                 shaderExecutable = vxnneGetTensorAbsShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_ABS, &node->kernelAttributes.borderMode, inputs, outputs);
+            else if (enable_tensorTR_SHExe)
+                shaderExecutable = vxnneGetTensorTRShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSCENDENTAL, &node->kernelAttributes.borderMode, inputs, minVal, maxVal, func_v, outputs);
             else if (enable_tf_quantize)
                 shaderExecutable = vxnneGetActivation_UInt8ShaderExecutable(node->base.context, VXNNE_KERNEL_ACTIVATION_UINT8, &node->kernelAttributes.borderMode, func_v, inputs, minVal, maxVal, outputs);
             else

@@ -322,6 +322,7 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_LSTMUNIT_LAYER_NORM_STATE_OUT = 63,
     VXNNE_KERNEL_TENSOR_2D_ADD = 64,
     VXNNE_KERNEL_TENSOR_ABS = 65,
+    VXNNE_KERNEL_TENSOR_TRANSCENDENTAL = 66,
     VXNNE_KERNEL_FIXED_COUNT,
 };
 
@@ -3481,6 +3482,16 @@ vxnne_shader_executable vxnneGetTensorAbsShaderExecutable(
     vx_border_mode_t        *borderMode,
     vx_tensor               input,
     vx_tensor               output);
+
+vxnne_shader_executable vxnneGetTensorTRShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               inputs,
+    vx_float32              a_val,
+    vx_float32              b_val,
+    vx_enum                 funcType,
+    vx_tensor               outputs);
 
 vx_status vxnneWrapUserNode(
     vx_context context,
