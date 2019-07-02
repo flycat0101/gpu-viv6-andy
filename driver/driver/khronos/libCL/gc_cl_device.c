@@ -47,24 +47,33 @@ static struct _cl_device_id _device =
                                 /* Device Info      */
 };
 
-static char *extension_w_atomic = "cl_khr_byte_addressable_store "
-                                  "cl_khr_global_int32_base_atomics "
-                                  "cl_khr_global_int32_extended_atomics "
-                                  "cl_khr_local_int32_base_atomics "
+#define _atomic_extensions        "cl_khr_global_int32_base_atomics " \
+                                  "cl_khr_global_int32_extended_atomics " \
+                                  "cl_khr_local_int32_base_atomics " \
                                   "cl_khr_local_int32_extended_atomics "
+
+static char *extension_w_atomic = "cl_khr_byte_addressable_store "
                                   "cl_khr_gl_sharing "
-                                  "cl_khr_fp16 ";
+                                  _atomic_extensions;
+
+static char *extension_w_atomic_fp16 = "cl_khr_byte_addressable_store "
+                                       "cl_khr_gl_sharing "
+                                       "cl_khr_fp16 "
+                                       _atomic_extensions;
 
 static char *extension_without_atomic = "cl_khr_byte_addressable_store "
-                                        "cl_khr_gl_sharing "
-                                        "cl_khr_fp16 ";
+                                        "cl_khr_gl_sharing ";
+
+static char *extension_without_atomic_w_fp16 = "cl_khr_byte_addressable_store "
+                                               "cl_khr_gl_sharing "
+                                               "cl_khr_fp16 ";
 
 static char *extension_w_atomic_wo_glsharing = "cl_khr_byte_addressable_store "
-                                  "cl_khr_global_int32_base_atomics "
-                                  "cl_khr_global_int32_extended_atomics "
-                                  "cl_khr_local_int32_base_atomics "
-                                  "cl_khr_local_int32_extended_atomics "
-                                  "cl_khr_fp16 ";
+                                               _atomic_extensions;
+
+static char *extension_w_atomic_fp16_wo_glsharing = "cl_khr_byte_addressable_store "
+                                                    "cl_khr_fp16 "
+                                                    _atomic_extensions;
 
 cl_device_id clgDefaultDevice = gcvNULL;
 clsDeviceId_PTR clgDevices = gcvNULL;
@@ -199,6 +208,7 @@ clGetDeviceIDs(
                 gctUINT offset;
                 gctSTRING productName = gcvNULL;
                 gctBOOL skipCLGLSharingExtension = gcvFALSE;
+                gctBOOL skipCLKhrFp16Extension = gcvFALSE;
                 const gctSTRING epProfile = "EMBEDDED_PROFILE";
                 gctBOOL chipEnableEP = gcvFALSE;
                 chipModel = clgDefaultDevice->deviceInfo.chipModel;
@@ -224,17 +234,27 @@ clGetDeviceIDs(
                     skipCLGLSharingExtension = gcvTRUE;
                 }
 
+                if(patchId == gcvPATCH_OCLCTS)
+                {
+                    skipCLKhrFp16Extension = gcvTRUE;
+                }
+
 #if defined (__QNXNTO__)
                 skipCLGLSharingExtension = gcvTRUE;
 #endif
                 clgDevices[i].gpuId = i;
                 if (clgDefaultDevice->deviceInfo.atomicSupport)
                 {
-                    clgDevices[i].extensions = skipCLGLSharingExtension ? extension_w_atomic_wo_glsharing : extension_w_atomic;
+                    clgDevices[i].extensions = skipCLGLSharingExtension ?
+                                                  (skipCLKhrFp16Extension ? extension_w_atomic_wo_glsharing
+                                                      : extension_w_atomic_fp16_wo_glsharing)
+                                                : (skipCLKhrFp16Extension ? extension_w_atomic
+                                                      : extension_w_atomic_fp16);
                 }
                 else
                 {
-                    clgDevices[i].extensions = extension_without_atomic;
+                    clgDevices[i].extensions = skipCLKhrFp16Extension ? extension_without_atomic
+                                                                      : extension_without_atomic_w_fp16;
                 }
 
                 gcoHAL_GetProductName(gcvNULL, &productName, gcvNULL);
