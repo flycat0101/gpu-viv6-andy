@@ -199,6 +199,7 @@ typedef struct _gcsNN_UNIFIED_FEATURE
     gctUINT  coefDeltaCordOverFlowZRL8BitFix : 1;
     gctUINT  lowEfficiencyOfIDWriteImgBufFix : 1;
     gctUINT  xyOffsetLimitationFix : 1;
+    gctUINT  kernelPerCoreLTOneThirdCoefFix : 1;
 } gcsNN_UNIFIED_FEATURE;
 
 /* Features are derived from above ones */

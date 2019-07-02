@@ -204,7 +204,7 @@ static void _calcArchModelCacheMode(vx_context context, vx_arch_perf perf, vx_in
 
 
 static vx_int8 gOrigShowType = -1;
-static const vx_char *archModelVersion = "0.138";
+static const vx_char *archModelVersion = "ARCHCTS@211217";
 static const vx_char *SWTilingVersion = "0.120-";
 vx_status showArchPerformance(
     vx_context context,
@@ -423,6 +423,9 @@ vx_status showArchPerformance(
         vxInfo("NumUsedNNCores: %d\nConvOutFIFODepth: %d\n\n", perf->info.nnCores, perf->info.convOutFifoDepth);
     }
 
+        vxInfo("KERNEL_PER_CORE_LESS_THAN_THIRD_COEF_BUFF_DEPTH_FIX: %d\n",
+            context->nnConfig.unifiedFeature.kernelPerCoreLTOneThirdCoefFix
+            );
 
     if (perf->opType == VXNNE_OPERATOR_CONVOLUTION
         || perf->opType == VXNNE_OPERATOR_DEPTH_WISE_CONV
@@ -636,16 +639,34 @@ static vx_float64 _calcUnalignedBW(vx_float64 size, vx_float64 ppc)
     return ret;
 }
 
-static vx_uint32 _calcNumOfKernel(vx_uint32 tile_x, vx_uint32 tile_y, vx_uint32 z, vx_uint32 accu_buf_depth, vx_uint32 cores, vx_uint32 interleave_mode, vx_uint32 zdp, vx_uint32 kx, vx_uint32 ky, vx_bool isV8)
+static vx_uint32 _calcNumOfKernel(vx_uint32 tile_x, vx_uint32 tile_y, vx_uint32 z, vx_uint32 accu_buf_depth, vx_uint32 cores, vx_uint32 interleave_mode, vx_uint32 zdp, vx_uint32 kx, vx_uint32 ky, vx_bool isV8, vx_uint32 data_size, vx_uint32 lanes_per_conv, vx_bool isDepthWise, vx_bool kernel_per_core_lt_one_third_coef_fix, vx_uint32 pooling_stride)
 {
     vx_uint32 numKernel;
 
     numKernel = (vx_uint32)(accu_buf_depth * interleave_mode / tile_y);
-    numKernel = gcmMIN(127, (vx_uint32)gcmMIN(numKernel, ceilf((vx_float32)z / cores)));
 
+    if (isV8)
+    {
+        if ((kx == 1) && (ky == 1))
+        {
+            numKernel = (vx_uint32)(1.0f * accu_buf_depth / ceilf(1.0f * tile_y / interleave_mode));
+        }
+        else
+        {
+            vx_float32 tileVecNum = ceilf(1.0f * tile_x * tile_y / pooling_stride / lanes_per_conv);
+            numKernel = (vx_uint32)((vx_float32)accu_buf_depth / (tileVecNum * pooling_stride));
+        }
+    }
+
+    numKernel = gcmMIN(127, (vx_uint32)gcmMIN(numKernel, ceilf((vx_float32)z / cores)));
     if ((kx == 1) && (ky == 1) && (zdp != 1) && !isV8)
     {
         numKernel = (vx_uint32)(gcmMIN(numKernel, accu_buf_depth / 3));
+    }
+    if (isV8 && !kernel_per_core_lt_one_third_coef_fix)
+    {
+#define ZDP_LOOP_COUNT 3
+        numKernel = (vx_uint32)(gcmMIN(numKernel, (vx_uint32)((2 * accu_buf_depth * ZDP_LOOP_COUNT / 3) / 3)));
     }
     return (vx_uint32)numKernel;
 }
@@ -2361,6 +2382,7 @@ vx_status calculateArchPerf(
     vx_uint32 vipSramAccUnitSizeInByte;
     vx_uint32 zdp = context->nnConfig.derivedFeature.nnZDP;
     vx_uint32 equivalentVipSramWidthInByte = context->nnConfig.fixedFeature.equivalentVipsramWidthInByte;
+    vx_bool kernelPerCoreLTOneThirdCoefFix = context->nnConfig.unifiedFeature.kernelPerCoreLTOneThirdCoefFix ? vx_true_e : vx_false_e;
 #ifdef USE_LIB_NN_ARCH_PERF
     APM_OUT_BW_T       outBandWidth = {0};
 #endif
@@ -2640,7 +2662,7 @@ vx_status calculateArchPerf(
                                     vx_uint32 vipSramInimageStride = gcmMIN((x + kernelXSize - 1), inXSize);
                                     vx_uint32 vipSramInimageSlice = vipSramInimageStride * gcmMIN((y + kernelYSize - 1), inYSize);
                                     k = _calcNumOfKernel(x, y, outZSize, adjustAccuBuffDepth, numCores, interleaveMode,
-                                        zdp, kernelXSize, kernelYSize, isV8);
+                                        zdp, kernelXSize, kernelYSize, isV8, dataSize, lanesPerConv, isDepthWise, kernelPerCoreLTOneThirdCoefFix, poolingStride);
                                     if (!context->nnConfig.unifiedFeature.coefDeltaCordOverFlowZRL8BitFix &&
                                         ((kernelXSize == 2 && kernelYSize == 2) ||
                                          (kernelXSize == 1 && kernelYSize == 2) ||
