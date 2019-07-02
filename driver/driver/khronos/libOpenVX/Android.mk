@@ -73,6 +73,7 @@ LOCAL_SRC_FILES += \
     driver/src/gc_vx_nn_extension_interface.c \
     driver/src/gc_vx_internal_node_api.c \
     driver/src/gc_vx_nn_util.c \
+	driver/src/gc_vx_nn_encoder.c \
     driver/src/gc_vx_nn_command.c \
     driver/src/gc_vx_lstm.c \
 

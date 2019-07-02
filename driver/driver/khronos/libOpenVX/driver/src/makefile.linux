@@ -94,6 +94,7 @@ OBJECTS         +=    \
                     $(OBJ_DIR)/gc_vx_nn_extension_interface.o \
                     $(OBJ_DIR)/gc_vx_internal_node_api.o \
                     $(OBJ_DIR)/gc_vx_nn_util.o \
+                    $(OBJ_DIR)/gc_vx_nn_encoder.o \
                     $(OBJ_DIR)/gc_vx_lstm.o \
                     $(OBJ_DIR)/gc_vx_nn_command.o   \
 
