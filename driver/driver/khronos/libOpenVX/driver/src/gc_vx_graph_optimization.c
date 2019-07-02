@@ -1988,10 +1988,14 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_DeleteReshape(vx_graph graph)
             vx_tensor reshapeOut = (vx_tensor)node->paramTable[node->numParameters - 1];
             vx_node pNode = nodeTable[node->parentNodes[0]];
 
+            if(pNode->merged && pNode->replacedBy != NULL)
+                pNode = pNode->replacedBy;
+
             if(vxoGraphOptimization_matchTensorInNode(pNode, reshapeIn, &index) )
             {
                 vxoGraphOptimization_updateTensorInNode(&pNode, index, reshapeOut);
                 node->merged = vx_true_e;
+                node->replacedBy = pNode;
             }
         }
     }
