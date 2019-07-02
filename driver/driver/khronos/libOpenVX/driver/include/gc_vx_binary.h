@@ -91,7 +91,8 @@ typedef enum _vx_binary_operation_target_e
     VX_BINARY_OPERATION_TYPE_TP   = 3, /* TP operation */
     VX_BINARY_OPERATION_TYPE_SW   = 4, /* CPU operation */
     VX_BINARY_OPERATION_TYPE_SC   = 5, /* Scaler operation */
-    VX_BINARY_OPERATION_TYPE_INIT   = 0xFFFF, /* global init command. added in v1.1 */
+    VX_BINARY_OPERATION_TYPE_END  = 0xFFFE, /* end of commands */
+    VX_BINARY_OPERATION_TYPE_INIT = 0xFFFF, /* global init command. added in v1.1 */
 }
 vx_binary_operation_target_e;
 
@@ -327,11 +328,15 @@ typedef struct _vx_binary_save_s
     vx_uint32                                operationCount;
     vx_uint32                                currOperationIndex;
     vx_uint32                                currOperationOffset;
+    vx_uint32                                lastOperation0ffset;
     vx_uint64                                *operationCmdPhysical;
     vx_uint32                                *operationOffset;
 
     /* init operation data info */
     vx_uint32                                initOperationCount;
+    /* end operation data info */
+    vx_uint32                                endOperationCount;
+
     /* nn operation data info */
     vx_uint32                                nnOperationCount;
     vx_uint32                                currNNOperationIndex;
@@ -567,6 +572,12 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveShaderOperation(
     gctUINT8_PTR stateBuffer,
     gctUINT stateSize,
     vx_uint32 batchIndex
+    );
+
+VX_INTERNAL_API vx_status vxoGraphBinary_SaveEndOperation(
+    vx_graph graph,
+    vx_uint8_ptr stateBuffer,
+    vx_uint32 stateSize
     );
 
 VX_INTERNAL_API vx_status vxoGraphBinary_SaveScalerOperation(

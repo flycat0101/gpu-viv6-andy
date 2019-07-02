@@ -9305,8 +9305,21 @@ OnError:
 VX_PRIVATE_API void vxoGraph_EndProcess(vx_graph graph)
 {
     vx_uint32 i, j;
+    gctUINT8 captureBuffer[VX_MAX_INITIALIZE_COMMAND_SIZE] = {0};
+    gctUINT32 actualSize = 0;
+
     gcmHEADER_ARG("graph=%p", graph);
     vxmASSERT(graph);
+
+    if (graph->binarySave)
+    {
+        gcfVX_CaptureState(captureBuffer,
+                            VX_MAX_INITIALIZE_COMMAND_SIZE,
+                            &actualSize,
+                            gcvTRUE,
+                            gcvFALSE);
+    }
+
     if (!graph->isChildGraph)
     {
         gcfVX_Flush(gcvTRUE);
@@ -9361,6 +9374,22 @@ VX_PRIVATE_API void vxoGraph_EndProcess(vx_graph graph)
                 }
             }
         }
+    }
+
+    if (graph->binarySave)
+    {
+        vx_status status = VX_SUCCESS;
+        status = gcfVX_CaptureState(gcvNULL, 0, &actualSize, gcvFALSE, gcvFALSE);
+        if (status != VX_SUCCESS)
+        {
+            vxError("fail to capture end operation for generating binary graph\n");
+        }
+        vxoGraphBinary_SaveEndOperation(graph,
+                                        (vx_uint8_ptr)captureBuffer,
+                                        (vx_uint32)actualSize);
+
+        /* close binary graph file */
+        vxoGraphBinary_ReSaveInputAndPatchTable(graph);
     }
 
 #if gcdDUMP
@@ -9619,11 +9648,6 @@ VX_PRIVATE_API vx_status vxoGraph_ProcessInternal(vx_graph graph)
     if (action != VX_ACTION_CONTINUE)
     {
         vxmONERROR(VX_ERROR_GRAPH_ABANDONED);
-    }
-
-    if (graph->binarySave != NULL)
-    {
-        vxmONERROR(vxoGraphBinary_ReSaveInputAndPatchTable(graph));
     }
 
 OnError:
