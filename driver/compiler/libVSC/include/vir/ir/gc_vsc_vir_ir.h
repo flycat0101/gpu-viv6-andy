@@ -4910,23 +4910,34 @@ typedef enum _VIR_SHADER_RESOURCE_ENTRY_FLAG
     VIR_SRE_FLAG_TREAT_TEXELBUFFER_AS_IMAGE     = 0x0002,
 } VIR_ShaderResourceEntryFlag;
 
-typedef struct _VIR_SHADER_RESOURCE_ALLOC_ENTRY
+typedef struct _VIR_SHADER_RESOURCE_ALLOC_ENTRY VIR_SHADER_RESOURCE_ALLOC_ENTRY;
+struct _VIR_SHADER_RESOURCE_ALLOC_ENTRY
 {
-    VSC_SHADER_RESOURCE_BINDING     resBinding;
+    VSC_SHADER_RESOURCE_BINDING         resBinding;
 
-    VIR_ShaderResourceEntryFlag     resFlag;
+    VIR_ShaderResourceEntryFlag         resFlag;
 
-    gctBOOL                         bUse;
+    gctBOOL                             bUse;
 
-    gctUINT                         hwRegNo;
-    gctUINT                         hwRegRange;
+    gctUINT                             hwRegNo;
+    gctUINT                             hwRegRange;
 
-    gctUINT8                        swizzle;
+    gctUINT8                            swizzle;
 
     /* For unsize resources */
-    gctUINT                         fixedSize;
-    gctUINT                         lastElementSize;
-}VIR_SHADER_RESOURCE_ALLOC_ENTRY;
+    gctUINT                             fixedSize;
+    gctUINT                             lastElementSize;
+
+    /*
+    ** According to vulkan spec:
+    **      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER descriptor set entries can also be accessed via
+    **      separate sampler and sampled image shader variables.
+    ** so for a combined image sampler, we may allocate two shader resource entries for it.
+    ** When pCombinedSampledImage is not empty, it means that these two variables exist in the same time,
+    ** then the sampler variable is saved in the main element,the sampled image variable is saved in the "combinedSampledImage".
+    */
+    VIR_SHADER_RESOURCE_ALLOC_ENTRY*    pCombinedSampledImage;
+};
 
 typedef struct _VIR_SHADER_PUSH_CONSTANT_ALLOC_ENTRY
 {

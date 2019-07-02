@@ -3966,11 +3966,10 @@ _VSC_UF_AUBO_TransformInstructionsForShaders(
 
 
 extern VIR_UniformKind _VIR_CG_ResType2UniformKind(VSC_SHADER_RESOURCE_TYPE    resType);
-extern VIR_Uniform* _VIR_CG_FindResUniform(IN VIR_Shader           *pShader,
-                                           IN VIR_UniformKind      uniformKind,
-                                           IN gctUINT              setOrOffset,
-                                           IN gctUINT              binding,
-                                           IN gctUINT              arraySize);
+extern VIR_Uniform* _VIR_CG_FindResUniform(IN VIR_Shader*                   pShader,
+                                           IN VIR_UniformKind               uniformKind,
+                                           IN VSC_SHADER_RESOURCE_BINDING*  pResBinding,
+                                           INOUT VIR_Uniform**              ppResUniform);
 
 static void _CheckPerShaderReservation(IN VSC_AllShaders           *all_shaders,
                                        IN VSC_PROGRAM_RESOURCE_LAYOUT  *pgResourceLayout,
@@ -4003,9 +4002,8 @@ static void _CheckPerShaderReservation(IN VSC_AllShaders           *all_shaders,
                     {
                         if (_VIR_CG_FindResUniform(shader,
                                                    _VIR_CG_ResType2UniformKind(resBinding.type),
-                                                   resBinding.set,
-                                                   resBinding.binding,
-                                                   resBinding.arraySize) == gcvNULL)
+                                                   &resBinding,
+                                                   gcvNULL) == 0)
                         {
                             newReservedCount = VSC_UF_AUBO_GetPerShRsvedCount(aubo, i) + resBinding.arraySize;
                             VSC_UF_AUBO_SetPerShRsvedCount(aubo, i, newReservedCount);

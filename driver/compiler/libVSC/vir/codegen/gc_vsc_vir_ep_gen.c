@@ -3683,70 +3683,6 @@ static VSC_ErrCode _AddImageSize(SHADER_PRIV_CONSTANT_ENTRY**   ppImageSize,
     return errCode;
 }
 
-static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHelper,
-                                                       PROG_VK_COMBINED_TEXTURE_SAMPLER_TABLE* pCombinedSampTexTable,
-                                                       VIR_SHADER_RESOURCE_ALLOC_ENTRY* pResAllocEntry,
-                                                       VIR_Shader* pShader,
-                                                       gctUINT stageIdx,
-                                                       SHADER_EXECUTABLE_PROFILE* pSep)
-{
-    PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY* pCombTsEntry = gcvNULL;
-    gctUINT                                   i, combTsEntryIndex;
-
-    for (i = 0; i < pCombinedSampTexTable->countOfEntries; i ++)
-    {
-        if (_CheckTwoResBindingsAreSame(&pCombinedSampTexTable->pCombTsEntries[i].combTsBinding, &pResAllocEntry->resBinding))
-        {
-            pCombTsEntry = &pCombinedSampTexTable->pCombTsEntries[i];
-            break;
-        }
-    }
-
-    if (pCombTsEntry == gcvNULL)
-    {
-        pCombTsEntry = _enlargeVkCombTsEntryRoom(pCombinedSampTexTable, 1, &combTsEntryIndex);
-        memset(pCombTsEntry, 0, sizeof(PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY));
-        pCombTsEntry->combTsEntryIndex = combTsEntryIndex;
-        memcpy(&pCombTsEntry->combTsBinding, &pResAllocEntry->resBinding, sizeof(VSC_SHADER_RESOURCE_BINDING));
-    }
-
-    if (pResAllocEntry->hwRegNo != NOT_ASSIGNED)
-    {
-        pCombTsEntry->activeStageMask |= pResAllocEntry->bUse ? (1 << stageIdx) : 0;
-        pCombTsEntry->stageBits |= VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx);
-        pCombTsEntry->hwMappings[stageIdx].samplerMapping.hwSamplerSlot = pResAllocEntry->hwRegNo;
-    }
-    else
-    {
-        pCombTsEntry->hwMappings[stageIdx].samplerMapping.hwSamplerSlot = NOT_ASSIGNED;
-    }
-
-    _SetResOpBits(pShader, &pCombTsEntry->combTsBinding, &pCombTsEntry->pResOpBits);
-
-    /* Extra samplers for VSC_LIB_LINK_TYPE_RESOURCE */
-    if (pResAllocEntry->hwRegNo != NOT_ASSIGNED)
-    {
-        _AddExtraSamplerArray(&pCombTsEntry->hwMappings[stageIdx].ppExtraSamplerArray,
-                              &pCombTsEntry->combTsBinding,
-                              pShader,
-                              pSep,
-                              gcvFALSE,
-                              gcvFALSE,
-                              -1,
-                              1,
-                              0);
-    }
-
-    /* Set textureSize/lodMinMax */
-    _AddTextureSizeAndLodMinMax(pCombTsEntry->pTextureSize[stageIdx],
-                                pCombTsEntry->pLodMinMax[stageIdx],
-                                pCombTsEntry->pLevelsSamples[stageIdx],
-                                &pCombTsEntry->combTsBinding,
-                                pSep);
-
-    return VSC_ERR_NONE;
-}
-
 static PROG_VK_SEPARATED_SAMPLER_TABLE_ENTRY* _enlargeVkSeparatedSamplerEntryRoom(PROG_VK_SEPARATED_SAMPLER_TABLE* pSeparatedSamplerTable,
                                                                                   gctUINT enlargeCount,
                                                                                   gctUINT* pStartEntryIdx)
@@ -3781,6 +3717,7 @@ static PROG_VK_SEPARATED_SAMPLER_TABLE_ENTRY* _enlargeVkSeparatedSamplerEntryRoo
 }
 
 static VSC_ErrCode _AddVkSeparatedSamplerEntryToSeparatedSamplerTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHelper,
+                                                                           PROG_VK_RESOURCE_SET* pResSet,
                                                                            PROG_VK_SEPARATED_SAMPLER_TABLE* pSeparatedSamplerTable,
                                                                            VIR_SHADER_RESOURCE_ALLOC_ENTRY* pResAllocEntry,
                                                                            VIR_Shader* pShader,
@@ -3859,6 +3796,7 @@ static PROG_VK_SEPARATED_TEXTURE_TABLE_ENTRY* _enlargeVkSeparatedTexEntryRoom(PR
 }
 
 static VSC_ErrCode _AddVkSeparatedTexEntryToSeparatedTexTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHelper,
+                                                                   PROG_VK_RESOURCE_SET* pResSet,
                                                                    PROG_VK_SEPARATED_TEXTURE_TABLE* pSeparatedTexTable,
                                                                    VIR_SHADER_RESOURCE_ALLOC_ENTRY* pResAllocEntry,
                                                                    VIR_Shader* pShader,
@@ -4002,6 +3940,7 @@ static PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY* _enlargeVkUniformTexBufferEntry
 }
 
 static VSC_ErrCode _AddVkUtbEntryToUniformTexBufTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHelper,
+                                                           PROG_VK_RESOURCE_SET* pResSet,
                                                            PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE* pUtbTable,
                                                            VIR_SHADER_RESOURCE_ALLOC_ENTRY* pResAllocEntry,
                                                            VIR_Shader* pShader,
@@ -4120,6 +4059,7 @@ static PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY* _enlargeInputAttachmentEntryRoom(PR
 }
 
 static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHelper,
+                                                   PROG_VK_RESOURCE_SET* pResSet,
                                                    PROG_VK_INPUT_ATTACHMENT_TABLE* pIaTable,
                                                    VIR_SHADER_RESOURCE_ALLOC_ENTRY* pResAllocEntry,
                                                    VIR_Shader* pShader,
@@ -4261,6 +4201,7 @@ static PROG_VK_STORAGE_TABLE_ENTRY* _enlargeVkStorageEntryRoom(PROG_VK_STORAGE_T
 }
 
 static VSC_ErrCode _AddVkStorageEntryToStorageTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHelper,
+                                                         PROG_VK_RESOURCE_SET* pResSet,
                                                          PROG_VK_STORAGE_TABLE* pStorageTable,
                                                          VIR_SHADER_RESOURCE_ALLOC_ENTRY* pResAllocEntry,
                                                          VIR_Shader* pShader,
@@ -4383,6 +4324,7 @@ static PROG_VK_UNIFORM_BUFFER_TABLE_ENTRY* _enlargeVkUbEntryRoom(PROG_VK_UNIFORM
 }
 
 static VSC_ErrCode _AddVkUbEntryToUbTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHelper,
+                                               PROG_VK_RESOURCE_SET* pResSet,
                                                PROG_VK_UNIFORM_BUFFER_TABLE* pUbTable,
                                                VIR_SHADER_RESOURCE_ALLOC_ENTRY* pResAllocEntry,
                                                VIR_Shader* pShader,
@@ -4433,6 +4375,104 @@ static VSC_ErrCode _AddVkUbEntryToUbTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHelper
     {
         hwChannel = (((pResAllocEntry->swizzle) >> ((channel) * 2)) & 0x3);
         _SetValidChannelForHwConstantLoc(pHwDirectAddrBase, hwChannel);
+    }
+
+    return VSC_ERR_NONE;
+}
+
+static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHelper,
+                                                       PROG_VK_RESOURCE_SET* pResSet,
+                                                       PROG_VK_COMBINED_TEXTURE_SAMPLER_TABLE* pCombinedSampTexTable,
+                                                       VIR_SHADER_RESOURCE_ALLOC_ENTRY* pResAllocEntry,
+                                                       VIR_Shader* pShader,
+                                                       gctUINT stageIdx,
+                                                       SHADER_EXECUTABLE_PROFILE* pSep)
+{
+    PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY* pCombTsEntry = gcvNULL;
+    VIR_SHADER_RESOURCE_ALLOC_ENTRY*          pSampledImage = pResAllocEntry->pCombinedSampledImage;
+    gctUINT                                   i, combTsEntryIndex;
+
+    for (i = 0; i < pCombinedSampTexTable->countOfEntries; i ++)
+    {
+        if (_CheckTwoResBindingsAreSame(&pCombinedSampTexTable->pCombTsEntries[i].combTsBinding, &pResAllocEntry->resBinding))
+        {
+            pCombTsEntry = &pCombinedSampTexTable->pCombTsEntries[i];
+            break;
+        }
+    }
+
+    if (pCombTsEntry == gcvNULL)
+    {
+        pCombTsEntry = _enlargeVkCombTsEntryRoom(pCombinedSampTexTable, 1, &combTsEntryIndex);
+        memset(pCombTsEntry, 0, sizeof(PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY));
+        pCombTsEntry->combTsEntryIndex = combTsEntryIndex;
+        memcpy(&pCombTsEntry->combTsBinding, &pResAllocEntry->resBinding, sizeof(VSC_SHADER_RESOURCE_BINDING));
+    }
+
+    if (pResAllocEntry->hwRegNo != NOT_ASSIGNED)
+    {
+        pCombTsEntry->activeStageMask |= pResAllocEntry->bUse ? (1 << stageIdx) : 0;
+        pCombTsEntry->stageBits |= VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx);
+        pCombTsEntry->hwMappings[stageIdx].samplerMapping.hwSamplerSlot = pResAllocEntry->hwRegNo;
+    }
+    else
+    {
+        pCombTsEntry->hwMappings[stageIdx].samplerMapping.hwSamplerSlot = NOT_ASSIGNED;
+    }
+
+    _SetResOpBits(pShader, &pCombTsEntry->combTsBinding, &pCombTsEntry->pResOpBits);
+
+    /* Extra samplers for VSC_LIB_LINK_TYPE_RESOURCE */
+    if (pResAllocEntry->hwRegNo != NOT_ASSIGNED)
+    {
+        _AddExtraSamplerArray(&pCombTsEntry->hwMappings[stageIdx].ppExtraSamplerArray,
+                              &pCombTsEntry->combTsBinding,
+                              pShader,
+                              pSep,
+                              gcvFALSE,
+                              gcvFALSE,
+                              -1,
+                              1,
+                              0);
+    }
+
+    /* Set textureSize/lodMinMax */
+    _AddTextureSizeAndLodMinMax(pCombTsEntry->pTextureSize[stageIdx],
+                                pCombTsEntry->pLodMinMax[stageIdx],
+                                pCombTsEntry->pLevelsSamples[stageIdx],
+                                &pCombTsEntry->combTsBinding,
+                                pSep);
+
+    /*
+    ** pSampledImage is not empty means that this combined image sampler is accessed via separate sampler and sampled image shader variables,
+    ** so we add this image entry to the storage table.
+    */
+    if (pSampledImage != gcvNULL)
+    {
+        PROG_VK_SEPARATED_TEXTURE_TABLE_ENTRY*  pTextureEntry = gcvNULL;
+        PROG_VK_SEPARATED_TEXTURE_TABLE*        pSeparatedTexTable = &pResSet->separatedTexTable;
+        gctUINT                                 i;
+
+        _AddVkSeparatedTexEntryToSeparatedTexTableOfPEP(pPepGenHelper,
+                                                        pResSet,
+                                                        pSeparatedTexTable,
+                                                        pSampledImage,
+                                                        pShader,
+                                                        stageIdx,
+                                                        pSep);
+
+        for (i = 0; i < pSeparatedTexTable->countOfEntries; i ++)
+        {
+            if (_CheckTwoResBindingsAreSame(&pSeparatedTexTable->pTextureEntries[i].texBinding, &pSampledImage->resBinding))
+            {
+                pTextureEntry = &pSeparatedTexTable->pTextureEntries[i];
+                break;
+            }
+        }
+
+        gcmASSERT(pTextureEntry != gcvNULL);
+
+        pCombTsEntry->sampledImageIndexInStorageTable = i;
     }
 
     return VSC_ERR_NONE;
@@ -5105,6 +5145,7 @@ static VSC_ErrCode _CollectResourceLayoutTablesToPEP(VSC_PEP_GEN_HELPER* pPepGen
         {
         case VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER:
             errCode = _AddVkCombStEntryToCombStTableOfPEP(pPepGenHelper,
+                                                          pResSet,
                                                           &pResSet->combinedSampTexTable,
                                                           pResAllocEntry,
                                                           pShader,
@@ -5116,6 +5157,7 @@ static VSC_ErrCode _CollectResourceLayoutTablesToPEP(VSC_PEP_GEN_HELPER* pPepGen
 
         case VSC_SHADER_RESOURCE_TYPE_SAMPLER:
             errCode = _AddVkSeparatedSamplerEntryToSeparatedSamplerTableOfPEP(pPepGenHelper,
+                                                                              pResSet,
                                                                               &pResSet->separatedSamplerTable,
                                                                               pResAllocEntry,
                                                                               pShader,
@@ -5127,6 +5169,7 @@ static VSC_ErrCode _CollectResourceLayoutTablesToPEP(VSC_PEP_GEN_HELPER* pPepGen
 
         case VSC_SHADER_RESOURCE_TYPE_SAMPLED_IMAGE:
             errCode = _AddVkSeparatedTexEntryToSeparatedTexTableOfPEP(pPepGenHelper,
+                                                                      pResSet,
                                                                       &pResSet->separatedTexTable,
                                                                       pResAllocEntry,
                                                                       pShader,
@@ -5140,6 +5183,7 @@ static VSC_ErrCode _CollectResourceLayoutTablesToPEP(VSC_PEP_GEN_HELPER* pPepGen
             gcmASSERT(pResAllocEntry->hwRegNo != NOT_ASSIGNED);
 
             errCode = _AddVkUtbEntryToUniformTexBufTableOfPEP(pPepGenHelper,
+                                                              pResSet,
                                                               &pResSet->uniformTexBufTable,
                                                               pResAllocEntry,
                                                               pShader,
@@ -5153,6 +5197,7 @@ static VSC_ErrCode _CollectResourceLayoutTablesToPEP(VSC_PEP_GEN_HELPER* pPepGen
             gcmASSERT(pResAllocEntry->hwRegNo != NOT_ASSIGNED);
 
             errCode = _AddVkInputAttachmentTableOfPEP(pPepGenHelper,
+                                                      pResSet,
                                                       &pResSet->inputAttachmentTable,
                                                       pResAllocEntry,
                                                       pShader,
@@ -5169,6 +5214,7 @@ static VSC_ErrCode _CollectResourceLayoutTablesToPEP(VSC_PEP_GEN_HELPER* pPepGen
             gcmASSERT(pResAllocEntry->hwRegNo != NOT_ASSIGNED);
 
             errCode = _AddVkStorageEntryToStorageTableOfPEP(pPepGenHelper,
+                                                            pResSet,
                                                             &pResSet->storageTable,
                                                             pResAllocEntry,
                                                             pShader,
@@ -5183,6 +5229,7 @@ static VSC_ErrCode _CollectResourceLayoutTablesToPEP(VSC_PEP_GEN_HELPER* pPepGen
             gcmASSERT(pResAllocEntry->hwRegNo != NOT_ASSIGNED);
 
             errCode = _AddVkUbEntryToUbTableOfPEP(pPepGenHelper,
+                                                  pResSet,
                                                   &pResSet->uniformBufferTable,
                                                   pResAllocEntry,
                                                   pShader,

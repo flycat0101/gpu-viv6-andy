@@ -2032,15 +2032,24 @@ OnError:
     return retValue;
 }
 
-VIR_Uniform* _VIR_CG_FindResUniform(
-    IN VIR_Shader           *pShader,
-    IN VIR_UniformKind      uniformKind,
-    IN gctUINT              setNo,
-    IN gctUINT              binding,
-    IN gctUINT              arraySize)
+gctUINT _VIR_CG_FindResUniform(
+    IN VIR_Shader*                  pShader,
+    IN VIR_UniformKind              uniformKind,
+    IN VSC_SHADER_RESOURCE_BINDING* pResBinding,
+    INOUT VIR_Uniform**             ppUniformArray
+    )
 {
-    VIR_Uniform     *retUniform = gcvNULL;
-    gctUINT         i;
+    VIR_Uniform*    pRetUniform[2] = { gcvNULL, gcvNULL };
+    gctUINT         setNo = pResBinding->set;
+    gctUINT         binding = pResBinding->binding;
+    gctUINT         arraySize = pResBinding->arraySize;
+    gctUINT         i, uniformCount = 0;
+    gctBOOL         bGoThroughAllUniforms = gcvFALSE;
+
+    if (pResBinding->type == VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER)
+    {
+        bGoThroughAllUniforms = gcvTRUE;
+    }
 
     for (i = 0; i < (gctINT) VIR_IdList_Count(&pShader->uniforms); ++i)
     {
@@ -2076,12 +2085,46 @@ VIR_Uniform* _VIR_CG_FindResUniform(
             VIR_Symbol_GetBinding(sym) == binding &&
             thisArraySize == arraySize)
         {
-            retUniform = symUniform;
-            break;
+            gcmASSERT(uniformCount < 2);
+            pRetUniform[uniformCount] = symUniform;
+            uniformCount++;
+
+            if (!bGoThroughAllUniforms)
+            {
+                break;
+            }
+            if (uniformCount == 2)
+            {
+                break;
+            }
         }
     }
 
-    return retUniform;
+    /*
+    ** Make sure that:
+    ** the first element is the SAMPLER variable and the second element is the SAMPLED IMAGE variable.
+    */
+    if (pResBinding->type == VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER)
+    {
+        if (uniformCount == 2)
+        {
+            if (VIR_Symbol_isImage(VIR_Shader_GetSymFromId(pShader, VIR_Uniform_GetSymID(pRetUniform[0]))))
+            {
+                VIR_Uniform* tempUniform = pRetUniform[0];
+
+                pRetUniform[0] = pRetUniform[1];
+                pRetUniform[1] = tempUniform;
+            }
+        }
+    }
+
+    if (ppUniformArray)
+    {
+        ppUniformArray[0] = pRetUniform[0];
+        ppUniformArray[1] = pRetUniform[1];
+    }
+
+    return uniformCount;
 }
 
 static gctBOOL _VIG_CG_IsUniformPushConst(
@@ -2367,23 +2410,165 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
     for (i = 0; i < pResLayout->resourceBindingCount; i++)
     {
         VSC_SHADER_RESOURCE_BINDING resBinding = pResLayout->pResBindings[i];
-        VIR_Uniform     *pUniform = gcvNULL;
+        VIR_Uniform*    pUniformArray[2] = { gcvNULL, gcvNULL };
         VIR_UniformKind uniformKind = _VIR_CG_ResType2UniformKind(resBinding.type);
         VIR_Symbol      *pSym = gcvNULL;
         gctUINT         uniformSize = 0;
+        gctUINT         j, resCount = 0;
 
         memcpy(&pResAllocLayout->pResAllocEntries[i].resBinding, &resBinding, sizeof(VSC_SHADER_RESOURCE_BINDING));
 
-        pUniform = _VIR_CG_FindResUniform(pShader, uniformKind, resBinding.set, resBinding.binding, resBinding.arraySize);
+        /*
+        ** According to vulkan spec:
+        **      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER descriptor set entries can also be accessed via
+        **      separate sampler and sampled image shader variables.
+        ** So we may get two uniforms for a resource descriptorSet/binding pair.
+        */
+        resCount = _VIR_CG_FindResUniform(pShader, uniformKind, &resBinding, pUniformArray);
 
-        if (pUniform != gcvNULL)
+        /* allocate even if it does not appear in the shader */
+        if (resCount == 0)
         {
+            gctINT physical, shift;
+            gctUINT8 swizzle;
+
+            /* not find in the shader */
+            retValue = VIR_CG_FindUniformUse(&uniformColorMap,
+                                  VIR_TYPE_FLOAT_X4,
+                                  resBinding.arraySize,
+                                  gcvTRUE,
+                                  &physical,
+                                  &swizzle,
+                                  &shift);
+            ON_ERROR(retValue, "Failed to Allocate Uniform");
+
+            pResAllocLayout->pResAllocEntries[i].bUse = gcvFALSE;
+            pResAllocLayout->pResAllocEntries[i].hwRegNo = physical;
+            pResAllocLayout->pResAllocEntries[i].hwRegRange = resBinding.arraySize;
+            pResAllocLayout->pResAllocEntries[i].swizzle = swizzle;
+
+            continue;
+        }
+
+        /* So far only COMBINED_IMAGE_SAMPLER can map to two uniforms. */
+        if (resCount == 2)
+        {
+            gcmASSERT(resBinding.type == VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER);
+        }
+
+        /* Found, allocate all uniforms. */
+        for (j = 0; j < resCount; j++)
+        {
+            VIR_Uniform*    pUniform = pUniformArray[j];
+
+            gcmASSERT(pUniform);
+
             pSym = VIR_Shader_GetSymFromId(pShader, VIR_Uniform_GetSymID(pUniform));
             VIR_Symbol_ClrFlag(pSym, VIR_SYMFLAG_INACTIVE);
 
             switch (resBinding.type)
             {
             case VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER:
+            {
+                gctBOOL bIsSampledImage = (j == 1);
+
+                if (bIsSampledImage)
+                {
+                    /* For a sampled image, we need to allocate a image uniform for it, and we may also need to allocate a sampler for it. */
+                    gcmASSERT(VIR_Uniform_IsImageCanBeSampled(pUniform));
+
+                    if (!pHwConfig->hwFeatureFlags.supportSeparatedTex)
+                    {
+                        retValue = _VIR_CG_MapNonSamplerUniforms(pShader,
+                            pHwConfig,
+                            pUniform,
+                            gcvFALSE,
+                            &uniformColorMap,
+                            codeGenUniformBase,
+                            handleDefaultUBO,
+                            unblockUniformBlock,
+                            gcvFALSE, /* treat sampler as const */
+                            gcvTRUE, /* single uniform */
+                            gcvTRUE, /* always allocate */
+                            pMM,
+                            &uniformSize,
+                            gcvNULL);
+                        ON_ERROR(retValue, "Failed to Allocate Uniform");
+
+                        gcmASSERT(uniformSize <= resBinding.arraySize);
+                    }
+                    else
+                    {
+                        gcmASSERT(gcvFALSE);
+                    }
+                }
+                else if (VIR_Uniform_IsTreatTexelBufferAsImg(pUniform))
+                {
+                    retValue = _VIR_CG_MapNonSamplerUniforms(pShader,
+                        pHwConfig,
+                        pUniform,
+                        gcvFALSE,
+                        &uniformColorMap,
+                        codeGenUniformBase,
+                        handleDefaultUBO,
+                        unblockUniformBlock,
+                        gcvTRUE, /* treat sampler as const */
+                        gcvTRUE, /* single uniform */
+                        gcvTRUE, /* always allocate */
+                        pMM,
+                        &uniformSize,
+                        gcvNULL);
+
+                    if (VIR_Uniform_IsTreatTexelBufferAsImg(pUniform))
+                    {
+                        pResAllocLayout->pResAllocEntries[i].resFlag |= VIR_SRE_FLAG_TREAT_TEXELBUFFER_AS_IMAGE;
+                    }
+                }
+                else
+                {
+                    /* sampler allocation */
+                    retValue = _VIR_CG_MapSamplerUniforms(pShader,
+                        pHwConfig,
+                        pUniform,
+                        &uniformColorMap,
+                        codeGenUniformBase,
+                        handleDefaultUBO,
+                        unblockUniformBlock,
+                        allocateSamplerReverse,
+                        gcvTRUE, /* always allocate */
+                        maxSampler,
+                        pMM,
+                        &uniformSize,
+                        &sampler);
+                    ON_ERROR(retValue, "Failed to Allocate Uniform");
+                }
+                gcmASSERT(uniformSize <= resBinding.arraySize);
+
+                if (!bIsSampledImage)
+                {
+                    pResAllocLayout->pResAllocEntries[i].bUse = gcvTRUE;
+                    pResAllocLayout->pResAllocEntries[i].hwRegNo = pUniform->physical;
+                    pResAllocLayout->pResAllocEntries[i].hwRegRange = uniformSize;
+                    pResAllocLayout->pResAllocEntries[i].swizzle = pUniform->swizzle;
+                }
+                else
+                {
+                    pResAllocLayout->pResAllocEntries[i].pCombinedSampledImage =
+                        (VIR_SHADER_RESOURCE_ALLOC_ENTRY*)vscMM_Alloc(&pShader->pmp.mmWrapper, sizeof(VIR_SHADER_RESOURCE_ALLOC_ENTRY));
+                    memset(pResAllocLayout->pResAllocEntries[i].pCombinedSampledImage, 0, sizeof(VIR_SHADER_RESOURCE_ALLOC_ENTRY));
+
+                    memcpy(&pResAllocLayout->pResAllocEntries[i].pCombinedSampledImage->resBinding, &resBinding, sizeof(VSC_SHADER_RESOURCE_BINDING));
+
+                    pResAllocLayout->pResAllocEntries[i].pCombinedSampledImage->resBinding.type = VSC_SHADER_RESOURCE_TYPE_SAMPLED_IMAGE;
+                    pResAllocLayout->pResAllocEntries[i].pCombinedSampledImage->bUse = gcvTRUE;
+                    pResAllocLayout->pResAllocEntries[i].pCombinedSampledImage->hwRegNo = pUniform->physical;
+                    pResAllocLayout->pResAllocEntries[i].pCombinedSampledImage->hwRegRange = uniformSize;
+                    pResAllocLayout->pResAllocEntries[i].pCombinedSampledImage->swizzle = pUniform->swizzle;
+                }
+
+                break;
+            }
+
             case VSC_SHADER_RESOURCE_TYPE_UNIFORM_TEXEL_BUFFER:
             {
                 if (VIR_Uniform_IsTreatTexelBufferAsImg(pUniform))
@@ -2569,27 +2754,6 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
             default:
                 break;
             }
-        }
-        else
-        {
-            /* allocate even if it does not appear in the shader */
-            gctINT physical, shift;
-            gctUINT8 swizzle;
-
-            /* not find in the shader */
-            retValue = VIR_CG_FindUniformUse(&uniformColorMap,
-                                  VIR_TYPE_FLOAT_X4,
-                                  resBinding.arraySize,
-                                  gcvTRUE,
-                                  &physical,
-                                  &swizzle,
-                                  &shift);
-            ON_ERROR(retValue, "Failed to Allocate Uniform");
-
-            pResAllocLayout->pResAllocEntries[i].bUse = gcvFALSE;
-            pResAllocLayout->pResAllocEntries[i].hwRegNo = physical;
-            pResAllocLayout->pResAllocEntries[i].hwRegRange = resBinding.arraySize;
-            pResAllocLayout->pResAllocEntries[i].swizzle = swizzle;
         }
     }
 

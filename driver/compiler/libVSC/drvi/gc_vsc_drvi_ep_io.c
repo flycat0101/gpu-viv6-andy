@@ -1367,6 +1367,9 @@ _vscEP_Buffer_SaveVKCombinedTextureSamplerEntry(
     {
         _vscEP_Buffer_SaveVkCombTexSampHwMapping(pEPBuf, &pCombTsEntry->hwMappings[i], pCombTsEntry->combTsBinding.arraySize);
     }
+
+    /* Save the sampled image index. */
+    VSC_IO_writeUint(pIoBuf, pCombTsEntry->sampledImageIndexInStorageTable);
 }
 
 /* Save Vulkan combined texture-sampler table. */
@@ -4140,6 +4143,9 @@ _vscEP_Buffer_LoadVKCombinedTextureSamplerEntry(
     {
         ON_ERROR0(_vscEP_Buffer_LoadVkCombTexSampHwMapping(pEPBuf, &pCombTsEntry->hwMappings[i], pCombTsEntry->combTsBinding.arraySize));
     }
+
+    /* Load the sampled image index. */
+    VSC_IO_readUint(pIoBuf, &pCombTsEntry->sampledImageIndexInStorageTable);
 
 OnError:
     return errCode;
