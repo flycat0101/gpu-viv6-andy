@@ -1489,6 +1489,10 @@ VkResult halti5_setDrawID(
     __vkPipeline *pip
     );
 
+int32_t halti5_convertLocationToRenderIndex(
+    gcsHINT_PTR pHints,
+    uint32_t locationIndex
+    );
 
 #endif /* __gc_halti5_chip_h__ */
 

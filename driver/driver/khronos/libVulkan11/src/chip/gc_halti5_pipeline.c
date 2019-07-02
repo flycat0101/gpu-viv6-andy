@@ -1406,6 +1406,8 @@ static void halti5_helper_GetPsOutputSetting(
     __vkRenderPass *rdp = pip->renderPass;
     __vkRenderSubPassInfo *subPass = &rdp->subPassInfo[pip->subPass];
     halti5_graphicsPipeline *chipGfxPipeline =(halti5_graphicsPipeline *)pip->chipPriv;
+    halti5_pipeline *chipPipeline = (halti5_pipeline *)chipGfxPipeline;
+    struct _gcsHINT *hints = &chipPipeline->curInstance->hwStates.hints;
     PROG_FRAGOUT_TABLE_ENTRY *fragOutTable = chipGfxPipeline->chipPipeline.masterInstance->pep.fragOutTable.pFragOutEntries;
 
     gcmASSERT(outputMode);
@@ -1432,7 +1434,14 @@ static void halti5_helper_GetPsOutputSetting(
         __VK_VERIFY_OK(halti5_helper_convertHwPEDesc(devCtx, attachmentDesc->formatInfo->residentImgFormat, is16BitStorage, &hwPEDesc));
         while (partIndex < chipGfxPipeline->patchOutput.outputs[i].partCount)
         {
-            hwRtIndex = chipGfxPipeline->patchOutput.outputs[i].locations[partIndex];
+            hwRtIndex = halti5_convertLocationToRenderIndex(hints, chipGfxPipeline->patchOutput.outputs[i].locations[partIndex]);
+
+            if (hwRtIndex == 0xFFFFFFFF)
+            {
+                partIndex++;
+                continue;
+            }
+
             switch (hwRtIndex)
             {
             case 0:
@@ -1842,6 +1851,26 @@ static VkResult halti5_pip_emit_graphicsShaderInstance(
     return VK_SUCCESS;
 }
 
+static int32_t get_used_color_count(
+    struct _gcsHINT *hints,
+    __vkRenderSubPassInfo *subPass
+    )
+{
+    uint32_t i;
+    int32_t colorOutCount = 0;
+
+    for (i = 0; i < subPass->colorCount; i++)
+    {
+        if (hints->psOutput2RtIndex[i] != -1 && subPass->color_attachment_index[i] != VK_ATTACHMENT_UNUSED)
+        {
+            colorOutCount++;
+        }
+        __VK_ASSERT(!(hints->psOutput2RtIndex[i] != -1 && subPass->color_attachment_index[i] == VK_ATTACHMENT_UNUSED) );
+    }
+
+    return colorOutCount;
+}
+
 static VkResult halti5_pip_emit_graphicsProgram(
     __vkDevContext *devCtx,
     __vkPipeline *pip,
@@ -1882,8 +1911,9 @@ static VkResult halti5_pip_emit_graphicsProgram(
 
     chipGfxPipeline->psOutCntl4to7 = psOutCntl4to7;
 
-    colorOutCount = ((subPass->colorCount + chipGfxPipeline->patchOutput.count) != 0) ?
-        (subPass->colorCount + chipGfxPipeline->patchOutput.count - 1) : 0;
+    colorOutCount = get_used_color_count(hints, subPass);
+    colorOutCount = ((colorOutCount + chipGfxPipeline->patchOutput.count) != 0) ?
+        (colorOutCount + chipGfxPipeline->patchOutput.count - 1) : 0;
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0404, VK_FALSE,
         ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -2538,7 +2568,7 @@ static VkResult halti5_pip_emit_rt(
         __vkAttachmentDesc *attachMent;
         VkBool32 sRGB = VK_FALSE;
         HwPEDesc hwPEDesc;
-        uint32_t hwRtIndex ;
+        uint32_t hwRtIndex;
         uint32_t partIndex = 0;
         VkBool32 is16BitStorage = VK_FALSE;
 
@@ -2560,7 +2590,14 @@ static VkResult halti5_pip_emit_rt(
 
         while (partIndex < chipGfxPipeline->patchOutput.outputs[i].partCount)
         {
-            hwRtIndex = chipGfxPipeline->patchOutput.outputs[i].locations[partIndex];
+            hwRtIndex = halti5_convertLocationToRenderIndex(hints, chipGfxPipeline->patchOutput.outputs[i].locations[partIndex]);
+
+            if (hwRtIndex == 0xFFFFFFFF)
+            {
+                partIndex++;
+                continue;
+            }
+
             colorMask = halti5_helper_GetColorMask(devCtx, blendAttach[i].colorWriteMask,
                 hwPEDesc.hwFormat, attachMent->formatInfo->residentImgFormat, partIndex);
 
@@ -5643,23 +5680,7 @@ static VkResult halti5_pip_build_gfxshaders(
                         if ((privOutputMapping->pPrivOutputEntries[k].commonPrivm.privmKind & VSC_LIB_LINK_TYPE_COLOR_OUTPUT)
                             && (*(gctUINT*)privOutputMapping->pPrivOutputEntries[k].commonPrivm.pPrivateData == chipGfxPipeline->patchOutput.outputs[j].locations[0]))
                         {
-                            uint32_t i;
-                            VkBool32 found = gcvFALSE;
-
-                            for (i = 0; i < gcdMAX_DRAW_BUFFERS; i++)
-                            {
-                                if (hints->psOutput2RtIndex[i] == (gctINT32)privOutputMapping->pPrivOutputEntries[k].pOutput->ioIndex)
-                                {
-                                    chipGfxPipeline->patchOutput.outputs[j].locations[1] = i;
-                                    found = gcvTRUE;
-                                    break;
-                                }
-                            }
-
-                            if (found)
-                            {
-                                break;
-                            }
+                            chipGfxPipeline->patchOutput.outputs[j].locations[1] = privOutputMapping->pPrivOutputEntries[k].pOutput->ioIndex;
                         }
                     }
                     patchMask &= ~(1 << j);

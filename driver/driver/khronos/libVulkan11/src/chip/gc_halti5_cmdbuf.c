@@ -5031,6 +5031,8 @@ VkResult halti5_setRenderTargets(
 #endif
     const gcsFEATURE_DATABASE *database = devCtx->database;
     halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
+    halti5_pipeline *chipPipeline = (halti5_pipeline *)pip->chipPriv;
+    struct _gcsHINT *hints = &chipPipeline->curInstance->hwStates.hints;
     PROG_FRAGOUT_TABLE_ENTRY *fragOutTable = chipGfxPipeline->chipPipeline.masterInstance->pep.fragOutTable.pFragOutEntries;
     uint32_t tileMode = 0;
 #if __VK_ENABLETS
@@ -5041,7 +5043,7 @@ VkResult halti5_setRenderTargets(
     for (i = 0; i < subPass->colorCount; i++)
     {
         halti5_imageView *chipImgv;
-        uint32_t hwRtIndex ;
+        uint32_t hwRtIndex;
         uint32_t partIndex = 0;
 
         if (subPass->color_attachment_index[i] == VK_ATTACHMENT_UNUSED)
@@ -5088,7 +5090,13 @@ VkResult halti5_setRenderTargets(
 
         while (partIndex < chipGfxPipeline->patchOutput.outputs[i].partCount)
         {
-            hwRtIndex = chipGfxPipeline->patchOutput.outputs[i].locations[partIndex];
+            hwRtIndex = halti5_convertLocationToRenderIndex(hints, chipGfxPipeline->patchOutput.outputs[i].locations[partIndex]);
+
+            if (hwRtIndex == 0xFFFFFFFF)
+            {
+                partIndex++;
+                continue;
+            }
 
             rtBaseAddr = rtImage->memory->devAddr;
             rtBaseAddr += (uint32_t)(rtImage->memOffset
@@ -12751,5 +12759,29 @@ VkResult halti5_setDrawID(
 
     return VK_SUCCESS;
 }
+
+int32_t halti5_convertLocationToRenderIndex(
+    gcsHINT_PTR pHints,
+    uint32_t locationIndex
+    )
+{
+    uint32_t i;
+    int32_t  hwRtIndex = 0;
+
+    for (i = 0; i < gcdMAX_DRAW_BUFFERS; i++)
+    {
+        if (pHints->psOutput2RtIndex[i] != -1)
+        {
+            if ((uint32_t)pHints->psOutput2RtIndex[i] == locationIndex)
+            {
+                return hwRtIndex;
+            }
+            hwRtIndex++;
+        }
+    }
+
+    return -1;
+}
+
 
 
