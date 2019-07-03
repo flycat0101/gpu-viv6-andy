@@ -2123,6 +2123,9 @@ gcoBUFFER_Destroy(
             gcvNULL, commitWorker->workerThread
             ));
 
+            gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL, commitWorker->stopSignal));
+            gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL, commitWorker->startSignal));
+
             gcmVERIFY_OK(gcoOS_Free(gcvNULL, commitWorker));
 
             Buffer->hal->commitWorker = gcvNULL;
