@@ -1718,8 +1718,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceFeatures2(
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES:
             {
                 VkPhysicalDeviceMultiviewFeatures * phyDevMulViewFeatures = (VkPhysicalDeviceMultiviewFeatures *)extFeature;
-                phyDevMulViewFeatures->multiview = VK_FALSE;
-                phyDevMulViewFeatures->multiviewGeometryShader = VK_FALSE;;
+                phyDevMulViewFeatures->multiview = VK_TRUE;
+                phyDevMulViewFeatures->multiviewGeometryShader = VK_FALSE;
                 phyDevMulViewFeatures->multiviewTessellationShader = VK_FALSE;
                 extFeature = (uint32_t *)phyDevMulViewFeatures->pNext;
             }

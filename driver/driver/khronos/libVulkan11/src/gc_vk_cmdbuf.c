@@ -1387,6 +1387,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdResolveImage(
     __vkImage *pDstImage = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, dstImage);
     __vkDevContext *devCtx = ((__vkCommandBuffer*)commandBuffer)->devCtx;
     VkResult result = VK_SUCCESS;
+    VkBool32 rawCopy = VK_FALSE;
 
     for (ir = 0; ir < regionCount; ++ir)
     {
@@ -1409,6 +1410,14 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdResolveImage(
         dstRes.u.img.subRes.arrayLayer = pRegions[ir].dstSubresource.baseArrayLayer;
         dstRes.u.img.offset            = pRegions[ir].dstOffset;
         dstRes.u.img.extent            = pRegions[ir].extent;
+
+        /*if srcImg's format greater than 64bpp and srcImg's sampleCount not equal dstImg's sampleCount,
+        need enable rawCopy to go computeBlit path.*/
+        if (pSrcImage->formatInfo.bitsPerBlock >= 64 &&
+            pSrcImage->createInfo.samples != pDstImage->createInfo.samples)
+        {
+            rawCopy = VK_TRUE;
+        }
 
         if (pSrcImage->createInfo.imageType == VK_IMAGE_TYPE_3D)
         {
@@ -1441,7 +1450,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdResolveImage(
                 commandBuffer,
                 &srcRes,
                 &dstRes,
-                VK_FALSE,
+                rawCopy,
                 VK_FILTER_NEAREST,
                 VK_TRUE
                 ));
