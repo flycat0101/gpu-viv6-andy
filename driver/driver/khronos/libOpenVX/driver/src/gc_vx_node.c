@@ -798,6 +798,13 @@ VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx
         }
     }
 
+    if (node->graph->verified && node->paramTable[index]->type == VX_TYPE_TENSOR)
+    {
+        vx_tensor tensor = (vx_tensor)node->paramTable[index];
+        vxmASSERT(!vxoTensor_IsVirtualTensor(tensor));
+        vxoTensor_AllocateMemory(tensor);
+    }
+
     /* update binary graph node parameters to support multiple input/output buffers
        this is for importing binary graph */
     if (node->kernel->enumeration == VX_KERNEL_IMPORT_FROM_FILE)
