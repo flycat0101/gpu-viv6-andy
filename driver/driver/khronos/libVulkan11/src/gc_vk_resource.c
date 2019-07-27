@@ -1608,8 +1608,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_MapMemory(
                     gcvDUMP_BUFFER_VERIFY,
                     dvm->devAddr,
                     dvm->hostAddr,
-                    dvm->mappedOffset,
-                    dvm->mappedSize);
+                    (gctSIZE_T)dvm->mappedOffset,
+                    (gctSIZE_T)dvm->mappedSize);
 
     return VK_SUCCESS;
 }
@@ -1626,8 +1626,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_UnmapMemory(
                    gcvDUMP_BUFFER_MEMORY,
                    dvm->devAddr,
                    dvm->hostAddr,
-                   (gctUINT)dvm->mappedOffset,
-                   (gctUINT)dvm->mappedSize);
+                   (gctSIZE_T)dvm->mappedOffset,
+                   (gctSIZE_T)dvm->mappedSize);
 
     dvm->mappedOffset = 0;
     dvm->mappedSize = 0;
@@ -1648,8 +1648,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_FlushMappedMemoryRanges(
                     gcvDUMP_BUFFER_MEMORY,
                     dvm->devAddr,
                     dvm->hostAddr,
-                    pMemRanges->offset,
-                    pMemRanges->size);
+                    (gctSIZE_T)pMemRanges->offset,
+                    (gctSIZE_T)pMemRanges->size);
 #endif
     return VK_SUCCESS;
 }
@@ -1668,8 +1668,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_InvalidateMappedMemoryRanges(
                     gcvDUMP_BUFFER_VERIFY,
                     dvm->devAddr,
                     dvm->hostAddr,
-                    pMemRanges->offset,
-                    pMemRanges->size);
+                    (gctSIZE_T)pMemRanges->offset,
+                    (gctSIZE_T)pMemRanges->size);
 #endif
     return VK_SUCCESS;
 }

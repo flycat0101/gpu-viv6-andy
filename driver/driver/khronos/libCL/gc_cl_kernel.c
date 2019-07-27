@@ -3845,7 +3845,7 @@ clfFlushVIRKernelResource(
             case SHS_PRIV_CONSTANT_KIND_LOCAL_SIZE:
                 localWorkSize[0] = NDRangeKernel->localWorkSize[0] ? NDRangeKernel->localWorkSize[0] : 1;
                 localWorkSize[1] = NDRangeKernel->localWorkSize[1] ? NDRangeKernel->localWorkSize[1] : 1;
-                localWorkSize[2] = NDRangeKernel->localWorkSize[2] ? NDRangeKernel->localWorkSize[1] : 1;
+                localWorkSize[2] = NDRangeKernel->localWorkSize[2] ? NDRangeKernel->localWorkSize[2] : 1;
                 data = (gctPOINTER)localWorkSize;
                 Columns = 3;
                 break;
